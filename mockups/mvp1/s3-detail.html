@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="FR-REC-030" data-domain="recommend">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>팝콘PC AI · 부품 상세 및 교체 (S3 목업)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+  --error:#C0392B; --on-error:#ffffff;
+  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-xl:1.5rem; --r-full:9999px;
+  --xs:4px; --sm:8px; --md:16px; --lg:24px; --xl:32px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+.num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font-family:inherit;cursor:pointer}
+h1,h2,h3,h4{font-family:var(--font-head)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── Top bar ── */
+.topbar{position:fixed;top:0;left:0;right:0;height:64px;z-index:50;background:var(--card);
+  border-bottom:1px solid var(--outline-variant);display:flex;align-items:center;gap:var(--md);padding:0 var(--lg)}
+.brand{font-family:var(--font-head);font-weight:800;color:var(--primary);font-size:20px;letter-spacing:-.02em}
+.divider{width:1px;height:22px;background:var(--outline-variant)}
+.topbar__title{font-family:var(--font-head);font-size:14px;font-weight:700}
+.topbar__spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  color:var(--primary);background:rgba(101,161,212,.12);padding:5px 12px;border-radius:var(--r-full)}
+.pill--error{color:var(--error);background:rgba(192,57,43,.10)}
+@media(max-width:900px){
+  .topbar{gap:var(--sm);padding:0 var(--md)}
+  .brand{font-size:16px}
+  .divider,.topbar__title{display:none}
+}
+
+/* ── Composer bar (상시 대화 바) ── */
+.composer-bar{position:fixed;top:64px;left:0;right:0;z-index:40;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--outline-variant);padding:var(--md) var(--lg)}
+.composer-bar__inner{max-width:1200px;margin:0 auto;position:relative}
+.composer-bar textarea{width:100%;height:54px;padding:14px 56px 14px var(--lg);border:2px solid var(--outline-variant);
+  border-radius:var(--r-xl);font-family:inherit;font-size:16px;resize:none;background:var(--card)}
+.composer-bar textarea:focus{outline:none;border-color:var(--primary)}
+.composer-bar__send{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:40px;height:40px;
+  background:var(--primary);color:#fff;border:0;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;transition:.15s}
+.composer-bar__send:hover{background:var(--primary-bright)}
+
+/* ── Layout ── */
+main{flex:1;padding:184px 0 128px;max-width:1200px;width:100%;margin:0 auto;display:flex;gap:var(--lg);padding-left:var(--lg);padding-right:var(--lg)}
+.col-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--lg)}
+.col-right{width:360px;flex:none}
+.aside__sticky{position:sticky;top:200px;display:flex;flex-direction:column;gap:var(--md)}
+@media(max-width:900px){main{flex-direction:column;padding-top:196px}.col-right{width:100%}.aside__sticky{position:static}}
+
+/* ── Page header ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;gap:var(--md);flex-wrap:wrap}
+.page-header h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.status-badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;
+  color:var(--primary);background:rgba(101,161,212,.12);border:1px solid rgba(101,161,212,.28);padding:7px 14px;border-radius:var(--r-full)}
+.status-badge .dot{width:9px;height:9px;border-radius:50%;background:var(--primary)}
+.status-badge--error{color:var(--error);background:rgba(192,57,43,.10);border-color:rgba(192,57,43,.28)}
+.status-badge--error .dot{background:var(--error)}
+
+/* ── Price summary ── */
+.price-summary{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-xl);padding:var(--md) var(--lg);
+  display:flex;align-items:baseline;gap:12px;box-shadow:var(--shadow);flex-wrap:wrap}
+.price-summary__label{font-size:13px;color:var(--on-variant);font-weight:600}
+.price-summary__total{font-family:var(--font-head);font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.02em}
+.price-summary__asof{font-size:12px;color:var(--on-variant);margin-left:auto}
+
+/* ── Component cards ── */
+.parts-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--md)}
+@media(max-width:560px){.parts-grid{grid-template-columns:1fr}}
+.part-card{position:relative;background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);
+  padding:var(--md);box-shadow:var(--shadow);transition:.15s;display:flex;flex-direction:column;gap:var(--md)}
+.part-card:hover{border-color:var(--primary-bright)}
+.part-card__alt-count{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;color:var(--tertiary);
+  background:var(--tertiary-container);padding:4px 10px;border-radius:var(--r-full)}
+.part-card__top{display:flex;gap:var(--md)}
+.part-card__img{width:64px;height:64px;border-radius:var(--r-md);background:var(--container);color:var(--primary);flex:none;display:flex;align-items:center;justify-content:center;font-size:30px}
+.part-card__kind{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--on-variant)}
+.part-card__name{font-family:var(--font-head);font-size:16px;font-weight:700;line-height:1.3;margin:2px 0 4px}
+.part-card__price{font-size:14px;font-weight:700;color:var(--secondary)}
+.part-card__swap{width:100%;border:1px solid var(--outline-variant);background:var(--container-low);color:var(--on);
+  padding:9px;border-radius:var(--r);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.part-card__swap:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ── Alternatives panel ── */
+.alternatives{background:var(--container-low);border:2px solid rgba(101,161,212,.30);border-radius:var(--r-xl);padding:var(--lg);box-shadow:var(--shadow);animation:rise .3s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.alternatives__head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--md);margin-bottom:var(--md)}
+.alternatives__head h3{font-size:17px;font-weight:800}
+.alternatives__cap{font-size:13px;color:var(--on-variant);display:flex;align-items:center;gap:6px;margin-top:2px}
+.alternatives__cap .ico{color:var(--primary)}
+.alternatives__close{border:0;background:transparent;color:var(--on-variant);padding:4px}
+.alt-item{display:flex;align-items:center;gap:var(--md);background:var(--card);border:1px solid var(--outline-variant);
+  border-radius:var(--r-md);padding:var(--md);transition:.15s}
+.alt-item+.alt-item{margin-top:var(--sm)}
+.alt-item:hover{border-color:var(--primary)}
+.alt-item__img{width:52px;height:52px;border-radius:var(--r);background:var(--container);color:var(--primary);flex:none;display:flex;align-items:center;justify-content:center;font-size:26px}
+.alt-item__body{flex:1;min-width:0}
+.alt-item__name{font-family:var(--font-head);font-size:15px;font-weight:700}
+.alt-item__perf{font-size:12px;color:var(--on-variant)}
+.alt-item__compat{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--primary);margin-top:2px}
+.alt-item__right{text-align:right;flex:none}
+.alt-item__delta{font-size:14px;font-weight:700;color:var(--tertiary);font-family:var(--font-head)}
+.alt-item__apply{margin-top:6px;background:var(--primary);color:#fff;border:0;padding:6px 14px;border-radius:var(--r-full);font-size:13px;font-weight:700;transition:.15s}
+.alt-item__apply:hover{background:var(--primary-bright)}
+.alternatives__empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:var(--lg);
+  border:1px dashed var(--outline-variant);border-radius:var(--r-md);color:var(--on-variant)}
+.alternatives__empty .ico{font-size:28px;color:var(--outline)}
+
+/* ── Chain swap ── */
+.chain{background:var(--card);border:1px solid rgba(192,57,43,.35);border-left:4px solid var(--error);border-radius:var(--r-lg);padding:var(--lg);box-shadow:var(--shadow);animation:rise .3s ease-out}
+.chain__head{display:flex;align-items:center;gap:8px;color:var(--error);font-weight:800;font-size:16px;margin-bottom:6px}
+.chain__reason{font-size:14px;color:var(--on-variant);margin-bottom:var(--md)}
+.chain__opts{display:flex;flex-direction:column;gap:var(--sm);margin-bottom:var(--md)}
+.chain__opt{display:flex;align-items:center;gap:var(--md);padding:var(--md);border:1px solid var(--outline-variant);border-radius:var(--r-md);cursor:pointer;transition:.15s}
+.chain__opt:hover{border-color:var(--primary);background:var(--container-low)}
+.chain__opt input{width:18px;height:18px;accent-color:var(--primary);flex:none}
+.chain__opt-body{flex:1}
+.chain__opt-name{font-weight:700;font-size:14px}
+.chain__opt-sub{font-size:12px;color:var(--on-variant)}
+.chain__opt-delta{font-family:var(--font-head);font-weight:700;color:var(--tertiary)}
+.chain__apply{width:100%;background:var(--primary);color:#fff;border:0;padding:12px;border-radius:var(--r);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s}
+.chain__apply:hover{background:var(--primary-bright)}
+.chain__cap{font-size:12px;color:var(--on-variant);text-align:center;margin-top:8px}
+
+/* ── Compat panel ── */
+.panel{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-xl);padding:var(--lg);box-shadow:var(--shadow)}
+.panel__head{display:flex;align-items:center;gap:8px;margin-bottom:var(--md)}
+.panel__head h2{font-size:15px;font-weight:700;color:var(--on)}
+.panel__head .ico{color:var(--primary)}
+.compat-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--container-low)}
+.compat-row:last-child{border-bottom:0}
+.compat-row__label{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.compat-row__label .ico{color:var(--tertiary)}
+.compat-row__state{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--primary)}
+.compat-row--error .compat-row__state{color:var(--error)}
+.compat-status{margin-top:var(--md);padding:12px var(--md);border-radius:var(--r-md);display:flex;align-items:center;gap:8px;
+  font-size:14px;font-weight:700;background:rgba(101,161,212,.10);color:var(--primary)}
+.compat-status .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.compat-status--error{background:rgba(192,57,43,.10);color:var(--error)}
+
+/* tip */
+.tip{background:rgba(101,161,212,.07);border:1px solid rgba(101,161,212,.16);border-radius:var(--r-xl);padding:var(--md)}
+.tip__label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--tertiary);margin-bottom:4px}
+.tip p{font-size:13px;color:var(--on-variant)}
+
+/* ── Sticky CTA ── */
+.cta{position:fixed;bottom:0;left:0;right:0;z-index:45;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+  border-top:1px solid var(--outline-variant);padding:var(--md) var(--lg)}
+.cta__inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:var(--lg);flex-wrap:wrap}
+.cta__price{display:flex;flex-direction:column}
+.cta__price small{font-size:11px;color:var(--on-variant);font-weight:600}
+.cta__price b{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--primary)}
+.cta__actions{margin-left:auto;display:flex;gap:var(--md);align-items:center}
+.cta__lockcap{font-size:12px;color:var(--error);display:flex;align-items:center;gap:5px;max-width:220px}
+.btn{padding:12px 22px;border-radius:var(--r-lg);font-weight:700;font-size:15px;border:1px solid transparent;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+.btn--ghost{background:var(--container-low);border-color:var(--outline-variant);color:var(--on)}
+.btn--ghost:hover{background:var(--container)}
+.btn--primary{background:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(101,161,212,.30)}
+.btn--primary:hover{background:var(--primary-bright)}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;pointer-events:none}
+@media(max-width:900px){.cta__actions{width:100%;margin-left:0}.btn{flex:1;justify-content:center}}
+
+/* ── Loading / toast ── */
+.loading{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center}
+.loading.show{display:flex}
+.loading__scrim{position:absolute;inset:0;background:rgba(33,45,81,.35);backdrop-filter:blur(3px)}
+.loading__box{position:relative;background:var(--card);border-radius:var(--r-xl);padding:var(--xl);text-align:center;box-shadow:var(--shadow)}
+.spin{width:44px;height:44px;border:4px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite;margin:0 auto var(--md)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:120px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;
+  font-size:13px;padding:10px 18px;border-radius:var(--r);opacity:0;pointer-events:none;transition:.25s;z-index:90}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ═══ SVG 아이콘 심볼 (단색 currentColor) ═══ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="8" cy="12" r="2.5"/><path d="M14 12h5"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 16v3M10 16v3M14 16v3M18 16v3"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 8h2M16 12h2M7 16h10"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z"/></symbol>
+  <symbol id="i-cool" viewBox="0 0 24 24"><path d="M12 2v20M4.2 5.2 19.8 18.8M19.8 5.2 4.2 18.8M2 12h20"/></symbol>
+  <symbol id="i-case" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 6h6M9 10h6"/></symbol>
+  <symbol id="i-tip" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7c-.6.5-1 1.3-1 2.1H9c0-.8-.4-1.6-1-2.1A7 7 0 0 1 12 2Z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L23 6H5.1"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+</svg>
+
+<!-- ═══ Top bar ═══ -->
+<header class="topbar">
+  <span class="brand">팝콘PC AI</span>
+  <span class="divider"></span>
+  <span class="topbar__title">부품 상세 및 교체</span>
+  <div class="topbar__spacer"></div>
+  <!-- 종합 호환상태 배지 (헤더용 축약) -->
+  <span class="pill" id="topStatus"><svg class="ico"><use href="#i-check"/></svg><span data-bind="overall_status">호환 5종 통과</span></span>
+</header>
+
+<!-- ═══ 상단 상시 대화 바 ═══ -->
+<div class="composer-bar">
+  <div class="composer-bar__inner">
+    <label for="refine" class="num" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">자연어 교체 요청</label>
+    <textarea id="refine" placeholder="바꾸고 싶은 부품을 말로도 요청하세요. 예) 그래픽카드 한 단계 높여줘 / 파워 조용한 걸로"></textarea>
+    <button class="composer-bar__send" data-action="refine-request" aria-label="교체 요청 보내기"><svg class="ico" style="font-size:22px"><use href="#i-send"/></svg></button>
+  </div>
+</div>
+
+<main>
+  <!-- ═══ 좌: 현재 구성 ═══ -->
+  <section class="col-left">
+    <div class="page-header">
+      <h1>부품 상세 및 교체</h1>
+      <!-- 종합 호환상태 배지 (정상/위험 텍스트 병기) -->
+      <span class="status-badge" id="pageStatus" aria-live="polite">
+        <span class="dot"></span><span data-bind="overall_status_full">조립 가능 — 호환 5종 통과</span>
+      </span>
+    </div>
+
+    <!-- 총액 요약 -->
+    <div class="price-summary">
+      <span class="price-summary__label">현재 구성 총액</span>
+      <span class="price-summary__total num" id="totalPrice" data-bind="total_price">4,769,000원</span>
+      <span class="price-summary__asof" data-bind="price_asof">3시간 전 재고가 기준</span>
+    </div>
+
+    <!-- 현재 구성 리스트 -->
+    <div class="parts-grid" data-repeat="components">
+      <!-- CPU -->
+      <article class="part-card" data-part="cpu">
+        <span class="part-card__alt-count">안전 대안 <span data-bind="alt_count">12</span>개</span>
+        <div class="part-card__top">
+          <span class="part-card__img" role="img" aria-label="Intel Core i9-14900K 프로세서"><svg class="ico"><use href="#i-cpu"/></svg></span>
+          <div>
+            <p class="part-card__kind">CPU</p>
+            <h3 class="part-card__name" data-bind-item>Intel Core i9-14900K</h3>
+            <p class="part-card__price num">849,000원</p>
+          </div>
+        </div>
+        <button class="part-card__swap" data-action="swap-part" data-part="cpu"><svg class="ico"><use href="#i-swap"/></svg>변경</button>
+      </article>
+      <!-- GPU -->
+      <article class="part-card" data-part="gpu">
+        <span class="part-card__alt-count">안전 대안 <span data-bind="alt_count">8</span>개</span>
+        <div class="part-card__top">
+          <span class="part-card__img" role="img" aria-label="NVIDIA RTX 4070 Ti 그래픽카드"><svg class="ico"><use href="#i-gpu"/></svg></span>
+          <div>
+            <p class="part-card__kind">GPU</p>
+            <h3 class="part-card__name" data-bind-item>NVIDIA RTX 4070 Ti</h3>
+            <p class="part-card__price num">1,190,000원</p>
+          </div>
+        </div>
+        <button class="part-card__swap" data-action="swap-part" data-part="gpu"><svg class="ico"><use href="#i-swap"/></svg>변경</button>
+      </article>
+      <!-- RAM -->
+      <article class="part-card" data-part="ram">
+        <span class="part-card__alt-count">안전 대안 <span data-bind="alt_count">24</span>개</span>
+        <div class="part-card__top">
+          <span class="part-card__img" role="img" aria-label="DDR5 32GB 메모리 모듈"><svg class="ico"><use href="#i-ram"/></svg></span>
+          <div>
+            <p class="part-card__kind">RAM</p>
+            <h3 class="part-card__name" data-bind-item>DDR5 32GB (16GB x2)</h3>
+            <p class="part-card__price num">185,000원</p>
+          </div>
+        </div>
+        <button class="part-card__swap" data-action="swap-part" data-part="ram"><svg class="ico"><use href="#i-swap"/></svg>변경</button>
+      </article>
+      <!-- 메인보드 -->
+      <article class="part-card" data-part="board">
+        <span class="part-card__alt-count">안전 대안 <span data-bind="alt_count">5</span>개</span>
+        <div class="part-card__top">
+          <span class="part-card__img" role="img" aria-label="ASUS ROG Z790-F 메인보드"><svg class="ico"><use href="#i-board"/></svg></span>
+          <div>
+            <p class="part-card__kind">메인보드</p>
+            <h3 class="part-card__name" data-bind-item>ASUS ROG Z790-F</h3>
+            <p class="part-card__price num">520,000원</p>
+          </div>
+        </div>
+        <button class="part-card__swap" data-action="swap-part" data-part="board"><svg class="ico"><use href="#i-swap"/></svg>변경</button>
+      </article>
+      <!-- 파워 -->
+      <article class="part-card" data-part="power">
+        <span class="part-card__alt-count">안전 대안 <span data-bind="alt_count">14</span>개</span>
+        <div class="part-card__top">
+          <span class="part-card__img" role="img" aria-label="시소닉 750W 80PLUS 골드 파워 서플라이"><svg class="ico"><use href="#i-power"/></svg></span>
+          <div>
+            <p class="part-card__kind">파워</p>
+            <h3 class="part-card__name" data-bind-item id="powerName">시소닉 FOCUS 750W 골드</h3>
+            <p class="part-card__price num" id="powerPrice">135,000원</p>
+          </div>
+        </div>
+        <button class="part-card__swap" data-action="swap-part" data-part="power"><svg class="ico"><use href="#i-swap"/></svg>변경</button>
+      </article>
+      <!-- 케이스 -->
+      <article class="part-card" data-part="case">
+        <span class="part-card__alt-count">안전 대안 <span data-bind="alt_count">19</span>개</span>
+        <div class="part-card__top">
+          <span class="part-card__img" role="img" aria-label="NZXT H5 Flow 미들타워 케이스"><svg class="ico"><use href="#i-case"/></svg></span>
+          <div>
+            <p class="part-card__kind">케이스</p>
+            <h3 class="part-card__name" data-bind-item>NZXT H5 Flow</h3>
+            <p class="part-card__price num">109,000원</p>
+          </div>
+        </div>
+        <button class="part-card__swap" data-action="swap-part" data-part="case"><svg class="ico"><use href="#i-swap"/></svg>변경</button>
+      </article>
+    </div>
+
+    <!-- ═══ 안전 대안 패널 (hidden, swap-part로 노출) ═══ -->
+    <section class="alternatives" id="altPanel" hidden aria-label="안전 대안 목록">
+      <div class="alternatives__head">
+        <div>
+          <h3>호환 가능한 대안 — <span id="altKind">그래픽카드</span></h3>
+          <p class="alternatives__cap"><svg class="ico"><use href="#i-shield"/></svg>현 구성과 <b>호환 5종 100% 통과</b>한 제품만 보여드립니다.</p>
+        </div>
+        <button class="alternatives__close" data-action="close-alternatives" aria-label="대안 닫기"><svg class="ico" style="font-size:20px"><use href="#i-x"/></svg></button>
+      </div>
+
+      <!-- 대안 목록 (모두 100% 통과) -->
+      <div id="altList" data-repeat="alternatives">
+        <div class="alt-item">
+          <span class="alt-item__img" role="img" aria-label="NVIDIA RTX 4080 SUPER 그래픽카드"><svg class="ico"><use href="#i-gpu"/></svg></span>
+          <div class="alt-item__body">
+            <p class="alt-item__name">NVIDIA RTX 4080 SUPER</p>
+            <p class="alt-item__perf">성능 약 +28% · 현재 파워로 조립 가능</p>
+            <span class="alt-item__compat"><svg class="ico"><use href="#i-check"/></svg>호환 5종 통과</span>
+          </div>
+          <div class="alt-item__right">
+            <p class="alt-item__delta num">+520,000원</p>
+            <button class="alt-item__apply" data-action="apply-alternative" data-code="376681" data-part="gpu">적용</button>
+          </div>
+        </div>
+        <div class="alt-item">
+          <span class="alt-item__img" role="img" aria-label="NVIDIA RTX 4070 그래픽카드"><svg class="ico"><use href="#i-gpu"/></svg></span>
+          <div class="alt-item__body">
+            <p class="alt-item__name">NVIDIA RTX 4070</p>
+            <p class="alt-item__perf">성능 약 -14% · 현재 파워로 조립 가능</p>
+            <span class="alt-item__compat"><svg class="ico"><use href="#i-check"/></svg>호환 5종 통과</span>
+          </div>
+          <div class="alt-item__right">
+            <p class="alt-item__delta num">-260,000원</p>
+            <button class="alt-item__apply" data-action="apply-alternative" data-code="376682" data-part="gpu">적용</button>
+          </div>
+        </div>
+        <!-- 연쇄 스왑을 유발하는 대안: 그래도 GPU 자체는 호환 통과, 파워만 함께 교체 필요 -->
+        <div class="alt-item">
+          <span class="alt-item__img" role="img" aria-label="NVIDIA RTX 4090 그래픽카드"><svg class="ico"><use href="#i-gpu"/></svg></span>
+          <div class="alt-item__body">
+            <p class="alt-item__name">NVIDIA RTX 4090</p>
+            <p class="alt-item__perf">성능 약 +52% · 파워 함께 교체 필요(연쇄)</p>
+            <span class="alt-item__compat"><svg class="ico"><use href="#i-check"/></svg>파워 동시 교체 시 통과</span>
+          </div>
+          <div class="alt-item__right">
+            <p class="alt-item__delta num">+1,460,000원</p>
+            <button class="alt-item__apply" data-action="apply-alternative" data-code="376683" data-part="gpu" data-chain="1">적용</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 대안 없음 (hidden) -->
+      <div class="alternatives__empty" id="altEmpty" hidden>
+        <svg class="ico"><use href="#i-search"/></svg>
+        <p>지금 구성과 호환되는 안전한 대안이 없어요.</p>
+        <p style="font-size:12px">사유: 이 등급에서 소켓·규격을 모두 만족하는 재고가 현재 0개입니다.</p>
+      </div>
+
+      <!-- 스왑 후 품절 (hidden) -->
+      <div class="alternatives__empty" id="swapSoldout" hidden>
+        <svg class="ico" style="color:var(--error)"><use href="#i-alert"/></svg>
+        <p>방금 그 대안이 품절됐어요. 다른 안전 대안을 다시 불러올게요.</p>
+      </div>
+    </section>
+
+    <!-- ═══ 연쇄 스왑 안내 (hidden) ═══ -->
+    <section class="chain" id="chainPanel" hidden aria-live="polite" aria-label="연쇄 변경 안내">
+      <div class="chain__head"><svg class="ico" style="font-size:20px"><use href="#i-alert"/></svg>연쇄 변경이 필요합니다</div>
+      <p class="chain__reason" data-bind="chain_reason">이 그래픽카드(RTX 4090)를 쓰려면 파워를 1000W 이상 등급으로 함께 바꿔야 조립이 가능합니다. 현재 750W는 정격 마진이 부족합니다.</p>
+      <div class="chain__opts" data-repeat="chain_options" role="radiogroup" aria-label="함께 교체할 파워 선택">
+        <label class="chain__opt">
+          <input type="radio" name="chainPower" value="ssr-1000" checked>
+          <span class="chain__opt-body"><span class="chain__opt-name">시소닉 PRIME 1000W 골드</span><span class="chain__opt-sub">정격 마진 +38% 확보 · 조용함</span></span>
+          <span class="chain__opt-delta num">+95,000원</span>
+        </label>
+        <label class="chain__opt">
+          <input type="radio" name="chainPower" value="corsair-1000">
+          <span class="chain__opt-body"><span class="chain__opt-name">Corsair RM1000e</span><span class="chain__opt-sub">정격 마진 +35% 확보</span></span>
+          <span class="chain__opt-delta num">+80,000원</span>
+        </label>
+      </div>
+      <button class="chain__apply" data-action="apply-chain-swap"><svg class="ico"><use href="#i-swap"/></svg>연쇄 변경하고 계속하기</button>
+      <p class="chain__cap">승인하시면 파워가 자동으로 함께 교체되고, 위험 상태가 해제됩니다.</p>
+    </section>
+  </section>
+
+  <!-- ═══ 우: 호환성 재검증 ═══ -->
+  <aside class="col-right">
+    <div class="aside__sticky">
+      <div class="panel">
+        <div class="panel__head"><svg class="ico"><use href="#i-shield"/></svg><h2>호환성 5종 실시간 재검증</h2></div>
+        <div data-repeat="compat_matrix">
+          <div class="compat-row" data-check="socket">
+            <span class="compat-row__label"><svg class="ico"><use href="#i-cpu"/></svg>CPU 소켓</span>
+            <span class="compat-row__state"><svg class="ico"><use href="#i-check"/></svg>정상</span>
+          </div>
+          <div class="compat-row" data-check="memory">
+            <span class="compat-row__label"><svg class="ico"><use href="#i-ram"/></svg>메모리 규격</span>
+            <span class="compat-row__state"><svg class="ico"><use href="#i-check"/></svg>정상</span>
+          </div>
+          <div class="compat-row" data-check="power" id="rowPower">
+            <span class="compat-row__label"><svg class="ico"><use href="#i-power"/></svg>파워 정격 마진</span>
+            <span class="compat-row__state" id="rowPowerState"><svg class="ico"><use href="#i-check"/></svg>정상 (+34%)</span>
+          </div>
+          <div class="compat-row" data-check="cooler">
+            <span class="compat-row__label"><svg class="ico"><use href="#i-cool"/></svg>쿨러 TDP</span>
+            <span class="compat-row__state"><svg class="ico"><use href="#i-check"/></svg>정상</span>
+          </div>
+          <div class="compat-row" data-check="case">
+            <span class="compat-row__label"><svg class="ico"><use href="#i-case"/></svg>케이스 실장</span>
+            <span class="compat-row__state"><svg class="ico"><use href="#i-check"/></svg>정상</span>
+          </div>
+        </div>
+        <!-- 종합 상태 인디케이터 -->
+        <div class="compat-status" id="compatStatus" aria-live="polite">
+          <span class="dot"></span><span>조립 가능 — 호환 5종 통과</span>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div class="tip__label"><svg class="ico"><use href="#i-tip"/></svg>안심 안내</div>
+        <p>부품을 바꿔도 <b>조립 안 되는 구성은 나오지 않습니다.</b> 호환 5종을 매번 다시 검증하고, 위험이 생기면 원인과 해결책을 먼저 보여드립니다.</p>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- ═══ 하단 sticky CTA ═══ -->
+<footer class="cta">
+  <div class="cta__inner">
+    <div class="cta__price">
+      <small>총 견적 금액 (부가세 포함)</small>
+      <b class="num" id="ctaPrice" data-bind="total_price">4,769,000원</b>
+    </div>
+    <div class="cta__actions">
+      <!-- 위험 락 사유 캡션 (hidden 기본) -->
+      <span class="cta__lockcap" id="ctaLockCap" hidden><svg class="ico"><use href="#i-lock"/></svg>호환성 위험이 해결되어야 담을 수 있어요.</span>
+      <button class="btn btn--ghost" data-action="goto-result"><svg class="ico"><use href="#i-back"/></svg>제안서로 돌아가기</button>
+      <button class="btn btn--primary" id="ctaCart" data-action="add-cart"><svg class="ico"><use href="#i-cart"/></svg>장바구니 담기</button>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══ 예외: 로딩 (hidden) ═══ -->
+<div class="loading" id="loading" role="status" aria-live="polite">
+  <div class="loading__scrim"></div>
+  <div class="loading__box"><div class="spin"></div><p style="font-weight:700;color:var(--primary)">호환성을 다시 계산 중입니다…</p></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s){return document.querySelector(s);};
+
+  // ════════════ 상태: 단일 원천 ════════════
+  // 총액과 호환 상태는 여기서만 갱신한다.
+  var state = {
+    total: 4769000,      // 현재 구성 총액
+    risk: false,         // 종합 호환 위험 여부
+    powerPrice: 135000   // 현재 파워 가격
+  };
+  var CHAIN_POWER = {
+    'ssr-1000': {name:'시소닉 PRIME 1000W 골드', price:230000},   // +95,000
+    'corsair-1000': {name:'Corsair RM1000e', price:215000}          // +80,000
+  };
+
+  var loadingEl=$('#loading'), toastEl=$('#toast'), toastT;
+  function show(el){el.classList.add('show');}
+  function hide(el){el.classList.remove('show');}
+  function toast(m){toastEl.textContent=m;toastEl.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){toastEl.classList.remove('show');},2400);}
+  function won(n){return n.toLocaleString('ko-KR')+'원';}
+
+  // ════════════ 렌더: 상태 → 화면 ════════════
+  function renderTotal(){
+    $('#totalPrice').textContent=won(state.total);
+    $('#ctaPrice').textContent=won(state.total);
+  }
+
+  function setRisk(on, reason){
+    state.risk = on;
+    var status=$('#compatStatus'), pageBadge=$('#pageStatus'), top=$('#topStatus');
+    var rowPower=$('#rowPower'), rowPowerState=$('#rowPowerState');
+    var cart=$('#ctaCart'), lockCap=$('#ctaLockCap');
+
+    if(on){
+      // 파워 정격 마진 행 → 위험 (아이콘+텍스트 병기)
+      rowPower.classList.add('compat-row--error');
+      rowPowerState.innerHTML='<svg class="ico"><use href="#i-alert"/></svg>위험 (용량 부족)';
+      // 종합 상태 → 위험
+      status.classList.add('compat-status--error');
+      status.querySelector('span:last-child').textContent='위험 — 파워 용량 부족';
+      // 페이지 헤더 배지 → 위험
+      pageBadge.classList.add('status-badge--error');
+      pageBadge.querySelector('[data-bind="overall_status_full"]').textContent='위험 — 파워 용량 부족';
+      // 상단 배지 → 위험
+      top.classList.add('pill--error');
+      top.querySelector('[data-bind="overall_status"]').textContent='위험 — 파워 부족';
+      // 장바구니 잠금 (색+텍스트 병기)
+      cart.disabled=true;
+      lockCap.hidden=false;
+      toast('호환성 위험이 발생해 결제가 잠겼습니다');
+    } else {
+      rowPower.classList.remove('compat-row--error');
+      rowPowerState.innerHTML='<svg class="ico"><use href="#i-check"/></svg>정상 (+38%)';
+      status.classList.remove('compat-status--error');
+      status.querySelector('span:last-child').textContent='조립 가능 — 호환 5종 통과';
+      pageBadge.classList.remove('status-badge--error');
+      pageBadge.querySelector('[data-bind="overall_status_full"]').textContent='조립 가능 — 호환 5종 통과';
+      top.classList.remove('pill--error');
+      top.querySelector('[data-bind="overall_status"]').textContent='호환 5종 통과';
+      cart.disabled=false;
+      lockCap.hidden=true;
+    }
+  }
+
+  // ════════════ 안전 대안 패널 ════════════
+  var altPanel=$('#altPanel'), altPanelEmpty=$('#altEmpty'),
+      altListEl=$('#altList'), swapSoldout=$('#swapSoldout');
+  var KIND={cpu:'CPU',gpu:'그래픽카드',ram:'메모리',board:'메인보드',power:'파워',case:'케이스'};
+
+  function openAlternatives(part){
+    $('#altKind').textContent=KIND[part]||'부품';
+    // 데모: 모든 부품에 대안 있음(빈/품절 예외는 hidden 유지). 실제로는 엔진이 목록을 채운다.
+    altPanel.hidden=false;
+    altPanelEmpty.hidden=true;
+    swapSoldout.hidden=true;
+    altListEl.hidden=false;
+    altPanel.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  function closeAlternatives(){ altPanel.hidden=true; }
+
+  // ════════════ 연쇄 스왑 ════════════
+  var chainPanel=$('#chainPanel');
+  function openChain(){
+    chainPanel.hidden=false;
+    chainPanel.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+
+  // ════════════ 이벤트 위임 ════════════
+  document.addEventListener('click', function(e){
+    var el=e.target.closest('[data-action]'); if(!el) return;
+    var a=el.dataset.action;
+
+    if(a==='swap-part'){ openAlternatives(el.dataset.part); return; }
+    if(a==='close-alternatives'){ closeAlternatives(); return; }
+
+    if(a==='apply-alternative'){
+      var part=el.dataset.part;
+      if(el.dataset.chain==='1'){
+        // 위험 유발 대안: GPU만 반영하지 않고, 먼저 위험을 띄우고 연쇄 안내를 연다(정직).
+        // 총액엔 GPU 차액을 우선 반영(+1,460,000), 위험 상태로 잠금.
+        state.total += 1460000;
+        renderTotal();
+        closeAlternatives();
+        setRisk(true);
+        openChain();
+        return;
+      }
+      // 100% 통과 대안: 바로 반영, 위험 없음
+      closeAlternatives();
+      show(loadingEl);
+      setTimeout(function(){
+        hide(loadingEl);
+        // 데모 차액 반영(대안별 delta)
+        var delta = el.dataset.code==='376681' ? 520000 : (el.dataset.code==='376682' ? -260000 : 0);
+        state.total += delta;
+        renderTotal();
+        toast('대안을 적용했어요 — 호환 5종 재검증 통과');
+      }, 900);
+      return;
+    }
+
+    if(a==='apply-chain-swap'){
+      // ★ 승인: 파워 자동 동시 교체 + 위험 자동 해제 + 총액 갱신
+      var sel=document.querySelector('input[name="chainPower"]:checked');
+      var key=sel?sel.value:'ssr-1000';
+      var np=CHAIN_POWER[key];
+      show(loadingEl);
+      setTimeout(function(){
+        hide(loadingEl);
+        // 총액: 기존 파워 빼고 새 파워 더함
+        state.total = state.total - state.powerPrice + np.price;
+        state.powerPrice = np.price;
+        // 파워 카드 갱신
+        $('#powerName').textContent=np.name;
+        $('#powerPrice').textContent=won(np.price);
+        renderTotal();
+        // 위험 해제 (파워 행·종합·배지·장바구니 락 전부 원복)
+        setRisk(false);
+        chainPanel.hidden=true;
+        toast('파워를 '+np.name+'(으)로 함께 교체했어요 — 위험 해제됨');
+      }, 1000);
+      return;
+    }
+
+    if(a==='refine-request'){
+      var t=$('#refine').value.trim(); if(!t){return;}
+      $('#refine').value='';
+      // 아주 단순한 파싱 시늉: 부품 키워드 → 안전 대안 패널 오픈(수기 클릭과 동일 결과)
+      var part = /그래픽|gpu|4090|4080|4070/i.test(t) ? 'gpu'
+               : /파워|psu/i.test(t) ? 'power'
+               : /메모리|ram|램/i.test(t) ? 'ram'
+               : /메인보드|보드|mb/i.test(t) ? 'board'
+               : /케이스|case/i.test(t) ? 'case'
+               : /cpu|프로세서/i.test(t) ? 'cpu' : 'gpu';
+      toast(KIND[part]+' 안전 대안을 불러왔어요');
+      openAlternatives(part);
+      return;
+    }
+
+    if(a==='goto-result'){ window.location.href='s2-result.html'; return; }
+    if(a==='add-cart'){
+      if($('#ctaCart').disabled) return;  // 위험 락
+      window.location.href='s4-cart.html';
+      return;
+    }
+  });
+
+  // 대안 패널 ESC 닫기
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape' && !altPanel.hidden){ closeAlternatives(); }
+  });
+  // refine: Enter 전송(Shift+Enter 줄바꿈)
+  $('#refine').addEventListener('keydown', function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();document.querySelector('[data-action="refine-request"]').click();}
+  });
+
+  // ── 데모 트리거(콘솔): 대안없음 / 품절 예외 확인용 ──
+  window.demoEmpty=function(){ openAlternatives('cpu'); altListEl.hidden=true; altPanelEmpty.hidden=false; };
+  window.demoSoldout=function(){ openAlternatives('gpu'); altListEl.hidden=true; swapSoldout.hidden=false; };
+
+  // 초기 렌더
+  renderTotal();
+})();
+</script>
+</body>
+</html>

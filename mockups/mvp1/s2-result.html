@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="FR-REC-020" data-domain="recommend">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>팝콘PC AI · 견적 제안서 (S2 목업)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+  --error:#C0392B; --on-error:#ffffff;
+  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-xl:1.5rem; --r-full:9999px;
+  --xs:4px; --sm:8px; --md:16px; --lg:24px; --xl:32px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+.num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font-family:inherit;cursor:pointer}
+a{color:inherit}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+html{scroll-behavior:smooth}
+
+/* ── Top bar ── */
+.topbar{position:fixed;top:0;left:0;right:0;height:64px;z-index:60;background:var(--card);
+  border-bottom:1px solid var(--outline-variant);display:flex;align-items:center;gap:var(--md);padding:0 var(--lg)}
+.brand{font-family:var(--font-head);font-weight:800;color:var(--primary);font-size:20px;letter-spacing:-.02em}
+.divider{width:1px;height:22px;background:var(--outline-variant)}
+.topbar__title{font-family:var(--font-head);font-size:14px;font-weight:700}
+.topbar__spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  color:var(--primary);background:rgba(101,161,212,.12);padding:5px 12px;border-radius:var(--r-full)}
+@media(max-width:768px){.topbar{gap:var(--sm);padding:0 var(--md)}.divider,.topbar__title{display:none}.brand{font-size:16px}}
+
+/* ── Sticky region: 대화바 + 서브내비 ── */
+.stickytop{position:fixed;top:64px;left:0;right:0;z-index:50;background:rgba(240,245,249,.9);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--outline-variant)}
+.stickytop__inner{max-width:1120px;margin:0 auto;padding:var(--sm) var(--lg);display:flex;flex-direction:column;gap:var(--sm)}
+
+/* 상시 대화 바 */
+.composer-bar{display:flex;gap:var(--sm);align-items:stretch;
+  background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-xl);padding:6px 6px 6px var(--md);box-shadow:var(--shadow)}
+.composer-bar textarea{flex:1;border:0;resize:none;height:40px;padding:8px 0;font-family:inherit;font-size:15px;background:transparent}
+.composer-bar textarea:focus{outline:none}
+.composer-bar__send{width:40px;height:40px;flex:none;background:var(--primary);color:#fff;border:0;border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center;transition:.15s}
+.composer-bar__send:hover{background:var(--primary-bright)}
+
+/* 서브내비 */
+.subnav{display:flex;align-items:center;justify-content:space-between;gap:var(--md)}
+.set-tabs{display:flex;gap:var(--sm);overflow-x:auto;scrollbar-width:none}
+.set-tabs::-webkit-scrollbar{display:none}
+.set-tab{white-space:nowrap;border:1px solid var(--outline-variant);background:var(--card);color:var(--on-variant);
+  padding:8px 16px;border-radius:var(--r-full);font-size:14px;font-weight:600;transition:.15s;display:inline-flex;align-items:center;gap:5px}
+.set-tab:hover{border-color:var(--primary-bright);color:var(--primary-bright)}
+.set-tab[aria-selected="true"]{border-color:var(--primary);border-width:2px;color:var(--primary);background:rgba(101,161,212,.10);font-weight:700;padding:7px 15px}
+.anchors{display:flex;gap:var(--md);flex:none}
+.anchors a{font-size:14px;font-weight:600;color:var(--on-variant);padding-bottom:2px;border-bottom:2px solid transparent;transition:.15s}
+.anchors a:hover{color:var(--primary)}
+@media(max-width:768px){.anchors{display:none}}
+
+/* ── layout ── */
+main{max-width:1120px;margin:0 auto;padding:184px var(--lg) 128px}
+.section{margin-bottom:var(--xl);scroll-margin-top:196px}
+.section__title{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:var(--md)}
+.card{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+
+/* 호환성 배지 (가격보다 먼저) */
+.compat{background:var(--primary);color:#fff;border-radius:var(--r-xl);padding:var(--lg);margin-bottom:var(--lg);box-shadow:var(--shadow)}
+.compat__head{display:flex;align-items:center;gap:10px;font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:4px}
+.compat__sub{font-size:14px;opacity:.92;margin-bottom:var(--md)}
+.compat__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--sm)}
+.compat__row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);border-radius:var(--r-full);padding:7px 14px;font-size:13px;font-weight:600}
+.compat__cap{font-size:12px;opacity:.85;margin-top:var(--md);display:flex;align-items:center;gap:6px}
+
+/* 세트 헤더 + 총액 */
+.sethead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:var(--md);margin-bottom:var(--md)}
+.badge-inline{display:inline-flex;align-items:center;gap:6px;background:var(--primary-container);color:#00224b;
+  padding:4px 10px;border-radius:var(--r);font-size:12px;font-weight:700;margin-bottom:8px}
+.sethead h3{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:-.02em}
+.setprice{text-align:right}
+.setprice__label{font-size:13px;color:var(--on-variant)}
+.setprice__val{font-family:var(--font-head);font-size:32px;font-weight:800;color:var(--primary);letter-spacing:-.01em;line-height:1.1}
+.setprice__val span{font-size:16px;font-weight:700}
+.setprice__asof{font-size:12px;color:var(--on-variant);display:inline-flex;align-items:center;gap:5px;margin-top:2px}
+
+/* 구성 본문 2열 */
+.summary-grid{display:grid;grid-template-columns:5fr 7fr;gap:var(--md)}
+@media(max-width:768px){.summary-grid{grid-template-columns:1fr}}
+.pc-card{padding:var(--lg);display:flex;flex-direction:column;gap:var(--md)}
+.pc-img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:var(--r-md);background:var(--container-low)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:var(--sm)}
+.metric{background:var(--container-low);border-radius:var(--r-md);padding:var(--sm) var(--md);text-align:center}
+.metric__label{font-size:12px;color:var(--on-variant)}
+.metric__val{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--secondary)}
+.metric__val--t{color:var(--tertiary)}
+.metric__val small{font-size:12px;font-weight:600}
+.parts{padding:var(--lg)}
+.parts h4{font-size:14px;font-weight:700;color:var(--on-variant);display:flex;align-items:center;gap:6px;margin-bottom:var(--sm)}
+.part{display:flex;align-items:center;gap:var(--md);padding:10px var(--sm);border-radius:var(--r-md);transition:.15s}
+.part:hover{background:var(--container-low)}
+.part+.part{border-top:1px solid var(--container-low)}
+.part__ico{width:40px;height:40px;flex:none;background:var(--container);color:var(--primary-bright);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center}
+.part__ico .ico{font-size:22px}
+.part__cat{font-size:11px;color:var(--on-variant);font-weight:600}
+.part__name{font-size:14px;font-weight:700}
+.part__price{margin-left:auto;font-size:14px;font-weight:700}
+
+/* 근거 리포트 */
+.reason-lead{font-size:15px;color:var(--on-variant);margin-bottom:var(--lg)}
+.reason-lead b{color:var(--primary);font-weight:700}
+.reason-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--md)}
+@media(max-width:768px){.reason-grid{grid-template-columns:1fr}}
+.reason-card{background:var(--card);border:1px solid var(--outline-variant);border-left:4px solid var(--primary);
+  border-radius:var(--r-lg);padding:var(--lg);box-shadow:var(--shadow)}
+.reason-card__top{display:flex;align-items:center;gap:10px;margin-bottom:var(--sm)}
+.reason-card__ico{width:36px;height:36px;flex:none;background:var(--container);color:var(--primary-bright);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center}
+.reason-card__ico .ico{font-size:20px}
+.reason-card h4{font-size:15px;font-weight:700}
+.reason-card p{font-size:13px;color:var(--on-variant);margin-bottom:var(--md)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--tertiary);
+  background:var(--tertiary-container);padding:4px 10px;border-radius:var(--r-full)}
+.tag .ico{font-size:13px}
+/* 예산 트레이드오프 콜아웃 */
+.tradeoff{margin-top:var(--lg);background:rgba(101,161,212,.07);border:1px solid rgba(101,161,212,.20);
+  border-radius:var(--r-lg);padding:var(--lg);display:flex;flex-wrap:wrap;align-items:center;gap:var(--md);justify-content:space-between}
+.tradeoff__body{flex:1;min-width:260px}
+.tradeoff__label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--primary);margin-bottom:4px}
+.tradeoff p{font-size:14px;color:var(--on)}
+.btn-primary{background:var(--primary);color:#fff;border:0;padding:11px 20px;border-radius:var(--r-md);font-weight:700;font-size:14px;transition:.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-primary:hover{background:var(--primary-bright)}
+.btn-ghost{background:var(--card);color:var(--on-variant);border:1px solid var(--outline-variant);padding:11px 20px;border-radius:var(--r-md);font-weight:700;font-size:14px;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+
+/* 비교 */
+.compare-summary{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:var(--md);
+  background:var(--container-low);border-radius:var(--r-lg);padding:var(--lg);margin-bottom:var(--md)}
+.compare-summary__mine .l,.compare-summary__mkt .l{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--on-variant);text-transform:uppercase}
+.compare-summary__v{font-family:var(--font-head);font-size:26px;font-weight:800}
+.compare-summary__mine .compare-summary__v{color:var(--primary)}
+.compare-summary__mkt{text-align:right;opacity:.75}
+.gap-badge{display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--outline-variant);
+  color:var(--error);font-weight:700;font-size:14px;padding:8px 14px;border-radius:var(--r-full);white-space:nowrap;box-shadow:var(--shadow)}
+@media(max-width:768px){.compare-summary{grid-template-columns:1fr;text-align:center}.compare-summary__mkt{text-align:center}.gap-badge{justify-self:center}}
+
+.compare-table{overflow:hidden;padding:0}
+.compare-row{display:grid;grid-template-columns:1.4fr 1fr 1fr .9fr;gap:var(--sm);padding:var(--md) var(--lg);align-items:center;font-size:14px}
+.compare-row+.compare-row{border-top:1px solid var(--container-low)}
+.compare-row--head{background:var(--container-low);font-size:12px;font-weight:700;color:var(--on-variant);text-transform:uppercase;letter-spacing:.03em}
+.compare-row__part{font-weight:700}
+.compare-row__diff{font-weight:700}
+.compare-row__diff--same{color:var(--on-variant)}
+.compare-row__diff--up{color:var(--error)}
+.compare-row__why{grid-column:1/-1;margin-top:6px;font-size:13px;color:var(--on-variant);
+  background:rgba(192,57,43,.06);border:1px solid rgba(192,57,43,.16);border-left:3px solid var(--error);
+  border-radius:var(--r);padding:8px 12px;display:flex;gap:8px}
+.compare-row__why .ico{color:var(--error);flex:none;margin-top:2px}
+@media(max-width:768px){
+  .compare-row{grid-template-columns:1fr 1fr;gap:6px}
+  .compare-row--head{display:none}
+  .compare-row__part{grid-column:1/-1;padding-bottom:2px}
+  .compare-row__cell::before{content:attr(data-label);display:block;font-size:11px;color:var(--on-variant);font-weight:600}
+}
+/* 정직 프레임 요약 */
+.honesty{background:rgba(101,161,212,.07);border:1px solid rgba(101,161,212,.20);border-radius:var(--r-lg);padding:var(--lg);margin-top:var(--md);display:flex;gap:10px}
+.honesty .ico{color:var(--primary);flex:none;font-size:20px;margin-top:2px}
+.honesty p{font-size:14px;color:var(--on)}
+.honesty b{font-weight:700}
+
+/* 외부 견적 진단 */
+.diagnose{margin-top:var(--lg);background:var(--container-low);border:1px dashed var(--outline);border-radius:var(--r-lg);padding:var(--lg)}
+.diagnose h3{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:var(--sm)}
+.diagnose textarea{width:100%;height:90px;padding:var(--md);border:1px solid var(--outline-variant);border-radius:var(--r-md);
+  font-family:inherit;font-size:14px;resize:vertical;background:var(--card)}
+.diagnose textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(101,161,212,.2)}
+.diagnose__actions{display:flex;justify-content:flex-end;margin-top:var(--sm)}
+.diagnose__result{margin-top:var(--md);display:flex;flex-direction:column;gap:var(--sm)}
+.finding{display:flex;gap:10px;align-items:flex-start;padding:12px var(--md);border-radius:var(--r-md);font-size:14px;border:1px solid var(--outline-variant);background:var(--card)}
+.finding .ico{flex:none;margin-top:2px}
+.finding--risk{border-color:rgba(192,57,43,.3);background:rgba(192,57,43,.06)}
+.finding--risk .ico{color:var(--error)}
+.finding--ok .ico{color:var(--primary)}
+.finding b{font-weight:700}
+.diagnose__cta{margin-top:var(--md);text-align:right}
+
+/* ── 하단 sticky CTA ── */
+.cta{position:fixed;bottom:0;left:0;right:0;z-index:55;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);
+  border-top:1px solid var(--outline-variant);padding:var(--md) var(--lg)}
+.cta__inner{max-width:1120px;margin:0 auto;display:flex;gap:var(--md)}
+.cta__inner button{flex:1;padding:16px;border-radius:var(--r-lg);font-weight:700;font-size:16px;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s;border:0}
+.cta__detail{flex:1;background:var(--container);color:var(--on)}
+.cta__detail:hover{background:var(--outline-variant)}
+.cta__cart{flex:2!important;background:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(101,161,212,.35)}
+.cta__cart:hover{background:var(--primary-bright)}
+
+/* ── 예외/상태 오버레이 ── */
+.overlay{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:var(--lg)}
+.overlay.show{display:flex}
+.overlay__scrim{position:absolute;inset:0;background:rgba(33,45,81,.4);backdrop-filter:blur(3px)}
+.dialog{position:relative;background:var(--card);border-radius:var(--r-xl);padding:var(--xl);max-width:440px;width:100%;box-shadow:0 20px 60px rgba(33,45,81,.3);text-align:center;animation:rise .25s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.dialog__icon{width:64px;height:64px;border-radius:var(--r-full);background:rgba(101,161,212,.12);color:var(--primary);
+  display:flex;align-items:center;justify-content:center;margin:0 auto var(--md);font-size:32px}
+.dialog__icon--err{background:rgba(192,57,43,.1);color:var(--error)}
+.dialog h2{font-size:22px;font-weight:800;font-family:var(--font-head);margin-bottom:var(--sm)}
+.dialog p{font-size:15px;color:var(--on-variant);margin-bottom:var(--lg)}
+.relax{display:flex;flex-direction:column;gap:var(--sm);margin-bottom:var(--lg)}
+.relax button{display:flex;align-items:center;justify-content:space-between;padding:var(--md);border:1px solid var(--outline-variant);
+  border-radius:var(--r-md);background:var(--card);font-size:14px;font-weight:600;transition:.15s}
+.relax button:hover{border-color:var(--primary);background:var(--container-low)}
+.relax .n{color:var(--primary);font-weight:700}
+.dialog__close{width:100%;padding:14px;background:var(--on);color:#fff;border:0;border-radius:var(--r-md);font-weight:700}
+.spin{width:48px;height:48px;border:4px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite;margin:0 auto var(--md)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.stale{position:fixed;top:64px;left:0;right:0;z-index:59;background:rgba(192,57,43,.1);border-bottom:1px solid rgba(192,57,43,.25);
+  color:var(--error);font-size:13px;font-weight:600;padding:8px var(--lg);display:flex;align-items:center;justify-content:center;gap:8px}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;
+  font-size:13px;padding:10px 18px;border-radius:var(--r);opacity:0;pointer-events:none;transition:.25s;z-index:90}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ═══ SVG 아이콘 심볼 (단색 currentColor) ═══ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="8" cy="12" r="2.2"/><circle cx="15" cy="12" r="2.2"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="9" rx="1"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3M6 11v3M10 11v3M14 11v3M18 11v3"/></symbol>
+  <symbol id="i-ssd" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M9 17h.01"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 8h2M16 12h2M8 16h8"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M12 10v4M8 12h.01M16 12h.01"/></symbol>
+  <symbol id="i-case" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="1"/><path d="M9 6h.01M9 9h.01M9 12h3"/></symbol>
+  <symbol id="i-perf" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M21 7v5M21 7h-5"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20 12 12 20l-8-8V4h8Z"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-budget" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M6 7h12M6 7 3 13a3 3 0 0 0 6 0L6 7ZM18 7l-3 6a3 3 0 0 0 6 0l-3-6Z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h6M14 18h6"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.5 13h11l2-8H6"/></symbol>
+  <symbol id="i-diag" viewBox="0 0 24 24"><path d="M3 3v18h18M8 15l3-4 3 3 4-6"/></symbol>
+</svg>
+
+<!-- ═══ Top bar ═══ -->
+<header class="topbar">
+  <span class="brand">팝콘PC AI</span>
+  <span class="divider"></span>
+  <span class="topbar__title">견적 제안서</span>
+  <div class="topbar__spacer"></div>
+  <span class="pill"><svg class="ico"><use href="#i-shield"/></svg>호환성 5종 통과</span>
+</header>
+
+<!-- ═══ 가격 갱신 지연 (예외, 기본 숨김) ═══ -->
+<div class="stale" id="price-stale" hidden><svg class="ico"><use href="#i-clock"/></svg><span>가격 정보를 갱신하는 중입니다. 표시 금액은 직전 기준값입니다.</span></div>
+
+<!-- ═══ 상단 상시 대화 바 + sticky 서브내비 ═══ -->
+<div class="stickytop">
+  <div class="stickytop__inner">
+    <!-- 상시 대화 바 -->
+    <form class="composer-bar" data-action="refine-request" onsubmit="return false">
+      <label for="refine-input" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">구성 수정 요청</label>
+      <textarea id="refine-input" placeholder="이 구성에서 바꾸고 싶은 점을 말씀하세요. 예) 좀 더 조용하게"></textarea>
+      <button class="composer-bar__send" type="submit" aria-label="보내기"><svg class="ico" style="font-size:22px"><use href="#i-send"/></svg></button>
+    </form>
+    <!-- 서브내비: 3구성 탭 + 앵커 -->
+    <nav class="subnav" aria-label="구성 선택 및 섹션 이동">
+      <div class="set-tabs" role="tablist" aria-label="3구성 선택">
+        <button class="set-tab" role="tab" data-action="select-set" data-set="value" aria-selected="false">가성비형</button>
+        <button class="set-tab" role="tab" data-action="select-set" data-set="recommend" aria-selected="true"><svg class="ico"><use href="#i-shield"/></svg>추천형</button>
+        <button class="set-tab" role="tab" data-action="select-set" data-set="highend" aria-selected="false">고성능형</button>
+      </div>
+      <div class="anchors">
+        <a href="#sec-summary">구성</a>
+        <a href="#sec-reason">근거</a>
+        <a href="#sec-compare">비교</a>
+      </div>
+    </nav>
+  </div>
+</div>
+
+<main>
+  <!-- ═══ 섹션1 — 구성 요약 ═══ -->
+  <section class="section" id="sec-summary" aria-labelledby="sec-summary-t">
+    <h2 class="section__title" id="sec-summary-t" style="position:absolute;left:-9999px">구성 요약</h2>
+
+    <!-- ★ 호환성 배지 (가격보다 먼저) -->
+    <div class="compat" role="group" aria-label="호환성 검증 결과">
+      <div class="compat__head"><svg class="ico"><use href="#i-shield"/></svg>호환성 5종 전부 통과</div>
+      <p class="compat__sub">이 조합은 조립 가능함이 검증되었습니다. 결정론 엔진이 실재고 위에서 5종 하드필터를 통과시킨 구성입니다.</p>
+      <div class="compat__grid" data-repeat="compat_matrix">
+        <div class="compat__row"><svg class="ico"><use href="#i-check"/></svg>CPU 소켓 일치 · 통과</div>
+        <div class="compat__row"><svg class="ico"><use href="#i-check"/></svg>메모리 규격 일치 · 통과</div>
+        <div class="compat__row"><svg class="ico"><use href="#i-check"/></svg>파워 정격 마진 132%</div>
+        <div class="compat__row"><svg class="ico"><use href="#i-check"/></svg>쿨러 발열 TDP · 통과</div>
+        <div class="compat__row"><svg class="ico"><use href="#i-check"/></svg>케이스 실장 공간 여유</div>
+      </div>
+      <p class="compat__cap"><svg class="ico"><use href="#i-info"/></svg>조립 불가능한 구성은 애초에 후보에서 제외됩니다.</p>
+    </div>
+
+    <!-- 세트 헤더 + 총액 + 가격 기준시각 -->
+    <div class="sethead">
+      <div>
+        <span class="badge-inline"><svg class="ico"><use href="#i-bolt"/></svg>당일 출고</span>
+        <h3 data-bind="set_label">추천형 견적</h3>
+      </div>
+      <div class="setprice">
+        <div class="setprice__label">최종 견적가</div>
+        <div class="setprice__val num" data-bind="total_price" aria-label="총 1,250,000원">1,250,000<span>원</span></div>
+        <div class="setprice__asof"><svg class="ico"><use href="#i-clock"/></svg><span data-bind="price_asof">3시간 전 기준</span></div>
+      </div>
+    </div>
+
+    <!-- 본문 2열 -->
+    <div class="summary-grid">
+      <!-- 좌: 이미지 + 지표 -->
+      <div class="card pc-card">
+        <img class="pc-img" data-bind="pc_image" src="assets/pc-dummy.jpg" alt="추천형 견적 완성 PC 본체 예시 이미지"
+             onerror="this.style.display='none'">
+        <div class="metrics">
+          <div class="metric"><div class="metric__label">1% Low FPS (QHD)</div><div class="metric__val num" data-bind="low_fps">96<small> fps</small></div></div>
+          <div class="metric"><div class="metric__label">가격 효율 점수</div><div class="metric__val metric__val--t num" data-bind="score">S+</div></div>
+        </div>
+      </div>
+      <!-- 우: 부품 7종 -->
+      <div class="card parts">
+        <h4><svg class="ico"><use href="#i-list"/></svg>부품 상세 (7종)</h4>
+        <div data-repeat="components" id="parts-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 섹션2 — 근거 리포트 ═══ -->
+  <section class="section" id="sec-reason" aria-labelledby="sec-reason-t">
+    <h2 class="section__title" id="sec-reason-t">이 구성을 고른 이유</h2>
+    <p class="reason-lead" data-bind="reason_lead">
+      실재고 <b class="num">2,480</b>대에서 조건·호환·예산을 통과한 <b class="num">42</b>대 중, 이 예산대에서 점수가 가장 높은 구성입니다.
+      아래 근거는 결정론 엔진의 선정 값을 그대로 옮긴 것입니다(사후 창작 아님).
+    </p>
+    <div class="reason-grid" data-repeat="reason_items" id="reason-list"></div>
+
+    <!-- 예산 트레이드오프 콜아웃 -->
+    <div class="tradeoff">
+      <div class="tradeoff__body">
+        <div class="tradeoff__label"><svg class="ico"><use href="#i-budget"/></svg>예산 트레이드오프</div>
+        <p data-bind="tradeoff_text">지금이 설정 예산 대비 최적입니다. <b class="num">+100,000원</b>이면 GPU 한 등급(RTX 4060 Ti) 위로 갈 수 있지만, 설정하신 예산 상한을 넘습니다.</p>
+      </div>
+      <button class="btn-primary" data-action="raise-budget"><svg class="ico"><use href="#i-budget"/></svg>예산 올려 다시 보기</button>
+    </div>
+  </section>
+
+  <!-- ═══ 섹션3 — 비교견적 (정직 프레임) ═══ -->
+  <section class="section" id="sec-compare" aria-labelledby="sec-compare-t">
+    <h2 class="section__title" id="sec-compare-t">다른 곳과 비교해도, 이유가 있습니다</h2>
+
+    <!-- 요약 -->
+    <div class="compare-summary">
+      <div class="compare-summary__mine"><div class="l">우리 견적</div><div class="compare-summary__v num" data-bind="our_total">1,250,000원</div></div>
+      <div class="gap-badge"><svg class="ico"><use href="#i-perf"/></svg><span class="num" data-bind="price_gap">+30,000원</span></div>
+      <div class="compare-summary__mkt"><div class="l">시장 최저가 조합</div><div class="compare-summary__v num" data-bind="market_total">1,220,000원</div></div>
+    </div>
+
+    <!-- 행별 비교표 (차이 행마다 '왜' 병기) -->
+    <div class="card compare-table" role="table" aria-label="부품별 가격 비교">
+      <div class="compare-row compare-row--head" role="row">
+        <span role="columnheader">부품</span><span role="columnheader">우리</span><span role="columnheader">최저가</span><span role="columnheader">차이</span>
+      </div>
+      <div data-repeat="compare_rows" id="compare-list"></div>
+    </div>
+
+    <!-- 정직 프레임 요약 -->
+    <div class="honesty">
+      <svg class="ico"><use href="#i-scale"/></svg>
+      <p><b>더 싸게 사는 법도 있습니다.</b> 다만 이 구성이 왜 안전한지 — 호환 보증·조립·A/S·당일출고 — 까지 함께 보여드립니다. 우리가 비싼 항목은 숨기지 않고, 그 차액의 근거를 드립니다.</p>
+    </div>
+
+    <!-- 외부 견적 진단 -->
+    <div class="diagnose">
+      <h3><svg class="ico"><use href="#i-diag"/></svg>다른 곳에서 받은 견적을 붙여넣어 보세요</h3>
+      <label for="diagnose-input" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">외부 견적 입력</label>
+      <textarea id="diagnose-input" placeholder="견적 목록을 붙여넣으세요 (부품명·가격). 우리 엔진이 호환·정격을 진단합니다."></textarea>
+      <div class="diagnose__actions">
+        <button class="btn-primary" data-action="diagnose-quote"><svg class="ico"><use href="#i-diag"/></svg>진단하기</button>
+      </div>
+
+      <!-- 진단 결과 (기본 숨김) -->
+      <div class="diagnose__result" id="diagnose-result" data-repeat="diagnose_findings" hidden></div>
+      <!-- 진단 실패 (예외, 기본 숨김) -->
+      <div class="finding finding--risk" id="diagnose-fail" hidden style="margin-top:16px">
+        <svg class="ico"><use href="#i-alert"/></svg>
+        <div><b>일부 항목을 못 읽었어요.</b> 형식을 확인하시거나, 부품명과 가격을 한 줄씩 직접 입력해 주세요.</div>
+      </div>
+      <div class="diagnose__cta" id="diagnose-cta" hidden>
+        <button class="btn-ghost" data-action="fix-from-diagnosis"><svg class="ico"><use href="#i-shield"/></svg>이 진단대로 안전 구성 받기</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ═══ 하단 sticky CTA ═══ -->
+<div class="cta">
+  <div class="cta__inner">
+    <button class="cta__detail" data-action="goto-detail"><svg class="ico" style="font-size:20px"><use href="#i-tune"/></svg>부품 변경</button>
+    <button class="cta__cart" data-action="add-cart"><svg class="ico" style="font-size:20px"><use href="#i-cart"/></svg>장바구니 담기</button>
+  </div>
+</div>
+
+<!-- ═══ 예외: 예산 초과안만 생성 (기본 숨김) ═══ -->
+<div class="overlay" id="ov-over-budget">
+  <div class="overlay__scrim"></div>
+  <div class="dialog" role="alertdialog" aria-labelledby="ob-t">
+    <div class="dialog__icon dialog__icon--err"><svg class="ico" style="font-size:32px"><use href="#i-alert"/></svg></div>
+    <h2 id="ob-t">예산 내 구성이 없어요</h2>
+    <p>설정하신 예산 안에서 호환·정격을 모두 통과하는 구성을 찾지 못했습니다. 아래 중 하나를 선택해 주세요.</p>
+    <div class="relax">
+      <button data-action="apply-relaxation" data-relax="budget_up"><span>① 예산 100,000원 올리기</span><span class="n num">+구성 12개</span></button>
+      <button data-action="apply-relaxation" data-relax="perf_down"><span>② 성능 한 단계 낮추기</span><span class="n num">+구성 8개</span></button>
+    </div>
+    <button class="dialog__close" data-action="close-overlay">닫기</button>
+  </div>
+</div>
+
+<!-- ═══ 예외: 빈 결과 (기본 숨김) ═══ -->
+<div class="overlay" id="ov-empty">
+  <div class="overlay__scrim"></div>
+  <div class="dialog" role="alertdialog" aria-labelledby="em-t">
+    <div class="dialog__icon dialog__icon--err"><svg class="ico" style="font-size:32px"><use href="#i-alert"/></svg></div>
+    <h2 id="em-t">조건에 맞는 견적이 없습니다</h2>
+    <p>지금 조건 조합을 통과하는 구성이 0개입니다. 조건을 완화하러 이동할까요?</p>
+    <button class="dialog__close" data-action="goto-relax">조건 완화하러 가기</button>
+  </div>
+</div>
+
+<!-- ═══ 예외: 로딩 (기본 숨김) ═══ -->
+<div class="overlay" id="ov-load">
+  <div class="overlay__scrim"></div>
+  <div class="dialog"><div class="spin"></div><p style="margin:0;font-weight:700;color:var(--primary)">구성을 다시 계산 중입니다…</p></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s){return document.querySelector(s);};
+
+  // ════════════════ 더미 데이터: 3구성 세트 (결정론 엔진 산출값 전제) ════════════════
+  // 각 세트는 부품 7종 + 근거 + 비교표를 전부 갖는다. 탭 전환 = 세트 교체.
+  var SETS={
+    value:{
+      label:'가성비형 견적', total:'980,000원', asof:'3시간 전 기준',
+      low_fps:'72', score:'A',
+      our_total:'980,000원', market_total:'965,000원', price_gap:'+15,000원',
+      components:[
+        ['i-cpu','CPU','AMD Ryzen 5 5500','118,000원'],
+        ['i-gpu','GPU','NVIDIA RTX 4060','420,000원'],
+        ['i-ram','RAM','DDR4 16GB (8GBx2) 3200MHz','62,000원'],
+        ['i-ssd','SSD','NVMe 500GB Gen3','48,000원'],
+        ['i-board','메인보드','B550M mATX','92,000원'],
+        ['i-power','파워','600W 80PLUS Bronze','58,000원'],
+        ['i-case','케이스','미들타워 (3팬)','42,000원']
+      ],
+      reason_lead:'실재고 <b class="num">2,480</b>대에서 조건·호환·예산을 통과한 <b class="num">42</b>대 중, 최저 예산대에서 프레임 방어가 되는 최소 구성입니다.',
+      reason_items:[
+        ['i-gpu','RTX 4060 — 이 가격대 유일한 프레임 방어선','FHD 인기게임 1% Low를 지키는 최저가 GPU. 아래 등급은 이 예산대에서 프레임이 급락합니다.',[['커뮤니티 최다 추천'],['벤치 1% Low 우위']]],
+        ['i-power','600W 정격 — 최소 마진 확보','현재 부하 대비 정격 마진 121%. 가성비 라인에서도 정격 미달 파워는 후보에서 제외했습니다.',[['호환·전력 검증 통과']]]
+      ],
+      tradeoff:'지금이 최저 예산대 최적입니다. <b class="num">+120,000원</b>이면 RAM·SSD를 한 단계 올릴 수 있지만, 설정 예산 상한을 넘습니다.',
+      compare_rows:[
+        ['CPU','118,000원','118,000원','동일','same',''],
+        ['파워','58,000원','41,000원','+17,000원','up','저기 1.7만 싼 파워는 정격 마진이 부족 — 이 구성 GPU 부하에서 재구매 위험.'],
+        ['SSD','48,000원','46,000원','+2,000원','up','2천원 싼 SSD는 DRAM 캐시 없는 모델 — 장기 쓰기 속도 저하 위험.']
+      ]
+    },
+    recommend:{
+      label:'추천형 견적', total:'1,250,000원', asof:'3시간 전 기준',
+      low_fps:'96', score:'S+',
+      our_total:'1,250,000원', market_total:'1,220,000원', price_gap:'+30,000원',
+      components:[
+        ['i-cpu','CPU','Intel Core i5-13400F','240,000원'],
+        ['i-gpu','GPU','NVIDIA RTX 4060','420,000원'],
+        ['i-ram','RAM','DDR5 16GB (8GBx2) 5600MHz','95,000원'],
+        ['i-ssd','SSD','NVMe 1TB Gen4','92,000원'],
+        ['i-board','메인보드','B760M mATX','135,000원'],
+        ['i-power','파워','700W 80PLUS Gold','98,000원'],
+        ['i-case','케이스','미들타워 강화유리 (3팬)','70,000원']
+      ],
+      reason_lead:'실재고 <b class="num">2,480</b>대에서 조건·호환·예산을 통과한 <b class="num">42</b>대 중, 이 예산대에서 점수가 가장 높은 구성입니다. 아래 근거는 결정론 엔진의 선정 값을 그대로 옮긴 것입니다(사후 창작 아님).',
+      reason_items:[
+        ['i-gpu','RTX 4060 — QHD 1% Low 방어, 이 예산대 점수 1위','인기게임 QHD에서 1% Low 프레임을 지키며 전력·발열 효율이 이전 세대 대비 30% 낮습니다. 이 예산대 후보 중 점수 1위.',[['커뮤니티 최다 추천'],['벤치 1% Low 우위']]],
+        ['i-power','700W 80PLUS Gold — 정격 마진 132%','최대 부하 대비 32% 출력 마진. 정격 미달·저효율 파워는 하드필터에서 제외되어 후보에 오르지 못합니다.',[['호환·전력 검증 통과'],['안전 마진 확보']]]
+      ],
+      tradeoff:'지금이 설정 예산 대비 최적입니다. <b class="num">+100,000원</b>이면 GPU 한 등급(RTX 4060 Ti) 위로 갈 수 있지만, 설정하신 예산 상한을 넘습니다.',
+      compare_rows:[
+        ['CPU','240,000원','240,000원','동일','same',''],
+        ['GPU','420,000원','420,000원','동일','same',''],
+        ['파워','98,000원','68,000원','+30,000원','up','저기 3만원 싼 파워는 이 GPU 정격 마진이 부족 — 재구매 위험. 우리는 80PLUS Gold 정품만 씁니다.'],
+        ['조립·A/S','포함','미포함','안심 포함','same','']
+      ]
+    },
+    highend:{
+      label:'고성능형 견적', total:'1,780,000원', asof:'3시간 전 기준',
+      low_fps:'138', score:'S',
+      our_total:'1,780,000원', market_total:'1,742,000원', price_gap:'+38,000원',
+      components:[
+        ['i-cpu','CPU','Intel Core i5-14600KF','340,000원'],
+        ['i-gpu','GPU','NVIDIA RTX 4070 SUPER','780,000원'],
+        ['i-ram','RAM','DDR5 32GB (16GBx2) 6000MHz','168,000원'],
+        ['i-ssd','SSD','NVMe 2TB Gen4','168,000원'],
+        ['i-board','메인보드','B760 ATX','185,000원'],
+        ['i-power','파워','850W 80PLUS Gold','139,000원'],
+        ['i-case','케이스','미들타워 강화유리 (4팬)','불포함 · 0원']
+      ],
+      reason_lead:'실재고 <b class="num">2,480</b>대에서 조건·호환·예산을 통과한 <b class="num">42</b>대 중, QHD 고주사율을 노린 상위 구성입니다. 예산 상한 근처의 최고 점수 조합입니다.',
+      reason_items:[
+        ['i-gpu','RTX 4070 SUPER — QHD 고주사율 여유','QHD 165Hz에서 1% Low를 여유롭게 방어. AAA 최신작도 상옵 이상에서 프레임이 안정적입니다.',[['벤치 1% Low 우위'],['상위 점수']]],
+        ['i-power','850W 80PLUS Gold — 상위 GPU 정격 여유','고성능 GPU의 순간 전력 스파이크까지 흡수하는 정격 마진. 확장 여유도 확보했습니다.',[['호환·전력 검증 통과'],['안전 마진 확보']]]
+      ],
+      tradeoff:'이 구성이 설정 예산 상한 근처의 최고 점수입니다. 한 등급 더 올리면 예산을 크게 초과하며, 체감 이득 대비 비효율입니다.',
+      compare_rows:[
+        ['GPU','780,000원','780,000원','동일','same',''],
+        ['RAM','168,000원','150,000원','+18,000원','up','1.8만 싼 램은 XMP 미검증 로트 — 이 보드에서 6000MHz 인증이 안 된 위험.'],
+        ['파워','139,000원','119,000원','+20,000원','up','2만원 싼 파워는 850W 표기지만 실효 출력·리플 검증 미달 — 상위 GPU에 부적합.']
+      ]
+    }
+  };
+
+  // ════════════════ 렌더러 ════════════════
+  function partHTML(c){
+    return '<div class="part"><div class="part__ico"><svg class="ico"><use href="#'+c[0]+'"/></svg></div>'+
+      '<div><div class="part__cat">'+c[1]+'</div><div class="part__name">'+c[2]+'</div></div>'+
+      '<div class="part__price num">'+c[3]+'</div></div>';
+  }
+  function reasonHTML(r){
+    var tags=r[3].map(function(t){return '<span class="tag"><svg class="ico"><use href="#i-tag"/></svg>'+t[0]+'</span>';}).join('');
+    return '<div class="reason-card"><div class="reason-card__top">'+
+      '<div class="reason-card__ico"><svg class="ico"><use href="#'+r[0]+'"/></svg></div>'+
+      '<h4>'+r[1]+'</h4></div>'+
+      '<p>'+r[2]+'</p><div class="tags">'+tags+'</div></div>';
+  }
+  function compareHTML(row){
+    // row = [part, ours, market, diff, kind(same|up), why]
+    var diffCls = row[4]==='up' ? 'compare-row__diff--up' : 'compare-row__diff--same';
+    var why = row[5] ? '<div class="compare-row__why"><svg class="ico"><use href="#i-alert"/></svg><span>'+row[5]+'</span></div>' : '';
+    return '<div class="compare-row" role="row">'+
+      '<span class="compare-row__part" role="cell">'+row[0]+'</span>'+
+      '<span class="compare-row__cell num" role="cell" data-label="우리">'+row[1]+'</span>'+
+      '<span class="compare-row__cell num" role="cell" data-label="최저가">'+row[2]+'</span>'+
+      '<span class="compare-row__diff num '+diffCls+'" role="cell" data-label="차이">'+row[3]+'</span>'+
+      why+'</div>';
+  }
+
+  function renderSet(key){
+    var s=SETS[key]; if(!s) return;
+    // 세트 헤더/총액/기준시각
+    $('[data-bind="set_label"]').textContent=s.label;
+    $('[data-bind="total_price"]').innerHTML=s.total.replace('원','<span>원</span>');
+    $('[data-bind="total_price"]').setAttribute('aria-label','총 '+s.total);
+    $('[data-bind="price_asof"]').textContent=s.asof;
+    $('[data-bind="low_fps"]').innerHTML=s.low_fps+'<small> fps</small>';
+    $('[data-bind="score"]').textContent=s.score;
+    // 부품 7종
+    $('#parts-list').innerHTML=s.components.map(partHTML).join('');
+    // 근거
+    $('[data-bind="reason_lead"]').innerHTML=s.reason_lead;
+    $('#reason-list').innerHTML=s.reason_items.map(reasonHTML).join('');
+    $('[data-bind="tradeoff_text"]').innerHTML=s.tradeoff;
+    // 비교
+    $('[data-bind="our_total"]').textContent=s.our_total;
+    $('[data-bind="market_total"]').textContent=s.market_total;
+    $('[data-bind="price_gap"]').textContent=s.price_gap;
+    $('#compare-list').innerHTML=s.compare_rows.map(compareHTML).join('');
+  }
+
+  // ════════════════ 이벤트 (위임) ════════════════
+  document.addEventListener('click', function(e){
+    var el=e.target.closest('[data-action]'); if(!el) return;
+    var a=el.dataset.action;
+
+    if(a==='select-set'){
+      document.querySelectorAll('[data-action="select-set"]').forEach(function(b){
+        b.setAttribute('aria-selected', String(b===el));
+      });
+      show('#ov-load');
+      setTimeout(function(){ renderSet(el.dataset.set); hide('#ov-load'); toast(el.textContent.trim()+' 구성으로 갱신했어요'); }, 550);
+      return;
+    }
+
+    if(a==='refine-request'){
+      var t=$('#refine-input').value.trim();
+      show('#ov-load');
+      setTimeout(function(){ hide('#ov-load'); toast(t?'요청을 반영해 재계산했어요 — 목업':'바꾸고 싶은 점을 입력해 주세요'); $('#refine-input').value=''; }, 700);
+      return;
+    }
+
+    if(a==='raise-budget'){ toast('예산을 올려 다시 계산합니다 — 목업'); return; }
+
+    if(a==='diagnose-quote'){
+      var q=$('#diagnose-input').value.trim();
+      // 빈/짧은 입력 → 파싱 실패 예외
+      if(q.length<8){
+        $('#diagnose-result').hidden=true; $('#diagnose-cta').hidden=true;
+        $('#diagnose-fail').hidden=false;
+        return;
+      }
+      $('#diagnose-fail').hidden=true;
+      var res=$('#diagnose-result');
+      res.innerHTML=
+        '<div class="finding finding--risk"><svg class="ico"><use href="#i-alert"/></svg><div><b>위험 · 파워 정격 부족</b> — 붙여넣은 견적의 RTX 4070엔 최소 650W 권장인데 550W가 잡혀 있습니다.</div></div>'+
+        '<div class="finding finding--ok"><svg class="ico"><use href="#i-check"/></svg><div><b>통과 · 나머지 호환 이상 없음</b> — CPU 소켓·메모리 규격·케이스 실장은 문제 없습니다.</div></div>';
+      res.hidden=false; $('#diagnose-cta').hidden=false;
+      toast('진단을 마쳤어요');
+      return;
+    }
+    if(a==='fix-from-diagnosis'){ toast('진단 결과대로 안전 구성을 다시 만듭니다 — 목업'); return; }
+
+    if(a==='apply-relaxation'){ hide('#ov-over-budget'); toast('완화 조건을 반영해 재계산합니다 — 목업'); return; }
+    if(a==='goto-relax'){ hide('#ov-empty'); window.location.href='s1-session.html'; return; }
+    if(a==='close-overlay'){ hide('#ov-over-budget'); hide('#ov-empty'); return; }
+
+    // ── 라우팅 ──
+    if(a==='goto-detail'){ window.location.href='s3-detail.html'; return; }
+    if(a==='add-cart'){ window.location.href='s4-cart.html'; return; }
+  });
+
+  // 대화바 submit(엔터) 처리
+  $('.composer-bar').addEventListener('submit', function(e){
+    e.preventDefault();
+    document.querySelector('[data-action="refine-request"] .composer-bar__send').click();
+  });
+
+  function show(sel){ $(sel).classList.add('show'); }
+  function hide(sel){ $(sel).classList.remove('show'); }
+  var toastT;
+  function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('show');},2200); }
+
+  // ════════════════ 데모: 예외 트리거 (콘솔에서 호출) ════════════════
+  window.overBudgetDemo=function(){ show('#ov-over-budget'); };
+  window.emptyDemo=function(){ show('#ov-empty'); };
+  window.staleDemo=function(){ var s=$('#price-stale'); s.hidden=!s.hidden; };
+
+  // 초기 렌더: 추천형
+  renderSet('recommend');
+})();
+</script>
+</body>
+</html>

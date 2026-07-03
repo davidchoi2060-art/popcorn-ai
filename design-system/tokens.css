@@ -1,0 +1,17 @@
+/* Popcorn Light - design tokens (single source of truth) */
+/* 톤: Popcorn AI 랜딩의 '밝은 본문 시트' 준용(D-07). 다크모드 아님.
+   서사는 결정론 엔진·신뢰 판매자 불변(A-07): '3대 AI 생성/최저가' 카피 금지. */
+:root{
+  --bg:#F0F5F9; --surface:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+  --error:#C0392B; --on-error:#ffffff;
+  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-num:'JetBrains Mono','Inter',monospace;
+  --r-sm:.25rem; --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-full:9999px;
+  --sp-xs:4px; --sp-sm:8px; --sp-md:16px; --sp-lg:24px; --sp-xl:32px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+/* success(초록) 토큰은 여전히 미정(U-01). '통과'는 --primary, '위험'은 --error, 항상 텍스트 병기 */

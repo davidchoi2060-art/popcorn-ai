@@ -1,0 +1,481 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>팝콘 AI | 모든 견적에는 이유가 있습니다.</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#005ab3",
+                        "primary-bright": "#0082fd",
+                        "on-primary": "#eff2ff",
+                        "primary-container": "#64a1ff",
+                        "secondary": "#3155b7",
+                        "secondary-container": "#c4d0ff",
+                        "tertiary": "#853d97",
+                        "tertiary-container": "#e795f7",
+                        "background": "#f6f5ff",
+                        "surface": "#f6f5ff",
+                        "surface-card": "#ffffff",
+                        "surface-container": "#e3e7ff",
+                        "on-surface": "#212d51",
+                        "on-surface-variant": "#4e5a81",
+                        "outline": "#6a769e",
+                        "outline-variant": "#a0acd7",
+                        "error": "#b31b25",
+                        "on-error": "#ffefee",
+                    },
+                    spacing: {
+                        "xs": "4px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "2xl": "48px",
+                        "3xl": "80px",
+                        "margin-desktop": "24px",
+                        "container-max": "1280px",
+                    },
+                    fontFamily: {
+                        "headline-lg": ["Inter", "Pretendard", "sans-serif"],
+                        "headline-md": ["Inter", "Pretendard", "sans-serif"],
+                        "body-md": ["Inter", "Pretendard", "sans-serif"],
+                        "label-md": ["Inter", "Pretendard", "sans-serif"],
+                    },
+                    fontSize: {
+                        "headline-lg": ["48px", { lineHeight: "1.2", fontWeight: "700" }],
+                        "headline-md": ["36px", { lineHeight: "1.3", fontWeight: "600" }],
+                        "body-md": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "label-md": ["16px", { lineHeight: "1.6", fontWeight: "500" }],
+                        "label-caps": ["14px", { lineHeight: "1.6", fontWeight: "700", letterSpacing: "0.05em" }],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "1rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px",
+                    },
+                    boxShadow: {
+                        "ambient": "0 4px 20px -2px rgba(33, 45, 81, 0.08), 0 2px 8px -1px rgba(33, 45, 81, 0.04)",
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', 'Pretendard', sans-serif;
+            background-color: #f6f5ff;
+            color: #212d51;
+            line-height: 1.6;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .composer-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #005ab3;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .float-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface" data-domain="landing" data-screen-id="FR-LND-010">
+<!-- GNB -->
+<header class="fixed top-0 left-0 right-0 h-16 bg-white border-b border-outline-variant z-50 shadow-sm">
+<div class="max-w-container-max mx-auto px-margin-desktop h-full flex justify-between items-center">
+<div class="flex items-center gap-2">
+<iconify-icon class="text-2xl" icon="fluent-color:home-24"></iconify-icon>
+<span class="text-[24px] font-bold text-primary">팝콘 AI</span>
+</div>
+<nav class="hidden md:flex items-center gap-8 text-[16px] font-medium text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" data-action="scroll-to-input">
+<iconify-icon class="mr-1 align-middle" icon="fluent-color:board-24"></iconify-icon>견적 받기
+            </button>
+<button class="hover:text-primary transition-colors cursor-pointer" data-action="open-auth">로그인/회원가입</button>
+<button class="hover:text-primary transition-colors cursor-pointer" data-action="goto-qna">고객문의</button>
+<button class="hover:text-primary transition-colors cursor-pointer" data-action="goto-admin">관리자</button>
+<button class="hover:text-primary transition-colors cursor-pointer" data-action="goto-dev">DEV</button>
+</nav>
+<button class="md:hidden p-2 text-on-surface">
+<iconify-icon class="text-2xl" icon="fluent:line-horizontal-3-24-filled"></iconify-icon>
+</button>
+</div>
+</header>
+<main class="pt-16">
+<!-- Hero Section -->
+<section class="hero relative min-h-[85vh] flex flex-col items-center justify-center px-margin-desktop py-3xl overflow-hidden bg-surface">
+<div class="relative z-10 text-center max-w-4xl w-full flex flex-col items-center gap-xl">
+<!-- Trust Badges -->
+<div class="flex flex-wrap justify-center gap-md mb-md">
+<span class="px-lg py-sm bg-tertiary-container text-tertiary font-label-md rounded-full border border-tertiary/20 flex items-center">
+<iconify-icon class="mr-2 text-xl" icon="fluent-color:check-circle-20"></iconify-icon>실재고 검증
+                </span>
+<span class="px-lg py-sm bg-tertiary-container text-tertiary font-label-md rounded-full border border-tertiary/20 flex items-center">
+<iconify-icon class="mr-2 text-xl" icon="fluent-color:approvals-app-20"></iconify-icon>호환성 5종 통과
+                </span>
+<span class="px-lg py-sm bg-tertiary-container text-tertiary font-label-md rounded-full border border-tertiary/20 flex items-center">
+<iconify-icon class="mr-2 text-xl" icon="fluent-color:book-contacts-20"></iconify-icon>선정 근거 리포트
+                </span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">모든 견적에는 이유가 있습니다.</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+                실재고 안에서, 호환성을 통과한 구성만 제안합니다.<br>
+                왜 이 부품이 당신의 PC에 포함되었는지 끝까지 설명합니다.
+            </p>
+<!-- Composer Input -->
+<div class="w-full mt-2xl" id="composer-anchor">
+<div class="relative group max-w-3xl mx-auto">
+<div class="absolute -inset-1 bg-gradient-to-r from-primary to-primary-bright rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000 group-focus-within:duration-200"></div>
+<div class="relative bg-white rounded-xl shadow-ambient p-lg flex items-end gap-md">
+<textarea class="composer-input flex-1 min-h-[100px] p-md border-none resize-none font-body-md text-on-surface focus:ring-0 placeholder:text-outline-variant" id="main-composer" placeholder="어떤 PC가 필요하세요?  예) 배그 잘 돌아가는 100만원대" rows="2"></textarea>
+<button class="h-16 w-16 flex items-center justify-center bg-primary text-on-primary rounded-xl hover:bg-primary-bright transition-all active:scale-95 shadow-lg" data-action="start-session">
+<iconify-icon class="text-3xl" icon="fluent:arrow-right-24-filled"></iconify-icon>
+</button>
+</div>
+</div>
+<div class="mt-md flex flex-col md:flex-row justify-between items-center px-sm gap-md max-w-3xl mx-auto">
+<span class="font-label-md text-on-surface-variant">입력하시면 실재고에서 후보를 좁혀 드립니다.</span>
+<div class="hero__live flex items-center gap-sm font-label-md text-primary bg-primary/5 px-md py-sm rounded-full">
+<span class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+</span>
+<span class="font-bold">지금 실재고(부품포함) 검증 중 <span class="text-xl" data-bind="live_stock_count">26,490</span>개</span>
+</div>
+</div>
+</div>
+<!-- Accelerator Chips -->
+<div class="flex flex-wrap justify-center gap-md mt-xl">
+<button class="px-xl py-lg bg-white border border-outline-variant text-on-surface-variant rounded-full hover:border-primary hover:text-primary hover:bg-primary/5 transition-all font-label-md shadow-sm flex items-center gap-3" data-action="quick-intent" data-intent="game">
+<iconify-icon class="text-2xl" icon="fluent-color:games-24"></iconify-icon> 게임용
+                </button>
+<button class="px-xl py-lg bg-white border border-outline-variant text-on-surface-variant rounded-full hover:border-primary hover:text-primary hover:bg-primary/5 transition-all font-label-md shadow-sm flex items-center gap-3" data-action="quick-intent" data-intent="office">
+<iconify-icon class="text-2xl" icon="fluent-color:print-24"></iconify-icon> 사무용
+                </button>
+<button class="px-xl py-lg bg-white border border-outline-variant text-on-surface-variant rounded-full hover:border-primary hover:text-primary hover:bg-primary/5 transition-all font-label-md shadow-sm flex items-center gap-3" data-action="quick-intent" data-intent="edit">
+<iconify-icon class="text-2xl" icon="fluent-color:board-24"></iconify-icon> 영상편집
+                </button>
+<button class="px-xl py-lg bg-white border border-outline-variant text-on-surface-variant rounded-full hover:border-primary hover:text-primary hover:bg-primary/5 transition-all font-label-md shadow-sm flex items-center gap-3" data-action="quick-intent" data-intent="stream">
+<iconify-icon class="text-2xl" icon="fluent-color:live-24"></iconify-icon> 인터넷방송
+                </button>
+</div>
+</div>
+</section>
+<!-- How It Works Section -->
+<section class="py-3xl px-margin-desktop bg-white">
+<div class="max-w-container-max mx-auto">
+<div class="text-center mb-2xl">
+<h2 class="font-headline-md text-headline-md text-on-surface">감이 아니라, 검증으로 고릅니다.</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-xl relative">
+<!-- Step 1 -->
+<div class="how__step p-xl bg-surface rounded-2xl border border-outline-variant/30 flex flex-col gap-lg shadow-sm group hover:shadow-md transition-all">
+<div class="h-16 w-16 rounded-xl flex items-center justify-center text-white font-bold">
+<iconify-icon class="text-4xl" icon="fluent-color:apps-list-detail-24"></iconify-icon>
+</div>
+<div>
+<h3 class="text-2xl font-bold mb-md">실재고 확인</h3>
+<p class="font-body-md text-on-surface-variant">품절·단종된 제품은 후보군에서 즉시 제외하여 헛걸음 없는 쇼핑을 보장합니다.</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="how__step p-xl bg-surface rounded-2xl border border-outline-variant/30 flex flex-col gap-lg shadow-sm group hover:shadow-md transition-all">
+<div class="h-16 w-16 rounded-xl flex items-center justify-center text-white font-bold">
+<iconify-icon class="text-4xl" icon="fluent-color:arrow-sync-24"></iconify-icon>
+</div>
+<div>
+<h3 class="text-2xl font-bold mb-md">호환성 검증</h3>
+<p class="font-body-md text-on-surface-variant">소켓, 전력 소모량, 부품 치수 등 5가지 핵심 항목을 AI가 정밀 검증합니다.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="how__step p-xl bg-surface rounded-2xl border border-outline-variant/30 flex flex-col gap-lg shadow-sm group hover:shadow-md transition-all">
+<div class="h-16 w-16 rounded-xl flex items-center justify-center text-white font-bold">
+<iconify-icon class="text-4xl" icon="fluent-color:book-contacts-24"></iconify-icon>
+</div>
+<div>
+<h3 class="text-2xl font-bold mb-md">근거 설명</h3>
+<p class="font-body-md text-on-surface-variant">선택된 각 부품의 벤치마크 점수와 선정 이유를 리포트로 투명하게 공개합니다.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Reason Report Preview Section -->
+<section class="py-3xl px-margin-desktop bg-surface">
+<div class="max-w-container-max mx-auto">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md mb-2xl">
+<div class="max-w-2xl">
+<h2 class="font-headline-md text-headline-md text-on-surface">모든 견적에는, 이런 이유가 붙습니다.</h2>
+<p class="font-body-md text-on-surface-variant mt-md">전문가들이 인정하는 데이터를 바탕으로 부품을 추천합니다.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-xl">
+<!-- Reason Card 1 -->
+<div class="reason-card bg-white p-xl rounded-2xl shadow-ambient border border-white flex flex-col gap-lg">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-primary bg-primary/10 px-md py-sm rounded flex items-center">
+<iconify-icon class="mr-2" icon="fluent-color:starburst-24"></iconify-icon>GPU
+                        </span>
+<span class="px-md py-sm bg-tertiary-container text-tertiary font-label-md rounded-full">성능 근거</span>
+</div>
+<h4 class="text-2xl font-bold text-on-surface">RTX 4060</h4>
+<p class="font-body-md text-on-surface-variant">
+                        인기게임 1% Low 프레임 방어율이 이 예산대 최상위권이며, 커뮤니티에서 실사용 안정성이 가장 높게 평가되었습니다.
+                    </p>
+<div class="mt-auto pt-lg border-t border-outline-variant/20 flex gap-md flex-wrap">
+<span class="font-label-md text-outline font-medium">#벤치마크_상위_15%</span>
+<span class="font-label-md text-outline font-medium">#가성비_검증</span>
+</div>
+</div>
+<!-- Reason Card 2 -->
+<div class="reason-card bg-white p-xl rounded-2xl shadow-ambient border border-white flex flex-col gap-lg">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-primary bg-primary/10 px-md py-sm rounded flex items-center">
+<iconify-icon class="mr-2" icon="fluent-color:shield-check-24"></iconify-icon>PSU
+                        </span>
+<span class="px-md py-sm bg-tertiary-container text-tertiary font-label-md rounded-full">안정성 근거</span>
+</div>
+<h4 class="text-2xl font-bold text-on-surface">정격 650W 80PLUS</h4>
+<p class="font-body-md text-on-surface-variant">
+                        이 GPU와 CPU 조합 기준 피크 전력 대비 30% 이상의 마진을 확보하여 장시간 게이밍에도 안정적인 전력을 공급합니다.
+                    </p>
+<div class="mt-auto pt-lg border-t border-outline-variant/20 flex gap-md flex-wrap">
+<span class="font-label-md text-outline font-medium">#전력마진_확보</span>
+<span class="font-label-md text-outline font-medium">#소음_최적화</span>
+</div>
+</div>
+<!-- Reason Card 3 -->
+<div class="reason-card bg-white p-xl rounded-2xl shadow-ambient border border-white flex flex-col gap-lg">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-primary bg-primary/10 px-md py-sm rounded flex items-center">
+<iconify-icon class="mr-2" icon="fluent-color:flash-24"></iconify-icon>RAM
+                        </span>
+<span class="px-md py-sm bg-tertiary-container text-tertiary font-label-md rounded-full">호환성 근거</span>
+</div>
+<h4 class="text-2xl font-bold text-on-surface">DDR5 32GB (16GBx2)</h4>
+<p class="font-body-md text-on-surface-variant">
+                        최신 칩셋 메인보드와의 QVL 리스트 대조를 완료하였으며, 영상 편집 워크플로우에 필요한 최소 대역폭을 충족합니다.
+                    </p>
+<div class="mt-auto pt-lg border-t border-outline-variant/20 flex gap-md flex-wrap">
+<span class="font-label-md text-outline font-medium">#듀얼채널_구성</span>
+<span class="font-label-md text-outline font-medium">#QVL_통과</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Spec Preview Section -->
+<section class="py-3xl px-margin-desktop bg-white">
+<div class="max-w-container-max mx-auto">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-2xl items-center">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-lg">
+<iconify-icon class="mr-3 align-middle text-4xl" icon="fluent-color:apps-list-24"></iconify-icon>추천 구성 미리보기
+                    </h2>
+<p class="font-body-md text-on-surface-variant mb-2xl">현재 가장 많은 사용자가 선택하고 있는 밸런스 구성을 확인해보세요.</p>
+<div class="space-y-lg">
+<div class="flex items-center gap-lg p-xl bg-surface rounded-2xl">
+<span class="w-16 h-16 bg-white rounded-xl border border-outline-variant flex items-center justify-center font-bold text-primary text-xl shadow-sm">CPU</span>
+<div class="flex-1">
+<div class="text-xl font-bold">Intel Core i5-13400F</div>
+<div class="font-label-md text-on-surface-variant">고효율 하이브리드 아키텍처</div>
+</div>
+</div>
+<div class="flex items-center gap-lg p-xl bg-surface rounded-2xl">
+<span class="w-16 h-16 bg-white rounded-xl border border-outline-variant flex items-center justify-center font-bold text-primary text-xl shadow-sm">GPU</span>
+<div class="flex-1">
+<div class="text-xl font-bold">NVIDIA GeForce RTX 4060 Ti</div>
+<div class="font-label-md text-on-surface-variant">DLSS 3 지원 최신 그래픽카드</div>
+</div>
+</div>
+<div class="flex items-center gap-lg p-xl bg-surface rounded-2xl">
+<span class="w-16 h-16 bg-white rounded-xl border border-outline-variant flex items-center justify-center font-bold text-primary text-xl shadow-sm">MB</span>
+<div class="flex-1">
+<div class="text-xl font-bold">B760M DDR5 Pro</div>
+<div class="font-label-md text-on-surface-variant">안정적인 전원부 설계</div>
+</div>
+</div>
+</div>
+<div class="mt-2xl p-xl bg-primary/5 border border-primary/20 rounded-2xl flex items-center justify-between shadow-sm">
+<div class="font-body-md font-bold">실재고 기준 예상 견적가</div>
+<div class="text-headline-md text-primary font-bold" data-bind="preview_price">1,250,000원</div>
+</div>
+</div>
+<div class="relative rounded-3xl overflow-hidden shadow-2xl h-[500px]">
+<img alt="High-end PC Build" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfQXtjck7z7JJa5-2d0BbEkrHn8Lb9KzrRUqdns-goqlzTymSeknqtPGAG81oShg1hYLPFpka6Phe4Ad4vr0M3T1Amnt5SPM6MpNW8z8Zei80CMCQlBv4UrFzFUUgqXJazHlUbtU1Xio_H_umWZ_rhV8IbQykIsvJOun025mIzKqRsrRIeWIzmcxUEuvJia6-aDJWmN-2qQQZSfA2_mN_A_MYXE1W_ebI2MXg_fGSSHW6DO7l2_sPqvMiZUyOgdO8BcJnZxC7-oJ8">
+<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-xl">
+<div class="text-white">
+<div class="text-3xl font-bold mb-md">실시간 인기 구성 #01</div>
+<div class="text-xl opacity-90">게임과 작업, 모두 놓칠 수 없는 사용자들을 위한 베스트 셀러</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Reviews Section -->
+<section class="py-3xl px-margin-desktop bg-surface">
+<div class="max-w-container-max mx-auto">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2xl text-center">사용자 후기</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-xl">
+<!-- Review 1 -->
+<div class="bg-white p-xl rounded-2xl shadow-ambient border border-outline-variant/10 flex flex-col gap-lg">
+<div class="flex text-tertiary gap-1">
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+</div>
+<p class="font-body-md text-on-surface">"어려운 용어 없이 설명해주니까 컴맹인 저도 안심하고 샀어요. 배송도 빠르고 정말 만족합니다."</p>
+<div class="font-label-md text-on-surface-variant font-bold mt-auto">컴퓨터초보101 님</div>
+</div>
+<!-- Review 2 -->
+<div class="bg-white p-xl rounded-2xl shadow-ambient border border-outline-variant/10 flex flex-col gap-lg">
+<div class="flex text-tertiary gap-1">
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+</div>
+<p class="font-body-md text-on-surface">"재고 기반이라 그런지 견적 내고 바로 다음 날 조립 들어갔네요. 투명한 근거 제시가 아주 좋습니다."</p>
+<div class="font-label-md text-on-surface-variant font-bold mt-auto">겜돌이77 님</div>
+</div>
+<!-- Review 3 -->
+<div class="bg-white p-xl rounded-2xl shadow-ambient border border-outline-variant/10 flex flex-col gap-lg">
+<div class="flex text-tertiary gap-1">
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-filled"></iconify-icon>
+<iconify-icon class="text-2xl" icon="fluent:star-24-regular"></iconify-icon>
+</div>
+<p class="font-body-md text-on-surface">"영상편집용으로 맞췄는데 AI가 추천해준 대로 하니 렉 없이 작업 잘 됩니다. 리포트가 진짜 도움됐어요."</p>
+<div class="font-label-md text-on-surface-variant font-bold mt-auto">크리에이터X 님</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Final CTA Section -->
+<section class="py-3xl px-margin-desktop bg-primary text-on-primary text-center relative overflow-hidden">
+<div class="relative z-10 max-w-2xl mx-auto flex flex-col items-center gap-xl">
+<h2 class="font-headline-lg text-headline-lg">지금, 이유 있는 견적을 받아보세요.</h2>
+<p class="font-body-md opacity-90 text-xl">복잡한 고민은 AI에게 맡기고, 당신은 최고의 결과만 누리세요.</p>
+<button class="px-2xl py-xl bg-white text-primary rounded-2xl text-2xl font-bold shadow-xl hover:shadow-2xl hover:scale-105 transition-all" data-action="scroll-to-input" onclick="document.getElementById('composer-anchor').scrollIntoView({behavior: 'smooth'}); document.getElementById('main-composer').focus();">견적 시작하기</button>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="footer bg-white border-t border-outline-variant py-2xl px-margin-desktop">
+<div class="max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-start gap-2xl">
+<div class="flex flex-col gap-lg">
+<span class="text-3xl font-bold text-primary">팝콘 PC AI</span>
+<p class="font-label-md text-on-surface-variant">© 2024 TechAdvisor PC Solutions.<br>Data-driven builds, reason-based results.</p>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-xl">
+<div class="flex flex-col gap-md">
+<span class="font-label-caps text-on-surface font-bold">서비스</span>
+<a class="font-label-md text-on-surface-variant hover:text-primary" href="#">견적 받기</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary" href="#">추천 구성</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary" href="#">부품 벤치마크</a>
+</div>
+<div class="flex flex-col gap-md">
+<span class="font-label-caps text-on-surface font-bold">고객지원</span>
+<a class="font-label-md text-on-surface-variant hover:text-primary" href="#">FAQ</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary" href="#">고객센터</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary" href="#">카카오톡 문의</a>
+</div>
+<div class="flex flex-col gap-md col-span-2 md:col-span-1">
+<span class="font-label-caps text-on-surface font-bold">기업정보</span>
+<p class="font-label-md text-on-surface-variant">서울특별시 용산구 한강대로</p>
+<p class="font-label-md text-on-surface-variant">사업자번호: 000-00-00000</p>
+</div>
+</div>
+</div>
+<div class="max-w-container-max mx-auto mt-2xl pt-xl border-t border-outline-variant/30 flex flex-col md:flex-row justify-between items-center gap-lg">
+<div class="flex gap-xl">
+<a class="font-label-md text-on-surface-variant hover:underline" href="#">이용약관</a>
+<a class="font-label-md text-on-surface-variant hover:underline" href="#">개인정보처리방침</a>
+</div>
+<div class="flex gap-md">
+<button class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container hover:bg-primary-container transition-colors shadow-sm">
+<iconify-icon class="text-2xl" icon="fluent:share-24-filled"></iconify-icon>
+</button>
+</div>
+</div>
+</footer>
+<!-- Exception UI: Loading Layer -->
+<div class="loading-layer fixed inset-0 bg-white/95 backdrop-blur-xl z-[60] flex flex-col items-center justify-center gap-xl hidden">
+<div class="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+<div class="text-center">
+<h3 class="text-3xl font-bold text-on-surface">실재고에서 후보를 불러오는 중입니다...</h3>
+<p class="text-xl text-on-surface-variant mt-md">잠시만 기다려주세요. 최적의 구성을 검증하고 있습니다.</p>
+</div>
+</div>
+<script>
+    const sendBtn = document.querySelector('[data-action="start-session"]');
+    const loadingLayer = document.querySelector('.loading-layer');
+    const textarea = document.getElementById('main-composer');
+
+    if(sendBtn) {
+        sendBtn.addEventListener('click', () => {
+            if(textarea.value.trim() !== '') {
+                loadingLayer.classList.remove('hidden');
+                setTimeout(() => {
+                    console.log("Session started with text:", textarea.value);
+                }, 2000);
+            } else {
+                textarea.classList.add('ring-2', 'ring-error');
+                setTimeout(() => textarea.classList.remove('ring-2', 'ring-error'), 1000);
+            }
+        });
+    }
+
+    const chips = document.querySelectorAll('[data-action="quick-intent"]');
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const intent = chip.getAttribute('data-intent');
+            let prompt = "";
+            switch(intent) {
+                case 'game': prompt = "배틀그라운드 끊김 없이 돌아가는 게임용 PC 추천해줘"; break;
+                case 'office': prompt = "업무용으로 쓸 가성비 좋은 사무용 PC 알려줘"; break;
+                case 'edit': prompt = "4K 영상 편집 쾌적하게 할 수 있는 사양으로 보여줘"; break;
+                case 'stream': prompt = "트위치 원컴 방송용 견적 짜줘"; break;
+            }
+            textarea.value = prompt;
+            sendBtn.click();
+        });
+    });
+
+    window.addEventListener('scroll', () => {
+        const header = document.querySelector('header');
+        if (window.scrollY > 0) {
+            header.classList.add('shadow-md');
+        } else {
+            header.classList.remove('shadow-md');
+        }
+    });
+</script>
+</body></html>

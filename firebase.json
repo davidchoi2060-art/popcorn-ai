@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "mockups/mvp1",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="FR-REC-040" data-domain="recommend">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>팝콘PC AI · 주문 확인 · 결제 인계 (S4 목업)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+  --error:#C0392B; --on-error:#ffffff;
+  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-xl:1.5rem; --r-full:9999px;
+  --xs:4px; --sm:8px; --md:16px; --lg:24px; --xl:32px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+.num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font-family:inherit;cursor:pointer}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Top bar */
+.topbar{position:fixed;top:0;left:0;right:0;height:64px;z-index:50;background:var(--card);
+  border-bottom:1px solid var(--outline-variant);display:flex;align-items:center;gap:var(--md);padding:0 var(--lg)}
+.brand{font-family:var(--font-head);font-weight:800;color:var(--primary);font-size:20px;letter-spacing:-.02em}
+.divider{width:1px;height:22px;background:var(--outline-variant)}
+.topbar__title{font-family:var(--font-head);font-size:14px;font-weight:700}
+.topbar__spacer{flex:1}
+.steps{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--on-variant);font-weight:600}
+.steps b{color:var(--primary)}
+@media(max-width:768px){
+  .topbar{gap:var(--sm);padding:0 var(--md)}
+  .brand{font-size:16px}
+  .divider,.topbar__title,.steps{display:none}
+}
+
+/* layout — 단일 컬럼 집중형 */
+main{flex:1;padding:88px 0 160px;max-width:720px;width:100%;margin:0 auto;
+  display:flex;flex-direction:column;gap:var(--lg);padding-left:var(--lg);padding-right:var(--lg)}
+
+/* page header */
+.page-header h1{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:-.02em}
+.page-header p{font-size:15px;color:var(--on-variant);margin-top:4px}
+
+/* 얇은 구성 수정 진입 링크 */
+.edit-entry{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
+  font-size:14px;color:var(--on-variant);background:var(--container-low);
+  border:1px solid var(--outline-variant);border-radius:var(--r-full);padding:10px var(--md)}
+.edit-entry a{color:var(--primary-bright);font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.edit-entry a:hover{text-decoration:underline}
+
+/* card 공통 */
+.card{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+.card__head{padding:var(--md) var(--lg);border-bottom:1px solid var(--outline-variant)}
+.card__head h3{font-family:var(--font-head);font-size:16px;font-weight:700}
+.card__body{padding:var(--lg)}
+
+/* 1) 최종 신뢰 배지 */
+.assurance{border:2px solid rgba(101,161,212,.30);border-radius:var(--r-lg);background:linear-gradient(180deg,rgba(101,161,212,.07),var(--card));
+  padding:var(--lg);box-shadow:var(--shadow)}
+.assurance__title{display:flex;align-items:center;gap:10px;color:var(--primary);margin-bottom:var(--md)}
+.assurance__title h2{font-family:var(--font-head);font-size:19px;font-weight:800;line-height:1.35}
+.assurance__title .badge{width:38px;height:38px;border-radius:var(--r-full);background:var(--primary);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.compat{display:flex;flex-wrap:wrap;gap:var(--sm);padding-bottom:var(--md);margin-bottom:var(--md);border-bottom:1px solid var(--outline-variant)}
+.compat__item{display:inline-flex;align-items:center;gap:6px;background:var(--container-low);border:1px solid var(--outline-variant);
+  border-radius:var(--r-full);padding:6px 12px;font-size:13px;font-weight:600}
+.compat__item .ico{color:var(--primary);font-size:16px}
+.compat__item b{color:var(--primary);font-weight:700}
+.points{display:flex;flex-wrap:wrap;gap:var(--sm)}
+.point{display:inline-flex;align-items:center;gap:6px;background:rgba(110,143,214,.10);border:1px solid rgba(110,143,214,.22);
+  color:var(--tertiary);border-radius:var(--r-full);padding:6px 14px;font-size:13px;font-weight:700}
+.assurance__cap{font-size:13px;color:var(--on-variant);margin-top:var(--md)}
+
+/* 2) 장바구니 요약 */
+.item{display:flex;align-items:center;justify-content:space-between;gap:var(--md);padding:var(--md) var(--lg);border-bottom:1px solid var(--container-low)}
+.item:last-child{border-bottom:0}
+.item--service{background:rgba(110,143,214,.05)}
+.item__left{display:flex;align-items:center;gap:var(--md);min-width:0}
+.item__ico{width:44px;height:44px;border-radius:var(--r-md);background:var(--container);color:var(--on-variant);
+  display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.item--service .item__ico{background:rgba(110,143,214,.14);color:var(--tertiary)}
+.item__cat{font-size:12px;font-weight:600;color:var(--on-variant)}
+.item__name{font-size:15px;font-weight:700;line-height:1.35}
+.item__tag{display:inline-block;font-size:11px;font-weight:700;color:var(--tertiary);background:rgba(110,143,214,.12);
+  border-radius:var(--r-full);padding:1px 8px;margin-left:6px;vertical-align:middle}
+.item__price{font-size:15px;font-weight:600;white-space:nowrap}
+
+/* 합계 */
+.total{padding:var(--lg);border-top:1px solid var(--outline-variant);background:var(--container-low);border-radius:0 0 var(--r-lg) var(--r-lg)}
+.total__row{display:flex;justify-content:space-between;font-size:15px;padding:5px 0}
+.total__row span:first-child{color:var(--on-variant)}
+.total__grand{display:flex;justify-content:space-between;align-items:flex-end;padding-top:var(--md);margin-top:var(--sm);border-top:1px solid var(--outline-variant)}
+.total__asof{font-size:12px;color:var(--on-variant);margin-bottom:2px}
+.total__price{font-family:var(--font-head);font-size:28px;font-weight:800;color:var(--primary);line-height:1}
+.total__vat{font-size:13px;color:var(--on-variant)}
+.free{color:var(--primary);font-weight:700}
+
+/* 쿠폰 */
+.coupon{display:flex;gap:var(--sm);padding:0 var(--lg) var(--lg)}
+.coupon input{flex:1;padding:10px var(--md);border:1px solid var(--outline-variant);border-radius:var(--r-md);font-family:inherit;font-size:14px}
+.coupon input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(101,161,212,.2)}
+.btn-ghost{background:var(--card);color:var(--primary);border:1px solid var(--outline-variant);
+  padding:10px 16px;border-radius:var(--r-md);font-weight:700;font-size:14px;transition:.15s}
+.btn-ghost:hover{border-color:var(--primary);background:var(--container-low)}
+
+/* 3) 최종 실재고 재확인 */
+.stock{display:flex;align-items:flex-start;gap:10px;font-size:15px;font-weight:700}
+.stock .dot{width:12px;height:12px;border-radius:var(--r-full);flex:none;margin-top:6px}
+.stock--ok{color:var(--primary)}
+.stock--ok .dot{background:var(--primary)}
+.stock--soldout{color:var(--error);flex-direction:column;align-items:stretch}
+.stock--soldout .stock__line{display:flex;align-items:flex-start;gap:10px}
+.stock--soldout .dot{background:var(--error)}
+.stock--checking{color:var(--on-variant)}
+.stock--checking .dot{background:var(--on-variant);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.stock__fix{align-self:flex-start;margin-top:var(--sm);margin-left:22px;background:var(--error);color:#fff;border:0;
+  padding:9px 16px;border-radius:var(--r-md);font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px}
+
+/* 4) 로그인 게이트 */
+.auth-gate{text-align:center;padding:var(--xl) var(--lg);border:2px dashed var(--outline);border-radius:var(--r-lg);background:var(--container-low)}
+.auth-gate__ico{width:52px;height:52px;border-radius:var(--r-full);background:var(--container);color:var(--on-variant);
+  display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto var(--md)}
+.auth-gate h3{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:var(--md)}
+.auth-gate .btn-auth{width:100%;background:var(--primary);color:#fff;border:0;padding:14px;border-radius:var(--r-md);
+  font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s}
+.auth-gate .btn-auth:hover{background:var(--primary-bright)}
+.auth-gate__cap{font-size:13px;color:var(--on-variant);margin-top:var(--md)}
+.auth-done{display:flex;align-items:center;gap:10px;color:var(--primary);font-weight:700;font-size:15px;
+  background:var(--container-low);border:1px solid var(--outline-variant);border-radius:var(--r-md);padding:var(--md) var(--lg)}
+
+/* 인라인 경고(예외) */
+.inline-alert{display:flex;align-items:flex-start;gap:10px;color:var(--error);background:rgba(192,57,43,.06);
+  border:1px solid rgba(192,57,43,.25);border-radius:var(--r-md);padding:var(--md);font-size:14px;font-weight:600}
+.inline-alert .ico{font-size:20px;flex:none;margin-top:2px}
+.inline-alert a{color:var(--error);font-weight:700}
+
+/* 5) 하단 sticky CTA */
+.cta{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);
+  border-top:1px solid var(--outline-variant);padding:var(--md) var(--lg)}
+.cta__inner{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:var(--md)}
+.cta__price{display:flex;flex-direction:column;line-height:1.2}
+.cta__price small{font-size:12px;color:var(--on-variant)}
+.cta__price b{font-family:var(--font-head);font-size:20px;font-weight:800}
+.cta__spacer{flex:1}
+.cta__link{color:var(--on-variant);font-size:14px;font-weight:600;text-decoration:underline;background:none;border:0;padding:8px}
+.cta__link:hover{color:var(--primary)}
+.btn-checkout{background:var(--primary);color:#fff;border:0;padding:14px 28px;border-radius:var(--r-lg);
+  font-weight:800;font-size:16px;display:flex;align-items:center;gap:8px;box-shadow:0 6px 16px rgba(101,161,212,.30);transition:.2s}
+.btn-checkout:hover{background:var(--primary-bright)}
+.btn-checkout:disabled{background:var(--container);color:var(--on-variant);cursor:not-allowed;box-shadow:none}
+.cta__reason{font-size:12px;color:var(--error);text-align:right;margin-top:4px;font-weight:600;min-height:16px}
+@media(max-width:768px){
+  main{padding-bottom:190px}
+  .cta__inner{flex-wrap:wrap}
+  .btn-checkout{flex:1;justify-content:center}
+  .cta__price{order:-1;width:100%}
+}
+
+/* overlay / 인증 모달 */
+.overlay{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:var(--lg)}
+.overlay.show{display:flex}
+.overlay__scrim{position:absolute;inset:0;background:rgba(33,45,81,.4);backdrop-filter:blur(3px)}
+.dialog{position:relative;background:var(--card);border-radius:var(--r-xl);padding:var(--xl);max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(33,45,81,.3);animation:rise .25s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.dialog h2{font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:var(--sm);display:flex;align-items:center;gap:8px}
+.dialog p{font-size:14px;color:var(--on-variant);margin-bottom:var(--lg)}
+.dialog__field{margin-bottom:var(--md)}
+.dialog__field label{display:block;font-size:13px;font-weight:600;color:var(--on-variant);margin-bottom:5px}
+.dialog__field input{width:100%;padding:11px var(--md);border:1px solid var(--outline-variant);border-radius:var(--r-md);font-family:inherit;font-size:15px}
+.dialog__field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(101,161,212,.2)}
+.dialog__actions{display:flex;gap:var(--sm);margin-top:var(--lg)}
+.dialog__actions .btn-primary{flex:1;background:var(--primary);color:#fff;border:0;padding:13px;border-radius:var(--r-md);font-weight:700;font-size:15px}
+.dialog__actions .btn-primary:hover{background:var(--primary-bright)}
+.dialog__actions .btn-cancel{background:var(--container);color:var(--on-variant);border:0;padding:13px 18px;border-radius:var(--r-md);font-weight:700;font-size:15px}
+.dialog__cap{font-size:12px;color:var(--on-variant);text-align:center;margin-top:var(--md)}
+
+.toast{position:fixed;bottom:170px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A202C;color:#fff;
+  font-size:13px;padding:10px 18px;border-radius:var(--r);opacity:0;pointer-events:none;transition:.25s;z-index:90;max-width:90%}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ═══ SVG 아이콘 심볼 (단색 currentColor) ═══ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-tool" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5l-9 9a2.8 2.8 0 0 1-4-4l8-8-2-2 2-2 2 2Z"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M1 4h13v10H1zM14 8h4l3 3v3h-7"/><circle cx="6" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="m9 12-2 9 5-3 5 3-2-9"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="8" cy="12" r="2.2"/><path d="M13 12h6"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="5" height="5"/><path d="M15 8h3M15 12h3M8 15h8"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 16v3M10 16v3M14 16v3M18 16v3M6 11v2M10 11v2M14 11v2M18 11v2"/></symbol>
+  <symbol id="i-drive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10"/><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M14 9h4M14 13h4"/></symbol>
+  <symbol id="i-case" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/><path d="M9 7h6M9 11h6"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8"/></symbol>
+</svg>
+
+<!-- ═══ Top bar ═══ -->
+<header class="topbar">
+  <span class="brand">팝콘PC AI</span>
+  <span class="divider"></span>
+  <span class="topbar__title">주문 확인</span>
+  <div class="topbar__spacer"></div>
+  <nav class="steps" aria-label="진행 단계">
+    <span>견적</span><span>›</span><span>제안</span><span>›</span><span>변경</span><span>›</span><b>주문 확인</b>
+  </nav>
+</header>
+
+<main>
+  <!-- 위험 진입 차단 (예외, hidden) -->
+  <div class="inline-alert" id="cart-blocked" role="alert" hidden>
+    <svg class="ico"><use href="#i-alert"/></svg>
+    <span>호환성 위험이 남아 있어 결제로 진행할 수 없어요.
+      <a href="#" data-action="goto-detail">부품 변경으로 이동 →</a></span>
+  </div>
+
+  <!-- 세션 만료 (예외, hidden) -->
+  <div class="inline-alert" id="session-expired" role="alert" hidden>
+    <svg class="ico"><use href="#i-alert"/></svg>
+    <span>세션이 만료됐습니다. 구성은 보관돼 있어요.
+      <a href="#" data-action="open-auth">다시 로그인하기 →</a></span>
+  </div>
+
+  <!-- 페이지 헤더 -->
+  <div class="page-header">
+    <h1>주문 확인</h1>
+    <p>구성하신 PC를 마지막으로 확인하고 결제로 넘어갑니다.</p>
+  </div>
+
+  <!-- 0) 구성 수정 진입 (얇게) -->
+  <div class="edit-entry">
+    <span>구성을 더 바꾸고 싶으세요?</span>
+    <a href="#" data-action="goto-detail">부품 변경하기 <svg class="ico"><use href="#i-arrow"/></svg></a>
+  </div>
+
+  <!-- 1) 최종 신뢰 배지 -->
+  <section class="assurance" aria-labelledby="assurance-title">
+    <div class="assurance__title">
+      <span class="badge"><svg class="ico"><use href="#i-shield"/></svg></span>
+      <h2 id="assurance-title">이 구성은 조립 가능함이 검증됐습니다</h2>
+    </div>
+    <div class="compat" data-repeat="compat_matrix" aria-label="호환성 5종 통과">
+      <span class="compat__item"><svg class="ico"><use href="#i-check"/></svg>소켓 <b>통과</b></span>
+      <span class="compat__item"><svg class="ico"><use href="#i-check"/></svg>메모리 <b>통과</b></span>
+      <span class="compat__item"><svg class="ico"><use href="#i-check"/></svg>전력 <b>통과</b></span>
+      <span class="compat__item"><svg class="ico"><use href="#i-check"/></svg>쿨러 <b>통과</b></span>
+      <span class="compat__item"><svg class="ico"><use href="#i-check"/></svg>케이스 <b>통과</b></span>
+    </div>
+    <div class="points">
+      <span class="point"><svg class="ico"><use href="#i-tool"/></svg>전문가 조립 · 검수</span>
+      <span class="point"><svg class="ico"><use href="#i-truck"/></svg>당일 출고</span>
+      <span class="point"><svg class="ico"><use href="#i-award"/></svg>A/S 보증</span>
+    </div>
+    <p class="assurance__cap">결제 후 조립 검수를 거쳐 출고됩니다.</p>
+  </section>
+
+  <!-- 2) 장바구니 요약 -->
+  <section class="card" aria-labelledby="summary-title">
+    <div class="card__head"><h3 id="summary-title">구성 상세</h3></div>
+    <div data-repeat="cart_items">
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-cpu"/></svg></span>
+          <div><p class="item__cat">CPU</p><p class="item__name">Intel Core i7-14700K</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>580,000원</span>
+      </div>
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-gpu"/></svg></span>
+          <div><p class="item__cat">GPU</p><p class="item__name">NVIDIA RTX 4070 Ti SUPER</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>420,000원</span>
+      </div>
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-board"/></svg></span>
+          <div><p class="item__cat">메인보드</p><p class="item__name">MSI MAG Z790 Tomahawk WiFi</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>250,000원</span>
+      </div>
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-ram"/></svg></span>
+          <div><p class="item__cat">메모리</p><p class="item__name">삼성 DDR5-5600 32GB (16×2)</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>120,000원</span>
+      </div>
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-drive"/></svg></span>
+          <div><p class="item__cat">SSD</p><p class="item__name">삼성 990 PRO 1TB NVMe</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>135,000원</span>
+      </div>
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-power"/></svg></span>
+          <div><p class="item__cat">파워</p><p class="item__name">시소닉 FOCUS GX-750 750W</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>110,000원</span>
+      </div>
+      <div class="item">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-case"/></svg></span>
+          <div><p class="item__cat">케이스</p><p class="item__name">NZXT H5 Flow</p></div>
+        </div>
+        <span class="item__price num" data-bind-item>90,000원</span>
+      </div>
+      <!-- 조립 서비스: 별도 행 명시 (비용 투명 — 숨기지 않음) -->
+      <div class="item item--service">
+        <div class="item__left">
+          <span class="item__ico"><svg class="ico"><use href="#i-tool"/></svg></span>
+          <div>
+            <p class="item__cat">조립 서비스<span class="item__tag">별도 청구</span></p>
+            <p class="item__name">전문가 조립 · 검수 공임 (ASSEMBLY_SERVICE)</p>
+          </div>
+        </div>
+        <span class="item__price num" data-bind-item>30,000원</span>
+      </div>
+    </div>
+
+    <!-- 합계 -->
+    <div class="total">
+      <div class="total__row"><span>부품 합계 (7종)</span><span class="num" data-bind="parts_price">1,705,000원</span></div>
+      <div class="total__row"><span>조립비</span><span class="num" data-bind="assembly_price">30,000원</span></div>
+      <div class="total__row"><span>배송비</span><span class="free">무료</span></div>
+      <div class="total__grand">
+        <div>
+          <p class="total__asof"><span data-bind="price_asof">3시간 전 기준</span> · VAT 포함</p>
+          <span class="total__price num" data-bind="total_price"
+                aria-label="총 결제금액 175만 5천원">1,735,000원</span>
+        </div>
+        <span class="total__vat">총 결제금액</span>
+      </div>
+    </div>
+
+    <!-- (선택) 쿠폰·적립 -->
+    <div class="coupon">
+      <label for="coupon-code" class="num" style="display:none">쿠폰 코드</label>
+      <input id="coupon-code" type="text" placeholder="쿠폰 코드 입력 (선택)" aria-label="쿠폰 코드">
+      <button class="btn-ghost" data-action="apply-coupon">적용</button>
+    </div>
+  </section>
+
+  <!-- 3) 최종 실재고 재확인 -->
+  <section class="card" aria-labelledby="stock-title">
+    <div class="card__head"><h3 id="stock-title">결제 직전 실재고 재확인</h3></div>
+    <div class="card__body">
+      <!-- 재확인 로딩 (예외, hidden) -->
+      <div class="stock stock--checking" id="stock-checking" hidden>
+        <span class="dot"></span><span>재고를 확인하는 중입니다…</span>
+      </div>
+      <!-- 정상 -->
+      <div class="stock stock--ok" id="stock-ok">
+        <span class="dot"></span><span>전 품목 재고 확보 — 바로 출고 가능</span>
+      </div>
+      <!-- 품절 발생 (예외, hidden) -->
+      <div class="stock stock--soldout" id="stock-soldout" role="alert" hidden>
+        <div class="stock__line">
+          <span class="dot"></span>
+          <span>방금 <b data-bind="soldout_part">시소닉 FOCUS GX-750 750W</b>이(가) 품절됐습니다. 대체 후 계속하시겠어요?</span>
+        </div>
+        <button class="stock__fix" data-action="fix-soldout">
+          <svg class="ico"><use href="#i-swap"/></svg>안전 대안으로 교체
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4) 로그인 게이트 (게스트일 때만) -->
+  <section class="card__wrap" aria-labelledby="auth-title">
+    <!-- 미로그인 결제 시도 안내 (예외, hidden) -->
+    <div class="inline-alert" id="auth-required" role="alert" hidden style="margin-bottom:var(--md)">
+      <svg class="ico"><use href="#i-alert"/></svg>
+      <span>결제하려면 먼저 로그인이 필요합니다. 아래에서 로그인해 주세요.</span>
+    </div>
+
+    <div class="auth-gate" id="auth-gate">
+      <span class="auth-gate__ico"><svg class="ico"><use href="#i-user"/></svg></span>
+      <h3 id="auth-title">결제를 위해 로그인이 필요합니다</h3>
+      <button class="btn-auth" data-action="open-auth">
+        <svg class="ico"><use href="#i-lock"/></svg>로그인 / 회원가입으로 계속
+      </button>
+      <p class="auth-gate__cap">기존 팝콘PC 쇼핑몰 계정으로 로그인됩니다.</p>
+      <!-- SSO 실패 (예외, hidden) -->
+      <p class="auth-gate__cap" id="auth-fail" style="color:var(--error);font-weight:600" hidden>
+        로그인에 실패했습니다. 다시 시도해 주세요.
+      </p>
+    </div>
+
+    <!-- 로그인 완료 상태 (기본 hidden) -->
+    <div class="auth-done" id="auth-done" hidden>
+      <svg class="ico" style="font-size:20px;color:var(--primary)"><use href="#i-check"/></svg>
+      <span><b data-bind="user_name">홍길동</b>님으로 로그인됨 — 결제를 진행할 수 있어요.</span>
+    </div>
+  </section>
+</main>
+
+<!-- ═══ 5) 하단 sticky CTA ═══ -->
+<footer class="cta">
+  <div>
+    <div class="cta__inner">
+      <div class="cta__price">
+        <small>총 결제금액</small>
+        <b class="num" data-bind="total_price">1,735,000원</b>
+      </div>
+      <div class="cta__spacer"></div>
+      <button class="cta__link" data-action="goto-detail">부품 변경</button>
+      <button class="btn-checkout" id="checkout" data-action="checkout"
+              aria-describedby="checkout-reason" disabled>
+        <svg class="ico" style="font-size:20px"><use href="#i-card"/></svg>결제하기
+      </button>
+    </div>
+    <p class="cta__reason" id="checkout-reason" role="status" aria-live="polite">로그인 후 결제할 수 있어요.</p>
+  </div>
+</footer>
+
+<!-- ═══ 인증 모달 (시늉) ═══ -->
+<div class="overlay" id="ov-auth" role="dialog" aria-modal="true" aria-labelledby="ov-auth-title">
+  <div class="overlay__scrim" data-action="close-auth"></div>
+  <div class="dialog">
+    <h2 id="ov-auth-title"><svg class="ico" style="color:var(--primary)"><use href="#i-lock"/></svg>팝콘PC 쇼핑몰 로그인</h2>
+    <p>기존 쇼핑몰 계정으로 로그인하면 여기까지의 구성이 그대로 이어집니다. (목업 — 아무 값이나 입력)</p>
+    <div class="dialog__field">
+      <label for="auth-id">아이디</label>
+      <input id="auth-id" type="text" placeholder="popcorn_id" autocomplete="username">
+    </div>
+    <div class="dialog__field">
+      <label for="auth-pw">비밀번호</label>
+      <input id="auth-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="dialog__actions">
+      <button class="btn-cancel" data-action="close-auth">취소</button>
+      <button class="btn-primary" data-action="do-login">로그인</button>
+    </div>
+    <p class="dialog__cap">SSO 연동 — 신규 회원 시스템을 만들지 않습니다.</p>
+  </div>
+</div>
+
+<!-- ═══ 결제 레일 오류 (예외, hidden) ═══ -->
+<div class="overlay" id="ov-checkout-fail" role="dialog" aria-modal="true" aria-labelledby="ov-fail-title">
+  <div class="overlay__scrim"></div>
+  <div class="dialog">
+    <h2 id="ov-fail-title"><svg class="ico" style="color:var(--error)"><use href="#i-alert"/></svg>결제 연결 오류</h2>
+    <p>결제 연결에 문제가 있어요. 구성은 그대로 보관돼 있으니 잠시 후 다시 시도해 주세요.</p>
+    <div class="dialog__actions">
+      <button class="btn-primary" data-action="checkout">다시 시도</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s){return document.querySelector(s);};
+
+  // ════════════════ 상태: 단일 원천 ════════════════
+  // 결제 게이팅의 세 축. 셋 다 안전해야만 [결제하기] 활성.
+  var state = {
+    loggedIn:  false,   // 로그인 완료 여부 (게스트 기본)
+    stockOk:   true,    // 최종 실재고 재확인 통과 여부
+    compatOk:  true     // 호환성 위험 없음 여부 (S3에서 위험 진입 시 false)
+  };
+
+  // ════════════════ 렌더러: 상태 → 결제 버튼 게이팅 ════════════════
+  var checkoutBtn = $('#checkout');
+  var reasonEl    = $('#checkout-reason');
+
+  function render(){
+    // 결제 가능 = 로그인 완료 + 재고 정상 + 호환성 위험 없음
+    var ok = state.loggedIn && state.stockOk && state.compatOk;
+    checkoutBtn.disabled = !ok;
+
+    // disabled 사유 캡션 (aria-describedby로 연결됨) — 우선순위: 위험 > 품절 > 미로그인
+    var reason = '';
+    if(!state.compatOk)      reason = '호환성 위험이 남아 있어 결제할 수 없어요. 부품을 변경해 주세요.';
+    else if(!state.stockOk)  reason = '품절 부품이 있어요. 안전 대안으로 교체 후 결제할 수 있어요.';
+    else if(!state.loggedIn) reason = '로그인 후 결제할 수 있어요.';
+    reasonEl.textContent = reason;   // 활성 시 빈 문자열
+
+    // 로그인 게이트 노출: 게스트일 때만
+    $('#auth-gate').hidden  = state.loggedIn;
+    $('#auth-done').hidden  = !state.loggedIn;
+  }
+
+  // ════════════════ 이벤트 (위임) ════════════════
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('[data-action]'); if(!el) return;
+    var a = el.dataset.action;
+    if(el.tagName==='A') e.preventDefault();
+
+    // 부품 변경 → S3
+    if(a==='goto-detail'){
+      toast('부품 변경(S3)으로 이동합니다 — 목업');
+      setTimeout(function(){ window.location.href='s3-detail.html'; }, 500);
+      return;
+    }
+
+    // 로그인 게이트 → 인증 모달 열기
+    if(a==='open-auth'){
+      $('#auth-fail').hidden = true;
+      $('#auth-required').hidden = true;
+      show('#ov-auth');
+      setTimeout(function(){ $('#auth-id').focus(); }, 50);
+      return;
+    }
+    if(a==='close-auth'){ hide('#ov-auth'); return; }
+
+    // 로그인 실행 (시늉) → 로그인 완료 상태로
+    if(a==='do-login'){
+      hide('#ov-auth');
+      state.loggedIn = true;
+      render();
+      toast('로그인되었습니다 — 결제를 진행할 수 있어요');
+      return;
+    }
+
+    // 결제하기 → 외부 쇼핑몰 릴레이 시늉
+    if(a==='checkout'){
+      // 방어: disabled 상태에서 눌리면(모달 재시도 등) 사유로 유도
+      if(checkoutBtn.disabled){
+        if(!state.loggedIn){
+          $('#auth-required').hidden = false;
+          $('#auth-gate').scrollIntoView({behavior:'smooth',block:'center'});
+        }
+        return;
+      }
+      hide('#ov-checkout-fail');
+      toast('외부 쇼핑몰 결제로 릴레이 — 목업 (확정 구성 페이로드 전달)');
+      return;
+    }
+
+    // 품절 → 안전 대안 교체(S3 흐름)
+    if(a==='fix-soldout'){
+      toast('안전 대안 교체(S3)로 이동합니다 — 목업');
+      setTimeout(function(){ window.location.href='s3-detail.html'; }, 500);
+      return;
+    }
+
+    // 쿠폰 적용 (시늉)
+    if(a==='apply-coupon'){
+      var code=$('#coupon-code').value.trim();
+      toast(code ? '쿠폰을 확인 중입니다 — 목업 (쇼핑몰 정책 적용)' : '쿠폰 코드를 입력해 주세요');
+      return;
+    }
+  });
+
+  // Enter로 로그인
+  $('#ov-auth').addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ e.preventDefault(); $('[data-action="do-login"]').click(); }
+    if(e.key==='Escape'){ hide('#ov-auth'); }
+  });
+
+  function show(sel){ $(sel).classList.add('show'); }
+  function hide(sel){ $(sel).classList.remove('show'); }
+  var toastT;
+  function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT);
+    toastT=setTimeout(function(){t.classList.remove('show');},2400); }
+
+  // ════════════════ 데모용 트리거 (콘솔에서 호출) ════════════════
+  // 품절 발생 시연: 재고 NG + 정상표시 숨김 + 품절표시 노출
+  window.soldoutDemo=function(){
+    state.stockOk=false; $('#stock-ok').hidden=true; $('#stock-soldout').hidden=false; render();
+  };
+  // 호환성 위험 진입 시연: 상단 차단 배너 + 결제 비활성
+  window.blockedDemo=function(){
+    state.compatOk=false; $('#cart-blocked').hidden=false; render();
+  };
+  // 세션 만료 시연
+  window.expiredDemo=function(){
+    state.loggedIn=false; $('#session-expired').hidden=false; render();
+  };
+  // 결제 레일 오류 시연
+  window.failDemo=function(){ show('#ov-checkout-fail'); };
+
+  // 초기 렌더 (게스트 · 재고정상 · 위험없음 → 결제 비활성, 사유="로그인 후")
+  render();
+})();
+</script>
+</body>
+</html>

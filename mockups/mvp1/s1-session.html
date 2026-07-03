@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="FR-REC-010" data-domain="recommend">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>팝콘PC AI · 대화형 견적 세션 (S1 목업)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+  --error:#C0392B; --on-error:#ffffff;
+  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-xl:1.5rem; --r-full:9999px;
+  --xs:4px; --sm:8px; --md:16px; --lg:24px; --xl:32px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+.num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
+/* 단색 인라인 아이콘: currentColor 상속 */
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font-family:inherit;cursor:pointer}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Top bar */
+.topbar{position:fixed;top:0;left:0;right:0;height:64px;z-index:50;background:var(--card);
+  border-bottom:1px solid var(--outline-variant);display:flex;align-items:center;gap:var(--md);padding:0 var(--lg)}
+.brand{font-weight:700;color:var(--primary);font-size:20px;letter-spacing:-.02em}
+.divider{width:1px;height:22px;background:var(--outline-variant)}
+.topbar__title{font-size:14px;font-weight:700}
+.topbar__spacer{flex:1}
+.gearwrap{display:flex;flex-direction:column;align-items:center;gap:2px;max-width:340px;flex:1}
+.gear{display:flex;background:var(--container);border-radius:var(--r);padding:3px;width:100%}
+.gear button{flex:1;border:0;background:transparent;color:var(--on-variant);font-weight:600;font-size:13px;padding:6px 8px;border-radius:6px;transition:.15s}
+.gear button[aria-checked="true"]{background:var(--primary);color:#fff}
+.gear__hint{font-size:11px;color:var(--on-variant)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  color:var(--primary);background:rgba(0,90,179,.08);padding:5px 12px;border-radius:var(--r-full)}
+/* 모바일: 기어 토글은 제거하지 말고 축약해 유지(2기어는 핵심 기능) */
+@media(max-width:900px){
+  .topbar{gap:var(--sm);padding:0 var(--md)}
+  .brand{font-size:16px}
+  .divider,.topbar__title,.gear__hint{display:none}
+  .gearwrap{max-width:none;flex:0 1 auto}
+  .gear button{padding:6px 10px;font-size:12px}
+}
+
+/* layout */
+main{flex:1;padding:64px 0 140px;max-width:1440px;width:100%;margin:0 auto;display:flex;gap:var(--md);padding-left:var(--lg);padding-right:var(--lg)}
+.stream{flex:1;max-width:62%;padding-top:var(--lg);display:flex;flex-direction:column;gap:var(--lg)}
+@media(max-width:900px){main{flex-direction:column}.stream{max-width:100%}}
+
+/* messages */
+.msg{display:flex;gap:var(--md);animation:rise .3s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.msg--user{justify-content:flex-end}
+.avatar{width:40px;height:40px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;flex:none;font-size:20px}
+.avatar--ai{background:var(--primary-container);color:#00224b}
+.avatar--user{background:var(--container);color:var(--on-variant)}
+.bubble{padding:var(--md) var(--lg);border-radius:var(--r-xl);max-width:85%;font-size:16px;box-shadow:var(--shadow)}
+.bubble--ai{background:var(--container-low);border-top-left-radius:6px}
+.bubble--user{background:rgba(0,90,179,.1);border:1px solid rgba(0,90,179,.15);border-top-right-radius:6px}
+.chips{display:flex;flex-wrap:wrap;gap:var(--sm);margin-top:var(--sm)}
+.chip{background:var(--card);border:1px solid var(--outline-variant);color:var(--on-variant);
+  padding:8px 16px;border-radius:var(--r-full);font-size:14px;font-weight:500;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--primary-bright);color:var(--primary-bright)}
+.chip[aria-pressed="true"]{border-color:var(--primary);color:var(--primary);background:rgba(0,90,179,.06);font-weight:700}
+.chip:disabled{opacity:.45;pointer-events:none}
+
+/* power edit */
+.poweredit{background:var(--card);border:2px solid rgba(0,90,179,.2);border-radius:var(--r-xl);padding:var(--lg);box-shadow:var(--shadow)}
+.poweredit h3{font-size:14px;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:6px;margin-bottom:var(--md)}
+.poweredit textarea{width:100%;height:110px;padding:var(--md);border:1px solid var(--outline-variant);border-radius:var(--r-md);font-family:inherit;font-size:16px;resize:none}
+.poweredit textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(0,90,179,.2)}
+.poweredit__actions{display:flex;justify-content:flex-end;margin-top:var(--md)}
+.btn-primary{background:var(--primary);color:#fff;border:0;padding:10px 20px;border-radius:var(--r);font-weight:700;font-size:14px;transition:.15s}
+.btn-primary:hover{background:var(--primary-bright)}
+
+/* aside */
+.aside{width:38%;padding-top:var(--lg)}
+.aside__sticky{position:sticky;top:88px;display:flex;flex-direction:column;gap:var(--md)}
+.panel{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-xl);padding:var(--lg);box-shadow:var(--shadow)}
+.panel__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sm)}
+.panel__head h2,.panel__head h3{font-size:14px;font-weight:700;color:var(--on-variant);display:flex;align-items:center;gap:6px}
+.panel--pool{padding:0;overflow:hidden}
+.pool__band{background:var(--primary);color:#fff;padding:10px var(--lg);font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.pool__body{padding:var(--lg)}
+.pool__num{font-size:32px;font-weight:800;color:var(--primary);line-height:1}
+.pool__unit{font-size:22px;font-weight:700;color:var(--primary)}
+.pool__total{font-size:14px;color:var(--on-variant);margin:6px 0 var(--md)}
+.pool__delta{font-weight:700;color:var(--primary);margin-left:8px;opacity:0;transition:opacity .3s}
+.pool__delta.show{opacity:1}
+.pool__steps{border-top:1px solid var(--container)}
+.step{display:flex;align-items:center;justify-content:space-between;font-size:14px;color:var(--on);padding:9px 0;border-bottom:1px solid var(--container-low)}
+.step:last-child{border-bottom:0}
+.step__ok{display:inline-flex;align-items:center;gap:5px;color:var(--primary);font-weight:700;font-size:13px}
+.step__wait{color:var(--on-variant);font-weight:600;font-size:13px}
+
+/* constraints */
+.cst{display:flex;flex-direction:column;gap:var(--sm)}
+.cst__item{display:flex;align-items:center;justify-content:space-between;background:var(--container-low);
+  padding:10px var(--md);border-radius:var(--r-md);border:1px solid transparent;transition:.15s;animation:rise .25s ease-out}
+.cst__item:hover{border-color:var(--outline-variant)}
+.cst__label{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:500}
+.cst__label .ico{color:var(--tertiary)}
+.cst__actions{display:flex;gap:8px;opacity:0;transition:.15s}
+.cst__item:hover .cst__actions{opacity:1}
+.cst__actions button{border:0;background:transparent;font-size:12px;font-weight:700}
+.cst__edit{color:var(--on-variant)}.cst__edit:hover{color:var(--primary)}
+.cst__del{color:var(--error)}
+.cst__empty{font-size:14px;color:var(--on-variant);text-align:center;padding:var(--md);border:1px dashed var(--outline-variant);border-radius:var(--r-md)}
+.tip{background:rgba(133,61,151,.05);border:1px solid rgba(133,61,151,.1);border-radius:var(--r-xl);padding:var(--md)}
+.tip__label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--tertiary);margin-bottom:4px}
+.tip p{font-size:13px;color:var(--on-variant)}
+@media(max-width:900px){.aside{width:100%}.aside__sticky{position:static}}
+
+/* composer */
+.composer{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);
+  border-top:1px solid var(--outline-variant);padding:var(--md) var(--lg)}
+.composer__inner{max-width:1440px;margin:0 auto;display:flex;gap:var(--md);align-items:stretch}
+.composer__field{flex:1;position:relative}
+.composer__field textarea{width:100%;height:56px;padding:14px 56px 14px var(--lg);border:2px solid var(--outline-variant);
+  border-radius:var(--r-xl);font-family:inherit;font-size:16px;resize:none}
+.composer__field textarea:focus{outline:none;border-color:var(--primary)}
+.composer__send{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:40px;height:40px;
+  background:var(--primary);color:#fff;border:0;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;transition:.15s}
+.composer__send:hover{background:var(--primary-bright)}
+.confirm-wrap{display:flex;flex-direction:column;gap:6px;align-items:stretch;
+  background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-xl);padding:var(--md);box-shadow:var(--shadow)}
+.confirm{width:100%;padding:14px 20px;border:0;border-radius:var(--r-lg);font-weight:700;font-size:16px;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:.2s;background:var(--container);color:var(--on-variant);cursor:not-allowed}
+.confirm--ready{background:var(--primary);color:#fff;cursor:pointer;box-shadow:0 6px 16px rgba(0,90,179,.25)}
+.confirm--ready:hover{background:var(--primary-bright)}
+.confirm__cap{font-size:12px;color:var(--on-variant);text-align:center}
+
+/* overlay / exceptions */
+.overlay{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:var(--lg)}
+.overlay.show{display:flex}
+.overlay__scrim{position:absolute;inset:0;background:rgba(33,45,81,.4);backdrop-filter:blur(3px)}
+.dialog{position:relative;background:var(--card);border-radius:var(--r-xl);padding:var(--xl);max-width:420px;width:100%;box-shadow:0 20px 60px rgba(33,45,81,.3);animation:rise .25s ease-out;text-align:center}
+.dialog__icon{width:64px;height:64px;border-radius:var(--r-full);background:rgba(179,27,37,.1);color:var(--error);
+  display:flex;align-items:center;justify-content:center;margin:0 auto var(--md);font-size:32px}
+.dialog h2{font-size:22px;font-weight:700;margin-bottom:var(--sm)}
+.dialog p{font-size:15px;color:var(--on-variant);margin-bottom:var(--lg)}
+.relax{width:100%;display:flex;flex-direction:column;gap:var(--sm);margin-bottom:var(--lg)}
+.relax button{display:flex;align-items:center;justify-content:space-between;padding:var(--md);border:1px solid var(--outline-variant);
+  border-radius:var(--r-md);background:var(--card);font-size:14px;transition:.15s}
+.relax button:hover{border-color:var(--primary);background:var(--container-low)}
+.relax .n{color:var(--primary);font-weight:700}
+.dialog__close{width:100%;padding:14px;background:var(--on);color:#fff;border:0;border-radius:var(--r-md);font-weight:700}
+.spin{width:48px;height:48px;border:4px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite;margin:0 auto var(--md)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:150px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--on);color:#fff;
+  font-size:13px;padding:10px 18px;border-radius:var(--r);opacity:0;pointer-events:none;transition:.25s;z-index:90}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Popcorn Light (랜딩 준용): 톤 오버라이드 ── */
+.brand{font-family:var(--font-head);font-weight:800}
+.topbar__title{font-family:var(--font-head)}
+.pool__num,.pool__unit{font-family:var(--font-head)}
+textarea::placeholder{color:var(--on-variant)}
+.composer{background:rgba(255,255,255,.85)}
+.avatar--ai{color:var(--primary-bright)}
+.bubble--user{background:rgba(101,161,212,.12);border-color:rgba(101,161,212,.28)}
+.pill{background:rgba(101,161,212,.12)}
+.chip[aria-pressed="true"]{background:rgba(101,161,212,.10)}
+.tip{background:rgba(101,161,212,.07);border-color:rgba(101,161,212,.16)}
+.poweredit{border-color:rgba(101,161,212,.30)}
+.toast{background:#1A202C;color:#fff}
+</style>
+</head>
+<body>
+
+<!-- ═══ SVG 아이콘 심볼 (단색 currentColor) ═══ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-ai" viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 1 4 4v1a4 4 0 0 1-1 8H9a4 4 0 0 1-1-8V7a4 4 0 0 1 4-4Z"/><circle cx="9.5" cy="10.5" r=".6" fill="currentColor" stroke="none"/><circle cx="14.5" cy="10.5" r=".6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5Z"/></symbol>
+  <symbol id="i-budget" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24"><path d="M7 11h4M9 9v4M15 11h.01M17.5 12.5h.01M17 4a5 5 0 0 1 5 5v3a4 4 0 0 1-7.2 2.4L14 13H10l-.8 1.4A4 4 0 0 1 2 12V9a5 5 0 0 1 5-5Z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-badge" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="m9 12-2 9 5-3 5 3-2-9"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></symbol>
+  <symbol id="i-tip" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7c-.6.5-1 1.3-1 2.1H9c0-.8-.4-1.6-1-2.1A7 7 0 0 1 12 2Z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></symbol>
+  <symbol id="i-office" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="13" rx="1"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-cast" viewBox="0 0 24 24"><path d="M2 8a10 10 0 0 1 10 10M2 13a5 5 0 0 1 5 5M2 18h.01"/><rect x="14" y="4" width="8" height="14" rx="1"/></symbol>
+</svg>
+
+<!-- ═══ Top bar ═══ -->
+<header class="topbar">
+  <span class="brand">팝콘PC AI</span>
+  <span class="divider"></span>
+  <span class="topbar__title">AI 견적 세션</span>
+  <div class="gearwrap">
+    <div class="gear" role="radiogroup" aria-label="입력 방식">
+      <button data-action="switch-gear" data-gear="ask" role="radio" aria-checked="true">추천 질문 받기</button>
+      <button data-action="switch-gear" data-gear="manual" role="radio" aria-checked="false">직접 다 입력</button>
+    </div>
+    <span class="gear__hint">언제든 바꿀 수 있어요. 고른 조건은 유지됩니다.</span>
+  </div>
+  <div class="topbar__spacer"></div>
+  <span class="pill"><svg class="ico"><use href="#i-check"/></svg><span data-bind="constraint_count">조건 0개</span></span>
+</header>
+
+<main>
+  <!-- ═══ 대화 스트림 ═══ -->
+  <section class="stream" aria-live="polite">
+    <!-- 직접입력(manual) 패널 — 기본 숨김, 대화 위에 표시 -->
+    <div class="poweredit" id="poweredit" hidden>
+      <h3><svg class="ico"><use href="#i-keyboard"/></svg>상세 스펙 직접 입력</h3>
+      <textarea id="power-input" placeholder="스펙을 한 번에 입력하세요. 예) 인기게임, 예산 120만, 조용하게"></textarea>
+      <div class="poweredit__actions">
+        <button class="btn-primary" data-action="parse-spec">조건 분석하기</button>
+      </div>
+    </div>
+    <!-- 대화 버블 컨테이너 -->
+    <div id="stream" style="display:flex;flex-direction:column;gap:24px"></div>
+  </section>
+
+  <!-- ═══ 사이드바 ═══ -->
+  <aside class="aside">
+    <div class="aside__sticky">
+      <!-- 후보 풀 카운터 -->
+      <div class="panel panel--pool">
+        <div class="pool__band"><svg class="ico"><use href="#i-shield"/></svg>실재고 검증 파이프라인</div>
+        <div class="pool__body">
+          <div><span class="pool__num num" data-bind="candidate_count" id="pool-num">26,480</span><span class="pool__unit">개</span></div>
+          <div class="pool__total">전체 <span class="num" data-bind="total_stock">26,480</span>개 중<span class="pool__delta num" id="pool-delta"></span></div>
+          <div class="pool__steps" aria-label="검증 단계">
+            <div class="step"><span>실재고 확인</span><span class="step__ok"><svg class="ico"><use href="#i-check"/></svg> 통과</span></div>
+            <div class="step"><span>호환성 5종</span><span class="step__ok"><svg class="ico"><use href="#i-check"/></svg> 통과</span></div>
+            <div class="step"><span>조건 반영</span><span class="step__wait" id="step-cond-state">대기 중</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- 제약 요약 (단일 원천 렌더 타깃) -->
+      <div class="panel">
+        <div class="panel__head">
+          <h3><svg class="ico"><use href="#i-filter"/></svg>현재 제약 요약</h3>
+        </div>
+        <div class="cst" id="cst-list" data-repeat="constraints"></div>
+        <button class="cst__empty" id="cst-add" data-action="add-constraint" style="margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:none">
+          <svg class="ico"><use href="#i-add"/></svg>조건 추가하기
+        </button>
+      </div>
+      <!-- 견적 확정 (제약 요약 바로 아래 — 조건 확인→확정 동선) -->
+      <div class="confirm-wrap">
+        <button class="confirm" id="confirm" data-action="confirm-estimate" disabled>
+          <svg class="ico" style="font-size:22px"><use href="#i-badge"/></svg>견적 확정하기
+        </button>
+        <span class="confirm__cap" id="confirm-cap">용도와 예산을 정하면 확정할 수 있어요.</span>
+      </div>
+      <!-- Tip -->
+      <div class="tip">
+        <div class="tip__label"><svg class="ico"><use href="#i-tip"/></svg>Tip</div>
+        <p>아래 입력창에 <b>"조용하게"</b>, <b>"화이트로"</b>, <b>"예산 20만 올려"</b> 처럼 말해보세요. 조건에 바로 반영됩니다.</p>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- ═══ 하단 상시 입력 + 확정 ═══ -->
+<footer class="composer">
+  <div class="composer__inner">
+    <div class="composer__field">
+      <textarea id="composer-input" placeholder="추가 요청이나 수정 사항을 입력하세요 (예: 조용하게 / 예산 20만 올려 / 화이트로)"></textarea>
+      <button class="composer__send" data-action="send-message" aria-label="보내기"><svg class="ico" style="font-size:22px"><use href="#i-send"/></svg></button>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══ 예외: 후보 0대 ═══ -->
+<div class="overlay" id="ov-zero">
+  <div class="overlay__scrim"></div>
+  <div class="dialog">
+    <div class="dialog__icon"><svg class="ico" style="font-size:32px"><use href="#i-alert"/></svg></div>
+    <h2>조건을 만족하는 부품이 없어요</h2>
+    <p id="zero-reason" data-bind="zero_reason">지금 조건 조합을 통과하는 부품이 0개예요.</p>
+    <div class="relax" data-repeat="relaxations">
+      <button data-action="apply-relaxation" data-relax="gpu_down"><span>GPU 한 단계 낮추기</span><span class="n">1,240개</span></button>
+      <button data-action="apply-relaxation" data-relax="budget_up"><span>예산 20만원 올리기</span><span class="n">3,400개</span></button>
+    </div>
+    <button class="dialog__close" data-action="close-overlay">조건 수정하기</button>
+  </div>
+</div>
+
+<!-- ═══ 예외: 로딩 ═══ -->
+<div class="overlay" id="ov-load">
+  <div class="overlay__scrim"></div>
+  <div class="dialog"><div class="spin"></div><p style="margin:0;font-weight:700;color:var(--primary)">실재고에서 최적 구성을 조율 중입니다…</p></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ════════════════ 상태: 단일 원천 ════════════════
+  // 후보 풀 = "완성 PC 대수"가 아니라 "전체 부품 풀에서 조건 통과 부품 수"
+  var TOTAL = 26480;                 // 전체 부품 개수
+  var session = {
+    gear: 'ask',
+    // 제약(constraints): 이 객체 하나가 모든 것의 원천.
+    // 칩/자유입력/파싱/기어전환이 전부 여기만 갱신한다.
+    constraints: {},   // {key:{icon,label,pool}}  pool=이 조건 통과 후 남는 부품 수
+    step: 'usage'
+  };
+  // 제약 정의(더미 데이터: 실제로는 엔진 카운트 API가 부품 풀을 좁힘)
+  var C = {
+    usage:  { icon:'i-game',   label:function(v){return USAGE[v]||'용도';}, pool:14200 },
+    game_weight:{ icon:'i-game', label:function(v){return WEIGHT[v];}, pool:8600 },
+    budget: { icon:'i-budget', label:function(v){return v;}, pool:3120 },
+    style:  { icon:'i-chip',   label:function(v){return v;}, pool:1450 }
+  };
+  var USAGE={gaming:'인기 게임용',office:'사무용',video:'영상편집',streaming:'인터넷방송'};
+  var WEIGHT={light:'가벼운 게임(롤·오버워치)',popular:'인기 게임(배그·로아)',heavy:'무거운 게임(AAA)'};
+
+  // ════════════════ DOM ════════════════
+  var $=function(s){return document.querySelector(s);};
+  var stream=$('#stream'), poweredit=$('#poweredit');
+  var cstList=$('#cst-list'), poolNum=$('#pool-num'),
+      poolDelta=$('#pool-delta'), stepCond=$('#step-cond-state');
+  var confirmBtn=$('#confirm'), confirmCap=$('#confirm-cap'), cstCount=$('[data-bind="constraint_count"]');
+  var lastPool=TOTAL;
+
+  // ════════════════ 렌더러: 상태 → 화면 ════════════════
+  function currentPool(){
+    // 활성 제약들의 최솟 pool = 현재 후보수. 순서와 무관하고,
+    // 제약을 "추가"하면 절대 늘지 않는다(단조 감소). 넓어지는 건 삭제/완화 때만.
+    var keys=Object.keys(session.constraints);
+    if(!keys.length) return TOTAL;
+    var min=TOTAL;
+    keys.forEach(function(k){ var p=session.constraints[k].pool; if(p<min) min=p; });
+    return min;
+  }
+
+  function render(){
+    // 1) 제약 요약
+    var keys=Object.keys(session.constraints);
+    cstList.innerHTML='';
+    if(!keys.length){
+      cstList.innerHTML='<div class="cst__empty">아직 조건이 없어요. 질문에 답하거나 아래에 입력해보세요.</div>';
+    } else {
+      keys.forEach(function(k){
+        var c=session.constraints[k];
+        var row=document.createElement('div');
+        row.className='cst__item';
+        row.innerHTML='<span class="cst__label"><svg class="ico"><use href="#'+c.icon+'"/></svg>'+c.label+'</span>'+
+          '<span class="cst__actions"><button class="cst__edit" data-action="edit-constraint" data-k="'+k+'">수정</button>'+
+          '<button class="cst__del" data-action="delete-constraint" data-k="'+k+'">삭제</button></span>';
+        cstList.appendChild(row);
+      });
+    }
+    // 2) 후보 풀 카운터 + 애니메이션 (검증 파이프라인 프레이밍)
+    var pool=currentPool();
+    animateNum(poolNum, lastPool, pool);
+    if(pool!==lastPool){
+      var diff=pool-lastPool;
+      poolDelta.textContent=(diff<0?'▼ ':'▲ ')+Math.abs(diff).toLocaleString()+'개';
+      poolDelta.classList.add('show');
+      setTimeout(function(){poolDelta.classList.remove('show');},1600);
+    }
+    lastPool=pool;
+    // 검증 3단계: 재고·호환성은 엔진 전제라 항상 통과, '조건 반영'만 상태 연동(정직)
+    if(keys.length){
+      stepCond.innerHTML='<svg class="ico"><use href="#i-check"/></svg> '+keys.length+'개 적용';
+      stepCond.className='step__ok';
+    } else {
+      stepCond.textContent='대기 중';
+      stepCond.className='step__wait';
+    }
+    // 3) 조건 개수 배지
+    cstCount.textContent='조건 '+keys.length+'개';
+    // 4) 확정 버튼: 용도 + 예산이 최소 조건
+    var ready = session.constraints.usage && session.constraints.budget;
+    confirmBtn.disabled=!ready;
+    confirmBtn.classList.toggle('confirm--ready', !!ready);
+    confirmCap.textContent = ready
+      ? '지금 조건으로 가성비·추천·고성능 3구성을 만들 수 있어요.'
+      : '용도와 예산을 정하면 확정할 수 있어요.';
+  }
+
+  function animateNum(el,from,to){
+    var start=performance.now(), dur=500;
+    function tick(now){
+      var p=Math.min((now-start)/dur,1);
+      var v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));
+      el.textContent=v.toLocaleString();
+      if(p<1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ════════════════ 상태 변경 (전부 이 함수 경유) ════════════════
+  function setConstraint(key,value){
+    var def=C[key]||{icon:'i-chip',label:function(v){return v;},pool:currentPool()};
+    session.constraints[key]={icon:def.icon,label:def.label(value),pool:def.pool,value:value};
+    render();
+  }
+  function removeConstraint(key){ delete session.constraints[key]; render(); }
+
+  // ════════════════ 대화 스트림 ════════════════
+  function addBubble(role, html, chips){
+    var wrap=document.createElement('div');
+    wrap.className='msg msg--'+role;
+    var avatar='<div class="avatar avatar--'+(role==='ai'?'ai':'user')+'"><svg class="ico" style="font-size:22px"><use href="#'+(role==='ai'?'i-ai':'i-user')+'"/></svg></div>';
+    var body='<div class="bubble bubble--'+role+'">'+html+'</div>';
+    // AI는 아바타 왼쪽, 유저는 아바타 오른쪽
+    wrap.innerHTML = role==='ai' ? avatar+'<div>'+body+(chips||'')+'</div>' : body+avatar;
+    stream.appendChild(wrap); // 대화는 스트림 맨 끝에 쌓임
+    scrollDown();
+  }
+  function scrollDown(){ window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}); }
+
+  // ask 기어 질문 시퀀스
+  var Q = {
+    usage:{ text:'어떤 목적으로 PC를 쓰실 계획인가요?', chips:[
+      ['usage','gaming','i-game','게임용'],['usage','office','i-office','사무용'],
+      ['usage','video','i-video','영상편집'],['usage','streaming','i-cast','인터넷방송']] },
+    game_weight:{ text:'주로 어떤 게임을 즐기시나요? 사양이 갈립니다.', chips:[
+      ['game_weight','light','i-game','가벼운 (롤·오버워치)'],
+      ['game_weight','popular','i-game','인기 (배그·로아)'],
+      ['game_weight','heavy','i-game','무거운 (AAA)']] },
+    budget:{ text:'예산은 어느 정도로 생각하세요?', chips:[
+      ['budget','80만원대','i-budget','80만원대'],['budget','100~130만','i-budget','100~130만'],
+      ['budget','150만원 이상','i-budget','150만원 이상']] },
+    style:{ text:'선호하는 스타일이 있나요? (선택)', chips:[
+      ['style','조용한 구성','i-chip','조용한'],['style','화이트 컨셉','i-chip','화이트'],
+      ['style','가성비 우선','i-chip','가성비 우선']] }
+  };
+  function chipHTML(list){
+    var h='<div class="chips">';
+    list.forEach(function(c){
+      h+='<button class="chip" data-action="quick-answer" data-q="'+c[0]+'" data-value="'+c[1]+'">'+
+         '<svg class="ico"><use href="#'+c[2]+'"/></svg>'+c[3]+'</button>';
+    });
+    return h+'</div>';
+  }
+  function askNext(){
+    var order=['usage','game_weight','budget','style'];
+    // 다음으로 물을 미충족 질문 찾기 (게임 아니면 game_weight 건너뜀)
+    for(var n=0;n<order.length;n++){
+      var k=order[n];
+      if(session.constraints[k]) continue;
+      if(k==='game_weight' && session.constraints.usage && session.constraints.usage.value!=='gaming') continue;
+      var q=Q[k];
+      addBubble('ai', q.text, chipHTML(q.chips));
+      return;
+    }
+    addBubble('ai','필요한 조건이 다 모였어요. 오른쪽에서 확인하고 <b>견적 확정하기</b>를 눌러주세요.');
+  }
+
+  // ════════════════ 이벤트 (위임) ════════════════
+  document.addEventListener('click', function(e){
+    var el=e.target.closest('[data-action]'); if(!el) return;
+    var a=el.dataset.action;
+
+    if(a==='switch-gear'){
+      session.gear=el.dataset.gear;   // ★ 제약은 건드리지 않음 = 상태 보존
+      document.querySelectorAll('[data-action="switch-gear"]').forEach(function(b){
+        b.setAttribute('aria-checked', String(b.dataset.gear===session.gear));
+      });
+      poweredit.hidden = (session.gear!=='manual');
+      toast(session.gear==='manual'?'직접 입력 모드 — 지금까지 고른 조건은 유지됩니다':'추천 질문 모드');
+      if(session.gear==='manual') poweredit.scrollIntoView({behavior:'smooth',block:'center'});
+      return;
+    }
+
+    if(a==='quick-answer'){
+      var q=el.dataset.q, v=el.dataset.value;
+      addBubble('user', el.textContent.trim());
+      setConstraint(q, v);
+      // 칩 눌림 표시
+      el.parentElement.querySelectorAll('.chip').forEach(function(c){c.setAttribute('aria-pressed','false');c.disabled=true;});
+      el.setAttribute('aria-pressed','true');
+      setTimeout(askNext, 350);
+      return;
+    }
+
+    if(a==='parse-spec'){
+      var t=$('#power-input').value.trim(); if(!t){return;}
+      addBubble('user', t);
+      // 아주 단순한 파싱 시늉 (실제로는 LLM 파서)
+      if(/게임|배그|롤|겜/.test(t)) setConstraint('usage','gaming');
+      if(/사무|업무/.test(t)) setConstraint('usage','office');
+      var m=t.match(/(\d+)\s*만/); if(m) setConstraint('budget', m[1]+'만원대');
+      if(/조용|저소음/.test(t)) setConstraint('style','조용한 구성');
+      if(/화이트|white/i.test(t)) setConstraint('style','화이트 컨셉');
+      addBubble('ai','입력을 분석해 조건에 반영했어요. 부족한 값은 오른쪽에서 확인하거나 추가로 알려주세요.');
+      $('#power-input').value='';
+      return;
+    }
+
+    if(a==='send-message'){
+      var input=$('#composer-input'), txt=input.value.trim(); if(!txt){return;}
+      addBubble('user', txt);
+      // 자유 입력 → 제약 갱신 (점프·수정)
+      var hit=false;
+      if(/조용|저소음/.test(txt)){setConstraint('style','조용한 구성');hit=true;}
+      if(/화이트|white/i.test(txt)){setConstraint('style','화이트 컨셉');hit=true;}
+      var mb=txt.match(/예산\s*(\d+)/); if(mb){setConstraint('budget',mb[1]+'만원대');hit=true;}
+      var up=txt.match(/(\d+)\s*만?\s*올려/); if(up){setConstraint('budget','예산 상향');hit=true;}
+      if(/게임|배그|롤/.test(txt)){setConstraint('usage','gaming');hit=true;}
+      addBubble('ai', hit?'반영했어요. 오른쪽 조건 요약을 확인해보세요.':'말씀 감사해요. 조금 더 구체적으로 알려주시면 조건에 반영할게요. (예: "예산 120만", "조용하게")');
+      input.value='';
+      return;
+    }
+
+    if(a==='delete-constraint'){ removeConstraint(el.dataset.k); toast('조건을 삭제했어요'); return; }
+    if(a==='edit-constraint'){ $('#composer-input').focus(); toast('아래 입력창에서 수정해 말해주세요'); return; }
+    if(a==='add-constraint'){ $('#composer-input').focus(); return; }
+
+    if(a==='confirm-estimate'){
+      if(confirmBtn.disabled) return;
+      show('#ov-load');
+      setTimeout(function(){ window.location.href='s2-result.html'; }, 1200);
+      return;
+    }
+
+    if(a==='apply-relaxation'){
+      hide('#ov-zero');
+      // 완화: 예시로 budget 상향 반영
+      if(el.dataset.relax==='budget_up') setConstraint('budget','예산 상향(+20만)');
+      if(el.dataset.relax==='gpu_down') setConstraint('style','GPU 한 단계 낮춤');
+      toast('완화 조건을 반영했어요');
+      return;
+    }
+    if(a==='close-overlay'){ hide('#ov-zero'); return; }
+  });
+
+  function show(sel){ $(sel).classList.add('show'); }
+  function hide(sel){ $(sel).classList.remove('show'); }
+  var toastT;
+  function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('show');},2200); }
+
+  // Enter 전송(Shift+Enter 줄바꿈)
+  $('#composer-input').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();document.querySelector('[data-action="send-message"]').click();}
+  });
+
+  // ════════════════ 데모용: 후보 0대 트리거 (콘솔에서 zeroDemo() 호출) ════════════════
+  window.zeroDemo=function(){ $('#zero-reason').textContent='"예산 50만 + RTX 4090" 조합이 통과하는 부품을 0개로 만들었어요.'; show('#ov-zero'); };
+
+  // 초기 렌더 + 첫 질문
+  render();
+  addBubble('ai','안녕하세요! 딱 맞는 견적을 찾아드리는 팝콘 AI입니다. 몇 가지만 여쭤볼게요.');
+  setTimeout(askNext, 400);
+})();
+</script>
+</body>
+</html>

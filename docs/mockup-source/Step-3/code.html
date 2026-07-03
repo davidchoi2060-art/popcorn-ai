@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>부품 상세 및 교체 - 팝콘 PC AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-dim": "#78308a",
+                        "surface": "#f6f5ff",
+                        "on-tertiary-fixed-variant": "#611874",
+                        "tertiary": "#853d97",
+                        "on-primary-fixed": "#000000",
+                        "surface-container-high": "#dbe1ff",
+                        "secondary-container": "#c4d0ff",
+                        "primary-container": "#64a1ff",
+                        "on-tertiary-fixed": "#330041",
+                        "inverse-surface": "#000b2e",
+                        "primary-dim": "#004e9d",
+                        "on-secondary-container": "#153fa2",
+                        "secondary-fixed-dim": "#b1c2ff",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#4593ff",
+                        "outline-variant": "#a0acd7",
+                        "on-secondary-fixed": "#002c83",
+                        "primary-fixed": "#64a1ff",
+                        "outline": "#6a769e",
+                        "tertiary-container": "#e795f7",
+                        "inverse-on-surface": "#909cc6",
+                        "surface-tint": "#005ab3",
+                        "surface-variant": "#d3dcff",
+                        "error-dim": "#9f0519",
+                        "surface-container-low": "#eef0ff",
+                        "secondary": "#3155b7",
+                        "tertiary-fixed-dim": "#d888e8",
+                        "on-secondary-fixed-variant": "#2349ac",
+                        "on-primary-container": "#00224b",
+                        "on-surface-variant": "#4e5a81",
+                        "on-background": "#212d51",
+                        "inverse-primary": "#3e90ff",
+                        "on-secondary": "#f1f2ff",
+                        "tertiary-fixed": "#e795f7",
+                        "surface-container": "#e3e7ff",
+                        "on-tertiary": "#ffeefc",
+                        "surface-container-highest": "#d3dcff",
+                        "error-container": "#fb5151",
+                        "on-surface": "#212d51",
+                        "on-tertiary-container": "#570a6a",
+                        "on-primary-fixed-variant": "#002b5c",
+                        "secondary-dim": "#2248ab",
+                        "error": "#b31b25",
+                        "surface-bright": "#f6f5ff",
+                        "background": "#f6f5ff",
+                        "on-primary": "#eff2ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin": "24px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "gutter": "16px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter", "Pretendard"],
+                        "headline-lg": ["Inter", "Pretendard"],
+                        "label-md": ["Inter", "Pretendard"],
+                        "body-md": ["Inter", "Pretendard"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', 'Pretendard', sans-serif; }
+        .tabular { font-variant-numeric: tabular-nums; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopNavBar (Shared Component) -->
+<nav class="fixed top-0 w-full z-50 flex items-center justify-between px-margin py-sm bg-surface shadow-sm">
+<div class="flex items-center gap-xl">
+<span class="text-headline-md font-headline-md font-bold text-primary">팝콘 PC AI</span>
+<div class="hidden md:flex items-center gap-lg">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">견적 받기</a>
+<a class="text-primary border-b-2 border-primary pb-1 font-label-md text-label-md" href="#">부품 상세</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">방법론</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">고객지원</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="px-md py-sm rounded-lg text-primary font-label-md text-label-md hover:bg-surface-container-low transition-all">제안서 검토</button>
+<button class="px-md py-sm rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-all">장바구니 담기</button>
+</div>
+</nav>
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 hidden lg:flex flex-col p-md border-r border-outline-variant bg-surface-container-low">
+<div class="mb-xl px-sm">
+<h2 class="font-headline-md text-headline-md font-bold text-primary">호환성 검증</h2>
+<p class="text-on-surface-variant text-label-md">5대 항목 실시간 검증</p>
+</div>
+<nav class="flex-1 space-y-sm">
+<div class="flex items-center gap-md p-md bg-secondary-container text-on-secondary-container rounded-lg font-bold scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined">verified</span>
+<span class="font-label-md text-label-md">호환성</span>
+</div>
+<div class="flex items-center gap-md p-md text-on-surface-variant hover:bg-surface-container rounded-lg transition-all cursor-pointer">
+<span class="material-symbols-outlined">thermostat</span>
+<span class="font-label-md text-label-md">발열/TDP</span>
+</div>
+<div class="flex items-center gap-md p-md text-on-surface-variant hover:bg-surface-container rounded-lg transition-all cursor-pointer">
+<span class="material-symbols-outlined">bolt</span>
+<span class="font-label-md text-label-md">정격 출력</span>
+</div>
+<div class="flex items-center gap-md p-md text-on-surface-variant hover:bg-surface-container rounded-lg transition-all cursor-pointer">
+<span class="material-symbols-outlined">straighten</span>
+<span class="font-label-md text-label-md">실장 규격</span>
+</div>
+<div class="flex items-center gap-md p-md text-on-surface-variant hover:bg-surface-container rounded-lg transition-all cursor-pointer">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span class="font-label-md text-label-md">BIOS 버전</span>
+</div>
+</nav>
+<div class="pt-lg border-t border-outline-variant space-y-sm">
+<button class="w-full py-md bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-all">구성 잠금</button>
+<div class="flex items-center justify-between px-sm py-xs">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">settings</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">help</span>
+</div>
+</div>
+</aside>
+<main class="lg:ml-64 pt-16 pb-32">
+<!-- Top Composer Bar -->
+<div class="sticky top-16 z-40 bg-surface/80 backdrop-blur-md px-margin py-md border-b border-outline-variant/30">
+<div class="relative max-w-4xl mx-auto">
+<textarea class="w-full h-14 px-md py-sm bg-surface-container-lowest border-2 border-primary-container rounded-xl focus:ring-2 focus:ring-primary focus:outline-none text-body-md font-body-md resize-none pr-16 transition-all" placeholder="예: '그래픽카드를 RTX 4080으로 업그레이드해줘' 혹은 '화이트 감성으로 부품 교체'"></textarea>
+<button class="absolute right-3 top-3 p-2 bg-primary text-on-primary rounded-lg shadow-md hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined">auto_fix_high</span>
+</button>
+</div>
+</div>
+<div class="px-margin py-lg max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-12 gap-gutter">
+<!-- Left Column: Parts List -->
+<div class="xl:col-span-8 space-y-lg">
+<div class="flex items-center justify-between mb-md">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">부품 상세 및 교체</h1>
+<div class="flex items-center gap-sm px-md py-sm bg-primary-container/20 rounded-full border border-primary/20" id="overall-status">
+<span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+<span class="text-primary font-bold text-label-md">조립 가능 — 호환 5종 통과</span>
+</div>
+</div>
+<!-- Chain Swap Alert (Visible when triggered) -->
+<div class="hidden p-md bg-error-container/10 border-l-4 border-error rounded-r-xl flex gap-md items-start animate-in fade-in slide-in-from-top-4 duration-300" id="chain-alert">
+<span class="material-symbols-outlined text-error">warning</span>
+<div>
+<h4 class="font-bold text-error text-label-md">연쇄 교체 필요 알림</h4>
+<p class="text-on-surface-variant text-label-md">이 그래픽카드로 교체하려면 최소 1000W 이상의 파워 서플라이가 필요합니다.</p>
+</div>
+<button class="ml-auto text-on-surface-variant hover:text-error" onclick="document.getElementById('chain-alert').classList.add('hidden')">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Component Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- CPU Card -->
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant/30 hover:shadow-md transition-shadow group relative overflow-hidden">
+<div class="absolute top-0 right-0 p-3">
+<span class="px-3 py-1 bg-tertiary-container text-on-tertiary-container rounded-full text-xs font-bold">안전 대안: 12</span>
+</div>
+<div class="flex gap-md mb-md">
+<div class="w-20 h-20 bg-surface-container-high rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Professional studio photo of Intel Core i9 processor" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaB4c72V9L7Ck1tv-capkB2yHBW_1J9ycb8pKohsQRYmB9nAwjMRc9kzZkzHNKKSmJaevJTEz8FN7SX-TxFPSEyVhFeAoxojF-Zq_ua6odZhtp6_2obzb6vfDA15TIvbf4rVbuCb20rV2oGPoAtvINRSf4rG5WndROhCTI9zzww4dAYKtgnHDcIx3ztrAZcKM9o8Qo7gXmds0defCLOCGWKcB-_PIsBRD3prT10IzYUzHarc4Lg5y0_vSoukJeFC5fahzji2FcVMk"/>
+</div>
+<div class="flex-1">
+<p class="text-on-surface-variant text-xs uppercase tracking-wider font-bold mb-1">프로세서</p>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight mb-2">Intel Core i9-14900K</h3>
+<p class="tabular text-secondary font-bold text-label-md">849,000원</p>
+</div>
+</div>
+<div class="flex gap-sm">
+<button class="flex-1 py-sm bg-surface-container border border-outline-variant text-on-surface-variant rounded-lg font-bold hover:bg-primary hover:text-on-primary hover:border-primary transition-all flex items-center justify-center gap-xs" data-action="swap-part" onclick="toggleAlternatives()">
+<span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+                                교체하기
+                            </button>
+</div>
+</div>
+<!-- GPU Card -->
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant/30 hover:shadow-md transition-shadow group relative">
+<div class="absolute top-0 right-0 p-3">
+<span class="px-3 py-1 bg-tertiary-container text-on-tertiary-container rounded-full text-xs font-bold">안전 대안: 8</span>
+</div>
+<div class="flex gap-md mb-md">
+<div class="w-20 h-20 bg-surface-container-high rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="NVIDIA GeForce RTX 4090 graphics card" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_Xu1NhzIL9SatAVRtGFEa9bJOFGdiuFIvJIqnBVfsTnMSkIi2TPpuq2aav2ws8rENyV5f5NAPRHqkozu4ZeoPMCd6uoLHp9w1Pzu9r2F4AEehQATgImQrTAiQFLLDy2yR7SDu2MCoEGHpxGLLwj8cH9Y00H0K4ocxxsHW4Kl3L9BZQc3QC9WdeHXHFw5k4P33wxsybQKRBxELoZddPcSqVRZ4f2ejnHii-wddnpgxCA_vVOmHH3ZURM1XSFpM9S7mx2oaF_1Li0I"/>
+</div>
+<div class="flex-1">
+<p class="text-on-surface-variant text-xs uppercase tracking-wider font-bold mb-1">그래픽카드</p>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight mb-2">NVIDIA RTX 4090 FE</h3>
+<p class="tabular text-secondary font-bold text-label-md">2,650,000원</p>
+</div>
+</div>
+<div class="flex gap-sm">
+<button class="flex-1 py-sm bg-surface-container border border-outline-variant text-on-surface-variant rounded-lg font-bold hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-xs" data-action="swap-part" onclick="toggleAlternatives()">
+<span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+                                교체하기
+                            </button>
+</div>
+</div>
+<!-- RAM Card -->
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant/30 hover:shadow-md transition-shadow group relative">
+<div class="absolute top-0 right-0 p-3">
+<span class="px-3 py-1 bg-tertiary-container text-on-tertiary-container rounded-full text-xs font-bold">안전 대안: 24</span>
+</div>
+<div class="flex gap-md mb-md">
+<div class="w-20 h-20 bg-surface-container-high rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="DDR5 RAM sticks with RGB" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTPjWfFYUGZ10hcoNXFRuXT-98mjWNUlwvzWn2KjTZ4MbtECTPEZWb_idpRGhpzZljefaVDmmSdiur6a1nnn8awULio5p5opZy-Dkqf95XWlFqpQDuy3huhgpjOvTqGaDDRM6DhrWOrpanAMA5Wwrpiq5vzTO-WxSbvkYYoE4Ww8Xt2t-Ovv2PpaiAKwXa0jg7FHrRa54bB9QtLbFbBFz9a20Hljo9VTwcQbtNViQGMhrW2zTTiv7p8ev7g8IC8qCmVQ6XkhW33eQ"/>
+</div>
+<div class="flex-1">
+<p class="text-on-surface-variant text-xs uppercase tracking-wider font-bold mb-1">메모리</p>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight mb-2">DDR5 32GB (16x2)</h3>
+<p class="tabular text-secondary font-bold text-label-md">185,000원</p>
+</div>
+</div>
+<button class="w-full py-sm bg-surface-container border border-outline-variant text-on-surface-variant rounded-lg font-bold hover:bg-primary hover:text-on-primary transition-all" data-action="swap-part" onclick="toggleAlternatives()">교체하기</button>
+</div>
+<!-- MB Card -->
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant/30 hover:shadow-md transition-shadow group relative">
+<div class="absolute top-0 right-0 p-3">
+<span class="px-3 py-1 bg-tertiary-container text-on-tertiary-container rounded-full text-xs font-bold">안전 대안: 5</span>
+</div>
+<div class="flex gap-md mb-md">
+<div class="w-20 h-20 bg-surface-container-high rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="High-end Z790 motherboard" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZ8tP2CNdKShfZSaiLJgPYrYqjG14hcManFI6vOgc42eeYIeb88eESGsWiK9kKW39B767DcbhG_0pEYcQCQhqX-zlpwI_OErKB8kPDJuGairjcDrUqU5WJI4fq1bQvRe61IN_vdzUYAmJ-X7uq_8arw-Gn0yp5_o8vVocf7RMp4vtdQd3RTYjy4B4tRsC3Il0kA5xxTtD4f8atPq3nWCDTsnTzLJnJybkPK8ZcELeSF-YSJriGLzfQT-QVbGz4NvDZL_JtqfBrWxQ"/>
+</div>
+<div class="flex-1">
+<p class="text-on-surface-variant text-xs uppercase tracking-wider font-bold mb-1">메인보드</p>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight mb-2">ASUS ROG Z790-F</h3>
+<p class="tabular text-secondary font-bold text-label-md">520,000원</p>
+</div>
+</div>
+<button class="w-full py-sm bg-surface-container border border-outline-variant text-on-surface-variant rounded-lg font-bold hover:bg-primary hover:text-on-primary transition-all" data-action="swap-part" onclick="toggleAlternatives()">교체하기</button>
+</div>
+</div>
+<!-- Alternatives Panel (Hidden by default) -->
+<div class="hidden animate-in slide-in-from-bottom-8 duration-500" id="alternatives-panel">
+<div class="bg-surface-container-low rounded-2xl p-lg border-2 border-primary/30">
+<div class="flex items-center justify-between mb-lg">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">호환 가능한 대체 부품</h2>
+<p class="text-on-surface-variant text-label-md">현재 구성과 100% 호환되는 최적의 대안들입니다.</p>
+</div>
+<button class="p-2 hover:bg-surface-variant rounded-full transition-all" onclick="toggleAlternatives()">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="space-y-sm">
+<!-- Alternative Item 1 -->
+<div class="flex items-center gap-md p-md bg-surface-container-lowest rounded-xl hover:ring-2 hover:ring-primary cursor-pointer transition-all">
+<div class="w-16 h-16 bg-surface-container rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Corsair 1000W modular power supply" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMd10svM9Rb3ziOyEh6YQBhWPlTMJ6qQaH0Q3zyT6aSg_zHKSfPfgDLzeBEcHIzqDct1tqKYJnEJ3StpSwWWkgcfa10IeGVe-0vx3xvqXJordipd1Xb5yumWb6TzD8l2v7n6xquOoJ5iWkvUF4nsw9b-eQG7Egm9lfE1Ko40Ofv0TjuCBOBSI7b7EcB9ItRswHlc4HvRGe-oyh8N3Vs_ULCky5A6R13520a6_6saQU1xC1hBM82uMJlz3Clakd7RAmDmq3Kw2XAAQ"/>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-on-surface">Intel Core i7-14700K</h4>
+<p class="text-on-surface-variant text-xs">성능 변화: -12% | 호환성: 완벽</p>
+</div>
+<div class="text-right">
+<p class="tabular font-bold text-primary">-150,000원</p>
+<button class="mt-1 px-3 py-1 bg-primary text-on-primary rounded-full text-xs font-bold">선택</button>
+</div>
+</div>
+<!-- Alternative Item 2 -->
+<div class="flex items-center gap-md p-md bg-surface-container-lowest rounded-xl hover:ring-2 hover:ring-primary cursor-pointer transition-all">
+<div class="w-16 h-16 bg-surface-container rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="High-speed memory module" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_IcsWXQnd7Y2CFcFmSBbYKDa-6dcGsFPCNXbh1kI0-7qKM8zjA417fb8csBpZxrDEPCoOUe3eBlS5FXXGoj1oSrvBeggsRN2B_xXpuj4pqlJJ9CekwJEs0DIboJHUX1VAeaEpr8YymzhfZvl1PW_Dw49XLMnBU8tRob2cYfhmYSmDklAhzZ3Z_m9m1B4R_2nCMVJ1p55g5-sX9pIOFujDg2ePzRQnrp6wBFG2grjkYUxD66HbO_-XhMqFiV1gdv-4PUkTfUUGKfw"/>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-on-surface">AMD Ryzen 9 7950X3D</h4>
+<p class="text-on-surface-variant text-xs">성능 변화: +5% (게이밍) | 메인보드 교체 필요</p>
+</div>
+<div class="text-right">
+<p class="tabular font-bold text-error">+80,000원</p>
+<button class="mt-1 px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-xs font-bold" onclick="showChainAlert()">검토</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Compatibility Sidebar -->
+<div class="xl:col-span-4">
+<div class="sticky top-40 space-y-lg">
+<div class="bg-surface-container-low rounded-2xl p-lg border border-outline-variant/30">
+<div class="flex items-center gap-sm mb-lg">
+<span class="material-symbols-outlined text-primary">analytics</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">실시간 호환성 체크</h2>
+</div>
+<div class="space-y-md">
+<!-- CPU Socket -->
+<div class="flex items-center justify-between p-md bg-surface-container-lowest rounded-xl border border-outline-variant/10">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">developer_board</span>
+</div>
+<span class="font-bold text-label-md">소켓 호환</span>
+</div>
+<div class="flex items-center gap-xs text-primary font-bold">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                    통과
+                                </div>
+</div>
+<!-- RAM Spec -->
+<div class="flex items-center justify-between p-md bg-surface-container-lowest rounded-xl border border-outline-variant/10">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">memory</span>
+</div>
+<span class="font-bold text-label-md">RAM 규격</span>
+</div>
+<div class="flex items-center gap-xs text-primary font-bold">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                    정상
+                                </div>
+</div>
+<!-- PSU Margin -->
+<div class="flex items-center justify-between p-md bg-surface-container-lowest rounded-xl border border-outline-variant/10 transition-all" id="psu-check">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<span class="font-bold text-label-md">파워 여유</span>
+</div>
+<div class="flex items-center gap-xs text-primary font-bold">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                    +120W 여유
+                                </div>
+</div>
+<!-- Cooler TDP -->
+<div class="flex items-center justify-between p-md bg-surface-container-lowest rounded-xl border border-outline-variant/10">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">ac_unit</span>
+</div>
+<span class="font-bold text-label-md">쿨러 TDP</span>
+</div>
+<div class="flex items-center gap-xs text-primary font-bold">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                    호환 가능
+                                </div>
+</div>
+<!-- Case Clearance -->
+<div class="flex items-center justify-between p-md bg-surface-container-lowest rounded-xl border border-outline-variant/10">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">square_foot</span>
+</div>
+<span class="font-bold text-label-md">케이스 간섭</span>
+</div>
+<div class="flex items-center gap-xs text-primary font-bold">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                    여유로움
+                                </div>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high/40 rounded-2xl p-lg border-2 border-dashed border-outline-variant flex flex-col items-center justify-center text-center gap-md">
+<div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-primary">lightbulb</span>
+</div>
+<p class="text-on-surface-variant text-label-md">
+                            "파워 서플라이를 골드 등급으로 올리면<br/><strong class="text-on-surface">장기적인 전기세가 15% 절감</strong>됩니다."
+                        </p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Sticky CTA -->
+<footer class="fixed bottom-0 w-full z-50 bg-surface/90 backdrop-blur-xl border-t border-outline-variant/30 px-margin py-lg flex flex-col md:flex-row items-center justify-between gap-md">
+<div class="flex items-center gap-xl">
+<div class="text-left">
+<p class="text-on-surface-variant text-xs">총 견적 금액 (부가세 포함)</p>
+<h3 class="font-headline-lg text-headline-lg text-primary tabular tracking-tight">4,854,000원</h3>
+</div>
+<div class="hidden md:block h-10 w-px bg-outline-variant"></div>
+<div class="hidden md:flex gap-md text-on-surface-variant text-label-md">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase font-bold text-outline">배송</span>
+<span>무료 배송</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase font-bold text-outline">조립</span>
+<span>전문가 조립 포함</span>
+</div>
+</div>
+</div>
+<div class="flex gap-md w-full md:w-auto">
+<button class="flex-1 md:flex-none px-xl py-md bg-surface-container border border-outline-variant text-on-surface rounded-xl font-bold hover:bg-surface-variant transition-all">
+                제안서로 돌아가기
+            </button>
+<button class="flex-1 md:flex-none px-xl py-md bg-primary text-on-primary rounded-xl font-bold shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-md" id="cta-cart">
+<span class="material-symbols-outlined">shopping_cart</span>
+                장바구니 담기
+            </button>
+</div>
+</footer>
+<script>
+        function toggleAlternatives() {
+            const panel = document.getElementById('alternatives-panel');
+            panel.classList.toggle('hidden');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function showChainAlert() {
+            const alert = document.getElementById('chain-alert');
+            const psuCheck = document.getElementById('psu-check');
+            const overallStatus = document.getElementById('overall-status');
+            const ctaCart = document.getElementById('cta-cart');
+
+            alert.classList.remove('hidden');
+            
+            // UI State Change to Error
+            psuCheck.classList.remove('bg-surface-container-lowest');
+            psuCheck.classList.add('bg-error-container/20', 'border-error');
+            const psuStatusText = psuCheck.querySelector('.flex.items-center.gap-xs');
+            psuStatusText.innerHTML = '<span class="material-symbols-outlined text-[20px]">error</span>용량 부족';
+            psuStatusText.classList.replace('text-primary', 'text-error');
+
+            overallStatus.classList.replace('bg-primary-container/20', 'bg-error-container/20');
+            overallStatus.classList.replace('border-primary/20', 'border-error/20');
+            overallStatus.querySelector('.bg-primary').classList.replace('bg-primary', 'bg-error');
+            const overallStatusText = overallStatus.querySelector('.text-primary');
+            overallStatusText.innerHTML = '위험 — 파워 용량 부족';
+            overallStatusText.classList.replace('text-primary', 'text-error');
+
+            ctaCart.disabled = true;
+            ctaCart.classList.add('opacity-50', 'cursor-not-allowed', 'grayscale');
+        }
+
+        // Simple animation for the textarea focus
+        const composer = document.querySelector('textarea');
+        composer.addEventListener('focus', () => {
+            composer.parentElement.classList.add('scale-[1.02]');
+        });
+        composer.addEventListener('blur', () => {
+            composer.parentElement.classList.remove('scale-[1.02]');
+        });
+    </script>
+</body></html>

@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+# build output
+dist/
+build/
+# env / secrets
+.env
+.env.*
+*.key
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+# logs
+*.log
+
+# 민감 인프라 식별자 (프로젝트 ID·IP·서비스계정 — 커밋 금지)
+docs/infra/GCP_SETUP.md
+
+# Firebase
+.firebase/
+firebase-debug.log
+*-debug.log
+
+# 아카이브 원본 참고본의 대용량 이미지 (리포 경량화)
+docs/mockup-source/**/*.png

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="INT-GATE-010" data-domain="internal">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>팝콘PC AI · 내부 접근 허브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+  :root{
+    /* Popcorn Light tokens (랜딩 준용) */
+    --bg:#F0F5F9; --surface:#F0F5F9; --card:#ffffff; --container:#E4ECF4;
+    --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+    --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+    --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+    --error:#C0392B; --on-error:#ffffff;
+    --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+    --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
+    --r-sm:.25rem; --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-full:9999px;
+    --sp-xs:4px; --sp-sm:8px; --sp-md:16px; --sp-lg:24px; --sp-xl:32px;
+    --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
+
+  /* ── Top bar ── */
+  .topbar{display:flex;align-items:center;gap:var(--sp-md);padding:14px var(--sp-lg);
+    background:var(--card);border-bottom:1px solid var(--outline-variant);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.01em}
+  .brand__dot{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--primary),var(--tertiary))}
+  .topbar__badge{font-size:12px;font-weight:600;color:var(--on-variant);background:var(--container);
+    padding:4px 10px;border-radius:var(--r-full)}
+  .topbar__spacer{flex:1}
+  .roleswitch{display:inline-flex;background:var(--container);border-radius:var(--r-full);padding:3px}
+  .roleswitch button{border:0;background:transparent;color:var(--on-variant);font-family:inherit;font-weight:600;
+    font-size:13px;padding:6px 14px;border-radius:var(--r-full);cursor:pointer;transition:.15s}
+  .roleswitch button[aria-checked="true"]{background:var(--primary);color:var(--on-primary)}
+  .user{font-size:13px;color:var(--on-variant);display:flex;align-items:center;gap:6px}
+
+  /* ── Status strip ── */
+  .strip{display:flex;gap:var(--sp-md);flex-wrap:wrap;padding:12px var(--sp-lg);
+    background:var(--container);border-bottom:1px solid var(--outline-variant)}
+  .stat{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--on-variant)}
+  .stat__label{color:var(--on-variant)}
+  .stat__val{font-weight:600;color:var(--on)}
+  .dot{width:8px;height:8px;border-radius:var(--r-full);flex:none}
+  .dot--ok{background:var(--primary)} .dot--warn{background:var(--error)}
+
+  /* ── Main ── */
+  main{max-width:1200px;margin:0 auto;padding:var(--sp-xl) var(--sp-lg) 64px}
+  .lead{margin-bottom:var(--sp-lg)}
+  .lead h1{font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .lead p{color:var(--on-variant);font-size:14px;margin-top:6px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-md)}
+
+  /* ── MVP card ── */
+  .mvp{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);
+    padding:var(--sp-lg);display:flex;flex-direction:column;gap:var(--sp-md);box-shadow:var(--shadow)}
+  .mvp__head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .mvp__no{font-size:12px;font-weight:600;color:var(--on-variant);letter-spacing:.04em}
+  .mvp__title{font-size:16px;font-weight:700;letter-spacing:-.01em;margin-top:2px}
+  .mvp__desc{font-size:13px;color:var(--on-variant);min-height:34px}
+  .status{font-size:11px;font-weight:600;padding:3px 9px;border-radius:var(--r-full);white-space:nowrap;flex:none}
+  .status--dev{background:var(--primary);color:var(--on-primary)}
+  .status--design{background:var(--secondary);color:#fff}
+  .status--plan{background:var(--tertiary-container);color:#570a6a}
+  .engine-tag{font-size:11px;font-weight:600;color:var(--tertiary);background:#f3e8f8;
+    display:inline-block;padding:3px 8px;border-radius:var(--r-full)}
+
+  /* progress */
+  .prog{display:flex;flex-direction:column;gap:6px}
+  .prog__label{font-size:11px;color:var(--on-variant);display:flex;justify-content:space-between}
+  .prog__steps{display:flex;gap:4px}
+  .prog__seg{flex:1;height:6px;border-radius:var(--r-full);background:var(--outline-variant)}
+  .prog__seg--done{background:var(--primary)}
+  .prog__seg--wip{background:var(--primary-container)}
+
+  /* shortcuts */
+  .short{border-top:1px solid var(--outline-variant);padding-top:var(--sp-md);display:flex;flex-direction:column;gap:8px}
+  .short__cap{font-size:11px;font-weight:600;color:var(--on-variant);letter-spacing:.04em}
+  .short__row{display:flex;gap:8px}
+  .btn{flex:1;border:1px solid var(--outline-variant);background:var(--card);color:var(--on);
+    font-family:inherit;font-weight:600;font-size:13px;padding:10px 8px;border-radius:var(--r);
+    cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .btn:hover:not(:disabled){border-color:var(--primary-bright);color:var(--primary-bright)}
+  .btn__sub{font-size:10px;font-weight:500;color:var(--on-variant)}
+  .btn--primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+  .btn--primary:hover:not(:disabled){background:var(--primary-bright);border-color:var(--primary-bright);color:#fff}
+  .btn--primary .btn__sub{color:rgba(239,242,255,.8)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn[hidden]{display:none}
+
+  .mvp__devlist{font-size:12px}
+  .mvp__devlist summary{cursor:pointer;color:var(--primary);font-weight:600;list-style:none}
+  .mvp__devlist summary::-webkit-details-marker{display:none}
+  .mvp__devlist ul{margin-top:8px;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+  .mvp__devlist li{color:var(--on-variant);padding:4px 8px;border-radius:var(--r-sm);cursor:pointer}
+  .mvp__devlist li:hover{background:var(--container);color:var(--on)}
+
+  /* ── Dev tools ── */
+  .devtools{margin-top:var(--sp-xl);background:var(--card);border:1px solid var(--outline-variant);
+    border-radius:var(--r-lg);padding:var(--sp-lg)}
+  .devtools[hidden]{display:none}
+  .devtools h2{font-size:14px;font-weight:700;margin-bottom:var(--sp-md)}
+  .devtools__row{display:flex;gap:var(--sp-md);flex-wrap:wrap;align-items:center}
+  .chip{border:1px solid var(--outline-variant);background:var(--card);color:var(--on);font-family:inherit;
+    font-weight:600;font-size:13px;padding:8px 14px;border-radius:var(--r-full);cursor:pointer}
+  .chip:hover{border-color:var(--primary-bright);color:var(--primary-bright)}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--on-variant);margin-left:auto}
+  .toggle button{border:1px solid var(--outline-variant);background:var(--container);font-family:inherit;
+    font-weight:600;font-size:12px;padding:6px 12px;border-radius:var(--r-full);cursor:pointer;color:var(--on)}
+
+  .note{font-size:12px;color:var(--on-variant);margin-top:var(--sp-md);padding:12px var(--sp-md);
+    background:var(--container);border-radius:var(--r);border-left:3px solid var(--tertiary)}
+
+  /* toast */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--on);color:#fff;font-size:13px;font-weight:500;padding:12px 20px;border-radius:var(--r);
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  @media (max-width:640px){
+    .topbar{gap:8px}.topbar__spacer{order:5;flex-basis:100%;height:0}
+    main{padding:var(--sp-lg) var(--sp-md) 48px}
+  }
+
+  /* ── Popcorn Light (랜딩 준용): 톤 오버라이드 ── */
+  .brand,.mvp__title,.lead h1{font-family:var(--font-head)}
+  .status--plan{color:var(--on)}
+  .engine-tag{background:rgba(110,143,214,.14)}
+  .toast{background:#1A202C;color:#fff}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<header class="topbar">
+  <div class="brand"><span class="brand__dot" aria-hidden="true"></span>팝콘PC AI · 내부 접근 허브</div>
+  <span class="topbar__badge">내부자 전용</span>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__badge num">환경 DEV</span>
+  <div class="roleswitch" role="radiogroup" aria-label="역할 전환">
+    <button data-action="switch-role" data-role="staff" role="radio" aria-checked="false">직원</button>
+    <button data-action="switch-role" data-role="operator" role="radio" aria-checked="false">운영자</button>
+    <button data-action="switch-role" data-role="dev" role="radio" aria-checked="true">개발자</button>
+  </div>
+  <span class="user" data-bind="current_user">👤 davidchoi2060</span>
+</header>
+
+<!-- ── Status strip ── -->
+<div class="strip" aria-label="시스템 상태">
+  <div class="stat"><span class="dot dot--ok"></span><span class="stat__label">서버</span><span class="stat__val" data-bind="server_status">정상</span></div>
+  <div class="stat"><span class="dot dot--ok"></span><span class="stat__label">DB 연결</span><span class="stat__val" data-bind="db_status">Cloud SQL 연결됨</span></div>
+  <div class="stat"><span class="stat__label">오늘 AI 비용</span><span class="stat__val num" data-bind="ai_cost">$0.00 / $50.00</span></div>
+  <div class="stat"><span class="stat__label">API 모드</span><span class="stat__val" data-bind="api_mode">Mock</span></div>
+</div>
+
+<main>
+  <div class="lead">
+    <h1>어디로 가시겠어요?</h1>
+    <p>세 서비스의 메인·랜딩·운영자 화면으로 바로 이동합니다. 역할에 따라 열리는 버튼이 달라집니다.</p>
+  </div>
+
+  <div class="grid">
+
+    <!-- ── MVP 1 ── -->
+    <section class="mvp" data-mvp="1">
+      <div class="mvp__head">
+        <div><div class="mvp__no">MVP 1</div><div class="mvp__title">팝콘PC 단독 AI 견적</div></div>
+        <span class="status status--dev">개발중</span>
+      </div>
+      <p class="mvp__desc">자체 실재고 기반 AI 견적. 가장 먼저 오픈하는 코어 서비스.</p>
+
+      <div class="prog">
+        <div class="prog__label"><span>화면 진척 S0~S4</span><span class="num">5 / 5</span></div>
+        <div class="prog__steps">
+          <span class="prog__seg prog__seg--done" title="S0"></span>
+          <span class="prog__seg prog__seg--done" title="S1"></span>
+          <span class="prog__seg prog__seg--done" title="S2"></span>
+          <span class="prog__seg prog__seg--done" title="S3"></span>
+          <span class="prog__seg prog__seg--done" title="S4"></span>
+        </div>
+      </div>
+
+      <div class="short">
+        <span class="short__cap">바로가기</span>
+        <div class="short__row">
+          <button class="btn btn--primary" data-action="goto" data-screen="landing" data-mvp="1">메인<span class="btn__sub">고객 진입</span></button>
+          <button class="btn" data-action="goto" data-screen="s0" data-mvp="1">랜딩<span class="btn__sub">S0 입력게이트</span></button>
+          <button class="btn js-operator" data-action="goto" data-screen="adm-dashboard" data-mvp="1">운영자<span class="btn__sub">관리자 뷰</span></button>
+        </div>
+      </div>
+
+      <details class="mvp__devlist js-devonly">
+        <summary>화면 목록 (S0~S4)</summary>
+        <ul>
+          <li data-action="goto" data-screen="s0" data-mvp="1">S0 · 랜딩 / 입력 게이트</li>
+          <li data-action="goto" data-screen="rec-session" data-mvp="1">S1 · 대화형 견적 세션</li>
+          <li data-action="goto" data-screen="rec-result" data-mvp="1">S2 · 견적 제안서</li>
+          <li data-action="goto" data-screen="rec-detail" data-mvp="1">S3 · 부품 변경</li>
+          <li data-action="goto" data-screen="rec-cart" data-mvp="1">S4 · 주문 확인·결제 인계</li>
+        </ul>
+      </details>
+    </section>
+
+    <!-- ── MVP 2 ── -->
+    <section class="mvp" data-mvp="2">
+      <div class="mvp__head">
+        <div><div class="mvp__no">MVP 2</div><div class="mvp__title">AI 제안 + 용산 도매 최저가</div></div>
+        <span class="status status--design">설계</span>
+      </div>
+      <p class="mvp__desc">AI 최적 구성 후 입점 도매사 최저가를 제시하는 확장 서비스.</p>
+      <span class="engine-tag">엔진 ① 공유</span>
+
+      <div class="short">
+        <span class="short__cap">바로가기</span>
+        <div class="short__row">
+          <button class="btn btn--primary" data-action="goto" data-screen="landing" data-mvp="2">메인<span class="btn__sub">서비스 진입</span></button>
+          <button class="btn" data-action="goto" data-screen="landing" data-mvp="2" data-variant="s0">랜딩<span class="btn__sub">입력게이트</span></button>
+          <button class="btn js-operator" data-action="goto" data-screen="adm-dashboard" data-mvp="2">운영자<span class="btn__sub">입점사·마진</span></button>
+        </div>
+      </div>
+
+      <details class="mvp__devlist js-devonly">
+        <summary>화면 목록</summary>
+        <ul><li>설계 진행 중 — 화면 ID 미확정</li></ul>
+      </details>
+    </section>
+
+    <!-- ── MVP 3 ── -->
+    <section class="mvp" data-mvp="3">
+      <div class="mvp__head">
+        <div><div class="mvp__no">MVP 3</div><div class="mvp__title">입점 부품 가격비교 포털</div></div>
+        <span class="status status--plan">기획</span>
+      </div>
+      <p class="mvp__desc">입점업체 가격만 비교하는 최적화 포털. (외부 크롤링 미사용)</p>
+      <span class="engine-tag">엔진 ① 공유</span>
+
+      <div class="short">
+        <span class="short__cap">바로가기</span>
+        <div class="short__row">
+          <button class="btn btn--primary" data-action="goto" data-screen="landing" data-mvp="3">메인<span class="btn__sub">서비스 진입</span></button>
+          <button class="btn" data-action="goto" data-screen="landing" data-mvp="3" data-variant="s0">랜딩<span class="btn__sub">입력게이트</span></button>
+          <button class="btn js-operator" data-action="goto" data-screen="adm-dashboard" data-mvp="3">운영자<span class="btn__sub">입점가 비교</span></button>
+        </div>
+      </div>
+
+      <details class="mvp__devlist js-devonly">
+        <summary>화면 목록</summary>
+        <ul><li>기획 단계 — 화면 미정</li></ul>
+      </details>
+    </section>
+
+  </div>
+
+  <!-- ── Dev tools (개발자 역할일 때만) ── -->
+  <section class="devtools js-devonly" aria-label="개발자 도구">
+    <h2>개발자 도구</h2>
+    <div class="devtools__row">
+      <button class="chip" data-action="goto" data-screen="dev-hub">화면 진척 매트릭스 · DEV 허브</button>
+      <button class="chip" data-action="goto" data-screen="adm-dashboard">관리자 허브</button>
+      <div class="toggle">API 모드 <button data-action="toggle-api">Mock ⇄ Real</button></div>
+    </div>
+    <div class="note">
+      바로가기는 현재 대상 화면의 <strong>Screen 키</strong>를 앱으로 전달하는 목업 동작입니다.
+      실제로 그 화면이 열리려면 앱에 URL/쿼리 파라미터 라우팅(<span class="num">?screen=…&mvp=…</span>)이 붙어야 합니다 — 다음 이터레이션 작업.
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var state={ role:'dev', apiMode:'Mock' };
+
+  function applyRole(role){
+    state.role=role;
+    // role switch UI
+    document.querySelectorAll('[data-action="switch-role"]').forEach(function(b){
+      b.setAttribute('aria-checked', String(b.dataset.role===role));
+    });
+    var isDev = role==='dev';
+    var isOperatorPlus = (role==='operator'||role==='dev');
+    // 운영자 버튼: 운영자/개발자만
+    document.querySelectorAll('.js-operator').forEach(function(el){ el.hidden = !isOperatorPlus; });
+    // 개발자 전용 영역: 화면목록·개발자도구
+    document.querySelectorAll('.js-devonly').forEach(function(el){ el.hidden = !isDev; });
+  }
+
+  function toast(msg){
+    var t=document.getElementById('toast');
+    t.textContent=msg; t.classList.add('show');
+    clearTimeout(t._t); t._t=setTimeout(function(){ t.classList.remove('show'); },2200);
+  }
+
+  // 이벤트 위임
+  document.addEventListener('click', function(e){
+    var el=e.target.closest('[data-action]'); if(!el) return;
+    var action=el.dataset.action;
+
+    if(action==='switch-role'){ applyRole(el.dataset.role); return; }
+
+    if(action==='toggle-api'){
+      state.apiMode = state.apiMode==='Mock' ? 'Real' : 'Mock';
+      document.querySelector('[data-bind="api_mode"]').textContent=state.apiMode;
+      toast('API 모드: '+state.apiMode);
+      return;
+    }
+
+    if(action==='goto'){
+      var screen=el.dataset.screen;
+      var mvp=el.dataset.mvp || '';
+      var variant=el.dataset.variant || '';
+      // 실제 목업 파일이 있는 화면(MVP1)은 바로 이동
+      var FILES={ 'landing':'main-landing.html', 's0':'s0-landing.html', 'rec-session':'s1-session.html', 'rec-result':'s2-result.html', 'rec-detail':'s3-detail.html', 'rec-cart':'s4-cart.html' };
+      if(mvp==='1' && FILES[screen]){
+        window.location.href = encodeURI(FILES[screen]);
+        return;
+      }
+      // 그 외: 아직 목업 없음 — Screen 키 전달 시늉
+      var target='?screen='+encodeURIComponent(screen)
+        + (mvp?'&mvp='+encodeURIComponent(mvp):'')
+        + (variant?'&variant='+encodeURIComponent(variant):'');
+      toast('이동(목업): '+screen + (mvp?' · MVP'+mvp:'') + '  →  '+target);
+      return;
+    }
+  });
+
+  applyRole('dev'); // 기본 역할
+})();
+</script>
+</body>
+</html>

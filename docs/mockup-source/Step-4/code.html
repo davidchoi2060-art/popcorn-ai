@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>주문 확인 - Popcorn AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#4e5a81",
+                    "tertiary-fixed": "#e795f7",
+                    "surface-container-highest": "#d3dcff",
+                    "on-tertiary-fixed": "#330041",
+                    "secondary-fixed-dim": "#b1c2ff",
+                    "surface-dim": "#c7d3ff",
+                    "on-secondary-container": "#153fa2",
+                    "error-dim": "#9f0519",
+                    "on-tertiary-container": "#570a6a",
+                    "background": "#f6f5ff",
+                    "on-primary-container": "#00224b",
+                    "primary-fixed": "#64a1ff",
+                    "on-secondary-fixed-variant": "#2349ac",
+                    "secondary-fixed": "#c4d0ff",
+                    "error-container": "#fb5151",
+                    "on-tertiary": "#ffeefc",
+                    "on-error": "#ffefee",
+                    "tertiary-fixed-dim": "#d888e8",
+                    "outline-variant": "#a0acd7",
+                    "inverse-primary": "#3e90ff",
+                    "tertiary-container": "#e795f7",
+                    "on-background": "#212d51",
+                    "on-secondary-fixed": "#002c83",
+                    "surface-container-low": "#eef0ff",
+                    "secondary": "#3155b7",
+                    "secondary-dim": "#2248ab",
+                    "surface": "#f6f5ff",
+                    "on-primary-fixed": "#000000",
+                    "on-surface": "#212d51",
+                    "on-tertiary-fixed-variant": "#611874",
+                    "on-error-container": "#570008",
+                    "on-secondary": "#f1f2ff",
+                    "error": "#b31b25",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary": "#eff2ff",
+                    "surface-container": "#e3e7ff",
+                    "inverse-surface": "#000b2e",
+                    "outline": "#6a769e",
+                    "on-primary-fixed-variant": "#002b5c",
+                    "tertiary-dim": "#78308a",
+                    "primary": "#005ab3",
+                    "secondary-container": "#c4d0ff",
+                    "primary-dim": "#004e9d",
+                    "surface-container-high": "#dbe1ff",
+                    "tertiary": "#853d97",
+                    "surface-variant": "#d3dcff",
+                    "surface-tint": "#005ab3",
+                    "surface-bright": "#f6f5ff",
+                    "primary-fixed-dim": "#4593ff",
+                    "primary-container": "#64a1ff",
+                    "inverse-on-surface": "#909cc6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "32px",
+                    "base": "8px",
+                    "sm": "8px",
+                    "margin": "24px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "xs": "4px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter", "Noto Sans KR"],
+                    "label-md": ["Inter", "Noto Sans KR"],
+                    "body-md": ["Inter", "Noto Sans KR"],
+                    "headline-md": ["Inter", "Noto Sans KR"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', 'Noto Sans KR', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(8px); }
+        .transition-all-custom { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- TopNavBar -->
+<nav class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin h-16 bg-surface-lowest dark:bg-inverse-surface shadow-sm">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Popcorn AI</div>
+<div class="hidden md:flex gap-lg items-center">
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">견적 받기</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">로그인</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">고객지원</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">관리자</a>
+</div>
+<button class="bg-primary text-on-primary px-lg py-sm rounded-lg font-label-md text-label-md hover:bg-primary-dim transition-all shadow-sm">
+            Get Started
+        </button>
+</nav>
+<main class="pt-24 pb-40 px-margin max-w-5xl mx-auto">
+<!-- Header -->
+<header class="mb-xl">
+<h1 class="font-headline-lg text-headline-lg text-on-background">주문 확인</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">구성하신 제품들을 마지막으로 확인해 주세요.</p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg items-start">
+<!-- Left Column: Summary & Assurance -->
+<div class="lg:col-span-7 space-y-lg">
+<!-- Trust Section (cart__assurance) -->
+<section class="bg-primary-container/10 border border-primary-container rounded-xl p-lg shadow-sm">
+<div class="flex items-center gap-sm mb-md text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">verified</span>
+<h2 class="font-headline-md text-headline-md text-primary">이 구성은 조립 가능함이 검증됐습니다</h2>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-md border-b border-primary-container/30 pb-lg mb-lg">
+<div class="flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary mb-xs" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-md text-label-md text-on-primary-container">Socket</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary mb-xs" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-md text-label-md text-on-primary-container">RAM</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary mb-xs" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-md text-label-md text-on-primary-container">Power</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary mb-xs" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-md text-label-md text-on-primary-container">Cooler</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary mb-xs" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-md text-label-md text-on-primary-container">Case</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-md">
+<div class="flex items-center gap-xs px-md py-xs bg-surface-container-highest rounded-full text-on-surface">
+<span class="material-symbols-outlined text-[18px]">engineering</span>
+<span class="text-label-md font-label-md">전문가 조립·검수</span>
+</div>
+<div class="flex items-center gap-xs px-md py-xs bg-surface-container-highest rounded-full text-on-surface">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+<span class="text-label-md font-label-md">당일 출고</span>
+</div>
+<div class="flex items-center gap-xs px-md py-xs bg-surface-container-highest rounded-full text-on-surface">
+<span class="material-symbols-outlined text-[18px]">workspace_premium</span>
+<span class="text-label-md font-label-md">A/S 보증</span>
+</div>
+</div>
+</section>
+<!-- Summary Section (cart__summary) -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-hidden">
+<div class="p-lg border-b border-outline-variant/20 bg-surface-container-low/50">
+<h3 class="font-headline-md text-headline-md">부품 상세 리스트</h3>
+</div>
+<ul class="divide-y divide-outline-variant/10">
+<li class="p-lg flex justify-between items-center hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined">memory</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">CPU</p>
+<p class="font-body-md text-body-md font-bold">Intel Core i7-14700K</p>
+</div>
+</div>
+<span class="font-body-md text-body-md">580,000원</span>
+</li>
+<li class="p-lg flex justify-between items-center hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined">videogame_asset</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">GPU</p>
+<p class="font-body-md text-body-md font-bold">NVIDIA RTX 4070 Ti Super</p>
+</div>
+</div>
+<span class="font-body-md text-body-md">450,000원</span>
+</li>
+<li class="p-lg flex justify-between items-center hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined">settings_input_component</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">Motherboard</p>
+<p class="font-body-md text-body-md font-bold">MSI MAG Z790 Tomahawk WiFi</p>
+</div>
+</div>
+<span class="font-body-md text-body-md">250,000원</span>
+</li>
+<li class="p-lg flex justify-between items-center hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined">build</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">ASSEMBLY_SERVICE</p>
+<p class="font-body-md text-body-md font-bold">프리미엄 조립 및 공임</p>
+</div>
+</div>
+<span class="font-body-md text-body-md">5,000원</span>
+</li>
+</ul>
+</section>
+</div>
+<!-- Right Column: Payment & Auth -->
+<div class="lg:col-span-5 space-y-lg sticky top-24">
+<!-- Stock Check (cart__stock) -->
+<div class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant/30 shadow-sm">
+<div class="flex items-center gap-md text-primary" id="stock-available">
+<span class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+</span>
+<p class="font-label-md text-label-md font-bold">전 품목 재고 확보 — 바로 출고 가능</p>
+</div>
+<!-- Hidden Alert for Sold Out State (can be toggled via JS) -->
+<div class="hidden flex items-center gap-md text-error" id="stock-unavailable">
+<span class="material-symbols-outlined">error</span>
+<p class="font-label-md text-label-md font-bold">방금 부품이 품절됐습니다. 대체 후 계속하시겠어요?</p>
+</div>
+</div>
+<!-- Price Breakdown -->
+<section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant/30 shadow-sm">
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-md uppercase tracking-wider">최종 결제 금액</h3>
+<div class="space-y-sm">
+<div class="flex justify-between font-body-md text-body-md">
+<span class="text-on-surface-variant">부품 합계</span>
+<span>1,280,000원</span>
+</div>
+<div class="flex justify-between font-body-md text-body-md">
+<span class="text-on-surface-variant">조립 공임</span>
+<span>5,000원</span>
+</div>
+<div class="flex justify-between font-body-md text-body-md">
+<span class="text-on-surface-variant">배송비</span>
+<span class="text-primary font-bold">무료</span>
+</div>
+<div class="pt-md mt-md border-t border-outline-variant/20">
+<div class="flex justify-between items-end">
+<div>
+<p class="text-xs text-on-surface-variant mb-xs">3시간 전 기준</p>
+<span class="font-headline-lg text-headline-lg text-primary">1,285,000원</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant pb-1">VAT 포함</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Auth Gate (cart__auth-gate) -->
+<section class="bg-surface-container-highest/30 rounded-xl p-lg border-2 border-dashed border-outline-variant flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-outline mb-sm" style="font-size: 40px;">account_circle</span>
+<p class="font-headline-md text-headline-md mb-md">결제를 위해 로그인이 필요합니다</p>
+<button class="w-full bg-on-background text-background py-md rounded-lg font-label-md text-label-md hover:bg-on-surface transition-all">
+                        로그인 / 회원가입으로 계속
+                    </button>
+<p class="mt-md text-xs text-on-surface-variant">비회원 주문 시 포인트 적립 및 A/S 관리가 제한될 수 있습니다.</p>
+</section>
+</div>
+</div>
+</main>
+<!-- Bottom Sticky CTA Bar -->
+<div class="fixed bottom-0 left-0 w-full bg-surface-lowest/90 backdrop-blur-md border-t border-outline-variant/20 px-margin py-md z-40">
+<div class="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-md">
+<div class="hidden md:flex flex-col">
+<span class="text-xs text-on-surface-variant">선택된 품목 8개</span>
+<span class="font-headline-md text-headline-md text-on-background">1,285,000원</span>
+</div>
+<div class="flex w-full md:w-auto items-center gap-lg">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary underline transition-colors" href="#">부품 변경하기</a>
+<button class="flex-1 md:flex-none bg-primary text-on-primary px-xl py-md rounded-xl font-headline-md text-headline-md hover:bg-primary-dim transition-all shadow-lg active:scale-95">
+                    결제하기
+                </button>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="w-full py-xl px-margin flex flex-col md:flex-row justify-between items-start gap-lg bg-surface-container-low dark:bg-inverse-surface mt-20">
+<div>
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed mb-sm">Popcorn AI</div>
+<p class="font-body-md text-body-md text-on-surface-variant">© 2024 Popcorn AI. All rights reserved.</p>
+</div>
+<div class="flex flex-wrap gap-xl">
+<div class="flex flex-col gap-sm">
+<span class="font-label-md text-label-md font-bold text-on-surface">Legal</span>
+<a class="font-body-md text-body-md text-on-surface-variant hover:underline hover:text-primary dark:hover:text-primary-fixed transition-opacity" href="#">Privacy Policy</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:underline hover:text-primary dark:hover:text-primary-fixed transition-opacity" href="#">Terms of Service</a>
+</div>
+<div class="flex flex-col gap-sm">
+<span class="font-label-md text-label-md font-bold text-on-surface">Support</span>
+<a class="font-body-md text-body-md text-on-surface-variant hover:underline hover:text-primary dark:hover:text-primary-fixed transition-opacity" href="#">Contact Support</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:underline hover:text-primary dark:hover:text-primary-fixed transition-opacity" href="#">Methodology</a>
+</div>
+<div class="flex flex-col gap-sm">
+<span class="font-label-md text-label-md font-bold text-on-surface">System</span>
+<a class="font-body-md text-body-md text-on-surface-variant hover:underline hover:text-primary dark:hover:text-primary-fixed transition-opacity" href="#">Technical Specs</a>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interaction: Toggle stock status for demonstration
+        setTimeout(() => {
+            console.log("Stock status update simulation ready.");
+        }, 3000);
+
+        // Simple visibility observer for entrance animations
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-4');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('section, header').forEach(el => {
+            el.classList.add('opacity-0', 'translate-y-4', 'transition-all', 'duration-700', 'ease-out');
+            observer.observe(el);
+        });
+    </script>
+</body></html>
