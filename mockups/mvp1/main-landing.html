@@ -244,9 +244,9 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // CTA 라우팅 (목업): 견적 시작 계열 → S1 대화 세션, 작동 방식 보기 → HOW 섹션
+  // CTA 라우팅 (목업): 견적 시작 계열 → S0 입력 게이트(→ 이후 S1), 작동 방식 보기 → HOW 섹션
   document.querySelectorAll('[data-cta="start"]').forEach(function (b) {
-    b.addEventListener('click', function () { window.location.href = 's1-session.html'; });
+    b.addEventListener('click', function () { window.location.href = 's0-landing.html'; });
   });
   (function () {
     var howBtn = document.querySelector('[data-cta="how"]');
