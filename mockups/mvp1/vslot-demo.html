@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Popcorn · 시각 슬롯 규약 데모</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vslot.css">
+<style>
+:root{
+  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --tertiary:#6E8FD6; --error:#C0392B;
+  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --font-head:'Hanken Grotesk','Pretendard',system-ui,sans-serif;
+  --r-lg:1rem; --r-full:9999px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;padding:40px 24px 80px}
+.wrap{max-width:920px;margin:0 auto}
+h1{font-family:var(--font-head);font-size:26px;font-weight:800;margin-bottom:6px}
+.sub{color:var(--on-variant);font-size:14px;margin-bottom:32px}
+h2{font-family:var(--font-head);font-size:16px;font-weight:700;margin:28px 0 12px;display:flex;align-items:center;gap:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+.ptable{width:100%;border-collapse:collapse;font-size:13px}
+.ptable th,.ptable td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--container)}
+.ptable th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-variant);font-weight:700}
+.ptable td.num{font-family:'JetBrains Mono',monospace;text-align:right}
+.ptable tr.win td{color:var(--primary);font-weight:700}
+.ico{stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
+  <symbol id="i-gallery" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M1 5h13v11H1zM14 8h4l3 3v5h-7"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/></symbol>
+</svg>
+
+<div class="wrap">
+  <h1>시각 슬롯 규약 데모</h1>
+  <p class="sub">ux-upgrade-spec §1 · "위치만 잡고 내용 정의" — 자산 오기 전 placeholder, 오면 교체. 아래 5개 타입 확인용.</p>
+
+  <div class="grid2">
+    <!-- image: placeholder -->
+    <section>
+      <h2><svg class="ico" width="18" height="18"><use href="#i-img"/></svg>image (자산 대기)</h2>
+      <figure class="vslot" data-visual="build-photo-cablemgmt" data-visual-type="image"
+              data-visual-spec="내부 선정리 완료 실사진 1장, 4:3">
+        <div class="vslot__ph">
+          <svg class="ico" width="30" height="30"><use href="#i-img"/></svg>
+          <span class="vslot__type">IMAGE</span>
+          <span class="vslot__label">선정리 완료 실사진</span>
+          <span class="vslot__note">케이블 정리된 내부 실사진 1장 (4:3). 자산 조달 후 교체.</span>
+        </div>
+        <figcaption class="vslot__cap">모든 PC는 선정리 후 출고됩니다.</figcaption>
+      </figure>
+    </section>
+
+    <!-- image: filled 예시 -->
+    <section>
+      <h2><svg class="ico" width="18" height="18"><use href="#i-img"/></svg>image (자산 채워진 상태)</h2>
+      <figure class="vslot is-filled" data-visual="os-boot" data-visual-type="image" data-visual-spec="OS 부팅 완료 화면">
+        <div class="vslot__ph"></div>
+        <div class="vslot__asset" style="aspect-ratio:4/3;background:linear-gradient(135deg,#1E3A5F,#65A1D4);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--font-head);font-weight:700">실제 이미지 (교체됨)</div>
+        <figcaption class="vslot__cap">OS 설치·업데이트 완료 상태로 배송.</figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <!-- gallery: placeholder -->
+  <h2><svg class="ico" width="18" height="18"><use href="#i-gallery"/></svg>gallery (실사진 4장, 자산 대기)</h2>
+  <figure class="vslot" data-visual="inspection-gallery" data-visual-type="gallery"
+          data-visual-spec="검수 실사진 4장: 선정리/번인화면/포장/OS부팅">
+    <div class="vslot__ph">
+      <span class="vslot__type">GALLERY · 4</span>
+      <div class="vslot__tiles" style="--n:4">
+        <div class="vslot__tile">선정리</div>
+        <div class="vslot__tile">번인 화면</div>
+        <div class="vslot__tile">안전 포장</div>
+        <div class="vslot__tile">OS 부팅</div>
+      </div>
+      <span class="vslot__note">검수·조립 실사진 4장. 후기 사진 갤러리에도 동일 규약 사용.</span>
+    </div>
+    <figcaption class="vslot__cap">이 PC가 거친 실제 과정.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <!-- chart: 실제 구현(더미) -->
+    <section>
+      <h2><svg class="ico" width="18" height="18"><use href="#i-chart"/></svg>chart (지금 구현 · 더미)</h2>
+      <figure class="vslot" data-visual="low-fps" data-visual-type="chart"
+              data-visual-spec="게임별 1% Low FPS 막대">
+        <div class="vslot__body"><canvas id="c-fps" width="380" height="180" style="width:100%;height:auto"></canvas></div>
+        <figcaption class="vslot__cap">인기 게임 1% Low FPS (QHD) · 더미 데이터.</figcaption>
+      </figure>
+    </section>
+
+    <!-- diagram: 실제 SVG -->
+    <section>
+      <h2><svg class="ico" width="18" height="18"><use href="#i-truck"/></svg>diagram (지금 구현 · SVG)</h2>
+      <figure class="vslot" data-visual="delivery-timeline" data-visual-type="diagram"
+              data-visual-spec="결제→검수→번인→포장→출고 5스텝">
+        <div class="vslot__body">
+          <svg viewBox="0 0 380 90" width="100%" role="img" aria-label="배송 타임라인: 결제, 검수, 번인, 포장, 당일출고">
+            <line x1="30" y1="30" x2="350" y2="30" stroke="var(--outline-variant)" stroke-width="3"/>
+            <g font-family="Inter" font-size="10" fill="var(--on-variant)" text-anchor="middle">
+              <g><circle cx="30" cy="30" r="7" fill="var(--primary)"/><text x="30" y="55" fill="var(--on)" font-weight="700">결제</text></g>
+              <g><circle cx="110" cy="30" r="7" fill="var(--primary)"/><text x="110" y="55" fill="var(--on)" font-weight="700">검수</text></g>
+              <g><circle cx="190" cy="30" r="7" fill="var(--primary)"/><text x="190" y="55" fill="var(--on)" font-weight="700">24h 번인</text></g>
+              <g><circle cx="270" cy="30" r="7" fill="var(--primary)"/><text x="270" y="55" fill="var(--on)" font-weight="700">포장</text></g>
+              <g><circle cx="350" cy="30" r="7" fill="var(--primary)"/><text x="350" y="55" fill="var(--on)" font-weight="700">당일 출고</text></g>
+            </g>
+          </svg>
+        </div>
+        <figcaption class="vslot__cap">주문 후 출고까지 5단계.</figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <!-- table: 실제 구현 -->
+  <h2><svg class="ico" width="18" height="18"><use href="#i-chart"/></svg>table (지금 구현 · 가격 이득 비교 예시)</h2>
+  <figure class="vslot" data-visual="price-benefit" data-visual-type="table"
+          data-visual-spec="개별구매 vs 우리 총액·이득">
+    <div class="vslot__body">
+      <table class="ptable">
+        <thead><tr><th>항목</th><th style="text-align:right">개별 구매</th><th style="text-align:right">우리</th><th style="text-align:right">차이</th></tr></thead>
+        <tbody>
+          <tr><td>부품 합계 (7종)</td><td class="num">1,705,000</td><td class="num">1,705,000</td><td class="num">—</td></tr>
+          <tr><td>조립·선정리·검수</td><td class="num">직접 / 리스크</td><td class="num">포함</td><td class="num">—</td></tr>
+          <tr><td>24h 번인·A/S</td><td class="num">없음</td><td class="num">포함</td><td class="num">—</td></tr>
+          <tr class="win"><td>실부담</td><td class="num">1,705,000 + 시간·리스크</td><td class="num">1,735,000</td><td class="num">안심 +∞</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption class="vslot__cap">"직접 사서 조립"의 숨은 비용까지 정직하게.</figcaption>
+  </figure>
+</div>
+
+<script>
+(function(){
+  var c=document.getElementById('c-fps'); if(!c)return; var x=c.getContext('2d');
+  var data=[['롤',240],['오버워치',210],['배그',165],['로스트아크',150],['사이버펑크',96]];
+  var max=260,W=c.width,H=c.height,pad=28,bw=42,gap=(W-pad*2-bw*data.length)/(data.length-1);
+  x.font="11px Inter"; x.textAlign="center";
+  data.forEach(function(d,i){
+    var bx=pad+i*(bw+gap), bh=(d[1]/max)*(H-pad-20), by=H-20-bh;
+    x.fillStyle="#65A1D4"; x.beginPath(); x.roundRect(bx,by,bw,bh,4); x.fill();
+    x.fillStyle="#111827"; x.fillText(d[1], bx+bw/2, by-5);
+    x.fillStyle="#64748B"; x.fillText(d[0], bx+bw/2, H-6);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,612 +1,560 @@
 <!DOCTYPE html>
 <html lang="ko" data-screen-id="FR-LND-010" data-domain="landing">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>팝콘PC AI · 모든 견적에는 이유가 있습니다 (S0 목업)</title>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>팝콘PC AI · 랜딩 · 입력 게이트 (S0)</title>
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
-  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
-  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
-  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
-  --error:#C0392B; --on-error:#ffffff;
-  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
-  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
-  --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-xl:1.5rem; --r-full:9999px;
-  --xs:4px; --sm:8px; --md:16px; --lg:24px; --xl:32px; --2xl:48px; --3xl:80px;
-  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
-  --max:1200px;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;-webkit-font-smoothing:antialiased}
-.num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
-h1,h2,h3,h4{font-family:var(--font-head);letter-spacing:-.02em}
-.ico{width:1em;height:1em;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
-button{font-family:inherit;cursor:pointer}
-a{color:inherit;text-decoration:none}
-.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--lg)}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
-/* ═══ GNB ═══ */
-.gnb{position:fixed;top:0;left:0;right:0;height:64px;z-index:50;background:var(--card);
-  border-bottom:1px solid var(--outline-variant);display:flex;align-items:center}
-.gnb__inner{max-width:var(--max);width:100%;margin:0 auto;padding:0 var(--lg);display:flex;align-items:center;gap:var(--md)}
-.gnb__brand{display:flex;align-items:center;gap:8px;font-family:var(--font-head);font-weight:800;color:var(--primary);font-size:20px;letter-spacing:-.02em}
-.gnb__brand .ico{color:var(--primary);font-size:22px}
-.gnb__spacer{flex:1}
-.gnb__nav{display:flex;align-items:center;gap:var(--lg)}
-.gnb__link{font-size:14px;font-weight:600;color:var(--on-variant);display:inline-flex;align-items:center;gap:6px;transition:.15s;background:none;border:0;padding:6px 4px}
-.gnb__link:hover{color:var(--primary)}
-.gnb__menu{display:none;background:none;border:0;color:var(--on);font-size:24px;padding:6px}
-@media(max-width:768px){
-  .gnb__nav{display:none}
-  .gnb__menu{display:inline-flex}
-}
-
-/* ═══ Hero ═══ */
-main{padding-top:64px}
-.hero{position:relative;min-height:88vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:var(--3xl) var(--lg);text-align:center;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;z-index:0;
-  background:radial-gradient(60% 55% at 50% 30%,rgba(101,161,212,.16),transparent 70%)}
-.hero__inner{position:relative;z-index:1;width:100%;max-width:820px;display:flex;flex-direction:column;align-items:center;gap:var(--lg)}
-.hero__trust{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sm)}
-.trust-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--tertiary);
-  background:var(--tertiary-container);border:1px solid rgba(110,143,214,.22);padding:6px 14px;border-radius:var(--r-full)}
-.hero h1{font-size:clamp(30px,5vw,46px);font-weight:900;line-height:1.15;color:var(--on)}
-.hero__sub{font-size:17px;color:var(--on-variant);max-width:560px}
-
-/* Composer */
-.composer{width:100%;max-width:680px;margin-top:var(--md)}
-.composer__box{position:relative;background:var(--card);border:2px solid var(--outline-variant);border-radius:var(--r-xl);
-  box-shadow:var(--shadow);display:flex;align-items:flex-end;gap:var(--sm);padding:var(--sm) var(--sm) var(--sm) var(--lg);transition:.15s}
-.composer__box:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px rgba(101,161,212,.22),var(--shadow)}
-.composer__box.shake{animation:shake .4s}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
-.composer__input{flex:1;border:0;background:none;resize:none;font-family:inherit;font-size:17px;color:var(--on);
-  padding:16px 0;line-height:1.5;max-height:160px}
-.composer__input:focus{outline:none}
-.composer__input::placeholder{color:var(--on-variant)}
-.composer__send{width:52px;height:52px;flex:none;background:var(--primary);color:#fff;border:0;border-radius:var(--r-lg);
-  display:flex;align-items:center;justify-content:center;transition:.15s}
-.composer__send:hover{background:var(--primary-bright)}
-.composer__send:active{transform:scale(.94)}
-.composer__error{display:flex;align-items:center;gap:6px;justify-content:center;margin-top:10px;
-  font-size:14px;font-weight:600;color:var(--error)}
-.composer__meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--sm);margin-top:12px;padding:0 4px}
-.composer__hint{font-size:13px;color:var(--on-variant)}
-.live-stock{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--primary);
-  background:rgba(101,161,212,.12);padding:6px 12px;border-radius:var(--r-full)}
-.live-stock__dot{position:relative;width:8px;height:8px;flex:none}
-.live-stock__dot span{position:absolute;inset:0;border-radius:50%;background:var(--primary)}
-.live-stock__dot span:first-child{animation:ping 1.6s cubic-bezier(0,0,.2,1) infinite}
-@keyframes ping{75%,100%{transform:scale(2.4);opacity:0}}
-.live-stock--stale{color:var(--on-variant);background:var(--container)}
-.live-stock--stale .live-stock__dot span{background:var(--on-variant);animation:none}
-
-/* Accelerator chips — 입력창보다 낮은 위계 */
-.hero__chips{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sm);margin-top:var(--sm)}
-.chip{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--outline-variant);
-  color:var(--on-variant);padding:8px 16px;border-radius:var(--r-full);font-size:14px;font-weight:600;transition:.15s}
-.chip:hover{border-color:var(--primary-bright);color:var(--primary-bright);background:rgba(101,161,212,.06)}
-.chip .ico{color:var(--tertiary)}
-
-/* ═══ Section common ═══ */
-section{padding:var(--3xl) 0}
-.sec--card{background:var(--card)}
-.sec__head{text-align:center;max-width:640px;margin:0 auto var(--2xl)}
-.sec__head--left{text-align:left;margin-left:0}
-.sec__head h2{font-size:clamp(24px,3.5vw,32px);font-weight:800;color:var(--on)}
-.sec__head p{margin-top:12px;font-size:16px;color:var(--on-variant)}
-
-/* How It Works */
-.how__grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--lg)}
-.how__step{background:var(--bg);border:1px solid var(--outline-variant);border-radius:var(--r-lg);padding:var(--xl);
-  display:flex;flex-direction:column;gap:var(--md);transition:.15s}
-.how__step:hover{box-shadow:var(--shadow);border-color:var(--primary-container)}
-.how__badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--primary)}
-.how__icon{width:52px;height:52px;border-radius:var(--r-md);background:var(--primary-container);color:var(--primary-bright);
-  display:flex;align-items:center;justify-content:center;font-size:26px}
-.how__step h3{font-size:19px;font-weight:800}
-.how__step p{font-size:15px;color:var(--on-variant)}
-
-/* Reason preview */
-.reason__grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--lg)}
-.reason-card{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);
-  padding:var(--xl);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:var(--md)}
-.reason-card__top{display:flex;align-items:center;justify-content:space-between;gap:var(--sm)}
-.tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:5px 12px;border-radius:var(--r-full)}
-.tag--part{color:var(--primary);background:rgba(101,161,212,.12)}
-.tag--reason{color:var(--tertiary);background:var(--tertiary-container)}
-.reason-card h4{font-size:20px;font-weight:800}
-.reason-card p{font-size:15px;color:var(--on-variant)}
-.reason-card__foot{margin-top:auto;padding-top:var(--md);border-top:1px solid var(--outline-variant);
-  display:flex;flex-wrap:wrap;gap:var(--sm)}
-.reason-card__foot span{font-size:13px;font-weight:600;color:var(--tertiary)}
-
-/* Spec preview */
-.spec__grid{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--2xl);align-items:center}
-.parts-list{display:flex;flex-direction:column;gap:12px}
-.part{display:flex;align-items:center;gap:var(--md);background:var(--bg);border:1px solid var(--outline-variant);
-  border-radius:var(--r-md);padding:14px var(--md)}
-.part__key{width:52px;height:52px;flex:none;background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-md);
-  display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-weight:800;color:var(--primary);font-size:14px}
-.part__name{font-size:16px;font-weight:700}
-.part__desc{font-size:13px;color:var(--on-variant)}
-.spec__price{margin-top:var(--lg);display:flex;align-items:center;justify-content:space-between;gap:var(--md);
-  background:rgba(101,161,212,.08);border:1px solid var(--primary-container);border-radius:var(--r-lg);padding:var(--lg)}
-.spec__price-label{font-size:15px;font-weight:700}
-.spec__price-num{font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--primary)}
-.spec__aside{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);padding:var(--xl);box-shadow:var(--shadow)}
-.spec__aside .badge-line{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--primary);margin-bottom:var(--sm)}
-.spec__aside h3{font-size:22px;font-weight:800;margin-bottom:8px}
-.spec__aside p{font-size:15px;color:var(--on-variant)}
-.spec__checks{margin-top:var(--lg);display:flex;flex-direction:column;gap:10px}
-.spec__check{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
-.spec__check .ico{color:var(--primary)}
-
-/* Reviews */
-.review__grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--lg)}
-.review-card{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);
-  padding:var(--xl);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:var(--md)}
-.stars{display:flex;gap:2px;color:var(--tertiary);font-size:18px}
-.review-card p{font-size:15px;color:var(--on)}
-.review-card__name{margin-top:auto;font-size:14px;font-weight:700;color:var(--on-variant)}
-
-/* Event banner */
-.event-banner{background:var(--secondary);color:#fff;border-radius:var(--r-lg);padding:var(--lg) var(--xl);
-  display:flex;align-items:center;gap:var(--md);box-shadow:var(--shadow)}
-.event-banner__icon{width:44px;height:44px;flex:none;border-radius:var(--r-md);background:rgba(255,255,255,.18);
-  display:flex;align-items:center;justify-content:center;font-size:22px}
-.event-banner__body{flex:1}
-.event-banner__tag{font-size:12px;font-weight:800;letter-spacing:.04em;opacity:.85}
-.event-banner__title{font-family:var(--font-head);font-size:18px;font-weight:800}
-
-/* Final CTA */
-.final-cta{background:var(--primary);color:#fff;text-align:center}
-.final-cta h2{font-size:clamp(26px,4vw,38px);font-weight:900;color:#fff}
-.final-cta p{margin-top:12px;font-size:17px;opacity:.92;max-width:520px;margin-left:auto;margin-right:auto}
-.cta-btn{margin-top:var(--xl);background:#fff;color:var(--primary);border:0;padding:16px 36px;border-radius:var(--r-lg);
-  font-family:var(--font-head);font-size:18px;font-weight:800;box-shadow:var(--shadow);transition:.15s;display:inline-flex;align-items:center;gap:8px}
-.cta-btn:hover{transform:translateY(-2px)}
-
-/* Footer */
-.footer{background:var(--card);border-top:1px solid var(--outline-variant);padding:var(--2xl) 0 var(--xl)}
-.footer__top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--2xl)}
-.footer__brand{display:flex;flex-direction:column;gap:12px;max-width:280px}
-.footer__wordmark{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--primary)}
-.footer__brand p{font-size:13px;color:var(--on-variant)}
-.footer__cols{display:flex;flex-wrap:wrap;gap:var(--2xl)}
-.footer__col{display:flex;flex-direction:column;gap:10px}
-.footer__col h4{font-size:13px;font-weight:800;color:var(--on);letter-spacing:.03em}
-.footer__col a,.footer__col p{font-size:13px;color:var(--on-variant)}
-.footer__col a:hover{color:var(--primary)}
-.footer__bottom{max-width:var(--max);margin:var(--xl) auto 0;padding:var(--lg) var(--lg) 0;border-top:1px solid var(--outline-variant);
-  display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--md)}
-.footer__legal{display:flex;gap:var(--lg)}
-.footer__legal a{font-size:13px;color:var(--on-variant)}
-.footer__legal a:hover{text-decoration:underline}
-.footer__copy{font-size:13px;color:var(--on-variant)}
-
-/* Loading layer (예외) */
-.loading-layer{position:fixed;inset:0;z-index:100;background:rgba(240,245,249,.94);backdrop-filter:blur(6px);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--lg);padding:var(--lg);text-align:center}
-.loading-layer[hidden]{display:none}
-.spin{width:56px;height:56px;border:5px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite}
-@keyframes sp{to{transform:rotate(360deg)}}
-.loading-layer h3{font-size:22px;font-weight:800}
-.loading-layer p{font-size:15px;color:var(--on-variant)}
-
-/* Responsive */
-@media(max-width:768px){
-  .how__grid,.reason__grid,.review__grid{grid-template-columns:1fr}
-  .spec__grid{grid-template-columns:1fr;gap:var(--xl)}
-  .composer__meta{justify-content:center}
-  .event-banner{flex-direction:column;text-align:center}
-  section{padding:var(--2xl) 0}
-}
-[hidden]{display:none!important}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:#f1eee8;font-family:'Pretendard','Pretendard Variable',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+[data-cta="start"]{cursor:pointer}
+#enter{transition:box-shadow .3s}
+[data-lane]{transition:transform .15s,box-shadow .15s,border-color .15s}
+[data-lane]:hover{transform:translateY(-1px);box-shadow:0 8px 20px -12px rgba(30,25,15,.35)}
+/* --- S0 프로세스 애니메이션 --- */
+.s0a-bars{display:flex;align-items:flex-end;gap:3px;height:24px;margin-top:2px}
+.s0a-bars i{flex:1;background:linear-gradient(#5fd6a0,#2f6d52);border-radius:2px;transform:scaleY(.3);transform-origin:bottom;animation:s0bar 1.3s ease-in-out infinite}
+@keyframes s0bar{0%,100%{transform:scaleY(.28)}50%{transform:scaleY(1)}}
+.s0a-xray{position:relative;height:62px;border-radius:10px;background:#101014;border:1px solid #26262c;overflow:hidden}
+.s0a-xray>svg{position:absolute;inset:0;margin:auto;opacity:.55}
+.s0a-scan{position:absolute;left:7%;right:16%;height:2px;background:#7fa8ff;box-shadow:0 0 12px 2px rgba(127,168,255,.75);top:8%;animation:s0scan 2.6s ease-in-out infinite alternate}
+@keyframes s0scan{0%{top:10%}100%{top:82%}}
+.s0a-nodes{position:absolute;right:10px;top:9px;bottom:9px;display:flex;flex-direction:column;justify-content:space-between}
+.s0a-nodes i{width:6px;height:6px;border-radius:50%;background:#7fa8ff;opacity:.25;animation:s0node 2.6s ease-in-out infinite}
+@keyframes s0node{0%,100%{opacity:.22}50%{opacity:1;box-shadow:0 0 8px rgba(127,168,255,.85)}}
+.s0a-doc{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+.s0a-doc span{height:5px;border-radius:3px;background:#c9a0ff;opacity:.5;width:0;animation:s0ln 3.4s ease-in-out infinite}
+@keyframes s0ln{0%{width:0}55%{width:var(--w)}100%{width:var(--w)}}
+@media(prefers-reduced-motion:reduce){.s0a-bars i,.s0a-scan,.s0a-nodes i,.s0a-doc span{animation:none}.s0a-bars i{transform:scaleY(.7)}.s0a-doc span{width:var(--w)}}
+.s0perf-track{height:8px;border-radius:5px;background:#2e2e29;overflow:hidden}
+.s0perf-track i{display:block;height:100%;border-radius:5px;width:0;animation:s0perf 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes s0perf{from{width:0}to{width:var(--w)}}
+@media(prefers-reduced-motion:reduce){.s0perf-track i{animation:none;width:var(--w)}}
+.s0rev-mask{overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.s0rev-track{display:flex;width:max-content;animation:s0rev 46s linear infinite}
+.s0rev-mask:hover .s0rev-track{animation-play-state:paused}
+@keyframes s0rev{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.s0rev-card{flex:0 0 340px;margin-right:20px;background:#fff;border:1px solid #ece9e3;border-radius:18px;padding:24px}
+@media(max-width:768px){.s0rev-card{flex-basis:278px}}
+@media(prefers-reduced-motion:reduce){.s0rev-track{animation:none}}
 </style>
 </head>
 <body>
+<script>
+(function(){var KEY="popcorn-gate-ok";var PASS="WnRnal";
+if(localStorage.getItem(KEY)==="1")return;
+var ov=document.createElement("div");ov.id="__gate";
+ov.setAttribute("style","position:fixed;inset:0;z-index:99999;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:Pretendard,-apple-system,sans-serif;");
+ov.innerHTML='<div style="width:min(340px,86vw);background:#fff;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;box-sizing:border-box;"><div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span> · 내부 검토</div><p style="margin:10px 0 18px;font-size:13px;color:#8a8578;font-weight:600;">접근 암호를 입력하세요.</p><input id="__gp" type="password" autocomplete="off" placeholder="암호" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:12px;font-size:14px;font-family:inherit;outline:none;"><p id="__ge" style="margin:8px 0 0;font-size:12px;color:#b31b25;font-weight:700;height:14px;"></p><button id="__gb" style="margin-top:12px;width:100%;padding:12px;border:none;background:#2b5fd9;color:#fff;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">입장</button></div>';
+function go(){document.body.appendChild(ov);var inp=document.getElementById("__gp"),err=document.getElementById("__ge"),btn=document.getElementById("__gb");function s(){if(inp.value===PASS){localStorage.setItem(KEY,"1");ov.remove();}else{err.textContent="암호가 올바르지 않습니다.";inp.value="";inp.focus();}}btn.addEventListener("click",s);inp.addEventListener("keydown",function(e){if(e.key==="Enter")s();});inp.focus();}
+if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})();
+</script>
 
-<!-- ═══ SVG 아이콘 심볼 (단색 currentColor) ═══ -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
-  <symbol id="i-report" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
-  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
-  <symbol id="i-game" viewBox="0 0 24 24"><path d="M7 11h4M9 9v4M15 11h.01M17.5 12.5h.01M17 4a5 5 0 0 1 5 5v3a4 4 0 0 1-7.2 2.4L14 13H10l-.8 1.4A4 4 0 0 1 2 12V9a5 5 0 0 1 5-5Z"/></symbol>
-  <symbol id="i-office" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="13" rx="1"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></symbol>
-  <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></symbol>
-  <symbol id="i-cast" viewBox="0 0 24 24"><path d="M2 8a10 10 0 0 1 10 10M2 13a5 5 0 0 1 5 5M2 18h.01"/><rect x="14" y="4" width="8" height="14" rx="1"/></symbol>
-  <symbol id="i-stock" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></symbol>
-  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/></symbol>
-  <symbol id="i-gpu" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="8" cy="12" r="2.2"/><circle cx="15" cy="12" r="2.2"/></symbol>
-  <symbol id="i-ram" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 16v2M10 16v2M14 16v2M18 16v2M5 11h2M9 11h2M13 11h2M17 11h2"/></symbol>
-  <symbol id="i-ssd" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v4H8z"/><path d="M8 16h.01M12 16h.01"/></symbol>
-  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 8h2M16 11h2M7 17h10"/></symbol>
-  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v8M6.5 6.5a8 8 0 1 0 11 0"/></symbol>
-  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.6 5.3 5.9.9-4.2 4.1 1 5.9L12 16.9 6.7 19.2l1-5.9L3.5 9.2l5.9-.9Z" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></symbol>
-  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
-  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
-  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
-  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2h-4v-6H9v6H5a2 2 0 0 1-2-2Z"/></symbol>
-</svg>
 
-<!-- ═══ GNB ═══ -->
-<header class="gnb">
-  <div class="gnb__inner">
-    <a class="gnb__brand" href="s0-landing.html" aria-label="팝콘PC AI 홈">
-      <svg class="ico" aria-hidden="true"><use href="#i-home"/></svg>팝콘PC AI
-    </a>
-    <div class="gnb__spacer"></div>
-    <nav class="gnb__nav" aria-label="주 메뉴">
-      <button class="gnb__link" data-action="scroll-to-input"><svg class="ico" aria-hidden="true"><use href="#i-report"/></svg>견적 받기</button>
-      <button class="gnb__link" data-action="open-auth">로그인/회원가입</button>
-      <button class="gnb__link" data-action="goto-qna">고객문의</button>
-      <button class="gnb__link" data-action="goto-admin">관리자</button>
-      <button class="gnb__link" data-action="goto-dev">DEV</button>
-    </nav>
-    <button class="gnb__menu" data-action="toggle-menu" aria-label="메뉴 열기"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg></button>
-  </div>
+<div style="min-height:100vh;background:#f1eee8;">
+<!-- nav -->
+<header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;padding:0 40px;">
+<div style="max-width:1360px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;">
+<div style="display:flex;align-items:center;gap:28px;">
+<div style="font-size:17px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span>
+</div>
+<nav style="display:flex;gap:22px;">
+<a href="#how" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">작동 방식</a>
+<a href="#reason" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">근거</a>
+<a href="#build" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">추천 구성</a>
+<a href="#reviews" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">후기</a>
+</nav>
+</div>
+<div style="display:flex;align-items:center;gap:16px;">
+<a href="#" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">로그인 / 회원가입</a>
+<button style="padding:10px 18px;border:none;background:#2b5fd9;border-radius:10px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;" data-cta="start">견적 받기</button>
+</div>
+</div>
 </header>
-
-<main>
-  <!-- ═══ Hero + 입력 게이트 ═══ -->
-  <section class="hero" id="hero">
-    <div class="hero__inner">
-      <div class="hero__trust" data-repeat="trust_badges">
-        <span class="trust-badge"><svg class="ico" aria-hidden="true"><use href="#i-stock"/></svg>실재고 검증</span>
-        <span class="trust-badge"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>호환성 5종 통과</span>
-        <span class="trust-badge"><svg class="ico" aria-hidden="true"><use href="#i-report"/></svg>선정 근거 리포트</span>
-      </div>
-
-      <h1>모든 견적에는 이유가 있습니다.</h1>
-      <p class="hero__sub">실재고 안에서, 호환성을 통과한 구성만 제안합니다. 왜 이 부품이 당신의 PC에 들어갔는지 끝까지 설명합니다.</p>
-
-      <!-- 대화 입력 composer (주 경로) -->
-      <div class="composer">
-        <label for="hero-composer" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">어떤 PC가 필요한지 입력하세요</label>
-        <div class="composer__box" id="composer-box">
-          <textarea id="hero-composer" class="composer__input" rows="1"
-            placeholder="어떤 PC가 필요하세요?  예) 배그 잘 돌아가는 100만원대"></textarea>
-          <button class="composer__send" data-action="start-session" aria-label="견적 시작">
-            <svg class="ico" style="font-size:24px" aria-hidden="true"><use href="#i-send"/></svg>
-          </button>
-        </div>
-        <!-- 예외: 내용 입력 안내 -->
-        <div class="composer__error" id="composer-error" hidden>
-          <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>내용을 입력하거나 아래 칩을 눌러 시작하세요.
-        </div>
-
-        <div class="composer__meta">
-          <span class="composer__hint">입력하시면 실재고에서 후보를 좁혀 드립니다.</span>
-          <span class="live-stock" id="live-stock" title="판매 중 실재고 집계">
-            <span class="live-stock__dot"><span></span><span></span></span>
-            지금 검증 중인 실재고 <span class="num" data-bind="live_stock_count">26,480</span>개
-          </span>
-          <!-- 예외: 재고 갱신 지연 (기본 숨김) -->
-          <span class="live-stock live-stock--stale" id="live-stock-stale" hidden>
-            <span class="live-stock__dot"><span></span><span></span></span>
-            재고 정보를 갱신하는 중입니다
-          </span>
-        </div>
-      </div>
-
-      <!-- 가속기 칩 (입력창보다 낮은 위계) -->
-      <div class="hero__chips" data-repeat="quick_intents" aria-label="빠른 시작">
-        <button class="chip" data-action="quick-intent" data-intent="game"><svg class="ico" aria-hidden="true"><use href="#i-game"/></svg>게임용</button>
-        <button class="chip" data-action="quick-intent" data-intent="office"><svg class="ico" aria-hidden="true"><use href="#i-office"/></svg>사무용</button>
-        <button class="chip" data-action="quick-intent" data-intent="edit"><svg class="ico" aria-hidden="true"><use href="#i-video"/></svg>영상편집</button>
-        <button class="chip" data-action="quick-intent" data-intent="stream"><svg class="ico" aria-hidden="true"><use href="#i-cast"/></svg>인터넷방송</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ How It Works ═══ -->
-  <section class="sec--card">
-    <div class="wrap">
-      <div class="sec__head">
-        <h2>감이 아니라, 검증으로 고릅니다.</h2>
-        <p>결정론 엔진이 실재고 위에서 같은 입력에 늘 같은 결과를 냅니다. 즉흥이 아니라 규칙입니다.</p>
-      </div>
-      <div class="how__grid" data-repeat="steps">
-        <div class="how__step">
-          <span class="how__icon"><svg class="ico" aria-hidden="true"><use href="#i-stock"/></svg></span>
-          <span class="how__badge">STEP 1 · 실재고 확인</span>
-          <h3>품절·단종은 후보에서 즉시 제외</h3>
-          <p>지금 창고에 있는 부품만 후보로 둡니다. 못 사는 조합은 애초에 나오지 않습니다.</p>
-        </div>
-        <div class="how__step">
-          <span class="how__icon"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg></span>
-          <span class="how__badge">STEP 2 · 호환성 검증</span>
-          <h3>소켓·전력·치수 5종 통과만 남김</h3>
-          <p>소켓, 전력, 케이스 치수 등 5종 호환성을 통과한 구성만 후보에 남깁니다.</p>
-        </div>
-        <div class="how__step">
-          <span class="how__icon"><svg class="ico" aria-hidden="true"><use href="#i-report"/></svg></span>
-          <span class="how__badge">STEP 3 · 근거 설명</span>
-          <h3>왜 이 부품인지 리포트로 제공</h3>
-          <p>선정된 부품마다 이유를 붙입니다. 창작이 아니라 재고·벤치·규칙에 근거한 사실입니다.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ 근거 리포트 미리보기 ═══ -->
-  <section>
-    <div class="wrap">
-      <div class="sec__head sec__head--left">
-        <h2>모든 견적에는, 이런 이유가 붙습니다.</h2>
-        <p>선정된 부품마다 근거 태그가 따라옵니다. 아래는 예시입니다.</p>
-      </div>
-      <div class="reason__grid" data-repeat="reason_samples">
-        <div class="reason-card">
-          <div class="reason-card__top">
-            <span class="tag tag--part"><svg class="ico" aria-hidden="true"><use href="#i-gpu"/></svg>GPU</span>
-            <span class="tag tag--reason">성능 근거</span>
-          </div>
-          <h4>RTX 4060</h4>
-          <p>인기 게임 1% Low 프레임 방어율이 이 예산대 최상위권이며, 내부 판매 데이터에서 실사용 안정성이 높게 확인되었습니다.</p>
-          <div class="reason-card__foot"><span>#프레임_방어</span><span>#이_예산대_다수선택</span></div>
-        </div>
-        <div class="reason-card">
-          <div class="reason-card__top">
-            <span class="tag tag--part"><svg class="ico" aria-hidden="true"><use href="#i-power"/></svg>PSU</span>
-            <span class="tag tag--reason">안정성 근거</span>
-          </div>
-          <h4>정격 650W 80PLUS</h4>
-          <p>이 GPU·CPU 조합의 피크 전력 대비 정격 마진 30% 이상을 확보합니다. 장시간 부하에도 여유 있는 전력 공급입니다.</p>
-          <div class="reason-card__foot"><span>#전력마진_30%</span><span>#정격_검증</span></div>
-        </div>
-        <div class="reason-card">
-          <div class="reason-card__top">
-            <span class="tag tag--part"><svg class="ico" aria-hidden="true"><use href="#i-ram"/></svg>RAM</span>
-            <span class="tag tag--reason">호환성 근거</span>
-          </div>
-          <h4>DDR5 32GB (16GB×2)</h4>
-          <p>메인보드 QVL 대조를 통과한 듀얼채널 구성입니다. 선택한 용도의 최소 대역폭 요건을 충족합니다.</p>
-          <div class="reason-card__foot"><span>#QVL_통과</span><span>#듀얼채널</span></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Spec Preview (부품 6종) ═══ -->
-  <section class="sec--card">
-    <div class="wrap">
-      <div class="spec__grid">
-        <div>
-          <div class="sec__head sec__head--left" style="margin-bottom:var(--lg)">
-            <h2>추천 구성 미리보기</h2>
-            <p>실재고 기준으로 지금 자주 선택되는 밸런스 구성입니다. 부품 6종과 예상가를 확인해보세요.</p>
-          </div>
-          <div class="parts-list" data-repeat="components">
-            <div class="part">
-              <span class="part__key">CPU</span>
-              <div><div class="part__name">Intel Core i5-13400F</div><div class="part__desc">10코어 하이브리드, 게임·작업 밸런스</div></div>
-            </div>
-            <div class="part">
-              <span class="part__key">GPU</span>
-              <div><div class="part__name">GeForce RTX 4060</div><div class="part__desc">DLSS 3 지원, 이 예산대 프레임 방어</div></div>
-            </div>
-            <div class="part">
-              <span class="part__key">RAM</span>
-              <div><div class="part__name">DDR5 32GB (16GB×2)</div><div class="part__desc">듀얼채널, QVL 통과 구성</div></div>
-            </div>
-            <div class="part">
-              <span class="part__key">SSD</span>
-              <div><div class="part__name">NVMe 1TB Gen4</div><div class="part__desc">고속 로딩, 넉넉한 게임 저장</div></div>
-            </div>
-            <div class="part">
-              <span class="part__key">보드</span>
-              <div><div class="part__name">B760M DDR5</div><div class="part__desc">안정 전원부, 확장 슬롯 여유</div></div>
-            </div>
-            <div class="part">
-              <span class="part__key">파워</span>
-              <div><div class="part__name">정격 650W 80PLUS</div><div class="part__desc">전력 마진 30% 확보</div></div>
-            </div>
-          </div>
-          <div class="spec__price">
-            <span class="spec__price-label">실재고 기준 예상 견적가</span>
-            <span class="spec__price-num num" data-bind="preview_price">1,250,000원</span>
-          </div>
-        </div>
-        <aside class="spec__aside">
-          <span class="badge-line"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>검증 파이프라인 통과</span>
-          <h3>조립 불가능한 PC는<br>여기선 안 나옵니다.</h3>
-          <p>후보는 검증 3단계를 모두 통과한 구성입니다. 색이 아니라 텍스트로도 결과를 병기합니다.</p>
-          <div class="spec__checks" data-repeat="preview_checks">
-            <div class="spec__check"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>실재고 확인 · 통과</div>
-            <div class="spec__check"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>호환성 5종 · 통과</div>
-            <div class="spec__check"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>근거 리포트 · 첨부</div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Reviews ═══ -->
-  <section>
-    <div class="wrap">
-      <div class="sec__head"><h2>사용자 후기</h2></div>
-      <div class="review__grid" data-repeat="reviews">
-        <div class="review-card">
-          <div class="stars" aria-label="별점 5점 만점 5점">
-            <svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg>
-          </div>
-          <p>"어려운 용어 없이 왜 이 부품인지 다 설명해주니까 컴맹인 저도 안심하고 샀어요."</p>
-          <span class="review-card__name">컴초보101 님</span>
-        </div>
-        <div class="review-card">
-          <div class="stars" aria-label="별점 5점 만점 5점">
-            <svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg>
-          </div>
-          <p>"재고 기반이라 견적 내고 바로 다음 날 조립 들어갔어요. 근거가 투명해서 신뢰가 갑니다."</p>
-          <span class="review-card__name">겜돌이77 님</span>
-        </div>
-        <div class="review-card">
-          <div class="stars" aria-label="별점 5점 만점 4점">
-            <svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><svg class="ico" style="color:var(--outline-variant)" aria-hidden="true"><use href="#i-star"/></svg>
-          </div>
-          <p>"영상편집용으로 맞췄는데 추천 그대로 하니 렉 없이 잘 돌아갑니다. 리포트가 도움됐어요."</p>
-          <span class="review-card__name">크리에이터X 님</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ 특가 배너 ═══ -->
-  <section class="sec--card" style="padding-top:0">
-    <div class="wrap" data-repeat="events">
-      <div class="event-banner">
-        <span class="event-banner__icon"><svg class="ico" aria-hidden="true"><use href="#i-tag"/></svg></span>
-        <div class="event-banner__body">
-          <div class="event-banner__tag">이번 주 특가</div>
-          <div class="event-banner__title">인기 게이밍 구성, 실재고 한정 수량 할인 진행 중</div>
-        </div>
-        <button class="chip" data-action="scroll-to-input" style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff">
-          견적으로 확인<svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg>
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Final CTA ═══ -->
-  <section class="final-cta">
-    <div class="wrap">
-      <h2>지금, 이유 있는 견적을 받아보세요.</h2>
-      <p>복잡한 고민은 검증 엔진에 맡기고, 당신은 근거 있는 결과만 확인하세요.</p>
-      <button class="cta-btn" data-action="scroll-to-input">견적 시작하기<svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>
-    </div>
-  </section>
-</main>
-
-<!-- ═══ Footer ═══ -->
-<footer class="footer">
-  <div class="wrap">
-    <div class="footer__top">
-      <div class="footer__brand">
-        <span class="footer__wordmark">팝콘PC AI</span>
-        <p>실재고 기반 AI 견적. 모든 견적에는 이유가 있습니다.</p>
-      </div>
-      <div class="footer__cols" data-repeat="footer_columns">
-        <div class="footer__col">
-          <h4>서비스</h4>
-          <a href="#" data-action="scroll-to-input">견적 받기</a>
-          <a href="#">추천 구성</a>
-          <a href="#">부품 벤치마크</a>
-        </div>
-        <div class="footer__col">
-          <h4>고객지원</h4>
-          <a href="#" data-action="goto-qna">고객문의</a>
-          <a href="#">자주 묻는 질문</a>
-          <a href="#">카카오톡 문의</a>
-        </div>
-        <div class="footer__col">
-          <h4>회사</h4>
-          <p>서울특별시 용산구 한강대로</p>
-          <p>고객센터 1600-0000</p>
-        </div>
-      </div>
-    </div>
-    <div class="footer__bottom">
-      <div class="footer__legal">
-        <a href="#">이용약관</a>
-        <a href="#">개인정보처리방침</a>
-      </div>
-      <span class="footer__copy">© 2026 팝콘PC AI · 재고·근거 기반 견적</span>
-    </div>
-  </div>
+<main style="max-width:1360px;margin:0 auto;padding:44px 40px 72px;">
+<!-- HERO -->
+<section style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:stretch;margin-bottom:32px;">
+<div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;">
+<span style="display:flex;align-items:center;gap:5px;background:#e9f6ef;color:#1c7a4d;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">inventory_2</span>실시간 재고 검증</span>
+<span style="display:flex;align-items:center;gap:5px;background:#eaf1fd;color:#2149b0;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">verified</span>호환성 5종 통과</span>
+<span style="display:flex;align-items:center;gap:5px;background:#f2edfb;color:#4a2a94;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">description</span>선정 근거 리포트</span>
+</div>
+<h1 style="margin:0;font-size:52px;line-height:1.12;font-weight:900;letter-spacing:-.02em;color:#17171b;">모든 견적에는<br>
+<span style="color:#2b5fd9;">이유가 있습니다.</span>
+</h1>
+<p style="margin:20px 0 28px;font-size:17px;line-height:1.65;color:#55555c;max-width:520px;">실시간 재고 안에서, 호환성을 통과한 구성만 제안합니다. 왜 이 부품이 당신의 PC에 들어갔는지 끝까지 설명합니다.</p>
+<div id="enter" style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:18px;box-shadow:0 12px 34px -22px rgba(30,25,15,.25);">
+<div style="font-size:13.5px;font-weight:800;color:#17171b;margin-bottom:3px;">어떻게 견적을 받으시겠어요?</div>
+<div style="font-size:12.5px;color:#8a8578;margin-bottom:14px;">방식만 고르시면, 용도는 다음 단계에서 여쭤봅니다.</div>
+<div style="display:flex;flex-direction:column;gap:10px;">
+<button data-lane="guided" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#fff;border:1.5px solid #e6e2da;border-radius:14px;padding:15px 16px;cursor:pointer;font-family:inherit;">
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#2f9e6d;">bolt</span>
+<span style="flex:1;">
+<span style="display:block;font-size:15px;font-weight:900;color:#17171b;">AI에게 맡길게요</span>
+<span style="display:block;font-size:12.5px;color:#6b6b73;margin-top:2px;">용도만 알려주세요. 최적 구성을 AI가 골라 드립니다.</span>
+</span>
+<span style="font-family:'Material Symbols Outlined';font-size:22px;color:#c9c5bd;">chevron_right</span>
+</button>
+<button data-lane="chat" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#f5f8ff;border:1.5px solid #2b5fd9;border-radius:14px;padding:15px 16px;cursor:pointer;font-family:inherit;">
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#2b5fd9;">forum</span>
+<span style="flex:1;">
+<span style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:900;color:#17171b;">AI와 같이 정할게요 <span style="background:#2b5fd9;color:#fff;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;">추천</span></span>
+<span style="display:block;font-size:12.5px;color:#4a6ab0;margin-top:2px;">대화하면서 원하는 방향으로 좁혀갑니다.</span>
+</span>
+<span style="font-family:'Material Symbols Outlined';font-size:22px;color:#2b5fd9;">chevron_right</span>
+</button>
+<button data-lane="expert" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#fff;border:1.5px solid #e6e2da;border-radius:14px;padding:15px 16px;cursor:pointer;font-family:inherit;">
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:#f2edfb;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#6a3fbf;">tune</span>
+<span style="flex:1;">
+<span style="display:block;font-size:15px;font-weight:900;color:#17171b;">직접 고를게요</span>
+<span style="display:block;font-size:12.5px;color:#6b6b73;margin-top:2px;">부품은 직접 고르고, AI가 호환성·검수를 최종 점검합니다.</span>
+</span>
+<span style="font-family:'Material Symbols Outlined';font-size:22px;color:#c9c5bd;">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- dark stock card -->
+<div style="background:#17171b;color:#fff;border-radius:22px;padding:34px 32px;display:flex;flex-direction:column;box-shadow:0 14px 40px -22px rgba(30,25,15,.4);">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#5fd6a0;">
+<span style="width:8px;height:8px;border-radius:50%;background:#5fd6a0;">
+</span>지금 검증 중인 실시간 재고</div>
+<div style="font-size:60px;font-weight:900;line-height:1.02;letter-spacing:-.02em;margin-top:6px;"><span data-bind="live_stock_count">26,480</span><span style="font-size:26px;color:#9a968d;"> 개</span>
+</div>
+<div style="font-size:13px;color:#9a968d;margin-top:4px;">재고 정보를 실시간으로 갱신하는 중입니다</div>
+<div style="height:1px;background:#2e2e29;margin:24px 0;">
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;flex:1;">
+<div style="display:flex;align-items:center;gap:16px;">
+<div style="flex:0 0 128px;">
+<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:22px;color:#5fd6a0;">check_circle</span><span style="font-size:14px;font-weight:800;color:#fff;">실시간 재고 확인</span></div>
+<div style="font-size:12px;color:#9a968d;margin-top:4px;padding-left:30px;">품절·단종은 즉시 제외</div>
+</div>
+<div style="flex:1;min-width:0;position:relative;">
+<img src="assets/verify-1-stock.png" alt="실시간 재고 확인" style="width:100%;height:auto;display:block;border-radius:10px;" onerror="this.style.display='none';this.parentNode.querySelector('.imgph').style.display='flex';">
+<div class="imgph" style="display:none;height:92px;align-items:center;justify-content:center;text-align:center;background:repeating-linear-gradient(45deg,#232320,#232320 8px,#2b2b28 8px,#2b2b28 16px);border:1.5px dashed #3a3a35;border-radius:10px;color:#9a968d;font-family:ui-monospace,monospace;font-size:11.5px;padding:12px;">assets/verify-1-stock.png</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:16px;">
+<div style="flex:0 0 128px;">
+<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:22px;color:#7fa8ff;">check_circle</span><span style="font-size:14px;font-weight:800;color:#fff;">호환성 5종 통과</span></div>
+<div style="font-size:12px;color:#9a968d;margin-top:4px;padding-left:30px;">소켓·전력·치수까지 검증</div>
+</div>
+<div style="flex:1;min-width:0;position:relative;">
+<img src="assets/verify-2-compat.png" alt="호환성 5종 통과" style="width:100%;height:auto;display:block;border-radius:10px;" onerror="this.style.display='none';this.parentNode.querySelector('.imgph').style.display='flex';">
+<div class="imgph" style="display:none;height:92px;align-items:center;justify-content:center;text-align:center;background:repeating-linear-gradient(45deg,#232320,#232320 8px,#2b2b28 8px,#2b2b28 16px);border:1.5px dashed #3a3a35;border-radius:10px;color:#9a968d;font-family:ui-monospace,monospace;font-size:11.5px;padding:12px;">assets/verify-2-compat.png</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:16px;">
+<div style="flex:0 0 128px;">
+<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:22px;color:#c9a0ff;">check_circle</span><span style="font-size:14px;font-weight:800;color:#fff;">근거 리포트 첨부</span></div>
+<div style="font-size:12px;color:#9a968d;margin-top:4px;padding-left:30px;">왜 이 부품인지 설명</div>
+</div>
+<div style="flex:1;min-width:0;position:relative;">
+<img src="assets/verify-3-report.png" alt="근거 리포트 첨부" style="width:100%;height:auto;display:block;border-radius:10px;" onerror="this.style.display='none';this.parentNode.querySelector('.imgph').style.display='flex';">
+<div class="imgph" style="display:none;height:92px;align-items:center;justify-content:center;text-align:center;background:repeating-linear-gradient(45deg,#232320,#232320 8px,#2b2b28 8px,#2b2b28 16px);border:1.5px dashed #3a3a35;border-radius:10px;color:#9a968d;font-family:ui-monospace,monospace;font-size:11.5px;padding:12px;">assets/verify-3-report.png</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- HOW IT WORKS -->
+<section id="how" style="margin-bottom:36px;">
+<h2 style="margin:0 0 6px;font-size:30px;font-weight:900;color:#17171b;letter-spacing:-.01em;">감이 아니라, <span style="color:#2f9e6d;">검증으로 고릅니다.</span>
+</h2>
+<p style="margin:0 0 22px;font-size:15.5px;color:#6b6b73;max-width:720px;">결정론 엔진이 실시간 재고 위에서 같은 입력에 늘 같은 결과를 냅니다. 즉흥이 아니라 규칙입니다.</p>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
+<div style="background:#e9f6ef;border-radius:20px;padding:26px;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+<span style="width:46px;height:46px;border-radius:13px;background:#2f9e6d;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">inventory_2</span>
+<span style="font-size:12px;font-weight:800;color:#3d7a5c;">STEP 1 · 실시간 재고 확인</span>
+</div>
+<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:#0f5132;">품절·단종은 후보에서 즉시 제외</h3>
+<p style="margin:0;font-size:14px;line-height:1.65;color:#3d7a5c;">지금 창고에 있는 부품만 후보로 둡니다. 못 사는 조합은 애초에 나오지 않습니다.</p>
+</div>
+<div style="background:#eaf1fd;border-radius:20px;padding:26px;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+<span style="width:46px;height:46px;border-radius:13px;background:#2b5fd9;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">verified</span>
+<span style="font-size:12px;font-weight:800;color:#4a6ab0;">STEP 2 · 호환성 검증</span>
+</div>
+<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:#1c3f8f;">소켓·전력·치수 5종 통과만 남김</h3>
+<p style="margin:0;font-size:14px;line-height:1.65;color:#4a6ab0;">소켓, 전력, 케이스 치수 등 5종 호환성을 통과한 구성만 후보에 남깁니다.</p>
+</div>
+<div style="background:#f2edfb;border-radius:20px;padding:26px;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+<span style="width:46px;height:46px;border-radius:13px;background:#6a3fbf;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">description</span>
+<span style="font-size:12px;font-weight:800;color:#6b5a92;">STEP 3 · 근거 설명</span>
+</div>
+<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:#4a2a94;">왜 이 부품인지 리포트로 제공</h3>
+<p style="margin:0;font-size:14px;line-height:1.65;color:#6b5a92;">선정된 부품마다 이유를 붙입니다. 창작이 아니라 재고·벤치·규칙에 근거한 사실입니다.</p>
+</div>
+</div>
+</section>
+<!-- REASON TAGS -->
+<section id="reason" style="background:#fff;border:1px solid #ece9e3;border-radius:22px;padding:32px 34px;margin-bottom:32px;">
+<h2 style="margin:0 0 6px;font-size:24px;font-weight:900;color:#17171b;">모든 견적에는, 이런 이유가 붙습니다.</h2>
+<p style="margin:0 0 22px;font-size:14.5px;color:#6b6b73;">선정된 부품마다 근거 태그가 따라옵니다. 아래는 예시입니다.</p>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">
+<div style="border:1px solid #edeae4;border-radius:16px;padding:22px;">
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#2b5fd9;margin-bottom:10px;">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">bar_chart</span>GPU 성능 근거</div>
+<h4 style="margin:0 0 8px;font-size:18px;font-weight:900;color:#17171b;">RTX 4060</h4>
+<p style="margin:0 0 14px;font-size:13.5px;line-height:1.65;color:#55555c;">인기 게임 1% Low 프레임 방어율이 이 예산대 최상위권이며, 내부 판매 데이터에서 실사용 안정성이 높게 확인되었습니다.</p>
+<div style="display:flex;gap:6px;flex-wrap:wrap;">
+<span style="background:#e8effc;color:#2149b0;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#프레임_방어</span>
+<span style="background:#e8effc;color:#2149b0;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#이_예산대_다수선택</span>
+</div>
+</div>
+<div style="border:1px solid #edeae4;border-radius:16px;padding:22px;">
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#2f9e6d;margin-bottom:10px;">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">bolt</span>PSU 안정성 근거</div>
+<h4 style="margin:0 0 8px;font-size:18px;font-weight:900;color:#17171b;">정격 650W 80PLUS</h4>
+<p style="margin:0 0 14px;font-size:13.5px;line-height:1.65;color:#55555c;">이 GPU·CPU 조합의 피크 전력 대비 정격 마진 30% 이상을 확보합니다. 장시간 부하에도 여유 있는 전력 공급입니다.</p>
+<div style="display:flex;gap:6px;flex-wrap:wrap;">
+<span style="background:#e7f4ec;color:#1c7a4d;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#전력마진_30%</span>
+<span style="background:#e7f4ec;color:#1c7a4d;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#정격_검증</span>
+</div>
+</div>
+<div style="border:1px solid #edeae4;border-radius:16px;padding:22px;">
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#6a3fbf;margin-bottom:10px;">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">memory</span>RAM 호환성 근거</div>
+<h4 style="margin:0 0 8px;font-size:18px;font-weight:900;color:#17171b;">DDR5 32GB (16GB×2)</h4>
+<p style="margin:0 0 14px;font-size:13.5px;line-height:1.65;color:#55555c;">메인보드 QVL 대조를 통과한 듀얼채널 구성입니다. 선택한 용도의 최소 대역폭 요건을 충족합니다.</p>
+<div style="display:flex;gap:6px;flex-wrap:wrap;">
+<span style="background:#f0ecfa;color:#4a2a94;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#QVL_통과</span>
+<span style="background:#f0ecfa;color:#4a2a94;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#듀얼채널</span>
+</div>
+</div>
+</div>
+</section>
+<!-- BUILD PREVIEW -->
+<section id="build" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">
+<div style="background:#fff;border:1px solid #ece9e3;border-radius:22px;padding:30px 32px;">
+<h2 style="margin:0 0 6px;font-size:22px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">추천 구성 미리보기 <span style="display:inline-flex;align-items:center;gap:5px;background:#b31b25;color:#fff;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.01em;"><span style="font-family:'Material Symbols Outlined';font-size:15px;">visibility</span>예시 화면</span></h2>
+<p style="margin:0 0 20px;font-size:14px;color:#6b6b73;">실시간 재고 기준으로 지금 자주 선택되는 밸런스 구성입니다.</p>
+<div style="display:flex;flex-direction:column;">
+<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
+<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="7.5" width="11" height="11" rx="1.5"/><rect x="10.5" y="10.5" width="5" height="5" rx="1"/><path d="M10 7.5V4.5M16 7.5V4.5M10 21.5v-3M16 21.5v-3M7.5 10H4.5M7.5 16H4.5M21.5 10h-3M21.5 16h-3"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">CPU</span></span>
+<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div style="font-size:14.5px;font-weight:800;color:#17171b;">Intel Core i5-13400F</div>
+<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">10코어 하이브리드, 게임·작업 밸런스</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
+<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="19" height="10.5" rx="1.5"/><circle cx="9" cy="13.2" r="2.4"/><circle cx="16" cy="13.2" r="2.4"/><path d="M6 18.5v3"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">GPU</span></span>
+<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div style="font-size:14.5px;font-weight:800;color:#17171b;">GeForce RTX 4060</div>
+<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">DLSS 3 지원, 이 예산대 프레임 방어</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
+<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1"/><path d="M8 11.5h10"/><path d="M7 18.5v2M10 18.5v2M13.5 18.5v2M17 18.5v2M20 18.5v2"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">RAM</span></span>
+<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div style="font-size:14.5px;font-weight:800;color:#17171b;">DDR5 32GB (16GB×2)</div>
+<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">듀얼채널, QVL 통과 구성</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
+<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9.5" width="19" height="7.5" rx="1"/><rect x="6" y="11.5" width="6.5" height="3.5" rx="0.6"/><circle cx="19.5" cy="13.2" r="1.1"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">SSD</span></span>
+<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div style="font-size:14.5px;font-weight:800;color:#17171b;">NVMe 1TB Gen4</div>
+<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">고속 로딩, 넉넉한 게임 저장</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
+<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="18" height="18" rx="1.6"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 7v9M18.5 7v9"/><path d="M7 17.5h6"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">보드</span></span>
+<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div style="font-size:14.5px;font-weight:800;color:#17171b;">B760M DDR5</div>
+<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">안정 전원부, 확장 슬롯 여유</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:13px 0;">
+<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1.6"/><circle cx="11" cy="13" r="3.3"/><circle cx="11" cy="13" r="0.6"/><rect x="16.5" y="10.5" width="3.2" height="2.4" rx="0.5"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">파워</span></span>
+<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div style="font-size:14.5px;font-weight:800;color:#17171b;">정격 650W 80PLUS</div>
+<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">전력 마진 30% 확보</div>
+</div>
+</div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:18px 22px;background:#17171b;border-radius:14px;">
+<span style="font-size:13.5px;font-weight:700;color:#9a968d;">실시간 재고 기준 예상 견적가</span>
+<span style="font-size:26px;font-weight:900;color:#fff;">1,250,000<span style="font-size:15px;color:#9a968d;">원</span>
+</span>
+</div>
+</div>
+<div style="background:#17171b;color:#fff;border-radius:22px;padding:30px 30px;display:flex;flex-direction:column;">
+<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#7fa8ff;margin-bottom:12px;">
+<span style="font-family:'Material Symbols Outlined';font-size:17px;">speed</span>예상 성능</div>
+<h3 style="margin:0 0 4px;font-size:24px;font-weight:900;line-height:1.25;">이 구성, 실제로<br>이만큼 나옵니다.</h3>
+<div style="font-size:12.5px;color:#9a968d;margin-bottom:20px;">RTX 4060 · QHD(2560×1440) · 높음 옵션 기준 추정</div>
+<!-- ① 부품별 금액 비율 (파이) -->
+<div style="padding-top:16px;border-top:1px solid #2e2e29;">
+<div style="font-size:12px;font-weight:800;color:#c9c5bd;margin-bottom:14px;">① 부품별 금액 비율</div>
+<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+<div style="width:126px;height:126px;flex:0 0 auto;border-radius:50%;background:conic-gradient(#7fa8ff 0 32%,#5fd6a0 32% 50%,#c9a0ff 50% 62%,#ffcb4a 62% 73%,#ff9d7a 73% 82%,#6ee7d6 82% 90%,#9aa0ad 90% 100%);display:flex;align-items:center;justify-content:center;">
+<div style="width:76px;height:76px;border-radius:50%;background:#17171b;display:flex;flex-direction:column;align-items:center;justify-content:center;"><div style="font-size:10.5px;color:#9a968d;font-weight:700;">총액</div><div style="font-size:15px;font-weight:900;color:#fff;">125만원</div></div>
+</div>
+<div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:6px;">
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#7fa8ff;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">그래픽카드</span><b style="color:#fff;font-variant-numeric:tabular-nums;">32%</b><span style="color:#9a968d;width:38px;text-align:right;">40만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#5fd6a0;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">CPU</span><b style="color:#fff;font-variant-numeric:tabular-nums;">18%</b><span style="color:#9a968d;width:38px;text-align:right;">22만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#c9a0ff;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">메인보드</span><b style="color:#fff;font-variant-numeric:tabular-nums;">12%</b><span style="color:#9a968d;width:38px;text-align:right;">15만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#ffcb4a;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">메모리</span><b style="color:#fff;font-variant-numeric:tabular-nums;">11%</b><span style="color:#9a968d;width:38px;text-align:right;">14만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#ff9d7a;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">저장장치</span><b style="color:#fff;font-variant-numeric:tabular-nums;">9%</b><span style="color:#9a968d;width:38px;text-align:right;">11만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#6ee7d6;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">파워</span><b style="color:#fff;font-variant-numeric:tabular-nums;">8%</b><span style="color:#9a968d;width:38px;text-align:right;">10만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#9aa0ad;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">케이스·기타</span><b style="color:#fff;font-variant-numeric:tabular-nums;">10%</b><span style="color:#9a968d;width:38px;text-align:right;">13만</span></div>
+</div>
+</div>
+</div>
+<!-- ② 용량 구성 (등급별 막대) -->
+<div style="margin-top:22px;padding-top:16px;border-top:1px solid #2e2e29;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+<div style="font-size:12px;font-weight:800;color:#c9c5bd;">② 용량 구성 · 등급별</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;">
+<span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:#5a5f68;"></span>보급형</span>
+<span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:#7fa8ff;"></span>일반형</span>
+<span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:#5fd6a0;"></span>고급형</span>
+<span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#ffcb4a;font-weight:700;"><span style="width:9px;height:9px;border-radius:2px;border:2px solid #ffcb4a;"></span>내 구성</span>
+</div>
+</div>
+<div style="display:flex;gap:16px;padding-top:18px;">
+<div style="flex:1;text-align:center;">
+<div style="display:flex;gap:6px;align-items:flex-end;justify-content:center;height:82px;">
+<div style="width:17px;height:25%;background:#5a5f68;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#9a968d;white-space:nowrap;">500G</span></div>
+<div style="width:17px;height:50%;background:#7fa8ff;border-radius:3px 3px 0 0;box-shadow:0 0 0 2px #ffcb4a;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#ffcb4a;font-weight:800;white-space:nowrap;">1TB</span></div>
+<div style="width:17px;height:100%;background:#5fd6a0;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">2TB</span></div>
+</div>
+<div style="font-size:11.5px;color:#c9c5bd;font-weight:700;margin-top:9px;">저장장치(HDD)</div>
+<div style="font-size:10px;color:#ffcb4a;font-weight:800;margin-top:2px;">✓ 선택 1TB</div>
+</div>
+<div style="flex:1;text-align:center;">
+<div style="display:flex;gap:6px;align-items:flex-end;justify-content:center;height:82px;">
+<div style="width:17px;height:25%;background:#5a5f68;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#9a968d;white-space:nowrap;">16G</span></div>
+<div style="width:17px;height:50%;background:#7fa8ff;border-radius:3px 3px 0 0;box-shadow:0 0 0 2px #ffcb4a;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#ffcb4a;font-weight:800;white-space:nowrap;">32G</span></div>
+<div style="width:17px;height:100%;background:#5fd6a0;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">64G</span></div>
+</div>
+<div style="font-size:11.5px;color:#c9c5bd;font-weight:700;margin-top:9px;">메모리(RAM)</div>
+<div style="font-size:10px;color:#ffcb4a;font-weight:800;margin-top:2px;">✓ 선택 32G</div>
+</div>
+<div style="flex:1;text-align:center;">
+<div style="display:flex;gap:6px;align-items:flex-end;justify-content:center;height:82px;">
+<div style="width:17px;height:50%;background:#5a5f68;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#9a968d;white-space:nowrap;">6G</span></div>
+<div style="width:17px;height:67%;background:#7fa8ff;border-radius:3px 3px 0 0;box-shadow:0 0 0 2px #ffcb4a;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#ffcb4a;font-weight:800;white-space:nowrap;">8G</span></div>
+<div style="width:17px;height:100%;background:#5fd6a0;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">12G</span></div>
+</div>
+<div style="font-size:11.5px;color:#c9c5bd;font-weight:700;margin-top:9px;">그래픽 카드(GPU VRAM)</div>
+<div style="font-size:10px;color:#ffcb4a;font-weight:800;margin-top:2px;">✓ 선택 8G</div>
+</div>
+</div>
+</div>
+<!-- ③ 게임별 예상 성능 (꺾은선) -->
+<div style="margin-top:22px;padding-top:16px;border-top:1px solid #2e2e29;flex:1;">
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#7fa8ff;margin-bottom:3px;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">show_chart</span>③ 게임별 예상 FPS · QHD</div>
+<div style="font-size:10.5px;color:#807b72;margin-bottom:12px;">세로축 = FPS · 60↑ 원활 · 120↑ 쾌적 · 240 고주사율급</div>
+<svg viewBox="0 0 480 152" style="width:100%;height:auto;overflow:visible;" font-family="Pretendard, sans-serif">
+<defs><linearGradient id="s0fpsg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fa8ff" stop-opacity=".38"/><stop offset="1" stop-color="#7fa8ff" stop-opacity="0"/></linearGradient></defs>
+<rect x="46" y="18" width="424" height="47" fill="#5fd6a0" opacity="0.06"/>
+<rect x="46" y="65" width="424" height="23.5" fill="#7fa8ff" opacity="0.05"/>
+<g stroke="#2e2e29" stroke-width="1" stroke-dasharray="3 3">
+<line x1="46" y1="18" x2="470" y2="18"/><line x1="46" y1="41.5" x2="470" y2="41.5"/><line x1="46" y1="65" x2="470" y2="65"/><line x1="46" y1="88.5" x2="470" y2="88.5"/>
+</g>
+<line x1="46" y1="112" x2="470" y2="112" stroke="#3a3a35" stroke-width="1"/>
+<g fill="#9a968d" font-size="9" text-anchor="end">
+<text x="40" y="21">240</text><text x="40" y="44.5">180</text><text x="40" y="68">120</text><text x="40" y="91.5">60</text><text x="40" y="115">0</text>
+</g>
+<text x="14" y="66" fill="#7fa8ff" font-size="9" font-weight="700" text-anchor="middle" transform="rotate(-90 14 66)">FPS</text>
+<polygon points="60,18 161,21 261,51 362,60 462,84 462,112 60,112" fill="url(#s0fpsg)"/>
+<polyline points="60,18 161,21 261,51 362,60 462,84" fill="none" stroke="#7fa8ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<g>
+<circle cx="60" cy="18" r="4" fill="#7fa8ff" stroke="#17171b" stroke-width="2"/><text x="60" y="10" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">240</text><text x="60" y="132" fill="#9a968d" font-size="10" text-anchor="middle">리그</text>
+<circle cx="161" cy="21" r="4" fill="#7fa8ff" stroke="#17171b" stroke-width="2"/><text x="161" y="13" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">231</text><text x="161" y="132" fill="#9a968d" font-size="10" text-anchor="middle">발로란트</text>
+<circle cx="261" cy="51" r="4" fill="#7fa8ff" stroke="#17171b" stroke-width="2"/><text x="261" y="43" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">156</text><text x="261" y="132" fill="#9a968d" font-size="10" text-anchor="middle">FC 24</text>
+<circle cx="362" cy="60" r="4" fill="#7fa8ff" stroke="#17171b" stroke-width="2"/><text x="362" y="52" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">134</text><text x="362" y="132" fill="#9a968d" font-size="10" text-anchor="middle">배그</text>
+<circle cx="462" cy="84" r="4" fill="#ffcb4a" stroke="#17171b" stroke-width="2"/><text x="462" y="76" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">72</text><text x="462" y="132" fill="#9a968d" font-size="10" text-anchor="middle">사이버펑크</text>
+</g>
+</svg>
+</div>
+<p style="margin:12px 0 0;font-size:11.5px;color:#807b72;line-height:1.5;">실측 벤치 기반 추정치입니다. 실사용 환경·패치에 따라 달라질 수 있습니다.</p>
+</div>
+</section>
+<!-- BUILD PHOTOS -->
+<section id="buildphotos" style="background:#fff;border:1px solid #ece9e3;border-radius:22px;padding:32px 34px;margin-bottom:32px;">
+<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#3d7a5c;margin-bottom:10px;">
+<span style="font-family:'Material Symbols Outlined';font-size:17px;">photo_library</span>제작 과정 투명 공개</div>
+<h2 style="margin:0 0 6px;font-size:24px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">구매하신 PC의 제작 사진을 첨부해 드립니다. <span style="display:inline-flex;align-items:center;gap:5px;background:#e9f6ef;color:#1c7a4d;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.01em;"><span style="font-family:'Material Symbols Outlined';font-size:15px;">photo_camera</span>예시 사진</span></h2>
+<p style="margin:0 0 22px;font-size:14.5px;color:#6b6b73;">실제 조립·검수 과정을 사진으로 남겨 주문 상세에 함께 전달합니다.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;">
+<figure style="margin:0;">
+<img src="assets/build-1-wiring.png" alt="내부 배선" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+<div style="aspect-ratio:4/3;border-radius:14px;border:1.5px dashed #cfccc4;background:repeating-linear-gradient(45deg,#f0eee8,#f0eee8 9px,#f7f6f2 9px,#f7f6f2 18px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#a29d92;">
+<span style="font-family:'Material Symbols Outlined';font-size:28px;">cable</span>
+<span style="font-size:11px;font-family:ui-monospace,monospace;">사진 자리</span>
+</div>
+<figcaption style="margin-top:9px;font-size:12.5px;font-weight:700;color:#55555c;text-align:center;">내부 배선</figcaption>
+</figure>
+<figure style="margin:0;">
+<img src="assets/build-2-front.png" alt="본체 정면" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+<div style="aspect-ratio:4/3;border-radius:14px;border:1.5px dashed #cfccc4;background:repeating-linear-gradient(45deg,#f0eee8,#f0eee8 9px,#f7f6f2 9px,#f7f6f2 18px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#a29d92;">
+<span style="font-family:'Material Symbols Outlined';font-size:28px;">desktop_windows</span>
+<span style="font-size:11px;font-family:ui-monospace,monospace;">사진 자리</span>
+</div>
+<figcaption style="margin-top:9px;font-size:12.5px;font-weight:700;color:#55555c;text-align:center;">본체 정면</figcaption>
+</figure>
+<figure style="margin:0;">
+<img src="assets/build-3-boot.png" alt="OS 부팅 확인" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+<div style="aspect-ratio:4/3;border-radius:14px;border:1.5px dashed #cfccc4;background:repeating-linear-gradient(45deg,#f0eee8,#f0eee8 9px,#f7f6f2 9px,#f7f6f2 18px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#a29d92;">
+<span style="font-family:'Material Symbols Outlined';font-size:28px;">power_settings_new</span>
+<span style="font-size:11px;font-family:ui-monospace,monospace;">사진 자리</span>
+</div>
+<figcaption style="margin-top:9px;font-size:12.5px;font-weight:700;color:#55555c;text-align:center;">OS 부팅 확인</figcaption>
+</figure>
+<figure style="margin:0;">
+<img src="assets/build-4-burnin.png" alt="번인 테스트" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+<div style="aspect-ratio:4/3;border-radius:14px;border:1.5px dashed #cfccc4;background:repeating-linear-gradient(45deg,#f0eee8,#f0eee8 9px,#f7f6f2 9px,#f7f6f2 18px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#a29d92;">
+<span style="font-family:'Material Symbols Outlined';font-size:28px;">monitor_heart</span>
+<span style="font-size:11px;font-family:ui-monospace,monospace;">사진 자리</span>
+</div>
+<figcaption style="margin-top:9px;font-size:12.5px;font-weight:700;color:#55555c;text-align:center;">번인 테스트</figcaption>
+</figure>
+<figure style="margin:0;">
+<img src="assets/build-5-packaging.png" alt="안전 포장" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+<div style="aspect-ratio:4/3;border-radius:14px;border:1.5px dashed #cfccc4;background:repeating-linear-gradient(45deg,#f0eee8,#f0eee8 9px,#f7f6f2 9px,#f7f6f2 18px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#a29d92;">
+<span style="font-family:'Material Symbols Outlined';font-size:28px;">package_2</span>
+<span style="font-size:11px;font-family:ui-monospace,monospace;">사진 자리</span>
+</div>
+<figcaption style="margin-top:9px;font-size:12.5px;font-weight:700;color:#55555c;text-align:center;">안전 포장</figcaption>
+</figure>
+</div>
+</section>
+<!-- REVIEWS -->
+<section id="reviews" style="margin-bottom:32px;">
+<h2 style="margin:0 0 22px;font-size:24px;font-weight:900;color:#17171b;">사용자 후기</h2>
+<div class="s0rev-mask">
+<div class="s0rev-track" id="s0rev-track">
+<div class="s0rev-card">
+<div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">어려운 용어 없이 왜 이 부품인지 다 설명해주니까 컴맹인 저도 안심하고 샀어요.</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<span style="width:34px;height:34px;border-radius:50%;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">person</span>
+<span style="font-size:13.5px;font-weight:800;color:#55555c;">컴초보101 님</span>
+</div>
+</div>
+<div class="s0rev-card">
+<div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">재고 기반이라 견적 내고 바로 다음 날 조립 들어갔어요. 근거가 투명해서 신뢰가 갑니다.</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<span style="width:34px;height:34px;border-radius:50%;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#2b5fd9;">person</span>
+<span style="font-size:13.5px;font-weight:800;color:#55555c;">겜돌이77 님</span>
+</div>
+</div>
+<div class="s0rev-card">
+<div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">영상편집용으로 맞췄는데 추천 그대로 하니 렉 없이 잘 돌아갑니다. 리포트가 도움됐어요.</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<span style="width:34px;height:34px;border-radius:50%;background:#f2edfb;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#6a3fbf;">person</span>
+<span style="font-size:13.5px;font-weight:800;color:#55555c;">크리에이터X 님</span>
+</div>
+</div>
+<div class="s0rev-card">
+<div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">예산 딱 맞춰 오버 없이 견적이 나왔어요. 필요 없는 비싼 부품을 안 끼워 팔아서 더 신뢰가 갔습니다.</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<span style="width:34px;height:34px;border-radius:50%;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#2b5fd9;">person</span>
+<span style="font-size:13.5px;font-weight:800;color:#55555c;">예산러_민 님</span>
+</div>
+</div>
+<div class="s0rev-card">
+<div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">호환성이 늘 걱정이라 커뮤니티에 물어봤는데, 여기선 5종 검증 통과가 딱 떠서 마음이 편했어요.</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<span style="width:34px;height:34px;border-radius:50%;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">person</span>
+<span style="font-size:13.5px;font-weight:800;color:#55555c;">스팀덕후 님</span>
+</div>
+</div>
+<div class="s0rev-card">
+<div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">두 번째 구매인데 제작 사진까지 보내줘서 선정리 상태를 확인하고 안심했습니다.</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<span style="width:34px;height:34px;border-radius:50%;background:#fbf3e2;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#c77b1f;">person</span>
+<span style="font-size:13.5px;font-weight:800;color:#55555c;">재구매_J 님</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- weekly deal -->
+<section style="background:#fbf3e2;border-radius:22px;padding:26px 32px;margin-bottom:32px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
+<div style="display:flex;align-items:center;gap:16px;">
+<span style="width:46px;height:46px;border-radius:13px;background:#c77b1f;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">local_fire_department</span>
+<div>
+<div style="font-size:12px;font-weight:800;color:#c77b1f;">이번 주 특가</div>
+<div style="font-size:18px;font-weight:900;color:#8a561a;">인기 게이밍 구성, 실시간 재고 한정 수량 할인 중</div>
+</div>
+</div>
+<button style="flex:0 0 auto;padding:14px 24px;border:none;background:#c77b1f;border-radius:12px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;" data-cta="start">견적으로 확인</button>
+</section>
+<!-- final CTA -->
+<section style="background:#17171b;color:#fff;border-radius:22px;padding:44px 40px;text-align:center;margin-bottom:40px;">
+<h2 style="margin:0 0 12px;font-size:32px;font-weight:900;letter-spacing:-.01em;">지금, <span style="color:#ffcb4a;">이유 있는 견적</span>을 받아보세요.</h2>
+<p style="margin:0 auto 26px;font-size:16px;color:#c9c5bd;max-width:560px;line-height:1.6;">복잡한 고민은 검증 엔진에 맡기고, 당신은 근거 있는 결과만 확인하세요.</p>
+<button style="padding:17px 40px;border:none;background:#2b5fd9;border-radius:13px;font-size:16px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;" data-cta="start">견적 시작하기</button>
+</section>
+<!-- footer -->
+<footer style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:28px;padding-top:8px;">
+<div>
+<div style="font-size:16px;font-weight:900;color:#17171b;margin-bottom:8px;">팝콘PC <span style="color:#2b5fd9;">AI</span>
+</div>
+<p style="margin:0;font-size:13.5px;line-height:1.6;color:#8a8578;max-width:280px;">실시간 재고 기반 AI 견적. 모든 견적에는 이유가 있습니다.</p>
+</div>
+<div>
+<div style="font-size:13px;font-weight:800;color:#17171b;margin-bottom:12px;">서비스</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<a href="#" style="font-size:13.5px;color:#6b6b73;text-decoration:none;">견적 받기</a>
+<a href="#" style="font-size:13.5px;color:#6b6b73;text-decoration:none;">추천 구성</a>
+<a href="#" style="font-size:13.5px;color:#6b6b73;text-decoration:none;">부품 벤치마크</a>
+</div>
+</div>
+<div>
+<div style="font-size:13px;font-weight:800;color:#17171b;margin-bottom:12px;">고객지원</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<a href="#" style="font-size:13.5px;color:#6b6b73;text-decoration:none;">고객문의</a>
+<a href="#" style="font-size:13.5px;color:#6b6b73;text-decoration:none;">자주 묻는 질문</a>
+<a href="#" style="font-size:13.5px;color:#6b6b73;text-decoration:none;">카카오톡 문의</a>
+</div>
+</div>
+<div>
+<div style="font-size:13px;font-weight:800;color:#17171b;margin-bottom:12px;">회사</div>
+<div style="font-size:13px;color:#8a8578;line-height:1.7;">서울특별시 용산구 한강대로<br>고객센터 1600-0000</div>
+</div>
 </footer>
-
-<!-- ═══ 예외: 로딩 레이어 ═══ -->
-<div class="loading-layer" id="loading-layer" hidden>
-  <div class="spin"></div>
-  <h3>실재고에서 후보를 불러오는 중입니다...</h3>
-  <p>잠시만 기다려주세요. 검증 3단계를 통과한 구성만 남기고 있습니다.</p>
+<div style="border-top:1px solid #e6e2da;margin-top:28px;padding-top:18px;display:flex;justify-content:space-between;align-items:center;">
+<div style="display:flex;gap:16px;">
+<a href="#" style="font-size:12.5px;color:#8a8578;text-decoration:none;">이용약관</a>
+<a href="#" style="font-size:12.5px;color:#8a8578;text-decoration:none;">개인정보처리방침</a>
+</div>
+<div style="font-size:12.5px;color:#a29d92;">© 2026 팝콘PC AI · 재고·근거 기반 견적</div>
+</div>
+</main>
 </div>
 
 <script>
-(function(){
-  "use strict";
-  var $=function(s){return document.querySelector(s);};
-  var textarea=$('#hero-composer'), box=$('#composer-box'), err=$('#composer-error'), loading=$('#loading-layer');
-
-  // 오토그로우
-  function grow(){ textarea.style.height='auto'; textarea.style.height=Math.min(textarea.scrollHeight,160)+'px'; }
-  textarea.addEventListener('input', function(){ grow(); if(textarea.value.trim()){ err.hidden=true; } });
-
-  // 세션 진입 연출 → S1로 이관
-  function goSession(){
-    loading.hidden=false;
-    setTimeout(function(){ window.location.href='s1-session.html'; }, 1200);
-  }
-
-  // 칩 → 입력창에 첫 발화 주입 후 세션 시작
-  var INTENT={
-    game:'배그 끊김 없이 돌아가는 게임용 PC 추천해줘',
-    office:'문서·웹 작업용 가성비 사무용 PC 알려줘',
-    edit:'영상편집 쾌적한 구성으로 견적 짜줘',
-    stream:'인터넷방송 원컴 세팅 견적 보여줘'
-  };
-
-  document.addEventListener('click', function(e){
-    var el=e.target.closest('[data-action]'); if(!el) return;
-    var a=el.dataset.action;
-
-    if(a==='start-session'){
-      if(!textarea.value.trim()){
-        err.hidden=false;
-        box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
-        textarea.focus();
-        return;
-      }
-      goSession();
-      return;
-    }
-
-    if(a==='quick-intent'){
-      textarea.value=INTENT[el.dataset.intent]||'';
-      grow(); err.hidden=true;
-      goSession();
-      return;
-    }
-
-    if(a==='scroll-to-input'){
-      e.preventDefault();
-      $('#hero').scrollIntoView({behavior:'smooth',block:'start'});
-      setTimeout(function(){ textarea.focus(); }, 500);
-      return;
-    }
-
-    // 목업 스텁: 아직 화면 없는 라우트
-    if(a==='open-auth'||a==='goto-qna'||a==='goto-admin'||a==='goto-dev'||a==='toggle-menu'){
-      // 정적 목업 — 해당 화면 미구현
-      return;
-    }
-  });
-
-  // Enter 전송(Shift+Enter 줄바꿈)
-  textarea.addEventListener('keydown', function(e){
-    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); $('[data-action="start-session"]').click(); }
-  });
-
-  // GNB 스크롤 그림자
-  window.addEventListener('scroll', function(){
-    $('.gnb').style.boxShadow = window.scrollY>4 ? 'var(--shadow)' : 'none';
-  });
-
-  // 데모용: 재고 갱신 지연 상태 토글 (콘솔에서 staleDemo() 호출)
-  window.staleDemo=function(){ $('#live-stock').hidden=true; $('#live-stock-stale').hidden=false; };
-})();
+document.addEventListener('click',function(e){
+  var lane=e.target.closest('[data-lane]');
+  if(lane){window.location.href='s1-session.html?mode='+lane.getAttribute('data-lane');return;}
+  var el=e.target.closest('[data-cta="start"]');
+  if(el){var t=document.getElementById('enter');if(t){t.scrollIntoView({behavior:'smooth',block:'center'});t.style.boxShadow='0 0 0 3px rgba(43,95,217,.35)';setTimeout(function(){t.style.boxShadow='0 12px 34px -22px rgba(30,25,15,.25)';},900);}}
+});
+(function(){var tr=document.getElementById('s0rev-track');if(tr){Array.prototype.slice.call(tr.children).forEach(function(c){var d=c.cloneNode(true);d.setAttribute('aria-hidden','true');tr.appendChild(d);});}})();
 </script>
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
+<span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
+<style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
 </body>
 </html>

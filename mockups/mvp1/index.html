@@ -1,339 +1,204 @@
 <!DOCTYPE html>
-<html lang="ko" data-screen-id="INT-GATE-010" data-domain="internal">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="ko" data-screen-id="INT-GATE-010" data-domain="internal"><head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>팝콘PC AI · 내부 접근 허브</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0&display=swap" rel="stylesheet">
 <style>
-  :root{
-    /* Popcorn Light tokens (랜딩 준용) */
-    --bg:#F0F5F9; --surface:#F0F5F9; --card:#ffffff; --container:#E4ECF4;
-    --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
-    --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
-    --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
-    --error:#C0392B; --on-error:#ffffff;
-    --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
-    --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
-    --r-sm:.25rem; --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-full:9999px;
-    --sp-xs:4px; --sp-sm:8px; --sp-md:16px; --sp-lg:24px; --sp-xl:32px;
-    --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums}
-
-  /* ── Top bar ── */
-  .topbar{display:flex;align-items:center;gap:var(--sp-md);padding:14px var(--sp-lg);
-    background:var(--card);border-bottom:1px solid var(--outline-variant);position:sticky;top:0;z-index:10;flex-wrap:wrap}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.01em}
-  .brand__dot{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--primary),var(--tertiary))}
-  .topbar__badge{font-size:12px;font-weight:600;color:var(--on-variant);background:var(--container);
-    padding:4px 10px;border-radius:var(--r-full)}
-  .topbar__spacer{flex:1}
-  .roleswitch{display:inline-flex;background:var(--container);border-radius:var(--r-full);padding:3px}
-  .roleswitch button{border:0;background:transparent;color:var(--on-variant);font-family:inherit;font-weight:600;
-    font-size:13px;padding:6px 14px;border-radius:var(--r-full);cursor:pointer;transition:.15s}
-  .roleswitch button[aria-checked="true"]{background:var(--primary);color:var(--on-primary)}
-  .user{font-size:13px;color:var(--on-variant);display:flex;align-items:center;gap:6px}
-
-  /* ── Status strip ── */
-  .strip{display:flex;gap:var(--sp-md);flex-wrap:wrap;padding:12px var(--sp-lg);
-    background:var(--container);border-bottom:1px solid var(--outline-variant)}
-  .stat{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--on-variant)}
-  .stat__label{color:var(--on-variant)}
-  .stat__val{font-weight:600;color:var(--on)}
-  .dot{width:8px;height:8px;border-radius:var(--r-full);flex:none}
-  .dot--ok{background:var(--primary)} .dot--warn{background:var(--error)}
-
-  /* ── Main ── */
-  main{max-width:1200px;margin:0 auto;padding:var(--sp-xl) var(--sp-lg) 64px}
-  .lead{margin-bottom:var(--sp-lg)}
-  .lead h1{font-size:22px;font-weight:700;letter-spacing:-.02em}
-  .lead p{color:var(--on-variant);font-size:14px;margin-top:6px}
-
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-md)}
-
-  /* ── MVP card ── */
-  .mvp{background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg);
-    padding:var(--sp-lg);display:flex;flex-direction:column;gap:var(--sp-md);box-shadow:var(--shadow)}
-  .mvp__head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-  .mvp__no{font-size:12px;font-weight:600;color:var(--on-variant);letter-spacing:.04em}
-  .mvp__title{font-size:16px;font-weight:700;letter-spacing:-.01em;margin-top:2px}
-  .mvp__desc{font-size:13px;color:var(--on-variant);min-height:34px}
-  .status{font-size:11px;font-weight:600;padding:3px 9px;border-radius:var(--r-full);white-space:nowrap;flex:none}
-  .status--dev{background:var(--primary);color:var(--on-primary)}
-  .status--design{background:var(--secondary);color:#fff}
-  .status--plan{background:var(--tertiary-container);color:#570a6a}
-  .engine-tag{font-size:11px;font-weight:600;color:var(--tertiary);background:#f3e8f8;
-    display:inline-block;padding:3px 8px;border-radius:var(--r-full)}
-
-  /* progress */
-  .prog{display:flex;flex-direction:column;gap:6px}
-  .prog__label{font-size:11px;color:var(--on-variant);display:flex;justify-content:space-between}
-  .prog__steps{display:flex;gap:4px}
-  .prog__seg{flex:1;height:6px;border-radius:var(--r-full);background:var(--outline-variant)}
-  .prog__seg--done{background:var(--primary)}
-  .prog__seg--wip{background:var(--primary-container)}
-
-  /* shortcuts */
-  .short{border-top:1px solid var(--outline-variant);padding-top:var(--sp-md);display:flex;flex-direction:column;gap:8px}
-  .short__cap{font-size:11px;font-weight:600;color:var(--on-variant);letter-spacing:.04em}
-  .short__row{display:flex;gap:8px}
-  .btn{flex:1;border:1px solid var(--outline-variant);background:var(--card);color:var(--on);
-    font-family:inherit;font-weight:600;font-size:13px;padding:10px 8px;border-radius:var(--r);
-    cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:2px}
-  .btn:hover:not(:disabled){border-color:var(--primary-bright);color:var(--primary-bright)}
-  .btn__sub{font-size:10px;font-weight:500;color:var(--on-variant)}
-  .btn--primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
-  .btn--primary:hover:not(:disabled){background:var(--primary-bright);border-color:var(--primary-bright);color:#fff}
-  .btn--primary .btn__sub{color:rgba(239,242,255,.8)}
-  .btn:disabled{opacity:.4;cursor:not-allowed}
-  .btn[hidden]{display:none}
-
-  .mvp__devlist{font-size:12px}
-  .mvp__devlist summary{cursor:pointer;color:var(--primary);font-weight:600;list-style:none}
-  .mvp__devlist summary::-webkit-details-marker{display:none}
-  .mvp__devlist ul{margin-top:8px;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px}
-  .mvp__devlist li{color:var(--on-variant);padding:4px 8px;border-radius:var(--r-sm);cursor:pointer}
-  .mvp__devlist li:hover{background:var(--container);color:var(--on)}
-
-  /* ── Dev tools ── */
-  .devtools{margin-top:var(--sp-xl);background:var(--card);border:1px solid var(--outline-variant);
-    border-radius:var(--r-lg);padding:var(--sp-lg)}
-  .devtools[hidden]{display:none}
-  .devtools h2{font-size:14px;font-weight:700;margin-bottom:var(--sp-md)}
-  .devtools__row{display:flex;gap:var(--sp-md);flex-wrap:wrap;align-items:center}
-  .chip{border:1px solid var(--outline-variant);background:var(--card);color:var(--on);font-family:inherit;
-    font-weight:600;font-size:13px;padding:8px 14px;border-radius:var(--r-full);cursor:pointer}
-  .chip:hover{border-color:var(--primary-bright);color:var(--primary-bright)}
-  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--on-variant);margin-left:auto}
-  .toggle button{border:1px solid var(--outline-variant);background:var(--container);font-family:inherit;
-    font-weight:600;font-size:12px;padding:6px 12px;border-radius:var(--r-full);cursor:pointer;color:var(--on)}
-
-  .note{font-size:12px;color:var(--on-variant);margin-top:var(--sp-md);padding:12px var(--sp-md);
-    background:var(--container);border-radius:var(--r);border-left:3px solid var(--tertiary)}
-
-  /* toast */
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
-    background:var(--on);color:#fff;font-size:13px;font-weight:500;padding:12px 20px;border-radius:var(--r);
-    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.25s;z-index:50}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-  @media (max-width:900px){.grid{grid-template-columns:1fr}}
-  @media (max-width:640px){
-    .topbar{gap:8px}.topbar__spacer{order:5;flex-basis:100%;height:0}
-    main{padding:var(--sp-lg) var(--sp-md) 48px}
-  }
-
-  /* ── Popcorn Light (랜딩 준용): 톤 오버라이드 ── */
-  .brand,.mvp__title,.lead h1{font-family:var(--font-head)}
-  .status--plan{color:var(--on)}
-  .engine-tag{background:rgba(110,143,214,.14)}
-  .toast{background:#1A202C;color:#fff}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:#f1eee8;font-family:'Pretendard','Pretendard Variable',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
 </style>
 </head>
 <body>
+<script>
+(function(){var KEY="popcorn-gate-ok";var PASS="WnRnal";
+if(localStorage.getItem(KEY)==="1")return;
+var ov=document.createElement("div");ov.id="__gate";
+ov.setAttribute("style","position:fixed;inset:0;z-index:99999;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:Pretendard,-apple-system,sans-serif;");
+ov.innerHTML='<div style="width:min(340px,86vw);background:#fff;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;box-sizing:border-box;"><div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span> · 내부 검토</div><p style="margin:10px 0 18px;font-size:13px;color:#8a8578;font-weight:600;">접근 암호를 입력하세요.</p><input id="__gp" type="password" autocomplete="off" placeholder="암호" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:12px;font-size:14px;font-family:inherit;outline:none;"><p id="__ge" style="margin:8px 0 0;font-size:12px;color:#b31b25;font-weight:700;height:14px;"></p><button id="__gb" style="margin-top:12px;width:100%;padding:12px;border:none;background:#2b5fd9;color:#fff;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">입장</button></div>';
+function go(){document.body.appendChild(ov);var inp=document.getElementById("__gp"),err=document.getElementById("__ge"),btn=document.getElementById("__gb");function s(){if(inp.value===PASS){localStorage.setItem(KEY,"1");ov.remove();}else{err.textContent="암호가 올바르지 않습니다.";inp.value="";inp.focus();}}btn.addEventListener("click",s);inp.addEventListener("keydown",function(e){if(e.key==="Enter")s();});inp.focus();}
+if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})();
+</script>
 
-<!-- ── Top bar ── -->
-<header class="topbar">
-  <div class="brand"><span class="brand__dot" aria-hidden="true"></span>팝콘PC AI · 내부 접근 허브</div>
-  <span class="topbar__badge">내부자 전용</span>
-  <div class="topbar__spacer"></div>
-  <span class="topbar__badge num">환경 DEV</span>
-  <div class="roleswitch" role="radiogroup" aria-label="역할 전환">
-    <button data-action="switch-role" data-role="staff" role="radio" aria-checked="false">직원</button>
-    <button data-action="switch-role" data-role="operator" role="radio" aria-checked="false">운영자</button>
-    <button data-action="switch-role" data-role="dev" role="radio" aria-checked="true">개발자</button>
-  </div>
-  <span class="user" data-bind="current_user">👤 davidchoi2060</span>
-</header>
 
-<!-- ── Status strip ── -->
-<div class="strip" aria-label="시스템 상태">
-  <div class="stat"><span class="dot dot--ok"></span><span class="stat__label">서버</span><span class="stat__val" data-bind="server_status">정상</span></div>
-  <div class="stat"><span class="dot dot--ok"></span><span class="stat__label">DB 연결</span><span class="stat__val" data-bind="db_status">Cloud SQL 연결됨</span></div>
-  <div class="stat"><span class="stat__label">오늘 AI 비용</span><span class="stat__val num" data-bind="ai_cost">$0.00 / $50.00</span></div>
-  <div class="stat"><span class="stat__label">API 모드</span><span class="stat__val" data-bind="api_mode">Mock</span></div>
+
+<div style="min-height:100vh;background:#f1eee8;">
+
+  <!-- nav -->
+  <header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;padding:0 40px;">
+    <div style="max-width:1360px;margin:0 auto;height:62px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span></div>
+        <span style="width:1px;height:16px;background:#d8d4cc;"></span>
+        <div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">hub</span>내부 접근 허브</div>
+        <span style="background:#17171b;color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px;">DEV</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="display:inline-flex;background:#f4f2ec;border-radius:10px;padding:3px;">
+          <span style="padding:6px 13px;border-radius:7px;background:#17171b;color:#fff;font-size:12.5px;font-weight:800;cursor:pointer;" data-role="staff">직원</span>
+          <span style="padding:6px 13px;border-radius:7px;color:#6b6b73;font-size:12.5px;font-weight:700;cursor:pointer;" data-role="operator">운영자</span>
+          <span style="padding:6px 13px;border-radius:7px;color:#6b6b73;font-size:12.5px;font-weight:700;cursor:pointer;" data-role="dev">개발자</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;"><span style="width:30px;height:30px;border-radius:50%;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">person</span><span style="font-size:13.5px;font-weight:800;color:#3a3a40;">davidchoi2060</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:1360px;margin:0 auto;padding:32px 40px 64px;">
+
+    <!-- status strip -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;">
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
+        <span style="width:40px;height:40px;border-radius:11px;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#2f9e6d;">dns</span>
+        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">서버</div><b style="font-size:15px;color:#0f5132;">정상</b></div>
+      </div>
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
+        <span style="width:40px;height:40px;border-radius:11px;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#2f9e6d;">database</span>
+        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">DB 연결</div><b style="font-size:14px;color:#17171b;">Cloud SQL 연결됨</b></div>
+      </div>
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
+        <span style="width:40px;height:40px;border-radius:11px;background:#fbf3e2;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#c77b1f;">payments</span>
+        <div style="flex:1;"><div style="font-size:12px;color:#8a8578;font-weight:700;">오늘 AI 비용</div><b style="font-size:15px;color:#17171b;">$0.00 <span style="font-size:12px;color:#8a8578;font-weight:600;">/ $50.00</span></b></div>
+      </div>
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
+        <span style="width:40px;height:40px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#2b5fd9;">api</span>
+        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">API 모드</div><b style="font-size:15px;color:#17171b;">Mock</b></div>
+      </div>
+    </div>
+
+    <!-- title -->
+    <div style="margin-bottom:24px;">
+      <h1 style="margin:0 0 8px;font-size:34px;font-weight:900;color:#17171b;letter-spacing:-.01em;">어디로 가시겠어요?</h1>
+      <p style="margin:0;font-size:15.5px;color:#6b6b73;max-width:720px;line-height:1.6;">세 서비스의 메인·랜딩·운영자 화면으로 바로 이동합니다. 역할에 따라 열리는 버튼이 달라집니다.</p>
+    </div>
+
+    <!-- MVP cards -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-bottom:32px;">
+
+      <!-- MVP 1 -->
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:22px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 14px 40px -28px rgba(30,25,15,.28);">
+        <div style="background:#17171b;color:#fff;padding:22px 24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#7fa8ff;">MVP 1</span>
+            <span style="display:flex;align-items:center;gap:5px;background:#1c7a4d;color:#fff;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#5fd6a0;"></span>개발중</span>
+          </div>
+          <h2 style="margin:0 0 6px;font-size:20px;font-weight:900;">팝콘PC 단독 AI 견적</h2>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#9a968d;">자체 실시간 재고 기반 AI 견적. 가장 먼저 오픈하는 코어 서비스.</p>
+        </div>
+        <div style="padding:20px 24px;flex:1;display:flex;flex-direction:column;">
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:800;color:#8a8578;margin-bottom:6px;"><span>화면 진척 S0~S4</span><span style="color:#2f9e6d;">5 / 5</span></div>
+            <div style="height:8px;background:#f0eee9;border-radius:999px;overflow:hidden;"><div style="width:100%;height:100%;background:#2f9e6d;border-radius:999px;"></div></div>
+          </div>
+          <div style="font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;">바로가기</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+            <a href="main-landing.html" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#2b5fd9;border-radius:11px;text-decoration:none;"><span style="font-size:13.5px;font-weight:800;color:#fff;">메인 · 고객 진입</span><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#bcd0ff;">arrow_forward</span></a>
+            <div style="display:flex;gap:8px;">
+              <a href="s0-landing.html" style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13px;font-weight:800;color:#3a3a40;">랜딩</span><span style="font-size:11px;color:#8a8578;">S0</span></a>
+              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13px;font-weight:800;color:#3a3a40;">운영자</span><span style="font-family:'Material Symbols Outlined';font-size:15px;color:#8a8578;">admin_panel_settings</span></a>
+            </div>
+          </div>
+          <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
+            <div style="font-size:11.5px;font-weight:900;color:#8a8578;margin-bottom:10px;">화면 목록 (S0~S4)</div>
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              <a href="s0-landing.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S0</span>랜딩 / 입력 게이트</a>
+              <a href="s1-session.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S1</span>대화형 견적 세션</a>
+              <a href="s2-result.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S2</span>견적 제안서</a>
+              <a href="s3-detail.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S3</span>부품 변경</a>
+              <a href="s4-cart.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S4</span>주문 확인 · 결제 인계</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MVP 2 -->
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:22px;overflow:hidden;display:flex;flex-direction:column;opacity:.96;">
+        <div style="background:#2c2c32;color:#fff;padding:22px 24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#c9a0ff;">MVP 2</span>
+            <span style="background:#4a2a94;color:#e0d0ff;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;">설계</span>
+          </div>
+          <h2 style="margin:0 0 6px;font-size:20px;font-weight:900;">AI 제안 + 용산 도매 최저가</h2>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#9a968d;">AI 최적 구성 후 입점 도매사 최저가를 제시하는 확장 서비스.</p>
+        </div>
+        <div style="padding:20px 24px;flex:1;display:flex;flex-direction:column;">
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#f2edfb;color:#4a2a94;font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;align-self:flex-start;margin-bottom:16px;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">share</span>엔진 ① 공유</span>
+          <div style="font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;">바로가기</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+            <a href="#" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13.5px;font-weight:800;color:#3a3a40;">메인 · 서비스 진입</span><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#c9c5bd;">arrow_forward</span></a>
+            <div style="display:flex;gap:8px;">
+              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">랜딩</a>
+              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">운영자 · 마진</a>
+            </div>
+          </div>
+          <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
+            <div style="font-size:11.5px;font-weight:900;color:#8a8578;margin-bottom:10px;">화면 목록</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#a29d92;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">architecture</span>설계 진행 중 — 화면 ID 미확정</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MVP 3 -->
+      <div style="background:#fff;border:1px solid #ece9e3;border-radius:22px;overflow:hidden;display:flex;flex-direction:column;opacity:.96;">
+        <div style="background:#2c2c32;color:#fff;padding:22px 24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#ffcb4a;">MVP 3</span>
+            <span style="background:#8a561a;color:#ffe6bd;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;">기획</span>
+          </div>
+          <h2 style="margin:0 0 6px;font-size:20px;font-weight:900;">입점 부품 가격비교 포털</h2>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#9a968d;">입점업체 가격만 비교하는 최적화 포털. (외부 크롤링 미사용)</p>
+        </div>
+        <div style="padding:20px 24px;flex:1;display:flex;flex-direction:column;">
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#fbf3e2;color:#8a561a;font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;align-self:flex-start;margin-bottom:16px;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">share</span>엔진 ① 공유</span>
+          <div style="font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;">바로가기</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+            <a href="#" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13.5px;font-weight:800;color:#3a3a40;">메인 · 서비스 진입</span><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#c9c5bd;">arrow_forward</span></a>
+            <div style="display:flex;gap:8px;">
+              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">랜딩</a>
+              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">운영자 · 입점가</a>
+            </div>
+          </div>
+          <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
+            <div style="font-size:11.5px;font-weight:900;color:#8a8578;margin-bottom:10px;">화면 목록</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#a29d92;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">lightbulb</span>기획 단계 — 화면 미정</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- dev tools -->
+    <section style="background:#17171b;color:#fff;border-radius:22px;padding:26px 30px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <span style="width:46px;height:46px;border-radius:13px;background:#232320;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:24px;color:#7fa8ff;">code</span>
+        <div>
+          <h3 style="margin:0 0 3px;font-size:18px;font-weight:900;">개발자 도구</h3>
+          <p style="margin:0;font-size:13px;color:#9a968d;">화면 진척 매트릭스 · DEV 허브 · API 모드 전환</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button style="padding:11px 18px;border:1.5px solid #3a3a35;background:transparent;border-radius:11px;font-size:13.5px;font-weight:800;color:#e6e2da;cursor:pointer;font-family:inherit;">관리자 허브</button>
+        <button style="padding:11px 18px;border:none;background:#2b5fd9;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;" id="hub-api"><span style="font-family:'Material Symbols Outlined';font-size:17px;">swap_horiz</span>API 모드 Mock ⇄ Real</button>
+      </div>
+    </section>
+
+    <p style="margin:18px 4px 0;font-size:12.5px;color:#a29d92;line-height:1.6;">바로가기는 현재 대상 화면의 <b style="color:#8a8578;">Screen 키</b>를 앱으로 전달하는 목업 동작입니다. 실제로 그 화면이 열리려면 앱에 URL/쿼리 파라미터 라우팅(?screen=…&amp;mvp=…)이 붙어야 합니다 — 다음 이터레이션 작업.</p>
+
+  </main>
 </div>
 
-<main>
-  <div class="lead">
-    <h1>어디로 가시겠어요?</h1>
-    <p>세 서비스의 메인·랜딩·운영자 화면으로 바로 이동합니다. 역할에 따라 열리는 버튼이 달라집니다.</p>
-  </div>
 
-  <div class="grid">
 
-    <!-- ── MVP 1 ── -->
-    <section class="mvp" data-mvp="1">
-      <div class="mvp__head">
-        <div><div class="mvp__no">MVP 1</div><div class="mvp__title">팝콘PC 단독 AI 견적</div></div>
-        <span class="status status--dev">개발중</span>
-      </div>
-      <p class="mvp__desc">자체 실재고 기반 AI 견적. 가장 먼저 오픈하는 코어 서비스.</p>
 
-      <div class="prog">
-        <div class="prog__label"><span>화면 진척 S0~S4</span><span class="num">5 / 5</span></div>
-        <div class="prog__steps">
-          <span class="prog__seg prog__seg--done" title="S0"></span>
-          <span class="prog__seg prog__seg--done" title="S1"></span>
-          <span class="prog__seg prog__seg--done" title="S2"></span>
-          <span class="prog__seg prog__seg--done" title="S3"></span>
-          <span class="prog__seg prog__seg--done" title="S4"></span>
-        </div>
-      </div>
-
-      <div class="short">
-        <span class="short__cap">바로가기</span>
-        <div class="short__row">
-          <button class="btn btn--primary" data-action="goto" data-screen="landing" data-mvp="1">메인<span class="btn__sub">고객 진입</span></button>
-          <button class="btn" data-action="goto" data-screen="s0" data-mvp="1">랜딩<span class="btn__sub">S0 입력게이트</span></button>
-          <button class="btn js-operator" data-action="goto" data-screen="adm-dashboard" data-mvp="1">운영자<span class="btn__sub">관리자 뷰</span></button>
-        </div>
-      </div>
-
-      <details class="mvp__devlist js-devonly">
-        <summary>화면 목록 (S0~S4)</summary>
-        <ul>
-          <li data-action="goto" data-screen="s0" data-mvp="1">S0 · 랜딩 / 입력 게이트</li>
-          <li data-action="goto" data-screen="rec-session" data-mvp="1">S1 · 대화형 견적 세션</li>
-          <li data-action="goto" data-screen="rec-result" data-mvp="1">S2 · 견적 제안서</li>
-          <li data-action="goto" data-screen="rec-detail" data-mvp="1">S3 · 부품 변경</li>
-          <li data-action="goto" data-screen="rec-cart" data-mvp="1">S4 · 주문 확인·결제 인계</li>
-        </ul>
-      </details>
-    </section>
-
-    <!-- ── MVP 2 ── -->
-    <section class="mvp" data-mvp="2">
-      <div class="mvp__head">
-        <div><div class="mvp__no">MVP 2</div><div class="mvp__title">AI 제안 + 용산 도매 최저가</div></div>
-        <span class="status status--design">설계</span>
-      </div>
-      <p class="mvp__desc">AI 최적 구성 후 입점 도매사 최저가를 제시하는 확장 서비스.</p>
-      <span class="engine-tag">엔진 ① 공유</span>
-
-      <div class="short">
-        <span class="short__cap">바로가기</span>
-        <div class="short__row">
-          <button class="btn btn--primary" data-action="goto" data-screen="landing" data-mvp="2">메인<span class="btn__sub">서비스 진입</span></button>
-          <button class="btn" data-action="goto" data-screen="landing" data-mvp="2" data-variant="s0">랜딩<span class="btn__sub">입력게이트</span></button>
-          <button class="btn js-operator" data-action="goto" data-screen="adm-dashboard" data-mvp="2">운영자<span class="btn__sub">입점사·마진</span></button>
-        </div>
-      </div>
-
-      <details class="mvp__devlist js-devonly">
-        <summary>화면 목록</summary>
-        <ul><li>설계 진행 중 — 화면 ID 미확정</li></ul>
-      </details>
-    </section>
-
-    <!-- ── MVP 3 ── -->
-    <section class="mvp" data-mvp="3">
-      <div class="mvp__head">
-        <div><div class="mvp__no">MVP 3</div><div class="mvp__title">입점 부품 가격비교 포털</div></div>
-        <span class="status status--plan">기획</span>
-      </div>
-      <p class="mvp__desc">입점업체 가격만 비교하는 최적화 포털. (외부 크롤링 미사용)</p>
-      <span class="engine-tag">엔진 ① 공유</span>
-
-      <div class="short">
-        <span class="short__cap">바로가기</span>
-        <div class="short__row">
-          <button class="btn btn--primary" data-action="goto" data-screen="landing" data-mvp="3">메인<span class="btn__sub">서비스 진입</span></button>
-          <button class="btn" data-action="goto" data-screen="landing" data-mvp="3" data-variant="s0">랜딩<span class="btn__sub">입력게이트</span></button>
-          <button class="btn js-operator" data-action="goto" data-screen="adm-dashboard" data-mvp="3">운영자<span class="btn__sub">입점가 비교</span></button>
-        </div>
-      </div>
-
-      <details class="mvp__devlist js-devonly">
-        <summary>화면 목록</summary>
-        <ul><li>기획 단계 — 화면 미정</li></ul>
-      </details>
-    </section>
-
-  </div>
-
-  <!-- ── Dev tools (개발자 역할일 때만) ── -->
-  <section class="devtools js-devonly" aria-label="개발자 도구">
-    <h2>개발자 도구</h2>
-    <div class="devtools__row">
-      <button class="chip" data-action="goto" data-screen="dev-hub">화면 진척 매트릭스 · DEV 허브</button>
-      <button class="chip" data-action="goto" data-screen="adm-dashboard">관리자 허브</button>
-      <div class="toggle">API 모드 <button data-action="toggle-api">Mock ⇄ Real</button></div>
-    </div>
-    <div class="note">
-      바로가기는 현재 대상 화면의 <strong>Screen 키</strong>를 앱으로 전달하는 목업 동작입니다.
-      실제로 그 화면이 열리려면 앱에 URL/쿼리 파라미터 라우팅(<span class="num">?screen=…&mvp=…</span>)이 붙어야 합니다 — 다음 이터레이션 작업.
-    </div>
-  </section>
-</main>
-
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-
+<div id="hub-toast" style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:#17171b;color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:12px;opacity:0;pointer-events:none;transition:.25s;z-index:60;"></div>
 <script>
 (function(){
-  var state={ role:'dev', apiMode:'Mock' };
-
-  function applyRole(role){
-    state.role=role;
-    // role switch UI
-    document.querySelectorAll('[data-action="switch-role"]').forEach(function(b){
-      b.setAttribute('aria-checked', String(b.dataset.role===role));
-    });
-    var isDev = role==='dev';
-    var isOperatorPlus = (role==='operator'||role==='dev');
-    // 운영자 버튼: 운영자/개발자만
-    document.querySelectorAll('.js-operator').forEach(function(el){ el.hidden = !isOperatorPlus; });
-    // 개발자 전용 영역: 화면목록·개발자도구
-    document.querySelectorAll('.js-devonly').forEach(function(el){ el.hidden = !isDev; });
-  }
-
-  function toast(msg){
-    var t=document.getElementById('toast');
-    t.textContent=msg; t.classList.add('show');
-    clearTimeout(t._t); t._t=setTimeout(function(){ t.classList.remove('show'); },2200);
-  }
-
-  // 이벤트 위임
-  document.addEventListener('click', function(e){
-    var el=e.target.closest('[data-action]'); if(!el) return;
-    var action=el.dataset.action;
-
-    if(action==='switch-role'){ applyRole(el.dataset.role); return; }
-
-    if(action==='toggle-api'){
-      state.apiMode = state.apiMode==='Mock' ? 'Real' : 'Mock';
-      document.querySelector('[data-bind="api_mode"]').textContent=state.apiMode;
-      toast('API 모드: '+state.apiMode);
-      return;
-    }
-
-    if(action==='goto'){
-      var screen=el.dataset.screen;
-      var mvp=el.dataset.mvp || '';
-      var variant=el.dataset.variant || '';
-      // 실제 목업 파일이 있는 화면(MVP1)은 바로 이동
-      var FILES={ 'landing':'main-landing.html', 's0':'s0-landing.html', 'rec-session':'s1-session.html', 'rec-result':'s2-result.html', 'rec-detail':'s3-detail.html', 'rec-cart':'s4-cart.html' };
-      if(mvp==='1' && FILES[screen]){
-        window.location.href = encodeURI(FILES[screen]);
-        return;
-      }
-      // 그 외: 아직 목업 없음 — Screen 키 전달 시늉
-      var target='?screen='+encodeURIComponent(screen)
-        + (mvp?'&mvp='+encodeURIComponent(mvp):'')
-        + (variant?'&variant='+encodeURIComponent(variant):'');
-      toast('이동(목업): '+screen + (mvp?' · MVP'+mvp:'') + '  →  '+target);
-      return;
-    }
-  });
-
-  applyRole('dev'); // 기본 역할
+function tmsg(m){var t=document.getElementById('hub-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2200);}
+document.querySelectorAll('[data-role]').forEach(function(r){r.addEventListener('click',function(){document.querySelectorAll('[data-role]').forEach(function(x){x.style.background='transparent';x.style.color='#6b6b73';x.style.fontWeight='700';});r.style.background='#17171b';r.style.color='#fff';r.style.fontWeight='800';tmsg('역할: '+r.textContent);});});
+var api=document.getElementById('hub-api'),mode='Mock';if(api)api.addEventListener('click',function(){mode=(mode==='Mock'?'Real':'Mock');tmsg('API 모드: '+mode);});
 })();
 </script>
-</body>
-</html>
+</body></html>

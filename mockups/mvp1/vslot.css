@@ -1,0 +1,67 @@
+/* Popcorn — 시각 슬롯(visual slot) 규약 · ux-upgrade-spec §1
+   host 페이지의 :root(Popcorn Light) 토큰을 그대로 사용한다.
+   "위치만 잡고 내용 정의" — 자산(사진 등) 오기 전엔 placeholder, 오면 .is-filled로 교체. */
+
+.vslot{margin:0;background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-lg,1rem);
+  overflow:hidden;box-shadow:var(--shadow)}
+.vslot__ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:var(--container-low);border:1.5px dashed var(--outline);color:var(--on-variant);
+  border-radius:var(--r-lg,1rem);min-height:150px;padding:22px;text-align:center}
+.vslot__ph .ico{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.65}
+.vslot__type{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--primary);background:rgba(101,161,212,.12);padding:3px 9px;border-radius:var(--r-full,9999px)}
+.vslot__label{font-size:13.5px;font-weight:700;color:var(--on)}
+.vslot__note{font-size:12px;color:var(--on-variant);max-width:40ch;line-height:1.55}
+.vslot__cap{font-size:12px;color:var(--on-variant);padding:10px 14px;border-top:1px solid var(--container)}
+
+/* 타입별 종횡비 힌트 (자리 크기 감 잡기용) */
+.vslot[data-visual-type="image"] .vslot__ph{aspect-ratio:4/3}
+.vslot[data-visual-type="gallery"] .vslot__ph{aspect-ratio:16/6}
+.vslot[data-visual-type="chart"] .vslot__ph{aspect-ratio:16/7}
+.vslot[data-visual-type="diagram"] .vslot__ph{aspect-ratio:16/5}
+
+/* gallery placeholder 내부 타일 */
+.vslot__tiles{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:8px;width:100%}
+.vslot__tile{aspect-ratio:1;background:rgba(101,161,212,.10);border:1px dashed var(--outline-variant);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--on-variant);text-align:center;padding:4px}
+
+/* 자산이 채워지면 placeholder 숨김, 실제 콘텐츠 노출 */
+.vslot.is-filled .vslot__ph{display:none}
+.vslot__asset{display:block;width:100%;height:auto}
+.vslot:not(.is-filled) .vslot__asset{display:none}
+
+/* chart/table/diagram = 지금 실제 구현(placeholder 아님)일 때 프레임+캡션만 사용 */
+.vslot__body{padding:16px}
+
+/* ══ 강조 · 우선순위 규약 (색상 다양 · 확 띄게) ══
+   색 의미: 파랑=구성/근거 · 초록=검증/안심 · 앰버=가격/이득 · 보라=성능 · 빨강=주의 */
+/* 1) 색·두께·크기 */
+.em1{font-weight:800;color:#2C7DBE}                 /* 기본 핵심(파랑) */
+.em1--lg{font-size:1.16em}
+.em2{font-weight:700;color:var(--on)}
+.em-safe{font-weight:800;color:#0E8F5F}             /* 검증/안심(초록) */
+.em-price{font-weight:800;color:#B26A00}            /* 가격/이득(앰버) */
+.em-perf{font-weight:800;color:#6D4FC7}             /* 성능(보라) */
+.em-danger{font-weight:800;color:#C0392B}           /* 주의(빨강) */
+/* 2) 형광펜 — 진하게(글자 뒤 70%), 색상별 */
+.mark,.mark-blue{background:linear-gradient(transparent 28%, rgba(101,161,212,.55) 0);padding:1px 4px;border-radius:3px;font-weight:700;color:#0C447C}
+.mark-safe{background:linear-gradient(transparent 28%, rgba(29,158,117,.45) 0);padding:1px 4px;border-radius:3px;font-weight:700;color:#0A5A3C}
+.mark-price{background:linear-gradient(transparent 28%, rgba(240,175,40,.62) 0);padding:1px 4px;border-radius:3px;font-weight:700;color:#7A4A00}
+.mark-danger{background:linear-gradient(transparent 28%, rgba(224,90,75,.42) 0);padding:1px 4px;border-radius:3px;font-weight:700;color:#8A1F14}
+/* 3) 밑줄 강조 (굵게) */
+.uline{border-bottom:3px solid #65A1D4;padding-bottom:1px}
+.uline-safe{border-bottom:3px solid #1D9E75;padding-bottom:1px}
+/* 4) 핵심 콜아웃 박스 (배경색·아이콘, 색상별) */
+.keybox{display:flex;gap:11px;align-items:flex-start;border-radius:12px;padding:14px 16px;margin:14px 0;
+  font-size:14.5px;line-height:1.6;color:var(--on);background:rgba(101,161,212,.14);border:1.5px solid rgba(101,161,212,.42)}
+.keybox .ico{flex:none;width:24px;height:24px;color:#2C7DBE;margin-top:1px}
+.keybox b{color:#2C7DBE;font-weight:800}
+.keybox--safe{background:rgba(29,158,117,.12);border-color:rgba(29,158,117,.40)}
+.keybox--safe .ico,.keybox--safe b{color:#0E8F5F}
+.keybox--price{background:rgba(240,175,40,.16);border-color:rgba(224,160,17,.48)}
+.keybox--price .ico,.keybox--price b{color:#B26A00}
+/* 5) "핵심" 인라인 아이콘 배지 (색 채움) */
+.keytag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:#fff;background:#2C7DBE;padding:3px 10px;border-radius:9999px;vertical-align:middle}
+.keytag--safe{background:#0E8F5F}
+.keytag--price{background:#B26A00}
+.keytag .ico{width:12px;height:12px}
