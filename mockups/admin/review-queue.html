@@ -554,6 +554,14 @@
            note:"제목 파싱은 AM5로 잡았으나 B550은 AM4. 소켓 오류는 CPU 호환 전체를 무너뜨림 → 최우선 교정."}
         ];
         let cur = "all", sel = null, done = 0;
+        // #4 위험도 — 추천을 실제로 망가뜨리는 정도(색+텍스트 병기)
+        const CRIT_CONFLICT = ["socket","rated_watt","tdp_watt","mem_type"];
+        const RISK = {"치명":{o:3,c:"danger"},"주의":{o:2,c:"warning"},"경미":{o:1,c:"secondary"}};
+        function riskOf(q){
+          if(q.type==="spec_conflict") return CRIT_CONFLICT.includes(q.field)?"치명":"주의";
+          if(q.type==="spec_missing") return "주의";
+          return "경미"; // AI 확신 낮음 · 등록 오류
+        }
 
         function counts(){ const c={all:QUEUE.length}; QUEUE.forEach(q=>c[q.type]=(c[q.type]||0)+1); return c; }
         function renderPills(){
@@ -567,7 +575,7 @@
           document.getElementById("remainCount").textContent = QUEUE.length;
           document.getElementById("doneCount").textContent = done;
         }
-        function list(){ return cur==="all"?QUEUE:QUEUE.filter(q=>q.type===cur); }
+        function list(){ return (cur==="all"?QUEUE:QUEUE.filter(q=>q.type===cur)).slice().sort((a,b)=>RISK[riskOf(b)].o-RISK[riskOf(a)].o); }
         function confBadge(v){ if(v===null) return `<span class="badge badge-phoenix badge-phoenix-secondary">신뢰도 N/A</span>`;
           const col = v>=0.9?"primary":v>=0.7?"warning":"danger"; return `<span class="badge badge-phoenix badge-phoenix-${col}">신뢰도 ${Math.round(v*100)}%</span>`; }
         function renderList(){
@@ -575,7 +583,7 @@
           document.getElementById("queueList").innerHTML = l.length? l.map(q=>{
             const t=TYPES[q.type]; const on=q.id===sel;
             return `<div data-id="${q.id}" class="p-3 border-bottom cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
-              <div class="d-flex justify-content-between align-items-start mb-1"><span class="badge badge-phoenix badge-phoenix-${t.c}">${t.label}</span><span class="fs-10 text-body-quaternary">${q.wait}</span></div>
+              <div class="d-flex justify-content-between align-items-start mb-1"><div class="d-flex align-items-center gap-2"><span class="fs-10 fw-bolder text-nowrap" style="color:var(--bs-${RISK[riskOf(q)].c})">● ${riskOf(q)}</span><span class="badge badge-phoenix badge-phoenix-${t.c}">${t.label}</span></div><span class="fs-10 text-body-quaternary">${q.wait}</span></div>
               <h6 class="mb-1 text-body-highlight text-truncate">${q.name}</h6>
               <div class="d-flex justify-content-between align-items-center"><span class="fs-9 text-body-tertiary">${q.cat} · <code>${q.field}</code></span>${confBadge(q.conf)}</div>
             </div>`;
@@ -588,6 +596,8 @@
           const d = document.getElementById("detail");
           if(!q){ d.innerHTML = `<div class="card"><div class="card-body text-center py-6 text-body-tertiary"><span data-feather="inbox" style="width:40px;height:40px;"></span><h5 class="mt-3 mb-1 text-body-secondary">모두 처리했습니다</h5><p class="mb-0">이 분류의 검수 항목이 비었습니다.</p></div></div>`; if(window.feather) feather.replace(); return; }
           const t = TYPES[q.type];
+          const rk = riskOf(q);
+          const rmsg = {"치명":"이 오류는 호환 판정 자체를 무너뜨립니다. 최우선 처리하세요.","주의":"특정 조건의 추천에서 오판 위험이 있습니다. 확정을 권장합니다.","경미":"값은 유효합니다. 신뢰도·형식만 확인하면 통과됩니다."}[rk];
           const isCsv = q.type==="csv_error", isSrc = q.type==="sourcing_hold";
           const verdict = isSrc? `<span class="badge badge-phoenix badge-phoenix-info">매입 대기</span>`
             : (q.origin===q.know? `<span class="badge badge-phoenix badge-phoenix-primary">일치</span>` : `<span class="badge badge-phoenix badge-phoenix-danger">불일치 — 확정 필요</span>`);
@@ -598,6 +608,7 @@
                 <div class="col-6"><div class="bg-body-secondary rounded-2 p-2 h-100"><p class="fs-10 text-body-tertiary mb-1">${isCsv?"파싱 결과":"AI 지식 대조"}</p><p class="mb-0 fw-bold text-body-highlight">${q.know}</p></div></div>
               </div>
               <p class="fs-9 text-body-tertiary mb-0 mt-2"><span data-feather="info" style="width:13px;height:13px;vertical-align:-2px;"></span> ${q.note}</p>
+              <a href="imports.html?id=${q.id}" class="btn btn-link btn-sm p-0 mt-2 fs-9 fw-bold text-decoration-none">원문 상세 보기 <span data-feather="external-link" style="width:12px;height:12px;vertical-align:-1px;"></span></a>
             </div>`;
           const steps = ["원문 파싱","단위 정규화","지식 대조","신뢰도 산정"];
           const si = isCsv?1:(isSrc?4:4);
@@ -612,8 +623,9 @@
           else if(isSrc) actions = `<button class="btn btn-primary btn-sm" data-act="매입 완료 처리">매입가 입력·통과</button><button class="btn btn-phoenix-warning btn-sm" data-act="계속 보류">계속 보류</button>`;
           else actions = `<button class="btn btn-primary btn-sm" data-act="원문값으로 확정">원문값 확정</button><button class="btn btn-phoenix-primary btn-sm" data-act="지식값으로 확정">지식값 확정</button><button class="btn btn-phoenix-secondary btn-sm" data-act="직접 수정">직접 수정</button><button class="btn btn-phoenix-danger btn-sm" data-act="반려">반려</button>`;
           d.innerHTML = `<div class="card"><div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-1"><span class="badge badge-phoenix badge-phoenix-${t.c}">${t.label}</span><span class="fs-10 text-body-quaternary">${q.id} · ${q.cat}</span></div>
-              <h4 class="mb-3">${q.name}</h4>
+              <div class="d-flex justify-content-between align-items-start mb-1"><div class="d-flex align-items-center gap-2"><span class="badge badge-phoenix badge-phoenix-${RISK[rk].c}">위험도 ${rk}</span><span class="badge badge-phoenix badge-phoenix-${t.c}">${t.label}</span></div><span class="fs-10 text-body-quaternary">${q.id} · ${q.cat}</span></div>
+              <h4 class="mb-2">${q.name}</h4>
+              <div class="d-flex align-items-start gap-2 rounded-2 px-3 py-2 mb-3 bg-${RISK[rk].c}-subtle"><span data-feather="${rk==='치명'?'alert-octagon':rk==='주의'?'alert-triangle':'info'}" style="width:15px;height:15px;color:var(--bs-${RISK[rk].c});flex:none;margin-top:1px;"></span><span class="fs-9 text-body-secondary">${rmsg}</span></div>
               ${crossCard}${pipeline}${crit}
               <div class="alert alert-subtle-secondary d-flex align-items-center py-2 fs-9 mb-3" role="alert"><span data-feather="lock" style="width:14px;height:14px;" class="me-2"></span>확정 시 해당 필드는 <b class="mx-1">locked_fields</b>에 잠기며, 이후 CSV 재적재가 값을 덮어쓰지 않습니다.</div>
               <div class="d-flex flex-wrap gap-2">${actions}</div>
@@ -635,7 +647,7 @@
           t.textContent=m;t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",2200);
         }
         function renderAll(){ renderPills(); renderList(); renderDetail(); }
-        sel = QUEUE[0].id; renderAll();
+        sel = list()[0].id; renderAll();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
