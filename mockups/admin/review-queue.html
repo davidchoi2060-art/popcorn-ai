@@ -522,8 +522,7 @@
           spec_conflict:{label:"사양 불일치", c:"danger"},
           spec_missing:{label:"필수 사양 없음", c:"warning"},
           low_confidence:{label:"AI 확신 낮음", c:"warning"},
-          csv_error:{label:"등록 오류", c:"secondary"},
-          sourcing_hold:{label:"매입 대기", c:"info"}
+          csv_error:{label:"등록 오류", c:"secondary"}
         };
         let QUEUE = [
           {id:"P-4821", name:"이엠텍 지포스 RTX 4060 STORM X2 WHITE", cat:"그래픽카드", type:"spec_conflict", field:"length_mm", origin:"272mm", know:"251mm", conf:0.93, wait:"12분 전",
@@ -550,9 +549,6 @@
           {id:"P-7044", name:"WD Blue SN580 1TB", cat:"SSD", type:"csv_error", field:"price_krw", origin:"\"1,29,000\"", know:"자릿수 형식 오류", conf:null, wait:"업로드 배치 #212",
            crit:[["판매가 price_krw","형식 오류",false],["용량 capacity_gb","1000",true],["폼팩터 form_factor","M.2 2280",true],["인터페이스 interface","PCIe 4.0",true]],
            note:"가격 자릿수 구분 오류(1,29,000). 129,000으로 교정 필요."},
-          {id:"P-8890", name:"AMD 라이젠7 7700 (정품)", cat:"CPU", type:"sourcing_hold", field:"-", origin:"자체재고 0", know:"용산 도매 견적 대기", conf:null, wait:"3시간 전",
-           crit:[["소켓 socket","AM5",true],["코어/스레드 cores","8C/16T",true],["TDP tdp_watt","65W",true],["내장그래픽 igpu","있음",true]],
-           note:"스펙은 완비. 자체재고 소진 → 용산 매입 견적 회신 전까지 추천 가능 재고 노출 보류."},
           {id:"P-4102", name:"기가바이트 B550M K", cat:"메인보드", type:"spec_conflict", field:"socket", origin:"AM5", know:"AM4 (B550 칩셋)", conf:0.82, wait:"4시간 전",
            crit:[["소켓 socket","불일치",false],["메모리 규격 mem_type","DDR4",true],["폼팩터 form_factor","mATX",true],["M.2 슬롯 m2_slots","1",true]],
            note:"제목 파싱은 AM5로 잡았으나 B550은 AM4. 소켓 오류는 CPU 호환 전체를 무너뜨림 → 최우선 교정."}
