@@ -8,6 +8,8 @@
 > 출처: `CLAUDE.md`, `HANDOFF.md`, `docs/prompts/S0~S4`, `docs/infra/GCP_SETUP.md`
 >
 > **상품 DB 재설계 (2026-07-07):** 상품 스키마의 단일 원천은 [`docs/06_db-erd.md`](../06_db-erd.md)(ERD **Ver 3.0**), 결정 근거는 [`docs/decisions/2026-07-07_product-data.md`](2026-07-07_product-data.md)(ADR 9건). 관리자 화면(ADM-\*)·목 데이터의 컬럼명·상태값·reason 코드는 이 두 문서를 표준으로 따른다. 인계 원본: GDRIVE `.../5단계/HANDOFF_DB_2026-07-07.md`.
+>
+> **관리자 용어집 확정 (UX-14, 2026-07-07):** 모든 관리자(운영자) 화면 라벨의 단일 원천은 [`docs/decisions/admin-terminology.md`](admin-terminology.md). 은어(큐·풀·import·verified·candidate·소싱·릴레이) 퇴출, 운영자 언어로 확정. 핵심: 검수 큐→**상품 검수**, 원본 조회→**상품 원본 자료**, 후보 풀→**추천 가능 재고**, 치명필드/verified→**필수 사양/확인 완료**. 새 화면은 이 표를 따르고, 없는 용어는 표에 먼저 등록 후 사용.
 
 **상태 범례:** ✅ 확정(번복 금지·근거 있음) · 🟡 미정(임의 결정 금지, 사용자 확인 필요) · ⛔ 폐기(과거 방향, 되살리지 말 것)
 
