@@ -1,10 +1,14 @@
 {
   "hosting": {
-    "public": "mockups/mvp1",
+    "public": "mockups",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "redirects": [
+      { "source": "/", "destination": "/mvp1/index.html", "type": 302 },
+      { "source": "/:page.html", "destination": "/mvp1/:page.html", "type": 302 }
     ],
     "headers": [
       { "source": "**", "headers": [ { "key": "Cache-Control", "value": "no-cache, max-age=0" } ] }
