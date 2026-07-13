@@ -10,7 +10,7 @@
     <!-- ===============================================-->
     <!--    Document Title-->
     <!-- ===============================================-->
-    <title>팝콘PC 관리자 · 상품 원본 자료</title>
+    <title>팝콘PC 관리자 · AI 사용량·비용</title>
 
 
     <!-- ===============================================-->
@@ -76,7 +76,7 @@
                   <li class="nav-item"><a class="nav-link" href="review-queue.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning ms-2">9</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="product-edit.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 등록·수정</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="csv-upload.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 일괄 등록</span></div></a></li>
-                  <li class="nav-item"><a class="nav-link active" href="imports.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 원본 자료</span></div></a></li>
+                  <li class="nav-item"><a class="nav-link" href="imports.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 원본 자료</span></div></a></li>
                 </ul></div></div></li>
               <li class="nav-item"><p class="navbar-vertical-label">가격 · 매입</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-price" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-price"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="dollar-sign"></span></span><span class="nav-link-text">가격 · 매입</span></div></a>
@@ -104,7 +104,7 @@
               <li class="nav-item"><p class="navbar-vertical-label">시스템</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-sys" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-sys"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="settings"></span></span><span class="nav-link-text">시스템</span></div></a>
                 <div class="parent-wrapper label-1"><ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-sys">
-                  <li class="nav-item"><a class="nav-link" href="ai-cost.html"><div class="d-flex align-items-center"><span class="nav-link-text">AI 사용량 · 비용</span></div></a></li>
+                  <li class="nav-item"><a class="nav-link active" href="ai-cost.html"><div class="d-flex align-items-center"><span class="nav-link-text">AI 사용량 · 비용</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="operators.html"><div class="d-flex align-items-center"><span class="nav-link-text">운영자 · 권한</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="activity-logs.html"><div class="d-flex align-items-center"><span class="nav-link-text">작업 기록</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="csv-jobs.html"><div class="d-flex align-items-center"><span class="nav-link-text">일괄 등록 이력</span></div></a></li>
@@ -504,25 +504,46 @@
         </div>
       </nav>
       <div class="content">
-        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 원본 자료</li></ol></nav>
-        <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">상품 원본 자료 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-IMP-010</span></h2>
-          <p class="text-body-tertiary mb-0">업로드된 원본을 <b class="text-body-secondary">받은 그대로(동결)</b> 보관합니다. 읽기 전용 — 어떤 검증·확정도 원본을 바꾸지 않습니다.</p></div>
+        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">AI 사용량 · 비용</li></ol></nav>
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+          <div><h2 class="mb-1">AI 사용량 · 비용 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-010</span></h2>
+          <p class="text-body-tertiary mb-0">언어모델 호출은 <b class="text-body-secondary">파싱·사양 추출·근거 생성뿐</b>입니다. 견적 산출은 AI를 쓰지 않으므로 여기 비용이 없습니다.</p></div>
+          <span class="badge badge-phoenix badge-phoenix-secondary">일 예산 캡 $50</span>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">오늘 사용</p><h4 class="mb-1">$3.42 <span class="fs-10 fw-semibold text-body-tertiary">/ $50</span></h4><div class="progress" style="height:5px;"><div class="progress-bar bg-primary" style="width:6.8%;"></div></div></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">이번 달</p><h4 class="mb-0">$61.20</h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">적재 배치당 평균</p><h4 class="mb-0">$1.90</h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">상담 1건당 평균</p><h4 class="mb-0">$0.011</h4></div></div></div>
         </div>
         <div class="row g-3">
-          <div class="col-12 col-lg-4">
-            <div class="card"><div class="card-body p-0">
-              <div class="p-3 border-bottom"><h6 class="mb-0">배치 목록</h6></div>
-              <div id="batches"></div>
+          <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
+            <h6 class="mb-2">용도별 사용 (오늘)</h6>
+            <div id="usage"></div>
+            <h6 class="mb-2 mt-4">최근 7일</h6>
+            <div class="d-flex align-items-end gap-2" style="height:90px;">
+              <div class="flex-1 bg-primary rounded-top" style="height:34%;" title="$2.1"></div><div class="flex-1 bg-primary rounded-top" style="height:28%;" title="$1.8"></div><div class="flex-1 bg-primary rounded-top" style="height:88%;" title="$5.4 — 배치 #208"></div><div class="flex-1 bg-primary rounded-top" style="height:30%;" title="$1.9"></div><div class="flex-1 bg-primary rounded-top" style="height:26%;" title="$1.7"></div><div class="flex-1 bg-primary rounded-top" style="height:70%;" title="$4.3 — 배치 #212"></div><div class="flex-1 bg-warning rounded-top" style="height:55%;" title="오늘 $3.42"></div>
+            </div>
+            <div class="d-flex justify-content-between fs-10 text-body-tertiary mt-1"><span>7/7</span><span>오늘</span></div>
+          </div></div></div>
+          <div class="col-12 col-lg-5">
+            <div class="card mb-3"><div class="card-body">
+              <h6 class="mb-2">캡 도달 시 동작 (정책)</h6>
+              <div class="fs-9 d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-secondary">고객 입력 파싱</span><span class="badge badge-phoenix badge-phoenix-primary">항상 유지</span></div>
+                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-secondary">근거 생성</span><span class="badge badge-phoenix badge-phoenix-primary">항상 유지</span></div>
+                <div class="d-flex justify-content-between"><span class="text-body-secondary">사양 추출 배치</span><span class="badge badge-phoenix badge-phoenix-warning">자동 연기 → 다음날</span></div>
+              </div>
+              <p class="fs-10 text-body-tertiary mt-2 mb-0">고객 대면 기능이 우선, 배치는 미룹니다.</p>
             </div></div>
-          </div>
-          <div class="col-12 col-lg-8">
             <div class="card"><div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0" id="btitle">배치 #213 — 용산도매_입고_0713.xlsx</h6><span class="badge badge-phoenix badge-phoenix-secondary">읽기 전용</span></div>
-              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-                <thead><tr class="text-body-tertiary"><th>행</th><th>SKU</th><th>원본 셀 (그대로)</th><th>처리 결과</th></tr></thead>
-                <tbody id="brows"></tbody>
-              </table></div>
+              <h6 class="mb-2">모델별 (오늘)</h6>
+              <div class="table-responsive"><table class="table table-sm fs-9 mb-0"><tbody>
+                <tr><td>파싱 앙상블 A</td><td class="text-end">$0.41</td></tr>
+                <tr><td>파싱 앙상블 B</td><td class="text-end">$0.28</td></tr>
+                <tr><td>사양 추출 (배치)</td><td class="text-end">$2.46</td></tr>
+                <tr><td>근거 생성</td><td class="text-end">$0.27</td></tr>
+              </tbody></table></div>
             </div></div>
           </div>
         </div>
@@ -530,49 +551,11 @@
       </div>
       <script>
       (function(){
-        const BATCHES=[
-          ["213","용산도매_입고_0713.xlsx","07-13","5,214행","primary","완료"],
-          ["212","다나와_시세_0712.csv","07-12","3,882행","warning","오류 2행"],
-          ["211","용산도매_입고_0709.xlsx","07-09","5,120행","primary","완료"]
-        ];
-        const ROWS={
-          "213":[
-            ["18","P-4821",'상품명:"이엠텍 지포스 RTX 4060 STORM X2 WHITE" · 길이:"272mm" · 매입:"352000"',["검수 회부 — length_mm 대조 불일치","warning","review-queue.html"]],
-            ["19","P-4822",'상품명:"MSI RTX 4060 벤투스 2X" · 매입:"368000"',["정본 반영 · 가격 검토 대기","warning","price-review.html"]],
-            ["231","P-1001",'상품명:"AMD 라이젠5 7600" · 매입:"215000"',["정본 반영","primary",null]],
-            ["1204","P-7043",'용량:"32G B" (공백 포함)',["오류 — 파싱 실패 · 적재 제외","secondary",null]],
-            ["3010","P-3390",'정격:"500W"',["잠금 우선 — 확정값 400W 유지","info",null]]
-          ],
-          "212":[
-            ["77","P-6012",'용량:"2TB"',["정본 반영","primary",null]],
-            ["2881","P-7044",'가격:"1,29,000"',["오류 — 형식 오류 · 적재 제외","secondary",null]]
-          ],
-          "211":[["1","P-2001",'상품명:"ASUS PRIME B650M-A II"',["정본 반영","primary",null]]]
-        };
-        let cur="213";
-        const deepId=new URLSearchParams(location.search).get("id");
-        function render(){
-          document.getElementById("batches").innerHTML=BATCHES.map(([id,f,d,n,c,st])=>`
-            <div data-b="${id}" class="p-3 border-bottom cursor-pointer ${id===cur?"bg-primary-subtle":""}" style="border-left:3px solid ${id===cur?"var(--phoenix-primary)":"transparent"};">
-              <div class="d-flex justify-content-between mb-1"><b class="fs-9">배치 #${id}</b><span class="fs-10 text-body-quaternary">${d}</span></div>
-              <div class="fs-9 text-body-secondary text-truncate">${f}</div>
-              <div class="d-flex justify-content-between mt-1"><span class="fs-10 text-body-tertiary">${n}</span><span class="badge badge-phoenix badge-phoenix-${c}">${st}</span></div>
-            </div>`).join("");
-          document.querySelectorAll("[data-b]").forEach(el=>el.onclick=()=>{cur=el.dataset.b;render();});
-          const b=BATCHES.find(x=>x[0]===cur);
-          document.getElementById("btitle").textContent="배치 #"+cur+" — "+b[1];
-          document.getElementById("brows").innerHTML=ROWS[cur].map(([r,sku,raw,[lab,col,link]])=>{
-            const hl=deepId&&sku===deepId;
-            return `<tr ${hl?'class="bg-warning-subtle"':""}>
-              <td class="text-body-tertiary">${r}</td><td><code>${sku}</code>${hl?' <span class="badge badge-phoenix badge-phoenix-warning">찾은 상품</span>':""}</td>
-              <td class="text-body-secondary" style="font-family:monospace;font-size:11.5px;">${raw}</td>
-              <td>${link?`<a href="${link}" class="badge badge-phoenix badge-phoenix-${col} text-decoration-none">${lab}</a>`:`<span class="badge badge-phoenix badge-phoenix-${col}">${lab}</span>`}</td>
-            </tr>`;
-          }).join("");
-        }
-        // 딥링크: 해당 SKU가 있는 배치로 이동
-        if(deepId){for(const[bid,rows]of Object.entries(ROWS)){if(rows.some(r=>r[1]===deepId)){cur=bid;break;}}}
-        render();if(window.feather)feather.replace();
+        const U=[["사양 추출 (적재 배치)",72,"warning"],["고객 입력 파싱",21,"primary"],["근거 생성",7,"info"]];
+        document.getElementById("usage").innerHTML=U.map(([n,v,c])=>`
+          <div class="py-2"><div class="d-flex justify-content-between fs-9 mb-1"><span class="text-body-secondary">${n}</span><b>${v}%</b></div>
+          <div class="rounded-pill overflow-hidden" style="height:8px;background:var(--phoenix-secondary-bg);"><div style="width:${v}%;height:100%;background:var(--phoenix-${c});"></div></div></div>`).join("");
+        if(window.feather)feather.replace();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

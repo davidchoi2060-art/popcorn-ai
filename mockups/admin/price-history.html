@@ -10,7 +10,7 @@
     <!-- ===============================================-->
     <!--    Document Title-->
     <!-- ===============================================-->
-    <title>팝콘PC 관리자 · 상품 원본 자료</title>
+    <title>팝콘PC 관리자 · 가격 이력</title>
 
 
     <!-- ===============================================-->
@@ -76,7 +76,7 @@
                   <li class="nav-item"><a class="nav-link" href="review-queue.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning ms-2">9</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="product-edit.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 등록·수정</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="csv-upload.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 일괄 등록</span></div></a></li>
-                  <li class="nav-item"><a class="nav-link active" href="imports.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 원본 자료</span></div></a></li>
+                  <li class="nav-item"><a class="nav-link" href="imports.html"><div class="d-flex align-items-center"><span class="nav-link-text">상품 원본 자료</span></div></a></li>
                 </ul></div></div></li>
               <li class="nav-item"><p class="navbar-vertical-label">가격 · 매입</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-price" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-price"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="dollar-sign"></span></span><span class="nav-link-text">가격 · 매입</span></div></a>
@@ -84,7 +84,7 @@
                   <li class="nav-item"><a class="nav-link" href="price-review.html"><div class="d-flex align-items-center"><span class="nav-link-text">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary ms-2">5</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="margin-policy.html"><div class="d-flex align-items-center"><span class="nav-link-text">마진 정책</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="sourcing.html"><div class="d-flex align-items-center"><span class="nav-link-text">매입 견적(용산)</span></div></a></li>
-                  <li class="nav-item"><a class="nav-link" href="price-history.html"><div class="d-flex align-items-center"><span class="nav-link-text">가격 이력</span></div></a></li>
+                  <li class="nav-item"><a class="nav-link active" href="price-history.html"><div class="d-flex align-items-center"><span class="nav-link-text">가격 이력</span></div></a></li>
                 </ul></div></div></li>
               <li class="nav-item"><p class="navbar-vertical-label">추천 설정</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-eng" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-eng"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="cpu"></span></span><span class="nav-link-text">추천 설정</span></div></a>
@@ -504,77 +504,39 @@
         </div>
       </nav>
       <div class="content">
-        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 원본 자료</li></ol></nav>
-        <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">상품 원본 자료 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-IMP-010</span></h2>
-          <p class="text-body-tertiary mb-0">업로드된 원본을 <b class="text-body-secondary">받은 그대로(동결)</b> 보관합니다. 읽기 전용 — 어떤 검증·확정도 원본을 바꾸지 않습니다.</p></div>
+        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">가격 이력</li></ol></nav>
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+          <div><h2 class="mb-1">가격 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-030</span></h2>
+          <p class="text-body-tertiary mb-0">판매가·공급처별 매입가의 모든 변동과 <b class="text-body-secondary">그 사유</b>가 남습니다. 견적 재현·소명의 근거입니다.</p></div>
+          <select id="pick" class="form-select form-select-sm" style="max-width:320px;"><option>P-4821 — 이엠텍 RTX 4060 STORM X2 WHITE</option><option>P-3390 — 마이크로닉스 Classic II 500W</option></select>
         </div>
         <div class="row g-3">
-          <div class="col-12 col-lg-4">
-            <div class="card"><div class="card-body p-0">
-              <div class="p-3 border-bottom"><h6 class="mb-0">배치 목록</h6></div>
-              <div id="batches"></div>
-            </div></div>
-          </div>
-          <div class="col-12 col-lg-8">
-            <div class="card"><div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0" id="btitle">배치 #213 — 용산도매_입고_0713.xlsx</h6><span class="badge badge-phoenix badge-phoenix-secondary">읽기 전용</span></div>
-              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-                <thead><tr class="text-body-tertiary"><th>행</th><th>SKU</th><th>원본 셀 (그대로)</th><th>처리 결과</th></tr></thead>
-                <tbody id="brows"></tbody>
-              </table></div>
-            </div></div>
-          </div>
+          <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
+            <h6 class="mb-2">최근 6주 추이</h6>
+            <svg viewBox="0 0 560 220" style="width:100%;height:auto;">
+              <line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
+              <text x="4" y="30" font-size="10" fill="var(--phoenix-tertiary-color)">42만</text><text x="4" y="105" font-size="10" fill="var(--phoenix-tertiary-color)">38만</text><text x="4" y="185" font-size="10" fill="var(--phoenix-tertiary-color)">34만</text>
+              <polyline points="60,60 140,60 220,55 300,50 380,48 460,40 540,40" fill="none" stroke="var(--phoenix-primary)" stroke-width="2.5"/>
+              <polyline points="60,140 140,138 220,130 300,132 380,120 460,118 540,110" fill="none" stroke="var(--phoenix-warning)" stroke-width="2" stroke-dasharray="5 4"/>
+              <polyline points="60,150 140,150 220,146 300,140 380,138 460,130 540,124" fill="none" stroke="var(--phoenix-info)" stroke-width="2" stroke-dasharray="2 3"/>
+              <text x="60" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">6/1</text><text x="300" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">6/22</text><text x="520" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">7/13</text>
+            </svg>
+            <div class="d-flex gap-3 fs-10 text-body-tertiary"><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입 · 용산도매A</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-info);vertical-align:middle;"></span> 매입 · 다나와직송B</span></div>
+          </div></div></div>
+          <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body p-0">
+            <div class="p-3 border-bottom"><h6 class="mb-0">변동 기록</h6></div>
+            <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-3">일자</th><th>구분</th><th class="text-end">변동</th><th>사유</th></tr></thead><tbody>
+              <tr><td class="ps-3">07-13</td><td>매입 A</td><td class="text-end">356,000 → 352,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #213</a></td></tr>
+              <tr><td class="ps-3">07-12</td><td>매입 B</td><td class="text-end">364,000 → 361,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #212</a></td></tr>
+              <tr><td class="ps-3">07-08</td><td class="fw-bold">판매가</td><td class="text-end fw-bold">405,000 → 398,000</td><td><a href="price-review.html" class="fs-10">가격 검토 승인</a> · 김운영</td></tr>
+              <tr><td class="ps-3">07-02</td><td>매입 A</td><td class="text-end">361,000 → 356,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #208</a></td></tr>
+              <tr><td class="ps-3">06-25</td><td class="fw-bold">판매가</td><td class="text-end fw-bold">412,000 → 405,000</td><td>운영자 직접 수정 · david</td></tr>
+            </tbody></table></div>
+          </div></div></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>
-      (function(){
-        const BATCHES=[
-          ["213","용산도매_입고_0713.xlsx","07-13","5,214행","primary","완료"],
-          ["212","다나와_시세_0712.csv","07-12","3,882행","warning","오류 2행"],
-          ["211","용산도매_입고_0709.xlsx","07-09","5,120행","primary","완료"]
-        ];
-        const ROWS={
-          "213":[
-            ["18","P-4821",'상품명:"이엠텍 지포스 RTX 4060 STORM X2 WHITE" · 길이:"272mm" · 매입:"352000"',["검수 회부 — length_mm 대조 불일치","warning","review-queue.html"]],
-            ["19","P-4822",'상품명:"MSI RTX 4060 벤투스 2X" · 매입:"368000"',["정본 반영 · 가격 검토 대기","warning","price-review.html"]],
-            ["231","P-1001",'상품명:"AMD 라이젠5 7600" · 매입:"215000"',["정본 반영","primary",null]],
-            ["1204","P-7043",'용량:"32G B" (공백 포함)',["오류 — 파싱 실패 · 적재 제외","secondary",null]],
-            ["3010","P-3390",'정격:"500W"',["잠금 우선 — 확정값 400W 유지","info",null]]
-          ],
-          "212":[
-            ["77","P-6012",'용량:"2TB"',["정본 반영","primary",null]],
-            ["2881","P-7044",'가격:"1,29,000"',["오류 — 형식 오류 · 적재 제외","secondary",null]]
-          ],
-          "211":[["1","P-2001",'상품명:"ASUS PRIME B650M-A II"',["정본 반영","primary",null]]]
-        };
-        let cur="213";
-        const deepId=new URLSearchParams(location.search).get("id");
-        function render(){
-          document.getElementById("batches").innerHTML=BATCHES.map(([id,f,d,n,c,st])=>`
-            <div data-b="${id}" class="p-3 border-bottom cursor-pointer ${id===cur?"bg-primary-subtle":""}" style="border-left:3px solid ${id===cur?"var(--phoenix-primary)":"transparent"};">
-              <div class="d-flex justify-content-between mb-1"><b class="fs-9">배치 #${id}</b><span class="fs-10 text-body-quaternary">${d}</span></div>
-              <div class="fs-9 text-body-secondary text-truncate">${f}</div>
-              <div class="d-flex justify-content-between mt-1"><span class="fs-10 text-body-tertiary">${n}</span><span class="badge badge-phoenix badge-phoenix-${c}">${st}</span></div>
-            </div>`).join("");
-          document.querySelectorAll("[data-b]").forEach(el=>el.onclick=()=>{cur=el.dataset.b;render();});
-          const b=BATCHES.find(x=>x[0]===cur);
-          document.getElementById("btitle").textContent="배치 #"+cur+" — "+b[1];
-          document.getElementById("brows").innerHTML=ROWS[cur].map(([r,sku,raw,[lab,col,link]])=>{
-            const hl=deepId&&sku===deepId;
-            return `<tr ${hl?'class="bg-warning-subtle"':""}>
-              <td class="text-body-tertiary">${r}</td><td><code>${sku}</code>${hl?' <span class="badge badge-phoenix badge-phoenix-warning">찾은 상품</span>':""}</td>
-              <td class="text-body-secondary" style="font-family:monospace;font-size:11.5px;">${raw}</td>
-              <td>${link?`<a href="${link}" class="badge badge-phoenix badge-phoenix-${col} text-decoration-none">${lab}</a>`:`<span class="badge badge-phoenix badge-phoenix-${col}">${lab}</span>`}</td>
-            </tr>`;
-          }).join("");
-        }
-        // 딥링크: 해당 SKU가 있는 배치로 이동
-        if(deepId){for(const[bid,rows]of Object.entries(ROWS)){if(rows.some(r=>r[1]===deepId)){cur=bid;break;}}}
-        render();if(window.feather)feather.replace();
-      })();
-      </script>
+      <script>(function(){document.getElementById("pick").onchange=()=>{};if(window.feather)feather.replace();})();</script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
         <div class="modal-dialog">
           <div class="modal-content mt-15 rounded-pill">
