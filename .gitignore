@@ -25,3 +25,6 @@ firebase-debug.log
 
 # 아카이브 원본 참고본의 대용량 이미지 (리포 경량화)
 docs/mockup-source/**/*.png
+
+# 비공개 내부 문서 (커밋 금지)
+docs/patent/
