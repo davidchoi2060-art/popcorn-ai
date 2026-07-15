@@ -30,7 +30,7 @@
 - 토큰 단일원천 = `design-system/tokens.css` `:root`. 임의 HEX/px 금지.
 - 서체: Inter(라틴·숫자) + Pretendard(한글). 숫자는 tabular.
 - 색: primary `#005ab3`/hover `#0082fd`, tertiary `#853d97`, error `#b31b25`. **초록 없음** → 통과=primary, 위험=error, 항상 텍스트 병기.
-- **아이콘: 단색 currentColor 인라인 SVG만.** 풀컬러 팩(fluent-color/streamline) 금지.
+- **아이콘: Streamline Ultimate Color (CC BY 4.0, 출처 표기 필수)** — 2026-07-16 사용자 지시로 단색 정책 폐기. 파일=`mockups/shared/icons/su/`, 매핑=`_map.json`, 런타임 스와퍼=`mockups/shared/su-icons.js`(전 페이지 주입, 출처 표기 자동 삽입). 새 아이콘 필요 시 iconify에서 받아 `ms-`/`ft-` 규칙으로 추가.
 - 마크업: `data-screen-id`/`data-domain`/`data-bind`/`data-repeat`/`data-action`, 예외는 `hidden`. 한국어 UI, 768px 세로 스택.
 
 ## 상태 관리 원칙 (S1에서 확립)
