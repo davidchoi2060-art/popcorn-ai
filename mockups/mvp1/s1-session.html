@@ -350,7 +350,7 @@ function slotOf(k){for(var i=0;i<SLOTS.length;i++)if(SLOTS[i].key===k)return SLO
 function cur(k){return slotOf(k).opts[pick[k]];}
 function enableConfirm(m){var b=document.getElementById('s1-xconfirm'),c=document.getElementById('s1-xconfirm-cap');if(b){b.disabled=false;b.style.background='#2b5fd9';b.style.cursor='pointer';}if(c)c.textContent=m;}
 function lockConfirm(m){var b=document.getElementById('s1-xconfirm'),c=document.getElementById('s1-xconfirm-cap');if(b){b.disabled=true;b.style.background='#c9c5bd';b.style.cursor='not-allowed';}if(c)c.textContent=m;}
-function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:flex-start;gap:12px;background:#f7f6f2;border-radius:12px;padding:12px 14px;';var oh='';s.opts.forEach(function(o,i){oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+o.t+'</option>';});row.innerHTML='<img src="assets/parts/'+(s.key==='board'?'mb':s.key)+'.png" alt="'+s.label+'" style="flex:0 0 auto;width:34px;height:34px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;margin-top:1px;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 52px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:62px;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+(s.opts[pick[s.key]].spec||'')+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=s.opts[pick[s.key]].spec||'';renderReason();resetValidation();});});renderReason();}
+function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:5px 14px 5px 5px;';var oh='';s.opts.forEach(function(o,i){oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+o.t+'</option>';});row.innerHTML='<img src="assets/parts/'+(s.key==='board'?'mb':s.key)+'.png" alt="'+s.label+'" style="flex:0 0 auto;width:80px;height:80px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 52px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:62px;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+(s.opts[pick[s.key]].spec||'')+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=s.opts[pick[s.key]].spec||'';renderReason();resetValidation();});});renderReason();}
 function resetValidation(){var ph='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:150px;color:#a29d92;border:1.5px dashed #ddd8ce;border-radius:14px;padding:22px;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#d8d2c6;">rule</span><span style="font-size:12.5px;line-height:1.5;font-weight:600;">AI 검증하기를 누르면<br>여기에 결과가 나옵니다.</span></div>';var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='';var cp=document.getElementById('s1-compat');if(cp)cp.innerHTML=ph;var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=ph;lockConfirm('부품을 검증해야 진행할 수 있어요.');}
 function applyFix(k){if(k==='board'){var soc=cur('cpu').socket,bi=pick.board;slotOf('board').opts.forEach(function(o,i){if(o.socket===soc)bi=i;});pick.board=bi;}else if(k==='ram'||k==='ram32')pick.ram=0;else if(k==='psu')pick.psu=0;else if(k==='case')pick.case=0;renderParts();validate();}
 function renderReason(){var box=document.getElementById('s1-reason');if(!box)return;var html='';SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];html+='<div style="border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;overflow:hidden;"><div class="acc-h" style="display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;"><span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+s.ci+'</span><div style="flex:1;min-width:0;"><div style="font-size:11px;color:#8a8578;font-weight:700;">'+s.label+'</div><b style="font-size:13.5px;color:#17171b;">'+o.t+'</b></div><span class="acc-i" style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#c9c5bd;">expand_more</span></div><div class="acc-b" style="display:none;padding:2px 13px 13px 42px;"><p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:#55555c;">'+(o.reason||'')+'</p><div style="font-size:11.5px;color:#8a8578;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;">link</span>출처: '+(o.src||'—')+'</div></div></div>';});box.innerHTML=html;Array.prototype.forEach.call(box.querySelectorAll('.acc-h'),function(h){h.addEventListener('click',function(){var b=h.parentNode.querySelector('.acc-b');var ic=h.querySelector('.acc-i');if(b.style.display==='block'){b.style.display='none';if(ic)ic.textContent='expand_more';}else{b.style.display='block';if(ic)ic.textContent='expand_less';}});});}
@@ -502,4 +502,43 @@ var _ac=document.getElementById('s1-addcond');if(_ac)_ac.addEventListener('click
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
+
+<script>
+(function(){
+var PART_INFO={
+ cpu:["CPU (프로세서)","PC의 두뇌입니다. 프로그램 실행 속도를 좌우하고, 코어 수가 많을수록 동시 작업·인코딩에 유리합니다. 메인보드 소켓(AM5, LGA1700 등)과 규격이 맞아야 장착됩니다."],
+ gpu:["그래픽카드 (GPU)","게임·영상 처리를 전담합니다. 게임 화질과 프레임을 사실상 이 부품이 결정하며, 케이스 장착 길이와 파워 용량을 함께 확인해야 합니다."],
+ mb:["메인보드","모든 부품이 꽂히는 기판입니다. CPU 소켓, 메모리 규격(DDR4/DDR5), M.2 슬롯 수를 결정하므로 확장 계획까지 고려해 고릅니다."],
+ ram:["메모리 (RAM)","작업 공간의 크기입니다. 클수록 여러 프로그램을 동시에 띄워도 느려지지 않습니다. 게임은 16GB, 영상편집은 32GB 이상을 권장합니다."],
+ ssd:["저장장치 (SSD)","OS·프로그램·게임이 설치되는 공간입니다. NVMe 방식은 부팅·로딩이 SATA보다 훨씬 빠릅니다. 1TB가 표준, 편집·대용량은 2TB 이상."],
+ hdd:["하드디스크 (HDD)","대용량 자료 보관용 저장장치입니다. 속도는 SSD보다 느리지만 용량당 가격이 저렴해 창고용으로 적합합니다."],
+ psu:["파워서플라이 (PSU)","전체 부품에 전기를 공급합니다. 부품 소비전력 합에 30% 여유를 둔 정격 용량을 권장하며, 80PLUS 인증 제품이 효율·안정성에 유리합니다."],
+ "case":["케이스","부품이 들어가는 본체입니다. 그래픽카드 최대 길이·쿨러 최대 높이 제한이 있어, 저희 엔진이 장착 가능 여부를 자동 검증합니다."]
+};
+var tip=null;
+function closeTip(){if(tip){tip.remove();tip=null;}}
+function showTip(img,key){
+ var info=PART_INFO[key];if(!info)return;
+ if(tip&&tip.dataset.key===key){closeTip();return;}
+ closeTip();
+ tip=document.createElement('div');tip.dataset.key=key;
+ tip.style.cssText='position:absolute;z-index:9999;max-width:280px;background:#fff;border:1.5px solid #e2ded5;border-radius:14px;padding:13px 16px;box-shadow:0 14px 40px -12px rgba(30,25,15,.35);font-family:Pretendard,-apple-system,sans-serif;';
+ tip.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><img src="assets/parts/'+key+'.png" style="width:26px;height:26px;border-radius:7px;border:1px solid #ece9e3;"><b style="font-size:13.5px;color:#17171b;">'+info[0]+'</b></div><p style="margin:0;font-size:12.5px;line-height:1.6;color:#5c584e;">'+info[1]+'</p>';
+ document.body.appendChild(tip);
+ var r=img.getBoundingClientRect();
+ var top=r.bottom+window.scrollY+8, left=r.left+window.scrollX;
+ if(left+290>document.documentElement.clientWidth)left=document.documentElement.clientWidth-300;
+ tip.style.top=top+'px';tip.style.left=Math.max(8,left)+'px';
+}
+document.addEventListener('click',function(e){
+ var img=e.target.closest('img[src*="assets/parts/"]');
+ if(img&&!(tip&&tip.contains(e.target))){
+  var m=(img.getAttribute('src')||'').match(/parts\/([a-z]+)\.png/);
+  if(m){e.stopPropagation();showTip(img,m[1]);return;}
+ }
+ if(tip&&!tip.contains(e.target))closeTip();
+});
+window.addEventListener('scroll',closeTip,{passive:true});
+})();
+</script>
 </body></html>
