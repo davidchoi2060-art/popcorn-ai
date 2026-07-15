@@ -353,7 +353,7 @@
           if(!q){ d.innerHTML = `<div class="card"><div class="card-body text-center py-6 text-body-tertiary"><span data-feather="inbox" style="width:40px;height:40px;"></span><h5 class="mt-3 mb-1 text-body-secondary">모두 처리했습니다</h5><p class="mb-0">이 분류의 검수 항목이 비었습니다.</p></div></div>`; if(window.feather) feather.replace(); return; }
           const t = TYPES[q.type];
           const rk = riskOf(q);
-          const rmsg = {"치명":"이 오류는 호환 판정 자체를 무너뜨립니다. 최우선 처리하세요.","주의":"특정 조건의 추천에서 오판 위험이 있습니다. 확정을 권장합니다.","경미":"값은 유효합니다. 신뢰도·형식만 확인하면 통과됩니다."}[rk];
+          const rmsg = {"치명":"소켓·전력 등 호환 판정의 기준값 오류입니다. 먼저 처리해 주세요.","주의":"특정 조건의 추천에서 오판 위험이 있습니다. 확정을 권장합니다.","경미":"값은 유효합니다. 신뢰도·형식만 확인하면 통과됩니다."}[rk];
           const isCsv = q.type==="csv_error", isSrc = q.type==="sourcing_hold";
           const verdict = isSrc? `<span class="badge badge-phoenix badge-phoenix-info">매입 대기</span>`
             : (q.origin===q.know? `<span class="badge badge-phoenix badge-phoenix-primary">일치</span>` : `<span class="badge badge-phoenix badge-phoenix-danger">불일치 — 확정 필요</span>`);

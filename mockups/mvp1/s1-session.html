@@ -188,7 +188,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           <div id="s1-budget-marker" style="display:none;position:absolute;top:-4px;width:3px;height:18px;background:#17171b;border-radius:2px;transition:left .5s;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#a29d92;font-weight:700;"><span>0</span><span>150만</span><span>300만+</span></div>
-        <p id="s1-budget-note" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;line-height:1.55;">부품 전체 합계 기준이에요. 용도·대상을 알려주시면 범위가 좁혀져요.</p>
+        <p id="s1-budget-note" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;line-height:1.55;">부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.</p>
         <p style="margin:6px 0 0;font-size:11px;color:#b5b0a4;">2026년 7월 시장가 · 자체 재고가 기준</p>
       </div>
 
@@ -247,7 +247,7 @@ function enable(){cb.disabled=false;cb.style.background='#2b5fd9';cb.style.curso
 function candidates(n){poolN=n;animate(pool,n);if(empty)empty.style.display='none';if(s3)s3.style.opacity='1';if(s3i){s3i.textContent='check_circle';s3i.style.color='#5fd6a0';}if(s3s){s3s.textContent='통과';s3s.style.color='#5fd6a0';}enable();}
 function relax(n){candidates(n);addAI('조건을 살짝 완화하니 후보 '+n.toLocaleString()+'개가 생겼어요. 이대로 견적을 확정할 수 있어요.');}
 function addConstraint(icon,label,value){var e=document.getElementById('s1-cons-empty');if(e)e.style.display='none';var box=document.getElementById('s1-cons');if(!box)return;var d=document.createElement('div');d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f6f2;border-radius:11px;';d.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+icon+'</span><div style="flex:1;"><div style="font-size:11.5px;color:#8a8578;font-weight:700;">'+label+'</div><b style="font-size:13.5px;color:#17171b;">'+value+'</b></div>';box.appendChild(d);consCount++;var c=document.getElementById('s1-cons-count');if(c)c.textContent='조건 '+consCount+'개';}
-function addCond(text,icon,label,value,factor){addUser(text);addConstraint(icon,label,value);poolN=Math.max(1,Math.round(poolN*factor));setTimeout(function(){candidates(poolN);addAI('네, <b>'+value+'</b> 조건을 반영했어요. 실시간 재고에서 <b>'+poolN.toLocaleString()+'개</b> 후보로 좁혀졌습니다 — 오른쪽에서 확인하고 견적을 확정할 수 있어요.');},350);}
+function addCond(text,icon,label,value,factor){addUser(text);addConstraint(icon,label,value);poolN=Math.max(1,Math.round(poolN*factor));setTimeout(function(){candidates(poolN);addAI('네, <b>'+value+'</b> 조건을 반영했어요. 후보가 <b>'+poolN.toLocaleString()+'개</b>로 좁혀졌습니다.');},350);}
 function overConstrain(text){addUser(text);addConstraint('savings','예산','80만원 이하');addConstraint('sports_esports','용도','고사양 게임');setTimeout(function(){poolN=0;animate(pool,0);if(s3)s3.style.opacity='1';if(s3i){s3i.textContent='error';s3i.style.color='#e0894a';}if(s3s){s3s.textContent='0개';s3s.style.color='#e0894a';}addAI('<b>예산 80만 · 저소음 · 고사양</b>을 동시에 만족하는 부품이 지금 재고에 <b style="color:#b04a3a;">0개</b>예요. 아래에서 한 가지만 완화하면 바로 후보가 생깁니다.');if(empty){msgs.appendChild(empty);empty.style.display='flex';}msgs.scrollTop=msgs.scrollHeight;},350);}
 document.querySelectorAll('button').forEach(function(b){var x=b.textContent;if(x.indexOf('GPU 한 단계 낮추기')>-1)b.addEventListener('click',function(){relax(1240);});else if(x.indexOf('예산 20만원 올리기')>-1)b.addEventListener('click',function(){relax(3400);});});
 cb.addEventListener('click',function(){if(!cb.disabled)window.location.href='s2-result.html';});
@@ -259,7 +259,7 @@ var M=MODES[mode]||MODES.chat;var bn=document.getElementById('s1-mode-banner');
 if(bn){bn.style.background=M.bg;bn.style.color=M.c;bn.querySelector('[data-mi]').textContent=M.ic;bn.querySelector('[data-mt]').textContent=M.t;bn.style.display='flex';}
 setGear(M.gear);
 var mg=document.getElementById('s1-manual-go'),mi=document.getElementById('s1-manual-input');
-if(mg)mg.addEventListener('click',function(){var t=(mi.value||'').trim()||'인기게임, 예산 120만, 조용하게';setGear('ask');addUser(t);setTimeout(function(){candidates(2140);addAI('입력을 분석해 조건에 반영했어요. 실시간 재고에서 <b>2,140개</b> 후보로 좁혔습니다 — 오른쪽에서 확인하고 견적을 확정해 주세요.');},350);});
+if(mg)mg.addEventListener('click',function(){var t=(mi.value||'').trim()||'인기게임, 예산 120만, 조용하게';setGear('ask');addUser(t);setTimeout(function(){candidates(2140);addAI('입력을 분석해 조건에 반영했어요. 후보가 <b>2,140개</b>로 좁혀졌습니다.');},350);});
 function mkChip(label,warm){var s=document.createElement('span');s.textContent=label;s.style.cssText='background:'+(warm?'#fdf9f0':'#fff')+';border:1.5px solid '+(warm?'#e6c98f':'#e2ded5')+';color:'+(warm?'#8a561a':'#3a3a40')+';padding:9px 14px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;';return s;}
 // ---- guided 인터뷰 스텝 ----
 var Q_PURPOSE={id:'purpose',q:'누가 쓰실 PC인가요?',cl:'대상',ci:'person',f:0.72,opts:[{t:'내가 집에서',v:'개인·가정',why:['가정 환경 안정성 우선']},{t:'내 사무실용',v:'개인 사무',why:['고성능 게임 부품 제외','저소음·안정 우선']},{t:'직원용(여러 대)',v:'직원용',why:['고사양 부품 제외','동일사양 대량 재고 우선']},{t:'부모님',v:'부모님',why:['복잡한 고성능 부품 제외','저소음·간단 구성']},{t:'자녀',v:'자녀',why:['예산 안전 범위 우선']},{t:'지인 대신 부탁',v:'지인 대신',why:[]}]};
@@ -281,9 +281,9 @@ function gAnswer(st,opts){if(opts.length){addUser(opts.map(function(o){return o.
 function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots.innerHTML='';for(var i=0;i<QUEUE.length;i++){var d=document.createElement('span');d.style.cssText='width:22px;height:6px;border-radius:3px;transition:.3s;background:'+(i<qidx?'#2b5fd9':(i===qidx?'#7fa8ff':'#e6e2da'))+';';dots.appendChild(d);}}var num=document.getElementById('s1-progress-num');if(num)num.textContent=qidx>=QUEUE.length?'완료':((qidx+1)+' / '+QUEUE.length);}
 function guidedAsk(){
  setProgress();
- if(qidx>=QUEUE.length){setTimeout(function(){candidates(poolN);addAI('필요한 걸 다 여쭤봤어요. 조건을 통과한 <b>'+poolN.toLocaleString()+'개</b>에서 <b>추천 1구성</b>을 준비했어요 — 오른쪽에서 확정하시면 제안서를 보여드릴게요.');},300);return;}
+ if(qidx>=QUEUE.length){setTimeout(function(){candidates(poolN);addAI('다 여쭤봤습니다. 조건을 통과한 <b>'+poolN.toLocaleString()+'개</b>에서 <b>추천 구성</b>을 준비했어요.');},300);return;}
  var st=QUEUE[qidx];
- addAI((qidx===0?'좋아요, 딱 맞게 골라 드릴게요. 몇 가지만 여쭤볼게요.<br>':'')+'<b>'+st.q+'</b>'+(st.multi?' <span style="font-weight:600;color:#8a8578;font-size:13px;">(여러 개 가능)</span>':''));
+ addAI((qidx===0?'몇 가지만 여쭤볼게요.<br>':'')+'<b>'+st.q+'</b>'+(st.multi?' <span style="font-weight:600;color:#8a8578;font-size:13px;">(여러 개 가능)</span>':''));
  var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;align-items:center;';
  if(st.multi){
   var sel=[];var hintBox=null;var hasHint=false;st.opts.forEach(function(o){if(o.hint)hasHint=true;});
@@ -301,7 +301,7 @@ function guidedAsk(){
    if(selc)selChip(selc,false);selc=c;selChip(c,true);
    addUser('아, <b>'+o.t+'</b>(으)로 바꿀게요');
    addConstraint(st.ci,st.cl,o.v);
-   addAI('네, <b>'+st.cl+'</b>을(를) <b>'+o.v+'</b>(으)로 바꿨어요. 오른쪽 제약 요약과 예상 예산 범위도 함께 갱신했어요.');
+   addAI('네, <b>'+st.cl+'</b>을(를) <b>'+o.v+'</b>(으)로 바꿔 반영했어요.');
   });row.appendChild(c);});
   msgs.appendChild(row);
  }
@@ -381,8 +381,8 @@ var TALKS=[
  {k:['영상','편집','프리미어','다빈치','인코딩'],a:'영상편집은 게임과 우선순위가 달라요.<br>① <b>CPU 코어 수</b>(인코딩 속도) ② <b>램 32GB↑</b>(4K 타임라인) ③ <b>NVMe SSD</b>(소스 스크럽) 순이고, GPU는 그다음이에요.<br>어떤 툴로 어떤 영상(FHD/4K)을 만드실지 알려주시면 더 정확해져요.',p:{i:'movie',l:'용도',v:'영상편집',f:0.55,why:['영상편집: 다코어 CPU·램 32GB↑ 우선']}},
  {k:['게임','롤','배그','발로란트','오버워치','로아','풀옵','프레임','fps'],a:'게임이 목적이면 <b>어떤 게임을 어느 화질로</b>가 핵심이에요.<br>· 롤·발로란트급은 엔트리 GPU로도 144fps<br>· 배그·오버워치는 미들급 GPU 권장<br>· 로아 같은 MMO는 CPU도 함께 중요해요.<br>주로 하시는 게임을 알려주시면 조건에 반영할게요.',p:{i:'sports_esports',l:'용도',v:'게임',f:0.6,why:['게임 용도: GPU 성능 우선 정렬']}},
  {k:['ddr','램','메모리'],a:'지금 새로 맞추신다면 <b>DDR5를 권해요</b>. AM5 등 최신 플랫폼이 DDR5 전용이라 업그레이드 수명이 길어요.<br>다만 <b>기존 DDR4 보드에서 램만 올리는 건</b> 규격이 달라 불가능해요 — 보드·CPU까지 함께 바꾸는 그림이 됩니다. 기존 PC 사양을 알려주시면 갈아탈 가치가 있는지 계산해드릴게요.',p:{i:'memory',l:'관심 부품',v:'DDR5 메모리',f:0.85,why:['DDR5 플랫폼 관심 반영']}},
- {k:['파워','와트','psu','전력'],a:'파워는 <b>부품 소비전력 합에 여유율 30%</b>를 두는 게 저희 조립 기준이에요(정격 기준). 예: RTX 4060 구성이면 500~550W면 충분하고, 4070 Ti 이상이면 750W를 권해요.<br>구성이 정해지면 엔진이 자동으로 검증하니 걱정 안 하셔도 돼요.'},
- {k:['호환','소켓','am5','am4','맞아','장착','들어가'],a:'호환은 저희가 제일 자신 있는 부분이에요 🙂 소켓 일치·GPU 길이·쿨러 높이·전력 여유·램 규격을 <b>결정론 엔진이 전부 검사</b>해서, 조립 불가능한 조합은 견적에서 아예 나오지 않아요.<br>확인하고 싶은 조합이 있으면 부품명을 알려주세요 — 바로 검증해드릴게요.'},
+ {k:['파워','와트','psu','전력'],a:'파워는 <b>부품 소비전력 합에 여유율 30%</b>를 두는 게 저희 조립 기준이에요(정격 기준). 예: RTX 4060 구성이면 500~550W면 충분하고, 4070 Ti 이상이면 750W를 권해요.<br>구성이 정해지면 엔진이 자동으로 검증합니다.'},
+ {k:['호환','소켓','am5','am4','맞아','장착','들어가'],a:'호환은 소켓 일치·GPU 길이·쿨러 높이·전력 여유·램 규격을 <b>결정론 엔진이 전부 검사</b>합니다 — 조립 불가능한 조합은 견적에 아예 나오지 않아요.<br>확인하고 싶은 조합이 있으면 부품명을 알려주세요 — 바로 검증해드릴게요.'},
  {k:['ssd','nvme','하드','hdd','저장'],a:'요즘은 <b>NVMe SSD가 기본</b>이에요. 부팅·로딩 체감이 SATA와 확실히 다릅니다.<br>· 일반 사무·게임: 1TB NVMe<br>· 영상편집·대용량: 2TB NVMe + 창고용 HDD 조합이 가성비<br>지금 990 PRO 2TB가 재고 기준 좋은 가격대에 있어요.'},
  {k:['소음','조용','저소음','팬소리'],a:'저소음은 조합의 문제라 좋은 질문이에요. <b>큰 팬 쿨러(저RPM) + 80PLUS 파워 + 통풍 좋은 케이스</b>가 핵심이고, GPU는 팬 2개 이상 모델이 유리해요.<br>조건에 넣어두면 시끄러운 부품은 후보에서 빠져요.',p:{i:'volume_off',l:'우선순위',v:'저소음',f:0.7,why:['저소음: 고RPM 쿨러·고발열 부품 제외']}},
  {k:['재고','당일','출고','배송','언제'],a:'저희는 <b>용산 자체 실재고</b>로만 견적해요 — 견적에 뜨는 부품은 전부 지금 매장에 있는 것들이고, 오후 3시 전 결제면 보통 당일 조립 출고돼요.<br>특정 부품 재고가 궁금하면 이름을 알려주세요.'},
@@ -399,22 +399,22 @@ function talkSend(t){addUser(t);var low=t.toLowerCase();
  setTimeout(function(){
   if(bud&&!hit){addAI(bud.a);talkApply(bud);return;}
   if(hit){addAI(hit.a);if(hit.p)talkApply(hit.p);if(bud)talkApply(bud);return;}
-  if(!isPC){addAI('음, 그건 제 전문이 아니라 정확한 답을 드리기 어려워요 🙂<br>저는 <b>팝콘PC의 실재고·조립 데이터</b>로 답하는 PC 상담 AI라서, PC 밖의 주제는 자신이 없거든요.<br>대신 이런 질문엔 확실하게 답해드려요 👇');talkChips();return;}
+  if(!isPC){addAI('그 주제는 제가 정확히 답하기 어렵습니다.<br><b>팝콘PC의 실재고·조립 데이터</b>로 답하는 PC 상담 전용이라서요.<br>대신 이런 질문에는 잘 답합니다:');talkChips();return;}
   addAI('네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), <b>예산</b>을 함께 말씀해 주세요.');
  },400);}
-function talkStart(){addAI('안녕하세요, <b>팝콘톡</b>이에요 🍿 견적을 바로 뽑는 자리가 아니라, <b>궁금한 걸 먼저 묻고 답하는 자리</b>예요.<br>부품 성능·가격 동향·호환·용도 추천… 뭐든 물어보세요. 대화에서 읽어낸 조건(예산·용도)은 오른쪽 <b>실시간 재고 검증</b>에 그대로 쌓여서, 준비되면 그대로 견적으로 이어져요.');talkChips();}
+function talkStart(){addAI('<b>팝콘톡</b>입니다. 견적 전에 궁금한 것부터 물어보세요.<br>부품 성능·가격 동향·호환·용도 추천까지 — 대화에서 파악된 조건(예산·용도)은 오른쪽 <b>실시간 재고 검증</b>에 쌓이고, 준비되면 그대로 견적으로 이어집니다.');talkChips();}
 // ---- 예상 예산 범위 (2026-07 시장가 조사 기준: 견적왕·다나와·퀘이사존) ----
 var BUDGET_TIERS={
- parents:{lo:30,hi:60,label:'부모님 · 인터넷용',note:'인터넷·영상 시청 중심의 간단 구성 기준이에요.'},
- office:{lo:40,hi:80,label:'사무 · 문서용',note:'문서·웹·화상회의 중심, 부품 전체 합계 기준이에요.'},
- lightgame:{lo:70,hi:110,label:'라이트 게임',note:'롤·발로란트·피파급을 FHD로 즐기는 구성 기준이에요.'},
- dev:{lo:80,hi:130,label:'개발 · 전문 사무',note:'멀티태스킹·컴파일 여유를 둔 구성 기준이에요.'},
- midgame:{lo:100,hi:140,label:'보급 게이밍',note:'배그·오버워치·로아급 FHD 구성 기준이에요.'},
- highgame:{lo:130,hi:180,label:'고사양 게이밍(QHD)',note:'풀옵션·QHD 고주사율 구성 기준이에요.'},
- stream:{lo:150,hi:230,label:'방송 · 스트리밍',note:'게임+송출 동시 구동 구성 기준이에요.'},
+ parents:{lo:30,hi:60,label:'부모님 · 인터넷용',note:'인터넷·영상 시청 중심이면 이 정도로 충분합니다.'},
+ office:{lo:40,hi:80,label:'사무 · 문서용',note:'문서·웹·화상회의 중심, 부품 전체 합계 기준입니다.'},
+ lightgame:{lo:70,hi:110,label:'라이트 게임',note:'롤·발로란트·피파급은 FHD에서 이 범위면 충분해요.'},
+ dev:{lo:80,hi:130,label:'개발 · 전문 사무',note:'멀티태스킹·컴파일 여유를 두면 이 정도가 듭니다.'},
+ midgame:{lo:100,hi:140,label:'보급 게이밍',note:'배그·오버워치·로아급을 FHD로 돌리는 범위예요.'},
+ highgame:{lo:130,hi:180,label:'고사양 게이밍(QHD)',note:'풀옵션·QHD 고주사율이면 이 범위를 봅니다.'},
+ stream:{lo:150,hi:230,label:'방송 · 스트리밍',note:'게임과 송출을 동시에 돌리는 구성입니다.'},
  edit:{lo:150,hi:250,label:'영상편집 · 크리에이터',note:'FHD 편집은 150부터, 4K 작업은 200 이상을 봐야 해요.'},
- latest:{lo:160,hi:200,label:'최신 사양 게이밍',note:'최신 세대 CPU·GPU 기준의 구성이에요.'},
- extreme:{lo:200,hi:300,label:'하이엔드 · 4K',note:'4K·최상위 부품 구성 기준이에요.'}
+ latest:{lo:160,hi:200,label:'최신 사양 게이밍',note:'최신 세대 CPU·GPU로 맞출 때의 범위입니다.'},
+ extreme:{lo:200,hi:300,label:'하이엔드 · 4K',note:'4K·최상위 부품으로 채우는 구성입니다.'}
 };
 var consPairs=[];
 function pickTier(){
@@ -438,7 +438,7 @@ function budgetSaid(){
  return null;
 }
 function budgetUpdate(){
- var k=pickTier(),T=k?BUDGET_TIERS[k]:{lo:40,hi:300,label:'전체 구성 기준',note:'부품 전체 합계 기준이에요. 용도·대상을 알려주시면 범위가 좁혀져요.'};
+ var k=pickTier(),T=k?BUDGET_TIERS[k]:{lo:40,hi:300,label:'전체 구성 기준',note:'부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.'};
  var el=document.getElementById('s1-budget-range');
  if(el)el.innerHTML=T.lo+'<span style="font-size:16px;color:#9a968d;"> ~ </span>'+T.hi+'<span style="font-size:14px;color:#9a968d;"> 만원</span>';
  var bs=document.getElementById('s1-budget-basis');if(bs)bs.textContent=T.label;
