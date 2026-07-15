@@ -299,7 +299,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
 <div style="display:flex;align-items:center;gap:12px;">
 <span style="width:44px;height:44px;border-radius:13px;background:#c77b1f;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">balance</span>
-<h2 style="margin:0;font-size:21px;font-weight:900;color:#8a561a;">직접 사서 조립하는 것과 비교하면</h2>
+<h2 style="margin:0;font-size:21px;font-weight:900;color:#8a561a;">최저가보다 <span id="s2-gap-title">3만원</span> 비싼 이유</h2>
 </div>
 <span style="background:#c77b1f;color:#fff;font-size:13px;font-weight:800;padding:7px 14px;border-radius:999px;">핵심 4</span>
 </div>
@@ -362,7 +362,7 @@ var S2SETS={
  highend:{label:'고성능형 견적',price:'1,780,000',fps:'138',score:'S',cpu:'Ryzen 7 7700',gpu:'RTX 4070 SUPER',ram:'DDR5 32GB (16×2) 6000',ssd:'NVMe SSD 2TB',psu:'750W 80+ 골드',market:'1,760,000원',gap:'+20,000원'}
 };
 function s2set(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
-function s2apply(k){var d=S2SETS[k];if(!d)return;['setlabel','price','fps','score','cpu','gpu','ram','ssd','psu'].forEach(function(f){s2set('s2-'+f,d[f]);});s2set('s2-cmp-parts',d.price);s2set('s2-cmp-parts2',d.price);s2set('s2-market',d.market);s2set('s2-gap',d.gap);}
+function s2apply(k){var d=S2SETS[k];if(!d)return;['setlabel','price','fps','score','cpu','gpu','ram','ssd','psu'].forEach(function(f){s2set('s2-'+f,d[f]);});s2set('s2-cmp-parts',d.price);s2set('s2-cmp-parts2',d.price);s2set('s2-market',d.market);s2set('s2-gap',d.gap);var _g=parseInt((d.gap||'').replace(/[^0-9]/g,''),10);var _gt=document.getElementById('s2-gap-title');if(_gt&&_g)_gt.textContent=(_g/10000)+'만원';}
 document.querySelectorAll('.s2tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.s2tab').forEach(function(x){x.classList.remove('is-active');x.setAttribute('aria-selected','false');});t.classList.add('is-active');t.setAttribute('aria-selected','true');s2apply(t.getAttribute('data-set'));});});
 document.querySelectorAll('button').forEach(function(b){var x=(b.textContent||'').trim();if(x.indexOf('부품 변경')===0){b.addEventListener('click',function(){window.location.href='s3-detail.html';});}else if(x.indexOf('장바구니 담기')===0){b.addEventListener('click',function(){window.location.href='s4-cart.html';});}});
 </script>
