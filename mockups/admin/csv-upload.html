@@ -327,8 +327,8 @@
               <h6 class="mb-2">잠긴 필드 충돌 <span class="badge badge-phoenix badge-phoenix-info">잠금 우선 — 자동 무시</span></h6>
               <p class="fs-9 text-body-tertiary mb-2">운영자가 검수에서 확정한 값은 이번 적재가 덮어쓰지 않습니다.</p>
               <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>SKU</th><th>필드</th><th>업로드 값</th><th>유지되는 확정값</th></tr></thead><tbody>
-                <tr><td><code>P-3390</code></td><td><code>rated_watt</code></td><td class="text-body-tertiary text-decoration-line-through">500W</td><td class="fw-bold">400W</td></tr>
-                <tr><td><code>P-4102</code></td><td><code>socket</code></td><td class="text-body-tertiary text-decoration-line-through">AM5</td><td class="fw-bold">AM4</td></tr>
+                <tr><td><code>P-3390</code></td><td>정격 출력 <code>{rated_watt}</code></td><td class="text-body-tertiary text-decoration-line-through">500W</td><td class="fw-bold">400W</td></tr>
+                <tr><td><code>P-4102</code></td><td>소켓 <code>{socket}</code></td><td class="text-body-tertiary text-decoration-line-through">AM5</td><td class="fw-bold">AM4</td></tr>
               </tbody></table></div>
             </div></div></div>
           </div>
@@ -378,9 +378,9 @@
 
         // ── STEP1: 파일 선택 + 매핑
         const MAP=[
-          ["상품코드","sku","자동"],["공급처","supplier","자동"],["상품명","name","자동"],["분류","category","자동"],
-          ["매입가(원)","cost_krw","자동"],["판매가(원)","price_krw","자동"],["재고수량","stock_qty","자동"],
-          ["규격/사양","spec_raw","자동"],["비고","(적재 안 함)","확인 필요"]
+          ["상품코드","상품코드 {sku}","자동"],["공급처","공급처 {supplier}","자동"],["상품명","상품명 {name}","자동"],["분류","분류 {category}","자동"],
+          ["매입가(원)","매입가 {cost_krw}","자동"],["판매가(원)","판매가 {price_krw}","자동"],["재고수량","재고 수량 {stock_qty}","자동"],
+          ["규격/사양","사양 원문 {spec_raw}","자동"],["비고","(적재 안 함)","확인 필요"]
         ];
         document.getElementById("dropzone").onclick=()=>{
           document.getElementById("fileinfo").classList.remove("d-none");

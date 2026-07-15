@@ -298,7 +298,7 @@
               <h5 class="mb-2">이 상품의 흐름</h5>
               <div class="fs-9 d-flex flex-column gap-2">
                 <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">최근 원본 반입</span><a href="imports.html?id=P-4821">배치 #213 · 07-13</a></div>
-                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">검수 이력</span><a href="review-queue.html">length_mm 확정 대기</a></div>
+                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">검수 이력</span><a href="review-queue.html">장착 길이 {length_mm} 확정 대기</a></div>
                 <div class="d-flex justify-content-between"><span class="text-body-tertiary">추천 가능 여부</span><span class="badge badge-phoenix badge-phoenix-warning">불가 — 필수 사양 1건 미확인</span></div>
               </div>
             </div></div>
@@ -315,10 +315,10 @@
         // 필수 사양: [필드, 값, 출처, 잠금]  출처: origin(원본 추출)/ai(AI 대조)/op(운영자 확정)
         const SRC={origin:["원본 추출","secondary"],ai:["AI 대조","info"],op:["운영자 확정","primary"]};
         const SPECS=[
-          ["장착 길이 length_mm","", "none", false, "검수 대기 — 원문 272mm vs 지식 251mm"],
-          ["소비전력 tdp_watt","115W","ai",false,null],
-          ["보조전원 pcie_power","8-pin","origin",false,null],
-          ["슬롯 폭 slot_width","2.2슬롯","op",true,null]
+          ["장착 길이 {length_mm}","", "none", false, "검수 대기 — 원문 272mm vs 지식 251mm"],
+          ["소비전력 {tdp_watt}","115W","ai",false,null],
+          ["보조전원 {pcie_power}","8-pin","origin",false,null],
+          ["슬롯 폭 {slot_width}","2.2슬롯","op",true,null]
         ];
         function render(){
           document.getElementById("specs").innerHTML=SPECS.map(([f,v,s,lock,warn],i)=>`

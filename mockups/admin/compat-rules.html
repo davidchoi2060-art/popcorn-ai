@@ -277,13 +277,13 @@
             <div class="card mb-3"><div class="card-body">
               <h5 class="mb-1">카테고리별 필수 사양 <span class="fs-10 fw-normal text-body-tertiary">— 미확인이면 검수 회부·추천 제외</span></h5>
               <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>카테고리</th><th>필수 사양 필드</th></tr></thead><tbody>
-                <tr><td class="fw-semibold">CPU</td><td><code>socket</code> <code>tdp_watt</code> <code>igpu</code></td></tr>
-                <tr><td class="fw-semibold">메인보드</td><td><code>socket</code> <code>mem_type</code> <code>form_factor</code> <code>m2_slots</code></td></tr>
-                <tr><td class="fw-semibold">그래픽카드</td><td><code>length_mm</code> <code>tdp_watt</code> <code>pcie_power</code> <code>slot_width</code></td></tr>
-                <tr><td class="fw-semibold">파워</td><td><code>rated_watt</code> <code>efficiency</code> <code>form_factor</code></td></tr>
-                <tr><td class="fw-semibold">케이스</td><td><code>gpu_max_len</code> <code>cpu_cooler_h</code> <code>mb_support</code></td></tr>
-                <tr><td class="fw-semibold">CPU쿨러</td><td><code>height_mm</code> <code>socket_support</code> <code>tdp_support</code></td></tr>
-                <tr><td class="fw-semibold">메모리</td><td><code>mem_type</code> <code>capacity_gb</code> <code>speed_mts</code></td></tr>
+                <tr><td class="fw-semibold">CPU</td><td>소켓 <code>{socket}</code> 소비전력 <code>{tdp_watt}</code> 내장그래픽 <code>{igpu}</code></td></tr>
+                <tr><td class="fw-semibold">메인보드</td><td>소켓 <code>{socket}</code> 메모리 규격 <code>{mem_type}</code> 폼팩터 <code>{form_factor}</code> M.2 슬롯 수 <code>{m2_slots}</code></td></tr>
+                <tr><td class="fw-semibold">그래픽카드</td><td>장착 길이 <code>{length_mm}</code> 소비전력 <code>{tdp_watt}</code> 보조전원 <code>{pcie_power}</code> 슬롯 폭 <code>{slot_width}</code></td></tr>
+                <tr><td class="fw-semibold">파워</td><td>정격 출력 <code>{rated_watt}</code> 80PLUS 등급 <code>{efficiency}</code> 폼팩터 <code>{form_factor}</code></td></tr>
+                <tr><td class="fw-semibold">케이스</td><td>GPU 최대 길이 <code>{gpu_max_len}</code> 쿨러 최대 높이 <code>{cpu_cooler_h}</code> 지원 보드 규격 <code>{mb_support}</code></td></tr>
+                <tr><td class="fw-semibold">CPU쿨러</td><td>높이 <code>{height_mm}</code> 지원 소켓 <code>{socket_support}</code> 지원 TDP <code>{tdp_support}</code></td></tr>
+                <tr><td class="fw-semibold">메모리</td><td>메모리 규격 <code>{mem_type}</code> 용량 <code>{capacity_gb}</code> 동작 속도 <code>{speed_mts}</code></td></tr>
               </tbody></table></div>
             </div></div>
             <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>저장 시 재계산</b> — v6 발행 즉시 추천 가능 재고를 재계산합니다(예상 24,912 → 약 24,7xx). 과거 견적은 당시 규칙 버전으로 재현됩니다.</div>
@@ -296,11 +296,11 @@
         function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
         const RULES=[
           ["R-01","CPU ↔ 메인보드 소켓 일치","불일치 시 조합 불가",true,null],
-          ["R-02","그래픽카드 길이 ≤ 케이스 허용 길이","length_mm vs gpu_max_len",true,null],
-          ["R-03","쿨러 높이 ≤ 케이스 허용 높이","height_mm vs cpu_cooler_h",true,null],
+          ["R-02","그래픽카드 길이 ≤ 케이스 허용 길이","장착 길이 {length_mm} vs GPU 최대 길이 {gpu_max_len}",true,null],
+          ["R-03","쿨러 높이 ≤ 케이스 허용 높이","쿨러 높이 {height_mm} vs 케이스 허용 {cpu_cooler_h}",true,null],
           ["R-04","전력 여유율","부품 합산 소비전력 대비 파워 정격",true,["여유율 ≥","30","%"]],
-          ["R-05","메모리 규격 일치","DDR4/DDR5 ↔ 보드 mem_type",true,null],
-          ["R-06","M.2 슬롯 수 ≥ 저장장치 수","보드 m2_slots 확인",false,null]
+          ["R-05","메모리 규격 일치","DDR4/DDR5 ↔ 보드 메모리 규격 {mem_type}",true,null],
+          ["R-06","M.2 슬롯 수 ≥ 저장장치 수","보드 M.2 슬롯 수 {m2_slots} 확인",false,null]
         ];
         document.getElementById("rules").innerHTML=RULES.map(([id,name,desc,on,param],i)=>`
           <div class="d-flex align-items-center gap-3 py-2 ${i<RULES.length-1?"border-bottom":""}">

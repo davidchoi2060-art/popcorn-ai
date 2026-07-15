@@ -274,6 +274,7 @@
       </div>
       <script>
       (function(){
+        var FIELD_KO={"socket": "소켓", "tdp_watt": "소비전력", "igpu": "내장그래픽", "mem_type": "메모리 규격", "form_factor": "폼팩터", "m2_slots": "M.2 슬롯 수", "length_mm": "장착 길이", "pcie_power": "보조전원", "slot_width": "슬롯 폭", "rated_watt": "정격 출력", "efficiency": "80PLUS 등급", "rail_12v": "+12V 출력", "gpu_max_len": "GPU 최대 길이", "cpu_cooler_h": "쿨러 최대 높이", "mb_support": "지원 보드 규격", "psu_form": "파워 규격", "capacity_gb": "용량", "interface": "인터페이스", "dram": "DRAM 캐시", "height_mm": "높이", "socket_support": "지원 소켓", "tdp_support": "지원 TDP", "fan_size": "팬 크기", "speed_mts": "동작 속도", "kit": "구성", "price_krw": "판매가", "cost_krw": "매입가", "stock_qty": "재고 수량", "spec_raw": "사양 원문", "sku": "상품코드", "supplier": "공급처", "name": "상품명", "category": "분류", "cores": "코어/스레드"};function fk(f,cls){if(!f||f==="-")return "<code"+(cls?" class=\""+cls+"\"":"")+">-</code>";var k=FIELD_KO[f];return (k?k+" ":"")+"<code"+(cls?" class=\""+cls+"\"":"")+">{"+f+"}</code>";}
         const TYPES = {
           spec_conflict:{label:"사양 불일치", c:"danger"},
           spec_missing:{label:"필수 사양 없음", c:"warning"},
@@ -282,31 +283,31 @@
         };
         let QUEUE = [
           {id:"P-4821", name:"이엠텍 지포스 RTX 4060 STORM X2 WHITE", cat:"그래픽카드", type:"spec_conflict", field:"length_mm", origin:"272mm", know:"251mm", conf:0.93, wait:"12분 전",
-           crit:[["장착 길이 length_mm","불일치",false],["소비전력 tdp_watt","115W",true],["보조전원 pcie_power","8-pin",true],["슬롯 폭 slot_width","2.2슬롯",true]],
+           crit:[["장착 길이 {length_mm}","불일치",false],["소비전력 {tdp_watt}","115W",true],["보조전원 {pcie_power}","8-pin",true],["슬롯 폭 {slot_width}","2.2슬롯",true]],
            note:"원문 상세페이지 272mm vs 지식DB 레퍼런스 251mm. 케이스 GPU 최대 길이 호환 판정에 직접 영향 → 필수 사양."},
           {id:"P-3390", name:"마이크로닉스 Classic II 500W 80+", cat:"파워서플라이", type:"spec_conflict", field:"rated_watt", origin:"정격 500W", know:"정격 400W (80+ 미인증)", conf:0.78, wait:"31분 전",
-           crit:[["정격 출력 rated_watt","불일치",false],["80PLUS 등급 efficiency","미인증",false],["+12V 합산 rail_12v","-",null],["폼팩터 form_factor","ATX",true]],
+           crit:[["정격 출력 {rated_watt}","불일치",false],["80PLUS 등급 {efficiency}","미인증",false],["+12V 합산 {rail_12v}","-",null],["폼팩터 {form_factor}","ATX",true]],
            note:"제목 500W vs 사양표 400W. 전력 여유(headroom) 계산의 근거값 → 반드시 확정 후 잠금."},
           {id:"P-5140", name:"ASRock B650M PG Lightning", cat:"메인보드", type:"spec_missing", field:"mem_type", origin:"없음", know:"DDR5 (B650 칩셋 기준)", conf:0.55, wait:"1시간 전",
-           crit:[["메모리 규격 mem_type","미확인",false],["소켓 socket","AM5",true],["폼팩터 form_factor","mATX",true],["M.2 슬롯 m2_slots","2",true]],
+           crit:[["메모리 규격 {mem_type}","미확인",false],["소켓 {socket}","AM5",true],["폼팩터 {form_factor}","mATX",true],["M.2 슬롯 {m2_slots}","2",true]],
            note:"상세페이지에 메모리 규격 명시 없음. 칩셋 기준 추정값이라 confidence 낮음 → 운영자 확정 필요."},
           {id:"P-2765", name:"3RSYS J600 강화유리", cat:"케이스", type:"spec_missing", field:"gpu_max_len", origin:"없음", know:"330mm (동일 시리즈 추정)", conf:0.60, wait:"1시간 전",
-           crit:[["GPU 최대 길이 gpu_max_len","미확인",false],["쿨러 최대 높이 cpu_cooler_h","165mm",true],["지원 폼팩터 mb_support","ATX",true],["파워 장착 psu_form","ATX",true]],
+           crit:[["GPU 최대 길이 {gpu_max_len}","미확인",false],["쿨러 최대 높이 {cpu_cooler_h}","165mm",true],["지원 폼팩터 {mb_support}","ATX",true],["파워 장착 {psu_form}","ATX",true]],
            note:"GPU 호환 판정의 상대 필드. 미확인 시 4060 같은 긴 카드 추천에서 오판 위험."},
           {id:"P-6012", name:"삼성전자 990 PRO M.2 NVMe 2TB", cat:"SSD", type:"low_confidence", field:"capacity_gb", origin:"2TB", know:"2000GB 정규화", conf:0.71, wait:"2시간 전",
-           crit:[["용량 capacity_gb","2000",true],["폼팩터 form_factor","M.2 2280",true],["인터페이스 interface","PCIe 4.0",true],["DRAM 캐시 dram","있음",true]],
+           crit:[["용량 {capacity_gb}","2000",true],["폼팩터 {form_factor}","M.2 2280",true],["인터페이스 {interface}","PCIe 4.0",true],["DRAM 캐시 {dram}","있음",true]],
            note:"값 자체는 맞으나 단위 정규화 신뢰도 0.71. 스팟 확인만 하면 즉시 통과 가능."},
           {id:"P-1188", name:"쿨러마스터 Hyper 212 Black", cat:"CPU쿨러", type:"low_confidence", field:"height_mm", origin:"높이 표기 애매", know:"159mm", conf:0.64, wait:"2시간 전",
-           crit:[["쿨러 높이 height_mm","159",true],["소켓 지원 socket_support","AM5/LGA1700",true],["TDP 지원 tdp_support","150W",true],["팬 규격 fan_size","120mm",true]],
+           crit:[["쿨러 높이 {height_mm}","159",true],["소켓 지원 {socket_support}","AM5/LGA1700",true],["TDP 지원 {tdp_support}","150W",true],["팬 규격 {fan_size}","120mm",true]],
            note:"케이스 쿨러 최대 높이 호환용 필수 사양. 원문 이미지 표기가 흐릿 → 재확인 권장."},
           {id:"P-7043", name:"삼성 DDR5-5600 32GB", cat:"메모리", type:"csv_error", field:"capacity_gb", origin:"\"32G B\" (공백 포함)", know:"파싱 실패", conf:null, wait:"업로드 배치 #212",
-           crit:[["용량 capacity_gb","파싱 실패",false],["규격 mem_type","DDR5",true],["속도 speed_mts","5600",true],["구성 kit","1x32GB",true]],
+           crit:[["용량 {capacity_gb}","파싱 실패",false],["규격 {mem_type}","DDR5",true],["속도 {speed_mts}","5600",true],["구성 {kit}","1x32GB",true]],
            note:"원본 셀에 공백이 섞여 숫자 파싱 실패. 값 교정 후 재적재."},
           {id:"P-7044", name:"WD Blue SN580 1TB", cat:"SSD", type:"csv_error", field:"price_krw", origin:"\"1,29,000\"", know:"자릿수 형식 오류", conf:null, wait:"업로드 배치 #212",
-           crit:[["판매가 price_krw","형식 오류",false],["용량 capacity_gb","1000",true],["폼팩터 form_factor","M.2 2280",true],["인터페이스 interface","PCIe 4.0",true]],
+           crit:[["판매가 {price_krw}","형식 오류",false],["용량 {capacity_gb}","1000",true],["폼팩터 {form_factor}","M.2 2280",true],["인터페이스 {interface}","PCIe 4.0",true]],
            note:"가격 자릿수 구분 오류(1,29,000). 129,000으로 교정 필요."},
           {id:"P-4102", name:"기가바이트 B550M K", cat:"메인보드", type:"spec_conflict", field:"socket", origin:"AM5", know:"AM4 (B550 칩셋)", conf:0.82, wait:"4시간 전",
-           crit:[["소켓 socket","불일치",false],["메모리 규격 mem_type","DDR4",true],["폼팩터 form_factor","mATX",true],["M.2 슬롯 m2_slots","1",true]],
+           crit:[["소켓 {socket}","불일치",false],["메모리 규격 {mem_type}","DDR4",true],["폼팩터 {form_factor}","mATX",true],["M.2 슬롯 {m2_slots}","1",true]],
            note:"제목 파싱은 AM5로 잡았으나 B550은 AM4. 소켓 오류는 CPU 호환 전체를 무너뜨림 → 최우선 교정."}
         ];
         let cur = "all", sel = null, done = 0;
@@ -341,7 +342,7 @@
             return `<div data-id="${q.id}" class="p-3 border-bottom cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
               <div class="d-flex justify-content-between align-items-start mb-1"><div class="d-flex align-items-center gap-2"><span class="fs-10 fw-bolder text-nowrap" style="color:var(--bs-${RISK[riskOf(q)].c})">● ${riskOf(q)}</span><span class="badge badge-phoenix badge-phoenix-${t.c}">${t.label}</span></div><span class="fs-10 text-body-quaternary">${q.wait}</span></div>
               <h6 class="mb-1 text-body-highlight text-truncate">${q.name}</h6>
-              <div class="d-flex justify-content-between align-items-center"><span class="fs-9 text-body-tertiary">${q.cat} · <code>${q.field}</code></span>${confBadge(q.conf)}</div>
+              <div class="d-flex justify-content-between align-items-center"><span class="fs-9 text-body-tertiary">${q.cat} · ${fk(q.field)}</span>${confBadge(q.conf)}</div>
             </div>`;
           }).join("") : `<div class="p-5 text-center text-body-tertiary"><span data-feather="check-circle" style="width:32px;height:32px;"></span><p class="mt-2 mb-0 fw-semibold">이 분류에 대기 항목이 없습니다.</p></div>`;
           document.querySelectorAll("#queueList [data-id]").forEach(el=>el.onclick=()=>{sel=el.dataset.id;renderAll();});
@@ -358,7 +359,7 @@
           const verdict = isSrc? `<span class="badge badge-phoenix badge-phoenix-info">매입 대기</span>`
             : (q.origin===q.know? `<span class="badge badge-phoenix badge-phoenix-primary">일치</span>` : `<span class="badge badge-phoenix badge-phoenix-danger">불일치 — 확정 필요</span>`);
           const crossCard = `<div class="border rounded-3 p-3 mb-3">
-              <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0">${isCsv?"원본 · 파싱 결과":"사양 대조"} <code class="fs-9">${q.field}</code></h6>${verdict}</div>
+              <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0">${isCsv?"원본 · 파싱 결과":"사양 대조"} ${fk(q.field,"fs-9")}</h6>${verdict}</div>
               <div class="row g-2">
                 <div class="col-6"><div class="bg-body-secondary rounded-2 p-2 h-100"><p class="fs-10 text-body-tertiary mb-1">${isCsv?"원본 셀":"원문 추출값"}</p><p class="mb-0 fw-bold text-body-highlight">${q.origin}</p></div></div>
                 <div class="col-6"><div class="bg-body-secondary rounded-2 p-2 h-100"><p class="fs-10 text-body-tertiary mb-1">${isCsv?"파싱 결과":"AI 지식 대조"}</p><p class="mb-0 fw-bold text-body-highlight">${q.know}</p></div></div>
