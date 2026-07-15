@@ -293,7 +293,16 @@ function guidedAsk(){
   if(st.skip){var sk=document.createElement('span');sk.textContent='건너뛰기';sk.style.cssText='font-size:12.5px;font-weight:700;color:#8a8578;cursor:pointer;';sk.addEventListener('click',function(){lockRow(row);gAnswer(st,[]);});row.appendChild(sk);}
   msgs.appendChild(row);if(hintBox)msgs.appendChild(hintBox);
  }else{
-  st.opts.forEach(function(o){var c=mkChip(o.t,false);c.addEventListener('click',function(){lockRow(row);gAnswer(st,[o]);});row.appendChild(c);});
+  // 단일 선택: 답한 뒤에도 칩이 살아 있어 실수를 바로 고칠 수 있다(교체 반영)
+  var answered=false,selc=null;
+  st.opts.forEach(function(o){var c=mkChip(o.t,false);c.addEventListener('click',function(){
+   if(!answered){answered=true;selc=c;selChip(c,true);row.style.opacity='.85';gAnswer(st,[o]);return;}
+   if(c===selc)return;
+   if(selc)selChip(selc,false);selc=c;selChip(c,true);
+   addUser('아, <b>'+o.t+'</b>(으)로 바꿀게요');
+   addConstraint(st.ci,st.cl,o.v);
+   addAI('네, <b>'+st.cl+'</b>을(를) <b>'+o.v+'</b>(으)로 바꿨어요. 오른쪽 제약 요약과 예상 예산 범위도 함께 갱신했어요.');
+  });row.appendChild(c);});
   msgs.appendChild(row);
  }
  msgs.scrollTop=msgs.scrollHeight;
@@ -445,8 +454,26 @@ function budgetUpdate(){
  }else if(mk){mk.style.display='none';}
  var np=document.getElementById('s1-budget-note');if(np)np.innerHTML=note;
 }
+// 단일 제약객체 원칙: 같은 라벨은 누적이 아니라 교체 — 요약 카드도 제자리 갱신
+var consMap={};
 var _bgAddConstraint=addConstraint;
-addConstraint=function(icon,label,value){_bgAddConstraint(icon,label,value);consPairs.push({l:label,v:value});budgetUpdate();};
+addConstraint=function(icon,label,value){
+ var ex=consMap[label];
+ if(ex&&ex.parentNode){
+  var b=ex.querySelector('b');if(b)b.textContent=value;
+  var ic=ex.querySelector('span');if(ic&&icon)ic.textContent=icon;
+  ex.style.transition='background .4s';ex.style.background='#fbf3e2';
+  setTimeout(function(){ex.style.background='#f7f6f2';},700);
+ }else{
+  _bgAddConstraint(icon,label,value);
+  var box=document.getElementById('s1-cons');
+  if(box&&box.lastElementChild&&box.lastElementChild.id!=='s1-cons-empty')consMap[label]=box.lastElementChild;
+ }
+ var found=false;
+ for(var i=0;i<consPairs.length;i++){if(consPairs[i].l===label){consPairs[i].v=value;found=true;break;}}
+ if(!found)consPairs.push({l:label,v:value});
+ budgetUpdate();
+};
 budgetUpdate();
 if(mode==='guided'){
  var _gb=document.getElementById('s1-gearbar');if(_gb)_gb.style.display='none';
