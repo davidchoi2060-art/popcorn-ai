@@ -111,5 +111,13 @@
 "ms-wifi": "wifi-transfer",
 "ms-error": "road-sign-stop",
 "ms-expand_less": "arrow-button-up",
-"ft-alert-octagon": "road-sign-stop"
+"ft-alert-octagon": "road-sign-stop",
+"ft-list": "layout-content",
+"ft-edit": "content-paper-edit",
+"ft-percent": "discount-dollar-dash",
+"ft-trending-up": "analytics-graph-lines",
+"ft-shield": "shield-check-1",
+"ft-sliders": "settings-slider-desktop-horizontal",
+"ft-repeat": "data-transfer-circle",
+"ft-clock": "stopwatch"
 }
