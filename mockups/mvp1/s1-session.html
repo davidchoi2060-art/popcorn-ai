@@ -403,15 +403,7 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
   addAI('네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), <b>예산</b>을 함께 말씀해 주세요.');
  },400);}
 function talkStart(){
- var d=document.createElement('div');d.id='talk-empty';
- d.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:20px;flex:1;min-height:340px;padding:34px 20px;';
- d.innerHTML='<div><div style="font-size:27px;font-weight:800;color:#c2bcae;letter-spacing:-.01em;">무엇이 궁금하신가요?</div>'
- +'<div style="font-size:13.5px;color:#b5b0a4;font-weight:600;margin-top:9px;">부품이든, 가격이든, &quot;이거 조립 되나요&quot;든 — 편하게 물어보세요.</div></div>'
- +'<div id="talk-empty-chips" style="display:flex;flex-wrap:wrap;gap:9px;justify-content:center;max-width:600px;"></div>';
- msgs.appendChild(d);
- var box=d.querySelector('#talk-empty-chips');
- TALK_SUGGEST.forEach(function(q){var ch=mkChip(q,true);ch.addEventListener('click',function(){talkSend(q);});box.appendChild(ch);});
- if(inp)setTimeout(function(){inp.focus();},300);
+ if(inp){inp.placeholder='무엇이 궁금하신가요?';setTimeout(function(){inp.focus();},300);}
 }
 // ---- 예상 예산 범위 (2026-07 시장가 조사 기준: 견적왕·다나와·퀘이사존) ----
 var BUDGET_TIERS={
@@ -503,7 +495,8 @@ if(mode==='guided'){
 }else if(mode==='talk'){var _tgb=document.getElementById('s1-gearbar');if(_tgb)_tgb.style.display='none';
  var _tgr=document.getElementById('s1-grid');if(_tgr){_tgr.style.gridTemplateColumns='1fr';var _sec=_tgr.querySelector('section');if(_sec){_sec.style.maxWidth='760px';_sec.style.width='100%';_sec.style.margin='0 auto';}}
  var _tas=document.getElementById('s1-aside');if(_tas)_tas.style.display='none';
- var _tib=document.getElementById('s1-inputbar');if(_tib){var _tl=document.createElement('p');_tl.style.cssText='margin:9px 0 0;font-size:11.5px;color:#b5b0a4;text-align:center;font-weight:600;';_tl.textContent='답변은 저희 실재고·조립 데이터 기준입니다 · 모든 견적에는 이유가 있습니다';_tib.appendChild(_tl);}
+ var _tbn=document.getElementById('s1-mode-banner');if(_tbn)_tbn.style.display='none';
+ var _tfg=msgs.firstElementChild;if(_tfg&&_tfg.id!=='s1-empty')_tfg.remove();
  talkStart();
 }else{var _cgb=document.getElementById('s1-gearbar');if(_cgb)_cgb.style.display='none';chatStart();}
 function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}addUser(t);inp.value='';var old=poolN;addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');poolN=Math.max(1,Math.round(poolN*0.6));animate(pool,poolN);logFilter('입력 이해',old-poolN,['입력하신 조건 반영']);candidates(poolN);setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},400);}
