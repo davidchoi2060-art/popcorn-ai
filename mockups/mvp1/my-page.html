@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="MY-010" data-domain="customer"><head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC AI · 마이페이지</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:#f1eee8;font-family:'Pretendard',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+.msym{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+.card{background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:22px}
+.btn2{padding:9px 14px;border:1.5px solid #ddd8ce;background:#fff;border-radius:10px;font-size:12.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.btnp{padding:9px 14px;border:none;background:#2b5fd9;border-radius:10px;font-size:12.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.h6{margin:0 0 4px;font-size:15.5px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:8px}
+.sub{margin:0 0 14px;font-size:12px;color:#8a8578;font-weight:600}
+.sw{position:relative;width:38px;height:22px;background:#ddd8ce;border-radius:999px;cursor:pointer;transition:.2s;flex:0 0 auto}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:#2b5fd9}.sw.on::after{left:19px}
+@media(max-width:768px){.grid2{grid-template-columns:1fr!important}}
+</style>
+</head>
+<body>
+<script>
+(function(){var KEY="popcorn-gate-ok";var PASS="WnRnal";
+if(localStorage.getItem(KEY)==="1")return;
+var ov=document.createElement("div");ov.id="__gate";
+ov.setAttribute("style","position:fixed;inset:0;z-index:99999;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:Pretendard,-apple-system,sans-serif;");
+ov.innerHTML='<div style="width:min(340px,86vw);background:#fff;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;box-sizing:border-box;"><div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span> · 내부 검토</div><p style="margin:10px 0 18px;font-size:13px;color:#8a8578;font-weight:600;">접근 암호를 입력하세요.</p><input id="__gp" type="password" autocomplete="off" placeholder="암호" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:12px;font-size:14px;font-family:inherit;outline:none;"><p id="__ge" style="margin:8px 0 0;font-size:12px;color:#b31b25;font-weight:700;height:14px;"></p><button id="__gb" style="margin-top:12px;width:100%;padding:12px;border:none;background:#2b5fd9;color:#fff;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">입장</button></div>';
+function go(){document.body.appendChild(ov);var inp=document.getElementById("__gp"),err=document.getElementById("__ge"),btn=document.getElementById("__gb");function s(){if(inp.value===PASS){localStorage.setItem(KEY,"1");ov.remove();}else{err.textContent="암호가 올바르지 않습니다.";inp.value="";inp.focus();}}btn.addEventListener("click",s);inp.addEventListener("keydown",function(e){if(e.key==="Enter")s();});inp.focus();}
+if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})();
+</script>
+
+<header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;">
+  <div style="max-width:1120px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="main-landing.html" style="font-size:16px;font-weight:900;color:#17171b;text-decoration:none;">팝콘PC <span style="color:#2b5fd9;">AI</span></a>
+      <span style="width:1px;height:15px;background:#d8d4cc;"></span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span class="msym" style="font-size:18px;color:#2b5fd9;">person</span>마이페이지</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a href="s0-landing.html" class="btnp"><span class="msym" style="font-size:15px;">forum</span>새 견적 상담</a>
+      <button id="my-logout" class="btn2">로그아웃</button>
+    </div>
+  </div>
+</header>
+
+<main style="max-width:1120px;margin:0 auto;padding:26px 22px 70px;">
+
+  <!-- 프로필 -->
+  <div class="card" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:18px;">
+    <span style="width:54px;height:54px;border-radius:16px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#2b5fd9;" id="my-avatar">?</span>
+    <div style="flex:1;min-width:200px;">
+      <div style="font-size:18px;font-weight:900;color:#17171b;"><span id="my-nick">-</span> 님</div>
+      <div style="font-size:12.5px;color:#8a8578;font-weight:600;"><span id="my-email">-</span> · <span id="my-via">-</span> 가입 · <span id="my-joined">-</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="text-align:right;">
+        <div style="font-size:11.5px;color:#8a8578;font-weight:700;">쇼핑몰 계정</div>
+        <span style="display:inline-flex;align-items:center;gap:5px;background:#f4f2ec;color:#6b6b73;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;"><span class="msym" style="font-size:14px;">link</span>연결 안 됨</span>
+      </div>
+      <button id="my-map" class="btn2">계정 연결</button>
+    </div>
+  </div>
+
+  <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+
+    <!-- 주문/배송 -->
+    <div class="card">
+      <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">receipt_long</span>주문 · 배송</h3>
+      <p class="sub">주문 원장은 팝콘PC AI에 있습니다 — 결제 방식과 무관하게 여기서 추적돼요.</p>
+      <div style="border:1.5px solid #ece9e3;border-radius:14px;padding:16px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <b style="font-size:13.5px;color:#17171b;">ORD-84213 <span style="font-weight:600;color:#8a8578;">· 07-14</span></b>
+          <b style="font-size:14px;color:#17171b;">812,000원</b>
+        </div>
+        <div style="font-size:12px;color:#8a8578;font-weight:600;margin-bottom:12px;">라이젠5 7600 · RTX 4060 구성 (7종) <a href="s2-result.html" style="color:#2b5fd9;">구성 보기</a></div>
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:12px;" id="ordsteps"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn2" data-toast="송장 CJ대한통운 6482-1234-5678 — 배송 조회 (목업)"><span class="msym" style="font-size:15px;">package_2</span>송장 조회</button>
+          <button class="btn2" data-toast="환불·클레임 접수 화면은 다음 단계에 만들어집니다 (목업)"><span class="msym" style="font-size:15px;">swap_horiz</span>환불 신청</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;border:1.5px dashed #ddd8ce;border-radius:14px;padding:13px 16px;">
+        <span style="font-size:12.5px;color:#8a8578;font-weight:700;">ORD-83907 · 06-28 · 배송 완료</span>
+        <button class="btnp" data-toast="후기 작성 화면은 다음 단계에 만들어집니다 (목업)"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</button>
+      </div>
+    </div>
+
+    <!-- 상담 내역 -->
+    <div class="card">
+      <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">forum</span>상담 내역</h3>
+      <p class="sub">모든 상담은 당시 재고 스냅샷과 함께 저장돼요 — 그때 가격 그대로 다시 열 수 있습니다.</p>
+      <div id="consults"></div>
+    </div>
+
+    <!-- 관심 부품 -->
+    <div class="card">
+      <h3 class="h6"><span class="msym" style="font-size:19px;color:#c77b1f;">interests</span>관심 부품</h3>
+      <p class="sub">가격 알림을 켜두면 매입가 기준 변동 시 알려드려요.</p>
+      <div id="wishlist"></div>
+    </div>
+
+    <!-- 내 후기 + 계정 -->
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="card">
+        <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">star</span>내 후기</h3>
+        <p class="sub">구매 인증된 주문만 후기를 남길 수 있어요.</p>
+        <div style="border:1.5px solid #ece9e3;border-radius:14px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="display:inline-flex;align-items:center;gap:5px;background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;"><span class="msym" style="font-size:13px;">verified</span>구매 인증</span>
+            <b style="font-size:12.5px;color:#c77b1f;">★ 5.0</b>
+          </div>
+          <p style="margin:0;font-size:12.5px;color:#3a3a40;line-height:1.6;">"사무용 20대 동일 사양으로 한 번에 받았습니다. 근거 리포트를 도입 문서에 그대로 붙였어요."</p>
+          <div style="font-size:11px;color:#a29d92;font-weight:600;margin-top:6px;">ORD-83907 · 06-30 · <a href="s2-result.html" style="color:#8a8578;">구성 보기</a></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="h6"><span class="msym" style="font-size:19px;color:#6b6b73;">lock</span>계정 설정</h3>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;font-weight:700;color:#3a3a40;">
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span>비밀번호 변경</span><button class="btn2" data-toast="비밀번호 변경 (목업)">변경</button></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span>가격 알림 수신</span><span class="sw on" data-sw></span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span>마케팅 수신 동의</span><span class="sw" data-sw></span></div>
+          <a href="#!" style="font-size:11.5px;color:#a29d92;text-decoration:underline;" data-toast="탈퇴 절차 (목업) — 주문·법정 보관 데이터 제외 즉시 파기">회원 탈퇴</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:rgba(23,23,27,.82);color:#fff;font-size:12px;font-weight:800;text-decoration:none;backdrop-filter:blur(4px);"><span class="msym" style="font-size:15px;">grid_view</span>허브</a>
+
+<script src="../shared/auth.js"></script>
+<script>
+(function(){
+ var m=window.popcornAuth.member();
+ if(!m){
+  window.popcornAuth.open('join',function(mm){location.reload();});
+ }else{
+  document.getElementById('my-nick').textContent=m.nick;
+  document.getElementById('my-email').textContent=m.email;
+  document.getElementById('my-via').textContent=m.via||'이메일';
+  document.getElementById('my-joined').textContent=m.joined||'2026-07-16';
+  document.getElementById('my-avatar').textContent=(m.nick||'?').charAt(0);
+ }
+ document.getElementById('my-logout').onclick=function(){window.popcornAuth.logout();setTimeout(function(){location.href='main-landing.html';},600);};
+ document.getElementById('my-map').onclick=function(){window.popcornAuth.toast('현재 운영 모드: 독립 가입 — 쇼핑몰 계정 연결은 연동 모드에서 열립니다 (목업)');};
+
+ // 주문 스텝
+ var steps=[['결제 완료',1],['조립·검수',1],['배송 중',2],['완료',0]];
+ document.getElementById('ordsteps').innerHTML=steps.map(function(s,i){
+  var st=s[1]; var col=st===1?'#2b5fd9':(st===2?'#c77b1f':'#d8d4cc');
+  return '<div style="flex:1;text-align:center;"><div style="height:5px;border-radius:3px;background:'+col+';margin-bottom:5px;"></div><span style="font-size:10.5px;font-weight:800;color:'+(st?'#3a3a40':'#a29d92')+';">'+s[0]+(st===2?' ●':'')+'</span></div>';
+ }).join('');
+
+ // 상담 내역
+ var CS=[
+  ['07-14','맡김','#e9f6ef;color:#1c7a4d','사무용 + 라이트 게임 · 80만','812,000원 · 7부품','SNAP-0714-1042'],
+  ['07-10','팝콘톡','#fbf3e2;color:#8a561a','4060 vs 4060 Ti 비교 상담','견적 미확정 (질문만)','SNAP-0710-1512'],
+  ['06-27','함께','#eaf1fd;color:#2149b0','영상편집 + 게임 · 150만','1,486,000원 · 8부품','SNAP-0627-0955']
+ ];
+ document.getElementById('consults').innerHTML=CS.map(function(c){
+  return '<div style="border:1.5px solid #ece9e3;border-radius:14px;padding:13px 16px;margin-bottom:9px;">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'
+   +'<span style="display:inline-flex;gap:6px;align-items:center;"><span style="background:'+c[2]+';font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">'+c[1]+'</span><b style="font-size:13px;color:#17171b;">'+c[3]+'</b></span>'
+   +'<span style="font-size:11px;color:#a29d92;font-weight:700;">'+c[0]+'</span></div>'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+   +'<span style="font-size:12px;color:#8a8578;font-weight:600;">'+c[4]+' · <code style="font-size:10.5px;">'+c[5]+'</code></span>'
+   +'<a class="btn2" href="s2-result.html" style="padding:6px 11px;"><span class="msym" style="font-size:14px;">sync</span>그때 가격으로 다시 보기</a></div></div>';
+ }).join('');
+
+ // 관심 부품
+ var WL=[
+  ['gpu','이엠텍 RTX 4060 STORM X2','398,000원','▼ 1.5% 내림','#2149b0','재고 6',true],
+  ['ram','삼성 DDR5-5600 32GB','120,000원','▲ 5.1% 오름','#b31b25','재고 64',true],
+  ['ssd','삼성 990 PRO 2TB','219,000원','— 보합','#8a8578','재고 31',false]
+ ];
+ document.getElementById('wishlist').innerHTML=WL.map(function(w,i){
+  return '<div style="display:flex;align-items:center;gap:12px;border:1.5px solid #ece9e3;border-radius:14px;padding:8px 14px 8px 8px;margin-bottom:9px;">'
+   +'<img src="assets/parts/'+w[0]+'.png" alt="" style="width:52px;height:52px;border-radius:10px;border:1px solid #ece9e3;">'
+   +'<div style="flex:1;min-width:0;"><b style="font-size:13px;color:#17171b;display:block;">'+w[1]+'</b>'
+   +'<span style="font-size:12px;font-weight:800;color:#17171b;">'+w[2]+'</span> <span style="font-size:11.5px;font-weight:800;color:'+w[4]+';">'+w[3]+'</span> <span style="font-size:11px;color:#a29d92;font-weight:700;">· '+w[5]+'</span></div>'
+   +'<div style="text-align:center;"><div style="font-size:10px;color:#8a8578;font-weight:700;margin-bottom:3px;">가격 알림</div><span class="sw'+(w[6]?' on':'')+'" data-sw></span></div></div>';
+ }).join('');
+
+ document.querySelectorAll('[data-toast]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();window.popcornAuth.toast(b.getAttribute('data-toast'));});});
+ document.querySelectorAll('[data-sw]').forEach(function(s){s.addEventListener('click',function(){s.classList.toggle('on');window.popcornAuth.toast(s.classList.contains('on')?'가격 알림을 켰어요 — 변동 시 알려드릴게요':'알림을 껐어요');});});
+})();
+</script>
+<script src="../shared/su-icons.js"></script>
+</body></html>
