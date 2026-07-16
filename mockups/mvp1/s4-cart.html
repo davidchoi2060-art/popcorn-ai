@@ -130,6 +130,13 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           </div>
         </div>
 
+        <!-- 운영 모드 표시 (A-10) -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #ece9e3;border-radius:14px;padding:10px 14px;">
+          <span style="font-size:12px;font-weight:800;color:#8a8578;">운영 모드</span>
+          <span id="s4-mode-badge" style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px;background:#f2edfb;color:#4a2a94;">쇼핑몰 인계</span>
+          <button id="s4-mode-demo" style="border:1.5px solid #ddd8ce;background:#fff;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:800;color:#8a8578;cursor:pointer;font-family:inherit;">전환 미리보기</button>
+        </div>
+
         <!-- login gate -->
         <div id="s4-authgate" style="background:#f2edfb;border-radius:20px;padding:22px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -138,6 +145,43 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           </div>
           <p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:#6b5a92;">기존 팝콘PC 쇼핑몰 계정으로 로그인됩니다. 여기까지의 구성이 그대로 이어집니다.</p>
           <button style="width:100%;padding:14px;border:none;background:#6a3fbf;border-radius:12px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;" id="s4-login"><span style="font-family:'Material Symbols Outlined';font-size:19px;">login</span>로그인 / 회원가입으로 계속</button>
+        </div>
+
+        <!-- 자체 결제 (own 모드) -->
+        <div id="s4-own" style="display:none;flex-direction:column;gap:14px;">
+          <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:18px;">
+            <div id="s4-own-member"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:18px;">
+            <h4 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;">배송지</h4>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <input id="s4-name" placeholder="받는 분" style="padding:11px 13px;border:1.5px solid #e6e2da;border-radius:10px;font-size:13.5px;font-family:inherit;outline:none;">
+              <input id="s4-phone" placeholder="연락처 (배송·설치 안내용)" style="padding:11px 13px;border:1.5px solid #e6e2da;border-radius:10px;font-size:13.5px;font-family:inherit;outline:none;">
+              <input id="s4-addr" placeholder="주소" style="padding:11px 13px;border:1.5px solid #e6e2da;border-radius:10px;font-size:13.5px;font-family:inherit;outline:none;">
+            </div>
+            <p style="margin:8px 0 0;font-size:11px;color:#a29d92;">배송 정보는 이 주문 처리에만 사용됩니다.</p>
+          </div>
+          <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:18px;">
+            <h4 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;">결제수단</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;" id="s4-paymethods">
+              <button data-pm="카드" style="flex:1;padding:11px;border:1.5px solid #2b5fd9;background:#eaf1fd;border-radius:10px;font-size:13px;font-weight:800;color:#2149b0;cursor:pointer;font-family:inherit;">신용·체크카드</button>
+              <button data-pm="계좌이체" style="flex:1;padding:11px;border:1.5px solid #e6e2da;background:#fff;border-radius:10px;font-size:13px;font-weight:800;color:#6b6b73;cursor:pointer;font-family:inherit;">계좌이체</button>
+              <button data-pm="카카오페이" style="flex:1;padding:11px;border:1.5px solid #e6e2da;background:#fff;border-radius:10px;font-size:13px;font-weight:800;color:#6b6b73;cursor:pointer;font-family:inherit;">카카오페이</button>
+            </div>
+            <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:12px;color:#6b6b73;font-weight:600;line-height:1.5;cursor:pointer;">
+              <input type="checkbox" id="s4-agree" style="margin-top:2px;">
+              <span>주문 내용을 확인했으며, <a href="#!" style="color:#8a8578;">이용약관</a>·<a href="#!" style="color:#8a8578;">전자상거래 환불 규정</a>에 동의합니다.</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 주문 완료 (own 결제 후) -->
+        <div id="s4-done" style="display:none;background:#eaf1fd;border-radius:20px;padding:22px;text-align:center;">
+          <span style="width:44px;height:44px;border-radius:50%;background:#2b5fd9;display:inline-flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:24px;color:#fff;">check_circle</span>
+          <h3 style="margin:10px 0 4px;font-size:17px;font-weight:900;color:#17171b;">주문이 완료됐습니다</h3>
+          <p style="margin:0 0 4px;font-size:13px;color:#4a6ab0;font-weight:700;">주문번호 <b>ORD-84216</b> · 스냅샷 SNAP-0716-1030</p>
+          <p style="margin:0 0 14px;font-size:12px;color:#8a8578;">조립·검수 후 출고됩니다. 진행 상황은 마이페이지에서 확인하세요.</p>
+          <a href="my-page.html" style="display:inline-flex;align-items:center;gap:6px;padding:11px 18px;border:none;background:#2b5fd9;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;text-decoration:none;">마이페이지에서 추적</a>
         </div>
 
         <!-- CTA -->
@@ -167,8 +211,62 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 (function(){
 function tmsg(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
 var login=document.getElementById('s4-login'),pay=document.getElementById('s4-pay'),cap=document.getElementById('s4-pay-cap'),gate=document.getElementById('s4-authgate');
-if(login)login.addEventListener('click',function(){if(gate)gate.style.display='none';if(pay){pay.disabled=false;pay.style.background='#2b5fd9';pay.style.cursor='pointer';}if(cap)cap.textContent='이제 결제를 진행할 수 있어요.';tmsg('로그인되었습니다 — 결제를 진행할 수 있어요.');});
-if(pay)pay.addEventListener('click',function(){if(pay.disabled)return;tmsg('기존 팝콘PC 쇼핑몰 결제로 넘어갑니다 — 목업');});
+var own=document.getElementById('s4-own'),done=document.getElementById('s4-done'),badge=document.getElementById('s4-mode-badge');
+function opsPay(){try{return (JSON.parse(localStorage.getItem('popcorn-ops')||'{}').pay)||'mall';}catch(e){return 'mall';}}
+var mallLogged=false,pm='카드';
+function member(){return (window.popcornAuth&&window.popcornAuth.member())||null;}
+function renderMember(){
+ var box=document.getElementById('s4-own-member');if(!box)return;
+ var m=member();
+ if(m)box.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><span style="width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-weight:900;color:#2b5fd9;">'+(m.nick||'?').charAt(0)+'</span><div><b style="font-size:13.5px;color:#17171b;">'+m.nick+'</b> 님으로 주문합니다<br><span style="font-size:11.5px;color:#8a8578;">'+m.email+' · 상담·주문이 계정에 저장돼요</span></div></div>';
+ else box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="font-size:13px;font-weight:800;color:#3a3a40;">주문하려면 로그인해 주세요</span><button id="s4-own-login" style="padding:10px 16px;border:none;background:#2b5fd9;border-radius:10px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">로그인 · 가입</button></div>';
+ var lb=document.getElementById('s4-own-login');
+ if(lb)lb.onclick=function(){window.popcornAuth.open('login',function(){renderMember();check();});};
+}
+function check(){
+ var mode=opsPay();
+ var ok=false, msg='';
+ if(mode==='mall'){ok=mallLogged;msg=ok?'이제 결제를 진행할 수 있어요.':'로그인 후 결제할 수 있어요.';}
+ else{
+  var m=member(),nm=(document.getElementById('s4-name')||{}).value,ph=(document.getElementById('s4-phone')||{}).value,ad=(document.getElementById('s4-addr')||{}).value,ag=(document.getElementById('s4-agree')||{}).checked;
+  if(!m)msg='로그인 후 결제할 수 있어요.';
+  else if(!(nm&&ph&&ad))msg='배송지를 입력해 주세요.';
+  else if(!ag)msg='약관에 동의해 주세요.';
+  else{ok=true;msg=pm+' · 재고 예약 후 결제가 진행됩니다.';}
+ }
+ if(pay){pay.disabled=!ok;pay.style.background=ok?'#2b5fd9':'#c9c5bd';pay.style.cursor=ok?'pointer':'not-allowed';}
+ if(cap)cap.textContent=msg;
+}
+function applyMode(){
+ var mode=opsPay();
+ if(badge){badge.textContent=mode==='own'?'자체 결제':'쇼핑몰 인계';badge.style.background=mode==='own'?'#eaf1fd':'#f2edfb';badge.style.color=mode==='own'?'#2149b0':'#4a2a94';}
+ if(gate)gate.style.display=mode==='mall'?'':'none';
+ if(own)own.style.display=mode==='own'?'flex':'none';
+ if(done)done.style.display='none';
+ if(mode==='own')renderMember();
+ check();
+}
+var demo=document.getElementById('s4-mode-demo');
+if(demo)demo.addEventListener('click',function(){
+ var ops={};try{ops=JSON.parse(localStorage.getItem('popcorn-ops')||'{}');}catch(e){}
+ ops.pay=opsPay()==='own'?'mall':'own';if(ops.pay==='own'){ops.settle='own';}else{ops.settle='mall';ops.refund='mall';}
+ localStorage.setItem('popcorn-ops',JSON.stringify(ops));
+ tmsg('운영 모드 미리보기: '+(ops.pay==='own'?'자체 결제':'쇼핑몰 인계')+' — 실제로는 관리자 운영 전환 설정에서 발행');
+ applyMode();
+});
+if(login)login.addEventListener('click',function(){mallLogged=true;if(gate)gate.style.display='none';tmsg('쇼핑몰 계정으로 로그인되었습니다 — 결제를 진행할 수 있어요.');check();});
+['s4-name','s4-phone','s4-addr'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',check);});
+var ag=document.getElementById('s4-agree');if(ag)ag.addEventListener('change',check);
+var pms=document.querySelectorAll('#s4-paymethods [data-pm]');
+pms.forEach(function(b){b.addEventListener('click',function(){pm=b.dataset.pm;pms.forEach(function(x){var on=x===b;x.style.border='1.5px solid '+(on?'#2b5fd9':'#e6e2da');x.style.background=on?'#eaf1fd':'#fff';x.style.color=on?'#2149b0':'#6b6b73';});check();});});
+if(pay)pay.addEventListener('click',function(){
+ if(pay.disabled)return;
+ if(opsPay()==='mall'){tmsg('기존 팝콘PC 쇼핑몰 결제로 넘어갑니다 — 인계 모드 (목업)');return;}
+ tmsg('재고 예약(hold) 완료 — 7개 부품 점유');
+ setTimeout(function(){tmsg(pm+' 결제 승인 (목업 PG)');},1200);
+ setTimeout(function(){if(own)own.style.display='none';if(done)done.style.display='block';var cta=document.querySelector('#s4-pay').parentNode.parentNode;if(cta)cta.style.display='none';tmsg('주문 ORD-84216 생성 — 원장은 본 시스템에 저장됐어요');},2400);
+});
+applyMode();
 var so=document.getElementById('s4-soldout');if(so)so.addEventListener('click',function(){window.location.href='s3-detail.html';});
 var cp=document.getElementById('s4-coupon');if(cp)cp.addEventListener('click',function(){tmsg('쿠폰 코드를 확인했어요 — 목업');});
 })();

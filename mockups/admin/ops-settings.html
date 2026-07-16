@@ -310,7 +310,7 @@
         function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2600);}
 
         // own=자체, mall=쇼핑몰
-        var SW={member:"own",pay:"mall",settle:"mall",ship:"mall",refund:"mall"}; // 현재 v3 = 1단계
+        var SW={member:"own",pay:"mall",settle:"mall",ship:"mall",refund:"mall"};try{var _saved=JSON.parse(localStorage.getItem("popcorn-ops")||"null");if(_saved)for(var _k in SW)if(_saved[_k])SW[_k]=_saved[_k];}catch(e){} // 발행값 복원
         var DEF=[
          ["member","회원 연동","자체: 독립 가입(이메일·소셜). 쇼핑몰: 가입 시 쇼핑몰 계정 자동 생성·매핑, 기존 회원 이메일 병합 제안.","독립 가입","계정 매핑"],
          ["pay","결제","자체: 본 시스템 PG 결제창. 쇼핑몰: S4에서 쇼핑몰 결제로 인계(현행).","자체 PG","쇼핑몰 인계"],
@@ -369,7 +369,7 @@
           var tr=document.createElement("tr");
           tr.innerHTML='<td class="ps-3 text-body-tertiary">v4 · 오늘</td><td><b>david</b></td><td>'+stageName()+' 적용</td>';
           h.insertBefore(tr,h.firstChild);
-          toast("설정 v4 발행 — 즉시 적용 · 작업 기록 저장");
+          localStorage.setItem("popcorn-ops",JSON.stringify(SW));toast("설정 v4 발행 — 즉시 적용 · 작업 기록 저장 (고객 S4에 반영됨)");
         };
         render();if(window.feather)feather.replace();
       })();
