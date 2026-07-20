@@ -376,18 +376,27 @@ function validate(){var cn=compatNotes();var notes=cn.notes;var warns=0;notes.fo
 var TALK_SUGGEST=['게임용으로 100만원이면 어때요?','RTX 4060이면 배그 잘 돌아가요?','요즘 그래픽카드 가격 어때요?','쓰던 PC 업그레이드 되나요?'];
 var PCWORDS=['pc','컴퓨터','컴퓨','부품','견적','게임','롤','배그','발로란트','오버워치','로아','그래픽','지포스','rtx','gtx','라데온','cpu','라이젠','인텔','gpu','램','메모리','ddr','ssd','nvme','하드','hdd','파워','psu','케이스','쿨러','메인보드','보드','am5','am4','소켓','모니터','조립','업그레이드','영상','편집','방송','스트리밍','사무','개발','예산','만원','성능','호환','재고','가격','시세','발열','소음','와트','업글','풀옵','프레임','fps'];
 var TALKS=[
+ {k:['모르겠','몰라','글쎄'],a:'괜찮아요, 다들 그렇게 시작하세요. 거꾸로 가볼게요 — <b>예산 느낌</b>만 알려주시면 그 돈으로 뭘 할 수 있는지 보여드릴게요.',chips:['60만 안팎이요','100만 안팎이요','150만 이상도 괜찮아요']},
+ {k:['사려','사고 싶','추천','바꾸','맞추','장만','필요해'],a:'좋아요, 딱 맞는 걸 찾아드릴게요. <b>주로 뭘 하실 PC</b>인가요?',chips:['게임 위주예요','사무·인강용이에요','영상편집 같은 작업용이에요','아직 잘 모르겠어요']},
+ {k:['사무','인강','문서','엑셀','주식','웹서핑'],a:'사무·인강용은 <b>40~80만이면 충분히 쾌적</b>해요. 내장그래픽으로 조용하게, 부팅 빠른 NVMe SSD는 기본으로 잡습니다. 모니터 개수나 다루는 파일 크기에 따라 램 용량만 조금 달라져요.',p:{i:'description',l:'용도',v:'사무·인강',f:0.55,why:['사무·인강: 저소음·안정 우선, 고성능 GPU 제외']}},
+ {k:['조립비','공임','조립 비용','조립료'],a:'조립·검수 공임은 <b>3만원</b>입니다. 선정리·24시간 안정성 테스트·기본 세팅까지 포함이고, 견적서에 <b>별도 행으로 투명하게</b> 표기돼요 — 총액에 숨기지 않습니다.'},
+ {k:['에이에스','a/s','as','보증','수리','고장','애프터'],a:'무상 보증 <b>2년</b>, 왕복 택배비는 저희 부담입니다. 초기 불량은 수령 7일 내 교환, 지원은 전화·원격·용산 방문 세 가지예요. <span style="font-size:11.5px;color:#a29d92;">(*정책 확정 전 예시)</span>'},
+ {k:['다나와','최저가','타사','다른 데','견적 봐','견적서 봐'],a:'좋은 비교예요. 부품값 자체는 최저가 조합과 거의 같고, 차이는 <b>조립·선정리·24시간 검사·2년 A/S 포함 여부</b>입니다.<br>다른 곳 견적이 있으면 <b>그대로 붙여넣어 주세요</b> — 부품·가격·호환성을 그 자리에서 진단해 드릴게요.'},
+ {k:['싸게','비싸','할인','깎','흥정'],a:'솔직히 말씀드리면 저희 견적은 최저가 조합보다 보통 <b>2~3만원</b> 높습니다. 그 차이가 조립·선정리·24시간 검사·2년 A/S 값이에요.<br>부품값은 똑같고, 견적서에서 <b>&quot;최저가보다 N만원 비싼 이유&quot;</b>로 그대로 보여드립니다.'},
+ {k:['매장','방문','오프라인','직접 가'],a:'서울 <b>용산</b>에 매장이 있습니다. 조립 과정을 직접 보실 수도 있고, 온라인 견적을 매장에서 그대로 이어받아 상담할 수도 있어요.'},
  {k:['4060','ti','비교','차이'],min:2,a:'좋은 질문이에요. 자체 판매 데이터 기준으로 <b>RTX 4060 Ti는 4060보다 1440p 게임에서 평균 +18%</b> 빠르고, 지금 저희 재고가는 <b>약 11만원 차이</b>예요.<br>· FHD(1080p) 위주면 4060으로 충분 — 차액으로 SSD를 올리는 게 체감이 커요.<br>· QHD(1440p)·고주사율 모니터면 Ti가 값을 해요.',p:{i:'memory',l:'관심 부품',v:'RTX 4060급 GPU',f:0.72,why:['GPU 관심 대역 반영: 미들급 게이밍']}},
  {k:['가격','시세','동향','얼마','비싸','내려','올라'],a:'저희 <b>실제 매입가 기준</b>(외부 크롤링이 아니라 자체 데이터예요) 최근 4주 동향이에요.<br>· 그래픽카드: <b>-3.2%</b> 완만한 하락 — 급하지 않으면 나쁘지 않은 시점<br>· DDR5 메모리: <b>+5.1%</b> 상승 — 필요하면 미루지 않는 걸 권해요<br>· SSD(NVMe): 보합<br>특정 부품이 궁금하면 이름을 알려주세요. 재고가로 바로 답해드릴게요.'},
  {k:['영상','편집','프리미어','다빈치','인코딩'],a:'영상편집은 게임과 우선순위가 달라요.<br>① <b>CPU 코어 수</b>(인코딩 속도) ② <b>램 32GB↑</b>(4K 타임라인) ③ <b>NVMe SSD</b>(소스 스크럽) 순이고, GPU는 그다음이에요.<br>어떤 툴로 어떤 영상(FHD/4K)을 만드실지 알려주시면 더 정확해져요.',p:{i:'movie',l:'용도',v:'영상편집',f:0.55,why:['영상편집: 다코어 CPU·램 32GB↑ 우선']}},
  {k:['게임','롤','배그','발로란트','오버워치','로아','풀옵','프레임','fps'],a:'게임이 목적이면 <b>어떤 게임을 어느 화질로</b>가 핵심이에요.<br>· 롤·발로란트급은 엔트리 GPU로도 144fps<br>· 배그·오버워치는 미들급 GPU 권장<br>· 로아 같은 MMO는 CPU도 함께 중요해요.<br>주로 하시는 게임을 알려주시면 조건에 반영할게요.',p:{i:'sports_esports',l:'용도',v:'게임',f:0.6,why:['게임 용도: GPU 성능 우선 정렬']}},
  {k:['ddr','램','메모리'],a:'지금 새로 맞추신다면 <b>DDR5를 권해요</b>. AM5 등 최신 플랫폼이 DDR5 전용이라 업그레이드 수명이 길어요.<br>다만 <b>기존 DDR4 보드에서 램만 올리는 건</b> 규격이 달라 불가능해요 — 보드·CPU까지 함께 바꾸는 그림이 됩니다. 기존 PC 사양을 알려주시면 갈아탈 가치가 있는지 계산해드릴게요.',p:{i:'memory',l:'관심 부품',v:'DDR5 메모리',f:0.85,why:['DDR5 플랫폼 관심 반영']}},
  {k:['파워','와트','psu','전력'],a:'파워는 <b>부품 소비전력 합에 여유율 30%</b>를 두는 게 저희 조립 기준이에요(정격 기준). 예: RTX 4060 구성이면 500~550W면 충분하고, 4070 Ti 이상이면 750W를 권해요.<br>구성이 정해지면 엔진이 자동으로 검증합니다.'},
- {k:['호환','소켓','am5','am4','맞아','장착','들어가'],a:'호환은 소켓 일치·GPU 길이·쿨러 높이·전력 여유·램 규격을 <b>결정론 엔진이 전부 검사</b>합니다 — 조립 불가능한 조합은 견적에 아예 나오지 않아요.<br>확인하고 싶은 조합이 있으면 부품명을 알려주세요 — 바로 검증해드릴게요.'},
+ {k:['호환','소켓','am5','am4','맞아','장착','들어가','병목'],a:'호환은 소켓 일치·GPU 길이·쿨러 높이·전력 여유·램 규격을 <b>결정론 엔진이 전부 검사</b>합니다 — 조립 불가능한 조합은 견적에 아예 나오지 않아요.<br>확인하고 싶은 조합이 있으면 부품명을 알려주세요 — 바로 검증해드릴게요.'},
  {k:['ssd','nvme','하드','hdd','저장'],a:'요즘은 <b>NVMe SSD가 기본</b>이에요. 부팅·로딩 체감이 SATA와 확실히 다릅니다.<br>· 일반 사무·게임: 1TB NVMe<br>· 영상편집·대용량: 2TB NVMe + 창고용 HDD 조합이 가성비<br>지금 990 PRO 2TB가 재고 기준 좋은 가격대에 있어요.'},
  {k:['소음','조용','저소음','팬소리'],a:'저소음은 조합의 문제라 좋은 질문이에요. <b>큰 팬 쿨러(저RPM) + 80PLUS 파워 + 통풍 좋은 케이스</b>가 핵심이고, GPU는 팬 2개 이상 모델이 유리해요.<br>조건에 넣어두면 시끄러운 부품은 후보에서 빠져요.',p:{i:'volume_off',l:'우선순위',v:'저소음',f:0.7,why:['저소음: 고RPM 쿨러·고발열 부품 제외']}},
  {k:['재고','당일','출고','배송','언제'],a:'저희는 <b>용산 자체 실재고</b>로만 견적해요 — 견적에 뜨는 부품은 전부 지금 매장에 있는 것들이고, 오후 3시 전 결제면 보통 당일 조립 출고돼요.<br>특정 부품 재고가 궁금하면 이름을 알려주세요.'},
  {k:['업그레이드','업글','기존','쓰던','중고'],a:'기존 PC 업그레이드도 도와드려요. <b>지금 쓰시는 CPU(또는 보드)와 목적</b>을 알려주시면, 재사용 가능한 부품은 빼고 바꿀 것만 견적에 잡아드릴게요.',p:{i:'build',l:'상황',v:'기존 PC 업그레이드',f:0.8,why:['보유 부품 재사용 전제 반영']}}
 ];
+function talkRow(list){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';list.forEach(function(q){var ch=mkChip(q,true);ch.addEventListener('click',function(){row.style.opacity='.45';row.style.pointerEvents='none';talkSend(q);});row.appendChild(ch);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function talkChips(){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';TALK_SUGGEST.forEach(function(q){var c=mkChip(q,true);c.addEventListener('click',function(){talkSend(q);});row.appendChild(c);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function talkBudget(t){var m=t.match(/(\d{2,3})\s*만/);if(!m)return null;var n=+m[1];return{i:'savings',l:'예산',v:m[1]+'만원대',f:0.6,why:['예산 '+m[1]+'만원대: 초과 부품 제외'],a:'예산 <b>'+m[1]+'만원대</b>로 기억해둘게요. 이 예산이면 '+(n>=150?'QHD 게이밍·크리에이터급까지':(n>=100?'FHD 고사양~QHD 엔트리 게이밍':'사무·라이트 게이밍'))+' 구성이 가능해요. 용도를 알려주시면 더 좁혀드릴게요.'};}
 function talkApply(p){addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);}
@@ -397,8 +406,10 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
  TALKS.forEach(function(x){var n=0;x.k.forEach(function(k){if(low.indexOf(k)>-1)n++;});var need=x.min||1;if(n>=need&&n>score){hit=x;score=n;}});
  var isPC=PCWORDS.some(function(w){return low.indexOf(w)>-1;});
  setTimeout(function(){
+  if(/^(안녕|하이|hi|헬로|ㅎㅇ|반갑)/.test(low)){addAI('안녕하세요! 팝콘톡입니다. 부품·가격·용도, PC에 관한 건 뭐든 물어보세요.');talkRow(TALK_SUGGEST);return;}
+  if(/(감사|고마워|땡큐|thank)/.test(low)&&low.length<20){addAI('별말씀을요. 더 궁금한 게 생기면 언제든 물어보세요!');return;}
   if(bud&&!hit){addAI(bud.a);talkApply(bud);return;}
-  if(hit){addAI(hit.a);if(hit.p)talkApply(hit.p);if(bud)talkApply(bud);return;}
+  if(hit){addAI(hit.a);if(hit.p)talkApply(hit.p);if(bud)talkApply(bud);if(hit.chips)talkRow(hit.chips);return;}
   if(!isPC){addAI('그 주제는 제가 정확히 답하기 어렵습니다.<br><b>팝콘PC의 실재고·조립 데이터</b>로 답하는 PC 상담 전용이라서요.<br>대신 이런 질문에는 잘 답합니다:');talkChips();return;}
   addAI('네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), <b>예산</b>을 함께 말씀해 주세요.');
  },400);}
