@@ -399,7 +399,42 @@ var TALKS=[
 function talkRow(list){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';list.forEach(function(q){var ch=mkChip(q,true);ch.addEventListener('click',function(){row.style.opacity='.45';row.style.pointerEvents='none';talkSend(q);});row.appendChild(ch);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function talkChips(){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';TALK_SUGGEST.forEach(function(q){var c=mkChip(q,true);c.addEventListener('click',function(){talkSend(q);});row.appendChild(c);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function talkBudget(t){var m=t.match(/(\d{2,3})\s*만/);if(!m)return null;var n=+m[1];return{i:'savings',l:'예산',v:m[1]+'만원대',f:0.6,why:['예산 '+m[1]+'만원대: 초과 부품 제외'],a:'예산 <b>'+m[1]+'만원대</b>로 기억해둘게요. 이 예산이면 '+(n>=150?'QHD 게이밍·크리에이터급까지':(n>=100?'FHD 고사양~QHD 엔트리 게이밍':'사무·라이트 게이밍'))+' 구성이 가능해요. 용도를 알려주시면 더 좁혀드릴게요.'};}
-function talkApply(p){addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);}
+// ---- UX-17 ②-2: 조건 첫 발생 시 우측 패널 슬라이드-인 + 패널 용어 고객 언어 개역 ----
+function talkRelabel(){
+ function sw(sel,from,to){var r=document.querySelector(sel);if(!r)return;var w=document.createTreeWalker(r,NodeFilter.SHOW_TEXT,null);var n;while((n=w.nextNode())){if(n.nodeValue&&n.nodeValue.indexOf(from)>-1){n.nodeValue=n.nodeValue.replace(from,to);return;}}}
+ sw('#s1-side-pipe','실시간 재고 검증 파이프라인','지금 고를 수 있는 부품');
+ sw('#s1-side-pipe','지금 검증 중인 전체 실시간 재고','말씀하신 조건을 통과한 실재고 부품 수');
+ sw('#s1-side-pipe','호환성 5종','조립 호환 검사');
+ sw('#s1-filterwrap','선택에 따라 걸러낸 기준','말씀하신 내용으로 걸러낸 기준');
+ sw('#s1-side-cons','현재 제약 요약','지금까지 잡힌 조건');
+}
+var talkPanelOn=false;
+function talkReveal(){
+ if(mode!=='talk'||talkPanelOn)return;talkPanelOn=true;
+ var gr=document.getElementById('s1-grid'),as=document.getElementById('s1-aside');
+ var sec=gr?gr.querySelector('section'):null;
+ if(gr)gr.style.transition='grid-template-columns .55s cubic-bezier(.25,.8,.3,1),column-gap .55s cubic-bezier(.25,.8,.3,1)';
+ if(sec)sec.style.transition='max-width .55s cubic-bezier(.25,.8,.3,1)';
+ if(as){as.style.transform='translateX(30px)';as.style.visibility='visible';as.style.transition='opacity .45s ease .3s,transform .55s cubic-bezier(.25,.8,.3,1) .3s';}
+ var _applied=false;
+ function _apply(){if(_applied)return;_applied=true;
+  if(gr){gr.style.gridTemplateColumns='1.62fr 372px';gr.style.columnGap='24px';}
+  if(sec)sec.style.maxWidth='900px';
+  if(as){as.style.opacity='1';as.style.transform='translateX(0)';}
+ }
+ requestAnimationFrame(function(){requestAnimationFrame(_apply);});
+ setTimeout(_apply,150);/* 백그라운드 탭(rAF 정지)에서도 최종 상태 보장 */
+ setTimeout(function(){if(as)as.style.overflow='';},900);
+ if(as){
+  var co=document.createElement('div');
+  co.style.cssText='flex:0 0 auto;display:flex;align-items:center;gap:7px;background:#fbf3e2;border:1.5px solid #e6c98f;color:#8a561a;font-size:12.5px;font-weight:800;padding:10px 13px;border-radius:12px;opacity:0;transition:opacity .4s;';
+  co.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:17px;">arrow_downward</span>방금 말씀이 이렇게 반영됐어요';
+  as.insertBefore(co,as.firstChild);
+  setTimeout(function(){co.style.opacity='1';},850);
+  setTimeout(function(){co.style.opacity='0';setTimeout(function(){co.remove();},450);},5600);
+ }
+}
+function talkApply(p){talkReveal();addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
  var bud=talkBudget(t);
  var hit=null,score=0;
@@ -504,8 +539,9 @@ if(mode==='guided'){
  var _evb=document.getElementById('s1-validate');if(_evb)_evb.addEventListener('click',validate);
  var _xc=document.getElementById('s1-xconfirm');if(_xc)_xc.addEventListener('click',function(){if(!_xc.disabled)window.location.href='s2-result.html';});
 }else if(mode==='talk'){var _tgb=document.getElementById('s1-gearbar');if(_tgb)_tgb.style.display='none';
- var _tgr=document.getElementById('s1-grid');if(_tgr){_tgr.style.gridTemplateColumns='1fr';var _sec=_tgr.querySelector('section');if(_sec){_sec.style.maxWidth='760px';_sec.style.width='100%';_sec.style.margin='0 auto';}}
- var _tas=document.getElementById('s1-aside');if(_tas)_tas.style.display='none';
+ var _tgr=document.getElementById('s1-grid');if(_tgr){_tgr.style.gridTemplateColumns='1fr 0px';_tgr.style.columnGap='0px';var _sec=_tgr.querySelector('section');if(_sec){_sec.style.maxWidth='760px';_sec.style.width='100%';_sec.style.margin='0 auto';}}
+ var _tas=document.getElementById('s1-aside');if(_tas){_tas.style.opacity='0';_tas.style.visibility='hidden';_tas.style.minWidth='0';_tas.style.overflow='hidden';}
+ talkRelabel();
  var _tbn=document.getElementById('s1-mode-banner');if(_tbn)_tbn.style.display='none';
  var _tfg=msgs.firstElementChild;if(_tfg&&_tfg.id!=='s1-empty')_tfg.remove();
  talkStart();
