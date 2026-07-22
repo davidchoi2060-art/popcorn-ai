@@ -272,11 +272,13 @@
           <div class="card-header border-bottom border-translucent">
             <div class="d-flex flex-wrap align-items-center gap-2">
               <ul class="nav nav-pills gap-2 fs-9 mb-0" id="pills"></ul>
-              <input id="q" class="form-control form-control-sm ms-auto" style="max-width:220px;" placeholder="SKU · 상품명 검색">
+              <select id="fcat" class="form-select form-select-sm ms-auto" style="max-width:132px;" title="분류 필터"></select>
+              <select id="fmfr" class="form-select form-select-sm" style="max-width:132px;" title="제조사 필터"></select>
+              <input id="q" class="form-control form-control-sm" style="max-width:240px;" placeholder="SKU · 자체 상품번호 · 상품명 검색">
             </div>
           </div>
           <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-            <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">SKU</th><th>상품명</th><th>분류</th><th>필수 사양</th><th class="text-end">재고</th><th class="text-end">공급처</th><th class="text-end">판매가</th><th>상태</th><th class="pe-4"></th></tr></thead>
+            <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">SKU · 자체 상품번호</th><th>상품명</th><th>분류</th><th>필수 사양</th><th class="text-end">재고</th><th class="text-end">공급처</th><th class="text-end">판매가</th><th>상태</th><th class="pe-4"></th></tr></thead>
             <tbody id="rows"></tbody>
           </table></div></div>
         </div>
@@ -303,7 +305,17 @@
           ["P-1188","쿨러마스터 Hyper 212 Black","CPU쿨러",4,4,25,2,"39,000","ok"],
           ["P-9001","녹투아 NH-D15","CPU쿨러",4,4,3,1,"139,000","price"]
         ];
-        let cur="all", q="";
+        let cur="all", q="", fcat="all", fmfr="all";
+        // 자체 상품번호(기존 쇼핑몰 상품번호) — SKU에서 결정론 생성한 목업값
+        const mno=sku=>String(20480000+parseInt(sku.slice(2),10));
+        // 제조사 — 상품명 첫 토큰
+        const mfr=p=>p[1].split(" ")[0];
+        function fillSelects(){
+          const cats=[...new Set(P.map(p=>p[2]))];
+          const mfrs=[...new Set(P.map(mfr))].sort((a,b)=>a.localeCompare(b,"ko"));
+          document.getElementById("fcat").innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join("");
+          document.getElementById("fmfr").innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join("");
+        }
         const KPI=[["전체 상품","26,480","개","primary"],["추천 가능","24,912","개","primary"],["검수 대기","9","건","warning"],["재고 없음","618","개","info"]];
         document.getElementById("kpis").innerHTML=KPI.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         function counts(){const c={all:P.length};P.forEach(p=>c[p[8]]=(c[p[8]]||0)+1);return c;}
@@ -322,11 +334,14 @@
         }
         function render(){
           pills();
-          const list=P.filter(p=>(cur==="all"||p[8]===cur)&&(q===""||p[0].toLowerCase().includes(q)||p[1].toLowerCase().includes(q)));
+          const list=P.filter(p=>(cur==="all"||p[8]===cur)
+            &&(fcat==="all"||p[2]===fcat)
+            &&(fmfr==="all"||mfr(p)===fmfr)
+            &&(q===""||p[0].toLowerCase().includes(q)||p[1].toLowerCase().includes(q)||mno(p[0]).includes(q)));
           document.getElementById("rows").innerHTML=list.length?list.map(p=>{
             const [sku,name,cat,d,t,stock,sup,price,st]=p; const [lab,col,link,act]=ST[st];
             return `<tr>
-              <td class="ps-4"><code>${sku}</code></td>
+              <td class="ps-4"><code>${sku}</code><div class="fs-10 text-body-tertiary text-nowrap">자체 №${mno(sku)}</div></td>
               <td class="fw-semibold text-body-highlight"><a href="product-edit.html?id=${sku}" class="text-decoration-none text-body-highlight">${name}</a></td>
               <td class="text-body-tertiary">${cat}</td>
               <td>${specBadge(d,t)}</td>
@@ -339,7 +354,9 @@
           }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
         }
         document.getElementById("q").addEventListener("input",e=>{q=e.target.value.trim().toLowerCase();render();});
-        render();if(window.feather)feather.replace();
+        document.getElementById("fcat").addEventListener("change",e=>{fcat=e.target.value;render();});
+        document.getElementById("fmfr").addEventListener("change",e=>{fmfr=e.target.value;render();});
+        fillSelects();render();if(window.feather)feather.replace();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
