@@ -402,12 +402,15 @@ document.querySelectorAll('.s2tab').forEach(function(t){t.addEventListener('clic
 document.querySelectorAll('button').forEach(function(b){var x=(b.textContent||'').trim();if(x.indexOf('부품 변경')===0){b.addEventListener('click',function(){window.location.href='s3-detail.html';});}else if(x.indexOf('장바구니 담기')===0){b.addEventListener('click',function(){window.location.href='s4-cart.html';});}});
 // 함께 구성(주변기기) 담기 토글 — 본체 견적과 분리, 근거 기반 제안 (A-02 유지)
 var s2pSel={};
+var S2P_META={mon:['모니터','LG 울트라기어 27GS75Q'],kbd:['키보드','앱코 K660 축교환 기계식'],mou:['마우스','로지텍 G102 LIGHTSYNC'],hset:['헤드셋','하이퍼엑스 Cloud III']};
 document.querySelectorAll('.s2p-add').forEach(function(b){
  b.addEventListener('click',function(){
   var id=b.getAttribute('data-p'),price=parseInt(b.getAttribute('data-price'),10);
   if(s2pSel[id]){delete s2pSel[id];b.textContent='담기';b.style.background='#fff';b.style.color='#3a3a40';b.style.borderColor='#ddd8ce';}
   else{s2pSel[id]=price;b.textContent='담김 ✓';b.style.background='#2b5fd9';b.style.color='#fff';b.style.borderColor='#2b5fd9';}
   var n=0,sum=0;for(var k in s2pSel){n++;sum+=s2pSel[k];}
+  var arr=[];for(var k2 in s2pSel){arr.push({c:S2P_META[k2][0],n:S2P_META[k2][1],p:s2pSel[k2]});}
+  try{localStorage.setItem('popcorn-periph',JSON.stringify(arr));}catch(e){}
   var el=document.getElementById('s2p-sum');
   if(el){el.innerHTML=n?('함께 구성 <b style="color:#17171b;">'+n+'개</b> 선택 · <b style="color:#17171b;">+'+sum.toLocaleString()+'원</b> — 장바구니에서 본체와 함께 결제됩니다.'):'아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.';}
  });

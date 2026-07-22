@@ -92,6 +92,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/psu.png" alt="파워" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">파워</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">시소닉 FOCUS GX-750 750W</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">110,000원</div></div>
           <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;"><img src="assets/parts/case.png" alt="케이스" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">케이스</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">NZXT H5 Flow</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">90,000원</div></div>
           <div style="display:flex;align-items:center;gap:14px;padding:14px 22px;background:#f7f9fc;"><span style="flex:0 0 44px;"><span style="font-family:'Material Symbols Outlined';font-size:22px;color:#2b5fd9;">build</span></span><div style="flex:1;"><div style="font-size:14.5px;font-weight:700;color:#17171b;">전문가 조립 · 검수 공임</div><div style="font-size:12px;color:#8a8578;">별도 청구 · ASSEMBLY_SERVICE</div></div><div style="font-size:14.5px;font-weight:800;color:#17171b;">30,000원</div></div>
+          <div id="s4-periph"></div>
         </div>
 
         <!-- restock check -->
@@ -116,6 +117,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           <div style="display:flex;flex-direction:column;gap:11px;padding-bottom:16px;border-bottom:1px solid #f0eee9;">
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">부품 합계 (7종)</span><b style="color:#17171b;">1,705,000원</b></div>
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">조립비</span><b style="color:#17171b;">30,000원</b></div>
+            <div id="s4-periph-line" style="display:none;justify-content:space-between;font-size:14px;"></div>
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">배송비</span><b style="color:#2f9e6d;">무료</b></div>
           </div>
           <div style="display:flex;gap:8px;margin:16px 0;">
@@ -125,7 +127,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           <div style="background:#17171b;border-radius:14px;padding:18px 20px;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;">
               <div><div style="font-size:13px;font-weight:700;color:#9a968d;">총 결제금액</div><div style="font-size:11px;color:#7a766d;">3시간 전 기준 · VAT 포함</div></div>
-              <div style="font-size:26px;font-weight:900;color:#fff;">1,735,000<span style="font-size:14px;color:#9a968d;">원</span></div>
+              <div id="s4-total" style="font-size:26px;font-weight:900;color:#fff;">1,735,000<span style="font-size:14px;color:#9a968d;">원</span></div>
             </div>
           </div>
         </div>
@@ -188,7 +190,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
         <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:18px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <span style="font-size:13px;font-weight:700;color:#8a8578;">총 결제금액</span>
-            <span style="font-size:20px;font-weight:900;color:#17171b;">1,735,000원</span>
+            <span id="s4-total2" style="font-size:20px;font-weight:900;color:#17171b;">1,735,000원</span>
           </div>
           <div style="display:flex;gap:10px;">
             <a href="s3-detail.html" style="flex:0 0 auto;padding:14px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:12px;font-size:14px;font-weight:800;color:#3a3a40;text-decoration:none;">부품 변경</a>
@@ -310,6 +312,23 @@ document.addEventListener('click',function(e){
  if(tip&&!tip.contains(e.target))closeTip();
 });
 window.addEventListener('scroll',closeTip,{passive:true});
+})();
+</script>
+<script>
+// 주변기기 ③: S2 '함께 구성' 선택이 장바구니로 이어짐 (localStorage popcorn-periph)
+(function(){
+ var box=document.getElementById('s4-periph');if(!box)return;
+ var arr=[];try{arr=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
+ if(!arr.length)return;
+ var icons={'모니터':'desktop_windows','키보드':'keyboard','마우스':'mouse','헤드셋':'headphones'};
+ var sum=0,h='<div style="display:flex;align-items:center;gap:8px;padding:12px 22px;background:#fbf3e2;font-size:12.5px;font-weight:800;color:#8a561a;"><span style="font-family:\'Material Symbols Outlined\';font-size:17px;">devices</span>함께 구성 (주변기기 '+arr.length+'종) — 견적서에서 담으신 항목</div>';
+ arr.forEach(function(it){sum+=it.p;h+='<div style="display:flex;align-items:center;gap:14px;padding:12px 22px;border-bottom:1px solid #f7f6f2;"><span style="flex:0 0 44px;text-align:center;"><span style="font-family:\'Material Symbols Outlined\';font-size:22px;color:#c77b1f;">'+(icons[it.c]||'devices')+'</span></span><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+it.c+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.n+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.p.toLocaleString()+'원</div></div>';});
+ box.innerHTML=h;
+ var line=document.getElementById('s4-periph-line');
+ if(line){line.style.display='flex';line.innerHTML='<span style="color:#6b6b73;">함께 구성 ('+arr.length+'종)</span><b style="color:#17171b;">'+sum.toLocaleString()+'원</b>';}
+ var total=1735000+sum;
+ var t1=document.getElementById('s4-total');if(t1)t1.innerHTML=total.toLocaleString()+'<span style="font-size:14px;color:#9a968d;">원</span>';
+ var t2=document.getElementById('s4-total2');if(t2)t2.textContent=total.toLocaleString()+'원';
 })();
 </script>
 <script src="../shared/auth.js"></script>

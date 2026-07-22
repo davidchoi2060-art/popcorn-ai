@@ -394,7 +394,7 @@ function inspectBlock(){var cpu=cur('cpu'),gpu=cur('gpu'),psu=cur('psu');functio
 function validate(){var cn=compatNotes();var notes=cn.notes;var warns=0;notes.forEach(function(x){if(x.level==='warn')warns++;});var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='<div style="display:flex;align-items:center;gap:11px;padding:14px 16px;border-radius:12px;background:'+(warns?'#fbecec':'#eaf7ef')+';"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:'+(warns?'#b31b25':'#2f9e6d')+';">'+(warns?'error':'verified')+'</span><div><div style="font-size:15px;font-weight:900;color:'+(warns?'#8a1f22':'#0f5132')+';">'+(warns?(warns+'건의 경고가 있어요'):'전부 통과했습니다')+'</div><div style="font-size:12.5px;font-weight:600;color:'+(warns?'#a15055':'#3d7a5c')+';">'+(warns?'경고를 해결하면 진행할 수 있어요.':'조립·호환에 문제가 없습니다.')+'</div></div></div>';var cp=document.getElementById('s1-compat');if(cp){cp.innerHTML=compatSection(notes);Array.prototype.forEach.call(cp.querySelectorAll('[data-fix]'),function(b){b.addEventListener('click',function(){applyFix(b.getAttribute('data-fix'));});});}var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=inspectBlock();if(warns===0)enableConfirm('호환성·검수 모두 통과 — 이 구성으로 진행할 수 있어요.');else lockConfirm(warns+'건의 경고를 해결해야 진행할 수 있어요.');}
 // ---- talk 팝콘톡: 자유 문답 (LLM 지식 상담 — 파싱은 동일 제약객체, 견적 생성은 여전히 엔진) ----
 var TALK_SUGGEST=['게임용으로 100만원이면 어때요?','RTX 4060이면 배그 잘 돌아가요?','요즘 그래픽카드 가격 어때요?','쓰던 PC 업그레이드 되나요?'];
-var PCWORDS=['pc','컴퓨터','컴퓨','부품','견적','게임','롤','배그','발로란트','오버워치','로아','그래픽','지포스','rtx','gtx','라데온','cpu','라이젠','인텔','gpu','램','메모리','ddr','ssd','nvme','하드','hdd','파워','psu','케이스','쿨러','메인보드','보드','am5','am4','소켓','모니터','조립','업그레이드','영상','편집','방송','스트리밍','사무','개발','예산','만원','성능','호환','재고','가격','시세','발열','소음','와트','업글','풀옵','프레임','fps','화이트','디자인','감성'];
+var PCWORDS=['pc','컴퓨터','컴퓨','부품','견적','게임','롤','배그','발로란트','오버워치','로아','그래픽','지포스','rtx','gtx','라데온','cpu','라이젠','인텔','gpu','램','메모리','ddr','ssd','nvme','하드','hdd','파워','psu','케이스','쿨러','메인보드','보드','am5','am4','소켓','모니터','조립','업그레이드','영상','편집','방송','스트리밍','사무','개발','예산','만원','성능','호환','재고','가격','시세','발열','소음','와트','업글','풀옵','프레임','fps','화이트','디자인','감성','인치','듀얼','해상도'];
 var TALKS=[
  {k:['모르겠','몰라','글쎄'],a:'괜찮아요, 다들 그렇게 시작하세요. 거꾸로 가볼게요 — <b>예산 느낌</b>만 알려주시면 그 돈으로 뭘 할 수 있는지 보여드릴게요.',chips:['60만 안팎이요','100만 안팎이요','150만 이상도 괜찮아요']},
  {k:['사려','사고 싶','추천','바꾸','맞추','장만','필요해'],a:'좋아요, 딱 맞는 걸 찾아드릴게요. <b>주로 뭘 하실 PC</b>인가요?',chips:['게임 위주예요','사무·인강용이에요','영상편집 같은 작업용이에요','아직 잘 모르겠어요']},
@@ -490,6 +490,20 @@ function talkFlow(){
   },1100);
  }
 }
+// 주변기기 ③: 모니터 언급 인지 — 보유(재사용)와 구매 의향을 구분해 조건화
+function talkMon(t){
+ if(t.indexOf('모니터')<0)return null;
+ var m=t.match(/(\d{2})\s*(인치|형)/);var inch=m?m[1]:null;
+ var dual=/(2\s*개|두\s*개|듀얼|3\s*개|세\s*개)/.test(t);
+ var own=/(쓰고|쓰는|사용 중|사용중|있어|있는|보유|쓰던)/.test(t);
+ if(own){
+  var v=((inch?inch+'형':'')+(dual?' 듀얼':'')+' 보유').trim();if(v==='보유')v='보유 모니터';
+  return {i:'desktop_windows',l:'모니터',v:v,f:1,why:['보유 모니터 기준: 출력 포트·권장 GPU 매칭'],
+   a:'모니터는 '+(inch?'<b>'+inch+'형'+(dual?' 듀얼':'')+'</b>을':'갖고 계신 걸')+' 쓰시는군요 — 조건에 잡아뒀어요.'+(dual?' 듀얼이면 <b>출력 포트 2개 이상</b>은 기본으로 확인합니다.':'')+' 해상도(FHD/QHD/4K)까지 알려주시면 GPU 권장이 더 정확해져요.'};
+ }
+ return {i:'desktop_windows',l:'모니터',v:'구매 예정',f:1,why:['모니터: 함께 구성 제안 대상'],
+  a:'모니터도 새로 보시는군요 — 조건에 잡아뒀어요. 본체가 정해지면 <b>견적서의 &quot;함께 쓰면 좋은 구성&quot;</b>에서 GPU 성능에 맞는 주사율로 골라 드릴게요.'};
+}
 function talkApply(p){addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
  var bud=talkBudget(t);
@@ -499,8 +513,10 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
  setTimeout(function(){
   if(/^(안녕|하이|hi|헬로|ㅎㅇ|반갑)/.test(low)){addAI('안녕하세요! 팝콘톡입니다. 부품·가격·용도, PC에 관한 건 뭐든 물어보세요.');talkRow(TALK_SUGGEST);return;}
   if(/(감사|고마워|땡큐|thank)/.test(low)&&low.length<20){addAI('별말씀을요. 더 궁금한 게 생기면 언제든 물어보세요!');return;}
-  if(bud&&!hit){addAI(bud.a);talkApply(bud);talkFlow();return;}
-  if(hit){addAI(hit.a);if(hit.p)talkApply(hit.p);if(bud)talkApply(bud);if(hit.chips)talkRow(hit.chips);talkFlow();return;}
+  var mon=talkMon(t);
+  if(bud&&!hit){addAI(bud.a);talkApply(bud);if(mon){addAI(mon.a);talkApply(mon);}talkFlow();return;}
+  if(hit){addAI(hit.a);if(hit.p)talkApply(hit.p);if(bud)talkApply(bud);if(mon){addAI(mon.a);talkApply(mon);}if(hit.chips)talkRow(hit.chips);talkFlow();return;}
+  if(mon){addAI(mon.a);talkApply(mon);if(bud)talkApply(bud);talkFlow();return;}
   if(!isPC){addAI('그 주제는 제가 정확히 답하기 어렵습니다.<br><b>팝콘PC의 실재고·조립 데이터</b>로 답하는 PC 상담 전용이라서요.<br>대신 이런 질문에는 잘 답합니다:');talkChips();return;}
   addAI('네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), <b>예산</b>을 함께 말씀해 주세요.');
  },400);}
