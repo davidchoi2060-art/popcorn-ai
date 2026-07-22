@@ -299,7 +299,8 @@
               <button class="btn btn-primary btn-sm ms-auto" id="applyBtn">선택 반영</button>
             </div>
           </div>
-          <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
+          <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1000px;">
+            <colgroup id="cols"></colgroup>
             <thead id="thead"></thead><tbody id="rows"></tbody>
           </table></div></div>
           <div class="card-footer py-2 fs-10 text-body-tertiary">변동 없음 <b id="sameN">159</b>행은 자동 통과됐습니다 · 반영 결과는 <a href="price-history.html">가격 이력</a>과 <a href="activity-logs.html">작업 기록</a>에 남습니다.</div>
@@ -352,6 +353,12 @@
         function render(){
           kpis();tabsBar();
           const th=document.getElementById("thead"), tb=document.getElementById("rows");
+          const cols=document.getElementById("cols");
+          if(cols)cols.innerHTML=tab==="chg"
+            ?'<col style="width:44px"><col><col style="width:110px"><col style="width:130px"><col style="width:130px"><col style="width:100px"><col style="width:230px">'
+            :tab==="new"
+            ?'<col><col style="width:110px"><col style="width:130px"><col style="width:250px"><col style="width:150px">'
+            :'<col><col style="width:190px"><col style="width:330px"><col style="width:130px">';
           if(tab==="chg"){
             th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2" style="width:36px;"><input type="checkbox" class="form-check-input" id="ckAll" checked></th><th>모델명</th><th>분류</th><th class="text-end">매입가 어제</th><th class="text-end">오늘</th><th class="text-end">변동</th><th class="text-end">재계산 판매가</th></tr>`;
             tb.innerHTML=CHG.length?CHG.map((c,i)=>{
