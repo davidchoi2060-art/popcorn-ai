@@ -230,6 +230,25 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
   </div>
 </div>
 
+<!-- UX-17 ④ 모바일 하단 요약 바 (768px 이하, 조건 첫 발생 후 표시) -->
+<div id="s1-mbar">
+  <div style="flex:1;min-width:0;">
+    <div id="s1-mbar-line" style="font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums;">조건 0개 · 후보 26,480개</div>
+    <div style="font-size:11px;color:#c9c5bd;font-weight:600;margin-top:2px;">말씀하신 조건이 실시간으로 반영돼요</div>
+  </div>
+  <button id="s1-mbar-btn" data-action="toggle-summary-sheet" style="flex:0 0 auto;padding:10px 16px;border:none;background:#2b5fd9;color:#fff;border-radius:999px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;">조건·견적 보기</button>
+</div>
+<style>
+#s1-mbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:85;background:rgba(23,23,27,.94);color:#fff;padding:12px 16px;align-items:center;gap:12px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+@media(max-width:768px){
+ #s1-grid{grid-template-columns:1fr !important;column-gap:0 !important;padding:16px 16px 96px !important;}
+ #s1-aside{display:none !important;}
+ #s1-mbar.on{display:flex;}
+ #s1-aside.m-sheet{display:flex !important;position:fixed;left:0;right:0;bottom:64px;top:auto;max-height:68vh;overflow-y:auto !important;background:#f1eee8;z-index:84;padding:16px 16px 22px;border-radius:20px 20px 0 0;box-shadow:0 -14px 44px rgba(0,0,0,.28);opacity:1 !important;visibility:visible !important;transform:none !important;min-width:0;}
+ #hub-fab{bottom:78px !important;}
+}
+</style>
+
 
 
 
@@ -241,7 +260,7 @@ if(cb)cb.disabled=true;/* 마크업은 회색 스타일뿐 실제 잠금이 없�
 var s3=document.getElementById('s1-step3'),s3i=document.getElementById('s1-step3-ico'),s3s=document.getElementById('s1-step3-state');
 var inp=document.getElementById('s1-input'),snd=document.getElementById('s1-send');
 var poolN=26480,consCount=0;
-function animate(el,to){var f=parseInt((el.firstChild.textContent||'').replace(/[^0-9]/g,''))||0;var st=performance.now();(function tick(t){var p=Math.min((t-st)/500,1);el.firstChild.textContent=Math.round(f+(to-f)*(1-Math.pow(1-p,3))).toLocaleString();if(p<1)requestAnimationFrame(tick);})(performance.now());setTimeout(function(){el.firstChild.textContent=to.toLocaleString();},600);/* 백그라운드 탭(rAF 정지)에서도 최종값 보장 */}
+function animate(el,to){var f=parseInt((el.firstChild.textContent||'').replace(/[^0-9]/g,''))||0;var st=performance.now();(function tick(t){var p=Math.min((t-st)/500,1);el.firstChild.textContent=Math.round(f+(to-f)*(1-Math.pow(1-p,3))).toLocaleString();if(p<1)requestAnimationFrame(tick);})(performance.now());setTimeout(function(){el.firstChild.textContent=to.toLocaleString();},600);/* 백그라운드 탭(rAF 정지)에서도 최종값 보장 */if(el===pool)mbarUpdate();}
 function addAI(t){var d=document.createElement('div');d.style.cssText='display:flex;gap:12px;align-items:flex-start;max-width:88%;';d.innerHTML='<span style="flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">auto_awesome</span><div style="background:#f7f6f2;border-radius:4px 16px 16px 16px;padding:15px 18px;"><p style="margin:0;font-size:15px;line-height:1.65;color:#2c2c32;">'+t+'</p></div>';msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
 function addUser(t){var d=document.createElement('div');d.style.cssText='align-self:flex-end;max-width:80%;';d.innerHTML='<div style="background:#2b5fd9;color:#fff;border-radius:16px 4px 16px 16px;padding:14px 18px;"><p style="margin:0;font-size:15px;line-height:1.6;">'+t+'</p></div>';msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
 function enable(){if(mode==='talk'&&!talkReady){if(cap)cap.textContent='용도와 예산을 알려주시면 견적을 만들 수 있어요.';return;}cb.disabled=false;cb.style.background='#2b5fd9';cb.style.cursor='pointer';if(cap)cap.textContent='지금 조건으로 가성비·추천·고성능 3구성을 만들 수 있어요.';}
@@ -410,9 +429,15 @@ function talkRelabel(){
  sw('#s1-filterwrap','선택에 따라 걸러낸 기준','말씀하신 내용으로 걸러낸 기준');
  sw('#s1-side-cons','현재 제약 요약','지금까지 잡힌 조건');
 }
-var talkPanelOn=false;
-function talkReveal(){
- if(mode!=='talk'||talkPanelOn)return;talkPanelOn=true;
+var panelOn=false;
+function panelLatent(){
+ var gr=document.getElementById('s1-grid');
+ if(gr){gr.style.gridTemplateColumns='1fr 0px';gr.style.columnGap='0px';var sec=gr.querySelector('section');if(sec){sec.style.maxWidth='760px';sec.style.width='100%';sec.style.margin='0 auto';}}
+ var as=document.getElementById('s1-aside');if(as){as.style.opacity='0';as.style.visibility='hidden';as.style.minWidth='0';as.style.overflow='hidden';}
+ talkRelabel();
+}
+function panelReveal(){
+ if(mode==='expert'||panelOn)return;panelOn=true;
  var gr=document.getElementById('s1-grid'),as=document.getElementById('s1-aside');
  var sec=gr?gr.querySelector('section'):null;
  if(gr)gr.style.transition='grid-template-columns .55s cubic-bezier(.25,.8,.3,1),column-gap .55s cubic-bezier(.25,.8,.3,1)';
@@ -435,6 +460,7 @@ function talkReveal(){
   setTimeout(function(){co.style.opacity='1';},850);
   setTimeout(function(){co.style.opacity='0';setTimeout(function(){co.remove();},450);},5600);
  }
+ var mb=document.getElementById('s1-mbar');if(mb){mb.classList.add('on');mbarUpdate();}
 }
 // ---- UX-17 ③: 조건 축적 → 견적 준비 서사 (용도+예산 = 견적 재료) ----
 var talkReady=false,talkNudged=false;
@@ -464,7 +490,7 @@ function talkFlow(){
   },1100);
  }
 }
-function talkApply(p){talkReveal();addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
+function talkApply(p){addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
  var bud=talkBudget(t);
  var hit=null,score=0;
@@ -536,6 +562,7 @@ function budgetUpdate(){
 var consMap={};
 var _bgAddConstraint=addConstraint;
 addConstraint=function(icon,label,value){
+ panelReveal();
  var ex=consMap[label];
  if(ex&&ex.parentNode){
   var b=ex.querySelector('b');if(b)b.textContent=value;
@@ -551,6 +578,7 @@ addConstraint=function(icon,label,value){
  for(var i=0;i<consPairs.length;i++){if(consPairs[i].l===label){consPairs[i].v=value;found=true;break;}}
  if(!found)consPairs.push({l:label,v:value});
  budgetUpdate();
+ mbarUpdate();
 };
 budgetUpdate();
 if(mode==='guided'){
@@ -559,6 +587,7 @@ if(mode==='guided'){
  var _pg=document.getElementById('s1-progress');if(_pg)_pg.style.display='flex';
  var _gf=document.getElementById('s1-guided-foot');if(_gf)_gf.style.display='flex';
  var _esc=document.getElementById('s1-guided-esc');if(_esc)_esc.addEventListener('click',function(){var a=document.getElementById('s1-inputbar');if(a)a.style.display='';var f=document.getElementById('s1-guided-foot');if(f)f.style.display='none';});
+ panelLatent();
  guidedAsk();
 }else if(mode==='expert'){
  var _egb=document.getElementById('s1-gearbar');if(_egb)_egb.style.display='none';
@@ -569,19 +598,21 @@ if(mode==='guided'){
  var _evb=document.getElementById('s1-validate');if(_evb)_evb.addEventListener('click',validate);
  var _xc=document.getElementById('s1-xconfirm');if(_xc)_xc.addEventListener('click',function(){if(!_xc.disabled)window.location.href='s2-result.html';});
 }else if(mode==='talk'){var _tgb=document.getElementById('s1-gearbar');if(_tgb)_tgb.style.display='none';
- var _tgr=document.getElementById('s1-grid');if(_tgr){_tgr.style.gridTemplateColumns='1fr 0px';_tgr.style.columnGap='0px';var _sec=_tgr.querySelector('section');if(_sec){_sec.style.maxWidth='760px';_sec.style.width='100%';_sec.style.margin='0 auto';}}
- var _tas=document.getElementById('s1-aside');if(_tas){_tas.style.opacity='0';_tas.style.visibility='hidden';_tas.style.minWidth='0';_tas.style.overflow='hidden';}
- talkRelabel();
+ panelLatent();
  if(cap)cap.textContent='용도와 예산을 알려주시면 견적을 만들 수 있어요.';
  var _tbn=document.getElementById('s1-mode-banner');if(_tbn)_tbn.style.display='none';
  var _tfg=msgs.firstElementChild;if(_tfg&&_tfg.id!=='s1-empty')_tfg.remove();
  talkStart();
-}else{var _cgb=document.getElementById('s1-gearbar');if(_cgb)_cgb.style.display='none';chatStart();}
+}else{var _cgb=document.getElementById('s1-gearbar');if(_cgb)_cgb.style.display='none';panelLatent();chatStart();}
 function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}addUser(t);inp.value='';var old=poolN;addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');poolN=Math.max(1,Math.round(poolN*0.6));animate(pool,poolN);logFilter('입력 이해',old-poolN,['입력하신 조건 반영']);candidates(poolN);setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},400);}
 if(snd)snd.addEventListener('click',send);
 if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();send();}});
 function focusInput(){var ib=document.getElementById('s1-inputbar');if(ib&&ib.style.display==='none')ib.style.display='';var gf=document.getElementById('s1-guided-foot');if(gf)gf.style.display='none';if(!inp)return;inp.scrollIntoView({behavior:'smooth',block:'nearest'});inp.focus();inp.classList.remove('s1-flash');void inp.offsetWidth;inp.classList.add('s1-flash');setTimeout(function(){inp.classList.remove('s1-flash');},2100);}
 var _ac=document.getElementById('s1-addcond');if(_ac)_ac.addEventListener('click',focusInput);
+// ---- UX-17 ④ 모바일: 하단 요약 바 + 조건 시트 토글 ----
+function mbarUpdate(){var l=document.getElementById('s1-mbar-line');if(l)l.textContent='조건 '+consCount+'개 · 후보 '+poolN.toLocaleString()+'개';}
+var _mb=document.getElementById('s1-mbar-btn');
+if(_mb)_mb.addEventListener('click',function(){var as=document.getElementById('s1-aside');if(!as)return;var open=as.classList.toggle('m-sheet');_mb.textContent=open?'닫기':'조건·견적 보기';});
 })();
 </script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
