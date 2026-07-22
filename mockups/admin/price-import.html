@@ -360,7 +360,7 @@
             ?'<col><col style="width:110px"><col style="width:130px"><col style="width:250px"><col style="width:150px">'
             :'<col><col style="width:190px"><col style="width:330px"><col style="width:130px">';
           if(tab==="chg"){
-            th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2" style="width:36px;"><input type="checkbox" class="form-check-input" id="ckAll" checked></th><th>모델명</th><th>분류</th><th class="text-end">매입가 어제</th><th class="text-end">오늘</th><th class="text-end">변동</th><th class="text-end">재계산 판매가</th></tr>`;
+            th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2" style="width:36px;"><input type="checkbox" class="form-check-input" id="ckAll" checked></th><th>모델명</th><th>분류</th><th class="text-end">매입가 어제</th><th class="text-end">오늘</th><th class="text-end">변동</th><th class="pe-4 text-end">재계산 판매가</th></tr>`;
             tb.innerHTML=CHG.length?CHG.map((c,i)=>{
               const d=c.t-c.y, pct=(d/c.y*100).toFixed(1);
               return `<tr>
@@ -370,7 +370,7 @@
                 <td class="text-end text-body-tertiary">${won(c.y)}</td>
                 <td class="text-end fw-bold">${won(c.t)}</td>
                 <td class="text-end"><span class="badge badge-phoenix badge-phoenix-${d<0?"primary":"danger"}">${d<0?"▼":"▲"} ${Math.abs(pct)}%</span></td>
-                <td class="text-end fw-bold">${won(sell(c.t))} <span class="fs-10 fw-normal text-body-tertiary">(+수수료 2.2%)</span></td>
+                <td class="pe-4 text-end fw-bold">${won(sell(c.t))} <span class="fs-10 fw-normal text-body-tertiary">(+수수료 2.2%)</span></td>
               </tr>`;
             }).join(""):`<tr><td colspan="7" class="text-center text-body-tertiary py-5">오늘 가격 변동이 모두 반영됐습니다.</td></tr>`;
             tb.querySelectorAll("[data-i]").forEach(ck=>ck.onchange=()=>{CHG[+ck.dataset.i].on=ck.checked;tabsBar();});
