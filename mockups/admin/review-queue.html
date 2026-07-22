@@ -267,6 +267,7 @@
           <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">10</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">0</span>건</p></div>
         </div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="filterPills"></ul>
+        <div id="bulkBar"></div>
         <div class="row g-3">
           <div class="col-12 col-lg-5"><div class="card"><div class="card-body p-0"><div id="queueList" class="scrollbar" style="max-height:70vh;overflow-y:auto;"></div></div></div></div>
           <div class="col-12 col-lg-7"><div id="detail"></div></div>
@@ -391,20 +392,59 @@
           d.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>process(q.id, b.dataset.act));
           if(window.feather) feather.replace();
         }
+        // #3 확정 결과 피드백 — 확정이 추천 가능 재고·견적에 미치는 영향을 즉시 보여준다 (영향 견적 수는 분류별 목업값)
+        const IMPACT = {"그래픽카드":14,"메인보드":11,"파워서플라이":9,"메모리":8,"케이스":7,"SSD":6,"CPU쿨러":5};
+        // #6 되돌리기 — 마지막 처리(단건·일괄)를 복원
+        let lastAction = null, bulkArmed = false;
+        function undo(){
+          if(!lastAction) return;
+          lastAction.entries.forEach(e=>QUEUE.splice(Math.min(e.idx,QUEUE.length),0,e.item));
+          done -= lastAction.count;
+          sel = lastAction.entries[0].item.id;
+          lastAction = null;
+          renderAll();
+          toast("되돌렸습니다 — 항목이 검수 대기로 복원됐습니다.");
+        }
         function process(id, act){
           const idx = QUEUE.findIndex(x=>x.id===id); if(idx<0) return;
+          const q = QUEUE[idx];
           const l = list(); const pos = l.findIndex(x=>x.id===id);
           QUEUE.splice(idx,1); done++;
+          lastAction = {entries:[{item:q, idx:idx}], count:1};
           const nl = list(); sel = nl.length? (nl[Math.min(pos, nl.length-1)].id) : null;
-          toast(`${id} — ${act} 완료 · 추천 가능 재고 반영`);
+          const neg = (act==="반려"||act==="원본 제외"||act==="계속 보류");
+          if(neg) toast(`<b>${id}</b> — ${act} 처리 · 추천 가능 재고 미진입`, true);
+          else toast(`<b>${id}</b> ${act} · <b>추천 가능 재고 +1</b> · 영향 견적 ${IMPACT[q.cat]||5}건`, true);
           renderAll();
         }
-        function toast(m){
-          let t=document.getElementById("__rtoast");
-          if(!t){t=document.createElement("div");t.id="__rtoast";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:.2s;";document.body.appendChild(t);}
-          t.textContent=m;t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",2200);
+        // #5 사유별 일괄 확정 — 값이 유효한 저신뢰(경미) 항목만 대상. 치명·주의는 단건 검수 강제.
+        function bulkConfirm(){
+          const items = QUEUE.filter(q=>q.type==="low_confidence");
+          if(!items.length) return;
+          lastAction = {entries:items.map(q=>({item:q, idx:QUEUE.indexOf(q)})), count:items.length};
+          let impact = 0; items.forEach(q=>impact+=(IMPACT[q.cat]||5));
+          QUEUE = QUEUE.filter(q=>q.type!=="low_confidence"); done += items.length;
+          const nl = list(); sel = nl.length? nl[0].id : null;
+          toast(`<b>AI 확신 낮음 ${items.length}건</b> 원문값 일괄 확정 · <b>추천 가능 재고 +${items.length}</b> · 영향 견적 ${impact}건`, true);
+          renderAll();
         }
-        function renderAll(){ renderPills(); renderList(); renderDetail(); }
+        function renderBulk(){
+          const el = document.getElementById("bulkBar"); if(!el) return;
+          const n = QUEUE.filter(q=>q.type==="low_confidence").length;
+          if(cur!=="low_confidence"||!n){ el.innerHTML=""; el.className=""; bulkArmed=false; return; }
+          el.className = "alert alert-subtle-warning d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-3";
+          el.innerHTML = `<span data-feather="zap" style="width:15px;height:15px;flex:none;"></span><span class="fs-9"><b>값은 유효한 저신뢰 항목 ${n}건</b> — 원문값 기준으로 한 번에 확정할 수 있습니다. <span class="text-body-tertiary">위험도 치명·주의 항목은 일괄 확정 대상이 아닙니다(단건 검수).</span></span><button id="bulkBtn" class="btn btn-sm ${bulkArmed?"btn-warning":"btn-phoenix-warning"} ms-auto text-nowrap">${bulkArmed?`한 번 더 누르면 ${n}건 확정`:`${n}건 일괄 확정`}</button>`;
+          document.getElementById("bulkBtn").onclick = ()=>{ if(bulkArmed){ bulkArmed=false; bulkConfirm(); } else { bulkArmed=true; renderBulk(); } };
+          if(window.feather) feather.replace();
+        }
+        function toast(m, actionable){
+          let t=document.getElementById("__rtoast");
+          if(!t){t=document.createElement("div");t.id="__rtoast";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:.2s;display:flex;align-items:center;gap:12px;max-width:92vw;";document.body.appendChild(t);}
+          t.innerHTML = `<span>${m}</span>` + (actionable?`<button id="__undoBtn" style="background:none;border:1px solid rgba(255,255,255,.4);color:#ffd166;font-size:12px;font-weight:800;padding:4px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;">되돌리기</button><a href="activity-logs.html" style="color:#9ec5ff;font-size:12px;font-weight:700;white-space:nowrap;">작업 기록</a>`:"");
+          const ub=t.querySelector("#__undoBtn"); if(ub)ub.onclick=()=>{t.style.opacity="0";undo();};
+          t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0", actionable?6500:2200);
+        }
+        function renderAll(){ renderPills(); renderBulk(); renderList(); renderDetail(); }
         sel = list()[0].id; renderAll();
       })();
       </script>

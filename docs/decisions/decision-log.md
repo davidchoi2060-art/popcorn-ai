@@ -81,7 +81,7 @@
 | D-01 | 디자인 시스템 = **Vibrant Horizon.** 토큰 단일 원천 = `design-system/tokens.css`의 `:root`. 임의 HEX/px·인라인 스타일 금지. | ✅ | CLAUDE.md §3. |
 | D-02 | 서체 = **Inter(라틴·숫자) + Pretendard(한글) 페어링.** Inter 단독 금지(한글 깨짐). 숫자·가격은 Inter tabular. | ✅ | |
 | D-03 | 팔레트: primary `#005ab3`(액션) · `#0082fd`(hover) · tertiary `#853d97`(근거·태그) · error `#b31b25`(위험). | ✅ | primary는 과거 `#0075d5`에서 `#005ab3`로 갱신된 정본. |
-| D-04 | **아이콘은 단색 currentColor 세트만**(Lucide 권장 또는 인라인 SVG). 풀컬러 팩(fluent-color/streamline 등) 금지 — 토큰 색 통제 불가·톤 불일치. | ✅ | HANDOFF §4, S1 검증 시 전량 제거. |
+| D-04 | ~~아이콘은 단색 currentColor 세트만. 풀컬러 팩 금지~~ → **D-10(2026-07-16)으로 폐기.** 현행 정책 = Streamline Ultimate Color 전면 사용(상단 블록쿼트 D-10 참조). | ⛔ | 2026-07-16 사용자 지시로 번복. 이 행은 기록 보존용. |
 | D-05 | 마크업 계약(Stitch 승계): 최상위 `data-screen-id`·`data-domain`, 동적값 `data-bind`, 반복 `data-repeat`, 액션 `data-action`, 예외/상태 UI는 `hidden`. 시맨틱 태그·alt·label·aria 준수. 한국어 UI(기술 약어만 영문). 768px 이하 세로 스택. | ✅ | CLAUDE.md §3. |
 | D-06 | **후보 풀 카운터 시각화 = "검증 파이프라인"(안 B).** primary 헤더 밴드 + 실시간 숫자 틱다운·델타 + 검증 3단계 체크리스트(실재고 확인·호환성 5종·조건 반영). 도트 40개·진행바는 폐기. '조건 반영' 단계만 상태 연동(0개일 때 "대기 중"으로 정직 표기). | ✅ 2026-07-02 | 3안 비교 후 선택. "검증 절차 = 증거" 프레이밍이 신뢰 판매자 정체성(A-01)에 밀착. 기존 U-03 대체. |
 | D-07 | **디자인 톤 = "Popcorn Light"(랜딩 준용)로 개정.** 사용자가 `Popcorn AI 랜딩.html`의 **밝은 본문 시트 톤**(다크 히어로가 아니라 라이트 콘텐츠)을 다른 화면에 준용하기로 선택 — **다크모드 아님.** 캔버스 `#F0F5F9`, 카드 `#ffffff`, 텍스트 `#111827`·뮤트 `#64748B`, 액센트 블루 `#65A1D4`(hover `#4A90E2`), 경계 `#DCE7F2`. 서체: 헤드라인 **Hanken Grotesk**+Pretendard(한글), 본문 Inter+Pretendard, 수치·라벨 JetBrains Mono. **기존 Vibrant Horizon 색·서체(D-01~D-03)를 이 톤으로 대체**하되 토큰 단일원천·단색 아이콘(D-04)·data-* 마크업(D-05)·검증 파이프라인(D-06)은 유지. | ✅ 2026-07-03 | 사용자 톤 선택(밝은 배경·폰트·폰트사이즈 준용). 서사는 A-07로 불변. |
