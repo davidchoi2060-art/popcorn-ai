@@ -276,7 +276,7 @@
       </div>
       <script>
       (function(){
-        var FIELD_KO={"socket": "소켓", "tdp_watt": "소비전력", "igpu": "내장그래픽", "mem_type": "메모리 규격", "form_factor": "폼팩터", "m2_slots": "M.2 슬롯 수", "length_mm": "장착 길이", "pcie_power": "보조전원", "slot_width": "슬롯 폭", "rated_watt": "정격 출력", "efficiency": "80PLUS 등급", "rail_12v": "+12V 출력", "gpu_max_len": "GPU 최대 길이", "cpu_cooler_h": "쿨러 최대 높이", "mb_support": "지원 보드 규격", "psu_form": "파워 규격", "capacity_gb": "용량", "interface": "인터페이스", "dram": "DRAM 캐시", "height_mm": "높이", "socket_support": "지원 소켓", "tdp_support": "지원 TDP", "fan_size": "팬 크기", "speed_mts": "동작 속도", "kit": "구성", "price_krw": "판매가", "cost_krw": "매입가", "stock_qty": "재고 수량", "spec_raw": "사양 원문", "sku": "상품코드", "supplier": "공급처", "name": "상품명", "category": "분류", "cores": "코어/스레드"};function fk(f,cls){if(!f||f==="-")return "<code"+(cls?" class=\""+cls+"\"":"")+">-</code>";var k=FIELD_KO[f];return (k?k+" ":"")+"<code"+(cls?" class=\""+cls+"\"":"")+">{"+f+"}</code>";}
+        var FIELD_KO={"socket": "소켓", "tdp_watt": "소비전력", "igpu": "내장그래픽", "mem_type": "메모리 규격", "form_factor": "폼팩터", "m2_slots": "M.2 슬롯 수", "length_mm": "장착 길이", "pcie_power": "보조전원", "slot_width": "슬롯 폭", "rated_watt": "정격 출력", "efficiency": "80PLUS 등급", "rail_12v": "+12V 출력", "gpu_max_len": "GPU 최대 길이", "cpu_cooler_h": "쿨러 최대 높이", "mb_support": "지원 보드 규격", "psu_form": "파워 규격", "capacity_gb": "용량", "interface": "인터페이스", "dram": "DRAM 캐시", "height_mm": "높이", "socket_support": "지원 소켓", "tdp_support": "지원 TDP", "fan_size": "팬 크기", "speed_mts": "동작 속도", "kit": "구성", "refresh_hz": "주사율", "resolution": "해상도", "panel": "패널", "ports": "출력 포트", "size_inch": "화면 크기", "price_krw": "판매가", "cost_krw": "매입가", "stock_qty": "재고 수량", "spec_raw": "사양 원문", "sku": "상품코드", "supplier": "공급처", "name": "상품명", "category": "분류", "cores": "코어/스레드"};function fk(f,cls){if(!f||f==="-")return "<code"+(cls?" class=\""+cls+"\"":"")+">-</code>";var k=FIELD_KO[f];return (k?k+" ":"")+"<code"+(cls?" class=\""+cls+"\"":"")+">{"+f+"}</code>";}
         const TYPES = {
           spec_conflict:{label:"사양 불일치", c:"danger"},
           spec_missing:{label:"필수 사양 없음", c:"warning"},
@@ -310,7 +310,10 @@
            note:"가격 자릿수 구분 오류(1,29,000). 129,000으로 교정 필요."},
           {id:"P-4102", name:"기가바이트 B550M K", cat:"메인보드", type:"spec_conflict", field:"socket", origin:"AM5", know:"AM4 (B550 칩셋)", conf:0.82, wait:"4시간 전",
            crit:[["소켓 {socket}","불일치",false],["메모리 규격 {mem_type}","DDR4",true],["폼팩터 {form_factor}","mATX",true],["M.2 슬롯 {m2_slots}","1",true]],
-           note:"제목 파싱은 AM5로 잡았으나 B550은 AM4. 소켓 오류는 CPU 호환 전체를 무너뜨림 → 최우선 교정."}
+           note:"제목 파싱은 AM5로 잡았으나 B550은 AM4. 소켓 오류는 CPU 호환 전체를 무너뜨림 → 최우선 교정."},
+          {id:"P-7102", name:"삼성 오디세이 G5 G51C 32형", cat:"모니터", type:"spec_missing", field:"refresh_hz", origin:"없음", know:"165Hz (시리즈 기준 추정)", conf:0.62, wait:"38분 전",
+           crit:[["주사율 {refresh_hz}","미확인",false],["해상도 {resolution}","QHD 2560×1440",true],["패널 {panel}","VA",true],["출력 포트 {ports}","DP1.4 · HDMI2.0",true]],
+           note:"주사율 미표기. 주변기기 '함께 구성' 제안에서 GPU 성능 매칭 근거(권장 프레임)로 쓰이는 필수 사양 → 운영자 확정 필요."}
         ];
         let cur = "all", sel = null, done = 0;
         // #4 위험도 — 추천을 실제로 망가뜨리는 정도(색+텍스트 병기)
