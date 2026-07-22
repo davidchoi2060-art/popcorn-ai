@@ -268,20 +268,14 @@
           <button class="btn btn-primary btn-sm" id="btnDrop">+ 오늘 단가표 업로드</button>
         </div>
 
-        <!-- 파일·프리셋 인식 카드 -->
-        <div class="card mb-3"><div class="card-body py-3">
-          <div class="d-flex flex-wrap align-items-center gap-3">
-            <span data-feather="file-text" style="width:26px;height:26px;color:var(--phoenix-primary);flex:none;"></span>
-            <div class="flex-1" style="min-width:220px;">
-              <h6 class="mb-0">MSI_단가표0716MTF.xlsx <span class="badge badge-phoenix badge-phoenix-primary ms-1">프리셋 자동 인식 — MSI(웨이코스) · 윈윈 플랫폼</span></h6>
-              <p class="fs-9 text-body-tertiary mb-0 mt-1">시트 7개 중 <b>5개 인식</b> (Sheet3 빈 시트 · '가격지도' 규정 문서 제외) · 헤더 2줄/칩셋 그룹 정규화 · <b>174행</b> 추출 · 오늘 07:12 수신</p>
-            </div>
-            <div class="text-end">
-              <span class="badge badge-phoenix badge-phoenix-secondary">가격지도(단가 단속) 미적용 — 단품 외부 노출 없음</span>
-              <p class="fs-10 text-body-quaternary mb-0 mt-1">프리셋 수정: 공급처 관리에서</p>
-            </div>
-          </div>
+        <!-- 오늘 수신함 (다중 거래처) -->
+        <div class="card mb-3"><div class="card-body py-2 px-3">
+          <div class="d-flex align-items-center gap-2 mb-2"><h6 class="mb-0 fs-9 text-body-tertiary">오늘 수신함</h6><span class="badge badge-phoenix badge-phoenix-warning" id="inboxBadge">2건 대기</span></div>
+          <div id="inbox"></div>
         </div></div>
+
+        <!-- 선택 파일 프리셋·열 매핑 -->
+        <div class="card mb-3"><div class="card-body py-3" id="presetCard"></div></div>
 
         <!-- 판매가 공식 -->
         <div class="alert alert-subtle-primary d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-3 fs-9" role="alert">
@@ -312,85 +306,161 @@
         const FEE=0.022, MARGIN=0.0;
         const sell=c=>Math.round(c*(1+FEE+MARGIN)/1000)*1000;
         const won=n=>n.toLocaleString()+"원";
-        // 실제 MSI 단가표(0716) 기반 데모 데이터 — 어제값은 목업
-        let CHG=[
-          ["MSI 지포스 RTX 5080 뱅가드 SOC D","그래픽카드",2184000,2120000],
-          ["MSI 지포스 RTX 5070 Ti 게이밍 트리오","그래픽카드",1559000,1513000],
-          ["MSI 지포스 RTX 5070 벤투스 2X OC","그래픽카드",950000,971000],
-          ["MSI MPG X870E 카본 WIFI","메인보드",634000,625000],
-          ["MSI MAG B850 토마호크 맥스 WIFI","메인보드",312000,307000],
-          ["MSI MAG B860M 박격포","메인보드",239000,232000],
-          ["SPATIUM M480 Pro PCIe 4.0 2TB","SSD",393000,379000],
-          ["MAG A850GL PCIE5 WHITE","파워",138000,134000]
-        ].map(r=>({name:r[0],cat:r[1],y:r[2],t:r[3],on:true}));
-        let NEW=[
-          {name:"PRO H810M-E",cat:"메인보드",cost:111000,match:null},
-          {name:"MSI PRO B840-P WIFI",cat:"메인보드",cost:186000,match:["P-2044",87]},
-          {name:"SPATIUM M560 PCIe 5.0 2TB",cat:"SSD",cost:379000,match:["P-6031",91]}
-        ];
-        let STAT=[
-          {name:"MSI 지포스 RTX 5080 뱅가드 SOC D",from:"품절",to:"가능"},
-          {name:"MSI 지포스 RTX 5070 게이밍 트리오 OC",from:"문의",to:"가능"},
-          {name:"MSI 지포스 RTX 5090 슈프림 리퀴드 S",from:"가능",to:"품절"},
-          {name:"MAG A650BNL WHITE",from:"가능",to:"품절"}
-        ];
-        let tab="chg", lastApplied=null;
+        // 실제 수신 파일 2종 기반 데모 — 어제값은 목업
+        const FILES={
+         gbt:{
+          label:"GBT PCD VGA MB 단가표 0721클릭.xlsx", time:"오늘 07:31", preset:"클릭나라 · 기가바이트(PCD)",
+          recog:"시트 4개 전부 인식 · 헤더 3행 · <b>다나와 상품코드 열 존재</b> · 246행 추출",
+          map:'매입가 ← <b>공급가</b> <span class="text-body-tertiary">(POWER 시트: 공급가 결측 → <b>현금/딜러몰가 대체</b> — 확정 규칙)</span> · 발주 상태 ← 재고현황(<b>O→가능 · X→품절</b>) + 비고(문의)',
+          note:'<span class="badge badge-phoenix badge-phoenix-info">다나와 상품코드 매칭 — 자동 연결 우선</span>',
+          same:232, applied:false, lastUndo:null,
+          chg:[
+           {name:"GA-Z890 AORUS XTREME AI TOP",cat:"메인보드",y:1420000,t:1394000,memo:"0721 가격변동"},
+           {name:"GA-Z890 AORUS MASTER",cat:"메인보드",y:636000,t:629000,memo:"0721 가격변동"},
+           {name:"GA-Z890 AORUS ELITE DUO ICE",cat:"메인보드",y:394000,t:386000,memo:"0720 인하"},
+           {name:"GA-B860 AORUS ELITE WIFI7",cat:"메인보드",y:278000,t:271000,memo:"0721 가격변동"},
+           {name:"GA-B860M AORUS ELITE",cat:"메인보드",y:224000,t:217000,memo:"0721 가격변동",alt:"타 공급처 최저 215,000원(조이젠) — 이 파일이 최저 아님"},
+           {name:"GIGABYTE 지포스 RTX 5090 GAMING OC",cat:"그래픽카드",y:6750000,t:6974000,memo:"인상 품절"},
+           {name:"GIGABYTE UD850GM PG5 80PLUS골드",cat:"파워",y:109000,t:105000,memo:"공급가 결측",sub:"딜러몰가 대체"}
+          ].map(r=>(r.on=true,r)),
+          nw:[
+           {name:"GA-Z890I AORUS ULTRA",cat:"메인보드",cost:469000,m:{k:"code",v:"다나와코드 69699695 일치 — P-2101에 공급처 가격 자동 추가"}},
+           {name:"GIGABYTE UD1300GM PG5",cat:"파워",cost:259000,m:{k:"sim",v:"이름 유사도 89% — 후보 P-3410"}},
+           {name:"W790 AI TOP",cat:"메인보드",cost:1407000,m:{k:"none",v:"다나와코드·유사 이름 없음 — 신규 등록 필요"}}
+          ],
+          stat:[
+           {name:"GIGABYTE AORUS RTX 5080 MASTER",raw:"재고현황 X → O",from:"품절",to:"가능"},
+           {name:"GIGABYTE 지포스 RTX 5070 Ti WINDFORCE",raw:"비고 문의 → 재고현황 O",from:"문의",to:"가능"},
+           {name:"GIGABYTE 지포스 RTX 5090 GAMING OC",raw:"비고 '인상 품절'",from:"가능",to:"품절"},
+           {name:"GA-Z790 AORUS ELITE AX",raw:"재고현황 O → X",from:"가능",to:"품절"}
+          ]
+         },
+         msi:{
+          label:"MSI_단가표0716MTF.xlsx", time:"오늘 07:12", preset:"MSI(웨이코스) · 윈윈 플랫폼",
+          recog:"시트 7개 중 5개 인식 (Sheet3 빈 시트 · '가격지도' 규정 문서 제외) · 헤더 2줄/칩셋 그룹 정규화 · 174행 추출",
+          map:'매입가 ← <b>판매가(윈윈·셀프로)</b> · 발주 상태 ← 비고(품절/가능/문의) · 상품코드 없음 — <b>모델명 매칭</b>',
+          note:'<span class="badge badge-phoenix badge-phoenix-secondary">가격지도(단가 단속) 미적용 — 단품 외부 노출 없음</span>',
+          same:159, applied:false, lastUndo:null,
+          chg:[
+           {name:"MSI 지포스 RTX 5080 뱅가드 SOC D",cat:"그래픽카드",y:2184000,t:2120000},
+           {name:"MSI 지포스 RTX 5070 Ti 게이밍 트리오",cat:"그래픽카드",y:1559000,t:1513000},
+           {name:"MSI 지포스 RTX 5070 벤투스 2X OC",cat:"그래픽카드",y:950000,t:971000},
+           {name:"MSI MPG X870E 카본 WIFI",cat:"메인보드",y:634000,t:625000},
+           {name:"MSI MAG B850 토마호크 맥스 WIFI",cat:"메인보드",y:312000,t:307000},
+           {name:"MSI MAG B860M 박격포",cat:"메인보드",y:239000,t:232000},
+           {name:"SPATIUM M480 Pro PCIe 4.0 2TB",cat:"SSD",y:393000,t:379000},
+           {name:"MAG A850GL PCIE5 WHITE",cat:"파워",y:138000,t:134000}
+          ].map(r=>(r.on=true,r)),
+          nw:[
+           {name:"PRO H810M-E",cat:"메인보드",cost:111000,m:{k:"none",v:"다나와코드 없음·유사 이름 없음 — 신규 등록 필요"}},
+           {name:"MSI PRO B840-P WIFI",cat:"메인보드",cost:186000,m:{k:"sim",v:"이름 유사도 87% — 후보 P-2044"}},
+           {name:"SPATIUM M560 PCIe 5.0 2TB",cat:"SSD",cost:379000,m:{k:"sim",v:"이름 유사도 91% — 후보 P-6031"}}
+          ],
+          stat:[
+           {name:"MSI 지포스 RTX 5080 뱅가드 SOC D",raw:"비고 품절 → 가능",from:"품절",to:"가능"},
+           {name:"MSI 지포스 RTX 5070 게이밍 트리오 OC",raw:"비고 문의 → 가능",from:"문의",to:"가능"},
+           {name:"MSI 지포스 RTX 5090 슈프림 리퀴드 S",raw:"비고 가능 → 품절",from:"가능",to:"품절"},
+           {name:"MAG A650BNL WHITE",raw:"비고 가능 → 품절",from:"가능",to:"품절"}
+          ]
+         }
+        };
+        let fid="gbt", tab="chg";
+        const F=()=>FILES[fid];
+        function inbox(){
+          const order=["gbt","msi"];
+          document.getElementById("inbox").innerHTML=order.map(k=>{
+            const f=FILES[k], on=k===fid;
+            const sum=f.applied?`반영 완료`:`변동 ${f.chg.length} · 신규 ${f.nw.length} · 전환 ${f.stat.length}`;
+            return `<div data-fid="${k}" class="d-flex flex-wrap align-items-center gap-2 py-2 px-2 rounded-2 cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
+              <span data-feather="file-text" style="width:16px;height:16px;color:var(--phoenix-primary);flex:none;"></span>
+              <b class="fs-9 text-body-highlight">${f.label}</b>
+              <span class="fs-10 text-body-quaternary">${f.time}</span>
+              <span class="badge badge-phoenix badge-phoenix-secondary fs-10">${f.preset}</span>
+              <span class="ms-auto fs-10 ${f.applied?"text-body-quaternary":"fw-bold"}">${sum}</span>
+              <span class="badge badge-phoenix badge-phoenix-${f.applied?"primary":"warning"}">${f.applied?"반영 완료":"대기"}</span>
+            </div>`;
+          }).join("");
+          document.querySelectorAll("#inbox [data-fid]").forEach(el=>el.onclick=()=>{fid=el.dataset.fid;tab="chg";render();});
+          const n=Object.values(FILES).filter(f=>!f.applied).length;
+          document.getElementById("inboxBadge").textContent=n?`${n}건 대기`:"모두 반영 완료";
+        }
+        function presetCard(){
+          const f=F();
+          document.getElementById("presetCard").innerHTML=`
+            <div class="d-flex flex-wrap align-items-center gap-3">
+              <span data-feather="file-text" style="width:26px;height:26px;color:var(--phoenix-primary);flex:none;"></span>
+              <div class="flex-1" style="min-width:260px;">
+                <h6 class="mb-0">${f.label} <span class="badge badge-phoenix badge-phoenix-primary ms-1">프리셋 자동 인식 — ${f.preset}</span></h6>
+                <p class="fs-9 text-body-tertiary mb-0 mt-1">${f.recog}</p>
+                <p class="fs-9 mb-0 mt-1"><span class="badge badge-phoenix badge-phoenix-secondary me-1">열 매핑</span>${f.map}</p>
+              </div>
+              <div class="text-end">${f.note}<p class="fs-10 text-body-quaternary mb-0 mt-1">프리셋 수정: 공급처 관리에서</p></div>
+            </div>`;
+        }
         function kpis(){
-          const K=[["가격 변동",CHG.length,"건","warning"],["신규 모델",NEW.length,"건","info"],["발주 상태 전환",STAT.length,"건","primary"],["변동 없음(자동 통과)",159,"행","secondary"]];
+          const f=F();
+          const K=[["가격 변동",f.chg.length,"건","warning"],["신규·매칭",f.nw.length,"건","info"],["발주 상태 전환",f.stat.length,"건","primary"],["변동 없음(자동 통과)",f.same,"행","secondary"]];
           document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function tabsBar(){
-          const T=[["chg","가격 변동",CHG.length,"warning"],["new","신규 모델",NEW.length,"info"],["stat","발주 상태 전환",STAT.length,"primary"]];
+          const f=F();
+          const T=[["chg","가격 변동",f.chg.length,"warning"],["new","신규·매칭",f.nw.length,"info"],["stat","발주 상태 전환",f.stat.length,"primary"]];
           document.getElementById("tabs").innerHTML=T.map(([k,l,n,c])=>{
             const on=k===tab;
             return `<li class="nav-item"><a href="#!" data-t="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+c} ms-1">${n}</span></a></li>`;
           }).join("");
           document.querySelectorAll("#tabs [data-t]").forEach(a=>a.onclick=e=>{e.preventDefault();tab=a.dataset.t;render();});
           const ab=document.getElementById("applyBtn");
-          ab.style.display=tab==="chg"?"":"none";
-          ab.textContent=`선택 ${CHG.filter(c=>c.on).length}건 반영`;
+          ab.style.display=tab==="chg"&&f.chg.length?"":"none";
+          ab.textContent=`선택 ${f.chg.filter(c=>c.on).length}건 반영`;
         }
         function render(){
-          kpis();tabsBar();
+          inbox();presetCard();kpis();tabsBar();
+          const f=F();
           const th=document.getElementById("thead"), tb=document.getElementById("rows");
           const cols=document.getElementById("cols");
           if(cols)cols.innerHTML=tab==="chg"
             ?'<col style="width:44px"><col><col style="width:110px"><col style="width:130px"><col style="width:130px"><col style="width:100px"><col style="width:230px">'
             :tab==="new"
-            ?'<col><col style="width:110px"><col style="width:130px"><col style="width:250px"><col style="width:150px">'
-            :'<col><col style="width:190px"><col style="width:330px"><col style="width:130px">';
+            ?'<col><col style="width:110px"><col style="width:130px"><col style="width:380px"><col style="width:150px">'
+            :'<col><col style="width:230px"><col style="width:330px"><col style="width:130px">';
           if(tab==="chg"){
             th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2" style="width:36px;"><input type="checkbox" class="form-check-input" id="ckAll" checked></th><th>모델명</th><th>분류</th><th class="text-end">매입가 어제</th><th class="text-end">오늘</th><th class="text-end">변동</th><th class="pe-4 text-end">재계산 판매가</th></tr>`;
-            tb.innerHTML=CHG.length?CHG.map((c,i)=>{
+            tb.innerHTML=f.chg.length?f.chg.map((c,i)=>{
               const d=c.t-c.y, pct=(d/c.y*100).toFixed(1);
+              const subLine=(c.memo?`<span class="me-2">비고: ${c.memo}</span>`:"")+(c.alt?`<span class="text-warning-emphasis">${c.alt}</span>`:"");
               return `<tr>
                 <td class="ps-4"><input type="checkbox" class="form-check-input" data-i="${i}" ${c.on?"checked":""}></td>
-                <td class="fw-semibold text-body-highlight">${c.name}</td>
+                <td class="fw-semibold text-body-highlight">${c.name}${subLine?`<div class="fs-10 fw-normal text-body-tertiary text-truncate">${subLine}</div>`:""}</td>
                 <td class="text-body-tertiary">${c.cat}</td>
                 <td class="text-end text-body-tertiary">${won(c.y)}</td>
-                <td class="text-end fw-bold">${won(c.t)}</td>
+                <td class="text-end fw-bold">${won(c.t)}${c.sub?`<div class="fs-10 fw-normal"><span class="badge badge-phoenix badge-phoenix-secondary">${c.sub}</span></div>`:""}</td>
                 <td class="text-end"><span class="badge badge-phoenix badge-phoenix-${d<0?"primary":"danger"}">${d<0?"▼":"▲"} ${Math.abs(pct)}%</span></td>
                 <td class="pe-4 text-end fw-bold">${won(sell(c.t))} <span class="fs-10 fw-normal text-body-tertiary">(+수수료 2.2%)</span></td>
               </tr>`;
-            }).join(""):`<tr><td colspan="7" class="text-center text-body-tertiary py-5">오늘 가격 변동이 모두 반영됐습니다.</td></tr>`;
-            tb.querySelectorAll("[data-i]").forEach(ck=>ck.onchange=()=>{CHG[+ck.dataset.i].on=ck.checked;tabsBar();});
-            const ca=document.getElementById("ckAll"); if(ca)ca.onchange=()=>{CHG.forEach(c=>c.on=ca.checked);render();};
+            }).join(""):`<tr><td colspan="7" class="text-center text-body-tertiary py-5">이 파일의 가격 변동이 모두 반영됐습니다.</td></tr>`;
+            tb.querySelectorAll("[data-i]").forEach(ck=>ck.onchange=()=>{f.chg[+ck.dataset.i].on=ck.checked;tabsBar();});
+            const ca=document.getElementById("ckAll"); if(ca)ca.onchange=()=>{f.chg.forEach(c=>c.on=ca.checked);render();};
           }else if(tab==="new"){
             th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2">모델명</th><th>분류</th><th class="text-end">매입가</th><th>SKU 매칭</th><th class="pe-4 text-end"></th></tr>`;
-            tb.innerHTML=NEW.map(n=>`<tr>
-              <td class="ps-4 fw-semibold text-body-highlight">${n.name}</td>
-              <td class="text-body-tertiary">${n.cat}</td>
-              <td class="text-end">${won(n.cost)}</td>
-              <td>${n.match?`<span class="badge badge-phoenix badge-phoenix-info">후보 ${n.match[0]} · 유사도 ${n.match[1]}%</span>`:`<span class="badge badge-phoenix badge-phoenix-warning">매칭 없음 — 신규 등록 필요</span>`}</td>
-              <td class="pe-4 text-end"><a class="btn btn-sm btn-subtle-secondary" href="review-queue.html">검수에서 확정</a></td>
-            </tr>`).join("");
+            const MB={code:["primary","자동 연결"],sim:["info","후보"],none:["warning","검수 필요"]};
+            tb.innerHTML=f.nw.map(n=>{
+              const [col,lab]=MB[n.m.k];
+              return `<tr>
+                <td class="ps-4 fw-semibold text-body-highlight">${n.name}</td>
+                <td class="text-body-tertiary">${n.cat}</td>
+                <td class="text-end">${won(n.cost)}</td>
+                <td><span class="badge badge-phoenix badge-phoenix-${col} me-1">${lab}</span><span class="fs-10 text-body-tertiary">${n.m.v}</span></td>
+                <td class="pe-4 text-end">${n.m.k==="code"?`<span class="fs-10 text-body-quaternary">확인 불필요</span>`:`<a class="btn btn-sm btn-subtle-secondary" href="review-queue.html">검수에서 확정</a>`}</td>
+              </tr>`;
+            }).join("");
           }else{
             th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2">모델명</th><th>발주 상태</th><th>영향</th><th class="pe-4 text-end"></th></tr>`;
-            tb.innerHTML=STAT.map(s=>{
+            tb.innerHTML=f.stat.map(s=>{
               const up=s.to==="가능";
               return `<tr>
                 <td class="ps-4 fw-semibold text-body-highlight">${s.name}</td>
-                <td><span class="text-body-tertiary">${s.from}</span> → <span class="badge badge-phoenix badge-phoenix-${up?"primary":"danger"}">${s.to}</span></td>
+                <td><span class="text-body-tertiary">${s.from}</span> → <span class="badge badge-phoenix badge-phoenix-${up?"primary":"danger"}">${s.to}</span><div class="fs-10 text-body-quaternary">${s.raw}</div></td>
                 <td class="fs-9 text-body-tertiary">${up?"발주 재개 가능 — 재고 없음 상품이면 매입 후보로":"발주 불가 — 매입 견적에서 대안 공급처 확인"}</td>
                 <td class="pe-4 text-end"><a class="btn btn-sm btn-subtle-secondary" href="sourcing.html">매입 견적</a></td>
               </tr>`;
@@ -406,17 +476,18 @@
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
         }
         function undo(){
-          if(!lastApplied)return;
-          CHG=lastApplied.concat(CHG);lastApplied=null;render();
-          toast("되돌렸습니다 — 가격 변경이 반영 전 상태로 복원됐습니다.");
+          const f=F(); if(!f.lastUndo)return;
+          f.chg=f.lastUndo.concat(f.chg); f.lastUndo=null; f.applied=false; render();
+          toast("되돌렸습니다 — 이 파일의 가격 변경이 반영 전 상태로 복원됐습니다.");
         }
         document.getElementById("applyBtn").onclick=()=>{
-          const sel=CHG.filter(c=>c.on); if(!sel.length)return;
-          lastApplied=sel; CHG=CHG.filter(c=>!c.on);
-          toast(`매입가 <b>${sel.length}건</b> 반영 · 판매가 재계산(수수료 2.2%·마진 0%) 완료 · <b>영향 견적 23건</b>`,true);
+          const f=F(); const sel=f.chg.filter(c=>c.on); if(!sel.length)return;
+          f.lastUndo=sel; f.chg=f.chg.filter(c=>!c.on);
+          if(!f.chg.length)f.applied=true;
+          toast(`<b>${f.preset}</b> 매입가 <b>${sel.length}건</b> 반영 · 판매가 재계산(수수료 2.2%·마진 0%) 완료 · 가격 이력 기록`,true);
           render();
         };
-        document.getElementById("btnDrop").onclick=()=>toast("데모 — 내일 파일을 올리면 같은 방식으로 어제(오늘)와 비교합니다.");
+        document.getElementById("btnDrop").onclick=()=>toast("데모 — 파일을 올리면 프리셋을 자동 인식해 수신함에 추가됩니다.");
         render();
       })();
       </script>
