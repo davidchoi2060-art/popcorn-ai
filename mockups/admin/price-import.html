@@ -311,7 +311,7 @@
          gbt:{
           label:"GBT PCD VGA MB 단가표 0721클릭.xlsx", time:"오늘 07:31", preset:"클릭나라 · 기가바이트(PCD)",
           recog:"시트 4개 전부 인식 · 헤더 3행 · <b>다나와 상품코드 열 존재</b> · 246행 추출",
-          map:'매입가 ← <b>공급가</b> <span class="text-body-tertiary">(POWER 시트: 공급가 결측 → <b>현금/딜러몰가 대체</b> — 확정 규칙)</span> · 발주 상태 ← 재고현황(<b>O→가능 · X→품절</b>) + 비고(문의)',
+          map:'매입가 ← <b>가격 열 중 최저가</b> <span class="text-body-tertiary">(통상 공급가가 최저 — POWER 시트처럼 공급가 결측이면 다음 최저가인 현금/딜러몰가 자동 적용)</span> · 발주 상태 ← 재고현황(<b>O→가능 · X→품절</b>) + 비고(문의)',
           note:'<span class="badge badge-phoenix badge-phoenix-info">다나와 상품코드 매칭 — 자동 연결 우선</span>',
           same:232, applied:false, lastUndo:null,
           chg:[
@@ -321,7 +321,7 @@
            {name:"GA-B860 AORUS ELITE WIFI7",cat:"메인보드",y:278000,t:271000,memo:"0721 가격변동"},
            {name:"GA-B860M AORUS ELITE",cat:"메인보드",y:224000,t:217000,memo:"0721 가격변동",alt:"타 공급처 최저 215,000원(조이젠) — 이 파일이 최저 아님"},
            {name:"GIGABYTE 지포스 RTX 5090 GAMING OC",cat:"그래픽카드",y:6750000,t:6974000,memo:"인상 품절"},
-           {name:"GIGABYTE UD850GM PG5 80PLUS골드",cat:"파워",y:109000,t:105000,memo:"공급가 결측",sub:"딜러몰가 대체"}
+           {name:"GIGABYTE UD850GM PG5 80PLUS골드",cat:"파워",y:109000,t:105000,memo:"공급가 결측",sub:"최저가(딜러몰) 적용"}
           ].map(r=>(r.on=true,r)),
           nw:[
            {name:"GA-Z890I AORUS ULTRA",cat:"메인보드",cost:469000,m:{k:"code",v:"다나와코드 69699695 일치 — P-2101에 공급처 가격 자동 추가"}},
@@ -338,7 +338,7 @@
          msi:{
           label:"MSI_단가표0716MTF.xlsx", time:"오늘 07:12", preset:"MSI(웨이코스) · 윈윈 플랫폼",
           recog:"시트 7개 중 5개 인식 (Sheet3 빈 시트 · '가격지도' 규정 문서 제외) · 헤더 2줄/칩셋 그룹 정규화 · 174행 추출",
-          map:'매입가 ← <b>판매가(윈윈·셀프로)</b> · 발주 상태 ← 비고(품절/가능/문의) · 상품코드 없음 — <b>모델명 매칭</b>',
+          map:'매입가 ← <b>가격 열 중 최저가</b> <span class="text-body-tertiary">(이 파일에선 판매가(윈윈·셀프로) 열)</span> · 발주 상태 ← 비고(품절/가능/문의) · 상품코드 없음 — <b>모델명 매칭</b>',
           note:'<span class="badge badge-phoenix badge-phoenix-secondary">가격지도(단가 단속) 미적용 — 단품 외부 노출 없음</span>',
           same:159, applied:false, lastUndo:null,
           chg:[
