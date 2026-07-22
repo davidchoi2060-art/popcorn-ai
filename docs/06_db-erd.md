@@ -1,11 +1,11 @@
 # 06. DB 설계 (ERD & 스키마)
 
 **파일 경로:** `docs/06_db-erd.md`
-**문서 버전:** Ver 3.0
-**DBMS:** PostgreSQL (DB명 `popcorn_pc`)
-**갱신일:** 2026-07-07
-**선행 문서:** `12_data_normalization.md`, `13_standard_product_csv.md`, `07_api-spec.md`
-**대체 선언:** 본 문서는 `06_db-erd.md` Ver 2.0 전체와 `12_data_normalization.md`의 §9(정규화 테이블 설계)·§18(최종 저장 기준)을 대체한다. 관련 결정 근거는 `docs/decisions/2026-07-07_product-data.md` 참조.
+**문서 버전:** Ver 4.0
+**DBMS:** PostgreSQL (DB명 `popcorn_pc`) — 구성 위치: 구글 클라우드(기구성, 사용자 확인 2026-07-21). **실제 DB 생성·마이그레이션은 본 개정본 검토 후 별도 승인으로 착수한다.**
+**갱신일:** 2026-07-21
+**선행 문서:** `12_data_normalization.md`, `13_standard_product_csv.md`, `07_api-spec.md`, `docs/decisions/decision-log.md`(A-10·주변기기·가격 산정·단가표 결정), `docs/decisions/admin-identity.md`(ADM-PRC-040)
+**대체 선언:** Ver 3.0의 상품 스파인(§1~§9)을 계승하되, **원칙 3(재고 수량 미보유)을 폐기**하고(A-10 커머스 승격) §10~§13(커머스 원장 · 공급처 단가표 · 상담·회원 활동 · 운영 설정)을 증분한다. Ver 2.0 대체 관계는 Ver 3.0 선언을 승계한다.
 
 ---
 
@@ -13,9 +13,11 @@
 
 1. **레이어 분리로 "원본 보존"과 "표준 단일화"를 동시에 만족한다.** 원본 보존은 `product_imports`가, 표준 확정본은 `products`가 담당한다. 두 원칙을 한 테이블에 욱여넣지 않는다.
 2. **`products`는 운영의 단일 진실(Single Source of Truth)이다.** 추천 엔진, 관리자 화면, 소싱 매칭이 모두 이 테이블만 바라본다. `product_category_normalized` 테이블은 폐기한다.
-3. **재고 수량은 보유하지 않는다.** 재고 원장은 기존 쇼핑몰이다. 본 시스템은 상태값(판매중/품절/단종/삭제대기)만 동기화한다. 수량 보유는 이중 원장을 만든다.
+3. **[Ver 4.0 개정 — A-10] 재고 차감 단일 원장 = 본 시스템.** `products.stock_qty`를 보유하고 `stock_movements`가 입출고 원장이다. 쇼핑몰 판매분은 API 유입(`movement_type='mall_sale'`)으로 정합을 유지하고, 자체 결제 진행 중 재고는 `stock_reservations`(hold)로 예약한다. (Ver 3.0의 "수량 미보유·상태만 동기화" 원칙은 폐기 — §9 참조)
 4. **추천 후보 풀의 정의는 뷰 한 곳(`v_recommendation_candidates`)에만 존재한다.** 결정론 엔진, S1 후보 카운터, 스왑 대안 조회는 전부 이 뷰를 조회한다.
 5. **회사 원장 필드와 공개 사실 필드를 구분한다.** 제품명·제품코드·매입가·판매가·상태는 회사만 아는 사실(CSV/실시간 업데이트로 관리), 소켓·TDP·치수·메모리 규격은 세상의 공개된 사실(AI 보강 파이프라인으로 관리)이다. §7 참조.
+6. **[Ver 4.0] 주문 원장은 운영 모드와 무관하게 항상 본 시스템에 생성한다.** 인계 모드는 복제 전달일 뿐이다(A-10 — 스냅샷 재현·감사 체계). 주문 라인은 생성 시점의 가격·사양을 스냅샷으로 보존한다.
+7. **[Ver 4.0] 운영 설정은 버전 관리한다.** 운영 모드 스위치 5종·가격 산정 파라미터(카드수수료·마진)는 현행값 테이블 + 이력 테이블 쌍으로 관리하고, 모든 변경은 작업자·사유와 함께 기록한다.
 
 ---
 
@@ -33,6 +35,25 @@ erDiagram
   recommendations ||--o{ recommendation_items : "포함"
   users ||--o{ recommendations : "요청"
   admin_operators ||--o{ admin_operator_activity_logs : "활동"
+
+  %% Ver 4.0 증분
+  members ||--o{ orders : "주문"
+  orders ||--o{ order_items : "라인(스냅샷)"
+  orders ||--o{ payments : "결제"
+  orders ||--o{ shipments : "배송"
+  orders ||--o{ refunds : "환불·클레임"
+  payments ||--o{ settlements : "정산"
+  orders ||--o{ stock_reservations : "재고 예약(hold)"
+  products ||--o{ stock_movements : "입출고 원장"
+  suppliers ||--o{ supplier_presets : "파싱 프리셋"
+  suppliers ||--o{ supplier_price_files : "일일 단가표"
+  supplier_price_files ||--o{ supplier_price_rows : "정규화 행"
+  suppliers ||--o{ supplier_product_map : "모델↔SKU 매핑"
+  products ||--o{ product_supplier_prices : "공급처 가격 1:N"
+  members ||--o{ consult_sessions : "상담"
+  consult_sessions ||--o{ quote_snapshots : "견적 스냅샷"
+  members ||--o{ member_reviews : "후기(구매 인증)"
+  members ||--o{ member_favorites : "관심 부품"
 ```
 
 ---
@@ -80,12 +101,18 @@ CREATE TABLE products (
   supplier            VARCHAR(200),
   warranty_months     INTEGER,
   spec_source_text    TEXT,                        -- 원본 스펙 정제본
+
+  -- [Ver 4.0 추가]
+  danawa_code         VARCHAR(20),                 -- 다나와 상품코드 — 거래처 간 교차 매칭 키 (§11)
+  stock_qty           INTEGER NOT NULL DEFAULT 0,  -- 재고 수량 — 단일 원장 (A-10, 원칙 3)
+
   created_at          TIMESTAMP NOT NULL DEFAULT now(),
   updated_at          TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_products_candidate ON products (status, ai_candidate_yn, part_type);
 CREATE INDEX idx_products_name_trgm ON products USING gin (product_name gin_trgm_ops);
+CREATE UNIQUE INDEX idx_products_danawa ON products (danawa_code) WHERE danawa_code IS NOT NULL;  -- [Ver 4.0]
 ```
 
 기존 `margin_locked` 단일 플래그는 폐기하고 `locked_fields`로 대체한다.
@@ -117,6 +144,16 @@ CREATE TABLE product_specs (
   tag_white       BOOLEAN NOT NULL DEFAULT false,
   tag_rgb         BOOLEAN NOT NULL DEFAULT false,
   tag_silent      BOOLEAN NOT NULL DEFAULT false,
+
+  -- [Ver 4.0] 주변기기 사양 (와이드 테이블 기조 유지 — EAV 채택 안 함)
+  size_inch       NUMERIC(4,1),     -- MONITOR 화면 크기
+  resolution      VARCHAR(20),      -- MONITOR: FHD/QHD/UHD…
+  refresh_hz      INTEGER,          -- MONITOR 주사율 — 함께 구성 GPU 매칭 근거
+  panel           VARCHAR(20),      -- MONITOR: IPS/VA/OLED…
+  ports           JSONB,            -- MONITOR 출력 포트 예: {"dp":1,"hdmi":2}
+  switch_type     VARCHAR(30),      -- KEYBOARD 스위치
+  key_layout      VARCHAR(20),      -- KEYBOARD 배열(풀/텐키리스…)
+  connection      VARCHAR(20),      -- KEYBOARD/MOUSE/HEADSET: 유선/무선/블루투스
 
   extract_source  VARCHAR(20),      -- 'rule' / 'ai_text' / 'ai_knowledge' / 'manual'
   confidence      NUMERIC(4,2),     -- 자동 추출 신뢰도
@@ -181,6 +218,19 @@ WHERE p.status = '판매중'
 
 품절/단종 토글 → `products.status` 변경 → 뷰에서 즉시 제외(1초 룰 자동 충족). 후보 풀 캐시를 도입할 경우 상태 변경 시 캐시 무효화 훅을 함께 건다.
 
+**[Ver 4.0] v_companion_candidates — 함께 구성(주변기기) 후보 뷰.** 본체 엔진과 분리된 제안 풀. 엔진 검증 대상이 아니라 권장 매칭 근거(주사율↔GPU·포트)로만 쓰인다(주변기기 결정 2026-07-21).
+
+```sql
+CREATE VIEW v_companion_candidates AS
+SELECT p.*, ps.*
+FROM products p
+JOIN product_specs ps USING (product_code)
+WHERE p.status = '판매중'
+  AND p.review_required_yn = false
+  AND p.category_group = 'peripheral'
+  AND p.part_type IN ('MONITOR','KEYBOARD','MOUSE','HEADSET','SPEAKER','WEBCAM');
+```
+
 ### 3.7 유지 테이블
 
 `users`, `logs`, `recommendations`, `recommendation_items`, `policy_weights`, `category_margin_policies`, `api_cost_logs`, `promo_click_logs`, `swap_event_logs`, `rate_limit_policies`, `cost_thresholds`, `csv_import_jobs`, `csv_import_errors`, `admin_operators`, `admin_operator_activity_logs`, 제품 소싱 3종(`sourcing_batches`, `product_sourcing_quotes`, `product_sourcing_match_candidates`)은 Ver 2.0 정의를 유지한다.
@@ -232,7 +282,16 @@ WHERE p.status = '판매중'
 | COOLER_CPU_AIR | cooler_tdp, cooler_height_mm | socket |
 | COOLER_CPU_AIO | cooler_tdp | socket |
 
-이 매트릭스는 호환성 검증 룰의 입력 필드와 1:1로 일치해야 하며, 검증 룰 변경 시 본 표를 함께 개정한다.
+**[Ver 4.0] 주변기기(함께 구성 풀 — 분류별 필수 사양 세트가 본체와 다름):**
+
+| part_type | 필수 필드 | 권장 필드 |
+|---|---|---|
+| MONITOR | size_inch, resolution, refresh_hz, ports | panel |
+| KEYBOARD | connection | switch_type, key_layout |
+| MOUSE | connection | — |
+| HEADSET / SPEAKER / WEBCAM | connection | — |
+
+이 매트릭스는 호환성 검증 룰의 입력 필드와 1:1로 일치해야 하며, 검증 룰 변경 시 본 표를 함께 개정한다. 주변기기 필수 필드 미확정 시에도 `review_required_yn = true`로 함께 구성 풀에서 제외된다(모니터 주사율 검수 케이스 — ADM-PRD-020).
 
 ---
 
@@ -241,9 +300,11 @@ WHERE p.status = '판매중'
 1. **소싱 확정 매칭 시 매입가 갱신은 자동이 아니다.** 확정 모달에서 운영자가 "매입가 갱신" 여부를 선택한다. 갱신 시 `history(reason='sourcing', ref_id=sourcing_id)`.
 2. **판매가 재계산은 제안 + 승인 방식이다.** 매입가 변경 시 시스템은 `카테고리 마진 정책 기준 권장 판매가`를 산출해 상품 마스터에 제안 배지로 노출한다. 운영자 승인 시에만 `sale_price` 반영, `history(reason='margin_policy')`. 자동 집행하지 않는다 — 가격 결정권은 운영자에게 있다.
    - UI 파급: ADM-DSH-010 대시보드에 "가격 검토 대기 N건" 미니 위젯 추가.
-3. **모든 가격 변경은 `product_price_history`에 reason·ref_id와 함께 기록한다.** 근거 리포트("모든 견적에는 이유가 있습니다")의 가격 출처 추적 기반이다.
+3. **모든 가격 변경은 `product_price_history`에 reason·ref_id와 함께 기록한다.** 근거 리포트("모든 견적에는 이유가 있습니다")의 가격 출처 추적 기반이다. **[Ver 4.0] reason에 `price_import`(단가표 일일 반영) 추가** — ref_id = supplier_price_files.file_id.
 
 `sale_price`가 locked_fields에 등록된 상품은 제안 배지만 노출하고 CSV·정책에 의한 변경을 차단한다.
+
+**[Ver 4.0] 4. 판매가 현행 산정 공식 = 매입가 + 카드수수료 + 마진(기본 0%).** 매입 구조 = 다중 거래처가 플랫폼(윈윈 등)에 단품가 입력 → **매입가 판정 = 단가표 가격 열 중 최저가**(특정 열 고정 매핑 아님, 2026-07-21 사용자 확정). 수수료율·마진율은 `pricing_settings`(§13)에서 버전 관리한다. 마진 상세 구조는 미정(향후 확정)이므로 파라미터화로 수용한다. 단가표 diff 반영 시 재계산 판매가는 §6.2 제안+승인 원칙을 따르되, ADM-PRC-040의 "선택 일괄 반영"이 승인 행위에 해당한다.
 
 ---
 
@@ -307,6 +368,8 @@ WHERE p.status = '판매중'
 | T3 | CSV 재업로드 | imports 누적, 가격 갱신+history, 잠긴 필드 스킵 |
 | T4 | 소싱 확정 매칭 | 매입가 갱신 선택 + history, 판매가 제안 배지 |
 | T5 | 품절 토글 | status 변경 → 뷰에서 즉시 제외 (1초 룰) |
+| T6 | [Ver 4.0] 단가표 일일 수신 | 프리셋 파싱 → rows 스냅샷 → 어제 대비 diff → 일괄 반영 시 매입가 갱신+history(reason='price_import') + 재계산 판매가 제안 + 발주 상태 갱신 |
+| T7 | [Ver 4.0] 자체 주문 생성 | orders+order_items(가격·사양 스냅샷) → stock_reservations(hold) → 결제 승인 시 stock_movements 차감·hold 해제 |
 
 정규화·스펙 추출(1단계)은 **CSV 업서트 트랜잭션 내 동기 실행**한다(룰 기반·LLM 미호출·26,480행 규모 근거). LLM 보강(2~3단계)은 업서트 완료 후 비동기 잡으로 수행한다.
 
@@ -322,3 +385,302 @@ WHERE p.status = '판매중'
 | `product_upload_reviews` | product_reviews로 확장 대체 |
 | 12번 문서 §9, §18 | 본 문서 §3, §4가 대체 |
 | Ver 2.0 추천 후보 쿼리 | §3.6 뷰가 유일한 정의 |
+| [Ver 4.0] Ver 3.0 원칙 3 "재고 수량 미보유·상태만 동기화" | 폐기. A-10 커머스 승격 — 재고 단일 원장 = 본 시스템 (§1 원칙 3 개정, §10.6) |
+| [Ver 4.0] "주문·고객 = 읽기 전용, 주문 원장 = 쇼핑몰"(A-09 일부) | 폐기. 주문 원장 항상 본 시스템 (§1 원칙 6, §10) |
+
+---
+
+## 10. [Ver 4.0] 커머스 원장 (A-10)
+
+운영 모드 스위치 5종(회원 연동·결제·정산·배송·환불 — 각 `own`/`mall`)과 무관하게 **주문 원장은 항상 본 시스템에 생성**된다. 인계 모드는 복제 전달일 뿐이다.
+
+### 10.1 members — 자체 회원 (+ 쇼핑몰 계정 매핑)
+
+```sql
+CREATE TABLE members (
+  member_id      BIGSERIAL PRIMARY KEY,
+  email          VARCHAR(255) UNIQUE,
+  nickname       VARCHAR(100) NOT NULL,
+  joined_via     VARCHAR(20) NOT NULL,   -- 'email' / 'kakao' / 'naver'
+  mall_member_id VARCHAR(100),           -- 기존 쇼핑몰 계정 매핑 (미연결 NULL — MY-010 "계정 연결")
+  status         VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_at     TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+### 10.2 orders / order_items — 주문 원장 (항상 생성)
+
+```sql
+CREATE TABLE orders (
+  order_id     BIGSERIAL PRIMARY KEY,
+  order_no     VARCHAR(20) UNIQUE NOT NULL,     -- 'ORD-84216'
+  member_id    BIGINT REFERENCES members(member_id),
+  channel      VARCHAR(10) NOT NULL,            -- 'own' / 'mall'(인계 복제)
+  status       VARCHAR(30) NOT NULL,            -- 접수/결제완료/조립중/출고/배송중/완료/취소
+  total_amount BIGINT NOT NULL,
+  ops_snapshot JSONB NOT NULL,                  -- 생성 시점 운영 모드 5종 스냅샷 (감사)
+  created_at   TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE order_items (
+  item_id      BIGSERIAL PRIMARY KEY,
+  order_id     BIGINT NOT NULL REFERENCES orders(order_id),
+  product_code BIGINT REFERENCES products(product_code),
+  item_kind    VARCHAR(20) NOT NULL,            -- 'core_part' / 'peripheral' / 'assembly_service'
+  name_snap    VARCHAR(500) NOT NULL,           -- 스냅샷 (원칙 6)
+  price_snap   BIGINT NOT NULL,
+  spec_snap    JSONB,
+  qty          INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE order_events (                      -- 상태 이력 (감사)
+  event_id   BIGSERIAL PRIMARY KEY,
+  order_id   BIGINT NOT NULL REFERENCES orders(order_id),
+  from_state VARCHAR(30), to_state VARCHAR(30) NOT NULL,
+  actor      VARCHAR(50),                        -- 운영자/시스템/PG
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+### 10.3 payments / settlements — 결제·정산 (정산은 결제를 따라간다)
+
+```sql
+CREATE TABLE payments (
+  payment_id BIGSERIAL PRIMARY KEY,
+  order_id   BIGINT NOT NULL REFERENCES orders(order_id),
+  pay_mode   VARCHAR(10) NOT NULL,   -- 'own'(자체 PG) / 'mall'(쇼핑몰 인계)
+  method     VARCHAR(30),            -- 카드/계좌이체/… (own일 때)
+  pg_ref     VARCHAR(100),           -- PG 거래 참조 (own)
+  amount     BIGINT NOT NULL,
+  status     VARCHAR(20) NOT NULL,   -- 대기/승인/취소/환불
+  paid_at    TIMESTAMP
+);
+
+CREATE TABLE settlements (
+  settlement_id BIGSERIAL PRIMARY KEY,
+  payment_id    BIGINT NOT NULL REFERENCES payments(payment_id),
+  settle_mode   VARCHAR(10) NOT NULL,  -- 결제 모드를 따라감 (A-10 자동 보정 규칙)
+  fee_amount    BIGINT,                -- 카드수수료 등
+  net_amount    BIGINT,
+  settled_at    TIMESTAMP
+);
+```
+
+### 10.4 shipments / refunds — 배송·환불(클레임)
+
+```sql
+CREATE TABLE shipments (
+  shipment_id BIGSERIAL PRIMARY KEY,
+  order_id    BIGINT NOT NULL REFERENCES orders(order_id),
+  ship_mode   VARCHAR(10) NOT NULL,   -- 'own' / 'mall'
+  carrier     VARCHAR(50), tracking_no VARCHAR(50),
+  status      VARCHAR(20) NOT NULL,   -- 준비/출고/배송중/완료
+  shipped_at  TIMESTAMP, delivered_at TIMESTAMP
+);
+
+CREATE TABLE refunds (
+  refund_id   BIGSERIAL PRIMARY KEY,
+  order_id    BIGINT NOT NULL REFERENCES orders(order_id),
+  refund_mode VARCHAR(10) NOT NULL,   -- own-refund는 own-payment 전제 (A-10 자동 보정)
+  reason_type VARCHAR(30) NOT NULL,   -- 단순변심/초기불량/오배송/…
+  amount      BIGINT NOT NULL,
+  status      VARCHAR(20) NOT NULL,   -- 접수/검토/승인/완료/반려
+  created_at  TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+### 10.5 stock_reservations — 재고 예약 (hold)
+
+자체 결제(pay=own) 진행 중에만 활성. 결제 승인 → 차감 전환, 이탈·만료 → 해제.
+
+```sql
+CREATE TABLE stock_reservations (
+  reservation_id BIGSERIAL PRIMARY KEY,
+  order_id       BIGINT NOT NULL REFERENCES orders(order_id),
+  product_code   BIGINT NOT NULL REFERENCES products(product_code),
+  qty            INTEGER NOT NULL,
+  status         VARCHAR(20) NOT NULL DEFAULT 'held',  -- held/converted/released/expired
+  expires_at     TIMESTAMP NOT NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+### 10.6 stock_movements — 입출고 원장
+
+```sql
+CREATE TABLE stock_movements (
+  movement_id   BIGSERIAL PRIMARY KEY,
+  product_code  BIGINT NOT NULL REFERENCES products(product_code),
+  movement_type VARCHAR(20) NOT NULL,  -- inbound(매입)/own_sale/mall_sale(API 유입)/adjust/return
+  qty_delta     INTEGER NOT NULL,      -- +입고 / -출고
+  ref_kind      VARCHAR(20), ref_id BIGINT,   -- order_id, sourcing_id 등
+  created_at    TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+### 10.7 member_reviews / member_favorites — 후기(구매 인증만)·관심 부품
+
+```sql
+CREATE TABLE member_reviews (
+  review_id     BIGSERIAL PRIMARY KEY,
+  member_id     BIGINT NOT NULL REFERENCES members(member_id),
+  order_item_id BIGINT NOT NULL REFERENCES order_items(item_id),  -- 구매 인증 강제 (A-10: 후기=구매 인증만)
+  rating        SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  body          TEXT,
+  created_at    TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE member_favorites (
+  favorite_id  BIGSERIAL PRIMARY KEY,
+  member_id    BIGINT NOT NULL REFERENCES members(member_id),
+  product_code BIGINT NOT NULL REFERENCES products(product_code),
+  price_alert  BOOLEAN NOT NULL DEFAULT false,   -- MY-010 가격 알림 토글
+  created_at   TIMESTAMP NOT NULL DEFAULT now(),
+  UNIQUE (member_id, product_code)
+);
+```
+
+---
+
+## 11. [Ver 4.0] 공급처 단가표 (ADM-PRC-040)
+
+거래처가 1일 1회 보내는 단가표 엑셀의 정규화·diff·반영 파이프라인. 실파일 2종(MSI_단가표0716, GBT PCD 0721클릭)으로 검증된 설계다.
+
+### 11.1 suppliers / supplier_presets
+
+```sql
+CREATE TABLE suppliers (
+  supplier_id   BIGSERIAL PRIMARY KEY,
+  name          VARCHAR(100) NOT NULL,   -- '클릭나라', 'MSI(웨이코스)'
+  platform      VARCHAR(50),             -- '윈윈' 등 입력 플랫폼
+  brands        VARCHAR(200),            -- 취급 브랜드 메모
+  created_at    TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE supplier_presets (
+  preset_id    BIGSERIAL PRIMARY KEY,
+  supplier_id  BIGINT NOT NULL REFERENCES suppliers(supplier_id),
+  rules        JSONB NOT NULL,   -- 시트 인식(제외 시트 포함)·헤더 행·칩셋 캐리포워드·스킵 행·가격 열 후보·상태 어휘 정규화(O→가능/X→품절)
+  version      INTEGER NOT NULL DEFAULT 1,
+  updated_at   TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+### 11.2 supplier_price_files / supplier_price_rows — 일일 스냅샷 (diff 원천)
+
+```sql
+CREATE TABLE supplier_price_files (
+  file_id     BIGSERIAL PRIMARY KEY,
+  supplier_id BIGINT NOT NULL REFERENCES suppliers(supplier_id),
+  file_name   VARCHAR(300) NOT NULL,
+  received_at TIMESTAMP NOT NULL,
+  row_count   INTEGER,
+  status      VARCHAR(20) NOT NULL DEFAULT '대기'   -- 대기/반영 완료/부분 반영
+);
+
+CREATE TABLE supplier_price_rows (
+  row_id       BIGSERIAL PRIMARY KEY,
+  file_id      BIGINT NOT NULL REFERENCES supplier_price_files(file_id),
+  model_name   VARCHAR(300) NOT NULL,
+  danawa_code  VARCHAR(20),             -- 있으면 최우선 매칭 키
+  prices       JSONB NOT NULL,          -- 원본 가격 열 전부 {"공급가":..,"현금딜러몰":..}
+  cost_price   BIGINT NOT NULL,         -- 매입가 판정값 = 가격 열 중 최저가 (결측 자동 승계)
+  supply_state VARCHAR(10),             -- 정규화: 가능/품절/문의
+  memo         VARCHAR(200)             -- 비고 원문 ('0721 가격변동', '인상 품절')
+);
+
+CREATE INDEX idx_price_rows_file ON supplier_price_rows (file_id);
+```
+
+어제 대비 diff(가격 변동/신규/발주 상태 전환/무변동)는 같은 supplier의 직전 file rows와의 비교로 산출한다 — 별도 diff 테이블 없음(스냅샷이 원천).
+
+### 11.3 supplier_product_map — 모델 ↔ SKU 매핑 기억
+
+```sql
+CREATE TABLE supplier_product_map (
+  map_id       BIGSERIAL PRIMARY KEY,
+  supplier_id  BIGINT NOT NULL REFERENCES suppliers(supplier_id),
+  model_key    VARCHAR(300) NOT NULL,   -- 정규화된 공급처 모델명(또는 상품코드)
+  product_code BIGINT NOT NULL REFERENCES products(product_code),
+  match_method VARCHAR(20) NOT NULL,    -- 'danawa_code'(자동) / 'similarity'(후보→검수 확정) / 'manual'
+  confirmed_by BIGINT, confirmed_at TIMESTAMP,
+  UNIQUE (supplier_id, model_key)
+);
+```
+
+매칭 우선순위: ① 기억된 map → ② danawa_code 일치(자동 확정) → ③ 이름 유사도(후보 제시) → ④ 검수 확정. 한 번 확정되면 이후 매일 자동.
+
+### 11.4 product_supplier_prices — 상품 1:N 공급처 최신가
+
+```sql
+CREATE TABLE product_supplier_prices (
+  psp_id       BIGSERIAL PRIMARY KEY,
+  product_code BIGINT NOT NULL REFERENCES products(product_code),
+  supplier_id  BIGINT NOT NULL REFERENCES suppliers(supplier_id),
+  cost_price   BIGINT NOT NULL,
+  supply_state VARCHAR(10) NOT NULL,    -- 가능/품절/문의 — 매입 견적(발주 가능성) 신호
+  src_file_id  BIGINT REFERENCES supplier_price_files(file_id),
+  updated_at   TIMESTAMP NOT NULL DEFAULT now(),
+  UNIQUE (product_code, supplier_id)
+);
+```
+
+`products.purchase_price` 갱신 후보 = 이 테이블의 공급처 간 최저 `cost_price`(발주 가능 상태 우선). "타 공급처 최저가" 표시의 원천.
+
+---
+
+## 12. [Ver 4.0] 상담·견적 스냅샷 (S1·S2·MY-010)
+
+```sql
+CREATE TABLE consult_sessions (
+  session_id  BIGSERIAL PRIMARY KEY,
+  member_id   BIGINT REFERENCES members(member_id),   -- 비회원 NULL
+  mode        VARCHAR(10) NOT NULL,    -- guided/chat/expert/talk
+  constraints JSONB NOT NULL DEFAULT '[]',   -- 단일 제약객체 스냅샷 (S1 상태 관리 원칙)
+  created_at  TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE quote_snapshots (
+  snapshot_id BIGSERIAL PRIMARY KEY,
+  session_id  BIGINT NOT NULL REFERENCES consult_sessions(session_id),
+  quote_type  VARCHAR(20) NOT NULL,    -- value/recommend/highend
+  items       JSONB NOT NULL,          -- 부품·가격·근거 스냅샷 — MY-010 "그때 가격으로 다시 보기"
+  companion   JSONB,                   -- 함께 구성(주변기기) 선택 스냅샷
+  total_amount BIGINT NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+기존 `recommendations`/`recommendation_items`(Ver 2.0 유지분)는 엔진 산출 기록으로 유지하고, `quote_snapshots`는 **고객에게 보여준 그대로**의 보존본이라는 점에서 역할이 다르다(재현·감사).
+
+---
+
+## 13. [Ver 4.0] 운영 설정 (버전 관리 — 원칙 7)
+
+```sql
+CREATE TABLE ops_settings (               -- 운영 모드 스위치 5종 현행값
+  key        VARCHAR(30) PRIMARY KEY,     -- member/pay/settle/ship/refund
+  mode       VARCHAR(10) NOT NULL,        -- 'own' / 'mall'
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE ops_settings_history (
+  history_id BIGSERIAL PRIMARY KEY,
+  changes    JSONB NOT NULL,              -- 변경 전→후 5종 묶음
+  version    INTEGER NOT NULL,
+  changed_by BIGINT NOT NULL,             -- 관리자 전용 (A-10)
+  reason     VARCHAR(300),
+  changed_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE pricing_settings (           -- 판매가 산정 파라미터 (§6.4)
+  setting_id    BIGSERIAL PRIMARY KEY,
+  card_fee_rate NUMERIC(5,4) NOT NULL,    -- 예: 0.0220 (실요율 확정 필요 — 목업 예시값)
+  margin_rate   NUMERIC(5,4) NOT NULL DEFAULT 0,
+  effective_from TIMESTAMP NOT NULL,
+  created_by    BIGINT,
+  created_at    TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+**정합 규칙(A-10, 화면 ADM-OPS-010과 동일):** ① settle은 pay를 따라간다(자동 보정). ② refund=own은 pay=own 전제. ③ 스위치 변경은 관리자 전용 + history 필수. ④ 재고 예약(hold)은 pay=own에서만 활성.
