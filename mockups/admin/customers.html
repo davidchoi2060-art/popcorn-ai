@@ -10,7 +10,7 @@
     <!-- ===============================================-->
     <!--    Document Title-->
     <!-- ===============================================-->
-    <title>팝콘PC 관리자 · 고객(회원)</title>
+    <title>팝콘PC 관리자 · 회원 관리</title>
 
 
     <!-- ===============================================-->
@@ -97,10 +97,10 @@
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-order" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-order"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="file-text"></span></span><span class="nav-link-text">견적 · 주문</span></div></a>
                 <div class="parent-wrapper label-1"><ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-order">
                   <li class="nav-item"><a class="nav-link" href="sessions.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="message-square" style="width:16px;height:16px;"></span></span><span class="nav-link-text">견적 상담 기록</span></div></a></li>
-                  <li class="nav-item"><a class="nav-link" href="orders.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="send" style="width:16px;height:16px;"></span></span><span class="nav-link-text">주문 관리</span></div></a></li><li class="nav-item"><a class="nav-link" href="refunds.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="corner-up-left" style="width:16px;height:16px;"></span></span><span class="nav-link-text">환불 · 클레임</span><span class="badge badge-phoenix badge-phoenix-danger ms-2">1</span></div></a></li>
+                  <li class="nav-item"><a class="nav-link" href="orders.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="send" style="width:16px;height:16px;"></span></span><span class="nav-link-text">주문 관리</span></div></a></li><li class="nav-item"><a class="nav-link" href="refunds.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="corner-up-left" style="width:16px;height:16px;"></span></span><span class="nav-link-text">환불 · 클레임</span><span class="badge badge-phoenix badge-phoenix-danger ms-2">1</span></div></a></li><li class="nav-item"><a class="nav-link" href="payments.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="credit-card" style="width:16px;height:16px;"></span></span><span class="nav-link-text">결제 · 정산</span></div></a></li><li class="nav-item"><a class="nav-link" href="shipping.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="truck" style="width:16px;height:16px;"></span></span><span class="nav-link-text">배송 관리</span></div></a></li><li class="nav-item"><a class="nav-link" href="reviews.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="star" style="width:16px;height:16px;"></span></span><span class="nav-link-text">후기 관리</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="swap-logs.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="repeat" style="width:16px;height:16px;"></span></span><span class="nav-link-text">부품 교체 · 클릭 기록</span></div></a></li>
                 </ul></div></div></li>
-              <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link label-1" href="customers.html"><div class="d-flex align-items-center"><span class="nav-link-icon"><span data-feather="users"></span></span><span class="nav-link-text">고객(회원)</span></div></a></div></li>
+              <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link label-1" href="customers.html"><div class="d-flex align-items-center"><span class="nav-link-icon"><span data-feather="users"></span></span><span class="nav-link-text">회원 관리</span></div></a></div></li>
               <li class="nav-item"><p class="navbar-vertical-label">시스템</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-sys" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-sys"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="settings"></span></span><span class="nav-link-text">시스템</span></div></a>
                 <div class="parent-wrapper label-1"><ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-sys">
@@ -261,24 +261,82 @@
         </div>
       </nav>
       <div class="content">
-        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">고객(회원)</li></ol></nav>
+        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">회원 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">고객(회원) <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-010</span></h2>
-          <p class="text-body-tertiary mb-0">회원 원장은 쇼핑몰입니다. 여기서는 <b class="text-body-secondary">견적 활동 맥락만</b> 최소 정보로 봅니다(읽기 전용).</p></div>
+          <div><h2 class="mb-1">회원 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-010</span></h2>
+          <p class="text-body-tertiary mb-0">자체 회원 원장 — 쇼핑몰 계정 매핑 상태(운영 모드 연동), 주문·상담·후기·관심 부품을 한 화면에서 봅니다.</p></div>
         </div>
-        <div class="alert alert-subtle-info fs-9 mb-3" role="alert">개인정보 최소 원칙 — 이름은 마스킹되며 연락처·주소는 이 시스템에 저장하지 않습니다. 상세는 쇼핑몰 회원 관리에서.</div>
-        <div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-          <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">회원</th><th class="text-end">상담</th><th class="text-end">주문</th><th>최근 활동</th><th class="pe-4 text-end"></th></tr></thead>
-          <tbody>
-            <tr><td class="ps-4 fw-semibold">김*수 <code class="fs-10">M-10442</code></td><td class="text-end">6</td><td class="text-end">2</td><td class="text-body-tertiary">오늘 10:45 — 주문 완료</td><td class="pe-4 text-end"><a href="sessions.html" class="btn btn-sm btn-subtle-secondary">상담 기록</a> <a href="#!" onclick="return false;" class="btn btn-sm btn-phoenix-secondary">쇼핑몰 프로필 ↗</a></td></tr>
-            <tr><td class="ps-4 fw-semibold">이*희 <code class="fs-10">M-10391</code></td><td class="text-end">3</td><td class="text-end">1</td><td class="text-body-tertiary">오늘 10:02 — 주문 완료</td><td class="pe-4 text-end"><a href="sessions.html" class="btn btn-sm btn-subtle-secondary">상담 기록</a> <a href="#!" onclick="return false;" class="btn btn-sm btn-phoenix-secondary">쇼핑몰 프로필 ↗</a></td></tr>
-            <tr><td class="ps-4 fw-semibold">박*진 <code class="fs-10">M-10388</code></td><td class="text-end">9</td><td class="text-end">0</td><td class="text-body-tertiary">오늘 09:48 — 전달 재시도 중</td><td class="pe-4 text-end"><a href="sessions.html" class="btn btn-sm btn-subtle-secondary">상담 기록</a> <a href="orders.html" class="btn btn-sm btn-phoenix-warning">주문 상태</a></td></tr>
-            <tr><td class="ps-4 fw-semibold">최*식 <code class="fs-10">M-10201</code></td><td class="text-end">2</td><td class="text-end">1</td><td class="text-body-tertiary">어제 18:22</td><td class="pe-4 text-end"><a href="sessions.html" class="btn btn-sm btn-subtle-secondary">상담 기록</a> <a href="#!" onclick="return false;" class="btn btn-sm btn-phoenix-secondary">쇼핑몰 프로필 ↗</a></td></tr>
-          </tbody>
-        </table></div></div></div>
+        <div class="row g-2 mb-3" id="kpis"></div>
+        <div class="row g-3">
+          <div class="col-12 col-lg-5"><div class="card"><div class="card-body p-0"><div id="mlist"></div></div></div></div>
+          <div class="col-12 col-lg-7"><div id="detail"></div></div>
+        </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>(function(){if(window.feather)feather.replace();})();</script>
+      <script>
+      (function(){
+        let M=[
+         {id:1,name:"김민준",email:"mj.kim@example.com",via:"이메일",joined:"07-10",mapped:false,orders:2,consults:3,reviews:0,favs:2,last:"오늘",
+          note:"RTX 4070 관심 — 가격 알림 2건 활성. 상담 3회(팝콘톡 2·함께 정하기 1)."},
+         {id:2,name:"이서연",email:"sy.lee@example.com",via:"카카오",joined:"06-20",mapped:true,orders:1,consults:1,reviews:1,favs:1,last:"07-20",
+          note:"쇼핑몰 계정 매핑 완료 — 과거 쇼핑몰 주문 이력 연동 표시."},
+         {id:3,name:"박도윤",email:"dy.park@example.com",via:"네이버",joined:"06-24",mapped:false,orders:1,consults:0,reviews:1,favs:0,last:"07-02",
+          note:"인계 주문 1건 후 가입 전환 — 매핑 요청 미발송."}
+        ];
+        let sel=1, lastAction=null;
+        function kpis(){
+          const K=[["전체 회원",M.length,"명","primary"],["쇼핑몰 계정 매핑",M.filter(m=>m.mapped).length,"명","info"],["이번 주 가입",1,"명","primary"],["가격 알림 활성",M.reduce((s,m)=>s+m.favs,0),"건","warning"]];
+          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+        }
+        function list(){
+          document.getElementById("mlist").innerHTML=M.map(m=>{
+            const on=m.id===sel;
+            return `<div data-id="${m.id}" class="p-3 border-bottom cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
+              <div class="d-flex justify-content-between align-items-center mb-1"><div class="d-flex align-items-center gap-2"><b class="fs-9 text-body-highlight">${m.name}</b><span class="badge badge-phoenix badge-phoenix-secondary fs-10">${m.via}</span>${m.mapped?'<span class="badge badge-phoenix badge-phoenix-info fs-10">쇼핑몰 매핑</span>':""}</div><span class="fs-10 text-body-quaternary">최근 ${m.last}</span></div>
+              <div class="fs-10 text-body-tertiary">${m.email} · 주문 ${m.orders} · 상담 ${m.consults} · 후기 ${m.reviews}</div>
+            </div>`;
+          }).join("");
+          document.querySelectorAll("#mlist [data-id]").forEach(el=>el.onclick=()=>{sel=+el.dataset.id;renderAll();});
+        }
+        function member(){return M.find(m=>m.id===sel);}
+        function detail(){
+          const m=member();const d=document.getElementById("detail");if(!m)return;
+          d.innerHTML=`<div class="card"><div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joined}</span>${m.mapped?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>'}</div>
+            <p class="fs-9 text-body-tertiary mb-3">${m.email}</p>
+            <div class="row g-2 mb-3">
+              <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">주문</div><b>${m.orders}</b></div></div>
+              <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">상담 세션</div><b>${m.consults}</b></div></div>
+              <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">후기</div><b>${m.reviews}</b></div></div>
+              <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">관심 부품</div><b>${m.favs}</b></div></div>
+            </div>
+            <div class="alert alert-subtle-secondary py-2 fs-9 mb-3" role="alert"><span data-feather="user" style="width:13px;height:13px;" class="me-1"></span>${m.note}</div>
+            <div class="d-flex flex-wrap gap-2">
+              <a class="btn btn-phoenix-secondary btn-sm" href="orders.html">주문 원장</a>
+              <a class="btn btn-phoenix-secondary btn-sm" href="sessions.html">상담 기록 (스냅샷)</a>
+              <a class="btn btn-phoenix-secondary btn-sm" href="reviews.html">후기</a>
+              ${m.mapped?"":`<button class="btn btn-primary btn-sm" data-act="map">쇼핑몰 계정 매핑 요청 발송</button>`}
+            </div>
+            <p class="fs-10 text-body-tertiary mb-0 mt-3">매핑은 고객 동의 기반 — 요청 발송 시 고객 마이페이지의 "계정 연결"에 안내가 표시됩니다. (운영 모드 '회원 연동' 스위치 연동)</p>
+          </div></div>`;
+          const mb=d.querySelector("[data-act='map']");
+          if(mb)mb.onclick=()=>{lastAction={id:m.id};toast(`<b>${m.name}</b>님에게 쇼핑몰 계정 매핑 요청 발송 — 동의 시 주문 이력 연동`,true);};
+          if(window.feather)feather.replace();
+        }
+        function undo(){lastAction=null;toast("되돌렸습니다 — 매핑 요청이 취소됐습니다.");}
+        
+        function toast(m,actionable){
+          let t=document.getElementById("__rtoast");
+          if(!t){t=document.createElement("div");t.id="__rtoast";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:.2s;display:flex;align-items:center;gap:12px;max-width:92vw;";document.body.appendChild(t);}
+          t.innerHTML=`<span>${m}</span>`+(actionable?`<button id="__undoBtn" style="background:none;border:1px solid rgba(255,255,255,.4);color:#ffd166;font-size:12px;font-weight:800;padding:4px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;">되돌리기</button><a href="activity-logs.html" style="color:#9ec5ff;font-size:12px;font-weight:700;white-space:nowrap;">작업 기록</a>`:"");
+          const ub=t.querySelector("#__undoBtn");if(ub)ub.onclick=()=>{t.style.opacity="0";undo();};
+          t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
+        }
+
+        function renderAll(){kpis();list();detail();}
+        renderAll();
+      })();
+      </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
         <div class="modal-dialog">
           <div class="modal-content mt-15 rounded-pill">
