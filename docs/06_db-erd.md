@@ -6,6 +6,7 @@
 **갱신일:** 2026-07-21
 **선행 문서:** `12_data_normalization.md`, `13_standard_product_csv.md`, `07_api-spec.md`, `docs/decisions/decision-log.md`(A-10·주변기기·가격 산정·단가표 결정), `docs/decisions/admin-identity.md`(ADM-PRC-040)
 **대체 선언:** Ver 3.0의 상품 스파인(§1~§9)을 계승하되, **원칙 3(재고 수량 미보유)을 폐기**하고(A-10 커머스 승격) §10~§13(커머스 원장 · 공급처 단가표 · 상담·회원 활동 · 운영 설정)을 증분한다. Ver 2.0 대체 관계는 Ver 3.0 선언을 승계한다.
+**검토 이력:** 1차 검토 2026-07-23 — 이슈 6건 발견·반영(users↔members 관계 정의, member_reviews 상태·S2 인용 필드, refunds 단계 어휘, products.supplier 폐기 예고, settlement_batches 신설, 매핑 요청 시각).
 
 ---
 
@@ -37,7 +38,9 @@ erDiagram
   admin_operators ||--o{ admin_operator_activity_logs : "활동"
 
   %% Ver 4.0 증분
+  users |o--o| members : "가입 승격 (익명→회원)"
   members ||--o{ orders : "주문"
+  settlement_batches ||--o{ settlements : "일 마감"
   orders ||--o{ order_items : "라인(스냅샷)"
   orders ||--o{ payments : "결제"
   orders ||--o{ shipments : "배송"
@@ -98,7 +101,7 @@ CREATE TABLE products (
   market_price        BIGINT,                      -- 시중가 (참고)
 
   locked_fields       JSONB NOT NULL DEFAULT '[]', -- 운영자 보정 잠금 (§4)
-  supplier            VARCHAR(200),
+  supplier            VARCHAR(200),                -- [검토: 폐기 예정] §11.4 product_supplier_prices(1:N)로 대체 — 마이그레이션 시 제거 여부 확정
   warranty_months     INTEGER,
   spec_source_text    TEXT,                        -- 원본 스펙 정제본
 
@@ -399,14 +402,18 @@ WHERE p.status = '판매중'
 ```sql
 CREATE TABLE members (
   member_id      BIGSERIAL PRIMARY KEY,
+  user_id        BIGINT REFERENCES users(user_id),  -- [검토 반영] 익명 활동 주체와의 승격 관계 — 가입 시 기존 상담·추천 이력 연결
   email          VARCHAR(255) UNIQUE,
   nickname       VARCHAR(100) NOT NULL,
   joined_via     VARCHAR(20) NOT NULL,   -- 'email' / 'kakao' / 'naver'
   mall_member_id VARCHAR(100),           -- 기존 쇼핑몰 계정 매핑 (미연결 NULL — MY-010 "계정 연결")
+  mall_map_requested_at TIMESTAMP,       -- [검토 반영] 관리자 매핑 요청 발송 시각 (ADM-CUS-010, 동의 대기)
   status         VARCHAR(20) NOT NULL DEFAULT 'active',
   created_at     TIMESTAMP NOT NULL DEFAULT now()
 );
 ```
+
+> **users ↔ members 관계(검토 이슈 #1):** Ver 2.0 `users`는 **익명 포함 요청 주체**(세션·디바이스 단위)로 유지한다 — `recommendations.user_id`는 그대로. `members`는 가입 회원 원장이며 `user_id`로 익명 이력과 1:0..1 연결된다(가입 시 승격). 상담·주문은 `member_id`(비회원 NULL) 기준.
 
 ### 10.2 orders / order_items — 주문 원장 (항상 생성)
 
@@ -459,10 +466,22 @@ CREATE TABLE payments (
 CREATE TABLE settlements (
   settlement_id BIGSERIAL PRIMARY KEY,
   payment_id    BIGINT NOT NULL REFERENCES payments(payment_id),
+  batch_id      BIGINT REFERENCES settlement_batches(batch_id),  -- [검토 반영] 일 마감 소속
   settle_mode   VARCHAR(10) NOT NULL,  -- 결제 모드를 따라감 (A-10 자동 보정 규칙)
   fee_amount    BIGINT,                -- 카드수수료 등
   net_amount    BIGINT,
   settled_at    TIMESTAMP
+);
+
+-- [검토 반영 — 이슈 #5] 일 단위 정산 마감 (ADM-PAY-010 '정산 마감' 액션의 원장)
+CREATE TABLE settlement_batches (
+  batch_id    BIGSERIAL PRIMARY KEY,
+  settle_date DATE NOT NULL UNIQUE,
+  gross       BIGINT NOT NULL,
+  fee         BIGINT NOT NULL,         -- pricing_settings.card_fee_rate 기준
+  net         BIGINT NOT NULL,
+  status      VARCHAR(10) NOT NULL DEFAULT '대기',  -- 대기/마감
+  closed_by   BIGINT, closed_at TIMESTAMP
 );
 ```
 
@@ -484,7 +503,7 @@ CREATE TABLE refunds (
   refund_mode VARCHAR(10) NOT NULL,   -- own-refund는 own-payment 전제 (A-10 자동 보정)
   reason_type VARCHAR(30) NOT NULL,   -- 단순변심/초기불량/오배송/…
   amount      BIGINT NOT NULL,
-  status      VARCHAR(20) NOT NULL,   -- 접수/검토/승인/완료/반려
+  status      VARCHAR(20) NOT NULL,   -- 접수/검토/수거·처리/완료/반려 — [검토 반영] ADM-CLM-010 화면 단계와 일치
   created_at  TIMESTAMP NOT NULL DEFAULT now()
 );
 ```
@@ -527,6 +546,9 @@ CREATE TABLE member_reviews (
   order_item_id BIGINT NOT NULL REFERENCES order_items(item_id),  -- 구매 인증 강제 (A-10: 후기=구매 인증만)
   rating        SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   body          TEXT,
+  status        VARCHAR(20) NOT NULL DEFAULT '게시',  -- [검토 반영] 게시/숨김/신고됨 (ADM-CUS-020)
+  cite_s2       BOOLEAN NOT NULL DEFAULT false,       -- [검토 반영] S2 "먼저 받아본 사람들" 근거 인용 여부 — 운영자 선별
+  moderation_note VARCHAR(300),                       -- 숨김·신고 처리 사유
   created_at    TIMESTAMP NOT NULL DEFAULT now()
 );
 
