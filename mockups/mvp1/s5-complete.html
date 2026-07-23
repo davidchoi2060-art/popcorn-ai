@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="S5-010" data-domain="customer"><head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC AI · 주문 완료</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:#f1eee8;font-family:'Pretendard',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+.msym{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+.card{background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:22px}
+@media(max-width:768px){.grid2{grid-template-columns:1fr!important}}
+</style>
+</head>
+<body>
+<script>
+(function(){var KEY="popcorn-gate-ok";var PASS="WnRnal";
+if(localStorage.getItem(KEY)==="1")return;
+var ov=document.createElement("div");ov.id="__gate";
+ov.setAttribute("style","position:fixed;inset:0;z-index:99999;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:Pretendard,-apple-system,sans-serif;");
+ov.innerHTML='<div style="width:min(340px,86vw);background:#fff;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;box-sizing:border-box;"><div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span> · 내부 검토</div><p style="margin:10px 0 18px;font-size:13px;color:#8a8578;font-weight:600;">접근 암호를 입력하세요.</p><input id="__gp" type="password" autocomplete="off" placeholder="암호" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:12px;font-size:14px;font-family:inherit;outline:none;"><p id="__ge" style="margin:8px 0 0;font-size:12px;color:#b31b25;font-weight:700;height:14px;"></p><button id="__gb" style="margin-top:12px;width:100%;padding:12px;border:none;background:#2b5fd9;color:#fff;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">입장</button></div>';
+function go(){document.body.appendChild(ov);var inp=document.getElementById("__gp"),err=document.getElementById("__ge"),btn=document.getElementById("__gb");function s(){if(inp.value===PASS){localStorage.setItem(KEY,"1");ov.remove();}else{err.textContent="암호가 올바르지 않습니다.";inp.value="";inp.focus();}}btn.addEventListener("click",s);inp.addEventListener("keydown",function(e){if(e.key==="Enter")s();});inp.focus();}
+if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})();
+</script>
+
+<header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;">
+  <div style="max-width:920px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="main-landing.html" style="font-size:16px;font-weight:900;color:#17171b;text-decoration:none;">팝콘PC <span style="color:#2b5fd9;">AI</span></a>
+      <span style="width:1px;height:15px;background:#d8d4cc;"></span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span class="msym" style="font-size:18px;color:#2b5fd9;">check_circle</span>주문 완료</span>
+    </div>
+    <a href="my-page.html" style="font-size:13px;font-weight:800;color:#2b5fd9;text-decoration:none;">마이페이지 →</a>
+  </div>
+</header>
+
+<main style="max-width:920px;margin:0 auto;padding:30px 22px 70px;">
+
+  <!-- 완료 히어로 -->
+  <div class="card" style="text-align:center;padding:38px 26px;margin-bottom:18px;">
+    <span style="width:64px;height:64px;border-radius:20px;background:#eaf1fd;display:inline-flex;align-items:center;justify-content:center;"><span class="msym" style="font-size:36px;color:#2b5fd9;">check_circle</span></span>
+    <h1 style="margin:16px 0 6px;font-size:26px;font-weight:900;color:#17171b;">주문이 완료됐습니다</h1>
+    <p style="margin:0 0 20px;font-size:14px;color:#8a8578;font-weight:600;">주문 시점의 가격·사양·추천 근거가 <b style="color:#3a3a40;">그대로 보존</b>됩니다 — 모든 견적에는 이유가 있으니까요.</p>
+    <div style="display:inline-flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f7f6f2;border-radius:14px;padding:14px 22px;">
+      <span style="font-size:13px;font-weight:700;color:#8a8578;">주문번호</span><b style="font-size:16px;color:#17171b;">ORD-84216</b>
+      <span style="width:1px;height:14px;background:#ddd8ce;"></span>
+      <span style="font-size:13px;font-weight:700;color:#8a8578;">결제금액</span><b id="s5-total" style="font-size:16px;color:#17171b;">1,735,000원</b>
+      <span style="width:1px;height:14px;background:#ddd8ce;"></span>
+      <span style="font-size:13px;font-weight:700;color:#8a8578;">결제수단</span><b style="font-size:14px;color:#17171b;">신용카드 (자체 결제)</b>
+    </div>
+    <p id="s5-periph" style="display:none;margin:12px 0 0;font-size:13px;color:#8a561a;font-weight:700;"></p>
+  </div>
+
+  <!-- 다음 일정 -->
+  <div class="card" style="margin-bottom:18px;">
+    <h3 style="margin:0 0 4px;font-size:15.5px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:8px;"><span class="msym" style="font-size:19px;color:#2b5fd9;">schedule</span>이제 이렇게 진행됩니다</h3>
+    <p style="margin:0 0 18px;font-size:12px;color:#8a8578;font-weight:600;">각 단계가 끝날 때마다 알림을 드리고, 조립 사진과 검사 리포트는 주문 상세에 첨부됩니다.</p>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;" class="grid2">
+      <div style="background:#eaf1fd;border-radius:13px;padding:15px 16px;">
+        <div style="font-size:11.5px;font-weight:800;color:#2149b0;">1 · 오늘</div>
+        <b style="font-size:14px;color:#17171b;">결제 완료 · 재고 확보</b>
+        <p style="margin:5px 0 0;font-size:12px;color:#55555c;line-height:1.5;">예약(hold)했던 7개 부품이 이 주문에 확정 배정됐어요.</p>
+      </div>
+      <div style="background:#f7f6f2;border-radius:13px;padding:15px 16px;">
+        <div style="font-size:11.5px;font-weight:800;color:#8a8578;">2 · 내일</div>
+        <b style="font-size:14px;color:#17171b;">전문가 조립 · 선정리</b>
+        <p style="margin:5px 0 0;font-size:12px;color:#55555c;line-height:1.5;">조립 과정을 사진으로 남깁니다.</p>
+      </div>
+      <div style="background:#f7f6f2;border-radius:13px;padding:15px 16px;">
+        <div style="font-size:11.5px;font-weight:800;color:#8a8578;">3</div>
+        <b style="font-size:14px;color:#17171b;">24시간 안정성 테스트</b>
+        <p style="margin:5px 0 0;font-size:12px;color:#55555c;line-height:1.5;">온도·부하 검사 리포트를 첨부합니다.</p>
+      </div>
+      <div style="background:#f7f6f2;border-radius:13px;padding:15px 16px;">
+        <div style="font-size:11.5px;font-weight:800;color:#8a8578;">4</div>
+        <b style="font-size:14px;color:#17171b;">출고 · 배송</b>
+        <p style="margin:5px 0 0;font-size:12px;color:#55555c;line-height:1.5;">송장 번호를 알려드립니다. 왕복 택배비는 A/S 기간 내 당사 부담.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 안내 2종 -->
+  <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px;">
+    <div class="card" style="display:flex;gap:12px;align-items:flex-start;">
+      <span class="msym" style="font-size:22px;color:#6a3fbf;flex:none;">history</span>
+      <div><b style="font-size:14px;color:#17171b;">주문 스냅샷 보존</b>
+      <p style="margin:4px 0 0;font-size:12.5px;color:#6b6b73;line-height:1.6;">이후 부품 가격이 변해도 이 주문에는 영향이 없고, 주문 상세에서 <b>그때 가격·사양 그대로</b> 언제든 확인할 수 있습니다.</p></div>
+    </div>
+    <div class="card" style="display:flex;gap:12px;align-items:flex-start;">
+      <span class="msym" style="font-size:22px;color:#6a3fbf;flex:none;">support_agent</span>
+      <div><b style="font-size:14px;color:#17171b;">무상 보증 2년</b>
+      <p style="margin:4px 0 0;font-size:12.5px;color:#6b6b73;line-height:1.6;">부품·조립 하자 보증, 초기 불량은 수령 7일 내 교환. 전화·원격·용산 방문 지원. <span style="color:#a29d92;">(*정책 확정 전 예시)</span></p></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;justify-content:center;">
+    <a href="my-orders.html?id=ORD-84216" style="padding:15px 26px;border:none;background:#2b5fd9;border-radius:12px;font-size:15px;font-weight:800;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:7px;"><span class="msym" style="font-size:19px;">receipt_long</span>주문 상세 보기</a>
+    <a href="main-landing.html" style="padding:15px 22px;border:1.5px solid #ddd8ce;background:#fff;border-radius:12px;font-size:15px;font-weight:800;color:#3a3a40;text-decoration:none;">메인으로</a>
+  </div>
+
+</main>
+
+<script>
+(function(){
+ var arr=[];try{arr=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
+ if(!arr.length)return;
+ var sum=0;arr.forEach(function(it){sum+=it.p;});
+ var t=document.getElementById('s5-total');if(t)t.textContent=(1735000+sum).toLocaleString()+'원';
+ var p=document.getElementById('s5-periph');
+ if(p){p.style.display='block';p.innerHTML='함께 구성 주변기기 <b>'+arr.length+'종</b>은 본체와 함께 포장·출고됩니다.';}
+})();
+</script>
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
+<span class="msym" style="font-size:17px;">grid_view</span>허브</a>
+<style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
+<script src="../shared/auth.js"></script>
+<script src="../shared/su-icons.js"></script>
+</body></html>

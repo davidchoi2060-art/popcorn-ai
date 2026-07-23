@@ -67,7 +67,10 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 
     <!-- 주문/배송 -->
     <div class="card">
-      <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">receipt_long</span>주문 · 배송</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">receipt_long</span>주문 · 배송</h3>
+        <span style="display:flex;gap:12px;"><a href="my-orders.html" style="font-size:12px;font-weight:800;color:#2b5fd9;text-decoration:none;">전체 주문 →</a><a href="my-payments.html" style="font-size:12px;font-weight:800;color:#8a8578;text-decoration:none;">결제 내역</a></span>
+      </div>
       <p class="sub">주문 원장은 팝콘PC AI에 있습니다 — 결제 방식과 무관하게 여기서 추적돼요.</p>
       <div style="border:1.5px solid #ece9e3;border-radius:14px;padding:16px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
@@ -78,7 +81,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
         <div style="display:flex;align-items:center;gap:4px;margin-bottom:12px;" id="ordsteps"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn2" data-toast="송장 CJ대한통운 6482-1234-5678 — 배송 조회 (목업)"><span class="msym" style="font-size:15px;">package_2</span>송장 조회</button>
-          <button class="btn2" data-toast="환불·클레임 접수 화면은 다음 단계에 만들어집니다 (목업)"><span class="msym" style="font-size:15px;">swap_horiz</span>환불 신청</button>
+          <a class="btn2" href="my-orders.html?id=ORD-84213"><span class="msym" style="font-size:15px;">swap_horiz</span>환불 신청</a>
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;border:1.5px dashed #ddd8ce;border-radius:14px;padding:13px 16px;">

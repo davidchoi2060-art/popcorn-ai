@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko" data-screen-id="MY-030" data-domain="customer"><head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC AI · 결제 내역</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:#f1eee8;font-family:'Pretendard',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+.msym{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+.card{background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:22px}
+</style>
+</head>
+<body>
+<script>
+(function(){var KEY="popcorn-gate-ok";var PASS="WnRnal";
+if(localStorage.getItem(KEY)==="1")return;
+var ov=document.createElement("div");ov.id="__gate";
+ov.setAttribute("style","position:fixed;inset:0;z-index:99999;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:Pretendard,-apple-system,sans-serif;");
+ov.innerHTML='<div style="width:min(340px,86vw);background:#fff;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;box-sizing:border-box;"><div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span> · 내부 검토</div><p style="margin:10px 0 18px;font-size:13px;color:#8a8578;font-weight:600;">접근 암호를 입력하세요.</p><input id="__gp" type="password" autocomplete="off" placeholder="암호" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:12px;font-size:14px;font-family:inherit;outline:none;"><p id="__ge" style="margin:8px 0 0;font-size:12px;color:#b31b25;font-weight:700;height:14px;"></p><button id="__gb" style="margin-top:12px;width:100%;padding:12px;border:none;background:#2b5fd9;color:#fff;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">입장</button></div>';
+function go(){document.body.appendChild(ov);var inp=document.getElementById("__gp"),err=document.getElementById("__ge"),btn=document.getElementById("__gb");function s(){if(inp.value===PASS){localStorage.setItem(KEY,"1");ov.remove();}else{err.textContent="암호가 올바르지 않습니다.";inp.value="";inp.focus();}}btn.addEventListener("click",s);inp.addEventListener("keydown",function(e){if(e.key==="Enter")s();});inp.focus();}
+if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})();
+</script>
+
+<header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;">
+  <div style="max-width:920px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="main-landing.html" style="font-size:16px;font-weight:900;color:#17171b;text-decoration:none;">팝콘PC <span style="color:#2b5fd9;">AI</span></a>
+      <span style="width:1px;height:15px;background:#d8d4cc;"></span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span class="msym" style="font-size:18px;color:#2b5fd9;">credit_card</span>결제 내역</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <a href="my-orders.html" style="font-size:13px;font-weight:800;color:#2b5fd9;text-decoration:none;">주문 내역 →</a>
+      <a href="my-page.html" style="font-size:13px;font-weight:800;color:#8a8578;text-decoration:none;">마이페이지</a>
+    </div>
+  </div>
+</header>
+
+<main style="max-width:920px;margin:0 auto;padding:26px 22px 70px;">
+
+  <div class="card" style="display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin-bottom:16px;">
+    <div><div style="font-size:12px;color:#8a8578;font-weight:700;">이번 달 결제</div><b id="mp-month" style="font-size:22px;color:#17171b;">1,735,000원</b></div>
+    <span style="width:1px;height:26px;background:#ece9e3;"></span>
+    <div><div style="font-size:12px;color:#8a8578;font-weight:700;">누적 결제 (3건)</div><b id="mp-total" style="font-size:22px;color:#17171b;">3,831,000원</b></div>
+    <span style="margin-left:auto;font-size:12px;color:#8a8578;font-weight:600;">결제 방식(자체/쇼핑몰 인계)과 무관하게 전 건이 기록됩니다.</span>
+  </div>
+
+  <div class="card" style="padding:8px 22px;">
+    <div id="plist"></div>
+  </div>
+
+  <p style="margin:14px 4px 0;font-size:12px;color:#a29d92;font-weight:600;">환불이 승인되면 이 목록에 <b>환불</b> 행이 별도로 추가됩니다 — 승인·취소·환불이 전부 한 줄씩 남는 결제 관점의 원장입니다.</p>
+
+</main>
+
+<script>
+(function(){
+var periph=[];try{periph=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
+var psum=0;periph.forEach(function(x){psum+=x.p;});
+var PAYS=[
+ {at:'오늘 14:22',order:'ORD-84216',method:'신용카드',mode:'own',amount:1735000+psum,state:'승인'},
+ {at:'07-14 11:05',order:'ORD-84213',method:'신용카드',mode:'own',amount:812000,state:'승인'},
+ {at:'06-28 16:40',order:'ORD-83907',method:'쇼핑몰 결제',mode:'mall',amount:1284000,state:'승인'}
+];
+var won=function(n){return n.toLocaleString()+'원';};
+var stCol={'승인':['#eaf1fd','#2149b0'],'취소':['#f4f2ec','#6b6b73'],'환불':['#fbecec','#8a1f22']};
+document.getElementById('plist').innerHTML=PAYS.map(function(p){
+ var c=stCol[p.state];
+ return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #f0eee9;">'
+  +'<span style="flex:0 0 92px;font-size:12.5px;color:#8a8578;font-weight:700;">'+p.at+'</span>'
+  +'<div style="flex:1;min-width:180px;"><b style="font-size:14px;color:#17171b;">'+p.method+'</b> <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;'+(p.mode==='own'?'background:#eaf1fd;color:#2149b0;':'background:#f2edfb;color:#4a2a94;')+'">'+(p.mode==='own'?'자체':'쇼핑몰 인계')+'</span>'
+  +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-top:2px;"><a href="my-orders.html?id='+p.order+'" style="color:#2b5fd9;text-decoration:none;font-weight:800;">'+p.order+'</a> 주문</div></div>'
+  +'<span style="font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:'+c[0]+';color:'+c[1]+';">'+p.state+'</span>'
+  +'<b style="font-size:15px;color:#17171b;font-variant-numeric:tabular-nums;">'+won(p.amount)+'</b></div>';
+}).join('');
+var total=0;PAYS.forEach(function(p){total+=p.amount;});
+document.getElementById('mp-total').textContent=won(total);
+document.getElementById('mp-month').textContent=won(PAYS[0].amount);
+})();
+</script>
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
+<span class="msym" style="font-size:17px;">grid_view</span>허브</a>
+<style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
+<script src="../shared/auth.js"></script>
+<script src="../shared/su-icons.js"></script>
+</body></html>

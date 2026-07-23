@@ -266,7 +266,8 @@ if(pay)pay.addEventListener('click',function(){
  if(opsPay()==='mall'){tmsg('기존 팝콘PC 쇼핑몰 결제로 넘어갑니다 — 인계 모드 (목업)');return;}
  tmsg('재고 예약(hold) 완료 — 7개 부품 점유');
  setTimeout(function(){tmsg(pm+' 결제 승인 (목업 PG)');},1200);
- setTimeout(function(){if(own)own.style.display='none';if(done)done.style.display='block';var cta=document.querySelector('#s4-pay').parentNode.parentNode;if(cta)cta.style.display='none';tmsg('주문 ORD-84216 생성 — 원장은 본 시스템에 저장됐어요');},2400);
+ setTimeout(function(){tmsg('주문 ORD-84216 생성 — 원장은 본 시스템에 저장됐어요');},2400);
+ setTimeout(function(){window.location.href='s5-complete.html';},3400);
 });
 applyMode();
 var so=document.getElementById('s4-soldout');if(so)so.addEventListener('click',function(){window.location.href='s3-detail.html';});
