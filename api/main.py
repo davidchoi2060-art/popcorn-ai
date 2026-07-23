@@ -12,6 +12,7 @@ from sqlalchemy import text
 from .admin_price_import import router as admin_price_import_router
 from .admin_products import router as admin_products_router
 from .admin_reviews import router as admin_reviews_router
+from .candidates import router as candidates_router
 from .db import engine
 
 app = FastAPI(title="popcorn-pc-ai (local slice)")
@@ -27,6 +28,7 @@ def health():
 app.include_router(admin_products_router)
 app.include_router(admin_reviews_router)
 app.include_router(admin_price_import_router)
+app.include_router(candidates_router)
 
 # 정적 마운트는 반드시 마지막 — 먼저 걸면 /api/*가 캐치올에 잡힌다.
 # mockups 전체를 마운트해야 admin/의 ../shared/su-icons.js 참조가 유지된다.

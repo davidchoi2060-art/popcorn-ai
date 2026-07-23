@@ -597,6 +597,69 @@ addConstraint=function(icon,label,value){
  budgetUpdate();
  mbarUpdate();
 };
+// ---- 엔진 v0 LIVE 연동 (슬라이스 4) — 성공 시 카운터·필터 로그를 실측으로, 실패(file://·정적)면 26,480 연출 원형 ----
+var LIVE=false,_srv=false,_seq=0,_ct=null;
+function scheduleCount(){if(!LIVE)return;clearTimeout(_ct);_ct=setTimeout(doCount,300);}
+function doCount(){var seq=++_seq;
+ fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({constraints:consPairs.map(function(p){return {l:p.l,v:p.v};})})})
+  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  .then(function(d){if(seq!==_seq)return;applyCount(d);})
+  .catch(function(){});}
+function renderEffects(effects){
+ var wrap=document.getElementById('s1-filterwrap'),box=document.getElementById('s1-filterlog');
+ if(!box)return;box.innerHTML='';
+ if(effects.length&&wrap)wrap.style.display='block';
+ effects.forEach(function(e){
+  var d=document.createElement('div');d.style.cssText='background:#232320;border-radius:10px;padding:10px 12px;';
+  var right=e.applied?'<b style="font-size:12.5px;color:#ff9d7a;font-variant-numeric:tabular-nums;flex:0 0 auto;">−'+e.delta.toLocaleString()+'</b>':'<span style="font-size:10.5px;color:#9a968d;border:1px solid #3a3a35;border-radius:999px;padding:2px 8px;flex:0 0 auto;white-space:nowrap;">영향 없음</span>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:800;color:#e6e2da;">'+e.label+'</span>'+right+'</div><div style="font-size:11.5px;color:#9a968d;line-height:1.45;margin-top:3px;">'+e.reason+'</div>';
+  box.appendChild(d);});
+ box.scrollTop=box.scrollHeight;}
+function applyCount(d){
+ _srv=true;candidates(d.count);_srv=false;
+ renderEffects(d.effects);
+ if(d.count===0){
+  if(s3i){s3i.textContent='error';s3i.style.color='#e0894a';}
+  if(s3s){s3s.textContent='0개';s3s.style.color='#e0894a';}
+  cb.disabled=true;cb.style.background='';cb.style.cursor='';
+  if(cap)cap.textContent='조건을 하나만 완화하면 후보가 생겨요.';
+  if(empty){msgs.appendChild(empty);empty.style.display='flex';msgs.scrollTop=msgs.scrollHeight;}
+ }else if(empty){empty.style.display='none';}}
+// LIVE 시 가짜 연출 차단 — 배수 곱 결과는 서버 응답이 덮어쓴다
+var _anim=animate;animate=function(el,to){if(LIVE&&el===pool&&!_srv)return;_anim(el,to);};
+var _logF=logFilter;logFilter=function(l,d,r){if(LIVE)return;_logF(l,d,r);};
+var _cand=candidates;candidates=function(n){if(LIVE&&!_srv){scheduleCount();return;}_cand(n);};
+var _overC=overConstrain;overConstrain=function(text){
+ if(!LIVE){_overC(text);return;}
+ addUser(text);addConstraint('savings','예산','80만원 이하');addConstraint('sports_esports','용도','고사양 게임');
+ setTimeout(function(){addAI('조건을 모두 반영했어요 — 통과한 후보 수는 옆 패널에서 실시간으로 확인돼요.');},350);};
+var _liveBase=addConstraint;addConstraint=function(icon,label,value){_liveBase(icon,label,value);scheduleCount();};
+// LIVE 전용 버튼 가로채기(capture) — 완화 칩·직접 입력의 하드코딩 숫자 제거
+document.querySelectorAll('button').forEach(function(b){var x=b.textContent||'';
+ if(x.indexOf('예산 20만원 올리기')>-1)b.addEventListener('click',function(ev){
+  if(!LIVE)return;ev.stopImmediatePropagation();
+  var cur=null;consPairs.forEach(function(p){if(p.l==='예산')cur=p.v;});
+  var m=cur&&cur.match(/(\d{2,3})\s*만/);var nv=m?((+m[1]+20)+'만원 이하'):'100만원 이하';
+  addConstraint('savings','예산',nv);addAI('예산을 <b>'+nv+'</b>로 완화해 다시 세어볼게요.');},true);});
+if(mg)mg.addEventListener('click',function(ev){
+ if(!LIVE)return;ev.stopImmediatePropagation();
+ var t=(mi.value||'').trim()||'인기게임, 예산 120만, 조용하게';
+ setGear('ask');addUser(t);addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');
+ setTimeout(function(){addAI('입력을 분석해 조건에 반영했어요 — 통과 후보 수는 옆 패널에서 실시간으로 확인돼요.');},350);},true);
+// 초기 1회: 제약 0개 총계 — 성공 시 LIVE 전환(즉시 세팅, 틱다운 없음 — 26,480→9 애니는 거짓 필터 연출)
+fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({constraints:[]})})
+ .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+ .then(function(d){
+  LIVE=true;poolN=d.total;
+  pool.firstChild.textContent=d.total.toLocaleString();
+  mbarUpdate();
+  NUDGES=NUDGES.filter(function(n){return n.v!=='예산 절감';});/* 예산 숫자를 덮어써 카운터가 되레 오르는 역설 방지 */
+  var hd=document.querySelector('#s1-side-pipe > div');
+  if(hd){var bg=document.createElement('span');bg.id='s1-datasrc';bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='margin-left:auto;background:#2f9e6d;color:#fff;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:800;flex:0 0 auto;';hd.appendChild(bg);}
+  var sub=pool.nextElementSibling;if(sub)sub.textContent='조건 통과 실재고 (시드 데이터 기준)';
+  document.querySelectorAll('button').forEach(function(b){if((b.textContent||'').indexOf('GPU 한 단계 낮추기')>-1)b.style.display='none';});/* v0 무필터 영역 */
+  if(consPairs.length)scheduleCount();
+ }).catch(function(){});
 budgetUpdate();
 if(mode==='guided'){
  var _gb=document.getElementById('s1-gearbar');if(_gb)_gb.style.display='none';
