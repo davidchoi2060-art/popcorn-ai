@@ -196,6 +196,110 @@ var rf=document.getElementById('s3-refine'),ri=document.getElementById('s3-refin
 if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){return;}ri.value='';tmsg('"'+t+'" 요청을 반영했어요 — 안전 대안으로 교체했습니다');});
 })();
 </script>
+<script>
+// ---- 스왑 엔진 LIVE (슬라이스 8) — popcorn-quote + candidates 성공 시에만. 아니면 정적 원형 ----
+(function(){
+ var raw;try{raw=localStorage.getItem('popcorn-quote');}catch(e){return;}
+ if(!raw)return;
+ var Q;try{Q=JSON.parse(raw).data;}catch(e){return;}
+ if(!Q||!Q.sets)return;
+ var tier=null;try{tier=localStorage.getItem('popcorn-quote-tier');}catch(e){}
+ if(!tier||!Q.sets[tier])tier=Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend');
+ if(!Q.sets[tier])return;
+ var C=null;
+ var PKO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'그래픽카드',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'저장장치'};
+ var PIMG={CPU:'cpu',GPU:'gpu',MB:'mb',RAM:'ram',SSD:'ssd',POWER:'psu',CASE:'case'};
+ var toastEl=document.getElementById('s3-toast');
+ function tmsg(m){toastEl.textContent=m;toastEl.style.opacity='1';toastEl.style.transform='translateX(-50%) translateY(0)';clearTimeout(toastEl._t);toastEl._t=setTimeout(function(){toastEl.style.opacity='0';toastEl.style.transform='translateX(-50%) translateY(20px)';},2800);}
+ var partsBox=document.querySelector('main [data-swap]')?document.querySelector('main [data-swap]').closest('div[style*="overflow:hidden"]'):null;
+ var totalEl=(function(){var sp=document.querySelectorAll('span');for(var i=0;i<sp.length;i++){if(sp[i].textContent.indexOf('4,769,000')===0)return sp[i];}return null;})();
+ var compatCard=document.querySelector('aside > div');
+ function renderParts(){
+  if(!partsBox)return;
+  var h='';
+  C.current.forEach(function(p){
+   var slot=p.slot,sl=C.slots[slot]||{alternatives:[]},n=sl.alternatives.length;
+   var badge=p.unavailable
+    ?'<span style="background:#fbe9e7;color:#b04a3a;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">품절 — 대안으로 교체 필요</span>'
+    :(n?'<span style="background:#e7f4ec;color:#1c7a4d;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 '+n+'개</span>'
+       :'<span style="background:#f0eee9;color:#8a8578;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">대안 없음</span>');
+   var img=PIMG[slot]
+    ?'<img src="assets/parts/'+PIMG[slot]+'.png" alt="'+PKO[slot]+'" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;">'
+    :'<span style="flex:0 0 72px;height:72px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid #ece9e3;background:#fff;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#8a8578;">mode_fan</span></span>';
+   h+='<div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">'+img
+    +'<div style="flex:1;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">'+PKO[slot]+'</span>'+badge+'</div>'
+    +'<div style="font-size:16px;font-weight:800;color:#17171b;">'+p.name+'</div></div>'
+    +'<div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">'+p.price.toLocaleString()+'<span style="font-size:12px;color:#8a8578;">원</span></div></div>'
+    +'<button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-live-swap="'+slot+'">변경</button></div>';
+  });
+  partsBox.innerHTML=h;
+  partsBox.querySelectorAll('[data-live-swap]').forEach(function(b){b.addEventListener('click',function(){openLive(b.getAttribute('data-live-swap'));});});
+  if(totalEl)totalEl.innerHTML=C.total.toLocaleString()+'<span style="font-size:13px;color:#8a8578;">원</span>';
+ }
+ function renderCompat(){
+  var cm=C.compat;if(!cm||!compatCard)return;
+  var box=compatCard.querySelector('div[style*="flex-direction:column"]');if(!box)return;
+  var find=function(k){for(var i=0;i<cm.checks.length;i++)if(cm.checks[i].key===k)return cm.checks[i];return null;};
+  var row=function(lab,val,sub){return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:#5fd6a0;">check_circle</span>'+lab+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+sub+'</span>':'')+'</span><b style="font-size:12.5px;color:#5fd6a0;">'+val+'</b></div>';};
+  var s=find('socket'),m=find('mem'),t=find('cooler_tdp'),f=find('fit');
+  box.innerHTML=row('CPU 소켓','정상',s?s.detail:'')+row('메모리 규격','정상',m?m.detail:'')
+   +row('파워 정격 여유',cm.power_headroom_pct+'%','')+row('쿨러 TDP','정상',t?t.detail:'')
+   +row('케이스 실장','정상',f?f.detail:'');
+ }
+ function openLive(slot){
+  var s=C.slots[slot];
+  document.getElementById('s3-part').textContent=PKO[slot];
+  var alts=document.getElementById('s3-alts');alts.innerHTML='';
+  if(s.empty){
+   alts.innerHTML='<div style="padding:20px;text-align:center;color:#8a8578;font-size:13.5px;font-weight:700;">'+s.empty_reason+'</div>';
+  }else s.alternatives.forEach(function(a){
+   var diff=(a.price_diff>=0?'+':'')+a.price_diff.toLocaleString()+'원';
+   var chainHtml='';
+   if(a.chain){
+    var c=a.chain[0];
+    chainHtml='<div style="margin-top:9px;background:#fbf3e2;border-radius:9px;padding:9px 11px;font-size:12px;color:#8a561a;font-weight:700;line-height:1.5;">'+a.chain_reason
+     +'<br>→ '+PKO[c.slot]+'를 <b>'+c.to.name+'</b>(으)로 함께 바꿉니다 ('+(c.to.price_diff>=0?'+':'')+c.to.price_diff.toLocaleString()+'원)</div>'
+     +'<div style="margin-top:8px;font-size:12.5px;font-weight:800;color:#2b5fd9;">연쇄 변경하고 계속하기 →</div>';
+   }
+   var b=document.createElement('button');
+   b.style.cssText='display:block;width:100%;padding:14px 16px;border:1.5px solid #e2ded5;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;';
+   b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+a.name+'</span><span style="font-size:12.5px;color:#1c7a4d;font-weight:700;">✓ 호환 5종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
+   b.addEventListener('click',function(){applySwap(slot,a,b);});
+   alts.appendChild(b);
+  });
+  document.getElementById('s3-modal').style.display='flex';
+ }
+ function applySwap(slot,a,btn){
+  btn.disabled=true;
+  var changes=[{slot:slot,product_code:a.product_code}];
+  if(a.chain)a.chain.forEach(function(c){changes.push({slot:c.slot,product_code:c.to.product_code});});
+  fetch('/api/swap/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:Q.session_id,tier:tier,changes:changes})})
+   .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+   .then(function(res){
+    document.getElementById('s3-modal').style.display='none';
+    if(!res.ok){var d=res.j.detail||{};tmsg('⚠ '+(d.detail||d.error||'적용 실패'));return;}
+    Q.sets[tier].items=res.j.items;Q.sets[tier].total=res.j.total;Q.sets[tier].compat=res.j.compat;
+    try{localStorage.setItem('popcorn-quote',JSON.stringify({at:Date.now(),data:Q}));}catch(e){}
+    tmsg((a.chain?'연쇄 변경 적용 — ':'')+PKO[slot]+' 교체 완료 · 호환 5종 재검증 통과 · 총 '+res.j.total.toLocaleString()+'원');
+    load();
+   })
+   .catch(function(){tmsg('⚠ 적용에 실패했어요 — 다시 시도해 주세요.');});
+ }
+ function load(){
+  return fetch('/api/swap/candidates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:Q.session_id,tier:tier})})
+   .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+   .then(function(d){C=d;renderParts();renderCompat();});
+ }
+ load().then(function(){
+  // LIVE 성립 — 배지·정직화·티어 재저장
+  var hd=compatCard?compatCard.querySelector('div'):null;
+  if(hd){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='margin-left:auto;background:#2f9e6d;color:#fff;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:800;flex:0 0 auto;';hd.appendChild(bg);}
+  var rf2=document.getElementById('s3-refine');
+  if(rf2)rf2.addEventListener('click',function(ev){ev.stopImmediatePropagation();tmsg('자연어 교체는 준비 중이에요 — 아래 [변경] 버튼을 이용해 주세요.');},true);
+  document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(){try{localStorage.setItem('popcorn-quote-tier',tier);}catch(e){}},true);});
+ }).catch(function(){});
+})();
+</script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>

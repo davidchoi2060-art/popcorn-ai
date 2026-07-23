@@ -521,10 +521,12 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  var first=Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend');
  document.querySelectorAll('.s2tab').forEach(function(t){var on=t.getAttribute('data-set')===first;t.classList.toggle('is-active',on);t.setAttribute('aria-selected',on?'true':'false');});
  s2apply(first);
- // S4 전달 계약: '장바구니 담기' 시 선택 티어 저장 (LIVE 한정, 네비게이션은 기존 핸들러)
+ // S3/S4 전달 계약: '장바구니 담기'·'부품 변경' 시 선택 티어 저장 (LIVE 한정, 네비게이션은 기존 핸들러)
  document.addEventListener('click',function(ev){
   var t=ev.target&&ev.target.closest?ev.target.closest('button'):null;
-  if(!t||(t.textContent||'').trim().indexOf('장바구니 담기')!==0)return;
+  if(!t)return;
+  var x=(t.textContent||'').trim();
+  if(x.indexOf('장바구니 담기')!==0&&x.indexOf('부품 변경')!==0)return;
   var at=document.querySelector('.s2tab.is-active');
   try{localStorage.setItem('popcorn-quote-tier',at?at.getAttribute('data-set'):first);}catch(e){}
  },true);

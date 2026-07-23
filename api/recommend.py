@@ -110,6 +110,26 @@ def _dfs(slot_pools, budget_limit):
     return go(0, {}, 0)
 
 
+def build_compat(chosen: dict) -> dict:
+    """호환성 5종 요약 — recommend(_build_set)와 swap이 공유(계약·반올림 동일 유지)."""
+    cpu, mb, ram, gpu = chosen["CPU"], chosen["MB"], chosen["RAM"], chosen["GPU"]
+    case, cooler, power = chosen["CASE"], chosen["COOLER"], chosen["POWER"]
+    headroom = int(power["rated_watt"] / gpu["required_power_watt"] * 100)
+    return {
+        "power_headroom_pct": headroom,
+        "checks": [
+            {"key": "socket", "label": "CPU 소켓 규격 일치", "pass": True,
+             "detail": f"{cpu['socket']} = {mb['socket']} (쿨러 {cooler['socket']})"},
+            {"key": "mem", "label": "메모리 규격 일치", "pass": True,
+             "detail": f"{ram['mem_type']} = {mb['mem_type']}"},
+            {"key": "cooler_tdp", "label": "쿨러 발열(TDP) 통과", "pass": True,
+             "detail": f"{cooler['cooler_tdp']}W ≥ {cpu['tdp_watt']}W"},
+            {"key": "fit", "label": "케이스 장착 공간 여유", "pass": True,
+             "detail": f"GPU {gpu['length_mm']}≤{case['gpu_max_mm']}mm · 쿨러 {cooler['cooler_height_mm']}≤{case['cooler_height_mm']}mm"},
+        ],
+    }
+
+
 def _build_set(tier, pool, cap):
     slot_pools = {}
     for s in SLOTS:
@@ -122,9 +142,6 @@ def _build_set(tier, pool, cap):
     if chosen is None:
         return None
     total = sum(p["sale_price"] for p in chosen.values())
-    cpu, mb, ram, gpu = chosen["CPU"], chosen["MB"], chosen["RAM"], chosen["GPU"]
-    case, cooler, power = chosen["CASE"], chosen["COOLER"], chosen["POWER"]
-    headroom = int(power["rated_watt"] / gpu["required_power_watt"] * 100)
     verdict = "none" if cap is None else ("within" if total <= cap else "over")
     reasons = {
         "value": ["조건 통과 부품에서 예산 안 최저가 조합", "조립 불가 조합은 탐색에서 제외"],
@@ -138,19 +155,7 @@ def _build_set(tier, pool, cap):
                    "sku": chosen[s]["sku"], "name": chosen[s]["product_name"],
                    "price": chosen[s]["sale_price"]} for s in SLOTS],
         "total": total,
-        "compat": {
-            "power_headroom_pct": headroom,
-            "checks": [
-                {"key": "socket", "label": "CPU 소켓 규격 일치", "pass": True,
-                 "detail": f"{cpu['socket']} = {mb['socket']} (쿨러 {cooler['socket']})"},
-                {"key": "mem", "label": "메모리 규격 일치", "pass": True,
-                 "detail": f"{ram['mem_type']} = {mb['mem_type']}"},
-                {"key": "cooler_tdp", "label": "쿨러 발열(TDP) 통과", "pass": True,
-                 "detail": f"{cooler['cooler_tdp']}W ≥ {cpu['tdp_watt']}W"},
-                {"key": "fit", "label": "케이스 장착 공간 여유", "pass": True,
-                 "detail": f"GPU {gpu['length_mm']}≤{case['gpu_max_mm']}mm · 쿨러 {cooler['cooler_height_mm']}≤{case['cooler_height_mm']}mm"},
-            ],
-        },
+        "compat": build_compat(chosen),
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},
         "reasons": reasons,
