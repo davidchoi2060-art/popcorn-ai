@@ -18,6 +18,7 @@ db/
 └─ seed/seed_0004_candidate-pool.sql  S1 후보 풀 슬라이스 패치 (추천 가능 6종+태그, 재실행 안전)
 └─ seed/seed_0005_quote-engine.sql  견적 엔진 슬라이스 패치 (티어 부품 9종, 재실행 안전)
 └─ seed/seed_0006_own-payment.sql  운영 모드 2단계 승격 (결제·정산 자체, 재실행 안전)
+└─ seed/seed_0007_admin-orders.sql  주문 1 스냅샷 라벨 백필 (part_type, 재실행 안전)
 ```
 
 ## 사용법 (로컬 PC → Cloud SQL)

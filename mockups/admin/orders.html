@@ -265,7 +265,7 @@
 
         <div id="v-list">
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">주문 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-020</span></h2>
+          <div><h2 class="mb-1">주문 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">주문 원장은 <b class="text-body-secondary">항상 본 시스템</b>입니다 — 결제 방식(자체/쇼핑몰 인계)과 무관하게 전 주문이 여기 남습니다. (A-10)</p></div>
         </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -315,6 +315,7 @@
         function matches(o){
           if(fch!=="all"&&o.ch!==fch)return false;
           if(cur==="all")return true;
+          if(cur==="paid")return o.status==="결제완료";
           if(cur==="progress")return o.status==="조립중";
           if(cur==="shipping")return o.status==="배송중";
           if(cur==="done")return o.status==="완료";
@@ -322,7 +323,7 @@
           return true;
         }
         function pills(){
-          const P=[["all","전체",O.length,"dark"],["progress","조립중",O.filter(o=>o.status==="조립중").length,"warning"],["shipping","배송중",O.filter(o=>o.status==="배송중").length,"warning"],["done","완료",O.filter(o=>o.status==="완료").length,"secondary"],["refund","환불·클레임",O.filter(o=>o.refund).length,"danger"]];
+          const P=[["all","전체",O.length,"dark"],["paid","결제완료",O.filter(o=>o.status==="결제완료").length,"info"],["progress","조립중",O.filter(o=>o.status==="조립중").length,"warning"],["shipping","배송중",O.filter(o=>o.status==="배송중").length,"warning"],["done","완료",O.filter(o=>o.status==="완료").length,"secondary"],["refund","환불·클레임",O.filter(o=>o.refund).length,"danger"]];
           document.getElementById("pills").innerHTML=P.map(([k,l,n,c])=>{
             const on=k===cur;
             return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+c} ms-1">${n}</span></a></li>`;
@@ -355,6 +356,7 @@
           const rows=o.items.map(it=>`<div class="d-flex align-items-center gap-3 py-2 border-bottom"><span class="fs-10 fw-bold text-body-tertiary" style="flex:0 0 130px;">${it[0]}</span><div class="flex-1 fs-9 fw-semibold text-body-highlight">${it[1]}</div><b class="fs-9">${won(it[2])}</b></div>`).join("");
           let actions="";
           if(o.refund)actions=`<a class="btn btn-phoenix-danger btn-sm" href="refunds.html">환불·클레임에서 처리 →</a>`;
+          else if(o.status==="결제완료")actions=`<button class="btn btn-primary btn-sm" data-act="assemble">조립 시작</button>`;
           else if(o.status==="조립중")actions=`<button class="btn btn-primary btn-sm" data-act="ship">검사 완료 · 출고 처리</button>`;
           else if(o.status==="배송중")actions=`<button class="btn btn-primary btn-sm" data-act="done">배송 완료 처리</button>`;
           document.getElementById("v-detail").innerHTML=`
@@ -381,19 +383,45 @@
           document.getElementById("d-back").onclick=e=>{e.preventDefault();document.getElementById("v-detail").style.display="none";document.getElementById("v-list").style.display="";render();};
           const ab=document.querySelector("#v-detail [data-act]");
           if(ab)ab.onclick=()=>{
+            const MSG={assemble:`<b>${o.no}</b> 조립 시작 처리`,ship:`<b>${o.no}</b> 출고 처리 · 송장 발번 · 고객 알림 발송`,done:`<b>${o.no}</b> 배송 완료 처리 · 구매 확정 안내 발송`};
+            if(LIVE){
+              ab.disabled=true;
+              fetch(`/api/admin/orders/${o.no}/advance`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:ab.dataset.act})})
+                .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+                .then(res=>{
+                  if(!res.ok){const d=res.j.detail||{};toast("⚠ "+(d.detail||d.error||"처리 실패"));ab.disabled=false;return;}
+                  lastAction={no:o.no,status:o.status,step:o.step,ship:o.ship,undo_id:res.j.undo_id};
+                  o.status=res.j.status;o.step=res.j.step;if(res.j.ship)o.ship=res.j.ship;
+                  toast(MSG[ab.dataset.act],true);detail();
+                })
+                .catch(()=>{toast("⚠ 처리에 실패했어요 — 다시 시도해 주세요.");ab.disabled=false;});
+              return;
+            }
             lastAction={no:o.no,status:o.status,step:o.step,ship:o.ship};
-            if(ab.dataset.act==="ship"){o.status="배송중";o.step=3;o.ship="CJ대한통운 6483-0021-7745 (자동 발번)";toast(`<b>${o.no}</b> 출고 처리 · 송장 발번 · 고객 알림 발송`,true);}
-            else{o.status="완료";o.step=4;toast(`<b>${o.no}</b> 배송 완료 처리 · 구매 확정 안내 발송`,true);}
+            if(ab.dataset.act==="assemble"){o.status="조립중";o.step=2;}
+            else if(ab.dataset.act==="ship"){o.status="배송중";o.step=3;o.ship="CJ대한통운 6483-0021-7745 (자동 발번)";}
+            else{o.status="완료";o.step=4;}
+            toast(MSG[ab.dataset.act],true);
             detail();
           };
           if(window.feather)feather.replace();
         }
-        function undo(){
-          if(!lastAction)return;
+        function restoreLocal(){
           const o=O.find(x=>x.no===lastAction.no);
           if(o){o.status=lastAction.status;o.step=lastAction.step;o.ship=lastAction.ship;}
-          lastAction=null;if(sel===o.no)detail();else render();
+          lastAction=null;if(o&&sel===o.no)detail();else render();
           toast("되돌렸습니다 — 주문 상태가 이전으로 복원됐습니다.");
+        }
+        function undo(){
+          if(!lastAction)return;
+          if(LIVE&&lastAction.undo_id){
+            fetch(`/api/admin/orders/undo/${lastAction.undo_id}`,{method:"POST"})
+              .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+              .then(restoreLocal)
+              .catch(()=>toast("⚠ 되돌리기에 실패했어요."));
+            return;
+          }
+          restoreLocal();
         }
         function toast(m,actionable){
           let t=document.getElementById("__rtoast");
@@ -403,7 +431,27 @@
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
         }
         document.getElementById("fch").addEventListener("change",e=>{fch=e.target.value;render();});
+        // ---- LIVE (슬라이스 7) — 즉시 더미 렌더 후 API 시도, 실패 시 더미 유지 ----
+        let LIVE=false;
+        function fmtT(iso){
+          const d=new Date(iso),now=new Date();
+          const hm=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+          if(d.toDateString()===now.toDateString())return "오늘 "+hm;
+          return String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+" "+hm;
+        }
+        const fromApi=o=>({no:o.no,t:fmtT(o.created_at),cust:o.cust,ch:o.ch,status:o.status,step:o.step,
+          total:o.total,ops:o.ops,pay:o.pay,ship:o.ship,hold:o.hold,items:o.items,refund:o.refund});
         render();
+        fetch("/api/admin/orders")
+          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(d=>{
+            LIVE=true;O=d.items.map(fromApi);
+            const b=document.getElementById("dataSrc");
+            b.textContent="실데이터 · Cloud SQL";
+            b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            render();
+          })
+          .catch(()=>{});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
