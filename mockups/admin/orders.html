@@ -10,7 +10,7 @@
     <!-- ===============================================-->
     <!--    Document Title-->
     <!-- ===============================================-->
-    <title>팝콘PC 관리자 · 주문 (쇼핑몰 전달)</title>
+    <title>팝콘PC 관리자 · 주문 관리</title>
 
 
     <!-- ===============================================-->
@@ -97,7 +97,7 @@
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-order" role="button" data-bs-toggle="collapse" aria-expanded="true" aria-controls="nv-order"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="file-text"></span></span><span class="nav-link-text">견적 · 주문</span></div></a>
                 <div class="parent-wrapper label-1"><ul class="nav collapse parent show" data-bs-parent="#navbarVerticalCollapse" id="nv-order">
                   <li class="nav-item"><a class="nav-link" href="sessions.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="message-square" style="width:16px;height:16px;"></span></span><span class="nav-link-text">견적 상담 기록</span></div></a></li>
-                  <li class="nav-item"><a class="nav-link active" href="orders.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="send" style="width:16px;height:16px;"></span></span><span class="nav-link-text">주문 (쇼핑몰 전달)</span></div></a></li>
+                  <li class="nav-item"><a class="nav-link active" href="orders.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="send" style="width:16px;height:16px;"></span></span><span class="nav-link-text">주문 관리</span></div></a></li><li class="nav-item"><a class="nav-link" href="refunds.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="corner-up-left" style="width:16px;height:16px;"></span></span><span class="nav-link-text">환불 · 클레임</span><span class="badge badge-phoenix badge-phoenix-danger ms-2">1</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="swap-logs.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="repeat" style="width:16px;height:16px;"></span></span><span class="nav-link-text">부품 교체 · 클릭 기록</span></div></a></li>
                 </ul></div></div></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link label-1" href="customers.html"><div class="d-flex align-items-center"><span class="nav-link-icon"><span data-feather="users"></span></span><span class="nav-link-text">고객(회원)</span></div></a></div></li>
@@ -261,43 +261,149 @@
         </div>
       </nav>
       <div class="content">
-        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">주문 (쇼핑몰 전달)</li></ol></nav>
+        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">주문 관리</li></ol></nav>
+
+        <div id="v-list">
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">주문 (쇼핑몰 전달) <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-020</span></h2>
-          <p class="text-body-tertiary mb-0">주문의 원장은 <b class="text-body-secondary">기존 팝콘PC 쇼핑몰</b>입니다. 여기서는 확정 견적의 전달 상태만 봅니다(읽기 전용).</p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder">오늘 12건</h4><p class="fs-9 text-body-tertiary mb-0">전달 11 · 재시도 1</p></div>
+          <div><h2 class="mb-1">주문 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-020</span></h2>
+          <p class="text-body-tertiary mb-0">주문 원장은 <b class="text-body-secondary">항상 본 시스템</b>입니다 — 결제 방식(자체/쇼핑몰 인계)과 무관하게 전 주문이 여기 남습니다. (A-10)</p></div>
         </div>
-        <div class="alert alert-subtle-info fs-9 mb-3" role="alert">결제·배송·취소·회원 처리는 쇼핑몰 관리자에서 하십시오. 이 화면은 <b>견적→주문 인계가 성공했는지</b>만 책임집니다.</div>
-        <div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-          <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">시각</th><th>견적(스냅샷)</th><th>고객</th><th class="text-end">금액</th><th>전달 상태</th><th class="pe-4 text-end"></th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table></div></div></div>
+        <div class="row g-2 mb-3" id="kpis"></div>
+        <div class="card">
+          <div class="card-header border-bottom border-translucent"><div class="d-flex flex-wrap align-items-center gap-2">
+            <ul class="nav nav-pills gap-2 fs-9 mb-0" id="pills"></ul>
+            <select id="fch" class="form-select form-select-sm ms-auto" style="max-width:150px;"><option value="all">전체 채널</option><option value="own">자체 결제</option><option value="mall">쇼핑몰 인계</option></select>
+          </div></div>
+          <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1000px;">
+            <colgroup><col style="width:120px"><col style="width:110px"><col style="width:90px"><col style="width:110px"><col><col style="width:120px"><col style="width:150px"><col style="width:90px"></colgroup>
+            <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">주문번호</th><th>시각</th><th>고객</th><th>채널</th><th>구성</th><th class="text-end">금액</th><th>상태</th><th class="pe-4"></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table></div></div>
+        </div>
+        </div>
+
+        <div id="v-detail" style="display:none;"></div>
+
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
       (function(){
-        function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
+        const won=n=>n.toLocaleString()+"원";
         let O=[
-          ["10:45","SNAP-0713-1042","김*수","812,000",["전달됨","primary"],"shop-84213"],
-          ["10:02","SNAP-0713-0940","이*희","1,486,000",["전달됨","primary"],"shop-84210"],
-          ["09:48","SNAP-0713-0912","박*진","658,000",["재시도 중 (2/5)","warning"],null],
-          ["어제 18:22","SNAP-0712-1822","최*식","1,102,000",["전달됨","primary"],"shop-84188"]
+         {no:"ORD-84216",t:"오늘 14:22",cust:"김민준",ch:"own",status:"조립중",step:2,total:2087000,
+          ops:"결제 자체 · 정산 자체 · 배송 자체 · 환불 쇼핑몰 (주문 시점 스냅샷)",pay:"신용카드 · PG 승인 TX-88213",ship:null,
+          hold:"재고 예약(hold) 7건 → 결제 승인 시 확정 배정 전환 완료",
+          items:[["CPU","Intel Core i7-14700K",580000],["GPU","NVIDIA RTX 4070 Ti SUPER",420000],["메인보드","MSI MAG Z790 Tomahawk WiFi",250000],["메모리","삼성 DDR5-5600 32GB",120000],["SSD","삼성 990 PRO 1TB",135000],["파워","시소닉 FOCUS GX-750",110000],["케이스","NZXT H5 Flow",90000],["조립·검수","전문가 조립 · 24시간 검사",30000],["모니터(함께 구성)","LG 울트라기어 27GS75Q",329000],["마우스(함께 구성)","로지텍 G102 LIGHTSYNC",23000]],refund:null},
+         {no:"ORD-84213",t:"07-14 11:05",cust:"김민준",ch:"own",status:"배송중",step:3,total:812000,
+          ops:"결제 자체 · 정산 자체 · 배송 자체 · 환불 쇼핑몰",pay:"신용카드 · PG 승인 TX-87954",ship:"CJ대한통운 6482-1234-5678",
+          hold:"확정 배정 완료",items:[["구성","라이젠5 7600 · RTX 4060 (7종) + 조립·검수",812000]],refund:"RF-1024 환불 접수 (초기 불량)"},
+         {no:"ORD-83907",t:"06-28 16:40",cust:"이서연",ch:"mall",status:"완료",step:4,total:1284000,
+          ops:"전 항목 쇼핑몰 인계 (1단계 프리셋)",pay:"쇼핑몰 결제 (인계)",ship:"CJ대한통운 6480-8821-3341 · 배송 완료",
+          hold:"—(인계 주문 · 재고 수량은 API 유입으로 정합)",items:[["구성","라이젠5 5600 · RTX 3060 (7종) + 조립·검수",1284000]],refund:null},
+         {no:"ORD-83881",t:"06-25 10:12",cust:"박도윤",ch:"mall",status:"완료",step:4,total:452000,
+          ops:"전 항목 쇼핑몰 인계",pay:"쇼핑몰 결제 (인계)",ship:"배송 완료",hold:"—",items:[["구성","사무용 구성 (6종) + 조립·검수",452000]],refund:null}
         ];
-        function render(){
-          document.getElementById("rows").innerHTML=O.map((o,i)=>`
-            <tr><td class="ps-4 text-body-tertiary">${o[0]}</td>
-            <td><code class="fs-10">${o[1]}</code> <a href="sessions.html" class="fs-10">상담 보기</a></td>
-            <td>${o[2]}</td><td class="text-end fw-bold">${o[3]}원</td>
-            <td><span class="badge badge-phoenix badge-phoenix-${o[4][1]}">${o[4][0]}</span></td>
-            <td class="pe-4 text-end text-nowrap">
-              ${o[5]?`<a href="#!" class="btn btn-sm btn-phoenix-secondary" onclick="return false;">쇼핑몰 주문 ${o[5]} ↗</a>`:`<button class="btn btn-sm btn-primary" data-r="${i}">지금 재전달</button>`}
-            </td></tr>`).join("");
-          document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{
-            const i=+b.dataset.r;O[i][4]=["전달됨","primary"];O[i][5]="shop-84215";
-            toast("재전달 성공 — 쇼핑몰 주문 shop-84215 생성");render();
-          });
+        let cur="all", fch="all", sel=null, lastAction=null;
+        const STEPS=["결제 완료","조립·검사","출고·배송","배송 완료"];
+        const chBadge=ch=>ch==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>';
+        const stBadge=o=>o.refund?'<span class="badge badge-phoenix badge-phoenix-danger text-nowrap">환불 접수</span>':'<span class="badge badge-phoenix badge-phoenix-'+(o.status==="완료"?"secondary":"warning")+' text-nowrap">'+o.status+'</span>';
+        function kpis(){
+          const own=O.filter(o=>o.ch==="own").length, mall=O.length-own, rf=O.filter(o=>o.refund).length;
+          const K=[["오늘 주문",O.filter(o=>o.t.indexOf("오늘")>-1).length,"건","primary"],["자체 결제",own,"건","primary"],["쇼핑몰 인계",mall,"건","info"],["환불·클레임 진행",rf,"건","danger"]];
+          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
-        render();if(window.feather)feather.replace();
+        function matches(o){
+          if(fch!=="all"&&o.ch!==fch)return false;
+          if(cur==="all")return true;
+          if(cur==="progress")return o.status==="조립중";
+          if(cur==="shipping")return o.status==="배송중";
+          if(cur==="done")return o.status==="완료";
+          if(cur==="refund")return !!o.refund;
+          return true;
+        }
+        function pills(){
+          const P=[["all","전체",O.length,"dark"],["progress","조립중",O.filter(o=>o.status==="조립중").length,"warning"],["shipping","배송중",O.filter(o=>o.status==="배송중").length,"warning"],["done","완료",O.filter(o=>o.status==="완료").length,"secondary"],["refund","환불·클레임",O.filter(o=>o.refund).length,"danger"]];
+          document.getElementById("pills").innerHTML=P.map(([k,l,n,c])=>{
+            const on=k===cur;
+            return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+c} ms-1">${n}</span></a></li>`;
+          }).join("");
+          document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
+        }
+        function render(){
+          kpis();pills();
+          const list=O.filter(matches);
+          document.getElementById("rows").innerHTML=list.length?list.map(o=>`<tr>
+            <td class="ps-4 fw-bold text-body-highlight">${o.no}</td>
+            <td class="text-body-tertiary">${o.t}</td>
+            <td>${o.cust}</td>
+            <td>${chBadge(o.ch)}</td>
+            <td class="text-truncate text-body-secondary">${o.items[0][1]}${o.items.length>1?" 외":""}</td>
+            <td class="text-end fw-bold">${won(o.total)}</td>
+            <td>${stBadge(o)}</td>
+            <td class="pe-4 text-end"><a href="#!" data-o="${o.no}" class="btn btn-sm btn-phoenix-secondary">상세</a></td>
+          </tr>`).join(""):`<tr><td colspan="8" class="text-center text-body-tertiary py-5">조건에 맞는 주문이 없습니다.</td></tr>`;
+          document.querySelectorAll("#rows [data-o]").forEach(a=>a.onclick=e=>{e.preventDefault();sel=a.dataset.o;detail();});
+          if(window.feather)feather.replace();
+        }
+        function order(){return O.find(o=>o.no===sel);}
+        function detail(){
+          const o=order();if(!o)return;
+          const steps='<div class="d-flex align-items-center gap-1 my-3">'+STEPS.map((s,i)=>{
+            const on=i<o.step;
+            return `<div class="flex-1 text-center"><div class="rounded-circle mx-auto mb-1 d-flex align-items-center justify-content-center ${on?"bg-primary text-white":"bg-body-secondary text-body-tertiary"}" style="width:22px;height:22px;font-size:11px;font-weight:800;">${i+1}</div><span class="fs-10 ${on?"text-body-highlight fw-semibold":"text-body-quaternary"}">${s}</span></div>${i<3?`<div class="flex-1" style="height:2px;background:${i<o.step-1?"var(--phoenix-primary)":"var(--phoenix-border-color)"};margin-top:-14px;"></div>`:""}`;
+          }).join("")+"</div>";
+          const rows=o.items.map(it=>`<div class="d-flex align-items-center gap-3 py-2 border-bottom"><span class="fs-10 fw-bold text-body-tertiary" style="flex:0 0 130px;">${it[0]}</span><div class="flex-1 fs-9 fw-semibold text-body-highlight">${it[1]}</div><b class="fs-9">${won(it[2])}</b></div>`).join("");
+          let actions="";
+          if(o.refund)actions=`<a class="btn btn-phoenix-danger btn-sm" href="refunds.html">환불·클레임에서 처리 →</a>`;
+          else if(o.status==="조립중")actions=`<button class="btn btn-primary btn-sm" data-act="ship">검사 완료 · 출고 처리</button>`;
+          else if(o.status==="배송중")actions=`<button class="btn btn-primary btn-sm" data-act="done">배송 완료 처리</button>`;
+          document.getElementById("v-detail").innerHTML=`
+            <a href="#!" id="d-back" class="fs-9 fw-bold text-decoration-none d-inline-flex align-items-center gap-1 mb-3"><span data-feather="arrow-left" style="width:14px;height:14px;"></span>주문 목록</a>
+            <div class="card mb-3"><div class="card-body">
+              <div class="d-flex flex-wrap align-items-center gap-2"><h3 class="mb-0">${o.no}</h3>${chBadge(o.ch)}${stBadge(o)}<span class="ms-auto fs-10 text-body-quaternary">${o.t} · ${o.cust}</span></div>
+              ${steps}
+              <div class="alert alert-subtle-secondary py-2 fs-10 mb-0" role="alert"><span data-feather="settings" style="width:13px;height:13px;" class="me-1"></span>주문 시점 운영 모드: <b>${o.ops}</b></div>
+            </div></div>
+            <div class="card mb-3"><div class="card-body">
+              <h6 class="mb-1">주문 구성 <span class="badge badge-phoenix badge-phoenix-warning fs-10">주문 시점 스냅샷</span></h6>
+              <p class="fs-10 text-body-tertiary mb-2">이후 정본 가격이 변해도 이 주문의 금액·사양은 변하지 않습니다.</p>
+              ${rows}
+              <div class="d-flex justify-content-between pt-2"><b class="fs-9 text-body-tertiary">총액</b><b>${won(o.total)}</b></div>
+            </div></div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">결제</h6><p class="fs-9 mb-0 text-body-secondary">${o.pay}</p></div></div></div>
+              <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">배송</h6><p class="fs-9 mb-0 text-body-secondary">${o.ship||"출고 전 — 검사 완료 후 송장 등록"}</p></div></div></div>
+              <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">재고 원장</h6><p class="fs-9 mb-0 text-body-secondary">${o.hold}</p></div></div></div>
+            </div>
+            <div class="d-flex gap-2">${actions}<a class="btn btn-phoenix-secondary btn-sm" href="activity-logs.html">작업 기록</a></div>`;
+          document.getElementById("v-list").style.display="none";
+          document.getElementById("v-detail").style.display="";
+          document.getElementById("d-back").onclick=e=>{e.preventDefault();document.getElementById("v-detail").style.display="none";document.getElementById("v-list").style.display="";render();};
+          const ab=document.querySelector("#v-detail [data-act]");
+          if(ab)ab.onclick=()=>{
+            lastAction={no:o.no,status:o.status,step:o.step,ship:o.ship};
+            if(ab.dataset.act==="ship"){o.status="배송중";o.step=3;o.ship="CJ대한통운 6483-0021-7745 (자동 발번)";toast(`<b>${o.no}</b> 출고 처리 · 송장 발번 · 고객 알림 발송`,true);}
+            else{o.status="완료";o.step=4;toast(`<b>${o.no}</b> 배송 완료 처리 · 구매 확정 안내 발송`,true);}
+            detail();
+          };
+          if(window.feather)feather.replace();
+        }
+        function undo(){
+          if(!lastAction)return;
+          const o=O.find(x=>x.no===lastAction.no);
+          if(o){o.status=lastAction.status;o.step=lastAction.step;o.ship=lastAction.ship;}
+          lastAction=null;if(sel===o.no)detail();else render();
+          toast("되돌렸습니다 — 주문 상태가 이전으로 복원됐습니다.");
+        }
+        function toast(m,actionable){
+          let t=document.getElementById("__rtoast");
+          if(!t){t=document.createElement("div");t.id="__rtoast";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:.2s;display:flex;align-items:center;gap:12px;max-width:92vw;";document.body.appendChild(t);}
+          t.innerHTML=`<span>${m}</span>`+(actionable?`<button id="__undoBtn" style="background:none;border:1px solid rgba(255,255,255,.4);color:#ffd166;font-size:12px;font-weight:800;padding:4px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;">되돌리기</button><a href="activity-logs.html" style="color:#9ec5ff;font-size:12px;font-weight:700;white-space:nowrap;">작업 기록</a>`:"");
+          const ub=t.querySelector("#__undoBtn");if(ub)ub.onclick=()=>{t.style.opacity="0";undo();};
+          t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
+        }
+        document.getElementById("fch").addEventListener("change",e=>{fch=e.target.value;render();});
+        render();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
