@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 검수</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">상품 검수 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-020</span></h2><p class="text-body-tertiary mb-0">AI가 자동 통과시키지 못한 항목만 모입니다. <b class="text-body-secondary">검수를 통과해야 추천 가능 재고에 올라갑니다.</b></p></div>
+          <div><h2 class="mb-1">상품 검수 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2><p class="text-body-tertiary mb-0">AI가 자동 통과시키지 못한 항목만 모입니다. <b class="text-body-secondary">검수를 통과해야 추천 가능 재고에 올라갑니다.</b></p></div>
           <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">10</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">0</span>건</p></div>
         </div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="filterPills"></ul>
@@ -276,7 +276,7 @@
       </div>
       <script>
       (function(){
-        var FIELD_KO={"socket": "소켓", "tdp_watt": "소비전력", "igpu": "내장그래픽", "mem_type": "메모리 규격", "form_factor": "폼팩터", "m2_slots": "M.2 슬롯 수", "length_mm": "장착 길이", "pcie_power": "보조전원", "slot_width": "슬롯 폭", "rated_watt": "정격 출력", "efficiency": "80PLUS 등급", "rail_12v": "+12V 출력", "gpu_max_len": "GPU 최대 길이", "cpu_cooler_h": "쿨러 최대 높이", "mb_support": "지원 보드 규격", "psu_form": "파워 규격", "capacity_gb": "용량", "interface": "인터페이스", "dram": "DRAM 캐시", "height_mm": "높이", "socket_support": "지원 소켓", "tdp_support": "지원 TDP", "fan_size": "팬 크기", "speed_mts": "동작 속도", "kit": "구성", "refresh_hz": "주사율", "resolution": "해상도", "panel": "패널", "ports": "출력 포트", "size_inch": "화면 크기", "price_krw": "판매가", "cost_krw": "매입가", "stock_qty": "재고 수량", "spec_raw": "사양 원문", "sku": "상품코드", "supplier": "공급처", "name": "상품명", "category": "분류", "cores": "코어/스레드"};function fk(f,cls){if(!f||f==="-")return "<code"+(cls?" class=\""+cls+"\"":"")+">-</code>";var k=FIELD_KO[f];return (k?k+" ":"")+"<code"+(cls?" class=\""+cls+"\"":"")+">{"+f+"}</code>";}
+        var FIELD_KO={"socket": "소켓", "tdp_watt": "소비전력", "igpu": "내장그래픽", "mem_type": "메모리 규격", "form_factor": "폼팩터", "m2_slots": "M.2 슬롯 수", "length_mm": "장착 길이", "pcie_power": "보조전원", "slot_width": "슬롯 폭", "rated_watt": "정격 출력", "efficiency": "80PLUS 등급", "rail_12v": "+12V 출력", "gpu_max_len": "GPU 최대 길이", "cpu_cooler_h": "쿨러 최대 높이", "mb_support": "지원 보드 규격", "psu_form": "파워 규격", "capacity_gb": "용량", "interface": "인터페이스", "dram": "DRAM 캐시", "height_mm": "높이", "socket_support": "지원 소켓", "tdp_support": "지원 TDP", "fan_size": "팬 크기", "speed_mts": "동작 속도", "kit": "구성", "refresh_hz": "주사율", "resolution": "해상도", "panel": "패널", "ports": "출력 포트", "size_inch": "화면 크기", "price_krw": "판매가", "cost_krw": "매입가", "stock_qty": "재고 수량", "spec_raw": "사양 원문", "sku": "상품코드", "supplier": "공급처", "name": "상품명", "category": "분류", "cores": "코어/스레드", "gpu_max_mm": "GPU 최대 길이", "cooler_height_mm": "쿨러 최대 높이", "cooler_tdp": "지원 TDP", "required_power_watt": "권장 파워", "clock_mhz": "동작 클럭", "pcie_gen": "PCIe 세대", "chipset": "칩셋", "switch_type": "스위치", "key_layout": "배열", "connection": "연결 방식"};function fk(f,cls){if(!f||f==="-")return "<code"+(cls?" class=\""+cls+"\"":"")+">-</code>";var k=FIELD_KO[f];return (k?k+" ":"")+"<code"+(cls?" class=\""+cls+"\"":"")+">{"+f+"}</code>";}
         const TYPES = {
           spec_conflict:{label:"사양 불일치", c:"danger"},
           spec_missing:{label:"필수 사양 없음", c:"warning"},
@@ -316,10 +316,26 @@
            note:"주사율 미표기. 주변기기 '함께 구성' 제안에서 GPU 성능 매칭 근거(권장 프레임)로 쓰이는 필수 사양 → 운영자 확정 필요."}
         ];
         let cur = "all", sel = null, done = 0;
+        // 실데이터 모드 — fetch 성공 시 QUEUE를 API 계약으로 교체, 실패(file://·정적 호스팅)면 더미 유지
+        let LIVE = false;
+        function relTime(iso){const s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return"방금 전";const m=Math.floor(s/60);if(m<60)return m+"분 전";const h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전";}
+        const fromApi=it=>({id:it.sku,review_id:it.review_id,name:it.name,cat:it.cat,type:it.type,field:it.field,
+          origin:it.origin_value==null?"없음":it.origin_value, know:it.suggested_value==null?"—":it.suggested_value,
+          origin_raw:it.origin_value, know_raw:it.suggested_value,
+          conf:it.confidence, wait:relTime(it.created_at), risk:it.risk,
+          crit:it.crit.map(c=>[(FIELD_KO[c.field]?FIELD_KO[c.field]+" ":"")+"{"+c.field+"}", c.value, c.ok]),
+          note:it.detail});
+        async function api(path, body){
+          const r = await fetch("/api/admin"+path,{method:"POST",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):null});
+          if(!r.ok){let m="처리 실패 ("+r.status+")";try{const j=await r.json();if(j.detail)m=j.detail;}catch(e){}throw new Error(m);}
+          return r.json();
+        }
+        const ACT_API = {"원문값으로 확정":"origin","지식값으로 확정":"suggested","직접 수정":"manual","반려":"reject"};
         // #4 위험도 — 추천을 실제로 망가뜨리는 정도(색+텍스트 병기)
         const CRIT_CONFLICT = ["socket","rated_watt","tdp_watt","mem_type"];
         const RISK = {"치명":{o:3,c:"danger"},"주의":{o:2,c:"warning"},"경미":{o:1,c:"secondary"}};
         function riskOf(q){
+          if(q.risk) return q.risk; // LIVE — 서버 파생(ERD §7.3 치명 필드 기준)
           if(q.type==="spec_conflict") return CRIT_CONFLICT.includes(q.field)?"치명":"주의";
           if(q.type==="spec_missing") return "주의";
           return "경미"; // AI 확신 낮음 · 등록 오류
@@ -383,7 +399,11 @@
           let actions;
           if(isCsv) actions = `<button class="btn btn-primary btn-sm" data-act="교정 후 재적재">교정 후 재적재</button><button class="btn btn-phoenix-secondary btn-sm" data-act="원본 제외">이 행 제외</button>`;
           else if(isSrc) actions = `<button class="btn btn-primary btn-sm" data-act="매입 완료 처리">매입가 입력·통과</button><button class="btn btn-phoenix-warning btn-sm" data-act="계속 보류">계속 보류</button>`;
-          else actions = `<button class="btn btn-primary btn-sm" data-act="원문값으로 확정">원문값 확정</button><button class="btn btn-phoenix-primary btn-sm" data-act="지식값으로 확정">지식값 확정</button><button class="btn btn-phoenix-secondary btn-sm" data-act="직접 수정">직접 수정</button><button class="btn btn-phoenix-danger btn-sm" data-act="반려">반려</button>`;
+          else{
+            // LIVE — 값이 없는 소스는 확정 불가 (spec_missing은 원문 없음, low_confidence는 지식값 없음)
+            const noOrigin = LIVE && q.origin_raw==null, noKnow = LIVE && q.know_raw==null;
+            actions = `<button class="btn btn-primary btn-sm" data-act="원문값으로 확정"${noOrigin?" disabled":""}>원문값 확정</button><button class="btn btn-phoenix-primary btn-sm" data-act="지식값으로 확정"${noKnow?" disabled":""}>지식값 확정</button><button class="btn btn-phoenix-secondary btn-sm" data-act="직접 수정">직접 수정</button><button class="btn btn-phoenix-danger btn-sm" data-act="반려">반려</button>`;
+          }
           d.innerHTML = `<div class="card"><div class="card-body">
               <div class="d-flex justify-content-between align-items-start mb-1"><div class="d-flex align-items-center gap-2"><span class="badge badge-phoenix badge-phoenix-${RISK[rk].c}">위험도 ${rk}</span><span class="badge badge-phoenix badge-phoenix-${t.c}">${t.label}</span></div><span class="fs-10 text-body-quaternary">${q.id} · ${q.cat}</span></div>
               <h4 class="mb-2">${q.name}</h4>
@@ -399,8 +419,7 @@
         const IMPACT = {"그래픽카드":14,"메인보드":11,"파워서플라이":9,"메모리":8,"케이스":7,"SSD":6,"CPU쿨러":5};
         // #6 되돌리기 — 마지막 처리(단건·일괄)를 복원
         let lastAction = null, bulkArmed = false;
-        function undo(){
-          if(!lastAction) return;
+        function restoreLocal(){
           lastAction.entries.forEach(e=>QUEUE.splice(Math.min(e.idx,QUEUE.length),0,e.item));
           done -= lastAction.count;
           sel = lastAction.entries[0].item.id;
@@ -408,28 +427,61 @@
           renderAll();
           toast("되돌렸습니다 — 항목이 검수 대기로 복원됐습니다.");
         }
-        function process(id, act){
+        function undo(){
+          if(!lastAction) return;
+          if(LIVE && lastAction.undo_id){
+            api(`/reviews/undo/${lastAction.undo_id}`).then(restoreLocal).catch(e=>toast("⚠ "+e.message));
+            return;
+          }
+          restoreLocal();
+        }
+        function applyLocal(id, act, res){
           const idx = QUEUE.findIndex(x=>x.id===id); if(idx<0) return;
           const q = QUEUE[idx];
           const l = list(); const pos = l.findIndex(x=>x.id===id);
           QUEUE.splice(idx,1); done++;
-          lastAction = {entries:[{item:q, idx:idx}], count:1};
+          lastAction = {entries:[{item:q, idx:idx}], count:1, undo_id:res?res.undo_id:null};
           const nl = list(); sel = nl.length? (nl[Math.min(pos, nl.length-1)].id) : null;
           const neg = (act==="반려"||act==="원본 제외"||act==="계속 보류");
           if(neg) toast(`<b>${id}</b> — ${act} 처리 · 추천 가능 재고 미진입`, true);
+          else if(res) toast(`<b>${id}</b> ${act} · ${res.pool_added?"<b>추천 가능 재고 +1</b>":"처리 완료"}`, true);
           else toast(`<b>${id}</b> ${act} · <b>추천 가능 재고 +1</b> · 영향 견적 ${IMPACT[q.cat]||5}건`, true);
           renderAll();
         }
+        function process(id, act){
+          const q = QUEUE.find(x=>x.id===id); if(!q) return;
+          if(LIVE && ACT_API[act]){
+            let value = null;
+            if(act==="직접 수정"){
+              value = prompt(`${q.name}\n${FIELD_KO[q.field]||q.field} 값을 입력하세요 (단위 없이 — 예: 272, DDR5):`);
+              if(value===null || value.trim()==="") return;
+              value = value.trim();
+            }
+            api(`/reviews/${q.review_id}/process`, {action:ACT_API[act], value})
+              .then(res=>applyLocal(id, act, res))
+              .catch(e=>toast("⚠ "+e.message));
+            return;
+          }
+          applyLocal(id, act, null);
+        }
         // #5 사유별 일괄 확정 — 값이 유효한 저신뢰(경미) 항목만 대상. 치명·주의는 단건 검수 강제.
-        function bulkConfirm(){
-          const items = QUEUE.filter(q=>q.type==="low_confidence");
-          if(!items.length) return;
-          lastAction = {entries:items.map(q=>({item:q, idx:QUEUE.indexOf(q)})), count:items.length};
+        function applyBulkLocal(items, res){
+          lastAction = {entries:items.map(q=>({item:q, idx:QUEUE.indexOf(q)})), count:items.length, undo_id:res?res.undo_id:null};
           let impact = 0; items.forEach(q=>impact+=(IMPACT[q.cat]||5));
           QUEUE = QUEUE.filter(q=>q.type!=="low_confidence"); done += items.length;
           const nl = list(); sel = nl.length? nl[0].id : null;
-          toast(`<b>AI 확신 낮음 ${items.length}건</b> 원문값 일괄 확정 · <b>추천 가능 재고 +${items.length}</b> · 영향 견적 ${impact}건`, true);
+          if(res) toast(`<b>AI 확신 낮음 ${res.count}건</b> 원문값 일괄 확정 · <b>추천 가능 재고 +${res.pool_added}</b>`, true);
+          else toast(`<b>AI 확신 낮음 ${items.length}건</b> 원문값 일괄 확정 · <b>추천 가능 재고 +${items.length}</b> · 영향 견적 ${impact}건`, true);
           renderAll();
+        }
+        function bulkConfirm(){
+          const items = QUEUE.filter(q=>q.type==="low_confidence");
+          if(!items.length) return;
+          if(LIVE){
+            api("/reviews/bulk-confirm").then(res=>applyBulkLocal(items, res)).catch(e=>toast("⚠ "+e.message));
+            return;
+          }
+          applyBulkLocal(items, null);
         }
         function renderBulk(){
           const el = document.getElementById("bulkBar"); if(!el) return;
@@ -448,7 +500,19 @@
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0", actionable?6500:2200);
         }
         function renderAll(){ renderPills(); renderBulk(); renderList(); renderDetail(); }
-        sel = list()[0].id; renderAll();
+        // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패 시 더미 유지
+        sel = list().length? list()[0].id : null; renderAll();
+        fetch("/api/admin/reviews")
+          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(d=>{
+            LIVE = true; QUEUE = d.items.map(fromApi);
+            const b = document.getElementById("dataSrc");
+            b.textContent = "실데이터 · Cloud SQL";
+            b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            const l = list(); sel = l.length? l[0].id : null;
+            renderAll();
+          })
+          .catch(()=>{});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

@@ -6,7 +6,7 @@
 **갱신일:** 2026-07-21
 **선행 문서:** `12_data_normalization.md`, `13_standard_product_csv.md`, `07_api-spec.md`, `docs/decisions/decision-log.md`(A-10·주변기기·가격 산정·단가표 결정), `docs/decisions/admin-identity.md`(ADM-PRC-040)
 **대체 선언:** Ver 3.0의 상품 스파인(§1~§9)을 계승하되, **원칙 3(재고 수량 미보유)을 폐기**하고(A-10 커머스 승격) §10~§13(커머스 원장 · 공급처 단가표 · 상담·회원 활동 · 운영 설정)을 증분한다. Ver 2.0 대체 관계는 Ver 3.0 선언을 승계한다.
-**검토 이력:** 1차 검토 2026-07-23 — 이슈 6건 발견·반영(users↔members 관계 정의, member_reviews 상태·S2 인용 필드, refunds 단계 어휘, products.supplier 폐기 예고, settlement_batches 신설, 매핑 요청 시각). 2차(DDL 작성 중, 같은 날) — ① `products.sku VARCHAR(20) UNIQUE` 추가(화면의 P-xxxx SKU는 product_code 자체상품번호와 별개 식별자), ② 후보 뷰 2종은 `SELECT p.*, ps.*`가 중복 컬럼으로 불가 → 명시 컬럼 + `ps.updated_at AS spec_updated_at`(실행본 `db/migrations/versions/0001_initial_schema.py` 기준).
+**검토 이력:** 1차 검토 2026-07-23 — 이슈 6건 발견·반영(users↔members 관계 정의, member_reviews 상태·S2 인용 필드, refunds 단계 어휘, products.supplier 폐기 예고, settlement_batches 신설, 매핑 요청 시각). 2차(DDL 작성 중, 같은 날) — ① `products.sku VARCHAR(20) UNIQUE` 추가(화면의 P-xxxx SKU는 product_code 자체상품번호와 별개 식별자), ② 후보 뷰 2종은 `SELECT p.*, ps.*`가 중복 컬럼으로 불가 → 명시 컬럼 + `ps.updated_at AS spec_updated_at`(실행본 `db/migrations/versions/0001_initial_schema.py` 기준). 3차 2026-07-23 — ADM-PRD-020 슬라이스: `product_reviews`에 origin_value·suggested_value·confidence 추가(마이그레이션 0002), §8 T2 해제·승격 조건 명문화. 검수 큐 정렬은 슬라이스 2에서 위험도순(치명>주의>경미) — 노출 빈도 데이터 확보 시 §7.4로 복귀.
 **실행본:** `db/` — Alembic 마이그레이션(0001 = 본 문서 전체 DDL) + 시드. 스키마 변경은 본 문서 개정 → 새 마이그레이션 순서.
 
 ---
@@ -198,6 +198,9 @@ CREATE TABLE product_reviews (
   review_type   VARCHAR(30) NOT NULL,  -- 'csv_error' / 'spec_missing' / 'spec_conflict' / 'low_confidence' / 'sourcing_hold'
   field_name    VARCHAR(50),           -- 대상 필드 (해당 시)
   detail        TEXT,                  -- 사유·비교값 (예: "원문 272mm vs 지식 251mm")
+  origin_value    VARCHAR(255),        -- 원문 추출값 (0002 추가 — 캐스팅 가능한 정규값만: '272', 'DDR5'. 단위 표기 금지)
+  suggested_value VARCHAR(255),        -- AI 지식 대조값 (0002 추가 — 동일 규약)
+  confidence      NUMERIC(4,2),        -- 필드 단위 신뢰도 (0002 추가)
   review_status VARCHAR(30) NOT NULL DEFAULT '대기',  -- 대기/검수중/승인/수정/보류/제외
   reviewed_by   BIGINT,
   reviewed_at   TIMESTAMP,
@@ -206,6 +209,8 @@ CREATE TABLE product_reviews (
 
 CREATE INDEX idx_reviews_queue ON product_reviews (review_status, created_at);
 ```
+
+값 컬럼 3종(0002)은 교차검증 게이트(§7.2) 산출값의 1급 승격 — 검수 확정 액션의 기계 판독 입력이다. `specs.confidence`(행 대표값)와 입도가 다르다(큐행 = 필드 단위). **검수 대상 필드는 확정 전 `product_specs`에서 NULL을 유지**하고(§7.2 "반영하지 않고 큐행"), 값은 큐행의 origin/suggested에만 존재하며 확정 액션이 비로소 specs에 쓴다.
 
 ### 3.6 v_recommendation_candidates — 추천 후보 뷰 (유일한 정의처)
 
@@ -369,7 +374,7 @@ WHERE p.status = '판매중'
 |---|---|---|
 | T0 | CSV 최초 업로드 | imports 냉동 + products INSERT + 동기 정규화·룰 추출 실행 |
 | T1 | AI 추출 부분 실패 | specs 부분 채움, review_required=true, reviews 큐 등록 |
-| T2 | 운영자 검수 보정 | specs 수동값 + verified, locked_fields 등록, review 해제 |
+| T2 | 운영자 검수 보정 | specs 수동값 + verified, locked_fields 등록, review 해제 (해제 = 필수 필드 충족 ∧ 잔여 대기·검수중 리뷰 0건. review_required true→false **전이 시에만** ai_candidate_yn 승격) |
 | T3 | CSV 재업로드 | imports 누적, 가격 갱신+history, 잠긴 필드 스킵 |
 | T4 | 소싱 확정 매칭 | 매입가 갱신 선택 + history, 판매가 제안 배지 |
 | T5 | 품절 토글 | status 변경 → 뷰에서 즉시 제외 (1초 룰) |
