@@ -17,6 +17,7 @@ db/
 └─ seed/seed_0003_price-import.sql  단가표 슬라이스 패치 (스냅샷·오늘 파일·매핑, 재실행 안전)
 └─ seed/seed_0004_candidate-pool.sql  S1 후보 풀 슬라이스 패치 (추천 가능 6종+태그, 재실행 안전)
 └─ seed/seed_0005_quote-engine.sql  견적 엔진 슬라이스 패치 (티어 부품 9종, 재실행 안전)
+└─ seed/seed_0006_own-payment.sql  운영 모드 2단계 승격 (결제·정산 자체, 재실행 안전)
 ```
 
 ## 사용법 (로컬 PC → Cloud SQL)

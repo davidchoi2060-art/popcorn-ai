@@ -111,6 +111,31 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
  if(p){p.style.display='block';p.innerHTML='함께 구성 주변기기 <b>'+arr.length+'종</b>은 본체와 함께 포장·출고됩니다.';}
 })();
 </script>
+<script>
+// ---- 주문 완료 LIVE (슬라이스 6) — popcorn-order 존재 시 실값. 없으면 더미 원형 ----
+(function(){
+ var raw;try{raw=localStorage.getItem('popcorn-order');}catch(e){return;}
+ if(!raw)return;
+ var O;try{O=JSON.parse(raw);}catch(e){return;}
+ if(!O||!O.order_no)return;
+ // 주문번호·총액·결제수단
+ document.querySelectorAll('b').forEach(function(b){
+  if(b.childElementCount===0&&b.textContent.trim()==='ORD-84216')b.textContent=O.order_no;
+  if(b.childElementCount===0&&b.textContent.trim()==='신용카드 (자체 결제)')b.textContent=O.method+' (자체 결제)';
+ });
+ var t=document.getElementById('s5-total');if(t)t.textContent=O.total.toLocaleString()+'원';
+ // hold 실수
+ document.querySelectorAll('p').forEach(function(p){
+  if(p.childElementCount===0&&p.textContent.indexOf('예약(hold)했던')===0)
+   p.textContent='예약(hold)했던 '+O.held+'개 부품이 이 주문에 확정 배정됐어요.';
+ });
+ // 주변기기 문구(주문 성공 시 popcorn-periph는 클리어됨 — 주문 스냅샷 기준)
+ var pp=document.getElementById('s5-periph');
+ if(pp&&O.periph_n){pp.style.display='block';pp.innerHTML='함께 구성 주변기기 <b>'+O.periph_n+'종</b>은 본체와 함께 포장·출고됩니다.';}
+ // 딥링크
+ document.querySelectorAll('a[href*="ORD-84216"]').forEach(function(a){a.href='my-orders.html?id='+O.order_no;});
+})();
+</script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="msym" style="font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>

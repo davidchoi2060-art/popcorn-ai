@@ -471,7 +471,7 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  if(periphGrid&&Q.companion&&Q.companion.length){
   S2P_META={};s2pSel={};
   periphGrid.innerHTML=Q.companion.map(function(c){
-   S2P_META[c.sku]=[c.label,c.name];
+   S2P_META[c.sku]=[c.label,c.name,c.product_code];
    return '<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">'
     +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">'+(PICON[c.part_type]||'devices')+'</span><span style="font-size:12px;font-weight:800;color:#8a8578;">'+c.label+'</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 '+c.stock+'대</span></div>'
     +'<div><b style="font-size:15.5px;color:#17171b;">'+c.name+'</b>'+(c.spec?'<span style="font-size:12.5px;color:#8a8578;font-weight:600;"> · '+c.spec+'</span>':'')+'</div>'
@@ -483,7 +483,7 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
     var id=b.getAttribute('data-p'),price=parseInt(b.getAttribute('data-price'),10);
     if(s2pSel[id]){delete s2pSel[id];b.textContent='담기';b.style.background='#fff';b.style.color='#3a3a40';b.style.borderColor='#ddd8ce';}
     else{s2pSel[id]=price;b.textContent='담김 ✓';b.style.background='#2b5fd9';b.style.color='#fff';b.style.borderColor='#2b5fd9';}
-    var n=0,sum=0,arr=[];for(var k in s2pSel){n++;sum+=s2pSel[k];arr.push({c:S2P_META[k][0],n:S2P_META[k][1],p:s2pSel[k]});}
+    var n=0,sum=0,arr=[];for(var k in s2pSel){n++;sum+=s2pSel[k];arr.push({c:S2P_META[k][0],n:S2P_META[k][1],p:s2pSel[k],code:S2P_META[k][2]});}
     try{localStorage.setItem('popcorn-periph',JSON.stringify(arr));}catch(e){}
     var el=document.getElementById('s2p-sum');
     if(el){el.innerHTML=n?('함께 구성 <b style="color:#17171b;">'+n+'개</b> 선택 · <b style="color:#17171b;">+'+sum.toLocaleString()+'원</b> — 장바구니에서 본체와 함께 결제됩니다.'):'아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.';}
@@ -521,6 +521,13 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  var first=Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend');
  document.querySelectorAll('.s2tab').forEach(function(t){var on=t.getAttribute('data-set')===first;t.classList.toggle('is-active',on);t.setAttribute('aria-selected',on?'true':'false');});
  s2apply(first);
+ // S4 전달 계약: '장바구니 담기' 시 선택 티어 저장 (LIVE 한정, 네비게이션은 기존 핸들러)
+ document.addEventListener('click',function(ev){
+  var t=ev.target&&ev.target.closest?ev.target.closest('button'):null;
+  if(!t||(t.textContent||'').trim().indexOf('장바구니 담기')!==0)return;
+  var at=document.querySelector('.s2tab.is-active');
+  try{localStorage.setItem('popcorn-quote-tier',at?at.getAttribute('data-set'):first);}catch(e){}
+ },true);
 })();
 </script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">

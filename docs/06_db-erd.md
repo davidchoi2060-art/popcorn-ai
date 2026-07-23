@@ -6,7 +6,7 @@
 **갱신일:** 2026-07-21
 **선행 문서:** `12_data_normalization.md`, `13_standard_product_csv.md`, `07_api-spec.md`, `docs/decisions/decision-log.md`(A-10·주변기기·가격 산정·단가표 결정), `docs/decisions/admin-identity.md`(ADM-PRC-040)
 **대체 선언:** Ver 3.0의 상품 스파인(§1~§9)을 계승하되, **원칙 3(재고 수량 미보유)을 폐기**하고(A-10 커머스 승격) §10~§13(커머스 원장 · 공급처 단가표 · 상담·회원 활동 · 운영 설정)을 증분한다. Ver 2.0 대체 관계는 Ver 3.0 선언을 승계한다.
-**검토 이력:** 1차 검토 2026-07-23 — 이슈 6건 발견·반영(users↔members 관계 정의, member_reviews 상태·S2 인용 필드, refunds 단계 어휘, products.supplier 폐기 예고, settlement_batches 신설, 매핑 요청 시각). 2차(DDL 작성 중, 같은 날) — ① `products.sku VARCHAR(20) UNIQUE` 추가(화면의 P-xxxx SKU는 product_code 자체상품번호와 별개 식별자), ② 후보 뷰 2종은 `SELECT p.*, ps.*`가 중복 컬럼으로 불가 → 명시 컬럼 + `ps.updated_at AS spec_updated_at`(실행본 `db/migrations/versions/0001_initial_schema.py` 기준). 3차 2026-07-23 — ADM-PRD-020 슬라이스: `product_reviews`에 origin_value·suggested_value·confidence 추가(마이그레이션 0002), §8 T2 해제·승격 조건 명문화. 검수 큐 정렬은 슬라이스 2에서 위험도순(치명>주의>경미) — 노출 빈도 데이터 확보 시 §7.4로 복귀.
+**검토 이력:** 1차 검토 2026-07-23 — 이슈 6건 발견·반영(users↔members 관계 정의, member_reviews 상태·S2 인용 필드, refunds 단계 어휘, products.supplier 폐기 예고, settlement_batches 신설, 매핑 요청 시각). 2차(DDL 작성 중, 같은 날) — ① `products.sku VARCHAR(20) UNIQUE` 추가(화면의 P-xxxx SKU는 product_code 자체상품번호와 별개 식별자), ② 후보 뷰 2종은 `SELECT p.*, ps.*`가 중복 컬럼으로 불가 → 명시 컬럼 + `ps.updated_at AS spec_updated_at`(실행본 `db/migrations/versions/0001_initial_schema.py` 기준). 3차 2026-07-23 — ADM-PRD-020 슬라이스: `product_reviews`에 origin_value·suggested_value·confidence 추가(마이그레이션 0002), §8 T2 해제·승격 조건 명문화. 검수 큐 정렬은 슬라이스 2에서 위험도순(치명>주의>경미) — 노출 빈도 데이터 확보 시 §7.4로 복귀. 4차 2026-07-24 — S4 주문 슬라이스: `orders`에 shipping_snap(배송지 스냅샷 저장처 부재 해소)·session_id(주문↔견적 링크) 추가(마이그레이션 0003).
 **실행본:** `db/` — Alembic 마이그레이션(0001 = 본 문서 전체 DDL) + 시드. 스키마 변경은 본 문서 개정 → 새 마이그레이션 순서.
 
 ---
@@ -433,6 +433,8 @@ CREATE TABLE orders (
   status       VARCHAR(30) NOT NULL,            -- 접수/결제완료/조립중/출고/배송중/완료/취소
   total_amount BIGINT NOT NULL,
   ops_snapshot JSONB NOT NULL,                  -- 생성 시점 운영 모드 5종 스냅샷 (감사)
+  shipping_snap JSONB,                          -- 배송지 스냅샷 {name,phone,addr} (0003 추가 — 저장처 부재 해소)
+  session_id   BIGINT REFERENCES consult_sessions(session_id),  -- 주문↔견적 스냅샷 링크 (0003 추가 — "그때 근거" 원장 근거, 비상담 주문은 NULL)
   created_at   TIMESTAMP NOT NULL DEFAULT now()
 );
 

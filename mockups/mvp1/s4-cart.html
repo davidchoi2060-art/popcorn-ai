@@ -332,6 +332,101 @@ window.addEventListener('scroll',closeTip,{passive:true});
  var t2=document.getElementById('s4-total2');if(t2)t2.textContent=total.toLocaleString()+'원';
 })();
 </script>
+<script>
+// ---- 주문 원장 LIVE (슬라이스 6) — popcorn-quote 존재 + 서버 도달 시. 아니면 더미 원형 ----
+(function(){
+ var raw;try{raw=localStorage.getItem('popcorn-quote');}catch(e){return;}
+ if(!raw)return;
+ var Q;try{Q=JSON.parse(raw).data;}catch(e){return;}
+ if(!Q||!Q.sets)return;
+ var tier=null;try{tier=localStorage.getItem('popcorn-quote-tier');}catch(e){}
+ if(!tier||!Q.sets[tier])tier=Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend');
+ var S=Q.sets[tier];if(!S)return;
+ var periphArr=[];try{periphArr=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
+ var periphValid=periphArr.filter(function(it){return it.code;});
+ var periphSum=0;periphArr.forEach(function(it){periphSum+=it.p;});
+ function toast(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
+ var PIMG={CPU:'cpu',GPU:'gpu',MB:'mb',RAM:'ram',SSD:'ssd',POWER:'psu',CASE:'case'};
+ var PKO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'GPU',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'SSD'};
+ fetch('/api/ops').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(ops){
+  // 1) 본체 하드코딩 → 견적 스냅샷 부품으로 재렌더
+  var card=document.getElementById('s4-periph').parentNode;
+  var partRows=[].filter.call(card.children,function(d){return d.querySelector&&d.querySelector('img[src*="assets/parts/"]');});
+  var anchor=partRows.length?partRows[0]:null;
+  S.items.forEach(function(it){
+   var d=document.createElement('div');
+   d.style.cssText='display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;';
+   var img=PIMG[it.part_type]
+    ?'<img src="assets/parts/'+PIMG[it.part_type]+'.png" alt="'+it.part_type+'" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'
+    :'<span style="flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #ece9e3;background:#fff;"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:#8a8578;">mode_fan</span></span>';
+   d.innerHTML=img+'<span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.name+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.price.toLocaleString()+'원</div>';
+   card.insertBefore(d,anchor);
+  });
+  partRows.forEach(function(d){d.remove();});
+  // 2) 합계 재계산 — 부품 합계 행·총액 2곳
+  var sumRow=null;
+  document.querySelectorAll('span').forEach(function(s){if(s.childElementCount===0&&s.textContent.indexOf('부품 합계')===0)sumRow=s;});
+  if(sumRow){sumRow.textContent='부품 합계 ('+S.items.length+'종)';var b=sumRow.parentNode.querySelector('b');if(b)b.textContent=S.total.toLocaleString()+'원';}
+  var total=S.total+30000+periphSum;
+  var t1=document.getElementById('s4-total');if(t1)t1.innerHTML=total.toLocaleString()+'<span style="font-size:14px;color:#9a968d;">원</span>';
+  var t2=document.getElementById('s4-total2');if(t2)t2.textContent=total.toLocaleString()+'원';
+  if(periphArr.length!==periphValid.length)toast('이전 세션의 주변기기 일부는 실주문에서 제외됩니다 — 견적서에서 다시 담아주세요.');
+  // 3) 운영 모드 = 서버 동기화 (데모 전환 비활성)
+  try{var lo=JSON.parse(localStorage.getItem('popcorn-ops')||'{}');
+   if((lo.pay||'mall')!==ops.pay){document.getElementById('s4-mode-demo').click();}
+   else{localStorage.setItem('popcorn-ops',JSON.stringify(ops));}
+  }catch(e){}
+  var demo=document.getElementById('s4-mode-demo');
+  if(demo){demo.disabled=true;demo.style.opacity='.45';demo.style.cursor='not-allowed';demo.textContent='관리자 설정';demo.title='운영 전환은 관리자 운영 전환 설정에서';}
+  // 재고 카피 정직화
+  document.querySelectorAll('div').forEach(function(d){if(d.childElementCount===0&&d.textContent.indexOf('전 품목 재고 확보')===0)d.textContent='결제 시점에 서버가 전 품목 재고를 확정 검증합니다';});
+  // 배지
+  var mrow=document.getElementById('s4-mode-badge');
+  if(mrow){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:#e7f4ec;color:#1c7a4d;';mrow.parentNode.insertBefore(bg,mrow);}
+  // 4) 결제수단 추적(캡처 — 메인 IIFE의 pm은 폐쇄 변수)
+  var pm='카드';
+  document.querySelectorAll('#s4-paymethods [data-pm]').forEach(function(b){b.addEventListener('click',function(){pm=b.dataset.pm;},true);});
+  // 5) 결제 가로채기 → POST /api/orders
+  var payBtn=document.getElementById('s4-pay');
+  if(payBtn)payBtn.addEventListener('click',function(ev){
+   if(payBtn.disabled)return;
+   var mode='mall';try{mode=(JSON.parse(localStorage.getItem('popcorn-ops')||'{}').pay)||'mall';}catch(e){}
+   if(mode!=='own')return; /* mall 인계 연출은 기존 핸들러 */
+   ev.stopImmediatePropagation();ev.preventDefault();
+   var m=(window.popcornAuth&&window.popcornAuth.member())||null;
+   if(!m)return;
+   var orig=payBtn.textContent;payBtn.disabled=true;payBtn.textContent='결제 진행 중…';
+   var body={session_id:Q.session_id,tier:tier,
+    periph:periphValid.map(function(it){return {code:it.code,qty:1};}),
+    member:{nick:m.nick||'회원',email:m.email||'guest@popcornpc.local',via:m.via||'email'},
+    shipping:{name:(document.getElementById('s4-name')||{}).value||'',phone:(document.getElementById('s4-phone')||{}).value||'',addr:(document.getElementById('s4-addr')||{}).value||''},
+    method:pm};
+   fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+     if(!res.ok){
+      var d=res.j.detail||{};
+      if(d.error==='soldout'){toast('재고 부족: '+d.items.map(function(x){return x.name;}).join(', ')+' — 대안으로 교체해 주세요.');}
+      else{toast('⚠ '+(d.detail||d.error||'주문 실패'));}
+      payBtn.disabled=false;payBtn.textContent=orig;return;
+     }
+     var od=res.j;
+     toast('재고 예약(hold) 완료 — '+od.held+'개 부품 점유');
+     setTimeout(function(){toast(od.payment.method+' 결제 승인 (목업 PG) · '+od.payment.pg_ref);},1200);
+     setTimeout(function(){toast('주문 '+od.order_no+' 생성 — 원장은 본 시스템에 저장됐어요');},2400);
+     setTimeout(function(){
+      try{
+       localStorage.setItem('popcorn-order',JSON.stringify({order_no:od.order_no,total:od.total,method:od.payment.method,held:od.held,periph_n:periphValid.length,at:Date.now()}));
+       localStorage.removeItem('popcorn-periph');localStorage.removeItem('popcorn-quote-tier');
+      }catch(e){}
+      window.location.href='s5-complete.html';
+     },3400);
+    })
+    .catch(function(){toast('주문 처리에 실패했어요 — 잠시 후 다시 시도해 주세요.');payBtn.disabled=false;payBtn.textContent=orig;});
+  },true);
+ }).catch(function(){});
+})();
+</script>
 <script src="../shared/auth.js"></script>
 <script src="../shared/su-icons.js"></script>
 </body></html>
