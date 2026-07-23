@@ -29,3 +29,5 @@ docs/mockup-source/**/*.png
 # 비공개 내부 문서 (커밋 금지)
 docs/patent/
 docs/partners/
+__pycache__/
+*.pyc
