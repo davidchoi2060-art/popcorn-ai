@@ -131,9 +131,9 @@
 
 ## 7. 인프라 현황 참고 (모델링 중엔 건드리지 않음)
 
-- 리전 `asia-northeast3`(서울) 고정. VM `popcorn-app`(e2-small), Cloud SQL `popcorn-db`(PostgreSQL 16). "붙는다(`SELECT 1`)"까지만 검증됨.
-- DB 앱 유저·확장 생성(`popcorn_app`/`pg_trgm`)은 **모델링 이후로 미룸.** 상세·민감 식별자는 `docs/infra/GCP_SETUP.md`.
-- **모델링 단계에서는 인프라를 더 건드리지 않는다.**
+- 리전 `asia-northeast3`(서울) 고정. VM `popcorn-app`(e2-small), Cloud SQL `popcorn-db`(PostgreSQL 16). 상세·민감 식별자는 `docs/infra/GCP_SETUP.md`(로컬 전용).
+- **DB 구축 완료(2026-07-23)**: `popcorn_pc` DB + `popcorn_app` 계정 + pg_trgm, Alembic `0001_initial_schema` 적용(테이블 46·뷰 2, ERD 4.0), `db/seed/seed.sql` 투입(상품 13·주문 4·환불 1·설정 프리셋). 개발 PC IP를 승인된 네트워크에 등록(유동 IP — 상세는 GCP_SETUP.md).
+- 스키마 변경은 **ERD 개정 → 새 마이그레이션** 순서. API 서버·LLM 연동·운영 배포는 여전히 별도 승인 필요.
 
 ---
 
