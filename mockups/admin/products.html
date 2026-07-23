@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 목록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">상품 목록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-010</span></h2>
+          <div><h2 class="mb-1">상품 목록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">정본(단일 진실)의 현재 상태입니다. 각 상품이 <b class="text-body-secondary">왜 추천 가능/불가인지</b>가 함께 표시됩니다.</p></div>
           <a href="product-edit.html?new=1" class="btn btn-primary btn-sm">+ 상품 단건 등록</a>
         </div>
@@ -312,19 +312,25 @@
           ["P-7301","하이퍼엑스 Cloud III","헤드셋",4,4,17,1,"119,000","price"]
         ];
         let cur="all", q="", fcat="all", fmfr="all";
-        // 자체 상품번호(기존 쇼핑몰 상품번호) — SKU에서 결정론 생성한 목업값
-        const mno=sku=>String(20480000+parseInt(sku.slice(2),10));
-        // 제조사 — 상품명 첫 토큰
-        const mfr=p=>p[1].split(" ")[0];
+        // 정규화 어댑터 — 더미(위치배열)와 API(계약 JSON)를 같은 객체형으로
+        // 더미 폴백 전용 파생: 자체 상품번호(product_code)와 제조사(상품명 첫 토큰)
+        const fromDummy=p=>({product_code:String(20480000+parseInt(p[0].slice(2),10)),sku:p[0],name:p[1],cat:p[2],maker:p[1].split(" ")[0],spec_done:p[3],spec_total:p[4],stock:p[5],supplier_count:p[6],price_text:p[7]+"원",status_key:p[8]});
+        const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
+        let DATA=P.map(fromDummy);
         function fillSelects(){
-          const cats=[...new Set(P.map(p=>p[2]))];
-          const mfrs=[...new Set(P.map(mfr))].sort((a,b)=>a.localeCompare(b,"ko"));
+          const cats=[...new Set(DATA.map(p=>p.cat))];
+          const mfrs=[...new Set(DATA.map(p=>p.maker))].sort((a,b)=>a.localeCompare(b,"ko"));
           document.getElementById("fcat").innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join("");
           document.getElementById("fmfr").innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join("");
         }
-        const KPI=[["전체 상품","26,480","개","primary"],["추천 가능","24,912","개","primary"],["검수 대기","9","건","warning"],["재고 없음","618","개","info"]];
-        document.getElementById("kpis").innerHTML=KPI.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
-        function counts(){const c={all:P.length};P.forEach(p=>c[p[8]]=(c[p[8]]||0)+1);return c;}
+        // KPI — k 없으면 더미 집계값, 있으면 서버 kpis(상호배타 버킷: 검수 우선이라 재고 없음과 중복 없음)
+        function renderKpis(k){
+          const rows=k
+            ?[["전체 상품",k.total.toLocaleString("ko-KR"),"개"],["추천 가능",k.ok.toLocaleString("ko-KR"),"개"],["검수 대기",k.review.toLocaleString("ko-KR"),"건"],["재고 없음",k.oos.toLocaleString("ko-KR"),"개"]]
+            :[["전체 상품","26,480","개"],["추천 가능","24,912","개"],["검수 대기","9","건"],["재고 없음","618","개"]];
+          document.getElementById("kpis").innerHTML=rows.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+        }
+        function counts(){const c={all:DATA.length};DATA.forEach(p=>c[p.status_key]=(c[p.status_key]||0)+1);return c;}
         function pills(){
           const c=counts();
           const order=[["all","전체","dark"],["ok","추천 가능","primary"],["review","검수 대기","warning"],["oos","재고 없음","info"],["price","가격 검토","warning"]];
@@ -335,34 +341,46 @@
           document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
         }
         function specBadge(done,total){
+          if(total===0)return `<span class="fs-10 text-body-tertiary">—</span>`; // 필수 사양 매트릭스 미등록 분류
           const ok=done===total;
           return `<span class="badge badge-phoenix badge-phoenix-${ok?"primary":"warning"}">${ok?"확인 완료":"미확인 "+(total-done)}</span> <span class="fs-10 text-body-tertiary">${done}/${total}</span>`;
         }
         function render(){
           pills();
-          const list=P.filter(p=>(cur==="all"||p[8]===cur)
-            &&(fcat==="all"||p[2]===fcat)
-            &&(fmfr==="all"||mfr(p)===fmfr)
-            &&(q===""||p[0].toLowerCase().includes(q)||p[1].toLowerCase().includes(q)||mno(p[0]).includes(q)));
+          const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
+            &&(fcat==="all"||p.cat===fcat)
+            &&(fmfr==="all"||p.maker===fmfr)
+            &&(q===""||p.sku.toLowerCase().includes(q)||p.name.toLowerCase().includes(q)||p.product_code.includes(q)));
           document.getElementById("rows").innerHTML=list.length?list.map(p=>{
-            const [sku,name,cat,d,t,stock,sup,price,st]=p; const [lab,col,link,act]=ST[st];
+            const [lab,col,link,act]=ST[p.status_key];
             return `<tr>
-              <td class="ps-4"><code>${mno(sku)}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${sku}</div></td>
-              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?id=${sku}" class="text-decoration-none text-body-highlight">${name}</a></td>
-              <td class="text-body-tertiary">${cat}</td>
-              <td>${specBadge(d,t)}</td>
-              <td class="text-end ${stock===0?"text-danger fw-bold":""}">${stock}</td>
-              <td class="text-end">${sup}</td>
-              <td class="text-end">${price}원</td>
+              <td class="ps-4"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
+              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?id=${p.sku}" class="text-decoration-none text-body-highlight">${p.name}</a></td>
+              <td class="text-body-tertiary">${p.cat}</td>
+              <td>${specBadge(p.spec_done,p.spec_total)}</td>
+              <td class="text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
+              <td class="text-end">${p.supplier_count}</td>
+              <td class="text-end">${p.price_text}</td>
               <td><span class="badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
-              <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?id=${sku}">상세</a></td>
+              <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?id=${p.sku}">상세</a></td>
             </tr>`;
           }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
         }
         document.getElementById("q").addEventListener("input",e=>{q=e.target.value.trim().toLowerCase();render();});
         document.getElementById("fcat").addEventListener("change",e=>{fcat=e.target.value;render();});
         document.getElementById("fmfr").addEventListener("change",e=>{fmfr=e.target.value;render();});
-        fillSelects();render();if(window.feather)feather.replace();
+        // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패(file://·정적 호스팅) 시 더미 유지
+        fillSelects();renderKpis(null);render();if(window.feather)feather.replace();
+        const srcBadge=document.getElementById("dataSrc");
+        fetch("/api/admin/products")
+          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(d=>{
+            DATA=d.items.map(fromApi);
+            srcBadge.textContent="실데이터 · Cloud SQL";
+            srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            fillSelects();renderKpis(d.kpis);render();
+          })
+          .catch(()=>{srcBadge.textContent="더미 데이터";});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

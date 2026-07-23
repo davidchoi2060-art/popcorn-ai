@@ -1,11 +1,13 @@
 # dependencies
 node_modules/
+.venv/
 # build output
 dist/
 build/
 # env / secrets
 .env
 .env.*
+!.env.example
 *.key
 # OS / editor
 Thumbs.db

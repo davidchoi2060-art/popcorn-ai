@@ -1,0 +1,9 @@
+# popcorn-pc-ai - single source of Python deps (shared by db/ Alembic and api/ FastAPI)
+# usage: python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
+# NOTE: ASCII only in this file (Windows pip decodes with cp949)
+fastapi~=0.115
+uvicorn[standard]~=0.34
+SQLAlchemy~=2.0
+psycopg2-binary~=2.9
+alembic~=1.16
+python-dotenv~=1.0
