@@ -418,6 +418,111 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  });
 });
 </script>
+<script>
+// ---- 엔진 v1 LIVE 렌더 (슬라이스 5) — localStorage popcorn-quote 있을 때만. 없으면 더미 원형 ----
+(function(){
+ var raw;try{raw=localStorage.getItem('popcorn-quote');}catch(e){return;}
+ if(!raw)return;
+ var Q;try{Q=JSON.parse(raw).data;}catch(e){return;}
+ if(!Q||!Q.sets)return;
+ function relTime(iso){var s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return'방금 전 기준';var m=Math.floor(s/60);if(m<60)return m+'분 전 기준';return Math.floor(m/60)+'시간 전 기준';}
+ function byText(txt){var all=document.querySelectorAll('div,span,p,h2,h3');for(var i=0;i<all.length;i++){if(all[i].childElementCount===0&&all[i].textContent.trim()===txt)return all[i];}return null;}
+ var PART_KO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'그래픽카드',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'저장장치'};
+ // 배지
+ var bar=document.querySelector('.s2bar__inner');
+ if(bar){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='background:#2f9e6d;color:#fff;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;flex:0 0 auto;';bar.insertBefore(bg,bar.children[1]||null);}
+ // 근거 없는 수치 정직 숨김 (사용자 확정 ②)
+ var fps=document.getElementById('s2-fps'),sc=document.getElementById('s2-score');
+ if(fps)fps.parentNode.parentNode.style.display='none';
+ if(sc)sc.parentNode.parentNode.style.display='none';
+ // 생성 시각 정직 표기
+ var sl=document.getElementById('s2-setlabel');
+ if(sl&&sl.parentNode.lastChild)sl.parentNode.lastChild.textContent=' '+relTime(Q.generated_at);
+ // 깔때기 실수치
+ var f1=byText('2,480대'),f2=byText('42대'),f3=byText('1등'),f4=byText('점수 최고'),fcap=byText('전체 재고');
+ if(f1)f1.textContent=Q.funnel.total+'개';if(fcap)fcap.textContent='전체 후보(실재고)';
+ if(f2)f2.textContent=Q.funnel.passed+'개';
+ if(f3)f3.textContent='규칙 선택';if(f4)f4.textContent='추천 구성';
+ var fp=byText('이 예산대에서 점수가 가장 높은 구성입니다. 이 순위는 엔진이 계산한 결과를 그대로 옮긴 것입니다.');
+ if(fp)fp.textContent='조건·호환·예산을 통과한 부품에서 규칙으로 뽑은 구성입니다. 성능 점수는 준비 중이라, 지금은 가격을 사양 근사로 씁니다 — 이 순위는 엔진 계산 결과 그대로입니다.';
+ // 트레이드오프 카드 숨김
+ var tt=byText('예산 트레이드오프');
+ if(tt){var card=tt.closest('div[style*="fbf6ea"]')||tt.parentNode.parentNode;card.style.display='none';if(card.parentNode)card.parentNode.style.gridTemplateColumns='1fr';}
+ // §2 검수 수치 → 정직 표기
+ var chk=document.getElementById('sec-check');
+ if(chk){
+  var grid=chk.querySelector('div[style*="repeat(5,1fr)"]');
+  if(grid){grid.outerHTML='<div style="background:#fff;border-radius:12px;padding:18px 20px;margin-bottom:14px;font-size:14.5px;line-height:1.7;color:#1c3f8f;"><b>발열·소음·소비전력 수치는 출고 시 이 PC의 실측 리포트로 제공됩니다.</b><br>새 제품 검사 · 포트/부팅 확인 · 조립·선정리 검수를 전부 통과해야 출고합니다.</div>';}
+  var banner=chk.querySelector('div[style*="background:#2b5fd9"]');
+  if(banner)banner.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:21px;">timer</span>24시간 안정성 테스트 후 출고 — 온도·부하가 안전 범위를 유지해야 출고합니다';
+ }
+ // §4 비교 — 최저가 데이터 없음(U-06 미정): 정직 헤더 + 시장가 문단 숨김
+ var gt=document.getElementById('s2-gap-title');
+ if(gt)gt.parentNode.textContent='직접 조립과 비교하면';
+ var mk=document.getElementById('s2-market');
+ if(mk)mk.closest('p').style.display='none';
+ // 호환성 실값
+ var fit=document.getElementById('sec-fit');
+ var pctEl=fit?fit.querySelector('div[style*="font-size:52px"]'):null;
+ var checkCards=fit?fit.querySelectorAll('div[style*="repeat(4,1fr)"] > div'):[];
+ // 함께 구성 — companion 실데이터 재렌더
+ var periphGrid=document.querySelector('#sec-periph div[style*="auto-fit"]');
+ var PICON={MONITOR:'desktop_windows',KEYBOARD:'keyboard',MOUSE:'mouse',HEADSET:'headphones',SPEAKER:'speaker',WEBCAM:'videocam'};
+ if(periphGrid&&Q.companion&&Q.companion.length){
+  S2P_META={};s2pSel={};
+  periphGrid.innerHTML=Q.companion.map(function(c){
+   S2P_META[c.sku]=[c.label,c.name];
+   return '<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">'+(PICON[c.part_type]||'devices')+'</span><span style="font-size:12px;font-weight:800;color:#8a8578;">'+c.label+'</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 '+c.stock+'대</span></div>'
+    +'<div><b style="font-size:15.5px;color:#17171b;">'+c.name+'</b>'+(c.spec?'<span style="font-size:12.5px;color:#8a8578;font-weight:600;"> · '+c.spec+'</span>':'')+'</div>'
+    +'<p style="margin:0;font-size:13px;line-height:1.6;color:#55555c;background:#f7f6f2;border-radius:10px;padding:10px 12px;flex:1;"><b style="color:#853d97;">이 견적 기준:</b> 이 견적과 포트·용도 호환을 확인했습니다 — 상세 매칭 근거는 준비 중입니다.</p>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">'+c.price.toLocaleString()+'원</b><button class="s2p-add" data-p="'+c.sku+'" data-price="'+c.price+'" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div></div>';
+  }).join('');
+  periphGrid.querySelectorAll('.s2p-add').forEach(function(b){
+   b.addEventListener('click',function(){
+    var id=b.getAttribute('data-p'),price=parseInt(b.getAttribute('data-price'),10);
+    if(s2pSel[id]){delete s2pSel[id];b.textContent='담기';b.style.background='#fff';b.style.color='#3a3a40';b.style.borderColor='#ddd8ce';}
+    else{s2pSel[id]=price;b.textContent='담김 ✓';b.style.background='#2b5fd9';b.style.color='#fff';b.style.borderColor='#2b5fd9';}
+    var n=0,sum=0,arr=[];for(var k in s2pSel){n++;sum+=s2pSel[k];arr.push({c:S2P_META[k][0],n:S2P_META[k][1],p:s2pSel[k]});}
+    try{localStorage.setItem('popcorn-periph',JSON.stringify(arr));}catch(e){}
+    var el=document.getElementById('s2p-sum');
+    if(el){el.innerHTML=n?('함께 구성 <b style="color:#17171b;">'+n+'개</b> 선택 · <b style="color:#17171b;">+'+sum.toLocaleString()+'원</b> — 장바구니에서 본체와 함께 결제됩니다.'):'아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.';}
+   });
+  });
+ }
+ // 부품 리스트 컨테이너
+ var listWrap=document.getElementById('s2-cpu')?document.getElementById('s2-cpu').closest('div[style*="flex-direction:column"]'):null;
+ var listHead=byText('부품 상세 · 7종');
+ // 탭 → 실데이터 apply
+ s2apply=function(k){
+  var s=Q.sets[k];if(!s)return;
+  var el=document.getElementById('s2-setlabel');if(el)el.textContent=s.label;
+  var pr=document.getElementById('s2-price');if(pr)pr.textContent=s.total.toLocaleString();
+  if(listHead)listHead.textContent='부품 상세 · '+s.items.length+'종 (전체)';
+  if(listWrap){
+   listWrap.innerHTML=s.items.map(function(it){
+    return '<div style="display:flex;justify-content:space-between;font-size:13.5px;gap:10px;"><span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[it.part_type]||it.part_type)+'</span><span style="font-weight:700;text-align:right;">'+it.name+' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span></span></div>';
+   }).join('')
+   +'<a href="#sec-periph" style="font-size:12.5px;color:#e8b563;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:15px;">devices</span>모니터·키보드는 아래 &quot;함께 쓰면 좋은 구성&quot;에서 ↓</a>';
+  }
+  if(pctEl){pctEl.textContent=s.compat.power_headroom_pct+'%';}
+  for(var i=0;i<Math.min(checkCards.length,s.compat.checks.length);i++){
+   var c=s.compat.checks[i];
+   checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:#2f9e6d;">check_circle</span><span style="font-size:14.5px;font-weight:700;color:#2c4c3c;">'+c.label+'</span><span style="font-size:12px;color:#7aa891;">'+c.detail+'</span>';
+  }
+  var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
+  if(cp)cp.textContent=s.total.toLocaleString();if(cp2)cp2.textContent=s.total.toLocaleString();
+ };
+ // null 티어 탭 비활성
+ document.querySelectorAll('.s2tab').forEach(function(t){
+  var k=t.getAttribute('data-set');
+  if(!Q.sets[k]){t.disabled=true;t.style.opacity='.38';t.style.cursor='not-allowed';t.title='이 조건으로는 이 티어 구성이 없습니다';}
+ });
+ var first=Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend');
+ document.querySelectorAll('.s2tab').forEach(function(t){var on=t.getAttribute('data-set')===first;t.classList.toggle('is-active',on);t.setAttribute('aria-selected',on?'true':'false');});
+ s2apply(first);
+})();
+</script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>

@@ -674,7 +674,7 @@ CREATE TABLE quote_snapshots (
   session_id  BIGINT NOT NULL REFERENCES consult_sessions(session_id),
   quote_type  VARCHAR(20) NOT NULL,    -- value/recommend/highend
   items       JSONB NOT NULL,          -- 부품·가격·근거 스냅샷 — MY-010 "그때 가격으로 다시 보기"
-  companion   JSONB,                   -- 함께 구성(주변기기) 선택 스냅샷
+  companion   JSONB,                   -- 함께 구성(주변기기) 선택 스냅샷 (v1: 추천 시점엔 선택이 없어 제시본(offered)을 저장 — "고객에게 보여준 그대로" 정신. 선택 스냅샷은 체크아웃 단계에서)
   total_amount BIGINT NOT NULL,
   created_at  TIMESTAMP NOT NULL DEFAULT now()
 );

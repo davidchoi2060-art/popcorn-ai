@@ -660,6 +660,47 @@ fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'applicatio
   document.querySelectorAll('button').forEach(function(b){if((b.textContent||'').indexOf('GPU 한 단계 낮추기')>-1)b.style.display='none';});/* v0 무필터 영역 */
   if(consPairs.length)scheduleCount();
  }).catch(function(){});
+// ---- 견적 확정 → 엔진 v1 (슬라이스 5) — LIVE 시 POST /api/recommend 후 S2로 ----
+// U-08 클라 미러: (용도 또는 상황)+예산 없으면 확정 잠금 유지(서버 400은 최후 방어선)
+var _enable=enable;
+enable=function(){
+ if(LIVE){
+  var has=function(ls){return consPairs.some(function(p){return ls.indexOf(p.l)>-1;});};
+  if(!(has(['용도','상황'])&&has(['예산']))){
+   if(cap)cap.textContent='용도와 예산을 알려주시면 견적을 확정할 수 있어요.';
+   return;
+  }
+ }
+ _enable();
+};
+function goRecommend(btn){
+ var orig=btn.textContent;btn.disabled=true;btn.textContent='견적 생성 중…';
+ fetch('/api/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode,constraints:consPairs.map(function(p){return {l:p.l,v:p.v};})})})
+  .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+  .then(function(res){
+   if(!res.ok){
+    var miss=(res.j.detail&&res.j.detail.missing)?res.j.detail.missing.join(', '):'조건';
+    addAI('견적을 만들려면 <b>'+miss+'</b>이(가) 더 필요해요.');
+    btn.disabled=false;btn.textContent=orig;return;
+   }
+   var s=res.j.sets;
+   if(!s.value&&!s.recommend&&!s.highend){
+    addAI('이 조건으로는 <b>조립 가능한 구성이 없어요</b> — 예산을 조금 올려보시면 바로 후보가 생깁니다.');
+    btn.disabled=false;btn.textContent=orig;return;
+   }
+   localStorage.setItem('popcorn-quote',JSON.stringify({at:Date.now(),data:res.j}));
+   window.location.href='s2-result.html';
+  })
+  .catch(function(){addAI('견적 생성에 실패했어요 — 잠시 후 다시 시도해 주세요.');btn.disabled=false;btn.textContent=orig;});
+}
+document.addEventListener('click',function(ev){
+ if(!LIVE)return;
+ var t=ev.target&&ev.target.closest?ev.target.closest('button'):null;
+ if(!t)return;
+ if(t.id==='s1-xconfirm')return;/* expert는 부품 직접 지정 — v1 제외, 더미 이동 유지 */
+ if(t.id==='s1-confirm'&&!t.disabled){ev.stopImmediatePropagation();ev.preventDefault();goRecommend(t);return;}
+ if((t.textContent||'').indexOf('이 조건으로 견적 받기')>-1){ev.stopImmediatePropagation();ev.preventDefault();goRecommend(t);}
+},true);
 budgetUpdate();
 if(mode==='guided'){
  var _gb=document.getElementById('s1-gearbar');if(_gb)_gb.style.display='none';
