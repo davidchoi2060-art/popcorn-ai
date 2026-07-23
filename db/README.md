@@ -14,6 +14,7 @@ db/
 │  └─ versions/0001_initial_schema.py   ERD 4.0 전체 DDL
 └─ seed/seed.sql                목업 더미 데이터 (개발 시드, 빈 DB 전제)
 └─ seed/seed_0002_review-queue.sql  검수 큐 슬라이스 패치 (0002 마이그레이션 후 1회, 재실행 안전)
+└─ seed/seed_0003_price-import.sql  단가표 슬라이스 패치 (스냅샷·오늘 파일·매핑, 재실행 안전)
 ```
 
 ## 사용법 (로컬 PC → Cloud SQL)

@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">단가표 일일 반영</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">단가표 일일 반영 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-040</span></h2>
+          <div><h2 class="mb-1">단가표 일일 반영 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-040</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">거래처가 매일 보내는 단가표 엑셀을 어제와 비교해 <b class="text-body-secondary">변경분만</b> 확인하고 반영합니다. 변동 없는 행은 자동 통과됩니다.</p></div>
           <button class="btn btn-primary btn-sm" id="btnDrop">+ 오늘 단가표 업로드</button>
         </div>
@@ -280,7 +280,7 @@
         <!-- 판매가 공식 -->
         <div class="alert alert-subtle-primary d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-3 fs-9" role="alert">
           <span data-feather="percent" style="width:15px;height:15px;flex:none;"></span>
-          <span><b>판매가 산정(현행)</b> = 매입가(거래처 입력 단가) + 카드수수료 <b>2.2%</b> + 마진 <b>0%</b> <span class="text-body-tertiary">· 천원 반올림</span></span>
+          <span><b>판매가 산정(현행)</b> = 매입가(거래처 입력 단가) + 카드수수료 <b id="feeRate">2.2%</b> + 마진 <b id="marginRate">0%</b> <span class="text-body-tertiary">· 천원 반올림</span></span>
           <a href="margin-policy.html" class="ms-auto fw-bold text-decoration-none">마진 정책 설정 →</a>
         </div>
 
@@ -303,11 +303,34 @@
       
       <script>
       (function(){
-        const FEE=0.022, MARGIN=0.0;
+        let FEE=0.022, MARGIN=0.0;
         const sell=c=>Math.round(c*(1+FEE+MARGIN)/1000)*1000;
         const won=n=>n.toLocaleString()+"원";
-        // 실제 수신 파일 2종 기반 데모 — 어제값은 목업
-        const FILES={
+        // 실데이터 모드 — GET 성공 시 FILES를 API 계약으로 교체, 실패(file://·정적 호스팅)면 더미 유지
+        let LIVE=false, UNDO={};
+        function relTime(iso){const s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return"방금 전";const m=Math.floor(s/60);if(m<60)return m+"분 전";const h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전";}
+        const fromApi=f=>({
+          file_id:f.file_id, label:f.label, time:relTime(f.received_at),
+          preset:f.supplier, recog:f.preset.summary, map:f.preset.map_text,
+          note:`<span class="badge badge-phoenix badge-phoenix-${f.preset.note.indexOf("다나와")>=0?"info":"secondary"}">${f.preset.note}</span>`,
+          same:f.same, status:f.status, applied:f.status==="반영 완료", lastUndo:null,
+          chg:f.chg.map(c=>({row_id:c.row_id, name:c.name, cat:c.cat, y:c.y, t:c.t, memo:c.memo, sub:c.sub, alt:c.alt, disabled:!c.product_code, on:!!c.product_code})),
+          nw:f.nw.map(n=>({name:n.name, cat:n.cat, cost:n.cost, m:{k:n.match.k, v:n.match.text}})),
+          stat:f.stat.map(s=>({name:s.name, raw:s.raw, from:s.from, to:s.to}))
+        });
+        async function reload(){
+          const r=await fetch("/api/admin/price-import");
+          if(!r.ok)throw new Error(r.status);
+          const d=await r.json();
+          FEE=d.fee_rate; MARGIN=d.margin_rate;
+          document.getElementById("feeRate").textContent=(FEE*100).toFixed(1)+"%";
+          document.getElementById("marginRate").textContent=(MARGIN*100).toFixed(0)+"%";
+          const nf={}; d.files.forEach(f=>{nf[String(f.file_id)]=fromApi(f);});
+          FILES=nf;
+          if(!FILES[fid]) fid=Object.keys(FILES)[0];
+        }
+        // 실제 수신 파일 2종 기반 데모 — 어제값은 목업 (폴백 전용)
+        let FILES={
          gbt:{
           label:"GBT PCD VGA MB 단가표 0721클릭.xlsx", time:"오늘 07:31", preset:"클릭나라 · 기가바이트(PCD)",
           recog:"시트 4개 전부 인식 · 헤더 3행 · <b>다나와 상품코드 열 존재</b> · 246행 추출",
@@ -367,9 +390,11 @@
         let fid="gbt", tab="chg";
         const F=()=>FILES[fid];
         function inbox(){
-          const order=["gbt","msi"];
+          const order=Object.keys(FILES);
           document.getElementById("inbox").innerHTML=order.map(k=>{
             const f=FILES[k], on=k===fid;
+            const st=f.status||(f.applied?"반영 완료":"대기");
+            const stCol=st==="반영 완료"?"primary":st==="부분 반영"?"info":"warning";
             const sum=f.applied?`반영 완료`:`변동 ${f.chg.length} · 신규 ${f.nw.length} · 전환 ${f.stat.length}`;
             return `<div data-fid="${k}" class="d-flex flex-wrap align-items-center gap-2 py-2 px-2 rounded-2 cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
               <span data-feather="file-text" style="width:16px;height:16px;color:var(--phoenix-primary);flex:none;"></span>
@@ -377,7 +402,7 @@
               <span class="fs-10 text-body-quaternary">${f.time}</span>
               <span class="badge badge-phoenix badge-phoenix-secondary fs-10">${f.preset}</span>
               <span class="ms-auto fs-10 ${f.applied?"text-body-quaternary":"fw-bold"}">${sum}</span>
-              <span class="badge badge-phoenix badge-phoenix-${f.applied?"primary":"warning"}">${f.applied?"반영 완료":"대기"}</span>
+              <span class="badge badge-phoenix badge-phoenix-${stCol}">${st}</span>
             </div>`;
           }).join("");
           document.querySelectorAll("#inbox [data-fid]").forEach(el=>el.onclick=()=>{fid=el.dataset.fid;tab="chg";render();});
@@ -401,6 +426,7 @@
           const f=F();
           const K=[["가격 변동",f.chg.length,"건","warning"],["신규·매칭",f.nw.length,"건","info"],["발주 상태 전환",f.stat.length,"건","primary"],["변동 없음(자동 통과)",f.same,"행","secondary"]];
           document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const sn=document.getElementById("sameN"); if(sn)sn.textContent=f.same;
         }
         function tabsBar(){
           const f=F();
@@ -412,7 +438,7 @@
           document.querySelectorAll("#tabs [data-t]").forEach(a=>a.onclick=e=>{e.preventDefault();tab=a.dataset.t;render();});
           const ab=document.getElementById("applyBtn");
           ab.style.display=tab==="chg"&&f.chg.length?"":"none";
-          ab.textContent=`선택 ${f.chg.filter(c=>c.on).length}건 반영`;
+          ab.textContent=`선택 ${f.chg.filter(c=>c.on&&!c.disabled).length}건 반영`;
         }
         function render(){
           inbox();presetCard();kpis();tabsBar();
@@ -430,17 +456,17 @@
               const d=c.t-c.y, pct=(d/c.y*100).toFixed(1);
               const subLine=(c.memo?`<span class="me-2">비고: ${c.memo}</span>`:"")+(c.alt?`<span class="text-warning-emphasis">${c.alt}</span>`:"");
               return `<tr>
-                <td class="ps-4"><input type="checkbox" class="form-check-input" data-i="${i}" ${c.on?"checked":""}></td>
-                <td class="fw-semibold text-body-highlight">${c.name}${subLine?`<div class="fs-10 fw-normal text-body-tertiary text-truncate">${subLine}</div>`:""}</td>
+                <td class="ps-4"><input type="checkbox" class="form-check-input" data-i="${i}" ${c.on&&!c.disabled?"checked":""}${c.disabled?" disabled":""}></td>
+                <td class="fw-semibold text-body-highlight">${c.name}${c.disabled?` <span class="badge badge-phoenix badge-phoenix-warning fs-10">미매칭 — 검수 필요</span>`:""}${subLine?`<div class="fs-10 fw-normal text-body-tertiary text-truncate">${subLine}</div>`:""}</td>
                 <td class="text-body-tertiary">${c.cat}</td>
                 <td class="text-end text-body-tertiary">${won(c.y)}</td>
                 <td class="text-end fw-bold">${won(c.t)}${c.sub?`<div class="fs-10 fw-normal"><span class="badge badge-phoenix badge-phoenix-secondary">${c.sub}</span></div>`:""}</td>
                 <td class="text-end"><span class="badge badge-phoenix badge-phoenix-${d<0?"primary":"danger"}">${d<0?"▼":"▲"} ${Math.abs(pct)}%</span></td>
-                <td class="pe-4 text-end fw-bold">${won(sell(c.t))} <span class="fs-10 fw-normal text-body-tertiary">(+수수료 2.2%)</span></td>
+                <td class="pe-4 text-end fw-bold">${won(sell(c.t))} <span class="fs-10 fw-normal text-body-tertiary">(+수수료 ${(FEE*100).toFixed(1)}%)</span></td>
               </tr>`;
             }).join(""):`<tr><td colspan="7" class="text-center text-body-tertiary py-5">이 파일의 가격 변동이 모두 반영됐습니다.</td></tr>`;
             tb.querySelectorAll("[data-i]").forEach(ck=>ck.onchange=()=>{f.chg[+ck.dataset.i].on=ck.checked;tabsBar();});
-            const ca=document.getElementById("ckAll"); if(ca)ca.onchange=()=>{f.chg.forEach(c=>c.on=ca.checked);render();};
+            const ca=document.getElementById("ckAll"); if(ca)ca.onchange=()=>{f.chg.forEach(c=>{if(!c.disabled)c.on=ca.checked;});render();};
           }else if(tab==="new"){
             th.innerHTML=`<tr class="text-body-tertiary"><th class="ps-4 py-2">모델명</th><th>분류</th><th class="text-end">매입가</th><th>SKU 매칭</th><th class="pe-4 text-end"></th></tr>`;
             const MB={code:["primary","자동 연결"],sim:["info","후보"],none:["warning","검수 필요"]};
@@ -475,20 +501,50 @@
           const ub=t.querySelector("#__undoBtn"); if(ub)ub.onclick=()=>{t.style.opacity="0";undo();};
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
         }
+        async function apiPost(path){
+          const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:path.indexOf("/apply")>=0?JSON.stringify({row_ids:apiPost._ids||[]}):null});
+          if(!r.ok){let m="처리 실패 ("+r.status+")";try{const j=await r.json();if(j.detail)m=j.detail;}catch(e){}throw new Error(m);}
+          return r.json();
+        }
         function undo(){
-          const f=F(); if(!f.lastUndo)return;
+          const f=F();
+          if(LIVE){
+            const uid=UNDO[fid]; if(!uid)return;
+            apiPost(`/api/admin/price-import/undo/${uid}`)
+              .then(async()=>{delete UNDO[fid]; await reload(); render();
+                toast("되돌렸습니다 — 이 파일의 가격 변경이 반영 전 상태로 복원됐습니다(역방향 가격 이력 기록).");})
+              .catch(e=>toast("⚠ "+e.message));
+            return;
+          }
+          if(!f.lastUndo)return;
           f.chg=f.lastUndo.concat(f.chg); f.lastUndo=null; f.applied=false; render();
           toast("되돌렸습니다 — 이 파일의 가격 변경이 반영 전 상태로 복원됐습니다.");
         }
         document.getElementById("applyBtn").onclick=()=>{
-          const f=F(); const sel=f.chg.filter(c=>c.on); if(!sel.length)return;
+          const f=F(); const sel=f.chg.filter(c=>c.on&&!c.disabled); if(!sel.length)return;
+          if(LIVE){
+            apiPost._ids=sel.map(c=>c.row_id);
+            apiPost(`/api/admin/price-import/${f.file_id}/apply`)
+              .then(async res=>{UNDO[fid]=res.undo_id; await reload(); render();
+                toast(`<b>${f.preset}</b> 매입가 <b>${res.applied}건</b> 반영 · 판매가 재계산(수수료 ${(FEE*100).toFixed(1)}%·마진 ${(MARGIN*100).toFixed(0)}%) 완료 · 가격 이력 기록`,true);})
+              .catch(e=>toast("⚠ "+e.message));
+            return;
+          }
           f.lastUndo=sel; f.chg=f.chg.filter(c=>!c.on);
           if(!f.chg.length)f.applied=true;
           toast(`<b>${f.preset}</b> 매입가 <b>${sel.length}건</b> 반영 · 판매가 재계산(수수료 2.2%·마진 0%) 완료 · 가격 이력 기록`,true);
           render();
         };
         document.getElementById("btnDrop").onclick=()=>toast("데모 — 파일을 올리면 프리셋을 자동 인식해 수신함에 추가됩니다.");
+        // 즉시 더미 렌더(빈 화면 방지) 후 API 시도
         render();
+        reload().then(()=>{
+          LIVE=true;
+          const b=document.getElementById("dataSrc");
+          b.textContent="실데이터 · Cloud SQL";
+          b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+          fid=Object.keys(FILES)[0]; tab="chg"; render();
+        }).catch(()=>{});
       })();
       </script>
 
