@@ -42,7 +42,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
   <div class="card" style="display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin-bottom:16px;">
     <div><div style="font-size:12px;color:#8a8578;font-weight:700;">이번 달 결제</div><b id="mp-month" style="font-size:22px;color:#17171b;">1,735,000원</b></div>
     <span style="width:1px;height:26px;background:#ece9e3;"></span>
-    <div><div style="font-size:12px;color:#8a8578;font-weight:700;">누적 결제 (3건)</div><b id="mp-total" style="font-size:22px;color:#17171b;">3,831,000원</b></div>
+    <div><div id="mp-total-label" style="font-size:12px;color:#8a8578;font-weight:700;">누적 결제 (3건)</div><b id="mp-total" style="font-size:22px;color:#17171b;">3,831,000원</b></div>
     <span style="margin-left:auto;font-size:12px;color:#8a8578;font-weight:600;">결제 방식(자체/쇼핑몰 인계)과 무관하게 전 건이 기록됩니다.</span>
   </div>
 
@@ -65,18 +65,50 @@ var PAYS=[
 ];
 var won=function(n){return n.toLocaleString()+'원';};
 var stCol={'승인':['#eaf1fd','#2149b0'],'취소':['#f4f2ec','#6b6b73'],'환불':['#fbecec','#8a1f22']};
-document.getElementById('plist').innerHTML=PAYS.map(function(p){
- var c=stCol[p.state];
- return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #f0eee9;">'
-  +'<span style="flex:0 0 92px;font-size:12.5px;color:#8a8578;font-weight:700;">'+p.at+'</span>'
-  +'<div style="flex:1;min-width:180px;"><b style="font-size:14px;color:#17171b;">'+p.method+'</b> <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;'+(p.mode==='own'?'background:#eaf1fd;color:#2149b0;':'background:#f2edfb;color:#4a2a94;')+'">'+(p.mode==='own'?'자체':'쇼핑몰 인계')+'</span>'
-  +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-top:2px;"><a href="my-orders.html?id='+p.order+'" style="color:#2b5fd9;text-decoration:none;font-weight:800;">'+p.order+'</a> 주문</div></div>'
-  +'<span style="font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:'+c[0]+';color:'+c[1]+';">'+p.state+'</span>'
-  +'<b style="font-size:15px;color:#17171b;font-variant-numeric:tabular-nums;">'+won(p.amount)+'</b></div>';
-}).join('');
+function render(rows){
+ if(!rows.length){document.getElementById('plist').innerHTML='<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">결제 내역이 없습니다.</div>';return;}
+ document.getElementById('plist').innerHTML=rows.map(function(p){
+  var c=stCol[p.state]||['#f4f2ec','#6b6b73'];
+  return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #f0eee9;">'
+   +'<span style="flex:0 0 92px;font-size:12.5px;color:#8a8578;font-weight:700;">'+p.at+'</span>'
+   +'<div style="flex:1;min-width:180px;"><b style="font-size:14px;color:#17171b;">'+p.method+'</b> <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;'+(p.mode==='own'?'background:#eaf1fd;color:#2149b0;':'background:#f2edfb;color:#4a2a94;')+'">'+(p.mode==='own'?'자체':'쇼핑몰 인계')+'</span>'
+   +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-top:2px;"><a href="my-orders.html?id='+p.order+'" style="color:#2b5fd9;text-decoration:none;font-weight:800;">'+p.order+'</a> 주문</div></div>'
+   +'<span style="font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:'+c[0]+';color:'+c[1]+';">'+p.state+'</span>'
+   +'<b style="font-size:15px;color:#17171b;font-variant-numeric:tabular-nums;">'+won(p.amount)+'</b></div>';
+ }).join('');
+}
+render(PAYS);
 var total=0;PAYS.forEach(function(p){total+=p.amount;});
 document.getElementById('mp-total').textContent=won(total);
 document.getElementById('mp-month').textContent=won(PAYS[0].amount);
+
+// ---- LIVE (슬라이스 12) — popcorn-member 있고 API 성공 시 결제 원장 전 행으로 교체, 아니면 더미 원형 ----
+// 더미 첫 행의 psum 가산은 리터럴 전용 — 실데이터 amount는 결제 실액(주변기기 포함)이라 재적용 금지(이중 계상).
+function fmtT(iso){
+ var d=new Date(iso),now=new Date();
+ var hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+ if(d.toDateString()===now.toDateString())return '오늘 '+hm;
+ return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
+}
+var mem=null;try{mem=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
+if(mem&&mem.email){
+ fetch('/api/my/payments?email='+encodeURIComponent(mem.email))
+  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  .then(function(d){
+   var rows=d.items.map(function(p){return {at:p.at?fmtT(p.at):'—',order:p.order_no,method:p.method,mode:p.mode,amount:p.amount,state:p.status};});
+   render(rows);
+   // KPI — 응답 rows 단일 원천. 합계는 승인·환불만(취소는 돈이 안 움직임), 건수는 원장 전 행.
+   var now=new Date(),month=0,sum=0;
+   d.items.forEach(function(p){
+    if(p.status!=='승인'&&p.status!=='환불')return;
+    sum+=p.amount;
+    if(p.at){var t=new Date(p.at);if(t.getFullYear()===now.getFullYear()&&t.getMonth()===now.getMonth())month+=p.amount;}
+   });
+   document.getElementById('mp-month').textContent=won(month);
+   document.getElementById('mp-total').textContent=won(sum);
+   document.getElementById('mp-total-label').textContent='누적 결제 ('+d.items.length+'건)';
+  }).catch(function(){});
+}
 })();
 </script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
