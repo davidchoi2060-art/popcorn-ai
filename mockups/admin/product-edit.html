@@ -309,9 +309,11 @@
       </div>
       <script>
       (function(){
-        const isNew=new URLSearchParams(location.search).get("new")==="1";
-        const id=new URLSearchParams(location.search).get("id");
-        if(isNew){document.getElementById("ptitle").innerHTML='새 상품 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-040</span>';document.getElementById("bc").textContent="상품 등록";document.getElementById("psku").textContent="SKU 자동 발번";}
+        const _q=new URLSearchParams(location.search);
+        const isNew=_q.get("new")==="1";
+        const id=_q.get("id");
+        const fromPrice=isNew&&_q.get("from")==="price"; // 슬라이스 15: 단가표發 신규 등록 프리필(시늉)
+        if(isNew){document.getElementById("ptitle").innerHTML='새 상품 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-040</span>'+(fromPrice?' <span class="badge badge-phoenix badge-phoenix-info align-middle fs-10">단가표發</span>':'');document.getElementById("bc").textContent="상품 등록";document.getElementById("psku").textContent="SKU 자동 발번";}
         else if(id){document.getElementById("psku").textContent=id;}
         // 필수 사양: [필드, 값, 출처, 잠금]  출처: origin(원본 추출)/ai(AI 대조)/op(운영자 확정)
         const SRC={origin:["원본 추출","secondary"],ai:["AI 대조","info"],op:["운영자 확정","primary"]};
@@ -332,12 +334,30 @@
             </div>`).join("");
           document.querySelectorAll("[data-lock]").forEach(b=>b.onclick=()=>{const i=+b.dataset.lock;SPECS[i][3]=!SPECS[i][3];if(SPECS[i][3])SPECS[i][2]="op";render();});
         }
+        // 슬라이스 15: 단가표發 신규 등록 프리필(시늉) — 등록 API·SKU 발번은 다음 슬라이스에서 연결
+        function fieldByLabel(txt){
+          const lab=[...document.querySelectorAll("label.form-label")].find(l=>l.textContent.trim()===txt);
+          return lab? lab.parentElement.querySelector("input,select") : null;
+        }
+        if(fromPrice){
+          const nm=_q.get("name")||"", cost=+(_q.get("cost")||0), sup=_q.get("sup")||"", cat=_q.get("cat")||"";
+          const set=(t,v)=>{const el=fieldByLabel(t);if(el)el.value=v;};
+          set("상품명",nm); set("재고 수량","0"); set("판매가(원)","");
+          const catSel=fieldByLabel("분류"); if(catSel&&[...catSel.options].some(o=>o.textContent===cat)) catSel.value=cat;
+          const expSel=fieldByLabel("노출 상태"); if(expSel) expSel.value="숨김";
+          const tb=document.querySelector(".col-lg-5 table tbody");
+          if(tb) tb.innerHTML=`<tr><td class="fw-semibold">${sup}</td><td class="text-end fw-bold">${cost.toLocaleString()}원</td><td class="text-body-tertiary">오늘 <span class="badge badge-phoenix badge-phoenix-primary">최저</span></td><td class="text-end"><button class="btn btn-sm btn-subtle-secondary">수정</button></td></tr>`;
+          SPECS.length=0; // 신규 — 분류 확정 후 사양 템플릿 로드(시늉)
+          const al=document.querySelector(".alert.alert-subtle-secondary");
+          if(al) al.innerHTML='<span data-feather="shield" style="width:14px;height:14px;flex:none;" class="me-2"></span>단가표發 신규 등록 — 저장해도 <b class="mx-1">추천·함께 구성 풀에는 들어가지 않습니다</b>(후보 제외·검수 필요 상태로 시작). 필수 사양 검수를 전부 통과해야 후보로 승격됩니다.';
+        }
         document.getElementById("save").onclick=()=>{
           let t=document.getElementById("__t");
           if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;";document.body.appendChild(t);}
-          t.textContent="저장 완료 — 수정 필드는 운영자 확정으로 잠금 처리";t.style.opacity="1";setTimeout(()=>t.style.opacity="0",2200);
+          t.textContent=fromPrice?"등록 시늉 — 신규 등록 API는 다음 슬라이스에서 연결됩니다 (등록 직후 풀 제외)":"저장 완료 — 수정 필드는 운영자 확정으로 잠금 처리";t.style.opacity="1";setTimeout(()=>t.style.opacity="0",2200);
         };
         render();if(window.feather)feather.replace();
+        if(fromPrice&&!SPECS.length)document.getElementById("specs").innerHTML='<p class="fs-9 text-body-tertiary py-3 mb-0">분류 확정 후 필수 사양 템플릿이 로드됩니다 — <b>전부 확인돼야 추천 가능 재고에 진입</b>합니다.</p>';
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

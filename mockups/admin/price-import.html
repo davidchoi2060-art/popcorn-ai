@@ -477,7 +477,7 @@
                 <td class="text-body-tertiary">${n.cat}</td>
                 <td class="text-end">${won(n.cost)}</td>
                 <td><span class="badge badge-phoenix badge-phoenix-${col} me-1">${lab}</span><span class="fs-10 text-body-tertiary">${n.m.v}</span></td>
-                <td class="pe-4 text-end">${n.m.k==="code"?`<span class="fs-10 text-body-quaternary">확인 불필요</span>`:`<a class="btn btn-sm btn-subtle-secondary" href="review-queue.html">검수에서 확정</a>`}</td>
+                <td class="pe-4 text-end">${n.m.k==="code"?`<span class="fs-10 text-body-quaternary">확인 불필요</span>`:`<a class="btn btn-sm btn-subtle-secondary" href="review-queue.html?type=sourcing_hold&name=${encodeURIComponent(n.name)}">검수에서 확정</a>`}</td>
               </tr>`;
             }).join("");
           }else{
