@@ -62,11 +62,12 @@ def _item_label(kind: str, spec) -> str:
     return LABELS.get(pt, pt) if pt else "구성"
 
 
-def _log(conn, action: str, target_id: str, detail: dict) -> int:
+def _log(conn, action: str, target_id: str, detail: dict, kind: str = "order") -> int:
     return conn.execute(text(
         "INSERT INTO admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)"
-        " VALUES (:op, :a, 'order', :t, CAST(:d AS JSONB)) RETURNING log_id"),
-        {"op": OPERATOR_ID, "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
+        " VALUES (:op, :a, :k, :t, CAST(:d AS JSONB)) RETURNING log_id"),
+        {"op": OPERATOR_ID, "a": action, "k": kind, "t": target_id,
+         "d": json.dumps(detail)}).scalar()
 
 
 @router.get("/orders")

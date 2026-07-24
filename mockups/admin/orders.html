@@ -306,7 +306,7 @@
         let cur="all", fch="all", sel=null, lastAction=null;
         const STEPS=["결제 완료","조립·검사","출고·배송","배송 완료"];
         const chBadge=ch=>ch==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>';
-        const stBadge=o=>o.refund?'<span class="badge badge-phoenix badge-phoenix-danger text-nowrap">환불 접수</span>':'<span class="badge badge-phoenix badge-phoenix-'+(o.status==="완료"?"secondary":"warning")+' text-nowrap">'+o.status+'</span>';
+        const stBadge=o=>o.refund?'<span class="badge badge-phoenix badge-phoenix-danger text-nowrap">환불 접수</span>':'<span class="badge badge-phoenix badge-phoenix-'+(o.status==="완료"?"secondary":(o.status==="취소"?"danger":"warning"))+' text-nowrap">'+o.status+'</span>';
         function kpis(){
           const own=O.filter(o=>o.ch==="own").length, mall=O.length-own, rf=O.filter(o=>o.refund).length;
           const K=[["오늘 주문",O.filter(o=>o.t.indexOf("오늘")>-1).length,"건","primary"],["자체 결제",own,"건","primary"],["쇼핑몰 인계",mall,"건","info"],["환불·클레임 진행",rf,"건","danger"]];

@@ -77,11 +77,11 @@ var ORDERS=[
 ];
 var STEPS=['결제 완료','조립·검사','출고·배송','배송 완료'];
 var cur='all', sel=null, LIVE=false;
-function kindOf(st){return (st==='조립중'||st==='결제완료')?'주문 취소':(st==='완료'?'반품·교환':'환불');}
+function kindOf(st){return (st==='조립중'||st==='결제완료'||st==='취소')?'주문 취소':(st==='완료'?'반품·교환':'환불');}
 var won=function(n){return n.toLocaleString()+'원';};
 function chBadge(ch){return ch==='own'?'<span style="background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">자체</span>':'<span style="background:#f2edfb;color:#4a2a94;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">쇼핑몰 인계</span>';}
 function stBadge(o){
- if(o.refund)return '<span style="background:#fbecec;color:#8a1f22;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;">'+o.refund.kind+' 접수됨</span>';
+ if(o.refund)return '<span style="background:#fbecec;color:#8a1f22;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;">'+o.refund.kind+' '+((o.refund.status&&o.refund.status!=='접수')?o.refund.status:'접수됨')+'</span>';
  var col=o.status==='완료'?['#f4f2ec','#6b6b73']:['#fbf3e2','#8a561a'];
  return '<span style="background:'+col[0]+';color:'+col[1]+';font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;">'+o.status+'</span>';
 }
@@ -121,10 +121,13 @@ function renderDetail(){
  var rows=o.items.map(function(it){
   return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #f0eee9;"><span style="flex:0 0 96px;font-size:11.5px;font-weight:800;color:#8a8578;">'+it[0]+'</span><div style="flex:1;font-size:13.5px;font-weight:700;color:#17171b;">'+it[1]+'</div><b style="font-size:13.5px;color:#17171b;">'+won(it[2])+'</b></div>';
  }).join('');
- var rIdx=o.refund?Math.max(0,['접수','검토','수거·처리','완료'].indexOf(o.refund.status||'접수')):0;
- var refundBlock=o.refund?'<div class="card" style="background:#fbecec;border-color:#f0cfd1;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="msym" style="font-size:19px;color:#b31b25;">assignment_return</span><b style="font-size:14px;color:#8a1f22;">'+o.refund.kind+' 접수 '+o.refund.no+'</b><span style="font-size:12px;color:#a15055;font-weight:700;">· '+o.refund.reason+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+['접수','검토','수거·처리','완료'].map(function(s,i){return '<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;'+(i===rIdx?'background:#b31b25;color:#fff;':'background:#fff;color:#a15055;')+'">'+s+'</span>';}).join('')+'</div><p style="margin:8px 0 0;font-size:12px;color:#a15055;font-weight:600;">'+o.refund.modeNote+'</p></div>':'';
+ var rIdx=o.refund?['접수','검토','수거·처리','완료'].indexOf(o.refund.status||'접수'):0;
+ var rChips=(o.refund&&rIdx<0)
+  ?'<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:#b31b25;color:#fff;">반려됨</span><span style="font-size:11.5px;color:#a15055;font-weight:600;align-self:center;">— 필요하시면 다시 접수할 수 있어요</span>'
+  :['접수','검토','수거·처리','완료'].map(function(s,i){return '<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;'+(i===rIdx?'background:#b31b25;color:#fff;':'background:#fff;color:#a15055;')+'">'+s+'</span>';}).join('');
+ var refundBlock=o.refund?'<div class="card" style="background:#fbecec;border-color:#f0cfd1;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="msym" style="font-size:19px;color:#b31b25;">assignment_return</span><b style="font-size:14px;color:#8a1f22;">'+o.refund.kind+' 접수 '+o.refund.no+'</b><span style="font-size:12px;color:#a15055;font-weight:700;">· '+o.refund.reason+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+rChips+'</div><p style="margin:8px 0 0;font-size:12px;color:#a15055;font-weight:600;">'+o.refund.modeNote+'</p></div>':'';
  var actions='';
- if(!o.refund){
+ if(!o.refund||o.refund.status==='반려'){
   var kind=kindOf(o.status);
   actions='<button class="btn2" id="d-refund" style="color:#8a1f22;border-color:#e8c9cb;">'+kind+' 접수</button>';
  }

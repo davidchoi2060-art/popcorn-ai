@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">환불 · 클레임</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">환불 · 클레임 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CLM-010</span></h2>
+          <div><h2 class="mb-1">환불 · 클레임 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CLM-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">접수는 <b class="text-body-secondary">항상 본 시스템</b>에서 받습니다. 처리 방식(자체/쇼핑몰 인계)은 운영 전환 설정을 따르고, 원장은 여기 남습니다.</p></div>
           <a href="ops-settings.html" class="btn btn-phoenix-secondary btn-sm">운영 전환 설정</a>
         </div>
@@ -283,11 +283,15 @@
          {no:"RF-1019",order:"ORD-83907",cust:"이서연",kind:"반품·교환",reason:"단순 변심",mode:"mall",state:1,amount:1284000,at:"07-19 15:40",note:"케이스 색상 변경 희망 — 교환 우선 검토."},
          {no:"RF-1015",order:"ORD-83721",cust:"박도윤",kind:"환불",reason:"오배송 · 구성 오류",mode:"own",state:3,amount:98000,at:"07-11 10:05",note:"주변기기 1종 오배송 — 부분 환불 완료. 결제 내역에 환불 행 생성됨."}
         ];
-        let sel="RF-1024", lastAction=null;
+        let sel="RF-1024", lastAction=null, LIVE=false;
         const modeBadge=m=>m==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체 처리</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>';
-        const stateBadge=r=>'<span class="badge badge-phoenix badge-phoenix-'+(r.state===3?"secondary":r.state===0?"danger":"warning")+'">'+STATES[r.state]+'</span>';
+        const stateBadge=r=>r.state===-1
+          ?'<span class="badge badge-phoenix badge-phoenix-danger">반려</span>'
+          :'<span class="badge badge-phoenix badge-phoenix-'+(r.state===3?"secondary":r.state===0?"danger":"warning")+'">'+STATES[r.state]+'</span>';
         function kpis(){
-          const K=[["접수 대기",R.filter(r=>r.state===0).length,"건","danger"],["검토·처리 중",R.filter(r=>r.state===1||r.state===2).length,"건","warning"],["이번 달 완료",R.filter(r=>r.state===3).length,"건","secondary"],["평균 처리",1.8,"일","primary"]];
+          const K=LIVE
+            ?[["접수 대기",R.filter(r=>r.state===0).length,"건","danger"],["검토·처리 중",R.filter(r=>r.state===1||r.state===2).length,"건","warning"],["완료",R.filter(r=>r.state===3).length,"건","secondary"],["평균 처리","—","(집계 준비 중)","primary"]]
+            :[["접수 대기",R.filter(r=>r.state===0).length,"건","danger"],["검토·처리 중",R.filter(r=>r.state===1||r.state===2).length,"건","warning"],["이번 달 완료",R.filter(r=>r.state===3).length,"건","secondary"],["평균 처리",1.8,"일","primary"]];
           document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function list(){
@@ -304,7 +308,9 @@
         function refund(){return R.find(r=>r.no===sel);}
         function detail(){
           const r=refund();const d=document.getElementById("detail");if(!r)return;
-          const steps='<div class="d-flex gap-2 flex-wrap my-3">'+STATES.map((s,i)=>`<span class="badge badge-phoenix badge-phoenix-${i<=r.state?(i===r.state?"primary":"secondary"):"secondary"}" style="${i>r.state?"opacity:.4;":""}">${i+1} ${s}</span>`).join("")+"</div>";
+          const steps=r.state===-1
+            ?'<div class="alert alert-subtle-danger py-2 fs-9 my-3" role="alert">반려됨 — 고객은 필요 시 다시 접수할 수 있습니다.</div>'
+            :'<div class="d-flex gap-2 flex-wrap my-3">'+STATES.map((s,i)=>`<span class="badge badge-phoenix badge-phoenix-${i<=r.state?(i===r.state?"primary":"secondary"):"secondary"}" style="${i>r.state?"opacity:.4;":""}">${i+1} ${s}</span>`).join("")+"</div>";
           let actions="";
           if(r.state===0)actions=`<button class="btn btn-primary btn-sm" data-act="review">검토 시작</button><button class="btn btn-phoenix-danger btn-sm" data-act="reject">반려</button>`;
           else if(r.state===1)actions=(r.mode==="own"
@@ -322,23 +328,58 @@
               <div class="d-flex justify-content-between mb-1"><span class="fs-9 text-body-tertiary">고객 · 사유</span><b class="fs-9">${r.cust} · ${r.reason}</b></div>
               <div class="d-flex justify-content-between"><span class="fs-9 text-body-tertiary">환불 예정 금액</span><b class="fs-9">${won(r.amount)}</b></div>
             </div>
-            <div class="alert alert-subtle-secondary py-2 fs-9 mb-3" role="alert"><span data-feather="message-square" style="width:13px;height:13px;" class="me-1"></span>${r.note}</div>
+            <div class="alert alert-subtle-secondary py-2 fs-9 mb-3" role="alert"><span data-feather="message-square" style="width:13px;height:13px;" class="me-1"></span>${r.note||"— (상세 사유 저장은 준비 중입니다)"}</div>
             <div class="alert alert-subtle-info py-2 fs-9 mb-3" role="alert"><span data-feather="settings" style="width:13px;height:13px;" class="me-1"></span>${modeNote}</div>
             <p class="fs-10 text-body-tertiary mb-2">완료 시: 고객 결제 내역에 <b>환불 행</b> 생성 · 회수 부품은 재고 원장(stock_movements: return)으로 복귀 · 전 과정 작업 기록.</p>
             <div class="d-flex flex-wrap gap-2">${actions}<a class="btn btn-phoenix-secondary btn-sm" href="activity-logs.html">작업 기록</a></div>
           </div></div>`;
           d.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{
+            const MSG={review:`<b>${r.no}</b> 검토 시작`,
+              approve:r.mode==="own"?`<b>${r.no}</b> 승인 — 수거 접수 · PG 환불 예약`:`<b>${r.no}</b> 쇼핑몰 인계 처리 기록 — 진행 상태 동기화`,
+              reject:`<b>${r.no}</b> 반려 — 고객에게 사유 안내 발송`};
+            if(LIVE){
+              b.disabled=true;
+              const prevState=r.state;
+              fetch(`/api/admin/refunds/${r.refund_id}/advance`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:b.dataset.act})})
+                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+                .then(res=>{
+                  if(!res.ok){const dd=res.j.detail||{};toast("⚠ "+(dd.detail||dd.error||"처리 실패"));b.disabled=false;return;}
+                  r.state=res.j.state;
+                  if(b.dataset.act==="complete"){
+                    lastAction=null; // 완료 = 비가역(원장 확산 — 목업의 되돌리기와 의도된 차이)
+                    toast(`<b>${r.no}</b> 환불 확정 · 환불 행 ${res.j.refund_row?res.j.refund_row.amount.toLocaleString()+"원":""} · 재고 복귀 ${res.j.returned}건`,false);
+                  }else{
+                    lastAction={no:r.no,state:prevState,undo_id:res.j.undo_id};
+                    toast(MSG[b.dataset.act],true);
+                  }
+                  renderAll();
+                })
+                .catch(()=>{toast("⚠ 처리에 실패했어요 — 다시 시도해 주세요.");b.disabled=false;});
+              return;
+            }
             lastAction={no:r.no,state:r.state};
-            if(b.dataset.act==="review"){r.state=1;toast(`<b>${r.no}</b> 검토 시작`,true);}
-            else if(b.dataset.act==="approve"){r.state=2;toast(r.mode==="own"?`<b>${r.no}</b> 승인 — 수거 접수 · PG 환불 예약`:`<b>${r.no}</b> 쇼핑몰 인계 처리 기록 — 진행 상태 동기화`,true);}
+            if(b.dataset.act==="review"){r.state=1;toast(MSG.review,true);}
+            else if(b.dataset.act==="approve"){r.state=2;toast(MSG.approve,true);}
             else if(b.dataset.act==="complete"){r.state=3;toast(`<b>${r.no}</b> 환불 확정 · 결제 내역 환불 행 생성 · 재고 복귀`,true);}
-            else{toast(`<b>${r.no}</b> 반려 — 고객에게 사유 안내 발송`,true);}
+            else{toast(MSG.reject,true);}
             renderAll();
           });
           if(window.feather)feather.replace();
         }
         function undo(){
           if(!lastAction)return;
+          if(LIVE&&lastAction.undo_id){
+            fetch(`/api/admin/refunds/undo/${lastAction.undo_id}`,{method:"POST"})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const dd=res.j.detail||{};toast("⚠ "+(dd.detail||dd.error||"되돌리기 실패"));return;}
+                const r=R.find(x=>x.no===lastAction.no);if(r)r.state=res.j.state;
+                lastAction=null;renderAll();
+                toast("되돌렸습니다 — 처리 상태가 이전으로 복원됐습니다.");
+              })
+              .catch(()=>toast("⚠ 되돌리기에 실패했어요."));
+            return;
+          }
           const r=R.find(x=>x.no===lastAction.no);if(r)r.state=lastAction.state;
           lastAction=null;renderAll();
           toast("되돌렸습니다 — 처리 상태가 이전으로 복원됐습니다.");
@@ -351,7 +392,27 @@
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
         }
         function renderAll(){kpis();list();detail();}
+        // ---- LIVE (슬라이스 11) — 즉시 더미 렌더 후 API 시도, 실패 시 더미 유지 ----
+        function fmtT(iso){
+          const dd=new Date(iso),now=new Date();
+          const hm=String(dd.getHours()).padStart(2,"0")+":"+String(dd.getMinutes()).padStart(2,"0");
+          if(dd.toDateString()===now.toDateString())return "오늘 "+hm;
+          return String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0")+" "+hm;
+        }
+        const fromApi=r=>({refund_id:r.refund_id,no:r.no,order:r.order,cust:r.cust,kind:r.kind,
+          reason:r.reason,mode:r.mode,state:r.state,amount:r.amount,at:fmtT(r.at),note:r.note});
         renderAll();
+        fetch("/api/admin/refunds")
+          .then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
+          .then(d=>{
+            LIVE=true;R=d.items.map(fromApi);
+            sel=R.length?R[0].no:null;
+            const b=document.getElementById("dataSrc");
+            b.textContent="실데이터 · Cloud SQL";
+            b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            renderAll();
+          })
+          .catch(()=>{});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
