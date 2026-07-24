@@ -10,12 +10,13 @@ diff는 같은 공급처의 직전 파일 rows와의 비교로만 산출(ERD §1
 """
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import bindparam, text
 
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
+from .price_parser import parse_price_file
 
 router = APIRouter(prefix="/api/admin")
 
@@ -206,6 +207,59 @@ def _preset_view(conn, supplier_id: int, row_count) -> dict:
         "note": "다나와 상품코드 매칭 — 자동 연결 우선" if rules.get("danawa_code_col")
                 else "상품코드 없음 — 모델명 매칭",
     }
+
+
+@router.post("/price-import/upload")
+def upload_price_file(file: UploadFile, dry_run: int = 0):
+    """슬라이스 14(T6 첫 단계): 실파일 .xlsx → 파싱 → supplier_price_files+rows 적재.
+
+    공급처 인식 = rules.file_pattern(파일명 부분 일치, 실패·중복 400). 동명 파일 재수신 허용 —
+    새 file 행(received_at 구분), GET은 공급처별 최신만 보므로 재수신=최신본, 동일 내용
+    재업로드는 diff '변경 0'으로 자연 수렴(해시 중복 검출 이관). 바이너리는 파싱 후 폐기
+    (원본 보관 이관). dry_run=1이면 파싱 요약만 반환·미적재(검증·프리셋 튜닝용).
+    """
+    fname = file.filename or ""
+    if not fname.lower().endswith(".xlsx"):
+        raise HTTPException(400, "지원 형식이 아닙니다 — .xlsx 파일만 받습니다")
+    data = file.file.read()
+    with engine.begin() as conn:
+        presets = conn.execute(text(
+            "SELECT DISTINCT ON (p.supplier_id) p.supplier_id, p.rules, s.name"
+            " FROM supplier_presets p JOIN suppliers s USING (supplier_id)"
+            " ORDER BY p.supplier_id, p.version DESC")).mappings().all()
+        hits = [p for p in presets
+                if p["rules"].get("file_pattern") and p["rules"]["file_pattern"] in fname]
+        if len(hits) != 1:
+            raise HTTPException(400, {"error": "supplier_unrecognized",
+                                      "detail": f"파일명으로 공급처를 인식하지 못했습니다({fname})"
+                                                " — 프리셋 file_pattern을 확인하세요"})
+        sup = hits[0]
+        try:
+            parsed = parse_price_file(data, sup["rules"])
+        except Exception as e:
+            raise HTTPException(400, f"파싱 실패: {e}")
+        if not parsed["rows"]:
+            raise HTTPException(400, "추출된 상품 행이 없습니다 — 프리셋·파일을 확인하세요")
+        summary = {
+            "supplier_id": sup["supplier_id"], "supplier": sup["name"], "file_name": fname,
+            "row_count": len(parsed["rows"]), "sheets": parsed["sheets"],
+            "skipped_sheets": parsed["skipped_sheets"], "skipped_rows": parsed["skipped_rows"],
+            "sample": parsed["rows"][:3],
+        }
+        if dry_run:
+            return {"dry_run": True, **summary}
+        file_id = conn.execute(text(
+            "INSERT INTO supplier_price_files (supplier_id, file_name, received_at, row_count, status)"
+            " VALUES (:s, :n, now(), :c, '대기') RETURNING file_id"),
+            {"s": sup["supplier_id"], "n": fname, "c": len(parsed["rows"])}).scalar()
+        conn.execute(
+            text("INSERT INTO supplier_price_rows"
+                 " (file_id, model_name, danawa_code, prices, cost_price, supply_state, memo)"
+                 " VALUES (:f, :m, :d, CAST(:p AS JSONB), :c, :st, :me)"),
+            [{"f": file_id, "m": r["model_name"], "d": r["danawa_code"],
+              "p": json.dumps(r["prices"], ensure_ascii=False), "c": r["cost_price"],
+              "st": r["supply_state"], "me": r["memo"]} for r in parsed["rows"]])
+        return {"dry_run": False, "file_id": file_id, **summary}
 
 
 @router.get("/price-import")

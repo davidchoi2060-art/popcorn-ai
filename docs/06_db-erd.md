@@ -378,7 +378,7 @@ WHERE p.status = '판매중'
 | T3 | CSV 재업로드 | imports 누적, 가격 갱신+history, 잠긴 필드 스킵 |
 | T4 | 소싱 확정 매칭 | 매입가 갱신 선택 + history, 판매가 제안 배지 |
 | T5 | 품절 토글 | status 변경 → 뷰에서 즉시 제외 (1초 룰) |
-| T6 | [Ver 4.0] 단가표 일일 수신 | 프리셋 파싱 → rows 스냅샷 → 어제 대비 diff → 일괄 반영 시 매입가 갱신+history(reason='price_import') + 재계산 판매가 제안 + 발주 상태 갱신 |
+| T6 | [Ver 4.0] 단가표 일일 수신 (2026-07-24 전 구간 실현 — 슬라이스 3 diff·반영 + 슬라이스 14 파싱·업로드) | 프리셋 파싱(rules 어댑터 — §11.1) → rows 스냅샷 → 어제 대비 diff → 일괄 반영 시 매입가 갱신+history(reason='price_import') + 재계산 판매가 제안 + 발주 상태 갱신. 동명 파일 재수신 허용(새 file 행 — 최신본 승계, 해시 중복 검출 이관) |
 | T7 | [Ver 4.0] 자체 주문 생성 | orders+order_items(가격·사양 스냅샷) → stock_reservations(hold) → 결제 승인 시 stock_movements 차감·hold 해제 |
 | T8 | [Ver 4.0] 환불·클레임 처리 (2026-07-24 성문화) | 접수→검토→수거·처리→**완료**(payments 환불 행 추가 — 원 결제 레일 승계·음수 표기 / order_items 실물 라인 stock_movements 'return'+재고 복귀 / 주문 결제완료·조립중·배송중→'취소'+이벤트, 완료(반품·교환)만 유지) / 접수·검토→**반려**. 완료는 비가역(원장 확산 — undo 불가), 나머지 전이는 활동 로그 undo. 완료·반려 시 활성 잠금 해제(주문 전이 재개) |
 | T9 | [Ver 4.0] 일 정산 마감 (2026-07-24 성문화) | own ∧ (승인·환불) 결제를 date(paid_at) 일자로 묶어 settlement_batches('마감'·closed_by·closed_at) 생성 + 결제별 settlements(fee_amount = \|amount\|×card_fee_rate 원 단위 half-up·부호 보존, settle_mode = 결제 pay_mode 승계 — A-10 자동 보정). batch 합계 = Σ개별 행(정합 불변식). '대기'는 저장 없는 파생 상태(batch 부재 일자 — status '대기' 어휘 v1 미사용), settle_date UNIQUE = 이중 마감 가드. 마감 후 동일 일자 유입분은 '마감 후 유입' 정직 표기만(재정산·보정 배치 v2). undo = 생성분 삭제(운영 상태 테이블 — shipments 전례, 수치는 활동 로그 detail 보존) |
@@ -593,7 +593,13 @@ CREATE TABLE suppliers (
 CREATE TABLE supplier_presets (
   preset_id    BIGSERIAL PRIMARY KEY,
   supplier_id  BIGINT NOT NULL REFERENCES suppliers(supplier_id),
-  rules        JSONB NOT NULL,   -- 시트 인식(제외 시트 포함)·헤더 행·칩셋 캐리포워드·스킵 행·가격 열 후보·상태 어휘 정규화(O→가능/X→품절)
+  rules        JSONB NOT NULL,   -- 파서 어댑터(코드 아닌 데이터). [4차 개정·슬라이스 14 성문] 키:
+                                 --   file_pattern(파일명→공급처 인식) · sheets.exclude(제외 시트)
+                                 --   model_col(+model_col_fallback — 헤더 앵커: 상단 12행에서 라벨 탐지,
+                                 --     시트별 헤더 오프셋 편차 흡수) · danawa_code_col · state_col · memo_col
+                                 --   state_map(정확 일치 O→가능/X→품절, 미일치 시 키워드 품절·문의 스캔,
+                                 --     기본 가능. memo '문의' 포함 시 최종 override) · price_cols(+cost_rule
+                                 --     min_price — 유효값>0 최저) · carry_forward(칩셋 병합 그룹 forward-fill)
   version      INTEGER NOT NULL DEFAULT 1,
   updated_at   TIMESTAMP NOT NULL DEFAULT now()
 );

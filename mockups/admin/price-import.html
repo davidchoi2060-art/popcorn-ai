@@ -535,7 +535,30 @@
           toast(`<b>${f.preset}</b> 매입가 <b>${sel.length}건</b> 반영 · 판매가 재계산(수수료 2.2%·마진 0%) 완료 · 가격 이력 기록`,true);
           render();
         };
-        document.getElementById("btnDrop").onclick=()=>toast("데모 — 파일을 올리면 프리셋을 자동 인식해 수신함에 추가됩니다.");
+        // 업로드 (슬라이스 14) — LIVE면 실파일 POST(공급처 자동 인식·파싱·적재 후 diff 재조회), 더미면 기존 연출
+        const fileInput=document.createElement("input");
+        fileInput.type="file";fileInput.accept=".xlsx";fileInput.style.display="none";
+        document.body.appendChild(fileInput);
+        fileInput.onchange=async()=>{
+          const f=fileInput.files[0];fileInput.value="";
+          if(!f)return;
+          const btn=document.getElementById("btnDrop");btn.disabled=true;btn.textContent="업로드 중…";
+          try{
+            const fd=new FormData();fd.append("file",f);
+            const r=await fetch("/api/admin/price-import/upload",{method:"POST",body:fd});
+            const j=await r.json();
+            if(!r.ok){const d=j.detail;toast("업로드 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||"파일을 확인하세요"));return;}
+            const sheets=j.sheets.map(s=>s.name+" "+s.rows+"행").join(" · ");
+            const skip=j.skipped_sheets.length?` · 제외 시트 ${j.skipped_sheets.length}`:"";
+            toast(`<b>${j.supplier}</b> 수신 — ${j.row_count}행 (${sheets})${skip}`);
+            await reload();render();
+          }catch(e){toast("업로드 실패 — 네트워크 오류");}
+          finally{btn.disabled=false;btn.textContent="+ 오늘 단가표 업로드";}
+        };
+        document.getElementById("btnDrop").onclick=()=>{
+          if(LIVE){fileInput.click();return;}
+          toast("데모 — 파일을 올리면 프리셋을 자동 인식해 수신함에 추가됩니다.");
+        };
         // 즉시 더미 렌더(빈 화면 방지) 후 API 시도
         render();
         reload().then(()=>{
