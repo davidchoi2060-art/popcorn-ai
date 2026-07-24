@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from .admin_orders import router as admin_orders_router
 from .admin_refunds import router as admin_refunds_router
+from .admin_payments import router as admin_payments_router
 from .admin_price_import import router as admin_price_import_router
 from .admin_products import router as admin_products_router
 from .admin_reviews import router as admin_reviews_router
@@ -36,6 +37,7 @@ app.include_router(admin_products_router)
 app.include_router(admin_reviews_router)
 app.include_router(admin_orders_router)
 app.include_router(admin_refunds_router)
+app.include_router(admin_payments_router)
 app.include_router(admin_price_import_router)
 app.include_router(candidates_router)
 app.include_router(recommend_router)

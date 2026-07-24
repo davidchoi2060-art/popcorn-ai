@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">결제 · 정산</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">결제 · 정산 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PAY-010</span></h2>
+          <div><h2 class="mb-1">결제 · 정산 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PAY-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">결제는 전 채널이 기록되고, <b class="text-body-secondary">정산은 결제 모드를 따라갑니다</b>(A-10) — 자체 결제분만 여기서 정산합니다.</p></div>
           <a href="ops-settings.html" class="btn btn-phoenix-secondary btn-sm">운영 전환 설정</a>
         </div>
@@ -290,10 +290,19 @@
          {day:"07-14",gross:812000,state:"마감"},
          {day:"07-11",gross:-98000,state:"마감",note:"환불 반영"}
         ];
-        let tab="pay", lastAction=null;
+        let tab="pay", lastAction=null, LIVE=false, FEE_PCT="2.2", TODAY=null;
         function kpis(){
-          const own=PAYS.filter(p=>p.mode==="own"&&p.state==="승인").reduce((s,p)=>s+p.amount,0);
-          const K=[["오늘 결제",won(2087000),"","primary"],["이번 달 자체 결제",won(own),"","primary"],["인계 결제",PAYS.filter(p=>p.mode==="mall").length,"건","info"],["정산 대기",SETTLES.filter(s=>s.state==="대기").length,"건","warning"]];
+          let K;
+          if(LIVE){
+            // 순액 = 승인·환불 화이트리스트(취소·대기는 돈 미이동 — MY-030 규칙 승계). 오늘·당월 판정은 UTC 일자 문자열 비교.
+            const net=a=>a.filter(p=>p.state==="승인"||p.state==="환불").reduce((s,p)=>s+p.amount,0);
+            const tNet=net(PAYS.filter(p=>p.iso&&p.iso.slice(0,10)===TODAY));
+            const mNet=net(PAYS.filter(p=>p.mode==="own"&&p.iso&&p.iso.slice(0,7)===TODAY.slice(0,7)));
+            K=[["오늘 결제",tNet<0?'<span class="text-danger">'+won(tNet)+'</span>':won(tNet),"","primary"],["이번 달 자체 결제",won(mNet),"","primary"],["인계 결제",PAYS.filter(p=>p.mode==="mall").length,"건","info"],["정산 대기",SETTLES.filter(s=>s.state==="대기").length,"건","warning"]];
+          }else{
+            const own=PAYS.filter(p=>p.mode==="own"&&p.state==="승인").reduce((s,p)=>s+p.amount,0);
+            K=[["오늘 결제",won(2087000),"","primary"],["이번 달 자체 결제",won(own),"","primary"],["인계 결제",PAYS.filter(p=>p.mode==="mall").length,"건","info"],["정산 대기",SETTLES.filter(s=>s.state==="대기").length,"건","warning"]];
+          }
           document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function tabs(){
@@ -318,20 +327,33 @@
                 <td class="text-body-tertiary">${p.pg}</td>
                 <td>${p.mode==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>'}</td>
                 <td></td>
-                <td><span class="badge badge-phoenix badge-phoenix-${p.state==="승인"?"primary":"danger"}">${p.state}</span></td>
+                <td><span class="badge badge-phoenix badge-phoenix-${p.state==="승인"?"primary":(p.state==="환불"?"danger":"secondary")}">${p.state}</span></td>
                 <td class="pe-4 text-end fw-bold ${p.amount<0?"text-danger":""}">${won(p.amount)}</td>
               </tr>`).join("")}</tbody></table></div>`;
           }else{
             b.innerHTML='<div class="p-3">'+SETTLES.map((s,i)=>{
-              const fee=Math.round(Math.abs(s.gross)*FEE)*(s.gross<0?-1:1), net=s.gross-fee;
+              // LIVE 행은 서버 계산값(마감 행 = 마감 당시 수수료 보존 — 요율 변경에도 불변). 더미 행만 FEE 상수 공식.
+              const fee=(s.fee!=null)?s.fee:Math.round(Math.abs(s.gross)*FEE)*(s.gross<0?-1:1), net=(s.net!=null)?s.net:s.gross-fee;
               return `<div class="border rounded-3 p-3 mb-2 d-flex flex-wrap align-items-center gap-3">
                 <b class="fs-9" style="flex:0 0 110px;">${s.day}</b>
-                <div class="flex-1 fs-9 text-body-secondary">자체 결제 합계 <b>${won(s.gross)}</b> · 카드수수료(2.2%) <b>${won(fee)}</b> → 순액 <b class="text-body-highlight">${won(net)}</b>${s.note?' · <span class="text-danger fw-bold">'+s.note+'</span>':''}</div>
+                <div class="flex-1 fs-9 text-body-secondary">자체 결제 합계 <b>${won(s.gross)}</b> · 카드수수료(${FEE_PCT}%) <b>${won(fee)}</b> → 순액 <b class="text-body-highlight">${won(net)}</b>${s.note?' · <span class="text-danger fw-bold">'+s.note+'</span>':''}${s.late?' · <span class="text-warning fw-bold">마감 후 유입 '+s.late.n+'건 · '+won(s.late.gross)+' — 미정산</span>':''}</div>
                 ${s.state==="대기"?`<button class="btn btn-primary btn-sm" data-i="${i}">정산 마감</button>`:'<span class="badge badge-phoenix badge-phoenix-secondary">마감</span>'}
               </div>`;
             }).join("")+'<p class="fs-10 text-body-tertiary mb-0 mt-2">쇼핑몰 인계 결제분은 쇼핑몰 정산 대상입니다 — 여기서는 집계만 분리 표시합니다. 수수료율은 가격 설정(마진 정책)의 카드수수료를 따릅니다.</p></div>';
             document.querySelectorAll("#body [data-i]").forEach(btn=>btn.onclick=()=>{
-              const i=+btn.dataset.i;lastAction={i:i,state:SETTLES[i].state};
+              const i=+btn.dataset.i;
+              if(LIVE){
+                const s=SETTLES[i];btn.disabled=true;
+                fetch('/api/admin/settlements/'+s.date+'/close',{method:'POST'})
+                 .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+                 .then(res=>{
+                   if(!res.ok){const d=res.j.detail;toast('마감 실패: '+(typeof d==='string'?d:(d&&(d.detail||d.error))||'잠시 후 다시 시도해 주세요'));btn.disabled=false;return;}
+                   lastAction={undo_id:res.j.undo_id};
+                   reload().then(()=>toast(`<b>${s.day}</b> 정산 마감 · 순액 ${won(res.j.batch.net)} 확정 · 정산 원장 ${res.j.batch.n}건 기록`,true));
+                 }).catch(()=>{btn.disabled=false;toast('마감 실패 — 네트워크 오류');});
+                return;
+              }
+              lastAction={i:i,state:SETTLES[i].state};
               SETTLES[i].state="마감";
               toast(`<b>${SETTLES[i].day}</b> 정산 마감 · 순액 확정 · 정산 원장 기록`,true);render();
             });
@@ -340,6 +362,17 @@
         }
         function undo(){
           if(!lastAction)return;
+          if(LIVE){
+            if(!lastAction.undo_id)return;
+            const id=lastAction.undo_id;lastAction=null;
+            fetch('/api/admin/settlements/undo/'+id,{method:'POST'})
+             .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+             .then(res=>{
+               if(!res.ok){const d=res.j.detail;toast('되돌리기 실패: '+(typeof d==='string'?d:(d&&(d.detail||d.error))||''));return;}
+               reload().then(()=>toast("되돌렸습니다 — 정산이 대기 상태로 복원됐습니다."));
+             }).catch(()=>toast('되돌리기 실패 — 네트워크 오류'));
+            return;
+          }
           SETTLES[lastAction.i].state=lastAction.state;lastAction=null;render();
           toast("되돌렸습니다 — 정산이 대기 상태로 복원됐습니다.");
         }
@@ -353,6 +386,30 @@
         }
 
         render();
+
+        // ---- LIVE (슬라이스 13) — API 성공 시 결제 원장·정산 파생 행으로 교체, 실패 시 더미 원형 ----
+        // 대기 행은 서버 파생이라 액션 후에는 로컬 패치 대신 reload()(GET 재조회)로 정합 유지.
+        function fmtT(iso){
+          const d=new Date(iso),now=new Date();
+          const hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+          if(d.toDateString()===now.toDateString())return '오늘 '+hm;
+          return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
+        }
+        function dayLabel(date){const md=date.slice(5);return date===TODAY?('오늘 ('+md+')'):md;}
+        function fromApi(d){
+          TODAY=d.today;FEE_PCT=(d.fee_rate*100).toFixed(1);
+          PAYS=d.payments.map(p=>({at:p.at?fmtT(p.at):'—',iso:p.at,order:p.order_no,method:p.method,pg:p.mode==='own'?(p.pg_ref||'—'):'—(인계)',mode:p.mode,amount:p.amount,state:p.status}));
+          SETTLES=d.settles.map(s=>({day:dayLabel(s.date),date:s.date,gross:s.gross,fee:s.fee,net:s.net,state:s.state,note:s.refund_n>0?'환불 반영':null,late:s.late}));
+        }
+        function reload(){
+          return fetch('/api/admin/payments').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+           .then(d=>{
+             LIVE=true;fromApi(d);
+             const el=document.getElementById('dataSrc');el.textContent='실데이터 · Cloud SQL';el.classList.remove('badge-phoenix-secondary');el.classList.add('badge-phoenix-primary');
+             render();
+           });
+        }
+        reload().catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

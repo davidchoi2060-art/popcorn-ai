@@ -381,6 +381,7 @@ WHERE p.status = '판매중'
 | T6 | [Ver 4.0] 단가표 일일 수신 | 프리셋 파싱 → rows 스냅샷 → 어제 대비 diff → 일괄 반영 시 매입가 갱신+history(reason='price_import') + 재계산 판매가 제안 + 발주 상태 갱신 |
 | T7 | [Ver 4.0] 자체 주문 생성 | orders+order_items(가격·사양 스냅샷) → stock_reservations(hold) → 결제 승인 시 stock_movements 차감·hold 해제 |
 | T8 | [Ver 4.0] 환불·클레임 처리 (2026-07-24 성문화) | 접수→검토→수거·처리→**완료**(payments 환불 행 추가 — 원 결제 레일 승계·음수 표기 / order_items 실물 라인 stock_movements 'return'+재고 복귀 / 주문 결제완료·조립중·배송중→'취소'+이벤트, 완료(반품·교환)만 유지) / 접수·검토→**반려**. 완료는 비가역(원장 확산 — undo 불가), 나머지 전이는 활동 로그 undo. 완료·반려 시 활성 잠금 해제(주문 전이 재개) |
+| T9 | [Ver 4.0] 일 정산 마감 (2026-07-24 성문화) | own ∧ (승인·환불) 결제를 date(paid_at) 일자로 묶어 settlement_batches('마감'·closed_by·closed_at) 생성 + 결제별 settlements(fee_amount = \|amount\|×card_fee_rate 원 단위 half-up·부호 보존, settle_mode = 결제 pay_mode 승계 — A-10 자동 보정). batch 합계 = Σ개별 행(정합 불변식). '대기'는 저장 없는 파생 상태(batch 부재 일자 — status '대기' 어휘 v1 미사용), settle_date UNIQUE = 이중 마감 가드. 마감 후 동일 일자 유입분은 '마감 후 유입' 정직 표기만(재정산·보정 배치 v2). undo = 생성분 삭제(운영 상태 테이블 — shipments 전례, 수치는 활동 로그 detail 보존) |
 
 정규화·스펙 추출(1단계)은 **CSV 업서트 트랜잭션 내 동기 실행**한다(룰 기반·LLM 미호출·26,480행 규모 근거). LLM 보강(2~3단계)은 업서트 완료 후 비동기 잡으로 수행한다.
 
