@@ -29,6 +29,14 @@ from .db import engine
 router = APIRouter(prefix="/api/admin")
 
 OPERATOR_ID = 1
+RF_BASE = 1023  # refund 표시 라벨 파생 기준(RF-1024 재현) — refund_no 컬럼 성문화는 ADM-CLM-010 재결정
+
+
+def refund_label(refund_id: int) -> str:
+    """표시 전용 환불 번호 — admin·my 화면 공용 단일 원천."""
+    return f"RF-{RF_BASE + refund_id}"
+
+
 LABELS = {**PART_TYPE_LABELS, "COOLER": "CPU쿨러"}
 STEP = {"접수": 1, "결제완료": 1, "조립중": 2, "출고": 3, "배송중": 3, "완료": 4, "취소": 0}
 ACTIVE_REFUND = ("접수", "검토", "수거·처리")
@@ -66,7 +74,7 @@ def list_orders():
     with engine.connect() as conn:
         orders = conn.execute(text(
             "SELECT o.order_id, o.order_no, o.channel, o.status, o.total_amount,"
-            " o.ops_snapshot, o.created_at, COALESCE(m.nickname, '비회원') AS cust"
+            " o.ops_snapshot, o.shipping_snap, o.created_at, COALESCE(m.nickname, '비회원') AS cust"
             " FROM orders o LEFT JOIN members m USING (member_id)"
             " ORDER BY o.created_at DESC, o.order_id DESC")).mappings().all()
         items_by = {}
@@ -115,8 +123,9 @@ def list_orders():
             "cust": o["cust"], "ch": o["channel"], "status": o["status"],
             "step": STEP.get(o["status"], 1), "total": o["total_amount"],
             "ops": _ops_text(ops), "pay": pay, "ship": ship, "hold": hold,
+            "recipient": (o["shipping_snap"] or {}).get("name"),  # 배송 화면용(시드 4건은 스냅샷 부재 → null)
             "items": items_by.get(oid, []),
-            "refund": f"RF-{1023 + rf['refund_id']} 환불 {rf['status']} ({rf['reason_type']})" if rf else None,
+            "refund": f"{refund_label(rf['refund_id'])} 환불 {rf['status']} ({rf['reason_type']})" if rf else None,
         })
     return {"items": out}
 
