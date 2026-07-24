@@ -14,6 +14,7 @@ from .admin_price_import import router as admin_price_import_router
 from .admin_products import router as admin_products_router
 from .admin_reviews import router as admin_reviews_router
 from .candidates import router as candidates_router
+from .my_orders import router as my_orders_router
 from .orders import router as orders_router
 from .recommend import router as recommend_router
 from .swap import router as swap_router
@@ -37,6 +38,7 @@ app.include_router(candidates_router)
 app.include_router(recommend_router)
 app.include_router(orders_router)
 app.include_router(swap_router)
+app.include_router(my_orders_router)
 
 # 정적 마운트는 반드시 마지막 — 먼저 걸면 /api/*가 캐치올에 잡힌다.
 # mockups 전체를 마운트해야 admin/의 ../shared/su-icons.js 참조가 유지된다.

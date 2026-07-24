@@ -76,7 +76,8 @@ var ORDERS=[
   total:1284000,pay:{method:'쇼핑몰 결제 (인계)',state:'승인',at:'06-28 16:40'},ship:{carrier:'CJ대한통운',no:'6480-8821-3341'},refund:null}
 ];
 var STEPS=['결제 완료','조립·검사','출고·배송','배송 완료'];
-var cur='all', sel=null;
+var cur='all', sel=null, LIVE=false;
+function kindOf(st){return (st==='조립중'||st==='결제완료')?'주문 취소':(st==='완료'?'반품·교환':'환불');}
 var won=function(n){return n.toLocaleString()+'원';};
 function chBadge(ch){return ch==='own'?'<span style="background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">자체</span>':'<span style="background:#f2edfb;color:#4a2a94;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">쇼핑몰 인계</span>';}
 function stBadge(o){
@@ -88,7 +89,7 @@ function show(v){['v-list','v-detail','v-refund'].forEach(function(id){document.
 // ---- 목록 ----
 function matches(o){
  if(cur==='all')return true;
- if(cur==='progress')return o.status==='조립중'&&!o.refund;
+ if(cur==='progress')return (o.status==='조립중'||o.status==='결제완료')&&!o.refund;
  if(cur==='shipping')return o.status==='배송중'&&!o.refund;
  if(cur==='done')return o.status==='완료'&&!o.refund;
  if(cur==='refund')return !!o.refund;
@@ -120,10 +121,11 @@ function renderDetail(){
  var rows=o.items.map(function(it){
   return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #f0eee9;"><span style="flex:0 0 96px;font-size:11.5px;font-weight:800;color:#8a8578;">'+it[0]+'</span><div style="flex:1;font-size:13.5px;font-weight:700;color:#17171b;">'+it[1]+'</div><b style="font-size:13.5px;color:#17171b;">'+won(it[2])+'</b></div>';
  }).join('');
- var refundBlock=o.refund?'<div class="card" style="background:#fbecec;border-color:#f0cfd1;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="msym" style="font-size:19px;color:#b31b25;">assignment_return</span><b style="font-size:14px;color:#8a1f22;">'+o.refund.kind+' 접수 '+o.refund.no+'</b><span style="font-size:12px;color:#a15055;font-weight:700;">· '+o.refund.reason+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+['접수','검토','수거·처리','완료'].map(function(s,i){return '<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;'+(i===0?'background:#b31b25;color:#fff;':'background:#fff;color:#a15055;')+'">'+s+'</span>';}).join('')+'</div><p style="margin:8px 0 0;font-size:12px;color:#a15055;font-weight:600;">'+o.refund.modeNote+'</p></div>':'';
+ var rIdx=o.refund?Math.max(0,['접수','검토','수거·처리','완료'].indexOf(o.refund.status||'접수')):0;
+ var refundBlock=o.refund?'<div class="card" style="background:#fbecec;border-color:#f0cfd1;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="msym" style="font-size:19px;color:#b31b25;">assignment_return</span><b style="font-size:14px;color:#8a1f22;">'+o.refund.kind+' 접수 '+o.refund.no+'</b><span style="font-size:12px;color:#a15055;font-weight:700;">· '+o.refund.reason+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+['접수','검토','수거·처리','완료'].map(function(s,i){return '<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;'+(i===rIdx?'background:#b31b25;color:#fff;':'background:#fff;color:#a15055;')+'">'+s+'</span>';}).join('')+'</div><p style="margin:8px 0 0;font-size:12px;color:#a15055;font-weight:600;">'+o.refund.modeNote+'</p></div>':'';
  var actions='';
  if(!o.refund){
-  var kind=o.status==='조립중'?'주문 취소':(o.status==='완료'?'반품·교환':'환불');
+  var kind=kindOf(o.status);
   actions='<button class="btn2" id="d-refund" style="color:#8a1f22;border-color:#e8c9cb;">'+kind+' 접수</button>';
  }
  document.getElementById('v-detail').innerHTML=
@@ -146,8 +148,8 @@ function renderDetail(){
 function opsRefund(){var ops={};try{ops=JSON.parse(localStorage.getItem('popcorn-ops')||'{}');}catch(e){}return ops.refund==='own'?'own':'mall';}
 function renderRefund(){
  var o=order();if(!o)return;
- var kind=o.status==='조립중'?'주문 취소':(o.status==='완료'?'반품·교환':'환불');
- var mode=opsRefund();
+ var kind=kindOf(o.status);
+ var mode=LIVE?(o.refund_mode||'mall'):opsRefund();
  var modeNote=mode==='own'
   ?'자체 환불 처리 모드 — 접수 즉시 검토가 시작되고, 승인 시 결제 수단으로 환불됩니다.'
   :'현재 환불 처리는 <b>쇼핑몰 인계 모드</b>입니다 — 접수는 여기서 받고, 처리는 기존 쇼핑몰 절차로 진행됩니다. 진행 상태는 이 주문에 계속 표시됩니다.';
@@ -165,7 +167,21 @@ function renderRefund(){
  document.getElementById('r-cancel').onclick=function(){show('v-detail');};
  document.getElementById('r-submit').onclick=function(){
   if(!reason)return;
-  o.refund={kind:kind,no:'RF-1024',reason:reason,modeNote:mode==='own'?'자체 처리 — 검토 후 결제 수단으로 환불됩니다.':'쇼핑몰 인계 모드 — 처리는 쇼핑몰 절차, 상태는 여기에 표시됩니다. (주문 원장은 본 시스템)'};
+  var noteOf=function(m){return m==='own'?'자체 처리 — 검토 후 결제 수단으로 환불됩니다.':'쇼핑몰 인계 모드 — 처리는 쇼핑몰 절차, 상태는 여기에 표시됩니다. (주문 원장은 본 시스템)';};
+  if(LIVE){
+   var sb=document.getElementById('r-submit');sb.disabled=true;sb.textContent='접수 중…';
+   var member=null;try{member=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
+   fetch('/api/my/refunds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_no:o.no,email:member?member.email:'',reason_type:reason})})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+     if(!res.ok){var d=res.j.detail||{};alert('접수 실패: '+(d.detail||d.error||'잠시 후 다시 시도해 주세요'));sb.disabled=false;sb.textContent='접수하기';return;}
+     o.refund={kind:kind,no:res.j.refund_no,reason:reason,status:res.j.status,modeNote:noteOf(res.j.mode)};
+     renderDetail();show('v-detail');
+    })
+    .catch(function(){alert('접수에 실패했어요 — 잠시 후 다시 시도해 주세요.');sb.disabled=false;sb.textContent='접수하기';});
+   return;
+  }
+  o.refund={kind:kind,no:'RF-1024',reason:reason,modeNote:noteOf(mode)};
   renderDetail();show('v-detail');
  };
 }
@@ -173,6 +189,35 @@ function renderRefund(){
 renderList();
 var qid=new URLSearchParams(location.search).get('id');
 if(qid&&ORDERS.some(function(o){return o.no===qid;})){sel=qid;renderDetail();show('v-detail');}
+// ---- LIVE (슬라이스 10) — popcorn-member 있고 API 성공 시 회원 주문으로 교체(회원 경계), 아니면 더미 원형 ----
+// 주변기기 concat은 더미 리터럴 전용 — LIVE는 order_items에 이미 포함되어 자연 우회.
+function fmtT(iso){
+ var d=new Date(iso),now=new Date();
+ var hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+ if(d.toDateString()===now.toDateString())return '오늘 '+hm;
+ return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
+}
+var noteOfMode=function(m){return m==='own'?'자체 처리 — 검토 후 결제 수단으로 환불됩니다.':'쇼핑몰 인계 모드 — 처리는 쇼핑몰 절차, 상태는 여기에 표시됩니다. (주문 원장은 본 시스템)';};
+var fromApi=function(o){return {no:o.no,date:fmtT(o.created_at),channel:o.channel,status:o.status,step:o.step,
+ items:o.items,total:o.total,
+ pay:o.pay?{method:o.pay.method,state:o.pay.state,at:o.pay.at?fmtT(o.pay.at):''}:{method:'결제 대기',state:'—',at:''},
+ ship:o.ship,refund_mode:o.refund_mode,
+ refund:o.refund?{kind:kindOf(o.status),no:o.refund.no,reason:o.refund.reason,status:o.refund.status,modeNote:noteOfMode(o.refund.mode)}:null};};
+var mem=null;try{mem=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
+if(mem&&mem.email){
+ fetch('/api/my/orders?email='+encodeURIComponent(mem.email))
+  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  .then(function(d){
+   LIVE=true;
+   ORDERS=d.items.map(fromApi);
+   renderList();
+   if(qid){
+    if(ORDERS.some(function(o){return o.no===qid;})){sel=qid;renderDetail();show('v-detail');}
+    else{sel=null;show('v-list');}
+   }
+  })
+  .catch(function(){});
+}
 })();
 </script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
