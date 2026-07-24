@@ -5,7 +5,8 @@
              stock, supplier_count, sale_price, status_key}],
     kpis: {total, ok, review, oos, price} }   # 상호배타 버킷 합 (목업의 독립 카운트와 다름)
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from .db import engine
@@ -107,3 +108,74 @@ def list_products():  # def(비동기 아님) — psycopg2 동기 드라이버, 
         kpis["total"] += 1
         kpis[status_key] += 1
     return {"items": items, "kpis": kpis}
+
+
+# ---- 슬라이스 16: 신규 상품 등록 (단가표發 편입 ②) ----
+# 풀 안전 2중 방어: ai_candidate=false(추천 풀 제외) + review_required=true(주변기기 뷰까지 제외)
+# — 등록이 S1 카운터·S2 추천 기검증 수치를 절대 바꾸지 않는다. sale_price는 NULL 유지
+# (판매가 산정은 검수·가격정책 통과 후 — ERD §6). 등록 undo 없음(목업 스펙 부재).
+# SKU 발번 = MAX+1(dev 단독 수용 — 동시 발번은 주문 advisory lock 전례로 이관).
+class RegisterBody(BaseModel):
+    name: str
+    part_label: str            # 화면 분류 라벨(그래픽카드 등) — PART_TYPE_LABELS 역매핑
+    supplier_id: int
+    model_name: str            # 단가표 행 원문 — map model_key(상품명 입력과 별도)
+    cost_price: int
+    danawa_code: str | None = None
+
+
+@router.post("/products")
+def register_product(body: RegisterBody):
+    from .admin_orders import _log  # kind 파라미터형 공용 로거
+    rev = {}
+    for k, v in PART_TYPE_LABELS.items():
+        rev.setdefault(v, k)       # CPU쿨러 중복 라벨은 선순위(COOLER_CPU_AIR) 채택
+    pt = rev.get(body.part_label.strip())
+    if pt is None:
+        raise HTTPException(400, f"알 수 없는 분류: {body.part_label}")
+    if not body.name.strip():
+        raise HTTPException(400, "상품명이 비어 있습니다")
+    with engine.begin() as conn:
+        if conn.execute(text("SELECT 1 FROM suppliers WHERE supplier_id=:s"),
+                        {"s": body.supplier_id}).first() is None:
+            raise HTTPException(404, "공급처가 없습니다")
+        if body.danawa_code:
+            dup = conn.execute(text(
+                "SELECT sku FROM products WHERE danawa_code=:d"), {"d": body.danawa_code}).scalar()
+            if dup:
+                raise HTTPException(400, f"다나와 코드 중복 — 기존 상품 {dup}에 연결하세요")
+        num = conn.execute(text(
+            r"SELECT COALESCE(MAX(CAST(SUBSTRING(sku FROM 3) AS INTEGER)), 0) + 1"
+            r" FROM products WHERE sku ~ '^P-[0-9]+$'")).scalar()
+        sku, pc = f"P-{num}", int(f"2048{num}")
+        conn.execute(text(
+            "INSERT INTO products (product_code, sku, product_name, part_type, category_group,"
+            " status, ai_candidate_yn, review_required_yn, purchase_price, stock_qty, danawa_code)"
+            " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d)"),
+            {"pc": pc, "sku": sku, "n": body.name.strip(), "pt": pt,
+             "cost": body.cost_price, "d": body.danawa_code})
+        conn.execute(text(
+            "INSERT INTO product_specs (product_code, part_type) VALUES (:pc, :pt)"),
+            {"pc": pc, "pt": pt})  # 검수 대상 필드는 확정 전 NULL 유지(ERD §3.5)
+        map_id = conn.execute(text(
+            "INSERT INTO supplier_product_map (supplier_id, model_key, product_code, match_method, confirmed_by, confirmed_at)"
+            " VALUES (:s, :k, :pc, 'manual', :op, now())"
+            " ON CONFLICT (supplier_id, model_key) DO NOTHING RETURNING map_id"),
+            {"s": body.supplier_id, "k": body.model_name, "pc": pc, "op": 1}).scalar()
+        if map_id is None:
+            raise HTTPException(409, "이미 연결된 단가표 모델입니다")
+        srow = conn.execute(text(
+            "SELECT r.supply_state, f.file_id FROM supplier_price_rows r"
+            " JOIN supplier_price_files f USING (file_id)"
+            " WHERE f.supplier_id=:s AND r.model_name=:k"
+            " ORDER BY f.received_at DESC LIMIT 1"),
+            {"s": body.supplier_id, "k": body.model_name}).first()
+        conn.execute(text(
+            "INSERT INTO product_supplier_prices (product_code, supplier_id, cost_price, supply_state, src_file_id)"
+            " VALUES (:pc, :s, :c, :st, :f)"),  # 신규 상품 — 재판정(_reprice) 불요, 기존 가격 무영향
+            {"pc": pc, "s": body.supplier_id, "c": body.cost_price,
+             "st": srow[0] if srow else "가능", "f": srow[1] if srow else None})
+        _log(conn, "product_register", sku,
+             {"product_code": pc, "sku": sku, "part_type": pt, "supplier_id": body.supplier_id,
+              "model_key": body.model_name, "cost_price": body.cost_price}, kind="product")
+        return {"ok": True, "sku": sku, "product_code": pc}

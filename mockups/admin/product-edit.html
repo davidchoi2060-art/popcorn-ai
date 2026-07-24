@@ -351,10 +351,29 @@
           const al=document.querySelector(".alert.alert-subtle-secondary");
           if(al) al.innerHTML='<span data-feather="shield" style="width:14px;height:14px;flex:none;" class="me-2"></span>단가표發 신규 등록 — 저장해도 <b class="mx-1">추천·함께 구성 풀에는 들어가지 않습니다</b>(후보 제외·검수 필요 상태로 시작). 필수 사양 검수를 전부 통과해야 후보로 승격됩니다.';
         }
-        document.getElementById("save").onclick=()=>{
+        function showToast(m){
           let t=document.getElementById("__t");
           if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;";document.body.appendChild(t);}
-          t.textContent=fromPrice?"등록 시늉 — 신규 등록 API는 다음 슬라이스에서 연결됩니다 (등록 직후 풀 제외)":"저장 완료 — 수정 필드는 운영자 확정으로 잠금 처리";t.style.opacity="1";setTimeout(()=>t.style.opacity="0",2200);
+          t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",3200);
+        }
+        document.getElementById("save").onclick=()=>{
+          // 슬라이스 16: 단가표發 신규 등록 실배선 — sup_id가 있으면(검수 큐 LIVE 경유) POST, 아니면 시늉
+          if(fromPrice&&_q.get("sup_id")){
+            const btn=document.getElementById("save");btn.disabled=true;
+            fetch("/api/admin/products",{method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({name:fieldByLabel("상품명").value, part_label:fieldByLabel("분류").value,
+                supplier_id:+_q.get("sup_id"), model_name:_q.get("model")||_q.get("name")||"",
+                cost_price:+(_q.get("cost")||0), danawa_code:_q.get("danawa")||null})})
+              .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail;showToast("등록 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||"입력을 확인하세요"));btn.disabled=false;return;}
+                showToast(res.j.sku+" 등록 완료 — 검수 대기 · 추천 풀 제외(검수 통과 후 승격)");
+                document.getElementById("psku").textContent=res.j.sku;
+              })
+              .catch(()=>{showToast("정적 모드 — 등록 API는 개발 서버(8000)에서 동작합니다");btn.disabled=false;});
+            return;
+          }
+          showToast(fromPrice?"등록 시늉 — 검수 큐(실데이터)에서 진입하면 실제 등록됩니다 (등록 직후 풀 제외)":"저장 완료 — 수정 필드는 운영자 확정으로 잠금 처리");
         };
         render();if(window.feather)feather.replace();
         if(fromPrice&&!SPECS.length)document.getElementById("specs").innerHTML='<p class="fs-9 text-body-tertiary py-3 mb-0">분류 확정 후 필수 사양 템플릿이 로드됩니다 — <b>전부 확인돼야 추천 가능 재고에 진입</b>합니다.</p>';

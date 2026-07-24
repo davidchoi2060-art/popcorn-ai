@@ -80,7 +80,115 @@ def list_reviews():
         "risk": _risk(r["review_type"], r["field_name"]),
         "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
     } for r in rows]
+    items.extend(_sourcing_items())
     return {"items": items}
+
+
+# ---- 슬라이스 16: 단가표 신규(sourcing_hold) — 저장 없는 파생 큐 ----
+# 공급처별 최신 파일의 미매칭 행(map 무 ∧ danawa 불일치)을 편입 대기 항목으로 파생.
+# 연결·등록이 supplier_product_map을 쓰면 파생 조건에서 자연 소멸(상태 테이블 불필요·멱등).
+# 시트·칩셋은 스냅샷에 미저장(스키마 무개정) — 화면 '—' 정직 표시, 컬럼화·페이지네이션 이관.
+SIM_THRESHOLD = 0.3  # admin_price_import._file_diff와 동일 규칙
+
+
+def _sourcing_items():
+    q = text("""
+        SELECT r.row_id, r.model_name, r.danawa_code, r.cost_price, r.supply_state, r.memo,
+               f.supplier_id, f.file_name, f.received_at, s.name AS sup_name,
+               c.sku AS cand_sku, c.product_name AS cand_name, c.sim AS cand_sim
+        FROM (SELECT DISTINCT ON (supplier_id) file_id, supplier_id, file_name, received_at
+              FROM supplier_price_files ORDER BY supplier_id, received_at DESC) f
+        JOIN suppliers s USING (supplier_id)
+        JOIN supplier_price_rows r USING (file_id)
+        LEFT JOIN supplier_product_map m
+               ON m.supplier_id = f.supplier_id AND m.model_key = r.model_name
+        LEFT JOIN LATERAL (
+          SELECT p.sku, p.product_name, similarity(r.model_name, p.product_name) AS sim
+          FROM products p WHERE similarity(r.model_name, p.product_name) > :th
+          ORDER BY sim DESC LIMIT 1
+        ) c ON true
+        WHERE m.map_id IS NULL
+          AND (r.danawa_code IS NULL
+               OR NOT EXISTS (SELECT 1 FROM products p2 WHERE p2.danawa_code = r.danawa_code))
+        ORDER BY f.supplier_id, r.row_id
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(q, {"th": SIM_THRESHOLD}).mappings().all()
+    return [{
+        "review_id": None, "sku": None, "type": "sourcing_hold",
+        "src_row_id": r["row_id"], "supplier_id": r["supplier_id"],
+        "name": r["model_name"], "cat": "미분류", "part_type": None,
+        "field": None, "origin_value": None, "suggested_value": None, "confidence": None,
+        "created_at": r["received_at"].isoformat(), "risk": "경미", "crit": [],
+        "detail": ("단가표 신규 행 — 카탈로그에 같은 모델이 없습니다. 이름 유사 후보가 있어 연결 검토가 우선입니다."
+                   if r["cand_sku"] else
+                   "단가표 신규 행 — 유사 후보 없음. 취급하려면 신규 상품으로 등록하고 검수를 거칩니다."),
+        "src": {"sup": r["sup_name"], "file": r["file_name"], "cost": r["cost_price"],
+                "state": r["supply_state"], "memo": r["memo"],
+                "danawa_code": r["danawa_code"]},
+        "cand": ({"sku": r["cand_sku"], "name": r["cand_name"], "sim": float(r["cand_sim"])}
+                 if r["cand_sku"] else None),
+    } for r in rows]
+
+
+class LinkBody(BaseModel):
+    row_id: int
+    sku: str
+    via: str = "manual"  # candidate(유사 후보 채택 → similarity) | manual(SKU 직접 입력)
+
+
+@router.post("/reviews/sourcing/link")
+def sourcing_link(body: LinkBody):
+    """편입 ①: 기존 상품에 연결 — map 등록만(psp·가격 무변경 — '다음 단가표부터 자동 매칭')."""
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT r.row_id, r.model_name, f.supplier_id FROM supplier_price_rows r"
+            " JOIN supplier_price_files f USING (file_id) WHERE r.row_id=:i"),
+            {"i": body.row_id}).mappings().first()
+        if row is None:
+            raise HTTPException(404, "단가표 행이 없습니다")
+        prod = conn.execute(text(
+            "SELECT product_code, sku FROM products WHERE sku=:s"), {"s": body.sku.strip()}).mappings().first()
+        if prod is None:
+            raise HTTPException(404, f"상품이 없습니다: {body.sku}")
+        method = "similarity" if body.via == "candidate" else "manual"
+        map_id = conn.execute(text(
+            "INSERT INTO supplier_product_map (supplier_id, model_key, product_code, match_method, confirmed_by, confirmed_at)"
+            " VALUES (:s, :k, :pc, :m, :op, now())"
+            " ON CONFLICT (supplier_id, model_key) DO NOTHING RETURNING map_id"),
+            {"s": row["supplier_id"], "k": row["model_name"], "pc": prod["product_code"],
+             "m": method, "op": OPERATOR_ID}).scalar()
+        if map_id is None:
+            raise HTTPException(409, "이미 연결된 모델입니다")
+        log_id = _log(conn, "sourcing_link", row["model_name"][:100],
+                      {"map_id": map_id, "row_id": row["row_id"], "supplier_id": row["supplier_id"],
+                       "model_key": row["model_name"], "product_code": prod["product_code"],
+                       "sku": prod["sku"], "method": method})
+        return {"ok": True, "undo_id": log_id, "sku": prod["sku"]}
+
+
+@router.post("/reviews/sourcing/unlink/{log_id}")
+def sourcing_unlink(log_id: int):
+    with engine.begin() as conn:
+        log = conn.execute(text(
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            {"i": log_id}).mappings().first()
+        if log is None or log["action"] != "sourcing_link":
+            raise HTTPException(404, "되돌릴 연결 기록이 없습니다")
+        if conn.execute(text(
+                "SELECT 1 FROM admin_operator_activity_logs"
+                " WHERE action='sourcing_unlink' AND (detail->>'ref_log_id')::int=:i LIMIT 1"),
+                {"i": log_id}).first():
+            raise HTTPException(409, "이미 되돌린 연결입니다")
+        d = log["detail"]
+        m = conn.execute(text(
+            "SELECT product_code, match_method FROM supplier_product_map WHERE map_id=:m FOR UPDATE"),
+            {"m": d["map_id"]}).first()
+        if m is None or m[0] != d["product_code"] or m[1] != d["method"]:
+            raise HTTPException(409, "연결 이후 매핑이 변경되어 되돌릴 수 없습니다")
+        conn.execute(text("DELETE FROM supplier_product_map WHERE map_id=:m"), {"m": d["map_id"]})
+        _log(conn, "sourcing_unlink", str(log_id), {"ref_log_id": log_id, "model_key": d["model_key"]})
+        return {"ok": True}
 
 
 class ProcessBody(BaseModel):

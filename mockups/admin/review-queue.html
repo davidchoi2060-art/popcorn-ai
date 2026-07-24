@@ -331,7 +331,14 @@
         // 실데이터 모드 — fetch 성공 시 QUEUE를 API 계약으로 교체, 실패(file://·정적 호스팅)면 더미 유지
         let LIVE = false;
         function relTime(iso){const s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return"방금 전";const m=Math.floor(s/60);if(m<60)return m+"분 전";const h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전";}
-        const fromApi=it=>({id:it.sku,review_id:it.review_id,name:it.name,cat:it.cat,type:it.type,field:it.field,
+        const fromApi=it=> it.type==="sourcing_hold"
+          ? ({id:"SRC-"+it.src_row_id, review_id:null, row_id:it.src_row_id, supplier_id:it.supplier_id,
+              name:it.name, cat:it.cat, type:it.type, field:"supplier",
+              origin:it.src.sup, know:"—", conf:null, wait:relTime(it.created_at), risk:it.risk,
+              src:{sup:it.src.sup, file:it.src.file, sheet:"—", cost:it.src.cost, state:it.src.state,
+                   memo:it.src.memo, danawa:it.src.danawa_code, cand:it.cand},
+              crit:[], note:it.detail})
+          : ({id:it.sku,review_id:it.review_id,name:it.name,cat:it.cat,type:it.type,field:it.field,
           origin:it.origin_value==null?"없음":it.origin_value, know:it.suggested_value==null?"—":it.suggested_value,
           origin_raw:it.origin_value, know_raw:it.suggested_value,
           conf:it.confidence, wait:relTime(it.created_at), risk:it.risk,
@@ -461,7 +468,8 @@
         function undo(){
           if(!lastAction) return;
           if(LIVE && lastAction.undo_id){
-            api(`/reviews/undo/${lastAction.undo_id}`).then(restoreLocal).catch(e=>toast("⚠ "+e.message));
+            const path = lastAction.kind==="sourcing" ? `/reviews/sourcing/unlink/${lastAction.undo_id}` : `/reviews/undo/${lastAction.undo_id}`;
+            api(path).then(restoreLocal).catch(e=>toast("⚠ "+e.message));
             return;
           }
           restoreLocal();
@@ -474,7 +482,8 @@
           lastAction = {entries:[{item:q, idx:idx}], count:1, undo_id:res?res.undo_id:null};
           const nl = list(); sel = nl.length? (nl[Math.min(pos, nl.length-1)].id) : null;
           const neg = (act==="반려"||act==="원본 제외"||act==="계속 보류"||act==="보류");
-          if(act==="기존 상품에 연결") toast(`<b>${id}</b> — <b>${q._linkSku}</b>에 연결(시늉) · 다음 단가표부터 자동 매칭 · 풀 변동 없음`, true);
+          if(act==="기존 상품에 연결") toast(`<b>${id}</b> — <b>${q._linkSku}</b>에 연결${LIVE?"":"(시늉)"} · 다음 단가표부터 자동 매칭 · 풀 변동 없음`, true);
+          else if(act==="보류") toast(`<b>${id}</b> — 보류 · 이 화면에서만 숨김${LIVE?" (보류 저장은 준비 중)":""}`, true);
           else if(neg) toast(`<b>${id}</b> — ${act} 처리 · 추천 가능 재고 미진입`, true);
           else if(res) toast(`<b>${id}</b> ${act} · ${res.pool_added?"<b>추천 가능 재고 +1</b>":"처리 완료"}`, true);
           else toast(`<b>${id}</b> ${act} · <b>추천 가능 재고 +1</b> · 영향 견적 ${IMPACT[q.cat]||5}건`, true);
@@ -482,16 +491,25 @@
         }
         function process(id, act){
           const q = QUEUE.find(x=>x.id===id); if(!q) return;
-          // 슬라이스 15: 단가표 신규(편입) 액션 — 목업 시늉. map 등록·상품 생성 API는 다음 슬라이스에서 연결.
+          // 슬라이스 15 설계 → 슬라이스 16 관통: 단가표 신규(편입) 액션.
+          // LIVE = link POST(map 등록만 — 다음 단가표부터 자동 매칭) / 등록 = product-edit로 파라미터 관통 / 보류 = 저장 이관(화면 숨김만).
           if(q.type==="sourcing_hold"){
             if(act==="신규 상품으로 등록"){
-              location.href = `product-edit.html?new=1&from=price&name=${encodeURIComponent(q.name)}&cost=${q.src.cost}&sup=${encodeURIComponent(q.src.sup)}&cat=${encodeURIComponent(q.cat)}`;
+              const p = new URLSearchParams({new:"1", from:"price", name:q.name, cost:q.src.cost, sup:q.src.sup, cat:q.cat});
+              if(LIVE){ p.set("sup_id", q.supplier_id); p.set("model", q.name); if(q.src.danawa) p.set("danawa", q.src.danawa); }
+              location.href = "product-edit.html?" + p.toString();
               return;
             }
             if(act==="기존 상품에 연결"){
-              let sku = q.src.cand? q.src.cand.sku : null;
-              if(!sku){ sku = prompt(`${q.name}\n연결할 상품 SKU를 입력하세요 (예: P-2001):`); if(sku===null||!sku.trim()) return; sku = sku.trim(); }
+              let via = "candidate", sku = q.src.cand? q.src.cand.sku : null;
+              if(!sku){ sku = prompt(`${q.name}\n연결할 상품 SKU를 입력하세요 (예: P-2001):`); if(sku===null||!sku.trim()) return; sku = sku.trim(); via = "manual"; }
               q._linkSku = sku;
+              if(LIVE){
+                api("/reviews/sourcing/link", {row_id:q.row_id, sku:sku, via:via})
+                  .then(res=>{ applyLocal(id, act, res); if(lastAction) lastAction.kind = "sourcing"; })
+                  .catch(e=>toast("⚠ "+e.message));
+                return;
+              }
             }
             applyLocal(id, act, null);
             return;
