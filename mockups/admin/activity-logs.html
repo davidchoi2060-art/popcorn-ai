@@ -308,11 +308,11 @@
           if(d.toDateString()===now.toDateString())return '오늘 '+hm;
           return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
         }
-        const KIND_COL={order:"info",refund:"danger",settlement:"warning",price_file:"primary",product_review:"primary",product:"secondary"};
+        const KIND_COL={order:"info",refund:"danger",settlement:"warning",price_file:"primary",product_review:"primary",product:"secondary",member_review:"info",member:"secondary"};
         fetch("/api/admin/activity-logs")
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
           .then(d=>{
-            TYPES={all:["전체","dark"],order:["주문","info"],refund:["환불","danger"],settlement:["정산","warning"],price_file:["단가표","primary"],product_review:["검수·매입","primary"],product:["상품","secondary"]};
+            TYPES={all:["전체","dark"],order:["주문","info"],refund:["환불","danger"],settlement:["정산","warning"],price_file:["단가표","primary"],product_review:["검수·매입","primary"],product:["상품","secondary"],member_review:["후기","info"],member:["회원","secondary"]};
             ROWS=d.items.map(i=>({at:fmtT(i.at),op:i.operator,key:i.kind,col:KIND_COL[i.kind]||"secondary",
               act:i.action_label,target:(i.target||"—"),sum:i.summary,undone:i.undone,isUndo:i.is_undo}));
             cur="all";

@@ -19,7 +19,7 @@ LIMIT = 500  # 초과 시 total과 함께 정직 표기("최근 500건") — 페
 
 KIND_LABELS = {"order": "주문", "refund": "환불", "settlement": "정산",
                "price_file": "단가표", "product_review": "검수·매입", "product": "상품",
-               "member_review": "후기"}
+               "member_review": "후기", "member": "회원"}
 ACTION_LABELS = {
     "order_advance": "주문 처리", "order_advance_undo": "주문 처리 되돌림",
     "refund_advance": "환불 처리", "refund_advance_undo": "환불 처리 되돌림",
@@ -30,6 +30,7 @@ ACTION_LABELS = {
     "sourcing_link": "매입 모델 연결", "sourcing_unlink": "매입 모델 연결 해제",
     "product_register": "상품 등록",
     "member_review_moderate": "후기 처리", "member_review_undo": "후기 처리 되돌림",
+    "member_map_request": "매핑 요청 발송", "member_map_request_undo": "매핑 요청 되돌림",
 }
 MODERATE_SUB = {"hide": "숨김 처리", "keep": "게시 유지", "restore": "게시 복원",
                 "cite_on": "S2 근거 인용", "cite_off": "S2 근거 인용 해제"}
@@ -63,6 +64,8 @@ def _summary(action: str, d: dict) -> str:
     if action == "member_review_moderate":
         a = d.get("after", {})
         return f"{MODERATE_SUB.get(d.get('action'), d.get('action', ''))} · 후기 #{d.get('review_id')} → {a.get('status')}"
+    if action == "member_map_request":
+        return f"{d.get('nickname')}님에게 쇼핑몰 계정 매핑 요청 발송 — 동의 대기"
     if action.endswith("_undo") or d.get("ref_log_id"):
         return f"원 기록 #{d.get('ref_log_id')} 되돌림"
     return action  # 미지의 action — 원문 폴백

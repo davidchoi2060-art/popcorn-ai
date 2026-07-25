@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">회원 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">회원 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-010</span></h2>
+          <div><h2 class="mb-1">회원 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">자체 회원 원장 — 쇼핑몰 계정 매핑 상태(운영 모드 연동), 주문·상담·후기·관심 부품을 한 화면에서 봅니다.</p></div>
         </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -283,16 +283,25 @@
          {id:3,name:"박도윤",email:"dy.park@example.com",via:"네이버",joined:"06-24",mapped:false,orders:1,consults:0,reviews:1,favs:0,last:"07-02",
           note:"인계 주문 1건 후 가입 전환 — 매핑 요청 미발송."}
         ];
-        let sel=1, lastAction=null;
+        let sel=1, lastAction=null, LIVE=false;
+        // 매핑 상태 3종 — 더미(mapped bool)와 LIVE(map_state)를 통일하는 헬퍼
+        const mapState=m=>m.map_state||(m.mapped?"mapped":"none");
         function kpis(){
-          const K=[["전체 회원",M.length,"명","primary"],["쇼핑몰 계정 매핑",M.filter(m=>m.mapped).length,"명","info"],["이번 주 가입",1,"명","primary"],["가격 알림 활성",M.reduce((s,m)=>s+m.favs,0),"건","warning"]];
+          let K;
+          if(LIVE){
+            // 이번 주 가입 = 실계산, 가격 알림 = price_alert true만(더미의 Σ관심 오용 교정)
+            const now=new Date(), day=now.getDay()||7, wk=new Date(now); wk.setDate(now.getDate()-day+1); wk.setHours(0,0,0,0);
+            K=[["전체 회원",M.length,"명","primary"],["쇼핑몰 계정 매핑",M.filter(m=>mapState(m)==="mapped").length,"명","info"],["이번 주 가입",M.filter(m=>new Date(m.joined)>=wk).length,"명","primary"],["가격 알림 활성",M.reduce((s,m)=>s+(m.alerts||0),0),"건","warning"]];
+          }else{
+            K=[["전체 회원",M.length,"명","primary"],["쇼핑몰 계정 매핑",M.filter(m=>m.mapped).length,"명","info"],["이번 주 가입",1,"명","primary"],["가격 알림 활성",M.reduce((s,m)=>s+m.favs,0),"건","warning"]];
+          }
           document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function list(){
           document.getElementById("mlist").innerHTML=M.map(m=>{
             const on=m.id===sel;
             return `<div data-id="${m.id}" class="p-3 border-bottom cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
-              <div class="d-flex justify-content-between align-items-center mb-1"><div class="d-flex align-items-center gap-2"><b class="fs-9 text-body-highlight">${m.name}</b><span class="badge badge-phoenix badge-phoenix-secondary fs-10">${m.via}</span>${m.mapped?'<span class="badge badge-phoenix badge-phoenix-info fs-10">쇼핑몰 매핑</span>':""}</div><span class="fs-10 text-body-quaternary">최근 ${m.last}</span></div>
+              <div class="d-flex justify-content-between align-items-center mb-1"><div class="d-flex align-items-center gap-2"><b class="fs-9 text-body-highlight">${m.name}</b><span class="badge badge-phoenix badge-phoenix-secondary fs-10">${m.via}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info fs-10">쇼핑몰 매핑</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning fs-10">동의 대기</span>':"")}</div><span class="fs-10 text-body-quaternary">최근 ${m.last}</span></div>
               <div class="fs-10 text-body-tertiary">${m.email} · 주문 ${m.orders} · 상담 ${m.consults} · 후기 ${m.reviews}</div>
             </div>`;
           }).join("");
@@ -302,7 +311,7 @@
         function detail(){
           const m=member();const d=document.getElementById("detail");if(!m)return;
           d.innerHTML=`<div class="card"><div class="card-body">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joined}</span>${m.mapped?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>'}</div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joinedLabel||m.joined}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료'+(m.mall_id?" · "+m.mall_id:"")+'</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning">매핑 요청 발송 — 동의 대기'+(m.requested?" ("+m.requested+")":"")+'</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>')}</div>
             <p class="fs-9 text-body-tertiary mb-3">${m.email}</p>
             <div class="row g-2 mb-3">
               <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">주문</div><b>${m.orders}</b></div></div>
@@ -315,15 +324,42 @@
               <a class="btn btn-phoenix-secondary btn-sm" href="orders.html">주문 원장</a>
               <a class="btn btn-phoenix-secondary btn-sm" href="sessions.html">상담 기록 (스냅샷)</a>
               <a class="btn btn-phoenix-secondary btn-sm" href="reviews.html">후기</a>
-              ${m.mapped?"":`<button class="btn btn-primary btn-sm" data-act="map">쇼핑몰 계정 매핑 요청 발송</button>`}
+              ${mapState(m)==="none"?`<button class="btn btn-primary btn-sm" data-act="map">쇼핑몰 계정 매핑 요청 발송</button>`:""}
             </div>
             <p class="fs-10 text-body-tertiary mb-0 mt-3">매핑은 고객 동의 기반 — 요청 발송 시 고객 마이페이지의 "계정 연결"에 안내가 표시됩니다. (운영 모드 '회원 연동' 스위치 연동)</p>
           </div></div>`;
           const mb=d.querySelector("[data-act='map']");
-          if(mb)mb.onclick=()=>{lastAction={id:m.id};toast(`<b>${m.name}</b>님에게 쇼핑몰 계정 매핑 요청 발송 — 동의 시 주문 이력 연동`,true);};
+          if(mb)mb.onclick=()=>{
+            if(LIVE){
+              mb.disabled=true;
+              fetch(`/api/admin/members/${m.id}/map-request`,{method:"POST"})
+                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+                .then(res=>{
+                  if(!res.ok){const dd=res.j.detail;toast("발송 실패: "+(typeof dd==="string"?dd:(dd&&(dd.detail||dd.error))||""));mb.disabled=false;return;}
+                  lastAction={undo_id:res.j.undo_id};
+                  const honest=res.j.member_mode==="own"?" · 현재 독립 가입 모드 — 연동 모드 전환 시 고객 마이페이지에 표시됩니다":" — 고객 마이페이지 \"계정 연결\"에 안내 표시";
+                  reload().then(()=>toast(`<b>${m.name}</b>님에게 매핑 요청 발송 기록${honest}`,true));
+                }).catch(()=>{mb.disabled=false;toast("발송 실패 — 네트워크 오류");});
+              return;
+            }
+            lastAction={id:m.id};toast(`<b>${m.name}</b>님에게 쇼핑몰 계정 매핑 요청 발송 — 동의 시 주문 이력 연동`,true);
+          };
           if(window.feather)feather.replace();
         }
-        function undo(){lastAction=null;toast("되돌렸습니다 — 매핑 요청이 취소됐습니다.");}
+        function undo(){
+          if(LIVE){
+            if(!lastAction||!lastAction.undo_id)return;
+            const id=lastAction.undo_id;lastAction=null;
+            fetch(`/api/admin/members/map-request/undo/${id}`,{method:"POST"})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const dd=res.j.detail;toast("되돌리기 실패: "+(typeof dd==="string"?dd:(dd&&(dd.detail||dd.error))||""));return;}
+                reload().then(()=>toast("되돌렸습니다 — 매핑 요청이 취소됐습니다."));
+              }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
+            return;
+          }
+          lastAction=null;toast("되돌렸습니다 — 매핑 요청이 취소됐습니다.");
+        }
         
         function toast(m,actionable){
           let t=document.getElementById("__rtoast");
@@ -335,6 +371,25 @@
 
         function renderAll(){kpis();list();detail();}
         renderAll();
+
+        // ---- LIVE (슬라이스 20) — API 성공 시 회원 원장·집계 실데이터로 교체, 실패 시 더미 원형 ----
+        // 상담 집계는 실질 제한적(S1 상담은 로그인 전 세션이라 회원 귀속 안 됨 — 시드 귀속분만).
+        function fmtD(iso){if(!iso)return "—";const d=new Date(iso),now=new Date();if(d.toDateString()===now.toDateString())return "오늘";return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+        function reload(){
+          return fetch("/api/admin/members").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
+            .then(d=>{
+              LIVE=true;
+              M=d.items.map(i=>({id:i.id,name:i.name,email:i.email,via:i.via,joined:i.joined,joinedLabel:fmtD(i.joined),
+                map_state:i.map_state,mall_id:i.mall_id,requested:i.requested_at?fmtD(i.requested_at):null,
+                orders:i.orders,consults:i.consults,reviews:i.reviews,favs:i.favs,alerts:i.alerts,
+                last:fmtD(i.last),note:i.note}));
+              if(!M.some(m=>m.id===sel)) sel=M.length?M[0].id:null;
+              const b=document.getElementById("dataSrc");
+              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              renderAll();
+            });
+        }
+        reload().catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
