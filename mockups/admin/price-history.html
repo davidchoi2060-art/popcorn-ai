@@ -263,14 +263,14 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">가격 이력</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">가격 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-030</span></h2>
+          <div><h2 class="mb-1">가격 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">판매가·공급처별 매입가의 모든 변동과 <b class="text-body-secondary">그 사유</b>가 남습니다. 견적 재현·소명의 근거입니다.</p></div>
           <select id="pick" class="form-select form-select-sm" style="max-width:320px;"><option>P-4821 — 이엠텍 RTX 4060 STORM X2 WHITE</option><option>P-3390 — 마이크로닉스 Classic II 500W</option></select>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
-            <h6 class="mb-2">최근 6주 추이</h6>
-            <svg viewBox="0 0 560 220" style="width:100%;height:auto;">
+            <h6 class="mb-2" id="chartTitle">최근 6주 추이</h6>
+            <svg id="chart" viewBox="0 0 560 220" style="width:100%;height:auto;">
               <line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
               <text x="4" y="30" font-size="10" fill="var(--phoenix-tertiary-color)">42만</text><text x="4" y="105" font-size="10" fill="var(--phoenix-tertiary-color)">38만</text><text x="4" y="185" font-size="10" fill="var(--phoenix-tertiary-color)">34만</text>
               <polyline points="60,60 140,60 220,55 300,50 380,48 460,40 540,40" fill="none" stroke="var(--phoenix-primary)" stroke-width="2.5"/>
@@ -278,11 +278,12 @@
               <polyline points="60,150 140,150 220,146 300,140 380,138 460,130 540,124" fill="none" stroke="var(--phoenix-info)" stroke-width="2" stroke-dasharray="2 3"/>
               <text x="60" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">6/1</text><text x="300" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">6/22</text><text x="520" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">7/13</text>
             </svg>
-            <div class="d-flex gap-3 fs-10 text-body-tertiary"><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입 · 용산도매A</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-info);vertical-align:middle;"></span> 매입 · 다나와직송B</span></div>
+            <div class="d-flex gap-3 fs-10 text-body-tertiary" id="legend"><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입 · 용산도매A</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-info);vertical-align:middle;"></span> 매입 · 다나와직송B</span></div>
+            <p class="fs-10 text-body-quaternary mt-2 mb-0" id="chartNote" hidden></p>
           </div></div></div>
           <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body p-0">
-            <div class="p-3 border-bottom"><h6 class="mb-0">변동 기록</h6></div>
-            <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-3">일자</th><th>구분</th><th class="text-end">변동</th><th>사유</th></tr></thead><tbody>
+            <div class="p-3 border-bottom"><h6 class="mb-0">변동 기록 <span class="fs-10 fw-normal text-body-tertiary" id="histCount"></span></h6></div>
+            <div class="table-responsive" style="max-height:320px;overflow-y:auto;"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-3">일자</th><th>구분</th><th class="text-end">변동</th><th>사유</th></tr></thead><tbody id="histRows">
               <tr><td class="ps-3">07-13</td><td>매입 A</td><td class="text-end">356,000 → 352,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #213</a></td></tr>
               <tr><td class="ps-3">07-12</td><td>매입 B</td><td class="text-end">364,000 → 361,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #212</a></td></tr>
               <tr><td class="ps-3">07-08</td><td class="fw-bold">판매가</td><td class="text-end fw-bold">405,000 → 398,000</td><td><a href="price-review.html" class="fs-10">가격 검토 승인</a> · 김운영</td></tr>
@@ -293,7 +294,61 @@
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>(function(){document.getElementById("pick").onchange=()=>{};if(window.feather)feather.replace();})();</script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 27) — 가격 이력 원장 조회. 공급처별 매입가 분리는 원장에 없어 2선만 ----
+        let LIVE=false;
+        const won=n=>n==null?"—":n.toLocaleString()+"원";
+        const fmtD=iso=>{const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+        function drawChart(series){
+          const pts=[...series.sale.map(p=>({...p,k:"sale"})),...series.purchase.map(p=>({...p,k:"purchase"}))];
+          const svg=document.getElementById("chart");
+          if(!pts.length){svg.innerHTML=`<text x="200" y="110" font-size="12" fill="var(--phoenix-tertiary-color)">가격 이력이 없습니다</text>`;return;}
+          const ts=pts.map(p=>new Date(p.at).getTime()), vs=pts.map(p=>p.price);
+          const t0=Math.min(...ts), t1=Math.max(...ts), v0=Math.min(...vs), v1=Math.max(...vs);
+          const X=t=>t1===t0?300:60+((t-t0)/(t1-t0))*480;
+          const Y=v=>v1===v0?100:180-((v-v0)/(v1-v0))*160;
+          const line=(arr,color,dash)=>{
+            if(!arr.length)return "";
+            const pl=arr.map(p=>`${X(new Date(p.at).getTime()).toFixed(1)},${Y(p.price).toFixed(1)}`).join(" ");
+            const dots=arr.map(p=>`<circle cx="${X(new Date(p.at).getTime()).toFixed(1)}" cy="${Y(p.price).toFixed(1)}" r="3" fill="${color}"><title>${fmtD(p.at)} ${won(p.price)}</title></circle>`).join("");
+            return `<polyline points="${pl}" fill="none" stroke="${color}" stroke-width="2.5"${dash?` stroke-dasharray="${dash}"`:""}/>${dots}`;
+          };
+          svg.innerHTML=`<line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
+            <text x="2" y="24" font-size="10" fill="var(--phoenix-tertiary-color)">${(v1/10000).toFixed(0)}만</text>
+            <text x="2" y="186" font-size="10" fill="var(--phoenix-tertiary-color)">${(v0/10000).toFixed(0)}만</text>
+            ${line(series.purchase,"var(--phoenix-warning)","5 4")}${line(series.sale,"var(--phoenix-primary)","")}
+            <text x="52" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t0).toISOString())}</text>
+            <text x="510" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t1).toISOString())}</text>`;
+        }
+        function load(pc){
+          return fetch("/api/admin/price-history"+(pc?`?product_code=${pc}`:"")).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+            .then(d=>{
+              LIVE=true;
+              const sel=document.getElementById("pick");
+              sel.innerHTML=d.products.map(p=>`<option value="${p.product_code}"${d.product&&p.product_code===d.product.product_code?" selected":""}>${p.sku} — ${p.name} (${p.count}건)</option>`).join("");
+              document.getElementById("chartTitle").textContent=`${d.product.sku} 가격 추이 — 현재 매입 ${won(d.product.purchase)} · 판매 ${won(d.product.sale)}`;
+              document.getElementById("legend").innerHTML=`<span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입가(공급처 간 최저)</span>`;
+              const cn=document.getElementById("chartNote");cn.hidden=false;cn.textContent=d.note;
+              drawChart(d.series);
+              document.getElementById("histCount").textContent=`${d.items.length}건`;
+              document.getElementById("histRows").innerHTML=d.items.length?d.items.map(h=>`
+                <tr><td class="ps-3 text-body-tertiary">${fmtD(h.at)}</td>
+                  <td class="${h.field==="sale"?"fw-bold":""}">${h.field_label}</td>
+                  <td class="text-end ${h.field==="sale"?"fw-bold":""}">${h.old==null?"신규":won(h.old)} → ${won(h.new)}${h.delta?`<div class="fs-10 ${h.delta>0?"text-danger":"text-primary"}">${h.delta>0?"+":""}${h.delta.toLocaleString()}</div>`:""}</td>
+                  <td><a href="${h.reason_link}" class="fs-10">${h.reason_label}</a>${h.ref_id?`<div class="fs-10 text-body-quaternary">ref ${h.ref_id}</div>`:""}</td></tr>`).join("")
+                :`<tr><td colspan="4" class="text-center text-body-tertiary py-4">이 상품의 가격 이력이 없습니다.</td></tr>`;
+              const b=document.getElementById("dataSrc");
+              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              sel.onchange=()=>load(+sel.value);
+              if(window.feather)feather.replace();
+            });
+        }
+        document.getElementById("pick").onchange=()=>{};
+        load(null).catch(()=>{});
+        if(window.feather)feather.replace();
+      })();
+      </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
         <div class="modal-dialog">
           <div class="modal-content mt-15 rounded-pill">
