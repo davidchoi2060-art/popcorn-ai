@@ -18,7 +18,8 @@ router = APIRouter(prefix="/api/admin")
 LIMIT = 500  # 초과 시 total과 함께 정직 표기("최근 500건") — 페이지네이션 이관
 
 KIND_LABELS = {"order": "주문", "refund": "환불", "settlement": "정산",
-               "price_file": "단가표", "product_review": "검수·매입", "product": "상품"}
+               "price_file": "단가표", "product_review": "검수·매입", "product": "상품",
+               "member_review": "후기"}
 ACTION_LABELS = {
     "order_advance": "주문 처리", "order_advance_undo": "주문 처리 되돌림",
     "refund_advance": "환불 처리", "refund_advance_undo": "환불 처리 되돌림",
@@ -28,7 +29,10 @@ ACTION_LABELS = {
     "review_undo": "검수 되돌림",
     "sourcing_link": "매입 모델 연결", "sourcing_unlink": "매입 모델 연결 해제",
     "product_register": "상품 등록",
+    "member_review_moderate": "후기 처리", "member_review_undo": "후기 처리 되돌림",
 }
+MODERATE_SUB = {"hide": "숨김 처리", "keep": "게시 유지", "restore": "게시 복원",
+                "cite_on": "S2 근거 인용", "cite_off": "S2 근거 인용 해제"}
 ORDER_SUB = {"assemble": "조립 시작", "ship": "출고", "done": "배송 완료"}
 REFUND_SUB = {"review": "검토 시작", "approve": "승인", "complete": "완료", "reject": "반려"}
 REVIEW_MODE = {"approve": "승인", "manual": "직접 수정", "reject": "보류"}
@@ -56,6 +60,9 @@ def _summary(action: str, d: dict) -> str:
         return f"{(d.get('model_key') or '')[:40]} 연결 해제"
     if action == "product_register":
         return f"{d.get('sku')} 등록 · 매입 {d.get('cost_price', 0):,}원 ({d.get('part_type')})"
+    if action == "member_review_moderate":
+        a = d.get("after", {})
+        return f"{MODERATE_SUB.get(d.get('action'), d.get('action', ''))} · 후기 #{d.get('review_id')} → {a.get('status')}"
     if action.endswith("_undo") or d.get("ref_log_id"):
         return f"원 기록 #{d.get('ref_log_id')} 되돌림"
     return action  # 미지의 action — 원문 폴백

@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">후기 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">후기 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-020</span></h2>
+          <div><h2 class="mb-1">후기 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">후기는 <b class="text-body-secondary">구매 인증(주문 라인 연계)만</b> 존재합니다 — 가짜 후기 원천 차단(A-10). 노출·신고 처리와 S2 근거 인용을 관리합니다.</p></div>
         </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -311,17 +311,41 @@
           }).join("");
           document.querySelectorAll("#rlist [data-act]").forEach(b=>b.onclick=()=>{
             const r=R.find(x=>x.id===+b.dataset.id);if(!r)return;
+            const act=b.dataset.act, apiAct=act==="cite"?(r.cite?"cite_off":"cite_on"):act;
+            const msg={hide:"후기 숨김 처리 — 고객에게 사유 안내 발송", keep:"신고 검토 완료 — 게시 유지", restore:"후기 게시 복원",
+                       cite_on:'S2 견적서 근거로 인용 시작 — "먼저 받아본 사람들" 소스', cite_off:"S2 근거 인용 해제"}[apiAct];
+            if(LIVE){
+              b.disabled=true;
+              fetch(`/api/admin/member-reviews/${r.id}/moderate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:apiAct})})
+                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+                .then(res=>{
+                  if(!res.ok){const d=res.j.detail;toast("처리 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));b.disabled=false;return;}
+                  lastAction={undo_id:res.j.undo_id};
+                  reload().then(()=>toast(msg,true));
+                }).catch(()=>{b.disabled=false;toast("처리 실패 — 네트워크 오류");});
+              return;
+            }
             lastAction={id:r.id,state:r.state,cite:r.cite};
-            if(b.dataset.act==="hide"){r.state="숨김";toast(`후기 숨김 처리 — 고객에게 사유 안내 발송`,true);}
-            else if(b.dataset.act==="keep"){r.state="게시";toast(`신고 검토 완료 — 게시 유지`,true);}
-            else if(b.dataset.act==="restore"){r.state="게시";toast(`후기 게시 복원`,true);}
-            else{r.cite=!r.cite;toast(r.cite?`S2 견적서 근거로 인용 시작 — "먼저 받아본 사람들" 소스`:`S2 근거 인용 해제`,true);}
-            render();
+            if(act==="hide"){r.state="숨김";}
+            else if(act==="keep"||act==="restore"){r.state="게시";}
+            else{r.cite=!r.cite;}
+            toast(msg,true);render();
           });
           if(window.feather)feather.replace();
         }
         function undo(){
           if(!lastAction)return;
+          if(LIVE){
+            if(!lastAction.undo_id)return;
+            const id=lastAction.undo_id;lastAction=null;
+            fetch(`/api/admin/member-reviews/undo/${id}`,{method:"POST"})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail;toast("되돌리기 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));return;}
+                reload().then(()=>toast("되돌렸습니다 — 후기 상태가 이전으로 복원됐습니다."));
+              }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
+            return;
+          }
           const r=R.find(x=>x.id===lastAction.id);
           if(r){r.state=lastAction.state;r.cite=lastAction.cite;}
           lastAction=null;render();
@@ -337,6 +361,24 @@
         }
 
         render();
+
+        // ---- LIVE (슬라이스 19) — API 성공 시 실후기로 교체(구매 인증 라인 실연결), 실패 시 더미 원형 ----
+        // 신고 박스: 신고됨 상태 ∧ moderation_note(접수 메모 겸용 — 신고 수신함 컬럼화 이관) 있을 때만.
+        let LIVE=false;
+        function fmtD(iso){const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+        function reload(){
+          return fetch("/api/admin/member-reviews").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
+            .then(d=>{
+              LIVE=true;
+              R=d.items.map(i=>({id:i.id,cust:i.cust,order:i.order,item:i.item,rating:i.rating,at:fmtD(i.at),
+                state:i.state,cite:i.cite,body:i.body,
+                report:(i.state==="신고됨"&&i.note)?i.note:null}));
+              const b=document.getElementById("dataSrc");
+              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              render();
+            });
+        }
+        reload().catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
