@@ -263,9 +263,9 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">추천 설정</a></li><li class="breadcrumb-item active">추천 가능 재고 현황</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">추천 가능 재고 현황 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-030</span></h2>
+          <div><h2 class="mb-1">추천 가능 재고 현황 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">고객 화면(S1)의 후보 카운터가 세는 바로 그 집합. <b class="text-body-secondary">얇은 카테고리 = 견적 실패 위험</b>을 미리 봅니다.</p></div>
-          <div class="text-end"><h3 class="mb-0 fw-bolder">24,912 <span class="fs-9 fw-semibold text-body-tertiary">/ 26,480개 (94.1%)</span></h3><p class="fs-9 text-body-tertiary mb-0">규칙 v5 · 정책 v12 기준</p></div>
+          <div class="text-end"><h3 class="mb-0 fw-bolder" id="headTotal">24,912 <span class="fs-9 fw-semibold text-body-tertiary">/ 26,480개 (94.1%)</span></h3><p class="fs-9 text-body-tertiary mb-0" id="headNote">규칙 v5 · 정책 v12 기준</p></div>
         </div>
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-8"><div class="card h-100"><div class="card-body">
@@ -274,8 +274,8 @@
           </div></div></div>
           <div class="col-12 col-lg-4">
             <div class="card mb-3"><div class="card-body">
-              <h6 class="mb-2">제외 사유 합계 <span class="fs-10 fw-normal text-body-tertiary">1,568개</span></h6>
-              <div class="fs-9 d-flex flex-column gap-2">
+              <h6 class="mb-2">제외 사유 합계 <span class="fs-10 fw-normal text-body-tertiary" id="reasonTotal">1,568개</span></h6>
+              <div class="fs-9 d-flex flex-column gap-2" id="reasons">
                 <div class="d-flex justify-content-between"><a href="review-queue.html">검수 대기</a><b>9</b></div>
                 <div class="d-flex justify-content-between"><a href="sourcing.html">재고 없음 · 매입</a><b>618</b></div>
                 <div class="d-flex justify-content-between"><a href="price-review.html">가격 검토 대기</a><b>5</b></div>
@@ -284,7 +284,7 @@
             </div></div>
             <div class="card border-warning"><div class="card-body">
               <h6 class="mb-2 text-warning">⚠ 얇은 카테고리</h6>
-              <div class="fs-9 d-flex flex-column gap-2">
+              <div class="fs-9 d-flex flex-column gap-2" id="thin">
                 <div><b>mATX 케이스(화이트)</b> — 후보 3개<br><span class="fs-10 text-body-tertiary">"화이트 감성" 제약 결합 시 견적 실패 위험 → <a href="sourcing.html">매입 검토</a></span></div>
                 <div><b>750W 이상 파워</b> — 후보 7개<br><span class="fs-10 text-body-tertiary">고성능 GPU 견적의 병목</span></div>
               </div>
@@ -297,17 +297,43 @@
       (function(){
         // [카테고리, 가능, 검수, 재고없음, 가격]
         const C=[["CPU",3210,1,80,0],["메인보드",2988,3,112,0],["메모리",4102,1,64,1],["그래픽카드",2455,2,190,2],["SSD/저장장치",5120,1,88,1],["파워",2410,1,44,1],["케이스",3020,0,30,0],["CPU쿨러",1607,0,10,0]];
-        const COLS=["var(--phoenix-primary)","var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-danger)"];
-        document.getElementById("bars").innerHTML=C.map(([name,ok,rv,oos,pr])=>{
-          const total=ok+rv+oos+pr;
-          const seg=(v,c)=>v?`<div style="width:${(v/total*100).toFixed(2)}%;background:${c};height:100%;" title="${v}"></div>`:"";
-          return `<div class="d-flex align-items-center gap-3 py-2">
-            <span class="fs-9 text-body-secondary" style="width:110px;flex:none;">${name}</span>
-            <div class="flex-1 rounded-pill overflow-hidden d-flex" style="height:14px;background:var(--phoenix-secondary-bg);">${seg(ok,COLS[0])}${seg(rv,COLS[1])}${seg(oos,COLS[2])}${seg(pr,COLS[3])}</div>
-            <b class="fs-9" style="width:56px;text-align:right;">${ok.toLocaleString()}</b>
-          </div>`;
-        }).join("");
-        if(window.feather)feather.replace();
+        const COLS=["var(--phoenix-primary)","var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-danger)","var(--phoenix-secondary)"];
+        // 세그먼트 순서 = 게이트 순서(가능 / 검수 대기 / 후보 미승격 / 가격 / 재고없음 / 사양 미등록)
+        function drawBars(rows){
+          document.getElementById("bars").innerHTML=rows.map(r=>{
+            const total=r.total||1;
+            const seg=(v,c,t)=>v?`<div style="width:${(v/total*100).toFixed(2)}%;background:${c};height:100%;" title="${t} ${v}"></div>`:"";
+            return `<div class="d-flex align-items-center gap-3 py-2">
+              <span class="fs-9 text-body-secondary" style="width:110px;flex:none;">${r.name}</span>
+              <div class="flex-1 rounded-pill overflow-hidden d-flex" style="height:14px;background:var(--phoenix-secondary-bg);">${seg(r.ok,COLS[0],"추천 가능")}${seg(r.need_review,COLS[1],"검수 대기")}${seg(r.not_candidate,COLS[1],"후보 미승격")}${seg(r.no_price,COLS[3],"가격 검토")}${seg(r.oos,COLS[2],"재고 없음")}${seg(r.no_specs,COLS[4],"사양 미등록")}</div>
+              <b class="fs-9" style="width:56px;text-align:right;">${r.ok.toLocaleString()}<span class="fs-10 fw-normal text-body-tertiary">/${total}</span></b>
+            </div>`;
+          }).join("");
+          if(window.feather)feather.replace();
+        }
+        drawBars(C.map(([name,ok,rv,oos,pr])=>({name,ok,need_review:rv,not_candidate:0,no_price:pr,oos,no_specs:0,total:ok+rv+oos+pr})));
+
+        // ---- LIVE (슬라이스 25) — 4중 게이트별 제외 사유 실집계. 'ok' 합계 = S1 후보 카운터와 동일 집합 ----
+        fetch("/api/admin/candidate-pool")
+          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(d=>{
+            drawBars(d.categories);
+            document.getElementById("headTotal").innerHTML=`${d.ok_total.toLocaleString()} <span class="fs-9 fw-semibold text-body-tertiary">/ ${d.core_total.toLocaleString()}개 (${d.rate}%)</span>`;
+            document.getElementById("headNote").textContent="핵심 부품 기준 · 규칙·정책 버전 표기 준비 중";
+            document.getElementById("reasonTotal").textContent=`${d.reason_total.toLocaleString()}개`;
+            document.getElementById("reasons").innerHTML=d.reasons.map(x=>
+              `<div class="d-flex justify-content-between">${x.count?`<a href="${x.link}">${x.label}</a>`:`<span class="text-body-tertiary">${x.label}</span>`}<b>${x.count.toLocaleString()}</b></div>`).join("");
+            document.getElementById("thin").innerHTML=d.thin.length?d.thin.map(t=>
+              `<div><b>${t.name}</b> — 후보 ${t.count}개<br><span class="fs-10 text-body-tertiary">${t.why} → <a href="${t.link}">입고·매입 검토</a></span></div>`).join("")
+              :`<div class="fs-9 text-body-tertiary">임계(${d.thin_threshold}개) 이하 카테고리가 없습니다.</div>`;
+            const note=document.createElement("p");
+            note.className="fs-10 text-body-tertiary mb-0 mt-2";note.id="poolNote";note.textContent=d.note;
+            const host=document.getElementById("bars").parentElement;
+            if(!document.getElementById("poolNote"))host.appendChild(note);
+            const b=document.getElementById("dataSrc");
+            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+          })
+          .catch(()=>{});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
