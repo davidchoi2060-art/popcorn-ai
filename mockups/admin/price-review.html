@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">가격 검토 대기</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">가격 검토 대기 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-010</span></h2>
+          <div><h2 class="mb-1">가격 검토 대기 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">매입가 변동이 임계(±15%)를 넘거나 <b class="text-body-secondary">마진 정책을 위반</b>하는 건만 모입니다. 승인 전까지 판매가는 바뀌지 않습니다.</p></div>
           <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">5</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="done">0</span>건 · <a href="margin-policy.html">마진 정책 v8</a></p></div>
         </div>
@@ -284,16 +284,16 @@
           ["P-6020","WD Blue SN580 1TB","용산도매A","72,000 → 84,000","+16.7%","89,000","99,900","15.9%",["임계 초과","warning"]],
           ["P-3395","시소닉 FOCUS GX-750","다나와직송B","112,000 → 111,000","-0.9%","129,000","129,000","14.0%",["마진 위반(최소 15%)","danger"]]
         ];
-        let done=0;
+        let done=0, LIVE=false, NOTE="";
         function render(){
           document.getElementById("cnt").textContent=R.length;
           document.getElementById("done").textContent=done;
-          document.getElementById("rows").innerHTML=R.length?R.map(([sku,name,sup,delta,pct,curp,prop,margin,[why,c]],i)=>`
+          document.getElementById("rows").innerHTML=R.length?R.map(([sku,name,sup,delta,pct,curp,prop,margin,[why,c],code],i)=>`
             <tr class="${c==="danger"?"bg-danger-subtle bg-opacity-25":""}">
               <td class="ps-4"><b class="text-body-highlight">${name}</b><br><code class="fs-10">${sku}</code></td>
               <td class="text-body-tertiary">${sup}</td>
-              <td class="text-end">${delta}<br><b class="${pct.startsWith("+")?"text-danger":"text-primary"}">${pct}</b></td>
-              <td class="text-end">${curp}원</td>
+              <td class="text-end">${delta}<br><b class="${pct.startsWith("+")?"text-danger":(pct==="—"?"text-body-tertiary":"text-primary")}">${pct}</b></td>
+              <td class="text-end">${curp==="—"?'<span class="text-body-tertiary">— (미산정)</span>':curp+"원"}</td>
               <td class="text-end fw-bold">${prop}원</td>
               <td class="text-end">${margin}</td>
               <td><span class="badge badge-phoenix badge-phoenix-${c} text-nowrap">${why}</span></td>
@@ -302,13 +302,53 @@
                 <button class="btn btn-sm btn-phoenix-secondary" data-a="${i}" data-act="판매가 유지">유지</button>
                 <button class="btn btn-sm btn-subtle-secondary" data-a="${i}" data-act="직접 수정">수정</button>
               </td></tr>`).join("")
-            :`<tr><td colspan="8" class="text-center text-body-tertiary py-5"><b>모두 처리했습니다.</b><br><span class="fs-10">새 일괄 등록·매입 확정 시 다시 쌓입니다.</span></td></tr>`;
+            :`<tr><td colspan="8" class="text-center text-body-tertiary py-5"><b>모두 처리했습니다.</b><br><span class="fs-10">${LIVE?NOTE:"새 일괄 등록·매입 확정 시 다시 쌓입니다."}</span></td></tr>`;
           document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
-            const i=+b.dataset.a;const r=R[i];R.splice(i,1);done++;
-            toast(`${r[0]} — ${b.dataset.act} · 가격 이력 기록 · 작업 기록 저장`);render();
+            const i=+b.dataset.a, r=R[i], act=b.dataset.act;
+            if(LIVE){
+              const api={"제안가 승인":"approve","판매가 유지":"keep","직접 수정":"manual"}[act];
+              let price=null;
+              if(api==="manual"){
+                const v=prompt(`${r[1]}\n판매가를 입력하세요 (원, 숫자만):`, String(r[6]).replace(/[^0-9]/g,""));
+                if(v===null||!v.trim())return;
+                price=parseInt(v.replace(/[^0-9]/g,""),10);
+                if(!price){toast("판매가를 숫자로 입력해 주세요");return;}
+              }
+              b.disabled=true;
+              fetch(`/api/admin/price-review/${r[9]}/decide`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:api,price:price})})
+                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+                .then(res=>{
+                  if(!res.ok){const d=res.j.detail;toast("처리 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));b.disabled=false;return;}
+                  done++;
+                  const tail=res.j.sale_price?` 판매가 ${res.j.sale_price.toLocaleString()}원 확정`:" 판매가 미산정 유지(제안 차단)";
+                  reload().then(()=>toast(`${r[0]} — ${act} ·${tail} · 가격 이력·작업 기록 저장`));
+                }).catch(()=>{b.disabled=false;toast("처리 실패 — 네트워크 오류");});
+              return;
+            }
+            R.splice(i,1);done++;
+            toast(`${r[0]} — ${act} · 가격 이력 기록 · 작업 기록 저장`);render();
           });
         }
         render();if(window.feather)feather.replace();
+
+        // ---- LIVE (슬라이스 21) — 가격 검토 대기 파생 목록. v1은 '첫 산정' 유형만 실데이터(note로 정직 표기) ----
+        const won=n=>n==null?"—":n.toLocaleString();
+        function reload(){
+          return fetch("/api/admin/price-review").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
+            .then(d=>{
+              LIVE=true;NOTE=d.note;
+              R=d.items.map(i=>[i.sku,i.name,i.supplier,
+                i.current==null?`첫 등록 ${won(i.purchase)}`:`${won(i.purchase)} 기준`,
+                i.current==null?"—":"",
+                i.current==null?"—":won(i.current),
+                won(i.proposed), i.margin_pct==null?"—":i.margin_pct+"%",
+                [i.why, i.kind==="first"?"info":"warning"], i.product_code]);
+              const b=document.getElementById("dataSrc");
+              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              render();
+            });
+        }
+        reload().catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
