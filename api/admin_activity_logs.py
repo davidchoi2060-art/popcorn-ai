@@ -19,7 +19,7 @@ LIMIT = 500  # 초과 시 total과 함께 정직 표기("최근 500건") — 페
 
 KIND_LABELS = {"order": "주문", "refund": "환불", "settlement": "정산",
                "price_file": "단가표", "product_review": "검수·매입", "product": "상품",
-               "member_review": "후기", "member": "회원"}
+               "member_review": "후기", "member": "회원", "stock": "재고"}
 ACTION_LABELS = {
     "order_advance": "주문 처리", "order_advance_undo": "주문 처리 되돌림",
     "refund_advance": "환불 처리", "refund_advance_undo": "환불 처리 되돌림",
@@ -32,6 +32,7 @@ ACTION_LABELS = {
     "member_review_moderate": "후기 처리", "member_review_undo": "후기 처리 되돌림",
     "member_map_request": "매핑 요청 발송", "member_map_request_undo": "매핑 요청 되돌림",
     "price_review_decide": "가격 검토 처리",
+    "stock_inbound": "재고 입고", "stock_inbound_undo": "재고 입고 되돌림",
 }
 PRICE_REVIEW_SUB = {"approve": "제안가 승인", "keep": "판매가 유지(제안 차단)",
                     "manual": "직접 수정"}
@@ -67,6 +68,10 @@ def _summary(action: str, d: dict) -> str:
     if action == "member_review_moderate":
         a = d.get("after", {})
         return f"{MODERATE_SUB.get(d.get('action'), d.get('action', ''))} · 후기 #{d.get('review_id')} → {a.get('status')}"
+    if action == "stock_inbound":
+        b = (d.get("before") or {}).get("stock_qty", 0)
+        sub = "실사 조정" if d.get("why") == "adjust" else "매입 입고"
+        return f"{d.get('sku')} · {sub} +{d.get('qty')} · 재고 {b} → {b + (d.get('qty') or 0)}"
     if action == "price_review_decide":
         sub = PRICE_REVIEW_SUB.get(d.get("action"), d.get("action", ""))
         p = d.get("price")

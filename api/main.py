@@ -18,6 +18,7 @@ from .admin_payments import router as admin_payments_router
 from .admin_price_import import router as admin_price_import_router
 from .admin_price_review import router as admin_price_review_router
 from .admin_products import router as admin_products_router
+from .admin_stock import router as admin_stock_router
 from .admin_reviews import router as admin_reviews_router
 from .candidates import router as candidates_router
 from .my_orders import router as my_orders_router
@@ -47,6 +48,7 @@ app.include_router(admin_member_reviews_router)
 app.include_router(admin_members_router)
 app.include_router(admin_price_import_router)
 app.include_router(admin_price_review_router)
+app.include_router(admin_stock_router)
 app.include_router(candidates_router)
 app.include_router(recommend_router)
 app.include_router(orders_router)

@@ -319,7 +319,7 @@
            qty:4,cost:352000,sup:"용산도매A",stock:6,priced:true,why:"adjust",note:"안전재고 미달 보충(연출)"}
         ];
         const WHY={inbound:["매입 입고","primary"],adjust:["실사 조정","info"]};
-        let cur="all", done=0, lastAction=null;
+        let cur="all", done=0, lastAction=null, LIVE=false, NOTE="";
 
         function kpis(){
           const K=[["입고 대기",R.length,"건","primary"],["오늘 입고",done,"건","primary"],
@@ -336,10 +336,13 @@
           }).join("");
           document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
         }
-        // 입고 후 상태 예고 — 3중 게이트(검수·가격·재고)를 화면에 성문화
+        // 입고 후 상태 예고 — 3중 게이트(검수·가격·재고)를 화면에 성문화. LIVE는 서버 필드(reviewed/priced/status)로 판정.
         function after(r){
           const to=r.stock+r.qty;
+          if(r.reviewed===false) return [`재고 ${r.stock} → ${to}`,"검수 미통과 — 추천 제외","warning"];
           if(!r.priced) return [`재고 ${r.stock} → ${to}`,"판매가 미산정 — 가격 검토 필요","warning"];
+          if(r.has_specs===false) return [`재고 ${r.stock} → ${to}`,"사양 미등록 — 추천 제외","warning"];
+          if(r.status==="품절") return [`재고 ${r.stock} → ${to}`,"품절 해제 · 추천 가능 재고 진입","primary"];
           if(r.stock===0) return [`재고 0 → ${to}`,"추천 가능 재고 진입","primary"];
           return [`재고 ${r.stock} → ${to}`,"재고 보충","secondary"];
         }
@@ -378,6 +381,20 @@
             r.qty=q;render();toast(`<b>${r.sku}</b> 입고 수량 ${q}개로 수정`,true);
             return;
           }
+          if(a==="confirm"&&LIVE){
+            fetch(`/api/admin/stock-inbound/${r.id}`,{method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({qty:r.qty,why:r.why})})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail;toast("입고 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));return;}
+                lastAction={mode:"live",undo_id:res.j.undo_id};done++;
+                const j=res.j;
+                const tail=j.pool_entered?"추천 가능 재고 진입":(r.reviewed===false?"검수 미통과 — 추천 제외":(!r.priced?"판매가 미산정 — 가격 검토 필요":"추천 미진입"));
+                const st=j.status_changed?" · 품절 해제":"";
+                reload().then(()=>toast(`<b>${j.sku}</b> 입고 ${r.qty}개 확정 · 재고 ${j.stock_before} → ${j.stock_after}${st} · ${tail}`,true));
+              }).catch(()=>toast("입고 실패 — 네트워크 오류"));
+            return;
+          }
           lastAction={mode:a,idx:i,item:{...r}};
           const [head,tail]=after(r);
           R.splice(i,1);
@@ -387,19 +404,33 @@
         }
         function undo(){
           if(!lastAction)return;
+          if(lastAction.mode==="live"){
+            const id=lastAction.undo_id;lastAction=null;
+            fetch(`/api/admin/stock-inbound/undo/${id}`,{method:"POST"})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail;toast("되돌리기 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));return;}
+                done=Math.max(0,done-1);
+                reload().then(()=>toast("되돌렸습니다 — 역방향 원장 행으로 상쇄하고 재고를 복원했습니다."));
+              }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
+            return;
+          }
           const {mode,idx,item}=lastAction;
           if(mode==="qty") R[idx]=item;
           else { R.splice(Math.min(idx,R.length),0,item); if(mode==="confirm")done--; }
           lastAction=null;render();
           toast("되돌렸습니다 — 입고 대기 상태로 복원됐습니다.");
         }
-        // 직접 입고 등록 — 목록에 대기 행으로 추가(확정은 표에서)
-        const CATALOG=[
+        // 직접 입고 등록 — 목록에 대기 행으로 추가(확정은 표에서). LIVE면 CATALOG를 실상품으로 교체.
+        let CATALOG=[
           {id:20489103,sku:"P-9103",name:"GIGABYTE AORUS RTX 5090 AI BOX",cat:"그래픽카드",cost:7346000,sup:"클릭나라",stock:0,priced:false},
           {id:20486012,sku:"P-6012",name:"삼성전자 990 PRO M.2 NVMe 2TB",cat:"SSD",cost:212000,sup:"용산도매A",stock:3,priced:true},
           {id:20483390,sku:"P-3390",name:"마이크로닉스 Classic II 500W",cat:"파워",cost:47000,sup:"다나와직송B",stock:12,priced:true}
         ];
-        document.getElementById("in-prod").innerHTML=CATALOG.map((c,i)=>`<option value="${i}">${c.sku} · ${c.name}</option>`).join("");
+        function fillCatalog(){
+          document.getElementById("in-prod").innerHTML=CATALOG.map((c,i)=>`<option value="${i}">${c.sku} · ${c.name}${c.stock!=null?` (재고 ${c.stock})`:""}</option>`).join("");
+        }
+        fillCatalog();
         document.getElementById("in-add").onclick=()=>{
           const c=CATALOG[+document.getElementById("in-prod").value];
           const q=parseInt(document.getElementById("in-qty").value.replace(/[^0-9]/g,""),10);
@@ -427,6 +458,28 @@
           _undo();
         };
         render();
+
+        // ---- LIVE (슬라이스 23) — 입고 원장 실배선(ERD §8 T10). 입고 후 예고·풀 진입은 서버 실측값 ----
+        // 매입가는 원장에 남기지 않는다(stock_movements에 단가 컬럼 없음) → LIVE에선 입력 칸 읽기 전용.
+        function reload(){
+          return fetch("/api/admin/stock-inbound").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
+            .then(d=>{
+              const prevQty={};R.forEach(r=>{prevQty[r.id]=r.qty;});
+              LIVE=true;NOTE=d.note;
+              R=d.items.map(i=>({id:i.product_code,sku:i.sku,name:i.name,cat:i.cat,
+                qty:prevQty[i.product_code]||1,cost:i.purchase||0,sup:i.supplier,stock:i.stock,
+                priced:i.priced,reviewed:i.reviewed,has_specs:i.has_specs,status:i.status,why:i.why,note:i.note}));
+              CATALOG=d.catalog.map(c=>({id:c.product_code,sku:c.sku,name:c.name,cat:c.cat,
+                cost:c.purchase||0,sup:"—",stock:c.stock,priced:c.priced,reviewed:c.reviewed}));
+              fillCatalog();
+              const ci=document.getElementById("in-cost");
+              ci.value="";ci.readOnly=true;ci.placeholder="상품 매입가 사용(원장 미기록)";
+              const b=document.getElementById("dataSrc");
+              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              render();
+            });
+        }
+        reload().catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
