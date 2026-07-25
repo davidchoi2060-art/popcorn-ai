@@ -263,9 +263,9 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">견적 상담 기록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">견적 상담 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-010</span></h2>
+          <div><h2 class="mb-1">견적 상담 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">읽기 전용 관측 창. 모든 상담은 <b class="text-body-secondary">재고 스냅샷과 함께 저장</b>되어 당시 그대로 재현할 수 있습니다.</p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder">오늘 48건</h4><p class="fs-9 text-body-tertiary mb-0">완주 31 · 이탈 17</p></div>
+          <div class="text-end"><h4 class="mb-0 fw-bolder" id="headCnt">오늘 48건</h4><p class="fs-9 text-body-tertiary mb-0" id="headSub">완주 31 · 이탈 17</p></div>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
@@ -287,8 +287,9 @@
           ["09:31","guided","영상편집 · 200만","이탈(예산 단계)","이탈",["SNAP-0713-0931",["용도: 영상편집"],[],null]],
           ["09:02","chat","견적 다시 뽑아줘(재현)","812,000원 · 동일","완주",["SNAP-0713-1042",["재현 요청 — 동일 스냅샷"],[["결과","이전과 동일 구성 확인","—"]],null]]
         ];
-        let sel=0;
+        let sel=0, LIVE=false, L=[], NOTE="";
         function render(){
+          if(LIVE){renderLive();return;}
           document.getElementById("rows").innerHTML=S.map((s,i)=>`
             <tr data-i="${i}" class="cursor-pointer ${i===sel?"bg-primary-subtle":""}">
               <td class="ps-3 text-body-tertiary">${s[0]}</td>
@@ -312,7 +313,55 @@
           </div></div>`;
           document.getElementById("replay").onclick=()=>toast(snap+" 기준 재현 완료 — 동일 구성 일치 확인");
         }
+        // ---- LIVE (슬라이스 26) — 상담 세션·견적 스냅샷 실원장. 읽기 전용(재현은 저장 스냅샷 기준) ----
+        const won=n=>n==null?"—":n.toLocaleString()+"원";
+        function fmtT(iso){
+          const d=new Date(iso),now=new Date();
+          const hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+          if(d.toDateString()===now.toDateString())return hm;
+          return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
+        }
+        function renderLive(){
+          document.getElementById("rows").innerHTML=L.map((s,i)=>`
+            <tr data-i="${i}" class="cursor-pointer ${i===sel?"bg-primary-subtle":""}">
+              <td class="ps-3 text-body-tertiary">${fmtT(s.at)}</td>
+              <td><span class="badge badge-phoenix badge-phoenix-${s.mode_color}">${s.mode_label}</span></td>
+              <td class="text-body-highlight">${s.summary}</td>
+              <td class="text-end">${s.result}</td>
+              <td><span class="fs-10 ${s.status.startsWith("이탈")?"text-danger":"text-body-tertiary"}">${s.status}</span></td>
+            </tr>`).join("");
+          document.querySelectorAll("#rows [data-i]").forEach(r=>r.onclick=()=>{sel=+r.dataset.i;render();});
+          const s=L[sel]; if(!s)return;
+          const d=document.getElementById("detail");
+          d.innerHTML=`<div class="card"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2"><h6 class="mb-0">상담 상세 — ${fmtT(s.at)}</h6><code class="fs-10">SESSION-${s.session_id}${s.rep?` · SNAP-${s.rep.id}`:""}</code></div>
+            <p class="fs-10 text-body-tertiary mb-2">제약객체(단일 원천) · ${s.member?s.member:"비로그인 세션 — 회원 미귀속"}</p>
+            <div class="d-flex flex-wrap gap-1 mb-3">${s.constraints.length?s.constraints.map(c=>`<span class="badge badge-phoenix badge-phoenix-secondary">${c}</span>`).join(""):`<span class="fs-9 text-body-tertiary">제약 없음</span>`}</div>
+            ${s.snapshots.length?`<p class="fs-10 text-body-tertiary mb-1">저장된 티어 견적 ${s.snapshots.length}건</p><div class="d-flex flex-wrap gap-1 mb-3">${s.snapshots.map(q=>`<span class="badge badge-phoenix badge-phoenix-${q.tier==="value"?"primary":(q.tier==="highend"?"info":"secondary")}">${q.tier_label} ${won(q.total)} · ${q.part_count}부품</span>`).join("")}</div>`:""}
+            ${s.rep&&s.rep.parts.length?`<p class="fs-10 text-body-tertiary mb-1">결과 구성 — ${s.rep.tier_label} ${won(s.rep.total)}</p><div class="table-responsive mb-3" style="max-height:220px;overflow-y:auto;"><table class="table table-sm fs-9 mb-0"><tbody>${s.rep.parts.map(p=>`<tr><td class="text-body-tertiary" style="width:66px;">${p.cat}</td><td>${p.name}<div class="fs-10 text-body-quaternary">${p.sku}</div></td><td class="text-end">${won(p.price)}</td></tr>`).join("")}</tbody></table></div>${s.rep.companion.length?`<p class="fs-10 text-body-tertiary mb-2">함께 구성 제시 ${s.rep.companion.length}건 — ${s.rep.companion.map(c=>c.name).join(", ")}</p>`:""}`:`<p class="fs-9 text-body-tertiary mb-3">결과 없음 (견적 미생성)</p>`}
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-phoenix-primary" id="replay"${s.rep?"":" disabled"}>이 스냅샷으로 재현</button>
+              ${s.order_no?`<a href="orders.html" class="btn btn-sm btn-phoenix-secondary">연결 주문 ${s.order_no} (${s.order_status})</a>`:""}
+            </div>
+            <p class="fs-10 text-body-tertiary mt-2 mb-0">재현 = 같은 제약 + 같은 스냅샷 → 같은 견적. 분쟁·문의 소명의 근거입니다.</p>
+            <p class="fs-10 text-body-quaternary mt-1 mb-0">${NOTE}</p>
+          </div></div>`;
+          const rb=document.getElementById("replay");
+          if(rb&&s.rep)rb.onclick=()=>toast(`SNAP-${s.rep.id} 기준 재현 — ${s.rep.tier_label} ${won(s.rep.total)} · ${s.rep.parts.length}부품 (당시 재고 스냅샷)`);
+          if(window.feather)feather.replace();
+        }
         render();if(window.feather)feather.replace();
+        fetch("/api/admin/sessions")
+          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(d=>{
+            LIVE=true;L=d.items;NOTE=d.note;sel=0;
+            document.getElementById("headCnt").textContent=`오늘 ${d.today}건`;
+            document.getElementById("headSub").textContent=`전체 ${d.items.length}건 · 완주 ${d.done} · 이탈 ${d.drop}`;
+            const b=document.getElementById("dataSrc");
+            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            render();
+          })
+          .catch(()=>{});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
