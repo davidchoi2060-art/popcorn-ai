@@ -100,6 +100,9 @@ def list_products():  # def(비동기 아님) — psycopg2 동기 드라이버, 
             "maker": r.maker,
             "spec_done": done,
             "spec_total": total,
+            # 사양 행 자체가 없는 상품 — 값 미확인(0/N)과 구분해야 한다.
+            # 추천 뷰가 product_specs를 조인하므로 이 상품은 재고·가격이 채워져도 미진입(슬라이스 23 발견).
+            "spec_row_missing": r.specs is None,
             "stock": r.stock_qty,
             "supplier_count": r.supplier_count,
             "sale_price": r.sale_price,

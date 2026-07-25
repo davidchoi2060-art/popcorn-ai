@@ -315,7 +315,7 @@
         // 정규화 어댑터 — 더미(위치배열)와 API(계약 JSON)를 같은 객체형으로
         // 더미 폴백 전용 파생: 자체 상품번호(product_code)와 제조사(상품명 첫 토큰)
         const fromDummy=p=>({product_code:String(20480000+parseInt(p[0].slice(2),10)),sku:p[0],name:p[1],cat:p[2],maker:p[1].split(" ")[0],spec_done:p[3],spec_total:p[4],stock:p[5],supplier_count:p[6],price_text:p[7]+"원",status_key:p[8]});
-        const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
+        const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,spec_row_missing:it.spec_row_missing,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
         let DATA=P.map(fromDummy);
         function fillSelects(){
           const cats=[...new Set(DATA.map(p=>p.cat))];
@@ -340,8 +340,10 @@
           }).join("");
           document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
         }
-        function specBadge(done,total){
+        function specBadge(done,total,rowMissing){
           if(total===0)return `<span class="fs-10 text-body-tertiary">—</span>`; // 필수 사양 매트릭스 미등록 분류
+          // 사양 행 자체 부재는 값 미확인(0/N)과 구분 — 추천 뷰가 specs를 조인하므로 재고·가격이 채워져도 미진입
+          if(rowMissing)return `<span class="badge badge-phoenix badge-phoenix-danger">사양 미등록</span> <span class="fs-10 text-body-tertiary">행 없음</span>`;
           const ok=done===total;
           return `<span class="badge badge-phoenix badge-phoenix-${ok?"primary":"warning"}">${ok?"확인 완료":"미확인 "+(total-done)}</span> <span class="fs-10 text-body-tertiary">${done}/${total}</span>`;
         }
@@ -357,7 +359,7 @@
               <td class="ps-4"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
               <td class="fw-semibold text-body-highlight"><a href="product-edit.html?id=${p.sku}" class="text-decoration-none text-body-highlight">${p.name}</a></td>
               <td class="text-body-tertiary">${p.cat}</td>
-              <td>${specBadge(p.spec_done,p.spec_total)}</td>
+              <td>${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
               <td class="text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
               <td class="text-end">${p.supplier_count}</td>
               <td class="text-end">${p.price_text}</td>
