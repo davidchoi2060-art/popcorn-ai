@@ -262,29 +262,29 @@
       </nav>
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item active">대시보드</li></ol></nav>
-        <div class="mb-4"><h2 class="mb-1">대시보드</h2><p class="text-body-tertiary mb-0">오늘 처리할 일 → 흐름 현황 → 시스템 상태 순서로 봅니다.</p></div>
+        <div class="mb-4"><h2 class="mb-1">대시보드 <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2><p class="text-body-tertiary mb-0">오늘 처리할 일 → 흐름 현황 → 시스템 상태 순서로 봅니다.</p></div>
 
         <h5 class="mb-3">처리 대기 <span class="fs-10 fw-normal text-body-tertiary">— 운영자의 판단이 필요한 것</span></h5>
         <div class="row g-3 mb-4">
-          <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-warning-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-warning" data-feather="clipboard" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">상품 검수</h6></div><h2 class="fw-bolder mb-2">9<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="review-queue.html" class="fs-9 fw-bold text-decoration-none">검수 대기 열기 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-primary" data-feather="dollar-sign" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">가격 검토 대기</h6></div><h2 class="fw-bolder mb-2">5<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="price-review.html" class="fs-9 fw-bold text-decoration-none">가격 판정 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-info-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-info" data-feather="truck" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">매입 대기</h6></div><h2 class="fw-bolder mb-2">4<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="sourcing.html" class="fs-9 fw-bold text-decoration-none">매입 견적 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-danger-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-danger" data-feather="send" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">주문 재전달 필요</h6></div><h2 class="fw-bolder mb-2">1<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="orders.html" class="fs-9 fw-bold text-decoration-none">전달 상태 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div>
+          <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-warning-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-warning" data-feather="clipboard" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">상품 검수</h6></div><h2 class="fw-bolder mb-2" id="pd-review">9<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="review-queue.html" class="fs-9 fw-bold text-decoration-none">검수 대기 열기 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-primary" data-feather="dollar-sign" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">가격 검토 대기</h6></div><h2 class="fw-bolder mb-2" id="pd-price">5<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="price-review.html" class="fs-9 fw-bold text-decoration-none">가격 판정 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-info-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-info" data-feather="truck" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold" id="pd-3-label">매입 대기</h6></div><h2 class="fw-bolder mb-2" id="pd-inbound">4<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="sourcing.html" class="fs-9 fw-bold text-decoration-none" id="pd-3-link">매입 견적 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-danger-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-danger" data-feather="send" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold" id="pd-4-label">주문 재전달 필요</h6></div><h2 class="fw-bolder mb-2" id="pd-refund">1<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="orders.html" class="fs-9 fw-bold text-decoration-none" id="pd-4-link">전달 상태 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div>
         </div>
 
         <h5 class="mb-3">오늘 흐름 <span class="fs-10 fw-normal text-body-tertiary">— 등록 → 추천 → 상담 → 주문</span></h5>
         <div class="row g-3 mb-4">
-          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">오늘 적재</h6><h3 class="fw-bolder mb-0">5,214<span class="fs-9 fw-semibold text-body-tertiary"> 행</span></h3><p class="fs-9 mb-0"><a href="csv-jobs.html" class="text-decoration-none">배치 #213 완료</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">추천 가능 재고</h6><h3 class="fw-bolder mb-0">24,912<span class="fs-9 fw-semibold text-body-tertiary"> 개</span></h3><p class="fs-9 mb-0"><a href="candidate-pool.html" class="text-decoration-none">전체의 94.1% · 얇은 카테고리 2</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">견적 상담</h6><h3 class="fw-bolder mb-0">48<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="sessions.html" class="text-decoration-none">완주 31 · 이탈 17</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">주문 전달</h6><h3 class="fw-bolder mb-0">12<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="orders.html" class="text-decoration-none">쇼핑몰 인계 11 · 재시도 1</a></p></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">오늘 적재</h6><h3 class="fw-bolder mb-0" id="fl-import">5,214<span class="fs-9 fw-semibold text-body-tertiary"> 행</span></h3><p class="fs-9 mb-0" id="fl-import-sub"><a href="csv-jobs.html" class="text-decoration-none">배치 #213 완료</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">추천 가능 재고</h6><h3 class="fw-bolder mb-0" id="fl-pool">24,912<span class="fs-9 fw-semibold text-body-tertiary"> 개</span></h3><p class="fs-9 mb-0"><a href="candidate-pool.html" class="text-decoration-none" id="fl-pool-sub">전체의 94.1% · 얇은 카테고리 2</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">견적 상담</h6><h3 class="fw-bolder mb-0" id="fl-sess">48<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="sessions.html" class="text-decoration-none" id="fl-sess-sub">완주 31 · 이탈 17</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">주문 전달</h6><h3 class="fw-bolder mb-0" id="fl-ord">12<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="orders.html" class="text-decoration-none" id="fl-ord-sub">쇼핑몰 인계 11 · 재시도 1</a></p></div></div></div>
         </div>
 
         <h5 class="mb-3">시스템 상태</h5>
         <div class="row g-3 mb-4">
           <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
             <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="text-body-tertiary fw-semibold mb-0">AI 사용량 (일 캡 $50)</h6><a href="ai-cost.html" class="fs-10">상세</a></div>
-            <h4 class="fw-bolder mb-2">$3.42 <span class="fs-10 fw-semibold text-body-tertiary">/ $50</span></h4>
-            <div class="progress" style="height:6px;"><div class="progress-bar bg-primary" style="width:6.8%;"></div></div>
+            <h4 class="fw-bolder mb-2" id="sy-ai">$3.42 <span class="fs-10 fw-semibold text-body-tertiary">/ $50</span></h4>
+            <div class="progress" style="height:6px;" id="sy-ai-bar"><div class="progress-bar bg-primary" style="width:6.8%;"></div></div>
             <p class="fs-10 text-body-tertiary mb-0 mt-2">캡 도달 시 배치 추출만 자동 연기 — 고객 대면 기능은 유지</p>
           </div></div></div>
           <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
             <h6 class="text-body-tertiary fw-semibold mb-2">적용 중인 버전 <span class="fs-10 fw-normal">(견적 재현 기준)</span></h6>
-            <div class="fs-9 d-flex flex-column gap-1">
+            <div class="fs-9 d-flex flex-column gap-1" id="sy-ver">
               <div class="d-flex justify-content-between"><a href="margin-policy.html" class="text-decoration-none">마진 정책</a><b>v8 · 07-01</b></div>
               <div class="d-flex justify-content-between"><a href="compat-rules.html" class="text-decoration-none">조립 호환 규칙</a><b>v5 · 06-28</b></div>
               <div class="d-flex justify-content-between"><a href="policy-weights.html" class="text-decoration-none">추천 기준</a><b>v12 · 07-05</b></div>
@@ -292,7 +292,7 @@
           </div></div></div>
           <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
             <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="text-body-tertiary fw-semibold mb-0">최근 작업 기록</h6><a href="activity-logs.html" class="fs-10">전체</a></div>
-            <div class="fs-9 d-flex flex-column gap-1">
+            <div class="fs-9 d-flex flex-column gap-1" id="sy-logs">
               <div class="text-truncate"><b>김운영</b> — P-3390 rated_watt 확정·잠금</div>
               <div class="text-truncate"><b>david</b> — 마진 정책 v8 발행</div>
               <div class="text-truncate"><b>시스템</b> — 배치 #213 적재 (5,214행)</div>
@@ -312,6 +312,53 @@
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
+
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 28) — 대시보드 실집계. 각 타일은 해당 화면과 같은 기준을 쓴다 ----
+        // 원천 부재 항목(오늘 적재·AI 사용량·적용 버전)은 값 대신 '—(준비 중)'으로 정직 표기.
+        const n = (v, u) => `${v.toLocaleString()}<span class="fs-9 fw-semibold text-body-tertiary"> ${u}</span>`;
+        const dash = u => `—<span class="fs-9 fw-semibold text-body-tertiary"> ${u}</span>`;
+        fetch("/api/admin/dashboard")
+          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(d=>{
+            const p=d.pending, f=d.flow, sy=d.system;
+            document.getElementById("pd-review").innerHTML=n(p.review,"건");
+            document.getElementById("pd-price").innerHTML=n(p.price,"건");
+            document.getElementById("pd-inbound").innerHTML=n(p.inbound,"건");
+            document.getElementById("pd-refund").innerHTML=n(p.refund,"건");
+            document.getElementById("pd-3-label").textContent="입고 대기";
+            const l3=document.getElementById("pd-3-link");l3.setAttribute("href","stock-inbound.html");
+            l3.innerHTML='재고 입고 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span>';
+            document.getElementById("pd-4-label").textContent="환불 처리 대기";
+            const l4=document.getElementById("pd-4-link");l4.setAttribute("href","refunds.html");
+            l4.innerHTML='환불 · 클레임 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span>';
+
+            document.getElementById("fl-import").innerHTML=f.import_rows==null?dash("행"):n(f.import_rows,"행");
+            document.getElementById("fl-import-sub").innerHTML=f.import_rows==null?'<span class="text-body-tertiary">CSV 적재 파이프라인 준비 중</span>':'<a href="csv-jobs.html" class="text-decoration-none">적재 이력</a>';
+            document.getElementById("fl-pool").innerHTML=n(f.pool_ok,"개");
+            document.getElementById("fl-pool-sub").textContent=`핵심 부품 ${f.pool_core}개 중 ${f.pool_rate}% · 게이트별 사유 보기`;
+            document.getElementById("fl-sess").innerHTML=n(f.sessions_today,"건");
+            document.getElementById("fl-sess-sub").textContent=`완주 ${f.sessions_done} · 이탈 ${f.sessions_drop}`;
+            document.getElementById("fl-ord").innerHTML=n(f.orders_total,"건");
+            document.getElementById("fl-ord-sub").textContent=`진행 중 ${f.orders_active} · ` + f.orders_by_status.map(o=>`${o.status} ${o.count}`).join(" · ");
+
+            document.getElementById("sy-ai").innerHTML=sy.ai_cost==null?'— <span class="fs-10 fw-semibold text-body-tertiary">LLM 연동 보류 — 집계 준비 중</span>':`$${sy.ai_cost}`;
+            document.getElementById("sy-ai-bar").innerHTML='<div class="progress-bar bg-secondary" style="width:0%;"></div>';
+            if(sy.versions==null)document.getElementById("sy-ver").innerHTML='<div class="text-body-tertiary">버전 관리(마진 정책·호환 규칙·추천 기준)는 준비 중입니다 — 현재는 단일 현행값으로 동작합니다.</div>';
+            document.getElementById("sy-logs").innerHTML=sy.recent_logs.map(g=>
+              `<div class="text-truncate"><b>${g.operator}</b> — ${g.kind} · ${g.action}${g.target?` (${g.target})`:""}</div>`).join("");
+
+            const b=document.getElementById("dataSrc");
+            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            const note=document.createElement("p");
+            note.className="fs-10 text-body-tertiary mt-2 mb-0";note.textContent=d.note;
+            document.querySelector(".content").appendChild(note);
+            if(window.feather)feather.replace();
+          })
+          .catch(()=>{});
+      })();
+      </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
         <div class="modal-dialog">
           <div class="modal-content mt-15 rounded-pill">

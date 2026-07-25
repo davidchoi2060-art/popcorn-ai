@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from .admin_activity_logs import router as admin_activity_logs_router
+from .admin_dashboard import router as admin_dashboard_router
 from .admin_member_reviews import router as admin_member_reviews_router
 from .admin_members import router as admin_members_router
 from .admin_orders import router as admin_orders_router
@@ -55,6 +56,7 @@ app.include_router(admin_stock_router)
 app.include_router(admin_pool_router)
 app.include_router(admin_sessions_router)
 app.include_router(admin_price_history_router)
+app.include_router(admin_dashboard_router)
 app.include_router(candidates_router)
 app.include_router(recommend_router)
 app.include_router(orders_router)
