@@ -22,6 +22,13 @@
 5. **말은 짧게.** 턴 사이 설명은 최소, 최종 보고는 요점만. 장황한 서술 금지.
 6. **세션은 일회용.** 결정은 이 파일/`docs/decisions/decision-log.md`에 기록. 긴 세션에 기억을 의존하지 마라. 컨텍스트가 길어지면 `/clear` 후 재시작.
 
+## 베타 배포 상태 (슬라이스 41 — 2026-07-26 가동)
+- 접속 `http://34.47.124.184/admin/login.html` · GCP `popcorn-app`(asia-northeast3-b) · Cloud SQL `popcorn-db`.
+- **nginx Basic Auth가 사이트 전체를 봉쇄한다** — 로그인이 dev 어댑터라 이게 유일한 실질 방벽이다. 걷어내려면 실 OAuth 먼저.
+- 앱은 `127.0.0.1:8000`에만 바인드(외부 직접 접근 불가) · 방화벽 80·22만.
+- 배포 갱신: 로컬 커밋·푸시 → 서버에서 `git pull` + `systemctl restart popcorn-api`(절차 `deploy/README.md`).
+- **서버 코드 직접 수정 금지** — 배포 타깃이다(전역 규약).
+
 ## 데이터 규모 (슬라이스 39 — 실카탈로그 적재 완료)
 - products **22,838건**(real 22,808 · demo 30). 원천 = `최종_정제완료_상품데이터.csv` 24,303행 + `db_product_specs.csv` EAV 339,650행.
 - **추천 후보 3,046건** · 검수 대기 **7,415건**(필수 사양 미확인). 적재는 `tools/catalog_import.py --origin real|demo`.
