@@ -25,7 +25,8 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
-from .admin_orders import OPERATOR_ID, _log
+from .admin_orders import _log
+from .auth import current_operator_id
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -126,7 +127,7 @@ def close_settlement(settle_date: str):
             " VALUES (:d, :g, :f, :n, '마감', :op, now())"
             " ON CONFLICT (settle_date) DO NOTHING RETURNING batch_id, closed_at"),
             {"d": settle_date, "g": gross, "f": fee, "n": gross - fee,
-             "op": OPERATOR_ID}).mappings().first()
+             "op": current_operator_id()}).mappings().first()
         if b is None:
             raise HTTPException(409, {"error": "already_closed",
                                       "detail": f"{settle_date}은 이미 마감된 일자입니다"})

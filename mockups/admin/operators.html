@@ -265,7 +265,7 @@
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
           <div><h2 class="mb-1">운영자 · 권한 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">확정·잠금·정책 발행은 <b class="text-body-secondary">누가 했는지가 남는 행위</b>입니다. 역할에 따라 허용 범위가 다릅니다.</p></div>
-          <button id="invite" class="btn btn-primary btn-sm">+ 운영자 초대</button>
+          <button id="invite" class="btn btn-primary btn-sm">직원 등록 방법</button>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
@@ -294,72 +294,159 @@
         <div id="liveSys" hidden class="mt-4"></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>(function(){function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}document.getElementById("invite").onclick=()=>toast("초대 메일 발송 (목업) — 역할은 가입 후 지정");if(window.feather)feather.replace();})();</script>
+      <script>(function(){function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}window.__toast=toast;document.getElementById("invite").onclick=()=>toast("직원이 login.html에서 회사 계정으로 신청하면 아래 '승인 대기'에 나타납니다");if(window.feather)feather.replace();})();</script>
       <script>
       (function(){
-        // ---- LIVE (슬라이스 32) — 실집계가 가능한 것만 실값. 원천이 없는 화면은 값 대신
-        // '원천 부재 + 사유'를 보여준다(0건과 원천 부재는 다르다).
-        var SCREEN = "operators";
+        // ---- LIVE (슬라이스 37) — 운영자 승인 게이트. owner 전용 API이므로 401/403이
+        // 정상 응답의 일부다: 왜 못 보는지를 화면이 말한다(빈 표로 두지 않는다).
+        var ROLE_OPTS = [["viewer","조회"],["operator","운영자"],["owner","관리자"]];
+        function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,
+          function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
         function card(title, sub, body, tone){
           return '<div class="card mb-3' + (tone ? ' border-' + tone : '') + '"><div class="card-body">'
             + '<h5 class="mb-1">' + title + '</h5>'
             + '<p class="fs-9 text-body-tertiary mb-3">' + sub + '</p>' + body + '</div></div>';
         }
-        function emptyCard(title, reason){
-          return card(title + ' <span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">원천 준비 중</span>',
-            '아직 기록이 쌓이는 경로가 없습니다 — 숫자를 지어내지 않고 사유를 밝힙니다.',
-            '<p class="fs-9 text-body-secondary mb-0">' + reason + '</p>', 'warning');
-        }
-        function fmt(iso){ if(!iso) return '—'; var d=new Date(iso);
+        function fmt(iso){ if(!iso) return '—'; var d = new Date(iso);
           return (d.getMonth()+1) + '-' + String(d.getDate()).padStart(2,'0'); }
+        function fmtT(iso){ if(!iso) return '—'; var d = new Date(iso);
+          return fmt(iso) + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+        function sel(id, cur){
+          return '<select class="form-select form-select-sm d-inline-block w-auto fs-10" id="' + id + '">'
+            + ROLE_OPTS.map(function(o){
+                return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + o[1] + '</option>';
+              }).join('') + '</select>';
+        }
+        function statusBadge(st){
+          var tone = st === '활성' ? 'primary' : (st === '대기' ? 'warning' : 'secondary');
+          return '<span class="badge badge-phoenix badge-phoenix-' + tone + '">' + esc(st) + '</span>';
+        }
 
-        fetch("/api/admin/system")
-          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-          .then(function(d){
-            var host = document.getElementById("liveSys"), html = "";
-            if(SCREEN === "operators"){
-              var rows = d.operators.rows.map(function(o){
-                return '<tr><td><b>' + o.name + '</b><div class="fs-10 text-body-tertiary">' + o.email + '</div></td>'
-                  + '<td><span class="badge badge-phoenix badge-phoenix-primary">' + o.role_label + '</span></td>'
+        function post(url, body){
+          return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                             body: JSON.stringify(body || {})})
+            .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, d: d}; }); });
+        }
+        function act(url, body, okMsg){
+          post(url, body).then(function(res){
+            if(!res.ok){ window.__toast(res.d.detail || '실패했습니다'); return; }
+            window.__toast(typeof okMsg === 'function' ? okMsg(res.d) : okMsg);
+            setTimeout(load, 700);
+          }).catch(function(){ window.__toast('API 연결 실패'); });
+        }
+
+        function render(d){
+          var host = document.getElementById('liveSys'), html = '';
+          var pend = d.items.filter(function(o){ return o.status === '대기'; });
+          var rest = d.items.filter(function(o){ return o.status !== '대기'; });
+
+          // ① 승인 대기 — 이 화면의 심장. 없으면 '없다'고 명시(원천 부재와 구분).
+          if(pend.length){
+            html += card('승인 대기 <span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">'
+                + pend.length + '건</span>',
+              '직원이 회사 계정으로 본인 확인을 마친 신청입니다. 권한을 정해 승인하면 그 순간부터 접근됩니다.',
+              pend.map(function(o){
+                return '<div class="border-top pt-3 mt-3 first:mt-0 d-flex flex-wrap justify-content-between align-items-end gap-2">'
+                  + '<div><b class="fs-8">' + esc(o.name) + '</b> '
+                  + '<span class="badge badge-phoenix badge-phoenix-secondary fs-10">' + esc(o.provider) + ' 인증</span>'
+                  + '<div class="fs-9 text-body-secondary">' + esc(o.email) + '</div>'
+                  + '<div class="fs-10 text-body-tertiary">연락처 ' + esc(o.phone || '미기재')
+                  + ' · 담당 ' + esc(o.duty || '미기재') + ' · 신청 ' + fmtT(o.joined) + '</div></div>'
+                  + '<div class="d-flex align-items-center gap-2">' + sel('r' + o.id, 'operator')
+                  + '<button class="btn btn-primary btn-sm" data-action="approve" data-id="' + o.id + '">승인</button>'
+                  + '<button class="btn btn-phoenix-danger btn-sm" data-action="suspend" data-id="' + o.id + '">거절(정지)</button>'
+                  + '</div></div>';
+              }).join(''), 'warning');
+          } else {
+            html += card('승인 대기', '대기 중인 신청이 0건입니다 — 신청이 들어오면 여기에 먼저 표시됩니다.',
+              '<p class="fs-9 text-body-secondary mb-0">직원은 <a href="login.html">login.html</a>에서 회사 계정으로 신청합니다.</p>');
+          }
+
+          // ② 계정 목록 — 권한 변경·정지. 작업 수는 감사 로그 실집계.
+          html += card('등록된 계정 <span class="badge badge-phoenix badge-phoenix-primary fs-10 align-middle">실데이터</span>',
+            '작업 수는 작업 기록(감사 로그) 실집계입니다. 정지하면 진행 중 세션이 즉시 끊깁니다.',
+            '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
+            + '<thead><tr class="text-body-tertiary"><th>계정</th><th>권한</th><th>상태</th>'
+            + '<th class="text-end">작업</th><th class="text-end">세션</th><th>최근 로그인</th>'
+            + '<th>승인자</th><th></th></tr></thead><tbody>'
+            + rest.map(function(o){
+                return '<tr><td><b>' + esc(o.name) + '</b>' + (o.is_me
+                    ? ' <span class="badge badge-phoenix badge-phoenix-info fs-10">나</span>' : '')
+                  + '<div class="fs-10 text-body-tertiary">' + esc(o.email) + '</div></td>'
+                  + '<td>' + (o.status === '활성' ? sel('c' + o.id, o.role)
+                      : '<span class="text-body-tertiary">' + esc(o.role_label) + '</span>') + '</td>'
+                  + '<td>' + statusBadge(o.status) + '</td>'
                   + '<td class="text-end">' + o.acts.toLocaleString() + '</td>'
-                  + '<td class="text-end">' + o.acts7.toLocaleString() + '</td>'
-                  + '<td class="text-body-tertiary">' + fmt(o.last_at) + '</td>'
-                  + '<td><span class="badge badge-phoenix badge-phoenix-secondary">' + o.status + '</span></td></tr>';
-              }).join('');
-              html += card('등록된 운영자 <span class="badge badge-phoenix badge-phoenix-primary fs-10 align-middle">실데이터</span>',
-                '작업량은 작업 기록(감사 로그) 기준 실집계입니다.',
-                '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
-                + '<thead><tr class="text-body-tertiary"><th>계정</th><th>권한</th><th class="text-end">전체 작업</th>'
-                + '<th class="text-end">최근 7일</th><th>마지막 활동</th><th>상태</th></tr></thead><tbody>'
-                + rows + '</tbody></table></div>'
-                + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + d.operators.note + '</p>');
-            } else if(SCREEN === "ai"){
-              html += emptyCard('AI 사용량 · 비용', d.ai_cost.reason);
+                  + '<td class="text-end">' + (o.live_sessions
+                      ? '<b>' + o.live_sessions + '</b>' : '<span class="text-body-quaternary">0</span>') + '</td>'
+                  + '<td class="text-body-tertiary">' + fmtT(o.last_login) + '</td>'
+                  + '<td class="text-body-tertiary">' + esc(o.approver || '—') + '</td>'
+                  + '<td class="text-end text-nowrap">'
+                  + (o.status === '활성' && !o.is_me
+                      ? '<button class="btn btn-phoenix-secondary btn-sm me-1" data-action="role" data-id="' + o.id + '">권한 저장</button>'
+                        + '<button class="btn btn-phoenix-danger btn-sm" data-action="suspend" data-id="' + o.id + '">정지</button>'
+                      : (o.is_me ? '<span class="fs-10 text-body-quaternary">본인 계정</span>'
+                                 : '<button class="btn btn-phoenix-primary btn-sm" data-action="approve" data-id="' + o.id + '">재승인</button>'))
+                  + '</td></tr>';
+              }).join('')
+            + '</tbody></table></div>'
+            + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + esc(d.note) + '</p>');
+
+          host.innerHTML = html;
+          host.hidden = false;
+
+          host.querySelectorAll('button[data-action]').forEach(function(b){
+            var id = b.dataset.id;
+            if(b.dataset.action === 'approve'){
+              b.onclick = function(){
+                var s = document.getElementById('r' + id);
+                act('/api/admin/operators/' + id + '/approve', {role: s ? s.value : 'operator'},
+                    function(r){ return '승인 완료 — 권한 ' + r.role; });
+              };
+            } else if(b.dataset.action === 'role'){
+              b.onclick = function(){
+                act('/api/admin/operators/' + id + '/role',
+                    {role: document.getElementById('c' + id).value},
+                    function(r){ return '권한 변경 — ' + r.role; });
+              };
             } else {
-              if(d.imports.empty){
-                html += emptyCard('일괄 등록 이력', d.imports.reason);
-              } else {
-                html += card('적재 배치', '최근 20건',
-                  '<div class="table-responsive"><table class="table table-sm fs-9 mb-0"><tbody>'
-                  + d.imports.rows.map(function(j){
-                      return '<tr><td>#' + j.job_id + '</td><td>' + j.file + '</td>'
-                        + '<td class="text-end">' + j.total + '행</td><td>' + j.status + '</td></tr>';
-                    }).join('') + '</tbody></table></div>');
-              }
+              b.onclick = function(){
+                act('/api/admin/operators/' + id + '/suspend', {},
+                    function(r){ return '정지 완료 — 세션 ' + r.sessions_killed + '개 즉시 종료'; });
+              };
             }
-            host.innerHTML = html;
-            host.hidden = false;
-            var b = document.getElementById("dataSrc");
-            if(SCREEN === "operators"){
-              b.textContent = "실데이터 · Cloud SQL";
-              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
-            } else {
-              b.textContent = "원천 준비 중 — 아래 사유 참조";
-              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
-            }
-            if(window.feather) feather.replace();
-          })
-          .catch(function(){});
+          });
+
+          var b = document.getElementById('dataSrc');
+          b.textContent = '실데이터 · Cloud SQL';
+          b.classList.remove('badge-phoenix-secondary', 'badge-phoenix-warning');
+          b.classList.add('badge-phoenix-primary');
+          if(window.feather) feather.replace();
+        }
+
+        function denied(code){
+          var host = document.getElementById('liveSys');
+          host.innerHTML = card('운영자 목록을 볼 수 없습니다 '
+              + '<span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">' + code + '</span>',
+            '아래 표는 목업 더미입니다 — 실제 계정이 아닙니다.',
+            code === 401
+              ? '<p class="fs-9 text-body-secondary mb-0">로그인이 필요합니다 — <a href="login.html">관리자 로그인</a></p>'
+              : '<p class="fs-9 text-body-secondary mb-0">이 화면은 <b>관리자(owner) 권한 전용</b>입니다. '
+                + '운영자·조회 권한으로는 계정 승인·권한 변경을 할 수 없습니다.</p>', 'warning');
+          host.hidden = false;
+        }
+
+        function load(){
+          fetch('/api/admin/operators')
+            .then(function(r){
+              if(r.status === 401 || r.status === 403){ denied(r.status); return null; }
+              if(!r.ok) throw new Error(r.status);
+              return r.json();
+            })
+            .then(function(d){ if(d) render(d); })
+            .catch(function(){});   // API 부재 = 목업 단독 열람(더미 원형 유지)
+        }
+        load();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
@@ -602,6 +689,7 @@
     <script src="assets/js/phoenix.js"></script>
 
   <script src="../shared/su-icons.js"></script>
+  <script src="../shared/admin-auth.js"></script>
 </body>
 
 </html>

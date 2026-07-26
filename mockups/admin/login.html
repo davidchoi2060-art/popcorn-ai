@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko" dir="ltr" data-navigation-type="default">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>팝콘PC 관리자 · 로그인</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicons/favicon-32x32.png">
+    <script src="assets/js/config.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800;900&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
+    <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
+    <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+    <style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style>
+  </head>
+
+  <body data-screen-id="ADM-SYS-021" data-domain="admin.auth">
+    <main class="main" id="top">
+      <div class="container-small py-6 py-lg-8">
+        <div class="row justify-content-center"><div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xxl-5">
+
+          <div class="text-center mb-4">
+            <a class="text-decoration-none" href="index.html"><h4 class="fw-bolder mb-1">팝콘PC <span class="text-primary">관리자</span></h4></a>
+            <p class="text-body-tertiary mb-0 fs-9">내부 운영 도구 — 승인된 직원만 이용할 수 있습니다.</p>
+          </div>
+
+          <div class="card"><div class="card-body p-4 p-sm-5">
+            <h5 class="mb-1">직원 로그인</h5>
+            <p class="text-body-tertiary fs-9 mb-4">회사 계정(구글·카카오)으로 본인 확인 → 관리자 승인 후 이용합니다.
+              <b class="text-body-secondary">비밀번호는 저장하지 않습니다.</b></p>
+
+            <!-- 소셜 신원 확인 (1단계) -->
+            <div class="d-grid gap-2 mb-3">
+              <button id="btnGoogle" class="btn btn-phoenix-secondary d-flex flex-center gap-2" type="button">
+                <span class="uil uil-google fs-8"></span>구글 계정으로 계속</button>
+              <button id="btnKakao" class="btn btn-phoenix-secondary d-flex flex-center gap-2" type="button">
+                <span class="uil uil-comment-alt-message fs-8"></span>카카오톡으로 계속</button>
+            </div>
+
+            <div class="position-relative my-4"><hr class="bg-body-secondary"><div class="divider-content-center bg-body">또는</div></div>
+
+            <!-- 2단계: 등록 정보 (승인 심사 자료) -->
+            <form id="loginForm" novalidate>
+              <div class="mb-3">
+                <label class="form-label fs-9" for="email">회사 이메일 <span class="text-danger">*</span></label>
+                <input class="form-control form-control-sm" id="email" name="email" type="email"
+                       placeholder="name@popcornpc.co.kr" autocomplete="username" required>
+              </div>
+              <div class="row g-2">
+                <div class="col-6 mb-3">
+                  <label class="form-label fs-9" for="name">이름</label>
+                  <input class="form-control form-control-sm" id="name" type="text" placeholder="홍길동">
+                </div>
+                <div class="col-6 mb-3">
+                  <label class="form-label fs-9" for="phone">연락처</label>
+                  <input class="form-control form-control-sm" id="phone" type="tel" placeholder="010-0000-0000">
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="form-label fs-9" for="duty">담당 업무</label>
+                <input class="form-control form-control-sm" id="duty" type="text" placeholder="예: 매장 검수 · 단가표 반영">
+                <div class="form-text fs-10">승인 담당자가 누구에게 어떤 권한을 줄지 판단하는 자료입니다.</div>
+              </div>
+              <button class="btn btn-primary w-100" type="submit" id="btnSubmit">로그인 · 사용 신청</button>
+            </form>
+
+            <!-- 결과 상태 (예외 UI 미리 마크업) -->
+            <div id="stPending" hidden class="alert alert-warning mt-4 mb-0 p-3">
+              <h6 class="alert-heading mb-1"><span class="uil uil-clock me-1"></span>승인 대기</h6>
+              <p class="fs-9 mb-0" id="pendingMsg">신청이 접수됐습니다 — 관리자 승인 후 이용할 수 있습니다.</p>
+              <p class="fs-10 mb-0 mt-2">승인 전에는 어떤 데이터도 보이지 않습니다(빈 화면이 아니라 접근 차단입니다).</p>
+            </div>
+            <div id="stError" hidden class="alert alert-danger mt-4 mb-0 p-3">
+              <h6 class="alert-heading mb-1"><span class="uil uil-exclamation-octagon me-1"></span>로그인할 수 없습니다</h6>
+              <p class="fs-9 mb-0" id="errorMsg">—</p>
+            </div>
+            <div id="stOk" hidden class="alert alert-primary mt-4 mb-0 p-3">
+              <h6 class="alert-heading mb-1"><span class="uil uil-check-circle me-1"></span>로그인 완료</h6>
+              <p class="fs-9 mb-0" id="okMsg">—</p>
+            </div>
+          </div></div>
+
+          <div class="card mt-3 border-warning"><div class="card-body py-3">
+            <p class="fs-10 text-body-secondary mb-0">
+              <b class="text-warning">현재 신원 확인은 dev 어댑터입니다</b> — 소셜 앱(구글 클라이언트 ID·카카오 REST 키)이
+              등록되기 전까지 <b>입력한 이메일을 본인 것으로 신뢰</b>합니다. 승인·권한·세션 흐름은 실제와 같으며,
+              연동 시 신원 검증 부분만 교체됩니다. <b>로컬 전용 — 공개 배포 차단 사유.</b>
+            </p>
+          </div></div>
+
+        </div></div>
+      </div>
+    </main>
+
+    <script>
+    (function(){
+      var form = document.getElementById("loginForm");
+      var boxes = { pending: "stPending", error: "stError", ok: "stOk" };
+      function show(which, msg){
+        Object.keys(boxes).forEach(function(k){ document.getElementById(boxes[k]).hidden = true; });
+        if(!which) return;
+        var el = document.getElementById(boxes[which]);
+        el.hidden = false;
+        var p = el.querySelector("p"); if(msg && p) p.textContent = msg;
+      }
+      function social(provider, label){
+        var email = document.getElementById("email").value.trim();
+        if(!email){
+          document.getElementById("email").focus();
+          show("error", label + " 인증은 앱 등록 후 동작합니다. 지금은 회사 이메일을 입력해 같은 흐름을 검증하세요.");
+          return;
+        }
+        submit(provider);
+      }
+      document.getElementById("btnGoogle").onclick = function(){ social("google", "구글"); };
+      document.getElementById("btnKakao").onclick = function(){ social("kakao", "카카오톡"); };
+
+      function submit(provider){
+        var body = {
+          email: document.getElementById("email").value.trim(),
+          name: document.getElementById("name").value.trim() || null,
+          phone: document.getElementById("phone").value.trim() || null,
+          duty: document.getElementById("duty").value.trim() || null,
+          provider: provider || "dev"
+        };
+        if(!body.email || body.email.indexOf("@") < 0){ show("error", "이메일 형식을 확인하세요."); return; }
+        var btn = document.getElementById("btnSubmit");
+        btn.disabled = true; btn.textContent = "확인 중...";
+        fetch("/api/admin/auth/login", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(body)
+        }).then(function(r){
+          return r.json().then(function(d){ return {ok: r.ok, status: r.status, d: d}; });
+        }).then(function(res){
+          btn.disabled = false; btn.textContent = "로그인 · 사용 신청";
+          if(!res.ok){ show("error", res.d.detail || ("서버 오류 " + res.status)); return; }
+          if(res.d.state === "pending"){ show("pending", res.d.message); return; }
+          show("ok", (res.d.message || "환영합니다") + " — 대시보드로 이동합니다.");
+          setTimeout(function(){ location.href = "index.html"; }, 900);
+        }).catch(function(){
+          btn.disabled = false; btn.textContent = "로그인 · 사용 신청";
+          show("error", "API 서버에 연결할 수 없습니다(로컬 8000 포트 확인).");
+        });
+      }
+      form.onsubmit = function(e){ e.preventDefault(); submit("dev"); };
+
+      // 이미 로그인 상태면 되돌린다
+      fetch("/api/admin/auth/me").then(function(r){ return r.json(); }).then(function(d){
+        if(d.authenticated){
+          show("ok", d.operator.name + " (" + d.operator.role + ") 로그인 상태입니다 — 대시보드로 이동합니다.");
+          setTimeout(function(){ location.href = "index.html"; }, 900);
+        }
+      }).catch(function(){});
+    })();
+    </script>
+    <script src="../shared/su-icons.js"></script>
+  </body>
+</html>

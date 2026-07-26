@@ -24,7 +24,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from .admin_orders import OPERATOR_ID, _log
+from .admin_orders import _log
+from .auth import current_operator_id
 from .admin_price_import import _half_up_1000, _reprice, _settings
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
@@ -116,7 +117,7 @@ def decide(product_code: int, body: DecideBody):
                     " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
                     " VALUES (:pc, 'sale', :o, :n, 'manual', :ref, :op)"),
                     {"pc": product_code, "o": p["sale_price"], "n": body.price,
-                     "ref": log_id, "op": OPERATOR_ID})
+                     "ref": log_id, "op": current_operator_id()})
                 applied = body.price
             else:  # keep — 판매가 미산정 유지 + 제안 차단(잠금)
                 conn.execute(text(

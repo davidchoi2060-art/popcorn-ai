@@ -5,7 +5,8 @@ undone(되돌려짐) 배지를 파생한다(ref_log_id 역참조 EXISTS — 각 
 동일 관계. ref_log_id는 price_import가 문자열, 나머지가 int로 저장해 텍스트 비교로 통일).
 비가역 처리(환불 complete 등)는 undo 행 자체가 없어 배지도 자연히 없다.
 표시 문장(행위·대상·변경 내용)은 서버 파생 — 화면은 렌더만.
-운영자는 mock 인증 한계로 전 행 '관리자'(OPERATOR_ID=1 고정 — 실 인증 이관).
+운영자 주체는 슬라이스 37부터 로그인 세션의 운영자다(그 전 기록은 시드 운영자 1 고정 —
+과거 행은 원장이므로 소급 수정하지 않는다).
 이관: 페이지네이션·created_at 인덱스·기간/운영자 필터·CSV 내보내기.
 """
 from fastapi import APIRouter

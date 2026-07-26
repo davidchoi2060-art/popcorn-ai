@@ -20,7 +20,9 @@ from .price_parser import parse_price_file
 
 router = APIRouter(prefix="/api/admin")
 
-OPERATOR_ID = 1
+# 작업 기록 주체 = 세션 운영자(슬라이스 37). 세션 없는 경로는 시드 운영자(1)로 폴백.
+from .auth import current_operator_id
+
 SIM_THRESHOLD = 0.3
 
 
@@ -167,7 +169,7 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
             " (product_code, field, old_price, new_price, reason, ref_id, changed_by, supplier_id)"
             " VALUES (:pc, 'purchase', :o, :n, :r, :ref, :op, :sid)"),
             {"pc": pc, "o": prod["purchase_price"], "n": new_purchase,
-             "r": reason, "ref": ref_id, "op": OPERATOR_ID, "sid": src_supplier})
+             "r": reason, "ref": ref_id, "op": current_operator_id(), "sid": src_supplier})
         out["purchase_changed"] = True
     if restore is not None and new_purchase == restore["purchase"]:
         new_sale = restore["sale"]
@@ -183,7 +185,7 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
             "INSERT INTO product_price_history (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
             " VALUES (:pc, 'sale', :o, :n, :r, :ref, :op)"),
             {"pc": pc, "o": prod["sale_price"], "n": new_sale,
-             "r": reason, "ref": ref_id, "op": OPERATOR_ID})
+             "r": reason, "ref": ref_id, "op": current_operator_id()})
         out["sale_changed"] = True
     return out
 
@@ -192,7 +194,7 @@ def _log(conn, action: str, target_id: str, detail: dict) -> int:
     return conn.execute(text(
         "INSERT INTO admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)"
         " VALUES (:op, :a, 'price_file', :t, CAST(:d AS JSONB)) RETURNING log_id"),
-        {"op": OPERATOR_ID, "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
+        {"op": current_operator_id(), "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
 
 
 def _preset_view(conn, supplier_id: int, row_count) -> dict:

@@ -13,7 +13,9 @@ from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
-OPERATOR_ID = 1  # 인증 슬라이스 전까지 시드 운영자 고정
+# 작업 기록 주체 = 세션 운영자(슬라이스 37). 세션 없는 경로는 시드 운영자(1)로 폴백.
+from .auth import current_operator_id
+
 
 # ERD §7.3 호환성 치명 필드 (목업 CRIT_CONFLICT와 다름 — ERD 우선 채택, 의도된 차이)
 CRITICAL_FIELDS = {"length_mm", "gpu_max_mm", "rated_watt", "socket"}
@@ -157,7 +159,7 @@ def sourcing_link(body: LinkBody):
             " VALUES (:s, :k, :pc, :m, :op, now())"
             " ON CONFLICT (supplier_id, model_key) DO NOTHING RETURNING map_id"),
             {"s": row["supplier_id"], "k": row["model_name"], "pc": prod["product_code"],
-             "m": method, "op": OPERATOR_ID}).scalar()
+             "m": method, "op": current_operator_id()}).scalar()
         if map_id is None:
             raise HTTPException(409, "이미 연결된 모델입니다")
         log_id = _log(conn, "sourcing_link", row["model_name"][:100],
@@ -265,7 +267,7 @@ def _approve(conn, review, value, new_status: str) -> tuple[dict, int]:
     conn.execute(text(
         "UPDATE product_reviews SET review_status=:st, reviewed_by=:op, reviewed_at=now()"
         " WHERE review_id=:rid"),
-        {"st": new_status, "op": OPERATOR_ID, "rid": review["review_id"]})
+        {"st": new_status, "op": current_operator_id(), "rid": review["review_id"]})
     return before, pool_added
 
 
@@ -274,7 +276,7 @@ def _log(conn, action: str, target_id: str, detail: dict) -> int:
     return conn.execute(text(
         "INSERT INTO admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)"
         " VALUES (:op, :a, 'product_review', :t, CAST(:d AS JSONB)) RETURNING log_id"),
-        {"op": OPERATOR_ID, "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
+        {"op": current_operator_id(), "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
 
 
 def _lock_waiting_review(conn, review_id: int):
@@ -298,7 +300,7 @@ def process_review(review_id: int, body: ProcessBody):
         if body.action == "reject":
             conn.execute(text(
                 "UPDATE product_reviews SET review_status='보류', reviewed_by=:op, reviewed_at=now()"
-                " WHERE review_id=:rid"), {"op": OPERATOR_ID, "rid": review_id})
+                " WHERE review_id=:rid"), {"op": current_operator_id(), "rid": review_id})
             log_id = _log(conn, "review_process", str(review_id),
                           {"mode": "reject", "review_id": review_id,
                            "before": {"review_status": "대기"}})

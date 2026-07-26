@@ -15,7 +15,8 @@ note는 서버 파생 문장(손글 서술 저장처 없음). 이관: 회원 딥
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
-from .admin_orders import OPERATOR_ID, _log
+from .admin_orders import _log
+from .auth import current_operator_id
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")

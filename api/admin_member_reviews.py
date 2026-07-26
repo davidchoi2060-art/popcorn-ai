@@ -18,7 +18,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from .admin_orders import OPERATOR_ID, _log
+from .admin_orders import _log
+from .auth import current_operator_id
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")

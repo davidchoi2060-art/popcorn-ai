@@ -14,6 +14,7 @@ from .admin_dashboard import router as admin_dashboard_router
 from .admin_engine_rules import router as admin_engine_rules_router
 from .admin_member_reviews import router as admin_member_reviews_router
 from .admin_members import router as admin_members_router
+from .admin_operators import router as admin_operators_router
 from .admin_orders import router as admin_orders_router
 from .admin_refunds import router as admin_refunds_router
 from .admin_payments import router as admin_payments_router
@@ -34,9 +35,13 @@ from .my_payments import router as my_payments_router
 from .orders import router as orders_router
 from .recommend import router as recommend_router
 from .swap import router as swap_router
+from .auth import auth_middleware, router as auth_router
 from .db import engine
 
 app = FastAPI(title="popcorn-pc-ai (local slice)")
+
+# 관리자 인증 게이트(슬라이스 37) — /api/admin/*는 세션+권한 필요(인증 엔드포인트 예외)
+app.middleware("http")(auth_middleware)
 
 
 @app.get("/api/health")
@@ -46,6 +51,8 @@ def health():
     return {"ok": True}
 
 
+app.include_router(auth_router)
+app.include_router(admin_operators_router)
 app.include_router(admin_products_router)
 app.include_router(admin_reviews_router)
 app.include_router(admin_orders_router)

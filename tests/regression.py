@@ -51,23 +51,64 @@ def check(name, ok, expect=None, got=None, kind="INVARIANT"):
         print(line)
 
 
+# 관리자 API는 슬라이스 37부터 세션 쿠키를 요구한다(로그인 없이 돌리면 전부 401).
+# http.cookiejar는 dotless 호스트('localhost')에 '.local'을 붙여 쿠키를 되돌려주지 않으므로
+# 세션 쿠키를 직접 들고 다닌다 — 브라우저 동작과 같고, 무엇을 보내는지가 코드에 보인다.
+SESSION = {"cookie": None}
+ADMIN_EMAIL = "admin@popcornpc.local"      # 시드 owner — dev 어댑터로 로그인
+
+
+def _headers(json_body=False):
+    h = {"Content-Type": "application/json"} if json_body else {}
+    if SESSION["cookie"]:
+        h["Cookie"] = SESSION["cookie"]
+    return h
+
+
 def get(path):
-    with urllib.request.urlopen(BASE + path) as r:
+    req = urllib.request.Request(BASE + path, headers=_headers())
+    with urllib.request.urlopen(req) as r:
         return json.load(r)
 
 
 def post(path, body=None):
     req = urllib.request.Request(
         BASE + path, data=json.dumps(body or {}).encode(), method="POST",
-        headers={"Content-Type": "application/json"})
+        headers=_headers(True))
     try:
         with urllib.request.urlopen(req) as r:
+            _capture(r)
             return r.status, json.load(r)
     except urllib.error.HTTPError as e:
         try:
             return e.code, json.loads(e.read().decode())
         except Exception:
             return e.code, None
+
+
+def _capture(resp):
+    """Set-Cookie에서 세션 쿠키를 집어 이후 요청에 붙인다."""
+    for raw in resp.headers.get_all("Set-Cookie") or []:
+        if raw.startswith("popcorn_admin_session="):
+            SESSION["cookie"] = raw.split(";")[0]
+
+
+def anon_status(path, body=None):
+    """세션 쿠키를 붙이지 않고 호출 — 인증 게이트가 실제로 막는지 확인하는 용도."""
+    req = urllib.request.Request(
+        BASE + path,
+        data=None if body is None else json.dumps(body).encode(),
+        method="GET" if body is None else "POST",
+        headers={} if body is None else {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+
+
+def login():
+    return post("/api/admin/auth/login", {"email": ADMIN_EMAIL, "provider": "dev"})
 
 
 def rec(budget):
@@ -229,6 +270,69 @@ def test_customer():
 
 
 # ────────────────────────── 7. 가드 (권한·상태 전이) ──────────────────────────
+# ──────────────────────── 8. 관리자 인증 · 승인 게이트 (슬라이스 37) ────────────────────────
+def test_auth():
+    print("\n[8] 관리자 인증 · 승인 게이트 (슬라이스 37)")
+    check("미인증 관리자 API 401", anon_status("/api/admin/products") == 401,
+          401, anon_status("/api/admin/products"))
+    anon_cust = anon_status("/api/candidates/count", {"constraints": []})
+    check("미인증도 고객 API는 열림", anon_cust == 200, 200, anon_cust)
+
+    d = get("/api/admin/auth/me")
+    check("세션 확인 me", bool(d["authenticated"]) and d["operator"]["role"] == "owner",
+          "owner 세션", d.get("operator"))
+
+    ops = get("/api/admin/operators")
+    me = [o for o in ops["items"] if o["is_me"]]
+    check("운영자 목록에 본인 표시", len(me) == 1, 1, len(me))
+    check("본인 라이브 세션 1개 이상", bool(me) and me[0]["live_sessions"] >= 1,
+          ">=1", me[0]["live_sessions"] if me else None)
+
+    # 승인 게이트 — 신규 신청은 '대기'이며 그 상태로는 세션이 발급되지 않는다.
+    # 계정은 원장이므로 지우지 않는다 → 2회차 실행은 '정지 잔류'를 확인하는 경로로 간다
+    # (분기마다 검사 2건씩 — 합계는 실행 횟수와 무관하게 같다).
+    applicant = "regress-applicant@popcornpc.local"
+    prev = [o for o in ops["items"] if o["email"] == applicant]
+    if prev:
+        check("이전 실행의 신청 계정이 정지 상태로 남음", prev[0]["status"] == "정지",
+              "정지", prev[0]["status"])
+        st, _ = post("/api/admin/auth/login", {"email": applicant, "provider": "dev"})
+        check("정지 계정 로그인 차단", st == 403, 403, st)
+        new_id = prev[0]["id"]
+    else:
+        st, r = post("/api/admin/auth/login",
+                     {"email": applicant, "name": "회귀신청자", "provider": "dev",
+                      "duty": "회귀 세트 검증용"})
+        check("신규 신청은 대기", r.get("state") == "pending", "pending", r.get("state"))
+        new_id = r["operator"]["id"]
+        st, _ = post("/api/admin/auth/login", {"email": applicant, "provider": "dev"})
+        check("대기 계정 재로그인도 대기", st == 200, 200, st)
+
+    st, r = post("/api/admin/operators/%d/approve" % new_id, {"role": "viewer"})
+    check("승인 → 활성", st == 200 and r.get("status") == "활성", "활성", r)
+    st, r = post("/api/admin/operators/%d/role" % new_id, {"role": "operator"})
+    check("권한 변경", st == 200 and r.get("role") == "operator", "operator", r)
+    st, r = post("/api/admin/operators/%d/suspend" % new_id)
+    check("정지 + 세션 무효화", st == 200 and r.get("status") == "정지", "정지", r)
+
+    # 자기 계정 보호 — 관리자가 스스로 잠기는 것을 막는다
+    my_id = me[0]["id"] if me else 1
+    st, _ = post("/api/admin/operators/%d/suspend" % my_id)
+    check("자기 계정 정지 차단", st == 409, 409, st)
+    st, _ = post("/api/admin/operators/%d/role" % my_id, {"role": "viewer"})
+    check("자기 계정 강등 차단", st == 409, 409, st)
+
+    # 마지막 관리자 보호 — 활성 owner가 1명뿐이면 정지 불가(자기 정지 차단과 별개 규칙)
+    owners = [o for o in get("/api/admin/operators")["items"]
+              if o["role"] == "owner" and o["status"] == "활성"]
+    check("활성 관리자 1명 이상 유지", len(owners) >= 1, ">=1", len(owners))
+
+    # 승인·권한·정지가 감사 로그에 남는다(주체 = 로그인 운영자)
+    logs = get("/api/admin/activity-logs")
+    acts = [l for l in logs["items"] if str(l.get("kind_raw", l.get("kind", ""))) == "operator"]
+    check("운영자 관리 행위가 작업 기록에 남음", len(acts) >= 3, ">=3건", len(acts))
+
+
 def test_guards():
     print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
     st, _ = post("/api/my/reviews", {"email": "mj.kim@example.com", "item_id": 999999,
@@ -255,8 +359,20 @@ def main():
         print(f"\n서버에 연결할 수 없습니다({BASE}). API를 먼저 띄우세요.\n  {e}")
         return 2
 
+    # 관리자 인증(슬라이스 37) — 로그인 없이는 관리자 항목 전부가 401이 된다
+    try:
+        st, d = login()
+    except Exception as e:
+        print("\n관리자 로그인 실패: " + repr(e))
+        return 2
+    if (d or {}).get("state") != "active":
+        print("\n관리자 로그인이 활성 세션을 만들지 못했습니다: " + repr(d))
+        print("  시드 owner(" + ADMIN_EMAIL + ")가 '활성' 상태인지 확인하세요.")
+        return 2
+    print("\n로그인: " + str(d["operator"].get("name")) + " · 권한 " + d["operator"]["role"])
+
     for fn in (test_engine, test_compat, test_gates, test_consistency,
-               test_ledgers, test_customer, test_guards):
+               test_ledgers, test_customer, test_auth, test_guards):
         try:
             fn()
         except Exception as e:

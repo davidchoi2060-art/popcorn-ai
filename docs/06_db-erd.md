@@ -283,7 +283,47 @@ CREATE TABLE compat_rules (
 
 `users`, `logs`, `recommendations`, `recommendation_items`, `policy_weights`, `category_margin_policies`, `api_cost_logs`, `promo_click_logs`, `swap_event_logs`, `rate_limit_policies`, `cost_thresholds`, `csv_import_jobs`, `csv_import_errors`, `admin_operators`, `admin_operator_activity_logs`, `product_sourcing_match_candidates`는 Ver 2.0 정의를 유지한다.
 
-### 3.9 [5차 개정] 매입 견적 — sourcing_batches / product_sourcing_quotes (A-10 정합)
+### 3.9 [5차 개정] 관리자 인증 — admin_operators 확장 / admin_sessions (사용자 확정 2026-07-26)
+
+**설계 원칙: 비밀번호를 저장하지 않는다.** 신원은 소셜 제공자(구글)가 확인하고, 우리는 **승인 여부와
+권한만** 관리한다. 우리가 갖지 않은 정보는 유출될 수 없다 — 커머스 개인정보를 다루는 시스템의
+공격면을 줄이는 선택이다. 자체 비밀번호를 추가하면 이 이득이 사라지므로 **추가하지 않는다**.
+
+**흐름**: 소셜 로그인 → 계정 없으면 `status='대기'`로 신청 생성(프로필) → **승인 전에는 어떤 데이터도
+보이지 않는다** → owner가 승인 + 권한 부여 → 세션 발급. 퇴사·사고 시 `status='정지'`(세션 즉시 무효).
+
+```sql
+ALTER TABLE admin_operators
+  ADD COLUMN provider     VARCHAR(20),    -- google (dev 어댑터: 'dev')
+  ADD COLUMN provider_uid VARCHAR(120),   -- 제공자 고유 ID — 이메일 변경에도 불변
+  ADD COLUMN phone        VARCHAR(30),    -- 신청 시 프로필
+  ADD COLUMN duty         VARCHAR(100),   -- 담당 업무
+  ADD COLUMN approved_by  BIGINT REFERENCES admin_operators(operator_id),
+  ADD COLUMN approved_at  TIMESTAMP,
+  ADD COLUMN last_login_at TIMESTAMP;
+-- status 어휘 확장: 대기 / 활성 / 정지   (기존 'active'는 '활성'으로 이행)
+-- role 어휘(확정 2026-07-14): viewer(조회) / operator(운영자) / owner(관리자)
+
+CREATE TABLE admin_sessions (
+  session_id  VARCHAR(64) PRIMARY KEY,     -- 랜덤 32바이트 hex (예측 불가)
+  operator_id BIGINT NOT NULL REFERENCES admin_operators(operator_id),
+  created_at  TIMESTAMP NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMP NOT NULL DEFAULT now(),
+  expires_at  TIMESTAMP NOT NULL,          -- 절대 만료(8시간)
+  revoked_at  TIMESTAMP,                   -- 로그아웃·정지 — **삭제하지 않는다**(감사)
+  user_agent  VARCHAR(300)
+);
+```
+
+**계약**: ① 쿠키는 `HttpOnly`+`SameSite=Lax`(+운영 `Secure`) — 토큰을 JS가 만지지 않아 XSS로
+탈취 불가 ② 유휴 30분·절대 8시간 초과 시 무효 ③ **권한 게이트**: `/api/admin/*`는 GET=viewer 이상,
+쓰기=operator 이상, 운영자 관리·정책 발행=owner ④ **작업 기록 주체가 세션 운영자로 바뀐다**
+(그동안 operator_id=1 고정이라 "누가 했는지"를 남기지 못했다 — 감사 로그가 실제로 성립하는 지점)
+⑤ 첫 관리자는 `.env` 부트스트랩 이메일 1개만 첫 로그인 시 자동 owner(그 뒤는 화면 승인만)
+⑥ **만료·유휴 판정은 전부 DB의 `now()`로 한다** — 애플리케이션 로컬시각(KST)과 DB 시각(UTC)을
+비교하면 방금 만든 세션도 만료로 오판된다(구현 중 실제로 겪은 함정).
+
+### 3.10 [5차 개정] 매입 견적 — sourcing_batches / product_sourcing_quotes (A-10 정합)
 
 Ver 2.0 정의(`vendor VARCHAR`)를 **공급처 원장과 연결**(`supplier_id` FK)하고 상태 어휘를 성문화한다.
 "재고 소진·안전재고 미달 자동 등록"(ADM-SRC-010)의 **대기 목록은 저장하지 않고 파생**한다 —
