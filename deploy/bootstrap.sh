@@ -19,6 +19,13 @@ APP_DIR="/srv/popcorn-ai"
 ENV_FILE="/etc/popcorn-ai.env"
 HTPASSWD="/etc/nginx/.htpasswd-popcorn"
 
+# 비대화형 배포용 입력 파일(원격 실행 시). 명령줄·프로세스 목록에 비밀값을 싣지 않으려고
+# 값을 파일로 받는다. 읽어 설치한 뒤 **즉시 지운다**.
+#   /tmp/popcorn-ai.env : DATABASE_URL / ADMIN_BOOTSTRAP_EMAILS / COOKIE_SECURE
+#   /tmp/popcorn-ba     : Basic Auth 한 줄 "아이디:비밀번호"
+SEED_ENV="/tmp/popcorn-ai.env"
+SEED_BA="/tmp/popcorn-ba"
+
 say() { printf "\n\033[1;34m==> %s\033[0m\n" "$1"; }
 ok()  { printf "    \033[32m[OK]\033[0m %s\n" "$1"; }
 
@@ -56,6 +63,12 @@ ok "의존성 설치"
 say "4/7 환경변수 ($ENV_FILE)"
 if [[ -f "$ENV_FILE" ]]; then
   ok "이미 있음 — 값을 바꾸려면 직접 편집: sudo nano $ENV_FILE"
+elif [[ -f "$SEED_ENV" ]]; then
+  install -m 600 -o root -g popcorn "$SEED_ENV" "$ENV_FILE"
+  shred -u "$SEED_ENV" 2>/dev/null || rm -f "$SEED_ENV"
+  grep -q "^DATABASE_URL=." "$ENV_FILE" || { echo "DATABASE_URL이 비어 있습니다."; exit 1; }
+  grep -q "^ADMIN_BOOTSTRAP_EMAILS=." "$ENV_FILE" || { echo "첫 관리자 이메일이 비어 있습니다."; exit 1; }
+  ok "전달받은 값으로 생성(권한 600) 후 씨앗 파일 삭제"
 else
   echo "    Cloud SQL 접속 문자열을 붙여넣으세요."
   echo "    예: postgresql+psycopg2://USER:PASSWORD@HOST:5432/popcorn_pc?sslmode=require"
@@ -78,6 +91,15 @@ fi
 say "5/7 Basic Auth — 이것이 지금 유일한 실질 방벽입니다"
 if [[ -f "$HTPASSWD" ]]; then
   ok "이미 있음 — 계정 추가: sudo htpasswd $HTPASSWD <아이디>"
+elif [[ -f "$SEED_BA" ]]; then
+  BAUSER="$(cut -d: -f1 "$SEED_BA")"
+  BAPASS="$(cut -d: -f2- "$SEED_BA")"
+  [[ -n "$BAUSER" && -n "$BAPASS" ]] || { echo "Basic Auth 값이 비었습니다."; exit 1; }
+  htpasswd -bc "$HTPASSWD" "$BAUSER" "$BAPASS" >/dev/null
+  unset BAPASS
+  shred -u "$SEED_BA" 2>/dev/null || rm -f "$SEED_BA"
+  chown root:www-data "$HTPASSWD"; chmod 640 "$HTPASSWD"
+  ok "전달받은 계정으로 생성($BAUSER) 후 씨앗 파일 삭제"
 else
   echo "    직원이 사이트에 들어올 때 쓸 아이디/비밀번호를 만듭니다."
   echo "    (로그인 화면이 dev 어댑터라, 이 빗장이 없으면 누구나 관리자로 들어옵니다)"
