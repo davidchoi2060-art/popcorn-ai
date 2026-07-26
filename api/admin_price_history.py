@@ -44,17 +44,26 @@ def price_history(product_code: int | None = None):
         if not any(p["product_code"] == pc for p in prods):
             raise HTTPException(404, "해당 상품의 가격 이력이 없습니다")
         rows = conn.execute(text(
-            "SELECT history_id, field, old_price, new_price, reason, ref_id, changed_at"
-            " FROM product_price_history WHERE product_code=:pc"
-            " ORDER BY changed_at, history_id"), {"pc": pc}).mappings().all()
+            "SELECT h.history_id, h.field, h.old_price, h.new_price, h.reason, h.ref_id,"
+            " h.changed_at, h.supplier_id, s.name AS supplier"
+            " FROM product_price_history h LEFT JOIN suppliers s USING (supplier_id)"
+            " WHERE h.product_code=:pc ORDER BY h.changed_at, h.history_id"),
+            {"pc": pc}).mappings().all()
         cur = conn.execute(text(
             "SELECT sku, product_name, purchase_price, sale_price FROM products"
             " WHERE product_code=:pc"), {"pc": pc}).mappings().one()
 
+    # 판매가 1선 + 매입가는 **공급처별 분리**(0004에서 supplier_id 추가 — 출처 미기록분은 '기록 없음')
     series = {"sale": [], "purchase": []}
+    by_supplier: dict = {}
     for r in rows:
-        if r["field"] in series and r["new_price"] is not None:
-            series[r["field"]].append({"at": r["changed_at"].isoformat(), "price": r["new_price"]})
+        if r["field"] not in series or r["new_price"] is None:
+            continue
+        pt = {"at": r["changed_at"].isoformat(), "price": r["new_price"]}
+        series[r["field"]].append(pt)
+        if r["field"] == "purchase":
+            key = r["supplier"] or "출처 미기록"
+            by_supplier.setdefault(key, []).append(pt)
     items = [{
         "id": r["history_id"], "at": r["changed_at"].isoformat(),
         "field": r["field"], "field_label": FIELD_KO.get(r["field"], r["field"]),
@@ -63,7 +72,7 @@ def price_history(product_code: int | None = None):
         "reason": r["reason"],
         "reason_label": REASON_KO.get(r["reason"], (r["reason"], "activity-logs.html"))[0],
         "reason_link": REASON_KO.get(r["reason"], (r["reason"], "activity-logs.html"))[1],
-        "ref_id": r["ref_id"],
+        "ref_id": r["ref_id"], "supplier": r["supplier"],
     } for r in reversed(rows)]   # 최신 우선
     return {
         "products": [{"product_code": p["product_code"], "sku": p["sku"],
@@ -71,7 +80,10 @@ def price_history(product_code: int | None = None):
         "product": {"product_code": pc, "sku": cur["sku"], "name": cur["product_name"],
                     "purchase": cur["purchase_price"], "sale": cur["sale_price"]},
         "items": items, "series": series,
-        "note": ("공급처별 매입가 분리는 원장에 공급처 구분이 없어 표시하지 않습니다"
-                 "(매입가는 공급처 간 재판정 결과 = 최저가) · 구간 필터는 준비 중이며"
-                 " 현재는 이력 전체를 시간축에 그립니다 · 되돌림도 역방향 행으로 남습니다."),
+        "by_supplier": [{"supplier": k, "points": v} for k, v in by_supplier.items()],
+        "note": ("매입가는 공급처별로 나눠 그립니다(마이그레이션 0004에서 이력에 공급처를 남김)."
+                 " '출처 미기록'은 공급처 구분이 없던 시점의 이력입니다 —"
+                 " 복수 공급처 상품은 추정하지 않고 그대로 둡니다 ·"
+                 " 구간 필터는 준비 중이며 현재는 이력 전체를 시간축에 그립니다 ·"
+                 " 되돌림도 역방향 행으로 남습니다."),
     }

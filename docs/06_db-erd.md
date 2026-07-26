@@ -110,6 +110,10 @@ CREATE TABLE products (
   -- [Ver 4.0 추가]
   danawa_code         VARCHAR(20),                 -- 다나와 상품코드 — 거래처 간 교차 매칭 키 (§11)
   stock_qty           INTEGER NOT NULL DEFAULT 0,  -- 재고 수량 — 단일 원장 (A-10, 원칙 3)
+  safety_stock        INTEGER,                     -- [5차 개정] 안전재고 기준 — 이 수량 미달 시
+                                                   --   매입 견적(ADM-SRC-010) 자동 등록·입고 대기 합류.
+                                                   --   NULL = 기준 미설정(미달 판정 대상 아님).
+                                                   --   확정 근거: 사용자 확정 2026-07-14 "안전재고 개념 유지"
 
   created_at          TIMESTAMP NOT NULL DEFAULT now(),
   updated_at          TIMESTAMP NOT NULL DEFAULT now()
@@ -178,8 +182,13 @@ CREATE TABLE product_price_history (
   field        VARCHAR(20) NOT NULL,   -- 'purchase' / 'sale' / 'market'
   old_price    BIGINT,
   new_price    BIGINT NOT NULL,
-  reason       VARCHAR(30) NOT NULL,   -- 'csv' / 'sourcing' / 'margin_policy' / 'manual'
-  ref_id       BIGINT,                 -- sourcing_id, job_id 등 근거 참조
+  reason       VARCHAR(30) NOT NULL,   -- 'csv' / 'sourcing' / 'margin_policy' / 'manual' / 'price_import'(+_undo)
+  ref_id       BIGINT,                 -- sourcing_id, job_id, file_id, 활동로그 log_id (사유별 의미 상이)
+  supplier_id  BIGINT REFERENCES suppliers(supplier_id),
+                                       -- [5차 개정] 매입가 이력의 출처 공급처.
+                                       --   field='purchase'일 때만 채운다(판매가는 공급처 무관 → NULL).
+                                       --   purchase_price 자체는 공급처 간 재판정 결과(최저가)이지만,
+                                       --   그 값을 만든 공급처를 남겨 ADM-PRC-030에서 공급처별 추이를 그린다.
   changed_by   BIGINT,                 -- 운영자 (시스템이면 NULL)
   changed_at   TIMESTAMP NOT NULL DEFAULT now()
 );

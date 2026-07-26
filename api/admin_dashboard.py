@@ -29,8 +29,11 @@ def dashboard():
         pending = {
             "review": one("SELECT COUNT(*) FROM product_reviews WHERE review_status='대기'"),
             "price": one(f"SELECT COUNT(*) FROM products p WHERE {_PRICE_PENDING}"),
+            # admin_stock._PENDING과 동일 조건 — 재고 0 ∨ 안전재고 미달(0004 safety_stock)
             "inbound": one("SELECT COUNT(*) FROM products"
-                           " WHERE stock_qty=0 AND status NOT IN ('단종','삭제대기')"),
+                           " WHERE status NOT IN ('단종','삭제대기')"
+                           " AND (stock_qty=0"
+                           "      OR (safety_stock IS NOT NULL AND stock_qty < safety_stock))"),
             "refund": one("SELECT COUNT(*) FROM refunds"
                           " WHERE status IN ('접수','검토','수거·처리')"),
         }

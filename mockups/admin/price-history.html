@@ -300,7 +300,9 @@
         let LIVE=false;
         const won=n=>n==null?"—":n.toLocaleString()+"원";
         const fmtD=iso=>{const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-        function drawChart(series){
+        // 공급처별 매입가 다중선(0004 supplier_id) + 판매가 1선. 색은 팔레트 순환(초록 없음).
+        const SUP_COLS=["var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-secondary)","var(--phoenix-danger)"];
+        function drawChart(series, bySupplier){
           const pts=[...series.sale.map(p=>({...p,k:"sale"})),...series.purchase.map(p=>({...p,k:"purchase"}))];
           const svg=document.getElementById("chart");
           if(!pts.length){svg.innerHTML=`<text x="200" y="110" font-size="12" fill="var(--phoenix-tertiary-color)">가격 이력이 없습니다</text>`;return;}
@@ -314,10 +316,13 @@
             const dots=arr.map(p=>`<circle cx="${X(new Date(p.at).getTime()).toFixed(1)}" cy="${Y(p.price).toFixed(1)}" r="3" fill="${color}"><title>${fmtD(p.at)} ${won(p.price)}</title></circle>`).join("");
             return `<polyline points="${pl}" fill="none" stroke="${color}" stroke-width="2.5"${dash?` stroke-dasharray="${dash}"`:""}/>${dots}`;
           };
+          const supLines=(bySupplier&&bySupplier.length)
+            ? bySupplier.map((g,i)=>line(g.points,SUP_COLS[i%SUP_COLS.length],"5 4")).join("")
+            : line(series.purchase,"var(--phoenix-warning)","5 4");
           svg.innerHTML=`<line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
             <text x="2" y="24" font-size="10" fill="var(--phoenix-tertiary-color)">${(v1/10000).toFixed(0)}만</text>
             <text x="2" y="186" font-size="10" fill="var(--phoenix-tertiary-color)">${(v0/10000).toFixed(0)}만</text>
-            ${line(series.purchase,"var(--phoenix-warning)","5 4")}${line(series.sale,"var(--phoenix-primary)","")}
+            ${supLines}${line(series.sale,"var(--phoenix-primary)","")}
             <text x="52" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t0).toISOString())}</text>
             <text x="510" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t1).toISOString())}</text>`;
         }
@@ -328,15 +333,19 @@
               const sel=document.getElementById("pick");
               sel.innerHTML=d.products.map(p=>`<option value="${p.product_code}"${d.product&&p.product_code===d.product.product_code?" selected":""}>${p.sku} — ${p.name} (${p.count}건)</option>`).join("");
               document.getElementById("chartTitle").textContent=`${d.product.sku} 가격 추이 — 현재 매입 ${won(d.product.purchase)} · 판매 ${won(d.product.sale)}`;
-              document.getElementById("legend").innerHTML=`<span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입가(공급처 간 최저)</span>`;
+              const sup=d.by_supplier||[];
+              document.getElementById("legend").innerHTML=
+                `<span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span>`
+                +(sup.length?sup.map((g,i)=>`<span><span style="display:inline-block;width:14px;height:3px;background:${SUP_COLS[i%SUP_COLS.length]};vertical-align:middle;"></span> 매입 · ${g.supplier}</span>`).join("")
+                  :`<span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입가</span>`);
               const cn=document.getElementById("chartNote");cn.hidden=false;cn.textContent=d.note;
-              drawChart(d.series);
+              drawChart(d.series, sup);
               document.getElementById("histCount").textContent=`${d.items.length}건`;
               document.getElementById("histRows").innerHTML=d.items.length?d.items.map(h=>`
                 <tr><td class="ps-3 text-body-tertiary">${fmtD(h.at)}</td>
                   <td class="${h.field==="sale"?"fw-bold":""}">${h.field_label}</td>
                   <td class="text-end ${h.field==="sale"?"fw-bold":""}">${h.old==null?"신규":won(h.old)} → ${won(h.new)}${h.delta?`<div class="fs-10 ${h.delta>0?"text-danger":"text-primary"}">${h.delta>0?"+":""}${h.delta.toLocaleString()}</div>`:""}</td>
-                  <td><a href="${h.reason_link}" class="fs-10">${h.reason_label}</a>${h.ref_id?`<div class="fs-10 text-body-quaternary">ref ${h.ref_id}</div>`:""}</td></tr>`).join("")
+                  <td><a href="${h.reason_link}" class="fs-10">${h.reason_label}</a>${h.supplier?`<div class="fs-10 text-body-tertiary">${h.supplier}</div>`:""}${h.ref_id?`<div class="fs-10 text-body-quaternary">ref ${h.ref_id}</div>`:""}</td></tr>`).join("")
                 :`<tr><td colspan="4" class="text-center text-body-tertiary py-4">이 상품의 가격 이력이 없습니다.</td></tr>`;
               const b=document.getElementById("dataSrc");
               b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");

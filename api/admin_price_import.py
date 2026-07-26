@@ -150,22 +150,24 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
         "SELECT purchase_price, sale_price, locked_fields FROM products"
         " WHERE product_code=:pc FOR UPDATE"), {"pc": pc}).mappings().one()
     rows = conn.execute(text(
-        "SELECT cost_price, supply_state FROM product_supplier_prices WHERE product_code=:pc"),
-        {"pc": pc}).all()
+        "SELECT cost_price, supply_state, supplier_id FROM product_supplier_prices"
+        " WHERE product_code=:pc"), {"pc": pc}).all()
     if not rows:
         return {"purchase_changed": False, "sale_changed": False, "sale_locked": False}
-    avail = [c for c, s in rows if s == "가능"]
-    new_purchase = min(avail) if avail else min(c for c, _ in rows)
+    avail = [(c, sid) for c, s, sid in rows if s == "가능"]
+    pool = avail if avail else [(c, sid) for c, _s, sid in rows]
+    new_purchase, src_supplier = min(pool)   # 최저가 + 그 값을 만든 공급처(이력에 남긴다 — 0004)
     out = {"purchase_changed": False, "sale_changed": False, "sale_locked": False}
     if new_purchase != prod["purchase_price"]:
         conn.execute(text(
             "UPDATE products SET purchase_price=:v, updated_at=now() WHERE product_code=:pc"),
             {"v": new_purchase, "pc": pc})
         conn.execute(text(
-            "INSERT INTO product_price_history (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
-            " VALUES (:pc, 'purchase', :o, :n, :r, :ref, :op)"),
+            "INSERT INTO product_price_history"
+            " (product_code, field, old_price, new_price, reason, ref_id, changed_by, supplier_id)"
+            " VALUES (:pc, 'purchase', :o, :n, :r, :ref, :op, :sid)"),
             {"pc": pc, "o": prod["purchase_price"], "n": new_purchase,
-             "r": reason, "ref": ref_id, "op": OPERATOR_ID})
+             "r": reason, "ref": ref_id, "op": OPERATOR_ID, "sid": src_supplier})
         out["purchase_changed"] = True
     if restore is not None and new_purchase == restore["purchase"]:
         new_sale = restore["sale"]

@@ -23,12 +23,13 @@ from .db import engine
 router = APIRouter(prefix="/api/admin")
 
 WHY = ("inbound", "adjust")
-NOTE = ("입고 대기 = 재고 0 상품입니다. 안전재고 미달 유형은 기준 컬럼이 준비되면 합류합니다"
+NOTE = ("입고 대기 = 재고 0 또는 **안전재고 미달** 상품입니다(기준은 상품별 safety_stock)"
         " · 매입가 변경은 단가표·매입 견적 소관(입고 원장에는 단가를 남기지 않습니다).")
 
 _PENDING = """
     SELECT p.product_code, p.sku, p.product_name, p.part_type, p.status, p.stock_qty,
-           p.purchase_price, p.sale_price, p.review_required_yn, p.ai_candidate_yn,
+           p.safety_stock, p.purchase_price, p.sale_price,
+           p.review_required_yn, p.ai_candidate_yn,
            psp.cost_price, s.name AS supplier,
            EXISTS(SELECT 1 FROM product_specs sp WHERE sp.product_code = p.product_code) AS has_specs
     FROM products p
@@ -36,8 +37,10 @@ _PENDING = """
                FROM product_supplier_prices ORDER BY product_code, cost_price) psp
            USING (product_code)
     LEFT JOIN suppliers s USING (supplier_id)
-    WHERE p.stock_qty = 0 AND p.status NOT IN ('단종','삭제대기')
-    ORDER BY p.product_code
+    WHERE p.status NOT IN ('단종','삭제대기')
+      AND (p.stock_qty = 0
+           OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+    ORDER BY (p.stock_qty > 0), p.product_code
 """
 
 
@@ -48,6 +51,9 @@ def _in_pool(conn, pc: int) -> bool:
 
 
 def _note_of(r) -> str:
+    if r["stock_qty"] > 0 and r["safety_stock"] and r["stock_qty"] < r["safety_stock"]:
+        return (f"안전재고 미달 — 현재 {r['stock_qty']} / 기준 {r['safety_stock']}"
+                " (판매는 계속되지만 소진 위험)")
     if r["review_required_yn"]:
         return "검수 미통과 — 입고해도 추천에 쓰이지 않습니다"
     if r["sale_price"] is None:
@@ -74,10 +80,12 @@ def stock_inbound():
             "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
             "purchase": r["purchase_price"] or r["cost_price"],
             "supplier": r["supplier"] or "—", "stock": r["stock_qty"],
+            "safety_stock": r["safety_stock"],
+            "why": "adjust" if r["stock_qty"] > 0 else "inbound",  # 미달 보충 = 실사 조정 성격
             "priced": r["sale_price"] is not None,
             "reviewed": not r["review_required_yn"],
             "has_specs": r["has_specs"],
-            "status": r["status"], "why": "inbound", "note": _note_of(r),
+            "status": r["status"], "note": _note_of(r),
         } for r in rows],
         "catalog": [{
             "product_code": c["product_code"], "sku": c["sku"], "name": c["product_name"],

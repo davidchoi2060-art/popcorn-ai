@@ -290,7 +290,7 @@
           </div>
           <p class="fs-10 text-body-tertiary mb-0 mt-2">실사 조정은 수량 차이를 사유와 함께 원장에 남깁니다 — 재고를 덮어쓰지 않고 <b class="text-body-secondary">증감분</b>으로 기록합니다.</p>
         </div></div>
-        <p class="fs-9 text-body-tertiary mt-2 mb-0">입고 확정 시 <a href="products.html">재고</a>가 즉시 반영되고, 검수·가격이 끝난 상품은 <a href="candidate-pool.html">추천 가능 재고</a>에 진입합니다. 처리 내역은 <a href="activity-logs.html">작업 기록</a>에 남습니다.<br><span class="text-body-quaternary">안전재고 미달 표기와 매입 견적 참조는 현재 <b>화면 연출</b>입니다 — 저장 컬럼(안전재고 기준·견적 참조)이 준비되면 실데이터로 바뀝니다.</span></p>
+        <p class="fs-9 text-body-tertiary mt-2 mb-0">입고 확정 시 <a href="products.html">재고</a>가 즉시 반영되고, 검수·가격이 끝난 상품은 <a href="candidate-pool.html">추천 가능 재고</a>에 진입합니다. 처리 내역은 <a href="activity-logs.html">작업 기록</a>에 남습니다.<br><span class="text-body-quaternary">안전재고 미달은 상품별 기준(safety_stock)으로 <b>실판정</b>합니다 — 매입 견적 참조(견적 확정분 연결)는 아직 화면 연출입니다.</span></p>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -308,7 +308,7 @@
       (function(){
         // ADM-SRC-020 재고 입고 — 목업 설계(슬라이스 22). API 미연결: 전 동작은 로컬 더미.
         // 원장 계약(ERD §10.6): 입고 = stock_movements(inbound|adjust, qty_delta +) + products.stock_qty 증가.
-        // 안전재고·매입 견적 참조는 저장 컬럼이 없어 화면 연출 — 하단 각주로 정직 표기.
+        // 안전재고는 마이그레이션 0004의 safety_stock으로 실판정(슬라이스 33). 매입 견적 참조만 연출.
         const won=n=>n.toLocaleString()+"원";
         let R=[
           {id:20489102,sku:"P-9102",name:"GIGABYTE 지포스 RTX 5060 Ti AERO OC D7 8GB",cat:"그래픽카드",
@@ -324,7 +324,7 @@
         function kpis(){
           const K=[["입고 대기",R.length,"건","primary"],["오늘 입고",done,"건","primary"],
                    ["재고 없음",R.filter(r=>r.stock===0).length,"개","danger"],
-                   ["안전재고 미달",R.filter(r=>r.why==="adjust").length,"개(연출)","warning"]];
+                   ["안전재고 미달",R.filter(r=>r.stock>0&&r.safety_stock&&r.stock<r.safety_stock).length,LIVE?"개":"개(연출)","warning"]];
           document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function list(){ return cur==="all"?R:R.filter(r=>r.why===cur); }
@@ -468,6 +468,7 @@
               LIVE=true;NOTE=d.note;
               R=d.items.map(i=>({id:i.product_code,sku:i.sku,name:i.name,cat:i.cat,
                 qty:prevQty[i.product_code]||1,cost:i.purchase||0,sup:i.supplier,stock:i.stock,
+                safety_stock:i.safety_stock,
                 priced:i.priced,reviewed:i.reviewed,has_specs:i.has_specs,status:i.status,why:i.why,note:i.note}));
               CATALOG=d.catalog.map(c=>({id:c.product_code,sku:c.sku,name:c.name,cat:c.cat,
                 cost:c.purchase||0,sup:"—",stock:c.stock,priced:c.priced,reviewed:c.reviewed}));
