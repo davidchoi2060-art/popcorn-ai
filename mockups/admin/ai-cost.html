@@ -262,7 +262,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">AI 사용량 · 비용</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">AI 사용량 · 비용 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-010</span></h2>
+          <div><h2 class="mb-1">AI 사용량 · 비용 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">언어모델 호출은 <b class="text-body-secondary">파싱·사양 추출·근거 생성뿐</b>입니다. 견적 산출은 AI를 쓰지 않으므로 여기 비용이 없습니다.</p></div>
           <span class="badge badge-phoenix badge-phoenix-secondary">일 예산 캡 $50</span>
         </div>
@@ -303,6 +303,7 @@
             </div></div>
           </div>
         </div>
+        <div id="liveSys" hidden class="mt-4"></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -312,6 +313,73 @@
           <div class="py-2"><div class="d-flex justify-content-between fs-9 mb-1"><span class="text-body-secondary">${n}</span><b>${v}%</b></div>
           <div class="rounded-pill overflow-hidden" style="height:8px;background:var(--phoenix-secondary-bg);"><div style="width:${v}%;height:100%;background:var(--phoenix-${c});"></div></div></div>`).join("");
         if(window.feather)feather.replace();
+      })();
+      </script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 32) — 실집계가 가능한 것만 실값. 원천이 없는 화면은 값 대신
+        // '원천 부재 + 사유'를 보여준다(0건과 원천 부재는 다르다).
+        var SCREEN = "ai";
+        function card(title, sub, body, tone){
+          return '<div class="card mb-3' + (tone ? ' border-' + tone : '') + '"><div class="card-body">'
+            + '<h5 class="mb-1">' + title + '</h5>'
+            + '<p class="fs-9 text-body-tertiary mb-3">' + sub + '</p>' + body + '</div></div>';
+        }
+        function emptyCard(title, reason){
+          return card(title + ' <span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">원천 준비 중</span>',
+            '아직 기록이 쌓이는 경로가 없습니다 — 숫자를 지어내지 않고 사유를 밝힙니다.',
+            '<p class="fs-9 text-body-secondary mb-0">' + reason + '</p>', 'warning');
+        }
+        function fmt(iso){ if(!iso) return '—'; var d=new Date(iso);
+          return (d.getMonth()+1) + '-' + String(d.getDate()).padStart(2,'0'); }
+
+        fetch("/api/admin/system")
+          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function(d){
+            var host = document.getElementById("liveSys"), html = "";
+            if(SCREEN === "operators"){
+              var rows = d.operators.rows.map(function(o){
+                return '<tr><td><b>' + o.name + '</b><div class="fs-10 text-body-tertiary">' + o.email + '</div></td>'
+                  + '<td><span class="badge badge-phoenix badge-phoenix-primary">' + o.role_label + '</span></td>'
+                  + '<td class="text-end">' + o.acts.toLocaleString() + '</td>'
+                  + '<td class="text-end">' + o.acts7.toLocaleString() + '</td>'
+                  + '<td class="text-body-tertiary">' + fmt(o.last_at) + '</td>'
+                  + '<td><span class="badge badge-phoenix badge-phoenix-secondary">' + o.status + '</span></td></tr>';
+              }).join('');
+              html += card('등록된 운영자 <span class="badge badge-phoenix badge-phoenix-primary fs-10 align-middle">실데이터</span>',
+                '작업량은 작업 기록(감사 로그) 기준 실집계입니다.',
+                '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
+                + '<thead><tr class="text-body-tertiary"><th>계정</th><th>권한</th><th class="text-end">전체 작업</th>'
+                + '<th class="text-end">최근 7일</th><th>마지막 활동</th><th>상태</th></tr></thead><tbody>'
+                + rows + '</tbody></table></div>'
+                + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + d.operators.note + '</p>');
+            } else if(SCREEN === "ai"){
+              html += emptyCard('AI 사용량 · 비용', d.ai_cost.reason);
+            } else {
+              if(d.imports.empty){
+                html += emptyCard('일괄 등록 이력', d.imports.reason);
+              } else {
+                html += card('적재 배치', '최근 20건',
+                  '<div class="table-responsive"><table class="table table-sm fs-9 mb-0"><tbody>'
+                  + d.imports.rows.map(function(j){
+                      return '<tr><td>#' + j.job_id + '</td><td>' + j.file + '</td>'
+                        + '<td class="text-end">' + j.total + '행</td><td>' + j.status + '</td></tr>';
+                    }).join('') + '</tbody></table></div>');
+              }
+            }
+            host.innerHTML = html;
+            host.hidden = false;
+            var b = document.getElementById("dataSrc");
+            if(SCREEN === "operators"){
+              b.textContent = "실데이터 · Cloud SQL";
+              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+            } else {
+              b.textContent = "원천 준비 중 — 아래 사유 참조";
+              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+            }
+            if(window.feather) feather.replace();
+          })
+          .catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
