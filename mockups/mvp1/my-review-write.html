@@ -177,7 +177,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
     }
     btn.disabled=true;
     fetch("/api/my/reviews",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({email:MEMBER.email,item_id:o.item_id,rating:rating,body:document.getElementById("body").value})})
+      body:JSON.stringify({item_id:o.item_id,rating:rating,body:document.getElementById("body").value})})
      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
      .then(function(res){
        if(!res.ok){window.popcornAuth.toast("등록 실패: "+(res.j.detail||"입력을 확인해 주세요"));btn.disabled=false;return;}
@@ -192,8 +192,9 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
   var MEMBER=null, LIVE=false;
   try{MEMBER=JSON.parse(localStorage.getItem("popcorn-member")||"null");}catch(e){}
   if(MEMBER&&MEMBER.email){
-    fetch("/api/my/account?email="+encodeURIComponent(MEMBER.email))
-     .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+    fetch("/api/my/account")
+     .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
+                     if(!r.ok)throw new Error(r.status);return r.json();})
      .then(function(d){
        if(!d.member||!d.reviewable.length)return;   // 미가입·대상 없음 — 시안 유지
        LIVE=true;

@@ -174,7 +174,7 @@ function renderRefund(){
   if(LIVE){
    var sb=document.getElementById('r-submit');sb.disabled=true;sb.textContent='접수 중…';
    var member=null;try{member=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
-   fetch('/api/my/refunds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_no:o.no,email:member?member.email:'',reason_type:reason})})
+   fetch('/api/my/refunds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_no:o.no,reason_type:reason})})
     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
     .then(function(res){
      if(!res.ok){var d=res.j.detail||{};alert('접수 실패: '+(d.detail||d.error||'잠시 후 다시 시도해 주세요'));sb.disabled=false;sb.textContent='접수하기';return;}
@@ -208,8 +208,9 @@ var fromApi=function(o){return {no:o.no,date:fmtT(o.created_at),channel:o.channe
  refund:o.refund?{kind:kindOf(o.status),no:o.refund.no,reason:o.refund.reason,status:o.refund.status,modeNote:noteOfMode(o.refund.mode)}:null};};
 var mem=null;try{mem=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
 if(mem&&mem.email){
- fetch('/api/my/orders?email='+encodeURIComponent(mem.email))
-  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+ fetch('/api/my/orders')
+  .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
+                     if(!r.ok)throw new Error(r.status);return r.json();})
   .then(function(d){
    LIVE=true;
    ORDERS=d.items.map(fromApi);

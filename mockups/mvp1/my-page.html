@@ -203,7 +203,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
  function postMap(agree,okMsg){
   if(!LIVE){setMap(agree?'mapped':'none',okMsg+' (시안)');return;}
   fetch('/api/my/account/map',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:m.email,agree:agree})})
+    body:JSON.stringify({agree:agree})})
    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
    .then(function(res){
      if(!res.ok){window.popcornAuth.toast('처리 실패: '+(res.j.detail||''));return;}
@@ -217,8 +217,9 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
  document.getElementById('map-deny').onclick=function(){postMap(false,'연결하지 않기로 했어요 — 기존 쇼핑몰 이력은 따로 유지됩니다');};
  renderMap();
  if(m&&m.email){
-  fetch('/api/my/account?email='+encodeURIComponent(m.email))
-   .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  fetch('/api/my/account')
+   .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
+                     if(!r.ok)throw new Error(r.status);return r.json();})
    .then(function(d){
      if(!d.member)return;                 // 미가입 이메일 — 시안값 유지
      LIVE=true;MALL_ID=d.mall_member_id;

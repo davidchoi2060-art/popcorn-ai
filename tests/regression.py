@@ -54,14 +54,16 @@ def check(name, ok, expect=None, got=None, kind="INVARIANT"):
 # 관리자 API는 슬라이스 37부터 세션 쿠키를 요구한다(로그인 없이 돌리면 전부 401).
 # http.cookiejar는 dotless 호스트('localhost')에 '.local'을 붙여 쿠키를 되돌려주지 않으므로
 # 세션 쿠키를 직접 들고 다닌다 — 브라우저 동작과 같고, 무엇을 보내는지가 코드에 보인다.
-SESSION = {"cookie": None}
+# 관리자(37)·고객(38) 세션은 쿠키 이름이 달라 동시에 들고 다닐 수 있다.
+SESSION = {}                                # 쿠키명 -> "name=value"
+COOKIE_NAMES = ("popcorn_admin_session", "popcorn_member_session")
 ADMIN_EMAIL = "admin@popcornpc.local"      # 시드 owner — dev 어댑터로 로그인
 
 
 def _headers(json_body=False):
     h = {"Content-Type": "application/json"} if json_body else {}
-    if SESSION["cookie"]:
-        h["Cookie"] = SESSION["cookie"]
+    if SESSION:
+        h["Cookie"] = "; ".join(SESSION.values())
     return h
 
 
@@ -87,10 +89,11 @@ def post(path, body=None):
 
 
 def _capture(resp):
-    """Set-Cookie에서 세션 쿠키를 집어 이후 요청에 붙인다."""
+    """Set-Cookie에서 세션 쿠키를 집어 이후 요청에 붙인다(관리자·고객 각각)."""
     for raw in resp.headers.get_all("Set-Cookie") or []:
-        if raw.startswith("popcorn_admin_session="):
-            SESSION["cookie"] = raw.split(";")[0]
+        for name in COOKIE_NAMES:
+            if raw.startswith(name + "="):
+                SESSION[name] = raw.split(";")[0]
 
 
 def anon_status(path, body=None):
@@ -109,6 +112,11 @@ def anon_status(path, body=None):
 
 def login():
     return post("/api/admin/auth/login", {"email": ADMIN_EMAIL, "provider": "dev"})
+
+
+def member_login(email, nickname=None):
+    """고객 로그인 = 가입(승인 게이트 없음 — 슬라이스 38). 세션을 갈아탄다."""
+    return post("/api/auth/login", {"email": email, "nickname": nickname, "provider": "dev"})
 
 
 def rec(budget):
@@ -246,27 +254,52 @@ def test_ledgers():
 
 # ──────────────────── 6. 고객 축 계약 (구매 인증·회원 경계) ────────────────────
 def test_customer():
-    print("\n[6] 고객 축 계약 — 회원 경계·구매 인증 (슬라이스 10·12·30)")
-    mine = get("/api/my/orders?email=mj.kim@example.com")["items"]
-    other = get("/api/my/orders?email=sy.lee@example.com")["items"]
+    print("\n[6] 고객 축 계약 — 회원 경계·구매 인증 (슬라이스 10·12·30·38)")
+    # 슬라이스 38: 회원 경계는 **세션**이 정한다(?email= 은 더 이상 받지 않는다).
+    check("미인증 회원 API 401", anon_status("/api/my/orders") == 401,
+          401, anon_status("/api/my/orders"))
+
+    member_login("mj.kim@example.com")
+    mine = get("/api/my/orders")["items"]
+    pays = get("/api/my/payments")["items"]
+    acct = get("/api/my/account")
+    member_login("sy.lee@example.com")
+    other = get("/api/my/orders")["items"]
     mine_nos = {o["no"] for o in mine}
     check("회원 경계: 타인 주문 미포함",
           not (mine_nos & {o["no"] for o in other}), "교집합 없음",
           mine_nos & {o["no"] for o in other})
-    check("미가입 이메일 → 빈 목록",
-          get("/api/my/orders?email=nobody@nowhere.test")["items"] == [], [], "비어야 함")
+    # 다른 회원 세션으로 타인 주문의 환불을 접수할 수 없다(경계가 세션으로 강제되는가)
+    if mine_nos:
+        st, _ = post("/api/my/refunds",
+                     {"order_no": sorted(mine_nos)[0], "reason_type": "단순 변심"})
+        check("타인 주문 환불 접수 → 403", st == 403, 403, st)
+    else:
+        check("타인 주문 환불 접수 → 403", False, "주문 1건 이상 필요", "mj.kim 주문 없음")
 
-    pays = get("/api/my/payments?email=mj.kim@example.com")["items"]
+    # 신규 이메일 로그인 = 가입(승인 게이트 없음) → 주문은 당연히 0건
+    member_login("regress-guest@popcornpc.local", "회귀게스트")
+    fresh = get("/api/my/orders")["items"]
+    check("신규 가입 회원 → 빈 주문 목록", fresh == [], [], fresh)
+    me = get("/api/auth/me")
+    check("고객 세션 me", bool(me["authenticated"])
+          and me["member"]["email"] == "regress-guest@popcornpc.local",
+          "regress-guest 세션", me.get("member"))
+
     check("결제 원장은 전 행(승인·환불 각 한 줄)",
           any(p["status"] == "환불" for p in pays) and any(p["status"] == "승인" for p in pays),
           "승인·환불 모두 존재", {p["status"] for p in pays})
     check("고객 응답에 pg_ref 미포함(미노출 계약)",
           all("pg_ref" not in p for p in pays), "pg_ref 키 없음",
           [k for p in pays for k in p if k == "pg_ref"])
-
-    acct = get("/api/my/account?email=mj.kim@example.com")
     check("후기는 구매 인증(완료 주문) 라인만",
           all(r["order_no"] for r in acct["reviewable"]), "전 항목 주문 연결", acct["reviewable"])
+
+    # 로그아웃하면 즉시 닫힌다(철회 기록 — 세션 행은 남는다)
+    post("/api/auth/logout")
+    SESSION.pop("popcorn_member_session", None)
+    check("로그아웃 후 회원 API 401", anon_status("/api/my/orders") == 401,
+          401, anon_status("/api/my/orders"))
 
 
 # ────────────────────────── 7. 가드 (권한·상태 전이) ──────────────────────────
@@ -335,17 +368,19 @@ def test_auth():
 
 def test_guards():
     print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
-    st, _ = post("/api/my/reviews", {"email": "mj.kim@example.com", "item_id": 999999,
+    member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
+    st, _ = post("/api/my/reviews", {"item_id": 999999,
                                      "rating": 5, "body": "존재하지 않는 라인 테스트입니다"})
     check("없는 주문 라인 후기 → 404", st == 404, 404, st)
-    st, _ = post("/api/my/reviews", {"email": "mj.kim@example.com", "item_id": 12,
+    st, _ = post("/api/my/reviews", {"item_id": 12,
                                      "rating": 5, "body": "타인 주문 라인 테스트입니다"})
     check("타인 주문 라인 후기 → 403", st == 403, 403, st)
     st, _ = post("/api/admin/stock-inbound/20489103", {"qty": 0, "why": "inbound"})
     check("입고 수량 0 → 400", st == 400, 400, st)
     st, _ = post("/api/admin/sourcing/request", {"product_code": 20489103, "supplier_ids": []})
     check("공급처 미선택 견적 요청 → 400", st == 400, 400, st)
-    st, _ = post("/api/my/account/map", {"email": "sy.lee@example.com", "agree": True})
+    member_login("sy.lee@example.com")
+    st, _ = post("/api/my/account/map", {"agree": True})
     check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
 
 

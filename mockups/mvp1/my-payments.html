@@ -92,8 +92,9 @@ function fmtT(iso){
 }
 var mem=null;try{mem=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
 if(mem&&mem.email){
- fetch('/api/my/payments?email='+encodeURIComponent(mem.email))
-  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+ fetch('/api/my/payments')
+  .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
+                     if(!r.ok)throw new Error(r.status);return r.json();})
   .then(function(d){
    var rows=d.items.map(function(p){return {at:p.at?fmtT(p.at):'—',order:p.order_no,method:p.method,mode:p.mode,amount:p.amount,state:p.status};});
    render(rows);

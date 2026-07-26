@@ -36,11 +36,16 @@ from .orders import router as orders_router
 from .recommend import router as recommend_router
 from .swap import router as swap_router
 from .auth import auth_middleware, router as auth_router
+from .customer_auth import member_middleware, router as customer_auth_router
 from .db import engine
 
 app = FastAPI(title="popcorn-pc-ai (local slice)")
 
-# 관리자 인증 게이트(슬라이스 37) — /api/admin/*는 세션+권한 필요(인증 엔드포인트 예외)
+# 인증 게이트. 미들웨어는 **등록 역순으로 실행**되므로 고객 게이트를 먼저 등록해
+# 관리자 게이트가 바깥(먼저 실행)에 오게 한다 — 관리자 경로가 고객 세션 조회를 타지 않는다.
+# 고객(슬라이스 38): /api/my/*는 세션 필요 · 상담·추천·주문은 게스트 허용
+app.middleware("http")(member_middleware)
+# 관리자(슬라이스 37): /api/admin/*는 세션+권한 필요(인증 엔드포인트 예외)
 app.middleware("http")(auth_middleware)
 
 
@@ -52,6 +57,7 @@ def health():
 
 
 app.include_router(auth_router)
+app.include_router(customer_auth_router)
 app.include_router(admin_operators_router)
 app.include_router(admin_products_router)
 app.include_router(admin_reviews_router)

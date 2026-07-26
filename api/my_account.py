@@ -11,12 +11,14 @@
   검증 3중: ① 그 라인이 이 회원의 주문인가 ② 주문이 '완료'인가(배송 완료 후에만)
   ③ 같은 라인에 이미 후기가 있는가(중복 차단). 등록분은 '게시' 상태로 시작하고
   관리자 화면(ADM-CUS-020)의 숨김·신고 처리 대상이 된다.
-인증은 mock(email 파라미터 — 실 인증 이관). 수정·삭제는 범위 밖(관리자 숨김만 — 목업에도 없음).
+인증(슬라이스 38): **회원 경계는 세션이 정한다** — 요청 본문의 이메일은 더 이상 받지 않는다.
+수정·삭제는 범위 밖(관리자 숨김만 — 목업에도 없음).
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .customer_auth import require_member
 from .db import engine
 
 router = APIRouter(prefix="/api/my")
@@ -24,21 +26,22 @@ router = APIRouter(prefix="/api/my")
 MALL_BASE = 2200  # 데모 발급 규칙 — 실 쇼핑몰 연동 시 교체(이관)
 
 
-def _member(conn, email: str):
+def _member(conn, member_id: int):
     m = conn.execute(text(
         "SELECT member_id, nickname, mall_member_id, mall_map_requested_at"
-        " FROM members WHERE email=:e FOR UPDATE"), {"e": email}).mappings().first()
+        " FROM members WHERE member_id=:i FOR UPDATE"), {"i": member_id}).mappings().first()
     if m is None:
         raise HTTPException(404, "회원이 없습니다")
     return m
 
 
 @router.get("/account")
-def account(email: str = ""):
+def account():
+    me = require_member()                        # 회원 경계 = 세션(슬라이스 38)
     with engine.connect() as conn:
         m = conn.execute(text(
             "SELECT member_id, nickname, mall_member_id, mall_map_requested_at"
-            " FROM members WHERE email=:e"), {"e": email}).mappings().first()
+            " FROM members WHERE member_id=:i"), {"i": me["member_id"]}).mappings().first()
         if m is None:
             return {"member": None, "map_state": "none"}
         state = ("mapped" if m["mall_member_id"]
@@ -73,15 +76,15 @@ def account(email: str = ""):
 
 
 class MapBody(BaseModel):
-    email: str
     agree: bool
 
 
 @router.post("/account/map")
 def account_map(body: MapBody):
+    me = require_member()
     """동의 = 연결 확정 / 거절 = 요청 해제. 요청이 없는 상태에서는 둘 다 불가(관리자 발송 선행)."""
     with engine.begin() as conn:
-        m = _member(conn, body.email)
+        m = _member(conn, me["member_id"])
         if m["mall_member_id"]:
             raise HTTPException(409, "이미 쇼핑몰 계정과 연결돼 있습니다")
         if not m["mall_map_requested_at"]:
@@ -99,7 +102,6 @@ def account_map(body: MapBody):
 
 
 class ReviewBody(BaseModel):
-    email: str
     item_id: int
     rating: int
     body: str
@@ -107,13 +109,14 @@ class ReviewBody(BaseModel):
 
 @router.post("/reviews")
 def write_review(body: ReviewBody):
+    me = require_member()
     if not 1 <= body.rating <= 5:
         raise HTTPException(400, "별점은 1~5 사이여야 합니다")
     text_body = (body.body or "").strip()
     if len(text_body) < 10:
         raise HTTPException(400, "후기는 10자 이상 적어 주세요")
     with engine.begin() as conn:
-        m = _member(conn, body.email)
+        m = _member(conn, me["member_id"])
         line = conn.execute(text(
             "SELECT oi.item_id, o.member_id, o.status, o.order_no FROM order_items oi"
             " JOIN orders o USING (order_id) WHERE oi.item_id=:i FOR UPDATE"),

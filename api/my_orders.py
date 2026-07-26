@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .admin_orders import STEP, _item_label, refund_label
+from .customer_auth import require_member
 from .db import engine
 
 router = APIRouter(prefix="/api/my")
@@ -22,12 +23,10 @@ ACTIVE_REFUND = ("접수", "검토", "수거·처리")
 
 
 @router.get("/orders")
-def my_orders(email: str):
+def my_orders():
+    # 회원 경계는 **세션**이 정한다(슬라이스 38). 요청이 주장하는 이메일은 더 이상 믿지 않는다.
+    member_id = require_member()["member_id"]
     with engine.connect() as conn:
-        member_id = conn.execute(text(
-            "SELECT member_id FROM members WHERE email=:e"), {"e": email}).scalar()
-        if member_id is None:
-            return {"items": []}
         orders = conn.execute(text(
             "SELECT order_id, order_no, channel, status, total_amount, ops_snapshot, created_at"
             " FROM orders WHERE member_id=:m ORDER BY created_at DESC, order_id DESC"),
@@ -79,22 +78,22 @@ def my_orders(email: str):
 
 class RefundBody(BaseModel):
     order_no: str
-    email: str
     reason_type: str
 
 
 @router.post("/refunds")
 def create_refund(body: RefundBody):
+    me = require_member()
     if body.reason_type not in REASONS:
         raise HTTPException(400, f"알 수 없는 사유: {body.reason_type}")
     with engine.begin() as conn:
         o = conn.execute(text(
-            "SELECT o.order_id, o.status, o.total_amount, o.ops_snapshot, m.email"
-            " FROM orders o LEFT JOIN members m USING (member_id)"
-            " WHERE o.order_no=:n FOR UPDATE OF o"), {"n": body.order_no}).mappings().first()
+            "SELECT o.order_id, o.status, o.total_amount, o.ops_snapshot, o.member_id"
+            " FROM orders o WHERE o.order_no=:n FOR UPDATE OF o"),
+            {"n": body.order_no}).mappings().first()
         if o is None:
             raise HTTPException(404, "주문이 없습니다")
-        if o["email"] != body.email:
+        if o["member_id"] != me["member_id"]:
             raise HTTPException(403, "본인 주문만 접수할 수 있습니다")
         if o["status"] in ("접수", "취소"):
             raise HTTPException(409, {"error": "invalid_state",

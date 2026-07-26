@@ -345,6 +345,42 @@ ALTER TABLE product_sourcing_quotes
 같은 batch의 다른 quote는 '취소' → 재고는 **입고 화면(ADM-SRC-020)에서 실제 입고 시** 증가한다
 (확정은 가격 결정일 뿐 수량이 들어온 사건이 아니다 — T10과의 경계).
 
+### 3.11 [6차 개정] 고객 인증 — members 확장 / member_sessions (2026-07-26, 슬라이스 38)
+
+**닫는 구멍**: `/api/my/*`가 `?email=` 하나로 아무나 남의 주문·결제·후기를 내주고 있었다.
+회원 경계는 이제 **세션이 정한다** — 요청이 주장하는 이메일이 아니라.
+
+관리자 인증(§3.9)과 **의도적으로 다른 3가지** — 지키는 대상이 다르다:
+
+| | 관리자 | 고객 |
+|---|---|---|
+| 승인 게이트 | owner 승인 필요 | **없음** — 첫 로그인이 가입 |
+| 만료 | 절대 8시간 · 유휴 30분 | **절대 14일 · 유휴 없음** |
+| 권한 등급 | viewer/operator/owner | **없음** — 경계는 member_id |
+
+같은 원칙: **비밀번호를 저장하지 않는다.** `joined_via`가 이미 email/kakao/naver를 갖고 있어
+`provider` 컬럼은 만들지 않고 재사용한다(원천을 둘로 나누지 않는다).
+
+```sql
+ALTER TABLE members
+  ADD COLUMN provider_uid  VARCHAR(120),   -- 제공자 고유 ID — 이메일 변경에도 불변
+  ADD COLUMN last_login_at TIMESTAMP;
+CREATE UNIQUE INDEX idx_members_provider ON members (joined_via, provider_uid)
+  WHERE provider_uid IS NOT NULL;
+
+CREATE TABLE member_sessions (             -- 구조는 admin_sessions와 동일(정책만 다름)
+  session_id VARCHAR(64) PRIMARY KEY, member_id BIGINT NOT NULL REFERENCES members(member_id),
+  created_at TIMESTAMP NOT NULL DEFAULT now(), last_seen_at TIMESTAMP NOT NULL DEFAULT now(),
+  expires_at TIMESTAMP NOT NULL, revoked_at TIMESTAMP, user_agent VARCHAR(300)
+);
+```
+
+**계약**: ① 쿠키 `popcorn_member_session`(HttpOnly·SameSite=Lax) ② 만료·철회 판정은 DB `now()`
+③ **게스트는 그대로 열려 있다** — 상담·추천·주문 생성은 로그인을 요구하지 않는다("견적을 보려고
+가입을 강요하지 않는다"는 A-10 결정을 인증이 뒤집지 않는다) ④ 주문 귀속: **세션이 있으면 세션 회원**,
+없으면 게스트 주문(email upsert 유지 — 그 이메일은 자기신고값이며, 같은 이메일로 로그인해야
+MY에서 보인다) ⑤ 탈퇴·정지 회원(`status != 'active'`)의 세션은 즉시 무효.
+
 ---
 
 ## 4. 필드 소유권 & 덮어쓰기 규칙

@@ -12,24 +12,22 @@ settlements·pg_ref 노출은 ADM-PAY-010 몫.
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .customer_auth import require_member
 from .db import engine
 
 router = APIRouter(prefix="/api/my")
 
 
 @router.get("/payments")
-def list_payments(email: str = ""):
+def list_payments():
+    member_id = require_member()["member_id"]   # 회원 경계 = 세션(슬라이스 38)
     with engine.connect() as conn:
-        m = conn.execute(text(
-            "SELECT member_id FROM members WHERE email=:e"), {"e": email}).first()
-        if m is None:
-            return {"items": []}  # 미가입 — 정직 빈 목록(my_orders 동일)
         rows = conn.execute(text(
             "SELECT o.order_no, p.pay_mode, p.method, p.amount, p.status, p.paid_at"
             " FROM payments p JOIN orders o USING (order_id)"
             " WHERE o.member_id=:m"
             " ORDER BY p.paid_at DESC NULLS LAST, p.payment_id DESC"),
-            {"m": m[0]}).mappings().all()
+            {"m": member_id}).mappings().all()
     return {"items": [{
         "order_no": r["order_no"], "mode": r["pay_mode"], "method": r["method"],
         "amount": r["amount"], "status": r["status"],

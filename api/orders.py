@@ -8,7 +8,7 @@ stock_reservations(hold)가 존재하는 이유가 그 미래 분리다(§10.5).
 원칙: 라인 가격은 전부 견적 스냅샷(quote_snapshots) 기준 — 클라이언트 가격을 신뢰하지 않고,
 "고객에게 보여준 그대로"(원칙 6)를 원장에 남긴다. products는 재고·상태 검증에만 쓴다.
 mall 주문 생성은 v1 제외(쇼핑몰 연동 없는 가짜 원장 — 인계 연출은 목업 폴백 존치).
-회원은 mock 인증(email upsert) 수용 — 실 인증은 별도 슬라이스.
+회원(슬라이스 38): 세션이 있으면 세션 회원으로 귀속, 없으면 게스트 주문(email upsert 유지).
 """
 import json
 from datetime import datetime
@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .customer_auth import current_member
 from .db import engine
 
 router = APIRouter(prefix="/api")
@@ -103,15 +104,23 @@ def create_order(body: OrderBody):
         if soldout:
             raise HTTPException(409, {"error": "soldout", "items": soldout})
 
-        # 회원 — email 기준 조회/생성 (mock 인증 수용)
-        member_id = conn.execute(text(
-            "SELECT member_id FROM members WHERE email=:e"), {"e": body.member.email}).scalar()
-        if member_id is None:
+        # 회원 — **세션이 있으면 세션 회원**(확인된 신원). 없으면 게스트 주문으로
+        # email upsert를 유지한다(슬라이스 38: 견적을 보려고 가입을 강요하지 않는다는
+        # A-10 결정을 인증이 뒤집지 않는다). 게스트 주문의 이메일은 자기신고값이며,
+        # 그 주문 내역은 같은 이메일로 로그인해야 MY에서 보인다.
+        me = current_member()
+        if me is not None:
+            member_id = me["member_id"]
+        else:
             member_id = conn.execute(text(
-                "INSERT INTO members (email, nickname, joined_via) VALUES (:e, :n, :v)"
-                " RETURNING member_id"),
-                {"e": body.member.email, "n": body.member.nick,
-                 "v": VIA_MAP.get(body.member.via, "email")}).scalar()
+                "SELECT member_id FROM members WHERE email=:e"),
+                {"e": body.member.email}).scalar()
+            if member_id is None:
+                member_id = conn.execute(text(
+                    "INSERT INTO members (email, nickname, joined_via) VALUES (:e, :n, :v)"
+                    " RETURNING member_id"),
+                    {"e": body.member.email, "n": body.member.nick,
+                     "v": VIA_MAP.get(body.member.via, "email")}).scalar()
 
         # 발번 — 시드 형식 ORD-##### 승계 (advisory lock으로 직렬화, UNIQUE 백스톱)
         seq = conn.execute(text(
