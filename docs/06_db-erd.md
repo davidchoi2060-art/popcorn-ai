@@ -281,7 +281,29 @@ CREATE TABLE compat_rules (
 
 ### 3.8 유지 테이블
 
-`users`, `logs`, `recommendations`, `recommendation_items`, `policy_weights`, `category_margin_policies`, `api_cost_logs`, `promo_click_logs`, `swap_event_logs`, `rate_limit_policies`, `cost_thresholds`, `csv_import_jobs`, `csv_import_errors`, `admin_operators`, `admin_operator_activity_logs`, 제품 소싱 3종(`sourcing_batches`, `product_sourcing_quotes`, `product_sourcing_match_candidates`)은 Ver 2.0 정의를 유지한다.
+`users`, `logs`, `recommendations`, `recommendation_items`, `policy_weights`, `category_margin_policies`, `api_cost_logs`, `promo_click_logs`, `swap_event_logs`, `rate_limit_policies`, `cost_thresholds`, `csv_import_jobs`, `csv_import_errors`, `admin_operators`, `admin_operator_activity_logs`, `product_sourcing_match_candidates`는 Ver 2.0 정의를 유지한다.
+
+### 3.9 [5차 개정] 매입 견적 — sourcing_batches / product_sourcing_quotes (A-10 정합)
+
+Ver 2.0 정의(`vendor VARCHAR`)를 **공급처 원장과 연결**(`supplier_id` FK)하고 상태 어휘를 성문화한다.
+"재고 소진·안전재고 미달 자동 등록"(ADM-SRC-010)의 **대기 목록은 저장하지 않고 파생**한다 —
+`products.safety_stock`(0004)으로 판정 가능하므로 별도 큐 테이블을 두면 동기화 문제만 생긴다.
+저장하는 것은 **운영자가 실제로 한 행위**(견적 요청·회신 기록·확정)뿐이다.
+
+```sql
+ALTER TABLE product_sourcing_quotes
+  ADD COLUMN supplier_id BIGINT REFERENCES suppliers(supplier_id),
+  ADD COLUMN replied_at  TIMESTAMP,      -- 회신 기록 시각 (NULL = 회신 대기)
+  ADD COLUMN memo        VARCHAR(200);   -- 회신 조건(납기·수량 등) 자유 기록
+-- status 어휘: 요청 / 회신 / 확정 / 취소
+```
+
+**흐름 계약**: 대기(파생) → **[견적 요청]** 공급처별 quote 행 생성(status='요청') →
+**[회신 기록]** 운영자가 회신가를 대행 입력(status='회신'·replied_at) — 공급처 회신은 전화·메일로
+오므로 **자동 수신이 아니라 대행 입력이 실제 업무**다(정직) → **[이 가격으로 확정]** 최저가 채택 →
+`product_supplier_prices` 갱신 + `_reprice`(가격 이력 reason='sourcing'·supplier_id) +
+같은 batch의 다른 quote는 '취소' → 재고는 **입고 화면(ADM-SRC-020)에서 실제 입고 시** 증가한다
+(확정은 가격 결정일 뿐 수량이 들어온 사건이 아니다 — T10과의 경계).
 
 ---
 

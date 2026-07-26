@@ -19,7 +19,7 @@ LIMIT = 500  # 초과 시 total과 함께 정직 표기("최근 500건") — 페
 
 KIND_LABELS = {"order": "주문", "refund": "환불", "settlement": "정산",
                "price_file": "단가표", "product_review": "검수·매입", "product": "상품",
-               "member_review": "후기", "member": "회원", "stock": "재고"}
+               "member_review": "후기", "member": "회원", "stock": "재고", "sourcing": "매입 견적"}
 ACTION_LABELS = {
     "order_advance": "주문 처리", "order_advance_undo": "주문 처리 되돌림",
     "refund_advance": "환불 처리", "refund_advance_undo": "환불 처리 되돌림",
@@ -33,6 +33,7 @@ ACTION_LABELS = {
     "member_map_request": "매핑 요청 발송", "member_map_request_undo": "매핑 요청 되돌림",
     "price_review_decide": "가격 검토 처리",
     "stock_inbound": "재고 입고", "stock_inbound_undo": "재고 입고 되돌림",
+    "sourcing_request": "견적 요청", "sourcing_reply": "회신 기록", "sourcing_confirm": "매입 확정",
 }
 PRICE_REVIEW_SUB = {"approve": "제안가 승인", "keep": "판매가 유지(제안 차단)",
                     "manual": "직접 수정"}
@@ -76,6 +77,14 @@ def _summary(action: str, d: dict) -> str:
         sub = PRICE_REVIEW_SUB.get(d.get("action"), d.get("action", ""))
         p = d.get("price")
         return f"{d.get('sku')} · {sub}" + (f" {p:,}원" if p else "")
+    if action == "sourcing_request":
+        return f"{len(d.get('quotes', []))}개 공급처에 견적 요청 — {d.get('sku', '')}"
+    if action == "sourcing_reply":
+        return f"회신가 {d.get('price', 0):,}원 기록 (견적 #{d.get('quote_id')})"
+    if action == "sourcing_confirm":
+        b = (d.get("before") or {}).get("cost_price")
+        return (f"매입 확정 {d.get('price', 0):,}원"
+                + (f" (이전 {b:,}원)" if b else " (신규 공급처)"))
     if action == "member_map_request":
         return f"{d.get('nickname')}님에게 쇼핑몰 계정 매핑 요청 발송 — 동의 대기"
     if action.endswith("_undo") or d.get("ref_log_id"):

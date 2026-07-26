@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">매입 견적(용산)</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">매입 견적(용산) <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SRC-010</span></h2>
+          <div><h2 class="mb-1">매입 견적(용산) <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SRC-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">재고가 소진되면 자동으로 여기 모입니다. <b class="text-body-secondary">매입가를 확정해야 추천 가능 재고에 재편입</b>됩니다.</p></div>
           <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">4</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 재편입 <span id="done">0</span>건</p></div>
         </div>
@@ -306,6 +306,121 @@
           });
         }
         render();if(window.feather)feather.replace();
+      })();
+      </script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 35) — 대기는 재고·안전재고에서 파생, 저장하는 건 운영자 행위뿐.
+        // 회신은 자동 수신이 아니라 **대행 입력**(공급처 회신은 전화·메일로 온다) — 정직 표기.
+        var SUPS = [], NOTE = "";
+        function won(n){ return n == null ? "—" : n.toLocaleString() + "원"; }
+        function toastL(m){
+          var t = document.getElementById("__t");
+          if(!t){ t = document.createElement("div"); t.id = "__t";
+            t.style.cssText = "position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:92vw;";
+            document.body.appendChild(t); }
+          t.textContent = m; t.style.opacity = "1";
+          clearTimeout(t._x); t._x = setTimeout(function(){ t.style.opacity = "0"; }, 3200);
+        }
+        function post(path, body){
+          return fetch("/api/admin" + path, {method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify(body || {})}).then(function(r){
+              return r.json().then(function(j){ if(!r.ok) throw new Error((j && j.detail) || r.status); return j; });
+            });
+        }
+        var ST = {req:["견적 요청 전","secondary"], wait:["회신 대기","warning"], reply:["회신 도착","primary"]};
+
+        function renderLive(d){
+          NOTE = d.note; SUPS = d.suppliers;
+          document.getElementById("cnt").textContent = d.items.length;
+          document.getElementById("done").textContent = d.done_today;
+          var host = document.getElementById("cards");
+          host.innerHTML = d.items.length ? d.items.map(function(it){
+            var st = ST[it.state];
+            var fix = it.last_fix
+              ? '<div class="alert alert-subtle-primary py-1 px-2 fs-10 mb-2 mt-1">매입 확정됨 — '
+                + it.last_fix.supplier + ' ' + won(it.last_fix.price)
+                + ' · <a href="stock-inbound.html">입고 처리</a>하면 재고가 늘어납니다(확정은 가격 결정)</div>'
+              : '';
+            var rows = it.quotes.map(function(q){
+              return '<tr><td>' + q.supplier
+                + (q.best ? ' <span class="badge badge-phoenix badge-phoenix-primary">최저</span>' : '')
+                + (q.memo ? '<div class="fs-10 text-body-tertiary">' + q.memo + '</div>' : '')
+                + '</td><td class="text-end fw-bold">' + (q.price == null ? '회신 대기' : won(q.price))
+                + '</td><td class="text-body-tertiary">' + (q.replied_at ? q.replied_at.slice(5,16).replace("T"," ") : "—")
+                + '</td><td class="text-end text-nowrap">'
+                + '<button class="btn btn-sm btn-subtle-secondary" data-reply="' + q.quote_id + '">회신 입력</button>'
+                + (q.price != null ? ' <button class="btn btn-sm btn-primary" data-fixq="' + q.quote_id + '">이 가격으로 확정</button>' : '')
+                + '</td></tr>';
+            }).join("");
+            return '<div class="card mb-3"><div class="card-body">'
+              + '<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">'
+              + '<div><span class="badge badge-phoenix badge-phoenix-' + st[1] + ' me-2">' + st[0] + '</span>'
+              + '<b class="text-body-highlight">' + it.name + '</b> <code class="fs-10">' + it.sku + '</code>'
+              + '<br><span class="fs-10 text-body-tertiary">' + it.cat + ' · ' + it.why + '</span></div>'
+              + (it.state === "req"
+                  ? '<button class="btn btn-sm btn-phoenix-primary" data-req="' + it.product_code + '">공급처에 견적 요청</button>'
+                  : '')
+              + '</div>' + fix
+              + (it.quotes.length
+                  ? '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
+                    + '<thead><tr class="text-body-tertiary"><th>공급처</th><th class="text-end">회신 매입가</th>'
+                    + '<th>회신 시각</th><th class="text-end"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                  : '<p class="fs-9 text-body-tertiary mb-0">아직 요청 전입니다.</p>')
+              + '</div></div>';
+          }).join("")
+          : '<div class="card"><div class="card-body text-center py-5 text-body-tertiary"><b>매입 대기가 없습니다.</b><br><span class="fs-10">재고 소진·안전재고 미달 시 자동 등록됩니다.</span></div></div>';
+
+          var note = document.getElementById("srcNote");
+          if(!note){ note = document.createElement("p"); note.id = "srcNote";
+            note.className = "fs-10 text-body-tertiary mt-2 mb-0"; host.parentNode.appendChild(note); }
+          note.textContent = NOTE;
+
+          host.querySelectorAll("[data-req]").forEach(function(b){
+            b.onclick = function(){
+              b.disabled = true;
+              post("/sourcing/request", {product_code: +b.dataset.req, supplier_ids: SUPS.map(function(x){ return x.id; })})
+                .then(function(j){ toastL(j.quotes.length + "개 공급처에 견적 요청 기록 — 회신이 오면 입력하세요"); return reload(); })
+                .catch(function(e){ toastL("요청 실패: " + e.message); b.disabled = false; });
+            };
+          });
+          host.querySelectorAll("[data-reply]").forEach(function(b){
+            b.onclick = function(){
+              var v = prompt("공급처 회신 매입가를 입력하세요 (원):");
+              if(v === null) return;
+              var price = parseInt(String(v).replace(/[^0-9]/g, ""), 10);
+              if(!price){ toastL("금액은 1원 이상의 숫자여야 합니다"); return; }
+              var memo = prompt("회신 조건(납기 등) — 선택:", "") || null;
+              post("/sourcing/quotes/" + b.dataset.reply + "/reply", {price: price, memo: memo})
+                .then(function(){ toastL("회신 " + won(price) + " 기록"); return reload(); })
+                .catch(function(e){ toastL("기록 실패: " + e.message); });
+            };
+          });
+          host.querySelectorAll("[data-fixq]").forEach(function(b){
+            b.onclick = function(){
+              b.disabled = true;
+              post("/sourcing/quotes/" + b.dataset.fixq + "/confirm", {})
+                .then(function(j){
+                  toastL(j.sku + " 매입 확정 " + won(j.price) + " — 가격 이력 기록"
+                    + (j.sale_changed ? " · 판매가 재산정" : "") + " · 재고는 입고 화면에서 늘어납니다");
+                  return reload();
+                })
+                .catch(function(e){ toastL("확정 실패: " + e.message); b.disabled = false; });
+            };
+          });
+          if(window.feather) feather.replace();
+        }
+        function reload(){
+          return fetch("/api/admin/sourcing").then(function(r){
+            if(!r.ok) throw new Error(r.status); return r.json();
+          }).then(function(d){
+            renderLive(d);
+            var b = document.getElementById("dataSrc");
+            b.textContent = "실데이터 · Cloud SQL";
+            b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+          });
+        }
+        reload().catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

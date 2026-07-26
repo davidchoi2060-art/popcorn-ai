@@ -23,6 +23,7 @@ from .admin_price_history import router as admin_price_history_router
 from .admin_price_review import router as admin_price_review_router
 from .admin_products import router as admin_products_router
 from .admin_sessions import router as admin_sessions_router
+from .admin_sourcing import router as admin_sourcing_router
 from .admin_stock import router as admin_stock_router
 from .admin_system import router as admin_system_router
 from .admin_reviews import router as admin_reviews_router
@@ -62,6 +63,7 @@ app.include_router(admin_price_history_router)
 app.include_router(admin_dashboard_router)
 app.include_router(admin_engine_rules_router)
 app.include_router(admin_system_router)
+app.include_router(admin_sourcing_router)
 app.include_router(candidates_router)
 app.include_router(recommend_router)
 app.include_router(orders_router)
