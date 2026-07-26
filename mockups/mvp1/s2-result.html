@@ -464,7 +464,8 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  // 호환성 실값
  var fit=document.getElementById('sec-fit');
  var pctEl=fit?fit.querySelector('div[style*="font-size:52px"]'):null;
- var checkCards=fit?fit.querySelectorAll('div[style*="repeat(4,1fr)"] > div'):[];
+ var checkGrid=fit?fit.querySelector('div[style*="repeat(4,1fr)"]'):null;
+ var checkCards=checkGrid?checkGrid.querySelectorAll(':scope > div'):[];
  // 함께 구성 — companion 실데이터 재렌더
  var periphGrid=document.querySelector('#sec-periph div[style*="auto-fit"]');
  var PICON={MONITOR:'desktop_windows',KEYBOARD:'keyboard',MOUSE:'mouse',HEADSET:'headphones',SPEAKER:'speaker',WEBCAM:'videocam'};
@@ -506,9 +507,17 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    +'<a href="#sec-periph" style="font-size:12.5px;color:#e8b563;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:15px;">devices</span>모니터·키보드는 아래 &quot;함께 쓰면 좋은 구성&quot;에서 ↓</a>';
   }
   if(pctEl){pctEl.textContent=s.compat.power_headroom_pct+'%';}
+  // 호환 근거는 규칙 수만큼 전부 보여준다(슬라이스 34 — 엔진이 판정한 규칙과 1:1).
+  // 카드가 부족하면 첫 카드를 복제해 늘린다 — 4종만 보여주고 3종을 숨기지 않는다.
+  if(checkGrid&&s.compat.checks.length>checkCards.length&&checkCards.length){
+   var proto=checkCards[0];
+   for(var k=checkCards.length;k<s.compat.checks.length;k++)checkGrid.appendChild(proto.cloneNode(false));
+   checkCards=checkGrid.querySelectorAll(':scope > div');
+  }
   for(var i=0;i<Math.min(checkCards.length,s.compat.checks.length);i++){
    var c=s.compat.checks[i];
-   checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:#2f9e6d;">check_circle</span><span style="font-size:14.5px;font-weight:700;color:#2c4c3c;">'+c.label+'</span><span style="font-size:12px;color:#7aa891;">'+c.detail+'</span>';
+   var okCol=c.pass!==false;
+   checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:'+(okCol?'#2f9e6d':'#b31b25')+';">'+(okCol?'check_circle':'error')+'</span><span style="font-size:14.5px;font-weight:700;color:#2c4c3c;">'+c.label+'</span><span style="font-size:12px;color:#7aa891;">'+c.detail+'</span>';
   }
   var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
   if(cp)cp.textContent=s.total.toLocaleString();if(cp2)cp2.textContent=s.total.toLocaleString();

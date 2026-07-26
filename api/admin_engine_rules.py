@@ -1,8 +1,8 @@
 """추천 설정 3화면(호환 규칙·추천 기준·마진 정책)의 실근거 노출 — 읽기 전용.
 
-이 화면들의 저장 테이블은 비어 있거나(policy_weights·category_margin_policies 0행)
-아예 없다(compat_rules 테이블 부재). 그러나 **엔진이 실제로 쓰는 규칙은 코드에 살아 있다** —
-호환 5종(recommend.build_compat)·티어 정렬·예산 배분율(candidates.BUDGET_ALLOC)·태그 스코프·
+**호환 규칙은 compat_rules 테이블이 단일 원천**(슬라이스 34 — 엔진이 이 표를 읽어 판정한다).
+나머지는 아직 저장 테이블이 비어 있어(policy_weights·category_margin_policies 0행) 코드에
+살아 있는 규칙을 노출한다 — 티어 정렬·예산 배분율(candidates.BUDGET_ALLOC)·태그 스코프·
 가격 공식(pricing_settings 실값 + 천원 half-up). 화면이 연출값을 보여주는 대신
 **지금 견적을 만드는 그 규칙**을 그대로 노출한다("모든 견적에는 이유가 있습니다"의 근거).
 
@@ -20,23 +20,8 @@ from .recommend import SLOTS, TIER_LABELS
 
 router = APIRouter(prefix="/api/admin")
 
-# recommend.build_compat이 실제로 검사하는 5종 — 라벨·기준을 화면 계약으로 노출
-COMPAT_CHECKS = [
-    {"key": "socket", "label": "CPU 소켓 규격 일치",
-     "rule": "CPU.socket = MB.socket (쿨러 지원 소켓 포함)",
-     "source": "product_specs.socket", "blocking": True},
-    {"key": "mem", "label": "메모리 규격 일치", "rule": "RAM.mem_type = MB.mem_type",
-     "source": "product_specs.mem_type", "blocking": True},
-    {"key": "cooler_tdp", "label": "쿨러 발열(TDP) 통과",
-     "rule": "COOLER.cooler_tdp ≥ CPU.tdp_watt",
-     "source": "product_specs.cooler_tdp / tdp_watt", "blocking": True},
-    {"key": "gpu_len", "label": "그래픽카드 장착 길이",
-     "rule": "CASE.gpu_max_mm ≥ GPU.length_mm",
-     "source": "product_specs.gpu_max_mm / length_mm", "blocking": True},
-    {"key": "power", "label": "전원 용량 여유",
-     "rule": "POWER.rated_watt ≥ GPU.required_power_watt (여유율 = 정격 ÷ 권장 × 100)",
-     "source": "product_specs.rated_watt / required_power_watt", "blocking": True},
-]
+# 호환 규칙은 이제 compat_rules 테이블이 단일 원천(슬라이스 34) — 하드코딩 제거.
+OP_KO = {"eq": "=", "gte": "≥", "lte": "≤"}
 
 TIER_RULES = [
     {"key": "value", "label": TIER_LABELS["value"], "order": "슬롯별 가격 오름차순",
@@ -62,16 +47,27 @@ def engine_rules():
             "SELECT key, weight, updated_at FROM policy_weights ORDER BY key")).mappings().all()
         pool = conn.execute(text(
             "SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")).scalar_one()
+        rule_rows = conn.execute(text(
+            "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, blocking, active"
+            " FROM compat_rules ORDER BY sort_order, rule_id")).mappings().all()
+
+    checks = [{
+        "key": r["rule_key"], "label": r["label"],
+        "rule": f"{r['slot']}.{r['field']} {OP_KO.get(r['op'], r['op'])} {r['ref_slot']}.{r['ref_field']}",
+        "source": f"product_specs.{r['field']} / {r['ref_field']}",
+        "blocking": r["blocking"], "active": r["active"],
+    } for r in rule_rows]
 
     fee = float(s["card_fee_rate"]) if s else 0.0
     margin = float(s["margin_rate"]) if s else 0.0
     sample = 100_000
     return {
         "compat": {
-            "checks": COMPAT_CHECKS,
+            "checks": checks,
             "slots": SLOTS,
-            "note": ("호환 규칙 저장 테이블(compat_rules)은 아직 없습니다 — 위 규칙은"
-                     " 지금 견적을 만드는 엔진 코드의 실제 검사 항목입니다(규칙 버전 관리는 이관)."),
+            "note": ("호환 규칙은 **compat_rules 테이블이 단일 원천**입니다(슬라이스 34) —"
+                     " 엔진이 매 견적마다 이 표를 읽어 판정합니다. NULL 값은 불통과(값을 모르는"
+                     " 부품을 호환으로 판정하지 않음) · 규칙 편집 UI·버전 발행은 이관."),
         },
         "tiers": {
             "rules": TIER_RULES,

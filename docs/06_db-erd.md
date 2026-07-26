@@ -250,7 +250,36 @@ WHERE p.status = '판매중'
   AND p.part_type IN ('MONITOR','KEYBOARD','MOUSE','HEADSET','SPEAKER','WEBCAM');
 ```
 
-### 3.7 유지 테이블
+### 3.7 [5차 개정] compat_rules — 조립 호환 규칙 (엔진의 단일 원천)
+
+추천 엔진의 슬롯 진입 검사를 **데이터로 표현**한다. 그동안 규칙은 코드 상수(`recommend._slot_ok`)로만
+존재했고 화면(ADM-ENG-010)은 그것을 읽어 표시했다 — 이제 **엔진이 이 테이블을 읽는다**.
+테이블만 만들고 코드가 계속 상수를 쓰면 이중 원천이 되므로, 이 개정은 엔진 리팩터링과 함께 적용한다.
+
+```sql
+CREATE TABLE compat_rules (
+  rule_id     BIGSERIAL PRIMARY KEY,
+  rule_key    VARCHAR(40) NOT NULL UNIQUE,  -- socket / mem / gpu_len / cooler_socket …
+  slot        VARCHAR(20) NOT NULL,         -- 검사 대상 슬롯 (SLOTS 어휘)
+  field       VARCHAR(40) NOT NULL,         -- product_specs 컬럼
+  op          VARCHAR(4)  NOT NULL,         -- eq / gte / lte
+  ref_slot    VARCHAR(20) NOT NULL,         -- 비교 상대 슬롯 — **탐색 순서상 앞이어야 한다**
+  ref_field   VARCHAR(40) NOT NULL,
+  label       VARCHAR(100) NOT NULL,        -- 화면 표시명
+  detail_fmt  VARCHAR(200),                 -- 표시 문구 템플릿 ({v}=대상값, {r}=상대값)
+  blocking    BOOLEAN NOT NULL DEFAULT true,-- false면 경고만(현재 전부 true)
+  active      BOOLEAN NOT NULL DEFAULT true,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  updated_at  TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+**계약**: ① NULL 필드는 **불통과**(값을 모르는 부품을 호환으로 판정하지 않는다 — 신뢰 판매자 원칙)
+② `ref_slot`은 슬롯 탐색 순서(CPU→MB→RAM→GPU→CASE→COOLER→POWER→SSD)에서 `slot`보다 앞이어야
+하며, 위반 규칙은 로드 시 **건너뛰고 경고**한다(잘못된 규칙이 엔진을 죽이지 않게) ③ `active=false`
+규칙은 로드하지 않는다 ④ 규칙 변경은 견적 결과를 바꾸므로 회귀 검증 대상이다(버전 발행은 이관).
+
+### 3.8 유지 테이블
 
 `users`, `logs`, `recommendations`, `recommendation_items`, `policy_weights`, `category_margin_policies`, `api_cost_logs`, `promo_click_logs`, `swap_event_logs`, `rate_limit_policies`, `cost_thresholds`, `csv_import_jobs`, `csv_import_errors`, `admin_operators`, `admin_operator_activity_logs`, 제품 소싱 3종(`sourcing_batches`, `product_sourcing_quotes`, `product_sourcing_match_candidates`)은 Ver 2.0 정의를 유지한다.
 

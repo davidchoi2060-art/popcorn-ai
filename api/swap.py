@@ -21,7 +21,8 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .db import engine
-from .recommend import SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat
+from .recommend import (SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
+                        load_compat_rules)
 
 router = APIRouter(prefix="/api/swap")
 
@@ -78,8 +79,8 @@ def _chosen_from_parts(parts, specs):
     return chosen
 
 
-def _valid(chosen) -> list:
-    return [s for s in SLOTS if not _slot_ok(s, chosen[s], chosen)]
+def _valid(chosen, rules) -> list:
+    return [s for s in SLOTS if not _slot_ok(s, chosen[s], chosen, rules)]
 
 
 def _chain_reason(alt_slot: str, chain: list, chosen: dict, alt: dict) -> str:
@@ -92,10 +93,10 @@ def _chain_reason(alt_slot: str, chain: list, chosen: dict, alt: dict) -> str:
     return f"이 부품을 쓰려면 {names}을(를) 함께 바꿔야 조립할 수 있어요."
 
 
-def _find_chain(slot, alt, chosen, pool_by_slot):
+def _find_chain(slot, alt, chosen, pool_by_slot, rules):
     """대안 적용 후 위반 슬롯을 가격 오름차순 교체로 해소(1패스). 실패·자기 슬롯 위반 → None."""
     trial = {**chosen, slot: alt}
-    violations = _valid(trial)
+    violations = _valid(trial, rules)
     if not violations:
         return []
     if slot in violations:
@@ -107,14 +108,14 @@ def _find_chain(slot, alt, chosen, pool_by_slot):
             if cand["product_code"] == trial[vs]["product_code"]:
                 continue
             t2 = {**trial, vs: cand}
-            if not _valid(t2):
+            if not _valid(t2, rules):
                 chain.append({"_slot": vs, "_from": trial[vs], "_to": cand})
                 trial = t2
                 fixed = True
                 break
         if not fixed:
             return None
-    return chain if not _valid(trial) else None
+    return chain if not _valid(trial, rules) else None
 
 
 def _pool_ctx(conn):
@@ -134,6 +135,8 @@ def candidates(body: SwapQuery):
         specs = _specs_by_code(conn, [it["product_code"] for it in parts])
         chosen = _chosen_from_parts(parts, specs)
         pool, by_slot, pool_codes = _pool_ctx(conn)
+        rules = load_compat_rules(conn)
+        rules = load_compat_rules(conn)   # 엔진과 같은 규칙 원천(슬라이스 34)
 
     current = [{"slot": it["part_type"], "product_code": it["product_code"],
                 "sku": it["sku"], "name": it["name"], "price": it["price"],
@@ -144,7 +147,7 @@ def candidates(body: SwapQuery):
         for alt in by_slot.get(s, []):
             if alt["product_code"] == chosen[s]["product_code"]:
                 continue
-            chain = _find_chain(s, alt, chosen, by_slot)
+            chain = _find_chain(s, alt, chosen, by_slot, rules)
             if chain is None:
                 continue  # 해소 불가 — 미노출(UX-11 ①)
             entry = {"product_code": alt["product_code"], "sku": alt["sku"],
@@ -197,7 +200,7 @@ def apply(body: ApplyBody):
                 raise HTTPException(409, {"error": "swap_soldout",
                                           "detail": "방금 그 대안이 품절됐어요 — 목록을 새로고침해 주세요"})
             chosen[slot] = alt
-        violations = _valid(chosen)
+        violations = _valid(chosen, rules)
         if violations:
             raise HTTPException(409, {"error": "incompatible", "violations": violations,
                                       "detail": "이 조합은 조립할 수 없어요 — " +
@@ -215,7 +218,7 @@ def apply(body: ApplyBody):
             else:
                 new_parts.append(it)
         total = sum(it["price"] for it in new_parts)
-        compat = build_compat(chosen)
+        compat = build_compat(chosen, rules)
         reasons = (snap["items"].get("reasons") or []) + ["고객 부품 변경 반영 (S3)"]
         sid = conn.execute(text(
             "INSERT INTO quote_snapshots (session_id, quote_type, items, companion, total_amount)"

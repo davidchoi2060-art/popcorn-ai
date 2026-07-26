@@ -49,25 +49,46 @@ def _load_pool(conn):
         " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
 
 
-def _slot_ok(slot, p, chosen):
-    """슬롯 진입 호환 검사 — 앞 슬롯만 참조. NULL 필드는 불통과."""
-    if slot == "MB":
-        return p["socket"] is not None and p["socket"] == chosen["CPU"]["socket"]
-    if slot == "RAM":
-        return p["mem_type"] is not None and p["mem_type"] == chosen["MB"]["mem_type"]
-    if slot == "CASE":
-        return (p["gpu_max_mm"] is not None and chosen["GPU"]["length_mm"] is not None
-                and p["gpu_max_mm"] >= chosen["GPU"]["length_mm"])
-    if slot == "COOLER":
-        return (p["socket"] == chosen["CPU"]["socket"]
-                and p["cooler_tdp"] is not None and chosen["CPU"]["tdp_watt"] is not None
-                and p["cooler_tdp"] >= chosen["CPU"]["tdp_watt"]
-                and p["cooler_height_mm"] is not None
-                and p["cooler_height_mm"] <= chosen["CASE"]["cooler_height_mm"])
-    if slot == "POWER":
-        return (p["rated_watt"] is not None and chosen["GPU"]["required_power_watt"] is not None
-                and p["rated_watt"] >= chosen["GPU"]["required_power_watt"])
-    return True  # CPU·GPU·SSD — 독립
+def load_compat_rules(conn) -> dict:
+    """compat_rules(ERD §3.7)를 슬롯별로 로드 — **엔진의 단일 원천**(슬라이스 34).
+
+    로드 시 계약 검증: ref_slot이 탐색 순서상 slot보다 앞이어야 한다. 위반 규칙은
+    건너뛰고 경고한다(잘못된 규칙이 KeyError로 엔진을 죽이지 않게).
+    """
+    rows = conn.execute(text(
+        "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, detail_fmt, blocking"
+        " FROM compat_rules WHERE active ORDER BY sort_order, rule_id")).mappings().all()
+    by_slot: dict = {}
+    for r in rows:
+        if r["slot"] not in SLOTS or r["ref_slot"] not in SLOTS:
+            print(f"[compat_rules] 알 수 없는 슬롯 — 규칙 건너뜀: {r['rule_key']}")
+            continue
+        if SLOTS.index(r["ref_slot"]) >= SLOTS.index(r["slot"]):
+            print(f"[compat_rules] ref_slot이 탐색 순서상 뒤 — 규칙 건너뜀: {r['rule_key']}")
+            continue
+        by_slot.setdefault(r["slot"], []).append(dict(r))
+    return by_slot
+
+
+def _cmp(op: str, v, r) -> bool:
+    """NULL 불통과 — 값을 모르는 부품을 호환으로 판정하지 않는다(ERD §3.7 계약)."""
+    if v is None or r is None:
+        return False
+    if op == "eq":
+        return v == r
+    if op == "gte":
+        return v >= r
+    if op == "lte":
+        return v <= r
+    return False   # 미지의 연산자 — 불통과(조용히 통과시키지 않는다)
+
+
+def _slot_ok(slot, p, chosen, rules: dict):
+    """슬롯 진입 호환 검사 — DB 규칙을 그대로 적용. 규칙 없는 슬롯(CPU·GPU·SSD)은 독립."""
+    for rule in rules.get(slot, ()):
+        if not _cmp(rule["op"], p[rule["field"]], chosen[rule["ref_slot"]][rule["ref_field"]]):
+            return False
+    return True
 
 
 def _tier_sort(parts, tier, has_cap):
@@ -81,7 +102,7 @@ def _tier_sort(parts, tier, has_cap):
     return sorted(asc, key=lambda p: (abs(asc.index(p) - mid), asc.index(p)))
 
 
-def _dfs(slot_pools, budget_limit):
+def _dfs(slot_pools, budget_limit, rules: dict):
     """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기."""
     min_rest = [0] * (len(SLOTS) + 1)
     for i in range(len(SLOTS) - 1, -1, -1):
@@ -98,7 +119,7 @@ def _dfs(slot_pools, budget_limit):
                 return None
             if budget_limit is not None and total + p["sale_price"] + min_rest[i + 1] > budget_limit:
                 continue
-            if not _slot_ok(slot, p, chosen):
+            if not _slot_ok(slot, p, chosen, rules):
                 continue
             chosen[slot] = p
             r = go(i + 1, chosen, total + p["sale_price"])
@@ -110,27 +131,30 @@ def _dfs(slot_pools, budget_limit):
     return go(0, {}, 0)
 
 
-def build_compat(chosen: dict) -> dict:
-    """호환성 5종 요약 — recommend(_build_set)와 swap이 공유(계약·반올림 동일 유지)."""
-    cpu, mb, ram, gpu = chosen["CPU"], chosen["MB"], chosen["RAM"], chosen["GPU"]
-    case, cooler, power = chosen["CASE"], chosen["COOLER"], chosen["POWER"]
-    headroom = int(power["rated_watt"] / gpu["required_power_watt"] * 100)
-    return {
-        "power_headroom_pct": headroom,
-        "checks": [
-            {"key": "socket", "label": "CPU 소켓 규격 일치", "pass": True,
-             "detail": f"{cpu['socket']} = {mb['socket']} (쿨러 {cooler['socket']})"},
-            {"key": "mem", "label": "메모리 규격 일치", "pass": True,
-             "detail": f"{ram['mem_type']} = {mb['mem_type']}"},
-            {"key": "cooler_tdp", "label": "쿨러 발열(TDP) 통과", "pass": True,
-             "detail": f"{cooler['cooler_tdp']}W ≥ {cpu['tdp_watt']}W"},
-            {"key": "fit", "label": "케이스 장착 공간 여유", "pass": True,
-             "detail": f"GPU {gpu['length_mm']}≤{case['gpu_max_mm']}mm · 쿨러 {cooler['cooler_height_mm']}≤{case['cooler_height_mm']}mm"},
-        ],
-    }
+def build_compat(chosen: dict, rules: dict) -> dict:
+    """호환성 요약 — **DB 규칙에서 생성**(슬라이스 34). recommend와 swap이 공유.
+
+    표시 항목이 규칙과 1:1이 되어, 규칙을 추가하면 화면 근거도 자동으로 늘어난다.
+    detail은 규칙의 detail_fmt({v}=대상값 / {r}=상대값)로 조립한다.
+    """
+    checks = []
+    for slot in SLOTS:
+        for rule in rules.get(slot, ()):
+            v = chosen[slot][rule["field"]]
+            r = chosen[rule["ref_slot"]][rule["ref_field"]]
+            fmt = rule["detail_fmt"] or "{v} / {r}"
+            checks.append({
+                "key": rule["rule_key"], "label": rule["label"],
+                "pass": _cmp(rule["op"], v, r),
+                "detail": fmt.replace("{v}", str(v)).replace("{r}", str(r)),
+            })
+    gpu, power = chosen["GPU"], chosen["POWER"]
+    headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
+                if power["rated_watt"] and gpu["required_power_watt"] else None)
+    return {"power_headroom_pct": headroom, "checks": checks}
 
 
-def _build_set(tier, pool, cap):
+def _build_set(tier, pool, cap, rules):
     slot_pools = {}
     for s in SLOTS:
         cands = [p for p in pool if p["part_type"] in SLOT_TYPES[s]]
@@ -138,7 +162,7 @@ def _build_set(tier, pool, cap):
             return None
         slot_pools[s] = _tier_sort(cands, tier, cap is not None)
     limit = cap if (cap is not None and tier in ("value", "recommend")) else None
-    chosen = _dfs(slot_pools, limit)
+    chosen = _dfs(slot_pools, limit, rules)
     if chosen is None:
         return None
     total = sum(p["sale_price"] for p in chosen.values())
@@ -155,7 +179,7 @@ def _build_set(tier, pool, cap):
                    "sku": chosen[s]["sku"], "name": chosen[s]["product_name"],
                    "price": chosen[s]["sale_price"]} for s in SLOTS],
         "total": total,
-        "compat": build_compat(chosen),
+        "compat": build_compat(chosen, rules),
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},
         "reasons": reasons,
@@ -221,13 +245,14 @@ def recommend(body: RecommendBody):
         if cap is not None:
             capped, _, _ = _apply_one(capped, "예산", budget_v)
 
-        sets = {"value": _build_set("value", capped, cap)}
+        rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
+        sets = {"value": _build_set("value", capped, cap, rules)}
         if sets["value"] is None:
             # 최소 구성이 예산 밖이면 견적 불성립 — 전 티어 불가(정직)
             sets["recommend"] = sets["highend"] = None
         else:
-            sets["recommend"] = _build_set("recommend", capped, cap)
-            sets["highend"] = _build_set("highend", common, cap)
+            sets["recommend"] = _build_set("recommend", capped, cap, rules)
+            sets["highend"] = _build_set("highend", common, cap, rules)
 
         session_id = conn.execute(text(
             "INSERT INTO consult_sessions (member_id, mode, constraints) VALUES"
