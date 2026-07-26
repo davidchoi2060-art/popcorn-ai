@@ -26,7 +26,11 @@ router = APIRouter(prefix="/api")
 
 SLOTS = ["CPU", "MB", "RAM", "GPU", "CASE", "COOLER", "POWER", "SSD"]
 SLOT_TYPES = {s: (s,) for s in SLOTS} | {"COOLER": ("COOLER_CPU_AIR", "COOLER_CPU_AIO")}
-DFS_NODE_CAP = 100_000  # 안전망 — v1 풀 규모(18)에선 도달 불가
+# 안전망 — 병리적 조합 폭발을 막는 상한. 실규모 실측(슬라이스 40)에 맞춰 상향했다.
+# 시드 30종 시절엔 100,000이 "도달 불가"였지만 실카탈로그(추천 후보 3,046)에서는
+# 예산 100만원 추천이 682,419노드를 써서 답을 찾는다(0.11초). 100,000은 답이 있는데도
+# 없다고 말하게 만드는 값이었다. 탐색 자체는 싸다 — 100,007노드가 0.02초다.
+DFS_NODE_CAP = 2_000_000
 
 TIER_LABELS = {"value": "가성비형 견적", "recommend": "추천형 견적", "highend": "고성능형 견적"}
 
@@ -64,10 +68,10 @@ def load_compat_rules(conn) -> dict:
     by_slot: dict = {}
     for r in rows:
         if r["slot"] not in SLOTS or r["ref_slot"] not in SLOTS:
-            print(f"[compat_rules] 알 수 없는 슬롯 — 규칙 건너뜀: {r['rule_key']}")
+            print(f"[compat_rules] 알 수 없는 슬롯, 규칙 건너뜀: {r['rule_key']}")
             continue
         if SLOTS.index(r["ref_slot"]) >= SLOTS.index(r["slot"]):
-            print(f"[compat_rules] ref_slot이 탐색 순서상 뒤 — 규칙 건너뜀: {r['rule_key']}")
+            print(f"[compat_rules] ref_slot이 탐색 순서상 뒤, 규칙 건너뜀: {r['rule_key']}")
             continue
         by_slot.setdefault(r["slot"], []).append(dict(r))
     return by_slot
@@ -112,7 +116,7 @@ def check_rule_fields(pool, rules: dict) -> list:
     missing = sorted({f for rs in rules.values() for r in rs
                       for f in (r["field"], r["ref_field"]) if f not in keys})
     if missing:
-        print(f"[recommend] 경고: 규칙 참조 필드가 후보 풀에 없습니다 → {missing}"
+        print(f"[recommend] 경고: 규칙 참조 필드가 후보 풀에 없습니다: {missing}"
               " (_load_pool SELECT 목록에 추가해야 합니다)")
     return missing
 
@@ -128,24 +132,111 @@ def _tier_sort(parts, tier, has_cap):
     return sorted(asc, key=lambda p: (abs(asc.index(p) - mid), asc.index(p)))
 
 
+def build_search_index(slot_pools, rules: dict) -> dict:
+    """탐색 가속 인덱스 (슬라이스 40) — **결정론을 바꾸지 않는다.**
+
+    두 가지만 한다: ① 후보 집합을 줄인다(순서는 티어 정렬 그대로 유지) ② 확실히 실패할
+    분기를 미리 자른다. 둘 다 원래 DFS가 어차피 버렸을 경로만 건드리므로 **첫 완성 구성은
+    동일**하다. 회귀 세트의 고정 기대값이 그 증거다(150만 1,500,000 · 200만+ 2,145,200 불변).
+
+    **실측 이득은 작다(정직 기록)**: 예산 70만원 추천에서 노드 46,738 → 45,888(2%).
+    병목이 eq 규칙 슬롯이 아니라 예산 가지치기에 걸리는 조합의 대량 순회였기 때문이다.
+    100만원 추천이 안 나온 진짜 원인은 노드 상한값이었고 그건 DFS_NODE_CAP 상향으로 고쳤다.
+    이 인덱스는 부품이 더 늘어날 때를 위한 구조로 남긴다 — 결과는 바뀌지 않음이 확인됐다.
+
+    ① **eq / contains 규칙 → 값 인덱스**: MB는 CPU 소켓별, RAM은 MB 메모리 규격별,
+       쿨러는 지원 소켓별로 미리 묶는다. 상대 값이 정해지면 그 그룹만 본다
+       (기존에는 전 후보를 순회하며 하나씩 비교했다).
+    ② **gte / lte 규칙 → 극값 전방 검사**: 슬롯의 field 최대·최소를 미리 계산해,
+       상대 슬롯을 고른 즉시 "대상 슬롯에 후보가 0인가"를 O(1)로 판정한다.
+       예: GPU 길이가 케이스 최대 장착 길이보다 크면 그 GPU는 즉시 버린다
+       (케이스 수백 개를 순회한 뒤 실패하지 않는다). 극값으로 0을 확정할 때만 자르므로
+       판정이 느슨한 방향이고, 결과는 바뀌지 않는다.
+    """
+    eq_idx: dict = {}
+    fwd: list = []
+    for slot, rs in rules.items():
+        pool = slot_pools.get(slot) or []
+        for rule in rs:
+            op, fld = rule["op"], rule["field"]
+            if op in ("eq", "contains"):
+                g: dict = {}
+                for p in pool:
+                    v = p.get(fld)
+                    if v is None:
+                        continue          # NULL 불통과 — 인덱스에 넣지 않는다
+                    for key in (v if op == "contains" else (v,)):
+                        g.setdefault(key, []).append(p)
+                eq_idx.setdefault(slot, []).append((rule, g))
+            elif op in ("gte", "lte"):
+                vals = [p.get(fld) for p in pool if p.get(fld) is not None]
+                if vals:
+                    fwd.append((rule["ref_slot"], rule, slot,
+                                max(vals) if op == "gte" else min(vals)))
+    return {"eq": eq_idx, "fwd": fwd}
+
+
+def _narrow(slot, chosen, idx, pool):
+    """eq/contains 인덱스로 후보를 좁힌다 — 티어 정렬 순서는 그대로 남는다."""
+    lists = []
+    for rule, g in idx["eq"].get(slot, ()):
+        ref = chosen[rule["ref_slot"]].get(rule["ref_field"])
+        if ref is None:
+            return []                     # 상대 값을 모른다 → 전부 불통과(NULL 원칙)
+        got = g.get(ref)
+        if not got:
+            return []
+        lists.append(got)
+    if not lists:
+        return pool
+    lists.sort(key=len)
+    base = lists[0]
+    for other in lists[1:]:
+        codes = {p["product_code"] for p in other}
+        base = [p for p in base if p["product_code"] in codes]
+    return base
+
+
+def _fwd_ok(slot, p, idx):
+    """이 후보를 고르면 뒤 슬롯이 확실히 비는가 — 비면 지금 자른다(극값 기준)."""
+    for ref_slot, rule, _target, ext in idx["fwd"]:
+        if ref_slot != slot:
+            continue
+        rv = p.get(rule["ref_field"])
+        if rv is None:
+            return False                  # 상대 값이 없으면 대상 슬롯이 전부 불통과
+        if rule["op"] == "gte" and ext < rv:
+            return False
+        if rule["op"] == "lte" and ext > rv:
+            return False
+    return True
+
+
 def _dfs(slot_pools, budget_limit, rules: dict):
-    """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기."""
+    """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기.
+
+    min_rest(남은 슬롯 최저가 합)는 **좁히기 전 전체 풀** 기준으로 둔다 — 더 느슨한 하한이라
+    가지치기가 결과를 바꾸지 않는다(좁힌 풀로 계산하면 chosen에 따라 값이 달라져 계산 불가).
+    """
     min_rest = [0] * (len(SLOTS) + 1)
     for i in range(len(SLOTS) - 1, -1, -1):
         min_rest[i] = min_rest[i + 1] + min(p["sale_price"] for p in slot_pools[SLOTS[i]])
+    idx = build_search_index(slot_pools, rules)
     nodes = [0]
 
     def go(i, chosen, total):
         if i == len(SLOTS):
             return dict(chosen)
         slot = SLOTS[i]
-        for p in slot_pools[slot]:
+        for p in _narrow(slot, chosen, idx, slot_pools[slot]):
             nodes[0] += 1
             if nodes[0] > DFS_NODE_CAP:
                 return None
             if budget_limit is not None and total + p["sale_price"] + min_rest[i + 1] > budget_limit:
                 continue
             if not _slot_ok(slot, p, chosen, rules):
+                continue
+            if not _fwd_ok(slot, p, idx):
                 continue
             chosen[slot] = p
             r = go(i + 1, chosen, total + p["sale_price"])
@@ -154,7 +245,10 @@ def _dfs(slot_pools, budget_limit, rules: dict):
             del chosen[slot]
         return None
 
-    return go(0, {}, 0)
+    got = go(0, {}, 0)
+    if got is None and nodes[0] > DFS_NODE_CAP:
+        print(f"[recommend] 탐색 노드 상한({DFS_NODE_CAP:,}) 도달, 구성 없음으로 처리")
+    return got
 
 
 def build_compat(chosen: dict, rules: dict) -> dict:

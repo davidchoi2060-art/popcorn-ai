@@ -34,7 +34,7 @@ FIXED = {
     "pool_size": 3_046,                 # S1 후보 카운터 = 추천 뷰 ∧ 재고>0
     "value_total": 289_700,             # 가성비(전 예산 공통 — 최저가 조합)
     "recommend_70": 699_900,            # 시드 시절엔 70만원 견적 자체가 불성립이었다
-    "recommend_100": None,              # ★ 현재 불가 — 아래 KNOWN_LIMIT 참조
+    "recommend_100": 1_000_000,         # 슬라이스 40에서 해소(노드 상한 상향)
     "recommend_150": 1_500_000,
     "recommend_open": 2_145_200,        # "200만원 이상" = 캡 미적용·중간 순위
     "highend_total": 30_250_600,        # 서버용 RAM(512GB ECC 2,779만원)이 실제로 카탈로그에 있다
@@ -42,11 +42,10 @@ FIXED = {
     "review_pending": 7_415,            # 적재가 회부한 필수 사양 미확인 건수
 }
 
-# **알려진 한계**(고쳐지면 이 테스트가 실패해서 알려준다 — 그게 목적이다):
-# 예산 100만원 추천 티어가 DFS 노드 상한(100,000)에 걸려 결과를 못 낸다. 캡 내 후보는
-# 충분하다(CPU 63·MB 153·RAM 24·GPU 39…) — 데이터가 아니라 **탐색 전략의 한계**다.
-# 실측: 100만 = 100,007노드 도달 실패 / 150만 = 19,804노드 성공. 슬라이스 40에서 해소 예정.
-KNOWN_LIMIT = "추천 100만원 — DFS 노드 상한 도달(슬라이스 40 대상)"
+# 슬라이스 39의 '알려진 한계'는 슬라이스 40에서 해소됐다: 예산 100만원 추천이 안 나온 원인은
+# 탐색 전략이 아니라 **노드 상한값**이었다(100,000 → 682,419노드면 답이 있다. 탐색은 싸다 —
+# 100,007노드가 0.02초). 상한을 2,000,000으로 올려 1,000,000원 구성이 나온다.
+# 이 이력을 남겨두는 이유: 같은 증상(견적 '불가')을 다시 만나면 데이터가 아니라 상한을 먼저 본다.
 
 results = []
 
@@ -146,11 +145,9 @@ def test_engine():
     s100 = rec("100만원")
     check("가성비 총액", s100["value"]["total"] == FIXED["value_total"],
           FIXED["value_total"], s100["value"]["total"], "FIXED")
-    # 알려진 한계 — 지금은 '불가'가 기대값이다. 슬라이스 40에서 나오게 되면 이 검사가
-    # 실패해서 "고쳐졌다"고 알려준다(그때 FIXED["recommend_100"]에 실측값을 넣는다).
-    check(f"추천 100만 = 현재 불가 [{KNOWN_LIMIT}]",
-          s100.get("recommend") is None, "불가(None)",
-          (s100.get("recommend") or {}).get("total"), "FIXED")
+    check("추천 총액(100만)",
+          (s100.get("recommend") or {}).get("total") == FIXED["recommend_100"],
+          FIXED["recommend_100"], (s100.get("recommend") or {}).get("total"), "FIXED")
     check("고성능 총액", s100["highend"]["total"] == FIXED["highend_total"],
           FIXED["highend_total"], s100["highend"]["total"], "FIXED")
 
