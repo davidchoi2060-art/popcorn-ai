@@ -617,6 +617,10 @@ function renderEffects(effects){
  box.scrollTop=box.scrollHeight;}
 function applyCount(d){
  _srv=true;candidates(d.count);_srv=false;
+ poolN=d.count;if(typeof mbarUpdate==='function')mbarUpdate();
+ /* 이미 뿌려진 제안 말풍선의 숫자도 서버 값으로 맞춘다 — 낡은 수를 남기지 않는다 */
+ Array.prototype.forEach.call(document.querySelectorAll('#s1-msgs b'),function(b){
+  if(/^[\\d,]+개$/.test((b.textContent||'').trim()))b.textContent=d.count.toLocaleString()+'개';});
  renderEffects(d.effects);
  if(d.count===0){
   if(s3i){s3i.textContent='error';s3i.style.color='#e0894a';}
@@ -725,13 +729,43 @@ if(mode==='guided'){
  var _tfg=msgs.firstElementChild;if(_tfg&&_tfg.id!=='s1-empty')_tfg.remove();
  talkStart();
 }else{var _cgb=document.getElementById('s1-gearbar');if(_cgb)_cgb.style.display='none';panelLatent();chatStart();}
-function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}addUser(t);inp.value='';var old=poolN;addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');poolN=Math.max(1,Math.round(poolN*0.6));animate(pool,poolN);logFilter('입력 이해',old-poolN,['입력하신 조건 반영']);candidates(poolN);setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},400);}
+// 자유 입력 처리 — LIVE(실서버 연결)와 목업 단독을 가른다.
+// **LIVE에서는 화면이 숫자를 스스로 만들지 않는다**(슬라이스 47): 예전에는
+// poolN*0.6 으로 후보 수를 지어내 "조건 통과 1,852개"라고 말했는데, 서버 실측은
+// 3,087이었다. 서버가 모르는 숫자를 고객에게 보여주는 것은 "모든 견적에는 이유가
+// 있습니다"와 정면으로 어긋난다. 이제 LIVE에서는 입력을 **서버가 실제로 반영하는
+// 조건**(예산·저소음·화이트)으로 승격해 다시 세고, 못 읽은 말은 세었다고 하지 않는다.
+function liveParse(s){
+  var out=[];
+  var m=s.match(/(\d{2,4})\s*만/);
+  if(m)out.push(['savings','예산',m[1]+'만원']);
+  if(/조용|저소음|정숙|무소음/.test(s))out.push(['volume_off','선호','저소음']);
+  if(/화이트|하얀|흰/.test(s))out.push(['palette','선호','화이트']);
+  return out;
+}
+function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}
+ addUser(t);inp.value='';addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');
+ if(LIVE){
+  var cons=liveParse(t);
+  if(cons.length){
+   cons.forEach(function(c){addConstraint(c[0],c[1],c[2]);});   // → scheduleCount() → 서버 재계산
+   setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},700);
+  }else{
+   setTimeout(function(){addAI('말씀은 기록했어요. 다만 <b>후보 수를 바꾸는 조건</b>으로는 아직 못 읽었어요 — 예산(예: 100만), 조용하게, 화이트처럼 말해주시면 그 자리에서 다시 세어드려요.');},350);
+  }
+  return;
+ }
+ var old=poolN;poolN=Math.max(1,Math.round(poolN*0.6));animate(pool,poolN);
+ logFilter('입력 이해',old-poolN,['입력하신 조건 반영']);candidates(poolN);
+ setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},400);}
 if(snd)snd.addEventListener('click',send);
 if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();send();}});
 function focusInput(){var ib=document.getElementById('s1-inputbar');if(ib&&ib.style.display==='none')ib.style.display='';var gf=document.getElementById('s1-guided-foot');if(gf)gf.style.display='none';if(!inp)return;inp.scrollIntoView({behavior:'smooth',block:'nearest'});inp.focus();inp.classList.remove('s1-flash');void inp.offsetWidth;inp.classList.add('s1-flash');setTimeout(function(){inp.classList.remove('s1-flash');},2100);}
 var _ac=document.getElementById('s1-addcond');if(_ac)_ac.addEventListener('click',focusInput);
 // ---- UX-17 ④ 모바일: 하단 요약 바 + 조건 시트 토글 ----
 function mbarUpdate(){var l=document.getElementById('s1-mbar-line');if(l)l.textContent='조건 '+consCount+'개 · 후보 '+poolN.toLocaleString()+'개';}
+
+
 var _mb=document.getElementById('s1-mbar-btn');
 if(_mb)_mb.addEventListener('click',function(){var as=document.getElementById('s1-aside');if(!as)return;var open=as.classList.toggle('m-sheet');_mb.textContent=open?'닫기':'조건·견적 보기';});
 })();
