@@ -143,7 +143,7 @@ function renderDetail(){
   +'<div class="card"><h3 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:7px;"><span class="msym" style="font-size:18px;color:#2b5fd9;">credit_card</span>결제</h3><div style="font-size:13px;color:#55555c;line-height:1.9;">'+o.pay.method+'<br>상태: <b style="color:#17171b;">'+o.pay.state+'</b> · '+o.pay.at+'</div><a href="my-payments.html" style="font-size:12.5px;font-weight:800;color:#2b5fd9;text-decoration:none;">결제 내역에서 보기 →</a></div>'
   +'<div class="card"><h3 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:7px;"><span class="msym" style="font-size:18px;color:#2b5fd9;">local_shipping</span>배송</h3><div style="font-size:13px;color:#55555c;line-height:1.9;">'+(o.ship?(o.ship.carrier+'<br>송장 <b style="color:#17171b;">'+o.ship.no+'</b>'):'출고 전 — 조립·검사가 끝나면 송장이 등록됩니다.')+'</div></div>'
   +'</div>'
-  +'<div style="display:flex;gap:10px;">'+actions+'<a class="btn2" href="s2-result.html">그때 견적서 다시 보기</a>'+(o.status==='완료'?'<a class="btnp" href="my-page.html">후기 쓰기</a>':'')+'</div>';
+  +'<div style="display:flex;gap:10px;">'+actions+'<a class="btn2" href="s2-result.html">그때 견적서 다시 보기</a>'+(o.status==='완료'?'<a class="btnp" href="my-review-write.html?order='+encodeURIComponent(o.no)+'">후기 쓰기</a>':'')+'</div>';
  document.getElementById('d-back').onclick=function(e){e.preventDefault();renderList();show('v-list');};
  var rb=document.getElementById('d-refund');if(rb)rb.onclick=function(){renderRefund();show('v-refund');};
 }

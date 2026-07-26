@@ -57,9 +57,33 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div style="text-align:right;">
         <div style="font-size:11.5px;color:#8a8578;font-weight:700;">쇼핑몰 계정</div>
-        <span style="display:inline-flex;align-items:center;gap:5px;background:#f4f2ec;color:#6b6b73;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;"><span class="msym" style="font-size:14px;">link</span>연결 안 됨</span>
+        <span id="map-pill" style="display:inline-flex;align-items:center;gap:5px;background:#f4f2ec;color:#6b6b73;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;"><span class="msym" style="font-size:14px;">link</span>연결 안 됨</span>
       </div>
       <button id="my-map" class="btn2">계정 연결</button>
+    </div>
+  </div>
+
+  <!-- 계정 연결 안내 (관리자 매핑 요청 도착 시) -->
+  <div class="card" id="map-panel" hidden style="margin-bottom:18px;border-color:#cfe0fb;background:#f7faff;">
+    <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+      <span style="width:40px;height:40px;border-radius:12px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;flex:none;"><span class="msym" style="font-size:21px;color:#2b5fd9;">link</span></span>
+      <div style="flex:1;min-width:240px;">
+        <h3 class="h6" style="margin-bottom:2px;">쇼핑몰 계정 연결 요청이 도착했어요</h3>
+        <p class="sub" style="margin-bottom:10px;">기존 팝콘PC 쇼핑몰에서 주문하신 이력을 이 계정과 연결합니다. <b style="color:#3a3a40;">연결하면 지난 주문·후기가 마이페이지에 함께 표시</b>돼요. 동의하지 않으면 아무것도 바뀌지 않습니다.</p>
+        <div style="border:1.5px solid #e6e2da;background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:800;color:#3a3a40;margin-bottom:6px;">연결되는 정보</div>
+          <div style="font-size:12px;color:#8a8578;font-weight:600;line-height:1.8;">
+            · 쇼핑몰 주문 이력(주문번호·구성·금액)<br>
+            · 쇼핑몰에 남긴 후기<br>
+            <span style="color:#a29d92;">· 결제 수단·비밀번호 등 인증 정보는 연결되지 않습니다</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="map-agree" class="btnp"><span class="msym" style="font-size:16px;">check</span>동의하고 연결</button>
+          <button id="map-later" class="btn2">나중에</button>
+          <button id="map-deny" class="btn2" style="color:#b31b25;border-color:#f0d3d5;">연결 안 함</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -86,7 +110,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;border:1.5px dashed #ddd8ce;border-radius:14px;padding:13px 16px;">
         <span style="font-size:12.5px;color:#8a8578;font-weight:700;">ORD-83907 · 06-28 · 배송 완료</span>
-        <button class="btnp" data-toast="후기 작성 화면은 다음 단계에 만들어집니다 (목업)"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</button>
+        <a class="btnp" href="my-review-write.html" style="padding:9px 14px;font-size:12.5px;"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</a>
       </div>
     </div>
 
@@ -148,7 +172,37 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
   document.getElementById('my-avatar').textContent=(m.nick||'?').charAt(0);
  }
  document.getElementById('my-logout').onclick=function(){window.popcornAuth.logout();setTimeout(function(){location.href='main-landing.html';},600);};
- document.getElementById('my-map').onclick=function(){window.popcornAuth.toast('현재 운영 모드: 독립 가입 — 쇼핑몰 계정 연결은 연동 모드에서 열립니다 (목업)');};
+ // 쇼핑몰 계정 연결 3상태(슬라이스 29 설계) — none: 요청 없음 / requested: 관리자 요청 도착(동의 대기) / mapped: 연결 완료
+ // 관리자 ADM-CUS-010의 "매핑 요청 발송"이 이 화면의 안내로 도착한다. 저장 API는 다음 슬라이스.
+ var MAP_KEY='popcorn-map-state';
+ function mapState(){return localStorage.getItem(MAP_KEY)||'requested';}  // 시안 기본값 = 요청 도착
+ function renderMap(){
+  var st=mapState(), pill=document.getElementById('map-pill'), panel=document.getElementById('map-panel');
+  if(st==='mapped'){
+   pill.style.background='#eaf1fd';pill.style.color='#2149b0';
+   pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · MALL-2201';
+   panel.hidden=true;
+  }else if(st==='requested'){
+   pill.style.background='#fbf3e2';pill.style.color='#8a561a';
+   pill.innerHTML='<span class="msym" style="font-size:14px;">schedule</span>연결 요청 도착';
+   panel.hidden=false;
+  }else{
+   pill.style.background='#f4f2ec';pill.style.color='#6b6b73';
+   pill.innerHTML='<span class="msym" style="font-size:14px;">link_off</span>연결 안 됨';
+   panel.hidden=true;
+  }
+ }
+ function setMap(st,msg){localStorage.setItem(MAP_KEY,st);renderMap();window.popcornAuth.toast(msg);}
+ document.getElementById('my-map').onclick=function(){
+  var st=mapState();
+  if(st==='mapped'){window.popcornAuth.toast('이미 쇼핑몰 계정과 연결돼 있어요 (MALL-2201)');return;}
+  if(st==='requested'){document.getElementById('map-panel').scrollIntoView({behavior:'smooth',block:'center'});return;}
+  window.popcornAuth.toast('연결은 관리자 요청이 도착했을 때 진행할 수 있어요 — 고객센터로 문의해 주세요 (시안)');
+ };
+ document.getElementById('map-agree').onclick=function(){setMap('mapped','쇼핑몰 계정을 연결했어요 — 지난 주문·후기가 곧 함께 표시됩니다 (저장은 다음 단계)');};
+ document.getElementById('map-later').onclick=function(){document.getElementById('map-panel').hidden=true;window.popcornAuth.toast('나중에 다시 안내해 드릴게요 — 프로필의 "계정 연결"에서 언제든 열 수 있어요');};
+ document.getElementById('map-deny').onclick=function(){setMap('none','연결하지 않기로 했어요 — 기존 쇼핑몰 이력은 따로 유지됩니다');};
+ renderMap();
 
  // 주문 스텝
  var steps=[['결제 완료',1],['조립·검수',1],['배송 중',2],['완료',0]];
