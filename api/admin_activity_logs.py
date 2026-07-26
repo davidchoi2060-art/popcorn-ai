@@ -20,7 +20,7 @@ LIMIT = 500  # 초과 시 total과 함께 정직 표기("최근 500건") — 페
 
 KIND_LABELS = {"order": "주문", "refund": "환불", "settlement": "정산",
                "price_file": "단가표", "product_review": "검수·매입", "product": "상품",
-               "member_review": "후기", "member": "회원", "stock": "재고", "sourcing": "매입 견적"}
+               "member_review": "후기", "member": "회원", "stock": "재고", "sourcing": "매입 견적", "ops": "운영 전환"}
 ACTION_LABELS = {
     "order_advance": "주문 처리", "order_advance_undo": "주문 처리 되돌림",
     "refund_advance": "환불 처리", "refund_advance_undo": "환불 처리 되돌림",
@@ -35,6 +35,7 @@ ACTION_LABELS = {
     "price_review_decide": "가격 검토 처리",
     "stock_inbound": "재고 입고", "stock_inbound_undo": "재고 입고 되돌림",
     "sourcing_request": "견적 요청", "sourcing_reply": "회신 기록", "sourcing_confirm": "매입 확정",
+    "ops_change": "운영 모드 전환", "ops_change_undo": "운영 모드 되돌림",
 }
 PRICE_REVIEW_SUB = {"approve": "제안가 승인", "keep": "판매가 유지(제안 차단)",
                     "manual": "직접 수정"}

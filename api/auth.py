@@ -103,9 +103,16 @@ def resolve_session(sid: str) -> dict | None:
                 "email": row["email"], "role": row["role"], "status": row["status"]}
 
 
+# 정책 발행급 쓰기 — 운영자 관리와 운영 모드 전환은 owner만.
+# 운영 모드는 주문·결제 흐름을 실제로 바꾼다(pay='mall'이면 자체 주문이 409로 거부된다).
+OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings")
+
+
 def required_role(method: str, path: str) -> str:
     """경로·메서드별 최소 권한 — 읽기 viewer / 쓰기 operator / 운영자·정책 owner."""
     if path.startswith("/api/admin/operators"):
+        return "owner"                      # 조회조차 owner(계정 목록은 민감)
+    if path.startswith(OWNER_WRITE_PREFIXES) and method not in ("GET", "HEAD", "OPTIONS"):
         return "owner"
     return "viewer" if method in ("GET", "HEAD", "OPTIONS") else "operator"
 

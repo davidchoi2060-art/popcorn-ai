@@ -381,6 +381,55 @@ def test_auth():
     check("운영자 관리 행위가 작업 기록에 남음", len(acts) >= 3, ">=3건", len(acts))
 
 
+# ────────────── 9. 운영 전환 설정 (슬라이스 44) ──────────────
+def test_ops():
+    """이 설정은 주문 흐름을 실제로 바꾼다 — 바꾸고, 막히는지 보고, 반드시 원복한다.
+
+    원복까지가 이 테스트의 일부다. 중간에 실패해도 finally로 되돌린다 — 회귀가
+    운영 모드를 망친 상태로 남기면 그 뒤 테스트와 실제 화면이 전부 어긋난다.
+    """
+    print("\n[9] 운영 전환 설정 — 스위치가 흐름을 바꾸는가 (슬라이스 44)")
+    base = get("/api/admin/ops-settings")["modes"]
+    check("운영 모드 5종 존재", set(base) == {"member", "pay", "settle", "ship", "refund"},
+          "5종", sorted(base))
+
+    order_body = {"session_id": 1, "tier": "value", "periph": [],
+                  "member": {"nick": "회귀", "email": "ops-regress@popcornpc.local"},
+                  "shipping": {"name": "회귀", "phone": "010-0000-0000", "addr": "서울"}}
+    undo_ids = []
+    try:
+        # ① 상호 제약: 환불만 '자체'로 요청해도 결제가 쇼핑몰이면 서버가 보정한다
+        st, d = post("/api/admin/ops-settings", {"modes": {"pay": "mall"}})
+        undo_ids.append(d.get("undo_id"))
+        check("결제 전환 시 정산도 함께 이동(정산은 결제를 따른다)",
+              d.get("changed", {}).get("settle", {}).get("to") == "mall",
+              "settle=mall", d.get("changed"))
+        st, d2 = post("/api/admin/ops-settings", {"modes": {"refund": "own"}})
+        if d2.get("undo_id"):
+            undo_ids.append(d2["undo_id"])
+        check("쇼핑몰 결제 상태에서 환불 '자체'는 보정된다",
+              d2.get("modes", {}).get("refund") == "mall", "refund=mall", d2.get("modes"))
+
+        # ② 스위치가 주문 흐름을 실제로 막는가
+        st, r = post("/api/orders", order_body)
+        detail = r.get("detail") if isinstance(r, dict) else None
+        err = detail.get("error") if isinstance(detail, dict) else None
+        check("쇼핑몰 결제 모드에서 자체 주문 409", st == 409 and err == "pay_mode_mall",
+              "409 pay_mode_mall", f"{st} {err}")
+    finally:
+        for lid in reversed([i for i in undo_ids if i]):
+            post(f"/api/admin/ops-settings/undo/{lid}")
+
+    after = get("/api/admin/ops-settings")["modes"]
+    check("되돌리기로 원상 복구", after == base, base, after)
+
+    # ③ 원복 상태에서는 결제 게이트를 통과한다(이후 실패 사유는 견적·재고여야 한다)
+    st, r = post("/api/orders", order_body)
+    detail = r.get("detail") if isinstance(r, dict) else None
+    err = detail.get("error") if isinstance(detail, dict) else None
+    check("원복 후 결제 게이트 통과", err != "pay_mode_mall", "pay_mode_mall 아님", err)
+
+
 def test_guards():
     print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
     member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
@@ -422,7 +471,7 @@ def main():
     print("\n로그인: " + str(d["operator"].get("name")) + " · 권한 " + d["operator"]["role"])
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
-               test_ledgers, test_customer, test_auth, test_guards):
+               test_ledgers, test_customer, test_auth, test_ops, test_guards):
         try:
             fn()
         except Exception as e:

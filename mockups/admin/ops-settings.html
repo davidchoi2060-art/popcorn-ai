@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">운영 전환 설정</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">운영 전환 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-OPS-010</span></h2>
+          <div><h2 class="mb-1">운영 전환 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-OPS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">쇼핑몰 병행 운영기의 분기 스위치. <b class="text-body-secondary">어떤 모드든 주문 원장은 본 시스템에 생성</b>되고, 인계는 복제 전달일 뿐입니다.</p></div>
           <div class="d-flex align-items-center gap-2">
             <span class="badge badge-phoenix badge-phoenix-secondary">현재 설정 v3 · 07-14 적용</span>
@@ -371,7 +371,161 @@
           h.insertBefore(tr,h.firstChild);
           localStorage.setItem("popcorn-ops",JSON.stringify(SW));toast("설정 v4 발행 — 즉시 적용 · 작업 기록 저장 (고객 S4에 반영됨)");
         };
+        window.__opsToast=toast;
         render();if(window.feather)feather.replace();
+      })();
+      </script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 44) — 운영 전환 설정 실배선.
+        // 이 화면은 **주문·결제 흐름을 실제로 바꾼다**(pay='mall'이면 자체 주문이 409로 거부).
+        // 저장은 서버가 상호 제약을 다시 강제하고(정산=결제 / 환불 자체는 결제 자체일 때만),
+        // 보정이 있었으면 그 사유를 화면에 그대로 알린다 — 조용히 바꾸지 않는다.
+        var API = "/api/admin/ops-settings";
+        var badge = document.getElementById("dataSrc");
+        var LIVE = false, MODES = {};
+
+        function toast(m){ if(window.__opsToast) window.__opsToast(m); }
+        function fmt(iso){
+          if(!iso) return "—";
+          var d = new Date(iso);
+          return (d.getMonth()+1) + "-" + String(d.getDate()).padStart(2,"0") + " "
+               + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+        }
+        function modeKo(m){ return m === "own" ? "자체" : "쇼핑몰"; }
+
+        function paintSwitches(d){
+          var host = document.getElementById("switches");
+          host.innerHTML = d.items.map(function(it){
+            var own = it.mode === "own";
+            return '<div class="d-flex justify-content-between align-items-center border-top py-3">'
+              + '<div><b>' + it.label + '</b>'
+              + '<div class="fs-10 text-body-tertiary">최근 변경 ' + fmt(it.updated_at) + '</div></div>'
+              + '<div class="btn-group btn-group-sm" role="group">'
+              + '<button class="btn ' + (own ? "btn-primary" : "btn-phoenix-secondary")
+              + '" data-live-sw="' + it.key + ':own">자체</button>'
+              + '<button class="btn ' + (!own ? "btn-primary" : "btn-phoenix-secondary")
+              + '" data-live-sw="' + it.key + ':mall">쇼핑몰 인계</button>'
+              + '</div></div>';
+          }).join("");
+          host.querySelectorAll("[data-live-sw]").forEach(function(b){
+            b.onclick = function(){
+              var a = b.dataset.liveSw.split(":");
+              if(MODES[a[0]] === a[1]) return;
+              var next = {};
+              next[a[0]] = a[1];
+              save(next);
+            };
+          });
+        }
+
+        function paintPreview(d){
+          document.getElementById("preview").innerHTML = d.effects.map(function(e){
+            return '<div class="d-flex justify-content-between gap-2 border-bottom pb-1">'
+              + '<span class="text-body-tertiary">' + e.where + '</span>'
+              + '<span class="text-end fw-semibold">' + e.effect + '</span></div>';
+          }).join("") + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + d.note + '</p>';
+        }
+
+        function paintPresets(d){
+          var host = document.getElementById("presets");
+          host.innerHTML = d.presets.map(function(p, i){
+            var on = Object.keys(p.modes).every(function(k){ return MODES[k] === p.modes[k]; });
+            return '<button class="btn btn-sm ' + (on ? "btn-primary" : "btn-phoenix-secondary")
+              + '" data-live-p="' + i + '">' + p.label + (on ? " · 현재" : "") + '</button>';
+          }).join("");
+          host.querySelectorAll("[data-live-p]").forEach(function(b){
+            b.onclick = function(){ save(d.presets[+b.dataset.liveP].modes); };
+          });
+        }
+
+        function paintHistory(d){
+          var host = document.getElementById("history");
+          if(!d.history.length){
+            host.innerHTML = '<tr><td class="ps-3 text-body-tertiary" colspan="3">'
+              + '변경 기록이 없습니다 — 이 화면에서 스위치를 바꾸면 여기에 남습니다.</td></tr>';
+            return;
+          }
+          host.innerHTML = d.history.map(function(h){
+            var ch = h.changed || {};
+            var txt = Object.keys(ch).map(function(k){
+              return k + " " + modeKo(ch[k].from) + " → " + modeKo(ch[k].to);
+            }).join(" · ") || "—";
+            if(h.action === "ops_change_undo"){
+              txt = '<span class="text-body-tertiary">되돌림 #' + (h.undo_of || "?") + '</span> ' + txt;
+            }
+            var undo = "";
+            if(h.action === "ops_change" && !h.undone){
+              undo = '<button class="btn btn-link btn-sm p-0 ms-2" data-live-undo="'
+                   + h.log_id + '">되돌리기</button>';
+            } else if(h.undone){
+              undo = '<span class="fs-10 text-body-quaternary ms-2">되돌림</span>';
+            }
+            return '<tr><td class="ps-3 text-body-tertiary">' + fmt(h.at) + '</td>'
+              + '<td><b>' + (h.operator || "—") + '</b></td>'
+              + '<td>' + txt + undo + '</td></tr>';
+          }).join("");
+          host.querySelectorAll("[data-live-undo]").forEach(function(b){
+            b.onclick = function(){
+              fetch(API + "/undo/" + b.dataset.liveUndo, {method: "POST"})
+                .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+                .then(function(res){
+                  toast(res.ok ? "되돌렸습니다" : (res.j.detail || "되돌릴 수 없습니다"));
+                  if(res.ok) load();
+                });
+            };
+          });
+        }
+
+        function paint(d){
+          LIVE = true;
+          MODES = d.modes;
+          badge.textContent = "실데이터 · Cloud SQL";
+          badge.classList.remove("badge-phoenix-secondary");
+          badge.classList.add("badge-phoenix-primary");
+          paintPresets(d);
+          paintSwitches(d);
+          paintPreview(d);
+          paintHistory(d);
+          if(window.feather) feather.replace();
+        }
+
+        function save(next){
+          fetch(API, {method: "POST", headers: {"Content-Type": "application/json"},
+                      body: JSON.stringify({modes: next})})
+            .then(function(r){
+              return r.json().then(function(j){ return {ok: r.ok, status: r.status, j: j}; });
+            })
+            .then(function(res){
+              if(!res.ok){
+                toast(res.status === 403
+                  ? "관리자(owner) 권한이 필요합니다 — 운영 모드 전환은 정책 발행급입니다"
+                  : (res.j.detail || "저장할 수 없습니다"));
+                return;
+              }
+              (res.j.notes || []).forEach(function(n){ toast(n); });
+              toast(res.j.message || "적용됐습니다");
+              load();
+            })
+            .catch(function(){ toast("API 연결 실패"); });
+        }
+
+        function load(){
+          fetch(API)
+            .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+            .then(paint)
+            .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
+        }
+
+        // 발행 버튼은 LIVE에서 의미가 없다(스위치 클릭이 곧 저장이다) — 정직하게 알린다
+        var pub = document.getElementById("publish");
+        if(pub){
+          pub.addEventListener("click", function(){
+            if(LIVE) toast("스위치를 누르면 그 즉시 저장·적용됩니다 — 별도 발행 단계가 없습니다");
+          }, true);
+        }
+
+        load();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
