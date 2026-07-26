@@ -1,5 +1,11 @@
 # 내부 직원 베타 배포 절차 (GCP VM · 외부 IP · HTTP)
 
+> **배포 완료(2026-07-26)**: `popcorn-app`(asia-northeast3-b) · 고정 IP `34.47.124.184`
+> · Cloud SQL `popcorn-db`. 접속 `http://34.47.124.184/admin/login.html`
+> 검증: 미인증 401 · `:8000` 직접 불가 · Basic Auth 통과 시 200 ·
+> 상품 22,838건 · 검수 7,415건 · S1 후보 3,046 · 추천(100만) 1,000,000.
+> 재검증은 `sudo bash deploy/verify.sh`.
+
 **범위**: 내부 직원만 쓰는 베타. 고객은 들어오지 않는다 → 결제(PG)·통신판매업 신고·법정 표시·
 택배사 연동은 이 배포의 범위가 아니다.
 
@@ -21,7 +27,7 @@ Basic Auth 계정 | 아래 §3에서 서버에서 직접 생성 |
 `DATABASE_URL` | Cloud SQL 접속 문자열(로컬 `.env`와 같은 값) |
 `ADMIN_BOOTSTRAP_EMAILS` | 첫 관리자 이메일 1개 — 이 계정만 자동 승인된다 |
 
-**비밀값은 이 리포에 절대 커밋하지 않는다.** 서버의 `/etc/popcorn-ai.env`(권한 600)에만 둔다.
+**비밀값은 이 리포에 절대 커밋하지 않는다.** 서버의 `/etc/popcorn-ai.env`(권한 640 root:popcorn)에만 둔다 — systemd는 root로 읽고, 앱 계정은 그룹 읽기로 읽는다(600으로 두면 popcorn 계정이 도는 진단 스크립트가 읽지 못한다 — 실제 배포에서 겪음).
 
 ---
 
@@ -52,7 +58,7 @@ sudo -u popcorn mkdir -p /srv/popcorn-ai/.cache
 환경변수 파일 — **이 명령을 그대로 붙이지 말고 값을 채워서** 실행한다:
 
 ```bash
-sudo install -m 600 -o root -g popcorn /dev/null /etc/popcorn-ai.env
+sudo install -m 640 -o root -g popcorn /dev/null /etc/popcorn-ai.env
 sudo nano /etc/popcorn-ai.env
 ```
 

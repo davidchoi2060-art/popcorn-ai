@@ -64,11 +64,11 @@ say "4/7 환경변수 ($ENV_FILE)"
 if [[ -f "$ENV_FILE" ]]; then
   ok "이미 있음 — 값을 바꾸려면 직접 편집: sudo nano $ENV_FILE"
 elif [[ -f "$SEED_ENV" ]]; then
-  install -m 600 -o root -g popcorn "$SEED_ENV" "$ENV_FILE"
+  install -m 640 -o root -g popcorn "$SEED_ENV" "$ENV_FILE"
   shred -u "$SEED_ENV" 2>/dev/null || rm -f "$SEED_ENV"
   grep -q "^DATABASE_URL=." "$ENV_FILE" || { echo "DATABASE_URL이 비어 있습니다."; exit 1; }
   grep -q "^ADMIN_BOOTSTRAP_EMAILS=." "$ENV_FILE" || { echo "첫 관리자 이메일이 비어 있습니다."; exit 1; }
-  ok "전달받은 값으로 생성(권한 600) 후 씨앗 파일 삭제"
+  ok "전달받은 값으로 생성(권한 640 root:popcorn) 후 씨앗 파일 삭제"
 else
   echo "    Cloud SQL 접속 문자열을 붙여넣으세요."
   echo "    예: postgresql+psycopg2://USER:PASSWORD@HOST:5432/popcorn_pc?sslmode=require"
@@ -77,7 +77,7 @@ else
   echo "    첫 관리자 이메일 — 이 계정만 첫 로그인 시 자동 승인됩니다(나머지는 이 계정이 승인)."
   read -rp  "    ADMIN_BOOTSTRAP_EMAILS: " BOOT
   [[ -n "$BOOT" ]] || { echo "첫 관리자가 없으면 아무도 승인할 수 없습니다."; exit 1; }
-  install -m 600 -o root -g popcorn /dev/null "$ENV_FILE"
+  install -m 640 -o root -g popcorn /dev/null "$ENV_FILE"
   {
     echo "DATABASE_URL=$DB_URL"
     echo "ADMIN_BOOTSTRAP_EMAILS=$BOOT"
@@ -85,7 +85,7 @@ else
     echo "COOKIE_SECURE="
   } > "$ENV_FILE"
   unset DB_URL
-  ok "생성(권한 600, root:popcorn)"
+  ok "생성(권한 640, root:popcorn)"
 fi
 
 say "5/7 Basic Auth — 이것이 지금 유일한 실질 방벽입니다"

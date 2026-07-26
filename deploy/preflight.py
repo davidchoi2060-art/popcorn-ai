@@ -122,7 +122,8 @@ if os.name != "nt":
     envf = "/etc/popcorn-ai.env"
     if os.path.exists(envf):
         mode = oct(os.stat(envf).st_mode)[-3:]
-        check("환경변수 파일 권한 600", mode == "600", f"현재 {mode}")
+        # 640(root:popcorn) 허용 — 앱 계정이 자기 설정을 읽어야 한다(그룹 읽기까지만).
+        check("환경변수 파일 권한 600/640", mode in ("600", "640"), f"현재 {mode}")
     else:
         check("환경변수 파일 존재", False, envf)
 else:
