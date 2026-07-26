@@ -51,6 +51,7 @@ def _load_pool(conn):
     return [dict(r) for r in conn.execute(text(
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"
         " socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
+        " form_factor, form_factor_list,"
         " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent,"
         " spec_sources, data_origin"
         " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]

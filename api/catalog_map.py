@@ -344,6 +344,50 @@ B_MAP = {
 }
 
 
+# ─────────── 케이스 지원 보드 규격 목록 (슬라이스 43) ───────────
+# 케이스는 규격을 여러 개 수용한다(실측: 3개 1,110건·4개 566건). 원천 스펙 문자열에
+# "ATX / mATX / MiniITX" 형태로 적혀 있어 92%가 회수된다.
+#
+# **'지원 파워 : ATX'는 세면 안 된다** — 그건 파워 규격이지 보드 규격이 아니다. 섞으면
+# mATX 전용 케이스가 ATX 보드도 받는다고 말하게 되어(과하게 관대) 조립 보증이 무너진다.
+# 그래서 "키 : 값" 형태 토큰은 건너뛰고 **키 없는 토큰(형식 A의 특성값)에서만** 모은다.
+FF_TOKEN = re.compile(r"^(E-?ATX|XL-?ATX|M-?ATX|Micro-?ATX|Mini-?ITX|MiniITX|ITX|ATX)$", re.I)
+FF_NORM = {"ATX": "ATX", "MATX": "m-ATX", "MICROATX": "m-ATX",
+           "MINIITX": "mini-ITX", "ITX": "mini-ITX",
+           "EATX": "E-ATX", "XLATX": "E-ATX"}
+# 규격 포함 관계 — 큰 규격을 받는 케이스는 작은 규격도 받는다(업계 표준 크기 순서).
+# 원천 목록이 불완전한 케이스(ATX만 적힌 것)에서 mATX 보드를 부당하게 막지 않기 위해 넓힌다.
+FF_ACCEPTS = {"E-ATX": ["E-ATX", "ATX", "m-ATX", "mini-ITX"],
+              "ATX": ["ATX", "m-ATX", "mini-ITX"],
+              "m-ATX": ["m-ATX", "mini-ITX"],
+              "mini-ITX": ["mini-ITX"]}
+
+
+def case_form_list(raw: str) -> list:
+    """케이스가 수용하는 보드 규격 목록. 못 뽑으면 빈 리스트(= 검수 대상, 불통과)."""
+    found = []
+    for tok in (raw or "").split("/"):
+        tok = tok.strip()
+        if not tok or ":" in tok:        # "지원 파워 : ATX" 같은 키-값은 제외
+            continue
+        m = FF_TOKEN.match(tok)
+        if not m:
+            continue
+        norm = FF_NORM.get(m.group(1).upper().replace("-", ""))
+        if norm and norm not in found:
+            found.append(norm)
+    if not found:
+        return []
+    # 가장 큰 규격의 수용 범위로 확장 — 목록 표기가 빠진 경우를 덮는다
+    order = ["E-ATX", "ATX", "m-ATX", "mini-ITX"]
+    biggest = next((o for o in order if o in found), None)
+    out = list(FF_ACCEPTS.get(biggest, found))
+    for v in found:                      # 표기된 것은 무조건 포함
+        if v not in out:
+            out.append(v)
+    return [o for o in order if o in out]
+
+
 def extract_from_text(part_type: str, raw: str) -> tuple:
     """형식 B 원문에서 뽑기 — (specs, sources). sources는 전부 'text_kv'."""
     kv = parse_kv_text(raw)
@@ -351,6 +395,13 @@ def extract_from_text(part_type: str, raw: str) -> tuple:
         return {}, {}
     mapping = B_MAP.get(part_type) or {}
     s, src = {}, {}
+    if part_type == "CASE":
+        lst = case_form_list(raw)
+        if lst:
+            s["form_factor_list"] = lst
+            src["form_factor_list"] = "text_tokens"
+            s.setdefault("form_factor", lst[0])       # 대표값(표시용) — 판정은 목록이 한다
+            src.setdefault("form_factor", "text_tokens")
     for bkey, (field, conv) in mapping.items():
         if field in s or bkey not in kv:
             continue

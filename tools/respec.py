@@ -40,11 +40,11 @@ REQUIRED = {
     "SSD": ["form_factor", "interface", "capacity_gb"],
     "HDD": ["form_factor", "interface", "capacity_gb"],
     "POWER": ["rated_watt", "form_factor"],
-    "CASE": ["form_factor", "gpu_max_mm", "cooler_height_mm"],
+    "CASE": ["form_factor_list", "gpu_max_mm", "cooler_height_mm"],
     "COOLER_CPU_AIR": ["socket_list", "cooler_height_mm", "cooler_tdp"],
     "COOLER_CPU_AIO": ["socket_list", "cooler_tdp"],
 }
-JSON_COLS = {"socket_list", "spec_sources"}
+JSON_COLS = {"socket_list", "form_factor_list", "spec_sources"}
 BATCH = 300
 
 
@@ -63,7 +63,11 @@ def main():
                    ps.spec_sources
             FROM products p JOIN product_specs ps USING (product_code)
             WHERE p.category_group = 'core_part' AND p.spec_source_text IS NOT NULL
-              AND p.review_required_yn = true
+              AND (p.review_required_yn = true
+                   -- 이미 승격된 케이스도 포함: 새 규칙(CASE.form_factor_list contains
+                   -- MB.form_factor)이 목록을 요구하므로, 비어 있으면 견적에서 케이스가
+                   -- 전부 탈락한다(슬라이스 43). 채우기만 하고 다른 값은 건드리지 않는다.
+                   OR (p.part_type = 'CASE' AND ps.form_factor_list IS NULL))
         """)).mappings().all()
     print(f"검수 대기 상태의 핵심 부품 {len(rows):,}건을 재파싱합니다\n")
 

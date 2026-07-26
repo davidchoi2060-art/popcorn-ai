@@ -38,7 +38,8 @@ FIXED = {
     "recommend_150": 1_500_000,
     "recommend_open": 2_144_900,        # "200만원 이상" = 캡 미적용·중간 순위
     "highend_total": 30_250_600,        # 서버용 RAM(512GB ECC 2,779만원)이 실제로 카탈로그에 있다
-    "compat_checks": 7,                 # compat_rules 활성 규칙 수(슬라이스 34)
+    "compat_checks": 8,                 # 활성 규칙 수 — 슬라이스 43에서 8번째 추가
+                                        # (CASE.form_factor_list contains MB.form_factor)
     "review_pending": 6_490,            # 슬라이스 42 재파싱 회수 후(적재 직후 7,415)
 }
 

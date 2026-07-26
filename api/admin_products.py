@@ -33,7 +33,7 @@ REQUIRED_SPEC_FIELDS = {
     "SSD": ["form_factor", "interface", "capacity_gb"],
     "HDD": ["form_factor", "interface", "capacity_gb"],
     "POWER": ["rated_watt", "form_factor"],
-    "CASE": ["form_factor", "gpu_max_mm", "cooler_height_mm"],
+    "CASE": ["form_factor_list", "gpu_max_mm", "cooler_height_mm"],
     "COOLER_CPU_AIR": ["socket", "cooler_height_mm", "cooler_tdp"],
     "COOLER_CPU_AIO": ["socket", "cooler_tdp"],
     "MONITOR": ["size_inch", "resolution", "refresh_hz", "panel"],

@@ -47,7 +47,7 @@ REQUIRED = {
     "SSD": ["form_factor", "interface", "capacity_gb"],
     "HDD": ["form_factor", "interface", "capacity_gb"],
     "POWER": ["rated_watt", "form_factor"],
-    "CASE": ["form_factor", "gpu_max_mm", "cooler_height_mm"],
+    "CASE": ["form_factor_list", "gpu_max_mm", "cooler_height_mm"],
     "COOLER_CPU_AIR": ["socket_list", "cooler_height_mm", "cooler_tdp"],
     "COOLER_CPU_AIO": ["socket_list", "cooler_tdp"],
 }
@@ -55,7 +55,7 @@ SPEC_COLS = ["socket", "socket_list", "chipset", "mem_type", "capacity_gb", "clo
              "tdp_watt", "rated_watt", "required_power_watt", "length_mm", "gpu_max_mm",
              "cooler_height_mm", "cooler_tdp", "pcie_gen", "form_factor", "interface",
              "size_inch", "resolution", "refresh_hz", "panel"]
-JSON_COLS = {"socket_list"}
+JSON_COLS = {"socket_list", "form_factor_list"}
 # product_specs의 VARCHAR 길이(DB 실측) — 초과 값은 잘라 넣고 검수로 알린다
 SPEC_MAXLEN = {"socket": 30, "chipset": 50, "mem_type": 10, "pcie_gen": 20,
                "form_factor": 50, "interface": 50, "resolution": 20, "panel": 20}
