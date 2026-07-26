@@ -170,10 +170,44 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
   }
   document.getElementById("body").addEventListener("input",onInput);
   document.getElementById("submit").onclick=function(){
-    var o=ORDERS[pick];
-    window.popcornAuth.toast(o.no+" 후기 등록 시늉 — ★"+rating+" · 구매 인증 배지와 함께 노출됩니다 (저장은 다음 단계)");
+    var o=ORDERS[pick], btn=document.getElementById("submit");
+    if(!LIVE||!o.item_id){
+      window.popcornAuth.toast(o.no+" 후기 등록 시늉 — ★"+rating+" · 구매 인증 배지와 함께 노출됩니다 (저장은 개발 서버에서)");
+      return;
+    }
+    btn.disabled=true;
+    fetch("/api/my/reviews",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:MEMBER.email,item_id:o.item_id,rating:rating,body:document.getElementById("body").value})})
+     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+     .then(function(res){
+       if(!res.ok){window.popcornAuth.toast("등록 실패: "+(res.j.detail||"입력을 확인해 주세요"));btn.disabled=false;return;}
+       window.popcornAuth.toast(res.j.order_no+" 후기 등록 완료 — 구매 인증 배지와 함께 노출됩니다");
+       o.written=true;renderOrders();
+       setTimeout(function(){location.href="my-page.html";},1600);
+     }).catch(function(){window.popcornAuth.toast("등록 실패 — 네트워크 오류");btn.disabled=false;});
   };
   renderOrders();renderSnap();renderStars();renderTags();onInput();
+
+  // ---- LIVE (슬라이스 30) — 구매 인증 대상은 서버가 준다(완료 주문 라인 ∧ 미작성) ----
+  var MEMBER=null, LIVE=false;
+  try{MEMBER=JSON.parse(localStorage.getItem("popcorn-member")||"null");}catch(e){}
+  if(MEMBER&&MEMBER.email){
+    fetch("/api/my/account?email="+encodeURIComponent(MEMBER.email))
+     .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+     .then(function(d){
+       if(!d.member||!d.reviewable.length)return;   // 미가입·대상 없음 — 시안 유지
+       LIVE=true;
+       ORDERS=d.reviewable.map(function(x){
+         return {no:x.order_no,at:x.at.slice(5,10),item:x.item,total:x.total,written:x.written,
+                 item_id:x.item_id,parts:[["구성",x.item]]};
+       });
+       var q=new URLSearchParams(location.search).get("order");
+       pick=ORDERS.findIndex(function(o){return (q&&o.no===q&&!o.written);});
+       if(pick<0)pick=ORDERS.findIndex(function(o){return !o.written;});
+       if(pick<0)pick=0;
+       renderOrders();renderSnap();
+     }).catch(function(){});
+  }
 })();
 </script>
 <script src="../shared/su-icons.js"></script>

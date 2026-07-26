@@ -174,13 +174,14 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
  document.getElementById('my-logout').onclick=function(){window.popcornAuth.logout();setTimeout(function(){location.href='main-landing.html';},600);};
  // 쇼핑몰 계정 연결 3상태(슬라이스 29 설계) — none: 요청 없음 / requested: 관리자 요청 도착(동의 대기) / mapped: 연결 완료
  // 관리자 ADM-CUS-010의 "매핑 요청 발송"이 이 화면의 안내로 도착한다. 저장 API는 다음 슬라이스.
- var MAP_KEY='popcorn-map-state';
+ // LIVE(슬라이스 30): /api/my/account가 실상태를 주면 그것으로 덮어쓴다. 실패 시 로컬 시안값.
+ var MAP_KEY='popcorn-map-state', LIVE=false, MALL_ID=null;
  function mapState(){return localStorage.getItem(MAP_KEY)||'requested';}  // 시안 기본값 = 요청 도착
  function renderMap(){
   var st=mapState(), pill=document.getElementById('map-pill'), panel=document.getElementById('map-panel');
   if(st==='mapped'){
    pill.style.background='#eaf1fd';pill.style.color='#2149b0';
-   pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · MALL-2201';
+   pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · '+(MALL_ID||'MALL-2201');
    panel.hidden=true;
   }else if(st==='requested'){
    pill.style.background='#fbf3e2';pill.style.color='#8a561a';
@@ -199,10 +200,31 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
   if(st==='requested'){document.getElementById('map-panel').scrollIntoView({behavior:'smooth',block:'center'});return;}
   window.popcornAuth.toast('연결은 관리자 요청이 도착했을 때 진행할 수 있어요 — 고객센터로 문의해 주세요 (시안)');
  };
- document.getElementById('map-agree').onclick=function(){setMap('mapped','쇼핑몰 계정을 연결했어요 — 지난 주문·후기가 곧 함께 표시됩니다 (저장은 다음 단계)');};
+ function postMap(agree,okMsg){
+  if(!LIVE){setMap(agree?'mapped':'none',okMsg+' (시안)');return;}
+  fetch('/api/my/account/map',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:m.email,agree:agree})})
+   .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+   .then(function(res){
+     if(!res.ok){window.popcornAuth.toast('처리 실패: '+(res.j.detail||''));return;}
+     MALL_ID=res.j.mall_member_id||null;
+     localStorage.setItem(MAP_KEY,res.j.map_state);renderMap();
+     window.popcornAuth.toast(okMsg);
+   }).catch(function(){window.popcornAuth.toast('처리 실패 — 네트워크 오류');});
+ }
+ document.getElementById('map-agree').onclick=function(){postMap(true,'쇼핑몰 계정을 연결했어요 — 지난 주문·후기가 곧 함께 표시됩니다');};
  document.getElementById('map-later').onclick=function(){document.getElementById('map-panel').hidden=true;window.popcornAuth.toast('나중에 다시 안내해 드릴게요 — 프로필의 "계정 연결"에서 언제든 열 수 있어요');};
- document.getElementById('map-deny').onclick=function(){setMap('none','연결하지 않기로 했어요 — 기존 쇼핑몰 이력은 따로 유지됩니다');};
+ document.getElementById('map-deny').onclick=function(){postMap(false,'연결하지 않기로 했어요 — 기존 쇼핑몰 이력은 따로 유지됩니다');};
  renderMap();
+ if(m&&m.email){
+  fetch('/api/my/account?email='+encodeURIComponent(m.email))
+   .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+   .then(function(d){
+     if(!d.member)return;                 // 미가입 이메일 — 시안값 유지
+     LIVE=true;MALL_ID=d.mall_member_id;
+     localStorage.setItem(MAP_KEY,d.map_state);renderMap();
+   }).catch(function(){});
+ }
 
  // 주문 스텝
  var steps=[['결제 완료',1],['조립·검수',1],['배송 중',2],['완료',0]];
