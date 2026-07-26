@@ -28,6 +28,7 @@ from .admin_products import router as admin_products_router
 from .admin_sessions import router as admin_sessions_router
 from .admin_sourcing import router as admin_sourcing_router
 from .admin_stock import router as admin_stock_router
+from .admin_swap_logs import router as admin_swap_logs_router
 from .admin_system import router as admin_system_router
 from .admin_reviews import router as admin_reviews_router
 from .candidates import router as candidates_router
@@ -74,6 +75,7 @@ app.include_router(admin_members_router)
 app.include_router(admin_price_import_router)
 app.include_router(admin_price_review_router)
 app.include_router(admin_stock_router)
+app.include_router(admin_swap_logs_router)
 app.include_router(admin_pool_router)
 app.include_router(admin_sessions_router)
 app.include_router(admin_price_history_router)

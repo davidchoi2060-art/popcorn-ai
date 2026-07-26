@@ -11,7 +11,10 @@ UX-11: ① 호환 100% 통과 대안만 노출 ③ 연쇄는 정직 설명 후 �
 - 연쇄 1패스: 위반 슬롯을 가격 오름차순 순회 교체 후 전체 재검증. 실패하거나
   위반 슬롯이 스왑 슬롯 자신이면(예: 파워 하향) 미노출. tie=product_code(A-02).
 - chain_reason은 고정 템플릿(A-03 — LLM 없음).
-v1 제외: 예산 재판정(사용자 명시 선택 — 가격차로 정직), swap_event_logs(레거시 users FK — 이관).
+v1 제외: 예산 재판정(사용자 명시 선택 — 가격차로 정직).
+교체 기록(swap_event_logs)은 슬라이스 46에서 시작한다 — 미뤘던 이유(레거시 users FK)는
+user_id를 채우지 않고 session_id·slot·price_delta로 맥락을 남기는 방식(0013)으로 해소했다.
+스왑은 게스트도 하므로 주체를 지어내지 않는다.
 """
 import json
 from datetime import datetime
@@ -21,15 +24,20 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .db import engine
-from .recommend import (SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
+from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
                         load_compat_rules)
 
 router = APIRouter(prefix="/api/swap")
 
 SLOT_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
            "CASE": "케이스", "COOLER": "CPU쿨러", "POWER": "파워", "SSD": "저장장치"}
-SPEC_COLS = ("socket, mem_type, tdp_watt, rated_watt, required_power_watt,"
-             " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent")
+# **호환 규칙이 참조하는 필드는 전부 여기 있어야 한다.** 하나라도 빠지면 그 규칙이
+# NULL 불통과로 떨어져 **모든 대안이 사라진다**(대안 0건 = S3 부품 변경 무력).
+# 실제로 슬라이스 39(socket_list)·43(form_factor_list) 추가 때 이 목록을 함께 늘리지
+# 않아 전 슬롯 대안이 0이 됐고, 슬라이스 46에서야 발견했다 — 회귀에 스왑 항목을 넣은 이유다.
+SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
+             " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
+             " form_factor, form_factor_list, tag_white, tag_silent")
 
 
 class SwapQuery(BaseModel):
@@ -136,6 +144,9 @@ def candidates(body: SwapQuery):
         chosen = _chosen_from_parts(parts, specs)
         pool, by_slot, pool_codes = _pool_ctx(conn)
         rules = load_compat_rules(conn)   # 엔진과 같은 규칙 원천(슬라이스 34)
+    # 규칙이 참조하는 필드가 chosen(스냅샷 조인)에 실렸는지 확인 — 누락은 '대안 0건'이라는
+    # 조용한 고장으로 나타난다. 경고로 드러낸다(슬라이스 46 전례).
+    check_rule_fields(list(chosen.values()), rules)
 
     current = [{"slot": it["part_type"], "product_code": it["product_code"],
                 "sku": it["sku"], "name": it["name"], "price": it["price"],
@@ -191,6 +202,9 @@ def apply(body: ApplyBody):
         specs = _specs_by_code(conn, [it["product_code"] for it in parts])
         chosen = _chosen_from_parts(parts, specs)
         pool, by_slot, pool_codes = _pool_ctx(conn)
+        # 규칙은 요청마다 로드한다(엔진과 같은 원천). 슬라이스 40에서 이 줄을 '중복'으로 보고
+        # 지웠다가 apply가 NameError로 죽었다 — candidates와 apply는 각자 필요하다.
+        rules = load_compat_rules(conn)
         live = {p["product_code"]: p for p in pool}
 
         for slot, code in ch_by_slot.items():
@@ -218,6 +232,21 @@ def apply(body: ApplyBody):
                 new_parts.append(it)
         total = sum(it["price"] for it in new_parts)
         compat = build_compat(chosen, rules)
+
+        # 교체 사실을 원장에 남긴다(슬라이스 46) — 그동안 swap_event_logs는 0행이었다.
+        # 이 기록이 "고객이 어떤 추천을 어떤 부품으로 바꿨나"의 유일한 원천이고,
+        # 추천 기준을 고칠 근거가 된다(부품 교체 기록 화면).
+        before_by_slot = {it["part_type"]: it for it in parts}
+        for slot, code in ch_by_slot.items():
+            was = before_by_slot.get(slot) or {}
+            delta = None
+            if was.get("price") is not None:
+                delta = chosen[slot]["sale_price"] - was["price"]
+            conn.execute(text(
+                "INSERT INTO swap_event_logs (from_product, to_product, session_id, slot,"
+                " price_delta) VALUES (:fp, :tp, :s, :sl, :pd)"),
+                {"fp": was.get("product_code"), "tp": code, "s": body.session_id,
+                 "sl": slot, "pd": delta})
         reasons = (snap["items"].get("reasons") or []) + ["고객 부품 변경 반영 (S3)"]
         sid = conn.execute(text(
             "INSERT INTO quote_snapshots (session_id, quote_type, items, companion, total_amount)"

@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">부품 교체 · 클릭 기록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">부품 교체 · 클릭 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-030</span></h2>
+          <div><h2 class="mb-1">부품 교체 · 클릭 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">고객이 추천을 어떻게 고치는지가 <b class="text-body-secondary">추천 기준을 조정할 신호</b>입니다. 읽기 전용 관측 창.</p></div>
           <span class="badge badge-phoenix badge-phoenix-secondary">최근 30일 · 스왑 1,204회</span>
         </div>
@@ -295,6 +295,82 @@
             <div class="rounded-pill overflow-hidden" style="height:8px;background:var(--phoenix-secondary-bg);"><div style="width:${v}%;height:100%;background:var(--phoenix-primary);"></div></div>
           </div>`).join("");
         if(window.feather)feather.replace();
+      })();
+      </script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 46) — 부품 교체 기록 실배선.
+        // **두 원천의 상태가 다르다**: 교체는 이제 쌓이고(swap_event_logs), 근거 클릭은
+        // 기록 경로 자체가 없다(promo_click_logs 0행). 0을 '클릭이 없었다'로 보여주면 거짓이라
+        // 클릭 영역은 '원천 준비 중'으로 표기한다(배지 3종 규약).
+        var badge = document.getElementById("dataSrc");
+        var LIVE = false;
+
+        function esc(s){
+          return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+            return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c];
+          });
+        }
+        function won(v){ return v == null ? "—" : (v > 0 ? "+" : "") + v.toLocaleString() + "원"; }
+
+        function paint(d){
+          LIVE = true;
+          badge.textContent = "실데이터 · Cloud SQL";
+          badge.classList.remove("badge-phoenix-secondary");
+          badge.classList.add("badge-phoenix-primary");
+
+          // ① 자주 일어나는 교체 — 표 본문을 서버 집계로 교체
+          var tb = document.querySelector("table tbody");
+          if(tb){
+            if(!d.pairs.length){
+              tb.innerHTML = '<tr><td colspan="5" class="p-3 fs-9 text-body-tertiary">'
+                + '아직 교체 기록이 없습니다 — 고객이 S3에서 부품을 바꾸면 여기에 쌓입니다.'
+                + '</td></tr>';
+            } else {
+              tb.innerHTML = d.pairs.map(function(p){
+                return '<tr><td class="ps-3"><span class="badge badge-phoenix '
+                  + 'badge-phoenix-secondary me-1">' + esc(p.slot_label) + '</span>'
+                  + '<b>' + esc(p.from_sku || "—") + '</b>'
+                  + '<div class="fs-10 text-body-tertiary">' + esc((p.from_name || "").slice(0,34)) + '</div></td>'
+                  + '<td><b>' + esc(p.to_sku || "—") + '</b>'
+                  + '<div class="fs-10 text-body-tertiary">' + esc((p.to_name || "").slice(0,34)) + '</div></td>'
+                  + '<td class="text-end">' + p.n + '</td>'
+                  + '<td class="text-end">' + p.pct + '%</td>'
+                  + '<td class="fs-9">' + esc(p.signal) + '</td></tr>';
+              }).join("");
+            }
+          }
+
+          // ② 슬롯별 요약 — 어느 슬롯을 자주 바꾸는가(추천 기준을 고칠 신호)
+          var host = document.querySelector("#clicks");
+          if(host){
+            var slots = d.by_slot.length
+              ? '<div class="d-flex flex-column gap-2">' + d.by_slot.map(function(s){
+                  return '<div class="d-flex justify-content-between align-items-center">'
+                    + '<span>' + esc(s.label) + '</span>'
+                    + '<span class="fs-9"><b>' + s.n + '회</b> · ' + s.pct + '%'
+                    + ' · 평균 ' + won(s.avg_delta) + '</span></div>';
+                }).join("") + '</div>'
+              : '<p class="fs-9 text-body-tertiary mb-0">교체 기록 없음</p>';
+
+            // 클릭 원천은 상태가 다르다 — 사유를 밝힌다(0건이 아니라 '측정하지 않음')
+            var clickBlock = d.clicks.empty
+              ? '<div class="alert alert-warning py-2 px-3 fs-9 mb-0 mt-3">'
+                + '<b>근거 리포트 클릭 — 원천 준비 중</b><div class="mt-1">'
+                + esc(d.clicks.reason) + '</div></div>'
+              : '<p class="fs-9 mb-0 mt-3">클릭 ' + d.clicks.count.toLocaleString() + '건</p>';
+
+            host.innerHTML = '<div class="fs-10 text-body-tertiary mb-2">슬롯별 교체 빈도 '
+              + '(총 ' + d.total.toLocaleString() + '회)</div>' + slots + clickBlock
+              + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + esc(d.note) + '</p>';
+          }
+          if(window.feather) feather.replace();
+        }
+
+        fetch("/api/admin/swap-logs")
+          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+          .then(paint)
+          .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

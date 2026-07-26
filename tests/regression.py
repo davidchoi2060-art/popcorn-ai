@@ -441,6 +441,53 @@ def test_ops():
     check("원복 후 결제 게이트 통과", err != "pay_mode_mall", "pay_mode_mall 아님", err)
 
 
+# ────────── 10. 부품 교체(S3) — 대안·적용·원장 (슬라이스 46) ──────────
+def test_swap():
+    """대안이 0건이면 S3 화면이 무력하다 — 그 조용한 고장을 여기서 잡는다."""
+    print("\n[10] 부품 교체(S3) — 대안·적용·원장 (슬라이스 46)")
+    _, rec = post("/api/recommend", {"mode": "guided",
+                  "constraints": [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "150만원"}]})
+    sess = rec["session_id"]
+
+    st, cand = post("/api/swap/candidates",
+                    {"session_id": sess, "tier": "recommend", "slot": "GPU"})
+    slots = cand.get("slots", {})
+    total_alts = sum(len(v.get("alternatives") or []) for v in slots.values())
+    check("스왑 대안이 존재한다(슬롯 합)", total_alts > 0, "> 0", total_alts)
+    empty_slots = [k for k, v in slots.items() if not (v.get("alternatives") or [])]
+    check("전 슬롯 동시 0건이 아니다(규칙 필드 누락 신호)",
+          len(empty_slots) < len(slots), f"< {len(slots)}개 슬롯", empty_slots)
+
+    gpu = slots.get("GPU", {}).get("alternatives") or []
+    if not gpu:
+        check("GPU 대안 존재", False, "> 0", 0)
+        return
+    pick = next((a for a in gpu if not a.get("chain")), gpu[0])
+
+    before = get("/api/admin/swap-logs")["total"]
+    st, ap = post("/api/swap/apply", {"session_id": sess, "tier": "recommend",
+                                      "changes": [{"slot": "GPU",
+                                                   "product_code": pick["product_code"]}]})
+    check("스왑 적용 성공", st == 200, 200, st)
+    if st != 200:
+        return
+    check("적용 결과가 호환 전부 통과",
+          all(c["pass"] for c in ap["compat"]["checks"]), "전부 통과",
+          [c["key"] for c in ap["compat"]["checks"] if not c["pass"]])
+    check("호환 항목 = 활성 규칙 수", len(ap["compat"]["checks"]) == FIXED["compat_checks"],
+          FIXED["compat_checks"], len(ap["compat"]["checks"]))
+
+    after = get("/api/admin/swap-logs")
+    check("교체가 원장에 남는다", after["total"] == before + 1, before + 1, after["total"])
+    top = after["recent"][0] if after["recent"] else {}
+    check("기록에 슬롯·전후 SKU가 남는다",
+          top.get("slot") == "GPU" and top.get("to_sku") == pick["sku"],
+          f"GPU/{pick['sku']}", f"{top.get('slot')}/{top.get('to_sku')}")
+    check("근거 클릭은 '측정하지 않음'으로 구분된다",
+          after["clicks"]["empty"] is True and bool(after["clicks"]["reason"]),
+          "empty=True + 사유", after["clicks"])
+
+
 def test_guards():
     print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
     member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
@@ -482,7 +529,8 @@ def main():
     print("\n로그인: " + str(d["operator"].get("name")) + " · 권한 " + d["operator"]["role"])
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
-               test_ledgers, test_customer, test_auth, test_ops, test_guards):
+               test_ledgers, test_customer, test_auth, test_ops, test_swap,
+               test_guards):
         try:
             fn()
         except Exception as e:
