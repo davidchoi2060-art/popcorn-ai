@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 원본 자료</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">상품 원본 자료 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-IMP-010</span></h2>
+          <div><h2 class="mb-1">상품 원본 자료 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-IMP-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">업로드된 원본을 <b class="text-body-secondary">받은 그대로(동결)</b> 보관합니다. 읽기 전용 — 어떤 검증·확정도 원본을 바꾸지 않습니다.</p></div>
         </div>
         <div class="row g-3">
@@ -330,6 +330,95 @@
         // 딥링크: 해당 SKU가 있는 배치로 이동
         if(deepId){for(const[bid,rows]of Object.entries(ROWS)){if(rows.some(r=>r[1]===deepId)){cur=bid;break;}}}
         render();if(window.feather)feather.replace();
+      })();
+      </script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 45) — 상품 원본 자료 실배선.
+        // **이 화면이 보여주는 원본 셀은 '적재가 거부한 행'뿐이다.** 성공 행 원문은 저장하지
+        // 않는다(원본 CSV가 정본 · 22,808행 × 32컬럼 중복 회피). 그 사실을 화면이 먼저 말한다 —
+        // "원본이 다 보인다"고 착각하게 두지 않는다.
+        var badge = document.getElementById("dataSrc");
+        var LIVE = false, JOBS = [], cur = null;
+
+        function n(v){ return (v == null ? 0 : v).toLocaleString(); }
+        function esc(s){
+          return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+            return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c];
+          });
+        }
+        function fmt(iso){
+          if(!iso) return "—";
+          var d = new Date(iso);
+          return (d.getMonth()+1) + "-" + String(d.getDate()).padStart(2,"0");
+        }
+
+        function paintBatches(){
+          document.getElementById("batches").innerHTML = JOBS.map(function(b){
+            var on = b.job_id === cur;
+            return '<button class="btn btn-sm w-100 text-start mb-2 '
+              + (on ? "btn-primary" : "btn-phoenix-secondary") + '" data-live-job="' + b.job_id + '">'
+              + '<b>#' + b.job_id + '</b> ' + esc(b.file.slice(0, 22))
+              + '<div class="fs-10 ' + (on ? "" : "text-body-tertiary") + '">'
+              + fmt(b.at) + ' · 적재 ' + n(b.ok) + ' · 거부 ' + n(b.error) + '</div></button>';
+          }).join("") || '<p class="fs-9 text-body-tertiary mb-0">적재 배치가 없습니다.</p>';
+          document.querySelectorAll("[data-live-job]").forEach(function(b){
+            b.onclick = function(){ cur = +b.dataset.liveJob; paintBatches(); loadRows(); };
+          });
+        }
+
+        function loadRows(){
+          fetch("/api/admin/import-jobs/" + cur + "/rows")
+            .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+            .then(function(d){
+              document.getElementById("btitle").textContent =
+                "배치 #" + d.job.job_id + " — " + d.job.file;
+              var body = document.getElementById("brows");
+              if(!d.rows.length){
+                body.innerHTML = '<tr><td colspan="4" class="text-body-tertiary fs-9 p-3">'
+                  + '이 배치에는 보관된 원본 셀이 없습니다 — 거부된 행이 0건입니다.'
+                  + ' 적재된 ' + n(d.job.ok) + '행의 원문은 저장하지 않습니다(원본 CSV가 정본).'
+                  + '</td></tr>';
+                return;
+              }
+              body.innerHTML = d.rows.map(function(r){
+                var cells = r.cells.map(function(c){
+                  return '<div><span class="text-body-tertiary">' + esc(c.col) + '</span> '
+                       + '<b>' + esc(c.value) + '</b></div>';
+                }).join("");
+                var tone = r.kind === "error" ? "danger" : "primary";
+                var label = r.kind === "error" ? "거부" : "적재";
+                return '<tr><td class="ps-3 text-body-tertiary">'
+                  + (r.row_no != null ? r.row_no : "—") + '</td>'
+                  + '<td>' + esc(r.sku || "—") + '</td>'
+                  + '<td class="fs-10" style="max-width:420px;">' + cells + '</td>'
+                  + '<td><span class="badge badge-phoenix badge-phoenix-' + tone + '">'
+                  + label + '</span><div class="fs-10 text-body-tertiary">'
+                  + esc(r.reason) + '</div></td></tr>';
+              }).join("")
+              + '<tr><td colspan="4" class="fs-10 text-body-quaternary p-3">' + d.note + '</td></tr>';
+              if(window.feather) feather.replace();
+            })
+            .catch(function(){});
+        }
+
+        var q = new URLSearchParams(location.search).get("job");
+
+        fetch("/api/admin/import-jobs")
+          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function(d){
+            LIVE = true;
+            badge.textContent = "실데이터 · Cloud SQL";
+            badge.classList.remove("badge-phoenix-secondary");
+            badge.classList.add("badge-phoenix-primary");
+            JOBS = d.items;
+            // 거부 행이 있는 배치를 먼저 고른다 — 원본 셀이 있는 배치가 이 화면의 볼거리다
+            var withRows = JOBS.filter(function(b){ return b.err_rows > 0; });
+            cur = q ? +q : ((withRows[0] || JOBS[0] || {}).job_id || null);
+            paintBatches();
+            if(cur) loadRows();
+          })
+          .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

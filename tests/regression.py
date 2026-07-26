@@ -218,6 +218,17 @@ def test_consistency():
     dash = get("/api/admin/dashboard")["pending"]
     # 슬라이스 39: 검수 큐가 서버 페이지네이션이 되어 items는 한 페이지뿐이다 —
     # 정합은 **전체 건수(total)** 로 비교해야 한다(페이지 길이와 비교하면 항상 어긋난다).
+
+    # 슬라이스 45: 적재 이력 — 화면이 사실을 말하는지(불변식)
+    jobs = get("/api/admin/import-jobs")
+    s = jobs["summary"]
+    check("적재 배치 원장 존재", s["batches"] >= 1 and len(jobs["items"]) >= 1,
+          ">=1건", s["batches"])
+    check("카탈로그 = 실데이터 + 데모", s["catalog"] == s["real"] + s["demo"],
+          s["real"] + s["demo"], s["catalog"])
+    bad = [b for b in jobs["items"] if b["ok"] + b["error"] > b["total"]]
+    check("배치별 적재+거부 <= 원본 행수", not bad, "초과 없음", bad[:2])
+
     rv = get("/api/admin/reviews")
     check("검수 대기", dash["review"] == rv["total"], rv["total"], dash["review"])
     check("검수 대기 규모(적재 결과)", rv["total"] == FIXED["review_pending"],
