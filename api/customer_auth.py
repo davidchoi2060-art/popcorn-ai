@@ -18,6 +18,7 @@
 `/api/orders`)은 로그인을 요구하지 않는다. 견적을 보려고 가입을 강요하지 않는다는
 UX 결정(A-10)을 인증이 뒤집지 않는다.
 """
+import os
 import secrets
 from contextvars import ContextVar
 
@@ -40,6 +41,16 @@ _current: ContextVar[dict | None] = ContextVar("current_member", default=None)
 # 게이트 대상 = 회원 전용 경로. 인증 엔드포인트 자체는 예외.
 GUARDED_PREFIX = "/api/my/"
 OPEN_PREFIXES = ("/api/auth/",)
+
+
+def cookie_secure() -> bool:
+    """HTTPS 전용 쿠키 여부 — 환경변수로 켠다(COOKIE_SECURE=1).
+
+    내부 베타는 도메인이 없어 HTTP로 시작한다(사용자 결정 2026-07-26). 그 상태에서 secure를
+    켜면 브라우저가 쿠키를 아예 저장하지 않아 로그인이 되지 않는다. 도메인·인증서를 붙이는
+    날 이 환경변수만 켜면 되도록 값으로 빼둔다 — 코드를 고치지 않는다.
+    """
+    return os.environ.get("COOKIE_SECURE", "").strip() in ("1", "true", "True", "yes")
 
 
 def current_member() -> dict | None:
@@ -138,7 +149,7 @@ def login(body: LoginBody, request: Request, response: Response):
             raise HTTPException(403, "이용할 수 없는 계정입니다 — 고객센터에 문의해 주세요")
         sid = _new_session(conn, m["member_id"], request.headers.get("user-agent"))
         response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/",
-                            max_age=ABSOLUTE_DAYS * 24 * 3600)
+                            max_age=ABSOLUTE_DAYS * 24 * 3600, secure=cookie_secure())
         return {"state": "active", "created": created,
                 "member": {"id": m["member_id"], "email": m["email"],
                            "nickname": m["nickname"], "via": m["joined_via"]},

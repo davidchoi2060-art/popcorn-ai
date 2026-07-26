@@ -38,6 +38,16 @@ _current: ContextVar[dict | None] = ContextVar("current_operator", default=None)
 OPEN_PREFIXES = ("/api/admin/auth/",)
 
 
+def cookie_secure() -> bool:
+    """HTTPS 전용 쿠키 여부 — 환경변수로 켠다(COOKIE_SECURE=1).
+
+    내부 베타는 도메인이 없어 HTTP로 시작한다(사용자 결정 2026-07-26). 그 상태에서 secure를
+    켜면 브라우저가 쿠키를 아예 저장하지 않아 로그인이 되지 않는다. 도메인·인증서를 붙이는
+    날 이 환경변수만 켜면 되도록 값으로 빼둔다 — 코드를 고치지 않는다.
+    """
+    return os.environ.get("COOKIE_SECURE", "").strip() in ("1", "true", "True", "yes")
+
+
 def bootstrap_emails() -> set:
     """첫 관리자 — .env ADMIN_BOOTSTRAP_EMAILS(쉼표 구분)만 첫 로그인 시 자동 owner."""
     raw = os.environ.get("ADMIN_BOOTSTRAP_EMAILS", "")
@@ -155,7 +165,8 @@ def login(body: LoginBody, request: Request, response: Response):
                  "p": body.provider, "uid": email, "ph": body.phone, "du": body.duty}).scalar()
             if auto_owner:
                 sid = _new_session(conn, new_id, request.headers.get("user-agent"))
-                response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/")
+                response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/",
+                                    secure=cookie_secure())
                 return {"state": "active", "operator": {"id": new_id, "email": email,
                         "role": "owner"}, "bootstrap": True,
                         "message": "부트스트랩 계정으로 자동 승인됐습니다(관리자 권한)"}
@@ -167,7 +178,8 @@ def login(body: LoginBody, request: Request, response: Response):
         if op["status"] == "정지":
             raise HTTPException(403, "정지된 계정입니다 — 관리자에게 문의하세요")
         sid = _new_session(conn, op["operator_id"], request.headers.get("user-agent"))
-        response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/")
+        response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/",
+                                    secure=cookie_secure())
         return {"state": "active", "operator": {"id": op["operator_id"], "name": op["name"],
                 "email": op["email"], "role": op["role"]}}
 

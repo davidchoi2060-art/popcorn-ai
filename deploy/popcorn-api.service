@@ -1,0 +1,40 @@
+[Unit]
+Description=팝콘PC AI API (내부 직원 베타)
+Documentation=file:///srv/popcorn-ai/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=popcorn
+Group=popcorn
+WorkingDirectory=/srv/popcorn-ai
+
+# 비밀값은 이 파일에 쓰지 않는다 — /etc/popcorn-ai.env(권한 600, root:popcorn)에 둔다.
+# 필요한 키: DATABASE_URL · ADMIN_BOOTSTRAP_EMAILS · COOKIE_SECURE
+EnvironmentFile=/etc/popcorn-ai.env
+
+# 127.0.0.1에만 바인드 — 외부에서 8000으로 직접 들어올 수 없다(반드시 nginx를 통과).
+# nginx가 Basic Auth로 먼저 막으므로 이 바인드가 그 우회를 봉쇄하는 짝이다.
+ExecStart=/srv/popcorn-ai/.venv/bin/python -m uvicorn api.main:app \
+    --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+
+Restart=always
+RestartSec=3
+# 로그는 journald로 — stdout 인코딩은 UTF-8로 고정한다(슬라이스 40: cp949에서 로그가
+# UnicodeEncodeError를 내고 요청이 500이 된 전례. 리눅스는 기본 UTF-8이지만 명시한다).
+Environment=PYTHONIOENCODING=utf-8
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=popcorn-api
+
+# 최소 권한 — 앱은 자기 디렉터리만 읽고 어디에도 쓰지 않는다(원장은 Cloud SQL에 있다)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/popcorn-ai/.cache
+
+[Install]
+WantedBy=multi-user.target
