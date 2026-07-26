@@ -263,7 +263,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">마진 정책</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">마진 정책 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-020</span></h2>
+          <div><h2 class="mb-1">마진 정책 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">카테고리별 판매가 제안 규칙. <b class="text-body-secondary">이후의 가격 제안에만</b> 적용되고 소급하지 않습니다(재현성 보존).</p></div>
           <div class="d-flex align-items-center gap-2"><span class="badge badge-phoenix badge-phoenix-secondary">현재 v8 · 07-01 적용</span><button id="save" class="btn btn-primary btn-sm">저장 → v9 발행</button></div>
         </div>
@@ -284,6 +284,7 @@
             <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>버전이 남는 이유</b> — 견적·가격 이력은 당시 정책 버전과 함께 저장됩니다. v9를 발행해도 과거 견적은 v8로 재현됩니다.</div>
           </div>
         </div>
+        <div id="liveRules" hidden class="mt-4"></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -297,6 +298,88 @@
           <td><select class="form-select form-select-sm" style="width:130px;"><option${r==="백원 올림"?" selected":""}>백원 올림</option><option${r==="천원 절사"?" selected":""}>천원 절사</option><option>990원 맞춤</option></select></td>
           <td><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked></div></td></tr>`).join("");
         document.getElementById("save").onclick=()=>toast("마진 정책 v9 발행 — 이후 가격 제안부터 적용 · 작업 기록 저장");
+      })();
+      </script>
+      <script>
+      (function(){
+        // ---- LIVE (슬라이스 31) — 엔진이 실제로 쓰는 규칙 노출. 저장 테이블이 비어 있어도
+        // 견적을 만드는 규칙은 코드에 살아 있다 → 화면이 연출 대신 실근거를 보여준다.
+        var SCREEN = "margin";
+        function card(title, sub, body){
+          return '<div class="card mb-3"><div class="card-body">'
+            + '<h5 class="mb-1">' + title + ' <span class="badge badge-phoenix badge-phoenix-primary fs-10 align-middle">현재 적용 중</span></h5>'
+            + '<p class="fs-9 text-body-tertiary mb-3">' + sub + '</p>' + body + '</div></div>';
+        }
+        function table(head, rows){
+          return '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
+            + '<thead><tr class="text-body-tertiary">' + head.map(function(h){return '<th>'+h+'</th>';}).join('') + '</tr></thead>'
+            + '<tbody>' + rows.map(function(r){return '<tr>' + r.map(function(c){return '<td>'+c+'</td>';}).join('') + '</tr>';}).join('') + '</tbody></table></div>';
+        }
+        function note(t){ return '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + t + '</p>'; }
+
+        fetch("/api/admin/engine-rules")
+          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function(d){
+            var host = document.getElementById("liveRules"), html = "";
+            if(SCREEN === "compat"){
+              html += card("조립 호환 검사 5종",
+                "견적을 만들 때마다 이 5개를 전부 통과한 조합만 제시합니다 — 하나라도 어긋나면 그 조합은 후보에서 빠집니다.",
+                table(["검사", "판정 기준", "사양 원천"],
+                  d.compat.checks.map(function(c){
+                    return ['<b>'+c.label+'</b>', '<code class="fs-10">'+c.rule+'</code>',
+                            '<span class="text-body-tertiary fs-10">'+c.source+'</span>'];
+                  })) + note(d.compat.note));
+              html += card("견적 슬롯 구성",
+                "한 대의 PC를 구성하는 슬롯 순서 — 이 순서로 후보를 탐색합니다.",
+                '<div class="d-flex flex-wrap gap-2">' + d.compat.slots.map(function(s){
+                  return '<span class="badge badge-phoenix badge-phoenix-secondary">'+s+'</span>';
+                }).join('') + '</div>');
+            } else if(SCREEN === "weights"){
+              html += card("티어별 선택 규칙",
+                "가성비·추천·고성능은 서로 다른 정렬 규칙입니다 — 같은 재고에서 같은 입력이면 언제나 같은 결과가 나옵니다.",
+                table(["티어", "정렬", "예산 상한", "비고"],
+                  d.tiers.rules.map(function(t){
+                    return ['<b>'+t.label+'</b>', t.order, t.cap, '<span class="fs-10 text-body-tertiary">'+t.note+'</span>'];
+                  })) + note(d.tiers.tie_break + ' · 현재 후보 풀 ' + d.tiers.pool_size + '종'));
+              html += card("예산 배분 상한",
+                "예산을 말하면 부품별로 이 비율까지만 후보에 넣습니다.",
+                '<div class="d-flex flex-wrap gap-2">' + d.budget.alloc.map(function(a){
+                  return '<span class="badge badge-phoenix badge-phoenix-info">'+a.part_type+' '+a.pct+'%</span>';
+                }).join('') + '</div>'
+                + '<div class="mt-3">' + d.budget.tag_scope.map(function(t){
+                    return '<div class="fs-9 mb-1"><b>'+t.tag+'</b> <code class="fs-10">'+t.field+'</code> — 적용 대상: '
+                      + t.scope.join(', ') + '</div>';
+                  }).join('') + '</div>'
+                + note(d.budget.note + ' ' + d.budget.tag_note));
+              html += card("추천 가중치",
+                "가중치 스코어 엔진은 아직 도입 전입니다.",
+                '<p class="fs-9 text-body-secondary mb-0">' + d.weights.note + '</p>'
+                + note(d.tiers.performance_proxy));
+            } else {
+              var p = d.pricing;
+              html += card("판매가 산정 공식",
+                "모든 판매가는 이 공식 하나로 계산됩니다 — 운영자 승인 전에는 반영되지 않습니다.",
+                '<div class="fs-9 mb-2"><code>' + p.formula + '</code></div>'
+                + table(["항목", "현재 값"], [
+                    ["카드수수료", "<b>" + p.card_fee_pct + "%</b>"],
+                    ["마진", "<b>" + p.margin_pct + "%</b>"],
+                    ["예시", "매입 " + p.example.purchase.toLocaleString() + "원 → 판매 <b>" + p.example.sale.toLocaleString() + "원</b>"]
+                  ]));
+              html += card("카테고리별 마진",
+                "카테고리마다 다른 마진을 줄 수 있습니다.",
+                (p.categories.length
+                  ? table(["카테고리", "마진"], p.categories.map(function(c){ return [c.category, c.pct + "%"]; }))
+                  : '<p class="fs-9 text-body-secondary mb-0">등록된 카테고리별 정책이 없습니다 — 현재는 전 카테고리에 기본값이 적용됩니다.</p>')
+                + note(p.category_note));
+            }
+            host.innerHTML = html;
+            host.hidden = false;
+            var b = document.getElementById("dataSrc");
+            b.textContent = "실데이터 · Cloud SQL";
+            b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+            if(window.feather) feather.replace();
+          })
+          .catch(function(){});
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
