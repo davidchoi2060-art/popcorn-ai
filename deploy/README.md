@@ -106,10 +106,15 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 6. 데이터 · 첫 로그인
 
+> 서버와 로컬이 **같은 Cloud SQL**을 본다 — 로컬에서 마이그레이션을 이미 적용했다면
+> 서버에서 다시 돌릴 필요가 없다. 확인만 한다(아래). alembic은 환경변수가 필요하므로
+> `/etc/popcorn-ai.env`를 먼저 읽어야 한다(그냥 실행하면 DATABASE_URL 오류).
+
+
 DB는 이미 Cloud SQL에 있으므로 마이그레이션만 맞춘다(적재는 로컬에서 이미 완료 — products 22,838):
 
 ```bash
-cd /srv/popcorn-ai/db && sudo -u popcorn ../.venv/bin/python -m alembic current
+sudo -u popcorn bash -c 'set -a; . /etc/popcorn-ai.env; set +a; cd /srv/popcorn-ai/db && ../.venv/bin/python -m alembic current'
 ```
 
 첫 관리자는 `ADMIN_BOOTSTRAP_EMAILS`에 넣은 이메일로 `admin/login.html`에서 로그인하면 자동
@@ -150,7 +155,7 @@ sudo journalctl -u popcorn-api --since '10 min ago' -p err   # 에러만
 ```bash
 cd /srv/popcorn-ai && sudo -u popcorn git pull
 sudo -u popcorn .venv/bin/pip install -r requirements.txt
-cd db && sudo -u popcorn ../.venv/bin/python -m alembic upgrade head
+sudo -u popcorn bash -c 'set -a; . /etc/popcorn-ai.env; set +a; cd /srv/popcorn-ai/db && ../.venv/bin/python -m alembic upgrade head'
 sudo systemctl restart popcorn-api
 ```
 
