@@ -254,3 +254,108 @@ def _storage(feats, kv):
     if ff is None and kv.get("M.2사이즈"):
         ff = "M.2"
     return iface, ff
+
+
+# ─────────────────── 형식 B 파서 (슬라이스 42) ───────────────────
+# 원천 '스펙' 문자열에 **두 가지 표기 형식이 섞여 있다**(슬라이스 42 실측):
+#   A: "ASRock / AMD / AM4 / A520 (AMD) / m ATX / DDR4 / ..."      값만 나열
+#   B: "제조회사 : ASRock / CPU 소켓 : AMD(소켓AM4) / 세부 칩셋 : (AMD) B550 / 폼팩터 : M ATX"
+# EAV(db_product_specs.csv)는 A만 파싱했고 B는 1~2%만 담겨 있다. 그래서 B는 원문
+# (products.spec_source_text)에서 직접 읽는다 — **값을 지어내는 게 아니라 원천을 제대로 읽는 것**이다.
+# 실측 회수 가능성: MB 소켓 46% · CASE form_factor 78%(표기 확인 필요) · POWER 67%.
+
+B_SOCKET = re.compile(r"(?:소켓\s*)?(LGA\s?\d{3,4}|AM[45]|sTRX4|TR4)", re.I)
+B_CHIPSET = re.compile(r"([A-Z]\d{2,3}[A-Z]?)")
+B_NUM = re.compile(r"([\d,]+(?:\.\d+)?)")
+
+
+def parse_kv_text(raw: str) -> dict:
+    """원문에서 '키 : 값' 쌍을 뽑는다(형식 B). 키가 없는 토큰은 무시(형식 A는 EAV가 담당)."""
+    out = {}
+    for tok in (raw or "").split("/"):
+        tok = tok.strip()
+        if ":" not in tok:
+            continue
+        k, _, v = tok.partition(":")
+        k, v = k.strip(), v.strip()
+        if k and v:
+            out.setdefault(k, v)
+    return out
+
+
+def _b_socket(v):
+    m = B_SOCKET.search(v or "")
+    if not m:
+        return None
+    s = m.group(1).upper().replace(" ", "")
+    return s if s.startswith(("AM", "S", "T")) else s   # LGA1700 · AM4 형태 그대로
+
+
+def _b_chipset(v):
+    m = B_CHIPSET.search((v or "").replace("(AMD)", "").replace("(Intel)", "").replace("(인텔)", ""))
+    return m.group(1) if m else None
+
+
+def _b_form(v):
+    k = (v or "").upper().replace("-", "").replace(" ", "")
+    for pat, out in (("EATX", "E-ATX"), ("MATX", "m-ATX"), ("MICROATX", "m-ATX"),
+                     ("MINIITX", "mini-ITX"), ("ITX", "mini-ITX"),
+                     ("SFX", "SFX"), ("TFX", "TFX"), ("ATX", "ATX")):
+        if pat in k:
+            return out
+    return None
+
+
+def _b_num(v):
+    m = B_NUM.search(v or "")
+    if not m:
+        return None
+    n = float(m.group(1).replace(",", ""))
+    return int(n) if n.is_integer() else n
+
+
+def _b_mem(v):
+    m = re.search(r"DDR[345]", v or "", re.I)
+    return m.group(0).upper() if m else None
+
+
+# 형식 B 키 -> (우리 필드, 변환기). 슬롯별로 의미가 달라 슬롯 안에서만 적용한다.
+B_MAP = {
+    "MB": {"CPU 소켓": ("socket", _b_socket), "소켓": ("socket", _b_socket),
+           "세부 칩셋": ("chipset", _b_chipset), "칩셋": ("chipset", _b_chipset),
+           "폼팩터": ("form_factor", _b_form), "메모리 종류": ("mem_type", _b_mem)},
+    "CPU": {"CPU 소켓": ("socket", _b_socket), "소켓": ("socket", _b_socket),
+            "열 설계 전력": ("tdp_watt", _b_num), "TDP": ("tdp_watt", _b_num)},
+    "CASE": {"그래픽카드 장착": ("gpu_max_mm", _b_num),
+             "CPU쿨러 장착": ("cooler_height_mm", _b_num),
+             "쿨러 높이": ("cooler_height_mm", _b_num)},
+    "POWER": {"정격 출력": ("rated_watt", _b_num), "표준 출력": ("rated_watt", _b_num),
+              "제품 분류": ("form_factor", _b_form), "ATX12V 규격": ("form_factor", _b_form)},
+    "GPU": {"권장 파워": ("required_power_watt", _b_num),
+            "권장파워": ("required_power_watt", _b_num),
+            "길이": ("length_mm", _b_num), "가로": ("length_mm", _b_num)},
+    "COOLER_CPU_AIR": {"TDP": ("cooler_tdp", _b_num), "높이": ("cooler_height_mm", _b_num),
+                       "쿨러 높이": ("cooler_height_mm", _b_num)},
+    "COOLER_CPU_AIO": {"TDP": ("cooler_tdp", _b_num)},
+    "RAM": {"메모리 종류": ("mem_type", _b_mem), "메모리 용량": ("capacity_gb", _cap),
+            "동작 클럭": ("clock_mhz", _b_num)},
+    "SSD": {"용량": ("capacity_gb", _cap)},
+    "HDD": {"용량": ("capacity_gb", _cap)},
+}
+
+
+def extract_from_text(part_type: str, raw: str) -> tuple:
+    """형식 B 원문에서 뽑기 — (specs, sources). sources는 전부 'text_kv'."""
+    kv = parse_kv_text(raw)
+    if not kv:
+        return {}, {}
+    mapping = B_MAP.get(part_type) or {}
+    s, src = {}, {}
+    for bkey, (field, conv) in mapping.items():
+        if field in s or bkey not in kv:
+            continue
+        got = conv(kv[bkey])
+        if got is not None:
+            s[field] = got
+            src[field] = "text_kv"
+    return s, src
