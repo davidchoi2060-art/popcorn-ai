@@ -20,6 +20,7 @@ PART_TYPE_LABELS = {
     "COOLER_CPU_AIR": "CPU쿨러", "COOLER_CPU_AIO": "CPU쿨러",
     "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
     "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠",
+    "ETC": "미분류",   # 적재 시 부품 종류를 정하지 못한 상품(슬라이스 39) — 추천 대상 아님
 }
 
 # part_type별 필수 사양 필드(ERD 4.0 필수 사양 매트릭스). 미등록 타입은 0/0 → 화면 "—".
@@ -43,16 +44,50 @@ REQUIRED_SPEC_FIELDS = {
     "WEBCAM": ["connection"],
 }
 
-_QUERY = text("""
+# 실데이터 24,303행이 들어온 뒤로 전 행 반환·전 행 순회 KPI는 불가능하다(슬라이스 39).
+# 목록은 서버에서 필터·페이지네이션하고, KPI는 SQL 집계로 전체를 센다.
+# status_key 파생 로직(derive_status)과 아래 CASE는 **같은 판정을 두 곳에 쓴다** —
+# 성능 때문에 감수한 중복이므로 한쪽을 바꾸면 반드시 다른 쪽도 바꿔야 한다.
+_STATUS_CASE = """
+    CASE WHEN p.review_required_yn THEN 'review'
+         WHEN p.stock_qty = 0 OR p.status = '품절' THEN 'oos'
+         WHEN p.sale_price IS NULL THEN 'price'
+         WHEN p.status = '판매중' THEN 'ok'
+         ELSE 'review' END
+"""
+
+_WHERE = """
+    WHERE (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%'
+           OR p.maker ILIKE '%%' || :q || '%%')
+      AND (:part_type = '' OR p.part_type = :part_type)
+      AND (:origin = '' OR p.data_origin = :origin)
+"""
+
+_QUERY = text(f"""
     SELECT p.product_code, p.sku, p.product_name, p.maker, p.part_type,
-           p.status, p.review_required_yn, p.sale_price, p.stock_qty,
+           p.status, p.review_required_yn, p.sale_price, p.stock_qty, p.data_origin,
            COALESCE(sp.cnt, 0) AS supplier_count,
            to_jsonb(ps) AS specs
     FROM products p
     LEFT JOIN product_specs ps USING (product_code)
     LEFT JOIN (SELECT product_code, COUNT(*) AS cnt
                FROM product_supplier_prices GROUP BY product_code) sp USING (product_code)
+    {_WHERE}
+      AND (:status = '' OR {_STATUS_CASE.strip()} = :status)
     ORDER BY p.product_code
+    LIMIT :size OFFSET :offset
+""")
+
+_COUNT = text(f"""
+    SELECT count(*) FROM products p
+    {_WHERE}
+      AND (:status = '' OR {_STATUS_CASE.strip()} = :status)
+""")
+
+_KPI = text(f"""
+    SELECT {_STATUS_CASE.strip()} AS k, count(*) AS n FROM products p
+    {_WHERE}
+    GROUP BY 1
 """)
 
 
@@ -83,12 +118,22 @@ def spec_progress(part_type: str, specs: dict | None) -> tuple[int, int]:
 
 
 @router.get("/products")
-def list_products():  # def(비동기 아님) — psycopg2 동기 드라이버, FastAPI 스레드풀 실행
+def list_products(q: str = "", part_type: str = "", status: str = "", origin: str = "",
+                  page: int = 1, size: int = 100):
+    # def(비동기 아님) — psycopg2 동기 드라이버, FastAPI 스레드풀 실행
+    size = max(1, min(size, 500))     # 상한 — 브라우저가 버티는 범위
+    page = max(1, page)
+    p = {"q": q.strip(), "part_type": part_type.strip(), "status": status.strip(),
+         "origin": origin.strip(), "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
-        rows = conn.execute(_QUERY).all()
+        rows = conn.execute(_QUERY, p).all()
+        total_count = conn.execute(_COUNT, p).scalar_one()
+        kpi_rows = dict(conn.execute(_KPI, p).all())
 
     items = []
-    kpis = {"total": 0, "ok": 0, "review": 0, "oos": 0, "price": 0}
+    kpis = {"total": sum(kpi_rows.values()), "ok": kpi_rows.get("ok", 0),
+            "review": kpi_rows.get("review", 0), "oos": kpi_rows.get("oos", 0),
+            "price": kpi_rows.get("price", 0)}
     for r in rows:
         status_key = derive_status(r)
         done, total = spec_progress(r.part_type, r.specs)
@@ -107,10 +152,13 @@ def list_products():  # def(비동기 아님) — psycopg2 동기 드라이버, 
             "supplier_count": r.supplier_count,
             "sale_price": r.sale_price,
             "status_key": status_key,
+            "origin": r.data_origin,
         })
-        kpis["total"] += 1
-        kpis[status_key] += 1
-    return {"items": items, "kpis": kpis}
+    return {"items": items, "kpis": kpis,
+            "page": page, "size": size, "total": total_count,
+            "pages": (total_count + size - 1) // size,
+            "note": ("실데이터 24,303행 규모 — 목록은 서버에서 필터·페이지네이션됩니다."
+                     " KPI는 필터 조건 전체 집계입니다(현재 페이지 합이 아닙니다).")}
 
 
 # ---- 슬라이스 16: 신규 상품 등록 (단가표發 편입 ②) ----

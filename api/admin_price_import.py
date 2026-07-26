@@ -101,8 +101,10 @@ def _file_diff(conn, file_row, ctx):
                 k, txt = "code", f"기억된 매핑/다나와코드 일치 — {prod['sku']} 자동 연결"
             else:
                 sim = conn.execute(text(
+                    # trgm 유사도 연산자는 GIN 인덱스를 쓴다
+                    # (슬라이스 39: similarity()>th 형태는 full scan이 된다)
                     "SELECT sku, similarity(:m, product_name) s FROM products"
-                    " WHERE similarity(:m, product_name) > :th ORDER BY s DESC LIMIT 1"),
+                    " WHERE product_name % :m ORDER BY s DESC LIMIT 1"),
                     {"m": r["model_name"], "th": SIM_THRESHOLD}).first()
                 if sim:
                     k, txt = "sim", f"이름 유사도 {round(sim[1]*100)}% — 후보 {sim[0]}"

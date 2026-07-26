@@ -381,6 +381,57 @@ CREATE TABLE member_sessions (             -- 구조는 admin_sessions와 동일
 없으면 게스트 주문(email upsert 유지 — 그 이메일은 자기신고값이며, 같은 이메일로 로그인해야
 MY에서 보인다) ⑤ 탈퇴·정지 회원(`status != 'active'`)의 세션은 즉시 무효.
 
+### 3.12 [7차 개정] 카탈로그 적재(T0) — 데모/실데이터 구분 · 다중 소켓 · 사양 출처 (2026-07-26, 슬라이스 39)
+
+실파일 실측(마스터 24,303행 · 사양 EAV 339,650행 · 키 724종)에서 나온 개정이다.
+
+**원천의 형태**: 사양이 **EAV(키-값)** 로 오는데 우리 `product_specs`는 컬럼형이다. 게다가
+EAV 값의 60%(203,467행)가 `특성` 키에 값만 들어 있어(소켓·DDR·폼팩터·용량) **키가 아니라
+값 패턴**으로 뽑아야 한다. 그래서 추출은 3계층이다:
+`① EAV 키 직결 → ② 특성 값 패턴 → ③ 상품명 유도`. 그리고 GPU 권장파워만 ④ 참조표.
+
+```sql
+ALTER TABLE products       ADD COLUMN data_origin VARCHAR(10) NOT NULL DEFAULT 'real';
+ALTER TABLE members        ADD COLUMN data_origin VARCHAR(10) NOT NULL DEFAULT 'real';
+ALTER TABLE orders         ADD COLUMN data_origin VARCHAR(10) NOT NULL DEFAULT 'real';
+ALTER TABLE csv_import_jobs ADD COLUMN data_origin VARCHAR(10) NOT NULL DEFAULT 'real',
+                            ADD COLUMN row_review INTEGER NOT NULL DEFAULT 0,
+                            ADD COLUMN source VARCHAR(40);
+ALTER TABLE product_specs  ADD COLUMN socket_list  JSONB,   -- 쿨러 다중 소켓
+                            ADD COLUMN spec_sources JSONB;   -- 필드 → eav|feature|name|reference
+ALTER TABLE compat_rules   ALTER COLUMN op TYPE VARCHAR(12); -- 'contains' 수용
+CREATE TABLE gpu_power_reference (chipset_key PK, recommended_watt, confirmed_yn, source_note, …);
+```
+
+**계약 5항**
+
+① **데모/실데이터 구분**(사용자 지시 2026-07-26): 직원 베타에서 실운영 데이터가 쌓이면 시드
+데모와 섞여 분리할 수 없다. `data_origin`('real'|'demo')을 원장 3곳에 두고, 기존 시드는
+전부 'demo'로 이행했다. 적재 스크립트가 `--origin`으로 받으므로 **앞으로도 데모를 올려
+테스트**할 수 있다.
+
+② **쿨러는 소켓을 여러 개 지원한다**(실측: 6개 지원 180건·5개 73건·7개 43건). 단일값
+`socket`으로는 표현이 불가능해 `socket_list JSONB` + `op='contains'` 규칙으로 바꿨다.
+호환 규칙 `COOLER.socket_list contains CPU.socket`. **NULL·빈 배열은 불통과**(기존 원칙 유지).
+
+③ **필드별 출처를 남긴다**(`spec_sources`). GPU 권장파워는 원천에 **391건 중 9건뿐**이라
+칩셋 표준표로 채우는데(사용자 결정), 행 단위 `extract_source`로는 "이 필드만 참조값"을 말할
+수 없다. 근거 카드는 `reference` 출처를 **'표준 권장값(확인 대기)'** 으로 구분 표시해야 한다 —
+원천값과 같은 얼굴로 보이면 "근거가 사실"이라는 정체성이 깨진다.
+
+④ **재고 수량은 원천에 없다**(상태값 판매중 7,860 / 품절 16,443만). 사용자 결정: 판매중 →
+`stock_qty=1`, 품절 → 0. **수량은 실사 전까지 사실이 아니다** — 입고 화면(ADM-SRC-020)에서
+채운다. 화면은 이 한계를 표기한다.
+
+⑤ **part_type 어휘에 'ETC'(미분류) 추가**: `part_type`이 NOT NULL이고 실파일에는 우리 슬롯에
+없는 상품(시스템 쿨러·튜닝용품·완제품PC·케이블 등 5,150건)이 있다. 적재하되 'ETC' +
+`category_group='etc'`로 두어 추천에서 자연 제외되고, 화면에는 '미분류'로 드러난다.
+`삭제대기`·`내부관리용`·`고객님 개인결제` 분류(1,410건)는 **적재하지 않는다**(취급 상품이 아니다).
+
+**추천 게이트는 실질 5중이다**(슬라이스 39에서 확인): 뷰 WHERE가
+`판매중 ∧ ai_candidate ∧ ¬review_required ∧ category_group='core_part' ∧ part_type 10종`,
+호출부가 `stock_qty>0`. 적재가 `category_group`을 채우지 않으면 사양이 완전해도 풀에 못 든다.
+
 ---
 
 ## 4. 필드 소유권 & 덮어쓰기 규칙

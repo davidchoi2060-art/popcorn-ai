@@ -42,10 +42,13 @@ class RecommendBody(BaseModel):
 
 
 def _load_pool(conn):
+    # 규칙이 참조하는 필드는 전부 여기서 실려야 한다 — 규칙을 추가하면 이 목록도 함께 늘린다
+    # (슬라이스 39에서 socket_list를 빼먹어 KeyError로 견적이 500이 됐다).
     return [dict(r) for r in conn.execute(text(
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"
-        " socket, mem_type, tdp_watt, rated_watt, required_power_watt,"
-        " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent"
+        " socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
+        " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent,"
+        " spec_sources, data_origin"
         " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
 
 
@@ -80,15 +83,38 @@ def _cmp(op: str, v, r) -> bool:
         return v >= r
     if op == "lte":
         return v <= r
+    if op == "contains":
+        # 다중값 필드(쿨러 socket_list) — 상대 값이 목록에 있는가. 빈 목록은 불통과.
+        # 실측 근거: 쿨러는 소켓을 평균 5~6개 지원해 단일값 비교로는 표현할 수 없다(슬라이스 39).
+        return bool(v) and r in v
     return False   # 미지의 연산자 — 불통과(조용히 통과시키지 않는다)
 
 
 def _slot_ok(slot, p, chosen, rules: dict):
-    """슬롯 진입 호환 검사 — DB 규칙을 그대로 적용. 규칙 없는 슬롯(CPU·GPU·SSD)은 독립."""
+    """슬롯 진입 호환 검사 — DB 규칙을 그대로 적용. 규칙 없는 슬롯(CPU·GPU·SSD)은 독립.
+
+    필드가 풀에 없으면 `.get()`이 None을 주고 NULL 불통과 규칙이 걸린다 — 500으로 죽는 대신
+    "판정할 수 없으니 통과시키지 않는다"로 떨어진다(누락은 check_rule_fields가 경고로 알린다).
+    """
     for rule in rules.get(slot, ()):
-        if not _cmp(rule["op"], p[rule["field"]], chosen[rule["ref_slot"]][rule["ref_field"]]):
+        v = p.get(rule["field"])
+        r = chosen[rule["ref_slot"]].get(rule["ref_field"])
+        if not _cmp(rule["op"], v, r):
             return False
     return True
+
+
+def check_rule_fields(pool, rules: dict) -> list:
+    """규칙이 참조하는 필드가 풀에 실렸는지 확인 — 누락은 조용한 전면 불통과를 만든다."""
+    if not pool:
+        return []
+    keys = set(pool[0].keys())
+    missing = sorted({f for rs in rules.values() for r in rs
+                      for f in (r["field"], r["ref_field"]) if f not in keys})
+    if missing:
+        print(f"[recommend] 경고: 규칙 참조 필드가 후보 풀에 없습니다 → {missing}"
+              " (_load_pool SELECT 목록에 추가해야 합니다)")
+    return missing
 
 
 def _tier_sort(parts, tier, has_cap):
@@ -140,8 +166,8 @@ def build_compat(chosen: dict, rules: dict) -> dict:
     checks = []
     for slot in SLOTS:
         for rule in rules.get(slot, ()):
-            v = chosen[slot][rule["field"]]
-            r = chosen[rule["ref_slot"]][rule["ref_field"]]
+            v = chosen[slot].get(rule["field"])
+            r = chosen[rule["ref_slot"]].get(rule["ref_field"])
             fmt = rule["detail_fmt"] or "{v} / {r}"
             checks.append({
                 "key": rule["rule_key"], "label": rule["label"],
@@ -246,6 +272,7 @@ def recommend(body: RecommendBody):
             capped, _, _ = _apply_one(capped, "예산", budget_v)
 
         rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
+        check_rule_fields(pool, rules)    # 규칙 필드 누락은 조용한 전면 불통과 → 경고로 드러낸다
         sets = {"value": _build_set("value", capped, cap, rules)}
         if sets["value"] is None:
             # 최소 구성이 예산 밖이면 견적 불성립 — 전 티어 불가(정직)

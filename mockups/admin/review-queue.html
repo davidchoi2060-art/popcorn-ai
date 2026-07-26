@@ -575,17 +575,47 @@
         }
         // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패 시 더미 유지
         applyDeepLink(); renderAll();
-        fetch("/api/admin/reviews")
-          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
-          .then(d=>{
-            LIVE = true; QUEUE = d.items.map(fromApi);
-            const b = document.getElementById("dataSrc");
-            b.textContent = "실데이터 · Cloud SQL";
-            b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
-            applyDeepLink(); // LIVE에선 단가표 신규 유형이 0건(다음 슬라이스에서 실데이터화) — 빈 분류 정직 표시
-            renderAll();
-          })
-          .catch(()=>{});
+        // 슬라이스 39: 실카탈로그 적재로 대기 건수가 수천이 됐다 — 서버가 페이지로 나눠 보낸다.
+        // **화면이 한 페이지만 받는다는 사실을 숨기지 않는다**: 전체 건수와 종류별 분포를 띠로 밝힌다.
+        var RV_PAGE = 1;
+        function rvBanner(d){
+          var el = document.getElementById("rvScale");
+          if(!el){
+            el = document.createElement("div");
+            el.id = "rvScale";
+            el.className = "alert alert-warning py-2 px-3 mb-3 fs-9";
+            var host = document.querySelector(".content nav.mb-3");
+            if(host && host.parentNode) host.parentNode.insertBefore(el, host.nextSibling);
+          }
+          var top = (d.by_type || []).slice(0, 6)
+            .map(function(x){ return x.label + " " + x.n.toLocaleString(); }).join(" · ");
+          el.innerHTML = '<b>검수 대기 ' + d.total.toLocaleString() + '건</b> — 이 화면은 그중 '
+            + d.items.length + '건(' + RV_PAGE + '/' + Math.max(1, d.pages) + '페이지)만 보여줍니다.'
+            + (top ? '<div class="mt-1 text-body-secondary">종류별: ' + top + '</div>' : '')
+            + '<div class="mt-1"><button class="btn btn-phoenix-secondary btn-sm" id="rvPrev"'
+            + (RV_PAGE <= 1 ? ' disabled' : '') + '>← 이전</button> '
+            + '<button class="btn btn-phoenix-secondary btn-sm" id="rvNext"'
+            + (RV_PAGE >= d.pages ? ' disabled' : '') + '>다음 →</button></div>';
+          var pv = document.getElementById("rvPrev"), nx = document.getElementById("rvNext");
+          if(pv) pv.onclick = function(){ if(RV_PAGE > 1){ RV_PAGE--; rvLoad(); } };
+          if(nx) nx.onclick = function(){ if(RV_PAGE < d.pages){ RV_PAGE++; rvLoad(); } };
+        }
+        function rvLoad(){
+          fetch("/api/admin/reviews?page=" + RV_PAGE + "&size=100")
+            .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+            .then(d=>{
+              LIVE = true; QUEUE = d.items.map(fromApi);
+              const b = document.getElementById("dataSrc");
+              b.textContent = "실데이터 · Cloud SQL";
+              b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              applyDeepLink();
+              renderAll();
+              rvBanner(d);
+              if(window.feather) feather.replace();
+            })
+            .catch(()=>{});
+        }
+        rvLoad();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

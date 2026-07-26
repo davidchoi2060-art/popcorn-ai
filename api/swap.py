@@ -135,7 +135,6 @@ def candidates(body: SwapQuery):
         specs = _specs_by_code(conn, [it["product_code"] for it in parts])
         chosen = _chosen_from_parts(parts, specs)
         pool, by_slot, pool_codes = _pool_ctx(conn)
-        rules = load_compat_rules(conn)
         rules = load_compat_rules(conn)   # 엔진과 같은 규칙 원천(슬라이스 34)
 
     current = [{"slot": it["part_type"], "product_code": it["product_code"],

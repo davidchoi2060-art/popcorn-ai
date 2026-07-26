@@ -368,21 +368,67 @@
             </tr>`;
           }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
         }
-        document.getElementById("q").addEventListener("input",e=>{q=e.target.value.trim().toLowerCase();render();});
-        document.getElementById("fcat").addEventListener("change",e=>{fcat=e.target.value;render();});
-        document.getElementById("fmfr").addEventListener("change",e=>{fmfr=e.target.value;render();});
         // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패(file://·정적 호스팅) 시 더미 유지
         fillSelects();renderKpis(null);render();if(window.feather)feather.replace();
         const srcBadge=document.getElementById("dataSrc");
-        fetch("/api/admin/products")
-          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
-          .then(d=>{
-            DATA=d.items.map(fromApi);
-            srcBadge.textContent="실데이터 · Cloud SQL";
-            srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
-            fillSelects();renderKpis(d.kpis);render();
-          })
-          .catch(()=>{srcBadge.textContent="더미 데이터";});
+
+        // ---- LIVE (슬라이스 39): 실데이터 24,303행 규모 — **서버 페이지네이션**.
+        // 검색·분류 필터도 서버로 보낸다(브라우저에서 전 행을 필터할 수 없다).
+        var LIVE=false, PAGE=1, SIZE=100, TOTAL=0, PAGES=1;
+        function bar(){
+          var el=document.getElementById("pgBar");
+          if(!el){
+            el=document.createElement("div");el.id="pgBar";
+            el.className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3";
+            var host=document.querySelector(".table-responsive");
+            if(host&&host.parentNode) host.parentNode.appendChild(el);
+          }
+          el.innerHTML='<div class="fs-9 text-body-tertiary">전체 <b class="text-body-secondary">'
+            + TOTAL.toLocaleString() + '</b>건 · ' + PAGE + ' / ' + PAGES + ' 페이지'
+            + ' <span class="ms-2">(한 페이지 ' + SIZE + '건 — 서버에서 나눠 보냅니다)</span></div>'
+            + '<div class="btn-group btn-group-sm">'
+            + '<button class="btn btn-phoenix-secondary" id="pgPrev"' + (PAGE<=1?" disabled":"") + '>← 이전</button>'
+            + '<button class="btn btn-phoenix-secondary" id="pgNext"' + (PAGE>=PAGES?" disabled":"") + '>다음 →</button></div>';
+          var pv=document.getElementById("pgPrev"), nx=document.getElementById("pgNext");
+          if(pv) pv.onclick=function(){ if(PAGE>1){PAGE--;load();} };
+          if(nx) nx.onclick=function(){ if(PAGE<PAGES){PAGE++;load();} };
+        }
+        function load(){
+          var url="/api/admin/products?page="+PAGE+"&size="+SIZE
+            + "&q=" + encodeURIComponent(q||"")
+            + "&part_type=" + encodeURIComponent(fcat==="all"?"":catToPartType(fcat));
+          fetch(url)
+            .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+            .then(d=>{
+              LIVE=true; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size;
+              DATA=d.items.map(fromApi);
+              srcBadge.textContent="실데이터 · Cloud SQL";
+              srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              renderKpis(d.kpis);
+              render();       // 서버가 이미 필터했으므로 클라이언트 필터는 통과만 한다
+              bar();
+              if(window.feather)feather.replace();
+            })
+            .catch(()=>{ if(!LIVE) srcBadge.textContent="더미 데이터"; });
+        }
+        // 화면 분류 라벨 → part_type (서버 필터용). 라벨이 겹치는 CPU쿨러는 서버에서 미지원 → 빈값.
+        function catToPartType(label){
+          var m={"CPU":"CPU","메인보드":"MB","메모리":"RAM","그래픽카드":"GPU","SSD":"SSD",
+                 "HDD":"HDD","파워":"POWER","케이스":"CASE","모니터":"MONITOR","키보드":"KEYBOARD",
+                 "마우스":"MOUSE","헤드셋":"HEADSET","스피커":"SPEAKER","웹캠":"WEBCAM","미분류":"ETC"};
+          return m[label]||"";
+        }
+        var typing=null;
+        document.getElementById("q").addEventListener("input",e=>{
+          q=e.target.value.trim().toLowerCase();
+          if(LIVE){ clearTimeout(typing); typing=setTimeout(function(){PAGE=1;load();},300); }
+          else render();
+        });
+        document.getElementById("fcat").addEventListener("change",e=>{
+          fcat=e.target.value; if(LIVE){PAGE=1;load();} else render();
+        });
+        document.getElementById("fmfr").addEventListener("change",e=>{fmfr=e.target.value;render();});
+        load();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

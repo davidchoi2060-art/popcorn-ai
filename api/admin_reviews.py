@@ -53,7 +53,14 @@ def _crit(part_type: str, target_field: str | None, review_type: str, specs: dic
 
 
 @router.get("/reviews")
-def list_reviews():
+def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: str = ""):
+    """검수 큐 — 실데이터 적재 후 대기 건수가 수천이 되므로 서버 페이지네이션이 필수다(슬라이스 39).
+
+    단가표發 편입 대기(sourcing_hold)는 **파생 목록**이라 페이지네이션 밖이다 —
+    항목 수가 공급처 최신 파일 규모(수백)로 제한되므로 1페이지에만 덧붙인다.
+    """
+    size = max(1, min(size, 500))
+    page = max(1, page)
     q = text("""
         SELECT r.review_id, r.product_code, r.review_type, r.field_name, r.detail,
                r.origin_value, r.suggested_value, r.confidence, r.created_at,
@@ -62,10 +69,28 @@ def list_reviews():
         JOIN products p USING (product_code)          -- product_code NULL(csv_error류)은 자연 제외
         LEFT JOIN product_specs ps USING (product_code)
         WHERE r.review_status = '대기'
-        ORDER BY r.created_at
+          AND (:part_type = '' OR p.part_type = :part_type)
+          AND (:origin = '' OR p.data_origin = :origin)
+        ORDER BY r.created_at, r.review_id
+        LIMIT :size OFFSET :offset
     """)
+    qc = text("""
+        SELECT count(*) FROM product_reviews r JOIN products p USING (product_code)
+         WHERE r.review_status = '대기'
+           AND (:part_type = '' OR p.part_type = :part_type)
+           AND (:origin = '' OR p.data_origin = :origin)
+    """)
+    qg = text("""
+        SELECT p.part_type, count(*) n FROM product_reviews r JOIN products p USING (product_code)
+         WHERE r.review_status = '대기' GROUP BY 1 ORDER BY 2 DESC
+    """)
+    p = {"part_type": part_type.strip(), "origin": origin.strip(),
+         "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
-        rows = conn.execute(q).mappings().all()
+        rows = conn.execute(q, p).mappings().all()
+        total = conn.execute(qc, p).scalar_one()
+        by_type = [{"part_type": r[0], "label": PART_TYPE_LABELS.get(r[0], r[0]), "n": r[1]}
+                   for r in conn.execute(qg).all()]
     items = [{
         "review_id": r["review_id"],
         "sku": r["sku"],
@@ -82,8 +107,12 @@ def list_reviews():
         "risk": _risk(r["review_type"], r["field_name"]),
         "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
     } for r in rows]
-    items.extend(_sourcing_items())
-    return {"items": items}
+    if page == 1 and not part_type:
+        items.extend(_sourcing_items())
+    return {"items": items, "page": page, "size": size, "total": total,
+            "pages": (total + size - 1) // size, "by_type": by_type,
+            "note": ("검수 대기는 서버에서 나눠 보냅니다 — by_type은 전체 집계입니다."
+                     " 단가표發 편입 대기는 파생 목록이라 1페이지에만 붙습니다.")}
 
 
 # ---- 슬라이스 16: 단가표 신규(sourcing_hold) — 저장 없는 파생 큐 ----
@@ -105,8 +134,11 @@ def _sourcing_items():
         LEFT JOIN supplier_product_map m
                ON m.supplier_id = f.supplier_id AND m.model_key = r.model_name
         LEFT JOIN LATERAL (
+          -- similarity(a,b) > th 형태는 trgm GIN 인덱스를 타지 못한다
+          -- (24,303행 × 단가표 308행 = 이 화면 1페이지가 247초 걸렸다 — 슬라이스 39 실측).
+          -- trgm 유사도 연산자는 인덱스를 쓴다. 임계값은 위 set_limit()으로 명시한다.
           SELECT p.sku, p.product_name, similarity(r.model_name, p.product_name) AS sim
-          FROM products p WHERE similarity(r.model_name, p.product_name) > :th
+          FROM products p WHERE p.product_name % r.model_name
           ORDER BY sim DESC LIMIT 1
         ) c ON true
         WHERE m.map_id IS NULL
@@ -115,6 +147,9 @@ def _sourcing_items():
         ORDER BY f.supplier_id, r.row_id
     """)
     with engine.connect() as conn:
+        # 유사도 임계값을 세션에 고정 — `%` 연산자가 이 값을 쓴다(코드와 DB 판정을 일치시킨다).
+        # SET 문은 파라미터를 받지 않으므로 pg_trgm의 set_limit() 함수를 쓴다.
+        conn.execute(text("SELECT set_limit(:th)"), {"th": SIM_THRESHOLD})
         rows = conn.execute(q, {"th": SIM_THRESHOLD}).mappings().all()
     return [{
         "review_id": None, "sku": None, "type": "sourcing_hold",
