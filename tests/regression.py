@@ -1,0 +1,285 @@
+# -*- coding: utf-8 -*-
+"""팝콘PC AI 통합 회귀 세트 — 슬라이스 1~35의 기검증 수치를 실행 가능하게 묶는다.
+
+실행: .venv/Scripts/python tests/regression.py        (API 서버가 8000에 떠 있어야 함)
+      .venv/Scripts/python tests/regression.py --quiet  (실패만 출력)
+
+**두 종류를 구분한다 — 이 구분이 회귀 세트의 수명을 결정한다.**
+  ① 고정 기대값(FIXED): 현재 dev 재고 스냅샷에서만 성립하는 수치(945,000 등).
+     재고·가격을 의도적으로 바꾸면 여기도 함께 갱신한다. 갱신할 때는 decision-log에
+     "왜 바뀌었는지"를 남긴다 — 값만 고치면 회귀 세트가 거짓 안심이 된다.
+  ② 불변식(INVARIANT): 데이터가 어떻게 누적돼도 성립해야 하는 관계(정합·원장 짝·배타 버킷).
+     이게 깨지면 데이터가 아니라 **코드가 잘못된 것**이다.
+
+의존성 없음(stdlib만) — 프로젝트에 테스트 프레임워크를 도입하지 않는다는 선택이다.
+목업=스펙 단계에서는 "브라우저 손검증 + 이 스크립트"가 검증 수단이다.
+"""
+import io
+import json
+import sys
+import urllib.error
+import urllib.request
+
+# Windows 콘솔(cp949)에서도 한글·기호가 깨지지 않게 stdout을 UTF-8로 고정한다.
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
+BASE = "http://localhost:8000"
+QUIET = "--quiet" in sys.argv
+
+# ① 고정 기대값 — 현재 재고 스냅샷 기준(슬라이스 34~35 시점)
+FIXED = {
+    "pool_size": 20,                    # S1 후보 카운터 = 추천 뷰 ∧ 재고>0
+    "value_total": 945_000,             # 가성비(전 예산 공통 — 최저가 조합)
+    "recommend_100": 993_000,
+    "recommend_150": 1_367_000,
+    "recommend_open": 1_149_000,        # "200만원 이상" = 캡 미적용·중간 순위
+    "highend_total": 1_738_000,
+    "compat_checks": 7,                 # compat_rules 활성 규칙 수(슬라이스 34)
+}
+
+results = []
+
+
+def check(name, ok, expect=None, got=None, kind="INVARIANT"):
+    results.append({"name": name, "ok": bool(ok), "expect": expect, "got": got, "kind": kind})
+    if not QUIET or not ok:
+        mark = "PASS" if ok else "FAIL"
+        line = f"  [{mark}] ({kind[0]}) {name}"
+        if not ok:
+            line += f"\n         기대: {expect}\n         실제: {got}"
+        print(line)
+
+
+def get(path):
+    with urllib.request.urlopen(BASE + path) as r:
+        return json.load(r)
+
+
+def post(path, body=None):
+    req = urllib.request.Request(
+        BASE + path, data=json.dumps(body or {}).encode(), method="POST",
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read().decode())
+        except Exception:
+            return e.code, None
+
+
+def rec(budget):
+    _, d = post("/api/recommend", {"mode": "guided",
+                                   "constraints": [{"l": "용도", "v": "게임"},
+                                                   {"l": "예산", "v": budget}]})
+    return (d or {}).get("sets", d or {})
+
+
+# ─────────────────────────────── 1. 결정론 엔진 ───────────────────────────────
+def test_engine():
+    print("\n[1] 결정론 엔진 (슬라이스 4·5·8·34)")
+    _, c = post("/api/candidates/count", {"constraints": []})
+    check("S1 후보 카운터", c["total"] == FIXED["pool_size"],
+          FIXED["pool_size"], c["total"], "FIXED")
+
+    s100 = rec("100만원")
+    check("가성비 총액", s100["value"]["total"] == FIXED["value_total"],
+          FIXED["value_total"], s100["value"]["total"], "FIXED")
+    check("추천 총액(100만)", s100["recommend"]["total"] == FIXED["recommend_100"],
+          FIXED["recommend_100"], s100["recommend"]["total"], "FIXED")
+    check("고성능 총액", s100["highend"]["total"] == FIXED["highend_total"],
+          FIXED["highend_total"], s100["highend"]["total"], "FIXED")
+
+    s150 = rec("150만원")
+    check("추천 총액(150만)", s150["recommend"]["total"] == FIXED["recommend_150"],
+          FIXED["recommend_150"], s150["recommend"]["total"], "FIXED")
+
+    sopen = rec("200만원 이상")
+    check("추천 총액(캡 없음)", sopen["recommend"]["total"] == FIXED["recommend_open"],
+          FIXED["recommend_open"], sopen["recommend"]["total"], "FIXED")
+
+    s70 = rec("70만원")
+    check("70만원 견적 불성립(전 티어 null)",
+          s70.get("value") is None and s70.get("recommend") is None,
+          "value·recommend 모두 null", {k: bool(s70.get(k)) for k in ("value", "recommend")})
+
+    # 재현성 — 같은 입력 3회 = 같은 결과
+    totals = {rec("100만원")["value"]["total"] for _ in range(3)}
+    check("재현성(A-02): 3회 호출 동일", len(totals) == 1, "1개 값", totals)
+
+    # 예산 준수 / 초과 정직 표기
+    check("가성비는 예산 안", s100["value"]["budget"]["verdict"] == "within",
+          "within", s100["value"]["budget"]["verdict"])
+    check("고성능 초과는 'over'로 정직 표기", s100["highend"]["budget"]["verdict"] == "over",
+          "over", s100["highend"]["budget"]["verdict"])
+
+
+# ───────────────────────── 2. 호환 규칙 (DB 단일 원천) ─────────────────────────
+def test_compat():
+    print("\n[2] 호환 규칙 — compat_rules 단일 원천 (슬라이스 34)")
+    rules = get("/api/admin/engine-rules")["compat"]["checks"]
+    active = [r for r in rules if r.get("active", True)]
+    check("활성 규칙 수", len(active) == FIXED["compat_checks"],
+          FIXED["compat_checks"], len(active), "FIXED")
+
+    compat = rec("100만원")["value"]["compat"]
+    check("견적 호환 항목 = 규칙 수(1:1)", len(compat["checks"]) == len(active),
+          len(active), len(compat["checks"]))
+    check("호환 검사 전부 통과", all(c["pass"] for c in compat["checks"]),
+          "전 항목 pass", [c["key"] for c in compat["checks"] if not c["pass"]])
+    check("전원 여유율 100% 이상", (compat["power_headroom_pct"] or 0) >= 100,
+          ">= 100", compat["power_headroom_pct"])
+
+
+# ──────────────────────── 3. 4중 게이트 (추천 풀 진입) ────────────────────────
+def test_gates():
+    print("\n[3] 4중 게이트 — 사양·검수·가격·재고 (슬라이스 23·24·25)")
+    pool = get("/api/admin/candidate-pool")
+    check("ok 합계 = S1 카운터(같은 집합)", pool["ok_total"] == pool["pool_total"],
+          pool["pool_total"], pool["ok_total"])
+    total_buckets = sum(
+        c["ok"] + c["need_review"] + c["not_candidate"] + c["no_price"] + c["oos"] + c["no_specs"]
+        for c in pool["categories"])
+    check("카테고리 배타 버킷 합 = 카테고리 총계", total_buckets == pool["core_total"],
+          pool["core_total"], total_buckets)
+    check("ok + 제외 사유 합 = 핵심 부품 수",
+          pool["ok_total"] + pool["reason_total"] == pool["core_total"],
+          pool["core_total"], pool["ok_total"] + pool["reason_total"])
+    check("사양 미등록 0건(슬라이스 24에서 해소)",
+          next(r["count"] for r in pool["reasons"] if r["key"] == "no_specs") == 0,
+          0, next(r["count"] for r in pool["reasons"] if r["key"] == "no_specs"))
+
+
+# ───────────────────── 4. 화면 간 정합 (대시보드 = 각 화면) ─────────────────────
+def test_consistency():
+    print("\n[4] 화면 간 정합 — 대시보드는 각 화면과 같은 기준 (슬라이스 28·33·35)")
+    dash = get("/api/admin/dashboard")["pending"]
+    reviews = [i for i in get("/api/admin/reviews")["items"] if i["type"] != "sourcing_hold"]
+    check("검수 대기", dash["review"] == len(reviews), len(reviews), dash["review"])
+    check("가격 검토", dash["price"] == len(get("/api/admin/price-review")["items"]),
+          len(get("/api/admin/price-review")["items"]), dash["price"])
+    stock = get("/api/admin/stock-inbound")["items"]
+    check("입고 대기", dash["inbound"] == len(stock), len(stock), dash["inbound"])
+    sourcing = get("/api/admin/sourcing")["items"]
+    check("매입 대기 = 입고 대기(같은 파생 조건)", len(sourcing) == len(stock),
+          len(stock), len(sourcing))
+    active_rf = [r for r in get("/api/admin/refunds")["items"]
+                 if r["status"] in ("접수", "검토", "수거·처리")]
+    check("활성 환불", dash["refund"] == len(active_rf), len(active_rf), dash["refund"])
+    flow = get("/api/admin/dashboard")["flow"]
+    check("추천 풀", flow["pool_ok"] == get("/api/admin/candidate-pool")["ok_total"],
+          get("/api/admin/candidate-pool")["ok_total"], flow["pool_ok"])
+    check("오늘 상담", flow["sessions_today"] == get("/api/admin/sessions")["today"],
+          get("/api/admin/sessions")["today"], flow["sessions_today"])
+
+
+# ────────────────────────── 5. 원장 불변식 (커머스) ──────────────────────────
+def test_ledgers():
+    print("\n[5] 원장 불변식 — 정산·재고·가격 (슬라이스 13·23·27)")
+    pay = get("/api/admin/payments")
+    for s in pay["settles"]:
+        if s["state"] == "마감":
+            check(f"정산 {s['date']}: 순액 = 총액 − 수수료",
+                  s["net"] == s["gross"] - s["fee"],
+                  s["gross"] - s["fee"], s["net"])
+    closed = [s for s in pay["settles"] if s["state"] == "마감"]
+    check("마감 정산 존재(잔류 데이터 확인)", len(closed) >= 1, ">= 1건", len(closed))
+
+    hist = get("/api/admin/price-history")
+    undone = [h for h in hist["items"] if "되돌림" in h["reason_label"]]
+    check("가격 되돌림은 삭제가 아니라 역방향 행", len(undone) >= 1, ">= 1건", len(undone))
+    for h in hist["items"]:
+        if h["field"] == "purchase" and h["old"] is not None:
+            check("매입가 이력에 old/new 모두 기록", h["new"] is not None,
+                  "new 존재", h)
+            break
+
+    logs = get("/api/admin/activity-logs")
+    undo_rows = [i for i in logs["items"] if i["is_undo"]]
+    undone_rows = [i for i in logs["items"] if i["undone"]]
+    check("되돌림 행 수 = 되돌려진 원본 수(1:1)", len(undo_rows) == len(undone_rows),
+          len(undo_rows), len(undone_rows))
+
+
+# ──────────────────── 6. 고객 축 계약 (구매 인증·회원 경계) ────────────────────
+def test_customer():
+    print("\n[6] 고객 축 계약 — 회원 경계·구매 인증 (슬라이스 10·12·30)")
+    mine = get("/api/my/orders?email=mj.kim@example.com")["items"]
+    other = get("/api/my/orders?email=sy.lee@example.com")["items"]
+    mine_nos = {o["no"] for o in mine}
+    check("회원 경계: 타인 주문 미포함",
+          not (mine_nos & {o["no"] for o in other}), "교집합 없음",
+          mine_nos & {o["no"] for o in other})
+    check("미가입 이메일 → 빈 목록",
+          get("/api/my/orders?email=nobody@nowhere.test")["items"] == [], [], "비어야 함")
+
+    pays = get("/api/my/payments?email=mj.kim@example.com")["items"]
+    check("결제 원장은 전 행(승인·환불 각 한 줄)",
+          any(p["status"] == "환불" for p in pays) and any(p["status"] == "승인" for p in pays),
+          "승인·환불 모두 존재", {p["status"] for p in pays})
+    check("고객 응답에 pg_ref 미포함(미노출 계약)",
+          all("pg_ref" not in p for p in pays), "pg_ref 키 없음",
+          [k for p in pays for k in p if k == "pg_ref"])
+
+    acct = get("/api/my/account?email=mj.kim@example.com")
+    check("후기는 구매 인증(완료 주문) 라인만",
+          all(r["order_no"] for r in acct["reviewable"]), "전 항목 주문 연결", acct["reviewable"])
+
+
+# ────────────────────────── 7. 가드 (권한·상태 전이) ──────────────────────────
+def test_guards():
+    print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
+    st, _ = post("/api/my/reviews", {"email": "mj.kim@example.com", "item_id": 999999,
+                                     "rating": 5, "body": "존재하지 않는 라인 테스트입니다"})
+    check("없는 주문 라인 후기 → 404", st == 404, 404, st)
+    st, _ = post("/api/my/reviews", {"email": "mj.kim@example.com", "item_id": 12,
+                                     "rating": 5, "body": "타인 주문 라인 테스트입니다"})
+    check("타인 주문 라인 후기 → 403", st == 403, 403, st)
+    st, _ = post("/api/admin/stock-inbound/20489103", {"qty": 0, "why": "inbound"})
+    check("입고 수량 0 → 400", st == 400, 400, st)
+    st, _ = post("/api/admin/sourcing/request", {"product_code": 20489103, "supplier_ids": []})
+    check("공급처 미선택 견적 요청 → 400", st == 400, 400, st)
+    st, _ = post("/api/my/account/map", {"email": "sy.lee@example.com", "agree": True})
+    check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
+
+
+def main():
+    print("=" * 74)
+    print("팝콘PC AI 통합 회귀 세트 — (F)=고정 기대값 / (I)=불변식")
+    print("=" * 74)
+    try:
+        get("/api/health")
+    except Exception as e:
+        print(f"\n서버에 연결할 수 없습니다({BASE}). API를 먼저 띄우세요.\n  {e}")
+        return 2
+
+    for fn in (test_engine, test_compat, test_gates, test_consistency,
+               test_ledgers, test_customer, test_guards):
+        try:
+            fn()
+        except Exception as e:
+            check(f"{fn.__name__} 실행 중 예외", False, "정상 실행", repr(e))
+
+    fails = [r for r in results if not r["ok"]]
+    fixed_fails = [r for r in fails if r["kind"] == "FIXED"]
+    print("\n" + "=" * 74)
+    print(f"합계 {len(results)}건 · 통과 {len(results) - len(fails)}건 · 실패 {len(fails)}건")
+    if fails:
+        print("\n실패 목록:")
+        for r in fails:
+            print(f"  - ({r['kind']}) {r['name']}: 기대 {r['expect']} / 실제 {r['got']}")
+        if fixed_fails:
+            print("\n※ 고정 기대값(FIXED) 실패는 재고·가격이 의도적으로 바뀐 것일 수 있습니다.")
+            print("  의도된 변경이면 FIXED 값을 갱신하고 decision-log에 사유를 남기세요.")
+        if len(fails) > len(fixed_fails):
+            print("\n※ 불변식(INVARIANT) 실패는 데이터가 아니라 코드 문제입니다 — 먼저 고치세요.")
+    else:
+        print("전 항목 통과 — 엔진·게이트·정합·원장·고객 계약·가드 정상")
+    print("=" * 74)
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
