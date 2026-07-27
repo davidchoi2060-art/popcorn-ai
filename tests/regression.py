@@ -4,18 +4,27 @@
 실행: .venv/Scripts/python tests/regression.py        (API 서버가 8000에 떠 있어야 함)
       .venv/Scripts/python tests/regression.py --quiet  (실패만 출력)
 
-**두 종류를 구분한다 — 이 구분이 회귀 세트의 수명을 결정한다.**
-  ① 고정 기대값(FIXED): 현재 dev 재고 스냅샷에서만 성립하는 수치(945,000 등).
-     재고·가격을 의도적으로 바꾸면 여기도 함께 갱신한다. 갱신할 때는 decision-log에
-     "왜 바뀌었는지"를 남긴다 — 값만 고치면 회귀 세트가 거짓 안심이 된다.
-  ② 불변식(INVARIANT): 데이터가 어떻게 누적돼도 성립해야 하는 관계(정합·원장 짝·배타 버킷).
-     이게 깨지면 데이터가 아니라 **코드가 잘못된 것**이다.
+**전량 불변식(INVARIANT)이다 — 고정 기대값(FIXED)은 폐지했다 (A-13, 2026-07-27).**
+  왜: 베타 운영 중 실주문 1건이 부품 8개 재고를 줄이자 고정값 5개가 동시에 깨졌다.
+  그때마다 손으로 숫자를 맞추면 회귀는 '거짓 안심'이 된다 — 코드가 틀려도 값만 고치게 된다.
 
-의존성 없음(stdlib만) — 프로젝트에 테스트 프레임워크를 도입하지 않는다는 선택이다.
+  대신 원칙은 하나다: **같은 사실을 두 경로로 구해 일치를 본다.**
+    · API가 말하는 수 ↔ DB가 세는 수 (원천 대조)
+    · 응답 내부의 정합 (부품 가격 합 = 총액, 규칙 수 = 판정 수)
+    · 데이터가 어떻게 누적돼도 성립해야 하는 관계 (티어 서열·예산 준수·원장 짝)
+  이게 깨지면 데이터가 아니라 **코드가 잘못된 것**이다.
+
+  절대값이 사라지며 잃는 것: "가중치를 잘못 바꿔 추천 총액이 조용히 달라지는" 변화는
+  관계식만으로 못 잡는다. 그래서 주요 수치를 스냅샷에 적어두고 **바뀌면 알린다**
+  (drift 참조). 알림은 실패로 세지 않는다 — 재고가 움직이면 값도 움직이는 게 정상이다.
+
+DB 대조는 프로젝트 .venv의 SQLAlchemy를 쓴다(DATABASE_URL, 로컬 전용). DB에 닿지 못하면
+해당 검사만 건너뛰고 그 사실을 알린다 — 조용히 통과시키지 않는다.
 목업=스펙 단계에서는 "브라우저 손검증 + 이 스크립트"가 검증 수단이다.
 """
 import io
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -26,22 +35,8 @@ if hasattr(sys.stdout, "buffer"):
 
 BASE = "http://localhost:8000"
 QUIET = "--quiet" in sys.argv
-
-# ① 고정 기대값 — 현재 재고 스냅샷 기준(슬라이스 34~35 시점)
-# 슬라이스 39(2026-07-26) 전량 갱신 — 실파일 24,303행 적재로 후보 풀이 20 → 3,046이 됐다.
-# 이전 값(945,000·993,000·1,367,000·1,149,000·1,738,000·S1 20)은 시드 30종 시절 스냅샷이다.
-FIXED = {
-    "pool_size": 3_087,                 # S1 후보 카운터 = 추천 뷰 ∧ 재고>0
-    "value_total": 289_700,             # 가성비(전 예산 공통 — 최저가 조합)
-    "recommend_70": 699_900,            # 시드 시절엔 70만원 견적 자체가 불성립이었다
-    "recommend_100": 1_000_000,         # 슬라이스 40에서 해소(노드 상한 상향)
-    "recommend_150": 1_500_000,
-    "recommend_open": 2_144_900,        # "200만원 이상" = 캡 미적용·중간 순위
-    "highend_total": 30_250_600,        # 서버용 RAM(512GB ECC 2,779만원)이 실제로 카탈로그에 있다
-    "compat_checks": 8,                 # 활성 규칙 수 — 슬라이스 43에서 8번째 추가
-                                        # (CASE.form_factor_list contains MB.form_factor)
-    "review_pending": 6_490,            # 슬라이스 42 재파싱 회수 후(적재 직후 7,415)
-}
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SNAP_PATH = os.path.join(ROOT, "tests", ".regression-snapshot.json")
 
 # 슬라이스 39의 '알려진 한계'는 슬라이스 40에서 해소됐다: 예산 100만원 추천이 안 나온 원인은
 # 탐색 전략이 아니라 **노드 상한값**이었다(100,000 → 682,419노드면 답이 있다. 탐색은 싸다 —
@@ -49,6 +44,48 @@ FIXED = {
 # 이 이력을 남겨두는 이유: 같은 증상(견적 '불가')을 다시 만나면 데이터가 아니라 상한을 먼저 본다.
 
 results = []
+
+# ── DB 원천 대조 (A-13) ────────────────────────────────────────────────────────
+# API가 말하는 수를 DB가 세는 수와 맞춘다. 절대값을 박는 대신 원천에 물어보는 것이
+# 재고가 움직여도 성립하는 유일한 방법이다.
+_engine = None
+_db_why = ""
+try:
+    from dotenv import load_dotenv
+    from sqlalchemy import create_engine, text
+    load_dotenv(os.path.join(ROOT, ".env"))
+    _engine = create_engine(os.environ["DATABASE_URL"])
+    with _engine.connect() as _c:
+        _c.execute(text("SELECT 1"))
+except Exception as _e:                                  # noqa: BLE001
+    _engine, _db_why = None, f"{type(_e).__name__}: {_e}"
+
+
+def db_one(sql, **p):
+    """DB에서 직접 센 값. DB에 닿지 못하면 None(호출부가 건너뛰고 사유를 알린다)."""
+    if _engine is None:
+        return None
+    with _engine.connect() as c:
+        return c.execute(text(sql), p).scalar()
+
+
+# ── 값 변화 알림 (실패 아님) ───────────────────────────────────────────────────
+# 관계식만으로는 "가중치를 잘못 건드려 추천 총액이 조용히 달라지는" 변화를 못 잡는다.
+# 그래서 주요 수치를 적어두고 바뀌면 보고한다. 재고가 움직이면 값도 움직이는 게 정상이므로
+# **실패로 세지 않는다** — 사람이 보고 "이건 내가 바꾼 게 아닌데?"를 판단하라는 신호다.
+_snap_old, _snap_new, _drifts = {}, {}, []
+try:
+    with io.open(SNAP_PATH, encoding="utf-8") as _f:
+        _snap_old = json.load(_f)
+except Exception:                                        # noqa: BLE001
+    _snap_old = {}
+
+
+def drift(key, value):
+    _snap_new[key] = value
+    if key in _snap_old and _snap_old[key] != value:
+        _drifts.append((key, _snap_old[key], value))
+    return value
 
 
 def check(name, ok, expect=None, got=None, kind="INVARIANT"):
@@ -140,30 +177,57 @@ def rec(budget):
 def test_engine():
     print("\n[1] 결정론 엔진 (슬라이스 4·5·8·34)")
     _, c = post("/api/candidates/count", {"constraints": []})
-    check("S1 후보 카운터", c["total"] == FIXED["pool_size"],
-          FIXED["pool_size"], c["total"], "FIXED")
+    drift("pool_size", c["total"])
+    # 후보 풀은 절대값이 아니라 **DB가 세는 수와 같은지**로 본다(A-13).
+    pool_db = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty > 0")
+    if pool_db is None:
+        print("  [SKIP] (I) S1 후보 카운터 = DB 실측 — DB 미연결: " + _db_why)
+    else:
+        check("S1 후보 카운터 = DB 실측(추천 뷰 ∧ 재고>0)", c["total"] == pool_db,
+              pool_db, c["total"])
+    check("제약 없으면 total == count", c["total"] == c["count"], c["total"], c["count"])
+    check("후보 풀이 비어 있지 않다", c["total"] > 0, "> 0", c["total"])
 
-    s100 = rec("100만원")
-    check("가성비 총액", s100["value"]["total"] == FIXED["value_total"],
-          FIXED["value_total"], s100["value"]["total"], "FIXED")
-    check("추천 총액(100만)",
-          (s100.get("recommend") or {}).get("total") == FIXED["recommend_100"],
-          FIXED["recommend_100"], (s100.get("recommend") or {}).get("total"), "FIXED")
-    check("고성능 총액", s100["highend"]["total"] == FIXED["highend_total"],
-          FIXED["highend_total"], s100["highend"]["total"], "FIXED")
-
-    s150 = rec("150만원")
-    check("추천 총액(150만)", s150["recommend"]["total"] == FIXED["recommend_150"],
-          FIXED["recommend_150"], s150["recommend"]["total"], "FIXED")
-
+    s100, s150, s70 = rec("100만원"), rec("150만원"), rec("70만원")
     sopen = rec("200만원 이상")
-    check("추천 총액(캡 없음)", sopen["recommend"]["total"] == FIXED["recommend_open"],
-          FIXED["recommend_open"], sopen["recommend"]["total"], "FIXED")
+    for lab, s in (("70만", s70), ("100만", s100), ("150만", s150), ("캡없음", sopen)):
+        for tier in ("value", "recommend", "highend"):
+            st = s.get(tier)
+            if not st:
+                continue
+            drift(f"{tier}_{lab}", st["total"])
+            # ★ 구성 내부 정합 — 부품 가격의 합이 곧 총액이다. 가장 강한 관계식이다.
+            check(f"[{lab}·{tier}] 부품 가격 합 = 총액",
+                  sum(i["price"] for i in st["items"]) == st["total"],
+                  sum(i["price"] for i in st["items"]), st["total"])
+            check(f"[{lab}·{tier}] 슬롯 8개 구성", len(st["items"]) == 8, 8, len(st["items"]))
 
-    # 시드 30종 시절에는 70만원이 견적 불성립이었다 — 실카탈로그에서는 성립한다(의도된 변경)
-    s70 = rec("70만원")
-    check("추천 총액(70만)", (s70.get("recommend") or {}).get("total") == FIXED["recommend_70"],
-          FIXED["recommend_70"], (s70.get("recommend") or {}).get("total"), "FIXED")
+    # 티어 서열 — 가성비 <= 추천 <= 고성능. 재고가 어떻게 바뀌어도 성립해야 한다.
+    for lab, s in (("70만", s70), ("100만", s100), ("150만", s150), ("캡없음", sopen)):
+        v, r, h = (s.get("value") or {}).get("total"), \
+                  (s.get("recommend") or {}).get("total"), \
+                  (s.get("highend") or {}).get("total")
+        if v and r:
+            check(f"[{lab}] 가성비 <= 추천", v <= r, f"{v} <= {r}", f"{v} vs {r}")
+        if r and h:
+            check(f"[{lab}] 추천 <= 고성능", r <= h, f"{r} <= {h}", f"{r} vs {h}")
+
+    # 가성비는 '예산과 무관한 최저가 조합'이다 — 예산이 달라도 같은 값이어야 한다.
+    vals = {s["value"]["total"] for s in (s70, s100, s150, sopen) if s.get("value")}
+    check("가성비는 전 예산 공통(최저가 조합)", len(vals) == 1, "1개 값", vals)
+
+    # 추천은 예산을 채운다 — 상한 이내이면서 상한의 90% 이상. (캡 없음은 상한이 없어 제외)
+    for lab, s in (("70만", s70), ("100만", s100), ("150만", s150)):
+        r = s.get("recommend")
+        if not r:
+            continue
+        cap = r["budget"]["cap"]
+        check(f"[{lab}] 추천은 예산 이내", r["total"] <= cap, f"<= {cap}", r["total"])
+        check(f"[{lab}] 추천은 예산을 채운다(>=90%)", r["total"] >= cap * 0.9,
+              f">= {int(cap * 0.9)}", r["total"])
+    check("캡 없음 추천 >= 150만 추천",
+          sopen["recommend"]["total"] >= s150["recommend"]["total"],
+          f">= {s150['recommend']['total']}", sopen["recommend"]["total"])
 
     # 재현성 — 같은 입력 3회 = 같은 결과
     totals = {rec("100만원")["value"]["total"] for _ in range(3)}
@@ -174,6 +238,214 @@ def test_engine():
           "within", s100["value"]["budget"]["verdict"])
     check("고성능 초과는 'over'로 정직 표기", s100["highend"]["budget"]["verdict"] == "over",
           "over", s100["highend"]["budget"]["verdict"])
+    # verdict는 말이 아니라 수치와 맞아야 한다 — over면 over_by가 정확히 초과분이다.
+    hb = s100["highend"]["budget"]
+    check("over_by = 총액 - 상한", hb["over_by"] == s100["highend"]["total"] - hb["cap"],
+          s100["highend"]["total"] - hb["cap"], hb["over_by"])
+    vb = s100["value"]["budget"]
+    check("within이면 over_by = 0", vb["over_by"] == 0, 0, vb["over_by"])
+
+    # ── 화면 정직성(슬라이스 48): 후보 수가 0이 아니어도 슬롯이 비면 견적은 불성립이다.
+    # 화면은 이 판정을 서버에서만 받아야 한다 — 예전엔 후보 수>0이면 무조건
+    # "3구성을 만들 수 있어요"라고 말해 거짓이 됐다.
+    NARROW = [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "30만원대"},
+              {"l": "선호", "v": "저소음"}]
+    _, cn = post("/api/candidates/count", {"constraints": NARROW})
+    check("좁은 조건: 후보가 남아도 buildable=false",
+          cn["count"] > 0 and cn["buildable"] is False, "count>0 & buildable=false",
+          f'count={cn["count"]} buildable={cn["buildable"]}')
+    check("빈 슬롯을 이름으로 알린다",
+          bool(cn["empty_slots"]) and all(s.get("label") for s in cn["empty_slots"]),
+          "슬롯 라벨 1개 이상", cn["empty_slots"])
+    check("verdict가 불성립을 말한다", "만들 수 없" in cn["verdict"],
+          "불성립 문구", cn["verdict"])
+    _, rn = post("/api/recommend", {"mode": "guided", "constraints": NARROW})
+    check("buildable=false면 추천도 전 티어 불성립(카운터와 엔진이 같은 말을 한다)",
+          all(v is None for v in (rn.get("sets") or {}).values()), "전 티어 None",
+          {k: (v or {}).get("total") for k, v in (rn.get("sets") or {}).items()})
+    _, cw = post("/api/candidates/count", {"constraints": []})
+    check("제약 없음이면 buildable=true",
+          cw["buildable"] is True and not cw["empty_slots"], "true / 빈 슬롯 없음",
+          f'{cw["buildable"]} {cw["empty_slots"]}')
+    check("견적 슬롯 8개를 모두 센다", len(cw["slots"]) == 8, 8, len(cw["slots"]))
+    # 쿨러는 공랭·수냉이 한 슬롯 — part_type으로 세면 AIO 0을 빈 슬롯으로 오판한다
+    _, cs = post("/api/candidates/count",
+                 {"constraints": [{"l": "용도", "v": "게임"}, {"l": "선호", "v": "저소음"}]})
+    check("저소음: 쿨러는 공랭/수냉 합산으로 판정(AIO 0이어도 성립)",
+          cs["slots"]["COOLER"] > 0 and cs["buildable"] is True,
+          "COOLER>0 & buildable=true",
+          f'COOLER={cs["slots"]["COOLER"]} buildable={cs["buildable"]}')
+
+
+# ─────────────── 11. 카탈로그 업로드 적재 (슬라이스 50) ───────────────
+# 이 슬라이스에서 실제로 겪은 사고를 회귀로 고정한다:
+#   · EAV 없이 마스터만 올리면 기존 사양이 지워져 추천 후보가 무너졌다(후보 -1 · 검수 +169).
+#   · 드라이런 없이 적용하거나 다른 파일을 확정하는 경로가 열려 있으면 안 된다.
+CSV_HEAD = ("자체상품코드,상품명,카테고리1,카테고리2,카테고리3,상태값,매입가,일반회원,"
+            "시중가,공급처,스펙,제조사,모델명,다나와No")
+
+
+def _mp(fields: dict, files: dict) -> tuple[bytes, dict]:
+    """multipart/form-data 본문 — stdlib만 쓰는 이 스크립트의 원칙을 유지한다."""
+    b = "----pcregress" + str(abs(hash(repr(fields) + repr(list(files)))))
+    out = []
+    for k, v in fields.items():
+        out.append(f"--{b}\r\nContent-Disposition: form-data; "
+                   f'name="{k}"\r\n\r\n{v}\r\n'.encode())
+    for k, (fn, raw) in files.items():
+        out.append(f"--{b}\r\nContent-Disposition: form-data; "
+                   f'name="{k}"; filename="{fn}"\r\n'
+                   "Content-Type: text/csv\r\n\r\n".encode() + raw + b"\r\n")
+    out.append(f"--{b}--\r\n".encode())
+    return b"".join(out), {"Content-Type": "multipart/form-data; boundary=" + b}
+
+
+def post_raw(path, data, headers):
+    h = dict(headers)
+    if SESSION:
+        h["Cookie"] = "; ".join(SESSION.values())
+    req = urllib.request.Request(BASE + path, data=data, method="POST", headers=h)
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read().decode())
+        except Exception:                                # noqa: BLE001
+            return e.code, {}
+
+
+def test_upload():
+    print("\n[11] 카탈로그 업로드 적재 — 드라이런·가드·사양 보존 (슬라이스 50)")
+    # 컬럼이 어긋난 파일은 절반 넣지 않고 거부한다
+    st, _ = post_raw("/api/admin/catalog-import/dryrun",
+                     *_mp({"origin": "real"}, {"master": ("bad.csv", b"a,b\n1,2\n")}))
+    check("컬럼 불일치 파일은 400", st == 400, 400, st)
+    st, _ = post_raw("/api/admin/catalog-import/dryrun",
+                     *_mp({"origin": "mars"},
+                          {"master": ("x.csv", (CSV_HEAD + "\n").encode())}))
+    check("잘못된 origin은 400", st == 400, 400, st)
+    # EAV는 두 파일이 짝이다 — 하나만 올리면 조용히 무시하지 않고 거부한다
+    st, _ = post_raw("/api/admin/catalog-import/dryrun",
+                     *_mp({"origin": "real"},
+                          {"master": ("x.csv", (CSV_HEAD + "\n").encode()),
+                           "db_products": ("p.csv", b"product_id\n1\n")}))
+    check("EAV 한쪽만 올리면 400", st == 400, 400, st)
+
+    # ⚠ 회귀는 **적용하지 않는다.** 처음엔 apply까지 돌렸는데 매 실행이 정본 상품 하나를
+    # 테스트 값으로 덮었다(시드 P-1001이 ETC·매입가 1000원으로 강등됐고 손으로 복구했다).
+    # 검증 수단이 검증 대상을 오염시키면 안 된다 — 드라이런까지만 보고, 적용은 가드만 본다.
+    row = db_one("SELECT product_code FROM v_recommendation_candidates"
+                 " WHERE stock_qty > 0 AND part_type = 'CPU' ORDER BY product_code LIMIT 1")
+    if row is None:
+        print("  [SKIP] (I) 드라이런 영향 예측 — DB 미연결 또는 CPU 후보 없음")
+        return
+    name = db_one("SELECT product_name FROM products WHERE product_code = :p", p=row)
+    # 카테고리를 매핑되지 않는 값으로 준다 → 이 상품은 'ETC'로 강등되어 후보에서 빠진다.
+    # 드라이런이 **그 사실을 미리 알리는가**가 이 검사의 핵심이다(슬라이스 50에서
+    # 이 경고가 없었다면 후보가 조용히 무너졌다).
+    csv_body = (CSV_HEAD + "\n"
+                + f'{row},"{(name or "").replace(chr(34), "")}",'
+                  'PC/주요부품,CPU,인텔,판매중,1000,2000,3000,회귀,,테스트,회귀모델,\n')
+    st, dry = post_raw("/api/admin/catalog-import/dryrun",
+                       *_mp({"origin": "real"},
+                            {"master": ("regress.csv", csv_body.encode("utf-8"))}))
+    check("드라이런 성공", st == 200, 200, st)
+    if st != 200:
+        return
+    check("드라이런은 영향(신규/갱신/후보 진입·이탈)을 알린다",
+          all(k in dry["impact"] for k in ("new", "update", "pool_in", "pool_out")),
+          "impact 4종", list(dry.get("impact", {})))
+    check("드라이런은 되돌릴 수 없다는 사실을 밝힌다",
+          "되돌리기는 없습니다" in dry["warning"], "경고 문구", dry["warning"][:40])
+    check("기존 상품은 갱신으로 센다", dry["impact"]["update"] == 1 and dry["impact"]["new"] == 0,
+          "update=1 new=0", dry["impact"])
+    check("분류가 어긋나 후보에서 빠지는 것을 미리 알린다",
+          dry["impact"]["pool_out"] == 1, 1, dry["impact"]["pool_out"])
+    check("검수 새로 회부 수는 중복을 뺀 실측이다",
+          dry["impact"]["review_new"] <= dry["impact"]["review_planned"],
+          f'<= {dry["impact"]["review_planned"]}', dry["impact"]["review_new"])
+    # 드라이런이 본 것과 다른 건수로는 적용되지 않는다 (여기서 멈춘다 — DB를 바꾸지 않는다)
+    st, _ = post_raw("/api/admin/catalog-import/apply",
+                     *_mp({"staging_id": dry["staging_id"],
+                           "expect_ok": str(dry["summary"]["ok"] + 1)}, {}))
+    check("건수가 다르면 적용 거부(409)", st == 409, 409, st)
+    st, _ = post_raw("/api/admin/catalog-import/apply",
+                     *_mp({"staging_id": "nonexistent0000", "expect_ok": "1"}, {}))
+    check("없는 업로드 적용은 404", st == 404, 404, st)
+
+    # ── 외부 사양 제안(다나와) — 슬라이스 51
+    # 수집 값은 정본에 바로 들어가지 않고 제안으로만 올라간다. 그 계약을 고정한다.
+    sug = db_one("SELECT count(*) FROM product_reviews"
+                 " WHERE review_status='대기' AND suggested_value IS NOT NULL")
+    if sug is None:
+        print("  [SKIP] (I) 외부 제안 계약 — DB 미연결")
+    else:
+        # 제안이 붙어도 origin_value는 비어 있어야 한다 = 일괄 확정 대상이 아니다(사람 확인 강제)
+        auto = db_one("SELECT count(*) FROM product_reviews"
+                      " WHERE review_status='대기' AND suggested_value IS NOT NULL"
+                      "   AND origin_value IS NOT NULL AND review_type='low_confidence'")
+        check("외부 제안은 일괄 확정 대상이 아니다(사람 확인 강제)", auto == 0, 0, auto)
+        # 제안이 정본을 앞질러 들어가지 않았는가 — 제안이 있는 필드가 이미 채워져 있으면 모순
+        leaked = db_one("""
+            SELECT count(*) FROM product_reviews r JOIN product_specs s USING (product_code)
+             WHERE r.review_status='대기' AND r.suggested_value IS NOT NULL
+               AND ((r.field_name='form_factor_list' AND s.form_factor_list IS NOT NULL)
+                 OR (r.field_name='gpu_max_mm' AND s.gpu_max_mm IS NOT NULL)
+                 OR (r.field_name='cooler_height_mm' AND s.cooler_height_mm IS NOT NULL))""")
+        check("제안값이 승인 없이 정본에 들어가지 않았다", leaked == 0, 0, leaked)
+    # 목록형 사양도 승인할 수 있어야 한다(JSONB) — 빠져 있어 케이스 규격을 확정 못 했다
+    rules = get("/api/admin/reviews?size=1")
+    check("검수 응답이 제안 출처를 밝힌다",
+          "queue" in rules and all("suggest_source" in i for i in rules["items"][:1] or [{}]),
+          "suggest_source 포함", list((rules["items"] or [{}])[0])[:12])
+
+    # ── 적재 분류 판정 (슬라이스 51)
+    # 오분류를 걸러내되 **진짜 부품을 떨어뜨리지 않는 것**이 훨씬 중요하다.
+    # 규칙이 넓어지면 멀쩡한 수랭 쿨러·랙마운트 케이스·모듈러 파워가 추천에서 사라진다.
+    try:
+        sys.path.insert(0, ROOT)
+        from api.catalog_map import map_part_type
+        CLS = [
+            # (라벨, l2, l3, 원문, core_part여야 하는가) — 쿨러는 l3로 공랭/수냉을 가른다
+            ("시스템 팬", "CPU쿨러", "공랭쿨러",
+             "ARCTIC / 시스템/케이스용 / 시스템 쿨러 / 3000 RPM", False),
+            ("수랭 CPU쿨러", "CPU쿨러", "수냉쿨러",
+             "샤칸 / 시스템쿨러 / 수랭 / 팬 크기 : 120(mm)", True),
+            ("라이저 케이블", "케이스(CASE)", "", "PC내부 전원.튜닝케이블 / 라이저 케이블", False),
+            ("랙마운트 케이스", "케이스(CASE)", "",
+             "2MONS / 서버, 허브랙 / 랙마운트(3U) / CPU쿨러장착높이 : 110(mm)", True),
+            ("SSD 자리의 램", "고속저장(SSD)", "",
+             "비즈텍 / 데스크탑 / DDR4 / 16(GB) / 2666(MHz) / CL19 19 19 43", False),
+            ("진짜 SSD", "고속저장(SSD)", "",
+             "SSD / 제조회사 : 삼성전자 / 디스크 타입 : M.2 (2280)", True),
+            ("모듈러 파워", "파워(POWER)", "",
+             "리안리 / M ATX,SFX / 정격출력 : 750(W) / 케이블연결 : 풀모듈러", True),
+            ("HDMI 케이블", "메인보드(M/B)", "", "케이블/AV(영상.음성)통합관련 / HDMI 케이블", False),
+        ]
+        bad = []
+        for lab, l2, l3, raw, want in CLS:
+            _pt, grp, _why = map_part_type("PC/주요부품", l2, l3, lab, raw)
+            if (grp == "core_part") != want:
+                bad.append(f"{lab}->{grp}")
+        check("적재 분류: 비부품은 거르고 진짜 부품은 지킨다", not bad, "전 8종 정확", bad)
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 적재 분류 판정 — {e}")
+
+    # 검수 큐 정합 — 이미 값이 채워진 항목이 '대기'로 남아 있으면 큐가 부풀어 보인다
+    stale = db_one("""
+        SELECT count(*) FROM product_reviews r JOIN product_specs s USING (product_code)
+         WHERE r.review_status = '대기' AND r.review_type = 'spec_missing'
+           AND ((r.field_name = 'socket' AND s.socket IS NOT NULL)
+             OR (r.field_name = 'form_factor' AND s.form_factor IS NOT NULL)
+             OR (r.field_name = 'mem_type' AND s.mem_type IS NOT NULL)
+             OR (r.field_name = 'rated_watt' AND s.rated_watt IS NOT NULL)
+             OR (r.field_name = 'cooler_tdp' AND s.cooler_tdp IS NOT NULL))""")
+    if stale is None:
+        print("  [SKIP] (I) 검수 큐 정합 — DB 미연결")
+    else:
+        check("검수 대기에 이미 채워진 필드가 없다(tools/prune_reviews.py)",
+              stale == 0, 0, stale)
 
 
 # ───────────────────────── 2. 호환 규칙 (DB 단일 원천) ─────────────────────────
@@ -181,8 +453,14 @@ def test_compat():
     print("\n[2] 호환 규칙 — compat_rules 단일 원천 (슬라이스 34)")
     rules = get("/api/admin/engine-rules")["compat"]["checks"]
     active = [r for r in rules if r.get("active", True)]
-    check("활성 규칙 수", len(active) == FIXED["compat_checks"],
-          FIXED["compat_checks"], len(active), "FIXED")
+    drift("compat_rules_active", len(active))
+    # 규칙 수도 절대값이 아니라 DB 원천과 대조한다(A-13) — 규칙이 조용히 사라지면 잡힌다.
+    rules_db = db_one("SELECT count(*) FROM compat_rules WHERE active")
+    if rules_db is None:
+        print("  [SKIP] (I) 활성 규칙 수 = DB 실측 — DB 미연결")
+    else:
+        check("활성 규칙 수 = DB 실측", len(active) == rules_db, rules_db, len(active))
+    check("활성 규칙이 하나 이상", len(active) > 0, "> 0", len(active))
 
     compat = rec("100만원")["value"]["compat"]
     check("견적 호환 항목 = 규칙 수(1:1)", len(compat["checks"]) == len(active),
@@ -231,8 +509,14 @@ def test_consistency():
 
     rv = get("/api/admin/reviews")
     check("검수 대기", dash["review"] == rv["total"], rv["total"], dash["review"])
-    check("검수 대기 규모(적재 결과)", rv["total"] == FIXED["review_pending"],
-          FIXED["review_pending"], rv["total"], "FIXED")
+    drift("review_pending", rv["total"])
+    # 검수 대기는 products 플래그가 아니라 **검수 행의 상태**다(admin_reviews와 같은 정의).
+    rv_db = db_one("SELECT count(*) FROM product_reviews r JOIN products p USING (product_code)"
+                   " WHERE r.review_status = '대기'")
+    if rv_db is None:
+        print("  [SKIP] (I) 검수 대기 = DB 실측 — DB 미연결")
+    else:
+        check("검수 대기 = DB 실측", rv["total"] == rv_db, rv_db, rv["total"])
     check("가격 검토", dash["price"] == len(get("/api/admin/price-review")["items"]),
           len(get("/api/admin/price-review")["items"]), dash["price"])
     stock = get("/api/admin/stock-inbound")["items"]
@@ -474,8 +758,10 @@ def test_swap():
     check("적용 결과가 호환 전부 통과",
           all(c["pass"] for c in ap["compat"]["checks"]), "전부 통과",
           [c["key"] for c in ap["compat"]["checks"] if not c["pass"]])
-    check("호환 항목 = 활성 규칙 수", len(ap["compat"]["checks"]) == FIXED["compat_checks"],
-          FIXED["compat_checks"], len(ap["compat"]["checks"]))
+    n_rules = len([r for r in get("/api/admin/engine-rules")["compat"]["checks"]
+                   if r.get("active", True)])
+    check("교체 후 호환 항목 = 활성 규칙 수(1:1)",
+          len(ap["compat"]["checks"]) == n_rules, n_rules, len(ap["compat"]["checks"]))
 
     after = get("/api/admin/swap-logs")
     check("교체가 원장에 남는다", after["total"] == before + 1, before + 1, after["total"])
@@ -483,9 +769,27 @@ def test_swap():
     check("기록에 슬롯·전후 SKU가 남는다",
           top.get("slot") == "GPU" and top.get("to_sku") == pick["sku"],
           f"GPU/{pick['sku']}", f"{top.get('slot')}/{top.get('to_sku')}")
-    check("근거 클릭은 '측정하지 않음'으로 구분된다",
-          after["clicks"]["empty"] is True and bool(after["clicks"]["reason"]),
-          "empty=True + 사유", after["clicks"])
+    # 근거 클릭은 슬라이스 49부터 실제로 쌓인다(그 전엔 '원천 준비 중'이었다).
+    # 절대값 대신 응답 내부 정합을 본다 — 0건이어도 수천 건이어도 성립해야 한다.
+    ck = after["clicks"]
+    check("클릭 empty는 count와 일치한다", ck["empty"] == (ck["count"] == 0),
+          f'empty=={ck["count"] == 0}', ck["empty"])
+    check("클릭 식별/미식별 합 = 총계",
+          ck["identified"] + ck["unidentified"] == ck["count"],
+          ck["count"], ck["identified"] + ck["unidentified"])
+    check("클릭 상위 집계가 총계를 넘지 않는다",
+          sum(t["n"] for t in ck.get("top", [])) <= ck["count"],
+          f'<= {ck["count"]}', sum(t["n"] for t in ck.get("top", [])))
+    check("클릭 영역은 상태를 문장으로 밝힌다", bool(ck["reason"]), "사유 있음", ck["reason"])
+    # 실제로 쌓이는가 — 한 건 넣고 총계가 정확히 1 늘어야 한다(수집 경로가 살아 있다는 증거)
+    pc = pick["product_code"]
+    st_c, _ = post("/api/promo-click", {"product_code": pc})
+    check("근거 클릭 수집 경로가 살아 있다", st_c == 200, 200, st_c)
+    ck2 = get("/api/admin/swap-logs")["clicks"]
+    check("클릭 1건이 총계에 정확히 반영된다", ck2["count"] == ck["count"] + 1,
+          ck["count"] + 1, ck2["count"])
+    st_bad, _ = post("/api/promo-click", {"product_code": 999_999_999})
+    check("없는 상품 클릭은 404", st_bad == 404, 404, st_bad)
 
 
 def test_guards():
@@ -508,8 +812,11 @@ def test_guards():
 
 def main():
     print("=" * 74)
-    print("팝콘PC AI 통합 회귀 세트 — (F)=고정 기대값 / (I)=불변식")
+    print("팝콘PC AI 통합 회귀 세트 — 전량 불변식(I). 절대값 대신 관계·원천 대조 (A-13)")
     print("=" * 74)
+    if _engine is None:
+        print("\n⚠ DB에 연결하지 못했습니다 — 원천 대조 항목을 건너뜁니다.")
+        print("  " + _db_why)
     try:
         get("/api/health")
     except Exception as e:
@@ -530,27 +837,34 @@ def main():
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
-               test_guards):
+               test_upload, test_guards):
         try:
             fn()
         except Exception as e:
             check(f"{fn.__name__} 실행 중 예외", False, "정상 실행", repr(e))
 
     fails = [r for r in results if not r["ok"]]
-    fixed_fails = [r for r in fails if r["kind"] == "FIXED"]
     print("\n" + "=" * 74)
     print(f"합계 {len(results)}건 · 통과 {len(results) - len(fails)}건 · 실패 {len(fails)}건")
     if fails:
         print("\n실패 목록:")
         for r in fails:
-            print(f"  - ({r['kind']}) {r['name']}: 기대 {r['expect']} / 실제 {r['got']}")
-        if fixed_fails:
-            print("\n※ 고정 기대값(FIXED) 실패는 재고·가격이 의도적으로 바뀐 것일 수 있습니다.")
-            print("  의도된 변경이면 FIXED 값을 갱신하고 decision-log에 사유를 남기세요.")
-        if len(fails) > len(fixed_fails):
-            print("\n※ 불변식(INVARIANT) 실패는 데이터가 아니라 코드 문제입니다 — 먼저 고치세요.")
+            print(f"  - {r['name']}: 기대 {r['expect']} / 실제 {r['got']}")
+        print("\n※ 전부 불변식입니다 — 데이터가 아니라 코드 문제입니다. 값을 맞추지 말고 고치세요.")
     else:
         print("전 항목 통과 — 엔진·게이트·정합·원장·고객 계약·가드 정상")
+
+    # 값 변화는 실패가 아니라 알림이다(A-13). 재고가 움직이면 값도 움직인다.
+    if _drifts:
+        print("\n[값 변화] 실패 아님 — 재고·가격이 움직였는지, 내가 코드를 바꿨는지 확인하세요.")
+        for k, old, new in _drifts:
+            fmt = (lambda x: f"{x:,}") if isinstance(old, int) else str
+            print(f"  · {k}: {fmt(old)} -> {fmt(new)}")
+    try:
+        with io.open(SNAP_PATH, "w", encoding="utf-8", newline="") as f:
+            json.dump(_snap_new, f, ensure_ascii=False, indent=1, sort_keys=True)
+    except Exception as e:                               # noqa: BLE001
+        print(f"\n(스냅샷 기록 실패: {e})")
     print("=" * 74)
     return 1 if fails else 0
 

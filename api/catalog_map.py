@@ -38,16 +38,84 @@ MONITOR_L2 = {"27인치 모니터", "24인치 모니터", "32인치 이상", "23
 SKIP_L1 = {"삭제대기", "내부관리용", "고객님 개인결제"}
 
 
-def map_part_type(l1: str, l2: str, l3: str, name: str):
+# 원천이 **스스로 '액세서리'라 분류한 것**을 우리가 부품으로 올리지 않는다(슬라이스 51).
+# 시스템 팬을 CPU쿨러로, 베어본을 메인보드로 올려두면 채울 수 없는 사양을 영원히 검수
+# 대기에 쌓는다(실측 160건이 그 상태였다).
+# 판단 근거는 **스펙 원문의 분류 토큰**뿐이다 — 상품명으로 보면 모듈러 파워의 '케이블',
+# SSD의 '연장가이드'까지 걸려 진짜 부품을 추천에서 떨어뜨린다(위험 방향이 반대다).
+NOT_PART = re.compile(
+    r"액세서리|베어본|미니PC|\bUPS\b|허브\.컨버터"
+    r"|케이블,젠더|커버,필터|브라켓,가이드|라이저"
+    # 네트워크 장비·케이블류가 메인보드 자리에 올라와 있었다(실측)
+    r"|스위치허브|랜케이블|LAN\s*케이블|HDMI\s*케이블|DP\s*케이블"
+    r"|케이블/AV|전원\.튜닝케이블", re.I)
+
+# '시스템 쿨러'는 케이스 팬을 뜻하지만, 원천이 이 말을 **CPU 쿨러 대분류로도 쓴다**
+# ("샤칸 / 시스템쿨러 / 수랭 / 수랭팬개수 : 2" = 진짜 수랭 CPU 쿨러).
+# 그래서 냉각 방식(수랭·공랭) 표시가 함께 있으면 CPU 쿨러로 본다 — 이 구분이 없으면
+# 멀쩡한 AIO를 추천에서 지운다.
+SYS_FAN = re.compile(r"시스템\s*쿨러|시스템/케이스용", re.I)
+CPU_COOL_HINT = re.compile(r"수랭|수냉|공랭|공냉|CPU\s*쿨러", re.I)
+# '허브랙'은 넣지 않는다 — "서버, 허브랙 / 랙마운트(3U)"는 진짜 랙마운트 PC 케이스이고
+# CPU쿨러 장착높이·VGA 장착길이까지 가진 부품이다(실측 3건이 오검출됐다).
+
+# 저장장치 자리에 메모리가 들어오면 원문이 스스로 밝힌다(DDR + CL + MHz).
+MEM_SPEC = re.compile(r"\bDDR[345]\b", re.I)
+MEM_CL = re.compile(r"\bCL\s?\d{1,2}\b", re.I)
+
+
+def _class_tokens(raw: str, n: int = 5) -> str:
+    """원천의 **분류 영역** — 앞쪽 토큰 중 키-값이 아닌 것들.
+
+    분류는 "제조사 / 시스템/케이스용 / 시스템 쿨러 / 가로: 80mm" 처럼 앞에 오지만
+    항상 1~2번째는 아니다(제조사·수입원이 먼저 오기도 한다). 그렇다고 전체를 훑으면
+    모듈러 파워의 '케이블' 같은 사양 값에 걸려 진짜 부품을 떨어뜨린다.
+    **키-값(`:` 포함) 토큰은 사양이지 분류가 아니므로** 그것만 걸러내면 둘 다 피할 수 있다.
+    """
+    out = []
+    for tok in (raw or "").split("/"):
+        tok = tok.strip()
+        if not tok or ":" in tok:
+            continue
+        out.append(tok)
+        if len(out) >= n:
+            break
+    return " / ".join(out)
+
+
+def is_accessory(raw: str) -> bool:
+    """원천이 스스로 부품이 아니라고 말하는가."""
+    cls = _class_tokens(raw)
+    if NOT_PART.search(cls):
+        return True
+    # 시스템 팬 — 단, 냉각 방식 표시가 있으면 CPU 쿨러다(원문 전체를 본다)
+    return bool(SYS_FAN.search(cls)) and not CPU_COOL_HINT.search(raw or "")
+
+
+def wrong_slot(part_type: str, raw: str) -> str | None:
+    """part_type이 원문과 명백히 어긋나는가. 확실한 것만 말한다."""
+    if part_type in ("SSD", "HDD") and MEM_SPEC.search(raw or "") and MEM_CL.search(raw or ""):
+        return "원문 사양이 메모리(DDR·CL) — 저장장치가 아님"
+    return None
+
+
+def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):
     """(part_type, category_group, skip_reason) — 매핑 못 해도 카탈로그에는 넣는다.
 
     part_type을 못 정한 상품은 `category_group='etc'`로 적재된다: 추천 대상이 아니지만
     재고·가격 관리 대상이기 때문이다(시스템 쿨러·튜닝용품·완제품PC·케이블 등).
+
+    `raw`(스펙 원문)를 주면 원천이 액세서리로 분류한 상품을 core_part로 올리지 않는다.
     """
     l1, l2, l3 = (l1 or "").strip(), (l2 or "").strip(), (l3 or "").strip()
     if l1 in SKIP_L1:
         return None, None, f"{l1} 분류"
+    if raw and is_accessory(raw):
+        return None, "etc", "원천 분류가 액세서리·베어본 — 부품 아님"
     if l2 in CORE_L2:
+        bad = wrong_slot(CORE_L2[l2], raw) if raw else None
+        if bad:
+            return None, "etc", bad
         return CORE_L2[l2], "core_part", None
     if l2 == "CPU쿨러":
         # 실측: l3가 공랭쿨러 314 / 수냉쿨러 239로 갈린다(빈값 2건은 검수)
@@ -264,7 +332,9 @@ def _storage(feats, kv):
 # (products.spec_source_text)에서 직접 읽는다 — **값을 지어내는 게 아니라 원천을 제대로 읽는 것**이다.
 # 실측 회수 가능성: MB 소켓 46% · CASE form_factor 78%(표기 확인 필요) · POWER 67%.
 
-B_SOCKET = re.compile(r"(?:소켓\s*)?(LGA\s?\d{3,4}|AM[45]|sTRX4|TR4)", re.I)
+# 원천 표기 실측: "인텔(소켓1700)" · "AMD(소켓AM4)" 형태가 많다 — LGA 접두 없이
+# '소켓' 뒤에 숫자만 온다. 이걸 못 읽어 메인보드 소켓 98건이 검수에 남아 있었다(슬라이스 51).
+B_SOCKET = re.compile(r"(?:소켓\s*)?(LGA\s?\d{3,4}|AM[45]|sTRX4|TR4)|소켓\s*(\d{3,4})", re.I)
 B_CHIPSET = re.compile(r"([A-Z]\d{2,3}[A-Z]?)")
 B_NUM = re.compile(r"([\d,]+(?:\.\d+)?)")
 
@@ -287,8 +357,9 @@ def _b_socket(v):
     m = B_SOCKET.search(v or "")
     if not m:
         return None
-    s = m.group(1).upper().replace(" ", "")
-    return s if s.startswith(("AM", "S", "T")) else s   # LGA1700 · AM4 형태 그대로
+    if m.group(1):
+        return m.group(1).upper().replace(" ", "")      # LGA1700 · AM4 형태 그대로
+    return "LGA" + m.group(2)                           # "소켓1700" -> LGA1700
 
 
 def _b_chipset(v):
@@ -368,8 +439,16 @@ def case_form_list(raw: str) -> list:
     found = []
     for tok in (raw or "").split("/"):
         tok = tok.strip()
-        if not tok or ":" in tok:        # "지원 파워 : ATX" 같은 키-값은 제외
+        if not tok:
             continue
+        if ":" in tok:
+            # "지원 파워 규격 : 표준 ATX"는 **파워** 규격이라 보드 규격이 아니다(제외).
+            # 다만 "제품 분류 : PC케이스(ATX)"는 케이스가 수용하는 보드 규격이다 —
+            # 이걸 통째로 버려서 63건이 검수에 남아 있었다(슬라이스 51).
+            k, _, v = tok.partition(":")
+            if k.strip() != "제품 분류":
+                continue
+            tok = v.strip().replace("PC케이스", "").strip("()（） ")
         m = FF_TOKEN.match(tok)
         if not m:
             continue
@@ -388,11 +467,46 @@ def case_form_list(raw: str) -> list:
     return [o for o in order if o in out]
 
 
-def extract_from_text(part_type: str, raw: str) -> tuple:
-    """형식 B 원문에서 뽑기 — (specs, sources). sources는 전부 'text_kv'."""
+# ─────────── 선호 태그 회수 (슬라이스 48) ───────────
+# S1의 "조용하게"·"화이트로"는 서버가 후보 수에 실제로 반영하는 조건인데,
+# 적재가 `tag_silent`·`tag_white`를 채우지 않아 태그 보유가 시드 몇 개뿐이었다.
+# 그 결과 저소음 조건에서 쿨러(AIO) 슬롯이 0이 되어 **견적이 불성립**했고,
+# S1은 "387개로 3구성을 만들 수 있다"고 말했다(거짓).
+#
+# **명시된 표현만 태그로 인정한다.** '무소음'·'저소음'처럼 제조사가 상품명·스펙에 쓴 말이
+# 근거다. "팬이 크니 조용할 것"처럼 추론하지 않는다 — 조용함은 주관적이고, 지어낸 태그는
+# 고객이 "조용하게"라고 말한 이유를 배신한다.
+TAG_WHITE_RE = re.compile(r"화이트|WHITE|백색", re.I)
+TAG_SILENT_RE = re.compile(r"무소음|저소음|정숙|사일런트|SILENT|LOW\s*NOISE", re.I)
+# 저소음이 의미 있는 슬롯(소음원). 그 밖의 부품에 붙이면 필터가 무의미해진다.
+TAG_SILENT_SLOTS = ("GPU", "POWER", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO")
+
+
+def extract_tags(part_type: str, name: str, raw: str) -> tuple:
+    """(tags, sources) — 명시 표현이 있을 때만 True를 담는다(False는 담지 않는다).
+
+    False를 담지 않는 이유: '태그 없음'과 '아직 판정 안 함'을 구분해야 한다.
+    DB 기본값(NULL/false)이 곧 '명시 표현 없음'이다.
+    """
+    src = (name or "") + " " + (raw or "")
+    tags, sources = {}, {}
+    if part_type == "CASE" and TAG_WHITE_RE.search(src):
+        tags["tag_white"] = True
+        sources["tag_white"] = "name_explicit"
+    if part_type in TAG_SILENT_SLOTS and TAG_SILENT_RE.search(src):
+        tags["tag_silent"] = True
+        sources["tag_silent"] = "name_explicit"
+    return tags, sources
+
+
+def extract_from_text(part_type: str, raw: str, name: str = "") -> tuple:
+    """형식 B 원문 + 명시 태그에서 뽑기 — (specs, sources).
+
+    sources: 'text_kv'(형식 B 키) · 'text_tokens'(케이스 규격 목록) ·
+    'name_explicit'(태그 — 제조사가 쓴 말)
+    """
     kv = parse_kv_text(raw)
-    if not kv:
-        return {}, {}
+    # kv가 비어도 태그·케이스 규격은 뽑을 수 있으므로 조기 return 하지 않는다(슬라이스 48)
     mapping = B_MAP.get(part_type) or {}
     s, src = {}, {}
     if part_type == "CASE":
@@ -409,4 +523,7 @@ def extract_from_text(part_type: str, raw: str) -> tuple:
         if got is not None:
             s[field] = got
             src[field] = "text_kv"
+    tags, tsrc = extract_tags(part_type, name, raw)      # 명시 표현만(슬라이스 48)
+    s.update(tags)
+    src.update(tsrc)
     return s, src

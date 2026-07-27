@@ -78,7 +78,7 @@ def main():
         need = REQUIRED.get(pt)
         if not need:
             continue
-        got, src = extract_from_text(pt, r["spec_source_text"])
+        got, src = extract_from_text(pt, r["spec_source_text"], r["product_name"])
         if not got:
             continue
         specs = r["specs"] or {}
