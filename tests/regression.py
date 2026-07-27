@@ -520,6 +520,33 @@ def test_product_edit():
           d3["locked_fields"] == before["locked"], before["locked"], d3["locked_fields"])
     st, _ = post(f"/api/admin/products/undo/{r['undo_id']}")
     check("이중 되돌리기는 409", st == 409, 409, st)
+
+    # 등록 화면에 남의 상품 값이 기본으로 들어 있으면 그대로 저장된다(사용자 지적, 슬라이스 55).
+    # 마크업에 예시 값이 박혀 있지 않은지 회귀가 지킨다.
+    try:
+        import re as _re
+        html = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+                       encoding="utf-8").read()
+        vals = _re.findall(r'<label class="form-label[^>]*>(상품명|재고 수량|판매가\(원\))</label>'
+                           r'<input[^>]*value="([^"]*)"', html)
+        dirty = [(lb, v) for lb, v in vals if v.strip()]
+        check("등록 폼 입력칸에 예시 값이 박혀 있지 않다", not dirty, "전부 빈 value", dirty)
+        # 보기와 고치기가 분리돼 있는가(슬라이스 55) — 보려고 들어갔다 잘못 저장하면
+        # locked_fields가 걸려 다음 적재가 그 값을 못 덮는다.
+        check("상세는 읽기 전용으로 열린다(?edit=1일 때만 편집)",
+              'var EDIT = _q.get("edit") === "1";' in html, "EDIT 기본 false",
+              'EDIT' in html)
+        check("읽기 모드에서 저장 버튼은 편집 전환만 한다",
+              "if(!EDIT){ EDIT = true; paint(); return; }" in html, "전환 분기 존재", False)
+        check("저장하면 읽기 모드로 돌아간다(연속 오조작 방지)",
+              "EDIT=false;               // 저장했으면 읽기로" in html, "복귀 분기 존재", False)
+        lst = io.open(os.path.join(ROOT, "mockups", "admin", "products.html"),
+                      encoding="utf-8").read()
+        check("목록의 행 버튼은 [수정]이고 편집 모드로 간다",
+              "&edit=1\">수정</a>" in lst, "[수정] + edit=1",
+              "상세</a>" in lst and "미변경")
+    except FileNotFoundError:
+        print("  [SKIP] (I) 등록 폼 예시 값 — 파일 없음")
     check("없는 상품 조회는 404",
           anon_admin_status(f"/api/admin/products/999999999") in (404, 401), "404", "—")
 

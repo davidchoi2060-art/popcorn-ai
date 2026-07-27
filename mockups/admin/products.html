@@ -364,7 +364,7 @@
               <td class="text-end">${p.supplier_count}</td>
               <td class="text-end">${p.price_text}</td>
               <td><span class="badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
-              <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?id=${p.sku}">상세</a></td>
+              <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?code=${p.product_code}&edit=1">수정</a></td>
             </tr>`;
           }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
         }
