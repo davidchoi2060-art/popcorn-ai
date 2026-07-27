@@ -461,9 +461,46 @@
 
         // ---- LIVE (슬라이스 23) — 입고 원장 실배선(ERD §8 T10). 입고 후 예고·풀 진입은 서버 실측값 ----
         // 매입가는 원장에 남기지 않는다(stock_movements에 단가 컬럼 없음) → LIVE에선 입력 칸 읽기 전용.
+        var SI_PAGE=1, SI_Q="", SI_TOTAL=0, SI_PAGES=1, SI_CATQ="";
+        function siBanner(){
+          var el=document.getElementById("siScale");
+          if(!el){
+            el=document.createElement("div"); el.id="siScale";
+            el.className="card mb-3";
+            var host=document.querySelector(".content nav.mb-3");
+            if(host&&host.parentNode) host.parentNode.insertBefore(el, host.nextSibling);
+          }
+          el.innerHTML='<div class="card-body py-3">'
+            +'<div class="d-flex flex-wrap align-items-center gap-2">'
+            +'<div><div class="fs-9 text-body-tertiary">입고 대상</div>'
+            +'<div class="fs-5 fw-bolder">'+SI_TOTAL.toLocaleString()+'</div></div>'
+            +'<div class="ms-3 flex-grow-1" style="max-width:320px;">'
+            +'<input id="siQ" class="form-control form-control-sm" placeholder="상품명·SKU 검색" '
+            +'value="'+(SI_Q||"")+'"></div>'
+            +'<button id="siGo" class="btn btn-phoenix-primary btn-sm">검색</button>'
+            +'<div class="ms-auto d-flex align-items-center gap-2">'
+            +'<span class="fs-9 text-body-tertiary">'+SI_PAGE+' / '+Math.max(1,SI_PAGES)+' 페이지</span>'
+            +'<button id="siPrev" class="btn btn-phoenix-secondary btn-sm"'
+            +(SI_PAGE<=1?' disabled':'')+'>← 이전</button>'
+            +'<button id="siNext" class="btn btn-phoenix-secondary btn-sm"'
+            +(SI_PAGE>=SI_PAGES?' disabled':'')+'>다음 →</button></div></div>'
+            +'<p class="fs-10 text-body-tertiary mb-0 mt-2">전체 '+SI_TOTAL.toLocaleString()
+            +'건 중 이 페이지만 표시합니다. 직접 등록 후보는 아래 검색어를 넣어야 조회됩니다.</p>'
+            +'</div>';
+          var q=document.getElementById("siQ"), go=document.getElementById("siGo");
+          if(go) go.onclick=function(){ SI_Q=(q.value||"").trim(); SI_PAGE=1; reload(); };
+          if(q) q.onkeydown=function(e){ if(e.key==="Enter"){ SI_Q=(q.value||"").trim(); SI_PAGE=1; reload(); } };
+          var pv=document.getElementById("siPrev"), nx=document.getElementById("siNext");
+          if(pv) pv.onclick=function(){ if(SI_PAGE>1){ SI_PAGE--; reload(); } };
+          if(nx) nx.onclick=function(){ if(SI_PAGE<SI_PAGES){ SI_PAGE++; reload(); } };
+        }
         function reload(){
-          return fetch("/api/admin/stock-inbound").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
+          var url="/api/admin/stock-inbound?page="+SI_PAGE+"&size=50"
+            +(SI_Q?"&q="+encodeURIComponent(SI_Q):"")
+            +(SI_CATQ?"&catalog_q="+encodeURIComponent(SI_CATQ):"");
+          return fetch(url).then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
             .then(d=>{
+              SI_TOTAL=d.total||0; SI_PAGES=d.pages||1;
               const prevQty={};R.forEach(r=>{prevQty[r.id]=r.qty;});
               LIVE=true;NOTE=d.note;
               R=d.items.map(i=>({id:i.product_code,sku:i.sku,name:i.name,cat:i.cat,
@@ -472,7 +509,28 @@
                 priced:i.priced,reviewed:i.reviewed,has_specs:i.has_specs,status:i.status,why:i.why,note:i.note}));
               CATALOG=d.catalog.map(c=>({id:c.product_code,sku:c.sku,name:c.name,cat:c.cat,
                 cost:c.purchase||0,sup:"—",stock:c.stock,priced:c.priced,reviewed:c.reviewed}));
+              // 검색어 없이는 후보를 받지 않는다 — 22,838건을 셀렉트에 넣지 않기 위해서다.
+              // 비어 있는 이유를 화면이 말해야 운영자가 '고장'으로 오해하지 않는다.
+              // 검색어 없이는 후보를 받지 않는다(22,838건을 셀렉트에 넣지 않기 위해).
+              // 비어 있는 이유를 화면이 말해야 운영자가 '고장'으로 오해하지 않는다.
+              var selEl=document.getElementById("in-prod");
+              if(selEl&&!SI_CATQ){
+                selEl.innerHTML='<option value="">아래 칸에서 상품을 검색하세요</option>';
+              }
+              // 검색 입력을 셀렉트 앞에 심는다(없으면 만든다)
+              if(selEl&&!document.getElementById("in-prodq")){
+                var wrap=document.createElement("div"); wrap.className="input-group input-group-sm mb-2";
+                wrap.innerHTML='<input id="in-prodq" class="form-control form-control-sm" '
+                  +'placeholder="상품명·SKU로 검색" value="'+(SI_CATQ||"")+'">'
+                  +'<button id="in-prodgo" class="btn btn-phoenix-primary btn-sm">찾기</button>';
+                selEl.parentNode.insertBefore(wrap, selEl);
+                var qi=document.getElementById("in-prodq"), gb=document.getElementById("in-prodgo");
+                var run=function(){ SI_CATQ=(qi.value||"").trim(); reload(); };
+                gb.onclick=run;
+                qi.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); run(); } };
+              }
               fillCatalog();
+              siBanner();
               const ci=document.getElementById("in-cost");
               ci.value="";ci.readOnly=true;ci.placeholder="상품 매입가 사용(원장 미기록)";
               const b=document.getElementById("dataSrc");
@@ -722,7 +780,8 @@
     <script src="vendors/dayjs/dayjs.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
-  <script src="../shared/su-icons.js"></script>
+  <script src="../shared/ui-progress.js"></script>
+<script src="../shared/su-icons.js"></script>
   <script src="../shared/admin-auth.js"></script>
 </body>
 

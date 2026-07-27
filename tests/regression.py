@@ -581,11 +581,20 @@ def test_consistency():
         check("검수 대기 = DB 실측", rv["total"] == rv_db, rv_db, rv["total"])
     check("가격 검토", dash["price"] == len(get("/api/admin/price-review")["items"]),
           len(get("/api/admin/price-review")["items"]), dash["price"])
-    stock = get("/api/admin/stock-inbound")["items"]
-    check("입고 대기", dash["inbound"] == len(stock), len(stock), dash["inbound"])
+    # 입고 목록은 서버 페이지네이션이다(슬라이스 54) — 대시보드가 세는 것은 전체이므로
+    # 한 페이지 길이가 아니라 total과 맞춰야 한다. 페이지 길이로 비교하면 화면이
+    # "50건"이라고 말하는 동안 대시보드는 15,259를 말하는 모순을 못 잡는다.
+    stock_res = get("/api/admin/stock-inbound?page=1&size=50")
+    check("입고 대기 = 대시보드 집계", dash["inbound"] == stock_res["total"],
+          stock_res["total"], dash["inbound"])
+    check("입고 목록은 한 페이지만 보낸다(전량 전송 금지)",
+          len(stock_res["items"]) <= stock_res["size"],
+          f'<= {stock_res["size"]}', len(stock_res["items"]))
+    check("검색어 없이는 직접 등록 후보를 보내지 않는다",
+          stock_res["catalog"] == [], "빈 목록", len(stock_res["catalog"]))
     sourcing = get("/api/admin/sourcing")["items"]
-    check("매입 대기 = 입고 대기(같은 파생 조건)", len(sourcing) == len(stock),
-          len(stock), len(sourcing))
+    check("매입 대기 = 입고 대기(같은 파생 조건)", len(sourcing) == stock_res["total"],
+          stock_res["total"], len(sourcing))
     active_rf = [r for r in get("/api/admin/refunds")["items"]
                  if r["status"] in ("접수", "검토", "수거·처리")]
     check("활성 환불", dash["refund"] == len(active_rf), len(active_rf), dash["refund"])

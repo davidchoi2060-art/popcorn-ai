@@ -40,7 +40,20 @@ _PENDING = """
     WHERE p.status NOT IN ('단종','삭제대기')
       AND (p.stock_qty = 0
            OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+      AND (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%')
+      AND (:part_type = '' OR p.part_type = :part_type)
     ORDER BY (p.stock_qty > 0), p.product_code
+    LIMIT :size OFFSET :offset
+"""
+
+# 목록과 같은 조건의 총계 — 화면이 '전체 N건 중 이 페이지'를 정직하게 말하려면 필요하다
+_PENDING_COUNT = """
+    SELECT count(*) FROM products p
+    WHERE p.status NOT IN ('단종','삭제대기')
+      AND (p.stock_qty = 0
+           OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+      AND (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%')
+      AND (:part_type = '' OR p.part_type = :part_type)
 """
 
 
@@ -67,14 +80,33 @@ def _note_of(r) -> str:
 
 
 @router.get("/stock-inbound")
-def stock_inbound():
+def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "",
+                  catalog_q: str = ""):
+    """입고 대상 — **서버 페이지네이션**(슬라이스 54).
+
+    전량 전송이던 것을 나눠 보낸다: 입고 대상 15,259건 · 카탈로그 22,838건을 매 요청마다
+    보내면 화면이 느려지고 브라우저가 버티지 못한다(상품 관리는 이미 페이지네이션이다).
+    직접 등록용 `catalog`은 **검색어가 있을 때만** 최대 50건 — 셀렉트 하나 때문에 전량을
+    보낼 이유가 없다.
+    """
+    size = max(1, min(size, 200))
+    page = max(1, page)
+    p = {"q": q.strip(), "part_type": part_type.strip(),
+         "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
-        rows = conn.execute(text(_PENDING)).mappings().all()
+        rows = conn.execute(text(_PENDING), p).mappings().all()
+        total = conn.execute(text(_PENDING_COUNT), p).scalar_one()
+        cq = catalog_q.strip()
         catalog = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, purchase_price, stock_qty,"
             " sale_price, review_required_yn"
-            " FROM products WHERE status NOT IN ('단종','삭제대기') ORDER BY sku")).mappings().all()
+            " FROM products WHERE status NOT IN ('단종','삭제대기')"
+            "   AND (product_name ILIKE '%%' || :cq || '%%' OR sku ILIKE '%%' || :cq || '%%')"
+            " ORDER BY sku LIMIT 50"), {"cq": cq}).mappings().all() if cq else []
     return {
+        "page": page, "size": size, "total": total,
+        "pages": (total + size - 1) // size,
+        "catalog_q": catalog_q.strip(),
         "items": [{
             "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
             "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
@@ -93,7 +125,9 @@ def stock_inbound():
             "purchase": c["purchase_price"], "stock": c["stock_qty"],
             "priced": c["sale_price"] is not None, "reviewed": not c["review_required_yn"],
         } for c in catalog],
-        "note": NOTE,
+        "note": NOTE + (" 목록은 서버에서 나눠 보냅니다 — 화면은 '전체 N건 중 이 페이지'를"
+                        " 표시합니다. 직접 등록 후보는 검색어를 입력해야 조회됩니다"
+                        "(22,838건 전량 전송을 없앴습니다)."),
     }
 
 

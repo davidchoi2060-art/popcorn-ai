@@ -172,10 +172,14 @@ def list_products(q: str = "", part_type: str = "", status: str = "", origin: st
 class RegisterBody(BaseModel):
     name: str
     part_label: str            # 화면 분류 라벨(그래픽카드 등) — PART_TYPE_LABELS 역매핑
-    supplier_id: int
-    model_name: str            # 단가표 행 원문 — map model_key(상품명 입력과 별도)
-    cost_price: int
+    # 아래 셋은 **단가표發 등록일 때만** 온다(슬라이스 54에서 선택으로 완화).
+    # 상품 관리에서 직접 등록하면 공급처가 정해지지 않은 상태이고, 없는 사실을
+    # 매핑·매입가 원장에 적을 수는 없다.
+    supplier_id: int | None = None
+    model_name: str | None = None      # 단가표 행 원문 — map model_key(상품명 입력과 별도)
+    cost_price: int | None = None
     danawa_code: str | None = None
+    maker: str | None = None
 
 
 @router.post("/products")
@@ -190,9 +194,12 @@ def register_product(body: RegisterBody):
         raise HTTPException(400, f"알 수 없는 분류: {body.part_label}")
     if not body.name.strip():
         raise HTTPException(400, "상품명이 비어 있습니다")
+    if body.supplier_id is not None and (body.model_name is None or body.cost_price is None):
+        raise HTTPException(400, "공급처를 지정하면 모델명과 매입가가 함께 있어야 합니다")
     with engine.begin() as conn:
-        if conn.execute(text("SELECT 1 FROM suppliers WHERE supplier_id=:s"),
-                        {"s": body.supplier_id}).first() is None:
+        if body.supplier_id is not None and conn.execute(
+                text("SELECT 1 FROM suppliers WHERE supplier_id=:s"),
+                {"s": body.supplier_id}).first() is None:
             raise HTTPException(404, "공급처가 없습니다")
         if body.danawa_code:
             dup = conn.execute(text(
@@ -209,9 +216,20 @@ def register_product(body: RegisterBody):
             " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d)"),
             {"pc": pc, "sku": sku, "n": body.name.strip(), "pt": pt,
              "cost": body.cost_price, "d": body.danawa_code})
+        if body.maker and body.maker.strip():
+            conn.execute(text("UPDATE products SET maker=:m WHERE product_code=:pc"),
+                         {"m": body.maker.strip()[:60], "pc": pc})
         conn.execute(text(
             "INSERT INTO product_specs (product_code, part_type) VALUES (:pc, :pt)"),
             {"pc": pc, "pt": pt})  # 검수 대상 필드는 확정 전 NULL 유지(ERD §3.5)
+        if body.supplier_id is None:
+            # 공급처 없는 직접 등록 — 매핑·매입가 원장은 만들지 않는다(없는 사실을 적지 않는다)
+            _log(conn, "product_register", sku,
+                 {"product_code": pc, "sku": sku, "part_type": pt,
+                  "supplier_id": None, "source": "manual"}, kind="product")
+            return {"ok": True, "sku": sku, "product_code": pc,
+                    "note": ("등록됐습니다 — 검수 대기 상태이고 추천 풀에는 들어가지 않습니다."
+                             " 사양 검수와 판매가 산정을 통과해야 추천에 쓰입니다.")}
         map_id = conn.execute(text(
             "INSERT INTO supplier_product_map (supplier_id, model_key, product_code, match_method, confirmed_by, confirmed_at)"
             " VALUES (:s, :k, :pc, 'manual', :op, now())"
@@ -259,6 +277,26 @@ STATUS_OK = ("판매중", "품절", "단종", "삭제대기")
 # 가격·재고는 정본 수치다 — 음수나 터무니없는 값이 들어가면 견적이 통째로 흔들린다
 LIMIT = {"sale_price": (0, 100_000_000), "purchase_price": (0, 100_000_000),
          "stock_qty": (0, 100_000)}
+
+
+@router.get("/product-meta")
+def product_meta():
+    """등록·수정 화면이 쓰는 선택지 — 화면에 하드코딩하면 서버가 아는 것과 갈린다.
+
+    실제로 등록 화면의 분류 셀렉트에 3종만 있어서 파워·케이스·메모리를 등록할 수 없었다
+    (슬라이스 54).
+    """
+    core = {"CPU", "MB", "RAM", "GPU", "POWER", "CASE", "SSD", "HDD",
+            "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
+    return {
+        "part_labels": [{"part_type": k, "label": v}
+                        for k, v in PART_TYPE_LABELS.items() if k in core],
+        "peripheral_labels": [{"part_type": k, "label": v}
+                              for k, v in PART_TYPE_LABELS.items()
+                              if k not in core and k != "ETC"],
+        "status_options": list(STATUS_OK),
+        "editable": sorted(EDITABLE),
+    }
 
 
 @router.get("/products/{product_code}")

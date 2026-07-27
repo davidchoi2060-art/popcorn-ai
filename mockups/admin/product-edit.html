@@ -518,6 +518,69 @@
             toast("불러오기 실패: "+esc(e.message)
               +" — 정적 모드에서는 목업 값이 보입니다");
           });
+        } else if(isNew && !fromPrice){
+          // ── 상품 관리에서 들어온 직접 등록 (슬라이스 54)
+          // 공급처·매입가는 아직 사실이 아니므로 묻지 않는다(단가표 반영에서 채워진다).
+          var box=document.createElement("div");
+          box.className="alert alert-subtle-info py-2 px-3 fs-9 mb-3";
+          box.innerHTML='<b>상품명과 분류만으로 등록합니다.</b> 등록 직후에는 '
+            +'<b>검수 대기</b> 상태이고 추천 풀에 들어가지 않습니다 — 사양 검수와 판매가 산정을 '
+            +'통과해야 추천에 쓰입니다. 공급처·매입가는 단가표 반영에서 채워집니다.';
+          var host=document.querySelector(".content nav.mb-3");
+          if(host&&host.parentNode) host.parentNode.insertBefore(box, host.nextSibling);
+          // 등록 단계에서 뜻이 없는 칸은 잠근다 — 채워도 반영되지 않는 칸을 열어두면 거짓이다
+          ["재고 수량","판매가(원)","노출 상태"].forEach(function(lb){
+            var el=fieldByLabel(lb);
+            if(el){ el.disabled=true; el.title="등록 후 상세 화면에서 수정합니다"; }
+          });
+          var sp=document.getElementById("specs");
+          if(sp) sp.innerHTML='<p class="fs-9 text-body-tertiary mb-0">사양은 등록 후 '
+            +'<a href="review-queue.html">상품 검수</a>에서 채웁니다.</p>';
+          // 분류 셀렉트를 서버가 아는 라벨로 채운다 — 화면에 3종만 하드코딩돼 있어
+          // 파워·케이스·메모리를 등록할 수 없었다(슬라이스 54).
+          fetch("/api/admin/product-meta").then(function(r){return r.json();})
+            .then(function(m){
+              var sel=fieldByLabel("분류");
+              if(sel&&m.part_labels&&m.part_labels.length){
+                sel.innerHTML=m.part_labels.map(function(x){
+                  return '<option>'+x.label+'</option>';}).join("");
+              }
+            }).catch(function(){});
+          // 제조사 칸이 없어 등록 시 제조사를 못 넣었다 — 상품명 칸 옆에 만든다
+          (function(){
+            var nmEl=fieldByLabel("상품명");
+            if(!nmEl || document.getElementById("mk")) return;
+            var w=document.createElement("div"); w.className="mt-2";
+            w.innerHTML='<label class="form-label fs-9 fw-bold">제조사</label>'
+              +'<input id="mk" class="form-control form-control-sm" placeholder="예) ASUS · 삼성전자">';
+            nmEl.parentElement.appendChild(w);
+          })();
+          var sb=document.getElementById("save");
+          sb.textContent="등록";
+          sb.onclick=function(){
+            var nm=(getField("상품명")||"").trim();
+            var catSel=fieldByLabel("분류");
+            var lab=catSel? catSel.options[catSel.selectedIndex].textContent.trim() : "";
+            if(!nm){ toast("상품명을 입력하세요"); return; }
+            if(!lab){ toast("분류를 선택하세요"); return; }
+            sb.disabled=true;
+            fetch("/api/admin/products",{method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({name:nm, part_label:lab,
+                                     maker:(getField("제조사")||"").trim()||null})})
+              .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+              .then(function(res){
+                sb.disabled=false;
+                if(!res.ok){
+                  var d=res.j.detail;
+                  toast("등록 실패: "+esc(typeof d==="string"?d:(d&&(d.detail||d.error))||"입력을 확인하세요"));
+                  return;
+                }
+                // 등록된 상품의 상세로 넘어가 이어서 수정할 수 있게 한다
+                location.href="product-edit.html?code="+res.j.product_code;
+              })
+              .catch(function(e){ sb.disabled=false; toast("등록 실패: "+esc(e.message)); });
+          };
         } else if(!isNew){
           // 대상 없이 열린 편집 화면 — 저장해도 아무 일이 없다. 그 사실을 밝힌다.
           var al=document.createElement("div");
@@ -772,7 +835,8 @@
     <script src="vendors/dayjs/dayjs.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
-  <script src="../shared/su-icons.js"></script>
+  <script src="../shared/ui-progress.js"></script>
+<script src="../shared/su-icons.js"></script>
   <script src="../shared/admin-auth.js"></script>
 </body>
 
