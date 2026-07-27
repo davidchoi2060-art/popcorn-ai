@@ -17,7 +17,10 @@ router = APIRouter(prefix="/api/admin")
 PART_TYPE_LABELS = {
     "CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
     "SSD": "SSD", "HDD": "HDD", "POWER": "파워", "CASE": "케이스",
-    "COOLER_CPU_AIR": "CPU쿨러", "COOLER_CPU_AIO": "CPU쿨러",
+    # 공랭·수냉은 견적에서 한 슬롯이지만 **상품 분류로는 다른 것**이다.
+    # 같은 라벨을 쓰면 집계에 'CPU쿨러'가 두 줄로 나와 운영자가 어느 쪽인지 알 수 없고,
+    # 라벨→코드 역매핑도 한쪽으로 뭉개진다(슬라이스 49).
+    "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수냉)",
     "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
     "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠",
     "ETC": "미분류",   # 적재 시 부품 종류를 정하지 못한 상품(슬라이스 39) — 추천 대상 아님
@@ -178,10 +181,11 @@ class RegisterBody(BaseModel):
 @router.post("/products")
 def register_product(body: RegisterBody):
     from .admin_orders import _log  # kind 파라미터형 공용 로거
-    rev = {}
-    for k, v in PART_TYPE_LABELS.items():
-        rev.setdefault(v, k)       # CPU쿨러 중복 라벨은 선순위(COOLER_CPU_AIR) 채택
-    pt = rev.get(body.part_label.strip())
+    # 라벨은 이제 1:1이다(공랭/수냉 분리) — setdefault로 뭉갤 중복이 없다.
+    rev = {v: k for k, v in PART_TYPE_LABELS.items()}
+    lab = body.part_label.strip()
+    # 뭉뚱그린 옛 라벨('CPU쿨러')을 보내는 화면이 남아 있을 수 있어 공랭으로 받아준다.
+    pt = rev.get(lab) or ("COOLER_CPU_AIR" if lab == "CPU쿨러" else None)
     if pt is None:
         raise HTTPException(400, f"알 수 없는 분류: {body.part_label}")
     if not body.name.strip():

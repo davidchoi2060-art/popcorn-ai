@@ -353,12 +353,29 @@
                 }).join("") + '</div>'
               : '<p class="fs-9 text-body-tertiary mb-0">교체 기록 없음</p>';
 
-            // 클릭 원천은 상태가 다르다 — 사유를 밝힌다(0건이 아니라 '측정하지 않음')
-            var clickBlock = d.clicks.empty
-              ? '<div class="alert alert-warning py-2 px-3 fs-9 mb-0 mt-3">'
-                + '<b>근거 리포트 클릭 — 원천 준비 중</b><div class="mt-1">'
-                + esc(d.clicks.reason) + '</div></div>'
-              : '<p class="fs-9 mb-0 mt-3">클릭 ' + d.clicks.count.toLocaleString() + '건</p>';
+            // 수집 경로는 슬라이스 49에서 열렸다. 0건은 '측정하지 않음'이 아니라
+            // '아직 아무도 누르지 않음'이다 — 둘을 같은 말로 쓰지 않는다.
+            var ck = d.clicks;
+            var clickBlock;
+            if(ck.empty){
+              clickBlock = '<div class="alert alert-subtle-secondary py-2 px-3 fs-9 mb-0 mt-3">'
+                + '<b>근거 리포트 클릭 — 아직 0건</b><div class="mt-1">'
+                + esc(ck.reason) + '</div></div>';
+            } else {
+              var top = (ck.top || []).map(function(c){
+                return '<div class="d-flex justify-content-between align-items-center">'
+                  + '<span class="text-truncate" style="max-width:70%;">'
+                  + '<span class="text-body-tertiary me-1">' + esc(c.label) + '</span>'
+                  + esc(c.name || ('#' + c.product_code)) + '</span>'
+                  + '<span class="fs-9"><b>' + c.n + '회</b></span></div>';
+              }).join("");
+              clickBlock = '<div class="mt-3"><div class="fs-10 text-body-tertiary mb-2">'
+                + '근거를 확인하려 누른 부품 (총 ' + ck.count.toLocaleString() + '회 · '
+                + '방문자 식별 ' + ck.identified.toLocaleString() + ' · 식별 없음 '
+                + (ck.unidentified || 0).toLocaleString() + ')</div>'
+                + '<div class="d-flex flex-column gap-2">' + top + '</div>'
+                + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + esc(ck.reason) + '</p></div>';
+            }
 
             host.innerHTML = '<div class="fs-10 text-body-tertiary mb-2">슬롯별 교체 빈도 '
               + '(총 ' + d.total.toLocaleString() + '회)</div>' + slots + clickBlock

@@ -263,8 +263,18 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 일괄 등록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">상품 일괄 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CSV-010</span></h2>
+          <div><h2 class="mb-1">상품 일괄 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CSV-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">엑셀/CSV를 올리면 <b class="text-body-secondary">상품 원본 자료에 그대로 보존</b>되고, 검증을 통과한 것만 정본에 반영됩니다.</p></div>
+        </div>
+        <!-- 이 화면의 4단계는 아직 시늉이다. 서버에 업로드 적재 엔드포인트가 없고
+             실제 적재는 스크립트로만 이뤄진다. 버튼이 도는 것처럼 보이면 운영자가
+             "올렸다"고 착각한다 — 그게 가장 위험한 거짓이다(슬라이스 49). -->
+        <div class="alert alert-warning d-flex align-items-start py-2 fs-9 mb-3" role="alert">
+          <span data-feather="alert-triangle" style="width:14px;height:14px;flex:none;" class="me-2 mt-1"></span>
+          <div><b>이 화면으로는 아직 실제 적재가 되지 않습니다.</b> 아래 단계는 흐름을 보여주는
+          시늉이고, 버튼을 눌러도 상품 데이터는 바뀌지 않습니다. 지금 적재는 서버에서
+          <code>tools/catalog_import.py</code>로만 실행합니다 — 적재 결과는
+          <a href="csv-jobs.html" class="alert-link">일괄 등록 이력</a>에서 실데이터로 확인하십시오.</div>
         </div>
         <div class="alert alert-subtle-info d-flex align-items-center py-2 fs-9 mb-3" role="alert"><span data-feather="archive" style="width:14px;height:14px;flex:none;" class="me-2"></span>
           올린 원본은 <b class="mx-1">수정할 수 없습니다.</b> 값을 고치려면 파일을 고쳐 다시 올리거나, 상품 검수에서 확정하십시오. 같은 상품(SKU)의 가격은 공급처별로 따로 관리됩니다.</div>
@@ -445,6 +455,167 @@
           },900);
         }
         stepbar();if(window.feather)feather.replace();
+
+        // ══ LIVE 배선 (슬라이스 50) — 업로드 → 드라이런 → 확인 → 적용 ══
+        // 목업 연출을 덮어쓴다. 파일을 실제로 고르지 않으면 아무 일도 일어나지 않는다 —
+        // "적재된 것 같다"는 착각이 이 화면에서 가장 위험한 거짓이다.
+        var LIVE=false, STAGE=null, PICKED={master:null,dbp:null,dbs:null};
+        function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+          return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+        function fmt(n){return (n==null?0:n).toLocaleString();}
+        function mb(b){return (b/1048576).toFixed(1)+"MB";}
+        function liveOn(){
+          if(LIVE) return;
+          LIVE=true;
+          var b=document.getElementById("dataSrc");
+          if(b){b.textContent="실데이터 · Cloud SQL";
+                b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");}
+          // 경고 배너를 실제 동작 설명으로 교체
+          document.querySelectorAll(".alert-warning").forEach(function(a){
+            if(/실제 적재가 되지 않습니다/.test(a.textContent)){
+              a.className="alert alert-subtle-warning d-flex align-items-start py-2 fs-9 mb-3";
+              a.innerHTML='<span data-feather="alert-triangle" style="width:14px;height:14px;'
+                +'flex:none;" class="me-2 mt-1"></span><div><b>이 화면은 실제로 적재합니다.</b> '
+                +'적재는 상품코드 기준 덮어쓰기이며 삭제는 없고, 잠근 매입가·판매가는 유지됩니다. '
+                +'새 파일에서 못 뽑은 사양은 <b>기존 값을 지우지 않습니다</b>. '
+                +'<b>적용 후 되돌리기는 없습니다</b> — 검증 결과를 확인한 뒤 실행하십시오.</div>';
+            }
+          });
+        }
+        // 파일 선택 UI를 dropzone 안에 심는다(마크업 최소 변경)
+        (function(){
+          var dz=document.getElementById("dropzone"); if(!dz) return;
+          var box=document.createElement("div");
+          box.className="mt-3 text-start";
+          box.innerHTML=
+            '<label class="form-label fs-9 fw-bold mb-1">상품 마스터 CSV <span class="text-danger">*</span></label>'
+            +'<input type="file" id="upMaster" accept=".csv" class="form-control form-control-sm mb-2">'
+            +'<label class="form-label fs-9 fw-bold mb-1">사양 EAV(선택) — 두 파일을 함께</label>'
+            +'<input type="file" id="upDbp" accept=".csv" class="form-control form-control-sm mb-1" placeholder="db_products.csv">'
+            +'<input type="file" id="upDbs" accept=".csv" class="form-control form-control-sm mb-2">'
+            +'<label class="form-label fs-9 fw-bold mb-1">데이터 구분</label>'
+            +'<select id="upOrigin" class="form-select form-select-sm">'
+            +'<option value="real">실데이터(real)</option><option value="demo">데모(demo)</option></select>'
+            +'<p class="fs-10 text-body-tertiary mb-0 mt-2">사양 EAV를 빼면 사양은 상품명·스펙 원문에서만'
+            +' 추출됩니다. 이미 확인된 사양은 유지됩니다.</p>';
+          dz.parentNode.insertBefore(box,dz.nextSibling);
+          box.addEventListener("click",function(e){e.stopPropagation();});
+          function pick(){
+            PICKED.master=document.getElementById("upMaster").files[0]||null;
+            PICKED.dbp=document.getElementById("upDbp").files[0]||null;
+            PICKED.dbs=document.getElementById("upDbs").files[0]||null;
+            var fi=document.getElementById("fileinfo");
+            if(PICKED.master){
+              liveOn();
+              if(fi){fi.classList.remove("d-none");
+                fi.innerHTML='<div class="fs-9"><b>'+esc(PICKED.master.name)+'</b> · '
+                  +mb(PICKED.master.size)
+                  +(PICKED.dbp&&PICKED.dbs?' · 사양 EAV 2개 포함':' · 사양 EAV 없음')+'</div>';}
+              document.getElementById("tostep2").disabled=false;
+            }
+          }
+          ["upMaster","upDbp","upDbs"].forEach(function(id){
+            document.getElementById(id).addEventListener("change",pick);});
+        })();
+        // 검증(드라이런) — 목업 renderImpact를 실측으로 대체
+        document.getElementById("tostep2").onclick=function(){
+          if(!PICKED.master){renderImpact();show(2);return;}
+          var btn=this, old=btn.textContent;
+          btn.disabled=true; btn.textContent="검증 중…";
+          var fd=new FormData();
+          fd.append("master",PICKED.master);
+          if(PICKED.dbp&&PICKED.dbs){fd.append("db_products",PICKED.dbp);fd.append("db_specs",PICKED.dbs);}
+          fd.append("origin",document.getElementById("upOrigin").value);
+          fetch("/api/admin/catalog-import/dryrun",{method:"POST",body:fd})
+            .then(function(r){return r.json().then(function(j){return {ok:r.ok,st:r.status,j:j};});})
+            .then(function(res){
+              btn.disabled=false; btn.textContent=old;
+              if(!res.ok){
+                var d=res.j.detail;
+                alert("검증 실패: "+(typeof d==="string"?d:JSON.stringify(d)));
+                return;
+              }
+              STAGE=res.j;
+              var s=res.j.summary, im=res.j.impact;
+              var cards=[
+                ["읽은 행",fmt(s.row_total),"행","secondary","파일 전체"],
+                ["신규 상품",fmt(im.new),"건","primary","처음 등록"],
+                ["기존 상품 갱신",fmt(im.update),"건","primary","덮어쓰기(삭제 없음)"],
+                ["추천 후보 진입",fmt(im.pool_in),"건","primary","게이트 통과"],
+                ["추천 후보 이탈",fmt(im.pool_out),"건",im.pool_out?"warning":"secondary","게이트 불통과"],
+                ["검수 새로 회부",fmt(im.review_new),"건",im.review_new?"warning":"secondary","사양 미확인"],
+                ["제외",fmt(s.skipped_total),"행","secondary","분류 대상 아님"],
+                ["오류",fmt(s.error),"행",s.error?"warning":"secondary","원본에만 보존"]
+              ];
+              document.getElementById("impact").innerHTML=
+                '<div class="col-12 mb-2"><div class="alert alert-subtle-info py-2 px-3 fs-9 mb-2">'
+                +esc(res.j.verdict)+'</div>'
+                +'<div class="alert alert-subtle-warning py-2 px-3 fs-9 mb-0">'+esc(res.j.warning)
+                +'</div></div>'
+                +cards.map(function(c){return '<div class="col-6 col-md-4 col-xl-auto flex-xl-fill">'
+                  +'<div class="border rounded-3 p-3 h-100"><p class="fs-10 text-body-tertiary mb-1">'
+                  +c[0]+'</p><h4 class="mb-1">'+c[1]
+                  +'<span class="fs-10 fw-semibold text-body-tertiary"> '+c[2]+'</span></h4>'
+                  +'<span class="badge badge-phoenix badge-phoenix-'+c[3]+' fs-10">'+c[4]
+                  +'</span></div></div>';}).join("")
+                +(s.error_samples&&s.error_samples.length
+                  ? '<div class="col-12 mt-2"><div class="fs-10 text-body-tertiary">거부된 행(최대 20):'
+                    +s.error_samples.map(function(x){return ' #'+x.row_no+' '+esc(x.reason);}).join(" ·")
+                    +'</div></div>' : "");
+              var t3=document.getElementById("tostep3");
+              if(t3) t3.textContent="이대로 적재 실행 ("+fmt(s.ok)+"건)";
+              show(2);
+              if(window.feather)feather.replace();
+            })
+            .catch(function(e){btn.disabled=false;btn.textContent=old;alert("검증 실패: "+e.message);});
+        };
+        // 적용 — 드라이런이 보고한 건수를 되돌려 보낸다(다른 파일 확정 사고 방지)
+        document.getElementById("tostep3").onclick=function(){
+          if(!STAGE){show(3);runBatch();return;}
+          var btn=this, old=btn.textContent;
+          btn.disabled=true; btn.textContent="적재 중…";
+          var fd=new FormData();
+          fd.append("staging_id",STAGE.staging_id);
+          fd.append("expect_ok",String(STAGE.summary.ok));
+          show(3);
+          var el=document.getElementById("stages");
+          if(el)el.innerHTML='<div class="d-flex align-items-center gap-3 py-2">'
+            +'<div class="spinner-border spinner-border-sm text-warning" role="status"></div>'
+            +'<b class="fs-9">정본 반영 중 — 한 트랜잭션으로 처리합니다</b></div>';
+          fetch("/api/admin/catalog-import/apply",{method:"POST",body:fd})
+            .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+            .then(function(res){
+              btn.disabled=false; btn.textContent=old;
+              var st=document.getElementById("batchstate");
+              var pb=document.getElementById("pbar");
+              if(!res.ok){
+                var d=res.j.detail||{};
+                if(st){st.className="badge badge-phoenix badge-phoenix-danger";st.textContent="실패";}
+                if(el)el.innerHTML='<div class="alert alert-subtle-danger py-2 px-3 fs-9 mb-0">'
+                  +esc(typeof d==="string"?d:(d.detail||d.error||"적재 실패"))+'</div>';
+                return;
+              }
+              STAGE=null;                       /* 같은 업로드를 두 번 적용하지 못하게 */
+              if(pb)pb.style.width="100%";
+              if(st){st.className="badge badge-phoenix badge-phoenix-primary";st.textContent="완료";}
+              if(el)el.innerHTML='<div class="alert alert-subtle-info py-2 px-3 fs-9 mb-0">'
+                +esc(res.j.verdict)+'</div>';
+              var rc=document.getElementById("resultcards");
+              if(rc)rc.innerHTML=[["배치",res.j.job_id],["반영",fmt(res.j.ok)+"건"],
+                ["검수 회부",fmt(res.j.review)+"건"],["오류",fmt(res.j.error)+"행"],
+                ["카탈로그",fmt(res.j.after.catalog)+"건"],["추천 후보",fmt(res.j.after.pool)+"건"],
+                ["검수 대기",fmt(res.j.after.review)+"건"]]
+                .map(function(c){return '<div class="col-6 col-md-3"><div class="bg-body-secondary '
+                  +'rounded-3 p-2 text-center"><p class="fs-10 text-body-tertiary mb-0">'+c[0]
+                  +'</p><b>'+c[1]+'</b></div></div>';}).join("");
+              var rw=document.getElementById("result");
+              if(rw)rw.classList.remove("d-none");
+              if(window.feather)feather.replace();
+            })
+            .catch(function(e){btn.disabled=false;btn.textContent=old;
+              if(el)el.innerHTML='<div class="alert alert-subtle-danger py-2 px-3 fs-9 mb-0">'
+                +esc(e.message)+'</div>';});
+        };
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

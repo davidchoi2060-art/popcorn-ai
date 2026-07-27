@@ -69,7 +69,16 @@ def swap_logs(limit: int = 100):
              ORDER BY e.log_id DESC LIMIT 20
         """)).mappings().all()
 
+        # 근거 클릭 — 슬라이스 49부터 S2 부품 행 클릭이 쌓인다(그 전은 기록 자체가 없다).
+        # 자주 눌린 부품 = 설명만으로 납득이 안 된 부품. 추천 기준을 손볼 지점이다.
         clicks = conn.execute(text("SELECT count(*) FROM promo_click_logs")).scalar_one()
+        click_ident = conn.execute(text(
+            "SELECT count(*) FROM promo_click_logs WHERE user_id IS NOT NULL")).scalar_one()
+        click_top = conn.execute(text("""
+            SELECT c.product_code, p.sku, p.product_name, p.part_type, count(*) n
+              FROM promo_click_logs c LEFT JOIN products p USING (product_code)
+             GROUP BY 1, 2, 3, 4 ORDER BY n DESC, 1 LIMIT 10
+        """)).mappings().all()
 
     return {
         "total": total,
@@ -93,11 +102,27 @@ def swap_logs(limit: int = 100):
             "delta": r["price_delta"], "session_id": r["session_id"],
             "at": r["created_at"].isoformat(),
         } for r in recent],
-        # 클릭 원천은 상태가 다르다 — 0을 성과처럼 보여주지 않는다(배지 3종 규약)
+        # 수집 경로는 슬라이스 49에서 생겼다. 그래도 0건이면 '측정값 0'이 아니라
+        # '아직 아무도 누르지 않음'이다 — 둘을 같은 말로 보여주지 않는다(배지 3종 규약).
         "clicks": {
             "empty": clicks == 0, "count": clicks,
-            "reason": ("근거 리포트 클릭을 기록하는 경로가 아직 없습니다 — 고객 화면(S2)이"
-                       " 클릭 이벤트를 보내지 않습니다. 0건이 아니라 '측정하지 않음'입니다."),
+            # user_id는 회원이 아니라 **익명 방문자 키**다(FK: users). 로그인해도 방문자 키가
+            # 없으면 식별되지 않으므로 '게스트'라고 부르면 거짓이 된다 — '식별 없음'이다.
+            "identified": click_ident,
+            "unidentified": clicks - click_ident,
+            "top": [{
+                "product_code": c["product_code"], "sku": c["sku"], "name": c["product_name"],
+                "part_type": c["part_type"],
+                "label": PART_TYPE_LABELS.get(c["part_type"], c["part_type"] or "—"),
+                "n": c["n"],
+            } for c in click_top],
+            "reason": ("아직 근거를 눌러본 고객이 없습니다 — 수집 경로는 열려 있습니다"
+                       "(S2 부품 행 클릭 → /api/promo-click). 0건이 곧 '관심 없음'은 아닙니다."
+                       if clicks == 0 else
+                       f"S2에서 근거를 확인하려 누른 {clicks:,}건입니다"
+                       f"(방문자 식별 {click_ident:,} · 식별 없음 {clicks - click_ident:,})."
+                       " 자주 눌린 부품은 설명만으로 납득되지 않은 부품입니다."
+                       " 누가 눌렀는지는 방문자 키가 있을 때만 남습니다 — 회원 ID는 담지 않습니다."),
         },
         "note": ("교체 기록은 슬라이스 46부터 쌓입니다(그 전 교체는 기록이 없습니다)."
                  " 어느 슬롯을 자주 바꾸는지가 추천 기준을 고칠 신호입니다 —"

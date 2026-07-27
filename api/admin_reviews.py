@@ -30,7 +30,12 @@ FIELD_CAST = {
     **{f: "VARCHAR" for f in (
         "socket", "chipset", "mem_type", "form_factor", "interface", "pcie_gen",
         "resolution", "panel", "switch_type", "key_layout", "connection")},
+    # 목록형 사양(JSONB). 승인 대상에서 빠져 있어 케이스 규격·쿨러 소켓을 확정할 수
+    # 없었다 — 검수 제안의 41%가 이 두 필드다(슬라이스 51).
+    **{f: "JSONB" for f in ("form_factor_list", "socket_list")},
 }
+# JSONB 필드는 값이 JSON 배열 문자열이어야 한다 — 화면·수집기가 보내는 표기를 맞춘다
+JSON_FIELDS = {"form_factor_list", "socket_list"}
 
 
 def _risk(review_type: str, field: str | None) -> str:
@@ -53,11 +58,15 @@ def _crit(part_type: str, target_field: str | None, review_type: str, specs: dic
 
 
 @router.get("/reviews")
-def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: str = ""):
+def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: str = "",
+                 sellable: int = 0):
     """검수 큐 — 실데이터 적재 후 대기 건수가 수천이 되므로 서버 페이지네이션이 필수다(슬라이스 39).
 
     단가표發 편입 대기(sourcing_hold)는 **파생 목록**이라 페이지네이션 밖이다 —
     항목 수가 공급처 최신 파일 규모(수백)로 제한되므로 1페이지에만 덧붙인다.
+
+    `sellable=1`이면 **판매중 ∧ 재고>0** 상품만 — 지금 매출에 영향을 주는 것부터 본다
+    (슬라이스 49: 6,490건 중 1,720건. 나머지는 팔 수도 없는 상품이라 급하지 않다).
     """
     size = max(1, min(size, 500))
     page = max(1, page)
@@ -71,6 +80,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         WHERE r.review_status = '대기'
           AND (:part_type = '' OR p.part_type = :part_type)
           AND (:origin = '' OR p.data_origin = :origin)
+          AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
         ORDER BY r.created_at, r.review_id
         LIMIT :size OFFSET :offset
     """)
@@ -79,18 +89,52 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
          WHERE r.review_status = '대기'
            AND (:part_type = '' OR p.part_type = :part_type)
            AND (:origin = '' OR p.data_origin = :origin)
+           AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
     """)
+    # 종류별 집계는 **지금 보고 있는 범위**를 따른다. 필터를 켰는데 전체 분포를 보여주면
+    # 화면의 숫자와 배너의 숫자가 다른 말을 한다(슬라이스 49). part_type 필터만 제외한다 —
+    # 자기 자신으로 거르면 한 종류만 남아 집계의 뜻이 없어진다.
     qg = text("""
         SELECT p.part_type, count(*) n FROM product_reviews r JOIN products p USING (product_code)
-         WHERE r.review_status = '대기' GROUP BY 1 ORDER BY 2 DESC
+         WHERE r.review_status = '대기'
+           AND (:origin = '' OR p.data_origin = :origin)
+           AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
+         GROUP BY 1 ORDER BY 2 DESC
+    """)
+    # 큐 구성 — "6,490건"만 보여주면 운영자는 언젠가 처리하면 줄어들 줄 안다.
+    # 실제로는 대부분이 **원문에 값 자체가 없어** 일괄 확정이 불가능한 항목이다(슬라이스 49).
+    # 무엇이 손댈 수 있는 일이고 무엇이 사람 손이 필요한 일인지 화면이 구분해 말해야 한다.
+    # bulkable은 **일괄 확정 API가 실제로 처리하는 조건과 같아야 한다**
+    # (bulk_confirm: review_type='low_confidence' ∧ origin_value IS NOT NULL).
+    # '값이 있는 것' 전부를 세면 버튼이 처리하지 못하는 수를 약속하게 된다.
+    qs = text("""
+        SELECT count(*) AS total,
+               count(*) FILTER (WHERE r.origin_value IS NOT NULL
+                                  AND r.review_type = 'low_confidence') AS bulkable,
+               count(*) FILTER (WHERE r.origin_value IS NOT NULL
+                                  AND r.review_type <> 'low_confidence') AS single,
+               count(*) FILTER (WHERE r.origin_value IS NULL) AS manual,
+               count(*) FILTER (WHERE p.status = '판매중' AND p.stock_qty > 0) AS sellable
+        FROM product_reviews r JOIN products p USING (product_code)
+        WHERE r.review_status = '대기'
+    """)
+    qf = text("""
+        SELECT r.field_name, count(*) n,
+               count(*) FILTER (WHERE p.status = '판매중' AND p.stock_qty > 0) sell
+        FROM product_reviews r JOIN products p USING (product_code)
+        WHERE r.review_status = '대기' AND r.field_name IS NOT NULL
+        GROUP BY 1 ORDER BY n DESC LIMIT 12
     """)
     p = {"part_type": part_type.strip(), "origin": origin.strip(),
-         "size": size, "offset": (page - 1) * size}
+         "sellable": 1 if sellable else 0, "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
         rows = conn.execute(q, p).mappings().all()
         total = conn.execute(qc, p).scalar_one()
         by_type = [{"part_type": r[0], "label": PART_TYPE_LABELS.get(r[0], r[0]), "n": r[1]}
-                   for r in conn.execute(qg).all()]
+                   for r in conn.execute(qg, p).all()]
+        s = conn.execute(qs).mappings().first()
+        by_field = [{"field": r[0], "n": r[1], "sellable": r[2]}
+                    for r in conn.execute(qf).all()]
     items = [{
         "review_id": r["review_id"],
         "sku": r["sku"],
@@ -102,17 +146,37 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         "detail": r["detail"],
         "origin_value": r["origin_value"],
         "suggested_value": r["suggested_value"],
+        # 제안값의 출처를 밝힌다 — 다나와에서 온 값을 'AI 지식'이라 부르면 거짓이다
+        # (슬라이스 51). 스키마 무개정이라 detail의 표기에서 파생한다.
+        "suggest_source": ("danawa" if "다나와 제안" in (r["detail"] or "") else
+                           ("ai" if r["suggested_value"] is not None else None)),
         "confidence": float(r["confidence"]) if r["confidence"] is not None else None,
         "created_at": r["created_at"].isoformat(),
         "risk": _risk(r["review_type"], r["field_name"]),
         "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
     } for r in rows]
-    if page == 1 and not part_type:
+    if page == 1 and not part_type and not sellable:
         items.extend(_sourcing_items())
     return {"items": items, "page": page, "size": size, "total": total,
             "pages": (total + size - 1) // size, "by_type": by_type,
-            "note": ("검수 대기는 서버에서 나눠 보냅니다 — by_type은 전체 집계입니다."
-                     " 단가표發 편입 대기는 파생 목록이라 1페이지에만 붙습니다.")}
+            "queue": {
+                "total": s["total"],
+                "bulkable": s["bulkable"],      # 일괄 확정 버튼이 실제로 처리하는 수
+                "single": s["single"],          # 값은 있지만 단건 검수 강제(치명·주의)
+                "manual": s["manual"],          # 원문에 값이 없다 — 사람이 찾아 넣어야 한다
+                "sellable": s["sellable"],      # 판매중 ∧ 재고>0 — 지금 매출에 영향
+                "by_field": by_field,
+                "verdict": (
+                    f"대기 {s['total']:,}건 중 일괄 확정으로 끝낼 수 있는 건 {s['bulkable']:,}건, "
+                    f"값은 있지만 단건 검수가 필요한 건 {s['single']:,}건입니다. "
+                    f"나머지 {s['manual']:,}건은 원문에 값이 없어 사람이 사양을 찾아 넣어야 합니다"
+                    f" — 재파싱(respec)으로는 더 회수되지 않습니다. "
+                    f"지금 매출에 영향을 주는 건 판매중·재고 있는 {s['sellable']:,}건입니다."
+                ),
+            },
+            "note": ("검수 대기는 서버에서 나눠 보냅니다 — by_type·queue는 전체 집계입니다."
+                     " 단가표發 편입 대기는 파생 목록이라 1페이지에만 붙습니다."
+                     " sellable=1이면 판매중·재고>0만 봅니다.")}
 
 
 # ---- 슬라이스 16: 단가표 신규(sourcing_hold) — 저장 없는 파생 큐 ----

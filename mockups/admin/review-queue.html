@@ -266,6 +266,7 @@
           <div><h2 class="mb-1">상품 검수 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2><p class="text-body-tertiary mb-0">AI가 자동 통과시키지 못한 항목만 모입니다. <b class="text-body-secondary">검수를 통과해야 추천 가능 재고에 올라갑니다.</b></p></div>
           <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">10</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">0</span>건</p></div>
         </div>
+        <div id="queueBrief"></div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="filterPills"></ul>
         <div id="bulkBar"></div>
         <div class="row g-3">
@@ -340,7 +341,7 @@
               crit:[], note:it.detail})
           : ({id:it.sku,review_id:it.review_id,name:it.name,cat:it.cat,type:it.type,field:it.field,
           origin:it.origin_value==null?"없음":it.origin_value, know:it.suggested_value==null?"—":it.suggested_value,
-          origin_raw:it.origin_value, know_raw:it.suggested_value,
+          origin_raw:it.origin_value, know_raw:it.suggested_value, know_src:it.suggest_source,
           conf:it.confidence, wait:relTime(it.created_at), risk:it.risk,
           crit:it.crit.map(c=>[(FIELD_KO[c.field]?FIELD_KO[c.field]+" ":"")+"{"+c.field+"}", c.value, c.ok]),
           note:it.detail});
@@ -420,7 +421,7 @@
               <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0">${isCsv?"원본 · 파싱 결과":"사양 대조"} ${fk(q.field,"fs-9")}</h6>${verdict}</div>
               <div class="row g-2">
                 <div class="col-6"><div class="bg-body-secondary rounded-2 p-2 h-100"><p class="fs-10 text-body-tertiary mb-1">${isCsv?"원본 셀":"원문 추출값"}</p><p class="mb-0 fw-bold text-body-highlight">${q.origin}</p></div></div>
-                <div class="col-6"><div class="bg-body-secondary rounded-2 p-2 h-100"><p class="fs-10 text-body-tertiary mb-1">${isCsv?"파싱 결과":"AI 지식 대조"}</p><p class="mb-0 fw-bold text-body-highlight">${q.know}</p></div></div>
+                <div class="col-6"><div class="bg-body-secondary rounded-2 p-2 h-100"><p class="fs-10 text-body-tertiary mb-1">${isCsv?"파싱 결과":(q.know_src==="danawa"?"다나와 제안 — 확인 필요":(q.know_src==="ai"?"AI 지식 대조":"제안 없음"))}</p><p class="mb-0 fw-bold text-body-highlight">${q.know}</p></div></div>
               </div>
               <p class="fs-9 text-body-tertiary mb-0 mt-2"><span data-feather="info" style="width:13px;height:13px;vertical-align:-2px;"></span> ${q.note}</p>
               <a href="imports.html?id=${q.id}" class="btn btn-link btn-sm p-0 mt-2 fs-9 fw-bold text-decoration-none">원문 상세 보기 <span data-feather="external-link" style="width:12px;height:12px;vertical-align:-1px;"></span></a>
@@ -600,8 +601,45 @@
           if(pv) pv.onclick = function(){ if(RV_PAGE > 1){ RV_PAGE--; rvLoad(); } };
           if(nx) nx.onclick = function(){ if(RV_PAGE < d.pages){ RV_PAGE++; rvLoad(); } };
         }
+        // 큐 구성 — "대기 6,490건"만 보여주면 운영자는 처리하다 보면 줄어들 줄 안다.
+        // 실제로는 그 99.95%가 **원문에 값이 없어** 확정 버튼으로는 한 건도 못 줄인다.
+        // 무엇이 손댈 수 있는 일이고 무엇이 사람 손이 필요한 일인지 먼저 말한다(슬라이스 49).
+        var RV_SELLABLE = 0;
+        function rvBrief(d){
+          var el = document.getElementById("queueBrief"); if(!el) return;
+          var q = d.queue; if(!q){ el.innerHTML = ""; return; }
+          var fields = (q.by_field || []).slice(0, 6).map(function(f){
+            return '<span class="badge badge-phoenix badge-phoenix-secondary me-1 mb-1">'
+              + f.field + ' ' + f.n.toLocaleString()
+              + '<span class="text-body-tertiary"> · 판매중 ' + f.sellable.toLocaleString() + '</span></span>';
+          }).join("");
+          el.className = "card mb-3";
+          el.innerHTML = '<div class="card-body py-3">'
+            + '<div class="d-flex flex-wrap gap-4 align-items-end mb-2">'
+            +   '<div><div class="fs-9 text-body-tertiary">대기</div>'
+            +     '<div class="fs-5 fw-bolder">' + q.total.toLocaleString() + '</div></div>'
+            +   '<div><div class="fs-9 text-body-tertiary">일괄 확정 가능</div>'
+            +     '<div class="fs-5 fw-bolder text-primary">' + q.bulkable.toLocaleString() + '</div></div>'
+            +   '<div><div class="fs-9 text-body-tertiary">단건 검수 필요(값 있음)</div>'
+            +     '<div class="fs-5 fw-bolder">' + (q.single || 0).toLocaleString() + '</div></div>'
+            +   '<div><div class="fs-9 text-body-tertiary">사람이 찾아 넣어야 함</div>'
+            +     '<div class="fs-5 fw-bolder">' + q.manual.toLocaleString() + '</div></div>'
+            +   '<div><div class="fs-9 text-body-tertiary">판매중·재고 있음(지금 매출 영향)</div>'
+            +     '<div class="fs-5 fw-bolder">' + q.sellable.toLocaleString() + '</div></div>'
+            +   '<button id="rvSellable" class="btn btn-sm ms-auto '
+            +     (RV_SELLABLE ? 'btn-primary' : 'btn-phoenix-primary') + '">'
+            +     (RV_SELLABLE ? '전체 보기' : '판매중·재고 있는 것만 보기') + '</button>'
+            + '</div>'
+            + '<p class="fs-9 text-body-secondary mb-2">' + q.verdict + '</p>'
+            + (fields ? '<div class="fs-9"><span class="text-body-tertiary me-1">막힌 필드:</span>'
+                        + fields + '</div>' : '')
+            + '</div>';
+          var sb = document.getElementById("rvSellable");
+          if(sb) sb.onclick = function(){ RV_SELLABLE = RV_SELLABLE ? 0 : 1; RV_PAGE = 1; rvLoad(); };
+        }
         function rvLoad(){
-          fetch("/api/admin/reviews?page=" + RV_PAGE + "&size=100")
+          fetch("/api/admin/reviews?page=" + RV_PAGE + "&size=100"
+                + (RV_SELLABLE ? "&sellable=1" : ""))
             .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
               LIVE = true; QUEUE = d.items.map(fromApi);
@@ -611,6 +649,7 @@
               applyDeepLink();
               renderAll();
               rvBanner(d);
+              rvBrief(d);
               if(window.feather) feather.replace();
             })
             .catch(()=>{});
