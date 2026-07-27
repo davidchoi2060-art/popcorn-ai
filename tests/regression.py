@@ -300,11 +300,11 @@ def _mp(fields: dict, files: dict) -> tuple[bytes, dict]:
     return b"".join(out), {"Content-Type": "multipart/form-data; boundary=" + b}
 
 
-def post_raw(path, data, headers):
+def post_raw(path, data, headers, method="POST"):
     h = dict(headers)
     if SESSION:
         h["Cookie"] = "; ".join(SESSION.values())
-    req = urllib.request.Request(BASE + path, data=data, method="POST", headers=h)
+    req = urllib.request.Request(BASE + path, data=data, method=method, headers=h)
     try:
         with urllib.request.urlopen(req) as r:
             return r.status, json.load(r)
@@ -472,6 +472,68 @@ def test_compat():
 
 
 # ──────────────────────── 3. 4중 게이트 (추천 풀 진입) ────────────────────────
+def test_product_edit():
+    print("\n[12] 단건 상품 수정 — 잠금·원장·되돌리기 (슬라이스 53)")
+    pc = db_one("SELECT product_code FROM v_recommendation_candidates"
+                " WHERE stock_qty > 0 ORDER BY product_code LIMIT 1")
+    if pc is None:
+        print("  [SKIP] (I) 단건 수정 — DB 미연결")
+        return
+    d = get(f"/api/admin/products/{pc}")
+    check("상세는 추천 여부를 문장으로 밝힌다", bool(d.get("verdict")), "verdict", d.get("verdict"))
+    check("상세에 수정 가능 필드 목록이 있다", bool(d.get("editable")), "editable", d.get("editable"))
+    before = {"sale_price": d["sale_price"], "status": d["status"],
+              "locked": list(d["locked_fields"])}
+
+    # 가드: 허용 범위·화이트리스트 밖은 막는다 — 정본 수치가 흔들리면 견적이 통째로 흔들린다
+    st, _ = post_raw(f"/api/admin/products/{pc}",
+                     json.dumps({"changes": {"stock_qty": -1}}).encode(),
+                     {"Content-Type": "application/json"}, method="PATCH")
+    check("음수 재고는 400", st == 400, 400, st)
+    st, _ = post_raw(f"/api/admin/products/{pc}",
+                     json.dumps({"changes": {"part_type": "CPU"}}).encode(),
+                     {"Content-Type": "application/json"}, method="PATCH")
+    check("수정 불가 필드는 400", st == 400, 400, st)
+
+    st, r = post_raw(f"/api/admin/products/{pc}",
+                     json.dumps({"changes": {"sale_price": (d["sale_price"] or 0) + 1000,
+                                             "status": "품절"}}).encode(),
+                     {"Content-Type": "application/json"}, method="PATCH")
+    check("수정 성공", st == 200, 200, st)
+    if st != 200:
+        return
+    check("수정한 필드는 잠긴다(다음 적재가 덮지 않게)",
+          {"sale_price", "status"} <= set(r["locked_fields"]),
+          "sale_price·status 잠금", r["locked_fields"])
+    d2 = get(f"/api/admin/products/{pc}")
+    check("상태로 빠진 이유를 정확히 말한다", "품절" in d2["verdict"], "'품절' 언급", d2["verdict"])
+    check("판매중이 아니면 추천에서 빠진다", d2["in_pool"] is False, False, d2["in_pool"])
+
+    # 되돌림은 삭제가 아니라 역방향 복원 — 잠금도 함께 되돌아가야 한다
+    st, _ = post(f"/api/admin/products/undo/{r['undo_id']}")
+    check("되돌리기 성공", st == 200, 200, st)
+    d3 = get(f"/api/admin/products/{pc}")
+    check("값이 원복된다", d3["sale_price"] == before["sale_price"]
+          and d3["status"] == before["status"],
+          before, {"sale_price": d3["sale_price"], "status": d3["status"]})
+    check("잠금도 원복된다(안 그러면 적재가 영영 못 채운다)",
+          d3["locked_fields"] == before["locked"], before["locked"], d3["locked_fields"])
+    st, _ = post(f"/api/admin/products/undo/{r['undo_id']}")
+    check("이중 되돌리기는 409", st == 409, 409, st)
+    check("없는 상품 조회는 404",
+          anon_admin_status(f"/api/admin/products/999999999") in (404, 401), "404", "—")
+
+
+def anon_admin_status(path):
+    """세션을 붙이고 상태코드만 본다(위 검사의 보조)."""
+    req = urllib.request.Request(BASE + path, headers=_headers())
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+
+
 def test_gates():
     print("\n[3] 4중 게이트 — 사양·검수·가격·재고 (슬라이스 23·24·25)")
     pool = get("/api/admin/candidate-pool")
@@ -837,7 +899,7 @@ def main():
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
-               test_upload, test_guards):
+               test_upload, test_product_edit, test_guards):
         try:
             fn()
         except Exception as e:

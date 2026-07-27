@@ -234,3 +234,214 @@ def register_product(body: RegisterBody):
              {"product_code": pc, "sku": sku, "part_type": pt, "supplier_id": body.supplier_id,
               "model_key": body.model_name, "cost_price": body.cost_price}, kind="product")
         return {"ok": True, "sku": sku, "product_code": pc}
+
+
+# ---- 슬라이스 53: 단건 상세 조회·수정 (ADM-PRD-040) ----
+# **왜 필요했나.** 카탈로그 22,838건을 운영하는데 상품 하나를 손으로 고칠 방법이 없었다.
+# 가격이 틀리거나 판매를 멈추려면 CSV를 통째로 다시 올려야 했다(검수 화면은 사양만 고친다).
+#
+# **수정한 값은 잠근다.** locked_fields에 등록하지 않으면 다음 적재가 그대로 덮어써
+# 어제 고친 가격이 오늘 되돌아간다(A-16의 짝). 적재는 이미 이 잠금을 존중한다.
+#
+# 되돌리기는 삭제가 아니라 **역방향 값 복원**이다(원장 원칙) — before 스냅샷을 로그에 남기고
+# undo가 그것을 되돌린다. 역참조 키는 규약대로 `ref_log_id`.
+
+# 화면에서 고칠 수 있는 필드 -> (DB 컬럼, 파서). 여기 없는 것은 화면이 못 바꾼다.
+EDITABLE = {
+    "name": ("product_name", lambda v: (str(v).strip() or None)),
+    "maker": ("maker", lambda v: (str(v).strip() or None)),
+    "sale_price": ("sale_price", lambda v: None if v in ("", None) else int(v)),
+    "purchase_price": ("purchase_price", lambda v: None if v in ("", None) else int(v)),
+    "stock_qty": ("stock_qty", lambda v: int(v)),
+    "status": ("status", lambda v: str(v).strip()),
+}
+STATUS_OK = ("판매중", "품절", "단종", "삭제대기")
+# 가격·재고는 정본 수치다 — 음수나 터무니없는 값이 들어가면 견적이 통째로 흔들린다
+LIMIT = {"sale_price": (0, 100_000_000), "purchase_price": (0, 100_000_000),
+         "stock_qty": (0, 100_000)}
+
+
+@router.get("/products/{product_code}")
+def get_product(product_code: int):
+    with engine.connect() as conn:
+        r = conn.execute(text(
+            "SELECT p.product_code, p.sku, p.product_name, p.maker, p.model_name, p.part_type,"
+            " p.category_group, p.status, p.ai_candidate_yn, p.review_required_yn,"
+            " p.purchase_price, p.sale_price, p.market_price, p.stock_qty, p.supplier,"
+            " p.danawa_code, p.data_origin, p.locked_fields, p.spec_source_text,"
+            " p.created_at, p.updated_at, to_jsonb(ps) AS specs"
+            " FROM products p LEFT JOIN product_specs ps USING (product_code)"
+            " WHERE p.product_code = :pc"), {"pc": product_code}).mappings().first()
+        if r is None:
+            raise HTTPException(404, "상품이 없습니다")
+        pending = conn.execute(text(
+            "SELECT count(*) FROM product_reviews WHERE product_code=:pc"
+            " AND review_status='대기'"), {"pc": product_code}).scalar_one()
+        in_pool = conn.execute(text(
+            "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
+            " AND stock_qty > 0"), {"pc": product_code}).first() is not None
+    done, total = spec_progress(r["part_type"], r["specs"])
+    locked = list(r["locked_fields"] or [])
+    if in_pool:
+        verdict = "추천 가능 재고에 있습니다."
+    elif pending:
+        verdict = f"사양 검수가 남아 추천에서 빠져 있습니다(대기 {pending}건)."
+    elif r["status"] != "판매중":
+        # 상태로 빠진 것을 "조건 미달"로 뭉뚱그리면 운영자가 원인을 못 찾는다
+        verdict = f"판매 상태가 '{r['status']}'이라 추천에서 빠져 있습니다."
+    elif (r["stock_qty"] or 0) <= 0:
+        verdict = "재고가 없어 추천에서 빠져 있습니다."
+    elif r["sale_price"] is None:
+        verdict = "판매가가 없어 추천에서 빠져 있습니다."
+    elif r["category_group"] != "core_part":
+        verdict = "부품 분류가 아니라 추천 대상이 아닙니다."
+    elif r["specs"] is None:
+        verdict = "사양 정보가 없어 추천에서 빠져 있습니다(적재에서 부품 종류를 못 정함)."
+    else:
+        verdict = "추천 조건을 아직 만족하지 않습니다."
+    return {
+        "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
+        "maker": r["maker"], "model_name": r["model_name"],
+        "part_type": r["part_type"], "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
+        "category_group": r["category_group"], "status": r["status"],
+        "purchase_price": r["purchase_price"], "sale_price": r["sale_price"],
+        "market_price": r["market_price"], "stock_qty": r["stock_qty"],
+        "supplier": r["supplier"], "danawa_code": r["danawa_code"],
+        "origin": r["data_origin"], "locked_fields": locked,
+        "spec_source_text": r["spec_source_text"],
+        "specs": r["specs"], "spec_done": done, "spec_total": total,
+        "spec_row_missing": r["specs"] is None,
+        "review_pending": pending, "in_pool": in_pool,
+        "editable": sorted(EDITABLE), "status_options": list(STATUS_OK),
+        "created_at": r["created_at"].isoformat(),
+        "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+        # 화면이 그대로 쓰는 한 문장 — 왜 추천에 들어가고 못 들어가는지
+        "verdict": verdict,
+    }
+
+
+class PatchBody(BaseModel):
+    changes: dict           # {필드: 값} — EDITABLE에 있는 것만
+    lock: bool = True       # 고친 값을 적재가 못 덮게 잠근다(기본 켬)
+
+
+@router.patch("/products/{product_code}")
+def patch_product(product_code: int, body: PatchBody):
+    import json as _json
+
+    from .admin_orders import _log
+
+    changes = {k: v for k, v in (body.changes or {}).items() if k in EDITABLE}
+    unknown = [k for k in (body.changes or {}) if k not in EDITABLE]
+    if unknown:
+        raise HTTPException(400, "수정할 수 없는 필드: " + ", ".join(unknown))
+    if not changes:
+        raise HTTPException(400, "변경할 내용이 없습니다")
+
+    parsed = {}
+    for k, raw in changes.items():
+        col, conv = EDITABLE[k]
+        try:
+            v = conv(raw)
+        except (TypeError, ValueError):
+            raise HTTPException(400, f"{k} 값 형식이 올바르지 않습니다: {raw!r}")
+        if k == "status" and v not in STATUS_OK:
+            raise HTTPException(400, f"알 수 없는 상태: {v}")
+        if k in LIMIT and v is not None:
+            lo, hi = LIMIT[k]
+            if not lo <= v <= hi:
+                raise HTTPException(400, f"{k}={v} 는 허용 범위({lo}~{hi}) 밖입니다")
+        if k == "name" and v is None:
+            raise HTTPException(400, "상품명은 비울 수 없습니다")
+        parsed[k] = (col, v)
+
+    with engine.begin() as conn:
+        cur = conn.execute(text(
+            "SELECT product_code, sku, product_name, maker, purchase_price, sale_price,"
+            " stock_qty, status, locked_fields FROM products WHERE product_code=:pc FOR UPDATE"),
+            {"pc": product_code}).mappings().first()
+        if cur is None:
+            raise HTTPException(404, "상품이 없습니다")
+
+        before, sets, params = {}, [], {"pc": product_code}
+        for k, (col, v) in parsed.items():
+            before[k] = cur[col]
+            if before[k] == v:            # 같은 값이면 원장을 더럽히지 않는다
+                continue
+            sets.append(f"{col} = :{k}")
+            params[k] = v
+        after = {k: parsed[k][1] for k in parsed if k in params}
+        if not after:
+            return {"ok": True, "changed": 0, "undo_id": None,
+                    "note": "값이 같아 바뀐 것이 없습니다"}
+
+        locked = list(cur["locked_fields"] or [])
+        if body.lock:
+            for k in after:
+                col = EDITABLE[k][0]
+                if col not in locked:
+                    locked.append(col)
+        sets.append("locked_fields = CAST(:lf AS JSONB)")
+        sets.append("updated_at = now()")
+        params["lf"] = _json.dumps(locked, ensure_ascii=False)
+        conn.execute(text("UPDATE products SET " + ", ".join(sets)
+                          + " WHERE product_code=:pc"), params)
+
+        log_id = _log(conn, "product_edit", cur["sku"],
+                      {"product_code": product_code, "sku": cur["sku"],
+                       "changes": {k: {"from": before[k], "to": after[k]} for k in after},
+                       "before": {"locked_fields": list(cur["locked_fields"] or [])},
+                       "locked": body.lock}, kind="product")
+        in_pool = conn.execute(text(
+            "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
+            " AND stock_qty > 0"), {"pc": product_code}).first() is not None
+
+    return {"ok": True, "changed": len(after), "fields": sorted(after),
+            "locked_fields": locked, "in_pool": in_pool, "undo_id": log_id,
+            "note": ("수정한 필드는 잠겼습니다 — 다음 적재가 덮어쓰지 않습니다."
+                     if body.lock else "잠그지 않았습니다 — 다음 적재가 덮어쓸 수 있습니다.")}
+
+
+@router.post("/products/undo/{log_id}")
+def undo_product_edit(log_id: int):
+    """수정 되돌리기 — 삭제가 아니라 이전 값으로의 역방향 복원(원장 원칙)."""
+    import json as _json
+
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            {"i": log_id}).mappings().first()
+        if row is None or row["action"] != "product_edit":
+            raise HTTPException(404, "되돌릴 수정 기록이 없습니다")
+        dup = conn.execute(text(
+            "SELECT 1 FROM admin_operator_activity_logs"
+            " WHERE action='product_edit_undo' AND (detail->>'ref_log_id')::int=:i LIMIT 1"),
+            {"i": log_id}).first()
+        if dup:
+            raise HTTPException(409, "이미 되돌린 수정입니다")
+
+        d = row["detail"] or {}
+        pc = d.get("product_code")
+        chg = d.get("changes") or {}
+        sets, params = [], {"pc": pc}
+        for k, fromto in chg.items():
+            if k not in EDITABLE:
+                continue
+            sets.append(EDITABLE[k][0] + " = :" + k)
+            params[k] = fromto.get("from")
+        if not sets:
+            raise HTTPException(400, "되돌릴 변경 내용이 없습니다")
+        restored = len(sets)
+        # 잠금도 수정 전 상태로 되돌린다 — 되돌렸는데 잠금만 남으면 적재가 영영 못 채운다
+        sets.append("locked_fields = CAST(:lf AS JSONB)")
+        params["lf"] = _json.dumps((d.get("before") or {}).get("locked_fields") or [],
+                                   ensure_ascii=False)
+        sets.append("updated_at = now()")
+        conn.execute(text("UPDATE products SET " + ", ".join(sets)
+                          + " WHERE product_code=:pc"), params)
+        _log(conn, "product_edit_undo", str(d.get("sku") or pc),
+             {"ref_log_id": log_id, "product_code": pc,
+              "restored": {k: v.get("from") for k, v in chg.items()}}, kind="product")
+    return {"ok": True, "restored": restored}
