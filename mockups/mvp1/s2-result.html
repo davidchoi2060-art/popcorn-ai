@@ -501,23 +501,80 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   var pr=document.getElementById('s2-price');if(pr)pr.textContent=s.total.toLocaleString();
   if(listHead)listHead.textContent='부품 상세 · '+s.items.length+'종 (전체)';
   if(listWrap){
+   /* 부품 행을 눌러 근거를 확인할 수 있게 한다(슬라이스 49).
+      누른 사실은 promo_click_logs에 남는다 — 자주 눌리는 부품 = 설명만으로 납득이
+      안 되는 부품이고, 그게 추천 기준을 손볼 지점이다. 기록 실패는 이동을 막지 않는다. */
    listWrap.innerHTML=s.items.map(function(it){
-    return '<div style="display:flex;justify-content:space-between;font-size:13.5px;gap:10px;"><span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[it.part_type]||it.part_type)+'</span><span style="font-weight:700;text-align:right;">'+it.name+' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span></span></div>';
+    return '<div data-click-part="'+it.product_code+'" role="button" tabindex="0"'
+     +' title="이 부품의 근거 보기" style="display:flex;justify-content:space-between;'
+     +'font-size:13.5px;gap:10px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px;">'
+     +'<span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[it.part_type]||it.part_type)+'</span>'
+     +'<span style="font-weight:700;text-align:right;">'+it.name
+     +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span></span></div>';
    }).join('')
    +'<a href="#sec-periph" style="font-size:12.5px;color:#e8b563;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:15px;">devices</span>모니터·키보드는 아래 &quot;함께 쓰면 좋은 구성&quot;에서 ↓</a>';
+   listWrap.querySelectorAll('[data-click-part]').forEach(function(row){
+    var go=function(){
+     var pc=row.getAttribute('data-click-part');
+     try{localStorage.setItem('popcorn-quote-tier',k);}catch(e){}
+     fetch('/api/promo-click',{method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({product_code:parseInt(pc,10)})})
+      .catch(function(){})                       /* 집계 실패가 이동을 막지 않는다 */
+      .then(function(){window.location.href='s3-detail.html';});
+    };
+    row.addEventListener('click',go);
+    row.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
+   });
   }
   if(pctEl){pctEl.textContent=s.compat.power_headroom_pct+'%';}
   // 호환 근거는 규칙 수만큼 전부 보여준다(슬라이스 34 — 엔진이 판정한 규칙과 1:1).
   // 카드가 부족하면 첫 카드를 복제해 늘린다 — 4종만 보여주고 3종을 숨기지 않는다.
   if(checkGrid&&s.compat.checks.length>checkCards.length&&checkCards.length){
    var proto=checkCards[0];
-   for(var k=checkCards.length;k<s.compat.checks.length;k++)checkGrid.appendChild(proto.cloneNode(false));
+   /* 루프 변수를 k로 쓰면 이 함수의 파라미터 k(티어 키)를 덮어쓴다 — 실제로
+      popcorn-quote-tier에 'value' 대신 '8'이 저장됐다(슬라이스 49). */
+   for(var ci=checkCards.length;ci<s.compat.checks.length;ci++)checkGrid.appendChild(proto.cloneNode(false));
    checkCards=checkGrid.querySelectorAll(':scope > div');
   }
   for(var i=0;i<Math.min(checkCards.length,s.compat.checks.length);i++){
    var c=s.compat.checks[i];
    var okCol=c.pass!==false;
    checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:'+(okCol?'#2f9e6d':'#b31b25')+';">'+(okCol?'check_circle':'error')+'</span><span style="font-size:14.5px;font-weight:700;color:#2c4c3c;">'+c.label+'</span><span style="font-size:12px;color:#7aa891;">'+c.detail+'</span>';
+  }
+  /* 제목·배지의 '5종'은 목업 시절 하드코딩이다 — 규칙 수는 서버가 정한다(현재 8종).
+     실제로 더 많이 검사하는데 적게 말하면 손해이고, 무엇보다 거짓이다(슬라이스 48).
+     실패가 하나라도 있으면 '전부 통과'라고 말하지 않는다. */
+  var nC=s.compat.checks.length,nF=0;
+  s.compat.checks.forEach(function(c){if(c.pass===false)nF++;});
+  var okAll=nF===0;
+  var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),tn,hits=[];
+  while((tn=tw.nextNode()))if(/호환성\s*\d+종|\d+가지를 모두 확인/.test(tn.nodeValue))hits.push(tn);
+  hits.forEach(function(n){
+   n.nodeValue=n.nodeValue
+    .replace(/호환성\s*\d+종,\s*전부\s*통과했습니다/,
+      okAll?('호환성 '+nC+'종, 전부 통과했습니다')
+           :('호환성 '+nC+'종 중 '+nF+'종이 통과하지 못했습니다'))
+    .replace(/호환성\s*\d+종\s*전부\s*통과/,
+      okAll?('호환성 '+nC+'종 전부 통과'):('호환성 '+nC+'종 중 '+nF+'종 불통과'))
+    .replace(/\d+가지를 모두 확인/,nC+'가지를 모두 확인');
+  });
+  /* 예산 판정은 서버가 내려준다(cap·verdict·over_by). 화면이 이걸 안 쓰면 120만원 예산에
+     3,025만원 구성을 내밀면서 초과 사실을 감춘다 — 실제로 그랬다(슬라이스 48).
+     초록 토큰이 없으므로 통과=primary·초과=error로 쓰고 **항상 텍스트를 병기**한다. */
+  var pe=document.getElementById('s2-price');
+  if(pe&&s.budget){
+   var bd=document.getElementById('s2-budget-verdict');
+   if(!bd){
+    bd=document.createElement('div');bd.id='s2-budget-verdict';
+    bd.style.cssText='margin-top:6px;font-size:12.5px;font-weight:800;line-height:1.45;';
+    pe.parentNode.appendChild(bd);
+   }
+   var ov=s.budget.verdict==='over';
+   bd.style.color=ov?'#b31b25':'#2b5fd9';
+   bd.textContent=ov
+    ?('예산 초과 — 상한 '+s.budget.cap.toLocaleString()+'원보다 '
+      +s.budget.over_by.toLocaleString()+'원 많습니다')
+    :('예산 안 — 상한 '+s.budget.cap.toLocaleString()+'원');
   }
   var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
   if(cp)cp.textContent=s.total.toLocaleString();if(cp2)cp2.textContent=s.total.toLocaleString();

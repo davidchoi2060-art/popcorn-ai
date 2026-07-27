@@ -212,7 +212,13 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
  var toastEl=document.getElementById('s3-toast');
  function tmsg(m){toastEl.textContent=m;toastEl.style.opacity='1';toastEl.style.transform='translateX(-50%) translateY(0)';clearTimeout(toastEl._t);toastEl._t=setTimeout(function(){toastEl.style.opacity='0';toastEl.style.transform='translateX(-50%) translateY(20px)';},2800);}
  var partsBox=document.querySelector('main [data-swap]')?document.querySelector('main [data-swap]').closest('div[style*="overflow:hidden"]'):null;
- var totalEl=(function(){var sp=document.querySelectorAll('span');for(var i=0;i<sp.length;i++){if(sp[i].textContent.indexOf('4,769,000')===0)return sp[i];}return null;})();
+ /* 더미 총액을 담은 요소를 텍스트노드로 찾는다. 이전에는 span으로 가정했는데 실제로는 div라
+    한 번도 못 찾았고, 상단 '현재 구성 총액'이 목업 값 4,769,000원에 멈춰 있었다(슬라이스 48). */
+ var totalEls=(function(){
+  var out=[],tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n;
+  while((n=tw.nextNode()))if((n.nodeValue||'').indexOf('4,769,000')>-1)out.push(n.parentElement);
+  return out;   /* 상단 '현재 구성 총액'과 하단 '총 견적 금액' — 둘 다 갱신해야 한다 */
+ })();
  var compatCard=document.querySelector('aside > div');
  function renderParts(){
   if(!partsBox)return;
@@ -234,17 +240,34 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
   });
   partsBox.innerHTML=h;
   partsBox.querySelectorAll('[data-live-swap]').forEach(function(b){b.addEventListener('click',function(){openLive(b.getAttribute('data-live-swap'));});});
-  if(totalEl)totalEl.innerHTML=C.total.toLocaleString()+'<span style="font-size:13px;color:#8a8578;">원</span>';
+  totalEls.forEach(function(el){el.innerHTML=C.total.toLocaleString()+'<span style="font-size:13px;color:#8a8578;">원</span>';});
  }
  function renderCompat(){
   var cm=C.compat;if(!cm||!compatCard)return;
   var box=compatCard.querySelector('div[style*="flex-direction:column"]');if(!box)return;
-  var find=function(k){for(var i=0;i<cm.checks.length;i++)if(cm.checks[i].key===k)return cm.checks[i];return null;};
-  var row=function(lab,val,sub){return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:#5fd6a0;">check_circle</span>'+lab+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+sub+'</span>':'')+'</span><b style="font-size:12.5px;color:#5fd6a0;">'+val+'</b></div>';};
-  var s=find('socket'),m=find('mem'),t=find('cooler_tdp'),f=find('fit');
-  box.innerHTML=row('CPU 소켓','정상',s?s.detail:'')+row('메모리 규격','정상',m?m.detail:'')
-   +row('파워 정격 여유',cm.power_headroom_pct+'%','')+row('쿨러 TDP','정상',t?t.detail:'')
-   +row('케이스 실장','정상',f?f.detail:'');
+  /* 서버가 판정한 규칙을 1:1로 전부 그린다. 라벨·근거·통과 여부 모두 서버 값이다.
+     초록 토큰이 없으므로 통과/불통과는 색만이 아니라 텍스트로도 구분한다.
+     이전에는 목업 5행 틀에 맞춰 4종만 골라 쓰고 pass=false도 '정상'으로 찍었다 —
+     불통과를 통과로 보이게 하는 가장 위험한 거짓이었다. find('fit')은 없는 키였다. */
+  var row=function(lab,val,sub,ok){var col=ok?'#5fd6a0':'#ff8f84';
+   return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:'+col+';">'+(ok?'check_circle':'error')+'</span>'+lab+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+sub+'</span>':'')+'</span><b style="font-size:12.5px;color:'+col+';">'+val+'</b></div>';};
+  var html='';
+  cm.checks.forEach(function(c){var ok=c.pass!==false;
+   html+=row(c.label,ok?'정상':'불통과',c.detail||'',ok);});
+  /* 여유율은 규칙 판정이 아니라 수치다 — 규칙 목록과 섞지 않고 뒤에 붙인다 */
+  if(typeof cm.power_headroom_pct==='number')
+   html+=row('파워 정격 여유',cm.power_headroom_pct+'%','권장 대비',cm.power_headroom_pct>=100);
+  box.innerHTML=html;
+  /* '5종'은 목업 시절 하드코딩이다 — 규칙 수는 서버가 정한다(현재 8종).
+     불통과가 있으면 '통과'라고 말하지 않는다. */
+  var nC=cm.checks.length,nF=0;
+  cm.checks.forEach(function(c){if(c.pass===false)nF++;});
+  var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),tn,hits=[];
+  while((tn=tw.nextNode()))if(/호환(성)?\s*\d+종/.test(tn.nodeValue))hits.push(tn);
+  hits.forEach(function(n){
+   n.nodeValue=n.nodeValue.replace(/호환(성?)\s*\d+종/g,function(_,g){return '호환'+g+' '+nC+'종';});
+   if(nF)n.nodeValue=n.nodeValue.replace(/조립 가능 — (호환\s*\d+종)\s*통과/,'조립 불가 — $1 중 '+nF+'종 불통과');
+  });
  }
  function openLive(slot){
   var s=C.slots[slot];
@@ -263,7 +286,7 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
    }
    var b=document.createElement('button');
    b.style.cssText='display:block;width:100%;padding:14px 16px;border:1.5px solid #e2ded5;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;';
-   b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+a.name+'</span><span style="font-size:12.5px;color:#1c7a4d;font-weight:700;">✓ 호환 5종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
+   b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+a.name+'</span><span style="font-size:12.5px;color:#1c7a4d;font-weight:700;">✓ 호환 '+((C.compat&&C.compat.checks||[]).length)+'종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
    b.addEventListener('click',function(){applySwap(slot,a,b);});
    alts.appendChild(b);
   });
@@ -280,7 +303,12 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
     if(!res.ok){var d=res.j.detail||{};tmsg('⚠ '+(d.detail||d.error||'적용 실패'));return;}
     Q.sets[tier].items=res.j.items;Q.sets[tier].total=res.j.total;Q.sets[tier].compat=res.j.compat;
     try{localStorage.setItem('popcorn-quote',JSON.stringify({at:Date.now(),data:Q}));}catch(e){}
-    tmsg((a.chain?'연쇄 변경 적용 — ':'')+PKO[slot]+' 교체 완료 · 호환 5종 재검증 통과 · 총 '+res.j.total.toLocaleString()+'원');
+    /* 재검증 결과는 이 응답이 말한다 — 개수도 통과 여부도 추측하지 않는다(슬라이스 48) */
+    var rc=(res.j.compat&&res.j.compat.checks)||[],rf=0;
+    rc.forEach(function(c){if(c.pass===false)rf++;});
+    tmsg((a.chain?'연쇄 변경 적용 — ':'')+PKO[slot]+' 교체 완료 · 호환 '+rc.length
+     +(rf?('종 중 '+rf+'종 불통과'):'종 재검증 통과')
+     +' · 총 '+res.j.total.toLocaleString()+'원');
     load();
    })
    .catch(function(){tmsg('⚠ 적용에 실패했어요 — 다시 시도해 주세요.');});
@@ -294,6 +322,10 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
   // LIVE 성립 — 배지·정직화·티어 재저장
   var hd=compatCard?compatCard.querySelector('div'):null;
   if(hd){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='margin-left:auto;background:#2f9e6d;color:#fff;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:800;flex:0 0 auto;';hd.appendChild(bg);}
+  /* '3시간 전 재고가 기준'은 목업 문구다 — LIVE는 지금 조회한 재고로 판정한다(슬라이스 48) */
+  var tw2=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n2;
+  while((n2=tw2.nextNode()))if((n2.nodeValue||'').indexOf('3시간 전 재고가 기준')>-1){
+   n2.nodeValue=n2.nodeValue.replace('3시간 전 재고가 기준','방금 조회한 재고 기준');break;}
   var rf2=document.getElementById('s3-refine');
   if(rf2)rf2.addEventListener('click',function(ev){ev.stopImmediatePropagation();tmsg('자연어 교체는 준비 중이에요 — 아래 [변경] 버튼을 이용해 주세요.');},true);
   document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(){try{localStorage.setItem('popcorn-quote-tier',tier);}catch(e){}},true);});

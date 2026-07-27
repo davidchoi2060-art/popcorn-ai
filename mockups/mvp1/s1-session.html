@@ -505,8 +505,14 @@ function talkMon(t){
  return {i:'desktop_windows',l:'모니터',v:'구매 예정',f:1,why:['모니터: 함께 구성 제안 대상'],
   a:'모니터도 새로 보시는군요 — 조건에 잡아뒀어요. 본체가 정해지면 <b>견적서의 &quot;함께 쓰면 좋은 구성&quot;</b>에서 GPU 성능에 맞는 주사율로 골라 드릴게요.'};
 }
-function talkApply(p){addSpec(p.l,p.v,p.i);var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
+function talkApply(p){addSpec(p.l,p.v,p.i);// LIVE에서는 배수 연출(p.f)로 후보 수를 만들지 않는다(슬라이스 48) — addSpec이
+ // addConstraint를 타고 서버 재계산이 걸리므로, 그 응답만이 화면 숫자의 출처다.
+ if(!LIVE){var old=poolN;poolN=Math.max(1,Math.round(poolN*p.f));animate(pool,poolN);logFilter(p.l,old-poolN,p.why);candidates(poolN);}var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
+ // LIVE 보충(슬라이스 48): 팝콘톡 파서는 예산·모니터·시나리오만 읽는다. 서버가 실제로
+ // 후보 수에 반영하는 선호(저소음·화이트)를 놓치면 고객이 말한 조건이 사라진다 —
+ // chat 모드와 같은 기준으로 맞춘다(예산은 talkBudget이 담당하므로 선호만 보충).
+ if(LIVE){liveParse(t).forEach(function(c){if(c[1]==='선호')addConstraint(c[0],c[1],c[2]);});}
  var bud=talkBudget(t);
  var hit=null,score=0;
  TALKS.forEach(function(x){var n=0;x.k.forEach(function(k){if(low.indexOf(k)>-1)n++;});var need=x.min||1;if(n>=need&&n>score){hit=x;score=n;}});
@@ -622,13 +628,95 @@ function applyCount(d){
  Array.prototype.forEach.call(document.querySelectorAll('#s1-msgs b'),function(b){
   if(/^[\\d,]+개$/.test((b.textContent||'').trim()))b.textContent=d.count.toLocaleString()+'개';});
  renderEffects(d.effects);
- if(d.count===0){
+ /* 후보 수가 0이 아니어도 슬롯 하나가 비면 견적을 만들 수 없다(슬라이스 48).
+    판단은 서버의 buildable/verdict만 쓴다 — 화면이 '3구성 가능'을 추측하지 않는다. */
+ var nb=(d.buildable===false),zero=(d.count===0);
+ if(zero||nb){
   if(s3i){s3i.textContent='error';s3i.style.color='#e0894a';}
-  if(s3s){s3s.textContent='0개';s3s.style.color='#e0894a';}
+  if(s3s){s3s.textContent=zero?'0개':'조립 불가';s3s.style.color='#e0894a';}
   cb.disabled=true;cb.style.background='';cb.style.cursor='';
-  if(cap)cap.textContent='조건을 하나만 완화하면 후보가 생겨요.';
+  if(cap)cap.textContent=d.verdict||'조건을 하나만 완화하면 후보가 생겨요.';
+  emptyCard(d);
   if(empty){msgs.appendChild(empty);empty.style.display='flex';msgs.scrollTop=msgs.scrollHeight;}
- }else if(empty){empty.style.display='none';}}
+ }else{
+  if(empty)empty.style.display='none';
+  if(cap&&d.verdict&&!cb.disabled)cap.textContent=d.verdict;
+ }}
+/* 경고 카드 문구를 실제 사유로 갈아끼운다 — '0개'와 '슬롯이 비었다'는 다른 사건이다 */
+function emptyCard(d){
+ if(!empty)return;
+ var h=empty.querySelector('h3'),p=empty.querySelector('p');
+ var es=(d.empty_slots||[]).map(function(s){return s.label;});
+ if(h)h.textContent=es.length?'견적을 만들 수 없어요 — '+es.join(' · ')+' 후보가 없어요'
+                             :'조건을 만족하는 상품이 없어요';
+ if(p)p.innerHTML=es.length
+   ? '통과한 부품은 <b>'+d.count.toLocaleString()+'개</b>지만 '
+     +'<b style="color:#b04a3a;">'+es.join(' · ')+'</b>가 한 개도 없어 조립이 성립하지 않아요. '
+     +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.'
+   : '지금 조건을 모두 만족하는 상품이 <b style="color:#b04a3a;">0개</b>예요. '
+     +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.';
+ relaxChips(d);
+}
+/* 제약을 하나 뺀다 — 원장이 아니라 화면 상태이므로 제자리에서 지운다 */
+function dropCons(label){
+ for(var i=consPairs.length-1;i>=0;i--)if(consPairs[i].l===label)consPairs.splice(i,1);
+ var n=consMap[label];if(n&&n.parentNode)n.parentNode.removeChild(n);delete consMap[label];
+ var box=document.getElementById('s1-cons'),eb=document.getElementById('s1-cons-empty');
+ if(box&&eb&&!Object.keys(consMap).length)eb.style.display='';
+ budgetUpdate();mbarUpdate();scheduleCount();
+}
+/* 완화 칩을 실측으로 다시 그린다 — '이걸 풀면 몇 개가 되고, 견적이 되는가'를 서버에 묻는다.
+   목업의 '+1,240개'는 서버가 모르는 수였다(슬라이스 48). */
+function relaxChips(d){
+ var host=document.getElementById('s1-relax');
+ if(!host){
+  var e=document.getElementById('s1-empty');if(!e)return;
+  var b0=e.querySelector('button');if(!b0||!b0.parentNode)return;
+  Array.prototype.forEach.call(e.querySelectorAll('button'),function(b){
+   if((b.textContent||'').indexOf('직접 수정')<0)b.style.display='none';});  /* 하드코딩 칩 은폐 */
+  host=document.createElement('div');host.id='s1-relax';
+  host.style.cssText='display:flex;flex-direction:column;gap:10px;';
+  b0.parentNode.insertBefore(host,b0);
+ }
+ /* 서버가 조건으로 반영하지 않은 제약(applied=false)은 완화 칩에서 뺀다 —
+    풀어도 후보 수가 그대로여서 선택지로 내밀면 거짓 기대를 준다(예: '요청' 원문·용도). */
+ var acted={};(d&&d.effects||[]).forEach(function(e){if(e.applied)acted[e.label]=1;});
+ var live=consPairs.filter(function(p){return acted[p.l];});
+ if(!live.length){host.innerHTML='';return;}
+ host.innerHTML='<div style="font-size:12px;color:#8a7a52;">완화 효과를 세는 중…</div>';
+ var mine=++relaxSeq;
+ Promise.all(live.map(function(p){
+  var rest=consPairs.filter(function(q){return q.l!==p.l;}).map(function(q){return {l:q.l,v:q.v};});
+  return fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({constraints:rest})}).then(function(r){return r.json();})
+   .then(function(d){return {p:p,d:d};}).catch(function(){return null;});
+ })).then(function(rs){
+  if(mine!==relaxSeq)return;
+  rs=rs.filter(Boolean);
+  /* 견적이 되는 완화를 먼저 — 사용자가 고를 이유가 있는 순서 */
+  rs.sort(function(a,b){return (b.d.buildable?1:0)-(a.d.buildable?1:0)||b.d.count-a.d.count;});
+  host.innerHTML='';
+  rs.forEach(function(x){
+   var ok=x.d.buildable!==false;
+   var bt=document.createElement('button');
+   bt.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;'
+    +'padding:13px 15px;border:1.5px solid #e0cfa5;background:#fff;border-radius:12px;'
+    +'cursor:pointer;font-family:inherit;text-align:left;';
+   bt.innerHTML='<span style="font-size:14px;font-weight:800;color:#17171b;">'
+     +x.p.l+' 조건 <span style="color:#8a7a52;font-weight:700;">('+x.p.v+')</span> 풀기</span>'
+    +'<span style="display:flex;align-items:center;gap:8px;flex:0 0 auto;">'
+    +'<b style="font-size:13.5px;color:#2f5fd0;font-variant-numeric:tabular-nums;">'
+     +x.d.count.toLocaleString()+'개</b>'
+    +'<span style="font-size:10.5px;border-radius:999px;padding:2px 8px;white-space:nowrap;'
+     +(ok?'background:#e8eefc;color:#2f5fd0;">견적 가능'
+        :'background:#f7e7e4;color:#b04a3a;">여전히 불가')+'</span></span>';
+   bt.addEventListener('click',function(){dropCons(x.p.l);});
+   host.appendChild(bt);
+  });
+  if(!rs.length)host.innerHTML='';
+ });
+}
+var relaxSeq=0;
 // LIVE 시 가짜 연출 차단 — 배수 곱 결과는 서버 응답이 덮어쓴다
 var _anim=animate;animate=function(el,to){if(LIVE&&el===pool&&!_srv)return;_anim(el,to);};
 var _logF=logFilter;logFilter=function(l,d,r){if(LIVE)return;_logF(l,d,r);};
@@ -735,12 +823,40 @@ if(mode==='guided'){
 // 3,087이었다. 서버가 모르는 숫자를 고객에게 보여주는 것은 "모든 견적에는 이유가
 // 있습니다"와 정면으로 어긋난다. 이제 LIVE에서는 입력을 **서버가 실제로 반영하는
 // 조건**(예산·저소음·화이트)으로 승격해 다시 세고, 못 읽은 말은 세었다고 하지 않는다.
+/* 용도 어휘 = guided 옵션 값과 동일. 순서가 우선순위다 — '고사양 게임'이 '게임'보다 먼저.
+   서버 recommend는 (용도|상황) + 예산을 요구하므로 용도를 못 읽으면 견적 자체가 불가하다. */
+var USE_PAT=[
+ [/고사양\s*게임|배그|배틀그라운드|대작|AAA/i,'고사양 게임'],
+ [/게임|롤\b|리그\s*오브|발로란트|오버워치|피파|로스트아크|스타크래프트/i,'게임'],
+ [/영상\s*편집|프리미어|다빈치|애프터\s*이펙트|렌더링|쇼츠|유튜브\s*제작/i,'영상 편집'],
+ [/주식|트레이딩|증권|차트\s*여러|HTS|MTS/i,'주식·트레이딩'],
+ [/\bAI\b|인공지능|스테이블\s*디퓨전|이미지\s*생성|챗봇|LLM/i,'AI 작업'],
+ [/사무|엑셀|문서|한글\s*작업|파워포인트|\bPPT\b|워드/i,'사무'],
+ [/인강|강의\s*시청|인터넷\s*위주|웹서핑/i,'인터넷·시청'],
+ [/영화|넷플릭스|미디어\s*감상|영상\s*시청/i,'영화·미디어']
+];
+/* 선호 어휘. 여러 개를 말하면 한 값으로 합친다 — 라벨 기준 교체라 따로 넣으면 덮인다.
+   서버 `_apply_one`이 한 값의 복수 태그를 순차 결합한다. */
+var PREF_PAT=[
+ [/조용|저소음|정숙|무소음|사일런트/i,'저소음'],
+ [/화이트|하얀|흰/i,'화이트']
+];
 function liveParse(s){
   var out=[];
   var m=s.match(/(\d{2,4})\s*만/);
   if(m)out.push(['savings','예산',m[1]+'만원']);
-  if(/조용|저소음|정숙|무소음/.test(s))out.push(['volume_off','선호','저소음']);
-  if(/화이트|하얀|흰/.test(s))out.push(['palette','선호','화이트']);
+  var uses=[];
+  for(var i=0;i<USE_PAT.length;i++){
+   if(!USE_PAT[i][0].test(s))continue;
+   /* '고사양 게임'이 이미 잡혔으면 '게임'은 중복이므로 건너뛴다 */
+   if(USE_PAT[i][1]==='게임'&&uses.indexOf('고사양 게임')>-1)continue;
+   uses.push(USE_PAT[i][1]);
+  }
+  if(uses.length)out.push(['interests','용도',uses.join(' · ')]);
+  var prefs=[];
+  PREF_PAT.forEach(function(p){if(p[0].test(s))prefs.push(p[1]);});
+  if(prefs.length)out.push([prefs.length>1?'tune':(prefs[0]==='저소음'?'volume_off':'palette'),
+                            '선호',prefs.join(' · ')]);
   return out;
 }
 function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}

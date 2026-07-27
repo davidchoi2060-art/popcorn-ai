@@ -358,7 +358,9 @@ window.addEventListener('scroll',closeTip,{passive:true});
    d.style.cssText='display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;';
    var img=PIMG[it.part_type]
     ?'<img src="assets/parts/'+PIMG[it.part_type]+'.png" alt="'+it.part_type+'" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'
-    :'<span style="flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #ece9e3;background:#fff;"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:#8a8578;">mode_fan</span></span>';
+    /* 쿨러는 부품 이미지가 없다. 아이콘 폰트(mode_fan)는 매핑에 없어 'mode_fan'이라는
+       글자로 그대로 노출됐다 — 이미지가 없으면 라벨로 대신한다(슬라이스 48). */
+    :'<span style="flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #ece9e3;background:#faf9f6;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span>';
    d.innerHTML=img+'<span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.name+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.price.toLocaleString()+'원</div>';
    card.insertBefore(d,anchor);
   });
@@ -380,6 +382,34 @@ window.addEventListener('scroll',closeTip,{passive:true});
   if(demo){demo.disabled=true;demo.style.opacity='.45';demo.style.cursor='not-allowed';demo.textContent='관리자 설정';demo.title='운영 전환은 관리자 운영 전환 설정에서';}
   // 재고 카피 정직화
   document.querySelectorAll('div').forEach(function(d){if(d.childElementCount===0&&d.textContent.indexOf('전 품목 재고 확보')===0)d.textContent='결제 시점에 서버가 전 품목 재고를 확정 검증합니다';});
+  // 검증 칩 = 서버가 판정한 규칙 1:1 (슬라이스 48)
+  // 목업은 소켓·메모리·전력·쿨러·케이스 5개로 고정이었다. 서버는 8종을 검사하므로
+  // 3종을 숨기고 있었고, 불통과가 나와도 전부 '통과'로 보일 구조였다.
+  var chips=(S.compat&&S.compat.checks)||[];
+  if(chips.length){
+   var chipBox=null;
+   document.querySelectorAll('div').forEach(function(d){
+    if(!chipBox&&d.children.length>=5&&/소켓 통과/.test(d.textContent||''))chipBox=d;});
+   if(chipBox){
+    var nF=0;chips.forEach(function(c){if(c.pass===false)nF++;});
+    chipBox.innerHTML=chips.map(function(c){
+     var ok=c.pass!==false;
+     return '<span title="'+(c.detail||'').replace(/"/g,'')+'" style="display:flex;'
+      +'align-items:center;gap:5px;background:#fff;color:'+(ok?'#1c7a4d':'#b31b25')
+      +';padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">'
+      +'<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">'
+      +(ok?'check_circle':'error')+'</span>'
+      /* 서버 라벨이 이미 '통과'로 끝나는 규칙이 있다(쿨러 발열(TDP) 통과) — 중복을 지운다 */
+      +c.label.replace(/\s*통과$/,'')+' '+(ok?'통과':'불통과')+'</span>';
+    }).join('');
+    if(nF){
+     var hh=document.querySelector('h2');
+     document.querySelectorAll('h2').forEach(function(h){
+      if((h.textContent||'').indexOf('조립 가능함이 검증')>-1)
+       h.textContent='조립할 수 없는 구성입니다 — 호환 '+chips.length+'종 중 '+nF+'종 불통과';});
+    }
+   }
+  }
   // 배지
   var mrow=document.getElementById('s4-mode-badge');
   if(mrow){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:#e7f4ec;color:#1c7a4d;';mrow.parentNode.insertBefore(bg,mrow);}

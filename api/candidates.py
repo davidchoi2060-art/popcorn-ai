@@ -76,6 +76,33 @@ def _apply_one(parts: list[dict], label: str, value: str):
     return parts, False, "구성 단계(스코어)에서 반영 — 후보 수에는 영향 없음"
 
 
+# 견적 슬롯 = 엔진과 같은 정의(recommend.SLOTS / SLOT_TYPES).
+# **part_type 단위로 세면 오판한다**: 쿨러는 공랭·수냉이 한 슬롯이라 AIO가 0이어도
+# AIR가 남아 있으면 견적이 성립한다(슬라이스 48에서 실제로 헷갈렸다).
+QUOTE_SLOTS = {
+    "CPU": ("CPU",), "MB": ("MB",), "RAM": ("RAM",), "GPU": ("GPU",),
+    "CASE": ("CASE",), "COOLER": ("COOLER_CPU_AIR", "COOLER_CPU_AIO"),
+    "POWER": ("POWER",), "SSD": ("SSD",),
+}
+SLOT_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
+           "CASE": "케이스", "COOLER": "CPU쿨러", "POWER": "파워", "SSD": "SSD"}
+
+
+def _slot_view(parts: list[dict]) -> tuple:
+    """(슬롯별 남은 수, 빈 슬롯 목록) — 빈 슬롯이 하나라도 있으면 견적을 만들 수 없다.
+
+    후보 수가 수백이어도 한 슬롯이 0이면 조립이 불가능하다. 그 사실을 화면이 알아야
+    "N개로 3구성을 만들 수 있어요"라고 잘못 말하지 않는다(슬라이스 48).
+    """
+    counts, empty = {}, []
+    for slot, types in QUOTE_SLOTS.items():
+        n = sum(1 for p in parts if p["part_type"] in types)
+        counts[slot] = n
+        if n == 0:
+            empty.append(slot)
+    return counts, empty
+
+
 @router.post("/candidates/count")
 def count_candidates(body: CountBody):
     with engine.connect() as conn:
@@ -91,4 +118,16 @@ def count_candidates(body: CountBody):
             "label": c.l, "value": c.v, "applied": applied,
             "delta": before - len(parts), "count_after": len(parts), "reason": reason,
         })
-    return {"total": total, "count": len(parts), "effects": effects}
+    slot_counts, empty = _slot_view(parts)
+    return {
+        "total": total, "count": len(parts), "effects": effects,
+        "slots": slot_counts,
+        "buildable": not empty,
+        "empty_slots": [{"slot": s, "label": SLOT_KO.get(s, s)} for s in empty],
+        # 화면이 그대로 쓸 수 있는 한 문장 — 서버와 화면이 다른 말을 하지 않게
+        "verdict": ("지금 조건으로 가성비·추천·고성능 3구성을 만들 수 있어요."
+                    if not empty else
+                    "조건이 너무 좁아 "
+                    + " · ".join(SLOT_KO.get(s, s) for s in empty)
+                    + " 후보가 없어요 — 견적을 만들 수 없습니다. 조건을 하나만 완화해 주세요."),
+    }
