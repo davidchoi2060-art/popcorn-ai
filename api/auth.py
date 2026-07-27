@@ -105,7 +105,10 @@ def resolve_session(sid: str) -> dict | None:
 
 # 정책 발행급 쓰기 — 운영자 관리와 운영 모드 전환은 owner만.
 # 운영 모드는 주문·결제 흐름을 실제로 바꾼다(pay='mall'이면 자체 주문이 409로 거부된다).
-OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings")
+# 카탈로그 일괄 적재도 owner다(슬라이스 50): 파일 하나가 22,000건 정본을 덮고,
+# upsert이라 되돌릴 수단이 없다 — 운영자 등급에게 열 수 있는 일이 아니다.
+OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
+                        "/api/admin/catalog-import")
 
 
 def required_role(method: str, path: str) -> str:
