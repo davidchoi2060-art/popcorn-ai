@@ -108,7 +108,9 @@ def resolve_session(sid: str) -> dict | None:
 # 카탈로그 일괄 적재도 owner다(슬라이스 50): 파일 하나가 22,000건 정본을 덮고,
 # upsert이라 되돌릴 수단이 없다 — 운영자 등급에게 열 수 있는 일이 아니다.
 OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
-                        "/api/admin/catalog-import")
+                        "/api/admin/catalog-import",
+                        # 사양 항목 추가는 스키마를 바꾼다 — owner만(슬라이스 56)
+                        "/api/admin/spec-fields")
 
 
 def required_role(method: str, path: str) -> str:

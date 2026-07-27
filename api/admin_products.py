@@ -37,8 +37,11 @@ REQUIRED_SPEC_FIELDS = {
     "HDD": ["form_factor", "interface", "capacity_gb"],
     "POWER": ["rated_watt", "form_factor"],
     "CASE": ["form_factor_list", "gpu_max_mm", "cooler_height_mm"],
-    "COOLER_CPU_AIR": ["socket", "cooler_height_mm", "cooler_tdp"],
-    "COOLER_CPU_AIO": ["socket", "cooler_tdp"],
+    # 쿨러는 소켓을 **목록**으로 가진다(하나의 쿨러가 여러 소켓을 지원한다).
+    # 화면만 `socket`을 보고 있어 socket_list가 채워진 쿨러 33건을 미확인으로 셌고,
+    # 추천 뷰·적재·호환 규칙은 모두 socket_list를 쓴다 — 정본에 맞춘다(슬라이스 56).
+    "COOLER_CPU_AIR": ["socket_list", "cooler_height_mm", "cooler_tdp"],
+    "COOLER_CPU_AIO": ["socket_list", "cooler_tdp"],
     "MONITOR": ["size_inch", "resolution", "refresh_hz", "panel"],
     "KEYBOARD": ["switch_type", "key_layout", "connection"],
     "MOUSE": ["connection"],

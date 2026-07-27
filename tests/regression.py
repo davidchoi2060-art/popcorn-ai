@@ -561,6 +561,62 @@ def anon_admin_status(path):
         return e.code
 
 
+def test_spec_fields():
+    print("\n[13] 사양 항목 정의 — 메타가 코드 상수를 대신한다 (슬라이스 56)")
+    d = get("/api/admin/spec-fields")
+    check("사양 항목 목록을 준다", bool(d["items"]), "1개 이상", len(d["items"]))
+    keys = {f["field_key"] for f in d["items"]}
+
+    # 메타가 코드 상수와 어긋나면 적재·검수·판정이 조용히 달라진다.
+    # 상수를 메타로 옮긴 것이 이 슬라이스의 핵심이므로, 둘이 같은지를 회귀가 지킨다.
+    try:
+        sys.path.insert(0, ROOT)
+        from api import spec_fields as SF
+        from api.admin_products import REQUIRED_SPEC_FIELDS
+        from api.admin_reviews import FIELD_CAST
+        from api.catalog_ingest import SPEC_COLS
+        SF.reload()
+        check("메타 spec_cols == 적재 SPEC_COLS",
+              sorted(SF.spec_cols()) == sorted(SPEC_COLS),
+              sorted(SPEC_COLS), sorted(SF.spec_cols()))
+        rm = SF.required_map()
+        bad = [pt for pt in REQUIRED_SPEC_FIELDS
+               if sorted(REQUIRED_SPEC_FIELDS[pt]) != sorted(rm.get(pt, []))]
+        check("메타 required_map == 필수 사양 정의", not bad, "전 종류 일치", bad)
+        fc = SF.field_cast()
+        badc = [k for k in FIELD_CAST if FIELD_CAST[k] != fc.get(k)]
+        check("메타 field_cast == 검수 승인 캐스트", not badc, "전 필드 일치", badc)
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 메타↔상수 대조 — {e}")
+
+    # 엔진이 읽는 필드는 추천 뷰에 실려 있어야 한다. 빠지면 값은 있는데 판정이 못 본다.
+    eng = [f["field_key"] for f in d["items"] if f["is_engine"]]
+    if _engine is None:
+        print("  [SKIP] (I) 엔진 필드 = 뷰 컬럼 — DB 미연결")
+    else:
+        missing = [k for k in eng if db_one(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE table_name='v_recommendation_candidates' AND column_name=:k", k=k) == 0]
+        check("엔진 사양은 모두 추천 뷰에 실려 있다", not missing, "누락 없음", missing)
+        # 메타에 있는 필드는 실제 컬럼이어야 한다(반대도 마찬가지 — 유령 항목 금지)
+        ghost = [k for k in keys if db_one(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE table_name='product_specs' AND column_name=:k", k=k) == 0]
+        check("메타의 모든 항목에 실제 컬럼이 있다", not ghost, "유령 없음", ghost)
+
+    # 가드 — 잘못된 항목이 스키마를 오염시키면 되돌리기 어렵다
+    for body, label, want in (
+        ({"field_key": "Bad-Key", "label": "x", "data_type": "INTEGER"}, "이름 규칙", 400),
+        ({"field_key": "socket", "label": "x", "data_type": "VARCHAR"}, "중복", 409),
+        ({"field_key": "select", "label": "x", "data_type": "VARCHAR"}, "예약어", 400),
+        ({"field_key": "zz_tmp", "label": "x", "data_type": "FLOAT"}, "자료형", 400),
+        ({"field_key": "zz_tmp", "label": "x", "data_type": "INTEGER",
+          "part_types": ["CASE"], "required_for": ["GPU"]}, "적용 밖 필수", 400),
+    ):
+        st, _ = post("/api/admin/spec-fields", body)
+        check(f"사양 항목 가드: {label}", st == want, want, st)
+
+
 def test_gates():
     print("\n[3] 4중 게이트 — 사양·검수·가격·재고 (슬라이스 23·24·25)")
     pool = get("/api/admin/candidate-pool")
@@ -935,7 +991,7 @@ def main():
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
-               test_upload, test_product_edit, test_guards):
+               test_upload, test_product_edit, test_spec_fields, test_guards):
         try:
             fn()
         except Exception as e:

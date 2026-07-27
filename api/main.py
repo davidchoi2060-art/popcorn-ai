@@ -33,6 +33,7 @@ from .admin_system import router as admin_system_router
 from .admin_reviews import router as admin_reviews_router
 from .candidates import router as candidates_router
 from .admin_catalog_import import router as admin_catalog_import_router
+from .admin_spec_fields import router as admin_spec_fields_router
 from .clicks import router as clicks_router
 from .my_account import router as my_account_router
 from .my_orders import router as my_orders_router
@@ -87,6 +88,7 @@ app.include_router(admin_system_router)
 app.include_router(admin_sourcing_router)
 app.include_router(candidates_router)
 app.include_router(admin_catalog_import_router)
+app.include_router(admin_spec_fields_router)
 app.include_router(clicks_router)
 app.include_router(recommend_router)
 app.include_router(orders_router)
