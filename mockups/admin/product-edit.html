@@ -426,6 +426,7 @@
           }
           var cb = document.getElementById("editCancel");
           if(cb) cb.style.display = EDIT ? "" : "none";
+          if(typeof applySpecMode === "function") applySpecMode();
           var hint = document.getElementById("modeHint");
           if(hint){
             hint.textContent = EDIT
@@ -433,6 +434,108 @@
               : "읽기 전용 — 고치려면 [수정]을 누르세요.";
             hint.className = "fs-10 " + (EDIT ? "text-warning" : "text-body-tertiary");
           }
+        }
+        // ── 사양 편집 (슬라이스 57) ──────────────────────────────────────────
+        // 검수 큐는 '검수 행이 있는 필드'만 다룬다. 화면에서 새로 만든 항목에는 검수 행이
+        // 없으므로 값을 넣을 길이 아예 없었다. 여기서 직접 입력한다.
+        var SPEC_META = null, SPEC_UNDO = null;
+        function specInputId(k){ return "sf_" + k; }
+        function paintSpecs(){
+          var sp = document.getElementById("specs");
+          if(!sp || !P) return;
+          if(!SPEC_META){
+            sp.innerHTML = '<p class="fs-9 text-body-tertiary mb-0">사양 항목을 불러오는 중…</p>';
+            return;
+          }
+          var s = P.specs || {};
+          var mine = SPEC_META.items.filter(function(f){
+            var pts = f.part_types || [];
+            return !pts.length || pts.indexOf(P.part_type) >= 0;
+          });
+          if(!mine.length){
+            sp.innerHTML = '<p class="fs-9 text-body-tertiary mb-0">이 부품 종류에 정의된 사양이 '
+              + '없습니다 — <a href="spec-fields.html">상품 스펙 관리</a>에서 항목을 만듭니다.</p>';
+            return;
+          }
+          sp.innerHTML = '<div class="row g-2">' + mine.map(function(f){
+            var req = (f.required_for || []).indexOf(P.part_type) >= 0;
+            var v = s[f.field_key];
+            var shown = (v == null) ? "" :
+              (typeof v === "object" ? JSON.stringify(v) : String(v));
+            var locked = (P.locked_fields || []).indexOf(f.field_key) >= 0;
+            var ctl = (f.data_type === "BOOLEAN")
+              ? '<select id="' + specInputId(f.field_key) + '" class="form-select form-select-sm">'
+                + '<option value="">미확인</option>'
+                + '<option value="true"' + (v === true ? " selected" : "") + '>예</option>'
+                + '<option value="false"' + (v === false ? " selected" : "") + '>아니오</option>'
+                + '</select>'
+              : '<input id="' + specInputId(f.field_key) + '" class="form-control form-control-sm" '
+                + 'value="' + esc(shown) + '" placeholder="'
+                + (f.data_type === "JSONB" ? '["ATX","m-ATX"]' : "미확인") + '">';
+            return '<div class="col-md-4"><label class="form-label fs-9 fw-bold mb-1">'
+              + esc(f.label)
+              + (f.unit ? ' <span class="text-body-tertiary">(' + esc(f.unit) + ')</span>' : "")
+              + (req ? ' <span class="text-danger" title="필수 사양">*</span>' : "")
+              + (locked ? ' <span class="text-body-tertiary" title="적재가 덮지 않음">🔒</span>' : "")
+              + '</label>' + ctl
+              + '<div class="fs-10 text-body-quaternary">' + esc(f.field_key) + '</div></div>';
+          }).join("") + '</div>'
+            + '<div class="d-flex align-items-center gap-2 mt-3">'
+            + '<button id="specSave" class="btn btn-primary btn-sm">사양 저장</button>'
+            + '<span class="fs-10 text-body-tertiary">* 표시는 필수 — 채워야 추천에 쓰입니다. '
+            + '저장하면 그 사양이 잠깁니다(다음 적재가 덮지 않음).</span></div>';
+          document.getElementById("specSave").onclick = saveSpecs;
+          applySpecMode();
+        }
+        function applySpecMode(){
+          // 읽기 모드에서는 사양도 잠근다 — 보기와 고치기를 나눈 규약을 따른다(A-24)
+          if(!SPEC_META || !P) return;
+          (SPEC_META.items || []).forEach(function(f){
+            var el = document.getElementById(specInputId(f.field_key));
+            if(el) el.disabled = !EDIT;
+          });
+          var b = document.getElementById("specSave");
+          if(b) b.style.display = EDIT ? "" : "none";
+        }
+        function saveSpecs(){
+          var vals = {}, s = P.specs || {};
+          (SPEC_META.items || []).forEach(function(f){
+            var el = document.getElementById(specInputId(f.field_key));
+            if(!el || el.disabled) return;
+            var raw = el.value;
+            var cur = s[f.field_key];
+            if(f.data_type === "BOOLEAN"){
+              var b = raw === "" ? null : (raw === "true");
+              if(b !== (cur == null ? null : !!cur)) vals[f.field_key] = b;
+              return;
+            }
+            var curStr = (cur == null) ? "" :
+              (typeof cur === "object" ? JSON.stringify(cur) : String(cur));
+            if(raw.trim() !== curStr) vals[f.field_key] = raw.trim() === "" ? null : raw.trim();
+          });
+          if(!Object.keys(vals).length){ toast("바뀐 사양이 없습니다"); return; }
+          var btn = document.getElementById("specSave");
+          btn.disabled = true;
+          fetch("/api/admin/products/" + encodeURIComponent(CODE) + "/specs",
+                {method:"PATCH", headers:{"Content-Type":"application/json"},
+                 body: JSON.stringify({values: vals, lock: true})})
+            .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+            .then(function(res){
+              btn.disabled = false;
+              if(!res.ok) return;            // 실패 사유는 공용 진행 바가 말한다
+              SPEC_UNDO = res.j.undo_id;
+              EDIT = false;                  // 저장했으면 읽기로(연속 오조작 방지)
+              load().then(function(){
+                toast(esc(res.j.note), true);
+              });
+            })
+            .catch(function(){ btn.disabled = false; });
+        }
+        function loadSpecMeta(){
+          return fetch("/api/admin/spec-fields")
+            .then(function(r){ return r.ok ? r.json() : null; })
+            .then(function(m){ SPEC_META = m; })
+            .catch(function(){ SPEC_META = null; });
         }
         function paint(){
           document.getElementById("ptitle").innerHTML=esc(P.name)
@@ -489,31 +592,16 @@
             sb0.parentNode.appendChild(hint);
           }
           applyMode();
-          // 사양 표는 실데이터로 — 여기서 고치지 않고 검수 화면으로 보낸다
-          var sp=document.getElementById("specs");
-          if(sp){
-            var s=P.specs||{};
-            var keys=Object.keys(s).filter(function(k){
-              return ["product_code","part_type","created_at","updated_at","spec_sources",
-                      "extract_source","confidence","verified_yn"].indexOf(k)<0 && s[k]!=null;});
-            sp.innerHTML = keys.length
-              ? '<div class="d-flex flex-wrap gap-2">'+keys.map(function(k){
-                  return '<span class="badge badge-phoenix badge-phoenix-secondary">'+esc(k)
-                    +' <b class="text-body-emphasis">'+esc(JSON.stringify(s[k]).replace(/^"|"$/g,""))
-                    +'</b></span>';}).join("")+'</div>'
-                +'<p class="fs-10 text-body-tertiary mb-0 mt-2">사양 수정은 '
-                +'<a href="review-queue.html">상품 검수</a>에서 합니다 — 근거와 함께 확정해야 '
-                +'추천 판정이 흔들리지 않습니다.</p>'
-              : '<p class="fs-9 text-body-tertiary mb-0">사양이 없습니다 — '
-                +'<a href="review-queue.html">상품 검수</a>에서 채웁니다.</p>';
-          }
+          paintSpecs();
         }
 
         function load(){
-          return fetch("/api/admin/products/"+encodeURIComponent(CODE))
-            .then(function(r){ if(!r.ok) throw new Error(r.status===404?"상품이 없습니다":r.status);
-                               return r.json(); })
-            .then(function(d){ P=d; paint(); if(window.feather) feather.replace(); });
+          return Promise.all([
+              fetch("/api/admin/products/"+encodeURIComponent(CODE))
+                .then(function(r){ if(!r.ok) throw new Error(r.status===404?"상품이 없습니다":r.status);
+                                   return r.json(); }),
+              SPEC_META ? Promise.resolve(SPEC_META) : loadSpecMeta()])
+            .then(function(a){ P=a[0]; paint(); if(window.feather) feather.replace(); });
         }
 
         function undoEdit(){

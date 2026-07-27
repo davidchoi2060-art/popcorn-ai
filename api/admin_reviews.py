@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
-from .admin_products import PART_TYPE_LABELS, REQUIRED_SPEC_FIELDS
+from .admin_products import PART_TYPE_LABELS, required_fields
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -48,7 +48,7 @@ def _risk(review_type: str, field: str | None) -> str:
 
 def _crit(part_type: str, target_field: str | None, review_type: str, specs: dict | None):
     out = []
-    for f in REQUIRED_SPEC_FIELDS.get(part_type, []):
+    for f in required_fields(part_type):
         if f == target_field:
             out.append({"field": f, "value": "불일치" if review_type == "spec_conflict" else "미확인", "ok": False})
         else:
@@ -353,7 +353,7 @@ def _approve(conn, review, value, new_status: str) -> tuple[dict, int]:
     specs_now = conn.execute(text(
         "SELECT to_jsonb(ps) AS s FROM product_specs ps WHERE product_code=:pc"),
         {"pc": pc}).scalar()
-    required = REQUIRED_SPEC_FIELDS.get(prod["part_type"], [])
+    required = required_fields(prod["part_type"])
     all_filled = all((specs_now or {}).get(f) is not None for f in required)
     new_review_required = not (all_filled and remaining == 0)
 

@@ -604,6 +604,41 @@ def test_spec_fields():
             " WHERE table_name='product_specs' AND column_name=:k", k=k) == 0]
         check("메타의 모든 항목에 실제 컬럼이 있다", not ghost, "유령 없음", ghost)
 
+    # 사양 값 입력 — 화면에서 만든 항목에 값을 넣을 길이 있어야 한다(슬라이스 57).
+    # 검수 큐는 '검수 행이 있는 필드'만 다루므로 새 항목은 영영 비어 있게 된다.
+    pc = db_one("""
+        SELECT p.product_code FROM products p JOIN product_specs s USING (product_code)
+         WHERE p.part_type='POWER' AND p.status='판매중' AND p.stock_qty>0
+           AND s.form_factor IS NOT NULL AND s.rated_watt IS NULL
+         ORDER BY p.product_code LIMIT 1""")
+    if pc is None:
+        print("  [SKIP] (I) 사양 값 입력 — 대상 없음")
+    else:
+        pool0 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
+        st, w = post_raw(f"/api/admin/products/{pc}/specs",
+                         json.dumps({"values": {"size_inch": 27}}).encode(),
+                         {"Content-Type": "application/json"}, method="PATCH")
+        check("다른 부품 종류의 사양은 400", st == 400, 400, st)
+        st, r = post_raw(f"/api/admin/products/{pc}/specs",
+                         json.dumps({"values": {"rated_watt": 650}}).encode(),
+                         {"Content-Type": "application/json"}, method="PATCH")
+        check("사양 입력 성공", st == 200, 200, st)
+        if st == 200:
+            check("입력한 사양은 잠긴다", "rated_watt" in r["locked_fields"],
+                  "rated_watt 잠금", r["locked_fields"])
+            check("채운 필드의 검수 대기가 해소된다", r["reviews_closed"] >= 0,
+                  ">= 0", r["reviews_closed"])
+            st2, _ = post(f"/api/admin/products/specs/undo/{r['undo_id']}")
+            check("사양 입력 되돌리기", st2 == 200, 200, st2)
+            back = db_one("SELECT rated_watt FROM product_specs WHERE product_code=:p", p=pc)
+            check("값이 원복된다", back is None, None, back)
+            lf = db_one("SELECT locked_fields::text FROM products WHERE product_code=:p", p=pc)
+            check("잠금도 원복된다", "rated_watt" not in (lf or ""), "잠금 없음", lf)
+            pool1 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
+            check("되돌린 뒤 추천 후보가 제자리", pool1 == pool0, pool0, pool1)
+            st3, _ = post(f"/api/admin/products/specs/undo/{r['undo_id']}")
+            check("사양 이중 되돌리기는 409", st3 == 409, 409, st3)
+
     # 가드 — 잘못된 항목이 스키마를 오염시키면 되돌리기 어렵다
     for body, label, want in (
         ({"field_key": "Bad-Key", "label": "x", "data_type": "INTEGER"}, "이름 규칙", 400),

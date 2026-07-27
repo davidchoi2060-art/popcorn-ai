@@ -8,7 +8,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
+from .auth import current_operator_id
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -113,8 +115,24 @@ def derive_status(row) -> str:
     return "review"  # 단종·삭제대기 안전망 — 행을 숨기지 않고 운영자 확인 대상으로
 
 
+def required_fields(part_type: str) -> list:
+    """필수 사양 — **메타(spec_field_defs)가 단일 원천**이다(슬라이스 57).
+
+    상수를 그대로 쓰면 화면에서 '필수로 지정'해도 게이트가 모른다 — 아무 효과 없는
+    버튼이 된다. 메타를 못 읽는 상황(초기화 전·DB 단절)에서만 상수로 되돌아간다.
+    """
+    try:
+        from . import spec_fields as SF
+        got = SF.required_for(part_type)
+        if got:
+            return got
+    except Exception:                                    # noqa: BLE001
+        pass
+    return REQUIRED_SPEC_FIELDS.get(part_type, [])
+
+
 def spec_progress(part_type: str, specs: dict | None) -> tuple[int, int]:
-    fields = REQUIRED_SPEC_FIELDS.get(part_type)
+    fields = required_fields(part_type)
     if not fields:
         return 0, 0
     if specs is None:
@@ -486,3 +504,190 @@ def undo_product_edit(log_id: int):
              {"ref_log_id": log_id, "product_code": pc,
               "restored": {k: v.get("from") for k, v in chg.items()}}, kind="product")
     return {"ok": True, "restored": restored}
+
+
+# ---- 슬라이스 57: 상품별 사양 값 입력 ----
+# 사양 항목을 화면에서 만들 수 있게 됐지만(슬라이스 56) **값을 넣을 곳이 없었다.**
+# 상세는 사양을 읽기만 하고, 검수 큐는 검수 행이 있는 필드만 다룬다 — 새로 만든 항목에는
+# 검수 행이 없으므로 영영 비어 있게 된다.
+#
+# 검수 승인과 같은 규칙을 따른다: 값 반영 → **고친 필드 잠금**(다음 적재가 못 덮게) →
+# 그 필드의 검수 대기 행 해소 → 필수가 다 차면 게이트 통과(추천 후보 진입).
+
+
+class SpecBody(BaseModel):
+    values: dict            # {field_key: value} — 그 part_type에 유효한 필드만
+    lock: bool = True
+
+
+@router.patch("/products/{product_code}/specs")
+def patch_product_specs(product_code: int, body: SpecBody):
+    import json as _json
+
+    from . import spec_fields as SF
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        prod = conn.execute(text(
+            "SELECT product_code, sku, part_type, category_group, review_required_yn,"
+            " ai_candidate_yn, locked_fields FROM products"
+            " WHERE product_code=:pc FOR UPDATE"), {"pc": product_code}).mappings().first()
+        if prod is None:
+            raise HTTPException(404, "상품이 없습니다")
+        pt = prod["part_type"]
+
+        # 이 부품 종류에서 쓰는 항목만 받는다. 다른 종류 전용 필드를 넣으면
+        # 값은 들어가도 아무도 읽지 않는 죽은 데이터가 된다.
+        allowed = {f["field_key"]: f for f in SF.fields_for(pt)}
+        unknown = [k for k in (body.values or {}) if k not in allowed]
+        if unknown:
+            raise HTTPException(400, f"{pt}에서 쓰지 않는 사양입니다: " + ", ".join(unknown))
+        if not body.values:
+            raise HTTPException(400, "입력한 사양이 없습니다")
+
+        cast = SF.field_cast()
+        jsonf = SF.json_cols()
+        cur = conn.execute(text(
+            "SELECT to_jsonb(ps) AS s FROM product_specs ps"
+            " WHERE product_code=:pc FOR UPDATE"), {"pc": product_code}).scalar()
+        if cur is None:
+            conn.execute(text(
+                "INSERT INTO product_specs (product_code, part_type) VALUES (:pc, :pt)"),
+                {"pc": product_code, "pt": pt})
+            cur = {}
+
+        before, sets, params = {}, [], {"pc": product_code}
+        for k, raw in body.values.items():
+            v = raw
+            if isinstance(v, str) and not v.strip():
+                v = None                      # 빈 문자열은 '지운다'가 아니라 '입력 안 함'
+            if v is not None and k in jsonf and not isinstance(v, str):
+                v = _json.dumps(v, ensure_ascii=False)
+            if cur.get(k) == v:
+                continue
+            before[k] = cur.get(k)
+            sets.append(f"{k} = CAST(:{k} AS {cast.get(k, 'VARCHAR')})")
+            params[k] = v
+        if not sets:
+            return {"ok": True, "changed": 0, "undo_id": None,
+                    "note": "값이 같아 바뀐 것이 없습니다"}
+
+        try:
+            conn.execute(text(
+                "UPDATE product_specs SET " + ", ".join(sets)
+                + ", updated_at = now() WHERE product_code = :pc"), params)
+        except DBAPIError:
+            raise HTTPException(400, "값 형식이 올바르지 않습니다 — 자료형을 확인하세요")
+
+        # 사람이 넣은 값은 잠근다(A-16의 짝) — 안 그러면 다음 적재가 덮는다
+        locked = list(prod["locked_fields"] or [])
+        if body.lock:
+            for k in params:
+                if k != "pc" and k not in locked:
+                    locked.append(k)
+            conn.execute(text(
+                "UPDATE products SET locked_fields = CAST(:lf AS JSONB), updated_at = now()"
+                " WHERE product_code = :pc"),
+                {"lf": _json.dumps(locked, ensure_ascii=False), "pc": product_code})
+
+        # 채운 필드의 검수 대기 행 해소 — 안 하면 큐가 실제 할 일보다 부풀어 보인다
+        filled = [k for k in params if k != "pc" and params[k] is not None]
+        closed = 0
+        if filled:
+            r = conn.execute(text(
+                "UPDATE product_reviews SET review_status='처리', reviewed_by=:op,"
+                " reviewed_at=now(),"
+                " detail = detail || ' [운영자 직접 입력으로 해소]'"
+                " WHERE product_code=:pc AND review_status='대기'"
+                "   AND field_name = ANY(:f)"),
+                {"pc": product_code, "f": filled, "op": current_operator_id()})
+            closed = r.rowcount
+
+        # 게이트 ② — 필수가 다 차고 대기가 없으면 추천 후보로 승격
+        now = conn.execute(text(
+            "SELECT to_jsonb(ps) AS s FROM product_specs ps WHERE product_code=:pc"),
+            {"pc": product_code}).scalar() or {}
+        need = required_fields(pt)
+        all_filled = bool(need) and all(now.get(f) is not None for f in need)
+        remain = conn.execute(text(
+            "SELECT count(*) FROM product_reviews WHERE product_code=:pc"
+            " AND review_status IN ('대기','검수중')"), {"pc": product_code}).scalar_one()
+        promoted = False
+        if all_filled and remain == 0 and prod["category_group"] == "core_part":
+            conn.execute(text(
+                "UPDATE products SET review_required_yn=false, ai_candidate_yn=true,"
+                " updated_at=now() WHERE product_code=:pc"), {"pc": product_code})
+            conn.execute(text(
+                "UPDATE product_specs SET verified_yn=true, updated_at=now()"
+                " WHERE product_code=:pc"), {"pc": product_code})
+            promoted = not prod["ai_candidate_yn"]
+
+        log_id = _log(conn, "spec_edit", prod["sku"],
+                      {"product_code": product_code, "sku": prod["sku"],
+                       "changes": {k: {"from": before.get(k), "to": params[k]}
+                                   for k in params if k != "pc"},
+                       "before": {"locked_fields": list(prod["locked_fields"] or []),
+                                  "review_required_yn": prod["review_required_yn"],
+                                  "ai_candidate_yn": prod["ai_candidate_yn"]},
+                       "locked": body.lock}, kind="product")
+        in_pool = conn.execute(text(
+            "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
+            " AND stock_qty > 0"), {"pc": product_code}).first() is not None
+
+    n = len([k for k in params if k != "pc"])
+    return {"ok": True, "changed": n, "fields": sorted(k for k in params if k != "pc"),
+            "reviews_closed": closed, "promoted": promoted, "in_pool": in_pool,
+            "locked_fields": locked, "undo_id": log_id,
+            "note": (f"{n}개 사양을 저장했습니다."
+                     + (f" 검수 대기 {closed}건이 해소됐습니다." if closed else "")
+                     + (" 필수 사양이 모두 채워져 추천 후보에 올랐습니다." if promoted else "")
+                     + (" 수정한 사양은 잠겼습니다 — 다음 적재가 덮어쓰지 않습니다."
+                        if body.lock else ""))}
+
+
+@router.post("/products/specs/undo/{log_id}")
+def undo_spec_edit(log_id: int):
+    """사양 입력 되돌리기 — 값·잠금·게이트 상태를 함께 되돌린다."""
+    import json as _json
+
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            {"i": log_id}).mappings().first()
+        if row is None or row["action"] != "spec_edit":
+            raise HTTPException(404, "되돌릴 사양 입력 기록이 없습니다")
+        dup = conn.execute(text(
+            "SELECT 1 FROM admin_operator_activity_logs"
+            " WHERE action='spec_edit_undo' AND (detail->>'ref_log_id')::int=:i LIMIT 1"),
+            {"i": log_id}).first()
+        if dup:
+            raise HTTPException(409, "이미 되돌린 입력입니다")
+
+        from . import spec_fields as SF
+        cast = SF.field_cast()
+        d = row["detail"] or {}
+        pc = d.get("product_code")
+        chg = d.get("changes") or {}
+        sets, params = [], {"pc": pc}
+        for k, ft in chg.items():
+            if k not in cast:
+                continue
+            sets.append(f"{k} = CAST(:{k} AS {cast[k]})")
+            params[k] = ft.get("from")
+        if sets:
+            conn.execute(text("UPDATE product_specs SET " + ", ".join(sets)
+                              + ", updated_at = now() WHERE product_code = :pc"), params)
+        b = d.get("before") or {}
+        conn.execute(text(
+            "UPDATE products SET locked_fields = CAST(:lf AS JSONB),"
+            " review_required_yn = :rr, ai_candidate_yn = :ac, updated_at = now()"
+            " WHERE product_code = :pc"),
+            {"lf": _json.dumps(b.get("locked_fields") or [], ensure_ascii=False),
+             "rr": b.get("review_required_yn", True),
+             "ac": b.get("ai_candidate_yn", False), "pc": pc})
+        _log(conn, "spec_edit_undo", str(d.get("sku") or pc),
+             {"ref_log_id": log_id, "product_code": pc,
+              "restored": {k: v.get("from") for k, v in chg.items()}}, kind="product")
+    return {"ok": True, "restored": len(sets)}
