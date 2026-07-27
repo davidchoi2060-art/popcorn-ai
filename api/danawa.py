@@ -88,7 +88,10 @@ def _num(v: str):
 
 FF_MAP = {"E-ATX": "E-ATX", "EATX": "E-ATX", "ATX": "ATX", "M-ATX": "m-ATX",
           "MATX": "m-ATX", "MICRO-ATX": "m-ATX", "M-ITX": "mini-ITX",
-          "MITX": "mini-ITX", "MINI-ITX": "mini-ITX", "ITX": "mini-ITX"}
+          "MITX": "mini-ITX", "MINI-ITX": "mini-ITX", "ITX": "mini-ITX",
+          # 파워 전용 소형 규격. 없으면 "M-ATX(SFX) 파워"에서 앞의 m-ATX만 잡혀
+          # SFX 파워가 일반 케이스에 들어가는 것으로 잘못 판정된다(실측 13건).
+          "SFX": "SFX", "SFX-L": "SFX", "SFXL": "SFX", "TFX": "TFX", "FLEX": "Flex-ATX"}
 
 
 def _forms(v: str) -> list:
@@ -100,7 +103,9 @@ def _forms(v: str) -> list:
         got = FF_MAP.get(k)
         if got and got not in out:
             out.append(got)
-    order = ["E-ATX", "ATX", "m-ATX", "mini-ITX"]
+    # 큰 규격부터. 파워 전용 소형 규격(SFX·TFX)도 목록에 있어야 한다 —
+    # 빠져 있으면 여기서 걸러져 SFX 파워가 m-ATX로 확정된다(실측 13건).
+    order = ["E-ATX", "ATX", "m-ATX", "mini-ITX", "SFX", "TFX", "Flex-ATX"]
     return [o for o in order if o in out]
 
 
@@ -164,7 +169,10 @@ def to_fields(part_type: str, head: str, kv: dict, txt: str = "") -> dict:
         if "form_factor" not in got:
             f = _forms(head or "")
             if f:
-                got["form_factor"] = f[0]
+                # "M-ATX(SFX)"처럼 둘이 함께 오면 **더 구체적인 소형 규격**이 실물이다.
+                # 앞의 것을 그냥 고르면 SFX 파워를 m-ATX로 확정해 호환 판정이 틀어진다.
+                small = [x for x in f if x in ("SFX", "TFX", "Flex-ATX")]
+                got["form_factor"] = small[0] if small else f[0]
         if "rated_watt" not in got:
             m = re.search(r"(?:^|/)\s*(\d{3,4})\s*W\s*(?:/|$)", txt or "")
             if m:

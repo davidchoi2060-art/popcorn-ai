@@ -59,11 +59,14 @@ def _crit(part_type: str, target_field: str | None, review_type: str, specs: dic
 
 @router.get("/reviews")
 def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: str = "",
-                 sellable: int = 0):
+                 sellable: int = 0, suggested: int = 0):
     """검수 큐 — 실데이터 적재 후 대기 건수가 수천이 되므로 서버 페이지네이션이 필수다(슬라이스 39).
 
     단가표發 편입 대기(sourcing_hold)는 **파생 목록**이라 페이지네이션 밖이다 —
     항목 수가 공급처 최신 파일 규모(수백)로 제한되므로 1페이지에만 덧붙인다.
+
+    `suggested=1`이면 **외부 제안이 붙은 것만** — 승인/기각 판단만 하면 되는 목록이다.
+    제안이 몇십 건인데 큐가 수천 건이면 화면에서 찾을 방법이 없다(슬라이스 52).
 
     `sellable=1`이면 **판매중 ∧ 재고>0** 상품만 — 지금 매출에 영향을 주는 것부터 본다
     (슬라이스 49: 6,490건 중 1,720건. 나머지는 팔 수도 없는 상품이라 급하지 않다).
@@ -81,6 +84,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
           AND (:part_type = '' OR p.part_type = :part_type)
           AND (:origin = '' OR p.data_origin = :origin)
           AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
+          AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
         ORDER BY r.created_at, r.review_id
         LIMIT :size OFFSET :offset
     """)
@@ -90,6 +94,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
            AND (:part_type = '' OR p.part_type = :part_type)
            AND (:origin = '' OR p.data_origin = :origin)
            AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
+           AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
     """)
     # 종류별 집계는 **지금 보고 있는 범위**를 따른다. 필터를 켰는데 전체 분포를 보여주면
     # 화면의 숫자와 배너의 숫자가 다른 말을 한다(슬라이스 49). part_type 필터만 제외한다 —
@@ -99,6 +104,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
          WHERE r.review_status = '대기'
            AND (:origin = '' OR p.data_origin = :origin)
            AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
+           AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
          GROUP BY 1 ORDER BY 2 DESC
     """)
     # 큐 구성 — "6,490건"만 보여주면 운영자는 언젠가 처리하면 줄어들 줄 안다.
@@ -114,7 +120,9 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
                count(*) FILTER (WHERE r.origin_value IS NOT NULL
                                   AND r.review_type <> 'low_confidence') AS single,
                count(*) FILTER (WHERE r.origin_value IS NULL) AS manual,
-               count(*) FILTER (WHERE p.status = '판매중' AND p.stock_qty > 0) AS sellable
+               count(*) FILTER (WHERE p.status = '판매중' AND p.stock_qty > 0) AS sellable,
+               -- 외부 제안이 붙어 승인/기각 판단만 하면 되는 것(슬라이스 52)
+               count(*) FILTER (WHERE r.suggested_value IS NOT NULL) AS suggested
         FROM product_reviews r JOIN products p USING (product_code)
         WHERE r.review_status = '대기'
     """)
@@ -126,7 +134,8 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         GROUP BY 1 ORDER BY n DESC LIMIT 12
     """)
     p = {"part_type": part_type.strip(), "origin": origin.strip(),
-         "sellable": 1 if sellable else 0, "size": size, "offset": (page - 1) * size}
+         "sellable": 1 if sellable else 0, "suggested": 1 if suggested else 0,
+         "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
         rows = conn.execute(q, p).mappings().all()
         total = conn.execute(qc, p).scalar_one()
@@ -155,7 +164,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         "risk": _risk(r["review_type"], r["field_name"]),
         "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
     } for r in rows]
-    if page == 1 and not part_type and not sellable:
+    if page == 1 and not part_type and not sellable and not suggested:
         items.extend(_sourcing_items())
     return {"items": items, "page": page, "size": size, "total": total,
             "pages": (total + size - 1) // size, "by_type": by_type,
@@ -165,6 +174,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
                 "single": s["single"],          # 값은 있지만 단건 검수 강제(치명·주의)
                 "manual": s["manual"],          # 원문에 값이 없다 — 사람이 찾아 넣어야 한다
                 "sellable": s["sellable"],      # 판매중 ∧ 재고>0 — 지금 매출에 영향
+                "suggested": s["suggested"],    # 외부 제안 대기 — 승인/기각만 하면 된다
                 "by_field": by_field,
                 "verdict": (
                     f"대기 {s['total']:,}건 중 일괄 확정으로 끝낼 수 있는 건 {s['bulkable']:,}건, "
@@ -176,7 +186,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
             },
             "note": ("검수 대기는 서버에서 나눠 보냅니다 — by_type·queue는 전체 집계입니다."
                      " 단가표發 편입 대기는 파생 목록이라 1페이지에만 붙습니다."
-                     " sellable=1이면 판매중·재고>0만 봅니다.")}
+                     " sellable=1이면 판매중·재고>0만, suggested=1이면 외부 제안이 붙은 것만 봅니다.")}
 
 
 # ---- 슬라이스 16: 단가표 신규(sourcing_hold) — 저장 없는 파생 큐 ----

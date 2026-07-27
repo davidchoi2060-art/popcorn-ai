@@ -320,7 +320,16 @@ def _companion(conn):
             continue
         seen.add(r["part_type"])
         if r["part_type"] == "MONITOR":
-            spec = f"{r['size_inch']:g}형 {r['resolution']} {r['refresh_hz']}Hz {r['panel']}"
+            # 사양이 부분만 채워진 모니터가 있다 — `:g` 포맷이 NULL을 만나 500이 났다
+            # (슬라이스 52: 검수 승인으로 일부 필드가 채워지자 드러났다).
+            # 없는 값은 지어내지 않고 그 자리를 비운다.
+            parts = []
+            if r["size_inch"] is not None:
+                parts.append(f"{r['size_inch']:g}형")
+            for k, suf in (("resolution", ""), ("refresh_hz", "Hz"), ("panel", "")):
+                if r[k] is not None:
+                    parts.append(f"{r[k]}{suf}")
+            spec = " ".join(parts)
         elif r["part_type"] == "KEYBOARD":
             spec = f"{r['switch_type'] or ''} {r['connection'] or ''}".strip()
         else:
