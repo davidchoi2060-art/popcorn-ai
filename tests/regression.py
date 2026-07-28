@@ -762,6 +762,66 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_margin_policy():
+    print("\n[18] 마진 정책 — 고치면 실제로 저장되는가 (슬라이스 74)")
+    # "수정해도 변경이 안 된다"는 보고. 확인해 보니 저장 기능이 아예 없었다 —
+    # 화면은 SCREEN='margin'인데 그 분기가 없어 표가 마크업 더미였고 쓰기 API도 없었다.
+    d = get("/api/admin/engine-rules")
+    p = d.get("pricing") or {}
+    check("현재 가격 정책을 서버가 준다",
+          p.get("card_fee_pct") is not None and p.get("margin_pct") is not None,
+          "수수료·마진 있음", sorted(p))
+    fee0 = db_one("SELECT card_fee_rate FROM pricing_settings"
+                  " ORDER BY effective_from DESC LIMIT 1")
+    n0 = db_one("SELECT count(*) FROM pricing_settings")
+
+    # 같은 값을 다시 넣으면 이력이 쌓이지 않아야 한다(부동소수점 비교가 헐거우면 쌓인다)
+    st, _ = post("/api/admin/pricing-settings",
+                 {"card_fee_rate": float(fee0), "margin_rate": float(
+                     db_one("SELECT margin_rate FROM pricing_settings"
+                            " ORDER BY effective_from DESC LIMIT 1"))})
+    check("같은 값 재저장은 400", st == 400, 400, st)
+    check("거부됐으면 이력이 늘지 않는다",
+          db_one("SELECT count(*) FROM pricing_settings") == n0, n0,
+          db_one("SELECT count(*) FROM pricing_settings"))
+
+    # 비율은 0~1이다. 13을 넣으면 1300%가 되어 가격이 폭주한다.
+    for bad in (1.5, -0.1):
+        st2, _ = post("/api/admin/pricing-settings",
+                      {"card_fee_rate": bad, "margin_rate": 0.1})
+        check(f"범위 밖({bad})은 400", st2 == 400, 400, st2)
+
+    st3, ap = post("/api/admin/pricing-settings",
+                   {"card_fee_rate": 0.022, "margin_rate": 0.135})
+    check("정책 변경 저장", st3 == 200, 200, st3)
+    if st3 == 200:
+        # pricing_settings는 이력 테이블 — 고치는 게 아니라 새 행을 넣는다
+        check("새 버전으로 쌓인다(덮어쓰지 않는다)",
+              db_one("SELECT count(*) FROM pricing_settings") == n0 + 1, n0 + 1,
+              db_one("SELECT count(*) FROM pricing_settings"))
+        # 바꿔도 기존 판매가는 움직이지 않는다 — 그 사실을 응답이 말해야 한다
+        check("기존 판매가가 안 바뀐다는 것을 알린다",
+              "바뀌지 않습니다" in (ap.get("note") or ""), "안내 있음", ap.get("note"))
+        db_one("SELECT 1")     # 정리는 아래에서
+    # 검증으로 만든 행은 지운다 — 회귀가 정본을 바꾸면 안 된다
+    if _engine is not None:
+        with _engine.begin() as c:
+            c.execute(text("DELETE FROM pricing_settings WHERE setting_id > :i"),
+                      {"i": db_one("SELECT min(setting_id) FROM pricing_settings")})
+    check("검증 후 정책이 원래 1건", db_one("SELECT count(*) FROM pricing_settings") == n0,
+          n0, db_one("SELECT count(*) FROM pricing_settings"))
+
+    try:
+        mp = io.open(os.path.join(ROOT, "mockups", "admin", "margin-policy.html"),
+                     encoding="utf-8").read()
+        check("마진 화면에 margin 분기가 있다", 'SCREEN === "margin"' in mp,
+              "분기 있음", "없음")
+        check("마진 화면이 저장을 호출한다", "/api/admin/pricing-settings" in mp,
+              "저장 호출", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 마진 화면 — {e}")
+
+
 def test_part_type_change():
     print("\n[16] 분류 변경 — 바꾸기 전에 영향을 먼저 말한다 (슬라이스 67)")
     # 규약은 "상세에서 분류는 고치지 않는다"였다. 그런데 적재가 잘못 넣은 분류를
@@ -1556,6 +1616,7 @@ def main():
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
+               test_margin_policy,
                test_password_auth,
                test_part_type_change,
                test_usage_floors,

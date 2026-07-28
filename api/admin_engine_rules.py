@@ -10,7 +10,8 @@
 '현행값 1벌'만 존재한다 — 화면은 버전 대신 '현재 적용 중'으로 표기하고 이관을 밝힌다.
 값을 바꾸는 기능은 이 슬라이스 범위 밖(코드 상수·pricing_settings 직접 수정 영역).
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from .timeutil import iso
@@ -105,3 +106,101 @@ def engine_rules():
                      " 스코어 엔진 도입 시 이 표가 실값으로 채워집니다."),
         },
     }
+
+
+# ---- 슬라이스 74: 마진 정책 저장 ----
+# "마진정책을 수정해도 변경이 안 된다"는 보고. 확인해 보니 **저장 기능이 아예 없었다** —
+# 화면은 SCREEN="margin"인데 그 분기가 없어 표가 전부 마크업 더미였고, 쓰기 API도 없었다.
+#
+# pricing_settings는 **이력 테이블**이다(effective_from). 고치는 게 아니라 새 행을 넣는다 —
+# 과거 견적을 그때 정책으로 재현할 수 있어야 하기 때문이다.
+#
+# **바꿔도 기존 판매가는 움직이지 않는다.** 산정은 단가표 반영 때 일어난다.
+# 그 사실을 응답이 먼저 말한다 — 안 그러면 "바꿨는데 가격이 그대로"라고 읽는다.
+
+
+class PricingBody(BaseModel):
+    card_fee_rate: float          # 0.022 = 2.2%
+    margin_rate: float            # 0.13  = 13%
+
+
+@router.post("/pricing-settings")
+def save_pricing(body: PricingBody):
+    from .admin_orders import _log
+    from .auth import current_operator
+
+    me = current_operator() or {}
+    if me.get("role") != "owner":
+        raise HTTPException(403, "관리자(owner)만 바꿀 수 있습니다")
+    # 비율은 0~1로 받는다. 13을 넣으면 1300%가 되어 가격이 폭주한다.
+    for name, v in (("카드 수수료율", body.card_fee_rate), ("마진율", body.margin_rate)):
+        if not (0 <= v < 1):
+            raise HTTPException(400, f"{name}은 0 이상 1 미만이어야 합니다(0.13 = 13%)")
+
+    with engine.begin() as conn:
+        cur = conn.execute(text(
+            "SELECT card_fee_rate, margin_rate FROM pricing_settings"
+            " ORDER BY effective_from DESC LIMIT 1")).mappings().first()
+        # 부동소수점을 그대로 비교하면 2.2%를 다시 넣어도 '다른 값'이 된다
+        # (2.2/100이 0.022000000000000002이 될 수 있다). 소수 6자리로 맞춰 본다.
+        def _same(a, b):
+            return round(float(a), 6) == round(float(b), 6)
+
+        if cur and _same(cur["card_fee_rate"], body.card_fee_rate)                 and _same(cur["margin_rate"], body.margin_rate):
+            raise HTTPException(400, "현재 값과 같습니다 — 바뀐 것이 없습니다")
+        conn.execute(text(
+            "INSERT INTO pricing_settings (card_fee_rate, margin_rate, effective_from,"
+            " created_by) VALUES (:f, :m, now(), :by)"),
+            {"f": body.card_fee_rate, "m": body.margin_rate,
+             "by": me.get("operator_id")})
+        log_id = _log(conn, "pricing_settings", "전역",
+                      {"from": {"card_fee_rate": float(cur["card_fee_rate"]) if cur else None,
+                                "margin_rate": float(cur["margin_rate"]) if cur else None},
+                       "to": {"card_fee_rate": body.card_fee_rate,
+                              "margin_rate": body.margin_rate}}, kind="price")
+        # 이 정책으로 다시 산정될 대상이 몇 건인지 — 영향 규모를 숫자로 말한다
+        affected = conn.execute(text(
+            "SELECT count(*) FROM products WHERE purchase_price IS NOT NULL")).scalar_one()
+
+    return {"ok": True, "undo_id": log_id, "affected_candidates": affected,
+            "note": ("정책을 새 버전으로 저장했습니다."
+                     f" 매입가가 있는 {affected:,}건이 다음 단가표 반영 때 이 값으로 산정됩니다."
+                     " **기존 판매가는 지금 바뀌지 않습니다.**")}
+
+
+class CategoryMarginBody(BaseModel):
+    items: list[dict]             # [{category, margin_rate}]
+
+
+@router.post("/category-margins")
+def save_category_margins(body: CategoryMarginBody):
+    """카테고리별 마진 — **엔진은 아직 이 값을 쓰지 않는다.**
+
+    화면에 표가 있어 저장할 곳은 만들어 두되, 가격 산정은 여전히 전역 margin_rate를
+    쓴다. 쓰지 않는 값을 '적용됩니다'라고 말하면 그게 거짓이므로 응답이 밝힌다.
+    """
+    from .admin_orders import _log
+    from .auth import current_operator
+
+    me = current_operator() or {}
+    if me.get("role") != "owner":
+        raise HTTPException(403, "관리자(owner)만 바꿀 수 있습니다")
+    for it in body.items:
+        r = it.get("margin_rate")
+        if r is None or not (0 <= float(r) < 1):
+            raise HTTPException(400, "마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)")
+        if not (it.get("category") or "").strip():
+            raise HTTPException(400, "카테고리가 비어 있습니다")
+
+    with engine.begin() as conn:
+        for it in body.items:
+            conn.execute(text(
+                "INSERT INTO category_margin_policies (category, margin_rate, updated_at)"
+                " VALUES (:c, :m, now())"
+                " ON CONFLICT (category) DO UPDATE SET"
+                "   margin_rate = EXCLUDED.margin_rate, updated_at = now()"),
+                {"c": it["category"].strip(), "m": float(it["margin_rate"])})
+        _log(conn, "category_margins", "카테고리", {"count": len(body.items)}, kind="price")
+    return {"ok": True, "count": len(body.items),
+            "note": ("카테고리별 마진을 저장했습니다. **가격 산정은 아직 전역 마진율을"
+                     " 씁니다** — 이 값은 기록으로만 남습니다.")}

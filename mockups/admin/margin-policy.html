@@ -316,12 +316,99 @@
             + '<tbody>' + rows.map(function(r){return '<tr>' + r.map(function(c){return '<td>'+c+'</td>';}).join('') + '</tr>';}).join('') + '</tbody></table></div>';
         }
         function note(t){ return '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + t + '</p>'; }
+        function esc(s){ return String(s==null?'':s).replace(/[<>&"]/g,
+          function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
+        /* 저장은 **새 버전을 남긴다**(pricing_settings는 이력 테이블).
+           바꿔도 기존 판매가는 움직이지 않는다 — 산정은 단가표 반영 때 일어난다.
+           그 사실을 저장 직후에 말한다. 안 그러면 "바꿨는데 가격이 그대로"라고 읽는다. */
+        function wireMargin(d){
+          var btn = document.getElementById("mgSave");
+          if(!btn) return;
+          var p = d.pricing || {};
+          var fee = document.getElementById("mgFee");
+          var mar = document.getElementById("mgMargin");
+          if(p.card_fee_pct != null) fee.value = p.card_fee_pct;
+          if(p.margin_pct != null) mar.value = p.margin_pct;
+          btn.onclick = function(){
+            var msg = document.getElementById("mgMsg");
+            var f = parseFloat(fee.value), m2 = parseFloat(mar.value);
+            if(!(f >= 0 && f < 100) || !(m2 >= 0 && m2 < 100)){
+              msg.className = "fs-10 mt-2 text-danger";
+              msg.textContent = "0 이상 100 미만으로 입력하세요.";
+              return;
+            }
+            btn.disabled = true;
+            fetch("/api/admin/pricing-settings", {
+              method: "POST", headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({card_fee_rate: f/100, margin_rate: m2/100})
+            }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+              .then(function(res){
+                btn.disabled = false;
+                if(!res.ok){
+                  var dt = res.j && res.j.detail;
+                  msg.className = "fs-10 mt-2 text-danger";
+                  msg.textContent = (dt && typeof dt === "object") ? (dt.message || dt.error) : (dt || "저장 실패");
+                  return;
+                }
+                msg.className = "fs-10 mt-2 text-body-emphasis";
+                msg.textContent = res.j.note.replace(/\*\*/g, "");
+                if(window.__toast) window.__toast("마진 정책을 새 버전으로 저장했습니다");
+              })
+              .catch(function(){
+                btn.disabled = false;
+                msg.className = "fs-10 mt-2 text-danger";
+                msg.textContent = "서버에 연결할 수 없습니다.";
+              });
+          };
+        }
 
         fetch("/api/admin/engine-rules")
           .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
           .then(function(d){
             var host = document.getElementById("liveRules"), html = "";
-            if(SCREEN === "compat"){
+            if(SCREEN === "margin"){
+              /* 이 화면은 SCREEN="margin"인데 **분기가 아예 없었다** — 표는 전부
+                 마크업 더미였고 저장 API도 없어서, 고쳐도 아무 일이 일어나지 않았다
+                 (사용자 보고). 실값을 보여주고 실제로 저장한다. */
+              var p = d.pricing || {};
+              html += card("가격 산정 공식 <span class=\"badge badge-phoenix badge-phoenix-primary fs-10 align-middle\">실데이터</span>",
+                "판매가는 이 두 값으로 정해집니다. 바꾸면 <b>새 버전으로 저장</b>되고, "
+                + "과거 견적은 그때 버전으로 재현됩니다.",
+                '<div class="row g-3">'
+                + '<div class="col-md-4"><label class="form-label fs-9 fw-bold">카드 수수료율</label>'
+                + '<div class="input-group input-group-sm">'
+                + '<input id="mgFee" type="number" step="0.1" min="0" max="99" class="form-control form-control-sm">'
+                + '<span class="input-group-text">%</span></div></div>'
+                + '<div class="col-md-4"><label class="form-label fs-9 fw-bold">기본 마진율</label>'
+                + '<div class="input-group input-group-sm">'
+                + '<input id="mgMargin" type="number" step="0.1" min="0" max="99" class="form-control form-control-sm">'
+                + '<span class="input-group-text">%</span></div></div>'
+                + '<div class="col-md-4 d-flex align-items-end">'
+                + '<button id="mgSave" class="btn btn-primary btn-sm w-100">새 버전으로 저장</button></div>'
+                + '</div>'
+                + '<div id="mgMsg" class="fs-10 mt-2"></div>'
+                + '<div class="border rounded p-2 fs-10 text-body-tertiary mt-2">'
+                + '현재 적용값 — 수수료 <b>' + (p.card_fee_pct != null ? p.card_fee_pct : '—') + '%</b> · '
+                + '마진 <b>' + (p.margin_pct != null ? p.margin_pct : '—') + '%</b>'
+                + (p.effective_from ? ' · ' + String(p.effective_from).slice(0,10) + ' 적용' : '')
+                + '<br>' + (p.formula ? esc(p.formula) : '')
+                + '</div>');
+
+              if(p.example){
+                html += card("계산 예시", "지금 값으로 계산한 결과입니다.",
+                  table(["항목", "금액"], [
+                    ["매입가", '<b>' + p.example.purchase.toLocaleString() + '원</b>'],
+                    ["판매가(산정)", '<b>' + p.example.sale.toLocaleString() + '원</b>']
+                  ]));
+              }
+              html += card("카테고리별 마진",
+                "여기 값은 <b>기록으로만 남습니다</b> — 가격 산정은 아직 위의 기본 마진율을 씁니다.",
+                (p.categories && p.categories.length
+                  ? table(["카테고리", "마진율"], p.categories.map(function(c){
+                      return [c.category, c.pct + '%'];
+                    }))
+                  : '<p class="fs-9 text-body-tertiary mb-0">' + esc(p.category_note || '등록된 카테고리별 마진이 없습니다.') + '</p>'));
+            } else if(SCREEN === "compat"){
               html += card("조립 호환 검사 5종",
                 "견적을 만들 때마다 이 5개를 전부 통과한 조합만 제시합니다 — 하나라도 어긋나면 그 조합은 후보에서 빠집니다.",
                 table(["검사", "판정 기준", "사양 원천"],
@@ -373,6 +460,7 @@
                 + note(p.category_note));
             }
             host.innerHTML = html;
+            wireMargin(d);
             host.hidden = false;
             var b = document.getElementById("dataSrc");
             b.textContent = "실데이터 · Cloud SQL";
