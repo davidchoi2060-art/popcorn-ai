@@ -817,3 +817,185 @@ def delete_supplier_price(product_code: int, supplier_id: int):
              {"product_code": product_code, "supplier_id": supplier_id,
               "supplier": row["name"], "cost_price": row["cost_price"]}, kind="product")
     return {"ok": True, "note": f"{row['name']} 매입가를 삭제했습니다."}
+
+
+# ---- 슬라이스 67: 분류(part_type) 변경 ----
+# 규약은 "상세에서 분류는 고치지 않는다 — 슬롯을 바꾸는 일이라 재적재 소관"이었다.
+# 그런데 적재가 잘못 넣은 분류(미분류 5,149건)를 운영자가 바로잡을 길이 없어서
+# 그 상품들이 영영 추천에서 빠진 채 남았다. 그래서 연다 — 단, **눈 감고 바꾸게 하지는
+# 않는다**: 분류가 바뀌면 필수 사양 목록이 통째로 바뀌고 추천 슬롯도 달라진다.
+# 바꾸기 전에 그 영향을 먼저 보여준다(preview).
+
+CORE_PARTS = {"CPU", "MB", "RAM", "GPU", "POWER", "CASE", "SSD", "HDD",
+              "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
+PERIPHERALS = {"MONITOR", "KEYBOARD", "MOUSE", "HEADSET", "SPEAKER", "WEBCAM"}
+
+
+def group_of(part_type: str) -> str:
+    """분류 -> 카테고리 그룹. 적재(catalog_map)와 같은 기준."""
+    if part_type in CORE_PARTS:
+        return "core_part"
+    if part_type in PERIPHERALS:
+        return "peripheral"
+    return "etc"
+
+
+class PartTypeBody(BaseModel):
+    part_type: str
+    preview: bool = False       # True면 DB를 바꾸지 않고 영향만 계산한다
+
+
+@router.post("/products/{product_code}/part-type")
+def change_part_type(product_code: int, body: PartTypeBody):
+    """분류 변경 — preview로 영향을 먼저 보고, 확인 후 적용한다."""
+    from .admin_orders import _log
+
+    new_pt = (body.part_type or "").strip()
+    if new_pt not in PART_TYPE_LABELS:
+        raise HTTPException(400, "알 수 없는 분류입니다")
+
+    with engine.begin() as conn:
+        r = conn.execute(text(
+            "SELECT product_code, sku, product_name, part_type, category_group,"
+            " ai_candidate_yn, review_required_yn, sale_price, stock_qty, status"
+            " FROM products WHERE product_code=:pc FOR UPDATE"),
+            {"pc": product_code}).mappings().first()
+        if r is None:
+            raise HTTPException(404, "상품이 없습니다")
+        old_pt = r["part_type"]
+        if old_pt == new_pt:
+            raise HTTPException(400, "이미 그 분류입니다")
+
+        specs = conn.execute(text(
+            "SELECT to_jsonb(ps) FROM product_specs ps WHERE product_code=:pc"),
+            {"pc": product_code}).scalar() or {}
+        old_need, new_need = required_fields(old_pt), required_fields(new_pt)
+        missing = [f for f in new_need if specs.get(f) is None]
+        dropped = [f for f in old_need if f not in new_need]
+        in_pool_now = conn.execute(text(
+            "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
+            " AND stock_qty>0"), {"pc": product_code}).first() is not None
+        new_group = group_of(new_pt)
+        # 바꾼 뒤 추천 후보가 될 수 있는가 — 4중 게이트를 그대로 따져본다
+        will_pool = (new_group == "core_part" and not missing
+                     and r["status"] == "판매중" and (r["stock_qty"] or 0) > 0
+                     and r["sale_price"] is not None)
+
+        impact = {
+            "from": {"part_type": old_pt, "label": PART_TYPE_LABELS.get(old_pt, old_pt),
+                     "group": r["category_group"]},
+            "to": {"part_type": new_pt, "label": PART_TYPE_LABELS.get(new_pt, new_pt),
+                   "group": new_group},
+            "required_add": [f for f in new_need if f not in old_need],
+            "required_drop": dropped,
+            "missing_after": missing,
+            "in_pool_now": in_pool_now, "in_pool_after": will_pool,
+        }
+        impact["note"] = (
+            impact["from"]["label"] + " -> " + impact["to"]["label"] + "로 바꿉니다."
+            + (" 필수 사양 " + str(len(missing)) + "건이 비어 검수 대기가 됩니다."
+               if missing else " 필수 사양은 모두 채워져 있습니다.")
+            + (" 추천 후보에서 빠집니다." if in_pool_now and not will_pool
+               else (" 추천 후보에 오릅니다." if not in_pool_now and will_pool else "")))
+
+        if body.preview:
+            return {"preview": True, "impact": impact}
+
+        conn.execute(text(
+            "UPDATE products SET part_type=:pt, category_group=:g,"
+            " ai_candidate_yn = CASE WHEN :ok THEN true ELSE false END,"
+            " review_required_yn = CASE WHEN :ok THEN false ELSE true END,"
+            " updated_at=now() WHERE product_code=:pc"),
+            {"pt": new_pt, "g": new_group, "ok": will_pool, "pc": product_code})
+        # 사양 행의 분류도 함께 옮긴다 — 어긋나면 적재·검수가 서로 다른 종류로 본다
+        conn.execute(text(
+            "UPDATE product_specs SET part_type=:pt, updated_at=now()"
+            " WHERE product_code=:pc"), {"pt": new_pt, "pc": product_code})
+        # 새 분류에서 쓰지 않는 필드의 검수 대기는 의미가 없다 — 닫는다
+        closed = 0
+        if dropped:
+            closed = conn.execute(text(
+                "UPDATE product_reviews SET review_status=:done, reviewed_by=:op,"
+                " reviewed_at=now(), detail = detail || :tail"
+                " WHERE product_code=:pc AND review_status=:wait"
+                "   AND field_name = ANY(:f)"),
+                {"pc": product_code, "f": dropped, "op": current_operator_id(),
+                 "done": "처리", "wait": "대기", "tail": " [분류 변경으로 해소]"}).rowcount
+        # 새 분류에서 필요한데 비어 있는 사양은 검수로 올린다
+        opened = 0
+        for f in missing:
+            exists = conn.execute(text(
+                "SELECT 1 FROM product_reviews WHERE product_code=:pc"
+                " AND field_name=:f AND review_status=:wait"),
+                {"pc": product_code, "f": f, "wait": "대기"}).first()
+            if exists:
+                continue
+            # review_type은 NOT NULL이고 큐가 유형별로 화면을 나눈다.
+            # 분류를 바꿔 비게 된 필수 사양은 결국 '사양 없음'이므로 기존 유형을 쓴다 —
+            # 새 유형을 만들면 검수 화면이 그 항목을 어디에도 못 놓는다.
+            conn.execute(text(
+                "INSERT INTO product_reviews (product_code, review_type, field_name,"
+                " review_status, detail, created_at)"
+                " VALUES (:pc, :rt, :f, :wait, :d, now())"),
+                {"pc": product_code, "rt": "spec_missing", "f": f, "wait": "대기",
+                 "d": "분류 변경(" + PART_TYPE_LABELS.get(new_pt, new_pt)
+                      + ") - 필수 사양 미확인"})
+            opened += 1
+
+        log_id = _log(conn, "part_type_change", r["sku"],
+                      {"product_code": product_code, "sku": r["sku"],
+                       "from": old_pt, "to": new_pt,
+                       "before": {"category_group": r["category_group"],
+                                  "ai_candidate_yn": r["ai_candidate_yn"],
+                                  "review_required_yn": r["review_required_yn"]},
+                       "closed": closed, "opened": opened}, kind="product")
+        now_pool = conn.execute(text(
+            "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
+            " AND stock_qty>0"), {"pc": product_code}).first() is not None
+
+    return {"ok": True, "impact": impact, "reviews_closed": closed,
+            "reviews_opened": opened, "in_pool": now_pool, "undo_id": log_id,
+            "note": ("분류를 " + impact["to"]["label"] + "로 바꿨습니다."
+                     + (" 검수 " + str(closed) + "건이 해소되고" if closed else "")
+                     + (" " + str(opened) + "건이 새로 올라왔습니다." if opened else
+                        (" 추천 후보에 올랐습니다." if now_pool else "")))}
+
+
+@router.post("/products/part-type/undo/{log_id}")
+def undo_part_type(log_id: int):
+    """분류 변경 되돌리기 — 분류·그룹·게이트 상태를 함께 되돌린다."""
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            {"i": log_id}).mappings().first()
+        if row is None or row["action"] != "part_type_change":
+            raise HTTPException(404, "되돌릴 분류 변경 기록이 없습니다")
+        dup = conn.execute(text(
+            "SELECT 1 FROM admin_operator_activity_logs"
+            " WHERE action='part_type_change_undo'"
+            "   AND (detail->>'ref_log_id')::int=:i LIMIT 1"), {"i": log_id}).first()
+        if dup:
+            raise HTTPException(409, "이미 되돌린 변경입니다")
+        d = row["detail"] or {}
+        pc, b = d.get("product_code"), d.get("before") or {}
+        conn.execute(text(
+            "UPDATE products SET part_type=:pt, category_group=:g,"
+            " ai_candidate_yn=:ac, review_required_yn=:rr, updated_at=now()"
+            " WHERE product_code=:pc"),
+            {"pt": d.get("from"), "g": b.get("category_group"),
+             "ac": b.get("ai_candidate_yn", False),
+             "rr": b.get("review_required_yn", True), "pc": pc})
+        conn.execute(text(
+            "UPDATE product_specs SET part_type=:pt, updated_at=now()"
+            " WHERE product_code=:pc"), {"pt": d.get("from"), "pc": pc})
+        # 분류 변경으로 새로 올린 검수는 근거가 사라졌으니 함께 거둔다
+        conn.execute(text(
+            "DELETE FROM product_reviews WHERE product_code=:pc"
+            "   AND review_status=:wait AND detail LIKE :pat"),
+            {"pc": pc, "wait": "대기", "pat": "분류 변경(%"})
+        _log(conn, "part_type_change_undo", str(d.get("sku") or pc),
+             {"ref_log_id": log_id, "product_code": pc, "restored": d.get("from")},
+             kind="product")
+    return {"ok": True, "restored": d.get("from")}

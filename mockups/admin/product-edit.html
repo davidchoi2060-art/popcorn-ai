@@ -450,6 +450,72 @@
             .then(function(d){ SUPPLIERS = d? d.items : []; return SUPPLIERS; })
             .catch(function(){ SUPPLIERS = []; return SUPPLIERS; });
         }
+        // ── 분류 변경 (슬라이스 67) ───────────────────────────────────────
+        // 분류가 바뀌면 필수 사양 목록이 통째로 바뀌고 추천 슬롯도 달라진다.
+        // 그래서 **먼저 물어본다**: 서버에 preview를 요청해 영향을 보여주고,
+        // 운영자가 확인한 뒤에만 적용한다.
+        var PMETA = null;
+        function loadPartMeta(){
+          if(PMETA) return Promise.resolve(PMETA);
+          return fetch("/api/admin/product-meta").then(function(r){return r.ok?r.json():null;})
+            .then(function(m){ PMETA = m; return m; }).catch(function(){ return null; });
+        }
+        function askPartType(from, to, sel){
+          fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/part-type",
+                {method:"POST", headers:{"Content-Type":"application/json"},
+                 body: JSON.stringify({part_type:to, preview:true})})
+            .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
+            .then(function(res){
+              if(!res.ok){ sel.value = from; return; }
+              var i = res.j.impact;
+              var warn = i.missing_after && i.missing_after.length;
+              var html = '<div class="modal fade" id="ptModal" tabindex="-1">'
+                + '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">'
+                + '<div class="modal-header"><h5 class="modal-title">분류를 바꿉니다</h5>'
+                + '<button class="btn-close" data-bs-dismiss="modal"></button></div>'
+                + '<div class="modal-body">'
+                + '<p class="fs-9 mb-3"><b>'+esc(i.from.label)+'</b> → <b>'+esc(i.to.label)+'</b></p>'
+                + '<div class="border rounded p-2 fs-10 mb-2">'+esc(i.note)+'</div>'
+                + (i.required_add && i.required_add.length
+                    ? '<div class="fs-10 mb-1"><b>새로 필요한 사양</b> — '
+                      + i.required_add.map(esc).join(" · ")+'</div>' : "")
+                + (i.required_drop && i.required_drop.length
+                    ? '<div class="fs-10 mb-1"><b>더 이상 쓰지 않는 사양</b> — '
+                      + i.required_drop.map(esc).join(" · ")+'</div>' : "")
+                + (warn ? '<div class="fs-10 text-danger mt-2">비어 있는 필수 사양 '
+                          + i.missing_after.length + '건이 검수 대기로 올라옵니다.</div>' : "")
+                + '<div class="fs-10 text-body-tertiary mt-2">추천 후보: '
+                + (i.in_pool_now?"있음":"없음")+' → '+(i.in_pool_after?"있음":"없음")+'</div>'
+                + '<p class="fs-10 text-body-tertiary mt-2 mb-0">되돌릴 수 있습니다 — '
+                + '작업 기록에 남습니다.</p></div>'
+                + '<div class="modal-footer">'
+                + '<button class="btn btn-phoenix-secondary btn-sm" data-bs-dismiss="modal">취소</button>'
+                + '<button class="btn btn-primary btn-sm" id="ptGo">바꾸기</button>'
+                + '</div></div></div></div>';
+              document.getElementById("ptModal") && document.getElementById("ptModal").remove();
+              document.body.insertAdjacentHTML("beforeend", html);
+              var el = document.getElementById("ptModal"), m = new bootstrap.Modal(el);
+              var applied = false;
+              el.addEventListener("hidden.bs.modal", function(){
+                if(!applied) sel.value = from;      // 취소하면 화면도 되돌린다
+                el.remove();
+              });
+              document.getElementById("ptGo").onclick = function(){
+                fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/part-type",
+                      {method:"POST", headers:{"Content-Type":"application/json"},
+                       body: JSON.stringify({part_type:to})})
+                  .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
+                  .then(function(out){
+                    if(!out.ok) return;
+                    applied = true; m.hide();
+                    EDIT = false;                   // 저장했으면 읽기로(연속 오조작 방지)
+                    load().then(function(){ toast(esc(out.j.note), true); });
+                  });
+              };
+              m.show();
+            })
+            .catch(function(){ sel.value = from; });
+        }
         function paintSuppliers(){
           var tb = document.getElementById("supRows");
           if(!tb) return;
@@ -638,12 +704,32 @@
           setField("상품명", P.name);
           setField("재고 수량", P.stock_qty);
           setField("판매가(원)", P.sale_price==null?"":P.sale_price);
+          /* 분류 변경을 연다(슬라이스 67). 예전에는 잠가 뒀는데, 적재가 잘못 넣은
+             분류(미분류 5,149건)를 바로잡을 길이 없어 그 상품들이 영영 추천에서 빠졌다.
+             **눈 감고 바꾸게 하지는 않는다** — 고르면 서버에 영향을 먼저 물어보고
+             확인을 받은 뒤에 적용한다. */
           var cat=fieldByLabel("분류");
           if(cat){
-            var has=[].some.call(cat.options,function(o){return o.textContent===P.cat;});
-            if(!has){var op=document.createElement("option");op.textContent=P.cat;cat.appendChild(op);}
-            cat.value=[].filter.call(cat.options,function(o){return o.textContent===P.cat;})[0].value;
-            cat.disabled=true;   // 분류 변경은 슬롯을 바꾼다 — 여기서 열지 않는다(검수·재적재 소관)
+            if(SPEC_META || true){
+              // 선택지는 서버 메타에서 온다(목록 필터와 같은 원천)
+              var opts = (PMETA && PMETA.part_labels ? PMETA.part_labels : [])
+                .concat(PMETA && PMETA.peripheral_labels ? PMETA.peripheral_labels : []);
+              if(opts.length){
+                cat.innerHTML = opts.map(function(o){
+                  return '<option value="'+o.part_type+'">'+esc(o.label)+'</option>';
+                }).join("") + '<option value="ETC">미분류</option>';
+              }
+            }
+            var cur = P.part_type;
+            var hit = [].filter.call(cat.options,function(o){return o.value===cur;})[0];
+            if(!hit){ var op=document.createElement("option");
+                      op.value=cur; op.textContent=P.cat; cat.appendChild(op); }
+            cat.value = cur;
+            cat.disabled = !EDIT;          // 읽기 모드에서는 잠근다(다른 필드와 같은 규칙)
+            cat.onchange = function(){
+              if(cat.value===cur) return;
+              askPartType(cur, cat.value, cat);
+            };
           }
           // '노출 상태' 셀렉트를 판매 상태로 쓴다 — 서버가 허용하는 값만 넣는다
           var stSel=fieldByLabel("노출 상태");
@@ -693,7 +779,8 @@
               fetch("/api/admin/products/"+encodeURIComponent(CODE))
                 .then(function(r){ if(!r.ok) throw new Error(r.status===404?"상품이 없습니다":r.status);
                                    return r.json(); }),
-              SPEC_META ? Promise.resolve(SPEC_META) : loadSpecMeta()])
+              SPEC_META ? Promise.resolve(SPEC_META) : loadSpecMeta(),
+              loadPartMeta()])
             .then(function(a){ P=a[0]; paint(); if(window.feather) feather.replace(); });
         }
 

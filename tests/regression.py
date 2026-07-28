@@ -688,6 +688,78 @@ def test_pool_gate():
     check("API에 타임존 없는 isoformat()이 없다", not bad, "전부 iso() 사용", bad)
 
 
+def test_part_type_change():
+    print("\n[16] 분류 변경 — 바꾸기 전에 영향을 먼저 말한다 (슬라이스 67)")
+    # 규약은 "상세에서 분류는 고치지 않는다"였다. 그런데 적재가 잘못 넣은 분류를
+    # 바로잡을 길이 없어 그 상품들이 영영 추천에서 빠졌다. 열되, 눈 감고 바꾸게 하지
+    # 않는다 — 분류가 바뀌면 필수 사양이 통째로 바뀌고 추천 슬롯도 달라진다.
+    pc = db_one("SELECT product_code FROM products WHERE part_type='ETC'"
+                " AND status='판매중' ORDER BY product_code LIMIT 1")
+    if pc is None:
+        print("  [SKIP] (I) 분류 변경 — 대상 없음")
+        return
+    was = db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
+    pool0 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
+
+    st, prev = post(f"/api/admin/products/{pc}/part-type",
+                    {"part_type": "CASE", "preview": True})
+    check("미리보기가 영향을 준다", st == 200 and bool(prev and prev.get("impact")),
+          200, st)
+    # 미리보기는 **DB를 바꾸지 않아야 한다** — 바꾸면 '확인 후 적용'이 거짓말이 된다
+    check("미리보기는 DB를 바꾸지 않는다",
+          db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc) == was,
+          was, db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc))
+    if prev and prev.get("impact"):
+        i = prev["impact"]
+        check("영향에 필수 사양 변화가 있다",
+              "required_add" in i and "missing_after" in i, "필드 있음", sorted(i))
+
+    st2, ap = post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})
+    check("분류 변경 적용", st2 == 200, 200, st2)
+    if st2 == 200:
+        check("products와 product_specs의 분류가 같다",
+              db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
+              == (db_one("SELECT part_type FROM product_specs WHERE product_code=:p", p=pc)
+                  or "CASE"),
+              "일치", "다름")
+        check("같은 분류로 또 바꾸면 400",
+              post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})[0] == 400,
+              400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})[0])
+        check("없는 분류는 400",
+              post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0] == 400,
+              400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0])
+        uid = ap.get("undo_id")
+        st3, _ = post(f"/api/admin/products/part-type/undo/{uid}")
+        check("분류 변경 되돌리기", st3 == 200, 200, st3)
+        check("분류가 원복된다",
+              db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc) == was,
+              was, db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc))
+        check("되돌린 뒤 추천 풀이 제자리",
+              db_one("SELECT count(*) FROM v_recommendation_candidates"
+                     " WHERE stock_qty>0") == pool0, pool0,
+              db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0"))
+        check("이중 되돌리기는 409",
+              post(f"/api/admin/products/part-type/undo/{uid}")[0] == 409, 409,
+              post(f"/api/admin/products/part-type/undo/{uid}")[0])
+
+    # 공급처 매입가 — 표가 마크업 하드코딩이라 신규 등록 화면에도 남의 값이 떴다
+    sup = get("/api/admin/suppliers")
+    check("공급처 선택지를 서버가 준다", bool(sup.get("items")), "1개 이상",
+          len(sup.get("items") or []))
+    try:
+        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+                     encoding="utf-8").read()
+        # 공급처 표(tbody#supRows)만 본다 — 상단 알림 더미와 코드 주석까지 잡으면 오탐이다
+        i = pe.find('id="supRows"')
+        body = pe[i:pe.find("</tbody>", i)] if i >= 0 else ""
+        check("공급처 표에 예시 매입가가 없다",
+              bool(body) and "원</td>" not in body, "서버 렌더", body[:60])
+        check("분류 변경이 미리보기를 거친다", "preview:true" in pe.replace(" ", ""),
+              "preview 호출", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 상세 화면 계약 — {e}")
+
+
 def test_usage_floors():
     print("\n[14] 용도 하한 — 화면이 한 약속을 서버가 지키는가 (슬라이스 58)")
     # 화면은 오래전부터 "저사양 GPU 제외(프레임 미달)"라고 적어 왔는데 서버는 용도로
@@ -1328,6 +1400,7 @@ def main():
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
+               test_part_type_change,
                test_usage_floors,
                test_guards):
         try:
