@@ -265,53 +265,22 @@
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
           <div><h2 class="mb-1">조립 호환 규칙 · 필수 사양 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">"조립 불가 PC는 안 나온다"의 실체. <b class="text-body-secondary">규칙을 바꾸면 추천 가능 재고 수가 바뀝니다.</b></p></div>
-          <div class="d-flex align-items-center gap-2"><span class="badge badge-phoenix badge-phoenix-secondary">규칙 v5 · 06-28 적용</span><button id="save" class="btn btn-primary btn-sm">저장 → v6 발행</button></div>
         </div>
-        <div class="row g-3">
-          <div class="col-12 col-lg-6">
-            <div class="card h-100"><div class="card-body">
-              <h5 class="mb-2">호환 규칙</h5>
-              <div id="rules"></div>
-            </div></div>
-          </div>
-          <div class="col-12 col-lg-6">
-            <div class="card mb-3"><div class="card-body">
-              <h5 class="mb-1">카테고리별 필수 사양 <span class="fs-10 fw-normal text-body-tertiary">— 미확인이면 검수 회부·추천 제외</span></h5>
-              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>카테고리</th><th>필수 사양 필드</th></tr></thead><tbody>
-                <tr><td class="fw-semibold">CPU</td><td>소켓 <code>{socket}</code> 소비전력 <code>{tdp_watt}</code> 내장그래픽 <code>{igpu}</code></td></tr>
-                <tr><td class="fw-semibold">메인보드</td><td>소켓 <code>{socket}</code> 메모리 규격 <code>{mem_type}</code> 폼팩터 <code>{form_factor}</code> M.2 슬롯 수 <code>{m2_slots}</code></td></tr>
-                <tr><td class="fw-semibold">그래픽카드</td><td>장착 길이 <code>{length_mm}</code> 소비전력 <code>{tdp_watt}</code> 보조전원 <code>{pcie_power}</code> 슬롯 폭 <code>{slot_width}</code></td></tr>
-                <tr><td class="fw-semibold">파워</td><td>정격 출력 <code>{rated_watt}</code> 80PLUS 등급 <code>{efficiency}</code> 폼팩터 <code>{form_factor}</code></td></tr>
-                <tr><td class="fw-semibold">케이스</td><td>GPU 최대 길이 <code>{gpu_max_len}</code> 쿨러 최대 높이 <code>{cpu_cooler_h}</code> 지원 보드 규격 <code>{mb_support}</code></td></tr>
-                <tr><td class="fw-semibold">CPU쿨러</td><td>높이 <code>{height_mm}</code> 지원 소켓 <code>{socket_support}</code> 지원 TDP <code>{tdp_support}</code></td></tr>
-                <tr><td class="fw-semibold">메모리</td><td>메모리 규격 <code>{mem_type}</code> 용량 <code>{capacity_gb}</code> 동작 속도 <code>{speed_mts}</code></td></tr>
-              </tbody></table></div>
-            </div></div>
-            <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>저장 시 재계산</b> — v6 발행 즉시 추천 가능 재고를 재계산합니다(예상 24,912 → 약 24,7xx). 과거 견적은 당시 규칙 버전으로 재현됩니다.</div>
-          </div>
-        </div>
-        <div id="liveRules" hidden class="mt-4"></div>
+        <!-- 더미 규칙 6종과 하드코딩된 '카테고리별 필수 사양' 표를 걷어냈다(슬라이스 82).
+             실재하지 않는 규칙과 사양 필드를 사실처럼 보여주고 있었고, 버전 발행 체계와
+             재계산 예상 수치도 근거가 없었다. 슬라이스 76에서 마진 정책·가중치에 한 정리를
+             이 화면만 빠뜨린 것이다. 아래 LIVE가 서버의 compat_rules를 그대로 보여준다.
+             회귀가 이 화면의 마크업에서 연출 잔재를 검사한다 — 주석에도 그 문자열을
+             다시 적지 않는다(적으면 검사가 잡는다). -->
+        <div id="liveRules" class="mt-1"></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
       (function(){
         function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        const RULES=[
-          ["R-01","CPU ↔ 메인보드 소켓 일치","불일치 시 조합 불가",true,null],
-          ["R-02","그래픽카드 길이 ≤ 케이스 허용 길이","장착 길이 {length_mm} vs GPU 최대 길이 {gpu_max_len}",true,null],
-          ["R-03","쿨러 높이 ≤ 케이스 허용 높이","쿨러 높이 {height_mm} vs 케이스 허용 {cpu_cooler_h}",true,null],
-          ["R-04","전력 여유율","부품 합산 소비전력 대비 파워 정격",true,["여유율 ≥","30","%"]],
-          ["R-05","메모리 규격 일치","DDR4/DDR5 ↔ 보드 메모리 규격 {mem_type}",true,null],
-          ["R-06","M.2 슬롯 수 ≥ 저장장치 수","보드 M.2 슬롯 수 {m2_slots} 확인",false,null]
-        ];
-        document.getElementById("rules").innerHTML=RULES.map(([id,name,desc,on,param],i)=>`
-          <div class="d-flex align-items-center gap-3 py-2 ${i<RULES.length-1?"border-bottom":""}">
-            <code class="fs-10" style="width:38px;flex:none;">${id}</code>
-            <div class="flex-1"><b class="fs-9 text-body-highlight">${name}</b><br><span class="fs-10 text-body-tertiary">${desc}</span></div>
-            ${param?`<span class="fs-10 text-body-tertiary">${param[0]}</span><input class="form-control form-control-sm text-end" style="width:60px;" value="${param[1]}"><span class="fs-10">${param[2]}</span>`:""}
-            <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" ${on?"checked":""}></div>
-          </div>`).join("");
-        document.getElementById("save").onclick=()=>toast("규칙 v6 발행 — 추천 가능 재고 재계산 시작 · 작업 기록 저장");
+        // 더미 규칙 배열·발행 버튼 제거(슬라이스 82) — 아래 LIVE가 실제 규칙을 보여준다.
+        // toast는 LIVE 실패 안내에서 계속 쓴다.
+        window.__toast = toast;
       })();
       </script>
       <script>
@@ -336,13 +305,46 @@
           .then(function(d){
             var host = document.getElementById("liveRules"), html = "";
             if(SCREEN === "compat"){
-              html += card("조립 호환 검사 5종",
-                "견적을 만들 때마다 이 5개를 전부 통과한 조합만 제시합니다 — 하나라도 어긋나면 그 조합은 후보에서 빠집니다.",
-                table(["검사", "판정 기준", "사양 원천"],
+              // 제목에 '5종'이 박혀 있었다 — 실제는 서버가 주는 수(8종)다.
+              // 화면이 숫자를 지어내면 근거가 무너진다(CLAUDE.md 화면 정직성).
+              var nAct = d.compat.checks.filter(function(c){ return c.active; }).length;
+              html += card("조립 호환 검사 " + nAct + "종",
+                "견적을 만들 때마다 이 검사를 전부 통과한 조합만 제시합니다 — 하나라도 어긋나면 그 조합은 후보에서 빠집니다.",
+                table(["검사", "판정 기준", "적용 부품", "사양 원천"],
                   d.compat.checks.map(function(c){
-                    return ['<b>'+c.label+'</b>', '<code class="fs-10">'+c.rule+'</code>',
+                    var pts = (c.part_types || []);
+                    var scope = pts.length
+                      ? pts.map(function(p){
+                          return '<span class="badge badge-phoenix badge-phoenix-info me-1">'+p+'</span>';
+                        }).join('')
+                      : '<span class="text-body-quaternary fs-10">' + c.rule.split('.')[0] + ' 전체</span>';
+                    return ['<b>'+c.label+'</b>', '<code class="fs-10">'+c.rule+'</code>', scope,
                             '<span class="text-body-tertiary fs-10">'+c.source+'</span>'];
                   })) + note(d.compat.note));
+              // 카테고리별 필수 사양 — 하드코딩 표를 걷어내고 메타(spec_field_defs)를 읽는다.
+              // '읽는 규칙'이 비면 근거 없이 상품을 묶고 있다는 뜻이라 그대로 드러낸다.
+              var req = d.compat.required || [];
+              var dead = 0;
+              html += card("부품별 필수 사양",
+                "이 값이 비면 검수 대기가 되고 추천에서 빠집니다 — 게이트가 읽는 목록 그대로입니다.",
+                table(["부품", "필수 사양", "읽는 규칙"],
+                  req.map(function(g){
+                    var fs = g.fields.map(function(f){
+                      return '<span class="badge badge-phoenix badge-phoenix-secondary me-1">'
+                        + f.label + ' <code class="fs-10">' + f.key + '</code></span>';
+                    }).join('');
+                    var used = g.fields.map(function(f){
+                      if(f.used_by.length) return f.used_by.join(' · ');
+                      dead++;
+                      return '<span class="badge badge-phoenix badge-phoenix-warning">'
+                        + f.key + ' — 읽는 규칙 없음</span>';
+                    }).join(' ');
+                    return ['<b>'+g.part_label+'</b>', fs, '<span class="fs-10">'+used+'</span>'];
+                  }))
+                + note(d.compat.required_note)
+                + (dead ? '<div class="alert alert-subtle-warning fs-9 mt-2 mb-0">'
+                    + '어떤 호환 검사도 읽지 않는 필수 사양이 <b>' + dead + '건</b> 있습니다 —'
+                    + ' 규칙을 추가하거나 필수 지정을 푸는 판단이 필요합니다.</div>' : ''));
               html += card("견적 슬롯 구성",
                 "한 대의 PC를 구성하는 슬롯 순서 — 이 순서로 후보를 탐색합니다.",
                 '<div class="d-flex flex-wrap gap-2">' + d.compat.slots.map(function(s){
@@ -393,7 +395,20 @@
             b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
             if(window.feather) feather.replace();
           })
-          .catch(function(){});
+          .catch(function(e){
+            // 더미를 걷어냈으므로 실패하면 화면이 빈다 — 조용히 비우지 않는다.
+            // 예전에는 연출 규칙이 남아 있어 "불러오기에 실패했는데 규칙은 보이는" 상태였고,
+            // 그게 더 나빴다(가짜를 진짜로 읽는다).
+            var host = document.getElementById("liveRules");
+            host.innerHTML = '<div class="alert alert-subtle-warning mb-0" role="alert">'
+              + '<b>규칙을 불러오지 못했습니다</b> (' + e.message + ')<br>'
+              + '<span class="fs-9">이 화면은 서버의 <code>compat_rules</code>를 그대로 보여줍니다 —'
+              + ' 불러오지 못하면 아무것도 표시하지 않습니다. 로그인이 만료됐는지 확인하세요.</span>'
+              + '</div>';
+            var b = document.getElementById("dataSrc");
+            b.textContent = "불러오기 실패";
+            b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

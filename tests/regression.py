@@ -71,6 +71,24 @@ def db_one(sql, **p):
         return c.execute(text(sql), p).scalar()
 
 
+def db_all(sql, **p):
+    """행 목록(dict). DB에 닿지 못하면 빈 목록."""
+    if _engine is None:
+        return []
+    with _engine.connect() as c:
+        return [dict(r) for r in c.execute(text(sql), p).mappings().all()]
+
+
+# 슬롯 → 그 슬롯이 받는 부품 종류. **엔진 것을 그대로 읽는다** — 여기에 베껴 두면
+# 언젠가 어긋나고, 그때 회귀는 엔진이 아니라 자기 사본을 지키게 된다.
+try:
+    sys.path.insert(0, ROOT)
+    from api.recommend import SLOT_TYPES as _ST
+    SLOT_TYPES_DB = {s: list(ts) for s, ts in _ST.items()}
+except Exception:                                        # noqa: BLE001
+    SLOT_TYPES_DB = {}
+
+
 # ── 값 변화 알림 (실패 아님) ───────────────────────────────────────────────────
 # 관계식만으로는 "가중치를 잘못 건드려 추천 총액이 조용히 달라지는" 변화를 못 잡는다.
 # 그래서 주요 수치를 적어두고 바뀌면 보고한다. 재고가 움직이면 값도 움직이는 게 정상이므로
@@ -485,9 +503,53 @@ def test_compat():
     except Exception as e:                               # noqa: BLE001
         print(f"  [SKIP] (I) 부트스트랩 규칙 대조 — {e}")
 
+    # 규칙이 **한 부품 종류를 통째로 죽이고 있지 않은가**(슬라이스 82 실사고).
+    # cooler_height(공랭용)가 슬롯 단위로 걸려 수랭 49개 전부가 NULL 불통과로 탈락했다.
+    # 실패도 경고도 없이 사라져서, 화면은 "수랭 재고 239개"라고 말하고 있었다.
+    # 규칙이 겨냥한 종류에서 그 필드가 100% 비어 있으면 그 종류는 절대 못 뽑힌다.
+    if _engine is None:
+        print("  [SKIP] (I) 규칙 전멸 탐지 — DB 미연결")
+    else:
+        wiped = []
+        for r in db_all(
+                "SELECT rule_key, slot, field, part_types FROM compat_rules WHERE active"):
+            pts = r["part_types"] or SLOT_TYPES_DB.get(r["slot"], [])
+            for pt in pts:
+                n = db_one("SELECT count(*) FROM v_recommendation_candidates"
+                           " WHERE stock_qty>0 AND part_type=:p", p=pt)
+                if not n:
+                    continue
+                have = db_one(f"SELECT count({r['field']}) FROM v_recommendation_candidates"
+                              " WHERE stock_qty>0 AND part_type=:p", p=pt)
+                if have == 0:
+                    wiped.append(f"{r['rule_key']}→{pt}({n}개 전멸)")
+        check("규칙이 특정 부품 종류를 전멸시키지 않는다", not wiped, "전멸 없음", wiped)
+
+    # 화면 계약 — compat-rules.html이 연출을 다시 들이지 않는가(슬라이스 82).
+    # 이 화면은 실재하지 않는 규칙 6종(R-01~R-06)과 필드({igpu}·{m2_slots}·{pcie_power}·
+    # {slot_width}·{efficiency}·{speed_mts}), 'v5 → v6 발행' 버전 체계,
+    # '예상 24,912 → 약 24,7xx'를 사실처럼 보여주고 있었다. 슬라이스 76에서 마진 정책·
+    # 가중치에 한 정리를 이 화면만 빠뜨렸다 — 되돌아오지 않게 마크업으로 고정한다.
+    _p = os.path.join(ROOT, "mockups", "admin", "compat-rules.html")
+    _t = io.open(_p, encoding="utf-8").read()
+    for bad in ('"R-01"', "{igpu}", "{m2_slots}", "{pcie_power}", "{slot_width}",
+                "{speed_mts}", "v6 발행", "24,912"):
+        check(f"compat-rules에 연출 잔재 없음: {bad}", bad not in _t, "없음", "발견")
+    check("compat-rules는 서버의 필수 사양을 읽는다", "compat.required" in _t,
+          "d.compat.required 사용", "없음")
+    check("compat-rules는 불러오기 실패를 알린다", "불러오지 못했습니다" in _t,
+          "실패 안내 있음", "없음")
+
     compat = rec("100만원")["value"]["compat"]
-    check("견적 호환 항목 = 규칙 수(1:1)", len(compat["checks"]) == len(active),
-          len(active), len(compat["checks"]))
+    keys = {c["key"] for c in compat["checks"]}
+    akeys = {r["key"] for r in active}
+    # 1:1은 **적용 부품이 지정되지 않은 규칙**에서만 성립한다. 종류를 좁힌 규칙은 어떤
+    # 부품이 뽑혔느냐에 따라 빠질 수 있다(수랭 구성엔 '쿨러 높이 여유'가 없는 게 정상).
+    # 개수를 맞추는 검사는 티어가 수랭을 고르는 순간 무작위로 실패한다.
+    always = {r["key"] for r in active if not (r.get("part_types") or [])}
+    check("근거는 활성 규칙에서만 나온다", keys <= akeys, "부분집합", sorted(keys - akeys))
+    check("적용 부품 제한 없는 규칙은 근거에 전부 있다", always <= keys,
+          "누락 없음", sorted(always - keys))
     check("호환 검사 전부 통과", all(c["pass"] for c in compat["checks"]),
           "전 항목 pass", [c["key"] for c in compat["checks"] if not c["pass"]])
     check("전원 여유율 100% 이상", (compat["power_headroom_pct"] or 0) >= 100,

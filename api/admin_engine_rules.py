@@ -24,6 +24,11 @@ router = APIRouter(prefix="/api/admin")
 
 # 호환 규칙은 이제 compat_rules 테이블이 단일 원천(슬라이스 34) — 하드코딩 제거.
 OP_KO = {"eq": "=", "gte": "≥", "lte": "≤"}
+PART_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
+           "CASE": "케이스", "POWER": "파워", "SSD": "SSD", "HDD": "HDD",
+           "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수랭)",
+           "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
+           "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠"}
 
 TIER_RULES = [
     {"key": "value", "label": TIER_LABELS["value"], "order": "슬롯별 가격 오름차순",
@@ -50,7 +55,8 @@ def engine_rules():
         pool = conn.execute(text(
             "SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")).scalar_one()
         rule_rows = conn.execute(text(
-            "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, blocking, active"
+            "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, blocking, active,"
+            " part_types"
             " FROM compat_rules ORDER BY sort_order, rule_id")).mappings().all()
 
     checks = [{
@@ -58,7 +64,47 @@ def engine_rules():
         "rule": f"{r['slot']}.{r['field']} {OP_KO.get(r['op'], r['op'])} {r['ref_slot']}.{r['ref_field']}",
         "source": f"product_specs.{r['field']} / {r['ref_field']}",
         "blocking": r["blocking"], "active": r["active"],
+        # 빈 목록 = 슬롯 전체. 값이 있으면 그 종류에만 걸린다 — 쿨러 슬롯처럼 성격이
+        # 다른 부품이 섞이는 자리에서 겨냥하지 않은 부품까지 죽이지 않기 위한 조건이다.
+        "part_types": r["part_types"] or [],
     } for r in rule_rows]
+
+    # 카테고리별 필수 사양 — 화면이 표를 하드코딩하고 있었다(존재하지 않는 {igpu}·{m2_slots}·
+    # {pcie_power}·{slot_width}까지). 게이트가 실제로 읽는 것은 spec_field_defs 메타다.
+    from .recommend import SLOT_TYPES
+    from .spec_fields import required_map, all_fields
+    labels = {f["field_key"]: f["label"] for f in all_fields()}
+    rm = required_map()
+
+    # 용도 하한도 사양을 읽는다 — 호환 규칙만 보면 capacity_gb가 '아무도 안 읽는 값'으로
+    # 보인다(실제로는 게임용 SSD 500GB 하한 등이 그걸 쓴다).
+    with engine.connect() as conn:
+        floor_use = {(r["slot"], r["field"]) for r in conn.execute(text(
+            "SELECT slot, field FROM usage_floors")).mappings()}
+
+    def _readers(pt: str, key: str) -> list:
+        """(부품 종류, 필드)를 실제로 읽는 규칙. **필드 이름만 맞춰선 안 된다** —
+        case_board의 ref_field는 메인보드의 form_factor다. 이름만 보면 파워·SSD의
+        form_factor까지 '읽고 있다'고 말하게 되는데, 그 둘은 아무도 안 읽는다."""
+        out = set()
+        for r in rule_rows:
+            if not r["active"]:
+                continue
+            own = r["part_types"] or list(SLOT_TYPES.get(r["slot"], ()))
+            if key == r["field"] and pt in own:
+                out.add(r["rule_key"])
+            if key == r["ref_field"] and pt in SLOT_TYPES.get(r["ref_slot"], ()):
+                out.add(r["rule_key"])
+        for slot, field in floor_use:
+            if field == key and pt in SLOT_TYPES.get(slot, ()):
+                out.add("용도 하한")
+        return sorted(out)
+
+    required = [{
+        "part_type": pt, "part_label": PART_KO.get(pt, pt),
+        "fields": [{"key": k, "label": labels.get(k, k), "used_by": _readers(pt, k)}
+                   for k in sorted(rm.get(pt, []))],
+    } for pt in sorted(rm) if rm.get(pt)]
 
     fee = float(s["card_fee_rate"]) if s else 0.0
     margin = float(s["margin_rate"]) if s else 0.0
@@ -67,9 +113,14 @@ def engine_rules():
         "compat": {
             "checks": checks,
             "slots": SLOTS,
+            "required": required,
             "note": ("호환 규칙은 **compat_rules 테이블이 단일 원천**입니다(슬라이스 34) —"
                      " 엔진이 매 견적마다 이 표를 읽어 판정합니다. NULL 값은 불통과(값을 모르는"
                      " 부품을 호환으로 판정하지 않음) · 규칙 편집 UI·버전 발행은 이관."),
+            "required_note": ("필수 사양은 **spec_field_defs 메타가 단일 원천**입니다 —"
+                              " 게이트가 읽는 그 목록입니다. '읽는 규칙'이 비어 있으면"
+                              " 어떤 호환 검사도 그 값을 쓰지 않는다는 뜻입니다"
+                              " — 근거 없이 상품을 검수 대기로 묶고 있는 것입니다."),
         },
         "tiers": {
             "rules": TIER_RULES,

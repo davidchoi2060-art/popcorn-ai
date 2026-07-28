@@ -75,7 +75,8 @@ def load_compat_rules(conn) -> dict:
     건너뛰고 경고한다(잘못된 규칙이 KeyError로 엔진을 죽이지 않게).
     """
     rows = conn.execute(text(
-        "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, detail_fmt, blocking"
+        "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, detail_fmt, blocking,"
+        " part_types"
         " FROM compat_rules WHERE active ORDER BY sort_order, rule_id")).mappings().all()
     by_slot: dict = {}
     for r in rows:
@@ -106,6 +107,17 @@ def _cmp(op: str, v, r) -> bool:
     return False   # 미지의 연산자 — 불통과(조용히 통과시키지 않는다)
 
 
+def _rule_applies(rule, p) -> bool:
+    """이 규칙이 이 부품을 겨냥하는가 — `part_types`가 비면 슬롯 전체(기존 동작).
+
+    한 슬롯에 성격이 다른 부품이 들어온다: 쿨러 슬롯은 공랭과 수랭을 함께 받는다.
+    공랭용 높이 규칙이 수랭에도 걸려 **수랭 49개가 통째로 탈락**하고 있었다(슬라이스 82).
+    NULL 불통과라 실패가 아니라 '조용한 전멸'로 나타난다.
+    """
+    pts = rule.get("part_types") or []
+    return not pts or p.get("part_type") in pts
+
+
 def _slot_ok(slot, p, chosen, rules: dict):
     """슬롯 진입 호환 검사 — DB 규칙을 그대로 적용. 규칙 없는 슬롯(CPU·GPU·SSD)은 독립.
 
@@ -113,6 +125,8 @@ def _slot_ok(slot, p, chosen, rules: dict):
     "판정할 수 없으니 통과시키지 않는다"로 떨어진다(누락은 check_rule_fields가 경고로 알린다).
     """
     for rule in rules.get(slot, ()):
+        if not _rule_applies(rule, p):
+            continue
         v = p.get(rule["field"])
         r = chosen[rule["ref_slot"]].get(rule["ref_field"])
         if not _cmp(rule["op"], v, r):
@@ -272,6 +286,10 @@ def build_compat(chosen: dict, rules: dict) -> dict:
     checks = []
     for slot in SLOTS:
         for rule in rules.get(slot, ()):
+            # 겨냥하지 않은 부품에는 검사를 내밀지 않는다. 수랭 구성에 '쿨러 높이 여유'를
+            # 띄우면 검증한 적 없는 것을 검증했다고 말하는 셈이다(슬라이스 82).
+            if not _rule_applies(rule, chosen[slot]):
+                continue
             v = chosen[slot].get(rule["field"])
             r = chosen[rule["ref_slot"]].get(rule["ref_field"])
             fmt = rule["detail_fmt"] or "{v} / {r}"
