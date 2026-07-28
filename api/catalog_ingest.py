@@ -36,7 +36,8 @@ REQUIRED = {
 SPEC_COLS = ["socket", "socket_list", "chipset", "mem_type", "capacity_gb", "clock_mhz",
              "tdp_watt", "rated_watt", "required_power_watt", "length_mm", "gpu_max_mm",
              "cooler_height_mm", "cooler_tdp", "pcie_gen", "form_factor", "interface",
-             "size_inch", "resolution", "refresh_hz", "panel"]
+             "size_inch", "resolution", "refresh_hz", "panel",
+             "radiator_rows", "radiator_max_rows"]
 JSON_COLS = {"socket_list", "form_factor_list"}
 # product_specs의 VARCHAR 길이(DB 실측) — 초과 값은 잘라 넣고 검수로 알린다
 SPEC_MAXLEN = {"socket": 30, "chipset": 50, "mem_type": 10, "pcie_gen": 20,

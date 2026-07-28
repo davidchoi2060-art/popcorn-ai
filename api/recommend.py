@@ -59,7 +59,8 @@ def _load_pool(conn):
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"
         " socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
         " form_factor, form_factor_list, capacity_gb,"
-        " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent,"
+        " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
+        " radiator_rows, radiator_max_rows, tag_white, tag_silent,"
         " spec_sources, data_origin"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
@@ -173,6 +174,10 @@ def build_search_index(slot_pools, rules: dict) -> dict:
     ① **eq / contains 규칙 → 값 인덱스**: MB는 CPU 소켓별, RAM은 MB 메모리 규격별,
        쿨러는 지원 소켓별로 미리 묶는다. 상대 값이 정해지면 그 그룹만 본다
        (기존에는 전 후보를 순회하며 하나씩 비교했다).
+    **적용 부품이 슬롯의 일부인 규칙은 여기서 제외한다**(슬라이스 82-B) — 아래 두 최적화는
+    모두 "슬롯 전체가 이 규칙을 받는다"를 전제로 자르기 때문이다. 전제가 깨지면 자르기가
+    유효한 구성을 없애고, 그건 '규칙이 막았다'보다 나쁘다(막힌 이유를 설명할 수 없다).
+
     ② **gte / lte 규칙 → 극값 전방 검사**: 슬롯의 field 최대·최소를 미리 계산해,
        상대 슬롯을 고른 즉시 "대상 슬롯에 후보가 0인가"를 O(1)로 판정한다.
        예: GPU 길이가 케이스 최대 장착 길이보다 크면 그 GPU는 즉시 버린다
@@ -184,6 +189,16 @@ def build_search_index(slot_pools, rules: dict) -> dict:
     for slot, rs in rules.items():
         pool = slot_pools.get(slot) or []
         for rule in rs:
+            # **적용 부품이 슬롯의 일부인 규칙은 인덱스에 넣지 않는다**(슬라이스 82-B).
+            # 인덱스와 전방 검사는 "이 규칙은 슬롯 전체에 걸린다"를 전제로 자른다.
+            # 수랭 전용 라디에이터 규칙을 그대로 넣었더니, 수랭 최대 열이 비어 있는
+            # 케이스를 "붙을 쿨러가 없다"며 통째로 잘라냈다 — 공랭을 쓰는 구성까지
+            # 더 비싼 케이스로 밀려 가성비 총액이 316,400에서 323,800이 됐다.
+            # 규칙이 막은 게 아니라 **탐색이 유효한 구성을 못 찾은 것**이라 더 나쁘다.
+            # 자르지 않으면 느려질 뿐이지만, 잘못 자르면 결과가 조용히 달라진다.
+            scope = rule.get("part_types") or []
+            if scope and not set(SLOT_TYPES.get(slot, ())) <= set(scope):
+                continue
             op, fld = rule["op"], rule["field"]
             if op in ("eq", "contains"):
                 g: dict = {}

@@ -251,6 +251,8 @@ def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
         put("form_factor", _form(feats), "feature")
         put("gpu_max_mm", _num(kv.get("VGA장착길이")), "eav")
         put("cooler_height_mm", _num(kv.get("CPU쿨러장착높이")), "eav")
+        put("radiator_max_rows",
+            _b_rows(kv.get("수랭쿨러지원") or kv.get("수랭쿨러 지원")), "eav")
 
     elif part_type in ("COOLER_CPU_AIR", "COOLER_CPU_AIO"):
         if sockets:
@@ -261,6 +263,10 @@ def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
         put("cooler_tdp", _num(kv.get("TDP")), "eav")
         if part_type == "COOLER_CPU_AIR":
             put("cooler_height_mm", _num(kv.get("높이")), "eav")
+        else:
+            v, vsrc = radiator_rows(_num(kv.get("수랭팬개수")), name)
+            if v:
+                put("radiator_rows", v, vsrc)
 
     elif part_type in ("SSD", "HDD"):
         put("capacity_gb", _cap(kv.get("용량")), "eav")
@@ -403,6 +409,45 @@ def _b_num(v):
     return int(n) if n.is_integer() else n
 
 
+def _b_rows(v):
+    """'최대 3열' · '3(EA)' → 3. 실측 범위는 1~4열(480mm까지)."""
+    n = _b_num(v)
+    return int(n) if isinstance(n, (int, float)) and 1 <= n <= 4 else None
+
+
+# 상품명에 제조사가 쓴 라디에이터 규격 → 열 수.
+# **추론이 아니라 명시 표현이다** — 제조사가 제품명에 적은 규격을 읽을 뿐이다(태그 규칙과 같다).
+RAD_NAME = re.compile(r"\b(120|140|240|280|360|420|480)\b")
+RAD_ROWS = {"120": 1, "140": 1, "240": 2, "280": 2, "360": 3, "420": 3, "480": 4}
+
+
+def radiator_rows_from_name(name: str):
+    m = RAD_NAME.search(name or "")
+    return RAD_ROWS.get(m.group(1)) if m else None
+
+
+def radiator_rows(fan_count, name: str):
+    """수랭 라디에이터 열 수 — 제품명 규격이 있으면 그것이 실제 크기다.
+
+    원문 '수랭팬개수'는 라디에이터 크기와 어긋날 수 있다(실측):
+      · 360 제품에 팬 2로 적힌 것 5건 — **과소**. `<=` 규칙에서 과소는
+        조립 불가 조합을 통과시키는 방향이라 가장 위험하다.
+      · 발키리 GL36(360 푸시풀)에 팬 6 — **과대**. 6열 케이스는 없으므로
+        어떤 케이스에도 안 들어가는 부품이 된다(0021이 고친 것과 같은 전멸).
+
+    그래서 팬개수를 그대로 쓰지 않는다:
+      ① 제품명에 규격이 있으면 그 값(제조사가 쓴 실제 라디에이터 크기)
+      ② 없으면 팬개수 — 단 4 이상은 푸시풀과 구분할 수 없어 **비워 둔다**.
+         모르면 값을 넣지 않는다. 규칙은 NULL을 통과시키지 않고, 검수에서 사람이 채운다.
+    """
+    by_name = radiator_rows_from_name(name)
+    if by_name:
+        return by_name, "name_explicit"
+    if fan_count and 1 <= fan_count <= 3:
+        return fan_count, "text_kv"
+    return None, None
+
+
 def _b_mem(v):
     m = re.search(r"DDR[345]", v or "", re.I)
     return m.group(0).upper() if m else None
@@ -417,7 +462,9 @@ B_MAP = {
             "열 설계 전력": ("tdp_watt", _b_num), "TDP": ("tdp_watt", _b_num)},
     "CASE": {"그래픽카드 장착": ("gpu_max_mm", _b_num),
              "CPU쿨러 장착": ("cooler_height_mm", _b_num),
-             "쿨러 높이": ("cooler_height_mm", _b_num)},
+             "쿨러 높이": ("cooler_height_mm", _b_num),
+             "수랭쿨러 지원": ("radiator_max_rows", _b_rows),
+             "수랭쿨러지원": ("radiator_max_rows", _b_rows)},
     "POWER": {"정격 출력": ("rated_watt", _b_num), "표준 출력": ("rated_watt", _b_num),
               "제품 분류": ("form_factor", _b_form), "ATX12V 규격": ("form_factor", _b_form)},
     "GPU": {"권장 파워": ("required_power_watt", _b_num),
@@ -425,7 +472,8 @@ B_MAP = {
             "길이": ("length_mm", _b_num), "가로": ("length_mm", _b_num)},
     "COOLER_CPU_AIR": {"TDP": ("cooler_tdp", _b_num), "높이": ("cooler_height_mm", _b_num),
                        "쿨러 높이": ("cooler_height_mm", _b_num)},
-    "COOLER_CPU_AIO": {"TDP": ("cooler_tdp", _b_num)},
+    "COOLER_CPU_AIO": {"TDP": ("cooler_tdp", _b_num),
+                       "수랭팬개수": ("radiator_rows", _b_rows)},
     "RAM": {"메모리 종류": ("mem_type", _b_mem), "메모리 용량": ("capacity_gb", _cap),
             "동작 클럭": ("clock_mhz", _b_num)},
     "SSD": {"용량": ("capacity_gb", _cap)},
@@ -541,6 +589,16 @@ def extract_from_text(part_type: str, raw: str, name: str = "") -> tuple:
         if got is not None:
             s[field] = got
             src[field] = "text_kv"
+    if part_type == "COOLER_CPU_AIO":
+        # 팬개수를 그대로 열 수로 쓰지 않는다 — radiator_rows()가 이유를 설명한다.
+        v, vsrc = radiator_rows(_b_rows(kv.get("수랭팬개수")), name)
+        if v:
+            s["radiator_rows"] = v
+            src["radiator_rows"] = vsrc
+        else:
+            s.pop("radiator_rows", None)
+            src.pop("radiator_rows", None)
+
     tags, tsrc = extract_tags(part_type, name, raw)      # 명시 표현만(슬라이스 48)
     s.update(tags)
     src.update(tsrc)

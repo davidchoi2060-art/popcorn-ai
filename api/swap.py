@@ -38,6 +38,7 @@ SLOT_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그�
 # 않아 전 슬롯 대안이 0이 됐고, 슬라이스 46에서야 발견했다 — 회귀에 스왑 항목을 넣은 이유다.
 SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
              " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
+             " radiator_rows, radiator_max_rows,"
              " form_factor, form_factor_list, tag_white, tag_silent")
 
 

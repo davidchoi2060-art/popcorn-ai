@@ -490,16 +490,16 @@ def test_compat():
     # 개발 시드(더미 상품·주문과 한 묶음)에만 있었다 — 새로 세운 서버는 규칙이 0이었고,
     # 엔진은 실패하지 않고 조용히 전부 통과시킨다(규칙 없는 슬롯 = 독립).
     # 부트스트랩 마이그레이션이 전 규칙을 덮는지 여기서 지킨다.
+    # 빈 DB로 세워도 규칙이 서는가 — 규칙이 마이그레이션 이력에 있어야 한다.
+    # (0019가 기본 8종을 넣고, 이후 규칙은 각자의 마이그레이션이 넣는다. 어디에 있든
+    #  `alembic upgrade head`만으로 재현되면 된다 — 특정 파일을 고집하지 않는다.)
     try:
-        import importlib.util as _iu
-        _p = os.path.join(ROOT, "db", "migrations", "versions",
-                          "0019_bootstrap_operating_rules.py")
-        _s = _iu.spec_from_file_location("_boot19", _p)
-        _m = _iu.module_from_spec(_s)
-        _s.loader.exec_module(_m)
-        seeded = {r[0] for r in _m.RULES}
-        gap = sorted({r["key"] for r in active} - seeded)
-        check("활성 규칙은 전부 부트스트랩에 들어 있다", not gap, "누락 없음", gap)
+        _dir = os.path.join(ROOT, "db", "migrations", "versions")
+        _src = "".join(io.open(os.path.join(_dir, f), encoding="utf-8").read()
+                       for f in os.listdir(_dir) if f.endswith(".py"))
+        gap = sorted(r["key"] for r in active if f"'{r['key']}'" not in _src
+                     and f'"{r["key"]}"' not in _src)
+        check("활성 규칙은 전부 마이그레이션 이력에 있다", not gap, "누락 없음", gap)
     except Exception as e:                               # noqa: BLE001
         print(f"  [SKIP] (I) 부트스트랩 규칙 대조 — {e}")
 
@@ -524,6 +524,31 @@ def test_compat():
                 if have == 0:
                     wiped.append(f"{r['rule_key']}→{pt}({n}개 전멸)")
         check("규칙이 특정 부품 종류를 전멸시키지 않는다", not wiped, "전멸 없음", wiped)
+
+    # 탐색 가속 인덱스가 **결과를 바꾸지 않는가**(슬라이스 82-B 실사고).
+    # build_search_index는 "이 규칙은 슬롯 전체에 걸린다"를 전제로 분기를 자른다.
+    # 수랭 전용 규칙을 그대로 넣었더니, 수랭 최대 열이 비어 있는 케이스를 "붙을 쿨러가
+    # 없다"며 잘라내 **공랭 구성까지** 더 비싼 케이스로 밀렸다(가성비 316,400 -> 323,800).
+    # 규칙이 막은 게 아니라 탐색이 유효한 구성을 못 찾은 것이라 설명조차 할 수 없었다.
+    # 인덱스를 끄고 돌린 결과와 같아야 한다 — 다르면 자르기가 결과를 바꾸고 있다.
+    try:
+        sys.path.insert(0, ROOT)
+        from api import recommend as _R
+        with _R.engine.begin() as _c:
+            _pool, _rules = _R._load_pool(_c), _R.load_compat_rules(_c)
+        _cap = _R._budget_cap("150만원")
+        _real = _R._build_set("value", _pool, _cap, _rules)
+        _orig = _R.build_search_index
+        try:
+            _R.build_search_index = lambda sp, rl: {"eq": {}, "fwd": []}
+            _plain = _R._build_set("value", _pool, _cap, _rules)
+        finally:
+            _R.build_search_index = _orig
+        check("탐색 인덱스가 결과를 바꾸지 않는다",
+              (_real or {}).get("total") == (_plain or {}).get("total"),
+              (_plain or {}).get("total"), (_real or {}).get("total"))
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 탐색 인덱스 동등성 — {e}")
 
     # 화면 계약 — compat-rules.html이 연출을 다시 들이지 않는가(슬라이스 82).
     # 이 화면은 실재하지 않는 규칙 6종(R-01~R-06)과 필드({igpu}·{m2_slots}·{pcie_power}·
@@ -1734,10 +1759,17 @@ def test_swap():
     check("적용 결과가 호환 전부 통과",
           all(c["pass"] for c in ap["compat"]["checks"]), "전부 통과",
           [c["key"] for c in ap["compat"]["checks"] if not c["pass"]])
-    n_rules = len([r for r in get("/api/admin/engine-rules")["compat"]["checks"]
-                   if r.get("active", True)])
-    check("교체 후 호환 항목 = 활성 규칙 수(1:1)",
-          len(ap["compat"]["checks"]) == n_rules, n_rules, len(ap["compat"]["checks"]))
+    # 1:1이 아니라 관계로 본다 — 적용 부품을 좁힌 규칙은 어떤 부품이 뽑혔느냐에 따라
+    # 빠진다(수랭 구성엔 '쿨러 높이 여유'가, 공랭 구성엔 '라디에이터 장착'이 없는 게 정상).
+    _act = [r for r in get("/api/admin/engine-rules")["compat"]["checks"]
+            if r.get("active", True)]
+    _keys = {c["key"] for c in ap["compat"]["checks"]}
+    _always = {r["key"] for r in _act if not (r.get("part_types") or [])}
+    check("교체 후 근거는 활성 규칙에서만 나온다",
+          _keys <= {r["key"] for r in _act}, "부분집합",
+          sorted(_keys - {r["key"] for r in _act}))
+    check("교체 후 적용 부품 제한 없는 규칙은 전부 있다", _always <= _keys,
+          "누락 없음", sorted(_always - _keys))
 
     after = get("/api/admin/swap-logs")
     check("교체가 원장에 남는다", after["total"] == before + 1, before + 1, after["total"])
