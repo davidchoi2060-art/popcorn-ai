@@ -32,7 +32,11 @@ def list_operators():
             "    WHERE l.operator_id = o.operator_id) AS acts,"
             " (SELECT COUNT(*) FROM admin_sessions s"
             "    WHERE s.operator_id = o.operator_id"
-            "      AND s.revoked_at IS NULL AND s.expires_at > now()) AS live_sessions"
+            "      AND s.revoked_at IS NULL AND s.expires_at > now()) AS live_sessions,"
+            # 비밀번호가 없으면 **로그인 자체가 안 된다**(슬라이스 70). 화면이 그걸 알아야
+            # owner가 누구에게 발급해야 하는지 안다.
+            " (o.password_hash IS NOT NULL) AS has_password, o.must_change_password,"
+            " (o.locked_until IS NOT NULL AND o.locked_until > now()) AS is_locked"
             " FROM admin_operators o"
             " LEFT JOIN admin_operators a ON a.operator_id = o.approved_by"
             " ORDER BY (o.status='대기') DESC, o.operator_id")).mappings().all()
@@ -47,10 +51,14 @@ def list_operators():
         "approver": r["approver"], "acts": r["acts"], "live_sessions": r["live_sessions"],
         "last_login": iso(r["last_login_at"]) if r["last_login_at"] else None,
         "is_me": r["operator_id"] == me.get("operator_id"),
+        "has_password": bool(r["has_password"]),
+        "must_change_password": bool(r["must_change_password"]),
+        "is_locked": bool(r["is_locked"]),
     } for r in rows], "me": me,
         "note": ("승인 전 계정은 어떤 데이터도 볼 수 없습니다 · 정지 시 진행 중 세션이 즉시 끊깁니다"
                  " · 자기 계정의 강등·정지는 막혀 있습니다(스스로 잠기는 것 방지)"
-                 " · 비밀번호는 저장하지 않습니다(신원은 소셜 제공자가 확인)")}
+                 " · 비밀번호는 해시로만 보관합니다(원문은 저장하지 않습니다)"
+                 " · 비밀번호가 없는 계정은 로그인할 수 없습니다 — owner가 발급해야 합니다")}
 
 
 class ApproveBody(BaseModel):
@@ -134,3 +142,65 @@ def suspend(operator_id: int):
              {"operator_id": operator_id, "email": o["email"], "sessions_killed": killed,
               "before": {"status": o["status"], "role": o["role"]}}, kind="operator")
         return {"ok": True, "status": "정지", "sessions_killed": killed}
+
+
+# ---- 슬라이스 73: 운영자 이메일 정정 ----
+# 신청 화면에서 오타가 난 계정이 실제로 있었다(lsa@proteam13@@ — @가 두 번).
+# 이메일은 **로그인 신원**이라 형식이 깨지면 그 사람은 영영 못 들어온다.
+# 계정을 지우고 다시 신청하게 할 수도 있지만, 승인 이력과 권한이 함께 사라진다.
+#
+# 신원을 바꾸는 일이므로 owner만, 그리고 **비밀번호는 함께 지운다** —
+# 바뀐 주소의 주인이 정말 그 사람인지 다시 확인받아야 한다.
+
+
+class FixEmailBody(BaseModel):
+    email: str
+
+
+@router.post("/operators/{operator_id}/email")
+def fix_email(operator_id: int, body: FixEmailBody):
+    from .admin_orders import _log
+
+    me = current_operator() or {}
+    if me.get("role") != "owner":
+        raise HTTPException(403, "관리자(owner)만 정정할 수 있습니다")
+    new = (body.email or "").strip().lower()
+    # 형식 검사 — 느슨하게 보되 '@가 하나' 같은 최소 조건은 지킨다
+    if new.count("@") != 1 or new.startswith("@") or new.endswith("@"):
+        raise HTTPException(400, "이메일 형식이 올바르지 않습니다")
+    local, _, domain = new.partition("@")
+    if not local or "." not in domain or domain.endswith("."):
+        raise HTTPException(400, "이메일 형식이 올바르지 않습니다")
+
+    with engine.begin() as conn:
+        cur = conn.execute(text(
+            "SELECT email, name, status FROM admin_operators WHERE operator_id=:i"
+            " FOR UPDATE"), {"i": operator_id}).mappings().first()
+        if cur is None:
+            raise HTTPException(404, "운영자가 없습니다")
+        if cur["email"] and cur["email"].lower() == new:
+            raise HTTPException(400, "같은 이메일입니다")
+        dup = conn.execute(text(
+            "SELECT operator_id FROM admin_operators WHERE lower(email)=:e"
+            "   AND operator_id <> :i"), {"e": new, "i": operator_id}).scalar()
+        if dup:
+            raise HTTPException(409, "이미 쓰는 이메일입니다")
+
+        conn.execute(text(
+            "UPDATE admin_operators SET email=:e, provider_uid=:e,"
+            # 신원이 바뀌었으니 비밀번호는 무효로 둔다 — 새 주소의 주인이 맞는지
+            # owner가 다시 발급하며 확인한다
+            " password_hash=NULL, password_set_at=NULL, must_change_password=false,"
+            " login_fail_count=0, locked_until=NULL"
+            " WHERE operator_id=:i"), {"e": new, "i": operator_id})
+        # 쓰던 세션도 끊는다(옛 신원으로 열린 세션이다)
+        killed = conn.execute(text(
+            "UPDATE admin_sessions SET revoked_at=now()"
+            " WHERE operator_id=:i AND revoked_at IS NULL"),
+            {"i": operator_id}).rowcount
+        _log(conn, "operator_email_fix", cur["name"],
+             {"operator_id": operator_id, "from": cur["email"], "to": new,
+              "sessions_killed": killed}, kind="operator")
+    return {"ok": True, "email": new, "sessions_killed": killed,
+            "note": (cur["name"] + " 님의 이메일을 정정했습니다."
+                     " 비밀번호가 초기화됐으니 다시 발급해 주세요.")}
