@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from fastapi import APIRouter
 
+from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 
@@ -100,7 +101,7 @@ def swap_logs(limit: int = 100):
             "from_sku": r["from_sku"], "to_sku": r["to_sku"],
             "from_name": r["from_name"], "to_name": r["to_name"],
             "delta": r["price_delta"], "session_id": r["session_id"],
-            "at": r["created_at"].isoformat(),
+            "at": iso(r["created_at"]),
         } for r in recent],
         # 수집 경로는 슬라이스 49에서 생겼다. 그래도 0건이면 '측정값 0'이 아니라
         # '아직 아무도 누르지 않음'이다 — 둘을 같은 말로 보여주지 않는다(배지 3종 규약).

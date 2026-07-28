@@ -15,6 +15,7 @@ note는 서버 파생 문장(손글 서술 저장처 없음). 이관: 회원 딥
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import _log
 from .auth import current_operator_id
 from .db import engine
@@ -69,12 +70,12 @@ def list_members():
         state = "mapped" if r["mall_member_id"] else ("requested" if r["requested_at"] else "none")
         items.append({
             "id": r["member_id"], "name": r["nickname"], "email": r["email"],
-            "via": VIA_KO.get(r["joined_via"], r["joined_via"]), "joined": r["created_at"].isoformat(),
+            "via": VIA_KO.get(r["joined_via"], r["joined_via"]), "joined": iso(r["created_at"]),
             "map_state": state, "mall_id": r["mall_member_id"],
-            "requested_at": r["requested_at"].isoformat() if r["requested_at"] else None,
+            "requested_at": iso(r["requested_at"]) if r["requested_at"] else None,
             "orders": r["orders"], "consults": r["consults"], "reviews": r["reviews"],
             "favs": r["favs"], "alerts": r["alerts"],
-            "last": last.isoformat() if last else None,
+            "last": iso(last) if last else None,
             "note": _note(r),
         })
     return {"items": items, "member_mode": mode}

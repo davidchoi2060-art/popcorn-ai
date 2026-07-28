@@ -12,6 +12,7 @@ settlements·pg_ref 노출은 ADM-PAY-010 몫.
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .timeutil import iso
 from .customer_auth import require_member
 from .db import engine
 
@@ -31,5 +32,5 @@ def list_payments():
     return {"items": [{
         "order_no": r["order_no"], "mode": r["pay_mode"], "method": r["method"],
         "amount": r["amount"], "status": r["status"],
-        "at": r["paid_at"].isoformat() if r["paid_at"] else None,
+        "at": iso(r["paid_at"]) if r["paid_at"] else None,
     } for r in rows]}

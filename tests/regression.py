@@ -642,6 +642,52 @@ def test_spec_fields():
     _spec_field_guards()
 
 
+def test_pool_gate():
+    print("\n[15] 후보 게이트 — 팔 수 없는 부품은 견적에 못 들어온다 (슬라이스 62)")
+    # '4중 게이트(사양·검수·가격·재고)'라고 적어 두고 뷰는 가격을 보지 않았다.
+    # 판매가 NULL인 상품 하나가 후보에 들어와 예산 비교가 TypeError를 냈고
+    # **견적 API 전체가 500**이 됐다. 조용히 줄어드는 게 아니라 화면이 통째로 죽는다.
+    n = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE sale_price IS NULL")
+    check("후보 풀에 판매가 없는 부품이 없다", n == 0, 0, n)
+    n2 = db_one("SELECT count(*) FROM v_recommendation_candidates"
+                " WHERE stock_qty > 0 AND sale_price IS NULL")
+    check("재고 있는 후보는 전부 가격이 있다", n2 == 0, 0, n2)
+    # 게이트를 우회해 값이 없는 부품이 생겨도 엔진이 죽지 않아야 한다(이중 방어)
+    try:
+        src = io.open(os.path.join(ROOT, "api", "recommend.py"), encoding="utf-8").read()
+        check("엔진 풀 로드가 가격을 다시 확인한다",
+              "sale_price IS NOT NULL" in src, "방어 조건 있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 엔진 방어 — {e}")
+
+    # 시각은 타임존을 달고 나가야 한다(슬라이스 62). DB는 UTC로 돌고 컬럼은
+    # timestamp without time zone이라, 그냥 isoformat()하면 타임존 없는 문자열이 된다.
+    # 브라우저의 new Date()는 그걸 **로컬 시각으로 해석**해 UTC 07:27이 서울 07:27로
+    # 찍혔다 — 실제로는 16:27이라 9시간이 어긋났다(사용자 보고).
+    log = get("/api/admin/activity-logs?size=1")
+    rows = log.get("items") or log.get("logs") or []
+    if rows:
+        at = rows[0].get("at") or rows[0].get("created_at")
+        check("작업 기록 시각에 타임존이 붙어 있다",
+              bool(at) and ("+" in at[10:] or at.endswith("Z")), "+00:00 또는 Z", at)
+        try:
+            from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+            d = _dt.fromisoformat(at)
+            check("작업 기록 시각이 지금과 가깝다(시계 어긋남 없음)",
+                  abs((_dt.now(_tz.utc) - d).total_seconds()) < 86400,
+                  "24시간 이내", str(d))
+        except ValueError as e:                          # noqa: BLE001
+            check("작업 기록 시각을 파싱할 수 있다", False, "ISO 형식", f"{at} ({e})")
+    # 코드에 타임존 없는 isoformat()이 남아 있으면 같은 사고가 반복된다
+    bad = []
+    for f in glob.glob(os.path.join(ROOT, "api", "*.py")):
+        if os.path.basename(f) == "timeutil.py":
+            continue
+        if ".isoformat()" in io.open(f, encoding="utf-8").read():
+            bad.append(os.path.basename(f))
+    check("API에 타임존 없는 isoformat()이 없다", not bad, "전부 iso() 사용", bad)
+
+
 def test_usage_floors():
     print("\n[14] 용도 하한 — 화면이 한 약속을 서버가 지키는가 (슬라이스 58)")
     # 화면은 오래전부터 "저사양 GPU 제외(프레임 미달)"라고 적어 왔는데 서버는 용도로
@@ -837,6 +883,38 @@ def test_usage_floors():
                      encoding="utf-8").read()
         head = pe[pe.find('id="ptitle"'):pe.find('id="ptitle"') + 200]
         check("상품 상세 제목에 예시 상품명이 없다", "이엠텍" not in head, "비어 있음", head[:60])
+        # 메뉴 배지가 마크업 더미를 그대로 쓰고 있었다(상품 검수 9 <-> 실제 5,162).
+        # 서버 값으로 갈아끼우고, 원천 없는 배지는 지우고, 주기적으로 다시 읽는다.
+        for need, why in (("paintBadges", "배지 갱신"), ("clearDummyBadges", "더미 제거"),
+                          ("setInterval", "주기 갱신"), ("korean", "한글화")):
+            check(f"패널 스크립트에 {why}가 있다", need in js, need, "없음")
+        # 메뉴 배지가 가리키는 화면은 worklist가 다 덮어야 한다 — 안 덮이면 그 배지는
+        # 지어낸 수로 남는다
+        hrefs = {i["href"] for i in wl["items"]}
+        idx = io.open(os.path.join(ROOT, "mockups", "admin", "index.html"),
+                      encoding="utf-8").read()
+        import re as _re
+        badged = set(_re.findall(r'href="([a-z-]+\.html)"[^>]*>(?:(?!</a>).)*?class="badge',
+                                 idx, _re.S))
+        # NEW 배지처럼 숫자가 아닌 것은 대상이 아니다
+        num = {h for h in badged if _re.search(
+            r'href="' + _re.escape(h) + r'"(?:(?!</a>).)*?class="badge[^"]*"[^>]*>\s*[\d,]+\s*<',
+            idx, _re.S)}
+        uncovered = sorted(num - hrefs)
+        check("숫자 배지가 달린 메뉴는 worklist가 덮는다", not uncovered, "전부 덮음", uncovered)
+        # 좌측 메뉴는 아코디언이었다 — 하나를 열면 나머지가 닫혀, 그룹을 오갈 때마다
+        # 다시 펼쳐야 했다. 기본은 전부 펼침이고, 운영자가 접은 것만 접힌 채로 둔다.
+        mjs = io.open(os.path.join(ROOT, "mockups", "shared", "admin-menu.js"),
+                      encoding="utf-8").read()
+        check("메뉴가 아코디언을 해제한다",
+              "removeAttribute('data-bs-parent')" in mjs, "해제 있음", "없음")
+        check("메뉴 접힘 상태를 기억한다",
+              "hidden.bs.collapse" in mjs and "shown.bs.collapse" in mjs,
+              "두 이벤트 모두", "누락")
+        mmiss = [os.path.basename(p) for p in pages
+                 if "navbar-vertical" in io.open(p, encoding="utf-8").read()
+                 and "admin-menu.js" not in io.open(p, encoding="utf-8").read()]
+        check("메뉴 스크립트가 전 화면에 주입됐다", not mmiss, "누락 없음", mmiss)
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 작업 패널 주입 — {e}")
 
@@ -1229,7 +1307,8 @@ def main():
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
-               test_upload, test_product_edit, test_spec_fields, test_usage_floors,
+               test_upload, test_product_edit, test_spec_fields, test_pool_gate,
+               test_usage_floors,
                test_guards):
         try:
             fn()

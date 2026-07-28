@@ -23,6 +23,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 
@@ -122,7 +123,7 @@ def list_orders():
                 else "—(인계 주문 · 재고 수량은 API 유입으로 정합)")
         rf = refunds.get(oid)
         out.append({
-            "order_id": oid, "no": o["order_no"], "created_at": o["created_at"].isoformat(),
+            "order_id": oid, "no": o["order_no"], "created_at": iso(o["created_at"]),
             "cust": o["cust"], "ch": o["channel"], "status": o["status"],
             "step": STEP.get(o["status"], 1), "total": o["total_amount"],
             "ops": _ops_text(ops), "pay": pay, "ship": ship, "hold": hold,

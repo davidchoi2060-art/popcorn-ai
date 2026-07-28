@@ -13,6 +13,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
 from .db import engine
 
@@ -84,7 +85,7 @@ def dashboard():
                 "operator": g["operator"],
                 "kind": KIND_LABELS.get(g["target_kind"], g["target_kind"]),
                 "action": ACTION_LABELS.get(g["action"], g["action"]),
-                "target": g["target_id"], "at": g["created_at"].isoformat(),
+                "target": g["target_id"], "at": iso(g["created_at"]),
             } for g in logs],
         },
         "note": ("오늘 적재·AI 사용량·적용 버전은 원천(CSV 적재 파이프라인·LLM 연동·버전 관리)이"
@@ -111,6 +112,14 @@ def worklist():
             " WHERE r.review_status='대기' AND p.status='판매중' AND p.stock_qty > 0")).scalar_one()
         orders_wait = conn.execute(text(
             "SELECT COUNT(*) FROM orders WHERE status='결제완료'")).scalar_one()
+        # 매입 견적 = 보낸 뒤 답을 기다리는 것(admin_sourcing과 같은 기준)
+        sourcing_wait = conn.execute(text(
+            "SELECT COUNT(*) FROM product_sourcing_quotes WHERE status='요청'")).scalar_one()
+        # 단가표 = 공급사별 최신 파일 중 아직 다 반영하지 않은 것(price_import 화면과 같은 기준)
+        price_files = conn.execute(text(
+            "SELECT COUNT(*) FROM (SELECT DISTINCT ON (supplier_id) status"
+            "   FROM supplier_price_files ORDER BY supplier_id, received_at DESC) t"
+            " WHERE status IS DISTINCT FROM '반영 완료'")).scalar_one()
         pool = conn.execute(text(
             "SELECT COUNT(*) FROM v_recommendation_candidates"
             " WHERE stock_qty > 0")).scalar_one()
@@ -131,5 +140,11 @@ def worklist():
         {"key": "refund", "label": "환불 처리", "count": p["refund"],
          "focus": None, "focus_label": None,
          "href": "refunds.html", "hint": "접수·검토·수거 중"},
+        {"key": "price_import", "label": "단가표 반영", "count": price_files,
+         "focus": None, "focus_label": None,
+         "href": "price-import.html", "hint": "공급사 최신 파일 중 미반영"},
+        {"key": "sourcing", "label": "매입 견적", "count": sourcing_wait,
+         "focus": None, "focus_label": None,
+         "href": "sourcing.html", "hint": "요청 후 회신 대기"},
     ]
     return {"items": items, "total": sum(i["count"] for i in items), "pool": pool}

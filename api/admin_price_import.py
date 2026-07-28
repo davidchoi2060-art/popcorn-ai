@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import bindparam, text
 
+from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 from .price_parser import parse_price_file
@@ -283,7 +284,7 @@ def price_import():
             d = _file_diff(conn, f, ctx)
             out.append({
                 "file_id": f["file_id"], "supplier_id": f["supplier_id"], "supplier": f["supplier"],
-                "label": f["file_name"], "received_at": f["received_at"].isoformat(),
+                "label": f["file_name"], "received_at": iso(f["received_at"]),
                 "status": f["status"], "row_count": f["row_count"],
                 "preset": _preset_view(conn, f["supplier_id"], f["row_count"]),
                 "same": d["same"], "chg": d["chg"], "nw": d["nw"], "stat": d["stat"],

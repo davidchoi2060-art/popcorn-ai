@@ -140,6 +140,52 @@
     });
   }
 
+  /* 좌측 메뉴·상단 알림의 배지 숫자를 서버 값으로 갈아끼운다.
+     마크업에는 상품 검수 9 · 가격 검토 5 · 단가표 15 · 재고 입고 3이 박혀 있었다.
+     실제로는 5,162 · 0 · 1 · 15,261이다 — 메뉴가 대놓고 거짓말을 하고 있었다.
+     href로 찾으므로 사이드바와 상단 드롭다운이 한 번에 맞춰진다. */
+  function paintBadges(d) {
+    var byHref = {};
+    (d.items || []).forEach(function (i) { byHref[i.href] = i; });
+    [].forEach.call(document.querySelectorAll('a[href]'), function (a) {
+      var it = byHref[a.getAttribute('href')];
+      var b = a.querySelector('.badge');
+      if (!b) return;
+      if (!it) {
+        // 원천이 없는 배지는 지운다 — 지어낸 수를 남기느니 없는 편이 낫다
+        if (/^\s*\d+\s*$/.test(b.textContent)) b.remove();
+        return;
+      }
+      if (!it.count) { b.remove(); return; }      // 0건이면 배지 자체를 없앤다
+      // '대기 9'처럼 접두어가 붙은 것은 접두어를 살린다
+      var pre = (b.textContent || '').replace(/[\d,\s]+$/, '').trim();
+      b.textContent = (pre ? pre + ' ' : '') + it.count.toLocaleString();
+    });
+  }
+
+  /* 패널 머리말과 여는 버튼이 영문이었다("Theme Customizer" · "customize").
+     한국어 UI 규약이기도 하고, 무엇보다 이제 테마 설정이 아니다. */
+  function korean(panel) {
+    var h = panel.querySelector('.offcanvas-header h5, .offcanvas-title');
+    if (h) h.innerHTML = '<span class="fas fa-clipboard-list me-2 fs-8"></span>작업 패널';
+    var p = panel.querySelector('.offcanvas-header p');
+    if (p) p.textContent = '지금 처리할 일과 바로가기입니다';
+    // 템플릿의 'Reset to default'는 테마 초기화 버튼이라 쓸 데가 없다
+    [].forEach.call(panel.querySelectorAll('button, a'), function (b) {
+      if (/reset to default/i.test((b.textContent || '').trim())) b.remove();
+    });
+    var tog = document.querySelector('.setting-toggle');
+    if (tog) {
+      [].forEach.call(tog.querySelectorAll('*'), function (e) {
+        if (e.children.length === 0 && /customize/i.test(e.textContent || '')) {
+          e.textContent = '할 일';
+        }
+      });
+      tog.setAttribute('aria-label', '작업 패널 열기');
+      tog.setAttribute('title', '작업 패널');
+    }
+  }
+
   function boot() {
     var panel = document.getElementById(PANEL);
     if (!panel) return;
@@ -147,26 +193,49 @@
     // 템플릿이 심어둔 안내 말풍선(settings-popover)은 테마 설정을 가리키던 것이라 지운다
     var pop = document.querySelector('.settings-popover');
     if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    korean(panel);
 
     var body = panel.querySelector('.offcanvas-body') || panel;
     body.innerHTML = '<div class="p-3 fs-9 text-body-tertiary">작업 목록을 불러오는 중…</div>';
-    var head = panel.querySelector('.offcanvas-title');
-    if (head) head.textContent = '작업 패널';
 
-    fetch('/api/admin/worklist')
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        if (!d) {
-          // 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다(목업 폴백)
+    function load(first) {
+      return fetch('/api/admin/worklist')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) {
+            // 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다(목업 폴백).
+            // 마크업의 더미 배지도 지운다: 서버에 못 닿았는데 '검수 9'가 남아 있으면
+            // 그게 실제 값인 줄 안다.
+            if (first) clearDummyBadges();
+            body.innerHTML = '<div class="p-3 fs-9 text-body-tertiary">'
+              + '작업 목록을 불러오지 못했습니다 — 서버에 연결되면 표시됩니다.</div>';
+            return;
+          }
+          paintBadges(d);
+          render(body, d);
+        })
+        .catch(function () {
+          if (first) clearDummyBadges();
           body.innerHTML = '<div class="p-3 fs-9 text-body-tertiary">'
-            + '작업 목록을 불러오지 못했습니다 — 서버에 연결되면 표시됩니다.</div>';
-          return;
-        }
-        render(body, d);
-      })
-      .catch(function () {
-        body.innerHTML = '<div class="p-3 fs-9 text-body-tertiary">'
-          + '작업 목록을 불러오지 못했습니다.</div>';
+            + '작업 목록을 불러오지 못했습니다.</div>';
+        });
+    }
+
+    load(true);
+    /* 메뉴 숫자는 계속 따라가야 한다. 운영자가 검수를 처리해도 옆의 배지가 어제 값이면
+       무엇이 남았는지 알 수 없다. 60초마다 갱신하고, 다른 탭에서 보고 있을 때는 쉰다. */
+    setInterval(function () {
+      if (document.visibilityState === 'visible') load(false);
+    }, 60000);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') load(false);
+    });
+  }
+
+  function clearDummyBadges() {
+    [].forEach.call(document.querySelectorAll('.navbar-vertical a .badge, .dropdown-item .badge'),
+      function (b) {
+        if (/^\s*(\D*\s)?[\d,]+\s*$/.test(b.textContent || '')) b.remove();
       });
   }
 

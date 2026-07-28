@@ -12,6 +12,7 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
+from .timeutil import iso
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -49,7 +50,7 @@ def list_jobs():
             "origin_label": ORIGIN_LABELS.get(r["data_origin"], r["data_origin"]),
             "total": r["row_total"], "ok": r["row_ok"], "error": r["row_error"],
             "review": r["row_review"], "status": r["status"],
-            "operator": r["operator"], "at": r["created_at"].isoformat(),
+            "operator": r["operator"], "at": iso(r["created_at"]),
             "err_rows": r["err_rows"], "kept_rows": r["kept_rows"],
         } for r in rows],
         "summary": {"batches": agg["n"], "total": agg["t"], "ok": agg["ok"],
@@ -103,7 +104,7 @@ def job_rows(job_id: int, limit: int = 100):
                 "total": job["row_total"], "ok": job["row_ok"],
                 "error": job["row_error"], "review": job["row_review"],
                 "source": job["source"], "origin": job["data_origin"],
-                "at": job["created_at"].isoformat()},
+                "at": iso(job["created_at"])},
         "rows": rows,
         "shown": {"error": len(errs), "kept": len(kept)},
         "note": ("원본 셀은 **적재가 거부한 행**만 보관합니다 — 성공 행 원문은 저장하지 않고"

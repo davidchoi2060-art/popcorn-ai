@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .customer_auth import require_member
 from .db import engine
 
@@ -62,10 +63,10 @@ def account():
     return {
         "member": {"id": m["member_id"], "nickname": m["nickname"]},
         "map_state": state, "mall_member_id": m["mall_member_id"],
-        "requested_at": m["mall_map_requested_at"].isoformat() if m["mall_map_requested_at"] else None,
+        "requested_at": iso(m["mall_map_requested_at"]) if m["mall_map_requested_at"] else None,
         "reviewable": [{
             "item_id": r["item_id"], "order_no": r["order_no"],
-            "at": r["created_at"].isoformat(),
+            "at": iso(r["created_at"]),
             "item": r["name_snap"] + (f" 외 {r['lines'] - 1}건" if (r["lines"] or 1) > 1 else ""),
             "total": r["order_total"] or 0,
             "written": r["review_id"] is not None,

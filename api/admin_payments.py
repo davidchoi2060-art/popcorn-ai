@@ -25,6 +25,7 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import _log
 from .auth import current_operator_id
 from .db import engine
@@ -75,12 +76,12 @@ def list_payments():
     for b in batches:
         late = [r for r in by_day.get(b["settle_date"], []) if not r["settled"]]
         settles.append({
-            "date": b["settle_date"].isoformat(), "state": b["status"],
+            "date": iso(b["settle_date"]), "state": b["status"],
             "gross": b["gross"], "fee": b["fee"], "net": b["net"],
             "n": len(by_day.get(b["settle_date"], [])) - len(late),
             "refund_n": sum(1 for r in by_day.get(b["settle_date"], [])
                             if r["settled"] and r["status"] == "환불"),
-            "closed_at": b["closed_at"].isoformat() if b["closed_at"] else None,
+            "closed_at": iso(b["closed_at"]) if b["closed_at"] else None,
             "late": {"n": len(late), "gross": sum(r["amount"] for r in late)} if late else None,
         })
     for d, drows in by_day.items():
@@ -89,7 +90,7 @@ def list_payments():
         fees = [_fee_won(r["amount"], rate) for r in drows]  # 잠정 — 개별→합산(마감과 동일 규칙)
         gross = sum(r["amount"] for r in drows)
         settles.append({
-            "date": d.isoformat(), "state": "대기",
+            "date": iso(d), "state": "대기",
             "gross": gross, "fee": sum(fees), "net": gross - sum(fees),
             "n": len(drows), "refund_n": sum(1 for r in drows if r["status"] == "환불"),
             "closed_at": None, "late": None,
@@ -97,11 +98,11 @@ def list_payments():
     settles.sort(key=lambda s: s["date"], reverse=True)
 
     return {
-        "fee_rate": float(rate), "today": today.isoformat(),
+        "fee_rate": float(rate), "today": iso(today),
         "payments": [{
             "order_no": p["order_no"], "mode": p["pay_mode"], "method": p["method"],
             "pg_ref": p["pg_ref"], "amount": p["amount"], "status": p["status"],
-            "at": p["paid_at"].isoformat() if p["paid_at"] else None,
+            "at": iso(p["paid_at"]) if p["paid_at"] else None,
         } for p in pays],
         "settles": settles,
     }
@@ -146,7 +147,7 @@ def close_settlement(settle_date: str):
         return {"ok": True, "undo_id": log_id,
                 "batch": {"date": settle_date, "gross": gross, "fee": fee,
                           "net": gross - fee, "n": len(items),
-                          "closed_at": b["closed_at"].isoformat()}}
+                          "closed_at": iso(b["closed_at"])}}
 
 
 @router.post("/settlements/undo/{log_id}")

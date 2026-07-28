@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import usage_floors as UF
+from .timeutil import iso, now_iso
 from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap
 from .db import engine
 
@@ -60,7 +61,11 @@ def _load_pool(conn):
         " form_factor, form_factor_list, capacity_gb,"
         " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent,"
         " spec_sources, data_origin"
-        " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
+        # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
+        # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
+        # 조용히 결과가 줄어드는 게 아니라 화면이 통째로 죽는 자리라 이중으로 막는다.
+        " FROM v_recommendation_candidates"
+        " WHERE stock_qty > 0 AND sale_price IS NOT NULL")).mappings().all()]
 
 
 def load_compat_rules(conn) -> dict:
@@ -387,7 +392,7 @@ def _recent_pick(conn):
             "items": [{"part_type": _slot_of(c["part_type"]), "product_code": c["product_code"],
                        "name": c["product_name"], "price": c["sale_price"]} for c in cur],
             "total": sum(c["sale_price"] for c in cur),
-            "at": r["created_at"].isoformat() if r["created_at"] else None,
+            "at": iso(r["created_at"]) if r["created_at"] else None,
         })
     if not ok:
         return None
@@ -579,7 +584,7 @@ def recommend(body: RecommendBody):
                  "co": json.dumps({"offered": comp}),  # 제시본(offered) — 선택 스냅샷은 이후 단계
                  "ta": s["total"]})
 
-    return {"session_id": session_id, "generated_at": datetime.now().isoformat(),
+    return {"session_id": session_id, "generated_at": now_iso(),
             "funnel": {"total": total_n, "passed": len(passed)},
             # 서버가 실제로 건 하한 — 화면이 지어내지 않고 이것만 말한다
             "usage_floors": {"usage": UF.label_of(usage_v), "items": floors},

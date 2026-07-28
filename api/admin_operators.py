@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import _log
 from .auth import ROLE_RANK, current_operator
 from .db import engine
@@ -41,10 +42,10 @@ def list_operators():
         "role": r["role"], "role_label": ROLE_KO.get(r["role"], r["role"]),
         "status": r["status"], "provider": r["provider"] or "—",
         "phone": r["phone"], "duty": r["duty"],
-        "joined": r["created_at"].isoformat(),
-        "approved_at": r["approved_at"].isoformat() if r["approved_at"] else None,
+        "joined": iso(r["created_at"]),
+        "approved_at": iso(r["approved_at"]) if r["approved_at"] else None,
         "approver": r["approver"], "acts": r["acts"], "live_sessions": r["live_sessions"],
-        "last_login": r["last_login_at"].isoformat() if r["last_login_at"] else None,
+        "last_login": iso(r["last_login_at"]) if r["last_login_at"] else None,
         "is_me": r["operator_id"] == me.get("operator_id"),
     } for r in rows], "me": me,
         "note": ("승인 전 계정은 어떤 데이터도 볼 수 없습니다 · 정지 시 진행 중 세션이 즉시 끊깁니다"

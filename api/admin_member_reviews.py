@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import _log
 from .auth import current_operator_id
 from .db import engine
@@ -49,7 +50,7 @@ def list_member_reviews():
             " ORDER BY r.created_at DESC, r.review_id DESC")).mappings().all()
     return {"items": [{
         "id": r["review_id"], "cust": r["nickname"], "order": r["order_no"],
-        "item": r["name_snap"], "rating": r["rating"], "at": r["created_at"].isoformat(),
+        "item": r["name_snap"], "rating": r["rating"], "at": iso(r["created_at"]),
         "state": r["status"], "cite": r["cite_s2"], "body": r["body"],
         "note": r["moderation_note"],
     } for r in rows]}

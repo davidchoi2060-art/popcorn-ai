@@ -23,6 +23,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso, now_iso
 from .db import engine
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
                         load_compat_rules)
@@ -183,7 +184,7 @@ def candidates(body: SwapQuery):
                     "empty_reason": "지금 판매 중인 재고에 이 부품의 대안이 없어요" if not alts else None}
     return {"session_id": body.session_id, "tier": body.tier,
             "snapshot_id": snap["snapshot_id"], "total": snap["total_amount"],
-            "generated_at": snap["created_at"].isoformat(),
+            "generated_at": iso(snap["created_at"]),
             "current": current, "compat": snap["items"].get("compat"), "slots": slots}
 
 
@@ -256,4 +257,4 @@ def apply(body: ApplyBody):
              "co": json.dumps(snap["companion"]) if snap["companion"] is not None else None,
              "ta": total}).scalar()
     return {"snapshot_id": sid, "items": new_parts, "total": total, "compat": compat,
-            "generated_at": datetime.now().isoformat()}
+            "generated_at": now_iso()}

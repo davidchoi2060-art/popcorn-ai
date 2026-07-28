@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import _log
 from .auth import current_operator_id
 from .admin_price_import import _reprice, _settings
@@ -83,7 +84,7 @@ def sourcing():
                 "quote_id": q["quote_id"], "supplier_id": q["supplier_id"],
                 "supplier": q["supplier"] or q["vendor"] or "—",
                 "price": q["price"], "status": q["status"],
-                "replied_at": q["replied_at"].isoformat() if q["replied_at"] else None,
+                "replied_at": iso(q["replied_at"]) if q["replied_at"] else None,
                 "memo": q["memo"], "best": q["price"] is not None and q["price"] == best,
             } for q in qs],
         })

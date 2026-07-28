@@ -13,6 +13,7 @@ sourcing=sourcing_id) — 화면 링크도 사유별로 분기한다.
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
+from .timeutil import iso
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -59,13 +60,13 @@ def price_history(product_code: int | None = None):
     for r in rows:
         if r["field"] not in series or r["new_price"] is None:
             continue
-        pt = {"at": r["changed_at"].isoformat(), "price": r["new_price"]}
+        pt = {"at": iso(r["changed_at"]), "price": r["new_price"]}
         series[r["field"]].append(pt)
         if r["field"] == "purchase":
             key = r["supplier"] or "출처 미기록"
             by_supplier.setdefault(key, []).append(pt)
     items = [{
-        "id": r["history_id"], "at": r["changed_at"].isoformat(),
+        "id": r["history_id"], "at": iso(r["changed_at"]),
         "field": r["field"], "field_label": FIELD_KO.get(r["field"], r["field"]),
         "old": r["old_price"], "new": r["new_price"],
         "delta": (r["new_price"] - r["old_price"]) if (r["old_price"] is not None and r["new_price"] is not None) else None,

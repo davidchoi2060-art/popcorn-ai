@@ -13,6 +13,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_price_import import _half_up_1000
 from .candidates import BUDGET_ALLOC, SILENT_SCOPE, WHITE_SCOPE
 from .db import engine
@@ -87,7 +88,7 @@ def engine_rules():
         },
         "pricing": {
             "card_fee_pct": round(fee * 100, 2), "margin_pct": round(margin * 100, 2),
-            "effective_from": s["effective_from"].isoformat() if s and s["effective_from"] else None,
+            "effective_from": iso(s["effective_from"]) if s and s["effective_from"] else None,
             "formula": "판매가 = 매입가 × (1 + 카드수수료 + 마진) → 1,000원 단위 half-up",
             "example": {"purchase": sample,
                         "sale": _half_up_1000(sample * (1 + fee + margin))},

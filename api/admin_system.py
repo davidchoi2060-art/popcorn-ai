@@ -12,6 +12,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .timeutil import iso
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -46,9 +47,9 @@ def system():
             "rows": [{
                 "id": o["operator_id"], "name": o["name"], "email": o["email"],
                 "role": o["role"], "role_label": ROLE_KO.get(o["role"], o["role"]),
-                "status": o["status"], "joined": o["created_at"].isoformat(),
+                "status": o["status"], "joined": iso(o["created_at"]),
                 "acts": o["acts"], "acts7": o["acts7"],
-                "last_at": o["last_at"].isoformat() if o["last_at"] else None,
+                "last_at": iso(o["last_at"]) if o["last_at"] else None,
             } for o in ops],
             "note": ROLE_NOTE,
         },
@@ -63,7 +64,7 @@ def system():
             "rows": [{
                 "job_id": j["job_id"], "file": j["file_name"], "total": j["row_total"],
                 "ok": j["row_ok"], "error": j["row_error"], "status": j["status"],
-                "at": j["created_at"].isoformat(),
+                "at": iso(j["created_at"]),
             } for j in job_rows],
             "reason": ("CSV 일괄 적재(T0) 파이프라인이 아직 없습니다 — 현재 상품은 시드와"
                        " 단가표 편입(ADM-SRC-020 경로)으로 들어옵니다."

@@ -24,6 +24,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import ACTIVE_REFUND, _log, refund_label
 from .auth import current_operator_id
 from .db import engine
@@ -57,7 +58,7 @@ def list_refunds():
         "order": r["order_no"], "cust": r["cust"], "kind": _kind(r["order_status"]),
         "reason": r["reason_type"], "mode": r["refund_mode"],
         "state": STATE_IDX.get(r["status"], 0), "status": r["status"],
-        "amount": r["amount"], "at": r["created_at"].isoformat(),
+        "amount": r["amount"], "at": iso(r["created_at"]),
         "note": None,  # reason_detail 저장처 없음(이관) — 화면 '—' 정직
         "order_status": r["order_status"],
     } for r in rows]

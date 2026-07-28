@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from .timeutil import iso
 from .auth import current_operator_id
 from .db import engine
 
@@ -372,8 +373,8 @@ def get_product(product_code: int):
         "spec_row_missing": r["specs"] is None,
         "review_pending": pending, "in_pool": in_pool,
         "editable": sorted(EDITABLE), "status_options": list(STATUS_OK),
-        "created_at": r["created_at"].isoformat(),
-        "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+        "created_at": iso(r["created_at"]),
+        "updated_at": iso(r["updated_at"]) if r["updated_at"] else None,
         # 화면이 그대로 쓰는 한 문장 — 왜 추천에 들어가고 못 들어가는지
         "verdict": verdict,
     }

@@ -12,6 +12,7 @@ undone(되돌려짐) 배지를 파생한다(ref_log_id 역참조 EXISTS — 각 
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .timeutil import iso
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -110,7 +111,7 @@ def list_activity_logs():
             " ORDER BY l.log_id DESC LIMIT :lim"), {"lim": LIMIT}).mappings().all()
     return {"total": total, "limit": LIMIT, "items": [{
         "log_id": r["log_id"],
-        "at": r["created_at"].isoformat(),
+        "at": iso(r["created_at"]),
         "operator": r["operator"],
         "kind": r["target_kind"],
         "kind_label": KIND_LABELS.get(r["target_kind"], r["target_kind"]),

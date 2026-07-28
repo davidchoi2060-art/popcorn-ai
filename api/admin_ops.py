@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import _log
 from .db import engine
 
@@ -95,12 +96,12 @@ def get_ops():
         "modes": modes,
         "items": [{"key": r["key"], "label": LABELS.get(r["key"], r["key"]),
                    "mode": r["mode"], "mode_label": MODE_LABELS.get(r["mode"], r["mode"]),
-                   "updated_at": r["updated_at"].isoformat()} for r in rows],
+                   "updated_at": iso(r["updated_at"])} for r in rows],
         "presets": PRESETS,
         "effects": _effects(dict(modes)),
         # 되돌림 행도 '무엇을 되돌렸는지'를 내려준다 — 화면에 '—'만 남으면 이력이 아니다
         "history": [{"log_id": h["log_id"], "action": h["action"],
-                     "operator": h["operator"], "at": h["created_at"].isoformat(),
+                     "operator": h["operator"], "at": iso(h["created_at"]),
                      "changed": ((h["detail"] or {}).get("changed")
                                  or (h["detail"] or {}).get("restored")),
                      "undo_of": (h["detail"] or {}).get("ref_log_id"),

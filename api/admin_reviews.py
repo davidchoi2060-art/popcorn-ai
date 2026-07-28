@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS, required_fields
 from .db import engine
 
@@ -160,7 +161,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         "suggest_source": ("danawa" if "다나와 제안" in (r["detail"] or "") else
                            ("ai" if r["suggested_value"] is not None else None)),
         "confidence": float(r["confidence"]) if r["confidence"] is not None else None,
-        "created_at": r["created_at"].isoformat(),
+        "created_at": iso(r["created_at"]),
         "risk": _risk(r["review_type"], r["field_name"]),
         "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
     } for r in rows]
@@ -230,7 +231,7 @@ def _sourcing_items():
         "src_row_id": r["row_id"], "supplier_id": r["supplier_id"],
         "name": r["model_name"], "cat": "미분류", "part_type": None,
         "field": None, "origin_value": None, "suggested_value": None, "confidence": None,
-        "created_at": r["received_at"].isoformat(), "risk": "경미", "crit": [],
+        "created_at": iso(r["received_at"]), "risk": "경미", "crit": [],
         "detail": ("단가표 신규 행 — 카탈로그에 같은 모델이 없습니다. 이름 유사 후보가 있어 연결 검토가 우선입니다."
                    if r["cand_sku"] else
                    "단가표 신규 행 — 유사 후보 없음. 취급하려면 신규 상품으로 등록하고 검수를 거칩니다."),

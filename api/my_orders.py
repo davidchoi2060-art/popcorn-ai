@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_orders import STEP, _item_label, refund_label
 from .customer_auth import require_member
 from .db import engine
@@ -61,9 +62,9 @@ def my_orders():
         if p:
             suffix = " (자체 결제)" if p["pay_mode"] == "own" else " (인계)"
             pay = {"method": p["method"] + suffix, "state": p["status"],
-                   "at": p["paid_at"].isoformat() if p["paid_at"] else None}
+                   "at": iso(p["paid_at"]) if p["paid_at"] else None}
         out.append({
-            "no": o["order_no"], "created_at": o["created_at"].isoformat(),
+            "no": o["order_no"], "created_at": iso(o["created_at"]),
             "channel": o["channel"], "status": o["status"],
             "step": STEP.get(o["status"], 1), "total": o["total_amount"],
             "items": items_by.get(oid, []),

@@ -16,6 +16,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 
@@ -77,7 +78,7 @@ def list_sessions():
         else:
             drop += 1
         items.append({
-            "session_id": r["session_id"], "at": r["created_at"].isoformat(),
+            "session_id": r["session_id"], "at": iso(r["created_at"]),
             "mode": r["mode"], "mode_label": MODE_KO.get(r["mode"], (r["mode"], "secondary"))[0],
             "mode_color": MODE_KO.get(r["mode"], (r["mode"], "secondary"))[1],
             "member": r["nickname"],            # 전부 None — 화면은 '비로그인 세션'
