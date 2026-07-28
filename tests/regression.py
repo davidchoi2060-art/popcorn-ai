@@ -762,6 +762,72 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_usage_floor_admin():
+    print("\n[19] 용도 하한 관리 — 값을 고칠 화면이 있는가 (슬라이스 75)")
+    # 하한은 슬라이스 58에서 만들었지만 **고칠 화면이 없었다.** 값은 실측으로 정한
+    # 그대로였고 운영자는 그게 무엇인지도 볼 수 없었다.
+    d = get("/api/admin/usage-floors")
+    check("용도별 하한을 준다", bool(d.get("groups")), "1개 이상", len(d.get("groups") or []))
+    items = [i for g in (d.get("groups") or []) for i in g["items"]]
+    check("각 하한이 실측 통과 수를 함께 준다",
+          all(i.get("pass_count") is not None and i.get("slot_total") is not None
+              for i in items), "전부 있음",
+          [i["floor_id"] for i in items if i.get("pass_count") is None])
+    # 화면이 세지 않는다 — 서버가 센 수와 DB가 센 수가 같아야 한다
+    gpu = next((i for i in items if i["field"] == "required_power_watt"), None)
+    if gpu:
+        real = db_one("SELECT count(*) FROM v_recommendation_candidates"
+                      " WHERE stock_qty>0 AND part_type='GPU'"
+                      "   AND required_power_watt >= :v", v=gpu["value"])
+        check("통과 수가 DB 실집계와 같다", gpu["pass_count"] == real, real,
+              gpu["pass_count"])
+
+    fid = items[0]["floor_id"] if items else None
+    if fid:
+        was = items[0]["value"]
+        # 미리보기는 DB를 바꾸지 않아야 한다 — 바꾸면 '확인 후 적용'이 거짓말이 된다
+        st, pv = post(f"/api/admin/usage-floors/{fid}", {"value": was + 200, "preview": True})
+        check("미리보기가 영향을 준다",
+              st == 200 and (pv or {}).get("impact", {}).get("pass_after") is not None,
+              200, st)
+        check("미리보기는 DB를 바꾸지 않는다",
+              db_one("SELECT value FROM usage_floors WHERE floor_id=:i", i=fid) == was,
+              was, db_one("SELECT value FROM usage_floors WHERE floor_id=:i", i=fid))
+        check("음수 하한은 400",
+              post(f"/api/admin/usage-floors/{fid}", {"value": -1})[0] == 400, 400,
+              post(f"/api/admin/usage-floors/{fid}", {"value": -1})[0])
+        check("없는 하한은 404",
+              post("/api/admin/usage-floors/99999", {"value": 100})[0] == 404, 404,
+              post("/api/admin/usage-floors/99999", {"value": 100})[0])
+
+        # 바꾸면 **견적에 즉시 반영**되어야 한다(캐시를 비우지 않으면 옛 값이 남는다)
+        st2, _ = post(f"/api/admin/usage-floors/{fid}", {"value": was + 50})
+        if st2 == 200:
+            _s, q = post("/api/recommend", {"mode": "chat", "constraints": [
+                {"l": "예산", "v": "120만원"}, {"l": "용도", "v": "고사양 게임"}]})
+            got = {i["slot"]: i["value"] for i in
+                   ((q or {}).get("usage_floors") or {}).get("items") or []}
+            check("바꾼 하한이 견적에 바로 반영된다",
+                  got.get(items[0]["slot"]) == was + 50, was + 50,
+                  got.get(items[0]["slot"]))
+            post(f"/api/admin/usage-floors/{fid}", {"value": was})     # 원복
+            check("원복된다",
+                  db_one("SELECT value FROM usage_floors WHERE floor_id=:i", i=fid) == was,
+                  was, db_one("SELECT value FROM usage_floors WHERE floor_id=:i", i=fid))
+
+    try:
+        uf = io.open(os.path.join(ROOT, "mockups", "admin", "usage-floors.html"),
+                     encoding="utf-8").read()
+        check("하한 화면이 미리보기를 거친다", "preview: true" in uf.replace('"', "'")
+              or "preview:true" in uf.replace(" ", ""), "preview 호출", "없음")
+        idx = io.open(os.path.join(ROOT, "mockups", "admin", "index.html"),
+                      encoding="utf-8").read()
+        check("메뉴에 용도 하한이 있다", 'href="usage-floors.html"' in idx,
+              "메뉴 있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 하한 화면 — {e}")
+
+
 def test_margin_policy():
     print("\n[18] 마진 정책 — 고치면 실제로 저장되는가 (슬라이스 74)")
     # "수정해도 변경이 안 된다"는 보고. 확인해 보니 저장 기능이 아예 없었다 —
@@ -1616,6 +1682,7 @@ def main():
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
+               test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
                test_part_type_change,

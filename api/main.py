@@ -12,6 +12,7 @@ from sqlalchemy import text
 from .admin_activity_logs import router as admin_activity_logs_router
 from .admin_dashboard import router as admin_dashboard_router
 from .admin_engine_rules import router as admin_engine_rules_router
+from .admin_usage_floors import router as admin_usage_floors_router
 from .admin_member_reviews import router as admin_member_reviews_router
 from .admin_members import router as admin_members_router
 from .admin_operators import router as admin_operators_router
@@ -84,6 +85,7 @@ app.include_router(admin_sessions_router)
 app.include_router(admin_price_history_router)
 app.include_router(admin_dashboard_router)
 app.include_router(admin_engine_rules_router)
+app.include_router(admin_usage_floors_router)
 app.include_router(admin_system_router)
 app.include_router(admin_sourcing_router)
 app.include_router(candidates_router)

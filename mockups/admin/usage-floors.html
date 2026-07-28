@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC 관리자 · 용도 하한</title>
+<link rel="stylesheet" href="assets/css/theme.css">
+<link rel="stylesheet" href="assets/css/user.css">
+</head>
+<body data-screen-id="ADM-ENG-030" data-domain="engine">
+<main class="main" id="top">
+  <div class="content">
+    <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="index.html">홈</a></li>
+      <li class="breadcrumb-item"><a href="#!">추천 설정</a></li>
+      <li class="breadcrumb-item active">용도 하한</li>
+    </ol></nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+      <div>
+        <h2 class="mb-1">용도 하한
+          <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-030</span>
+          <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span>
+        </h2>
+        <p class="mb-0 fs-9 text-body-tertiary">
+          "게임용"이라고 말하면 어느 선 이상만 후보로 삼을지 정합니다.
+          <b>이 값이 견적을 직접 바꿉니다.</b>
+        </p>
+      </div>
+      <a href="policy-weights.html" class="btn btn-phoenix-secondary btn-sm">추천 기준 설정 →</a>
+    </div>
+
+    <div id="host" hidden></div>
+    <div id="fallback" class="alert alert-subtle-warning fs-9" role="alert">
+      용도 하한을 불러오는 중입니다 — 서버에 연결되면 표시됩니다.
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  var host = document.getElementById("host");
+  var fb = document.getElementById("fallback");
+  var src = document.getElementById("dataSrc");
+
+  function esc(s){ return String(s==null?"":s).replace(/[<>&"]/g,
+    function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; }); }
+  function toast(m){
+    var t=document.getElementById("__t");
+    if(!t){ t=document.createElement("div"); t.id="__t";
+      t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);"
+        +"background:#141824;color:#fff;font-size:13px;font-weight:700;padding:11px 20px;"
+        +"border-radius:10px;z-index:9999;opacity:0;transition:.2s;";
+      document.body.appendChild(t); }
+    t.innerHTML=m; t.style.opacity="1";
+    clearTimeout(t._x); t._x=setTimeout(function(){t.style.opacity="0";},3200);
+  }
+
+  /* 남은 후보 수를 막대로 보여준다 — 하한을 올리면 무엇이 줄어드는지
+     숫자만으로는 잘 안 읽힌다. 0이면 붉게: 그 용도로는 견적이 안 나온다. */
+  function bar(pass, total){
+    var pct = total ? Math.round(pass/total*100) : 0;
+    var tone = pass === 0 ? "bg-danger" : (pct < 20 ? "bg-warning" : "bg-primary");
+    return '<div class="d-flex align-items-center gap-2">'
+      + '<div class="progress flex-1" style="height:6px;min-width:70px;">'
+      + '<div class="progress-bar ' + tone + '" style="width:' + pct + '%"></div></div>'
+      + '<span class="fs-10 text-body-tertiary text-nowrap">' + pass + '/' + total + '</span></div>';
+  }
+
+  function render(d){
+    var html = '<div class="alert alert-subtle-info fs-10 mb-3">' + esc(d.note) + '</div>';
+    (d.groups || []).forEach(function(g){
+      html += '<div class="card mb-3"><div class="card-body">'
+        + '<div class="d-flex justify-content-between align-items-start mb-2">'
+        + '<div><h5 class="mb-1">' + esc(g.usage_label) + '</h5>'
+        + '<div class="fs-10 text-body-tertiary">이렇게 말하면 적용됩니다 — '
+        + (g.match_terms || []).map(function(x){
+            return '<span class="badge badge-phoenix badge-phoenix-secondary">' + esc(x) + '</span>';
+          }).join(" ") + '</div></div></div>'
+        + '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
+        + '<thead><tr class="text-body-tertiary"><th>슬롯</th><th>기준</th>'
+        + '<th style="width:130px;">하한</th><th style="width:180px;">지금 재고에서 통과</th>'
+        + '<th></th></tr></thead><tbody>'
+        + g.items.map(function(i){
+            return '<tr><td><b>' + esc(i.slot_label) + '</b></td>'
+              + '<td>' + esc(i.field_label)
+              + '<div class="fs-10 text-body-quaternary">' + esc(i.field) + '</div></td>'
+              + '<td><div class="input-group input-group-sm">'
+              + '<input class="form-control form-control-sm uf-val" data-id="' + i.floor_id
+              + '" data-cur="' + i.value + '" type="number" min="0" value="' + i.value + '">'
+              + '<span class="input-group-text fs-10">' + esc(i.unit) + '</span></div></td>'
+              + '<td>' + bar(i.pass_count, i.slot_total) + '</td>'
+              + '<td class="text-end"><button class="btn btn-phoenix-primary btn-sm uf-save"'
+              + ' data-id="' + i.floor_id + '">저장</button></td></tr>';
+          }).join("")
+        + '</tbody></table></div></div></div>';
+    });
+    host.innerHTML = html;
+    host.hidden = false;
+    fb.hidden = true;
+    wire();
+  }
+
+  /* 바꾸기 전에 **영향을 먼저 보여준다.** 하한을 올리면 후보가 줄고,
+     0이 되면 그 용도로는 견적이 아예 안 나온다 — 누르고 나서 알면 늦다. */
+  function wire(){
+    host.querySelectorAll(".uf-save").forEach(function(b){
+      b.onclick = function(){
+        var id = b.getAttribute("data-id");
+        var inp = host.querySelector('.uf-val[data-id="' + id + '"]');
+        var v = parseInt(inp.value, 10);
+        if(!(v >= 0)){ toast("0 이상으로 입력하세요"); return; }
+        if(String(v) === inp.getAttribute("data-cur")){ toast("바뀐 값이 없습니다"); return; }
+        b.disabled = true;
+        fetch("/api/admin/usage-floors/" + encodeURIComponent(id), {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({value: v, preview: true})
+        }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+          .then(function(res){
+            b.disabled = false;
+            if(!res.ok){
+              var dt = res.j && res.j.detail;
+              toast("⚠ " + esc((dt && typeof dt === "object") ? (dt.message || dt.error) : (dt || "실패")));
+              return;
+            }
+            var im = res.j.impact;
+            if(!confirm(im.note.replace(/\*\*/g, "") + "\n\n적용할까요?")) return;
+            b.disabled = true;
+            fetch("/api/admin/usage-floors/" + encodeURIComponent(id), {
+              method: "POST", headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({value: v})
+            }).then(function(r2){ return r2.json().then(function(j){ return {ok:r2.ok, j:j}; }); })
+              .then(function(out){
+                b.disabled = false;
+                if(!out.ok) return;
+                toast(esc(out.j.note));
+                load();
+              });
+          })
+          .catch(function(){ b.disabled = false; toast("서버에 연결할 수 없습니다"); });
+      };
+    });
+  }
+
+  function load(){
+    return fetch("/api/admin/usage-floors")
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){
+        src.textContent = "실데이터 · Cloud SQL";
+        src.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+        render(d);
+      })
+      .catch(function(e){
+        // 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다
+        src.textContent = "연결 안 됨";
+        fb.textContent = "용도 하한을 불러오지 못했습니다 (" + e.message + ") — "
+          + "관리자로 로그인했는지 확인하세요.";
+        fb.hidden = false;
+      });
+  }
+  load();
+})();
+</script>
+<script src="../shared/admin-auth.js"></script>
+<script src="../shared/ui-progress.js"></script>
+<script src="../shared/su-icons.js"></script>
+<script src="../shared/admin-panel.js"></script>
+<script src="../shared/admin-menu.js"></script>
+</body>
+</html>

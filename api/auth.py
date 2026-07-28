@@ -114,7 +114,11 @@ def resolve_session(sid: str) -> dict | None:
 OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
                         "/api/admin/catalog-import",
                         # 사양 항목 추가는 스키마를 바꾼다 — owner만(슬라이스 56)
-                        "/api/admin/spec-fields")
+                        "/api/admin/spec-fields",
+                        # 용도 하한·마진은 견적과 가격을 직접 바꾼다 — owner만(슬라이스 74·75)
+                        "/api/admin/usage-floors",
+                        "/api/admin/pricing-settings",
+                        "/api/admin/category-margins")
 
 
 def required_role(method: str, path: str) -> str:
