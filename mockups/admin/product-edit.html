@@ -289,11 +289,10 @@
           <div class="col-12 col-lg-5">
             <div class="card mb-3"><div class="card-body">
               <h5 class="mb-1">공급처별 매입가 <span class="fs-10 fw-normal text-body-tertiary">— 같은 SKU라도 공급처마다 가격이 다릅니다</span></h5>
-              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-2"><thead><tr class="text-body-tertiary"><th>공급처</th><th class="text-end">매입가</th><th>기준일</th><th></th></tr></thead><tbody>
-                <tr><td class="fw-semibold">용산도매A</td><td class="text-end fw-bold">352,000원</td><td class="text-body-tertiary">07-13 <span class="badge badge-phoenix badge-phoenix-primary">최저</span></td><td class="text-end"><button class="btn btn-sm btn-subtle-secondary">수정</button></td></tr>
-                <tr><td class="fw-semibold">다나와직송B</td><td class="text-end">361,000원</td><td class="text-body-tertiary">07-12</td><td class="text-end"><button class="btn btn-sm btn-subtle-secondary">수정</button></td></tr>
+              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-2"><thead><tr class="text-body-tertiary"><th>공급처</th><th class="text-end">매입가</th><th>기준일</th><th></th></tr></thead><tbody id="supRows">
+                <tr><td colspan="4" class="text-body-tertiary fs-10">불러오는 중…</td></tr>
               </tbody></table></div>
-              <button class="btn btn-phoenix-secondary btn-sm w-100">+ 공급처 추가</button>
+              <button id="supAdd" class="btn btn-phoenix-secondary btn-sm w-100">+ 공급처 추가</button>
             </div></div>
             <div class="card"><div class="card-body">
               <h5 class="mb-2">이 상품의 흐름</h5>
@@ -440,6 +439,99 @@
         // 없으므로 값을 넣을 길이 아예 없었다. 여기서 직접 입력한다.
         var SPEC_META = null, SPEC_UNDO = null;
         function specInputId(k){ return "sf_" + k; }
+        // ── 공급처별 매입가 (슬라이스 66) ─────────────────────────────────
+        // 표가 마크업 하드코딩이었다(용산도매A 352,000 · 다나와직송B 361,000).
+        // **신규 등록 화면에도 그 값이 그대로 떠서** 없는 공급처가 있는 것처럼 보였고,
+        // [+ 공급처 추가]는 아무 일도 하지 않았다.
+        var SUPPLIERS = null;      // 선택지(서버) — 화면이 공급처 이름을 지어내지 않게
+        function loadSupplierList(){
+          if(SUPPLIERS) return Promise.resolve(SUPPLIERS);
+          return fetch("/api/admin/suppliers").then(function(r){return r.ok?r.json():null;})
+            .then(function(d){ SUPPLIERS = d? d.items : []; return SUPPLIERS; })
+            .catch(function(){ SUPPLIERS = []; return SUPPLIERS; });
+        }
+        function paintSuppliers(){
+          var tb = document.getElementById("supRows");
+          if(!tb) return;
+          if(!CODE_OK()){    // 신규 등록 — 아직 상품이 없으니 공급처도 없다
+            tb.innerHTML = '<tr><td colspan="4" class="text-body-tertiary fs-10">'
+              + '상품을 먼저 등록하면 공급처 매입가를 넣을 수 있습니다.</td></tr>';
+            return;
+          }
+          var list = (P && P.suppliers) || [];
+          if(!list.length){
+            tb.innerHTML = '<tr><td colspan="4" class="text-body-tertiary fs-10">'
+              + '등록된 공급처 매입가가 없습니다.</td></tr>';
+            return;
+          }
+          var lo = Math.min.apply(null, list.map(function(s){
+            return s.cost_price==null? Infinity : s.cost_price; }));
+          tb.innerHTML = list.map(function(s){
+            var isLo = s.cost_price!=null && s.cost_price===lo;
+            return '<tr><td class="fw-semibold">'+esc(s.supplier)+'</td>'
+              + '<td class="text-end'+(isLo?' fw-bold':'')+'">'
+              + (s.cost_price==null? '—' : s.cost_price.toLocaleString()+'원')+'</td>'
+              + '<td class="text-body-tertiary">'+(s.at? String(s.at).slice(5,10) : '—')
+              + (isLo? ' <span class="badge badge-phoenix badge-phoenix-primary">최저</span>':'')
+              + '</td><td class="text-end">'
+              + '<button class="btn btn-sm btn-subtle-secondary sup-edit" data-s="'+s.supplier_id
+              + '" data-v="'+(s.cost_price==null?'':s.cost_price)+'">수정</button></td></tr>';
+          }).join("");
+        }
+        function CODE_OK(){ return !!(CODE && P && P.product_code); }
+        function supPrompt(sid, cur){
+          loadSupplierList().then(function(sups){
+            if(!sups.length){ toast("등록된 공급처가 없습니다"); return; }
+            var opts = sups.map(function(s){
+              return '<option value="'+s.supplier_id+'"'+(String(s.supplier_id)===String(sid)?' selected':'')
+                +'>'+esc(s.name)+'</option>'; }).join("");
+            var html = '<div class="modal fade" id="supModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered">'
+              + '<div class="modal-content"><div class="modal-header"><h5 class="modal-title">'
+              + (sid? '매입가 수정':'공급처 추가')+'</h5>'
+              + '<button class="btn-close" data-bs-dismiss="modal"></button></div>'
+              + '<div class="modal-body"><label class="form-label fs-9 fw-bold">공급처</label>'
+              + '<select id="supSel" class="form-select form-select-sm mb-3"'+(sid?' disabled':'')+'>'+opts+'</select>'
+              + '<label class="form-label fs-9 fw-bold">매입가(원)</label>'
+              + '<input id="supCost" type="number" min="0" class="form-control form-control-sm" value="'
+              + (cur||'')+'" placeholder="비워 두면 가격 미확인">'
+              + '<p class="fs-10 text-body-tertiary mt-2 mb-0">매입가는 단가표 반영이 주 경로입니다 — '
+              + '여기서는 단건 보정만 합니다.</p></div>'
+              + '<div class="modal-footer">'
+              + (sid? '<button class="btn btn-phoenix-danger btn-sm me-auto" id="supDel">삭제</button>':'')
+              + '<button class="btn btn-phoenix-secondary btn-sm" data-bs-dismiss="modal">취소</button>'
+              + '<button class="btn btn-primary btn-sm" id="supSave">저장</button>'
+              + '</div></div></div></div>';
+            document.getElementById("supModal") && document.getElementById("supModal").remove();
+            document.body.insertAdjacentHTML("beforeend", html);
+            var el = document.getElementById("supModal"), m = new bootstrap.Modal(el);
+            el.addEventListener("hidden.bs.modal", function(){ el.remove(); });
+            document.getElementById("supSave").onclick = function(){
+              var s = +document.getElementById("supSel").value;
+              var cRaw = document.getElementById("supCost").value;
+              fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/suppliers",
+                {method:"POST", headers:{"Content-Type":"application/json"},
+                 body: JSON.stringify({supplier_id:s,
+                        cost_price: cRaw===""? null : parseInt(cRaw,10)})})
+                .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
+                .then(function(res){ if(!res.ok) return; m.hide(); load(); });
+            };
+            var del = document.getElementById("supDel");
+            if(del) del.onclick = function(){
+              fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/suppliers/"+sid,
+                    {method:"DELETE"})
+                .then(function(r){ if(r.ok){ m.hide(); load(); } });
+            };
+            m.show();
+          });
+        }
+        document.addEventListener("click", function(ev){
+          var a = ev.target.closest && ev.target.closest("#supAdd");
+          if(a){ ev.preventDefault();
+                 if(!CODE_OK()){ toast("상품을 먼저 등록해 주세요"); return; }
+                 supPrompt(null, ""); return; }
+          var e2 = ev.target.closest && ev.target.closest(".sup-edit");
+          if(e2){ ev.preventDefault(); supPrompt(e2.getAttribute("data-s"), e2.getAttribute("data-v")); }
+        });
         function paintSpecs(){
           var sp = document.getElementById("specs");
           if(!sp || !P) return;
@@ -593,6 +685,7 @@
           }
           applyMode();
           paintSpecs();
+          paintSuppliers();
         }
 
         function load(){

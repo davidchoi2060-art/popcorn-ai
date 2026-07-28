@@ -69,6 +69,7 @@ _WHERE = """
     WHERE (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%'
            OR p.maker ILIKE '%%' || :q || '%%')
       AND (:part_type = '' OR p.part_type = :part_type)
+      AND (:maker = '' OR p.maker = :maker)
       AND (:origin = '' OR p.data_origin = :origin)
 """
 
@@ -144,12 +145,15 @@ def spec_progress(part_type: str, specs: dict | None) -> tuple[int, int]:
 
 @router.get("/products")
 def list_products(q: str = "", part_type: str = "", status: str = "", origin: str = "",
-                  page: int = 1, size: int = 100):
+                  maker: str = "", page: int = 1, size: int = 100):
     # def(비동기 아님) — psycopg2 동기 드라이버, FastAPI 스레드풀 실행
     size = max(1, min(size, 500))     # 상한 — 브라우저가 버티는 범위
     page = max(1, page)
+    # maker는 **서버에서 거른다**(슬라이스 66). 화면이 현재 페이지 안에서만 걸러
+    # 22,841건 중 100건에만 필터가 먹었다 — 운영자는 "그 제조사 상품이 없다"고 읽는다.
     p = {"q": q.strip(), "part_type": part_type.strip(), "status": status.strip(),
-         "origin": origin.strip(), "size": size, "offset": (page - 1) * size}
+         "origin": origin.strip(), "maker": maker.strip(),
+         "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
         rows = conn.execute(_QUERY, p).all()
         total_count = conn.execute(_COUNT, p).scalar_one()
@@ -310,12 +314,26 @@ def product_meta():
     """
     core = {"CPU", "MB", "RAM", "GPU", "POWER", "CASE", "SSD", "HDD",
             "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
+    # 목록 필터와 상세 셀렉트가 **같은 원천**을 봐야 한다(슬라이스 66).
+    # 목록은 지금까지 '현재 페이지에 로드된 행'에서 분류·제조사를 뽑아 썼다.
+    # 서버 페이지네이션이라 한 페이지에 없는 값은 필터에 아예 안 나왔고,
+    # 그래서 상세에서 고른 분류가 목록 필터엔 없는 일이 생겼다.
+    with engine.connect() as conn:
+        makers = [r[0] for r in conn.execute(text(
+            "SELECT maker FROM products WHERE maker IS NOT NULL AND maker <> ''"
+            " GROUP BY maker ORDER BY count(*) DESC, maker"))]
+        used = [r[0] for r in conn.execute(text(
+            "SELECT part_type FROM products WHERE part_type IS NOT NULL"
+            " GROUP BY part_type ORDER BY count(*) DESC"))]
     return {
         "part_labels": [{"part_type": k, "label": v}
                         for k, v in PART_TYPE_LABELS.items() if k in core],
         "peripheral_labels": [{"part_type": k, "label": v}
                               for k, v in PART_TYPE_LABELS.items()
                               if k not in core and k != "ETC"],
+        # 목록 필터용 — 실제로 상품이 있는 분류만(빈 분류를 고르면 결과가 0이라 혼란스럽다)
+        "used_parts": [{"part_type": k, "label": PART_TYPE_LABELS.get(k, k)} for k in used],
+        "makers": makers,
         "status_options": list(STATUS_OK),
         "editable": sorted(EDITABLE),
     }
@@ -340,6 +358,14 @@ def get_product(product_code: int):
         in_pool = conn.execute(text(
             "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
             " AND stock_qty > 0"), {"pc": product_code}).first() is not None
+        # 공급처별 매입가 — 화면 표는 지금까지 마크업 하드코딩이었다(용산도매A 352,000 등).
+        # 신규 등록 화면에도 그 값이 그대로 떠서 **없는 공급처가 있는 것처럼** 보였다.
+        sups = [dict(x) for x in conn.execute(text(
+            "SELECT sp.psp_id, sp.supplier_id, s.name AS supplier, sp.cost_price,"
+            " sp.supply_state, sp.updated_at"
+            " FROM product_supplier_prices sp JOIN suppliers s USING (supplier_id)"
+            " WHERE sp.product_code = :pc"
+            " ORDER BY sp.cost_price NULLS LAST, sp.psp_id"), {"pc": product_code}).mappings()]
     done, total = spec_progress(r["part_type"], r["specs"])
     locked = list(r["locked_fields"] or [])
     if in_pool:
@@ -372,6 +398,10 @@ def get_product(product_code: int):
         "specs": r["specs"], "spec_done": done, "spec_total": total,
         "spec_row_missing": r["specs"] is None,
         "review_pending": pending, "in_pool": in_pool,
+        "suppliers": [{"psp_id": s["psp_id"], "supplier_id": s["supplier_id"],
+                       "supplier": s["supplier"], "cost_price": s["cost_price"],
+                       "state": s["supply_state"], "at": iso(s["updated_at"])}
+                      for s in sups],
         "editable": sorted(EDITABLE), "status_options": list(STATUS_OK),
         "created_at": iso(r["created_at"]),
         "updated_at": iso(r["updated_at"]) if r["updated_at"] else None,
@@ -692,3 +722,98 @@ def undo_spec_edit(log_id: int):
              {"ref_log_id": log_id, "product_code": pc,
               "restored": {k: v.get("from") for k, v in chg.items()}}, kind="product")
     return {"ok": True, "restored": len(sets)}
+
+
+# ---- 슬라이스 66: 공급처별 매입가 ----
+# 화면의 공급처 표가 마크업 하드코딩이었다(용산도매A 352,000 · 다나와직송B 361,000).
+# **신규 등록 화면에도 그 값이 그대로 떠서** 없는 공급처가 있는 것처럼 보였고,
+# [+ 공급처 추가]는 아무 일도 하지 않았다.
+#
+# 매입가는 단가표 반영(price-import)이 주 경로다. 여기서는 **단건 보정**만 한다 —
+# 운영자가 전화로 받은 값을 그 자리에 넣는 용도다. 출처를 남겨 나중에 구분한다.
+
+
+# supply_state는 NOT NULL이고 실데이터는 '가능'/'품절' 둘뿐이다.
+# 화면이 안 보내면 '가능'으로 둔다 — 매입가를 넣는다는 건 살 수 있다는 뜻이다.
+SUPPLY_STATES = ("가능", "품절")
+
+
+class SupplierPriceBody(BaseModel):
+    supplier_id: int
+    cost_price: int | None = None
+    state: str | None = None
+
+
+@router.get("/suppliers")
+def list_suppliers():
+    """공급처 선택지 — 화면이 이름을 지어내지 않게."""
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT supplier_id, name, platform FROM suppliers ORDER BY name")).mappings().all()
+    return {"items": [dict(r) for r in rows]}
+
+
+@router.post("/products/{product_code}/suppliers")
+def upsert_supplier_price(product_code: int, body: SupplierPriceBody):
+    from .admin_orders import _log
+
+    if body.cost_price is not None and body.cost_price < 0:
+        raise HTTPException(400, "매입가는 0원 이상이어야 합니다")
+    if body.state is not None and body.state not in SUPPLY_STATES:
+        raise HTTPException(400, "공급 상태는 " + " · ".join(SUPPLY_STATES) + " 중 하나입니다")
+    with engine.begin() as conn:
+        if conn.execute(text("SELECT 1 FROM products WHERE product_code=:pc"),
+                        {"pc": product_code}).first() is None:
+            raise HTTPException(404, "상품이 없습니다")
+        sup = conn.execute(text("SELECT name FROM suppliers WHERE supplier_id=:s"),
+                           {"s": body.supplier_id}).scalar()
+        if sup is None:
+            raise HTTPException(400, "등록되지 않은 공급처입니다")
+        before = conn.execute(text(
+            "SELECT psp_id, cost_price FROM product_supplier_prices"
+            " WHERE product_code=:pc AND supplier_id=:s"),
+            {"pc": product_code, "s": body.supplier_id}).mappings().first()
+        # 같은 (상품, 공급처)는 한 행이다 — 같은 공급처를 두 번 넣으면 어느 값이 맞는지 알 수 없다
+        conn.execute(text(
+            "INSERT INTO product_supplier_prices"
+            " (product_code, supplier_id, cost_price, supply_state, updated_at)"
+            " VALUES (:pc, :s, :c, :st, now())"
+            " ON CONFLICT (product_code, supplier_id) DO UPDATE SET"
+            "   cost_price = EXCLUDED.cost_price,"
+            "   supply_state = COALESCE(EXCLUDED.supply_state, product_supplier_prices.supply_state),"
+            "   updated_at = now()"),
+            {"pc": product_code, "s": body.supplier_id,
+             "c": body.cost_price, "st": body.state or "가능"})
+        log_id = _log(conn, "supplier_price", str(product_code),
+                      {"product_code": product_code, "supplier_id": body.supplier_id,
+                       "supplier": sup, "to": body.cost_price,
+                       "from": before["cost_price"] if before else None,
+                       "new": before is None}, kind="product")
+        n = conn.execute(text(
+            "SELECT count(*) FROM product_supplier_prices WHERE product_code=:pc"),
+            {"pc": product_code}).scalar_one()
+    return {"ok": True, "supplier": sup, "count": n, "undo_id": log_id,
+            "note": (f"{sup} 매입가를 "
+                     + (f"{body.cost_price:,}원으로 " if body.cost_price is not None else "")
+                     + ("등록했습니다." if before is None else "수정했습니다."))}
+
+
+@router.delete("/products/{product_code}/suppliers/{supplier_id}")
+def delete_supplier_price(product_code: int, supplier_id: int):
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT sp.cost_price, s.name FROM product_supplier_prices sp"
+            " JOIN suppliers s USING (supplier_id)"
+            " WHERE sp.product_code=:pc AND sp.supplier_id=:s"),
+            {"pc": product_code, "s": supplier_id}).mappings().first()
+        if row is None:
+            raise HTTPException(404, "그 공급처 가격이 없습니다")
+        conn.execute(text(
+            "DELETE FROM product_supplier_prices WHERE product_code=:pc AND supplier_id=:s"),
+            {"pc": product_code, "s": supplier_id})
+        _log(conn, "supplier_price_remove", str(product_code),
+             {"product_code": product_code, "supplier_id": supplier_id,
+              "supplier": row["name"], "cost_price": row["cost_price"]}, kind="product")
+    return {"ok": True, "note": f"{row['name']} 매입가를 삭제했습니다."}

@@ -317,11 +317,27 @@
         const fromDummy=p=>({product_code:String(20480000+parseInt(p[0].slice(2),10)),sku:p[0],name:p[1],cat:p[2],maker:p[1].split(" ")[0],spec_done:p[3],spec_total:p[4],stock:p[5],supplier_count:p[6],price_text:p[7]+"원",status_key:p[8]});
         const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,spec_row_missing:it.spec_row_missing,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
         let DATA=P.map(fromDummy);
+        /* 필터 선택지는 **서버가 준다**(슬라이스 66).
+           예전에는 현재 페이지에 로드된 행에서 뽑아 썼다 — 서버 페이지네이션이라
+           한 페이지(100건)에 없는 분류·제조사는 목록에 아예 나오지 않았고,
+           그래서 상세에서 고른 분류가 목록 필터엔 없는 일이 생겼다.
+           상세 셀렉트와 같은 원천(/api/admin/product-meta)을 본다. */
+        let META=null;
         function fillSelects(){
-          const cats=[...new Set(DATA.map(p=>p.cat))];
-          const mfrs=[...new Set(DATA.map(p=>p.maker))].sort((a,b)=>a.localeCompare(b,"ko"));
+          const cats = META && META.used_parts
+            ? META.used_parts.map(x=>x.label)
+            : [...new Set(DATA.map(p=>p.cat))];
+          const mfrs = META && META.makers
+            ? META.makers
+            : [...new Set(DATA.map(p=>p.maker))].sort((a,b)=>a.localeCompare(b,"ko"));
           document.getElementById("fcat").innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join("");
           document.getElementById("fmfr").innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join("");
+        }
+        function loadMeta(){
+          return fetch("/api/admin/product-meta")
+            .then(r=>r.ok?r.json():null)
+            .then(m=>{ if(m){ META=m; fillSelects(); } })
+            .catch(()=>{});
         }
         // KPI — k 없으면 더미 집계값, 있으면 서버 kpis(상호배타 버킷: 검수 우선이라 재고 없음과 중복 없음)
         function renderKpis(k){
@@ -396,7 +412,10 @@
         function load(){
           var url="/api/admin/products?page="+PAGE+"&size="+SIZE
             + "&q=" + encodeURIComponent(q||"")
-            + "&part_type=" + encodeURIComponent(fcat==="all"?"":catToPartType(fcat));
+            + "&part_type=" + encodeURIComponent(fcat==="all"?"":catToPartType(fcat))
+            // 제조사도 서버에서 거른다 — 예전에는 현재 페이지 안에서만 걸러
+            // 22,841건 중 100건에만 필터가 먹었다(슬라이스 66)
+            + "&maker=" + encodeURIComponent(fmfr==="all"?"":fmfr);
           fetch(url)
             .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
@@ -427,7 +446,10 @@
         document.getElementById("fcat").addEventListener("change",e=>{
           fcat=e.target.value; if(LIVE){PAGE=1;load();} else render();
         });
-        document.getElementById("fmfr").addEventListener("change",e=>{fmfr=e.target.value;render();});
+        document.getElementById("fmfr").addEventListener("change",e=>{
+          fmfr=e.target.value; if(LIVE){PAGE=1;load();} else render();
+        });
+        loadMeta();   // 필터 선택지는 서버 원천 — 목록과 별개로 한 번만 받는다
         load();
       })();
       </script>
