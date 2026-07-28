@@ -206,6 +206,8 @@ class RegisterBody(BaseModel):
     cost_price: int | None = None
     danawa_code: str | None = None
     maker: str | None = None
+    # 닮은 상품이 있어도 "다른 상품이다"라고 확인했으면 그대로 등록한다(슬라이스 68)
+    confirm_similar: bool = False
 
 
 @router.post("/products")
@@ -232,6 +234,17 @@ def register_product(body: RegisterBody):
                 "SELECT sku FROM products WHERE danawa_code=:d"), {"d": body.danawa_code}).scalar()
             if dup:
                 raise HTTPException(400, f"다나와 코드 중복 — 기존 상품 {dup}에 연결하세요")
+        # 이름이 거의 같은 상품이 이미 있으면 **먼저 묻는다**(슬라이스 68).
+        # 실수로 같은 상품을 두 번 만들면 재고·매입가가 갈라져 어느 쪽이 맞는지 알 수 없다.
+        # 막지는 않는다 — 운영자가 "다른 상품"이라고 하면 그대로 등록한다.
+        if not body.confirm_similar:
+            from . import dedupe
+            similar = dedupe.find_similar(conn, body.name.strip(), pt)
+            if similar:
+                raise HTTPException(409, {
+                    "error": "similar_products",
+                    "message": "이름이 거의 같은 상품이 이미 있습니다 — 확인해 주세요",
+                    "items": similar})
         num = conn.execute(text(
             r"SELECT COALESCE(MAX(CAST(SUBSTRING(sku FROM 3) AS INTEGER)), 0) + 1"
             r" FROM products WHERE sku ~ '^P-[0-9]+$'")).scalar()
@@ -999,3 +1012,21 @@ def undo_part_type(log_id: int):
              {"ref_log_id": log_id, "product_code": pc, "restored": d.get("from")},
              kind="product")
     return {"ok": True, "restored": d.get("from")}
+
+
+@router.get("/product-similar")
+def similar_products(name: str = "", part_type: str = "", exclude: int | None = None):
+    """이름이 닮은 기존 상품 — 등록 전 확인·중복 정리에 쓴다(슬라이스 68).
+
+    판정 기준은 `api/dedupe`가 단일 원천이다. 등록 API와 이 조회가 다른 잣대를 쓰면
+    "확인창엔 안 떴는데 등록은 막힌다" 같은 일이 생긴다.
+    """
+    from . import dedupe
+
+    if not name.strip():
+        return {"items": [], "threshold": dedupe.SIMILAR_THRESHOLD}
+    with engine.connect() as conn:
+        items = dedupe.find_similar(conn, name.strip(), part_type.strip() or None, exclude)
+    return {"items": items, "threshold": dedupe.SIMILAR_THRESHOLD,
+            "note": ("이름이 거의 같은 상품입니다 — 같은 상품이면 등록하지 말고"
+                     " 기존 상품을 수정하세요.")}

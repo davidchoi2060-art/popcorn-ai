@@ -28,6 +28,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 # Windows 콘솔(cp949)에서도 한글·기호가 깨지지 않게 stdout을 UTF-8로 고정한다.
@@ -741,6 +742,51 @@ def test_part_type_change():
         check("이중 되돌리기는 409",
               post(f"/api/admin/products/part-type/undo/{uid}")[0] == 409, 409,
               post(f"/api/admin/products/part-type/undo/{uid}")[0])
+
+    # ── 중복 등록 확인 (슬라이스 68) ────────────────────────────────
+    # 기존 danawa.title_similarity는 이 용도에 못 쓴다: 모델명 토큰이 겹치면 점수를
+    # 끌어올려 MP600 PRO NH와 XT를 1.000으로 본다. 중복 판정은 **다른 점을 지우지
+    # 않아야** 한다. 임계값은 실카탈로그 3,889쌍 실측으로 0.97(상위 6.5%).
+    try:
+        sys.path.insert(0, ROOT)
+        from api import dedupe
+        cases = [
+            ("커세어 CORSAIR MP600 PRO NH M.2 NVMe (8TB)",
+             "커세어 CORSAIR MP600 PRO XT M.2 NVMe (8TB)", False),
+            ("갤럭시 BOY 지포스 RTX 3050 EX BLACK D6 6GB DVI",
+             "갤럭시 BOY 지포스 RTX 3050 EX OC D6 8GB", False),
+            ("중고 삼성전자 970 EVO M.2 2280 (250GB)",
+             "삼성전자 970 EVO M.2 2280 (250GB) 정품", True),
+        ]
+        bad = []
+        for a, b, want in cases:
+            got = dedupe.score(a, b) >= dedupe.SIMILAR_THRESHOLD
+            if got != want:
+                bad.append(f"{a[:24]} vs {b[:24]}: {dedupe.score(a, b)}")
+        check("중복 판정이 다른 상품을 같다고 하지 않는다", not bad, "전 케이스 일치", bad)
+        check("수치가 다르면 점수를 깎는다",
+              dedupe.score("RTX 3050 D6 6GB", "RTX 3050 D6 8GB") < 0.8,
+              "< 0.8", dedupe.score("RTX 3050 D6 6GB", "RTX 3050 D6 8GB"))
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 중복 판정 — {e}")
+
+    name = db_one("SELECT product_name FROM products WHERE part_type='GPU'"
+                  " ORDER BY product_code LIMIT 1")
+    if name:
+        n0 = db_one("SELECT count(*) FROM products")
+        st, d = post("/api/admin/products", {"name": name, "part_label": "그래픽카드"})
+        check("같은 이름 등록은 409로 되묻는다", st == 409, 409, st)
+        # **되물었으면 등록되지 않아야 한다** — 물어보고 만들어버리면 확인이 무의미하다
+        check("되묻는 동안 등록되지 않는다", db_one("SELECT count(*) FROM products") == n0,
+              n0, db_one("SELECT count(*) FROM products"))
+        if st == 409 and isinstance(d.get("detail"), dict):
+            check("닮은 상품 목록을 함께 준다", bool(d["detail"].get("items")),
+                  "1개 이상", len(d["detail"].get("items") or []))
+        sim = get("/api/admin/product-similar?name="
+                  + urllib.parse.quote(name) + "&part_type=GPU")
+        check("유사 조회와 등록이 같은 잣대를 쓴다",
+              bool(sim.get("items")) and sim.get("threshold") == 0.97,
+              "0.97 · 결과 있음", sim.get("threshold"))
 
     # 공급처 매입가 — 표가 마크업 하드코딩이라 신규 등록 화면에도 남의 값이 떴다
     sup = get("/api/admin/suppliers")
