@@ -282,8 +282,8 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 </div>
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:18px 22px;background:#17171b;border-radius:14px;">
-<span style="font-size:13.5px;font-weight:700;color:#9a968d;">실시간 재고 기준 예상 견적가</span>
-<span style="font-size:26px;font-weight:900;color:#fff;">1,250,000<span style="font-size:15px;color:#9a968d;">원</span>
+<span style="font-size:13.5px;font-weight:700;color:#9a968d;" data-bind="showcase_caption">실시간 재고 기준 예상 견적가</span>
+<span style="font-size:26px;font-weight:900;color:#fff;"><span data-bind="showcase_total">1,250,000</span><span style="font-size:15px;color:#9a968d;">원</span>
 </span>
 </div>
 </div>
@@ -553,6 +553,35 @@ document.addEventListener('click',function(e){
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
+<script>
+/* 첫 화면이 말하는 수를 서버가 책임진다 (슬라이스 59).
+   이 화면은 "지금 검증 중인 실시간 재고 26,480개"·"재고 정보를 실시간으로 갱신하는 중"이라고
+   써 붙이고 **API를 한 번도 부르지 않았다.** 26,480은 어느 실제 값과도 맞지 않았고
+   (후보 3,308 · 재고 있는 상품 7,581 · 수량 합 8,239), 호환성도 5종이라 했지만 실제는 8종이다.
+   서버가 못 주면 조용히 원래 문구를 남긴다 — 목업 폴백(Firebase 검토 배포 무영향). */
+(function(){
+ fetch('/api/showcase').then(function(r){return r.ok?r.json():null;}).then(function(d){
+  if(!d)return;
+  function put(name,txt){
+   Array.prototype.forEach.call(document.querySelectorAll('[data-bind="'+name+'"]'),
+    function(el){el.textContent=txt;});
+  }
+  put('live_stock_count',d.pool.toLocaleString());
+  if(d.pick){
+   put('showcase_total',d.pick.total.toLocaleString());
+   /* 조건을 밝히지 않으면 "예상 견적가"가 어디서 온 수인지 알 수 없다.
+      무엇을 기준으로 뽑았는지 말해야 그 수가 근거를 갖는다. */
+   put('showcase_caption',d.usage+' · '+d.budget_label+' 기준 추천 구성');
+  }
+  // 호환 규칙 수는 서버가 정한다 — 8종을 검사하면서 5종이라 말하면 손해이고, 거짓이다
+  var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n,hit=[];
+  while((n=tw.nextNode()))if(/호환성\s*\d+종/.test(n.nodeValue))hit.push(n);
+  hit.forEach(function(t){t.nodeValue=t.nodeValue.replace(/호환성\s*\d+종/,'호환성 '+d.rules+'종');});
+  Array.prototype.forEach.call(document.querySelectorAll('img[alt*="호환성"]'),function(im){
+   im.alt=im.alt.replace(/호환성\s*\d+종/,'호환성 '+d.rules+'종');});
+ }).catch(function(){});
+})();
+</script>
 <script src="../shared/auth.js"></script>
 <script src="../shared/ui-progress.js"></script>
 <script src="../shared/su-icons.js"></script>

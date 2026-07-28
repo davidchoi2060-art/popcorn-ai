@@ -168,7 +168,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
             <div style="text-align:left;"><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:800; font-size:20px;">검증 완료</div><div style="color:rgba(255,255,255,.6); font-size:14px; margin-top:2px;">조건·호환·예산을 통과한 구성</div></div>
           </div>
           <div style="position:relative; display:flex; align-items:center; gap:24px;">
-            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:'JetBrains Mono';">Verified Pick</div><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; letter-spacing:-0.02em;">1,487,000<span style="font-size:18px; font-weight:700;">원</span></div></div>
+            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:'JetBrains Mono';">Verified Pick</div><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">1,487,000</span><span style="font-size:18px; font-weight:700;">원</span></div></div>
             <button style="background:#65A1D4; color:#fff; border:none; width:56px; height:56px; border-radius:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" data-cta="start"><span class="msym" style="font-size:26px;">arrow_forward</span></button>
           </div>
         </div>
@@ -215,9 +215,9 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           </div>
           <div style="background:linear-gradient(160deg,#1A202C,#0F172A); border-radius:28px; padding:38px; position:relative; overflow:hidden; box-shadow:0 30px 60px -30px rgba(15,23,42,.7); display:flex; flex-direction:column;">
             <div style="position:absolute; top:0; right:0; background:#65A1D4; color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:12px; letter-spacing:.12em; padding:9px 18px; border-radius:0 0 0 18px;">TOP PICK</div>
-            <div style="color:rgba(255,255,255,.55); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;">검증 통과 견적</div>
-            <div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;">1,487,000<span style="font-size:22px;">원</span></div>
-            <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="color:rgba(255,255,255,.55); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;" data-bind="showcase_caption">검증 통과 견적</div>
+            <div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;"><span data-bind="showcase_total">1,487,000</span><span style="font-size:22px;">원</span></div>
+            <div style="display:flex; flex-direction:column; gap:2px;" data-repeat="showcase_items">
               <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">CPU · Ryzen 5 7600</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">254,000</span></div>
               <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">GPU · RTX 4060 Ti</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">645,000</span></div>
               <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">RAM · DDR5-5600 32GB</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">132,000</span></div>
@@ -332,6 +332,49 @@ document.addEventListener('DOMContentLoaded', function () {
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
+<script>
+/* 첫 화면이 말하는 수를 서버가 책임진다 (슬라이스 59).
+   이 화면은 "TOP PICK · 검증 통과 견적"이라 써 붙이고 **API를 한 번도 부르지 않았다.**
+   RTX 4060 Ti를 645,000원이라 적었지만 우리 재고의 실제 가격은 428,000원이다(-217,000).
+   고객이 가장 먼저 보는 화면이 근거 없는 수를 말하면 "모든 견적에는 이유가 있습니다"가
+   첫 줄에서 무너진다. 서버가 못 주면 원래 마크업을 그대로 둔다(목업 폴백). */
+(function(){
+ var PKO={CPU:'CPU',MB:'메인보드',RAM:'RAM',GPU:'GPU',CASE:'케이스',
+          COOLER:'쿨러',POWER:'파워',SSD:'SSD'};
+ fetch('/api/showcase').then(function(r){return r.ok?r.json():null;}).then(function(d){
+  if(!d||!d.pick)return;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_total"]'),
+   function(el){el.textContent=d.pick.total.toLocaleString();});
+  /* 무엇을 기준으로 뽑은 구성인지 밝힌다 — 조건 없는 'TOP PICK'은 근거가 없다 */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_caption"]'),
+   function(el){el.textContent=d.usage+' · '+d.budget_label+' 기준';});
+  var box=document.querySelector('[data-repeat="showcase_items"]');
+  if(!box)return;
+  var proto=box.firstElementChild;
+  if(!proto)return;
+  // 마크업에 있던 3줄 자리에 실제 구성의 대표 3종을 넣는다(CPU·GPU·RAM 순)
+  var want=['CPU','GPU','RAM'];
+  var rows=want.map(function(k){
+   return d.pick.items.filter(function(i){return i.part_type===k;})[0];}).filter(Boolean);
+  if(!rows.length)return;
+  /* 카탈로그 상품명에는 판매 문구가 붙어 있다("… (멀티팩(정품)) 회원가입 계좌이체 맞춤").
+     첫 화면은 요약이므로 모델명까지만 보여준다 — 자른다고 다른 물건이 되지는 않지만,
+     너무 짧아지면 무엇인지 알 수 없으므로 그때는 원문을 쓴다. */
+  function shortName(s){
+   var head=String(s).split('(')[0].trim();
+   return (head.length>=6?head:String(s)).slice(0,34);
+  }
+  box.innerHTML='';
+  rows.forEach(function(it){
+   var el=proto.cloneNode(true);
+   var sp=el.querySelectorAll('span');
+   if(sp[0])sp[0].textContent=(PKO[it.part_type]||it.part_type)+' · '+shortName(it.name);
+   if(sp[1])sp[1].textContent=it.price.toLocaleString();
+   box.appendChild(el);
+  });
+ }).catch(function(){});
+})();
+</script>
 <script src="../shared/auth.js"></script>
 <script src="../shared/ui-progress.js"></script>
 <script src="../shared/su-icons.js"></script>

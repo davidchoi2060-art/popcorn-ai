@@ -322,6 +322,52 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     }
 
 
+# ---- 슬라이스 59: 첫 화면이 말하는 수를 서버가 책임진다 ----
+# main-landing과 S0은 "실시간 재고 검증"·"검증 통과 견적"이라고 써 붙이고 **API를 한 번도
+# 부르지 않았다.** 재고 26,480개(어느 실제 값과도 다름) · 호환성 5종(실제 8종) ·
+# RTX 4060 Ti 645,000원(실제 428,000원)을 고객이 처음 보는 화면에서 말하고 있었다.
+#
+# 견적 API를 그대로 쓰지 않는 이유: 그건 consult_sessions·quote_snapshots를 남긴다.
+# 랜딩 방문마다 상담 세션이 쌓이면 원장이 오염된다. 여기서는 **읽기만** 한다.
+SHOWCASE = {"usage": "게임", "budget": "150만원"}   # 대표 조건 — 화면이 이 조건을 밝힌다
+_SHOW_CACHE: dict = {"at": 0.0, "data": None}
+SHOWCASE_TTL = 300.0                                # 5분 — 재고가 움직여도 그 안에 따라온다
+
+
+@router.get("/showcase")
+def showcase():
+    """첫 화면용 대표 구성 — 세션을 만들지 않는 읽기 전용 경로."""
+    import time
+
+    now = time.time()
+    if _SHOW_CACHE["data"] is not None and now - _SHOW_CACHE["at"] < SHOWCASE_TTL:
+        return _SHOW_CACHE["data"] | {"cached": True}
+
+    cap = _budget_cap(SHOWCASE["budget"])
+    with engine.begin() as conn:
+        pool = _load_pool(conn)
+        rules = load_compat_rules(conn)
+        common = pool
+        for label, value in (("용도", SHOWCASE["usage"]),):
+            common, _, _ = _apply_one(common, label, value)
+        capped, _, _ = _apply_one(common, "예산", SHOWCASE["budget"])
+        pick = _build_set("recommend", capped, cap, rules)
+        if pick is None:                    # 배분율이 막으면 푼다(견적 경로와 같은 규칙)
+            pick = _build_set("recommend", common, cap, rules)
+
+    data = {
+        # S1 후보 카운터와 **같은 정의**다 — S0에서 다른 수를 보여주면 다음 화면에서
+        # 갑자기 줄어든 것처럼 보인다.
+        "pool": len(pool),
+        "rules": sum(len(v) for v in rules.values()),
+        "usage": SHOWCASE["usage"], "budget_label": SHOWCASE["budget"],
+        "pick": pick and {"items": pick["items"], "total": pick["total"]},
+        "cached": False,
+    }
+    _SHOW_CACHE.update({"at": now, "data": data})
+    return data
+
+
 def _companion(conn):
     rows = conn.execute(text(
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"

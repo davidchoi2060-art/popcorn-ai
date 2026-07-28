@@ -743,6 +743,51 @@ def test_usage_floors():
     except OSError:
         pass
 
+    # ⑧ 첫 화면(main-landing·S0)이 말하는 수 — 고객이 가장 먼저 보는 화면이 근거 없는
+    # 수를 말하면 "모든 견적에는 이유가 있습니다"가 첫 줄에서 무너진다. 실제로 재고
+    # 26,480개(어느 값과도 불일치)·호환성 5종(실제 8종)·RTX 4060 Ti 645,000원
+    # (실제 428,000원)을 말하고 있었고, 두 화면 다 API를 한 번도 부르지 않았다.
+    sc = get("/api/showcase")
+    check("showcase 후보 수 = S1 카운터와 같은 정의",
+          sc["pool"] == db_one("SELECT count(*) FROM v_recommendation_candidates"
+                               " WHERE stock_qty>0"),
+          db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0"),
+          sc["pool"])
+    check("showcase 규칙 수 = 활성 호환 규칙",
+          sc["rules"] == db_one("SELECT count(*) FROM compat_rules WHERE active"),
+          db_one("SELECT count(*) FROM compat_rules WHERE active"), sc["rules"])
+    pk = sc.get("pick")
+    check("showcase가 대표 구성을 준다", bool(pk and pk["items"]), "구성 있음", bool(pk))
+    if pk:
+        check("showcase 부품 합 = 총액",
+              sum(i["price"] for i in pk["items"]) == pk["total"],
+              pk["total"], sum(i["price"] for i in pk["items"]))
+        # 가격은 DB 원천과 같아야 한다 — 화면이 지어낸 수를 보여주던 자리다
+        wrong = [i["part_type"] for i in pk["items"] if db_one(
+            "SELECT sale_price FROM v_recommendation_candidates WHERE product_code=:p",
+            p=i["product_code"]) != i["price"]]
+        check("showcase 가격 = DB 원천", not wrong, "전 부품 일치", wrong)
+        oos = [i["part_type"] for i in pk["items"] if (db_one(
+            "SELECT stock_qty FROM v_recommendation_candidates WHERE product_code=:p",
+            p=i["product_code"]) or 0) <= 0]
+        check("showcase 구성은 재고가 있다", not oos, "전 부품 재고>0", oos)
+    # 랜딩이 상담 세션을 남기지 않는가 — 방문마다 쌓이면 원장이 오염된다
+    n0 = db_one("SELECT count(*) FROM consult_sessions")
+    get("/api/showcase")
+    check("showcase는 상담 세션을 만들지 않는다",
+          db_one("SELECT count(*) FROM consult_sessions") == n0, n0,
+          db_one("SELECT count(*) FROM consult_sessions"))
+    # 첫 화면 마크업이 서버 값을 받을 자리를 갖고 있는가
+    for page, binds in (("main-landing.html", ("showcase_total", "showcase_items")),
+                        ("s0-landing.html", ("live_stock_count", "showcase_total"))):
+        try:
+            h = io.open(os.path.join(ROOT, "mockups", "mvp1", page), encoding="utf-8").read()
+            miss = [b for b in binds if b not in h]
+            check(f"{page}가 서버 값을 받는다", not miss and "/api/showcase" in h,
+                  "바인드+fetch 있음", miss or "fetch 없음")
+        except OSError as e:                             # noqa: BLE001
+            print(f"  [SKIP] (I) {page} — {e}")
+
 
 def _spec_field_guards():
     # 가드 — 잘못된 항목이 스키마를 오염시키면 되돌리기 어렵다
