@@ -100,4 +100,25 @@ app.include_router(my_account_router)
 # 정적 마운트는 반드시 마지막 — 먼저 걸면 /api/*가 캐치올에 잡힌다.
 # mockups 전체를 마운트해야 admin/의 ../shared/su-icons.js 참조가 유지된다.
 MOCKUPS_DIR = Path(__file__).resolve().parent.parent / "mockups"
-app.mount("/", StaticFiles(directory=MOCKUPS_DIR, html=True), name="mockups")
+
+
+class NoCacheStatic(StaticFiles):
+    """HTML·JS·CSS를 브라우저가 캐시하지 않게 한다 (슬라이스 71).
+
+    배포했는데 **옛 화면이 그대로 보이는 일**이 반복됐다. 실제 사고: 로그인 화면에
+    비밀번호 칸을 넣어 배포했는데도 폰에서는 옛 화면이 떠서 로그인할 수 없었다.
+    서버 파일은 새것이었고 브라우저가 옛 사본을 쥐고 있었다.
+
+    개발·베타 단계에서는 캐시 이득보다 **"고쳤는데 안 바뀐다"는 혼선의 비용이 크다.**
+    화면이 바뀌지 않는 것보다 조금 느린 편이 낫다. 이미지·폰트는 그대로 캐시한다.
+    """
+
+    async def get_response(self, path, scope):
+        resp = await super().get_response(path, scope)
+        if path.endswith((".html", ".js", ".css")) or path in ("", "/"):
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            resp.headers["Pragma"] = "no-cache"
+        return resp
+
+
+app.mount("/", NoCacheStatic(directory=MOCKUPS_DIR, html=True), name="mockups")
