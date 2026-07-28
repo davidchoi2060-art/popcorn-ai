@@ -48,6 +48,15 @@
                 <input class="form-control form-control-sm" id="email" name="email" type="email"
                        placeholder="name@popcornpc.co.kr" autocomplete="username" required>
               </div>
+              <!-- 비밀번호(슬라이스 70) — 예전에는 이메일만 맞으면 들어왔고, nginx Basic Auth가
+                   유일한 방벽이었다. 그 팝업이 모바일에서 불편해 이 칸으로 대체한다. -->
+              <div class="mb-3">
+                <label class="form-label fs-9" for="password">비밀번호 <span class="text-danger">*</span></label>
+                <input class="form-control form-control-sm" id="password" name="password"
+                       type="password" placeholder="비밀번호" autocomplete="current-password">
+                <div class="fs-10 text-body-tertiary mt-1">처음 신청하실 때는 비우고 보내셔도 됩니다 —
+                  승인 후 관리자가 비밀번호를 발급합니다.</div>
+              </div>
               <div class="row g-2">
                 <div class="col-6 mb-3">
                   <label class="form-label fs-9" for="name">이름</label>
@@ -120,6 +129,7 @@
       function submit(provider){
         var body = {
           email: document.getElementById("email").value.trim(),
+          password: document.getElementById("password").value || null,
           name: document.getElementById("name").value.trim() || null,
           phone: document.getElementById("phone").value.trim() || null,
           duty: document.getElementById("duty").value.trim() || null,
@@ -135,8 +145,22 @@
           return r.json().then(function(d){ return {ok: r.ok, status: r.status, d: d}; });
         }).then(function(res){
           btn.disabled = false; btn.textContent = "로그인 · 사용 신청";
-          if(!res.ok){ show("error", res.d.detail || ("서버 오류 " + res.status)); return; }
+          if(!res.ok){
+            /* 서버는 사유를 객체로 준다({error, message}) — 그대로 넣으면 화면에
+               [object Object]가 뜬다. 사람이 읽을 문장만 꺼낸다. */
+            var det = res.d && res.d.detail;
+            var msg = (det && typeof det === "object")
+              ? (det.message || det.error) : (det || ("서버 오류 " + res.status));
+            show("error", msg);
+            return;
+          }
           if(res.d.state === "pending"){ show("pending", res.d.message); return; }
+          if(res.d.must_change_password){
+            // 발급받은 임시 비밀번호로 들어왔다 — 본인 것으로 바꾸기 전에는 계속 안내한다
+            show("pending", "임시 비밀번호로 로그인했습니다 — 내 정보에서 비밀번호를 바꿔 주세요.");
+            setTimeout(function(){ location.href = "index.html"; }, 1600);
+            return;
+          }
           show("ok", (res.d.message || "환영합니다") + " — 대시보드로 이동합니다.");
           setTimeout(function(){ location.href = "index.html"; }, 900);
         }).catch(function(){

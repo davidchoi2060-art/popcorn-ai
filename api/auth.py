@@ -22,7 +22,11 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from datetime import datetime
+
 from .db import engine
+from .passwords import (hash_password,
+                        strength_problem, verify_password)
 
 router = APIRouter(prefix="/api/admin/auth")
 
@@ -147,10 +151,17 @@ async def auth_middleware(request: Request, call_next):
 # ───────────────────────────── 인증 엔드포인트 ─────────────────────────────
 class LoginBody(BaseModel):
     email: str
+    password: str | None = None  # 활성 계정은 필수(슬라이스 70) — 신청 단계에서는 없다
     name: str | None = None
     provider: str = "dev"        # dev | google — 구글 연동 시 id_token 검증으로 교체
     phone: str | None = None
     duty: str | None = None
+
+
+# 무차별 대입 방어 — fail2ban이 없으므로 앱에서 막는다.
+# 계정 잠금은 그 계정만 막고 IP는 막지 않는다(공유 IP에서 남의 작업을 끊지 않게).
+MAX_FAILS = 5
+LOCK_MINUTES = 15
 
 
 @router.post("/login")
@@ -189,11 +200,67 @@ def login(body: LoginBody, request: Request, response: Response):
                     "message": "승인 대기 중입니다 — 관리자에게 승인을 요청하세요"}
         if op["status"] == "정지":
             raise HTTPException(403, "정지된 계정입니다 — 관리자에게 문의하세요")
-        sid = _new_session(conn, op["operator_id"], request.headers.get("user-agent"))
+
+        # ── 비밀번호 검증 (슬라이스 70) ──────────────────────────────
+        # 예전에는 이메일만 맞으면 들여보냈다(dev 어댑터). 그래서 nginx Basic Auth가
+        # 유일한 방벽이었고, 그 팝업이 모바일에서 불편했다. 이제 앱이 직접 확인한다.
+        op_id, op_name = op["operator_id"], op["name"]
+        op_email, op_role = op["email"], op["role"]
+        # 잠금 판정은 **DB가 한다**. datetime.now()는 서버 로컬(KST)이고 DB는 UTC라
+        # 파이썬에서 비교하면 9시간 어긋나 잠금이 통째로 무시된다(슬라이스 62 전례).
+        st = conn.execute(text(
+            "SELECT password_hash, must_change_password, login_fail_count,"
+            " (locked_until IS NOT NULL AND locked_until > now()) AS is_locked,"
+            " GREATEST(0, CEIL(EXTRACT(EPOCH FROM (locked_until - now())) / 60))"
+            "   AS lock_min"
+            " FROM admin_operators WHERE operator_id=:i FOR UPDATE"),
+            {"i": op["operator_id"]}).mappings().first()
+        if not st["password_hash"]:
+            # 비밀번호가 없는 계정은 **들어올 수 없다** — 자동 발급은 곧 뒷문이다
+            raise HTTPException(403, {
+                "error": "password_not_set",
+                "message": "비밀번호가 아직 설정되지 않았습니다 — 관리자에게 발급을 요청하세요"})
+        if st["is_locked"]:
+            left = int(st["lock_min"] or 1)
+            raise HTTPException(429, {
+                "error": "locked",
+                "message": f"로그인 시도가 많아 잠겼습니다 — {left}분 뒤에 다시 시도하세요"})
+        # 실패는 여기서 **판정만** 한다. 이 블록 안에서 예외를 던지면 트랜잭션이
+        # 통째로 되감겨 실패 기록까지 사라진다 — 그러면 아무리 시도해도 잠기지 않는다.
+        bad_pw = not verify_password(body.password or "", st["password_hash"])
+        if bad_pw:
+            fails = (st["login_fail_count"] or 0) + 1
+        else:
+            must_change = bool(st["must_change_password"])
+            conn.execute(text(
+                "UPDATE admin_operators SET login_fail_count=0, locked_until=NULL,"
+                " last_login_at=now() WHERE operator_id=:i"), {"i": op["operator_id"]})
+
+    if bad_pw:
+        lock = fails >= MAX_FAILS
+        # 기록은 **성공한 트랜잭션**으로 남긴다(예외 밖)
+        with engine.begin() as conn2:
+            conn2.execute(text(
+                "UPDATE admin_operators SET login_fail_count=:f,"
+                " locked_until = CASE WHEN :lk THEN now() + (:m || ' minutes')::interval"
+                "                     ELSE locked_until END"
+                " WHERE operator_id=:i"),
+                {"f": 0 if lock else fails, "lk": lock, "m": str(LOCK_MINUTES),
+                 "i": op_id})
+        # 어느 쪽이 틀렸는지 말하지 않는다 — 계정 존재 여부가 새어 나간다
+        raise HTTPException(401, {
+            "error": "bad_credentials",
+            "message": ("이메일 또는 비밀번호가 올바르지 않습니다"
+                        + (f" — {LOCK_MINUTES}분간 잠겼습니다" if lock else
+                           f" (남은 시도 {max(0, MAX_FAILS - fails)}회)"))})
+
+    with engine.begin() as conn:
+        sid = _new_session(conn, op_id, request.headers.get("user-agent"))
         response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/",
                                     secure=cookie_secure())
-        return {"state": "active", "operator": {"id": op["operator_id"], "name": op["name"],
-                "email": op["email"], "role": op["role"]}}
+        return {"state": "active", "operator": {"id": op_id, "name": op_name,
+                "email": op_email, "role": op_role},
+                "must_change_password": must_change}
 
 
 @router.post("/logout")
@@ -215,3 +282,74 @@ def me(request: Request):
             "note": ("provider는 현재 dev 어댑터입니다(이메일을 신원으로 신뢰) —"
                      " 구글 연동은 클라이언트 ID 준비 시 교체하며 신청·승인·세션 로직은 그대로입니다."
                      " **dev 어댑터는 로컬 전용이며 공개 배포 차단 사유입니다.**")}
+
+
+# ---- 슬라이스 70: 비밀번호 발급·변경 ----
+# 원문은 이 파일에서도 저장·기록하지 않는다. 해시만 DB로 간다.
+
+
+class SetPasswordBody(BaseModel):
+    current: str | None = None      # 본인 변경일 때 필요
+    new: str
+
+
+@router.post("/password")
+def change_my_password(body: SetPasswordBody, request: Request):
+    """본인 비밀번호 변경. 현재 비밀번호를 확인한다."""
+    op = resolve_session(request.cookies.get(COOKIE, ""))
+    if op is None:
+        raise HTTPException(401, "로그인이 필요합니다")
+    with engine.begin() as conn:
+        cur = conn.execute(text(
+            "SELECT email, password_hash FROM admin_operators WHERE operator_id=:i"
+            " FOR UPDATE"), {"i": op["operator_id"]}).mappings().first()
+        if cur["password_hash"] and not verify_password(body.current or "",
+                                                        cur["password_hash"]):
+            raise HTTPException(401, "현재 비밀번호가 올바르지 않습니다")
+        bad = strength_problem(body.new, cur["email"])
+        if bad:
+            raise HTTPException(400, bad)
+        if cur["password_hash"] and verify_password(body.new, cur["password_hash"]):
+            raise HTTPException(400, "이전과 다른 비밀번호를 쓰세요")
+        conn.execute(text(
+            "UPDATE admin_operators SET password_hash=:h, password_set_at=now(),"
+            " must_change_password=false, login_fail_count=0, locked_until=NULL"
+            " WHERE operator_id=:i"),
+            {"h": hash_password(body.new), "i": op["operator_id"]})
+        # 다른 기기의 세션은 끊는다 — 비밀번호를 바꾼 이유가 유출일 수 있다
+        conn.execute(text(
+            "UPDATE admin_sessions SET revoked_at=now()"
+            " WHERE operator_id=:i AND revoked_at IS NULL"
+            "   AND session_id <> :s"),
+            {"i": op["operator_id"], "s": request.cookies.get(COOKIE, "")})
+    return {"ok": True, "note": "비밀번호를 바꿨습니다. 다른 기기의 로그인은 해제됐습니다."}
+
+
+class IssuePasswordBody(BaseModel):
+    password: str
+
+
+@router.post("/operators/{operator_id}/password")
+def issue_password(operator_id: int, body: IssuePasswordBody, request: Request):
+    """owner가 임시 비밀번호를 발급한다 — 받은 사람은 최초 로그인에서 바꿔야 한다."""
+    op = resolve_session(request.cookies.get(COOKIE, ""))
+    if op is None or op.get("role") != "owner":
+        raise HTTPException(403, "관리자(owner)만 발급할 수 있습니다")
+    with engine.begin() as conn:
+        target = conn.execute(text(
+            "SELECT email, name FROM admin_operators WHERE operator_id=:i"),
+            {"i": operator_id}).mappings().first()
+        if target is None:
+            raise HTTPException(404, "운영자가 없습니다")
+        bad = strength_problem(body.password, target["email"])
+        if bad:
+            raise HTTPException(400, bad)
+        conn.execute(text(
+            "UPDATE admin_operators SET password_hash=:h, password_set_at=now(),"
+            " must_change_password=true, login_fail_count=0, locked_until=NULL"
+            " WHERE operator_id=:i"),
+            {"h": hash_password(body.password), "i": operator_id})
+    # 발급한 비밀번호를 응답에 되돌려 주지 않는다 — 로그·화면에 남는다
+    return {"ok": True, "operator": target["name"],
+            "note": f"{target['name']} 님의 임시 비밀번호를 발급했습니다."
+                    " 본인이 최초 로그인에서 바꿔야 합니다."}

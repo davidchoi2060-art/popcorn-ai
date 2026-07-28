@@ -106,7 +106,10 @@ def check(name, ok, expect=None, got=None, kind="INVARIANT"):
 # 관리자(37)·고객(38) 세션은 쿠키 이름이 달라 동시에 들고 다닐 수 있다.
 SESSION = {}                                # 쿠키명 -> "name=value"
 COOKIE_NAMES = ("popcorn_admin_session", "popcorn_member_session")
-ADMIN_EMAIL = "admin@popcornpc.local"      # 시드 owner — dev 어댑터로 로그인
+ADMIN_EMAIL = "admin@popcornpc.local"      # 시드 owner(로컬 dev 전용 — 운영 계정 아님)
+# 슬라이스 70부터 로그인에 비밀번호가 필요하다. 이 값은 **로컬 시드 전용**이며
+# 운영 서버에는 이 계정이 없다. 실 운영자 비밀번호는 tools/set_admin_password.py로 넣는다.
+ADMIN_PW = "Rg7#tzQm4vLp"
 
 
 def _headers(json_body=False):
@@ -160,7 +163,8 @@ def anon_status(path, body=None):
 
 
 def login():
-    return post("/api/admin/auth/login", {"email": ADMIN_EMAIL, "provider": "dev"})
+    return post("/api/admin/auth/login",
+                {"email": ADMIN_EMAIL, "password": ADMIN_PW, "provider": "dev"})
 
 
 def member_login(email, nickname=None):
@@ -687,6 +691,75 @@ def test_pool_gate():
         if ".isoformat()" in io.open(f, encoding="utf-8").read():
             bad.append(os.path.basename(f))
     check("API에 타임존 없는 isoformat()이 없다", not bad, "전부 iso() 사용", bad)
+
+
+def test_password_auth():
+    print("\n[17] 관리자 비밀번호 인증 — Basic Auth를 걷을 근거 (슬라이스 70)")
+    # 예전에는 이메일만 맞으면 들어왔다(dev 어댑터). nginx Basic Auth가 유일한 방벽이라
+    # 그걸 걷으면 승인된 관리자 이메일을 아는 사람은 누구나 들어왔다.
+    # **이 항목이 통과해야 Basic Auth를 걷을 수 있다.**
+    st, d = post("/api/admin/auth/login", {"email": ADMIN_EMAIL})
+    check("비밀번호 없이는 못 들어온다", st == 401, 401, st)
+    st, d = post("/api/admin/auth/login",
+                 {"email": ADMIN_EMAIL, "password": "definitely-wrong-9999"})
+    check("틀린 비밀번호는 401", st == 401, 401, st)
+    if st == 401 and isinstance((d or {}).get("detail"), dict):
+        # 어느 쪽이 틀렸는지 말하면 계정 존재 여부가 새어 나간다
+        m = d["detail"].get("message") or ""
+        check("어느 쪽이 틀렸는지 말하지 않는다",
+              "이메일 또는 비밀번호" in m, "모호한 문구", m[:40])
+
+    # 비밀번호가 없는 계정은 자동 발급되지 않는다 — 자동 발급은 곧 뒷문이다
+    noped = db_one("SELECT email FROM admin_operators WHERE password_hash IS NULL"
+                   " AND status='활성' LIMIT 1")
+    if noped:
+        st2, d2 = post("/api/admin/auth/login",
+                       {"email": noped, "password": "whatever-12345!"})
+        check("비밀번호 미설정 계정은 403", st2 == 403, 403, st2)
+        check("미설정 계정이 자동으로 만들어지지 않는다",
+              db_one("SELECT password_hash FROM admin_operators"
+                     " WHERE lower(email)=:e", e=noped.lower()) is None,
+              None, "생성됨")
+
+    # 해시만 저장된다 — DB가 새도 비밀번호는 새지 않는다
+    h = db_one("SELECT password_hash FROM admin_operators WHERE lower(email)=:e",
+               e=ADMIN_EMAIL.lower())
+    check("비밀번호는 scrypt 해시로 저장된다",
+          bool(h) and h.startswith("scrypt$"), "scrypt$...", (h or "")[:16])
+    check("저장값에 원문이 없다", bool(h) and ADMIN_PW not in h, "원문 없음", "원문 포함")
+
+    try:
+        sys.path.insert(0, ROOT)
+        from api.passwords import strength_problem, verify_password
+        check("빈 비밀번호는 통과하지 못한다", not verify_password("", h), False, True)
+        check("약한 비밀번호는 거부된다",
+              all(strength_problem(p) for p in ("short1!", "aaaaaaaaaaaa", "12345678901")),
+              "전부 거부", "일부 통과")
+        check("긴 무작위 비밀번호는 통과", strength_problem("Vq7#mzLp2rTx") is None,
+              None, strength_problem("Vq7#mzLp2rTx"))
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 비밀번호 모듈 — {e}")
+
+    # 잠금 판정은 DB가 한다 — 파이썬 datetime.now()(KST)와 DB now()(UTC)를 비교하면
+    # 9시간 어긋나 잠금이 통째로 무시된다(슬라이스 62와 같은 부류의 사고)
+    try:
+        src = io.open(os.path.join(ROOT, "api", "auth.py"), encoding="utf-8").read()
+        check("잠금 판정을 DB가 한다", "locked_until > now()" in src,
+              "SQL 판정", "파이썬 비교")
+        check("실패 기록이 롤백되지 않는다", "with engine.begin() as conn2" in src,
+              "별도 트랜잭션", "같은 트랜잭션")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 잠금 계약 — {e}")
+
+    # 화면이 비밀번호를 받는가
+    try:
+        lg = io.open(os.path.join(ROOT, "mockups", "admin", "login.html"),
+                     encoding="utf-8").read()
+        check("로그인 화면에 비밀번호 칸이 있다",
+              'id="password"' in lg and "password: document" in lg.replace('"', '"'),
+              "입력+전송", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
 def test_part_type_change():
@@ -1483,6 +1556,7 @@ def main():
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
+               test_password_auth,
                test_part_type_change,
                test_usage_floors,
                test_guards):
