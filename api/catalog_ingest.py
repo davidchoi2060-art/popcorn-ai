@@ -32,6 +32,8 @@ REQUIRED = {
     "CASE": ["form_factor_list", "gpu_max_mm", "cooler_height_mm"],
     "COOLER_CPU_AIR": ["socket_list", "cooler_height_mm", "cooler_tdp"],
     "COOLER_CPU_AIO": ["socket_list", "cooler_tdp"],
+    # 주변기기 없음 — 견적 슬롯 밖이고 제안 코드가 NULL을 견딘다(슬라이스 84).
+    # 폴백 상수다. 정본은 spec_field_defs 메타 — _required_for()가 그것을 먼저 본다.
 }
 SPEC_COLS = ["socket", "socket_list", "chipset", "mem_type", "capacity_gb", "clock_mhz",
              "tdp_watt", "rated_watt", "required_power_watt", "length_mm", "gpu_max_mm",
@@ -87,9 +89,42 @@ def load_eav(products_raw: bytes | None, specs_raw: bytes | None):
     return dict(kvs), dict(feats)
 
 
-# 필수 사양 판정에 쓰이는 필드 전부(REQUIRED의 합집합). 기존 값을 함께 봐야
-# "이 적재 후 이 상품의 사양이 완전한가"를 정직하게 판단할 수 있다.
-GATE_FIELDS = sorted({f for fs in REQUIRED.values() for f in fs})
+def _required_for(part_type: str) -> list:
+    """필수 사양 — **메타(spec_field_defs)가 단일 원천**이다 (슬라이스 84).
+
+    여기가 상수를 쓰는 바람에 판정 원천이 둘로 갈려 있었다:
+      · 적재     상수 REQUIRED — 주변기기 항목이 아예 없다
+      · 검수·수정 메타(admin_products.required_fields) — 주변기기 4~3종이 필수
+    그래서 **같은 모니터가 어느 경로를 거쳤느냐로 결과가 달라졌다.** 적재로 들어오면
+    검수 통과, 상세에서 값을 하나 고치면 그 순간 필수 미충족으로 판정돼 주변기기
+    제안 풀에서 빠진다. 운영자에게는 "고쳤더니 사라졌다"로만 보인다.
+
+    상수는 메타를 못 읽을 때의 폴백으로만 남긴다(admin_products와 같은 규약).
+    """
+    try:
+        from . import spec_fields as SF
+        got = SF.required_for(part_type)
+        if got:
+            return got
+    except Exception:                                    # noqa: BLE001
+        pass
+    return REQUIRED.get(part_type, [])
+
+
+def gate_fields() -> list:
+    """필수 판정에 쓰이는 필드 전부. 기존 값을 함께 봐야
+    "이 적재 후 이 상품의 사양이 완전한가"를 정직하게 판단할 수 있다."""
+    try:
+        from . import spec_fields as SF
+        got = sorted({f for fs in SF.required_map().values() for f in fs})
+        if got:
+            return got
+    except Exception:                                    # noqa: BLE001
+        pass
+    return sorted({f for fs in REQUIRED.values() for f in fs})
+
+
+GATE_FIELDS = sorted({f for fs in REQUIRED.values() for f in fs})   # 폴백용 상수
 
 
 def read_refs(conn) -> dict:
@@ -104,9 +139,10 @@ def read_refs(conn) -> dict:
         "SELECT danawa_code, product_code FROM products WHERE danawa_code IS NOT NULL")).all()}
     # 이미 확인된 사양. **이걸 모르면 EAV 없이 올린 파일이 기존 사양을 지운 것으로 계산되어
     # 멀쩡한 추천 후보를 검수로 떨어뜨린다** — 실제로 그런 일이 있었다(슬라이스 50).
-    existing = {r[0]: {k: v for k, v in zip(GATE_FIELDS, r[1:]) if v is not None}
+    gf = gate_fields()          # 메타가 원천 — 화면에서 필수를 늘리면 여기도 따라온다
+    existing = {r[0]: {k: v for k, v in zip(gf, r[1:]) if v is not None}
                 for r in conn.execute(text(
-                    f"SELECT product_code, {', '.join(GATE_FIELDS)} FROM product_specs")).all()}
+                    f"SELECT product_code, {', '.join(gf)} FROM product_specs")).all()}
     return {"gpu_ref": gpu_ref, "locked": locked, "dan_owner": dan_owner,
             "existing": existing}
 
@@ -148,7 +184,7 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
         sale = (r["상태값"] or "").strip() == "판매중"
         sp, src = extract_specs(pt, kvs.get(skey, {}), feats.get(skey, []), name, l2, gpu_ref) \
             if pt else ({}, {})
-        need = REQUIRED.get(pt, [])
+        need = _required_for(pt)
         # 적재는 채우기만 하고 지우지 않는다(apply_plan의 COALESCE) — 따라서 '없는 사양'은
         # 새로 뽑은 값과 **이미 있는 값을 합쳐서** 판정해야 한다. 새 값만 보면 EAV를 안 올린
         # 파일이 멀쩡한 후보를 전부 검수로 떨어뜨린다(슬라이스 50 실측: 후보 -1 · 검수 +169).

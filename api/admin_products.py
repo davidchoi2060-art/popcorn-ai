@@ -45,12 +45,10 @@ REQUIRED_SPEC_FIELDS = {
     # 추천 뷰·적재·호환 규칙은 모두 socket_list를 쓴다 — 정본에 맞춘다(슬라이스 56).
     "COOLER_CPU_AIR": ["socket_list", "cooler_height_mm", "cooler_tdp"],
     "COOLER_CPU_AIO": ["socket_list", "cooler_tdp"],
-    "MONITOR": ["size_inch", "resolution", "refresh_hz", "panel"],
-    "KEYBOARD": ["switch_type", "key_layout", "connection"],
-    "MOUSE": ["connection"],
-    "HEADSET": ["connection"],
-    "SPEAKER": ["connection"],
-    "WEBCAM": ["connection"],
+    # 주변기기에는 필수를 걸지 않는다(슬라이스 84). 견적 8슬롯 밖이고, 제안을 그리는
+    # _companion()이 이미 NULL을 견딘다("없는 값은 지어내지 않고 그 자리를 비운다").
+    # 필수로 두면 모니터 585개 중 556개가 근거 없이 제안에서 빠졌다.
+    # 이건 폴백 상수다 — 정본은 spec_field_defs 메타이고, 둘이 어긋나면 회귀가 잡는다.
 }
 
 # 실데이터 24,303행이 들어온 뒤로 전 행 반환·전 행 순회 KPI는 불가능하다(슬라이스 39).

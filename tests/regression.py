@@ -693,6 +693,18 @@ def test_spec_fields():
         bad = [pt for pt in REQUIRED_SPEC_FIELDS
                if sorted(REQUIRED_SPEC_FIELDS[pt]) != sorted(rm.get(pt, []))]
         check("메타 required_map == 필수 사양 정의", not bad, "전 종류 일치", bad)
+        # **적재도 같은 원천을 봐야 한다**(슬라이스 84 실사고). 적재는 상수를, 검수·수정은
+        # 메타를 보고 있었다 — 주변기기가 상수에 없어서, 같은 모니터가 적재로 들어오면
+        # 통과하고 상세에서 한 번 고치면 그 순간 제안 풀에서 빠졌다.
+        from api.catalog_ingest import _required_for
+        split = [pt for pt in set(list(REQUIRED_SPEC_FIELDS) + list(rm))
+                 if sorted(_required_for(pt)) != sorted(rm.get(pt, []))]
+        check("적재의 필수 판정 = 메타", not split, "전 종류 일치", split)
+        # 주변기기는 견적 슬롯 밖이고 제안 코드가 NULL을 견딘다 — 필수로 걸면
+        # 근거 없이 제안을 막는다(모니터 556개가 그랬다).
+        peri = [pt for pt in ("MONITOR", "KEYBOARD", "MOUSE", "HEADSET", "SPEAKER", "WEBCAM")
+                if rm.get(pt)]
+        check("주변기기에는 필수 사양이 걸려 있지 않다", not peri, "없음", peri)
         fc = SF.field_cast()
         badc = [k for k in FIELD_CAST if FIELD_CAST[k] != fc.get(k)]
         check("메타 field_cast == 검수 승인 캐스트", not badc, "전 필드 일치", badc)
