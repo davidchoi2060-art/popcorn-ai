@@ -1030,3 +1030,242 @@ def similar_products(name: str = "", part_type: str = "", exclude: int | None = 
     return {"items": items, "threshold": dedupe.SIMILAR_THRESHOLD,
             "note": ("이름이 거의 같은 상품입니다 — 같은 상품이면 등록하지 말고"
                      " 기존 상품을 수정하세요.")}
+
+
+# ---- 슬라이스 69: 중복 상품 편입·삭제 ----
+# 실수로 같은 상품을 두 번 만들면 재고와 매입가가 갈라진다. 정리할 길이 필요하다.
+#
+# **삭제는 마지막 수단이다.** products를 참조하는 테이블이 15개고, 그중 order_items에
+# 걸린 상품을 지우면 **과거 주문서가 깨진다**(실측 33종). 그래서 두 갈래로 나눈다:
+#   · 편입(권장) — 재고·공급처를 원본으로 옮기고 중복은 '삭제대기'로. 원장이 남고 되돌릴 수 있다.
+#   · 삭제       — 주문 이력이 하나도 없을 때만. 되돌릴 수 없어 화면이 먼저 그렇게 말한다.
+
+# 편입해도 되는 참조 = 옮기거나 남겨도 뜻이 변하지 않는 것.
+# order_items는 여기 없다 — 과거 주문은 그때 그 상품을 가리켜야 한다.
+BLOCK_DELETE = [
+    ("order_items", "product_code", "주문 이력"),
+]
+CHECK_REFS = [
+    ("order_items", "product_code", "주문"),
+    ("stock_movements", "product_code", "재고 원장"),
+    ("promo_click_logs", "product_code", "근거 클릭"),
+    ("swap_event_logs", "from_product", "부품 교체(이전)"),
+    ("swap_event_logs", "to_product", "부품 교체(이후)"),
+    ("member_favorites", "product_code", "찜"),
+    ("product_price_history", "product_code", "가격 이력"),
+    ("stock_reservations", "product_code", "재고 예약"),
+]
+
+
+def _ref_counts(conn, pc: int) -> list:
+    out = []
+    for tbl, col, label in CHECK_REFS:
+        n = conn.execute(text(
+            f"SELECT count(*) FROM {tbl} WHERE {col} = :pc"), {"pc": pc}).scalar_one()
+        if n:
+            out.append({"table": tbl, "label": label, "count": n})
+    return out
+
+
+class MergeBody(BaseModel):
+    into: int                   # 남길 원본 상품
+    preview: bool = False
+
+
+@router.post("/products/{product_code}/merge")
+def merge_product(product_code: int, body: MergeBody):
+    """중복 상품을 원본에 편입한다 — 재고·공급처를 옮기고 중복은 '삭제대기'로."""
+    from .admin_orders import _log
+
+    if product_code == body.into:
+        raise HTTPException(400, "같은 상품끼리는 합칠 수 없습니다")
+    with engine.begin() as conn:
+        dup = conn.execute(text(
+            "SELECT product_code, sku, product_name, part_type, status, stock_qty"
+            " FROM products WHERE product_code=:pc FOR UPDATE"),
+            {"pc": product_code}).mappings().first()
+        keep = conn.execute(text(
+            "SELECT product_code, sku, product_name, part_type, status, stock_qty"
+            " FROM products WHERE product_code=:pc FOR UPDATE"),
+            {"pc": body.into}).mappings().first()
+        if dup is None or keep is None:
+            raise HTTPException(404, "상품이 없습니다")
+        if dup["status"] == "삭제대기":
+            raise HTTPException(409, "이미 정리된 상품입니다")
+
+        refs = _ref_counts(conn, product_code)
+        move_stock = dup["stock_qty"] or 0
+        # 원본에 없는 공급처만 옮긴다 — 같은 공급처가 두 값을 가지면 어느 쪽이 맞는지 모른다
+        sups = conn.execute(text(
+            "SELECT sp.supplier_id, sp.cost_price, sp.supply_state"
+            " FROM product_supplier_prices sp WHERE sp.product_code=:d"
+            "   AND NOT EXISTS (SELECT 1 FROM product_supplier_prices k"
+            "                    WHERE k.product_code=:k AND k.supplier_id=sp.supplier_id)"),
+            {"d": product_code, "k": body.into}).mappings().all()
+
+        impact = {
+            "dup": {"product_code": dup["product_code"], "sku": dup["sku"],
+                    "name": dup["product_name"], "stock": dup["stock_qty"]},
+            "keep": {"product_code": keep["product_code"], "sku": keep["sku"],
+                     "name": keep["product_name"], "stock": keep["stock_qty"]},
+            "move_stock": move_stock, "move_suppliers": len(sups),
+            "refs": refs,
+            "part_type_same": dup["part_type"] == keep["part_type"],
+        }
+        impact["note"] = (
+            "재고 " + str(move_stock) + "개와 공급처 " + str(len(sups)) + "곳을 "
+            + keep["sku"] + "로 옮기고, " + dup["sku"] + "는 삭제대기로 둡니다."
+            + ("" if impact["part_type_same"]
+               else " 두 상품의 분류가 다릅니다 — 확인하세요."))
+        if body.preview:
+            return {"preview": True, "impact": impact}
+
+        # 재고는 원장으로 옮긴다 — 수량만 고치면 어디서 왔는지 알 수 없다
+        if move_stock:
+            conn.execute(text(
+                "INSERT INTO stock_movements (product_code, movement_type, qty_delta,"
+                " ref_kind, ref_id) VALUES (:pc, :mt, :q, :rk, :ri)"),
+                {"pc": product_code, "mt": "adjust", "q": -move_stock,
+                 "rk": "manual", "ri": body.into})
+            conn.execute(text(
+                "INSERT INTO stock_movements (product_code, movement_type, qty_delta,"
+                " ref_kind, ref_id) VALUES (:pc, :mt, :q, :rk, :ri)"),
+                {"pc": body.into, "mt": "adjust", "q": move_stock,
+                 "rk": "manual", "ri": product_code})
+            conn.execute(text(
+                "UPDATE products SET stock_qty = stock_qty + :q, updated_at=now()"
+                " WHERE product_code=:pc"), {"q": move_stock, "pc": body.into})
+            conn.execute(text(
+                "UPDATE products SET stock_qty = 0, updated_at=now()"
+                " WHERE product_code=:pc"), {"pc": product_code})
+        for s in sups:
+            conn.execute(text(
+                "UPDATE product_supplier_prices SET product_code=:k, updated_at=now()"
+                " WHERE product_code=:d AND supplier_id=:s"),
+                {"k": body.into, "d": product_code, "s": s["supplier_id"]})
+        # 중복은 지우지 않는다 — 상태로 내린다(원장·이력이 그대로 남는다)
+        conn.execute(text(
+            "UPDATE products SET status=:st, ai_candidate_yn=false,"
+            " review_required_yn=true, updated_at=now() WHERE product_code=:pc"),
+            {"st": "삭제대기", "pc": product_code})
+        # 정리된 상품의 검수 대기는 의미가 없다
+        closed = conn.execute(text(
+            "UPDATE product_reviews SET review_status=:done, reviewed_by=:op,"
+            " reviewed_at=now(), detail = detail || :tail"
+            " WHERE product_code=:pc AND review_status=:wait"),
+            {"pc": product_code, "op": current_operator_id(),
+             "done": "처리", "wait": "대기", "tail": " [중복 편입으로 해소]"}).rowcount
+
+        log_id = _log(conn, "product_merge", dup["sku"],
+                      {"dup": product_code, "into": body.into,
+                       "dup_sku": dup["sku"], "keep_sku": keep["sku"],
+                       "moved_stock": move_stock,
+                       "moved_suppliers": [s["supplier_id"] for s in sups],
+                       "before": {"status": dup["status"], "stock_qty": dup["stock_qty"]},
+                       "closed": closed}, kind="product")
+    return {"ok": True, "impact": impact, "reviews_closed": closed, "undo_id": log_id,
+            "note": (dup["sku"] + "를 " + keep["sku"] + "에 편입했습니다."
+                     + (" 재고 " + str(move_stock) + "개 이동." if move_stock else "")
+                     + (" 공급처 " + str(len(sups)) + "곳 이동." if sups else ""))}
+
+
+@router.post("/products/merge/undo/{log_id}")
+def undo_merge(log_id: int):
+    """편입 되돌리기 — 재고를 역방향 원장으로 돌리고 상태를 복원한다."""
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            {"i": log_id}).mappings().first()
+        if row is None or row["action"] != "product_merge":
+            raise HTTPException(404, "되돌릴 편입 기록이 없습니다")
+        dup2 = conn.execute(text(
+            "SELECT 1 FROM admin_operator_activity_logs WHERE action='product_merge_undo'"
+            "   AND (detail->>'ref_log_id')::int=:i LIMIT 1"), {"i": log_id}).first()
+        if dup2:
+            raise HTTPException(409, "이미 되돌린 편입입니다")
+        d = row["detail"] or {}
+        pc, into, qty = d.get("dup"), d.get("into"), d.get("moved_stock") or 0
+        if qty:
+            cur = conn.execute(text(
+                "SELECT stock_qty FROM products WHERE product_code=:p FOR UPDATE"),
+                {"p": into}).scalar_one()
+            if cur < qty:
+                raise HTTPException(409, "원본 재고가 편입분보다 적습니다 — 이후 판매·조정이 있었습니다")
+            conn.execute(text(
+                "INSERT INTO stock_movements (product_code, movement_type, qty_delta,"
+                " ref_kind, ref_id) VALUES (:pc, :mt, :q, :rk, :ri)"),
+                {"pc": into, "mt": "adjust", "q": -qty, "rk": "manual", "ri": pc})
+            conn.execute(text(
+                "INSERT INTO stock_movements (product_code, movement_type, qty_delta,"
+                " ref_kind, ref_id) VALUES (:pc, :mt, :q, :rk, :ri)"),
+                {"pc": pc, "mt": "adjust", "q": qty, "rk": "manual", "ri": into})
+            conn.execute(text(
+                "UPDATE products SET stock_qty = stock_qty - :q, updated_at=now()"
+                " WHERE product_code=:p"), {"q": qty, "p": into})
+            conn.execute(text(
+                "UPDATE products SET stock_qty = :q, updated_at=now()"
+                " WHERE product_code=:p"), {"q": qty, "p": pc})
+        for sid in (d.get("moved_suppliers") or []):
+            conn.execute(text(
+                "UPDATE product_supplier_prices SET product_code=:p, updated_at=now()"
+                " WHERE product_code=:k AND supplier_id=:s"),
+                {"p": pc, "k": into, "s": sid})
+        b = d.get("before") or {}
+        conn.execute(text(
+            "UPDATE products SET status=:st, updated_at=now() WHERE product_code=:p"),
+            {"st": b.get("status") or "판매중", "p": pc})
+        _log(conn, "product_merge_undo", str(d.get("dup_sku") or pc),
+             {"ref_log_id": log_id, "dup": pc, "into": into}, kind="product")
+    return {"ok": True, "restored": pc}
+
+
+@router.delete("/products/{product_code}")
+def delete_product(product_code: int, force: bool = False):
+    """상품 삭제 — 주문 이력이 있으면 거부한다(과거 주문서가 깨진다)."""
+    from .admin_orders import _log
+
+    with engine.begin() as conn:
+        r = conn.execute(text(
+            "SELECT sku, product_name, status FROM products WHERE product_code=:pc"
+            " FOR UPDATE"), {"pc": product_code}).mappings().first()
+        if r is None:
+            raise HTTPException(404, "상품이 없습니다")
+        for tbl, col, label in BLOCK_DELETE:
+            n = conn.execute(text(
+                f"SELECT count(*) FROM {tbl} WHERE {col} = :pc"),
+                {"pc": product_code}).scalar_one()
+            if n:
+                raise HTTPException(409, {
+                    "error": "has_history",
+                    "message": (label + " " + str(n) + "건이 있어 지울 수 없습니다 —"
+                                " 편입하거나 '삭제대기'로 내려 주세요"),
+                    "refs": _ref_counts(conn, product_code)})
+        refs = _ref_counts(conn, product_code)
+        if refs and not force:
+            raise HTTPException(409, {
+                "error": "has_refs",
+                "message": "이 상품을 가리키는 기록이 있습니다 — 확인 후 지웁니다",
+                "refs": refs})
+        # 참조를 먼저 정리한다(FK 순서). 이력 성격이라 상품과 함께 사라져도 뜻이 남는다.
+        for tbl, col in (("stock_reservations", "product_code"),
+                         ("promo_click_logs", "product_code"),
+                         ("member_favorites", "product_code"),
+                         ("product_price_history", "product_code"),
+                         ("stock_movements", "product_code"),
+                         ("supplier_product_map", "product_code"),
+                         ("product_sourcing_quotes", "product_code"),
+                         ("product_sourcing_match_candidates", "product_code"),
+                         ("product_supplier_prices", "product_code"),
+                         ("product_reviews", "product_code"),
+                         ("product_specs", "product_code")):
+            conn.execute(text(f"DELETE FROM {tbl} WHERE {col} = :pc"), {"pc": product_code})
+        conn.execute(text("DELETE FROM swap_event_logs WHERE from_product=:pc"
+                          "   OR to_product=:pc"), {"pc": product_code})
+        conn.execute(text("DELETE FROM products WHERE product_code=:pc"),
+                     {"pc": product_code})
+        _log(conn, "product_delete", r["sku"],
+             {"product_code": product_code, "sku": r["sku"],
+              "name": r["product_name"], "refs": refs}, kind="product")
+    return {"ok": True, "note": r["sku"] + " 상품을 삭제했습니다. 되돌릴 수 없습니다."}

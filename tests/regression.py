@@ -788,6 +788,43 @@ def test_part_type_change():
               bool(sim.get("items")) and sim.get("threshold") == 0.97,
               "0.97 · 결과 있음", sim.get("threshold"))
 
+    # ── 중복 편입·삭제 (슬라이스 69) ────────────────────────────────
+    # 삭제는 마지막 수단이다. products를 참조하는 테이블이 15개고, 주문에 걸린 상품을
+    # 지우면 **과거 주문서가 깨진다**(실측 33종). 그래서 편입을 먼저 권하고,
+    # 주문 이력이 있으면 삭제를 거부한다.
+    ordered = db_one("SELECT product_code FROM order_items"
+                     " WHERE product_code IS NOT NULL LIMIT 1")
+    if ordered:
+        st, d = post_raw(f"/api/admin/products/{ordered}", b"", {}, method="DELETE")
+        check("주문 이력이 있는 상품은 삭제 거부", st == 409, 409, st)
+        if st == 409 and isinstance((d or {}).get("detail"), dict):
+            check("거부 사유를 밝힌다",
+                  (d["detail"].get("error") == "has_history"), "has_history",
+                  d["detail"].get("error"))
+        # 거부했으면 **정말로 남아 있어야** 한다
+        check("거부된 상품이 그대로 있다",
+              db_one("SELECT count(*) FROM products WHERE product_code=:p",
+                     p=ordered) == 1, 1,
+              db_one("SELECT count(*) FROM products WHERE product_code=:p", p=ordered))
+    # 편입 가드 — 자기 자신과는 합칠 수 없다
+    any_pc = db_one("SELECT product_code FROM products ORDER BY product_code LIMIT 1")
+    if any_pc:
+        st2, _ = post(f"/api/admin/products/{any_pc}/merge", {"into": any_pc})
+        check("자기 자신과 편입은 400", st2 == 400, 400, st2)
+        st3, _ = post(f"/api/admin/products/{any_pc}/merge", {"into": 99999999})
+        check("없는 상품으로 편입은 404", st3 == 404, 404, st3)
+        # 미리보기는 DB를 바꾸지 않아야 한다
+        other = db_one("SELECT product_code FROM products WHERE product_code<>:p"
+                       " ORDER BY product_code LIMIT 1", p=any_pc)
+        if other:
+            was = db_one("SELECT status FROM products WHERE product_code=:p", p=any_pc)
+            post(f"/api/admin/products/{any_pc}/merge",
+                 {"into": other, "preview": True})
+            check("편입 미리보기는 DB를 바꾸지 않는다",
+                  db_one("SELECT status FROM products WHERE product_code=:p",
+                         p=any_pc) == was, was,
+                  db_one("SELECT status FROM products WHERE product_code=:p", p=any_pc))
+
     # 공급처 매입가 — 표가 마크업 하드코딩이라 신규 등록 화면에도 남의 값이 떴다
     sup = get("/api/admin/suppliers")
     check("공급처 선택지를 서버가 준다", bool(sup.get("items")), "1개 이상",
