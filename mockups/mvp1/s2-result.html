@@ -601,10 +601,25 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   var k=t.getAttribute('data-set');
   if(!Q.sets[k]){t.disabled=true;t.style.opacity='.38';t.style.cursor='not-allowed';t.title='이 조건으로는 이 티어 구성이 없습니다';}
  });
- var first=Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend');
+ /* 고른 구성을 복원한다. 이게 없으면 S3에서 돌아왔을 때 화면이 추천형으로 리셋되고,
+    사용자는 고성능형을 고른 채로 알고 [장바구니 담기]를 눌러 **고른 적 없는 구성**으로
+    넘어간다(사용자 보고). 조건이 바뀌어 그 티어가 없어졌으면 기본값으로 돌아간다. */
+ var saved=null;try{saved=localStorage.getItem('popcorn-quote-tier');}catch(e){}
+ var first=(saved&&Q.sets[saved])?saved
+  :(Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend'));
  document.querySelectorAll('.s2tab').forEach(function(t){var on=t.getAttribute('data-set')===first;t.classList.toggle('is-active',on);t.setAttribute('aria-selected',on?'true':'false');});
  s2apply(first);
- // S3/S4 전달 계약: '장바구니 담기'·'부품 변경' 시 선택 티어 저장 (LIVE 한정, 네비게이션은 기존 핸들러)
+ /* 선택 = 곧 상태다. 탭을 누른 그 순간 저장한다 — 버튼을 누를 때까지 미루면
+    그 사이 어떤 경로로 나가든(링크·뒤로가기) 선택이 사라진다. capture로 붙여
+    더미 핸들러보다 먼저 기록한다. */
+ document.querySelectorAll('.s2tab').forEach(function(t){
+  t.addEventListener('click',function(){
+   if(t.disabled)return;
+   try{localStorage.setItem('popcorn-quote-tier',t.getAttribute('data-set'));}catch(e){}
+  },true);
+ });
+ try{localStorage.setItem('popcorn-quote-tier',first);}catch(e){}
+ // 안전망 — 탭을 안 거치고 바로 진행하는 경우에도 화면에 보이는 구성으로 넘긴다
  document.addEventListener('click',function(ev){
   var t=ev.target&&ev.target.closest?ev.target.closest('button'):null;
   if(!t)return;

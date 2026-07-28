@@ -696,6 +696,26 @@ def test_usage_floors():
                 " AND p.spec_source_text ~ 'SO ?DIMM'")
     check("노트북 메모리가 후보 풀에 없다", nb == 0, 0, nb)
 
+    # ⑥ 티어 선택이 화면 왕복에도 유지되는가 (사용자 보고 — S3에서 돌아오면 추천형으로
+    # 리셋돼, 고성능형을 고른 줄 알고 누른 [장바구니 담기]가 다른 구성으로 넘어갔다).
+    # 마크업 계약이라 브라우저 없이 확인한다: 저장된 선택을 복원하는 코드가 있는가.
+    s2 = os.path.join(ROOT, "mockups", "mvp1", "s2-result.html")
+    try:
+        html = io.open(s2, encoding="utf-8").read()
+        check("S2가 저장된 티어를 복원한다",
+              "(saved&&Q.sets[saved])?saved" in html.replace(" ", ""),
+              "saved 복원 분기", "없음")
+        check("S2가 탭 클릭 즉시 티어를 저장한다",
+              html.count("popcorn-quote-tier") >= 3, ">= 3회 참조",
+              html.count("popcorn-quote-tier"))
+        s1 = io.open(os.path.join(ROOT, "mockups", "mvp1", "s1-session.html"),
+                     encoding="utf-8").read()
+        check("새 견적은 이전 티어 선택을 지운다",
+              "removeItem('popcorn-quote-tier')" in s1.replace('"', "'"),
+              "removeItem 있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 티어 전달 계약 — {e}")
+
 
 def _spec_field_guards():
     # 가드 — 잘못된 항목이 스키마를 오염시키면 되돌리기 어렵다

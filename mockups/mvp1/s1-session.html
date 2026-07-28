@@ -781,6 +781,9 @@ function goRecommend(btn){
     btn.disabled=false;btn.textContent=orig;return;
    }
    localStorage.setItem('popcorn-quote',JSON.stringify({at:Date.now(),data:res.j}));
+   /* 새 견적은 새로 고른다 — 지난 세션에서 고른 티어가 남아 있으면 조건이 바뀌었는데도
+      그 구성이 선택된 채로 열린다. S2가 저장된 선택을 복원하게 되면서 생긴 짝이다. */
+   try{localStorage.removeItem('popcorn-quote-tier');}catch(e){}
    window.location.href='s2-result.html';
   })
   .catch(function(){addAI('견적 생성에 실패했어요 — 잠시 후 다시 시도해 주세요.');btn.disabled=false;btn.textContent=orig;});
