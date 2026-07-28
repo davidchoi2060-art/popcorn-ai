@@ -265,8 +265,9 @@
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
           <div><h2 class="mb-1">추천 기준 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">엔진이 부품을 고르는 <b class="text-body-secondary">결정론적 스코어의 가중치</b>. 무작위성이 없으므로 이 값이 곧 추천 성향입니다.</p></div>
-          <div class="d-flex align-items-center gap-2"><span class="badge badge-phoenix badge-phoenix-secondary">정책 v12 · 07-05 적용</span><button id="save" class="btn btn-primary btn-sm">저장 → v13 발행</button></div>
+          <div class="d-flex align-items-center gap-2"><span class="fs-10 text-body-tertiary">가중치 저장소가 비어 있어 발행할 정책이 없습니다</span></div>
         </div>
+        <div id="liveRules" hidden class="mb-4"></div>
         <div class="row g-3">
           <div class="col-12 col-lg-7">
             <div class="card"><div class="card-body">
@@ -280,17 +281,17 @@
           </div>
           <div class="col-12 col-lg-5">
             <div class="card mb-3"><div class="card-body">
-              <h6 class="mb-2">변경 미리보기 <span class="fs-10 fw-normal text-body-tertiary">동일 제약: "사무용 80만"</span></h6>
-              <div class="fs-9 d-flex flex-column gap-2">
-                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">CPU</span><span><s class="text-body-quaternary">라이젠5 7600</s> → <b>라이젠5 7500F</b></span></div>
-                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">SSD</span><span>변화 없음</span></div>
-                <div class="d-flex justify-content-between"><span class="text-body-tertiary">견적 합계</span><span><s class="text-body-quaternary">812,000</s> → <b class="text-primary">784,000원</b></span></div>
+              <h6 class="mb-2">변경 미리보기</h6>
+              <div class="fs-9 text-body-tertiary">
+                가중치를 바꿨을 때 견적이 어떻게 달라지는지는 <b>아직 보여드릴 수 없습니다</b> —
+                지금 추천은 가중치가 아니라 <b>티어별 정렬 + 호환 제약</b>으로 결정되기 때문입니다.
+                <div class="mt-2">스코어 엔진이 도입되면 이 자리에 실제 재계산 결과가 나옵니다.</div>
               </div>
             </div></div>
-            <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>버전이 남는 이유</b> — 모든 견적은 당시 정책 버전과 함께 저장됩니다. v13 발행 후에도 과거 견적은 v12로 그대로 재현됩니다.</div>
+            <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>지금 무엇이 추천을 정하는가</b> — 가중치 저장소가 비어 있어, 추천은 티어별 정렬과 호환 제약으로 결정됩니다. 아래 실데이터에서 그 규칙을 확인하세요.</div>
           </div>
         </div>
-        <div id="liveRules" hidden class="mt-4"></div>
+        
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -313,11 +314,9 @@
           document.getElementById("presets").innerHTML=Object.keys(PRESETS).map(k=>`<button class="btn btn-sm btn-phoenix-secondary" data-p="${k}">${k}</button>`).join("");
           document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{PRESETS[b.dataset.p].forEach((v,i)=>W[i][2]=v);render();toast("프리셋 적용: "+b.dataset.p);});
         }
-        document.getElementById("save").onclick=()=>{
-          const sum=W.reduce((a,[,,v])=>a+v,0);
-          if(sum!==100){toast("합계가 100이어야 합니다 (현재 "+sum+")");return;}
-          toast("정책 v13 발행 — 이후 견적부터 적용 · 작업 기록 저장");
-        };
+        /* 발행 버튼을 없앴다 — 가중치 저장소가 비어 있어 발행할 정책이 없고,
+           눌러도 아무 일이 일어나지 않는 버튼은 "저장됐다"는 오해만 만든다.
+           스코어 엔진이 도입되면 저장 경로와 함께 되살린다. */
         render();
       })();
       </script>

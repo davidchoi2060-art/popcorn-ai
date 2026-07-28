@@ -265,26 +265,16 @@
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
           <div><h2 class="mb-1">마진 정책 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
           <p class="text-body-tertiary mb-0">카테고리별 판매가 제안 규칙. <b class="text-body-secondary">이후의 가격 제안에만</b> 적용되고 소급하지 않습니다(재현성 보존).</p></div>
-          <div class="d-flex align-items-center gap-2"><span class="badge badge-phoenix badge-phoenix-secondary">현재 v8 · 07-01 적용</span><button id="save" class="btn btn-primary btn-sm">저장 → v9 발행</button></div>
+          <div class="d-flex align-items-center gap-2"><span class="fs-10 text-body-tertiary">값은 아래에서 고칩니다</span></div>
         </div>
+        <div id="liveRules" hidden class="mb-4"></div>
         <div class="row g-3">
           <div class="col-12 col-lg-8"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
             <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">카테고리</th><th class="text-end">기본 마진율</th><th class="text-end">최소 마진율</th><th>끝자리 규칙</th><th>활성</th></tr></thead>
-            <tbody id="rows"></tbody>
+            <tbody id="rows"><tr><td colspan="5" class="text-body-tertiary fs-10 ps-4 py-3">아래 실데이터 영역에서 확인하세요.</td></tr></tbody>
           </table></div></div></div></div>
-          <div class="col-12 col-lg-4">
-            <div class="card mb-3"><div class="card-body">
-              <h6 class="mb-2">예시 계산 <span class="fs-10 fw-normal text-body-tertiary">그래픽카드 기준</span></h6>
-              <div class="fs-9 d-flex flex-column gap-2">
-                <div class="d-flex justify-content-between"><span class="text-body-tertiary">매입가(최저 공급처)</span><b>352,000원</b></div>
-                <div class="d-flex justify-content-between"><span class="text-body-tertiary">+ 기본 마진 13%</span><b>397,760원</b></div>
-                <div class="d-flex justify-content-between border-top pt-2"><span class="text-body-tertiary">끝자리 규칙(백원 올림)</span><b class="text-primary">397,800원 제안</b></div>
-              </div>
-            </div></div>
-            <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>버전이 남는 이유</b> — 견적·가격 이력은 당시 정책 버전과 함께 저장됩니다. v9를 발행해도 과거 견적은 v8로 재현됩니다.</div>
-          </div>
-        </div>
-        <div id="liveRules" hidden class="mt-4"></div>
+          
+        
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -297,7 +287,7 @@
           <td class="text-end"><input class="form-control form-control-sm d-inline-block text-end" style="width:70px;" value="${m}">%</td>
           <td><select class="form-select form-select-sm" style="width:130px;"><option${r==="백원 올림"?" selected":""}>백원 올림</option><option${r==="천원 절사"?" selected":""}>천원 절사</option><option>990원 맞춤</option></select></td>
           <td><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked></div></td></tr>`).join("");
-        document.getElementById("save").onclick=()=>toast("마진 정책 v9 발행 — 이후 가격 제안부터 적용 · 작업 기록 저장");
+        
       })();
       </script>
       <script>
