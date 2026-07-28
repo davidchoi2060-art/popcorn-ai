@@ -22,6 +22,7 @@ DB 대조는 프로젝트 .venv의 SQLAlchemy를 쓴다(DATABASE_URL, 로컬 전
 해당 검사만 건너뛰고 그 사실을 알린다 — 조용히 통과시키지 않는다.
 목업=스펙 단계에서는 "브라우저 손검증 + 이 스크립트"가 검증 수단이다.
 """
+import glob
 import io
 import json
 import os
@@ -799,6 +800,45 @@ def test_usage_floors():
                   "바인드+fetch 있음", miss or "fetch 없음")
         except OSError as e:                             # noqa: BLE001
             print(f"  [SKIP] (I) {page} — {e}")
+
+    # ⑨ 운영자 작업 패널 (슬라이스 61) — 오른쪽 자리가 Theme Customizer(영문 · RTL ·
+    # 레이아웃 변경)였다. 운영자가 얻는 건 없고 잘못 누르면 화면이 바뀌는 자리였다.
+    wl = get("/api/admin/worklist")
+    dash = get("/api/admin/dashboard")
+    wm = {i["key"]: i["count"] for i in wl["items"]}
+    # 같은 것을 두 번 세면 두 화면이 다른 수를 말한다 — 원천이 하나여야 한다
+    diff = [k for k in ("review", "price", "inbound", "refund")
+            if dash["pending"][k] != wm.get(k)]
+    check("작업 패널 = 대시보드와 같은 집계", not diff, "전 항목 일치", diff)
+    check("작업 패널 후보 수 = 대시보드", wl["pool"] == dash["flow"]["pool_ok"],
+          dash["flow"]["pool_ok"], wl["pool"])
+    # 링크가 실제 화면을 가리키는가 — 깨진 바로가기는 없느니만 못하다
+    dead = [i["href"] for i in wl["items"]
+            if not os.path.exists(os.path.join(ROOT, "mockups", "admin", i["href"]))]
+    check("작업 패널 바로가기가 실재한다", not dead, "전 경로 존재", dead)
+    # 검수는 '판매중·재고 있는 것'이 실제 작업 목록이다(전체를 다 훑을 수는 없다)
+    rv = next((i for i in wl["items"] if i["key"] == "review"), None)
+    if rv:
+        check("검수 항목이 실제 작업 대상을 따로 센다",
+              rv["focus"] is not None and rv["focus"] <= rv["count"],
+              f"<= {rv['count']}", rv["focus"])
+    try:
+        js = io.open(os.path.join(ROOT, "mockups", "shared", "admin-panel.js"),
+                     encoding="utf-8").read()
+        check("패널이 서버 값만 쓴다", "/api/admin/worklist" in js, "worklist fetch", "없음")
+        pages = glob.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+        miss = [os.path.basename(p) for p in pages
+                if "settings-offcanvas" in io.open(p, encoding="utf-8").read()
+                and "admin-panel.js" not in io.open(p, encoding="utf-8").read()]
+        check("패널 있는 화면에 모두 주입됐다", not miss, "누락 없음", miss)
+        # 상품 상세 제목에 예시 상품명이 남아 있으면 '최근 본 상품'에 엉뚱한 이름이
+        # 박힌다 — 실제로 다른 상품 이름이 저장됐다(슬라이스 61).
+        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+                     encoding="utf-8").read()
+        head = pe[pe.find('id="ptitle"'):pe.find('id="ptitle"') + 200]
+        check("상품 상세 제목에 예시 상품명이 없다", "이엠텍" not in head, "비어 있음", head[:60])
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 작업 패널 주입 — {e}")
 
 
 def _spec_field_guards():

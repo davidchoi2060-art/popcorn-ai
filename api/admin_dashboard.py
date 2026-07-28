@@ -22,21 +22,30 @@ _PRICE_PENDING = ("p.sale_price IS NULL AND p.review_required_yn = false"
                   " AND NOT (p.locked_fields @> '[\"sale_price\"]'::jsonb)")
 
 
+def pending_counts(conn) -> dict:
+    """처리 대기 집계 — **대시보드와 작업 패널의 단일 원천**(슬라이스 61).
+
+    같은 것을 두 번 세면 두 화면이 다른 수를 말한다. 여기 한 곳만 고친다.
+    """
+    one = lambda sql: conn.execute(text(sql)).scalar_one()      # noqa: E731
+    return {
+        "review": one("SELECT COUNT(*) FROM product_reviews WHERE review_status='대기'"),
+        "price": one(f"SELECT COUNT(*) FROM products p WHERE {_PRICE_PENDING}"),
+        # admin_stock._PENDING과 동일 조건 — 재고 0 ∨ 안전재고 미달(0004 safety_stock)
+        "inbound": one("SELECT COUNT(*) FROM products"
+                       " WHERE status NOT IN ('단종','삭제대기')"
+                       " AND (stock_qty=0"
+                       "      OR (safety_stock IS NOT NULL AND stock_qty < safety_stock))"),
+        "refund": one("SELECT COUNT(*) FROM refunds"
+                      " WHERE status IN ('접수','검토','수거·처리')"),
+    }
+
+
 @router.get("/dashboard")
 def dashboard():
     with engine.connect() as conn:
         one = lambda sql: conn.execute(text(sql)).scalar_one()
-        pending = {
-            "review": one("SELECT COUNT(*) FROM product_reviews WHERE review_status='대기'"),
-            "price": one(f"SELECT COUNT(*) FROM products p WHERE {_PRICE_PENDING}"),
-            # admin_stock._PENDING과 동일 조건 — 재고 0 ∨ 안전재고 미달(0004 safety_stock)
-            "inbound": one("SELECT COUNT(*) FROM products"
-                           " WHERE status NOT IN ('단종','삭제대기')"
-                           " AND (stock_qty=0"
-                           "      OR (safety_stock IS NOT NULL AND stock_qty < safety_stock))"),
-            "refund": one("SELECT COUNT(*) FROM refunds"
-                          " WHERE status IN ('접수','검토','수거·처리')"),
-        }
+        pending = pending_counts(conn)
         pool_ok = one("SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")
         core = one("SELECT COUNT(*) FROM products WHERE category_group='core_part'"
                    " AND part_type = ANY(ARRAY['CPU','GPU','MB','RAM','SSD','HDD','POWER','CASE',"
@@ -82,3 +91,45 @@ def dashboard():
                  " 준비되면 실값으로 바뀝니다 · '매입 대기'는 입고 대기로, '주문 재전달'은"
                  " 환불 처리 대기로 교체했습니다(원천 부재)."),
     }
+
+
+@router.get("/worklist")
+def worklist():
+    """작업 패널 — 어느 화면에서든 '지금 할 일'과 그 화면으로 가는 길(슬라이스 61).
+
+    대시보드는 같은 것을 보여주지만 **보려면 대시보드로 돌아가야 한다.** 이 패널의
+    값어치는 거기 있다 — 작업하던 화면을 떠나지 않고 확인하고 바로 이동한다.
+
+    숫자는 `pending_counts` 하나에서 나온다(대시보드와 같은 원천). 화면이 세지 않는다.
+    """
+    with engine.connect() as conn:
+        p = pending_counts(conn)
+        # 검수는 전체보다 **판매중·재고 있는 것**이 실제 작업 목록이다(6,000건을 다
+        # 훑을 수는 없다). admin_reviews의 sellable과 같은 기준.
+        review_focus = conn.execute(text(
+            "SELECT COUNT(*) FROM product_reviews r JOIN products p USING (product_code)"
+            " WHERE r.review_status='대기' AND p.status='판매중' AND p.stock_qty > 0")).scalar_one()
+        orders_wait = conn.execute(text(
+            "SELECT COUNT(*) FROM orders WHERE status='결제완료'")).scalar_one()
+        pool = conn.execute(text(
+            "SELECT COUNT(*) FROM v_recommendation_candidates"
+            " WHERE stock_qty > 0")).scalar_one()
+
+    items = [
+        {"key": "review", "label": "상품 검수", "count": p["review"],
+         "focus": review_focus, "focus_label": "판매중·재고 있는 것",
+         "href": "review-queue.html", "hint": "사양이 비어 추천에서 빠진 상품"},
+        {"key": "orders", "label": "주문 처리", "count": orders_wait,
+         "focus": None, "focus_label": None,
+         "href": "orders.html", "hint": "결제완료 — 조립 대기"},
+        {"key": "price", "label": "가격 검토", "count": p["price"],
+         "focus": None, "focus_label": None,
+         "href": "price-review.html", "hint": "판매가가 없어 팔 수 없는 상품"},
+        {"key": "inbound", "label": "재고 입고", "count": p["inbound"],
+         "focus": None, "focus_label": None,
+         "href": "stock-inbound.html", "hint": "재고 0 또는 안전재고 미달"},
+        {"key": "refund", "label": "환불 처리", "count": p["refund"],
+         "focus": None, "focus_label": None,
+         "href": "refunds.html", "hint": "접수·검토·수거 중"},
+    ]
+    return {"items": items, "total": sum(i["count"] for i in items), "pool": pool}
