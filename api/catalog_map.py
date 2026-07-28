@@ -63,6 +63,14 @@ CPU_COOL_HINT = re.compile(r"수랭|수냉|공랭|공냉|CPU\s*쿨러", re.I)
 MEM_SPEC = re.compile(r"\bDDR[345]\b", re.I)
 MEM_CL = re.compile(r"\bCL\s?\d{1,2}\b", re.I)
 
+# 노트북용 메모리(SO-DIMM)는 데스크톱 보드에 꽂히지 않는다 — 견적에 들어가면 조립 불가다
+# (슬라이스 58: "타무즈 노트북용 DDR5"가 200만원 고성능 구성에 실제로 올라왔다).
+# **'노트북'만으로는 안 된다**: 원천은 M.2 SSD를 "PC / 노트북"으로 적는데 그건 겸용이라는 뜻이다.
+# 노트북 전용 = SO DIMM이 명시됐거나, 분류에 '노트북'이 있고 'PC'가 없는 경우(실측 102건·오탐 0).
+SODIMM = re.compile(r"SO[\s\-]?DIMM", re.I)
+NB_ONLY = re.compile(r"(^|/)\s*노트북\s*(/|$)")
+PC_ALSO = re.compile(r"(^|/)\s*PC\s*(/|$)", re.I)
+
 
 def _class_tokens(raw: str, n: int = 5) -> str:
     """원천의 **분류 영역** — 앞쪽 토큰 중 키-값이 아닌 것들.
@@ -96,7 +104,17 @@ def wrong_slot(part_type: str, raw: str) -> str | None:
     """part_type이 원문과 명백히 어긋나는가. 확실한 것만 말한다."""
     if part_type in ("SSD", "HDD") and MEM_SPEC.search(raw or "") and MEM_CL.search(raw or ""):
         return "원문 사양이 메모리(DDR·CL) — 저장장치가 아님"
+    if part_type == "RAM" and is_sodimm(raw):
+        return "원문 분류가 노트북 전용(SO-DIMM) — 데스크톱 메모리 슬롯 아님"
     return None
+
+
+def is_sodimm(raw: str) -> bool:
+    """노트북 전용 메모리인가 — 분류 토큰만 본다(상품명은 보지 않는다)."""
+    cls = _class_tokens(raw or "")
+    if SODIMM.search(cls):
+        return True
+    return bool(NB_ONLY.search(cls)) and not PC_ALSO.search(cls)
 
 
 def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):

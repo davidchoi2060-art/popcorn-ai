@@ -576,6 +576,23 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
       +s.budget.over_by.toLocaleString()+'원 많습니다')
     :('예산 안 — 상한 '+s.budget.cap.toLocaleString()+'원');
   }
+  /* 서버가 준 `reasons`를 화면이 버리고 있었다(슬라이스 58). "모든 견적에는 이유가
+     있습니다"라고 해놓고 정작 엔진이 적어 보낸 이유를 한 줄도 보여주지 않았다.
+     용도 하한("고사양 게임 GPU 등급 550W 이상")도 여기로 나온다 — 지어내지 않고 그대로. */
+  if(pe&&s.reasons&&s.reasons.length){
+   var rw=document.getElementById('s2-reasons');
+   if(!rw){
+    rw=document.createElement('ul');rw.id='s2-reasons';
+    rw.style.cssText='margin:10px 0 0;padding:10px 12px;list-style:none;font-size:12px;'
+     +'line-height:1.65;color:#55555c;background:#f7f6f2;border-radius:10px;';
+    pe.parentNode.appendChild(rw);
+   }
+   rw.innerHTML=s.reasons.map(function(t){
+    return '<li style="display:flex;gap:6px;"><span style="color:#853d97;font-weight:800;">·</span>'
+     +'<span>'+String(t).replace(/[<>&]/g,function(c){
+       return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];})+'</span></li>';
+   }).join('');
+  }
   var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
   if(cp)cp.textContent=s.total.toLocaleString();if(cp2)cp2.textContent=s.total.toLocaleString();
  };

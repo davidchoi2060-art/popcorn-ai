@@ -19,7 +19,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from .candidates import BUDGET_ALLOC, _apply_one, _budget_cap
+from . import usage_floors as UF
+from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap
 from .db import engine
 
 router = APIRouter(prefix="/api")
@@ -33,6 +34,11 @@ SLOT_TYPES = {s: (s,) for s in SLOTS} | {"COOLER": ("COOLER_CPU_AIR", "COOLER_CP
 DFS_NODE_CAP = 2_000_000
 
 TIER_LABELS = {"value": "가성비형 견적", "recommend": "추천형 견적", "highend": "고성능형 견적"}
+
+# 고성능 티어가 예산을 넘어도 되는 배수(슬라이스 58 · U-13).
+# "예산 무시"는 견적이 아니다 — 램 하나에 예산의 776%를 쓰는 구성이 나왔다.
+# 1.5배는 "조금 더 쓰면 이만큼 나아진다"를 보여주면서 부품 균형을 지키는 선이다.
+HIGHEND_CAP_X = 1.5
 
 
 class Constraint(BaseModel):
@@ -51,7 +57,7 @@ def _load_pool(conn):
     return [dict(r) for r in conn.execute(text(
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"
         " socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
-        " form_factor, form_factor_list,"
+        " form_factor, form_factor_list, capacity_gb,"
         " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp, tag_white, tag_silent,"
         " spec_sources, data_origin"
         " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
@@ -275,14 +281,19 @@ def build_compat(chosen: dict, rules: dict) -> dict:
     return {"power_headroom_pct": headroom, "checks": checks}
 
 
-def _build_set(tier, pool, cap, rules):
+def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None):
     slot_pools = {}
     for s in SLOTS:
         cands = [p for p in pool if p["part_type"] in SLOT_TYPES[s]]
         if not cands:
             return None
         slot_pools[s] = _tier_sort(cands, tier, cap is not None)
-    limit = cap if (cap is not None and tier in ("value", "recommend")) else None
+    # 고성능도 총액 상한을 받는다(슬라이스 58). 상한 없이 가격 내림차순으로 두면
+    # 120만원 예산에 램 931만원 + 데이터센터 SSD 492만원을 얹은 1,741만원이 나온다 —
+    # GPU는 그대로 RTX 4060인 채로. "가장 비싼 것"은 "용도에 필요한 최고 성능"이 아니다.
+    limit = cap if cap is not None else None
+    if limit is not None and tier == "highend":
+        limit = int(limit * HIGHEND_CAP_X)
     chosen = _dfs(slot_pools, limit, rules)
     if chosen is None:
         return None
@@ -292,8 +303,10 @@ def _build_set(tier, pool, cap, rules):
         "value": ["조건 통과 부품에서 예산 안 최저가 조합", "조립 불가 조합은 탐색에서 제외"],
         "recommend": ["예산 안에서 가격 기준 최고 사양 조합",
                       "성능 지표 미보유 — 가격을 사양 근사로 사용(정직 표기)"],
-        "highend": ["예산 상한 없이 가격 기준 최고 사양 조합(초과분은 아래에 정직 표기)"],
+        "highend": [f"예산의 {HIGHEND_CAP_X:g}배까지 허용한 최고 사양 조합"
+                    f"(부품별 배분 상한은 유지 — 초과분은 아래에 정직 표기)"],
     }[tier]
+    reasons = reasons + [n for n in (floor_note, relax_note) if n]
     return {
         "label": TIER_LABELS[tier],
         "items": [{"part_type": s, "product_code": chosen[s]["product_code"],
@@ -375,15 +388,52 @@ def recommend(body: RecommendBody):
         if cap is not None:
             capped, _, _ = _apply_one(capped, "예산", budget_v)
 
+        # 용도 하한(슬라이스 58) — 서버가 실제로 건 하한만 근거로 말한다.
+        # GPU는 성능 지표가 없어 권장 전원을 계층 근사로 쓴다. 그 사실을 숨기지 않는다.
+        usage_v = next((c.v for c in body.constraints if c.l in ("용도", "상황")), "")
+        floors = UF.summary(usage_v)
+        floor_note = None
+        if floors:
+            # 근거에는 **숫자가 있어야 한다**. "고사양 게임 GPU 등급"만으로는 무엇을 걸렀는지
+            # 알 수 없다 — 얼마 이상인지가 근거다.
+            unit = {"required_power_watt": "W", "capacity_gb": "GB"}
+            said = " · ".join(f"{SLOT_KO.get(f['slot'], f['slot'])} "
+                              f"{f['value']:,}{unit.get(f['field'], '')} 이상" for f in floors)
+            floor_note = (f"{UF.label_of(usage_v)} 하한 — {said}."
+                          " GPU는 성능 지표가 없어 권장 전원을 등급 근사로 사용합니다")
+
+        # 고성능 풀 = 예산 배분율을 HIGHEND_CAP_X배로 늘려 적용(전면 해제가 아니다).
+        # `common`(배분 미적용)을 그대로 주면 램 931만원이 다시 들어온다.
+        hi_pool = common
+        if cap is not None:
+            hi_cap = int(cap * HIGHEND_CAP_X)
+            hi_pool = [p for p in common
+                       if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
+
         rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
         check_rule_fields(pool, rules)    # 규칙 필드 누락은 조용한 전면 불통과 → 경고로 드러낸다
-        sets = {"value": _build_set("value", capped, cap, rules)}
+        # 가성비형은 **부품별 배분율을 받지 않는다**(슬라이스 58). 최저가를 고르는 티어에
+        # "비싼 부품 차단" 상한은 무의미한데, 슬롯 후보를 예산마다 다르게 만들어
+        # 150만원이 70만원보다 비싼 가성비 구성을 내놓았다(회귀 '가성비는 전 예산 공통' 실패).
+        # 진짜 제약은 총액이고 그건 DFS 가지치기가 건다.
+        sets = {"value": _build_set("value", common, cap, rules, floor_note)}
         if sets["value"] is None:
             # 최소 구성이 예산 밖이면 견적 불성립 — 전 티어 불가(정직)
             sets["recommend"] = sets["highend"] = None
         else:
-            sets["recommend"] = _build_set("recommend", capped, cap, rules)
-            sets["highend"] = _build_set("highend", common, cap, rules)
+            # 배분율은 "한 부품에 몰빵하지 마라"는 균형 장치일 뿐 조립 조건이 아니다.
+            # 저예산에서는 그것이 슬롯을 전멸시켜 견적을 못 만든다 — 실측: 50만원 사무용에서
+            # RAM 배분 10%(5만원)가 DDR4 램(최저 84,900원)을 전부 걸러 남은 DDR5 8GB 하나가
+            # 남은 DDR4 보드와 맞지 않았다. **균형을 못 지킬 바엔 균형을 포기하고 견적을 낸다** —
+            # 총액 상한은 그대로 지킨다. 포기했으면 근거에 그렇게 적는다(정직).
+            relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
+            sets["recommend"] = _build_set("recommend", capped, cap, rules, floor_note)
+            if sets["recommend"] is None:
+                sets["recommend"] = _build_set("recommend", common, cap, rules, floor_note,
+                                               relaxed)
+            sets["highend"] = _build_set("highend", hi_pool, cap, rules, floor_note)
+            if sets["highend"] is None:
+                sets["highend"] = _build_set("highend", common, cap, rules, floor_note, relaxed)
 
         session_id = conn.execute(text(
             "INSERT INTO consult_sessions (member_id, mode, constraints) VALUES"
@@ -404,4 +454,7 @@ def recommend(body: RecommendBody):
 
     return {"session_id": session_id, "generated_at": datetime.now().isoformat(),
             "funnel": {"total": total_n, "passed": len(passed)},
+            # 서버가 실제로 건 하한 — 화면이 지어내지 않고 이것만 말한다
+            "usage_floors": {"usage": UF.label_of(usage_v), "items": floors},
+            "highend_cap_x": HIGHEND_CAP_X,
             "sets": sets, "companion": comp}

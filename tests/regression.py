@@ -638,7 +638,66 @@ def test_spec_fields():
             check("되돌린 뒤 추천 후보가 제자리", pool1 == pool0, pool0, pool1)
             st3, _ = post(f"/api/admin/products/specs/undo/{r['undo_id']}")
             check("사양 이중 되돌리기는 409", st3 == 409, 409, st3)
+    _spec_field_guards()
 
+
+def test_usage_floors():
+    print("\n[14] 용도 하한 — 화면이 한 약속을 서버가 지키는가 (슬라이스 58)")
+    # 화면은 오래전부터 "저사양 GPU 제외(프레임 미달)"라고 적어 왔는데 서버는 용도로
+    # 아무것도 하지 않았다. 그 결과 '고사양 게임'에 GT710 2GB가 나왔다.
+    C = [{"l": "예산", "v": "120만원"}, {"l": "용도", "v": "고사양 게임"}]
+    _st, d = post("/api/recommend", {"mode": "chat", "constraints": C})
+    d = d or {}
+
+    fl = (d.get("usage_floors") or {}).get("items") or []
+    check("용도 하한을 응답이 밝힌다", bool(fl), "1개 이상", len(fl))
+    floors = {f["slot"]: f["value"] for f in fl}
+
+    # ① 모든 티어의 부품이 하한을 실제로 만족하는가 — 이것이 이 슬라이스의 계약이다
+    for tier, s in (d.get("sets") or {}).items():
+        if not s:
+            continue
+        for it in s["items"]:
+            need = floors.get(it["part_type"])
+            if need is None:
+                continue
+            got = db_one(
+                "SELECT CASE WHEN :pt='GPU' THEN required_power_watt ELSE capacity_gb END"
+                " FROM v_recommendation_candidates WHERE product_code=:pc",
+                pt=it["part_type"], pc=it["product_code"])
+            check(f"{tier}·{it['part_type']}가 용도 하한을 만족", got is not None and got >= need,
+                  f">= {need}", got)
+
+    # ② 하한이 없는 용도는 하한을 만들어내지 않는다(지어내기 금지)
+    _st2, d2 = post("/api/recommend", {"mode": "chat", "constraints": [
+        {"l": "예산", "v": "120만원"}, {"l": "용도", "v": "기타"}]})
+    d2 = d2 or {}
+    check("정의 없는 용도엔 하한을 지어내지 않는다",
+          not ((d2.get("usage_floors") or {}).get("items")), "빈 목록",
+          (d2.get("usage_floors") or {}).get("items"))
+
+    # ③ 후보 카운터와 견적이 같은 하한을 쓴다 — 다르면 화면이 딴 말을 하게 된다
+    _st3, cnt = post("/api/candidates/count", {"constraints": C})
+    cnt = cnt or {"effects": []}
+    eff = next((e for e in cnt["effects"] if e["label"] == "용도"), None)
+    check("후보 카운터도 용도를 실제로 적용한다", bool(eff and eff["applied"]),
+          "applied=True", eff and eff["applied"])
+
+    # ④ 고성능은 예산 무시가 아니라 배수 상한을 받는다 — 램 하나에 예산의 776%를 쓴 전례
+    x = d.get("highend_cap_x")
+    hi = (d.get("sets") or {}).get("highend")
+    if hi and x:
+        check("고성능 총액 <= 예산 x 배수", hi["total"] <= 1_200_000 * x,
+              f"<= {int(1_200_000 * x):,}", hi["total"])
+
+    # ⑤ 노트북 전용 메모리(SO-DIMM)는 데스크톱 견적에 들어오지 않는다 — 조립 불가 조합
+    nb = db_one("SELECT count(*) FROM v_recommendation_candidates c JOIN products p"
+                " USING (product_code) WHERE c.part_type='RAM' AND c.stock_qty>0"
+                " AND p.spec_source_text ~ 'SO ?DIMM'")
+    check("노트북 메모리가 후보 풀에 없다", nb == 0, 0, nb)
+
+
+def _spec_field_guards():
     # 가드 — 잘못된 항목이 스키마를 오염시키면 되돌리기 어렵다
     for body, label, want in (
         ({"field_key": "Bad-Key", "label": "x", "data_type": "INTEGER"}, "이름 규칙", 400),
@@ -1026,7 +1085,8 @@ def main():
 
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
-               test_upload, test_product_edit, test_spec_fields, test_guards):
+               test_upload, test_product_edit, test_spec_fields, test_usage_floors,
+               test_guards):
         try:
             fn()
         except Exception as e:

@@ -19,9 +19,19 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from . import usage_floors as UF
 from .db import engine
 
 router = APIRouter(prefix="/api")
+
+# 용도 하한이 쓰는 사양 — 풀 SELECT에 반드시 실려야 한다.
+# 빠뜨리면 `.get()`이 None을 주고 NULL 불통과로 **조용히** 전멸한다(규칙 필드 전례).
+FLOOR_COLS = ("capacity_gb", "required_power_watt")
+
+
+def _floor_slot(part_type: str) -> str:
+    """part_type → 하한 슬롯. 쿨러만 두 종류가 한 슬롯이다(엔진과 같은 정의)."""
+    return "COOLER" if part_type.startswith("COOLER_") else part_type
 
 # 예산 상한 배분율 — "어느 부품도 자기 배분율 상한을 초과할 수 없다"
 BUDGET_ALLOC = {
@@ -60,6 +70,18 @@ def _apply_one(parts: list[dict], label: str, value: str):
         kept = [p for p in parts
                 if p["sale_price"] <= int(cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
         return kept, True, "부품별 예산 상한(CPU 25%·GPU 40% 등 배분율) 초과 부품 제외"
+    if label in ("용도", "상황"):
+        # 슬라이스 58: 용도가 실제로 부품을 거른다. 이전에는 "구성 단계(스코어)에서 반영"이라고
+        # 답하고 아무것도 하지 않아, 고사양 게임에 GT710 2GB가 나왔다.
+        floors = UF.slot_floors(value)
+        if not floors:
+            return parts, False, "하한이 정의되지 않은 용도 — 후보 수에는 영향 없음"
+        kept = [p for p in parts
+                if not (fs := floors.get(_floor_slot(p["part_type"]))) or UF.passes(p, fs)]
+        unit = {"required_power_watt": "W", "capacity_gb": "GB"}
+        why = " · ".join(f"{SLOT_KO.get(s, s)} {f[2]:,}{unit.get(f[0], '')} 이상"
+                         for s, fl in floors.items() for f in fl[:1])
+        return kept, True, f"용도 하한 미달 부품 제외 — {why}"
     applied, reasons = False, []
     if "저소음" in value:
         parts = [p for p in parts
@@ -107,8 +129,9 @@ def _slot_view(parts: list[dict]) -> tuple:
 def count_candidates(body: CountBody):
     with engine.connect() as conn:
         parts = [dict(r) for r in conn.execute(text(
-            "SELECT part_type, sale_price, tag_white, tag_silent"
-            " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
+            "SELECT part_type, sale_price, tag_white, tag_silent, "
+            + ", ".join(FLOOR_COLS)
+            + " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
     total = len(parts)
     effects = []
     for c in body.constraints:
