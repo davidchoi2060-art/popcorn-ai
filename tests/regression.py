@@ -828,6 +828,34 @@ def test_usage_floor_admin():
         print(f"  [SKIP] (I) 하한 화면 — {e}")
 
 
+def test_screen_identity():
+    print("\n[20] 화면 식별자 — 마크업 계약 (슬라이스 78)")
+    # 계약은 "최상위에 data-screen-id, data-domain"인데 32개 중 2개만 지키고 있었다.
+    # 화면 ID는 이미 배지로 보이므로 그 값을 body로 옮겼다.
+    import glob as _g
+    import re as _re
+    pages = [p for p in _g.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+             if not os.path.basename(p).startswith("_")]
+    miss_sid, miss_dom, seen = [], [], {}
+    for p in pages:
+        n = os.path.basename(p)
+        t = io.open(p, encoding="utf-8").read()
+        m = _re.search(r'data-screen-id="([^"]+)"', t)
+        d = _re.search(r'data-domain="([^"]+)"', t)
+        if not m:
+            miss_sid.append(n)
+        else:
+            seen.setdefault(m.group(1), []).append(n)
+        if not d:
+            miss_dom.append(n)
+    check("모든 관리자 화면에 data-screen-id가 있다", not miss_sid, "누락 없음", miss_sid)
+    check("모든 관리자 화면에 data-domain이 있다", not miss_dom, "누락 없음", miss_dom)
+    # 같은 ID를 두 화면이 쓰면 화면을 특정할 수 없다 — 실제로 충돌이 있었다
+    # (용도 하한이 추천 가능 재고 현황의 ADM-ENG-030을 쓰고 있었다)
+    dup = {k: v for k, v in seen.items() if len(v) > 1}
+    check("화면 ID가 중복되지 않는다", not dup, "중복 없음", dup)
+
+
 def test_margin_policy():
     print("\n[18] 마진 정책 — 고치면 실제로 저장되는가 (슬라이스 74)")
     # "수정해도 변경이 안 된다"는 보고. 확인해 보니 저장 기능이 아예 없었다 —
@@ -1682,6 +1710,7 @@ def main():
     for fn in (test_engine, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
+               test_screen_identity,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
