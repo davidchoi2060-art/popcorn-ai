@@ -334,6 +334,68 @@ _SHOW_CACHE: dict = {"at": 0.0, "data": None}
 SHOWCASE_TTL = 300.0                                # 5분 — 재고가 움직여도 그 안에 따라온다
 
 
+SHOWCASE_SCAN = 40      # 훑어볼 최근 견적 수 — 이 안에서 지금도 살 수 있는 것만 고른다
+# part_type -> 슬롯명 역매핑(SLOT_TYPES의 역). 쿨러만 두 종류가 한 슬롯이다.
+_SLOT_OF = {t: s for s, ts in SLOT_TYPES.items() for t in ts}
+
+
+def _slot_of(part_type: str) -> str:
+    return _SLOT_OF.get(part_type, part_type)
+
+
+def _recent_pick(conn):
+    """실제로 만들어진 최근 견적 중 **지금도 유효한 것**을 고른다(슬라이스 60).
+
+    고정 조건으로 매번 같은 구성을 만들면 첫 화면이 죽어 있다. 실제 견적을 보여주면
+    새 상담이 생길 때마다 바뀐다 — 그게 '실시간 재고 기반'이라는 말에 맞다.
+
+    다만 **과거 견적을 그대로 내걸 수는 없다**: 그때는 있던 부품이 지금 품절일 수 있고,
+    가격도 움직인다. '검증 통과 견적'이라고 말하려면 지금 이 순간 살 수 있어야 한다.
+    그래서 ① 전 부품이 현재도 추천 후보이며 재고가 있는 것만 통과시키고
+    ② 금액은 **스냅샷이 아니라 현재 가격**으로 다시 합산한다.
+
+    회원·세션 식별자는 읽지 않는다 — 남의 상담 기록이 아니라 구성만 보여준다.
+    """
+    rows = conn.execute(text(
+        "SELECT snapshot_id, items, created_at FROM quote_snapshots"
+        " WHERE quote_type = 'recommend' ORDER BY snapshot_id DESC LIMIT :n"),
+        {"n": SHOWCASE_SCAN}).mappings().all()
+    if not rows:
+        return None
+
+    codes = {p.get("product_code") for r in rows
+             for p in ((r["items"] or {}).get("parts") or []) if p.get("product_code")}
+    if not codes:
+        return None
+    live = {r["product_code"]: r for r in conn.execute(text(
+        "SELECT product_code, product_name, sale_price, part_type"
+        " FROM v_recommendation_candidates WHERE stock_qty > 0"
+        "   AND product_code = ANY(:c)"), {"c": list(codes)}).mappings().all()}
+
+    ok = []
+    for r in rows:
+        parts = (r["items"] or {}).get("parts") or []
+        if len(parts) != len(SLOTS):
+            continue
+        cur = [live.get(p.get("product_code")) for p in parts]
+        if any(c is None for c in cur):      # 하나라도 품절·후보 이탈이면 못 보여준다
+            continue
+        # part_type을 **슬롯명으로 되돌린다** — 뷰는 COOLER_CPU_AIR/AIO로 나누지만
+        # 견적 API가 주는 이름은 COOLER다. 화면은 견적 응답 기준으로 만들어져 있어서
+        # 그대로 내보내면 'COOLER_CPU_AIR'이 고객 화면에 그대로 찍힌다.
+        ok.append({
+            "items": [{"part_type": _slot_of(c["part_type"]), "product_code": c["product_code"],
+                       "name": c["product_name"], "price": c["sale_price"]} for c in cur],
+            "total": sum(c["sale_price"] for c in cur),
+            "at": r["created_at"].isoformat() if r["created_at"] else None,
+        })
+    if not ok:
+        return None
+    # 캐시가 갱신될 때마다 다음 것으로 넘어간다 — 상담이 뜸해도 첫 화면은 계속 움직인다
+    _SHOW_CACHE["turn"] = (_SHOW_CACHE.get("turn", 0) + 1) % len(ok)
+    return ok[_SHOW_CACHE["turn"]] | {"live_count": len(ok)}
+
+
 @router.get("/showcase")
 def showcase():
     """첫 화면용 대표 구성 — 세션을 만들지 않는 읽기 전용 경로."""
@@ -347,13 +409,17 @@ def showcase():
     with engine.begin() as conn:
         pool = _load_pool(conn)
         rules = load_compat_rules(conn)
-        common = pool
-        for label, value in (("용도", SHOWCASE["usage"]),):
-            common, _, _ = _apply_one(common, label, value)
-        capped, _, _ = _apply_one(common, "예산", SHOWCASE["budget"])
-        pick = _build_set("recommend", capped, cap, rules)
-        if pick is None:                    # 배분율이 막으면 푼다(견적 경로와 같은 규칙)
-            pick = _build_set("recommend", common, cap, rules)
+        pick, source = _recent_pick(conn), "recent"
+        if pick is None:
+            # 아직 견적이 없거나 전부 품절됐다 — 지금 재고로 하나 만들어 보여준다
+            common = pool
+            common, _, _ = _apply_one(common, "용도", SHOWCASE["usage"])
+            capped, _, _ = _apply_one(common, "예산", SHOWCASE["budget"])
+            built = _build_set("recommend", capped, cap, rules)
+            if built is None:               # 배분율이 막으면 푼다(견적 경로와 같은 규칙)
+                built = _build_set("recommend", common, cap, rules)
+            pick = built and {"items": built["items"], "total": built["total"], "at": None}
+            source = "built"
 
     data = {
         # S1 후보 카운터와 **같은 정의**다 — S0에서 다른 수를 보여주면 다음 화면에서
@@ -361,7 +427,8 @@ def showcase():
         "pool": len(pool),
         "rules": sum(len(v) for v in rules.values()),
         "usage": SHOWCASE["usage"], "budget_label": SHOWCASE["budget"],
-        "pick": pick and {"items": pick["items"], "total": pick["total"]},
+        "source": source,                   # recent = 실제 견적 · built = 지금 만든 것
+        "pick": pick,
         "cached": False,
     }
     _SHOW_CACHE.update({"at": now, "data": data})

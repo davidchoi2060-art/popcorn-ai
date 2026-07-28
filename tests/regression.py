@@ -771,6 +771,18 @@ def test_usage_floors():
             "SELECT stock_qty FROM v_recommendation_candidates WHERE product_code=:p",
             p=i["product_code"]) or 0) <= 0]
         check("showcase 구성은 재고가 있다", not oos, "전 부품 재고>0", oos)
+        # 실제 견적을 보여주더라도 **지금 살 수 있는 것**이어야 한다(슬라이스 60).
+        # 과거 스냅샷을 그대로 내걸면 품절 부품이 '검증 통과 견적'으로 나간다.
+        check("showcase 구성이 견적 슬롯을 다 채운다", len(pk["items"]) == 8, 8,
+              len(pk["items"]))
+        bad_slot = [i["part_type"] for i in pk["items"]
+                    if i["part_type"] not in ("CPU", "MB", "RAM", "GPU",
+                                              "CASE", "COOLER", "POWER", "SSD")]
+        # 뷰는 COOLER_CPU_AIR/AIO로 나누지만 화면은 견적 API의 슬롯명(COOLER)을 쓴다.
+        # 되돌리지 않으면 'COOLER_CPU_AIR'이 고객 화면에 그대로 찍힌다.
+        check("showcase 슬롯명이 견적 API와 같다", not bad_slot, "슬롯명 정규화", bad_slot)
+        if sc.get("source") == "recent":
+            check("실제 견적이면 생성 시각을 준다", bool(pk.get("at")), "at 있음", pk.get("at"))
     # 랜딩이 상담 세션을 남기지 않는가 — 방문마다 쌓이면 원장이 오염된다
     n0 = db_one("SELECT count(*) FROM consult_sessions")
     get("/api/showcase")

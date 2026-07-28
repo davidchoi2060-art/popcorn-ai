@@ -560,6 +560,14 @@ document.addEventListener('click',function(e){
    (후보 3,308 · 재고 있는 상품 7,581 · 수량 합 8,239), 호환성도 5종이라 했지만 실제는 8종이다.
    서버가 못 주면 조용히 원래 문구를 남긴다 — 목업 폴백(Firebase 검토 배포 무영향). */
 (function(){
+ function ago(iso){
+  var s=(Date.now()-new Date(iso).getTime())/1000;
+  if(!isFinite(s)||s<0)return null;
+  if(s<90)return '방금';
+  var m=Math.floor(s/60); if(m<60)return m+'분 전';
+  var h=Math.floor(m/60); if(h<24)return h+'시간 전';
+  return Math.floor(h/24)+'일 전';
+ }
  fetch('/api/showcase').then(function(r){return r.ok?r.json():null;}).then(function(d){
   if(!d)return;
   function put(name,txt){
@@ -570,8 +578,12 @@ document.addEventListener('click',function(e){
   if(d.pick){
    put('showcase_total',d.pick.total.toLocaleString());
    /* 조건을 밝히지 않으면 "예상 견적가"가 어디서 온 수인지 알 수 없다.
-      무엇을 기준으로 뽑았는지 말해야 그 수가 근거를 갖는다. */
-   put('showcase_caption',d.usage+' · '+d.budget_label+' 기준 추천 구성');
+      무엇을 기준으로 뽑았는지 말해야 그 수가 근거를 갖는다.
+      실제 상담에서 나온 견적이면 언제 것인지까지 말한다(슬라이스 60). */
+   var t=d.pick.at?ago(d.pick.at):null;
+   put('showcase_caption',
+       d.source==='recent'?((t?t+' ':'')+'검증된 실제 견적')
+                          :(d.usage+' · '+d.budget_label+' 기준 추천 구성'));
   }
   // 호환 규칙 수는 서버가 정한다 — 8종을 검사하면서 5종이라 말하면 손해이고, 거짓이다
   var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n,hit=[];

@@ -341,13 +341,30 @@ document.addEventListener('DOMContentLoaded', function () {
 (function(){
  var PKO={CPU:'CPU',MB:'메인보드',RAM:'RAM',GPU:'GPU',CASE:'케이스',
           COOLER:'쿨러',POWER:'파워',SSD:'SSD'};
+ /* 실제 상담에서 나온 견적이면 언제 것인지 말한다 — '계속 바뀌는 화면'의 근거가 된다.
+    지금 만든 것이면 그렇다고 말한다(지어내지 않는다). */
+ function ago(iso){
+  var s=(Date.now()-new Date(iso).getTime())/1000;
+  if(!isFinite(s)||s<0)return null;
+  if(s<90)return '방금';
+  var m=Math.floor(s/60); if(m<60)return m+'분 전';
+  var h=Math.floor(m/60); if(h<24)return h+'시간 전';
+  return Math.floor(h/24)+'일 전';
+ }
+ function cap(d){
+  var t=d.pick&&d.pick.at?ago(d.pick.at):null;
+  if(d.source==='recent'&&t)return t+' 검증된 실제 견적';
+  if(d.source==='recent')return '최근 검증된 실제 견적';
+  return d.usage+' · '+d.budget_label+' 기준';
+ }
  fetch('/api/showcase').then(function(r){return r.ok?r.json():null;}).then(function(d){
   if(!d||!d.pick)return;
   Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_total"]'),
    function(el){el.textContent=d.pick.total.toLocaleString();});
-  /* 무엇을 기준으로 뽑은 구성인지 밝힌다 — 조건 없는 'TOP PICK'은 근거가 없다 */
+  /* 무엇을 기준으로 뽑은 구성인지 밝힌다 — 조건 없는 'TOP PICK'은 근거가 없다.
+     실제 상담에서 나온 견적이면 언제 것인지까지 말한다(슬라이스 60). */
   Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_caption"]'),
-   function(el){el.textContent=d.usage+' · '+d.budget_label+' 기준';});
+   function(el){el.textContent=cap(d);});
   var box=document.querySelector('[data-repeat="showcase_items"]');
   if(!box)return;
   var proto=box.firstElementChild;
