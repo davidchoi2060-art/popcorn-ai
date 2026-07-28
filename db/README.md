@@ -38,7 +38,9 @@ SQL
 set DATABASE_URL=postgresql+psycopg2://popcorn_app:<비번>@<CLOUD_SQL_IP>:5432/popcorn_pc?sslmode=require
 cd db && alembic upgrade head
 
-# 3) 시드 (선택 — 개발 데이터)
+# 3) 시드 — **개발용 더미 전용. 실제로 문을 여는 곳에서는 돌리지 않는다.**
+#    상품 30종·주문·회원·결제·환불이 딸려 와 원장에 가짜 데이터가 남는다.
+#    운영에 필요한 규칙(호환 8종·가격 정책·운영 전환)은 이미 2)가 넣었다(0019).
 psql "host=<CLOUD_SQL_IP> port=5432 user=popcorn_app dbname=popcorn_pc sslmode=require" -f seed/seed.sql
 
 # 롤백: alembic downgrade base  /  SQL 미리보기: alembic upgrade head --sql
@@ -46,6 +48,9 @@ psql "host=<CLOUD_SQL_IP> port=5432 user=popcorn_app dbname=popcorn_pc sslmode=r
 
 ## 규칙
 
+- **빈 상태에서 시작하는 절차는 `docs/07_운영-시작-순서.md`.** 2)까지만 하면 운영 규칙이
+  전부 서고(호환 8 · 사양 항목 29 · 용도 하한 21 · 가격 정책 · 운영 전환 5) 더미는 0건이다
+  — 격리 스키마로 관통 검증했다(2026-07-29).
 - 스키마 변경은 **ERD 문서 개정 → 새 마이그레이션 파일** 순서. DDL 직접 수정 금지.
 - `DATABASE_URL`은 셸 환경변수 또는 로컬 `.env`(gitignore)로만. 예시는 `.env.example`.
 - pg_trgm 확장 필요(마이그레이션이 생성 시도 — Cloud SQL은 기본 허용 목록에 있음).

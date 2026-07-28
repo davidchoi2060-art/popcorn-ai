@@ -468,6 +468,23 @@ def test_compat():
         check("활성 규칙 수 = DB 실측", len(active) == rules_db, rules_db, len(active))
     check("활성 규칙이 하나 이상", len(active) > 0, "> 0", len(active))
 
+    # 규칙은 **빈 DB에서도 서야 한다**(슬라이스 81). 0005는 테이블만 만들고 규칙은
+    # 개발 시드(더미 상품·주문과 한 묶음)에만 있었다 — 새로 세운 서버는 규칙이 0이었고,
+    # 엔진은 실패하지 않고 조용히 전부 통과시킨다(규칙 없는 슬롯 = 독립).
+    # 부트스트랩 마이그레이션이 전 규칙을 덮는지 여기서 지킨다.
+    try:
+        import importlib.util as _iu
+        _p = os.path.join(ROOT, "db", "migrations", "versions",
+                          "0019_bootstrap_operating_rules.py")
+        _s = _iu.spec_from_file_location("_boot19", _p)
+        _m = _iu.module_from_spec(_s)
+        _s.loader.exec_module(_m)
+        seeded = {r[0] for r in _m.RULES}
+        gap = sorted({r["key"] for r in active} - seeded)
+        check("활성 규칙은 전부 부트스트랩에 들어 있다", not gap, "누락 없음", gap)
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 부트스트랩 규칙 대조 — {e}")
+
     compat = rec("100만원")["value"]["compat"]
     check("견적 호환 항목 = 규칙 수(1:1)", len(compat["checks"]) == len(active),
           len(active), len(compat["checks"]))
@@ -609,6 +626,14 @@ def test_spec_fields():
             "SELECT count(*) FROM information_schema.columns"
             " WHERE table_name='product_specs' AND column_name=:k", k=k) == 0]
         check("메타의 모든 항목에 실제 컬럼이 있다", not ghost, "유령 없음", ghost)
+
+    # 화면에서 만든 항목은 **코드 이력에도 있어야 한다**(슬라이스 81).
+    # cpu_gpu 전례: 운영자가 베타 서버에서 항목을 만들었는데 앱이 리포 폴더에 쓸 수 없어
+    # 마이그레이션 파일이 안 남았다. 컬럼·메타는 커밋된 뒤라 변경은 살아 있는데 이력만
+    # 없는 상태로 하루가 갔고, 그때 복구했다면 그 컬럼은 사라졌을 것이다.
+    # 이 불변식이 그 상태를 다음 회귀에서 바로 잡는다.
+    check("화면에서 만든 사양 항목에 마이그레이션 이력이 있다",
+          d.get("unrecorded") == [], [], d.get("unrecorded"))
 
     # 사양 값 입력 — 화면에서 만든 항목에 값을 넣을 길이 있어야 한다(슬라이스 57).
     # 검수 큐는 '검수 행이 있는 필드'만 다루므로 새 항목은 영영 비어 있게 된다.
@@ -1430,8 +1455,25 @@ def test_ledgers():
     logs = get("/api/admin/activity-logs")
     undo_rows = [i for i in logs["items"] if i["is_undo"]]
     undone_rows = [i for i in logs["items"] if i["undone"]]
-    check("되돌림 행 수 = 되돌려진 원본 수(1:1)", len(undo_rows) == len(undone_rows),
-          len(undo_rows), len(undone_rows))
+    # 1:1은 **전체**에서 성립하는 관계다. 목록은 페이지라서 원본이 창 밖으로 밀리면
+    # 145 대 144처럼 하나씩 어긋난다 — 실제로 그렇게 터졌다(2026-07-29). 페이지 안에서
+    # 개수를 맞추는 검사는 로그가 쌓일 때마다 무작위로 실패한다. 원장 전체로 본다.
+    if _engine is None:
+        print("  [SKIP] (I) 되돌림 1:1 — DB 미연결")
+    else:
+        n_undo = db_one("SELECT count(*) FROM admin_operator_activity_logs"
+                        " WHERE detail ? 'ref_log_id'")
+        n_orig = db_one("SELECT count(DISTINCT (detail->>'ref_log_id')::bigint)"
+                        " FROM admin_operator_activity_logs WHERE detail ? 'ref_log_id'")
+        check("되돌림 행 수 = 되돌려진 원본 수(1:1)", n_undo == n_orig, n_orig, n_undo)
+        # 페이지 쪽은 개수가 아니라 **근거**를 본다: '되돌려짐' 배지가 붙은 행은
+        # 실제로 그것을 가리키는 되돌림 행이 있어야 한다(창 밖에 있어도 상관없다).
+        phantom = [i["log_id"] for i in undone_rows if db_one(
+            "SELECT count(*) FROM admin_operator_activity_logs"
+            " WHERE (detail->>'ref_log_id')::bigint = :k", k=i["log_id"]) == 0]
+        check("'되돌려짐' 배지에 근거가 있다", not phantom, "근거 없는 배지 없음", phantom)
+    check("되돌림 행은 _undo 액션으로 식별된다", all(i["is_undo"] for i in undo_rows),
+          "전부 _undo", [i["log_id"] for i in undo_rows if not i["is_undo"]])
 
 
 # ──────────────────── 6. 고객 축 계약 (구매 인증·회원 경계) ────────────────────

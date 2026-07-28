@@ -95,6 +95,18 @@ def list_spec_fields():
                 f"SELECT '{f['field_key']}' AS field_key,"
                 f" count({f['field_key']}) AS n FROM product_specs"
                 for f in live) + ") x")).all()) if live else {}
+    # 화면에서 만든 항목 중 **코드 이력이 없는 것**. 서버에서는 마이그레이션 파일을 쓸 수
+    # 없어 이 상태가 생긴다(cpu_gpu 전례). 그대로 두면 재구축·복구 때 컬럼이 사라지는데
+    # 아무 데도 표시가 없어 알 길이 없었다 — 여기서 드러낸다.
+    try:
+        mig_files = os.listdir(MIG_DIR)
+    except OSError:
+        mig_files = []
+    unrecorded = [f["field_key"] for f in fields
+                  if f.get("is_custom")
+                  and not any(fn.endswith(f"_spec_field_{f['field_key']}.py")
+                              for fn in mig_files)]
+
     ghosts = [f["field_key"] for f in fields if f["field_key"] not in real]
     if ghosts:
         SF.reload()                      # 캐시가 낡았을 수 있다 — 다음 조회는 새로 읽는다
@@ -111,9 +123,14 @@ def list_spec_fields():
         "part_types": list(ALL_PART_TYPES),
         # 메타에는 있는데 컬럼이 없는 항목 — 있으면 화면이 그 사실을 말해야 한다
         "ghosts": ghosts,
+        # 컬럼은 있는데 코드 이력이 없는 항목 — 복구하면 사라진다
+        "unrecorded": unrecorded,
         "note": ("사양 항목을 추가하면 product_specs에 컬럼이 생기고 추천 뷰가 재생성되며"
                  " 마이그레이션 파일이 기록됩니다(복구·재구축 시 이 컬럼이 살아남습니다)."
-                 " 삭제는 열지 않습니다 — 컬럼을 지우면 그 안의 데이터가 함께 사라집니다."),
+                 " 삭제는 열지 않습니다 — 컬럼을 지우면 그 안의 데이터가 함께 사라집니다."
+                 + (f" ⚠ 코드 이력이 없는 항목 {len(unrecorded)}건"
+                    f"({', '.join(unrecorded)}) — 지금 복구하면 사라집니다."
+                    if unrecorded else "")),
     }
 
 
@@ -184,22 +201,45 @@ def add_spec_field(body: FieldBody):
                        "is_engine": body.is_engine, "in_ingest": body.in_ingest},
                       kind="product")
 
-    # ④ 마이그레이션 파일 — 화면에서 만든 컬럼이 이력에 없으면 재구축·복구 때 사라진다
+    # ④ 마이그레이션 파일 — 화면에서 만든 컬럼이 이력에 없으면 재구축·복구 때 사라진다.
+    #
+    # **쓰지 못할 수 있다.** 배포 서버에서 앱은 리포 폴더에 쓸 권한이 없다(있어도 쓰면 안 된다 —
+    # 배포 타깃에 파일을 만들면 working tree가 어긋나 다음 git pull이 깨진다).
+    # 실제로 그렇게 실패했다: 운영자가 '내장그래픽(cpu_gpu)'을 만들었을 때 ①~③은 커밋됐는데
+    # 여기서 예외가 나 500이 반환됐다. 운영자 화면엔 '실패'라고 떴지만 **컬럼은 이미 생겼다.**
+    # 되돌릴 수도 없고, 이력도 안 남고, 아무도 그 사실을 몰랐다(2026-07-28 → 07-29 발견).
+    #
+    # 그래서 여기서는 실패해도 요청을 실패로 만들지 않는다. 이미 일어난 변경을 부정하는 대신
+    # **이력이 없다는 사실을 정확히 말한다.** 목록 화면이 그 항목에 계속 표시를 단다.
     rev, prev = _next_revision()
     path = os.path.join(MIG_DIR, f"{rev}_spec_field_{key}.py")
-    io.open(path, "w", encoding="utf-8", newline="").write(
-        _migration_src(rev, prev, key, body))
+    recorded, why = True, None
+    try:
+        io.open(path, "w", encoding="utf-8", newline="").write(
+            _migration_src(rev, prev, key, body))
+    except OSError as e:
+        recorded, why = False, f"{type(e).__name__}: {e}"
+        print(f"[spec-fields] 마이그레이션 파일을 쓰지 못했습니다({key}): {why}")
+
     # ⑤ 버전 스탬프 — DB는 이미 그 상태인데 alembic_version만 뒤처져 있으면
     #    "적용 안 된 마이그레이션이 있다"고 보인다. 생성한 파일은 멱등하게 썼으므로
     #    나중에 upgrade가 다시 돌아도 안전하지만, 상태는 사실과 맞춰 둔다.
-    with engine.begin() as conn:
-        conn.execute(text("UPDATE alembic_version SET version_num = :v"), {"v": rev})
+    #    **파일을 못 썼으면 스탬프도 찍지 않는다** — 없는 리비전을 가리키면 다음 배포에서
+    #    alembic이 "그런 리비전 없음"으로 멈춘다.
+    if recorded:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE alembic_version SET version_num = :v"), {"v": rev})
     SF.reload()
-    return {"ok": True, "field_key": key, "revision": rev,
-            "migration": os.path.basename(path), "undo_id": log_id,
-            "view_rebuilt": body.is_engine,
-            "note": (f"'{body.label}' 항목을 만들었습니다. 마이그레이션 {rev}로 기록했으니"
-                     " 서버를 다시 세워도 남습니다."
+    return {"ok": True, "field_key": key, "revision": rev if recorded else None,
+            "migration": os.path.basename(path) if recorded else None,
+            "undo_id": log_id, "view_rebuilt": body.is_engine,
+            "recorded": recorded,
+            "note": (f"'{body.label}' 항목을 만들었습니다."
+                     + (f" 마이그레이션 {rev}로 기록했으니 서버를 다시 세워도 남습니다."
+                        if recorded else
+                        " 다만 **코드 이력에 남기지 못했습니다**(이 서버에는 쓸 수 없습니다)."
+                        " 지금 상태로는 서버를 다시 세우거나 백업에서 복구하면 이 항목이"
+                        " 사라집니다 — 개발 PC에서 마이그레이션을 추가해야 합니다.")
                      + (" 추천 뷰를 재생성했습니다 — 엔진이 이 값을 읽습니다."
                         if body.is_engine else
                         " 표시용이라 추천 판정에는 쓰이지 않습니다."))}
