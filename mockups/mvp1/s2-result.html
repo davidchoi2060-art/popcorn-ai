@@ -569,12 +569,20 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
     bd.style.cssText='margin-top:6px;font-size:12.5px;font-weight:800;line-height:1.45;';
     pe.parentNode.appendChild(bd);
    }
+   /* cap은 **null일 수 있다** — '200만원 이상'·'AI 추천 예산'처럼 숫자 상한이 없는 표현이면
+      서버가 verdict='none', cap=null을 준다. 예전 코드는 그걸 그대로 toLocaleString()에
+      넘겨 TypeError로 죽었고, **이 스크립트의 나머지가 통째로 멈췄다** — 근거도 안 그려지고
+      고른 티어도 저장되지 않아, 고성능형을 골라도 장바구니엔 추천형이 담겼다(사용자 보고).
+      화면이 죽는 것보다 나쁜 건, 죽은 줄 모르고 다른 구성으로 결제까지 가는 것이다. */
    var ov=s.budget.verdict==='over';
+   var hasCap=s.budget.cap!=null;
    bd.style.color=ov?'#b31b25':'#2b5fd9';
-   bd.textContent=ov
-    ?('예산 초과 — 상한 '+s.budget.cap.toLocaleString()+'원보다 '
-      +s.budget.over_by.toLocaleString()+'원 많습니다')
-    :('예산 안 — 상한 '+s.budget.cap.toLocaleString()+'원');
+   bd.textContent=!hasCap
+    ?'예산 상한을 정하지 않으셨어요 — 이 구성의 총액입니다'
+    :(ov
+      ?('예산 초과 — 상한 '+s.budget.cap.toLocaleString()+'원보다 '
+        +s.budget.over_by.toLocaleString()+'원 많습니다')
+      :('예산 안 — 상한 '+s.budget.cap.toLocaleString()+'원'));
   }
   /* 서버가 준 `reasons`를 화면이 버리고 있었다(슬라이스 58). "모든 견적에는 이유가
      있습니다"라고 해놓고 정작 엔진이 적어 보낸 이유를 한 줄도 보여주지 않았다.

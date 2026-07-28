@@ -716,6 +716,33 @@ def test_usage_floors():
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 티어 전달 계약 — {e}")
 
+    # ⑦ 숫자 상한이 없는 예산('200만원 이상'·'AI 추천 예산')도 견적이어야 한다.
+    # 실제 사고: cap=null을 화면이 toLocaleString()에 넘겨 TypeError로 죽었고,
+    # 그 뒤 스크립트가 통째로 멈춰 고른 티어가 저장되지 않았다 — 고성능형을 골라도
+    # 장바구니엔 추천형이 담겼다. 화면이 죽는 것보다 나쁜 건 죽은 줄 모르고 결제까지 가는 것.
+    _s4, nc = post("/api/recommend", {"mode": "chat", "constraints": [
+        {"l": "예산", "v": "AI 추천 예산"}, {"l": "용도", "v": "고사양 게임"}]})
+    nc = nc or {}
+    hs = (nc.get("sets") or {}).get("highend")
+    rs = (nc.get("sets") or {}).get("recommend")
+    if hs and rs:
+        check("상한 없는 예산에도 고성능이 나온다", hs["budget"]["cap"] is None,
+              None, hs["budget"]["cap"])
+        # 상한이 없다고 무한정 비싸지면 안 된다 — 추천 구성이 기준선이다
+        check("상한 없는 예산의 고성능 <= 추천 x 배수",
+              hs["total"] <= rs["total"] * nc.get("highend_cap_x", 1.5),
+              f"<= {int(rs['total'] * nc.get('highend_cap_x', 1.5)):,}", hs["total"])
+        check("기준선을 근거로 밝힌다",
+              any("정하지 않으" in r for r in hs.get("reasons") or []),
+              "기준선 문구 있음", hs.get("reasons"))
+    # 화면이 cap=null을 무방비로 포맷하지 않는가 (죽으면 그 뒤가 전부 멈춘다)
+    try:
+        html = io.open(s2, encoding="utf-8").read().replace(" ", "")
+        check("S2가 cap=null을 방어한다", "s.budget.cap!=null" in html,
+              "null 가드 있음", "없음")
+    except OSError:
+        pass
+
 
 def _spec_field_guards():
     # 가드 — 잘못된 항목이 스키마를 오염시키면 되돌리기 어렵다

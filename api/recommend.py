@@ -281,7 +281,7 @@ def build_compat(chosen: dict, rules: dict) -> dict:
     return {"power_headroom_pct": headroom, "checks": checks}
 
 
-def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None):
+def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None):
     slot_pools = {}
     for s in SLOTS:
         cands = [p for p in pool if p["part_type"] in SLOT_TYPES[s]]
@@ -294,6 +294,8 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None):
     limit = cap if cap is not None else None
     if limit is not None and tier == "highend":
         limit = int(limit * HIGHEND_CAP_X)
+    if limit_override is not None:
+        limit = limit_override
     chosen = _dfs(slot_pools, limit, rules)
     if chosen is None:
         return None
@@ -431,9 +433,21 @@ def recommend(body: RecommendBody):
             if sets["recommend"] is None:
                 sets["recommend"] = _build_set("recommend", common, cap, rules, floor_note,
                                                relaxed)
-            sets["highend"] = _build_set("highend", hi_pool, cap, rules, floor_note)
+            # 예산을 숫자로 말하지 않아도(‘200만원 이상’·‘AI 추천 예산’) 상한은 있어야 한다.
+            # 없으면 고성능이 3,025만원이 된다 — 램 하나에 931만원을 쓰던 그 구성이
+            # 예산 없는 경로로 그대로 돌아온다. 기준선은 **추천 구성**이다:
+            # "예산을 안 정하셨으니 추천 구성의 1.5배까지 봅니다"가 말이 되는 유일한 기준이다.
+            hi_note, hi_limit = None, None
+            if cap is None and sets["recommend"]:
+                hi_limit = int(sets["recommend"]["total"] * HIGHEND_CAP_X)
+                hi_note = (f"예산 상한을 정하지 않으셔서 추천 구성"
+                           f"({sets['recommend']['total']:,}원)의 {HIGHEND_CAP_X:g}배"
+                           f"({hi_limit:,}원)까지로 잡았습니다")
+            sets["highend"] = _build_set("highend", hi_pool, cap, rules, floor_note,
+                                         hi_note, hi_limit)
             if sets["highend"] is None:
-                sets["highend"] = _build_set("highend", common, cap, rules, floor_note, relaxed)
+                sets["highend"] = _build_set("highend", common, cap, rules, floor_note,
+                                             hi_note or relaxed, hi_limit)
 
         session_id = conn.execute(text(
             "INSERT INTO consult_sessions (member_id, mode, constraints) VALUES"
