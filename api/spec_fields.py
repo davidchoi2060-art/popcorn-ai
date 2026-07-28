@@ -111,3 +111,40 @@ def fields_for(part_type: str) -> list:
             continue
         out.append({**r, "required": part_type in (r["required_for"] or [])})
     return out
+
+
+def rule_readers(conn) -> dict:
+    """(부품 종류, 필드) → 그 값을 실제로 읽는 규칙 이름들 (슬라이스 83).
+
+    **필드 이름만 맞춰선 안 된다.** case_board의 ref_field는 메인보드의 form_factor다 —
+    이름만 보면 파워·SSD의 form_factor까지 "읽고 있다"고 말하게 되는데, 그 둘은
+    실제로 아무도 안 읽는다(근거 없이 검수 대기로 묶고 있다는 뜻이라 정확해야 한다).
+
+    호환 규칙과 용도 하한을 함께 본다. 호환 규칙만 보면 capacity_gb가 '죽은 필드'로
+    보이는데, 실제로는 게임용 SSD 500GB 하한 등이 그걸 쓴다.
+
+    관리자 화면 두 곳(조립 호환 규칙 · 상품 스펙 관리)이 같은 답을 해야 하므로
+    여기 한 곳에 둔다 — 두 번 구현하면 언젠가 서로 다른 말을 한다.
+    """
+    from .recommend import SLOT_TYPES
+
+    out: dict = {}
+
+    def add(pt, field, name):
+        out.setdefault((pt, field), set()).add(name)
+
+    for r in conn.execute(text(
+            "SELECT rule_key, slot, field, ref_slot, ref_field, part_types"
+            " FROM compat_rules WHERE active")).mappings():
+        own = r["part_types"] or list(SLOT_TYPES.get(r["slot"], ()))
+        for pt in own:
+            add(pt, r["field"], r["rule_key"])
+        for pt in SLOT_TYPES.get(r["ref_slot"], ()):
+            add(pt, r["ref_field"], r["rule_key"])
+
+    for r in conn.execute(text(
+            "SELECT DISTINCT slot, field FROM usage_floors")).mappings():
+        for pt in SLOT_TYPES.get(r["slot"], ()):
+            add(pt, r["field"], "용도 하한")
+
+    return {k: sorted(v) for k, v in out.items()}

@@ -269,7 +269,11 @@
           </div>
           <div id="warnBox"></div>
           <div id="addForm" class="card mb-3 d-none"><div class="card-body"></div></div>
-          <div class="card"><div class="card-body p-0"><div class="table-responsive">
+          <!-- 부품 축 — 한 사양이 여러 부품에 걸리므로(form_factor는 4곳, tag_rgb는 10곳)
+               '부품별 정렬'은 성립하지 않는다. 부품을 먼저 고르고 그 사양만 본다. -->
+          <div id="partAxis" class="mb-3"></div>
+          <div id="partView"></div>
+          <div id="allView" class="card d-none"><div class="card-body p-0"><div class="table-responsive">
             <table class="table table-sm fs-9 mb-0 align-middle">
               <thead class="text-body-tertiary"><tr>
                 <th class="ps-4">항목 키</th><th>표시 이름</th><th>자료형</th>
@@ -281,12 +285,141 @@
           
       <script>
       (function(){
-        var META=null, PART=[], TYPES=[];
+        var META=null, PART=[], TYPES=[], CUR=null;   // CUR: 고른 부품(null = 전체)
         function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
           return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
         function n(x){return (x==null?0:x).toLocaleString();}
+        function pct(a,b){ return b ? Math.round(a*100/b) : 0; }
+
+        // 충족률 막대 — 색에만 의존하지 않는다(초록 토큰이 없고, 색맹 대응).
+        // 숫자와 퍼센트를 항상 함께 쓴다.
+        function bar(a,b){
+          var p = pct(a,b);
+          var tone = p >= 90 ? "primary" : (p >= 60 ? "info" : "warning");
+          return '<div class="d-flex align-items-center gap-2">'
+            + '<div class="progress flex-1" style="height:6px;min-width:90px;">'
+            + '<div class="progress-bar bg-'+tone+'" style="width:'+p+'%"></div></div>'
+            + '<span class="fs-10 text-body-tertiary" style="white-space:nowrap;">'
+            + n(a)+'/'+n(b)+' · '+p+'%</span></div>';
+        }
+
+        function axis(){
+          var parts = META.parts || [];
+          function chip(p){
+            var on = CUR === p.part_type;
+            // 필수 사양 중 가장 덜 찬 것 — 이 부품의 병목이다
+            var req = p.fields.filter(function(f){ return f.required; });
+            var worst = req.length && p.live
+              ? Math.min.apply(null, req.map(function(f){ return pct(f.filled, p.live); }))
+              : null;
+            return '<button type="button" data-pt="'+esc(p.part_type)+'"'
+              + ' class="btn btn-sm '+(on?"btn-primary":"btn-phoenix-secondary")+' me-2 mb-2">'
+              + esc(p.label)
+              + ' <span class="fs-10">'+n(p.live)+'</span>'
+              + (worst !== null && worst < 90
+                  ? ' <span class="badge badge-phoenix badge-phoenix-warning fs-10 ms-1">'
+                    + worst + '%</span>' : '')
+              + '</button>';
+          }
+          var core = parts.filter(function(p){ return p.group === "core"; });
+          var peri = parts.filter(function(p){ return p.group !== "core"; });
+          document.getElementById("partAxis").innerHTML =
+            '<div class="card"><div class="card-body py-3">'
+            + '<div class="fs-10 text-body-tertiary mb-2">견적에 들어가는 부품 <span class="text-body-quaternary">— 8슬롯이 모두 차야 견적이 성립합니다</span></div>'
+            + '<div>' + core.map(chip).join("") + '</div>'
+            + '<div class="fs-10 text-body-tertiary mt-2 mb-2">주변기기 <span class="text-body-quaternary">— 견적 슬롯에는 들어가지 않습니다</span></div>'
+            + '<div>' + peri.map(chip).join("") + '</div>'
+            + '<div class="mt-2 pt-2 border-top"><button type="button" data-pt="" class="btn btn-sm '
+            + (CUR===null?"btn-primary":"btn-phoenix-secondary")+'">전체 항목 '
+            + '<span class="fs-10">'+n((META.items||[]).length)+'</span></button>'
+            + '<span class="fs-10 text-body-tertiary ms-2">항목을 추가하거나 전체 구조를 볼 때</span></div>'
+            + '</div></div>';
+          document.querySelectorAll("#partAxis button[data-pt]").forEach(function(b){
+            b.onclick = function(){
+              CUR = b.dataset.pt || null;
+              try { sessionStorage.setItem("specPart", CUR || "__all__"); } catch(e){}
+              render();
+            };
+          });
+        }
+
+        function partCard(){
+          var p = (META.parts||[]).filter(function(x){ return x.part_type === CUR; })[0];
+          var host = document.getElementById("partView");
+          if(!p){ host.innerHTML = ""; return; }
+          // 필수 → 선택 순. 필수 안에서는 **덜 찬 것이 위**다 — 그게 작업 순서다.
+          var req = p.fields.filter(function(f){ return f.required; })
+                            .sort(function(a,b){ return pct(a.filled,p.live)-pct(b.filled,p.live); });
+          var opt = p.fields.filter(function(f){ return !f.required; });
+          function row(f, isReq){
+            var miss = Math.max(0, p.live - f.filled);
+            var used = f.used_by || [];
+            // '필수가 아니면 영향 없음'은 거짓이다 — 규칙이 읽는 값이 비면
+            // 그 규칙이 걸리는 조합에서 빠진다(전체 탈락이 아닐 뿐이다).
+            var impact;
+            if(isReq){
+              impact = miss
+                ? '<span class="text-body-secondary">이 값이 없어 <b>'+n(miss)+'개</b>가 추천에서 빠집니다</span>'
+                : '<span class="text-body-quaternary">전부 채워졌습니다</span>';
+            } else if(used.length){
+              impact = miss
+                ? '<span class="text-body-secondary"><b>'+n(miss)+'개</b>는 <code class="fs-10">'
+                  + esc(used.join(" · ")) + '</code> 검사를 통과하지 못해 그 조합에서 빠집니다</span>'
+                : '<span class="text-body-quaternary">전부 채워졌습니다</span>';
+            } else {
+              impact = '<span class="text-body-quaternary">읽는 규칙이 없어 추천에 영향이 없습니다</span>';
+            }
+            var use = f.is_engine
+              ? '<span class="badge badge-phoenix badge-phoenix-primary fs-10">추천 판정</span>'
+              : '<span class="badge badge-phoenix badge-phoenix-secondary fs-10">표시용</span>';
+            if(isReq && !used.length){
+              // 필수인데 아무 규칙도 읽지 않는다 — 근거 없이 상품을 묶고 있다
+              use += ' <span class="badge badge-phoenix badge-phoenix-warning fs-10">읽는 규칙 없음</span>';
+            }
+            return '<tr>'
+              + '<td class="ps-3"><b class="text-body-highlight">'+esc(f.label)+'</b>'
+              + ' <code class="fs-10">'+esc(f.field_key)+'</code></td>'
+              + '<td style="min-width:200px;">'+bar(f.filled, p.live)+'</td>'
+              + '<td class="fs-10">'+impact+'</td>'
+              + '<td>'+use+'</td>'
+              + '</tr>';
+          }
+          var body = "";
+          if(req.length){
+            body += '<tr class="text-body-tertiary"><td colspan="4" class="ps-3 fs-10 fw-bold pt-3">'
+                 + '필수 사양 — 하나라도 비면 추천에서 빠집니다</td></tr>'
+                 + req.map(function(f){ return row(f, true); }).join("");
+          }
+          if(opt.length){
+            body += '<tr class="text-body-tertiary"><td colspan="4" class="ps-3 fs-10 fw-bold pt-3">'
+                 + '선택 사양</td></tr>'
+                 + opt.map(function(f){ return row(f, false); }).join("");
+          }
+          if(!p.fields.length){
+            body = '<tr><td colspan="4" class="ps-3 py-3 text-body-tertiary">'
+                 + '이 부품에 적용되는 사양 항목이 없습니다.</td></tr>';
+          }
+          host.innerHTML = '<div class="card"><div class="card-body pb-0">'
+            + '<h5 class="mb-1">'+esc(p.label)+'</h5>'
+            + '<p class="fs-9 text-body-tertiary mb-0">판매중·재고 있는 상품 <b>'+n(p.live)+'개</b>'
+            + ' <span class="text-body-quaternary">· 카탈로그 보유 '+n(p.total)+'개</span>'
+            + (p.in_quote ? '' : ' <span class="badge badge-phoenix badge-phoenix-secondary fs-10 ms-1">견적 슬롯 아님</span>')
+            + '</p></div>'
+            + '<div class="table-responsive"><table class="table table-sm fs-9 mb-0 align-middle">'
+            + '<thead class="text-body-tertiary"><tr><th class="ps-3">사양</th>'
+            + '<th>채워진 비율</th><th>영향</th><th>쓰임</th></tr></thead>'
+            + '<tbody>'+body+'</tbody></table></div></div>';
+        }
 
         function render(){
+          axis();
+          document.getElementById("allView").classList.toggle("d-none", CUR !== null);
+          document.getElementById("partView").classList.toggle("d-none", CUR === null);
+          if(CUR !== null){ partCard(); renderWarn(); return; }
+          renderAll();
+        }
+
+        function renderAll(){
           document.getElementById("rows").innerHTML = META.items.map(function(f){
             var pts=(f.part_types||[]);
             var req=(f.required_for||[]);
@@ -314,9 +447,15 @@
               + '<td class="text-end">'+n(f.filled)+'</td>'
               + '<td>'+use+'</td><td>'+origin+'</td></tr>';
           }).join("");
+          renderWarn();
+        }
+
+        function renderWarn(){
           var w=document.getElementById("warnBox");
           w.className="alert alert-subtle-info py-2 px-3 fs-9 mb-3";
-          w.innerHTML='<b>* 표시는 그 부품 종류의 필수 사양</b>입니다 — 채워지지 않으면 추천에서 빠집니다. '
+          w.innerHTML = (CUR === null
+              ? '<b>* 표시는 그 부품 종류의 필수 사양</b>입니다 — 채워지지 않으면 추천에서 빠집니다. '
+              : '<b>분모는 판매중·재고 있는 상품</b>입니다 — 실제로 팔 수 있는 것 기준입니다. ')
             + esc(META.note);
           if(window.feather) feather.replace();
         }
@@ -389,6 +528,13 @@
             .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
             .then(function(d){
               META=d; PART=d.part_types; TYPES=d.data_types;
+              // 마지막으로 보던 부품을 기억한다 — 검수는 한 부품을 여러 번 오간다.
+              // 서버가 그 부품을 더 이상 주지 않으면 조용히 전체로 돌아간다.
+              var want = null;
+              try { want = sessionStorage.getItem("specPart"); } catch(e){}
+              var has = (d.parts||[]).some(function(p){ return p.part_type === want; });
+              CUR = want === "__all__" ? null
+                  : (has ? want : (((d.parts||[])[0] || {}).part_type || null));
               var badge=document.getElementById("dataSrc");
               badge.textContent="실데이터 · Cloud SQL";
               badge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");

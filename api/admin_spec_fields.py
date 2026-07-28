@@ -43,6 +43,14 @@ RESERVED = {"product_code", "part_type", "created_at", "updated_at", "verified_y
 ALL_PART_TYPES = ("CPU", "MB", "RAM", "GPU", "SSD", "HDD", "POWER", "CASE",
                   "COOLER_CPU_AIR", "COOLER_CPU_AIO",
                   "MONITOR", "KEYBOARD", "MOUSE", "HEADSET", "SPEAKER", "WEBCAM")
+# 화면의 부품 축. 견적 대상(부품)과 주변기기를 나눈다 — 주변기기는 8슬롯에 안 들어간다.
+PART_LABEL = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
+              "CASE": "케이스", "POWER": "파워", "SSD": "SSD", "HDD": "HDD",
+              "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수랭)",
+              "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
+              "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠"}
+CORE_PARTS = ("CPU", "MB", "RAM", "GPU", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO",
+              "POWER", "SSD", "HDD")
 
 
 def _add_col_to_view(conn, view: str, key: str) -> bool:
@@ -95,6 +103,28 @@ def list_spec_fields():
                 f"SELECT '{f['field_key']}' AS field_key,"
                 f" count({f['field_key']}) AS n FROM product_specs"
                 for f in live) + ") x")).all()) if live else {}
+
+        # 부품별 충족률 — 이 화면의 핵심 수치다(슬라이스 83).
+        # 지금까지 '채워진 값'은 **분모가 전 상품 22,841**이라 아무것도 알려주지 못했다.
+        # socket 3,476은 CPU가 준비됐는지 말해주지 않는다(socket은 CPU·MB에만 해당).
+        # 부품을 축으로 세우면 "CPU 301개 중 284개(94%)"가 되고, 그게 검수 우선순위다.
+        cols = ", ".join(f"count(s.{f['field_key']}) AS f_{f['field_key']}" for f in live)
+        fill_rows = conn.execute(text(
+            "SELECT p.part_type, count(*) AS n"
+            + (", " + cols if cols else "")
+            + " FROM products p JOIN product_specs s USING (product_code)"
+            " WHERE p.status = '판매중' AND p.stock_qty > 0"
+            " GROUP BY p.part_type")).mappings().all()
+        fill = {r["part_type"]: r for r in fill_rows}
+        # 판매중·재고와 무관한 전체 보유량도 함께 준다(축 칩이 '팔 수 있는 것'을 말하되,
+        # 카탈로그에 몇 개가 있는지도 알아야 "왜 이렇게 적지?"에 답할 수 있다)
+        total_by = dict(conn.execute(text(
+            "SELECT part_type, count(*) FROM products"
+            " WHERE category_group IN ('core_part','peripheral')"
+            " GROUP BY part_type")).all())
+        # 이 값을 읽는 규칙 — '필수가 아니면 영향 없음'은 거짓이다.
+        # radiator_rows는 필수가 아니지만 비면 그 수랭은 어떤 케이스와도 못 묶인다.
+        readers = SF.rule_readers(conn)
     # 화면에서 만든 항목 중 **코드 이력이 없는 것**. 서버에서는 마이그레이션 파일을 쓸 수
     # 없어 이 상태가 생긴다(cpu_gpu 전례). 그대로 두면 재구축·복구 때 컬럼이 사라지는데
     # 아무 데도 표시가 없어 알 길이 없었다 — 여기서 드러낸다.
@@ -121,6 +151,24 @@ def list_spec_fields():
         } for f in fields],
         "data_types": sorted(TYPES),
         "part_types": list(ALL_PART_TYPES),
+        # 부품 축 — 화면이 이걸로 칩을 그리고, 고른 부품의 사양만 보여준다.
+        # 한 사양이 여러 부품에 걸리므로(form_factor는 4곳, tag_rgb는 10곳)
+        # '부품별 정렬'은 성립하지 않는다. 축을 바꿔야 중복 없이 보인다.
+        "parts": [{
+            "part_type": pt,
+            "label": PART_LABEL.get(pt, pt),
+            "group": "core" if pt in CORE_PARTS else "peripheral",
+            "in_quote": pt in CORE_PARTS,
+            "live": (fill.get(pt) or {}).get("n", 0),      # 판매중 · 재고 > 0
+            "total": total_by.get(pt, 0),
+            "fields": [{
+                "field_key": f["field_key"], "label": f["label"],
+                "required": pt in (f["required_for"] or []),
+                "is_engine": f["is_engine"],
+                "used_by": readers.get((pt, f["field_key"]), []),
+                "filled": (fill.get(pt) or {}).get("f_" + f["field_key"], 0),
+            } for f in fields if pt in (f["part_types"] or [])],
+        } for pt in ALL_PART_TYPES],
         # 메타에는 있는데 컬럼이 없는 항목 — 있으면 화면이 그 사실을 말해야 한다
         "ghosts": ghosts,
         # 컬럼은 있는데 코드 이력이 없는 항목 — 복구하면 사라진다

@@ -71,38 +71,16 @@ def engine_rules():
 
     # 카테고리별 필수 사양 — 화면이 표를 하드코딩하고 있었다(존재하지 않는 {igpu}·{m2_slots}·
     # {pcie_power}·{slot_width}까지). 게이트가 실제로 읽는 것은 spec_field_defs 메타다.
-    from .recommend import SLOT_TYPES
-    from .spec_fields import required_map, all_fields
+    from .spec_fields import required_map, all_fields, rule_readers
     labels = {f["field_key"]: f["label"] for f in all_fields()}
     rm = required_map()
-
-    # 용도 하한도 사양을 읽는다 — 호환 규칙만 보면 capacity_gb가 '아무도 안 읽는 값'으로
-    # 보인다(실제로는 게임용 SSD 500GB 하한 등이 그걸 쓴다).
     with engine.connect() as conn:
-        floor_use = {(r["slot"], r["field"]) for r in conn.execute(text(
-            "SELECT slot, field FROM usage_floors")).mappings()}
-
-    def _readers(pt: str, key: str) -> list:
-        """(부품 종류, 필드)를 실제로 읽는 규칙. **필드 이름만 맞춰선 안 된다** —
-        case_board의 ref_field는 메인보드의 form_factor다. 이름만 보면 파워·SSD의
-        form_factor까지 '읽고 있다'고 말하게 되는데, 그 둘은 아무도 안 읽는다."""
-        out = set()
-        for r in rule_rows:
-            if not r["active"]:
-                continue
-            own = r["part_types"] or list(SLOT_TYPES.get(r["slot"], ()))
-            if key == r["field"] and pt in own:
-                out.add(r["rule_key"])
-            if key == r["ref_field"] and pt in SLOT_TYPES.get(r["ref_slot"], ()):
-                out.add(r["rule_key"])
-        for slot, field in floor_use:
-            if field == key and pt in SLOT_TYPES.get(slot, ()):
-                out.add("용도 하한")
-        return sorted(out)
+        readers = rule_readers(conn)     # 두 화면이 같은 답을 하도록 한 곳에서 계산한다
 
     required = [{
         "part_type": pt, "part_label": PART_KO.get(pt, pt),
-        "fields": [{"key": k, "label": labels.get(k, k), "used_by": _readers(pt, k)}
+        "fields": [{"key": k, "label": labels.get(k, k),
+                    "used_by": readers.get((pt, k), [])}
                    for k in sorted(rm.get(pt, []))],
     } for pt in sorted(rm) if rm.get(pt)]
 

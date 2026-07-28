@@ -722,6 +722,36 @@ def test_spec_fields():
     check("화면에서 만든 사양 항목에 마이그레이션 이력이 있다",
           d.get("unrecorded") == [], [], d.get("unrecorded"))
 
+    # 부품 축 — 이 화면의 숫자는 전부 서버가 준다(슬라이스 83).
+    # 예전 '채워진 값'은 분모가 전 상품 22,841이라 "CPU가 준비됐는가"에 답하지 못했다.
+    parts = d.get("parts") or []
+    check("부품 축을 서버가 준다", len(parts) >= 10, ">= 10", len(parts))
+    core = [p for p in parts if p.get("group") == "core"]
+    check("견적 대상 부품이 구분된다", len(core) == 10, 10, len(core))
+    # 충족 수는 분모(판매중·재고)를 넘을 수 없다 — 넘으면 분모·분자가 다른 모집단이다
+    bad = [f"{p['part_type']}.{f['field_key']}" for p in parts for f in p["fields"]
+           if f["filled"] > p["live"]]
+    check("충족 수 <= 판매중·재고 수", not bad, "초과 없음", bad)
+    # 필수 여부와 메타가 어긋나면 화면이 "빠집니다"를 잘못 말한다
+    rm = {f["field_key"]: (f["required_for"] or []) for f in d["items"]}
+    mism = [f"{p['part_type']}.{f['field_key']}" for p in parts for f in p["fields"]
+            if f["required"] != (p["part_type"] in rm.get(f["field_key"], []))]
+    check("부품 축의 필수 표시 = 메타", not mism, "일치", mism)
+    if _engine is not None:
+        pt0 = next((p for p in core if p["live"]), None)
+        if pt0:
+            live_db = db_one("SELECT count(*) FROM products WHERE part_type=:p"
+                             " AND status='판매중' AND stock_qty>0", p=pt0["part_type"])
+            check(f"부품 축 분모 = DB 실측({pt0['part_type']})",
+                  pt0["live"] == live_db, live_db, pt0["live"])
+    # 두 화면이 같은 답을 해야 한다 — '이 값을 읽는 규칙'은 한 곳에서 계산한다
+    er = get("/api/admin/engine-rules")["compat"]["required"]
+    er_map = {(g["part_type"], f["key"]): f["used_by"] for g in er for f in g["fields"]}
+    diff = [f"{k[0]}.{k[1]}" for k, v in er_map.items()
+            if any(f["field_key"] == k[1] and f.get("used_by") != v
+                   for p in parts if p["part_type"] == k[0] for f in p["fields"])]
+    check("스펙 관리와 호환 규칙 화면이 같은 '읽는 규칙'을 말한다", not diff, "일치", diff)
+
     # 사양 값 입력 — 화면에서 만든 항목에 값을 넣을 길이 있어야 한다(슬라이스 57).
     # 검수 큐는 '검수 행이 있는 필드'만 다루므로 새 항목은 영영 비어 있게 된다.
     pc = db_one("""
