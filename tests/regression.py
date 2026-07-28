@@ -915,6 +915,26 @@ def test_usage_floors():
                  if "navbar-vertical" in io.open(p, encoding="utf-8").read()
                  and "admin-menu.js" not in io.open(p, encoding="utf-8").read()]
         check("메뉴 스크립트가 전 화면에 주입됐다", not mmiss, "누락 없음", mmiss)
+
+        # 검수 [직접 수정]은 브라우저 기본 prompt()였다 — 값 하나만 묻는 회색 상자에
+        # 상품이 무엇인지도 다른 사양이 어떤지도 없었다(사용자 지적). 맥락 없는 판단은
+        # 오판을 부른다. 모달로 바꾸되 **새 API를 만들지 않는다**(기존 process 재사용).
+        rq = io.open(os.path.join(ROOT, "mockups", "admin", "review-queue.html"),
+                     encoding="utf-8").read()
+        check("검수 직접 수정이 prompt()를 쓰지 않는다",
+              "prompt(`${q.name}\\n${FIELD_KO" not in rq, "모달 사용", "prompt 잔존")
+        check("검수 직접 수정 모달이 있다", "openFixModal" in rq, "openFixModal", "없음")
+        check("모달이 기존 검수 API를 재사용한다",
+              "/process`, {action:\"manual\"" in rq, "process 호출", "다른 경로")
+        # 하단 채팅은 Phoenix 고객지원 데모였다("Eric" · 영문 문의 목록)
+        hjs = io.open(os.path.join(ROOT, "mockups", "shared", "admin-helper.js"),
+                      encoding="utf-8").read()
+        check("운영 도우미가 답을 지어내지 않는다",
+              "준비 중" in hjs, "준비 중 표기", "없음")
+        hmiss = [os.path.basename(p) for p in pages
+                 if "support-chat-container" in io.open(p, encoding="utf-8").read()
+                 and "admin-helper.js" not in io.open(p, encoding="utf-8").read()]
+        check("도우미 스크립트가 채팅 있는 화면에 모두 주입됐다", not hmiss, "누락 없음", hmiss)
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 작업 패널 주입 — {e}")
 
