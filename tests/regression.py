@@ -583,26 +583,80 @@ def test_compat():
     check("compat-rules는 불러오기 실패를 알린다", "불러오지 못했습니다" in _t,
           "실패 안내 있음", "없음")
 
-    # 화면에 같은 블록이 두 번 붙지 않았는가(슬라이스 87 실사고).
-    # 재고 입고 화면에 다른 화면의 목록 카드가 통째로 붙어 있었다 — `footer`가 둘이 되어
-    # position-absolute로 **같은 자리에 겹쳐 찍혔고**(사용자 신고: "하단 텍스트가 겹쳐서 나옴"),
-    # id도 rows·kpis·pills가 중복돼 getElementById가 첫 번째만 채웠다.
-    # 두 번째 표는 영원히 빈 채로 남아 하단을 어지럽혔다.
+    # 화면 구조 전수 감사 — 붙여넣기 사고가 남기는 흔적(슬라이스 87·88 실사고).
+    #
+    # 재고 입고에 다른 화면의 목록 카드가, 상품 스펙 관리에 상품 관리 화면의 스크립트가
+    # 통째로 붙어 있었다. 눈에 보인 증상은 "하단 글자가 겹친다" 하나뿐이었지만
+    # 실제로는 네 가지가 함께 어긋나 있었다. 정적으로 전부 잡는다.
+    #
+    #   A 푸터 중복      position-absolute라 같은 자리에 겹쳐 찍힌다
+    #   B id 중복        getElementById는 첫 번째만 준다 — 나머지는 빈 채로 남는다
+    #   D 끊긴 참조      JS가 부르는 id가 마크업에 없다 → 그 기능이 조용히 죽는다
+    #   E 태그 불균형    짝 없는 닫는 태그
+    #
+    # 오탐을 두 군데서 뺀다: 빈 목록용 `<td colspan>` 행은 데이터 열이 아니고,
+    # `el.id = "x"`로 JS가 만드는 요소는 '없는 것'이 아니다.
     import glob as _g2
     import re as _re2
-    dup_foot, dup_id = [], []
-    for _p in _g2.glob(os.path.join(ROOT, "mockups", "admin", "*.html")):
+    from collections import Counter as _C
+    from html.parser import HTMLParser as _HP
+
+    _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
+             "meta", "param", "source", "track", "wbr"}
+
+    class _S(_HP):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack, self.stray, self.ids, self.foot, self.insc = [], [], [], 0, 0
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            if tag == "script":
+                self.insc += 1
+            if self.insc:
+                return
+            if a.get("id"):
+                self.ids.append(a["id"])
+            if tag == "footer" and "position-absolute" in (a.get("class") or ""):
+                self.foot += 1
+            if tag not in _VOID:
+                self.stack.append(tag)
+
+        def handle_endtag(self, tag):
+            if tag == "script":
+                self.insc = max(0, self.insc - 1)
+                return
+            if self.insc or tag in _VOID:
+                return
+            for k in range(len(self.stack) - 1, -1, -1):
+                if self.stack[k] == tag:
+                    del self.stack[k:]
+                    return
+            self.stray.append(tag)
+
+    _bad = []
+    for _p in sorted(_g2.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
         _s = io.open(_p, encoding="utf-8").read()
-        if _s.count('<footer class="footer position-absolute">') > 1:
-            dup_foot.append(_n)
-        for _k in ("rows", "kpis", "pills", "cards"):
-            if _s.count(f'id="{_k}"') > 1:
-                dup_id.append(f"{_n}#{_k}")
-    check("화면마다 푸터는 하나다", not dup_foot, "중복 없음", dup_foot)
-    check("목록 컨테이너 id가 화면에 하나뿐이다", not dup_id, "중복 없음", dup_id)
+        _st = _S()
+        _st.feed(_s)
+        _js = chr(10).join(_re2.findall(r"<script[^>]*>(.*?)</script>", _s, _re2.S))
+        if _st.foot > 1:
+            _bad.append(f"{_n}: 푸터 {_st.foot}개")
+        for _k, _v in _C(_st.ids).items():
+            if _v > 1:
+                _bad.append(f"{_n}: id={_k} {_v}개")
+        _made = (set(_re2.findall(r'id="([^"{$]+)"', _js))
+                 | set(_re2.findall(r'\.id\s*=\s*"([^"]+)"', _js)))
+        for _b in sorted(set(_re2.findall(r'getElementById\("([^"]+)"\)', _js))
+                         - set(_st.ids) - _made):
+            if "$" not in _b and "+" not in _b:
+                _bad.append(f"{_n}: JS가 #{_b}를 부르는데 없다")
+        if _st.stray:
+            _bad.append(f"{_n}: 짝 없는 닫는 태그 {_C(_st.stray).most_common(2)}")
+    check("관리자 화면 구조 감사(푸터·id 중복·끊긴 참조·태그)", not _bad, "이상 없음", _bad)
 
     compat = rec("100만원")["value"]["compat"]
     keys = {c["key"] for c in compat["checks"]}
