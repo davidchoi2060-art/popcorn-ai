@@ -25,13 +25,25 @@ from .db import engine
 router = APIRouter(prefix="/api/admin")
 
 # 대기 사유 파생 — 입고 화면(admin_stock)과 같은 조건을 쓴다(기준이 갈리면 숫자가 갈린다)
-_PENDING = """
-    SELECT p.product_code, p.sku, p.product_name, p.part_type, p.stock_qty, p.safety_stock,
-           p.purchase_price
+#
+# **서버 페이지네이션이다**(슬라이스 86). 예전에는 조건에 맞는 전 행을 돌려줬고,
+# 실측 15,261건 · 3.6MB였다 — 화면이 열리는 데 몇 초가 걸렸고 그 뒤로도 브라우저가
+# 그 표를 통째로 그려야 했다. 목록은 전부 서버 페이지네이션이라는 규약(슬라이스 54)에서
+# 이 화면만 빠져 있었다.
+_WHERE = """
     FROM products p
     WHERE p.status NOT IN ('단종','삭제대기')
       AND (p.stock_qty = 0 OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+      AND (:q = '' OR p.product_name ILIKE :like OR p.sku ILIKE :like
+           OR CAST(p.product_code AS TEXT) = :q)
+      AND (:part_type = '' OR p.part_type = :part_type)
+"""
+_PENDING = """
+    SELECT p.product_code, p.sku, p.product_name, p.part_type, p.stock_qty, p.safety_stock,
+           p.purchase_price
+""" + _WHERE + """
     ORDER BY p.stock_qty, p.product_code
+    LIMIT :size OFFSET :offset
 """
 
 
@@ -42,14 +54,28 @@ def _why(r) -> str:
 
 
 @router.get("/sourcing")
-def sourcing():
+def sourcing(page: int = 1, size: int = 100, q: str = "", part_type: str = ""):
+    """매입 견적 대기 — 서버 페이지네이션 + 검색.
+
+    `q`는 상품명·SKU·상품코드를 함께 본다(운영자는 셋 중 아무거나 손에 있는 것으로 찾는다).
+    견적·확정 이력은 **이 페이지의 상품에 대해서만** 조회한다 — 예전에는 진행 중인 견적과
+    확정 이력을 전건 읽고 나서 목록에 붙였다.
+    """
+    size = max(1, min(size, 500))
+    page = max(1, page)
+    kw = (q or "").strip()
+    p = {"q": kw, "like": f"%{kw}%", "part_type": (part_type or "").strip(),
+         "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
-        rows = conn.execute(text(_PENDING)).mappings().all()
+        total = conn.execute(text("SELECT COUNT(*) " + _WHERE), p).scalar_one()
+        rows = conn.execute(text(_PENDING), p).mappings().all()
+        codes = [r["product_code"] for r in rows]
         quotes = conn.execute(text(
             "SELECT q.quote_id, q.product_code, q.supplier_id, q.vendor, q.price, q.status,"
             " q.replied_at, q.memo, q.created_at, s.name AS supplier"
             " FROM product_sourcing_quotes q LEFT JOIN suppliers s USING (supplier_id)"
-            " WHERE q.status IN ('요청','회신') ORDER BY q.quote_id")).mappings().all()
+            " WHERE q.status IN ('요청','회신') AND q.product_code = ANY(:c)"
+            " ORDER BY q.quote_id"), {"c": codes}).mappings().all() if codes else []
         sups = conn.execute(text(
             "SELECT supplier_id, name FROM suppliers ORDER BY supplier_id")).mappings().all()
         done = conn.execute(text(
@@ -60,7 +86,9 @@ def sourcing():
             "SELECT DISTINCT ON (q.product_code) q.product_code, q.price, q.replied_at,"
             " s.name AS supplier FROM product_sourcing_quotes q"
             " LEFT JOIN suppliers s USING (supplier_id)"
-            " WHERE q.status='확정' ORDER BY q.product_code, q.quote_id DESC")).mappings().all()
+            " WHERE q.status='확정' AND q.product_code = ANY(:c)"
+            " ORDER BY q.product_code, q.quote_id DESC"),
+            {"c": codes}).mappings().all() if codes else []
     last_fix = {c["product_code"]: {"price": c["price"], "supplier": c["supplier"]}
                 for c in confirmed}
 
@@ -89,8 +117,12 @@ def sourcing():
             } for q in qs],
         })
     return {"items": items, "done_today": done,
+            "page": page, "size": size, "total": total,
+            "pages": (total + size - 1) // size,
+            "q": kw, "part_type": p["part_type"],
             "suppliers": [{"id": s["supplier_id"], "name": s["name"]} for s in sups],
-            "note": ("대기 목록은 재고·안전재고에서 파생합니다(별도 큐 테이블 없음) ·"
+            "note": (f"전체 {total:,}건 중 {page}페이지 ·"
+                     " 대기 목록은 재고·안전재고에서 파생합니다(별도 큐 테이블 없음) ·"
                      " 견적 요청·회신은 **기록**이며 실제 발송·자동 수신 연동은 준비 중입니다"
                      " — 공급처 회신은 운영자가 대행 입력합니다 ·"
                      " 확정은 가격 결정이며 재고는 입고 화면에서 늘어납니다.")}

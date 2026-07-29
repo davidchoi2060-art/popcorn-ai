@@ -71,6 +71,11 @@ def db_one(sql, **p):
         return c.execute(text(sql), p).scalar()
 
 
+def _uq(s):
+    import urllib.parse
+    return urllib.parse.quote(s)
+
+
 def db_all(sql, **p):
     """행 목록(dict). DB에 닿지 못하면 빈 목록."""
     if _engine is None:
@@ -1564,9 +1569,19 @@ def test_consistency():
           f'<= {stock_res["size"]}', len(stock_res["items"]))
     check("검색어 없이는 직접 등록 후보를 보내지 않는다",
           stock_res["catalog"] == [], "빈 목록", len(stock_res["catalog"]))
-    sourcing = get("/api/admin/sourcing")["items"]
-    check("매입 대기 = 입고 대기(같은 파생 조건)", len(sourcing) == stock_res["total"],
-          stock_res["total"], len(sourcing))
+    src = get("/api/admin/sourcing")
+    # 두 화면이 같은 파생 조건을 쓴다 — 이제 둘 다 페이지라서 **total끼리** 대조한다
+    # (예전엔 sourcing이 전 행을 보내 len(items)와 비교했다: 15,261건 · 3.6MB).
+    check("매입 대기 = 입고 대기(같은 파생 조건)", src["total"] == stock_res["total"],
+          stock_res["total"], src["total"])
+    check("매입 견적 목록은 한 페이지만 보낸다(전량 전송 금지)",
+          len(src["items"]) <= src["size"], f'<= {src["size"]}', len(src["items"]))
+    # 검색이 실제로 좁히는가 — 화면 상단 검색이 서버까지 가는지 확인한다
+    narrowed = get("/api/admin/sourcing?q=" + _uq("삼성"))
+    check("매입 견적 검색이 서버에서 좁힌다", narrowed["total"] < src["total"],
+          f'< {src["total"]}', narrowed["total"])
+    none = get("/api/admin/sourcing?q=" + _uq("ZZ존재하지않는상품ZZ"))
+    check("없는 검색어는 0건", none["total"] == 0, 0, none["total"])
     active_rf = [r for r in get("/api/admin/refunds")["items"]
                  if r["status"] in ("접수", "검토", "수거·처리")]
     check("활성 환불", dash["refund"] == len(active_rf), len(active_rf), dash["refund"])

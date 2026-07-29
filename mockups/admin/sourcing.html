@@ -267,7 +267,22 @@
           <p class="text-body-tertiary mb-0">재고가 소진되면 자동으로 여기 모입니다. <b class="text-body-secondary">매입가를 확정해야 추천 가능 재고에 재편입</b>됩니다.</p></div>
           <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">4</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 재편입 <span id="done">0</span>건</p></div>
         </div>
+        <!-- 검색·페이지 — 전 행을 한 번에 그리던 화면이었다(15,261건 · 3.6MB).
+             상단에 검색을 두는 이유: 운영자는 목록을 훑지 않고 특정 상품을 찾아온다. -->
+        <div id="srcBar" class="card mb-3"><div class="card-body py-2">
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input id="srcQ" class="form-control form-control-sm" style="max-width:320px;"
+                   placeholder="상품명 · SKU · 상품코드로 검색">
+            <select id="srcCat" class="form-select form-select-sm" style="max-width:180px;">
+              <option value="">전체 분류</option>
+            </select>
+            <button id="srcGo" class="btn btn-primary btn-sm">검색</button>
+            <button id="srcClear" class="btn btn-phoenix-secondary btn-sm">초기화</button>
+            <span id="srcInfo" class="fs-9 text-body-tertiary ms-auto"></span>
+          </div>
+        </div></div>
         <div id="cards"></div>
+        <div id="srcPager" class="d-flex justify-content-center align-items-center gap-2 my-3"></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -330,9 +345,38 @@
         }
         var ST = {req:["견적 요청 전","secondary"], wait:["회신 대기","warning"], reply:["회신 도착","primary"]};
 
+        var SRC_PAGE = 1, SRC_Q = "", SRC_CAT = "";
+        function renderPager(d){
+          var el = document.getElementById("srcPager");
+          var info = document.getElementById("srcInfo");
+          if(info) info.textContent = d.total
+            ? "전체 " + d.total.toLocaleString() + "건 중 " + d.page + " / " + d.pages + " 페이지"
+            : "조건에 맞는 대기 건이 없습니다";
+          if(!el) return;
+          if(d.pages <= 1){ el.innerHTML = ""; return; }
+          function btn(p, label, on){
+            return '<button class="btn btn-sm ' + (on ? "btn-primary" : "btn-phoenix-secondary")
+              + '" data-pg="' + p + '"' + (p < 1 || p > d.pages ? " disabled" : "") + '>'
+              + label + '</button>';
+          }
+          var around = [];
+          for(var i = Math.max(1, d.page - 2); i <= Math.min(d.pages, d.page + 2); i++)
+            around.push(btn(i, i, i === d.page));
+          el.innerHTML = btn(1, "«", false) + btn(d.page - 1, "‹", false)
+            + around.join("") + btn(d.page + 1, "›", false) + btn(d.pages, "»", false);
+          el.querySelectorAll("button[data-pg]").forEach(function(b){
+            b.onclick = function(){
+              var p = parseInt(b.dataset.pg, 10);
+              if(p >= 1 && p <= d.pages){ SRC_PAGE = p; reload();
+                window.scrollTo({top:0, behavior:"smooth"}); }
+            };
+          });
+        }
+
         function renderLive(d){
           NOTE = d.note; SUPS = d.suppliers;
-          document.getElementById("cnt").textContent = d.items.length;
+          // 헤더는 **이 페이지 수가 아니라 전체 대기 수**를 말한다 — 예전엔 같은 값이었다
+          document.getElementById("cnt").textContent = (d.total != null ? d.total : d.items.length).toLocaleString();
           document.getElementById("done").textContent = d.done_today;
           var host = document.getElementById("cards");
           host.innerHTML = d.items.length ? d.items.map(function(it){
@@ -411,15 +455,47 @@
           if(window.feather) feather.replace();
         }
         function reload(){
-          return fetch("/api/admin/sourcing").then(function(r){
+          var qs = "?page=" + SRC_PAGE + "&size=100"
+            + (SRC_Q ? "&q=" + encodeURIComponent(SRC_Q) : "")
+            + (SRC_CAT ? "&part_type=" + encodeURIComponent(SRC_CAT) : "");
+          return fetch("/api/admin/sourcing" + qs).then(function(r){
             if(!r.ok) throw new Error(r.status); return r.json();
           }).then(function(d){
             renderLive(d);
+            renderPager(d);
             var b = document.getElementById("dataSrc");
             b.textContent = "실데이터 · Cloud SQL";
             b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
           });
         }
+        function srcSearch(){
+          SRC_Q = (document.getElementById("srcQ").value || "").trim();
+          SRC_CAT = document.getElementById("srcCat").value || "";
+          SRC_PAGE = 1;
+          reload().catch(function(e){ toastL("불러오지 못했습니다: " + e.message); });
+        }
+        document.getElementById("srcGo").onclick = srcSearch;
+        document.getElementById("srcQ").addEventListener("keydown", function(e){
+          if(e.key === "Enter"){ e.preventDefault(); srcSearch(); }
+        });
+        document.getElementById("srcClear").onclick = function(){
+          document.getElementById("srcQ").value = "";
+          document.getElementById("srcCat").value = "";
+          srcSearch();
+        };
+        // 분류 선택지는 서버가 준다 — 화면이 현재 페이지에서 뽑으면 없는 값이 생긴다
+        fetch("/api/admin/product-meta").then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(m){
+            // used_parts = 실제로 쓰이는 분류(상품 관리 필터와 같은 원천).
+            // 없으면 전체 라벨로 대체한다 — 화면이 스스로 목록을 만들지 않는다.
+            var list = (m && (m.used_parts || m.part_labels)) || [];
+            var sel = document.getElementById("srcCat");
+            list.forEach(function(p){
+              var o = document.createElement("option");
+              o.value = p.part_type; o.textContent = p.label || p.part_type;
+              sel.appendChild(o);
+            });
+          }).catch(function(){});
         reload().catch(function(){});
       })();
       </script>
