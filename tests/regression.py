@@ -1021,6 +1021,72 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_setup_status():
+    print("\n[23] 운영 시작 체크리스트 — 절차를 문서에서 화면으로 (슬라이스 94)")
+    # 절차가 문서에만 있으면 그 문서가 낡아도 아무도 모른다 — 슬라이스 93에서
+    # 3단계(공급처)가 실행 불가능한 채로 오래 있었던 것이 그 증거다.
+    d = get("/api/admin/setup-status")
+    check("운영 시작 상태를 읽는다", isinstance(d, dict) and "steps" in d, "steps 있음", d)
+    if not isinstance(d, dict) or "steps" not in d:
+        return
+
+    steps = d["steps"]
+    check("8단계를 모두 판정한다", len(steps) == 8, 8, len(steps))
+    check("단계 번호가 1~8로 이어진다", [s["no"] for s in steps] == list(range(1, 9)),
+          list(range(1, 9)), [s["no"] for s in steps])
+    check("완료 수 = 실제 done 수",
+          d.get("done_count") == len([s for s in steps if s["done"]]),
+          len([s for s in steps if s["done"]]), d.get("done_count"))
+    check("complete = 미완료가 없을 때만",
+          d.get("complete") == all(s["done"] for s in steps),
+          all(s["done"] for s in steps), d.get("complete"))
+    # 여덟 개를 나열하면 어디부터인지 모른다 — 하나만 지목해야 한다
+    todo = [s for s in steps if not s["done"]]
+    if todo:
+        check("다음 할 일은 미완료 중 첫 단계 하나",
+              (d.get("next") or {}).get("no") == todo[0]["no"],
+              todo[0]["no"], (d.get("next") or {}).get("no"))
+    else:
+        check("전부 끝나면 다음 할 일이 없다", d.get("next") is None, None, d.get("next"))
+
+    # 각 단계가 실제로 갈 수 있는 화면을 가리키는가 —
+    # 슬라이스 93의 공급처처럼 '문서에는 있는데 화면이 없는' 단계를 막는다
+    missing = [s["screen"] for s in steps
+               if not os.path.exists(os.path.join(ROOT, "mockups", "admin", s["screen"]))]
+    check("모든 단계가 실제 있는 화면을 가리킨다", not missing, "전부 존재", missing)
+
+    # ── 슬롯은 엔진과 같은 정의로 센다 ──
+    slot_step = [s for s in steps if s["key"] == "slots"][0]
+    check("슬롯 8개를 센다", len(slot_step.get("slots") or []) == 8, 8,
+          len(slot_step.get("slots") or []))
+    check("빈 슬롯 목록이 실제 0인 슬롯과 일치",
+          sorted(slot_step["empty_slots"])
+          == sorted([x["label"] for x in slot_step["slots"] if x["count"] == 0]),
+          "일치", "불일치")
+    check("슬롯 단계 완료 = 빈 슬롯 없음",
+          slot_step["done"] == (len(slot_step["empty_slots"]) == 0),
+          len(slot_step["empty_slots"]) == 0, slot_step["done"])
+    # 쿨러는 공랭·수냉이 한 슬롯이다. part_type으로 세면 AIO 0을 빈 슬롯으로 오판한다.
+    cooler = [x for x in slot_step["slots"] if x["key"] == "COOLER"][0]["count"]
+    src_cooler = db_one("SELECT COUNT(*) FROM v_recommendation_candidates"
+                        " WHERE stock_qty > 0 AND part_type IN"
+                        " ('COOLER_CPU_AIR','COOLER_CPU_AIO')")
+    if src_cooler is not None:
+        check("쿨러 슬롯 = 공랭 + 수냉 (DB 대조)", cooler == src_cooler, src_cooler, cooler)
+
+    # ── 화면 계약 ──
+    try:
+        idx = io.open(os.path.join(ROOT, "mockups", "admin", "index.html"),
+                      encoding="utf-8").read()
+        check("대시보드에 체크리스트 자리가 있다", 'id="setupHost"' in idx, "있음", "없음")
+        check("대시보드가 setup-status를 부른다",
+              "/api/admin/setup-status" in idx, "호출", "없음")
+        # 완료되면 접힌다 — 끝난 뒤에도 자리를 차지하면 대시보드가 가려진다
+        check("완료 시 한 줄로 접는 분기가 있다", "d.complete" in idx, "분기 있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 대시보드 계약 - {e}")
+
+
 def _sup(body, sid=None, method="POST"):
     path = "/api/admin/suppliers" + (f"/{sid}" if sid else "")
     return post_raw(path, json.dumps(body).encode(),
@@ -2206,6 +2272,7 @@ def main():
                test_screen_identity,
                test_my_profile,
                test_suppliers,
+               test_setup_status,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

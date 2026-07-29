@@ -265,6 +265,10 @@
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item active">대시보드</li></ol></nav>
         <div class="mb-4"><h2 class="mb-1">대시보드 <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2><p class="text-body-tertiary mb-0">오늘 처리할 일 → 흐름 현황 → 시스템 상태 순서로 봅니다.</p></div>
 
+        <!-- 운영 시작 체크리스트 (슬라이스 94) — 절차를 문서에서 화면으로.
+             판정·수치는 전부 서버가 실데이터로 구한다(화면 정직성 원칙). -->
+        <div id="setupHost" hidden></div>
+
         <h5 class="mb-3">처리 대기 <span class="fs-10 fw-normal text-body-tertiary">— 운영자의 판단이 필요한 것</span></h5>
         <div class="row g-3 mb-4">
           <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-warning-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-warning" data-feather="clipboard" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">상품 검수</h6></div><h2 class="fw-bolder mb-2" id="pd-review">9<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="review-queue.html" class="fs-9 fw-bold text-decoration-none">검수 대기 열기 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-primary" data-feather="dollar-sign" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold">가격 검토 대기</h6></div><h2 class="fw-bolder mb-2" id="pd-price">5<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="price-review.html" class="fs-9 fw-bold text-decoration-none">가격 판정 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-info-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-info" data-feather="truck" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold" id="pd-3-label">매입 대기</h6></div><h2 class="fw-bolder mb-2" id="pd-inbound">4<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="sourcing.html" class="fs-9 fw-bold text-decoration-none" id="pd-3-link">매입 견적 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-danger-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-danger" data-feather="send" style="width:19px;height:19px;"></span></div><h6 class="mb-0 text-body-secondary fw-semibold" id="pd-4-label">주문 재전달 필요</h6></div><h2 class="fw-bolder mb-2" id="pd-refund">1<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="orders.html" class="fs-9 fw-bold text-decoration-none" id="pd-4-link">전달 상태 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a></div></div></div>
@@ -599,6 +603,95 @@
     <script src="vendors/dayjs/dayjs.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
+  <script>
+  /* 운영 시작 체크리스트 — 아무것도 없는 상태에서 무엇부터 할지 화면이 말한다.
+     문서(docs/07_운영-시작-순서.md)에만 있으면 그 문서가 낡아도 아무도 모른다.
+     실제로 슬라이스 93에서 3단계(공급처)가 실행 불가능한 채로 오래 있었다. */
+  (function(){
+    var host = document.getElementById("setupHost");
+    if(!host) return;
+
+    function esc(t){ return String(t==null?"":t).replace(/[<>&"]/g,
+      function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; }); }
+    /* 서버 문구의 **강조**만 살린다 — 나머지는 평문으로 둔다(주입 방지). */
+    function md(t){ return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+
+    function slotBar(step){
+      if(!step.slots) return "";
+      return '<div class="d-flex flex-wrap gap-1 mt-2">' + step.slots.map(function(x){
+        var tone = x.count > 0 ? "badge-phoenix-primary" : "badge-phoenix-danger";
+        return '<span class="badge badge-phoenix ' + tone + ' fs-10">'
+             + esc(x.label) + ' ' + x.count + '</span>';
+      }).join("") + '</div>';
+    }
+
+    function row(st){
+      var mark = st.done
+        ? '<span class="text-primary fw-bold">완료</span>'
+        : '<span class="text-danger fw-bold">필요</span>';
+      return [
+        '<tr', (st.done ? ' class="opacity-75"' : ''), '>',
+          '<td class="text-center fw-bold">', st.no, '</td>',
+          '<td>', mark, '</td>',
+          '<td><b>', esc(st.title), '</b>',
+            '<div class="fs-10 text-body-tertiary">', esc(st.screen_label), '</div>',
+            (st.done ? "" : '<div class="fs-10 text-body-quaternary mt-1">' + md(st.why) + '</div>'),
+            slotBar(st),
+          '</td>',
+          '<td class="text-end fs-9">', esc(st.value), '</td>',
+          '<td class="text-end"><a class="btn btn-phoenix-secondary btn-sm" href="',
+            esc(st.screen), '">열기</a></td>',
+        '</tr>'
+      ].join("");
+    }
+
+    fetch("/api/admin/setup-status")
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){
+        if(d.complete){
+          /* 끝났으면 자리를 차지하지 않는다 — 한 줄로 접는다. */
+          host.innerHTML = '<div class="alert alert-subtle-primary fs-9 py-2 mb-4">'
+            + '<b>운영 시작 준비 완료</b> — ' + esc(d.note)
+            + ' <a href="candidate-pool.html" class="ms-2">슬롯별 후보 보기</a></div>';
+          host.hidden = false;
+          return;
+        }
+        var nx = d.next || {};
+        host.innerHTML = [
+          '<div class="card mb-4 border border-warning">',
+            '<div class="card-body">',
+              '<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">',
+                '<div>',
+                  '<h5 class="mb-1">운영 시작 준비 ',
+                    '<span class="badge badge-phoenix badge-phoenix-warning fs-10">',
+                      d.done_count, ' / ', d.total, '</span></h5>',
+                  '<p class="fs-9 text-body-tertiary mb-0">', esc(d.note), '</p>',
+                '</div>',
+                '<a class="btn btn-primary btn-sm" href="', esc(nx.screen || "#"), '">',
+                  esc(nx.title || ""), ' 하러 가기 →</a>',
+              '</div>',
+              '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">',
+                '<thead><tr class="text-body-tertiary">',
+                  '<th class="text-center" style="width:34px;">#</th>',
+                  '<th style="width:52px;">상태</th><th>단계</th>',
+                  '<th class="text-end">현재</th><th></th></tr></thead>',
+                '<tbody>', d.steps.map(row).join(""), '</tbody>',
+              '</table></div>',
+              '<p class="fs-10 text-body-quaternary mb-0 mt-2">',
+                '순서를 바꾸면 되돌아갑니다 — 예를 들어 마진을 나중에 정하면 ',
+                '이미 산정된 판매가를 전부 다시 계산해야 합니다. 자세한 절차는 ',
+                '<code>', esc(d.doc), '</code>.</p>',
+            '</div>',
+          '</div>'
+        ].join("");
+        host.hidden = false;
+      })
+      .catch(function(){
+        /* 못 받았으면 지어내지 않는다 — 조용히 숨긴다(대시보드 나머지는 계속 쓴다). */
+        host.hidden = true;
+      });
+  })();
+  </script>
   <script src="../shared/ui-progress.js"></script>
 <script src="../shared/admin-panel.js"></script>
 <script src="../shared/admin-menu.js"></script>
