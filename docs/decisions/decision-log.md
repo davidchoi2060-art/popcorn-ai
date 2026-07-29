@@ -163,7 +163,36 @@
 - **스키마 변경은 ERD 개정 → 새 마이그레이션 순서.** 화면에서 사양 항목을 늘려도 마이그레이션 파일이 함께 기록돼야 한다 — 없으면 서버 재구축·백업 복구 때 그 컬럼이 사라진다(슬라이스 56·81).
 - **운영 규칙은 시드가 아니라 마이그레이션에 있다**(0019): `alembic upgrade head`만으로 호환 8·사양 항목 29·용도 하한 21·가격 정책·운영 전환 5가 서고 더미는 0건이다. `db/seed/*.sql`은 **개발용 더미 전용** — 실제 개업에 쓰면 가짜 주문이 원장에 남는다(슬라이스 81).
 - **배포는 슬라이스 41부터 가동 중**(P-06 = 로컬에서 고치고 서버는 `git pull`). 절차 `deploy/README.md`, 복구 `deploy/RESTORE.md`.
-- 🟡 **미확인(2026-07-29):** 이 GCP 서버가 **개발 서버인지 운영 서버인지.** 여태 "개발 서버이고 운영은 별도 시스템"이 전제였는데 사용자가 "실제 운영서버"라고 표현했다. 데이터 취급(테스트 주문이 진짜 원장에 남는지)·백업 기준이 갈린다. 정해지면 이 줄을 확정 결정으로 올린다.
+
+### I-01 서버 분리 — 승격이 아니라 신설 (✅ 2026-07-29 사용자 확정)
+
+**현재 서버(`popcorn-app` · `popcorn-db`)는 개발/스테이징으로 남긴다. 운영은 새로 세운다.**
+검토했던 "현 서버를 운영으로 승격 + 복제해서 개발" 안은 **채택하지 않는다.**
+
+**왜 승격하지 않는가**
+- 베타 기간의 오염이 그대로 **운영 원장**이 된다. 이 프로젝트는 이미 두 번 겪었다 — 슬라이스 78에서
+  검사용 로그인이 승인을 거쳐 **owner 권한 계정**(`nobody-zz@example.com`)이 됐고, 실주문 검증
+  `ORD-84222`는 재고 원장까지 건드려 별도 정리가 필요했다. 지금은 어느 것이 테스트인지 기억하지만
+  **시간이 지나면 구분할 수 없다.** 그 질문은 정산·환불·세무에서 계속 돌아온다.
+- **깨끗하게 세우는 길이 이미 검증돼 있다**(슬라이스 81 · 절차 `docs/07_운영-시작-순서.md`).
+  승격하면 그 검증이 쓰이지 못하고, 언젠가 **재해 복구 때 처음으로** 그 길을 걷게 된다.
+- 복제 방향도 반대다. 운영→개발 복제는 **실고객 개인정보를 개발 서버로 옮긴다**(PIPA).
+  개발→운영 방향엔 그 위험이 없다.
+
+**운영 DB는 원장을 비우고 시작하되, 사람 노동은 옮긴다**
+
+| | 대상 | 근거 |
+|---|---|---|
+| **이관** | `products` `product_specs` `product_supplier_prices` `suppliers` `supplier_product_map` · 규칙류(`compat_rules` `spec_field_defs` `usage_floors` `category_margin_policies` `pricing_settings` `policy_weights` `ops_settings`) | **재현 불가능한 사람 노동.** 다나와 제안 543건 승인·`cooler_tdp` 손 입력·분류 교정은 원천 CSV에 없다. `locked_fields`가 사람이 고친 값을 표시한다. `data_origin='demo'`는 제외. |
+| **버림** | `orders` `order_items` `order_events` `payments` `refunds` `settlements` `settlement_batches` `shipments` · `stock_movements` `stock_reservations` · `consult_sessions` `recommendations` `recommendation_items` `quote_snapshots` `promo_click_logs` `swap_event_logs` · `members` `users` `admin_operators` 및 활동 로그 | **원장과 계정.** 테스트가 섞인 채 구분 불가능해지는 것들. |
+
+- **재고는 원장을 옮기지 않는다.** 실물을 새로 실사해 입고 처리한다 — 과거 테스트 입고가 섞이면
+  "이 수량이 왜 이런가"에 답할 수 없다.
+- **지금이 가장 싸다**: 실고객 데이터 0건(내부 베타) · 슬라이스 81 절차가 방금 검증됨 · 원장이 얕다.
+- **개발 DB는 백업·PITR을 끄고 더 작은 티어**로 둔다(또는 개발 VM 안 로컬 PostgreSQL).
+  날아가면 `alembic upgrade head`로 다시 세우면 된다 — 그게 슬라이스 81이 보장하는 것이다.
+- **GCP 리소스 이름은 바꾸지 않는다**(`popcorn-app`·`popcorn-db`가 개발이 된다). 이름 변경은
+  재생성을 요구하고 Cloud SQL 인스턴스명은 삭제 후 재사용에 제약이 있다. **역할은 문서가 정한다.**
 
 ---
 

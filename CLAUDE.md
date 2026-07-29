@@ -23,7 +23,9 @@
 6. **세션은 일회용.** 결정은 이 파일/`docs/decisions/decision-log.md`에 기록. 긴 세션에 기억을 의존하지 마라. 컨텍스트가 길어지면 `/clear` 후 재시작.
 
 ## 베타 배포 상태 (슬라이스 41 — 2026-07-26 가동)
-- 접속 `http://34.47.124.184/admin/login.html` · GCP `popcorn-app`(asia-northeast3-b) · Cloud SQL `popcorn-db`.
+- **이 서버 = 개발/스테이징이다. 운영은 새로 세운다**(2026-07-29 확정 · decision-log **I-01**). 승격하지 않는다 — 베타의 테스트 잔재가 운영 원장이 되면 나중에 구분할 수 없다(슬라이스 78 owner 테스트 계정 · 실주문 `ORD-84222` 전례). 운영 DB는 **원장을 비우고** 시작하되 **카탈로그·규칙은 이관**한다(사람 검수 값은 원천 CSV로 재현 안 됨). 그래서 **여기서는 부작용 있는 검사를 해도 되고, 운영 서버에서는 절대 안 된다.**
+- 정본 도메인 `popcornai.co.kr`은 **운영 몫**이다. 개발엔 서브도메인(`dev.`)을 붙인다 — 나중에 옮기면 인증서·OAuth 리다이렉트·쿠키를 전부 다시 손봐야 한다.
+- 접속 `http://34.47.124.184/admin/login.html` · GCP `popcorn-app`(asia-northeast3-b) · Cloud SQL `popcorn-db`. **이름은 그대로 둔다**(역할은 문서가 정한다 — 리소스명 변경은 재생성을 요구한다).
 - **nginx Basic Auth가 사이트 전체를 봉쇄한다** — 로그인이 dev 어댑터라 이게 유일한 실질 방벽이다. 걷어내려면 실 OAuth 먼저.
 - 앱은 `127.0.0.1:8000`에만 바인드(외부 직접 접근 불가) · 방화벽 80·22만.
 - 배포 갱신: 로컬 커밋·푸시 → 서버에서 `git pull` + `systemctl restart popcorn-api`(절차 `deploy/README.md`).
