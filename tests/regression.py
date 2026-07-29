@@ -583,6 +583,27 @@ def test_compat():
     check("compat-rules는 불러오기 실패를 알린다", "불러오지 못했습니다" in _t,
           "실패 안내 있음", "없음")
 
+    # 화면에 같은 블록이 두 번 붙지 않았는가(슬라이스 87 실사고).
+    # 재고 입고 화면에 다른 화면의 목록 카드가 통째로 붙어 있었다 — `footer`가 둘이 되어
+    # position-absolute로 **같은 자리에 겹쳐 찍혔고**(사용자 신고: "하단 텍스트가 겹쳐서 나옴"),
+    # id도 rows·kpis·pills가 중복돼 getElementById가 첫 번째만 채웠다.
+    # 두 번째 표는 영원히 빈 채로 남아 하단을 어지럽혔다.
+    import glob as _g2
+    import re as _re2
+    dup_foot, dup_id = [], []
+    for _p in _g2.glob(os.path.join(ROOT, "mockups", "admin", "*.html")):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if _s.count('<footer class="footer position-absolute">') > 1:
+            dup_foot.append(_n)
+        for _k in ("rows", "kpis", "pills", "cards"):
+            if _s.count(f'id="{_k}"') > 1:
+                dup_id.append(f"{_n}#{_k}")
+    check("화면마다 푸터는 하나다", not dup_foot, "중복 없음", dup_foot)
+    check("목록 컨테이너 id가 화면에 하나뿐이다", not dup_id, "중복 없음", dup_id)
+
     compat = rec("100만원")["value"]["compat"]
     keys = {c["key"] for c in compat["checks"]}
     akeys = {r["key"] for r in active}
