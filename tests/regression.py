@@ -71,6 +71,18 @@ def db_one(sql, **p):
         return c.execute(text(sql), p).scalar()
 
 
+def db_exec(sql, **p):
+    """검사가 남긴 흔적을 치울 때만 쓴다(슬라이스 78·93).
+
+    **정본을 건드리는 용도가 아니다.** 회귀는 쓰기 경로를 가드로만 확인한다는 원칙
+    (슬라이스 50 전례)은 그대로다 — 이 헬퍼는 검사가 스스로 만든 행을 되돌리기 위한 것이다.
+    """
+    if _engine is None:
+        return None
+    with _engine.begin() as c:
+        c.execute(text(sql), p)
+
+
 def _uq(s):
     import urllib.parse
     return urllib.parse.quote(s)
@@ -1007,6 +1019,103 @@ def test_password_auth():
               "입력+전송", "없음")
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
+
+
+def _sup(body, sid=None, method="POST"):
+    path = "/api/admin/suppliers" + (f"/{sid}" if sid else "")
+    return post_raw(path, json.dumps(body).encode(),
+                    {"Content-Type": "application/json"}, method=method)
+
+
+def test_suppliers():
+    print("\n[22] 공급처 — 빈 상태에서 막혀 있던 길 (슬라이스 93)")
+    # 배경: `INSERT INTO suppliers`가 개발용 시드에만 있어, 정직하게 빈 DB로 시작하면
+    # 공급처를 만들 수단이 아예 없었다 → 매입가 대상 없음 → 판매가 없음 → 후보 0 → 견적 0건.
+    d = get("/api/admin/suppliers")
+    check("공급처 목록을 읽는다", isinstance(d, dict) and "items" in d, "items 있음", d)
+    if not isinstance(d, dict) or "items" not in d:
+        return
+
+    # 화면이 세지 않는다 — 빈 상태 판정도 서버가 준다
+    check("빈 상태 판정을 서버가 준다",
+          d.get("empty") == (d.get("active") == 0), "active==0과 일치", d.get("empty"))
+    check("활성 수 = 실제 활성 항목 수",
+          d.get("active") == len([i for i in d["items"] if i["status"] == "활성"]),
+          d.get("active"), len([i for i in d["items"] if i["status"] == "활성"]))
+    check("전체 수 = 항목 수", d.get("total") == len(d["items"]),
+          d.get("total"), len(d["items"]))
+    src_total = db_one("SELECT COUNT(*) FROM suppliers")
+    if src_total is not None:                       # DB와 두 경로 대조
+        check("API 전체 수 = DB가 세는 수", d.get("total") == src_total,
+              src_total, d.get("total"))
+
+    NAME = "회귀검사-공급처-임시"
+    # 앞선 실패가 남긴 것이 있으면 먼저 치운다(검사는 멱등이어야 한다)
+    db_exec("DELETE FROM admin_operator_activity_logs WHERE target_id = :n", n=NAME)
+    db_exec("DELETE FROM suppliers WHERE name = :n", n=NAME)
+
+    st, made = _sup({"name": NAME, "platform": "회귀", "brands": "TEST"})
+    check("공급처를 만들 수 있다", st == 200, 200, st)
+    sid = (made or {}).get("id")
+
+    # ── 가드 ──
+    st2, _ = _sup({"name": "  " + NAME.lower() + "  "})
+    check("같은 이름은 대소문자·공백을 무시하고 막는다", st2 == 409, 409, st2)
+    check("중복 시도로 행이 늘지 않았다",
+          db_one("SELECT COUNT(*) FROM suppliers WHERE lower(btrim(name))=lower(:n)",
+                 n=NAME) == 1, 1,
+          db_one("SELECT COUNT(*) FROM suppliers WHERE lower(btrim(name))=lower(:n)", n=NAME))
+    check("빈 이름은 400", _sup({"name": "   "})[0] == 400, 400, _sup({"name": "  "})[0])
+    check("없는 상태값은 400", _sup({"name": NAME + "2", "status": "삭제"})[0] == 400,
+          400, _sup({"name": NAME + "3", "status": "삭제"})[0])
+    # 모르는 필드를 조용히 무시하면 보낸 쪽이 성공했다고 믿는다(슬라이스 58과 같은 부류)
+    check("모르는 필드는 거절한다", _sup({"name": NAME + "4", "supplier_id": 9})[0] == 422,
+          422, _sup({"name": NAME + "5", "supplier_id": 9})[0])
+
+    if sid:
+        # ── 중지 전에 영향을 먼저 말한다 ──
+        im = get(f"/api/admin/suppliers/{sid}/impact")
+        check("중지 영향을 미리 알려준다",
+              isinstance(im, dict) and "linked_products" in im and im.get("note"),
+              "영향+문구", im)
+        st3, out = _sup({"name": NAME, "status": "중지"}, sid, "PATCH")
+        check("중지는 상태 전이로 한다", st3 == 200
+              and db_one("SELECT status FROM suppliers WHERE supplier_id=:i", i=sid) == "중지",
+              "중지", db_one("SELECT status FROM suppliers WHERE supplier_id=:i", i=sid))
+        # 삭제가 아니라 상태 전이 — 행은 남아 있어야 한다(참조 테이블 6개)
+        check("중지해도 행은 남는다",
+              db_one("SELECT COUNT(*) FROM suppliers WHERE supplier_id=:i", i=sid) == 1,
+              1, db_one("SELECT COUNT(*) FROM suppliers WHERE supplier_id=:i", i=sid))
+        check("중지가 활성 수에서 빠진다",
+              get("/api/admin/suppliers").get("active")
+              == len([i for i in get("/api/admin/suppliers")["items"]
+                      if i["status"] == "활성"]), "일치", "불일치")
+        check("작업 기록에 남는다",
+              (db_one("SELECT COUNT(*) FROM admin_operator_activity_logs"
+                      " WHERE action IN ('supplier_create','supplier_update')"
+                      " AND target_id = :n", n=NAME) or 0) >= 2, "2건 이상", 0)
+
+    # 검사는 흔적을 남기지 않는다(슬라이스 78)
+    db_exec("DELETE FROM admin_operator_activity_logs WHERE target_id = :n", n=NAME)
+    db_exec("DELETE FROM suppliers WHERE name LIKE :n", n=NAME + "%")
+    check("검사가 만든 공급처를 치웠다",
+          db_one("SELECT COUNT(*) FROM suppliers WHERE name LIKE :n", n=NAME + "%") == 0,
+          0, db_one("SELECT COUNT(*) FROM suppliers WHERE name LIKE :n", n=NAME + "%"))
+
+    # ── 화면 계약 ──
+    import glob as _g4
+    missing = []
+    for _p in sorted(_g4.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_") or _n in ("login.html", "my-profile.html",
+                                        "suppliers.html", "usage-floors.html"):
+            continue                       # 셸이 없는 화면은 좌측 메뉴 자체가 없다
+        if 'href="suppliers.html"' not in io.open(_p, encoding="utf-8").read():
+            missing.append(_n)
+    check("좌측 메뉴에 공급처가 있다", not missing, "전 화면", missing[:4])
+    check("공급처 화면 파일이 있다",
+          os.path.exists(os.path.join(ROOT, "mockups", "admin", "suppliers.html")),
+          "있음", "없음")
 
 
 def _patch_me(body):
@@ -2096,6 +2205,7 @@ def main():
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
                test_screen_identity,
                test_my_profile,
+               test_suppliers,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

@@ -755,13 +755,8 @@ class SupplierPriceBody(BaseModel):
     state: str | None = None
 
 
-@router.get("/suppliers")
-def list_suppliers():
-    """공급처 선택지 — 화면이 이름을 지어내지 않게."""
-    with engine.connect() as conn:
-        rows = conn.execute(text(
-            "SELECT supplier_id, name, platform FROM suppliers ORDER BY name")).mappings().all()
-    return {"items": [dict(r) for r in rows]}
+# GET /suppliers는 `api/admin_suppliers.py`로 옮겼다(슬라이스 93).
+# 같은 경로를 두 곳에서 정의하면 먼저 등록된 쪽이 이겨서, 고친 쪽이 안 먹는다.
 
 
 @router.post("/products/{product_code}/suppliers")

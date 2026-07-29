@@ -30,6 +30,7 @@ from .admin_products import router as admin_products_router
 from .admin_sessions import router as admin_sessions_router
 from .admin_sourcing import router as admin_sourcing_router
 from .admin_stock import router as admin_stock_router
+from .admin_suppliers import router as admin_suppliers_router
 from .admin_swap_logs import router as admin_swap_logs_router
 from .admin_system import router as admin_system_router
 from .admin_reviews import router as admin_reviews_router
@@ -68,6 +69,7 @@ app.include_router(auth_router)
 app.include_router(customer_auth_router)
 app.include_router(admin_operators_router)
 app.include_router(admin_profile_router)
+app.include_router(admin_suppliers_router)
 app.include_router(admin_ops_router)
 app.include_router(admin_imports_router)
 app.include_router(admin_products_router)
