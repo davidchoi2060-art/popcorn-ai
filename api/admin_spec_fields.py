@@ -36,6 +36,15 @@ MIG_DIR = os.path.join(ROOT, "db", "migrations", "versions")
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,38}$")
 TYPES = {"INTEGER": "INTEGER", "NUMERIC": "NUMERIC(10,2)", "VARCHAR": "VARCHAR(80)",
          "BOOLEAN": "BOOLEAN", "JSONB": "JSONB"}
+# 자료형 설명 — 운영자가 고를 때 무엇을 담는 그릇인지 알아야 한다(슬라이스 85).
+# **값은 그대로 두고 표시만 늘린다** — 저장되는 것은 키(INTEGER 등)다.
+TYPE_HELP = {
+    "INTEGER": "정수 — 개수·와트·mm처럼 소수점이 없는 수",
+    "NUMERIC": "소수 — 인치·전압처럼 소수점이 필요한 수",
+    "VARCHAR": "짧은 글자 — 소켓·규격·인터페이스 같은 이름값",
+    "BOOLEAN": "예/아니오 — 있다·없다로 답하는 값",
+    "JSONB": "목록 — 지원 소켓처럼 값이 여러 개인 것",
+}
 # 이미 쓰이는 이름·예약어는 막는다(다른 뜻으로 읽히면 판정이 틀어진다)
 RESERVED = {"product_code", "part_type", "created_at", "updated_at", "verified_yn",
             "extract_source", "confidence", "spec_sources", "select", "from", "where",
@@ -150,6 +159,8 @@ def list_spec_fields():
             "note": f["note"], "filled": used.get(f["field_key"], 0),
         } for f in fields],
         "data_types": sorted(TYPES),
+        # 화면 셀렉트에 괄호로 붙일 설명. 값(key)은 건드리지 않는다.
+        "data_type_help": {k: TYPE_HELP.get(k, "") for k in sorted(TYPES)},
         "part_types": list(ALL_PART_TYPES),
         # 부품 축 — 화면이 이걸로 칩을 그리고, 고른 부품의 사양만 보여준다.
         # 한 사양이 여러 부품에 걸리므로(form_factor는 4곳, tag_rgb는 10곳)

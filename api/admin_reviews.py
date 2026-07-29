@@ -3,6 +3,8 @@
 승인 전이(ERD §8 T2): specs 값 반영 → (잔여 0건이면) verified → locked_fields 등록
 → review_required 재산정(필수 충족 ∧ 잔여 0) → true→false 전이 시에만 ai_candidate 승격.
 """
+import re
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -60,7 +62,7 @@ def _crit(part_type: str, target_field: str | None, review_type: str, specs: dic
 
 @router.get("/reviews")
 def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: str = "",
-                 sellable: int = 0, suggested: int = 0):
+                 sellable: int = 0, suggested: int = 0, field: str = ""):
     """검수 큐 — 실데이터 적재 후 대기 건수가 수천이 되므로 서버 페이지네이션이 필수다(슬라이스 39).
 
     단가표發 편입 대기(sourcing_hold)는 **파생 목록**이라 페이지네이션 밖이다 —
@@ -71,6 +73,11 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
 
     `sellable=1`이면 **판매중 ∧ 재고>0** 상품만 — 지금 매출에 영향을 주는 것부터 본다
     (슬라이스 49: 6,490건 중 1,720건. 나머지는 팔 수도 없는 상품이라 급하지 않다).
+
+    `field=cooler_tdp`처럼 **한 사양만** 볼 수 있다(슬라이스 85). 화면은 종류별 집계를
+    이미 보여주면서 그걸로 좁힐 방법이 없었다 — 큐가 5,000건인데 "쿨러 발열 한도 350건을
+    오늘 끝내겠다"는 작업을 시작할 수가 없었다. 같은 사양을 연달아 보면 판단 기준이
+    유지되고, 자료를 한 번 펼쳐 놓고 처리할 수 있다.
     """
     size = max(1, min(size, 500))
     page = max(1, page)
@@ -86,6 +93,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
           AND (:origin = '' OR p.data_origin = :origin)
           AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
           AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
+          AND (:field = '' OR r.field_name = :field)
         ORDER BY r.created_at, r.review_id
         LIMIT :size OFFSET :offset
     """)
@@ -96,6 +104,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
            AND (:origin = '' OR p.data_origin = :origin)
            AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
            AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
+           AND (:field = '' OR r.field_name = :field)
     """)
     # 종류별 집계는 **지금 보고 있는 범위**를 따른다. 필터를 켰는데 전체 분포를 보여주면
     # 화면의 숫자와 배너의 숫자가 다른 말을 한다(슬라이스 49). part_type 필터만 제외한다 —
@@ -135,6 +144,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         GROUP BY 1 ORDER BY n DESC LIMIT 12
     """)
     p = {"part_type": part_type.strip(), "origin": origin.strip(),
+         "field": field.strip(),
          "sellable": 1 if sellable else 0, "suggested": 1 if suggested else 0,
          "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
@@ -165,10 +175,11 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
         "risk": _risk(r["review_type"], r["field_name"]),
         "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
     } for r in rows]
-    if page == 1 and not part_type and not sellable and not suggested:
+    if page == 1 and not part_type and not sellable and not suggested and not field:
         items.extend(_sourcing_items())
     return {"items": items, "page": page, "size": size, "total": total,
             "pages": (total + size - 1) // size, "by_type": by_type,
+            "field": field.strip(),        # 화면이 지금 무엇으로 좁혔는지 되돌려 말한다
             "queue": {
                 "total": s["total"],
                 "bulkable": s["bulkable"],      # 일괄 확정 버튼이 실제로 처리하는 수
@@ -306,6 +317,9 @@ def sourcing_unlink(log_id: int):
 class ProcessBody(BaseModel):
     action: str  # origin | suggested | manual | reject
     value: str | None = None
+    # 같은 모델의 변형에 같은 값을 함께 넣는다(슬라이스 85). **화면이 고른 것만** —
+    # 서버가 알아서 확장하지 않는다. 목록은 /reviews/{id}/siblings가 제안한다.
+    also: list[int] = []
 
 
 def _approve(conn, review, value, new_status: str) -> tuple[dict, int]:
@@ -400,6 +414,58 @@ def _lock_waiting_review(conn, review_id: int):
     return r
 
 
+# 같은 모델의 색상·패키지 변형 — 사양이 같은데 검수만 따로 해야 했다.
+# 실측: cooler_tdp 대기 307건이 서로 다른 모델로는 232개뿐이다(75건이 변형).
+# **자동으로 채우지 않는다.** 후보를 찾아 보여주고, 사람이 골라서 함께 적용한다 —
+# 이름이 닮았다는 것만으로 사양이 같다고 단정하면 지어낸 값과 다를 게 없다.
+_VARIANT = re.compile(r"\(([^)]*)\)")
+_COLOR = re.compile(r"(블랙|화이트|블루|레드|핑크|그레이|실버|골드|투명|"
+                    r"BLACK|WHITE|BLUE|RED|PINK|GRAY|GREY|SILVER|GOLD)", re.I)
+
+
+def _model_key(name: str) -> str:
+    """색상·괄호 표기를 지운 모델 이름. 보수적으로 — 괄호 밖 단어는 건드리지 않는다
+    (`AS500`과 `AS500 PLUS`는 다른 제품이므로 묶이면 안 된다)."""
+    s = _VARIANT.sub(" ", name or "")
+    s = _COLOR.sub(" ", s)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+@router.get("/reviews/{review_id}/siblings")
+def review_siblings(review_id: int):
+    """이 검수 건과 **같은 모델로 보이는** 대기 건들 — 함께 처리할 후보.
+
+    조건을 좁게 둔다: 같은 제조사 · 같은 부품 종류 · 같은 사양 필드 · 대기 상태 ·
+    색상 표기를 지운 이름이 같을 것. 하나라도 어긋나면 후보에서 뺀다.
+    """
+    with engine.connect() as conn:
+        me = conn.execute(text(
+            "SELECT r.review_id, r.product_code, r.field_name, p.product_name, p.maker,"
+            " p.part_type FROM product_reviews r JOIN products p USING (product_code)"
+            " WHERE r.review_id=:rid"), {"rid": review_id}).mappings().first()
+        if me is None:
+            raise HTTPException(404, "검수 항목이 없습니다")
+        rows = conn.execute(text(
+            "SELECT r.review_id, r.product_code, p.product_name, p.status, p.stock_qty"
+            " FROM product_reviews r JOIN products p USING (product_code)"
+            " WHERE r.review_status='대기' AND r.field_name=:f AND p.part_type=:pt"
+            "   AND coalesce(p.maker,'')=coalesce(:mk,'') AND r.review_id <> :rid"
+            " ORDER BY p.product_name"),
+            {"f": me["field_name"], "pt": me["part_type"], "mk": me["maker"],
+             "rid": review_id}).mappings().all()
+    key = _model_key(me["product_name"])
+    sibs = [{"review_id": r["review_id"], "product_code": r["product_code"],
+             "name": r["product_name"],
+             "sellable": bool(r["status"] == "판매중" and (r["stock_qty"] or 0) > 0)}
+            for r in rows if _model_key(r["product_name"]) == key]
+    return {"review_id": review_id, "field": me["field_name"],
+            "name": me["product_name"], "model_key": key, "siblings": sibs,
+            "note": ("같은 제조사·같은 부품 종류에서 색상 표기만 다른 대기 건입니다."
+                     " 사양이 같은지는 **사람이 확인**해야 합니다 —"
+                     " 이름이 닮았다는 것만으로 값을 옮기지 않습니다."
+                     if sibs else "함께 처리할 만한 같은 모델 대기 건이 없습니다.")}
+
+
 @router.post("/reviews/{review_id}/process")
 def process_review(review_id: int, body: ProcessBody):
     if body.action not in ("origin", "suggested", "manual", "reject"):
@@ -422,10 +488,30 @@ def process_review(review_id: int, body: ProcessBody):
             raise HTTPException(400, "확정할 값이 없습니다")
         new_status = "수정" if body.action == "manual" else "승인"
         before, pool_added = _approve(conn, review, value, new_status)
-        log_id = _log(conn, "review_process", str(review_id),
-                      {"mode": "approve", "review_id": review_id,
-                       "field": review["field_name"], "value": str(value), "before": before})
-        return {"ok": True, "undo_id": log_id, "pool_added": pool_added}
+        detail = {"mode": "approve", "review_id": review_id,
+                  "field": review["field_name"], "value": str(value), "before": before}
+
+        # 함께 적용 — 화면이 지정한 대기 건에만 같은 값을 넣는다.
+        # 같은 사양 필드가 아니면 거부한다: 다른 필드에 같은 숫자를 넣는 건 사고다.
+        extra = []
+        for rid in dict.fromkeys(body.also or []):
+            if rid == review_id:
+                continue
+            sib = _lock_waiting_review(conn, rid)
+            if sib["field_name"] != review["field_name"]:
+                raise HTTPException(400, "다른 사양 항목은 함께 처리할 수 없습니다")
+            sb, sadd = _approve(conn, sib, value, new_status)
+            pool_added += sadd
+            extra.append({"review_id": rid, "product_code": sib["product_code"],
+                          "before": sb})
+        if extra:
+            # 한 로그에 함께 담는다 — 되돌리면 전부 함께 되돌아간다(부분 원복 금지).
+            detail["also"] = extra
+        log_id = _log(conn, "review_process", str(review_id), detail)
+        return {"ok": True, "undo_id": log_id, "pool_added": pool_added,
+                "applied": 1 + len(extra),
+                "note": (f"{1 + len(extra)}건에 같은 값을 넣었습니다 — 되돌리면 함께 돌아갑니다."
+                         if extra else None)}
 
 
 @router.post("/reviews/bulk-confirm")
@@ -485,7 +571,15 @@ def undo(log_id: int):
         if log is None or log["action"] not in ("review_process", "review_bulk_confirm"):
             raise HTTPException(404, "되돌릴 작업 기록이 없습니다")
         detail = log["detail"]
-        entries = detail["items"] if log["action"] == "review_bulk_confirm" else [detail]
+        if log["action"] == "review_bulk_confirm":
+            entries = detail["items"]
+        else:
+            # 함께 적용분(also)도 같은 로그에 담겨 있다 — **부분 원복은 없다**.
+            # 하나만 되돌리면 같은 모델의 형제끼리 값이 갈려 어느 쪽이 맞는지 알 수 없다.
+            entries = [detail] + [
+                {"mode": detail.get("mode"), "field": detail.get("field"),
+                 "review_id": a["review_id"], "before": a["before"]}
+                for a in (detail.get("also") or [])]
         for e in entries:
             _revert_one(conn, e)
         _log(conn, "review_undo", str(log_id), {"ref_log_id": log_id, "count": len(entries)})

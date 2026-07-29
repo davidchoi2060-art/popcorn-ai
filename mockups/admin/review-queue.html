@@ -582,6 +582,9 @@
                   <div class="row g-3">
                     <div class="col-md-7">
                       <h6 class="fs-9 mb-2">고칠 사양</h6>${inputs}
+                      <!-- 같은 모델의 색상 변형 — 서버가 찾아 주고 사람이 고른다(슬라이스 85).
+                           실측: cooler_tdp 대기 307건이 모델로는 232개다. -->
+                      <div id="fixSibs" class="fs-10 text-body-quaternary">같은 모델 확인 중…</div>
                     </div>
                     <div class="col-md-5">
                       <h6 class="fs-9 mb-2">이 상품의 필수 사양</h6>
@@ -608,6 +611,32 @@
             if(!b) return;
             el.querySelector(`.fix-val[data-i="${b.getAttribute("data-i")}"]`).value = b.getAttribute("data-v");
           });
+          // 같은 모델의 다른 대기 건 — 사양이 같은지는 사람이 확인한다(자동 적용 금지)
+          fetch(`/api/admin/reviews/${q.review_id}/siblings`)
+            .then(r=>r.ok?r.json():null)
+            .then(d=>{
+              const box = el.querySelector("#fixSibs");
+              if(!box) return;
+              if(!d || !d.siblings || !d.siblings.length){
+                box.innerHTML = '<span class="text-body-quaternary">'
+                  + '같은 모델로 보이는 다른 대기 건은 없습니다.</span>';
+                return;
+              }
+              box.className = "border rounded p-2 mt-1";
+              box.innerHTML = '<div class="fs-9 fw-bold mb-1">같은 모델에도 함께 넣기'
+                + ' <span class="text-body-tertiary fw-normal">' + d.siblings.length + '건</span></div>'
+                + d.siblings.map(s=>
+                    '<label class="d-block fs-10 mb-1"><input type="checkbox" class="form-check-input me-1 fix-sib"'
+                    + ' value="' + s.review_id + '">' + fixEsc(s.name)
+                    + (s.sellable ? '' : ' <span class="text-body-quaternary">(판매중 아님)</span>')
+                    + '</label>').join("")
+                + '<div class="fs-10 text-body-tertiary mt-1">' + fixEsc(d.note) + '</div>';
+            })
+            .catch(()=>{
+              const box = el.querySelector("#fixSibs");
+              if(box) box.textContent = "같은 모델을 확인하지 못했습니다.";
+            });
+
           el.querySelector("#fixSave").onclick = ()=>{
             const jobs = [];
             el.querySelectorAll(".fix-val").forEach(inp=>{
@@ -617,8 +646,14 @@
             if(!jobs.length){ toast("입력한 값이 없습니다"); return; }
             el.querySelector("#fixSave").disabled = true;
             // 한 건씩 확정한다 — 하나가 실패해도 나머지는 남는다(일괄 롤백 전례를 피한다)
+            const also = Array.from(el.querySelectorAll(".fix-sib:checked"))
+                              .map(c=>parseInt(c.value,10));
             Promise.all(jobs.map(([r,v])=>
-              api(`/reviews/${r.review_id}/process`, {action:"manual", value:v})
+              api(`/reviews/${r.review_id}/process`,
+                  // 함께 적용은 기준 건에만 붙인다 — 형제 목록은 그 사양 기준으로 찾은 것이다
+                  r.review_id===q.review_id && also.length
+                    ? {action:"manual", value:v, also:also}
+                    : {action:"manual", value:v})
                 .then(res=>({r,res})).catch(e=>({r,err:e}))
             )).then(out=>{
               m.hide();
@@ -626,6 +661,10 @@
               okList.forEach(o=>applyLocal(o.r.id===id?id:o.r.id, "직접 수정", o.res));
               const bad = out.filter(o=>o.err);
               if(bad.length) toast("⚠ "+bad.length+"건 실패 — "+bad[0].err.message);
+              // 서버가 실제로 몇 건에 넣었는지 그대로 말한다(화면이 세지 않는다)
+              const applied = okList.reduce((n,o)=>n+(o.res && o.res.applied || 1), 0);
+              if(applied > okList.length) toast(applied + "건에 같은 값을 넣었습니다");
+              if(also.length) rvLoad();   // 형제가 목록에서 빠졌으니 다시 읽는다
             });
           };
           el.addEventListener("hidden.bs.modal", ()=>el.remove());
@@ -707,14 +746,21 @@
         // 큐 구성 — "대기 6,490건"만 보여주면 운영자는 처리하다 보면 줄어들 줄 안다.
         // 실제로는 그 99.95%가 **원문에 값이 없어** 확정 버튼으로는 한 건도 못 줄인다.
         // 무엇이 손댈 수 있는 일이고 무엇이 사람 손이 필요한 일인지 먼저 말한다(슬라이스 49).
-        var RV_SELLABLE = 0, RV_SUGGESTED = 0;
+        var RV_SELLABLE = 0, RV_SUGGESTED = 0, RV_FIELD = "";
         function rvBrief(d){
           var el = document.getElementById("queueBrief"); if(!el) return;
           var q = d.queue; if(!q){ el.innerHTML = ""; return; }
-          var fields = (q.by_field || []).slice(0, 6).map(function(f){
-            return '<span class="badge badge-phoenix badge-phoenix-secondary me-1 mb-1">'
+          // 배지를 누르면 그 사양만 본다(슬라이스 85). 예전에는 "무엇이 막고 있는지"는
+          // 보여주면서 그걸로 좁힐 방법이 없었다 — 5,000건 큐에서 "쿨러 발열 한도 350건을
+          // 오늘 끝내겠다"는 작업을 시작할 수가 없었다.
+          var fields = (q.by_field || []).slice(0, 8).map(function(f){
+            var on = RV_FIELD === f.field;
+            return '<button type="button" data-fld="' + f.field + '"'
+              + ' class="btn btn-sm ' + (on ? 'btn-primary' : 'btn-phoenix-secondary')
+              + ' me-1 mb-1 py-1 fs-10">'
               + f.field + ' ' + f.n.toLocaleString()
-              + '<span class="text-body-tertiary"> · 판매중 ' + f.sellable.toLocaleString() + '</span></span>';
+              + '<span class="' + (on ? '' : 'text-body-tertiary') + '"> · 판매중 '
+              + f.sellable.toLocaleString() + '</span></button>';
           }).join("");
           el.className = "card mb-3";
           el.innerHTML = '<div class="card-body py-3">'
@@ -742,18 +788,31 @@
             +   '</div>'
             + '</div>'
             + '<p class="fs-9 text-body-secondary mb-2">' + q.verdict + '</p>'
-            + (fields ? '<div class="fs-9"><span class="text-body-tertiary me-1">막힌 필드:</span>'
-                        + fields + '</div>' : '')
+            + (fields ? '<div class="fs-9"><span class="text-body-tertiary me-1">막힌 필드'
+                        + '<span class="text-body-quaternary"> — 누르면 그 사양만 봅니다</span>:</span>'
+                        + fields
+                        + (RV_FIELD ? ' <button type="button" id="rvFieldClear"'
+                            + ' class="btn btn-link btn-sm p-0 fs-10 ms-1">필터 해제</button>' : '')
+                        + '</div>' : '')
             + '</div>';
           var sb = document.getElementById("rvSellable");
           if(sb) sb.onclick = function(){ RV_SELLABLE = RV_SELLABLE ? 0 : 1; RV_PAGE = 1; rvLoad(); };
           var qb = document.getElementById("rvSuggested");
           if(qb) qb.onclick = function(){ RV_SUGGESTED = RV_SUGGESTED ? 0 : 1; RV_PAGE = 1; rvLoad(); };
+          el.querySelectorAll("button[data-fld]").forEach(function(b){
+            b.onclick = function(){
+              RV_FIELD = (RV_FIELD === b.dataset.fld) ? "" : b.dataset.fld;
+              RV_PAGE = 1; rvLoad();
+            };
+          });
+          var fc = document.getElementById("rvFieldClear");
+          if(fc) fc.onclick = function(){ RV_FIELD = ""; RV_PAGE = 1; rvLoad(); };
         }
         function rvLoad(){
           fetch("/api/admin/reviews?page=" + RV_PAGE + "&size=100"
                 + (RV_SELLABLE ? "&sellable=1" : "")
-                + (RV_SUGGESTED ? "&suggested=1" : ""))
+                + (RV_SUGGESTED ? "&suggested=1" : "")
+                + (RV_FIELD ? "&field=" + encodeURIComponent(RV_FIELD) : ""))
             .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
               LIVE = true; QUEUE = d.items.map(fromApi);

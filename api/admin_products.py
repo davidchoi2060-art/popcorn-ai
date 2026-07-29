@@ -922,6 +922,13 @@ def change_part_type(product_code: int, body: PartTypeBody):
         conn.execute(text(
             "UPDATE product_specs SET part_type=:pt, updated_at=now()"
             " WHERE product_code=:pc"), {"pt": new_pt, "pc": product_code})
+        # 사양 행이 아예 없을 수 있다 — ETC로 적재된 상품은 만들어지지 않았다.
+        # 그대로 두면 부품인데 사양 행이 없는 상태가 되어 '사양 미등록'으로 잡힌다
+        # (실제로 그렇게 됐다: 운영자가 ETC → 메인보드로 바꾼 상품 하나가 그 상태였다).
+        conn.execute(text(
+            "INSERT INTO product_specs (product_code, part_type) VALUES (:pc, :pt)"
+            " ON CONFLICT (product_code) DO NOTHING"),
+            {"pc": product_code, "pt": new_pt})
         # 새 분류에서 쓰지 않는 필드의 검수 대기는 의미가 없다 — 닫는다
         closed = 0
         if dropped:

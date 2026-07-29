@@ -124,10 +124,17 @@ def check(name, ok, expect=None, got=None, kind="INVARIANT"):
 # 관리자(37)·고객(38) 세션은 쿠키 이름이 달라 동시에 들고 다닐 수 있다.
 SESSION = {}                                # 쿠키명 -> "name=value"
 COOKIE_NAMES = ("popcorn_admin_session", "popcorn_member_session")
-ADMIN_EMAIL = "admin@popcornpc.local"      # 시드 owner(로컬 dev 전용 — 운영 계정 아님)
-# 슬라이스 70부터 로그인에 비밀번호가 필요하다. 이 값은 **로컬 시드 전용**이며
-# 운영 서버에는 이 계정이 없다. 실 운영자 비밀번호는 tools/set_admin_password.py로 넣는다.
-ADMIN_PW = "Rg7#tzQm4vLp"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@popcornpc.local")
+# 비밀번호는 **여기 적지 않는다.** `.env`(gitignore) 또는 환경변수에서 읽는다.
+#
+# 왜 고쳤나(슬라이스 85): 이 자리에 값이 그대로 박혀 있었고, 주석은 "로컬 시드 전용이며
+# 운영 서버에는 이 계정이 없다"고 적혀 있었다. **그 전제가 틀렸다.** 로컬과 베타는
+# 같은 Cloud SQL을 본다 — `admin@popcornpc.local`은 베타에서도 owner·활성이고
+# 실제로 로그인 기록이 있다. 게다가 이 리포는 공개고, 베타는 Basic Auth를 걷어낸 뒤
+# 누구나 로그인 화면에 닿는다. 즉 리포를 읽은 사람이 owner로 들어올 수 있었다.
+#
+# "테스트용"이라는 이름표는 그 값이 실제로 무엇을 여는지 바꾸지 않는다.
+ADMIN_PW = os.environ.get("ADMIN_PW", "")
 
 
 def _headers(json_body=False):
@@ -181,6 +188,12 @@ def anon_status(path, body=None):
 
 
 def login():
+    if not ADMIN_PW:
+        print("\n  ADMIN_PW가 없습니다 — `.env`에 `ADMIN_PW=...`를 넣으세요"
+              " (리포에는 적지 않습니다).\n"
+              "  비밀번호 발급·변경: .venv/Scripts/python tools/set_admin_password.py"
+              f" {ADMIN_EMAIL}\n")
+        sys.exit(2)
     return post("/api/admin/auth/login",
                 {"email": ADMIN_EMAIL, "password": ADMIN_PW, "provider": "dev"})
 
@@ -1460,8 +1473,12 @@ def test_usage_floors():
         check("검수 직접 수정이 prompt()를 쓰지 않는다",
               "prompt(`${q.name}\\n${FIELD_KO" not in rq, "모달 사용", "prompt 잔존")
         check("검수 직접 수정 모달이 있다", "openFixModal" in rq, "openFixModal", "없음")
+        # 쓰기는 여전히 기존 process 하나로만 간다(읽기용 siblings 조회는 별개다).
         check("모달이 기존 검수 API를 재사용한다",
-              "/process`, {action:\"manual\"" in rq, "process 호출", "다른 경로")
+              "/process`" in rq and 'action:"manual"' in rq, "process 호출", "다른 경로")
+        # 같은 모델 함께 적용 — 서버가 찾아 주고 사람이 고른다(슬라이스 85)
+        check("함께 적용은 사람이 고른 것만 보낸다",
+              "fix-sib" in rq and "also:also" in rq, "체크 목록 사용", "없음")
         # 하단 채팅은 Phoenix 고객지원 데모였다("Eric" · 영문 문의 목록)
         hjs = io.open(os.path.join(ROOT, "mockups", "shared", "admin-helper.js"),
                       encoding="utf-8").read()

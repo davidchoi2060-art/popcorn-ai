@@ -472,7 +472,12 @@
             +'<input id="fl" class="form-control form-control-sm" placeholder="소음도"></div>'
             +'<div class="col-md-2"><label class="form-label fs-9 fw-bold">자료형</label>'
             +'<select id="ft" class="form-select form-select-sm">'
-            + TYPES.map(function(x){return '<option>'+x+'</option>';}).join("")+'</select></div>'
+            + TYPES.map(function(x){
+                // 값(value)은 그대로 두고 보이는 글자에만 설명을 붙인다 —
+                // 저장되는 것은 INTEGER 같은 키다(슬라이스 85, 사용자 요청).
+                var h = (META && META.data_type_help && META.data_type_help[x]) || "";
+                return '<option value="'+x+'">'+x+(h ? ' ('+h+')' : '')+'</option>';
+              }).join("")+'</select></div>'
             +'<div class="col-md-2"><label class="form-label fs-9 fw-bold">단위</label>'
             +'<input id="fu" class="form-control form-control-sm" placeholder="dB · mm · W"></div>'
             +'<div class="col-md-2"><label class="form-label fs-9 fw-bold">비고</label>'
