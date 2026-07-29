@@ -120,15 +120,96 @@ sudo -u popcorn bash -c 'set -a; . /etc/popcorn-ai.env; set +a; cd /srv/popcorn-
 첫 관리자는 `ADMIN_BOOTSTRAP_EMAILS`에 넣은 이메일로 `admin/login.html`에서 로그인하면 자동
 승인된다. 나머지 직원은 같은 화면에서 신청하고, 관리자가 **운영자·권한** 화면에서 승인한다.
 
-## 7. 도메인 확보 후 HTTPS 전환
+## 7. HTTPS 전환 (슬라이스 91)
+
+> **이 서버는 개발/스테이징이다**(decision-log I-01). 도메인은 **`dev.popcornai.co.kr`**을 쓴다 —
+> 정본 `popcornai.co.kr`은 운영 서버 몫으로 남겨 둔다. 정본을 여기 붙였다가 옮기면
+> 인증서·OAuth 리다이렉트 URI·쿠키를 전부 다시 손봐야 한다.
+
+**끝나는 것:** 관리자 비밀번호(슬라이스 70)·Basic Auth 비밀번호·세션 쿠키의 평문 전송.
+**끝나지 않는 것:** 누가 들어오는가. HTTPS는 전송 구간만 지킨다 — Basic Auth는 그대로 둔다.
+
+### 0) 선행 — DNS (가비아, 사용자 작업)
+
+| 호스트 | 타입 | 값 |
+|--------|------|-----|
+| `dev` | A | `34.47.124.184` |
+
+`@`(popcornai.co.kr 자체)는 **비워 둔다**(운영 몫). 전파 확인:
 
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d <도메인>
+nslookup -type=A dev.popcornai.co.kr 8.8.8.8
 ```
 
-그다음 `/etc/popcorn-ai.env`에 `COOKIE_SECURE=1`을 넣고 `sudo systemctl restart popcorn-api`.
-이 값 하나로 세션 쿠키가 HTTPS 전용이 된다(코드 수정 없음).
+### 1) 1단계 설정 적용 — ACME 통로를 연다
+
+`nginx-popcorn.conf`에 `/.well-known/acme-challenge/`만 Basic Auth를 우회하는 블록이 있다.
+**이게 없으면 Let's Encrypt가 401을 받아 발급이 실패한다.**
+
+```bash
+sudo mkdir -p /var/www/certbot
+sudo cp /srv/popcorn-ai/deploy/nginx-popcorn.conf /etc/nginx/sites-available/popcorn
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+통로가 열렸는지 **발급 전에** 확인한다 — 시험 파일을 놓고 밖에서 읽어본다:
+
+```bash
+sudo mkdir -p /var/www/certbot/.well-known/acme-challenge
+echo ok | sudo tee /var/www/certbot/.well-known/acme-challenge/test
+curl -s -o /dev/null -w '%{http_code}\n' http://dev.popcornai.co.kr/.well-known/acme-challenge/test
+sudo rm /var/www/certbot/.well-known/acme-challenge/test
+```
+
+`200`이면 통과. **`401`이면 Basic Auth가 아직 막고 있는 것이니 여기서 멈춘다** — 그대로
+발급을 시도하면 실패하고, Let's Encrypt는 같은 도메인에 실패 횟수 제한을 건다.
+
+### 2) 인증서 발급 — `--webroot`를 쓴다
+
+```bash
+sudo apt install -y certbot
+sudo certbot certonly --webroot -w /var/www/certbot -d dev.popcornai.co.kr
+```
+
+**`--nginx`가 아니라 `--webroot`인 이유:** `--nginx`는 설정 파일을 직접 고친다. 서버에서 고쳐지면
+리포 사본과 갈라지고 **다음 배포가 그걸 덮어쓴다**(P-06 — 서버는 배포 타깃이다).
+`--webroot`는 설정에 손대지 않고 우리가 열어둔 경로에 파일만 놓는다.
+
+### 3) 2단계 설정으로 교체
+
+```bash
+sudo cp /srv/popcorn-ai/deploy/nginx-popcorn-tls.conf /etc/nginx/sites-available/popcorn
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**같은 자리를 덮어쓴다.** 두 파일을 동시에 enabled로 두면 `default_server`가 충돌한다.
+
+### 4) 쿠키를 HTTPS 전용으로
+
+```bash
+echo 'COOKIE_SECURE=1' | sudo tee -a /etc/popcorn-ai.env
+sudo systemctl restart popcorn-api
+```
+
+코드 수정 없이 환경변수 하나다. **이걸 빼먹으면** 세션 쿠키가 계속 평문 경로로도 나가서
+2단계의 이득이 절반만 남는다.
+
+### 5) 검증
+
+```bash
+curl -sI http://dev.popcornai.co.kr/admin/login.html | head -1        # 301
+curl -sI https://dev.popcornai.co.kr/admin/login.html | head -1       # 401 (Basic Auth = 봉쇄 살아있음)
+curl -s https://dev.popcornai.co.kr/api/health                        # 인증 없이 통과
+sudo certbot renew --dry-run                                          # 갱신 경로 확인
+```
+
+`https`에서 **401이 떠야 정상**이다. 200이면 봉쇄가 풀린 것이니 즉시 중단한다(§5를 다시 본다).
+`renew --dry-run`은 90일 뒤 조용한 만료를 막는 유일한 검사다 — 건너뛰지 않는다.
+
+### 되돌리기
+
+`nginx-popcorn.conf`를 다시 덮어쓰고 reload하면 1단계로 돌아간다. 인증서는 남아 있으므로
+재발급 없이 다시 3)으로 갈 수 있다. `COOKIE_SECURE`는 함께 빼야 한다(HTTP에서 켜두면 로그인이 안 된다).
 
 ---
 
