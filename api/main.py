@@ -16,6 +16,7 @@ from .admin_usage_floors import router as admin_usage_floors_router
 from .admin_member_reviews import router as admin_member_reviews_router
 from .admin_members import router as admin_members_router
 from .admin_operators import router as admin_operators_router
+from .admin_profile import router as admin_profile_router
 from .admin_imports import router as admin_imports_router
 from .admin_ops import router as admin_ops_router
 from .admin_orders import router as admin_orders_router
@@ -66,6 +67,7 @@ def health():
 app.include_router(auth_router)
 app.include_router(customer_auth_router)
 app.include_router(admin_operators_router)
+app.include_router(admin_profile_router)
 app.include_router(admin_ops_router)
 app.include_router(admin_imports_router)
 app.include_router(admin_products_router)

@@ -123,6 +123,12 @@ OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
 
 def required_role(method: str, path: str) -> str:
     """경로·메서드별 최소 권한 — 읽기 viewer / 쓰기 operator / 운영자·정책 owner."""
+    # 내 정보(ADM-SYS-030)는 **자기 것만** 다루므로 쓰기도 viewer로 연다(슬라이스 92).
+    # 조회 등급 직원도 자기 이름·연락처는 고칠 수 있어야 한다. 권한 상승은 등급이 아니라
+    # `admin_profile.EDITABLE` 화이트리스트가 막는다 — role·status·email은 아예 못 보낸다.
+    # `/operators`보다 **먼저** 검사한다: 아래 owner 규칙이 접두어로 걸리지 않게.
+    if path.startswith("/api/admin/my-profile"):
+        return "viewer"
     if path.startswith("/api/admin/operators"):
         return "owner"                      # 조회조차 owner(계정 목록은 민감)
     if path.startswith(OWNER_WRITE_PREFIXES) and method not in ("GET", "HEAD", "OPTIONS"):

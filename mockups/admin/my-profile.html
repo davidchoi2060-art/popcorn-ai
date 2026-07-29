@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC 관리자 · 내 정보</title>
+<link rel="stylesheet" href="assets/css/theme.css">
+<link rel="stylesheet" href="assets/css/user.css">
+</head>
+<body data-screen-id="ADM-SYS-022" data-domain="system">
+<main class="main" id="top">
+  <div class="content">
+    <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="index.html">홈</a></li>
+      <li class="breadcrumb-item active">내 정보</li>
+    </ol></nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+      <div>
+        <h2 class="mb-1">내 정보
+          <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-022</span>
+          <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span>
+        </h2>
+        <p class="mb-0 fs-9 text-body-tertiary">
+          내 계정 정보를 확인하고 <b>이름 · 연락처 · 직무</b>를 고칩니다.
+        </p>
+      </div>
+      <a href="activity-logs.html" class="btn btn-phoenix-secondary btn-sm">내 작업 기록 →</a>
+    </div>
+
+    <div id="host" hidden></div>
+    <div id="fallback" class="alert alert-subtle-warning fs-9" role="alert">
+      내 정보를 불러오는 중입니다 — 서버에 연결되면 표시됩니다.
+    </div>
+  </div>
+</main>
+
+<script>
+/* 감시자 — **별도 스크립트여야 한다.** 아래 본 스크립트가 파싱 실패로 통째로 죽으면
+   화면은 "불러오는 중"에 영원히 멈추고 사용자에겐 아무 신호도 없다. 슬라이스 92에서
+   실제로 그랬다(줄머리 `+`가 삼항연산자를 쪼갰다). 콘솔 에러는 사용자가 보지 않는다.
+   같은 <script>에 넣으면 함께 죽으므로 의미가 없다 — 슬라이스 58의 교훈 그대로다. */
+window.__profileAlive = false;
+setTimeout(function(){
+  if (window.__profileAlive) return;
+  var fb = document.getElementById("fallback");
+  var src = document.getElementById("dataSrc");
+  if (fb) {
+    fb.textContent = "화면 스크립트가 실행되지 않았습니다 — 새로고침해도 같으면 관리자에게 알려주세요.";
+    fb.hidden = false;
+  }
+  if (src) src.textContent = "화면 오류";
+}, 5000);
+</script>
+<script>
+(function(){
+  window.__profileAlive = true;      // 감시자에게 "나는 살아 있다"
+  var host = document.getElementById("host");
+  var fb   = document.getElementById("fallback");
+  var src  = document.getElementById("dataSrc");
+  var DATA = null;
+
+  function esc(s){ return String(s==null?"":s).replace(/[<>&"]/g,
+    function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; }); }
+  function toast(m){
+    var t=document.getElementById("__t");
+    if(!t){ t=document.createElement("div"); t.id="__t";
+      t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);"
+        +"background:#141824;color:#fff;font-size:13px;font-weight:700;padding:11px 20px;"
+        +"border-radius:10px;z-index:9999;opacity:0;transition:.2s;";
+      document.body.appendChild(t); }
+    t.innerHTML=m; t.style.opacity="1";
+    clearTimeout(t._x); t._x=setTimeout(function(){t.style.opacity="0";},3600);
+  }
+  /* 값이 없으면 지어내지 않고 '—'로 둔다. 빈 자리를 그럴듯한 것으로 채우지 않는다. */
+  function dash(v){ return (v===null||v===undefined||v==="") ? "—" : esc(v); }
+
+  /* 사진은 아직 저장 경로가 없다(슬라이스 93 예정) — 이름 첫 글자로 대신한다.
+     '사진 없음' 자리를 비워두면 무엇이 빠졌는지 알 수 없어 이니셜로 채운다. */
+  function initial(name){
+    var n = (name||"").trim();
+    return n ? esc(n.charAt(0)) : "?";
+  }
+
+  function row(label, value, hint){
+    return '<div class="col-sm-6 mb-3">'
+      + '<div class="fs-10 text-body-tertiary mb-1">' + esc(label) + '</div>'
+      + '<div class="fw-semibold">' + value + '</div>'
+      + (hint ? '<div class="fs-10 text-body-quaternary mt-1">' + esc(hint) + '</div>' : '')
+      + '</div>';
+  }
+
+  /* 문자열을 줄머리 `+`로 이어붙이며 그 안에 삼항을 넣었다가 스크립트가 통째로 죽었다
+     (`d.has_password` 다음 줄이 `+ ? (...)`가 되어 파싱 실패 — 화면은 "불러오는 중"에서
+     영원히 멈춰 있었고 콘솔 밖으로는 아무 신호도 없었다). 조건은 **먼저 변수로 만들고**,
+     이어붙이기는 배열 join으로 한다 — 슬라이스 58의 교훈("화면이 죽는 것보다 나쁜 건
+     죽은 줄 모르는 것")과 같은 자리다. */
+  function render(d){
+    DATA = d;
+
+    var pwValue = d.has_password
+      ? ('설정됨' + (d.password_set_at
+          ? ' <span class="fs-10 text-body-tertiary">(' + esc(d.password_set_at) + ')</span>'
+          : ''))
+      : '<span class="text-danger">미설정 — 로그인할 수 없습니다</span>';
+    var lockValue = d.is_locked
+      ? '<span class="badge badge-phoenix badge-phoenix-danger">잠김</span>'
+      : '<span class="badge badge-phoenix badge-phoenix-primary">정상</span>';
+    var approverHint = d.approver ? ('승인자: ' + d.approver) : null;
+
+    host.innerHTML = [
+      '<div class="alert alert-subtle-info fs-10 mb-3">', esc(d.note), '</div>',
+
+      /* ── 신원 ─────────────────────────────────────────── */
+      '<div class="card mb-3"><div class="card-body">',
+        '<div class="d-flex align-items-center gap-3 mb-4">',
+          '<div class="d-flex align-items-center justify-content-center rounded-circle ',
+            'bg-primary text-white fw-bold" style="width:64px;height:64px;font-size:28px;">',
+            initial(d.name), '</div>',
+          '<div>',
+            '<h4 class="mb-1">', dash(d.name), '</h4>',
+            '<div class="fs-9 text-body-tertiary">', dash(d.email), '</div>',
+            '<div class="mt-1">',
+              '<span class="badge badge-phoenix badge-phoenix-secondary">',
+                esc(d.role_label), '</span> ',
+              '<span class="badge badge-phoenix badge-phoenix-secondary">',
+                esc(d.status), '</span>',
+            '</div>',
+          '</div>',
+        '</div>',
+
+        '<h5 class="mb-3">기본 정보</h5>',
+        '<div class="row">',
+          '<div class="col-sm-6 mb-3">',
+            '<label class="form-label fs-9" for="f-name">이름 <span class="text-danger">*</span></label>',
+            '<input id="f-name" class="form-control form-control-sm" maxlength="100" value="',
+              esc(d.name), '">',
+          '</div>',
+          '<div class="col-sm-6 mb-3">',
+            '<label class="form-label fs-9" for="f-phone">연락처</label>',
+            '<input id="f-phone" class="form-control form-control-sm" maxlength="30"',
+              ' placeholder="010-0000-0000" value="', esc(d.phone || ""), '">',
+          '</div>',
+          '<div class="col-sm-6 mb-3">',
+            '<label class="form-label fs-9" for="f-duty">직무</label>',
+            '<input id="f-duty" class="form-control form-control-sm" maxlength="100"',
+              ' placeholder="예: 상품 검수" value="', esc(d.duty || ""), '">',
+          '</div>',
+        '</div>',
+        '<div class="d-flex gap-2">',
+          '<button id="save" class="btn btn-primary btn-sm">저장</button>',
+          '<button id="reset" class="btn btn-phoenix-secondary btn-sm">되돌리기</button>',
+        '</div>',
+      '</div></div>',
+
+      /* ── 못 고치는 것 — 왜 못 고치는지 함께 적는다 ────── */
+      '<div class="card mb-3"><div class="card-body">',
+        '<h5 class="mb-1">계정</h5>',
+        '<p class="fs-10 text-body-tertiary mb-3">',
+          '아래 항목은 본인이 바꿀 수 없습니다. 정정이 필요하면 관리자에게 요청하세요.</p>',
+        '<div class="row">',
+          row("이메일 (로그인 신원)", dash(d.email),
+              "이 값으로 계정을 찾습니다 — 바꾸면 계정이 다른 사람에게 옮겨갑니다"),
+          row("권한 등급", esc(d.role_label), "승인 게이트를 지키기 위해 잠겨 있습니다"),
+          row("상태", esc(d.status)),
+          row("로그인 방식", dash(d.provider)),
+        '</div>',
+      '</div></div>',
+
+      /* ── 보안 ─────────────────────────────────────────── */
+      '<div class="card mb-3"><div class="card-body">',
+        '<h5 class="mb-3">보안</h5>',
+        '<div class="row">',
+          row("비밀번호", pwValue, "원문은 저장하지 않습니다(해시만 보관)"),
+          row("계정 잠금", lockValue, "로그인 실패 " + d.login_fail_count + "회"),
+          row("마지막 로그인", dash(d.last_login)),
+          row("열려 있는 세션", esc(d.live_sessions) + "개"),
+        '</div>',
+        '<button id="pw" class="btn btn-phoenix-primary btn-sm">비밀번호 변경</button>',
+      '</div></div>',
+
+      /* ── 이력 ─────────────────────────────────────────── */
+      '<div class="card"><div class="card-body">',
+        '<h5 class="mb-3">이력</h5>',
+        '<div class="row">',
+          row("가입(신청)", dash(d.joined)),
+          row("승인", dash(d.approved_at), approverHint),
+          row("남긴 작업 기록", esc(d.acts) + "건"),
+        '</div>',
+      '</div></div>'
+    ].join("");
+
+    host.hidden = false;
+    fb.hidden = true;
+    wire();
+  }
+
+  function wire(){
+    document.getElementById("reset").onclick = function(){ render(DATA); toast("서버 값으로 되돌렸습니다"); };
+
+    document.getElementById("save").onclick = function(){
+      var b = this;
+      var body = {
+        name:  document.getElementById("f-name").value.trim(),
+        phone: document.getElementById("f-phone").value.trim(),
+        duty:  document.getElementById("f-duty").value.trim()
+      };
+      if(!body.name){ toast("이름을 입력하세요"); return; }
+      b.disabled = true;
+      fetch("/api/admin/my-profile", {
+        method: "PATCH", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(res){
+          b.disabled = false;
+          if(!res.ok){
+            var dt = res.j && res.j.detail;
+            toast("⚠ " + esc((dt && typeof dt === "object") ? (dt.message || dt.error || JSON.stringify(dt)) : (dt || "저장하지 못했습니다")));
+            return;
+          }
+          // 서버가 준 문구를 그대로 쓴다 — 화면이 따로 지어내지 않는다.
+          toast(esc(res.j.note));
+          render(res.j);
+        })
+        .catch(function(){ b.disabled = false; toast("서버에 연결할 수 없습니다"); });
+    };
+
+    document.getElementById("pw").onclick = function(){
+      var cur = prompt("현재 비밀번호를 입력하세요");
+      if(cur === null) return;
+      var nw = prompt("새 비밀번호를 입력하세요 (8자 이상)");
+      if(nw === null) return;
+      fetch("/api/admin/auth/password", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({current: cur, "new": nw})
+      }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(res){
+          if(!res.ok){
+            var dt = res.j && res.j.detail;
+            toast("⚠ " + esc(typeof dt === "object" ? (dt.message || dt.error) : (dt || "변경하지 못했습니다")));
+            return;
+          }
+          toast(esc(res.j.note || "비밀번호를 변경했습니다"));
+          load();
+        })
+        .catch(function(){ toast("서버에 연결할 수 없습니다"); });
+    };
+  }
+
+  function load(){
+    return fetch("/api/admin/my-profile")
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){
+        src.textContent = "실데이터 · Cloud SQL";
+        src.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+        render(d);
+      })
+      .catch(function(e){
+        // 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다.
+        // 여기에 더미 프로필을 두면 남의 이름이 내 화면에 뜬다(슬라이스 55 전례).
+        src.textContent = "연결 안 됨";
+        fb.textContent = "내 정보를 불러오지 못했습니다 (" + e.message + ") — "
+          + "관리자로 로그인했는지 확인하세요.";
+        fb.hidden = false;
+        host.hidden = true;
+      });
+  }
+  load();
+})();
+</script>
+<script src="../shared/admin-auth.js"></script>
+<script src="../shared/ui-progress.js"></script>
+<script src="../shared/su-icons.js"></script>
+<script src="../shared/admin-panel.js"></script>
+<script src="../shared/admin-menu.js"></script>
+</body>
+</html>

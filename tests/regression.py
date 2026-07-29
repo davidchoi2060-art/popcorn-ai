@@ -1009,6 +1009,105 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def _patch_me(body):
+    return post_raw("/api/admin/my-profile", json.dumps(body).encode(),
+                    {"Content-Type": "application/json"}, method="PATCH")
+
+
+def test_my_profile():
+    print("\n[21] 내 정보 — 자기 것만, 그것도 일부만 고친다 (슬라이스 92)")
+    d = get("/api/admin/my-profile")
+    check("내 정보를 읽는다", bool(d and d.get("id")), "id 있음", d)
+    if not (d and d.get("id")):
+        return
+    me_id, me_name = d["id"], d["name"]
+
+    # 서버가 무엇을 고칠 수 있는지 알려준다 — 화면이 스스로 정하면 서버와 어긋난다
+    check("고칠 수 있는 필드를 서버가 말한다",
+          sorted(d.get("editable") or []) == ["duty", "name", "phone"],
+          ["duty", "name", "phone"], d.get("editable"))
+    # 비밀번호는 어떤 형태로도 응답에 실리지 않는다
+    check("응답에 비밀번호가 없다",
+          not any("password" in k and k != "has_password"
+                  and k != "password_set_at" and k != "must_change_password"
+                  for k in d), "해시 없음", [k for k in d if "password" in k])
+
+    # ── 권한 상승 차단 ── 등급이 아니라 필드가 막는다
+    role_before = db_one("SELECT role FROM admin_operators WHERE operator_id=:i", i=me_id)
+    st2, _ = _patch_me({"name": me_name, "role": "owner"})
+    check("권한을 함께 보내면 거절한다(조용히 무시하지 않는다)",
+          st2 in (400, 422), "400/422", st2)
+    check("거절된 요청이 권한을 바꾸지 않았다",
+          db_one("SELECT role FROM admin_operators WHERE operator_id=:i", i=me_id)
+          == role_before, role_before,
+          db_one("SELECT role FROM admin_operators WHERE operator_id=:i", i=me_id))
+
+    email_before = db_one("SELECT email FROM admin_operators WHERE operator_id=:i", i=me_id)
+    st3, _ = _patch_me({"name": me_name, "email": "hijack@example.com"})
+    check("이메일을 함께 보내면 거절한다", st3 in (400, 422), "400/422", st3)
+    check("거절된 요청이 이메일을 바꾸지 않았다",
+          db_one("SELECT email FROM admin_operators WHERE operator_id=:i", i=me_id)
+          == email_before, email_before,
+          db_one("SELECT email FROM admin_operators WHERE operator_id=:i", i=me_id))
+
+    st4, _ = _patch_me({"name": "   "})
+    check("빈 이름은 거절한다", st4 == 400, 400, st4)
+    check("이름은 여전히 그대로다",
+          db_one("SELECT name FROM admin_operators WHERE operator_id=:i", i=me_id)
+          == me_name, me_name,
+          db_one("SELECT name FROM admin_operators WHERE operator_id=:i", i=me_id))
+
+    # ── 왕복: 고쳤다가 되돌린다 ──
+    # 검사는 흔적을 남기지 않는다(슬라이스 78). 직무를 잠시 바꿨다가 반드시 복구한다.
+    duty_before = db_one("SELECT duty FROM admin_operators WHERE operator_id=:i", i=me_id)
+    probe = "회귀검사-임시"
+    st5, d5 = _patch_me({"name": me_name, "duty": probe})
+    check("직무를 고칠 수 있다", st5 == 200, 200, st5)
+    check("고친 값이 DB에 남는다",
+          db_one("SELECT duty FROM admin_operators WHERE operator_id=:i", i=me_id) == probe,
+          probe, db_one("SELECT duty FROM admin_operators WHERE operator_id=:i", i=me_id))
+    check("무엇이 바뀌었는지 응답이 말한다",
+          "duty" in (d5 or {}).get("changed", {}), "duty 포함", (d5 or {}).get("changed"))
+    # 원장에 남는가 — 쓰기는 작업 기록을 남긴다(원장 규약)
+    check("작업 기록에 남는다",
+          (db_one("SELECT COUNT(*) FROM admin_operator_activity_logs"
+                  " WHERE action='operator_self_update' AND operator_id=:i", i=me_id) or 0) > 0,
+          "1건 이상", 0)
+
+    # 같은 값을 다시 보내면 원장을 늘리지 않는다 — '고쳤다'는 거짓 기록이 된다
+    n_before = db_one("SELECT COUNT(*) FROM admin_operator_activity_logs"
+                      " WHERE action='operator_self_update' AND operator_id=:i", i=me_id)
+    _patch_me({"name": me_name, "duty": probe})
+    check("바뀐 게 없으면 기록을 남기지 않는다",
+          db_one("SELECT COUNT(*) FROM admin_operator_activity_logs"
+                 " WHERE action='operator_self_update' AND operator_id=:i", i=me_id)
+          == n_before, n_before,
+          db_one("SELECT COUNT(*) FROM admin_operator_activity_logs"
+                 " WHERE action='operator_self_update' AND operator_id=:i", i=me_id))
+
+    # 복구 — 검사가 흔적을 남기지 않는다
+    _patch_me({"name": me_name, "duty": duty_before})
+    check("검사가 원래 값을 되돌려 놓았다",
+          db_one("SELECT duty FROM admin_operators WHERE operator_id=:i", i=me_id)
+          == duty_before, duty_before,
+          db_one("SELECT duty FROM admin_operators WHERE operator_id=:i", i=me_id))
+
+    # ── 화면 계약 ── 프로필 메뉴가 없는 곳을 가리키지 않는다
+    import glob as _g3
+    dead = []
+    for _p in sorted(_g3.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        for ln in io.open(_p, encoding="utf-8").read().split("\n"):
+            if 'href="#!"' in ln and ("내 정보" in ln or "대시보드" in ln):
+                dead.append(_n + ": " + ("내 정보" if "내 정보" in ln else "대시보드"))
+    check("프로필 메뉴에 죽은 링크가 없다", not dead, "없음", dead[:4])
+    check("내 정보 화면 파일이 있다",
+          os.path.exists(os.path.join(ROOT, "mockups", "admin", "my-profile.html")),
+          "있음", "없음")
+
+
 def test_usage_floor_admin():
     print("\n[19] 용도 하한 관리 — 값을 고칠 화면이 있는가 (슬라이스 75)")
     # 하한은 슬라이스 58에서 만들었지만 **고칠 화면이 없었다.** 값은 실측으로 정한
@@ -1996,6 +2095,7 @@ def main():
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
                test_screen_identity,
+               test_my_profile,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

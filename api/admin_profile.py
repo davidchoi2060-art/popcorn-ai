@@ -1,0 +1,157 @@
+"""ADM-SYS-022 내 정보 — 운영자 자기 계정 조회·수정 (슬라이스 92).
+
+**이 화면은 새로 생긴 약속이 아니다.** 상단바 프로필 드롭다운의 `내 정보`가 30개 화면에
+이미 있었는데 전부 `href="#!"`인 죽은 링크였다. 이 모듈이 그 약속을 지킨다.
+
+■ 자기 것만, 그것도 일부만 고친다
+운영자·권한(ADM-SYS-020)은 **owner가 남을** 관리하는 화면이고, 여기는 **본인이 자기를** 보는
+화면이다. 그래서 고칠 수 있는 필드를 셋으로 못박는다 — `name` · `phone` · `duty`.
+
+  role/status  자기 권한 상승·정지 해제를 막는다. 승인 게이트의 의미가 사라진다.
+  email        **로그인 신원 그 자체다**(dev 어댑터든 OAuth든 이메일로 계정을 찾는다).
+               본인이 바꾸면 계정이 통째로 다른 사람에게 옮겨간다. 정정은 owner 경로
+               (`/operators/{id}/email`, 슬라이스 73)로만 한다.
+
+■ 모르는 필드는 조용히 무시하지 않고 거절한다(`extra="forbid"`)
+`{"name":"x","role":"owner"}`를 보냈을 때 role만 버리고 200을 주면 **보낸 쪽은 성공했다고
+믿는다.** 화면이 죽은 줄 모르고 다른 것을 파는 것과 같은 부류다(슬라이스 58 전례).
+422로 거절해서 "그 필드는 여기서 못 고친다"를 분명히 한다.
+
+■ 등급이 아니라 필드가 방벽이다
+`required_role`에서 이 경로를 **viewer**로 열어 뒀다. 조회 등급 직원도 자기 이름·연락처는
+고칠 수 있어야 하기 때문이다. 권한 상승은 등급이 아니라 위 화이트리스트가 막는다.
+"""
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import text
+
+from .admin_orders import _log
+from .auth import current_operator
+from .db import engine
+from .timeutil import iso
+
+router = APIRouter(prefix="/api/admin")
+
+ROLE_KO = {"viewer": "조회", "operator": "운영자", "owner": "관리자"}
+
+# 본인이 고칠 수 있는 필드 — 이 셋이 전부다. 늘릴 때는 위 주석의 판단을 다시 한다.
+EDITABLE = ("name", "phone", "duty")
+
+
+class ProfileBody(BaseModel):
+    # extra="forbid" — 모르는 필드는 거절한다(위 주석 참조). 조용한 무시가 더 위험하다.
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    phone: str | None = None
+    duty: str | None = None
+
+
+def _row(conn, op_id: int):
+    return conn.execute(text(
+        "SELECT o.operator_id, o.name, o.email, o.role, o.status, o.provider, o.phone,"
+        " o.duty, o.created_at, o.approved_at, o.last_login_at, o.password_set_at,"
+        " o.must_change_password, o.login_fail_count, a.name AS approver,"
+        " (o.password_hash IS NOT NULL) AS has_password,"
+        " (o.locked_until IS NOT NULL AND o.locked_until > now()) AS is_locked,"
+        " (SELECT COUNT(*) FROM admin_operator_activity_logs l"
+        "    WHERE l.operator_id = o.operator_id) AS acts,"
+        " (SELECT COUNT(*) FROM admin_sessions s"
+        "    WHERE s.operator_id = o.operator_id"
+        "      AND s.revoked_at IS NULL AND s.expires_at > now()) AS live_sessions"
+        " FROM admin_operators o"
+        " LEFT JOIN admin_operators a ON a.operator_id = o.approved_by"
+        " WHERE o.operator_id = :id"), {"id": op_id}).mappings().first()
+
+
+def _shape(r) -> dict:
+    return {
+        "id": r["operator_id"], "name": r["name"], "email": r["email"],
+        "role": r["role"], "role_label": ROLE_KO.get(r["role"], r["role"]),
+        "status": r["status"], "provider": r["provider"] or "—",
+        "phone": r["phone"], "duty": r["duty"],
+        "joined": iso(r["created_at"]),
+        "approved_at": iso(r["approved_at"]) if r["approved_at"] else None,
+        "approver": r["approver"],
+        "last_login": iso(r["last_login_at"]) if r["last_login_at"] else None,
+        "password_set_at": iso(r["password_set_at"]) if r["password_set_at"] else None,
+        "has_password": bool(r["has_password"]),
+        "must_change_password": bool(r["must_change_password"]),
+        "is_locked": bool(r["is_locked"]),
+        "login_fail_count": r["login_fail_count"],
+        "acts": r["acts"], "live_sessions": r["live_sessions"],
+        # 화면이 무엇을 잠글지 서버가 알려준다 — 화면이 스스로 정하면 서버와 어긋난다.
+        "editable": list(EDITABLE),
+    }
+
+
+@router.get("/my-profile")
+def get_my_profile():
+    me = current_operator()
+    if not me:
+        raise HTTPException(401, "로그인이 필요합니다")
+    with engine.connect() as conn:
+        r = _row(conn, me["operator_id"])
+    if r is None:                     # 세션은 살아 있는데 계정 행이 없다(삭제된 경우)
+        raise HTTPException(404, "계정을 찾을 수 없습니다")
+    d = _shape(r)
+    d["note"] = ("이름·연락처·직무만 본인이 고칠 수 있습니다"
+                 " · 이메일은 로그인 신원이라 관리자만 정정합니다"
+                 " · 권한 등급은 여기서 바꿀 수 없습니다"
+                 " · 비밀번호는 해시로만 보관합니다(원문은 저장하지 않습니다)")
+    return d
+
+
+@router.patch("/my-profile")
+def update_my_profile(body: ProfileBody):
+    me = current_operator()
+    if not me:
+        raise HTTPException(401, "로그인이 필요합니다")
+
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, "이름을 입력하세요")
+    if len(name) > 100:
+        raise HTTPException(400, "이름은 100자 이하로 입력하세요")
+    phone = (body.phone or "").strip() or None
+    if phone and len(phone) > 30:
+        raise HTTPException(400, "연락처는 30자 이하로 입력하세요")
+    duty = (body.duty or "").strip() or None
+    if duty and len(duty) > 100:
+        raise HTTPException(400, "직무는 100자 이하로 입력하세요")
+
+    with engine.begin() as conn:
+        before = _row(conn, me["operator_id"])
+        if before is None:
+            raise HTTPException(404, "계정을 찾을 수 없습니다")
+
+        changed = {}
+        for key, new in (("name", name), ("phone", phone), ("duty", duty)):
+            if (before[key] or None) != new:
+                changed[key] = {"before": before[key], "after": new}
+        if not changed:
+            # 바뀐 게 없으면 원장에 남기지 않는다 — '고쳤다'는 기록이 거짓이 된다.
+            out = _shape(before)
+            out["note"] = "바뀐 값이 없습니다"
+            out["changed"] = {}
+            return out
+
+        conn.execute(text(
+            "UPDATE admin_operators SET name=:n, phone=:p, duty=:d WHERE operator_id=:id"),
+            {"n": name, "p": phone, "d": duty, "id": me["operator_id"]})
+
+        # 원문 값을 그대로 남긴다 — 민감정보가 아니고, 무엇이 어떻게 바뀌었는지
+        # 나중에 되짚을 수 있어야 한다(비밀번호와는 다르다).
+        _log(conn, "operator_self_update", before["email"] or str(me["operator_id"]),
+             {"changed": changed}, kind="operator")
+
+        after = _row(conn, me["operator_id"])
+
+    out = _shape(after)
+    out["changed"] = changed
+    # 이름을 바꾸면 **과거 작업 기록의 표시 이름도 함께 바뀐다**(로그는 operator_id를
+    # 참조하고 이름은 조인으로 나온다). 같은 사람이므로 의도된 동작이지만, 화면이
+    # 그 사실을 미리 말해야 "예전 기록이 왜 바뀌었지"를 묻지 않는다.
+    out["note"] = ("저장했습니다 — " + " · ".join(
+        {"name": "이름", "phone": "연락처", "duty": "직무"}[k] for k in changed)
+        + (" (이름은 지난 작업 기록의 표시에도 함께 반영됩니다)" if "name" in changed else ""))
+    return out
