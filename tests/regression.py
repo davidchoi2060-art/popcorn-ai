@@ -1092,6 +1092,40 @@ def test_stock_ledger():
           db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc) == before,
           before, db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc))
 
+    # ── 재고 = 원장 합 (슬라이스 98) ──
+    # 적재가 stock_qty를 직접 넣으면서 원장을 안 남겨 7,547건이 원장 밖에 있었다.
+    # `stock_movements` 합으로 재고를 검증할 수 없다는 뜻이었다.
+    # 0026이 기초 재고(opening)로 기준선을 긋고, catalog_ingest가 앞으로 델타를 남긴다.
+    #
+    # **이 불변식이 이 슬라이스의 본체다.** 어긋나면 재고를 원장 밖에서 바꾼 경로가
+    # 새로 생겼다는 뜻이다 — 그 경로를 찾아 원장을 남기게 고쳐야 한다(값을 맞추지 말고).
+    off = db_one("SELECT count(*) FROM products p"
+                 " LEFT JOIN (SELECT product_code, SUM(qty_delta) sd"
+                 "              FROM stock_movements GROUP BY product_code) m"
+                 "        ON m.product_code = p.product_code"
+                 " WHERE p.stock_qty <> COALESCE(m.sd, 0)")
+    if off is not None:
+        check("재고 = 원장 합 (전 상품)", off == 0, 0, off)
+    orphan = db_one("SELECT count(*) FROM products p WHERE p.stock_qty > 0"
+                    "   AND NOT EXISTS (SELECT 1 FROM stock_movements m"
+                    "                    WHERE m.product_code = p.product_code)")
+    if orphan is not None:
+        check("재고가 있으면 원장이 있다", orphan == 0, 0, orphan)
+    # 기초 재고는 입고를 주장하지 않는다 — 과거 입고 시점을 모르기 때문이다.
+    # 이 행이 inbound로 섞이면 "언제 들어왔는지 안다"는 거짓이 된다.
+    bad_open = db_one("SELECT count(*) FROM stock_movements"
+                      " WHERE ref_kind = 'opening' AND movement_type <> 'adjust'")
+    if bad_open is not None:
+        check("기초 재고는 입고를 주장하지 않는다", bad_open == 0, 0, bad_open)
+    # 적재가 원장을 남기는 코드가 살아 있는가 — 지워지면 다시 7,547건이 쌓인다
+    try:
+        ci = io.open(os.path.join(ROOT, "api", "catalog_ingest.py"), encoding="utf-8").read()
+        check("적재가 재고 델타를 원장에 남긴다",
+              "stock_movements" in ci and "'catalog'" in ci, "있음", "없음")
+        check("적재는 절대값이 아니라 델타를 남긴다", "stock_before" in ci, "델타", "절대값")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 적재 원장 계약 - {e}")
+
     # ── 화면 계약 ── 연속 등록 (슬라이스 97)
     # 빈 상태에서 견적 한 벌 = 8개 슬롯. 슬롯 하나가 0이면 견적이 0건이라 최소 8번 등록한다.
     try:

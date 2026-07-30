@@ -336,8 +336,39 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
           spec_source_text = EXCLUDED.spec_source_text, data_origin = EXCLUDED.data_origin,
           updated_at = now()
     """)
+    # ── 재고 델타를 원장에 남긴다 (슬라이스 98) ─────────────────────────
+    # 적재는 `stock_qty = EXCLUDED.stock_qty`로 **덮어쓴다**. 그런데 원장에는 아무것도
+    # 남지 않아, 재고>0인데 원장이 없는 상품이 7,547건 쌓여 있었다. `stock_movements`
+    # 합으로 재고를 검증할 수 없다는 뜻이고, "이 재고가 어디서 왔나"에 답할 수 없다.
+    #
+    # 절대값이 아니라 **델타**를 남긴다 — 재적재가 8을 5로 바꾸면 -3이다.
+    # 종류: 처음 우리 재고로 기록되면(0 -> N) `inbound`, 이후 원천과 맞추는 것은 `adjust`.
+    #       적재가 물리적 입고를 목격한 것은 아니므로 후자를 입고라고 부르지 않는다.
+    pcs = [p["pc"] for p in prods]
+    stock_before = {}
+    if pcs:
+        stock_before = {r[0]: (r[1] or 0) for r in conn.execute(text(
+            "SELECT product_code, stock_qty FROM products WHERE product_code = ANY(:c)"),
+            {"c": pcs}).all()}
+
     for i in range(0, len(prods), BATCH):
         conn.execute(ins_p, prods[i:i + BATCH])
+
+    moves = []
+    for p in prods:
+        b = stock_before.get(p["pc"], 0)
+        a = int(p["stock"] or 0)
+        if a == b:
+            continue
+        moves.append({"pc": p["pc"], "q": a - b, "ref": job_id,
+                      "t": "inbound" if b == 0 and a > 0 else "adjust"})
+    if moves:
+        ins_mv = text(
+            "INSERT INTO stock_movements"
+            " (product_code, movement_type, qty_delta, ref_kind, ref_id)"
+            " VALUES (:pc, :t, :q, 'catalog', :ref)")
+        for i in range(0, len(moves), BATCH):
+            conn.execute(ins_mv, moves[i:i + BATCH])
 
     # **적재는 채우기만 하고 지우지 않는다.** 새 파일에서 못 뽑은 필드가 기존 값을 NULL로
     # 덮으면, EAV를 빼고 마스터만 올린 한 번의 적재가 추천 후보를 통째로 무너뜨린다
