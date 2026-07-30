@@ -265,7 +265,7 @@
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 검수</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
           <div><h2 class="mb-1">상품 검수 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2><p class="text-body-tertiary mb-0">AI가 자동 통과시키지 못한 항목만 모입니다. <b class="text-body-secondary">검수를 통과해야 추천 가능 재고에 올라갑니다.</b></p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">10</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">0</span>건</p></div>
+          <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">10</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">0</span>건<br><span id="pageNote" class="fs-10 text-body-quaternary"></span></p></div>
         </div>
         <div id="queueBrief"></div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="filterPills"></ul>
@@ -330,6 +330,9 @@
            note:"주사율 미표기. 주변기기 '함께 구성' 제안에서 GPU 성능 매칭 근거(권장 프레임)로 쓰이는 필수 사양 → 운영자 확정 필요."}
         ];
         let cur = "all", sel = null, done = 0;
+        /* 서버가 준 수를 그대로 쓰기 위해 응답을 보관한다.
+           더미 폴백일 때는 비어 있어 예전 계산으로 되돌아간다. */
+        let SRV = {};
         // 실데이터 모드 — fetch 성공 시 QUEUE를 API 계약으로 교체, 실패(file://·정적 호스팅)면 더미 유지
         let LIVE = false;
         function relTime(iso){const s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return"방금 전";const m=Math.floor(s/60);if(m<60)return m+"분 전";const h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전";}
@@ -371,8 +374,25 @@
             return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${active?"active":""}" style="${active?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${active?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${n}</span></a></li>`;
           }).join("");
           document.querySelectorAll("#filterPills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;const l=list();sel=l[0]?l[0].id:null;renderAll();});
-          document.getElementById("remainCount").textContent = QUEUE.length;
-          document.getElementById("doneCount").textContent = done;
+          /* 큰 숫자는 **서버가 준 수**를 쓴다(슬라이스 96).
+             예전에는 `QUEUE.length` — 현재 페이지 길이(최대 100)를 '남은 N건'으로 띄웠다.
+             실제로 5,152건이 남아 있는데 화면은 '남은 100건'이라 말했고, 같은 화면 아래에는
+             '검수 대기 5,152건'이 있어 한 화면이 두 말을 했다.
+             '오늘 처리'도 JS 변수였다 — 새로고침하면 0이 되니 '오늘'이 아니었다.
+             지금은 서버가 서울 자정 기준으로 센 값이라 F5를 눌러도 남는다. */
+          var rc = document.getElementById("remainCount");
+          rc.textContent = (SRV.remaining != null ? SRV.remaining : QUEUE.length).toLocaleString();
+          var dc = document.getElementById("doneCount");
+          dc.textContent = (SRV.my_today != null ? SRV.my_today : done).toLocaleString();
+          /* 페이지가 전체보다 작으면 그 사실을 밝힌다 — 목록이 100줄인데 남은 수가
+             5,152이면 운영자가 "왜 안 보이지"를 묻게 된다. */
+          var pg = document.getElementById("pageNote");
+          if(pg){
+            var shown = QUEUE.length, tot = SRV.remaining;
+            pg.textContent = (tot != null && tot > shown)
+              ? "이 화면은 그중 " + shown.toLocaleString() + "건을 보여줍니다"
+              : "";
+          }
         }
         function list(){ return (cur==="all"?QUEUE:QUEUE.filter(q=>q.type===cur)).slice().sort((a,b)=>RISK[riskOf(b)].o-RISK[riskOf(a)].o); }
         function confBadge(v){ if(v===null) return `<span class="badge badge-phoenix badge-phoenix-secondary">신뢰도 N/A</span>`;
@@ -599,7 +619,11 @@
                   <a class="btn btn-link btn-sm me-auto" target="_blank"
                      href="products.html?q=${encodeURIComponent(q.id)}">상품 관리에서 열기 →</a>
                   <button class="btn btn-phoenix-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                  <span id="fixPos" class="fs-10 text-body-tertiary me-auto"></span>
                   <button class="btn btn-primary btn-sm" id="fixSave">저장</button>
+                  <!-- 830건을 손으로 넣어야 하는데 저장하면 모달이 닫히고 끝이었다.
+                       목록에서 다시 찾아 클릭하는 왕복이 830번이다(슬라이스 96). -->
+                  <button class="btn btn-phoenix-primary btn-sm" id="fixNext">저장하고 다음</button>
                 </div>
               </div></div></div>`;
 
@@ -638,7 +662,7 @@
               if(box) box.textContent = "같은 모델을 확인하지 못했습니다.";
             });
 
-          el.querySelector("#fixSave").onclick = ()=>{
+          function doSave(goNext){
             const jobs = [];
             el.querySelectorAll(".fix-val").forEach(inp=>{
               const v = (inp.value||"").trim();
@@ -646,6 +670,7 @@
             });
             if(!jobs.length){ toast("입력한 값이 없습니다"); return; }
             el.querySelector("#fixSave").disabled = true;
+            el.querySelector("#fixNext").disabled = true;
             // 한 건씩 확정한다 — 하나가 실패해도 나머지는 남는다(일괄 롤백 전례를 피한다)
             const also = Array.from(el.querySelectorAll(".fix-sib:checked"))
                               .map(c=>parseInt(c.value,10));
@@ -666,8 +691,50 @@
               const applied = okList.reduce((n,o)=>n+(o.res && o.res.applied || 1), 0);
               if(applied > okList.length) toast(applied + "건에 같은 값을 넣었습니다");
               if(also.length) rvLoad();   // 형제가 목록에서 빠졌으니 다시 읽는다
+
+              /* 연속 입력 — 슬라이스 85가 사양별 필터를 만들며 "같은 사양을 연달아 보면
+                 판단 기준이 유지된다"고 적었는데, 연달아 보는 흐름 자체가 없었다.
+                 방금 처리한 것을 뺀 뒤 **같은 사양의 다음 항목**을 바로 연다.
+                 같은 사양이 없으면 목록의 다음 항목, 그것도 없으면 끝났다고 말한다 —
+                 조용히 닫히면 끝난 건지 실패한 건지 알 수 없다. */
+              if(goNext){
+                var doneIds = {};
+                okList.forEach(function(o){ if(o.r.review_id) doneIds[o.r.review_id] = 1; });
+                var left = list().filter(function(x){
+                  return x.review_id && !doneIds[x.review_id] && x.type !== "sourcing_hold"; });
+                var nx = left.filter(function(x){ return x.field === q.field; });
+                if(!nx.length) nx = left;
+                if(nx.length){
+                  sel = nx[0].id;
+                  setTimeout(function(){ openFixModal(nx[0], nx[0].id); }, 280);
+                } else {
+                  toast("이 목록은 끝났습니다 — 다른 사양으로 좁혀 보세요");
+                }
+              }
             });
-          };
+          }
+          el.querySelector("#fixSave").onclick = function(){ doSave(false); };
+          el.querySelector("#fixNext").onclick = function(){ doSave(true); };
+
+          /* 몇 번째를 하고 있는가 — 307건을 넣는 중이라면 이게 유일한 진행 신호다.
+             분모는 **서버가 준 수**를 쓴다. 현재 페이지 길이를 쓰면 '100건 중 12번째'가
+             되어 실제(307건)와 어긋난다 — 남은 수를 페이지 길이로 세던 그 실수와 같다. */
+          (function(){
+            var same = list().filter(function(x){
+              return x.review_id && x.type !== "sourcing_hold" && x.field === q.field; });
+            var at = -1;
+            for(var i = 0; i < same.length; i++){
+              if(same[i].review_id === q.review_id){ at = i; break; }
+            }
+            var tot = (SRV.field === q.field && SRV.remaining != null)
+                      ? SRV.remaining : same.length;
+            var pos = el.querySelector("#fixPos");
+            if(pos && at >= 0){
+              var name = fk(q.field).replace(/<[^>]*>/g, "").replace(/\{[^}]*\}/g, "").trim()
+                         || q.field;
+              pos.textContent = name + " " + tot.toLocaleString() + "건 중 " + (at + 1) + "번째";
+            }
+          })();
           el.addEventListener("hidden.bs.modal", ()=>el.remove());
           m.show();
         }
@@ -816,7 +883,7 @@
                 + (RV_FIELD ? "&field=" + encodeURIComponent(RV_FIELD) : ""))
             .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
-              LIVE = true; QUEUE = d.items.map(fromApi);
+              LIVE = true; SRV = d; QUEUE = d.items.map(fromApi);
               const b = document.getElementById("dataSrc");
               b.textContent = "실데이터 · Cloud SQL";
               b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");

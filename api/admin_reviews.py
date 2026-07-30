@@ -177,8 +177,34 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
     } for r in rows]
     if page == 1 and not part_type and not sellable and not suggested and not field:
         items.extend(_sourcing_items())
+    # 오늘 내가 처리한 건수 — **서버가 센다**(슬라이스 96).
+    # 화면은 `let done = 0`이라는 JS 변수로 세고 있었다. 새로고침하면 0이 되므로
+    # 하루 종일 검수하다 F5를 누르면 성과가 사라졌고, 무엇보다 라벨이 '오늘 처리'인데
+    # 실제로는 '이 페이지를 연 뒤 처리'였다 — 화면이 사실과 다른 것을 말하고 있었다.
+    #
+    # **'오늘'은 서울 기준이다.** DB는 UTC로 돌고 `reviewed_at`은 naive UTC다.
+    # `date_trunc('day', now())`를 그대로 쓰면 UTC 자정(= 09:00 KST)이 경계가 되어,
+    # 오전 8시에 출근한 운영자는 어제 저녁 작업이 '오늘'로 잡히고 9시가 되기 전까지
+    # 자기 오전 작업은 안 잡힌다. 사람에게 보여주는 '오늘'은 그 사람의 오늘이어야 한다.
+    #   now() AT TIME ZONE 'Asia/Seoul'        -> 서울 벽시계
+    #   date_trunc('day', ...)                 -> 서울 자정(naive)
+    #   ... AT TIME ZONE 'Asia/Seoul'          -> 그 순간의 절대시각
+    #   ... AT TIME ZONE 'UTC'                 -> naive UTC (reviewed_at과 같은 축)
+    with engine.connect() as conn:
+        me = current_operator_id()
+        my_today = conn.execute(text(
+            "SELECT count(*) FROM product_reviews"
+            " WHERE reviewed_by = :me AND reviewed_at >="
+            "   (date_trunc('day', now() AT TIME ZONE 'Asia/Seoul')"
+            "      AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'UTC'"),
+            {"me": me}).scalar_one() if me else 0
+
     return {"items": items, "page": page, "size": size, "total": total,
             "pages": (total + size - 1) // size, "by_type": by_type,
+            # 지금 걸린 필터에서 남은 수. 화면의 큰 숫자가 이걸 써야 한다 —
+            # 예전에는 현재 페이지 길이(최대 100)를 '남은 N건'으로 띄웠다.
+            "remaining": total,
+            "my_today": my_today,
             "field": field.strip(),        # 화면이 지금 무엇으로 좁혔는지 되돌려 말한다
             "queue": {
                 "total": s["total"],

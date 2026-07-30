@@ -1021,6 +1021,67 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_review_flow():
+    print("\n[25] 검수 큐 흐름 — 연속 입력과 정직한 진행 표시 (슬라이스 96)")
+    # 899건(판매중.재고)을 사람이 손으로 넣어야 하는데, 화면이 두 가지를 잘못하고 있었다.
+    d = get("/api/admin/reviews?page=1&size=100&sellable=1")
+    check("검수 큐를 읽는다", isinstance(d, dict) and "items" in d, "items 있음", type(d).__name__)
+    if not isinstance(d, dict) or "items" not in d:
+        return
+
+    # ① 남은 수는 **서버가 준 값**이다. 예전 화면은 현재 페이지 길이(최대 100)를
+    #    '남은 N건'으로 띄웠다 — 실제 899건이 남았는데 화면은 100이라 말했고,
+    #    같은 화면 아래에는 정직한 총계가 있어 한 화면이 두 말을 했다.
+    check("남은 수를 서버가 준다", d.get("remaining") == d.get("total"),
+          d.get("total"), d.get("remaining"))
+    check("남은 수는 페이지 길이와 다를 수 있다",
+          d.get("remaining") is not None, "값 있음", None)
+    src = db_one("SELECT count(*) FROM product_reviews r JOIN products p USING (product_code)"
+                 " WHERE r.review_status='대기' AND p.status='판매중' AND p.stock_qty>0")
+    if src is not None:
+        check("남은 수 = DB가 세는 수(판매중.재고)", d.get("remaining") == src, src, d.get("remaining"))
+
+    # ② '오늘 처리'는 서버 집계다. JS 변수였을 때는 새로고침하면 0이 됐다 —
+    #    라벨이 '오늘'인데 실제로는 '이 페이지를 연 뒤'였다.
+    check("오늘 처리 수를 서버가 준다", d.get("my_today") is not None, "값 있음", None)
+    # 서울 자정 기준이어야 한다. UTC 자정(=09:00 KST)을 쓰면 오전 8시에 0으로 보인다.
+    seoul = db_one("SELECT count(*) FROM product_reviews pr"
+                   " WHERE pr.reviewed_by = (SELECT operator_id FROM admin_operators"
+                   "                          WHERE lower(email)=:e)"
+                   "   AND pr.reviewed_at >= (date_trunc('day',"
+                   "         now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')"
+                   "         AT TIME ZONE 'UTC'", e=ADMIN_EMAIL.lower())
+    if seoul is not None:
+        check("오늘 처리는 서울 자정 기준", d.get("my_today") == seoul, seoul, d.get("my_today"))
+
+    # 사양별로 좁히면 남은 수도 그 사양 기준이어야 한다 — 분모가 안 따라오면
+    # '307건 중 12번째'가 '100건 중 12번째'가 된다
+    f = db_one("SELECT r.field_name FROM product_reviews r JOIN products p USING (product_code)"
+               " WHERE r.review_status='대기' AND p.status='판매중' AND p.stock_qty>0"
+               " GROUP BY r.field_name ORDER BY count(*) DESC LIMIT 1")
+    if f:
+        fd = get(f"/api/admin/reviews?page=1&size=100&sellable=1&field={_uq(f)}")
+        check("사양으로 좁히면 남은 수도 좁혀진다",
+              fd.get("remaining") == fd.get("total") and fd.get("remaining") <= d.get("remaining"),
+              f"<= {d.get('remaining')}", fd.get("remaining"))
+        check("서버가 어떤 사양으로 좁혔는지 되돌려 말한다", fd.get("field") == f, f, fd.get("field"))
+
+    # ── 화면 계약 ──
+    try:
+        rq = io.open(os.path.join(ROOT, "mockups", "admin", "review-queue.html"),
+                     encoding="utf-8").read()
+        # 830건을 손으로 넣는데 저장하면 모달이 닫히고 끝이었다 — 왕복이 830번이다
+        check("저장하고 다음 버튼이 있다", 'id="fixNext"' in rq, "있음", "없음")
+        check("다음 항목을 여는 분기가 있다", "goNext" in rq, "있음", "없음")
+        check("몇 번째인지 표시한다", 'id="fixPos"' in rq, "있음", "없음")
+        # 큰 숫자가 서버 값을 쓰는가 — 페이지 길이로 되돌아가면 다시 거짓말한다
+        check("남은 수에 서버 값을 쓴다", "SRV.remaining" in rq, "사용", "없음")
+        check("오늘 처리에 서버 값을 쓴다", "SRV.my_today" in rq, "사용", "없음")
+        check("페이지가 전체보다 작으면 밝힌다", 'id="pageNote"' in rq, "있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 검수 화면 계약 - {e}")
+
+
 def test_product_gate():
     print("\n[24] 상품 게이트 체크리스트 · 사양 항목 정의 이름 정정 (슬라이스 95)")
     # 왜 필요했나: `verdict`는 elif 사슬이라 **막힌 이유 하나만** 말한다. 실측 사례 —
@@ -2376,6 +2437,7 @@ def main():
                test_suppliers,
                test_setup_status,
                test_product_gate,
+               test_review_flow,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
