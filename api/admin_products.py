@@ -552,6 +552,26 @@ def patch_product(product_code: int, body: PatchBody):
                        "changes": {k: {"from": before[k], "to": after[k]} for k in after},
                        "before": {"locked_fields": list(cur["locked_fields"] or [])},
                        "locked": body.lock}, kind="product")
+
+        # ── 재고를 고치면 원장에 남긴다 (슬라이스 97) ──────────────────
+        # 여기서 stock_qty를 바꿀 수 있는데 stock_movements에 아무것도 남지 않았다.
+        # 재고 입고(ADM-SRC-020)는 원장 계약대로 남기는데 이 경로만 건너뛰었다.
+        #
+        # 실제 사용은 0건이었지만 **등록 직후 재고를 넣는 가장 자연스러운 경로가 여기다** —
+        # 상세에 칸이 있으니 굳이 다른 화면으로 갈 이유가 없다. 쓰기 시작하면
+        # 슬라이스 69가 경고한 상태가 된다: "수량만 고치면 어디서 왔는지 알 수 없다".
+        #
+        # 칸을 지우는 대신 원장을 남기는 쪽을 택했다 — 지우면 등록 직후 또 다른 화면으로
+        # 보내야 해서 편의성이 나빠진다. 종류는 `adjust`다(입고가 아니라 사람의 보정이므로).
+        if "stock_qty" in after:
+            delta = int(after["stock_qty"]) - int(before["stock_qty"] or 0)
+            if delta:
+                conn.execute(text(
+                    "INSERT INTO stock_movements"
+                    " (product_code, movement_type, qty_delta, ref_kind, ref_id)"
+                    " VALUES (:pc, 'adjust', :q, 'manual', :ref)"),
+                    {"pc": product_code, "q": delta, "ref": log_id})
+
         in_pool = conn.execute(text(
             "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
             " AND stock_qty > 0"), {"pc": product_code}).first() is not None
@@ -601,6 +621,17 @@ def undo_product_edit(log_id: int):
         sets.append("updated_at = now()")
         conn.execute(text("UPDATE products SET " + ", ".join(sets)
                           + " WHERE product_code=:pc"), params)
+        # 재고를 되돌리면 원장도 **역방향 행**으로 되돌린다(슬라이스 97).
+        # 원래 행을 지우면 "재고가 늘었다가 줄었다"는 사실이 사라진다 — 원장 규약대로
+        # 상쇄 행을 남긴다. 되돌림 로그를 먼저 남길 수 없으므로 ref_id는 원본 log_id다.
+        if "stock_qty" in chg:
+            back = int(chg["stock_qty"].get("from") or 0) - int(chg["stock_qty"].get("to") or 0)
+            if back:
+                conn.execute(text(
+                    "INSERT INTO stock_movements"
+                    " (product_code, movement_type, qty_delta, ref_kind, ref_id)"
+                    " VALUES (:pc, 'adjust', :q, 'manual', :ref)"),
+                    {"pc": pc, "q": back, "ref": log_id})
         _log(conn, "product_edit_undo", str(d.get("sku") or pc),
              {"ref_log_id": log_id, "product_code": pc,
               "restored": {k: v.get("from") for k, v in chg.items()}}, kind="product")

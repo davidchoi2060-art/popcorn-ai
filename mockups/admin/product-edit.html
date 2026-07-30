@@ -978,6 +978,23 @@
             +'통과해야 추천에 쓰입니다. 공급처·매입가는 단가표 반영에서 채워집니다.';
           var host=document.querySelector(".content nav.mb-3");
           if(host&&host.parentNode) host.parentNode.insertBefore(box, host.nextSibling);
+
+          /* 연속 등록 (슬라이스 97) — 빈 상태에서 견적 한 벌을 만들려면 8개 슬롯을
+             모두 채워야 하고, 슬롯 하나가 0이면 견적이 0건이다. 즉 최소 8번을 등록한다.
+             예전에는 저장하면 그 상품 상세로 이동해 끝났다 — 다음 상품을 등록하려면
+             상품 관리로 돌아가 [단건 등록]을 다시 눌러야 했다.
+             96에서 검수에 넣은 것과 같은 패턴이다. */
+          var sbNew = document.getElementById("save");
+          if(sbNew && !document.getElementById("saveNext")){
+            var nb = document.createElement("button");
+            nb.id = "saveNext";
+            nb.className = "btn btn-phoenix-primary btn-sm";
+            nb.textContent = "저장하고 다음 상품";
+            sbNew.parentNode.insertBefore(nb, sbNew.nextSibling);
+            /* 분류는 유지한다 — 같은 종류를 연달아 넣는 일이 흔하고(파워 5종을 등록),
+               매번 다시 고르게 하면 그 자체가 왕복이다. 이름만 비운다. */
+            nb.onclick = function(){ window.__saveNext = true; sbNew.click(); };
+          }
           // 등록 단계에서 뜻이 없는 칸은 잠근다 — 채워도 반영되지 않는 칸을 열어두면 거짓이다
           ["재고 수량","판매가(원)","노출 상태"].forEach(function(lb){
             var el=fieldByLabel(lb);
@@ -1046,6 +1063,36 @@
                   if(!res.ok){
                     var d=res.j.detail;
                     toast("등록 실패: "+esc(typeof d==="string"?d:(d&&(d.detail||d.error))||"입력을 확인하세요"));
+                    return;
+                  }
+                  if(window.__saveNext){
+                    /* 같은 화면에 남아 다음 상품을 받는다. 방금 등록한 것은 링크로 남겨
+                       사양·매입가·재고를 이어서 넣을 수 있게 한다 — 등록만 8번 하고
+                       나머지를 잊으면 슬롯은 여전히 0이다. */
+                    window.__saveNext = false;
+                    var reg = (window.__regDone = window.__regDone || []);
+                    reg.push({code: res.j.product_code, sku: res.j.sku, name: nm});
+                    /* 이름 칸은 라벨로 찾는다 — 이 화면의 관례다(fieldByLabel).
+                       제조사도 비운다: 다른 제조사 제품을 이어 넣을 때 앞 값이 남으면
+                       그게 그대로 저장된다(슬라이스 55가 잡은 '남의 값' 사고와 같은 부류). */
+                    var nameEl = fieldByLabel("상품명");
+                    var mkEl = document.getElementById("mk");
+                    var box2 = document.getElementById("regTrail");
+                    if(!box2){
+                      box2 = document.createElement("div");
+                      box2.id = "regTrail";
+                      box2.className = "alert alert-subtle-primary py-2 px-3 fs-9 mb-3";
+                      var h2 = document.querySelector(".content nav.mb-3");
+                      if(h2 && h2.parentNode) h2.parentNode.insertBefore(box2, h2.nextSibling);
+                    }
+                    box2.innerHTML = '<b>이번에 등록한 ' + reg.length + '개</b> — '
+                      + '사양·매입가·재고를 넣어야 추천 후보가 됩니다: '
+                      + reg.map(function(x){
+                          return '<a href="product-edit.html?code=' + x.code + '">'
+                                 + esc(x.name) + '</a>'; }).join(" · ");
+                    toast("등록했습니다 — 다음 상품을 입력하세요");
+                    if(mkEl) mkEl.value = "";
+                    if(nameEl){ nameEl.value = ""; nameEl.focus(); }
                     return;
                   }
                   // 등록된 상품의 상세로 넘어가 이어서 수정할 수 있게 한다

@@ -1021,6 +1021,95 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_stock_ledger():
+    print("\n[26] 재고 원장 · 연속 등록 (슬라이스 97)")
+    # 상품 상세에서 stock_qty를 고칠 수 있는데 stock_movements에 아무것도 남지 않았다.
+    # 재고 입고(ADM-SRC-020)는 원장 계약대로 남기는데 이 경로만 건너뛰었다.
+    # 사용 기록은 0건이었지만 **등록 직후 재고를 넣는 가장 자연스러운 경로가 여기다** —
+    # 쓰기 시작하면 "수량만 고치면 어디서 왔는지 알 수 없다"(슬라이스 69)가 된다.
+    pc = db_one("SELECT product_code FROM products WHERE data_origin='demo'"
+                " AND category_group='core_part' ORDER BY product_code LIMIT 1")
+    if pc is None:
+        print("  [SKIP] (I) 데모 상품 표본 없음")
+        return
+    before = db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc)
+    mv0 = db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc)
+    if before is None:
+        print("  [SKIP] (I) 재고 조회 실패")
+        return
+
+    st, d = post_raw(f"/api/admin/products/{pc}",
+                     json.dumps({"changes": {"stock_qty": before + 7}}).encode(),
+                     {"Content-Type": "application/json"}, method="PATCH")
+    check("상세에서 재고를 고칠 수 있다", st == 200, 200, st)
+    undo_id = (d or {}).get("undo_id")
+    check("재고를 고치면 원장에 남는다",
+          db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc) == mv0 + 1,
+          mv0 + 1, db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc))
+    check("원장 종류는 adjust다(입고가 아니라 사람의 보정)",
+          db_one("SELECT movement_type FROM stock_movements WHERE product_code=:i"
+                 " ORDER BY movement_id DESC LIMIT 1", i=pc) == "adjust",
+          "adjust", db_one("SELECT movement_type FROM stock_movements WHERE product_code=:i"
+                           " ORDER BY movement_id DESC LIMIT 1", i=pc))
+    check("증감분이 원장에 정확히 적힌다",
+          db_one("SELECT qty_delta FROM stock_movements WHERE product_code=:i"
+                 " ORDER BY movement_id DESC LIMIT 1", i=pc) == 7,
+          7, db_one("SELECT qty_delta FROM stock_movements WHERE product_code=:i"
+                    " ORDER BY movement_id DESC LIMIT 1", i=pc))
+
+    if undo_id:
+        st2, _ = post(f"/api/admin/products/undo/{undo_id}")
+        check("되돌리기가 된다", st2 == 200, 200, st2)
+        # 되돌림은 삭제가 아니라 역방향 행이다 — 원래 행을 지우면
+        # "재고가 늘었다가 줄었다"는 사실이 사라진다
+        check("되돌리면 상쇄 행이 쌓인다(원래 행을 지우지 않는다)",
+              db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc)
+              == mv0 + 2, mv0 + 2,
+              db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc))
+        check("상쇄 행은 역방향이다",
+              db_one("SELECT qty_delta FROM stock_movements WHERE product_code=:i"
+                     " ORDER BY movement_id DESC LIMIT 1", i=pc) == -7,
+              -7, db_one("SELECT qty_delta FROM stock_movements WHERE product_code=:i"
+                         " ORDER BY movement_id DESC LIMIT 1", i=pc))
+        check("재고가 원래 값으로 돌아온다",
+              db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc) == before,
+              before, db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc))
+
+    # 검사가 만든 원장 행·로그는 치운다.
+    # 원장 규약("지우지 않는다")은 **실제 운영 행위**에 적용된다 — 검사가 만든 것은
+    # 슬라이스 78이 말한 '검사 잔재'이므로 남기지 않는다(안 치우면 실행마다 2행씩 쌓인다).
+    db_exec("DELETE FROM stock_movements WHERE product_code=:i AND movement_type='adjust'"
+            " AND ref_kind='manual' AND abs(qty_delta)=7"
+            " AND created_at > now() - interval '5 minutes'", i=pc)
+    db_exec("DELETE FROM admin_operator_activity_logs"
+            " WHERE action IN ('product_edit','product_edit_undo')"
+            "   AND target_id = (SELECT sku FROM products WHERE product_code=:i)"
+            "   AND created_at > now() - interval '5 minutes'", i=pc)
+    check("검사가 원장을 원래대로 되돌렸다",
+          db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc) == mv0,
+          mv0, db_one("SELECT count(*) FROM stock_movements WHERE product_code=:i", i=pc))
+    check("검사가 재고를 원래대로 되돌렸다",
+          db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc) == before,
+          before, db_one("SELECT stock_qty FROM products WHERE product_code=:i", i=pc))
+
+    # ── 화면 계약 ── 연속 등록 (슬라이스 97)
+    # 빈 상태에서 견적 한 벌 = 8개 슬롯. 슬롯 하나가 0이면 견적이 0건이라 최소 8번 등록한다.
+    try:
+        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+                     encoding="utf-8").read()
+        check("저장하고 다음 상품 버튼이 있다",
+              'id="saveNext"' in pe or '.id = "saveNext"' in pe, "있음", "없음")
+        check("등록 후 같은 화면에 남는 분기가 있다", "__saveNext" in pe, "있음", "없음")
+        # 등록만 8번 하고 사양·매입가·재고를 잊으면 슬롯은 여전히 0이다
+        check("이번에 등록한 것을 링크로 남긴다",
+              'id="regTrail"' in pe or '.id = "regTrail"' in pe, "있음", "없음")
+        # 앞 상품의 값이 남아 그대로 저장되면 슬라이스 55가 잡은 '남의 값' 사고가 된다
+        check("다음 입력을 위해 이름·제조사를 비운다",
+              'fieldByLabel("상품명")' in pe and 'mkEl.value = ""' in pe, "비움", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 등록 화면 계약 - {e}")
+
+
 def test_review_flow():
     print("\n[25] 검수 큐 흐름 — 연속 입력과 정직한 진행 표시 (슬라이스 96)")
     # 899건(판매중.재고)을 사람이 손으로 넣어야 하는데, 화면이 두 가지를 잘못하고 있었다.
@@ -2438,6 +2527,7 @@ def main():
                test_setup_status,
                test_product_gate,
                test_review_flow,
+               test_stock_ledger,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
