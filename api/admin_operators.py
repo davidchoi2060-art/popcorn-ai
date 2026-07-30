@@ -12,12 +12,38 @@ from sqlalchemy import text
 
 from .timeutil import iso
 from .admin_orders import _log
+# 빈 값의 이유(로그인 방식·승인)는 **내 정보와 같은 판정을 쓴다**(슬라이스 100 4/4).
+# 여기서 다시 구현하면 문구를 고칠 때 한쪽만 고치는 사고가 난다 — 실제로 이 화면은
+# 같은 두 필드를 `—`로 보여 주고 있었다.
+from .admin_profile import identity_reasons
 from .auth import ROLE_RANK, current_operator
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
 ROLE_KO = {"viewer": "조회", "operator": "운영자", "owner": "관리자"}
+
+
+def _pending_note(rows) -> str:
+    """승인 대기 안내문 — **승인 판단의 근거이므로 서버가 말한다.**
+
+    화면은 오래 "직원이 회사 계정으로 **본인 확인을 마친** 신청입니다"라고 적어 왔다.
+    dev 어댑터에서는 본인 확인이 일어나지 않는다(`"@" in email`만 본다). owner는 그 문장을
+    읽고 신원이 확인된 줄 알고 승인한다 — **승인 게이트의 근거가 거짓 전제 위에 있었다.**
+    그래서 문구를 실제 신청 상태에서 파생시킨다: 실 OAuth가 붙어 검증이 실제로 일어나면
+    문구가 저절로 바뀐다(손으로 고쳐야 하는 문장은 언젠가 사실과 어긋난다).
+    """
+    pend = [r for r in rows if r["status"] == "대기"]
+    if not pend:
+        return "대기 중인 신청이 없습니다."
+    bad = [r for r in pend if not identity_reasons(r)["provider_verified"]]
+    if bad:
+        return (f"신청 {len(pend)}건 중 {len(bad)}건은 신원이 검증되지 않은 신청입니다"
+                " — 지금은 신청자가 입력한 이메일을 그대로 신원으로 받습니다(dev 어댑터)."
+                " 승인 전에 본인에게 직접 확인하십시오."
+                " 승인하면 그 순간부터 접근됩니다.")
+    return ("회사 계정으로 본인 확인을 마친 신청입니다."
+            " 권한을 정해 승인하면 그 순간부터 접근됩니다.")
 
 
 @router.get("/operators")
@@ -27,7 +53,8 @@ def list_operators():
         # 작업 수·세션 수가 동시에 부풀어 오른다(실제로 1,320으로 뻥튄 것을 보고 고쳤다).
         rows = conn.execute(text(
             "SELECT o.operator_id, o.name, o.email, o.role, o.status, o.provider, o.phone,"
-            " o.duty, o.created_at, o.approved_at, o.last_login_at, a.name AS approver,"
+            " o.duty, o.created_at, o.approved_at, o.approved_by, o.last_login_at,"
+            " a.name AS approver,"
             " (SELECT COUNT(*) FROM admin_operator_activity_logs l"
             "    WHERE l.operator_id = o.operator_id) AS acts,"
             " (SELECT COUNT(*) FROM admin_sessions s"
@@ -44,7 +71,9 @@ def list_operators():
     return {"items": [{
         "id": r["operator_id"], "name": r["name"], "email": r["email"],
         "role": r["role"], "role_label": ROLE_KO.get(r["role"], r["role"]),
-        "status": r["status"], "provider": r["provider"] or "—",
+        # 표시용 '—'를 데이터에 담지 않는다 — 값이 없다는 사실은 null이 말하고,
+        # 왜 없는지는 identity_reasons가 문장으로 말한다(슬라이스 100 4/4와 같은 원천).
+        "status": r["status"], "provider": r["provider"],
         "phone": r["phone"], "duty": r["duty"],
         "joined": iso(r["created_at"]),
         "approved_at": iso(r["approved_at"]) if r["approved_at"] else None,
@@ -54,7 +83,9 @@ def list_operators():
         "has_password": bool(r["has_password"]),
         "must_change_password": bool(r["must_change_password"]),
         "is_locked": bool(r["is_locked"]),
+        **identity_reasons(r),
     } for r in rows], "me": me,
+        "pending_note": _pending_note(rows),
         "note": ("승인 전 계정은 어떤 데이터도 볼 수 없습니다 · 정지 시 진행 중 세션이 즉시 끊깁니다"
                  " · 자기 계정의 강등·정지는 막혀 있습니다(스스로 잠기는 것 방지)"
                  " · 비밀번호는 해시로만 보관합니다(원문은 저장하지 않습니다)"

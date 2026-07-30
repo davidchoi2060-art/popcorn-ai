@@ -475,11 +475,22 @@
           if(pend.length){
             html += card('승인 대기 <span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">'
                 + pend.length + '건</span>',
-              '직원이 회사 계정으로 본인 확인을 마친 신청입니다. 권한을 정해 승인하면 그 순간부터 접근됩니다.',
+              /* 이 문장은 **승인 판단의 근거**다. 예전에는 "본인 확인을 마친 신청입니다"라고
+                 적어 두었는데 dev 어댑터에서는 본인 확인이 일어나지 않는다 — owner가 그 문장을
+                 읽고 신원이 확인된 줄 알고 승인하게 만들고 있었다. 서버가 실제 상태에서
+                 파생해 준 문구를 그대로 쓴다(실 OAuth가 붙으면 저절로 바뀐다). */
+              esc(d.pending_note || ''),
               pend.map(function(o){
                 return '<div class="border-top pt-3 mt-3 first:mt-0 d-flex flex-wrap justify-content-between align-items-end gap-2">'
                   + '<div><b class="fs-8">' + esc(o.name) + '</b> '
-                  + '<span class="badge badge-phoenix badge-phoenix-secondary fs-10">' + esc(o.provider) + ' 인증</span>'
+                  /* 예전에는 provider 원본에 '인증'을 붙여 붙였다 — `dev`가 인증 배지로 나가
+                     **있지도 않은 인증을 단언**했다. 검증되지 않았으면 붉게, 문장으로도 밝힌다
+                     (초록 없음 · 색에만 의존하지 않는다). 옛 표현을 주석에도 다시 적지 않는다
+                     — 회귀가 그 문자열의 부재로 재발을 막기 때문이다(슬라이스 89 전례). */
+                  + '<span class="badge badge-phoenix fs-10 badge-phoenix-'
+                  + (o.provider_verified ? 'secondary' : 'danger') + '" title="'
+                  + esc(o.provider_note || '') + '">' + esc(o.provider_label)
+                  + (o.provider_verified ? '' : ' · 미검증') + '</span>'
                   + '<div class="fs-9 text-body-secondary">' + esc(o.email) + '</div>'
                   + '<div class="fs-10 text-body-tertiary">연락처 ' + esc(o.phone || '미기재')
                   + ' · 담당 ' + esc(o.duty || '미기재') + ' · 신청 ' + fmtT(o.joined) + '</div></div>'
@@ -521,7 +532,12 @@
                   + '<td class="text-end">' + (o.live_sessions
                       ? '<b>' + o.live_sessions + '</b>' : '<span class="text-body-quaternary">0</span>') + '</td>'
                   + '<td class="text-body-tertiary">' + fmtT(o.last_login) + '</td>'
-                  + '<td class="text-body-tertiary">' + esc(o.approver || '—') + '</td>'
+                  /* 예전에는 승인자 이름이 없으면 줄표 하나로 대신했다 — **부트스트랩 자동
+                     승인**과 **승인자 계정이 지워진 것**과 **아직 승인 안 된 것**이 전부
+                     같아 보였다. 짧은 라벨과 문장 둘 다 서버가 준다(표 칸은 문장을 못 담는다). */
+                  + '<td class="text-body-tertiary" title="'
+                  + esc(o.approved_note || o.approved_none_reason || '') + '">'
+                  + esc(o.approved_short) + '</td>'
                   + '<td class="text-end text-nowrap">'
                   + (o.status === '활성'
                       ? (o.is_me ? ''

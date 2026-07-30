@@ -91,15 +91,21 @@ def identity_reasons(r) -> dict:
         none_reason = None
         if r["approver"]:
             approved_note = f"승인자: {r['approver']}"
+            approved_short = r["approver"]
         elif r["approved_by"]:
             # 승인은 사람이 했는데 그 계정이 지워졌다(슬라이스 78에서 실제로 지웠다).
             approved_note = (f"승인자 계정(#{r['approved_by']})이 남아 있지 않아"
                              " 이름을 찾을 수 없습니다")
+            approved_short = "계정 삭제됨"
         else:
             approved_note = ("부트스트랩 자동 승인 — 사람이 승인한 것이 아닙니다"
                              " (ADMIN_BOOTSTRAP_EMAILS의 첫 관리자)")
+            approved_short = "부트스트랩(자동)"
     else:
         approved_note = None
+        # 표 칸에 문장을 담을 수 없다. 짧은 라벨도 **서버가** 준다 — 화면이 문장을 잘라
+        # 만들면 그건 화면이 지어내는 것이고, 문구를 고칠 때 두 곳이 어긋난다(ADM-SYS-020).
+        approved_short = "승인 안 됨"
         if r["status"] == "대기":
             none_reason = "승인 대기 중입니다 — 승인되면 그때 시각이 기록됩니다"
         elif r["status"] == "활성":
@@ -115,7 +121,7 @@ def identity_reasons(r) -> dict:
 
     return {"provider_label": label, "provider_verified": verified,
             "provider_note": note, "approved_note": approved_note,
-            "approved_none_reason": none_reason}
+            "approved_none_reason": none_reason, "approved_short": approved_short}
 
 
 def _row(conn, op_id: int):

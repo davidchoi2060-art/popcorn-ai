@@ -2676,6 +2676,78 @@ def test_auth():
     check("본인 라이브 세션 1개 이상", bool(me) and me[0]["live_sessions"] >= 1,
           ">=1", me[0]["live_sessions"] if me else None)
 
+    # ── 운영자·권한(ADM-SYS-020)도 내 정보와 **같은 판정**을 쓴다 (슬라이스 102) ──
+    # 이 화면은 `o.approver || '—'`로 세 사실을 같아 보이게 했고(부트스트랩 자동 승인 ·
+    # 승인자 계정 삭제 · 미승인), 신청 배지는 `dev`를 "dev 인증"으로 내보내 **있지도 않은
+    # 인증을 단언**했다. 판정은 `identity_reasons` 하나로 모았다.
+    _it = ops["items"]
+    check("모든 계정에 로그인 방식 이유가 있다",
+          all(o.get("provider_label") and o.get("provider_note") for o in _it),
+          "전 항목", [o["id"] for o in _it
+                    if not (o.get("provider_label") and o.get("provider_note"))])
+    check("모든 계정에 승인 라벨이 있다",
+          all(o.get("approved_short") for o in _it),
+          "전 항목", [o["id"] for o in _it if not o.get("approved_short")])
+    check("데이터 필드에 표시용 '—'를 담지 않는다",
+          not any(o.get("provider") == "—" for o in _it),
+          "0건", [o["id"] for o in _it if o.get("provider") == "—"])
+    check("승인 경위와 부재 이유는 배타다",
+          all(bool(o.get("approved_note")) != bool(o.get("approved_none_reason"))
+              for o in _it), "전 항목 하나만",
+          [o["id"] for o in _it
+           if bool(o.get("approved_note")) == bool(o.get("approved_none_reason"))])
+    # 같은 사실을 두 경로로 센다(A-13) — 화면이 부르는 라벨 수 = DB 실측
+    _boot_db = db_one("SELECT count(*) FROM admin_operators"
+                      " WHERE approved_at IS NOT NULL AND approved_by IS NULL")
+    _none_db = db_one("SELECT count(*) FROM admin_operators WHERE approved_at IS NULL")
+    if _boot_db is None:
+        print("  [SKIP] (I) 승인 라벨 = DB 실측 — DB 미연결")
+    else:
+        check("부트스트랩 자동 승인 수 = DB 실측",
+              len([o for o in _it if o["approved_short"] == "부트스트랩(자동)"]) == _boot_db,
+              _boot_db, len([o for o in _it if o["approved_short"] == "부트스트랩(자동)"]))
+        check("미승인 계정 수 = DB 실측",
+              len([o for o in _it if o["approved_short"] == "승인 안 됨"]) == _none_db,
+              _none_db, len([o for o in _it if o["approved_short"] == "승인 안 됨"]))
+
+    # ── 승인 대기 안내문 ── **승인 판단의 근거이므로 서버가 말한다**
+    # 예전 문구는 "직원이 회사 계정으로 본인 확인을 마친 신청입니다"였다. dev 어댑터에서는
+    # 본인 확인이 일어나지 않으므로 owner를 잘못된 전제로 승인하게 만들고 있었다.
+    check("승인 대기 안내문을 서버가 준다",
+          bool(ops.get("pending_note")), "문구 있음", ops.get("pending_note"))
+    from api.admin_operators import _pending_note as _pn
+    from api.admin_profile import PROVIDER_KO as _PK
+    _P = lambda **k: dict(dict(provider="dev", approved_at=None, approved_by=None,
+                               status="대기", approver=None), **k)
+    check("검증되지 않은 신청이 있으면 그 사실을 먼저 말한다",
+          "검증되지 않은" in _pn([_P()]), "미검증 언급", _pn([_P()]))
+    check("대기가 없으면 없다고 말한다",
+          "없습니다" in _pn([_P(status="활성")]), "0건 문구", _pn([_P(status="활성")]))
+    # 검증됐다고 말하는 분기는 **오늘 도달할 수 없다**(어떤 provider도 verified가 아니다).
+    # 그래서 값이 아니라 **관계**를 지킨다: 검증된 제공자가 생기면 문구가 바뀐다.
+    # 실 OAuth를 붙일 때 손댈 자리가 PROVIDER_KO 하나임을 이 검사가 증명한다.
+    _PK["_regress_verified"] = ("검증됨(검사용)", True, "검사가 넣은 항목입니다")
+    try:
+        _after = _pn([_P(provider="_regress_verified")])
+        check("검증된 제공자가 생기면 안내문이 바뀐다",
+              "검증되지 않은" not in _after and "본인 확인" in _after,
+              "본인 확인 문구", _after)
+    finally:
+        _PK.pop("_regress_verified", None)
+    check("검사가 제공자 목록을 되돌려 놓았다",
+          "_regress_verified" not in _PK, "없음", sorted(_PK))
+
+    # ── 화면 계약 ── 되돌아오면 안 되는 문구들
+    _op = io.open(os.path.join(ROOT, "mockups", "admin", "operators.html"),
+                  encoding="utf-8").read()
+    check("화면이 '있지도 않은 인증'을 단언하지 않는다",
+          "esc(o.provider) + ' 인증'" not in _op, "제거됨", "잔존")
+    check("화면이 승인자를 '—'로 뭉개지 않는다",
+          "o.approver || '—'" not in _op, "제거됨", "잔존")
+    check("화면이 본인 확인 문구를 하드코딩하지 않는다",
+          "pending_note" in _op and "'직원이 회사 계정으로 본인 확인을 마친" not in _op,
+          "서버 문구 사용", "하드코딩 잔존")
+
     # 승인 게이트 — 신규 신청은 '대기'이며 그 상태로는 세션이 발급되지 않는다.
     # 계정은 원장이므로 지우지 않는다 → 2회차 실행은 '정지 잔류'를 확인하는 경로로 간다
     # (분기마다 검사 2건씩 — 합계는 실행 횟수와 무관하게 같다).
