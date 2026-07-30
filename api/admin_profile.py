@@ -46,10 +46,83 @@ class ProfileBody(BaseModel):
     duty: str | None = None
 
 
+# ─────────────── 빈 값에 이유를 적는다 (슬라이스 100 · 4/4) ───────────────
+# `—` 하나로 덮으면 **서로 다른 세 사실이 같아 보인다.** 실제로 이 DB에 셋이 다 있었다:
+#   #1  시드가 직접 만든 계정      provider NULL · approved_at NULL (신청·승인을 안 거쳤다)
+#   #4  부트스트랩 자동 승인       approved_at 있음 · approved_by NULL (사람이 승인 안 했다)
+#   #17 아직 승인 대기             approved_at NULL (승인될 차례를 기다린다)
+# 판정은 **서버가** 한다 — 화면이 빈 값을 보고 이유를 추측하면 그게 지어낸 근거가 된다.
+#
+# **`provider`는 요청 본문에서 그대로 들어온다**(`auth.py` 신청 INSERT). 검증이 없다.
+# 그래서 'google'을 "Google 계정"이라 적으면 **하지 않은 검증을 주장**하는 것이다.
+# 실 OAuth를 붙이는 날 여기의 `verified`와 문구를 함께 고친다 — 이 자리가 그 신호다.
+PROVIDER_NONE = ("기록 없음", False,
+                 "신청 절차를 거치지 않고 만들어진 계정입니다(시드·부트스트랩)."
+                 " 로그인은 이메일과 비밀번호로 합니다.")
+PROVIDER_KO = {
+    "dev": ("개발용 임시 인증", False,
+            "dev 어댑터입니다 — 이메일 입력만으로 통과하며 신원을 검증하지 않습니다."
+            " 실 OAuth 전환 전까지 내부 전용입니다."),
+    "google": ("Google(신고된 값)", False,
+               "클라이언트가 보낸 제공자 이름을 그대로 기록한 값입니다."
+               " id_token 검증은 아직 하지 않습니다."),
+}
+
+
+def identity_reasons(r) -> dict:
+    """`로그인 방식`·`승인`이 비어 있는 이유를 문장으로 만든다.
+
+    **이 판정의 단일 원천이다.** 운영자·권한(ADM-SYS-020)도 같은 두 필드를 보여 주므로
+    그 화면을 고칠 때는 이 함수를 가져다 쓴다 — 같은 판정을 두 번 구현하면 한쪽만
+    고치는 사고가 난다(상품 보기·고치기를 한 화면에 둔 것과 같은 이유).
+    """
+    p = r["provider"]
+    if not p:
+        label, verified, note = PROVIDER_NONE
+    elif p in PROVIDER_KO:
+        label, verified, note = PROVIDER_KO[p]
+    else:
+        # 모르는 값에 PROVIDER_NONE 문구를 붙이면 거짓말이 된다(신청은 거쳤으므로).
+        label, verified, note = (
+            f"{p}(신고된 값)", False,
+            "우리가 아는 제공자 목록에 없는 값입니다 — 검증하지 않았습니다.")
+
+    if r["approved_at"]:
+        none_reason = None
+        if r["approver"]:
+            approved_note = f"승인자: {r['approver']}"
+        elif r["approved_by"]:
+            # 승인은 사람이 했는데 그 계정이 지워졌다(슬라이스 78에서 실제로 지웠다).
+            approved_note = (f"승인자 계정(#{r['approved_by']})이 남아 있지 않아"
+                             " 이름을 찾을 수 없습니다")
+        else:
+            approved_note = ("부트스트랩 자동 승인 — 사람이 승인한 것이 아닙니다"
+                             " (ADMIN_BOOTSTRAP_EMAILS의 첫 관리자)")
+    else:
+        approved_note = None
+        if r["status"] == "대기":
+            none_reason = "승인 대기 중입니다 — 승인되면 그때 시각이 기록됩니다"
+        elif r["status"] == "활성":
+            # 승인 경로는 항상 approved_at을 넣는다(admin_operators.py). 활성인데 비었다면
+            # 신청·승인을 거치지 않고 만들어진 계정이라는 뜻이다.
+            none_reason = ("승인 기록 없이 활성입니다"
+                           " — 신청·승인을 거치지 않고 만들어진 계정입니다(시드)")
+        elif r["status"] == "정지":
+            # 승인되기 전에 정지된 계정 — 반려된 신청이 이 모양으로 남는다.
+            none_reason = "승인된 적이 없습니다 — 승인 전에 정지된 계정입니다"
+        else:
+            none_reason = "승인 기록이 없습니다"
+
+    return {"provider_label": label, "provider_verified": verified,
+            "provider_note": note, "approved_note": approved_note,
+            "approved_none_reason": none_reason}
+
+
 def _row(conn, op_id: int):
     return conn.execute(text(
         "SELECT o.operator_id, o.name, o.email, o.role, o.status, o.provider, o.phone,"
-        " o.duty, o.created_at, o.approved_at, o.last_login_at, o.password_set_at,"
+        " o.duty, o.created_at, o.approved_at, o.approved_by, o.last_login_at,"
+        " o.password_set_at,"
         " o.must_change_password, o.login_fail_count, a.name AS approver,"
         " (o.password_hash IS NOT NULL) AS has_password,"
         " (o.locked_until IS NOT NULL AND o.locked_until > now()) AS is_locked,"
@@ -67,7 +140,9 @@ def _shape(r) -> dict:
     return {
         "id": r["operator_id"], "name": r["name"], "email": r["email"],
         "role": r["role"], "role_label": ROLE_KO.get(r["role"], r["role"]),
-        "status": r["status"], "provider": r["provider"] or "—",
+        # 데이터 필드에 표시용 '—'를 넣지 않는다 — 값이 없다는 사실은 null이 말하고,
+        # 왜 없는지는 identity_reasons가 문장으로 말한다.
+        "status": r["status"], "provider": r["provider"],
         "phone": r["phone"], "duty": r["duty"],
         "joined": iso(r["created_at"]),
         "approved_at": iso(r["approved_at"]) if r["approved_at"] else None,
@@ -81,6 +156,8 @@ def _shape(r) -> dict:
         "acts": r["acts"], "live_sessions": r["live_sessions"],
         # 화면이 무엇을 잠글지 서버가 알려준다 — 화면이 스스로 정하면 서버와 어긋난다.
         "editable": list(EDITABLE),
+        # 빈 값의 이유도 같은 원칙이다 — 화면이 추측하지 않고 받아 적는다.
+        **identity_reasons(r),
     }
 
 

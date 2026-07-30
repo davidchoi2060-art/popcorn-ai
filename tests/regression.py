@@ -1709,6 +1709,97 @@ def test_my_profile():
                   and k != "password_set_at" and k != "must_change_password"
                   for k in d), "해시 없음", [k for k in d if "password" in k])
 
+    # ── 빈 값에 이유를 적는다 (슬라이스 100 · 4/4) ──
+    # `—` 하나로 덮으면 **서로 다른 세 사실이 같아 보인다**: 시드가 만든 계정 ·
+    # 부트스트랩 자동 승인 · 승인 대기. 판정은 서버가 하고 화면은 받아 적는다 —
+    # 화면이 빈 값을 보고 이유를 추측하면 그게 지어낸 근거다(화면 정직성).
+    check("로그인 방식은 값이 없어도 이유를 말한다",
+          bool(d.get("provider_label")), "빈 문자 아님", d.get("provider_label"))
+    check("데이터 필드에 표시용 '—'를 담지 않는다",
+          d.get("provider") != "—", "원본 값 또는 null", d.get("provider"))
+    # dev 어댑터는 `"@" in email`만 본다 — 이 관계는 실 OAuth가 붙어도 참이다.
+    check("dev 어댑터를 검증됐다고 말하지 않는다",
+          not (d.get("provider") == "dev" and d.get("provider_verified")),
+          "dev면 verified 거짓", d.get("provider_verified"))
+    check("검증되지 않았다면 그 사실을 문장으로 말한다",
+          bool(d.get("provider_note")) or bool(d.get("provider_verified")),
+          "note 있음", d.get("provider_note"))
+
+    _ap = db_all("SELECT approved_at, approved_by, status FROM admin_operators"
+                 " WHERE operator_id = :i", i=me_id)
+    if not _ap:
+        print("  [SKIP] (I) 승인 이유 = DB 실측 — DB 미연결")
+    else:
+        has_at = _ap[0]["approved_at"] is not None
+        check("승인 시각의 유무를 서버와 DB가 같이 본다",
+              bool(d.get("approved_at")) == has_at, has_at, bool(d.get("approved_at")))
+        # 유무와 이유는 **배타**다. 둘 다 비면 화면에 남는 것은 `—` 하나뿐이다.
+        check("승인 시각이 없으면 왜 없는지 말한다",
+              bool(d.get("approved_none_reason")) == (not has_at),
+              not has_at, bool(d.get("approved_none_reason")))
+        check("승인 시각이 있으면 누가 승인했는지 말한다",
+              bool(d.get("approved_note")) == has_at, has_at, bool(d.get("approved_note")))
+        check("승인자와 부재 이유를 동시에 말하지 않는다",
+              not (d.get("approved_note") and d.get("approved_none_reason")), "하나만",
+              [d.get("approved_note"), d.get("approved_none_reason")])
+        if has_at and _ap[0]["approved_by"] is None:
+            # 사람이 승인한 것처럼 보이게 두지 않는다 — 승인 게이트의 의미가 흐려진다.
+            check("부트스트랩 자동 승인임을 밝힌다",
+                  "부트스트랩" in (d.get("approved_note") or ""),
+                  "부트스트랩 언급", d.get("approved_note"))
+
+    # 내 세션은 계정 하나뿐이라 HTTP로는 한 분기만 지나간다. 나머지 분기는 **판정 함수를
+    # 직접** 검사한다 — 부작용이 없는 순수 함수이고, 로그인을 더 만들면 세션 잔재가 남는다
+    # (슬라이스 78: 검증이 흔적을 남긴다).
+    from api.admin_profile import identity_reasons as _ir
+    _CASES = (
+        ("시드 계정", dict(provider=None, approved_at=None, approved_by=None,
+                        status="활성", approver=None), "시드", None),
+        ("부트스트랩 자동 승인", dict(provider="dev", approved_at="X", approved_by=None,
+                             status="활성", approver=None), None, "부트스트랩"),
+        ("사람이 승인", dict(provider="dev", approved_at="X", approved_by=4,
+                        status="활성", approver="홍길동"), None, "홍길동"),
+        ("승인자 계정이 지워짐", dict(provider="dev", approved_at="X", approved_by=4,
+                            status="활성", approver=None), None, "남아 있지 않아"),
+        ("승인 대기", dict(provider="dev", approved_at=None, approved_by=None,
+                       status="대기", approver=None), "대기", None),
+        ("승인 전 정지", dict(provider="google", approved_at=None, approved_by=None,
+                         status="정지", approver=None), "정지", None),
+    )
+    for _why, _row, _want_none, _want_note in _CASES:
+        _d = _ir(_row)
+        # 배타 — 둘 다 비면 화면에 남는 것은 `—` 하나뿐이고, 셋이 같아 보인다.
+        check(f"이유가 정확히 하나다({_why})",
+              bool(_d["approved_note"]) != bool(_d["approved_none_reason"]),
+              "하나만", [_d["approved_note"], _d["approved_none_reason"]])
+        if _want_none:
+            check(f"부재 이유가 사실을 가리킨다({_why})",
+                  _want_none in (_d["approved_none_reason"] or ""),
+                  _want_none, _d["approved_none_reason"])
+        if _want_note:
+            check(f"승인 경위를 밝힌다({_why})",
+                  _want_note in (_d["approved_note"] or ""),
+                  _want_note, _d["approved_note"])
+        check(f"로그인 방식에 빈 값이 없다({_why})",
+              bool(_d["provider_label"]) and bool(_d["provider_note"]),
+              "label·note 있음", [_d["provider_label"], _d["provider_note"]])
+    # 실 OAuth가 붙기 전에는 어떤 제공자도 검증되지 않는다 — 'google'이라 적혀 있어도
+    # 클라이언트가 보낸 값일 뿐이다(auth.py는 provider를 본문에서 그대로 받는다).
+    check("검증하지 않은 제공자를 검증됐다고 말하지 않는다",
+          not any(_ir(dict(provider=p, approved_at="X", approved_by=1, status="활성",
+                           approver="x"))["provider_verified"]
+                  for p in ("dev", "google", "kakao", None)),
+          "전부 verified 거짓", "검증됐다고 말하는 제공자가 있다")
+
+    _pp = io.open(os.path.join(ROOT, "mockups", "admin", "my-profile.html"),
+                  encoding="utf-8").read()
+    check("화면이 서버가 준 이유를 쓴다",
+          "provider_label" in _pp and "approved_none_reason" in _pp,
+          "두 필드 사용", [f for f in ("provider_label", "approved_none_reason")
+                        if f not in _pp])
+    check("화면이 로그인 방식을 원본 값으로 적지 않는다",
+          "dash(d.provider)" not in _pp, "provider_label 사용", "dash(d.provider) 잔존")
+
     # ── 권한 상승 차단 ── 등급이 아니라 필드가 막는다
     role_before = db_one("SELECT role FROM admin_operators WHERE operator_id=:i", i=me_id)
     st2, _ = _patch_me({"name": me_name, "role": "owner"})

@@ -336,11 +336,14 @@ setTimeout(function(){
     return n ? esc(n.charAt(0)) : "?";
   }
 
-  function row(label, value, hint){
+  /* hintClass — 검증되지 않은 사실은 눈에 띄게 적는다(초록 없음 · 위험은 --error).
+     기본값은 흐린 회색이라 기존 호출부는 그대로 동작한다. */
+  function row(label, value, hint, hintClass){
     return '<div class="col-sm-6 mb-3">'
       + '<div class="fs-10 text-body-tertiary mb-1">' + esc(label) + '</div>'
       + '<div class="fw-semibold">' + value + '</div>'
-      + (hint ? '<div class="fs-10 text-body-quaternary mt-1">' + esc(hint) + '</div>' : '')
+      + (hint ? '<div class="fs-10 mt-1 ' + (hintClass || 'text-body-quaternary') + '">'
+                + esc(hint) + '</div>' : '')
       + '</div>';
   }
 
@@ -364,7 +367,13 @@ setTimeout(function(){
     var lockValue = d.is_locked
       ? '<span class="badge badge-phoenix badge-phoenix-danger">잠김</span>'
       : '<span class="badge badge-phoenix badge-phoenix-primary">정상</span>';
-    var approverHint = d.approver ? ('승인자: ' + d.approver) : null;
+    /* 승인 시각이 비는 이유는 여럿이고 서로 다른 사실이다(시드 계정 · 승인 전 정지 ·
+       승인 대기). '—' 하나로 덮으면 그것들이 같아 보인다 — 판정은 서버가 해서 문장으로 준다.
+       힌트에 조건을 걸지 않는다: 서버가 `approved_note`와 `approved_none_reason` 중
+       **하나만** 채우고(회귀가 그 배타를 지킨다), 조건을 한 번 더 걸면 `approved_at`을
+       포맷 없이 만지는 줄이 생겨 ISO 검사가 거짓 양성을 낸다. */
+    var approvedValue = d.approved_at ? esc(PT.full(d.approved_at)) : '기록 없음';
+    var approvedHint = d.approved_note || d.approved_none_reason;
 
     host.innerHTML = [
       '<div class="alert alert-subtle-info fs-10 mb-3">', esc(d.note), '</div>',
@@ -421,7 +430,10 @@ setTimeout(function(){
               "이 값으로 계정을 찾습니다 — 바꾸면 계정이 다른 사람에게 옮겨갑니다"),
           row("권한 등급", esc(d.role_label), "승인 게이트를 지키기 위해 잠겨 있습니다"),
           row("상태", esc(d.status)),
-          row("로그인 방식", dash(d.provider)),
+          /* 예전에는 `dev`라는 낱말만 떴다 — 운영자에게 그건 아무 뜻이 아니다.
+             이유는 서버가 준다(`identity_reasons`). 검증 안 된 값은 붉게 적는다. */
+          row("로그인 방식", esc(d.provider_label), d.provider_note,
+              d.provider_verified ? null : "text-danger"),
         '</div>',
       '</div></div>',
 
@@ -454,7 +466,7 @@ setTimeout(function(){
         '<h5 class="mb-3">이력</h5>',
         '<div class="row">',
           row("가입(신청)", esc(PT.full(d.joined))),
-          row("승인", esc(PT.full(d.approved_at)), approverHint),
+          row("승인", approvedValue, approvedHint),
           row("남긴 작업 기록", esc(d.acts) + "건"),
         '</div>',
       '</div></div>'
