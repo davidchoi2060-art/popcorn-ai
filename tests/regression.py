@@ -1021,6 +1021,79 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_time_display():
+    print("\n[27] 시각 표기 — 화면이 ISO 원문을 내보내지 않는다 (슬라이스 100)")
+    # 슬라이스 62가 정한 규약: 서버는 타임존 붙은 절대시각을 주고 **표시는 화면이 한다.**
+    # 그런데 내 정보 화면(슬라이스 92)이 ISO를 원문 그대로 출력했다 —
+    #     마지막 로그인   2026-07-30T04:57:22.084811+00:00
+    # 사람이 못 읽고, 더 나쁜 것은 04:57(UTC)이 실제 13:57(KST)와 9시간 어긋나 보인다는 것이다.
+    # 운영자는 "새벽에 로그인했나?"로 읽는다.
+    import glob as _g6
+    import re as _re6
+
+    # 서버가 ISO로 돌려주는 필드 이름 — 이 값이 포맷 없이 화면에 나가면 원문이 그대로 보인다
+    ISO_FIELDS = ("joined", "approved_at", "last_login", "password_set_at", "created",
+                  "created_at", "updated_at", "received_at", "reviewed_at",
+                  "effective_from", "expires_at", "last_seen_at")
+    # 포맷을 거쳤다는 흔적 — 화면마다 이름이 다르므로(fmtT·fmt·relTime·PT) 넓게 본다
+    FMT = _re6.compile(r"(PT\.|fmtT\s*\(|fmt\w*\s*\(|relTime\s*\(|new Date\s*\(|toLocale)")
+
+    raw = []
+    for _p in (sorted(_g6.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+               + sorted(_g6.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        for f in ISO_FIELDS:
+            # ``가 없으면 `joined`가 `joinedLabel`에도 걸려 오탐이 된다
+            NL = chr(10)          # 이스케이프가 전달 중 풀리는 것을 피한다
+            for m in _re6.finditer(r"[\w$]+\.(" + f + r")" + chr(92) + "b", _s):
+                ls = _s.rfind(NL, 0, m.start()) + 1
+                le = _s.find(NL, m.end())
+                line = _s[ls:le if le > 0 else len(_s)]
+                if FMT.search(line):
+                    continue
+                raw.append(f"{_n}:{_s[:m.start()].count(chr(10)) + 1} {f}")
+    check("화면이 ISO 원문을 그대로 출력하지 않는다", not raw, "없음", raw[:5])
+
+    # 공통 포맷 모듈이 있어야 7번째 사본이 생기지 않는다.
+    # (fmtT가 이미 6개 화면에 각자 정의돼 두 갈래로 갈려 있었다)
+    fp = os.path.join(ROOT, "mockups", "shared", "fmt-time.js")
+    check("시각 표기 공통 모듈이 있다", os.path.exists(fp), "있음", "없음")
+    if os.path.exists(fp):
+        ft = io.open(fp, encoding="utf-8").read()
+        # 못 읽는 값을 'Invalid Date'로 흘리지 않는다 — 화면에 그 글자가 뜨면 그것도 거짓이다
+        check("잘못된 값을 Invalid Date로 흘리지 않는다", "isNaN" in ft, "가드 있음", "없음")
+        # 값이 없으면 지어내지 않는다
+        check("값이 없으면 '—'로 둔다", "NONE" in ft and "'—'" in ft, "있음", "없음")
+
+    # 하드코딩된 날짜를 기본값으로 쓰지 않는다 —
+    # my-page가 `m.joined || '2026-07-16'`으로 없는 가입일을 지어내고 있었다
+    hard = []
+    for _p in (sorted(_g6.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+               + sorted(_g6.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        for m in _re6.finditer(r"\|\|\s*['\"]20\d\d-\d\d-\d\d", _s):
+            hard.append(f"{_n}:{_s[:m.start()].count(chr(10)) + 1}")
+    check("하드코딩된 날짜를 기본값으로 쓰지 않는다", not hard, "없음", hard[:4])
+
+    # 화면이 그 모듈을 실제로 싣는가 — 안 실으면 PT가 undefined라 렌더가 죽는다
+    missing = []
+    for _p in (sorted(_g6.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+               + sorted(_g6.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if "PT." in _s and "fmt-time.js" not in _s:
+            missing.append(_n)
+    check("PT를 쓰는 화면은 모듈을 싣는다", not missing, "전부", missing[:4])
+
+
 def test_stock_ledger():
     print("\n[26] 재고 원장 · 연속 등록 (슬라이스 97)")
     # 상품 상세에서 stock_qty를 고칠 수 있는데 stock_movements에 아무것도 남지 않았다.
@@ -2562,6 +2635,7 @@ def main():
                test_product_gate,
                test_review_flow,
                test_stock_ledger,
+               test_time_display,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

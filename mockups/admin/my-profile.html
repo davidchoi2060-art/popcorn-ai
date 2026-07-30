@@ -72,7 +72,9 @@ setTimeout(function(){
     t.innerHTML=m; t.style.opacity="1";
     clearTimeout(t._x); t._x=setTimeout(function(){t.style.opacity="0";},3600);
   }
-  /* 값이 없으면 지어내지 않고 '—'로 둔다. 빈 자리를 그럴듯한 것으로 채우지 않는다. */
+  /* 값이 없으면 지어내지 않고 '—'로 둔다. 빈 자리를 그럴듯한 것으로 채우지 않는다.
+     **날짜에는 쓰지 않는다** — ISO 원문이 그대로 나가 04:57(UTC)이 13:57(KST)로
+     읽히지 않았다(슬라이스 100). 시각은 `PT.full()`을 쓴다. */
   function dash(v){ return (v===null||v===undefined||v==="") ? "—" : esc(v); }
 
   /* 사진은 아직 저장 경로가 없다(슬라이스 93 예정) — 이름 첫 글자로 대신한다.
@@ -98,9 +100,13 @@ setTimeout(function(){
   function render(d){
     DATA = d;
 
+    /* 시각은 **먼저 한 줄에서** 포맷한다. 조건과 포맷을 다른 줄로 나누면
+       "ISO 원문을 내보내지 않는다" 검사(슬라이스 100)가 거짓 양성을 낸다 —
+       검사를 느슨하게 하는 대신 코드를 정리하는 쪽이 맞다. 위 주석의 원칙과 같다. */
+    var pwWhen = d.password_set_at ? PT.full(d.password_set_at) : null;
     var pwValue = d.has_password
-      ? ('설정됨' + (d.password_set_at
-          ? ' <span class="fs-10 text-body-tertiary">(' + esc(d.password_set_at) + ')</span>'
+      ? ('설정됨' + (pwWhen
+          ? ' <span class="fs-10 text-body-tertiary">(' + esc(pwWhen) + ')</span>'
           : ''))
       : '<span class="text-danger">미설정 — 로그인할 수 없습니다</span>';
     var lockValue = d.is_locked
@@ -173,7 +179,7 @@ setTimeout(function(){
         '<div class="row">',
           row("비밀번호", pwValue, "원문은 저장하지 않습니다(해시만 보관)"),
           row("계정 잠금", lockValue, "로그인 실패 " + d.login_fail_count + "회"),
-          row("마지막 로그인", dash(d.last_login)),
+          row("마지막 로그인", esc(PT.full(d.last_login))),
           row("열려 있는 세션", esc(d.live_sessions) + "개"),
         '</div>',
         '<button id="pw" class="btn btn-phoenix-primary btn-sm">비밀번호 변경</button>',
@@ -183,8 +189,8 @@ setTimeout(function(){
       '<div class="card"><div class="card-body">',
         '<h5 class="mb-3">이력</h5>',
         '<div class="row">',
-          row("가입(신청)", dash(d.joined)),
-          row("승인", dash(d.approved_at), approverHint),
+          row("가입(신청)", esc(PT.full(d.joined))),
+          row("승인", esc(PT.full(d.approved_at)), approverHint),
           row("남긴 작업 기록", esc(d.acts) + "건"),
         '</div>',
       '</div></div>'
@@ -268,6 +274,7 @@ setTimeout(function(){
   load();
 })();
 </script>
+<script src="../shared/fmt-time.js"></script>
 <script src="../shared/admin-auth.js"></script>
 <script src="../shared/ui-progress.js"></script>
 <script src="../shared/su-icons.js"></script>

@@ -312,7 +312,7 @@
         function detail(){
           const m=member();const d=document.getElementById("detail");if(!m)return;
           d.innerHTML=`<div class="card"><div class="card-body">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joinedLabel||m.joined}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료'+(m.mall_id?" · "+m.mall_id:"")+'</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning">매핑 요청 발송 — 동의 대기'+(m.requested?" ("+m.requested+")":"")+'</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>')}</div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joinedLabel||PT.full(m.joined)}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료'+(m.mall_id?" · "+m.mall_id:"")+'</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning">매핑 요청 발송 — 동의 대기'+(m.requested?" ("+m.requested+")":"")+'</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>')}</div>
             <p class="fs-9 text-body-tertiary mb-3">${m.email}</p>
             <div class="row g-2 mb-3">
               <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">주문</div><b>${m.orders}</b></div></div>
@@ -637,7 +637,8 @@
 <script src="../shared/admin-menu.js"></script>
 <script src="../shared/admin-helper.js"></script>
 <script src="../shared/su-icons.js"></script>
-  <script src="../shared/admin-auth.js"></script>
+  <script src="../shared/fmt-time.js"></script>
+<script src="../shared/admin-auth.js"></script>
 </body>
 
 </html>

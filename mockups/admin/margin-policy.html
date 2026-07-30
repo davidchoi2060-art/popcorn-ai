@@ -381,7 +381,7 @@
                 + '<div class="border rounded p-2 fs-10 text-body-tertiary mt-2">'
                 + '현재 적용값 — 수수료 <b>' + (p.card_fee_pct != null ? p.card_fee_pct : '—') + '%</b> · '
                 + '마진 <b>' + (p.margin_pct != null ? p.margin_pct : '—') + '%</b>'
-                + (p.effective_from ? ' · ' + String(p.effective_from).slice(0,10) + ' 적용' : '')
+                + (p.effective_from ? ' · ' + PT.date(p.effective_from) + ' 적용' : '')
                 + '<br>' + (p.formula ? esc(p.formula) : '')
                 + '</div>');
 
@@ -705,7 +705,8 @@
 <script src="../shared/admin-menu.js"></script>
 <script src="../shared/admin-helper.js"></script>
 <script src="../shared/su-icons.js"></script>
-  <script src="../shared/admin-auth.js"></script>
+  <script src="../shared/fmt-time.js"></script>
+<script src="../shared/admin-auth.js"></script>
 </body>
 
 </html>
