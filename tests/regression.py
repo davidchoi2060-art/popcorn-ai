@@ -1463,6 +1463,12 @@ def test_margin_policy():
     fee0 = db_one("SELECT card_fee_rate FROM pricing_settings"
                   " ORDER BY effective_from DESC LIMIT 1")
     n0 = db_one("SELECT count(*) FROM pricing_settings")
+    # **검사가 만든 행만** 지우기 위해 기준점을 잡는다(아래 정리 참조).
+    # 예전에는 min(setting_id)를 기준으로 그 위를 전부 지웠다 — 그러면 운영자가 정한
+    # 정책까지 사라진다. 실제로 마진 12%를 저장한 직후 이 검사가 그것을 지울 상태였다.
+    max0 = db_one("SELECT max(setting_id) FROM pricing_settings")
+    log0 = db_one("SELECT COALESCE(max(log_id), 0) FROM admin_operator_activity_logs"
+                  " WHERE action = 'pricing_settings'")
 
     # 같은 값을 다시 넣으면 이력이 쌓이지 않아야 한다(부동소수점 비교가 헐거우면 쌓인다)
     st, _ = post("/api/admin/pricing-settings",
@@ -1491,14 +1497,36 @@ def test_margin_policy():
         # 바꿔도 기존 판매가는 움직이지 않는다 — 그 사실을 응답이 말해야 한다
         check("기존 판매가가 안 바뀐다는 것을 알린다",
               "바뀌지 않습니다" in (ap.get("note") or ""), "안내 있음", ap.get("note"))
-        db_one("SELECT 1")     # 정리는 아래에서
-    # 검증으로 만든 행은 지운다 — 회귀가 정본을 바꾸면 안 된다
-    if _engine is not None:
+    # 검증으로 만든 것만 지운다 — 회귀가 정본을 바꾸면 안 된다(슬라이스 50 원칙).
+    #
+    # 예전 코드는 `setting_id > min(setting_id)`로 지웠다. 정책 이력이 1건뿐일 때는
+    # 우연히 맞았지만, **운영자가 마진을 정하는 순간부터 그 정책을 지운다.**
+    # 실제로 2026-07-30 마진 12%를 저장한 직후 이 검사가 그것을 삭제할 상태였고,
+    # 앞선 실행이 남긴 로그(#2107 "0% -> 13.5%")는 행 없이 로그만 남아
+    # **원장이 거짓을 말하는 상태**를 만들었다.
+    #
+    # 그래서 두 가지를 바꿨다:
+    #   ① 기준을 max0으로 — 검사 시작 시점보다 뒤에 생긴 행만 지운다
+    #   ② 로그도 함께 지운다 — 행만 지우면 작업 기록이 없는 변경을 말하게 된다
+    if _engine is not None and max0 is not None:
         with _engine.begin() as c:
+            c.execute(text(
+                "DELETE FROM admin_operator_activity_logs"
+                " WHERE action = 'pricing_settings' AND log_id > :lg"),
+                {"lg": log0 or 0})
             c.execute(text("DELETE FROM pricing_settings WHERE setting_id > :i"),
-                      {"i": db_one("SELECT min(setting_id) FROM pricing_settings")})
-    check("검증 후 정책이 원래 1건", db_one("SELECT count(*) FROM pricing_settings") == n0,
+                      {"i": max0})
+    check("검증 후 정책 이력이 원래대로", db_one("SELECT count(*) FROM pricing_settings") == n0,
           n0, db_one("SELECT count(*) FROM pricing_settings"))
+    check("검증 후 최신 정책이 그대로",
+          db_one("SELECT max(setting_id) FROM pricing_settings") == max0,
+          max0, db_one("SELECT max(setting_id) FROM pricing_settings"))
+    # 행 없는 정책 로그가 남아 있으면 원장이 거짓을 말한다
+    check("정책 로그 수 = 정책 행이 설명되는 범위",
+          (db_one("SELECT count(*) FROM admin_operator_activity_logs"
+                  " WHERE action='pricing_settings' AND log_id > :lg", lg=log0 or 0) or 0) == 0,
+          0, db_one("SELECT count(*) FROM admin_operator_activity_logs"
+                    " WHERE action='pricing_settings' AND log_id > :lg", lg=log0 or 0))
 
     try:
         mp = io.open(os.path.join(ROOT, "mockups", "admin", "margin-policy.html"),
