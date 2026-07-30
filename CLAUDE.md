@@ -26,7 +26,13 @@
 - **이 서버 = 개발/스테이징이다. 운영은 새로 세운다**(2026-07-29 확정 · decision-log **I-01**). 승격하지 않는다 — 베타의 테스트 잔재가 운영 원장이 되면 나중에 구분할 수 없다(슬라이스 78 owner 테스트 계정 · 실주문 `ORD-84222` 전례). 운영 DB는 **원장을 비우고** 시작하되 **카탈로그·규칙은 이관**한다(사람 검수 값은 원천 CSV로 재현 안 됨). 그래서 **여기서는 부작용 있는 검사를 해도 되고, 운영 서버에서는 절대 안 된다.**
 - 정본 도메인 `popcornai.co.kr`은 **운영 몫**이다. 개발엔 서브도메인(`dev.`)을 붙인다 — 나중에 옮기면 인증서·OAuth 리다이렉트·쿠키를 전부 다시 손봐야 한다.
 - 접속 `http://34.47.124.184/admin/login.html` · GCP `popcorn-app`(asia-northeast3-b) · Cloud SQL `popcorn-db`. **이름은 그대로 둔다**(역할은 문서가 정한다 — 리소스명 변경은 재생성을 요구한다).
-- **nginx Basic Auth가 사이트 전체를 봉쇄한다** — 로그인이 dev 어댑터라 이게 유일한 실질 방벽이다. 걷어내려면 실 OAuth 먼저.
+- **접속 = `https://admin.popcornai.co.kr`** (2026-07-28 HTTPS 전환 · Let's Encrypt). 정본 `popcornai.co.kr`은 여전히 운영 몫이다.
+- **접근 정책: 관리자는 열고 고객은 막는다**(2026-07-30 사용자 결정 · 절차 `deploy/README.md §7`). Basic Auth는 폐기했다 — certbot이 설정을 고치며 `auth_basic`이 사라진 것을 발견하고, 복구 대신 경로별 분리를 택했다.
+  - 관리자: 열림. **비밀번호 인증(슬라이스 70) + `/api/admin/*` 미들웨어**가 막는다.
+  - 고객: nginx가 **404**로 막는다 — `/mvp1/` `/api/auth/` `/api/my/` `/api/candidates` `/api/recommend` `/api/swap/` `/api/orders` `/api/ops` `/api/showcase` `/api/promo-click`.
+- **고객 경로를 열려면 실 OAuth가 먼저다.** 고객 인증은 아직 dev 어댑터로 검증이 `"@" in email` 하나뿐이라, 누구나 남의 이메일로 로그인해 그 사람 주문·결제를 볼 수 있다. 실회원이 0명이라 훔칠 것이 없을 뿐 한 명이라도 가입하면 그 순간부터 노출이다. **차단 블록을 걷는 것이 곧 그 구멍을 여는 것이다.**
+- **`/api/auth/`와 `/api/admin/auth/`는 다른 경로다.** nginx 접두어 매칭은 URI 시작부터 보므로 관리자 로그인은 고객 차단에 걸리지 않는다 — 잘못 막으면 아무도 못 들어온다.
+- **nginx 설정 정본 = `deploy/nginx-popcorn.conf`이고 서버 실제와 일치해야 한다.** 2026-07-30까지 리포는 `server_name _;` HTTP 설정을 들고 있었고 서버는 certbot이 고친 HTTPS로 돌았다 — 리포를 복사하면 돌아가는 설정을 덮어썼다. 고칠 때는 **백업 → 로컬 수정·push → 서버 pull → `nginx -t` → reload**(P-06: 서버에서 직접 고치지 않는다).
 - 앱은 `127.0.0.1:8000`에만 바인드(외부 직접 접근 불가) · 방화벽 80·22만.
 - 배포 갱신: 로컬 커밋·푸시 → 서버에서 `git pull` + `systemctl restart popcorn-api`(절차 `deploy/README.md`).
 - **DB 복구 절차 = `deploy/RESTORE.md`** (2026-07-27 리허설 통과). 자동 백업 매일 21:00 UTC·7건, **PITR 로그 7일** — 최근 7일 임의 시점으로 되돌릴 수 있다. **원본을 덮어쓰지 않는다**: `backups restore`가 아니라 `instances clone --point-in-time`으로 복제본을 만들어 검증 후 전환한다(복제 약 4분). 운영 인스턴스는 삭제 보호 ON.

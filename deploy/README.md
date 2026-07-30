@@ -1,20 +1,19 @@
 # 내부 직원 베타 배포 절차 (GCP VM · 외부 IP · HTTP)
 
-> **배포 완료(2026-07-26)**: `popcorn-app`(asia-northeast3-b) · 고정 IP `34.47.124.184`
-> · Cloud SQL `popcorn-db`. 접속 `http://34.47.124.184/admin/login.html`
-> 검증: 미인증 401 · `:8000` 직접 불가 · Basic Auth 통과 시 200 ·
-> 상품 22,838건 · 검수 7,415건 · S1 후보 3,046 · 추천(100만) 1,000,000.
-> 재검증은 `sudo bash deploy/verify.sh`.
+> **현행(2026-07-30)**: `popcorn-app`(asia-northeast3-b) · 고정 IP `34.47.124.184`
+> · Cloud SQL `popcorn-db`. 접속 **https://admin.popcornai.co.kr/admin/login.html**
+> 접근 정책은 **관리자 열림 · 고객 404 차단**(§7). 재검증은 `sudo bash deploy/verify.sh`.
+>
+> ⚠️ 아래 §0~§6은 **최초 구축 절차**다(2026-07-26 기준, HTTP·Basic Auth 전제).
+> 지금 서버는 그 상태가 아니다 — 현행 접근 정책은 **§7이 정본**이다.
 
 **범위**: 내부 직원만 쓰는 베타. 고객은 들어오지 않는다 → 결제(PG)·통신판매업 신고·법정 표시·
 택배사 연동은 이 배포의 범위가 아니다.
 
-**두 가지 결정**(2026-07-26, 사용자):
-1. **nginx Basic Auth로 사이트 전체를 봉쇄한다.** 지금 로그인은 dev 어댑터(입력 이메일을
-   신원으로 신뢰)라, 앱이 그대로 노출되면 누구나 승인된 관리자 이메일을 입력해 들어올 수 있다.
-   Basic Auth가 그 앞을 막는다. 실 OAuth 연동이 끝나면 걷어낼 수 있다.
-2. **HTTP로 시작한다**(도메인 없음). 같은 망을 쓰는 상대는 Basic Auth 비밀번호와 세션 쿠키를
-   가로챌 수 있다 — 이건 감수하는 위험이고, 도메인 확보 후 §7로 전환한다.
+**최초 결정(2026-07-26)과 그 뒤 바뀐 것:**
+1. ~~nginx Basic Auth로 사이트 전체를 봉쇄한다~~ → **2026-07-30 폐기.** certbot이 설정을
+   고치며 `auth_basic`이 사라진 것을 발견하고, 복구 대신 **경로별 분리**를 택했다(§7).
+2. ~~HTTP로 시작한다~~ → **2026-07-28 HTTPS 전환 완료**(`admin.popcornai.co.kr`).
 
 ---
 
@@ -120,96 +119,83 @@ sudo -u popcorn bash -c 'set -a; . /etc/popcorn-ai.env; set +a; cd /srv/popcorn-
 첫 관리자는 `ADMIN_BOOTSTRAP_EMAILS`에 넣은 이메일로 `admin/login.html`에서 로그인하면 자동
 승인된다. 나머지 직원은 같은 화면에서 신청하고, 관리자가 **운영자·권한** 화면에서 승인한다.
 
-## 7. HTTPS 전환 (슬라이스 91)
+## 7. HTTPS · 접근 정책 (2026-07-30 현행)
 
-> **이 서버는 개발/스테이징이다**(decision-log I-01). 도메인은 **`dev.popcornai.co.kr`**을 쓴다 —
-> 정본 `popcornai.co.kr`은 운영 서버 몫으로 남겨 둔다. 정본을 여기 붙였다가 옮기면
-> 인증서·OAuth 리다이렉트 URI·쿠키를 전부 다시 손봐야 한다.
+> **이 절은 이미 끝난 일을 기록한 것이다.** 새로 세우는 서버가 아니면 따라 할 것이 없다.
+> 슬라이스 91에 있던 "2단계 전환 절차"는 폐기했다 — 그때 `dev.popcornai.co.kr`을
+> 전제로 썼는데, 실제로는 **`admin.popcornai.co.kr`으로 7월 28일에 이미 끝나 있었다.**
+> 그 절차를 그대로 따라가면 돌아가는 설정을 덮어쓴다.
 
-**끝나는 것:** 관리자 비밀번호(슬라이스 70)·Basic Auth 비밀번호·세션 쿠키의 평문 전송.
-**끝나지 않는 것:** 누가 들어오는가. HTTPS는 전송 구간만 지킨다 — Basic Auth는 그대로 둔다.
+### 현재 상태
 
-### 0) 선행 — DNS (가비아, 사용자 작업)
+| 항목 | 값 |
+|---|---|
+| 접속 | **https://admin.popcornai.co.kr** |
+| 인증서 | Let's Encrypt (2026-07-28 발급 · 90일) |
+| HTTP(80) | ACME 통로만 남기고 301 → HTTPS |
+| 설정 정본 | `deploy/nginx-popcorn.conf` — **서버 실제와 일치한다** |
 
-| 호스트 | 타입 | 값 |
-|--------|------|-----|
-| `dev` | A | `34.47.124.184` |
+### 접근 정책 — 관리자는 열고 고객은 막는다 (사용자 결정 2026-07-30)
 
-`@`(popcornai.co.kr 자체)는 **비워 둔다**(운영 몫). 전파 확인:
+예전에는 Basic Auth가 사이트 전체를 봉쇄했다. 그런데 `certbot --nginx`가 설정을 고치는
+과정에서 **`auth_basic` 지시어가 사라져** 사이트가 공개된 상태로 이틀을 보냈다.
+Basic Auth 복구 대신 경로별로 나누는 쪽을 택했다.
+
+| 대상 | 정책 | 무엇이 막는가 |
+|---|---|---|
+| 관리자 | **열어 둔다** | 비밀번호 인증(슬라이스 70) + `/api/admin/*` 미들웨어 게이트 |
+| 고객 | **404로 막는다** | nginx `location ^~` 차단 |
+
+차단 경로: `/mvp1/` · `/api/auth/` · `/api/my/` · `/api/candidates` · `/api/recommend` ·
+`/api/swap/` · `/api/orders` · `/api/ops` · `/api/showcase` · `/api/promo-click`
+
+> ### ⚠️ `/api/auth/` 와 `/api/admin/auth/` 는 다른 경로다
+> nginx 접두어 매칭은 URI 시작부터 본다. `/api/admin/auth/login`은 고객 차단에 걸리지 않는다.
+> **잘못 막으면 아무도 관리자로 들어올 수 없다.**
+
+**404를 쓴다(403이 아니라)** — 아직 열지 않은 것의 존재를 알리지 않는다.
+
+### 고객 경로를 다시 열려면
+
+**실 OAuth가 먼저다.** 지금 고객 인증은 dev 어댑터라 검증이 `"@" in email` 하나뿐이고,
+누구나 남의 이메일로 로그인해 그 사람 주문·결제를 볼 수 있다. 실회원이 0명이라
+훔칠 것이 없을 뿐, 한 명이라도 가입하면 그 순간부터 노출이다.
+
+열 때는 `nginx-popcorn.conf`의 차단 블록을 걷고, 로컬에서 고쳐 push → 서버 pull →
+아래 절차로 적용한다. **서버에서 직접 고치지 않는다**(P-06).
+
+### 설정을 바꾸는 절차
 
 ```bash
-nslookup -type=A dev.popcornai.co.kr 8.8.8.8
-```
-
-### 1) 1단계 설정 적용 — ACME 통로를 연다
-
-`nginx-popcorn.conf`에 `/.well-known/acme-challenge/`만 Basic Auth를 우회하는 블록이 있다.
-**이게 없으면 Let's Encrypt가 401을 받아 발급이 실패한다.**
-
-```bash
-sudo mkdir -p /var/www/certbot
+# 로컬에서 deploy/nginx-popcorn.conf 를 고치고 커밋·푸시한 뒤, 서버에서:
+sudo cp /etc/nginx/sites-available/popcorn /etc/nginx/sites-available/popcorn.bak-$(date +%Y%m%d-%H%M%S)
+sudo -u popcorn bash -c 'cd /srv/popcorn-ai && git pull --ff-only'
 sudo cp /srv/popcorn-ai/deploy/nginx-popcorn.conf /etc/nginx/sites-available/popcorn
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-통로가 열렸는지 **발급 전에** 확인한다 — 시험 파일을 놓고 밖에서 읽어본다:
+`nginx -t`가 실패하면 **reload하지 말고** 백업으로 되돌린다. 백업을 먼저 뜨는 이유다.
+
+### 검증 (외부에서)
 
 ```bash
-sudo mkdir -p /var/www/certbot/.well-known/acme-challenge
-echo ok | sudo tee /var/www/certbot/.well-known/acme-challenge/test
-curl -s -o /dev/null -w '%{http_code}\n' http://dev.popcornai.co.kr/.well-known/acme-challenge/test
-sudo rm /var/www/certbot/.well-known/acme-challenge/test
+B=https://admin.popcornai.co.kr
+curl -sI $B/admin/login.html     | head -1    # 200  관리자 화면은 열려 있다
+curl -sI $B/api/admin/products   | head -1    # 401  미들웨어 게이트
+curl -sI $B/api/auth/login       | head -1    # 404  고객 인증 차단
+curl -sI $B/mvp1/s1-session.html | head -1    # 404  고객 화면 차단
+curl -sI $B/api/health           | head -1    # 200  감시용
+sudo certbot renew --dry-run                  # 90일 뒤 조용한 만료를 막는 유일한 검사
 ```
 
-`200`이면 통과. **`401`이면 Basic Auth가 아직 막고 있는 것이니 여기서 멈춘다** — 그대로
-발급을 시도하면 실패하고, Let's Encrypt는 같은 도메인에 실패 횟수 제한을 건다.
+> **관리자 로그인을 비밀번호 없이 두 번 이상 시도하면 계정이 15분 잠긴다**(슬라이스 70).
+> 검증하다 시드 owner를 잠근 적이 있다 — 잠겼으면 `login_fail_count=0, locked_until=NULL`로
+> 풀거나 15분을 기다린다.
 
-### 2) 인증서 발급 — `--webroot`를 쓴다
+### 인증서 갱신
 
-```bash
-sudo apt install -y certbot
-sudo certbot certonly --webroot -w /var/www/certbot -d dev.popcornai.co.kr
-```
-
-**`--nginx`가 아니라 `--webroot`인 이유:** `--nginx`는 설정 파일을 직접 고친다. 서버에서 고쳐지면
-리포 사본과 갈라지고 **다음 배포가 그걸 덮어쓴다**(P-06 — 서버는 배포 타깃이다).
-`--webroot`는 설정에 손대지 않고 우리가 열어둔 경로에 파일만 놓는다.
-
-### 3) 2단계 설정으로 교체
-
-```bash
-sudo cp /srv/popcorn-ai/deploy/nginx-popcorn-tls.conf /etc/nginx/sites-available/popcorn
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-**같은 자리를 덮어쓴다.** 두 파일을 동시에 enabled로 두면 `default_server`가 충돌한다.
-
-### 4) 쿠키를 HTTPS 전용으로
-
-```bash
-echo 'COOKIE_SECURE=1' | sudo tee -a /etc/popcorn-ai.env
-sudo systemctl restart popcorn-api
-```
-
-코드 수정 없이 환경변수 하나다. **이걸 빼먹으면** 세션 쿠키가 계속 평문 경로로도 나가서
-2단계의 이득이 절반만 남는다.
-
-### 5) 검증
-
-```bash
-curl -sI http://dev.popcornai.co.kr/admin/login.html | head -1        # 301
-curl -sI https://dev.popcornai.co.kr/admin/login.html | head -1       # 401 (Basic Auth = 봉쇄 살아있음)
-curl -s https://dev.popcornai.co.kr/api/health                        # 인증 없이 통과
-sudo certbot renew --dry-run                                          # 갱신 경로 확인
-```
-
-`https`에서 **401이 떠야 정상**이다. 200이면 봉쇄가 풀린 것이니 즉시 중단한다(§5를 다시 본다).
-`renew --dry-run`은 90일 뒤 조용한 만료를 막는 유일한 검사다 — 건너뛰지 않는다.
-
-### 되돌리기
-
-`nginx-popcorn.conf`를 다시 덮어쓰고 reload하면 1단계로 돌아간다. 인증서는 남아 있으므로
-재발급 없이 다시 3)으로 갈 수 있다. `COOKIE_SECURE`는 함께 빼야 한다(HTTP에서 켜두면 로그인이 안 된다).
+certbot이 systemd 타이머로 자동 갱신한다. 80의 `/.well-known/acme-challenge/`가 막히면
+**90일 뒤 조용히 만료된다** — 그 location을 지우지 않는다.
 
 ---
 
@@ -244,7 +230,8 @@ sudo systemctl restart popcorn-api
 
 | 위험 | 지금 상태 | 해소 조건 |
 |---|---|---|
-평문 통신 | HTTP — Basic Auth 비밀번호·세션 쿠키가 망에서 보인다 | 도메인 + §7 |
+~~평문 통신~~ | **해소(2026-07-28)** — HTTPS 전환 완료 | — |
+| 고객 인증 dev 어댑터 | `"@" in email`이 전부 — nginx가 고객 경로를 404로 막고 있다(§7) | 실 OAuth |
 신원 확인 | dev 어댑터(입력 이메일을 신뢰) — Basic Auth가 유일한 실질 방벽 | 실 OAuth 연동 |
 로그인 시도 제한 | 없음 | fail2ban 또는 앱 레벨 제한 |
 고객 축 | 코드는 있지만 베타에서 쓰지 않는다 | 고객 오픈은 별도 결정 |
