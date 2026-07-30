@@ -1021,6 +1021,46 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_screen_assets():
+    print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
+    # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
+    # my-profile · suppliers · usage-floors 세 화면이 `assets/css/theme.css`를 참조했는데
+    # 실제 파일은 `theme.min.css`다 — **404라 스타일이 하나도 안 먹었다.**
+    # 브라우저는 404 스타일시트를 규칙 0개인 빈 시트로 만들어 조용히 넘어간다.
+    # 내가 usage-floors(슬라이스 75)를 템플릿으로 삼으면서 그 버그를 물려받았다.
+    import glob as _g7
+    import re as _re7
+
+    # Phoenix 템플릿이 남긴 RTL 시트는 원래 없다(dir=rtl일 때만 쓰는 것) — 별건으로 둔다.
+    IGNORE = ("theme-rtl.min.css", "user-rtl.min.css")
+    missing = []
+    for _p in (sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+               + sorted(_g7.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        base = os.path.dirname(_p)
+        _s = io.open(_p, encoding="utf-8").read()
+        for m in _re7.finditer(r'(?:href|src)="([^"?:#]+\.(?:css|js))"', _s):
+            rel = m.group(1)
+            if rel.startswith(("http", "//")) or os.path.basename(rel) in IGNORE:
+                continue
+            if not os.path.exists(os.path.normpath(os.path.join(base, rel))):
+                missing.append(f"{_n} -> {rel}")
+    check("화면이 참조하는 CSS·JS가 실제로 있다", not missing, "전부 존재", missing[:5])
+
+    # 스타일이 안 먹으면 화면은 뜨지만 읽을 수 없는 상태가 된다 — 테마를 싣는지 본다
+    noTheme = []
+    for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if "theme.min.css" not in _s:
+            noTheme.append(_n)
+    check("모든 관리자 화면이 테마를 싣는다", not noTheme, "전부", noTheme[:5])
+
+
 def test_password_policy():
     print("\n[29] 비밀번호 변경 — 규칙을 먼저 말하고 입력을 가린다 (슬라이스 100)")
     # 예전 비밀번호 변경은 `prompt()` 2연타였다. 문제 셋:
@@ -2769,6 +2809,7 @@ def main():
                test_time_display,
                test_session_revoke,
                test_password_policy,
+               test_screen_assets,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

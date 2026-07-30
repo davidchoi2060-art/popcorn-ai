@@ -93,6 +93,10 @@
 - **초록 없음**(U-01 미정) → 통과=`--primary`, 위험=`--error`, 항상 텍스트 병기.
 - **아이콘: Streamline Ultimate Color (CC BY 4.0, 출처 표기 필수)** — 2026-07-16 사용자 지시로 단색 정책 폐기. 파일=`mockups/shared/icons/su/`, 매핑=`_map.json`, 런타임 스와퍼=`mockups/shared/su-icons.js`(전 페이지 주입, 출처 표기 자동 삽입). 새 아이콘 필요 시 iconify에서 받아 `ms-`/`ft-` 규칙으로 추가.
 - 마크업: `data-screen-id`/`data-domain`/`data-bind`/`data-repeat`/`data-action`, 예외는 `hidden`. 한국어 UI, 768px 세로 스택.
+- **Phoenix 원본 지도 = `docs/design/phoenix-template-map.md`** (v1.22.0, `D:\phoenix_Templet\`). 새 화면·컴포넌트·vendor가 필요하면 **옆 화면을 베끼지 말고 여기서 좌표를 찾는다.**
+  - **셸(좌측 메뉴·상단바)은 템플릿이 아니라 우리 화면(`activity-logs.html`)에서 가져온다** — 템플릿 `starter.html`은 좌측 메뉴가 Phoenix 데모 전체다.
+  - **자산 대조표를 먼저 본다**: 템플릿엔 있고 우리엔 없는 파일을 참조하면 404이고 브라우저는 **조용히 넘어간다**. `assets/css/theme.css`(비압축)를 참조한 세 화면이 스타일 없이 이틀 돌았다(슬라이스 100). 쓸 파일은 `theme.min.css`·`user.min.css`뿐이고 vendor는 템플릿 41개 중 우리에게 10개만 있다.
+  - 회귀 `[30] 화면 자산`이 **참조한 CSS·JS가 실제로 있는지** 검사한다.
 
 ## 화면 정직성 (슬라이스 47·48 — 가장 중요한 규칙)
 - **화면이 숫자를 지어내지 않는다.** 후보 수·가격·건수·규칙 수는 서버 응답만 쓴다. 목업 시절 연출(예: `poolN*0.6`, '호환성 5종', 완화 칩 '+1,240개')이 LIVE 경로에 남아 서버가 모르는 수를 말하면 '모든 견적에는 이유가 있습니다'가 무너진다.
