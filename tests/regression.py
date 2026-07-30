@@ -1021,6 +1021,82 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_doc_counts():
+    """[31] 문서 정합 — 문서가 말하는 수 = 실제 (슬라이스 103)
+
+    2026-07-30 HANDOFF를 갱신하다 **문서의 수가 실제와 어긋난 것을 셋 찾았다**:
+    관리자 화면 31(실제 33) · 호환 규칙 8종(실제 9종) · 존재하지도 않는 `sale_prices`
+    테이블을 근거로 적힌 backlog 항목.
+
+    `CLAUDE.md`는 **매 턴 컨텍스트에 로드된다** — 거기 적힌 수가 틀리면 그 세션 내내 틀린
+    전제로 일한다. 그래서 이 수들은 산문이 아니라 **검사되는 불변식**으로 둔다.
+    (원칙은 색 토큰 때와 같다: 값을 문서에 다시 적지 말거나, 적었으면 대조하거나.)
+    """
+    print("\n[31] 문서 정합 — 문서가 말하는 수 = 실제 (슬라이스 103)")
+    import glob as _g7
+    import re as _re7
+
+    real_screens = len([p for p in _g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+                        if "data-screen-id" in io.open(p, encoding="utf-8").read()])
+    real_html = len(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+    check("관리자 화면 수를 실제로 센다", real_screens > 0, "> 0", real_screens)
+
+    for doc in ("CLAUDE.md", "HANDOFF.md"):
+        s = io.open(os.path.join(ROOT, doc), encoding="utf-8").read()
+        said = [int(m) for m in _re7.findall(r"`mockups/admin/`\s*\*\*(\d+)화면", s)]
+        check(f"{doc}가 말하는 관리자 화면 수 = 실제",
+              said == [] or all(n == real_screens for n in said),
+              real_screens, said)
+        said_html = [int(m) for m in _re7.findall(r"`\.html`\s*(\d+)개", s)]
+        check(f"{doc}가 말하는 .html 파일 수 = 실제",
+              said_html == [] or all(n == real_html for n in said_html),
+              real_html, said_html)
+
+    rules_db = db_one("SELECT count(*) FROM compat_rules WHERE active")
+    if rules_db is None:
+        print("  [SKIP] (I) 문서의 호환 규칙 수 = DB 실측 — DB 미연결")
+    else:
+        # 표 칸(`| 활성 호환 규칙 | **9종** |`)과 산문을 둘 다 잡는다. 처음엔 산문만 잡는
+        # 정규식을 썼더니 HANDOFF의 표를 못 봐 `said == []`로 **공허하게 통과**했다 —
+        # 아무것도 검사하지 않는 검사가 가장 나쁘다(있으면 안심하는데 지키는 게 없다).
+        seen_any = False
+        for doc in ("CLAUDE.md", "HANDOFF.md"):
+            s = io.open(os.path.join(ROOT, doc), encoding="utf-8").read()
+            said = [int(m) for m in _re7.findall(r"호환 규칙[^\n]{0,12}?\*\*(\d+)종", s)]
+            seen_any = seen_any or bool(said)
+            check(f"{doc}가 말하는 호환 규칙 수 = DB 실측",
+                  said == [] or all(n == rules_db for n in said), rules_db, said)
+        # 어느 문서도 말하지 않으면 위 검사는 전부 공허하다 — 그 상태를 실패로 본다.
+        check("문서 중 최소 하나는 호환 규칙 수를 말한다", seen_any, "1곳 이상", "없음")
+
+    # 없는 테이블을 근거로 적지 않는다 — 이전 판의 backlog가 `sale_prices`를 들고 있었다.
+    if _engine is None:
+        print("  [SKIP] (I) 문서가 실재하는 테이블만 가리킨다 — DB 미연결")
+    else:
+        tables = {r["table_name"] for r in db_all(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
+        ghosts = []
+        for doc in ("CLAUDE.md", "HANDOFF.md"):
+            s = io.open(os.path.join(ROOT, doc), encoding="utf-8").read()
+            # 백틱 안의 snake_case 중 **테이블 이름으로 알려진 것만** 본다.
+            # 아무 snake_case나 테이블로 오해하면 오탐이 쏟아지고, 회귀가 자기 소음에
+            # 묻히면 아무도 안 본다.
+            for m in set(_re7.findall(r"`([a-z][a-z0-9_]{4,})`", s)):
+                if m in _KNOWN_TABLE_WORDS and m not in tables:
+                    ghosts.append(f"{doc}:{m}")
+        check("문서가 없는 테이블을 근거로 적지 않는다", not ghosts, "없음", sorted(ghosts))
+
+
+# 문서가 '테이블'이라 부르며 적을 법한 이름만 본다 — 아무 snake_case나 테이블로 오해하면
+# 오탐이 쏟아진다(회귀가 자기 소음에 묻히면 아무도 안 본다).
+_KNOWN_TABLE_WORDS = {
+    "sale_prices", "product_prices", "stock_movements", "compat_rules", "usage_floors",
+    "pricing_settings", "product_reviews", "product_specs", "admin_operators",
+    "admin_sessions", "spec_field_defs", "promo_click_logs", "consult_sessions",
+    "supplier_prices", "product_supplier_prices", "price_history", "product_price_history",
+}
+
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -2973,6 +3049,7 @@ def main():
                test_session_revoke,
                test_password_policy,
                test_screen_assets,
+               test_doc_counts,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
