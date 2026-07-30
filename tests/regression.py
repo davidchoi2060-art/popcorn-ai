@@ -1021,6 +1021,75 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_session_revoke():
+    print("\n[28] 다른 기기에서 로그아웃 (슬라이스 100)")
+    # 화면이 "열려 있는 세션 21개"라고 정직하게 말하면서 **끊을 수단을 주지 않았다.**
+    # 공용 PC에서 로그인한 것을 알아차려도 할 수 있는 게 없었다.
+    d = get("/api/admin/my-profile/sessions")
+    check("내 세션 목록을 읽는다", isinstance(d, dict) and "items" in d, "items 있음", d)
+    if not isinstance(d, dict) or "items" not in d:
+        return
+    cur = [i for i in d["items"] if i.get("current")]
+    check("현재 기기가 정확히 하나로 표시된다", len(cur) == 1, 1, len(cur))
+    check("다른 기기 수 = 전체 - 현재",
+          d.get("others") == d.get("total") - 1, d.get("total") - 1, d.get("others"))
+    # **세션 식별자를 내보내면 그 값이 곧 로그인 자격이다.**
+    leaked = sorted({k for i in d["items"] for k in i
+                     if "session" in k.lower() or k.lower() == "id"})
+    check("세션 식별자를 화면에 내보내지 않는다", not leaked, "없음", leaked)
+
+    src = db_one("SELECT count(*) FROM admin_sessions s"
+                 " JOIN admin_operators o USING (operator_id)"
+                 " WHERE lower(o.email) = :e AND s.revoked_at IS NULL"
+                 "   AND s.expires_at > now()", e=ADMIN_EMAIL.lower())
+    if src is not None:
+        check("세션 수 = DB가 세는 수", d.get("total") == src, src, d.get("total"))
+
+    # 왕복 — 세션 두 개를 더 만들고 끊는다. 현재 세션은 살아 있어야 한다.
+    extra = []
+    for _ in range(2):
+        st, _b = post("/api/admin/auth/login",
+                      {"email": ADMIN_EMAIL, "password": ADMIN_PW})
+        extra.append(st)
+    check("검사용 세션을 만들었다", extra == [200, 200], [200, 200], extra)
+    # 위 로그인이 SESSION 쿠키를 갈아치웠으므로 지금 쿠키가 현재 세션이다
+    before = get("/api/admin/my-profile/sessions").get("total")
+    st, r = post("/api/admin/my-profile/sessions/revoke-others")
+    check("다른 기기 로그아웃이 된다", st == 200, 200, st)
+    check("현재 세션은 남는다", r.get("remaining") == 1, 1, r.get("remaining"))
+    check("끊은 수 = 있던 수 - 1",
+          r.get("revoked") == (before or 0) - 1, (before or 0) - 1, r.get("revoked"))
+    # 현재 쿠키가 아직 통해야 한다 — 자기 세션을 끊으면 그 자리에서 쫓겨난다
+    still = get("/api/admin/my-profile")
+    check("끊은 뒤에도 현재 세션으로 조회된다",
+          isinstance(still, dict) and still.get("id") is not None, "조회됨", still)
+    # 삭제가 아니라 철회다 — 행이 남아 "언제 열려 있었나"를 잃지 않는다
+    rev = db_one("SELECT count(*) FROM admin_sessions s"
+                 " JOIN admin_operators o USING (operator_id)"
+                 " WHERE lower(o.email) = :e AND s.revoked_at IS NOT NULL",
+                 e=ADMIN_EMAIL.lower())
+    if rev is not None:
+        check("철회는 삭제가 아니다(행이 남는다)", rev > 0, "1건 이상", rev)
+    check("작업 기록에 남는다",
+          (db_one("SELECT count(*) FROM admin_operator_activity_logs"
+                  " WHERE action = 'session_revoke_others'") or 0) > 0,
+          "1건 이상", 0)
+
+    # ── 화면 계약 ──
+    try:
+        mp = io.open(os.path.join(ROOT, "mockups", "admin", "my-profile.html"),
+                     encoding="utf-8").read()
+        check("다른 기기 로그아웃 버튼이 있다", "revokeOthers" in mp, "있음", "없음")
+        # 세션이 하나뿐이면 할 일이 없다 — 버튼이 자리를 차지하지 않아야 한다
+        check("세션이 하나면 버튼을 내지 않는다", "live_sessions > 1" in mp, "분기 있음", "없음")
+        # 누르고 나서 알면 늦다 · 되돌릴 수 없다는 사실을 먼저 말한다
+        check("누르기 전에 영향을 먼저 묻는다",
+              "/my-profile/sessions" in mp and "confirm(" in mp, "확인 있음", "없음")
+        check("되돌릴 수 없다고 밝힌다", "되돌릴 수 없습니다" in mp, "있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 내 정보 화면 계약 - {e}")
+
+
 def test_time_display():
     print("\n[27] 시각 표기 — 화면이 ISO 원문을 내보내지 않는다 (슬라이스 100)")
     # 슬라이스 62가 정한 규약: 서버는 타임존 붙은 절대시각을 주고 **표시는 화면이 한다.**
@@ -2636,6 +2705,7 @@ def main():
                test_review_flow,
                test_stock_ledger,
                test_time_display,
+               test_session_revoke,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

@@ -180,9 +180,21 @@ setTimeout(function(){
           row("비밀번호", pwValue, "원문은 저장하지 않습니다(해시만 보관)"),
           row("계정 잠금", lockValue, "로그인 실패 " + d.login_fail_count + "회"),
           row("마지막 로그인", esc(PT.full(d.last_login))),
-          row("열려 있는 세션", esc(d.live_sessions) + "개"),
+          row("열려 있는 세션", esc(d.live_sessions) + "개",
+              d.live_sessions > 1
+                ? "지금 기기 외에도 열려 있습니다 — 공용 PC에서 로그인했다면 정리하세요"
+                : null),
         '</div>',
-        '<button id="pw" class="btn btn-phoenix-primary btn-sm">비밀번호 변경</button>',
+        '<div class="d-flex flex-wrap gap-2">',
+          '<button id="pw" class="btn btn-phoenix-primary btn-sm">비밀번호 변경</button>',
+          /* 화면이 "열려 있는 세션 21개"라고 말하면서 끊을 수단을 주지 않았다(슬라이스 100).
+             현재 기기는 남긴다 — "내가 지금 쓰는 것 말고 정리"가 대부분의 의도이고,
+             전부 끊으면 실수로 눌렀을 때 대가가 크다. */
+          (d.live_sessions > 1
+            ? '<button id="revokeOthers" class="btn btn-phoenix-secondary btn-sm">'
+              + '다른 기기에서 로그아웃</button>'
+            : ''),
+        '</div>',
       '</div></div>',
 
       /* ── 이력 ─────────────────────────────────────────── */
@@ -227,6 +239,41 @@ setTimeout(function(){
           // 서버가 준 문구를 그대로 쓴다 — 화면이 따로 지어내지 않는다.
           toast(esc(res.j.note));
           render(res.j);
+        })
+        .catch(function(){ b.disabled = false; toast("서버에 연결할 수 없습니다"); });
+    };
+
+    var ro = document.getElementById("revokeOthers");
+    if(ro) ro.onclick = function(){
+      var b = ro;
+      b.disabled = true;
+      /* 누르고 나서 알면 늦다 — 몇 개가 끊기는지 먼저 보여준다(슬라이스 67·75와 같은 원칙).
+         되돌리기는 없다: 끊은 세션을 되살리는 것은 보안상 위험하다. */
+      fetch("/api/admin/my-profile/sessions")
+        .then(function(r){ return r.json(); })
+        .then(function(s){
+          b.disabled = false;
+          if(!s.others){ toast("끊을 다른 세션이 없습니다"); return; }
+          if(!confirm(s.note + "\n\n되돌릴 수 없습니다. 계속할까요?")) return;
+          b.disabled = true;
+          return fetch("/api/admin/my-profile/sessions/revoke-others", {
+            method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"
+          }).then(function(r2){ return r2.json().then(function(j){ return {ok:r2.ok, j:j}; }); })
+            .then(function(res){
+              b.disabled = false;
+              if(!res.ok){
+                /* 이 화면에는 `err()` 헬퍼가 없다 — 정의되지 않은 함수를 부르면
+                   실패 경로에서 ReferenceError가 나고, 그때는 아무 안내도 못 뜬다
+                   (실패를 알리려는 코드가 실패하는 자리다). 이 화면의 기존 방식을 쓴다. */
+                var dt = res.j && res.j.detail;
+                toast("⚠ " + esc((dt && typeof dt === "object")
+                        ? (dt.message || dt.error || "요청을 처리하지 못했습니다")
+                        : (dt || "요청을 처리하지 못했습니다")));
+                return;
+              }
+              toast(esc(res.j.note));   // 서버가 준 문구 그대로
+              load();                   // 세션 수를 다시 읽는다
+            });
         })
         .catch(function(){ b.disabled = false; toast("서버에 연결할 수 없습니다"); });
     };

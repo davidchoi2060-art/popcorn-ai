@@ -21,12 +21,12 @@
 `required_role`에서 이 경로를 **viewer**로 열어 뒀다. 조회 등급 직원도 자기 이름·연락처는
 고칠 수 있어야 하기 때문이다. 권한 상승은 등급이 아니라 위 화이트리스트가 막는다.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
 from .admin_orders import _log
-from .auth import current_operator
+from .auth import COOKIE, current_operator
 from .db import engine
 from .timeutil import iso
 
@@ -155,3 +155,77 @@ def update_my_profile(body: ProfileBody):
         {"name": "이름", "phone": "연락처", "duty": "직무"}[k] for k in changed)
         + (" (이름은 지난 작업 기록의 표시에도 함께 반영됩니다)" if "name" in changed else ""))
     return out
+
+
+# ---- 슬라이스 100: 다른 기기에서 로그아웃 ----
+# 화면이 "열려 있는 세션 21개"라고 정직하게 말하면서 **끊을 수단을 주지 않았다.**
+# 공용 PC에서 로그인한 것을 알아차려도 할 수 있는 게 없었다.
+#
+# ■ 현재 세션은 남긴다 (사용자 결정 2026-07-30)
+# "내가 지금 쓰는 것 말고 정리"가 대부분의 의도다. 전부 끊으면 실수로 눌렀을 때
+# 대가가 크고, 비밀번호 유출을 의심하는 상황에는 **비밀번호 변경이 더 확실한 조치**이며
+# 그건 이미 있다(변경 시 다른 세션이 어떻게 되는지는 슬라이스 70 소관).
+#
+# ■ 삭제가 아니라 철회다
+# `revoked_at`을 남긴다 — 로그아웃(`/auth/logout`)과 같은 방식이다. 행을 지우면
+# "언제 어디서 열려 있었나"를 잃는다. `resolve_session`이 revoked를 즉시 무효로 본다.
+#
+# ■ 되돌리기는 만들지 않는다
+# 끊은 세션을 되살리는 것은 보안상 위험하다. 대신 누르기 전에 몇 개가 끊기는지 말한다.
+
+
+@router.get("/my-profile/sessions")
+def my_sessions(request: Request):
+    """내 세션 목록 — 누르기 전에 무엇이 끊기는지 보여주기 위한 것."""
+    me = current_operator()
+    if not me:
+        raise HTTPException(401, "로그인이 필요합니다")
+    cur = request.cookies.get(COOKIE, "")
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT session_id, created_at, last_seen_at, expires_at, user_agent"
+            " FROM admin_sessions"
+            " WHERE operator_id = :op AND revoked_at IS NULL AND expires_at > now()"
+            " ORDER BY last_seen_at DESC"), {"op": me["operator_id"]}).mappings().all()
+    items = [{
+        # **세션 식별자를 그대로 내보내지 않는다** — 그 값이 곧 로그인 자격이다.
+        # 지금 기기인지 구분할 수 있을 만큼만 알려준다.
+        "current": r["session_id"] == cur,
+        "created": iso(r["created_at"]),
+        "last_seen": iso(r["last_seen_at"]),
+        "expires": iso(r["expires_at"]),
+        "agent": (r["user_agent"] or "")[:120] or None,
+    } for r in rows]
+    others = [i for i in items if not i["current"]]
+    return {"items": items, "total": len(items), "others": len(others),
+            "note": (f"지금 기기를 포함해 {len(items)}개가 열려 있습니다."
+                     + (f" [다른 기기에서 로그아웃]을 누르면 {len(others)}개가 끊기고"
+                        " 지금 기기는 유지됩니다." if others else " 다른 기기는 없습니다."))}
+
+
+@router.post("/my-profile/sessions/revoke-others")
+def revoke_other_sessions(request: Request):
+    me = current_operator()
+    if not me:
+        raise HTTPException(401, "로그인이 필요합니다")
+    cur = request.cookies.get(COOKIE, "")
+    with engine.begin() as conn:
+        # 현재 세션을 뺀 나머지만. `cur`가 빈 값이면 전부가 대상이 되므로 막는다 —
+        # 쿠키 없이 이 경로에 닿는 일은 없어야 하지만, 있으면 자기 세션까지 끊긴다.
+        if not cur:
+            raise HTTPException(400, "현재 세션을 확인할 수 없습니다")
+        n = conn.execute(text(
+            "UPDATE admin_sessions SET revoked_at = now()"
+            " WHERE operator_id = :op AND session_id <> :cur"
+            "   AND revoked_at IS NULL AND expires_at > now()"),
+            {"op": me["operator_id"], "cur": cur}).rowcount
+        if n:
+            _log(conn, "session_revoke_others", me.get("email") or str(me["operator_id"]),
+                 {"revoked": n}, kind="operator")
+        left = conn.execute(text(
+            "SELECT count(*) FROM admin_sessions"
+            " WHERE operator_id = :op AND revoked_at IS NULL AND expires_at > now()"),
+            {"op": me["operator_id"]}).scalar_one()
+    return {"ok": True, "revoked": n, "remaining": left,
+            "note": (f"{n}개를 끊었습니다 — 지금 기기는 그대로 쓸 수 있습니다."
+                     if n else "끊을 다른 세션이 없습니다.")}
