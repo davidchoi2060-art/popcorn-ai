@@ -1021,6 +1021,68 @@ def test_password_auth():
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
 
 
+def test_password_policy():
+    print("\n[29] 비밀번호 변경 — 규칙을 먼저 말하고 입력을 가린다 (슬라이스 100)")
+    # 예전 비밀번호 변경은 `prompt()` 2연타였다. 문제 셋:
+    #   (1) 브라우저 prompt는 마스킹이 없어 입력이 화면에 그대로 보인다(어깨너머 노출)
+    #   (2) 강도 규칙을 거절당한 뒤에야 알았다 — 그리고 화면은 "8자 이상"이라 적었는데
+    #       서버는 10자를 요구했다. **화면이 규칙을 틀리게 말하고 있었다.**
+    #   (3) 새 비밀번호를 한 번만 받아 오타를 잡을 수 없었다
+    d = get("/api/admin/auth/password-policy")
+    check("강도 규칙을 서버가 준다",
+          isinstance(d, dict) and d.get("rules"), "rules 있음", d)
+    if not isinstance(d, dict) or not d.get("rules"):
+        return
+
+    # 판정과 설명이 같은 원천이어야 한다 — 화면이 베끼면 MIN_LENGTH를 올린 날 거짓이 된다
+    try:
+        sys.path.insert(0, ROOT)
+        from api.passwords import MIN_LENGTH, strength_problem
+        check("규칙이 알려주는 길이 = 실제 판정 길이",
+              d.get("min_length") == MIN_LENGTH, MIN_LENGTH, d.get("min_length"))
+        # 규칙 문구가 실제 판정과 어긋나지 않는가 — 길이 경계로 확인한다
+        short = "Aa1!" + "b" * (MIN_LENGTH - 5)
+        check("경계보다 짧으면 실제로 거절된다",
+              strength_problem(short) is not None, "거절", "통과")
+        okpw = "Vq7#mzLp2rTx"
+        check("규칙을 지킨 값은 통과한다", strength_problem(okpw) is None,
+              None, strength_problem(okpw))
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 강도 판정 모듈 - {e}")
+
+    # 규칙 설명에 원문·해시가 섞여 나가지 않는다
+    blob = json.dumps(d, ensure_ascii=False)
+    check("규칙 응답에 해시 형식이 없다", "scrypt$" not in blob, "없음", "포함")
+
+    # ── 화면 계약 ──
+    try:
+        mp = io.open(os.path.join(ROOT, "mockups", "admin", "my-profile.html"),
+                     encoding="utf-8").read()
+        # prompt는 입력이 화면에 그대로 보인다 — 비밀번호를 받는 데 쓰지 않는다
+        body = mp.split("</script>")
+        live = "".join(x for x in body if "openPwModal" in x or "pw-cur" in x)
+        check("비밀번호를 prompt로 받지 않는다",
+              "prompt(" not in live.replace("prompt() 2연타를 모달로", ""),
+              "모달", "prompt 사용")
+        check("비밀번호 칸이 type=password다", live.count('type="password"') >= 3,
+              "3칸 이상", live.count('type="password"'))
+        # 규칙을 화면에 베껴 쓰면 서버가 바뀔 때 거짓이 된다
+        check("규칙을 서버에서 받아 보여준다", "/auth/password-policy" in mp, "호출", "없음")
+        check("규칙을 못 받으면 지어내지 않는다",
+              "규칙을 불러오지 못했습니다" in mp, "정직 표기", "없음")
+        # 오타 때문에 서버까지 왕복하지 않는다
+        check("새 비밀번호를 두 번 받아 대조한다", "pw-new2" in mp, "있음", "없음")
+        # 바꾸면 다른 세션이 끊긴다(슬라이스 70) — 그 사실을 미리 말한다
+        check("세션 해제를 미리 알린다", "다른 기기의 로그인이 모두 해제" in mp, "있음", "없음")
+        # 이 화면은 lean 셸이라 bootstrap을 안 싣고 있었다 — 모달이 조용히 죽었다
+        check("모달에 필요한 bootstrap을 싣는다",
+              "vendors/bootstrap/bootstrap.min.js" in mp, "있음", "없음")
+        check("bootstrap이 없으면 그 사실을 말한다",
+              'typeof bootstrap === "undefined"' in mp, "가드 있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 비밀번호 모달 계약 - {e}")
+
+
 def test_session_revoke():
     print("\n[28] 다른 기기에서 로그아웃 (슬라이스 100)")
     # 화면이 "열려 있는 세션 21개"라고 정직하게 말하면서 **끊을 수단을 주지 않았다.**
@@ -2706,6 +2768,7 @@ def main():
                test_stock_ledger,
                test_time_display,
                test_session_revoke,
+               test_password_policy,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

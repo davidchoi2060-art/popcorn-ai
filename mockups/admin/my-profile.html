@@ -278,26 +278,122 @@ setTimeout(function(){
         .catch(function(){ b.disabled = false; toast("서버에 연결할 수 없습니다"); });
     };
 
+    /* 비밀번호 변경 — prompt() 2연타를 모달로 바꿨다 (슬라이스 100).
+       예전 문제 셋:
+         ① 브라우저 prompt는 마스킹이 없어 **입력이 화면에 그대로 보인다**(어깨너머 노출)
+         ② 강도 규칙을 거절당한 뒤에야 알았다 — 그리고 "8자 이상"이라고 적혀 있었는데
+            서버는 10자를 요구했다. **화면이 규칙을 틀리게 말하고 있었다.**
+         ③ 새 비밀번호를 한 번만 받아 오타를 잡을 수 없었다
+       규칙은 서버가 준다(`/auth/password-policy`) — 화면이 베끼면 또 어긋난다. */
     document.getElementById("pw").onclick = function(){
-      var cur = prompt("현재 비밀번호를 입력하세요");
-      if(cur === null) return;
-      var nw = prompt("새 비밀번호를 입력하세요 (8자 이상)");
-      if(nw === null) return;
-      fetch("/api/admin/auth/password", {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({current: cur, "new": nw})
-      }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
-        .then(function(res){
-          if(!res.ok){
-            var dt = res.j && res.j.detail;
-            toast("⚠ " + esc(typeof dt === "object" ? (dt.message || dt.error) : (dt || "변경하지 못했습니다")));
-            return;
-          }
-          toast(esc(res.j.note || "비밀번호를 변경했습니다"));
-          load();
-        })
-        .catch(function(){ toast("서버에 연결할 수 없습니다"); });
+      fetch("/api/admin/auth/password-policy")
+        .then(function(r){ return r.ok ? r.json() : {rules: [], min_length: null}; })
+        .catch(function(){ return {rules: [], min_length: null}; })
+        .then(openPwModal);
     };
+
+    function openPwModal(pol){
+      var rules = (pol.rules || []).map(function(t){
+        return '<li>' + esc(t) + '</li>';
+      }).join("");
+      var el = document.createElement("div");
+      el.className = "modal fade";
+      el.innerHTML = [
+        '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">',
+          '<div class="modal-header"><h5 class="modal-title">비밀번호 변경</h5>',
+            '<button class="btn-close" data-bs-dismiss="modal"></button></div>',
+          '<div class="modal-body">',
+            '<div class="mb-3">',
+              '<label class="form-label fs-9" for="pw-cur">현재 비밀번호</label>',
+              '<input id="pw-cur" type="password" autocomplete="current-password"',
+                ' class="form-control form-control-sm">',
+            '</div>',
+            '<div class="mb-3">',
+              '<label class="form-label fs-9" for="pw-new">새 비밀번호</label>',
+              '<input id="pw-new" type="password" autocomplete="new-password"',
+                ' class="form-control form-control-sm">',
+            '</div>',
+            '<div class="mb-3">',
+              '<label class="form-label fs-9" for="pw-new2">새 비밀번호 확인</label>',
+              '<input id="pw-new2" type="password" autocomplete="new-password"',
+                ' class="form-control form-control-sm">',
+              '<div id="pw-match" class="fs-10 mt-1"></div>',
+            '</div>',
+            (rules
+              ? '<div class="alert alert-subtle-info fs-10 mb-0">'
+                + '<b>이 규칙을 모두 지켜야 합니다</b>'
+                + '<ul class="mb-0 mt-1 ps-3">' + rules + '</ul></div>'
+              /* 규칙을 못 받았으면 지어내지 않는다 — 예전에 화면이 "8자 이상"이라
+                 틀리게 적어 두었던 자리다. */
+              : '<div class="alert alert-subtle-warning fs-10 mb-0">'
+                + '규칙을 불러오지 못했습니다 — 저장 시 서버가 판정합니다.</div>'),
+            '<p class="fs-10 text-body-quaternary mb-0 mt-2">',
+              '바꾸면 <b>다른 기기의 로그인이 모두 해제</b>됩니다. 지금 기기는 유지됩니다.</p>',
+          '</div>',
+          '<div class="modal-footer">',
+            '<button class="btn btn-phoenix-secondary btn-sm" data-bs-dismiss="modal">취소</button>',
+            '<button class="btn btn-primary btn-sm" id="pw-save">바꾸기</button>',
+          '</div>',
+        '</div></div>'
+      ].join("");
+      document.body.appendChild(el);
+      /* 없는 것을 있는 척하지 않는다 — bootstrap이 안 실렸으면 모달이
+         ReferenceError로 죽고 아무 안내도 안 뜬다. 그 사실을 말한다. */
+      if (typeof bootstrap === "undefined" || !bootstrap.Modal) {
+        el.remove();
+        toast("화면 구성요소를 불러오지 못했습니다 — 새로고침해 주세요");
+        return;
+      }
+      var m = new bootstrap.Modal(el);
+
+      var n1 = el.querySelector("#pw-new"), n2 = el.querySelector("#pw-new2");
+      var mt = el.querySelector("#pw-match");
+      /* 두 칸이 다르면 **서버에 보내기 전에** 알린다 — 오타 때문에 왕복하지 않게. */
+      function checkMatch(){
+        if(!n2.value){ mt.textContent = ""; return false; }
+        var ok = n1.value === n2.value;
+        mt.textContent = ok ? "일치합니다" : "두 값이 다릅니다";
+        mt.className = "fs-10 mt-1 " + (ok ? "text-primary" : "text-danger");
+        return ok;
+      }
+      n1.oninput = checkMatch;
+      n2.oninput = checkMatch;
+
+      el.querySelector("#pw-save").onclick = function(){
+        var b = this;
+        var cur = el.querySelector("#pw-cur").value;
+        var nw  = n1.value;
+        if(!cur){ toast("현재 비밀번호를 입력하세요"); return; }
+        if(!nw){ toast("새 비밀번호를 입력하세요"); return; }
+        if(nw !== n2.value){ toast("새 비밀번호 확인이 다릅니다"); return; }
+        b.disabled = true;
+        fetch("/api/admin/auth/password", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({current: cur, "new": nw})
+        }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+          .then(function(res){
+            b.disabled = false;
+            if(!res.ok){
+              /* 서버가 준 사유를 그대로 보여준다 — "규칙에 맞지 않습니다" 같은
+                 뭉뚱그린 문구로 바꾸면 무엇을 고쳐야 하는지 알 수 없다. */
+              var dt = res.j && res.j.detail;
+              toast("⚠ " + esc((dt && typeof dt === "object")
+                      ? (dt.message || dt.error || "변경하지 못했습니다")
+                      : (dt || "변경하지 못했습니다")));
+              return;
+            }
+            m.hide();
+            toast(esc(res.j.note || "비밀번호를 변경했습니다"));
+            load();          // 설정 시각·세션 수가 바뀐다
+          })
+          .catch(function(){ b.disabled = false; toast("서버에 연결할 수 없습니다"); });
+      };
+      /* 입력값이 DOM에 남지 않게 닫을 때 요소를 버린다.
+         비밀번호는 필요 이상으로 오래 메모리에 두지 않는다. */
+      el.addEventListener("hidden.bs.modal", function(){ el.remove(); });
+      m.show();
+      setTimeout(function(){ el.querySelector("#pw-cur").focus(); }, 200);
+    }
   }
 
   function load(){
@@ -321,6 +417,11 @@ setTimeout(function(){
   load();
 })();
 </script>
+<!-- Bootstrap JS — 모달에 필요하다. 이 화면은 lean 셸이라 안 싣고 있었고,
+     `bootstrap.Modal`이 ReferenceError로 죽어 **비밀번호 변경 모달이 조용히
+     열리지 않았다**(슬라이스 100에서 브라우저 검증으로 잡았다).
+     모달을 쓰는 다른 화면(operators · product-edit · review-queue)과 같은 경로다. -->
+<script src="vendors/bootstrap/bootstrap.min.js"></script>
 <script src="../shared/fmt-time.js"></script>
 <script src="../shared/admin-auth.js"></script>
 <script src="../shared/ui-progress.js"></script>

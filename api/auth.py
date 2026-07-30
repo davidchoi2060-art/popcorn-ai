@@ -303,6 +303,17 @@ class SetPasswordBody(BaseModel):
     new: str
 
 
+@router.get("/password-policy")
+def password_policy():
+    """강도 규칙 — 화면이 **거절당하기 전에** 보여주기 위한 것(슬라이스 100).
+
+    규칙 문구는 `passwords.password_rules()`가 만든다. 판정(`strength_problem`)과
+    같은 파일이라 어긋나지 않는다 — 화면이 베껴 쓰면 MIN_LENGTH를 올린 날 거짓이 된다.
+    """
+    from .passwords import password_rules
+    return password_rules()
+
+
 @router.post("/password")
 def change_my_password(body: SetPasswordBody, request: Request):
     """본인 비밀번호 변경. 현재 비밀번호를 확인한다."""

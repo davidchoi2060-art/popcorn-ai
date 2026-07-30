@@ -74,3 +74,24 @@ def strength_problem(raw: str, email: str | None = None) -> str | None:
         if bad in low:
             return "흔한 단어가 들어 있습니다"
     return None
+
+
+# ---- 슬라이스 100: 규칙을 화면에 알려준다 ----
+# 화면이 강도 규칙을 **베껴 쓰면** MIN_LENGTH를 올린 날 화면이 거짓을 말한다.
+# 그래서 `strength_problem`과 같은 파일에서 규칙 문구를 만들어 내려보낸다 —
+# 판정과 설명이 한 곳에 있어야 어긋나지 않는다.
+#
+# 지금까지는 운영자가 **거절당한 뒤에야** 규칙을 알았다(모달에 아무 안내가 없었다).
+def password_rules() -> dict:
+    """화면이 그대로 보여줄 규칙. 원문·해시와 무관한 설명만 담는다."""
+    return {
+        "min_length": MIN_LENGTH,
+        "rules": [
+            f"{MIN_LENGTH}자 이상",
+            "영문 대문자 · 소문자 · 숫자 · 기호 중 3가지 이상 섞기",
+            "같은 문자를 4번 이상 반복하지 않기",
+            "이메일 앞부분과 같은 문자열 쓰지 않기",
+            "흔한 단어(password · admin · qwerty 등) 쓰지 않기",
+            "이전 비밀번호와 다르게",
+        ],
+    }
