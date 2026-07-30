@@ -597,7 +597,7 @@ def test_compat():
 
     # 화면 구조 전수 감사 — 붙여넣기 사고가 남기는 흔적(슬라이스 87·88 실사고).
     #
-    # 재고 입고에 다른 화면의 목록 카드가, 상품 스펙 관리에 상품 관리 화면의 스크립트가
+    # 재고 입고에 다른 화면의 목록 카드가, 사양 항목 정의에 상품 관리 화면의 스크립트가
     # 통째로 붙어 있었다. 눈에 보인 증상은 "하단 글자가 겹친다" 하나뿐이었지만
     # 실제로는 네 가지가 함께 어긋나 있었다. 정적으로 전부 잡는다.
     #
@@ -1019,6 +1019,80 @@ def test_password_auth():
               "입력+전송", "없음")
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 로그인 화면 — {e}")
+
+
+def test_product_gate():
+    print("\n[24] 상품 게이트 체크리스트 · 사양 항목 정의 이름 정정 (슬라이스 95)")
+    # 왜 필요했나: `verdict`는 elif 사슬이라 **막힌 이유 하나만** 말한다. 실측 사례 —
+    # 미분류·사양없음·검수·품절·재고0 다섯이 막힌 상품에 verdict는 '품절'만 말했다.
+    # 운영자가 품절을 풀어도 미분류라 영원히 후보가 안 된다. 남은 것을 전부 말해야 한다.
+    pc = db_one("SELECT product_code FROM v_recommendation_candidates"
+                " WHERE stock_qty > 0 LIMIT 1")
+    if pc is None:
+        print("  [SKIP] (I) 후보 표본 없음")
+        return
+    d = get(f"/api/admin/products/{pc}")
+    check("통과 상품은 게이트가 전부 통과", d.get("gate_blocked") == [], [], d.get("gate_blocked"))
+    check("통과 상품은 다음 할 일이 없다", d.get("gate_first") is None, None, d.get("gate_first"))
+    check("게이트 항목은 6개", len(d.get("gate") or []) == 6, 6, len(d.get("gate") or []))
+
+    # 게이트 통과 여부와 실제 후보 여부가 일치해야 한다 —
+    # 어긋나면 화면이 "다 됐다"고 말하는데 견적에 안 나오는 상태가 된다
+    check("게이트 전부 통과 = in_pool", bool(d.get("in_pool")) is (not d.get("gate_blocked")),
+          d.get("in_pool"), not d.get("gate_blocked"))
+
+    # 여러 게이트가 동시에 막힌 상품 — 두더지잡기가 실제로 일어나는 경우
+    bad = db_one("SELECT product_code FROM products"
+                 " WHERE sale_price IS NULL AND stock_qty = 0"
+                 "   AND category_group = 'core_part' LIMIT 1")
+    if bad is not None:
+        b = get(f"/api/admin/products/{bad}")
+        blocked = b.get("gate_blocked") or []
+        check("여러 개가 막히면 전부 말한다", len(blocked) >= 2, "2개 이상", blocked)
+        check("판매가·재고가 막힌 것으로 잡힌다",
+              "price" in blocked and "stock" in blocked, "둘 다", blocked)
+        # 순서가 의미를 갖는다 — 첫 번째는 게이트 배열 순서상 가장 앞의 미통과 항목
+        first_key = [g["key"] for g in b["gate"] if not g["ok"]][0]
+        check("먼저 할 일은 목록 순서상 첫 미통과 항목",
+              (b.get("gate_first") or {}).get("key") == first_key,
+              first_key, (b.get("gate_first") or {}).get("key"))
+        check("남은 수와 목록 길이가 일치",
+              str(len(blocked)) in (b.get("gate_note") or ""),
+              f"{len(blocked)}가지", b.get("gate_note"))
+        # 라벨에 가운뎃점이 있으면 항목 구분자와 섞여 개수를 잘못 읽게 된다
+        check("게이트 라벨에 항목 구분자가 없다",
+              not any(" · " in g["label"] for g in b["gate"]),
+              "없음", [g["label"] for g in b["gate"] if " · " in g["label"]])
+
+    # ── 화면 계약 ──
+    try:
+        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+                     encoding="utf-8").read()
+        check("상세가 게이트 체크리스트를 그린다", "P.gate" in pe, "사용", "없음")
+        check("상세가 먼저 할 일을 지목한다", "gate_first" in pe, "사용", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 상세 화면 계약 - {e}")
+
+    # ── 이름 정정 (슬라이스 95) ──
+    # '상품 스펙 관리'는 개별 상품 스펙이 아니라 사양 항목(DB 컬럼)을 만드는 화면이었다.
+    # 그 이름 때문에 개별 상품 사양을 고치러 온 운영자가 스키마 편집기를 열게 됐다.
+    import glob as _g5
+    stale = [os.path.basename(x) for x in _g5.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+             if not os.path.basename(x).startswith("_")
+             and "상품 스펙 관리" in io.open(x, encoding="utf-8").read()]
+    check("옛 이름('상품 스펙 관리')이 남지 않았다", not stale, "없음", stale[:4])
+    try:
+        sf = io.open(os.path.join(ROOT, "mockups", "admin", "spec-fields.html"),
+                     encoding="utf-8").read()
+        check("사양 항목 정의로 이름이 바뀌었다", "사양 항목 정의" in sf, "있음", "없음")
+        # 이름을 바꿔도 잘못 오는 사람이 있다 — 갈 곳을 알려준다
+        check("개별 상품 사양은 여기가 아니라고 밝힌다",
+              "개별 상품의 사양 값을 넣는 곳이 아닙니다" in sf, "안내 있음", "없음")
+        check("갈 곳을 링크로 준다",
+              'href="products.html"' in sf and 'href="review-queue.html"' in sf,
+              "두 링크", "부족")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 사양 항목 정의 화면 - {e}")
 
 
 def test_setup_status():
@@ -2273,6 +2347,7 @@ def main():
                test_my_profile,
                test_suppliers,
                test_setup_status,
+               test_product_gate,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

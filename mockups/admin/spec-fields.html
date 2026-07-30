@@ -10,7 +10,7 @@
     <!-- ===============================================-->
     <!--    Document Title-->
     <!-- ===============================================-->
-    <title>팝콘PC 관리자 · 상품 스펙 관리</title>
+    <title>팝콘PC 관리자 · 사양 항목 정의</title>
 
 
     <!-- ===============================================-->
@@ -77,7 +77,7 @@
                   
                   <li class="nav-item"><a class="nav-link" href="csv-upload.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="upload-cloud" style="width:16px;height:16px;"></span></span><span class="nav-link-text">상품 일괄 등록</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="imports.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="archive" style="width:16px;height:16px;"></span></span><span class="nav-link-text">상품 원본 자료</span></div></a></li>
-                <li class="nav-item"><a class="nav-link" href="spec-fields.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="sliders" style="width:16px;height:16px;"></span></span><span class="nav-link-text">상품 스펙 관리</span></div></a></li></ul></div></div></li>
+                <li class="nav-item"><a class="nav-link" href="spec-fields.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="sliders" style="width:16px;height:16px;"></span></span><span class="nav-link-text">사양 항목 정의</span></div></a></li></ul></div></div></li>
               <li class="nav-item"><p class="navbar-vertical-label">가격 · 매입</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-price" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-price"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="dollar-sign"></span></span><span class="nav-link-text">가격 · 매입</span></div></a>
                 <div class="parent-wrapper label-1"><ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-price">
@@ -262,10 +262,18 @@
         </div>
       </nav>
       <div class="content">
-          <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="products.html">상품</a></li><li class="breadcrumb-item active">상품 스펙 관리</li></ol></nav>
+          <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="products.html">상품</a></li><li class="breadcrumb-item active">사양 항목 정의</li></ol></nav>
           <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-            <div><h2 class="mb-1">상품 스펙 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-050</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
-            <p class="text-body-tertiary mb-0">사양 항목을 늘리면 <b class="text-body-secondary">DB 컬럼이 생기고 추천 뷰·적재·검수가 함께 따라옵니다.</b></p></div>
+            <div><h2 class="mb-1">사양 항목 정의 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-050</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+            <p class="text-body-tertiary mb-0">사양 항목을 늘리면 <b class="text-body-secondary">DB 컬럼이 생기고 추천 뷰·적재·검수가 함께 따라옵니다.</b><br>
+              <!-- 예전 이름이 개별 상품의 스펙을 다루는 화면처럼 읽혔다. 그래서 사양 값을
+                   고치러 온 운영자가 여기서 DB 컬럼을 만들 뻔했다 — 이름을 바꾸고,
+                   그래도 잘못 오면 갈 곳을 알려준다(슬라이스 95).
+                   옛 이름은 회귀가 재유입을 막는다(주석에도 쓰지 않는다). -->
+              <span class="text-danger fw-semibold">개별 상품의 사양 값을 넣는 곳이 아닙니다</span>
+              — 그건 <a href="products.html">상품 관리</a>에서 상품을 열어 넣거나
+              <a href="review-queue.html">상품 검수</a>에서 확정합니다.
+              여기는 <b class="text-body-secondary">어떤 사양 항목이 존재하는지</b>를 정하는 곳입니다(관리자 전용).</p></div>
             <button id="addBtn" class="btn btn-primary btn-sm">+ 사양 항목 추가</button>
           </div>
           <div id="warnBox"></div>

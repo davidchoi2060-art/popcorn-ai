@@ -77,7 +77,7 @@
                   
                   <li class="nav-item"><a class="nav-link" href="csv-upload.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="upload-cloud" style="width:16px;height:16px;"></span></span><span class="nav-link-text">상품 일괄 등록</span></div></a></li>
                   <li class="nav-item"><a class="nav-link" href="imports.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="archive" style="width:16px;height:16px;"></span></span><span class="nav-link-text">상품 원본 자료</span></div></a></li>
-                <li class="nav-item"><a class="nav-link" href="spec-fields.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="sliders" style="width:16px;height:16px;"></span></span><span class="nav-link-text">상품 스펙 관리</span></div></a></li></ul></div></div></li>
+                <li class="nav-item"><a class="nav-link" href="spec-fields.html"><div class="d-flex align-items-center"><span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;"><span data-feather="sliders" style="width:16px;height:16px;"></span></span><span class="nav-link-text">사양 항목 정의</span></div></a></li></ul></div></div></li>
               <li class="nav-item"><p class="navbar-vertical-label">가격 · 매입</p><hr class="navbar-vertical-line"/></li>
               <li class="nav-item"><div class="nav-item-wrapper"><a class="nav-link dropdown-indicator label-1" href="#nv-price" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="nv-price"><div class="d-flex align-items-center"><div class="dropdown-indicator-icon-wrapper"><span class="fas fa-caret-right dropdown-indicator-icon"></span></div><span class="nav-link-icon"><span data-feather="dollar-sign"></span></span><span class="nav-link-text">가격 · 매입</span></div></a>
                 <div class="parent-wrapper label-1"><ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-price">
@@ -715,7 +715,7 @@
           });
           if(!mine.length){
             sp.innerHTML = '<p class="fs-9 text-body-tertiary mb-0">이 부품 종류에 정의된 사양이 '
-              + '없습니다 — <a href="spec-fields.html">상품 스펙 관리</a>에서 항목을 만듭니다.</p>';
+              + '없습니다 — <a href="spec-fields.html">사양 항목 정의</a>에서 항목을 만듭니다.</p>';
             return;
           }
           sp.innerHTML = '<div class="row g-2">' + mine.map(function(f){
@@ -847,16 +847,44 @@
             var host=document.querySelector(".content nav.mb-3");
             if(host&&host.parentNode) host.parentNode.insertBefore(box, host.nextSibling);
           }
+          /* 게이트 체크리스트 (슬라이스 95) — 막힌 것을 **한 번에 전부** 보여준다.
+             예전에는 `verdict` 한 문장만 띄웠는데 그건 첫 번째 이유만 말한다. 실측 사례:
+             미분류·사양없음·검수·품절·재고0 다섯이 막힌 상품에 verdict는 '품절'만 말했다.
+             운영자가 품절을 풀어도 미분류라 영원히 후보가 안 된다 — 왕복만 늘어난다.
+             순서도 의미가 있다: 분류를 고치면 사양 자리가 생기고 검수가 다시 판정된다.
+             그래서 첫 번째 막힌 항목을 따로 지목한다. */
+          var gateRows = (P.gate || []).map(function(g){
+            var mark = g.ok
+              ? '<span class="text-primary fw-bold">통과</span>'
+              : '<span class="text-danger fw-bold">필요</span>';
+            var fix = g.ok ? '' :
+              '<div class="fs-10 text-body-quaternary">' + esc(g.fix)
+              + (g.fix_screen
+                  ? ' <a href="' + esc(g.fix_screen) + '">열기</a>' : '') + '</div>';
+            return '<tr' + (g.ok ? ' class="opacity-75"' : '') + '>'
+              + '<td style="width:52px;">' + mark + '</td>'
+              + '<td><b>' + esc(g.label) + '</b>' + fix + '</td>'
+              + '<td class="text-end fs-9">' + esc(g.value) + '</td></tr>';
+          }).join("");
+          var first = P.gate_first;
           box.innerHTML='<div class="alert '+(P.in_pool?"alert-subtle-primary":"alert-subtle-warning")
-            +' py-2 px-3 fs-9 mb-0 d-flex flex-wrap gap-3 align-items-center">'
+            +' py-2 px-3 fs-9 mb-0">'
+            +'<div class="d-flex flex-wrap gap-3 align-items-center">'
             +'<b>'+(P.in_pool?"추천 가능":"추천 제외")+'</b>'
-            +'<span>'+esc(P.verdict)+'</span>'
-            +'<span class="text-body-tertiary">사양 '+P.spec_done+'/'+P.spec_total
-            +(P.spec_row_missing?" · 사양 행 없음":"")
-            +(P.review_pending?" · 검수 대기 "+P.review_pending+"건":"")+'</span>'
+            +'<span>'+esc(P.gate_note||P.verdict)+'</span>'
+            +(first?'<span class="badge badge-phoenix badge-phoenix-danger">먼저: '
+                    +esc(first.label)+'</span>':'')
             +(P.locked_fields.length
               ? '<span class="ms-auto text-body-tertiary">잠금: '+esc(P.locked_fields.join(", "))
                 +' <span class="text-body-quaternary">(적재가 덮지 않음)</span></span>' : '')
+            +'</div>'
+            +(gateRows
+              ? '<div class="table-responsive mt-2"><table class="table table-sm '
+                +'align-middle fs-9 mb-0">'
+                +'<tbody>'+gateRows+'</tbody></table></div>'
+                +'<div class="fs-10 text-body-quaternary mt-1">'
+                +'위에서부터 고치세요 — 분류를 바꾸면 아래 항목이 다시 판정됩니다.</div>'
+              : '')
             +'</div>';
           // 저장 버튼 옆에 [취소]와 모드 안내를 심는다(없으면 만든다)
           var sb0 = document.getElementById("save");

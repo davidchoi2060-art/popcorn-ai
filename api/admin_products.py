@@ -379,6 +379,51 @@ def get_product(product_code: int):
             " ORDER BY sp.cost_price NULLS LAST, sp.psp_id"), {"pc": product_code}).mappings()]
     done, total = spec_progress(r["part_type"], r["specs"])
     locked = list(r["locked_fields"] or [])
+
+    # ── 게이트 체크리스트 (슬라이스 95) ─────────────────────────────
+    # 왜 필요했나: `verdict`는 **막힌 이유를 하나씩만** 말한다(elif 사슬).
+    # 사양·판매가·재고가 동시에 비어 있으면, 사양을 채우고 돌아왔을 때 "판매가가 없어"가
+    # 새로 뜨고 그걸 고치면 또 "재고가 없어"가 뜬다. 두더지잡기다 — 운영자는 몇 번
+    # 왕복해야 끝나는지 알 수 없다. 그래서 **남은 것을 한 번에 전부** 보여준다.
+    #
+    # 조건은 추천 뷰(`v_recommendation_candidates`)의 실제 WHERE와 한 줄씩 대응한다.
+    # 뷰를 고치면 여기도 고쳐야 한다 — 어긋나면 화면이 "다 됐다"고 말하는데 후보가
+    # 아닌 상태가 된다(슬라이스 46과 같은 부류의 사고).
+    gate = [
+        {"key": "category", "label": "부품 분류",
+         "ok": r["category_group"] == "core_part" and r["part_type"] in PART_TYPE_LABELS,
+         "value": PART_TYPE_LABELS.get(r["part_type"], r["part_type"] or "미분류"),
+         "fix": "상세에서 분류를 고칩니다 — 바꾸기 전에 영향을 먼저 보여줍니다",
+         "fix_screen": None},
+        {"key": "spec_row", "label": "사양 정보",
+         "ok": r["specs"] is not None,
+         "value": "있음" if r["specs"] is not None else "없음(적재가 부품 종류를 못 정함)",
+         "fix": "분류를 바로잡으면 사양 자리가 생깁니다",
+         "fix_screen": None},
+        {"key": "review", "label": "필수 사양",
+         "ok": pending == 0 and bool(r["ai_candidate_yn"]) and not r["review_required_yn"],
+         "value": (f"{done}/{total} 항목"
+                   + (f" · 검수 대기 {pending}건" if pending else "")),
+         "fix": "이 화면에서 사양 값을 넣으면 검수도 함께 해소됩니다",
+         "fix_screen": "review-queue.html"},
+        {"key": "price", "label": "판매가",
+         "ok": r["sale_price"] is not None,
+         "value": (f"{r['sale_price']:,}원" if r["sale_price"] is not None else "없음"),
+         "fix": "아래 [공급처별 매입가]에 매입가를 넣으면 산정됩니다",
+         "fix_screen": "price-import.html"},
+        {"key": "status", "label": "판매 상태",
+         "ok": r["status"] == "판매중",
+         "value": r["status"],
+         "fix": "상세에서 '판매중'으로 바꿉니다",
+         "fix_screen": None},
+        {"key": "stock", "label": "재고",
+         "ok": (r["stock_qty"] or 0) > 0,
+         "value": f"{r['stock_qty'] or 0}개",
+         "fix": "재고 입고에서 수량을 넣습니다",
+         "fix_screen": "stock-inbound.html"},
+    ]
+    blocked = [g for g in gate if not g["ok"]]
+
     if in_pool:
         verdict = "추천 가능 재고에 있습니다."
     elif pending:
@@ -416,8 +461,22 @@ def get_product(product_code: int):
         "editable": sorted(EDITABLE), "status_options": list(STATUS_OK),
         "created_at": iso(r["created_at"]),
         "updated_at": iso(r["updated_at"]) if r["updated_at"] else None,
-        # 화면이 그대로 쓰는 한 문장 — 왜 추천에 들어가고 못 들어가는지
+        # 화면이 그대로 쓰는 한 문장 — 왜 추천에 들어가고 못 들어가는지.
+        # 하위호환으로 남긴다(회귀·기존 화면이 쓴다). 다만 **하나씩만** 말하므로,
+        # 운영자가 실제로 봐야 하는 것은 아래 `gate`다.
         "verdict": verdict,
+        # 남은 것을 한 번에 전부 — 왕복을 없앤다(슬라이스 95)
+        "gate": gate,
+        "gate_blocked": [g["key"] for g in blocked],
+        # **순서가 의미를 갖는다.** 분류를 고치면 사양 자리가 생기고 검수가 다시 판정된다.
+        # 아래에서부터 고치면(재고 먼저) 헛수고가 된다 — 첫 번째를 지목한다.
+        "gate_first": None if not blocked else {
+            "key": blocked[0]["key"], "label": blocked[0]["label"],
+            "fix": blocked[0]["fix"], "fix_screen": blocked[0]["fix_screen"]},
+        "gate_note": ("추천 가능 재고에 있습니다 — 견적에 나갈 수 있습니다"
+                      if not blocked else
+                      f"추천 후보가 되려면 {len(blocked)}가지 남았습니다 — "
+                      + " · ".join(g["label"] for g in blocked)),
     }
 
 
