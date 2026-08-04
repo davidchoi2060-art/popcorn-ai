@@ -24,6 +24,7 @@ from .admin_refunds import router as admin_refunds_router
 from .admin_payments import router as admin_payments_router
 from .admin_categories import router as admin_categories_router
 from .admin_category_mapping import router as admin_category_mapping_router
+from .admin_reprice import router as admin_reprice_router
 from .admin_pool import router as admin_pool_router
 from .admin_price_import import router as admin_price_import_router
 from .admin_price_history import router as admin_price_history_router
@@ -90,6 +91,7 @@ app.include_router(admin_stock_router)
 app.include_router(admin_swap_logs_router)
 app.include_router(admin_categories_router)
 app.include_router(admin_category_mapping_router)
+app.include_router(admin_reprice_router)
 app.include_router(admin_pool_router)
 app.include_router(admin_sessions_router)
 app.include_router(admin_price_history_router)

@@ -26,7 +26,8 @@ from sqlalchemy import text
 
 from .admin_orders import _log
 from .auth import current_operator_id
-from .admin_price_import import _half_up_1000, _reprice, _settings
+from .admin_price_import import _reprice, _settings
+from .pricing import sale_from_purchase
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 
@@ -58,7 +59,7 @@ def price_review():
     items = []
     for r in rows:
         purchase = r["purchase_price"] or r["cost_price"] or 0
-        proposed = _half_up_1000(purchase * (1 + fee + margin)) if purchase else None
+        proposed = sale_from_purchase(purchase, fee, margin) if purchase else None
         items.append({
             "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
             "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),

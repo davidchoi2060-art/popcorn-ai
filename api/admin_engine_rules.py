@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .timeutil import iso
-from .admin_price_import import _half_up_1000
+from .pricing import sale_from_purchase, formula_text
 from .candidates import BUDGET_ALLOC, SILENT_SCOPE, WHITE_SCOPE
 from .db import engine
 from .recommend import SLOTS, TIER_LABELS
@@ -113,11 +113,14 @@ def engine_rules():
             "tag_note": "스코프 밖 부품은 무조건 통과 — 미태깅 부품이 전멸하는 것을 막기 위한 규칙",
         },
         "pricing": {
-            "card_fee_pct": round(fee * 100, 2), "margin_pct": round(margin * 100, 2),
+            # 소수 셋째 자리까지 낸다 — 2.585%를 2.59%로 줄여 보이면 사용자가 정한 값이
+            # 화면에서 다른 값이 된다(슬라이스 E에서 실제로 겪었다).
+            "card_fee_pct": round(fee * 100, 3), "margin_pct": round(margin * 100, 3),
+            "card_fee_rate": fee, "margin_rate": margin,
             "effective_from": iso(s["effective_from"]) if s and s["effective_from"] else None,
-            "formula": "판매가 = 매입가 × (1 + 카드수수료 + 마진) → 1,000원 단위 half-up",
+            "formula": formula_text(fee, margin),
             "example": {"purchase": sample,
-                        "sale": _half_up_1000(sample * (1 + fee + margin))},
+                        "sale": sale_from_purchase(sample, fee, margin)},
             "categories": [{"category": c["category"], "pct": round(float(c["margin_rate"]) * 100, 2)}
                            for c in cat_rows],
             "category_note": ("카테고리별 마진 정책은 아직 등록된 행이 없습니다 —"
@@ -190,7 +193,9 @@ def save_pricing(body: PricingBody):
     return {"ok": True, "undo_id": log_id, "affected_candidates": affected,
             "note": ("정책을 새 버전으로 저장했습니다."
                      f" 매입가가 있는 {affected:,}건이 다음 단가표 반영 때 이 값으로 산정됩니다."
-                     " **기존 판매가는 지금 바뀌지 않습니다.**")}
+                     " **기존 판매가는 지금 바뀌지 않습니다** —"
+                     " 지금 맞추려면 [판매가 재산정](reprice.html)에서 미리보기 후 반영하세요."),
+            "reprice_href": "reprice.html"}
 
 
 class CategoryMarginBody(BaseModel):

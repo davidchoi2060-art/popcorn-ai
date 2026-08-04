@@ -1479,6 +1479,146 @@ def test_category_isolation():
         check("대시보드 미분류 = DB 실측", pend["unclassified"] == live[1], live[1],
               pend["unclassified"])
 
+def test_reprice():
+    """[36] 판매가 재산정 — 오름과 내림을 합치지 않는다 (슬라이스 E)
+
+    마진 정책은 화면에서 고칠 수 있었지만 **이미 매겨진 판매가를 정책에 맞출 길이 없었다.**
+    기존 `_reprice`는 공급처 단가 변동용이라 `product_supplier_prices` 행이 없으면 아무것도
+    하지 않는데, 매입가가 있는 18,748건 중 **18,743건이 그 행이 없다.**
+
+    ■ 실측이 설계를 바꿨다
+    처음엔 "정책과 다른 것 N건"으로 낼 생각이었다. 재 보니 18,540건에 총액 -2.4억이었고,
+    나눠 보니 서로 다른 셋이 섞여 있었다: 정책 미달(대부분·올라간다) · 역마진 1,008건 ·
+    배수 2.0 이상 이상치 206건(최대 20,000배 — 매입 45,000 / 판매 9억).
+    **합치면 9억짜리 이상치 한 건이 나머지 18,539건의 인상분을 덮는다.**
+    그래서 오름·내림을 갈라서 내고, 이상치와 역마진을 따로 센다.
+
+    쓰기 경로(apply)는 **가드만** 확인한다 — 실행하면 실제 판매가 수천 건이 움직인다
+    (슬라이스 50 전례: 회귀가 정본을 오염시키면 안 된다). apply·undo의 정상 동작은
+    슬라이스 E에서 22,838건 스냅샷 대조로 한 번 검증했다(전량 원복 확인).
+    """
+    print(chr(10) + "[36] 판매가 재산정 — 오름과 내림을 합치지 않는다 (슬라이스 E)")
+
+    d = get("/api/admin/reprice/preview?scope=live")
+    check("미리보기를 준다", isinstance(d, dict) and "changed" in d, "changed 포함", sorted(d))
+    check("공식을 문장으로 밝힌다", "매입가" in (d.get("formula") or ""), "공식 문장",
+          d.get("formula"))
+
+    # 오름·내림이 갈라져 있는가 — 이 슬라이스의 핵심
+    for k in ("up_count", "down_count", "up_sum", "down_sum", "outlier_count",
+              "negative_count", "locked_count"):
+        check(f"{k}를 따로 낸다", k in d, "있음", "없음")
+    check("변동 = 오름 + 내림",
+          d.get("changed") == d.get("up_count", 0) + d.get("down_count", 0),
+          d.get("up_count", 0) + d.get("down_count", 0), d.get("changed"))
+    check("오름 합계는 음수가 아니다", (d.get("up_sum") or 0) >= 0, ">= 0", d.get("up_sum"))
+    check("내림 합계는 양수가 아니다", (d.get("down_sum") or 0) <= 0, "<= 0", d.get("down_sum"))
+    check("대상 = 오름+내림+그대로+잠김",
+          d.get("target") == d.get("up_count", 0) + d.get("down_count", 0)
+          + d.get("same", 0) + d.get("locked_count", 0),
+          d.get("target"),
+          d.get("up_count", 0) + d.get("down_count", 0) + d.get("same", 0)
+          + d.get("locked_count", 0))
+
+    # 공식이 단일 원천인가 — 엔진 규칙 화면이 말하는 예시와 같은 값이어야 한다
+    er = get("/api/admin/engine-rules")
+    pr = ((er or {}).get("pricing") or {})
+    if pr.get("example"):
+        from api.pricing import sale_from_purchase
+        want = sale_from_purchase(pr["example"]["purchase"],
+                                  d.get("card_fee_rate"), d.get("margin_rate"))
+        check("두 화면이 같은 공식을 쓴다", pr["example"]["sale"] == want, want,
+              pr["example"]["sale"])
+
+    # 서버가 세는 수 = DB가 세는 수
+    if _engine is not None:
+        from api.pricing import sale_from_purchase as _sfp
+        with _engine.connect() as c:
+            fee, margin = [float(x) for x in c.execute(text(
+                "SELECT card_fee_rate, margin_rate FROM pricing_settings"
+                " ORDER BY effective_from DESC LIMIT 1")).one()]
+            rows = c.execute(text(
+                "SELECT purchase_price, sale_price, locked_fields FROM products"
+                " WHERE purchase_price IS NOT NULL AND purchase_price > 0"
+                "   AND status='판매중' AND stock_qty>0")).all()
+        up = down = same = locked = 0
+        up_sum = down_sum = 0
+        for pur, sale, lock in rows:
+            new = _sfp(pur, fee, margin)
+            if "sale_price" in (lock or []):
+                if new != sale:
+                    locked += 1
+                continue
+            if new == sale:
+                same += 1
+            elif sale is None or new > sale:
+                up += 1
+                up_sum += (new - sale) if sale is not None else 0
+            else:
+                down += 1
+                down_sum += new - sale
+        check("오름 수 = DB 실측", d.get("up_count") == up, up, d.get("up_count"))
+        check("내림 수 = DB 실측", d.get("down_count") == down, down, d.get("down_count"))
+        # **합계도 대조한다** — 부호만 보면 오름에 내림을 섞어도 양수라 통과한다.
+        # 이 슬라이스가 막으려는 것이 정확히 그 섞임이므로 값으로 잡는다.
+        check("오름 합계 = DB 실측", d.get("up_sum") == up_sum, up_sum, d.get("up_sum"))
+        check("내림 합계 = DB 실측", d.get("down_sum") == down_sum, down_sum, d.get("down_sum"))
+        check("그대로 수 = DB 실측", d.get("same") == same, same, d.get("same"))
+        check("잠긴 판매가는 변동에 세지 않는다", d.get("locked_count") == locked, locked,
+              d.get("locked_count"))
+
+    # 정책 비율이 저장되면서 조용히 반올림되지 않는가 (슬라이스 E 실사고)
+    # 2.585%를 넣었더니 NUMERIC(5,4) 때문에 0.0259가 되어 화면이 "2.59%"라고 말했다.
+    # API는 200을 돌려줬고 아무도 오류를 보지 못했다 — **사용자가 정한 값이 시스템 안에서
+    # 다른 값이 된 채로 남았다.** 0028에서 자릿수를 넓혔고, 여기서 그 상태를 지킨다.
+    if _engine is not None:
+        with _engine.connect() as c:
+            scale = c.execute(text(
+                "SELECT numeric_scale FROM information_schema.columns"
+                " WHERE table_name='pricing_settings' AND column_name='card_fee_rate'")).scalar()
+            stored = float(c.execute(text(
+                "SELECT card_fee_rate FROM pricing_settings"
+                " ORDER BY effective_from DESC LIMIT 1")).scalar())
+        check("수수료 자릿수가 충분하다(소수 6자리)", (scale or 0) >= 6, ">= 6", scale)
+        # 화면이 말하는 값 = DB가 든 값 (표시 반올림이 값을 감추지 않는다)
+        said = (pr or {}).get("card_fee_rate")
+        if said is not None:
+            check("화면이 말하는 수수료 = DB 실값", round(float(said), 6) == round(stored, 6),
+                  stored, said)
+        said_pct = (pr or {}).get("card_fee_pct")
+        if said_pct is not None:
+            check("퍼센트 표시가 실값과 어긋나지 않는다",
+                  abs(said_pct - stored * 100) < 0.0005, round(stored * 100, 3), said_pct)
+
+    # 가드 — 실행하지 않는다
+    try:
+        get("/api/admin/reprice/preview?scope=nope")
+        check("알 수 없는 범위는 400", False, 400, 200)
+    except urllib.error.HTTPError as e:
+        check("알 수 없는 범위는 400", e.code == 400, 400, e.code)
+    st, _ = post("/api/admin/reprice/apply", {"scope": "nope", "expect_changed": 1})
+    check("반영도 알 수 없는 범위는 400", st == 400, 400, st)
+    st, r = post("/api/admin/reprice/apply", {"scope": "live", "expect_changed": -1})
+    check("미리보기 확인값이 다르면 409", st == 409, 409, st)
+    st, _ = post("/api/admin/reprice/undo", {"log_id": 999999999})
+    check("없는 재산정 기록 되돌리기는 404", st == 404, 404, st)
+
+    # 화면 계약
+    _p = os.path.join(ROOT, "mockups", "admin", "reprice.html")
+    if os.path.exists(_p):
+        _h = io.open(_p, encoding="utf-8").read()
+        check("화면이 ADM-PRC-050이다", 'data-screen-id="ADM-PRC-050"' in _h, True,
+              'data-screen-id="ADM-PRC-050"' in _h)
+        check("화면이 미리보기를 거친다", "reprice/preview" in _h, True,
+              "reprice/preview" in _h)
+        check("화면이 확인값을 되돌려 보낸다", "expect_changed" in _h, True,
+              "expect_changed" in _h)
+        check("화면에 되돌리기가 있다", "reprice/undo" in _h, True, "reprice/undo" in _h)
+        # 오름·내림을 합친 단일 합계를 화면이 만들지 않는다
+        check("화면이 오름·내림을 따로 그린다",
+              "mUpSum" in _h and "mDownSum" in _h, True,
+              "mUpSum" in _h and "mDownSum" in _h)
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -3436,6 +3576,7 @@ def main():
                test_categories,
                test_category_mapping,
                test_category_isolation,
+               test_reprice,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

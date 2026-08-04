@@ -27,9 +27,9 @@ from .auth import current_operator_id
 SIM_THRESHOLD = 0.3
 
 
-def _half_up_1000(v: float) -> int:
-    # 목업 Math.round(half-up)와 일치 — Python round()는 은행가 반올림이라 사용 금지
-    return int(v / 1000 + 0.5) * 1000
+# 판매가 공식은 pricing이 단일 원천(슬라이스 E) — 세 곳에 흩어져 있던 것을 모았다.
+# 이름은 유지한다(다른 모듈이 이 이름으로 import 중).
+from .pricing import half_up_1000 as _half_up_1000, sale_from_purchase  # noqa: E402
 
 
 def _settings(conn):
@@ -177,7 +177,7 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
     if restore is not None and new_purchase == restore["purchase"]:
         new_sale = restore["sale"]
     else:
-        new_sale = _half_up_1000(new_purchase * (1 + fee + margin))
+        new_sale = sale_from_purchase(new_purchase, fee, margin)
     if "sale_price" in (prod["locked_fields"] or []):
         out["sale_locked"] = new_sale != prod["sale_price"]
     elif new_sale != prod["sale_price"]:
