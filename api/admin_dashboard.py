@@ -16,6 +16,7 @@ from sqlalchemy import text
 from .timeutil import iso
 from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
 from .db import engine
+from .taxonomy import CORE_TYPES
 
 router = APIRouter(prefix="/api/admin")
 
@@ -39,6 +40,10 @@ def pending_counts(conn) -> dict:
                        "      OR (safety_stock IS NOT NULL AND stock_qty < safety_stock))"),
         "refund": one("SELECT COUNT(*) FROM refunds"
                       " WHERE status IN ('접수','검토','수거·처리')"),
+        # 카테고리 매핑(슬라이스 C) — 기존 임대 관리자는 미매핑 1,458건을 별도 화면에
+        # 두고 방치했다. 여기서는 대시보드가 먼저 말한다.
+        "unmapped": one("SELECT COUNT(*) FROM products WHERE category_id IS NULL"),
+        "unclassified": one("SELECT COUNT(*) FROM products WHERE part_type='ETC'"),
     }
 
 
@@ -48,9 +53,11 @@ def dashboard():
         one = lambda sql: conn.execute(text(sql)).scalar_one()
         pending = pending_counts(conn)
         pool_ok = one("SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")
-        core = one("SELECT COUNT(*) FROM products WHERE category_group='core_part'"
-                   " AND part_type = ANY(ARRAY['CPU','GPU','MB','RAM','SSD','HDD','POWER','CASE',"
-                   "'COOLER_CPU_AIR','COOLER_CPU_AIO'])")
+        # 부품 종류 목록은 taxonomy가 단일 원천(슬라이스 A) — 여기 SQL에 박아 두면
+        # 종류가 늘 때 이 수만 조용히 뒤처진다.
+        core = conn.execute(text(
+            "SELECT COUNT(*) FROM products WHERE category_group='core_part'"
+            " AND part_type = ANY(:core)"), {"core": list(CORE_TYPES)}).scalar_one()
         sess_today = one("SELECT COUNT(*) FROM consult_sessions WHERE created_at::date=CURRENT_DATE")
         sess_done = one("SELECT COUNT(*) FROM consult_sessions s WHERE created_at::date=CURRENT_DATE"
                         " AND EXISTS (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)")
@@ -146,5 +153,11 @@ def worklist():
         {"key": "sourcing", "label": "매입 견적", "count": sourcing_wait,
          "focus": None, "focus_label": None,
          "href": "sourcing.html", "hint": "요청 후 회신 대기"},
+        # 미매핑과 미분류는 **다른 일이다**: 미매핑은 카테고리가 아예 없는 것,
+        # 미분류는 적재가 부품 종류를 못 정해 `미분류`에 들어간 것. 둘을 합치면
+        # "0건"으로 보이는데 실제로는 5천 건이 쌓여 있을 수 있다(슬라이스 C 실제 상황).
+        {"key": "category", "label": "카테고리 매핑", "count": p["unmapped"] + p["unclassified"],
+         "focus": p["unclassified"], "focus_label": "미분류(부품 종류 미정)",
+         "href": "category-mapping.html", "hint": "판매 분류가 없거나 미분류인 상품"},
     ]
     return {"items": items, "total": sum(i["count"] for i in items), "pool": pool}

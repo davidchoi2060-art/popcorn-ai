@@ -1381,6 +1381,104 @@ def test_category_mapping():
               bool(holder) and not _re10.search(r"[0-9]", holder.group(1)),
               "숫자 없음", holder.group(1) if holder else "(없음)")
 
+def test_category_isolation():
+    """[35] 카테고리를 옮겨도 견적은 그대로다 — 실측 (슬라이스 D)
+
+    `[33]`은 **소스를 읽어** 엔진이 categories를 참조하지 않는지 본다. 그건 정적 검사라
+    간접 경로(뷰·조인·다른 모듈 경유)를 놓칠 수 있다. 여기서는 **실제로 옮겨 보고
+    같은 견적이 나오는지** 확인한다.
+
+      ① 견적을 낸다 → 부품 구성과 총액을 기억한다
+      ② 그 견적에 실제로 들어간 부품들을 새 카테고리로 옮긴다
+      ③ 같은 입력으로 다시 견적을 낸다 → **부품·총액이 한 글자도 달라지면 안 된다**
+      ④ 되돌리고 시험 카테고리를 지운다
+
+    ②가 중요하다 — 견적과 무관한 상품을 옮기면 이 검사는 아무것도 지키지 않는다.
+
+    회귀는 정본을 바꾸지 않는다는 규칙(슬라이스 50)의 예외다. 용도 하한 검사(슬라이스 75)와
+    같은 형태로, **바꾼 것을 반드시 되돌리고 되돌아왔는지까지 확인한다.**
+    """
+    print(chr(10) + "[35] 카테고리를 옮겨도 견적은 그대로다 — 실측 (슬라이스 D)")
+
+    def fingerprint(sets):
+        """견적의 지문 — 티어별 (부품 코드 목록, 총액)."""
+        out = {}
+        for k, v in (sets or {}).items():
+            if not isinstance(v, dict):
+                continue
+            parts = v.get("items") or []
+            out[k] = (tuple(sorted(p.get("product_code") for p in parts)), v.get("total"))
+        return out
+
+    before = fingerprint(rec("150만원"))
+    check("견적이 나온다(비교할 것이 있다)", len(before) > 0, "> 0 티어", len(before))
+    codes = sorted({c for v in before.values() for c in v[0] if c is not None})
+    check("견적에 실제 부품이 들어 있다", len(codes) > 0, "> 0", len(codes))
+    if not codes:
+        return
+
+    st, made = post("/api/admin/categories",
+                    {"name": "__회귀_격리시험", "sort_order": 999})
+    check("시험 카테고리를 만든다", st == 200, 200, st)
+    cid = (made or {}).get("category_id")
+    if not cid:
+        return
+
+    log_id = None
+    try:
+        st, mv = post("/api/admin/category-mapping/move",
+                      {"product_codes": codes, "category_id": cid})
+        check("견적에 쓰인 부품을 옮긴다", st == 200, 200, st)
+        log_id = (mv or {}).get("log_id")
+        check("옮긴 수가 견적 부품 수와 맞는다", (mv or {}).get("moved") == len(codes),
+              len(codes), (mv or {}).get("moved"))
+
+        after = fingerprint(rec("150만원"))
+        check("카테고리를 옮겨도 견적 구성이 같다",
+              {k: v[0] for k, v in after.items()} == {k: v[0] for k, v in before.items()},
+              "동일", "다름")
+        check("카테고리를 옮겨도 총액이 같다",
+              {k: v[1] for k, v in after.items()} == {k: v[1] for k, v in before.items()},
+              {k: v[1] for k, v in before.items()},
+              {k: v[1] for k, v in after.items()})
+    finally:
+        # 되돌린다 — 검사가 흔적을 남기면 안 된다(슬라이스 78 전례).
+        if log_id:
+            st, _ = post("/api/admin/category-mapping/undo", {"log_id": log_id})
+            check("이동을 되돌린다", st == 200, 200, st)
+        st, _ = post_raw("/api/admin/categories/%d" % cid, None, {}, method="DELETE")
+        check("시험 카테고리를 지운다(=상품이 남아 있지 않다)", st == 200, 200, st)
+
+    restored = fingerprint(rec("150만원"))
+    check("원복 뒤 견적도 처음과 같다", restored == before, "동일", "다름")
+
+    # 대시보드·작업 패널이 카테고리 잔여를 말하는가 — 별도 화면에 숨겨 두지 않는다
+    dash = get("/api/admin/dashboard")
+    wl = get("/api/admin/worklist")
+    pend = (dash or {}).get("pending") or {}
+    check("대시보드가 미매핑·미분류를 센다",
+          "unmapped" in pend and "unclassified" in pend,
+          "unmapped·unclassified", sorted(pend))
+    cat_item = next((i for i in (wl or {}).get("items") or []
+                     if i.get("key") == "category"), None)
+    check("작업 패널에 카테고리 매핑이 있다", cat_item is not None, "있음", "없음")
+    if cat_item:
+        check("작업 패널 수 = 대시보드 수",
+              cat_item["count"] == pend["unmapped"] + pend["unclassified"],
+              pend["unmapped"] + pend["unclassified"], cat_item["count"])
+        check("작업 패널이 매핑 화면으로 보낸다",
+              cat_item.get("href") == "category-mapping.html",
+              "category-mapping.html", cat_item.get("href"))
+
+    if _engine is not None:
+        with _engine.connect() as c:
+            live = c.execute(text(
+                "SELECT count(*) FILTER (WHERE category_id IS NULL),"
+                "       count(*) FILTER (WHERE part_type='ETC') FROM products")).one()
+        check("대시보드 미매핑 = DB 실측", pend["unmapped"] == live[0], live[0], pend["unmapped"])
+        check("대시보드 미분류 = DB 실측", pend["unclassified"] == live[1], live[1],
+              pend["unclassified"])
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -3337,6 +3435,7 @@ def main():
                test_taxonomy_single_source,
                test_categories,
                test_category_mapping,
+               test_category_isolation,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
