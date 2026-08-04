@@ -326,13 +326,18 @@
       </div>
     </div>
 
-    <!-- 일괄 이동 막대 -->
-    <div class="card mb-3 border-primary" id="bulkBar" hidden>
+    <!-- 일괄 이동 막대 — Phoenix bulk-select 의 actions / replacedElement 계약 -->
+    <div class="card mb-3">
       <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+        <div id="bulk-replace">
+          <span class="fs-10 text-body-tertiary">행을 선택하면 다른 분류로 옮길 수 있습니다.</span>
+        </div>
+        <div class="d-none align-items-center gap-2" id="bulk-actions">
         <span class="fs-9"><b id="selCount">0</b>건 선택</span>
         <select class="form-select form-select-sm w-auto" id="moveTo"></select>
         <button class="btn btn-primary btn-sm" type="button" id="btnMove">이 카테고리로 옮기기</button>
         <button class="btn btn-link btn-sm p-0 ms-1 fs-9" type="button" id="btnClear">선택 해제</button>
+        </div>
         <span class="fs-10 text-body-tertiary ms-auto" id="moveHint"></span>
       </div>
     </div>
@@ -347,21 +352,30 @@
         </div>
       </div>
       <div class="card-body p-0">
+        <!-- data-list = 현재 페이지 안의 검색·정렬. 페이지 이동은 서버가 한다. -->
+        <div id="prodList" data-list='{"valueNames":["code","name","part","cat","price","stock"]}'>
         <div class="table-responsive">
           <table class="table table-sm table-hover fs-9 mb-0 align-middle">
             <thead class="text-body-tertiary">
               <tr>
-                <th style="width:36px;"><input class="form-check-input" type="checkbox" id="chkAll" aria-label="이 페이지 전체 선택"></th>
-                <th style="width:96px;">코드</th>
-                <th style="min-width:280px;">상품명</th>
-                <th style="width:120px;">부품 종류</th>
-                <th style="width:150px;">현재 카테고리</th>
-                <th class="text-end" style="width:100px;">판매가</th>
-                <th class="text-end" style="width:70px;">재고</th>
+                <th style="width:36px;" class="ps-3">
+                  <div class="form-check mb-0 fs-8">
+                    <input class="form-check-input" type="checkbox" id="chkAll"
+                           data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}'
+                           aria-label="이 페이지 전체 선택">
+                  </div>
+                </th>
+                <th class="sort" data-sort="code" style="width:96px;">코드</th>
+                <th class="sort" data-sort="name" style="min-width:280px;">상품명</th>
+                <th class="sort" data-sort="part" style="width:120px;">부품 종류</th>
+                <th class="sort" data-sort="cat" style="width:150px;">현재 카테고리</th>
+                <th class="sort text-end" data-sort="price" style="width:100px;">판매가</th>
+                <th class="sort text-end pe-3" data-sort="stock" style="width:70px;">재고</th>
               </tr>
             </thead>
-            <tbody id="rows" data-repeat="product"></tbody>
+            <tbody class="list" id="rows" data-repeat="product"></tbody>
           </table>
+        </div>
         </div>
       </div>
     </div>
@@ -423,7 +437,12 @@
   function syncBulk(){
     var c = selCount();
     document.getElementById("selCount").textContent = n(c);
-    document.getElementById("bulkBar").hidden = (c === 0);
+    // BulkSelect 는 카운터도 이벤트도 주지 않는다(액션바 d-none 토글만) — 상태를 우리가 맞춘다.
+    // deselectAll() 은 '토글'이라 선택이 없을 때 부르면 액션바가 오히려 나타난다.
+    var act = document.getElementById("bulk-actions");
+    act.classList.toggle("d-none", c === 0);
+    act.classList.toggle("d-flex", c > 0);
+    document.getElementById("bulk-replace").classList.toggle("d-none", c > 0);
     var hint = document.getElementById("moveHint");
     if(DATA && c > DATA.max_move){
       hint.textContent = "한 번에 " + n(DATA.max_move) + "건까지 옮깁니다 — 나머지는 다시 선택하세요";
@@ -434,15 +453,17 @@
     var warn = it.violates
       ? ' <span class="badge badge-phoenix badge-phoenix-warning fs-10">종류 다름</span>' : "";
     return '<tr>' +
-      '<td><input class="form-check-input" type="checkbox" data-pc="' + it.product_code + '"' +
-        (SEL[it.product_code] ? " checked" : "") + ' aria-label="선택"></td>' +
-      '<td style="font-family:var(--font-num,monospace);">' + it.product_code + '</td>' +
-      '<td>' + esc(it.name) + warn + '</td>' +
-      '<td>' + esc(it.part_label) + '</td>' +
-      '<td>' + (it.category ? esc(it.category)
+      '<td class="ps-3"><div class="form-check mb-0 fs-8">' +
+        '<input class="form-check-input" type="checkbox" data-pc="' + it.product_code + '"' +
+        ' data-bulk-select-row=\'{"code":' + it.product_code + '}\'' +
+        (SEL[it.product_code] ? " checked" : "") + ' aria-label="선택"></div></td>' +
+      '<td class="code" style="font-family:var(--font-num,monospace);">' + it.product_code + '</td>' +
+      '<td class="name">' + esc(it.name) + warn + '</td>' +
+      '<td class="part">' + esc(it.part_label) + '</td>' +
+      '<td class="cat">' + (it.category ? esc(it.category)
                             : '<span class="badge badge-phoenix badge-phoenix-warning fs-10">미매핑</span>') + '</td>' +
-      '<td class="text-end" style="font-family:var(--font-num,monospace);">' + n(it.sale_price) + '</td>' +
-      '<td class="text-end" style="font-family:var(--font-num,monospace);">' + n(it.stock_qty) + '</td>' +
+      '<td class="price text-end" style="font-family:var(--font-num,monospace);">' + n(it.sale_price) + '</td>' +
+      '<td class="stock text-end pe-3" style="font-family:var(--font-num,monospace);">' + n(it.stock_qty) + '</td>' +
       '</tr>';
   }
 
@@ -522,6 +543,8 @@
       });
     }
 
+    wireComponents();
+
     [].forEach.call(document.querySelectorAll("#scopeTabs button"), function(b){
       b.classList.toggle("active", b.getAttribute("data-scope") === STATE.scope);
     });
@@ -533,14 +556,28 @@
     syncBulk();
   }
 
+  var LIST = null, BULK = null;
+  function wireComponents(){
+    // listInit·bulkSelectInit 은 docReady 때 1회만 돈다. 우리 표는 fetch 뒤에 그려지므로
+    // 그 시점엔 존재하지 않는다 — 전역에 노출된 것으로 직접 붙인다.
+    var host = document.getElementById("prodList");
+    if(window.List && host){
+      if(!LIST){
+        try { LIST = new window.List(host, {valueNames:["code","name","part","cat","price","stock"]}); }
+        catch(e){ LIST = null; }
+      } else { try { LIST.reIndex(); } catch(e){} }
+    }
+    var head = document.getElementById("chkAll");
+    if(window.phoenix && window.phoenix.BulkSelect && head){
+      head.checked = false; head.indeterminate = false;
+      try { BULK = new window.phoenix.BulkSelect(head); BULK.init(); } catch(e){ BULK = null; }
+    }
+  }
+
   function load(){
     // 첫 호출은 scope를 모른다 — 서버에 물어 open_at을 받은 뒤 그 자리로 간다.
     var scope = STATE.scope || "all";
-    var cid = STATE.category_id;
-    if(scope === "unclassified"){
-      scope = "category";
-      cid = (DATA && DATA.unclassified_category_id) || cid;
-    }
+    var cid = STATE.category_id;   // unclassified 는 서버 범위라 치환하지 않는다
     var qs = "scope=" + encodeURIComponent(scope) +
       "&page=" + STATE.page + "&size=" + STATE.size +
       (cid ? "&category_id=" + cid : "") +
@@ -552,9 +589,6 @@
         DATA = d;
         if(STATE.scope === null){                 // 첫 로드 — 서버가 가리킨 곳으로 다시 간다
           STATE.scope = d.open_at || "all";
-          if(STATE.scope === "unclassified" && d.unclassified_category_id){
-            STATE.category_id = d.unclassified_category_id;
-          }
           return load();
         }
         render();
@@ -573,9 +607,6 @@
     if(!b) return;
     STATE.scope = b.getAttribute("data-scope");
     STATE.page = 1;
-    if(STATE.scope === "unclassified"){
-      STATE.category_id = DATA.unclassified_category_id || STATE.category_id;
-    }
     if(STATE.scope === "category" && !STATE.category_id){
       var fc = document.getElementById("fCat");
       STATE.category_id = fc.value ? parseInt(fc.value, 10)

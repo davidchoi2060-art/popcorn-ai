@@ -264,7 +264,7 @@
       <div class="content">
     <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0">
       <li class="breadcrumb-item"><a href="index.html">홈</a></li>
-      <li class="breadcrumb-item"><a href="#!">상품 관리</a></li>
+      <li class="breadcrumb-item"><a href="products.html">상품 관리</a></li>
       <li class="breadcrumb-item active">카테고리 관리</li>
     </ol></nav>
 
@@ -279,67 +279,146 @@
           부품 종류(엔진이 읽는 값)와 다른 축이라 <b>여기를 바꿔도 견적 결과는 달라지지 않습니다.</b>
         </p>
       </div>
-      <a href="products.html" class="btn btn-phoenix-secondary btn-sm">상품 관리 →</a>
+      <div class="d-flex gap-2">
+        <a href="category-mapping.html" class="btn btn-phoenix-secondary btn-sm">처리할 것부터 보기 →</a>
+        <button class="btn btn-primary btn-sm" type="button" id="btnAdd">+ 카테고리</button>
+      </div>
     </div>
 
-    <div class="row g-3 mb-3" id="summary" hidden>
-      <div class="col-6 col-md-3">
-        <div class="card h-100"><div class="card-body py-3">
-          <h6 class="text-body-tertiary fs-9 mb-1">카테고리</h6>
-          <p class="fs-6 mb-0 fw-bold" id="mCat">—</p>
-        </div></div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="card h-100"><div class="card-body py-3">
-          <h6 class="text-body-tertiary fs-9 mb-1">매핑된 상품</h6>
-          <p class="fs-6 mb-0 fw-bold" id="mMapped">—</p>
-        </div></div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="card h-100"><div class="card-body py-3">
-          <h6 class="text-body-tertiary fs-9 mb-1">미매핑</h6>
-          <p class="fs-6 mb-0 fw-bold" id="mUnmapped">—</p>
-          <p class="mb-0 fs-10 text-body-tertiary" id="mUnmappedLive">—</p>
-        </div></div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="card h-100"><div class="card-body py-3">
-          <h6 class="text-body-tertiary fs-9 mb-1">허용 종류 위반</h6>
-          <p class="fs-6 mb-0 fw-bold" id="mViol">—</p>
-          <p class="mb-0 fs-10 text-body-tertiary">막지 않고 알리기만 합니다</p>
-        </div></div>
+    <!-- 요약 — 트리는 **미매핑 상품을 보여줄 수 없다**(카테고리가 없으니 노드가 없다).
+         그래서 그 수는 여기서 말한다. 숫자는 전부 서버 응답만 쓴다(자리표시자로 시작). -->
+    <div class="card mb-3">
+      <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3 fs-9">
+        <span>분류 <b id="mCat">—</b></span>
+        <span class="text-body-tertiary">|</span>
+        <span>매핑된 상품 <b id="mMapped">—</b></span>
+        <span class="text-body-tertiary">|</span>
+        <span>미매핑 <b id="mUnmapped">—</b>
+          <span class="text-body-tertiary" id="mUnmappedLive">—</span></span>
+        <span class="text-body-tertiary">|</span>
+        <span>허용 종류 위반 <b id="mViol">—</b>
+          <span class="text-body-tertiary">(막지 않고 알리기만 합니다)</span></span>
+        <a href="category-mapping.html" class="ms-auto fs-10" id="lnkQueue" hidden>처리하러 가기 →</a>
       </div>
     </div>
 
     <div class="alert alert-subtle-info fs-9 py-2" role="alert" id="axisNote" hidden></div>
 
-    <div class="card mb-3">
-      <div class="card-header border-bottom border-translucent d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
-        <h5 class="mb-0 fs-8">분류 트리</h5>
-        <button class="btn btn-primary btn-sm" type="button" id="btnAdd">+ 카테고리 추가</button>
+    <div class="row g-3">
+      <!-- ── 좌: 카테고리 트리 (Phoenix treeview) ───────────────────────── -->
+      <div class="col-12 col-lg-4 col-xxl-3">
+        <div class="card h-100">
+          <div class="card-header border-bottom border-translucent py-2 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fs-8">분류 트리</h5>
+            <span class="fs-10 text-body-tertiary" id="treeMeta">—</span>
+          </div>
+          <div class="card-body py-2 px-2">
+            <div class="mb-2 px-1">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="fSubtree" checked>
+                <label class="form-check-label fs-10" for="fSubtree">하위 카테고리 상품까지 포함</label>
+              </div>
+            </div>
+            <div class="scrollbar" style="max-height:34rem;">
+              <ul class="mb-0 treeview" id="catTree"></ul>
+            </div>
+            <div class="fs-10 text-body-tertiary px-1 pt-2 border-top border-translucent mt-2">
+              배지는 <b>하위까지 합친 상품 수</b>입니다.
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-hover fs-9 mb-0 align-middle">
-            <thead class="text-body-tertiary">
-              <tr>
-                <th style="min-width:260px;">카테고리</th>
-                <th class="text-end" style="width:110px;">상품</th>
-                <th class="text-end" style="width:110px;">재고 있음</th>
-                <th style="width:200px;">허용 부품 종류</th>
-                <th class="text-center" style="width:80px;">노출</th>
-                <th class="text-end" style="width:80px;">정렬</th>
-                <th class="text-end" style="width:150px;">작업</th>
-              </tr>
-            </thead>
-            <tbody id="tree" data-repeat="category"></tbody>
-          </table>
+
+      <!-- ── 우: 선택한 카테고리의 상품 ─────────────────────────────────── -->
+      <div class="col-12 col-lg-8 col-xxl-9">
+        <div class="card h-100">
+          <div class="card-header border-bottom border-translucent py-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <h5 class="mb-0 fs-8" id="paneTitle">카테고리를 고르세요</h5>
+              <span class="badge badge-phoenix badge-phoenix-secondary fs-10" id="paneCount">—</span>
+              <div class="ms-auto d-flex align-items-center gap-2">
+                <button class="btn btn-phoenix-secondary btn-sm py-0 px-2 fs-10" type="button" id="btnEditCat" hidden>이 분류 수정</button>
+                <button class="btn btn-phoenix-danger btn-sm py-0 px-2 fs-10" type="button" id="btnDelCat" hidden>삭제</button>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-end gap-2 mt-2">
+              <div style="min-width:14rem;">
+                <label class="form-label fs-10 mb-1" for="fQ">상품명 · 상품코드</label>
+                <input class="form-control form-control-sm" id="fQ" type="search" placeholder="예: 케이블">
+              </div>
+              <div>
+                <label class="form-label fs-10 mb-1" for="fPt">부품 종류</label>
+                <select class="form-select form-select-sm" id="fPt"><option value="">전체</option></select>
+              </div>
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" id="fStock">
+                <label class="form-check-label fs-9" for="fStock">재고 있는 것만</label>
+              </div>
+              <button class="btn btn-phoenix-secondary btn-sm" type="button" id="btnSearch">검색</button>
+              <div class="ms-auto d-flex align-items-center gap-2">
+                <button class="btn btn-phoenix-secondary btn-sm py-0 px-2 fs-10" type="button" id="btnPrev">◀</button>
+                <span class="fs-9" id="pageLabel">—</span>
+                <button class="btn btn-phoenix-secondary btn-sm py-0 px-2 fs-10" type="button" id="btnNext">▶</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 일괄 이동 막대 — Phoenix bulk-select 의 actions/replacedElement 계약 -->
+          <div class="card-body py-2 border-bottom border-translucent">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <div id="bulk-replace">
+                <span class="fs-10 text-body-tertiary">행을 선택하면 다른 분류로 옮길 수 있습니다.</span>
+              </div>
+              <div class="d-none" id="bulk-actions">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <span class="fs-9"><b id="selCount">0</b>건 선택</span>
+                  <select class="form-select form-select-sm w-auto" id="moveTo"></select>
+                  <button class="btn btn-primary btn-sm" type="button" id="btnMove">옮기기</button>
+                  <button class="btn btn-link btn-sm p-0 fs-9" type="button" id="btnClear">해제</button>
+                </div>
+              </div>
+              <span class="fs-10 text-body-tertiary ms-auto" id="moveHint"></span>
+            </div>
+          </div>
+
+          <div class="card-body p-0">
+            <!-- data-list = 현재 페이지 안의 검색·정렬. 페이지 이동은 서버가 한다. -->
+            <div id="prodList" data-list='{"valueNames":["code","name","part","cat","price","stock"]}'>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover fs-9 mb-0 align-middle">
+                  <thead class="text-body-tertiary">
+                    <tr>
+                      <th style="width:36px;" class="ps-3">
+                        <div class="form-check mb-0 fs-8">
+                          <input class="form-check-input" type="checkbox" id="bulkHead"
+                                 data-bulk-select='{"body":"prodBody","actions":"bulk-actions","replacedElement":"bulk-replace"}'
+                                 aria-label="이 페이지 전체 선택">
+                        </div>
+                      </th>
+                      <th class="sort" data-sort="code" style="width:96px;">코드</th>
+                      <th class="sort" data-sort="name" style="min-width:260px;">상품명</th>
+                      <th class="sort" data-sort="part" style="width:120px;">부품 종류</th>
+                      <th class="sort" data-sort="cat" style="width:150px;">현재 분류</th>
+                      <th class="sort text-end" data-sort="price" style="width:100px;">판매가</th>
+                      <th class="sort text-end pe-3" data-sort="stock" style="width:70px;">재고</th>
+                    </tr>
+                  </thead>
+                  <tbody class="list" id="prodBody" data-repeat="product"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div id="fallback" class="alert alert-subtle-warning fs-9" role="alert">
+    <div id="fallback" class="alert alert-subtle-warning fs-9 mt-3" role="alert">
       카테고리를 불러오는 중입니다 — 서버에 연결되면 표시됩니다.
+    </div>
+
+    <div class="alert alert-subtle-primary fs-9 mt-3" id="undoBar" hidden>
+      <span id="undoMsg"></span>
+      <button class="btn btn-link btn-sm p-0 ms-2 fs-9" type="button" id="btnUndo">되돌리기</button>
     </div>
 
     <!-- 추가·수정 폼 -->
@@ -365,12 +444,15 @@
               <input class="form-control form-control-sm" id="fSort" type="number" value="0">
               <div class="form-text fs-10">작을수록 앞. 같으면 이름순.</div>
             </div>
+            <div class="mb-3 form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="fVisible" checked>
+              <label class="form-check-label fs-9" for="fVisible">고객에게 노출</label>
+            </div>
             <div class="mb-1">
               <label class="form-label fs-9" for="fTypes">허용 부품 종류 <span class="text-body-tertiary">(선택)</span></label>
               <select class="form-select form-select-sm" id="fTypes" multiple size="6"></select>
               <div class="form-text fs-10">
-                걸어 두면 다른 종류가 매핑됐을 때 <b>경고</b>합니다(막지는 않습니다).
-                비워 두면 제한 없음.
+                걸어 두면 다른 종류가 매핑됐을 때 <b>경고</b>합니다(막지는 않습니다). 비우면 제한 없음.
               </div>
             </div>
           </div>
@@ -385,13 +467,31 @@
       </div>
 <script>
 (function(){
-  // ADM-CAT-010 카테고리 관리 — 슬라이스 B.
-  // 화면은 숫자를 지어내지 않는다: 상품 수·미매핑·위반은 전부 서버 응답만 쓴다.
+  /* ADM-CAT-010 카테고리 관리 — 트리 + 상품 (슬라이스 F)
+   *
+   * Phoenix 컴포넌트를 **실제로** 쓴다. 다만 두 가지 제약이 있어 그만큼만 우리가 채운다:
+   *  ① treeviewInit·bulkSelectInit·listInit 은 docReady 때 **1회만** 돈다.
+   *     우리 트리·표는 fetch 뒤에 그려지므로 그 시점엔 존재하지 않는다.
+   *     → treeview: 접힘/펼침은 Bootstrap collapse 위임 핸들러가 처리하므로 동적이어도 된다.
+   *               treeviewInit 이 하던 `.treeview-row` prepend 만 우리가 대신한다.
+   *       bulk-select: window.phoenix.BulkSelect 가 노출돼 있어 렌더 후 new + init() 한다.
+   *       data-list: window.List 가 있어 렌더 후 생성하고, 이후에는 reIndex() 한다.
+   *  ② BulkSelect 는 '선택 n건' 카운터도, 선택 변경 이벤트도 제공하지 않는다(액션바 d-none
+   *     토글만 한다). → 카운터는 우리가 위임 클릭으로 센다.
+   *
+   * 화면은 숫자를 지어내지 않는다 — 건수·배지는 전부 서버 응답만 쓴다.
+   */
   var API = (location.protocol === "file:") ? "http://127.0.0.1:8000" : "";
-  var tree = document.getElementById("tree");
-  var fb   = document.getElementById("fallback");
-  var src  = document.getElementById("dataSrc");
-  var DATA = null, EDIT = null, modal = null;
+  var treeEl = document.getElementById("catTree");
+  var bodyEl = document.getElementById("prodBody");
+  var fb     = document.getElementById("fallback");
+  var src    = document.getElementById("dataSrc");
+
+  var CATS = null, CATNOTE = null, PARTS = [];
+  var SEL_CAT = null, EDIT = null, modal = null;
+  var LIST = null, BULK = null, LAST_LOG = null;
+  var PAGE = { page: 1, size: 100, pages: 1, total: 0 };
+  var SEL = {};   // product_code -> true (페이지를 넘어가도 유지)
 
   function esc(s){ return String(s==null?"":s).replace(/[<>&"]/g,
     function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; }); }
@@ -403,7 +503,7 @@
         "background:#333;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;max-width:80vw;";
       document.body.appendChild(t); }
     t.textContent=m; t.style.display="block";
-    clearTimeout(t.__h); t.__h=setTimeout(function(){ t.style.display="none"; }, 3200);
+    clearTimeout(t.__h); t.__h=setTimeout(function(){ t.style.display="none"; }, 4000);
   }
   function api(method, path, body){
     return fetch(API + path, {
@@ -418,92 +518,311 @@
     });
   }
 
-  // 부모→자식 배열. 서버가 sort_order·이름순으로 이미 정렬해 보낸다.
+  // ── 트리 ────────────────────────────────────────────────────────────
   function childrenOf(items){
     var by = {};
-    items.forEach(function(it){
-      var k = (it.parent_id == null) ? "root" : it.parent_id;
-      (by[k] = by[k] || []).push(it);
+    items.forEach(function(c){
+      var k = (c.parent_id == null) ? "root" : c.parent_id;
+      (by[k] = by[k] || []).push(c);
     });
     return by;
   }
 
-  function rowHtml(it, depth){
-    var pad = depth * 18;
-    var warn = it.violations > 0
-      ? ' <span class="badge badge-phoenix badge-phoenix-warning fs-10" title="허용 부품 종류를 벗어난 상품">위반 ' + n(it.violations) + '</span>'
-      : "";
-    var hidden = it.is_visible ? "" :
+  function nodeHtml(c, by, depth){
+    var kids = by[c.category_id] || [];
+    var id = "cat-node-" + c.category_id;
+    var badge = '<span class="treeview-badge">' + n(c.subtree_count) + '</span>';
+    var warn = c.violations > 0 ? '<span class="treeview-dot bg-warning"></span>' : "";
+    var hidden = c.is_visible ? "" :
       ' <span class="badge badge-phoenix badge-phoenix-secondary fs-10">숨김</span>';
-    var types = (it.allowed_labels && it.allowed_labels.length)
-      ? it.allowed_labels.map(function(t){
-          return '<span class="badge badge-phoenix badge-phoenix-info fs-10 me-1">'+esc(t)+'</span>'; }).join("")
-      : '<span class="text-body-quaternary fs-10">제한 없음</span>';
-    return '<tr data-cat="' + it.category_id + '">' +
-      '<td><span style="display:inline-block;width:' + pad + 'px;"></span>' +
-        (depth ? '<span class="text-body-quaternary me-1">└</span>' : '') +
-        '<span class="fw-semibold">' + esc(it.name) + '</span>' + hidden + warn + '</td>' +
-      '<td class="text-end" style="font-family:var(--font-num,monospace);">' + n(it.product_count) + '</td>' +
-      '<td class="text-end" style="font-family:var(--font-num,monospace);">' + n(it.in_stock_count) + '</td>' +
-      '<td>' + types + '</td>' +
-      '<td class="text-center">' +
-        '<button class="btn btn-link btn-sm p-0 fs-10" data-action="toggle" data-id="' + it.category_id + '">' +
-          (it.is_visible ? "노출" : "숨김") + '</button></td>' +
-      '<td class="text-end" style="font-family:var(--font-num,monospace);">' + it.sort_order + '</td>' +
-      '<td class="text-end">' +
-        '<button class="btn btn-phoenix-secondary btn-sm py-0 px-2 fs-10 me-1" data-action="edit" data-id="' + it.category_id + '">수정</button>' +
-        '<button class="btn btn-phoenix-danger btn-sm py-0 px-2 fs-10" data-action="del" data-id="' + it.category_id + '">삭제</button>' +
-      '</td></tr>';
+    var label = '<p class="treeview-text text-nowrap">' +
+      '<span class="fa-solid fa-' + (kids.length ? "folder" : "tag") + ' treeview-icon"></span>' +
+      esc(c.name) + hidden + badge + warn + '</p>';
+
+    if(kids.length){
+      // 폴더 노드 — 접힘은 Bootstrap collapse 위임 핸들러가 처리한다(동적 DOM에서도 된다).
+      // treeviewInit 이 안 도므로 data-show 대신 class="collapse show" 로 초기 펼침을 준다.
+      return '<li class="treeview-list-item">' +
+        '<a data-bs-toggle="collapse" href="#' + id + '" role="button" aria-expanded="' +
+          (depth === 0 ? "true" : "false") + '" data-cat="' + c.category_id + '">' + label + '</a>' +
+        '<ul class="collapse treeview-list' + (depth === 0 ? " show" : "") + '" id="' + id + '">' +
+          kids.map(function(k){ return nodeHtml(k, by, depth + 1); }).join("") +
+        '</ul></li>';
+    }
+    // 잎 노드
+    return '<li class="treeview-list-item">' +
+      '<div class="treeview-item"><a class="flex-1 ps-2 ms-2" href="#!" data-cat="' +
+        c.category_id + '">' + label + '</a></div></li>';
   }
 
-  function render(){
-    var items = DATA.items || [];
-    var by = childrenOf(items), html = "";
-    // 깊이는 저장하지 않고 그릴 때 센다 — 고정 깊이를 만들지 않기 위해서다.
+  function paintTree(){
+    var by = childrenOf(CATS);
+    treeEl.innerHTML = (by["root"] || []).map(function(c){ return nodeHtml(c, by, 0); }).join("");
+    // treeviewInit 이 하던 일 — 모든 항목 앞에 행 배경용 div 를 넣는다.
+    // (JS가 안 도는 상태로 두면 행 배경·hover 가 통째로 사라진다.)
+    [].forEach.call(treeEl.querySelectorAll(".treeview-list-item"), function(li){
+      if(!li.querySelector(":scope > .treeview-row")){
+        var row = document.createElement("div");
+        row.className = "treeview-row";
+        li.insertBefore(row, li.firstChild);
+      }
+    });
+    document.getElementById("treeMeta").textContent = n(CATS.length) + "개 분류";
+    markSelected();
+  }
+
+  function markSelected(){
+    [].forEach.call(treeEl.querySelectorAll("a[data-cat]"), function(a){
+      var on = SEL_CAT != null && String(SEL_CAT) === a.getAttribute("data-cat");
+      // treeview 에는 선택 상태 클래스가 없다(템플릿 확인). 우리가 만든다.
+      a.classList.toggle("fw-bold", on);
+      a.classList.toggle("text-primary", on);
+    });
+  }
+
+  // ── 상품 목록 ───────────────────────────────────────────────────────
+  function rowHtml(it){
+    var warn = it.violates
+      ? ' <span class="badge badge-phoenix badge-phoenix-warning fs-10">종류 다름</span>' : "";
+    return '<tr>' +
+      '<td class="ps-3"><div class="form-check mb-0 fs-8">' +
+        '<input class="form-check-input" type="checkbox" data-bulk-select-row=\'{"code":' +
+        it.product_code + '}\'' + (SEL[it.product_code] ? " checked" : "") + ' aria-label="선택"></div></td>' +
+      '<td class="code" style="font-family:var(--font-num,monospace);">' + it.product_code + '</td>' +
+      '<td class="name">' + esc(it.name) + warn + '</td>' +
+      '<td class="part">' + esc(it.part_label) + '</td>' +
+      '<td class="cat">' + (it.category ? esc(it.category)
+        : '<span class="badge badge-phoenix badge-phoenix-warning fs-10">미매핑</span>') + '</td>' +
+      '<td class="price text-end" style="font-family:var(--font-num,monospace);">' + n(it.sale_price) + '</td>' +
+      '<td class="stock text-end pe-3" style="font-family:var(--font-num,monospace);">' + n(it.stock_qty) + '</td>' +
+      '</tr>';
+  }
+
+  function wireComponents(){
+    // data-list — 처음 한 번 만들고 이후엔 다시 색인한다(list.js 에 destroy 가 없다).
+    var host = document.getElementById("prodList");
+    if(window.List){
+      if(!LIST){
+        try { LIST = new window.List(host, {valueNames:["code","name","part","cat","price","stock"]}); }
+        catch(e){ LIST = null; }
+      } else {
+        try { LIST.reIndex(); } catch(e){}
+      }
+    }
+    // bulk-select — window.phoenix.BulkSelect 로 렌더마다 다시 붙인다.
+    // (bulkSelectInit 은 docReady 1회라 우리 동적 표에는 닿지 않는다.)
+    var head = document.getElementById("bulkHead");
+    if(window.phoenix && window.phoenix.BulkSelect && head){
+      head.checked = false;
+      head.indeterminate = false;
+      try { BULK = new window.phoenix.BulkSelect(head); BULK.init(); } catch(e){ BULK = null; }
+    }
+    syncBulk();
+  }
+
+  function selCount(){ return Object.keys(SEL).length; }
+
+  function syncBulk(){
+    var c = selCount();
+    document.getElementById("selCount").textContent = n(c);
+    // BulkSelect 는 액션바를 토글만 한다(카운터도 이벤트도 없다). 상태를 우리가 강제한다 —
+    // deselectAll() 은 '토글'이라 선택이 없을 때 부르면 액션바가 오히려 나타난다.
+    document.getElementById("bulk-actions").classList.toggle("d-none", c === 0);
+    document.getElementById("bulk-replace").classList.toggle("d-none", c > 0);
+    document.getElementById("moveHint").textContent =
+      (CATNOTE && c > MAXMOVE) ? ("한 번에 " + n(MAXMOVE) + "건까지 옮깁니다") : "";
+  }
+  var MAXMOVE = 2000;
+
+  function paintProducts(d){
+    bodyEl.innerHTML = (d.items || []).map(rowHtml).join("") ||
+      '<tr><td colspan="7" class="text-center text-body-tertiary py-4">해당하는 상품이 없습니다.</td></tr>';
+    PAGE = {page:d.page, size:d.size, pages:d.pages||1, total:d.total};
+    document.getElementById("paneCount").textContent =
+      "전체 " + n(d.total) + "건 중 " + n((d.items||[]).length) + "건";
+    document.getElementById("pageLabel").textContent = n(d.page) + " / " + n(d.pages||1);
+    document.getElementById("btnPrev").disabled = (d.page <= 1);
+    document.getElementById("btnNext").disabled = (d.page >= (d.pages||1));
+    MAXMOVE = d.max_move || 2000;
+
+    var mv = document.getElementById("moveTo"), keep = mv.value;
+    mv.innerHTML = catOptions();
+    if(keep) mv.value = keep;
+
+    var pt = document.getElementById("fPt");
+    if(pt.options.length <= 1 && PARTS.length){
+      PARTS.forEach(function(p){
+        pt.insertAdjacentHTML("beforeend",
+          '<option value="' + esc(p.key) + '">' + esc(p.label) + '</option>');
+      });
+    }
+    wireComponents();
+  }
+
+  function catOptions(){
+    var by = childrenOf(CATS), out = [];
     (function walk(key, depth){
-      (by[key] || []).forEach(function(it){
-        html += rowHtml(it, depth);
-        walk(it.category_id, depth + 1);
+      (by[key] || []).forEach(function(c){
+        out.push('<option value="' + c.category_id + '">' +
+          new Array(depth + 1).join("　") + esc(c.name) + ' (' + n(c.product_count) + ')</option>');
+        walk(c.category_id, depth + 1);
       });
     })("root", 0);
-    tree.innerHTML = html || '<tr><td colspan="7" class="text-center text-body-tertiary py-4">카테고리가 없습니다 — 추가해 주세요.</td></tr>';
-
-    var mapped = items.reduce(function(a, b){ return a + (b.product_count || 0); }, 0);
-    var viol   = items.reduce(function(a, b){ return a + (b.violations || 0); }, 0);
-    document.getElementById("mCat").textContent = n(items.length);
-    document.getElementById("mMapped").textContent = n(mapped);
-    document.getElementById("mUnmapped").textContent = n(DATA.unmapped);
-    document.getElementById("mUnmappedLive").textContent =
-      "재고 있는 것 " + n(DATA.unmapped_in_stock) + "건";
-    document.getElementById("mViol").textContent = n(viol);
-    document.getElementById("summary").hidden = false;
-    if(DATA.note){
-      var a = document.getElementById("axisNote");
-      a.textContent = DATA.note.replace(/\*\*/g, "");
-      a.hidden = false;
-    }
-    fb.hidden = true;
-    src.textContent = "LIVE";
-    src.className = "badge badge-phoenix badge-phoenix-success align-middle fs-10";
+    return out.join("");
   }
 
+  function loadProducts(){
+    if(SEL_CAT == null){ return Promise.resolve(); }
+    var sub = document.getElementById("fSubtree").checked;
+    var qs = "scope=" + (sub ? "subtree" : "category") + "&category_id=" + SEL_CAT +
+      "&page=" + PAGE.page + "&size=" + PAGE.size +
+      (document.getElementById("fQ").value.trim()
+        ? "&q=" + encodeURIComponent(document.getElementById("fQ").value.trim()) : "") +
+      (document.getElementById("fPt").value
+        ? "&part_type=" + encodeURIComponent(document.getElementById("fPt").value) : "") +
+      (document.getElementById("fStock").checked ? "&in_stock=true" : "");
+    return api("GET", "/api/admin/category-mapping?" + qs)
+      .then(paintProducts)
+      .catch(function(e){ toast(e.message); });
+  }
+
+  function selectCat(cid){
+    SEL_CAT = cid;
+    PAGE.page = 1;
+    var c = CATS.filter(function(x){ return x.category_id === cid; })[0];
+    document.getElementById("paneTitle").textContent = c ? c.name : "—";
+    document.getElementById("btnEditCat").hidden = false;
+    document.getElementById("btnDelCat").hidden = false;
+    markSelected();
+    return loadProducts();
+  }
+
+  // ── 로드 ────────────────────────────────────────────────────────────
+  function loadTree(keep){
+    return api("GET", "/api/admin/categories").then(function(d){
+      CATS = d.items || [];
+      PARTS = d.part_types || [];
+      CATNOTE = d.note;
+      if(d.note){
+        var a = document.getElementById("axisNote");
+        a.textContent = d.note.replace(/\*\*/g, "");
+        a.hidden = false;
+      }
+      paintTree();
+      document.getElementById("mCat").textContent = n(CATS.length);
+      document.getElementById("mMapped").textContent =
+        n(CATS.reduce(function(a,c){ return a + (c.product_count||0); }, 0));
+      document.getElementById("mUnmapped").textContent = n(d.unmapped);
+      document.getElementById("mUnmappedLive").textContent =
+        "(재고 있는 것 " + n(d.unmapped_in_stock) + ")";
+      document.getElementById("mViol").textContent =
+        n(CATS.reduce(function(a,c){ return a + (c.violations||0); }, 0));
+      document.getElementById("lnkQueue").hidden = !(d.unmapped > 0);
+      fb.hidden = true;
+      src.textContent = "LIVE";
+      src.className = "badge badge-phoenix badge-phoenix-success align-middle fs-10";
+      if(!keep){
+        // 처음엔 상품이 가장 많은 최상위를 연다 — 빈 화면으로 열지 않는다.
+        var roots = CATS.filter(function(c){ return c.parent_id == null; })
+                        .sort(function(a,b){ return b.subtree_count - a.subtree_count; });
+        if(roots.length) return selectCat(roots[0].category_id);
+      }
+      if(SEL_CAT != null) return loadProducts();
+    }).catch(function(e){
+      fb.textContent = "카테고리를 불러오지 못했습니다 — " + e.message;
+      fb.hidden = false;
+      src.textContent = "연결 안 됨";
+      src.className = "badge badge-phoenix badge-phoenix-warning align-middle fs-10";
+    });
+  }
+
+  // ── 이벤트 ──────────────────────────────────────────────────────────
+  treeEl.addEventListener("click", function(e){
+    var a = e.target.closest("a[data-cat]");
+    if(!a) return;
+    // 폴더 노드는 Bootstrap collapse 도 함께 돈다 — 접힘은 그대로 두고 선택만 얹는다.
+    selectCat(parseInt(a.getAttribute("data-cat"), 10));
+  });
+
+  bodyEl.addEventListener("change", function(e){
+    var cb = e.target.closest("[data-bulk-select-row]");
+    if(!cb) return;
+    var v = JSON.parse(cb.getAttribute("data-bulk-select-row"));
+    if(cb.checked){ SEL[v.code] = true; } else { delete SEL[v.code]; }
+    syncBulk();
+  });
+  document.getElementById("bulkHead").addEventListener("change", function(){
+    var on = this.checked;
+    [].forEach.call(bodyEl.querySelectorAll("[data-bulk-select-row]"), function(cb){
+      cb.checked = on;
+      var v = JSON.parse(cb.getAttribute("data-bulk-select-row"));
+      if(on){ SEL[v.code] = true; } else { delete SEL[v.code]; }
+    });
+    syncBulk();
+  });
+  document.getElementById("btnClear").addEventListener("click", function(){
+    SEL = {};
+    [].forEach.call(bodyEl.querySelectorAll("[data-bulk-select-row]"), function(cb){ cb.checked = false; });
+    var h = document.getElementById("bulkHead"); h.checked = false; h.indeterminate = false;
+    syncBulk();
+  });
+
+  document.getElementById("btnSearch").addEventListener("click", function(){ PAGE.page = 1; loadProducts(); });
+  document.getElementById("fQ").addEventListener("keydown", function(e){
+    if(e.key === "Enter"){ document.getElementById("btnSearch").click(); }
+  });
+  document.getElementById("fPt").addEventListener("change", function(){ PAGE.page = 1; loadProducts(); });
+  document.getElementById("fStock").addEventListener("change", function(){ PAGE.page = 1; loadProducts(); });
+  document.getElementById("fSubtree").addEventListener("change", function(){ PAGE.page = 1; loadProducts(); });
+  document.getElementById("btnPrev").addEventListener("click", function(){
+    if(PAGE.page > 1){ PAGE.page--; loadProducts(); } });
+  document.getElementById("btnNext").addEventListener("click", function(){
+    if(PAGE.page < PAGE.pages){ PAGE.page++; loadProducts(); } });
+
+  document.getElementById("btnMove").addEventListener("click", function(){
+    var codes = Object.keys(SEL).map(Number);
+    var cid = parseInt(document.getElementById("moveTo").value, 10);
+    if(!codes.length){ toast("옮길 상품을 선택하세요"); return; }
+    if(!cid){ toast("옮길 분류를 고르세요"); return; }
+    var nm = document.getElementById("moveTo").selectedOptions[0].textContent.trim();
+    if(!confirm(n(codes.length) + "건을 '" + nm + "'(으)로 옮길까요?\n옮긴 뒤 되돌릴 수 있습니다.")) return;
+    api("POST", "/api/admin/category-mapping/move", { product_codes: codes, category_id: cid })
+      .then(function(d){
+        toast(d.verdict);
+        LAST_LOG = d.log_id;
+        document.getElementById("undoMsg").textContent = d.verdict;
+        document.getElementById("undoBar").hidden = false;
+        SEL = {};
+        return loadTree(true);
+      }).catch(function(e){ toast(e.message); });
+  });
+  document.getElementById("btnUndo").addEventListener("click", function(){
+    if(!LAST_LOG) return;
+    api("POST", "/api/admin/category-mapping/undo", { log_id: LAST_LOG })
+      .then(function(d){
+        toast(d.verdict); LAST_LOG = null;
+        document.getElementById("undoBar").hidden = true;
+        return loadTree(true);
+      }).catch(function(e){ toast(e.message); });
+  });
+
+  // ── 카테고리 편집 ───────────────────────────────────────────────────
   function fillForm(it){
     EDIT = it;
     document.getElementById("mTitle").textContent = it ? "카테고리 수정" : "카테고리 추가";
     document.getElementById("fName").value = it ? it.name : "";
     document.getElementById("fSort").value = it ? it.sort_order : 0;
+    document.getElementById("fVisible").checked = it ? !!it.is_visible : true;
 
-    var sel = document.getElementById("fParent");
-    // 자기 자신과 자기 자손은 상위로 고를 수 없다 — 트리가 고리가 된다.
     var banned = {};
     if(it){
       banned[it.category_id] = 1;
-      var by = childrenOf(DATA.items);
+      var by = childrenOf(CATS);
       (function mark(id){ (by[id] || []).forEach(function(c){ banned[c.category_id]=1; mark(c.category_id); }); })(it.category_id);
     }
     var opts = ['<option value="">(최상위)</option>'];
     (function walk(key, depth){
-      (childrenOf(DATA.items)[key] || []).forEach(function(c){
+      (childrenOf(CATS)[key] || []).forEach(function(c){
         if(!banned[c.category_id]){
           opts.push('<option value="' + c.category_id + '">' +
             new Array(depth + 1).join("　") + esc(c.name) + '</option>');
@@ -511,13 +830,13 @@
         walk(c.category_id, depth + 1);
       });
     })("root", 0);
+    var sel = document.getElementById("fParent");
     sel.innerHTML = opts.join("");
     sel.value = (it && it.parent_id != null) ? String(it.parent_id) : "";
 
-    var ts = document.getElementById("fTypes");
-    var have = {};
-    (it && it.allowed_part_types || []).forEach(function(t){ have[t] = 1; });
-    ts.innerHTML = (DATA.part_types || []).map(function(p){
+    var ts = document.getElementById("fTypes"), have = {};
+    ((it && it.allowed_part_types) || []).forEach(function(t){ have[t] = 1; });
+    ts.innerHTML = PARTS.map(function(p){
       return '<option value="' + esc(p.key) + '"' + (have[p.key] ? " selected" : "") + '>' +
              esc(p.label) + '</option>'; }).join("");
 
@@ -525,70 +844,51 @@
     modal.show();
   }
 
-  function save(){
-    var name   = document.getElementById("fName").value.trim();
-    var parent = document.getElementById("fParent").value;
-    var sort   = parseInt(document.getElementById("fSort").value, 10) || 0;
-    var types  = Array.prototype.slice.call(document.getElementById("fTypes").selectedOptions)
-                   .map(function(o){ return o.value; });
-    if(!name){ toast("카테고리 이름을 입력하세요"); return; }
+  document.getElementById("btnAdd").addEventListener("click", function(){ fillForm(null); });
+  document.getElementById("btnEditCat").addEventListener("click", function(){
+    var c = CATS.filter(function(x){ return x.category_id === SEL_CAT; })[0];
+    if(c) fillForm(c);
+  });
+  document.getElementById("btnDelCat").addEventListener("click", function(){
+    var c = CATS.filter(function(x){ return x.category_id === SEL_CAT; })[0];
+    if(!c) return;
+    if(!confirm("'" + c.name + "' 분류를 지울까요?\n상품이나 하위가 있으면 거부됩니다.")) return;
+    api("DELETE", "/api/admin/categories/" + c.category_id)
+      .then(function(d){ toast(d.verdict); SEL_CAT = null;
+        document.getElementById("btnEditCat").hidden = true;
+        document.getElementById("btnDelCat").hidden = true;
+        return loadTree(false); })
+      .catch(function(e){ toast(e.message); });
+  });
 
+  document.getElementById("btnSave").addEventListener("click", function(){
+    var name = document.getElementById("fName").value.trim();
+    var parent = document.getElementById("fParent").value;
+    var sort = parseInt(document.getElementById("fSort").value, 10) || 0;
+    var vis = document.getElementById("fVisible").checked;
+    var types = Array.prototype.slice.call(document.getElementById("fTypes").selectedOptions)
+                  .map(function(o){ return o.value; });
+    if(!name){ toast("카테고리 이름을 입력하세요"); return; }
     var p;
     if(EDIT){
-      var body = { name: name, sort_order: sort };
-      if(parent === "") { body.move_to_root = true; } else { body.parent_id = parseInt(parent, 10); }
-      if(types.length) { body.allowed_part_types = types; } else { body.clear_part_types = true; }
+      var body = { name: name, sort_order: sort, is_visible: vis };
+      if(parent === ""){ body.move_to_root = true; } else { body.parent_id = parseInt(parent, 10); }
+      if(types.length){ body.allowed_part_types = types; } else { body.clear_part_types = true; }
       p = api("PATCH", "/api/admin/categories/" + EDIT.category_id, body);
     }else{
       p = api("POST", "/api/admin/categories", {
         name: name, sort_order: sort,
         parent_id: parent === "" ? null : parseInt(parent, 10),
-        allowed_part_types: types.length ? types : null
-      });
+        allowed_part_types: types.length ? types : null });
     }
-    p.then(function(d){ modal.hide(); toast(d.verdict || "저장했습니다"); return load(); })
+    p.then(function(d){ modal.hide(); toast(d.verdict || "저장했습니다"); return loadTree(true); })
      .catch(function(e){ toast(e.message); });
-  }
+  });
 
-  function onAction(e){
-    var b = e.target.closest("button[data-action]");
-    if(!b) return;
-    var id = parseInt(b.getAttribute("data-id"), 10);
-    var it = (DATA.items || []).filter(function(x){ return x.category_id === id; })[0];
-    if(!it) return;
-    var act = b.getAttribute("data-action");
-
-    if(act === "edit"){ fillForm(it); return; }
-    if(act === "toggle"){
-      api("PATCH", "/api/admin/categories/" + id, { is_visible: !it.is_visible })
-        .then(function(d){ toast(d.verdict || "바꿨습니다"); return load(); })
-        .catch(function(e){ toast(e.message); });
-      return;
-    }
-    if(act === "del"){
-      if(!confirm("'" + it.name + "' 카테고리를 지울까요?\n상품이나 하위가 있으면 거부됩니다.")) return;
-      api("DELETE", "/api/admin/categories/" + id)
-        .then(function(d){ toast(d.verdict || "지웠습니다"); return load(); })
-        .catch(function(e){ toast(e.message); });
-    }
-  }
-
-  function load(){
-    return api("GET", "/api/admin/categories").then(function(d){ DATA = d; render(); })
-      .catch(function(e){
-        fb.textContent = "카테고리를 불러오지 못했습니다 — " + e.message;
-        fb.hidden = false;
-        src.textContent = "연결 안 됨";
-        src.className = "badge badge-phoenix badge-phoenix-warning align-middle fs-10";
-      });
-  }
-
-  document.getElementById("btnAdd").addEventListener("click", function(){ fillForm(null); });
-  document.getElementById("btnSave").addEventListener("click", save);
-  tree.addEventListener("click", onAction);
-  load();
+  loadTree(false);
 })();
 </script>
+
 
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
         <div class="modal-dialog">

@@ -1334,6 +1334,16 @@ def test_category_mapping():
         check("전체 수 = DB 실측", counts.get("all_products") == live[2], live[2],
               counts.get("all_products"))
 
+    # **탭이 말하는 수 = 그 탭을 눌렀을 때 나오는 수.**
+    # 예전엔 'unclassified' 가 서버 범위가 아니라 화면이 카테고리 id로 치환하는 값이었고,
+    # 그 id는 "allowed_part_types 가 정확히 ['ETC']인 첫 카테고리"였다. 미분류를 갈라내며
+    # 그 조건에 맞는 카테고리가 13개가 되자 탭은 5,148을 말하고 목록은 1,668을 보여줬다.
+    for _sc, _k in (("unmapped", "unmapped"), ("violation", "violation"),
+                    ("unclassified", "unclassified"), ("all", "all_products")):
+        _d = get("/api/admin/category-mapping?scope=%s&size=1" % _sc)
+        check("탭 '%s' 의 수 = 그 범위의 실제 건수" % _sc,
+              _d.get("total") == counts.get(_k), counts.get(_k), _d.get("total"))
+
     # 목록은 서버 페이지네이션이다 — 전 행을 보내면 안 된다(22,838건)
     d2 = get("/api/admin/category-mapping?scope=all&size=10&page=2")
     check("페이지 크기를 지킨다", len(d2.get("items") or []) <= 10, "<= 10",
@@ -1618,6 +1628,82 @@ def test_reprice():
         check("화면이 오름·내림을 따로 그린다",
               "mUpSum" in _h and "mDownSum" in _h, True,
               "mUpSum" in _h and "mDownSum" in _h)
+
+def test_template_usage():
+    """[37] Phoenix 템플릿을 실제로 쓰는가 (슬라이스 F)
+
+    2026-08-05 사용자 지적: "라이선스를 구매한 부트스트랩 UI를 전혀 활용하지 못하는 것 같다."
+    실사해 보니 맞았다 — **템플릿 컴포넌트를 실제로 초기화하는 화면이 0개**였다.
+    `data-list`는 35화면에 있었지만 전부 셸 상단 검색창이었고, `data-bulk-select`·echarts·
+    wizard·accordion은 `_demo-products.html`(템플릿 잔재라 화면이 아닌 파일)에만 있었다.
+
+    가장 아팠던 것: `phoenix.js`에 `treeviewInit`이 있고 `theme.min.css`에 treeview 스타일이
+    전부 있는데, 카테고리 트리를 `<table>`에 `<span style="width:18px">`로 들여쓰기를 흉내 내
+    만들고 있었다. **쓸 수 있는 트리가 이미 저장소 안에 있었다.**
+
+    여기서 지키는 것: 손으로 다시 만들지 않는다. 자세한 실사는
+    `docs/design/phoenix-audit-2026-08-05.md`.
+    """
+    print(chr(10) + "[37] Phoenix 템플릿을 실제로 쓰는가 (슬라이스 F)")
+    import glob as _g7
+    import re as _re11
+
+    admin = os.path.join(ROOT, "mockups", "admin")
+    def read(name):
+        p = os.path.join(admin, name)
+        return io.open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+
+    cat = read("categories.html")
+    check("카테고리 화면이 treeview 마크업을 쓴다",
+          'class="mb-0 treeview"' in cat or 'class="treeview"' in cat, True,
+          "treeview" in cat)
+    check("트리가 손으로 만든 들여쓰기가 아니다",
+          "treeview-list-item" in cat and 'style="display:inline-block;width:' not in cat,
+          True, "treeview-list-item" in cat)
+    check("트리 노드에 개수 배지가 있다", "treeview-badge" in cat, True, "treeview-badge" in cat)
+    # 상위 노드는 직접 상품이 0건인 게 보통이다 — 배지가 직접 수면 13,308건짜리가 "0"으로 보인다
+    check("배지가 자손 합계를 쓴다", "subtree_count" in cat, True, "subtree_count" in cat)
+    check("상위 노드를 누르면 하위까지 본다(scope=subtree)", "subtree" in cat, True,
+          "subtree" in cat)
+    check("표에 data-list(검색·정렬)를 건다", 'id="prodList" data-list=' in cat, True,
+          'id="prodList" data-list=' in cat)
+    # class="sort" 와 class="sort text-end" 를 모두 센다 — 앞의 것만 세면 4개로 보인다
+    _nsort = len(_re11.findall(r'class="sort[ "]', cat))
+    check("정렬 헤더가 있다", _nsort >= 5, ">= 5", _nsort)
+    check("일괄 선택은 Phoenix bulk-select를 쓴다",
+          "data-bulk-select=" in cat and "data-bulk-select-row=" in cat, True,
+          "data-bulk-select=" in cat)
+    # 컴포넌트는 docReady 1회만 붙는다 — 동적 렌더면 우리가 다시 붙여야 한다
+    check("동적 렌더 뒤 컴포넌트를 다시 붙인다",
+          "phoenix.BulkSelect" in cat and ("new window.List" in cat or "reIndex" in cat),
+          True, "phoenix.BulkSelect" in cat)
+
+    # 참조하는 vendor는 실제로 있어야 한다(없으면 조용히 안 붙는다)
+    vend = os.path.join(admin, "vendors")
+    have = set(os.listdir(vend)) if os.path.isdir(vend) else set()
+    NEED = {"data-choices": "choices", "data-echarts": "echarts", "data-countup": "countup",
+            "data-nouislider": "nouislider", "data-rater": "rater-js",
+            "data-sortable": "sortablejs", "data-calendar": "fullcalendar"}
+    missing = []
+    for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
+        if os.path.basename(_p).startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        for hook, v in NEED.items():
+            if hook in _s and v not in have:
+                missing.append(f"{os.path.basename(_p)}:{hook}->{v}")
+    check("vendor 없는 훅을 선언하지 않는다", missing == [], [], missing)
+
+    # 손으로 만든 전체선택이 남아 있지 않은가 — 있으면 컴포넌트를 또 베낀 것이다
+    handrolled = []
+    for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if 'id="chkAll"' in _s and "data-bulk-select" not in _s:
+            handrolled.append(_n)
+    check("전체선택을 손으로 만든 화면이 없다", handrolled == [], [], handrolled)
 
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
@@ -3577,6 +3663,7 @@ def main():
                test_category_mapping,
                test_category_isolation,
                test_reprice,
+               test_template_usage,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

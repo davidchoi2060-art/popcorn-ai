@@ -62,10 +62,19 @@ def _clean_types(v):
 
 
 def _rows(conn):
+    # n_sub = 자손까지 합친 수. **트리 배지는 이 값을 써야 한다** — 상위 노드는 직접 상품이
+    # 0건인 게 보통이라, 직접 수를 배지에 쓰면 13,308건을 담은 `부품`이 "0"으로 보인다
+    # (슬라이스 C에서 화면이 빈 채로 열린 것과 같은 함정).
     return conn.execute(text(
         "SELECT c.category_id, c.parent_id, c.name, c.sort_order, c.is_visible,"
         "       c.allowed_part_types, c.created_at, c.updated_at,"
         "       (SELECT count(*) FROM products p WHERE p.category_id = c.category_id) AS n,"
+        "       (SELECT count(*) FROM products p WHERE p.category_id IN ("
+        "          WITH RECURSIVE t AS ("
+        "            SELECT category_id FROM categories WHERE category_id = c.category_id"
+        "            UNION ALL"
+        "            SELECT c2.category_id FROM categories c2 JOIN t ON c2.parent_id = t.category_id"
+        "          ) SELECT category_id FROM t)) AS n_sub,"
         "       (SELECT count(*) FROM products p WHERE p.category_id = c.category_id"
         "          AND p.stock_qty > 0) AS n_stock"
         "  FROM categories c ORDER BY c.sort_order, c.name")).mappings().all()
@@ -108,7 +117,8 @@ def categories():
         "sort_order": r["sort_order"], "is_visible": r["is_visible"],
         "allowed_part_types": r["allowed_part_types"],
         "allowed_labels": [PART_LABELS.get(t, t) for t in (r["allowed_part_types"] or [])],
-        "product_count": r["n"], "in_stock_count": r["n_stock"],
+        "product_count": r["n"], "subtree_count": r["n_sub"],
+        "in_stock_count": r["n_stock"],
         "violations": viol.get(r["category_id"], 0),
         "created_at": iso(r["created_at"]), "updated_at": iso(r["updated_at"]),
     } for r in rows]

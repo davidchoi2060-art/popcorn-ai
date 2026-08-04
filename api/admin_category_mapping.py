@@ -56,7 +56,19 @@ _WHERE = {
     "unmapped":  "p.category_id IS NULL",
     "violation": ("p.category_id IS NOT NULL AND c.allowed_part_types IS NOT NULL"
                   " AND NOT (c.allowed_part_types @> to_jsonb(p.part_type))"),
+    # 적재가 부품 종류를 못 정한 것. **카테고리가 아니라 part_type 으로 센다** —
+    # 예전엔 "allowed_part_types 가 정확히 ['ETC'] 인 카테고리"를 찾아 그 id를 줬는데,
+    # 미분류를 갈라내며 그 조건에 맞는 카테고리가 13개가 되자 첫 번째(쿨링·튜닝)를 가리켰다.
+    # 탭은 5,148이라 말하고 목록은 1,668을 보여주는 상태였다(2026-08-05 발견).
+    "unclassified": "p.part_type = 'ETC'",
     "category":  "p.category_id = :cid",
+    # 트리에서 상위 노드를 누르면 그 아래 전부를 본다. 재귀 CTE로 자손을 모은다 —
+    # 깊이를 저장하지 않기로 했으므로(슬라이스 B) 질의 때마다 훑는 것이 맞다.
+    "subtree":   ("p.category_id IN (WITH RECURSIVE t AS ("
+                  "   SELECT category_id FROM categories WHERE category_id = :cid"
+                  "   UNION ALL"
+                  "   SELECT c2.category_id FROM categories c2 JOIN t ON c2.parent_id = t.category_id"
+                  " ) SELECT category_id FROM t)"),
     "all":       "TRUE",
 }
 
@@ -79,7 +91,7 @@ def mapping(scope: str = "unmapped", category_id: int | None = None, q: str = ""
             part_type: str = "", in_stock: bool = False, page: int = 1, size: int = 100):
     if scope not in _WHERE:
         raise HTTPException(400, "알 수 없는 범위입니다")
-    if scope == "category" and category_id is None:
+    if scope in ("category", "subtree") and category_id is None:
         raise HTTPException(400, "카테고리를 선택하세요")
     size = max(1, min(size, MAX_PAGE))
     page = max(1, page)
@@ -110,10 +122,22 @@ def mapping(scope: str = "unmapped", category_id: int | None = None, q: str = ""
             "         AS unclassified_stock,"
             "       count(*) AS all_products"
             f" FROM products p{join}")).mappings().one()
+        # n = 이 카테고리 직접 · n_sub = 자손까지 합친 수.
+        # 트리 배지는 **자손 합계**를 보여야 한다 — 상위 노드에 0이 뜨면 비어 보이는데
+        # 실제로는 아래에 수천 건이 있을 수 있다(슬라이스 C에서 빈 화면으로 열린 것과 같은 함정).
         cats = conn.execute(text(
-            "SELECT category_id, parent_id, name, allowed_part_types,"
-            "       (SELECT count(*) FROM products x WHERE x.category_id = c.category_id) n"
-            " FROM categories c ORDER BY sort_order, name")).mappings().all()
+            "SELECT c.category_id, c.parent_id, c.name, c.allowed_part_types, c.is_visible,"
+            "       c.sort_order,"
+            "       (SELECT count(*) FROM products x WHERE x.category_id = c.category_id) n,"
+            "       (SELECT count(*) FROM products x WHERE x.category_id IN ("
+            "          WITH RECURSIVE t AS ("
+            "            SELECT category_id FROM categories WHERE category_id = c.category_id"
+            "            UNION ALL"
+            "            SELECT c2.category_id FROM categories c2 JOIN t ON c2.parent_id = t.category_id"
+            "          ) SELECT category_id FROM t)) n_sub,"
+            "       (SELECT count(*) FROM products x WHERE x.category_id = c.category_id"
+            "          AND x.stock_qty > 0) n_stock"
+            " FROM categories c ORDER BY c.sort_order, c.name")).mappings().all()
 
     items = [{
         "product_code": r["product_code"], "name": r["product_name"],
@@ -136,12 +160,12 @@ def mapping(scope: str = "unmapped", category_id: int | None = None, q: str = ""
         "open_at": ("unmapped" if counts["unmapped"] else
                     "violation" if counts["violation"] else
                     "unclassified" if counts["unclassified"] else "all"),
-        "unclassified_category_id": next(
-            (c["category_id"] for c in cats
-             if (c["allowed_part_types"] or []) == ["ETC"]), None),
+        # unclassified 는 이제 서버 범위다 — 화면이 카테고리 id로 치환할 필요가 없다.
         "categories": [{"category_id": c["category_id"], "parent_id": c["parent_id"],
                         "name": c["name"], "allowed_part_types": c["allowed_part_types"],
-                        "product_count": c["n"]} for c in cats],
+                        "is_visible": c["is_visible"], "sort_order": c["sort_order"],
+                        "product_count": c["n"], "subtree_count": c["n_sub"],
+                        "in_stock_count": c["n_stock"]} for c in cats],
         "max_move": MAX_MOVE,
         "note": ("목록은 서버에서 걸러 페이지로 나눕니다 — 위 건수는 현재 페이지가 아니라"
                  " 조건 전체입니다. 허용 부품 종류를 어기는 이동도 **막지 않습니다**;"
