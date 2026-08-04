@@ -1291,6 +1291,96 @@ def test_categories():
               bool(holder) and not _re9.search(r"\d", holder.group(1)),
               "숫자 없음", holder.group(1) if holder else "(없음)")
 
+def test_category_mapping():
+    """[34] 상품 카테고리 매핑 — 남은 일을 화면이 먼저 말한다 (슬라이스 C)
+
+    슬라이스 B가 part_type 17종을 1단으로 깔아 전량 매핑됐지만, **`미분류` 하나에
+    5,148건(재고>0 2,415건)이 몰려 있다.** 그 안에는 케이블·마우스패드·캡처보드·확장카드·
+    시스템팬·그래픽카드 지지대, 그리고 PC와 무관한 "한경희 미니 건조기"까지 들어 있다.
+
+    기존 임대 관리자는 미매핑 1,458건을 별도 화면에 두고 방치했다. 여기서는 **서버가
+    일이 있는 곳을 가리키고**(`open_at`) 화면이 거기로 연다 — 기본 탭이 늘 비어 있으면
+    운영자는 할 일이 없다고 읽는다.
+
+    쓰기 경로는 **가드만** 확인한다(회귀는 정본을 바꾸지 않는다 — 슬라이스 50 전례).
+    """
+    print(chr(10) + "[34] 상품 카테고리 매핑 — 남은 일을 화면이 먼저 말한다 (슬라이스 C)")
+    import re as _re10
+
+    d = get("/api/admin/category-mapping?scope=all&size=1")
+    counts = (d or {}).get("counts") or {}
+    check("범위별 건수를 준다",
+          all(k in counts for k in ("unmapped", "violation", "unclassified", "all_products")),
+          "unmapped·violation·unclassified·all_products", sorted(counts))
+
+    # 서버가 가리키는 곳이 실제로 비어 있지 않은가 — 빈 화면으로 열면 안 된다
+    open_at = (d or {}).get("open_at")
+    size_of = {"unmapped": counts.get("unmapped"), "violation": counts.get("violation"),
+               "unclassified": counts.get("unclassified"), "all": counts.get("all_products")}
+    check("open_at이 가리키는 범위에 실제로 일이 있다",
+          open_at == "all" or (size_of.get(open_at) or 0) > 0,
+          "> 0", {open_at: size_of.get(open_at)})
+
+    if _engine is not None:
+        with _engine.connect() as c:
+            live = c.execute(text(
+                "SELECT count(*) FILTER (WHERE category_id IS NULL) u,"
+                "       count(*) FILTER (WHERE part_type = 'ETC') e,"
+                "       count(*) a FROM products")).one()
+        check("미매핑 수 = DB 실측", counts.get("unmapped") == live[0], live[0],
+              counts.get("unmapped"))
+        check("미분류 수 = DB 실측", counts.get("unclassified") == live[1], live[1],
+              counts.get("unclassified"))
+        check("전체 수 = DB 실측", counts.get("all_products") == live[2], live[2],
+              counts.get("all_products"))
+
+    # 목록은 서버 페이지네이션이다 — 전 행을 보내면 안 된다(22,838건)
+    d2 = get("/api/admin/category-mapping?scope=all&size=10&page=2")
+    check("페이지 크기를 지킨다", len(d2.get("items") or []) <= 10, "<= 10",
+          len(d2.get("items") or []))
+    check("전체 건수를 함께 준다", (d2.get("total") or 0) >= len(d2.get("items") or []),
+          ">= 표시 건수", d2.get("total"))
+    check("쪽수를 계산해 준다", (d2.get("pages") or 0) > 1, "> 1", d2.get("pages"))
+    check("2쪽은 1쪽과 다른 상품이다",
+          {i["product_code"] for i in (d2.get("items") or [])}
+          != {i["product_code"] for i in (get("/api/admin/category-mapping?scope=all&size=10")
+                                          .get("items") or [])},
+          "다름", "같음")
+
+    # 가드
+    st, _ = post("/api/admin/category-mapping/move", {"product_codes": [], "category_id": 1})
+    check("빈 선택은 400", st == 400, 400, st)
+    st, _ = post("/api/admin/category-mapping/move",
+                 {"product_codes": [1], "category_id": 99999999})
+    check("없는 카테고리는 404", st == 404, 404, st)
+    st, _ = post("/api/admin/category-mapping/move",
+                 {"product_codes": [999999999], "category_id":
+                  (d.get("categories") or [{}])[0].get("category_id") or 1})
+    check("없는 상품은 404", st == 404, 404, st)
+    st, _ = post("/api/admin/category-mapping/undo", {"log_id": 999999999})
+    check("없는 이동 기록 되돌리기는 404", st == 404, 404, st)
+    try:
+        get("/api/admin/category-mapping?scope=nope")
+        check("알 수 없는 범위는 400", False, 400, 200)
+    except urllib.error.HTTPError as e:
+        check("알 수 없는 범위는 400", e.code == 400, 400, e.code)
+
+    # 화면 계약
+    _p = os.path.join(ROOT, "mockups", "admin", "category-mapping.html")
+    if os.path.exists(_p):
+        _h = io.open(_p, encoding="utf-8").read()
+        check("화면이 ADM-CAT-020이다", 'data-screen-id="ADM-CAT-020"' in _h, True,
+              'data-screen-id="ADM-CAT-020"' in _h)
+        check("화면이 서버가 가리킨 곳으로 연다", "open_at" in _h, True, "open_at" in _h)
+        check("일괄 이동에 되돌리기가 있다", "category-mapping/undo" in _h, True,
+              "category-mapping/undo" in _h)
+        # 상한을 화면이 숨기지 않는다
+        check("한 번에 옮길 상한을 화면이 말한다", "max_move" in _h, True, "max_move" in _h)
+        holder = _re10.search(r'id="cUncls"[^>]*>([^<]*)<', _h)
+        check("미분류 수가 마크업에 박혀 있지 않다",
+              bool(holder) and not _re10.search(r"[0-9]", holder.group(1)),
+              "숫자 없음", holder.group(1) if holder else "(없음)")
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -3246,6 +3336,7 @@ def main():
                test_doc_counts,
                test_taxonomy_single_source,
                test_categories,
+               test_category_mapping,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
