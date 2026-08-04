@@ -654,7 +654,7 @@ def test_compat():
         _s = io.open(_p, encoding="utf-8").read()
         _st = _S()
         _st.feed(_s)
-        _js = chr(10).join(_re2.findall(r"<script[^>]*>(.*?)</script>", _s, _re2.S))
+        _js = chr(10).join(_re2.findall(r"<script\b[^>]*>(.*?)</script>", _s, _re2.S))
         if _st.foot > 1:
             _bad.append(f"{_n}: 푸터 {_st.foot}개")
         for _k, _v in _C(_st.ids).items():
@@ -1178,6 +1178,119 @@ def test_taxonomy_single_source():
           sorted(_T.QUOTE_SLOTS), sorted(_T.SLOTS))
 
 
+def test_categories():
+    """[33] 카테고리 트리 — 판매 축은 엔진과 분리돼 있다 (슬라이스 B)
+
+    `categories`는 **판매 탐색 축**이고 `part_type`은 **엔진 축**이다. 기존 임대 관리자는
+    이 둘을 한 트리에 섞어 대분류 20개가 상품분류·완제품유형·마케팅노출·내부업무·폐기를
+    동시에 뜻하게 됐고, 미매핑 1,458건(판매중 325건)이 조용히 쌓였다.
+
+    **가장 중요한 계약: 운영자가 카테고리를 옮겨도 견적 결과가 변하면 안 된다**(A-02).
+    그래서 엔진 모듈이 이 표를 참조하지 않는지 소스로 확인한다 — 한 번이라도 참조하면
+    "카테고리를 정리했더니 견적이 달라졌다"가 생기고, 그때는 원인을 찾을 수 없다.
+    """
+    print("\n[33] 카테고리 트리 — 판매 축은 엔진과 분리돼 있다 (슬라이스 B)")
+    import re as _re9
+
+    # 1) 엔진은 categories를 모른다 — 이 검사가 이 슬라이스의 핵심이다.
+    ENGINE = ("recommend.py", "candidates.py", "swap.py", "usage_floors.py", "taxonomy.py")
+    touch = []
+    for fn in ENGINE:
+        _p = os.path.join(ROOT, "api", fn)
+        if not os.path.exists(_p):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        # 주석·docstring의 언급은 봐주고 **코드에서 표를 읽는 것**만 잡는다.
+        code = _re9.sub(r'"""[\s\S]*?"""', "", _s)
+        code = _re9.sub(r"#.*", "", code)
+        if _re9.search(r"\bcategories\b|\bcategory_id\b", code):
+            touch.append(fn)
+    check("엔진 모듈이 categories를 읽지 않는다", touch == [], [], touch)
+
+    d = get("/api/admin/categories")          # get()은 본문만 돌려준다(상태코드 없음)
+    items = (d or {}).get("items") or []
+    check("카테고리 목록을 준다", isinstance(items, list), "list", type(items).__name__)
+    check("카테고리가 있다", len(items) > 0, "> 0", len(items))
+
+    ids = {c["category_id"] for c in items}
+
+    # 2) 트리가 트리인가 — 부모가 실재하고 고리가 없다
+    orphan = sorted(c["category_id"] for c in items
+                    if c["parent_id"] is not None and c["parent_id"] not in ids)
+    check("부모가 없는 카테고리가 없다", orphan == [], [], orphan)
+
+    parent = {c["category_id"]: c["parent_id"] for c in items}
+    looped = []
+    for cid in ids:
+        seen, cur = set(), cid
+        while cur is not None:
+            if cur in seen:
+                looped.append(cid)
+                break
+            seen.add(cur)
+            cur = parent.get(cur)
+    check("트리에 순환이 없다", looped == [], [], sorted(looped))
+
+    # 3) 형제 이름 중복 없음(부분 유니크 인덱스가 지키는 것을 응답으로도 확인)
+    pairs = [(c["parent_id"], c["name"]) for c in items]
+    dup = sorted({p for p in pairs if pairs.count(p) > 1})
+    check("같은 자리에 같은 이름이 없다", dup == [], [], dup)
+
+    # 4) 서버가 세는 수 = DB가 세는 수 (화면이 숫자를 지어내지 않게)
+    if _engine is not None:
+        with _engine.connect() as c:
+            live = dict(c.execute(text(
+                "SELECT category_id, count(*) FROM products"
+                " WHERE category_id IS NOT NULL GROUP BY 1")).all())
+            unmapped = c.execute(text(
+                "SELECT count(*) FROM products WHERE category_id IS NULL")).scalar()
+            viol = c.execute(text(
+                "SELECT count(*) FROM products p JOIN categories c USING (category_id)"
+                " WHERE c.allowed_part_types IS NOT NULL"
+                "   AND NOT (c.allowed_part_types @> to_jsonb(p.part_type))")).scalar()
+        bad = [c["category_id"] for c in items
+               if c["product_count"] != live.get(c["category_id"], 0)]
+        check("카테고리별 상품 수 = DB 실측", bad == [], [], bad)
+        check("미매핑 수 = DB 실측", d.get("unmapped") == unmapped, unmapped, d.get("unmapped"))
+        said_viol = sum(c.get("violations", 0) for c in items)
+        check("허용 종류 위반 수 = DB 실측", said_viol == viol, viol, said_viol)
+
+    # 5) 가드 — 쓰기 경로는 거부만 확인한다(회귀는 정본을 바꾸지 않는다)
+    st, _ = post("/api/admin/categories", {"name": "   "})
+    check("빈 이름은 400", st == 400, 400, st)
+    st, _ = post("/api/admin/categories", {"name": "회귀시험", "allowed_part_types": ["NOPE"]})
+    check("없는 부품 종류는 400", st == 400, 400, st)
+    st, _ = post("/api/admin/categories", {"name": "회귀시험", "parent_id": 99999999})
+    check("없는 상위는 404", st == 404, 404, st)
+    if items:
+        st, _ = post("/api/admin/categories", {"name": items[0]["name"],
+                                               "parent_id": items[0]["parent_id"]})
+        check("같은 자리 동명은 409", st == 409, 409, st)
+        # 상품이 걸린 카테고리는 지울 수 없다 — 지우면 그 상품들이 조용히 미매핑이 된다
+        withp = next((c for c in items if c["product_count"] > 0), None)
+        if withp:
+            st, _ = post_raw("/api/admin/categories/%d" % withp["category_id"],
+                             None, {}, method="DELETE")
+            check("상품이 있는 카테고리 삭제는 409", st == 409, 409, st)
+    st, _ = post_raw("/api/admin/categories/99999999",
+                     json.dumps({"name": "x"}).encode(),
+                     {"Content-Type": "application/json"}, method="PATCH")
+    check("없는 카테고리 수정은 404", st == 404, 404, st)
+
+    # 6) 화면 계약 — 마크업이 서버 값을 쓰는가(브라우저 없이)
+    _p = os.path.join(ROOT, "mockups", "admin", "categories.html")
+    if os.path.exists(_p):
+        _h = io.open(_p, encoding="utf-8").read()
+        check("화면이 ADM-CAT-010이다", 'data-screen-id="ADM-CAT-010"' in _h, True,
+              'data-screen-id="ADM-CAT-010"' in _h)
+        check("화면이 /api/admin/categories를 부른다", "/api/admin/categories" in _h, True,
+              "/api/admin/categories" in _h)
+        # 숫자를 마크업에 박아두지 않는다 — 요약 칸은 전부 자리표시자로 시작해야 한다
+        holder = _re9.search(r'id="mMapped"[^>]*>([^<]*)<', _h)
+        check("매핑 수가 마크업에 박혀 있지 않다",
+              bool(holder) and not _re9.search(r"\d", holder.group(1)),
+              "숫자 없음", holder.group(1) if holder else "(없음)")
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -1374,7 +1487,7 @@ def test_time_display():
             continue
         _s = io.open(_p, encoding="utf-8").read()
         for f in ISO_FIELDS:
-            # ``가 없으면 `joined`가 `joinedLabel`에도 걸려 오탐이 된다
+            # `\b`가 없으면 `joined`가 `joinedLabel`에도 걸려 오탐이 된다
             NL = chr(10)          # 이스케이프가 전달 중 풀리는 것을 피한다
             for m in _re6.finditer(r"[\w$]+\.(" + f + r")" + chr(92) + "b", _s):
                 ls = _s.rfind(NL, 0, m.start()) + 1
@@ -3132,6 +3245,7 @@ def main():
                test_screen_assets,
                test_doc_counts,
                test_taxonomy_single_source,
+               test_categories,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
