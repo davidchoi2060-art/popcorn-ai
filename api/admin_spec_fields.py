@@ -49,17 +49,9 @@ TYPE_HELP = {
 RESERVED = {"product_code", "part_type", "created_at", "updated_at", "verified_yn",
             "extract_source", "confidence", "spec_sources", "select", "from", "where",
             "order", "group", "table", "column", "user", "default", "check"}
-ALL_PART_TYPES = ("CPU", "MB", "RAM", "GPU", "SSD", "HDD", "POWER", "CASE",
-                  "COOLER_CPU_AIR", "COOLER_CPU_AIO",
-                  "MONITOR", "KEYBOARD", "MOUSE", "HEADSET", "SPEAKER", "WEBCAM")
 # 화면의 부품 축. 견적 대상(부품)과 주변기기를 나눈다 — 주변기기는 8슬롯에 안 들어간다.
-PART_LABEL = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
-              "CASE": "케이스", "POWER": "파워", "SSD": "SSD", "HDD": "HDD",
-              "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수랭)",
-              "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
-              "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠"}
-CORE_PARTS = ("CPU", "MB", "RAM", "GPU", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO",
-              "POWER", "SSD", "HDD")
+# 어휘는 taxonomy가 단일 원천(슬라이스 A) — 여기서 다시 정의하지 않는다.
+from .taxonomy import ASSIGNABLE_TYPES as ALL_PART_TYPES, PART_LABELS as PART_LABEL,                       CORE_TYPES as CORE_PARTS
 
 
 def _add_col_to_view(conn, view: str, key: str) -> bool:

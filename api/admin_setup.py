@@ -24,11 +24,10 @@ from sqlalchemy import text
 
 from .db import engine
 from .recommend import SLOTS, SLOT_TYPES
+from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천(슬라이스 A)
 
 router = APIRouter(prefix="/api/admin")
 
-SLOT_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
-           "CASE": "케이스", "COOLER": "CPU쿨러", "POWER": "파워", "SSD": "SSD"}
 
 
 def _slot_counts(conn) -> dict:

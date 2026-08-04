@@ -21,6 +21,7 @@ from sqlalchemy import text
 
 from . import usage_floors as UF
 from .db import engine
+from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천(슬라이스 A)
 
 router = APIRouter(prefix="/api")
 
@@ -29,9 +30,7 @@ router = APIRouter(prefix="/api")
 FLOOR_COLS = ("capacity_gb", "required_power_watt")
 
 
-def _floor_slot(part_type: str) -> str:
-    """part_type → 하한 슬롯. 쿨러만 두 종류가 한 슬롯이다(엔진과 같은 정의)."""
-    return "COOLER" if part_type.startswith("COOLER_") else part_type
+from .taxonomy import slot_of as _floor_slot   # part_type → 하한 슬롯(단일 원천)
 
 # 예산 상한 배분율 — "어느 부품도 자기 배분율 상한을 초과할 수 없다"
 BUDGET_ALLOC = {
@@ -101,13 +100,7 @@ def _apply_one(parts: list[dict], label: str, value: str):
 # 견적 슬롯 = 엔진과 같은 정의(recommend.SLOTS / SLOT_TYPES).
 # **part_type 단위로 세면 오판한다**: 쿨러는 공랭·수냉이 한 슬롯이라 AIO가 0이어도
 # AIR가 남아 있으면 견적이 성립한다(슬라이스 48에서 실제로 헷갈렸다).
-QUOTE_SLOTS = {
-    "CPU": ("CPU",), "MB": ("MB",), "RAM": ("RAM",), "GPU": ("GPU",),
-    "CASE": ("CASE",), "COOLER": ("COOLER_CPU_AIR", "COOLER_CPU_AIO"),
-    "POWER": ("POWER",), "SSD": ("SSD",),
-}
-SLOT_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
-           "CASE": "케이스", "COOLER": "CPU쿨러", "POWER": "파워", "SSD": "SSD"}
+from .taxonomy import QUOTE_SLOTS   # 단일 원천 — recommend.SLOT_TYPES와 같은 표였다(슬라이스 A)
 
 
 def _slot_view(parts: list[dict]) -> tuple:

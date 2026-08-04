@@ -16,18 +16,8 @@ from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
-# part_type 코드 → 화면 분류 라벨. 미등록 코드는 원문 폴백.
-PART_TYPE_LABELS = {
-    "CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
-    "SSD": "SSD", "HDD": "HDD", "POWER": "파워", "CASE": "케이스",
-    # 공랭·수냉은 견적에서 한 슬롯이지만 **상품 분류로는 다른 것**이다.
-    # 같은 라벨을 쓰면 집계에 'CPU쿨러'가 두 줄로 나와 운영자가 어느 쪽인지 알 수 없고,
-    # 라벨→코드 역매핑도 한쪽으로 뭉개진다(슬라이스 49).
-    "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수냉)",
-    "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
-    "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠",
-    "ETC": "미분류",   # 적재 시 부품 종류를 정하지 못한 상품(슬라이스 39) — 추천 대상 아님
-}
+# part_type 어휘는 taxonomy가 단일 원천(슬라이스 A) — 여기서 다시 정의하지 않는다.
+from .taxonomy import PART_LABELS as PART_TYPE_LABELS, CORE_TYPES
 
 # part_type별 필수 사양 필드(ERD 4.0 필수 사양 매트릭스). 미등록 타입은 0/0 → 화면 "—".
 # verified_yn은 이번 집계에 미반영(전 필드 채움+미검증 케이스는 다음 슬라이스).
@@ -922,8 +912,7 @@ def delete_supplier_price(product_code: int, supplier_id: int):
 # 않는다**: 분류가 바뀌면 필수 사양 목록이 통째로 바뀌고 추천 슬롯도 달라진다.
 # 바꾸기 전에 그 영향을 먼저 보여준다(preview).
 
-CORE_PARTS = {"CPU", "MB", "RAM", "GPU", "POWER", "CASE", "SSD", "HDD",
-              "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
+CORE_PARTS = set(CORE_TYPES)   # taxonomy가 단일 원천 — 두 벌이던 것을 합쳤다(슬라이스 A)
 PERIPHERALS = {"MONITOR", "KEYBOARD", "MOUSE", "HEADSET", "SPEAKER", "WEBCAM"}
 
 

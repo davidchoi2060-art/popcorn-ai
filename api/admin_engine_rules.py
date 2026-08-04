@@ -24,11 +24,7 @@ router = APIRouter(prefix="/api/admin")
 
 # 호환 규칙은 이제 compat_rules 테이블이 단일 원천(슬라이스 34) — 하드코딩 제거.
 OP_KO = {"eq": "=", "gte": "≥", "lte": "≤"}
-PART_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
-           "CASE": "케이스", "POWER": "파워", "SSD": "SSD", "HDD": "HDD",
-           "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수랭)",
-           "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
-           "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠"}
+from .taxonomy import PART_LABELS as PART_KO   # 단일 원천(슬라이스 A)
 
 TIER_RULES = [
     {"key": "value", "label": TIER_LABELS["value"], "order": "슬롯별 가격 오름차순",

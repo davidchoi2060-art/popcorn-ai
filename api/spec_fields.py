@@ -17,9 +17,6 @@ from sqlalchemy import text
 
 from .db import engine
 
-# 핵심 부품 — 적재·추천이 다루는 종류. 주변기기 전용 필드는 적재 대상이 아니다.
-CORE_TYPES = {"CPU", "MB", "RAM", "GPU", "SSD", "HDD", "POWER", "CASE",
-              "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
 
 _lock = threading.Lock()
 _cache: list | None = None

@@ -15,11 +15,10 @@ from sqlalchemy import text
 
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
+from .taxonomy import CORE_TYPES   # 단일 원천(슬라이스 A)
 
 router = APIRouter(prefix="/api/admin")
 
-CORE_TYPES = ("CPU", "GPU", "MB", "RAM", "SSD", "HDD", "POWER", "CASE",
-              "COOLER_CPU_AIR", "COOLER_CPU_AIO")
 THIN_THRESHOLD = 3   # 후보 N개 이하 = 견적 실패 위험(현 dev 재고 규모 기준 — 운영 시 재조정)
 REASONS = [("no_specs", "사양 미등록(행 없음)", "products.html"),
            ("need_review", "검수 대기", "review-queue.html"),

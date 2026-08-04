@@ -27,11 +27,10 @@ from .timeutil import iso, now_iso
 from .db import engine
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
                         load_compat_rules)
+from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천 — SSD를 여기만 "저장장치"로 쓰고 있었다
 
 router = APIRouter(prefix="/api/swap")
 
-SLOT_KO = {"CPU": "CPU", "MB": "메인보드", "RAM": "메모리", "GPU": "그래픽카드",
-           "CASE": "케이스", "COOLER": "CPU쿨러", "POWER": "파워", "SSD": "저장장치"}
 # **호환 규칙이 참조하는 필드는 전부 여기 있어야 한다.** 하나라도 빠지면 그 규칙이
 # NULL 불통과로 떨어져 **모든 대안이 사라진다**(대안 0건 = S3 부품 변경 무력).
 # 실제로 슬라이스 39(socket_list)·43(form_factor_list) 추가 때 이 목록을 함께 늘리지

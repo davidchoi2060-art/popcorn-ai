@@ -1097,6 +1097,87 @@ _KNOWN_TABLE_WORDS = {
 }
 
 
+def test_taxonomy_single_source():
+    """[32] 부품 어휘 단일 원천 — 정의는 taxonomy.py에만 있다 (슬라이스 A)
+
+    2026-08-04 기존 임대 관리자를 실사하다 그쪽 `베스트7주력부품`이 부품 분류 트리를
+    약어로 복제한 **두 번째 트리**인 것을 봤다. 같은 CPU가 어느 트리에 들어가는지가
+    담당자 기분에 달려 있었다. 그래서 우리 코드를 세어 보니 **같은 병이 이미 있었다**:
+
+        SLOT_KO      admin_setup · admin_swap_logs · candidates · swap   네 벌
+        라벨 맵      PART_TYPE_LABELS · PART_KO · SLOT_KO   세 어휘 여섯 곳
+        코어 집합    admin_pool.CORE_TYPES · admin_products.CORE_PARTS   두 벌
+        슬롯표       recommend.SLOT_TYPES · candidates.QUOTE_SLOTS       두 벌
+
+    그리고 **두 곳이 이미 어긋나 있었다** — swap.py만 SSD를 "저장장치"로 표시했고
+    (부품 교체 안내에서만 다른 말이 나갔다), PART_TYPE_LABELS만 수랭을 "수냉"으로 썼다
+    (자기 안에서도 공"랭"/수"냉"으로 어긋나 있었다).
+
+    **정의를 여러 벌 두면 어긋난다.** 카테고리 트리를 이 위에 얹으면 복제본이 하나 더
+    는다. 그래서 taxonomy.py로 모으고, 여기서 그 상태를 지킨다.
+    """
+    print("\n[32] 부품 어휘 단일 원천 — 정의는 taxonomy.py에만 있다 (슬라이스 A)")
+    import re as _re8
+
+    from api import taxonomy as _T
+    from api.admin_products import PART_TYPE_LABELS as _PTL, CORE_PARTS as _CP
+    from api.admin_engine_rules import PART_KO as _PK
+    from api.admin_setup import SLOT_KO as _SA
+    from api.admin_swap_logs import SLOT_KO as _SB
+    from api.candidates import SLOT_KO as _SC, QUOTE_SLOTS as _QS, _floor_slot as _fs
+    from api.swap import SLOT_KO as _SD
+    from api.recommend import SLOTS as _SL, SLOT_TYPES as _ST
+
+    # 1) 같은 객체를 보고 있는가 — 복사본이면 언제든 다시 어긋난다
+    check("SLOT_KO 네 곳이 같은 객체", _SA is _SB is _SC is _SD is _T.SLOT_LABELS,
+       "taxonomy.SLOT_LABELS", "복사본 존재")
+    check("part_type 라벨 맵이 같은 객체", _PTL is _PK is _T.PART_LABELS,
+       "taxonomy.PART_LABELS", "복사본 존재")
+    check("슬롯표가 같은 객체", _QS is _ST is _T.QUOTE_SLOTS,
+       "taxonomy.QUOTE_SLOTS", "복사본 존재")
+    check("코어 집합이 한 벌", _CP == set(_T.CORE_TYPES), True, _CP == set(_T.CORE_TYPES))
+    check("슬롯 목록·하한 슬롯이 단일 원천", _SL is _T.SLOTS and _fs is _T.slot_of,
+       True, _SL is _T.SLOTS and _fs is _T.slot_of)
+
+    # 2) 어긋났던 두 라벨이 실제로 고쳐졌는가 (되돌아가면 여기서 잡힌다)
+    check("SSD 라벨은 'SSD' — swap만 '저장장치'였다", _T.SLOT_LABELS["SSD"] == "SSD",
+          "SSD", _T.SLOT_LABELS["SSD"])
+    _cool = (_T.PART_LABELS["COOLER_CPU_AIR"], _T.PART_LABELS["COOLER_CPU_AIO"])
+    check("공랭/수랭 표기가 서로 맞는다", _cool == ("CPU쿨러(공랭)", "CPU쿨러(수랭)"),
+          ("CPU쿨러(공랭)", "CPU쿨러(수랭)"), _cool)
+
+    # 3) taxonomy.py 밖에서 다시 정의하지 않는가 — 소스를 스캔한다.
+    #    이 검사가 없으면 다음 사람이 조용히 일곱 번째 복제본을 만든다.
+    api_dir = os.path.join(ROOT, "api")
+    dup = []
+    # 이름을 넉넉히 잡는다 — 처음엔 PART_LABEL(단수)·ALL_PART_TYPES를 빠뜨려
+    # 복제본 세 벌을 놓쳤다. 검사가 좁으면 없는 안심을 준다.
+    PAT = _re8.compile(r"^\s*(SLOT_KO|SLOT_LABELS?|PART_KO|PART_TYPE_LABELS?|PART_LABELS?"
+                       r"|CORE_TYPES|CORE_PARTS|QUOTE_SLOTS|SLOT_TYPES|SLOTS"
+                       r"|ALL_PART_TYPES|PART_TYPES|ASSIGNABLE_TYPES)\s*=\s*[{\[(]",
+                       _re8.M)
+    for fn in sorted(os.listdir(api_dir)):
+        if not fn.endswith(".py") or fn == "taxonomy.py":
+            continue
+        for m in PAT.finditer(io.open(os.path.join(api_dir, fn), encoding="utf-8").read()):
+            dup.append(f"{fn}:{m.group(1)}")
+    check("taxonomy.py 밖에서 부품 어휘를 정의하지 않는다", dup == [], [], dup)
+
+    # 4) part_type 상수 = DB 실측 (문서 정합과 같은 사상 — 상수도 낡는다)
+    if _engine is not None:
+        with _engine.connect() as c:
+            live = {r[0] for r in c.execute(text(
+                "SELECT DISTINCT part_type FROM products WHERE part_type IS NOT NULL"))}
+        _unknown = sorted(live - set(_T.PART_TYPES))
+        check("taxonomy.PART_TYPES ⊇ DB 실측 part_type", _unknown == [], [], _unknown)
+
+    # 5) 슬롯표가 실제 part_type만 가리키는가 (오타 하나면 그 슬롯이 통째로 전멸한다)
+    bad = sorted({t for ts in _T.QUOTE_SLOTS.values() for t in ts} - set(_T.PART_TYPES))
+    check("슬롯표가 가리키는 part_type이 전부 실재", bad == [], [], bad)
+    check("슬롯 목록 = 슬롯표 키", sorted(_T.SLOTS) == sorted(_T.QUOTE_SLOTS),
+          sorted(_T.QUOTE_SLOTS), sorted(_T.SLOTS))
+
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -3050,6 +3131,7 @@ def main():
                test_password_policy,
                test_screen_assets,
                test_doc_counts,
+               test_taxonomy_single_source,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,
