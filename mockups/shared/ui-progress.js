@@ -79,9 +79,31 @@
     return fallback;
   }
 
+  /* 실패도 **이유를 말한다.**
+   *
+   * FastAPI 는 두 모양으로 답한다:
+   *   · 우리가 던진 400/403/404/409 → `detail` 이 문장 하나(한국어)
+   *   · 형식 검증 실패(422)         → `detail` 이 **배열**
+   *       [{type, loc:["body","supplier_id"], msg:"Input should be a valid integer", input:null}]
+   *
+   * 배열은 `typeof === "object"` 라 예전 코드가 두 번째 분기로 빠졌고,
+   * `d.detail`·`d.error` 가 없어 빈 문자열 → 결국 **"오류 422"** 만 떴다.
+   * 사용자가 "매입가 입력시 오류"라고 신고한 그 화면이 정확히 이 상태였다
+   * (2026-08-05) — 무엇이 잘못됐는지 한 글자도 알려주지 않았다.
+   *
+   * 어느 항목이 왜 틀렸는지까지 적는다. `loc` 의 'body' 는 사람에게 의미가 없어 뺀다.
+   */
   function errText(j, status) {
     var d = j && j.detail;
     if (typeof d === "string" && d.trim()) return d.trim();
+    if (Array.isArray(d) && d.length) {
+      return d.map(function (x) {
+        var f = (x.loc || []).filter(function (k) {
+          return k !== "body" && k !== "query" && k !== "path";
+        }).join(".");
+        return (f ? f + ": " : "") + (x.msg || "");
+      }).join(" · ");
+    }
     if (d && typeof d === "object") return String(d.detail || d.error || "").trim() || ("오류 " + status);
     return "오류 " + status;
   }
@@ -137,4 +159,8 @@
       }
     );
   };
+
+  /* 화면이 자기 자리에서 오류를 보여줄 때도 **같은 문장**을 쓰게 내보낸다.
+   * 두 벌로 만들면 진행 바와 toast 가 서로 다른 말을 한다(이 프로젝트의 고질병). */
+  window.popcornProgress = { errText: errText, okText: okText };
 })();

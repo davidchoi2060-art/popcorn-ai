@@ -402,6 +402,13 @@
         function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
           return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
         function won(n){return n==null? "—" : Number(n).toLocaleString()+"원";}
+        // 서버 오류 문장은 **공용 헬퍼 하나**를 쓴다(`shared/ui-progress.js`).
+        // 여기서 따로 만들면 상단 진행 바와 아래 toast 가 같은 실패를 다르게 말한다.
+        function errText(j){
+          var P = window.popcornProgress;
+          if(P && P.errText) return P.errText(j, "");
+          return (j && typeof j.detail === "string") ? j.detail : "저장하지 못했습니다";
+        }
         function toast(m, undoable){
           var el=document.getElementById("__t");
           if(!el){el=document.createElement("div");el.id="__t";
@@ -604,7 +611,9 @@
                        body: JSON.stringify({into:into, preview:true})})
                   .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
                   .then(function(res){
-                    if(!res.ok) return;
+                    // 미리보기가 실패하면 이유를 말한다 — 예전엔 조용히 끝나서
+                    // [편입] 을 눌러도 아무 일도 안 일어난 것처럼 보였다.
+                    if(!res.ok){ toast(errText(res.j)); return; }
                     if(!confirm(res.j.impact.note+"\n\n진행할까요?")) return;
                     fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/merge",
                           {method:"POST", headers:{"Content-Type":"application/json"},
@@ -669,8 +678,15 @@
         function supPrompt(sid, cur){
           loadSupplierList().then(function(sups){
             if(!sups.length){ toast("등록된 공급처가 없습니다"); return; }
+            // **목록 API 는 `id` 로 준다**(`/api/admin/suppliers` — 슬라이스 93에서
+            // admin_suppliers.py 로 옮기며 키 이름이 바뀌었다). 상품 상세의
+            // `P.suppliers` 는 `supplier_id` 라서 헷갈리기 쉽다 — 여기는 목록 쪽이다.
+            // 예전엔 `s.supplier_id` 를 읽어 `value="undefined"` 가 되었고,
+            // `+value` 가 NaN → JSON 에서 null → **저장할 때마다 422**였다.
+            // 그런데 실패를 화면이 삼켜서(아래 참조) 아무 일도 안 일어난 것처럼 보였다.
             var opts = sups.map(function(s){
-              return '<option value="'+s.supplier_id+'"'+(String(s.supplier_id)===String(sid)?' selected':'')
+              var v = (s.id != null ? s.id : s.supplier_id);
+              return '<option value="'+v+'"'+(String(v)===String(sid)?' selected':'')
                 +'>'+esc(s.name)+'</option>'; }).join("");
             var html = '<div class="modal fade" id="supModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered">'
               + '<div class="modal-content"><div class="modal-header"><h5 class="modal-title">'
@@ -680,7 +696,7 @@
               + '<select id="supSel" class="form-select form-select-sm mb-3"'+(sid?' disabled':'')+'>'+opts+'</select>'
               + '<label class="form-label fs-9 fw-bold">매입가(원)</label>'
               + '<input id="supCost" type="number" min="0" class="form-control form-control-sm" value="'
-              + (cur||'')+'" placeholder="비워 두면 가격 미확인">'
+              + (cur||'')+'" placeholder="예: 350000" required>'
               + '<p class="fs-10 text-body-tertiary mt-2 mb-0">매입가는 단가표 반영이 주 경로입니다 — '
               + '여기서는 단건 보정만 합니다.</p></div>'
               + '<div class="modal-footer">'
@@ -694,19 +710,37 @@
             el.addEventListener("hidden.bs.modal", function(){ el.remove(); });
             document.getElementById("supSave").onclick = function(){
               var s = +document.getElementById("supSel").value;
-              var cRaw = document.getElementById("supCost").value;
+              var cRaw = document.getElementById("supCost").value.trim();
+              // 보내기 전에 화면이 먼저 막는다 — 서버까지 갔다 와서 실패하면
+              // 운영자는 무엇이 잘못됐는지 모른 채 창만 본다.
+              if(!(s > 0)){ toast("공급처를 선택해 주세요"); return; }
+              var c = parseInt(cRaw, 10);
+              if(cRaw === "" || isNaN(c)){ toast("매입가를 숫자로 입력해 주세요"); return; }
+              if(c < 0){ toast("매입가는 0원 이상이어야 합니다"); return; }
               fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/suppliers",
                 {method:"POST", headers:{"Content-Type":"application/json"},
-                 body: JSON.stringify({supplier_id:s,
-                        cost_price: cRaw===""? null : parseInt(cRaw,10)})})
-                .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
-                .then(function(res){ if(!res.ok) return; m.hide(); load(); });
+                 body: JSON.stringify({supplier_id:s, cost_price:c})})
+                .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};},
+                                                        function(){return {ok:r.ok,j:null};}); })
+                .then(function(res){
+                  // **실패를 삼키지 않는다.** 예전엔 `if(!res.ok) return;` 이라
+                  // 저장을 눌러도 아무 일도 안 일어났고, 그게 이 버그를 오래 숨겼다.
+                  if(!res.ok){ toast(errText(res.j)); return; }
+                  m.hide(); load();
+                })
+                .catch(function(e){ toast("저장하지 못했습니다 — " + e.message); });
             };
             var del = document.getElementById("supDel");
             if(del) del.onclick = function(){
               fetch("/api/admin/products/"+encodeURIComponent(CODE)+"/suppliers/"+sid,
                     {method:"DELETE"})
-                .then(function(r){ if(r.ok){ m.hide(); load(); } });
+                .then(function(r){
+                  if(r.ok){ m.hide(); load(); return; }
+                  // 저장과 같은 이유로 실패를 삼키지 않는다
+                  return r.json().then(function(j){ toast(errText(j)); },
+                                       function(){ toast("삭제하지 못했습니다"); });
+                })
+                .catch(function(e){ toast("삭제하지 못했습니다 — " + e.message); });
             };
             m.show();
           });

@@ -2826,6 +2826,51 @@ def test_suppliers():
         check("API 전체 수 = DB가 세는 수", d.get("total") == src_total,
               src_total, d.get("total"))
 
+    # ── 상품 상세의 공급처 셀렉트 (2026-08-05 사용자 신고) ──────────────
+    # "상품 등록하고 공급처 추가 시 매입가 입력시 오류".
+    # 원인 둘이 겹쳐 있었다:
+    #   ① 목록 API 는 `id` 로 주는데(슬라이스 93에서 admin_suppliers.py 로 옮기며
+    #      키가 바뀌었다) 화면은 `s.supplier_id` 를 읽어 `value="undefined"` →
+    #      `+value` 가 NaN → JSON 에서 null → **저장할 때마다 422**.
+    #   ② `cost_price` 는 NOT NULL 인데 API 는 None 을 받고 입력창은 "비워 두면
+    #      가격 미확인"이라 안내했다 → 비우면 **500**.
+    # 그런데 화면이 `if(!res.ok) return;` 으로 실패를 삼켜, 저장을 눌러도 **아무 일도
+    # 일어나지 않았다.** 그게 이 버그를 오래 숨겼다.
+    if d["items"]:
+        check("공급처 목록 항목이 id 를 준다", "id" in d["items"][0],
+              "id", sorted(d["items"][0]))
+    _pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+                  encoding="utf-8").read()
+    # 화면이 목록에서 **서버가 주는 키**를 읽는가
+    check("상품 상세가 공급처 id 로 셀렉트를 만든다", "s.id != null" in _pe, True,
+          "s.id != null" in _pe)
+    # 지킬 수 없는 약속을 다시 적지 않는다
+    check("'비워 두면 가격 미확인' 안내가 없다", "비워 두면 가격 미확인" not in _pe,
+          True, "비워 두면 가격 미확인" not in _pe)
+    # 실패를 삼키지 않는가 — 이 한 줄이 돌아오면 같은 일이 되풀이된다
+    # **주석은 봐준다** — 고친 내역을 설명하는 주석까지 잡으면 기록을 못 남긴다.
+    # (회귀 [39]에서 이미 한 번 겪은 실수다.) 검사 대상은 실제로 도는 코드다.
+    import re as _re15
+    _pe_code = _re15.sub(r"(?m)//.*$", "", _re15.sub(r"/\*[\s\S]*?\*/", "", _pe))
+    _swallow = _pe_code.count("if(!res.ok) return;")
+    # 사양 저장 한 곳은 공용 진행 바가 실패를 말하므로 의도된 것이다(주석에 근거 있음).
+    check("공급처 저장 실패를 화면이 삼키지 않는다", _swallow <= 1, "<= 1", _swallow)
+
+    # 서버 가드 — **쓰기는 하지 않는다**(회귀는 정본을 쓰지 않는다, 슬라이스 50).
+    _pc = db_one("SELECT product_code FROM products ORDER BY product_code LIMIT 1")
+    _sid = d["items"][0]["id"] if d["items"] else None
+    if _pc is not None and _sid is not None:
+        _J = {"Content-Type": "application/json"}
+        st, r = post_raw("/api/admin/products/%s/suppliers" % _pc,
+                         json.dumps({"supplier_id": _sid, "cost_price": None}).encode(), _J)
+        check("매입가를 비우면 500 이 아니라 400", st == 400, 400, st)
+        st, r = post_raw("/api/admin/products/%s/suppliers" % _pc,
+                         json.dumps({"supplier_id": _sid, "cost_price": -1}).encode(), _J)
+        check("음수 매입가는 400", st == 400, 400, st)
+        st, r = post_raw("/api/admin/products/%s/suppliers" % _pc,
+                         json.dumps({"supplier_id": 99999999, "cost_price": 1000}).encode(), _J)
+        check("없는 공급처는 400", st == 400, 400, st)
+
     NAME = "회귀검사-공급처-임시"
     # 앞선 실패가 남긴 것이 있으면 먼저 치운다(검사는 멱등이어야 한다)
     db_exec("DELETE FROM admin_operator_activity_logs WHERE target_id = :n", n=NAME)

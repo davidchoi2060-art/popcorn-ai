@@ -843,7 +843,13 @@ class SupplierPriceBody(BaseModel):
 def upsert_supplier_price(product_code: int, body: SupplierPriceBody):
     from .admin_orders import _log
 
-    if body.cost_price is not None and body.cost_price < 0:
+    # `product_supplier_prices.cost_price` 는 **NOT NULL** 이다. 그런데 이 API 는
+    # `int | None` 을 받고 화면 입력창은 "비워 두면 가격 미확인"이라 안내하고 있었다 —
+    # 지킬 수 없는 약속이라 비워서 저장하면 **500** 이 났다(2026-08-05 사용자 신고).
+    # 500 은 운영자에게 아무것도 알려주지 않는다. 왜 안 되는지 먼저 말한다.
+    if body.cost_price is None:
+        raise HTTPException(400, "매입가를 입력하세요 — 가격 없이 공급처만 등록할 수는 없습니다")
+    if body.cost_price < 0:
         raise HTTPException(400, "매입가는 0원 이상이어야 합니다")
     if body.state is not None and body.state not in SUPPLY_STATES:
         raise HTTPException(400, "공급 상태는 " + " · ".join(SUPPLY_STATES) + " 중 하나입니다")
