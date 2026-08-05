@@ -36,7 +36,7 @@ from sqlalchemy import text
 from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
-from .taxonomy import PART_LABELS
+from .taxonomy import DISPLAY_LABELS, PART_LABELS, expand_display
 
 router = APIRouter(prefix="/api/admin")
 
@@ -80,7 +80,10 @@ def _filters(scope, cid, q, part_type, in_stock):
         where.append("(p.product_name ILIKE '%' || :q || '%'"
                      " OR CAST(p.product_code AS TEXT) = :q)")
     if p["pt"]:
-        where.append("p.part_type = :pt")
+        # 화면이 보내는 것은 **표시 종류**다(쿨러 하나). 실제 part_type 으로 풀어서 건다 —
+        # 'COOLER' 를 그대로 비교하면 그런 part_type 은 없어서 **0건**이 나온다.
+        p["pts"] = list(expand_display(p["pt"]))
+        where.append("p.part_type = ANY(:pts)")
     if in_stock:
         where.append("p.stock_qty > 0")
     return " AND ".join(where), p
@@ -171,7 +174,9 @@ def mapping(scope: str = "unmapped", category_id: int | None = None, q: str = ""
         # 그래서 탭마다 목록이 달라졌고, ②에서 온 것은 한글 라벨이 없어 `CASE`·`MB`·`GPU`
         # 같은 **영문 키가 그대로** 떴다(17종 중 16종). 카테고리 관리 화면과 다른 목록이
         # 보이는 원인이었다 — 같은 것을 두 곳에서 만들면 갈라진다(슬라이스 66 규약).
-        "part_types": [{"key": k, "label": v} for k, v in PART_LABELS.items()],
+        # 고르는 자리는 **표시 종류 16종**(쿨러 하나). 목록 행의 `part_label`은 그대로
+        # 'CPU쿨러(수랭)'이라 적는다 — 고르는 자리를 합치는 것이지 사실을 감추는 게 아니다.
+        "part_types": [{"key": k, "label": v} for k, v in DISPLAY_LABELS.items()],
         "max_move": MAX_MOVE,
         "note": ("목록은 서버에서 걸러 페이지로 나눕니다 — 위 건수는 현재 페이지가 아니라"
                  " 조건 전체입니다. 허용 부품 종류를 어기는 이동도 **막지 않습니다**;"

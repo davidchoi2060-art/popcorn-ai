@@ -25,7 +25,7 @@ from sqlalchemy import text
 from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
-from .taxonomy import PART_LABELS
+from .taxonomy import DISPLAY_LABELS, PART_LABELS, display_labels, expand_display
 from .timeutil import iso
 
 router = APIRouter(prefix="/api/admin")
@@ -50,15 +50,26 @@ def _clean_name(v) -> str:
 
 
 def _clean_types(v):
-    """allowed_part_types 검증 — 없는 part_type을 걸면 그 카테고리는 영영 경고만 낸다."""
+    """allowed_part_types 검증 — 없는 part_type을 걸면 그 카테고리는 영영 경고만 낸다.
+
+    화면은 **표시 종류 16종**을 보낸다(쿨러가 하나). 저장은 **실제 part_type**으로
+    푼다 — `'COOLER'` → 공랭·수랭 둘 다. 이 표를 읽는 것은 위반 판정
+    (`allowed_part_types @> part_type`)이고, 그쪽은 실제 값과 대조하기 때문이다.
+    표시 키를 그대로 넣으면 쿨러 1,373건이 전부 '허용 종류 위반'으로 뜬다.
+    """
     if v is None:
         return None
     if not isinstance(v, list):
         raise HTTPException(400, "허용 부품 종류는 목록이어야 합니다")
-    bad = [t for t in v if t not in PART_LABELS]
-    if bad:
-        raise HTTPException(400, "없는 부품 종류입니다: " + ", ".join(map(str, bad)))
-    return sorted(set(v)) or None      # 빈 목록 = 제한 없음(NULL)과 같은 뜻으로 둔다
+    out = []
+    for t in v:
+        if t in DISPLAY_LABELS:
+            out.extend(expand_display(t))
+        elif t in PART_LABELS:      # 예전 화면·API 호출이 실제 키를 보내도 받는다
+            out.append(t)
+        else:
+            raise HTTPException(400, "없는 부품 종류입니다: " + str(t))
+    return sorted(set(out)) or None    # 빈 목록 = 제한 없음(NULL)과 같은 뜻으로 둔다
 
 
 def _rows(conn):
@@ -116,7 +127,9 @@ def categories():
         "category_id": r["category_id"], "parent_id": r["parent_id"], "name": r["name"],
         "sort_order": r["sort_order"], "is_visible": r["is_visible"],
         "allowed_part_types": r["allowed_part_types"],
-        "allowed_labels": [PART_LABELS.get(t, t) for t in (r["allowed_part_types"] or [])],
+        # 라벨은 접어서 보여준다 — 쿨러가 걸린 카테고리가 '공랭, 수랭' 두 줄로 뜨면
+        # 화면에서 하나로 고른 것이 저장 뒤에 둘로 보인다(같은 것을 다르게 말하는 셈).
+        "allowed_labels": display_labels(r["allowed_part_types"]),
         "product_count": r["n"], "subtree_count": r["n_sub"],
         "in_stock_count": r["n_stock"],
         "violations": viol.get(r["category_id"], 0),
@@ -125,7 +138,9 @@ def categories():
     return {
         "items": items,
         "unmapped": unmapped, "unmapped_in_stock": unmapped_live,
-        "part_types": [{"key": k, "label": v} for k, v in PART_LABELS.items()],
+        # 고르는 자리는 **표시 종류 16종**이다(쿨러 하나 — 사용자 결정 2026-08-05).
+        # 저장은 `_clean_types`가 실제 part_type으로 푼다.
+        "part_types": [{"key": k, "label": v} for k, v in DISPLAY_LABELS.items()],
         "note": ("카테고리는 **판매 탐색 축**입니다 — 엔진(견적)은 이 표를 읽지 않습니다."
                  " 카테고리를 옮겨도 견적 결과는 달라지지 않습니다."),
     }

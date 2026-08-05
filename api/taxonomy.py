@@ -57,6 +57,50 @@ SLOT_LABELS = {
     "CASE": "케이스", "COOLER": "CPU쿨러", "POWER": "파워", "SSD": "SSD",
 }
 
+
+def slot_of(part_type: str) -> str:
+    """part_type → 견적 자리. 쿨러만 두 종류가 한 자리다."""
+    return "COOLER" if part_type.startswith("COOLER_") else part_type
+
+
+# ── 표시 종류 = 운영자가 고르는 자리 ──────────────────────────────────
+# 사용자 결정(2026-08-05): **화면에서는 CPU쿨러 공랭·수랭을 하나로 본다.** 16종.
+#
+# **part_type 은 합치지 않는다.** `radiator_rows`(라디에이터 열)는 `COOLER_CPU_AIO`에만
+# 적용되고(0022), 라디에이터 장착 규칙이 그 값으로 케이스 수납을 판정한다. 합치면
+# 수랭 628건 중 **589건이 들고 있는 판정 근거가 대상을 잃고**, 수랭이 안 들어가는
+# 케이스에 수랭이 붙는다. 견적이 조립 불가를 내는 것보다 나쁜 결과다.
+#
+# 접는 방식은 **견적 슬롯과 같다**(`slot_of`) — 두 번째 정의를 만들지 않는다.
+# 그래서 "쿨러는 하나"라는 사실이 이 파일 안에서 한 번만 적힌다.
+#
+# 상품 한 건의 표시는 이것을 쓰지 않는다: 목록 행은 여전히 `part_label`로
+# 'CPU쿨러(수랭)'이라 적는다 — 고르는 자리를 합치는 것이지 **사실을 감추는 게 아니다.**
+DISPLAY_LABELS: dict[str, str] = {}
+_members: dict[str, list[str]] = {}
+for _t, _l in PART_LABELS.items():
+    _k = slot_of(_t)
+    DISPLAY_LABELS.setdefault(_k, SLOT_LABELS.get(_k) or _l)
+    _members.setdefault(_k, []).append(_t)
+DISPLAY_MEMBERS = {_k: tuple(_v) for _k, _v in _members.items()}
+DISPLAY_TYPES = tuple(DISPLAY_LABELS)
+del _t, _l, _k, _members
+
+
+def expand_display(key: str) -> tuple[str, ...]:
+    """표시 종류 → 실제 part_type들. 'COOLER' → 공랭·수랭. 모르는 값은 그대로."""
+    return DISPLAY_MEMBERS.get(key, (key,))
+
+
+def display_labels(part_types) -> list[str]:
+    """part_type 목록 → 표시 라벨(중복 제거·순서 보존). 공랭+수랭 → 'CPU쿨러' 한 줄."""
+    out: list[str] = []
+    for t in part_types or []:
+        lb = DISPLAY_LABELS.get(slot_of(t), PART_LABELS.get(t, t))
+        if lb not in out:
+            out.append(lb)
+    return out
+
 # ── 핵심 부품 ─────────────────────────────────────────────────────────
 # 견적에 쓰이는 부품 종류. 후보 풀·검수 집계의 대상.
 # SSD 자리만 견적 필수라 HDD는 SLOTS에 없지만, **핵심 부품이긴 하다**.

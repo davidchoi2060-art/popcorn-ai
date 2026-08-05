@@ -1154,7 +1154,8 @@ def test_taxonomy_single_source():
     # 복제본 세 벌을 놓쳤다. 검사가 좁으면 없는 안심을 준다.
     PAT = _re8.compile(r"^\s*(SLOT_KO|SLOT_LABELS?|PART_KO|PART_TYPE_LABELS?|PART_LABELS?"
                        r"|CORE_TYPES|CORE_PARTS|QUOTE_SLOTS|SLOT_TYPES|SLOTS"
-                       r"|ALL_PART_TYPES|PART_TYPES|ASSIGNABLE_TYPES)\s*=\s*[{\[(]",
+                       r"|ALL_PART_TYPES|PART_TYPES|ASSIGNABLE_TYPES"
+                       r"|DISPLAY_LABELS|DISPLAY_MEMBERS|DISPLAY_TYPES)\s*=\s*[{\[(]",
                        _re8.M)
     for fn in sorted(os.listdir(api_dir)):
         if not fn.endswith(".py") or fn == "taxonomy.py":
@@ -1176,6 +1177,29 @@ def test_taxonomy_single_source():
     check("슬롯표가 가리키는 part_type이 전부 실재", bad == [], [], bad)
     check("슬롯 목록 = 슬롯표 키", sorted(_T.SLOTS) == sorted(_T.QUOTE_SLOTS),
           sorted(_T.QUOTE_SLOTS), sorted(_T.SLOTS))
+
+    # 6) 표시 축(운영자가 고르는 종류)은 **파생**이지 두 번째 정의가 아니다.
+    #    사용자 결정(2026-08-05): 화면에서 CPU쿨러 공랭·수랭을 하나로 본다 → 16종.
+    #    **엔진의 part_type 은 17종 그대로여야 한다** — 여기가 무너지면
+    #    radiator_rows(수랭 589건)가 적용 대상을 잃고 케이스 수납 판정이 사라진다.
+    check("part_type 은 17종 그대로 (엔진 축 불변)", len(_T.PART_TYPES) == 17,
+          17, len(_T.PART_TYPES))
+    check("표시 종류는 16종 (쿨러가 하나)", len(_T.DISPLAY_TYPES) == 16,
+          16, len(_T.DISPLAY_TYPES))
+    check("표시 축이 part_type 을 하나도 빠뜨리지 않는다",
+          {t for ts in _T.DISPLAY_MEMBERS.values() for t in ts} == set(_T.PART_TYPES),
+          "전부 포함",
+          sorted(set(_T.PART_TYPES) - {t for ts in _T.DISPLAY_MEMBERS.values() for t in ts}))
+    check("표시 'COOLER' = 공랭 + 수랭",
+          _T.expand_display("COOLER") == ("COOLER_CPU_AIR", "COOLER_CPU_AIO"),
+          ("COOLER_CPU_AIR", "COOLER_CPU_AIO"), _T.expand_display("COOLER"))
+    # 라벨을 두 번 적지 않았는가 — 슬롯 라벨과 같은 객체에서 왔어야 한다.
+    check("쿨러 표시 라벨 = 슬롯 라벨(같은 원천)",
+          _T.DISPLAY_LABELS["COOLER"] == _T.SLOT_LABELS["COOLER"],
+          _T.SLOT_LABELS["COOLER"], _T.DISPLAY_LABELS["COOLER"])
+    # 쿨러 말고는 접히지 않는다 — 접기 규칙이 번지면 다른 종류가 조용히 합쳐진다.
+    _folded = sorted(k for k, v in _T.DISPLAY_MEMBERS.items() if len(v) > 1)
+    check("접히는 것은 쿨러뿐", _folded == ["COOLER"], ["COOLER"], _folded)
 
 
 def test_categories():
@@ -1366,6 +1390,32 @@ def test_category_mapping():
         if [(x["key"], x["label"]) for x in (_o or {}).get("part_types", [])] != map_pt:
             _drift.append(_sc)
     check("탭이 바뀌어도 부품 종류 목록이 같다", _drift == [], [], _drift)
+
+    # 표시 축이 화면까지 살아 왔는가 — 16종이고 쿨러가 하나여야 한다(2026-08-05).
+    check("화면이 받는 부품 종류는 16종", len(map_pt) == 16, 16, len(map_pt))
+    check("쿨러가 한 줄로 온다", ("COOLER", "CPU쿨러") in map_pt,
+          ("COOLER", "CPU쿨러"), [x for x in map_pt if x[0].startswith("COOLER")])
+
+    # **필터가 실제로 두 종류를 함께 잡는가.** 여기가 핵심이다 —
+    # 'COOLER'를 그대로 `part_type =` 에 넣으면 그런 값은 없어서 조용히 0건이 된다.
+    # 화면엔 선택지가 멀쩡히 보이는데 고르면 빈 목록이 나오는 형태의 고장이다.
+    _cool = get("/api/admin/category-mapping?scope=all&part_type=COOLER&size=1")
+    _got = (_cool or {}).get("total")
+    if _engine is not None:
+        with _engine.connect() as c:
+            _want = c.execute(text(
+                "SELECT count(*) FROM products WHERE part_type IN"
+                " ('COOLER_CPU_AIR','COOLER_CPU_AIO')")).scalar()
+        check("쿨러 필터 = 공랭 + 수랭 실측", _got == _want, _want, _got)
+    else:
+        check("쿨러 필터가 0건이 아니다", bool(_got), "> 0", _got)
+
+    # 판매 트리에서도 쿨러는 한 노드다(0029). 두 개로 되돌아가면 여기서 잡힌다.
+    _cats = (get("/api/admin/categories") or {}).get("items", [])
+    _cool_nodes = [c["name"] for c in _cats
+                   if any(str(t).startswith("COOLER_")
+                          for t in (c.get("allowed_part_types") or []))]
+    check("판매 트리의 쿨러 노드는 하나", len(_cool_nodes) == 1, 1, _cool_nodes)
 
     # 목록은 서버 페이지네이션이다 — 전 행을 보내면 안 된다(22,838건)
     d2 = get("/api/admin/category-mapping?scope=all&size=10&page=2")
