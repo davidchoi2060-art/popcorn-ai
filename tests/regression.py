@@ -1344,6 +1344,29 @@ def test_category_mapping():
         check("탭 '%s' 의 수 = 그 범위의 실제 건수" % _sc,
               _d.get("total") == counts.get(_k), counts.get(_k), _d.get("total"))
 
+    # **두 화면이 같은 부품 종류 목록을 본다.**
+    # 사용자 지적(2026-08-05): 카테고리 관리는 17종을 한글로 보여주는데 상품 매핑은
+    # `CASE`·`MB`·`GPU` 같은 **영문 키**를 보여줬다. 매핑 API 가 part_types 를 주지 않아
+    # 화면이 ① 현재 페이지 상품과 ② 카테고리의 allowed_part_types 에서 조립했기 때문이다
+    # (②에는 라벨이 없다). 탭을 바꾸면 목록도 달라졌다.
+    # CLAUDE.md 가 슬라이스 66에 적어 둔 함정을 되풀이한 것이다 —
+    # "목록 필터 선택지는 서버가 준다. 화면이 현재 페이지에서 뽑으면 그 페이지에 없는 값은
+    #  아예 안 나온다."
+    cat_pt = [(x["key"], x["label"]) for x in (get("/api/admin/categories") or {}).get("part_types", [])]
+    map_pt = [(x["key"], x["label"]) for x in (d or {}).get("part_types", [])]
+    check("매핑 API 가 부품 종류 목록을 준다", len(map_pt) > 0, "> 0", len(map_pt))
+    # 개수만 보고하면 "17 대 17"이 되어 무엇이 다른지 알 수 없다 — 다른 항목을 보여준다.
+    _diff = sorted(set(cat_pt) ^ set(map_pt))[:4]
+    check("두 화면의 부품 종류 목록이 같다", cat_pt == map_pt,
+          "동일", _diff or ("순서 다름" if sorted(cat_pt) == sorted(map_pt) else "다름"))
+    # 탭이 바뀌어도 목록은 그대로여야 한다(조립하던 시절엔 탭마다 달랐다)
+    _drift = []
+    for _sc in ("unmapped", "violation", "unclassified"):
+        _o = get("/api/admin/category-mapping?scope=%s&size=1" % _sc)
+        if [(x["key"], x["label"]) for x in (_o or {}).get("part_types", [])] != map_pt:
+            _drift.append(_sc)
+    check("탭이 바뀌어도 부품 종류 목록이 같다", _drift == [], [], _drift)
+
     # 목록은 서버 페이지네이션이다 — 전 행을 보내면 안 된다(22,838건)
     d2 = get("/api/admin/category-mapping?scope=all&size=10&page=2")
     check("페이지 크기를 지킨다", len(d2.get("items") or []) <= 10, "<= 10",

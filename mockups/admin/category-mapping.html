@@ -538,17 +538,14 @@
            mv.innerHTML = catOptions(); if(keep) mv.value = keep;
            var fc = document.getElementById("fCat"); fillFc(fc); }
 
+    // 부품 종류는 **서버가 준 목록만** 쓴다(카테고리 관리 화면과 같은 원천).
+    // 화면이 현재 페이지에서 뽑으면 탭마다 목록이 달라지고, 카테고리의 허용 종류에서
+    // 모으면 한글 라벨이 없어 영문 키가 그대로 뜬다 — 둘 다 겪었다.
     var pt = document.getElementById("fPt");
-    if(pt.options.length <= 1){
-      var seen = {};
-      (DATA.items || []).forEach(function(i){ seen[i.part_type] = i.part_label; });
-      // 부품 종류 목록은 카테고리의 허용 종류에서 모은다(현재 페이지에 의존하지 않게)
-      (DATA.categories || []).forEach(function(c){
-        (c.allowed_part_types || []).forEach(function(t){ seen[t] = seen[t] || t; });
-      });
-      Object.keys(seen).sort().forEach(function(k){
+    if(pt.options.length <= 1 && (DATA.part_types || []).length){
+      DATA.part_types.forEach(function(p){
         pt.insertAdjacentHTML("beforeend",
-          '<option value="' + esc(k) + '">' + esc(seen[k]) + '</option>');
+          '<option value="' + esc(p.key) + '">' + esc(p.label) + '</option>');
       });
     }
 

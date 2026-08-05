@@ -166,6 +166,12 @@ def mapping(scope: str = "unmapped", category_id: int | None = None, q: str = ""
                         "is_visible": c["is_visible"], "sort_order": c["sort_order"],
                         "product_count": c["n"], "subtree_count": c["n_sub"],
                         "in_stock_count": c["n_stock"]} for c in cats],
+        # 부품 종류 목록은 **서버가 준다**(taxonomy 단일 원천).
+        # 예전엔 화면이 ① 현재 페이지 상품과 ② 카테고리의 allowed_part_types 에서 조립했다.
+        # 그래서 탭마다 목록이 달라졌고, ②에서 온 것은 한글 라벨이 없어 `CASE`·`MB`·`GPU`
+        # 같은 **영문 키가 그대로** 떴다(17종 중 16종). 카테고리 관리 화면과 다른 목록이
+        # 보이는 원인이었다 — 같은 것을 두 곳에서 만들면 갈라진다(슬라이스 66 규약).
+        "part_types": [{"key": k, "label": v} for k, v in PART_LABELS.items()],
         "max_move": MAX_MOVE,
         "note": ("목록은 서버에서 걸러 페이지로 나눕니다 — 위 건수는 현재 페이지가 아니라"
                  " 조건 전체입니다. 허용 부품 종류를 어기는 이동도 **막지 않습니다**;"
