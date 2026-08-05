@@ -2218,6 +2218,46 @@ def test_screen_assets():
     check("표를 가진 화면은 ui-list.js 를 phoenix.js 보다 먼저 싣는다",
           _order == [], [], _order[:5])
 
+    # ⑤ 폰트를 남의 서버에서 받지 않는다 (2026-08-05).
+    #    망이 막히거나 그쪽이 죽으면 글꼴이 통째로 바뀐다. 아이콘은 이미 로컬이었다.
+    _all = [(p, s) for p, s in
+            [(q, io.open(q, encoding="utf-8").read())
+             for q in sorted(_g7.glob(os.path.join(ROOT, "mockups", "**", "*.html"),
+                                      recursive=True))]]
+    _cdn = [os.path.relpath(p, ROOT) for p, s in _all
+            if "fonts.googleapis.com" in s or "fonts.gstatic.com" in s or "jsdelivr" in s]
+    check("외부 폰트 CDN을 부르는 화면이 없다", _cdn == [], [], _cdn[:5])
+
+    _fdir = os.path.join(ROOT, "mockups", "shared", "fonts")
+    _need = ("fonts.css", "PretendardVariable.woff2", "Inter.woff2",
+             "HankenGrotesk.woff2", "JetBrainsMono.woff2")
+    _gone = [f for f in _need if not os.path.exists(os.path.join(_fdir, f))]
+    check("로컬 폰트 파일이 실제로 있다", _gone == [], [], _gone)
+
+    # OFL 은 **재배포 시 라이선스 동봉이 조건**이다 — 폰트를 우리 서버에서 내주는 순간
+    # 재배포다. 아이콘(Streamline)에 출처 표기를 붙인 것과 같은 이유.
+    _ofl = sorted(f for f in os.listdir(_fdir) if f.startswith("OFL-"))
+    check("OFL 라이선스 원문을 함께 둔다", len(_ofl) >= 4, ">= 4", len(_ofl))
+
+    # 폰트를 쓰던 화면은 로컬 시트를 링크해야 한다 — 안 그러면 시스템 글꼴로 조용히 바뀐다.
+    _nolink = [os.path.relpath(p, ROOT) for p, s in _all
+               if ("Pretendard" in s or "Hanken" in s) and "shared/fonts/fonts.css" not in s]
+    check("폰트를 쓰는 화면이 로컬 시트를 링크한다", _nolink == [], [], _nolink[:5])
+
+    # ⑥ Material Symbols 폰트를 뗐으므로, 매핑이 없는 글리프는 **글자가 그대로 뜬다**
+    #    (예전엔 웹폰트가 가려 줬다). su-icons 의 MS 맵이 전부 덮는지 본다.
+    _su = io.open(os.path.join(ROOT, "mockups", "shared", "su-icons.js"),
+                  encoding="utf-8").read()
+    _msmap = set(_re7.findall(r'"([a-z_0-9]+)":\s*"(?:ms|ft)-', _su))
+    _raw = []
+    for p, s in _all:
+        for m in _re7.finditer(
+                r'class="[^"]*material-symbols-outlined[^"]*"[^>]*>([^<]*)<', s):
+            g = m.group(1).strip()
+            if g and g not in _msmap:
+                _raw.append(os.path.basename(p) + ":" + g)
+    check("material-symbols 글리프가 전부 매핑돼 있다", _raw == [], [], _raw[:5])
+
     # 스타일이 안 먹으면 화면은 뜨지만 읽을 수 없는 상태가 된다 — 테마를 싣는지 본다
     noTheme = []
     for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
