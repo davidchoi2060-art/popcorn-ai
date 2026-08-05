@@ -284,13 +284,17 @@
           </div></div></div>
           <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body p-0">
             <div class="p-3 border-bottom"><h6 class="mb-0">변동 기록 <span class="fs-10 fw-normal text-body-tertiary" id="histCount"></span></h6></div>
-            <div class="table-responsive" style="max-height:320px;overflow-y:auto;"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-3">일자</th><th>구분</th><th class="text-end">변동</th><th>사유</th></tr></thead><tbody id="histRows">
-              <tr><td class="ps-3">07-13</td><td>매입 A</td><td class="text-end">356,000 → 352,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #213</a></td></tr>
-              <tr><td class="ps-3">07-12</td><td>매입 B</td><td class="text-end">364,000 → 361,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #212</a></td></tr>
-              <tr><td class="ps-3">07-08</td><td class="fw-bold">판매가</td><td class="text-end fw-bold">405,000 → 398,000</td><td><a href="price-review.html" class="fs-10">가격 검토 승인</a> · 김운영</td></tr>
-              <tr><td class="ps-3">07-02</td><td>매입 A</td><td class="text-end">361,000 → 356,000</td><td><a href="csv-jobs.html" class="fs-10">배치 #208</a></td></tr>
-              <tr><td class="ps-3">06-25</td><td class="fw-bold">판매가</td><td class="text-end fw-bold">412,000 → 405,000</td><td>운영자 직접 수정 · david</td></tr>
+            <!-- data-list = 이 화면에 올라온 이력 안에서의 검색·정렬. 조회 범위(상품 선택)는 서버가 정한다.
+                 일자 열은 '07-13' 같은 문자열이라 정렬 대상에서 뺀다(문자열 정렬은 오해를 부른다). -->
+            <div id="histList" class="table-list" data-list='{"valueNames":["kind","change","reason"]}'>
+            <div class="table-responsive" style="max-height:320px;overflow-y:auto;"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-3">일자</th><th class="sort" data-sort="kind">구분</th><th class="sort text-end" data-sort="change">변동</th><th class="sort" data-sort="reason">사유</th></tr></thead><tbody class="list" id="histRows">
+              <tr><td class="ps-3">07-13</td><td class="kind">매입 A</td><td class="change text-end">356,000 → 352,000</td><td class="reason"><a href="csv-jobs.html" class="fs-10">배치 #213</a></td></tr>
+              <tr><td class="ps-3">07-12</td><td class="kind">매입 B</td><td class="change text-end">364,000 → 361,000</td><td class="reason"><a href="csv-jobs.html" class="fs-10">배치 #212</a></td></tr>
+              <tr><td class="ps-3">07-08</td><td class="kind fw-bold">판매가</td><td class="change text-end fw-bold">405,000 → 398,000</td><td class="reason"><a href="price-review.html" class="fs-10">가격 검토 승인</a> · 김운영</td></tr>
+              <tr><td class="ps-3">07-02</td><td class="kind">매입 A</td><td class="change text-end">361,000 → 356,000</td><td class="reason"><a href="csv-jobs.html" class="fs-10">배치 #208</a></td></tr>
+              <tr><td class="ps-3">06-25</td><td class="kind fw-bold">판매가</td><td class="change text-end fw-bold">412,000 → 405,000</td><td class="reason">운영자 직접 수정 · david</td></tr>
             </tbody></table></div>
+            </div>
           </div></div></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
@@ -299,6 +303,48 @@
       (function(){
         // ---- LIVE (슬라이스 27) — 가격 이력 원장 조회. 공급처별 매입가 분리는 원장에 없어 2선만 ----
         let LIVE=false;
+        // data-list — 표는 fetch 로 나중에 그리므로 렌더 직후 우리가 직접 붙인다.
+        // list.js 에 destroy 가 없어 처음 한 번만 만들고 이후엔 reIndex().
+        var LIST=null;
+        // list.js 가 읽는 셀 값은 innerHTML 이라 태그·콤마가 그대로 섞인다.
+        // 기본(자연) 정렬은 콤마를 만나면 1,205,000 을 356,000 보다 작게 본다(price-review 와 같은 함정).
+        function sortText(v){ return String(v==null?"":v).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(); }
+        // '변동' 은 '이전 → 이후(+델타)' 라 값 하나로 줄 수 없다. 변동폭(이후-이전)으로 비교한다.
+        // '신규 → x' 는 이전 값이 없어 변동폭을 만들 수 없다 — 지어내지 말고 뒤로 보낸다.
+        function sortDelta(v){
+          var n=sortText(v).replace(/,/g,"").match(/-?\d+/g);
+          return (n&&n.length>=2)?(parseFloat(n[1])-parseFloat(n[0])):null;
+        }
+        function listSort(a,b,opt){
+          var k=opt.valueName, av=a.values()[k], bv=b.values()[k];
+          if(k==="change"){
+            var x=sortDelta(av), y=sortDelta(bv);
+            if(x===null&&y===null) return 0;
+            if(x===null) return 1;
+            if(y===null) return -1;
+            return x<y?-1:(x>y?1:0);
+          }
+          return sortText(av).localeCompare(sortText(bv),"ko");
+        }
+        function wireList(){
+          var host=document.getElementById("histList");
+          if(!window.List||!host)return;
+          if(!LIST){
+            // docReady 의 listInit 이 [data-list] 를 보고 같은 표에 List 를 하나 더 만든다.
+            // 둘이 같은 th 에 핸들러를 걸면 클릭 한 번이 asc→desc 로 이어져 오름차순이 영영 안 나오고,
+            // 나중에 도는 쪽이 자기가 들고 있는 낡은(더미) 행으로 tbody 를 되돌려 놓는다.
+            // ① 아직 안 돌았으면 data-list 를 떼어 아예 안 만들게 한다
+            //    (화살표 CSS 는 `[data-list] .sort` 와 `.table-list .sort` 짝이라 컨테이너 class 가 대신 받는다)
+            // ② 이미 돌았으면 th 를 복제해 바꿔 끼워 그쪽 핸들러만 떼어낸다.
+            host.removeAttribute("data-list");
+            [].forEach.call(host.querySelectorAll("th.sort"),function(th){
+              th.className=th.className.replace(/\b(asc|desc)\b/g,"").replace(/\s+/g," ").trim();
+              th.parentNode.replaceChild(th.cloneNode(true),th);
+            });
+            try{ LIST=new window.List(host,{valueNames:["kind","change","reason"],sortFunction:listSort}); }catch(e){ LIST=null; }
+          }
+          else { try{ LIST.reIndex(); }catch(e){} }
+        }
         const won=n=>n==null?"—":n.toLocaleString()+"원";
         const fmtD=iso=>{const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
         // 공급처별 매입가 다중선(0004 supplier_id) + 판매가 1선. 색은 팔레트 순환(초록 없음).
@@ -344,10 +390,11 @@
               document.getElementById("histCount").textContent=`${d.items.length}건`;
               document.getElementById("histRows").innerHTML=d.items.length?d.items.map(h=>`
                 <tr><td class="ps-3 text-body-tertiary">${fmtD(h.at)}</td>
-                  <td class="${h.field==="sale"?"fw-bold":""}">${h.field_label}</td>
-                  <td class="text-end ${h.field==="sale"?"fw-bold":""}">${h.old==null?"신규":won(h.old)} → ${won(h.new)}${h.delta?`<div class="fs-10 ${h.delta>0?"text-danger":"text-primary"}">${h.delta>0?"+":""}${h.delta.toLocaleString()}</div>`:""}</td>
-                  <td><a href="${h.reason_link}" class="fs-10">${h.reason_label}</a>${h.supplier?`<div class="fs-10 text-body-tertiary">${h.supplier}</div>`:""}${h.ref_id?`<div class="fs-10 text-body-quaternary">ref ${h.ref_id}</div>`:""}</td></tr>`).join("")
+                  <td class="kind ${h.field==="sale"?"fw-bold":""}">${h.field_label}</td>
+                  <td class="change text-end ${h.field==="sale"?"fw-bold":""}">${h.old==null?"신규":won(h.old)} → ${won(h.new)}${h.delta?`<div class="fs-10 ${h.delta>0?"text-danger":"text-primary"}">${h.delta>0?"+":""}${h.delta.toLocaleString()}</div>`:""}</td>
+                  <td class="reason"><a href="${h.reason_link}" class="fs-10">${h.reason_label}</a>${h.supplier?`<div class="fs-10 text-body-tertiary">${h.supplier}</div>`:""}${h.ref_id?`<div class="fs-10 text-body-quaternary">ref ${h.ref_id}</div>`:""}</td></tr>`).join("")
                 :`<tr><td colspan="4" class="text-center text-body-tertiary py-4">이 상품의 가격 이력이 없습니다.</td></tr>`;
+              wireList();
               const b=document.getElementById("dataSrc");
               b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
               sel.onchange=()=>load(+sel.value);
@@ -355,7 +402,7 @@
             });
         }
         document.getElementById("pick").onchange=()=>{};
-        load(null).catch(()=>{});
+        load(null).catch(()=>{ wireList(); });   // 더미 폴백 표에도 정렬은 붙여 둔다(List 없으면 조용히 건너뜀)
         if(window.feather)feather.replace();
       })();
       </script>

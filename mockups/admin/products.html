@@ -278,11 +278,19 @@
               <input id="q" class="form-control form-control-sm" style="max-width:240px;" placeholder="자체 상품번호 · SKU · 상품명 검색">
             </div>
           </div>
-          <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1080px;">
+          <div class="card-body p-0">
+          <!-- data-list = **현재 페이지 안에서의** 검색·정렬(헤더 클릭). 페이지 이동은 서버가 한다 —
+               page/pagination 옵션을 넣지 않는다(넣으면 서버가 나눈 100건을 또 쪼갠다).
+               판매가만 attr 로 정렬한다: 표시값은 "239,000원"이라 문자열 정렬이 자릿수 쉼표에서 어긋나
+               1,299,000 을 239,000 보다 작다고 놓는다. data-num(원 단위 정수)이 그걸 막는다.
+               이 표에 날짜·시각 컬럼은 없다. -->
+          <div id="prodList" data-list='{"valueNames":["code","name","cat","spec","stock","supplier",{"name":"price","attr":"data-num"},"status"]}'>
+          <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1080px;">
             <colgroup><col style="width:150px"><col><col style="width:100px"><col style="width:130px"><col style="width:70px"><col style="width:80px"><col style="width:110px"><col style="width:170px"><col style="width:150px"></colgroup>
-            <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">자체 상품번호 · SKU</th><th>상품명</th><th>분류</th><th>필수 사양</th><th class="text-end">재고</th><th class="text-end">공급처</th><th class="text-end">판매가</th><th>상태</th><th class="pe-4"></th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table></div></div>
+            <thead><tr class="text-body-tertiary"><th class="sort ps-4 py-2" data-sort="code">자체 상품번호 · SKU</th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="supplier">공급처</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
+            <tbody class="list" id="rows"></tbody>
+          </table></div>
+          </div></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
@@ -364,6 +372,33 @@
           const ok=done===total;
           return `<span class="badge badge-phoenix badge-phoenix-${ok?"primary":"warning"}">${ok?"확인 완료":"미확인 "+(total-done)}</span> <span class="fs-10 text-body-tertiary">${done}/${total}</span>`;
         }
+        // 판매가 정렬 키 — 표시 문자열에서 숫자만 남긴다(값을 새로 만들지 않는다. "—"는 빈 값 그대로).
+        const priceNum=t=>String(t==null?"":t).replace(/[^0-9]/g,"");
+        /* ── 현재 페이지 정렬(list.js) ─────────────────────────────────────
+           Phoenix 의 listInit 은 docReady 때 **1회만** 돈다. 이 표는 fetch 응답으로 다시 그려지므로
+           렌더 직후 우리가 직접 붙인다. list.js 에는 destroy 가 없다 — 처음 한 번 만들고 이후엔 reIndex().
+           서버 페이지네이션은 그대로 둔다: page/pagination 옵션 없음 → 이 인스턴스는 현재 페이지만 다룬다. */
+        const LIST_VALUE_NAMES=["code","name","cat","spec","stock","supplier",{name:"price",attr:"data-num"},"status"];
+        var LIST=null, LIST_ARMED=false;
+        function wireList(){
+          var host=document.getElementById("prodList");
+          if(!window.List||!host||!LIST_ARMED) return;   // vendors/list.js 가 없으면 조용히 건너뛴다
+          if(LIST){ try{ LIST.reIndex(); }catch(e){} return; }
+          /* docReady 의 listInit 도 같은 컨테이너에 인스턴스를 하나 만든다(이 화면은 더미 행을 즉시
+             그리므로 그 인스턴스에 **옛 행**이 물린다). list.js 의 정렬은 tbody 를 비우고 자기 행을
+             다시 붙이므로, 그대로 두면 실데이터를 받은 뒤 정렬을 누를 때 더미가 되살아난다.
+             destroy 가 없으니 정렬 헤더를 복제해 그 핸들러만 떼어낸다(우리 인스턴스가 그 뒤에 붙는다). */
+          try{
+            [].forEach.call(host.querySelectorAll("th.sort"),function(th){
+              th.parentNode.replaceChild(th.cloneNode(true),th);
+            });
+          }catch(e){}
+          try{ LIST=new window.List(host,{valueNames:LIST_VALUE_NAMES}); }catch(e){ LIST=null; }
+        }
+        // listInit(docReady) 이 끝난 뒤에 만든다 — setTimeout 이 그 dispatch 다음 차례를 보장한다.
+        function armList(){ LIST_ARMED=true; wireList(); }
+        if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){ setTimeout(armList,0); });
+        else setTimeout(armList,0);
         function render(){
           pills();
           const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
@@ -373,17 +408,18 @@
           document.getElementById("rows").innerHTML=list.length?list.map(p=>{
             const [lab,col,link,act]=ST[p.status_key];
             return `<tr>
-              <td class="ps-4"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
-              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="text-decoration-none text-body-highlight">${p.name}</a></td>
-              <td class="text-body-tertiary">${p.cat}</td>
-              <td>${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
-              <td class="text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
-              <td class="text-end">${p.supplier_count}</td>
-              <td class="text-end">${p.price_text}</td>
-              <td><span class="badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
+              <td class="code ps-4"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
+              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight">${p.name}</a></td>
+              <td class="cat text-body-tertiary">${p.cat}</td>
+              <td class="spec">${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
+              <td class="stock text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
+              <td class="supplier text-end">${p.supplier_count}</td>
+              <td class="price text-end" data-num="${priceNum(p.price_text)}">${p.price_text}</td>
+              <td><span class="status badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
               <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?code=${p.product_code}&edit=1">수정</a></td>
             </tr>`;
           }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
+          wireList();   // 행을 다시 그렸으니 정렬 색인도 다시 잡는다
         }
         // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패(file://·정적 호스팅) 시 더미 유지
         fillSelects();renderKpis(null);render();if(window.feather)feather.replace();

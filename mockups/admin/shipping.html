@@ -270,11 +270,14 @@
         <div class="row g-2 mb-3" id="kpis"></div>
         <div class="card">
           <div class="card-header border-bottom border-translucent"><ul class="nav nav-pills gap-2 fs-9 mb-0" id="pills"></ul></div>
-          <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:980px;">
+          <div class="card-body p-0">
+            <!-- data-list = 현재 페이지 안의 검색·정렬만. 상태 탭(pills)·서버 조회는 그대로 두고,
+                 page/pagination 옵션은 넣지 않는다(넣으면 지금 목록을 또 쪼갠다). -->
+            <div id="shipList" data-list='{"valueNames":["ordno","cust","ch","items","track","state"]}'><div class="table-responsive"><table class="table table-list table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:980px;">
             <colgroup><col style="width:120px"><col style="width:90px"><col style="width:110px"><col><col style="width:190px"><col style="width:110px"><col style="width:160px"></colgroup>
-            <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">주문번호</th><th>고객</th><th>채널</th><th>구성</th><th>송장</th><th>상태</th><th class="pe-4 text-end"></th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table></div></div>
+            <thead><tr class="text-body-tertiary"><th class="sort ps-4 py-2" data-sort="ordno">주문번호</th><th class="sort" data-sort="cust">고객</th><th class="sort" data-sort="ch">채널</th><th class="sort" data-sort="items">구성</th><th class="sort" data-sort="track">송장</th><th class="sort" data-sort="state">상태</th><th class="pe-4 text-end"></th></tr></thead>
+            <tbody class="list" id="rows"></tbody>
+          </table></div></div></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
@@ -310,6 +313,29 @@
           }).join("");
           document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
         }
+        // ---- 현재 페이지 검색·정렬 (Phoenix data-list / list.js) ----
+        // 표는 fetch 응답으로 다시 그려지므로 렌더 직후 우리가 붙인다. list.js 에 destroy 가 없어
+        // 처음 한 번만 만들고 이후에는 reIndex() 한다.
+        // docReady 의 listInit 에는 맡기지 않는다 — 이 화면은 첫 렌더가 동기라 docReady 시점에 행이
+        // 이미 있어 인스턴스가 하나 더 생긴다. 두 인스턴스가 같은 <th class="sort"> 를 물면 정렬
+        // 방향을 서로 뒤집어(앞이 asc 로 바꿔 놓으면 뒤가 desc 로 읽음) 토글이 영영 안 된다.
+        // 그래서 초기화 소유권을 여기로 모은다(마크업의 data-list 는 계약 표기로 남긴다).
+        // 단, 정렬 헤더의 겉모습은 CSS 가 [data-list] .sort[data-sort] 로만 걸어 준다
+        // (cursor:pointer · white-space:nowrap). 속성을 떼면 클릭할 수 있어 보이지 않으므로
+        // 같은 규칙의 짝인 .table-list 를 표 요소에 붙여 두었다 — 그 클래스가 손대는 나머지
+        // 선택자는 전부 .page(페이지네이션)라 이 표엔 없다.
+        var LIST=null;
+        (function(){var h=document.getElementById("shipList");if(h)h.removeAttribute("data-list");})();
+        function wireList(){
+          var host=document.getElementById("shipList");
+          if(!window.List||!host)return;
+          if(!LIST){
+            try { LIST=new window.List(host,{valueNames:["ordno","cust","ch","items","track","state"]}); }
+            catch(e){ LIST=null; }
+          } else {
+            try { LIST.reIndex(); } catch(e){}
+          }
+        }
         function render(){
           kpis();pills();
           const list=S.filter(matches);
@@ -321,12 +347,12 @@
             else if(x.state==="배송중")act=`<button class="btn btn-phoenix-secondary btn-sm" data-no="${x.no}" data-act="done">배송 완료 처리</button>`;
             const stCol=x.state==="완료"?"secondary":(x.state==="배송중"?"warning":(x.state==="조립 대기"?"info":"danger"));
             return `<tr>
-              <td class="ps-4 fw-bold text-body-highlight">${x.no}</td>
-              <td>${x.cust}${x.recipient&&x.recipient!==x.cust?`<div class="fs-10 text-body-quaternary">수취 ${x.recipient}</div>`:""}</td>
-              <td>${x.ch==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>'}</td>
-              <td class="text-truncate text-body-secondary">${x.items}${x.note?`<div class="fs-10 text-body-quaternary text-truncate">${x.note}</div>`:""}</td>
-              <td class="fs-10 text-body-tertiary">${x.track||"—"}</td>
-              <td><span class="badge badge-phoenix badge-phoenix-${stCol} text-nowrap">${x.state}</span></td>
+              <td class="ordno ps-4 fw-bold text-body-highlight">${x.no}</td>
+              <td class="cust">${x.cust}${x.recipient&&x.recipient!==x.cust?`<div class="fs-10 text-body-quaternary">수취 ${x.recipient}</div>`:""}</td>
+              <td class="ch">${x.ch==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>'}</td>
+              <td class="items text-truncate text-body-secondary">${x.items}${x.note?`<div class="fs-10 text-body-quaternary text-truncate">${x.note}</div>`:""}</td>
+              <td class="track fs-10 text-body-tertiary">${x.track||"—"}</td>
+              <td class="state"><span class="badge badge-phoenix badge-phoenix-${stCol} text-nowrap">${x.state}</span></td>
               <td class="pe-4 text-end">${act}</td>
             </tr>`;
           }).join(""):`<tr><td colspan="7" class="text-center text-body-tertiary py-5">해당 상태의 건이 없습니다.</td></tr>`;
@@ -352,6 +378,7 @@
             toast(MSG[b.dataset.act],true);
             render();
           });
+          wireList();
           if(window.feather)feather.replace();
         }
         function restoreLocal(){
@@ -390,6 +417,10 @@
           note:o.status==="결제완료"?"주문 관리에서 [조립 시작] 후 진행됩니다":null,
           refund:o.refund,recipient:o.recipient});
         render();
+        // 첫 render() 는 list.js 로드 전에 돌므로(이 스크립트가 vendors 보다 위) 그때는 붙지 않는다.
+        // 더미 폴백(fetch 실패)에서도 검색·정렬이 되도록 스크립트가 다 실린 뒤 한 번 더 부른다.
+        if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",wireList);
+        else wireList();
         fetch("/api/admin/orders")
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
           .then(d=>{

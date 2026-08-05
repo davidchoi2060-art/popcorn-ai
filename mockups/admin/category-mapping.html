@@ -563,6 +563,13 @@
     var host = document.getElementById("prodList");
     if(window.List && host){
       if(!LIST){
+        // 유령 인스턴스 차단 — listInit(docReady)이 이미 이 컨테이너에 List 를 만들어
+        // th 에 정렬 핸들러를 걸어 뒀다. 그대로 두면 클릭 한 번에 두 번 뒤집혀 desc 에서 굳는다.
+        [].forEach.call(host.querySelectorAll("th.sort"), function(th){
+          th.parentNode.replaceChild(th.cloneNode(true), th);
+        });
+        host.classList.add("table-list");   // 속성을 지워도 정렬 커서·화살표 CSS 가 살아남게
+        host.removeAttribute("data-list");
         try { LIST = new window.List(host, {valueNames:["code","name","part","cat","price","stock"]}); }
         catch(e){ LIST = null; }
       } else { try { LIST.reIndex(); } catch(e){} }

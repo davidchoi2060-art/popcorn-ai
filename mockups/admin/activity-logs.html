@@ -269,10 +269,13 @@
         </div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="pills"></ul>
         <p id="limitNote" class="fs-10 text-body-tertiary mb-2" hidden></p>
-        <div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-          <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">시각</th><th>운영자</th><th>행위</th><th>대상</th><th>변경 내용</th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table></div></div></div>
+        <div class="card"><div class="card-body p-0">
+          <!-- data-list = 현재 페이지 안의 검색·정렬만 한다. 페이지 범위(최근 N건)는 서버가 정한다.
+               '시각'은 '어제 17:40'·'08-05 14:30' 같은 문자열로 그려지므로 정렬 대상에서 뺐다. -->
+          <div id="logList" data-list='{"valueNames":["op","act","target","change"]}'><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
+          <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">시각</th><th class="sort" data-sort="op">운영자</th><th class="sort" data-sort="act">행위</th><th class="sort" data-sort="target">대상</th><th class="sort" data-sort="change">변경 내용</th></tr></thead>
+          <tbody class="list" id="rows"></tbody>
+        </table></div></div></div></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -296,10 +299,40 @@
             <li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${k===cur?"active":""}" style="${k===cur?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${k===cur?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${c[k]||0}</span></a></li>`).join("");
           document.querySelectorAll("[data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
           document.getElementById("rows").innerHTML=ROWS.filter(r=>cur==="all"||r.key===cur).map(r=>`
-            <tr${r.isUndo?' class="opacity-75"':''}><td class="ps-4 text-body-tertiary">${r.at}</td><td class="fw-semibold">${r.op}</td>
-            <td><span class="badge badge-phoenix badge-phoenix-${r.col}">${r.act}</span>${r.undone?' <span class="badge badge-phoenix badge-phoenix-secondary">되돌려짐</span>':''}</td>
-            <td><code class="fs-10">${r.target}</code></td><td class="text-body-secondary">${r.sum}</td></tr>`).join("");
+            <tr${r.isUndo?' class="opacity-75"':''}><td class="ps-4 text-body-tertiary">${r.at}</td><td class="op fw-semibold">${r.op}</td>
+            <td class="act"><span class="badge badge-phoenix badge-phoenix-${r.col}">${r.act}</span>${r.undone?' <span class="badge badge-phoenix badge-phoenix-secondary">되돌려짐</span>':''}</td>
+            <td class="target"><code class="fs-10">${r.target}</code></td><td class="change text-body-secondary">${r.sum}</td></tr>`).join("");
+          wireList();
         }
+
+        /* data-list — listInit 은 docReady 때 1회만 돈다. 우리 표는 fetch 뒤에도 다시 그려지므로
+           렌더 직후 직접 붙인다. list.js 에 destroy 가 없어 처음 한 번 만들고 이후엔 reIndex() 다.
+           서버 페이지네이션은 그대로 둔다: page/pagination 옵션 없음 → 이 인스턴스는 현재 페이지만 다룬다. */
+        var LIST=null, LIST_ARMED=false;
+        function wireList(){
+          var host=document.getElementById("logList");
+          // list.min.js 는 문서 하단에서 로드된다 — 첫 render() 시점엔 window.List 가 아직 없다.
+          // 그래서 여기서 조용히 건너뛰고, armList 가 스크립트 로드 뒤에 다시 부른다.
+          if(!window.List||!host||!LIST_ARMED)return;
+          if(LIST){ try{ LIST.reIndex(); }catch(e){} return; }
+          /* docReady 의 listInit 도 같은 컨테이너(data-list)에 인스턴스를 하나 만들어 같은 th 에
+             정렬 핸들러를 걸어 둔다. 그 인스턴스는 **더미 행**을 물고 있고, list.js 의 정렬은
+             tbody 를 비우고 자기 행을 다시 붙이므로 — 실데이터를 받은 뒤 정렬을 누르면 지어낸
+             더미가 감사 기록으로 되살아난다. 게다가 두 인스턴스가 asc/desc 표시를 서로 읽어
+             두 번째 클릭부터 뒤집히지 않는다. destroy 가 없으니 정렬 헤더를 복제해 바꿔 끼워
+             그쪽 핸들러만 떼어낸다(우리 인스턴스가 그 뒤에 붙는다). */
+          try{
+            [].forEach.call(host.querySelectorAll("th.sort"),function(th){
+              th.className=th.className.replace(/\b(asc|desc)\b/g,"").replace(/\s+/g," ").trim();
+              th.parentNode.replaceChild(th.cloneNode(true),th);
+            });
+          }catch(e){}
+          try{ LIST=new window.List(host,{valueNames:["op","act","target","change"]}); }catch(e){ LIST=null; }
+        }
+        // listInit(docReady) 이 끝난 뒤에 만든다 — setTimeout 이 그 dispatch 다음 차례를 보장한다.
+        function armList(){ LIST_ARMED=true; wireList(); }
+        if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){ setTimeout(armList,0); });
+        else setTimeout(armList,0);
         render();if(window.feather)feather.replace();
 
         // ---- LIVE (슬라이스 17) — 감사 로그 실데이터: 전 행 원장(undo 행 포함), 되돌려짐 배지는 서버 파생 ----

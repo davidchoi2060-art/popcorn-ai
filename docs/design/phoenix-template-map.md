@@ -132,6 +132,130 @@
 
 ---
 
+## ⚡ 붙이는 법 — 좌표보다 이게 중요하다 (2026-08-05 실측)
+
+> 2026-08-05 실사에서 **템플릿 컴포넌트를 실제로 초기화하는 화면이 0개**인 것이 드러났다.
+> 원인 중 하나가 이 문서였다 — "어디에 있나"만 적혀 있고 **"어떻게 붙이나"**가 없었다.
+> 전수 실사는 `phoenix-audit-2026-08-05.md`.
+
+### 규칙 0 — 컴포넌트는 선언형이다
+
+`phoenix.js`가 `data-*` 속성을 보고 알아서 붙인다. **JS를 쓰지 마라. 속성을 써라.**
+
+```
+data-list  data-bulk-select  data-choices  data-echarts  data-countup
+data-flatpickr  data-nouislider  data-sortable  data-copy  data-password  …28종
+```
+
+### 규칙 1 — **initXxx는 `docReady` 때 딱 한 번 돈다**
+
+우리 화면은 대부분 fetch 응답으로 표를 **나중에** 그린다. 그 시점엔 DOM이 없으므로
+자동 초기화가 닿지 않는다. **렌더 직후 우리가 직접 붙여야 한다.**
+
+전역에 노출된 것은 둘뿐이다:
+
+```js
+window.List                  // vendors/list.js
+window.phoenix.BulkSelect    // phoenix.js  (window.phoenix = { utils, BulkSelect })
+```
+
+`treeviewInit` · `listInit` · `bulkSelectInit` 자체는 노출되지 않는다.
+
+```js
+var LIST = null, BULK = null;
+function wireComponents(){
+  var host = document.getElementById("prodList");
+  if(window.List && host){
+    if(!LIST){ LIST = new window.List(host, {valueNames:[...]}); }
+    else { LIST.reIndex(); }        // list.js 에 destroy 가 없다
+  }
+  var head = document.getElementById("bulkHead");
+  if(window.phoenix && window.phoenix.BulkSelect && head){
+    head.checked = false; head.indeterminate = false;
+    BULK = new window.phoenix.BulkSelect(head); BULK.init();
+  }
+}
+```
+
+### 규칙 2 — 표에 검색·정렬 붙이기 (`data-list`)
+
+```html
+<div id="prodList" data-list='{"valueNames":["code","name","price"]}'>
+  <table>
+    <thead><tr>
+      <th class="sort" data-sort="code">코드</th>
+      <th class="sort text-end" data-sort="price">가격</th>
+    </tr></thead>
+    <tbody class="list" id="prodBody">
+      <tr><td class="code">…</td><td class="price text-end">…</td></tr>
+    </tbody>
+  </table>
+</div>
+```
+
+- `valueNames` · `data-sort` · `<td class>` **셋이 같은 이름**이어야 한다. 하나만 어긋나도 그 컬럼이 조용히 죽는다.
+- `<tbody class="list">` 가 없으면 list.js가 항목을 못 찾는다.
+- **서버 페이지네이션과 공존한다.** `page`/`pagination` 옵션을 넣지 마라 — 현재 페이지를 또 쪼갠다.
+- **날짜 컬럼엔 `sort`를 붙이지 마라** — 화면이 문자열로 그리면 문자열 정렬이 된다.
+
+### 규칙 3 — 일괄 선택 (`data-bulk-select`)
+
+```html
+<input type="checkbox" id="bulkHead"
+       data-bulk-select='{"body":"prodBody","actions":"bulk-actions","replacedElement":"bulk-replace"}'>
+…
+<tr><td><input type="checkbox" data-bulk-select-row='{"code":12345}'></td>…</tr>
+```
+
+컴포넌트가 하는 일은 **`actions`/`replacedElement` 의 `d-none` 토글뿐**이다. 다음은 우리 몫:
+
+- **'선택 n건' 카운터가 없다** — `BULK.getSelectedRows().length` 로 직접 센다
+- **선택 변경 이벤트가 없다** — tbody 위임으로 직접 듣는다
+- **`body` id가 없으면 TypeError로 통째로 죽는다**(null 가드 없음). `actions`/`replacedElement`는 생략해도 안전
+- **`deselectAll()` 은 '토글'이다** — 선택이 없을 때 부르면 액션바가 **오히려 나타난다.** 쓰지 말고 직접 클래스를 맞춰라
+- `data-bulk-select-row` 값은 `JSON.parse` 된다 — `"2453"` 은 **숫자**가, `"0012"` 는 문자열이 된다. 타입을 고정하려면 객체로 감싸라
+
+### 규칙 4 — 계층 트리 (`treeview`)
+
+CSS(`theme.min.css`)와 JS(`treeviewInit`)가 **이미 우리 저장소에 있다.** 원본 마크업은
+`apps/file-manager/grid-view.html:2442`.
+
+```html
+<ul class="treeview" id="catTree">
+  <li class="treeview-list-item">
+    <a data-bs-toggle="collapse" href="#node-1"><p class="treeview-text">
+      <span class="fa-solid fa-folder treeview-icon"></span>부품<span class="treeview-badge">13,308</span></p></a>
+    <ul class="collapse treeview-list show" id="node-1"> … </ul>
+  </li>
+  <li class="treeview-list-item">      <!-- 잎 -->
+    <div class="treeview-item"><a class="flex-1 ps-2 ms-2" href="#!"><p class="treeview-text">…</p></a></div>
+  </li>
+</ul>
+```
+
+- **접힘/펼침은 100% Bootstrap collapse**다(위임 핸들러라 **동적 DOM에서도 된다**).
+- `treeviewInit`이 하는 일은 `.treeview-row` prepend + 줄무늬 계산뿐. 동적 렌더면 그것만 우리가 대신한다.
+- **`data-show="true"` 는 treeviewInit이 돌 때만 유효하다.** 동적이면 `class="collapse show"` 를 쓴다.
+- **선택 상태 클래스가 없다** — 하이라이트는 우리가 만든다.
+- `.treeview-list` 는 CSS가 없는 JS 훅이다. 빼면 조용히 죽는다.
+- `treeview-row` 를 마크업에 직접 쓰지 마라(JS가 넣는다 — 동적일 때만 우리가 넣는다).
+
+### 규칙 5 — vendor가 없으면 선언하지 마라
+
+우리 vendor 10개: `anchorjs bootstrap dayjs feather-icons fontawesome is list.js lodash popper simplebar`
+
+`data-choices`·`data-echarts`·`data-flatpickr`·`data-dropzone`·`data-sortable`·`data-countup`·
+`data-nouislider`·`data-rater`·`data-calendar` 는 **vendor를 먼저 복사**해야 한다
+(`D:\phoenix_Templet\public\vendors\<이름>` → `mockups/admin/vendors/`).
+회귀 `[37]`이 "vendor 없는 훅을 선언하지 않는다"를 지킨다.
+
+### 회귀가 지키는 것 — `[37] Phoenix 템플릿을 실제로 쓰는가`
+
+treeview 마크업 · 자손 배지 · `scope=subtree` · `data-list` · 정렬 헤더 · `bulk-select` ·
+동적 재부착 · vendor 없는 훅 금지 · **전체선택을 손으로 만든 화면 0개**.
+
+---
+
 ## 템플릿의 빌드 시스템은 쓰지 않는다
 
 ```

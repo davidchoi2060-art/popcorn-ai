@@ -268,10 +268,14 @@
           <p class="text-body-tertiary mb-0">매입가 변동이 임계(±15%)를 넘거나 <b class="text-body-secondary">마진 정책을 위반</b>하는 건만 모입니다. 승인 전까지 판매가는 바뀌지 않습니다.</p></div>
           <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">5</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="done">0</span>건 · <a href="margin-policy.html">마진 정책 v8</a></p></div>
         </div>
-        <div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-          <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">상품</th><th>공급처</th><th class="text-end">매입가 변동</th><th class="text-end">현재 판매가</th><th class="text-end">제안 판매가</th><th class="text-end">마진</th><th>사유</th><th class="pe-4 text-end">판정</th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table></div></div></div>
+        <div class="card"><div class="card-body p-0">
+          <!-- data-list = 현재 페이지 안의 검색·정렬(list.js). 건수·목록 구성은 그대로 서버가 정한다.
+               page/pagination 옵션은 넣지 않는다 — 넣으면 서버가 나눈 페이지를 또 쪼갠다.
+               '매입가 변동'은 두 값+증감률이 한 칸에 있어 문자열 정렬이 오해를 부르므로 sort 대상에서 뺐다. -->
+          <div id="prList" class="table-list" data-list='{"valueNames":["name","supplier","delta","current","proposed","margin","reason"]}'><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
+          <thead><tr class="text-body-tertiary"><th class="ps-4 py-2 sort" data-sort="name">상품</th><th class="sort" data-sort="supplier">공급처</th><th class="text-end">매입가 변동</th><th class="text-end sort" data-sort="current">현재 판매가</th><th class="text-end sort" data-sort="proposed">제안 판매가</th><th class="text-end sort" data-sort="margin">마진</th><th class="sort" data-sort="reason">사유</th><th class="pe-4 text-end">판정</th></tr></thead>
+          <tbody class="list" id="rows" data-repeat="review"></tbody>
+        </table></div></div></div></div>
         <p class="fs-9 text-body-tertiary mt-2 mb-0">제안 판매가 = 신규 매입가 + <a href="margin-policy.html">마진 정책</a>(카테고리 기본 마진, 끝자리 규칙) 자동 적용. 승인·수정 내역은 <a href="activity-logs.html">작업 기록</a>과 <a href="price-history.html">가격 이력</a>에 남습니다.</p>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
@@ -286,18 +290,79 @@
           ["P-3395","시소닉 FOCUS GX-750","다나와직송B","112,000 → 111,000","-0.9%","129,000","129,000","14.0%",["마진 위반(최소 15%)","danger"]]
         ];
         let done=0, LIVE=false, NOTE="";
+
+        // ── 현재 페이지 안의 검색·정렬(list.js) ──────────────────────────────
+        // phoenix 의 listInit 은 docReady 때 1회만 돈다. 이 표는 fetch 응답으로 다시 그려지므로
+        // 그때 만든 인스턴스는 지워진 행을 붙들게 된다 → 렌더 직후 우리가 직접 붙인다.
+        // list.js 에는 destroy 가 없다: 처음 한 번 만들고 이후에는 reIndex() 한다.
+        var LIST=null;
+        var VNAMES=["name","supplier","delta","current","proposed","margin","reason"];
+        // list.js 기본(자연) 정렬은 자릿수 콤마를 만나면 1,415,000 을 415,000 보다 작게 본다.
+        // 금액·비율 열은 값으로 비교하고, 값이 없는 행(—)은 뒤로 보낸다.
+        var NUMCOL={current:1,proposed:1,margin:1};
+        function sortPlain(v){ return String(v==null?"":v).replace(/<[^>]*>/g," ").trim(); }
+        function sortNum(v){
+          var m=sortPlain(v).replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);
+          return m?parseFloat(m[0]):null;
+        }
+        function listSort(a,b,opt){
+          var k=opt.valueName, av=a.values()[k], bv=b.values()[k];
+          if(NUMCOL[k]){
+            var x=sortNum(av), y=sortNum(bv);
+            if(x===null&&y===null) return 0;
+            if(x===null) return 1;
+            if(y===null) return -1;
+            return x<y?-1:(x>y?1:0);
+          }
+          return sortPlain(av).localeCompare(sortPlain(bv),"ko");
+        }
+        // 지금 걸려 있는 정렬을 헤더 화살표(.asc/.desc)에서 읽는다 — list.js 가 그 클래스를
+        // 단일 원천으로 쓰므로 우리가 따로 상태를 들지 않는다.
+        function activeSort(host){
+          var els=host.querySelectorAll(".sort[data-sort]");
+          for(var i=0;i<els.length;i++){
+            if(els[i].classList.contains("asc"))  return {v:els[i].getAttribute("data-sort"),o:"asc"};
+            if(els[i].classList.contains("desc")) return {v:els[i].getAttribute("data-sort"),o:"desc"};
+          }
+          return null;
+        }
+        function wireList(){
+          var host=document.getElementById("prList");
+          if(!window.List||!host) return;          // vendors/list.js 가 없으면 조용히 건너뛴다
+          if(!LIST){
+            try{
+              LIST=new window.List(host,{valueNames:VNAMES,sortFunction:listSort});
+              // 우리가 만들었으니 listInit 이 같은 표에 두 번째 List 를 만들지 않게 한다.
+              // (두 개면 클릭 한 번에 양쪽이 정렬하고, 낡은 쪽이 지워진 행을 되살린다.)
+              // 정렬 화살표·커서 CSS 는 `[data-list] .sort` 와 `.table-list .sort` 짝으로 걸려 있어
+              // 컨테이너의 class="table-list" 가 그대로 유지해 준다.
+              host.removeAttribute("data-list");
+            }catch(e){ LIST=null; }
+          }else{
+            // reIndex 는 정렬을 다시 걸지 않는다. 표는 서버 순서로 돌아오는데 헤더 화살표는
+            // 그대로 남아 '이 열로 정렬됨'이라고 거짓말한다 — 마진 오름차순으로 놓고 승인한
+            // 운영자가 다음 맨 윗줄을 '그 다음으로 나쁜 마진'으로 믿고 누르면 엉뚱한 상품의
+            // 판매가를 확정한다. 그래서 다시 그린 뒤 같은 정렬을 되건다.
+            try{
+              var s=activeSort(host);
+              LIST.reIndex();
+              if(s) LIST.sort(s.v,{order:s.o});
+            }catch(e){}
+          }
+        }
+
         function render(){
           document.getElementById("cnt").textContent=R.length;
           document.getElementById("done").textContent=done;
           document.getElementById("rows").innerHTML=R.length?R.map(([sku,name,sup,delta,pct,curp,prop,margin,[why,c],code],i)=>`
             <tr class="${c==="danger"?"bg-danger-subtle bg-opacity-25":""}">
-              <td class="ps-4"><b class="text-body-highlight">${name}</b><br><code class="fs-10">${sku}</code></td>
-              <td class="text-body-tertiary">${sup}</td>
-              <td class="text-end">${delta}<br><b class="${pct.startsWith("+")?"text-danger":(pct==="—"?"text-body-tertiary":"text-primary")}">${pct}</b></td>
-              <td class="text-end">${curp==="—"?'<span class="text-body-tertiary">— (미산정)</span>':curp+"원"}</td>
-              <td class="text-end fw-bold">${prop}원</td>
-              <td class="text-end">${margin}</td>
-              <td><span class="badge badge-phoenix badge-phoenix-${c} text-nowrap">${why}</span></td>
+              <td class="ps-4 name"><b class="text-body-highlight">${name}</b><br><code class="fs-10">${sku}</code></td>
+              <td class="text-body-tertiary supplier">${sup}</td>
+              <td class="text-end delta">${delta}<br><b class="${pct.startsWith("+")?"text-danger":(pct==="—"?"text-body-tertiary":"text-primary")}">${pct}</b></td>
+              <td class="text-end current">${curp==="—"?'<span class="text-body-tertiary">— (미산정)</span>':curp+"원"}</td>
+              <td class="text-end fw-bold proposed">${prop}원</td>
+              <td class="text-end margin">${margin}</td>
+              <td class="reason"><span class="badge badge-phoenix badge-phoenix-${c} text-nowrap">${why}</span></td>
               <td class="pe-4 text-end text-nowrap">
                 <button class="btn btn-sm btn-primary" data-a="${i}" data-act="제안가 승인">제안가 승인</button>
                 <button class="btn btn-sm btn-phoenix-secondary" data-a="${i}" data-act="판매가 유지">유지</button>
@@ -329,8 +394,12 @@
             R.splice(i,1);done++;
             toast(`${r[0]} — ${act} · 가격 이력 기록 · 작업 기록 저장`);render();
           });
+          wireList();
         }
         render();if(window.feather)feather.replace();
+        // list.js 는 이 스크립트보다 뒤(</body> 직전)에서 로드된다 — 첫 render() 때는 window.List 가 없다.
+        // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙는다.
+        document.addEventListener("DOMContentLoaded",wireList);
 
         // ---- LIVE (슬라이스 21) — 가격 검토 대기 파생 목록. v1은 '첫 산정' 유형만 실데이터(note로 정직 표기) ----
         const won=n=>n==null?"—":n.toLocaleString();

@@ -270,14 +270,23 @@
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
-            <h6 class="mb-2">자주 일어나는 교체</h6>
+            <!-- data-list = **현재 페이지 안**의 검색·정렬만 한다. 행은 fetch 응답으로 나중에 그려지므로
+                 docReady 1회짜리 listInit 에는 닿지 않는다 → 렌더 직후 wireList() 가 직접 붙인다.
+                 page/pagination 옵션은 두지 않는다(서버가 나눈 페이지를 또 쪼갠다).
+                 날짜 컬럼이 없어 문자열 정렬 함정도 없다. -->
+            <div id="swapList" class="table-list" data-list='{"valueNames":["from","to","n","pct","signal"]}'>
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h6 class="mb-0">자주 일어나는 교체</h6>
+                <input class="form-control form-control-sm search w-auto" id="swapSearch" type="search" placeholder="부품 · 신호 검색" aria-label="이 목록에서 검색">
+              </div>
             <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
-              <thead><tr class="text-body-tertiary"><th>추천 부품</th><th></th><th>교체 부품</th><th class="text-end">횟수</th><th class="text-end">비율</th><th>신호</th></tr></thead><tbody>
-                <tr><td>RTX 4060</td><td>→</td><td class="fw-semibold">RTX 4060 Ti</td><td class="text-end">386</td><td class="text-end fw-bold">32%</td><td><a href="policy-weights.html" class="badge badge-phoenix badge-phoenix-warning text-decoration-none">성능 가중 상향 검토</a></td></tr>
-                <tr><td>500W 파워</td><td>→</td><td class="fw-semibold">650W 파워</td><td class="text-end">214</td><td class="text-end fw-bold">18%</td><td><a href="compat-rules.html" class="badge badge-phoenix badge-phoenix-warning text-decoration-none">여유율 규칙 검토</a></td></tr>
-                <tr><td>일반 케이스</td><td>→</td><td class="fw-semibold">화이트 케이스</td><td class="text-end">168</td><td class="text-end fw-bold">14%</td><td><a href="sourcing.html" class="badge badge-phoenix badge-phoenix-info text-decoration-none">화이트 재고 확충</a></td></tr>
-                <tr><td>라이젠5 7600</td><td>→</td><td class="fw-semibold">라이젠5 7500F</td><td class="text-end">96</td><td class="text-end">8%</td><td><span class="badge badge-phoenix badge-phoenix-secondary">관찰</span></td></tr>
+              <thead><tr class="text-body-tertiary"><th class="sort" data-sort="from">추천 부품</th><th></th><th class="sort" data-sort="to">교체 부품</th><th class="sort text-end" data-sort="n">횟수</th><th class="sort text-end" data-sort="pct">비율</th><th class="sort" data-sort="signal">신호</th></tr></thead><tbody class="list" id="swapBody">
+                <tr><td class="from">RTX 4060</td><td>→</td><td class="to fw-semibold">RTX 4060 Ti</td><td class="n text-end">386</td><td class="pct text-end fw-bold">32%</td><td class="signal"><a href="policy-weights.html" class="badge badge-phoenix badge-phoenix-warning text-decoration-none">성능 가중 상향 검토</a></td></tr>
+                <tr><td class="from">500W 파워</td><td>→</td><td class="to fw-semibold">650W 파워</td><td class="n text-end">214</td><td class="pct text-end fw-bold">18%</td><td class="signal"><a href="compat-rules.html" class="badge badge-phoenix badge-phoenix-warning text-decoration-none">여유율 규칙 검토</a></td></tr>
+                <tr><td class="from">일반 케이스</td><td>→</td><td class="to fw-semibold">화이트 케이스</td><td class="n text-end">168</td><td class="pct text-end fw-bold">14%</td><td class="signal"><a href="sourcing.html" class="badge badge-phoenix badge-phoenix-info text-decoration-none">화이트 재고 확충</a></td></tr>
+                <tr><td class="from">라이젠5 7600</td><td>→</td><td class="to fw-semibold">라이젠5 7500F</td><td class="n text-end">96</td><td class="pct text-end">8%</td><td class="signal"><span class="badge badge-phoenix badge-phoenix-secondary">관찰</span></td></tr>
               </tbody></table></div>
+            </div>
           </div></div></div>
           <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body">
             <h6 class="mb-2">근거 리포트 클릭 <span class="fs-10 fw-normal text-body-tertiary">— 고객이 실제로 읽는 이유</span></h6>
@@ -306,6 +315,37 @@
         // 클릭 영역은 '원천 준비 중'으로 표기한다(배지 3종 규약).
         var badge = document.getElementById("dataSrc");
         var LIVE = false;
+        var LIST = null;
+
+        // 현재 페이지 안의 검색·정렬(list.js). listInit 은 docReady 때 1회만 돌아
+        // fetch 뒤에 다시 그려지는 이 표에는 닿지 않는다 — 렌더 직후 우리가 붙인다.
+        // list.js 에는 destroy 가 없으므로 처음 한 번만 만들고 이후에는 reIndex() 다.
+        function wireList(){
+          var host = document.getElementById("swapList");
+          if(!window.List || !host) return;
+          if(!LIST){
+            // 이 표는 폴백 4행을 **마크업에** 들고 있어서, docReady 의 listInit 이 이미
+            // 그 4행으로 인스턴스를 하나 만들어 뒀다. 그 인스턴스는 지금 DOM 에 없는
+            // 폴백 행을 붙들고 있고, list.js 의 clear() 는 tbody 를 통째로 비운다 —
+            // 그대로 두면 정렬·검색 한 번에 **실데이터가 지워지고 더미 숫자가 되살아난다.**
+            // 헤더 행과 검색창을 복제로 갈아 끼워 그때 걸린 핸들러만 떼고 우리 것을 만든다
+            // (마크업은 그대로 · 폴백 상태에서는 이 코드가 아예 돌지 않는다).
+            var hr = host.querySelector("thead tr");
+            if(hr && hr.parentNode) hr.parentNode.replaceChild(hr.cloneNode(true), hr);
+            var sb = host.querySelector("input.search");
+            if(sb && sb.parentNode) sb.parentNode.replaceChild(sb.cloneNode(true), sb);
+            try { LIST = new window.List(host, {valueNames:["from","to","n","pct","signal"]}); }
+            catch(e){ LIST = null; }
+            // 응답이 docReady 보다 먼저 올 수 있다(로컬 API + 캐시). 그때는 listInit 이
+            // **아직** 안 돈 것이라 위의 복제는 뗄 핸들러가 없고, 뒤늦게 도는 listInit 이
+            // 같은 표에 두 번째 인스턴스를 만든다 — 같은 th 에 정렬 핸들러가 겹쳐
+            // 한 번 클릭에 오름→내림이 연달아 걸리고 **오름차순이 영영 안 나온다.**
+            // 표식을 걷어 낸다(이미 돌았으면 무해). 실패했으면 남겨 listInit 에 맡긴다.
+            if(LIST) host.removeAttribute("data-list");
+          } else {
+            try { LIST.reIndex(); } catch(e){}
+          }
+        }
 
         function esc(s){
           return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
@@ -321,25 +361,31 @@
           badge.classList.add("badge-phoenix-primary");
 
           // ① 자주 일어나는 교체 — 표 본문을 서버 집계로 교체
-          var tb = document.querySelector("table tbody");
+          // 문서 전체의 첫 tbody 가 아니라 이 표의 tbody 다 — 상단바·모달에 표가 하나
+          // 생기면 실데이터를 엉뚱한 곳에 그리고, 이 표는 더미인 채 배지만 '실데이터'가 된다.
+          var tb = document.getElementById("swapBody");
           if(tb){
             if(!d.pairs.length){
-              tb.innerHTML = '<tr><td colspan="5" class="p-3 fs-9 text-body-tertiary">'
+              tb.innerHTML = '<tr><td colspan="6" class="p-3 fs-9 text-body-tertiary">'
                 + '아직 교체 기록이 없습니다 — 고객이 S3에서 부품을 바꾸면 여기에 쌓입니다.'
                 + '</td></tr>';
             } else {
+              // td 클래스는 valueNames 와 같은 이름이어야 한다(list.js 가 이 이름으로 값을 읽는다).
+              // 화살표 칸은 헤더(<th></th>)와 칸 수를 맞추기 위한 것 — 정렬 대상이 아니다.
               tb.innerHTML = d.pairs.map(function(p){
-                return '<tr><td class="ps-3"><span class="badge badge-phoenix '
+                return '<tr><td class="from ps-3"><span class="badge badge-phoenix '
                   + 'badge-phoenix-secondary me-1">' + esc(p.slot_label) + '</span>'
                   + '<b>' + esc(p.from_sku || "—") + '</b>'
                   + '<div class="fs-10 text-body-tertiary">' + esc((p.from_name || "").slice(0,34)) + '</div></td>'
-                  + '<td><b>' + esc(p.to_sku || "—") + '</b>'
+                  + '<td class="text-body-tertiary">→</td>'
+                  + '<td class="to"><b>' + esc(p.to_sku || "—") + '</b>'
                   + '<div class="fs-10 text-body-tertiary">' + esc((p.to_name || "").slice(0,34)) + '</div></td>'
-                  + '<td class="text-end">' + p.n + '</td>'
-                  + '<td class="text-end">' + p.pct + '%</td>'
-                  + '<td class="fs-9">' + esc(p.signal) + '</td></tr>';
+                  + '<td class="n text-end">' + p.n + '</td>'
+                  + '<td class="pct text-end">' + p.pct + '%</td>'
+                  + '<td class="signal fs-9">' + esc(p.signal) + '</td></tr>';
               }).join("");
             }
+            wireList();
           }
 
           // ② 슬롯별 요약 — 어느 슬롯을 자주 바꾸는가(추천 기준을 고칠 신호)

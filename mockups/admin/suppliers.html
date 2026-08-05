@@ -352,12 +352,12 @@ setTimeout(function(){
       : '<span class="badge badge-phoenix badge-phoenix-primary">활성</span>';
     return [
       '<tr data-id="', s.id, '"', (stopped ? ' class="opacity-50"' : ''), '>',
-        '<td><b>', esc(s.name), '</b></td>',
-        '<td>', dash(s.platform), '</td>',
-        '<td class="fs-10">', dash(s.brands), '</td>',
-        '<td class="text-end">', s.linked_products, '</td>',
-        '<td class="text-end">', s.price_files, '</td>',
-        '<td>', badge, '</td>',
+        '<td class="name"><b>', esc(s.name), '</b></td>',
+        '<td class="platform">', dash(s.platform), '</td>',
+        '<td class="brands fs-10">', dash(s.brands), '</td>',
+        '<td class="linked text-end">', s.linked_products, '</td>',
+        '<td class="files text-end">', s.price_files, '</td>',
+        '<td class="status">', badge, '</td>',
         '<td class="text-end">',
           '<button class="btn btn-phoenix-secondary btn-sm sup-edit" data-id="', s.id, '">수정</button> ',
           '<button class="btn btn-phoenix-', (stopped ? 'primary' : 'secondary'),
@@ -400,20 +400,36 @@ setTimeout(function(){
 
     parts.push([
       '<div class="card"><div class="card-body">',
-        '<div class="d-flex justify-content-between align-items-center mb-3">',
+        /* data-list = 이 목록 안의 검색·정렬만. 서버가 나눈 페이지를 다시 쪼개지 않도록
+           page/pagination 옵션은 넣지 않는다.
+           class="table-list" 는 장식이 아니다 — 정렬 화살표 CSS 가 `[data-list] .sort` 와
+           `.table-list .sort` 짝으로 걸려 있고, 아래에서 data-list 를 떼기 때문에
+           이 클래스가 없으면 화살표가 사라진다(price-review 와 같은 처리). */
+        '<div id="supList" class="table-list" data-list=\'{"valueNames":["name","platform","brands","linked","files","status"]}\'>',
+        '<div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">',
           '<h5 class="mb-0">공급처 목록</h5>',
-          '<span class="fs-10 text-body-tertiary">활성 ', d.active, ' / 전체 ', d.total, '</span>',
+          '<div class="d-flex align-items-center gap-2">',
+            /* type=search 로 두면 브라우저의 ✕ 버튼이 keyup 을 안 쏴서(list.js 는 keyup 만
+               듣는다) 값만 지워지고 표는 걸러진 채 남는다 — 실제보다 적게 보인다. */
+            '<input class="search form-control form-control-sm w-auto" type="text" ',
+              'placeholder="이 목록에서 검색" aria-label="공급처 목록 검색">',
+            '<span class="fs-10 text-body-tertiary">활성 ', d.active, ' / 전체 ', d.total, '</span>',
+          '</div>',
         '</div>',
         '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">',
           '<thead><tr class="text-body-tertiary">',
-            '<th>이름</th><th>구분</th><th>취급 브랜드</th>',
-            '<th class="text-end">매입가 연결</th><th class="text-end">단가표</th>',
-            '<th>상태</th><th></th>',
-          '</tr></thead><tbody id="rows">',
+            '<th class="sort" data-sort="name">이름</th>',
+            '<th class="sort" data-sort="platform">구분</th>',
+            '<th class="sort" data-sort="brands">취급 브랜드</th>',
+            '<th class="sort text-end" data-sort="linked">매입가 연결</th>',
+            '<th class="sort text-end" data-sort="files">단가표</th>',
+            '<th class="sort" data-sort="status">상태</th><th></th>',
+          '</tr></thead><tbody class="list" id="rows">',
           (d.items.length ? d.items.map(rowHtml).join("")
             : '<tr><td colspan="7" class="text-center text-body-tertiary py-4">등록된 공급처가 없습니다</td></tr>'),
           '</tbody>',
         '</table></div>',
+        '</div>',
         '<p class="fs-10 text-body-quaternary mb-0 mt-2">',
           '삭제는 없습니다 — 매입 이력이 걸려 있어 지우면 과거 기록이 깨집니다. ',
           '중지하면 새 매입가 입력에서만 빠지고 지난 기록은 그대로 남습니다.</p>',
@@ -424,9 +440,39 @@ setTimeout(function(){
     host.hidden = false;
     fb.hidden = true;
     wire();
+    wireList();
   }
 
   var DATA = null;
+
+  /* Phoenix data-list — listInit 은 docReady 때 1회만 돌고, 이 표는 fetch 응답으로
+     그 뒤에 그려지므로 그때는 DOM에 없다. 그래서 렌더 직후 우리가 직접 붙인다.
+     list.js 에는 destroy 가 없다 → 같은 노드면 reIndex(), 노드가 바뀌었으면 새로 만든다.
+     (render 가 host.innerHTML 을 통째로 갈아끼우므로 컨테이너 노드도 매번 새로 생긴다 —
+      묵은 노드에 reIndex 하면 화면에 없는 표를 색인하게 된다.) */
+  var LIST = null, LIST_EL = null;
+  function wireList(){
+    var el = document.getElementById("supList");
+    if(!window.List || !el) return;
+    if(LIST && LIST_EL === el){ try { LIST.reIndex(); } catch(e){} return; }
+    try {
+      LIST = new window.List(el, {
+        valueNames: ["name","platform","brands","linked","files","status"]
+      });
+      LIST_EL = el;
+      /* 우리가 붙였으니 listInit 이 같은 표에 두 번째 인스턴스를 만들지 않게 한다.
+         (fetch 응답이 DOMContentLoaded 보다 빨리 오면 표가 docReady 시점에 이미 있다.)
+         두 개면 클릭 한 번에 앞쪽이 asc 를 찍고 뒤쪽이 그 표시를 읽어 desc 로 뒤집어
+         — 오름차순으로는 영영 정렬되지 않는다(orders.html 전례). */
+      el.removeAttribute("data-list");
+    } catch(e){ LIST = null; LIST_EL = null; }
+  }
+  /* list.js 는 이 스크립트보다 뒤(</body> 직전)에서 로드된다 — 응답이 그보다 빨리 오면
+     첫 render() 의 wireList 는 window.List 가 없어 조용히 건너뛴다. 그때 검색·정렬이
+     통째로 죽은 채로 남으므로(다음 렌더는 등록·수정을 해야 온다) 여기서 한 번 더 건다.
+     이 리스너는 phoenix.js 보다 먼저 등록되므로 listInit 보다 먼저 실행된다. */
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireList);
+  else setTimeout(wireList, 0);
 
   function wire(){
     document.getElementById("add").onclick = function(){

@@ -1694,6 +1694,31 @@ def test_template_usage():
                 missing.append(f"{os.path.basename(_p)}:{hook}->{v}")
     check("vendor 없는 훅을 선언하지 않는다", missing == [], [], missing)
 
+    # 정렬 표가 있는 화면은 **유령 List 인스턴스**를 막아야 한다.
+    # phoenix.js 의 listInit 은 docReady 때 `[data-list]` 를 훑어 List 를 만든다. 우리 표는
+    # fetch 뒤에 그리지만 **인스턴스는 그때 이미 만들어지고 th 에 정렬 핸들러를 건다.**
+    # 우리가 나중에 만든 것과 둘이 같은 th 를 물면 클릭 한 번에 두 번 뒤집혀 desc 에서 굳는다
+    # (2026-08-05 열 개 화면에서 브라우저로 재현). 막는 법은 두 가지 — 둘 중 하나는 있어야 한다:
+    #   · th 를 cloneNode 로 갈아끼워 유령의 핸들러를 뗀다
+    #   · data-list 속성을 지운다(+ class="table-list" 로 정렬 커서 CSS 를 살린다)
+    unguarded = []
+    for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if not _re11.search(r'class="sort[ "]', _s):
+            continue
+        if "new window.List" not in _s:
+            continue
+        guarded = ("cloneNode" in _s) or ("removeAttribute" in _s and "data-list" in _s)
+        css_ok = ("table-list" in _s) or ("removeAttribute" not in _s)
+        if not guarded:
+            unguarded.append(_n + ":유령차단없음")
+        elif not css_ok:
+            unguarded.append(_n + ":정렬커서CSS없음")
+    check("정렬 표에 유령 List 차단이 있다", unguarded == [], [], unguarded)
+
     # 손으로 만든 전체선택이 남아 있지 않은가 — 있으면 컴포넌트를 또 베낀 것이다
     handrolled = []
     for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
@@ -1704,6 +1729,13 @@ def test_template_usage():
         if 'id="chkAll"' in _s and "data-bulk-select" not in _s:
             handrolled.append(_n)
     check("전체선택을 손으로 만든 화면이 없다", handrolled == [], [], handrolled)
+
+    # 몇 개 화면이 실제로 템플릿 표를 쓰는가 — 늘어나는 것이 정상이다(줄면 되돌린 것이다)
+    using = [os.path.basename(_p) for _p in sorted(_g7.glob(os.path.join(admin, "*.html")))
+             if not os.path.basename(_p).startswith("_")
+             and "new window.List" in io.open(_p, encoding="utf-8").read()]
+    check("템플릿 표를 쓰는 화면 수", len(using) >= 12, ">= 12", len(using))
+    drift("template_list_screens", len(using))
 
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
