@@ -36,6 +36,8 @@
     <link href="vendors/simplebar/simplebar.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
+    <link href="vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
+    <script src="../shared/ui-choices.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -521,13 +523,19 @@
     }else{ note.hidden = true; }
 
     // 셀렉트는 값을 잃지 않게 현재 선택을 기억했다 되돌린다
-    var mv = document.getElementById("moveTo"), keep = mv.value;
-    mv.innerHTML = catOptions();
-    if(keep) mv.value = keep;
-    var fc = document.getElementById("fCat"), keep2 = fc.value;
-    fc.innerHTML = catOptions();
-    if(keep2) fc.value = keep2;
-    else if(STATE.category_id) fc.value = String(STATE.category_id);
+    // 분류 35개 — 검색을 붙인다(공용 헬퍼가 감싼 것을 풀고 다시 감싼다).
+    var PC = window.popcornChoices;
+    var fillMv = function(sel){ sel.innerHTML = catOptions(); };
+    var wantCat = STATE.category_id ? String(STATE.category_id) : "";
+    var fillFc = function(sel){
+      sel.innerHTML = catOptions();
+      if(wantCat) sel.value = wantCat;
+    };
+    if(PC){ PC.refill("moveTo", fillMv, {searchPlaceholderValue:"분류 검색"});
+            PC.refill("fCat",   fillFc, {searchPlaceholderValue:"분류 검색"}); }
+    else { var mv = document.getElementById("moveTo"), keep = mv.value;
+           mv.innerHTML = catOptions(); if(keep) mv.value = keep;
+           var fc = document.getElementById("fCat"); fillFc(fc); }
 
     var pt = document.getElementById("fPt");
     if(pt.options.length <= 1){
@@ -939,6 +947,7 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
+    <script src="vendors/choices/choices.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
   <script src="../shared/ui-progress.js"></script>

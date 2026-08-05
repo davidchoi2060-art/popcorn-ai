@@ -36,6 +36,8 @@
     <link href="vendors/simplebar/simplebar.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
+    <link href="vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
+    <script src="../shared/ui-choices.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -652,9 +654,12 @@
     document.getElementById("btnNext").disabled = (d.page >= (d.pages||1));
     MAXMOVE = d.max_move || 2000;
 
-    var mv = document.getElementById("moveTo"), keep = mv.value;
-    mv.innerHTML = catOptions();
-    if(keep) mv.value = keep;
+    // 분류 35개 — 검색을 붙인다(공용 헬퍼가 감싼 것을 풀고 다시 감싼다).
+    var PC = window.popcornChoices;
+    if(PC){ PC.refill("moveTo", function(sel){ sel.innerHTML = catOptions(); },
+                      {searchPlaceholderValue:"분류 검색"}); }
+    else { var mv = document.getElementById("moveTo"), keep = mv.value;
+           mv.innerHTML = catOptions(); if(keep) mv.value = keep; }
 
     var pt = document.getElementById("fPt");
     if(pt.options.length <= 1 && PARTS.length){
@@ -837,9 +842,11 @@
         walk(c.category_id, depth + 1);
       });
     })("root", 0);
-    var sel = document.getElementById("fParent");
-    sel.innerHTML = opts.join("");
-    sel.value = (it && it.parent_id != null) ? String(it.parent_id) : "";
+    var PC2 = window.popcornChoices;
+    var want = (it && it.parent_id != null) ? String(it.parent_id) : "";
+    var fillP = function(sel){ sel.innerHTML = opts.join(""); sel.value = want; };
+    if(PC2){ PC2.refill("fParent", fillP, {searchPlaceholderValue:"상위 분류 검색"}); }
+    else { fillP(document.getElementById("fParent")); }
 
     var ts = document.getElementById("fTypes"), have = {};
     ((it && it.allowed_part_types) || []).forEach(function(t){ have[t] = 1; });
@@ -1134,6 +1141,7 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
+    <script src="vendors/choices/choices.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
   <script src="../shared/ui-progress.js"></script>

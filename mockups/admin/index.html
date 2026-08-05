@@ -279,6 +279,32 @@
           <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">오늘 적재</h6><h3 class="fw-bolder mb-0" id="fl-import">5,214<span class="fs-9 fw-semibold text-body-tertiary"> 행</span></h3><p class="fs-9 mb-0" id="fl-import-sub"><a href="csv-jobs.html" class="text-decoration-none">배치 #213 완료</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">추천 가능 재고</h6><h3 class="fw-bolder mb-0" id="fl-pool">24,912<span class="fs-9 fw-semibold text-body-tertiary"> 개</span></h3><p class="fs-9 mb-0"><a href="candidate-pool.html" class="text-decoration-none" id="fl-pool-sub">전체의 94.1% · 얇은 카테고리 2</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">견적 상담</h6><h3 class="fw-bolder mb-0" id="fl-sess">48<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="sessions.html" class="text-decoration-none" id="fl-sess-sub">완주 31 · 이탈 17</a></p></div></div></div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">주문 전달</h6><h3 class="fw-bolder mb-0" id="fl-ord">12<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="orders.html" class="text-decoration-none" id="fl-ord-sub">쇼핑몰 인계 11 · 재시도 1</a></p></div></div></div>
         </div>
 
+        <h5 class="mb-3">한눈에 <span class="fs-10 fw-normal text-body-tertiary">— 서버가 센 값만 그립니다</span></h5>
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-lg-4">
+            <div class="card h-100"><div class="card-body">
+              <h6 class="text-body-tertiary fw-semibold mb-1">추천 가능 비율</h6>
+              <p class="fs-10 text-body-tertiary mb-2">핵심 부품 중 4중 게이트를 통과한 것</p>
+              <div id="chPool" style="height:180px;"></div>
+              <p class="fs-9 mb-0 text-center" id="chPoolNote">—</p>
+            </div></div>
+          </div>
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100"><div class="card-body">
+              <h6 class="text-body-tertiary fw-semibold mb-1">주문 상태</h6>
+              <p class="fs-10 text-body-tertiary mb-2" id="chOrdNote">—</p>
+              <div id="chOrders" style="height:180px;"></div>
+            </div></div>
+          </div>
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100"><div class="card-body">
+              <h6 class="text-body-tertiary fw-semibold mb-1">처리 대기</h6>
+              <p class="fs-10 text-body-tertiary mb-2">클릭하면 그 화면으로 갑니다</p>
+              <div id="chPending" style="height:180px;"></div>
+            </div></div>
+          </div>
+        </div>
+
         <h5 class="mb-3">시스템 상태</h5>
         <div class="row g-3 mb-4">
           <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
@@ -328,6 +354,7 @@
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
           .then(d=>{
             const p=d.pending, f=d.flow, sy=d.system;
+            if(window.paintCharts) window.paintCharts(d);   // 정의는 아래 스크립트에 있다
             document.getElementById("pd-review").innerHTML=n(p.review,"건");
             document.getElementById("pd-price").innerHTML=n(p.price,"건");
             document.getElementById("pd-inbound").innerHTML=n(p.inbound,"건");
@@ -601,6 +628,7 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
+    <script src="vendors/echarts/echarts.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
   <script>
@@ -690,6 +718,131 @@
         /* 못 받았으면 지어내지 않는다 — 조용히 숨긴다(대시보드 나머지는 계속 쓴다). */
         host.hidden = true;
       });
+
+  /* ── 대시보드 차트 (슬라이스 H) ────────────────────────────────────
+   * echarts 는 vendors/echarts 로 들어왔다. phoenix.js 의 basicEchartsInit 은
+   * `data-echarts` 를 훑어 **2022년 날짜가 박힌 데모 기본값**을 씌우므로 쓰지 않는다.
+   * 우리는 window.echarts.init 을 직접 부르고 서버 값만 넣는다.
+   * 원천이 없으면 차트를 그리지 않고 그렇게 말한다(화면 정직성).
+   */
+  // 대시보드 fetch 가 이 스크립트보다 먼저 끝났을 수 있다 — 마지막 응답을 들고 있다가 다시 그린다.
+  window.paintCharts = function(d){
+    window.__lastDash = d;
+    if(!window.echarts || !d) return;
+    var U = (window.phoenix && window.phoenix.utils) || {};
+    var C = function(n, f){ try { return U.getColor ? U.getColor(n) : f; } catch(e){ return f; } };
+    var mk = function(id){
+      var el = document.getElementById(id);
+      if(!el) return null;
+      var c = window.echarts.getInstanceByDom(el);
+      if(!c) c = window.echarts.init(el);
+      return c;
+    };
+    var num = function(v){ return (v==null) ? "—" : Number(v).toLocaleString("ko-KR"); };
+    var TIP = { trigger:"item", backgroundColor:C("body-highlight-bg","#fff"),
+                borderColor:C("border-color","#ddd"), borderWidth:1,
+                textStyle:{ color:C("light-text-emphasis","#333") }, padding:[7,10] };
+
+    // ① 추천 가능 비율 — pool_ok / pool_core
+    var f = d.flow || {};
+    var pool = mk("chPool");
+    if(pool){
+      if(f.pool_core){
+        pool.setOption({
+          tooltip: TIP,
+          series: [{
+            type:"pie", radius:["62%","82%"], center:["50%","52%"],
+            avoidLabelOverlap:false, label:{show:false}, labelLine:{show:false},
+            data:[
+              { value:f.pool_ok, name:"추천 가능",
+                itemStyle:{color:C("primary","#3874ff")} },
+              { value:Math.max(0, f.pool_core - f.pool_ok), name:"게이트 미통과",
+                itemStyle:{color:C("secondary-bg","#e3e6ed")} }
+            ]
+          }],
+          graphic:[{ type:"text", left:"center", top:"44%",
+            style:{ text:(f.pool_rate!=null? f.pool_rate+"%" : "—"),
+                    fontSize:22, fontWeight:700, fill:C("body-highlight","#111") } }]
+        });
+        document.getElementById("chPoolNote").innerHTML =
+          "<b>" + num(f.pool_ok) + "</b> / " + num(f.pool_core) + "건" +
+          " <a href='candidate-pool.html' class='ms-1 text-decoration-none'>자세히</a>";
+      } else {
+        document.getElementById("chPoolNote").textContent = "원천 준비 중 — 핵심 부품이 없습니다";
+      }
+    }
+
+    // ② 주문 상태 — orders_by_status
+    var ord = mk("chOrders");
+    var obs = f.orders_by_status || [];
+    if(ord){
+      if(obs.length){
+        ord.setOption({
+          tooltip: TIP,
+          series: [{ type:"pie", radius:["50%","78%"], center:["50%","52%"],
+            label:{ show:true, formatter:"{b}\n{c}", fontSize:10,
+                    color:C("body-highlight","#111") },
+            labelLine:{ length:6, length2:6 },
+            data: obs.map(function(o){ return { value:o.count, name:o.status }; }) }]
+        });
+        document.getElementById("chOrdNote").textContent =
+          "전체 " + num(f.orders_total) + "건 · 진행 중 " + num(f.orders_active) + "건";
+      } else {
+        document.getElementById("chOrdNote").textContent = "주문이 아직 없습니다";
+      }
+    }
+
+    // ③ 처리 대기 — pending (0건은 막대를 만들지 않는다)
+    var pen = mk("chPending");
+    var P = d.pending || {};
+    var ITEMS = [
+      ["상품 검수", P.review, "review-queue.html"],
+      ["재고 입고", P.inbound, "stock-inbound.html"],
+      ["미분류", P.unclassified, "category-mapping.html"],
+      ["가격 검토", P.price, "price-review.html"],
+      ["환불 처리", P.refund, "refunds.html"],
+      ["미매핑", P.unmapped, "category-mapping.html"]
+    ].filter(function(x){ return (x[1] || 0) > 0; });
+    if(pen){
+      if(ITEMS.length){
+        ITEMS.sort(function(a,b){ return a[1] - b[1]; });   // 가로 막대는 아래가 작은 값
+        pen.setOption({
+          grid:{ left:78, right:46, top:6, bottom:6 },
+          tooltip: Object.assign({}, TIP, {trigger:"axis", axisPointer:{type:"shadow"}}),
+          xAxis:{ type:"value", show:false },
+          yAxis:{ type:"category", axisLine:{show:false}, axisTick:{show:false},
+                  axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10 },
+                  data: ITEMS.map(function(x){ return x[0]; }) },
+          series:[{ type:"bar", barWidth:12,
+            itemStyle:{ color:C("primary","#3874ff"), borderRadius:[0,6,6,0] },
+            label:{ show:true, position:"right", fontSize:10,
+                    color:C("body-tertiary","#8a94ad"),
+                    formatter:function(p){ return Number(p.value).toLocaleString("ko-KR"); } },
+            data: ITEMS.map(function(x){ return x[1]; }) }]
+        });
+        pen.off("click");
+        pen.on("click", function(e){
+          var it = ITEMS[e.dataIndex];
+          if(it && it[2]) location.href = it[2];
+        });
+      } else {
+        pen.setOption({ title:{ text:"처리할 것이 없습니다", left:"center", top:"middle",
+          textStyle:{ fontSize:12, color:C("body-tertiary","#8a94ad") } } });
+      }
+    }
+
+    if(!window.__chartResize){
+      window.__chartResize = true;
+      window.addEventListener("resize", function(){
+        ["chPool","chOrders","chPending"].forEach(function(id){
+          var el = document.getElementById(id);
+          var c = el && window.echarts.getInstanceByDom(el);
+          if(c) c.resize();
+        });
+      });
+    }
+  }
+
   })();
   </script>
   <script src="../shared/ui-progress.js"></script>

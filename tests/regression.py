@@ -1737,6 +1737,95 @@ def test_template_usage():
     check("템플릿 표를 쓰는 화면 수", len(using) >= 12, ">= 12", len(using))
     drift("template_list_screens", len(using))
 
+def test_charts_and_choices():
+    """[38] 차트·검색 셀렉트 — 산 것을 더 쓴다 (슬라이스 H)
+
+    2026-08-05 실사에서 대시보드에 차트가 **하나도 없고**, 제조사 셀렉트에 옵션이
+    **620개**나 되는데 검색이 없다는 것이 드러났다. vendor 두 개(`echarts`·`choices`)를
+    복사해 붙였다.
+
+    ■ 차트도 숫자를 지어내지 않는다
+    `phoenix.js` 의 `basicEchartsInit` 은 `data-echarts` 를 훑어 **2022년 날짜가 박힌
+    데모 기본값**을 씌운다. 그래서 쓰지 않고 `window.echarts.init` 을 직접 부른다.
+    원천이 없으면 차트를 그리지 않고 그렇게 말한다(0건 항목은 막대를 만들지 않는다).
+
+    ■ choices 는 공용 헬퍼 하나로 붙인다
+    슬라이스 G에서 같은 문제에 열두 화면이 제각각 대응해 해법이 두 갈래로 갈라졌다.
+    이번에는 `mockups/shared/ui-choices.js` 한 곳에 둔다. 회귀가 그 상태를 지킨다.
+    """
+    print(chr(10) + "[38] 차트·검색 셀렉트 — 산 것을 더 쓴다 (슬라이스 H)")
+    import glob as _g8
+    import re as _re12
+
+    admin = os.path.join(ROOT, "mockups", "admin")
+    vend = os.path.join(admin, "vendors")
+    have = set(os.listdir(vend)) if os.path.isdir(vend) else set()
+    for v in ("echarts", "choices"):
+        check("vendor %s 가 실제로 있다" % v, v in have, v, sorted(have))
+
+    idx = io.open(os.path.join(admin, "index.html"), encoding="utf-8").read()
+    check("대시보드가 echarts vendor를 싣는다", "vendors/echarts/echarts.min.js" in idx, True,
+          "vendors/echarts" in idx)
+    for cid in ("chPool", "chOrders", "chPending"):
+        check("대시보드에 %s 자리가 있다" % cid, ('id="%s"' % cid) in idx, True,
+              ('id="%s"' % cid) in idx)
+    # 데모 기본값을 씌우는 자동 초기화는 쓰지 않는다(2022년 날짜가 박혀 있다)
+    # 주석에서 언급하는 것과 **속성으로 선언하는 것**은 다르다 — 속성만 본다.
+    _attr = _re12.search(r'data-echarts\s*=', idx)
+    check("data-echarts 자동 초기화를 쓰지 않는다", _attr is None, "선언 없음",
+          _attr.group(0) if _attr else "없음")
+    check("차트를 서버 응답으로 그린다", "window.paintCharts" in idx and "d.flow" in idx,
+          True, "window.paintCharts" in idx)
+    # 차트 자리에 숫자를 박아두지 않는다 — 서버가 주기 전에는 '—'
+    for cid in ("chPoolNote", "chOrdNote"):
+        m = _re12.search(r'id="%s"[^>]*>([^<]*)<' % cid, idx)
+        check("%s 가 자리표시자로 시작한다" % cid,
+              bool(m) and not _re12.search(r"[0-9]", m.group(1)),
+              "숫자 없음", m.group(1) if m else "(없음)")
+
+    # choices — 공용 헬퍼 하나만 있고, 화면은 그것을 쓴다
+    helper = os.path.join(ROOT, "mockups", "shared", "ui-choices.js")
+    check("공용 헬퍼가 있다", os.path.exists(helper), True, os.path.exists(helper))
+    if os.path.exists(helper):
+        h = io.open(helper, encoding="utf-8").read()
+        check("헬퍼가 popcornChoices를 내놓는다", "popcornChoices" in h, True,
+              "popcornChoices" in h)
+        # 감싼 것을 풀지 않고 옵션을 갈면 UI와 값이 어긋난다 — refill 이 그 순서를 지킨다
+        check("헬퍼가 풀기→채우기→감싸기를 묶어 준다",
+              "function refill" in h and "unwrap" in h, True, "refill" in h)
+
+    # 화면이 Choices 를 직접 new 하지 않는다(헬퍼를 우회하면 다시 갈라진다)
+    direct = []
+    for _p in sorted(_g8.glob(os.path.join(admin, "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if "new window.Choices" in _s or "new Choices(" in _s:
+            direct.append(_n)
+    check("화면이 Choices를 직접 만들지 않는다(헬퍼를 쓴다)", direct == [], [], direct)
+
+    # 검색을 붙인 화면은 vendor·헬퍼를 함께 실어야 한다(하나만 빠지면 조용히 평범한 셀렉트가 된다)
+    broken = []
+    for _p in sorted(_g8.glob(os.path.join(admin, "*.html"))):
+        _n = os.path.basename(_p)
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        if "popcornChoices" not in _s:
+            continue
+        miss = [x for x in ("vendors/choices/choices.min.js",
+                            "vendors/choices/choices.min.css",
+                            "shared/ui-choices.js") if x not in _s]
+        if miss:
+            broken.append(_n + ":" + ",".join(miss))
+    check("검색 셀렉트 화면이 vendor·CSS·헬퍼를 다 싣는다", broken == [], [], broken)
+
+    using = [os.path.basename(_p) for _p in sorted(_g8.glob(os.path.join(admin, "*.html")))
+             if "popcornChoices" in io.open(_p, encoding="utf-8").read()]
+    check("검색 셀렉트를 쓰는 화면이 있다", len(using) >= 3, ">= 3", len(using))
+    drift("choices_screens", len(using))
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -3696,6 +3785,7 @@ def main():
                test_category_isolation,
                test_reprice,
                test_template_usage,
+               test_charts_and_choices,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

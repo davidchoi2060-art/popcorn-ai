@@ -36,6 +36,8 @@
     <link href="vendors/simplebar/simplebar.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
+    <link href="vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
+    <script src="../shared/ui-choices.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -339,8 +341,16 @@
           const mfrs = META && META.makers
             ? META.makers
             : [...new Set(DATA.map(p=>p.maker))].sort((a,b)=>a.localeCompare(b,"ko"));
-          document.getElementById("fcat").innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join("");
-          document.getElementById("fmfr").innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join("");
+          // 제조사는 실측 620개다 — 평범한 셀렉트로는 못 찾는다. 검색을 붙인다.
+          // 공용 헬퍼가 "풀기 → 채우기 → 다시 감싸기" 순서를 지켜 준다.
+          var PC = window.popcornChoices;
+          var fillCat = function(sel){ sel.innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join(""); };
+          var fillMfr = function(sel){ sel.innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join(""); };
+          if(PC){ PC.refill("fcat", fillCat, {searchEnabled: cats.length > 10});
+                  PC.refill("fmfr", fillMfr, {searchEnabled: true,
+                            searchPlaceholderValue: "제조사 검색"}); }
+          else { fillCat(document.getElementById("fcat"));
+                 fillMfr(document.getElementById("fmfr")); }
         }
         function loadMeta(){
           return fetch("/api/admin/product-meta")
@@ -727,6 +737,7 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
+    <script src="vendors/choices/choices.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
   <script src="../shared/ui-progress.js"></script>
