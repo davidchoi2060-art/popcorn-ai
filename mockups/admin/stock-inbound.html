@@ -54,6 +54,7 @@
         userLinkRTL.setAttribute('disabled', true);
       }
     </script>
+    <script src="../shared/ui-list.js"></script>
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
@@ -313,44 +314,14 @@
         const WHY={inbound:["매입 입고","primary"],adjust:["실사 조정","info"]};
         let cur="all", done=0, lastAction=null, LIVE=false, NOTE="";
 
-        // data-list — listInit 은 docReady 때 1회만 돈다. 이 표는 fetch 응답으로 다시 그려지므로
-        // 그 인스턴스는 곧 옛 행을 붙든 채 굳는다. 렌더 직후 우리가 직접 붙이고,
-        // list.js 에 destroy 가 없으니 처음 한 번 만든 뒤에는 reIndex() 한다.
-        var LIST=null;
-        // 매입가 열은 "680,000원"처럼 콤마가 박혀 나간다. list.js 기본(자연) 정렬은 앞 숫자 덩어리만
-        // 보므로 1,415,000 을 680,000 보다 작다고 본다 — 금액 열은 값으로 비교한다.
-        // 나머지 열은 innerHTML 이 아니라 태그를 벗긴 글자로 비교한다(사유 열은 배지 class 가 먼저 잡힌다).
-        var SI_NUMCOL={qty:1,cost:1};
-        function siPlain(v){ return String(v==null?"":v).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(); }
-        function siNum(v){ var m=siPlain(v).replace(/,/g,"").match(/-?\d+(?:\.\d+)?/); return m?parseFloat(m[0]):null; }
-        function siSort(a,b,opt){
-          var k=opt.valueName, av=a.values()[k], bv=b.values()[k];
-          if(SI_NUMCOL[k]){
-            var x=siNum(av), y=siNum(bv);
-            if(x===null&&y===null) return 0;
-            if(x===null) return 1;          // 값 없는 행(빈 상태 안내)은 뒤로
-            if(y===null) return -1;
-            return x<y?-1:(x>y?1:0);
-          }
-          return siPlain(av).localeCompare(siPlain(bv),"ko");
-        }
+        // ── 현재 페이지 안의 검색·정렬(list.js) — 공용 헬퍼 `shared/ui-list.js` 가 처리한다.
+        // 유령 인스턴스 제거 · 콤마 금액 수치 비교 · reIndex 뒤 정렬 되걸기 · vendor 재시도까지
+        // 전부 헬퍼 몫이다. 여기서는 어느 열을 수치로 볼지만 말한다.
+        // (수량·매입가: "680,000원"처럼 콤마가 박혀 나가 자연 정렬이 1,415,000 을 680,000 보다 작게 본다.)
         function wireList(){
-          var host=document.getElementById("inboundList");
-          if(!window.List||!host) return;
-          if(!LIST){
-            try {
-              LIST=new window.List(host,{valueNames:["name","cat","qty","cost","sup","why"],sortFunction:siSort});
-              // 잡았으면 listInit 에 넘기지 않는다. 이 화면은 더미 렌더가 동기라
-              // docReady 시점에 이미 행이 있어 listInit 도 인스턴스를 만들 수 있는데,
-              // 같은 컨테이너에 List 가 둘이면 th 클릭을 서로 덮어 정렬이 아예 먹지 않는다(실측).
-              // 정렬 커서·화살표 CSS 는 `[data-list] .sort` 와 `.table-list .sort` 짝이므로
-              // 속성을 떼도 컨테이너의 class="table-list" 가 그대로 유지해 준다.
-              host.removeAttribute("data-list");
-            }
-            catch(e){ LIST=null; }
-          } else {
-            try { LIST.reIndex(); } catch(e){}
-          }
+          window.popcornList.wire("inboundList",
+            ["name","cat","qty","cost","sup","why"],
+            {numeric:["qty","cost"]});
         }
         // listInit 보다 먼저 잡는다 — 우리 리스너가 먼저 등록되므로 같은 docReady 안에서 앞선다.
         document.addEventListener("DOMContentLoaded", wireList);

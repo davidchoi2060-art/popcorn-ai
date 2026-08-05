@@ -39,6 +39,7 @@
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <script src="../shared/ui-list.js"></script>
     <script>
       var phoenixIsRTL = window.config.config.phoenixIsRTL;
       if (phoenixIsRTL) {
@@ -309,41 +310,16 @@
           ops:"전 항목 쇼핑몰 인계",pay:"쇼핑몰 결제 (인계)",ship:"배송 완료",hold:"—",items:[["구성","사무용 구성 (6종) + 조립·검수",452000]],refund:null}
         ];
         let cur="all", fch="all", sel=null, lastAction=null;
-        // data-list — 표는 렌더 후에야 DOM에 있으므로 우리가 직접 붙인다.
-        // 처음 한 번 만들고 이후엔 다시 색인한다(list.js 에 destroy 가 없다).
-        var LIST=null;
-        // list.js 가 읽는 셀 값은 innerHTML 이라 배지 태그가 그대로 섞인다(sessions·price-history 와 같은 함정).
-        // '상태'·'채널'은 셀 안이 배지라 정렬 키가 배지 색 클래스로 시작한다 — 보이는 라벨이 아니라
-        // danger/secondary/warning, info/primary 순으로 서서 '환불 접수 → 완료 → 조립중' 같은
-        // 화면으로는 설명할 수 없는 순서가 된다. 태그를 벗기고 보이는 라벨로 비교한다.
-        // '금액'만 data-price(원단위 정수)라 문자열이 아니라 수로 비교한다.
-        function sortPlain(v){ return String(v==null?"":v).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(); }
-        function listSort(a,b,opt){
-          var k=opt.valueName, av=a.values()[k], bv=b.values()[k];
-          if(k==="price"){
-            var x=parseFloat(av), y=parseFloat(bv);
-            if(isNaN(x)&&isNaN(y))return 0;
-            if(isNaN(x))return 1;
-            if(isNaN(y))return -1;
-            return x<y?-1:(x>y?1:0);
-          }
-          return sortPlain(av).localeCompare(sortPlain(bv),"ko");
-        }
+        // 표의 검색·정렬 배선은 공용 헬퍼가 한다(../shared/ui-list.js) — 유령 인스턴스 제거,
+        // 정렬 화살표 CSS 유지, reIndex 뒤 정렬 되걸기, vendor 미로드 시 재시도가 전부 거기 있다.
+        // 화면은 컨테이너 id 와 열 이름만 준다.
+        // '금액'은 data-price(원단위 정수)를 **수로** 비교해야 한다 — 문자열로 두면 452,000 이
+        // 2,087,000 보다 크게 선다(자릿수가 아니라 첫 글자로 비교되기 때문).
         function wireList(){
-          var host=document.getElementById("ordList");
-          if(!window.List||!host)return;
-          if(!LIST){
-            // docReady 의 listInit 이 data-list 를 보고 이미 '항목 0개' 인스턴스를 하나 만들어
-            // 같은 th 에 정렬 핸들러를 걸어 뒀다. 그대로 두면 그쪽이 먼저 asc 를 찍고
-            // 우리 인스턴스가 그 표시를 읽어 desc 로 뒤집어 — 두 번째 클릭부터 desc 에서 멈춘다.
-            // th 를 복제해 바꿔 끼워 죽은 인스턴스의 핸들러만 떼고, 우리 것만 새로 건다.
-            [].forEach.call(host.querySelectorAll("th.sort"),function(th){
-              th.className=th.className.replace(/\b(asc|desc)\b/g,"").replace(/\s+/g," ").trim();
-              th.parentNode.replaceChild(th.cloneNode(true),th);
-            });
-            try{ LIST=new window.List(host,{valueNames:["ord","cust","ch","conf",{name:"price",attr:"data-price"},"status"],sortFunction:listSort}); }catch(e){ LIST=null; }
-          }
-          else { try{ LIST.reIndex(); }catch(e){} }
+          if(!window.popcornList)return;
+          window.popcornList.wire("ordList",
+            ["ord","cust","ch","conf",{name:"price",attr:"data-price"},"status"],
+            {numeric:["price"]});
         }
         const STEPS=["결제 완료","조립·검사","출고·배송","배송 완료"];
         const chBadge=ch=>ch==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>';
@@ -494,10 +470,6 @@
             render();
           })
           .catch(()=>{});
-        // 첫 render()는 vendors/list.js 보다 먼저 돈다(이 스크립트가 위에 있다).
-        // API가 실패해 재렌더가 없어도 정렬이 붙도록 로드 완료 후 한 번 더 붙인다.
-        if(document.readyState==="complete")wireList();
-        else window.addEventListener("load",wireList);
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

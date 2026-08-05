@@ -36,6 +36,7 @@
     <link href="vendors/simplebar/simplebar.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
+    <script src="../shared/ui-list.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -315,36 +316,20 @@
         // 클릭 영역은 '원천 준비 중'으로 표기한다(배지 3종 규약).
         var badge = document.getElementById("dataSrc");
         var LIVE = false;
-        var LIST = null;
 
-        // 현재 페이지 안의 검색·정렬(list.js). listInit 은 docReady 때 1회만 돌아
-        // fetch 뒤에 다시 그려지는 이 표에는 닿지 않는다 — 렌더 직후 우리가 붙인다.
-        // list.js 에는 destroy 가 없으므로 처음 한 번만 만들고 이후에는 reIndex() 다.
+        // 현재 페이지 안의 검색·정렬(list.js) — 배선은 공용 헬퍼(shared/ui-list.js)가 전담한다:
+        // 유령 인스턴스 제거(th 재생성 · data-list 해제 · 정렬 화살표 CSS 유지) · 처음 한 번만
+        // new List 이후 reIndex · 다시 그린 뒤 걸려 있던 정렬·검색어 되걸기 · 문서 끝에서
+        // 로드되는 vendor(list.js) 재시도까지. 여기서 다시 하지 않는다.
+        // 이 표는 폴백 4행을 **마크업에** 들고 있어 docReady 의 listInit 이 이미 인스턴스를
+        // 하나 만들어 뒀다 — 그대로 두면 정렬 한 번에 실데이터가 지워지고 더미가 되살아난다.
+        // 횟수·비율은 수치 열이다: 자연 정렬은 문자열로 봐 96 을 386 보다 뒤에 놓는다.
         function wireList(){
-          var host = document.getElementById("swapList");
-          if(!window.List || !host) return;
-          if(!LIST){
-            // 이 표는 폴백 4행을 **마크업에** 들고 있어서, docReady 의 listInit 이 이미
-            // 그 4행으로 인스턴스를 하나 만들어 뒀다. 그 인스턴스는 지금 DOM 에 없는
-            // 폴백 행을 붙들고 있고, list.js 의 clear() 는 tbody 를 통째로 비운다 —
-            // 그대로 두면 정렬·검색 한 번에 **실데이터가 지워지고 더미 숫자가 되살아난다.**
-            // 헤더 행과 검색창을 복제로 갈아 끼워 그때 걸린 핸들러만 떼고 우리 것을 만든다
-            // (마크업은 그대로 · 폴백 상태에서는 이 코드가 아예 돌지 않는다).
-            var hr = host.querySelector("thead tr");
-            if(hr && hr.parentNode) hr.parentNode.replaceChild(hr.cloneNode(true), hr);
-            var sb = host.querySelector("input.search");
-            if(sb && sb.parentNode) sb.parentNode.replaceChild(sb.cloneNode(true), sb);
-            try { LIST = new window.List(host, {valueNames:["from","to","n","pct","signal"]}); }
-            catch(e){ LIST = null; }
-            // 응답이 docReady 보다 먼저 올 수 있다(로컬 API + 캐시). 그때는 listInit 이
-            // **아직** 안 돈 것이라 위의 복제는 뗄 핸들러가 없고, 뒤늦게 도는 listInit 이
-            // 같은 표에 두 번째 인스턴스를 만든다 — 같은 th 에 정렬 핸들러가 겹쳐
-            // 한 번 클릭에 오름→내림이 연달아 걸리고 **오름차순이 영영 안 나온다.**
-            // 표식을 걷어 낸다(이미 돌았으면 무해). 실패했으면 남겨 listInit 에 맡긴다.
-            if(LIST) host.removeAttribute("data-list");
-          } else {
-            try { LIST.reIndex(); } catch(e){}
-          }
+          if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
+          window.popcornList.wire("swapList",["from","to","n","pct","signal"],{
+            numeric:["n","pct"],
+            searchInput:"swapSearch"
+          });
         }
 
         function esc(s){

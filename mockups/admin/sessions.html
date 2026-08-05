@@ -25,6 +25,7 @@
     <meta name="theme-color" content="#ffffff">
     <script src="vendors/simplebar/simplebar.min.js"></script>
     <script src="assets/js/config.js"></script>
+    <script src="../shared/ui-list.js"></script>
 
 
     <!-- ===============================================-->
@@ -302,48 +303,16 @@
         ];
         let sel=0, LIVE=false, L=[], NOTE="";
         // ---- Phoenix data-list — 현재 페이지 안의 검색·정렬만 담당한다(페이지 이동은 서버 몫) ----
-        // listInit 은 docReady 때 1회만 돈다. 이 표는 fetch 응답으로 나중에 그리므로 그때 DOM 에 없다.
-        // → 렌더 직후 우리가 직접 붙인다. list.js 에는 destroy 가 없어 처음 한 번만 만들고 이후엔 reIndex().
-        var LIST=null;
-        var VNAMES=["mode","summary","result","status"];
-        // '결과'는 금액이다. list.js 기본(자연) 정렬은 자릿수 콤마를 만나면
-        // 1,486,000원 을 812,000원 보다 작게 본다 — 금액 열은 값으로 비교하고
-        // 숫자가 없는 행(이탈·호환 통과)은 뒤로 보낸다.
-        var NUMCOL={result:1};
-        function sortPlain(v){ return String(v==null?"":v).replace(/<[^>]*>/g," ").trim(); }
-        function sortNum(v){
-          var m=sortPlain(v).replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);
-          return m?parseFloat(m[0]):null;
-        }
-        function listSort(a,b,opt){
-          var k=opt.valueName, av=a.values()[k], bv=b.values()[k];
-          if(NUMCOL[k]){
-            var x=sortNum(av), y=sortNum(bv);
-            if(x===null&&y===null) return 0;
-            if(x===null) return 1;
-            if(y===null) return -1;
-            return x<y?-1:(x>y?1:0);
-          }
-          return sortPlain(av).localeCompare(sortPlain(bv),"ko");
-        }
+        // 배선은 공용 헬퍼(shared/ui-list.js)가 한다: 유령 인스턴스 제거 · 정렬 화살표 CSS 유지 ·
+        // 처음 한 번만 new List 이후 reIndex · reIndex 뒤 정렬/검색어 되걸기 · vendor 지연 로드 재시도.
+        // '결과'는 금액 열이라 numeric 으로 넘긴다 — 자연 정렬은 콤마에서 숫자가 끊겨
+        // 1,486,000원 을 812,000원 보다 작게 보고, 숫자가 없는 행(이탈·호환 통과)은 뒤로 가야 한다.
         function wireList(){
-          var host=document.getElementById("sessList");
-          if(!window.List||!host)return;
-          if(!LIST){
-            try{
-              LIST=new window.List(host,{valueNames:VNAMES,sortFunction:listSort});
-              // 우리가 만들었으니 listInit 이 같은 표에 두 번째 List 를 만들지 않게 한다.
-              // (두 개면 th 의 asc/desc 를 앞 인스턴스가 먼저 뒤집어 우리 쪽이 계속 desc 로 굳고,
-              //  낡은 쪽 update() 가 tbody 를 비우며 지워진 행을 되살린다.)
-              host.removeAttribute("data-list");
-            }
-            catch(e){ LIST=null; }
-          }else{
-            try{ LIST.reIndex(); }catch(e){}
-          }
-          // reIndex 는 검색 상태를 지운다 — 입력창에 남은 검색어와 표가 어긋나지 않도록 다시 건다.
-          var q=document.getElementById("sessSearch");
-          if(LIST&&q&&q.value){ try{ LIST.search(q.value); }catch(e){} }
+          if(!window.popcornList)return;
+          window.popcornList.wire("sessList",["mode","summary","result","status"],{
+            numeric:["result"],
+            searchInput:"sessSearch"
+          });
         }
         function render(){
           if(LIVE){renderLive();return;}
@@ -411,8 +380,7 @@
         }
         render();if(window.feather)feather.replace();
         // vendors/list.js 는 이 스크립트보다 뒤(</body> 직전)에서 로드된다 — 첫 render() 때는 window.List 가 없다.
-        // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙고,
-        // 그때 data-list 를 떼어 listInit 이 두 번째 인스턴스를 만들지 못하게 한다.
+        // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙는다.
         document.addEventListener("DOMContentLoaded",wireList);
         fetch("/api/admin/sessions")
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})

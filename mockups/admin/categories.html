@@ -38,6 +38,7 @@
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
     <link href="vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
     <script src="../shared/ui-choices.js"></script>
+    <script src="../shared/ui-list.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -477,7 +478,7 @@
    *     → treeview: 접힘/펼침은 Bootstrap collapse 위임 핸들러가 처리하므로 동적이어도 된다.
    *               treeviewInit 이 하던 `.treeview-row` prepend 만 우리가 대신한다.
    *       bulk-select: window.phoenix.BulkSelect 가 노출돼 있어 렌더 후 new + init() 한다.
-   *       data-list: window.List 가 있어 렌더 후 생성하고, 이후에는 reIndex() 한다.
+   *       data-list: 공용 헬퍼 `shared/ui-list.js` 가 맡는다(유령 인스턴스 차단·재색인·정렬 복원).
    *  ② BulkSelect 는 '선택 n건' 카운터도, 선택 변경 이벤트도 제공하지 않는다(액션바 d-none
    *     토글만 한다). → 카운터는 우리가 위임 클릭으로 센다.
    *
@@ -491,7 +492,7 @@
 
   var CATS = null, CATNOTE = null, PARTS = [];
   var SEL_CAT = null, EDIT = null, modal = null;
-  var LIST = null, BULK = null, LAST_LOG = null;
+  var BULK = null, LAST_LOG = null;
   var PAGE = { page: 1, size: 100, pages: 1, total: 0 };
   var SEL = {};   // product_code -> true (페이지를 넘어가도 유지)
 
@@ -600,24 +601,18 @@
       '</tr>';
   }
 
+  // 표의 검색·정렬 — 공용 헬퍼가 유령 인스턴스 차단·재색인·정렬 복원·vendor 지연을 전부 맡는다.
+  // code·price·stock 은 수치 열이다(price·stock 은 콤마가 들어가고, code 는 자릿수가 달라
+  // 문자열로 비교하면 10001 이 9999 보다 앞선다).
+  function wireList(){
+    if(!window.popcornList) return;   // 헬퍼가 없으면 표는 그대로 둔다 — 화면을 죽이지 않는다.
+    window.popcornList.wire("prodList", ["code","name","part","cat","price","stock"], {
+      numeric: ["code","price","stock"]
+    });
+  }
+
   function wireComponents(){
-    // data-list — 처음 한 번 만들고 이후엔 다시 색인한다(list.js 에 destroy 가 없다).
-    var host = document.getElementById("prodList");
-    if(window.List){
-      if(!LIST){
-        // 유령 인스턴스 차단 — listInit(docReady)이 이미 이 컨테이너에 List 를 만들어
-        // th 에 정렬 핸들러를 걸어 뒀다. 그대로 두면 클릭 한 번에 두 번 뒤집혀 desc 에서 굳는다.
-        [].forEach.call(host.querySelectorAll("th.sort"), function(th){
-          th.parentNode.replaceChild(th.cloneNode(true), th);
-        });
-        host.classList.add("table-list");   // 속성을 지워도 정렬 커서·화살표 CSS 가 살아남게
-        host.removeAttribute("data-list");
-        try { LIST = new window.List(host, {valueNames:["code","name","part","cat","price","stock"]}); }
-        catch(e){ LIST = null; }
-      } else {
-        try { LIST.reIndex(); } catch(e){}
-      }
-    }
+    wireList();
     // bulk-select — window.phoenix.BulkSelect 로 렌더마다 다시 붙인다.
     // (bulkSelectInit 은 docReady 1회라 우리 동적 표에는 닿지 않는다.)
     var head = document.getElementById("bulkHead");

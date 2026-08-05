@@ -1673,10 +1673,11 @@ def test_template_usage():
     check("일괄 선택은 Phoenix bulk-select를 쓴다",
           "data-bulk-select=" in cat and "data-bulk-select-row=" in cat, True,
           "data-bulk-select=" in cat)
-    # 컴포넌트는 docReady 1회만 붙는다 — 동적 렌더면 우리가 다시 붙여야 한다
+    # 컴포넌트는 docReady 1회만 붙는다 — 동적 렌더면 우리가 다시 붙여야 한다.
+    # 표는 공용 헬퍼(shared/ui-list.js)가, 선택은 phoenix.BulkSelect 가 맡는다.
     check("동적 렌더 뒤 컴포넌트를 다시 붙인다",
-          "phoenix.BulkSelect" in cat and ("new window.List" in cat or "reIndex" in cat),
-          True, "phoenix.BulkSelect" in cat)
+          "phoenix.BulkSelect" in cat and "popcornList.wire" in cat,
+          True, "popcornList.wire" in cat)
 
     # 참조하는 vendor는 실제로 있어야 한다(없으면 조용히 안 붙는다)
     vend = os.path.join(admin, "vendors")
@@ -1694,30 +1695,58 @@ def test_template_usage():
                 missing.append(f"{os.path.basename(_p)}:{hook}->{v}")
     check("vendor 없는 훅을 선언하지 않는다", missing == [], [], missing)
 
-    # 정렬 표가 있는 화면은 **유령 List 인스턴스**를 막아야 한다.
-    # phoenix.js 의 listInit 은 docReady 때 `[data-list]` 를 훑어 List 를 만든다. 우리 표는
-    # fetch 뒤에 그리지만 **인스턴스는 그때 이미 만들어지고 th 에 정렬 핸들러를 건다.**
-    # 우리가 나중에 만든 것과 둘이 같은 th 를 물면 클릭 한 번에 두 번 뒤집혀 desc 에서 굳는다
-    # (2026-08-05 열 개 화면에서 브라우저로 재현). 막는 법은 두 가지 — 둘 중 하나는 있어야 한다:
-    #   · th 를 cloneNode 로 갈아끼워 유령의 핸들러를 뗀다
-    #   · data-list 속성을 지운다(+ class="table-list" 로 정렬 커서 CSS 를 살린다)
-    unguarded = []
+    # 정렬 표는 **공용 헬퍼**를 써야 한다.
+    #
+    # 슬라이스 G에서 열두 화면이 유령 List 인스턴스를 각자 막게 했더니 해법이 두 갈래
+    # (cloneNode 파 6 · removeAttribute 파 8)로 갈라졌고 정렬 비교 함수도 다섯 벌이 됐다.
+    # 슬라이스 A(부품 어휘)·H(choices)에서 겪은 그 병이다. 이제 `shared/ui-list.js` 하나가
+    # 유령 차단 · 정렬 복원 · 금액 수치 비교 · vendor 지연을 전부 맡는다.
+    #
+    # 헬퍼가 푸는 문제(전부 브라우저 실측):
+    #   · listInit(docReady)이 만든 유령이 th 를 물어 클릭 한 번에 두 번 뒤집힌다
+    #   · data-list 를 떼면 정렬 커서 CSS 가 사라진다(.table-list 짝이 필요)
+    #   · naturalSort("239,000원","1,299,000원") = +2 — 콤마 때문에 거꾸로다
+    #   · reIndex 는 정렬을 다시 걸지 않아 화살표만 남아 거짓말한다
+    helper = os.path.join(ROOT, "mockups", "shared", "ui-list.js")
+    check("표 공용 헬퍼가 있다", os.path.exists(helper), True, os.path.exists(helper))
+    if os.path.exists(helper):
+        h = io.open(helper, encoding="utf-8").read()
+        for need, why in (("popcornList", "전역 이름"),
+                          ("cloneNode", "유령 핸들러 떼기"),
+                          ("table-list", "정렬 커서 CSS 유지"),
+                          ("activeSort", "reIndex 뒤 정렬 복원"),
+                          ("toNum", "콤마 금액 수치 비교")):
+            check("헬퍼가 %s 를 담당한다" % why, need in h, need, need in h)
+
+    direct, own_sort, no_helper = [], [], []
     for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
         _s = io.open(_p, encoding="utf-8").read()
         if not _re11.search(r'class="sort[ "]', _s):
+            continue                                   # 정렬 표가 없는 화면은 대상 아님
+        if "popcornList.wire" not in _s:
+            no_helper.append(_n)
             continue
-        if "new window.List" not in _s:
-            continue
-        guarded = ("cloneNode" in _s) or ("removeAttribute" in _s and "data-list" in _s)
-        css_ok = ("table-list" in _s) or ("removeAttribute" not in _s)
-        if not guarded:
-            unguarded.append(_n + ":유령차단없음")
-        elif not css_ok:
-            unguarded.append(_n + ":정렬커서CSS없음")
-    check("정렬 표에 유령 List 차단이 있다", unguarded == [], [], unguarded)
+        if "new window.List" in _s or "new List(" in _s:
+            direct.append(_n)                          # 헬퍼를 우회하면 다시 갈라진다
+        # 비교 함수는 **헬퍼에 넘기는 경우만** 허용한다. 헬퍼 기본값으로 재현할 수 없는
+        # 도메인 규칙이 있다(예: 가격 이력의 '356,000 → 352,000' 은 **차액**으로 정렬해야
+        # 한다 — 앞의 수도 뒤의 수도 아니다). 그런 것을 금지하면 화면이 거짓 정렬을 낸다.
+        # 막아야 할 것은 **헬퍼를 우회해 자기 배선을 다시 만드는 것**이다.
+        if (_re11.search(r'function\s+\w*[Ss]ort\w*\s*\(\s*a\s*,\s*b\s*,', _s)
+                and 'sortFunction' not in _s):
+            own_sort.append(_n)                        # 헬퍼에 넘기지 않는 비교 함수
+        if "shared/ui-list.js" not in _s:
+            no_helper.append(_n + ":스크립트미로드")
+    check("정렬 표가 공용 헬퍼를 쓴다", no_helper == [], [], no_helper)
+    check("화면이 List를 직접 만들지 않는다", direct == [], [], direct)
+    check("비교 함수를 헬퍼를 우회해 쓰지 않는다", own_sort == [], [], own_sort)
+    # 특례가 몇 개인지 눈에 보이게 둔다 — 늘면 헬퍼 기본값을 고칠 때가 된 것이다.
+    special = [os.path.basename(_p) for _p in sorted(_g7.glob(os.path.join(admin, "*.html")))
+               if "sortFunction" in io.open(_p, encoding="utf-8").read()]
+    drift("custom_sortfn_screens", len(special))
 
     # 손으로 만든 전체선택이 남아 있지 않은가 — 있으면 컴포넌트를 또 베낀 것이다
     handrolled = []
@@ -1733,7 +1762,7 @@ def test_template_usage():
     # 몇 개 화면이 실제로 템플릿 표를 쓰는가 — 늘어나는 것이 정상이다(줄면 되돌린 것이다)
     using = [os.path.basename(_p) for _p in sorted(_g7.glob(os.path.join(admin, "*.html")))
              if not os.path.basename(_p).startswith("_")
-             and "new window.List" in io.open(_p, encoding="utf-8").read()]
+             and "popcornList.wire" in io.open(_p, encoding="utf-8").read()]
     check("템플릿 표를 쓰는 화면 수", len(using) >= 12, ">= 12", len(using))
     drift("template_list_screens", len(using))
 

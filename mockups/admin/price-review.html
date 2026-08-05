@@ -39,6 +39,7 @@
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <script src="../shared/ui-list.js"></script>
     <script>
       var phoenixIsRTL = window.config.config.phoenixIsRTL;
       if (phoenixIsRTL) {
@@ -291,64 +292,15 @@
         ];
         let done=0, LIVE=false, NOTE="";
 
-        // ── 현재 페이지 안의 검색·정렬(list.js) ──────────────────────────────
-        // phoenix 의 listInit 은 docReady 때 1회만 돈다. 이 표는 fetch 응답으로 다시 그려지므로
-        // 그때 만든 인스턴스는 지워진 행을 붙들게 된다 → 렌더 직후 우리가 직접 붙인다.
-        // list.js 에는 destroy 가 없다: 처음 한 번 만들고 이후에는 reIndex() 한다.
-        var LIST=null;
-        var VNAMES=["name","supplier","delta","current","proposed","margin","reason"];
-        // list.js 기본(자연) 정렬은 자릿수 콤마를 만나면 1,415,000 을 415,000 보다 작게 본다.
-        // 금액·비율 열은 값으로 비교하고, 값이 없는 행(—)은 뒤로 보낸다.
-        var NUMCOL={current:1,proposed:1,margin:1};
-        function sortPlain(v){ return String(v==null?"":v).replace(/<[^>]*>/g," ").trim(); }
-        function sortNum(v){
-          var m=sortPlain(v).replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);
-          return m?parseFloat(m[0]):null;
-        }
-        function listSort(a,b,opt){
-          var k=opt.valueName, av=a.values()[k], bv=b.values()[k];
-          if(NUMCOL[k]){
-            var x=sortNum(av), y=sortNum(bv);
-            if(x===null&&y===null) return 0;
-            if(x===null) return 1;
-            if(y===null) return -1;
-            return x<y?-1:(x>y?1:0);
-          }
-          return sortPlain(av).localeCompare(sortPlain(bv),"ko");
-        }
-        // 지금 걸려 있는 정렬을 헤더 화살표(.asc/.desc)에서 읽는다 — list.js 가 그 클래스를
-        // 단일 원천으로 쓰므로 우리가 따로 상태를 들지 않는다.
-        function activeSort(host){
-          var els=host.querySelectorAll(".sort[data-sort]");
-          for(var i=0;i<els.length;i++){
-            if(els[i].classList.contains("asc"))  return {v:els[i].getAttribute("data-sort"),o:"asc"};
-            if(els[i].classList.contains("desc")) return {v:els[i].getAttribute("data-sort"),o:"desc"};
-          }
-          return null;
-        }
+        // ── 현재 페이지 안의 검색·정렬(list.js) — 공용 헬퍼 `shared/ui-list.js` 가 처리한다.
+        // 유령 인스턴스 제거 · 콤마 금액 수치 비교 · reIndex 뒤 정렬 되걸기 · vendor 재시도까지
+        // 전부 헬퍼 몫이다. 여기서는 어느 열을 수치로 볼지만 말한다.
+        // (금액·비율 열: 콤마 때문에 자연 정렬이 1,415,000 을 415,000 보다 작게 본다.)
         function wireList(){
-          var host=document.getElementById("prList");
-          if(!window.List||!host) return;          // vendors/list.js 가 없으면 조용히 건너뛴다
-          if(!LIST){
-            try{
-              LIST=new window.List(host,{valueNames:VNAMES,sortFunction:listSort});
-              // 우리가 만들었으니 listInit 이 같은 표에 두 번째 List 를 만들지 않게 한다.
-              // (두 개면 클릭 한 번에 양쪽이 정렬하고, 낡은 쪽이 지워진 행을 되살린다.)
-              // 정렬 화살표·커서 CSS 는 `[data-list] .sort` 와 `.table-list .sort` 짝으로 걸려 있어
-              // 컨테이너의 class="table-list" 가 그대로 유지해 준다.
-              host.removeAttribute("data-list");
-            }catch(e){ LIST=null; }
-          }else{
-            // reIndex 는 정렬을 다시 걸지 않는다. 표는 서버 순서로 돌아오는데 헤더 화살표는
-            // 그대로 남아 '이 열로 정렬됨'이라고 거짓말한다 — 마진 오름차순으로 놓고 승인한
-            // 운영자가 다음 맨 윗줄을 '그 다음으로 나쁜 마진'으로 믿고 누르면 엉뚱한 상품의
-            // 판매가를 확정한다. 그래서 다시 그린 뒤 같은 정렬을 되건다.
-            try{
-              var s=activeSort(host);
-              LIST.reIndex();
-              if(s) LIST.sort(s.v,{order:s.o});
-            }catch(e){}
-          }
+          if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
+          window.popcornList.wire("prList",
+            ["name","supplier","delta","current","proposed","margin","reason"],
+            {numeric:["current","proposed","margin"]});
         }
 
         function render(){
@@ -397,8 +349,8 @@
           wireList();
         }
         render();if(window.feather)feather.replace();
-        // list.js 는 이 스크립트보다 뒤(</body> 직전)에서 로드된다 — 첫 render() 때는 window.List 가 없다.
-        // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙는다.
+        // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙는다
+        // (헬퍼는 멱등이라 여러 번 불러도 된다).
         document.addEventListener("DOMContentLoaded",wireList);
 
         // ---- LIVE (슬라이스 21) — 가격 검토 대기 파생 목록. v1은 '첫 산정' 유형만 실데이터(note로 정직 표기) ----

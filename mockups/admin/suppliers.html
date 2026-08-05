@@ -36,6 +36,7 @@
     <link href="vendors/simplebar/simplebar.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
+    <script src="../shared/ui-list.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -403,7 +404,7 @@ setTimeout(function(){
         /* data-list = 이 목록 안의 검색·정렬만. 서버가 나눈 페이지를 다시 쪼개지 않도록
            page/pagination 옵션은 넣지 않는다.
            class="table-list" 는 장식이 아니다 — 정렬 화살표 CSS 가 `[data-list] .sort` 와
-           `.table-list .sort` 짝으로 걸려 있고, 아래에서 data-list 를 떼기 때문에
+           `.table-list .sort` 짝으로 걸려 있고, 헬퍼가 런타임에 data-list 를 떼기 때문에
            이 클래스가 없으면 화살표가 사라진다(price-review 와 같은 처리). */
         '<div id="supList" class="table-list" data-list=\'{"valueNames":["name","platform","brands","linked","files","status"]}\'>',
         '<div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">',
@@ -445,34 +446,18 @@ setTimeout(function(){
 
   var DATA = null;
 
-  /* Phoenix data-list — listInit 은 docReady 때 1회만 돌고, 이 표는 fetch 응답으로
-     그 뒤에 그려지므로 그때는 DOM에 없다. 그래서 렌더 직후 우리가 직접 붙인다.
-     list.js 에는 destroy 가 없다 → 같은 노드면 reIndex(), 노드가 바뀌었으면 새로 만든다.
-     (render 가 host.innerHTML 을 통째로 갈아끼우므로 컨테이너 노드도 매번 새로 생긴다 —
-      묵은 노드에 reIndex 하면 화면에 없는 표를 색인하게 된다.) */
-  var LIST = null, LIST_EL = null;
+  /* 표의 검색·정렬 배선은 공용 헬퍼(shared/ui-list.js)가 전담한다 — 유령 인스턴스 제거,
+     data-list 해제, 재렌더 시 reIndex + 정렬 되걸기, vendor(list.js)가 아직이면 재시도까지.
+     linked·files 는 순수 정수 열이라 문자열 비교로는 10 이 9 보다 앞서므로 numeric 으로 넘긴다. */
   function wireList(){
-    var el = document.getElementById("supList");
-    if(!window.List || !el) return;
-    if(LIST && LIST_EL === el){ try { LIST.reIndex(); } catch(e){} return; }
-    try {
-      LIST = new window.List(el, {
-        valueNames: ["name","platform","brands","linked","files","status"]
-      });
-      LIST_EL = el;
-      /* 우리가 붙였으니 listInit 이 같은 표에 두 번째 인스턴스를 만들지 않게 한다.
-         (fetch 응답이 DOMContentLoaded 보다 빨리 오면 표가 docReady 시점에 이미 있다.)
-         두 개면 클릭 한 번에 앞쪽이 asc 를 찍고 뒤쪽이 그 표시를 읽어 desc 로 뒤집어
-         — 오름차순으로는 영영 정렬되지 않는다(orders.html 전례). */
-      el.removeAttribute("data-list");
-    } catch(e){ LIST = null; LIST_EL = null; }
+    /* 헬퍼가 없으면(자산 누락·404) 정렬만 포기하고 표는 그대로 둔다. 가드가 없으면 여기서 난
+       TypeError 가 load() 의 catch 로 굴러가 **다 받아온 표를 숨기고 "연결 안 됨"이라고
+       거짓말한다** — 화면이 죽은 줄 모르는 쪽이 죽는 것보다 나쁘다(슬라이스 58 전례). */
+    if(!window.popcornList) return;
+    window.popcornList.wire("supList", ["name","platform","brands","linked","files","status"], {
+      numeric: ["linked","files"]
+    });
   }
-  /* list.js 는 이 스크립트보다 뒤(</body> 직전)에서 로드된다 — 응답이 그보다 빨리 오면
-     첫 render() 의 wireList 는 window.List 가 없어 조용히 건너뛴다. 그때 검색·정렬이
-     통째로 죽은 채로 남으므로(다음 렌더는 등록·수정을 해야 온다) 여기서 한 번 더 건다.
-     이 리스너는 phoenix.js 보다 먼저 등록되므로 listInit 보다 먼저 실행된다. */
-  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireList);
-  else setTimeout(wireList, 0);
 
   function wire(){
     document.getElementById("add").onclick = function(){

@@ -39,6 +39,7 @@
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <script src="../shared/ui-list.js"></script>
     <script>
       var phoenixIsRTL = window.config.config.phoenixIsRTL;
       if (phoenixIsRTL) {
@@ -314,27 +315,14 @@
           document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
         }
         // ---- 현재 페이지 검색·정렬 (Phoenix data-list / list.js) ----
-        // 표는 fetch 응답으로 다시 그려지므로 렌더 직후 우리가 붙인다. list.js 에 destroy 가 없어
-        // 처음 한 번만 만들고 이후에는 reIndex() 한다.
-        // docReady 의 listInit 에는 맡기지 않는다 — 이 화면은 첫 렌더가 동기라 docReady 시점에 행이
-        // 이미 있어 인스턴스가 하나 더 생긴다. 두 인스턴스가 같은 <th class="sort"> 를 물면 정렬
-        // 방향을 서로 뒤집어(앞이 asc 로 바꿔 놓으면 뒤가 desc 로 읽음) 토글이 영영 안 된다.
-        // 그래서 초기화 소유권을 여기로 모은다(마크업의 data-list 는 계약 표기로 남긴다).
-        // 단, 정렬 헤더의 겉모습은 CSS 가 [data-list] .sort[data-sort] 로만 걸어 준다
-        // (cursor:pointer · white-space:nowrap). 속성을 떼면 클릭할 수 있어 보이지 않으므로
-        // 같은 규칙의 짝인 .table-list 를 표 요소에 붙여 두었다 — 그 클래스가 손대는 나머지
-        // 선택자는 전부 .page(페이지네이션)라 이 표엔 없다.
-        var LIST=null;
-        (function(){var h=document.getElementById("shipList");if(h)h.removeAttribute("data-list");})();
+        // 배선은 공용 헬퍼가 전담한다(../shared/ui-list.js) — 유령 인스턴스 제거(th 재생성 ·
+        // data-list 해제 · 정렬 화살표 CSS 유지), 재렌더 시 reIndex + 걸려 있던 정렬 되걸기,
+        // vendor(list.js) 미로드 시 재시도가 전부 거기 있다. 화면은 컨테이너 id 와 열 이름만 준다.
+        // 마크업의 data-list 선언은 계약 표기로 남긴다(헬퍼가 런타임에 뗀다).
+        // numeric 없음 — 주문번호·고객·채널·구성·송장·상태는 전부 문자열 열이다.
         function wireList(){
-          var host=document.getElementById("shipList");
-          if(!window.List||!host)return;
-          if(!LIST){
-            try { LIST=new window.List(host,{valueNames:["ordno","cust","ch","items","track","state"]}); }
-            catch(e){ LIST=null; }
-          } else {
-            try { LIST.reIndex(); } catch(e){}
-          }
+          if(!window.popcornList)return;
+          window.popcornList.wire("shipList",["ordno","cust","ch","items","track","state"]);
         }
         function render(){
           kpis();pills();
@@ -419,6 +407,7 @@
         render();
         // 첫 render() 는 list.js 로드 전에 돌므로(이 스크립트가 vendors 보다 위) 그때는 붙지 않는다.
         // 더미 폴백(fetch 실패)에서도 검색·정렬이 되도록 스크립트가 다 실린 뒤 한 번 더 부른다.
+        // (헬퍼도 vendor 미로드 시 load 에서 재시도하므로 이 호출은 중복돼도 안전하다 — 멱등.)
         if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",wireList);
         else wireList();
         fetch("/api/admin/orders")

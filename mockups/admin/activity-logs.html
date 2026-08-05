@@ -39,6 +39,7 @@
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <script src="../shared/ui-list.js"></script>
     <script>
       var phoenixIsRTL = window.config.config.phoenixIsRTL;
       if (phoenixIsRTL) {
@@ -305,34 +306,14 @@
           wireList();
         }
 
-        /* data-list — listInit 은 docReady 때 1회만 돈다. 우리 표는 fetch 뒤에도 다시 그려지므로
-           렌더 직후 직접 붙인다. list.js 에 destroy 가 없어 처음 한 번 만들고 이후엔 reIndex() 다.
-           서버 페이지네이션은 그대로 둔다: page/pagination 옵션 없음 → 이 인스턴스는 현재 페이지만 다룬다. */
-        var LIST=null, LIST_ARMED=false;
+        // ── 현재 페이지 안의 검색·정렬(list.js) — 공용 헬퍼 `shared/ui-list.js` 가 처리한다.
+        // 유령 인스턴스(더미 행을 물고 있는 listInit 산물) 제거 · reIndex 뒤 정렬 되걸기 ·
+        // 문서 하단에서 로드되는 vendor 재시도까지 전부 헬퍼 몫이다.
+        // 이 표는 수치 열이 없다(시각은 '어제 17:40' 같은 문자열이라 정렬 대상에서 빠져 있다).
+        // 서버 페이지네이션은 그대로 둔다: page/pagination 옵션 없음 → 현재 페이지만 다룬다.
         function wireList(){
-          var host=document.getElementById("logList");
-          // list.min.js 는 문서 하단에서 로드된다 — 첫 render() 시점엔 window.List 가 아직 없다.
-          // 그래서 여기서 조용히 건너뛰고, armList 가 스크립트 로드 뒤에 다시 부른다.
-          if(!window.List||!host||!LIST_ARMED)return;
-          if(LIST){ try{ LIST.reIndex(); }catch(e){} return; }
-          /* docReady 의 listInit 도 같은 컨테이너(data-list)에 인스턴스를 하나 만들어 같은 th 에
-             정렬 핸들러를 걸어 둔다. 그 인스턴스는 **더미 행**을 물고 있고, list.js 의 정렬은
-             tbody 를 비우고 자기 행을 다시 붙이므로 — 실데이터를 받은 뒤 정렬을 누르면 지어낸
-             더미가 감사 기록으로 되살아난다. 게다가 두 인스턴스가 asc/desc 표시를 서로 읽어
-             두 번째 클릭부터 뒤집히지 않는다. destroy 가 없으니 정렬 헤더를 복제해 바꿔 끼워
-             그쪽 핸들러만 떼어낸다(우리 인스턴스가 그 뒤에 붙는다). */
-          try{
-            [].forEach.call(host.querySelectorAll("th.sort"),function(th){
-              th.className=th.className.replace(/\b(asc|desc)\b/g,"").replace(/\s+/g," ").trim();
-              th.parentNode.replaceChild(th.cloneNode(true),th);
-            });
-          }catch(e){}
-          try{ LIST=new window.List(host,{valueNames:["op","act","target","change"]}); }catch(e){ LIST=null; }
+          window.popcornList.wire("logList", ["op","act","target","change"]);
         }
-        // listInit(docReady) 이 끝난 뒤에 만든다 — setTimeout 이 그 dispatch 다음 차례를 보장한다.
-        function armList(){ LIST_ARMED=true; wireList(); }
-        if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){ setTimeout(armList,0); });
-        else setTimeout(armList,0);
         render();if(window.feather)feather.replace();
 
         // ---- LIVE (슬라이스 17) — 감사 로그 실데이터: 전 행 원장(undo 행 포함), 되돌려짐 배지는 서버 파생 ----

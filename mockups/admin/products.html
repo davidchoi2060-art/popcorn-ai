@@ -38,6 +38,7 @@
     <link href="assets/css/theme-rtl.min.css" type="text/css" rel="stylesheet" id="style-rtl">
     <link href="vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
     <script src="../shared/ui-choices.js"></script>
+    <script src="../shared/ui-list.js"></script>
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user-rtl.min.css" type="text/css" rel="stylesheet" id="user-style-rtl">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
@@ -385,30 +386,21 @@
         // 판매가 정렬 키 — 표시 문자열에서 숫자만 남긴다(값을 새로 만들지 않는다. "—"는 빈 값 그대로).
         const priceNum=t=>String(t==null?"":t).replace(/[^0-9]/g,"");
         /* ── 현재 페이지 정렬(list.js) ─────────────────────────────────────
-           Phoenix 의 listInit 은 docReady 때 **1회만** 돈다. 이 표는 fetch 응답으로 다시 그려지므로
-           렌더 직후 우리가 직접 붙인다. list.js 에는 destroy 가 없다 — 처음 한 번 만들고 이후엔 reIndex().
-           서버 페이지네이션은 그대로 둔다: page/pagination 옵션 없음 → 이 인스턴스는 현재 페이지만 다룬다. */
+           배선은 공용 헬퍼(shared/ui-list.js)가 전담한다 — 유령 인스턴스 제거(th 재생성 · data-list
+           해제 · 정렬 화살표 CSS 유지), 처음 한 번만 new List 이후 reIndex, 다시 그린 뒤 걸려 있던
+           정렬 되걸기, 문서 끝에서 로드되는 vendor(list.js) 재시도까지. 여기서 다시 하지 않는다.
+           서버 페이지네이션은 그대로 둔다: page/pagination 옵션 없음 → 현재 페이지만 다룬다.
+           재고·공급처는 순수 정수 열이라 문자열 비교로는 12 가 9 보다 앞선다 → numeric 으로 넘긴다.
+           판매가는 valueNames 가 이미 data-num(원 단위 정수)을 싣고 있어 numeric 이 필요 없다.
+           검색 입력(#q)은 list.js 검색이 아니라 **서버 질의**다 — searchInput 으로 넘기지 않는다
+           (넘기면 서버가 돌려준 행을 화면이 한 번 더 걸러 '전체 N건'과 어긋난다). */
         const LIST_VALUE_NAMES=["code","name","cat","spec","stock","supplier",{name:"price",attr:"data-num"},"status"];
-        var LIST=null, LIST_ARMED=false;
         function wireList(){
-          var host=document.getElementById("prodList");
-          if(!window.List||!host||!LIST_ARMED) return;   // vendors/list.js 가 없으면 조용히 건너뛴다
-          if(LIST){ try{ LIST.reIndex(); }catch(e){} return; }
-          /* docReady 의 listInit 도 같은 컨테이너에 인스턴스를 하나 만든다(이 화면은 더미 행을 즉시
-             그리므로 그 인스턴스에 **옛 행**이 물린다). list.js 의 정렬은 tbody 를 비우고 자기 행을
-             다시 붙이므로, 그대로 두면 실데이터를 받은 뒤 정렬을 누를 때 더미가 되살아난다.
-             destroy 가 없으니 정렬 헤더를 복제해 그 핸들러만 떼어낸다(우리 인스턴스가 그 뒤에 붙는다). */
-          try{
-            [].forEach.call(host.querySelectorAll("th.sort"),function(th){
-              th.parentNode.replaceChild(th.cloneNode(true),th);
-            });
-          }catch(e){}
-          try{ LIST=new window.List(host,{valueNames:LIST_VALUE_NAMES}); }catch(e){ LIST=null; }
+          if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
+          window.popcornList.wire("prodList", LIST_VALUE_NAMES, {numeric:["stock","supplier"]});
         }
-        // listInit(docReady) 이 끝난 뒤에 만든다 — setTimeout 이 그 dispatch 다음 차례를 보장한다.
-        function armList(){ LIST_ARMED=true; wireList(); }
-        if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){ setTimeout(armList,0); });
-        else setTimeout(armList,0);
+        if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wireList);
+        else wireList();
         function render(){
           pills();
           const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
