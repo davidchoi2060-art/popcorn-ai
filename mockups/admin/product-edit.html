@@ -57,7 +57,10 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-PRD-030" data-domain="product">
+  <!-- data-dummy-fallback="none" : 이 화면은 더미 폴백을 걷어냈다(예시 사양 배열·공급처 표·흐름 3행 삭제).
+       표시가 없으면 admin-auth.js의 미로그인 띠가 "화면의 수치는 실데이터가 아니라 더미입니다"라고
+       말한다 — 더미가 없는 화면에서는 그 띠 자체가 거짓말이 된다. -->
+  <body data-screen-id="ADM-PRD-030" data-domain="product" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -265,8 +268,8 @@
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="products.html">상품 목록</a></li><li class="breadcrumb-item active" id="bc">상품 상세</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
           <div><h2 class="mb-1" id="ptitle"><span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-030</span></h2>
-          <p class="text-body-tertiary mb-0"><code id="psku">P-4821</code> · 그래픽카드 · 값마다 <b class="text-body-secondary">출처와 잠금 상태</b>가 표시됩니다.</p></div>
-          <div class="d-flex gap-2"><a href="imports.html?id=P-4821" class="btn btn-phoenix-secondary btn-sm">원본 자료</a><button id="dupTools" class="btn btn-phoenix-secondary btn-sm" hidden>중복 정리</button><button id="save" class="btn btn-primary btn-sm">저장</button></div>
+          <p class="text-body-tertiary mb-0"><code id="psku">—</code> · 값마다 <b class="text-body-secondary">출처와 잠금 상태</b>가 표시됩니다.</p></div>
+          <div class="d-flex gap-2"><a href="imports.html" class="btn btn-phoenix-secondary btn-sm">원본 자료</a><button id="dupTools" class="btn btn-phoenix-secondary btn-sm" hidden>중복 정리</button><button id="save" class="btn btn-primary btn-sm">저장</button></div>
         </div>
         <div class="alert alert-subtle-secondary d-flex align-items-center py-2 fs-9 mb-3" role="alert"><span data-feather="lock" style="width:14px;height:14px;flex:none;" class="me-2"></span>
           이 화면에서 직접 수정한 값은 <b class="mx-1">운영자 확정 → 잠금</b> 처리되어, 이후 일괄 등록이 덮어쓰지 않습니다.</div>
@@ -274,13 +277,13 @@
           <div class="col-12 col-lg-7">
             <div class="card mb-3"><div class="card-body">
               <h5 class="mb-1">필수 사양 <span class="fs-10 fw-normal text-body-tertiary">— 전부 확인 완료여야 추천 가능 재고 진입</span></h5>
-              <div id="specs"></div>
+              <div id="specs"><p class="fs-9 text-body-tertiary mb-0">불러오는 중…</p></div>
             </div></div>
             <div class="card"><div class="card-body">
               <h5 class="mb-3">기본 정보</h5>
               <div class="row g-3">
                 <div class="col-6"><label class="form-label fs-9 fw-bold">상품명</label><input class="form-control form-control-sm" value="" placeholder="예) ASUS DUAL RTX 4060 O8G"></div>
-                <div class="col-3"><label class="form-label fs-9 fw-bold">분류</label><select class="form-select form-select-sm"><option>그래픽카드</option><option>CPU</option><option>메인보드</option></select></div>
+                <div class="col-3"><label class="form-label fs-9 fw-bold">분류</label><select class="form-select form-select-sm"><option value="">분류를 선택하세요</option></select></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">재고 수량</label><input class="form-control form-control-sm text-end" value="" placeholder="0"></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">판매가(원)</label><input class="form-control form-control-sm text-end" value="" placeholder="미산정"></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">노출 상태</label><select class="form-select form-select-sm"><option>판매 중</option><option>숨김</option></select></div>
@@ -298,9 +301,10 @@
             <div class="card"><div class="card-body">
               <h5 class="mb-2">이 상품의 흐름</h5>
               <div class="fs-9 d-flex flex-column gap-2">
-                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">최근 원본 반입</span><a href="imports.html?id=P-4821">배치 #213 · 07-13</a></div>
-                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">검수 이력</span><a href="review-queue.html">장착 길이 {length_mm} 확정 대기</a></div>
-                <div class="d-flex justify-content-between"><span class="text-body-tertiary">추천 가능 여부</span><span class="badge badge-phoenix badge-phoenix-warning">불가 — 필수 사양 1건 미확인</span></div>
+                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">최근 원본 반입</span><span id="flowImport" class="text-body-tertiary">—</span></div>
+                <div class="d-flex justify-content-between border-bottom pb-2"><span class="text-body-tertiary">검수 이력</span><span id="flowReview" class="text-body-tertiary">—</span></div>
+                <div class="d-flex justify-content-between"><span class="text-body-tertiary">추천 가능 여부</span><span id="flowPool" class="text-body-tertiary">—</span></div>
+                <p id="flowNote" class="fs-10 text-body-quaternary mb-0">불러오는 중…</p>
               </div>
             </div></div>
           </div>
@@ -315,24 +319,36 @@
         const fromPrice=isNew&&_q.get("from")==="price"; // 슬라이스 15: 단가표發 신규 등록 프리필(시늉)
         if(isNew){document.getElementById("ptitle").innerHTML='새 상품 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-040</span>'+(fromPrice?' <span class="badge badge-phoenix badge-phoenix-info align-middle fs-10">단가표發</span>':'');document.getElementById("bc").textContent="상품 등록";document.getElementById("psku").textContent="SKU 자동 발번";}
         else if(id){document.getElementById("psku").textContent=id;}
-        // 필수 사양: [필드, 값, 출처, 잠금]  출처: origin(원본 추출)/ai(AI 대조)/op(운영자 확정)
-        const SRC={origin:["원본 추출","secondary"],ai:["AI 대조","info"],op:["운영자 확정","primary"]};
-        const SPECS=[
-          ["장착 길이 {length_mm}","", "none", false, "검수 대기 — 원문 272mm vs 지식 251mm"],
-          ["소비전력 {tdp_watt}","115W","ai",false,null],
-          ["보조전원 {pcie_power}","8-pin","origin",false,null],
-          ["슬롯 폭 {slot_width}","2.2슬롯","op",true,null]
-        ];
-        function render(){
-          document.getElementById("specs").innerHTML=SPECS.map(([f,v,s,lock,warn],i)=>`
-            <div class="d-flex align-items-center gap-2 py-2 ${i<SPECS.length-1?"border-bottom":""}">
-              <div style="width:200px;flex:none;"><span class="fs-9 text-body-secondary">${f}</span></div>
-              <input class="form-control form-control-sm" style="max-width:160px;" value="${v}" ${lock?"disabled":""} placeholder="${warn?"미확인":""}">
-              ${warn?`<a href="review-queue.html" class="badge badge-phoenix badge-phoenix-danger text-decoration-none">검수 대기</a><span class="fs-10 text-body-tertiary">${warn}</span>`
-                :`<span class="badge badge-phoenix badge-phoenix-${SRC[s][1]}">${SRC[s][0]}</span>`}
-              <button class="btn btn-sm ${lock?"btn-phoenix-primary":"btn-subtle-secondary"} ms-auto" data-lock="${i}">${lock?"🔒 잠금":"잠그기"}</button>
-            </div>`).join("");
-          document.querySelectorAll("[data-lock]").forEach(b=>b.onclick=()=>{const i=+b.dataset.lock;SPECS[i][3]=!SPECS[i][3];if(SPECS[i][3])SPECS[i][2]="op";render();});
+        /* 필수 사양·공급처는 서버에서만 온다.
+           예전에는 여기 예시 배열(SPECS)이 있어서 서버가 죽어도 없는 상품의 사양
+           (장착 길이·소비전력 115W·2.2슬롯)이 사실처럼 그려졌다 —
+           '남의 값이 기본값으로 박힌다'는 슬라이스 55 사고와 같은 부류다.
+           지금은 못 불러오면 왜 못 불러왔는지만 말한다. */
+        function setSpecsNote(msg){
+          var sp=document.getElementById("specs");
+          if(sp) sp.innerHTML='<p class="fs-9 text-body-tertiary mb-0">'+msg+'</p>';
+        }
+        function setSupNote(msg){
+          var tb=document.getElementById("supRows");
+          if(tb) tb.innerHTML='<tr><td colspan="4" class="text-center text-body-tertiary py-4">'
+            +msg+'</td></tr>';
+        }
+        function setFlowNote(msg){
+          // '—' 세 줄만 남기면 '반입 없음·검수 없음·추천 불가'라는 사실로 읽힌다.
+          var el=document.getElementById("flowNote");
+          if(!el) return;
+          el.innerHTML = msg || "";
+          el.hidden = !msg;
+        }
+        function showLoadFailed(msg){
+          var m = msg || "서버에 연결되지 않아 불러오지 못했습니다.";
+          setSpecsNote(m);
+          setSupNote(m);
+          setFlowNote(m);
+          var sk=document.getElementById("psku"); if(sk) sk.textContent="—";
+          ["flowImport","flowReview","flowPool"].forEach(function(k){
+            var el=document.getElementById(k); if(el) el.textContent="—";
+          });
         }
         // 슬라이스 15: 단가표發 신규 등록 프리필(시늉) — 등록 API·SKU 발번은 다음 슬라이스에서 연결
         function fieldByLabel(txt){
@@ -340,14 +356,29 @@
           return lab? lab.parentElement.querySelector("input,select") : null;
         }
         if(fromPrice){
-          const nm=_q.get("name")||"", cost=+(_q.get("cost")||0), sup=_q.get("sup")||"", cat=_q.get("cat")||"";
+          const nm=_q.get("name")||"", cat=_q.get("cat")||"";
           const set=(t,v)=>{const el=fieldByLabel(t);if(el)el.value=v;};
           set("상품명",nm); set("재고 수량","0"); set("판매가(원)","");
-          const catSel=fieldByLabel("분류"); if(catSel&&[...catSel.options].some(o=>o.textContent===cat)) catSel.value=cat;
+          /* 분류 선택지는 서버가 준다(관례: 화면이 분류를 지어내지 않는다).
+             마크업에 박혀 있던 3종(그래픽카드·CPU·메인보드)을 걷어냈으므로 여기서 채우지
+             않으면 셀렉트에 '선택하세요'만 남고, 등록 POST가 part_label=""로 나가
+             400('알 수 없는 분류')이 된다 — 단가표發 등록이 아예 불가능해진다. */
+          const catSel=fieldByLabel("분류");
+          fetch("/api/admin/product-meta").then(function(r){return r.ok?r.json():null;})
+            .then(function(m){
+              if(!catSel || !m || !m.part_labels || !m.part_labels.length) return;
+              catSel.innerHTML='<option value="">분류를 선택하세요</option>'
+                +m.part_labels.map(function(x){return '<option>'+esc(x.label)+'</option>';}).join("");
+              // URL의 분류가 서버 라벨과 맞을 때만 고른다 — 안 맞으면 비워 두고 사람이 고른다
+              var hit=[].filter.call(catSel.options,function(o){return o.textContent===cat;})[0];
+              catSel.value = hit? cat : "";
+            }).catch(function(){});
           const expSel=fieldByLabel("노출 상태"); if(expSel) expSel.value="숨김";
-          const tb=document.querySelector(".col-lg-5 table tbody");
-          if(tb) tb.innerHTML=`<tr><td class="fw-semibold">${sup}</td><td class="text-end fw-bold">${cost.toLocaleString()}원</td><td class="text-body-tertiary">오늘 <span class="badge badge-phoenix badge-phoenix-primary">최저</span></td><td class="text-end"><button class="btn btn-sm btn-subtle-secondary">수정</button></td></tr>`;
-          SPECS.length=0; // 신규 — 분류 확정 후 사양 템플릿 로드(시늉)
+          /* 공급처 매입가는 등록이 끝나야 생긴다. 예전에는 여기서 URL로 받은 값을
+             '오늘 최저'라는 표까지 붙여 그렸는데, 아직 등록되지도 않은 상품의
+             매입가를 등록된 사실처럼 보여준 것이었다(슬라이스 66이 마크업에서 지운 것과 같은 값). */
+          setSupNote("상품을 등록하면 공급처 매입가를 넣을 수 있습니다.");
+          setFlowNote("아직 등록되지 않은 상품입니다 — 반입·검수·추천 상태는 등록 후에 표시됩니다.");
           const al=document.querySelector(".alert.alert-subtle-secondary");
           if(al) al.innerHTML='<span data-feather="shield" style="width:14px;height:14px;flex:none;" class="me-2"></span>단가표發 신규 등록 — 저장해도 <b class="mx-1">추천·함께 구성 풀에는 들어가지 않습니다</b>(후보 제외·검수 필요 상태로 시작). 필수 사양 검수를 전부 통과해야 후보로 승격됩니다.';
         }
@@ -359,9 +390,13 @@
         document.getElementById("save").onclick=()=>{
           // 슬라이스 16: 단가표發 신규 등록 실배선 — sup_id가 있으면(검수 큐 LIVE 경유) POST, 아니면 시늉
           if(fromPrice&&_q.get("sup_id")){
+            const catEl0=fieldByLabel("분류");
+            const lab0=catEl0? (catEl0.value||"").trim() : "";
+            // 분류 없이 보내면 서버가 400으로 되돌린다 — 보내기 전에 화면에서 말한다
+            if(!lab0){ showToast("분류를 선택하세요"); return; }
             const btn=document.getElementById("save");btn.disabled=true;
             fetch("/api/admin/products",{method:"POST",headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({name:fieldByLabel("상품명").value, part_label:fieldByLabel("분류").value,
+              body:JSON.stringify({name:fieldByLabel("상품명").value, part_label:lab0,
                 supplier_id:+_q.get("sup_id"), model_name:_q.get("model")||_q.get("name")||"",
                 cost_price:+(_q.get("cost")||0), danawa_code:_q.get("danawa")||null})})
               .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
@@ -370,10 +405,13 @@
                 showToast(res.j.sku+" 등록 완료 — 검수 대기 · 추천 풀 제외(검수 통과 후 승격)");
                 document.getElementById("psku").textContent=res.j.sku;
               })
-              .catch(()=>{showToast("정적 모드 — 등록 API는 개발 서버(8000)에서 동작합니다");btn.disabled=false;});
+              .catch(()=>{showToast("서버에 연결되지 않아 등록하지 못했습니다");btn.disabled=false;});
             return;
           }
-          showToast(fromPrice?"등록 시늉 — 검수 큐(실데이터)에서 진입하면 실제 등록됩니다 (등록 직후 풀 제외)":"저장 완료 — 수정 필드는 운영자 확정으로 잠금 처리");
+          // 저장한 척하지 않는다 — 대상(sup_id·code)이 없으면 서버에 보낼 것이 없다
+          showToast(fromPrice
+            ?"등록되지 않았습니다 — 검수 큐에서 진입해야 실제로 등록됩니다"
+            :"저장되지 않았습니다 — 상품 관리에서 수정할 상품을 고르세요");
         };
 
         // ══ LIVE: ?code= 로 들어오면 실데이터 상세·수정 (슬라이스 53) ══
@@ -438,7 +476,7 @@
         // ── 사양 편집 (슬라이스 57) ──────────────────────────────────────────
         // 검수 큐는 '검수 행이 있는 필드'만 다룬다. 화면에서 새로 만든 항목에는 검수 행이
         // 없으므로 값을 넣을 길이 아예 없었다. 여기서 직접 입력한다.
-        var SPEC_META = null, SPEC_UNDO = null;
+        var SPEC_META = null, SPEC_UNDO = null, SPEC_META_FAILED = false;
         function specInputId(k){ return "sf_" + k; }
         // ── 공급처별 매입가 (슬라이스 66) ─────────────────────────────────
         // 표가 마크업 하드코딩이었다(용산도매A 352,000 · 다나와직송B 361,000).
@@ -705,7 +743,12 @@
           var sp = document.getElementById("specs");
           if(!sp || !P) return;
           if(!SPEC_META){
-            sp.innerHTML = '<p class="fs-9 text-body-tertiary mb-0">사양 항목을 불러오는 중…</p>';
+            /* 성공했는데 '불러오는 중…'이 남지 않게 — 시도했는데 못 받았으면 그렇게 말한다.
+               여기까지 왔다는 것은 상품 조회가 성공했다는 뜻(P가 있다)이라 '연결 안 됨'이
+               아니다. 사양 항목 정의만 못 받은 것이므로 그렇게만 말한다. */
+            setSpecsNote(SPEC_META_FAILED
+              ? "사양 항목 정의를 불러오지 못했습니다 — 서버가 항목 목록을 주지 않았습니다."
+              : "사양 항목을 불러오는 중…");
             return;
           }
           var s = P.specs || {};
@@ -795,8 +838,8 @@
         function loadSpecMeta(){
           return fetch("/api/admin/spec-fields")
             .then(function(r){ return r.ok ? r.json() : null; })
-            .then(function(m){ SPEC_META = m; })
-            .catch(function(){ SPEC_META = null; });
+            .then(function(m){ SPEC_META = m; SPEC_META_FAILED = !m; })
+            .catch(function(){ SPEC_META = null; SPEC_META_FAILED = true; });
         }
         function paint(){
           document.getElementById("ptitle").innerHTML=esc(P.name)
@@ -900,6 +943,19 @@
             hint.className = "fs-10 text-body-tertiary mt-1";
             sb0.parentNode.appendChild(hint);
           }
+          /* '이 상품의 흐름' — 서버가 준 값만 쓴다. 예전엔 여기에 '배치 #213 · 07-13',
+             '장착 길이 확정 대기' 같은 없는 이력이 박혀 있었다. 반입 이력은 이 응답에
+             없으므로 지어내지 않고 어디서 보는지만 가리킨다 — 빈 '—'는 '없음'으로 읽힌다. */
+          var fi=document.getElementById("flowImport");
+          if(fi) fi.innerHTML='<a href="imports.html">원본 자료에서 확인</a>';
+          var fr=document.getElementById("flowReview");
+          if(fr) fr.innerHTML = (P.review_pending==null) ? "—"
+            : (P.review_pending
+                ? '<a href="review-queue.html">검수 대기 '+P.review_pending+'건</a>'
+                : "검수 대기 없음");
+          var fp=document.getElementById("flowPool");
+          if(fp) fp.textContent = (P.in_pool==null) ? "—" : (P.in_pool?"추천 가능":"추천 제외");
+          setFlowNote("");
           applyMode();
           paintSpecs();
           paintSuppliers();
@@ -911,7 +967,10 @@
         function load(){
           return Promise.all([
               fetch("/api/admin/products/"+encodeURIComponent(CODE))
-                .then(function(r){ if(!r.ok) throw new Error(r.status===404?"상품이 없습니다":r.status);
+                .then(function(r){ if(!r.ok){
+                                     // 서버가 답을 준 실패다 — '연결 안 됨'과 구분해 둔다
+                                     var er=new Error(r.status===404?"상품이 없습니다":("서버 오류 "+r.status));
+                                     er.fromServer=true; throw er; }
                                    return r.json(); }),
               SPEC_META ? Promise.resolve(SPEC_META) : loadSpecMeta(),
               loadPartMeta()])
@@ -965,8 +1024,19 @@
                 .catch(function(e){saveBtn.disabled=false;toast("저장 실패: "+esc(e.message));});
             };
           }).catch(function(e){
-            toast("불러오기 실패: "+esc(e.message)
-              +" — 정적 모드에서는 목업 값이 보입니다");
+            /* 못 불러왔으면 화면은 빈 채로 두고 이유만 말한다 — 예전 값을 대신 그리지 않는다.
+               **원인은 지어내지 않는다**: 서버가 404·5xx로 답한 것과 아예 닿지 못한 것은
+               다르다. 404에 "서버에 연결되지 않아"라고 붙이면 한 문장 안에서 스스로를
+               반박한다. P가 이미 있으면 값은 받았고 그리다 실패한 것이다. */
+            var why = P ? "상품 정보는 받았지만 화면을 그리지 못했습니다."
+                    : (e && e.fromServer) ? ("상품 정보를 불러오지 못했습니다 — "+esc(e.message))
+                    : "서버에 연결되지 않아 불러오지 못했습니다.";
+            showLoadFailed(why);
+            if(saveBtn){
+              saveBtn.textContent="수정";
+              saveBtn.onclick=function(){ toast("상품 정보를 불러오지 못해 수정할 수 없습니다"); };
+            }
+            toast(why);
           });
         } else if(isNew && !fromPrice){
           // ── 상품 관리에서 들어온 직접 등록 (슬라이스 54)
@@ -1000,16 +1070,15 @@
             var el=fieldByLabel(lb);
             if(el){ el.disabled=true; el.title="등록 후 상세 화면에서 수정합니다"; }
           });
-          var sp=document.getElementById("specs");
-          if(sp) sp.innerHTML='<p class="fs-9 text-body-tertiary mb-0">사양은 등록 후 '
-            +'<a href="review-queue.html">상품 검수</a>에서 채웁니다.</p>';
+          setSpecsNote('사양은 등록 후 <a href="review-queue.html">상품 검수</a>에서 채웁니다.');
+          // 공급처 표·흐름도 '불러오는 중'으로 남지 않게 한다 — 등록 전에는 부를 것이 없다
+          setSupNote("상품을 등록하면 공급처 매입가를 넣을 수 있습니다.");
+          setFlowNote("아직 등록되지 않은 상품입니다 — 반입·검수·추천 상태는 등록 후에 표시됩니다.");
           // 신규 등록인데 **다른 상품의 값이 남아 있으면 그대로 저장된다.**
           // 마크업의 예시 값은 지웠지만, 어떤 경로로 들어와도 비어 있게 여기서 한 번 더 비운다.
           ["상품명","재고 수량","판매가(원)"].forEach(function(lb){
             var el=fieldByLabel(lb); if(el) el.value="";
           });
-          // 사양 표도 예시가 남으면 안 된다 — 등록 단계에는 사양이 없다
-          if(typeof SPECS!=="undefined" && SPECS.length) SPECS.length=0;
 
           // 분류 셀렉트를 서버가 아는 라벨로 채운다 — 화면에 3종만 하드코딩돼 있어
           // 파워·케이스·메모리를 등록할 수 없었다(슬라이스 54).
@@ -1145,10 +1214,15 @@
             +'실제로 수정할 수 있습니다. 이 상태로 저장하면 아무것도 바뀌지 않습니다.';
           var host=document.querySelector(".content nav.mb-3");
           if(host&&host.parentNode) host.parentNode.insertBefore(al, host.nextSibling);
+          // 대상이 없으면 요청 자체를 보내지 않는다 — '불러오는 중…'으로 남기지 않는다
+          setSpecsNote("상품이 지정되지 않아 사양을 불러오지 않았습니다.");
+          setSupNote("상품이 지정되지 않아 불러오지 않았습니다.");
+          setFlowNote("상품이 지정되지 않아 불러오지 않았습니다.");
         }
 
-        render();if(window.feather)feather.replace();
-        if(fromPrice&&!SPECS.length)document.getElementById("specs").innerHTML='<p class="fs-9 text-body-tertiary py-3 mb-0">분류 확정 후 필수 사양 템플릿이 로드됩니다 — <b>전부 확인돼야 추천 가능 재고에 진입</b>합니다.</p>';
+        if(window.feather)feather.replace();
+        if(fromPrice) setSpecsNote('분류 확정 후 필수 사양 항목이 표시됩니다 — '
+          +'<b>전부 확인돼야 추천 가능 재고에 진입</b>합니다.');
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

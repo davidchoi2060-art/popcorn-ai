@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-ENG-030" data-domain="engine">
+  <body data-screen-id="ADM-ENG-030" data-domain="engine" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -263,31 +263,35 @@
       </nav>
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">추천 설정</a></li><li class="breadcrumb-item active">추천 가능 재고 현황</li></ol></nav>
+        <!-- data-dummy-fallback="none" : 이 화면은 더미 폴백을 걷어냈다.
+             삭제한 것 — 머리말의 박힌 총계·비율, 근거 없는 규칙·정책 버전 표기,
+             카테고리 막대 8행 배열과 그것을 그리던 첫 호출, 제외 사유 4행, 얇은 카테고리 2건.
+             배지가 '더미'라 밝혀도 큼직한 수는 사람이 사실로 읽는다(좌측 메뉴 배지 전례 —
+             admin-panel.js의 clearDummyBadges가 같은 이유로 배지를 지운다).
+             지금은 서버 응답만 그리고, 못 받으면 0이 아니라 '—'와 이유 한 줄을 남긴다.
+             주석에도 그때의 수치를 다시 적지 않는다 — 적으면 그 자체가 화면에 남은 더미다. -->
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">추천 가능 재고 현황 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">추천 가능 재고 현황 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">고객 화면(S1)의 후보 카운터가 세는 바로 그 집합. <b class="text-body-secondary">얇은 카테고리 = 견적 실패 위험</b>을 미리 봅니다.</p></div>
-          <div class="text-end"><h3 class="mb-0 fw-bolder" id="headTotal">24,912 <span class="fs-9 fw-semibold text-body-tertiary">/ 26,480개 (94.1%)</span></h3><p class="fs-9 text-body-tertiary mb-0" id="headNote">규칙 v5 · 정책 v12 기준</p></div>
+          <div class="text-end"><h3 class="mb-0 fw-bolder" id="headTotal">—</h3><p class="fs-9 text-body-tertiary mb-0" id="headNote">불러오는 중…</p></div>
         </div>
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-8"><div class="card h-100"><div class="card-body">
             <h6 class="mb-1">카테고리별 구성 <span class="fs-10 fw-normal text-body-tertiary">■ 추천 가능 ■ 검수 대기 ■ 재고 없음 ■ 가격 검토</span></h6>
-            <div id="bars"></div>
+            <!-- 요청 전 상태 = '불러오는 중'. 서버 응답이 오면 아래 LIVE가 통째로 덮어쓴다. -->
+            <div id="bars"><div class="text-center text-body-tertiary py-4">불러오는 중…</div></div>
           </div></div></div>
           <div class="col-12 col-lg-4">
             <div class="card mb-3"><div class="card-body">
-              <h6 class="mb-2">제외 사유 합계 <span class="fs-10 fw-normal text-body-tertiary" id="reasonTotal">1,568개</span></h6>
+              <h6 class="mb-2">제외 사유 합계 <span class="fs-10 fw-normal text-body-tertiary" id="reasonTotal">—</span></h6>
               <div class="fs-9 d-flex flex-column gap-2" id="reasons">
-                <div class="d-flex justify-content-between"><a href="review-queue.html">검수 대기</a><b>9</b></div>
-                <div class="d-flex justify-content-between"><a href="sourcing.html">재고 없음 · 매입</a><b>618</b></div>
-                <div class="d-flex justify-content-between"><a href="price-review.html">가격 검토 대기</a><b>5</b></div>
-                <div class="d-flex justify-content-between"><span class="text-body-tertiary">필수 사양 미확인(적재분)</span><b>936</b></div>
+                <div class="text-center text-body-tertiary py-4">불러오는 중…</div>
               </div>
             </div></div>
             <div class="card border-warning"><div class="card-body">
               <h6 class="mb-2 text-warning">⚠ 얇은 카테고리</h6>
               <div class="fs-9 d-flex flex-column gap-2" id="thin">
-                <div><b>mATX 케이스(화이트)</b> — 후보 3개<br><span class="fs-10 text-body-tertiary">"화이트 감성" 제약 결합 시 견적 실패 위험 → <a href="sourcing.html">매입 검토</a></span></div>
-                <div><b>750W 이상 파워</b> — 후보 7개<br><span class="fs-10 text-body-tertiary">고성능 GPU 견적의 병목</span></div>
+                <div class="text-center text-body-tertiary py-4">불러오는 중…</div>
               </div>
             </div></div>
           </div>
@@ -296,9 +300,16 @@
       </div>
       <script>
       (function(){
-        // [카테고리, 가능, 검수, 재고없음, 가격]
-        const C=[["CPU",3210,1,80,0],["메인보드",2988,3,112,0],["메모리",4102,1,64,1],["그래픽카드",2455,2,190,2],["SSD/저장장치",5120,1,88,1],["파워",2410,1,44,1],["케이스",3020,0,30,0],["CPU쿨러",1607,0,10,0]];
+        // 더미 카테고리 배열(8행)과 그것을 그리던 첫 drawBars 호출을 걷어냈다.
+        // 서버가 죽으면 저 8행이 없는 재고 수를 사실처럼 그리고 있었다.
         const COLS=["var(--phoenix-primary)","var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-danger)","var(--phoenix-secondary)"];
+        const OFFLINE="서버에 연결되지 않아 불러오지 못했습니다.";
+        function noteLine(el,msg){ if(el) el.innerHTML='<div class="text-center text-body-tertiary py-4">'+msg+'</div>'; }
+        // 예외 메시지는 응답 본문 조각을 그대로 물고 온다(JSON 파싱 실패 시 앞 10자).
+        // 그대로 innerHTML에 넣으면 서버가 보낸 바이트가 태그로 살아난다 — 실제로 <img>·<svg>가 생겼다.
+        // 이유를 밝히려다 응답에 마크업 통제권을 넘기지 않는다.
+        function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]); }
+        function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
         // 세그먼트 순서 = 게이트 순서(가능 / 검수 대기 / 후보 미승격 / 가격 / 재고없음 / 사양 미등록)
         function drawBars(rows){
           document.getElementById("bars").innerHTML=rows.map(r=>{
@@ -312,12 +323,14 @@
           }).join("");
           if(window.feather)feather.replace();
         }
-        drawBars(C.map(([name,ok,rv,oos,pr])=>({name,ok,need_review:rv,not_candidate:0,no_price:pr,oos,no_specs:0,total:ok+rv+oos+pr})));
-
         // ---- LIVE (슬라이스 25) — 4중 게이트별 제외 사유 실집계. 'ok' 합계 = S1 후보 카운터와 동일 집합 ----
+        // 응답이 왔는지(상태 코드)를 남긴다 — '연결 실패'와 '서버가 거절'은 다른 사실이고,
+        // 둘을 한 문구로 말하면 401(로그인 만료)을 네트워크 문제로 읽게 된다.
+        let httpStatus=null, gotData=false;
         fetch("/api/admin/candidate-pool")
-          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(r=>{httpStatus=r.status;if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
           .then(d=>{
+            gotData=true;
             drawBars(d.categories);
             document.getElementById("headTotal").innerHTML=`${d.ok_total.toLocaleString()} <span class="fs-9 fw-semibold text-body-tertiary">/ ${d.core_total.toLocaleString()}개 (${d.rate}%)</span>`;
             document.getElementById("headNote").textContent="핵심 부품 기준 · 규칙·정책 버전 표기 준비 중";
@@ -332,9 +345,31 @@
             const host=document.getElementById("bars").parentElement;
             if(!document.getElementById("poolNote"))host.appendChild(note);
             const b=document.getElementById("dataSrc");
-            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            if(b){b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");}
           })
-          .catch(()=>{});
+          .catch(e=>{
+            // 더미를 걷어냈으므로 실패하면 화면이 빈다 — 조용히 비우지 않고 이유를 말한다.
+            // 0을 찍지 않는다: 0은 '없다'는 사실 주장이라 더미만큼 거짓말이다.
+            // 여기서 예외가 나면 안내조차 못 하고 뒤 코드가 통째로 죽는다 — 참조마다 가드한다.
+            const why=(e&&e.message)?e.message:"원인 불명";
+            let msg,badgeText;
+            if(gotData){ msg="집계를 받았지만 화면에 그리지 못했습니다."; badgeText="표시 실패"; }
+            else if(httpStatus===null){ msg=OFFLINE; badgeText="연결 안 됨"; }
+            else if(httpStatus===401||httpStatus===403){ msg="권한이 없어 불러오지 못했습니다."; badgeText="권한 없음"; }
+            else { msg="서버가 집계를 주지 못했습니다."; badgeText="불러오기 실패"; }
+            setText("headTotal","—");
+            setText("headNote",msg);
+            setText("reasonTotal","—");
+            noteLine(document.getElementById("bars"),msg+' <span class="fs-10">('+esc(why)+')</span>');
+            noteLine(document.getElementById("reasons"),msg);
+            noteLine(document.getElementById("thin"),msg);
+            const b=document.getElementById("dataSrc");
+            if(b){
+              // 원천(products·추천 뷰)은 있고 못 불러온 것이다 — 없는 원천을 말하지 않는다.
+              b.textContent=badgeText;
+              b.classList.replace("badge-phoenix-secondary","badge-phoenix-warning");
+            }
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

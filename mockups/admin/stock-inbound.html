@@ -265,7 +265,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">재고 입고</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">재고 입고 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SRC-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">재고 입고 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SRC-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">매입 확정분이 <b class="text-body-secondary">실제로 들어온 수량</b>을 원장에 기록합니다 — 입고 전까지는 검수·가격이 끝나도 추천에 쓰이지 않습니다.</p></div>
         </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -299,20 +299,16 @@
       </div>
       <script>
       (function(){
-        // ADM-SRC-020 재고 입고 — 목업 설계(슬라이스 22). API 미연결: 전 동작은 로컬 더미.
+        // ADM-SRC-020 재고 입고 — 화면은 서버 응답만 그린다. 더미 데이터는 두지 않는다.
         // 원장 계약(ERD §10.6): 입고 = stock_movements(inbound|adjust, qty_delta +) + products.stock_qty 증가.
-        // 안전재고는 마이그레이션 0004의 safety_stock으로 실판정(슬라이스 33). 매입 견적 참조만 연출.
+        // 안전재고는 마이그레이션 0004의 safety_stock으로 실판정(슬라이스 33).
         const won=n=>n.toLocaleString()+"원";
-        let R=[
-          {id:20489102,sku:"P-9102",name:"GIGABYTE 지포스 RTX 5060 Ti AERO OC D7 8GB",cat:"그래픽카드",
-           qty:6,cost:680000,sup:"클릭나라",stock:0,priced:true,why:"inbound",note:"매입 확정 · 검수·가격 완료"},
-          {id:20481002,sku:"P-1002",name:"AMD 라이젠7 7700 (정품)",cat:"CPU",
-           qty:10,cost:345000,sup:"용산도매A",stock:0,priced:true,why:"inbound",note:"매입 견적 확정 07-13 · 재고 0"},
-          {id:20484821,sku:"P-4821",name:"이엠텍 지포스 RTX 4060 STORM X2 WHITE",cat:"그래픽카드",
-           qty:4,cost:352000,sup:"용산도매A",stock:6,priced:true,why:"adjust",note:"안전재고 미달 보충(연출)"}
-        ];
+        let R=[];
         const WHY={inbound:["매입 입고","primary"],adjust:["실사 조정","info"]};
         let cur="all", done=0, lastAction=null, LIVE=false, NOTE="";
+        // STATE: loading(요청 전/중) → ok(성공) | error(실패). 빈 표가 '없음'인지 '못 불러옴'인지 가른다.
+        let STATE="loading";
+        const EMPTY_MSG={loading:"불러오는 중…",error:"서버에 연결되지 않아 불러오지 못했습니다."};
 
         // ── 현재 페이지 안의 검색·정렬(list.js) — 공용 헬퍼 `shared/ui-list.js` 가 처리한다.
         // 유령 인스턴스 제거 · 콤마 금액 수치 비교 · reIndex 뒤 정렬 되걸기 · vendor 재시도까지
@@ -327,15 +323,20 @@
         document.addEventListener("DOMContentLoaded", wireList);
 
         function kpis(){
-          const K=[["입고 대기",R.length,"건","primary"],["오늘 입고",done,"건","primary"],
-                   ["재고 없음",R.filter(r=>r.stock===0).length,"개","danger"],
-                   ["안전재고 미달",R.filter(r=>r.stock>0&&r.safety_stock&&r.stock<r.safety_stock).length,LIVE?"개":"개(연출)","warning"]];
-          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const el=document.getElementById("kpis"); if(!el)return;
+          // 서버 응답 전/실패 시에는 수치를 지어내지 않는다 — 전부 자리표시자.
+          const ok=(STATE==="ok");
+          const K=[["입고 대기",ok?R.length:"—","건"],["오늘 입고",ok?done:"—","건"],
+                   ["재고 없음",ok?R.filter(r=>r.stock===0).length:"—","개"],
+                   ["안전재고 미달",ok?R.filter(r=>r.stock>0&&r.safety_stock&&r.stock<r.safety_stock).length:"—","개"]];
+          el.innerHTML=K.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function list(){ return cur==="all"?R:R.filter(r=>r.why===cur); }
         function pills(){
-          const P=[["all","전체",R.length,"dark"],["inbound","매입 확정분",R.filter(r=>r.why==="inbound").length,"primary"],["adjust","실사 조정",R.filter(r=>r.why==="adjust").length,"info"]];
-          document.getElementById("pills").innerHTML=P.map(([k,l,n,c])=>{
+          const el=document.getElementById("pills"); if(!el)return;
+          const ok=(STATE==="ok");
+          const P=[["all","전체",ok?R.length:"—","dark"],["inbound","매입 확정분",ok?R.filter(r=>r.why==="inbound").length:"—","primary"],["adjust","실사 조정",ok?R.filter(r=>r.why==="adjust").length:"—","info"]];
+          el.innerHTML=P.map(([k,l,n,c])=>{
             const on=k===cur;
             return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+c} ms-1">${n}</span></a></li>`;
           }).join("");
@@ -353,8 +354,9 @@
         }
         function render(){
           kpis();pills();
+          const body=document.getElementById("rows"); if(!body)return;
           const L=list();
-          document.getElementById("rows").innerHTML=L.length?L.map(r=>{
+          body.innerHTML=L.length?L.map(r=>{
             const [head,tail,col]=after(r), [wl,wc]=WHY[r.why];
             return `<tr>
               <td class="name ps-4"><b class="text-body-highlight">${r.name}</b><div class="fs-10 text-body-tertiary">${r.sku} · <code class="fs-10">${r.id}</code></div></td>
@@ -370,7 +372,9 @@
                 <button class="btn btn-sm btn-subtle-secondary" data-id="${r.id}" data-act="hold">보류</button>
               </td></tr>`;
           }).join("")
-          :`<tr><td colspan="8" class="text-center text-body-tertiary py-5"><b>입고 대기가 없습니다.</b><br><span class="fs-10">매입 견적 확정 시 이 목록에 쌓입니다.</span></td></tr>`;
+          :(STATE==="ok"
+            ?`<tr><td colspan="8" class="text-center text-body-tertiary py-5"><b>입고 대기가 없습니다.</b><br><span class="fs-10">매입 견적 확정 시 이 목록에 쌓입니다.</span></td></tr>`
+            :`<tr><td colspan="8" class="text-center text-body-tertiary py-4">${EMPTY_MSG[STATE]}</td></tr>`);
           document.querySelectorAll("#rows [data-act]").forEach(b=>b.onclick=()=>act(+b.dataset.id, b.dataset.act));
           wireList();
           if(window.feather)feather.replace();
@@ -401,11 +405,11 @@
               }).catch(()=>toast("입고 실패 — 네트워크 오류"));
             return;
           }
+          // 서버 없이 입고를 확정한 척하지 않는다 — 원장은 서버만 쓴다.
+          if(a==="confirm"){ toast("서버에 연결되지 않아 입고를 확정할 수 없습니다."); return; }
           lastAction={mode:a,idx:i,item:{...r}};
-          const [head,tail]=after(r);
           R.splice(i,1);
-          if(a==="confirm"){ done++; toast(`<b>${r.sku}</b> 입고 ${r.qty}개 확정 · ${head} · ${tail} · 원장 기록`,true); }
-          else toast(`<b>${r.sku}</b> 보류 — 재고 미반영`,true);
+          toast(`<b>${r.sku}</b> 보류 — 재고 미반영`,true);
           render();
         }
         function undo(){
@@ -423,22 +427,27 @@
           }
           const {mode,idx,item}=lastAction;
           if(mode==="qty") R[idx]=item;
-          else { R.splice(Math.min(idx,R.length),0,item); if(mode==="confirm")done--; }
+          else R.splice(Math.min(idx,R.length),0,item);
           lastAction=null;render();
           toast("되돌렸습니다 — 입고 대기 상태로 복원됐습니다.");
         }
-        // 직접 입고 등록 — 목록에 대기 행으로 추가(확정은 표에서). LIVE면 CATALOG를 실상품으로 교체.
-        let CATALOG=[
-          {id:20489103,sku:"P-9103",name:"GIGABYTE AORUS RTX 5090 AI BOX",cat:"그래픽카드",cost:7346000,sup:"클릭나라",stock:0,priced:false},
-          {id:20486012,sku:"P-6012",name:"삼성전자 990 PRO M.2 NVMe 2TB",cat:"SSD",cost:212000,sup:"용산도매A",stock:3,priced:true},
-          {id:20483390,sku:"P-3390",name:"마이크로닉스 Classic II 500W",cat:"파워",cost:47000,sup:"다나와직송B",stock:12,priced:true}
-        ];
+        // 직접 입고 등록 — 후보는 서버(reload의 d.catalog)만 채운다. 화면에 상품을 두지 않는다.
+        let CATALOG=[];
         function fillCatalog(){
-          document.getElementById("in-prod").innerHTML=CATALOG.map((c,i)=>`<option value="${i}">${c.sku} · ${c.name}${c.stock!=null?` (재고 ${c.stock})`:""}</option>`).join("");
+          const el=document.getElementById("in-prod"); if(!el)return;
+          if(!CATALOG.length){
+            // 비어 있는 이유를 말한다 — 검색 전인지, 못 불러왔는지.
+            el.innerHTML=`<option value="">${STATE==="ok"?"아래 칸에서 상품을 검색하세요":EMPTY_MSG[STATE]}</option>`;
+            return;
+          }
+          el.innerHTML=CATALOG.map((c,i)=>`<option value="${i}">${c.sku} · ${c.name}${c.stock!=null?` (재고 ${c.stock})`:""}</option>`).join("");
         }
         fillCatalog();
         document.getElementById("in-add").onclick=()=>{
-          const c=CATALOG[+document.getElementById("in-prod").value];
+          const sel=document.getElementById("in-prod");
+          const si=sel?parseInt(sel.value,10):NaN;           // 자리표시자 option 은 value=""
+          const c=Number.isInteger(si)?CATALOG[si]:undefined;
+          if(!c){toast("등록할 상품을 먼저 검색해 선택하세요");return;}
           const q=parseInt(document.getElementById("in-qty").value.replace(/[^0-9]/g,""),10);
           if(!q){toast("수량은 1 이상의 숫자여야 합니다");return;}
           const costRaw=document.getElementById("in-cost").value.replace(/[^0-9]/g,"");
@@ -468,6 +477,11 @@
         // ---- LIVE (슬라이스 23) — 입고 원장 실배선(ERD §8 T10). 입고 후 예고·풀 진입은 서버 실측값 ----
         // 매입가는 원장에 남기지 않는다(stock_movements에 단가 컬럼 없음) → LIVE에선 입력 칸 읽기 전용.
         var SI_PAGE=1, SI_Q="", SI_TOTAL=0, SI_PAGES=1, SI_CATQ="";
+        // 서버 응답 전/실패면 총건수를 말하지 않는다(직전 성공값이 남으면 거짓이 된다).
+        function siTotal(){ return STATE==="ok"?SI_TOTAL.toLocaleString():"—"; }
+        // 쪽수도 같은 이유로 말하지 않는다 — '전체 —건'과 '1 / 306 페이지'가 나란히 서면
+        // 총건수만 가린 셈이 된다. 이동 버튼도 잠근다(총 쪽수를 모르면 이동은 근거가 없다).
+        function siPageLabel(){ return STATE==="ok"?(SI_PAGE+" / "+Math.max(1,SI_PAGES)):"— / —"; }
         function siBanner(){
           var el=document.getElementById("siScale");
           if(!el){
@@ -479,18 +493,18 @@
           el.innerHTML='<div class="card-body py-3">'
             +'<div class="d-flex flex-wrap align-items-center gap-2">'
             +'<div><div class="fs-9 text-body-tertiary">입고 대상</div>'
-            +'<div class="fs-5 fw-bolder">'+SI_TOTAL.toLocaleString()+'</div></div>'
+            +'<div class="fs-5 fw-bolder">'+siTotal()+'</div></div>'
             +'<div class="ms-3 flex-grow-1" style="max-width:320px;">'
             +'<input id="siQ" class="form-control form-control-sm" placeholder="상품명·SKU 검색" '
             +'value="'+(SI_Q||"")+'"></div>'
             +'<button id="siGo" class="btn btn-phoenix-primary btn-sm">검색</button>'
             +'<div class="ms-auto d-flex align-items-center gap-2">'
-            +'<span class="fs-9 text-body-tertiary">'+SI_PAGE+' / '+Math.max(1,SI_PAGES)+' 페이지</span>'
+            +'<span class="fs-9 text-body-tertiary">'+siPageLabel()+' 페이지</span>'
             +'<button id="siPrev" class="btn btn-phoenix-secondary btn-sm"'
-            +(SI_PAGE<=1?' disabled':'')+'>← 이전</button>'
+            +(STATE!=="ok"||SI_PAGE<=1?' disabled':'')+'>← 이전</button>'
             +'<button id="siNext" class="btn btn-phoenix-secondary btn-sm"'
-            +(SI_PAGE>=SI_PAGES?' disabled':'')+'>다음 →</button></div></div>'
-            +'<p class="fs-10 text-body-tertiary mb-0 mt-2">전체 '+SI_TOTAL.toLocaleString()
+            +(STATE!=="ok"||SI_PAGE>=SI_PAGES?' disabled':'')+'>다음 →</button></div></div>'
+            +'<p class="fs-10 text-body-tertiary mb-0 mt-2">전체 '+siTotal()
             +'건 중 이 페이지만 표시합니다. 직접 등록 후보는 아래 검색어를 넣어야 조회됩니다.</p>'
             +'</div>';
           var q=document.getElementById("siQ"), go=document.getElementById("siGo");
@@ -508,7 +522,7 @@
             .then(d=>{
               SI_TOTAL=d.total||0; SI_PAGES=d.pages||1;
               const prevQty={};R.forEach(r=>{prevQty[r.id]=r.qty;});
-              LIVE=true;NOTE=d.note;
+              LIVE=true;STATE="ok";NOTE=d.note;
               R=d.items.map(i=>({id:i.product_code,sku:i.sku,name:i.name,cat:i.cat,
                 qty:prevQty[i.product_code]||1,cost:i.purchase||0,sup:i.supplier,stock:i.stock,
                 safety_stock:i.safety_stock,
@@ -542,9 +556,23 @@
               const b=document.getElementById("dataSrc");
               b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
               render();
+            })
+            // 실패는 조용히 넘기지 않는다. 원천(API)은 있으므로 '연결 안 됨'.
+            // 여기서 예외를 삼키되 화면은 실패를 말한다 — 던지면 호출부(확정·되돌리기)의
+            // fire-and-forget reload()가 미처리 거부가 된다. DOM 접근은 전부 null 가드.
+            .catch(function(){
+              LIVE=false;STATE="error";
+              var b=document.getElementById("dataSrc");
+              if(b) b.textContent="연결 안 됨";
+              R=[];CATALOG=[];
+              fillCatalog();
+              // 배너가 이미 떠 있으면 직전 성공값이 남는다 — 다시 그려 '—'로 만든다.
+              // 없으면 만들지 않는다(검색·페이지 컨트롤을 실패 화면에 새로 세우지 않는다).
+              if(document.getElementById("siScale")) siBanner();
+              render();
             });
         }
-        reload().catch(function(){});
+        reload();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

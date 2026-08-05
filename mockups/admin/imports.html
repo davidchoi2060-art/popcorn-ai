@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-IMP-010" data-domain="import">
+  <body data-screen-id="ADM-IMP-010" data-domain="import" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,22 +264,22 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 원본 자료</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">상품 원본 자료 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-IMP-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">상품 원본 자료 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-IMP-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">업로드된 원본을 <b class="text-body-secondary">받은 그대로(동결)</b> 보관합니다. 읽기 전용 — 어떤 검증·확정도 원본을 바꾸지 않습니다.</p></div>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-4">
             <div class="card"><div class="card-body p-0">
               <div class="p-3 border-bottom"><h6 class="mb-0">배치 목록</h6></div>
-              <div id="batches"></div>
+              <div id="batches"><p class="fs-9 text-body-tertiary mb-0 p-3">불러오는 중…</p></div>
             </div></div>
           </div>
           <div class="col-12 col-lg-8">
             <div class="card"><div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0" id="btitle">배치 #213 — 용산도매_입고_0713.xlsx</h6><span class="badge badge-phoenix badge-phoenix-secondary">읽기 전용</span></div>
+              <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0" id="btitle">불러오는 중…</h6><span class="badge badge-phoenix badge-phoenix-secondary">읽기 전용</span></div>
               <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
                 <thead><tr class="text-body-tertiary"><th>행</th><th>SKU</th><th>원본 셀 (그대로)</th><th>처리 결과</th></tr></thead>
-                <tbody id="brows"></tbody>
+                <tbody id="brows"><tr><td colspan="4" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr></tbody>
               </table></div>
             </div></div>
           </div>
@@ -288,59 +288,25 @@
       </div>
       <script>
       (function(){
-        const BATCHES=[
-          ["213","용산도매_입고_0713.xlsx","07-13","5,214행","primary","완료"],
-          ["212","다나와_시세_0712.csv","07-12","3,882행","warning","오류 2행"],
-          ["211","용산도매_입고_0709.xlsx","07-09","5,120행","primary","완료"]
-        ];
-        const ROWS={
-          "213":[
-            ["18","P-4821",'상품명:"이엠텍 지포스 RTX 4060 STORM X2 WHITE" · 길이:"272mm" · 매입:"352000"',["검수 회부 — 장착 길이 {length_mm} 대조 불일치","warning","review-queue.html"]],
-            ["19","P-4822",'상품명:"MSI RTX 4060 벤투스 2X" · 매입:"368000"',["정본 반영 · 가격 검토 대기","warning","price-review.html"]],
-            ["231","P-1001",'상품명:"AMD 라이젠5 7600" · 매입:"215000"',["정본 반영","primary",null]],
-            ["1204","P-7043",'용량:"32G B" (공백 포함)',["오류 — 파싱 실패 · 적재 제외","secondary",null]],
-            ["3010","P-3390",'정격:"500W"',["잠금 우선 — 확정값 400W 유지","info",null]]
-          ],
-          "212":[
-            ["77","P-6012",'용량:"2TB"',["정본 반영","primary",null]],
-            ["2881","P-7044",'가격:"1,29,000"',["오류 — 형식 오류 · 적재 제외","secondary",null]]
-          ],
-          "211":[["1","P-2001",'상품명:"ASUS PRIME B650M-A II"',["정본 반영","primary",null]]]
-        };
-        let cur="213";
-        const deepId=new URLSearchParams(location.search).get("id");
-        function render(){
-          document.getElementById("batches").innerHTML=BATCHES.map(([id,f,d,n,c,st])=>`
-            <div data-b="${id}" class="p-3 border-bottom cursor-pointer ${id===cur?"bg-primary-subtle":""}" style="border-left:3px solid ${id===cur?"var(--phoenix-primary)":"transparent"};">
-              <div class="d-flex justify-content-between mb-1"><b class="fs-9">배치 #${id}</b><span class="fs-10 text-body-quaternary">${d}</span></div>
-              <div class="fs-9 text-body-secondary text-truncate">${f}</div>
-              <div class="d-flex justify-content-between mt-1"><span class="fs-10 text-body-tertiary">${n}</span><span class="badge badge-phoenix badge-phoenix-${c}">${st}</span></div>
-            </div>`).join("");
-          document.querySelectorAll("[data-b]").forEach(el=>el.onclick=()=>{cur=el.dataset.b;render();});
-          const b=BATCHES.find(x=>x[0]===cur);
-          document.getElementById("btitle").textContent="배치 #"+cur+" — "+b[1];
-          document.getElementById("brows").innerHTML=ROWS[cur].map(([r,sku,raw,[lab,col,link]])=>{
-            const hl=deepId&&sku===deepId;
-            return `<tr ${hl?'class="bg-warning-subtle"':""}>
-              <td class="text-body-tertiary">${r}</td><td><code>${sku}</code>${hl?' <span class="badge badge-phoenix badge-phoenix-warning">찾은 상품</span>':""}</td>
-              <td class="text-body-secondary" style="font-family:monospace;font-size:11.5px;">${raw}</td>
-              <td>${link?`<a href="${link}" class="badge badge-phoenix badge-phoenix-${col} text-decoration-none">${lab}</a>`:`<span class="badge badge-phoenix badge-phoenix-${col}">${lab}</span>`}</td>
-            </tr>`;
-          }).join("");
-        }
-        // 딥링크: 해당 SKU가 있는 배치로 이동
-        if(deepId){for(const[bid,rows]of Object.entries(ROWS)){if(rows.some(r=>r[1]===deepId)){cur=bid;break;}}}
-        render();if(window.feather)feather.replace();
-      })();
-      </script>
-      <script>
-      (function(){
         // ---- LIVE (슬라이스 45) — 상품 원본 자료 실배선.
         // **이 화면이 보여주는 원본 셀은 '적재가 거부한 행'뿐이다.** 성공 행 원문은 저장하지
-        // 않는다(원본 CSV가 정본 · 22,808행 × 32컬럼 중복 회피). 그 사실을 화면이 먼저 말한다 —
+        // 않는다(원본 CSV가 정본 · 중복 회피). 그 사실을 화면이 먼저 말한다 —
         // "원본이 다 보인다"고 착각하게 두지 않는다.
-        var badge = document.getElementById("dataSrc");
+        // 더미 데이터 없음: 서버 응답만 그린다. 못 불러오면 그 사실을 말한다.
         var LIVE = false, JOBS = [], cur = null;
+
+        function $(id){ return document.getElementById(id); }
+        function setText(id, t){ var el = $(id); if(el) el.textContent = t; }
+        function setHTML(id, h){ var el = $(id); if(el) el.innerHTML = h; }
+        function noteRows(msg){
+          setHTML("brows", '<tr><td colspan="4" class="text-center text-body-tertiary py-4">' + msg + '</td></tr>');
+        }
+        function offline(){
+          setText("dataSrc", "연결 안 됨");
+          setHTML("batches", '<p class="fs-9 text-body-tertiary mb-0 p-3">서버에 연결되지 않아 불러오지 못했습니다.</p>');
+          setText("btitle", "—");
+          noteRows("서버에 연결되지 않아 불러오지 못했습니다.");
+        }
 
         function n(v){ return (v == null ? 0 : v).toLocaleString(); }
         function esc(s){
@@ -355,14 +321,14 @@
         }
 
         function paintBatches(){
-          document.getElementById("batches").innerHTML = JOBS.map(function(b){
+          setHTML("batches", JOBS.map(function(b){
             var on = b.job_id === cur;
             return '<button class="btn btn-sm w-100 text-start mb-2 '
               + (on ? "btn-primary" : "btn-phoenix-secondary") + '" data-live-job="' + b.job_id + '">'
-              + '<b>#' + b.job_id + '</b> ' + esc(b.file.slice(0, 22))
+              + '<b>#' + b.job_id + '</b> ' + esc(String(b.file == null ? "—" : b.file).slice(0, 22))
               + '<div class="fs-10 ' + (on ? "" : "text-body-tertiary") + '">'
               + fmt(b.at) + ' · 적재 ' + n(b.ok) + ' · 거부 ' + n(b.error) + '</div></button>';
-          }).join("") || '<p class="fs-9 text-body-tertiary mb-0">적재 배치가 없습니다.</p>';
+          }).join("") || '<p class="fs-9 text-body-tertiary mb-0 p-3">적재 배치가 없습니다.</p>');
           document.querySelectorAll("[data-live-job]").forEach(function(b){
             b.onclick = function(){ cur = +b.dataset.liveJob; paintBatches(); loadRows(); };
           });
@@ -372,17 +338,15 @@
           fetch("/api/admin/import-jobs/" + cur + "/rows")
             .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
             .then(function(d){
-              document.getElementById("btitle").textContent =
-                "배치 #" + d.job.job_id + " — " + d.job.file;
-              var body = document.getElementById("brows");
+              setText("btitle", "배치 #" + d.job.job_id + " — " + d.job.file);
               if(!d.rows.length){
-                body.innerHTML = '<tr><td colspan="4" class="text-body-tertiary fs-9 p-3">'
+                setHTML("brows", '<tr><td colspan="4" class="text-body-tertiary fs-9 p-3">'
                   + '이 배치에는 보관된 원본 셀이 없습니다 — 거부된 행이 0건입니다.'
                   + ' 적재된 ' + n(d.job.ok) + '행의 원문은 저장하지 않습니다(원본 CSV가 정본).'
-                  + '</td></tr>';
+                  + '</td></tr>');
                 return;
               }
-              body.innerHTML = d.rows.map(function(r){
+              setHTML("brows", d.rows.map(function(r){
                 var cells = r.cells.map(function(c){
                   return '<div><span class="text-body-tertiary">' + esc(c.col) + '</span> '
                        + '<b>' + esc(c.value) + '</b></div>';
@@ -397,10 +361,13 @@
                   + label + '</span><div class="fs-10 text-body-tertiary">'
                   + esc(r.reason) + '</div></td></tr>';
               }).join("")
-              + '<tr><td colspan="4" class="fs-10 text-body-quaternary p-3">' + d.note + '</td></tr>';
+              + '<tr><td colspan="4" class="fs-10 text-body-quaternary p-3">' + d.note + '</td></tr>');
               if(window.feather) feather.replace();
             })
-            .catch(function(){});
+            .catch(function(){
+              setText("btitle", "—");
+              noteRows("서버에 연결되지 않아 불러오지 못했습니다.");
+            });
         }
 
         var q = new URLSearchParams(location.search).get("job");
@@ -409,17 +376,32 @@
           .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
           .then(function(d){
             LIVE = true;
-            badge.textContent = "실데이터 · Cloud SQL";
-            badge.classList.remove("badge-phoenix-secondary");
-            badge.classList.add("badge-phoenix-primary");
-            JOBS = d.items;
+            var badge = $("dataSrc");
+            if(badge){
+              badge.textContent = "실데이터 · Cloud SQL";
+              badge.classList.remove("badge-phoenix-secondary");
+              badge.classList.add("badge-phoenix-primary");
+            }
+            JOBS = d.items || [];
             // 거부 행이 있는 배치를 먼저 고른다 — 원본 셀이 있는 배치가 이 화면의 볼거리다
             var withRows = JOBS.filter(function(b){ return b.err_rows > 0; });
             cur = q ? +q : ((withRows[0] || JOBS[0] || {}).job_id || null);
             paintBatches();
-            if(cur) loadRows();
+            if(cur){
+              loadRows();
+            } else {
+              // 성공했는데 '불러오는 중…'이 남지 않게 한다
+              setText("btitle", "—");
+              noteRows("표시할 배치가 없습니다.");
+            }
           })
-          .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
+          .catch(function(){
+            if(!LIVE){ offline(); return; }
+            // 응답은 받았는데 그리다 실패했다 — '불러오는 중…'을 영원히 남기지 않는다
+            setHTML("batches", '<p class="fs-9 text-body-tertiary mb-0 p-3">응답을 표시하지 못했습니다.</p>');
+            setText("btitle", "—");
+            noteRows("응답을 표시하지 못했습니다.");
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

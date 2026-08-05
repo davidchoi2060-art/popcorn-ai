@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-CUS-010" data-domain="customer">
+  <body data-screen-id="ADM-CUS-010" data-domain="customer" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,42 +264,54 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">회원 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">회원 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">회원 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">자체 회원 원장 — 쇼핑몰 계정 매핑 상태(운영 모드 연동), 주문·상담·후기·관심 부품을 한 화면에서 봅니다.</p></div>
         </div>
-        <div class="row g-2 mb-3" id="kpis"></div>
+        <!-- 요약 수치의 초기값은 '—'다. 0 은 '회원이 없다'는 사실 주장이 되므로 서버 응답 전에는 쓰지 않는다. -->
+        <div class="row g-2 mb-3" id="kpis">
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">전체 회원</p><h4 class="mb-0">—<span class="fs-10 fw-semibold text-body-tertiary"> 명</span></h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">쇼핑몰 계정 매핑</p><h4 class="mb-0">—<span class="fs-10 fw-semibold text-body-tertiary"> 명</span></h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">이번 주 가입</p><h4 class="mb-0">—<span class="fs-10 fw-semibold text-body-tertiary"> 명</span></h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">가격 알림 활성</p><h4 class="mb-0">—<span class="fs-10 fw-semibold text-body-tertiary"> 건</span></h4></div></div></div>
+        </div>
         <div class="row g-3">
-          <div class="col-12 col-lg-5"><div class="card"><div class="card-body p-0"><div id="mlist"></div></div></div></div>
-          <div class="col-12 col-lg-7"><div id="detail"></div></div>
+          <div class="col-12 col-lg-5"><div class="card"><div class="card-body p-0"><div id="mlist"><p class="p-3 mb-0 text-center text-body-tertiary">불러오는 중…</p></div></div></div></div>
+          <div class="col-12 col-lg-7"><div id="detail"><div class="card"><div class="card-body text-center text-body-tertiary py-4">불러오는 중…</div></div></div></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
       (function(){
-        let M=[
-         {id:1,name:"김민준",email:"mj.kim@example.com",via:"이메일",joined:"07-10",mapped:false,orders:2,consults:3,reviews:0,favs:2,last:"오늘",
-          note:"RTX 4070 관심 — 가격 알림 2건 활성. 상담 3회(팝콘톡 2·함께 정하기 1)."},
-         {id:2,name:"이서연",email:"sy.lee@example.com",via:"카카오",joined:"06-20",mapped:true,orders:1,consults:1,reviews:1,favs:1,last:"07-20",
-          note:"쇼핑몰 계정 매핑 완료 — 과거 쇼핑몰 주문 이력 연동 표시."},
-         {id:3,name:"박도윤",email:"dy.park@example.com",via:"네이버",joined:"06-24",mapped:false,orders:1,consults:0,reviews:1,favs:0,last:"07-02",
-          note:"인계 주문 1건 후 가입 전환 — 매핑 요청 미발송."}
-        ];
-        let sel=1, lastAction=null, LIVE=false;
-        // 매핑 상태 3종 — 더미(mapped bool)와 LIVE(map_state)를 통일하는 헬퍼
-        const mapState=m=>m.map_state||(m.mapped?"mapped":"none");
+        // 더미 폴백 없음 — 서버가 주지 않은 회원은 화면이 만들어내지 않는다.
+        // 가짜 회원 행은 이름·이메일이라는 개인정보 형태를 띠어 특히 사실로 읽힌다.
+        let M=[], sel=null, lastAction=null, state="loading";
+        const mapState=m=>m.map_state||"none";
+        function setSrc(txt,cls){
+          const b=document.getElementById("dataSrc");if(!b)return;
+          b.classList.remove("badge-phoenix-secondary","badge-phoenix-warning","badge-phoenix-primary");
+          b.classList.add(cls);b.textContent=txt;
+        }
+        // 목록이 비면 왜 비었는지 말한다 — 빈 목록은 '회원이 없다'로 오해된다.
+        function reason(){
+          return state==="loading"?"불러오는 중…"
+            :state==="fail"?"서버에 연결되지 않아 불러오지 못했습니다."
+            :"등록된 회원이 없습니다.";
+        }
         function kpis(){
-          let K;
-          if(LIVE){
-            // 이번 주 가입 = 실계산, 가격 알림 = price_alert true만(더미의 Σ관심 오용 교정)
-            const now=new Date(), day=now.getDay()||7, wk=new Date(now); wk.setDate(now.getDate()-day+1); wk.setHours(0,0,0,0);
-            K=[["전체 회원",M.length,"명","primary"],["쇼핑몰 계정 매핑",M.filter(m=>mapState(m)==="mapped").length,"명","info"],["이번 주 가입",M.filter(m=>new Date(m.joined)>=wk).length,"명","primary"],["가격 알림 활성",M.reduce((s,m)=>s+(m.alerts||0),0),"건","warning"]];
-          }else{
-            K=[["전체 회원",M.length,"명","primary"],["쇼핑몰 계정 매핑",M.filter(m=>m.mapped).length,"명","info"],["이번 주 가입",1,"명","primary"],["가격 알림 활성",M.reduce((s,m)=>s+m.favs,0),"건","warning"]];
-          }
-          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const el=document.getElementById("kpis");if(!el)return;
+          const ok=state==="ok";
+          // 응답 전·실패 시에는 '—'. 0 은 '없다'는 사실 주장이라 쓰지 않는다.
+          const now=new Date(), day=now.getDay()||7, wk=new Date(now); wk.setDate(now.getDate()-day+1); wk.setHours(0,0,0,0);
+          const K=[["전체 회원",ok?M.length:"—","명"],
+                   ["쇼핑몰 계정 매핑",ok?M.filter(m=>mapState(m)==="mapped").length:"—","명"],
+                   ["이번 주 가입",ok?M.filter(m=>m.joined&&new Date(m.joined)>=wk).length:"—","명"],
+                   ["가격 알림 활성",ok?M.reduce((s,m)=>s+(m.alerts||0),0):"—","건"]];
+          el.innerHTML=K.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function list(){
-          document.getElementById("mlist").innerHTML=M.map(m=>{
+          const el=document.getElementById("mlist");if(!el)return;
+          if(!M.length){el.innerHTML=`<p class="p-3 mb-0 text-center text-body-tertiary">${reason()}</p>`;return;}
+          el.innerHTML=M.map(m=>{
             const on=m.id===sel;
             return `<div data-id="${m.id}" class="p-3 border-bottom cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
               <div class="d-flex justify-content-between align-items-center mb-1"><div class="d-flex align-items-center gap-2"><b class="fs-9 text-body-highlight">${m.name}</b><span class="badge badge-phoenix badge-phoenix-secondary fs-10">${m.via}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info fs-10">쇼핑몰 매핑</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning fs-10">동의 대기</span>':"")}</div><span class="fs-10 text-body-quaternary">최근 ${m.last}</span></div>
@@ -310,9 +322,11 @@
         }
         function member(){return M.find(m=>m.id===sel);}
         function detail(){
-          const m=member();const d=document.getElementById("detail");if(!m)return;
+          const d=document.getElementById("detail");if(!d)return;
+          const m=member();
+          if(!m){d.innerHTML=`<div class="card"><div class="card-body text-center text-body-tertiary py-4">${reason()}</div></div>`;return;}
           d.innerHTML=`<div class="card"><div class="card-body">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joinedLabel||PT.full(m.joined)}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료'+(m.mall_id?" · "+m.mall_id:"")+'</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning">매핑 요청 발송 — 동의 대기'+(m.requested?" ("+m.requested+")":"")+'</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>')}</div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h4 class="mb-0">${m.name}</h4><span class="badge badge-phoenix badge-phoenix-secondary">${m.via} 가입 · ${m.joinedLabel||"—"}</span>${mapState(m)==="mapped"?'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 계정 매핑 완료'+(m.mall_id?" · "+m.mall_id:"")+'</span>':(mapState(m)==="requested"?'<span class="badge badge-phoenix badge-phoenix-warning">매핑 요청 발송 — 동의 대기'+(m.requested?" ("+m.requested+")":"")+'</span>':'<span class="badge badge-phoenix badge-phoenix-warning">쇼핑몰 계정 미연결</span>')}</div>
             <p class="fs-9 text-body-tertiary mb-3">${m.email}</p>
             <div class="row g-2 mb-3">
               <div class="col-6 col-md-3"><div class="border rounded-3 p-2 text-center"><div class="fs-10 text-body-tertiary">주문</div><b>${m.orders}</b></div></div>
@@ -331,37 +345,29 @@
           </div></div>`;
           const mb=d.querySelector("[data-act='map']");
           if(mb)mb.onclick=()=>{
-            if(LIVE){
-              mb.disabled=true;
-              fetch(`/api/admin/members/${m.id}/map-request`,{method:"POST"})
-                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-                .then(res=>{
-                  if(!res.ok){const dd=res.j.detail;toast("발송 실패: "+(typeof dd==="string"?dd:(dd&&(dd.detail||dd.error))||""));mb.disabled=false;return;}
-                  lastAction={undo_id:res.j.undo_id};
-                  const honest=res.j.member_mode==="own"?" · 현재 독립 가입 모드 — 연동 모드 전환 시 고객 마이페이지에 표시됩니다":" — 고객 마이페이지 \"계정 연결\"에 안내 표시";
-                  reload().then(()=>toast(`<b>${m.name}</b>님에게 매핑 요청 발송 기록${honest}`,true));
-                }).catch(()=>{mb.disabled=false;toast("발송 실패 — 네트워크 오류");});
-              return;
-            }
-            lastAction={id:m.id};toast(`<b>${m.name}</b>님에게 쇼핑몰 계정 매핑 요청 발송 — 동의 시 주문 이력 연동`,true);
+            mb.disabled=true;
+            fetch(`/api/admin/members/${m.id}/map-request`,{method:"POST"})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const dd=res.j.detail;toast("발송 실패: "+(typeof dd==="string"?dd:(dd&&(dd.detail||dd.error))||""));mb.disabled=false;return;}
+                lastAction={undo_id:res.j.undo_id};
+                const honest=res.j.member_mode==="own"?" · 현재 독립 가입 모드 — 연동 모드 전환 시 고객 마이페이지에 표시됩니다":" — 고객 마이페이지 \"계정 연결\"에 안내 표시";
+                reload().then(()=>toast(`<b>${m.name}</b>님에게 매핑 요청 발송 기록${honest}`,true));
+              }).catch(()=>{mb.disabled=false;toast("발송 실패 — 네트워크 오류");});
           };
           if(window.feather)feather.replace();
         }
         function undo(){
-          if(LIVE){
-            if(!lastAction||!lastAction.undo_id)return;
-            const id=lastAction.undo_id;lastAction=null;
-            fetch(`/api/admin/members/map-request/undo/${id}`,{method:"POST"})
-              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-              .then(res=>{
-                if(!res.ok){const dd=res.j.detail;toast("되돌리기 실패: "+(typeof dd==="string"?dd:(dd&&(dd.detail||dd.error))||""));return;}
-                reload().then(()=>toast("되돌렸습니다 — 매핑 요청이 취소됐습니다."));
-              }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
-            return;
-          }
-          lastAction=null;toast("되돌렸습니다 — 매핑 요청이 취소됐습니다.");
+          if(!lastAction||!lastAction.undo_id)return;
+          const id=lastAction.undo_id;lastAction=null;
+          fetch(`/api/admin/members/map-request/undo/${id}`,{method:"POST"})
+            .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+            .then(res=>{
+              if(!res.ok){const dd=res.j.detail;toast("되돌리기 실패: "+(typeof dd==="string"?dd:(dd&&(dd.detail||dd.error))||""));return;}
+              reload().then(()=>toast("되돌렸습니다 — 매핑 요청이 취소됐습니다."));
+            }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
         }
-        
+
         function toast(m,actionable){
           let t=document.getElementById("__rtoast");
           if(!t){t=document.createElement("div");t.id="__rtoast";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:.2s;display:flex;align-items:center;gap:12px;max-width:92vw;";document.body.appendChild(t);}
@@ -373,24 +379,29 @@
         function renderAll(){kpis();list();detail();}
         renderAll();
 
-        // ---- LIVE (슬라이스 20) — API 성공 시 회원 원장·집계 실데이터로 교체, 실패 시 더미 원형 ----
+        // ---- 서버 로드 — 요청 전에는 '불러오는 중', 실패하면 이유를 말한다(더미 폴백 없음) ----
         // 상담 집계는 실질 제한적(S1 상담은 로그인 전 세션이라 회원 귀속 안 됨 — 시드 귀속분만).
         function fmtD(iso){if(!iso)return "—";const d=new Date(iso),now=new Date();if(d.toDateString()===now.toDateString())return "오늘";return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
         function reload(){
           return fetch("/api/admin/members").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
             .then(d=>{
-              LIVE=true;
-              M=d.items.map(i=>({id:i.id,name:i.name,email:i.email,via:i.via,joined:i.joined,joinedLabel:fmtD(i.joined),
+              state="ok";
+              M=(d.items||[]).map(i=>({id:i.id,name:i.name,email:i.email,via:i.via,joined:i.joined,joinedLabel:fmtD(i.joined),
                 map_state:i.map_state,mall_id:i.mall_id,requested:i.requested_at?fmtD(i.requested_at):null,
                 orders:i.orders,consults:i.consults,reviews:i.reviews,favs:i.favs,alerts:i.alerts,
                 last:fmtD(i.last),note:i.note}));
               if(!M.some(m=>m.id===sel)) sel=M.length?M[0].id:null;
-              const b=document.getElementById("dataSrc");
-              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              setSrc("실데이터 · Cloud SQL","badge-phoenix-primary");
               renderAll();
             });
         }
-        reload().catch(function(){});
+        reload().catch(function(){
+          // 응답을 이미 받은 뒤 렌더에서 난 예외를 '연결 안 됨'으로 뒤집지 않는다(orders.html 과 같은 규약).
+          if(state==="ok")return;
+          state="fail";M=[];sel=null;
+          setSrc("연결 안 됨","badge-phoenix-warning");
+          renderAll();
+        });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

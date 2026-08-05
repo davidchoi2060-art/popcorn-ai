@@ -264,8 +264,8 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 검수</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">상품 검수 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2><p class="text-body-tertiary mb-0">AI가 자동 통과시키지 못한 항목만 모입니다. <b class="text-body-secondary">검수를 통과해야 추천 가능 재고에 올라갑니다.</b></p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">10</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">0</span>건<br><span id="pageNote" class="fs-10 text-body-quaternary"></span></p></div>
+          <div><h2 class="mb-1">상품 검수 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2><p class="text-body-tertiary mb-0">AI가 자동 통과시키지 못한 항목만 모입니다. <b class="text-body-secondary">검수를 통과해야 추천 가능 재고에 올라갑니다.</b></p></div>
+          <div class="text-end"><h4 class="mb-0 fw-bolder">남은 <span id="remainCount">—</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="doneCount">—</span>건<br><span id="pageNote" class="fs-10 text-body-quaternary"></span></p></div>
         </div>
         <div id="queueBrief"></div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="filterPills"></ul>
@@ -286,55 +286,17 @@
           csv_error:{label:"등록 오류", c:"secondary"},
           sourcing_hold:{label:"단가표 신규", c:"info"}
         };
-        let QUEUE = [
-          // ---- 슬라이스 15 설계 시안: 단가표 신규(sourcing_hold) — 실파일 실측 모델명 차용(더미) ----
-          {id:"SRC-3021", name:"MSI PRO B650M-A WIFI", cat:"메인보드", type:"sourcing_hold", field:"supplier", origin:"MSI(웨이코스)", know:"—", conf:null, wait:"오늘 수신",
-           src:{sup:"MSI(웨이코스)", file:"MSI_단가표0716MTF.xlsx", sheet:"AMD MB · B650", cost:187000, state:"가능",
-                cand:{sku:"P-2001", name:"ASUS PRIME B650M-A II", sim:0.37}},
-           crit:[], note:"단가표 신규 행 — 카탈로그에 같은 모델이 없습니다. 이름 유사 후보가 있어 연결 검토가 우선입니다."},
-          {id:"SRC-3058", name:"GIGABYTE 지포스 RTX 5060 TI AERO OC D7 8GB", cat:"그래픽카드", type:"sourcing_hold", field:"supplier", origin:"클릭나라", know:"—", conf:null, wait:"오늘 수신",
-           src:{sup:"클릭나라", file:"GBT PCD VGA MB 단가표  0721클릭.xlsx", sheet:"GIGA VGA · 5060", cost:680000, state:"가능", cand:null},
-           crit:[], note:"단가표 신규 행 — 유사 후보 없음. 취급하려면 신규 상품으로 등록하고 검수를 거칩니다."},
-          {id:"SRC-3090", name:"GIGABYTE AORUS 지포스 RTX 5090 AI BOX 피씨디렉트", cat:"그래픽카드", type:"sourcing_hold", field:"supplier", origin:"클릭나라", know:"—", conf:null, wait:"오늘 수신",
-           src:{sup:"클릭나라", file:"GBT PCD VGA MB 단가표  0721클릭.xlsx", sheet:"GIGA VGA · 5090", cost:7346000, state:"품절", memo:"인상 품절", cand:null},
-           crit:[], note:"품절 상태의 신규 행 — 등록해도 재고 확보 전까지 판매 불가. 보류가 기본값입니다."},
-          {id:"P-4821", name:"이엠텍 지포스 RTX 4060 STORM X2 WHITE", cat:"그래픽카드", type:"spec_conflict", field:"length_mm", origin:"272mm", know:"251mm", conf:0.93, wait:"12분 전",
-           crit:[["장착 길이 {length_mm}","불일치",false],["소비전력 {tdp_watt}","115W",true],["보조전원 {pcie_power}","8-pin",true],["슬롯 폭 {slot_width}","2.2슬롯",true]],
-           note:"원문 상세페이지 272mm vs 지식DB 레퍼런스 251mm. 케이스 GPU 최대 길이 호환 판정에 직접 영향 → 필수 사양."},
-          {id:"P-3390", name:"마이크로닉스 Classic II 500W 80+", cat:"파워서플라이", type:"spec_conflict", field:"rated_watt", origin:"정격 500W", know:"정격 400W (80+ 미인증)", conf:0.78, wait:"31분 전",
-           crit:[["정격 출력 {rated_watt}","불일치",false],["80PLUS 등급 {efficiency}","미인증",false],["+12V 합산 {rail_12v}","-",null],["폼팩터 {form_factor}","ATX",true]],
-           note:"제목 500W vs 사양표 400W. 전력 여유(headroom) 계산의 근거값 → 반드시 확정 후 잠금."},
-          {id:"P-5140", name:"ASRock B650M PG Lightning", cat:"메인보드", type:"spec_missing", field:"mem_type", origin:"없음", know:"DDR5 (B650 칩셋 기준)", conf:0.55, wait:"1시간 전",
-           crit:[["메모리 규격 {mem_type}","미확인",false],["소켓 {socket}","AM5",true],["폼팩터 {form_factor}","mATX",true],["M.2 슬롯 {m2_slots}","2",true]],
-           note:"상세페이지에 메모리 규격 명시 없음. 칩셋 기준 추정값이라 confidence 낮음 → 운영자 확정 필요."},
-          {id:"P-2765", name:"3RSYS J600 강화유리", cat:"케이스", type:"spec_missing", field:"gpu_max_len", origin:"없음", know:"330mm (동일 시리즈 추정)", conf:0.60, wait:"1시간 전",
-           crit:[["GPU 최대 길이 {gpu_max_len}","미확인",false],["쿨러 최대 높이 {cpu_cooler_h}","165mm",true],["지원 폼팩터 {mb_support}","ATX",true],["파워 장착 {psu_form}","ATX",true]],
-           note:"GPU 호환 판정의 상대 필드. 미확인 시 4060 같은 긴 카드 추천에서 오판 위험."},
-          {id:"P-6012", name:"삼성전자 990 PRO M.2 NVMe 2TB", cat:"SSD", type:"low_confidence", field:"capacity_gb", origin:"2TB", know:"2000GB 정규화", conf:0.71, wait:"2시간 전",
-           crit:[["용량 {capacity_gb}","2000",true],["폼팩터 {form_factor}","M.2 2280",true],["인터페이스 {interface}","PCIe 4.0",true],["DRAM 캐시 {dram}","있음",true]],
-           note:"값 자체는 맞으나 단위 정규화 신뢰도 0.71. 스팟 확인만 하면 즉시 통과 가능."},
-          {id:"P-1188", name:"쿨러마스터 Hyper 212 Black", cat:"CPU쿨러", type:"low_confidence", field:"height_mm", origin:"높이 표기 애매", know:"159mm", conf:0.64, wait:"2시간 전",
-           crit:[["쿨러 높이 {height_mm}","159",true],["소켓 지원 {socket_support}","AM5/LGA1700",true],["TDP 지원 {tdp_support}","150W",true],["팬 규격 {fan_size}","120mm",true]],
-           note:"케이스 쿨러 최대 높이 호환용 필수 사양. 원문 이미지 표기가 흐릿 → 재확인 권장."},
-          {id:"P-7043", name:"삼성 DDR5-5600 32GB", cat:"메모리", type:"csv_error", field:"capacity_gb", origin:"\"32G B\" (공백 포함)", know:"파싱 실패", conf:null, wait:"업로드 배치 #212",
-           crit:[["용량 {capacity_gb}","파싱 실패",false],["규격 {mem_type}","DDR5",true],["속도 {speed_mts}","5600",true],["구성 {kit}","1x32GB",true]],
-           note:"원본 셀에 공백이 섞여 숫자 파싱 실패. 값 교정 후 재적재."},
-          {id:"P-7044", name:"WD Blue SN580 1TB", cat:"SSD", type:"csv_error", field:"price_krw", origin:"\"1,29,000\"", know:"자릿수 형식 오류", conf:null, wait:"업로드 배치 #212",
-           crit:[["판매가 {price_krw}","형식 오류",false],["용량 {capacity_gb}","1000",true],["폼팩터 {form_factor}","M.2 2280",true],["인터페이스 {interface}","PCIe 4.0",true]],
-           note:"가격 자릿수 구분 오류(1,29,000). 129,000으로 교정 필요."},
-          {id:"P-4102", name:"기가바이트 B550M K", cat:"메인보드", type:"spec_conflict", field:"socket", origin:"AM5", know:"AM4 (B550 칩셋)", conf:0.82, wait:"4시간 전",
-           crit:[["소켓 {socket}","불일치",false],["메모리 규격 {mem_type}","DDR4",true],["폼팩터 {form_factor}","mATX",true],["M.2 슬롯 {m2_slots}","1",true]],
-           note:"제목 파싱은 AM5로 잡았으나 B550은 AM4. 소켓 오류는 CPU 호환 전체를 무너뜨림 → 최우선 교정."},
-          {id:"P-7102", name:"삼성 오디세이 G5 G51C 32형", cat:"모니터", type:"spec_missing", field:"refresh_hz", origin:"없음", know:"165Hz (시리즈 기준 추정)", conf:0.62, wait:"38분 전",
-           crit:[["주사율 {refresh_hz}","미확인",false],["해상도 {resolution}","QHD 2560×1440",true],["패널 {panel}","VA",true],["출력 포트 {ports}","DP1.4 · HDMI2.0",true]],
-           note:"주사율 미표기. 주변기기 '함께 구성' 제안에서 GPU 성능 매칭 근거(권장 프레임)로 쓰이는 필수 사양 → 운영자 확정 필요."}
-        ];
+        /* 검수 큐는 서버 응답만 그린다.
+           여기에 더미 배열(상품·매입가·공급처·단가표 파일명)이 있었다 — 서버가 죽으면
+           존재하지 않는 상품과 금액을 사실처럼 보여줬다. 못 불러오면 비운 채로 이유를 말한다. */
+        let QUEUE = [];
         let cur = "all", sel = null, done = 0;
-        /* 서버가 준 수를 그대로 쓰기 위해 응답을 보관한다.
-           더미 폴백일 때는 비어 있어 예전 계산으로 되돌아간다. */
+        /* 서버가 준 수를 그대로 쓰기 위해 응답을 보관한다. 못 받으면 비어 있고,
+           그때는 화면이 대신 계산하지 않고 '—'로 둔다. */
         let SRV = {};
-        // 실데이터 모드 — fetch 성공 시 QUEUE를 API 계약으로 교체, 실패(file://·정적 호스팅)면 더미 유지
-        let LIVE = false;
+        /* 요청 전 / 성공 / 실패를 구분한다 — 실패를 '항목 없음'으로 그리면
+           운영자가 '검수 대기 0건'이라는 사실로 읽는다. */
+        let LOADSTATE = "loading"; // loading | ok | fail
         function relTime(iso){const s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return"방금 전";const m=Math.floor(s/60);if(m<60)return m+"분 전";const h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전";}
         const fromApi=it=> it.type==="sourcing_hold"
           ? ({id:"SRC-"+it.src_row_id, review_id:null, row_id:it.src_row_id, supplier_id:it.supplier_id,
@@ -359,7 +321,7 @@
         const CRIT_CONFLICT = ["socket","rated_watt","tdp_watt","mem_type"];
         const RISK = {"치명":{o:3,c:"danger"},"주의":{o:2,c:"warning"},"경미":{o:1,c:"secondary"}};
         function riskOf(q){
-          if(q.risk) return q.risk; // LIVE — 서버 파생(ERD §7.3 치명 필드 기준)
+          if(q.risk) return q.risk; // 서버 파생(ERD §7.3 치명 필드 기준)
           if(q.type==="spec_conflict") return CRIT_CONFLICT.includes(q.field)?"치명":"주의";
           if(q.type==="spec_missing") return "주의";
           return "경미"; // AI 확신 낮음 · 등록 오류
@@ -370,7 +332,8 @@
           const c = counts();
           const order = [["all","전체","dark"]].concat(Object.keys(TYPES).map(k=>[k,TYPES[k].label,TYPES[k].c]));
           document.getElementById("filterPills").innerHTML = order.map(([k,l,col])=>{
-            const n = c[k]||0; const active = k===cur;
+            // 못 불러왔으면 개수를 말하지 않는다 — '0'은 '대기 없음'이라는 사실 주장이 된다
+            const n = LOADSTATE==="ok" ? (c[k]||0) : "—"; const active = k===cur;
             return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${active?"active":""}" style="${active?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${active?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${n}</span></a></li>`;
           }).join("");
           document.querySelectorAll("#filterPills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;const l=list();sel=l[0]?l[0].id:null;renderAll();});
@@ -379,11 +342,12 @@
              실제로 5,152건이 남아 있는데 화면은 '남은 100건'이라 말했고, 같은 화면 아래에는
              '검수 대기 5,152건'이 있어 한 화면이 두 말을 했다.
              '오늘 처리'도 JS 변수였다 — 새로고침하면 0이 되니 '오늘'이 아니었다.
-             지금은 서버가 서울 자정 기준으로 센 값이라 F5를 눌러도 남는다. */
+             지금은 서버가 서울 자정 기준으로 센 값이라 F5를 눌러도 남는다.
+             **서버 값이 없으면 화면이 대신 세지 않는다** — '—'로 둔다. */
           var rc = document.getElementById("remainCount");
-          rc.textContent = (SRV.remaining != null ? SRV.remaining : QUEUE.length).toLocaleString();
+          if(rc) rc.textContent = (SRV.remaining != null ? SRV.remaining.toLocaleString() : "—");
           var dc = document.getElementById("doneCount");
-          dc.textContent = (SRV.my_today != null ? SRV.my_today : done).toLocaleString();
+          if(dc) dc.textContent = (SRV.my_today != null ? SRV.my_today.toLocaleString() : "—");
           /* 페이지가 전체보다 작으면 그 사실을 밝힌다 — 목록이 100줄인데 남은 수가
              5,152이면 운영자가 "왜 안 보이지"를 묻게 된다. */
           var pg = document.getElementById("pageNote");
@@ -395,6 +359,12 @@
           }
         }
         function list(){ return (cur==="all"?QUEUE:QUEUE.filter(q=>q.type===cur)).slice().sort((a,b)=>RISK[riskOf(b)].o-RISK[riskOf(a)].o); }
+        /* 비어 있는 이유를 구분해 말한다 — '대기 없음'과 '못 불러옴'은 다른 사실이다. */
+        function emptyState(){
+          if(LOADSTATE==="fail") return {icon:"alert-triangle", head:"서버에 연결되지 않아 불러오지 못했습니다.", sub:"검수 대기 건수는 확인할 수 없습니다."};
+          if(LOADSTATE==="loading") return {icon:"loader", head:"불러오는 중…", sub:""};
+          return {icon:"check-circle", head:"이 분류에 대기 항목이 없습니다.", sub:""};
+        }
         function confBadge(v){ if(v===null) return `<span class="badge badge-phoenix badge-phoenix-secondary">신뢰도 N/A</span>`;
           const col = v>=0.9?"primary":v>=0.7?"warning":"danger"; return `<span class="badge badge-phoenix badge-phoenix-${col}">신뢰도 ${Math.round(v*100)}%</span>`; }
         function renderList(){
@@ -406,14 +376,21 @@
               <h6 class="mb-1 text-body-highlight text-truncate">${q.name}</h6>
               <div class="d-flex justify-content-between align-items-center"><span class="fs-9 text-body-tertiary">${q.type==="sourcing_hold"?`${q.cat} · ${q.src.sup}`:`${q.cat} · ${fk(q.field)}`}</span>${q.type==="sourcing_hold"?(q.src.cand?`<span class="badge badge-phoenix badge-phoenix-info">후보 ${Math.round(q.src.cand.sim*100)}%</span>`:`<span class="badge badge-phoenix badge-phoenix-secondary">후보 없음</span>`):confBadge(q.conf)}</div>
             </div>`;
-          }).join("") : `<div class="p-5 text-center text-body-tertiary"><span data-feather="check-circle" style="width:32px;height:32px;"></span><p class="mt-2 mb-0 fw-semibold">이 분류에 대기 항목이 없습니다.</p></div>`;
+          }).join("") : (function(e){ return `<div class="p-5 text-center text-body-tertiary"><span data-feather="${e.icon}" style="width:32px;height:32px;"></span><p class="mt-2 mb-0 fw-semibold">${e.head}</p>${e.sub?`<p class="mb-0 fs-9">${e.sub}</p>`:""}</div>`; })(emptyState());
           document.querySelectorAll("#queueList [data-id]").forEach(el=>el.onclick=()=>{sel=el.dataset.id;renderAll();});
           if(window.feather) feather.replace();
         }
         function renderDetail(){
           const q = QUEUE.find(x=>x.id===sel);
           const d = document.getElementById("detail");
-          if(!q){ d.innerHTML = `<div class="card"><div class="card-body text-center py-6 text-body-tertiary"><span data-feather="inbox" style="width:40px;height:40px;"></span><h5 class="mt-3 mb-1 text-body-secondary">모두 처리했습니다</h5><p class="mb-0">이 분류의 검수 항목이 비었습니다.</p></div></div>`; if(window.feather) feather.replace(); return; }
+          if(!d) return;
+          if(!q){
+            const e = emptyState();
+            const head = LOADSTATE==="ok" ? "모두 처리했습니다" : e.head;
+            const sub  = LOADSTATE==="ok" ? "이 분류의 검수 항목이 비었습니다." : e.sub;
+            d.innerHTML = `<div class="card"><div class="card-body text-center py-6 text-body-tertiary"><span data-feather="${LOADSTATE==="ok"?"inbox":e.icon}" style="width:40px;height:40px;"></span><h5 class="mt-3 mb-1 text-body-secondary">${head}</h5><p class="mb-0">${sub}</p></div></div>`;
+            if(window.feather) feather.replace(); return;
+          }
           const t = TYPES[q.type];
           const rk = riskOf(q);
           const isCsv = q.type==="csv_error", isSrc = q.type==="sourcing_hold";
@@ -459,8 +436,8 @@
           if(isCsv) actions = `<button class="btn btn-primary btn-sm" data-act="교정 후 재적재">교정 후 재적재</button><button class="btn btn-phoenix-secondary btn-sm" data-act="원본 제외">이 행 제외</button>`;
           else if(isSrc) actions = `<button class="btn btn-primary btn-sm" data-act="기존 상품에 연결">기존 상품에 연결${q.src.cand?` (${q.src.cand.sku})`:""}</button><button class="btn btn-phoenix-primary btn-sm" data-act="신규 상품으로 등록">신규 상품으로 등록</button><button class="btn btn-phoenix-warning btn-sm" data-act="보류">보류</button>`;
           else{
-            // LIVE — 값이 없는 소스는 확정 불가 (spec_missing은 원문 없음, low_confidence는 지식값 없음)
-            const noOrigin = LIVE && q.origin_raw==null, noKnow = LIVE && q.know_raw==null;
+            // 값이 없는 소스는 확정 불가 (spec_missing은 원문 없음, low_confidence는 지식값 없음)
+            const noOrigin = q.origin_raw==null, noKnow = q.know_raw==null;
             actions = `<button class="btn btn-primary btn-sm" data-act="원문값으로 확정"${noOrigin?" disabled":""}>원문값 확정</button><button class="btn btn-phoenix-primary btn-sm" data-act="지식값으로 확정"${noKnow?" disabled":""}>지식값 확정</button><button class="btn btn-phoenix-secondary btn-sm" data-act="직접 수정">직접 수정</button><button class="btn btn-phoenix-danger btn-sm" data-act="반려">반려</button>`;
           }
           d.innerHTML = `<div class="card"><div class="card-body">
@@ -475,8 +452,8 @@
           d.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>process(q.id, b.dataset.act));
           if(window.feather) feather.replace();
         }
-        // #3 확정 결과 피드백 — 확정이 추천 가능 재고·견적에 미치는 영향을 즉시 보여준다 (영향 견적 수는 분류별 목업값)
-        const IMPACT = {"그래픽카드":14,"메인보드":11,"파워서플라이":9,"메모리":8,"케이스":7,"SSD":6,"CPU쿨러":5};
+        /* #3 확정 결과 피드백 — 영향(추천 가능 재고 증감)은 **서버 응답만** 말한다.
+           여기에 분류별 '영향 견적 N건' 목업 상수가 있었다: 서버가 모르는 수였다. */
         // #6 되돌리기 — 마지막 처리(단건·일괄)를 복원
         let lastAction = null, bulkArmed = false;
         function restoreLocal(){
@@ -489,7 +466,7 @@
         }
         function undo(){
           if(!lastAction) return;
-          if(LIVE && lastAction.undo_id){
+          if(lastAction.undo_id){
             const path = lastAction.kind==="sourcing" ? `/reviews/sourcing/unlink/${lastAction.undo_id}` : `/reviews/undo/${lastAction.undo_id}`;
             api(path).then(restoreLocal).catch(e=>toast("⚠ "+e.message));
             return;
@@ -504,21 +481,23 @@
           lastAction = {entries:[{item:q, idx:idx}], count:1, undo_id:res?res.undo_id:null};
           const nl = list(); sel = nl.length? (nl[Math.min(pos, nl.length-1)].id) : null;
           const neg = (act==="반려"||act==="원본 제외"||act==="계속 보류"||act==="보류");
-          if(act==="기존 상품에 연결") toast(`<b>${id}</b> — <b>${q._linkSku}</b>에 연결${LIVE?"":"(시늉)"} · 다음 단가표부터 자동 매칭 · 풀 변동 없음`, true);
-          else if(act==="보류") toast(`<b>${id}</b> — 보류 · 이 화면에서만 숨김${LIVE?" (보류 저장은 준비 중)":""}`, true);
+          if(act==="기존 상품에 연결") toast(`<b>${id}</b> — <b>${q._linkSku}</b>에 연결 · 다음 단가표부터 자동 매칭 · 풀 변동 없음`, true);
+          else if(act==="보류") toast(`<b>${id}</b> — 보류 · 이 화면에서만 숨김 (보류 저장은 준비 중)`, true);
           else if(neg) toast(`<b>${id}</b> — ${act} 처리 · 추천 가능 재고 미진입`, true);
           else if(res) toast(`<b>${id}</b> ${act} · ${res.pool_added?"<b>추천 가능 재고 +1</b>":"처리 완료"}`, true);
-          else toast(`<b>${id}</b> ${act} · <b>추천 가능 재고 +1</b> · 영향 견적 ${IMPACT[q.cat]||5}건`, true);
+          // 서버 응답이 없으면 무엇이 늘었는지 화면이 지어내지 않는다
+          else toast(`<b>${id}</b> ${act} — 이 화면에서만 반영됐습니다(서버 저장 없음)`, true);
           renderAll();
         }
         function process(id, act){
           const q = QUEUE.find(x=>x.id===id); if(!q) return;
           // 슬라이스 15 설계 → 슬라이스 16 관통: 단가표 신규(편입) 액션.
-          // LIVE = link POST(map 등록만 — 다음 단가표부터 자동 매칭) / 등록 = product-edit로 파라미터 관통 / 보류 = 저장 이관(화면 숨김만).
+          // 연결 = link POST(map 등록만 — 다음 단가표부터 자동 매칭) / 등록 = product-edit로 파라미터 관통 / 보류 = 저장 이관(화면 숨김만).
           if(q.type==="sourcing_hold"){
             if(act==="신규 상품으로 등록"){
               const p = new URLSearchParams({new:"1", from:"price", name:q.name, cost:q.src.cost, sup:q.src.sup, cat:q.cat});
-              if(LIVE){ p.set("sup_id", q.supplier_id); p.set("model", q.name); if(q.src.danawa) p.set("danawa", q.src.danawa); }
+              p.set("sup_id", q.supplier_id); p.set("model", q.name);
+              if(q.src.danawa) p.set("danawa", q.src.danawa);
               location.href = "product-edit.html?" + p.toString();
               return;
             }
@@ -526,17 +505,15 @@
               let via = "candidate", sku = q.src.cand? q.src.cand.sku : null;
               if(!sku){ sku = prompt(`${q.name}\n연결할 상품 SKU를 입력하세요 (예: P-2001):`); if(sku===null||!sku.trim()) return; sku = sku.trim(); via = "manual"; }
               q._linkSku = sku;
-              if(LIVE){
-                api("/reviews/sourcing/link", {row_id:q.row_id, sku:sku, via:via})
-                  .then(res=>{ applyLocal(id, act, res); if(lastAction) lastAction.kind = "sourcing"; })
-                  .catch(e=>toast("⚠ "+e.message));
-                return;
-              }
+              api("/reviews/sourcing/link", {row_id:q.row_id, sku:sku, via:via})
+                .then(res=>{ applyLocal(id, act, res); if(lastAction) lastAction.kind = "sourcing"; })
+                .catch(e=>toast("⚠ "+e.message));
+              return;
             }
             applyLocal(id, act, null);
             return;
           }
-          if(LIVE && ACT_API[act]){
+          if(ACT_API[act]){
             /* [직접 수정]은 브라우저 기본 prompt()였다 — 값 하나를 묻는 회색 상자에
                상품이 무엇인지, 다른 사양은 어떤지가 하나도 없었다(사용자 지적).
                맥락 없이 숫자만 고르라는 화면은 오판을 부른다. 모달로 바꿔
@@ -742,21 +719,18 @@
         // #5 사유별 일괄 확정 — 값이 유효한 저신뢰(경미) 항목만 대상. 치명·주의는 단건 검수 강제.
         function applyBulkLocal(items, res){
           lastAction = {entries:items.map(q=>({item:q, idx:QUEUE.indexOf(q)})), count:items.length, undo_id:res?res.undo_id:null};
-          let impact = 0; items.forEach(q=>impact+=(IMPACT[q.cat]||5));
           QUEUE = QUEUE.filter(q=>q.type!=="low_confidence"); done += items.length;
           const nl = list(); sel = nl.length? nl[0].id : null;
+          // 몇 건이 확정됐고 풀이 얼마나 늘었는지는 **서버가 센 수**만 말한다
           if(res) toast(`<b>AI 확신 낮음 ${res.count}건</b> 원문값 일괄 확정 · <b>추천 가능 재고 +${res.pool_added}</b>`, true);
-          else toast(`<b>AI 확신 낮음 ${items.length}건</b> 원문값 일괄 확정 · <b>추천 가능 재고 +${items.length}</b> · 영향 견적 ${impact}건`, true);
+          // 서버가 수를 주지 않았어도 **말은 한다** — 행이 조용히 사라지면 되돌리기 버튼도 못 본다
+          else toast(`AI 확신 낮음 일괄 확정 — 서버가 처리 결과 수를 주지 않았습니다`, true);
           renderAll();
         }
         function bulkConfirm(){
           const items = QUEUE.filter(q=>q.type==="low_confidence");
           if(!items.length) return;
-          if(LIVE){
-            api("/reviews/bulk-confirm").then(res=>applyBulkLocal(items, res)).catch(e=>toast("⚠ "+e.message));
-            return;
-          }
-          applyBulkLocal(items, null);
+          api("/reviews/bulk-confirm").then(res=>applyBulkLocal(items, res)).catch(e=>toast("⚠ "+e.message));
         }
         function renderBulk(){
           const el = document.getElementById("bulkBar"); if(!el) return;
@@ -784,7 +758,7 @@
           const hit = n? l.find(q=>q.name===n) : null;
           sel = hit? hit.id : (l.length? l[0].id : null);
         }
-        // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패 시 더미 유지
+        // 요청 전에는 '불러오는 중…'만 그린다 — 아직 아무것도 확인하지 못했다
         applyDeepLink(); renderAll();
         // 슬라이스 39: 실카탈로그 적재로 대기 건수가 수천이 됐다 — 서버가 페이지로 나눠 보낸다.
         // **화면이 한 페이지만 받는다는 사실을 숨기지 않는다**: 전체 건수와 종류별 분포를 띠로 밝힌다.
@@ -883,17 +857,36 @@
                 + (RV_FIELD ? "&field=" + encodeURIComponent(RV_FIELD) : ""))
             .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
-              LIVE = true; SRV = d; QUEUE = d.items.map(fromApi);
+              LOADSTATE = "ok"; SRV = d; QUEUE = d.items.map(fromApi);
               const b = document.getElementById("dataSrc");
-              b.textContent = "실데이터 · Cloud SQL";
-              b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              // 성공하면 실패 문구를 반드시 덮어쓴다(색까지) — 남으면 성공을 실패로 읽는다
+              if(b){
+                b.textContent = "실데이터 · Cloud SQL";
+                b.className = "badge badge-phoenix badge-phoenix-primary align-middle fs-10";
+              }
               applyDeepLink();
               renderAll();
               rvBanner(d);
               rvBrief(d);
               if(window.feather) feather.replace();
             })
-            .catch(()=>{});
+            .catch(()=>{
+              /* 못 불러왔으면 **아무 수도 말하지 않는다**. 예전에는 조용히 삼키고
+                 더미 배열을 그대로 그려서, 없는 상품·매입가를 사실처럼 보여줬다.
+                 여기서 예외가 나면 그 뒤가 통째로 안 도니 전부 null 가드를 둔다. */
+              LOADSTATE = "fail"; SRV = {}; QUEUE = []; sel = null;
+              const b = document.getElementById("dataSrc");
+              if(b){
+                b.textContent = "연결 안 됨";
+                b.className = "badge badge-phoenix badge-phoenix-warning align-middle fs-10";
+              }
+              const br = document.getElementById("queueBrief");
+              if(br){ br.className = ""; br.innerHTML = ""; }
+              const sc = document.getElementById("rvScale");
+              if(sc && sc.parentNode) sc.parentNode.removeChild(sc);
+              renderAll();
+              if(window.feather) feather.replace();
+            });
         }
         rvLoad();
       })();

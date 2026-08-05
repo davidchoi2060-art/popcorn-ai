@@ -265,9 +265,9 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">가격 검토 대기</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">가격 검토 대기 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">가격 검토 대기 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">매입가 변동이 임계(±15%)를 넘거나 <b class="text-body-secondary">마진 정책을 위반</b>하는 건만 모입니다. 승인 전까지 판매가는 바뀌지 않습니다.</p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">5</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="done">0</span>건 · <a href="margin-policy.html">마진 정책 v8</a></p></div>
+          <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">—</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 처리 <span id="done">—</span>건 · <a href="margin-policy.html">마진 정책</a></p></div>
         </div>
         <div class="card"><div class="card-body p-0">
           <!-- data-list = 현재 페이지 안의 검색·정렬(list.js). 건수·목록 구성은 그대로 서버가 정한다.
@@ -275,7 +275,7 @@
                '매입가 변동'은 두 값+증감률이 한 칸에 있어 문자열 정렬이 오해를 부르므로 sort 대상에서 뺐다. -->
           <div id="prList" class="table-list" data-list='{"valueNames":["name","supplier","delta","current","proposed","margin","reason"]}'><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
           <thead><tr class="text-body-tertiary"><th class="ps-4 py-2 sort" data-sort="name">상품</th><th class="sort" data-sort="supplier">공급처</th><th class="text-end">매입가 변동</th><th class="text-end sort" data-sort="current">현재 판매가</th><th class="text-end sort" data-sort="proposed">제안 판매가</th><th class="text-end sort" data-sort="margin">마진</th><th class="sort" data-sort="reason">사유</th><th class="pe-4 text-end">판정</th></tr></thead>
-          <tbody class="list" id="rows" data-repeat="review"></tbody>
+          <tbody class="list" id="rows" data-repeat="review"><tr><td colspan="8" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr></tbody>
         </table></div></div></div></div>
         <p class="fs-9 text-body-tertiary mt-2 mb-0">제안 판매가 = 신규 매입가 + <a href="margin-policy.html">마진 정책</a>(카테고리 기본 마진, 끝자리 규칙) 자동 적용. 승인·수정 내역은 <a href="activity-logs.html">작업 기록</a>과 <a href="price-history.html">가격 이력</a>에 남습니다.</p>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
@@ -283,14 +283,10 @@
       <script>
       (function(){
         function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        let R=[
-          ["P-4822","MSI RTX 4060 벤투스 2X","용산도매A","368,000 → 402,000","+9.2%","415,000","459,000","12.4%",["임계 초과·마진 위반","danger"]],
-          ["P-9001","녹투아 NH-D15","다나와직송B","118,000 → 96,000","-18.6%","139,000","119,000","19.3%",["임계 초과(인하)","warning"]],
-          ["P-3001","삼성 DDR5-5600 16GB","용산도매A","41,000 → 47,500","+15.9%","52,000","57,900","18.0%",["임계 초과","warning"]],
-          ["P-6020","WD Blue SN580 1TB","용산도매A","72,000 → 84,000","+16.7%","89,000","99,900","15.9%",["임계 초과","warning"]],
-          ["P-3395","시소닉 FOCUS GX-750","다나와직송B","112,000 → 111,000","-0.9%","129,000","129,000","14.0%",["마진 위반(최소 15%)","danger"]]
-        ];
-        let done=0, LIVE=false, NOTE="";
+        // 목록은 서버 응답으로만 채운다. 더미 배열을 두지 않는다 —
+        // 서버가 죽었을 때 없는 상품·공급처·금액을 사실처럼 보여주게 된다.
+        let R=[];
+        let done=0, NOTE="";
 
         // ── 현재 페이지 안의 검색·정렬(list.js) — 공용 헬퍼 `shared/ui-list.js` 가 처리한다.
         // 유령 인스턴스 제거 · 콤마 금액 수치 비교 · reIndex 뒤 정렬 되걸기 · vendor 재시도까지
@@ -303,10 +299,25 @@
             {numeric:["current","proposed","margin"]});
         }
 
+        // 이 화면의 모든 DOM 접근은 이 헬퍼를 거친다 — 실패 경로에서 null 에 걸려
+        // 예외가 나면 그 뒤 코드가 통째로 안 돈다(화면이 죽은 줄 모르고 남는다).
+        function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+
+        // 서버에 못 닿았을 때: 왜 비었는지 말하고, 수치는 자리표시자로 되돌린다.
+        function showFail(){
+          setText("cnt","—");setText("done","—");
+          const b=document.getElementById("dataSrc");
+          if(b){b.textContent="연결 안 됨";b.classList.remove("badge-phoenix-primary");b.classList.add("badge-phoenix-secondary");}
+          const t=document.getElementById("rows");
+          if(t)t.innerHTML='<tr><td colspan="8" class="text-center text-body-tertiary py-4">서버에 연결되지 않아 불러오지 못했습니다.</td></tr>';
+        }
+
         function render(){
-          document.getElementById("cnt").textContent=R.length;
-          document.getElementById("done").textContent=done;
-          document.getElementById("rows").innerHTML=R.length?R.map(([sku,name,sup,delta,pct,curp,prop,margin,[why,c],code],i)=>`
+          setText("cnt",R.length);
+          setText("done",done);
+          const rows=document.getElementById("rows");
+          if(!rows)return;
+          rows.innerHTML=R.length?R.map(([sku,name,sup,delta,pct,curp,prop,margin,[why,c],code],i)=>`
             <tr class="${c==="danger"?"bg-danger-subtle bg-opacity-25":""}">
               <td class="ps-4 name"><b class="text-body-highlight">${name}</b><br><code class="fs-10">${sku}</code></td>
               <td class="text-body-tertiary supplier">${sup}</td>
@@ -320,35 +331,33 @@
                 <button class="btn btn-sm btn-phoenix-secondary" data-a="${i}" data-act="판매가 유지">유지</button>
                 <button class="btn btn-sm btn-subtle-secondary" data-a="${i}" data-act="직접 수정">수정</button>
               </td></tr>`).join("")
-            :`<tr><td colspan="8" class="text-center text-body-tertiary py-5"><b>모두 처리했습니다.</b><br><span class="fs-10">${LIVE?NOTE:"새 일괄 등록·매입 확정 시 다시 쌓입니다."}</span></td></tr>`;
+            :`<tr><td colspan="8" class="text-center text-body-tertiary py-5"><b>모두 처리했습니다.</b><br><span class="fs-10">${NOTE||""}</span></td></tr>`;
           document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
             const i=+b.dataset.a, r=R[i], act=b.dataset.act;
-            if(LIVE){
-              const api={"제안가 승인":"approve","판매가 유지":"keep","직접 수정":"manual"}[act];
-              let price=null;
-              if(api==="manual"){
-                const v=prompt(`${r[1]}\n판매가를 입력하세요 (원, 숫자만):`, String(r[6]).replace(/[^0-9]/g,""));
-                if(v===null||!v.trim())return;
-                price=parseInt(v.replace(/[^0-9]/g,""),10);
-                if(!price){toast("판매가를 숫자로 입력해 주세요");return;}
-              }
-              b.disabled=true;
-              fetch(`/api/admin/price-review/${r[9]}/decide`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:api,price:price})})
-                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-                .then(res=>{
-                  if(!res.ok){const d=res.j.detail;toast("처리 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));b.disabled=false;return;}
-                  done++;
-                  const tail=res.j.sale_price?` 판매가 ${res.j.sale_price.toLocaleString()}원 확정`:" 판매가 미산정 유지(제안 차단)";
-                  reload().then(()=>toast(`${r[0]} — ${act} ·${tail} · 가격 이력·작업 기록 저장`));
-                }).catch(()=>{b.disabled=false;toast("처리 실패 — 네트워크 오류");});
-              return;
+            if(!r)return;
+            const api={"제안가 승인":"approve","판매가 유지":"keep","직접 수정":"manual"}[act];
+            let price=null;
+            if(api==="manual"){
+              const v=prompt(`${r[1]}\n판매가를 입력하세요 (원, 숫자만):`, String(r[6]).replace(/[^0-9]/g,""));
+              if(v===null||!v.trim())return;
+              price=parseInt(v.replace(/[^0-9]/g,""),10);
+              if(!price){toast("판매가를 숫자로 입력해 주세요");return;}
             }
-            R.splice(i,1);done++;
-            toast(`${r[0]} — ${act} · 가격 이력 기록 · 작업 기록 저장`);render();
+            b.disabled=true;
+            fetch(`/api/admin/price-review/${r[9]}/decide`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:api,price:price})})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail;toast("처리 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));b.disabled=false;return;}
+                done++;
+                const tail=res.j.sale_price?` 판매가 ${res.j.sale_price.toLocaleString()}원 확정`:" 판매가 미산정 유지(제안 차단)";
+                // 목록 갱신이 실패하면 낡은 행을 남기지 않고 실패를 표시한다
+                reload().catch(showFail).then(()=>toast(`${r[0]} — ${act} ·${tail} · 가격 이력·작업 기록 저장`));
+              }).catch(()=>{b.disabled=false;toast("처리 실패 — 네트워크 오류");});
           });
           wireList();
         }
-        render();if(window.feather)feather.replace();
+        // 요청 전에는 그리지 않는다 — 마크업의 '불러오는 중…' 이 그대로 보인다.
+        if(window.feather)feather.replace();
         // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙는다
         // (헬퍼는 멱등이라 여러 번 불러도 된다).
         document.addEventListener("DOMContentLoaded",wireList);
@@ -358,7 +367,7 @@
         function reload(){
           return fetch("/api/admin/price-review").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
             .then(d=>{
-              LIVE=true;NOTE=d.note;
+              NOTE=d.note;
               R=d.items.map(i=>[i.sku,i.name,i.supplier,
                 i.current==null?`첫 등록 ${won(i.purchase)}`:`${won(i.purchase)} 기준`,
                 i.current==null?"—":"",
@@ -366,11 +375,12 @@
                 won(i.proposed), i.margin_pct==null?"—":i.margin_pct+"%",
                 [i.why, i.kind==="first"?"info":"warning"], i.product_code]);
               const b=document.getElementById("dataSrc");
-              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              // 성공 경로에서 반드시 덮어쓴다 — 실패 문구가 남아 있으면 안 된다.
+              if(b){b.textContent="실데이터 · Cloud SQL";b.classList.remove("badge-phoenix-secondary");b.classList.add("badge-phoenix-primary");}
               render();
             });
         }
-        reload().catch(function(){});
+        reload().catch(showFail);
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

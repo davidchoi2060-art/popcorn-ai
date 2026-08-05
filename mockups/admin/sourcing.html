@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-SRC-010" data-domain="sourcing">
+  <body data-screen-id="ADM-SRC-010" data-domain="sourcing" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,9 +264,9 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">매입 견적(용산)</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">매입 견적(용산) <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SRC-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">매입 견적(용산) <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SRC-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">재고가 소진되면 자동으로 여기 모입니다. <b class="text-body-secondary">매입가를 확정해야 추천 가능 재고에 재편입</b>됩니다.</p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">4</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 재편입 <span id="done">0</span>건</p></div>
+          <div class="text-end"><h4 class="mb-0 fw-bolder">대기 <span id="cnt">—</span>건</h4><p class="fs-9 text-body-tertiary mb-0">오늘 재편입 <span id="done">—</span>건</p></div>
         </div>
         <!-- 검색·페이지 — 전 행을 한 번에 그리던 화면이었다(15,261건 · 3.6MB).
              상단에 검색을 두는 이유: 운영자는 목록을 훑지 않고 특정 상품을 찾아온다. -->
@@ -282,48 +282,10 @@
             <span id="srcInfo" class="fs-9 text-body-tertiary ms-auto"></span>
           </div>
         </div></div>
-        <div id="cards"></div>
+        <div id="cards"><div class="card"><div class="card-body text-center text-body-tertiary py-4">불러오는 중…</div></div></div>
         <div id="srcPager" class="d-flex justify-content-center align-items-center gap-2 my-3"></div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>
-      (function(){
-        function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        // 상태: req(견적 요청)/wait(회신 대기)/reply(회신 도착 — 확정 가능)
-        let S=[
-          ["P-1002","AMD 라이젠7 7700 (정품)","CPU","reply","재고 0 — 자동 등록 · 07-13",[["용산도매A","345,000원","오늘 10:20",true],["용산도매C","352,000원","오늘 09:40",false]]],
-          ["P-4821","이엠텍 RTX 4060 STORM X2 WHITE","그래픽카드","wait","재고 6 → 안전재고 미달 · 07-13",[["용산도매A","회신 대기",null,false]]],
-          ["P-2765","3RSYS J600 강화유리","케이스","reply","재고 0 — 자동 등록 · 07-12",[["용산도매B","41,000원","어제",true]]],
-          ["P-6012","삼성 990 PRO 2TB","SSD","req","재고 3 → 안전재고 미달 · 오늘",[]]
-        ];
-        const ST={req:["견적 요청 전","secondary"],wait:["회신 대기","warning"],reply:["회신 도착","primary"]};
-        let done=0;
-        function render(){
-          document.getElementById("cnt").textContent=S.length;document.getElementById("done").textContent=done;
-          document.getElementById("cards").innerHTML=S.length?S.map(([sku,name,cat,st,why,quotes],i)=>`
-            <div class="card mb-3"><div class="card-body">
-              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
-                <div><span class="badge badge-phoenix badge-phoenix-${ST[st][1]} me-2">${ST[st][0]}</span><b class="text-body-highlight">${name}</b> <code class="fs-10">${sku}</code><br><span class="fs-10 text-body-tertiary">${cat} · ${why}</span></div>
-                ${st==="req"?`<button class="btn btn-sm btn-phoenix-primary" data-req="${i}">공급처에 견적 요청</button>`:""}
-              </div>
-              ${quotes.length?`<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>공급처</th><th class="text-end">회신 매입가</th><th>회신 시각</th><th class="text-end"></th></tr></thead><tbody>${
-                quotes.map(([sup,price,at,best],qi)=>`<tr><td>${sup}${best?' <span class="badge badge-phoenix badge-phoenix-primary">최저</span>':""}</td><td class="text-end fw-bold">${price}</td><td class="text-body-tertiary">${at||"—"}</td><td class="text-end">${st==="reply"&&at?`<button class="btn btn-sm btn-primary" data-fix="${i}:${qi}">이 가격으로 확정</button>`:""}</td></tr>`).join("")
-              }</tbody></table></div>`:`<p class="fs-9 text-body-tertiary mb-0">아직 요청 전입니다.</p>`}
-            </div></div>`).join("")
-          :`<div class="card"><div class="card-body text-center py-5 text-body-tertiary"><b>매입 대기가 없습니다.</b><br><span class="fs-10">재고 소진·안전재고 미달 시 자동 등록됩니다.</span></div></div>`;
-          document.querySelectorAll("[data-fix]").forEach(b=>b.onclick=()=>{
-            const [i,qi]=b.dataset.fix.split(":").map(Number);const r=S[i];
-            S.splice(i,1);done++;
-            toast(`${r[0]} 매입 확정 ${r[5][qi][1]} — 가격 이력 기록 · 재고 입고 대기 1건 추가(입고 확정 시 추천 재고 편입)`);render();
-          });
-          document.querySelectorAll("[data-req]").forEach(b=>b.onclick=()=>{
-            const i=+b.dataset.req;S[i][3]="wait";S[i][5]=[["용산도매A","회신 대기",null,false]];
-            toast(`${S[i][0]} — 견적 요청 발송`);render();
-          });
-        }
-        render();if(window.feather)feather.replace();
-      })();
-      </script>
       <script>
       (function(){
         // ---- LIVE (슬라이스 35) — 대기는 재고·안전재고에서 파생, 저장하는 건 운영자 행위뿐.
@@ -345,6 +307,26 @@
             });
         }
         var ST = {req:["견적 요청 전","secondary"], wait:["회신 대기","warning"], reply:["회신 도착","primary"]};
+
+        // 불러오지 못하면 **왜 비었는지** 말한다. 지어낸 대기 건으로 채우지 않는다.
+        // DOM 을 만지다 예외가 나면 뒤가 통째로 안 도니 자리마다 가드한다.
+        function srcFail(e){
+          var b = document.getElementById("dataSrc");
+          if(b){
+            b.textContent = "연결 안 됨";
+            b.classList.remove("badge-phoenix-primary");
+            b.classList.add("badge-phoenix-secondary"); // 다음 성공에서 primary 로 되돌아갈 수 있게
+          }
+          var c = document.getElementById("cnt"); if(c) c.textContent = "—";
+          var dn = document.getElementById("done"); if(dn) dn.textContent = "—";
+          var host = document.getElementById("cards");
+          if(host) host.innerHTML = '<div class="card"><div class="card-body text-center text-body-tertiary py-4">'
+            + '서버에 연결되지 않아 불러오지 못했습니다.</div></div>';
+          var note = document.getElementById("srcNote"); if(note) note.textContent = "";
+          var info = document.getElementById("srcInfo"); if(info) info.textContent = "";
+          var pg = document.getElementById("srcPager"); if(pg) pg.innerHTML = "";
+          if(e && e.message) toastL("불러오지 못했습니다: " + e.message);
+        }
 
         var SRC_PAGE = 1, SRC_Q = "", SRC_CAT = "";
         function renderPager(d){
@@ -467,13 +449,13 @@
             var b = document.getElementById("dataSrc");
             b.textContent = "실데이터 · Cloud SQL";
             b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
-          });
+          }).catch(function(e){ srcFail(e); });
         }
         function srcSearch(){
           SRC_Q = (document.getElementById("srcQ").value || "").trim();
           SRC_CAT = document.getElementById("srcCat").value || "";
           SRC_PAGE = 1;
-          reload().catch(function(e){ toastL("불러오지 못했습니다: " + e.message); });
+          reload(); // 실패 처리는 reload 안의 srcFail 이 한다
         }
         document.getElementById("srcGo").onclick = srcSearch;
         document.getElementById("srcQ").addEventListener("keydown", function(e){
@@ -497,7 +479,7 @@
               sel.appendChild(o);
             });
           }).catch(function(){});
-        reload().catch(function(){});
+        reload();
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

@@ -58,7 +58,10 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-SYS-030" data-domain="system">
+  <!-- data-dummy-fallback="none" : 이 화면은 더미 폴백을 걷어냈다(정적 7행 삭제).
+       표시가 없으면 `shared/admin-auth.js` 의 미로그인 띠가 "수치는 더미입니다"라고
+       말하는데, 여기엔 더미가 없으므로 그 띠가 거짓말이 된다. -->
+  <body data-screen-id="ADM-SYS-030" data-domain="system" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -265,7 +268,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">작업 기록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">작업 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">작업 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">확정·잠금·정책 발행·적재·가격 승인 — <b class="text-body-secondary">추천을 바꾸는 모든 행위</b>의 감사 추적입니다.</p></div>
         </div>
         <ul class="nav nav-pills mb-3 gap-2 fs-9" id="pills"></ul>
@@ -281,28 +284,35 @@
       </div>
       <script>
       (function(){
-        const A=[
-          ["10:31","김운영","confirm","검수 확정·잠금","P-3390 정격 출력 {rated_watt}","500W → 400W (검증값 확정)"],
-          ["10:12","david","policy","정책 발행","마진 정책 v8","케이스 마진 18% → 20%"],
-          ["09:58","김운영","price","가격 승인","P-4822 판매가","415,000 → 459,000 (제안가)"],
-          ["09:40","박검수","confirm","검수 확정·잠금","P-4102 소켓 {socket}","AM5 → AM4 (검증값 확정)"],
-          ["09:15","시스템","batch","배치 적재","배치 #213 (5,214행)","신규 1,847 · 갱신 3,102 · 검수 38"],
-          ["08:50","david","sourcing","매입 확정","P-2765 매입가","41,000원 (용산도매B) → 재편입"],
-          ["어제 17:40","david","policy","규칙 발행","호환 규칙 v5","R-04 여유율 25% → 30%"]
-        ];
-        const T={all:["전체","dark"],confirm:["확정·잠금","primary"],policy:["정책·규칙","danger"],price:["가격","warning"],batch:["적재","info"],sourcing:["매입","info"]};
-        let cur="all";
-        // 통합 행 형태 — 더미(A)와 LIVE(API)를 같은 render가 그린다. 더미 원형은 폴백에서 그대로.
-        let TYPES=T, ROWS=A.map(a=>({at:a[0],op:a[1],key:a[2],col:(T[a[2]]||["","secondary"])[1],act:a[3],target:a[4],sum:a[5],undone:false,isUndo:false}));
+        // 열 수 — 시각·운영자·행위·대상·변경 내용. 빈 상태 안내의 colspan 이 이 수를 따른다.
+        const COLS=5;
+        // 이 화면은 **서버 응답만으로** 그린다. 더미 배열도, 더미를 그리는 폴백 경로도 없다.
+        // 감사 추적이 없는 사람·없는 변경을 사실처럼 보이면 그것 자체가 사고다(화면 정직성).
+        let TYPES={}, ROWS=[], cur="all";
+        // 요청 전 상태. 성공·실패 경로가 **반드시** 덮어쓴다(성공했는데 실패 문구가 남지 않게).
+        let emptyMsg="불러오는 중…";
+        function setBadge(text,cls){
+          const b=document.getElementById("dataSrc");
+          if(!b)return;
+          b.textContent=text;
+          b.classList.remove("badge-phoenix-secondary","badge-phoenix-primary","badge-phoenix-warning");
+          b.classList.add(cls);
+        }
         function render(){
+          const body=document.getElementById("rows");
+          if(!body)return;
           const c={all:ROWS.length};ROWS.forEach(r=>c[r.key]=(c[r.key]||0)+1);
-          document.getElementById("pills").innerHTML=Object.entries(TYPES).map(([k,[l,col]])=>`
+          const pills=document.getElementById("pills");
+          // 데이터가 없으면 분류 칩도 내밀지 않는다 — 0 으로 채운 칩은 '그 종류가 0건'이라는 사실로 읽힌다.
+          if(pills)pills.innerHTML=Object.entries(TYPES).map(([k,[l,col]])=>`
             <li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${k===cur?"active":""}" style="${k===cur?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${k===cur?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${c[k]||0}</span></a></li>`).join("");
           document.querySelectorAll("[data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
-          document.getElementById("rows").innerHTML=ROWS.filter(r=>cur==="all"||r.key===cur).map(r=>`
+          const list=ROWS.filter(r=>cur==="all"||r.key===cur);
+          body.innerHTML=list.length?list.map(r=>`
             <tr${r.isUndo?' class="opacity-75"':''}><td class="ps-4 text-body-tertiary">${r.at}</td><td class="op fw-semibold">${r.op}</td>
             <td class="act"><span class="badge badge-phoenix badge-phoenix-${r.col}">${r.act}</span>${r.undone?' <span class="badge badge-phoenix badge-phoenix-secondary">되돌려짐</span>':''}</td>
-            <td class="target"><code class="fs-10">${r.target}</code></td><td class="change text-body-secondary">${r.sum}</td></tr>`).join("");
+            <td class="target"><code class="fs-10">${r.target}</code></td><td class="change text-body-secondary">${r.sum}</td></tr>`).join("")
+            :`<tr><td colspan="${COLS}" class="text-center text-body-tertiary py-4">${emptyMsg}</td></tr>`;
           wireList();
         }
 
@@ -328,15 +338,22 @@
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
           .then(d=>{
             TYPES={all:["전체","dark"],order:["주문","info"],refund:["환불","danger"],settlement:["정산","warning"],price_file:["단가표","primary"],product_review:["검수·매입","primary"],product:["상품","secondary"],member_review:["후기","info"],member:["회원","secondary"],stock:["재고","primary"]};
-            ROWS=d.items.map(i=>({at:fmtT(i.at),op:i.operator,key:i.kind,col:KIND_COL[i.kind]||"secondary",
+            ROWS=(d.items||[]).map(i=>({at:fmtT(i.at),op:i.operator,key:i.kind,col:KIND_COL[i.kind]||"secondary",
               act:i.action_label,target:(i.target||"—"),sum:i.summary,undone:i.undone,isUndo:i.is_undo}));
             cur="all";
-            const b=document.getElementById("dataSrc");
-            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
-            if(d.total>d.limit){const n=document.getElementById("limitNote");n.hidden=false;n.textContent=`전체 ${d.total.toLocaleString()}건 중 최근 ${d.limit.toLocaleString()}건 표시 — 페이지네이션은 준비 중입니다.`;}
+            emptyMsg="아직 기록된 작업이 없습니다.";   // 요청 전 문구를 성공 경로가 덮는다
+            setBadge("실데이터 · Cloud SQL","badge-phoenix-primary");
+            if(d.total>d.limit){const n=document.getElementById("limitNote");if(n){n.hidden=false;n.textContent=`전체 ${d.total.toLocaleString()}건 중 최근 ${d.limit.toLocaleString()}건 표시 — 페이지네이션은 준비 중입니다.`;}}
             render();
           })
-          .catch(()=>{});
+          .catch(()=>{
+            // 원천(감사 로그 API)은 있는데 못 불러온 상태 — 지어내지 말고 이유를 말한다.
+            TYPES={};ROWS=[];cur="all";
+            emptyMsg="서버에 연결되지 않아 불러오지 못했습니다.";
+            setBadge("연결 안 됨","badge-phoenix-warning");
+            const n=document.getElementById("limitNote");if(n)n.hidden=true;
+            render();
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

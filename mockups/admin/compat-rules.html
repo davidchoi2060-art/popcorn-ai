@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-ENG-010" data-domain="engine">
+  <body data-screen-id="ADM-ENG-010" data-domain="engine" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,7 +264,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">추천 설정</a></li><li class="breadcrumb-item active">조립 호환 규칙 · 필수 사양</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">조립 호환 규칙 · 필수 사양 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">조립 호환 규칙 · 필수 사양 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">"조립 불가 PC는 안 나온다"의 실체. <b class="text-body-secondary">규칙을 바꾸면 추천 가능 재고 수가 바뀝니다.</b></p></div>
         </div>
         <!-- 더미 규칙 6종과 하드코딩된 '카테고리별 필수 사양' 표를 걷어냈다(슬라이스 82).
@@ -273,7 +273,9 @@
              이 화면만 빠뜨린 것이다. 아래 LIVE가 서버의 compat_rules를 그대로 보여준다.
              회귀가 이 화면의 마크업에서 연출 잔재를 검사한다 — 주석에도 그 문자열을
              다시 적지 않는다(적으면 검사가 잡는다). -->
-        <div id="liveRules" class="mt-1"></div>
+        <div id="liveRules" class="mt-1">
+          <div class="text-center text-body-tertiary py-4" data-live-placeholder>불러오는 중…</div>
+        </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
       <script>
@@ -294,15 +296,23 @@
             + '<h5 class="mb-1">' + title + ' <span class="badge badge-phoenix badge-phoenix-primary fs-10 align-middle">현재 적용 중</span></h5>'
             + '<p class="fs-9 text-body-tertiary mb-3">' + sub + '</p>' + body + '</div></div>';
         }
-        function table(head, rows){
+        function table(head, rows, emptyMsg){
+          // 표가 비면 왜 비었는지 한 줄로 말한다 — 빈 표를 말없이 두면 '규칙이 없다'로 읽힌다.
+          var body = rows.length
+            ? rows.map(function(r){return '<tr>' + r.map(function(c){return '<td>'+c+'</td>';}).join('') + '</tr>';}).join('')
+            : '<tr><td colspan="' + head.length + '" class="text-center text-body-tertiary py-4">'
+              + (emptyMsg || '등록된 항목이 없습니다.') + '</td></tr>';
           return '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
             + '<thead><tr class="text-body-tertiary">' + head.map(function(h){return '<th>'+h+'</th>';}).join('') + '</tr></thead>'
-            + '<tbody>' + rows.map(function(r){return '<tr>' + r.map(function(c){return '<td>'+c+'</td>';}).join('') + '</tr>';}).join('') + '</tbody></table></div>';
+            + '<tbody>' + body + '</tbody></table></div>';
         }
         function note(t){ return '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + t + '</p>'; }
 
+        // 서버가 응답했는지(상태 코드가 왔는지)를 남긴다 — '연결 실패'와 '서버가 거절'은 다른
+        // 사실이다. 둘을 한 문구로 말하면 401(로그인 만료)을 네트워크 문제로 읽게 된다.
+        var httpStatus = null;
         fetch("/api/admin/engine-rules")
-          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function(r){ httpStatus = r.status; if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
           .then(function(d){
             var host = document.getElementById("liveRules"), html = "";
             if(SCREEN === "compat"){
@@ -321,7 +331,10 @@
                       : '<span class="text-body-quaternary fs-10">' + c.rule.split('.')[0] + ' 전체</span>';
                     return ['<b>'+c.label+'</b>', '<code class="fs-10">'+c.rule+'</code>', scope,
                             '<span class="text-body-tertiary fs-10">'+c.source+'</span>'];
-                  })) + note(d.compat.note));
+                  }),
+                  // 규칙 0종은 '아무 문제 없음'이 아니다 — 거르는 검사가 없다는 뜻이다.
+                  "등록된 호환 검사가 없습니다 — 걸러지는 조합이 하나도 없다는 뜻입니다.")
+                + note(d.compat.note));
               // 카테고리별 필수 사양 — 하드코딩 표를 걷어내고 메타(spec_field_defs)를 읽는다.
               // '읽는 규칙'이 비면 근거 없이 상품을 묶고 있다는 뜻이라 그대로 드러낸다.
               var req = d.compat.required || [];
@@ -341,7 +354,8 @@
                         + f.key + ' — 읽는 규칙 없음</span>';
                     }).join(' ');
                     return ['<b>'+g.part_label+'</b>', fs, '<span class="fs-10">'+used+'</span>'];
-                  }))
+                  }),
+                  "필수로 지정된 사양이 없습니다 — 사양이 비어도 검수로 회부되지 않습니다.")
                 + note(d.compat.required_note)
                 + (dead ? '<div class="alert alert-subtle-warning fs-9 mt-2 mb-0">'
                     + '어떤 호환 검사도 읽지 않는 필수 사양이 <b>' + dead + '건</b> 있습니다 —'
@@ -389,26 +403,56 @@
                   : '<p class="fs-9 text-body-secondary mb-0">등록된 카테고리별 정책이 없습니다 — 현재는 전 카테고리에 기본값이 적용됩니다.</p>')
                 + note(p.category_note));
             }
-            host.innerHTML = html;
-            host.hidden = false;
+            // 성공 경로도 가드한다. 여기서 예외가 나면 .catch가 이어받아, 서버가 준 진짜 규칙을
+            // 실패 안내로 덮어쓴다 — 규칙을 받아놓고 '불러오지 못했다'를 읽게 되는 최악이다.
+            if(host){ host.innerHTML = html; host.hidden = false; }
             var b = document.getElementById("dataSrc");
-            b.textContent = "실데이터 · Cloud SQL";
-            b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+            if(b){
+              b.textContent = "실데이터 · Cloud SQL";
+              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+            }
             if(window.feather) feather.replace();
           })
           .catch(function(e){
             // 더미를 걷어냈으므로 실패하면 화면이 빈다 — 조용히 비우지 않는다.
             // 예전에는 연출 규칙이 남아 있어 "불러오기에 실패했는데 규칙은 보이는" 상태였고,
             // 그게 더 나빴다(가짜를 진짜로 읽는다).
+            // 여기서 예외가 나면 안내조차 못 하고 뒤 코드가 통째로 죽는다 — 참조마다 가드한다.
+            var why = (e && e.message) ? e.message : "원인 불명";
+            // 무엇이 실패했는지 사실대로 나눈다. 상태 코드가 왔다면 연결은 된 것이므로
+            // '연결 안 됨'이라 말하면 안 된다 — 운영자가 엉뚱한 곳을 뒤진다.
+            var headline, badgeText, hint;
+            if(httpStatus === null){
+              headline = "서버에 연결되지 않아 불러오지 못했습니다.";
+              badgeText = "연결 안 됨";
+              hint = "API 서버가 떠 있는지 확인하세요.";
+            } else if(httpStatus === 401 || httpStatus === 403){
+              headline = "권한이 없어 규칙을 불러오지 못했습니다.";
+              badgeText = "권한 없음";
+              hint = "로그인이 만료됐는지 확인하세요.";
+            } else {
+              headline = "서버가 규칙을 주지 못했습니다.";
+              badgeText = "불러오기 실패";
+              hint = "서버 응답을 확인하세요.";
+            }
             var host = document.getElementById("liveRules");
-            host.innerHTML = '<div class="alert alert-subtle-warning mb-0" role="alert">'
-              + '<b>규칙을 불러오지 못했습니다</b> (' + e.message + ')<br>'
-              + '<span class="fs-9">이 화면은 서버의 <code>compat_rules</code>를 그대로 보여줍니다 —'
-              + ' 불러오지 못하면 아무것도 표시하지 않습니다. 로그인이 만료됐는지 확인하세요.</span>'
-              + '</div>';
+            if(host){
+              host.innerHTML = '<div class="alert alert-subtle-warning" role="alert">'
+                + '<b>' + headline + '</b>'
+                + ' <span class="fs-10 text-body-tertiary">(' + why + ')</span><br>'
+                + '<span class="fs-9">이 화면은 서버의 <code>compat_rules</code>를 그대로 보여줍니다 —'
+                + ' 불러오지 못하면 아무것도 표시하지 않습니다. ' + hint + '</span>'
+                + '</div>'
+                + table(["검사", "판정 기준", "적용 부품", "사양 원천"], [], headline);
+              host.hidden = false;
+            }
             var b = document.getElementById("dataSrc");
-            b.textContent = "불러오기 실패";
-            b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+            if(b){
+              // 원천(compat_rules)은 있고 못 불러온 것이다 — 없는 원천을 말하지 않는다.
+              b.textContent = badgeText;
+              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+            }
+            if(window.__toast) window.__toast(headline + " (" + why + ")");
           });
       })();
       </script>

@@ -57,7 +57,10 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-CLM-010" data-domain="claim">
+  <!-- data-dummy-fallback="none" : 이 화면은 더미 폴백을 걷어냈다(예시 접수 3건 배열 · 평균 처리 1.8일 ·
+       서버 없이 상태를 바꾸던 목업 처리 경로 삭제). 못 불러오면 비운 채 이유만 적는다.
+       admin-auth.js 가 이 표시로 미로그인 띠 문구를 고른다. -->
+  <body data-screen-id="ADM-CLM-010" data-domain="claim" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,7 +267,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">환불 · 클레임</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">환불 · 클레임 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CLM-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">환불 · 클레임 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CLM-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">접수는 <b class="text-body-secondary">항상 본 시스템</b>에서 받습니다. 처리 방식(자체/쇼핑몰 인계)은 운영 전환 설정을 따르고, 원장은 여기 남습니다.</p></div>
           <a href="ops-settings.html" class="btn btn-phoenix-secondary btn-sm">운영 전환 설정</a>
         </div>
@@ -277,26 +280,41 @@
       </div>
       <script>
       (function(){
-        const won=n=>n.toLocaleString()+"원";
+        // 더미 데이터 없음 — 이 화면은 서버 응답(GET /api/admin/refunds)만으로 그린다.
+        // 못 불러오면 목록·상세를 비운 채 이유를 적고 KPI 는 "—" 로 둔다.
+        // 0 을 찍지 않는다 — 0 은 '접수 건이 없다'는 사실 주장이라 서버가 죽었을 때 거짓이 된다.
+        const DASH="—";
+        const won=n=>(n==null?DASH:n.toLocaleString()+"원");
         const STATES=["접수","검토","수거·처리","완료"];
-        let R=[
-         {no:"RF-1024",order:"ORD-84213",cust:"김민준",kind:"환불",reason:"초기 불량",mode:"mall",state:0,amount:812000,at:"오늘 09:12",note:"수령 직후 화면 깜빡임 증상. 고객 메모: '게임 중 화면이 간헐적으로 꺼집니다.'"},
-         {no:"RF-1019",order:"ORD-83907",cust:"이서연",kind:"반품·교환",reason:"단순 변심",mode:"mall",state:1,amount:1284000,at:"07-19 15:40",note:"케이스 색상 변경 희망 — 교환 우선 검토."},
-         {no:"RF-1015",order:"ORD-83721",cust:"박도윤",kind:"환불",reason:"오배송 · 구성 오류",mode:"own",state:3,amount:98000,at:"07-11 10:05",note:"주변기기 1종 오배송 — 부분 환불 완료. 결제 내역에 환불 행 생성됨."}
-        ];
-        let sel="RF-1024", lastAction=null, LIVE=false;
+        let R=null;                      // null = 아직 못 불러옴(빈 배열과 구분한다)
+        let sel=null, lastAction=null, loadMsg="불러오는 중…";
+        function setSrc(text,cls){
+          const b=document.getElementById("dataSrc");
+          if(!b)return;
+          b.className="badge badge-phoenix badge-phoenix-"+cls+" align-middle fs-10";
+          b.textContent=text;
+        }
         const modeBadge=m=>m==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체 처리</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>';
         const stateBadge=r=>r.state===-1
           ?'<span class="badge badge-phoenix badge-phoenix-danger">반려</span>'
           :'<span class="badge badge-phoenix badge-phoenix-'+(r.state===3?"secondary":r.state===0?"danger":"warning")+'">'+STATES[r.state]+'</span>';
         function kpis(){
-          const K=LIVE
-            ?[["접수 대기",R.filter(r=>r.state===0).length,"건","danger"],["검토·처리 중",R.filter(r=>r.state===1||r.state===2).length,"건","warning"],["완료",R.filter(r=>r.state===3).length,"건","secondary"],["평균 처리","—","(집계 준비 중)","primary"]]
-            :[["접수 대기",R.filter(r=>r.state===0).length,"건","danger"],["검토·처리 중",R.filter(r=>r.state===1||r.state===2).length,"건","warning"],["이번 달 완료",R.filter(r=>r.state===3).length,"건","secondary"],["평균 처리",1.8,"일","primary"]];
-          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const el=document.getElementById("kpis");
+          if(!el)return;
+          // 평균 처리는 서버가 아직 내려주지 않는다 — 불러온 뒤에도 지어내지 않고 "—" 로 둔다.
+          const K=R
+            ?[["접수 대기",R.filter(r=>r.state===0).length,"건"],["검토·처리 중",R.filter(r=>r.state===1||r.state===2).length,"건"],["완료",R.filter(r=>r.state===3).length,"건"],["평균 처리",DASH,"(집계 준비 중)"]]
+            :[["접수 대기",DASH,""],["검토·처리 중",DASH,""],["완료",DASH,""],["평균 처리",DASH,""]];
+          el.innerHTML=K.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function list(){
-          document.getElementById("qlist").innerHTML=R.map(r=>{
+          const el=document.getElementById("qlist");
+          if(!el)return;
+          if(!R||!R.length){
+            el.innerHTML=`<div class="text-center text-body-tertiary py-4 fs-9">${R?"접수된 환불 · 클레임이 없습니다.":loadMsg}</div>`;
+            return;
+          }
+          el.innerHTML=R.map(r=>{
             const on=r.no===sel;
             return `<div data-id="${r.no}" class="p-3 border-bottom cursor-pointer ${on?"bg-primary-subtle":""}" style="border-left:3px solid ${on?"var(--phoenix-primary)":"transparent"};">
               <div class="d-flex justify-content-between align-items-start mb-1"><div class="d-flex align-items-center gap-2"><b class="fs-9 text-body-highlight">${r.no}</b><span class="badge badge-phoenix badge-phoenix-secondary">${r.kind}</span>${stateBadge(r)}</div><span class="fs-10 text-body-quaternary">${r.at}</span></div>
@@ -304,11 +322,17 @@
               <div class="d-flex justify-content-between align-items-center mt-1">${modeBadge(r.mode)}<b class="fs-9">${won(r.amount)}</b></div>
             </div>`;
           }).join("");
-          document.querySelectorAll("#qlist [data-id]").forEach(el=>el.onclick=()=>{sel=el.dataset.id;renderAll();});
+          document.querySelectorAll("#qlist [data-id]").forEach(n=>n.onclick=()=>{sel=n.dataset.id;renderAll();});
         }
-        function refund(){return R.find(r=>r.no===sel);}
+        function refund(){return R?R.find(r=>r.no===sel):null;}
         function detail(){
-          const r=refund();const d=document.getElementById("detail");if(!r)return;
+          const d=document.getElementById("detail");
+          if(!d)return;
+          const r=refund();
+          if(!r){
+            d.innerHTML=`<div class="card"><div class="card-body text-center text-body-tertiary py-4 fs-9">${!R?loadMsg:(R.length?"왼쪽에서 접수 건을 선택하세요.":"접수된 환불 · 클레임이 없습니다.")}</div></div>`;
+            return;
+          }
           const steps=r.state===-1
             ?'<div class="alert alert-subtle-danger py-2 fs-9 my-3" role="alert">반려됨 — 고객은 필요 시 다시 접수할 수 있습니다.</div>'
             :'<div class="d-flex gap-2 flex-wrap my-3">'+STATES.map((s,i)=>`<span class="badge badge-phoenix badge-phoenix-${i<=r.state?(i===r.state?"primary":"secondary"):"secondary"}" style="${i>r.state?"opacity:.4;":""}">${i+1} ${s}</span>`).join("")+"</div>";
@@ -338,52 +362,42 @@
             const MSG={review:`<b>${r.no}</b> 검토 시작`,
               approve:r.mode==="own"?`<b>${r.no}</b> 승인 — 수거 접수 · PG 환불 예약`:`<b>${r.no}</b> 쇼핑몰 인계 처리 기록 — 진행 상태 동기화`,
               reject:`<b>${r.no}</b> 반려 — 고객에게 사유 안내 발송`};
-            if(LIVE){
-              b.disabled=true;
-              const prevState=r.state;
-              fetch(`/api/admin/refunds/${r.refund_id}/advance`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:b.dataset.act})})
-                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-                .then(res=>{
-                  if(!res.ok){const dd=res.j.detail||{};toast("⚠ "+(dd.detail||dd.error||"처리 실패"));b.disabled=false;return;}
-                  r.state=res.j.state;
-                  if(b.dataset.act==="complete"){
-                    lastAction=null; // 완료 = 비가역(원장 확산 — 목업의 되돌리기와 의도된 차이)
-                    toast(`<b>${r.no}</b> 환불 확정 · 환불 행 ${res.j.refund_row?res.j.refund_row.amount.toLocaleString()+"원":""} · 재고 복귀 ${res.j.returned}건`,false);
-                  }else{
-                    lastAction={no:r.no,state:prevState,undo_id:res.j.undo_id};
-                    toast(MSG[b.dataset.act],true);
-                  }
-                  renderAll();
-                })
-                .catch(()=>{toast("⚠ 처리에 실패했어요 — 다시 시도해 주세요.");b.disabled=false;});
-              return;
-            }
-            lastAction={no:r.no,state:r.state};
-            if(b.dataset.act==="review"){r.state=1;toast(MSG.review,true);}
-            else if(b.dataset.act==="approve"){r.state=2;toast(MSG.approve,true);}
-            else if(b.dataset.act==="complete"){r.state=3;toast(`<b>${r.no}</b> 환불 확정 · 결제 내역 환불 행 생성 · 재고 복귀`,true);}
-            else{toast(MSG.reject,true);}
-            renderAll();
+            // 서버가 처리하지 않으면 상태도 바뀌지 않는다.
+            // (목업 시절엔 서버 없이 state 를 올리고 "환불 확정 · 재고 복귀"라 알렸다 —
+            //  원장에 아무 일도 없는데 처리됐다고 말하는 것이라 함께 걷어냈다.)
+            b.disabled=true;
+            const prevState=r.state;
+            fetch(`/api/admin/refunds/${r.refund_id}/advance`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:b.dataset.act})})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const dd=(res.j&&res.j.detail)||{};toast("⚠ "+(dd.detail||dd.error||"처리 실패"));b.disabled=false;return;}
+                r.state=res.j.state;
+                if(b.dataset.act==="complete"){
+                  lastAction=null; // 완료 = 비가역(원장 확산)
+                  toast(`<b>${r.no}</b> 환불 확정 · 환불 행 ${res.j.refund_row?won(res.j.refund_row.amount):""} · 재고 복귀 ${res.j.returned}건`,false);
+                }else{
+                  lastAction={no:r.no,state:prevState,undo_id:res.j.undo_id};
+                  toast(MSG[b.dataset.act],true);
+                }
+                renderAll();
+              })
+              .catch(()=>{toast("⚠ 처리에 실패했어요 — 다시 시도해 주세요.");b.disabled=false;});
           });
           if(window.feather)feather.replace();
         }
         function undo(){
-          if(!lastAction)return;
-          if(LIVE&&lastAction.undo_id){
-            fetch(`/api/admin/refunds/undo/${lastAction.undo_id}`,{method:"POST"})
-              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-              .then(res=>{
-                if(!res.ok){const dd=res.j.detail||{};toast("⚠ "+(dd.detail||dd.error||"되돌리기 실패"));return;}
-                const r=R.find(x=>x.no===lastAction.no);if(r)r.state=res.j.state;
-                lastAction=null;renderAll();
-                toast("되돌렸습니다 — 처리 상태가 이전으로 복원됐습니다.");
-              })
-              .catch(()=>toast("⚠ 되돌리기에 실패했어요."));
-            return;
-          }
-          const r=R.find(x=>x.no===lastAction.no);if(r)r.state=lastAction.state;
-          lastAction=null;renderAll();
-          toast("되돌렸습니다 — 처리 상태가 이전으로 복원됐습니다.");
+          // 되돌리기도 서버가 한다 — 화면에서만 state 를 되돌리면 원장과 어긋난다.
+          if(!lastAction||!lastAction.undo_id)return;
+          const prev=lastAction;
+          fetch(`/api/admin/refunds/undo/${prev.undo_id}`,{method:"POST"})
+            .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+            .then(res=>{
+              if(!res.ok){const dd=(res.j&&res.j.detail)||{};toast("⚠ "+(dd.detail||dd.error||"되돌리기 실패"));return;}
+              const r=R?R.find(x=>x.no===prev.no):null;if(r)r.state=res.j.state;
+              lastAction=null;renderAll();
+              toast("되돌렸습니다 — 처리 상태가 이전으로 복원됐습니다.");
+            })
+            .catch(()=>toast("⚠ 되돌리기에 실패했어요."));
         }
         function toast(m,actionable){
           let t=document.getElementById("__rtoast");
@@ -393,7 +407,7 @@
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
         }
         function renderAll(){kpis();list();detail();}
-        // ---- LIVE (슬라이스 11) — 즉시 더미 렌더 후 API 시도, 실패 시 더미 유지 ----
+        // ---- 서버 (슬라이스 11) — 빈 화면으로 시작해 응답을 받은 뒤에만 값을 그린다 ----
         function fmtT(iso){
           const dd=new Date(iso),now=new Date();
           const hm=String(dd.getHours()).padStart(2,"0")+":"+String(dd.getMinutes()).padStart(2,"0");
@@ -406,14 +420,19 @@
         fetch("/api/admin/refunds")
           .then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
           .then(d=>{
-            LIVE=true;R=d.items.map(fromApi);
+            R=(d.items||[]).map(fromApi);
             sel=R.length?R[0].no:null;
-            const b=document.getElementById("dataSrc");
-            b.textContent="실데이터 · Cloud SQL";
-            b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            setSrc("실데이터 · Cloud SQL","primary");
             renderAll();
           })
-          .catch(()=>{});
+          .catch(()=>{
+            // 응답을 이미 받은 뒤 렌더에서 난 예외를 '연결 안 됨'으로 뒤집지 않는다
+            // (뒤집으면 서버가 준 실데이터를 지우고 닿지도 않은 서버를 탓한다 — shipping.html 과 같은 규약).
+            if(R)return;
+            loadMsg="서버에 연결되지 않아 불러오지 못했습니다.";
+            setSrc("연결 안 됨","danger");
+            renderAll();
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

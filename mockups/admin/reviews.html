@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-CUS-020" data-domain="customer">
+  <body data-screen-id="ADM-CUS-020" data-domain="customer" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,7 +264,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">후기 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">후기 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">후기 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CUS-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">후기는 <b class="text-body-secondary">구매 인증(주문 라인 연계)만</b> 존재합니다 — 가짜 후기 원천 차단(A-10). 노출·신고 처리와 S2 근거 인용을 관리합니다.</p></div>
         </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -273,24 +273,44 @@
       </div>
       <script>
       (function(){
-        let R=[
-         {id:1,cust:"이서연",order:"ORD-83907",item:"라이젠5 5600 · RTX 3060 구성",rating:5,at:"07-20",state:"게시",cite:true,
-          body:"조립 사진이랑 검사 리포트까지 같이 와서 놀랐어요. 로아 풀옵 잘 돌아갑니다. 왜 이 부품인지 설명해준 게 제일 좋았어요."},
-         {id:2,cust:"박도윤",order:"ORD-83881",item:"사무용 구성",rating:4,at:"07-02",state:"게시",cite:false,
-          body:"사무용으로 조용하고 빠릅니다. 배송도 빨랐어요."},
-         {id:3,cust:"익명(신고 접수)",order:"ORD-83721",item:"주변기기",rating:1,at:"07-12",state:"신고됨",cite:false,
-          body:"[신고 1건 — 사유: 욕설 포함] 배송이 늦었고 ***** 같은 대응...", report:"신고자: 운영자 감지 · 커뮤니티 가이드 위반(욕설) 의심"}
-        ];
-        let lastAction=null;
+        // 더미 데이터 없음 — 이 화면은 서버 응답(GET /api/admin/member-reviews)만으로 그린다.
+        // 못 불러오면 목록을 비운 채 이유를 적는다: 없는 회원·주문·평점·후기 본문을 지어내지 않는다.
+        // 배지가 '더미'라고 밝혀도 큼직한 숫자와 실명 후기는 사람이 사실로 읽는다(좌측 메뉴
+        // 마크업 배지 '상품 검수 9' 대 실제 5,162 전례 — admin-panel.js clearDummyBadges).
+        let R=null, lastAction=null, loadMsg="불러오는 중…";
+        const DASH="—";
+        function setSrc(text,cls){
+          const b=document.getElementById("dataSrc");
+          if(!b)return;
+          b.className="badge badge-phoenix badge-phoenix-"+cls+" align-middle fs-10";
+          b.textContent=text;
+        }
         function kpis(){
-          const avg=(R.filter(r=>r.state!=="숨김").reduce((s,r)=>s+r.rating,0)/R.filter(r=>r.state!=="숨김").length).toFixed(1);
-          const K=[["전체 후기",R.length,"건","primary"],["평균 평점",avg,"점","primary"],["신고 처리 대기",R.filter(r=>r.state==="신고됨").length,"건","danger"],["S2 근거 인용 중",R.filter(r=>r.cite).length,"건","info"]];
-          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const el=document.getElementById("kpis");
+          if(!el)return;
+          // 못 불러왔으면 0 이 아니라 '—' 다 — 0 은 '없다'는 사실 주장이다.
+          let K=[["전체 후기",DASH,""],["평균 평점",DASH,""],["신고 처리 대기",DASH,""],["S2 근거 인용 중",DASH,""]];
+          if(R){
+            const vis=R.filter(r=>r.state!=="숨김");
+            const avg=vis.length?(vis.reduce((s,r)=>s+r.rating,0)/vis.length).toFixed(1):DASH;
+            K=[["전체 후기",R.length,"건"],["평균 평점",avg,vis.length?"점":""],
+               ["신고 처리 대기",R.filter(r=>r.state==="신고됨").length,"건"],
+               ["S2 근거 인용 중",R.filter(r=>r.cite).length,"건"]];
+          }
+          el.innerHTML=K.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function stars(n){return "★".repeat(n)+"☆".repeat(5-n);}
         function render(){
           kpis();
-          document.getElementById("rlist").innerHTML=R.map(r=>{
+          const el=document.getElementById("rlist");
+          if(!el)return;
+          if(!R||!R.length){
+            // 표가 아니라 카드 목록이라 colspan 자리가 없다 — 같은 문구를 한 줄로 둔다.
+            el.innerHTML=`<div class="card"><div class="card-body text-center text-body-tertiary py-4">${loadMsg}</div></div>`;
+            if(window.feather)feather.replace();
+            return;
+          }
+          el.innerHTML=R.map(r=>{
             const stCol=r.state==="게시"?"primary":(r.state==="신고됨"?"danger":"secondary");
             let acts="";
             if(r.state==="신고됨")acts=`<button class="btn btn-phoenix-danger btn-sm" data-id="${r.id}" data-act="hide">숨김 처리</button><button class="btn btn-phoenix-secondary btn-sm" data-id="${r.id}" data-act="keep">게시 유지</button>`;
@@ -311,46 +331,32 @@
             </div></div>`;
           }).join("");
           document.querySelectorAll("#rlist [data-act]").forEach(b=>b.onclick=()=>{
-            const r=R.find(x=>x.id===+b.dataset.id);if(!r)return;
+            const r=R&&R.find(x=>x.id===+b.dataset.id);if(!r)return;
             const act=b.dataset.act, apiAct=act==="cite"?(r.cite?"cite_off":"cite_on"):act;
             const msg={hide:"후기 숨김 처리 — 고객에게 사유 안내 발송", keep:"신고 검토 완료 — 게시 유지", restore:"후기 게시 복원",
                        cite_on:'S2 견적서 근거로 인용 시작 — "먼저 받아본 사람들" 소스', cite_off:"S2 근거 인용 해제"}[apiAct];
-            if(LIVE){
-              b.disabled=true;
-              fetch(`/api/admin/member-reviews/${r.id}/moderate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:apiAct})})
-                .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-                .then(res=>{
-                  if(!res.ok){const d=res.j.detail;toast("처리 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));b.disabled=false;return;}
-                  lastAction={undo_id:res.j.undo_id};
-                  reload().then(()=>toast(msg,true));
-                }).catch(()=>{b.disabled=false;toast("처리 실패 — 네트워크 오류");});
-              return;
-            }
-            lastAction={id:r.id,state:r.state,cite:r.cite};
-            if(act==="hide"){r.state="숨김";}
-            else if(act==="keep"||act==="restore"){r.state="게시";}
-            else{r.cite=!r.cite;}
-            toast(msg,true);render();
+            // 처리는 서버만 한다 — 화면 안에서 상태를 바꿔 처리된 척하지 않는다.
+            b.disabled=true;
+            fetch(`/api/admin/member-reviews/${r.id}/moderate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:apiAct})})
+              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail;toast("처리 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));b.disabled=false;return;}
+                lastAction={undo_id:res.j.undo_id};
+                reload().then(()=>toast(msg,true)).catch(()=>toast("처리는 됐지만 목록 갱신에 실패했습니다 — 새로고침해 주세요."));
+              }).catch(()=>{b.disabled=false;toast("처리 실패 — 네트워크 오류");});
           });
           if(window.feather)feather.replace();
         }
         function undo(){
-          if(!lastAction)return;
-          if(LIVE){
-            if(!lastAction.undo_id)return;
-            const id=lastAction.undo_id;lastAction=null;
-            fetch(`/api/admin/member-reviews/undo/${id}`,{method:"POST"})
-              .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
-              .then(res=>{
-                if(!res.ok){const d=res.j.detail;toast("되돌리기 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));return;}
-                reload().then(()=>toast("되돌렸습니다 — 후기 상태가 이전으로 복원됐습니다."));
-              }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
-            return;
-          }
-          const r=R.find(x=>x.id===lastAction.id);
-          if(r){r.state=lastAction.state;r.cite=lastAction.cite;}
-          lastAction=null;render();
-          toast("되돌렸습니다 — 후기 상태가 이전으로 복원됐습니다.");
+          if(!lastAction||!lastAction.undo_id)return;
+          const id=lastAction.undo_id;lastAction=null;
+          fetch(`/api/admin/member-reviews/undo/${id}`,{method:"POST"})
+            .then(x=>x.json().then(j=>({ok:x.ok,j:j})))
+            .then(res=>{
+              if(!res.ok){const d=res.j.detail;toast("되돌리기 실패: "+(typeof d==="string"?d:(d&&(d.detail||d.error))||""));return;}
+              reload().then(()=>toast("되돌렸습니다 — 후기 상태가 이전으로 복원됐습니다."))
+                      .catch(()=>toast("되돌렸지만 목록 갱신에 실패했습니다 — 새로고침해 주세요."));
+            }).catch(()=>toast("되돌리기 실패 — 네트워크 오류"));
         }
         
         function toast(m,actionable){
@@ -363,23 +369,34 @@
 
         render();
 
-        // ---- LIVE (슬라이스 19) — API 성공 시 실후기로 교체(구매 인증 라인 실연결), 실패 시 더미 원형 ----
+        // ---- 서버 (슬라이스 19) — 후기는 실데이터로만 그린다(구매 인증 라인 실연결).
         // 신고 박스: 신고됨 상태 ∧ moderation_note(접수 메모 겸용 — 신고 수신함 컬럼화 이관) 있을 때만.
-        let LIVE=false;
-        function fmtD(iso){const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+        function fmtD(iso){
+          if(!iso)return DASH;
+          const d=new Date(iso);
+          if(isNaN(d))return DASH;
+          return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        }
         function reload(){
           return fetch("/api/admin/member-reviews").then(x=>{if(!x.ok)throw new Error(x.status);return x.json();})
             .then(d=>{
-              LIVE=true;
-              R=d.items.map(i=>({id:i.id,cust:i.cust,order:i.order,item:i.item,rating:i.rating,at:fmtD(i.at),
+              R=(d.items||[]).map(i=>({id:i.id,cust:i.cust,order:i.order,item:i.item,rating:i.rating,at:fmtD(i.at),
                 state:i.state,cite:i.cite,body:i.body,
                 report:(i.state==="신고됨"&&i.note)?i.note:null}));
-              const b=document.getElementById("dataSrc");
-              b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              // 성공 문구는 응답을 받은 뒤에만 — 실패 초기값이 그대로 남지 않게 여기서 덮는다.
+              loadMsg="등록된 후기가 없습니다.";
+              setSrc("실데이터 · Cloud SQL","primary");
               render();
             });
         }
-        reload().catch(function(){});
+        reload().catch(function(){
+          // 이미 실데이터를 받은 뒤 렌더에서 난 예외를 '연결 안 됨'으로 뒤집지 않는다
+          // (뒤집으면 서버가 준 값을 지우고 닿지도 않은 서버를 탓한다 — shipping/orders 와 같은 규약).
+          if(R)return;
+          loadMsg="서버에 연결되지 않아 불러오지 못했습니다.";
+          setSrc("연결 안 됨","danger");
+          render();
+        });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

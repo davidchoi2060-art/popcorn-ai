@@ -58,7 +58,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-SHIP-010" data-domain="order">
+  <body data-screen-id="ADM-SHIP-010" data-domain="order" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -265,7 +265,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">배송 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">배송 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SHIP-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">배송 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SHIP-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">조립·검사가 끝난 주문은 <b class="text-body-secondary">여기서 출고 처리</b>합니다. 송장 등록·추적, 자체/인계 구분.</p></div>
         </div>
         <div class="row g-2 mb-3" id="kpis"></div>
@@ -284,20 +284,24 @@
       </div>
       <script>
       (function(){
-        let S=[
-         {no:"ORD-84210",cust:"최유진",ch:"own",items:"라이젠7 7700 · RTX 4070 SUPER (7종)",track:null,state:"출고 대기",note:"24시간 검사 통과 — 오늘 15시 마감분"},
-         {no:"ORD-84216",cust:"김민준",ch:"own",items:"i7-14700K · RTX 4070 Ti SUPER + 주변기기 2종",track:null,state:"조립·검사 중",note:"검사 완료 시 출고 대기로 전환"},
-         {no:"ORD-84213",cust:"김민준",ch:"own",items:"라이젠5 7600 · RTX 4060 (7종)",track:"CJ대한통운 6482-1234-5678",state:"배송중"},
-         {no:"ORD-83907",cust:"이서연",ch:"mall",items:"라이젠5 5600 · RTX 3060 (7종)",track:"CJ대한통운 6480-8821-3341",state:"완료"},
-         {no:"ORD-83881",cust:"박도윤",ch:"mall",items:"사무용 구성 (6종)",track:"완료",state:"완료"}
-        ];
-        let cur="wait", lastAction=null, LIVE=false;
-        const isWait=x=>x.state==="출고 대기"||x.state==="조립·검사 중"||x.state==="조립 대기";
+        // 더미 데이터 없음 — 이 화면은 서버 응답(GET /api/admin/orders)만으로 그린다.
+        // 못 불러오면 표를 비운 채 이유를 적는다(없는 주문·고객·송장을 지어내지 않는다).
+        let S=null, cur="wait", lastAction=null, loadMsg="불러오는 중…";
+        const DASH="—";
+        const isWait=x=>x.state==="조립·검사 중"||x.state==="조립 대기";
+        function setSrc(text,cls){
+          const b=document.getElementById("dataSrc");
+          if(!b)return;
+          b.className="badge badge-phoenix badge-phoenix-"+cls+" align-middle fs-10";
+          b.textContent=text;
+        }
         function kpis(){
-          const K=LIVE
-            ?[["조립 대기",S.filter(x=>x.state==="조립 대기").length,"건","info"],["조립·검사 중",S.filter(x=>x.state==="조립·검사 중").length,"건","warning"],["배송중",S.filter(x=>x.state==="배송중").length,"건","warning"],["평균 출고","—","(집계 준비 중)","primary"]]
-            :[["출고 대기",S.filter(x=>x.state==="출고 대기").length,"건","danger"],["조립·검사 중",S.filter(x=>x.state==="조립·검사 중").length,"건","warning"],["배송중",S.filter(x=>x.state==="배송중").length,"건","warning"],["평균 출고",1.2,"일","primary"]];
-          document.getElementById("kpis").innerHTML=K.map(([l,n,u,c])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const el=document.getElementById("kpis");
+          if(!el)return;
+          const K=S
+            ?[["조립 대기",S.filter(x=>x.state==="조립 대기").length,"건"],["조립·검사 중",S.filter(x=>x.state==="조립·검사 중").length,"건"],["배송중",S.filter(x=>x.state==="배송중").length,"건"],["평균 출고",DASH,"(집계 준비 중)"]]
+            :[["조립 대기",DASH,""],["조립·검사 중",DASH,""],["배송중",DASH,""],["평균 출고",DASH,""]];
+          el.innerHTML=K.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function matches(x){
           if(cur==="all")return true;
@@ -307,8 +311,10 @@
           return true;
         }
         function pills(){
-          const P=[["wait","출고 전 · 조립",S.filter(isWait).length,"danger"],["shipping","배송중",S.filter(x=>x.state==="배송중").length,"warning"],["done","완료",S.filter(x=>x.state==="완료").length,"secondary"],["all","전체",S.length,"dark"]];
-          document.getElementById("pills").innerHTML=P.map(([k,l,n,c])=>{
+          const el=document.getElementById("pills");
+          if(!el)return;
+          const P=[["wait","출고 전 · 조립",S?S.filter(isWait).length:DASH,"danger"],["shipping","배송중",S?S.filter(x=>x.state==="배송중").length:DASH,"warning"],["done","완료",S?S.filter(x=>x.state==="완료").length:DASH,"secondary"],["all","전체",S?S.length:DASH,"dark"]];
+          el.innerHTML=P.map(([k,l,n,c])=>{
             const on=k===cur;
             return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+c} ms-1">${n}</span></a></li>`;
           }).join("");
@@ -326,12 +332,19 @@
         }
         function render(){
           kpis();pills();
+          const tb=document.getElementById("rows");
+          if(!tb)return;
+          if(!S){
+            tb.innerHTML=`<tr><td colspan="7" class="text-center text-body-tertiary py-4">${loadMsg}</td></tr>`;
+            wireList();
+            if(window.feather)feather.replace();
+            return;
+          }
           const list=S.filter(matches);
-          document.getElementById("rows").innerHTML=list.length?list.map(x=>{
+          tb.innerHTML=list.length?list.map(x=>{
             let act="";
             if(x.refund)act=`<a class="btn btn-phoenix-danger btn-sm" href="refunds.html">환불·클레임 →</a>`;
-            else if(x.state==="출고 대기")act=`<button class="btn btn-primary btn-sm" data-no="${x.no}" data-act="ship">송장 등록 · 출고</button>`;
-            else if(LIVE&&x.state==="조립·검사 중")act=`<button class="btn btn-primary btn-sm" data-no="${x.no}" data-act="ship">검사 완료 · 송장 등록·출고</button>`;
+            else if(x.state==="조립·검사 중")act=`<button class="btn btn-primary btn-sm" data-no="${x.no}" data-act="ship">검사 완료 · 송장 등록·출고</button>`;
             else if(x.state==="배송중")act=`<button class="btn btn-phoenix-secondary btn-sm" data-no="${x.no}" data-act="done">배송 완료 처리</button>`;
             const stCol=x.state==="완료"?"secondary":(x.state==="배송중"?"warning":(x.state==="조립 대기"?"info":"danger"));
             return `<tr>
@@ -345,39 +358,31 @@
             </tr>`;
           }).join(""):`<tr><td colspan="7" class="text-center text-body-tertiary py-5">해당 상태의 건이 없습니다.</td></tr>`;
           document.querySelectorAll("#rows [data-act]").forEach(b=>b.onclick=()=>{
-            const x=S.find(s=>s.no===b.dataset.no);if(!x)return;
+            const x=S&&S.find(s=>s.no===b.dataset.no);if(!x)return;
             const MSG={ship:`<b>${x.no}</b> 송장 발번 · 출고 처리 · 고객 알림 발송`,done:`<b>${x.no}</b> 배송 완료 — 구매 확정 안내 발송`};
-            if(LIVE){
-              b.disabled=true;
-              fetch(`/api/admin/orders/${x.no}/advance`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:b.dataset.act})})
-                .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
-                .then(res=>{
-                  if(!res.ok){const d=res.j.detail||{};toast("⚠ "+(d.detail||d.error||"처리 실패"));b.disabled=false;return;}
-                  lastAction={no:x.no,state:x.state,track:x.track,undo_id:res.j.undo_id};
-                  x.state=res.j.status==="배송중"?"배송중":"완료";if(res.j.ship)x.track=res.j.ship;
-                  toast(MSG[b.dataset.act],true);render();
-                })
-                .catch(()=>{toast("⚠ 처리에 실패했어요 — 다시 시도해 주세요.");b.disabled=false;});
-              return;
-            }
-            lastAction={no:x.no,state:x.state,track:x.track};
-            if(b.dataset.act==="ship"){x.state="배송중";x.track="CJ대한통운 6484-1102-9930 (자동 발번)";}
-            else{x.state="완료";}
-            toast(MSG[b.dataset.act],true);
-            render();
+            b.disabled=true;
+            fetch(`/api/admin/orders/${x.no}/advance`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:b.dataset.act})})
+              .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+              .then(res=>{
+                if(!res.ok){const d=res.j.detail||{};toast("⚠ "+(d.detail||d.error||"처리 실패"));b.disabled=false;return;}
+                lastAction={no:x.no,state:x.state,track:x.track,undo_id:res.j.undo_id};
+                x.state=res.j.status==="배송중"?"배송중":"완료";if(res.j.ship)x.track=res.j.ship;
+                toast(MSG[b.dataset.act],true);render();
+              })
+              .catch(()=>{toast("⚠ 처리에 실패했어요 — 다시 시도해 주세요.");b.disabled=false;});
           });
           wireList();
           if(window.feather)feather.replace();
         }
         function restoreLocal(){
-          const x=S.find(s=>s.no===lastAction.no);
+          const x=S&&S.find(s=>s.no===lastAction.no);
           if(x){x.state=lastAction.state;x.track=lastAction.track;}
           lastAction=null;render();
           toast("되돌렸습니다 — 배송 상태가 이전으로 복원됐습니다.");
         }
         function undo(){
           if(!lastAction)return;
-          if(LIVE&&lastAction.undo_id){
+          if(lastAction.undo_id){
             fetch(`/api/admin/orders/undo/${lastAction.undo_id}`,{method:"POST"})
               .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
               .then(restoreLocal)
@@ -395,31 +400,37 @@
           t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity="0",actionable?6500:2200);
         }
 
-        // ---- LIVE (슬라이스 9 — 신규 API 0: 주문 원장 GET·advance·undo 재사용, 화면은 뷰) ----
+        // ---- 서버 (슬라이스 9 — 신규 API 0: 주문 원장 GET·advance·undo 재사용, 화면은 뷰) ----
         // 상태 정직화: DB 결제완료→"조립 대기"(예고), 조립중→"조립·검사 중"(출고 버튼 = advance ship).
-        // 목업 '출고 대기'는 검사 통과를 전제한 가공 상태 — v1 원장에 대응 없음(폴백 전용).
+        // 목업 시절의 '출고 대기'는 원장에 대응이 없어 삭제했다(더미 폴백과 함께).
         const STATE_MAP={"결제완료":"조립 대기","조립중":"조립·검사 중","출고":"배송중","배송중":"배송중","완료":"완료"};
         const fromApi=o=>({no:o.no,cust:o.cust,ch:o.ch,
-          items:(o.items[0]?o.items[0][1]:"")+(o.items.length>1?" 외 "+(o.items.length-1)+"종":""),
+          items:((o.items||[])[0]?o.items[0][1]:"")+((o.items||[]).length>1?" 외 "+(o.items.length-1)+"종":""),
           track:o.ship,state:STATE_MAP[o.status]||o.status,
           note:o.status==="결제완료"?"주문 관리에서 [조립 시작] 후 진행됩니다":null,
           refund:o.refund,recipient:o.recipient});
         render();
         // 첫 render() 는 list.js 로드 전에 돌므로(이 스크립트가 vendors 보다 위) 그때는 붙지 않는다.
-        // 더미 폴백(fetch 실패)에서도 검색·정렬이 되도록 스크립트가 다 실린 뒤 한 번 더 부른다.
+        // 스크립트가 다 실린 뒤 한 번 더 부른다.
         // (헬퍼도 vendor 미로드 시 load 에서 재시도하므로 이 호출은 중복돼도 안전하다 — 멱등.)
         if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",wireList);
         else wireList();
         fetch("/api/admin/orders")
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
           .then(d=>{
-            LIVE=true;S=d.items.filter(o=>o.status!=="취소").map(fromApi);
-            const b=document.getElementById("dataSrc");
-            b.textContent="실데이터 · Cloud SQL";
-            b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            S=(d.items||[]).filter(o=>o.status!=="취소").map(fromApi);
+            loadMsg="해당 상태의 건이 없습니다.";
+            setSrc("실데이터 · Cloud SQL","primary");
             render();
           })
-          .catch(()=>{});
+          .catch(()=>{
+            // 응답을 이미 받은 뒤 렌더에서 난 예외를 '연결 안 됨'으로 뒤집지 않는다(orders.html 과 같은 규약).
+            // 뒤집으면 서버가 준 실데이터를 지우고 닿지도 않은 서버를 탓한다.
+            if(S)return;
+            loadMsg="서버에 연결되지 않아 불러오지 못했습니다.";
+            setSrc("연결 안 됨","danger");
+            render();
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

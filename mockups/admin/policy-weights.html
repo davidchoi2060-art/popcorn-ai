@@ -57,7 +57,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-ENG-020" data-domain="engine">
+  <body data-screen-id="ADM-ENG-020" data-domain="engine" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -264,20 +264,19 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">추천 설정</a></li><li class="breadcrumb-item active">추천 기준 설정</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">추천 기준 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">추천 기준 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">엔진이 부품을 고르는 <b class="text-body-secondary">결정론적 스코어의 가중치</b>. 무작위성이 없으므로 이 값이 곧 추천 성향입니다.</p></div>
-          <div class="d-flex align-items-center gap-2"><span class="fs-10 text-body-tertiary">가중치 저장소가 비어 있어 발행할 정책이 없습니다</span></div>
+          <div class="d-flex align-items-center gap-2"><span id="publishState" class="fs-10 text-body-tertiary">발행 상태를 불러오는 중…</span></div>
         </div>
         <div id="liveRules" hidden class="mb-4"></div>
         <div class="row g-3">
           <div class="col-12 col-lg-7">
             <div class="card"><div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">가중치 <span class="fs-10 fw-normal text-body-tertiary">합계 100</span></h5>
-                <div class="d-flex gap-2" id="presets"></div>
+                <h5 class="mb-0">가중치</h5>
+                <span class="fs-10 text-body-tertiary">합계 <b id="weightSum">—</b></span>
               </div>
-              <div id="sliders"></div>
-              <div class="d-flex align-items-center gap-2 mt-3"><div class="progress flex-1" style="height:8px;"><div id="sumbar" class="progress-bar bg-primary" style="width:100%;"></div></div><b id="sum" class="fs-9">100</b></div>
+              <div id="weightsBox" class="fs-9 text-body-tertiary">불러오는 중…</div>
             </div></div>
           </div>
           <div class="col-12 col-lg-5">
@@ -289,7 +288,7 @@
                 <div class="mt-2">스코어 엔진이 도입되면 이 자리에 실제 재계산 결과가 나옵니다.</div>
               </div>
             </div></div>
-            <div class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>지금 무엇이 추천을 정하는가</b> — 가중치 저장소가 비어 있어, 추천은 티어별 정렬과 호환 제약으로 결정됩니다. 아래 실데이터에서 그 규칙을 확인하세요.</div>
+            <div id="engineBasis" class="alert alert-subtle-warning fs-9 mb-0" role="alert"><b>지금 무엇이 추천을 정하는가</b> — 서버에서 현재 규칙을 불러오는 중입니다.</div>
           </div>
         </div>
         
@@ -297,34 +296,13 @@
       </div>
       <script>
       (function(){
-        function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        let W=[["가격 적합도","예산 대비 구성 최적",35],["성능 점수","용도별 벤치 기반",25],["호환 여유","전력·공간 마진",15],["재고 회전","재고 소진 위험 반영",15],["판매 실적","실판매·스왑 통계",10]];
-        const PRESETS={"가성비":[45,20,10,15,10],"균형":[35,25,15,15,10],"고성능":[20,45,15,10,10]};
-        function render(){
-          document.getElementById("sliders").innerHTML=W.map(([n,d,v],i)=>`
-            <div class="d-flex align-items-center gap-3 py-2 ${i<W.length-1?"border-bottom":""}">
-              <div style="width:150px;flex:none;"><b class="fs-9 text-body-highlight">${n}</b><br><span class="fs-10 text-body-tertiary">${d}</span></div>
-              <input type="range" class="form-range flex-1" min="0" max="60" value="${v}" data-w="${i}">
-              <b class="fs-9" style="width:34px;text-align:right;">${v}</b>
-            </div>`).join("");
-          const sum=W.reduce((a,[,,v])=>a+v,0);
-          document.getElementById("sum").textContent=sum;
-          const bar=document.getElementById("sumbar");bar.style.width=Math.min(100,sum)+"%";
-          bar.className="progress-bar "+(sum===100?"bg-primary":"bg-danger");
-          document.querySelectorAll("[data-w]").forEach(s=>s.oninput=()=>{W[+s.dataset.w][2]=+s.value;render();});
-          document.getElementById("presets").innerHTML=Object.keys(PRESETS).map(k=>`<button class="btn btn-sm btn-phoenix-secondary" data-p="${k}">${k}</button>`).join("");
-          document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{PRESETS[b.dataset.p].forEach((v,i)=>W[i][2]=v);render();toast("프리셋 적용: "+b.dataset.p);});
-        }
-        /* 발행 버튼을 없앴다 — 가중치 저장소가 비어 있어 발행할 정책이 없고,
-           눌러도 아무 일이 일어나지 않는 버튼은 "저장됐다"는 오해만 만든다.
-           스코어 엔진이 도입되면 저장 경로와 함께 되살린다. */
-        render();
-      })();
-      </script>
-      <script>
-      (function(){
         // ---- LIVE (슬라이스 31) — 엔진이 실제로 쓰는 규칙 노출. 저장 테이블이 비어 있어도
         // 견적을 만드는 규칙은 코드에 살아 있다 → 화면이 연출 대신 실근거를 보여준다.
+        //
+        // 가중치 슬라이더·프리셋·발행 버튼을 없앴다 — 값이 전부 화면에 박아둔 더미였고
+        // (가격 적합도 35 · 성능 25 …), 저장할 곳도 없어 운영자가 "지금 추천은 이 가중치로
+        // 정해진다"고 읽게 만들었다. 가중치는 policy_weights(서버)가 유일한 원천이고,
+        // 비어 있으면 비어 있다고 말한다. 스코어 엔진이 도입되면 편집 UI를 저장 경로와 함께 되살린다.
         var SCREEN = "weights";
         function card(title, sub, body){
           return '<div class="card mb-3"><div class="card-body">'
@@ -376,6 +354,36 @@
                 "가중치 스코어 엔진은 아직 도입 전입니다.",
                 '<p class="fs-9 text-body-secondary mb-0">' + d.weights.note + '</p>'
                 + note(d.tiers.performance_proxy));
+
+              // 상단 '가중치' 카드 — 서버가 준 policy_weights 행만 그린다(빈 목록이면 그 사실을 말한다)
+              var wrows = (d.weights && d.weights.rows) || [];
+              var wb = document.getElementById("weightsBox");
+              if(wb){
+                wb.innerHTML = wrows.length
+                  ? wrows.map(function(w){
+                      return '<div class="d-flex justify-content-between align-items-center border-bottom py-2">'
+                        + '<span class="text-body-highlight">' + w.key + '</span><b>' + w.weight + '</b></div>';
+                    }).join('')
+                  : '<span>' + ((d.weights && d.weights.note) || '가중치 원천이 비어 있습니다.') + '</span>';
+              }
+              var ws = document.getElementById("weightSum");
+              if(ws) ws.textContent = wrows.length
+                ? wrows.reduce(function(a, w){ return a + Number(w.weight); }, 0)
+                : "—";
+
+              // 상단 두 문구도 서버 응답으로 정한다 — 예전엔 "가중치 저장소가 비어 있어…"와
+              // "아래 실데이터에서 확인하세요"가 마크업에 박혀 있어, 요청도 하기 전에(그리고
+              // 요청이 실패해도) 저장소 상태를 사실처럼 말했다. policy_weights에 행이 생기면
+              // 바로 아래 표가 그 행을 그리는데 위에서는 "비어 있다"고 말하는 자기모순이 된다.
+              var pubs = document.getElementById("publishState");
+              if(pubs) pubs.textContent = wrows.length
+                ? "가중치 " + wrows.length + "건이 등록돼 있습니다 — 편집·발행 UI는 스코어 엔진과 함께 엽니다"
+                : "가중치 저장소가 비어 있어 발행할 정책이 없습니다";
+              var eb = document.getElementById("engineBasis");
+              if(eb) eb.innerHTML = "<b>지금 무엇이 추천을 정하는가</b> — "
+                + (wrows.length
+                    ? "서버에서 가중치 " + wrows.length + "건을 받았습니다. 실제 적용 여부는 아래 '추천 가중치' 카드의 서버 설명을 보세요."
+                    : "가중치 저장소가 비어 있어, 추천은 티어별 정렬과 호환 제약으로 결정됩니다. 아래 표가 서버에서 받은 그 규칙입니다.");
             } else {
               var p = d.pricing;
               html += card("판매가 산정 공식",
@@ -400,7 +408,31 @@
             b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
             if(window.feather) feather.replace();
           })
-          .catch(function(){});
+          .catch(function(){
+            // 실패하면 이유를 말한다. 화면이 조용히 비면 운영자는 "설정이 비었다"고 읽는다.
+            // DOM 접근은 전부 null 가드 — 여기서 예외가 나면 뒤 문구가 통째로 안 걸린다.
+            var host = document.getElementById("liveRules");
+            if(host){
+              host.innerHTML = '<div class="card"><div class="card-body">'
+                + '<p class="text-center text-body-tertiary py-4 mb-0 fs-9">'
+                + '서버에 연결되지 않아 불러오지 못했습니다.</p></div></div>';
+              host.hidden = false;
+            }
+            var wb = document.getElementById("weightsBox");
+            if(wb) wb.textContent = "서버에 연결되지 않아 불러오지 못했습니다.";
+            var ws = document.getElementById("weightSum");
+            if(ws) ws.textContent = "—";
+            var pubs = document.getElementById("publishState");
+            if(pubs) pubs.textContent = "서버에 연결되지 않아 발행 상태를 확인하지 못했습니다";
+            var eb = document.getElementById("engineBasis");
+            if(eb) eb.innerHTML = "<b>지금 무엇이 추천을 정하는가</b> — "
+              + "서버에 연결되지 않아 현재 규칙을 확인하지 못했습니다.";
+            var b = document.getElementById("dataSrc");
+            if(b){
+              b.textContent = "연결 안 됨";
+              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+            }
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

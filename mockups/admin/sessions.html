@@ -265,9 +265,9 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">견적 상담 기록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">견적 상담 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">견적 상담 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">읽기 전용 관측 창. 모든 상담은 <b class="text-body-secondary">재고 스냅샷과 함께 저장</b>되어 당시 그대로 재현할 수 있습니다.</p></div>
-          <div class="text-end"><h4 class="mb-0 fw-bolder" id="headCnt">오늘 48건</h4><p class="fs-9 text-body-tertiary mb-0" id="headSub">완주 31 · 이탈 17</p></div>
+          <div class="text-end"><h4 class="mb-0 fw-bolder" id="headCnt">—</h4><p class="fs-9 text-body-tertiary mb-0" id="headSub">—</p></div>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card"><div class="card-body p-0">
@@ -293,20 +293,21 @@
       <script>
       (function(){
         function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        const MODES={guided:["맡김","primary"],chat:["함께","info"],expert:["직접","secondary"]};
-        const S=[
-          ["10:42","guided","사무용 + 가벼운 게임 · 80만","812,000원 · 7부품","완주 → 주문",["SNAP-0713-1042",["예산 80만","용도: 사무+라이트게임","화이트 감성"],[["CPU","라이젠5 7600","239,000"],["보드","ASUS PRIME B650M-A II","142,000"],["램","DDR5-5600 16GB","52,000"],["GPU","RTX 4060 STORM X2","398,000"]],"orders.html"]],
-          ["10:18","chat","롤+배그 풀옵 · 150만","1,486,000원 · 8부품","완주",["SNAP-0713-1018",["예산 150만","용도: 게임(중)","기존 모니터 유지"],[["CPU","라이젠7 7700","359,000"],["GPU","RTX 4060 Ti","512,000"]],null]],
-          ["09:55","expert","부품 직접 선택 검증","호환 통과","완주",["SNAP-0713-0955",["직접 선택 7부품"],[["검증","호환성 전체 통과","—"]],null]],
-          ["09:31","guided","영상편집 · 200만","이탈(예산 단계)","이탈",["SNAP-0713-0931",["용도: 영상편집"],[],null]],
-          ["09:02","chat","견적 다시 뽑아줘(재현)","812,000원 · 동일","완주",["SNAP-0713-1042",["재현 요청 — 동일 스냅샷"],[["결과","이전과 동일 구성 확인","—"]],null]]
-        ];
-        let sel=0, LIVE=false, L=[], NOTE="";
+        let sel=0, L=[], NOTE="";
+        // 표의 열 수 — 안내 한 줄을 표 안에 놓을 때 colspan 으로 쓴다(시각·모드·입력 요약·결과·상태).
+        const COLS=5;
+        // 데이터가 없을 때는 **비워 두지 않고 이유를 적는다.** 빈 표는 '상담이 0건'으로 읽힌다.
+        function msg(t){
+          const rows=document.getElementById("rows");
+          if(rows)rows.innerHTML=`<tr><td colspan="${COLS}" class="text-center text-body-tertiary py-4">${t}</td></tr>`;
+          const dt=document.getElementById("detail");
+          if(dt)dt.innerHTML=`<div class="card"><div class="card-body"><p class="fs-9 text-body-tertiary mb-0">${t}</p></div></div>`;
+        }
         // ---- Phoenix data-list — 현재 페이지 안의 검색·정렬만 담당한다(페이지 이동은 서버 몫) ----
         // 배선은 공용 헬퍼(shared/ui-list.js)가 한다: 유령 인스턴스 제거 · 정렬 화살표 CSS 유지 ·
         // 처음 한 번만 new List 이후 reIndex · reIndex 뒤 정렬/검색어 되걸기 · vendor 지연 로드 재시도.
-        // '결과'는 금액 열이라 numeric 으로 넘긴다 — 자연 정렬은 콤마에서 숫자가 끊겨
-        // 1,486,000원 을 812,000원 보다 작게 보고, 숫자가 없는 행(이탈·호환 통과)은 뒤로 가야 한다.
+        // '결과'는 금액 열이라 numeric 으로 넘긴다 — 자연 정렬은 천 단위 구분기호에서 숫자가 끊겨
+        // 백만원대를 십만원대보다 작게 보고, 숫자가 없는 행(이탈·호환 통과)은 뒤로 가야 한다.
         function wireList(){
           if(!window.popcornList)return;
           window.popcornList.wire("sessList",["mode","summary","result","status"],{
@@ -314,32 +315,8 @@
             searchInput:"sessSearch"
           });
         }
-        function render(){
-          if(LIVE){renderLive();return;}
-          document.getElementById("rows").innerHTML=S.map((s,i)=>`
-            <tr data-i="${i}" class="cursor-pointer ${i===sel?"bg-primary-subtle":""}">
-              <td class="ps-3 text-body-tertiary">${s[0]}</td>
-              <td><span class="mode badge badge-phoenix badge-phoenix-${MODES[s[1]][1]}">${MODES[s[1]][0]}</span></td>
-              <td class="summary text-body-highlight">${s[2]}</td>
-              <td class="result text-end">${s[3]}</td>
-              <td><span class="status fs-10 ${s[4].startsWith("이탈")?"text-danger":"text-body-tertiary"}">${s[4]}</span></td>
-            </tr>`).join("");
-          document.querySelectorAll("[data-i]").forEach(r=>r.onclick=()=>{sel=+r.dataset.i;render();});
-          wireList();
-          const s=S[sel], [snap,cons,parts,order]=s[5];
-          document.getElementById("detail").innerHTML=`<div class="card"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-start mb-2"><h6 class="mb-0">상담 상세 — ${s[0]}</h6><code class="fs-10">${snap}</code></div>
-            <p class="fs-10 text-body-tertiary mb-2">제약객체(단일 원천)</p>
-            <div class="d-flex flex-wrap gap-1 mb-3">${cons.map(c=>`<span class="badge badge-phoenix badge-phoenix-secondary">${c}</span>`).join("")}</div>
-            ${parts.length?`<p class="fs-10 text-body-tertiary mb-1">결과 구성</p><div class="table-responsive mb-3"><table class="table table-sm fs-9 mb-0"><tbody>${parts.map(([a,b,c])=>`<tr><td class="text-body-tertiary" style="width:60px;">${a}</td><td>${b}</td><td class="text-end">${c}</td></tr>`).join("")}</tbody></table></div>`:`<p class="fs-9 text-body-tertiary mb-3">결과 없음 (중도 이탈)</p>`}
-            <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-phoenix-primary" id="replay">이 스냅샷으로 재현</button>
-              ${order?`<a href="${order}" class="btn btn-sm btn-phoenix-secondary">연결 주문 보기</a>`:""}
-            </div>
-            <p class="fs-10 text-body-tertiary mt-2 mb-0">재현 = 같은 제약 + 같은 스냅샷 → 같은 견적. 분쟁·문의 소명의 근거입니다.</p>
-          </div></div>`;
-          document.getElementById("replay").onclick=()=>toast(snap+" 기준 재현 완료 — 동일 구성 일치 확인");
-        }
+        // 행 클릭이 부르는 이름 — 화면은 서버 응답(L)만 그린다.
+        function render(){renderLive();}
         // ---- LIVE (슬라이스 26) — 상담 세션·견적 스냅샷 실원장. 읽기 전용(재현은 저장 스냅샷 기준) ----
         const won=n=>n==null?"—":n.toLocaleString()+"원";
         function fmtT(iso){
@@ -349,6 +326,7 @@
           return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
         }
         function renderLive(){
+          if(!L.length){msg("조회된 상담 기록이 없습니다.");return;}
           document.getElementById("rows").innerHTML=L.map((s,i)=>`
             <tr data-i="${i}" class="cursor-pointer ${i===sel?"bg-primary-subtle":""}">
               <td class="ps-3 text-body-tertiary">${fmtT(s.at)}</td>
@@ -378,21 +356,29 @@
           if(rb&&s.rep)rb.onclick=()=>toast(`SNAP-${s.rep.id} 기준 재현 — ${s.rep.tier_label} ${won(s.rep.total)} · ${s.rep.parts.length}부품 (당시 재고 스냅샷)`);
           if(window.feather)feather.replace();
         }
-        render();if(window.feather)feather.replace();
+        // 요청을 보내기 **전** 상태 — 아직 아무것도 모른다. '실데이터'라고 말하지 않는다.
+        msg("불러오는 중…");if(window.feather)feather.replace();
         // vendors/list.js 는 이 스크립트보다 뒤(</body> 직전)에서 로드된다 — 첫 render() 때는 window.List 가 없다.
         // 이 리스너는 phoenix 의 docReady(listInit) 보다 먼저 등록되므로 우리 인스턴스가 먼저 붙는다.
         document.addEventListener("DOMContentLoaded",wireList);
         fetch("/api/admin/sessions")
           .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
           .then(d=>{
-            LIVE=true;L=d.items;NOTE=d.note;sel=0;
-            document.getElementById("headCnt").textContent=`오늘 ${d.today}건`;
-            document.getElementById("headSub").textContent=`전체 ${d.items.length}건 · 완주 ${d.done} · 이탈 ${d.drop}`;
+            L=d.items||[];NOTE=d.note||"";sel=0;
+            const h=document.getElementById("headCnt");if(h)h.textContent=`오늘 ${d.today}건`;
+            const hs=document.getElementById("headSub");if(hs)hs.textContent=`전체 ${L.length}건 · 완주 ${d.done} · 이탈 ${d.drop}`;
             const b=document.getElementById("dataSrc");
-            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+            if(b){b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");}
             render();
           })
-          .catch(()=>{});
+          // 실패했으면 **왜 비었는지** 말한다. 여기서 예외가 나면 안내조차 못 하므로 전부 null 가드.
+          .catch(()=>{
+            msg("서버에 연결되지 않아 불러오지 못했습니다.");
+            const h=document.getElementById("headCnt");if(h)h.textContent="—";
+            const hs=document.getElementById("headSub");if(hs)hs.textContent="—";
+            const b=document.getElementById("dataSrc");
+            if(b){b.textContent="연결 안 됨";b.classList.replace("badge-phoenix-secondary","badge-phoenix-danger");}
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">

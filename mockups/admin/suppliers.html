@@ -285,7 +285,7 @@
 
     <div id="host" hidden></div>
     <div id="fallback" class="alert alert-subtle-warning fs-9" role="alert">
-      공급처를 불러오는 중입니다 — 서버에 연결되면 표시됩니다.
+      공급처를 불러오는 중…
     </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
@@ -540,12 +540,17 @@ setTimeout(function(){
         render(d);
       })
       .catch(function(e){
-        // 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다
-        src.textContent = "연결 안 됨";
-        fb.textContent = "공급처를 불러오지 못했습니다 (" + e.message + ") — "
-          + "관리자로 로그인했는지 확인하세요.";
-        fb.hidden = false;
-        host.hidden = true;
+        /* 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다.
+           여기서 예외가 나면 화면은 "불러오는 중"에 멈춘 채 아무 신호도 안 준다(슬라이스 58).
+           그래서 실패 경로의 DOM 접근은 전부 가드한다. */
+        var why = (e && e.message) ? e.message : "연결 실패";
+        if (src) src.textContent = "연결 안 됨";
+        if (fb) {
+          fb.textContent = "공급처를 불러오지 못했습니다 (" + why + ") — "
+            + "관리자로 로그인했는지 확인하세요.";
+          fb.hidden = false;
+        }
+        if (host) host.hidden = true;
       });
   }
   load();

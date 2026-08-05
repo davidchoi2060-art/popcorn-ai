@@ -60,7 +60,7 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-PRD-010" data-domain="product">
+  <body data-screen-id="ADM-PRD-010" data-domain="product" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -267,7 +267,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 관리</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">상품 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">상품 관리 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">정본(단일 진실)의 현재 상태입니다. 각 상품이 <b class="text-body-secondary">왜 추천 가능/불가인지</b>가 함께 표시됩니다.</p></div>
           <a href="product-edit.html?new=1" class="btn btn-primary btn-sm">+ 상품 단건 등록</a>
         </div>
@@ -301,34 +301,15 @@
       (function(){
         // 상태: ok(추천 가능) / review(검수 대기) / oos(재고 없음→매입) / price(가격 검토)
         const ST={ok:["추천 가능","primary",null,null],review:["검수 대기","warning","review-queue.html","검수"],oos:["재고 없음 · 매입 대기","info","sourcing.html","매입"],price:["가격 검토 대기","warning","price-review.html","검토"]};
-        const P=[
-          ["P-1001","AMD 라이젠5 7600 (정품)","CPU",4,4,12,2,"239,000","ok"],
-          ["P-1002","AMD 라이젠7 7700 (정품)","CPU",4,4,0,1,"359,000","oos"],
-          ["P-2001","ASUS PRIME B650M-A II","메인보드",4,4,8,2,"142,000","ok"],
-          ["P-5140","ASRock B650M PG Lightning","메인보드",3,4,15,1,"128,000","review"],
-          ["P-4102","기가바이트 B550M K","메인보드",3,4,22,2,"89,000","review"],
-          ["P-3001","삼성 DDR5-5600 16GB","메모리",4,4,64,3,"52,000","ok"],
-          ["P-4821","이엠텍 RTX 4060 STORM X2 WHITE","그래픽카드",3,4,6,1,"398,000","review"],
-          ["P-4822","MSI RTX 4060 벤투스 2X","그래픽카드",4,4,9,2,"415,000","price"],
-          ["P-6012","삼성 990 PRO 2TB","SSD",4,4,31,2,"219,000","review"],
-          ["P-6020","WD Blue SN580 1TB","SSD",4,4,44,1,"89,000","ok"],
-          ["P-3390","마이크로닉스 Classic II 500W","파워",3,4,18,1,"49,000","review"],
-          ["P-3395","시소닉 FOCUS GX-750","파워",4,4,7,2,"129,000","ok"],
-          ["P-2765","3RSYS J600 강화유리","케이스",3,4,11,1,"45,000","review"],
-          ["P-1188","쿨러마스터 Hyper 212 Black","CPU쿨러",4,4,25,2,"39,000","ok"],
-          ["P-9001","녹투아 NH-D15","CPU쿨러",4,4,3,1,"139,000","price"],
-          ["P-7101","LG 울트라기어 27GS75Q QHD 180Hz","모니터",4,4,9,2,"329,000","ok"],
-          ["P-7102","삼성 오디세이 G5 G51C 32형","모니터",3,4,5,1,"359,000","review"],
-          ["P-7201","앱코 K660 축교환 기계식","키보드",4,4,44,1,"39,000","ok"],
-          ["P-7202","로지텍 G102 LIGHTSYNC","마우스",4,4,120,2,"23,000","ok"],
-          ["P-7301","하이퍼엑스 Cloud III","헤드셋",4,4,17,1,"119,000","price"]
-        ];
         let cur="all", q="", fcat="all", fmfr="all";
-        // 정규화 어댑터 — 더미(위치배열)와 API(계약 JSON)를 같은 객체형으로
-        // 더미 폴백 전용 파생: 자체 상품번호(product_code)와 제조사(상품명 첫 토큰)
-        const fromDummy=p=>({product_code:String(20480000+parseInt(p[0].slice(2),10)),sku:p[0],name:p[1],cat:p[2],maker:p[1].split(" ")[0],spec_done:p[3],spec_total:p[4],stock:p[5],supplier_count:p[6],price_text:p[7]+"원",status_key:p[8]});
+        // 정규화 어댑터 — API 계약 JSON을 화면 객체형으로. **원천은 서버뿐이다**:
+        // 더미 배열(P)과 그 어댑터는 걷어냈다 — 서버가 죽었을 때 없는 상품·재고·가격을
+        // 사실처럼 보여주고 있었다(26,480 · 24,912 · 239,000 …).
         const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,spec_row_missing:it.spec_row_missing,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
-        let DATA=P.map(fromDummy);
+        let DATA=[];
+        // 화면 상태 — loading: 요청 전·요청 중 / ok: 서버 응답 / fail: 못 불러옴.
+        // 수치를 말해도 되는 때는 ok 하나뿐이다.
+        let STATE="loading";
         /* 필터 선택지는 **서버가 준다**(슬라이스 66).
            예전에는 현재 페이지에 로드된 행에서 뽑아 썼다 — 서버 페이지네이션이라
            한 페이지(100건)에 없는 분류·제조사는 목록에 아예 나오지 않았고,
@@ -336,12 +317,10 @@
            상세 셀렉트와 같은 원천(/api/admin/product-meta)을 본다. */
         let META=null;
         function fillSelects(){
-          const cats = META && META.used_parts
-            ? META.used_parts.map(x=>x.label)
-            : [...new Set(DATA.map(p=>p.cat))];
-          const mfrs = META && META.makers
-            ? META.makers
-            : [...new Set(DATA.map(p=>p.maker))].sort((a,b)=>a.localeCompare(b,"ko"));
+          // 선택지는 서버 원천뿐이다. 못 받으면 '전체'만 남긴다 —
+          // 화면에 로드된 행에서 뽑으면 없는 분류·제조사를 지어내게 된다.
+          const cats = META && META.used_parts ? META.used_parts.map(x=>x.label) : [];
+          const mfrs = META && META.makers ? META.makers : [];
           // 제조사는 실측 620개다 — 평범한 셀렉트로는 못 찾는다. 검색을 붙인다.
           // 공용 헬퍼가 "풀기 → 채우기 → 다시 감싸기" 순서를 지켜 준다.
           var PC = window.popcornChoices;
@@ -359,20 +338,23 @@
             .then(m=>{ if(m){ META=m; fillSelects(); } })
             .catch(()=>{});
         }
-        // KPI — k 없으면 더미 집계값, 있으면 서버 kpis(상호배타 버킷: 검수 우선이라 재고 없음과 중복 없음)
+        // KPI — 서버 kpis(상호배타 버킷: 검수 우선이라 재고 없음과 중복 없음)만 쓴다.
+        // k 가 없으면(요청 전·실패) 전부 "—". 예전엔 여기에 26,480 · 24,912 같은
+        // 더미 집계값이 박혀 있어 서버가 죽어도 사실처럼 읽혔다.
         function renderKpis(k){
-          const rows=k
-            ?[["전체 상품",k.total.toLocaleString("ko-KR"),"개"],["추천 가능",k.ok.toLocaleString("ko-KR"),"개"],["검수 대기",k.review.toLocaleString("ko-KR"),"건"],["재고 없음",k.oos.toLocaleString("ko-KR"),"개"]]
-            :[["전체 상품","26,480","개"],["추천 가능","24,912","개"],["검수 대기","9","건"],["재고 없음","618","개"]];
-          document.getElementById("kpis").innerHTML=rows.map(([l,n,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${n}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
+          const host=document.getElementById("kpis"); if(!host) return;
+          const n=v=>(v==null?"—":v.toLocaleString("ko-KR"));
+          const rows=[["전체 상품",n(k&&k.total),"개"],["추천 가능",n(k&&k.ok),"개"],["검수 대기",n(k&&k.review),"건"],["재고 없음",n(k&&k.oos),"개"]];
+          host.innerHTML=rows.map(([l,v,u])=>`<div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">${l}</p><h4 class="mb-0">${v}<span class="fs-10 fw-semibold text-body-tertiary"> ${u}</span></h4></div></div></div>`).join("");
         }
         function counts(){const c={all:DATA.length};DATA.forEach(p=>c[p.status_key]=(c[p.status_key]||0)+1);return c;}
         function pills(){
-          const c=counts();
+          const host=document.getElementById("pills"); if(!host) return;
+          const c=counts(), known=STATE==="ok";   // 서버 응답 전에는 0 도 사실이 아니다
           const order=[["all","전체","dark"],["ok","추천 가능","primary"],["review","검수 대기","warning"],["oos","재고 없음","info"],["price","가격 검토","warning"]];
-          document.getElementById("pills").innerHTML=order.map(([k,l,col])=>{
+          host.innerHTML=order.map(([k,l,col])=>{
             const on=k===cur;
-            return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${c[k]||0}</span></a></li>`;
+            return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${known?(c[k]||0):"—"}</span></a></li>`;
           }).join("");
           document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
         }
@@ -401,13 +383,20 @@
         }
         if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wireList);
         else wireList();
+        // 표가 비는 이유를 표가 직접 말한다(colspan=9 — 위 colgroup·thead 와 같은 열 수)
+        const STATE_MSG={loading:"불러오는 중…",fail:"서버에 연결되지 않아 불러오지 못했습니다."};
         function render(){
           pills();
+          const host=document.getElementById("rows"); if(!host) return;
+          if(STATE!=="ok"){
+            host.innerHTML=`<tr><td colspan="9" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
+            return;
+          }
           const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
             &&(fcat==="all"||p.cat===fcat)
             &&(fmfr==="all"||p.maker===fmfr)
             &&(q===""||p.sku.toLowerCase().includes(q)||p.name.toLowerCase().includes(q)||p.product_code.includes(q)));
-          document.getElementById("rows").innerHTML=list.length?list.map(p=>{
+          host.innerHTML=list.length?list.map(p=>{
             const [lab,col,link,act]=ST[p.status_key];
             return `<tr>
               <td class="code ps-4"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
@@ -423,13 +412,14 @@
           }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
           wireList();   // 행을 다시 그렸으니 정렬 색인도 다시 잡는다
         }
-        // 즉시 더미 렌더(빈 화면 방지) 후 API 시도 — 성공 시 실데이터 교체, 실패(file://·정적 호스팅) 시 더미 유지
+        // 요청 전 상태 — 아직 아무것도 모른다("불러오는 중…" · KPI "—").
+        // 요청을 보내기도 전에 '실데이터'라고 말하지 않는다.
         fillSelects();renderKpis(null);render();if(window.feather)feather.replace();
         const srcBadge=document.getElementById("dataSrc");
 
-        // ---- LIVE (슬라이스 39): 실데이터 24,303행 규모 — **서버 페이지네이션**.
-        // 검색·분류 필터도 서버로 보낸다(브라우저에서 전 행을 필터할 수 없다).
-        var LIVE=false, PAGE=1, SIZE=100, TOTAL=0, PAGES=1;
+        // ---- 서버 페이지네이션(슬라이스 39). 검색·분류 필터도 서버로 보낸다
+        // (브라우저에서 전 행을 필터할 수 없다).
+        var PAGE=1, SIZE=100, TOTAL=0, PAGES=1;
         function bar(){
           var el=document.getElementById("pgBar");
           if(!el){
@@ -458,16 +448,29 @@
           fetch(url)
             .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
-              LIVE=true; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size;
+              STATE="ok"; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size;
               DATA=d.items.map(fromApi);
-              srcBadge.textContent="실데이터 · Cloud SQL";
-              srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              if(srcBadge){
+                srcBadge.textContent="실데이터 · Cloud SQL";
+                srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+              }
               renderKpis(d.kpis);
               render();       // 서버가 이미 필터했으므로 클라이언트 필터는 통과만 한다
               bar();
               if(window.feather)feather.replace();
             })
-            .catch(()=>{ if(!LIVE) srcBadge.textContent="더미 데이터"; });
+            // 실패하면 이유를 말하고 수치는 전부 "—"로 되돌린다.
+            // 여기서 예외가 나면 뒤 코드가 통째로 안 도니 전부 null 가드를 건다.
+            .catch(()=>{
+              STATE="fail"; DATA=[];
+              if(srcBadge){
+                srcBadge.textContent="연결 안 됨";   // 원천은 있는데 못 불러온 상태
+                srcBadge.classList.replace("badge-phoenix-primary","badge-phoenix-secondary");
+              }
+              renderKpis(null);
+              render();
+              var pg=document.getElementById("pgBar"); if(pg) pg.remove();   // 못 받은 '전체 N건'을 남기지 않는다
+            });
         }
         // 화면 분류 라벨 → part_type (서버 필터용). 라벨이 겹치는 CPU쿨러는 서버에서 미지원 → 빈값.
         function catToPartType(label){
@@ -477,16 +480,17 @@
           return m[label]||"";
         }
         var typing=null;
+        // 검색·필터는 **항상 서버 질의**다. 예전의 비-LIVE 분기(브라우저 안에서 더미를
+        // 걸러 그리던 길)는 더미와 함께 사라졌다.
         document.getElementById("q").addEventListener("input",e=>{
           q=e.target.value.trim().toLowerCase();
-          if(LIVE){ clearTimeout(typing); typing=setTimeout(function(){PAGE=1;load();},300); }
-          else render();
+          clearTimeout(typing); typing=setTimeout(function(){PAGE=1;load();},300);
         });
         document.getElementById("fcat").addEventListener("change",e=>{
-          fcat=e.target.value; if(LIVE){PAGE=1;load();} else render();
+          fcat=e.target.value; PAGE=1; load();
         });
         document.getElementById("fmfr").addEventListener("change",e=>{
-          fmfr=e.target.value; if(LIVE){PAGE=1;load();} else render();
+          fmfr=e.target.value; PAGE=1; load();
         });
         loadMeta();   // 필터 선택지는 서버 원천 — 목록과 별개로 한 번만 받는다
         load();

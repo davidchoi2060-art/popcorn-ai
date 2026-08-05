@@ -1855,6 +1855,87 @@ def test_charts_and_choices():
     check("검색 셀렉트를 쓰는 화면이 있다", len(using) >= 3, ">= 3", len(using))
     drift("choices_screens", len(using))
 
+def test_no_fabricated_data():
+    """[39] 서버가 없으면 지어내지 않는다 (더미 폴백 제거 1·2차)
+
+    2026-08-05 사용자 지시로 화면의 더미 폴백을 걷어냈다. 그전에는 서버에 못 닿으면
+    화면이 **없는 상품·주문·사람·금액을 사실처럼** 보여줬다 — 배지가 '더미 데이터'라고
+    밝혀도 큼직한 "24,912개"는 사람이 사실로 읽는다.
+
+    이 프로젝트는 이미 같은 판단을 내렸다: 좌측 메뉴 배지가 마크업 더미로
+    '상품 검수 9'라고 말했는데 실제는 5,162였고, 그래서 `admin-panel.js` 의
+    `clearDummyBadges()` 가 배지를 지운다. 본문에도 같은 논리를 적용한 것이다.
+
+    배지 어휘(HANDOFF 규약 2026-08-05 개정):
+        `실데이터 · Cloud SQL` / `연결 안 됨`(원천은 있는데 못 불러옴) /
+        `원천 준비 중`(저장 경로 자체가 없음).   ~~`더미 데이터`~~ 는 폐기.
+    """
+    print(chr(10) + "[39] 서버가 없으면 지어내지 않는다 (더미 폴백 제거)")
+    import glob as _g9
+    import re as _re13
+
+    admin = os.path.join(ROOT, "mockups", "admin")
+
+    def screens():
+        for _p in sorted(_g9.glob(os.path.join(admin, "*.html"))):
+            _n = os.path.basename(_p)
+            if _n.startswith("_") or _n == "login.html":
+                continue
+            yield _n, io.open(_p, encoding="utf-8").read()
+
+    # ① 폐기한 배지 문구가 남아 있지 않은가.
+    #    **주석은 봐준다** — 지운 내역을 설명하는 주석까지 잡으면 기록을 못 남긴다.
+    #    검사 대상은 화면이 사용자에게 *말하는 것*이다.
+    def strip_comments(x):
+        x = _re13.sub(r"<!--[\s\S]*?-->", "", x)
+        x = _re13.sub(r"/\*[\s\S]*?\*/", "", x)
+        x = _re13.sub(r"(?m)^\s*//.*$", "", x)
+        return _re13.sub(r"(?m)\s+//[^\"']*$", "", x)
+
+    said_dummy = [n for n, s_ in screens() if "더미 데이터" in strip_comments(s_)]
+    check("'더미 데이터' 배지를 쓰는 화면이 없다", said_dummy == [], [], said_dummy)
+
+    # ② 지어낸 알림이 남아 있지 않은가 — 알림 API 자체가 없다
+    noti = [n for n, s_ in screens() if "notification-card" in s_]
+    check("셸에 지어낸 알림이 없다", noti == [], [], noti)
+
+    # ③ 마크업 <tbody> 에 사실로 읽힐 행이 박혀 있지 않은가.
+    #    자리표시자('—', '불러오는 중…', '서버에 …')만 허용한다.
+    OK = ("—", "불러오는 중", "서버에", "연결", "표시됩니다", "없습니다", "준비 중")
+    hard = []
+    for n, s_ in screens():
+        body = _re13.sub(r"<script[\s\S]*?</script>", "", s_)
+        # 범례표(`data-legend`)는 데이터가 아니라 화면이 스스로 하는 설명이다 — 건너뛴다.
+        body = _re13.sub(r"<table[^>]*\bdata-legend\b[\s\S]*?</table>", "", body)
+        for tb in _re13.findall(r"<tbody[^>]*>([\s\S]*?)</tbody>", body):
+            for tr in _re13.findall(r"<tr[\s\S]*?</tr>", tb):
+                txt = _re13.sub(r"<[^>]+>", " ", tr)
+                txt = _re13.sub(r"\s+", " ", txt).strip()
+                if not txt:
+                    continue
+                if any(k in txt for k in OK):
+                    continue
+                hard.append(n + ": " + txt[:40])
+    check("마크업 표에 지어낸 행이 없다", hard == [], [], hard[:6])
+
+    # ④ 화면이 스스로 세는 큰 수를 마크업에 박아두지 않는다.
+    #    콤마가 들어간 4자리 이상 숫자는 서버가 주는 값이지 화면이 아는 값이 아니다.
+    #    (버전·연도·전화번호 오탐을 피하려 콤마 형식만 본다)
+    baked = []
+    for n, s_ in screens():
+        body = _re13.sub(r"<script[\s\S]*?</script>", "", s_)
+        body = _re13.sub(r"<!--[\s\S]*?-->", "", body)          # 주석 속 설명은 봐준다
+        for m in _re13.finditer(r">\s*([0-9]{1,3}(?:,[0-9]{3})+)\s*<", body):
+            baked.append(n + ":" + m.group(1))
+    check("마크업에 콤마 숫자를 박아두지 않는다", baked == [], [], baked[:8])
+
+    # ⑤ 서버가 준 값만 쓴다는 계약이 살아 있는가 — 실패 시 이유를 말하는 화면 수
+    honest = [n for n, s_ in screens()
+              if ("연결 안 됨" in s_ or "원천 준비 중" in s_
+                  or "서버에 연결" in s_)]
+    check("실패를 사실대로 말하는 화면이 있다", len(honest) >= 20, ">= 20", len(honest))
+    drift("honest_fallback_screens", len(honest))
+
 def test_screen_assets():
     print("\n[30] 화면 자산 — 참조한 CSS·JS가 실제로 있는가 (슬라이스 100)")
     # 사용자 지적("이 화면은 디자인이 반영이 안된건가?")으로 찾았다.
@@ -3815,6 +3896,7 @@ def main():
                test_reprice,
                test_template_usage,
                test_charts_and_choices,
+               test_no_fabricated_data,
                test_usage_floor_admin,
                test_margin_policy,
                test_password_auth,

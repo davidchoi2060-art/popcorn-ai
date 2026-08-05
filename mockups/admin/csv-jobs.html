@@ -264,115 +264,18 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">일괄 등록 이력</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">일괄 등록 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-040</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
-          <p class="text-body-tertiary mb-0">배치의 결과와 되돌리기. <b class="text-body-secondary">취소해도 원본은 보존</b>되고 정본 반영분만 롤백됩니다.</p></div>
+          <div><h2 class="mb-1">일괄 등록 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-040</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
+          <p class="text-body-tertiary mb-0">배치가 언제 무엇을 몇 건 넣었는지의 기록입니다. <b class="text-body-secondary">배치 되돌리기는 없습니다</b> — 잘못 들어간 값은 상품 상세에서 고칩니다.</p></div>
           <a href="csv-upload.html" class="btn btn-primary btn-sm">+ 새 일괄 등록</a>
         </div>
-        <div id="cards"></div>
-        <!-- liveSys: 슬라이스 32의 "원천 준비 중" 표시. 슬라이스 45에서 적재 원장이
-     실제로 생겼으므로 쓰지 않는다(사유 대신 사실을 보여준다). -->
-        <div id="liveSys" hidden class="mt-4"></div>
+        <!-- 요청 전 상태 = '불러오는 중'. 서버 응답이 오면 아래 LIVE 스크립트가 통째로 덮어쓴다. -->
+        <div id="cards"><div class="card"><div class="card-body text-center text-body-tertiary py-4">불러오는 중…</div></div></div>
+        <!-- 슬라이스 32의 liveSys("원천 준비 중" 사유 표시)는 이 화면에서 제거했다.
+     슬라이스 45에서 적재 원장이 실제로 생겼는데도 그 블록이 살아 있어, 서버가 붙으면
+     위의 실배치 목록 아래에 "아직 기록이 쌓이는 경로가 없습니다"를 함께 띄우거나
+     같은 배치를 다른 서식으로 한 번 더 그렸다. 사유와 사실이 동시에 보이면 거짓말이다. -->
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>
-      (function(){
-        function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        let B=[
-          ["213","용산도매_입고_0713.xlsx","오늘 09:15 · 김운영","5,214행",["완료","primary"],"신규 1,847 · 갱신 3,102 · 가격추가 262 · 오류 3 · 검수 38 · 잠금무시 2",true],
-          ["212","다나와_시세_0712.csv","어제 14:02 · david","3,882행",["오류 2행","warning"],"갱신 3,880 · 오류 2 (형식)",true],
-          ["211","용산도매_입고_0709.xlsx","07-09 · 김운영","5,120행",["완료","primary"],"신규 210 · 갱신 4,899 · 검수 11",false],
-          ["208","용산도매_입고_0702.xlsx","07-02 · 김운영","5,088행",["완료","primary"],"갱신 5,020 · 검수 renew 9",false]
-        ];
-        function render(){
-          document.getElementById("cards").innerHTML=B.map((b,i)=>`
-            <div class="card mb-3"><div class="card-body">
-              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-                <div>
-                  <span class="badge badge-phoenix badge-phoenix-${b[4][1]} me-2">${b[4][0]}</span><b class="text-body-highlight">배치 #${b[0]}</b> — ${b[1]}
-                  <br><span class="fs-10 text-body-tertiary">${b[2]} · ${b[3]}</span>
-                  <br><span class="fs-9 text-body-secondary">${b[5]}</span>
-                </div>
-                <div class="d-flex gap-2">
-                  <a href="imports.html" class="btn btn-sm btn-phoenix-secondary">원본 보기</a>
-                  ${b[6]?`<button class="btn btn-sm btn-phoenix-danger" data-c="${i}">배치 취소</button>`:`<span class="fs-10 text-body-quaternary align-self-center">취소 가능 기간 지남(72h)</span>`}
-                </div>
-              </div>
-            </div></div>`).join("");
-          document.querySelectorAll("[data-c]").forEach(btn=>btn.onclick=()=>{
-            const i=+btn.dataset.c;B[i][4]=["취소됨","secondary"];B[i][6]=false;B[i][5]+=" — 정본 반영분 롤백, 원본 보존";
-            toast(`배치 #${B[i][0]} 취소 — 정본 롤백 완료 · 원본 보존 · 작업 기록 저장`);render();
-          });
-        }
-        render();if(window.feather)feather.replace();
-      })();
-      </script>
-      <script>
-      (function(){
-        // ---- LIVE (슬라이스 32) — 실집계가 가능한 것만 실값. 원천이 없는 화면은 값 대신
-        // '원천 부재 + 사유'를 보여준다(0건과 원천 부재는 다르다).
-        var SCREEN = "imports";
-        function card(title, sub, body, tone){
-          return '<div class="card mb-3' + (tone ? ' border-' + tone : '') + '"><div class="card-body">'
-            + '<h5 class="mb-1">' + title + '</h5>'
-            + '<p class="fs-9 text-body-tertiary mb-3">' + sub + '</p>' + body + '</div></div>';
-        }
-        function emptyCard(title, reason){
-          return card(title + ' <span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">원천 준비 중</span>',
-            '아직 기록이 쌓이는 경로가 없습니다 — 숫자를 지어내지 않고 사유를 밝힙니다.',
-            '<p class="fs-9 text-body-secondary mb-0">' + reason + '</p>', 'warning');
-        }
-        function fmt(iso){ if(!iso) return '—'; var d=new Date(iso);
-          return (d.getMonth()+1) + '-' + String(d.getDate()).padStart(2,'0'); }
-
-        fetch("/api/admin/system")
-          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-          .then(function(d){
-            var host = document.getElementById("liveSys"), html = "";
-            if(SCREEN === "operators"){
-              var rows = d.operators.rows.map(function(o){
-                return '<tr><td><b>' + o.name + '</b><div class="fs-10 text-body-tertiary">' + o.email + '</div></td>'
-                  + '<td><span class="badge badge-phoenix badge-phoenix-primary">' + o.role_label + '</span></td>'
-                  + '<td class="text-end">' + o.acts.toLocaleString() + '</td>'
-                  + '<td class="text-end">' + o.acts7.toLocaleString() + '</td>'
-                  + '<td class="text-body-tertiary">' + fmt(o.last_at) + '</td>'
-                  + '<td><span class="badge badge-phoenix badge-phoenix-secondary">' + o.status + '</span></td></tr>';
-              }).join('');
-              html += card('등록된 운영자 <span class="badge badge-phoenix badge-phoenix-primary fs-10 align-middle">실데이터</span>',
-                '작업량은 작업 기록(감사 로그) 기준 실집계입니다.',
-                '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">'
-                + '<thead><tr class="text-body-tertiary"><th>계정</th><th>권한</th><th class="text-end">전체 작업</th>'
-                + '<th class="text-end">최근 7일</th><th>마지막 활동</th><th>상태</th></tr></thead><tbody>'
-                + rows + '</tbody></table></div>'
-                + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + d.operators.note + '</p>');
-            } else if(SCREEN === "ai"){
-              html += emptyCard('AI 사용량 · 비용', d.ai_cost.reason);
-            } else {
-              if(d.imports.empty){
-                html += emptyCard('일괄 등록 이력', d.imports.reason);
-              } else {
-                html += card('적재 배치', '최근 20건',
-                  '<div class="table-responsive"><table class="table table-sm fs-9 mb-0"><tbody>'
-                  + d.imports.rows.map(function(j){
-                      return '<tr><td>#' + j.job_id + '</td><td>' + j.file + '</td>'
-                        + '<td class="text-end">' + j.total + '행</td><td>' + j.status + '</td></tr>';
-                    }).join('') + '</tbody></table></div>');
-              }
-            }
-            host.innerHTML = html;
-            host.hidden = false;
-            var b = document.getElementById("dataSrc");
-            if(SCREEN === "operators"){
-              b.textContent = "실데이터 · Cloud SQL";
-              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
-            } else {
-              b.textContent = "원천 준비 중 — 아래 사유 참조";
-              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
-            }
-            if(window.feather) feather.replace();
-          })
-          .catch(function(){});
-      })();
-      </script>
       <script>
       (function(){
         // ---- LIVE (슬라이스 45) — 일괄 등록 이력 실배선.
@@ -391,11 +294,8 @@
         }
 
         function paint(d){
-          LIVE = true;
-          badge.textContent = "실데이터 · Cloud SQL";
-          badge.classList.remove("badge-phoenix-secondary");
-          badge.classList.add("badge-phoenix-primary");
-
+          // 배지·LIVE는 **다 그린 뒤에** 세운다(아래). 먼저 세우면 렌더가 중간에 죽었을 때
+          // '실데이터 · Cloud SQL'이라 써 놓고 본문엔 '불러오는 중…'이 남는다.
           var s = d.summary;
           var head = '<div class="card mb-3"><div class="card-body">'
             + '<div class="row g-3 text-center">'
@@ -407,7 +307,7 @@
             + '<div class="fs-10 text-body-tertiary">적재 배치</div></div>'
             + '<div class="col-6 col-md-3"><div class="fs-7 fw-bold text-warning">' + n(s.review) + '</div>'
             + '<div class="fs-10 text-body-tertiary">검수 회부(합)</div></div>'
-            + '</div><p class="fs-10 text-body-quaternary mb-0 mt-3">' + d.note + '</p>'
+            + '</div><p class="fs-10 text-body-quaternary mb-0 mt-3">' + (d.note || "") + '</p>'
             + '</div></div>';
 
           var cards = d.items.map(function(b){
@@ -438,14 +338,51 @@
           }).join("");
 
           host.innerHTML = head + (cards || '<div class="card"><div class="card-body '
-            + 'text-body-tertiary fs-9">적재 배치가 없습니다.</div></div>');
+            + 'text-body-tertiary fs-9">적재된 배치가 없습니다 — 서버가 답한 배치 이력이 '
+            + '0건입니다(불러오기 실패가 아닙니다).</div></div>');
+          LIVE = true;
+          if(badge){
+            badge.textContent = "실데이터 · Cloud SQL";
+            badge.classList.remove("badge-phoenix-secondary");
+            badge.classList.add("badge-phoenix-primary");
+          }
           if(window.feather) feather.replace();
+        }
+
+        // 실패 표시 — 숫자를 지어내지 않는다. 요약은 '—', 목록은 못 불러온 사유 한 줄.
+        // (원천은 있고 못 불러온 것이므로 '원천 준비 중'이 아니라 '연결 안 됨'이다)
+        function fail(badgeText, line){
+          if(badge){
+            badge.textContent = badgeText || "연결 안 됨";
+            badge.classList.remove("badge-phoenix-secondary");
+            badge.classList.remove("badge-phoenix-primary");
+            badge.classList.add("badge-phoenix-warning");
+          }
+          if(!host) return;
+          host.innerHTML = '<div class="card mb-3"><div class="card-body">'
+            + '<div class="row g-3 text-center">'
+            + '<div class="col-6 col-md-3"><div class="fs-7 fw-bold">—</div>'
+            + '<div class="fs-10 text-body-tertiary">현재 카탈로그</div></div>'
+            + '<div class="col-6 col-md-3"><div class="fs-7 fw-bold">—</div>'
+            + '<div class="fs-10 text-body-tertiary">실데이터 / 데모</div></div>'
+            + '<div class="col-6 col-md-3"><div class="fs-7 fw-bold">—</div>'
+            + '<div class="fs-10 text-body-tertiary">적재 배치</div></div>'
+            + '<div class="col-6 col-md-3"><div class="fs-7 fw-bold">—</div>'
+            + '<div class="fs-10 text-body-tertiary">검수 회부(합)</div></div>'
+            + '</div></div></div>'
+            + '<div class="card"><div class="card-body text-center text-body-tertiary py-4">'
+            + (line || '서버에 연결되지 않아 불러오지 못했습니다.') + '</div></div>';
         }
 
         fetch("/api/admin/import-jobs")
           .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-          .then(paint)
-          .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
+          .then(function(d){
+            // 응답이 와도 모양이 다르면 그리다 죽는다. 그때 '불러오는 중…'을 남기지 않고
+            // 못 그렸다고 말한다(값을 채워 넣지 않는다).
+            try { paint(d); }
+            catch(e){ if(!LIVE) fail("표시 실패", "서버 응답을 읽지 못했습니다 — 숫자를 지어내지 않고 비워 둡니다."); }
+          })
+          .catch(function(){ if(!LIVE) fail(); });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
