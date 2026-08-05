@@ -2140,8 +2140,13 @@ def test_screen_assets():
     import glob as _g7
     import re as _re7
 
-    # Phoenix 템플릿이 남긴 RTL 시트는 원래 없다(dir=rtl일 때만 쓰는 것) — 별건으로 둔다.
-    IGNORE = ("theme-rtl.min.css", "user-rtl.min.css")
+    # **예전엔 RTL 시트를 예외로 뒀다** — "dir=rtl일 때만 쓰는 것"이라 여겼기 때문이다.
+    # 2026-08-05 브라우저에서 열어 보니 **틀렸다**: 평범한 <link>라 브라우저가 항상
+    # 받아오고 항상 404였다(36화면 × 2). Phoenix는 LTR/RTL 두 벌을 다 싣고 쓰지 않는
+    # 쪽을 *불러온 뒤* disable 하는 구조인데, 우리는 RTL 시트를 가져오지 않았다.
+    # 그 소음이 **진짜 404를 가린다** — 이 검사가 태어난 이유가 바로 그것이었다.
+    # 지금은 링크·전환 스크립트·설정 토글을 전부 걷어냈으므로 예외를 없앤다.
+    IGNORE = ()
     missing = []
     for _p in (sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
                + sorted(_g7.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
@@ -2157,6 +2162,61 @@ def test_screen_assets():
             if not os.path.exists(os.path.normpath(os.path.join(base, rel))):
                 missing.append(f"{_n} -> {rel}")
     check("화면이 참조하는 CSS·JS가 실제로 있다", not missing, "전부 존재", missing[:5])
+
+    # ── 브라우저에서 실제로 열어 잡은 것들 (2026-08-05) ────────────────
+    _screens = [(_p, io.open(_p, encoding="utf-8").read())
+                for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+                if not os.path.basename(_p).startswith("_")]
+
+    # ① RTL 잔재가 돌아오지 않는가. 링크만 지우면 인라인 스크립트가 null 에
+    #    setAttribute 를 걸어 **TypeError** 가 난다(실제로 그렇게 됐다) — 셋을 함께 본다.
+    _rtl = [os.path.basename(p) for p, s in _screens
+            if "rtl.min.css" in s or "phoenixIsRTL" in s or "style-rtl" in s]
+    check("RTL 잔재가 없다(링크·전환 스크립트·설정 토글)", _rtl == [], [], _rtl[:5])
+
+    # ② 아이콘 하나 때문에 외부 폰트 CDN을 받지 않는다.
+    #    글리프 7종을 쓰려고 37화면이 unicons 를 통째로 받고 있었다 — 망이 막히면 사라진다.
+    _uni = [os.path.basename(p) for p, s in _screens
+            if "unicons.iconscout.com" in s or "uil-" in s]
+    check("unicons(외부 아이콘 CDN)를 쓰지 않는다", _uni == [], [], _uni[:5])
+
+    # ③ **feather 를 싣지 않는 화면**은 `_map.json` 에 있는 이름만 쓸 수 있다.
+    #    su-icons 는 매핑이 없으면 그냥 지나치므로 아이콘이 **조용히 사라진다**.
+    _mp = json.load(io.open(os.path.join(ROOT, "mockups", "shared", "icons", "su",
+                                         "_map.json"), encoding="utf-8"))
+    _keys = set(_mp) if isinstance(_mp, dict) else set(_mp)
+    _ghost_icon = []
+    for p, s in _screens:
+        if "feather.min.js" in s:
+            continue
+        for nm in sorted(set(_re7.findall(r'data-feather="([a-z-]+)"', s))):
+            if ("ft-" + nm) not in _keys:
+                _ghost_icon.append(os.path.basename(p) + ":" + nm)
+    check("feather 없는 화면은 매핑된 아이콘만 쓴다", _ghost_icon == [], [], _ghost_icon[:5])
+
+    # ④ 유령 List 를 막는 순서. `ui-list.js` 의 sweep 은 docReady 에 돌아
+    #    `phoenix.js` 의 listInit 보다 **먼저** [data-list] 를 걷어내야 한다.
+    #    뒤에 오면 list.js 가 0건 표에서 예외를 던지고(36화면에서 실제로 터졌다),
+    #    이 프로젝트는 uncaught 예외가 뒤따르는 초기화를 죽이는 사고를 이미 겪었다.
+    _ui = io.open(os.path.join(ROOT, "mockups", "shared", "ui-list.js"),
+                  encoding="utf-8").read()
+    check("ui-list.js 가 로드 시 유령을 걷어낸다",
+          "function sweep" in _ui and "DOMContentLoaded" in _ui, True,
+          "function sweep" in _ui and "DOMContentLoaded" in _ui)
+    # **셸 검색창은 대상이 아니다.** 그것도 `data-list` 지만 실제 항목(바로가기 5개)이
+    # 있어 정상 초기화된다 — 예외를 던지는 것은 fetch 뒤에 채우는 **빈 표**뿐이다.
+    # 처음엔 `data-list` 있는 화면 전부를 요구했다가 23화면을 오탐으로 잡았다.
+    _own_list = _re7.compile(r'<[^>]*\bdata-list=(?:(?!>)[^>])*>')
+    _order = []
+    for p, s in _screens:
+        mine = [m.group(0) for m in _own_list.finditer(s) if "search-box" not in m.group(0)]
+        if not mine:
+            continue                      # 셸 검색창만 있는 화면 — 헬퍼가 필요 없다
+        a, b = s.find("ui-list.js"), s.find("phoenix.js")
+        if a < 0 or b < 0 or a > b:
+            _order.append(os.path.basename(p))
+    check("표를 가진 화면은 ui-list.js 를 phoenix.js 보다 먼저 싣는다",
+          _order == [], [], _order[:5])
 
     # 스타일이 안 먹으면 화면은 뜨지만 읽을 수 없는 상태가 된다 — 테마를 싣는지 본다
     noTheme = []

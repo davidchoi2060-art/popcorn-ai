@@ -154,5 +154,42 @@
     return host.__list;
   }
 
-  w.popcornList = { wire: wire, toNum: toNum, activeSort: activeSort };
+  /* ⑥ 유령을 **Phoenix 보다 먼저** 없앤다 (2026-08-05 — 브라우저에서 실제로 잡은 것)
+   *
+   * ①의 `exorcise` 는 `wire()` 안에서 돈다. 그런데 `wire()` 는 **fetch 응답 뒤**에
+   * 불리고, `phoenix.js` 의 `listInit` 은 그보다 훨씬 앞선 docReady 에 이미
+   * `[data-list]` 를 훑어 간다. 그래서 ①은 유령을 **뒤늦게** 걷어낼 뿐, 유령이
+   * 태어나는 것 자체를 막지 못했다.
+   *
+   * 그 사이에 실제로 나던 일: 셸의 검색창(`navbar-top-search-box`)은 더미 결과를
+   * 걷어낸 뒤로 항상 0건인데, list.js 는 **0건이면 예외를 던진다**
+   *   "The list needs to have at least one item on init..."
+   * 전 36화면에서 로드마다 uncaught 로 터지고 있었다. 지금은 아이콘·트리뷰가
+   * 살아 있어 눈에 안 띄지만, 이 프로젝트는 **uncaught 예외가 뒤따르는 초기화를
+   * 통째로 죽이는** 사고를 이미 겪었다(슬라이스 58 — 죽은 줄 모르고 다른 구성이
+   * 장바구니에 담겼다).
+   *
+   * `ui-list.js` 는 `<head>`(3번째), `phoenix.js` 는 문서 끝(13번째)이라 여기서 먼저
+   * 건 리스너가 **먼저** 돈다 — 유령이 태어나기 전에 표식을 뗀다.
+   *
+   * **행이 이미 있는 표는 건드리지 않는다** — 서버가 그려 보낸 표라면 Phoenix 가
+   * 정상으로 처리하는 게 맞다. 우리 표는 전부 fetch 뒤에 그리므로 이때는 비어 있다.
+   */
+  function sweep() {
+    var hosts = d.querySelectorAll('[data-list]');
+    for (var i = 0; i < hosts.length; i++) {
+      var body = hosts[i].querySelector('.list');
+      if (body && body.children.length) continue;
+      hosts[i].classList.add('table-list');      // ② 정렬 화살표 CSS 는 살린다
+      hosts[i].removeAttribute('data-list');
+    }
+  }
+
+  if (d.readyState === 'loading') {
+    d.addEventListener('DOMContentLoaded', sweep);
+  } else {
+    sweep();                                     // 이미 늦었으면 지금이라도 (wire 가 뒤를 받는다)
+  }
+
+  w.popcornList = { wire: wire, toNum: toNum, activeSort: activeSort, sweep: sweep };
 })(window, document);

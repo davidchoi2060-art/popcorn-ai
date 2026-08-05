@@ -9,7 +9,6 @@
     <script src="assets/js/config.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800;900&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
@@ -34,9 +33,9 @@
             <!-- 소셜 신원 확인 (1단계) -->
             <div class="d-grid gap-2 mb-3">
               <button id="btnGoogle" class="btn btn-phoenix-secondary d-flex flex-center gap-2" type="button">
-                <span class="uil uil-google fs-8"></span>구글 계정으로 계속</button>
+                구글 계정으로 계속</button>
               <button id="btnKakao" class="btn btn-phoenix-secondary d-flex flex-center gap-2" type="button">
-                <span class="uil uil-comment-alt-message fs-8"></span>카카오톡으로 계속</button>
+                <span class="icon-feather fs-8" data-feather="message-square"></span>카카오톡으로 계속</button>
             </div>
 
             <div class="position-relative my-4"><hr class="bg-body-secondary"><div class="divider-content-center bg-body">또는</div></div>
@@ -77,16 +76,16 @@
 
             <!-- 결과 상태 (예외 UI 미리 마크업) -->
             <div id="stPending" hidden class="alert alert-warning mt-4 mb-0 p-3">
-              <h6 class="alert-heading mb-1"><span class="uil uil-clock me-1"></span>승인 대기</h6>
+              <h6 class="alert-heading mb-1"><span class="icon-feather me-1" data-feather="clock"></span>승인 대기</h6>
               <p class="fs-9 mb-0" id="pendingMsg">신청이 접수됐습니다 — 관리자 승인 후 이용할 수 있습니다.</p>
               <p class="fs-10 mb-0 mt-2">승인 전에는 어떤 데이터도 보이지 않습니다(빈 화면이 아니라 접근 차단입니다).</p>
             </div>
             <div id="stError" hidden class="alert alert-danger mt-4 mb-0 p-3">
-              <h6 class="alert-heading mb-1"><span class="uil uil-exclamation-octagon me-1"></span>로그인할 수 없습니다</h6>
+              <h6 class="alert-heading mb-1"><span class="icon-feather me-1" data-feather="alert-octagon"></span>로그인할 수 없습니다</h6>
               <p class="fs-9 mb-0" id="errorMsg">—</p>
             </div>
             <div id="stOk" hidden class="alert alert-primary mt-4 mb-0 p-3">
-              <h6 class="alert-heading mb-1"><span class="uil uil-check-circle me-1"></span>로그인 완료</h6>
+              <h6 class="alert-heading mb-1"><span class="icon-feather me-1" data-feather="check-circle"></span>로그인 완료</h6>
               <p class="fs-9 mb-0" id="okMsg">—</p>
             </div>
           </div></div>
