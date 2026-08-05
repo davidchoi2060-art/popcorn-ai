@@ -344,6 +344,22 @@
                 <button class="btn btn-phoenix-danger btn-sm py-0 px-2 fs-10" type="button" id="btnDelCat" hidden>삭제</button>
               </div>
             </div>
+            <!-- 마진 — 이 분류를 고르는 자리에서 정한다. 적용값과 **출처**를 함께 보인다:
+                 숫자만 보이면 이 노드에 값이 걸린 줄 알고, 지우려 해도 지울 게 없다. -->
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2" id="marginBar" hidden>
+              <span class="fs-10 text-body-tertiary">마진</span>
+              <span class="badge badge-phoenix badge-phoenix-info fs-10" data-bind="margin_effective" id="mgEff">—</span>
+              <span class="fs-10 text-body-tertiary" data-bind="margin_source" id="mgSrc">—</span>
+              <div class="ms-auto d-flex align-items-center gap-1">
+                <div class="input-group input-group-sm" style="width:8.5rem;">
+                  <input class="form-control form-control-sm" id="mgInput" type="number" step="0.1" min="0" max="99" placeholder="예: 12.5" aria-label="이 분류 마진율(퍼센트)">
+                  <span class="input-group-text fs-10">%</span>
+                </div>
+                <button class="btn btn-phoenix-primary btn-sm py-0 px-2 fs-10" type="button" id="btnMgSet" data-action="set-margin">정하기</button>
+                <button class="btn btn-phoenix-secondary btn-sm py-0 px-2 fs-10" type="button" id="btnMgClear" data-action="clear-margin" hidden>지우기</button>
+              </div>
+            </div>
+            <p class="fs-10 text-body-tertiary mb-0 mt-1" id="mgNote" hidden></p>
             <div class="d-flex flex-wrap align-items-end gap-2 mt-2">
               <div style="min-width:14rem;">
                 <label class="form-label fs-10 mb-1" for="fQ">상품명 · 상품코드</label>
@@ -490,7 +506,7 @@
   var fb     = document.getElementById("fallback");
   var src    = document.getElementById("dataSrc");
 
-  var CATS = null, CATNOTE = null, PARTS = [];
+  var CATS = null, CATNOTE = null, PARTS = [], MGNOTE = null;
   var SEL_CAT = null, EDIT = null, modal = null;
   var BULK = null, LAST_LOG = null;
   var PAGE = { page: 1, size: 100, pages: 1, total: 0 };
@@ -700,9 +716,52 @@
     document.getElementById("paneTitle").textContent = c ? c.name : "—";
     document.getElementById("btnEditCat").hidden = false;
     document.getElementById("btnDelCat").hidden = false;
+    paintMargin(c);
     markSelected();
     return loadProducts();
   }
+
+  // ── 마진 ────────────────────────────────────────────────────────────
+  // 서버가 준 세 값을 그대로 쓴다(margin_effective · margin_rate · margin_source).
+  // 화면이 상속을 다시 계산하지 않는다 — 두 곳에서 계산하면 갈라진다.
+  function paintMargin(c){
+    var bar = document.getElementById("marginBar");
+    if(!c){ bar.hidden = true; return; }
+    bar.hidden = false;
+    document.getElementById("mgEff").textContent =
+      c.margin_effective == null ? "—" : (c.margin_effective * 100).toFixed(1) + "%";
+    document.getElementById("mgSrc").textContent = c.margin_source || "";
+    document.getElementById("mgInput").value =
+      c.margin_rate == null ? "" : (c.margin_rate * 100).toFixed(1);
+    document.getElementById("btnMgClear").hidden = (c.margin_rate == null);
+    var note = document.getElementById("mgNote");
+    if(MGNOTE){ note.textContent = MGNOTE.replace(/\*\*/g, ""); note.hidden = false; }
+  }
+
+  function saveMargin(rate){
+    if(SEL_CAT == null) return;
+    return api("PUT", "/api/admin/categories/" + SEL_CAT + "/margin",
+               {margin_rate: rate})
+      .then(function(d){
+        toast(d.verdict + (d.products ? " — 하위까지 " + n(d.products) + "건" : ""));
+        return loadTree(true).then(function(){
+          paintMargin(CATS.filter(function(x){ return x.category_id === SEL_CAT; })[0]);
+        });
+      })
+      .catch(function(e){ toast(e.message); });
+  }
+
+  document.getElementById("btnMgSet").addEventListener("click", function(){
+    var v = document.getElementById("mgInput").value.trim();
+    if(v === ""){ toast("마진율을 입력하세요"); return; }
+    var pct = parseFloat(v);
+    if(!(pct >= 0 && pct < 100)){ toast("마진율은 0 이상 100 미만이어야 합니다"); return; }
+    saveMargin(pct / 100);
+  });
+
+  document.getElementById("btnMgClear").addEventListener("click", function(){
+    saveMargin(null);      // null = 이 분류의 값을 지우고 상위를 따른다
+  });
 
   // ── 로드 ────────────────────────────────────────────────────────────
   function loadTree(keep){
@@ -710,6 +769,7 @@
       CATS = d.items || [];
       PARTS = d.part_types || [];
       CATNOTE = d.note;
+      MGNOTE = d.margin_note;
       if(d.note){
         var a = document.getElementById("axisNote");
         a.textContent = d.note.replace(/\*\*/g, "");

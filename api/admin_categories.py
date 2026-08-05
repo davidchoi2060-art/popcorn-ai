@@ -25,12 +25,27 @@ from sqlalchemy import text
 from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
+from .pricing import margin_source_text, resolve_margins
 from .taxonomy import DISPLAY_LABELS, PART_LABELS, display_labels, expand_display
 from .timeutil import iso
 
 router = APIRouter(prefix="/api/admin")
 
 MAX_NAME = 80
+
+
+def _margins(conn, rows):
+    """노드별 적용 마진 — 자기 노드 → 조상 → 전역(pricing_settings).
+
+    공식·상속 규칙은 `pricing`이 단일 원천이다. 여기서 다시 계산하지 않는다.
+    """
+    default = float(conn.execute(text(
+        "SELECT margin_rate FROM pricing_settings"
+        " ORDER BY effective_from DESC LIMIT 1")).scalar() or 0)
+    own = {r[0]: float(r[1]) for r in conn.execute(text(
+        "SELECT category_id, margin_rate FROM category_margin_policies"))}
+    eff = resolve_margins([(r["category_id"], r["parent_id"]) for r in rows], own, default)
+    return own, eff, default
 
 
 def _owner():
@@ -123,6 +138,8 @@ def categories():
             "SELECT count(*) FROM products WHERE category_id IS NULL")).scalar()
         unmapped_live = conn.execute(text(
             "SELECT count(*) FROM products WHERE category_id IS NULL AND stock_qty > 0")).scalar()
+        own_margin, eff_margin, default_margin = _margins(conn, rows)
+    names = {r["category_id"]: r["name"] for r in rows}
     items = [{
         "category_id": r["category_id"], "parent_id": r["parent_id"], "name": r["name"],
         "sort_order": r["sort_order"], "is_visible": r["is_visible"],
@@ -133,6 +150,12 @@ def categories():
         "product_count": r["n"], "subtree_count": r["n_sub"],
         "in_stock_count": r["n_stock"],
         "violations": viol.get(r["category_id"], 0),
+        # 마진 — **세 값을 구분해서 준다.** 적용값만 주면 운영자는 이 노드에 값이
+        # 걸린 줄 알고, 지우려 해도 지울 게 없다(상속이면 조상에 걸려 있다).
+        "margin_rate": own_margin.get(r["category_id"]),          # 이 노드에 직접 건 값(없으면 null)
+        "margin_effective": eff_margin[r["category_id"]][0],       # 실제 적용되는 값
+        "margin_source": margin_source_text(
+            eff_margin[r["category_id"]][1], r["category_id"], names),
         "created_at": iso(r["created_at"]), "updated_at": iso(r["updated_at"]),
     } for r in rows]
     return {
@@ -141,6 +164,9 @@ def categories():
         # 고르는 자리는 **표시 종류 16종**이다(쿨러 하나 — 사용자 결정 2026-08-05).
         # 저장은 `_clean_types`가 실제 part_type으로 푼다.
         "part_types": [{"key": k, "label": v} for k, v in DISPLAY_LABELS.items()],
+        "default_margin": default_margin,
+        "margin_note": ("마진은 **다음 재산정부터** 쓰입니다 — 분류를 옮겨도 저장된"
+                        " 판매가는 그 자리에서 바뀌지 않습니다."),
         "note": ("카테고리는 **판매 탐색 축**입니다 — 엔진(견적)은 이 표를 읽지 않습니다."
                  " 카테고리를 옮겨도 견적 결과는 달라지지 않습니다."),
     }
@@ -282,3 +308,77 @@ def remove(cid: int):
         conn.execute(text("DELETE FROM categories WHERE category_id=:i"), {"i": cid})
         _log(conn, "카테고리 삭제", str(cid), {"name": cur["name"]}, kind="category")
     return {"verdict": f"'{cur['name']}' 카테고리를 지웠습니다"}
+
+
+# ── 마진 정책 ─────────────────────────────────────────────────────────
+# 이 트리가 마진을 정한다(2026-08-05). 예전엔 `category_margin_policies`가 자유
+# 문자열 키에 0행이었고 어느 화면도 저장하지 않았다 — 표만 있고 이어지지 않은
+# 죽은 테이블이었다. 이제 노드에 걸고 아래로 상속시킨다.
+
+class MarginBody(BaseModel):
+    margin_rate: float | None = None      # null = 이 노드의 값을 지운다(상속으로 되돌림)
+
+
+def _subtree_products(conn, cid: int) -> int:
+    """이 노드가 마진을 정하게 되는 상품 수 — 자손까지 센다."""
+    return conn.execute(text(
+        "SELECT count(*) FROM products WHERE category_id IN ("
+        "  WITH RECURSIVE t AS ("
+        "    SELECT category_id FROM categories WHERE category_id = :i"
+        "    UNION ALL"
+        "    SELECT c.category_id FROM categories c JOIN t ON c.parent_id = t.category_id"
+        "  ) SELECT category_id FROM t)"), {"i": cid}).scalar()
+
+
+@router.put("/categories/{cid}/margin")
+def set_margin(cid: int, body: MarginBody):
+    """노드에 마진을 걸거나(값) 지운다(null → 상속으로 되돌림).
+
+    **판매가를 여기서 바꾸지 않는다.** 다음 재산정에서 쓰인다 — 응답이 그 사실과
+    영향을 받는 상품 수를 함께 말한다. 값만 저장하고 조용히 있으면 운영자는
+    가격이 이미 바뀐 줄 안다.
+    """
+    _owner()
+    r = body.margin_rate
+    if r is not None and not (0 <= float(r) < 1):
+        raise HTTPException(400, "마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)")
+
+    with engine.begin() as conn:
+        cur = conn.execute(text(
+            "SELECT name FROM categories WHERE category_id=:i"), {"i": cid}).mappings().first()
+        if cur is None:
+            raise HTTPException(404, "카테고리를 찾을 수 없습니다")
+        before = conn.execute(text(
+            "SELECT margin_rate FROM category_margin_policies WHERE category_id=:i"),
+            {"i": cid}).scalar()
+
+        if r is None:
+            if before is None:
+                raise HTTPException(400, "이 분류에 직접 걸린 마진이 없습니다")
+            conn.execute(text(
+                "DELETE FROM category_margin_policies WHERE category_id=:i"), {"i": cid})
+        else:
+            conn.execute(text(
+                "INSERT INTO category_margin_policies (category_id, margin_rate, updated_at)"
+                " VALUES (:i, :m, now())"
+                " ON CONFLICT (category_id) DO UPDATE SET"
+                "   margin_rate = EXCLUDED.margin_rate, updated_at = now()"),
+                {"i": cid, "m": float(r)})
+
+        n = _subtree_products(conn, cid)
+        _log(conn, "카테고리 마진", str(cid),
+             {"name": cur["name"], "from": float(before) if before is not None else None,
+              "to": float(r) if r is not None else None, "products": n}, kind="price")
+
+    if r is None:
+        return {"verdict": f"'{cur['name']}' 마진을 지웠습니다 — 상위 분류를 따릅니다",
+                "products": n,
+                "note": ("**판매가는 지금 바뀌지 않습니다.**"
+                         " 반영하려면 [판매가 재산정](reprice.html)에서 미리보기 후 확인하세요."),
+                "reprice_href": "reprice.html"}
+    return {"verdict": f"'{cur['name']}' 마진을 {float(r) * 100:.1f}%로 정했습니다",
+            "products": n,
+            "note": (f"이 분류와 하위의 **{n:,}건**이 다음 재산정에서 이 마진을 씁니다."
+                     " **판매가는 지금 바뀌지 않습니다** —"
+                     " [판매가 재산정](reprice.html)에서 미리보기 후 확인하세요."),
+            "reprice_href": "reprice.html"}

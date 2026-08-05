@@ -43,9 +43,13 @@ def engine_rules():
         s = conn.execute(text(
             "SELECT card_fee_rate, margin_rate, effective_from FROM pricing_settings"
             " ORDER BY effective_from DESC LIMIT 1")).mappings().first()
+        # 마진 정책은 이제 **판매 분류 노드**에 걸린다(0030). 예전엔 자유 문자열
+        # 키에 0행이었고 어느 화면도 저장하지 않았다 — 죽은 표였다.
         cat_rows = conn.execute(text(
-            "SELECT category, margin_rate, updated_at FROM category_margin_policies"
-            " ORDER BY category")).mappings().all()
+            "SELECT c.name AS category, m.margin_rate, m.updated_at"
+            "  FROM category_margin_policies m"
+            "  JOIN categories c ON c.category_id = m.category_id"
+            " ORDER BY c.sort_order, c.name")).mappings().all()
         weights = conn.execute(text(
             "SELECT key, weight, updated_at FROM policy_weights ORDER BY key")).mappings().all()
         pool = conn.execute(text(
@@ -198,39 +202,8 @@ def save_pricing(body: PricingBody):
             "reprice_href": "reprice.html"}
 
 
-class CategoryMarginBody(BaseModel):
-    items: list[dict]             # [{category, margin_rate}]
-
-
-@router.post("/category-margins")
-def save_category_margins(body: CategoryMarginBody):
-    """카테고리별 마진 — **엔진은 아직 이 값을 쓰지 않는다.**
-
-    화면에 표가 있어 저장할 곳은 만들어 두되, 가격 산정은 여전히 전역 margin_rate를
-    쓴다. 쓰지 않는 값을 '적용됩니다'라고 말하면 그게 거짓이므로 응답이 밝힌다.
-    """
-    from .admin_orders import _log
-    from .auth import current_operator
-
-    me = current_operator() or {}
-    if me.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 바꿀 수 있습니다")
-    for it in body.items:
-        r = it.get("margin_rate")
-        if r is None or not (0 <= float(r) < 1):
-            raise HTTPException(400, "마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)")
-        if not (it.get("category") or "").strip():
-            raise HTTPException(400, "카테고리가 비어 있습니다")
-
-    with engine.begin() as conn:
-        for it in body.items:
-            conn.execute(text(
-                "INSERT INTO category_margin_policies (category, margin_rate, updated_at)"
-                " VALUES (:c, :m, now())"
-                " ON CONFLICT (category) DO UPDATE SET"
-                "   margin_rate = EXCLUDED.margin_rate, updated_at = now()"),
-                {"c": it["category"].strip(), "m": float(it["margin_rate"])})
-        _log(conn, "category_margins", "카테고리", {"count": len(body.items)}, kind="price")
-    return {"ok": True, "count": len(body.items),
-            "note": ("카테고리별 마진을 저장했습니다. **가격 산정은 아직 전역 마진율을"
-                     " 씁니다** — 이 값은 기록으로만 남습니다.")}
+# 카테고리별 마진 저장은 **카테고리 관리 화면으로 옮겼다**(2026-08-05):
+#   PUT /api/admin/categories/{cid}/margin
+# 여기 있던 `POST /category-margins`는 자유 문자열 키에 값을 넣었고, 그 키가 어느
+# 카테고리인지 아무도 몰랐다(FK 없음·0행·부르는 화면 없음). 고르는 자리와 값을 정하는
+# 자리를 갈라 두면 둘이 어긋난다 — 트리에서 노드를 고르는 그 자리에서 정한다.

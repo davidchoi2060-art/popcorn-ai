@@ -1702,6 +1702,127 @@ def test_reprice():
               "mUpSum" in _h and "mDownSum" in _h, True,
               "mUpSum" in _h and "mDownSum" in _h)
 
+def test_category_margin():
+    """[40] 마진 정책이 판매 분류 노드에 걸린다 (2026-08-05)
+
+    예전엔 `category_margin_policies`가 `category VARCHAR` 자유 문자열 키에 **0행**이었고,
+    저장 API를 부르는 화면이 하나도 없었다 — 표만 있고 아무 데도 이어지지 않은 죽은
+    테이블이었다. `margin-policy.html`은 그걸 읽어 빈 표를 그리고 있었다.
+
+    **왜 part_type이 아니라 노드인가**: 트리는 이미 갈라져서 34노드 중 13개가 `ETC`
+    하나를 공유한다(케이블·젠더 704 · 쿨링·튜닝 1,668 · 완제품 PC 318 · 소프트웨어 20).
+    part_type에 걸면 완제품 PC와 케이블이 같은 마진을 받는다.
+
+    **저장된 판매가를 그 자리에서 바꾸지 않는다** — 다음 재산정에서 쓰인다. 그래서
+    분류를 옮겼는데 값이 말없이 달라지는 사고가 없다. 회귀는 정본을 쓰지 않으므로
+    (슬라이스 50 전례) 여기서 마진을 걸지 않는다 — **가드와 읽기만** 본다.
+    """
+    print(chr(10) + "[40] 마진 정책이 판매 분류 노드에 걸린다")
+    import re as _re14
+    from api.pricing import resolve_margins as _rm
+
+    # 1) 상속 규칙을 순수 함수로 직접 검사한다 — 트리를 지어내 경계까지 본다.
+    #    (DB를 타면 '지금 정책이 없어서' 통과하는 거짓 안심이 된다)
+    NODES = [(1, None), (2, 1), (3, 2), (9, None)]      # 1 > 2 > 3, 9는 별개
+    r = _rm(NODES, {1: 0.10, 3: 0.05}, 0.12)
+    check("자기 노드에 걸린 값이 이긴다", r[3] == (0.05, 3), (0.05, 3), r[3])
+    check("없으면 조상을 따른다", r[2] == (0.10, 1), (0.10, 1), r[2])
+    check("조상에도 없으면 전역", r[9] == (0.12, None), (0.12, None), r[9])
+    # 순환·고아에서 멈추지 않는가 — 여기서 무한 루프면 가격 화면이 통째로 죽는다
+    r2 = _rm([(1, 2), (2, 1), (7, 99)], {}, 0.12)
+    check("순환이어도 멈추지 않고 전역", r2[1] == (0.12, None), (0.12, None), r2.get(1))
+    check("부모가 없는 노드도 전역", r2[7] == (0.12, None), (0.12, None), r2.get(7))
+
+    # 2) 상속을 **한 곳에서만** 계산하는가. 화면이나 다른 모듈이 다시 구현하면 갈라진다.
+    _dupes = []
+    for _dir, _ext in ((os.path.join(ROOT, "api"), ".py"),
+                       (os.path.join(ROOT, "mockups", "admin"), ".html")):
+        for _fn in sorted(os.listdir(_dir)):
+            if not _fn.endswith(_ext) or _fn == "pricing.py":
+                continue
+            _s = io.open(os.path.join(_dir, _fn), encoding="utf-8").read()
+            # 부모를 거슬러 올라가며 마진을 찾는 코드의 지문
+            if _re14.search(r"parent_id", _s) and _re14.search(r"margin", _s) \
+               and _re14.search(r"while|for\s*\(", _s) \
+               and "resolve_margins" not in _s and "margin_effective" not in _s:
+                _dupes.append(_fn)
+    check("마진 상속을 pricing.py 밖에서 다시 구현하지 않는다", _dupes == [], [], _dupes)
+
+    # 3) 응답이 세 값을 **구분해서** 준다. 적용값만 주면 운영자는 이 노드에 값이
+    #    걸린 줄 알고, 지우려 해도 지울 게 없다(상속이면 조상에 걸려 있다).
+    d = get("/api/admin/categories") or {}
+    items = d.get("items") or []
+    check("카테고리 응답이 비어 있지 않다", len(items) > 0, "> 0", len(items))
+    _keys = all(("margin_rate" in x and "margin_effective" in x and "margin_source" in x)
+                for x in items)
+    check("노드마다 직접값·적용값·출처를 준다", _keys, True, _keys)
+    check("전역 기본 마진을 함께 준다", isinstance(d.get("default_margin"), (int, float)),
+          "숫자", type(d.get("default_margin")).__name__)
+    # 적용값은 전역이거나 어딘가에 걸린 값이다 — 지어낸 수가 섞이면 안 된다
+    _own = {x["category_id"]: x["margin_rate"] for x in items if x["margin_rate"] is not None}
+    _allowed = set(_own.values()) | {d.get("default_margin")}
+    _odd = [x["name"] for x in items if x["margin_effective"] not in _allowed]
+    check("적용 마진은 전역이거나 걸린 값이다", _odd == [], [], _odd[:5])
+    # 직접 건 값이 없는 노드는 출처가 '이 분류'일 수 없다
+    _lie = [x["name"] for x in items
+            if x["margin_rate"] is None and x["margin_source"] == "이 분류"]
+    check("걸리지 않은 노드가 '이 분류'라 말하지 않는다", _lie == [], [], _lie)
+
+    # 4) 쓰기 가드만 확인한다 — 값을 걸지 않는다(회귀는 정본을 쓰지 않는다).
+    _cid = items[0]["category_id"]
+    _J = {"Content-Type": "application/json"}
+
+    def _put(path, body):
+        return post_raw(path, json.dumps(body).encode(), _J, method="PUT")
+
+    st, _ = _put("/api/admin/categories/%d/margin" % _cid, {"margin_rate": 1.5})
+    check("마진 1 이상은 막는다", st == 400, 400, st)
+    st, _ = _put("/api/admin/categories/%d/margin" % _cid, {"margin_rate": -0.1})
+    check("음수 마진은 막는다", st == 400, 400, st)
+    st, _ = _put("/api/admin/categories/999999/margin", {"margin_rate": 0.1})
+    check("없는 카테고리는 404", st == 404, 404, st)
+
+    # 5) 재산정이 마진을 **정말 상품별로** 쓰는가.
+    #    지금 DB엔 정책이 0행이라 아래 API 검사만 두면 마진이 하나뿐이어서
+    #    **무엇을 해도 통과한다**(공허한 검사 — 이 프로젝트에서 세 번 겪었다).
+    #    그래서 분류가 다른 가짜 행 두 개를 만들어 계산 함수를 직접 두드린다.
+    from api.admin_reprice import _classify as _cls
+    _rows2 = [{"product_code": "A", "product_name": "가", "part_type": "GPU",
+               "purchase_price": 100000, "sale_price": None, "status": "판매중",
+               "stock_qty": 1, "locked_fields": None, "category_id": 4},
+              {"product_code": "B", "product_name": "나", "part_type": "GPU",
+               "purchase_price": 100000, "sale_price": None, "status": "판매중",
+               "stock_qty": 1, "locked_fields": None, "category_id": 5}]
+    _c = _cls(_rows2, 0.02585, 0.12, {4: 0.30})       # 4번만 30%, 5번은 전역 12%
+    _by = {i["product_code"]: i for i in _c["up"]}
+    check("분류가 다르면 산정가도 다르다",
+          _by["A"]["proposed"] != _by["B"]["proposed"],
+          "다름", (_by["A"]["proposed"], _by["B"]["proposed"]))
+    check("분류에 걸린 마진이 그대로 쓰인다", _by["A"]["margin_rate"] == 0.30,
+          0.30, _by["A"]["margin_rate"])
+    check("걸리지 않은 분류는 전역", _by["B"]["margin_rate"] == 0.12,
+          0.12, _by["B"]["margin_rate"])
+    check("쓰인 마진 2종을 보고한다", sorted(_c["margins_used"]) == [0.12, 0.30],
+          [0.12, 0.30], sorted(_c["margins_used"]))
+
+    # 그리고 API 쪽 정합 — 합계가 대상 수와 맞아야 한다.
+    p = get("/api/admin/reprice/preview?scope=live") or {}
+    _used = p.get("margins_used") or []
+    check("재산정이 쓰인 마진을 보고한다", len(_used) > 0, "> 0", len(_used))
+    _sum = sum(u["count"] for u in _used)
+    check("마진별 건수 합 = 대상 건수", _sum == p.get("target"), p.get("target"), _sum)
+    check("마진이 하나면 varies=False",
+          p.get("margin_varies") == (len(_used) > 1), len(_used) > 1, p.get("margin_varies"))
+
+    # 6) 화면이 서버 값을 그대로 쓰는가(상속을 다시 계산하지 않는다)
+    _h = io.open(os.path.join(ROOT, "mockups", "admin", "categories.html"),
+                 encoding="utf-8").read()
+    check("화면이 적용 마진을 서버에서 받는다", "margin_effective" in _h, True,
+          "margin_effective" in _h)
+    check("화면이 출처를 함께 보여준다", "margin_source" in _h, True, "margin_source" in _h)
+    check("화면에 마진 저장 경로가 있다", "/margin" in _h, True, "/margin" in _h)
+
+
 def test_template_usage():
     """[37] Phoenix 템플릿을 실제로 쓰는가 (슬라이스 F)
 
@@ -3967,6 +4088,7 @@ def main():
                test_category_mapping,
                test_category_isolation,
                test_reprice,
+               test_category_margin,
                test_template_usage,
                test_charts_and_choices,
                test_no_fabricated_data,

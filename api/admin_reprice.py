@@ -49,7 +49,7 @@ from .admin_orders import _log
 from .admin_price_import import _settings
 from .auth import current_operator, current_operator_id
 from .db import engine
-from .pricing import formula_text, sale_from_purchase
+from .pricing import formula_text, resolve_margins, sale_from_purchase
 from .taxonomy import PART_LABELS
 
 router = APIRouter(prefix="/api/admin")
@@ -74,22 +74,44 @@ def _owner():
 def _rows(conn, scope):
     return conn.execute(text(
         "SELECT p.product_code, p.product_name, p.part_type, p.purchase_price, p.sale_price,"
-        "       p.status, p.stock_qty, p.locked_fields"
+        "       p.status, p.stock_qty, p.locked_fields, p.category_id"
         "  FROM products p"
         f" WHERE p.purchase_price IS NOT NULL AND p.purchase_price > 0 AND {SCOPES[scope][1]}"
         " ORDER BY p.product_code")).mappings().all()
 
 
-def _classify(rows, fee, margin):
-    """상품별 판정. **세 가지를 섞지 않는다** — 섞으면 총액이 서로 상쇄된다."""
+def _margin_map(conn, default):
+    """{category_id: 적용 마진}. 상속 규칙은 `pricing`이 단일 원천이다.
+
+    카테고리가 없는 상품(미매핑)은 **전역**을 쓴다 — 마진을 못 정했다고 값을
+    안 매기면 그 상품만 옛 가격으로 남아 조용히 어긋난다.
+    """
+    nodes = conn.execute(text("SELECT category_id, parent_id FROM categories")).all()
+    own = {r[0]: float(r[1]) for r in conn.execute(text(
+        "SELECT category_id, margin_rate FROM category_margin_policies"))}
+    return {cid: m for cid, (m, _src) in resolve_margins(nodes, own, default).items()}
+
+
+def _classify(rows, fee, margin, mmap=None):
+    """상품별 판정. **세 가지를 섞지 않는다** — 섞으면 총액이 서로 상쇄된다.
+
+    마진은 상품이 걸린 **분류**를 따른다(2026-08-05). `mmap`이 없으면 전역 하나다.
+    """
+    mmap = mmap or {}
     up, down, same, locked, outlier, negative = [], [], 0, [], [], []
+    used = {}          # 어떤 마진이 몇 건에 쓰였는가
     for r in rows:
         cur = r["sale_price"]
-        new = sale_from_purchase(r["purchase_price"], fee, margin)
+        m = mmap.get(r["category_id"], margin)
+        # **적용한 그 값을 센다.** 따로 한 번 더 계산하면 계산과 보고가 갈라진다 —
+        # 실제로 전역만 쓰면서 "분류별로 썼다"고 보고할 수 있었다(사보타주로 확인).
+        used[m] = used.get(m, 0) + 1
+        new = sale_from_purchase(r["purchase_price"], fee, m)
         purchase = float(r["purchase_price"])
         item = {"product_code": r["product_code"], "name": r["product_name"],
                 "part_label": PART_LABELS.get(r["part_type"], r["part_type"]),
                 "purchase": r["purchase_price"], "current": cur, "proposed": new,
+                "margin_rate": m,      # 이 상품에 실제로 쓰인 마진 — 화면이 근거로 쓴다
                 "delta": (new - cur) if cur is not None else None,
                 "status": r["status"], "stock_qty": r["stock_qty"],
                 "ratio": round(cur / purchase, 3) if cur is not None else None}
@@ -109,7 +131,7 @@ def _classify(rows, fee, margin):
         else:
             down.append(item)
     return {"up": up, "down": down, "same": same, "locked": locked,
-            "outlier": outlier, "negative": negative}
+            "outlier": outlier, "negative": negative, "margins_used": used}
 
 
 def _summary(c, scope, fee, margin, ex=6):
@@ -118,6 +140,11 @@ def _summary(c, scope, fee, margin, ex=6):
         "scope": scope, "scope_label": SCOPES[scope][0],
         "formula": formula_text(fee, margin),
         "card_fee_rate": fee, "margin_rate": margin,
+        # **마진이 하나가 아닐 수 있다**(분류별 정책 — 2026-08-05). 공식 한 줄만 내밀면
+        # 그 줄이 맞지 않는 상품이 섞여 있다는 사실을 감추는 셈이다.
+        "margins_used": [{"margin_rate": k, "count": v}
+                         for k, v in sorted(c["margins_used"].items())],
+        "margin_varies": len(c["margins_used"]) > 1,
         "target": len(c["up"]) + len(c["down"]) + c["same"] + len(c["locked"]),
         "changed": len(c["up"]) + len(c["down"]),
         # **오름·내림을 갈라서 낸다** — 하나로 합치면 9억짜리 이상치가 나머지를 덮는다
@@ -137,7 +164,10 @@ def _summary(c, scope, fee, margin, ex=6):
         "max_apply": MAX_APPLY,
         "note": ("**미리보기입니다 — 아무것도 바뀌지 않았습니다.**"
                  " 오름과 내림을 따로 냅니다: 합치면 이상치 한 건이 나머지 전부를 덮습니다."
-                 " 잠긴 판매가(운영자가 손으로 정한 값)는 세기만 하고 바꾸지 않습니다."),
+                 " 잠긴 판매가(운영자가 손으로 정한 값)는 세기만 하고 바꾸지 않습니다."
+                 + (" 마진은 **분류마다 다릅니다** — 위 공식은 전역 마진을 쓰는 상품에만"
+                    " 해당하고, 상품별로 적용된 마진은 목록에 함께 표시됩니다."
+                    if len(c["margins_used"]) > 1 else "")),
     }
 
 
@@ -147,8 +177,9 @@ def preview(scope: str = "live"):
         raise HTTPException(400, "알 수 없는 범위입니다")
     with engine.connect() as conn:
         fee, margin = _settings(conn)
+        mmap = _margin_map(conn, margin)
         rows = _rows(conn, scope)
-    return _summary(_classify(rows, fee, margin), scope, fee, margin)
+    return _summary(_classify(rows, fee, margin, mmap), scope, fee, margin)
 
 
 class ApplyBody(BaseModel):
@@ -164,7 +195,8 @@ def apply(body: ApplyBody):
         raise HTTPException(400, "알 수 없는 범위입니다")
     with engine.begin() as conn:
         fee, margin = _settings(conn)
-        c = _classify(_rows(conn, body.scope), fee, margin)
+        mmap = _margin_map(conn, margin)
+        c = _classify(_rows(conn, body.scope), fee, margin, mmap)
         targets = c["up"] + c["down"]
         if not targets:
             raise HTTPException(400, "정책과 다른 판매가가 없습니다 — 바꿀 것이 없습니다")
@@ -193,6 +225,9 @@ def apply(body: ApplyBody):
         log_id = _log(conn, "판매가 재산정", body.scope, {
             "scope": body.scope, "scope_label": SCOPES[body.scope][0],
             "card_fee_rate": fee, "margin_rate": margin,
+            # 어떤 마진으로 매겼는지 원장에 남긴다 — 나중에 "왜 이 값이지?"에 답하려면
+            # 그때 전역이 얼마였는지만으로는 부족하다(분류별 정책이 섞여 있다).
+            "margins_used": {str(k): v for k, v in sorted(c["margins_used"].items())},
             "changed": len(targets),
             "up": len(c["up"]), "down": len(c["down"]),
             "note": (body.note or "").strip()[:200],
