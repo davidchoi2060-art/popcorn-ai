@@ -58,7 +58,10 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-ORD-030" data-domain="order">
+  <!-- data-dummy-fallback="none" : 이 화면은 더미 폴백을 걷어냈다(정적 4행 삭제).
+       표시가 없으면 `shared/admin-auth.js` 의 미로그인 띠가 "수치는 더미입니다"라고
+       말하는데, 여기엔 더미가 없으므로 그 띠가 거짓말이 된다. -->
+  <body data-screen-id="ADM-ORD-030" data-domain="order" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -189,7 +192,7 @@
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary" data-noti-empty>알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -265,9 +268,12 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">부품 교체 · 클릭 기록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">부품 교체 · 클릭 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">부품 교체 · 클릭 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span></h2>
           <p class="text-body-tertiary mb-0">고객이 추천을 어떻게 고치는지가 <b class="text-body-secondary">추천 기준을 조정할 신호</b>입니다. 읽기 전용 관측 창.</p></div>
-          <span class="badge badge-phoenix badge-phoenix-secondary">최근 30일 · 스왑 1,204회</span>
+          <!-- '최근 30일'은 근거 없는 창이었다: /api/admin/swap-logs 는 기간 필터가 없고
+               swap_event_logs 전체를 센다. 수만 지우고 라벨을 남기면 화면이 여전히 거짓말한다
+               (슬라이스 59 전례: 아무도 바인딩하지 않은 `data-bind` 자리). 서버 total 로 채운다. -->
+          <span id="swapTotal" class="badge badge-phoenix badge-phoenix-secondary">기록 전체 · 스왑 —회</span>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
@@ -282,32 +288,23 @@
               </div>
             <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
               <thead><tr class="text-body-tertiary"><th class="sort" data-sort="from">추천 부품</th><th></th><th class="sort" data-sort="to">교체 부품</th><th class="sort text-end" data-sort="n">횟수</th><th class="sort text-end" data-sort="pct">비율</th><th class="sort" data-sort="signal">신호</th></tr></thead><tbody class="list" id="swapBody">
-                <tr><td class="from">RTX 4060</td><td>→</td><td class="to fw-semibold">RTX 4060 Ti</td><td class="n text-end">386</td><td class="pct text-end fw-bold">32%</td><td class="signal"><a href="policy-weights.html" class="badge badge-phoenix badge-phoenix-warning text-decoration-none">성능 가중 상향 검토</a></td></tr>
-                <tr><td class="from">500W 파워</td><td>→</td><td class="to fw-semibold">650W 파워</td><td class="n text-end">214</td><td class="pct text-end fw-bold">18%</td><td class="signal"><a href="compat-rules.html" class="badge badge-phoenix badge-phoenix-warning text-decoration-none">여유율 규칙 검토</a></td></tr>
-                <tr><td class="from">일반 케이스</td><td>→</td><td class="to fw-semibold">화이트 케이스</td><td class="n text-end">168</td><td class="pct text-end fw-bold">14%</td><td class="signal"><a href="sourcing.html" class="badge badge-phoenix badge-phoenix-info text-decoration-none">화이트 재고 확충</a></td></tr>
-                <tr><td class="from">라이젠5 7600</td><td>→</td><td class="to fw-semibold">라이젠5 7500F</td><td class="n text-end">96</td><td class="pct text-end">8%</td><td class="signal"><span class="badge badge-phoenix badge-phoenix-secondary">관찰</span></td></tr>
+                <!-- 정적 더미 행 없음(슬라이스 정직성 규약). 행은 서버 응답으로만 그린다 —
+                     실패하면 아래 .catch 가 "서버에 연결되면 표시됩니다" 한 줄을 대신 그린다. -->
+                <tr><td colspan="6" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr>
               </tbody></table></div>
             </div>
           </div></div></div>
           <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body">
             <h6 class="mb-2">근거 리포트 클릭 <span class="fs-10 fw-normal text-body-tertiary">— 고객이 실제로 읽는 이유</span></h6>
-            <div id="clicks"></div>
+            <div id="clicks"><p class="fs-9 text-body-tertiary mb-0">불러오는 중…</p></div>
             <p class="fs-10 text-body-tertiary mt-2 mb-0">"왜 이 부품인지"를 여는 비율이 높을수록 신뢰 판매자 포지셔닝이 작동한다는 뜻입니다.</p>
           </div></div></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>
-      (function(){
-        const C=[["호환성 근거 (조립 가능 이유)",68],["가격 근거 (예산 배분)",54],["성능 근거 (용도 적합)",47],["재고 근거 (당일 출고)",22]];
-        document.getElementById("clicks").innerHTML=C.map(([n,v])=>`
-          <div class="py-2">
-            <div class="d-flex justify-content-between fs-9 mb-1"><span class="text-body-secondary">${n}</span><b>${v}%</b></div>
-            <div class="rounded-pill overflow-hidden" style="height:8px;background:var(--phoenix-secondary-bg);"><div style="width:${v}%;height:100%;background:var(--phoenix-primary);"></div></div>
-          </div>`).join("");
-        if(window.feather)feather.replace();
-      })();
-      </script>
+      <!-- 근거 클릭 막대(68/54/47/22%)를 마크업에서 그리던 목업 스크립트는 걷어냈다.
+           서버가 없을 때도 그럴듯한 비율이 그려져 사람이 사실로 읽었다 — 이 자리는
+           아래 LIVE 스크립트의 paint()/catch 만 채운다. -->
       <script>
       (function(){
         // ---- LIVE (슬라이스 46) — 부품 교체 기록 실배선.
@@ -321,8 +318,9 @@
         // 유령 인스턴스 제거(th 재생성 · data-list 해제 · 정렬 화살표 CSS 유지) · 처음 한 번만
         // new List 이후 reIndex · 다시 그린 뒤 걸려 있던 정렬·검색어 되걸기 · 문서 끝에서
         // 로드되는 vendor(list.js) 재시도까지. 여기서 다시 하지 않는다.
-        // 이 표는 폴백 4행을 **마크업에** 들고 있어 docReady 의 listInit 이 이미 인스턴스를
-        // 하나 만들어 뒀다 — 그대로 두면 정렬 한 번에 실데이터가 지워지고 더미가 되살아난다.
+        // 마크업의 더미 4행은 걷어냈지만(자리표시자 한 줄만 남음) `data-list` 가 있는 한
+        // docReady 의 listInit 은 여전히 인스턴스를 하나 만든다 — 그대로 두면 정렬 한 번에
+        // 실데이터가 지워지고 자리표시자만 남는다. 그래서 렌더 직후 반드시 다시 붙인다.
         // 횟수·비율은 수치 열이다: 자연 정렬은 문자열로 봐 96 을 386 보다 뒤에 놓는다.
         function wireList(){
           if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
@@ -330,6 +328,20 @@
             numeric:["n","pct"],
             searchInput:"swapSearch"
           });
+        }
+
+        // 표에 **행이 없을 때는 검색을 잠근다.**
+        // 이유(브라우저에서 실측): 서버가 없을 때 tbody 에 남는 것은 "서버에 연결되면
+        // 표시됩니다" 한 줄뿐인데, `data-list` 때문에 docReady 의 listInit 이 만든 List 가
+        // 살아 있어 검색어를 한 글자만 쳐도 그 줄이 걸러져 **표가 통째로 빈다**.
+        // 빈 표는 '왜 비었는지'를 말하지 않는다 — 운영자는 '교체 0건'으로 읽는다.
+        // 검색할 목록 자체가 없으므로 잠그는 것이 사실에도 맞다.
+        function setSearch(on){
+          var q = document.getElementById("swapSearch");
+          if(!q) return;
+          q.disabled = !on;
+          if(!on) q.value = "";
+          q.placeholder = on ? "부품 · 신호 검색" : "검색할 목록이 없습니다";
         }
 
         function esc(s){
@@ -341,9 +353,14 @@
 
         function paint(d){
           LIVE = true;
-          badge.textContent = "실데이터 · Cloud SQL";
-          badge.classList.remove("badge-phoenix-secondary");
-          badge.classList.add("badge-phoenix-primary");
+          if(badge){
+            badge.textContent = "실데이터 · Cloud SQL";
+            badge.classList.remove("badge-phoenix-secondary");
+            badge.classList.add("badge-phoenix-primary");
+          }
+          // 머리말 배지 — 기간을 주장하지 않는다(API 에 기간 필터가 없다).
+          var tot = document.getElementById("swapTotal");
+          if(tot) tot.textContent = "기록 전체 · 스왑 " + (d.total || 0).toLocaleString() + "회";
 
           // ① 자주 일어나는 교체 — 표 본문을 서버 집계로 교체
           // 문서 전체의 첫 tbody 가 아니라 이 표의 tbody 다 — 상단바·모달에 표가 하나
@@ -354,7 +371,9 @@
               tb.innerHTML = '<tr><td colspan="6" class="p-3 fs-9 text-body-tertiary">'
                 + '아직 교체 기록이 없습니다 — 고객이 S3에서 부품을 바꾸면 여기에 쌓입니다.'
                 + '</td></tr>';
+              setSearch(false);   // 이 한 줄도 검색에 걸려 사라지면 '0건'으로 읽힌다
             } else {
+              setSearch(true);
               // td 클래스는 valueNames 와 같은 이름이어야 한다(list.js 가 이 이름으로 값을 읽는다).
               // 화살표 칸은 헤더(<th></th>)와 칸 수를 맞추기 위한 것 — 정렬 대상이 아니다.
               tb.innerHTML = d.pairs.map(function(p){
@@ -419,7 +438,23 @@
         fetch("/api/admin/swap-logs")
           .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
           .then(paint)
-          .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
+          .catch(function(){
+            // 서버가 없으면 지어내지 않는다 — 못 받았다고 말한다.
+            // paint() 가 이미 실데이터를 그린 뒤 터진 경우(LIVE)엔 화면을 되돌리지 않는다.
+            if(LIVE) return;
+            if(badge) badge.textContent = "연결 안 됨";
+            var tb = document.getElementById("swapBody");
+            if(tb){
+              tb.innerHTML = '<tr><td colspan="6" class="text-center text-body-tertiary py-4">'
+                + '서버에 연결되면 표시됩니다.</td></tr>';
+            }
+            setSearch(false);   // 유령 List 가 이 안내를 걸러 표를 비우지 못하게 한다
+            var host = document.getElementById("clicks");
+            if(host){
+              host.innerHTML = '<p class="fs-9 text-body-tertiary mb-0">'
+                + '서버에 연결되면 표시됩니다.</p>';
+            }
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
@@ -440,9 +475,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>

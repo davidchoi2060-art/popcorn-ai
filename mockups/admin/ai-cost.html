@@ -187,7 +187,7 @@
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary" data-noti-empty>알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -263,25 +263,22 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">AI 사용량 · 비용</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">AI 사용량 · 비용 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">AI 사용량 · 비용 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">원천 준비 중</span></h2>
           <p class="text-body-tertiary mb-0">언어모델 호출은 <b class="text-body-secondary">파싱·사양 추출·근거 생성뿐</b>입니다. 견적 산출은 AI를 쓰지 않으므로 여기 비용이 없습니다.</p></div>
-          <span class="badge badge-phoenix badge-phoenix-secondary">일 예산 캡 $50</span>
+          <span class="badge badge-phoenix badge-phoenix-secondary">일 예산 캡 —</span>
         </div>
         <div class="row g-2 mb-3">
-          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">오늘 사용</p><h4 class="mb-1">$3.42 <span class="fs-10 fw-semibold text-body-tertiary">/ $50</span></h4><div class="progress" style="height:5px;"><div class="progress-bar bg-primary" style="width:6.8%;"></div></div></div></div></div>
-          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">이번 달</p><h4 class="mb-0">$61.20</h4></div></div></div>
-          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">적재 배치당 평균</p><h4 class="mb-0">$1.90</h4></div></div></div>
-          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">상담 1건당 평균</p><h4 class="mb-0">$0.011</h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">오늘 사용</p><h4 class="mb-0">— <span class="fs-10 fw-semibold text-body-tertiary">/ —</span></h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">이번 달</p><h4 class="mb-0">—</h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">적재 배치당 평균</p><h4 class="mb-0">—</h4></div></div></div>
+          <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2"><p class="fs-10 text-body-tertiary mb-0">상담 1건당 평균</p><h4 class="mb-0">—</h4></div></div></div>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
             <h6 class="mb-2">용도별 사용 (오늘)</h6>
             <div id="usage"></div>
             <h6 class="mb-2 mt-4">최근 7일</h6>
-            <div class="d-flex align-items-end gap-2" style="height:90px;">
-              <div class="flex-1 bg-primary rounded-top" style="height:34%;" title="$2.1"></div><div class="flex-1 bg-primary rounded-top" style="height:28%;" title="$1.8"></div><div class="flex-1 bg-primary rounded-top" style="height:88%;" title="$5.4 — 배치 #208"></div><div class="flex-1 bg-primary rounded-top" style="height:30%;" title="$1.9"></div><div class="flex-1 bg-primary rounded-top" style="height:26%;" title="$1.7"></div><div class="flex-1 bg-primary rounded-top" style="height:70%;" title="$4.3 — 배치 #212"></div><div class="flex-1 bg-warning rounded-top" style="height:55%;" title="오늘 $3.42"></div>
-            </div>
-            <div class="d-flex justify-content-between fs-10 text-body-tertiary mt-1"><span>7/7</span><span>오늘</span></div>
+            <div id="last7" class="text-center text-body-tertiary py-4 fs-9">집계 원천 없음 — 실제 LLM 연동 보류(2026-07-21)로 기록이 쌓이지 않습니다.</div>
           </div></div></div>
           <div class="col-12 col-lg-5">
             <div class="card mb-3"><div class="card-body">
@@ -295,12 +292,7 @@
             </div></div>
             <div class="card"><div class="card-body">
               <h6 class="mb-2">모델별 (오늘)</h6>
-              <div class="table-responsive"><table class="table table-sm fs-9 mb-0"><tbody>
-                <tr><td>파싱 앙상블 A</td><td class="text-end">$0.41</td></tr>
-                <tr><td>파싱 앙상블 B</td><td class="text-end">$0.28</td></tr>
-                <tr><td>사양 추출 (배치)</td><td class="text-end">$2.46</td></tr>
-                <tr><td>근거 생성</td><td class="text-end">$0.27</td></tr>
-              </tbody></table></div>
+              <div class="table-responsive"><table class="table table-sm fs-9 mb-0"><tbody id="modelRows"></tbody></table></div>
             </div></div>
           </div>
         </div>
@@ -309,10 +301,20 @@
       </div>
       <script>
       (function(){
-        const U=[["사양 추출 (적재 배치)",72,"warning"],["고객 입력 파싱",21,"primary"],["근거 생성",7,"info"]];
-        document.getElementById("usage").innerHTML=U.map(([n,v,c])=>`
-          <div class="py-2"><div class="d-flex justify-content-between fs-9 mb-1"><span class="text-body-secondary">${n}</span><b>${v}%</b></div>
-          <div class="rounded-pill overflow-hidden" style="height:8px;background:var(--phoenix-secondary-bg);"><div style="width:${v}%;height:100%;background:var(--phoenix-${c});"></div></div></div>`).join("");
+        // 용도별 비중·모델별 비용은 원천(api_cost_logs)이 아직 없다. 지어낸 비율(72/21/7)을
+        // 그리면 운영자는 그것을 실제 집계로 읽는다 — 자리표시자만 둔다.
+        //
+        // 자리표시자는 '왜 비었는지'를 말한다. '서버에 연결되면 표시됩니다'라고 쓰면 원인을
+        // 연결 문제로 지목하는 셈인데 사실이 아니다 — 연결해도 안 나온다(api/admin_system.py:
+        // "api_cost_logs 0행 — LLM 연동 보류"). 0건과 원천 부재는 다르고, 고칠 수 없는 것을
+        // 기다리게 만드는 문구는 더미만큼 해롭다.
+        var NO_SRC = '집계 원천 없음 — 실제 LLM 연동 보류(2026-07-21)로 기록이 쌓이지 않습니다.';
+        var usage = document.getElementById("usage");
+        if(usage) usage.innerHTML =
+          '<div class="text-center text-body-tertiary py-4 fs-9">' + NO_SRC + '</div>';
+        var rows = document.getElementById("modelRows");
+        if(rows) rows.innerHTML =
+          '<tr><td colspan="2" class="text-center text-body-tertiary py-4">' + NO_SRC + '</td></tr>';
         if(window.feather)feather.replace();
       })();
       </script>
@@ -337,7 +339,7 @@
         fetch("/api/admin/system")
           .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
           .then(function(d){
-            var host = document.getElementById("liveSys"), html = "";
+            var host = document.getElementById("liveSys"), html = "", aiEmpty = true;
             if(SCREEN === "operators"){
               var rows = d.operators.rows.map(function(o){
                 return '<tr><td><b>' + o.name + '</b><div class="fs-10 text-body-tertiary">' + o.email + '</div></td>'
@@ -355,7 +357,26 @@
                 + rows + '</tbody></table></div>'
                 + '<p class="fs-10 text-body-quaternary mb-0 mt-2">' + d.operators.note + '</p>');
             } else if(SCREEN === "ai"){
-              html += emptyCard('AI 사용량 · 비용', d.ai_cost.reason);
+              // 서버가 준 empty를 무시하면, 기록이 쌓이기 시작한 날에도 화면은 계속
+              // '원천 준비 중'이라 말하며 실집계를 감춘다(imports 분기는 이미 empty를 본다).
+              var ai = d.ai_cost || {};
+              aiEmpty = (ai.empty !== false);
+              if(aiEmpty){
+                html += emptyCard('AI 사용량 · 비용', ai.reason || '서버가 사유를 주지 않았습니다.');
+              } else {
+                html += card('AI 사용량 · 비용 <span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">집계 미구현</span>',
+                  '기록이 쌓이기 시작했으나 이 화면은 아직 집계를 그리지 못합니다 — 위쪽 자리표시자는 실제 값이 아닙니다.',
+                  '<p class="fs-9 text-body-secondary mb-0">api_cost_logs ' + (ai.log_rows || 0).toLocaleString()
+                  + '행 · 임계 설정 ' + (ai.threshold_rows || 0).toLocaleString() + '행이 있습니다.</p>', 'warning');
+                var HOLD = '기록 ' + (ai.log_rows || 0).toLocaleString() + '행 — 집계 표시는 아직 구현되지 않았습니다(아래 참조).';
+                ['usage', 'last7'].forEach(function(id){
+                  var el = document.getElementById(id);
+                  if(el) el.innerHTML = '<div class="text-center text-body-tertiary py-4 fs-9">' + HOLD + '</div>';
+                });
+                var mr = document.getElementById("modelRows");
+                if(mr) mr.innerHTML =
+                  '<tr><td colspan="2" class="text-center text-body-tertiary py-4">' + HOLD + '</td></tr>';
+              }
             } else {
               if(d.imports.empty){
                 html += emptyCard('일괄 등록 이력', d.imports.reason);
@@ -368,19 +389,41 @@
                     }).join('') + '</tbody></table></div>');
               }
             }
-            host.innerHTML = html;
-            host.hidden = false;
+            if(host){ host.innerHTML = html; host.hidden = false; }
             var b = document.getElementById("dataSrc");
-            if(SCREEN === "operators"){
-              b.textContent = "실데이터 · Cloud SQL";
-              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
-            } else {
-              b.textContent = "원천 준비 중 — 아래 사유 참조";
-              b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+            if(b){
+              if(SCREEN === "operators"){
+                b.textContent = "실데이터 · Cloud SQL";
+                b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
+              } else if(SCREEN === "ai" && !aiEmpty){
+                b.textContent = "기록 있음 · 집계 미구현 — 아래 참조";
+                b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+              } else {
+                b.textContent = "원천 준비 중 — 아래 사유 참조";
+                b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+              }
             }
             if(window.feather) feather.replace();
           })
-          .catch(function(){});
+          .catch(function(){
+            // 서버에 못 닿아도 '더미 데이터'라고 말하지 않는다 — 더미를 걷어냈으므로 거짓이 된다.
+            // 동시에 '서버에 연결되면 표시됩니다'라고도 말하지 않는다 — 연결돼도 안 나온다.
+            // 두 사실을 함께 밝힌다: ① 지금 서버 상태를 확인하지 못했다 ② 집계 원천 자체가 없다.
+            var UNK = '서버 상태를 확인하지 못했습니다 · 집계 원천 없음(LLM 연동 보류).';
+            var b = document.getElementById("dataSrc");
+            if(b){
+              b.textContent = "원천 준비 중 · 서버 미확인";
+              if(b.classList.contains("badge-phoenix-secondary"))
+                b.classList.replace("badge-phoenix-secondary", "badge-phoenix-warning");
+            }
+            ['usage', 'last7'].forEach(function(id){
+              var el = document.getElementById(id);
+              if(el) el.innerHTML = '<div class="text-center text-body-tertiary py-4 fs-9">' + UNK + '</div>';
+            });
+            var rows = document.getElementById("modelRows");
+            if(rows) rows.innerHTML =
+              '<tr><td colspan="2" class="text-center text-body-tertiary py-4">' + UNK + '</td></tr>';
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
@@ -401,9 +444,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>

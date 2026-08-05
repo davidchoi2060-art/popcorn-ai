@@ -188,7 +188,7 @@
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary" data-noti-empty>알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -264,8 +264,8 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">상품</a></li><li class="breadcrumb-item active">상품 일괄 등록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">상품 일괄 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CSV-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
-          <p class="text-body-tertiary mb-0">엑셀/CSV를 올리면 <b class="text-body-secondary">상품 원본 자료에 그대로 보존</b>되고, 검증을 통과한 것만 정본에 반영됩니다.</p></div>
+          <div><h2 class="mb-1">상품 일괄 등록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-CSV-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">연결 안 됨</span></h2>
+          <p class="text-body-tertiary mb-0">CSV를 올리면 <b class="text-body-secondary">상품 원본 자료에 그대로 보존</b>되고, 검증을 통과한 것만 정본에 반영됩니다.</p></div>
         </div>
         <!-- 이 화면의 4단계는 아직 시늉이다. 서버에 업로드 적재 엔드포인트가 없고
              실제 적재는 스크립트로만 이뤄진다. 버튼이 도는 것처럼 보이면 운영자가
@@ -292,10 +292,10 @@
                 <div id="dropzone" class="border border-2 rounded-3 text-center py-6 cursor-pointer" style="border-style:dashed!important;">
                   <span data-feather="upload-cloud" style="width:34px;height:34px;color:var(--phoenix-primary);"></span>
                   <p class="mt-2 mb-1 fw-bold">여기에 파일을 끌어다 놓거나 클릭</p>
-                  <p class="fs-9 text-body-tertiary mb-0">.xlsx · .csv — 1회 최대 20,000행</p>
+                  <p class="fs-9 text-body-tertiary mb-0">.csv (UTF-8) — 파일당 최대 64MB · 엑셀은 CSV로 저장해 올려주세요</p>
                 </div>
                 <div id="fileinfo" class="d-none mt-3 p-3 bg-body-secondary rounded-3">
-                  <div class="d-flex align-items-center gap-2"><span data-feather="file-text" style="width:16px;height:16px;"></span><b class="fs-9">용산도매_입고_0713.xlsx</b><span class="badge badge-phoenix badge-phoenix-primary ms-auto">5,214행</span></div>
+                  <div class="d-flex align-items-center gap-2"><span data-feather="file-text" style="width:16px;height:16px;"></span><b class="fs-9">—</b><span class="badge badge-phoenix badge-phoenix-secondary ms-auto">—행</span></div>
                 </div>
                 <div class="mt-3">
                   <label class="form-label fs-9 fw-bold">공급처 · 매핑 프리셋</label>
@@ -323,48 +323,43 @@
         <!-- STEP 2: 검증 미리보기 -->
         <div id="step2" class="d-none">
           <div class="card mb-3"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">적재 결과 미리보기 <span class="fs-10 fw-normal text-body-tertiary">배치 #213 · 5,214행</span></h5><span class="badge badge-phoenix badge-phoenix-primary">SKU 기준 판정</span></div>
+            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">적재 결과 미리보기 <span class="fs-10 fw-normal text-body-tertiary">배치 — · —행</span></h5><span class="badge badge-phoenix badge-phoenix-primary">SKU 기준 판정</span></div>
             <div class="row g-2" id="impact"></div>
           </div></div>
           <div class="row g-3 mb-3">
             <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
               <h6 class="mb-2">오류 행 미리보기 <span class="fs-10 fw-normal text-body-tertiary">— 오류 행은 적재에서 제외되고 원본에만 남습니다</span></h6>
-              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>행</th><th>SKU</th><th>문제</th><th>원본 값</th></tr></thead><tbody>
-                <tr><td>1,204</td><td><code>P-7043</code></td><td><span class="badge badge-phoenix badge-phoenix-secondary">용량 파싱 실패</span></td><td class="text-body-tertiary">"32G B" (공백 포함)</td></tr>
-                <tr><td>2,881</td><td><code>P-7044</code></td><td><span class="badge badge-phoenix badge-phoenix-secondary">가격 형식 오류</span></td><td class="text-body-tertiary">"1,29,000"</td></tr>
-                <tr><td>4,102</td><td><code>—</code></td><td><span class="badge badge-phoenix badge-phoenix-danger">SKU 없음</span></td><td class="text-body-tertiary">공급처+모델명으로 후보 매칭 → 검수 확정</td></tr>
+              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>행</th><th>SKU</th><th>문제</th><th>원본 값</th></tr></thead><tbody id="errRows">
               </tbody></table></div>
             </div></div></div>
             <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body">
               <h6 class="mb-2">잠긴 필드 충돌 <span class="badge badge-phoenix badge-phoenix-info">잠금 우선 — 자동 무시</span></h6>
               <p class="fs-9 text-body-tertiary mb-2">운영자가 검수에서 확정한 값은 이번 적재가 덮어쓰지 않습니다.</p>
-              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>SKU</th><th>필드</th><th>업로드 값</th><th>유지되는 확정값</th></tr></thead><tbody>
-                <tr><td><code>P-3390</code></td><td>정격 출력 <code>{rated_watt}</code></td><td class="text-body-tertiary text-decoration-line-through">500W</td><td class="fw-bold">400W</td></tr>
-                <tr><td><code>P-4102</code></td><td>소켓 <code>{socket}</code></td><td class="text-body-tertiary text-decoration-line-through">AM5</td><td class="fw-bold">AM4</td></tr>
+              <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th>SKU</th><th>필드</th><th>업로드 값</th><th>유지되는 확정값</th></tr></thead><tbody id="lockRows">
               </tbody></table></div>
             </div></div></div>
           </div>
           <div class="d-flex justify-content-between">
             <button id="back1" class="btn btn-phoenix-secondary btn-sm">← 파일·매핑으로</button>
-            <button id="tostep3" class="btn btn-primary btn-sm">이대로 적재 실행 (5,211행)</button>
+            <button id="tostep3" class="btn btn-primary btn-sm">이대로 적재 실행 (—건)</button>
           </div>
         </div>
 
         <!-- STEP 3: 적재·배치 진행 -->
         <div id="step3" class="d-none">
           <div class="card mb-3"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">배치 #213 진행 상황</h5><span id="batchstate" class="badge badge-phoenix badge-phoenix-warning">진행 중</span></div>
+            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">배치 진행 상황</h5><span id="batchstate" class="badge badge-phoenix badge-phoenix-warning">진행 중</span></div>
             <div id="stages"></div>
             <div class="progress mt-3" style="height:8px;"><div id="pbar" class="progress-bar bg-primary" style="width:0%;transition:width .4s;"></div></div>
             <p class="fs-9 text-body-tertiary mt-2 mb-0">업로드가 끝나도 AI 사양 추출은 배치로 이어집니다 — 이 화면을 닫아도 진행되며, 결과는 일괄 등록 이력에서 다시 볼 수 있습니다.</p>
           </div></div>
           <div id="result" class="d-none">
             <div class="card"><div class="card-body">
-              <h5 class="mb-3">완료 — 배치 #213 결과</h5>
+              <h5 class="mb-3">완료 — 배치 결과</h5>
               <div class="row g-2 mb-3" id="resultcards"></div>
               <div class="d-flex flex-wrap gap-2">
-                <a href="review-queue.html" class="btn btn-primary btn-sm">검수 대기 38건 처리하러 가기 →</a>
-                <a href="price-review.html" class="btn btn-phoenix-primary btn-sm">가격 검토 12건</a>
+                <a href="review-queue.html" class="btn btn-primary btn-sm">검수 대기 처리하러 가기 →</a>
+                <a href="price-review.html" class="btn btn-phoenix-primary btn-sm">가격 검토</a>
                 <a href="csv-jobs.html" class="btn btn-phoenix-secondary btn-sm">일괄 등록 이력</a>
               </div>
             </div></div>
@@ -409,14 +404,15 @@
         document.getElementById("back1").onclick=()=>show(1);
 
         // ── STEP2: 영향 예측 카드
+        // 서버가 채우기 전에는 값을 지어내지 않는다 — 자리만 둔다(정직성 규칙).
         const IMPACT=[
-          ["신규 상품","1,847","건","primary","SKU 첫 등록"],
-          ["기존 상품 갱신","3,102","건","primary","재고·사양 변경"],
-          ["공급처 가격 추가","262","건","info","같은 SKU · 새 공급처 매입가"],
-          ["오류 행 (제외)","3","행","secondary","원본에만 보존"],
-          ["검수 회부 예상","38","건","warning","게이트 불통과"],
-          ["가격 검토 대기","12","건","warning","변동 ±15% 초과"],
-          ["잠금 충돌 (무시)","2","건","info","확정값 유지"]
+          ["신규 상품","—","건","secondary","SKU 첫 등록"],
+          ["기존 상품 갱신","—","건","secondary","재고·사양 변경"],
+          ["공급처 가격 추가","—","건","secondary","같은 SKU · 새 공급처 매입가"],
+          ["오류 행 (제외)","—","행","secondary","원본에만 보존"],
+          ["검수 회부 예상","—","건","secondary","게이트 불통과"],
+          ["가격 검토 대기","—","건","secondary","변동 ±15% 초과"],
+          ["잠금 충돌 (무시)","—","건","secondary","확정값 유지"]
         ];
         function renderImpact(){
           document.getElementById("impact").innerHTML=IMPACT.map(([l,n,u,c,d])=>`
@@ -428,7 +424,7 @@
         }
 
         // ── STEP3: 배치 진행 시뮬레이션
-        const STAGES=[["원본 적재 (310)","5,211행 동결 보존"],["AI 사양 추출","4단계: 파싱→정규화→대조→신뢰도"],["게이트 판정","교차검증·필수 사양 확인"],["정본 반영 (320)","잠금 우선 병합"]];
+        const STAGES=[["원본 적재 (310)","올린 원본 그대로 동결 보존"],["AI 사양 추출","4단계: 파싱→정규화→대조→신뢰도"],["게이트 판정","교차검증·필수 사양 확인"],["정본 반영 (320)","잠금 우선 병합"]];
         document.getElementById("tostep3").onclick=()=>{show(3);runBatch();};
         function runBatch(){
           const el=document.getElementById("stages");
@@ -455,6 +451,25 @@
             }
           },900);
         }
+        // 오류 행·잠금 충돌 표는 서버(드라이런)가 채운다. 마크업에 예시 행을 박아두면
+        // 서버가 없을 때 그 예시가 사실로 읽힌다(슬라이스 47·48) — 빈 상태만 그린다.
+        // 두 표에 문구를 쓰는 단일 통로. 표가 비어 있으면 화면은 '0건'이 아니라
+        // '왜 비었는지'를 말해야 한다.
+        function rowsNote(msg){
+          ["errRows","lockRows"].forEach(function(id){
+            var tb=document.getElementById(id);
+            if(tb) tb.innerHTML='<tr><td colspan="4" class="text-center '
+              +'text-body-tertiary py-4">'+msg+'</td></tr>';
+          });
+        }
+        // force=true면 이전 검증 결과를 지운다 — 새 파일을 검증하는 동안 지난 배치의
+        // 오류 행이 남아 있으면 그게 이번 파일의 결과로 읽힌다.
+        function emptyRows(force){
+          var tb=document.getElementById("errRows");
+          if(!tb||(!force&&tb.querySelector("tr"))) return;
+          rowsNote(force?"검증 결과를 기다리는 중…":"서버에 연결되면 표시됩니다.");
+        }
+        emptyRows();
         stepbar();if(window.feather)feather.replace();
 
         // ══ LIVE 배선 (슬라이스 50) — 업로드 → 드라이런 → 확인 → 적용 ══
@@ -465,12 +480,24 @@
           return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
         function fmt(n){return (n==null?0:n).toLocaleString();}
         function mb(b){return (b/1048576).toFixed(1)+"MB";}
+        // 배지는 '지금 무엇을 보고 있는가'를 말한다. 파일을 골랐다고 연결된 것이 아니므로
+        // 서버 응답을 받은 뒤에만 실데이터라고 말하고, 못 닿으면 되돌린다(index.html과 같은 규약).
+        // 과장은 금지, 축소는 허용 — 서버가 400으로 거부한 경우는 배지를 올리지 않는다.
+        function srcOk(){
+          var b=document.getElementById("dataSrc"); if(!b) return;
+          b.textContent="실데이터 · Cloud SQL";
+          b.classList.remove("badge-phoenix-secondary");
+          b.classList.add("badge-phoenix-primary");
+        }
+        function srcFail(){
+          var b=document.getElementById("dataSrc"); if(!b) return;
+          b.textContent="연결 안 됨";
+          b.classList.remove("badge-phoenix-primary");
+          b.classList.add("badge-phoenix-secondary");
+        }
         function liveOn(){
           if(LIVE) return;
           LIVE=true;
-          var b=document.getElementById("dataSrc");
-          if(b){b.textContent="실데이터 · Cloud SQL";
-                b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");}
           // 경고 배너를 실제 동작 설명으로 교체
           document.querySelectorAll(".alert-warning").forEach(function(a){
             if(/실제 적재가 되지 않습니다/.test(a.textContent)){
@@ -523,6 +550,7 @@
           if(!PICKED.master){renderImpact();show(2);return;}
           var btn=this, old=btn.textContent;
           btn.disabled=true; btn.textContent="검증 중…";
+          emptyRows(true);                  /* 지난 검증 결과를 이번 파일 것으로 읽히게 두지 않는다 */
           var fd=new FormData();
           fd.append("master",PICKED.master);
           if(PICKED.dbp&&PICKED.dbs){fd.append("db_products",PICKED.dbp);fd.append("db_specs",PICKED.dbs);}
@@ -533,6 +561,7 @@
               btn.disabled=false; btn.textContent=old;
               if(!res.ok){
                 var d=res.j.detail;
+                rowsNote("검증이 거부되어 표시할 결과가 없습니다.");
                 alert("검증 실패: "+(typeof d==="string"?d:JSON.stringify(d)));
                 return;
               }
@@ -558,17 +587,32 @@
                   +c[0]+'</p><h4 class="mb-1">'+c[1]
                   +'<span class="fs-10 fw-semibold text-body-tertiary"> '+c[2]+'</span></h4>'
                   +'<span class="badge badge-phoenix badge-phoenix-'+c[3]+' fs-10">'+c[4]
-                  +'</span></div></div>';}).join("")
-                +(s.error_samples&&s.error_samples.length
-                  ? '<div class="col-12 mt-2"><div class="fs-10 text-body-tertiary">거부된 행(최대 20):'
-                    +s.error_samples.map(function(x){return ' #'+x.row_no+' '+esc(x.reason);}).join(" ·")
-                    +'</div></div>' : "");
+                  +'</span></div></div>';}).join("");
+              // 검증이 성공했으므로 두 표의 '서버에 연결되면 표시됩니다'는 더 이상 사실이 아니다.
+              // 서버가 준 것만 그린다: 오류 행은 응답에 있고(최대 20), 잠금 충돌 목록은 없다.
+              var smp=s.error_samples||[];
+              var er=document.getElementById("errRows");
+              if(er) er.innerHTML = smp.length
+                ? smp.map(function(x){return '<tr><td>'+fmt(x.row_no)+'</td>'
+                    +'<td class="text-body-tertiary">—</td><td>'+esc(x.reason)+'</td>'
+                    +'<td class="text-body-tertiary">—</td></tr>';}).join("")
+                  +(s.error>smp.length
+                    ? '<tr><td colspan="4" class="text-body-tertiary">…외 '
+                      +fmt(s.error-smp.length)+'행 — 전체는 일괄 등록 이력에서 봅니다.</td></tr>' : "")
+                : '<tr><td colspan="4" class="text-center text-body-tertiary py-4">'
+                  +'거부된 행이 없습니다.</td></tr>';
+              var lr=document.getElementById("lockRows");
+              if(lr) lr.innerHTML='<tr><td colspan="4" class="text-center text-body-tertiary py-4">'
+                +'잠긴 필드는 적재가 자동으로 유지합니다 — 검증 응답은 충돌 목록을 내려주지 않습니다.</td></tr>';
+              srcOk();
               var t3=document.getElementById("tostep3");
               if(t3) t3.textContent="이대로 적재 실행 ("+fmt(s.ok)+"건)";
               show(2);
               if(window.feather)feather.replace();
             })
-            .catch(function(e){btn.disabled=false;btn.textContent=old;alert("검증 실패: "+e.message);});
+            .catch(function(e){btn.disabled=false;btn.textContent=old;
+              srcFail(); rowsNote("서버에 연결되면 표시됩니다.");
+              alert("검증 실패: "+e.message);});
         };
         // 적용 — 드라이런이 보고한 건수를 되돌려 보낸다(다른 파일 확정 사고 방지)
         document.getElementById("tostep3").onclick=function(){
@@ -583,6 +627,11 @@
           if(el)el.innerHTML='<div class="d-flex align-items-center gap-3 py-2">'
             +'<div class="spinner-border spinner-border-sm text-warning" role="status"></div>'
             +'<b class="fs-9">정본 반영 중 — 한 트랜잭션으로 처리합니다</b></div>';
+          // 실패 화면 위에 지난 성공의 결과 카드가 남아 있으면 그게 이번 결과로 읽힌다.
+          function hideResult(){
+            var rw0=document.getElementById("result");
+            if(rw0)rw0.classList.add("d-none");
+          }
           fetch("/api/admin/catalog-import/apply",{method:"POST",body:fd})
             .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
             .then(function(res){
@@ -590,22 +639,30 @@
               var st=document.getElementById("batchstate");
               var pb=document.getElementById("pbar");
               if(!res.ok){
+                hideResult();
                 var d=res.j.detail||{};
                 if(st){st.className="badge badge-phoenix badge-phoenix-danger";st.textContent="실패";}
                 if(el)el.innerHTML='<div class="alert alert-subtle-danger py-2 px-3 fs-9 mb-0">'
                   +esc(typeof d==="string"?d:(d.detail||d.error||"적재 실패"))+'</div>';
                 return;
               }
+              srcOk();
               STAGE=null;                       /* 같은 업로드를 두 번 적용하지 못하게 */
               if(pb)pb.style.width="100%";
               if(st){st.className="badge badge-phoenix badge-phoenix-primary";st.textContent="완료";}
               if(el)el.innerHTML='<div class="alert alert-subtle-info py-2 px-3 fs-9 mb-0">'
                 +esc(res.j.verdict)+'</div>';
+              // after가 없으면 0으로 채우지 않는다 — 서버가 안 준 수를 지어내는 것이다.
+              // 여기서 예외가 나면 .catch가 성공한 적재를 '실패'로 보고한다(가장 나쁜 오보).
+              var af=res.j.after||{};
+              function afv(v){return v==null?"—":fmt(v)+"건";}
               var rc=document.getElementById("resultcards");
-              if(rc)rc.innerHTML=[["배치",res.j.job_id],["반영",fmt(res.j.ok)+"건"],
-                ["검수 회부",fmt(res.j.review)+"건"],["오류",fmt(res.j.error)+"행"],
-                ["카탈로그",fmt(res.j.after.catalog)+"건"],["추천 후보",fmt(res.j.after.pool)+"건"],
-                ["검수 대기",fmt(res.j.after.review)+"건"]]
+              if(rc)rc.innerHTML=[["배치",res.j.job_id==null?"—":res.j.job_id],
+                ["반영",afv(res.j.ok)],
+                ["검수 회부",afv(res.j.review)],
+                ["오류",res.j.error==null?"—":fmt(res.j.error)+"행"],
+                ["카탈로그",afv(af.catalog)],["추천 후보",afv(af.pool)],
+                ["검수 대기",afv(af.review)]]
                 .map(function(c){return '<div class="col-6 col-md-3"><div class="bg-body-secondary '
                   +'rounded-3 p-2 text-center"><p class="fs-10 text-body-tertiary mb-0">'+c[0]
                   +'</p><b>'+c[1]+'</b></div></div>';}).join("");
@@ -614,8 +671,13 @@
               if(window.feather)feather.replace();
             })
             .catch(function(e){btn.disabled=false;btn.textContent=old;
+              srcFail(); hideResult();
+              var st2=document.getElementById("batchstate");
+              if(st2){st2.className="badge badge-phoenix badge-phoenix-danger";st2.textContent="실패";}
               if(el)el.innerHTML='<div class="alert alert-subtle-danger py-2 px-3 fs-9 mb-0">'
-                +esc(e.message)+'</div>';});
+                +'<b>서버 응답을 받지 못했습니다.</b> 적재가 되었는지 알 수 없습니다 — '
+                +'다시 실행하지 말고 <a href="csv-jobs.html" class="alert-link">일괄 등록 이력</a>에서 '
+                +'확인하십시오. ('+esc(e.message)+')</div>';});
         };
       })();
       </script>
@@ -637,9 +699,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>

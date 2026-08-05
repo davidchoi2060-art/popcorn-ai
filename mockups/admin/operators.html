@@ -57,7 +57,10 @@
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"><style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style></head>
 
 
-  <body data-screen-id="ADM-SYS-020" data-domain="system">
+  <!-- 이 화면에는 더미가 없다(하드코딩 4행을 걷어냈다). 공통 인증 띠가 "화면의 수치는
+       실데이터가 아니라 더미입니다"라고 말하면 그것이 거짓말이 되므로, 미로그인 안내를
+       사실에 맞게 바꾸도록 표시한다 — 아직 폴백이 남은 화면은 이 표시가 없어 문구가 그대로다. -->
+  <body data-screen-id="ADM-SYS-020" data-domain="system" data-dummy-fallback="none">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -145,20 +148,20 @@
                 <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <!-- 바로가기 배지에 건수를 박아두지 않는다: '대기 9'는 실제(검수 대기 6,490)와
+                         무관한 목업 시절 숫자였고, 아무도 갱신하지 않는다. 이 화면이 지운
+                         하드코딩 표와 정확히 같은 종류의 거짓말이다. 셀 자리는 링크만 남긴다. -->
+                    <a class="dropdown-item" href="review-queue.html"><span class="fw-normal text-body-highlight title">상품 검수</span></a>
+                    <a class="dropdown-item" href="price-review.html"><span class="fw-normal text-body-highlight title">가격 검토 대기</span></a>
+                    <a class="dropdown-item" href="sourcing.html"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span></a><a class="dropdown-item" href="stock-inbound.html"><span class="fw-normal text-body-highlight title">재고 입고</span></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>
                   </div>
-                  <hr class="my-0" />
-                  <h6 class="dropdown-header text-body-highlight fs-9 border-bottom border-translucent py-2 lh-sm">최근 검색</h6>
-                  <div class="py-2">
-                    <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">RTX 4060</span></a>
-                    <a class="dropdown-item" href="product-edit.html?id=P-3390"><span class="fw-normal text-body-highlight title">P-3390 마이크로닉스 500W</span></a>
-                    <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">DDR5-5600</span></a>
-                  </div>
+                  <!-- '최근 검색'은 **이 사람이 무엇을 찾았는지**를 말하는 자리다. 지어낸
+                       상품명·상품코드를 박아두면 남의 기록을 내 기록으로 보여주는 것이고,
+                       그중 하나는 존재하지도 않는 코드로 편집 화면을 열고 있었다.
+                       기록을 실제로 보관하기 전까지 이 칸은 두지 않는다. -->
                 </div>
                 <div class="text-center">
                   <p class="fallback fw-bold fs-7 d-none">결과가 없습니다.</p>
@@ -184,11 +187,15 @@
                   <div class="card-header p-2">
                     <div class="d-flex justify-content-between">
                       <h5 class="text-body-emphasis mb-0">알림</h5>
-                      <button class="btn btn-link p-0 fs-9 fw-normal" type="button">모두 읽음</button>
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <!-- 알림은 **아무것도 연결돼 있지 않다.** 여기에는 목업 시절 알림 4건이
+                         박혀 있었다 — 지어낸 검수 건수·상품명·공급처·매입가·주문번호에
+                         '10분 전' 같은 상대 시각까지 붙어 방금 일어난 일로 읽혔고, 읽지 않음
+                         표시까지 달려 있었다. 지운 문구를 주석에도 다시 적지 않는다(슬라이스 89).
+                         원천이 생기기 전까지는 연결되지 않았다는 사실만 적는다. -->
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-3 py-4 text-center"><p class="fs-9 text-body-tertiary mb-0">알림은 아직 연결되지 않았습니다 &mdash; 연결되면 서버가 보낸 것만 표시합니다.</p></div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -231,7 +238,7 @@
                         <img class="rounded-circle " src="assets/img/team/72x72/57.webp" alt="" />
 
                       </div>
-                      <h6 class="mt-2 text-body-emphasis">david · 관리자</h6>
+                      <h6 class="mt-2 text-body-emphasis">로그인이 필요합니다</h6>
                     </div>
                     <div class="mb-3 mx-3">
                       <input class="form-control form-control-sm" id="statusUpdateInput" type="text" placeholder="상태 메시지" />
@@ -264,19 +271,20 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">운영자 · 권한</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">운영자 · 권한 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">운영자 · 권한 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-SYS-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span></h2>
           <p class="text-body-tertiary mb-0">확정·잠금·정책 발행은 <b class="text-body-secondary">누가 했는지가 남는 행위</b>입니다. 역할에 따라 허용 범위가 다릅니다.</p></div>
           <button id="invite" class="btn btn-primary btn-sm">직원 등록 방법</button>
         </div>
         <div class="row g-3">
-          <div class="col-12 col-lg-7"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
+          <!-- 이 표는 **비워 둔다.** 예전에는 david·김운영·박검수·이알바 4행이 마크업에
+               박혀 있었다 — 서버에 못 닿으면 그대로 남아, 처음 보는 운영자에게는 그것이
+               실제 계정 목록으로 읽혔다(좌측 메뉴 배지가 '검수 9'라고 말하던 것과 같은 사고).
+               실데이터는 아래 #liveSys 의 '등록된 계정'이 그린다. -->
+          <div class="col-12 col-lg-7" id="opsFallbackCard"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
             <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">운영자</th><th>역할</th><th>최근 접속</th><th>상태</th></tr></thead>
-            <tbody>
-              <tr><td class="ps-4 fw-semibold">david <span class="fs-10 text-body-tertiary">대표</span></td><td><span class="badge badge-phoenix badge-phoenix-danger">관리자</span></td><td class="text-body-tertiary">지금</td><td><span class="badge badge-phoenix badge-phoenix-primary">활성</span></td></tr>
-              <tr><td class="ps-4 fw-semibold">김운영 <span class="fs-10 text-body-tertiary">매장</span></td><td><span class="badge badge-phoenix badge-phoenix-warning">운영자</span></td><td class="text-body-tertiary">오늘 09:12</td><td><span class="badge badge-phoenix badge-phoenix-primary">활성</span></td></tr>
-              <tr><td class="ps-4 fw-semibold">박검수 <span class="fs-10 text-body-tertiary">매장</span></td><td><span class="badge badge-phoenix badge-phoenix-warning">운영자</span></td><td class="text-body-tertiary">어제</td><td><span class="badge badge-phoenix badge-phoenix-primary">활성</span></td></tr>
-              <tr><td class="ps-4 fw-semibold">이알바 <span class="fs-10 text-body-tertiary">주말</span></td><td><span class="badge badge-phoenix badge-phoenix-secondary">조회 전용</span></td><td class="text-body-tertiary">07-06</td><td><span class="badge badge-phoenix badge-phoenix-secondary">휴면</span></td></tr>
-            </tbody>
+            <!-- 빈 tbody로 두면 머리글만 남아 **'등록된 운영자 0명'**으로 읽힌다.
+                 요청이 끝나기 전(또는 응답이 영영 안 오는 동안)에도 왜 비었는지 말해야 한다. -->
+            <tbody id="opsFallbackBody"><tr><td colspan="4" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr></tbody>
           </table></div></div></div></div>
           <div class="col-12 col-lg-5"><div class="card"><div class="card-body">
             <h6 class="mb-2">역할별 허용 범위</h6>
@@ -442,9 +450,11 @@
           document.querySelectorAll('[data-fix]').forEach(function(a){
             a.onclick = function(e){
               e.preventDefault();
-              var row = a.closest('tr');
-              var cur = row ? row.querySelector('.fs-10').childNodes[0].nodeValue.trim() : '';
-              fixEmail(a.getAttribute('data-fix'), a.getAttribute('data-name'), cur);
+              /* 현재 이메일은 **행에서 긁지 않는다.** `.fs-10`은 '나' 배지에도 붙어 있어
+                 본인 계정의 주소가 깨진 경우 첫 매치가 '나'가 되고, 정정 창이 현재 값으로
+                 '나'를 보여준다(무엇을 고치는지 못 보고 고치게 된다). 값을 그대로 싣는다. */
+              fixEmail(a.getAttribute('data-fix'), a.getAttribute('data-name'),
+                       a.getAttribute('data-cur') || '');
             };
           });
         }
@@ -520,7 +530,8 @@
                      — 조용히 두지 않고 그 자리에서 고칠 수 있게 한다(슬라이스 73). */
                   + (badEmail(o.email)
                       ? ' <a href="#!" class="text-danger fw-bold" data-fix="' + o.id
-                        + '" data-name="' + esc(o.name) + '">형식 오류 — 정정</a>' : '')
+                        + '" data-name="' + esc(o.name) + '"'
+                        + ' data-cur="' + esc(o.email) + '">형식 오류 — 정정</a>' : '')
                   + '</div></td>'
                   + '<td>' + (o.status === '활성' ? sel('c' + o.id, o.role)
                       : '<span class="text-body-tertiary">' + esc(o.role_label) + '</span>') + '</td>'
@@ -591,11 +602,40 @@
           if(window.feather) feather.replace();
         }
 
+        /* ── 못 불러왔을 때 ────────────────────────────────────────────────
+           마크업에 사람 4명(david·김운영·…)을 박아두는 대신 **그 자리에 사실을 적는다.**
+           null 가드를 붙이는 이유: 실패 경로에서 예외가 나면 그 뒤 코드가 통째로 안 돈다. */
+        function fallbackRow(msg){
+          var tb = document.getElementById('opsFallbackBody');
+          if(!tb) return;
+          tb.innerHTML = '<tr><td colspan="4" class="text-center text-body-tertiary py-4">'
+            + esc(msg || '서버에 연결되면 표시됩니다.') + '</td></tr>';
+        }
+        function showFallbackCard(on){
+          var c = document.getElementById('opsFallbackCard');
+          if(c) c.hidden = !on;
+        }
+        /* 배지는 더는 '더미 데이터'라고 말할 수 없다 — 지울 더미가 없다.
+           원천(`/api/admin/operators`)은 있고 못 불러온 것뿐이므로 '연결 안 됨'이다
+           ('원천 준비 중'은 ai-cost 처럼 원천 자체가 없는 화면의 문구다).
+           401/403은 연결은 됐고 권한이 없는 것이라 그대로 말한다 — 여기서 '연결 안 됨'이라
+           적으면 운영자가 네트워크를 뒤지게 된다. */
+        function srcBadge(text){
+          var b = document.getElementById('dataSrc');
+          if(!b) return;
+          b.textContent = text;
+          b.className = 'badge badge-phoenix badge-phoenix-warning align-middle fs-10';
+        }
+
         function denied(code){
           var host = document.getElementById('liveSys');
+          srcBadge(code === 401 ? '로그인 필요' : '권한 없음');
+          fallbackRow(code === 401 ? '로그인하면 표시됩니다.'
+                                   : '관리자(owner) 권한으로 보면 표시됩니다.');
+          if(!host) return;
           host.innerHTML = card('운영자 목록을 볼 수 없습니다 '
               + '<span class="badge badge-phoenix badge-phoenix-warning fs-10 align-middle">' + code + '</span>',
-            '아래 표는 목업 더미입니다 — 실제 계정이 아닙니다.',
+            '위 표는 비어 있습니다 — 목록을 받지 못했습니다.',
             code === 401
               ? '<p class="fs-9 text-body-secondary mb-0">로그인이 필요합니다 — <a href="login.html">관리자 로그인</a></p>'
               : '<p class="fs-9 text-body-secondary mb-0">이 화면은 <b>관리자(owner) 권한 전용</b>입니다. '
@@ -610,8 +650,18 @@
               if(!r.ok) throw new Error(r.status);
               return r.json();
             })
-            .then(function(d){ if(d) render(d); })
-            .catch(function(){});   // API 부재 = 목업 단독 열람(더미 원형 유지)
+            .then(function(d){
+              if(!d) return;              // denied()가 이미 화면을 세웠다
+              render(d);
+              showFallbackCard(false);    // 실데이터를 그린 뒤에만 빈 표를 접는다
+            })
+            .catch(function(){
+              // 서버가 없으면 지어내지 않는다 — 없다고 말한다.
+              // render()가 도중에 죽어도 여기로 굴러오므로 화면이 백지로 남지 않는다.
+              showFallbackCard(true);
+              fallbackRow('서버에 연결되면 표시됩니다.');
+              srcBadge('연결 안 됨');
+            });
         }
         load();
       })();
@@ -634,20 +684,20 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <!-- 바로가기 배지에 건수를 박아두지 않는다: '대기 9'는 실제(검수 대기 6,490)와
+                         무관한 목업 시절 숫자였고, 아무도 갱신하지 않는다. 이 화면이 지운
+                         하드코딩 표와 정확히 같은 종류의 거짓말이다. 셀 자리는 링크만 남긴다. -->
+                    <a class="dropdown-item" href="review-queue.html"><span class="fw-normal text-body-highlight title">상품 검수</span></a>
+                    <a class="dropdown-item" href="price-review.html"><span class="fw-normal text-body-highlight title">가격 검토 대기</span></a>
+                    <a class="dropdown-item" href="sourcing.html"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span></a><a class="dropdown-item" href="stock-inbound.html"><span class="fw-normal text-body-highlight title">재고 입고</span></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>
                   </div>
-                  <hr class="my-0" />
-                  <h6 class="dropdown-header text-body-highlight fs-9 border-bottom border-translucent py-2 lh-sm">최근 검색</h6>
-                  <div class="py-2">
-                    <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">RTX 4060</span></a>
-                    <a class="dropdown-item" href="product-edit.html?id=P-3390"><span class="fw-normal text-body-highlight title">P-3390 마이크로닉스 500W</span></a>
-                    <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">DDR5-5600</span></a>
-                  </div>
+                  <!-- '최근 검색'은 **이 사람이 무엇을 찾았는지**를 말하는 자리다. 지어낸
+                       상품명·상품코드를 박아두면 남의 기록을 내 기록으로 보여주는 것이고,
+                       그중 하나는 존재하지도 않는 코드로 편집 화면을 열고 있었다.
+                       기록을 실제로 보관하기 전까지 이 칸은 두지 않는다. -->
                 </div>
                 <div class="text-center">
                   <p class="fallback fw-bold fs-7 d-none">결과가 없습니다.</p>

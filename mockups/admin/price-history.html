@@ -189,7 +189,7 @@
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary" data-noti-empty>알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -265,22 +265,22 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">가격 이력</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">가격 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">가격 이력 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span></h2>
           <p class="text-body-tertiary mb-0">판매가·공급처별 매입가의 모든 변동과 <b class="text-body-secondary">그 사유</b>가 남습니다. 견적 재현·소명의 근거입니다.</p></div>
-          <select id="pick" class="form-select form-select-sm" style="max-width:320px;"><option>P-4821 — 이엠텍 RTX 4060 STORM X2 WHITE</option><option>P-3390 — 마이크로닉스 Classic II 500W</option></select>
+          <!-- 상품 목록은 서버가 채운다(load 성공 경로). 마크업에 예시 상품을 박아두면
+               서버가 죽었을 때 그것이 우리 카탈로그에 있는 상품으로 읽힌다. -->
+          <select id="pick" class="form-select form-select-sm" style="max-width:320px;"><option value="">불러오는 중…</option></select>
         </div>
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
-            <h6 class="mb-2" id="chartTitle">최근 6주 추이</h6>
+            <h6 class="mb-2" id="chartTitle">가격 추이</h6>
+            <!-- 선·눈금·범례는 전부 서버 값으로 그린다(drawChart). 마크업에는 축만 둔다 —
+                 그럴듯한 꺾은선과 '42만/34만'·'용산도매A'는 서버가 죽어도 사실처럼 읽힌다. -->
             <svg id="chart" viewBox="0 0 560 220" style="width:100%;height:auto;">
               <line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
-              <text x="4" y="30" font-size="10" fill="var(--phoenix-tertiary-color)">42만</text><text x="4" y="105" font-size="10" fill="var(--phoenix-tertiary-color)">38만</text><text x="4" y="185" font-size="10" fill="var(--phoenix-tertiary-color)">34만</text>
-              <polyline points="60,60 140,60 220,55 300,50 380,48 460,40 540,40" fill="none" stroke="var(--phoenix-primary)" stroke-width="2.5"/>
-              <polyline points="60,140 140,138 220,130 300,132 380,120 460,118 540,110" fill="none" stroke="var(--phoenix-warning)" stroke-width="2" stroke-dasharray="5 4"/>
-              <polyline points="60,150 140,150 220,146 300,140 380,138 460,130 540,124" fill="none" stroke="var(--phoenix-info)" stroke-width="2" stroke-dasharray="2 3"/>
-              <text x="60" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">6/1</text><text x="300" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">6/22</text><text x="520" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">7/13</text>
+              <text x="295" y="105" text-anchor="middle" font-size="12" fill="var(--phoenix-tertiary-color)">불러오는 중…</text>
             </svg>
-            <div class="d-flex gap-3 fs-10 text-body-tertiary" id="legend"><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입 · 용산도매A</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-info);vertical-align:middle;"></span> 매입 · 다나와직송B</span></div>
+            <div class="d-flex gap-3 fs-10 text-body-tertiary" id="legend"></div>
             <p class="fs-10 text-body-quaternary mt-2 mb-0" id="chartNote" hidden></p>
           </div></div></div>
           <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body p-0">
@@ -289,11 +289,7 @@
                  일자 열은 '07-13' 같은 문자열이라 정렬 대상에서 뺀다(문자열 정렬은 오해를 부른다). -->
             <div id="histList" class="table-list" data-list='{"valueNames":["kind","change","reason"]}'>
             <div class="table-responsive" style="max-height:320px;overflow-y:auto;"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-3">일자</th><th class="sort" data-sort="kind">구분</th><th class="sort text-end" data-sort="change">변동</th><th class="sort" data-sort="reason">사유</th></tr></thead><tbody class="list" id="histRows">
-              <tr><td class="ps-3">07-13</td><td class="kind">매입 A</td><td class="change text-end">356,000 → 352,000</td><td class="reason"><a href="csv-jobs.html" class="fs-10">배치 #213</a></td></tr>
-              <tr><td class="ps-3">07-12</td><td class="kind">매입 B</td><td class="change text-end">364,000 → 361,000</td><td class="reason"><a href="csv-jobs.html" class="fs-10">배치 #212</a></td></tr>
-              <tr><td class="ps-3">07-08</td><td class="kind fw-bold">판매가</td><td class="change text-end fw-bold">405,000 → 398,000</td><td class="reason"><a href="price-review.html" class="fs-10">가격 검토 승인</a> · 김운영</td></tr>
-              <tr><td class="ps-3">07-02</td><td class="kind">매입 A</td><td class="change text-end">361,000 → 356,000</td><td class="reason"><a href="csv-jobs.html" class="fs-10">배치 #208</a></td></tr>
-              <tr><td class="ps-3">06-25</td><td class="kind fw-bold">판매가</td><td class="change text-end fw-bold">412,000 → 405,000</td><td class="reason">운영자 직접 수정 · david</td></tr>
+              <tr><td colspan="4" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr>
             </tbody></table></div>
             </div>
           </div></div></div>
@@ -334,6 +330,8 @@
         const fmtD=iso=>{const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
         // 공급처별 매입가 다중선(0004 supplier_id) + 판매가 1선. 색은 팔레트 순환(초록 없음).
         const SUP_COLS=["var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-secondary)","var(--phoenix-danger)"];
+        const AXES=`<line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>`;
+        const svgMsg=t=>AXES+`<text x="295" y="105" text-anchor="middle" font-size="12" fill="var(--phoenix-tertiary-color)">${t}</text>`;
         function drawChart(series, bySupplier){
           const pts=[...series.sale.map(p=>({...p,k:"sale"})),...series.purchase.map(p=>({...p,k:"purchase"}))];
           const svg=document.getElementById("chart");
@@ -364,6 +362,9 @@
               LIVE=true;
               const sel=document.getElementById("pick");
               sel.innerHTML=d.products.map(p=>`<option value="${p.product_code}"${d.product&&p.product_code===d.product.product_code?" selected":""}>${p.sku} — ${p.name} (${p.count}건)</option>`).join("");
+              // 원장이 비면 서버가 product:null 을 준다(정상 응답이다). 여기서 d.product.sku 를 읽으면
+              // TypeError → 아래 catch 가 offline() 을 불러 **연결됐는데 '연결 안 됨'이라 거짓말한다.**
+              if(!d.product){ ledgerEmpty(d.note); return; }
               document.getElementById("chartTitle").textContent=`${d.product.sku} 가격 추이 — 현재 매입 ${won(d.product.purchase)} · 판매 ${won(d.product.sale)}`;
               const sup=d.by_supplier||[];
               document.getElementById("legend").innerHTML=
@@ -382,12 +383,47 @@
               wireList();
               const b=document.getElementById("dataSrc");
               b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
-              sel.onchange=()=>load(+sel.value);
+              // 다시 부를 때도 실패를 삼키지 않는다 — catch 가 없으면 서버가 죽은 뒤에도
+              // **앞 상품의 표·차트가 그대로 남은 채 셀렉트만 새 상품**을 가리킨다(남의 이력을 이 상품 것으로 읽는다).
+              sel.onchange=()=>load(+sel.value).catch(()=>{ offline(); wireList(); });
               if(window.feather)feather.replace();
             });
         }
+        // 서버는 답했는데 원장이 비었다 — '0건'이라는 사실이지 연결 실패가 아니다. 배지를 낮추지 않는다.
+        function ledgerEmpty(note){
+          const svg=document.getElementById("chart");if(svg)svg.innerHTML=svgMsg("가격 이력이 아직 없습니다.");
+          const lg=document.getElementById("legend");if(lg)lg.innerHTML="";
+          const ct=document.getElementById("chartTitle");if(ct)ct.textContent="가격 추이";
+          const hc=document.getElementById("histCount");if(hc)hc.textContent="0건";
+          const rows=document.getElementById("histRows");
+          if(rows)rows.innerHTML=`<tr><td colspan="4" class="text-center text-body-tertiary py-4">가격 이력이 아직 없습니다.</td></tr>`;
+          const sel=document.getElementById("pick");
+          if(sel)sel.innerHTML=`<option value="">이력이 있는 상품이 없습니다</option>`;
+          const cn=document.getElementById("chartNote");if(cn&&note){cn.hidden=false;cn.textContent=note;}
+          const b=document.getElementById("dataSrc");
+          if(b){b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");}
+          wireList();
+        }
+        // 서버에 못 닿았을 때 — 지어내지 않고 '못 불러왔다'고만 말한다.
+        // 마크업에 더미가 없으므로 '불러오는 중…'을 그대로 두면 영원히 로딩처럼 보인다.
+        // DOM 은 전부 null 가드한다: 여기서 예외가 나면 뒤의 wireList 가 통째로 안 돈다.
+        function offline(){
+          const svg=document.getElementById("chart");if(svg)svg.innerHTML=svgMsg("서버에 연결되면 표시됩니다.");
+          const lg=document.getElementById("legend");if(lg)lg.innerHTML="";
+          const ct=document.getElementById("chartTitle");if(ct)ct.textContent="가격 추이";
+          const hc=document.getElementById("histCount");if(hc)hc.textContent="";
+          const rows=document.getElementById("histRows");
+          if(rows)rows.innerHTML=`<tr><td colspan="4" class="text-center text-body-tertiary py-4">서버에 연결되면 표시됩니다.</td></tr>`;
+          const sel=document.getElementById("pick");
+          if(sel)sel.innerHTML=`<option value="">서버에 연결되면 표시됩니다.</option>`;
+          // 앞선 조회가 성공했다면 안내문·배지가 '실데이터'로 남아 있다 — 함께 거둔다.
+          const cn=document.getElementById("chartNote");if(cn){cn.hidden=true;cn.textContent="";}
+          // 원천(/api/admin/price-history)은 있다 — 못 불러온 것이지 준비 중이 아니다.
+          const b=document.getElementById("dataSrc");
+          if(b){b.textContent="연결 안 됨";b.classList.replace("badge-phoenix-primary","badge-phoenix-secondary");}
+        }
         document.getElementById("pick").onchange=()=>{};
-        load(null).catch(()=>{ wireList(); });   // 더미 폴백 표에도 정렬은 붙여 둔다(List 없으면 조용히 건너뜀)
+        load(null).catch(()=>{ offline(); wireList(); });   // 빈 표에도 정렬은 붙여 둔다(List 없으면 조용히 건너뜀)
         if(window.feather)feather.replace();
       })();
       </script>
@@ -409,9 +445,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>

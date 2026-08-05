@@ -188,7 +188,7 @@
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary" data-noti-empty>알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -264,16 +264,16 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">시스템</a></li><li class="breadcrumb-item active">운영 전환 설정</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 gap-2">
-          <div><h2 class="mb-1">운영 전환 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-OPS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">운영 전환 설정 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-OPS-010</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2>
           <p class="text-body-tertiary mb-0">쇼핑몰 병행 운영기의 분기 스위치. <b class="text-body-secondary">어떤 모드든 주문 원장은 본 시스템에 생성</b>되고, 인계는 복제 전달일 뿐입니다.</p></div>
           <div class="d-flex align-items-center gap-2">
-            <span class="badge badge-phoenix badge-phoenix-secondary">현재 설정 v3 · 07-14 적용</span>
+            <span class="badge badge-phoenix badge-phoenix-secondary">현재 설정 —</span>
             <span class="badge badge-phoenix badge-phoenix-danger">관리자 전용</span>
-            <button id="publish" class="btn btn-primary btn-sm">저장 → v4 발행</button>
+            <button id="publish" class="btn btn-phoenix-secondary btn-sm">저장 방식 안내</button>
           </div>
         </div>
         <div class="alert alert-subtle-warning d-flex align-items-center py-2 fs-9 mb-3" role="alert"><span data-feather="alert-triangle" style="width:14px;height:14px;flex:none;" class="me-2"></span>
-          스위치 변경은 <b class="mx-1">즉시 고객 흐름을 바꿉니다.</b> 발행 시 설정 버전이 올라가고 작업 기록에 남습니다 — 과거 주문은 당시 설정 버전으로 해석됩니다.</div>
+          스위치 변경은 <b class="mx-1">즉시 고객 흐름을 바꿉니다.</b> 누른 그 순간 저장·적용되고 작업 기록에 남습니다 — 별도 발행 단계가 없습니다.</div>
 
         <div class="row g-3">
           <div class="col-12 col-lg-7">
@@ -281,25 +281,23 @@
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">전환 단계 프리셋</h5><span class="fs-10 text-body-tertiary">클릭 시 아래 스위치 일괄 적용</span>
               </div>
-              <div class="d-flex flex-wrap gap-2" id="presets"></div>
+              <div class="d-flex flex-wrap gap-2" id="presets"><p class="fs-9 text-body-tertiary mb-0">불러오는 중…</p></div>
             </div></div>
             <div class="card"><div class="card-body">
               <h5 class="mb-1">도메인별 스위치</h5>
               <p class="fs-9 text-body-tertiary mb-2">정산은 결제를 따르고, 환불(자체)은 자체 결제일 때만 가능합니다 — 어긋나면 자동 보정됩니다.</p>
-              <div id="switches"></div>
+              <div id="switches"><p class="fs-9 text-body-tertiary mb-0">불러오는 중…</p></div>
             </div></div>
           </div>
           <div class="col-12 col-lg-5">
             <div class="card mb-3"><div class="card-body">
               <h6 class="mb-2">이 조합에서 벌어지는 일 <span class="fs-10 fw-normal text-body-tertiary">— 영향 미리보기</span></h6>
-              <div id="preview" class="fs-9 d-flex flex-column gap-2"></div>
+              <div id="preview" class="fs-9 d-flex flex-column gap-2"><p class="fs-9 text-body-tertiary mb-0">불러오는 중…</p></div>
             </div></div>
             <div class="card"><div class="card-body p-0">
               <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h6 class="mb-0">설정 변경 이력</h6><a href="activity-logs.html" class="fs-10">작업 기록</a></div>
               <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><tbody id="history">
-                <tr><td class="ps-3 text-body-tertiary">v3 · 07-14</td><td><b>david</b></td><td>결제 자체 → 쇼핑몰 (PG 점검)</td></tr>
-                <tr><td class="ps-3 text-body-tertiary">v2 · 07-08</td><td><b>david</b></td><td>회원 연동 쇼핑몰 → 자체 (독립 가입 개시)</td></tr>
-                <tr><td class="ps-3 text-body-tertiary">v1 · 07-01</td><td><b>david</b></td><td>최초 설정 (전부 쇼핑몰 인계)</td></tr>
+                <tr><td colspan="3" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr>
               </tbody></table></div>
             </div></div>
           </div>
@@ -310,70 +308,11 @@
       (function(){
         function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2600);}
 
-        // own=자체, mall=쇼핑몰
-        var SW={member:"own",pay:"mall",settle:"mall",ship:"mall",refund:"mall"};try{var _saved=JSON.parse(localStorage.getItem("popcorn-ops")||"null");if(_saved)for(var _k in SW)if(_saved[_k])SW[_k]=_saved[_k];}catch(e){} // 발행값 복원
-        var DEF=[
-         ["member","회원 연동","자체: 독립 가입(이메일·소셜). 쇼핑몰: 가입 시 쇼핑몰 계정 자동 생성·매핑, 기존 회원 이메일 병합 제안.","독립 가입","계정 매핑"],
-         ["pay","결제","자체: 본 시스템 PG 결제창. 쇼핑몰: S4에서 쇼핑몰 결제로 인계(현행).","자체 PG","쇼핑몰 인계"],
-         ["settle","정산","결제 주체가 정산 주체 — 결제 스위치를 자동으로 따릅니다.","자체 정산","쇼핑몰 합산"],
-         ["ship","배송","자체: 송장·추적을 배송 관리에서 처리. 쇼핑몰: 쇼핑몰 배송 프로세스 사용.","자체 처리","쇼핑몰 처리"],
-         ["refund","환불·클레임","자체 환불은 자체 결제(PG 취소 권한)일 때만 가능합니다.","자체 창구","쇼핑몰 창구"]
-        ];
-        var PRESETS=[
-         ["1단계 · 오픈","회원만 자체, 나머지 쇼핑몰 인계 — 리스크 최소",{member:"own",pay:"mall",settle:"mall",ship:"mall",refund:"mall"}],
-         ["2단계 · 병행","결제·정산·환불 자체, 배송은 쇼핑몰 — 부분 검증",{member:"own",pay:"own",settle:"own",ship:"mall",refund:"own"}],
-         ["3단계 · 독립","전부 자체 — 쇼핑몰은 레거시",{member:"own",pay:"own",settle:"own",ship:"own",refund:"own"}]
-        ];
-
-        function enforce(changed){
-          // 정산은 결제를 따름
-          if(SW.settle!==SW.pay){SW.settle=SW.pay;if(changed==="settle")toast("정산은 결제 주체를 따릅니다 — 결제와 동일하게 보정했어요.");else if(changed==="pay")toast("결제 변경에 따라 정산도 함께 전환됐어요.");}
-          // 환불 자체는 결제 자체일 때만
-          if(SW.refund==="own"&&SW.pay!=="own"){SW.refund="mall";toast("쇼핑몰 결제 건은 PG 취소 권한이 없어 환불도 쇼핑몰 창구로 보정했어요.");}
-        }
-        function stageName(){
-          for(var i=0;i<PRESETS.length;i++){var p=PRESETS[i][2],ok=true;for(var k in p)if(SW[k]!==p[k])ok=false;if(ok)return PRESETS[i][0];}
-          return "사용자 지정 조합";
-        }
-        function render(){
-          document.getElementById("presets").innerHTML=PRESETS.map(function(p,i){
-            var active=stageName()===p[0];
-            return '<button class="btn btn-sm '+(active?"btn-primary":"btn-phoenix-secondary")+'" data-p="'+i+'" style="min-width:160px;text-align:left;"><b>'+p[0]+'</b><br><span class="fs-10 '+(active?"":"text-body-tertiary")+'">'+p[1]+'</span></button>';
-          }).join("");
-          document.querySelectorAll("[data-p]").forEach(function(b){b.onclick=function(){var p=PRESETS[+b.dataset.p];for(var k in p[2])SW[k]=p[2][k];toast("프리셋 적용: "+p[0]+" — 저장해야 반영됩니다");render();};});
-
-          document.getElementById("switches").innerHTML=DEF.map(function(d){
-            var k=d[0],own=SW[k]==="own",locked=(k==="settle");
-            return '<div class="d-flex align-items-center gap-3 py-3 border-bottom">'
-             +'<div class="flex-1"><b class="fs-9 text-body-highlight">'+d[1]+'</b>'+(locked?' <span class="badge badge-phoenix badge-phoenix-secondary fs-10">결제 연동</span>':"")+'<br><span class="fs-10 text-body-tertiary">'+d[2]+'</span></div>'
-             +'<span class="badge badge-phoenix badge-phoenix-'+(own?"primary":"info")+' text-nowrap">'+(own?d[3]:d[4])+'</span>'
-             +'<div class="btn-group" role="group">'
-             +'<button class="btn btn-sm '+(own?"btn-primary":"btn-phoenix-secondary")+'" data-sw="'+k+':own" '+(locked?"disabled":"")+'>자체</button>'
-             +'<button class="btn btn-sm '+(!own?"btn-info":"btn-phoenix-secondary")+'" data-sw="'+k+':mall" '+(locked?"disabled":"")+'>쇼핑몰</button>'
-             +'</div></div>';
-          }).join("");
-          document.querySelectorAll("[data-sw]").forEach(function(b){b.onclick=function(){var a=b.dataset.sw.split(":");if(SW[a[0]]===a[1])return;SW[a[0]]=a[1];enforce(a[0]);render();};});
-
-          var pv=[];
-          pv.push(["현재 조합", "<b>"+stageName()+"</b>"]);
-          pv.push(["주문 원장","<b>항상 본 시스템</b> — 모드와 무관 (스냅샷·감사 유지)"]);
-          pv.push(["S4 결제 화면",SW.pay==="own"?"자체 결제창 (배송지+결제수단 입력)":"쇼핑몰 인계 화면 (현행)"]);
-          pv.push(["재고 예약(hold)",SW.pay==="own"?'<b class="text-primary">활성</b> — 결제 진행 중 임시 점유':"비활성 — 인계 시 쇼핑몰 재고 로직"]);
-          pv.push(["가입 흐름",SW.member==="own"?"독립 가입 (이메일·소셜)":"가입 시 쇼핑몰 계정 매핑 생성"]);
-          pv.push(["배송 추적",SW.ship==="own"?"마이페이지 + 배송 관리 화면":"쇼핑몰 배송 조회로 링크"]);
-          pv.push(["환불 접수",SW.refund==="own"?"마이페이지 → 환불·클레임 화면":"쇼핑몰 CS 창구 안내"]);
-          pv.push(["정산 마감",SW.settle==="own"?"결제·정산 화면에서 일 마감":"쇼핑몰 정산에 합산"]);
-          document.getElementById("preview").innerHTML=pv.map(function(x){return '<div class="d-flex justify-content-between border-bottom pb-2 gap-3"><span class="text-body-tertiary text-nowrap">'+x[0]+'</span><span class="text-end">'+x[1]+'</span></div>';}).join("");
-        }
-        document.getElementById("publish").onclick=function(){
-          var h=document.getElementById("history");
-          var tr=document.createElement("tr");
-          tr.innerHTML='<td class="ps-3 text-body-tertiary">v4 · 오늘</td><td><b>david</b></td><td>'+stageName()+' 적용</td>';
-          h.insertBefore(tr,h.firstChild);
-          localStorage.setItem("popcorn-ops",JSON.stringify(SW));toast("설정 v4 발행 — 즉시 적용 · 작업 기록 저장 (고객 S4에 반영됨)");
-        };
+        // 정적 더미 폴백을 걷어냈다(스위치 상태·프리셋·영향 미리보기·발행 시늉·localStorage 복원).
+        // 이 화면은 주문·결제 흐름을 실제로 바꾼다 — 서버에 못 닿았는데 "결제: 쇼핑몰 인계" 같은
+        // 가짜 현재 상태가 떠 있으면 운영자는 그것을 사실로 읽는다(좌측 메뉴 배지와 같은 논리).
+        // 남긴 것은 토스트 헬퍼뿐이다 — 아래 LIVE 스크립트가 저장 결과를 알리는 데 쓴다.
         window.__opsToast=toast;
-        render();if(window.feather)feather.replace();
       })();
       </script>
       <script>
@@ -479,15 +418,20 @@
         }
 
         function paint(d){
-          LIVE = true;
           MODES = d.modes;
-          badge.textContent = "실데이터 · Cloud SQL";
-          badge.classList.remove("badge-phoenix-secondary");
-          badge.classList.add("badge-phoenix-primary");
           paintPresets(d);
           paintSwitches(d);
           paintPreview(d);
           paintHistory(d);
+          // 다 그린 뒤에야 '실데이터'라고 말한다. 먼저 LIVE=true·배지를 세우면, 렌더 도중
+          // 예외가 났을 때 load()의 catch가 offline()으로 못 떨어져(!LIVE 가드) "실데이터"
+          // 배지 아래 "불러오는 중…"이 영원히 남는다 — 죽은 줄 모르는 화면이 가장 나쁘다.
+          LIVE = true;
+          if(badge){
+            badge.textContent = "실데이터 · Cloud SQL";
+            badge.classList.remove("badge-phoenix-secondary");
+            badge.classList.add("badge-phoenix-primary");
+          }
           if(window.feather) feather.replace();
         }
 
@@ -511,18 +455,38 @@
             .catch(function(){ toast("API 연결 실패"); });
         }
 
+        // 못 불러왔을 때. 원천(ops_settings)은 실재하므로 "더미 데이터"가 아니라 "연결 안 됨"이다.
+        // 여기서 예외가 나면 뒤 코드가 통째로 안 도니 요소마다 null 가드를 둔다.
+        var OFFLINE_MSG = "서버에 연결되면 표시됩니다.";
+        function offline(){
+          if(badge) badge.textContent = "연결 안 됨";
+          var box = '<p class="fs-9 text-body-tertiary mb-0">' + OFFLINE_MSG + '</p>';
+          ["presets", "switches", "preview"].forEach(function(id){
+            var el = document.getElementById(id);
+            if(el) el.innerHTML = box;
+          });
+          var h = document.getElementById("history");
+          if(h){
+            h.innerHTML = '<tr><td colspan="3" class="text-center text-body-tertiary py-4">'
+              + OFFLINE_MSG + '</td></tr>';
+          }
+        }
+
         function load(){
           fetch(API)
             .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
             .then(paint)
-            .catch(function(){ if(!LIVE) badge.textContent = "더미 데이터"; });
+            .catch(function(){ if(!LIVE) offline(); });
         }
 
-        // 발행 버튼은 LIVE에서 의미가 없다(스위치 클릭이 곧 저장이다) — 정직하게 알린다
+        // 발행 버튼은 LIVE에서 의미가 없다(스위치 클릭이 곧 저장이다) — 정직하게 알린다.
+        // 서버에 못 닿았을 때도 조용히 죽지 않는다 — 예전엔 더미 스크립트가 가짜 v4를 발행했다.
         var pub = document.getElementById("publish");
         if(pub){
           pub.addEventListener("click", function(){
-            if(LIVE) toast("스위치를 누르면 그 즉시 저장·적용됩니다 — 별도 발행 단계가 없습니다");
+            toast(LIVE
+              ? "스위치를 누르면 그 즉시 저장·적용됩니다 — 별도 발행 단계가 없습니다"
+              : "서버에 연결되지 않아 저장할 수 없습니다 — 현재 설정도 불러오지 못했습니다");
           }, true);
         }
 
@@ -547,9 +511,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>

@@ -188,7 +188,7 @@
                     </div>
                   </div>
                   <div class="card-body p-0">
-                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-warning-subtle"><span class="text-warning fs-9">검</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">검수 회부 38건</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">배치 #213 게이트 판정 완료 — 사양 확인이 필요합니다.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">10분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative unread border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-primary-subtle"><span class="text-primary fs-9">가</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">가격 검토 5건 대기</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">매입가 변동 임계(±15%) 초과 · 마진 위반 2건 포함.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">25분 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">주</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">주문 재전달 성공</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">shop-84215 — 쇼핑몰 인계 완료.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">1시간 전</span></p></div></div></div><div class="px-2 px-sm-3 py-3 notification-card position-relative read border-bottom"><div class="d-flex align-items-center"><div class="avatar avatar-m me-3"><div class="avatar-name rounded-circle bg-info-subtle"><span class="text-info fs-9">매</span></div></div><div class="flex-1 me-sm-3"><h4 class="fs-9 text-body-emphasis mb-1">매입 회신 도착</h4><p class="fs-9 text-body-highlight mb-0 fw-normal">P-1002 라이젠7 7700 — 용산도매A 345,000원.<span class="ms-2 text-body-quaternary text-opacity-75 fw-bold fs-10">2시간 전</span></p></div></div></div></div>
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary" data-noti-empty>알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
                   </div>
                   <div class="card-footer p-0 border-top border-translucent">
                     <div class="my-2 text-center fw-bold fs-10 text-body-tertiary text-opactity-85"><a class="fw-bolder" href="activity-logs.html">전체 작업 기록 보기</a></div>
@@ -264,7 +264,7 @@
       <div class="content">
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">가격 · 매입</a></li><li class="breadcrumb-item active">마진 정책</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-          <div><h2 class="mb-1">마진 정책 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">더미 데이터</span></h2>
+          <div><h2 class="mb-1">마진 정책 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRC-020</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span></h2>
           <p class="text-body-tertiary mb-0">카테고리별 판매가 제안 규칙. <b class="text-body-secondary">이후의 가격 제안에만</b> 적용되고 소급하지 않습니다(재현성 보존).</p></div>
           <div class="d-flex align-items-center gap-2"><span class="fs-10 text-body-tertiary">값은 아래에서 고칩니다</span></div>
         </div>
@@ -272,25 +272,14 @@
         <div class="row g-3">
           <div class="col-12 col-lg-8"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">
             <thead><tr class="text-body-tertiary"><th class="ps-4 py-2">카테고리</th><th class="text-end">기본 마진율</th><th class="text-end">최소 마진율</th><th>끝자리 규칙</th><th>활성</th></tr></thead>
-            <tbody id="rows"><tr><td colspan="5" class="text-body-tertiary fs-10 ps-4 py-3">아래 실데이터 영역에서 확인하세요.</td></tr></tbody>
+            <tbody id="rows"><tr><td colspan="5" class="text-center text-body-tertiary fs-10 py-4">카테고리별 마진은 위 실데이터 카드에 표시됩니다.</td></tr></tbody>
           </table></div></div></div></div>
-          
-        
+        </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
       </div>
-      <script>
-      (function(){
-        function toast(m){let t=document.getElementById("__t");if(!t){t=document.createElement("div");t.id="__t";t.style.cssText="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--phoenix-emphasis-bg,#141824);color:#fff;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;z-index:9999;opacity:0;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);";document.body.appendChild(t);}t.textContent=m;t.style.opacity="1";clearTimeout(t._x);t._x=setTimeout(()=>t.style.opacity="0",2400);}
-        const P=[["CPU",12,10,"백원 올림"],["메인보드",14,11,"백원 올림"],["메모리",15,12,"백원 올림"],["그래픽카드",13,10,"백원 올림"],["SSD/저장장치",16,12,"백원 올림"],["파워서플라이",17,15,"백원 올림"],["케이스",20,15,"천원 절사"],["CPU쿨러",18,14,"백원 올림"]];
-        document.getElementById("rows").innerHTML=P.map(([c,b,m,r])=>`
-          <tr><td class="ps-4 fw-semibold text-body-highlight">${c}</td>
-          <td class="text-end"><input class="form-control form-control-sm d-inline-block text-end" style="width:70px;" value="${b}">%</td>
-          <td class="text-end"><input class="form-control form-control-sm d-inline-block text-end" style="width:70px;" value="${m}">%</td>
-          <td><select class="form-select form-select-sm" style="width:130px;"><option${r==="백원 올림"?" selected":""}>백원 올림</option><option${r==="천원 절사"?" selected":""}>천원 절사</option><option>990원 맞춤</option></select></td>
-          <td><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked></div></td></tr>`).join("");
-        
-      })();
-      </script>
+      <!-- 카테고리별 마진 8행을 마크업 상수로 그리던 스크립트를 제거했다(슬라이스 — 정적 폴백 걷어내기).
+           CPU 12%/10% 같은 값은 서버가 모르는 수였고, 입력칸이라 고쳐도 아무 데도 저장되지 않았다.
+           #rows 는 성공 시 아래 실데이터 카드로 안내하고, 실패 시 LIVE 스크립트가 안내 문구를 그린다. -->
       <script>
       (function(){
         // ---- LIVE (슬라이스 31) — 엔진이 실제로 쓰는 규칙 노출. 저장 테이블이 비어 있어도
@@ -353,8 +342,26 @@
           };
         }
 
+        /* 서버가 없으면 지어내지 않는다 — 표는 비워 두고 "못 받았다"고 말한다.
+           연결 실패 판정은 **응답 단계에서만** 한다. 렌더 예외까지 이 자리로 굴러오면
+           다 받아놓고 "연결 안 됨"이라 말하게 된다(suppliers.html 전례). */
+        function fail(){
+          var b = document.getElementById("dataSrc");
+          if(b){
+            b.textContent = "연결 안 됨";
+            b.classList.remove("badge-phoenix-primary");
+            b.classList.add("badge-phoenix-secondary");
+          }
+          var tb = document.getElementById("rows");
+          if(tb){
+            tb.innerHTML = '<tr><td colspan="5" class="text-center text-body-tertiary py-4">'
+              + '서버에 연결되면 표시됩니다.</td></tr>';
+          }
+        }
+
         fetch("/api/admin/engine-rules")
           .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+          .catch(function(e){ fail(); throw e; })
           .then(function(d){
             var host = document.getElementById("liveRules"), html = "";
             if(SCREEN === "margin"){
@@ -458,7 +465,12 @@
             b.classList.replace("badge-phoenix-secondary", "badge-phoenix-primary");
             if(window.feather) feather.replace();
           })
-          .catch(function(){});
+          .catch(function(e){
+            /* 응답 실패는 위에서 이미 표시했다. 여기서 배지를 또 만지지 않는다 —
+               렌더 도중 죽은 경우까지 "연결 안 됨"이 되면 거짓말이 된다.
+               조용히 삼키지는 않는다(화면이 죽은 줄 모르는 것이 더 나쁘다). */
+            if(window.console) console.error("[engine-rules]", e);
+          });
       })();
       </script>
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
@@ -479,9 +491,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>
