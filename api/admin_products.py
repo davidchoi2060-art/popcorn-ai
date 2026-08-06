@@ -17,7 +17,7 @@ from .db import engine
 router = APIRouter(prefix="/api/admin")
 
 # part_type 어휘는 taxonomy가 단일 원천(슬라이스 A) — 여기서 다시 정의하지 않는다.
-from .taxonomy import PART_LABELS as PART_TYPE_LABELS, CORE_TYPES
+from .taxonomy import PART_LABELS as PART_TYPE_LABELS, CORE_TYPES, BUILT_TYPES
 
 # part_type별 필수 사양 필드(ERD 4.0 필수 사양 매트릭스). 미등록 타입은 0/0 → 화면 "—".
 # verified_yn은 이번 집계에 미반영(전 필드 채움+미검증 케이스는 다음 슬라이스).
@@ -329,9 +329,14 @@ def product_meta():
     return {
         "part_labels": [{"part_type": k, "label": v}
                         for k, v in PART_TYPE_LABELS.items() if k in core],
+        # **이진 분기가 아니다**(2026-08-05): 조립 부품도 주변기기도 아닌 완성품이 생겼다.
+        # 예전 조건(`core 아니고 ETC 아니면 주변기기`)을 그대로 두면 화면이 완제품 PC를
+        # '주변기기'라 부른다. 종류가 늘 때 이런 else 가 조용히 틀린 말을 한다.
         "peripheral_labels": [{"part_type": k, "label": v}
                               for k, v in PART_TYPE_LABELS.items()
-                              if k not in core and k != "ETC"],
+                              if k not in core and k != "ETC" and k not in BUILT_TYPES],
+        "built_labels": [{"part_type": k, "label": PART_TYPE_LABELS[k]}
+                         for k in BUILT_TYPES if k in PART_TYPE_LABELS],
         # 목록 필터용 — 실제로 상품이 있는 분류만(빈 분류를 고르면 결과가 0이라 혼란스럽다)
         "used_parts": [{"part_type": k, "label": PART_TYPE_LABELS.get(k, k)} for k in used],
         "makers": makers,

@@ -1,6 +1,6 @@
 """부품 어휘의 단일 원천 — 세 개념을 가른다(슬라이스 A).
 
-  part_type   상품 종류. 17종. `products.part_type`의 값. 엔진과 화면이 함께 읽는다.
+  part_type   상품 종류. 19종. `products.part_type`의 값. 엔진과 화면이 함께 읽는다.
   slot        **견적서의 자리.** 8종. part_type에서 파생된다(공랭·수랭 → 한 자리).
   CORE_TYPES  견적에 쓰이는 핵심 부품 종류. 10종.
 
@@ -28,6 +28,7 @@
 
 # ── part_type = 상품 종류 ─────────────────────────────────────────────
 # 닫힌 집합이다. **운영자가 늘릴 수 없다** — 엔진이 읽기 때문에 슬라이스로만 바뀐다.
+# 19종: 조립 부품 10 + 주변기기 6 + **완성품 2**(완제품·베어본) + 미분류 1.
 # (판매용 분류는 별도 축인 `categories`가 맡는다 — 그쪽은 운영자가 자유롭게 만든다.)
 # 회귀가 이 집합 = DB `products.part_type` distinct 를 대조한다.
 PART_LABELS = {
@@ -36,6 +37,15 @@ PART_LABELS = {
     "COOLER_CPU_AIR": "CPU쿨러(공랭)", "COOLER_CPU_AIO": "CPU쿨러(수랭)",
     "MONITOR": "모니터", "KEYBOARD": "키보드", "MOUSE": "마우스",
     "HEADSET": "헤드셋", "SPEAKER": "스피커", "WEBCAM": "웹캠",
+    # 완성품 축(2026-08-05 사용자 결정). **부품이 아니라 그 자체가 한 대다.**
+    #   · 엔진은 이 둘을 읽지 않는다 — 두 후보 뷰가 `category_group`(core_part/peripheral)과
+    #     `part_type` 을 **둘 다 화이트리스트**로 걸어서 정의상 들어갈 수 없다(회귀가 지킨다).
+    #   · 그런데도 `part_type` 에 둔 이유: **사양을 걸 수 있는 축이 이것 하나**이고
+    #     (`spec_field_defs.part_types` · `ASSIGNABLE_TYPES`), 주문·견적 스냅샷이 박는 것도
+    #     `part_type` 이다. 판매 분류(`categories`)는 어느 스냅샷에도 없어서 과거 주문에서
+    #     되살릴 수 없고, 적재는 `category_id` 를 읽지도 쓰지도 않는다.
+    #   · 둘을 나눠 둔다 — 조립비·필요 사양이 다르다. 합쳤다 나누는 것이 더 비싸다.
+    "PC_COMPLETE": "완제품 PC", "BAREBONE": "베어본·미니PC",
     "ETC": "미분류",   # 적재 시 부품 종류를 정하지 못한 상품(슬라이스 39) — 추천 대상 아님
 }
 PART_TYPES = tuple(PART_LABELS)
@@ -64,7 +74,7 @@ def slot_of(part_type: str) -> str:
 
 
 # ── 표시 종류 = 운영자가 고르는 자리 ──────────────────────────────────
-# 사용자 결정(2026-08-05): **화면에서는 CPU쿨러 공랭·수랭을 하나로 본다.** 16종.
+# 사용자 결정(2026-08-05): **화면에서는 CPU쿨러 공랭·수랭을 하나로 본다.** 18종(19종 − 쿨러 1).
 #
 # **part_type 은 합치지 않는다.** `radiator_rows`(라디에이터 열)는 `COOLER_CPU_AIO`에만
 # 적용되고(0022), 라디에이터 장착 규칙이 그 값으로 케이스 수납을 판정한다. 합치면
@@ -111,10 +121,13 @@ CORE_TYPES = ("CPU", "GPU", "MB", "RAM", "SSD", "HDD", "POWER", "CASE",
 # **미분류에 필수 사양을 걸면 그 상품들이 영원히 검수 대기가 된다**(슬라이스 56 규약).
 ASSIGNABLE_TYPES = tuple(t for t in PART_TYPES if t != "ETC")
 
+# 완성품은 부품이 아니다 — 어느 슬롯에도 들어가지 않고 후보 뷰에도 없다.
+# 화면이 '조립 부품 / 주변기기' **이진 분기**로 갈라 왔기 때문에 이 집합이 필요하다:
+# 그 분기만 두면 완제품이 '주변기기'라 불린다(실제로 두 곳이 그랬다).
+BUILT_TYPES = ("PC_COMPLETE", "BAREBONE")
 
-def slot_of(part_type: str) -> str:
-    """part_type → 견적 자리. 쿨러만 두 종류가 한 자리다."""
-    return "COOLER" if part_type.startswith("COOLER_") else part_type
+# `slot_of` 는 위(SLOT_LABELS 아래)에 한 번만 정의한다 — 여기 있던 두 번째 정의를 지웠다.
+# 같은 파일 안에서 두 벌이 되면 이 파일이 존재하는 이유가 없어진다.
 
 
 def part_label(part_type: str | None) -> str:

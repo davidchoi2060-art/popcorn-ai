@@ -409,11 +409,17 @@
             });
         }
         // 화면 분류 라벨 → part_type (서버 필터용). 라벨이 겹치는 CPU쿨러는 서버에서 미지원 → 빈값.
+        // 라벨 -> 코드 표를 **화면이 들고 있지 않는다**(2026-08-05).
+        // 하드코딩이라 종류가 늘 때마다 조용히 빠졌다 — 완제품 PC·베어본이 그랬다.
+        // 서버가 주는 목록(product-meta)에서 그때그때 만든다.
         function catToPartType(label){
-          var m={"CPU":"CPU","메인보드":"MB","메모리":"RAM","그래픽카드":"GPU","SSD":"SSD",
-                 "HDD":"HDD","파워":"POWER","케이스":"CASE","모니터":"MONITOR","키보드":"KEYBOARD",
-                 "마우스":"MOUSE","헤드셋":"HEADSET","스피커":"SPEAKER","웹캠":"WEBCAM","미분류":"ETC"};
-          return m[label]||"";
+          var all = [].concat(
+            (PMETA && PMETA.part_labels) || [],
+            (PMETA && PMETA.peripheral_labels) || [],
+            (PMETA && PMETA.built_labels) || [],
+            (PMETA && PMETA.used_parts) || []);
+          for(var i=0;i<all.length;i++){ if(all[i].label === label) return all[i].part_type; }
+          return "";
         }
         var typing=null;
         // 검색·필터는 **항상 서버 질의**다. 예전의 비-LIVE 분기(브라우저 안에서 더미를

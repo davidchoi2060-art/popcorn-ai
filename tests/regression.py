@@ -1182,10 +1182,20 @@ def test_taxonomy_single_source():
     #    사용자 결정(2026-08-05): 화면에서 CPU쿨러 공랭·수랭을 하나로 본다 → 16종.
     #    **엔진의 part_type 은 17종 그대로여야 한다** — 여기가 무너지면
     #    radiator_rows(수랭 589건)가 적용 대상을 잃고 케이스 수납 판정이 사라진다.
-    check("part_type 은 17종 그대로 (엔진 축 불변)", len(_T.PART_TYPES) == 17,
-          17, len(_T.PART_TYPES))
-    check("표시 종류는 16종 (쿨러가 하나)", len(_T.DISPLAY_TYPES) == 16,
-          16, len(_T.DISPLAY_TYPES))
+    #    2026-08-05: 완성품 축 2종(PC_COMPLETE·BAREBONE)이 늘어 17 → 19 가 됐다.
+    #    **수가 늘어난 것 자체는 문제가 아니다** — 지켜야 하는 것은 쿨러 쌍이 갈린 채로
+    #    남아 있는 것과, 늘어난 값이 엔진 뷰에 새어 들어가지 않는 것이다(아래 7번).
+    check("part_type 은 19종 (조립 10 + 주변기기 6 + 완성품 2 + 미분류)",
+          len(_T.PART_TYPES) == 19, 19, len(_T.PART_TYPES))
+    check("표시 종류는 18종 (쿨러만 하나로 접힌다)", len(_T.DISPLAY_TYPES) == 18,
+          18, len(_T.DISPLAY_TYPES))
+    check("완성품은 어느 견적 슬롯에도 없다",
+          not any(t in v for v in _T.QUOTE_SLOTS.values() for t in _T.BUILT_TYPES),
+          "슬롯 없음",
+          [t for v in _T.QUOTE_SLOTS.values() for t in _T.BUILT_TYPES if t in v])
+    check("완성품은 핵심 부품이 아니다",
+          not any(t in _T.CORE_TYPES for t in _T.BUILT_TYPES), "제외",
+          [t for t in _T.BUILT_TYPES if t in _T.CORE_TYPES])
     check("표시 축이 part_type 을 하나도 빠뜨리지 않는다",
           {t for ts in _T.DISPLAY_MEMBERS.values() for t in ts} == set(_T.PART_TYPES),
           "전부 포함",
@@ -1200,6 +1210,38 @@ def test_taxonomy_single_source():
     # 쿨러 말고는 접히지 않는다 — 접기 규칙이 번지면 다른 종류가 조용히 합쳐진다.
     _folded = sorted(k for k, v in _T.DISPLAY_MEMBERS.items() if len(v) > 1)
     check("접히는 것은 쿨러뿐", _folded == ["COOLER"], ["COOLER"], _folded)
+
+    # 7) **엔진이 읽는 두 뷰는 화이트리스트다** — 새 part_type 이 늘어도 새어 들어가면 안 된다.
+    #    완제품 PC 축(2026-08-05)을 넣기 **전에** 이 검사를 먼저 걸었다. 축을 늘리는 일은
+    #    "추천에 안 들어간다"를 말로 보장할 수 없고, 뷰가 실제로 막는지 봐야 한다.
+    #    두 뷰 모두 `category_group` 과 `part_type` 을 **둘 다** 화이트리스트로 건다(실측).
+    if _engine is not None:
+        with _engine.connect() as c:
+            _leak = c.execute(text(
+                "SELECT count(*) FROM v_recommendation_candidates"
+                " WHERE part_type NOT IN ('CPU','GPU','MB','RAM','SSD','HDD','POWER','CASE',"
+                "                         'COOLER_CPU_AIR','COOLER_CPU_AIO')")).scalar()
+            check("추천 후보에 조립 부품 아닌 종류가 없다", _leak == 0, 0, _leak)
+            _leak2 = c.execute(text(
+                "SELECT count(*) FROM v_companion_candidates"
+                " WHERE part_type NOT IN ('MONITOR','KEYBOARD','MOUSE','HEADSET',"
+                "                         'SPEAKER','WEBCAM')")).scalar()
+            check("주변기기 후보에 주변기기 아닌 종류가 없다", _leak2 == 0, 0, _leak2)
+            # 완제품·베어본은 어느 후보에도 없어야 한다(축이 생긴 뒤에도)
+            _pc = c.execute(text(
+                "SELECT (SELECT count(*) FROM v_recommendation_candidates"
+                "          WHERE part_type IN ('PC_COMPLETE','BAREBONE'))"
+                "     + (SELECT count(*) FROM v_companion_candidates"
+                "          WHERE part_type IN ('PC_COMPLETE','BAREBONE'))")).scalar()
+            check("완제품·베어본은 어느 후보에도 없다", _pc == 0, 0, _pc)
+            # **적재가 되돌리면 여기서 잡는다.** `part_type` 은 적재마다 다시 계산되는
+            # 파생값인데 완제품은 원천 분류 토큰을 잴 근거가 없어(원천 CSV 부재 ·
+            # product_imports 0행) `catalog_map` 에 분기를 넣지 못했다. 배정 근거는
+            # 운영자가 갈라 놓은 판매 분류이고, 그 둘이 어긋나면 되돌아간 것이다.
+            _drift = c.execute(text(
+                "SELECT count(*) FROM products p JOIN categories ct USING (category_id)"
+                " WHERE ct.name IN ('완제품 PC','미니PC·베어본') AND p.part_type = 'ETC'")).scalar()
+            check("완제품 분류인데 ETC 로 되돌아간 상품이 없다", _drift == 0, 0, _drift)
 
 
 def test_categories():
@@ -1392,7 +1434,9 @@ def test_category_mapping():
     check("탭이 바뀌어도 부품 종류 목록이 같다", _drift == [], [], _drift)
 
     # 표시 축이 화면까지 살아 왔는가 — 16종이고 쿨러가 하나여야 한다(2026-08-05).
-    check("화면이 받는 부품 종류는 16종", len(map_pt) == 16, 16, len(map_pt))
+    # 2026-08-05 완성품 축 2종이 늘어 16 -> 18. 매핑 화면은 **완제품도 걸러 볼 수 있어야**
+    # 하므로 표시 축 전체를 그대로 받는다(taxonomy.DISPLAY_LABELS 와 같은 수).
+    check("화면이 받는 부품 종류는 18종", len(map_pt) == 18, 18, len(map_pt))
     check("쿨러가 한 줄로 온다", ("COOLER", "CPU쿨러") in map_pt,
           ("COOLER", "CPU쿨러"), [x for x in map_pt if x[0].startswith("COOLER")])
 

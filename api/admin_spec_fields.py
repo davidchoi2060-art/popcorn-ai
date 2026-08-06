@@ -51,7 +51,7 @@ RESERVED = {"product_code", "part_type", "created_at", "updated_at", "verified_y
             "order", "group", "table", "column", "user", "default", "check"}
 # 화면의 부품 축. 견적 대상(부품)과 주변기기를 나눈다 — 주변기기는 8슬롯에 안 들어간다.
 # 어휘는 taxonomy가 단일 원천(슬라이스 A) — 여기서 다시 정의하지 않는다.
-from .taxonomy import ASSIGNABLE_TYPES as ALL_PART_TYPES, PART_LABELS as PART_LABEL,                       CORE_TYPES as CORE_PARTS
+from .taxonomy import ASSIGNABLE_TYPES as ALL_PART_TYPES, PART_LABELS as PART_LABEL,                       CORE_TYPES as CORE_PARTS, BUILT_TYPES
 
 
 def _add_col_to_view(conn, view: str, key: str) -> bool:
@@ -160,7 +160,10 @@ def list_spec_fields():
         "parts": [{
             "part_type": pt,
             "label": PART_LABEL.get(pt, pt),
-            "group": "core" if pt in CORE_PARTS else "peripheral",
+            # 이진 분기가 아니다 — 완성품(완제품·베어본)은 부품도 주변기기도 아니다.
+            # else 로 뭉개면 화면이 완제품을 '주변기기'라 부른다(2026-08-05).
+            "group": ("core" if pt in CORE_PARTS
+                      else "built" if pt in BUILT_TYPES else "peripheral"),
             "in_quote": pt in CORE_PARTS,
             "live": (fill.get(pt) or {}).get("n", 0),      # 판매중 · 재고 > 0
             "total": total_by.get(pt, 0),

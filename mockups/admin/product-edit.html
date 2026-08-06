@@ -829,7 +829,9 @@
             if(SPEC_META || true){
               // 선택지는 서버 메타에서 온다(목록 필터와 같은 원천)
               var opts = (PMETA && PMETA.part_labels ? PMETA.part_labels : [])
-                .concat(PMETA && PMETA.peripheral_labels ? PMETA.peripheral_labels : []);
+                .concat(PMETA && PMETA.peripheral_labels ? PMETA.peripheral_labels : [])
+                // 완성품(완제품 PC·베어본)도 고를 수 있어야 한다 — 부품도 주변기기도 아니다
+                .concat(PMETA && PMETA.built_labels ? PMETA.built_labels : []);
               if(opts.length){
                 cat.innerHTML = opts.map(function(o){
                   return '<option value="'+o.part_type+'">'+esc(o.label)+'</option>';
