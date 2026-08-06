@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from .timeutil import iso
+from .timeutil import iso, kst_day_range, range_sql
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 
@@ -74,13 +74,25 @@ def _log(conn, action: str, target_id: str, detail: dict, kind: str = "order") -
 
 
 @router.get("/orders")
-def list_orders():
+def list_orders(date_from: str | None = None, date_to: str | None = None):
+    # 기간은 **서울 날짜**로 받는다 — 변환은 `timeutil` 하나가 한다(9시간 함정).
+    try:
+        _lo, _hi = kst_day_range(date_from, date_to)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "기간 형식은 YYYY-MM-DD 입니다")
+    _p = {}
+    if _lo is not None:
+        _p["_dt_lo"] = _lo
+    if _hi is not None:
+        _p["_dt_hi"] = _hi
+    _RANGE = range_sql("o.created_at", _lo, _hi)
     with engine.connect() as conn:
         orders = conn.execute(text(
             "SELECT o.order_id, o.order_no, o.channel, o.status, o.total_amount,"
             " o.ops_snapshot, o.shipping_snap, o.created_at, COALESCE(m.nickname, '비회원') AS cust"
             " FROM orders o LEFT JOIN members m USING (member_id)"
-            " ORDER BY o.created_at DESC, o.order_id DESC")).mappings().all()
+            " WHERE TRUE" + _RANGE +
+            " ORDER BY o.created_at DESC, o.order_id DESC"), _p).mappings().all()
         items_by = {}
         for r in conn.execute(text(
                 "SELECT order_id, item_kind, name_snap, price_snap, qty, spec_snap"

@@ -34,6 +34,7 @@
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
 <style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style>  <link rel="stylesheet" href="../shared/fonts/fonts.css">
+    <script src="../shared/ui-daterange.js"></script>
   </head>
 
 
@@ -207,6 +208,7 @@
         <div class="row g-2 mb-3" id="kpis"></div>
         <div class="card">
           <div class="card-header border-bottom border-translucent"><ul class="nav nav-pills gap-2 fs-9 mb-0" id="tabs"></ul></div>
+            <div data-daterange></div>
           <div class="card-body p-0" id="body"></div>
         </div>
         <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
@@ -335,7 +337,7 @@
           SETTLES=(d.settles||[]).map(s=>({day:dayLabel(s.date),date:s.date,gross:s.gross,fee:s.fee,net:s.net,state:s.state,note:s.refund_n>0?'환불 반영':null,late:s.late}));
         }
         function reload(){
-          return fetch('/api/admin/payments').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          return fetch('/api/admin/payments' + popcornDate.qs('?')).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
            .then(d=>{
              fromApi(d);
              // 성공했으면 실패·대기 문구가 남지 않게 함께 바꾼다(배지만 바꾸면 표가 '불러오는 중'인 채로 거짓말한다).

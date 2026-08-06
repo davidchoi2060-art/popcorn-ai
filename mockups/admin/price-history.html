@@ -33,6 +33,7 @@
     <link href="vendors/simplebar/simplebar.min.css" rel="stylesheet">
     <link href="assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
     <link href="assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <script src="../shared/ui-daterange.js"></script>
     <script src="../shared/ui-list.js"></script>
 <style>:root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}body{font-family:var(--phoenix-font-sans-serif);}</style>  <link rel="stylesheet" href="../shared/fonts/fonts.css">
   </head>
@@ -293,7 +294,7 @@
             <text x="510" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t1).toISOString())}</text>`;
         }
         function load(pc){
-          return fetch("/api/admin/price-history"+(pc?`?product_code=${pc}`:"")).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          return fetch("/api/admin/price-history"+(pc?`?product_code=${pc}`+popcornDate.qs("&"):popcornDate.qs("?"))).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
             .then(d=>{
               LIVE=true;
               const sel=document.getElementById("pick");
@@ -427,6 +428,7 @@
               <div class="btn-reveal-trigger">
                 <button class="btn btn-link p-0 dropdown-toggle dropdown-caret-none transition-none d-flex" type="button" id="support-chat-dropdown" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h text-body"></span></button>
                 <div class="dropdown-menu dropdown-menu-end py-2" aria-labelledby="support-chat-dropdown"><a class="dropdown-item" href="#!">Request a callback</a><a class="dropdown-item" href="#!">Search in chat</a><a class="dropdown-item" href="#!">Show history</a><a class="dropdown-item" href="#!">Report to Admin</a><a class="dropdown-item btn-support-chat" href="#!">Close Support</a></div>
+            <div data-daterange></div>
               </div>
             </div>
             <div class="card-body chat p-0">

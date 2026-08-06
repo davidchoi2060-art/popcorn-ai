@@ -13,7 +13,7 @@ sourcing=sourcing_id) — 화면 링크도 사유별로 분기한다.
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
-from .timeutil import iso
+from .timeutil import iso, kst_day_range, range_sql
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -30,14 +30,29 @@ FIELD_KO = {"sale": "판매가", "purchase": "매입가"}
 
 
 @router.get("/price-history")
-def price_history(product_code: int | None = None):
+def price_history(product_code: int | None = None,
+                  date_from: str | None = None, date_to: str | None = None):
+    # 기간은 **서울 날짜**로 받는다 — 변환은 `timeutil` 하나가 한다(9시간 함정).
+    try:
+        _lo, _hi = kst_day_range(date_from, date_to)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "기간 형식은 YYYY-MM-DD 입니다")
+    _p = {}
+    if _lo is not None:
+        _p["_dt_lo"] = _lo
+    if _hi is not None:
+        _p["_dt_hi"] = _hi
+    _RANGE = range_sql("h.changed_at", _lo, _hi)
     with engine.connect() as conn:
         prods = conn.execute(text(
             "SELECT h.product_code, p.sku, p.product_name, COUNT(*) AS cnt,"
             " MAX(h.changed_at) AS last_at"
             " FROM product_price_history h JOIN products p USING (product_code)"
+            " WHERE TRUE" + _RANGE +
+            # 좌측 상품 목록도 같은 기간을 본다 — 안 그러면 "이 기간에 이력이 있는 상품"이
+            # 아니라 전체가 뜨고, 골라 들어가면 오른쪽이 비어 있다.
             " GROUP BY h.product_code, p.sku, p.product_name"
-            " ORDER BY cnt DESC, last_at DESC")).mappings().all()
+            " ORDER BY cnt DESC, last_at DESC"), _p).mappings().all()
         if not prods:
             return {"products": [], "items": [], "series": {"sale": [], "purchase": []},
                     "product": None, "note": "가격 이력이 아직 없습니다."}
@@ -48,8 +63,9 @@ def price_history(product_code: int | None = None):
             "SELECT h.history_id, h.field, h.old_price, h.new_price, h.reason, h.ref_id,"
             " h.changed_at, h.supplier_id, s.name AS supplier"
             " FROM product_price_history h LEFT JOIN suppliers s USING (supplier_id)"
-            " WHERE h.product_code=:pc ORDER BY h.changed_at, h.history_id"),
-            {"pc": pc}).mappings().all()
+            " WHERE h.product_code=:pc" + _RANGE +
+            " ORDER BY h.changed_at, h.history_id"),
+            {"pc": pc, **_p}).mappings().all()
         cur = conn.execute(text(
             "SELECT sku, product_name, purchase_price, sale_price FROM products"
             " WHERE product_code=:pc"), {"pc": pc}).mappings().one()

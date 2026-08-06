@@ -2383,6 +2383,49 @@ def test_screen_assets():
     check("건너뛴 주문의 사유를 화면이 말한다", "건너뛴 주문" in _oh, True,
           "건너뛴 주문" in _oh)
 
+    # ⑭ 기간 필터 (2026-08-05).
+    #    주문·가격 이력·활동 기록·결제에 기간으로 거를 방법이 **화면에도 서버에도 없었다.**
+    #    핵심은 **9시간**이다: 컬럼은 UTC naive 인데 운영자는 서울 날짜로 생각한다.
+    #    변환을 화면이 하기 시작하면 함정이 화면 수만큼 생기므로 서버 한 곳에서만 한다.
+    from api.timeutil import kst_day_range as _kdr
+    _lo, _hi = _kdr("2026-08-06", "2026-08-06")
+    check("서울 하루 = UTC 15:00~15:00",
+          (str(_lo), str(_hi)) == ("2026-08-05 15:00:00", "2026-08-06 15:00:00"),
+          "2026-08-05 15:00 ~ 2026-08-06 15:00", (str(_lo), str(_hi)))
+    # 끝날을 반개구간으로 두지 않으면 그날 낮 데이터가 통째로 빠진다
+    check("끝날은 다음날 00:00 미만(그날 전체 포함)",
+          (_hi - _lo).total_seconds() == 86400, 86400, (_hi - _lo).total_seconds())
+    for _bad, _why in ((("2026-08-07", "2026-08-01"), "뒤집힌 범위"),
+                       (("2026/08/07", None), "잘못된 형식")):
+        try:
+            _kdr(*_bad)
+            check("기간 가드: %s" % _why, False, "ValueError", "통과해 버림")
+        except ValueError as _e:
+            check("기간 가드: %s" % _why, "%" not in str(_e), "사람이 읽는 문장", str(_e)[:40])
+
+    # 변환은 한 곳에서만 — 화면이 시간대를 계산하면 안 된다
+    _tz = [os.path.basename(p2) for p2, s2 in _screens
+           if "getTimezoneOffset" in s2 or "9 * 60 * 60" in s2]
+    check("화면이 시간대를 직접 계산하지 않는다", _tz == [], [], _tz)
+
+    # 서버가 파라미터를 실제로 받는가(받기만 하고 안 걸면 아무 효과 없는 필터다)
+    for _m, _col in (("admin_orders", "o.created_at"), ("admin_activity_logs", "l.created_at"),
+                     ("admin_payments", "p.paid_at"), ("admin_price_history", "h.changed_at")):
+        _src = io.open(os.path.join(ROOT, "api", _m + ".py"), encoding="utf-8").read()
+        check("%s 가 기간을 받는다" % _m, "date_from" in _src, True, "date_from" in _src)
+        check("%s 가 기간을 실제로 건다" % _m, "_RANGE" in _src and 'range_sql("%s"' % _col in _src,
+              True, "_RANGE" in _src)
+
+    # 화면은 헬퍼를 **자기보다 먼저** 실어야 한다(인라인 스크립트가 그것을 쓴다)
+    _ord = []
+    for _p2, _s2 in _screens:
+        if "popcornDate.qs" not in _s2:
+            continue
+        _a, _b = _s2.find("ui-daterange.js"), _s2.find("popcornDate.qs")
+        if _a < 0 or _a > _b:
+            _ord.append(os.path.basename(_p2))
+    check("기간 헬퍼를 쓰기 전에 싣는다", _ord == [], [], _ord)
+
     # ⑨ **디자인 토큰을 화면이 다시 정의하지 않는다** (2026-08-05).
     #    `vslot-demo.html` 이 tokens.css 값을 인라인으로 베껴 두고 있었고,
     #    그 사본은 **이미 정본과 어긋나 있었다** — `--font-head` 에서 'Noto Sans KR' 이

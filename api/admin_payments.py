@@ -25,7 +25,7 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
-from .timeutil import iso
+from .timeutil import iso, kst_day_range, range_sql
 from .admin_orders import _log
 from .auth import current_operator_id
 from .db import engine
@@ -48,7 +48,18 @@ def _rate(conn) -> Decimal:
 
 
 @router.get("/payments")
-def list_payments():
+def list_payments(date_from: str | None = None, date_to: str | None = None):
+    # 기간은 **서울 날짜**로 받는다 — 변환은 `timeutil` 하나가 한다(9시간 함정).
+    try:
+        _lo, _hi = kst_day_range(date_from, date_to)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "기간 형식은 YYYY-MM-DD 입니다")
+    _p = {}
+    if _lo is not None:
+        _p["_dt_lo"] = _lo
+    if _hi is not None:
+        _p["_dt_hi"] = _hi
+    _RANGE = range_sql("p.paid_at", _lo, _hi)
     with engine.connect() as conn:
         rate = _rate(conn)
         today = conn.execute(text("SELECT CURRENT_DATE")).scalar_one()
@@ -56,7 +67,8 @@ def list_payments():
             "SELECT p.payment_id, o.order_no, p.pay_mode, p.method, p.pg_ref,"
             " p.amount, p.status, p.paid_at"
             " FROM payments p JOIN orders o USING (order_id)"
-            " ORDER BY p.paid_at DESC NULLS LAST, p.payment_id DESC")).mappings().all()
+            " WHERE TRUE" + _RANGE +
+            " ORDER BY p.paid_at DESC NULLS LAST, p.payment_id DESC"), _p).mappings().all()
         batches = conn.execute(text(
             "SELECT batch_id, settle_date, gross, fee, net, status, closed_at"
             " FROM settlement_batches ORDER BY settle_date DESC")).mappings().all()

@@ -9,10 +9,10 @@ undone(되돌려짐) 배지를 파생한다(ref_log_id 역참조 EXISTS — 각 
 과거 행은 원장이므로 소급 수정하지 않는다).
 이관: 페이지네이션·created_at 인덱스·기간/운영자 필터·CSV 내보내기.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
-from .timeutil import iso
+from .timeutil import iso, kst_day_range, range_sql
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -97,10 +97,24 @@ def _summary(action: str, d: dict) -> str:
 
 
 @router.get("/activity-logs")
-def list_activity_logs():
+def list_activity_logs(date_from: str | None = None, date_to: str | None = None):
+    # 기간은 **서울 날짜**로 받는다 — 변환은 `timeutil` 하나가 한다(9시간 함정).
+    try:
+        _lo, _hi = kst_day_range(date_from, date_to)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "기간 형식은 YYYY-MM-DD 입니다")
+    _p = {}
+    if _lo is not None:
+        _p["_dt_lo"] = _lo
+    if _hi is not None:
+        _p["_dt_hi"] = _hi
+    _RANGE = range_sql("l.created_at", _lo, _hi)
     with engine.connect() as conn:
+        # **합계도 같은 조건으로 센다.** 목록만 거르고 합계를 그대로 두면 화면이
+        # "전체 N건"이라 말하면서 M건을 보여준다 — 이 프로젝트가 이미 겪은 형태다.
         total = conn.execute(text(
-            "SELECT COUNT(*) FROM admin_operator_activity_logs")).scalar_one()
+            "SELECT COUNT(*) FROM admin_operator_activity_logs l"
+            " WHERE TRUE" + _RANGE), _p).scalar_one()
         rows = conn.execute(text(
             "SELECT l.log_id, l.action, l.target_kind, l.target_id, l.detail, l.created_at,"
             " COALESCE(o.name, '—') AS operator,"
@@ -109,7 +123,8 @@ def list_activity_logs():
             "          AND u.detail->>'ref_log_id' = CAST(l.log_id AS TEXT)) AS undone"
             " FROM admin_operator_activity_logs l"
             " LEFT JOIN admin_operators o USING (operator_id)"
-            " ORDER BY l.log_id DESC LIMIT :lim"), {"lim": LIMIT}).mappings().all()
+            " WHERE TRUE" + _RANGE +
+            " ORDER BY l.log_id DESC LIMIT :lim"), {"lim": LIMIT, **_p}).mappings().all()
     return {"total": total, "limit": LIMIT, "items": [{
         "log_id": r["log_id"],
         "at": iso(r["created_at"]),
