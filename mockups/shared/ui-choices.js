@@ -51,10 +51,17 @@
   var STYLE_ID = 'popcorn-choices-style';
   function ensureStyle(d) {
     if (!d || d.getElementById(STYLE_ID)) return;
+    // `.choices` 를 앞에 붙여 테마와 **같은 구체성**으로 맞춘다 — 테마가
+    // `.choices .choices__list--dropdown` 로 걸고 있어 한 단계 낮으면 지고,
+    // 그러면 목록이 125px 에 갇힌 채 글자만 잘린다(실측).
+    // `max-content` 만으로는 부족하다: 안쪽 목록이 폭 100% 라 계산이 제자리를 돈다.
+    // 그래서 **최소 폭을 명시**한다 — '그래픽카드 (2,458)' 가 16px 로 들어가는 크기.
     var css =
-      '.choices__list--dropdown{width:max-content;min-width:100%;max-width:24rem;}' +
-      '.choices__list--dropdown .choices__item{white-space:nowrap;overflow:hidden;' +
-      'text-overflow:ellipsis;}';
+      '.choices .choices__list--dropdown{min-width:16rem;width:max-content;' +
+      'max-width:24rem;}' +
+      '.choices .choices__list--dropdown .choices__list{width:100%;}' +
+      '.choices .choices__list--dropdown .choices__item{white-space:nowrap;' +
+      'overflow:hidden;text-overflow:ellipsis;}';
     var s = d.createElement('style');
     s.id = STYLE_ID;
     s.textContent = css;
