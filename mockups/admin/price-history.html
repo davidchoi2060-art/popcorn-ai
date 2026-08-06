@@ -25,6 +25,8 @@
     <meta name="theme-color" content="#ffffff">
     <script src="vendors/simplebar/simplebar.min.js"></script>
     <script src="assets/js/config.js"></script>
+    <!-- 차트 배선은 head 에서 — fetch 콜백이 문서 끝의 vendor 보다 먼저 끝날 수 있다. -->
+    <script src="../shared/ui-chart.js"></script>
 
 
     <!-- ===============================================-->
@@ -213,11 +215,11 @@
             <h6 class="mb-2" id="chartTitle">가격 추이</h6>
             <!-- 선·눈금·범례는 전부 서버 값으로 그린다(drawChart). 마크업에는 축만 둔다 —
                  그럴듯한 꺾은선과 '42만/34만'·'용산도매A'는 서버가 죽어도 사실처럼 읽힌다. -->
-            <svg id="chart" viewBox="0 0 560 220" style="width:100%;height:auto;">
-              <line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
-              <text x="295" y="105" text-anchor="middle" font-size="12" fill="var(--phoenix-tertiary-color)">불러오는 중…</text>
-            </svg>
-            <div class="d-flex gap-3 fs-10 text-body-tertiary" id="legend"></div>
+            <!-- `data-echarts` 를 쓰지 않는다: phoenix.js 의 basicEchartsInit 이 그 속성을 훑어
+                 2022년 날짜가 박힌 데모 기본값을 씌운다. 범례도 echarts 가 그린다(누르면 선을 끈다). -->
+            <div id="chart" style="height:248px;">
+              <p class="text-body-tertiary fs-9 d-flex align-items-center justify-content-center h-100 mb-0">불러오는 중…</p>
+            </div>
             <p class="fs-10 text-body-quaternary mt-2 mb-0" id="chartNote" hidden></p>
           </div></div></div>
           <div class="col-12 col-lg-5"><div class="card h-100"><div class="card-body p-0">
@@ -264,34 +266,49 @@
           window.popcornList.wire("histList",["kind","change","reason"],{sortFunction:listSort});
         }
         const won=n=>n==null?"—":n.toLocaleString()+"원";
+        // 손그림 SVG(AXES·svgMsg·SUP_COLS)는 걷었다 — echarts 가 축·범례·빈 상태를 모두 그린다.
         const fmtD=iso=>{const d=new Date(iso);return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-        // 공급처별 매입가 다중선(0004 supplier_id) + 판매가 1선. 색은 팔레트 순환(초록 없음).
-        const SUP_COLS=["var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-secondary)","var(--phoenix-danger)"];
-        const AXES=`<line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>`;
-        const svgMsg=t=>AXES+`<text x="295" y="105" text-anchor="middle" font-size="12" fill="var(--phoenix-tertiary-color)">${t}</text>`;
+        // 가격은 **다음 변경 전까지 그 값을 유지한다** — 그래서 계단선(step:"end")이다.
+        // 직선 보간은 두 점 사이에 서서히 변했다고 말하지만 그런 변동은 없었다.
+        // 원장을 보여주는 화면에서 없던 중간값을 그리지 않는다.
         function drawChart(series, bySupplier){
-          const pts=[...series.sale.map(p=>({...p,k:"sale"})),...series.purchase.map(p=>({...p,k:"purchase"}))];
-          const svg=document.getElementById("chart");
-          if(!pts.length){svg.innerHTML=`<text x="200" y="110" font-size="12" fill="var(--phoenix-tertiary-color)">가격 이력이 없습니다</text>`;return;}
-          const ts=pts.map(p=>new Date(p.at).getTime()), vs=pts.map(p=>p.price);
-          const t0=Math.min(...ts), t1=Math.max(...ts), v0=Math.min(...vs), v1=Math.max(...vs);
-          const X=t=>t1===t0?300:60+((t-t0)/(t1-t0))*480;
-          const Y=v=>v1===v0?100:180-((v-v0)/(v1-v0))*160;
-          const line=(arr,color,dash)=>{
-            if(!arr.length)return "";
-            const pl=arr.map(p=>`${X(new Date(p.at).getTime()).toFixed(1)},${Y(p.price).toFixed(1)}`).join(" ");
-            const dots=arr.map(p=>`<circle cx="${X(new Date(p.at).getTime()).toFixed(1)}" cy="${Y(p.price).toFixed(1)}" r="3" fill="${color}"><title>${fmtD(p.at)} ${won(p.price)}</title></circle>`).join("");
-            return `<polyline points="${pl}" fill="none" stroke="${color}" stroke-width="2.5"${dash?` stroke-dasharray="${dash}"`:""}/>${dots}`;
-          };
-          const supLines=(bySupplier&&bySupplier.length)
-            ? bySupplier.map((g,i)=>line(g.points,SUP_COLS[i%SUP_COLS.length],"5 4")).join("")
-            : line(series.purchase,"var(--phoenix-warning)","5 4");
-          svg.innerHTML=`<line x1="40" y1="10" x2="40" y2="190" stroke="var(--phoenix-border-color)"/><line x1="40" y1="190" x2="550" y2="190" stroke="var(--phoenix-border-color)"/>
-            <text x="2" y="24" font-size="10" fill="var(--phoenix-tertiary-color)">${(v1/10000).toFixed(0)}만</text>
-            <text x="2" y="186" font-size="10" fill="var(--phoenix-tertiary-color)">${(v0/10000).toFixed(0)}만</text>
-            ${supLines}${line(series.sale,"var(--phoenix-primary)","")}
-            <text x="52" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t0).toISOString())}</text>
-            <text x="510" y="212" font-size="10" fill="var(--phoenix-tertiary-color)">${fmtD(new Date(t1).toISOString())}</text>`;
+          const sale = (series && series.sale) || [];
+          const sup  = (bySupplier && bySupplier.length)
+            ? bySupplier
+            : (series && series.purchase && series.purchase.length
+                ? [{ supplier: "매입가", points: series.purchase }] : []);
+
+          window.popcornChart.draw("chart", (C, TIP)=>{
+            if(!sale.length && !sup.length) return null;
+            const TONES = ["warning", "info", "danger", "secondary"];
+            const mkSeries = (name, pts, tone, dashed)=>({
+              name: name, type: "line", step: "end", showSymbol: true, symbolSize: 5,
+              lineStyle: { width: 2, color: C(tone, "#adb5bd"),
+                           type: dashed ? "dashed" : "solid" },
+              itemStyle: { color: C(tone, "#adb5bd") },
+              data: pts.map(pt=>[pt.at, pt.price])
+            });
+            return {
+              tooltip: TIP({ trigger:"axis",
+                valueFormatter:v=>(v==null?"—":Number(v).toLocaleString("ko-KR")+"원") }),
+              legend: { bottom:0, itemWidth:14, itemHeight:8,
+                        textStyle:{ color:C("body-tertiary","#8a94ad"), fontSize:10 } },
+              grid: { left:64, right:16, top:10, bottom:38 },
+              xAxis: { type:"time",
+                       axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10 },
+                       axisLine:{ lineStyle:{ color:C("border-color","#eee") } } },
+              yAxis: { type:"value", scale:true,
+                       axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10,
+                         formatter:v=>(Math.abs(v)>=10000
+                            ? (v/10000).toFixed(0)+"만" : Number(v).toLocaleString("ko-KR")) },
+                       splitLine:{ lineStyle:{ color:C("border-color","#eee") } } },
+              series: [].concat(
+                sale.length ? [mkSeries("판매가", sale, "primary", false)] : [],
+                sup.map((g,i)=>mkSeries("매입 · "+g.supplier, g.points,
+                                        TONES[i%TONES.length], true))
+              )
+            };
+          }, "가격 이력이 없습니다");
         }
         function load(pc){
           return fetch("/api/admin/price-history"+(pc?`?product_code=${pc}`+popcornDate.qs("&"):popcornDate.qs("?"))).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
@@ -304,10 +321,6 @@
               if(!d.product){ ledgerEmpty(d.note); return; }
               document.getElementById("chartTitle").textContent=`${d.product.sku} 가격 추이 — 현재 매입 ${won(d.product.purchase)} · 판매 ${won(d.product.sale)}`;
               const sup=d.by_supplier||[];
-              document.getElementById("legend").innerHTML=
-                `<span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-primary);vertical-align:middle;"></span> 판매가</span>`
-                +(sup.length?sup.map((g,i)=>`<span><span style="display:inline-block;width:14px;height:3px;background:${SUP_COLS[i%SUP_COLS.length]};vertical-align:middle;"></span> 매입 · ${g.supplier}</span>`).join("")
-                  :`<span><span style="display:inline-block;width:14px;height:3px;background:var(--phoenix-warning);vertical-align:middle;"></span> 매입가</span>`);
               const cn=document.getElementById("chartNote");cn.hidden=false;cn.textContent=d.note;
               drawChart(d.series, sup);
               document.getElementById("histCount").textContent=`${d.items.length}건`;
@@ -328,8 +341,7 @@
         }
         // 서버는 답했는데 원장이 비었다 — '0건'이라는 사실이지 연결 실패가 아니다. 배지를 낮추지 않는다.
         function ledgerEmpty(note){
-          const svg=document.getElementById("chart");if(svg)svg.innerHTML=svgMsg("가격 이력이 아직 없습니다.");
-          const lg=document.getElementById("legend");if(lg)lg.innerHTML="";
+          window.popcornChart.draw("chart", ()=>null, "가격 이력이 아직 없습니다.");
           const ct=document.getElementById("chartTitle");if(ct)ct.textContent="가격 추이";
           const hc=document.getElementById("histCount");if(hc)hc.textContent="0건";
           const rows=document.getElementById("histRows");
@@ -345,8 +357,7 @@
         // 마크업에 더미가 없으므로 '불러오는 중…'을 그대로 두면 영원히 로딩처럼 보인다.
         // DOM 은 전부 null 가드한다: 여기서 예외가 나면 뒤의 wireList 가 통째로 안 돈다.
         function offline(){
-          const svg=document.getElementById("chart");if(svg)svg.innerHTML=svgMsg("서버에 연결되면 표시됩니다.");
-          const lg=document.getElementById("legend");if(lg)lg.innerHTML="";
+          window.popcornChart.draw("chart", ()=>null, "서버에 연결되면 표시됩니다.");
           const ct=document.getElementById("chartTitle");if(ct)ct.textContent="가격 추이";
           const hc=document.getElementById("histCount");if(hc)hc.textContent="";
           const rows=document.getElementById("histRows");
@@ -593,6 +604,7 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
+    <script src="vendors/echarts/echarts.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
   <script src="../shared/ui-progress.js"></script>

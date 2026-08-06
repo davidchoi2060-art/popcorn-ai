@@ -2581,35 +2581,50 @@ def test_session_revoke():
     if src is not None:
         check("세션 수 = DB가 세는 수", d.get("total") == src, src, d.get("total"))
 
-    # 왕복 — 세션 두 개를 더 만들고 끊는다. 현재 세션은 살아 있어야 한다.
-    extra = []
-    for _ in range(2):
-        st, _b = post("/api/admin/auth/login",
-                      {"email": ADMIN_EMAIL, "password": ADMIN_PW})
-        extra.append(st)
-    check("검사용 세션을 만들었다", extra == [200, 200], [200, 200], extra)
-    # 위 로그인이 SESSION 쿠키를 갈아치웠으므로 지금 쿠키가 현재 세션이다
-    before = get("/api/admin/my-profile/sessions").get("total")
-    st, r = post("/api/admin/my-profile/sessions/revoke-others")
-    check("다른 기기 로그아웃이 된다", st == 200, 200, st)
-    check("현재 세션은 남는다", r.get("remaining") == 1, 1, r.get("remaining"))
-    check("끊은 수 = 있던 수 - 1",
-          r.get("revoked") == (before or 0) - 1, (before or 0) - 1, r.get("revoked"))
-    # 현재 쿠키가 아직 통해야 한다 — 자기 세션을 끊으면 그 자리에서 쫓겨난다
-    still = get("/api/admin/my-profile")
-    check("끊은 뒤에도 현재 세션으로 조회된다",
-          isinstance(still, dict) and still.get("id") is not None, "조회됨", still)
-    # 삭제가 아니라 철회다 — 행이 남아 "언제 열려 있었나"를 잃지 않는다
-    rev = db_one("SELECT count(*) FROM admin_sessions s"
-                 " JOIN admin_operators o USING (operator_id)"
-                 " WHERE lower(o.email) = :e AND s.revoked_at IS NOT NULL",
-                 e=ADMIN_EMAIL.lower())
-    if rev is not None:
-        check("철회는 삭제가 아니다(행이 남는다)", rev > 0, "1건 이상", rev)
-    check("작업 기록에 남는다",
-          (db_one("SELECT count(*) FROM admin_operator_activity_logs"
-                  " WHERE action = 'session_revoke_others'") or 0) > 0,
-          "1건 이상", 0)
+    # ── 이 왕복은 **사람의 브라우저 세션을 끊는다** ─────────────────────────
+    # revoke-others 는 같은 운영자의 다른 세션을 전부 철회한다. 회귀는 시드 owner 로
+    # 로그인하므로, 그 계정으로 브라우저에 로그인해 둔 사람은 회귀가 돌 때마다 쫓겨난다.
+    #
+    # 사용자 신고(2026-08-06) "서버를 재기동하면 계속 로그인을 해야 한다" — **재기동 탓이
+    # 아니었다.** 세션은 `admin_sessions` 테이블에 있고 인증이 매 요청 DB를 조회하므로
+    # 재기동으로 죽지 않는다. 끊고 있던 것은 이 검사였다.
+    #
+    # 그래서 끄는 길을 둔다(`REGRESSION_KEEP_SESSIONS=1`). **조용히 건너뛰지는 않는다** —
+    # 건너뛴 검사는 거짓 안심이고, 이 프로젝트는 DB 에 못 닿을 때도 그 사실을 말한다.
+    # 화면을 붙들고 작업하는 동안만 켜고, 평소에는 끈 채로 둔다.
+    if os.environ.get("REGRESSION_KEEP_SESSIONS"):
+        print("  [건너뜀] 다른 기기 로그아웃 왕복 6건 — REGRESSION_KEEP_SESSIONS 가 켜져 있습니다.")
+        print("           사람의 브라우저 세션을 지키려고 뺀 것입니다. 이 항목은 검증되지 않았습니다.")
+    else:
+        # 왕복 — 세션 두 개를 더 만들고 끊는다. 현재 세션은 살아 있어야 한다.
+        extra = []
+        for _ in range(2):
+            st, _b = post("/api/admin/auth/login",
+                          {"email": ADMIN_EMAIL, "password": ADMIN_PW})
+            extra.append(st)
+        check("검사용 세션을 만들었다", extra == [200, 200], [200, 200], extra)
+        # 위 로그인이 SESSION 쿠키를 갈아치웠으므로 지금 쿠키가 현재 세션이다
+        before = get("/api/admin/my-profile/sessions").get("total")
+        st, r = post("/api/admin/my-profile/sessions/revoke-others")
+        check("다른 기기 로그아웃이 된다", st == 200, 200, st)
+        check("현재 세션은 남는다", r.get("remaining") == 1, 1, r.get("remaining"))
+        check("끊은 수 = 있던 수 - 1",
+              r.get("revoked") == (before or 0) - 1, (before or 0) - 1, r.get("revoked"))
+        # 현재 쿠키가 아직 통해야 한다 — 자기 세션을 끊으면 그 자리에서 쫓겨난다
+        still = get("/api/admin/my-profile")
+        check("끊은 뒤에도 현재 세션으로 조회된다",
+              isinstance(still, dict) and still.get("id") is not None, "조회됨", still)
+        # 삭제가 아니라 철회다 — 행이 남아 "언제 열려 있었나"를 잃지 않는다
+        rev = db_one("SELECT count(*) FROM admin_sessions s"
+                     " JOIN admin_operators o USING (operator_id)"
+                     " WHERE lower(o.email) = :e AND s.revoked_at IS NOT NULL",
+                     e=ADMIN_EMAIL.lower())
+        if rev is not None:
+            check("철회는 삭제가 아니다(행이 남는다)", rev > 0, "1건 이상", rev)
+        check("작업 기록에 남는다",
+              (db_one("SELECT count(*) FROM admin_operator_activity_logs"
+                      " WHERE action = 'session_revoke_others'") or 0) > 0,
+              "1건 이상", 0)
 
     # ── 화면 계약 ──
     try:

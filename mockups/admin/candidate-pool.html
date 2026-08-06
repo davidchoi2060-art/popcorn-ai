@@ -25,6 +25,11 @@
     <meta name="theme-color" content="#ffffff">
     <script src="vendors/simplebar/simplebar.min.js"></script>
     <script src="assets/js/config.js"></script>
+    <!-- 차트 배선은 head 에서 — 본문 인라인 스크립트의 fetch 콜백이 문서 끝의 vendor 보다
+         먼저 끝날 수 있다. 그때 popcornChart 가 없으면 차트만 조용히 빈 채로 남는다
+         (ui-choices 를 21번째에 두었다가 겪은 것과 같은 순서 문제).
+         echarts 자체는 무거워서 문서 끝에 두고, 헬퍼가 그때까지 옵션을 들고 기다린다. -->
+    <script src="../shared/ui-chart.js"></script>
 
 
     <!-- ===============================================-->
@@ -213,9 +218,14 @@
         </div>
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-8"><div class="card h-100"><div class="card-body">
-            <h6 class="mb-1">카테고리별 구성 <span class="fs-10 fw-normal text-body-tertiary">■ 추천 가능 ■ 검수 대기 ■ 재고 없음 ■ 가격 검토</span></h6>
-            <!-- 요청 전 상태 = '불러오는 중'. 서버 응답이 오면 아래 LIVE가 통째로 덮어쓴다. -->
+            <h6 class="mb-1">카테고리별 구성</h6>
+            <p class="fs-10 text-body-tertiary mb-2">막대 길이 = 실제 부품 수입니다. 예전에는 카테고리마다
+              자기 총계로 100%를 채워서, <b>2,457개짜리와 325개짜리가 같은 너비</b>로 보였습니다.</p>
+            <!-- 요청 전 상태 = '불러오는 중'. 서버 응답이 오면 아래 LIVE가 통째로 덮어쓴다.
+                 `data-echarts` 속성은 쓰지 않는다 — phoenix.js 의 basicEchartsInit 이 그것을 훑어
+                 2022년 날짜가 박힌 데모 기본값을 씌운다. -->
             <div id="bars"><div class="text-center text-body-tertiary py-4">불러오는 중…</div></div>
+            <div id="chCats" style="height:352px;" hidden></div>
           </div></div></div>
           <div class="col-12 col-lg-4">
             <div class="card mb-3"><div class="card-body">
@@ -238,25 +248,69 @@
       (function(){
         // 더미 카테고리 배열(8행)과 그것을 그리던 첫 drawBars 호출을 걷어냈다.
         // 서버가 죽으면 저 8행이 없는 재고 수를 사실처럼 그리고 있었다.
-        const COLS=["var(--phoenix-primary)","var(--phoenix-warning)","var(--phoenix-info)","var(--phoenix-danger)","var(--phoenix-secondary)"];
         const OFFLINE="서버에 연결되지 않아 불러오지 못했습니다.";
+        // 세그먼트 = 4중 게이트의 탈락 지점. 순서를 바꾸지 않는다(게이트 순서 그대로).
+        // 색은 토큰 이름으로만 고른다 — 초록은 없다(U-01 미정), 통과=primary·위험=danger.
+        const SEG=[
+          {key:"ok",            label:"추천 가능",   tone:"primary",      link:null},
+          {key:"need_review",   label:"검수 대기",   tone:"warning",      link:"review-queue.html"},
+          {key:"not_candidate", label:"후보 미승격", tone:"info",         link:"review-queue.html"},
+          {key:"no_price",      label:"가격 검토",   tone:"danger",       link:"price-review.html"},
+          {key:"oos",           label:"재고 없음",   tone:"secondary-bg", link:"stock-inbound.html"},
+          {key:"no_specs",      label:"사양 미등록", tone:"tertiary-bg",  link:"products.html"}
+        ];
         function noteLine(el,msg){ if(el) el.innerHTML='<div class="text-center text-body-tertiary py-4">'+msg+'</div>'; }
         // 예외 메시지는 응답 본문 조각을 그대로 물고 온다(JSON 파싱 실패 시 앞 10자).
         // 그대로 innerHTML에 넣으면 서버가 보낸 바이트가 태그로 살아난다 — 실제로 <img>·<svg>가 생겼다.
         // 이유를 밝히려다 응답에 마크업 통제권을 넘기지 않는다.
         function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]); }
         function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
-        // 세그먼트 순서 = 게이트 순서(가능 / 검수 대기 / 후보 미승격 / 가격 / 재고없음 / 사양 미등록)
+        // 가로 누적 막대 — **값 축을 공유**해서 카테고리 간 크기가 비교된다.
+        // 예전 CSS 막대는 카테고리마다 자기 total 로 100%를 채워, 부품이 7배 많은
+        // 그래픽카드와 HDD 가 같은 길이로 보였다. '어디에 부품이 없나'를 보는 화면인데
+        // 그 질문에 답하지 못하는 그림이었다.
         function drawBars(rows){
-          document.getElementById("bars").innerHTML=rows.map(r=>{
-            const total=r.total||1;
-            const seg=(v,c,t)=>v?`<div style="width:${(v/total*100).toFixed(2)}%;background:${c};height:100%;" title="${t} ${v}"></div>`:"";
-            return `<div class="d-flex align-items-center gap-3 py-2">
-              <span class="fs-9 text-body-secondary" style="width:110px;flex:none;">${r.name}</span>
-              <div class="flex-1 rounded-pill overflow-hidden d-flex" style="height:14px;background:var(--phoenix-secondary-bg);">${seg(r.ok,COLS[0],"추천 가능")}${seg(r.need_review,COLS[1],"검수 대기")}${seg(r.not_candidate,COLS[1],"후보 미승격")}${seg(r.no_price,COLS[3],"가격 검토")}${seg(r.oos,COLS[2],"재고 없음")}${seg(r.no_specs,COLS[4],"사양 미등록")}</div>
-              <b class="fs-9" style="width:56px;text-align:right;">${r.ok.toLocaleString()}<span class="fs-10 fw-normal text-body-tertiary">/${total}</span></b>
-            </div>`;
-          }).join("");
+          const bars=document.getElementById("bars"), host=document.getElementById("chCats");
+          if(!host) return;
+          if(bars) bars.hidden=true;
+          host.hidden=false;
+
+          if(!rows || !rows.length){
+            window.popcornChart.draw("chCats", ()=>null, "집계된 카테고리가 없습니다");
+            return;
+          }
+          // echarts 의 category 축은 첫 항목을 **아래**에 그린다 — 큰 것이 위로 오게 뒤집는다.
+          const R=rows.slice().reverse();
+          // 전 카테고리에서 0인 세그먼트는 범례에 넣지 않는다. 늘 0인 항목이 범례를
+          // 차지하면 '있는데 0'인지 '아예 안 쓰는 값'인지 구분이 안 된다.
+          const used=SEG.filter(s=>R.some(r=>(r[s.key]||0)>0));
+
+          window.popcornChart.draw("chCats", (C, TIP, num)=>({
+            tooltip: TIP({ trigger:"axis", axisPointer:{type:"shadow"} }),
+            legend: { data:used.map(s=>s.label), bottom:0, itemWidth:10, itemHeight:10,
+                      textStyle:{ color:C("body-tertiary","#8a94ad"), fontSize:10 } },
+            // 좌측 여백은 가장 긴 라벨('CPU쿨러(공랭)') 기준이다 — 좁히면 글자가 잘린다.
+            grid: { left:112, right:56, top:8, bottom:34 },
+            xAxis: { type:"value", axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10,
+                       formatter:v=>Number(v).toLocaleString("ko-KR") },
+                     splitLine:{ lineStyle:{ color:C("border-color","#eee") } } },
+            yAxis: { type:"category", data:R.map(r=>r.name), axisLine:{show:false}, axisTick:{show:false},
+                     axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10 } },
+            series: used.map((s,i)=>({
+              name:s.label, type:"bar", stack:"g", barWidth:14,
+              itemStyle:{ color:C(s.tone, "#adb5bd"),
+                          borderRadius: i===used.length-1 ? [0,4,4,0] : 0 },
+              data:R.map(r=>r[s.key]||0)
+            }))
+          }), "집계를 그릴 값이 없습니다",
+          // 세그먼트를 누르면 그 일을 처리하는 화면으로 — 차트가 작업의 입구가 된다.
+          inst=>{
+            inst.off("click");
+            inst.on("click", e=>{
+              const s=used[e.seriesIndex];
+              if(s && s.link) location.href=s.link;
+            });
+          });
           if(window.feather)feather.replace();
         }
         // ---- LIVE (슬라이스 25) — 4중 게이트별 제외 사유 실집계. 'ok' 합계 = S1 후보 카운터와 동일 집합 ----
@@ -536,6 +590,7 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
+    <script src="vendors/echarts/echarts.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
   <script src="../shared/ui-progress.js"></script>
