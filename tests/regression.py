@@ -2315,6 +2315,34 @@ def test_screen_assets():
           "max-content" in _uc and "nowrap" in _uc, True,
           "max-content" in _uc and "nowrap" in _uc)
 
+    # ⑪ 목록 화면의 **표 열 수가 서로 맞는가** (2026-08-05 · UI 개편).
+    #    체크박스 열을 넣으면서 colgroup·thead·행·빈 상태 colspan 이 어긋나기 쉽다.
+    #    어긋나면 표가 조용히 뒤틀린다 — 브라우저는 오류를 내지 않는다.
+    for _n in ("products.html", "category-mapping.html"):
+        _s = io.open(os.path.join(ROOT, "mockups", "admin", _n), encoding="utf-8").read()
+        _cg = _re7.search(r"<colgroup>(.*?)</colgroup>", _s, _re7.S)
+        if not _cg:
+            continue
+        _ncol = _cg.group(1).count("<col")
+        _i, _j = _s.find("<thead"), _s.find("</thead>")
+        _nth = len(_re7.findall(r"<th[ >]", _s[_i:_j]))
+        _spans = set(int(x) for x in _re7.findall(r'colspan="(\d+)"', _s))
+        check("%s 열 수가 맞는다(colgroup=thead)" % _n, _ncol == _nth,
+              _ncol, _nth)
+        check("%s 빈 상태 colspan 이 열 수와 같다" % _n, _spans <= {_nth},
+              _nth, sorted(_spans))
+
+    # ⑫ 일괄 선택은 **아무 일도 못 하는 체크박스가 아니다** — 실제 동작이 붙어 있어야 한다.
+    _pl = io.open(os.path.join(ROOT, "mockups", "admin", "products.html"),
+                  encoding="utf-8").read()
+    check("상품 목록에 일괄 선택이 있다", "data-bulk-select=" in _pl, True,
+          "data-bulk-select=" in _pl)
+    check("일괄 선택에 실제 동작이 붙어 있다", "/products/bulk-status" in _pl, True,
+          "/products/bulk-status" in _pl)
+    # 상태 선택지를 화면이 지어내지 않는다(서버 product-meta.status_options)
+    check("일괄 상태 선택지를 서버에서 받는다", "fillBulkStatus(m.status_options)" in _pl,
+          True, "fillBulkStatus(m.status_options)" in _pl)
+
     # ⑨ **디자인 토큰을 화면이 다시 정의하지 않는다** (2026-08-05).
     #    `vslot-demo.html` 이 tokens.css 값을 인라인으로 베껴 두고 있었고,
     #    그 사본은 **이미 정본과 어긋나 있었다** — `--font-head` 에서 'Noto Sans KR' 이

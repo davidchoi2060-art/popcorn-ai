@@ -1359,3 +1359,135 @@ def delete_product(product_code: int, force: bool = False):
              {"product_code": product_code, "sku": r["sku"],
               "name": r["product_name"], "refs": refs}, kind="product")
     return {"ok": True, "note": r["sku"] + " 상품을 삭제했습니다. 되돌릴 수 없습니다."}
+
+
+# ─────────────────────────── 목록 일괄 상태 변경 ───────────────────────────
+# 상품 목록에는 **일괄 선택이 없었다**(2026-08-05 실측 — `category-mapping` 한 곳뿐).
+# Phoenix 원본(`apps/e-commerce/admin/products.html`)은 첫 열이 선택 체크박스이고
+# 우리는 그 컴포넌트를 갖고 있으면서 목록 화면에 쓰지 않고 있었다.
+#
+# 일괄 선택만 붙이면 **아무 일도 못 하는 체크박스**가 된다. 그래서 실제 동작 하나를
+# 함께 준다: 상태 일괄 변경. 오늘 나온 필요가 근거다 — 완제품 208건처럼 성격이 같은
+# 덩어리를 한 번에 세우거나 내려야 할 때 지금은 한 건씩 눌러야 한다.
+#
+# 규약은 이미 검증된 `category-mapping/move` 를 그대로 따른다:
+#   · 바꾸기 **전 상태를 읽어** 로그에 담는다 — 부분 되돌리기도 정확해진다
+#   · 이미 그 상태인 것은 대상에서 뺀다(로그를 부풀리지 않는다)
+#   · 상한을 숨기지 않는다 — 넘으면 몇 건이 빠졌는지 응답이 밝힌다
+#   · 되돌리기는 삭제가 아니라 역방향 전이이고 `ref_log_id` 로 원 기록을 가리킨다
+#
+# **잠긴 상태는 건드리지 않는다** — 운영자가 손으로 정한 값을 일괄 작업이 덮으면
+# 어제 고친 것이 오늘 사라진다(A-16의 짝, 재산정이 잠긴 판매가를 세기만 하는 것과 같다).
+MAX_BULK = 2000
+
+
+class BulkStatusBody(BaseModel):
+    product_codes: list[int]
+    status: str
+
+
+def _bulk_operator():
+    from .auth import current_operator
+
+    me = current_operator() or {}
+    if me.get("role") not in ("owner", "operator"):
+        raise HTTPException(403, "운영자 이상만 일괄 변경할 수 있습니다")
+    return me
+
+
+def _pool_count(conn) -> int:
+    return conn.execute(text(
+        "SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty > 0")).scalar_one()
+
+
+@router.post("/products/bulk-status")
+def bulk_status(body: BulkStatusBody):
+    from .admin_orders import _log
+
+    _bulk_operator()
+    if body.status not in STATUS_OK:
+        raise HTTPException(400, "상태는 " + " · ".join(STATUS_OK) + " 중 하나입니다")
+    codes = list(dict.fromkeys(body.product_codes or []))
+    if not codes:
+        raise HTTPException(400, "상품을 선택하세요")
+    dropped = 0
+    if len(codes) > MAX_BULK:
+        dropped = len(codes) - MAX_BULK
+        codes = codes[:MAX_BULK]
+
+    with engine.begin() as conn:
+        before = conn.execute(text(
+            "SELECT product_code, status, locked_fields FROM products"
+            " WHERE product_code = ANY(:c)"), {"c": codes}).mappings().all()
+        if not before:
+            raise HTTPException(404, "해당 상품을 찾을 수 없습니다")
+        missing = len(codes) - len(before)
+
+        locked = [r for r in before if "status" in (r["locked_fields"] or [])]
+        targets = [r for r in before
+                   if r["status"] != body.status and r not in locked]
+        if not targets:
+            raise HTTPException(400, "바꿀 것이 없습니다 — 이미 모두 그 상태이거나 잠겨 있습니다")
+
+        pool_before = _pool_count(conn)
+        conn.execute(text(
+            "UPDATE products SET status = :s, updated_at = now()"
+            " WHERE product_code = ANY(:c)"),
+            {"s": body.status, "c": [r["product_code"] for r in targets]})
+        pool_after = _pool_count(conn)
+
+        log_id = _log(conn, "상품 상태 일괄 변경", body.status, {
+            "to": body.status, "changed": len(targets), "locked": len(locked),
+            "pool_before": pool_before, "pool_after": pool_after,
+            # 되돌리기용 — 상품별 원래 상태
+            "before": [{"pc": r["product_code"], "st": r["status"]} for r in targets],
+        }, kind="product")
+
+    # **건수가 아니라 영향을 말한다** — 상태는 추천 후보 게이트를 직접 건드린다.
+    delta = pool_after - pool_before
+    msg = f"{len(targets):,}건을 '{body.status}'(으)로 바꿨습니다"
+    if delta:
+        msg += f" · 추천 후보 {abs(delta):,}건이 " + ("늘었습니다" if delta > 0 else "줄었습니다")
+    if locked:
+        msg += f" · 잠긴 {len(locked):,}건은 그대로 뒀습니다"
+    if dropped:
+        msg += f" · 상한 {MAX_BULK:,}건을 넘어 {dropped:,}건은 건너뛰었습니다"
+    if missing:
+        msg += f" · 없는 상품 {missing:,}건은 건너뛰었습니다"
+    return {"verdict": msg, "changed": len(targets), "locked": len(locked),
+            "dropped": dropped, "missing": missing,
+            "pool_before": pool_before, "pool_after": pool_after, "log_id": log_id}
+
+
+class BulkUndoBody(BaseModel):
+    log_id: int
+
+
+@router.post("/products/bulk-status/undo")
+def bulk_status_undo(body: BulkUndoBody):
+    from .admin_orders import _log
+
+    _bulk_operator()
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT detail, action FROM admin_operator_activity_logs WHERE log_id = :i"),
+            {"i": body.log_id}).mappings().first()
+        if row is None or row["action"] != "상품 상태 일괄 변경":
+            raise HTTPException(404, "되돌릴 기록을 찾을 수 없습니다")
+        dup = conn.execute(text(
+            "SELECT 1 FROM admin_operator_activity_logs"
+            " WHERE detail->>'ref_log_id' = CAST(:i AS TEXT)"), {"i": body.log_id}).first()
+        if dup:
+            raise HTTPException(409, "이미 되돌린 기록입니다")
+
+        detail = row["detail"] or {}
+        before = detail.get("before") or []
+        if not before:
+            raise HTTPException(400, "되돌릴 내역이 비어 있습니다")
+        for b in before:
+            conn.execute(text(
+                "UPDATE products SET status = :s, updated_at = now()"
+                " WHERE product_code = :pc"), {"s": b["st"], "pc": b["pc"]})
+        _log(conn, "상품 상태 일괄 변경 되돌림", str(body.log_id),
+             {"ref_log_id": body.log_id, "restored": len(before)}, kind="product")
+    return {"verdict": f"{len(before):,}건의 상태를 되돌렸습니다", "restored": len(before)}

@@ -216,6 +216,20 @@
               <select id="fmfr" class="form-select form-select-sm" style="max-width:132px;" title="제조사 필터"></select>
               <input id="q" class="form-control form-control-sm" style="max-width:240px;" placeholder="자체 상품번호 · SKU · 상품명 검색">
             </div>
+            <!-- 일괄 선택 액션 바 — 선택이 없을 때는 안내만 보인다.
+                 `bulk-replace` / `bulk-actions` 이름은 Phoenix BulkSelect 규약이다. -->
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+              <div id="bulk-replace">
+                <span class="fs-10 text-body-tertiary">행을 선택하면 상태를 한 번에 바꿀 수 있습니다.</span>
+              </div>
+              <div class="d-none align-items-center gap-2" id="bulk-actions">
+                <span class="fs-9"><b id="selCount">0</b>건 선택</span>
+                <select class="form-select form-select-sm w-auto" id="bulkStatus" aria-label="바꿀 상태"></select>
+                <button class="btn btn-primary btn-sm" type="button" id="btnBulk">상태 바꾸기</button>
+                <button class="btn btn-link btn-sm p-0 ms-1 fs-9" type="button" id="btnBulkClear">선택 해제</button>
+                <span class="fs-10 text-body-tertiary" id="bulkHint"></span>
+              </div>
+            </div>
           </div>
           <div class="card-body p-0">
           <!-- data-list = **현재 페이지 안에서의** 검색·정렬(헤더 클릭). 페이지 이동은 서버가 한다 —
@@ -225,8 +239,8 @@
                이 표에 날짜·시각 컬럼은 없다. -->
           <div id="prodList" data-list='{"valueNames":["code","name","cat","spec","stock","supplier",{"name":"price","attr":"data-num"},"status"]}'>
           <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1080px;">
-            <colgroup><col style="width:150px"><col><col style="width:100px"><col style="width:130px"><col style="width:70px"><col style="width:80px"><col style="width:110px"><col style="width:170px"><col style="width:150px"></colgroup>
-            <thead><tr class="text-body-tertiary"><th class="sort ps-4 py-2" data-sort="code">자체 상품번호 · SKU</th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="supplier">공급처</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
+            <colgroup><col style="width:36px"><col style="width:150px"><col><col style="width:100px"><col style="width:130px"><col style="width:70px"><col style="width:80px"><col style="width:110px"><col style="width:170px"><col style="width:150px"></colgroup>
+            <thead><tr class="text-body-tertiary"><th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th><th class="sort py-2" data-sort="code">자체 상품번호 · SKU</th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="supplier">공급처</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
             <tbody class="list" id="rows"></tbody>
           </table></div>
           </div></div>
@@ -271,7 +285,7 @@
         function loadMeta(){
           return fetch("/api/admin/product-meta")
             .then(r=>r.ok?r.json():null)
-            .then(m=>{ if(m){ META=m; fillSelects(); } })
+            .then(m=>{ if(m){ META=m; fillSelects(); fillBulkStatus(m.status_options); } })
             .catch(()=>{});
         }
         // KPI — 서버 kpis(상호배타 버킷: 검수 우선이라 재고 없음과 중복 없음)만 쓴다.
@@ -319,13 +333,76 @@
         }
         if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wireList);
         else wireList();
-        // 표가 비는 이유를 표가 직접 말한다(colspan=9 — 위 colgroup·thead 와 같은 열 수)
+
+        /* ── 일괄 선택 ────────────────────────────────────────────────
+         * Phoenix 원본은 첫 열이 선택 체크박스인데 우리 목록에는 없었다.
+         * `category-mapping` 에서 이미 검증된 것을 그대로 가져온다 — 새로 짜지 않는다.
+         *
+         * 두 가지가 함정이었다(그 화면에서 겪은 것):
+         *   · `bulkSelectInit` 은 docReady 때 1회만 돈다. 우리 표는 fetch 뒤에 그려지므로
+         *     그때는 존재하지 않는다 → 전역에 노출된 `phoenix.BulkSelect` 로 직접 붙인다.
+         *   · BulkSelect 는 카운터도 이벤트도 주지 않는다(액션바 d-none 토글만).
+         *     그래서 선택 상태는 우리가 들고 있는다. 페이지를 넘어가도 유지된다.
+         */
+        var SEL={}, BULK=null;
+        function selCount(){ return Object.keys(SEL).length; }
+        function syncBulk(){
+          var c=selCount(), act=document.getElementById("bulk-actions");
+          if(!act) return;
+          document.getElementById("selCount").textContent=c.toLocaleString("ko-KR");
+          act.classList.toggle("d-none", c===0);
+          act.classList.toggle("d-flex", c>0);
+          document.getElementById("bulk-replace").classList.toggle("d-none", c>0);
+          var h=document.getElementById("bulkHint");
+          h.textContent = c>2000 ? "한 번에 2,000건까지 바꿉니다 — 나머지는 다시 선택하세요" : "";
+        }
+        function wireBulk(){
+          var head=document.getElementById("chkAll");
+          if(window.phoenix && window.phoenix.BulkSelect && head){
+            head.checked=false; head.indeterminate=false;
+            try{ BULK=new window.phoenix.BulkSelect(head); BULK.init(); }catch(e){ BULK=null; }
+          }
+          syncBulk();
+        }
+        document.addEventListener("change",function(ev){
+          var cb=ev.target.closest && ev.target.closest("#rows input[data-pc]");
+          if(!cb) return;
+          var pc=cb.getAttribute("data-pc");
+          if(cb.checked){ SEL[pc]=true; } else { delete SEL[pc]; }
+          syncBulk();
+        });
+        function fillBulkStatus(opts){
+          var sel=document.getElementById("bulkStatus");
+          if(!sel || sel.options.length || !opts || !opts.length) return;
+          // 선택지는 **서버가 준다**(product-meta.status_options) — 화면이 지어내지 않는다
+          sel.innerHTML=opts.map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join("");
+        }
+        var BULK_UNDO=null;
+        function bulkApply(){
+          var codes=Object.keys(SEL).map(Number);
+          if(!codes.length) return;
+          var st=document.getElementById("bulkStatus").value;
+          if(!st){ alert("바꿀 상태를 고르세요"); return; }
+          if(!confirm(codes.length.toLocaleString("ko-KR")+"건을 '"+st+"'(으)로 바꿉니다. 계속할까요?")) return;
+          fetch("/api/admin/products/bulk-status",{method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({product_codes:codes,status:st})})
+            .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+            .then(function(res){
+              // 실패를 삼키지 않는다 — 공용 헬퍼가 만든 같은 문장을 쓴다
+              if(!res.ok){ alert((window.popcornProgress&&window.popcornProgress.errText)
+                                 ? window.popcornProgress.errText(res.j,"") : "바꾸지 못했습니다"); return; }
+              BULK_UNDO=res.j.log_id; SEL={}; syncBulk(); load();
+            })
+            .catch(function(e){ alert("바꾸지 못했습니다 — "+e.message); });
+        }
+        // 표가 비는 이유를 표가 직접 말한다(colspan=10 — 위 colgroup·thead 와 같은 열 수)
         const STATE_MSG={loading:"불러오는 중…",fail:"서버에 연결되지 않아 불러오지 못했습니다."};
         function render(){
           pills();
           const host=document.getElementById("rows"); if(!host) return;
           if(STATE!=="ok"){
-            host.innerHTML=`<tr><td colspan="9" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
+            host.innerHTML=`<tr><td colspan="10" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
             return;
           }
           const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
@@ -335,7 +412,8 @@
           host.innerHTML=list.length?list.map(p=>{
             const [lab,col,link,act]=ST[p.status_key];
             return `<tr>
-              <td class="code ps-4"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
+              <td class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" data-pc="${p.product_code}" data-bulk-select-row='{"code":${p.product_code}}'${SEL[p.product_code]?" checked":""} aria-label="선택"></div></td>
+              <td class="code"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
               <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight">${p.name}</a></td>
               <td class="cat text-body-tertiary">${p.cat}</td>
               <td class="spec">${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
@@ -345,8 +423,9 @@
               <td><span class="status badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
               <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?code=${p.product_code}&edit=1">수정</a></td>
             </tr>`;
-          }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
+          }).join(""):`<tr><td colspan="10" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
           wireList();   // 행을 다시 그렸으니 정렬 색인도 다시 잡는다
+          wireBulk();   // 체크박스도 새로 생겼다 — 헤더 전체선택을 다시 건다
         }
         // 요청 전 상태 — 아직 아무것도 모른다("불러오는 중…" · KPI "—").
         // 요청을 보내기도 전에 '실데이터'라고 말하지 않는다.
@@ -374,6 +453,12 @@
           if(pv) pv.onclick=function(){ if(PAGE>1){PAGE--;load();} };
           if(nx) nx.onclick=function(){ if(PAGE<PAGES){PAGE++;load();} };
         }
+        document.addEventListener("click",function(ev){
+          if(ev.target.closest && ev.target.closest("#btnBulk")){ ev.preventDefault(); bulkApply(); return; }
+          if(ev.target.closest && ev.target.closest("#btnBulkClear")){
+            ev.preventDefault(); SEL={}; syncBulk(); render(); return;
+          }
+        });
         function load(){
           var url="/api/admin/products?page="+PAGE+"&size="+SIZE
             + "&q=" + encodeURIComponent(q||"")
