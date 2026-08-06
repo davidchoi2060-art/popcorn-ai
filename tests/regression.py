@@ -2248,6 +2248,23 @@ def test_screen_assets():
           "max-content" in _uc and "nowrap" in _uc, True,
           "max-content" in _uc and "nowrap" in _uc)
 
+    # ⑨ **디자인 토큰을 화면이 다시 정의하지 않는다** (2026-08-05).
+    #    `vslot-demo.html` 이 tokens.css 값을 인라인으로 베껴 두고 있었고,
+    #    그 사본은 **이미 정본과 어긋나 있었다** — `--font-head` 에서 'Noto Sans KR' 이
+    #    빠져 있었다. 부품 어휘(슬라이스 A)·choices(H)에서 겪은 그 병이다.
+    #    값을 두 벌 두면 언젠가 갈라지고, 갈라진 뒤에는 어느 쪽이 맞는지 알 수 없다.
+    _tok_src = io.open(os.path.join(ROOT, "design-system", "tokens.css"),
+                       encoding="utf-8").read()
+    _canon = set(_re7.findall(r"(--[a-z-]+)\s*:", _tok_src))
+    _copies = []
+    for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "**", "*.html"), recursive=True)):
+        _s = io.open(_p, encoding="utf-8").read()
+        # 화면이 정의하는 커스텀 속성 중 정본에 있는 이름을 다시 정의하는가
+        _defs = set(_re7.findall(r"(--[a-z-]+)\s*:\s*[^;]+;", _s)) & _canon
+        if _defs:
+            _copies.append(os.path.basename(_p) + ":" + ",".join(sorted(_defs)[:3]))
+    check("화면이 디자인 토큰을 다시 정의하지 않는다", _copies == [], [], _copies[:4])
+
     # ⑤ 폰트를 남의 서버에서 받지 않는다 (2026-08-05).
     #    망이 막히거나 그쪽이 죽으면 글꼴이 통째로 바뀐다. 아이콘은 이미 로컬이었다.
     _all = [(p, s) for p, s in

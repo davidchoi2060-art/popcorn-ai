@@ -4,18 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Popcorn · 시각 슬롯 규약 데모</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
 <link rel="stylesheet" href="vslot.css">
 <style>
-:root{
-  --bg:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
-  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
-  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
-  --tertiary:#6E8FD6; --error:#C0392B;
-  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
-  --font-head:'Hanken Grotesk','Pretendard',system-ui,sans-serif;
-  --r-lg:1rem; --r-full:9999px;
-  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
-}
+/* 디자인 토큰은 design-system/tokens.css 가 단일 원천이다.
+   여기 있던 사본은 이미 정본과 어긋나 있었다(--font-head 에 'Noto Sans KR' 누락). */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--on);line-height:1.6;padding:40px 24px 80px}
 .wrap{max-width:920px;margin:0 auto}
