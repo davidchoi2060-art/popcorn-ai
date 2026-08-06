@@ -211,14 +211,30 @@
           <div class="card-header border-bottom border-translucent"><div class="d-flex flex-wrap align-items-center gap-2">
             <ul class="nav nav-pills gap-2 fs-9 mb-0" id="pills"></ul>
             <select id="fch" class="form-select form-select-sm ms-auto" style="max-width:150px;"><option value="all">전체 채널</option><option value="own">자체 결제</option><option value="mall">쇼핑몰 인계</option></select>
-          </div></div>
+          </div>            <!-- 일괄 선택 액션 바 — 자격 없는 주문은 막지 않고 건너뛰며 사유를 말한다. -->
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+              <div id="bulk-replace">
+                <span class="fs-10 text-body-tertiary">행을 선택하면 같은 단계 주문을 한 번에 넘길 수 있습니다.</span>
+              </div>
+              <div class="d-none align-items-center gap-2" id="bulk-actions">
+                <span class="fs-9"><b id="selCount">0</b>건 선택</span>
+                <select class="form-select form-select-sm w-auto" id="bulkAction" aria-label="일괄 처리">
+                  <option value="assemble">결제완료 → 조립중</option>
+                  <option value="ship">조립중 → 배송중</option>
+                  <option value="done">배송중 → 완료</option>
+                </select>
+                <button class="btn btn-primary btn-sm" type="button" id="btnBulk">이 단계로 넘기기</button>
+                <button class="btn btn-link btn-sm p-0 ms-1 fs-9" type="button" id="btnBulkClear">선택 해제</button>
+              </div>
+            </div>
+</div>
           <div class="card-body p-0">
           <!-- data-list = 현재 페이지 안의 검색·정렬. 페이지 이동은 서버가 한다(page/pagination 옵션 금지). -->
           <!-- price 는 화면 표기가 "2,087,000원" 이라 문자열 정렬이 812,000 을 1,284,000 보다 크게 놓는다.
                td 의 class 는 그대로 두고 값만 data-price(원단위 정수)에서 읽는다. -->
           <div id="ordList" data-list='{"valueNames":["ord","cust","ch","conf",{"name":"price","attr":"data-price"},"status"]}'><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1000px;">
-            <colgroup><col style="width:120px"><col style="width:110px"><col style="width:90px"><col style="width:110px"><col><col style="width:120px"><col style="width:150px"><col style="width:90px"></colgroup>
-            <thead><tr class="text-body-tertiary"><th class="sort ps-4 py-2" data-sort="ord">주문번호</th><th>시각</th><th class="sort" data-sort="cust">고객</th><th class="sort" data-sort="ch">채널</th><th class="sort" data-sort="conf">구성</th><th class="sort text-end" data-sort="price">금액</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
+            <colgroup><col style="width:36px"><col style="width:120px"><col style="width:110px"><col style="width:90px"><col style="width:110px"><col><col style="width:120px"><col style="width:150px"><col style="width:90px"></colgroup>
+            <thead><tr class="text-body-tertiary"><th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th><th class="sort py-2" data-sort="ord">주문번호</th><th>시각</th><th class="sort" data-sort="cust">고객</th><th class="sort" data-sort="ch">채널</th><th class="sort" data-sort="conf">구성</th><th class="sort text-end" data-sort="price">금액</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
             <tbody class="list" id="rows"></tbody>
           </table></div></div></div>
         </div>
@@ -247,6 +263,68 @@
             ["ord","cust","ch","conf",{name:"price",attr:"data-price"},"status"],
             {numeric:["price"]});
         }
+
+        /* ── 일괄 선택 ────────────────────────────────────────────────
+         * products.html 에서 검증한 것을 그대로 옮긴다. 다른 점 하나:
+         * 주문은 **액션이 상태에 따라 다르다**(assemble/ship/done). 자격 없는 주문은
+         * 서버가 막지 않고 **사유와 함께 건너뛴다** — 왜 빠졌는지 모르면 운영자는
+         * 같은 선택을 반복한다.
+         *
+         * BulkSelect 는 카운터도 이벤트도 주지 않는다(액션바 토글만) — 상태는 우리가 든다.
+         * bulkSelectInit 은 docReady 1회라 fetch 뒤에 그린 표에는 안 닿는다 → 직접 붙인다.
+         */
+        var SEL={}, BULK=null;
+        function syncBulk(){
+          var c=Object.keys(SEL).length, act=document.getElementById("bulk-actions");
+          if(!act) return;
+          document.getElementById("selCount").textContent=c.toLocaleString("ko-KR");
+          act.classList.toggle("d-none", c===0);
+          act.classList.toggle("d-flex", c>0);
+          document.getElementById("bulk-replace").classList.toggle("d-none", c>0);
+        }
+        function wireBulk(){
+          var head=document.getElementById("chkAll");
+          if(window.phoenix && window.phoenix.BulkSelect && head){
+            head.checked=false; head.indeterminate=false;
+            try{ BULK=new window.phoenix.BulkSelect(head); BULK.init(); }catch(e){ BULK=null; }
+          }
+          syncBulk();
+        }
+        document.addEventListener("change",function(ev){
+          var cb=ev.target.closest && ev.target.closest("#rows input[data-no]");
+          if(!cb) return;
+          var no=cb.getAttribute("data-no");
+          if(cb.checked){ SEL[no]=true; } else { delete SEL[no]; }
+          syncBulk();
+        });
+        function bulkGo(){
+          var nos=Object.keys(SEL);
+          if(!nos.length) return;
+          var act=document.getElementById("bulkAction");
+          var label=act.options[act.selectedIndex].textContent;
+          if(!confirm(nos.length.toLocaleString("ko-KR")+"건을 '"+label+"' 처리합니다. 계속할까요?")) return;
+          fetch("/api/admin/orders/bulk-advance",{method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({order_nos:nos,action:act.value})})
+            .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+            .then(function(res){
+              if(!res.ok){ alert((window.popcornProgress&&window.popcornProgress.errText)
+                                 ? window.popcornProgress.errText(res.j,"") : "처리하지 못했습니다"); return; }
+              // **건너뛴 것을 숨기지 않는다** — 왜 빠졌는지 그 자리에서 말한다
+              var sk=res.j.skipped||[];
+              if(sk.length){
+                alert(res.j.verdict + "\n\n건너뛴 주문:\n" + sk.map(function(x){ return "· " + x.no + " — " + x.why; }).join("\n"));
+              }
+              SEL={}; syncBulk(); load();
+            })
+            .catch(function(e){ alert("처리하지 못했습니다 — "+e.message); });
+        }
+        document.addEventListener("click",function(ev){
+          if(ev.target.closest && ev.target.closest("#btnBulk")){ ev.preventDefault(); bulkGo(); return; }
+          if(ev.target.closest && ev.target.closest("#btnBulkClear")){
+            ev.preventDefault(); SEL={}; syncBulk(); render(); return;
+          }
+        });
         const STEPS=["결제 완료","조립·검사","출고·배송","배송 완료"];
         const chBadge=ch=>ch==="own"?'<span class="badge badge-phoenix badge-phoenix-primary">자체</span>':'<span class="badge badge-phoenix badge-phoenix-info">쇼핑몰 인계</span>';
         const stBadge=o=>o.refund?'<span class="badge badge-phoenix badge-phoenix-danger text-nowrap">환불 접수</span>':'<span class="badge badge-phoenix badge-phoenix-'+(o.status==="완료"?"secondary":(o.status==="취소"?"danger":"warning"))+' text-nowrap">'+o.status+'</span>';
@@ -283,7 +361,7 @@
           const msg=state==="loading"?"불러오는 중…"
             :state==="fail"?"서버에 연결되지 않아 불러오지 못했습니다."
             :"조건에 맞는 주문이 없습니다.";
-          return `<tr><td colspan="8" class="text-center text-body-tertiary py-4">${msg}</td></tr>`;
+          return `<tr><td colspan="9" class="text-center text-body-tertiary py-4">${msg}</td></tr>`;
         }
         // 품목 행이 없는 주문이 실제로 내려온다(API 는 items 를 `items_by.get(oid, [])` 로 만든다).
         // o.items[0][1] 은 그때 죽고, 그 예외를 아래 fetch 의 catch 가 state==="ok" 로 삼켜
@@ -296,7 +374,7 @@
           let html;
           try{
             html=list.length?list.map(o=>`<tr>
-            <td class="ord ps-4 fw-bold text-body-highlight">${o.no}</td>
+            <td class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" data-no="${o.no}" data-bulk-select-row='{"no":"${o.no}"}' aria-label="선택"></div></td><td class="ord fw-bold text-body-highlight">${o.no}</td>
             <td class="text-body-tertiary">${o.t}</td>
             <td class="cust">${o.cust}</td>
             <td class="ch">${chBadge(o.ch)}</td>
@@ -308,11 +386,12 @@
           }catch(err){
             // 못 그렸으면 못 그렸다고 말한다 — 직전 상태 문구('불러오는 중…')를 남기면 거짓이 된다.
             console.error(err);
-            html=`<tr><td colspan="8" class="text-center text-body-tertiary py-4">주문 목록을 표시하지 못했습니다 — 화면 오류입니다.</td></tr>`;
+            html=`<tr><td colspan="9" class="text-center text-body-tertiary py-4">주문 목록을 표시하지 못했습니다 — 화면 오류입니다.</td></tr>`;
           }
           rowsEl.innerHTML=html;
           document.querySelectorAll("#rows [data-o]").forEach(a=>a.onclick=e=>{e.preventDefault();sel=a.dataset.o;detail();});
           wireList();
+          wireBulk();
           if(window.feather)feather.replace();
         }
         function order(){return O.find(o=>o.no===sel);}

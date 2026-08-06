@@ -146,50 +146,135 @@ def _guard_refund(conn, order_id: int):
                                   "detail": "환불·클레임 진행 중 — 환불·클레임 화면에서 처리하세요"})
 
 
+def _advance_one(conn, o, order_no: str, action: str):
+    """주문 한 건을 다음 단계로 보낸다 — **단건 처리와 일괄 처리가 이 함수 하나를 쓴다.**
+
+    상태 기계를 두 벌로 두면 언젠가 갈라진다(부품 어휘·좌측 메뉴·디자인 토큰에서
+    겪은 그 병이다). 특히 여기는 **원장**이라 갈라지면 주문 이력이 서로 다른 말을 한다.
+    부수효과(배송 행 생성·완료 처리)와 `order_events` 기록이 전부 이 안에 있고,
+    로그도 건마다 `order_advance` 한 줄이라 **기존 되돌리기가 그대로 동작한다.**
+
+    호출자는 `FOR UPDATE` 로 잠근 행(`o`)을 넘긴다. 자격 검사(환불 진행·상태 불일치)는
+    여기서 한다 — 단건은 그대로 오류가 되고, 일괄은 미리 걸러 부르므로 걸리지 않는다.
+    """
+    expect, target = TRANSITIONS[action]
+    _guard_refund(conn, o["order_id"])
+    if o["status"] != expect:
+        raise HTTPException(409, {"error": "invalid_transition",
+                                  "detail": f"현재 상태 '{o['status']}' — '{expect}'에서만 가능한 처리입니다"})
+    before = {"status": o["status"]}
+    ship_text = None
+    if action == "ship":
+        tracking = f"6483-{o['order_id']:04d}-{(o['order_id'] * 7919) % 10000:04d}"
+        sid = conn.execute(text(
+            "INSERT INTO shipments (order_id, ship_mode, carrier, tracking_no, status, shipped_at)"
+            " VALUES (:o, :m, 'CJ대한통운', :t, '배송중', now()) RETURNING shipment_id"),
+            {"o": o["order_id"], "m": (o["ops_snapshot"] or {}).get("ship", "own"),
+             "t": tracking}).scalar()
+        before["shipment_id"] = sid
+        before["tracking"] = tracking
+        ship_text = f"CJ대한통운 {tracking}"
+    elif action == "done":
+        upd = conn.execute(text(
+            "UPDATE shipments SET status='완료', delivered_at=now() WHERE order_id=:o"
+            " RETURNING shipment_id, carrier, tracking_no"),
+            {"o": o["order_id"]}).mappings().first()
+        before["shipment_updated"] = bool(upd)
+        ship_text = f"{upd['carrier']} {upd['tracking_no']} · 배송 완료" if upd else "배송 완료"
+    conn.execute(text("UPDATE orders SET status=:s WHERE order_id=:o"),
+                 {"s": target, "o": o["order_id"]})
+    conn.execute(text(
+        "INSERT INTO order_events (order_id, from_state, to_state, actor)"
+        " VALUES (:o, :f, :t, '운영자')"), {"o": o["order_id"], "f": expect, "t": target})
+    log_id = _log(conn, "order_advance", order_no,
+                  {"order_id": o["order_id"], "action": action,
+                   "from": expect, "to": target, "before": before})
+    return {"ok": True, "undo_id": log_id, "status": target,
+            "step": STEP[target], "ship": ship_text}
+
+
 @router.post("/orders/{order_no}/advance")
 def advance(order_no: str, body: AdvanceBody):
     if body.action not in TRANSITIONS:
         raise HTTPException(400, f"알 수 없는 액션: {body.action}")
-    expect, target = TRANSITIONS[body.action]
     with engine.begin() as conn:
         o = conn.execute(text(
             "SELECT order_id, status, ops_snapshot FROM orders WHERE order_no=:n FOR UPDATE"),
             {"n": order_no}).mappings().first()
         if o is None:
             raise HTTPException(404, "주문이 없습니다")
-        _guard_refund(conn, o["order_id"])
-        if o["status"] != expect:
-            raise HTTPException(409, {"error": "invalid_transition",
-                                      "detail": f"현재 상태 '{o['status']}' — '{expect}'에서만 가능한 처리입니다"})
-        before = {"status": o["status"]}
-        ship_text = None
-        if body.action == "ship":
-            tracking = f"6483-{o['order_id']:04d}-{(o['order_id'] * 7919) % 10000:04d}"
-            sid = conn.execute(text(
-                "INSERT INTO shipments (order_id, ship_mode, carrier, tracking_no, status, shipped_at)"
-                " VALUES (:o, :m, 'CJ대한통운', :t, '배송중', now()) RETURNING shipment_id"),
-                {"o": o["order_id"], "m": (o["ops_snapshot"] or {}).get("ship", "own"),
-                 "t": tracking}).scalar()
-            before["shipment_id"] = sid
-            before["tracking"] = tracking
-            ship_text = f"CJ대한통운 {tracking}"
-        elif body.action == "done":
-            upd = conn.execute(text(
-                "UPDATE shipments SET status='완료', delivered_at=now() WHERE order_id=:o"
-                " RETURNING shipment_id, carrier, tracking_no"),
-                {"o": o["order_id"]}).mappings().first()
-            before["shipment_updated"] = bool(upd)
-            ship_text = f"{upd['carrier']} {upd['tracking_no']} · 배송 완료" if upd else "배송 완료"
-        conn.execute(text("UPDATE orders SET status=:s WHERE order_id=:o"),
-                     {"s": target, "o": o["order_id"]})
-        conn.execute(text(
-            "INSERT INTO order_events (order_id, from_state, to_state, actor)"
-            " VALUES (:o, :f, :t, '운영자')"), {"o": o["order_id"], "f": expect, "t": target})
-        log_id = _log(conn, "order_advance", order_no,
-                      {"order_id": o["order_id"], "action": body.action,
-                       "from": expect, "to": target, "before": before})
-        return {"ok": True, "undo_id": log_id, "status": target,
-                "step": STEP[target], "ship": ship_text}
+        return _advance_one(conn, o, order_no, body.action)
+
+
+# ─────────────────────────── 목록 일괄 처리 ───────────────────────────
+# 주문 목록에도 일괄 선택이 없었다(2026-08-05). 도매꾹의 '발주·발송'이 그렇듯
+# 같은 단계에 있는 주문을 한 번에 넘기는 것이 실제 업무다.
+#
+# **상태 기계를 다시 쓰지 않는다** — `_advance_one` 하나를 단건과 함께 쓴다.
+# 여기가 원장이라 두 벌이 되면 주문 이력이 서로 다른 말을 한다.
+#
+# 자격 없는 주문은 **막지 않고 건너뛰며 사유를 돌려준다.** 선택은 사람이 하는 것이고,
+# 왜 빠졌는지 모르면 운영자는 같은 선택을 반복한다:
+#   · 상태가 달라서(예: 이미 배송중인데 '조립' 을 눌렀다)
+#   · 환불·클레임이 진행 중이라서(그쪽 화면에서 처리해야 한다)
+#
+# 되돌리기는 **건마다 `order_advance` 로그**를 남기므로 기존 `/orders/undo/{log_id}` 가
+# 그대로 동작한다 — 되돌리기 로직을 새로 만들지 않았다.
+MAX_BULK_ORDER = 200        # 주문은 원장이라 상품보다 보수적으로 잡는다
+
+
+class BulkAdvanceBody(BaseModel):
+    order_nos: list[str]
+    action: str
+
+
+@router.post("/orders/bulk-advance")
+def bulk_advance(body: BulkAdvanceBody):
+    if body.action not in TRANSITIONS:
+        raise HTTPException(400, f"알 수 없는 액션: {body.action}")
+    nos = list(dict.fromkeys(body.order_nos or []))
+    if not nos:
+        raise HTTPException(400, "주문을 선택하세요")
+    dropped = 0
+    if len(nos) > MAX_BULK_ORDER:
+        dropped = len(nos) - MAX_BULK_ORDER
+        nos = nos[:MAX_BULK_ORDER]
+
+    expect, target = TRANSITIONS[body.action]
+    done, skipped, undo_ids = [], [], []
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT order_id, order_no, status, ops_snapshot FROM orders"
+            " WHERE order_no = ANY(:n) ORDER BY order_id FOR UPDATE"),
+            {"n": nos}).mappings().all()
+        found = {r["order_no"] for r in rows}
+        for miss in [x for x in nos if x not in found]:
+            skipped.append({"no": miss, "why": "없는 주문"})
+
+        active = {r[0] for r in conn.execute(text(
+            "SELECT DISTINCT order_id FROM refunds WHERE status = ANY(:st)"),
+            {"st": list(ACTIVE_REFUND)})}
+
+        for o in rows:
+            if o["status"] != expect:
+                skipped.append({"no": o["order_no"],
+                                "why": f"'{o['status']}' 상태 — '{expect}'에서만 됩니다"})
+                continue
+            if o["order_id"] in active:
+                skipped.append({"no": o["order_no"], "why": "환불·클레임 진행 중"})
+                continue
+            r = _advance_one(conn, o, o["order_no"], body.action)
+            done.append(o["order_no"])
+            undo_ids.append(r["undo_id"])
+
+    msg = f"{len(done):,}건을 '{target}'(으)로 넘겼습니다"
+    if skipped:
+        msg += f" · {len(skipped):,}건은 건너뛰었습니다"
+    if dropped:
+        msg += f" · 상한 {MAX_BULK_ORDER:,}건을 넘어 {dropped:,}건은 처리하지 않았습니다"
+    return {"verdict": msg, "advanced": len(done), "to": target,
+            "skipped": skipped[:20], "skipped_total": len(skipped),
+            "dropped": dropped, "undo_ids": undo_ids}
 
 
 @router.post("/orders/undo/{log_id}")

@@ -2318,7 +2318,7 @@ def test_screen_assets():
     # ⑪ 목록 화면의 **표 열 수가 서로 맞는가** (2026-08-05 · UI 개편).
     #    체크박스 열을 넣으면서 colgroup·thead·행·빈 상태 colspan 이 어긋나기 쉽다.
     #    어긋나면 표가 조용히 뒤틀린다 — 브라우저는 오류를 내지 않는다.
-    for _n in ("products.html", "category-mapping.html"):
+    for _n in ("products.html", "orders.html", "category-mapping.html"):
         _s = io.open(os.path.join(ROOT, "mockups", "admin", _n), encoding="utf-8").read()
         _cg = _re7.search(r"<colgroup>(.*?)</colgroup>", _s, _re7.S)
         if not _cg:
@@ -2342,6 +2342,30 @@ def test_screen_assets():
     # 상태 선택지를 화면이 지어내지 않는다(서버 product-meta.status_options)
     check("일괄 상태 선택지를 서버에서 받는다", "fillBulkStatus(m.status_options)" in _pl,
           True, "fillBulkStatus(m.status_options)" in _pl)
+
+    # ⑬ 주문 목록 일괄 처리 (2026-08-05).
+    #    주문은 **원장**이라 상태 기계를 두 벌로 두면 이력이 서로 다른 말을 한다.
+    #    단건과 일괄이 `_advance_one` 하나를 쓰는지, 되돌리기를 새로 만들지 않았는지 본다.
+    _ao = io.open(os.path.join(ROOT, "api", "admin_orders.py"), encoding="utf-8").read()
+    check("주문 전이가 한 함수에 모여 있다", _ao.count("def _advance_one") == 1, 1,
+          _ao.count("def _advance_one"))
+    check("단건 처리가 그 함수를 쓴다", "return _advance_one(conn, o, order_no" in _ao,
+          True, "return _advance_one(conn, o, order_no" in _ao)
+    check("일괄 처리도 그 함수를 쓴다", "_advance_one(conn, o, o[" in _ao, True,
+          "_advance_one(conn, o, o[" in _ao)
+    # 되돌리기를 두 벌로 만들지 않았다 — 일괄은 건마다 order_advance 로그를 남긴다
+    check("주문 되돌리기 구현은 하나뿐",
+          _ao.count('log["action"] != "order_advance"') == 1, 1,
+          _ao.count('log["action"] != "order_advance"'))
+    _oh = io.open(os.path.join(ROOT, "mockups", "admin", "orders.html"),
+                  encoding="utf-8").read()
+    check("주문 목록에 일괄 선택이 있다", "data-bulk-select=" in _oh, True,
+          "data-bulk-select=" in _oh)
+    check("주문 일괄 선택에 실제 동작이 붙어 있다", "/orders/bulk-advance" in _oh, True,
+          "/orders/bulk-advance" in _oh)
+    # **건너뛴 것을 숨기지 않는다** — 왜 빠졌는지 화면이 말해야 한다
+    check("건너뛴 주문의 사유를 화면이 말한다", "건너뛴 주문" in _oh, True,
+          "건너뛴 주문" in _oh)
 
     # ⑨ **디자인 토큰을 화면이 다시 정의하지 않는다** (2026-08-05).
     #    `vslot-demo.html` 이 tokens.css 값을 인라인으로 베껴 두고 있었고,
