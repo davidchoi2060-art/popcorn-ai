@@ -2244,6 +2244,29 @@ def test_screen_assets():
     #    맞춰(width:100%) 좁은 셀렉트에서 **단어 중간이 끊겼다**('그래픽카/드').
     _uc = io.open(os.path.join(ROOT, "mockups", "shared", "ui-choices.js"),
                   encoding="utf-8").read()
+    # ⑩ 메뉴 정본이 온전한가 (2026-08-05).
+    #    항목 33개는 옮기기 전 36화면의 **합집합**이다 — 줄어들면 어딘가로 가는 길이 막힌다.
+    _md = io.open(os.path.join(ROOT, "mockups", "shared", "admin-menu-data.js"),
+                  encoding="utf-8").read()
+    _hrefs = _re7.findall(r"href:\s*'([^']+)'", _md)
+    check("메뉴 항목이 33개다", len(_hrefs) == 33, 33, len(_hrefs))
+    check("메뉴가 가리키는 화면이 실제로 있다",
+          all(os.path.exists(os.path.join(ROOT, "mockups", "admin", h)) for h in _hrefs),
+          "전부 존재",
+          [h for h in _hrefs if not os.path.exists(os.path.join(ROOT, "mockups", "admin", h))][:3])
+    # 숫자 배지를 정본에 담지 않는다 — 담으면 거짓을 원천에 새긴다(실제 대기는 5,162였다)
+    _numbadge = _re7.findall(r"badge:\s*'(\d+)'", _md)
+    check("메뉴 정본에 지어낸 숫자 배지가 없다", _numbadge == [], [], _numbadge)
+    # 데이터가 먼저 실려야 그린다
+    _ord = []
+    for _p, _s in _screens:
+        if "admin-menu.js" not in _s:
+            continue
+        a, b = _s.find("admin-menu-data.js"), _s.find("admin-menu.js")
+        if a < 0 or a > b:
+            _ord.append(os.path.basename(_p))
+    check("메뉴 데이터를 admin-menu.js 보다 먼저 싣는다", _ord == [], [], _ord[:4])
+
     check("ui-choices 가 목록 폭을 보정한다",
           "max-content" in _uc and "nowrap" in _uc, True,
           "max-content" in _uc and "nowrap" in _uc)
@@ -2973,15 +2996,27 @@ def test_suppliers():
 
     # ── 화면 계약 ──
     import glob as _g4
-    missing = []
+    # 메뉴는 이제 **화면마다 박혀 있지 않다** — `shared/admin-menu-data.js` 한 곳이
+    # 원천이고 `admin-menu.js` 가 그린다(2026-08-05). 예전엔 36화면에 복제돼 있었고
+    # 그 복제본이 이미 갈라져서 ai-cost 엔 운영 전환 설정이, policy-weights 엔
+    # 용도 하한이 **빠져 있었다**. 그래서 검사도 정본 한 곳을 본다.
+    _menu = io.open(os.path.join(ROOT, "mockups", "shared", "admin-menu-data.js"),
+                    encoding="utf-8").read()
+    check("좌측 메뉴에 공급처가 있다", "'suppliers.html'" in _menu, "메뉴 있음",
+          "없음")
+    # 화면이 메뉴를 다시 박아 두지 않는가 — 두 벌이 되면 또 갈라진다
+    _inline = []
     for _p in sorted(_g4.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
         _n = os.path.basename(_p)
-        if _n.startswith("_") or _n in ("login.html", "my-profile.html",
-                                        "suppliers.html", "usage-floors.html"):
-            continue                       # 셸이 없는 화면은 좌측 메뉴 자체가 없다
-        if 'href="suppliers.html"' not in io.open(_p, encoding="utf-8").read():
-            missing.append(_n)
-    check("좌측 메뉴에 공급처가 있다", not missing, "전 화면", missing[:4])
+        if _n.startswith("_"):
+            continue
+        _s = io.open(_p, encoding="utf-8").read()
+        _i = _s.find('id="navbarVerticalNav">')
+        if _i < 0:
+            continue
+        if _s[_i + len('id="navbarVerticalNav">'):].lstrip().startswith("<li"):
+            _inline.append(_n)
+    check("화면이 메뉴 마크업을 다시 품지 않는다", _inline == [], [], _inline[:4])
     check("공급처 화면 파일이 있다",
           os.path.exists(os.path.join(ROOT, "mockups", "admin", "suppliers.html")),
           "있음", "없음")
@@ -3235,9 +3270,9 @@ def test_usage_floor_admin():
                      encoding="utf-8").read()
         check("하한 화면이 미리보기를 거친다", "preview: true" in uf.replace('"', "'")
               or "preview:true" in uf.replace(" ", ""), "preview 호출", "없음")
-        idx = io.open(os.path.join(ROOT, "mockups", "admin", "index.html"),
+        idx = io.open(os.path.join(ROOT, "mockups", "shared", "admin-menu-data.js"),
                       encoding="utf-8").read()
-        check("메뉴에 용도 하한이 있다", 'href="usage-floors.html"' in idx,
+        check("메뉴에 용도 하한이 있다", "'usage-floors.html'" in idx,
               "메뉴 있음", "없음")
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 하한 화면 — {e}")

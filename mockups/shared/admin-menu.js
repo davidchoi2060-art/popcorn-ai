@@ -25,7 +25,81 @@
       || document.querySelector('[data-bs-toggle="collapse"][data-bs-target="#' + id + '"]');
   }
 
+  /* ── 메뉴를 **데이터에서 그린다** (2026-08-05) ──────────────────────
+   *
+   * 예전에는 이 마크업이 36화면에 각각 박혀 있었다(672KB). 손으로 맞추다 보니
+   * 이미 갈라져서, `ai-cost` 에는 '운영 전환 설정'이 · `policy-weights` 에는
+   * '용도 하한'이 **빠져 있었다** — 그 화면에서는 갈 길이 아예 없었다.
+   * 이제 `admin-menu-data.js` 한 곳이 원천이고 여기서 그린다.
+   *
+   * 마크업은 Phoenix 규약 그대로다(클래스·collapse id·화살표 아이콘). 바꾸면
+   * 테마 CSS 와 어긋나므로 **모양을 바꾸지 않는다** — 옮기기만 한다.
+   */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function here() {
+    var f = (location.pathname.split('/').pop() || 'index.html');
+    return f || 'index.html';
+  }
+
+  function itemHTML(it, cur) {
+    var on = (it.href === cur) ? ' active' : '';
+    return '<li class="nav-item"><a class="nav-link' + on + '" href="' + esc(it.href) + '">'
+      + '<div class="d-flex align-items-center">'
+      + '<span class="nav-link-icon me-2" style="width:16px;height:16px;display:inline-flex;">'
+      + '<span data-feather="' + esc(it.icon) + '" style="width:16px;height:16px;"></span></span>'
+      + '<span class="nav-link-text">' + esc(it.label) + '</span>'
+      + (it.badge ? '<span class="badge badge-phoenix badge-phoenix-warning ms-2">'
+                    + esc(it.badge) + '</span>' : '')
+      + '</div></a></li>';
+  }
+
+  function render() {
+    var root = document.getElementById('navbarVerticalNav');
+    var data = window.POPCORN_ADMIN_MENU;
+    // 이미 마크업이 있으면(옛 화면) 손대지 않는다 — 섞어서 두 벌이 되는 게 최악이다
+    if (!root || !data || root.children.length) return;
+
+    var cur = here(), out = [];
+    data.forEach(function (g) {
+      if (g.section) {
+        out.push('<li class="nav-item"><p class="navbar-vertical-label">' + esc(g.section)
+                 + '</p><hr class="navbar-vertical-line"/></li>');
+        return;
+      }
+      if (!g.items) {                                   // 단독 항목
+        var on = (g.href === cur) ? ' active' : '';
+        out.push('<li class="nav-item"><div class="nav-item-wrapper">'
+          + '<a class="nav-link label-1' + on + '" href="' + esc(g.href) + '">'
+          + '<div class="d-flex align-items-center"><span class="nav-link-icon">'
+          + '<span data-feather="' + esc(g.icon) + '"></span></span>'
+          + '<span class="nav-link-text">' + esc(g.label) + '</span></div></a></div></li>');
+        return;
+      }
+      var mine = g.items.some(function (i) { return i.href === cur; });
+      out.push('<li class="nav-item"><div class="nav-item-wrapper">'
+        + '<a class="nav-link dropdown-indicator label-1' + (mine ? ' active' : '')
+        + '" href="#' + esc(g.id) + '" role="button" data-bs-toggle="collapse"'
+        + ' aria-expanded="' + (mine ? 'true' : 'false') + '" aria-controls="' + esc(g.id) + '">'
+        + '<div class="d-flex align-items-center">'
+        + '<div class="dropdown-indicator-icon-wrapper">'
+        + '<span class="fas fa-caret-right dropdown-indicator-icon"></span></div>'
+        + '<span class="nav-link-icon"><span data-feather="' + esc(g.icon) + '"></span></span>'
+        + '<span class="nav-link-text">' + esc(g.label) + '</span></div></a>'
+        + '<div class="parent-wrapper label-1">'
+        + '<ul class="nav collapse parent' + (mine ? ' show' : '') + '" id="' + esc(g.id) + '">'
+        + g.items.map(function (i) { return itemHTML(i, cur); }).join('')
+        + '</ul></div></div></li>');
+    });
+    root.innerHTML = out.join('');
+  }
+
   function boot() {
+    render();
     var groups = document.querySelectorAll('.navbar-vertical .collapse.parent[id]');
     if (!groups.length) return;
     var s = state();
@@ -54,6 +128,18 @@
       });
     });
   }
+
+  /* 그리는 시점이 중요하다.
+   *
+   * 이 파일은 문서 끝에서 로드되므로 `#navbarVerticalNav` 는 **이미 파싱돼 있다.**
+   * 그래서 DOMContentLoaded 를 기다리지 않고 **지금 바로** 그린다 —
+   * `feather.replace()`(phoenix docReady)와 `su-icons`(그 뒤)는 아직 돌지 않았고,
+   * 우리가 넣은 `data-feather` 스팬을 그들이 이어서 아이콘으로 바꿔 준다.
+   * 기다렸다가 그리면 **아이콘이 하나도 안 붙는다**(빈 스팬만 남는다).
+   *
+   * 혹시 이 스크립트가 <head> 로 옮겨져 노드가 아직 없다면 그때는 문서 완료 후에 그린다.
+   */
+  render();
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
