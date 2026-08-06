@@ -33,6 +33,34 @@
     removeItemButton: false
   };
 
+  /* 열린 목록이 **셀렉트 폭에 갇히지 않게** 한다 (2026-08-05 사용자 신고).
+   *
+   * 증상: 상품 매핑의 [옮길 분류] 목록이 `CPU (6` / `78)`, `그래픽카` / `드 (2,458)`
+   * 처럼 **단어 중간에서 끊겼다.**
+   *
+   * 원인 둘이 겹친다:
+   *   ① Phoenix 테마가 드롭다운 항목을 `font-size: 1rem !important`(16px)로 키운다.
+   *      vendor 기본은 14px 인데 테마가 !important 로 덮는다.
+   *   ② vendor 는 `.choices__list--dropdown{width:100%}` 라 **닫힌 컨트롤 폭**을 그대로
+   *      쓴다. 그 셀렉트는 `w-auto` 라 125px 였다 — 16px 한글 + 건수가 들어갈 수 없다.
+   *
+   * 폰트를 줄이면 테마와 싸우게 되고 다른 화면과도 어긋난다. **목록만 내용 폭으로**
+   * 펴는 쪽이 맞다: 닫힌 컨트롤은 그대로 좁게 두고, 열었을 때만 넓어진다.
+   * 상한(24rem)을 두어 긴 분류명이 화면을 밀어내지 않게 하고, 그때는 말줄임으로 끝낸다.
+   */
+  var STYLE_ID = 'popcorn-choices-style';
+  function ensureStyle(d) {
+    if (!d || d.getElementById(STYLE_ID)) return;
+    var css =
+      '.choices__list--dropdown{width:max-content;min-width:100%;max-width:24rem;}' +
+      '.choices__list--dropdown .choices__item{white-space:nowrap;overflow:hidden;' +
+      'text-overflow:ellipsis;}';
+    var s = d.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent = css;
+    (d.head || d.documentElement).appendChild(s);
+  }
+
   function unwrap(el) {
     if (el && el.__choices) {
       try { el.__choices.destroy(); } catch (e) { /* 이미 풀렸으면 무시 */ }
@@ -61,6 +89,7 @@
       return null;
     }
     unwrap(el);
+    ensureStyle(el.ownerDocument);      // 목록 폭 보정 — 붙일 때 한 번만 넣는다
     var o = {}, k;
     for (k in DEFAULTS) { if (DEFAULTS.hasOwnProperty(k)) o[k] = DEFAULTS[k]; }
     if (opts) { for (k in opts) { if (opts.hasOwnProperty(k)) o[k] = opts[k]; } }

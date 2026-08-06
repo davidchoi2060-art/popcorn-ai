@@ -2218,6 +2218,36 @@ def test_screen_assets():
     check("표를 가진 화면은 ui-list.js 를 phoenix.js 보다 먼저 싣는다",
           _order == [], [], _order[:5])
 
+    # ⑦ **디자인 토큰을 쓰면 토큰 파일을 실어야 한다** (2026-08-05 사용자 신고).
+    #    `design-system/tokens.css` 는 "단일 원천"으로 만들어 두고 **아무 화면도
+    #    불러오지 않고 있었다** — 서버가 `mockups/` 만 마운트해 닿을 길이 없었다.
+    #    그래서 `var(--font-num, monospace)` 가 전부 폴백으로 떨어져 숫자가 브라우저
+    #    기본 고정폭(Windows: Courier New)으로 그려졌다. 판매가 재산정 화면의
+    #    "글자 간격이 이상하다"가 그 증상이다. 토큰을 쓰면서 안 싣는 화면을 막는다.
+    _tokenless = []
+    for p, s in _screens:
+        if "var(--font-num" not in s and "var(--font-head" not in s:
+            continue
+        if "design-system/tokens.css" not in s:
+            _tokenless.append(os.path.basename(p))
+    check("토큰을 쓰는 화면은 tokens.css 를 싣는다", _tokenless == [], [], _tokenless[:5])
+    check("tokens.css 가 --font-num 을 정의한다",
+          "--font-num:" in io.open(os.path.join(ROOT, "design-system", "tokens.css"),
+                                   encoding="utf-8").read(), True, "정의 없음")
+    # 서버가 그 폴더를 실제로 내주는가 — 링크만 있고 404면 조용히 폴백으로 돌아간다
+    _main = io.open(os.path.join(ROOT, "api", "main.py"), encoding="utf-8").read()
+    check("서버가 design-system 을 서빙한다", '"/design-system"' in _main, True,
+          "마운트 없음")
+
+    # ⑧ choices 드롭다운이 셀렉트 폭에 갇히지 않는가.
+    #    Phoenix 가 항목을 1rem !important 로 키우는데 vendor 는 목록 폭을 컨트롤에
+    #    맞춰(width:100%) 좁은 셀렉트에서 **단어 중간이 끊겼다**('그래픽카/드').
+    _uc = io.open(os.path.join(ROOT, "mockups", "shared", "ui-choices.js"),
+                  encoding="utf-8").read()
+    check("ui-choices 가 목록 폭을 보정한다",
+          "max-content" in _uc and "nowrap" in _uc, True,
+          "max-content" in _uc and "nowrap" in _uc)
+
     # ⑤ 폰트를 남의 서버에서 받지 않는다 (2026-08-05).
     #    망이 막히거나 그쪽이 죽으면 글꼴이 통째로 바뀐다. 아이콘은 이미 로컬이었다.
     _all = [(p, s) for p, s in

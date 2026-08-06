@@ -135,4 +135,19 @@ class NoCacheStatic(StaticFiles):
         return resp
 
 
+# 디자인 토큰(`design-system/tokens.css`)도 서빙한다 (2026-08-05).
+#
+# 토큰 파일은 "단일 원천"으로 만들어 두고 **아무 화면도 불러오지 않고 있었다** —
+# 서버가 `mockups/` 만 마운트해서 닿을 길이 없었기 때문이다. 그 결과
+# `var(--font-num, monospace)` 가 전부 폴백으로 떨어져 숫자가 브라우저 기본
+# 고정폭(Windows: Courier New)으로 그려졌다. 사용자가 "글자 간격이 이상하다"고
+# 신고한 판매가 재산정 화면의 증상이 이것이다.
+#
+# 화면은 `../../design-system/tokens.css` 로 참조한다 — 브라우저가 루트 위로는
+# 올라가지 않으므로 HTTP 에서는 `/design-system/tokens.css` 로 풀리고,
+# `file://` 로 직접 열 때도 리포의 같은 파일을 가리킨다(둘 다 동작).
+TOKENS_DIR = Path(__file__).resolve().parent.parent / "design-system"
+if TOKENS_DIR.is_dir():
+    app.mount("/design-system", NoCacheStatic(directory=TOKENS_DIR), name="design-system")
+
 app.mount("/", NoCacheStatic(directory=MOCKUPS_DIR, html=True), name="mockups")
