@@ -2339,6 +2339,22 @@ def test_screen_assets():
           "data-bulk-select=" in _pl)
     check("일괄 선택에 실제 동작이 붙어 있다", "/products/bulk-status" in _pl, True,
           "/products/bulk-status" in _pl)
+
+    # **일괄 선택은 장식이 아니다** (2026-08-05 규칙).
+    # 체크박스만 붙이면 아무 일도 못 하는 버튼이 된다. 그래서 `data-bulk-select` 를
+    # 쓰는 화면은 **일괄 엔드포인트를 부르는 코드가 있어야 한다.**
+    # 실제로 두 화면은 이 기준으로 **붙이지 않기로** 했다:
+    #   · 가격 검토 대기 — 큐가 파생이고 지금 0건이다(판매가 없는 4건은 전부 검수 미통과라
+    #     검수 큐 소관). 누를 것이 없다.
+    #   · 재고 입고 — 목록 15,273건은 '입고 대상 상품'이고 입고 수량은 **상품마다 다르다.**
+    #     하나의 수량을 일괄 적용하면 거의 항상 틀린다.
+    _decor = []
+    for _p2, _s2 in _screens:
+        if "data-bulk-select=" not in _s2:
+            continue
+        if not _re7.search(r'/(bulk-status|bulk-advance|category-mapping/move)', _s2):
+            _decor.append(os.path.basename(_p2))
+    check("일괄 선택이 있는 화면은 일괄 동작도 있다", _decor == [], [], _decor)
     # 상태 선택지를 화면이 지어내지 않는다(서버 product-meta.status_options)
     check("일괄 상태 선택지를 서버에서 받는다", "fillBulkStatus(m.status_options)" in _pl,
           True, "fillBulkStatus(m.status_options)" in _pl)
