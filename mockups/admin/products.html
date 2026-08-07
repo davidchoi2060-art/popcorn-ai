@@ -245,7 +245,7 @@
                상품명이 약 490px 을 받게 한다. 좁은 화면에서는 접히는 대신
                table-responsive 가 가로로 스크롤한다 — 스캔이 목적인 표에서는 그쪽이 낫다. -->
           <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1320px;">
-            <colgroup><col style="width:36px"><col style="width:126px"><col><col style="width:84px"><col style="width:112px"><col style="width:56px"><col style="width:64px"><col style="width:96px"><col style="width:150px"><col style="width:104px"></colgroup>
+            <colgroup><col style="width:36px"><col style="width:116px"><col><col style="width:84px"><col style="width:104px"><col style="width:56px"><col style="width:64px"><col style="width:96px"><col style="width:128px"><col style="width:96px"></colgroup>
             <thead><tr class="text-body-tertiary"><th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th><th class="sort py-2" data-sort="code">자체 상품번호 · SKU</th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="supplier">공급처</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
             <tbody class="list" id="rows"></tbody>
           </table></div>
@@ -256,6 +256,14 @@
       <script>
       (function(){
         // 상태: ok(추천 가능) / review(검수 대기) / oos(재고 없음→매입) / price(가격 검토)
+        // 상품명은 두 줄까지만 보이므로 전체 이름을 title 로 남긴다.
+        // 속성 안에 들어가는 값이라 따옴표를 반드시 막는다 — 안 막으면 이름에 " 가 있는
+        // 상품 하나가 그 행의 마크업을 통째로 깨뜨린다.
+        function esc(v){
+          return String(v == null ? "" : v).replace(/[&<>"]/g, function(c){
+            return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
+          });
+        }
         const ST={ok:["추천 가능","primary",null,null],review:["검수 대기","warning","review-queue.html","검수"],oos:["재고 없음 · 매입 대기","info","sourcing.html","매입"],price:["가격 검토 대기","warning","price-review.html","검토"]};
         let cur="all", q="", fcat="all", fmfr="all";
         // 정규화 어댑터 — API 계약 JSON을 화면 객체형으로. **원천은 서버뿐이다**:
@@ -420,7 +428,7 @@
             return `<tr>
               <td class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" data-pc="${p.product_code}" data-bulk-select-row='{"code":${p.product_code}}'${SEL[p.product_code]?" checked":""} aria-label="선택"></div></td>
               <td class="code"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
-              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight">${p.name}</a></td>
+              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight line-clamp-2" title="${esc(p.name)}">${p.name}</a></td>
               <td class="cat text-body-tertiary">${p.cat}</td>
               <td class="spec">${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
               <td class="stock text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
