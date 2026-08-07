@@ -2423,6 +2423,18 @@ def test_screen_assets():
               _ncol, _nth)
         check("%s 빈 상태 colspan 이 열 수와 같다" % _n, _spans <= {_nth},
               _nth, sorted(_spans))
+        # **행 템플릿의 <td> 수도 같아야 한다.** 여기까지 안 세면 열을 뺄 때 행만 남아
+        # 표가 한 칸씩 밀린다 — 2026-08-07 에 공급처·상품번호 열을 빼면서 손으로 셌다.
+        # **colspan 이 있는 행은 빼야 한다** — 빈 상태·불러오는 중 행은 한 칸짜리다.
+        # (처음에 첫 `<tr>` 만 봤더니 orders.html 의 빈 상태 행을 데이터 행으로 오인해
+        #  멀쩡한 화면을 실패로 만들었다. 검사가 틀리면 진짜 결함을 가린다.)
+        _bodies = [t for t in _re7.findall(r"`<tr>(.*?)</tr>`", _s, _re7.S)
+                   if "colspan" not in t]
+        for _k, _t in enumerate(_bodies):
+            _ntd = len(_re7.findall(r"<td[ >]", _t))
+            check("%s 행 <td> 수가 열 수와 같다%s"
+                  % (_n, "" if len(_bodies) == 1 else " (%d번째)" % (_k + 1)),
+                  _ntd == _nth, _nth, _ntd)
 
     # ⑫ 일괄 선택은 **아무 일도 못 하는 체크박스가 아니다** — 실제 동작이 붙어 있어야 한다.
     _pl = io.open(os.path.join(ROOT, "mockups", "admin", "products.html"),

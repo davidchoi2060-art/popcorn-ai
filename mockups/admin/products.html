@@ -237,16 +237,16 @@
                판매가만 attr 로 정렬한다: 표시값은 "239,000원"이라 문자열 정렬이 자릿수 쉼표에서 어긋나
                1,299,000 을 239,000 보다 작다고 놓는다. data-num(원 단위 정수)이 그걸 막는다.
                이 표에 날짜·시각 컬럼은 없다. -->
-          <div id="prodList" data-list='{"valueNames":["code","name","cat","spec","stock","supplier",{"name":"price","attr":"data-num"},"status"]}'>
+          <div id="prodList" data-list='{"valueNames":["name","cat","spec","stock",{"name":"price","attr":"data-num"},"status"]}'>
           <!-- 열 너비: 상품명이 **나머지 전부**를 받는다.
                예전에는 고정 열 합이 996px 인데 min-width 가 1080px 이라 상품명에 84px 만
                남았고, "(BonoBoss) BOS A2 /사운드/스피커" 같은 이름이 3~4줄로 접혀
                목록의 본래 일(빠른 스캔)을 못 했다. 고정 열을 줄이고 최소 폭을 넓혀
                상품명이 약 490px 을 받게 한다. 좁은 화면에서는 접히는 대신
                table-responsive 가 가로로 스크롤한다 — 스캔이 목적인 표에서는 그쪽이 낫다. -->
-          <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1320px;">
-            <colgroup><col style="width:36px"><col style="width:116px"><col><col style="width:84px"><col style="width:104px"><col style="width:56px"><col style="width:64px"><col style="width:96px"><col style="width:128px"><col style="width:120px"></colgroup>
-            <thead><tr class="text-body-tertiary"><th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th><th class="sort py-2" data-sort="code">자체 상품번호 · SKU</th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="supplier">공급처</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
+          <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1140px;">
+            <colgroup><col style="width:36px"><col><col style="width:84px"><col style="width:104px"><col style="width:56px"><col style="width:96px"><col style="width:128px"><col style="width:120px"></colgroup>
+            <thead><tr class="text-body-tertiary"><th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
             <tbody class="list" id="rows"></tbody>
           </table></div>
           </div></div>
@@ -259,6 +259,10 @@
         // 상품명은 두 줄까지만 보이므로 전체 이름을 title 로 남긴다.
         // 속성 안에 들어가는 값이라 따옴표를 반드시 막는다 — 안 막으면 이름에 " 가 있는
         // 상품 하나가 그 행의 마크업을 통째로 깨뜨린다.
+        function skuTail(p){
+          var sku = p.sku == null ? "" : String(p.sku);
+          return (sku && sku !== String(p.product_code)) ? " · SKU " + esc(sku) : "";
+        }
         function esc(v){
           return String(v == null ? "" : v).replace(/[&<>"]/g, function(c){
             return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
@@ -340,10 +344,10 @@
            판매가는 valueNames 가 이미 data-num(원 단위 정수)을 싣고 있어 numeric 이 필요 없다.
            검색 입력(#q)은 list.js 검색이 아니라 **서버 질의**다 — searchInput 으로 넘기지 않는다
            (넘기면 서버가 돌려준 행을 화면이 한 번 더 걸러 '전체 N건'과 어긋난다). */
-        const LIST_VALUE_NAMES=["code","name","cat","spec","stock","supplier",{name:"price",attr:"data-num"},"status"];
+        const LIST_VALUE_NAMES=["name","cat","spec","stock",{name:"price",attr:"data-num"},"status"];
         function wireList(){
           if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
-          window.popcornList.wire("prodList", LIST_VALUE_NAMES, {numeric:["stock","supplier"]});
+          window.popcornList.wire("prodList", LIST_VALUE_NAMES, {numeric:["stock"]});
         }
         if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wireList);
         else wireList();
@@ -410,13 +414,13 @@
             })
             .catch(function(e){ alert("바꾸지 못했습니다 — "+e.message); });
         }
-        // 표가 비는 이유를 표가 직접 말한다(colspan=10 — 위 colgroup·thead 와 같은 열 수)
+        // 표가 비는 이유를 표가 직접 말한다(colspan=8 — 위 colgroup·thead 와 같은 열 수)
         const STATE_MSG={loading:"불러오는 중…",fail:"서버에 연결되지 않아 불러오지 못했습니다."};
         function render(){
           pills();
           const host=document.getElementById("rows"); if(!host) return;
           if(STATE!=="ok"){
-            host.innerHTML=`<tr><td colspan="10" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
+            host.innerHTML=`<tr><td colspan="8" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
             return;
           }
           const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
@@ -427,17 +431,15 @@
             const [lab,col,link,act]=ST[p.status_key];
             return `<tr>
               <td class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" data-pc="${p.product_code}" data-bulk-select-row='{"code":${p.product_code}}'${SEL[p.product_code]?" checked":""} aria-label="선택"></div></td>
-              <td class="code"><code>${p.product_code}</code><div class="fs-10 text-body-tertiary text-nowrap">SKU ${p.sku}</div></td>
-              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight line-clamp-2" title="${esc(p.name)}">${p.name}</a></td>
+              <td class="fw-semibold text-body-highlight"><a href="product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight line-clamp-2" title="${esc(p.name)}">${p.name}</a><div class="fs-10 text-body-tertiary text-nowrap"><code>${p.product_code}</code>${skuTail(p)}</div></td>
               <td class="cat text-body-tertiary">${p.cat}</td>
               <td class="spec">${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
               <td class="stock text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
-              <td class="supplier text-end">${p.supplier_count}</td>
               <td class="price text-end" data-num="${priceNum(p.price_text)}">${p.price_text}</td>
               <td><span class="status badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
               <td class="pe-4 text-end text-nowrap">${link?`<a class="btn btn-sm btn-subtle-secondary" href="${link}">${act}</a> `:""}<a class="btn btn-sm btn-phoenix-secondary" href="product-edit.html?code=${p.product_code}&edit=1">수정</a></td>
             </tr>`;
-          }).join(""):`<tr><td colspan="10" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
+          }).join(""):`<tr><td colspan="8" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
           wireList();   // 행을 다시 그렸으니 정렬 색인도 다시 잡는다
           wireBulk();   // 체크박스도 새로 생겼다 — 헤더 전체선택을 다시 건다
         }
