@@ -30,6 +30,7 @@ from .admin_price_import import router as admin_price_import_router
 from .admin_price_history import router as admin_price_history_router
 from .admin_price_review import router as admin_price_review_router
 from .admin_products import router as admin_products_router
+from .grades import router as grades_router
 from .admin_sessions import router as admin_sessions_router
 from .admin_setup import router as admin_setup_router
 from .admin_sourcing import router as admin_sourcing_router
@@ -70,6 +71,7 @@ def health():
 
 
 app.include_router(auth_router)
+app.include_router(grades_router)
 app.include_router(customer_auth_router)
 app.include_router(admin_operators_router)
 app.include_router(admin_profile_router)

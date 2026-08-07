@@ -1278,6 +1278,64 @@ def test_taxonomy_single_source():
                 " WHERE ct.name IN ('완제품 PC','미니PC·베어본') AND p.part_type = 'ETC'")).scalar()
             check("완제품 분류인데 ETC 로 되돌아간 상품이 없다", _drift == 0, 0, _drift)
 
+            # ── 등급 축 (0032 · 재설계안 §3-①) ────────────────────────────
+            # **엔진은 아직 등급을 읽지 않는다.** 축만 만들고 값이 찬 뒤에 연결한다 —
+            # 지금 연결하면 등급 없는 부품이 전부 0점이 되거나 등급 있는 소수만
+            # 추천되거나 둘 중 하나이고, 둘 다 지금보다 나쁘다. 완제품 축과 같은 순서로
+            # **배제 불변식을 먼저 건다.** 연결하는 슬라이스가 이 검사를 의도적으로
+            # 고치게 되고, 그때 비로소 "이제 읽는다"가 기록으로 남는다.
+            _eng = pathlib.Path(ROOT, "api")
+            _readers = []
+            for _f in ("recommend.py", "candidates.py", "swap.py", "pricing.py"):
+                _t = pathlib.Path(_eng, _f)
+                if _t.exists() and "part_grades" in _t.read_text(encoding="utf-8"):
+                    _readers.append(_f)
+            check("엔진이 아직 등급을 읽지 않는다", _readers == [], [], _readers)
+            # 추천 뷰도 마찬가지 — 뷰에 들어가면 엔진이 조용히 읽게 된다.
+            _vg = c.execute(text(
+                "SELECT count(*) FROM pg_views WHERE viewname IN"
+                " ('v_recommendation_candidates','v_companion_candidates')"
+                " AND definition ILIKE '%part_grades%'")).scalar()
+            check("추천 뷰에 등급이 들어가 있지 않다", _vg == 0, 0, _vg)
+
+            # 근거 없는 등급은 **스키마가** 막는다 — 규율이 아니라 구조로 강제한다.
+            # (지어낸 태그를 금지한 것과 같은 규칙. 정체성이 걸린 자리다.)
+            _nn = c.execute(text(
+                "SELECT count(*) FROM information_schema.columns"
+                " WHERE table_name='part_grades' AND column_name='basis'"
+                "   AND is_nullable='NO'")).scalar()
+            check("등급의 근거 칸은 NOT NULL 이다", _nn == 1, 1, _nn)
+            _ck = c.execute(text(
+                "SELECT count(*) FROM pg_constraint WHERE conrelid='part_grades'::regclass"
+                " AND contype='c' AND pg_get_constraintdef(oid) ILIKE '%btrim(basis)%'")).scalar()
+            check("근거가 공백만이어도 막는다", _ck == 1, 1, _ck)
+            # 등급은 조립 부품에만 매긴다 — 주변기기·완제품은 비교 축이 다르다.
+            _bad = c.execute(text(
+                "SELECT count(*) FROM part_grades g JOIN products p USING (product_code)"
+                " WHERE p.part_type NOT IN ('CPU','GPU','MB','RAM','SSD','HDD','POWER','CASE',"
+                "                           'COOLER_CPU_AIR','COOLER_CPU_AIO')")).scalar()
+            check("조립 부품 아닌 것에 등급이 없다", _bad == 0, 0, _bad)
+
+            # 등급판 화면 계약 — 브라우저 없이 마크업으로 본다
+            _gb = pathlib.Path(ROOT, "mockups", "admin", "grade-board.html").read_text(encoding="utf-8")
+            # **엔진이 안 읽는다는 사실을 화면이 먼저 말한다.** 안 그러면 운영자는
+            # "저장했는데 견적이 안 바뀐다"를 결함으로 신고한다(화면 정직성).
+            check("등급판이 '엔진이 아직 안 읽는다'를 화면에 적는다",
+                  "engineNote" in _gb and "engine_note" in _gb, True,
+                  "engineNote" in _gb and "engine_note" in _gb)
+            # 슬롯 선택지는 서버가 준다 — 화면이 부품 어휘를 지어내지 않는다.
+            check("등급판이 슬롯을 서버에서 받는다",
+                  "grades/meta" in _gb, True, "grades/meta" in _gb)
+            # **오류 문구는 공용 헬퍼가 만든다.** 화면이 따로 만들면 진행 바와
+            # 서로 다른 말을 한다. 인자 순서도 고정한다 — (json, status) 다.
+            check("등급판이 공용 오류 문구를 쓴다",
+                  "popcornProgress.errText(j, status)" in _gb, True,
+                  "popcornProgress.errText(j, status)" in _gb)
+            # 셸을 베낄 때 원본 화면의 스크립트가 따라오면 같은 id 를 두 곳이 만진다
+            # (실제로 용도 하한의 스크립트가 딸려 와 상태 배지를 덮어썼다).
+            check("등급판에 다른 화면의 스크립트가 섞이지 않았다",
+                  "floors" not in _gb, True, "floors" not in _gb)
+
 
 def test_categories():
     """[33] 카테고리 트리 — 판매 축은 엔진과 분리돼 있다 (슬라이스 B)
@@ -2420,11 +2478,12 @@ def test_screen_assets():
     _uc = io.open(os.path.join(ROOT, "mockups", "shared", "ui-choices.js"),
                   encoding="utf-8").read()
     # ⑩ 메뉴 정본이 온전한가 (2026-08-05).
-    #    항목 33개는 옮기기 전 36화면의 **합집합**이다 — 줄어들면 어딘가로 가는 길이 막힌다.
+    #    항목 34개 = 옮기기 전 36화면의 **합집합** 33 + 부품 등급판(2026-08-07).
+    #    줄어들면 어딘가로 가는 길이 막힌다 — 화면을 늘릴 때 이 수도 함께 올린다.
     _md = io.open(os.path.join(ROOT, "mockups", "shared", "admin-menu-data.js"),
                   encoding="utf-8").read()
     _hrefs = _re7.findall(r"href:\s*'([^']+)'", _md)
-    check("메뉴 항목이 33개다", len(_hrefs) == 33, 33, len(_hrefs))
+    check("메뉴 항목이 34개다", len(_hrefs) == 34, 34, len(_hrefs))
     check("메뉴가 가리키는 화면이 실제로 있다",
           all(os.path.exists(os.path.join(ROOT, "mockups", "admin", h)) for h in _hrefs),
           "전부 존재",

@@ -10,7 +10,7 @@
     <!-- ===============================================-->
     <!--    Document Title-->
     <!-- ===============================================-->
-    <title>팝콘PC 관리자 · 대시보드</title>
+    <title>팝콘PC 관리자 · 부품 등급판</title>
 
 
     <!-- ===============================================-->
@@ -37,7 +37,7 @@
   </head>
 
 
-  <body data-screen-id="ADM-DSH-010" data-domain="dashboard" data-dummy-fallback="none">
+  <body data-screen-id="ADM-ENG-050" data-domain="engine">
 
     <!-- ===============================================-->
     <!--    Main Content-->
@@ -198,161 +198,301 @@
         </div>
       </nav>
       <div class="content">
-        <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item active">대시보드</li></ol></nav>
-        <div class="mb-4"><h2 class="mb-1">대시보드 <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span></h2><p class="text-body-tertiary mb-0">오늘 처리할 일 → 흐름 현황 → 시스템 상태 순서로 봅니다.</p></div>
+    <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="index.html">홈</a></li>
+      <li class="breadcrumb-item"><a href="#!">추천 설정</a></li>
+      <li class="breadcrumb-item active">부품 등급판</li>
+    </ol></nav>
 
-        <!-- 운영 시작 체크리스트 (슬라이스 94) — 절차를 문서에서 화면으로.
-             판정·수치는 전부 서버가 실데이터로 구한다(화면 정직성 원칙). -->
-        <div id="setupHost" hidden></div>
-
-        <h5 class="mb-3">오늘 고객 흐름 <span class="fs-10 fw-normal text-body-tertiary">— 상담 → 견적 → 주문</span></h5>
-        <div class="row g-3 mb-4">
-          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">견적 상담</h6><h3 class="fw-bolder mb-0" id="fl-sess">—<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="sessions.html" class="text-decoration-none" id="fl-sess-sub">—</a></p><</div><</div><</div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">주문 전달</h6><h3 class="fw-bolder mb-0" id="fl-ord">—<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h3><p class="fs-9 mb-0"><a href="orders.html" class="text-decoration-none" id="fl-ord-sub">—</a></p><</div><</div><</div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">추천 가능 재고</h6><h3 class="fw-bolder mb-0" id="fl-pool">—<span class="fs-9 fw-semibold text-body-tertiary"> 개</span></h3><p class="fs-9 mb-0"><a href="candidate-pool.html" class="text-decoration-none" id="fl-pool-sub">—</a></p><</div><</div><</div><div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-3"><h6 class="text-body-tertiary fw-semibold mb-1">오늘 적재</h6><h3 class="fw-bolder mb-0" id="fl-import">—<span class="fs-9 fw-semibold text-body-tertiary"> 행</span></h3><p class="fs-9 mb-0" id="fl-import-sub"><a href="csv-jobs.html" class="text-decoration-none">적재 이력</a></p><</div><</div><</div>
-        </div>
-
-        <h5 class="mb-3">한눈에 <span class="fs-10 fw-normal text-body-tertiary">— 서버가 센 값만 그립니다</span></h5>
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-6 col-lg-4">
-            <div class="card h-100"><div class="card-body">
-              <h6 class="text-body-tertiary fw-semibold mb-1">주문 상태</h6>
-              <p class="fs-10 text-body-tertiary mb-2" id="chOrdNote">—</p>
-              <div id="chOrders" style="height:180px;"></div>
-            </div></div>
-          </div><div class="col-12 col-md-6 col-lg-4">
-            <div class="card h-100"><div class="card-body">
-              <h6 class="text-body-tertiary fw-semibold mb-1">처리 대기</h6>
-              <p class="fs-10 text-body-tertiary mb-2">클릭하면 그 화면으로 갑니다</p>
-              <div id="chPending" style="height:180px;"></div>
-            </div></div>
-          </div><div class="col-12 col-lg-4">
-            <div class="card h-100"><div class="card-body">
-              <h6 class="text-body-tertiary fw-semibold mb-1">추천 가능 비율</h6>
-              <p class="fs-10 text-body-tertiary mb-2">핵심 부품 중 4중 게이트를 통과한 것</p>
-              <div id="chPool" style="height:180px;"></div>
-              <p class="fs-9 mb-0 text-center" id="chPoolNote">—</p>
-            </div></div>
-          </div>
-        </div>
-
-        <h5 class="mb-3">처리 대기 <span class="fs-10 fw-normal text-body-tertiary">— 운영자가 처리할 것</span></h5>
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-danger-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-danger" data-feather="send" style="width:19px;height:19px;"></span><</div><h6 class="mb-0 text-body-secondary fw-semibold" id="pd-4-label">주문 재전달 필요</h6><</div><h2 class="fw-bolder mb-2" id="pd-refund">—<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="orders.html" class="fs-9 fw-bold text-decoration-none" id="pd-4-link">전달 상태 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a><</div><</div><</div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-warning-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-warning" data-feather="clipboard" style="width:19px;height:19px;"></span><</div><h6 class="mb-0 text-body-secondary fw-semibold">상품 검수</h6><</div><h2 class="fw-bolder mb-2" id="pd-review">—<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="review-queue.html" class="fs-9 fw-bold text-decoration-none">검수 대기 열기 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a><</div><</div><</div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-primary" data-feather="dollar-sign" style="width:19px;height:19px;"></span><</div><h6 class="mb-0 text-body-secondary fw-semibold">가격 검토 대기</h6><</div><h2 class="fw-bolder mb-2" id="pd-price">—<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="price-review.html" class="fs-9 fw-bold text-decoration-none">가격 판정 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a><</div><</div><</div><div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="d-flex align-items-center mb-3"><div class="bg-info-subtle rounded-3 d-flex align-items-center justify-content-center me-2" style="width:38px;height:38px;"><span class="text-info" data-feather="truck" style="width:19px;height:19px;"></span><</div><h6 class="mb-0 text-body-secondary fw-semibold" id="pd-3-label">매입 대기</h6><</div><h2 class="fw-bolder mb-2" id="pd-inbound">—<span class="fs-9 fw-semibold text-body-tertiary"> 건</span></h2><a href="sourcing.html" class="fs-9 fw-bold text-decoration-none" id="pd-3-link">매입 견적 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span></a><</div><</div><</div>
-        </div>
-
-        <h5 class="mb-3">시스템 상태</h5>
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
-            <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="text-body-tertiary fw-semibold mb-0">AI 사용량 (일 캡 —)</h6><a href="ai-cost.html" class="fs-10">상세</a></div>
-            <h4 class="fw-bolder mb-2" id="sy-ai">— <span class="fs-10 fw-semibold text-body-tertiary">/ 일 캡 —</span></h4>
-            <div class="progress" style="height:6px;" id="sy-ai-bar"><div class="progress-bar bg-secondary" style="width:0%;"></div></div>
-            <p class="fs-10 text-body-tertiary mb-0 mt-2">캡 도달 시 배치 추출만 자동 연기 — 고객 대면 기능은 유지</p>
-          </div></div></div>
-          <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
-            <h6 class="text-body-tertiary fw-semibold mb-2">적용 중인 버전 <span class="fs-10 fw-normal">(견적 재현 기준)</span></h6>
-            <div class="fs-9 d-flex flex-column gap-1" id="sy-ver">
-              <div class="d-flex justify-content-between"><a href="margin-policy.html" class="text-decoration-none">마진 정책</a><b>—</b></div>
-              <div class="d-flex justify-content-between"><a href="compat-rules.html" class="text-decoration-none">조립 호환 규칙</a><b>—</b></div>
-              <div class="d-flex justify-content-between"><a href="policy-weights.html" class="text-decoration-none">추천 기준</a><b>—</b></div>
-            </div>
-          </div></div></div>
-          <div class="col-12 col-lg-4"><div class="card h-100"><div class="card-body py-3">
-            <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="text-body-tertiary fw-semibold mb-0">최근 작업 기록</h6><a href="activity-logs.html" class="fs-10">전체</a></div>
-            <div class="fs-9 d-flex flex-column gap-1" id="sy-logs">
-              <div class="text-body-tertiary">불러오는 중…</div>
-            </div>
-          </div></div></div>
-        </div>
-
-        <div class="card mb-4">
-          <div class="card-header border-bottom border-translucent d-flex justify-content-between align-items-center"><h5 class="mb-0">최근 상품 검수 <span class="text-body-tertiary fw-normal fs-9">위험도순</span></h5><a href="review-queue.html" class="btn btn-sm btn-phoenix-secondary">전체 보기</a></div>
-          <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0"><thead><tr class="text-body-tertiary"><th class="ps-4 py-2">상품</th><th class="py-2" style="min-width:118px;">유형</th><th class="py-2">대상 필드</th><th class="py-2">상세</th><th class="py-2 pe-4 text-end">처리</th></tr></thead><tbody id="rvRecent">
-            <!-- 정적 더미 행을 걷어냈다(슬라이스 101). 이 표의 원천은 아직 서버가 주지 않는다 —
-                 빈 표는 '검수할 것이 없다'는 거짓말이 되므로 아래 스크립트가 자리표시자 한 줄을 넣는다. -->
-          </tbody></table></div></div>
-        </div>
-        <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+      <div>
+        <h2 class="mb-1">부품 등급판
+          <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ENG-050</span>
+          <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span>
+        </h2>
+        <p class="mb-0 fs-9 text-body-tertiary">
+          "얼마나 좋은가"를 우리가 직접 매깁니다. 지금까지 견적 엔진은 <b>조건에 맞는 것 중
+          가장 싼 것</b>을 골랐습니다 — 성능을 재는 축이 아예 없었기 때문입니다.
+        </p>
       </div>
+    </div>
+
+    <!-- 지금 이 값이 무엇을 하고 무엇을 하지 않는지 화면이 먼저 말한다.
+         "저장했는데 견적이 안 바뀐다"는 오해를 여기서 막는다(화면 정직성). -->
+    <div class="alert alert-subtle-warning d-flex align-items-start gap-2 py-2 px-3 mb-3" role="status">
+      <span data-feather="info" style="width:15px;height:15px;margin-top:2px;flex:none;"></span>
+      <div class="fs-9" id="engineNote">불러오는 중…</div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-8">
+        <div class="card h-100"><div class="card-body">
+          <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+            <div>
+              <label class="form-label fs-9 fw-bold mb-1" for="slotSel">슬롯</label>
+              <select class="form-select form-select-sm" id="slotSel" style="width:11rem;"></select>
+            </div>
+            <div>
+              <label class="form-label fs-9 fw-bold mb-1" for="onlySel">보기</label>
+              <select class="form-select form-select-sm" id="onlySel" style="width:11rem;">
+                <option value="">전체</option>
+                <option value="ungraded">등급 없는 것만</option>
+                <option value="graded">등급 있는 것만</option>
+              </select>
+            </div>
+            <div class="flex-grow-1" style="min-width:12rem;">
+              <label class="form-label fs-9 fw-bold mb-1" for="q">검색</label>
+              <input class="form-control form-control-sm" id="q" placeholder="상품명 또는 상품번호">
+            </div>
+          </div>
+
+          <p class="fs-9 text-body-tertiary mb-2" id="cov">—</p>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:900px;">
+              <colgroup><col><col style="width:104px"><col style="width:96px"><col style="width:88px"><col style="width:96px"></colgroup>
+              <thead><tr class="text-body-tertiary">
+                <th class="ps-3">부품</th>
+                <th class="text-end">판매가</th>
+                <th class="text-end">등급</th>
+                <th>추천 후보</th>
+                <th class="pe-3"></th>
+              </tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="fs-10 text-body-tertiary" id="pageNote">—</span>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-phoenix-secondary" type="button" id="prev">이전</button>
+              <button class="btn btn-phoenix-secondary" type="button" id="next">다음</button>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="col-12 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+          <h5 class="mb-1" id="edTitle">부품을 고르세요</h5>
+          <p class="fs-9 text-body-tertiary mb-3" id="edSub">
+            왼쪽 표에서 <b>등급 매기기</b>를 누르면 여기서 값을 넣습니다.
+          </p>
+
+          <div id="edForm" hidden>
+            <label class="form-label fs-9 fw-bold mb-1" for="gr">등급 (0~100)</label>
+            <input class="form-control form-control-sm mb-1" id="gr" type="number" min="0" max="100" step="1">
+            <p class="fs-10 text-body-tertiary mb-3" id="scaleNote">—</p>
+
+            <label class="form-label fs-9 fw-bold mb-1" for="bs">근거 <span class="text-danger">*</span></label>
+            <textarea class="form-control form-control-sm mb-1" id="bs" rows="3"
+                      placeholder="예) 같은 세대 상위 3번째 · 4K 60fps 기준"></textarea>
+            <!-- 근거를 왜 강제하는지 화면이 말한다. 스키마가 막는 이유와 같은 문장이다. -->
+            <p class="fs-10 text-body-tertiary mb-3">
+              근거 없는 등급은 저장하지 않습니다 — 지어낸 등급은 "모든 견적에는 이유가
+              있습니다"를 배신합니다.
+            </p>
+
+            <label class="form-label fs-9 fw-bold mb-1" for="sc">출처</label>
+            <input class="form-control form-control-sm mb-3" id="sc"
+                   placeholder="예) 제조사 자료 · 운영자 판단">
+
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" type="button" id="save">저장</button>
+              <button class="btn btn-phoenix-secondary btn-sm" type="button" id="clear" hidden>등급 지우기</button>
+              <button class="btn btn-link btn-sm p-0 ms-auto" type="button" id="cancel">취소</button>
+            </div>
+            <p class="fs-10 mt-2" id="edMsg" hidden></p>
+          </div>
+        </div></div>
+      </div>
+    </div>
 
       <script>
       (function(){
-        // ---- LIVE (슬라이스 28) — 대시보드 실집계. 각 타일은 해당 화면과 같은 기준을 쓴다 ----
-        // 원천 부재 항목(오늘 적재·AI 사용량·적용 버전)은 값 대신 '—(준비 중)'으로 정직 표기.
-        const n = (v, u) => `${v.toLocaleString()}<span class="fs-9 fw-semibold text-body-tertiary"> ${u}</span>`;
-        const dash = u => `—<span class="fs-9 fw-semibold text-body-tertiary"> ${u}</span>`;
+        "use strict";
+        var META = null, SLOT = "", ONLY = "", Q = "", PAGE = 1, CUR = null;
 
-        // 표의 빈 상태 — 행이 아예 없으면 '처리할 것이 없다'로 읽힌다(그것도 지어낸 사실이다).
-        const emptyRow = (id, cols, msg) => {
-          const tb = document.getElementById(id);
-          if (!tb) return;
-          tb.innerHTML = '<tr><td colspan="' + cols + '" class="text-center text-body-tertiary py-4">'
-            + msg + '</td></tr>';
-        };
-        // 빈 이유가 둘이라 문구도 둘이어야 한다. 하나로 쓰면 서버가 멀쩡히 붙어 있는데도
-        // '서버에 연결되면'이라 말해 배지('실데이터 · Cloud SQL')와 정면으로 어긋난다 —
-        // 운영자는 검수가 0건인지 화면이 고장난 건지 구분할 수 없다.
-        const RV_NO_SOURCE = '이 목록은 아직 서버가 제공하지 않습니다 — '
-          + '<a href="review-queue.html" class="text-decoration-none">검수 대기 전체 보기</a>';
-        const RV_OFFLINE = '서버에 연결되지 않아 불러오지 못했습니다.';
-        // 최근 상품 검수 표는 /api/admin/dashboard 응답에 아직 없다 — 처음부터 자리표시자로 둔다.
-        emptyRow("rvRecent", 5, RV_NO_SOURCE);
-
-        fetch("/api/admin/dashboard")
-          .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
-          .then(d=>{
-            const p=d.pending, f=d.flow, sy=d.system;
-            // 아래 스크립트(차트)는 vendor 12개 뒤에 있어 이 응답보다 늦게 뜰 수 있다.
-            // 응답을 여기서 보관해 두고, 늦게 뜬 쪽이 그것으로 다시 그린다.
-            window.__lastDash = d;
-            if(window.paintCharts) window.paintCharts(d);   // 정의는 아래 스크립트에 있다
-            document.getElementById("pd-review").innerHTML=n(p.review,"건");
-            document.getElementById("pd-price").innerHTML=n(p.price,"건");
-            document.getElementById("pd-inbound").innerHTML=n(p.inbound,"건");
-            document.getElementById("pd-refund").innerHTML=n(p.refund,"건");
-            document.getElementById("pd-3-label").textContent="입고 대기";
-            const l3=document.getElementById("pd-3-link");l3.setAttribute("href","stock-inbound.html");
-            l3.innerHTML='재고 입고 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span>';
-            document.getElementById("pd-4-label").textContent="환불 처리 대기";
-            const l4=document.getElementById("pd-4-link");l4.setAttribute("href","refunds.html");
-            l4.innerHTML='환불 · 클레임 <span data-feather="arrow-right" style="width:13px;height:13px;vertical-align:middle;"></span>';
-
-            document.getElementById("fl-import").innerHTML=f.import_rows==null?dash("행"):n(f.import_rows,"행");
-            document.getElementById("fl-import-sub").innerHTML=f.import_rows==null?'<span class="text-body-tertiary">CSV 적재 파이프라인 준비 중</span>':'<a href="csv-jobs.html" class="text-decoration-none">적재 이력</a>';
-            document.getElementById("fl-pool").innerHTML=n(f.pool_ok,"개");
-            document.getElementById("fl-pool-sub").textContent=`핵심 부품 ${f.pool_core}개 중 ${f.pool_rate}% · 게이트별 사유 보기`;
-            document.getElementById("fl-sess").innerHTML=n(f.sessions_today,"건");
-            document.getElementById("fl-sess-sub").textContent=`완주 ${f.sessions_done} · 이탈 ${f.sessions_drop}`;
-            document.getElementById("fl-ord").innerHTML=n(f.orders_total,"건");
-            document.getElementById("fl-ord-sub").textContent=`진행 중 ${f.orders_active} · ` + f.orders_by_status.map(o=>`${o.status} ${o.count}`).join(" · ");
-
-            document.getElementById("sy-ai").innerHTML=sy.ai_cost==null?'— <span class="fs-10 fw-semibold text-body-tertiary">LLM 연동 보류 — 집계 준비 중</span>':`$${sy.ai_cost}`;
-            document.getElementById("sy-ai-bar").innerHTML='<div class="progress-bar bg-secondary" style="width:0%;"></div>';
-            if(sy.versions==null)document.getElementById("sy-ver").innerHTML='<div class="text-body-tertiary">버전 관리(마진 정책·호환 규칙·추천 기준)는 준비 중입니다 — 현재는 단일 현행값으로 동작합니다.</div>';
-            // 빈 배열이면 '불러오는 중…'이 지워진 빈 칸만 남아 실패로 읽힌다. 0건이라고 말한다.
-            // null 가드도 겸한다 — 여기서 던지면 catch 로 떨어져 배지가 '연결 안 됨'이라 거짓말한다.
-            const gs=sy.recent_logs||[];
-            document.getElementById("sy-logs").innerHTML=gs.length?gs.map(g=>
-              `<div class="text-truncate"><b>${g.operator}</b> — ${g.kind} · ${g.action}${g.target?` (${g.target})`:""}</div>`).join("")
-              :'<div class="text-body-tertiary">아직 기록된 작업이 없습니다.</div>';
-
-            const b=document.getElementById("dataSrc");
-            b.textContent="실데이터 · Cloud SQL";b.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
-            const note=document.createElement("p");
-            note.className="fs-10 text-body-tertiary mt-2 mb-0";note.textContent=d.note;
-            document.querySelector(".content").appendChild(note);
-            if(window.feather)feather.replace();
-          })
-          .catch(()=>{
-            // 서버에 못 닿았다. 더미를 걷어냈으니 '더미 데이터'라고 말하면 그게 거짓이 된다 —
-            // 원천은 있는데 못 불러온 것이므로 '연결 안 됨'이라고 말한다.
-            // 여기서 예외가 나면 뒤가 통째로 안 도니 자리마다 가드를 둔다.
-            const b=document.getElementById("dataSrc");
-            if(b)b.textContent="연결 안 됨";
-            emptyRow("rvRecent", 5, RV_OFFLINE);
-            const lg=document.getElementById("sy-logs");
-            if(lg)lg.innerHTML='<div class="text-body-tertiary">서버에 연결되면 표시됩니다.</div>';
+        function esc(v){
+          return String(v == null ? "" : v).replace(/[&<>"]/g, function(c){
+            return ({"&":"&amp;","<":"&lt;",">":"&gt;"})[c] || "&quot;";
           });
+        }
+        function won(n){ return n == null ? "—" : Number(n).toLocaleString("ko-KR") + "원"; }
+        function el(id){ return document.getElementById(id); }
+        /* 성공·실패 문구는 **공용 진행 바(`ui-progress.js`)가 이미 띄운다** —
+         * fetch 를 감싸 GET 이 아닌 요청마다 서버가 준 `detail`/`note` 를 그대로 보여준다.
+         * 여기서 토스트를 또 만들면 진행 바와 **서로 다른 말을 하게 된다**(이 프로젝트의
+         * 고질병). 그래서 화면은 자기 자리에서만 말하고, 문장은 같은 헬퍼에서 가져온다.
+         *
+         * `errText(j, status)` 다 — **인자 순서를 틀리면 "[object Object]" 가 뜬다**
+         * (처음에 `(response, json)` 으로 불러 실제로 그렇게 나왔다). */
+        function errText(j, status){
+          if(window.popcornProgress && window.popcornProgress.errText)
+            return window.popcornProgress.errText(j, status);
+          var d = j && j.detail;
+          if(typeof d === "string" && d.trim()) return d.trim();
+          if(Array.isArray(d)) return d.map(function(x){ return x.msg || ""; }).join(" · ");
+          return "오류 " + status;
+        }
+        /* 화면 자기 자리의 안내문. 진행 바가 위에서 말하고, 이건 편집 칸 아래에서 말한다. */
+        function say(msg, bad){
+          var box = el("edMsg");
+          if(!box) return;
+          box.hidden = false;
+          box.className = "fs-10 mt-2 " + (bad ? "text-danger" : "text-primary");
+          box.textContent = msg || "";
+        }
+
+        function loadMeta(){
+          return fetch("/api/admin/grades/meta").then(function(r){
+            if(!r.ok) throw new Error(r.status);
+            return r.json();
+          }).then(function(m){
+            META = m;
+            el("dataSrc").textContent = "LIVE";
+            el("dataSrc").className =
+              "badge badge-phoenix badge-phoenix-primary align-middle fs-10";
+            el("engineNote").innerHTML = esc(m.engine_note);
+            el("scaleNote").innerHTML = esc(m.scale.note).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+            el("slotSel").innerHTML = m.slots.map(function(s){
+              return '<option value="' + esc(s.key) + '">' + esc(s.label) + '</option>';
+            }).join("");
+            SLOT = m.slots.length ? m.slots[0].key : "";
+          });
+        }
+
+        function load(){
+          if(!SLOT) return Promise.resolve();
+          var u = "/api/admin/grades?slot=" + encodeURIComponent(SLOT)
+                + "&page=" + PAGE
+                + (ONLY ? "&only=" + ONLY : "")
+                + (Q ? "&q=" + encodeURIComponent(Q) : "");
+          el("rows").innerHTML =
+            '<tr><td colspan="5" class="text-center text-body-tertiary py-4">불러오는 중…</td></tr>';
+          return fetch(u).then(function(r){
+            return r.json().then(function(j){ return {ok:r.ok, r:r, j:j}; });
+          }).then(function(res){
+            if(!res.ok){
+              el("rows").innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">'
+                + esc(errText(res.j, res.r.status)) + '</td></tr>';
+              return;
+            }
+            var d = res.j;
+            el("cov").textContent = d.note;
+            el("pageNote").textContent =
+              "전체 " + d.total.toLocaleString("ko-KR") + "건 중 " + d.page + " / " + d.pages + " 쪽";
+            el("prev").disabled = d.page <= 1;
+            el("next").disabled = d.page >= d.pages;
+            el("rows").innerHTML = d.items.length ? d.items.map(function(it){
+              return '<tr>'
+                + '<td class="ps-3"><div class="line-clamp-2" title="' + esc(it.product_name) + '">'
+                +   esc(it.product_name) + '</div>'
+                +   '<div class="fs-10 text-body-tertiary"><code>' + it.product_code + '</code> · '
+                +   esc(it.part_label) + '</div></td>'
+                + '<td class="text-end">' + won(it.sale_price) + '</td>'
+                + '<td class="text-end">' + (it.grade == null
+                     ? '<span class="text-body-tertiary">—</span>'
+                     : '<b>' + it.grade + '</b>') + '</td>'
+                + '<td>' + (it.in_pool
+                     ? '<span class="badge badge-phoenix badge-phoenix-primary">있음</span>'
+                     : '<span class="badge badge-phoenix badge-phoenix-secondary">없음</span>') + '</td>'
+                + '<td class="pe-3 text-end"><button class="btn btn-sm btn-phoenix-secondary" '
+                +   'data-pick="' + it.product_code + '">'
+                +   (it.grade == null ? "등급 매기기" : "고치기") + '</button></td>'
+                + '</tr>';
+            }).join("") : '<tr><td colspan="5" class="text-center text-body-tertiary py-4">'
+                        + '조건에 맞는 부품이 없습니다.</td></tr>';
+            window.__items = d.items;
+            if(window.feather) window.feather.replace();
+          });
+        }
+
+        function pick(code){
+          var it = (window.__items || []).filter(function(x){
+            return String(x.product_code) === String(code); })[0];
+          if(!it) return;
+          CUR = it;
+          el("edTitle").textContent = it.product_name;
+          el("edSub").innerHTML = '<code>' + it.product_code + '</code> · ' + esc(it.part_label)
+            + ' · ' + won(it.sale_price);
+          el("gr").value = it.grade == null ? "" : it.grade;
+          el("bs").value = it.basis || "";
+          el("sc").value = it.source || "";
+          el("edForm").hidden = false;
+          el("clear").hidden = (it.grade == null);
+          el("gr").focus();
+        }
+
+        function save(){
+          if(!CUR) return;
+          var g = el("gr").value.trim();
+          if(g === ""){ say("등급을 넣어 주세요", true); return; }
+          fetch("/api/admin/grades/" + CUR.product_code, {
+            method: "PUT", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({grade: Number(g), basis: el("bs").value,
+                                  source: el("sc").value})
+          }).then(function(r){
+            return r.json().then(function(j){ return {ok:r.ok, r:r, j:j}; });
+          }).then(function(res){
+            if(!res.ok){ say(errText(res.j, res.r.status), true); return; }
+            say(res.j.note);
+            el("edForm").hidden = true; CUR = null;
+            load();
+          });
+        }
+
+        function clearGrade(){
+          if(!CUR) return;
+          fetch("/api/admin/grades/" + CUR.product_code, {method: "DELETE"})
+            .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, r:r, j:j}; }); })
+            .then(function(res){
+              if(!res.ok){ say(errText(res.j, res.r.status), true); return; }
+              say(res.j.note);
+              el("edForm").hidden = true; CUR = null;
+              load();
+            });
+        }
+
+        document.addEventListener("click", function(ev){
+          var b = ev.target.closest && ev.target.closest("[data-pick]");
+          if(b){ ev.preventDefault(); pick(b.getAttribute("data-pick")); return; }
+          if(ev.target.closest && ev.target.closest("#save")){ ev.preventDefault(); save(); return; }
+          if(ev.target.closest && ev.target.closest("#clear")){ ev.preventDefault(); clearGrade(); return; }
+          if(ev.target.closest && ev.target.closest("#cancel")){
+            ev.preventDefault(); el("edForm").hidden = true; CUR = null; return;
+          }
+          if(ev.target.closest && ev.target.closest("#prev")){ ev.preventDefault(); PAGE = Math.max(1, PAGE-1); load(); return; }
+          if(ev.target.closest && ev.target.closest("#next")){ ev.preventDefault(); PAGE = PAGE+1; load(); return; }
+        });
+
+        var typing = null;
+        function wire(){
+          el("slotSel").addEventListener("change", function(e){
+            SLOT = e.target.value; PAGE = 1; el("edForm").hidden = true; CUR = null; load();
+          });
+          el("onlySel").addEventListener("change", function(e){
+            ONLY = e.target.value; PAGE = 1; load();
+          });
+          el("q").addEventListener("input", function(e){
+            Q = e.target.value.trim();
+            clearTimeout(typing);
+            typing = setTimeout(function(){ PAGE = 1; load(); }, 300);
+          });
+        }
+
+        loadMeta().then(function(){ wire(); return load(); }).catch(function(e){
+          el("dataSrc").textContent = "연결 안 됨";
+          el("dataSrc").className = "badge badge-phoenix badge-phoenix-danger align-middle fs-10";
+          el("engineNote").textContent = "서버에 연결되지 않아 불러오지 못했습니다 (" + e.message + ").";
+          el("rows").innerHTML =
+            '<tr><td colspan="5" class="text-center text-danger py-4">서버에 연결되지 않았습니다.</td></tr>';
+        });
       })();
       </script>
+<footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
+      </div>
+
       <div class="modal fade" id="searchBoxModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-phoenix-modal="data-phoenix-modal" style="--phoenix-backdrop-opacity: 1;">
         <div class="modal-dialog">
           <div class="modal-content mt-15 rounded-pill">
@@ -371,9 +511,9 @@
                     <div class="list pb-3">
                   <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
                   <div class="py-2">
-                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">—</span></div></a>
-                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">—</span></div></a>
-                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">—</span></div></a>
+                    <a class="dropdown-item" href="review-queue.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">상품 검수</span><span class="badge badge-phoenix badge-phoenix-warning">대기 9</span></div></a>
+                    <a class="dropdown-item" href="price-review.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">가격 검토 대기</span><span class="badge badge-phoenix badge-phoenix-primary">5</span></div></a>
+                    <a class="dropdown-item" href="sourcing.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span><span class="badge badge-phoenix badge-phoenix-info">4</span></div></a><a class="dropdown-item" href="stock-inbound.html"><div class="d-flex align-items-center justify-content-between"><span class="fw-normal text-body-highlight title">재고 입고</span><span class="badge badge-phoenix badge-phoenix-info">3</span></div></a>
                     <a class="dropdown-item" href="products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
                     <a class="dropdown-item" href="csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
                     <a class="dropdown-item" href="activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>
@@ -581,238 +721,8 @@
     <script src="vendors/list.js/list.min.js"></script>
     <script src="vendors/feather-icons/feather.min.js"></script>
     <script src="vendors/dayjs/dayjs.min.js"></script>
-    <script src="vendors/echarts/echarts.min.js"></script>
     <script src="assets/js/phoenix.js"></script>
 
-  <script>
-  /* 운영 시작 체크리스트 — 아무것도 없는 상태에서 무엇부터 할지 화면이 말한다.
-     문서(docs/07_운영-시작-순서.md)에만 있으면 그 문서가 낡아도 아무도 모른다.
-     실제로 슬라이스 93에서 3단계(공급처)가 실행 불가능한 채로 오래 있었다. */
-  (function(){
-    var host = document.getElementById("setupHost");
-    if(!host) return;
-
-    function esc(t){ return String(t==null?"":t).replace(/[<>&"]/g,
-      function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; }); }
-    /* 서버 문구의 **강조**만 살린다 — 나머지는 평문으로 둔다(주입 방지). */
-    function md(t){ return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
-
-    function slotBar(step){
-      if(!step.slots) return "";
-      return '<div class="d-flex flex-wrap gap-1 mt-2">' + step.slots.map(function(x){
-        var tone = x.count > 0 ? "badge-phoenix-primary" : "badge-phoenix-danger";
-        return '<span class="badge badge-phoenix ' + tone + ' fs-10">'
-             + esc(x.label) + ' ' + x.count + '</span>';
-      }).join("") + '</div>';
-    }
-
-    function row(st){
-      var mark = st.done
-        ? '<span class="text-primary fw-bold">완료</span>'
-        : '<span class="text-danger fw-bold">필요</span>';
-      return [
-        '<tr', (st.done ? ' class="opacity-75"' : ''), '>',
-          '<td class="text-center fw-bold">', st.no, '</td>',
-          '<td>', mark, '</td>',
-          '<td><b>', esc(st.title), '</b>',
-            '<div class="fs-10 text-body-tertiary">', esc(st.screen_label), '</div>',
-            (st.done ? "" : '<div class="fs-10 text-body-quaternary mt-1">' + md(st.why) + '</div>'),
-            slotBar(st),
-          '</td>',
-          '<td class="text-end fs-9">', esc(st.value), '</td>',
-          '<td class="text-end"><a class="btn btn-phoenix-secondary btn-sm" href="',
-            esc(st.screen), '">열기</a></td>',
-        '</tr>'
-      ].join("");
-    }
-
-    fetch("/api/admin/setup-status")
-      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){
-        if(d.complete){
-          /* 끝났으면 자리를 차지하지 않는다 — 한 줄로 접는다. */
-          host.innerHTML = '<div class="alert alert-subtle-primary fs-9 py-2 mb-4">'
-            + '<b>운영 시작 준비 완료</b> — ' + esc(d.note)
-            + ' <a href="candidate-pool.html" class="ms-2">슬롯별 후보 보기</a></div>';
-          host.hidden = false;
-          return;
-        }
-        var nx = d.next || {};
-        host.innerHTML = [
-          '<div class="card mb-4 border border-warning">',
-            '<div class="card-body">',
-              '<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">',
-                '<div>',
-                  '<h5 class="mb-1">운영 시작 준비 ',
-                    '<span class="badge badge-phoenix badge-phoenix-warning fs-10">',
-                      d.done_count, ' / ', d.total, '</span></h5>',
-                  '<p class="fs-9 text-body-tertiary mb-0">', esc(d.note), '</p>',
-                '</div>',
-                '<a class="btn btn-primary btn-sm" href="', esc(nx.screen || "#"), '">',
-                  esc(nx.title || ""), ' 하러 가기 →</a>',
-              '</div>',
-              '<div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0">',
-                '<thead><tr class="text-body-tertiary">',
-                  '<th class="text-center" style="width:34px;">#</th>',
-                  '<th style="width:52px;">상태</th><th>단계</th>',
-                  '<th class="text-end">현재</th><th></th></tr></thead>',
-                '<tbody>', d.steps.map(row).join(""), '</tbody>',
-              '</table></div>',
-              '<p class="fs-10 text-body-quaternary mb-0 mt-2">',
-                '순서를 바꾸면 되돌아갑니다 — 예를 들어 마진을 나중에 정하면 ',
-                '이미 산정된 판매가를 전부 다시 계산해야 합니다. 자세한 절차는 ',
-                '<code>', esc(d.doc), '</code>.</p>',
-            '</div>',
-          '</div>'
-        ].join("");
-        host.hidden = false;
-      })
-      .catch(function(){
-        /* 못 받았으면 지어내지 않는다 — 조용히 숨긴다(대시보드 나머지는 계속 쓴다). */
-        host.hidden = true;
-      });
-
-  /* ── 대시보드 차트 (슬라이스 H) ────────────────────────────────────
-   * echarts 는 vendors/echarts 로 들어왔다. phoenix.js 의 basicEchartsInit 은
-   * `data-echarts` 를 훑어 **2022년 날짜가 박힌 데모 기본값**을 씌우므로 쓰지 않는다.
-   * 우리는 window.echarts.init 을 직접 부르고 서버 값만 넣는다.
-   * 원천이 없으면 차트를 그리지 않고 그렇게 말한다(화면 정직성).
-   */
-  // 대시보드 fetch 가 이 스크립트보다 먼저 끝났을 수 있다 — 마지막 응답을 들고 있다가 다시 그린다.
-  window.paintCharts = function(d){
-    window.__lastDash = d;
-    if(!window.echarts || !d) return;
-    var U = (window.phoenix && window.phoenix.utils) || {};
-    var C = function(n, f){ try { return U.getColor ? U.getColor(n) : f; } catch(e){ return f; } };
-    var mk = function(id){
-      var el = document.getElementById(id);
-      if(!el) return null;
-      var c = window.echarts.getInstanceByDom(el);
-      if(!c) c = window.echarts.init(el);
-      return c;
-    };
-    var num = function(v){ return (v==null) ? "—" : Number(v).toLocaleString("ko-KR"); };
-    var TIP = { trigger:"item", backgroundColor:C("body-highlight-bg","#fff"),
-                borderColor:C("border-color","#ddd"), borderWidth:1,
-                textStyle:{ color:C("light-text-emphasis","#333") }, padding:[7,10] };
-
-    // ① 추천 가능 비율 — pool_ok / pool_core
-    var f = d.flow || {};
-    var pool = mk("chPool");
-    if(pool){
-      if(f.pool_core){
-        pool.setOption({
-          tooltip: TIP,
-          series: [{
-            type:"pie", radius:["62%","82%"], center:["50%","52%"],
-            avoidLabelOverlap:false, label:{show:false}, labelLine:{show:false},
-            data:[
-              { value:f.pool_ok, name:"추천 가능",
-                itemStyle:{color:C("primary","#3874ff")} },
-              { value:Math.max(0, f.pool_core - f.pool_ok), name:"게이트 미통과",
-                itemStyle:{color:C("secondary-bg","#e3e6ed")} }
-            ]
-          }],
-          graphic:[{ type:"text", left:"center", top:"44%",
-            style:{ text:(f.pool_rate!=null? f.pool_rate+"%" : "—"),
-                    fontSize:22, fontWeight:700, fill:C("body-color","#31374a") } }]
-        });
-        document.getElementById("chPoolNote").innerHTML =
-          "<b>" + num(f.pool_ok) + "</b> / " + num(f.pool_core) + "건" +
-          " <a href='candidate-pool.html' class='ms-1 text-decoration-none'>자세히</a>";
-      } else {
-        document.getElementById("chPoolNote").textContent = "원천 준비 중 — 핵심 부품이 없습니다";
-      }
-    }
-
-    // ② 주문 상태 — orders_by_status
-    var ord = mk("chOrders");
-    var obs = f.orders_by_status || [];
-    // 색을 주지 않으면 echarts **기본 팔레트**로 떨어진다 — #91cc75·#3ba272 두 초록에
-    // 원시 HEX 여섯. 우리 규칙 둘을 동시에 어긴다: 초록 없음(U-01)과 토큰 단일 원천.
-    // 주문 상태는 통과/위험이 아니라 **공정 단계**라 의미색이 아닌 순서 팔레트를 쓴다.
-    // (success 토큰은 존재하지만 #25b003 초록이라 쓰지 않는다.)
-    var ORD_TONES = ["primary", "info", "warning", "primary-light",
-                     "info-light", "tertiary-bg", "danger"];
-    if(ord){
-      if(obs.length){
-        ord.setOption({
-          tooltip: TIP,
-          series: [{ type:"pie", radius:["50%","78%"], center:["50%","52%"],
-            label:{ show:true, formatter:"{b}\n{c}", fontSize:10,
-                    color:C("body-color","#31374a") },
-            labelLine:{ length:6, length2:6 },
-            data: obs.map(function(o, i){
-              return { value:o.count, name:o.status,
-                       itemStyle:{ color:C(ORD_TONES[i % ORD_TONES.length], "#adb5bd") } };
-            }) }]
-        });
-        document.getElementById("chOrdNote").textContent =
-          "전체 " + num(f.orders_total) + "건 · 진행 중 " + num(f.orders_active) + "건";
-      } else {
-        document.getElementById("chOrdNote").textContent = "주문이 아직 없습니다";
-      }
-    }
-
-    // ③ 처리 대기 — pending (0건은 막대를 만들지 않는다)
-    var pen = mk("chPending");
-    var P = d.pending || {};
-    var ITEMS = [
-      ["상품 검수", P.review, "review-queue.html"],
-      ["재고 입고", P.inbound, "stock-inbound.html"],
-      ["미분류", P.unclassified, "category-mapping.html"],
-      ["가격 검토", P.price, "price-review.html"],
-      ["환불 처리", P.refund, "refunds.html"],
-      ["미매핑", P.unmapped, "category-mapping.html"]
-    ].filter(function(x){ return (x[1] || 0) > 0; });
-    if(pen){
-      if(ITEMS.length){
-        ITEMS.sort(function(a,b){ return a[1] - b[1]; });   // 가로 막대는 아래가 작은 값
-        pen.setOption({
-          grid:{ left:78, right:46, top:6, bottom:6 },
-          tooltip: Object.assign({}, TIP, {trigger:"axis", axisPointer:{type:"shadow"}}),
-          xAxis:{ type:"value", show:false },
-          yAxis:{ type:"category", axisLine:{show:false}, axisTick:{show:false},
-                  axisLabel:{ color:C("quaternary-color","#8a94ad"), fontSize:10 },
-                  data: ITEMS.map(function(x){ return x[0]; }) },
-          series:[{ type:"bar", barWidth:12,
-            itemStyle:{ color:C("primary","#3874ff"), borderRadius:[0,6,6,0] },
-            label:{ show:true, position:"right", fontSize:10,
-                    color:C("quaternary-color","#8a94ad"),
-                    formatter:function(p){ return Number(p.value).toLocaleString("ko-KR"); } },
-            data: ITEMS.map(function(x){ return x[1]; }) }]
-        });
-        pen.off("click");
-        pen.on("click", function(e){
-          var it = ITEMS[e.dataIndex];
-          if(it && it[2]) location.href = it[2];
-        });
-      } else {
-        pen.setOption({ title:{ text:"처리할 것이 없습니다", left:"center", top:"middle",
-          textStyle:{ fontSize:12, color:C("quaternary-color","#8a94ad") } } });
-      }
-    }
-
-    if(!window.__chartResize){
-      window.__chartResize = true;
-      window.addEventListener("resize", function(){
-        ["chPool","chOrders","chPending"].forEach(function(id){
-          var el = document.getElementById(id);
-          var c = el && window.echarts.getInstanceByDom(el);
-          if(c) c.resize();
-        });
-      });
-    }
-  }
-
-  /* 위 fetch 가 이 스크립트보다 먼저 끝났거나(vendor 12개가 앞을 막는다) echarts 가
-     아직 없었으면, 저장해 둔 마지막 응답으로 여기서 다시 그린다.
-     이 한 줄이 없으면 __lastDash 를 들고만 있고 아무도 쓰지 않는다 —
-     배지는 '실데이터'인데 차트 세 개가 빈 채로 남는다(죽은 줄 모르는 화면). */
-  if(window.__lastDash) window.paintCharts(window.__lastDash);
-
-  })();
-</script>
   <script src="../shared/ui-progress.js"></script>
 <script src="../shared/admin-panel.js"></script>
 <script src="../shared/admin-menu-data.js"></script>

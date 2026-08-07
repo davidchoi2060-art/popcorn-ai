@@ -60,6 +60,9 @@
     ] },
 
     { id: 'nv-eng', icon: 'cpu', label: '추천 설정', items: [
+      // 등급판이 이 그룹의 첫 항목이다 — 나머지 셋은 **거르는 장치**이고
+      // 이것만 **고르는 장치**다(재설계안 §3-①). 순서가 그 사실을 말한다.
+      { href: 'grade-board.html', icon: 'award', label: '부품 등급판', badge: 'NEW' },
       { href: 'compat-rules.html', icon: 'shield', label: '조립 호환 규칙 · 필수 사양' },
       { href: 'policy-weights.html', icon: 'sliders', label: '추천 기준 설정' },
       { href: 'usage-floors.html', icon: 'filter', label: '용도 하한' },
