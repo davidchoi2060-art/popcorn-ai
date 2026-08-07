@@ -220,6 +220,9 @@
               <div class="row g-3">
                 <div class="col-6"><label class="form-label fs-9 fw-bold">상품명</label><input class="form-control form-control-sm" value="" placeholder="예) ASUS DUAL RTX 4060 O8G"></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">분류</label><select class="form-select form-select-sm"><option value="">분류를 선택하세요</option></select></div>
+                <!-- 2단 선택(2026-08-06): 분류가 접힌 종류(CPU쿨러)일 때만 뜬다.
+                     무엇이 접히는지는 서버(taxonomy)가 정하고 화면은 options 유무만 본다. -->
+                <div class="col-3" id="subWrap" hidden><label class="form-label fs-9 fw-bold" for="subSel">냉각 방식</label><select class="form-select form-select-sm" id="subSel"></select></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">재고 수량</label><input class="form-control form-control-sm text-end" value="" placeholder="0"></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">판매가(원)</label><input class="form-control form-control-sm text-end" value="" placeholder="미산정"></div>
                 <div class="col-3"><label class="form-label fs-9 fw-bold">노출 상태</label><select class="form-select form-select-sm"><option>판매 중</option><option>숨김</option></select></div>
@@ -291,6 +294,52 @@
           const lab=[...document.querySelectorAll("label.form-label")].find(l=>l.textContent.trim()===txt);
           return lab? lab.parentElement.querySelector("input,select") : null;
         }
+
+        /* ── 분류 2단 선택 (2026-08-06 사용자 결정) ─────────────────────
+         * 예전엔 'CPU쿨러(공랭)' · 'CPU쿨러(수랭)' 두 줄이 나란히 있었다.
+         * 고르는 자리는 다른 화면처럼 'CPU쿨러' 하나로 두고, **고른 뒤에** 냉각 방식을 묻는다.
+         *
+         * `part_type` 은 여전히 둘로 나뉜 채다 — radiator_rows 가 수랭에만 걸리고
+         * 라디에이터 장착 규칙이 그 값으로 케이스 수납을 판정하기 때문이다(A-28).
+         * 그래서 **두 칸을 합쳐 하나의 정확한 값**으로 만들어 보낸다.
+         *
+         * 무엇이 접히는지는 화면이 모른다 — 서버가 준 `options` 유무만 본다.
+         */
+        var CHOICES = null;          // [{key,label,options?}]
+        function subWrap(){ return document.getElementById("subWrap"); }
+        function subSel(){ return document.getElementById("subSel"); }
+
+        function choiceOf(key){
+          return (CHOICES || []).filter(function(c){ return c.key === key; })[0] || null;
+        }
+        /** 접힌 값(COOLER_CPU_AIO)을 받으면 그것이 속한 묶음(COOLER)을 돌려준다. */
+        function groupOf(partType){
+          var hit = (CHOICES || []).filter(function(c){
+            return (c.options || []).some(function(o){ return o.key === partType; });
+          })[0];
+          return hit ? hit.key : partType;
+        }
+        /** 분류 칸 값이 바뀌면 두 번째 칸을 띄우거나 감춘다. */
+        function syncSub(key, want){
+          var w = subWrap(), sl = subSel();
+          if(!w || !sl) return;
+          var c = choiceOf(key);
+          if(!c || !c.options){ w.hidden = true; sl.innerHTML = ""; return; }
+          sl.innerHTML = c.options.map(function(o){
+            return '<option value="' + o.key + '">' + esc(o.label) + '</option>';
+          }).join("");
+          if(want) sl.value = want;
+          w.hidden = false;
+        }
+        /** 두 칸을 합친 **최종 part_type**. 두 번째 칸이 없으면 첫 칸 그대로. */
+        function resolvedType(key){
+          var c = choiceOf(key);
+          if(c && c.options){
+            var sl = subSel();
+            return (sl && sl.value) || c.options[0].key;
+          }
+          return key;
+        }
         if(fromPrice){
           const nm=_q.get("name")||"", cat=_q.get("cat")||"";
           const set=(t,v)=>{const el=fieldByLabel(t);if(el)el.value=v;};
@@ -302,12 +351,16 @@
           const catSel=fieldByLabel("분류");
           fetch("/api/admin/product-meta").then(function(r){return r.ok?r.json():null;})
             .then(function(m){
-              if(!catSel || !m || !m.part_labels || !m.part_labels.length) return;
+              if(!catSel || !m || !m.part_choices || !m.part_choices.length) return;
+              CHOICES = m.part_choices;          // 2단 선택지 — 접히는 것만 options 를 갖는다
               catSel.innerHTML='<option value="">분류를 선택하세요</option>'
-                +m.part_labels.map(function(x){return '<option>'+esc(x.label)+'</option>';}).join("");
+                +CHOICES.map(function(x){
+                   return '<option value="'+x.key+'">'+esc(x.label)+'</option>'; }).join("");
               // URL의 분류가 서버 라벨과 맞을 때만 고른다 — 안 맞으면 비워 두고 사람이 고른다
               var hit=[].filter.call(catSel.options,function(o){return o.textContent===cat;})[0];
-              catSel.value = hit? cat : "";
+              catSel.value = hit? hit.value : "";
+              syncSub(catSel.value, null);
+              catSel.addEventListener("change", function(){ syncSub(catSel.value, null); });
             }).catch(function(){});
           const expSel=fieldByLabel("노출 상태"); if(expSel) expSel.value="숨김";
           /* 공급처 매입가는 등록이 끝나야 생긴다. 예전에는 여기서 URL로 받은 값을
@@ -332,7 +385,8 @@
             if(!lab0){ showToast("분류를 선택하세요"); return; }
             const btn=document.getElementById("save");btn.disabled=true;
             fetch("/api/admin/products",{method:"POST",headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({name:fieldByLabel("상품명").value, part_label:lab0,
+              // 두 칸(분류 + 냉각 방식)을 합친 **최종 코드**를 보낸다 — 라벨 왕복을 없앴다
+              body:JSON.stringify({name:fieldByLabel("상품명").value, part_type:resolvedType(lab0),
                 supplier_id:+_q.get("sup_id"), model_name:_q.get("model")||_q.get("name")||"",
                 cost_price:+(_q.get("cost")||0), danawa_code:_q.get("danawa")||null})})
               .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
@@ -448,8 +502,16 @@
                  body: JSON.stringify({part_type:to, preview:true})})
             .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
             .then(function(res){
-              if(!res.ok){ sel.value = from; return; }
+              if(!res.ok){ sel.value = groupOf(from); syncSub(sel.value, from); return; }
               var i = res.j.impact;
+              /* **되돌릴 기준은 서버가 말한 현재 값**이다(`impact.from`).
+                 화면의 `cur` 는 저장 직후 `load()` 가 끝나기 전 창에서 낡는다 —
+                 그 창에서 취소하면 화면이 "공랭을 저장하고 수랭을 보여주는" 상태가 된다.
+                 실제로 재현했다(2026-08-07). DB를 아는 쪽은 서버뿐이므로 서버를 믿는다. */
+              var srvFrom = (i.from && i.from.part_type) || from;
+              if(srvFrom === to){        // 서버 기준으로는 바뀌는 게 없다
+                sel.value = groupOf(srvFrom); syncSub(sel.value, srvFrom); return;
+              }
               var warn = i.missing_after && i.missing_after.length;
               var html = '<div class="modal fade" id="ptModal" tabindex="-1">'
                 + '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">'
@@ -479,7 +541,10 @@
               var el = document.getElementById("ptModal"), m = new bootstrap.Modal(el);
               var applied = false;
               el.addEventListener("hidden.bs.modal", function(){
-                if(!applied) sel.value = from;      // 취소하면 화면도 되돌린다
+                // 취소하면 화면도 되돌린다. **중괄호가 필요하다** — 없으면 저장에
+                // 성공한 뒤에도 syncSub 가 옛 값으로 돌아가고, load() 재도색과
+                // 경합해 "공랭을 저장하고 수랭을 보여주는" 화면이 된다.
+                if(!applied){ sel.value = groupOf(srvFrom); syncSub(sel.value, srvFrom); }
                 el.remove();
               });
               document.getElementById("ptGo").onclick = function(){
@@ -491,12 +556,15 @@
                     if(!out.ok) return;
                     applied = true; m.hide();
                     EDIT = false;                   // 저장했으면 읽기로(연속 오조작 방지)
+                    // 재도색이 끝나기 전까지 잠근다 — 그 창에서 조작하면 낡은 `cur` 를
+                    // 든 핸들러가 돌아 화면과 DB가 어긋난다.
+                    sel.disabled = true; if(subSel()) subSel().disabled = true;
                     load().then(function(){ toast(esc(out.j.note), true); });
                   });
               };
               m.show();
             })
-            .catch(function(){ sel.value = from; });
+            .catch(function(){ sel.value = groupOf(from); syncSub(sel.value, from); });
         }
         // ── 중복 정리: 편입·삭제 (슬라이스 69) ───────────────────────────
         // 실수로 같은 상품을 두 번 만들면 재고와 매입가가 갈라진다.
@@ -828,26 +896,36 @@
           if(cat){
             if(SPEC_META || true){
               // 선택지는 서버 메타에서 온다(목록 필터와 같은 원천)
-              var opts = (PMETA && PMETA.part_labels ? PMETA.part_labels : [])
-                .concat(PMETA && PMETA.peripheral_labels ? PMETA.peripheral_labels : [])
-                // 완성품(완제품 PC·베어본)도 고를 수 있어야 한다 — 부품도 주변기기도 아니다
-                .concat(PMETA && PMETA.built_labels ? PMETA.built_labels : []);
-              if(opts.length){
-                cat.innerHTML = opts.map(function(o){
-                  return '<option value="'+o.part_type+'">'+esc(o.label)+'</option>';
+              // 2단 선택지 — 고를 수 있는 전부(코어·주변기기·완성품). 접히는 것만 options 를 갖는다.
+              CHOICES = (PMETA && PMETA.all_choices) ? PMETA.all_choices : [];
+              if(CHOICES.length){
+                cat.innerHTML = CHOICES.map(function(o){
+                  return '<option value="'+o.key+'">'+esc(o.label)+'</option>';
                 }).join("") + '<option value="ETC">미분류</option>';
               }
             }
             var cur = P.part_type;
-            var hit = [].filter.call(cat.options,function(o){return o.value===cur;})[0];
+            // 접힌 값(예: COOLER_CPU_AIO)이면 첫 칸은 묶음(COOLER), 둘째 칸이 그 값을 든다
+            var curKey = groupOf(cur);
+            var hit = [].filter.call(cat.options,function(o){return o.value===curKey;})[0];
             if(!hit){ var op=document.createElement("option");
                       op.value=cur; op.textContent=P.cat; cat.appendChild(op); }
-            cat.value = cur;
+            cat.value = curKey;
+            syncSub(curKey, cur);
             cat.disabled = !EDIT;          // 읽기 모드에서는 잠근다(다른 필드와 같은 규칙)
+            var _sw = subWrap(); if(_sw && subSel()) subSel().disabled = !EDIT;
+            // 첫 칸이 바뀌면 둘째 칸을 먼저 맞추고, **합친 최종 코드**로 물어본다.
+            // 접힌 종류를 고르면 냉각 방식이 결정돼야 서버에 보낼 값이 생긴다.
+            function askResolved(){
+              var next = resolvedType(cat.value);
+              if(next === cur) return;
+              askPartType(cur, next, cat);
+            }
             cat.onchange = function(){
-              if(cat.value===cur) return;
-              askPartType(cur, cat.value, cat);
+              syncSub(cat.value, null);
+              askResolved();
             };
+            if(subSel()) subSel().onchange = askResolved;
           }
           // '노출 상태' 셀렉트를 판매 상태로 쓴다 — 서버가 허용하는 값만 넣는다
           var stSel=fieldByLabel("노출 상태");
@@ -1058,11 +1136,17 @@
           fetch("/api/admin/product-meta").then(function(r){return r.json();})
             .then(function(m){
               var sel=fieldByLabel("분류");
-              if(sel&&m.part_labels&&m.part_labels.length){
+              // 2단 선택지 — 접히는 종류(CPU쿨러)만 options 를 갖는다.
+              // **세 번째 자리다**: 단가표發 등록 · 수정 · 여기(단건 등록)가 각각 셀렉트를
+              // 채우고 있었다. 셋 다 같은 원천(part_choices)을 쓴다.
+              if(sel&&m.part_choices&&m.part_choices.length){
+                CHOICES = m.part_choices;
                 sel.innerHTML='<option value="">분류를 선택하세요</option>'
-                  +m.part_labels.map(function(x){
-                    return '<option>'+x.label+'</option>';}).join("");
+                  +CHOICES.map(function(x){
+                    return '<option value="'+x.key+'">'+esc(x.label)+'</option>';}).join("");
                 sel.selectedIndex=0;
+                syncSub("", null);
+                sel.addEventListener("change", function(){ syncSub(sel.value, null); });
               }
             }).catch(function(){});
           // 제조사 칸이 없어 등록 시 제조사를 못 넣었다 — 상품명 칸 옆에 만든다
@@ -1091,7 +1175,7 @@
             function send(confirmed){
               return fetch("/api/admin/products",{method:"POST",
                   headers:{"Content-Type":"application/json"},
-                  body:JSON.stringify({name:nm, part_label:lab,
+                  body:JSON.stringify({name:nm, part_type:resolvedType(lab),
                                        maker:(getField("제조사")||"").trim()||null,
                                        confirm_similar:!!confirmed})})
                 .then(function(r){return r.json().then(function(j){return {ok:r.ok,st:r.status,j:j};});})

@@ -26,6 +26,7 @@ import glob
 import io
 import json
 import os
+import pathlib
 import sys
 import urllib.error
 import urllib.parse
@@ -1210,6 +1211,40 @@ def test_taxonomy_single_source():
     # 쿨러 말고는 접히지 않는다 — 접기 규칙이 번지면 다른 종류가 조용히 합쳐진다.
     _folded = sorted(k for k, v in _T.DISPLAY_MEMBERS.items() if len(v) > 1)
     check("접히는 것은 쿨러뿐", _folded == ["COOLER"], ["COOLER"], _folded)
+
+    # 2단 선택(2026-08-07) — 고르는 자리는 표시 축을 그대로 쓰되, 접히는 종류는
+    # 두 번째 칸으로 묻는다. **화면은 무엇이 접히는지 몰라야 한다** — `options` 유무만 본다.
+    _tree = _T.choice_tree(_T.CORE_TYPES)
+    _keys = [e["key"] for e in _tree]
+    check("등록 선택지 = 표시 축(쿨러가 한 칸)",
+          _keys.count("COOLER") == 1 and "COOLER_CPU_AIO" not in _keys,
+          "COOLER 한 칸", _keys)
+    _cool_e = [e for e in _tree if e["key"] == "COOLER"][0]
+    check("쿨러만 두 번째 칸을 갖는다",
+          [e["key"] for e in _tree if e.get("options")] == ["COOLER"],
+          ["COOLER"], [e["key"] for e in _tree if e.get("options")])
+    check("두 번째 칸 = 공랭 · 수랭 (part_type 코드)",
+          [o["key"] for o in _cool_e["options"]] == ["COOLER_CPU_AIR", "COOLER_CPU_AIO"],
+          ["COOLER_CPU_AIR", "COOLER_CPU_AIO"], [o["key"] for o in _cool_e["options"]])
+    check("두 번째 칸 라벨은 냉각 방식만 말한다",
+          [o["label"] for o in _cool_e["options"]] == ["공랭", "수랭"],
+          ["공랭", "수랭"], [o["label"] for o in _cool_e["options"]])
+    # 접힌 키는 **저장 가능한 값이 아니다** — 화면이 그대로 보내면 서버가 막아야 한다.
+    check("접힌 키 COOLER 는 part_type 이 아니다",
+          "COOLER" not in _T.PART_TYPES, "part_type 아님", "COOLER 가 part_type 에 있음")
+    # 화면은 세 자리에서 셀렉트를 채운다(단가표發 등록 · 수정 · 단건 등록).
+    # 셋 다 **같은 원천**(part_choices/all_choices)을 써야 한다 — 하나라도 옛 라벨 경로로
+    # 남으면 그 자리에서만 쿨러가 갈라진다(단일 원천 규율).
+    _pe = pathlib.Path(ROOT, "mockups", "admin", "product-edit.html").read_text(encoding="utf-8")
+    check("상품 등록·수정 화면에 옛 라벨 선택지 경로가 남지 않았다",
+          "part_labels" not in _pe, "없음", "part_labels 사용처가 남아 있음")
+    check("분류 셀렉트를 채우는 자리가 전부 choices 원천",
+          _pe.count("part_choices") + _pe.count("all_choices") >= 3,
+          ">=3", _pe.count("part_choices") + _pe.count("all_choices"))
+    # 되돌림은 **서버가 말한 현재 값**을 쓴다 — 화면의 cur 는 저장 직후 재도색 전 창에서
+    # 낡는다. 실제로 "공랭을 저장하고 수랭을 보여주는" 화면을 재현했다(2026-08-07).
+    check("분류 변경 취소는 서버 답으로 되돌린다", "srvFrom" in _pe,
+          "srvFrom 사용", "화면의 cur 로 되돌리고 있음")
 
     # 7) **엔진이 읽는 두 뷰는 화이트리스트다** — 새 part_type 이 늘어도 새어 들어가면 안 된다.
     #    완제품 PC 축(2026-08-05)을 넣기 **전에** 이 검사를 먼저 걸었다. 축을 늘리는 일은

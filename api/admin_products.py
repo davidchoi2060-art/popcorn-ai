@@ -17,7 +17,8 @@ from .db import engine
 router = APIRouter(prefix="/api/admin")
 
 # part_type 어휘는 taxonomy가 단일 원천(슬라이스 A) — 여기서 다시 정의하지 않는다.
-from .taxonomy import PART_LABELS as PART_TYPE_LABELS, CORE_TYPES, BUILT_TYPES
+from .taxonomy import (PART_LABELS as PART_TYPE_LABELS, CORE_TYPES,
+                       BUILT_TYPES, choice_tree)
 
 # part_type별 필수 사양 필드(ERD 4.0 필수 사양 매트릭스). 미등록 타입은 0/0 → 화면 "—".
 # verified_yn은 이번 집계에 미반영(전 필드 채움+미검증 케이스는 다음 슬라이스).
@@ -185,7 +186,11 @@ def list_products(q: str = "", part_type: str = "", status: str = "", origin: st
 # SKU 발번 = MAX+1(dev 단독 수용 — 동시 발번은 주문 advisory lock 전례로 이관).
 class RegisterBody(BaseModel):
     name: str
-    part_label: str            # 화면 분류 라벨(그래픽카드 등) — PART_TYPE_LABELS 역매핑
+    # 분류는 **코드로 받는 것이 정본**이다(`part_type`). 라벨은 옛 경로다 —
+    # 화면이 한글 라벨을 들고 왕복하면 표기를 다듬는 순간 등록이 깨진다.
+    # 2단 선택(2026-08-06)부터 화면은 코드를 보낸다.
+    part_type: str | None = None
+    part_label: str | None = None   # 옛 경로(라벨) — 둘 중 하나는 있어야 한다
     # 아래 셋은 **단가표發 등록일 때만** 온다(슬라이스 54에서 선택으로 완화).
     # 상품 관리에서 직접 등록하면 공급처가 정해지지 않은 상태이고, 없는 사실을
     # 매핑·매입가 원장에 적을 수는 없다.
@@ -202,12 +207,20 @@ class RegisterBody(BaseModel):
 def register_product(body: RegisterBody):
     from .admin_orders import _log  # kind 파라미터형 공용 로거
     # 라벨은 이제 1:1이다(공랭/수냉 분리) — setdefault로 뭉갤 중복이 없다.
-    rev = {v: k for k, v in PART_TYPE_LABELS.items()}
-    lab = body.part_label.strip()
-    # 뭉뚱그린 옛 라벨('CPU쿨러')을 보내는 화면이 남아 있을 수 있어 공랭으로 받아준다.
-    pt = rev.get(lab) or ("COOLER_CPU_AIR" if lab == "CPU쿨러" else None)
-    if pt is None:
-        raise HTTPException(400, f"알 수 없는 분류: {body.part_label}")
+    if body.part_type:
+        pt = body.part_type.strip()
+        if pt not in PART_TYPE_LABELS or pt == "ETC":
+            raise HTTPException(400, f"알 수 없는 분류: {body.part_type}")
+    else:
+        rev = {v: k for k, v in PART_TYPE_LABELS.items()}
+        lab = (body.part_label or "").strip()
+        if not lab:
+            raise HTTPException(400, "분류를 선택하세요")
+        # 뭉뚱그린 옛 라벨('CPU쿨러')을 보내는 화면이 남아 있을 수 있어 공랭으로 받아준다.
+        # **새 화면은 코드를 보내므로 여기 오지 않는다** — 옛 경로의 안전망일 뿐이다.
+        pt = rev.get(lab) or ("COOLER_CPU_AIR" if lab == "CPU쿨러" else None)
+        if pt is None:
+            raise HTTPException(400, f"알 수 없는 분류: {body.part_label}")
     if not body.name.strip():
         raise HTTPException(400, "상품명이 비어 있습니다")
     if body.supplier_id is not None and (body.model_name is None or body.cost_price is None):
@@ -337,6 +350,11 @@ def product_meta():
                               if k not in core and k != "ETC" and k not in BUILT_TYPES],
         "built_labels": [{"part_type": k, "label": PART_TYPE_LABELS[k]}
                          for k in BUILT_TYPES if k in PART_TYPE_LABELS],
+        # **2단 선택지**(2026-08-06 사용자 결정). 접히는 종류만 `options` 를 갖는다.
+        # 화면은 그것이 있으면 두 번째 칸을 띄우기만 한다 — 무엇이 접히는지는
+        # `taxonomy` 만 안다. 등록은 코어만, 수정은 고를 수 있는 전부를 쓴다.
+        "part_choices": choice_tree([k for k in PART_TYPE_LABELS if k in core]),
+        "all_choices": choice_tree([k for k in PART_TYPE_LABELS if k != "ETC"]),
         # 목록 필터용 — 실제로 상품이 있는 분류만(빈 분류를 고르면 결과가 0이라 혼란스럽다)
         "used_parts": [{"part_type": k, "label": PART_TYPE_LABELS.get(k, k)} for k in used],
         "makers": makers,

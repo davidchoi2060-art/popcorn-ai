@@ -97,6 +97,41 @@ DISPLAY_TYPES = tuple(DISPLAY_LABELS)
 del _t, _l, _k, _members
 
 
+# 접힌 종류의 **두 번째 칸** 라벨 — 2단 선택(2026-08-06 사용자 결정)에서 쓴다.
+# "CPU쿨러(공랭)" 에서 괄호를 벗겨 만들지 않는다 — 표기가 바뀌면 조용히 깨진다.
+SUB_LABELS = {"COOLER_CPU_AIR": "공랭", "COOLER_CPU_AIO": "수랭"}
+
+
+def choice_tree(types) -> list[dict]:
+    """고르는 자리에 쓸 **2단 선택지**. 접히는 종류만 `options` 를 갖는다.
+
+        [{"key": "CPU", "label": "CPU"},
+         {"key": "COOLER", "label": "CPU쿨러",
+          "options": [{"key": "COOLER_CPU_AIR", "label": "공랭"}, …]}]
+
+    화면은 `options` 가 있으면 두 번째 칸을 띄우기만 한다 — **무엇이 접히는지는
+    이 파일만 안다.** 화면이 'COOLER 는 공랭·수랭' 을 알기 시작하면 그 지식이
+    화면 수만큼 복제되고, 종류가 늘 때 한 곳만 빠진다.
+    """
+    order, members = [], {}
+    for t in types:
+        k = slot_of(t)
+        if k not in members:
+            order.append(k)
+            members[k] = []
+        members[k].append(t)
+    out = []
+    for k in order:
+        ts = members[k]
+        e = {"key": k if len(ts) > 1 else ts[0],
+             "label": DISPLAY_LABELS.get(k, PART_LABELS.get(ts[0], k))}
+        if len(ts) > 1:
+            e["options"] = [{"key": t, "label": SUB_LABELS.get(t, PART_LABELS.get(t, t))}
+                            for t in ts]
+        out.append(e)
+    return out
+
+
 def expand_display(key: str) -> tuple[str, ...]:
     """표시 종류 → 실제 part_type들. 'COOLER' → 공랭·수랭. 모르는 값은 그대로."""
     return DISPLAY_MEMBERS.get(key, (key,))
