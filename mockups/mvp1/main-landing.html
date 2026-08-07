@@ -64,13 +64,13 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
       <p style="margin:26px 0 0; font-size:19px; line-height:1.7; color:rgba(255,255,255,.78); max-width:640px;">말씀하신 그대로 이해하고, 엔진이 검증한 구성으로 답합니다. 조립 불가능한 조합은 후보에서 제외됩니다.</p>
       <div style="display:flex; gap:22px; margin:30px 0 34px; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#10A37F; box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>실시간 재고 검증</div>
-        <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757; box-shadow:0 0 0 4px rgba(217,119,87,.2);"></span>호환성 5종</div>
+        <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757; box-shadow:0 0 0 4px rgba(217,119,87,.2);"></span>호환성 <span data-bind="showcase_rules">—</span>종</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#4285F4; box-shadow:0 0 0 4px rgba(66,133,244,.2);"></span>근거 리포트</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#E8B563; box-shadow:0 0 0 4px rgba(232,181,99,.2);"></span>본체부터 모니터·주변기기까지</div>
       </div>
       <div style="display:flex; gap:16px; align-items:center;">
         <button style="background:#65A1D4; color:#fff; border:none; padding:19px 34px; border-radius:16px; font-family:'Hanken Grotesk'; font-weight:800; font-size:19px; cursor:pointer; box-shadow:0 20px 44px rgba(101,161,212,.4); display:flex; align-items:center; gap:10px;" data-cta="start">내 맞춤 견적 받기 <span class="msym" style="font-size:22px;">arrow_forward</span></button>
-        <button style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.28); backdrop-filter:blur(8px); padding:19px 28px; border-radius:16px; font-weight:600; font-size:17px; cursor:pointer; display:flex; align-items:center; gap:9px;" data-cta="how"><span class="msym" style="font-size:20px;">play_circle</span> 작동 방식 보기</button>
+        <button style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.28); backdrop-filter:blur(8px); padding:19px 28px; border-radius:16px; font-weight:600; font-size:17px; cursor:pointer; display:flex; align-items:center; gap:9px;" data-cta="how">작동 방식 보기</button>
       </div>
     </div>
 
@@ -164,7 +164,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
             <div style="text-align:left;"><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:800; font-size:20px;">검증 완료</div><div style="color:rgba(255,255,255,.6); font-size:14px; margin-top:2px;">조건·호환·예산을 통과한 구성</div></div>
           </div>
           <div style="position:relative; display:flex; align-items:center; gap:24px;">
-            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:'JetBrains Mono';">Verified Pick</div><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">1,487,000</span><span style="font-size:18px; font-weight:700;">원</span></div></div>
+            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:'JetBrains Mono';">Verified Pick</div><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">—</span><span style="font-size:18px; font-weight:700;">원</span></div></div>
             <button style="background:#65A1D4; color:#fff; border:none; width:56px; height:56px; border-radius:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" data-cta="start"><span class="msym" style="font-size:26px;">arrow_forward</span></button>
           </div>
         </div>
@@ -212,11 +212,11 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           <div style="background:linear-gradient(160deg,#1A202C,#0F172A); border-radius:28px; padding:38px; position:relative; overflow:hidden; box-shadow:0 30px 60px -30px rgba(15,23,42,.7); display:flex; flex-direction:column;">
             <div style="position:absolute; top:0; right:0; background:#65A1D4; color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:12px; letter-spacing:.12em; padding:9px 18px; border-radius:0 0 0 18px;">TOP PICK</div>
             <div style="color:rgba(255,255,255,.55); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;" data-bind="showcase_caption">검증 통과 견적</div>
-            <div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;"><span data-bind="showcase_total">1,487,000</span><span style="font-size:22px;">원</span></div>
+            <div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;"><span data-bind="showcase_total">—</span><span style="font-size:22px;">원</span></div>
             <div style="display:flex; flex-direction:column; gap:2px;" data-repeat="showcase_items">
-              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">CPU · Ryzen 5 7600</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">254,000</span></div>
-              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">GPU · RTX 4060 Ti</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">645,000</span></div>
-              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">RAM · DDR5-5600 32GB</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">132,000</span></div>
+              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">CPU · Ryzen 5 7600</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">—</span></div>
+              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">GPU · RTX 4060 Ti</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">—</span></div>
+              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">RAM · DDR5-5600 32GB</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">—</span></div>
             </div>
             <button style="margin-top:auto; width:100%; padding:16px; background:#fff; color:#111827; border:none; border-radius:14px; font-family:'Hanken Grotesk'; font-weight:800; font-size:17px; cursor:pointer;" data-cta="start">상세 견적 보기</button>
           </div>
@@ -238,7 +238,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
             <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:'Hanken Grotesk'; font-weight:800; color:#65A1D4;">박</div><div><div style="font-weight:700; font-size:15px; color:#111827;">박준호</div><div style="font-size:13px; color:#64748B;">10년차 · 하이엔드 게이밍</div></div></div>
           </div>
           <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:26px; padding:32px;">
-            <div style="display:flex; gap:3px; color:#F5B301; margin-bottom:18px;"><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star_half</span></div>
+            <div style="display:flex; gap:3px; color:#F5B301; margin-bottom:18px;"><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span style="font-size:14px; font-weight:800; color:#8a8578; margin-left:4px;">4.5</span></div>
             <p style="margin:0 0 24px; font-size:16px; line-height:1.65; color:#334155;">"사무용 20대를 동일 사양으로 한 번에 받았습니다. 도입 검토 문서에 근거 리포트를 그대로 붙였어요."</p>
             <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:'Hanken Grotesk'; font-weight:800; color:#65A1D4;">이</div><div><div style="font-weight:700; font-size:15px; color:#111827;">이현우</div><div style="font-size:13px; color:#64748B;">스타트업 IT 담당</div></div></div>
           </div>
@@ -361,6 +361,13 @@ document.addEventListener('DOMContentLoaded', function () {
      실제 상담에서 나온 견적이면 언제 것인지까지 말한다(슬라이스 60). */
   Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_caption"]'),
    function(el){el.textContent=cap(d);});
+  /* 호환 규칙 수는 **서버가 세는 수**다. 예전엔 '5종'이 마크업에 박혀 있었고 실제는 9종이었다 —
+     이 화면은 showcase 를 이미 부르면서 rules 를 받아만 놓고 쓰지 않았다.
+     CLAUDE.md 「화면 정직성」이 이 문구를 금지 예시로 적어 둔 바로 그것이다. */
+  if(d.rules!=null){
+   Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_rules"]'),
+    function(el){el.textContent=d.rules;});
+  }
   var box=document.querySelector('[data-repeat="showcase_items"]');
   if(!box)return;
   var proto=box.firstElementChild;

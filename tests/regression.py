@@ -2259,6 +2259,23 @@ def test_no_fabricated_data():
             baked.append(n + ":" + m.group(1))
     check("마크업에 콤마 숫자를 박아두지 않는다", baked == [], [], baked[:8])
 
+    # **고객 화면도 같은 규칙이다.** `[39]` 가 오래 `mockups/admin` 만 봤고, 그 사이
+    # 고객 화면에 20곳이 남아 있었다(감사 2026-08-06). 지금은 대부분 런타임에 덮이지만
+    # **서버가 실패하면 그 수들이 사실처럼 남는다** — 첫 화면일수록 위험하다.
+    # `vslot-demo` 는 규약 데모라 화면이 아니다(제외).
+    baked_cx = []
+    for _p3 in sorted(_g9.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html"))):
+        _n3 = os.path.basename(_p3)
+        if _n3 == "vslot-demo.html":
+            continue
+        _s3 = io.open(_p3, encoding="utf-8").read()
+        _b3 = _re13.sub(r"<script[\s\S]*?</script>", "", _s3)
+        _b3 = _re13.sub(r"<!--[\s\S]*?-->", "", _b3)
+        for _m3 in _re13.finditer(r">\s*([0-9]{1,3}(?:,[0-9]{3})+)\s*<", _b3):
+            baked_cx.append(_n3 + ":" + _m3.group(1))
+    check("고객 화면 마크업에도 콤마 숫자를 박아두지 않는다",
+          baked_cx == [], [], sorted(set(baked_cx))[:8])
+
     # ⑤ 서버가 준 값만 쓴다는 계약이 살아 있는가 — 실패 시 이유를 말하는 화면 수
     honest = [n for n, s_ in screens()
               if ("연결 안 됨" in s_ or "원천 준비 중" in s_
@@ -2329,6 +2346,28 @@ def test_screen_assets():
             if ("ft-" + nm) not in _keys:
                 _ghost_icon.append(os.path.basename(p) + ":" + nm)
     check("feather 없는 화면은 매핑된 아이콘만 쓴다", _ghost_icon == [], [], _ghost_icon[:5])
+
+    # **Material Symbols 리거처는 매핑이 없으면 이름이 글자로 남는다.**
+    # su-icons 의 MS 맵이 유일한 원천이다(`_map.json` 은 파일 목록이라 이름을 못 준다).
+    # 2026-08-06 감사에서 8종이 화면에 글자로 떠 있었다 — 버튼에 "play_circle 작동 방식 보기".
+    _su = io.open(os.path.join(ROOT, "mockups", "shared", "su-icons.js"),
+                  encoding="utf-8").read()
+    _ms_raw = _re7.search(r"var MS=(\{.*?\});", _su, _re7.DOTALL)
+    _ms_keys = set(json.loads(_ms_raw.group(1))) if _ms_raw else set()
+    check("su-icons 의 MS 맵을 읽을 수 있다", len(_ms_keys) > 0, "> 0", len(_ms_keys))
+
+    _all_screens = list(_screens)
+    for _p2 in sorted(_g7.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html"))):
+        if os.path.basename(_p2) != "vslot-demo.html":
+            _all_screens.append((_p2, io.open(_p2, encoding="utf-8").read()))
+
+    _raw_lig = []
+    for _p2, _s2 in _all_screens:
+        for _m2 in _re7.finditer(r'class="msym"[^>]*>([a-z0-9_]+)<', _s2):
+            if _m2.group(1) not in _ms_keys:
+                _raw_lig.append(os.path.basename(_p2) + ":" + _m2.group(1))
+    check("아이콘 이름이 글자로 남지 않는다(msym 매핑)",
+          _raw_lig == [], [], sorted(set(_raw_lig))[:6])
 
     # ④ 유령 List 를 막는 순서. `ui-list.js` 의 sweep 은 docReady 에 돌아
     #    `phoenix.js` 의 listInit 보다 **먼저** [data-list] 를 걷어내야 한다.
