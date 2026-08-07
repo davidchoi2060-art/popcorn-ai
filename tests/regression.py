@@ -2050,6 +2050,63 @@ def test_charts_and_choices():
               bool(m) and not _re12.search(r"[0-9]", m.group(1)),
               "숫자 없음", m.group(1) if m else "(없음)")
 
+    # ── 차트 색은 토큰에서 온다 (전수 감사 2026-08-06) ──────────────────
+    # 주문 상태 파이가 itemStyle 을 주지 않아 **echarts 기본 팔레트**로 떨어져 있었다:
+    #   #5470c6  #91cc75  #fac858  #ee6666  #73c0de  #3ba272
+    #             ↑초록                                ↑초록
+    # 초록 없음(U-01)과 "임의 HEX 금지"를 동시에 어겼는데 아무도 막지 못했다 —
+    # 마크업이 아니라 런타임 옵션이라서다. 정적으로 잡히는 것만 여기서 잡는다.
+    chart_files = [os.path.join(admin, n) for n in
+                   ("index.html", "candidate-pool.html", "reprice.html",
+                    "price-history.html")]
+    chart_files.append(os.path.join(ROOT, "mockups", "shared", "ui-chart.js"))
+
+    # ① 색 토큰 이름이 실제로 해석되는 것인가.
+    #    phoenix.utils.getColor 로 브라우저에서 실측한 목록이다. 여기 없는 이름을 쓰면
+    #    조용히 폴백 HEX 로 떨어진다 — `body-tertiary` 12곳이 그랬다(감사에서 교체).
+    #    새 이름을 쓰려면 **브라우저에서 확인하고** 이 목록에 넣는다.
+    KNOWN_TOKENS = {
+        "primary", "info", "warning", "danger", "secondary",
+        "primary-light", "info-light", "warning-light", "danger-light",
+        "primary-dark", "info-dark",
+        "secondary-bg", "tertiary-bg", "border-color", "body-highlight-bg",
+        "light-text-emphasis", "body-color", "tertiary-color", "quaternary-color",
+        "gray-500", "gray-600", "gray-700",
+    }
+    bad_token = []
+    for _f in chart_files:
+        if not os.path.exists(_f):
+            continue
+        _s = io.open(_f, encoding="utf-8").read()
+        for _m in _re12.finditer(r'\bC\(\s*"([a-z0-9-]+)"', _s):
+            if _m.group(1) not in KNOWN_TOKENS:
+                bad_token.append(os.path.basename(_f) + ":" + _m.group(1))
+    check("차트가 해석되는 색 토큰만 쓴다", bad_token == [], [], sorted(set(bad_token)))
+
+    # ② 초록은 쓰지 않는다(U-01 미정). success 토큰은 존재하지만 #25b003 초록이다.
+    green = []
+    for _f in chart_files:
+        if not os.path.exists(_f):
+            continue
+        _s = io.open(_f, encoding="utf-8").read()
+        if _re12.search(r'\bC\(\s*"success"', _s):
+            green.append(os.path.basename(_f))
+    check("차트가 success(초록) 토큰을 쓰지 않는다", green == [], [], green)
+
+    # ③ 차트 series 는 색을 스스로 정한다 — 안 정하면 기본 팔레트로 떨어진다.
+    #    series 리터럴 안에 itemStyle 이나 lineStyle 이 있어야 한다.
+    no_color = []
+    for _f in chart_files:
+        if not os.path.exists(_f) or _f.endswith("ui-chart.js"):
+            continue
+        _s = io.open(_f, encoding="utf-8").read()
+        for _m in _re12.finditer(r'type\s*:\s*"(pie|bar|line)"', _s):
+            _seg = _s[_m.start():_m.start() + 600]
+            if "itemStyle" not in _seg and "lineStyle" not in _seg:
+                no_color.append("%s:%s" % (os.path.basename(_f), _m.group(1)))
+    check("차트 series 가 색을 스스로 정한다(기본 팔레트 금지)",
+          no_color == [], [], sorted(set(no_color)))
+
     # choices — 공용 헬퍼 하나만 있고, 화면은 그것을 쓴다
     helper = os.path.join(ROOT, "mockups", "shared", "ui-choices.js")
     check("공용 헬퍼가 있다", os.path.exists(helper), True, os.path.exists(helper))

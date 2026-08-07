@@ -238,8 +238,14 @@
                1,299,000 을 239,000 보다 작다고 놓는다. data-num(원 단위 정수)이 그걸 막는다.
                이 표에 날짜·시각 컬럼은 없다. -->
           <div id="prodList" data-list='{"valueNames":["code","name","cat","spec","stock","supplier",{"name":"price","attr":"data-num"},"status"]}'>
-          <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1080px;">
-            <colgroup><col style="width:36px"><col style="width:150px"><col><col style="width:100px"><col style="width:130px"><col style="width:70px"><col style="width:80px"><col style="width:110px"><col style="width:170px"><col style="width:150px"></colgroup>
+          <!-- 열 너비: 상품명이 **나머지 전부**를 받는다.
+               예전에는 고정 열 합이 996px 인데 min-width 가 1080px 이라 상품명에 84px 만
+               남았고, "(BonoBoss) BOS A2 /사운드/스피커" 같은 이름이 3~4줄로 접혀
+               목록의 본래 일(빠른 스캔)을 못 했다. 고정 열을 줄이고 최소 폭을 넓혀
+               상품명이 약 490px 을 받게 한다. 좁은 화면에서는 접히는 대신
+               table-responsive 가 가로로 스크롤한다 — 스캔이 목적인 표에서는 그쪽이 낫다. -->
+          <div class="table-responsive"><table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1320px;">
+            <colgroup><col style="width:36px"><col style="width:126px"><col><col style="width:84px"><col style="width:112px"><col style="width:56px"><col style="width:64px"><col style="width:96px"><col style="width:150px"><col style="width:104px"></colgroup>
             <thead><tr class="text-body-tertiary"><th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th><th class="sort py-2" data-sort="code">자체 상품번호 · SKU</th><th class="sort" data-sort="name">상품명</th><th class="sort" data-sort="cat">분류</th><th class="sort" data-sort="spec">필수 사양</th><th class="sort text-end" data-sort="stock">재고</th><th class="sort text-end" data-sort="supplier">공급처</th><th class="sort text-end" data-sort="price">판매가</th><th class="sort" data-sort="status">상태</th><th class="pe-4"></th></tr></thead>
             <tbody class="list" id="rows"></tbody>
           </table></div>

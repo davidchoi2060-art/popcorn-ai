@@ -288,14 +288,14 @@
           window.popcornChart.draw("chCats", (C, TIP, num)=>({
             tooltip: TIP({ trigger:"axis", axisPointer:{type:"shadow"} }),
             legend: { data:used.map(s=>s.label), bottom:0, itemWidth:10, itemHeight:10,
-                      textStyle:{ color:C("body-tertiary","#8a94ad"), fontSize:10 } },
+                      textStyle:{ color:C("quaternary-color","#8a94ad"), fontSize:10 } },
             // 좌측 여백은 가장 긴 라벨('CPU쿨러(공랭)') 기준이다 — 좁히면 글자가 잘린다.
             grid: { left:112, right:56, top:8, bottom:34 },
-            xAxis: { type:"value", axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10,
+            xAxis: { type:"value", axisLabel:{ color:C("quaternary-color","#8a94ad"), fontSize:10,
                        formatter:v=>Number(v).toLocaleString("ko-KR") },
                      splitLine:{ lineStyle:{ color:C("border-color","#eee") } } },
             yAxis: { type:"category", data:R.map(r=>r.name), axisLine:{show:false}, axisTick:{show:false},
-                     axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10 } },
+                     axisLabel:{ color:C("quaternary-color","#8a94ad"), fontSize:10 } },
             series: used.map((s,i)=>({
               name:s.label, type:"bar", stack:"g", barWidth:14,
               itemStyle:{ color:C(s.tone, "#adb5bd"),

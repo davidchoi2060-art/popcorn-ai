@@ -300,7 +300,10 @@
                       return '<div class="d-flex justify-content-between align-items-center border-bottom py-2">'
                         + '<span class="text-body-highlight">' + w.key + '</span><b>' + w.weight + '</b></div>';
                     }).join('')
-                  : '<span>' + ((d.weights && d.weights.note) || '가중치 원천이 비어 있습니다.') + '</span>';
+                  // 서버의 `weights.note` 는 바로 위 '추천 가중치' 섹션이 이미 그대로 보여준다.
+                  // 여기에 또 그리면 같은 문단이 화면에 두 번 나온다(실제로 그랬다).
+                  // 이 카드는 목록 자리이므로 짧게 '없다'만 말한다.
+                  : '<span>등록된 가중치가 없습니다.</span>';
               }
               var ws = document.getElementById("weightSum");
               if(ws) ws.textContent = wrows.length

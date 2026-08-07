@@ -717,7 +717,7 @@
           }],
           graphic:[{ type:"text", left:"center", top:"44%",
             style:{ text:(f.pool_rate!=null? f.pool_rate+"%" : "—"),
-                    fontSize:22, fontWeight:700, fill:C("body-highlight","#111") } }]
+                    fontSize:22, fontWeight:700, fill:C("body-color","#31374a") } }]
         });
         document.getElementById("chPoolNote").innerHTML =
           "<b>" + num(f.pool_ok) + "</b> / " + num(f.pool_core) + "건" +
@@ -730,15 +730,24 @@
     // ② 주문 상태 — orders_by_status
     var ord = mk("chOrders");
     var obs = f.orders_by_status || [];
+    // 색을 주지 않으면 echarts **기본 팔레트**로 떨어진다 — #91cc75·#3ba272 두 초록에
+    // 원시 HEX 여섯. 우리 규칙 둘을 동시에 어긴다: 초록 없음(U-01)과 토큰 단일 원천.
+    // 주문 상태는 통과/위험이 아니라 **공정 단계**라 의미색이 아닌 순서 팔레트를 쓴다.
+    // (success 토큰은 존재하지만 #25b003 초록이라 쓰지 않는다.)
+    var ORD_TONES = ["primary", "info", "warning", "primary-light",
+                     "info-light", "tertiary-bg", "danger"];
     if(ord){
       if(obs.length){
         ord.setOption({
           tooltip: TIP,
           series: [{ type:"pie", radius:["50%","78%"], center:["50%","52%"],
             label:{ show:true, formatter:"{b}\n{c}", fontSize:10,
-                    color:C("body-highlight","#111") },
+                    color:C("body-color","#31374a") },
             labelLine:{ length:6, length2:6 },
-            data: obs.map(function(o){ return { value:o.count, name:o.status }; }) }]
+            data: obs.map(function(o, i){
+              return { value:o.count, name:o.status,
+                       itemStyle:{ color:C(ORD_TONES[i % ORD_TONES.length], "#adb5bd") } };
+            }) }]
         });
         document.getElementById("chOrdNote").textContent =
           "전체 " + num(f.orders_total) + "건 · 진행 중 " + num(f.orders_active) + "건";
@@ -766,12 +775,12 @@
           tooltip: Object.assign({}, TIP, {trigger:"axis", axisPointer:{type:"shadow"}}),
           xAxis:{ type:"value", show:false },
           yAxis:{ type:"category", axisLine:{show:false}, axisTick:{show:false},
-                  axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10 },
+                  axisLabel:{ color:C("quaternary-color","#8a94ad"), fontSize:10 },
                   data: ITEMS.map(function(x){ return x[0]; }) },
           series:[{ type:"bar", barWidth:12,
             itemStyle:{ color:C("primary","#3874ff"), borderRadius:[0,6,6,0] },
             label:{ show:true, position:"right", fontSize:10,
-                    color:C("body-tertiary","#8a94ad"),
+                    color:C("quaternary-color","#8a94ad"),
                     formatter:function(p){ return Number(p.value).toLocaleString("ko-KR"); } },
             data: ITEMS.map(function(x){ return x[1]; }) }]
         });
@@ -782,7 +791,7 @@
         });
       } else {
         pen.setOption({ title:{ text:"처리할 것이 없습니다", left:"center", top:"middle",
-          textStyle:{ fontSize:12, color:C("body-tertiary","#8a94ad") } } });
+          textStyle:{ fontSize:12, color:C("quaternary-color","#8a94ad") } } });
       }
     }
 

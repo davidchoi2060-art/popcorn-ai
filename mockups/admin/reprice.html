@@ -440,13 +440,13 @@
         xAxis: { type:"value", show:false },
         yAxis: { type:"category", data:R.map(function(c){ return c.label; }),
                  axisLine:{show:false}, axisTick:{show:false},
-                 axisLabel:{ color:C("body-tertiary","#8a94ad"), fontSize:10 } },
+                 axisLabel:{ color:C("quaternary-color","#8a94ad"), fontSize:10 } },
         series: [{
           type:"bar", barWidth:14,
           itemStyle:{ borderRadius:[0,4,4,0],
                       color:function(p){ return C(R[p.dataIndex].tone, "#adb5bd"); } },
           label:{ show:true, position:"right", fontSize:10,
-                  color:C("body-tertiary","#8a94ad"),
+                  color:C("quaternary-color","#8a94ad"),
                   formatter:function(p){ return Number(p.value).toLocaleString("ko-KR") + "건"; } },
           data:R.map(function(c){ return c.v; })
         }]
