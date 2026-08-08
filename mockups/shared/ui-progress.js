@@ -93,7 +93,7 @@
    *
    * 어느 항목이 왜 틀렸는지까지 적는다. `loc` 의 'body' 는 사람에게 의미가 없어 뺀다.
    */
-  function errText(j, status) {
+  function errText(j, status, where) {
     var d = j && j.detail;
     if (typeof d === "string" && d.trim()) return d.trim();
     if (Array.isArray(d) && d.length) {
@@ -104,14 +104,32 @@
         return (f ? f + ": " : "") + (x.msg || "");
       }).join(" · ");
     }
-    if (d && typeof d === "object") return String(d.detail || d.error || "").trim() || ("오류 " + status);
-    return "오류 " + status;
+    if (d && typeof d === "object") {
+      var inner = String(d.detail || d.error || d.message || "").trim();
+      if (inner) return inner;
+    }
+    /* **본문 맨 위도 본다.** `detail` 안만 뒤지면 `{"error": ...}` 로 오는 응답이
+     * 통째로 "오류 409" 가 된다 — 422 의 `detail` 배열을 못 읽어 "오류 422" 만
+     * 뜨던 것과 **같은 병**이다(2026-08-05 사용자 신고). 화면이 서버 응답의 모양을
+     * 하나로 가정하면 다른 모양이 올 때마다 조용해진다. */
+    var top = j && String(j.error || j.message || j.note || "").trim();
+    if (top) return top;
+    /* 그래도 읽을 문장이 없으면 **무엇이 실패했는지라도** 말한다.
+     * "오류 409" 만 뜨면 운영자도 개발자도 어느 요청인지 몰라 추측만 하게 된다
+     * (실제로 그 상태로 신고가 들어왔다 — 2026-08-07). */
+    return "오류 " + status + (where ? " — " + where : "");
   }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
+  }
+
+  /** 표시용 경로 — 오리진·질의는 빼고 어느 API 인지만 남긴다. */
+  function path(u) {
+    try { return new URL(u, location.origin).pathname; }
+    catch (e) { return String(u || "").split("?")[0]; }
   }
 
   var _fetch = window.fetch;
@@ -139,7 +157,8 @@
                  esc(okText(j, "완료되었습니다")) + "</span>", "#1c7a4d", 3200);
           } else {
             show('<span style="font-size:15px;">!</span><span>' +
-                 esc(errText(j, res.status)) + "</span>", "#b31b25", 6000);
+                 esc(errText(j, res.status, method + " " + path(url))) + "</span>",
+                 "#b31b25", 6000);
           }
         };
         if (clone) {

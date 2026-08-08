@@ -1367,6 +1367,21 @@ def test_taxonomy_single_source():
                   "r.reading" in _sw and "r.fix" in _sw, True,
                   "r.reading" in _sw and "r.fix" in _sw)
 
+            # ── 실패를 삼키지 않는다 — 오류 문구 (2026-08-07 사용자 신고) ──────
+            # "관리자 화면 상단에 계속 ! 오류 409" — **어느 요청인지 아무도 몰랐다.**
+            # 422 의 `detail` 배열을 못 읽어 "오류 422" 만 뜨던 것과 같은 병이다.
+            _up = pathlib.Path(ROOT, "mockups", "shared", "ui-progress.js").read_text(encoding="utf-8")
+            # ① 응답 본문의 **맨 위**도 본다 — `{"error": ...}` 로 오는 것들이 있다.
+            check("오류 문구가 본문 맨 위(error/message)도 읽는다",
+                  "j.error || j.message" in _up, True, "j.error || j.message" in _up)
+            # ② 읽을 문장이 없으면 **무엇이 실패했는지라도** 말한다. 상태 코드만 띄우면
+            #    운영자도 개발자도 추측만 하게 된다.
+            check("읽을 문장이 없으면 실패한 요청을 밝힌다",
+                  'where ? " — " + where' in _up, True, 'where ? " — " + where' in _up)
+            check("진행 바가 실패한 요청을 함께 넘긴다",
+                  'errText(j, res.status, method + " " + path(url))' in _up, True,
+                  'errText(j, res.status, method + " " + path(url))' in _up)
+
 
 def test_categories():
     """[33] 카테고리 트리 — 판매 축은 엔진과 분리돼 있다 (슬라이스 B)
