@@ -36,7 +36,11 @@ import urllib.request
 if hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-BASE = "http://localhost:8000"
+# 기준 URL. 기본은 8000 이지만 **다른 세션이 그 포트를 잡고 있을 수 있다** —
+# 그때 회귀를 그대로 돌리면 남의(그리고 대개 낡은) 서버를 검사하면서 내 코드를 판정한다.
+# 오늘 실제로 그렇게 돼서, 방금 넣은 필드가 "없다"고 나왔다(서버가 옛 코드였다).
+#   REGRESSION_BASE=http://127.0.0.1:8001 .venv/Scripts/python tests/regression.py
+BASE = os.environ.get("REGRESSION_BASE", "http://localhost:8000")
 QUIET = "--quiet" in sys.argv
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SNAP_PATH = os.path.join(ROOT, "tests", ".regression-snapshot.json")
@@ -4086,6 +4090,25 @@ def test_usage_floors():
     check("showcase 규칙 수 = 활성 호환 규칙",
           sc["rules"] == db_one("SELECT count(*) FROM compat_rules WHERE active"),
           db_one("SELECT count(*) FROM compat_rules WHERE active"), sc["rules"])
+    # **'통과'와 함께 말하는 숫자는 등록 수가 아니라 적용 수다** (사용자 결정 2026-08-08 · A안).
+    # 쿨러 높이(공랭 전용)와 라디에이터(수랭 전용)는 배타적이라 한 구성엔 하나만 걸린다 —
+    # 어떤 구성도 등록 9종을 다 통과하지 않는다. 첫 화면이 9라고 하면 S2·S3 는 같은 견적을
+    # 8이라 말하고, 두 화면이 어긋난다('호환성 5종'과 같은 종류의 거짓, 방향만 반대).
+    check("showcase 가 적용 규칙 수를 준다", sc.get("rules_applied") is not None,
+          "있음", sc.get("rules_applied"))
+    check("적용 수 <= 등록 수", (sc.get("rules_applied") or 0) <= sc["rules"],
+          "<= %s" % sc["rules"], sc.get("rules_applied"))
+    # **실제 견적이 돌린 검사 수와 같아야 한다** — 이 한 줄이 두 화면을 붙들어 둔다.
+    _q = post("/api/recommend", {"mode": "guided",
+                                 "constraints": [{"l": "용도", "v": "게임"},
+                                                 {"l": "예산", "v": "150만원"}]})[1]
+    _tiers = (_q or {}).get("sets") or {}
+    _counts = sorted({len(v["compat"]["checks"]) for v in _tiers.values()
+                      if isinstance(v, dict) and v.get("compat")})
+    check("적용 수 = 실제 견적이 돌린 검사 수",
+          _counts != [] and all(c == sc.get("rules_applied") for c in _counts),
+          sc.get("rules_applied"), _counts)
+
     pk = sc.get("pick")
     check("showcase가 대표 구성을 준다", bool(pk and pk["items"]), "구성 있음", bool(pk))
     if pk:

@@ -365,9 +365,13 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 호환 규칙 수는 **서버가 세는 수**다. 예전엔 '5종'이 마크업에 박혀 있었고 실제는 9종이었다 —
      이 화면은 showcase 를 이미 부르면서 rules 를 받아만 놓고 쓰지 않았다.
      CLAUDE.md 「화면 정직성」이 이 문구를 금지 예시로 적어 둔 바로 그것이다. */
-  if(d.rules!=null){
+  /* '통과'와 함께 말하는 숫자는 `rules_applied`(한 구성에 실제 걸리는 수)다.
+     등록 9종 중 쿨러 높이(공랭)·라디에이터(수랭)는 배타적이라 늘 8종이 걸린다 —
+     `rules` 를 쓰면 S2·S3 와 어긋난다(사용자 결정 2026-08-08 · A안). */
+  var _rn = (d.rules_applied!=null) ? d.rules_applied : d.rules;
+  if(_rn!=null){
    Array.prototype.forEach.call(document.querySelectorAll('[data-bind="showcase_rules"]'),
-    function(el){el.textContent=d.rules;});
+    function(el){el.textContent=_rn;});
   }
   var box=document.querySelector('[data-repeat="showcase_items"]');
   if(!box)return;

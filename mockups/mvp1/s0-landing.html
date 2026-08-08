@@ -570,12 +570,15 @@ document.addEventListener('click',function(e){
        d.source==='recent'?((t?t+' ':'')+'검증된 실제 견적')
                           :(d.usage+' · '+d.budget_label+' 기준 추천 구성'));
   }
-  // 호환 규칙 수는 서버가 정한다 — 8종을 검사하면서 5종이라 말하면 손해이고, 거짓이다
+  /* 호환 규칙 수는 서버가 정한다. **'통과'와 함께 말하는 숫자는 `rules_applied`** 다 —
+     등록은 9종이지만 쿨러 높이(공랭)·라디에이터(수랭)가 배타적이라 한 구성엔 8종만 걸린다.
+     `rules`(9)를 쓰면 S2·S3 가 같은 견적을 '8종'이라 말해 두 화면이 어긋난다
+     (사용자 결정 2026-08-08 · A안). */
   var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n,hit=[];
   while((n=tw.nextNode()))if(/호환성\s*\d+종/.test(n.nodeValue))hit.push(n);
-  hit.forEach(function(t){t.nodeValue=t.nodeValue.replace(/호환성\s*\d+종/,'호환성 '+d.rules+'종');});
+  hit.forEach(function(t){t.nodeValue=t.nodeValue.replace(/호환성\s*\d+종/,'호환성 '+(d.rules_applied||d.rules)+'종');});
   Array.prototype.forEach.call(document.querySelectorAll('img[alt*="호환성"]'),function(im){
-   im.alt=im.alt.replace(/호환성\s*\d+종/,'호환성 '+d.rules+'종');});
+   im.alt=im.alt.replace(/호환성\s*\d+종/,'호환성 '+(d.rules_applied||d.rules)+'종');});
  }).catch(function(){});
 })();
 </script>

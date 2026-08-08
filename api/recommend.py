@@ -90,6 +90,36 @@ def load_compat_rules(conn) -> dict:
     return by_slot
 
 
+def applied_rule_count(rules: dict) -> int:
+    """한 구성에 **실제로 걸리는** 검사 수 — 등록 규칙 수와 다르다.
+
+    등록은 9종인데 그중 둘은 쿨러 방식에 따라 **배타적**이다:
+    쿨러 높이(공랭 전용)와 라디에이터(수랭 전용). 한 구성의 쿨러는 하나뿐이라
+    둘 중 하나만 걸린다 — 그래서 **어떤 구성도 9종을 다 통과하지 않고 항상 8종이다.**
+
+    첫 화면이 "호환성 9종 통과"라고 말하면 S2·S3 가 같은 견적을 "8종"이라 말한다.
+    두 화면이 서로 다른 말을 하는 것은 '호환성 5종'과 같은 종류의 거짓이고,
+    방향만 반대다. 그래서 **화면에는 이 수를 준다**(사용자 결정 2026-08-08 · A안).
+
+    세는 법: 슬롯마다 제한 없는 규칙은 전부 세고, 제한 있는 규칙은 **한 종류가 고를 수
+    있는 최대치**만 센다(같은 part_type 에 규칙이 둘이면 둘 다 걸리므로 2).
+    8을 상수로 박지 않는 이유 — 규칙은 이미 8종에서 9종으로 한 번 늘었다.
+    """
+    n = 0
+    for _slot, rs in rules.items():
+        free = [r for r in rs if not r.get("part_types")]
+        limited = [r for r in rs if r.get("part_types")]
+        best = 0
+        if limited:
+            types: set = set()
+            for r in limited:
+                types |= set(r["part_types"])
+            for t in types:
+                best = max(best, sum(1 for r in limited if t in r["part_types"]))
+        n += len(free) + best
+    return n
+
+
 def _cmp(op: str, v, r) -> bool:
     """NULL 불통과 — 값을 모르는 부품을 호환으로 판정하지 않는다(ERD §3.7 계약)."""
     if v is None or r is None:
@@ -462,7 +492,11 @@ def showcase():
         # S1 후보 카운터와 **같은 정의**다 — S0에서 다른 수를 보여주면 다음 화면에서
         # 갑자기 줄어든 것처럼 보인다.
         "pool": len(pool),
+        # `rules` = 등록 규칙 수(운영자용) · `rules_applied` = 한 구성에 실제 걸리는 수.
+        # **화면이 '통과'와 함께 말하는 숫자는 rules_applied 다** — 배타 규칙 때문에
+        # 어떤 구성도 등록 수 전부를 통과하지 않는다(위 applied_rule_count 주석).
         "rules": sum(len(v) for v in rules.values()),
+        "rules_applied": applied_rule_count(rules),
         "usage": SHOWCASE["usage"], "budget_label": SHOWCASE["budget"],
         "source": source,                   # recent = 실제 견적 · built = 지금 만든 것
         "pick": pick,
