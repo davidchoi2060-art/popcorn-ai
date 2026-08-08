@@ -33,6 +33,35 @@ def _signal(delta, n) -> str:
     return "가격 변화 없음 — 취향·재고 사유"
 
 
+def _reading(delta: int, n: int) -> str:
+    """부호가 방향을 말한다 — 이 해석이 이 지표의 값어치 전부다."""
+    if not n:
+        return "교체가 없습니다 — 우리 선택이 그대로 받아들여졌습니다"
+    if delta > 0:
+        return "고객이 **더 비싼 것**으로 바꿨습니다 — 우리가 너무 아꼈습니다"
+    if delta < 0:
+        return "고객이 **더 싼 것**으로 바꿨습니다 — 우리가 과했습니다"
+    return "값은 그대로 바꿨습니다 — 취향·재고 사유입니다"
+
+
+def _fix(delta: int, n: int) -> dict | None:
+    """**결과 축이 정책 축으로 돌아가는 자리.**
+
+    지금까지 교체 기록은 쌓이기만 하고 아무 데도 가지 않았다. 무엇을 고쳐야 하는지
+    화면이 지목하지 않으면 운영자는 숫자를 보고도 할 일을 모른다.
+    """
+    if not n:
+        return None
+    if delta > 0:
+        return {"label": "용도 하한 열기", "href": "usage-floors.html",
+                "why": "하한이 낮아 싼 부품이 뽑히고 있을 수 있습니다"}
+    if delta < 0:
+        return {"label": "추천 기준 열기", "href": "policy-weights.html",
+                "why": "예산 배분이 이 슬롯에 과하게 실리고 있을 수 있습니다"}
+    return {"label": "부품 등급판 열기", "href": "grade-board.html",
+            "why": "값이 같은데 바꿨다면 우리가 매긴 서열이 취향과 어긋납니다"}
+
+
 @router.get("/swap-logs")
 def swap_logs(limit: int = 100):
     limit = max(1, min(limit, 500))
@@ -57,6 +86,42 @@ def swap_logs(limit: int = 100):
             SELECT slot, count(*) n, ROUND(AVG(price_delta))::int avg_delta
               FROM swap_event_logs WHERE slot IS NOT NULL
              GROUP BY slot ORDER BY n DESC
+        """)).mappings().all()
+
+        # ── 교체율 (재설계안 §1-① · 2026-08-07) ──────────────────────────
+        # **"최선의 부품"의 직접 측정.** 우리가 고른 것을 고객이 바꿨으면 우리가 틀렸다.
+        # 설문도 추정도 아니고 고객의 손이 직접 말한 것이다.
+        #
+        # 분모가 없으면 건수는 뜻을 갖지 못한다 — GPU 교체 231건이 많은지 적은지
+        # 제안 횟수를 알아야 안다. **분모는 `quote_snapshots` 다.**
+        # `recommendation_items` 는 0행이고 엔진이 쓰지 않는다(실측 2026-08-07) —
+        # 그쪽을 분모로 삼으면 0으로 나누거나 전부 0%가 된다.
+        #
+        # 스냅샷 형식이 둘이다: 지금은 `{parts:[{part_type,...}]}` 이고,
+        # 옛 형식 `[{slot,...}]` 이 1행 남아 있다. 둘 다 받는다 —
+        # 형식 하나만 보면 그 행들이 조용히 분모에서 빠진다.
+        #
+        # 쿨러는 표시 축대로 한 칸으로 합친다(A-28) — 화면이 공랭·수랭을 나눠 보지 않는다.
+        rate = conn.execute(text("""
+            WITH parts AS (
+              SELECT CASE WHEN it->>'part_type' LIKE 'COOLER%' THEN 'COOLER'
+                          ELSE COALESCE(it->>'part_type', it->>'slot') END AS slot
+                FROM quote_snapshots q,
+                     LATERAL jsonb_array_elements(
+                       CASE WHEN jsonb_typeof(q.items)='array' THEN q.items
+                            ELSE COALESCE(q.items->'parts','[]'::jsonb) END) it
+            ), proposed AS (
+              SELECT slot, count(*) n FROM parts WHERE slot IS NOT NULL GROUP BY 1
+            ), swapped AS (
+              SELECT CASE WHEN slot LIKE 'COOLER%' THEN 'COOLER' ELSE slot END AS slot,
+                     count(*) n, ROUND(AVG(price_delta))::bigint avg_delta
+                FROM swap_event_logs WHERE slot IS NOT NULL GROUP BY 1
+            )
+            SELECT p.slot, p.n AS proposed, COALESCE(s.n,0) AS swapped,
+                   ROUND(COALESCE(s.n,0)*100.0/p.n, 1)::float AS pct,
+                   COALESCE(s.avg_delta,0) AS avg_delta
+              FROM proposed p LEFT JOIN swapped s USING (slot)
+             ORDER BY COALESCE(s.n,0)*1.0/p.n DESC, p.slot
         """)).mappings().all()
 
         recent = conn.execute(text("""
@@ -89,6 +154,18 @@ def swap_logs(limit: int = 100):
             "n": p["n"], "pct": round(p["n"] * 100 / total) if total else 0,
             "avg_delta": p["avg_delta"], "signal": _signal(p["avg_delta"], p["n"]),
         } for p in pairs],
+        # **교체율 — "최선의 부품"의 직접 측정.**
+        # `fix` 는 이 신호가 어느 정책 화면으로 돌아가는지다. 이 한 줄이 결과 축을
+        # 정책 축에 잇는 화살표이고, 지금까지 이 화살표가 없어서 기록이 기록으로만 남았다.
+        "rate": [{
+            "slot": r["slot"], "label": SLOT_KO.get(r["slot"], r["slot"]),
+            "proposed": r["proposed"], "swapped": r["swapped"], "pct": r["pct"],
+            "avg_delta": int(r["avg_delta"] or 0),
+            "reading": _reading(int(r["avg_delta"] or 0), r["swapped"]),
+            "fix": _fix(int(r["avg_delta"] or 0), r["swapped"]),
+        } for r in rate],
+        "rate_note": ("분모는 견적 스냅샷에 실제로 제안된 횟수입니다. "
+                      "교체율이 높은 슬롯이 우리가 가장 못 고르는 부품입니다."),
         "by_slot": [{
             "slot": s["slot"], "label": SLOT_KO.get(s["slot"], s["slot"]),
             "n": s["n"], "pct": round(s["n"] * 100 / total) if total else 0,

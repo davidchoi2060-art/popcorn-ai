@@ -1336,6 +1336,37 @@ def test_taxonomy_single_source():
             check("등급판에 다른 화면의 스크립트가 섞이지 않았다",
                   "floors" not in _gb, True, "floors" not in _gb)
 
+            # ── 교체율 (재설계안 §1-① · 2026-08-07) ──────────────────────
+            # **분모가 없으면 건수는 뜻을 갖지 못한다.** 분모는 견적 스냅샷이다 —
+            # `recommendation_items` 는 0행이고 엔진이 쓰지 않는다(실측).
+            # 그쪽을 분모로 삼으면 0으로 나누거나 전 슬롯이 0%가 된다.
+            _api_sw = pathlib.Path(ROOT, "api", "admin_swap_logs.py").read_text(encoding="utf-8")
+            check("교체율 분모가 견적 스냅샷이다",
+                  "quote_snapshots" in _api_sw, True, "quote_snapshots" in _api_sw)
+            # **주석까지 잡지 않는다** — 왜 안 쓰는지 적은 설명이 검사에 걸린다
+            # (이 프로젝트에서 세 번 겪었다). 실제 사용처인 SQL 만 본다.
+            _nl = chr(10)
+            _sw_sql = _nl.join(l for l in _api_sw.split(_nl)
+                               if not l.strip().startswith("#"))
+            check("교체율이 죽은 표(recommendation_items)를 분모로 쓰지 않는다",
+                  "FROM recommendation_items" not in _sw_sql, True,
+                  "FROM recommendation_items" not in _sw_sql)
+            # 스냅샷 형식이 둘이다(지금 {parts:[...]} · 옛 [ ... ] 1행). 하나만 보면
+            # 그 행들이 조용히 분모에서 빠진다.
+            check("교체율이 스냅샷 두 형식을 모두 센다",
+                  "jsonb_typeof" in _api_sw, True, "jsonb_typeof" in _api_sw)
+            # **결과 축이 정책 축으로 돌아가는 화살표.** 이 링크가 없으면 기록이
+            # 기록으로만 남는다 — 재설계안이 지목한 열린 루프가 그대로다.
+            check("교체율이 고칠 화면을 지목한다",
+                  "usage-floors.html" in _api_sw and "policy-weights.html" in _api_sw
+                  and "grade-board.html" in _api_sw, True,
+                  [x for x in ("usage-floors.html", "policy-weights.html", "grade-board.html")
+                   if x not in _api_sw])
+            _sw = pathlib.Path(ROOT, "mockups", "admin", "swap-logs.html").read_text(encoding="utf-8")
+            check("교체 화면이 판정 문구를 서버에서 받는다",
+                  "r.reading" in _sw and "r.fix" in _sw, True,
+                  "r.reading" in _sw and "r.fix" in _sw)
+
 
 def test_categories():
     """[33] 카테고리 트리 — 판매 축은 엔진과 분리돼 있다 (슬라이스 B)

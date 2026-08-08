@@ -205,12 +205,32 @@
         <nav class="mb-3" aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.html">홈</a></li><li class="breadcrumb-item"><a href="#!">견적 · 주문</a></li><li class="breadcrumb-item active">부품 교체 · 클릭 기록</li></ol></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
           <div><h2 class="mb-1">부품 교체 · 클릭 기록 <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-ORD-030</span> <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중</span></h2>
-          <p class="text-body-tertiary mb-0">고객이 추천을 어떻게 고치는지가 <b class="text-body-secondary">추천 기준을 조정할 신호</b>입니다. 읽기 전용 관측 창.</p></div>
+          <p class="text-body-tertiary mb-0"><b class="text-body-secondary">우리가 고른 것을 고객이 바꿨다면 우리가 틀린 것입니다.</b> 설문도 추정도 아니고 고객의 손이 직접 말한 것이라, 이 표가 "최선의 부품"을 재는 가장 정직한 자리입니다.</p></div>
           <!-- '최근 30일'은 근거 없는 창이었다: /api/admin/swap-logs 는 기간 필터가 없고
                swap_event_logs 전체를 센다. 수만 지우고 라벨을 남기면 화면이 여전히 거짓말한다
                (슬라이스 59 전례: 아무도 바인딩하지 않은 `data-bind` 자리). 서버 total 로 채운다. -->
           <span id="swapTotal" class="badge badge-phoenix badge-phoenix-secondary">기록 전체 · 스왑 —회</span>
         </div>
+        <!-- 결과 축 → 정책 축 (재설계안 §3-③ · 2026-08-07).
+             지금까지 교체 기록은 쌓이기만 하고 아무 데도 가지 않았다. 각 행에서 곧바로
+             고칠 화면으로 넘어가는 링크가 **루프를 닫는 한 줄**이다. -->
+        <div class="card mb-3"><div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-1">
+            <h6 class="mb-0">우리가 틀린 곳 — 슬롯별 교체율</h6>
+            <span class="fs-10 text-body-tertiary" id="rateNote">—</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:760px;">
+              <colgroup><col style="width:104px"><col style="width:88px"><col style="width:72px"><col style="width:88px"><col><col style="width:132px"></colgroup>
+              <thead><tr class="text-body-tertiary">
+                <th class="ps-3">슬롯</th><th class="text-end">제안</th><th class="text-end">교체</th>
+                <th class="text-end">교체율</th><th>읽는 법</th><th class="pe-3">고칠 곳</th>
+              </tr></thead>
+              <tbody id="rateRows"><tr><td colspan="6" class="text-center text-body-tertiary py-3">불러오는 중…</td></tr></tbody>
+            </table>
+          </div>
+        </div></div>
+
         <div class="row g-3">
           <div class="col-12 col-lg-7"><div class="card h-100"><div class="card-body">
             <!-- data-list = **현재 페이지 안**의 검색·정렬만 한다. 행은 fetch 응답으로 나중에 그려지므로
@@ -297,6 +317,37 @@
           // 머리말 배지 — 기간을 주장하지 않는다(API 에 기간 필터가 없다).
           var tot = document.getElementById("swapTotal");
           if(tot) tot.textContent = "기록 전체 · 스왑 " + (d.total || 0).toLocaleString() + "회";
+
+          // ⓪ 우리가 틀린 곳 — 슬롯별 교체율 (재설계안 §3-③)
+          // **분모가 없으면 건수는 뜻을 갖지 못한다.** 서버가 제안 횟수를 함께 준다.
+          // 판정 문구(`reading`)와 고칠 곳(`fix`)도 서버가 만든다 — 화면이 해석을
+          // 지어내면 서버가 아는 것과 다른 말을 하게 된다.
+          var rn = document.getElementById("rateNote");
+          if(rn) rn.textContent = d.rate_note || "";
+          var rr = document.getElementById("rateRows");
+          if(rr){
+            var rate = d.rate || [];
+            rr.innerHTML = rate.length ? rate.map(function(r){
+              var strong = r.swapped > 0;
+              return '<tr>'
+                + '<td class="ps-3 fw-semibold">' + esc(r.label) + '</td>'
+                + '<td class="text-end">' + (r.proposed || 0).toLocaleString() + '</td>'
+                + '<td class="text-end">' + (r.swapped || 0).toLocaleString() + '</td>'
+                + '<td class="text-end">' + (strong
+                     ? '<b class="text-danger">' + r.pct + '%</b>'
+                     : '<span class="text-body-tertiary">' + r.pct + '%</span>') + '</td>'
+                + '<td class="fs-10">' + esc(r.reading).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+                +   (strong ? ' <span class="text-body-tertiary">(평균 '
+                      + (r.avg_delta > 0 ? "+" : "") + (r.avg_delta || 0).toLocaleString() + '원)</span>' : "")
+                + '</td>'
+                + '<td class="pe-3">' + (r.fix
+                     ? '<a class="btn btn-sm btn-phoenix-secondary" href="' + esc(r.fix.href) + '" title="'
+                       + esc(r.fix.why) + '">' + esc(r.fix.label) + '</a>'
+                     : '<span class="text-body-tertiary fs-10">—</span>') + '</td>'
+                + '</tr>';
+            }).join("") : '<tr><td colspan="6" class="text-center text-body-tertiary py-3">'
+                        + '아직 제안 기록이 없습니다 — 견적이 나가야 셀 수 있습니다.</td></tr>';
+          }
 
           // ① 자주 일어나는 교체 — 표 본문을 서버 집계로 교체
           // 문서 전체의 첫 tbody 가 아니라 이 표의 tbody 다 — 상단바·모달에 표가 하나
