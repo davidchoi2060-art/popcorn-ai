@@ -10,6 +10,7 @@ body{background:#f1eee8;font-family:'Pretendard','Pretendard Variable',-apple-sy
 .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+<link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
 <script>
@@ -34,7 +35,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
         <span style="width:1px;height:16px;background:#d8d4cc;"></span>
         <div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">receipt_long</span>주문 확인</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;background:#e9f6ef;color:#1c7a4d;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>조립 가능 검증됨</div>
+      <div style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>조립 가능 검증됨</div>
     </div>
   </header>
 
@@ -58,22 +59,22 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
       <section style="display:flex;flex-direction:column;gap:18px;">
 
         <!-- verified banner -->
-        <div style="background:#e9f6ef;border-radius:20px;padding:22px 24px;">
+        <div style="background:var(--success-container, #e9f6ef);border-radius:20px;padding:22px 24px;">
           <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">
-            <span style="width:42px;height:42px;border-radius:12px;background:#2f9e6d;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#fff;">verified</span>
-            <h2 style="margin:0;font-size:19px;font-weight:900;color:#0f5132;">이 구성은 조립 가능함이 검증됐습니다</h2>
+            <span style="width:42px;height:42px;border-radius:12px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#fff;">verified</span>
+            <h2 style="margin:0;font-size:19px;font-weight:900;color:var(--success-deep, #0f5132);">이 구성은 조립 가능함이 검증됐습니다</h2>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:#1c7a4d;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>소켓 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:#1c7a4d;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>메모리 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:#1c7a4d;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>전력 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:#1c7a4d;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>쿨러 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:#1c7a4d;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>케이스 통과</span>
+            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>소켓 통과</span>
+            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>메모리 통과</span>
+            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>전력 통과</span>
+            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>쿨러 통과</span>
+            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>케이스 통과</span>
           </div>
-          <div style="display:flex;gap:18px;flex-wrap:wrap;padding-top:14px;border-top:1px solid #d4e9dd;">
-            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:#2c4c3c;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">build</span>전문가 조립 · 검수</span>
-            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:#2c4c3c;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">bolt</span>당일 출고</span>
-            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:#2c4c3c;"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">shield</span>A/S 보증</span>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--success-container-line, #d4e9dd);">
+            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">build</span>전문가 조립 · 검수</span>
+            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">bolt</span>당일 출고</span>
+            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">shield</span>A/S 보증</span>
           </div>
         </div>
 
@@ -117,7 +118,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">부품 합계 (7종)</span><b style="color:#17171b;">1,705,000원</b></div>
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">조립비</span><b style="color:#17171b;">30,000원</b></div>
             <div id="s4-periph-line" style="display:none;justify-content:space-between;font-size:14px;"></div>
-            <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">배송비</span><b style="color:#2f9e6d;">무료</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">배송비</span><b style="color:var(--success, #2f9e6d);">무료</b></div>
           </div>
           <div style="display:flex;gap:8px;margin:16px 0;">
             <input placeholder="쿠폰 코드" style="flex:1;padding:11px 14px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:13.5px;font-family:inherit;outline:none;">
@@ -394,7 +395,7 @@ window.addEventListener('scroll',closeTip,{passive:true});
     chipBox.innerHTML=chips.map(function(c){
      var ok=c.pass!==false;
      return '<span title="'+(c.detail||'').replace(/"/g,'')+'" style="display:flex;'
-      +'align-items:center;gap:5px;background:#fff;color:'+(ok?'#1c7a4d':'#b31b25')
+      +'align-items:center;gap:5px;background:#fff;color:'+(ok?'var(--success-dark, #1c7a4d)':'#b31b25')
       +';padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">'
       +'<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">'
       +(ok?'check_circle':'error')+'</span>'
@@ -411,7 +412,7 @@ window.addEventListener('scroll',closeTip,{passive:true});
   }
   // 배지
   var mrow=document.getElementById('s4-mode-badge');
-  if(mrow){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:#e7f4ec;color:#1c7a4d;';mrow.parentNode.insertBefore(bg,mrow);}
+  if(mrow){var bg=document.createElement('span');bg.textContent='실데이터 · Cloud SQL';bg.style.cssText='font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);';mrow.parentNode.insertBefore(bg,mrow);}
   // 4) 결제수단 추적(캡처 — 메인 IIFE의 pm은 폐쇄 변수)
   var pm='카드';
   document.querySelectorAll('#s4-paymethods [data-pm]').forEach(function(b){b.addEventListener('click',function(){pm=b.dataset.pm;},true);});

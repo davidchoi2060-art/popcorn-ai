@@ -7,6 +7,24 @@
   --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
   --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
   --error:#C0392B; --on-error:#ffffff;
+  /* success — U-01 확정(2026-08-08 사용자 결정). 아래 값은 **새로 고른 색이 아니라**
+     고객 화면 8개가 이미 쓰고 있던 13종을 그대로 옮긴 것이다(총 169회).
+     겉보기가 달라지지 않게 하는 것이 목적이라 임의로 통일하지 않았다.
+     다만 눈으로 구분되지 않는 셋(#e9f6ef · #e7f4ec · #eaf7ef, 최대 차이 rgb 3)만
+     `--success-container` 하나로 합쳤다.
+     **'항상 텍스트 병기'는 그대로다** — 색만으로 통과/실패를 말하지 않는다(색약 배려). */
+  --success:#2f9e6d;                /* 기본 */
+  --success-bright:#5fd6a0;         /* 밝은 강조 */
+  --success-dark:#1c7a4d;           /* 진한 글자·아이콘 */
+  --success-deep:#0f5132;           /* 가장 진한 글자 */
+  --success-muted:#3d7a5c;          /* 낮은 채도 */
+  --success-ink:#2c4c3c;            /* 어두운 배경 위 글자 */
+  --success-sage:#7aa891;           /* 낮은 채도 보조 */
+  --success-teal:#10a37f;           /* 랜딩 강조(청록 계열) */
+  --success-teal-bright:#6ee7d6;
+  --success-container:#e9f6ef;      /* 연한 배경 */
+  --success-container-line:#d4e9dd; /* 연한 배경의 경계 */
+  --on-success:#ffffff;
   --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
   --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
   --font-num:'JetBrains Mono','Inter',monospace;
@@ -14,4 +32,5 @@
   --sp-xs:4px; --sp-sm:8px; --sp-md:16px; --sp-lg:24px; --sp-xl:32px;
   --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
 }
-/* success(초록) 토큰은 여전히 미정(U-01). '통과'는 --primary, '위험'은 --error, 항상 텍스트 병기 */
+/* U-01 확정(2026-08-08): success 토큰을 둔다. 관리자 화면은 계속 '통과'=--primary 를 쓰고,
+   초록은 고객 화면의 기존 용법(검증 통과·안전)에 한정한다. 어느 쪽이든 **항상 텍스트 병기**. */

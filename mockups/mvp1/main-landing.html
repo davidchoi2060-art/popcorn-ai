@@ -16,6 +16,7 @@
   .intent-tag { background:rgba(101,161,212,.12); color:#2A5C86; border:1px solid rgba(101,161,212,.3); border-radius:8px; padding:5px 11px; font-size:12.5px; font-weight:700; font-family:'JetBrains Mono'; opacity:0; animation:tagIn .5s ease-out both; }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+<link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
 <script>
@@ -63,7 +64,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
       <h1 style="margin:0; font-family:'Hanken Grotesk'; font-weight:800; font-size:56px; line-height:1.14; letter-spacing:-0.03em; color:#fff;">모든 견적에는 <span style="color:#8FC0E8;">이유가 있습니다.</span></h1>
       <p style="margin:26px 0 0; font-size:19px; line-height:1.7; color:rgba(255,255,255,.78); max-width:640px;">말씀하신 그대로 이해하고, 엔진이 검증한 구성으로 답합니다. 조립 불가능한 조합은 후보에서 제외됩니다.</p>
       <div style="display:flex; gap:22px; margin:30px 0 34px; align-items:center;">
-        <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#10A37F; box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>실시간 재고 검증</div>
+        <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f); box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>실시간 재고 검증</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757; box-shadow:0 0 0 4px rgba(217,119,87,.2);"></span>호환성 <span data-bind="showcase_rules">—</span>종</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#4285F4; box-shadow:0 0 0 4px rgba(66,133,244,.2);"></span>근거 리포트</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#E8B563; box-shadow:0 0 0 4px rgba(232,181,99,.2);"></span>본체부터 모니터·주변기기까지</div>
@@ -112,12 +113,12 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">'조용한 화이트 4K편집' 같은 말을 3개 AI가 교차 해석해 의도를 정확히 잡습니다.</p>
           </div>
           <!-- 02 엔진 -->
-          <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid #10A37F; box-shadow:0 20px 40px -30px rgba(16,163,127,.5);">
+          <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid var(--success-teal, #10a37f); box-shadow:0 20px 40px -30px rgba(16,163,127,.5);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
               <span style="font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">02</span>
               <span style="font-family:'JetBrains Mono'; font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
             </div>
-            <div style="width:44px; height:44px; border-radius:13px; background:#10A37F; color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">inventory_2</span></div>
+            <div style="width:44px; height:44px; border-radius:13px; background:var(--success-teal, #10a37f); color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">inventory_2</span></div>
             <div style="font-family:'Hanken Grotesk'; font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">실시간 재고 검증</div>
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">지금 살 수 있는 부품만 후보로. 품절·단종은 즉시 제외합니다.</p>
           </div>
@@ -157,7 +158,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
           <div style="position:absolute; inset:0; background:linear-gradient(90deg, rgba(16,163,127,.14), rgba(217,119,87,.14), rgba(66,133,244,.14)); opacity:.6;"></div>
           <div style="position:relative; display:flex; align-items:center; gap:18px;">
             <div style="display:flex;">
-              <span style="width:38px; height:38px; border-radius:50%; background:#10A37F; border:2px solid #111827;"></span>
+              <span style="width:38px; height:38px; border-radius:50%; background:var(--success-teal, #10a37f); border:2px solid #111827;"></span>
               <span style="width:38px; height:38px; border-radius:50%; background:#D97757; border:2px solid #111827; margin-left:-12px;"></span>
               <span style="width:38px; height:38px; border-radius:50%; background:#4285F4; border:2px solid #111827; margin-left:-12px;"></span>
             </div>
@@ -186,7 +187,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
                 <div style="font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#64748B; margin-bottom:14px;">다중 AI 의도 해석</div>
                 <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
                   <div style="display:flex; gap:8px;">
-                    <span style="display:inline-flex; align-items:center; gap:6px; background:#F1F5F9; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:700; color:#334155;"><span style="width:7px; height:7px; border-radius:50%; background:#10A37F; animation:pulseDot 1.4s infinite;"></span>AI 1</span>
+                    <span style="display:inline-flex; align-items:center; gap:6px; background:#F1F5F9; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:700; color:#334155;"><span style="width:7px; height:7px; border-radius:50%; background:var(--success-teal, #10a37f); animation:pulseDot 1.4s infinite;"></span>AI 1</span>
                     <span style="display:inline-flex; align-items:center; gap:6px; background:#F1F5F9; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:700; color:#334155;"><span style="width:7px; height:7px; border-radius:50%; background:#D97757; animation:pulseDot 1.4s infinite .25s;"></span>AI 2</span>
                     <span style="display:inline-flex; align-items:center; gap:6px; background:#F1F5F9; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:700; color:#334155;"><span style="width:7px; height:7px; border-radius:50%; background:#4285F4; animation:pulseDot 1.4s infinite .5s;"></span>AI 3</span>
                   </div>
@@ -204,7 +205,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
               <div style="height:9px; background:#E2EAF2; border-radius:999px; overflow:hidden;"><div style="height:100%; width:98%; background:linear-gradient(90deg,#65A1D4,#4A90E2); border-radius:999px; transform-origin:left; animation:growX 1.6s cubic-bezier(.22,1,.36,1) both; box-shadow:0 0 14px rgba(101,161,212,.55);"></div></div>
             </div>
             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
-              <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:#10A37F;"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">재고 필터</span><span style="margin-left:auto; font-size:11px; font-weight:700; color:#10A37F; background:rgba(16,163,127,.1); padding:3px 8px; border-radius:6px;">완료</span></div>
+              <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f);"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">재고 필터</span><span style="margin-left:auto; font-size:11px; font-weight:700; color:var(--success-teal, #10a37f); background:rgba(16,163,127,.1); padding:3px 8px; border-radius:6px;">완료</span></div>
               <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757;"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">호환성</span><span style="margin-left:auto; font-size:11px; font-weight:700; color:#D97757; background:rgba(217,119,87,.1); padding:3px 8px; border-radius:6px;">완료</span></div>
               <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:#4285F4;"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">근거 스코어</span><span style="margin-left:auto; display:flex; gap:3px; align-items:flex-end;"><span style="width:3px; background:#4285F4; border-radius:2px; animation:eqbar .9s infinite;"></span><span style="width:3px; background:#4285F4; border-radius:2px; animation:eqbar .9s infinite .15s;"></span><span style="width:3px; background:#4285F4; border-radius:2px; animation:eqbar .9s infinite .3s;"></span></span></div>
             </div>
@@ -251,7 +252,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
       <div style="position:absolute; top:-40px; right:60px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(101,161,212,.5),transparent 70%);"></div>
       <div style="position:relative; padding:72px 64px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap;">
         <div>
-          <div style="display:flex; gap:10px; margin-bottom:22px;"><span style="width:11px; height:11px; border-radius:50%; background:#10A37F;"></span><span style="width:11px; height:11px; border-radius:50%; background:#D97757;"></span><span style="width:11px; height:11px; border-radius:50%; background:#4285F4;"></span></div>
+          <div style="display:flex; gap:10px; margin-bottom:22px;"><span style="width:11px; height:11px; border-radius:50%; background:var(--success-teal, #10a37f);"></span><span style="width:11px; height:11px; border-radius:50%; background:#D97757;"></span><span style="width:11px; height:11px; border-radius:50%; background:#4285F4;"></span></div>
           <h2 style="margin:0; font-family:'Hanken Grotesk'; font-weight:900; font-size:46px; line-height:1.1; letter-spacing:-0.03em; color:#fff;">이유 있는 견적,<br>지금 받아보세요.</h2>
           <p style="margin:20px 0 0; font-size:18px; color:rgba(255,255,255,.72); max-width:480px; line-height:1.6;">질문 하나면 됩니다. 지금 재고에서 조건을 통과한 구성으로 답합니다.</p>
         </div>

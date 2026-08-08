@@ -26,6 +26,7 @@ body{background:#f1eee8;font-family:'Pretendard','Pretendard Variable',-apple-sy
 @media(prefers-reduced-motion:reduce){.s0rev-track{animation:none}}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+<link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
 <script>
@@ -64,7 +65,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <section style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:stretch;margin-bottom:32px;">
 <div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;">
-<span style="display:flex;align-items:center;gap:5px;background:#e9f6ef;color:#1c7a4d;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
+<span style="display:flex;align-items:center;gap:5px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
 <span style="font-family:'Material Symbols Outlined';font-size:16px;">inventory_2</span>실시간 재고 검증</span>
 <span style="display:flex;align-items:center;gap:5px;background:#eaf1fd;color:#2149b0;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
 <span style="font-family:'Material Symbols Outlined';font-size:16px;">verified</span>호환성 5종 통과</span>
@@ -80,7 +81,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="font-size:12.5px;color:#8a8578;margin-bottom:14px;">방식만 고르시면, 용도는 다음 단계에서 여쭤봅니다.</div>
 <div style="display:flex;flex-direction:column;gap:10px;">
 <button data-lane="guided" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#fff;border:1.5px solid #e6e2da;border-radius:14px;padding:15px 16px;cursor:pointer;font-family:inherit;">
-<span style="flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#2f9e6d;">bolt</span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:var(--success-container, #e9f6ef);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:var(--success, #2f9e6d);">bolt</span>
 <span style="flex:1;">
 <span style="display:block;font-size:15px;font-weight:900;color:#17171b;">AI에게 맡길게요</span>
 <span style="display:block;font-size:12.5px;color:#6b6b73;margin-top:2px;">용도만 알려주세요. 최적 구성을 AI가 골라 드립니다.</span>
@@ -117,8 +118,8 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 </div>
 <!-- dark stock card -->
 <div style="background:#17171b;color:#fff;border-radius:22px;padding:34px 32px;display:flex;flex-direction:column;box-shadow:0 14px 40px -22px rgba(30,25,15,.4);">
-<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#5fd6a0;">
-<span style="width:8px;height:8px;border-radius:50%;background:#5fd6a0;">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--success-bright, #5fd6a0);">
+<span style="width:8px;height:8px;border-radius:50%;background:var(--success-bright, #5fd6a0);">
 </span>지금 검증 중인 실시간 재고</div>
 <div style="font-size:60px;font-weight:900;line-height:1.02;letter-spacing:-.02em;margin-top:6px;"><span data-bind="live_stock_count">—</span><span style="font-size:26px;color:#9a968d;"> 개</span>
 </div>
@@ -149,17 +150,17 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 </section>
 <!-- HOW IT WORKS -->
 <section id="how" style="margin-bottom:36px;">
-<h2 style="margin:0 0 6px;font-size:30px;font-weight:900;color:#17171b;letter-spacing:-.01em;">감이 아니라, <span style="color:#2f9e6d;">검증으로 고릅니다.</span>
+<h2 style="margin:0 0 6px;font-size:30px;font-weight:900;color:#17171b;letter-spacing:-.01em;">감이 아니라, <span style="color:var(--success, #2f9e6d);">검증으로 고릅니다.</span>
 </h2>
 <p style="margin:0 0 22px;font-size:15.5px;color:#6b6b73;max-width:720px;">결정론 엔진이 실시간 재고 위에서 같은 입력에 늘 같은 결과를 냅니다. 즉흥이 아니라 규칙입니다.</p>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
-<div style="background:#e9f6ef;border-radius:20px;padding:26px;">
+<div style="background:var(--success-container, #e9f6ef);border-radius:20px;padding:26px;">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-<span style="width:46px;height:46px;border-radius:13px;background:#2f9e6d;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">inventory_2</span>
-<span style="font-size:12px;font-weight:800;color:#3d7a5c;">STEP 1 · 실시간 재고 확인</span>
+<span style="width:46px;height:46px;border-radius:13px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">inventory_2</span>
+<span style="font-size:12px;font-weight:800;color:var(--success-muted, #3d7a5c);">STEP 1 · 실시간 재고 확인</span>
 </div>
-<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:#0f5132;">품절·단종은 후보에서 즉시 제외</h3>
-<p style="margin:0;font-size:14px;line-height:1.65;color:#3d7a5c;">지금 창고에 있는 부품만 후보로 둡니다. 못 사는 조합은 애초에 나오지 않습니다.</p>
+<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:var(--success-deep, #0f5132);">품절·단종은 후보에서 즉시 제외</h3>
+<p style="margin:0;font-size:14px;line-height:1.65;color:var(--success-muted, #3d7a5c);">지금 창고에 있는 부품만 후보로 둡니다. 못 사는 조합은 애초에 나오지 않습니다.</p>
 </div>
 <div style="background:#eaf1fd;border-radius:20px;padding:26px;">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -195,13 +196,13 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 </div>
 </div>
 <div style="border:1px solid #edeae4;border-radius:16px;padding:22px;">
-<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#2f9e6d;margin-bottom:10px;">
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--success, #2f9e6d);margin-bottom:10px;">
 <span style="font-family:'Material Symbols Outlined';font-size:16px;">bolt</span>PSU 안정성 근거</div>
 <h4 style="margin:0 0 8px;font-size:18px;font-weight:900;color:#17171b;">정격 650W 80PLUS</h4>
 <p style="margin:0 0 14px;font-size:13.5px;line-height:1.65;color:#55555c;">이 GPU·CPU 조합의 피크 전력 대비 정격 마진 30% 이상을 확보합니다. 장시간 부하에도 여유 있는 전력 공급입니다.</p>
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
-<span style="background:#e7f4ec;color:#1c7a4d;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#전력마진_30%</span>
-<span style="background:#e7f4ec;color:#1c7a4d;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#정격_검증</span>
+<span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#전력마진_30%</span>
+<span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">#정격_검증</span>
 </div>
 </div>
 <div style="border:1px solid #edeae4;border-radius:16px;padding:22px;">
@@ -280,16 +281,16 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="padding-top:16px;border-top:1px solid #2e2e29;">
 <div style="font-size:12px;font-weight:800;color:#c9c5bd;margin-bottom:14px;">① 부품별 금액 비율</div>
 <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
-<div style="width:126px;height:126px;flex:0 0 auto;border-radius:50%;background:conic-gradient(#7fa8ff 0 32%,#5fd6a0 32% 50%,#c9a0ff 50% 62%,#ffcb4a 62% 73%,#ff9d7a 73% 82%,#6ee7d6 82% 90%,#9aa0ad 90% 100%);display:flex;align-items:center;justify-content:center;">
+<div style="width:126px;height:126px;flex:0 0 auto;border-radius:50%;background:conic-gradient(#7fa8ff 0 32%,var(--success-bright, #5fd6a0) 32% 50%,#c9a0ff 50% 62%,#ffcb4a 62% 73%,#ff9d7a 73% 82%,var(--success-teal-bright, #6ee7d6) 82% 90%,#9aa0ad 90% 100%);display:flex;align-items:center;justify-content:center;">
 <div style="width:76px;height:76px;border-radius:50%;background:#17171b;display:flex;flex-direction:column;align-items:center;justify-content:center;"><div style="font-size:10.5px;color:#9a968d;font-weight:700;">총액</div><div style="font-size:15px;font-weight:900;color:#fff;">125만원</div></div>
 </div>
 <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:6px;">
 <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#7fa8ff;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">그래픽카드</span><b style="color:#fff;font-variant-numeric:tabular-nums;">32%</b><span style="color:#9a968d;width:38px;text-align:right;">40만</span></div>
-<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#5fd6a0;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">CPU</span><b style="color:#fff;font-variant-numeric:tabular-nums;">18%</b><span style="color:#9a968d;width:38px;text-align:right;">22만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--success-bright, #5fd6a0);flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">CPU</span><b style="color:#fff;font-variant-numeric:tabular-nums;">18%</b><span style="color:#9a968d;width:38px;text-align:right;">22만</span></div>
 <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#c9a0ff;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">메인보드</span><b style="color:#fff;font-variant-numeric:tabular-nums;">12%</b><span style="color:#9a968d;width:38px;text-align:right;">15만</span></div>
 <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#ffcb4a;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">메모리</span><b style="color:#fff;font-variant-numeric:tabular-nums;">11%</b><span style="color:#9a968d;width:38px;text-align:right;">14만</span></div>
 <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#ff9d7a;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">저장장치</span><b style="color:#fff;font-variant-numeric:tabular-nums;">9%</b><span style="color:#9a968d;width:38px;text-align:right;">11만</span></div>
-<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#6ee7d6;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">파워</span><b style="color:#fff;font-variant-numeric:tabular-nums;">8%</b><span style="color:#9a968d;width:38px;text-align:right;">10만</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--success-teal-bright, #6ee7d6);flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">파워</span><b style="color:#fff;font-variant-numeric:tabular-nums;">8%</b><span style="color:#9a968d;width:38px;text-align:right;">10만</span></div>
 <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:9px;height:9px;border-radius:2px;background:#9aa0ad;flex:0 0 auto;"></span><span style="flex:1;color:#e6e2da;font-weight:600;">케이스·기타</span><b style="color:#fff;font-variant-numeric:tabular-nums;">10%</b><span style="color:#9a968d;width:38px;text-align:right;">13만</span></div>
 </div>
 </div>
@@ -301,7 +302,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="display:flex;gap:10px;flex-wrap:wrap;">
 <span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:#5a5f68;"></span>보급형</span>
 <span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:#7fa8ff;"></span>일반형</span>
-<span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:#5fd6a0;"></span>고급형</span>
+<span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#9a968d;font-weight:700;"><span style="width:8px;height:8px;border-radius:2px;background:var(--success-bright, #5fd6a0);"></span>고급형</span>
 <span style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:#ffcb4a;font-weight:700;"><span style="width:9px;height:9px;border-radius:2px;border:2px solid #ffcb4a;"></span>내 구성</span>
 </div>
 </div>
@@ -310,7 +311,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="display:flex;gap:6px;align-items:flex-end;justify-content:center;height:82px;">
 <div style="width:17px;height:25%;background:#5a5f68;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#9a968d;white-space:nowrap;">500G</span></div>
 <div style="width:17px;height:50%;background:#7fa8ff;border-radius:3px 3px 0 0;box-shadow:0 0 0 2px #ffcb4a;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#ffcb4a;font-weight:800;white-space:nowrap;">1TB</span></div>
-<div style="width:17px;height:100%;background:#5fd6a0;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">2TB</span></div>
+<div style="width:17px;height:100%;background:var(--success-bright, #5fd6a0);border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">2TB</span></div>
 </div>
 <div style="font-size:11.5px;color:#c9c5bd;font-weight:700;margin-top:9px;">저장장치(HDD)</div>
 <div style="font-size:10px;color:#ffcb4a;font-weight:800;margin-top:2px;">✓ 선택 1TB</div>
@@ -319,7 +320,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="display:flex;gap:6px;align-items:flex-end;justify-content:center;height:82px;">
 <div style="width:17px;height:25%;background:#5a5f68;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#9a968d;white-space:nowrap;">16G</span></div>
 <div style="width:17px;height:50%;background:#7fa8ff;border-radius:3px 3px 0 0;box-shadow:0 0 0 2px #ffcb4a;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#ffcb4a;font-weight:800;white-space:nowrap;">32G</span></div>
-<div style="width:17px;height:100%;background:#5fd6a0;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">64G</span></div>
+<div style="width:17px;height:100%;background:var(--success-bright, #5fd6a0);border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">64G</span></div>
 </div>
 <div style="font-size:11.5px;color:#c9c5bd;font-weight:700;margin-top:9px;">메모리(RAM)</div>
 <div style="font-size:10px;color:#ffcb4a;font-weight:800;margin-top:2px;">✓ 선택 32G</div>
@@ -328,7 +329,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="display:flex;gap:6px;align-items:flex-end;justify-content:center;height:82px;">
 <div style="width:17px;height:50%;background:#5a5f68;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#9a968d;white-space:nowrap;">6G</span></div>
 <div style="width:17px;height:67%;background:#7fa8ff;border-radius:3px 3px 0 0;box-shadow:0 0 0 2px #ffcb4a;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#ffcb4a;font-weight:800;white-space:nowrap;">8G</span></div>
-<div style="width:17px;height:100%;background:#5fd6a0;border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">12G</span></div>
+<div style="width:17px;height:100%;background:var(--success-bright, #5fd6a0);border-radius:3px 3px 0 0;position:relative;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;">12G</span></div>
 </div>
 <div style="font-size:11.5px;color:#c9c5bd;font-weight:700;margin-top:9px;">그래픽 카드(GPU VRAM)</div>
 <div style="font-size:10px;color:#ffcb4a;font-weight:800;margin-top:2px;">✓ 선택 8G</div>
@@ -341,7 +342,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="font-size:10.5px;color:#807b72;margin-bottom:12px;">세로축 = FPS · 60↑ 원활 · 120↑ 쾌적 · 240 고주사율급</div>
 <svg viewBox="0 0 480 152" style="width:100%;height:auto;overflow:visible;" font-family="Pretendard, sans-serif">
 <defs><linearGradient id="s0fpsg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fa8ff" stop-opacity=".38"/><stop offset="1" stop-color="#7fa8ff" stop-opacity="0"/></linearGradient></defs>
-<rect x="46" y="18" width="424" height="47" fill="#5fd6a0" opacity="0.06"/>
+<rect x="46" y="18" width="424" height="47" fill="var(--success-bright, #5fd6a0)" opacity="0.06"/>
 <rect x="46" y="65" width="424" height="23.5" fill="#7fa8ff" opacity="0.05"/>
 <g stroke="#2e2e29" stroke-width="1" stroke-dasharray="3 3">
 <line x1="46" y1="18" x2="470" y2="18"/><line x1="46" y1="41.5" x2="470" y2="41.5"/><line x1="46" y1="65" x2="470" y2="65"/><line x1="46" y1="88.5" x2="470" y2="88.5"/>
@@ -367,9 +368,9 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 </section>
 <!-- BUILD PHOTOS -->
 <section id="buildphotos" style="background:#fff;border:1px solid #ece9e3;border-radius:22px;padding:32px 34px;margin-bottom:32px;">
-<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#3d7a5c;margin-bottom:10px;">
+<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--success-muted, #3d7a5c);margin-bottom:10px;">
 <span style="font-family:'Material Symbols Outlined';font-size:17px;">photo_library</span>제작 과정 투명 공개</div>
-<h2 style="margin:0 0 6px;font-size:24px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">구매하신 PC의 제작 사진을 첨부해 드립니다. <span style="display:inline-flex;align-items:center;gap:5px;background:#e9f6ef;color:#1c7a4d;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.01em;"><span style="font-family:'Material Symbols Outlined';font-size:15px;">photo_camera</span>예시 사진</span></h2>
+<h2 style="margin:0 0 6px;font-size:24px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">구매하신 PC의 제작 사진을 첨부해 드립니다. <span style="display:inline-flex;align-items:center;gap:5px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.01em;"><span style="font-family:'Material Symbols Outlined';font-size:15px;">photo_camera</span>예시 사진</span></h2>
 <p style="margin:0 0 22px;font-size:14.5px;color:#6b6b73;">실제 조립·검수 과정을 사진으로 남겨 주문 상세에 함께 전달합니다.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;">
 <figure style="margin:0;">
@@ -423,7 +424,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
 <p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">어려운 용어 없이 왜 이 부품인지 다 설명해주니까 컴맹인 저도 안심하고 샀어요.</p>
 <div style="display:flex;align-items:center;gap:10px;">
-<span style="width:34px;height:34px;border-radius:50%;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">person</span>
+<span style="width:34px;height:34px;border-radius:50%;background:var(--success-container, #e9f6ef);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">person</span>
 <span style="font-size:13.5px;font-weight:800;color:#55555c;">컴초보101 님</span>
 </div>
 </div>
@@ -455,7 +456,7 @@ if(document.body)go();else document.addEventListener("DOMContentLoaded",go);})()
 <div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
 <p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">호환성이 늘 걱정이라 커뮤니티에 물어봤는데, 여기선 5종 검증 통과가 딱 떠서 마음이 편했어요.</p>
 <div style="display:flex;align-items:center;gap:10px;">
-<span style="width:34px;height:34px;border-radius:50%;background:#e9f6ef;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:#2f9e6d;">person</span>
+<span style="width:34px;height:34px;border-radius:50%;background:var(--success-container, #e9f6ef);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">person</span>
 <span style="font-size:13.5px;font-weight:800;color:#55555c;">스팀덕후 님</span>
 </div>
 </div>

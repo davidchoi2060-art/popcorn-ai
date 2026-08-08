@@ -2421,9 +2421,14 @@ def test_screen_assets():
 
     _raw_lig = []
     for _p2, _s2 in _all_screens:
-        for _m2 in _re7.finditer(r'class="msym"[^>]*>([a-z0-9_]+)<', _s2):
-            if _m2.group(1) not in _ms_keys:
-                _raw_lig.append(os.path.basename(_p2) + ":" + _m2.group(1))
+        # **스와퍼와 같은 조건으로 찾는다.** 예전엔 `class="msym"` 만 봤는데,
+        # 인라인 style 로 Material Symbols 를 지정한 span 이 6종 더 있었고 그것들이
+        # 화면에 글자로 떠 있었다(s0 의 'devices' 등). 검사가 좁으면 결함을 가린다.
+        for _m2 in _re7.finditer(
+                r'<(?:span|i)([^>]*(?:msym|material-symbols|Material Symbols)[^>]*)>'
+                r'([a-z0-9_]+)</(?:span|i)>', _s2):
+            if _m2.group(2) not in _ms_keys:
+                _raw_lig.append(os.path.basename(_p2) + ":" + _m2.group(2))
     check("아이콘 이름이 글자로 남지 않는다(msym 매핑)",
           _raw_lig == [], [], sorted(set(_raw_lig))[:6])
 
