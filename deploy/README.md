@@ -144,25 +144,34 @@ Basic Auth 복구 대신 경로별로 나누는 쪽을 택했다.
 | 대상 | 정책 | 무엇이 막는가 |
 |---|---|---|
 | 관리자 | **열어 둔다** | 비밀번호 인증(슬라이스 70) + `/api/admin/*` 미들웨어 게이트 |
-| 고객 | **404로 막는다** | nginx `location ^~` 차단 |
+| 고객 | **열어 둔다 (2026-08-09 개정)** | — 막는 것이 없다 |
 
-차단 경로: `/mvp1/` · `/api/auth/` · `/api/my/` · `/api/candidates` · `/api/recommend` ·
+**2026-08-09 이전에는** 아래 10경로를 nginx가 404로 막았다. 사용자 결정으로 전부 걷었다 —
+베타 테스터가 실제로 AI 상담 → 견적 → 구매까지 해보게 하는 것이 지금 단계의 목적이다.
+
+`/mvp1/` · `/api/auth/` · `/api/my/` · `/api/candidates` · `/api/recommend` ·
 `/api/swap/` · `/api/orders` · `/api/ops` · `/api/showcase` · `/api/promo-click`
+
+되돌리는 블록은 `nginx-popcorn.conf`에 **주석으로 보존**돼 있다(그대로 주석만 풀면 된다).
+
+> ### ⚠️ 열면서 감수한 구멍 — 반드시 알고 있어야 한다
+> 고객 인증은 **아직 dev 어댑터**다. `api/customer_auth.py`의 검증은
+> `if "@" not in email` 한 줄이 전부이고 비밀번호도 OAuth도 인증 메일도 없다.
+> **아무나 남의 이메일을 입력해 그 사람 세션을 받고, `/api/my/`로 그 사람의
+> 주문·결제·환불·후기를 볼 수 있다.** 개방 시점 실회원은 6명(전부 테스트 계정).
+>
+> **테스터에게 실제 개인정보를 넣지 말라고 공지해야 한다.**
+> 실 OAuth(카카오·네이버·구글)가 유일한 해소다 — 붙일 자리는
+> `api/admin_profile.PROVIDER_KO` + `_verify_google()`.
 
 > ### ⚠️ `/api/auth/` 와 `/api/admin/auth/` 는 다른 경로다
 > nginx 접두어 매칭은 URI 시작부터 본다. `/api/admin/auth/login`은 고객 차단에 걸리지 않는다.
-> **잘못 막으면 아무도 관리자로 들어올 수 없다.**
+> 나중에 **다시 막을 때** 이 구분을 어기면 아무도 관리자로 들어올 수 없다.
 
-**404를 쓴다(403이 아니라)** — 아직 열지 않은 것의 존재를 알리지 않는다.
+다시 막을 때 **404를 쓴다(403이 아니라)** — 아직 열지 않은 것의 존재를 알리지 않는다.
 
-### 고객 경로를 다시 열려면
-
-**실 OAuth가 먼저다.** 지금 고객 인증은 dev 어댑터라 검증이 `"@" in email` 하나뿐이고,
-누구나 남의 이메일로 로그인해 그 사람 주문·결제를 볼 수 있다. 실회원이 0명이라
-훔칠 것이 없을 뿐, 한 명이라도 가입하면 그 순간부터 노출이다.
-
-열 때는 `nginx-popcorn.conf`의 차단 블록을 걷고, 로컬에서 고쳐 push → 서버 pull →
-아래 절차로 적용한다. **서버에서 직접 고치지 않는다**(P-06).
+설정 변경은 로컬에서 고쳐 push → 서버 pull → 아래 절차로 적용한다.
+**서버에서 직접 고치지 않는다**(P-06).
 
 ### 설정을 바꾸는 절차
 
@@ -182,8 +191,8 @@ sudo nginx -t && sudo systemctl reload nginx
 B=https://admin.popcornai.co.kr
 curl -sI $B/admin/login.html     | head -1    # 200  관리자 화면은 열려 있다
 curl -sI $B/api/admin/products   | head -1    # 401  미들웨어 게이트
-curl -sI $B/api/auth/login       | head -1    # 404  고객 인증 차단
-curl -sI $B/mvp1/s1-session.html | head -1    # 404  고객 화면 차단
+curl -sI $B/mvp1/s1-session.html | head -1    # 200  고객 화면 (2026-08-09 개방)
+curl -sI $B/api/showcase         | head -1    # 200  고객 API  (2026-08-09 개방)
 curl -sI $B/api/health           | head -1    # 200  감시용
 sudo certbot renew --dry-run                  # 90일 뒤 조용한 만료를 막는 유일한 검사
 ```

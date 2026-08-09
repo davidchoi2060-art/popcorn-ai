@@ -27,11 +27,11 @@
 - 정본 도메인 `popcornai.co.kr`은 **운영 몫**이다. 개발엔 서브도메인(`dev.`)을 붙인다 — 나중에 옮기면 인증서·OAuth 리다이렉트·쿠키를 전부 다시 손봐야 한다.
 - 접속 `http://34.47.124.184/admin/login.html` · GCP `popcorn-app`(asia-northeast3-b) · Cloud SQL `popcorn-db`. **이름은 그대로 둔다**(역할은 문서가 정한다 — 리소스명 변경은 재생성을 요구한다).
 - **접속 = `https://admin.popcornai.co.kr`** (2026-07-28 HTTPS 전환 · Let's Encrypt). 정본 `popcornai.co.kr`은 여전히 운영 몫이다.
-- **접근 정책: 관리자는 열고 고객은 막는다**(2026-07-30 사용자 결정 · 절차 `deploy/README.md §7`). Basic Auth는 폐기했다 — certbot이 설정을 고치며 `auth_basic`이 사라진 것을 발견하고, 복구 대신 경로별 분리를 택했다.
+- **접근 정책: 관리자·고객 모두 열려 있다**(2026-08-09 사용자 결정으로 개정 · 절차 `deploy/README.md §7`). Basic Auth는 폐기했다 — certbot이 설정을 고치며 `auth_basic`이 사라진 것을 발견하고, 복구 대신 경로별 분리를 택했다(2026-07-30).
   - 관리자: 열림. **비밀번호 인증(슬라이스 70) + `/api/admin/*` 미들웨어**가 막는다.
-  - 고객: nginx가 **404**로 막는다 — `/mvp1/` `/api/auth/` `/api/my/` `/api/candidates` `/api/recommend` `/api/swap/` `/api/orders` `/api/ops` `/api/showcase` `/api/promo-click`.
-- **고객 경로를 열려면 실 OAuth가 먼저다.** 고객 인증은 아직 dev 어댑터로 검증이 `"@" in email` 하나뿐이라, 누구나 남의 이메일로 로그인해 그 사람 주문·결제를 볼 수 있다. 실회원이 0명이라 훔칠 것이 없을 뿐 한 명이라도 가입하면 그 순간부터 노출이다. **차단 블록을 걷는 것이 곧 그 구멍을 여는 것이다.**
-- **`/api/auth/`와 `/api/admin/auth/`는 다른 경로다.** nginx 접두어 매칭은 URI 시작부터 보므로 관리자 로그인은 고객 차단에 걸리지 않는다 — 잘못 막으면 아무도 못 들어온다.
+  - 고객: **2026-08-09에 열었다.** 2026-07-30~08-09 사이에는 nginx가 10경로를 404로 막고 있었다(`/mvp1/` `/api/auth/` `/api/my/` `/api/candidates` `/api/recommend` `/api/swap/` `/api/orders` `/api/ops` `/api/showcase` `/api/promo-click`). 되돌리는 방법은 `deploy/nginx-popcorn.conf`에 주석으로 보존돼 있다.
+- **⚠ 고객 인증은 여전히 dev 어댑터다 — 열면서 감수한 구멍이다.** `api/customer_auth.py`의 검증은 `if "@" not in email` 한 줄이 전부다(비밀번호·OAuth·인증메일 없음). **아무나 남의 이메일을 입력해 그 사람 세션을 받고 `/api/my/`로 주문·결제·환불·후기를 볼 수 있다.** 개방 시점 실회원은 6명(전부 테스트 계정)이었다. **테스터에게 실제 개인정보를 넣지 말라고 공지해야 하고, 실 OAuth(카카오·네이버·구글)가 유일한 해소다** — 붙일 자리는 `api/admin_profile.PROVIDER_KO` + `_verify_google()`.
+- **`/api/auth/`와 `/api/admin/auth/`는 다른 경로다.** nginx 접두어 매칭은 URI 시작부터 본다 — 나중에 고객 경로를 **다시 막을 때** 이 구분을 어기면 관리자 로그인까지 죽어 아무도 못 들어온다.
 - **nginx 설정 정본 = `deploy/nginx-popcorn.conf`이고 서버 실제와 일치해야 한다.** 2026-07-30까지 리포는 `server_name _;` HTTP 설정을 들고 있었고 서버는 certbot이 고친 HTTPS로 돌았다 — 리포를 복사하면 돌아가는 설정을 덮어썼다. 고칠 때는 **백업 → 로컬 수정·push → 서버 pull → `nginx -t` → reload**(P-06: 서버에서 직접 고치지 않는다).
 - 앱은 `127.0.0.1:8000`에만 바인드(외부 직접 접근 불가) · 방화벽 80·22만.
 - 배포 갱신: 로컬 커밋·푸시 → 서버에서 `git pull` + `systemctl restart popcorn-api`(절차 `deploy/README.md`).
