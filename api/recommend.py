@@ -15,9 +15,11 @@ NULL 스펙 필드는 해당 호환 검사 불통과로 간주(검증 불가 부
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
+
+from . import visitor
 
 from . import usage_floors as UF
 from .timeutil import iso, now_iso
@@ -541,7 +543,9 @@ def _companion(conn):
 
 
 @router.post("/recommend")
-def recommend(body: RecommendBody):
+def recommend(body: RecommendBody, request: Request, response: Response):
+    # 방문자 키 — 이 상담을 나중에 클릭·교체·주문과 잇는 실이다(슬라이스 2026-08-09).
+    # 발급이 실패하면 None 이고 상담은 그대로 진행된다.
     if body.mode not in ("guided", "chat", "expert", "talk"):
         raise HTTPException(400, f"알 수 없는 모드: {body.mode}")
     labels = {c.l for c in body.constraints}
@@ -633,10 +637,11 @@ def recommend(body: RecommendBody):
                 sets["highend"] = _build_set("highend", common, cap, rules, floor_note,
                                              hi_note or relaxed, hi_limit)
 
+        uid = visitor.resolve(conn, request, response)
         session_id = conn.execute(text(
-            "INSERT INTO consult_sessions (member_id, mode, constraints) VALUES"
-            " (NULL, :m, CAST(:c AS JSONB)) RETURNING session_id"),
-            {"m": body.mode,
+            "INSERT INTO consult_sessions (member_id, mode, constraints, user_id) VALUES"
+            " (NULL, :m, CAST(:c AS JSONB), :u) RETURNING session_id"),
+            {"m": body.mode, "u": uid,
              "c": json.dumps([{"l": c.l, "v": c.v} for c in body.constraints])}).scalar()
         comp = _companion(conn)
         for qt, s in sets.items():

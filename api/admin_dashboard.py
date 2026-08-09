@@ -151,6 +151,63 @@ def quote_quality():
     }
 
 
+@router.get("/funnel")
+def funnel():
+    """고객 깔때기 — 접속 → 문의 → 성공 → S2 도달 → 장바구니 → 구매.
+
+    ■ **방문자 키가 붙은 것만 센다** — 이게 이 집계의 전제다
+      2026-08-09 이전 상담 3,885건에는 방문자 키가 없다. 소급해서 키를 만들면
+      **없던 관계를 발명하는 것**이라(재고를 기초 재고로 기록한 것과 같은 규칙)
+      NULL 로 두었다. 그래서 이 깔때기는 **키가 생긴 뒤 발생분**만 센다.
+      화면이 그 사실을 먼저 말해야 한다 — 안 그러면 "상담이 3건뿐"으로 읽힌다.
+
+    ■ 각 단계가 **앞 단계의 부분집합**이어야 깔때기다
+      그래서 전부 `user_id` 로 센다. 모집단이 다른 수를 나란히 놓고 깔때기라 부르면
+      **화면이 있지도 않은 관계를 주장**하게 된다.
+
+    ■ ④ "끝까지 확인" = **S2 도달**(사용자 결정 2026-08-09)
+      S2 는 견적 제안서다. 견적 스냅샷이 생기면 S2 가 그릴 것이 있다는 뜻이므로
+      **스냅샷 존재로 판정**한다. 별도 페이지뷰 기록이 없기 때문이고,
+      그래서 이건 **근사**다 — 화면이 그렇게 밝힌다.
+
+    ■ ⑤ 장바구니는 **원천이 없다**
+      `carts` 테이블 자체가 없다. 0 을 주지 않고 `null` 을 준다 —
+      **0 은 "담은 사람이 없다"는 사실 주장이고, 우리는 그걸 모른다.**
+    """
+    with engine.connect() as conn:
+        one = lambda sql: conn.execute(text(sql)).scalar_one()
+        visitors = one("SELECT COUNT(*) FROM users WHERE anon_key NOT LIKE 'seed-%'")
+        consulted = one("SELECT COUNT(DISTINCT user_id) FROM consult_sessions"
+                        " WHERE user_id IS NOT NULL")
+        quoted = one("SELECT COUNT(DISTINCT s.user_id) FROM consult_sessions s"
+                     " WHERE s.user_id IS NOT NULL AND EXISTS"
+                     " (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)")
+        # ④ S2 도달 = 견적 스냅샷이 생긴 상담을 가진 방문자 (=③과 같은 집합).
+        #    지금은 ③과 구분되지 않는다 — S2 페이지뷰 기록이 없기 때문이다.
+        #    구분하려면 화면 도달 이벤트가 필요하고, 그건 별도 배관이다.
+        reached_s2 = quoted
+        ordered = one("SELECT COUNT(DISTINCT user_id) FROM orders WHERE user_id IS NOT NULL")
+        members_linked = one("SELECT COUNT(*) FROM members WHERE user_id IS NOT NULL")
+
+    def step(key, label, value, note=None):
+        return {"key": key, "label": label, "value": value, "note": note}
+
+    return {
+        "steps": [
+            step("visit", "접속(방문자)", visitors),
+            step("consult", "AI 부품 문의", consulted),
+            step("quote", "견적 성공", quoted),
+            step("s2", "제안서(S2) 도달", reached_s2,
+                 "지금은 「견적 성공」과 같은 집합입니다 — S2 화면 도달 기록이 따로 없습니다"),
+            step("cart", "장바구니", None, "장바구니 테이블이 없습니다 — 원천 부재"),
+            step("order", "구매 완료", ordered),
+        ],
+        "members_linked": members_linked,
+        "since_note": ("방문자 키는 2026-08-09 에 붙였습니다. **그 이전 상담·주문은 키가 없어"
+                       " 이 깔때기에 잡히지 않습니다** — 소급해서 키를 만들지 않았습니다."),
+    }
+
+
 @router.get("/worklist")
 def worklist():
     """작업 패널 — 어느 화면에서든 '지금 할 일'과 그 화면으로 가는 길(슬라이스 61).

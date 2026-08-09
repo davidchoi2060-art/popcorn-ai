@@ -147,6 +147,11 @@ def login(body: LoginBody, request: Request, response: Response):
                 " WHERE member_id=:i"), {"i": member_id}).mappings().first()
         elif m["status"] != "active":
             raise HTTPException(403, "이용할 수 없는 계정입니다 — 고객센터에 문의해 주세요")
+        # 방문자 키를 이 회원에 붙인다 — **익명으로 상담하다 가입해도 앞의 행동이 이어진다.**
+        # 지연 import: visitor 가 이 모듈의 cookie_secure 를 쓰므로 최상단에 두면 순환이 된다.
+        from . import visitor
+        visitor.promote(conn, visitor.resolve(conn, request, response), m["member_id"])
+
         sid = _new_session(conn, m["member_id"], request.headers.get("user-agent"))
         response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/",
                             max_age=ABSOLUTE_DAYS * 24 * 3600, secure=cookie_secure())

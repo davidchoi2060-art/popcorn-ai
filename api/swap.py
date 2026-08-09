@@ -19,7 +19,9 @@ user_id를 채우지 않고 session_id·slot·price_delta로 맥락을 남기는
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
+
+from . import visitor
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -189,7 +191,7 @@ def candidates(body: SwapQuery):
 
 
 @router.post("/apply")
-def apply(body: ApplyBody):
+def apply(body: ApplyBody, request: Request, response: Response):
     if not body.changes:
         raise HTTPException(400, "변경할 부품이 없습니다")
     ch_by_slot = {}
@@ -198,6 +200,7 @@ def apply(body: ApplyBody):
             raise HTTPException(400, f"잘못된 변경 슬롯: {c.slot}")
         ch_by_slot[c.slot] = c.product_code
     with engine.begin() as conn:
+        uid = visitor.resolve(conn, request, response)   # 교체 이벤트를 사람에 잇는다
         snap = _load_snapshot(conn, body.session_id, body.tier)
         parts = snap["items"]["parts"]
         specs = _specs_by_code(conn, [it["product_code"] for it in parts])
@@ -245,9 +248,9 @@ def apply(body: ApplyBody):
                 delta = chosen[slot]["sale_price"] - was["price"]
             conn.execute(text(
                 "INSERT INTO swap_event_logs (from_product, to_product, session_id, slot,"
-                " price_delta) VALUES (:fp, :tp, :s, :sl, :pd)"),
+                " price_delta, user_id) VALUES (:fp, :tp, :s, :sl, :pd, :uid)"),
                 {"fp": was.get("product_code"), "tp": code, "s": body.session_id,
-                 "sl": slot, "pd": delta})
+                 "sl": slot, "pd": delta, "uid": uid})
         reasons = (snap["items"].get("reasons") or []) + ["고객 부품 변경 반영 (S3)"]
         sid = conn.execute(text(
             "INSERT INTO quote_snapshots (session_id, quote_type, items, companion, total_amount)"

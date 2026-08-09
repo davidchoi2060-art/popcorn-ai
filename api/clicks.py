@@ -10,7 +10,9 @@
 기록하는 것은 `product_code`와 (로그인했다면) `member_id`뿐이다 — 스키마 무개정.
 게스트도 기록한다: 로그인은 견적을 보는 조건이 아니고, 로그인 전 행동이 오히려 많다.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
+
+from . import visitor
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -25,7 +27,7 @@ class ClickBody(BaseModel):
 
 
 @router.post("/promo-click")
-def promo_click(body: ClickBody):
+def promo_click(body: ClickBody, request: Request, response: Response):
     """근거를 확인하려고 부품을 누른 사실 1건. 실패해도 화면을 막지 않는다(집계용).
 
     `user_id`는 **회원 ID가 아니다.** FK가 `users`(익명 방문자 테이블)를 가리키고
@@ -38,10 +40,14 @@ def promo_click(body: ClickBody):
         if conn.execute(text("SELECT 1 FROM products WHERE product_code=:p"),
                         {"p": body.product_code}).first() is None:
             raise HTTPException(404, "없는 상품입니다")
+        # 회원이면 그 회원에 붙은 방문자 키를, 아니면 쿠키의 방문자 키를 쓴다.
+        # 예전에는 회원이 아니면 무조건 NULL 이라 235행 전부 식별이 없었다.
         uid = None
         if m.get("member_id"):
             uid = conn.execute(text("SELECT user_id FROM members WHERE member_id=:m"),
                                {"m": m["member_id"]}).scalar()
+        if uid is None:
+            uid = visitor.resolve(conn, request, response)
         log_id = conn.execute(text(
             "INSERT INTO promo_click_logs (product_code, user_id) VALUES (:p, :u)"
             " RETURNING log_id"), {"p": body.product_code, "u": uid}).scalar_one()

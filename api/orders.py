@@ -13,7 +13,9 @@ mall 주문 생성은 v1 제외(쇼핑몰 연동 없는 가짜 원장 — 인계
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
+
+from . import visitor
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -61,7 +63,7 @@ def get_ops():
 
 
 @router.post("/orders")
-def create_order(body: OrderBody):
+def create_order(body: OrderBody, request: Request, response: Response):
     if body.tier not in ("value", "recommend", "highend"):
         raise HTTPException(400, f"알 수 없는 티어: {body.tier}")
     with engine.begin() as conn:
@@ -129,12 +131,15 @@ def create_order(body: OrderBody):
         order_no = f"ORD-{seq}"
 
         total = snap["total_amount"] + ASSEMBLY_FEE + sum(c["price"] * q for c, q in periph_lines)
+        # 방문자 키 — 이 주문을 앞선 상담·클릭과 잇는 실. 없으면 NULL 로 남고 주문은 진행된다.
+        uid = visitor.resolve(conn, request, response)
+        visitor.promote(conn, uid, member_id)      # 익명으로 상담하다 가입해도 앞 행동이 이어진다
         order_id = conn.execute(text(
             "INSERT INTO orders (order_no, member_id, channel, status, total_amount,"
-            " ops_snapshot, shipping_snap, session_id)"
-            " VALUES (:no, :m, 'own', '접수', :t, CAST(:ops AS JSONB), CAST(:ship AS JSONB), :sid)"
+            " ops_snapshot, shipping_snap, session_id, user_id)"
+            " VALUES (:no, :m, 'own', '접수', :t, CAST(:ops AS JSONB), CAST(:ship AS JSONB), :sid, :uid)"
             " RETURNING order_id"),
-            {"no": order_no, "m": member_id, "t": total,
+            {"no": order_no, "m": member_id, "t": total, "uid": uid,
              "ops": json.dumps(ops),
              "ship": json.dumps({"name": body.shipping.name, "phone": body.shipping.phone,
                                  "addr": body.shipping.addr}),
