@@ -173,7 +173,11 @@ Basic Auth 복구 대신 경로별로 나누는 쪽을 택했다.
 설정 변경은 로컬에서 고쳐 push → 서버 pull → 아래 절차로 적용한다.
 **서버에서 직접 고치지 않는다**(P-06).
 
-### 설정을 바꾸는 절차
+### 설정을 바꾸는 절차 — **nginx 설정만** 바꿀 때
+
+> ⚠️ **이 절차를 코드 배포에 쓰지 마라.** 여기엔 `pip install` 도 `alembic` 도 없다.
+> 코드가 함께 바뀌었으면 「운영 명령 → 배포 갱신」의 한 줄을 쓴다.
+> 2026-08-09 에 이 절차를 코드 배포에 오용해 사이트를 내렸다.
 
 ```bash
 # 로컬에서 deploy/nginx-popcorn.conf 를 고치고 커밋·푸시한 뒤, 서버에서:
@@ -226,13 +230,32 @@ sudo journalctl -u popcorn-api -f           # 로그 실시간
 sudo journalctl -u popcorn-api --since '10 min ago' -p err   # 에러만
 ```
 
-배포 갱신:
+### 배포 갱신 — 이 한 줄을 쓴다
 
 ```bash
-cd /srv/popcorn-ai && sudo -u popcorn git pull
-sudo -u popcorn .venv/bin/pip install -r requirements.txt
-sudo -u popcorn bash -c 'set -a; . /etc/popcorn-ai.env; set +a; cd /srv/popcorn-ai/db && ../.venv/bin/python -m alembic upgrade head'
-sudo systemctl restart popcorn-api
+sudo -u popcorn bash -c 'cd /srv/popcorn-ai && git pull --ff-only && .venv/bin/pip install -q -r requirements.txt && set -a && . /etc/popcorn-ai.env && set +a && cd db && ../.venv/bin/python -m alembic upgrade head' && sudo systemctl restart popcorn-api && sleep 3 && systemctl is-active popcorn-api
+```
+
+**한 줄로 묶은 이유(2026-08-09 실사고):** 예전에는 네 줄짜리 순서였는데, `git pull` 과
+`systemctl restart` 만 쓰고 **`pip install` 을 건너뛴 채 배포해 사이트를 내렸다.**
+`requirements.txt` 에 `Jinja2` 를 새로 넣은 배포였고, 앱이 import 단계에서 죽어
+systemd 가 재시작을 무한 반복했다:
+
+```
+ImportError: jinja2 must be installed to use Jinja2Templates
+```
+
+`&&` 로 묶으면 **건너뛸 수 없고**, 앞 단계가 실패하면 뒤가 아예 안 돈다.
+`requirements.txt` 가 안 바뀌었으면 pip 은 몇 초에 끝나므로 **항상 넣어도 손해가 없다.**
+
+> **§7의 nginx 명령을 코드 배포에 쓰지 마라.** 그것은 설정 파일만 갈아끼우는
+> 절차라 `pip install` 도 `alembic` 도 없다. 오늘의 사고가 정확히 그 오용이었다.
+
+**배포 후 확인** — `is-active` 가 `active` 여야 한다. `activating` 이 계속 뜨면
+크래시 루프다. 원인은 로그에 있다:
+
+```bash
+sudo journalctl -u popcorn-api -n 30 --no-pager
 ```
 
 ## 남아 있는 위험 (베타에서 감수하는 것 · 정직 기록)
