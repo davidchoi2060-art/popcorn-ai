@@ -37,11 +37,68 @@
 <div class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="status">
   <span data-feather="alert-triangle" class="flex-shrink-0 mt-1" style="width:18px;height:18px;"></span>
   <div>
-    <b>레이아웃 견본입니다.</b>
-    아래 수치·그래프·표는 전부 <b>Phoenix 템플릿의 예시값</b>이고 팝콘PC 데이터가 아닙니다.
-    제목만 우리 것으로 바꿔 <b>배치를 확인하기 위한 화면</b>입니다 — 실데이터 연결은 다음 단계입니다.
+    <b>아래 「고객 깔때기」 한 장만 실데이터입니다.</b>
+    그 밖의 수치·그래프·표는 전부 <b>Phoenix 템플릿의 예시값</b>이고 팝콘PC 데이터가 아닙니다 —
+    제목만 우리 것으로 바꿔 배치를 확인하는 중입니다.
   </div>
 </div>
+
+{# ── 고객 깔때기 — 이 화면에서 **유일한 실데이터** ──────────────────
+   Phoenix 에 funnel 컴포넌트가 없어서 echarts funnel 을 쓸 수도 있었지만 안 썼다:
+   **장바구니가 `null`(원천 없음)인데 깔때기 차트는 그 칸을 0 으로 그리거나 빼버린다.**
+   둘 다 거짓이다. 그래서 이 대시보드의 `Top coupons` 가 쓰는 **라벨+막대 패턴**을
+   그대로 가져왔다 — null 을 "원천 없음" 텍스트로 정직하게 적을 수 있다. #}
+<div class="card mb-4" id="funnelCard">
+  <div class="card-header border-bottom border-translucent d-flex justify-content-between align-items-center py-2">
+    <h5 class="mb-0 fs-9">고객 깔때기
+      <span class="badge badge-phoenix badge-phoenix-primary ms-1 fs-10">실데이터</span></h5>
+    <span class="fs-10 text-body-tertiary" id="funnelSrc">불러오는 중…</span>
+  </div>
+  <div class="card-body">
+    <div id="funnelRows"><p class="fs-9 text-body-tertiary mb-0">불러오는 중…</p></div>
+    <p class="fs-10 text-body-tertiary mb-0 mt-3" id="funnelNote"></p>
+  </div>
+</div>
+
+{% raw %}
+<script>
+(function(){
+  var rows = document.getElementById('funnelRows');
+  var src  = document.getElementById('funnelSrc');
+  var note = document.getElementById('funnelNote');
+  var n = function(v){ return Number(v).toLocaleString('ko-KR'); };
+
+  fetch('/api/admin/funnel')
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(d){
+      src.textContent = '실데이터 · Cloud SQL';
+      // 막대 길이의 기준은 **첫 단계**다. 최댓값으로 잡으면 뒤 단계가 앞보다 길어 보일 수 있다.
+      var base = 0;
+      (d.steps || []).forEach(function(s){ if(s.value != null && s.value > base) base = s.value; });
+      rows.innerHTML = (d.steps || []).map(function(s, i){
+        var known = s.value != null;
+        var pct = (known && base) ? Math.max(2, Math.round(s.value / base * 100)) : 0;
+        return '<div class="mb-3">'
+          + '<div class="d-flex justify-content-between align-items-baseline mb-1">'
+          +   '<span class="fs-9 text-body-highlight">' + (i+1) + '. ' + s.label + '</span>'
+          +   (known ? '<span class="fw-bold">' + n(s.value) + '</span>'
+                     : '<span class="fs-10 text-body-quaternary">원천 없음</span>') + '</div>'
+          + (known
+              ? '<div class="progress" style="height:8px;"><div class="progress-bar" style="width:'+pct+'%"></div></div>'
+              : '<div class="progress bg-body-secondary" style="height:8px;"></div>')
+          + (s.note ? '<p class="fs-10 text-body-quaternary mb-0 mt-1">' + s.note + '</p>' : '')
+          + '</div>';
+      }).join('');
+      note.textContent = d.since_note || '';
+    })
+    .catch(function(){
+      src.textContent = '연결 안 됨';
+      rows.innerHTML = '<p class="fs-9 text-body-tertiary mb-0">서버에 연결되지 않아 불러오지 못했습니다.</p>';
+      note.textContent = '';
+    });
+})();
+</script>
+{% endraw %}
 
 
         <div class="pb-5">
