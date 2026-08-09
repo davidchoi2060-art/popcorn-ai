@@ -1,0 +1,425 @@
+{#
+  상품 관리 (ADM-PRD-010) — Jinja2 + Phoenix 이디엄 A/B 시험판 (2026-08-08)
+
+  기존 `mockups/admin/products.html` 과 **같은 API·같은 배선**을 쓴다.
+  비교 대상이 디자인이어야 하므로 데이터 경로는 한 글자도 바꾸지 않았다.
+
+  기존 대비 달라진 것 넷 (전부 Phoenix 원본 `apps/e-commerce/admin/products.html` 이디엄):
+
+    ① 분류 아이콘 열 — Phoenix 원본은 제품 사진을 싣는데 **우리는 이미지 원천이
+       없다**(products 테이블에도 목록 API 에도 이미지 컬럼이 없다). 사진을 지어내는
+       대신 실제 `cat` 값에서 파생하는 아이콘을 쓴다. 지어낸 값이 아니라 실데이터의
+       시각 부호다.
+    ② 행 액션을 btn-reveal 드롭다운으로 — 원본은 [검수]+[수정] 버튼 둘을 나란히
+       놓았고 폭 96px 에서 **100행 중 76행이 넘쳤다**(2026-08-07 실사고, CLAUDE.md
+       「감사 문서보다 코드가 먼저다」). `…` 하나로 접으면 120px → 56px 이 되고
+       남는 64px 은 상품명이 받는다.
+    ③ KPI 카드에 아이콘 — 숫자만 있던 4칸을 Phoenix `ecommerce` 카드 이디엄으로.
+       **값은 그대로 서버 kpis 뿐이다.**
+    ④ 검색 입력을 Phoenix search-box 로 — 돋보기 아이콘이 붙는다.
+
+  **버그 하나를 고쳤다**: 원본 `catToPartType` 이 선언된 적 없는 `PMETA` 를 읽어
+  분류 필터를 고르는 순간 ReferenceError 가 났다. 501행 catch 가 그것을 삼켜
+  서버가 멀쩡한데도 "연결 안 됨"으로 보였다. 실제 변수명은 `META` 다.
+
+  열 수 9개 — colgroup · thead · 행 · 빈 상태 colspan 이 전부 같아야 한다
+  (「목록 화면 규약」: 어긋나면 표가 조용히 뒤틀린다).
+#}
+{% extends "admin/_layout.html.j2" %}
+
+{% block title %}상품 관리{% endblock %}
+{% block body_attrs %}data-screen-id="ADM-PRD-010" data-domain="product" data-dummy-fallback="none"{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="/admin/index.html">홈</a></li>
+  <li class="breadcrumb-item"><a href="#!">상품</a></li>
+  <li class="breadcrumb-item active">상품 관리</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+  <div>
+    <h2 class="mb-1">상품 관리
+      <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-010</span>
+      <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span>
+    </h2>
+    <p class="text-body-tertiary mb-0">정본(단일 진실)의 현재 상태입니다. 각 상품이 <b class="text-body-secondary">왜 추천 가능/불가인지</b>가 함께 표시됩니다.</p>
+  </div>
+  <a href="/admin/product-edit.html?new=1" class="btn btn-primary btn-sm"><span data-feather="plus" style="width:14px;height:14px;"></span> 상품 단건 등록</a>
+</div>
+
+<div class="row g-2 mb-3" id="kpis"></div>
+
+<div class="card">
+  <div class="card-header border-bottom border-translucent">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <ul class="nav nav-pills gap-2 fs-9 mb-0" id="pills"></ul>
+      <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+        <select id="fcat" class="form-select form-select-sm" style="max-width:132px;" title="분류 필터" aria-label="분류 필터"></select>
+        <select id="fmfr" class="form-select form-select-sm" style="max-width:132px;" title="제조사 필터" aria-label="제조사 필터"></select>
+        <div class="search-box" style="width:248px;">
+          <form class="position-relative" onsubmit="return false;">
+            <input id="q" class="form-control form-control-sm search-input" type="search" placeholder="상품번호 · SKU · 상품명" aria-label="상품 검색">
+            <span class="fas fa-search search-box-icon"></span>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# 일괄 선택 액션 바 — 선택이 없을 때는 안내만 보인다.
+       `bulk-replace` / `bulk-actions` 이름은 Phoenix BulkSelect 규약이다. #}
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+      <div id="bulk-replace">
+        <span class="fs-10 text-body-tertiary">행을 선택하면 상태를 한 번에 바꿀 수 있습니다.</span>
+      </div>
+      <div class="d-none align-items-center gap-2" id="bulk-actions">
+        <span class="fs-9"><b id="selCount">0</b>건 선택</span>
+        <select class="form-select form-select-sm w-auto" id="bulkStatus" aria-label="바꿀 상태"></select>
+        <button class="btn btn-primary btn-sm" type="button" id="btnBulk">상태 바꾸기</button>
+        <button class="btn btn-link btn-sm p-0 ms-1 fs-9" type="button" id="btnBulkClear">선택 해제</button>
+        <span class="fs-10 text-body-tertiary" id="bulkHint"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    {# data-list = **현재 페이지 안에서의** 검색·정렬(헤더 클릭). 페이지 이동은 서버가 한다 —
+       page/pagination 옵션을 넣지 않는다(넣으면 서버가 나눈 100건을 또 쪼갠다).
+       판매가만 attr 로 정렬한다: 표시값 "239,000원"은 문자열 정렬이 쉼표에서 어긋나
+       1,299,000 을 239,000 보다 작다고 놓는다. data-num(원 단위 정수)이 그걸 막는다. #}
+    <div id="prodList" data-list='{"valueNames":["name","cat","spec","stock",{"name":"price","attr":"data-num"},"status"]}'>
+      {# 열 너비: 상품명이 나머지 전부를 받는다. 액션 열이 120px → 56px 로 줄어
+         상품명이 그만큼 더 받는다(btn-reveal 로 접었기 때문). #}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1140px;">
+          <colgroup>
+            <col style="width:36px"><col style="width:44px"><col>
+            <col style="width:84px"><col style="width:104px"><col style="width:56px">
+            <col style="width:96px"><col style="width:128px"><col style="width:56px">
+          </colgroup>
+          <thead>
+            <tr class="text-body-tertiary">
+              <th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th>
+              <th><span class="visually-hidden">분류 아이콘</span></th>
+              <th class="sort" data-sort="name">상품명</th>
+              <th class="sort" data-sort="cat">분류</th>
+              <th class="sort" data-sort="spec">필수 사양</th>
+              <th class="sort text-end" data-sort="stock">재고</th>
+              <th class="sort text-end" data-sort="price">판매가</th>
+              <th class="sort" data-sort="status">상태</th>
+              <th class="pe-3"><span class="visually-hidden">작업</span></th>
+            </tr>
+          </thead>
+          <tbody class="list" id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% raw %}
+<script>
+(function(){
+  // 상태: ok(추천 가능) / review(검수 대기) / oos(재고 없음→매입) / price(가격 검토)
+  function skuTail(p){
+    var sku = p.sku == null ? "" : String(p.sku);
+    return (sku && sku !== String(p.product_code)) ? " · SKU " + esc(sku) : "";
+  }
+  // 속성 안에 들어가는 값이라 따옴표를 반드시 막는다 — 안 막으면 이름에 " 가 있는
+  // 상품 하나가 그 행의 마크업을 통째로 깨뜨린다.
+  function esc(v){
+    return String(v == null ? "" : v).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
+    });
+  }
+  const ST={ok:["추천 가능","primary",null,null],review:["검수 대기","warning","/admin/review-queue.html","검수 큐로"],oos:["재고 없음 · 매입 대기","info","/admin/sourcing.html","매입 견적으로"],price:["가격 검토 대기","warning","/admin/price-review.html","가격 검토로"]};
+
+  /* 분류 아이콘 — Phoenix 원본의 제품 사진 자리를 대신한다.
+     우리에겐 이미지 원천이 없다(스키마·API 어디에도 없다). 사진을 지어내는 대신
+     **서버가 준 `cat` 값에서 파생**한다. 모르는 분류는 기본 아이콘으로 떨어지고,
+     그건 "분류가 없다"가 아니라 "아이콘을 아직 안 정했다"는 뜻이다. */
+  const ICON={"CPU":"cpu","메인보드":"grid","메모리":"server","SSD":"hard-drive","HDD":"hard-drive",
+              "그래픽카드":"layers","파워":"zap","케이스":"box","CPU쿨러":"wind","쿨러":"wind",
+              "모니터":"monitor","키보드":"type","마우스":"mouse-pointer","스피커":"volume-2"};
+  function catIcon(cat){
+    var name = ICON[cat] || "box";
+    return '<span class="d-inline-flex flex-center rounded-2 bg-body-secondary text-body-tertiary" style="width:30px;height:30px;" title="'+esc(cat)+'"><span data-feather="'+name+'" style="width:15px;height:15px;"></span></span>';
+  }
+
+  let cur="all", q="", fcat="all", fmfr="all";
+  // 정규화 어댑터 — API 계약 JSON을 화면 객체형으로. **원천은 서버뿐이다.**
+  const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,spec_row_missing:it.spec_row_missing,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
+  let DATA=[];
+  // 화면 상태 — loading: 요청 전·요청 중 / ok: 서버 응답 / fail: 못 불러옴.
+  // 수치를 말해도 되는 때는 ok 하나뿐이다.
+  let STATE="loading";
+  /* 필터 선택지는 **서버가 준다**(슬라이스 66). 현재 페이지에서 뽑으면
+     한 페이지(100건)에 없는 분류·제조사가 목록에 아예 안 나온다. */
+  let META=null;
+  function fillSelects(){
+    const cats = META && META.used_parts ? META.used_parts.map(x=>x.label) : [];
+    const mfrs = META && META.makers ? META.makers : [];
+    // 제조사는 실측 620개다 — 평범한 셀렉트로는 못 찾는다. 검색을 붙인다.
+    var PC = window.popcornChoices;
+    var fillCat = function(sel){ sel.innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join(""); };
+    var fillMfr = function(sel){ sel.innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join(""); };
+    if(PC){ PC.refill("fcat", fillCat, {searchEnabled: cats.length > 10});
+            PC.refill("fmfr", fillMfr, {searchEnabled: true, searchPlaceholderValue: "제조사 검색"}); }
+    else { fillCat(document.getElementById("fcat"));
+           fillMfr(document.getElementById("fmfr")); }
+  }
+  function loadMeta(){
+    return fetch("/api/admin/product-meta")
+      .then(r=>r.ok?r.json():null)
+      .then(m=>{ if(m){ META=m; fillSelects(); fillBulkStatus(m.status_options); } })
+      .catch(()=>{});
+  }
+
+  /* KPI — 서버 kpis(상호배타 버킷)만 쓴다. k 가 없으면(요청 전·실패) 전부 "—".
+     Phoenix ecommerce 카드 이디엄으로 아이콘을 붙였다. **값은 그대로다.** */
+  const KPI=[["total","전체 상품","개","box","secondary"],
+             ["ok","추천 가능","개","check-circle","primary"],
+             ["review","검수 대기","건","clipboard","warning"],
+             ["oos","재고 없음","개","alert-circle","info"]];
+  function renderKpis(k){
+    const host=document.getElementById("kpis"); if(!host) return;
+    const n=v=>(v==null?"—":v.toLocaleString("ko-KR"));
+    host.innerHTML=KPI.map(([key,label,unit,icon,tone])=>
+      `<div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-3">
+         <div class="d-flex align-items-center gap-2">
+           <span class="d-inline-flex flex-center rounded-2 bg-${tone}-subtle text-${tone}" style="width:32px;height:32px;"><span data-feather="${icon}" style="width:16px;height:16px;"></span></span>
+           <div><p class="fs-10 text-body-tertiary mb-0">${label}</p>
+           <h4 class="mb-0">${n(k&&k[key])}<span class="fs-10 fw-semibold text-body-tertiary"> ${unit}</span></h4></div>
+         </div></div></div></div>`).join("");
+    if(window.feather)feather.replace();
+  }
+  function counts(){const c={all:DATA.length};DATA.forEach(p=>c[p.status_key]=(c[p.status_key]||0)+1);return c;}
+  function pills(){
+    const host=document.getElementById("pills"); if(!host) return;
+    const c=counts(), known=STATE==="ok";   // 서버 응답 전에는 0 도 사실이 아니다
+    const order=[["all","전체","dark"],["ok","추천 가능","primary"],["review","검수 대기","warning"],["oos","재고 없음","info"],["price","가격 검토","warning"]];
+    host.innerHTML=order.map(([k,l,col])=>{
+      const on=k===cur;
+      return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${known?(c[k]||0):"—"}</span></a></li>`;
+    }).join("");
+    document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
+  }
+  function specBadge(done,total,rowMissing){
+    if(total===0)return `<span class="fs-10 text-body-tertiary">—</span>`; // 필수 사양 매트릭스 미등록 분류
+    // 사양 행 자체 부재는 값 미확인(0/N)과 구분 — 추천 뷰가 specs를 조인하므로 재고·가격이 채워져도 미진입
+    if(rowMissing)return `<span class="badge badge-phoenix badge-phoenix-danger">사양 미등록</span> <span class="fs-10 text-body-tertiary">행 없음</span>`;
+    const ok=done===total;
+    return `<span class="badge badge-phoenix badge-phoenix-${ok?"primary":"warning"}">${ok?"확인 완료":"미확인 "+(total-done)}</span> <span class="fs-10 text-body-tertiary">${done}/${total}</span>`;
+  }
+  // 판매가 정렬 키 — 표시 문자열에서 숫자만 남긴다(값을 새로 만들지 않는다. "—"는 빈 값 그대로).
+  const priceNum=t=>String(t==null?"":t).replace(/[^0-9]/g,"");
+
+  /* ── 현재 페이지 정렬(list.js) — 공용 헬퍼가 전담한다(shared/ui-list.js).
+     서버 페이지네이션은 그대로: page/pagination 옵션 없음 → 현재 페이지만 다룬다.
+     재고는 순수 정수라 문자열 비교로는 12 가 9 보다 앞선다 → numeric 으로 넘긴다.
+     검색 입력(#q)은 list.js 검색이 아니라 **서버 질의**다 — searchInput 으로 넘기지 않는다. */
+  const LIST_VALUE_NAMES=["name","cat","spec","stock",{name:"price",attr:"data-num"},"status"];
+  function wireList(){
+    if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
+    window.popcornList.wire("prodList", LIST_VALUE_NAMES, {numeric:["stock"]});
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wireList);
+  else wireList();
+
+  /* ── 일괄 선택 ────────────────────────────────────────────────
+   * `bulkSelectInit` 은 docReady 때 1회만 돈다. 우리 표는 fetch 뒤에 그려지므로
+   * 그때는 존재하지 않는다 → 전역 `phoenix.BulkSelect` 로 직접 붙인다.
+   * BulkSelect 는 카운터도 이벤트도 주지 않으므로 선택 상태는 우리가 들고 있는다.
+   */
+  var SEL={}, BULK=null;
+  function selCount(){ return Object.keys(SEL).length; }
+  function syncBulk(){
+    var c=selCount(), act=document.getElementById("bulk-actions");
+    if(!act) return;
+    document.getElementById("selCount").textContent=c.toLocaleString("ko-KR");
+    act.classList.toggle("d-none", c===0);
+    act.classList.toggle("d-flex", c>0);
+    document.getElementById("bulk-replace").classList.toggle("d-none", c>0);
+    var h=document.getElementById("bulkHint");
+    h.textContent = c>2000 ? "한 번에 2,000건까지 바꿉니다 — 나머지는 다시 선택하세요" : "";
+  }
+  function wireBulk(){
+    var head=document.getElementById("chkAll");
+    if(window.phoenix && window.phoenix.BulkSelect && head){
+      head.checked=false; head.indeterminate=false;
+      try{ BULK=new window.phoenix.BulkSelect(head); BULK.init(); }catch(e){ BULK=null; }
+    }
+    syncBulk();
+  }
+  document.addEventListener("change",function(ev){
+    var cb=ev.target.closest && ev.target.closest("#rows input[data-pc]");
+    if(!cb) return;
+    var pc=cb.getAttribute("data-pc");
+    if(cb.checked){ SEL[pc]=true; } else { delete SEL[pc]; }
+    syncBulk();
+  });
+  function fillBulkStatus(opts){
+    var sel=document.getElementById("bulkStatus");
+    if(!sel || sel.options.length || !opts || !opts.length) return;
+    // 선택지는 **서버가 준다**(product-meta.status_options) — 화면이 지어내지 않는다
+    sel.innerHTML=opts.map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join("");
+  }
+  var BULK_UNDO=null;
+  function bulkApply(){
+    var codes=Object.keys(SEL).map(Number);
+    if(!codes.length) return;
+    var st=document.getElementById("bulkStatus").value;
+    if(!st){ alert("바꿀 상태를 고르세요"); return; }
+    if(!confirm(codes.length.toLocaleString("ko-KR")+"건을 '"+st+"'(으)로 바꿉니다. 계속할까요?")) return;
+    fetch("/api/admin/products/bulk-status",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({product_codes:codes,status:st})})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        // 실패를 삼키지 않는다 — 공용 헬퍼가 만든 같은 문장을 쓴다
+        if(!res.ok){ alert((window.popcornProgress&&window.popcornProgress.errText)
+                           ? window.popcornProgress.errText(res.j,"") : "바꾸지 못했습니다"); return; }
+        BULK_UNDO=res.j.log_id; SEL={}; syncBulk(); load();
+      })
+      .catch(function(e){ alert("바꾸지 못했습니다 — "+e.message); });
+  }
+
+  // 표가 비는 이유를 표가 직접 말한다(colspan=9 — 위 colgroup·thead 와 같은 열 수)
+  const STATE_MSG={loading:"불러오는 중…",fail:"서버에 연결되지 않아 불러오지 못했습니다."};
+  function render(){
+    pills();
+    const host=document.getElementById("rows"); if(!host) return;
+    if(STATE!=="ok"){
+      host.innerHTML=`<tr><td colspan="9" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
+      return;
+    }
+    const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
+      &&(fcat==="all"||p.cat===fcat)
+      &&(fmfr==="all"||p.maker===fmfr)
+      &&(q===""||p.sku.toLowerCase().includes(q)||p.name.toLowerCase().includes(q)||p.product_code.includes(q)));
+    host.innerHTML=list.length?list.map(p=>{
+      const [lab,col,link,act]=ST[p.status_key];
+      /* 행 액션 — Phoenix btn-reveal 이디엄. 예전에는 [검수]+[수정] 버튼 둘을
+         96px 열에 나란히 넣어 100행 중 76행이 넘쳤다(실측 필요폭 119px).
+         `…` 하나로 접으면 56px 로 충분하고 남는 폭은 상품명이 받는다. */
+      const menu = (link?`<a class="dropdown-item" href="${link}">${act}</a>`:"")
+        + `<a class="dropdown-item" href="/admin/product-edit.html?code=${p.product_code}">상세 보기</a>`
+        + `<a class="dropdown-item" href="/admin/product-edit.html?code=${p.product_code}&edit=1">수정</a>`;
+      return `<tr class="position-static">
+        <td class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" data-pc="${p.product_code}" data-bulk-select-row='{"code":${p.product_code}}'${SEL[p.product_code]?" checked":""} aria-label="선택"></div></td>
+        <td class="py-1">${catIcon(p.cat)}</td>
+        <td class="fw-semibold text-body-highlight"><a href="/admin/product-edit.html?code=${p.product_code}" class="name text-decoration-none text-body-highlight line-clamp-2" title="${esc(p.name)}">${p.name}</a><div class="fs-10 text-body-tertiary text-nowrap"><code>${p.product_code}</code>${skuTail(p)}</div></td>
+        <td class="cat text-body-tertiary">${p.cat}</td>
+        <td class="spec">${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
+        <td class="stock text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
+        <td class="price text-end" data-num="${priceNum(p.price_text)}">${p.price_text}</td>
+        <td><span class="status badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
+        <td class="pe-3 text-end btn-reveal-trigger">
+          <div class="btn-reveal-trigger position-static">
+            <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent" aria-label="이 상품 작업"><span class="fas fa-ellipsis-h fs-10"></span></button>
+            <div class="dropdown-menu dropdown-menu-end py-2">${menu}</div>
+          </div>
+        </td>
+      </tr>`;
+    }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
+    wireList();   // 행을 다시 그렸으니 정렬 색인도 다시 잡는다
+    wireBulk();   // 체크박스도 새로 생겼다 — 헤더 전체선택을 다시 건다
+    if(window.feather)feather.replace();   // 분류 아이콘은 행마다 새로 생긴다
+  }
+
+  // 요청 전 상태 — 아직 아무것도 모른다("불러오는 중…" · KPI "—").
+  fillSelects();renderKpis(null);render();if(window.feather)feather.replace();
+  const srcBadge=document.getElementById("dataSrc");
+
+  // ---- 서버 페이지네이션(슬라이스 39). 검색·분류 필터도 서버로 보낸다.
+  var PAGE=1, SIZE=100, TOTAL=0, PAGES=1;
+  function bar(){
+    var el=document.getElementById("pgBar");
+    if(!el){
+      el=document.createElement("div");el.id="pgBar";
+      el.className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-3 pb-3";
+      var host=document.querySelector(".table-responsive");
+      if(host&&host.parentNode) host.parentNode.appendChild(el);
+    }
+    el.innerHTML='<div class="fs-9 text-body-tertiary">전체 <b class="text-body-secondary">'
+      + TOTAL.toLocaleString() + '</b>건 · ' + PAGE + ' / ' + PAGES + ' 페이지'
+      + ' <span class="ms-2">(한 페이지 ' + SIZE + '건 — 서버에서 나눠 보냅니다)</span></div>'
+      + '<div class="btn-group btn-group-sm">'
+      + '<button class="btn btn-phoenix-secondary" id="pgPrev"' + (PAGE<=1?" disabled":"") + '>← 이전</button>'
+      + '<button class="btn btn-phoenix-secondary" id="pgNext"' + (PAGE>=PAGES?" disabled":"") + '>다음 →</button></div>';
+    var pv=document.getElementById("pgPrev"), nx=document.getElementById("pgNext");
+    if(pv) pv.onclick=function(){ if(PAGE>1){PAGE--;load();} };
+    if(nx) nx.onclick=function(){ if(PAGE<PAGES){PAGE++;load();} };
+  }
+  document.addEventListener("click",function(ev){
+    if(ev.target.closest && ev.target.closest("#btnBulk")){ ev.preventDefault(); bulkApply(); return; }
+    if(ev.target.closest && ev.target.closest("#btnBulkClear")){
+      ev.preventDefault(); SEL={}; syncBulk(); render(); return;
+    }
+  });
+  function load(){
+    var url="/api/admin/products?page="+PAGE+"&size="+SIZE
+      + "&q=" + encodeURIComponent(q||"")
+      + "&part_type=" + encodeURIComponent(fcat==="all"?"":catToPartType(fcat))
+      // 제조사도 서버에서 거른다 — 예전에는 현재 페이지 안에서만 걸러
+      // 22,841건 중 100건에만 필터가 먹었다(슬라이스 66)
+      + "&maker=" + encodeURIComponent(fmfr==="all"?"":fmfr);
+    fetch(url)
+      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+      .then(d=>{
+        STATE="ok"; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size;
+        DATA=d.items.map(fromApi);
+        if(srcBadge){
+          srcBadge.textContent="실데이터 · Cloud SQL";
+          srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
+        }
+        renderKpis(d.kpis);
+        render();       // 서버가 이미 필터했으므로 클라이언트 필터는 통과만 한다
+        bar();
+        if(window.feather)feather.replace();
+      })
+      // 실패하면 이유를 말하고 수치는 전부 "—"로 되돌린다.
+      .catch(()=>{
+        STATE="fail"; DATA=[];
+        if(srcBadge){
+          srcBadge.textContent="연결 안 됨";   // 원천은 있는데 못 불러온 상태
+          srcBadge.classList.replace("badge-phoenix-primary","badge-phoenix-secondary");
+        }
+        renderKpis(null);
+        render();
+        var pg=document.getElementById("pgBar"); if(pg) pg.remove();   // 못 받은 '전체 N건'을 남기지 않는다
+      });
+  }
+  /* 화면 분류 라벨 → part_type (서버 필터용).
+     **버그 수정**: 원본은 여기서 `PMETA` 를 읽었는데 그런 변수는 선언된 적이 없다.
+     분류 필터를 고르는 순간 ReferenceError 가 나고 load() 의 catch 가 그것을 삼켜
+     서버가 멀쩡한데도 "연결 안 됨"으로 보였다. 실제 이름은 `META` 다. */
+  function catToPartType(label){
+    var all = [].concat(
+      (META && META.part_labels) || [],
+      (META && META.peripheral_labels) || [],
+      (META && META.built_labels) || [],
+      (META && META.used_parts) || []);
+    for(var i=0;i<all.length;i++){ if(all[i].label === label) return all[i].part_type; }
+    return "";
+  }
+  var typing=null;
+  // 검색·필터는 **항상 서버 질의**다.
+  document.getElementById("q").addEventListener("input",e=>{
+    q=e.target.value.trim().toLowerCase();
+    clearTimeout(typing); typing=setTimeout(function(){PAGE=1;load();},300);
+  });
+  document.getElementById("fcat").addEventListener("change",e=>{
+    fcat=e.target.value; PAGE=1; load();
+  });
+  document.getElementById("fmfr").addEventListener("change",e=>{
+    fmfr=e.target.value; PAGE=1; load();
+  });
+  loadMeta();   // 필터 선택지는 서버 원천 — 목록과 별개로 한 번만 받는다
+  load();
+})();
+</script>
+{% endraw %}
+{% endblock %}

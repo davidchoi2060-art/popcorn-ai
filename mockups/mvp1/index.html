@@ -91,6 +91,10 @@ body{background:#f1eee8;font-family:'Pretendard','Pretendard Variable',-apple-sy
               <a href="s0-landing.html" style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13px;font-weight:800;color:#3a3a40;">랜딩</span><span style="font-size:11px;color:#8a8578;">S0</span></a>
               <a href="../admin/index.html" style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13px;font-weight:800;color:#3a3a40;">운영자</span><span style="font-family:'Material Symbols Outlined';font-size:15px;color:#8a8578;">admin_panel_settings</span></a>
             </div>
+            <!-- 운영자 재구축(2026-08-09 착수) — 기존 37화면과 **병행 신축**이다.
+                 서버 렌더(Jinja2)라 절대경로를 쓴다. Firebase 정적 호스팅에는
+                 렌더할 서버가 없어 열리지 않는다 — 개발 서버에서만 동작한다. -->
+            <a href="/admin2/" style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px dashed #7fa8ff;border-radius:11px;text-decoration:none;background:#f5f8ff;"><span style="font-size:13px;font-weight:800;color:#2b5fd9;">운영자 재구축</span><span style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:900;letter-spacing:.06em;color:#fff;background:#2b5fd9;padding:2px 6px;border-radius:999px;">NEW</span><span style="font-family:'Material Symbols Outlined';font-size:15px;color:#2b5fd9;">build</span></span></a>
           </div>
           <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
             <div style="font-size:11.5px;font-weight:900;color:#8a8578;margin-bottom:10px;">화면 목록 (S0~S4)</div>

@@ -38,6 +38,7 @@ from .admin_stock import router as admin_stock_router
 from .admin_suppliers import router as admin_suppliers_router
 from .admin_swap_logs import router as admin_swap_logs_router
 from .admin_system import router as admin_system_router
+from .admin_ui import router as admin_ui_router
 from .admin_reviews import router as admin_reviews_router
 from .candidates import router as candidates_router
 from .admin_catalog_import import router as admin_catalog_import_router
@@ -112,6 +113,10 @@ app.include_router(swap_router)
 app.include_router(my_orders_router)
 app.include_router(my_payments_router)
 app.include_router(my_account_router)
+
+# 관리자 화면 서버 렌더(A/B 시험판, 2026-08-08). `/admin2/*`.
+# **캐치올 마운트보다 먼저** 걸어야 한다 — 뒤에 걸면 `/` 마운트가 먼저 잡아 404 다.
+app.include_router(admin_ui_router)
 
 # 정적 마운트는 반드시 마지막 — 먼저 걸면 /api/*가 캐치올에 잡힌다.
 # mockups 전체를 마운트해야 admin/의 ../shared/su-icons.js 참조가 유지된다.

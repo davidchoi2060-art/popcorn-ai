@@ -1,0 +1,231 @@
+{#
+  관리자 화면 공통 셸 — Phoenix `Layout.pug` 이식 (A/B 시험판, 2026-08-08)
+
+  이 파일이 존재하는 이유: 지금 `mockups/admin/*.html` 37벌이 아래 마크업을
+  **각자 한 벌씩** 들고 있다. head 33줄 + 상단바 160줄이 37번 복제돼 있고,
+  그래서 Phoenix 데모 잔재가 36/37 화면에 그대로 남았다 —
+  `Purchase template`(템플릿 판매 페이지 링크) · `Demo widget`/`Ask us anything`
+  (영문 데모 채팅, 가상 인물 "Eric") · `Theme Customizer`(영문) ·
+  `최근 검색`(지어낸 이력) · `대기 9` 류 하드코딩 badge.
+  한 벌로 모으면 한 번에 사라진다. 그것이 이 방식의 값어치다.
+
+  블록:
+    title       — <title> 뒤쪽 (앞의 "팝콘PC 관리자 · "는 여기서 붙인다)
+    body_attrs  — data-screen-id / data-domain / data-dummy-fallback
+    breadcrumb  — 빵부스러기 <ol>
+    content     — 본문. **인라인 스크립트도 여기 넣는다**(원본과 같은 위치 =
+                  vendor 로드 앞. 기존 배선이 그 순서를 전제로 짜여 있다).
+
+  스크립트 순서는 원본 그대로다 — 바꾸면 안 된다:
+    phoenix.js → ui-progress → admin-panel → admin-menu-data → admin-menu
+    → admin-helper → su-icons → admin-auth
+  `admin-menu.js` 는 DOMContentLoaded 를 기다리지 않고 즉시 그린다.
+  기다렸다 그리면 뒤에 오는 feather.replace()·su-icons 가 이미 지나가서
+  **아이콘이 하나도 안 붙는다**(CLAUDE.md 「단일 원천」에 기록된 사고).
+
+  경로는 전부 절대경로다. 이 문서는 `/admin2/...` 로 서빙되는데 상대경로를 쓰면
+  `/admin2/assets/...` 로 풀려 404 가 된다. `mockups/` 가 `/` 에 마운트돼 있으므로
+  관리자 자산은 `/admin/...`, 공용 스크립트는 `/shared/...` 다.
+#}<!DOCTYPE html>
+<html lang="ko" dir="ltr" data-navigation-type="default" data-navbar-horizontal-shape="default">
+
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>팝콘PC 관리자 · {% block title %}{% endblock %}</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/admin/assets/img/favicons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/admin/assets/img/favicons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/admin/assets/img/favicons/favicon-16x16.png">
+    <link rel="shortcut icon" type="image/x-icon" href="/admin/assets/img/favicons/favicon.ico">
+    <meta name="theme-color" content="#ffffff">
+
+    <script src="/admin/vendors/simplebar/simplebar.min.js"></script>
+    <script src="/admin/assets/js/config.js"></script>
+
+    <link href="/admin/vendors/simplebar/simplebar.min.css" rel="stylesheet">
+    <link href="/admin/vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
+    <script src="/shared/ui-choices.js"></script>
+    <script src="/shared/ui-list.js"></script>
+    <link href="/admin/assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
+    <link href="/admin/assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+    <link rel="stylesheet" href="/shared/fonts/fonts.css">
+    {# 토큰은 단일 원천이다. 지금 37화면 중 12개만 읽고 있는데(HANDOFF §4),
+       레이아웃에 두면 이 축의 모든 화면이 자동으로 읽는다. #}
+    <link rel="stylesheet" href="/design-system/tokens.css">
+    <style>
+      :root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}
+      body{font-family:var(--phoenix-font-sans-serif);}
+      /* 넓은 표(min-width 1140px)를 담은 카드가 좁은 화면에서 페이지를 가로로 밀어내던 것.
+         `.card` 는 flex 컨테이너인데 그 아이템(.card-header/.card-body)의 min-width 가
+         `auto` 라 내용(표)보다 작게 줄지 못한다 — 그래서 `.table-responsive` 의
+         overflow-x:auto 가 가둘 기회를 얻지 못하고 넘침이 문서까지 전파됐다.
+         모바일 375px 에서 페이지가 738px 넘쳤다(2026-08-08 실측). */
+      .card > .card-header, .card > .card-body { min-width: 0; }
+    </style>
+    {% block head_extra %}{% endblock %}
+  </head>
+
+  <body {% block body_attrs %}{% endblock %}>
+
+    <main class="main" id="top">
+
+      {# ── 좌측 메뉴 ────────────────────────────────────────────────
+         컨테이너만 둔다. 내용은 `admin-menu.js` 가 정본
+         `admin-menu-data.js` 에서 그린다 — 서버가 다시 그리면 그게 곧 두 벌이다. #}
+      <nav class="navbar navbar-vertical navbar-expand-lg">
+        <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
+          <div class="navbar-vertical-content">
+            <ul class="navbar-nav flex-column" id="navbarVerticalNav"></ul>
+          </div>
+        </div>
+        <div class="navbar-vertical-footer">
+          <button class="btn navbar-vertical-toggle border-0 fw-semibold w-100 white-space-nowrap d-flex align-items-center"><span class="icon-feather fs-8" data-feather="chevrons-left"></span><span class="icon-feather fs-8" data-feather="chevrons-right"></span><span class="navbar-vertical-footer-text ms-2">메뉴 접기</span></button>
+        </div>
+      </nav>
+
+      {# ── 상단바 ──────────────────────────────────────────────────
+         원본에서 걷어낸 것: 하드코딩 badge(`대기 9`·`5`·`4`·`3`) — 서버가 모르는
+         수다. `최근 검색` 3건 — 지어낸 이력이다. 둘 다 「화면이 숫자를 지어내지
+         않는다」 위반이라 마크업에서 아예 없앤다(런타임에 지우는 것보다 낫다). #}
+      <nav class="navbar navbar-top fixed-top navbar-expand" id="navbarDefault">
+        <div class="collapse navbar-collapse justify-content-between">
+          <div class="navbar-logo">
+            <button class="btn navbar-toggler navbar-toggler-humburger-icon hover-bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalCollapse" aria-controls="navbarVerticalCollapse" aria-expanded="false" aria-label="메뉴 열기"><span class="navbar-toggle-icon"><span class="toggle-line"></span></span></button>
+            <a class="navbar-brand me-1 me-sm-3" href="/admin/index.html">
+              <div class="d-flex align-items-center">
+                <h5 class="logo-text ms-0 mb-0 fw-bolder d-none d-sm-block">팝콘PC <span class="text-primary">관리자</span></h5>
+              </div>
+            </a>
+          </div>
+
+          <div class="search-box navbar-top-search-box d-none d-lg-block" data-list='{"valueNames":["title"]}' style="width:25rem;">
+            <form class="position-relative" data-bs-toggle="search" data-bs-display="static">
+              <input class="form-control search-input fuzzy-search rounded-pill form-control-sm" type="search" placeholder="화면 바로가기 검색..." aria-label="화면 검색">
+              <span class="fas fa-search search-box-icon"></span>
+            </form>
+            <div class="btn-close position-absolute end-0 top-50 translate-middle cursor-pointer shadow-none" data-bs-dismiss="search">
+              <button class="btn btn-link p-0" aria-label="닫기"></button>
+            </div>
+            <div class="dropdown-menu border start-0 py-0 overflow-hidden w-100">
+              <div class="scrollbar-overlay" style="max-height: 30rem;">
+                <div class="list pb-3">
+                  <h6 class="dropdown-header text-body-highlight fs-10 py-2">바로가기</h6>
+                  <div class="py-2">
+                    <a class="dropdown-item" href="/admin/review-queue.html"><span class="fw-normal text-body-highlight title">상품 검수</span></a>
+                    <a class="dropdown-item" href="/admin/price-review.html"><span class="fw-normal text-body-highlight title">가격 검토 대기</span></a>
+                    <a class="dropdown-item" href="/admin/sourcing.html"><span class="fw-normal text-body-highlight title">매입 견적(용산)</span></a>
+                    <a class="dropdown-item" href="/admin/stock-inbound.html"><span class="fw-normal text-body-highlight title">재고 입고</span></a>
+                    <a class="dropdown-item" href="/admin/products.html"><span class="fw-normal text-body-highlight title">상품 목록</span></a>
+                    <a class="dropdown-item" href="/admin/csv-upload.html"><span class="fw-normal text-body-highlight title">상품 일괄 등록</span></a>
+                    <a class="dropdown-item" href="/admin/activity-logs.html"><span class="fw-normal text-body-highlight title">작업 기록</span></a>
+                  </div>
+                </div>
+                <div class="text-center">
+                  <p class="fallback fw-bold fs-7 d-none">결과가 없습니다.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ul class="navbar-nav navbar-nav-icons flex-row">
+            <li class="nav-item d-flex align-items-center me-2"><a class="btn btn-phoenix-secondary btn-sm d-flex align-items-center gap-1" href="/mvp1/index.html" title="내부 접근 허브로 이동"><span data-feather="home" style="width:14px;height:14px;"></span>허브</a></li>
+            <li class="nav-item">
+              <div class="theme-control-toggle fa-icon-wait px-2">
+                <input class="form-check-input ms-0 theme-control-toggle-input" type="checkbox" data-theme-control="phoenixTheme" value="dark" id="themeControlToggle">
+                <label class="mb-0 theme-control-toggle-label theme-control-toggle-light" for="themeControlToggle" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-title="테마 전환" style="height:32px;width:32px;"><span class="icon" data-feather="moon"></span></label>
+                <label class="mb-0 theme-control-toggle-label theme-control-toggle-dark" for="themeControlToggle" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-title="테마 전환" style="height:32px;width:32px;"><span class="icon" data-feather="sun"></span></label>
+              </div>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link" href="#" style="min-width: 2.25rem" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-bs-auto-close="outside" aria-label="알림"><span class="d-block" style="height:20px;width:20px;"><span data-feather="bell" style="height:20px;width:20px;"></span></span></a>
+              <div class="dropdown-menu dropdown-menu-end notification-dropdown-menu py-0 shadow border navbar-dropdown-caret">
+                <div class="card position-relative border-0">
+                  <div class="card-header p-2">
+                    <h5 class="text-body-emphasis mb-0">알림</h5>
+                  </div>
+                  <div class="card-body p-0">
+                    <div class="scrollbar-overlay" style="max-height: 20rem;"><div class="p-4 text-center fs-9 text-body-tertiary">알림 원천이 아직 없습니다 — 준비되면 여기에 표시됩니다.</div></div>
+                  </div>
+                  <div class="card-footer p-0 border-top border-translucent">
+                    <div class="my-2 text-center fw-bold fs-10 text-body-tertiary"><a class="fw-bolder" href="/admin/activity-logs.html">전체 작업 기록 보기</a></div>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link lh-1 pe-0" id="navbarDropdownUser" href="#!" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-haspopup="true" aria-expanded="false" aria-label="내 계정">
+                <div class="avatar avatar-l"><span class="avatar-name rounded-circle"><span data-feather="user" style="width:18px;height:18px;"></span></span></div>
+              </a>
+              <div class="dropdown-menu dropdown-menu-end navbar-dropdown-caret py-0 dropdown-profile shadow border" aria-labelledby="navbarDropdownUser">
+                <div class="card position-relative border-0">
+                  <div class="card-body p-0">
+                    {# 이름은 admin-auth.js 가 `/api/admin/auth/me` 로 채운다.
+                       원본은 "david · 관리자"가 마크업에 박혀 있어 누가 로그인하든 그렇게 보였다. #}
+                    <div class="text-center pt-4 pb-3">
+                      <h6 class="mt-2 text-body-emphasis">로그인 확인 중…</h6>
+                    </div>
+                  </div>
+                  <div class="overflow-auto scrollbar" style="height: 8rem;">
+                    <ul class="nav d-flex flex-column mb-2 pb-1">
+                      <li class="nav-item"><a class="nav-link px-3 d-block" href="/admin/my-profile.html"><span class="me-2 text-body align-bottom" data-feather="user"></span><span>내 정보</span></a></li>
+                      <li class="nav-item"><a class="nav-link px-3 d-block" href="/admin/index.html"><span class="me-2 text-body align-bottom" data-feather="pie-chart"></span>대시보드</a></li>
+                      <li class="nav-item"><a class="nav-link px-3 d-block" href="/admin/activity-logs.html"><span class="me-2 text-body align-bottom" data-feather="lock"></span>작업 기록</a></li>
+                      <li class="nav-item"><a class="nav-link px-3 d-block" href="/admin/operators.html"><span class="me-2 text-body align-bottom" data-feather="settings"></span>운영자 · 권한</a></li>
+                    </ul>
+                  </div>
+                  <div class="card-footer p-0 border-top border-translucent">
+                    <div class="px-3 py-3"><a class="btn btn-phoenix-secondary d-flex flex-center w-100" href="#!"><span class="me-2" data-feather="log-out"></span>로그아웃</a></div>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="content">
+        <nav class="mb-3" aria-label="breadcrumb">{% block breadcrumb %}{% endblock %}</nav>
+
+        {% block content %}{% endblock %}
+
+        <footer class="footer position-absolute"><div class="row g-0 justify-content-between align-items-center h-100"><div class="col-12 col-sm-auto text-center"><p class="mb-0 mt-2 mt-sm-0 text-body">팝콘PC AI 관리자 · 내부 운영 도구<span class="d-none d-sm-inline-block mx-1">|</span>2026 &copy; 팝콘PC</p></div><div class="col-12 col-sm-auto text-center"><p class="mb-0 text-body-tertiary text-opacity-85">Phoenix 기반</p></div></div></footer>
+      </div>
+    </main>
+
+    {# 원본 585~597행의 셸 설정 스크립트. config.js 가 head 에서 이미 로드됐다. #}
+    <script>
+      (function () {
+        var cfg = window.config && window.config.config;
+        if (!cfg) return;
+        var top = document.querySelector('.navbar-top');
+        if (top && cfg.phoenixNavbarTopStyle === 'darker') top.setAttribute('data-navbar-appearance', 'darker');
+        var vert = document.querySelector('.navbar-vertical');
+        if (vert && cfg.phoenixNavbarVerticalStyle === 'darker') vert.setAttribute('data-navbar-appearance', 'darker');
+      })();
+    </script>
+
+    {# ── vendor · 공용 스크립트 — 순서가 계약이다(위 주석 참조) ── #}
+    <script src="/admin/vendors/popper/popper.min.js"></script>
+    <script src="/admin/vendors/bootstrap/bootstrap.min.js"></script>
+    <script src="/admin/vendors/anchorjs/anchor.min.js"></script>
+    <script src="/admin/vendors/is/is.min.js"></script>
+    <script src="/admin/vendors/fontawesome/all.min.js"></script>
+    <script src="/admin/vendors/lodash/lodash.min.js"></script>
+    <script src="/admin/vendors/list.js/list.min.js"></script>
+    <script src="/admin/vendors/feather-icons/feather.min.js"></script>
+    <script src="/admin/vendors/dayjs/dayjs.min.js"></script>
+    <script src="/admin/vendors/choices/choices.min.js"></script>
+    <script src="/admin/assets/js/phoenix.js"></script>
+
+    <script src="/shared/ui-progress.js"></script>
+    <script src="/shared/admin-panel.js"></script>
+    <script src="/shared/admin-menu-data.js"></script>
+    <script src="/shared/admin-menu.js"></script>
+    <script src="/shared/admin-helper.js"></script>
+    <script src="/shared/su-icons.js"></script>
+    <script src="/shared/admin-auth.js"></script>
+    {% block foot_extra %}{% endblock %}
+  </body>
+</html>

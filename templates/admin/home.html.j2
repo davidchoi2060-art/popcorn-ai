@@ -1,0 +1,111 @@
+{#
+  운영자 재구축 현황판 — 2026-08-09 착수.
+
+  지금은 "무엇이 서 있고 무엇이 아직 없는가"를 말하는 자리다. 화면이 늘면
+  이 자리가 새 대시보드가 된다.
+
+  **수치를 지어내지 않는다.** 목록은 `api/admin_ui.py` 의 BUILT / NEXT_STEPS 가
+  단일 원천이고, 화면은 그것을 그대로 그린다. 화면이 실제로 서기 전에 목록에
+  올리면 이 현황판이 곧 거짓말이 된다 — 기존 화면들이 정확히 그래서
+  "더미 데이터" 배지를 폐기해야 했다.
+#}
+{% extends "admin/_layout.html.j2" %}
+
+{% block title %}운영자 재구축{% endblock %}
+{% block body_attrs %}data-screen-id="NEW-HOME-010" data-domain="rebuild" data-dummy-fallback="none"{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item active">운영자 재구축</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="mb-1">운영자 시스템 재구축
+    <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">착수 2026-08-09</span>
+  </h2>
+  <p class="text-body-tertiary mb-0">
+    기존 <code>/admin/*</code> 37화면은 <b class="text-body-secondary">그대로 돌아갑니다.</b>
+    이건 이관이 아니라 병행 신축입니다 — 다 자라면 그때 갈아탑니다.
+  </p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header border-bottom border-translucent py-2">
+        <h5 class="mb-0 fs-9">왜 다시 짓는가</h5>
+      </div>
+      <div class="card-body">
+        <p class="fs-9 mb-2">
+          지금 37화면은 슬라이스 1~104를 거치며 <b>하나씩 쌓인 것</b>이지 동선에서 도출된 적이 없습니다.
+          좌측 메뉴가 전부 명사인 것이 그 증거입니다 — 상품 · 가격 · 추천 설정 · 견적/주문 · 회원 · 시스템.
+          <b>데이터 객체별 CRUD 구성이지 운영자가 하는 「일」 기준이 아닙니다.</b>
+        </p>
+        <p class="fs-9 mb-0 text-body-tertiary">
+          그래서 <b class="text-body-secondary">"이 상품이 왜 추천에 안 나오지?"</b> 하나를 답하려면
+          상품 관리 → 상품 검수 → 사양 항목 정의 → 추천 가능 재고 → 조립 호환 규칙,
+          <b class="text-body-secondary">화면 다섯</b>을 오가야 합니다.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header border-bottom border-translucent py-2">
+        <h5 class="mb-0 fs-9">지금 서 있는 화면</h5>
+      </div>
+      <div class="card-body">
+        {% if built %}
+        <div class="d-flex flex-column gap-2">
+          {% for s in built %}
+          <a class="d-flex align-items-start gap-2 text-decoration-none p-2 rounded-2 bg-body-secondary bg-opacity-25" href="{{ s.href }}">
+            <span class="d-inline-flex flex-center rounded-2 bg-primary-subtle text-primary flex-shrink-0" style="width:28px;height:28px;">
+              <span data-feather="check" style="width:14px;height:14px;"></span>
+            </span>
+            <span>
+              <span class="d-block fw-semibold text-body-highlight fs-9">{{ s.label }}</span>
+              <span class="d-block fs-10 text-body-tertiary">{{ s.note }}</span>
+            </span>
+          </a>
+          {% endfor %}
+        </div>
+        <p class="fs-10 text-body-tertiary mt-3 mb-0">
+          {{ built|length }}개. 화면이 <b>실제로 설 때만</b> 이 목록에 오릅니다.
+        </p>
+        {% else %}
+        <p class="fs-9 text-body-tertiary mb-0">아직 없습니다.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header border-bottom border-translucent py-2">
+    <h5 class="mb-0 fs-9">다음 순서</h5>
+  </div>
+  <div class="card-body">
+    <ol class="mb-0 ps-3">
+      {% for step in next_steps %}
+      <li class="fs-9 mb-2">{{ step }}</li>
+      {% endfor %}
+    </ol>
+    <p class="fs-10 text-body-tertiary mt-3 mb-0">
+      <b>2번이 승인 지점입니다</b> — 새 IA 를 승인받기 전에는 화면을 만들지 않습니다.
+      승인 없이 짓기 시작하면 지금 구성을 그대로 옮기게 됩니다.
+    </p>
+  </div>
+</div>
+
+<div class="mt-3">
+  <a class="btn btn-phoenix-secondary btn-sm" href="/admin/index.html">
+    <span data-feather="corner-up-left" style="width:14px;height:14px;"></span> 기존 운영자 화면으로
+  </a>
+  <a class="btn btn-phoenix-secondary btn-sm" href="/mvp1/index.html">
+    <span data-feather="home" style="width:14px;height:14px;"></span> 내부 허브
+  </a>
+</div>
+{% endblock %}
