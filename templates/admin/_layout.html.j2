@@ -71,13 +71,71 @@
 
     <main class="main" id="top">
 
-      {# ── 좌측 메뉴 ────────────────────────────────────────────────
-         컨테이너만 둔다. 내용은 `admin-menu.js` 가 정본
-         `admin-menu-data.js` 에서 그린다 — 서버가 다시 그리면 그게 곧 두 벌이다. #}
+      {# ── 좌측 메뉴 (LNB) — 새 IA · UX-14 ──────────────────────────
+         **서버가 그린다.** 단일 원천은 `api/admin_nav.NAV` 이고 레이아웃이 한 벌이라
+         모든 화면이 자동으로 같은 메뉴를 받는다 — 화면마다 복제되던 병이 구조적으로 사라진다.
+         그래서 이 레이아웃은 `admin-menu.js` 를 **로드하지 않는다**(로드하면 덮어쓴다).
+
+         state 세 가지를 메뉴가 정직하게 말한다:
+           new  재구축 완료 → /admin2/
+           old  아직 안 지음 → 기존 화면으로 보낸다(지금도 쓸 수 있다)
+           todo 아무 데도 없다 → 링크 없이 '준비 중' #}
       <nav class="navbar navbar-vertical navbar-expand-lg">
         <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
           <div class="navbar-vertical-content">
-            <ul class="navbar-nav flex-column" id="navbarVerticalNav"></ul>
+            <ul class="navbar-nav flex-column" id="navbarVerticalNav">
+              {% for g in nav %}
+              <li class="nav-item">
+                <div class="nav-item-wrapper">
+                  <a class="nav-link dropdown-indicator label-1{{ ' active' if g.active }}"
+                     href="#nv{{ loop.index }}" role="button" data-bs-toggle="collapse"
+                     aria-expanded="{{ 'true' if g.active else 'false' }}" aria-controls="nv{{ loop.index }}">
+                    <div class="d-flex align-items-center">
+                      <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                      <span class="nav-link-icon"><span data-feather="{{ g.icon }}"></span></span>
+                      <span class="nav-link-text">{{ g.title }}</span>
+                      {% if g.done %}<span class="badge badge-phoenix badge-phoenix-primary ms-2 fs-10">{{ g.done }}</span>{% endif %}
+                    </div>
+                  </a>
+                  <div class="parent-wrapper label-1">
+                    <ul class="nav collapse parent{{ ' show' if g.active }}" id="nv{{ loop.index }}">
+                      {% for it in g["items"] %}
+                      <li class="collapsed nav-item">
+                        {% if it.href %}
+                        <a class="nav-link{{ ' active' if it.active }}" href="{{ it.href }}"
+                           {% if it.note %}title="{{ it.note }}"{% endif %}>
+                          <div class="d-flex align-items-center">
+                            <span class="nav-link-text">{{ it.label }}</span>
+                            {% if it.state == 'new' %}<span class="badge badge-phoenix badge-phoenix-primary ms-2 fs-10">NEW</span>{% endif %}
+                          </div>
+                        </a>
+                        {% else %}
+                        {# 아무 데도 없는 화면 — 링크를 걸면 죽은 링크가 된다.
+                           숨기지 않는 이유: 이 메뉴가 곧 IA 이고, 무엇이 아직 없는지도 사실이다. #}
+                        <span class="nav-link disabled text-body-quaternary" style="cursor:default;"
+                              {% if it.note %}title="{{ it.note }}"{% endif %}>
+                          <div class="d-flex align-items-center">
+                            <span class="nav-link-text">{{ it.label }}</span>
+                            <span class="badge badge-phoenix badge-phoenix-secondary ms-2 fs-10">준비 중</span>
+                          </div>
+                        </span>
+                        {% endif %}
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+            <div class="px-3 py-3 mt-2 border-top border-translucent">
+              <p class="fs-10 text-body-tertiary mb-1">재구축 진척</p>
+              <p class="fs-10 text-body-quaternary mb-0">
+                {{ nav_counts.groups }}그룹 {{ nav_counts.total }}화면 ·
+                <b class="text-primary">완료 {{ nav_counts.new }}</b> ·
+                기존 {{ nav_counts.old }} · 준비 중 {{ nav_counts.todo }}
+              </p>
+            </div>
           </div>
         </div>
         <div class="navbar-vertical-footer">
@@ -219,10 +277,10 @@
     <script src="/admin/vendors/choices/choices.min.js"></script>
     <script src="/admin/assets/js/phoenix.js"></script>
 
+    {# admin-menu-data.js · admin-menu.js 는 **일부러 안 싣는다** — 좌측 메뉴를
+       서버가 그리므로 저 둘이 돌면 우리 메뉴를 지우고 옛 6그룹으로 덮어쓴다. #}
     <script src="/shared/ui-progress.js"></script>
     <script src="/shared/admin-panel.js"></script>
-    <script src="/shared/admin-menu-data.js"></script>
-    <script src="/shared/admin-menu.js"></script>
     <script src="/shared/admin-helper.js"></script>
     <script src="/shared/su-icons.js"></script>
     <script src="/shared/admin-auth.js"></script>

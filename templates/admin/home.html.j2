@@ -1,111 +1,293 @@
 {#
-  운영자 재구축 현황판 — 2026-08-09 착수.
+  운영자 대시보드 (재구축) — 2026-08-09 · UX-14
 
-  지금은 "무엇이 서 있고 무엇이 아직 없는가"를 말하는 자리다. 화면이 늘면
-  이 자리가 새 대시보드가 된다.
+  ■ 원칙 (사용자 결정 2026-08-09)
+    ① Phoenix 템플릿 틀을 그대로 쓴다. 여기서는 `dashboard/crm.html` 골격을 썼다 —
+       카드 8개 · 균등 그리드(col-6 col-xl-4)이고, 우리 항목이 정확히 8개라 맞는다.
+       travel-agency(15칸)·stock(23칸)은 절반 이상이 빈 채로 남는다.
+    ② 우리가 못 채우는 칸은 지우지 않고 **`[향후 사용예정]` 텍스트**로 둔다.
+    ③ **그 칸에 숫자나 차트는 절대 남기지 않는다** — 회색 0도 사람은 사실로 읽는다.
+       그래서 준비 중 칸에는 값 대신 "원천이 없다"는 문장만 있다.
 
-  **수치를 지어내지 않는다.** 목록은 `api/admin_ui.py` 의 BUILT / NEXT_STEPS 가
-  단일 원천이고, 화면은 그것을 그대로 그린다. 화면이 실제로 서기 전에 목록에
-  올리면 이 현황판이 곧 거짓말이 된다 — 기존 화면들이 정확히 그래서
-  "더미 데이터" 배지를 폐기해야 했다.
+  ■ 숫자의 원천 — 화면은 아무것도 계산하지 않는다
+    GET /api/admin/dashboard        처리 대기 · 오늘 흐름 · 주문
+    GET /api/admin/candidate-pool   슬롯별 후보 · 게이트별 막힌 사유
+    GET /api/admin/quote-quality    누적 견적 성립률 · 입력 방식 · 재고 정합
+    셋 다 서버 집계다. 특히 `pending_counts` 는 "대시보드와 작업 패널의 단일 원천"이라
+    주석에 못박혀 있다 — 여기서 다시 세면 두 화면이 다른 수를 말한다.
+
+  ■ 실패는 삼키지 않는다
+    못 불러오면 "연결 안 됨"이라 말하고 수치를 전부 "—" 로 되돌린다. 옛 더미로
+    폴백하지 않는다(`data-dummy-fallback="none"`).
 #}
 {% extends "admin/_layout.html.j2" %}
 
-{% block title %}운영자 재구축{% endblock %}
-{% block body_attrs %}data-screen-id="NEW-HOME-010" data-domain="rebuild" data-dummy-fallback="none"{% endblock %}
+{% block title %}대시보드{% endblock %}
+{% block body_attrs %}data-screen-id="NEW-DASH-010" data-domain="dashboard" data-dummy-fallback="none"{% endblock %}
 
 {% block breadcrumb %}
-<ol class="breadcrumb mb-0">
-  <li class="breadcrumb-item active">운영자 재구축</li>
-</ol>
+<ol class="breadcrumb mb-0"><li class="breadcrumb-item active">대시보드</li></ol>
 {% endblock %}
 
 {% block content %}
-<div class="mb-4">
-  <h2 class="mb-1">운영자 시스템 재구축
-    <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">착수 2026-08-09</span>
-  </h2>
-  <p class="text-body-tertiary mb-0">
-    기존 <code>/admin/*</code> 37화면은 <b class="text-body-secondary">그대로 돌아갑니다.</b>
-    이건 이관이 아니라 병행 신축입니다 — 다 자라면 그때 갈아탑니다.
-  </p>
-</div>
-
-<div class="row g-3 mb-4">
-  <div class="col-12 col-lg-7">
-    <div class="card h-100">
-      <div class="card-header border-bottom border-translucent py-2">
-        <h5 class="mb-0 fs-9">왜 다시 짓는가</h5>
-      </div>
-      <div class="card-body">
-        <p class="fs-9 mb-2">
-          지금 37화면은 슬라이스 1~104를 거치며 <b>하나씩 쌓인 것</b>이지 동선에서 도출된 적이 없습니다.
-          좌측 메뉴가 전부 명사인 것이 그 증거입니다 — 상품 · 가격 · 추천 설정 · 견적/주문 · 회원 · 시스템.
-          <b>데이터 객체별 CRUD 구성이지 운영자가 하는 「일」 기준이 아닙니다.</b>
-        </p>
-        <p class="fs-9 mb-0 text-body-tertiary">
-          그래서 <b class="text-body-secondary">"이 상품이 왜 추천에 안 나오지?"</b> 하나를 답하려면
-          상품 관리 → 상품 검수 → 사양 항목 정의 → 추천 가능 재고 → 조립 호환 규칙,
-          <b class="text-body-secondary">화면 다섯</b>을 오가야 합니다.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-lg-5">
-    <div class="card h-100">
-      <div class="card-header border-bottom border-translucent py-2">
-        <h5 class="mb-0 fs-9">지금 서 있는 화면</h5>
-      </div>
-      <div class="card-body">
-        {% if built %}
-        <div class="d-flex flex-column gap-2">
-          {% for s in built %}
-          <a class="d-flex align-items-start gap-2 text-decoration-none p-2 rounded-2 bg-body-secondary bg-opacity-25" href="{{ s.href }}">
-            <span class="d-inline-flex flex-center rounded-2 bg-primary-subtle text-primary flex-shrink-0" style="width:28px;height:28px;">
-              <span data-feather="check" style="width:14px;height:14px;"></span>
-            </span>
-            <span>
-              <span class="d-block fw-semibold text-body-highlight fs-9">{{ s.label }}</span>
-              <span class="d-block fs-10 text-body-tertiary">{{ s.note }}</span>
-            </span>
-          </a>
-          {% endfor %}
-        </div>
-        <p class="fs-10 text-body-tertiary mt-3 mb-0">
-          {{ built|length }}개. 화면이 <b>실제로 설 때만</b> 이 목록에 오릅니다.
-        </p>
-        {% else %}
-        <p class="fs-9 text-body-tertiary mb-0">아직 없습니다.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-header border-bottom border-translucent py-2">
-    <h5 class="mb-0 fs-9">다음 순서</h5>
-  </div>
-  <div class="card-body">
-    <ol class="mb-0 ps-3">
-      {% for step in next_steps %}
-      <li class="fs-9 mb-2">{{ step }}</li>
-      {% endfor %}
-    </ol>
-    <p class="fs-10 text-body-tertiary mt-3 mb-0">
-      <b>2번이 승인 지점입니다</b> — 새 IA 를 승인받기 전에는 화면을 만들지 않습니다.
-      승인 없이 짓기 시작하면 지금 구성을 그대로 옮기게 됩니다.
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+  <div>
+    <h2 class="mb-1">대시보드
+      <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">재구축</span>
+      <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span>
+    </h2>
+    <p class="text-body-tertiary mb-0">
+      <b class="text-body-secondary">지금 팔 수 있는가</b> · <b class="text-body-secondary">AI가 제 일을 하는가</b> ·
+      <b class="text-body-secondary">장사가 되는가</b> — 세 질문에 답합니다.
     </p>
   </div>
+  <a href="/admin/index.html" class="btn btn-phoenix-secondary btn-sm">
+    <span data-feather="corner-up-left" style="width:14px;height:14px;"></span> 기존 대시보드
+  </a>
 </div>
 
-<div class="mt-3">
-  <a class="btn btn-phoenix-secondary btn-sm" href="/admin/index.html">
-    <span data-feather="corner-up-left" style="width:14px;height:14px;"></span> 기존 운영자 화면으로
-  </a>
-  <a class="btn btn-phoenix-secondary btn-sm" href="/mvp1/index.html">
-    <span data-feather="home" style="width:14px;height:14px;"></span> 내부 허브
-  </a>
+<div class="row g-3" id="board">
+  {# ── ① 추천 가능 비율 ─────────────────────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">지금 팔 수 있는 부품</h5></div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3">
+          <div class="echart-dash" id="poolDonut" style="width:104px;height:104px;"></div>
+          <div>
+            <h3 class="mb-0" data-k="poolOk">—</h3>
+            <p class="fs-9 text-body-tertiary mb-1">추천 가능 / 전체 <span data-k="poolCore">—</span></p>
+            <span class="badge badge-phoenix badge-phoenix-primary" data-k="poolRate">—</span>
+          </div>
+        </div>
+        <p class="fs-10 text-body-tertiary mb-0 mt-3">4중 게이트(사양·검수·가격·재고)를 모두 통과한 부품입니다.</p>
+      </div></div>
+  </div>
+
+  {# ── ② 견적 성립률 — 우리만의 핵심 지표 ──────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100 border-primary"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">AI가 답을 냈는가 <span class="badge badge-phoenix badge-phoenix-primary fs-10 ms-1">핵심</span></h5></div>
+      <div class="card-body">
+        <h1 class="mb-0" data-k="qRate">—</h1>
+        <p class="fs-9 text-body-tertiary mb-2">상담 <span data-k="qSess">—</span>건 중 견적이 나온 비율</p>
+        <div class="progress mb-2" style="height:8px;">
+          <div class="progress-bar" id="qBar" style="width:0%"></div>
+        </div>
+        <p class="fs-10 text-body-tertiary mb-0">
+          답을 못 준 상담 <b class="text-danger" data-k="qFail">—</b>건.
+          <span class="d-block mt-1">왜 못 냈는지는 아직 알 수 없습니다 — 상담 기록에 결과 항목이 없습니다.</span>
+        </p>
+      </div></div>
+  </div>
+
+  {# ── ③ 작업 대기열 ──────────────────────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">처리 대기</h5></div>
+      <div class="card-body p-0"><div class="list-group list-group-flush" id="pendingList">
+        <div class="list-group-item fs-9 text-body-tertiary">불러오는 중…</div>
+      </div></div></div>
+  </div>
+
+  {# ── ④ 슬롯별 후보 — 가장 얇은 곳이 전체를 정한다 ────── #}
+  <div class="col-12 col-xl-8">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">슬롯별 추천 가능 부품</h5></div>
+      <div class="card-body">
+        <div class="echart-dash" id="slotBar" style="height:260px;"></div>
+        <p class="fs-10 text-body-tertiary mb-0 mt-2">
+          견적은 <b>모든 슬롯이 동시에 차야</b> 나옵니다 — 합이 아니라 곱이고, <b>가장 얇은 칸이 전체를 정합니다.</b>
+        </p>
+      </div></div>
+  </div>
+
+  {# ── ⑤ 게이트별 막힌 사유 ────────────────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">왜 추천에 못 들어가나</h5></div>
+      <div class="card-body p-0"><div class="list-group list-group-flush" id="reasonList">
+        <div class="list-group-item fs-9 text-body-tertiary">불러오는 중…</div>
+      </div></div></div>
+  </div>
+
+  {# ── ⑥ 입력 방식 ──────────────────────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">고객이 어떻게 말하나</h5></div>
+      <div class="card-body">
+        <div class="echart-dash" id="modePie" style="height:190px;"></div>
+        <p class="fs-10 text-body-tertiary mb-0">대화형 비중이 「AI와 대화」 경로의 실제 사용률입니다.</p>
+      </div></div>
+  </div>
+
+  {# ── ⑦ 커머스 ───────────────────────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">장사가 되는가</h5></div>
+      <div class="card-body">
+        <div class="row g-2 text-center">
+          <div class="col-4"><p class="fs-10 text-body-tertiary mb-0">주문</p><h4 class="mb-0" data-k="ordTotal">—</h4></div>
+          <div class="col-4"><p class="fs-10 text-body-tertiary mb-0">결제</p><h4 class="mb-0" data-k="pay">—</h4></div>
+          <div class="col-4"><p class="fs-10 text-body-tertiary mb-0">회원</p><h4 class="mb-0" data-k="mem">—</h4></div>
+        </div>
+        <hr class="my-3">
+        <p class="fs-10 text-body-tertiary mb-0">
+          베타 단계라 표본이 작습니다. <b>이 수로 추세를 읽지 마십시오.</b>
+        </p>
+      </div></div>
+  </div>
+
+  {# ── ⑧ 재고 정합 ──────────────────────────────── #}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card h-100"><div class="card-header border-bottom border-translucent py-2">
+      <h5 class="mb-0 fs-9">재고 = 원장 합</h5></div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3">
+          <span class="d-inline-flex flex-center rounded-circle" id="driftIcon"
+                style="width:52px;height:52px;background:var(--phoenix-secondary-bg-subtle);">
+            <span data-feather="shield" style="width:24px;height:24px;"></span>
+          </span>
+          <div><h3 class="mb-0" data-k="drift">—</h3>
+            <p class="fs-9 text-body-tertiary mb-0">어긋난 상품</p></div>
+        </div>
+        <p class="fs-10 text-body-tertiary mb-0 mt-3">
+          <b>0이어야 정상입니다.</b> 아니면 재고를 원장 없이 고치는 경로가 새로 생긴 것입니다.
+        </p>
+      </div></div>
+  </div>
+
+  {# ── ⑨~⑫ 준비 중 — Phoenix 틀을 유지하되 숫자·차트는 두지 않는다 ── #}
+  {% for t, why in [
+      ('방문자 · 유입', '방문 기록 테이블이 없습니다'),
+      ('회원가입 전환율', '방문 수가 없어 분모를 만들 수 없습니다'),
+      ('장바구니 전환', '장바구니 테이블이 없습니다 — 담기가 원장에 안 남습니다'),
+      ('매출 추이', '주문 표본이 10건이라 추세를 말할 수 없습니다') ] %}
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card h-100 border-dashed"><div class="card-body text-center py-4">
+      <span class="badge badge-phoenix badge-phoenix-secondary mb-2">향후 사용예정</span>
+      <h6 class="mb-1 text-body-tertiary">{{ t }}</h6>
+      <p class="fs-10 text-body-quaternary mb-0">{{ why }}</p>
+    </div></div>
+  </div>
+  {% endfor %}
 </div>
+
+<p class="fs-10 text-body-tertiary mt-3 mb-0">
+  「향후 사용예정」 칸에는 <b>숫자도 차트도 두지 않습니다</b> — 회색 0도 사람은 사실로 읽습니다.
+  원천이 생기면 그 자리에 실값이 들어옵니다.
+</p>
+
+{% raw %}
+<script>
+(function(){
+  var $ = function(k){ return document.querySelectorAll('[data-k="'+k+'"]'); };
+  function put(k, v){ $(k).forEach(function(e){ e.textContent = v; }); }
+  var n = function(v){ return v == null ? '—' : Number(v).toLocaleString('ko-KR'); };
+  var srcBadge = document.getElementById('dataSrc');
+
+  // 실패하면 이유를 말하고 수치는 전부 "—" 로 되돌린다. 더미로 폴백하지 않는다.
+  function fail(){
+    if(srcBadge){ srcBadge.textContent='연결 안 됨';
+      srcBadge.classList.replace('badge-phoenix-primary','badge-phoenix-secondary'); }
+    ['poolOk','poolCore','poolRate','qRate','qSess','qFail','ordTotal','pay','mem','drift']
+      .forEach(function(k){ put(k,'—'); });
+    ['pendingList','reasonList'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el) el.innerHTML='<div class="list-group-item fs-9 text-body-tertiary">서버에 연결되지 않아 불러오지 못했습니다.</div>';
+    });
+  }
+  function ok(){
+    if(srcBadge){ srcBadge.textContent='실데이터 · Cloud SQL';
+      srcBadge.classList.replace('badge-phoenix-secondary','badge-phoenix-primary'); }
+  }
+
+  // echarts 는 문서 끝에서 로드된다 — 없으면 차트만 포기하고 수치 렌더는 계속 간다.
+  function chart(id, option){
+    var el = document.getElementById(id);
+    if(!el || !window.echarts) return;
+    var c = echarts.init(el); c.setOption(option);
+    window.addEventListener('resize', function(){ c.resize(); });
+  }
+  var CSS = function(v, f){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || f; };
+
+  Promise.all([
+    fetch('/api/admin/dashboard').then(function(r){ if(!r.ok) throw 0; return r.json(); }),
+    fetch('/api/admin/candidate-pool').then(function(r){ if(!r.ok) throw 0; return r.json(); }),
+    fetch('/api/admin/quote-quality').then(function(r){ if(!r.ok) throw 0; return r.json(); })
+  ]).then(function(res){
+    var d = res[0], pool = res[1], q = res[2];
+    ok();
+
+    // ① 추천 가능
+    put('poolOk', n(pool.ok_total)); put('poolCore', n(pool.core_total));
+    put('poolRate', pool.rate + '%');
+    chart('poolDonut', { series:[{ type:'pie', radius:['62%','86%'], silent:true,
+      label:{show:false}, data:[
+        {value: pool.ok_total, itemStyle:{color: CSS('--phoenix-primary','#3874ff')}},
+        {value: Math.max(0, pool.core_total - pool.ok_total),
+         itemStyle:{color: CSS('--phoenix-secondary-bg-subtle','#e3e6ed')}}]}]});
+
+    // ② 견적 성립률
+    put('qRate', q.rate + '%'); put('qSess', n(q.sessions)); put('qFail', n(q.unquoted));
+    var bar = document.getElementById('qBar'); if(bar) bar.style.width = q.rate + '%';
+
+    // ③ 처리 대기 — pending 은 서버의 단일 원천을 그대로 그린다
+    var PEND = [['review','상품 사양 검수','/admin/review-queue.html'],
+                ['price','가격 검토','/admin/price-review.html'],
+                ['stock','재고 입고','/admin/stock-inbound.html'],
+                ['refund','환불 처리','/admin/refunds.html']];
+    var pl = document.getElementById('pendingList');
+    if(pl) pl.innerHTML = PEND.map(function(p){
+      var v = d.pending ? d.pending[p[0]] : null;
+      return '<a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2" href="'+p[2]+'">'
+        + '<span class="fs-9">'+p[1]+'</span>'
+        + '<span class="fw-bold">'+ n(v) +'</span></a>';
+    }).join('');
+
+    // ④ 슬롯별 후보 — 적은 것부터. 가장 얇은 칸이 위로 온다.
+    var cats = (pool.categories||[]).slice().sort(function(a,b){ return a.ok - b.ok; });
+    chart('slotBar', {
+      grid:{left:96, right:24, top:8, bottom:24},
+      xAxis:{type:'value', splitLine:{lineStyle:{color: CSS('--phoenix-border-color','#e3e6ed')}}},
+      yAxis:{type:'category', data: cats.map(function(c){ return c.name; }),
+             axisLine:{show:false}, axisTick:{show:false}},
+      tooltip:{trigger:'axis', axisPointer:{type:'shadow'}},
+      series:[{ type:'bar', data: cats.map(function(c){ return c.ok; }),
+                itemStyle:{color: CSS('--phoenix-primary','#3874ff'), borderRadius:[0,4,4,0]},
+                barMaxWidth:16 }]
+    });
+
+    // ⑤ 게이트별 사유
+    var rl = document.getElementById('reasonList');
+    if(rl) rl.innerHTML = (pool.reasons||[]).map(function(r){
+      return '<a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2" href="/admin/'+r.link+'">'
+        + '<span class="fs-9">'+r.label+'</span><span class="fw-bold">'+ n(r.count) +'</span></a>';
+    }).join('');
+
+    // ⑥ 입력 방식
+    var PAL = [CSS('--phoenix-primary','#3874ff'), CSS('--phoenix-info','#0097eb'),
+               CSS('--phoenix-warning','#e5780b')];
+    chart('modePie', { tooltip:{trigger:'item'},
+      legend:{bottom:0, textStyle:{fontSize:11}},
+      series:[{ type:'pie', radius:['45%','70%'], center:['50%','44%'], label:{show:false},
+        data:(q.modes||[]).map(function(m,i){
+          return { name:m.label, value:m.count, itemStyle:{color:PAL[i % PAL.length]} }; })}]});
+
+    // ⑦ 커머스 · ⑧ 재고 정합
+    put('ordTotal', n(d.flow ? d.flow.orders_total : null));
+    put('pay', n(q.payments)); put('mem', n(q.members));
+    put('drift', n(q.stock_drift));
+    var di = document.getElementById('driftIcon');
+    if(di && q.stock_drift === 0) di.style.background = 'var(--phoenix-primary-bg-subtle)';
+
+    if(window.feather) feather.replace();
+  }).catch(fail);
+})();
+</script>
+{% endraw %}
+{% endblock %}
+
+{% block foot_extra %}
+<script src="/admin/vendors/echarts/echarts.min.js"></script>
 {% endblock %}

@@ -101,6 +101,56 @@ def dashboard():
     }
 
 
+@router.get("/quote-quality")
+def quote_quality():
+    """견적 품질 — **AI 가 제 일을 하는가**(재구축 대시보드의 수요 축 · UX-14).
+
+    기존 `/dashboard` 의 `sessions_today` 는 **오늘치**만 본다. 재구축 대시보드는
+    **누적 성립률**을 중심 지표로 삼기로 했다 — "AI 제안이 얼마나 효율적인가"에
+    가장 가까운 답이고, 도매꾹에도 Phoenix 에도 없는 우리만의 지표이기 때문이다.
+
+    ■ 불성립은 **명시적으로 기록되지 않는다** — 근사임을 밝힌다
+      세션은 있는데 스냅샷이 없는 것으로 센다. 그래서 **왜 못 냈는지**(어느 슬롯이
+      비었나 · 어느 조건이 걸렸나)는 여기서 줄 수 없다. 그 축을 넣으려면
+      `consult_sessions` 에 결과 컬럼이 필요하다. **화면이 이 한계를 먼저 말한다** —
+      성립률만 보여주고 원인을 아는 척하면 그게 지어낸 근거다.
+
+    ■ 재고 정합은 관계식으로 센다
+      `stock_qty = SUM(qty_delta)` 는 회귀가 전 상품에서 지키는 불변식이다(슬라이스 98).
+      여기서도 **같은 식**으로 센다 — 두 곳이 다른 식을 쓰면 두 수가 갈린다.
+    """
+    with engine.connect() as conn:
+        one = lambda sql: conn.execute(text(sql)).scalar_one()
+        sess = one("SELECT COUNT(*) FROM consult_sessions")
+        done = one("SELECT COUNT(DISTINCT session_id) FROM quote_snapshots")
+        modes = conn.execute(text(
+            "SELECT mode, COUNT(*) FROM consult_sessions GROUP BY 1 ORDER BY 2 DESC")).all()
+        tiers = conn.execute(text(
+            "SELECT quote_type, COUNT(*) FROM quote_snapshots GROUP BY 1 ORDER BY 2 DESC")).all()
+        drift = one(
+            "SELECT COUNT(*) FROM products p WHERE p.stock_qty <> COALESCE("
+            " (SELECT SUM(m.qty_delta) FROM stock_movements m"
+            "  WHERE m.product_code = p.product_code), 0)")
+        members = one("SELECT COUNT(*) FROM members")
+        payments = one("SELECT COUNT(*) FROM payments")
+
+    MODE_KO = {"guided": "가이드형", "chat": "대화형", "talk": "음성"}
+    return {
+        "sessions": sess,
+        "quoted": done,
+        "unquoted": sess - done,
+        "rate": round(done / sess * 100, 1) if sess else 0.0,
+        "modes": [{"key": m, "label": MODE_KO.get(m, m), "count": n} for m, n in modes],
+        "tiers": [{"key": t, "count": n} for t, n in tiers],
+        "stock_drift": drift,          # 0이어야 한다 — 아니면 원장 안 남기는 경로가 생긴 것
+        "members": members,
+        "payments": payments,
+        "note": ("불성립은 별도로 기록되지 않아 **세션은 있는데 견적 스냅샷이 없는 것**으로"
+                 " 셉니다. 그래서 왜 못 냈는지(빈 슬롯·걸린 조건)는 아직 알 수 없습니다 —"
+                 " consult_sessions 에 결과 컬럼이 붙어야 답할 수 있습니다."),
+    }
+
+
 @router.get("/worklist")
 def worklist():
     """작업 패널 — 어느 화면에서든 '지금 할 일'과 그 화면으로 가는 길(슬라이스 61).

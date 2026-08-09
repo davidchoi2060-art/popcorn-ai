@@ -25,6 +25,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from .admin_nav import counts as nav_counts, nav_for
+
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -32,12 +34,16 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 router = APIRouter(prefix="/admin2", tags=["admin-ui"])
 
 
-def _render(request: Request, template: str, **ctx) -> HTMLResponse:
+def _render(request: Request, template: str, **ctx) -> HTMLResponse:  # noqa: D401
     """템플릿을 렌더하고 캐시를 막는다.
 
     캐시 정책은 정적 쪽 `NoCacheStatic` 과 같아야 한다 — 한쪽만 캐시하면
     "고쳤는데 안 바뀐다"가 한쪽에서만 일어나 비교가 오염된다.
     """
+    # 좌측 메뉴는 **서버가 그린다**(admin_nav 가 단일 원천). 레이아웃이 한 벌이라
+    # 모든 화면이 자동으로 같은 메뉴를 받는다 — 화면마다 복제되던 병이 구조적으로 사라진다.
+    ctx.setdefault("nav", nav_for(request.url.path))
+    ctx.setdefault("nav_counts", nav_counts())
     resp = templates.TemplateResponse(request, template, ctx)
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
