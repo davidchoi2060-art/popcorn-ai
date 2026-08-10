@@ -4813,7 +4813,17 @@ def test_display_name():
               all(n.startswith("회원가입") for n in exempt), "전부",
               [n[:20] for n in exempt if not n.startswith("회원가입")])
 
-    # ④ 관통 — 고객 응답(견적·대안·연쇄)에 꼬리가 없다
+    # ④ 파생이 못 푸는 결함은 **게이트가 막는다** — 이름 없는 부품이 견적에 들어가면
+    #    고객은 무엇을 사는지 알 수 없다. 123034(원천이 통째로 광고)를 검수 회부해 뺐고,
+    #    같은 것이 다음 적재로 또 들어오면 여기서 잡힌다. 고정 건수가 아니라 관계다.
+    bad = db_one("SELECT COUNT(*) FROM v_recommendation_candidates"
+                 " WHERE product_name LIKE '회원가입%'")
+    if bad is None:
+        check("[42] 이름 없는 후보 검사", True, "DB 미접속 — 건너뜀", "건너뜀", kind="SKIP")
+    else:
+        check("[42] 이름이 통째로 판매조건인 추천 후보 없음", bad == 0, 0, bad)
+
+    # ⑤ 관통 — 고객 응답(견적·대안·연쇄)에 꼬리가 없다
     TAILS = ("회원가입", "맞춤할인", "현금할인", "할인쿠폰")
     _, rec = post("/api/recommend", {"mode": "guided",
                   "constraints": [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "150만원"}]})
@@ -4827,7 +4837,8 @@ def test_display_name():
             for ch in a.get("chain") or []:
                 names.append((slot, ch["to"]["name"]))
                 names.append((slot, ch["from"]["name"]))
-    # 예외 상품(원천이 통째로 광고)은 여기서도 예외다 — 그것까지 세면 검수 전엔 늘 실패한다
+    # 이름이 통째로 광고인 상품은 여기서 세지 않는다 — 그건 ④가 게이트로 잡는 다른 결함이다.
+    # 둘을 섞으면 실패 메시지가 "파생이 샜다"인지 "게이트가 뚫렸다"인지 구분되지 않는다.
     leak = [(s, n) for s, n in names
             if any(t in n for t in TAILS) and not n.startswith("회원가입")]
     check(f"[42] 고객 응답 이름 {len(names)}건에 판매조건 꼬리 없음",
