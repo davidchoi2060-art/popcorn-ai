@@ -27,6 +27,7 @@ from sqlalchemy import text
 
 from .timeutil import iso, now_iso
 from .db import engine
+from .product_name import display_name   # 대안 제시도 고객이 보는 자리다
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
                         load_compat_rules)
 from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천 — SSD를 여기만 "저장장치"로 쓰고 있었다
@@ -164,7 +165,7 @@ def candidates(body: SwapQuery):
             if chain is None:
                 continue  # 해소 불가 — 미노출(UX-11 ①)
             entry = {"product_code": alt["product_code"], "sku": alt["sku"],
-                     "name": alt["product_name"], "price": alt["sale_price"],
+                     "name": display_name(alt["product_name"]), "price": alt["sale_price"],
                      "price_diff": alt["sale_price"] - chosen[s]["snap_price"],
                      "tags": {"silent": bool(alt.get("tag_silent")),
                               "white": bool(alt.get("tag_white"))},
@@ -173,10 +174,11 @@ def candidates(body: SwapQuery):
                 entry["chain"] = [{
                     "slot": c["_slot"],
                     "from": {"sku": c["_from"].get("snap_sku") or c["_from"].get("sku"),
-                             "name": c["_from"].get("snap_name") or c["_from"].get("product_name"),
+                             # 스냅샷 이름은 그때 고객이 본 기록이라 손대지 않는다 — 파생은 카탈로그 쪽만
+                             "name": c["_from"].get("snap_name") or display_name(c["_from"].get("product_name")),
                              "price": c["_from"].get("snap_price") or c["_from"].get("sale_price")},
                     "to": {"product_code": c["_to"]["product_code"], "sku": c["_to"]["sku"],
-                           "name": c["_to"]["product_name"], "price": c["_to"]["sale_price"],
+                           "name": display_name(c["_to"]["product_name"]), "price": c["_to"]["sale_price"],
                            "price_diff": c["_to"]["sale_price"]
                                          - (c["_from"].get("snap_price") or c["_from"].get("sale_price"))},
                 } for c in chain]
@@ -230,7 +232,7 @@ def apply(body: ApplyBody, request: Request, response: Response):
             if s in ch_by_slot:
                 p = chosen[s]
                 new_parts.append({"part_type": s, "product_code": p["product_code"],
-                                  "sku": p["sku"], "name": p["product_name"],
+                                  "sku": p["sku"], "name": display_name(p["product_name"]),
                                   "price": p["sale_price"]})
             else:
                 new_parts.append(it)

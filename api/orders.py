@@ -21,6 +21,7 @@ from sqlalchemy import text
 
 from .customer_auth import current_member
 from .db import engine
+from .product_name import display_name   # 품절 알림도 고객이 읽는다
 
 router = APIRouter(prefix="/api")
 
@@ -100,7 +101,7 @@ def create_order(body: OrderBody, request: Request, response: Response):
             need[it["product_code"]] = need.get(it["product_code"], 0) + 1
         for c, q in periph_lines:
             need[c["product_code"]] = need.get(c["product_code"], 0) + q
-        soldout = [{"sku": stock[pc]["sku"], "name": stock[pc]["product_name"]}
+        soldout = [{"sku": stock[pc]["sku"], "name": display_name(stock[pc]["product_name"])}
                    for pc, q in need.items()
                    if pc not in stock or stock[pc]["status"] != "판매중" or stock[pc]["stock_qty"] < q]
         if soldout:

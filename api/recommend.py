@@ -25,6 +25,7 @@ from . import usage_floors as UF
 from .timeutil import iso, now_iso
 from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap
 from .db import engine
+from .product_name import display_name   # 견적은 파는 이름이 아니라 설명하는 이름을 쓴다
 
 router = APIRouter(prefix="/api")
 
@@ -381,7 +382,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     return {
         "label": TIER_LABELS[tier],
         "items": [{"part_type": s, "product_code": chosen[s]["product_code"],
-                   "sku": chosen[s]["sku"], "name": chosen[s]["product_name"],
+                   "sku": chosen[s]["sku"], "name": display_name(chosen[s]["product_name"]),
                    "price": chosen[s]["sale_price"]} for s in SLOTS],
         "total": total,
         "compat": build_compat(chosen, rules),
@@ -454,7 +455,7 @@ def _recent_pick(conn):
         # 그대로 내보내면 'COOLER_CPU_AIR'이 고객 화면에 그대로 찍힌다.
         ok.append({
             "items": [{"part_type": _slot_of(c["part_type"]), "product_code": c["product_code"],
-                       "name": c["product_name"], "price": c["sale_price"]} for c in cur],
+                       "name": display_name(c["product_name"]), "price": c["sale_price"]} for c in cur],
             "total": sum(c["sale_price"] for c in cur),
             "at": iso(r["created_at"]) if r["created_at"] else None,
         })
@@ -536,7 +537,7 @@ def _companion(conn):
         else:
             spec = r["connection"] or ""
         out.append({"part_type": r["part_type"], "label": labels.get(r["part_type"], r["part_type"]),
-                    "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
+                    "product_code": r["product_code"], "sku": r["sku"], "name": display_name(r["product_name"]),
                     "price": r["sale_price"], "stock": r["stock_qty"], "spec": spec})
     order = ["MONITOR", "KEYBOARD", "MOUSE", "HEADSET", "SPEAKER", "WEBCAM"]
     return sorted(out, key=lambda c: order.index(c["part_type"]))

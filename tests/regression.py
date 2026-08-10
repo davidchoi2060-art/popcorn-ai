@@ -4738,6 +4738,104 @@ def test_guards():
     check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
 
 
+def test_display_name():
+    """[42] 견적 표시용 상품명 — 판매조건 꼬리가 고객에게 새지 않는다 (A-11 ⑤ · 2026-08-10)
+
+    ■ 왜 검사가 필요한가
+      `products.product_name` 은 마켓에 내보내는 **판매용 제목**이라 "… 회원가입 계좌이체
+      맞춤할인 2.5%" 같은 꼬리가 붙는다(전체 22,840건 중 868건). 견적은 "왜 이 부품인가"를
+      말하는 자리라 그 꼬리가 근거를 묻는다. 파생은 `api/product_name.display_name` 하나가
+      하고, **고객 응답을 만드는 자리마다** 불러야 한다 — 한 군데만 빠뜨려도 그 화면에서
+      조용히 광고가 샌다(500이 아니라 '이름이 좀 지저분함'으로 보인다).
+
+    ■ 관계로 본다
+      고정 건수를 적지 않는다. **원천에 꼬리가 있는 상품이 응답에 나타나면, 그 응답의
+      이름에는 꼬리가 없어야 한다** — 원천이 바뀌어도 성립하는 관계다.
+
+    ■ 예외는 하나이고 그것도 관계로 고정한다
+      자른 뒤 이름이 없어지는 상품(원천이 통째로 광고)은 자르지 않는다. 빈 이름을
+      내미느니 광고를 내미는 게 낫다. 그런 상품은 **검수로 풀 문제**라 여기서는
+      '예외가 늘지 않았는지'만 본다.
+    """
+    print("\n[42] 견적 표시용 상품명 — 판매조건 꼬리 차단 (A-11 ⑤)")
+    sys.path.insert(0, ROOT)
+    from api.product_name import display_name
+
+    # ① 배출 지점 전수 — `"name":` 자리에 원천을 파생 없이 넣으면 그 화면에서만 광고가 샌다.
+    #    관통 검사(④)만으로는 못 잡는다: 그 견적에 꼬리 달린 부품이 우연히 안 뽑히면
+    #    조용히 통과한다(실제로 150만원 견적 24행에 한 건도 없었다). 관계로 고정한다 —
+    #    **고객 모듈에서 product_name 을 name 으로 내보내는 줄은 전부 display_name 을 거친다.**
+    leaky = []
+    for fn in ("recommend.py", "swap.py", "orders.py"):
+        for i, ln in enumerate(open(os.path.join(ROOT, "api", fn),
+                                    encoding="utf-8").read().splitlines(), 1):
+            if '"name":' in ln and "product_name" in ln and "display_name" not in ln:
+                leaky.append(f"{fn}:{i}")
+    check("[42] 고객 모듈의 name 배출이 전부 파생을 거친다", not leaky, "없음", leaky)
+
+    # ① 단일 원천 — 파생을 다른 곳에서 또 구현하지 않는다
+    dup = []
+    for fn in ("recommend.py", "swap.py", "orders.py", "candidates.py"):
+        p = os.path.join(ROOT, "api", fn)
+        if not os.path.exists(p):
+            continue
+        src = open(p, encoding="utf-8").read()
+        if "회원가입" in src:
+            dup.append(fn)
+    check("[42] 파생 규칙이 product_name.py 밖에 없다", not dup, "없음", ", ".join(dup) or "-")
+
+    # ② 규칙 자체 — 부품 정보는 지우지 않는다
+    check("[42] 판매조건 꼬리를 걷는다",
+          display_name("인텔 코어i3 12세대 12100F (벌크) 회원가입 계좌이체 맞춤할인 2.5%")
+          == "인텔 코어i3 12세대 12100F (벌크)", "꼬리 제거", "미제거")
+    check("[42] 유통 형태는 보존한다((정품)·(벌크)·(멀티팩))",
+          display_name("AMD 라이젠7 9700X (멀티팩(정품))") == "AMD 라이젠7 9700X (멀티팩(정품))",
+          "원본 유지", "훼손")
+    check("[42] 잘라서 이름이 없어지면 자르지 않는다",
+          display_name("회원가입 계좌이체 맞춤할인 2.5%") == "회원가입 계좌이체 맞춤할인 2.5%",
+          "원본 유지", "빈 이름")
+    check("[42] None·빈 문자열에 죽지 않는다",
+          display_name(None) is None and display_name("") == "", "그대로", "예외")
+
+    # ③ 원천 전량 — 파생 결과에 꼬리가 남지 않는다(예외 제외)
+    kept = db_one("SELECT COUNT(*) FROM products WHERE product_name LIKE '%회원가입%'")
+    if kept is None:
+        check("[42] 원천 대조", True, "DB 미접속 — 건너뜀", "건너뜀", kind="SKIP")
+    else:
+        rows = []
+        with _engine.connect() as c:
+            rows = [r[0] for r in c.execute(text(
+                "SELECT product_name FROM products WHERE product_name LIKE '%회원가입%'")).all()]
+        leaked = [n for n in rows if "회원가입" in display_name(n) and display_name(n) != n]
+        check(f"[42] 원천 {len(rows)}건 파생 후 꼬리 잔존 없음", not leaked, 0, len(leaked))
+        exempt = [n for n in rows if display_name(n) == n]
+        check(f"[42] 자를 수 없는 예외 {len(exempt)}건 — 전부 원천이 통째로 광고",
+              all(n.startswith("회원가입") for n in exempt), "전부",
+              [n[:20] for n in exempt if not n.startswith("회원가입")])
+
+    # ④ 관통 — 고객 응답(견적·대안·연쇄)에 꼬리가 없다
+    TAILS = ("회원가입", "맞춤할인", "현금할인", "할인쿠폰")
+    _, rec = post("/api/recommend", {"mode": "guided",
+                  "constraints": [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "150만원"}]})
+    names = [(t, it["name"]) for t, s in (rec.get("sets") or {}).items()
+             for it in (s or {}).get("items") or []]
+    st, cand = post("/api/swap/candidates",
+                    {"session_id": rec["session_id"], "tier": "recommend"})
+    for slot, v in (cand.get("slots") or {}).items():
+        for a in v.get("alternatives") or []:
+            names.append((slot, a["name"]))
+            for ch in a.get("chain") or []:
+                names.append((slot, ch["to"]["name"]))
+                names.append((slot, ch["from"]["name"]))
+    # 예외 상품(원천이 통째로 광고)은 여기서도 예외다 — 그것까지 세면 검수 전엔 늘 실패한다
+    leak = [(s, n) for s, n in names
+            if any(t in n for t in TAILS) and not n.startswith("회원가입")]
+    check(f"[42] 고객 응답 이름 {len(names)}건에 판매조건 꼬리 없음",
+          not leak, 0, leak[:3])
+    check("[42] 응답 표본이 비어 있지 않다(검사가 헛돌지 않는다)",
+          len(names) > 100, "> 100건", len(names))
+
+
 def test_rebuild_screens():
     """[41] 재구축 화면(`/admin2/*`) 계약 — **렌더 결과**를 검사한다 (P-08 · 2026-08-10)
 
@@ -4876,7 +4974,8 @@ def main():
                test_part_type_change,
                test_usage_floors,
                test_guards,
-               test_rebuild_screens):
+               test_rebuild_screens,
+               test_display_name):
         try:
             fn()
         except Exception as e:
