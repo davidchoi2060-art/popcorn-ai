@@ -1,0 +1,505 @@
+<meta charset="utf-8">
+<title>PC 조립 조감도 — 무엇을 알아야 하고 무엇을 맞춰야 하는가</title>
+<style>
+  :root{
+    --ink:#101a24; --ink-2:#3d4d5c; --ink-3:#6b7d8d;
+    --paper:#F0F5F9; --card:#ffffff; --line:#D3E0EA; --line-soft:#E4ECF4;
+    --blue:#4A90E2; --blue-deep:#2E6DA8; --blue-wash:#DCE7F2;
+    --violet:#7A5FA8; --violet-wash:#E8E1F2;
+    --amber:#C77B1F; --amber-wash:#F6E9D5;
+    --teal:#1c7a4d; --teal-wash:#DBEDE3;
+    --red:#C0392B; --red-wash:#F6DEDA;
+    --grid:#E4ECF4;
+    --sans: 'Pretendard','Noto Sans KR',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --mono: ui-monospace,'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#E6EEF5; --ink-2:#A9BCCB; --ink-3:#7A8D9C;
+      --paper:#0D141B; --card:#141E28; --line:#26333F; --line-soft:#1C2731;
+      --blue:#6FAEEA; --blue-deep:#9CC9F2; --blue-wash:#17293A;
+      --violet:#A98BD6; --violet-wash:#251E33;
+      --amber:#E0A455; --amber-wash:#33260F;
+      --teal:#5FD6A0; --teal-wash:#10281D;
+      --red:#E8776A; --red-wash:#331716;
+      --grid:#1C2731;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#E6EEF5; --ink-2:#A9BCCB; --ink-3:#7A8D9C;
+    --paper:#0D141B; --card:#141E28; --line:#26333F; --line-soft:#1C2731;
+    --blue:#6FAEEA; --blue-deep:#9CC9F2; --blue-wash:#17293A;
+    --violet:#A98BD6; --violet-wash:#251E33;
+    --amber:#E0A455; --amber-wash:#33260F;
+    --teal:#5FD6A0; --teal-wash:#10281D;
+    --red:#E8776A; --red-wash:#331716;
+    --grid:#1C2731;
+  }
+  :root[data-theme="light"]{
+    --ink:#101a24; --ink-2:#3d4d5c; --ink-3:#6b7d8d;
+    --paper:#F0F5F9; --card:#ffffff; --line:#D3E0EA; --line-soft:#E4ECF4;
+    --blue:#4A90E2; --blue-deep:#2E6DA8; --blue-wash:#DCE7F2;
+    --violet:#7A5FA8; --violet-wash:#E8E1F2;
+    --amber:#C77B1F; --amber-wash:#F6E9D5;
+    --teal:#1c7a4d; --teal-wash:#DBEDE3;
+    --red:#C0392B; --red-wash:#F6DEDA;
+    --grid:#E4ECF4;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1040px; margin:0 auto; padding:44px 24px 80px;}
+
+  header{display:flex; flex-direction:column; gap:10px; margin-bottom:8px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-3);
+  }
+  h1{
+    margin:0; font-size:clamp(26px,3.6vw,38px); line-height:1.2;
+    letter-spacing:-.02em; font-weight:760; text-wrap:balance;
+  }
+  .lede{margin:0; max-width:62ch; color:var(--ink-2); font-size:16px;}
+
+  .tally{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+    gap:1px; background:var(--line); border:1px solid var(--line);
+    border-radius:12px; overflow:hidden; margin:26px 0 34px;
+  }
+  .tally div{background:var(--card); padding:14px 16px;}
+  .tally b{
+    display:block; font-family:var(--mono); font-size:23px; font-weight:600;
+    letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+  }
+  .tally span{font-size:12.5px; color:var(--ink-3);}
+
+  h2{
+    margin:44px 0 6px; font-size:20px; letter-spacing:-.01em; font-weight:700;
+    display:flex; align-items:baseline; gap:10px;
+  }
+  h2 em{
+    font-style:normal; font-family:var(--mono); font-size:11.5px;
+    color:var(--ink-3); letter-spacing:.06em;
+  }
+  .note{margin:0 0 20px; color:var(--ink-2); font-size:14.5px; max-width:66ch;}
+
+  figure{margin:0; background:var(--card); border:1px solid var(--line);
+         border-radius:14px; padding:8px; overflow-x:auto;}
+  svg{display:block; min-width:660px; width:100%; height:auto;}
+
+  .legend{
+    display:flex; flex-wrap:wrap; gap:8px 20px; margin:14px 2px 0;
+    font-size:12.5px; color:var(--ink-2);
+  }
+  .legend i{
+    display:inline-block; width:22px; height:0; border-top-width:2.5px;
+    border-top-style:solid; vertical-align:middle; margin-right:7px;
+  }
+
+  .groups{display:grid; gap:12px;}
+  .grp{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    overflow:hidden;
+  }
+  .grp > header{
+    display:flex; align-items:center; gap:10px; padding:11px 16px;
+    border-bottom:1px solid var(--line-soft); background:var(--wash);
+  }
+  .grp h3{margin:0; font-size:14.5px; font-weight:700;}
+  .grp .cnt{
+    margin-left:auto; font-family:var(--mono); font-size:11.5px; color:var(--ink-3);
+  }
+  .dot{width:9px; height:9px; border-radius:50%; background:var(--hue); flex:none;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th{
+    text-align:left; font-weight:600; font-size:11.5px; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--ink-3); padding:9px 16px 7px;
+    border-bottom:1px solid var(--line-soft); white-space:nowrap;
+  }
+  td{padding:9px 16px; border-bottom:1px solid var(--line-soft); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .pair{
+    font-family:var(--mono); font-size:11.5px; color:var(--hue);
+    font-weight:600; white-space:nowrap;
+  }
+  .link{font-weight:600; white-space:nowrap;}
+  .link s{text-decoration:none; color:var(--ink-3); font-weight:400; padding:0 3px;}
+  code{
+    font-family:var(--mono); font-size:12px; background:var(--line-soft);
+    padding:1px 5px; border-radius:4px; color:var(--ink-2);
+  }
+  .chip{
+    display:inline-block; font-size:11px; font-weight:650; padding:2px 8px;
+    border-radius:99px; white-space:nowrap; letter-spacing:.01em;
+  }
+  .chip.on{background:var(--teal-wash); color:var(--teal);}
+  .chip.off{background:var(--line-soft); color:var(--ink-3);}
+  .chip.no{background:var(--red-wash); color:var(--red);}
+
+  .parts{display:grid; grid-template-columns:repeat(auto-fill,minmax(292px,1fr)); gap:12px;}
+  .part{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px 12px; display:flex; flex-direction:column; gap:10px;
+  }
+  .part header{display:flex; align-items:baseline; gap:8px;}
+  .part h3{margin:0; font-size:15px; font-weight:700;}
+  .part .en{font-family:var(--mono); font-size:11px; color:var(--ink-3);}
+  .part .hub{
+    margin-left:auto; font-size:11px; font-weight:650; color:var(--blue-deep);
+    background:var(--blue-wash); padding:2px 8px; border-radius:99px;
+  }
+  .spec{display:grid; grid-template-columns:1fr auto; gap:2px 10px; align-items:center;}
+  .spec .nm{font-size:13px; display:flex; align-items:baseline; gap:6px; min-width:0;}
+  .spec .nm b{font-weight:600;}
+  .spec .nm u{
+    text-decoration:none; font-family:var(--mono); font-size:10.5px;
+    color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .bar{
+    display:flex; align-items:center; gap:7px;
+    font-family:var(--mono); font-size:11.5px; font-variant-numeric:tabular-nums;
+    color:var(--ink-3);
+  }
+  .bar i{
+    display:block; width:46px; height:5px; border-radius:99px;
+    background:var(--line-soft); position:relative; overflow:hidden;
+  }
+  .bar i s{
+    position:absolute; inset:0 auto 0 0; display:block; border-radius:99px;
+    background:var(--teal);
+  }
+  .bar.mid i s{background:var(--amber);}
+  .bar.low i s{background:var(--red);}
+  .bar.low, .bar.low span{color:var(--red);}
+  .warnmark{color:var(--ink-3); font-size:10.5px; font-family:var(--mono);}
+
+  .callout{
+    background:var(--card); border:1px solid var(--line);
+    border-left:3px solid var(--red); border-radius:0 12px 12px 0;
+    padding:14px 18px; margin:18px 0 0; font-size:14px; color:var(--ink-2);
+  }
+  .callout b{color:var(--ink);}
+  .callout ul{margin:8px 0 0; padding-left:18px;}
+  .callout li{margin:3px 0;}
+  footer{
+    margin-top:52px; padding-top:18px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--ink-3);
+  }
+  @media (max-width:640px){
+    .wrap{padding:30px 16px 60px;}
+    th,td{padding-left:12px; padding-right:12px;}
+  }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">팝콘AI · 조립 보증 표준</div>
+  <h1>PC 한 대를 조립하려면<br>무엇을 알아야 하는가</h1>
+  <p class="lede">부품 8종이 서로를 물리적·전기적으로 제약한다. 그 제약을 판정하려면 부품마다 정해진 사양이 있어야 하고, 사양이 없으면 “조립된다”고 말할 수 없다. 아래는 그 전체 지도다.</p>
+</header>
+
+<div class="tally">
+  <div><b>8</b><span>필수 부품</span></div>
+  <div><b>22</b><span>크로스체크 관계</span></div>
+  <div><b>9</b><span>지금 검사하는 규칙</span></div>
+  <div><b>46</b><span>사양 항목</span></div>
+</div>
+
+<h2>지도 <em>누가 누구를 제약하는가</em></h2>
+<p class="note">선 하나가 “이 둘은 서로 맞아야 한다”는 뜻이다. <b>메인보드가 허브</b>이고, <b>케이스는 담는 그릇</b>이라 안에 들어가는 거의 모든 것과 치수를 다툰다. 실선은 지금 검사하는 관계, 점선은 아직 검사하지 않는 관계다.</p>
+
+<figure>
+<svg viewBox="0 0 900 560" role="img" aria-label="PC 부품 간 호환성 관계 지도">
+  <defs>
+    <style>
+      .nd{fill:var(--card); stroke:var(--line); stroke-width:1.5;}
+      .nd-hub{fill:var(--blue-wash); stroke:var(--blue); stroke-width:2;}
+      .lbl{font-family:var(--sans); font-size:13.5px; font-weight:700; fill:var(--ink); text-anchor:middle;}
+      .sub{font-family:var(--mono); font-size:10px; fill:var(--ink-3); text-anchor:middle;}
+      .e{fill:none; stroke-width:2.2; stroke-linecap:round;}
+      .e-off{stroke-dasharray:2 5; stroke-width:2;}
+      .eA{stroke:var(--blue);} .eB{stroke:var(--violet);}
+      .eC{stroke:var(--amber);} .eD{stroke:var(--teal);}
+      .tag{font-family:var(--mono); font-size:9.5px; fill:var(--ink-3); text-anchor:middle;}
+      .case-fr{fill:none; stroke:var(--violet); stroke-width:1.6; stroke-dasharray:7 5; opacity:.75;}
+      .case-lb{font-family:var(--sans); font-size:12px; font-weight:700; fill:var(--violet);}
+    </style>
+  </defs>
+
+  <!-- 케이스 = 담는 그릇 -->
+  <rect class="case-fr" x="26" y="60" width="700" height="464" rx="18"/>
+  <text class="case-lb" x="44" y="50">케이스 — 안에 들어가는 모든 것과 치수를 다툰다</text>
+
+  <!-- 엣지: A 그룹 (보드 중심) -->
+  <path class="e eA" d="M232 168 L330 226"/>
+  <text class="tag" x="272" y="188">소켓</text>
+  <path class="e eA" d="M420 128 L420 216"/>
+  <text class="tag" x="452" y="176">메모리 규격</text>
+  <path class="e eA e-off" d="M512 226 L604 168"/>
+  <text class="tag" x="576" y="190">PCIe 슬롯</text>
+  <path class="e eA e-off" d="M512 268 L610 316"/>
+  <text class="tag" x="580" y="300">M.2 · SATA</text>
+
+  <!-- 엣지: B 그룹 (물리 공간) -->
+  <path class="e eB" d="M652 200 L700 200 L700 468 L520 468"/>
+  <text class="tag" x="700" y="356">GPU 길이</text>
+  <path class="e eB e-off" d="M172 200 L92 200 L92 468 L360 468"/>
+  <text class="tag" x="92" y="356">파워 규격</text>
+  <path class="e eB" d="M420 300 L420 396"/>
+  <text class="tag" x="452" y="352">보드 규격</text>
+
+  <!-- 엣지: C 그룹 (전력) -->
+  <path class="e eC" d="M628 226 L470 430"/>
+  <text class="tag" x="580" y="352">전원 용량</text>
+  <path class="e eC e-off" d="M212 226 L378 430"/>
+  <text class="tag" x="256" y="336">EPS 커넥터</text>
+
+  <!-- 엣지: D 그룹 (냉각) -->
+  <path class="e eD" d="M136 168 L136 118 L172 118"/>
+  <text class="tag" x="112" y="140">소켓</text>
+  <text class="tag" x="112" y="152">발열</text>
+  <path class="e eD e-off" d="M232 96 L352 96"/>
+  <text class="tag" x="292" y="82">램 간섭</text>
+
+  <!-- 노드 -->
+  <g>
+    <rect class="nd-hub" x="330" y="216" width="182" height="84" rx="12"/>
+    <text class="lbl" x="421" y="252">메인보드</text>
+    <text class="sub" x="421" y="270">15개 사양 · 허브</text>
+  </g>
+  <g>
+    <rect class="nd" x="172" y="168" width="120" height="58" rx="10"/>
+    <text class="lbl" x="232" y="194">CPU</text>
+    <text class="sub" x="232" y="211">5개 사양</text>
+  </g>
+  <g>
+    <rect class="nd" x="352" y="70" width="136" height="58" rx="10"/>
+    <text class="lbl" x="420" y="96">메모리</text>
+    <text class="sub" x="420" y="113">5개 사양</text>
+  </g>
+  <g>
+    <rect class="nd" x="592" y="142" width="120" height="58" rx="10"/>
+    <text class="lbl" x="652" y="168">그래픽카드</text>
+    <text class="sub" x="652" y="185">6개 사양</text>
+  </g>
+  <g>
+    <rect class="nd" x="592" y="288" width="120" height="58" rx="10"/>
+    <text class="lbl" x="652" y="314">저장장치</text>
+    <text class="sub" x="652" y="331">4개 사양</text>
+  </g>
+  <g>
+    <rect class="nd" x="360" y="430" width="160" height="58" rx="10"/>
+    <text class="lbl" x="440" y="456">파워</text>
+    <text class="sub" x="440" y="473">6개 사양</text>
+  </g>
+  <g>
+    <rect class="nd" x="76" y="68" width="156" height="58" rx="10"/>
+    <text class="lbl" x="154" y="94">CPU 쿨러</text>
+    <text class="sub" x="154" y="111">공랭 4 · 수랭 3</text>
+  </g>
+
+  <!-- 범례는 SVG 밖 -->
+</svg>
+</figure>
+
+<div class="legend">
+  <span><i style="border-top-color:var(--blue)"></i>보드 중심 — 논리·전기</span>
+  <span><i style="border-top-color:var(--violet)"></i>물리 공간 — 케이스</span>
+  <span><i style="border-top-color:var(--amber)"></i>전력</span>
+  <span><i style="border-top-color:var(--teal)"></i>냉각·간섭</span>
+  <span><i style="border-top-style:dashed;border-top-color:var(--ink-3)"></i>아직 검사하지 않음</span>
+</div>
+
+<h2>크로스체크 22쌍 <em>무엇과 무엇을 비교하는가</em></h2>
+<p class="note">관계마다 “양쪽에 어떤 사양이 있어야 판정되는가”가 정해져 있다. 한쪽만 있으면 판정할 수 없다 — 호환은 늘 쌍이다.</p>
+
+<div class="groups">
+
+  <section class="grp" style="--hue:var(--blue); --wash:var(--blue-wash)">
+    <header><span class="dot"></span><h3>A. 메인보드 중심 — 논리·전기</h3><span class="cnt">9쌍 · 검사 4</span></header>
+    <table>
+      <tr><th>쌍</th><th>연결</th><th>비교하는 것</th><th>상태</th></tr>
+      <tr><td class="pair">A1</td><td class="link">CPU<s>↔</s>메인보드</td><td>소켓 규격이 같은가 <code>socket</code></td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">A2</td><td class="link">CPU<s>↔</s>메인보드</td><td>칩셋이 그 CPU 세대를 지원하는가</td><td><span class="chip no">보드 값 0%</span></td></tr>
+      <tr><td class="pair">A3</td><td class="link">CPU<s>↔</s>메인보드</td><td>BIOS 버전이 그 CPU를 받는가</td><td><span class="chip no">데이터 없음</span></td></tr>
+      <tr><td class="pair">A4</td><td class="link">메모리<s>↔</s>메인보드</td><td>DDR4 / DDR5 규격 <code>mem_type</code></td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">A5</td><td class="link">메모리<s>↔</s>메인보드</td><td>모듈 개수 ≤ 슬롯 수 · 최대 용량</td><td><span class="chip off">규칙 없음</span></td></tr>
+      <tr><td class="pair">A6</td><td class="link">메모리<s>↔</s>메인보드</td><td>램 클럭 ≤ 보드 지원 상한 <em>(경고)</em></td><td><span class="chip off">규칙 없음</span></td></tr>
+      <tr><td class="pair">A7</td><td class="link">그래픽카드<s>↔</s>메인보드</td><td>PCIe 세대 <em>(하위호환 — 경고만)</em></td><td><span class="chip off">규칙 없음</span></td></tr>
+      <tr><td class="pair">A8</td><td class="link">저장장치<s>↔</s>메인보드</td><td>NVMe면 M.2 슬롯, SATA면 포트가 있는가</td><td><span class="chip off">규칙 없음</span></td></tr>
+      <tr><td class="pair">A9</td><td class="link">메인보드<s>↔</s>케이스</td><td>ATX / mATX / ITX 수용 <code>form_factor</code></td><td><span class="chip on">검사 중</span></td></tr>
+    </table>
+  </section>
+
+  <section class="grp" style="--hue:var(--violet); --wash:var(--violet-wash)">
+    <header><span class="dot"></span><h3>B. 물리 공간 — 케이스가 담을 수 있는가</h3><span class="cnt">6쌍 · 검사 3</span></header>
+    <table>
+      <tr><th>쌍</th><th>연결</th><th>비교하는 것</th><th>상태</th></tr>
+      <tr><td class="pair">B1</td><td class="link">그래픽카드<s>↔</s>케이스</td><td>카드 길이 ≤ 케이스 허용 길이 (mm)</td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">B2</td><td class="link">그래픽카드<s>↔</s>케이스</td><td>카드 두께(슬롯) · 높이</td><td><span class="chip no">양쪽 0%</span></td></tr>
+      <tr><td class="pair">B3</td><td class="link">공랭 쿨러<s>↔</s>케이스</td><td>쿨러 높이 ≤ 케이스 허용 높이</td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">B4</td><td class="link">수랭 쿨러<s>↔</s>케이스</td><td>라디에이터 열 수 ≤ 케이스 수용</td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">B5</td><td class="link">파워<s>↔</s>케이스</td><td>ATX / SFX 규격 · 파워 길이</td><td><span class="chip no">길이 21%</span></td></tr>
+      <tr><td class="pair">B6</td><td class="link">저장장치<s>↔</s>케이스</td><td>3.5" / 2.5" 베이가 남는가</td><td><span class="chip no">HDD 크기 0%</span></td></tr>
+    </table>
+  </section>
+
+  <section class="grp" style="--hue:var(--amber); --wash:var(--amber-wash)">
+    <header><span class="dot"></span><h3>C. 전력 — 파워가 감당하는가</h3><span class="cnt">4쌍 · 검사 1</span></header>
+    <table>
+      <tr><th>쌍</th><th>연결</th><th>비교하는 것</th><th>상태</th></tr>
+      <tr><td class="pair">C1</td><td class="link">파워<s>↔</s>그래픽카드</td><td>정격 출력 ≥ GPU 권장 전원</td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">C2</td><td class="link">파워<s>↔</s>구성 전체</td><td>CPU + GPU + 여유 20~30%</td><td><span class="chip off">합산 규칙 없음</span></td></tr>
+      <tr><td class="pair">C3</td><td class="link">파워<s>↔</s>그래픽카드</td><td>보조전원 커넥터 (8핀 · 12V-2x6)</td><td><span class="chip no">GPU 9%</span></td></tr>
+      <tr><td class="pair">C4</td><td class="link">파워<s>↔</s>메인보드</td><td>EPS 12V 커넥터 개수</td><td><span class="chip no">보드 0%</span></td></tr>
+    </table>
+  </section>
+
+  <section class="grp" style="--hue:var(--teal); --wash:var(--teal-wash)">
+    <header><span class="dot"></span><h3>D. 냉각·간섭</h3><span class="cnt">3쌍 · 검사 2</span></header>
+    <table>
+      <tr><th>쌍</th><th>연결</th><th>비교하는 것</th><th>상태</th></tr>
+      <tr><td class="pair">D1</td><td class="link">쿨러<s>↔</s>CPU</td><td>지원 소켓 목록에 그 소켓이 있는가</td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">D2</td><td class="link">쿨러<s>↔</s>CPU</td><td>냉각 성능(W) ≥ CPU 발열(TDP)</td><td><span class="chip on">검사 중 <em>· 값 38%</em></span></td></tr>
+      <tr><td class="pair">D3</td><td class="link">공랭 쿨러<s>↔</s>메모리</td><td>램 방향 여유 ≥ 램 높이</td><td><span class="chip no">양쪽 0%</span></td></tr>
+    </table>
+  </section>
+
+</div>
+
+<div class="callout">
+  <b>범위 밖으로 미뤄 둔 것</b> — 시스템 팬·확장카드·ODD도 실제로는 크로스체크가 필요하다(팬 크기 ↔ 케이스 장착 위치, 확장카드 ↔ 보드 여유 슬롯, 그리고 <b>3슬롯 두께 GPU가 바로 아래 PCIe 슬롯을 막는</b> 관계). 지금은 분류가 없어 <code>ETC</code>에 묻혀 있다 — 재고 기준 팬 194종·확장카드 84종·ODD 10종.
+</div>
+
+<h2>부품별 사양 <em>무엇을 알아야 하는가 · 지금 얼마나 아는가</em></h2>
+<p class="note">각 항목 오른쪽 수치는 <b>재고 있는 상품 중 그 값을 가진 비율</b>이다. <code>막음</code>은 없으면 조립을 보증할 수 없는 항목, <code>경고</code>는 조립은 되지만 알려야 하는 항목이다.</p>
+
+<div class="parts">
+
+  <article class="part">
+    <header><h3>메인보드</h3><span class="en">MB</span><span class="hub">허브 · 15항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>소켓</b><u>socket</u></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>칩셋</b><u>chipset</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>지원 CPU 세대</b><u>supported_cpu_gens</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>세대별 최소 BIOS</b><u>bios_min_version</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>메모리 규격</b><u>mem_type</u></span><span class="bar"><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>메모리 슬롯 수</b><u>mem_slots</u></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>최대 메모리 용량</b><u>mem_max_gb</u></span><span class="bar"><i><s style="width:89%"></s></i><span>89%</span></span>
+      <span class="nm"><b>지원 최대 클럭</b><u>mem_max_clock_mhz</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>x16 슬롯 세대</b><u>pcie_x16_gen</u> <span class="warnmark">경고</span></span><span class="bar mid"><i><s style="width:55%"></s></i><span>55%</span></span>
+      <span class="nm"><b>M.2 슬롯 수</b><u>m2_slots</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>M.2 지원 규격</b><u>m2_form_factors</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>SATA 포트 수</b><u>sata_ports</u></span><span class="bar"><i><s style="width:92%"></s></i><span>92%</span></span>
+      <span class="nm"><b>M.2/SATA 레인 공유</b><u>m2_sata_shared</u> <span class="warnmark">경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>EPS 12V 커넥터</b><u>eps_connectors</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>케이스</h3><span class="en">CASE</span><span class="hub">담는 그릇 · 9항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>수용 보드 규격</b><u>form_factor_list</u></span><span class="bar"><i><s style="width:97%"></s></i><span>97%</span></span>
+      <span class="nm"><b>GPU 최대 길이</b><u>gpu_max_mm</u></span><span class="bar"><i><s style="width:95%"></s></i><span>95%</span></span>
+      <span class="nm"><b>쿨러 최대 높이</b><u>cooler_height_mm</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>라디에이터 최대 열</b><u>radiator_max_rows</u></span><span class="bar mid"><i><s style="width:69%"></s></i><span>69%</span></span>
+      <span class="nm"><b>수용 파워 규격</b><u>psu_form_factor_list</u></span><span class="bar"><i><s style="width:84%"></s></i><span>84%</span></span>
+      <span class="nm"><b>3.5" 베이 수</b><u>bay_35_count</u></span><span class="bar mid"><i><s style="width:74%"></s></i><span>74%</span></span>
+      <span class="nm"><b>2.5" 베이 수</b><u>bay_25_count</u></span><span class="bar mid"><i><s style="width:56%"></s></i><span>56%</span></span>
+      <span class="nm"><b>GPU 최대 두께</b><u>gpu_max_slots</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>파워 최대 길이</b><u>psu_max_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>CPU</h3><span class="en">CPU</span><span class="hub">5항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>소켓</b><u>socket</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>CPU 세대</b><u>cpu_generation</u></span><span class="bar"><i><s style="width:89%"></s></i><span>89%</span></span>
+      <span class="nm"><b>지원 메모리 규격</b><u>mem_type_support</u></span><span class="bar"><i><s style="width:90%"></s></i><span>90%</span></span>
+      <span class="nm"><b>설계 전력(TDP)</b><u>tdp_watt</u></span><span class="bar mid"><i><s style="width:76%"></s></i><span>76%</span></span>
+      <span class="nm"><b>내장그래픽</b><u>igpu_yn</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:91%"></s></i><span>91%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>그래픽카드</h3><span class="en">GPU</span><span class="hub">6항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>길이</b><u>length_mm</u></span><span class="bar"><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>권장 전원 용량</b><u>required_power_watt</u></span><span class="bar"><i><s style="width:91%"></s></i><span>91%</span></span>
+      <span class="nm"><b>PCIe 세대</b><u>pcie_gen</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:97%"></s></i><span>97%</span></span>
+      <span class="nm"><b>요구 보조전원</b><u>aux_power_req</u></span><span class="bar low"><i><s style="width:9%"></s></i><span>9%</span></span>
+      <span class="nm"><b>두께(슬롯)</b><u>thickness_slots</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>높이</b><u>height_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>파워</h3><span class="en">POWER</span><span class="hub">6항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>정격 출력</b><u>rated_watt</u></span><span class="bar"><i><s style="width:98%"></s></i><span>98%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar"><i><s style="width:97%"></s></i><span>97%</span></span>
+      <span class="nm"><b>SATA 전원 커넥터</b><u>sata_connectors</u></span><span class="bar mid"><i><s style="width:77%"></s></i><span>77%</span></span>
+      <span class="nm"><b>제공 보조전원</b><u>aux_power_provided</u></span><span class="bar low"><i><s style="width:22%"></s></i><span>22%</span></span>
+      <span class="nm"><b>길이</b><u>length_mm</u></span><span class="bar low"><i><s style="width:21%"></s></i><span>21%</span></span>
+      <span class="nm"><b>EPS 12V 커넥터</b><u>eps_connectors</u></span><span class="bar low"><i><s style="width:14%"></s></i><span>14%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>메모리</h3><span class="en">RAM</span><span class="hub">5항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>메모리 규격</b><u>mem_type</u></span><span class="bar"><i><s style="width:95%"></s></i><span>95%</span></span>
+      <span class="nm"><b>동작 클럭</b><u>clock_mhz</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>용량</b><u>capacity_gb</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>모듈 개수</b><u>module_count</u></span><span class="bar"><i><s style="width:87%"></s></i><span>87%</span></span>
+      <span class="nm"><b>높이</b><u>height_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>CPU 쿨러</h3><span class="en">COOLER</span><span class="hub">공랭 4 · 수랭 3</span></header>
+    <div class="spec">
+      <span class="nm"><b>지원 소켓 목록</b><u>socket_list</u></span><span class="bar"><i><s style="width:99%"></s></i><span>99%</span></span>
+      <span class="nm"><b>쿨러 높이</b><u>cooler_height_mm</u> <span class="warnmark">공랭</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>라디에이터 열 수</b><u>radiator_rows</u> <span class="warnmark">수랭</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>냉각 성능(TDP)</b><u>cooler_tdp</u></span><span class="bar low"><i><s style="width:38%"></s></i><span>38%</span></span>
+      <span class="nm"><b>램 방향 여유</b><u>ram_clearance_mm</u> <span class="warnmark">공랭</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+  </article>
+
+  <article class="part">
+    <header><h3>저장장치</h3><span class="en">SSD · HDD</span><span class="hub">4항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>인터페이스</b><u>interface</u> <span class="warnmark">SSD</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u> <span class="warnmark">SSD</span></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>인터페이스</b><u>interface</u> <span class="warnmark">HDD</span></span><span class="bar mid"><i><s style="width:80%"></s></i><span>80%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u> <span class="warnmark">HDD</span></span><span class="bar mid"><i><s style="width:67%"></s></i><span>67%</span></span>
+      <span class="nm"><b>PCIe 세대</b><u>pcie_gen</u> <span class="warnmark">SSD·경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>크기(3.5"/2.5")</b><u>size_inch</u> <span class="warnmark">HDD</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+  </article>
+
+</div>
+
+<div class="callout">
+  <b>지금 가장 크게 빈 곳</b>
+  <ul>
+    <li><b>메인보드 4항목이 0%</b> — 지원 CPU 세대 · BIOS · M.2 규격 · EPS 커넥터. 원문(상품 스펙 텍스트)에 아예 없어 파싱으로는 못 채운다.</li>
+    <li><b>치수 계열이 통째로 비어 있다</b> — GPU 두께·높이, 램 높이, 케이스의 GPU 최대 두께·파워 최대 길이. 그래서 “케이스에 들어가는가”를 길이 하나로만 판정하고 있다.</li>
+    <li><b>보조전원 커넥터</b> — GPU 9% · 파워 22%. RTX 50 계열의 12V-2x6을 확인할 수 없다.</li>
+    <li><b>쿨러 냉각 성능 38%</b> — 규칙은 있는데 값이 없어 <b>쿨러의 62%가 그 규칙에서 자동 탈락</b>한다. 규칙이 있는 것과 작동하는 것은 다르다.</li>
+  </ul>
+</div>
+
+<footer>
+  수치는 <b>재고 있는 판매중 코어 부품</b> 기준(2026-08-11). 사양 정의 46항목 = <code>std.spec_defs</code>, 값 = <code>std.part_specs</code>, 검사 규칙 9개 = <code>compat_rules</code>.
+  관계 번호(A1~D3)는 <code>docs/design/build-compatibility-matrix-2026-08-10.md</code>와 같다.
+</footer>
+</div>
