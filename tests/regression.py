@@ -4738,6 +4738,72 @@ def test_guards():
     check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
 
 
+def test_std_schema():
+    """[43] 조립 보증 표준 스키마 `std` — **`public` 을 건드리지 않는다** (2026-08-10)
+
+    ■ 왜 이 검사가 필요한가
+      사용자 원칙: *"기존 DB 테이블을 건드리지 말고 신규 테이블을 생성"* ·
+      *"신규 DB 로 가지 맙시다."* 그래서 같은 DB 안의 별도 스키마 `std` 에 지었다.
+      **그 경계가 지켜지는지는 사람이 기억할 일이 아니라 검사가 지킬 일이다.**
+      실제로 0035 에서 내가 `product_specs` 에 컬럼 26개를 붙였다가 되돌렸다.
+
+    ■ 관계로 본다
+      고정 건수를 적지 않는다. `std.part_specs` 는 계속 늘고 `public` 은 그대로여야 한다.
+    """
+    print("\n[43] 조립 보증 표준 스키마 std — public 무손 (P-08)")
+    if _engine is None:
+        check("[43] std 스키마", True, "DB 미접속 — 건너뜀", "건너뜀", kind="SKIP")
+        return
+
+    with _engine.connect() as c:
+        # ① `public.product_specs` 에 표준 항목이 새어 들어오지 않았다
+        std_only = [r[0] for r in c.execute(text(
+            "SELECT field_key FROM std.spec_defs")).all()]
+        pub_cols = {r[0] for r in c.execute(text(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name='product_specs'")).all()}
+        leaked = sorted(set(std_only) & pub_cols - {
+            # 개념이 겹치는 기존 항목은 원래 public 에 있던 것이다(이관 대상)
+            "socket", "socket_list", "chipset", "mem_type", "tdp_watt", "rated_watt",
+            "required_power_watt", "length_mm", "gpu_max_mm", "cooler_height_mm",
+            "cooler_tdp", "radiator_rows", "radiator_max_rows", "form_factor",
+            "form_factor_list", "interface", "capacity_gb", "clock_mhz", "pcie_gen",
+            "size_inch"})
+        check("[43] 신설 표준 항목이 public 에 새지 않았다", not leaked, "없음", leaked)
+
+        # ② 값마다 근거가 있다 — 근거 없는 값은 지어낸 값과 구별되지 않는다
+        n = c.execute(text("SELECT COUNT(*) FROM std.part_specs")).scalar()
+        bad = c.execute(text(
+            "SELECT COUNT(*) FROM std.part_specs"
+            " WHERE source_ref IS NULL OR source_ref = ''")).scalar()
+        check(f"[43] 값 {n}건 전부 근거(source_ref) 보유", bad == 0, 0, bad)
+
+        # ③ 사람이 고친 값은 잠겨 있다 — 안 잠그면 다음 파싱이 덮어쓴다
+        unlocked = c.execute(text(
+            "SELECT COUNT(*) FROM std.part_specs WHERE source='human' AND NOT locked")).scalar()
+        check("[43] human 출처는 전부 잠김", unlocked == 0, 0, unlocked)
+
+        # ④ 정의 없는 필드가 값 테이블에 없다(FK 가 막지만 계약을 명시한다)
+        orphan = c.execute(text(
+            "SELECT COUNT(*) FROM std.part_specs s"
+            " WHERE NOT EXISTS (SELECT 1 FROM std.spec_defs d WHERE d.field_key=s.field_key)")).scalar()
+        check("[43] 정의 없는 필드의 값 없음", orphan == 0, 0, orphan)
+
+        # ⑤ **필수 승격은 항목별로 한다** — 한꺼번에 올리면 추천 후보가 0이 된다
+        req = c.execute(text(
+            "SELECT COUNT(*) FROM std.spec_defs WHERE required_for <> '[]'::jsonb")).scalar()
+        pool = c.execute(text(
+            "SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")).scalar()
+        check(f"[43] 필수 지정 {req}개인데 추천 후보가 비지 않았다", pool > 0, "> 0", pool)
+
+        # ⑥ 표준이 겨냥한 부품 종류가 실재한다(오타로 죽은 항목을 만들지 않는다)
+        types = {r[0] for r in c.execute(text(
+            "SELECT DISTINCT part_type FROM products")).all()}
+        ghost = sorted({p for r in c.execute(text("SELECT part_types FROM std.spec_defs")).all()
+                        for p in list(r[0] or []) if p not in types})
+        check("[43] 표준의 적용 대상이 전부 실재하는 부품 종류", not ghost, "없음", ghost)
+
+
 def test_display_name():
     """[42] 견적 표시용 상품명 — 판매조건 꼬리가 고객에게 새지 않는다 (A-11 ⑤ · 2026-08-10)
 
@@ -4986,7 +5052,8 @@ def main():
                test_usage_floors,
                test_guards,
                test_rebuild_screens,
-               test_display_name):
+               test_display_name,
+               test_std_schema):
         try:
             fn()
         except Exception as e:
