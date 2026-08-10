@@ -172,6 +172,28 @@ def get(path):
         return json.load(r)
 
 
+def get_html(path):
+    """렌더된 HTML 을 받는다 — **재구축 화면(`/admin2/*`) 검사의 유일한 길**.
+
+    기존 마크업 검사는 `mockups/admin/*.html` 을 **파일로 직접 읽는다.** 그 화면들은
+    완결된 정적 파일이라 그게 가능했다. 재구축 화면은 Jinja2 템플릿이라 파일에는
+    `{% extends %}` 조각만 있고 **완성된 HTML 은 서버가 렌더한 뒤에만 존재한다.**
+    그래서 파일이 아니라 **응답**을 읽는다.
+
+    반환은 `(status, html)`. 200 이 아니어도 예외를 던지지 않는다 — 상태 자체가
+    검사 대상이다.
+    """
+    req = urllib.request.Request(BASE + path, headers=_headers())
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, e.read().decode("utf-8", "replace")
+        except Exception:
+            return e.code, ""
+
+
 def post(path, body=None):
     req = urllib.request.Request(
         BASE + path, data=json.dumps(body or {}).encode(), method="POST",
@@ -4716,6 +4738,89 @@ def test_guards():
     check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
 
 
+def test_rebuild_screens():
+    """[41] 재구축 화면(`/admin2/*`) 계약 — **렌더 결과**를 검사한다 (P-08 · 2026-08-10)
+
+    ■ 왜 새 그룹인가
+      기존 마크업 검사는 `mockups/admin/*.html` 을 **파일로 읽는다.** 재구축 화면은
+      Jinja2 라 파일에는 `{% extends %}` 조각만 있고 **완성 HTML 은 서버가 렌더한 뒤에만
+      존재한다.** 즉 기존 방식으로는 재구축 화면을 **한 줄도 못 지킨다** — 화면이
+      쌓이기 전에 옮기지 않으면 검증 없는 화면이 늘어난다.
+
+    ■ 여기서 지키는 것은 **계약**이지 수치가 아니다
+      화면 수치는 JS 가 API 를 불러 그린다. 정적 HTML 에는 없다.
+      수치 대조는 브라우저 검증의 몫이고(P-08 §검증), 회귀는 **구조 계약**을 본다.
+    """
+    print(chr(10) + "[41] 재구축 화면 계약 — 렌더 결과를 검사한다")
+
+    import re as _re41
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    from api.admin_nav import NAV, counts as nav_counts
+
+    SCREENS = [("/admin2/", "NEW-DASH-010"), ("/admin2/products", "ADM-PRD-010")]
+
+    for path, screen_id in SCREENS:
+        st, html = get_html(path)
+        check(f"[41] {path} 200", st == 200, 200, st)
+        if st != 200:
+            continue
+
+        # ① 화면 정체성 — 규약(`data-screen-id`/`data-domain`)이 렌더 결과에 있어야 한다
+        check(f"[41] {path} data-screen-id={screen_id}",
+              f'data-screen-id="{screen_id}"' in html, screen_id, "없음")
+        check(f"[41] {path} data-domain 있음", "data-domain=" in html, "있음", "없음")
+
+        # ② **admin-menu.js 를 싣지 않는다** — 실으면 서버가 그린 LNB 를 지우고
+        #    옛 6그룹으로 덮어쓴다. 주석으로만 막아 두면 다음 사람이 다시 넣는다.
+        check(f"[41] {path} admin-menu.js 미로드",
+              "/shared/admin-menu.js" not in html, "미로드", "로드됨")
+
+        # ③ Phoenix 데모 잔재가 없다 — 기존 36화면에 남아 있던 것들
+        for leak in ("Purchase template", "Demo widget", "Ask us anything"):
+            check(f"[41] {path} 데모 잔재 없음 ({leak})", leak not in html, "없음", "있음")
+
+        # ④ 참조한 자산이 실재한다 — 404 를 브라우저는 **조용히 넘어간다**
+        #    (슬라이스 100: theme.css 를 참조한 세 화면이 스타일 없이 이틀 돌았다)
+        refs = set(_re41.findall(r'(?:src|href)="(/(?:admin|shared|design-system)/[^"?#]+)"', html))
+        missing = []
+        for ref in sorted(refs):
+            if ref.startswith("/admin/"):
+                p = pathlib.Path(ROOT, "mockups", "admin", ref[len("/admin/"):])
+            elif ref.startswith("/shared/"):
+                p = pathlib.Path(ROOT, "mockups", "shared", ref[len("/shared/"):])
+            else:
+                p = pathlib.Path(ROOT, "design-system", ref[len("/design-system/"):])
+            if not p.exists():
+                missing.append(ref)
+        check(f"[41] {path} 참조 자산 실재 ({len(refs)}개)",
+              not missing, "전부 있음", ", ".join(missing[:3]) or "-")
+
+        # ⑤ LNB 는 IA(admin_nav.NAV)와 같아야 한다 — 화면이 메뉴를 다시 품지 않는다
+        items = len(_re41.findall(r'<span class="nav-link-text">', html))
+        want = nav_counts()["total"] + len(NAV)      # 항목 + 그룹 제목
+        check(f"[41] {path} LNB 항목 수 = IA", items == want, want, items)
+
+    # ⑥ 견본 배너와 실데이터 배지가 **한 화면에 같이 있으면 안 된다**
+    #    반쪽 상태를 뭉뚱그리면 예시값이 우리 것으로 읽힌다(2026-08-09 실사고).
+    st, html = get_html("/admin2/")
+    if st == 200:
+        sample = "레이아웃 견본" in html
+        live = "실데이터 · Cloud SQL" in html
+        check("[41] 견본 배너와 실데이터 배지 공존 금지",
+              not (sample and live), "둘 중 하나", "둘 다 있음")
+
+    # ⑦ NAV 자체의 무결성 — 링크 없는 항목은 '준비 중'이어야 하고, 중복 라벨이 없어야 한다
+    labels = [it[0] for _t, _ic, items in NAV for it in items]
+    dup = sorted({x for x in labels if labels.count(x) > 1})
+    check("[41] NAV 라벨 중복 없음", not dup, "없음", ", ".join(dup) or "-")
+
+    c = nav_counts()
+    check("[41] NAV 합계 = new+old+todo",
+          c["total"] == c["new"] + c["old"] + c["todo"],
+          c["total"], c["new"] + c["old"] + c["todo"])
+
+
 def main():
     print("=" * 74)
     print("팝콘PC AI 통합 회귀 세트 — 전량 불변식(I). 절대값 대신 관계·원천 대조 (A-13)")
@@ -4770,7 +4875,8 @@ def main():
                test_password_auth,
                test_part_type_change,
                test_usage_floors,
-               test_guards):
+               test_guards,
+               test_rebuild_screens):
         try:
             fn()
         except Exception as e:
