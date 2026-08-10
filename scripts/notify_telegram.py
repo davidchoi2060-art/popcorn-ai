@@ -78,8 +78,22 @@ def run_and_capture(cmd: list[str]) -> tuple[str, int]:
     셸이 낄 자리가 사라진다.
     """
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
-    proc = subprocess.run(cmd, capture_output=True, env=env,
-                          encoding="utf-8", errors="replace")
+    cmd = list(cmd)
+    # Windows 는 `.venv/Scripts/python` 같은 **상대 경로 + 슬래시**를 못 찾는다
+    # (`FileNotFoundError [WinError 2]`). 셸이 없으니 아무도 대신 풀어 주지 않는다 —
+    # 여기서 흡수한다. 안 그러면 배치마다 절대 경로를 적어야 한다.
+    exe = cmd[0]
+    if not os.path.isabs(exe):
+        cand = os.path.abspath(exe.replace("/", os.sep))
+        for c in (cand, cand + ".exe"):
+            if os.path.isfile(c):
+                cmd[0] = c
+                break
+    try:
+        proc = subprocess.run(cmd, capture_output=True, env=env,
+                              encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        return f"실행 파일을 찾을 수 없습니다: {cmd[0]}", 127
     out = (proc.stdout or "") + (proc.stderr or "")
     return out.rstrip(), proc.returncode
 
