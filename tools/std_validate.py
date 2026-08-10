@@ -63,7 +63,14 @@ _UNIT_TAIL = re.compile(r"^\d+(gb|tb|mb|kb|w|v|a|mhz|ghz|mm|cm|hz|bit|ea|p)$")
 _TOKEN = re.compile(r"[a-z0-9]+")
 # `dedupe` 가 세는 용량 토큰. 이게 어긋나면 **다른 상품**이므로 부스트를 주면 안 된다
 # (16GB 와 32GB 가 `DDR5-5600` 공통 토큰 때문에 0.96 으로 붙었다).
-_CAP = re.compile(r"\d+\s*(?:gb|tb|mb|w|mm|hz)")
+# **`8G`·`32G` 처럼 단위를 줄여 쓴 것도 잡는다** — 램 이름에 흔한데 `GB` 만 보면 놓치고,
+# 그러면 8G 와 32G 가 같은 상품으로 붙는다(실제로 그랬다).
+_CAP = re.compile(r"(\d+)\s*(?:gb|tb|mb|g(?![a-z])|t(?![a-z])|w|mm|hz)", re.I)
+
+# **PC4/PC5 규격 코드는 모델 번호가 아니다.** `PC4 25600` 은 DDR4-3200 을 뜻하는
+# 규격 표기라 제조사가 달라도 같은 값이 나온다. 강한 토큰으로 두면
+# `게일 DDR4 8G PC4 25600` 과 `G.SKILL DDR4 32G PC4 25600` 이 붙는다.
+_SPEC_CODE = re.compile(r"pc[345]\s*[-]?\s*(\d{4,5})", re.I)
 
 
 # **치수는 모델명이 아니다.** 쿨러의 `240`·`360` 은 라디에이터 크기, 팬의 `120`·`140` 은
@@ -73,6 +80,19 @@ _DIMENSION = {"92", "120", "140", "200", "240", "280", "360", "420", "480"}
 # 부스트를 주기 전에 넘어야 하는 이름 자체의 최소 유사도.
 # 모델 토큰이 겹쳐도 **이름이 전혀 다르면** 다른 제품일 가능성이 높다.
 _BASE_FLOOR = 0.30
+
+# **메모리 세대 표기는 결정적이다.** 보드 이름의 `D4`/`D5` 는 DDR4/DDR5 를 뜻하고,
+# 그게 다르면 **물리적으로 호환되지 않는 다른 제품**이다. 그런데 두 글자라 약한 토큰으로
+# 분류되고, 제조사·모델이 같아 base 유사도가 높아서 그대로 붙어 버렸다:
+#     구성 `ASRock H610M HVS/M.2 R2.0 D4`  ↔  카탈로그 `ASRock H610M HDV/M.2 D5 Gen5`
+# 그리고 그 잘못된 매칭이 **mem 규칙 탈락 30건**의 대부분이었다 —
+# 즉 매처가 틀려서 "메모리 규격 불일치"라는 가짜 결함을 만들고 있었다.
+_DDR_GEN = re.compile(r"(?<![A-Za-z0-9])(?:DDR\s*([345])|D([45]))(?![A-Za-z0-9])", re.I)
+
+
+def ddr_gen(s):
+    """이름에 드러난 메모리 세대. `DDR5` · `D5` 둘 다 읽는다."""
+    return {(m.group(1) or m.group(2)) for m in _DDR_GEN.finditer(str(s or ""))}
 
 
 def model_tokens(s):
@@ -84,8 +104,13 @@ def model_tokens(s):
       `RTX 5060 Ti … D7` 과 `RTX 5090 … D7` 이 `d7` 하나로 붙었고,
       쿨러는 `240` 하나로 다른 제품끼리 붙었다.
     """
+    text = str(s or "")
+    spec_codes = set(_SPEC_CODE.findall(text))      # PC4 25600 같은 규격 코드
     strong, weak = set(), set()
-    for t in _TOKEN.findall(str(s or "").lower()):
+    for t in _TOKEN.findall(text.lower()):
+        if t in spec_codes:                         # 규격은 모델 식별자가 아니다
+            weak.add(t)
+            continue
         if not any(ch.isdigit() for ch in t):
             continue
         if t in _NOT_MODEL or _UNIT_TAIL.match(t):
@@ -112,9 +137,18 @@ def match_score(a, b):
       ③ 강한 토큰이 겹칠 때만 올린다. 약한 토큰(`d7`·`i5`)만으로는 올리지 않는다.
     """
     base = sim(a, b)
+    # ⓪ **메모리 세대가 어긋나면 다른 제품이다.** 부스트를 막는 것으로는 부족하다 —
+    #    제조사·모델이 같아 base 가 이미 높기 때문이다(H610M D4 ↔ H610M D5 가 0.86).
+    #    깎아서 임계 아래로 보낸다.
+    da, db = ddr_gen(a), ddr_gen(b)
+    if da and db and not (da & db):
+        return base * 0.50
+    # ① **용량이 어긋나면 다른 상품이다.** 부스트를 막는 것만으로는 부족했다 —
+    #    `dedupe` 는 `GB`·`TB` 만 보고 `8G`·`32G` 축약형을 놓쳐서 감쇄를 안 건다.
+    #    그 틈으로 `게일 DDR4 8G` 와 `G.SKILL DDR4 32G` 가 0.58 로 붙었다(제조사도 다르다).
     ca, cb = set(_CAP.findall(a.lower())), set(_CAP.findall(b.lower()))
-    if ca and cb and ca != cb:                       # ①
-        return base
+    if ca and cb and ca != cb:
+        return base * 0.75
     sa, wa = model_tokens(a)
     sb, wb = model_tokens(b)
     inter = sa & sb
