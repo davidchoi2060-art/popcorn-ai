@@ -121,6 +121,47 @@ def p_psu_aux(txt):
     return (out, " / ".join(refs)[:120]) if out else None
 
 
+_SOCK_TOKEN = re.compile(
+    r"(?:소켓\s*|LGA\s*)(\d{3,4})\s*(\(X\)|V\s*3)?|(?<![A-Za-z])(AM[45])(?![0-9])"
+    r"|(?<![A-Za-z])(sTRX\d|STRX\d|TR4|sTR5|STR5)(?![0-9])", re.I)
+
+
+def p_socket_list(txt):
+    """쿨러가 지원하는 소켓 목록.
+
+    ■ 왜 다시 파싱하나 — **기존 값이 틀렸다**(실물 검증이 잡았다)
+      원문에 소켓 표기가 **두 형식**으로 섞여 있는데 기존 파서는 `LGA1700` 만 읽고
+      **`소켓1700`(한글 '소켓' + 숫자, 275건)을 놓쳤다.** 그 결과 `LGA1700` 이
+      **234건**에서 빠졌다 — 인텔 12~14세대 현행 주력 소켓이다.
+
+      실제 사례(Thermalright Peerless Assassin 120 SE, 제조사 공식 스펙으로 확인):
+        원문   : … / 소켓1700 / LGA1200 / LGA115(X) / LGA2011 V3 / … / AM4 / …
+        기존 값: [AM4, LGA115(X), LGA1200, LGA2011, LGA2011-V3, LGA2066]  ← 1700 없음
+      **멀쩡한 쿨러가 LGA1700 CPU 와 안 맞는다고 판정돼 조용히 견적에서 빠진다.**
+
+    ■ 어휘는 기존 저장값을 따른다
+      `LGA115(X)` · `LGA2011-V3` 처럼 이미 쓰이는 표기를 유지한다 — 새 표기를 만들면
+      같은 소켓이 두 이름으로 갈라진다.
+    """
+    out, refs = [], []
+    for m in _SOCK_TOKEN.finditer(txt):
+        num, suf, am, tr = m.group(1), m.group(2), m.group(3), m.group(4)
+        if num:
+            v = "LGA" + num
+            if suf and "(" in suf:
+                v = "LGA115(X)" if num == "115" else v + "(X)"
+            elif suf:
+                v += "-V3"
+        elif am:
+            v = am.upper()
+        else:
+            v = tr.upper().replace("STRX", "STRX")
+        if v not in out:
+            out.append(v)
+            refs.append(m.group(0).strip())
+    return (out, " / ".join(refs)[:200]) if out else None
+
+
 def p_gpu_aux(txt):
     """GPU 가 요구하는 보조전원. `16핀(12V2x6),1개` · `8핀,2개` 형식."""
     out, refs = [], []
@@ -163,9 +204,13 @@ RULES = {
     "GPU": {
         "aux_power_req": p_gpu_aux,
     },
+    # 쿨러는 원문에 사양이 거의 없지만 **소켓 목록만은 있고, 그게 틀려 있었다**
+    "COOLER_CPU_AIR": {"socket_list": p_socket_list},
+    "COOLER_CPU_AIO": {"socket_list": p_socket_list},
 }
 
-LIST_FIELDS = {"psu_form_factor_list", "mem_type_support", "aux_power_provided", "aux_power_req"}
+LIST_FIELDS = {"psu_form_factor_list", "mem_type_support", "aux_power_provided",
+               "aux_power_req", "socket_list"}
 BOOL_FIELDS = {"igpu_yn"}
 TEXT_FIELDS = {"cpu_generation"}
 
@@ -198,8 +243,12 @@ def run(apply_it, only=None, limit=None):
             unknown = [f for f in RULES[pt] if f not in defined]
             if unknown:
                 raise SystemExit(f"std.spec_defs 에 없는 필드: {pt} -> {unknown}")
+            # **모집단을 재고로 좁히지 않는다.** 처음엔 `status='판매중' AND stock_qty>0`
+            # 으로 제한했는데, 그 결과 재고 0인 `DEEPCOOL AG400`(112889)이 **원문에
+            # LGA1700 이 있는데도 옛 값 그대로** 남아 실물 검증에서 탈락했다.
+            # 재고는 내일 바뀌고 **파싱은 공짜다** — 사람 입력만 우선순위를 두면 된다.
             q = ("SELECT product_code, spec_source_text FROM products"
-                 " WHERE part_type=:t AND status='판매중' AND stock_qty>0"
+                 " WHERE part_type=:t AND category_group='core_part'"
                  "   AND spec_source_text IS NOT NULL AND spec_source_text <> ''")
             if limit:
                 q += " ORDER BY product_code DESC LIMIT :n"
@@ -214,12 +263,14 @@ def run(apply_it, only=None, limit=None):
                     val, ref = got
                     if (pc, field) in locked:
                         continue
-                    plan.append((pc, field, val, ref))
+                    plan.append((pc, field, val, ref, pt))
 
     # ── 드라이런 보고 — 건수가 아니라 **영향**을 말한다 ────────────────────
+    # **부품 종류별로 센다.** 필드명으로만 세면 `socket_list` 가 공랭·수랭 양쪽에
+    # 걸려 합산돼 추출률이 173% 로 나온다(실제로 그렇게 틀린 수를 냈다).
     by_field = {}
-    for pc, field, val, ref in plan:
-        d = by_field.setdefault(field, {"new": 0, "same": 0, "diff": 0, "sample": None})
+    for pc, field, val, ref, pt in plan:
+        d = by_field.setdefault((pt, field), {"new": 0, "same": 0, "diff": 0, "sample": None})
         cur = existing.get((pc, field))
         if cur is None:
             d["new"] += 1
@@ -236,7 +287,7 @@ def run(apply_it, only=None, limit=None):
         pop = skipped[pt]["모집단"]
         print("\n[%s] 모집단 %d건" % (pt, pop))
         for field in RULES[pt]:
-            d = by_field.get(field, {"new": 0, "same": 0, "diff": 0, "sample": None})
+            d = by_field.get((pt, field), {"new": 0, "same": 0, "diff": 0, "sample": None})
             got = d["new"] + d["same"] + d["diff"]
             miss = skipped[pt].get(field, 0)
             print("  %-22s 추출 %4d (%3.0f%%) · 신규 %4d · 동일 %4d · 변경 %3d · 못읽음 %4d"
@@ -251,7 +302,7 @@ def run(apply_it, only=None, limit=None):
         return 0
 
     with ENGINE.begin() as c:
-        for pc, field, val, ref in plan:
+        for pc, field, val, ref, _pt in plan:
             vt = vn = vj = None
             if field in LIST_FIELDS:
                 vj = json.dumps(val, ensure_ascii=False)

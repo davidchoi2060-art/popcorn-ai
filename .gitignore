@@ -41,3 +41,6 @@ tests/.regression-snapshot.json
 # 다나와 수집 원문 캐시 (슬라이스 51) — 재수집을 막기 위한 로컬 사본.
 # 외부 사이트 콘텐츠이므로 리포에 담지 않는다.
 .cache/
+
+# 텔레그램 폴링 오프셋 — PC마다 다르다. 공유하면 메시지를 건너뛰거나 다시 읽는다
+references/telegram_offset.json

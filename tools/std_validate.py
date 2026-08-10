@@ -66,13 +66,23 @@ _TOKEN = re.compile(r"[a-z0-9]+")
 _CAP = re.compile(r"\d+\s*(?:gb|tb|mb|w|mm|hz)")
 
 
+# **치수는 모델명이 아니다.** 쿨러의 `240`·`360` 은 라디에이터 크기, 팬의 `120`·`140` 은
+# 팬 지름이다. 이걸 강한 토큰으로 보면 전혀 다른 제품이 붙는다 —
+# `DARKFLASH NEBULA DN 240` 과 `DARKFLASH Twister DX 240 (핑크)` 이 1.00 으로 붙었다.
+_DIMENSION = {"92", "120", "140", "200", "240", "280", "360", "420", "480"}
+# 부스트를 주기 전에 넘어야 하는 이름 자체의 최소 유사도.
+# 모델 토큰이 겹쳐도 **이름이 전혀 다르면** 다른 제품일 가능성이 높다.
+_BASE_FLOOR = 0.30
+
+
 def model_tokens(s):
     """모델 식별자 후보를 **강·약으로 나눈다.**
 
     · **강** = 숫자 3자리 이상을 품은 토큰(`14600k`·`9950x`·`265`·`5090`·`sn580`).
       이게 겹쳐야 같은 물건이라 볼 수 있다.
-    · **약** = 나머지(`i5`·`d7`). 겹쳐도 증거가 못 된다 —
-      `RTX 5060 Ti … D7` 과 `RTX 5090 … D7` 이 `d7` 하나로 붙었다.
+    · **약** = 나머지(`i5`·`d7`) **와 치수**(`240`·`360`). 겹쳐도 증거가 못 된다 —
+      `RTX 5060 Ti … D7` 과 `RTX 5090 … D7` 이 `d7` 하나로 붙었고,
+      쿨러는 `240` 하나로 다른 제품끼리 붙었다.
     """
     strong, weak = set(), set()
     for t in _TOKEN.findall(str(s or "").lower()):
@@ -82,6 +92,9 @@ def model_tokens(s):
             continue
         digits = sum(ch.isdigit() for ch in t)
         if t.isdigit() and len(t) < 3:      # 세대·코어수 같은 한두 자리 수는 신호가 아니다
+            continue
+        if t in _DIMENSION:                 # 치수는 약한 토큰
+            weak.add(t)
             continue
         (strong if digits >= 3 else weak).add(t)
     return strong, weak
@@ -107,7 +120,7 @@ def match_score(a, b):
     inter = sa & sb
     if not inter and sa and sb:                      # ②
         return base * 0.60
-    if inter:                                        # ③
+    if inter and base >= _BASE_FLOOR:                # ③
         return min(1.0, base + 0.40 + 0.05 * min(len(inter), 3))
     return base
 
