@@ -274,6 +274,13 @@
     .venv/Scripts/python tools/ui_check_account.py          # 활성화(없으면 만든다)
     .venv/Scripts/python tools/ui_check_account.py --off     # 정지 + 비밀번호 무효화
 
+**브라우저로 화면을 열 때는 `dev-login` 을 쓴다**(2026-08-11): `.env` 에
+`UI_CHECK_DEV_LOGIN=1` 을 두고 `GET /api/admin/auth/dev-login` 을 한 번 열면
+서버가 점검 계정 세션을 심는다. **비밀번호가 요청·응답·화면 어디에도 나오지 않는다** —
+그래서 자동화가 화면을 직접 확인할 수 있다.
+`.env` 스위치 + **localhost 요청만** + 계정 활성, 셋이 동시에 맞아야 동작한다.
+**운영에는 이 변수를 두지 않는다**(절차 `deploy/README.md`) — 열리면 누구나 관리자가 된다.
+
 - 값은 `.env` 의 `UI_CHECK_EMAIL` · `UI_CHECK_PW`(gitignore). **리포에 적지 않는다.**
 - **끌 때도 지우지 않는다** — 이 계정의 작업 기록이 원장에 남아 있어 삭제하면 FK 가 깨진다.
   정지 + 비밀번호 무효화가 맞다(되돌림이 삭제가 아니라 역방향 전이인 것과 같은 규칙).

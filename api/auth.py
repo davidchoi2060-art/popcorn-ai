@@ -374,3 +374,60 @@ def issue_password(operator_id: int, body: IssuePasswordBody, request: Request):
     return {"ok": True, "operator": target["name"],
             "note": f"{target['name']} 님의 임시 비밀번호를 발급했습니다."
                     " 본인이 최초 로그인에서 바꿔야 합니다."}
+
+
+# ── 개발 전용: 화면 점검용 세션 심기 (슬라이스 · 2026-08-11) ───────────────────
+#
+# ■ 왜 필요한가
+#   운영자 화면을 브라우저로 열어 확인하려면 세션이 필요한데, 세션 쿠키가 `HttpOnly`라
+#   **서버가 심어야** 한다. 그러면 로그인 요청을 브라우저 안에서 보내야 하고
+#   **그때 비밀번호가 기록에 남는다**(CLAUDE.md 「브라우저 점검 계정」이 적어 둔 문제).
+#   이 엔드포인트는 서버가 `.env` 에서 직접 읽어 세션만 심는다 —
+#   **비밀번호가 요청에도, 응답에도, 화면에도 나오지 않는다.**
+#
+# ■ 이게 열리면 누구나 관리자가 된다. 그래서 셋을 동시에 건다:
+#     ① `.env` 의 `UI_CHECK_DEV_LOGIN=1` (기본 꺼짐)
+#     ② **localhost 요청만** — 원격에서는 스위치가 켜져 있어도 거부
+#     ③ `UI_CHECK_EMAIL` 계정이 실제로 활성일 때만
+#   회귀가 「운영에서 꺼져 있는가」를 검사한다.
+#
+# ■ 로그인 이력을 남긴다 — 검사가 흔적 없이 지나가면 나중에 구분할 수 없다
+#   (슬라이스 78 전례: 검증이 만든 계정이 운영 목록에 남았다).
+
+LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def dev_login_enabled() -> bool:
+    return os.environ.get("UI_CHECK_DEV_LOGIN", "").strip() in ("1", "true", "True", "yes")
+
+
+@router.get("/dev-login")
+def dev_login(request: Request, response: Response):
+    """점검 계정으로 세션만 심는다. **개발 서버·localhost 전용.**"""
+    if not dev_login_enabled():
+        raise HTTPException(404, "사용할 수 없습니다")
+    host = (request.client.host if request.client else "") or ""
+    if host not in LOCAL_HOSTS:
+        # 어디서 왔는지는 남기되 그 이상은 말하지 않는다
+        raise HTTPException(403, "로컬에서만 사용할 수 있습니다")
+    email = os.environ.get("UI_CHECK_EMAIL", "").strip().lower()
+    if not email:
+        raise HTTPException(500, "UI_CHECK_EMAIL 이 설정돼 있지 않습니다")
+
+    with engine.begin() as conn:
+        op = conn.execute(text(
+            "SELECT operator_id, name, role, status FROM admin_operators"
+            " WHERE lower(email)=:e"), {"e": email}).mappings().first()
+        if op is None:
+            raise HTTPException(404, "점검 계정이 없습니다 — tools/ui_check_account.py 를 실행하십시오")
+        if op["status"] != "활성":
+            # 상태가 한글 '활성'이 아니면 resolve_session 이 세션을 버린다(실제로 겪었다)
+            raise HTTPException(403, f"점검 계정이 활성이 아닙니다: {op['status']}")
+        sid = _new_session(conn, op["operator_id"], request.headers.get("user-agent"))
+
+    response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/",
+                        secure=cookie_secure())
+    return {"ok": True, "operator": {"id": op["operator_id"], "name": op["name"],
+                                     "role": op["role"]},
+            "note": "화면 점검용 세션을 심었습니다(개발 서버 전용). "
+                    "끄려면 .env 의 UI_CHECK_DEV_LOGIN 을 지우십시오."}

@@ -267,3 +267,24 @@ sudo journalctl -u popcorn-api -n 30 --no-pager
 신원 확인 | dev 어댑터(입력 이메일을 신뢰) — Basic Auth가 유일한 실질 방벽 | 실 OAuth 연동 |
 로그인 시도 제한 | 없음 | fail2ban 또는 앱 레벨 제한 |
 고객 축 | 코드는 있지만 베타에서 쓰지 않는다 | 고객 오픈은 별도 결정 |
+
+## ⚠ 운영 서버에 절대 넣지 않는 환경변수
+
+`UI_CHECK_DEV_LOGIN` — **비밀번호 없이 관리자 세션을 심는다.** 화면을 브라우저로
+점검할 때만 쓰는 개발 전용 스위치다(`GET /api/admin/auth/dev-login`).
+
+세 겹으로 막혀 있지만 **첫 겹이 곧 마지막 겹이다**:
+
+  ① 이 환경변수가 켜져 있을 때만 동작한다 (없으면 404)
+  ② localhost 요청만 받는다 (원격은 403)
+  ③ `UI_CHECK_EMAIL` 계정이 활성일 때만
+
+`/etc/popcorn-ai.env` 에 이 이름이 나타나면 **즉시 지우고 서비스를 재시작한다.**
+확인:
+
+```bash
+sudo grep -c UI_CHECK_DEV_LOGIN /etc/popcorn-ai.env    # 0 이어야 한다
+```
+
+같은 이유로 `UI_CHECK_EMAIL`·`UI_CHECK_PW` 도 운영에 두지 않는다
+(CLAUDE.md 「브라우저 점검 계정」 — 개발 서버 전용).
