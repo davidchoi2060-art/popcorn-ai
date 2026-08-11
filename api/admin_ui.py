@@ -77,3 +77,34 @@ def home(request: Request) -> HTMLResponse:
 def products(request: Request) -> HTMLResponse:
     """상품 관리(ADM-PRD-010) — 기존 `/admin/products.html` 의 대조군."""
     return _render(request, "admin/products.html.j2")
+
+
+@router.get("/spec-standard", response_class=HTMLResponse)
+def spec_standard(request: Request) -> HTMLResponse:
+    """조립 사양 표준(ADM-STD-010) — **기존 화면에 대응물이 없는 신설**.
+
+    `std.spec_defs` 를 사람이 늘릴 수 있게 하는 자리다. 기존 `상품 사양 정의`
+    (`/admin/spec-fields.html`)는 `public.spec_field_defs`(wide)를 다루고 컬럼을
+    ALTER 한다 — 여기는 EAV 라 정의 행 하나면 끝이라 성격이 다르다.
+    """
+    return _render(request, "admin/spec_standard.html.j2")
+
+
+@router.get("/build-map", response_class=HTMLResponse)
+def build_map(request: Request) -> HTMLResponse:
+    """조립 호환 조감도(ADM-STD-020) — **신설**. 사용자 결정 2026-08-11.
+
+    `spec-standard` 가 「무엇이 비었나」를 말한다면 여기는 「왜 그게 문제인가」를 말한다.
+    읽는 목적과 고치는 목적이 달라 화면을 나눴다.
+
+    **이 화면만 Phoenix 를 쓰지 않는다.** 첫 판은 Phoenix 조각(KPI 카드·카드뷰·리스트뷰)을
+    조립했는데, 같은 데이터를 네 번 말하면서 정작 「조감도」인 지도가 화면의 1/4 이었다.
+    Phoenix 는 CRUD 화면에는 맞지만 **읽는 화면**을 담을 그릇이 없다 — 형식이 내용을 이겼다.
+    다시 만든 판은 사용자가 Claude 디자인으로 그린 원안을 옮긴 것이다(3안 탭 전환).
+      원안 : claude.ai/design · 22248237-152f-4f13-8201-54afca75ebe4
+             `조립 호환 조감도.dc.html`
+
+    그래서 `_layout.html.j2` 를 상속하지 않고 자체 셸을 그린다(전체 화면). 대신 좌측 메뉴는
+    정본(`admin_nav`)을 그대로 싣는다 — 나가는 길을 잃지 않게.
+    """
+    return _render(request, "admin/build_map.html.j2")

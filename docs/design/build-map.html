@@ -176,6 +176,8 @@
   .bar.mid i s{background:var(--amber);}
   .bar.low i s{background:var(--red);}
   .bar.low, .bar.low span{color:var(--red);}
+  .pairline{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;padding-top:9px;border-top:1px solid var(--line-soft);}
+  .pz{font-family:var(--mono);font-size:10px;color:var(--ink-3);background:var(--line-soft);padding:1px 5px;border-radius:4px;}
   .warnmark{color:var(--ink-3); font-size:10.5px; font-family:var(--mono);}
 
   .callout{
@@ -207,7 +209,7 @@
   <div><b>8</b><span>필수 부품</span></div>
   <div><b>22</b><span>크로스체크 관계</span></div>
   <div><b>9</b><span>지금 검사하는 규칙</span></div>
-  <div><b>46</b><span>사양 항목</span></div>
+  <div><b>49</b><span>사양 항목</span></div>
 </div>
 
 <h2>지도 <em>누가 누구를 제약하는가</em></h2>
@@ -326,7 +328,7 @@
       <tr><th>쌍</th><th>연결</th><th>비교하는 것</th><th>상태</th></tr>
       <tr><td class="pair">A1</td><td class="link">CPU<s>↔</s>메인보드</td><td>소켓 규격이 같은가 <code>socket</code></td><td><span class="chip on">검사 중</span></td></tr>
       <tr><td class="pair">A2</td><td class="link">CPU<s>↔</s>메인보드</td><td>칩셋이 그 CPU 세대를 지원하는가</td><td><span class="chip no">보드 값 0%</span></td></tr>
-      <tr><td class="pair">A3</td><td class="link">CPU<s>↔</s>메인보드</td><td>BIOS 버전이 그 CPU를 받는가</td><td><span class="chip no">데이터 없음</span></td></tr>
+      <tr><td class="pair">A3</td><td class="link">CPU<s>↔</s>메인보드</td><td>BIOS 버전이 그 CPU를 받는가 <em>(막지 않고 경고)</em></td><td><span class="chip no">데이터 없음</span></td></tr>
       <tr><td class="pair">A4</td><td class="link">메모리<s>↔</s>메인보드</td><td>DDR4 / DDR5 규격 <code>mem_type</code></td><td><span class="chip on">검사 중</span></td></tr>
       <tr><td class="pair">A5</td><td class="link">메모리<s>↔</s>메인보드</td><td>모듈 개수 ≤ 슬롯 수 · 최대 용량</td><td><span class="chip off">규칙 없음</span></td></tr>
       <tr><td class="pair">A6</td><td class="link">메모리<s>↔</s>메인보드</td><td>램 클럭 ≤ 보드 지원 상한 <em>(경고)</em></td><td><span class="chip off">규칙 없음</span></td></tr>
@@ -341,9 +343,9 @@
     <table>
       <tr><th>쌍</th><th>연결</th><th>비교하는 것</th><th>상태</th></tr>
       <tr><td class="pair">B1</td><td class="link">그래픽카드<s>↔</s>케이스</td><td>카드 길이 ≤ 케이스 허용 길이 (mm)</td><td><span class="chip on">검사 중</span></td></tr>
-      <tr><td class="pair">B2</td><td class="link">그래픽카드<s>↔</s>케이스</td><td>카드 두께(슬롯) · 높이</td><td><span class="chip no">양쪽 0%</span></td></tr>
+      <tr><td class="pair">B2</td><td class="link">그래픽카드<s>↔</s>케이스</td><td>카드 두께(슬롯) · <b>높이</b> — 케이스 쪽 높이 항목을 신설했다</td><td><span class="chip no">양쪽 0%</span></td></tr>
       <tr><td class="pair">B3</td><td class="link">공랭 쿨러<s>↔</s>케이스</td><td>쿨러 높이 ≤ 케이스 허용 높이</td><td><span class="chip on">검사 중</span></td></tr>
-      <tr><td class="pair">B4</td><td class="link">수랭 쿨러<s>↔</s>케이스</td><td>라디에이터 열 수 ≤ 케이스 수용</td><td><span class="chip on">검사 중</span></td></tr>
+      <tr><td class="pair">B4</td><td class="link">수랭 쿨러<s>↔</s>케이스</td><td>라디에이터 열 수 ≤ 케이스 수용 · <b>두께</b>(신설)</td><td><span class="chip on">검사 중</span></td></tr>
       <tr><td class="pair">B5</td><td class="link">파워<s>↔</s>케이스</td><td>ATX / SFX 규격 · 파워 길이</td><td><span class="chip no">길이 21%</span></td></tr>
       <tr><td class="pair">B6</td><td class="link">저장장치<s>↔</s>케이스</td><td>3.5" / 2.5" 베이가 남는가</td><td><span class="chip no">HDD 크기 0%</span></td></tr>
     </table>
@@ -384,118 +386,152 @@
   <article class="part">
     <header><h3>메인보드</h3><span class="en">MB</span><span class="hub">허브 · 15항목</span></header>
     <div class="spec">
-      <span class="nm"><b>소켓</b><u>socket</u></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
-      <span class="nm"><b>칩셋</b><u>chipset</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>메모리 규격</b><u>mem_type</u></span><span class="bar "><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>칩셋</b><u>chipset</u></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>M.2 슬롯 수</b><u>m2_slots</u></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>소켓</b><u>socket</u></span><span class="bar "><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>메모리 슬롯 수</b><u>mem_slots</u></span><span class="bar "><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar "><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>SATA 포트 수</b><u>sata_ports</u></span><span class="bar "><i><s style="width:92%"></s></i><span>92%</span></span>
+      <span class="nm"><b>최대 메모리 용량</b><u>mem_max_gb</u></span><span class="bar "><i><s style="width:89%"></s></i><span>89%</span></span>
       <span class="nm"><b>지원 CPU 세대</b><u>supported_cpu_gens</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
-      <span class="nm"><b>세대별 최소 BIOS</b><u>bios_min_version</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
-      <span class="nm"><b>메모리 규격</b><u>mem_type</u></span><span class="bar"><i><s style="width:96%"></s></i><span>96%</span></span>
-      <span class="nm"><b>메모리 슬롯 수</b><u>mem_slots</u></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
-      <span class="nm"><b>최대 메모리 용량</b><u>mem_max_gb</u></span><span class="bar"><i><s style="width:89%"></s></i><span>89%</span></span>
-      <span class="nm"><b>지원 최대 클럭</b><u>mem_max_clock_mhz</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
-      <span class="nm"><b>x16 슬롯 세대</b><u>pcie_x16_gen</u> <span class="warnmark">경고</span></span><span class="bar mid"><i><s style="width:55%"></s></i><span>55%</span></span>
-      <span class="nm"><b>M.2 슬롯 수</b><u>m2_slots</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
       <span class="nm"><b>M.2 지원 규격</b><u>m2_form_factors</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
-      <span class="nm"><b>SATA 포트 수</b><u>sata_ports</u></span><span class="bar"><i><s style="width:92%"></s></i><span>92%</span></span>
-      <span class="nm"><b>M.2/SATA 레인 공유</b><u>m2_sata_shared</u> <span class="warnmark">경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
-      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
       <span class="nm"><b>EPS 12V 커넥터</b><u>eps_connectors</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>지원 최대 클럭</b><u>mem_max_clock_mhz</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>x16 슬롯 세대</b><u>pcie_x16_gen</u> <span class="warnmark">경고</span></span><span class="bar mid"><i><s style="width:55%"></s></i><span>55%</span></span>
+      <span class="nm"><b>세대별 최소 BIOS</b><u>bios_min_version</u> <span class="warnmark">경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>M.2/SATA 레인 공유</b><u>m2_sata_shared</u> <span class="warnmark">경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
     </div>
+    <div class="pairline"><span class="pz">A1</span> <span class="pz">A2</span> <span class="pz">A3</span> <span class="pz">A4</span> <span class="pz">A5</span> <span class="pz">A6</span> <span class="pz">A7</span> <span class="pz">A8</span> <span class="pz">A9</span> <span class="pz">C4</span></div>
   </article>
 
   <article class="part">
-    <header><h3>케이스</h3><span class="en">CASE</span><span class="hub">담는 그릇 · 9항목</span></header>
+    <header><h3>케이스</h3><span class="en">CASE</span><span class="hub">담는 그릇 · 11항목</span></header>
     <div class="spec">
-      <span class="nm"><b>수용 보드 규격</b><u>form_factor_list</u></span><span class="bar"><i><s style="width:97%"></s></i><span>97%</span></span>
-      <span class="nm"><b>GPU 최대 길이</b><u>gpu_max_mm</u></span><span class="bar"><i><s style="width:95%"></s></i><span>95%</span></span>
-      <span class="nm"><b>쿨러 최대 높이</b><u>cooler_height_mm</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
-      <span class="nm"><b>라디에이터 최대 열</b><u>radiator_max_rows</u></span><span class="bar mid"><i><s style="width:69%"></s></i><span>69%</span></span>
-      <span class="nm"><b>수용 파워 규격</b><u>psu_form_factor_list</u></span><span class="bar"><i><s style="width:84%"></s></i><span>84%</span></span>
+      <span class="nm"><b>수용 보드 규격</b><u>form_factor_list</u></span><span class="bar "><i><s style="width:97%"></s></i><span>97%</span></span>
+      <span class="nm"><b>GPU 최대 길이</b><u>gpu_max_mm</u></span><span class="bar "><i><s style="width:95%"></s></i><span>95%</span></span>
+      <span class="nm"><b>쿨러 높이</b><u>cooler_height_mm</u></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>수용 파워 규격</b><u>psu_form_factor_list</u></span><span class="bar "><i><s style="width:84%"></s></i><span>84%</span></span>
       <span class="nm"><b>3.5" 베이 수</b><u>bay_35_count</u></span><span class="bar mid"><i><s style="width:74%"></s></i><span>74%</span></span>
+      <span class="nm"><b>라디에이터 최대 열 수</b><u>radiator_max_rows</u></span><span class="bar mid"><i><s style="width:69%"></s></i><span>69%</span></span>
       <span class="nm"><b>2.5" 베이 수</b><u>bay_25_count</u></span><span class="bar mid"><i><s style="width:56%"></s></i><span>56%</span></span>
       <span class="nm"><b>GPU 최대 두께</b><u>gpu_max_slots</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
       <span class="nm"><b>파워 최대 길이</b><u>psu_max_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>GPU 최대 높이</b><u>gpu_max_height_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>라디에이터 최대 두께</b><u>radiator_max_thickness_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
     </div>
+    <div class="pairline"><span class="pz">A9</span> <span class="pz">B1</span> <span class="pz">B2</span> <span class="pz">B3</span> <span class="pz">B4</span> <span class="pz">B5</span> <span class="pz">B6</span></div>
   </article>
 
   <article class="part">
     <header><h3>CPU</h3><span class="en">CPU</span><span class="hub">5항목</span></header>
     <div class="spec">
-      <span class="nm"><b>소켓</b><u>socket</u></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
-      <span class="nm"><b>CPU 세대</b><u>cpu_generation</u></span><span class="bar"><i><s style="width:89%"></s></i><span>89%</span></span>
-      <span class="nm"><b>지원 메모리 규격</b><u>mem_type_support</u></span><span class="bar"><i><s style="width:90%"></s></i><span>90%</span></span>
+      <span class="nm"><b>소켓</b><u>socket</u></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>지원 메모리 규격</b><u>mem_type_support</u></span><span class="bar "><i><s style="width:90%"></s></i><span>90%</span></span>
+      <span class="nm"><b>CPU 세대</b><u>cpu_generation</u></span><span class="bar "><i><s style="width:89%"></s></i><span>89%</span></span>
       <span class="nm"><b>설계 전력(TDP)</b><u>tdp_watt</u></span><span class="bar mid"><i><s style="width:76%"></s></i><span>76%</span></span>
-      <span class="nm"><b>내장그래픽</b><u>igpu_yn</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:91%"></s></i><span>91%</span></span>
+      <span class="nm"><b>내장그래픽</b><u>igpu_yn</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:91%"></s></i><span>91%</span></span>
     </div>
+    <div class="pairline"><span class="pz">A1</span> <span class="pz">A2</span> <span class="pz">A4</span> <span class="pz">D2</span></div>
   </article>
 
   <article class="part">
     <header><h3>그래픽카드</h3><span class="en">GPU</span><span class="hub">6항목</span></header>
     <div class="spec">
-      <span class="nm"><b>길이</b><u>length_mm</u></span><span class="bar"><i><s style="width:96%"></s></i><span>96%</span></span>
-      <span class="nm"><b>권장 전원 용량</b><u>required_power_watt</u></span><span class="bar"><i><s style="width:91%"></s></i><span>91%</span></span>
-      <span class="nm"><b>PCIe 세대</b><u>pcie_gen</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:97%"></s></i><span>97%</span></span>
+      <span class="nm"><b>길이</b><u>length_mm</u></span><span class="bar "><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>권장 전원 용량</b><u>required_power_watt</u></span><span class="bar "><i><s style="width:91%"></s></i><span>91%</span></span>
       <span class="nm"><b>요구 보조전원</b><u>aux_power_req</u></span><span class="bar low"><i><s style="width:9%"></s></i><span>9%</span></span>
-      <span class="nm"><b>두께(슬롯)</b><u>thickness_slots</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
       <span class="nm"><b>높이</b><u>height_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>두께(슬롯)</b><u>thickness_slots</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>PCIe 세대</b><u>pcie_gen</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:97%"></s></i><span>97%</span></span>
     </div>
+    <div class="pairline"><span class="pz">A7</span> <span class="pz">B1</span> <span class="pz">B2</span> <span class="pz">B5</span> <span class="pz">C1</span> <span class="pz">C3</span> <span class="pz">D3</span></div>
   </article>
 
   <article class="part">
     <header><h3>파워</h3><span class="en">POWER</span><span class="hub">6항목</span></header>
     <div class="spec">
-      <span class="nm"><b>정격 출력</b><u>rated_watt</u></span><span class="bar"><i><s style="width:98%"></s></i><span>98%</span></span>
-      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar"><i><s style="width:97%"></s></i><span>97%</span></span>
+      <span class="nm"><b>정격 출력</b><u>rated_watt</u></span><span class="bar "><i><s style="width:98%"></s></i><span>98%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar "><i><s style="width:97%"></s></i><span>97%</span></span>
       <span class="nm"><b>SATA 전원 커넥터</b><u>sata_connectors</u></span><span class="bar mid"><i><s style="width:77%"></s></i><span>77%</span></span>
       <span class="nm"><b>제공 보조전원</b><u>aux_power_provided</u></span><span class="bar low"><i><s style="width:22%"></s></i><span>22%</span></span>
       <span class="nm"><b>길이</b><u>length_mm</u></span><span class="bar low"><i><s style="width:21%"></s></i><span>21%</span></span>
       <span class="nm"><b>EPS 12V 커넥터</b><u>eps_connectors</u></span><span class="bar low"><i><s style="width:14%"></s></i><span>14%</span></span>
     </div>
+    <div class="pairline"><span class="pz">A9</span> <span class="pz">B1</span> <span class="pz">B5</span> <span class="pz">C1</span> <span class="pz">C3</span> <span class="pz">C4</span></div>
   </article>
 
   <article class="part">
     <header><h3>메모리</h3><span class="en">RAM</span><span class="hub">5항목</span></header>
     <div class="spec">
-      <span class="nm"><b>메모리 규격</b><u>mem_type</u></span><span class="bar"><i><s style="width:95%"></s></i><span>95%</span></span>
-      <span class="nm"><b>동작 클럭</b><u>clock_mhz</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:96%"></s></i><span>96%</span></span>
-      <span class="nm"><b>용량</b><u>capacity_gb</u> <span class="warnmark">경고</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
-      <span class="nm"><b>모듈 개수</b><u>module_count</u></span><span class="bar"><i><s style="width:87%"></s></i><span>87%</span></span>
+      <span class="nm"><b>메모리 규격</b><u>mem_type</u></span><span class="bar "><i><s style="width:95%"></s></i><span>95%</span></span>
+      <span class="nm"><b>모듈 개수</b><u>module_count</u></span><span class="bar "><i><s style="width:87%"></s></i><span>87%</span></span>
       <span class="nm"><b>높이</b><u>height_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>동작 클럭</b><u>clock_mhz</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>용량</b><u>capacity_gb</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
     </div>
+    <div class="pairline"><span class="pz">A4</span> <span class="pz">A5</span> <span class="pz">A6</span> <span class="pz">B2</span> <span class="pz">D3</span></div>
   </article>
 
   <article class="part">
-    <header><h3>CPU 쿨러</h3><span class="en">COOLER</span><span class="hub">공랭 4 · 수랭 3</span></header>
+    <header><h3>CPU 쿨러 · 공랭</h3><span class="en">COOLER_AIR</span><span class="hub">4항목</span></header>
     <div class="spec">
-      <span class="nm"><b>지원 소켓 목록</b><u>socket_list</u></span><span class="bar"><i><s style="width:99%"></s></i><span>99%</span></span>
-      <span class="nm"><b>쿨러 높이</b><u>cooler_height_mm</u> <span class="warnmark">공랭</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
-      <span class="nm"><b>라디에이터 열 수</b><u>radiator_rows</u> <span class="warnmark">수랭</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
-      <span class="nm"><b>냉각 성능(TDP)</b><u>cooler_tdp</u></span><span class="bar low"><i><s style="width:38%"></s></i><span>38%</span></span>
-      <span class="nm"><b>램 방향 여유</b><u>ram_clearance_mm</u> <span class="warnmark">공랭</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>지원 소켓 목록</b><u>socket_list</u></span><span class="bar "><i><s style="width:99%"></s></i><span>99%</span></span>
+      <span class="nm"><b>쿨러 높이</b><u>cooler_height_mm</u></span><span class="bar "><i><s style="width:96%"></s></i><span>96%</span></span>
+      <span class="nm"><b>쿨러 냉각 성능</b><u>cooler_tdp</u></span><span class="bar mid"><i><s style="width:52%"></s></i><span>52%</span></span>
+      <span class="nm"><b>램 방향 여유</b><u>ram_clearance_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
     </div>
+    <div class="pairline"><span class="pz">B3</span> <span class="pz">D1</span> <span class="pz">D2</span> <span class="pz">D3</span></div>
   </article>
 
   <article class="part">
-    <header><h3>저장장치</h3><span class="en">SSD · HDD</span><span class="hub">4항목</span></header>
+    <header><h3>CPU 쿨러 · 수랭</h3><span class="en">COOLER_AIO</span><span class="hub">4항목</span></header>
     <div class="spec">
-      <span class="nm"><b>인터페이스</b><u>interface</u> <span class="warnmark">SSD</span></span><span class="bar"><i><s style="width:94%"></s></i><span>94%</span></span>
-      <span class="nm"><b>폼팩터</b><u>form_factor</u> <span class="warnmark">SSD</span></span><span class="bar"><i><s style="width:93%"></s></i><span>93%</span></span>
-      <span class="nm"><b>인터페이스</b><u>interface</u> <span class="warnmark">HDD</span></span><span class="bar mid"><i><s style="width:80%"></s></i><span>80%</span></span>
-      <span class="nm"><b>폼팩터</b><u>form_factor</u> <span class="warnmark">HDD</span></span><span class="bar mid"><i><s style="width:67%"></s></i><span>67%</span></span>
-      <span class="nm"><b>PCIe 세대</b><u>pcie_gen</u> <span class="warnmark">SSD·경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
-      <span class="nm"><b>크기(3.5"/2.5")</b><u>size_inch</u> <span class="warnmark">HDD</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>지원 소켓 목록</b><u>socket_list</u></span><span class="bar "><i><s style="width:98%"></s></i><span>98%</span></span>
+      <span class="nm"><b>라디에이터 열 수</b><u>radiator_rows</u></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>쿨러 냉각 성능</b><u>cooler_tdp</u></span><span class="bar low"><i><s style="width:22%"></s></i><span>22%</span></span>
+      <span class="nm"><b>라디에이터 두께</b><u>radiator_thickness_mm</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
     </div>
+    <div class="pairline"><span class="pz">B4</span> <span class="pz">D1</span> <span class="pz">D2</span></div>
+  </article>
+
+  <article class="part">
+    <header><h3>SSD</h3><span class="en">SSD</span><span class="hub">4항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>인터페이스</b><u>interface</u></span><span class="bar "><i><s style="width:94%"></s></i><span>94%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar "><i><s style="width:93%"></s></i><span>93%</span></span>
+      <span class="nm"><b>용량</b><u>capacity_gb</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:100%"></s></i><span>100%</span></span>
+      <span class="nm"><b>PCIe 세대</b><u>pcie_gen</u> <span class="warnmark">경고</span></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+    </div>
+    <div class="pairline"><span class="pz">A7</span> <span class="pz">A8</span> <span class="pz">A9</span></div>
+  </article>
+
+  <article class="part">
+    <header><h3>HDD</h3><span class="en">HDD</span><span class="hub">4항목</span></header>
+    <div class="spec">
+      <span class="nm"><b>인터페이스</b><u>interface</u></span><span class="bar "><i><s style="width:80%"></s></i><span>80%</span></span>
+      <span class="nm"><b>폼팩터</b><u>form_factor</u></span><span class="bar mid"><i><s style="width:67%"></s></i><span>67%</span></span>
+      <span class="nm"><b>크기</b><u>size_inch</u></span><span class="bar low"><i><s style="width:2%"></s></i><span>0%</span></span>
+      <span class="nm"><b>용량</b><u>capacity_gb</u> <span class="warnmark">경고</span></span><span class="bar "><i><s style="width:90%"></s></i><span>90%</span></span>
+    </div>
+    <div class="pairline"><span class="pz">A8</span> <span class="pz">A9</span> <span class="pz">B6</span></div>
   </article>
 
 </div>
 
 <div class="callout">
-  <b>지금 가장 크게 빈 곳</b>
+  <b>값이 하나도 없는 항목 13개</b> — 원문(상품 스펙 텍스트)에 아예 없어 파싱으로는 못 채운다.
+  제조사 자료를 보거나 사람이 넣어야 한다.
+  <div style="margin:8px 0 0;font-size:13px;color:var(--ink-3)">램 방향 여유 <span style='opacity:.7'>COOLER_CPU_AIR</span> · 높이 <span style='opacity:.7'>GPU,RAM</span> · 크기 <span style='opacity:.7'>HDD</span> · 파워 최대 길이 <span style='opacity:.7'>CASE</span> · 두께(슬롯) <span style='opacity:.7'>GPU</span> · 라디에이터 두께 <span style='opacity:.7'>COOLER_CPU_AIO</span> · 라디에이터 최대 두께 <span style='opacity:.7'>CASE</span> · 세대별 최소 BIOS <span style='opacity:.7'>MB</span> · 지원 CPU 세대 <span style='opacity:.7'>MB</span> · GPU 최대 높이 <span style='opacity:.7'>CASE</span> · GPU 최대 두께 <span style='opacity:.7'>CASE</span> · M.2 지원 규격 <span style='opacity:.7'>MB</span> · M.2/SATA 레인 공유 <span style='opacity:.7'>MB</span></div>
   <ul>
-    <li><b>메인보드 4항목이 0%</b> — 지원 CPU 세대 · BIOS · M.2 규격 · EPS 커넥터. 원문(상품 스펙 텍스트)에 아예 없어 파싱으로는 못 채운다.</li>
-    <li><b>치수 계열이 통째로 비어 있다</b> — GPU 두께·높이, 램 높이, 케이스의 GPU 최대 두께·파워 최대 길이. 그래서 “케이스에 들어가는가”를 길이 하나로만 판정하고 있다.</li>
-    <li><b>보조전원 커넥터</b> — GPU 9% · 파워 22%. RTX 50 계열의 12V-2x6을 확인할 수 없다.</li>
-    <li><b>쿨러 냉각 성능 38%</b> — 규칙은 있는데 값이 없어 <b>쿨러의 62%가 그 규칙에서 자동 탈락</b>한다. 규칙이 있는 것과 작동하는 것은 다르다.</li>
+    <li><b>치수 계열이 통째로 비어 있다</b> — GPU 두께·높이, 램 높이, 케이스의 GPU 최대 두께·높이·파워 최대 길이. 그래서 “케이스에 들어가는가”를 아직 길이 하나로만 판정한다.</li>
+    <li><b>메인보드 4항목</b> — 지원 CPU 세대 · BIOS · M.2 규격 · EPS 커넥터.</li>
+    <li><b>보조전원 커넥터</b> — GPU 9&#37; · 파워 22&#37;. RTX 50 계열의 12V-2x6 을 확인할 수 없다.</li>
+    <li><b>쿨러 냉각 성능</b> 공랭 52&#37; · 수랭 22&#37; — 규칙은 있는데 값이 없어 <b>그만큼이 그 규칙에서 자동 탈락</b>한다. 규칙이 있는 것과 작동하는 것은 다르다.</li>
   </ul>
+  <p style="margin:12px 0 0"><b>전부 채우려 하지 않는다.</b> 모자란 항목은 운영자가 화면에서 직접 늘린다 —
+  <code>/admin2/spec-standard</code> (LNB · 상품사양관리 → <b>조립 사양 표준</b>).
+  EAV 라 항목을 추가해도 컬럼을 만들지 않으므로 즉시 쓸 수 있다.</p>
 </div>
 
 <footer>

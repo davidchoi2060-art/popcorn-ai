@@ -288,6 +288,31 @@ scss 변수명이 궁금할 때(`src/scss/_variables.scss` 등) 정도다.
 
 ---
 
+## ⚠ 원본 좌표는 **전체 경로로 적는다** (사용자 지시 2026-08-11)
+
+`apps/project-management/project-card-view.html` 처럼 상대 경로만 적으면
+**어느 드라이브의 무엇인지** 알 수 없다. 이 저장소는 `E:\DEV\popcorn-ai` 이고
+템플릿은 **다른 드라이브**에 있다. 주석·문서·커밋 어디에 적든 이렇게 쓴다:
+
+    D:\phoenix_Templet\public\apps\project-management\project-card-view.html
+
+## ⚠ 조립 호환 조감도(ADM-STD-020)는 **Phoenix 를 쓰지 않는다** (2026-08-11)
+
+예외를 기록해 둔다. 첫 판은 Phoenix 조각(KPI 카드 · 카드뷰 · 리스트뷰)을 조립했는데,
+같은 데이터를 네 번 말하면서 정작 「조감도」인 지도가 화면의 1/4 이었다.
+**Phoenix 는 CRUD 화면에는 맞지만 「읽는 화면」을 담을 그릇이 없다** — 형식이 내용을 이겼다.
+
+다시 만든 판은 사용자가 Claude 디자인으로 그린 원안을 옮긴 것이다(지도형·진단형·매트릭스형
+3안을 탭으로 전환). `_layout.html.j2` 도 상속하지 않고 자체 셸을 그리되, 좌측 메뉴는
+정본(`api/admin_nav.py`)을 그대로 싣는다.
+
+  원안 : claude.ai/design · 22248237-152f-4f13-8201-54afca75ebe4 · `조립 호환 조감도.dc.html`
+
+**이것은 규약의 예외이지 폐기가 아니다.** CRUD 화면은 계속 Phoenix 로 간다.
+덧붙여 — Phoenix 가 싣고 있는 ECharts 는 full build 라 `graph`·`sankey`·`tree` 를
+**전부 지원한다**. 예시 페이지에 없을 뿐이다(2026-08-11 확인).
+  D:\phoenix_Templet\public\vendors\echarts\echarts.min.js  (1,029,203 bytes)
+
 ## ⭐ 재구축(`/admin2/*`) 화면을 만드는 절차 — 순서가 규약이다
 
 > **사용자 확정 2026-08-09.** 이 순서를 뒤집지 마라.

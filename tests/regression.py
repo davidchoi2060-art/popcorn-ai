@@ -2497,7 +2497,7 @@ def test_screen_assets():
         # 인라인 style 로 Material Symbols 를 지정한 span 이 6종 더 있었고 그것들이
         # 화면에 글자로 떠 있었다(s0 의 'devices' 등). 검사가 좁으면 결함을 가린다.
         for _m2 in _re7.finditer(
-                r'<(?:span|i)([^>]*(?:msym|material-symbols|Material Symbols)[^>]*)>'
+                r'<(?:span|i)\b([^>]*(?:msym|material-symbols|Material Symbols)[^>]*)>'
                 r'([a-z0-9_]+)</(?:span|i)>', _s2):
             if _m2.group(2) not in _ms_keys:
                 _raw_lig.append(os.path.basename(_p2) + ":" + _m2.group(2))
@@ -4729,6 +4729,21 @@ def test_guards():
     st, _ = post("/api/my/reviews", {"item_id": 12,
                                      "rating": 5, "body": "타인 주문 라인 테스트입니다"})
     check("타인 주문 라인 후기 → 403", st == 403, 403, st)
+    # ── 개발 전용 dev-login 은 **열려 있으면 누구나 관리자가 된다** (2026-08-11)
+    #    스위치가 꺼져 있으면 404, 켜져 있어도 localhost 밖이면 403이어야 한다.
+    #    회귀는 로컬에서 도니 "켜졌으면 동작"까지만 확인하고, **운영 확인은 배포 문서가 맡는다**
+    #    (`.env` 에 UI_CHECK_DEV_LOGIN 이 없어야 한다).
+    import os as _os
+    _on = _os.environ.get("UI_CHECK_DEV_LOGIN", "").strip() in ("1", "true", "True", "yes")
+    st, body = get_html("/api/admin/auth/dev-login")
+    if _on:
+        check("dev-login 켜짐 → 로컬에서 세션이 심긴다", st == 200, 200, st)
+        check("dev-login 이 비밀번호를 응답에 담지 않는다",
+              "password" not in str(body).lower() and "pw" not in str(body).lower(),
+              "없음", "있음")
+    else:
+        check("dev-login 꺼짐 → 404", st == 404, 404, st)
+
     st, _ = post("/api/admin/stock-inbound/20489103", {"qty": 0, "why": "inbound"})
     check("입고 수량 0 → 400", st == 400, 400, st)
     st, _ = post("/api/admin/sourcing/request", {"product_code": 20489103, "supplier_ids": []})
@@ -4796,12 +4811,86 @@ def test_std_schema():
             "SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")).scalar()
         check(f"[43] 필수 지정 {req}개인데 추천 후보가 비지 않았다", pool > 0, "> 0", pool)
 
-        # ⑥ 표준이 겨냥한 부품 종류가 실재한다(오타로 죽은 항목을 만들지 않는다)
+        # ⑥ 사양 하나가 **여러 쌍에 걸칠 수 있어야** 한다 — 조감도가 드러낸 결함이다.
+        #    `height_mm` 은 RAM(D3 쿨러 간섭)과 GPU(B2 케이스 여유) 양쪽에 쓰이는데
+        #    단수 `compat_pair` 로는 한쪽만 적혀 판정 지도가 틀렸다(0038 에서 목록으로 바꿨다).
+        multi = c.execute(text(
+            "SELECT COUNT(*) FROM std.spec_defs"
+            " WHERE jsonb_array_length(compat_pairs) > 1")).scalar()
+        check("[43] 여러 쌍에 걸친 사양을 표현할 수 있다", multi > 0, "> 0", multi)
+
+        # ⑦ **막는 항목은 양쪽에 사양이 있어야 판정된다.** 한쪽만 있으면 영원히 못 막는다.
+        #    (케이스에 GPU 최대 높이가 없어 B2 가 반쪽이었다 — 0038 에서 채웠다)
+        lonely = [r[0] for r in c.execute(text("""
+            SELECT pair FROM (
+              SELECT p.pair, COUNT(DISTINCT t.part) AS parts
+              FROM std.spec_defs d,
+                   LATERAL jsonb_array_elements_text(d.compat_pairs) AS p(pair),
+                   LATERAL jsonb_array_elements_text(d.part_types) AS t(part)
+              WHERE d.is_blocking GROUP BY 1) x
+            WHERE parts < 2 ORDER BY 1""")).all()]
+        check("[43] 막는 관계는 부품 둘 이상이 얽힌다", not lonely, "없음", lonely)
+
+        # ⑧ **관계 정본이 엔진과 어긋나지 않는다.** `std.compat_pairs.rule_key` 가
+        #    가리키는 규칙이 `public.compat_rules` 에 실제로 살아 있어야 한다 —
+        #    어긋나면 화면이 "검사 중"이라 말하는데 엔진은 검사하지 않는다.
+        ghost_rules = [r[0] for r in c.execute(text(
+            "SELECT p.rule_key FROM std.compat_pairs p"
+            " WHERE p.rule_key IS NOT NULL AND NOT EXISTS ("
+            "   SELECT 1 FROM compat_rules r WHERE r.rule_key = p.rule_key AND r.active)"
+            " ORDER BY 1")).all()]
+        check("[43] 관계가 가리키는 규칙이 엔진에 실재한다", not ghost_rules, "없음", ghost_rules)
+
+        # ⑨ 검사 중인 규칙은 **전부** 관계에 매여 있다 — 지도에서 빠진 규칙이 없어야 한다
+        orphan_rules = [r[0] for r in c.execute(text(
+            "SELECT r.rule_key FROM compat_rules r WHERE r.active AND NOT EXISTS ("
+            "   SELECT 1 FROM std.compat_pairs p WHERE p.rule_key = r.rule_key)"
+            " ORDER BY 1")).all()]
+        check("[43] 엔진 규칙이 전부 지도에 있다", not orphan_rules, "없음", orphan_rules)
+
+        # ⑩ 표준이 겨냥한 부품 종류가 실재한다(오타로 죽은 항목을 만들지 않는다)
         types = {r[0] for r in c.execute(text(
             "SELECT DISTINCT part_type FROM products")).all()}
         ghost = sorted({p for r in c.execute(text("SELECT part_types FROM std.spec_defs")).all()
                         for p in list(r[0] or []) if p not in types})
         check("[43] 표준의 적용 대상이 전부 실재하는 부품 종류", not ghost, "없음", ghost)
+
+    # ⑪ 조감도(ADM-STD-020)가 기대는 API 계약 — 화면 셋이 같은 값을 각자 파생하지
+    #    않도록 **상태를 서버가 준다.** 그 값이 근거 플래그와 어긋나면 세 안이 동시에
+    #    거짓말을 한다. 관계식으로 본다(고정 기대값을 두지 않는다).
+    m = get("/api/admin/std/compat-map")
+    wrong = [p["pair_key"] for p in m["pairs"]
+             if p["status"] != ("out" if not p["in_scope"] else
+                                "checking" if p["rule_active"] else
+                                "norule" if p["ready"] else "missing")]
+    check("[43] compat-map status 가 근거 플래그와 일치", not wrong, "없음", wrong)
+
+    # 상태는 넷 중 하나뿐이고, 합은 관계 총수와 같다 — 어느 관계도 분류에서 새지 않는다
+    buckets = {k: len([p for p in m["pairs"] if p["status"] == k])
+               for k in ("checking", "norule", "missing", "out")}
+    check("[43] 상태 4분류 합 = 관계 총수",
+          sum(buckets.values()) == m["summary"]["pairs_total"],
+          m["summary"]["pairs_total"], sum(buckets.values()))
+    check("[43] 검사 중 수 = summary.pairs_checked",
+          buckets["checking"] == m["summary"]["pairs_checked"],
+          m["summary"]["pairs_checked"], buckets["checking"])
+
+    # 지도에 서는 노드는 **전부 이름을 받는다.** 하나라도 빠지면 화면이 영문 키를 노출한다
+    nodes = {x for p in m["pairs"] for x in (p["left_part"], p["right_part"])}
+    unnamed = sorted(n for n in nodes if not m["part_labels"].get(n))
+    check("[43] 지도 노드가 전부 이름을 받는다", not unnamed, "없음", unnamed)
+    check("[43] 부품 카드에 한글 이름이 있다",
+          all(p.get("name") for p in m["parts"]), "전부 있음",
+          [p["part_type"] for p in m["parts"] if not p.get("name")] or "-")
+
+    # ⑫ 데이터를 못 받았을 때 **돌아갈 길**이 화면 안에 있다.
+    #    2026-08-11 이 화면은 세션이 끊긴 채 사용자에게 갔고, 머리말에 «HTTP 401» 만
+    #    찍혀 운영자가 할 수 있는 것이 없었다. 오류를 표시하는 것과 조치를 주는 것은 다르다.
+    _, bm = get_html("/admin2/build-map")
+    for token, why in (("/admin/login.html", "로그인 경로"),
+                       ("세션 만료", "401 안내 문구"),
+                       ("data-action=\"retry\"", "재시도 버튼")):
+        check(f"[43] 조감도 조회 실패 안내 — {why}", token in bm, "있음", "없음")
 
 
 def test_display_name():
@@ -4933,7 +5022,9 @@ def test_rebuild_screens():
         sys.path.insert(0, ROOT)
     from api.admin_nav import NAV, counts as nav_counts
 
-    SCREENS = [("/admin2/", "NEW-DASH-010"), ("/admin2/products", "ADM-PRD-010")]
+    SCREENS = [("/admin2/", "NEW-DASH-010"), ("/admin2/products", "ADM-PRD-010"),
+               ("/admin2/spec-standard", "ADM-STD-010"),
+               ("/admin2/build-map", "ADM-STD-020")]
 
     for path, screen_id in SCREENS:
         st, html = get_html(path)
@@ -4971,8 +5062,15 @@ def test_rebuild_screens():
         check(f"[41] {path} 참조 자산 실재 ({len(refs)}개)",
               not missing, "전부 있음", ", ".join(missing[:3]) or "-")
 
-        # ⑤ LNB 는 IA(admin_nav.NAV)와 같아야 한다 — 화면이 메뉴를 다시 품지 않는다
-        items = len(_re41.findall(r'<span class="nav-link-text">', html))
+        # ⑤ LNB 는 IA(admin_nav.NAV)와 같아야 한다 — 화면이 메뉴를 다시 품지 않는다.
+        #   **셈은 마크업에 묶지 않는다.** 지킬 계약은 «IA 전체가 나온다»이지 클래스명이
+        #   아니다. 전체 화면 셸(ADM-STD-020)은 Phoenix 레이아웃을 상속하지 않아
+        #   `nav-link-text` 가 없다 — 그때 0을 세고 실패하면 검사가 사실이 아니라
+        #   구현 방식을 지키는 것이 된다.
+        items = (len(_re41.findall(r'<span class="nav-link-text">', html))   # Phoenix 레이아웃
+                 or (len(_re41.findall(r'class="lnb-g"', html))              # 자체 셸 — 그룹 제목
+                     + len(_re41.findall(r'class="off"', html))              #          준비 중
+                     + len(_re41.findall(r'<a href="[^"]*"\s+class="[^"]*"', html))))  # 링크
         want = nav_counts()["total"] + len(NAV)      # 항목 + 그룹 제목
         check(f"[41] {path} LNB 항목 수 = IA", items == want, want, items)
 

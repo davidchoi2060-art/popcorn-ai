@@ -1,0 +1,346 @@
+{#
+  조립 사양 표준 (ADM-STD-010) — 2026-08-11
+
+  **이 화면은 「무엇이 비었는가」를 먼저 말한다.** 목록이 아니라 그것이 이 화면의 일이다.
+  항목이 있다는 것과 값이 있다는 것은 다른데, 둘을 섞어 보여주면 "표준을 세웠다"는
+  착각을 만든다. 그래서 상단 4칸이 전부 **충족**에 대한 것이고 항목 수는 하나뿐이다.
+
+  **사람이 항목을 추가할 수 있다.** 사용자 방침(2026-08-11):
+  *"모자란 사양이 있다면 사용자가 직접 추가할 수 있도록 UI를 만들면 된다.
+    없는 스펙을 전부 맞출려고 하지 마라 — 일부는 사람에게 남겨두면 된다."*
+  EAV 라 정의 행 하나면 끝이다 — 컬럼 추가도, 마이그레이션 파일 기록도 없다
+  (그 파일 쓰기가 배포 서버에서 실패한 전례가 있다. 슬라이스 81 `cpu_gpu`).
+
+  **삭제 버튼은 없다.** 정의를 지우면 그 값이 어디에도 안 남는다. 쓰지 않을 항목은
+  적용 대상을 비워 감춘다 — 값은 남고 판정에서만 빠진다.
+
+  숫자는 전부 서버 응답만 쓴다(`/api/admin/std/spec-defs`). 선택지(부품 종류·자료형·
+  관계 번호)도 서버가 준다 — 화면에 하드코딩하면 서버가 늘어도 화면이 모른다.
+#}
+{% extends "admin/_layout.html.j2" %}
+
+{% block title %}조립 사양 표준{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="/admin2/">재구축</a></li>
+  <li class="breadcrumb-item active">조립 사양 표준</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div data-screen-id="ADM-STD-010" data-domain="spec-standard">
+
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
+    <div>
+      <h2 class="mb-1">조립 사양 표준</h2>
+      <p class="text-body-tertiary mb-0" style="max-width:62ch">
+        부품이 서로 맞는지 판정하려면 부품마다 정해진 사양이 있어야 합니다.
+        <b>없으면 조립을 보증할 수 없습니다.</b> 모자란 항목은 아래에서 직접 추가하십시오.
+      </p>
+    </div>
+    <button class="btn btn-primary" data-action="open-add">
+      <span class="fas fa-plus me-2"></span>사양 항목 추가
+    </button>
+  </div>
+
+  <div class="row g-3 mb-4" data-bind="kpis">
+    <div class="col-6 col-lg-3">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-body-tertiary mb-2">표준 항목</h6>
+        <div class="fs-4 fw-bold" data-bind="k-total">—</div>
+        <div class="text-body-quaternary fs-9" data-bind="k-total-sub">&nbsp;</div>
+      </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-body-tertiary mb-2">값이 거의 다 찬 항목</h6>
+        <div class="fs-4 fw-bold" data-bind="k-good">—</div>
+        <div class="text-body-quaternary fs-9">90% 이상</div>
+      </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-body-tertiary mb-2">절반도 못 찬 항목</h6>
+        <div class="fs-4 fw-bold text-warning" data-bind="k-mid">—</div>
+        <div class="text-body-quaternary fs-9">1~49%</div>
+      </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-body-tertiary mb-2">값이 하나도 없는 항목</h6>
+        <div class="fs-4 fw-bold text-danger" data-bind="k-zero">—</div>
+        <div class="text-body-quaternary fs-9">사람이 넣어야 합니다</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="card mb-4" data-bind="empty-panel" hidden>
+    <div class="card-body">
+      <h5 class="mb-2"><span class="fas fa-triangle-exclamation text-danger me-2"></span>값이 하나도 없는 항목</h5>
+      <p class="text-body-tertiary fs-9 mb-3">
+        원문(상품 스펙 텍스트)에 없어 파싱으로는 못 채웁니다.
+        제조사 자료를 보거나 사람이 넣어야 합니다.
+      </p>
+      <div class="d-flex flex-wrap gap-2" data-bind="empty-list"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header border-bottom d-flex flex-wrap gap-2 align-items-center">
+      <select class="form-select form-select-sm w-auto" data-bind="filter-part">
+        <option value="">부품 전체</option>
+      </select>
+      <select class="form-select form-select-sm w-auto" data-bind="filter-state">
+        <option value="">충족 상태 전체</option>
+        <option value="zero">값 없음 (0%)</option>
+        <option value="low">절반 미만 (1~49%)</option>
+        <option value="mid">50~89%</option>
+        <option value="good">90% 이상</option>
+      </select>
+      <span class="ms-auto text-body-tertiary fs-9" data-bind="count">—</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 fs-9">
+          <colgroup>
+            <col style="width:24%"><col style="width:9%"><col style="width:20%">
+            <col style="width:11%"><col style="width:8%"><col style="width:16%"><col style="width:12%">
+          </colgroup>
+          <thead class="border-bottom">
+            <tr>
+              <th class="ps-3">사양</th><th>자료형</th><th>적용 부품</th>
+              <th>호환 관계</th><th>판정</th><th>충족</th><th class="pe-3">출처</th>
+            </tr>
+          </thead>
+          <tbody data-repeat="defs"></tbody>
+        </table>
+      </div>
+      <div class="p-4 text-center text-body-tertiary" data-bind="empty" hidden>
+        조건에 맞는 항목이 없습니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- 추가 폼 -->
+  <div class="modal fade" tabindex="-1" data-bind="add-modal" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">사양 항목 추가</h5>
+          <button type="button" class="btn-close" data-action="close-add" aria-label="닫기"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-body-tertiary fs-9">
+            값을 담을 자리를 만듭니다. <b>컬럼을 만들지 않으므로 즉시 쓸 수 있습니다.</b>
+            추가해도 값은 0건이라 당장 판정에 쓰이지는 않습니다.
+          </p>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fs-9">키 <span class="text-body-quaternary">(영문 소문자·숫자·밑줄)</span></label>
+              <input class="form-control form-control-sm" data-bind="f-key" placeholder="radiator_thickness_mm">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fs-9">이름</label>
+              <input class="form-control form-control-sm" data-bind="f-label" placeholder="라디에이터 두께">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fs-9">자료형</label>
+              <select class="form-select form-select-sm" data-bind="f-type"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fs-9">단위 <span class="text-body-quaternary">(선택)</span></label>
+              <input class="form-control form-control-sm" data-bind="f-unit" placeholder="mm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fs-9">판정</label>
+              <select class="form-select form-select-sm" data-bind="f-block">
+                <option value="1">막음 — 없으면 조립 보증 불가</option>
+                <option value="0">경고 — 조립은 되지만 알린다</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fs-9">적용 부품 <span class="text-body-quaternary">(여럿 선택)</span></label>
+              <div class="d-flex flex-wrap gap-2" data-bind="f-parts"></div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fs-9">
+                호환 관계 <span class="text-body-quaternary">(선택 — 이 사양이 어느 판정에 쓰이는지)</span>
+              </label>
+              <div class="d-flex flex-wrap gap-2" data-bind="f-pairs"></div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fs-9">메모 <span class="text-body-quaternary">(왜 필요한지)</span></label>
+              <input class="form-control form-control-sm" data-bind="f-note"
+                     placeholder="27mm 와 45mm 는 상단 장착 시 보드·램 간섭이 다르다">
+            </div>
+          </div>
+          <div class="alert alert-danger mt-3 mb-0 py-2 fs-9" data-bind="f-error" hidden></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-phoenix-secondary btn-sm" data-action="close-add">취소</button>
+          <button class="btn btn-primary btn-sm" data-action="submit-add">추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function(){
+  var $ = function(k){ return document.querySelector('[data-bind="'+k+'"]'); };
+  var STATE = { all: [], meta: null };
+
+  function pctClass(p){
+    if (p === null) return 'text-body-quaternary';
+    if (p === 0) return 'text-danger';
+    if (p < 50) return 'text-warning';
+    return 'text-body';
+  }
+  function bar(p){
+    if (p === null) return '<span class="text-body-quaternary fs-9">적용 대상 없음</span>';
+    var c = p === 0 ? 'bg-danger' : (p < 50 ? 'bg-warning' : (p < 90 ? 'bg-info' : 'bg-success'));
+    return '<div class="d-flex align-items-center gap-2">'
+         + '<div class="progress" style="width:64px;height:5px">'
+         + '<div class="progress-bar '+c+'" style="width:'+Math.max(p,2)+'%"></div></div>'
+         + '<span class="'+pctClass(p)+' fs-9" style="font-variant-numeric:tabular-nums">'+p+'%</span></div>';
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[m]; }); }
+
+  function render(){
+    var part = $('filter-part').value, st = $('filter-state').value;
+    var rows = STATE.all.filter(function(d){
+      if (part && d.part_types.indexOf(part) < 0) return false;
+      if (!st) return true;
+      var p = d.pct;
+      if (st === 'zero') return p === 0;
+      if (st === 'low')  return p !== null && p > 0 && p < 50;
+      if (st === 'mid')  return p !== null && p >= 50 && p < 90;
+      if (st === 'good') return p !== null && p >= 90;
+      return true;
+    });
+    var tb = document.querySelector('[data-repeat="defs"]');
+    tb.innerHTML = rows.map(function(d){
+      return '<tr>'
+        + '<td class="ps-3"><div class="fw-semibold">'+esc(d.label)+'</div>'
+        +   '<div class="text-body-quaternary font-monospace fs-10">'+esc(d.field_key)+'</div></td>'
+        + '<td>'+esc((STATE.meta.types||{})[d.data_type] || d.data_type)
+        +   (d.unit ? ' <span class="text-body-quaternary">('+esc(d.unit)+')</span>' : '')+'</td>'
+        + '<td>'+(d.part_types.length
+              ? d.part_types.map(function(p){ return '<span class="badge badge-phoenix badge-phoenix-secondary me-1">'+esc(p)+'</span>'; }).join('')
+              : '<span class="text-body-quaternary">없음 — 감춰짐</span>')+'</td>'
+        + '<td>'+(d.compat_pairs.length
+              ? d.compat_pairs.map(function(p){ return '<span class="badge badge-phoenix badge-phoenix-info me-1">'+esc(p)+'</span>'; }).join('')
+              : '<span class="text-body-quaternary fs-10">정보</span>')+'</td>'
+        + '<td>'+(d.is_blocking
+              ? '<span class="badge badge-phoenix badge-phoenix-danger">막음</span>'
+              : '<span class="badge badge-phoenix badge-phoenix-warning">경고</span>')+'</td>'
+        + '<td>'+bar(d.pct)+'</td>'
+        + '<td class="pe-3">'+(d.is_custom
+              ? '<span class="badge badge-phoenix badge-phoenix-primary">사람이 추가</span>'
+              : '<span class="text-body-quaternary fs-10">표준</span>')+'</td>'
+        + '</tr>';
+    }).join('');
+    $('empty').hidden = rows.length > 0;
+    $('count').textContent = '전체 ' + STATE.all.length + '개 중 ' + rows.length + '개';
+  }
+
+  function fillKpis(){
+    var a = STATE.all;
+    var withNeed = a.filter(function(d){ return d.pct !== null; });
+    var zero = withNeed.filter(function(d){ return d.pct === 0; });
+    $('k-total').textContent = a.length;
+    $('k-total-sub').textContent = '사람이 추가한 것 ' + a.filter(function(d){ return d.is_custom; }).length + '개';
+    $('k-good').textContent = withNeed.filter(function(d){ return d.pct >= 90; }).length;
+    $('k-mid').textContent  = withNeed.filter(function(d){ return d.pct > 0 && d.pct < 50; }).length;
+    $('k-zero').textContent = zero.length;
+    if (zero.length){
+      $('empty-panel').hidden = false;
+      $('empty-list').innerHTML = zero.map(function(d){
+        return '<span class="badge badge-phoenix badge-phoenix-danger">'+esc(d.label)
+             + ' <span class="opacity-75">'+esc(d.part_types.join(','))+'</span></span>';
+      }).join('');
+    }
+  }
+
+  function buildForm(){
+    var m = STATE.meta;
+    $('f-type').innerHTML = Object.keys(m.types).map(function(k){
+      return '<option value="'+k+'">'+esc(m.types[k])+' ('+k+')</option>'; }).join('');
+    $('f-parts').innerHTML = m.part_types.map(function(p){
+      return '<label class="btn btn-sm btn-phoenix-secondary mb-0">'
+           + '<input type="checkbox" class="form-check-input me-1" value="'+esc(p)+'" data-part>'
+           + esc(p)+'</label>'; }).join('');
+    $('f-pairs').innerHTML = m.pairs.map(function(p){
+      return '<label class="btn btn-sm btn-phoenix-secondary mb-0">'
+           + '<input type="checkbox" class="form-check-input me-1" value="'+esc(p)+'" data-pair>'
+           + esc(p)+'</label>'; }).join('');
+    $('filter-part').innerHTML = '<option value="">부품 전체</option>'
+      + m.part_types.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
+  }
+
+  function load(){
+    fetch('/api/admin/std/spec-defs').then(function(r){ return r.json(); }).then(function(d){
+      STATE.all = d.items; STATE.meta = d;
+      buildForm(); fillKpis(); render();
+    }).catch(function(e){
+      $('count').textContent = '불러오지 못했습니다 — ' + e;
+    });
+  }
+
+  function modal(show){
+    var el = $('add-modal');
+    el.classList.toggle('show', show);
+    el.style.display = show ? 'block' : 'none';
+    el.setAttribute('aria-hidden', show ? 'false' : 'true');
+    document.body.classList.toggle('modal-open', show);
+    if (show) $('f-key').focus();
+  }
+
+  document.addEventListener('click', function(ev){
+    var a = ev.target.closest('[data-action]');
+    if (!a) return;
+    var act = a.getAttribute('data-action');
+    if (act === 'open-add'){ $('f-error').hidden = true; modal(true); }
+    if (act === 'close-add'){ modal(false); }
+    if (act === 'submit-add'){
+      var body = {
+        field_key: $('f-key').value.trim(),
+        label: $('f-label').value.trim(),
+        data_type: $('f-type').value,
+        unit: $('f-unit').value.trim() || null,
+        is_blocking: $('f-block').value === '1',
+        note: $('f-note').value.trim() || null,
+        part_types: [].map.call(document.querySelectorAll('[data-part]:checked'), function(x){ return x.value; }),
+        compat_pairs: [].map.call(document.querySelectorAll('[data-pair]:checked'), function(x){ return x.value; })
+      };
+      fetch('/api/admin/std/spec-defs', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+        .then(function(res){
+          if (!res.ok){
+            // 실패를 삼키지 않는다 — 무엇이 왜 틀렸는지 그대로 보여준다
+            var d = res.j && res.j.detail;
+            $('f-error').textContent = (typeof d === 'string') ? d : JSON.stringify(d);
+            $('f-error').hidden = false;
+            return;
+          }
+          modal(false);
+          ['f-key','f-label','f-unit','f-note'].forEach(function(k){ $(k).value = ''; });
+          document.querySelectorAll('[data-part]:checked,[data-pair]:checked')
+            .forEach(function(x){ x.checked = false; });
+          load();
+        });
+    }
+  });
+  $('filter-part').addEventListener('change', render);
+  $('filter-state').addEventListener('change', render);
+  load();
+})();
+</script>
+{% endblock %}

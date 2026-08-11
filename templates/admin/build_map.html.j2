@@ -1,0 +1,762 @@
+{#
+  조립 호환 조감도 (ADM-STD-020) — 2026-08-11 재작성
+
+  ■ 이 화면이 답하는 질문
+    "이 부품과 저 부품이 맞는지 판정하려면 무엇을 알아야 하고, 우리는 지금 어디까지 아는가"
+    `/admin2/spec-standard` 가 **무엇이 비었나**를 말한다면, 여기는 **왜 그게 문제인가**를 말한다.
+
+  ■ 출처 — 사용자가 Claude 디자인으로 그린 원안
+    프로젝트 : claude.ai/design  ·  `22248237-152f-4f13-8201-54afca75ebe4`
+    파일     : `조립 호환 조감도.dc.html`  (3안: 지도형 1a · 진단형 1b · 매트릭스형 1c)
+    원안은 `<x-dc>` + `DCLogic` + React 런타임(`support.js`) 형식이라 여기서는 돌지 않는다.
+    **화면 구성·색·서체·간격은 원안 그대로 옮기고, 런타임만 순수 JS 로 바꿨다.**
+
+  ■ 첫 판(Phoenix 조립)을 버린 이유
+    요약숫자 4칸 → 지도 → 관계 표 → 부품 카드를 **세로로 쌓아** 같은 데이터를 네 번 말했고,
+    「조감도」인데 지도가 화면의 1/4이라 스크롤해야 보였다. Phoenix 는 CRUD 화면에는 맞지만
+    **읽는 화면**을 담을 그릇이 없었다 — 형식이 내용을 이겼다.
+
+  ■ 원안과 달리 한 것 (셋, 전부 이유가 있다)
+    ① **3안을 나란히가 아니라 탭으로.** 원안은 1440×960 세 판을 옆으로 늘어놓은 비교
+       시트다. 실제 화면에서 셋을 동시에 띄우면 어느 안도 제 폭을 못 받는다. 탭이면
+       각 안이 전체 폭을 쓰고, **전환해도 선택(sel)이 유지돼** 같은 상태로 비교된다.
+    ② **좌측 메뉴는 원안이 지어낸 9개가 아니라 정본**(`api/admin_nav.py`)을 쓴다.
+       메뉴를 화면마다 복제하던 병이 이 프로젝트가 앓던 것이다.
+    ③ **부품 한글 이름도 정본**(`api/taxonomy.PART_LABELS`). 원안의 «프로세서·하드디스크·
+       공랭 쿨러» 대신 «CPU·HDD·CPU쿨러(공랭)» 이다.
+
+  ■ 전체 화면인 이유 — 사용자 결정(2026-08-11, 선택지 (나))
+    그래서 `_layout.html.j2` 를 상속하지 않고 자체 셸을 그린다. 대신 **나가는 길**을
+    잃지 않도록 좌측 메뉴 전량과 상단 이동 경로를 그대로 싣는다.
+
+  ■ 숫자는 전부 `/api/admin/std/compat-map` 응답만 쓴다. 화면은 상태를 파생조차 하지 않는다
+    (`status` 를 서버가 준다) — 세 안이 같은 값을 각자 계산하면 세 곳에서 어긋난다.
+#}<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC 관리자 · 조립 호환 조감도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --shell:#f7f4ee; --card:#fffdf9; --ink:#26231e; --nav:#211f1b;
+  --nav-fg:#a29b8d; --nav-on:#f4f1ea;
+  --mut:#6f6a61; --mut2:#8a8377; --mut3:#a09889; --line:rgba(0,0,0,.11);
+  --sans:'IBM Plex Sans KR',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--shell);color:var(--ink);font-family:var(--sans);
+     -webkit-font-smoothing:antialiased;display:flex;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ── 좌측 메뉴 (정본 admin_nav) ───────────────────────────────── */
+.lnb{width:212px;flex:none;background:var(--nav);color:#cfc9bd;display:flex;
+     flex-direction:column;overflow:hidden}
+.lnb-top{padding:16px 16px 12px;font:600 14px/1 var(--sans);color:var(--nav-on);
+         letter-spacing:-.01em;flex:none}
+.lnb-scroll{flex:1;min-height:0;overflow-y:auto;padding-bottom:16px}
+.lnb-scroll::-webkit-scrollbar{width:6px}
+.lnb-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+.lnb-grp{border-bottom:1px solid rgba(255,255,255,.045)}
+.lnb-g{width:100%;display:flex;align-items:center;gap:7px;padding:9px 14px;
+       background:none;border:0;cursor:pointer;text-align:left;
+       font:600 10px/1.2 var(--mono);letter-spacing:.11em;color:#8b8478}
+.lnb-g:hover{color:var(--nav-on);background:rgba(255,255,255,.045)}
+.lnb-g .t{flex:1;text-transform:uppercase}
+.lnb-g .c{font:500 9.5px/1 var(--mono);color:#5f5a51;font-variant-numeric:tabular-nums}
+.lnb-g .x{font-size:8px;transition:transform .15s ease}
+.lnb-grp[data-open="n"] .lnb-b{display:none}
+.lnb-grp[data-open="n"] .lnb-g .x{transform:rotate(-90deg)}
+.lnb-b{padding-bottom:5px}
+.lnb a,.lnb .off{display:block;padding:7px 16px;font:500 12.5px/1.35 var(--sans);
+       color:var(--nav-fg);border-left:3px solid transparent}
+.lnb a:hover{color:var(--nav-on);background:rgba(255,255,255,.05)}
+.lnb a.on{color:var(--nav-on);background:rgba(255,255,255,.09);
+          border-left-color:oklch(0.68 0.13 165)}
+.lnb .off{color:#57534b;cursor:default}
+.lnb .tag{font:500 9px/1 var(--mono);padding:1px 4px;border-radius:3px;
+          background:rgba(255,255,255,.06);color:#6d675c;margin-left:5px;vertical-align:1px}
+
+/* ── 셸 ─────────────────────────────────────────────────────── */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:var(--card);
+    display:flex;align-items:center;padding:0 18px;gap:12px}
+.hd .crumb{font:400 12px/1 var(--sans);color:var(--mut2)}
+.hd .sep{color:#c4bdae}
+.hd .now{font:600 13px/1 var(--sans)}
+.tabs{display:flex;gap:2px;margin-left:18px}
+.tab{font:500 12px/1 var(--sans);padding:7px 13px;border-radius:6px;border:1px solid transparent;
+     background:none;color:var(--mut2);cursor:pointer}
+.tab:hover{color:var(--ink);background:rgba(0,0,0,.04)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--shell);border-color:var(--ink)}
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 16px 16px}
+.view{flex:1;min-height:0;display:flex;flex-direction:column}
+.view[hidden]{display:none}
+
+/* ── 공통 조각 ───────────────────────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px}
+.stat{flex:1;padding:9px 11px}
+.stat .l{font:500 10.5px/1.3 var(--sans);color:var(--mut2)}
+.stat .v{font:600 25px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.stat .n{font:400 10.5px/1.3 var(--sans);color:var(--mut3)}
+.bar{display:block;height:100%;border-radius:3px}
+.track{flex:1;height:5px;background:rgba(0,0,0,.08);border-radius:3px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:5px;
+      font:500 10.5px/1.6 var(--sans)}
+.dim{opacity:.4}
+
+/* ── 1a 지도형 ───────────────────────────────────────────────── */
+.map-area{flex:1;min-height:0;position:relative;overflow:hidden}
+.map-area svg{position:absolute;inset:0;width:100%;height:100%}
+.elabel{position:absolute;transform:translate(-50%,-50%);font:600 10px/1 var(--mono);
+        padding:2px 4px;border-radius:4px;pointer-events:none;white-space:nowrap}
+.node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+      align-items:center;gap:2px;padding:7px 11px;border-radius:8px;cursor:default;
+      white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.node b{font:600 11.5px/1 var(--mono)}
+.node i{font:400 10.5px/1 var(--sans);font-style:normal;opacity:.68}
+.legend{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:5px;
+        background:rgba(255,253,249,.94);border:1px solid rgba(0,0,0,.1);border-radius:7px;
+        padding:8px 10px}
+.legend div{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--sans)}
+.sw{width:14px;height:6px;border-radius:2px;display:inline-block;flex:none}
+.rail{width:352px;flex:none;border-left:1px solid rgba(0,0,0,.12);background:var(--card);
+      display:flex;flex-direction:column;min-height:0}
+.cap{font:500 10.5px/1 var(--mono);letter-spacing:.1em;color:var(--mut3);margin-bottom:8px}
+.prow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px}
+.rrow{padding:7px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+
+/* ── 1b 진단형 ───────────────────────────────────────────────── */
+.gap{display:flex;gap:12px;background:var(--nav);color:var(--nav-on);border-radius:9px;
+     padding:14px 16px;align-items:center;margin-bottom:12px;flex:none}
+.lane{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--card);
+      border-radius:8px;min-height:0}
+.lane-hd{display:flex;align-items:center;gap:7px;padding:9px 10px;border-bottom:1px solid rgba(0,0,0,.1)}
+.mark{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
+      border-radius:5px;font:500 11px/1 var(--mono);flex:none}
+.lane-body{flex:1;min-height:0;overflow:auto;padding:8px 10px 10px;display:flex;
+           flex-direction:column;gap:7px}
+.lcard{padding:8px 9px;border-radius:6px;border:1px solid rgba(0,0,0,.1);background:var(--card)}
+
+/* ── 1c 매트릭스형 ───────────────────────────────────────────── */
+.mx-cell{width:36px;height:40px;flex:none;border:1px solid rgba(0,0,0,.07);margin:-0.5px;
+         display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:2px}
+.mx-cell span{font:600 9px/1 var(--mono);padding:2px 3px;border-radius:3px}
+.chip{display:inline-flex;align-items:baseline;gap:5px;padding:2px 6px;border-radius:5px;
+      font:400 10.5px/1.5 var(--sans)}
+
+@media (max-width:900px){
+  body{overflow:auto;display:block}
+  .lnb{width:100%;height:auto;max-height:180px}
+  .rail{width:100%;border-left:0;border-top:1px solid rgba(0,0,0,.12)}
+  .split,.lanes{flex-direction:column!important}
+  .map-area{height:520px;flex:none}
+}
+</style>
+</head>
+<body data-screen-id="ADM-STD-020" data-domain="compat-map">
+
+<nav class="lnb" aria-label="주메뉴">
+  <div class="lnb-top">admin2</div>
+  {#
+    대분류는 접힌다. 12그룹 · 54항목을 모두 펼치면 세로로 넘쳐 아래쪽 그룹은 스크롤
+    없이는 보이지도 않는다. 지금 있는 그룹만 펼치고 나머지는 접어 둔다.
+    접힘 상태는 `sessionStorage` 에 남긴다 — 화면을 옮길 때마다 다시 접히면 쓸모가 없다.
+
+    링크는 재구축된 화면(`/admin2/*`)에만 붙는다(`admin_nav.nav_for` 의 결정).
+    나머지는 「기존」(구화면은 있으나 재구축 전) · 「신설」(아무 데도 없음)로 구분해
+    표시만 한다 — 둘은 다른 사실이고, 재구축 순서를 정할 때 근거가 된다.
+  #}
+  <div class="lnb-scroll">
+    {% for g in nav %}
+      <div class="lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
+        <button type="button" class="lnb-g" data-action="lnb-group"
+                aria-expanded="{{ 'true' if g.active else 'false' }}">
+          <span class="t">{{ g.title }}</span>
+          <span class="c">{{ g.done }}/{{ g.total }}</span>
+          <span class="x" aria-hidden="true">▼</span>
+        </button>
+        <div class="lnb-b">
+          {% for it in g["items"] %}
+            {% if it.href %}
+              <a href="{{ it.href }}" class="{% if it.active %}on{% endif %}"
+                 {% if it.active %}aria-current="page"{% endif %}>{{ it.label }}</a>
+            {% else %}
+              <span class="off"
+                    title="{{ '기존 화면 있음 · 재구축 전' if it.state == 'old' else '신설 예정' }}"
+                >{{ it.label }}<span class="tag">{{ '기존' if it.state == 'old' else '신설' }}</span></span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</nav>
+
+<div class="main">
+  <header class="hd">
+    <span class="crumb">상품사양관리</span>
+    <span class="sep">/</span>
+    <span class="now">조립 호환 조감도</span>
+    <div class="tabs" role="tablist" aria-label="보기 방식">
+      <button class="tab" role="tab" data-action="view" data-view="map"
+              aria-selected="true">지도형</button>
+      <button class="tab" role="tab" data-action="view" data-view="diag"
+              aria-selected="false">진단형</button>
+      <button class="tab" role="tab" data-action="view" data-view="matrix"
+              aria-selected="false">매트릭스형</button>
+    </div>
+    <span style="flex:1"></span>
+    <span class="num" style="font-size:11.5px;color:var(--mut2)" data-bind="asof">—</span>
+  </header>
+
+  <div class="body">
+
+    {# ── 1a 지도형 ─────────────────────────────────────────── #}
+    <section class="view" data-view-panel="map" role="tabpanel" aria-label="지도형">
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex:none" data-repeat="stats"></div>
+      <div class="split" style="flex:1;min-height:0;display:flex;gap:12px">
+        <div class="card map-area">
+          <svg viewBox="0 0 960 640" preserveAspectRatio="xMidYMid meet" role="img"
+               aria-label="부품 간 호환 관계 지도">
+            <path data-bind="p-out"      fill="none" stroke="#bdb6a8" stroke-width="1.3" stroke-dasharray="5 5"></path>
+            <path data-bind="p-missing"  fill="none" stroke="oklch(0.62 0.11 285)" stroke-width="1.8"></path>
+            <path data-bind="p-norule"   fill="none" stroke="oklch(0.68 0.15 62)"  stroke-width="2.6"></path>
+            <path data-bind="p-checking" fill="none" stroke="oklch(0.56 0.11 165)" stroke-width="2.6"></path>
+            <path data-bind="p-hi"       fill="none" stroke="#26231e" stroke-width="3.4"></path>
+          </svg>
+          <div data-repeat="edge-labels"></div>
+          <div data-repeat="nodes"></div>
+          <div class="legend" data-repeat="legend"></div>
+        </div>
+        <aside class="rail card">
+          <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(0,0,0,.09);flex:none">
+            <div class="cap">부품 10종 · 사양 충족률</div>
+            <div data-repeat="rail-parts"></div>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:10px 14px 16px">
+            <div class="cap" data-bind="rail-title">—</div>
+            <div data-repeat="rail-rels"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    {# ── 1b 진단형 ─────────────────────────────────────────── #}
+    <section class="view" data-view-panel="diag" role="tabpanel" aria-label="진단형" hidden>
+      <div class="gap">
+        <div style="display:flex;align-items:baseline;gap:8px" class="num">
+          <span style="font:600 46px/0.9 var(--mono);color:oklch(0.72 0.13 165)"
+                data-bind="g-checked">—</span>
+          <span style="font:400 18px/1 var(--mono);color:var(--mut2)">/</span>
+          <span style="font:500 24px/1 var(--mono)" data-bind="g-scope">—</span>
+        </div>
+        <div style="font:400 13px/1.5 var(--sans);max-width:440px" data-bind="g-text"></div>
+        <span style="flex:1"></span>
+        <div style="display:flex;gap:18px" data-repeat="g-stats"></div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;gap:10px">
+        <div class="lanes" style="flex:1;min-width:0;display:flex;gap:10px" data-repeat="lanes"></div>
+        <aside class="card" style="width:330px;flex:none;display:flex;flex-direction:column;min-height:0">
+          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);
+                      font:600 12px/1.2 var(--sans);flex:none">사양 등록 필수</div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:8px 12px 12px"
+               data-repeat="diag-parts"></div>
+        </aside>
+      </div>
+    </section>
+
+    {# ── 1c 매트릭스형 ─────────────────────────────────────── #}
+    <section class="view" data-view-panel="matrix" role="tabpanel" aria-label="매트릭스형" hidden>
+      <div style="display:flex;gap:10px;align-items:stretch;margin-bottom:12px;flex:none">
+        <div class="card" style="flex:none;padding:10px 12px">
+          <div class="cap">규칙 적용률</div>
+          <div style="display:flex;align-items:baseline;gap:6px" class="num">
+            <span style="font:600 30px/1 var(--mono);color:oklch(0.5 0.11 165)"
+                  data-bind="m-checked">—</span>
+            <span style="font:400 14px/1 var(--mono);color:var(--mut3)"
+                  data-bind="m-scope">—</span>
+          </div>
+          <div style="font:400 10.5px/1.4 var(--sans);color:var(--mut2);margin-top:3px"
+               data-bind="m-note"></div>
+        </div>
+        <div style="flex:1;display:flex;gap:10px" data-repeat="legend-cards"></div>
+      </div>
+      <div class="split" style="display:flex;gap:12px;flex:1;min-height:0">
+        <div class="card" style="flex:0 1 auto;min-width:0;padding:10px 12px 12px;overflow:auto">
+          <div style="font:600 12px/1.2 var(--sans);margin-bottom:8px">부품 × 부품 관계 격자
+            <span style="font-weight:400;color:var(--mut2);font-size:11px">· 기호 = 상태</span></div>
+          <div style="display:flex"><div style="width:80px;flex:none"></div>
+            <div style="display:flex" data-repeat="mx-cols"></div></div>
+          <div data-repeat="mx-rows"></div>
+        </div>
+        <div class="card" style="flex:1 0 520px;min-width:0;display:flex;flex-direction:column;min-height:0">
+          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);flex:none;
+                      display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            <span style="font:600 12px/1.2 var(--sans)">부품 × 사양 충족률</span>
+            <span style="font:400 10.5px/1.3 var(--sans);color:var(--mut2)">진하게 = 필수 사양 ·
+              옅게 = 경고 사양 · 붉게 = 값 0%</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:6px 12px 12px"
+               data-repeat="heat-rows"></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  // ── 상태 4분류. 라벨·설명은 서버가 정한 status 키에 붙는 표시 규약이다.
+  //    색만으로 구분하지 않는다 — 기호(●◆○·)와 글자를 항상 함께 쓴다.
+  var STATUS = {
+    checking: {label:'검사 적용',       mark:'●', color:'oklch(0.48 0.11 165)', line:'oklch(0.56 0.11 165)', bg:'oklch(0.95 0.035 165)', bd:'oklch(0.84 0.06 165)', desc:'규칙 등록 완료'},
+    norule:   {label:'규칙 미등록',     mark:'◆', color:'oklch(0.5 0.14 62)',   line:'oklch(0.68 0.15 62)',  bg:'oklch(0.96 0.045 75)',  bd:'oklch(0.85 0.08 70)',  desc:'사양 값 확보 · 규칙 등록 필요'},
+    missing:  {label:'사양 값 부족',    mark:'○', color:'oklch(0.46 0.12 285)', line:'oklch(0.62 0.11 285)', bg:'oklch(0.96 0.025 285)', bd:'oklch(0.86 0.05 285)', desc:'사양 등록 필요'},
+    out:      {label:'범위 밖',           mark:'·', color:'#7d7669',              line:'#bdb6a8',              bg:'rgba(0,0,0,.04)',       bd:'rgba(0,0,0,.14)',      desc:'차기 단계 대상'}
+  };
+  var ORDER = ['norule', 'missing', 'checking', 'out'];   // 아까운 순
+
+  // ── 노드 좌표(960×640). **배치는 데이터가 아니라 판짜기**라 여기 둔다.
+  //    선의 상태·굵기는 전부 서버 값이 정한다 — 화면이 지어내는 것은 위치뿐이다.
+  var POS = {
+    CPU:[480,80], MB:[470,300], RAM:[722,168], GPU:[762,330], SSD:[690,470],
+    HDD:[500,528], CASE:[252,420], POWER:[150,288],
+    COOLER_CPU_AIR:[258,132], COOLER_CPU_AIO:[92,152],
+    '구성 전체':[96,432], MONITOR:[888,214], FAN:[330,600],
+    EXPANSION:[632,600], ODD:[92,556]
+  };
+  var SHORT = {COOLER_CPU_AIR:'AIR', COOLER_CPU_AIO:'AIO', EXPANSION:'EXP',
+               MONITOR:'MON', '구성 전체':'전체'};
+  var OUT_NODES = ['MONITOR', 'FAN', 'EXPANSION', 'ODD', '구성 전체'];
+
+  var $ = function (k) { return document.querySelector('[data-bind="' + k + '"],[data-repeat="' + k + '"]'); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+  var set = function (k, html) { var e = $(k); if (e) e.innerHTML = html; };
+  var num = function (n) { return (n == null ? '—' : Number(n).toLocaleString('ko-KR')); };
+  var pctColor = function (p) {
+    return p === 0 ? 'oklch(0.53 0.15 25)' : p < 60 ? 'oklch(0.52 0.13 62)' : '#4a463e';
+  };
+  var barColor = function (p) {
+    return p < 55 ? 'oklch(0.62 0.16 25)' : p < 75 ? 'oklch(0.68 0.14 62)' : 'oklch(0.58 0.1 165)';
+  };
+
+  var DATA = null, sel = null, view = 'map';
+
+  // ── 지도 기하 — 같은 두 부품을 잇는 관계가 여럿이면 부채꼴로 벌리고,
+  //    다른 노드를 덮으면 더 크게 비켜 간다(원안 알고리즘 그대로).
+  function geometry(rels) {
+    var buckets = {}, paths = {checking:'', norule:'', missing:'', out:'', hi:''}, labels = [];
+    rels.forEach(function (r) {
+      var k = r.parts.slice().sort().join('|');
+      (buckets[k] = buckets[k] || []).push(r);
+    });
+    var all = Object.keys(POS);
+    Object.keys(buckets).forEach(function (k) {
+      var group = buckets[k];
+      group.forEach(function (r, i) {
+        var a = POS[r.parts[0]], b = POS[r.parts[1]];
+        if (!a || !b) return;
+        var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        var len = Math.sqrt(dx * dx + dy * dy) || 1;
+        var base = group.length === 1 ? (r.status === 'out' ? 58 : 0)
+                                      : (i - (group.length - 1) / 2) * 52;
+        var others = all.filter(function (n) { return n !== r.parts[0] && n !== r.parts[1]; });
+        var clear = function (o) {
+          var qx = mx - dy / len * o, qy = my + dx / len * o;
+          var px = 0.25 * a[0] + 0.5 * qx + 0.25 * b[0];
+          var py = 0.25 * a[1] + 0.5 * qy + 0.25 * b[1];
+          return others.every(function (n) {
+            return Math.abs(px - POS[n][0]) > 56 || Math.abs(py - POS[n][1]) > 34;
+          });
+        };
+        var off = base;
+        [base, base + 62, base - 62, base + 116, base - 116, base + 170].some(function (o) {
+          if (clear(o)) { off = o; return true; } return false;
+        });
+        var cx = mx - dy / len * off, cy = my + dx / len * off;
+        var d = 'M' + a[0] + ' ' + a[1] + ' Q' + cx.toFixed(1) + ' ' + cy.toFixed(1) +
+                ' ' + b[0] + ' ' + b[1] + ' ';
+        var hit = sel && r.parts.indexOf(sel) >= 0;
+        paths[r.status] += d;
+        if (hit) paths.hi += d;
+        var lx = 0.25 * a[0] + 0.5 * cx + 0.25 * b[0];
+        var ly = 0.25 * a[1] + 0.5 * cy + 0.25 * b[1];
+        var S = STATUS[r.status];
+        labels.push('<div class="elabel" style="left:' + (lx / 960 * 100).toFixed(2) +
+          '%;top:' + (ly / 640 * 100).toFixed(2) + '%;background:' + (hit ? '#26231e' : '#fffdf9') +
+          ';color:' + (hit ? '#f7f4ee' : S.color) + ';border:1px solid ' +
+          (hit ? '#26231e' : S.bd) + ';opacity:' + (sel && !hit ? .3 : 1) + '">' +
+          esc(r.pair_key) + '</div>');
+      });
+    });
+    var linked = {};
+    rels.forEach(function (r) {
+      if (sel && r.parts.indexOf(sel) >= 0) r.parts.forEach(function (p) { linked[p] = 1; });
+    });
+    var nodes = Object.keys(POS).map(function (k) {
+      var isOut = OUT_NODES.indexOf(k) >= 0, on = sel === k, near = !!linked[k];
+      var p = POS[k];
+      return '<div class="node" data-part="' + esc(k) + '" style="left:' +
+        (p[0] / 960 * 100).toFixed(2) + '%;top:' + (p[1] / 640 * 100).toFixed(2) +
+        '%;background:' + (on ? '#26231e' : isOut ? 'rgba(247,244,238,.9)' : '#fffdf9') +
+        ';color:' + (on ? '#f7f4ee' : isOut ? '#8a8377' : '#26231e') +
+        ';border:1.5px ' + (isOut ? 'dashed' : 'solid') + ' ' +
+        (on || near ? '#26231e' : 'rgba(0,0,0,.22)') +
+        ';opacity:' + (sel && !near ? .38 : 1) + '">' +
+        '<b>' + esc(SHORT[k] || k) + '</b><i>' + esc(DATA.part_labels[k] || k) + '</i></div>';
+    });
+    return {paths: paths, labels: labels, nodes: nodes};
+  }
+
+  function render() {
+    var d = DATA, s = d.summary;
+    var rels = d.pairs.map(function (p) {
+      var S = STATUS[p.status];
+      return {
+        pair_key: p.pair_key, status: p.status, S: S, note: p.note,
+        pair: p.left_part + ' ↔ ' + p.right_part,
+        parts: [p.left_part, p.right_part],
+        what: p.compares, specs: p.specs || []
+      };
+    });
+    var counts = {};
+    ORDER.forEach(function (k) {
+      counts[k] = rels.filter(function (r) { return r.status === k; }).length;
+    });
+
+    /* ── 1a 지도형 ─────────────────────────────────────────── */
+    var stats = [
+      {l:'호환 관계',        v:s.pairs_in_scope, n:'전체 ' + s.pairs_total + ' (범위 밖 ' + (s.pairs_total - s.pairs_in_scope) + ')'},
+      {l:'검사 적용',        v:s.pairs_checked,  n:'규칙 등록 완료'},
+      {l:'판정 가능',        v:s.pairs_ready,    n:'양측 사양 값 확보'},
+      {l:'사양 항목',        v:s.specs_total,    n:'부품별 합계'}
+    ];
+    set('stats', stats.map(function (x) {
+      return '<div class="card stat"><div class="l">' + esc(x.l) + '</div>' +
+        '<div style="display:flex;align-items:baseline;gap:6px">' +
+        '<span class="v">' + esc(x.v) + '</span>' +
+        '<span class="n">' + esc(x.n) + '</span></div></div>';
+    }).join(''));
+
+    var geo = geometry(rels);
+    ['checking','norule','missing','out'].forEach(function (k) {
+      var e = $('p-' + k); if (e) e.setAttribute('d', geo.paths[k] || '');
+    });
+    var hi = $('p-hi'); if (hi) hi.setAttribute('d', geo.paths.hi || '');
+    set('edge-labels', geo.labels.join(''));
+    set('nodes', geo.nodes.join(''));
+    set('legend', ORDER.map(function (k) {
+      var S = STATUS[k];
+      return '<div><span class="sw" style="background:' +
+        (k === 'out' ? 'repeating-linear-gradient(45deg,#c9c3b7 0 3px,#e6e1d7 3px 6px)' : S.line) +
+        '"></span><span style="font-family:var(--mono)">' + S.mark + '</span><span>' +
+        esc(S.label) + '</span><span class="num" style="font-size:11px;color:var(--mut2)">' +
+        counts[k] + '</span></div>';
+    }).join(''));
+
+    set('rail-parts', d.parts.map(function (p) {
+      var on = sel === p.part_type;
+      return '<div class="prow" data-part="' + esc(p.part_type) + '" style="background:' +
+        (on ? '#26231e' : 'transparent') + ';color:' + (on ? '#f7f4ee' : '#26231e') +
+        ';opacity:' + (sel && !on ? .45 : 1) + '">' +
+        '<span style="width:126px;font:600 11px/1.2 var(--mono);white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis">' + esc(p.part_type) + '</span>' +
+        '<span class="track"><span class="bar" style="width:' + (p.pct || 0) +
+        '%;background:' + barColor(p.pct || 0) + '"></span></span>' +
+        '<span class="num" style="width:34px;text-align:right;font-size:11px;font-weight:500">' +
+        (p.pct == null ? '—' : p.pct + '%') + '</span>' +
+        '<span class="num" style="width:46px;text-align:right;font-size:10.5px;color:var(--mut3)">' +
+        num(p.stock) + '</span></div>';
+    }).join(''));
+
+    var railRels = (sel ? rels.filter(function (r) { return r.parts.indexOf(sel) >= 0; }) : rels)
+      .slice().sort(function (a, b) { return ORDER.indexOf(a.status) - ORDER.indexOf(b.status); });
+    set('rail-title', sel ? esc(sel) + ' 연관 관계 ' + railRels.length + '건'
+                          : '관계 ' + rels.length + '건 · 우선순위순');
+    set('rail-rels', railRels.map(function (r) {
+      var summary = r.specs.length
+        ? r.specs.map(function (x) { return x.part_type + '.' + x.label + ' ' + (x.pct == null ? '—' : x.pct + '%'); }).join('  ·  ')
+        : '연관 사양 없음';
+      return '<div class="rrow">' +
+        '<div style="display:flex;align-items:center;gap:7px">' +
+        '<span style="font:600 11px/1 var(--mono);color:var(--mut2)">' + esc(r.pair_key) + '</span>' +
+        '<span style="font:600 12px/1.2 var(--sans)">' + esc(r.pair) + '</span>' +
+        '<span style="flex:1"></span>' +
+        '<span class="pill" style="background:' + r.S.bg + ';color:' + r.S.color +
+        ';border:1px solid ' + r.S.bd + '"><span style="font-family:var(--mono)">' +
+        r.S.mark + '</span>' + esc(r.S.label) + '</span></div>' +
+        '<div style="font:400 11.5px/1.45 var(--sans);color:#5c574e;margin-top:2px">' +
+        esc(r.what) + '</div>' +
+        '<div style="font:400 10.5px/1.4 var(--mono);color:var(--mut3);margin-top:3px">' +
+        esc(summary) + '</div></div>';
+    }).join(''));
+
+    /* ── 1b 진단형 ─────────────────────────────────────────── */
+    var notChecked = s.pairs_in_scope - s.pairs_checked;
+    set('g-checked', s.pairs_checked);
+    set('g-scope', s.pairs_in_scope);
+    set('g-text', '검사 대상 ' + s.pairs_in_scope + '건 · 규칙 적용 ' + s.pairs_checked +
+      '건<br><b style="font-weight:600">미적용 ' + notChecked + '건 — 규칙 등록 필요</b>');
+    set('g-stats', stats.map(function (x) {
+      return '<div><div style="font:500 10.5px/1.3 var(--sans);color:var(--mut3)">' +
+        esc(x.l) + '</div><div class="num" style="font:600 22px/1.2 var(--mono)">' +
+        esc(x.v) + '</div><div style="font:400 10px/1.3 var(--sans);color:var(--mut2)">' +
+        esc(x.n) + '</div></div>';
+    }).join(''));
+
+    set('lanes', ORDER.map(function (k) {
+      var S = STATUS[k];
+      var items = rels.filter(function (r) { return r.status === k; });
+      return '<div class="lane" style="border:1px solid ' + S.bd + ';border-top:3px solid ' +
+        S.line + '"><div class="lane-hd"><span class="mark" style="background:' + S.bg +
+        ';color:' + S.color + ';border:1px solid ' + S.bd + '">' + S.mark + '</span>' +
+        '<span style="font:600 12px/1.2 var(--sans)">' + esc(S.label) + '</span>' +
+        '<span style="flex:1"></span><span class="num" style="font:600 15px/1 var(--mono)">' +
+        items.length + '</span></div>' +
+        '<div style="font:400 10.5px/1.4 var(--sans);color:var(--mut2);padding:6px 10px 0">' +
+        esc(S.desc) + '</div><div class="lane-body">' +
+        items.map(function (r) {
+          var on = sel && r.parts.indexOf(sel) >= 0;
+          var specs = r.specs.length ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">' +
+            r.specs.map(function (x) {
+              return '<div style="display:flex;align-items:baseline;gap:6px">' +
+                '<span style="flex:1;min-width:0;font:400 10.5px/1.35 var(--sans);color:var(--mut);' +
+                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+                esc(x.part_type + '.' + x.label) + '</span>' +
+                '<span class="num" style="font:500 10.5px/1.35 var(--mono);width:34px;' +
+                'text-align:right;color:' + pctColor(x.pct || 0) + '">' +
+                (x.pct == null ? '—' : x.pct + '%') + '</span></div>';
+            }).join('') + '</div>' : '';
+          var note = r.note ? '<div style="margin-top:6px;font:400 10.5px/1.45 var(--sans);' +
+            'color:var(--mut2)">↳ ' + esc(r.note) + '</div>' : '';
+          return '<div class="lcard" data-pair="' + esc(r.pair_key) + '" style="border-color:' +
+            (on ? '#26231e' : 'rgba(0,0,0,.1)') + ';background:' +
+            (on ? 'rgba(0,0,0,.04)' : '#fffdf9') + ';opacity:' + (sel && !on ? .42 : 1) + '">' +
+            '<div style="display:flex;align-items:baseline;gap:6px">' +
+            '<span style="font:600 10.5px/1 var(--mono);color:var(--mut2)">' + esc(r.pair_key) + '</span>' +
+            '<span style="font:600 11.5px/1.25 var(--sans)">' + esc(r.pair) + '</span></div>' +
+            '<div style="font:400 11px/1.45 var(--sans);color:#5c574e;margin-top:3px">' +
+            esc(r.what) + '</div>' + specs + note + '</div>';
+        }).join('') + '</div></div>';
+    }).join(''));
+
+    set('diag-parts', d.parts.map(function (p) {
+      var on = sel === p.part_type;
+      var zeros = (p.specs || []).filter(function (x) { return x.is_blocking && x.pct === 0; });
+      return '<div data-part="' + esc(p.part_type) + '" style="padding:8px 9px;border:1px solid ' +
+        (on ? '#26231e' : 'rgba(0,0,0,.1)') + ';border-radius:7px;margin-bottom:7px;background:' +
+        (on ? 'rgba(0,0,0,.035)' : '#fffdf9') + ';opacity:' + (sel && !on ? .5 : 1) + '">' +
+        '<div style="display:flex;align-items:baseline;gap:7px">' +
+        '<span style="font:600 12px/1.2 var(--mono)">' + esc(p.part_type) + '</span>' +
+        '<span style="font:400 10.5px/1.2 var(--sans);color:var(--mut2)">' + esc(p.name) + '</span>' +
+        '<span style="flex:1"></span><span class="num" style="font:600 13px/1 var(--mono)">' +
+        (p.pct == null ? '—' : p.pct + '%') + '</span></div>' +
+        '<div class="track" style="margin:5px 0 4px"><span class="bar" style="width:' +
+        (p.pct || 0) + '%;background:' + barColor(p.pct || 0) + '"></span></div>' +
+        '<div class="num" style="font-size:10.5px;color:var(--mut2)">재고 ' + num(p.stock) +
+        ' · 필수 사양 ' + p.blocking + '/' + p.total + '</div>' +
+        (zeros.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">' +
+          zeros.map(function (z) {
+            return '<span style="font:400 10.5px/1.4 var(--sans);color:oklch(0.48 0.13 25);' +
+              'background:oklch(0.95 0.03 25);border:1px solid oklch(0.87 0.05 25);' +
+              'border-radius:4px;padding:1px 5px">' + esc(z.label) + ' 0%</span>';
+          }).join('') + '</div>' : '') + '</div>';
+    }).join(''));
+
+    /* ── 1c 매트릭스형 ─────────────────────────────────────── */
+    set('m-checked', s.pairs_checked);
+    set('m-scope', '/ ' + s.pairs_in_scope);
+    set('m-note', '미적용 ' + notChecked + '건');
+    set('legend-cards', ORDER.map(function (k) {
+      var S = STATUS[k];
+      return '<div class="card" style="flex:1;border-left:3px solid ' + S.line +
+        ';padding:10px 12px"><div style="display:flex;align-items:center;gap:6px">' +
+        '<span class="sw" style="background:' + S.line + '"></span>' +
+        '<span style="font-family:var(--mono);font-size:11px">' + S.mark + '</span>' +
+        '<span style="font:500 11.5px/1.2 var(--sans)">' + esc(S.label) + '</span></div>' +
+        '<div class="num" style="font:600 24px/1.2 var(--mono);margin-top:4px">' + counts[k] +
+        '</div><div style="font:400 10.5px/1.35 var(--sans);color:var(--mut2)">' +
+        esc(S.desc) + '</div></div>';
+    }).join(''));
+
+    var cols = Object.keys(POS);
+    var cellMap = {};
+    rels.forEach(function (r) {
+      var k = r.parts.slice().sort().join('|');
+      (cellMap[k] = cellMap[k] || []).push(r);
+    });
+    set('mx-cols', cols.map(function (k) {
+      return '<div style="width:36px;flex:none;font:' + (sel === k ? 700 : 500) +
+        ' 9.5px/1.2 var(--mono);color:' + (sel === k ? '#26231e' : '#8a8377') +
+        ';text-align:center;padding-bottom:5px;white-space:nowrap;overflow:hidden">' +
+        esc(SHORT[k] || k) + '</div>';
+    }).join(''));
+    set('mx-rows', cols.map(function (rk) {
+      return '<div data-part="' + esc(rk) + '" style="display:flex;align-items:stretch;background:' +
+        (sel === rk ? 'rgba(0,0,0,.05)' : 'transparent') + '">' +
+        '<div style="width:80px;flex:none;display:flex;align-items:center;font:600 10.5px/1.2 var(--mono);' +
+        'padding:0 6px;color:' + (sel && sel !== rk ? '#a09889' : '#26231e') + '">' +
+        esc(SHORT[rk] || rk) + '</div>' +
+        cols.map(function (ck) {
+          var list = ck === rk ? [] : (cellMap[[rk, ck].sort().join('|')] || []);
+          var hot = sel && (sel === rk || sel === ck) && list.length > 0;
+          return '<div class="mx-cell" style="background:' +
+            (rk === ck ? 'rgba(0,0,0,.05)' : list.length ? (hot ? 'rgba(0,0,0,.06)' : '#fffdf9') : 'transparent') +
+            '">' + list.map(function (r) {
+              return '<span style="background:' + r.S.bg + ';color:' + r.S.color +
+                ';border:1px solid ' + r.S.bd + ';opacity:' +
+                (sel && !(sel === rk || sel === ck) ? .35 : 1) + '">' +
+                r.S.mark + esc(r.pair_key) + '</span>';
+            }).join('') + '</div>';
+        }).join('') + '</div>';
+    }).join(''));
+
+    set('heat-rows', d.parts.map(function (p) {
+      var on = sel === p.part_type;
+      return '<div data-part="' + esc(p.part_type) + '" style="display:flex;align-items:flex-start;' +
+        'gap:8px;padding:6px;border-radius:6px;border-bottom:1px solid rgba(0,0,0,.06);background:' +
+        (on ? 'rgba(0,0,0,.05)' : 'transparent') + ';opacity:' + (sel && !on ? .45 : 1) + '">' +
+        '<div style="width:150px;flex:none;display:flex;align-items:baseline;gap:6px">' +
+        '<span style="font:600 11.5px/1.2 var(--mono)">' + esc(p.part_type) + '</span>' +
+        '<span class="num" style="font-size:10px;color:var(--mut3)">' + num(p.stock) + '</span></div>' +
+        '<div class="num" style="width:46px;flex:none;font:600 12px/1.2 var(--mono);text-align:right">' +
+        (p.pct == null ? '—' : p.pct + '%') + '</div>' +
+        '<div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px">' +
+        (p.specs || []).map(function (x) {
+          var pc = x.pct || 0;
+          var col = pc === 0 ? 'oklch(0.5 0.15 25)' : pc < 60 ? 'oklch(0.5 0.13 62)' : '#3f3b34';
+          var bg  = pc === 0 ? 'oklch(0.95 0.03 25)' : pc < 60 ? 'oklch(0.96 0.03 75)' : 'rgba(0,0,0,.035)';
+          var bd  = pc === 0 ? 'oklch(0.87 0.05 25)' : pc < 60 ? 'oklch(0.88 0.05 70)' : 'rgba(0,0,0,.1)';
+          return '<span class="chip" style="background:' + bg + ';border:1px solid ' + bd +
+            ';color:' + col + ';opacity:' + (x.is_blocking ? 1 : .72) + '">' +
+            '<span>' + esc(x.label) + '</span>' +
+            '<span class="num" style="font:600 10.5px/1 var(--mono);color:' + col + '">' +
+            (x.pct == null ? '—' : x.pct + '%') + '</span>' +
+            '<span style="font:400 9.5px/1 var(--mono);color:var(--mut3)">' +
+            esc((x.pairs || []).join(',') || '—') + '</span></span>';
+        }).join('') + '</div></div>';
+    }).join(''));
+  }
+
+  // ── 상호 하이라이트. **세 안이 같은 sel 을 본다** — 탭을 바꿔도 선택이 남아
+  //    같은 상태로 세 표현을 비교할 수 있다(원안의 요구를 탭 구조로 옮긴 것).
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target.closest('[data-part]');
+    if (!t || !DATA) return;
+    var k = t.getAttribute('data-part');
+    if (k !== sel) { sel = k; render(); }
+  });
+  document.addEventListener('mouseout', function (e) {
+    if (!DATA || !sel) return;
+    var t = e.target.closest('[data-part]');
+    if (t && !t.contains(e.relatedTarget) && !(e.relatedTarget && e.relatedTarget.closest('[data-part]'))) {
+      sel = null; render();
+    }
+  });
+
+  // ── 좌측 메뉴 아코디언. 접힘 상태를 세션에 남겨 화면을 옮겨도 유지한다.
+  //    저장에 실패해도(프라이빗 모드 등) 메뉴는 그대로 동작해야 하므로 전부 감싼다.
+  var LNB_KEY = 'admin2.lnb.closed';
+  var closed = (function () {
+    try { return JSON.parse(sessionStorage.getItem(LNB_KEY)) || []; } catch (e) { return []; }
+  })();
+  var saveLnb = function () {
+    try { sessionStorage.setItem(LNB_KEY, JSON.stringify(closed)); } catch (e) { /* 무시 */ }
+  };
+  document.querySelectorAll('.lnb-grp').forEach(function (g) {
+    var key = g.getAttribute('data-grp');
+    // 접은 것은 접힌 채로 둔다 — **명시적 조작이 기본값을 이긴다.** 현재 그룹이라고
+    // 도로 펴면 운영자가 방금 한 일을 화면이 되돌리는 셈이다.
+    // 그 밖의 기본(현재 그룹만 펼침)은 서버가 이미 `data-open` 으로 정해 보낸다.
+    if (closed.indexOf(key) >= 0) {
+      g.setAttribute('data-open', 'n');
+      g.querySelector('[data-action="lnb-group"]').setAttribute('aria-expanded', 'false');
+    }
+    var btn = g.querySelector('[data-action="lnb-group"]');
+    btn.addEventListener('click', function () {
+      var open = g.getAttribute('data-open') === 'y';
+      g.setAttribute('data-open', open ? 'n' : 'y');
+      btn.setAttribute('aria-expanded', String(!open));
+      var i = closed.indexOf(key);
+      if (open && i < 0) closed.push(key);
+      if (!open && i >= 0) closed.splice(i, 1);
+      saveLnb();
+    });
+  });
+
+  document.querySelectorAll('[data-action="view"]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      view = b.getAttribute('data-view');
+      document.querySelectorAll('[data-action="view"]').forEach(function (x) {
+        x.setAttribute('aria-selected', String(x.getAttribute('data-view') === view));
+      });
+      document.querySelectorAll('[data-view-panel]').forEach(function (p) {
+        p.hidden = p.getAttribute('data-view-panel') !== view;
+      });
+    });
+  });
+
+  fetch('/api/admin/std/compat-map', {credentials: 'same-origin'})
+    .then(function (r) {
+      if (!r.ok) {
+        var e = new Error('HTTP ' + r.status);
+        e.status = r.status;   // 401 과 나머지를 갈라 다르게 안내한다
+        throw e;
+      }
+      return r.json();
+    })
+    .then(function (j) {
+      DATA = j;
+      var t = $('asof');
+      if (t) t.textContent = '관계 ' + j.summary.pairs_total + ' · 사양 ' + j.summary.specs_total;
+      render();
+    })
+    .catch(function (err) {
+      // 실패를 조용히 삼키지 않는다 — 빈 화면은 «관계가 없다»로 읽힌다.
+      // 그리고 **돌아갈 길을 준다.** 401 에 코드만 찍어 두면 운영자가 할 수 있는 것이
+      // 없다(2026-08-11 실제로 이 화면이 그 상태로 사용자에게 갔다).
+      var un = err.status === 401;
+      var t = $('asof');
+      if (t) { t.textContent = un ? '세션 만료' : '조회 실패'; t.style.color = 'oklch(0.5 0.15 25)'; }
+      document.querySelectorAll('[data-view-panel]').forEach(function (p) { p.hidden = true; });
+      var box = document.createElement('div');
+      box.className = 'card';
+      box.setAttribute('data-bind', 'load-error');
+      box.style.cssText = 'margin:auto;max-width:460px;padding:22px 24px;text-align:center';
+      box.innerHTML =
+        '<div style="font:600 14px/1.4 var(--sans);margin-bottom:6px">' +
+        (un ? '세션 만료' : '데이터 조회 실패') + '</div>' +
+        '<div style="font:400 12px/1.6 var(--sans);color:var(--mut2);margin-bottom:14px">' +
+        (un ? '관리자 로그인 후 다시 조회합니다.'
+            : '관계 데이터를 받지 못했습니다. — ' + esc(err.message)) + '</div>' +
+        (un ? '<a href="/admin/login.html" style="display:inline-block;padding:8px 18px;' +
+              'border-radius:6px;background:var(--ink);color:var(--shell);' +
+              'font:500 12px/1 var(--sans)">로그인</a>'
+            : '<button type="button" data-action="retry" style="padding:8px 18px;' +
+              'border-radius:6px;background:var(--ink);color:var(--shell);border:0;' +
+              'cursor:pointer;font:500 12px/1 var(--sans)">다시 시도</button>');
+      document.querySelector('.body').appendChild(box);
+      var again = box.querySelector('[data-action="retry"]');
+      if (again) again.addEventListener('click', function () { location.reload(); });
+    });
+})();
+</script>
+{% endraw %}
+</body>
+</html>
