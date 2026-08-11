@@ -110,13 +110,15 @@
                           </div>
                         </a>
                         {% else %}
-                        {# 아무 데도 없는 화면 — 링크를 걸면 죽은 링크가 된다.
-                           숨기지 않는 이유: 이 메뉴가 곧 IA 이고, 무엇이 아직 없는지도 사실이다. #}
+                        {# 링크는 재구축된 화면에만 붙는다(사용자 결정 2026-08-11 · `nav_for`).
+                           숨기지 않는 이유: 이 메뉴가 곧 IA 이고, 무엇이 아직 없는지도 사실이다.
+                           **「기존」과 「신설」을 가른다** — 구화면이 있는 것과 아무 데도 없는
+                           것은 다른 사실이고, 재구축 순서를 정할 때 그 차이가 근거가 된다. #}
                         <span class="nav-link disabled text-body-quaternary" style="cursor:default;"
-                              {% if it.note %}title="{{ it.note }}"{% endif %}>
+                              title="{{ it.note or ('기존 화면 있음 · 재구축 전' if it.state == 'old' else '신설 예정') }}">
                           <div class="d-flex align-items-center">
                             <span class="nav-link-text">{{ it.label }}</span>
-                            <span class="badge badge-phoenix badge-phoenix-secondary ms-2 fs-10">준비 중</span>
+                            <span class="badge badge-phoenix badge-phoenix-secondary ms-2 fs-10">{{ '기존' if it.state == 'old' else '신설' }}</span>
                           </div>
                         </span>
                         {% endif %}

@@ -49,6 +49,8 @@ NAV = [
 
     # 도매꾹에 대응물이 통째로 없는 축. 파는 일이 아니라 **추천되게 하는 일**이다.
     ("상품사양관리", "sliders", [
+        ("조립 호환 지도", "/admin2/build-map", None, "신설 · 관계 22쌍 한 장"),
+        ("조립 사양 표준", "/admin2/spec-standard", None, "신설 · 사람이 항목을 늘린다"),
         ("상품 사양 정의", None, "/admin/spec-fields.html", None),
         ("상품 사양 검수", None, "/admin/review-queue.html", None),
         ("조립 호환 규칙", None, "/admin/compat-rules.html", None),
@@ -135,15 +137,28 @@ def nav_for(current_path: str = "") -> list:
     """템플릿이 쓰기 좋은 형태로 편다.
 
     `state` 세 가지 — 화면이 어디까지 왔는지를 메뉴가 정직하게 말한다:
-      new   재구축 완료. `/admin2/` 로 간다
-      old   아직 안 지었다. 기존 화면으로 간다(쓸 수는 있다)
+      new   재구축 완료. `/admin2/` 로 간다. **링크는 이것만 붙는다**
+      old   기존 화면(`/admin/*.html`)은 있으나 재구축 전. 링크 없음
       todo  아무 데도 없다. 링크 없음
+
+    ■ 기존 화면으로 링크하지 않는다 (사용자 결정 2026-08-11)
+      전에는 `href = new or old` 였다. 재구축된 화면이 둘뿐일 때 나머지를 죽은 링크로
+      두면 새 메뉴가 구경거리가 되니, 기존 37화면으로 이어 두자는 판단이었다.
+
+      **뒤집는다.** 사용자 지시: *"확정된 화면만 링크를 붙이되, admin2 로 모두 붙여
+      나갑시다."* 새 메뉴가 옛 시스템으로 데려가면 **어디까지 지었는지가 흐려진다** —
+      운영자는 자기가 신·구 어느 쪽에 있는지 모른 채 일하게 된다. 지금 이 프로젝트가
+      고치고 있는 병이 바로 그것(화면이 사실을 흐리는 것)이다.
+
+      `old` 정보는 지운 게 아니라 **`state` 로 남긴다.** 「기존 화면은 있다」와
+      「아무 데도 없다」는 다른 사실이고, 재구축 순서를 정할 때 그 차이가 근거가 된다.
+      기존 화면은 계속 `/admin/*.html` 에서 직접 열 수 있다(병행 신축).
     """
     out = []
     for title, icon, items in NAV:
         rows = []
         for label, new, old, note in items:
-            href = new or old
+            href = new           # `old` 로는 잇지 않는다 — 위 결정
             state = "new" if new else ("old" if old else "todo")
             rows.append({
                 "label": label, "href": href, "state": state, "note": note,
