@@ -126,6 +126,119 @@ body{background:#f1eee8;font-family:'Pretendard',-apple-system,sans-serif;-webki
  document.querySelectorAll('a[href*="ORD-84216"]').forEach(function(a){a.href='my-orders.html?id='+O.order_no;});
 })();
 </script>
+<script>
+// ---- 인계 완료 LIVE (2026-08-12) — popcorn-handoff 존재 시 이 화면은 「주문」이 아니다 ----
+//
+// 화면을 새로 만들지 않고 같은 자리에서 얼굴을 바꾼다. 「결제 이후」는 개념이 하나이고,
+// 자체결제냐 인계냐는 운영 스위치가 정한다 — 두 화면으로 나누면 한쪽만 고치는 사고가 난다.
+//
+// **자체주문 블록보다 뒤에 둔다**: 둘 다 남아 있으면 인계가 이겨야 한다(S4 가 인계 시
+// popcorn-order 를 지우지만, 지우지 못한 경우에도 최근 사실이 이겨야 옳다).
+(function(){
+ var raw;try{raw=localStorage.getItem('popcorn-handoff');}catch(e){return;}
+ if(!raw)return;
+ var H;try{H=JSON.parse(raw);}catch(e){return;}
+ if(!H||!H.handoff_no)return;
+ var won=function(n){return (n||0).toLocaleString()+'원';};
+ var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+
+ // ── 히어로 — 무엇이 일어났는지 정확히 ───────────────────────────────
+ var h1=document.querySelector('h1');
+ if(h1)h1.textContent='쇼핑몰 장바구니로 넘겼습니다';
+ if(h1&&h1.nextElementSibling)
+  h1.nextElementSibling.innerHTML='결제 · 배송 · 환불은 <b style="color:#3a3a40;">팝콘PC 쇼핑몰</b>에서 진행됩니다. '
+   +'견적의 근거와 부품 목록은 <b style="color:#3a3a40;">인계 기록에 그대로 보존</b>됩니다.';
+ document.querySelectorAll('b').forEach(function(b){
+  if(b.childElementCount===0&&b.textContent.trim()==='ORD-84216')b.textContent=H.handoff_no;
+  if(b.childElementCount===0&&b.textContent.trim()==='신용카드 (자체 결제)')b.textContent='쇼핑몰에서 결제';
+ });
+ document.querySelectorAll('span').forEach(function(s){
+  if(s.childElementCount!==0)return;
+  var t=s.textContent.trim();
+  if(t==='주문번호')s.textContent='인계번호';
+  if(t==='결제금액')s.textContent='예상 금액';
+  if(t==='결제수단')s.textContent='결제';
+ });
+ var tt=document.getElementById('s5-total');
+ if(tt)tt.textContent=won(H.total_mall);
+
+ // ── 담을 목록 — 우리가 대신 담지 않으므로 무엇을 담아야 하는지 보여준다 ──
+ //    (CANON ⑥ 실서비스는 GET 만. 자동 담기는 윈윈소프트 API 가 나온 뒤다)
+ var hero=h1?h1.closest('.card'):null;
+ if(hero){
+  var box=document.createElement('div');
+  box.className='card';box.style.marginBottom='18px';
+  var rows=(H.cart||[]).map(function(c){
+   return '<div style="display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #f2efe9;">'
+     +'<span style="flex:0 0 74px;font-size:11.5px;font-weight:800;color:#8a8578;">'+esc(c.pd_no)+'</span>'
+     +'<span style="flex:1;font-size:13.5px;color:#17171b;">'+esc(c.name)+'</span>'
+     +(c.amount>1?'<span style="font-size:12px;color:#8a8578;">×'+c.amount+'</span>':'')
+     +'<b style="font-size:13.5px;color:#17171b;">'+won(c.price)+'</b></div>';
+  }).join('');
+  // 가격이 달라진 것은 **숫자로** 말한다. 「변동 있음」만으로는 사람이 판단할 수 없다
+  var chg=(H.changed||[]).length?'<div style="margin-top:12px;background:#fdf3f3;border:1px solid #f3dede;'
+    +'border-radius:11px;padding:11px 13px;"><b style="font-size:13px;color:#b31b25;">쇼핑몰 가격이 달라진 부품 '
+    +H.changed.length+'개</b>'+H.changed.map(function(c){
+      return '<div style="margin-top:5px;font-size:12.5px;color:#55555c;">'+esc(c.name)
+        +' — 견적 '+won(c.quoted)+' → 쇼핑몰 '+won(c.mall)
+        +' <b style="color:'+(c.diff>0?'#b31b25':'#1c7a4d')+';">('+(c.diff>0?'+':'')+won(c.diff)+')</b></div>';
+    }).join('')+'</div>':'';
+  var unk=(H.unknown||[]).length?'<div style="margin-top:10px;font-size:12.5px;color:#8a561a;font-weight:700;">'
+    +'쇼핑몰 가격을 확인하지 못한 부품 '+H.unknown.length+'개 — 쇼핑몰에서 실제 값을 확인해 주세요</div>':'';
+  box.innerHTML='<h3 style="margin:0 0 4px;font-size:15.5px;font-weight:900;color:#17171b;">'
+    +'쇼핑몰에서 담을 목록 '+(H.cart||[]).length+'개</h3>'
+    +'<p style="margin:0 0 12px;font-size:12px;color:#8a8578;font-weight:600;">'
+    +'장바구니는 쇼핑몰에서 직접 담습니다. 아래 목록과 같은 상품인지 확인해 주세요.</p>'
+    +rows
+    +'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0 0;">'
+    +'<span style="font-size:13px;font-weight:800;color:#8a8578;">예상 합계</span>'
+    +'<b style="font-size:17px;color:#17171b;">'+won(H.total_mall)+'</b></div>'
+    +chg+unk;
+  hero.parentNode.insertBefore(box,hero.nextSibling);
+ }
+
+ // ── 다음 일정 1단계 — 결제는 우리가 받지 않는다 ─────────────────────
+ document.querySelectorAll('b').forEach(function(b){
+  if(b.childElementCount===0&&b.textContent.trim()==='결제 완료 · 재고 확보')
+   b.textContent='쇼핑몰에서 결제';
+ });
+ document.querySelectorAll('p').forEach(function(p){
+  if(p.childElementCount===0&&p.textContent.indexOf('예약(hold)했던')===0)
+   p.textContent='장바구니에 담고 쇼핑몰에서 결제하면 조립이 시작됩니다.';
+ });
+
+ // ── 남은 「주문」 어휘 — 우리 원장에 주문은 없다. 있는 것은 인계다 ──────
+ //    「출고·배송」·「송장」은 그대로 둔다: 몰을 거치더라도 **실제로 팝콘PC가 하는 일**이다.
+ document.title='팝콘PC AI · 쇼핑몰 인계';
+ /* 상단 이동 경로는 아이콘 자식이 있어 textContent 로는 못 고친다 — 글자 노드만 바꾼다 */
+ document.querySelectorAll('header span').forEach(function(s){
+  [].forEach.call(s.childNodes,function(n){
+   if(n.nodeType===3&&n.nodeValue.trim()==='주문 완료')n.nodeValue='인계 완료';});
+ });
+ document.querySelectorAll('p').forEach(function(p){
+  if(p.childElementCount!==0)return;
+  if(p.textContent.indexOf('각 단계가 끝날 때마다')===0)
+   p.textContent='각 단계가 끝날 때마다 알림을 드리고, 조립 사진과 검사 리포트는 쇼핑몰 주문 내역에 첨부됩니다.';
+ });
+ document.querySelectorAll('b').forEach(function(b){
+  if(b.childElementCount===0&&b.textContent.trim()==='주문 스냅샷 보존')b.textContent='인계 기록 보존';
+ });
+ /* 이 문단은 <b> 자식이 있다 — childElementCount 가드를 걸면 영영 안 바뀐다 */
+ document.querySelectorAll('p').forEach(function(p){
+  if((p.textContent||'').indexOf('이후 부품 가격이 변해도')===0)
+   p.innerHTML='이후 부품 가격이 변해도 <b>넘긴 시점의 가격·사양·추천 근거</b>가 '
+    +'인계 기록에 그대로 남습니다. 쇼핑몰에서 값이 달라지면 위에 적어 둡니다.';
+ });
+
+ // ── 아래 버튼 — 갈 곳이 마이페이지가 아니라 쇼핑몰이다 ────────────────
+ document.querySelectorAll('a[href*="ORD-84216"], a[href^="my-orders.html"]').forEach(function(a){
+  a.href=H.cart_url||'#';
+  a.target='_blank';a.rel='noopener';
+  a.innerHTML='<span class="msym" style="font-size:19px;">shopping_cart</span>쇼핑몰 장바구니 열기';
+ });
+})();
+</script>
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="msym" style="font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>

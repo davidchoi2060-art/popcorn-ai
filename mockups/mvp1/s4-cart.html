@@ -219,7 +219,8 @@ function renderMember(){
 function check(){
  var mode=opsPay();
  var ok=false, msg='';
- if(mode==='mall'){ok=mallLogged;msg=ok?'이제 결제를 진행할 수 있어요.':'로그인 후 결제할 수 있어요.';}
+ /* 인계 모드에서 우리는 결제를 받지 않는다 — 문구가 그렇게 말해야 한다(범위 확정 2026-08-11) */
+ if(mode==='mall'){ok=mallLogged;msg=ok?'견적을 쇼핑몰 장바구니로 넘깁니다. 결제·배송은 쇼핑몰에서 진행됩니다.':'쇼핑몰 로그인 후 넘길 수 있어요.';}
  else{
   var m=member(),nm=(document.getElementById('s4-name')||{}).value,ph=(document.getElementById('s4-phone')||{}).value,ad=(document.getElementById('s4-addr')||{}).value,ag=(document.getElementById('s4-agree')||{}).checked;
   if(!m)msg='로그인 후 결제할 수 있어요.';
@@ -236,6 +237,9 @@ function applyMode(){
  if(gate)gate.style.display=mode==='mall'?'':'none';
  if(own)own.style.display=mode==='own'?'flex':'none';
  if(done)done.style.display='none';
+ /* 버튼이 하는 일을 버튼이 말한다. 인계 모드인데 「결제하기」라 적혀 있으면
+    누르는 사람은 우리에게 결제한다고 믿는다 — 실제로는 몰로 넘어간다. */
+ if(pay)pay.textContent=mode==='mall'?'쇼핑몰로 넘기기':'결제하기';
  if(mode==='own')renderMember();
  check();
 }
@@ -254,7 +258,9 @@ var pms=document.querySelectorAll('#s4-paymethods [data-pm]');
 pms.forEach(function(b){b.addEventListener('click',function(){pm=b.dataset.pm;pms.forEach(function(x){var on=x===b;x.style.border='1.5px solid '+(on?'#2b5fd9':'#e6e2da');x.style.background=on?'#eaf1fd':'#fff';x.style.color=on?'#2149b0':'#6b6b73';});check();});});
 if(pay)pay.addEventListener('click',function(){
  if(pay.disabled)return;
- if(opsPay()==='mall'){tmsg('기존 팝콘PC 쇼핑몰 결제로 넘어갑니다 — 인계 모드 (목업)');return;}
+ /* 여기까지 오면 LIVE 스크립트(아래 IIFE)가 뜨지 못한 것이다 — 평소엔 그쪽이 가로챈다.
+    예전엔 «인계 모드 (목업)» 토스트를 띄웠는데, 그러면 안 된 것을 된 것처럼 말한다. */
+ if(opsPay()==='mall'){tmsg('인계를 준비하지 못했습니다 — 새로고침 후 다시 시도해 주세요.');return;}
  tmsg('재고 예약(hold) 완료 — 7개 부품 점유');
  setTimeout(function(){tmsg(pm+' 결제 승인 (목업 PG)');},1200);
  setTimeout(function(){tmsg('주문 ORD-84216 생성 — 원장은 본 시스템에 저장됐어요');},2400);
@@ -407,12 +413,59 @@ window.addEventListener('scroll',closeTip,{passive:true});
   // 4) 결제수단 추적(캡처 — 메인 IIFE의 pm은 폐쇄 변수)
   var pm='카드';
   document.querySelectorAll('#s4-paymethods [data-pm]').forEach(function(b){b.addEventListener('click',function(){pm=b.dataset.pm;},true);});
-  // 5) 결제 가로채기 → POST /api/orders
+  // 5) 결제 가로채기 → 자체결제면 POST /api/orders · 인계면 POST /api/handoff
   var payBtn=document.getElementById('s4-pay');
   if(payBtn)payBtn.addEventListener('click',function(ev){
    if(payBtn.disabled)return;
    var mode='mall';try{mode=(JSON.parse(localStorage.getItem('popcorn-ops')||'{}').pay)||'mall';}catch(e){}
-   if(mode!=='own')return; /* mall 인계 연출은 기존 핸들러 */
+
+   /* ── 인계 (범위 확정 2026-08-11 · 우리는 팔지 않는다) ──────────────────
+      전에는 여기서 «인계 모드 (목업)» 토스트만 띄우고 **아무것도 부르지 않았다.**
+      화면은 넘어간 것처럼 보이는데 원장에 아무 기록이 없었다 — 화면 정직성 위반이다.
+
+      **장바구니를 우리가 대신 담지 않는다**(CANON ⑥ 실서비스는 GET 만).
+      인계는 「우리 원장에 남기고 · 담을 목록을 보여주고 · 몰로 보낸다」까지다.
+      자동 담기는 윈윈소프트 API 가 나온 뒤이고, 서버가 그 자리를 이미 비워 뒀다. */
+   if(mode==='mall'){
+    ev.stopImmediatePropagation();ev.preventDefault();
+    var o0=payBtn.textContent;payBtn.disabled=true;payBtn.textContent='넘기는 중…';
+    fetch('/api/handoff',{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:Q.session_id,tier:tier,
+        periph:periphValid.map(function(it){return {code:it.code,qty:1};})})})
+     .then(function(r){return r.json().then(function(j){return {ok:r.ok,st:r.status,j:j};});})
+     .then(function(res){
+      if(!res.ok){
+       var d=(res.j&&res.j.detail)||{};
+       /* 「실패했어요」로 뭉뚱그리지 않는다 — 사람이 다음에 무엇을 할지 알아야 한다 */
+       var m=d.error==='pay_mode_own' ? '지금은 자체 결제 모드입니다 — 관리자 운영 전환 설정을 확인해 주세요.'
+           : d.error==='quote_not_found' ? '견적을 찾지 못했어요 — 견적서에서 다시 담아주세요.'
+           : d.error==='periph_not_offered' ? '제안 목록에 없는 주변기기가 있어요 — 견적서에서 다시 담아주세요.'
+           : (d.detail||d.error||('넘기지 못했어요 (오류 '+res.st+')'));
+       toast(m);payBtn.disabled=false;payBtn.textContent=o0;return;
+      }
+      var h=res.j;
+      try{
+       localStorage.setItem('popcorn-handoff',JSON.stringify(h));
+       localStorage.removeItem('popcorn-order');   /* 자체주문 잔재가 남으면 S5 가 그걸 그린다 */
+       localStorage.removeItem('popcorn-periph');localStorage.removeItem('popcorn-quote-tier');
+      }catch(e){}
+      toast('인계 '+h.handoff_no+' 기록 — 담을 목록 '+h.cart.length+'개');
+      /* 가격이 달라졌으면 넘어가기 전에 말한다. 몰에서 다른 값을 보고 놀라면
+         「모든 견적에는 이유가 있습니다」가 그 자리에서 무너진다. */
+      if(h.changed&&h.changed.length)
+       setTimeout(function(){toast('쇼핑몰 가격이 달라진 부품 '+h.changed.length+'개 — 다음 화면에서 확인하세요');},1300);
+      if(!h.price_checked)
+       setTimeout(function(){toast('일부 부품은 쇼핑몰 가격을 확인하지 못했습니다');},2100);
+      setTimeout(function(){window.location.href='s5-complete.html';},
+                 (h.changed&&h.changed.length)||!h.price_checked?2900:1500);
+     })
+     .catch(function(){toast('넘기지 못했어요 — 잠시 후 다시 시도해 주세요.');
+                       payBtn.disabled=false;payBtn.textContent=o0;});
+    return;
+   }
+
+   if(mode!=='own')return;
    ev.stopImmediatePropagation();ev.preventDefault();
    var m=(window.popcornAuth&&window.popcornAuth.member())||null;
    if(!m)return;
