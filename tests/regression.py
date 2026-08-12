@@ -2729,9 +2729,13 @@ def test_screen_assets():
     #    값을 두 벌 두면 언젠가 갈라지고, 갈라진 뒤에는 어느 쪽이 맞는지 알 수 없다.
     _tok_src = io.open(os.path.join(ROOT, "design-system", "tokens.css"),
                        encoding="utf-8").read()
+    #    **`templates/` 도 훑는다** (2026-08-12 · ⑤ 와 같은 사각지대였다).
+    #    `dash`·`build_map` 이 `--card` 를 자기 `:root` 에 다시 정의하고 있었는데
+    #    이 검사가 목업만 보고 있어 통과했다. 대상 밖이면 검사는 없는 것과 같다.
     _canon = set(_re7.findall(r"(--[a-z-]+)\s*:", _tok_src))
     _copies = []
-    for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "**", "*.html"), recursive=True)):
+    for _p in (sorted(_g7.glob(os.path.join(ROOT, "mockups", "**", "*.html"), recursive=True))
+               + sorted(_g7.glob(os.path.join(ROOT, "templates", "**", "*.j2"), recursive=True))):
         _s = io.open(_p, encoding="utf-8").read()
         # 화면이 정의하는 커스텀 속성 중 정본에 있는 이름을 다시 정의하는가
         _defs = set(_re7.findall(r"(--[a-z-]+)\s*:\s*[^;]+;", _s)) & _canon
@@ -2741,10 +2745,15 @@ def test_screen_assets():
 
     # ⑤ 폰트를 남의 서버에서 받지 않는다 (2026-08-05).
     #    망이 막히거나 그쪽이 죽으면 글꼴이 통째로 바뀐다. 아이콘은 이미 로컬이었다.
-    _all = [(p, s) for p, s in
-            [(q, io.open(q, encoding="utf-8").read())
-             for q in sorted(_g7.glob(os.path.join(ROOT, "mockups", "**", "*.html"),
-                                      recursive=True))]]
+    #
+    #    **`templates/` 를 함께 훑는다** (2026-08-12). 이 검사는 `mockups/**` 만 보고 있어서
+    #    `/admin2/*` 서버 렌더 화면 둘이 **구글 폰트 CDN 을 부르는 채로 통과**했다.
+    #    검사가 있었는데 대상 밖이라 한 번도 안 걸린 것이다 — **통과는 증거가 아니다.**
+    #    화면은 이제 두 곳에 산다(목업 + Jinja 템플릿). 한 곳만 보면 새로 짓는 쪽이 샌다.
+    _screens = sorted(_g7.glob(os.path.join(ROOT, "mockups", "**", "*.html"), recursive=True)) \
+        + sorted(_g7.glob(os.path.join(ROOT, "templates", "**", "*.j2"), recursive=True))
+    _all = [(q, io.open(q, encoding="utf-8").read()) for q in _screens]
+    check("화면 파일을 목업·템플릿 양쪽에서 훑었다", len(_all) > 40, "40건 초과", len(_all))
     _cdn = [os.path.relpath(p, ROOT) for p, s in _all
             if "fonts.googleapis.com" in s or "fonts.gstatic.com" in s or "jsdelivr" in s]
     check("외부 폰트 CDN을 부르는 화면이 없다", _cdn == [], [], _cdn[:5])

@@ -37,28 +37,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팝콘PC 관리자 · 조립 호환 조감도</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+{# 색·서체는 **정본만 쓴다**(㉯·㈏ 확정 2026-08-12). 이 화면도 :root 를 자기가 들고
+   구글 CDN 에서 서체를 받고 있었다 — 현황판과 값이 12개 전부 같았으므로 팔레트가
+   하나인데 사본이 둘이었던 것이다. 정본은 design-system/tokens.css 하나다. #}
+<link rel="stylesheet" href="/shared/fonts/fonts.css">
+<link rel="stylesheet" href="/design-system/tokens.css">
 <style>
-:root{
-  --shell:#f7f4ee; --card:#fffdf9; --ink:#26231e; --nav:#211f1b;
-  --nav-fg:#a29b8d; --nav-on:#f4f1ea;
-  --mut:#6f6a61; --mut2:#8a8377; --mut3:#a09889; --line:rgba(0,0,0,.11);
-  --sans:'IBM Plex Sans KR',system-ui,-apple-system,sans-serif;
-  --mono:'IBM Plex Mono',ui-monospace,monospace;
-}
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--shell);color:var(--ink);font-family:var(--sans);
+body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);
      -webkit-font-smoothing:antialiased;display:flex;overflow:hidden}
 a{color:inherit;text-decoration:none}
-.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
 
 /* ── 좌측 메뉴 (정본 admin_nav) ───────────────────────────────── */
-.lnb{width:212px;flex:none;background:var(--nav);color:#cfc9bd;display:flex;
+.lnb{width:212px;flex:none;background:var(--nav);color:var(--on-nav-muted);display:flex;
      flex-direction:column;overflow:hidden}
-.lnb-top{padding:16px 16px 12px;font:600 14px/1 var(--sans);color:var(--nav-on);
+.lnb-top{padding:16px 16px 12px;font:600 14px/1 var(--font);color:var(--on-nav);
          letter-spacing:-.01em;flex:none}
 .lnb-scroll{flex:1;min-height:0;overflow-y:auto;padding-bottom:16px}
 .lnb-scroll::-webkit-scrollbar{width:6px}
@@ -66,95 +61,95 @@ a{color:inherit;text-decoration:none}
 .lnb-grp{border-bottom:1px solid rgba(255,255,255,.045)}
 .lnb-g{width:100%;display:flex;align-items:center;gap:7px;padding:9px 14px;
        background:none;border:0;cursor:pointer;text-align:left;
-       font:600 10px/1.2 var(--mono);letter-spacing:.11em;color:#8b8478}
-.lnb-g:hover{color:var(--nav-on);background:rgba(255,255,255,.045)}
+       font:600 10px/1.2 var(--font-num);letter-spacing:.11em;color:var(--on-nav-muted)}
+.lnb-g:hover{color:var(--on-nav);background:rgba(255,255,255,.045)}
 .lnb-g .t{flex:1;text-transform:uppercase}
-.lnb-g .c{font:500 9.5px/1 var(--mono);color:#5f5a51;font-variant-numeric:tabular-nums}
+.lnb-g .c{font:500 9.5px/1 var(--font-num);color:var(--on-nav-muted);font-variant-numeric:tabular-nums}
 .lnb-g .x{font-size:8px;transition:transform .15s ease}
 .lnb-grp[data-open="n"] .lnb-b{display:none}
 .lnb-grp[data-open="n"] .lnb-g .x{transform:rotate(-90deg)}
 .lnb-b{padding-bottom:5px}
-.lnb a,.lnb .off{display:block;padding:7px 16px;font:500 12.5px/1.35 var(--sans);
-       color:var(--nav-fg);border-left:3px solid transparent}
-.lnb a:hover{color:var(--nav-on);background:rgba(255,255,255,.05)}
-.lnb a.on{color:var(--nav-on);background:rgba(255,255,255,.09);
-          border-left-color:oklch(0.68 0.13 165)}
-.lnb .off{color:#57534b;cursor:default}
-.lnb .tag{font:500 9px/1 var(--mono);padding:1px 4px;border-radius:3px;
-          background:rgba(255,255,255,.06);color:#6d675c;margin-left:5px;vertical-align:1px}
+.lnb a,.lnb .off{display:block;padding:7px 16px;font:500 12.5px/1.35 var(--font);
+       color:var(--on-nav-muted);border-left:3px solid transparent}
+.lnb a:hover{color:var(--on-nav);background:rgba(255,255,255,.05)}
+.lnb a.on{color:var(--on-nav);background:rgba(255,255,255,.09);
+          border-left-color:var(--primary)}
+.lnb .off{color:var(--on-nav-muted);cursor:default}
+.lnb .tag{font:500 9px/1 var(--font-num);padding:1px 4px;border-radius:3px;
+          background:rgba(255,255,255,.06);color:var(--on-nav-muted);margin-left:5px;vertical-align:1px}
 
 /* ── 셸 ─────────────────────────────────────────────────────── */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
-.hd{height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:var(--card);
+.hd{height:52px;flex:none;border-bottom:1px solid var(--outline-variant);background:var(--card);
     display:flex;align-items:center;padding:0 18px;gap:12px}
-.hd .crumb{font:400 12px/1 var(--sans);color:var(--mut2)}
-.hd .sep{color:#c4bdae}
-.hd .now{font:600 13px/1 var(--sans)}
+.hd .crumb{font:400 12px/1 var(--font);color:var(--on-variant)}
+.hd .sep{color:var(--outline)}
+.hd .now{font:600 13px/1 var(--font)}
 .tabs{display:flex;gap:2px;margin-left:18px}
-.tab{font:500 12px/1 var(--sans);padding:7px 13px;border-radius:6px;border:1px solid transparent;
-     background:none;color:var(--mut2);cursor:pointer}
-.tab:hover{color:var(--ink);background:rgba(0,0,0,.04)}
-.tab[aria-selected="true"]{background:var(--ink);color:var(--shell);border-color:var(--ink)}
+.tab{font:500 12px/1 var(--font);padding:7px 13px;border-radius:6px;border:1px solid transparent;
+     background:none;color:var(--on-variant);cursor:pointer}
+.tab:hover{color:var(--on);background:var(--container)}
+.tab[aria-selected="true"]{background:var(--on);color:var(--bg);border-color:var(--on)}
 .body{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 16px 16px}
 .view{flex:1;min-height:0;display:flex;flex-direction:column}
 .view[hidden]{display:none}
 
 /* ── 공통 조각 ───────────────────────────────────────────────── */
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px}
+.card{background:var(--card);border:1px solid var(--outline-variant);border-radius:8px}
 .stat{flex:1;padding:9px 11px}
-.stat .l{font:500 10.5px/1.3 var(--sans);color:var(--mut2)}
-.stat .v{font:600 25px/1.15 var(--mono);font-variant-numeric:tabular-nums}
-.stat .n{font:400 10.5px/1.3 var(--sans);color:var(--mut3)}
+.stat .l{font:500 10.5px/1.3 var(--font);color:var(--on-variant)}
+.stat .v{font:600 25px/1.15 var(--font-num);font-variant-numeric:tabular-nums}
+.stat .n{font:400 10.5px/1.3 var(--font);color:var(--on-variant)}
 .bar{display:block;height:100%;border-radius:3px}
-.track{flex:1;height:5px;background:rgba(0,0,0,.08);border-radius:3px}
+.track{flex:1;height:5px;background:var(--container);border-radius:3px}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:5px;
-      font:500 10.5px/1.6 var(--sans)}
+      font:500 10.5px/1.6 var(--font)}
 .dim{opacity:.4}
 
 /* ── 1a 지도형 ───────────────────────────────────────────────── */
 .map-area{flex:1;min-height:0;position:relative;overflow:hidden}
 .map-area svg{position:absolute;inset:0;width:100%;height:100%}
-.elabel{position:absolute;transform:translate(-50%,-50%);font:600 10px/1 var(--mono);
+.elabel{position:absolute;transform:translate(-50%,-50%);font:600 10px/1 var(--font-num);
         padding:2px 4px;border-radius:4px;pointer-events:none;white-space:nowrap}
 .node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
       align-items:center;gap:2px;padding:7px 11px;border-radius:8px;cursor:default;
       white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.06)}
-.node b{font:600 11.5px/1 var(--mono)}
-.node i{font:400 10.5px/1 var(--sans);font-style:normal;opacity:.68}
+.node b{font:600 11.5px/1 var(--font-num)}
+.node i{font:400 10.5px/1 var(--font);font-style:normal;opacity:.68}
 .legend{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:5px;
-        background:rgba(255,253,249,.94);border:1px solid rgba(0,0,0,.1);border-radius:7px;
+        background:color-mix(in srgb, var(--card) 94%, transparent);border:1px solid var(--outline-variant);border-radius:7px;
         padding:8px 10px}
-.legend div{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--sans)}
+.legend div{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--font)}
 .sw{width:14px;height:6px;border-radius:2px;display:inline-block;flex:none}
-.rail{width:352px;flex:none;border-left:1px solid rgba(0,0,0,.12);background:var(--card);
+.rail{width:352px;flex:none;border-left:1px solid var(--outline-variant);background:var(--card);
       display:flex;flex-direction:column;min-height:0}
-.cap{font:500 10.5px/1 var(--mono);letter-spacing:.1em;color:var(--mut3);margin-bottom:8px}
+.cap{font:500 10.5px/1 var(--font-num);letter-spacing:.1em;color:var(--on-variant);margin-bottom:8px}
 .prow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px}
-.rrow{padding:7px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.rrow{padding:7px 0;border-bottom:1px solid var(--outline-variant)}
 
 /* ── 1b 진단형 ───────────────────────────────────────────────── */
-.gap{display:flex;gap:12px;background:var(--nav);color:var(--nav-on);border-radius:9px;
+.gap{display:flex;gap:12px;background:var(--nav);color:var(--on-nav);border-radius:9px;
      padding:14px 16px;align-items:center;margin-bottom:12px;flex:none}
 .lane{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--card);
       border-radius:8px;min-height:0}
-.lane-hd{display:flex;align-items:center;gap:7px;padding:9px 10px;border-bottom:1px solid rgba(0,0,0,.1)}
+.lane-hd{display:flex;align-items:center;gap:7px;padding:9px 10px;border-bottom:1px solid var(--outline-variant)}
 .mark{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
-      border-radius:5px;font:500 11px/1 var(--mono);flex:none}
+      border-radius:5px;font:500 11px/1 var(--font-num);flex:none}
 .lane-body{flex:1;min-height:0;overflow:auto;padding:8px 10px 10px;display:flex;
            flex-direction:column;gap:7px}
-.lcard{padding:8px 9px;border-radius:6px;border:1px solid rgba(0,0,0,.1);background:var(--card)}
+.lcard{padding:8px 9px;border-radius:6px;border:1px solid var(--outline-variant);background:var(--card)}
 
 /* ── 1c 매트릭스형 ───────────────────────────────────────────── */
-.mx-cell{width:36px;height:40px;flex:none;border:1px solid rgba(0,0,0,.07);margin:-0.5px;
+.mx-cell{width:36px;height:40px;flex:none;border:1px solid var(--outline-variant);margin:-0.5px;
          display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:2px}
-.mx-cell span{font:600 9px/1 var(--mono);padding:2px 3px;border-radius:3px}
+.mx-cell span{font:600 9px/1 var(--font-num);padding:2px 3px;border-radius:3px}
 .chip{display:inline-flex;align-items:baseline;gap:5px;padding:2px 6px;border-radius:5px;
-      font:400 10.5px/1.5 var(--sans)}
+      font:400 10.5px/1.5 var(--font)}
 
 @media (max-width:900px){
   body{overflow:auto;display:block}
   .lnb{width:100%;height:auto;max-height:180px}
-  .rail{width:100%;border-left:0;border-top:1px solid rgba(0,0,0,.12)}
+  .rail{width:100%;border-left:0;border-top:1px solid var(--outline-variant)}
   .split,.lanes{flex-direction:column!important}
   .map-area{height:520px;flex:none}
 }
@@ -213,7 +208,7 @@ a{color:inherit;text-decoration:none}
               aria-selected="false">매트릭스형</button>
     </div>
     <span style="flex:1"></span>
-    <span class="num" style="font-size:11.5px;color:var(--mut2)" data-bind="asof">—</span>
+    <span class="num" style="font-size:11.5px;color:var(--on-variant)" data-bind="asof">—</span>
   </header>
 
   <div class="body">
@@ -236,7 +231,7 @@ a{color:inherit;text-decoration:none}
           <div class="legend" data-repeat="legend"></div>
         </div>
         <aside class="rail card">
-          <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(0,0,0,.09);flex:none">
+          <div style="padding:12px 14px 10px;border-bottom:1px solid var(--outline-variant);flex:none">
             <div class="cap">부품 10종 · 사양 충족률</div>
             <div data-repeat="rail-parts"></div>
           </div>
@@ -252,20 +247,20 @@ a{color:inherit;text-decoration:none}
     <section class="view" data-view-panel="diag" role="tabpanel" aria-label="진단형" hidden>
       <div class="gap">
         <div style="display:flex;align-items:baseline;gap:8px" class="num">
-          <span style="font:600 46px/0.9 var(--mono);color:oklch(0.72 0.13 165)"
+          <span style="font:600 46px/0.9 var(--font-num);color:oklch(0.72 0.13 165)"
                 data-bind="g-checked">—</span>
-          <span style="font:400 18px/1 var(--mono);color:var(--mut2)">/</span>
-          <span style="font:500 24px/1 var(--mono)" data-bind="g-scope">—</span>
+          <span style="font:400 18px/1 var(--font-num);color:var(--on-variant)">/</span>
+          <span style="font:500 24px/1 var(--font-num)" data-bind="g-scope">—</span>
         </div>
-        <div style="font:400 13px/1.5 var(--sans);max-width:440px" data-bind="g-text"></div>
+        <div style="font:400 13px/1.5 var(--font);max-width:440px" data-bind="g-text"></div>
         <span style="flex:1"></span>
         <div style="display:flex;gap:18px" data-repeat="g-stats"></div>
       </div>
       <div style="flex:1;min-height:0;display:flex;gap:10px">
         <div class="lanes" style="flex:1;min-width:0;display:flex;gap:10px" data-repeat="lanes"></div>
         <aside class="card" style="width:330px;flex:none;display:flex;flex-direction:column;min-height:0">
-          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);
-                      font:600 12px/1.2 var(--sans);flex:none">사양 등록 필수</div>
+          <div style="padding:10px 12px;border-bottom:1px solid var(--outline-variant);
+                      font:600 12px/1.2 var(--font);flex:none">사양 등록 필수</div>
           <div style="flex:1;min-height:0;overflow:auto;padding:8px 12px 12px"
                data-repeat="diag-parts"></div>
         </aside>
@@ -278,29 +273,29 @@ a{color:inherit;text-decoration:none}
         <div class="card" style="flex:none;padding:10px 12px">
           <div class="cap">규칙 적용률</div>
           <div style="display:flex;align-items:baseline;gap:6px" class="num">
-            <span style="font:600 30px/1 var(--mono);color:oklch(0.5 0.11 165)"
+            <span style="font:600 30px/1 var(--font-num);color:oklch(0.5 0.11 165)"
                   data-bind="m-checked">—</span>
-            <span style="font:400 14px/1 var(--mono);color:var(--mut3)"
+            <span style="font:400 14px/1 var(--font-num);color:var(--on-variant)"
                   data-bind="m-scope">—</span>
           </div>
-          <div style="font:400 10.5px/1.4 var(--sans);color:var(--mut2);margin-top:3px"
+          <div style="font:400 10.5px/1.4 var(--font);color:var(--on-variant);margin-top:3px"
                data-bind="m-note"></div>
         </div>
         <div style="flex:1;display:flex;gap:10px" data-repeat="legend-cards"></div>
       </div>
       <div class="split" style="display:flex;gap:12px;flex:1;min-height:0">
         <div class="card" style="flex:0 1 auto;min-width:0;padding:10px 12px 12px;overflow:auto">
-          <div style="font:600 12px/1.2 var(--sans);margin-bottom:8px">부품 × 부품 관계 격자
-            <span style="font-weight:400;color:var(--mut2);font-size:11px">· 기호 = 상태</span></div>
+          <div style="font:600 12px/1.2 var(--font);margin-bottom:8px">부품 × 부품 관계 격자
+            <span style="font-weight:400;color:var(--on-variant);font-size:11px">· 기호 = 상태</span></div>
           <div style="display:flex"><div style="width:80px;flex:none"></div>
             <div style="display:flex" data-repeat="mx-cols"></div></div>
           <div data-repeat="mx-rows"></div>
         </div>
         <div class="card" style="flex:1 0 520px;min-width:0;display:flex;flex-direction:column;min-height:0">
-          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);flex:none;
+          <div style="padding:10px 12px;border-bottom:1px solid var(--outline-variant);flex:none;
                       display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-            <span style="font:600 12px/1.2 var(--sans)">부품 × 사양 충족률</span>
-            <span style="font:400 10.5px/1.3 var(--sans);color:var(--mut2)">진하게 = 필수 사양 ·
+            <span style="font:600 12px/1.2 var(--font)">부품 × 사양 충족률</span>
+            <span style="font:400 10.5px/1.3 var(--font);color:var(--on-variant)">진하게 = 필수 사양 ·
               옅게 = 경고 사양 · 붉게 = 값 0%</span>
           </div>
           <div style="flex:1;min-height:0;overflow:auto;padding:6px 12px 12px"
@@ -320,9 +315,9 @@ a{color:inherit;text-decoration:none}
   // ── 상태 4분류. 라벨·설명은 서버가 정한 status 키에 붙는 표시 규약이다.
   //    색만으로 구분하지 않는다 — 기호(●◆○·)와 글자를 항상 함께 쓴다.
   var STATUS = {
-    checking: {label:'검사 적용',       mark:'●', color:'oklch(0.48 0.11 165)', line:'oklch(0.56 0.11 165)', bg:'oklch(0.95 0.035 165)', bd:'oklch(0.84 0.06 165)', desc:'규칙 등록 완료'},
-    norule:   {label:'규칙 미등록',     mark:'◆', color:'oklch(0.5 0.14 62)',   line:'oklch(0.68 0.15 62)',  bg:'oklch(0.96 0.045 75)',  bd:'oklch(0.85 0.08 70)',  desc:'사양 값 확보 · 규칙 등록 필요'},
-    missing:  {label:'사양 값 부족',    mark:'○', color:'oklch(0.46 0.12 285)', line:'oklch(0.62 0.11 285)', bg:'oklch(0.96 0.025 285)', bd:'oklch(0.86 0.05 285)', desc:'사양 등록 필요'},
+    checking: {label:'검사 적용',       mark:'●', color:'oklch(0.48 0.11 165)', line:'oklch(0.56 0.11 165)', bg:'var(--primary-container)', bd:'var(--outline-variant)', desc:'규칙 등록 완료'},
+    norule:   {label:'규칙 미등록',     mark:'◆', color:'var(--on)',   line:'oklch(0.68 0.15 62)',  bg:'var(--primary-container)',  bd:'var(--primary)',  desc:'사양 값 확보 · 규칙 등록 필요'},
+    missing:  {label:'사양 값 부족',    mark:'○', color:'var(--secondary)', line:'oklch(0.62 0.11 285)', bg:'oklch(0.96 0.025 285)', bd:'oklch(0.86 0.05 285)', desc:'사양 등록 필요'},
     out:      {label:'범위 밖',           mark:'·', color:'#7d7669',              line:'#bdb6a8',              bg:'rgba(0,0,0,.04)',       bd:'rgba(0,0,0,.14)',      desc:'차기 단계 대상'}
   };
   var ORDER = ['norule', 'missing', 'checking', 'out'];   // 아까운 순
@@ -465,8 +460,8 @@ a{color:inherit;text-decoration:none}
       var S = STATUS[k];
       return '<div><span class="sw" style="background:' +
         (k === 'out' ? 'repeating-linear-gradient(45deg,#c9c3b7 0 3px,#e6e1d7 3px 6px)' : S.line) +
-        '"></span><span style="font-family:var(--mono)">' + S.mark + '</span><span>' +
-        esc(S.label) + '</span><span class="num" style="font-size:11px;color:var(--mut2)">' +
+        '"></span><span style="font-family:var(--font-num)">' + S.mark + '</span><span>' +
+        esc(S.label) + '</span><span class="num" style="font-size:11px;color:var(--on-variant)">' +
         counts[k] + '</span></div>';
     }).join(''));
 
@@ -475,13 +470,13 @@ a{color:inherit;text-decoration:none}
       return '<div class="prow" data-part="' + esc(p.part_type) + '" style="background:' +
         (on ? '#26231e' : 'transparent') + ';color:' + (on ? '#f7f4ee' : '#26231e') +
         ';opacity:' + (sel && !on ? .45 : 1) + '">' +
-        '<span style="width:126px;font:600 11px/1.2 var(--mono);white-space:nowrap;' +
+        '<span style="width:126px;font:600 11px/1.2 var(--font-num);white-space:nowrap;' +
         'overflow:hidden;text-overflow:ellipsis">' + esc(p.part_type) + '</span>' +
         '<span class="track"><span class="bar" style="width:' + (p.pct || 0) +
         '%;background:' + barColor(p.pct || 0) + '"></span></span>' +
         '<span class="num" style="width:34px;text-align:right;font-size:11px;font-weight:500">' +
         (p.pct == null ? '—' : p.pct + '%') + '</span>' +
-        '<span class="num" style="width:46px;text-align:right;font-size:10.5px;color:var(--mut3)">' +
+        '<span class="num" style="width:46px;text-align:right;font-size:10.5px;color:var(--on-variant)">' +
         num(p.stock) + '</span></div>';
     }).join(''));
 
@@ -495,15 +490,15 @@ a{color:inherit;text-decoration:none}
         : '연관 사양 없음';
       return '<div class="rrow">' +
         '<div style="display:flex;align-items:center;gap:7px">' +
-        '<span style="font:600 11px/1 var(--mono);color:var(--mut2)">' + esc(r.pair_key) + '</span>' +
-        '<span style="font:600 12px/1.2 var(--sans)">' + esc(r.pair) + '</span>' +
+        '<span style="font:600 11px/1 var(--font-num);color:var(--on-variant)">' + esc(r.pair_key) + '</span>' +
+        '<span style="font:600 12px/1.2 var(--font)">' + esc(r.pair) + '</span>' +
         '<span style="flex:1"></span>' +
         '<span class="pill" style="background:' + r.S.bg + ';color:' + r.S.color +
-        ';border:1px solid ' + r.S.bd + '"><span style="font-family:var(--mono)">' +
+        ';border:1px solid ' + r.S.bd + '"><span style="font-family:var(--font-num)">' +
         r.S.mark + '</span>' + esc(r.S.label) + '</span></div>' +
-        '<div style="font:400 11.5px/1.45 var(--sans);color:#5c574e;margin-top:2px">' +
+        '<div style="font:400 11.5px/1.45 var(--font);color:#5c574e;margin-top:2px">' +
         esc(r.what) + '</div>' +
-        '<div style="font:400 10.5px/1.4 var(--mono);color:var(--mut3);margin-top:3px">' +
+        '<div style="font:400 10.5px/1.4 var(--font-num);color:var(--on-variant);margin-top:3px">' +
         esc(summary) + '</div></div>';
     }).join(''));
 
@@ -514,9 +509,9 @@ a{color:inherit;text-decoration:none}
     set('g-text', '검사 대상 ' + s.pairs_in_scope + '건 · 규칙 적용 ' + s.pairs_checked +
       '건<br><b style="font-weight:600">미적용 ' + notChecked + '건 — 규칙 등록 필요</b>');
     set('g-stats', stats.map(function (x) {
-      return '<div><div style="font:500 10.5px/1.3 var(--sans);color:var(--mut3)">' +
-        esc(x.l) + '</div><div class="num" style="font:600 22px/1.2 var(--mono)">' +
-        esc(x.v) + '</div><div style="font:400 10px/1.3 var(--sans);color:var(--mut2)">' +
+      return '<div><div style="font:500 10.5px/1.3 var(--font);color:var(--on-variant)">' +
+        esc(x.l) + '</div><div class="num" style="font:600 22px/1.2 var(--font-num)">' +
+        esc(x.v) + '</div><div style="font:400 10px/1.3 var(--font);color:var(--on-variant)">' +
         esc(x.n) + '</div></div>';
     }).join(''));
 
@@ -526,32 +521,32 @@ a{color:inherit;text-decoration:none}
       return '<div class="lane" style="border:1px solid ' + S.bd + ';border-top:3px solid ' +
         S.line + '"><div class="lane-hd"><span class="mark" style="background:' + S.bg +
         ';color:' + S.color + ';border:1px solid ' + S.bd + '">' + S.mark + '</span>' +
-        '<span style="font:600 12px/1.2 var(--sans)">' + esc(S.label) + '</span>' +
-        '<span style="flex:1"></span><span class="num" style="font:600 15px/1 var(--mono)">' +
+        '<span style="font:600 12px/1.2 var(--font)">' + esc(S.label) + '</span>' +
+        '<span style="flex:1"></span><span class="num" style="font:600 15px/1 var(--font-num)">' +
         items.length + '</span></div>' +
-        '<div style="font:400 10.5px/1.4 var(--sans);color:var(--mut2);padding:6px 10px 0">' +
+        '<div style="font:400 10.5px/1.4 var(--font);color:var(--on-variant);padding:6px 10px 0">' +
         esc(S.desc) + '</div><div class="lane-body">' +
         items.map(function (r) {
           var on = sel && r.parts.indexOf(sel) >= 0;
           var specs = r.specs.length ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">' +
             r.specs.map(function (x) {
               return '<div style="display:flex;align-items:baseline;gap:6px">' +
-                '<span style="flex:1;min-width:0;font:400 10.5px/1.35 var(--sans);color:var(--mut);' +
+                '<span style="flex:1;min-width:0;font:400 10.5px/1.35 var(--font);color:var(--on-variant);' +
                 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
                 esc(x.part_type + '.' + x.label) + '</span>' +
-                '<span class="num" style="font:500 10.5px/1.35 var(--mono);width:34px;' +
+                '<span class="num" style="font:500 10.5px/1.35 var(--font-num);width:34px;' +
                 'text-align:right;color:' + pctColor(x.pct || 0) + '">' +
                 (x.pct == null ? '—' : x.pct + '%') + '</span></div>';
             }).join('') + '</div>' : '';
-          var note = r.note ? '<div style="margin-top:6px;font:400 10.5px/1.45 var(--sans);' +
-            'color:var(--mut2)">↳ ' + esc(r.note) + '</div>' : '';
+          var note = r.note ? '<div style="margin-top:6px;font:400 10.5px/1.45 var(--font);' +
+            'color:var(--on-variant)">↳ ' + esc(r.note) + '</div>' : '';
           return '<div class="lcard" data-pair="' + esc(r.pair_key) + '" style="border-color:' +
             (on ? '#26231e' : 'rgba(0,0,0,.1)') + ';background:' +
             (on ? 'rgba(0,0,0,.04)' : '#fffdf9') + ';opacity:' + (sel && !on ? .42 : 1) + '">' +
             '<div style="display:flex;align-items:baseline;gap:6px">' +
-            '<span style="font:600 10.5px/1 var(--mono);color:var(--mut2)">' + esc(r.pair_key) + '</span>' +
-            '<span style="font:600 11.5px/1.25 var(--sans)">' + esc(r.pair) + '</span></div>' +
-            '<div style="font:400 11px/1.45 var(--sans);color:#5c574e;margin-top:3px">' +
+            '<span style="font:600 10.5px/1 var(--font-num);color:var(--on-variant)">' + esc(r.pair_key) + '</span>' +
+            '<span style="font:600 11.5px/1.25 var(--font)">' + esc(r.pair) + '</span></div>' +
+            '<div style="font:400 11px/1.45 var(--font);color:#5c574e;margin-top:3px">' +
             esc(r.what) + '</div>' + specs + note + '</div>';
         }).join('') + '</div></div>';
     }).join(''));
@@ -563,17 +558,17 @@ a{color:inherit;text-decoration:none}
         (on ? '#26231e' : 'rgba(0,0,0,.1)') + ';border-radius:7px;margin-bottom:7px;background:' +
         (on ? 'rgba(0,0,0,.035)' : '#fffdf9') + ';opacity:' + (sel && !on ? .5 : 1) + '">' +
         '<div style="display:flex;align-items:baseline;gap:7px">' +
-        '<span style="font:600 12px/1.2 var(--mono)">' + esc(p.part_type) + '</span>' +
-        '<span style="font:400 10.5px/1.2 var(--sans);color:var(--mut2)">' + esc(p.name) + '</span>' +
-        '<span style="flex:1"></span><span class="num" style="font:600 13px/1 var(--mono)">' +
+        '<span style="font:600 12px/1.2 var(--font-num)">' + esc(p.part_type) + '</span>' +
+        '<span style="font:400 10.5px/1.2 var(--font);color:var(--on-variant)">' + esc(p.name) + '</span>' +
+        '<span style="flex:1"></span><span class="num" style="font:600 13px/1 var(--font-num)">' +
         (p.pct == null ? '—' : p.pct + '%') + '</span></div>' +
         '<div class="track" style="margin:5px 0 4px"><span class="bar" style="width:' +
         (p.pct || 0) + '%;background:' + barColor(p.pct || 0) + '"></span></div>' +
-        '<div class="num" style="font-size:10.5px;color:var(--mut2)">재고 ' + num(p.stock) +
+        '<div class="num" style="font-size:10.5px;color:var(--on-variant)">재고 ' + num(p.stock) +
         ' · 필수 사양 ' + p.blocking + '/' + p.total + '</div>' +
         (zeros.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">' +
           zeros.map(function (z) {
-            return '<span style="font:400 10.5px/1.4 var(--sans);color:oklch(0.48 0.13 25);' +
+            return '<span style="font:400 10.5px/1.4 var(--font);color:oklch(0.48 0.13 25);' +
               'background:oklch(0.95 0.03 25);border:1px solid oklch(0.87 0.05 25);' +
               'border-radius:4px;padding:1px 5px">' + esc(z.label) + ' 0%</span>';
           }).join('') + '</div>' : '') + '</div>';
@@ -588,10 +583,10 @@ a{color:inherit;text-decoration:none}
       return '<div class="card" style="flex:1;border-left:3px solid ' + S.line +
         ';padding:10px 12px"><div style="display:flex;align-items:center;gap:6px">' +
         '<span class="sw" style="background:' + S.line + '"></span>' +
-        '<span style="font-family:var(--mono);font-size:11px">' + S.mark + '</span>' +
-        '<span style="font:500 11.5px/1.2 var(--sans)">' + esc(S.label) + '</span></div>' +
-        '<div class="num" style="font:600 24px/1.2 var(--mono);margin-top:4px">' + counts[k] +
-        '</div><div style="font:400 10.5px/1.35 var(--sans);color:var(--mut2)">' +
+        '<span style="font-family:var(--font-num);font-size:11px">' + S.mark + '</span>' +
+        '<span style="font:500 11.5px/1.2 var(--font)">' + esc(S.label) + '</span></div>' +
+        '<div class="num" style="font:600 24px/1.2 var(--font-num);margin-top:4px">' + counts[k] +
+        '</div><div style="font:400 10.5px/1.35 var(--font);color:var(--on-variant)">' +
         esc(S.desc) + '</div></div>';
     }).join(''));
 
@@ -603,21 +598,21 @@ a{color:inherit;text-decoration:none}
     });
     set('mx-cols', cols.map(function (k) {
       return '<div style="width:36px;flex:none;font:' + (sel === k ? 700 : 500) +
-        ' 9.5px/1.2 var(--mono);color:' + (sel === k ? '#26231e' : '#8a8377') +
+        ' 9.5px/1.2 var(--font-num);color:' + (sel === k ? '#26231e' : '#8a8377') +
         ';text-align:center;padding-bottom:5px;white-space:nowrap;overflow:hidden">' +
         esc(SHORT[k] || k) + '</div>';
     }).join(''));
     set('mx-rows', cols.map(function (rk) {
       return '<div data-part="' + esc(rk) + '" style="display:flex;align-items:stretch;background:' +
-        (sel === rk ? 'rgba(0,0,0,.05)' : 'transparent') + '">' +
-        '<div style="width:80px;flex:none;display:flex;align-items:center;font:600 10.5px/1.2 var(--mono);' +
+        (sel === rk ? 'var(--container)' : 'transparent') + '">' +
+        '<div style="width:80px;flex:none;display:flex;align-items:center;font:600 10.5px/1.2 var(--font-num);' +
         'padding:0 6px;color:' + (sel && sel !== rk ? '#a09889' : '#26231e') + '">' +
         esc(SHORT[rk] || rk) + '</div>' +
         cols.map(function (ck) {
           var list = ck === rk ? [] : (cellMap[[rk, ck].sort().join('|')] || []);
           var hot = sel && (sel === rk || sel === ck) && list.length > 0;
           return '<div class="mx-cell" style="background:' +
-            (rk === ck ? 'rgba(0,0,0,.05)' : list.length ? (hot ? 'rgba(0,0,0,.06)' : '#fffdf9') : 'transparent') +
+            (rk === ck ? 'var(--container)' : list.length ? (hot ? 'rgba(0,0,0,.06)' : '#fffdf9') : 'transparent') +
             '">' + list.map(function (r) {
               return '<span style="background:' + r.S.bg + ';color:' + r.S.color +
                 ';border:1px solid ' + r.S.bd + ';opacity:' +
@@ -630,25 +625,25 @@ a{color:inherit;text-decoration:none}
     set('heat-rows', d.parts.map(function (p) {
       var on = sel === p.part_type;
       return '<div data-part="' + esc(p.part_type) + '" style="display:flex;align-items:flex-start;' +
-        'gap:8px;padding:6px;border-radius:6px;border-bottom:1px solid rgba(0,0,0,.06);background:' +
-        (on ? 'rgba(0,0,0,.05)' : 'transparent') + ';opacity:' + (sel && !on ? .45 : 1) + '">' +
+        'gap:8px;padding:6px;border-radius:6px;border-bottom:1px solid var(--outline-variant);background:' +
+        (on ? 'var(--container)' : 'transparent') + ';opacity:' + (sel && !on ? .45 : 1) + '">' +
         '<div style="width:150px;flex:none;display:flex;align-items:baseline;gap:6px">' +
-        '<span style="font:600 11.5px/1.2 var(--mono)">' + esc(p.part_type) + '</span>' +
-        '<span class="num" style="font-size:10px;color:var(--mut3)">' + num(p.stock) + '</span></div>' +
-        '<div class="num" style="width:46px;flex:none;font:600 12px/1.2 var(--mono);text-align:right">' +
+        '<span style="font:600 11.5px/1.2 var(--font-num)">' + esc(p.part_type) + '</span>' +
+        '<span class="num" style="font-size:10px;color:var(--on-variant)">' + num(p.stock) + '</span></div>' +
+        '<div class="num" style="width:46px;flex:none;font:600 12px/1.2 var(--font-num);text-align:right">' +
         (p.pct == null ? '—' : p.pct + '%') + '</div>' +
         '<div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px">' +
         (p.specs || []).map(function (x) {
           var pc = x.pct || 0;
-          var col = pc === 0 ? 'oklch(0.5 0.15 25)' : pc < 60 ? 'oklch(0.5 0.13 62)' : '#3f3b34';
+          var col = pc === 0 ? 'var(--error)' : pc < 60 ? 'oklch(0.5 0.13 62)' : '#3f3b34';
           var bg  = pc === 0 ? 'oklch(0.95 0.03 25)' : pc < 60 ? 'oklch(0.96 0.03 75)' : 'rgba(0,0,0,.035)';
           var bd  = pc === 0 ? 'oklch(0.87 0.05 25)' : pc < 60 ? 'oklch(0.88 0.05 70)' : 'rgba(0,0,0,.1)';
           return '<span class="chip" style="background:' + bg + ';border:1px solid ' + bd +
             ';color:' + col + ';opacity:' + (x.is_blocking ? 1 : .72) + '">' +
             '<span>' + esc(x.label) + '</span>' +
-            '<span class="num" style="font:600 10.5px/1 var(--mono);color:' + col + '">' +
+            '<span class="num" style="font:600 10.5px/1 var(--font-num);color:' + col + '">' +
             (x.pct == null ? '—' : x.pct + '%') + '</span>' +
-            '<span style="font:400 9.5px/1 var(--mono);color:var(--mut3)">' +
+            '<span style="font:400 9.5px/1 var(--font-num);color:var(--on-variant)">' +
             esc((x.pairs || []).join(',') || '—') + '</span></span>';
         }).join('') + '</div></div>';
     }).join(''));
@@ -733,24 +728,24 @@ a{color:inherit;text-decoration:none}
       // 없다(2026-08-11 실제로 이 화면이 그 상태로 사용자에게 갔다).
       var un = err.status === 401;
       var t = $('asof');
-      if (t) { t.textContent = un ? '세션 만료' : '조회 실패'; t.style.color = 'oklch(0.5 0.15 25)'; }
+      if (t) { t.textContent = un ? '세션 만료' : '조회 실패'; t.style.color = 'var(--error)'; }
       document.querySelectorAll('[data-view-panel]').forEach(function (p) { p.hidden = true; });
       var box = document.createElement('div');
       box.className = 'card';
       box.setAttribute('data-bind', 'load-error');
       box.style.cssText = 'margin:auto;max-width:460px;padding:22px 24px;text-align:center';
       box.innerHTML =
-        '<div style="font:600 14px/1.4 var(--sans);margin-bottom:6px">' +
+        '<div style="font:600 14px/1.4 var(--font);margin-bottom:6px">' +
         (un ? '세션 만료' : '데이터 조회 실패') + '</div>' +
-        '<div style="font:400 12px/1.6 var(--sans);color:var(--mut2);margin-bottom:14px">' +
+        '<div style="font:400 12px/1.6 var(--font);color:var(--on-variant);margin-bottom:14px">' +
         (un ? '관리자 로그인 후 다시 조회합니다.'
             : '관계 데이터를 받지 못했습니다. — ' + esc(err.message)) + '</div>' +
         (un ? '<a href="/admin/login.html" style="display:inline-block;padding:8px 18px;' +
-              'border-radius:6px;background:var(--ink);color:var(--shell);' +
-              'font:500 12px/1 var(--sans)">로그인</a>'
+              'border-radius:6px;background:var(--on);color:var(--bg);' +
+              'font:500 12px/1 var(--font)">로그인</a>'
             : '<button type="button" data-action="retry" style="padding:8px 18px;' +
-              'border-radius:6px;background:var(--ink);color:var(--shell);border:0;' +
-              'cursor:pointer;font:500 12px/1 var(--sans)">다시 시도</button>');
+              'border-radius:6px;background:var(--on);color:var(--bg);border:0;' +
+              'cursor:pointer;font:500 12px/1 var(--font)">다시 시도</button>');
       document.querySelector('.body').appendChild(box);
       var again = box.querySelector('[data-action="retry"]');
       if (again) again.addEventListener('click', function () { location.reload(); });
