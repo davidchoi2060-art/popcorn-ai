@@ -6,7 +6,7 @@
 <title>팝콘PC AI · 주문 확인 · 결제 인계 (S4)</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;padding:0}
-body{background:#f1eee8;font-family:'Pretendard','Pretendard Variable',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialiased;color:#1a1a1e}
 .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
@@ -271,7 +271,7 @@ var so=document.getElementById('s4-soldout');if(so)so.addEventListener('click',f
 var cp=document.getElementById('s4-coupon');if(cp)cp.addEventListener('click',function(){tmsg('쿠폰 코드를 확인했어요 — 목업');});
 })();
 </script>
-<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:var(--font);font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
 <script>
@@ -293,7 +293,7 @@ function showTip(img,key){
  if(tip&&tip.dataset.key===key){closeTip();return;}
  closeTip();
  tip=document.createElement('div');tip.dataset.key=key;
- tip.style.cssText='position:absolute;z-index:9999;max-width:280px;background:#fff;border:1.5px solid #e2ded5;border-radius:14px;padding:13px 16px;box-shadow:0 14px 40px -12px rgba(30,25,15,.35);font-family:Pretendard,-apple-system,sans-serif;';
+ tip.style.cssText='position:absolute;z-index:9999;max-width:280px;background:#fff;border:1.5px solid #e2ded5;border-radius:14px;padding:13px 16px;box-shadow:0 14px 40px -12px rgba(30,25,15,.35);font-family:var(--font);';
  tip.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><img src="assets/parts/'+key+'.png" style="width:26px;height:26px;border-radius:7px;border:1px solid #ece9e3;"><b style="font-size:13.5px;color:#17171b;">'+info[0]+'</b></div><p style="margin:0;font-size:12.5px;line-height:1.6;color:#5c584e;">'+info[1]+'</p>';
  document.body.appendChild(tip);
  var r=img.getBoundingClientRect();

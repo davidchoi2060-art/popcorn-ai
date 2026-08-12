@@ -7,13 +7,13 @@
 <style>
   * { box-sizing: border-box; }
   html { scroll-behavior:smooth; }
-  body { margin:0; background:#0B1220; font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; }
+  body { margin:0; background:#0B1220; font-family:var(--font); -webkit-font-smoothing:antialiased; }
   .msym { font-family:'Material Symbols Outlined'; font-weight:normal; font-style:normal; line-height:1; letter-spacing:normal; text-transform:none; white-space:nowrap; -webkit-font-feature-settings:'liga'; -webkit-font-smoothing:antialiased; }
   @keyframes growX { from{transform:scaleX(0)} to{transform:scaleX(1)} }
   @keyframes pulseDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
   @keyframes eqbar { 0%,100%{height:7px} 50%{height:20px} }
   @keyframes tagIn { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
-  .intent-tag { background:rgba(101,161,212,.12); color:#2A5C86; border:1px solid rgba(101,161,212,.3); border-radius:8px; padding:5px 11px; font-size:12.5px; font-weight:700; font-family:'JetBrains Mono'; opacity:0; animation:tagIn .5s ease-out both; }
+  .intent-tag { background:rgba(101,161,212,.12); color:#2A5C86; border:1px solid rgba(101,161,212,.3); border-radius:8px; padding:5px 11px; font-size:12.5px; font-weight:700; font-family:var(--font-num); opacity:0; animation:tagIn .5s ease-out both; }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -31,20 +31,20 @@
 
     <!-- header -->
     <div style="position:absolute; top:0; left:0; right:0; z-index:30; display:flex; align-items:center; justify-content:space-between; padding:26px 56px; max-width:1440px; margin:0 auto;">
-      <div style="font-family:'Pretendard','Hanken Grotesk'; font-weight:800; font-size:26px; color:#fff; letter-spacing:-0.02em;">팝콘PC <span style="color:#8FC0E8;">AI</span></div>
+      <div style="font-family:var(--font); font-weight:800; font-size:26px; color:#fff; letter-spacing:-0.02em;">팝콘PC <span style="color:#8FC0E8;">AI</span></div>
       <div style="display:flex; align-items:center; gap:40px;">
         <nav style="display:flex; gap:34px;">
           <a href="#how" style="color:#fff; font-weight:600; font-size:16px; text-decoration:none;">모델</a>
           <a href="#engine" style="color:rgba(255,255,255,.62); font-size:16px; text-decoration:none;">성능</a>
           <a href="#reviews" style="color:rgba(255,255,255,.62); font-size:16px; text-decoration:none;">작동 방식</a>
         </nav>
-        <button style="background:#65A1D4; color:#fff; border:none; padding:12px 26px; border-radius:999px; font-family:'Hanken Grotesk'; font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 10px 24px rgba(101,161,212,.35);" data-cta="start">견적 시작</button>
+        <button style="background:#65A1D4; color:#fff; border:none; padding:12px 26px; border-radius:999px; font-family:var(--font); font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 10px 24px rgba(101,161,212,.35);" data-cta="start">견적 시작</button>
       </div>
     </div>
 
     <!-- hero content -->
     <div style="position:relative; z-index:20; height:100%; display:flex; flex-direction:column; justify-content:center; padding:120px 56px 0; max-width:1080px; margin:0 auto; width:100%;">
-      <div style="display:inline-flex; align-self:flex-start; align-items:center; gap:9px; padding:8px 16px; border-radius:999px; background:rgba(101,161,212,.16); border:1px solid rgba(101,161,212,.4); color:#A9D0EE; font-family:'JetBrains Mono'; font-size:12px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; margin-bottom:26px;">
+      <div style="display:inline-flex; align-self:flex-start; align-items:center; gap:9px; padding:8px 16px; border-radius:999px; background:rgba(101,161,212,.16); border:1px solid rgba(101,161,212,.4); color:#A9D0EE; font-family:var(--font-num); font-size:12px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; margin-bottom:26px;">
         <span class="msym" style="font-size:15px; font-variation-settings:'FILL' 1;">bolt</span> 의도는 AI가 교차 해석 · 재고·호환성은 검증 엔진
       </div>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:24px;">
@@ -52,7 +52,7 @@
         <p style="margin:0; font-size:20px; font-weight:600; color:rgba(255,255,255,.62); line-height:1.5;">&ldquo;조립 잘 되는 거 맞아?&rdquo;</p>
         <p style="margin:0; font-size:20px; font-weight:600; color:rgba(255,255,255,.62); line-height:1.5;">&ldquo;같은 부품인데 왜 판매처마다 가격이 다르지?&rdquo;</p>
       </div>
-      <h1 style="margin:0; font-family:'Hanken Grotesk'; font-weight:800; font-size:56px; line-height:1.14; letter-spacing:-0.03em; color:#fff;">모든 견적에는 <span style="color:#8FC0E8;">이유가 있습니다.</span></h1>
+      <h1 style="margin:0; font-family:var(--font); font-weight:800; font-size:56px; line-height:1.14; letter-spacing:-0.03em; color:#fff;">모든 견적에는 <span style="color:#8FC0E8;">이유가 있습니다.</span></h1>
       <p style="margin:26px 0 0; font-size:19px; line-height:1.7; color:rgba(255,255,255,.78); max-width:640px;">말씀하신 그대로 이해하고, 엔진이 검증한 구성으로 답합니다. 조립 불가능한 조합은 후보에서 제외됩니다.</p>
       <div style="display:flex; gap:22px; margin:30px 0 34px; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f); box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>실시간 재고 검증</div>
@@ -61,7 +61,7 @@
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#E8B563; box-shadow:0 0 0 4px rgba(232,181,99,.2);"></span>본체부터 모니터·주변기기까지</div>
       </div>
       <div style="display:flex; gap:16px; align-items:center;">
-        <button style="background:#65A1D4; color:#fff; border:none; padding:19px 34px; border-radius:16px; font-family:'Hanken Grotesk'; font-weight:800; font-size:19px; cursor:pointer; box-shadow:0 20px 44px rgba(101,161,212,.4); display:flex; align-items:center; gap:10px;" data-cta="start">내 맞춤 견적 받기 <span class="msym" style="font-size:22px;">arrow_forward</span></button>
+        <button style="background:#65A1D4; color:#fff; border:none; padding:19px 34px; border-radius:16px; font-family:var(--font); font-weight:800; font-size:19px; cursor:pointer; box-shadow:0 20px 44px rgba(101,161,212,.4); display:flex; align-items:center; gap:10px;" data-cta="start">내 맞춤 견적 받기 <span class="msym" style="font-size:22px;">arrow_forward</span></button>
         <button style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.28); backdrop-filter:blur(8px); padding:19px 28px; border-radius:16px; font-weight:600; font-size:17px; cursor:pointer; display:flex; align-items:center; gap:9px;" data-cta="how">작동 방식 보기</button>
       </div>
     </div>
@@ -78,69 +78,69 @@
       <!-- trust strip -->
       <section style="display:flex; align-items:center; justify-content:space-between; gap:32px; padding:34px 0; border-bottom:1px solid rgba(148,163,184,.28); flex-wrap:wrap;">
         <div style="display:flex; gap:44px; flex-wrap:wrap;">
-          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">verified</span><span style="font-family:'Hanken Grotesk'; font-weight:700; font-size:16px; color:#1A202C;">25년 업력</span></div>
-          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">workspace_premium</span><span style="font-family:'Hanken Grotesk'; font-weight:700; font-size:16px; color:#1A202C;">정품 100%</span></div>
-        <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">support_agent</span><span style="font-family:'Hanken Grotesk'; font-weight:700; font-size:16px; color:#1A202C;">무상 A/S</span></div>
-          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">bolt</span><span style="font-family:'Hanken Grotesk'; font-weight:700; font-size:16px; color:#1A202C;">당일 조립 출고</span></div>
+          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">verified</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">25년 업력</span></div>
+          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">workspace_premium</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">정품 100%</span></div>
+        <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">support_agent</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">무상 A/S</span></div>
+          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">bolt</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">당일 조립 출고</span></div>
         </div>
         <p style="margin:0; font-size:14px; color:#64748B; font-style:italic;">서울 용산에서 25년, 직접 조립·검수해 온 팀입니다</p>
       </section>
 
       <!-- 실시간 재고 검증 엔진 FEATURE -->
       <section id="how" data-reveal style="padding:88px 0 20px; text-align:center;">
-        <div style="font-family:'JetBrains Mono'; font-size:13px; letter-spacing:.24em; color:#65A1D4; font-weight:600; text-transform:uppercase; margin-bottom:16px;">AI &times; REAL-STOCK ENGINE</div>
-        <h2 style="margin:0; font-family:'Hanken Grotesk'; font-weight:800; font-size:46px; letter-spacing:-0.025em; color:#111827;">하나의 질문, 검증된 하나의 답.</h2>
+        <div style="font-family:var(--font-num); font-size:13px; letter-spacing:.24em; color:#65A1D4; font-weight:600; text-transform:uppercase; margin-bottom:16px;">AI &times; REAL-STOCK ENGINE</div>
+        <h2 style="margin:0; font-family:var(--font); font-weight:800; font-size:46px; letter-spacing:-0.025em; color:#111827;">하나의 질문, 검증된 하나의 답.</h2>
         <p style="margin:18px auto 0; font-size:19px; line-height:1.65; color:#64748B; max-width:640px;">여러 AI가 의도를 교차 해석하고, 결정론 엔진이 재고·호환성·예산을 통과한 부품만으로 답을 만듭니다.</p>
 
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:16px; margin-top:52px; text-align:left;">
           <!-- 01 AI -->
           <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid #65A1D4; box-shadow:0 20px 40px -30px rgba(101,161,212,.6);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-              <span style="font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">01</span>
-              <span style="font-family:'JetBrains Mono'; font-size:10px; font-weight:700; letter-spacing:.1em; color:#65A1D4; background:rgba(101,161,212,.12); padding:4px 9px; border-radius:6px;">AI</span>
+              <span style="font-family:var(--font); font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">01</span>
+              <span style="font-family:var(--font-num); font-size:10px; font-weight:700; letter-spacing:.1em; color:#65A1D4; background:rgba(101,161,212,.12); padding:4px 9px; border-radius:6px;">AI</span>
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:#65A1D4; color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">psychology</span></div>
-            <div style="font-family:'Hanken Grotesk'; font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">말하면, 여러 AI가 이해</div>
+            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">말하면, 여러 AI가 이해</div>
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">'조용한 화이트 4K편집' 같은 말을 3개 AI가 교차 해석해 의도를 정확히 잡습니다.</p>
           </div>
           <!-- 02 엔진 -->
           <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid var(--success-teal, #10a37f); box-shadow:0 20px 40px -30px rgba(16,163,127,.5);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-              <span style="font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">02</span>
-              <span style="font-family:'JetBrains Mono'; font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
+              <span style="font-family:var(--font); font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">02</span>
+              <span style="font-family:var(--font-num); font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:var(--success-teal, #10a37f); color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">inventory_2</span></div>
-            <div style="font-family:'Hanken Grotesk'; font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">실시간 재고 검증</div>
+            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">실시간 재고 검증</div>
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">지금 살 수 있는 부품만 후보로. 품절·단종은 즉시 제외합니다.</p>
           </div>
           <!-- 03 엔진 -->
           <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid #4285F4; box-shadow:0 20px 40px -30px rgba(66,133,244,.5);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-              <span style="font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">03</span>
-              <span style="font-family:'JetBrains Mono'; font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
+              <span style="font-family:var(--font); font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">03</span>
+              <span style="font-family:var(--font-num); font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:#4285F4; color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">leaderboard</span></div>
-            <div style="font-family:'Hanken Grotesk'; font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">부품 선별·평가</div>
+            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">부품 선별·평가</div>
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">조건 통과 후보를 평점화하고, 왜 이 부품인지 선정 사유를 정리합니다.</p>
           </div>
           <!-- 04 엔진 -->
           <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid #D97757; box-shadow:0 20px 40px -30px rgba(217,119,87,.5);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-              <span style="font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">04</span>
-              <span style="font-family:'JetBrains Mono'; font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
+              <span style="font-family:var(--font); font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">04</span>
+              <span style="font-family:var(--font-num); font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:#D97757; color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">fact_check</span></div>
-            <div style="font-family:'Hanken Grotesk'; font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">부품 호환성 검토</div>
+            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">부품 호환성 검토</div>
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">소켓·전력·치수까지 전수 점검해 조립 가능한 조합만 남깁니다.</p>
           </div>
           <!-- 05 엔진 -->
           <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid #111827; box-shadow:0 20px 40px -30px rgba(15,23,42,.5);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-              <span style="font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">05</span>
-              <span style="font-family:'JetBrains Mono'; font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
+              <span style="font-family:var(--font); font-weight:900; font-size:30px; color:#DCE7F2; line-height:1;">05</span>
+              <span style="font-family:var(--font-num); font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">task_alt</span></div>
-            <div style="font-family:'Hanken Grotesk'; font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">견적 확정</div>
+            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">견적 확정</div>
             <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">검증된 구성과 근거 리포트를 확정, 그대로 주문까지.</p>
           </div>
         </div>
@@ -153,10 +153,10 @@
               <span style="width:38px; height:38px; border-radius:50%; background:#D97757; border:2px solid #111827; margin-left:-12px;"></span>
               <span style="width:38px; height:38px; border-radius:50%; background:#4285F4; border:2px solid #111827; margin-left:-12px;"></span>
             </div>
-            <div style="text-align:left;"><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:800; font-size:20px;">검증 완료</div><div style="color:rgba(255,255,255,.6); font-size:14px; margin-top:2px;">조건·호환·예산을 통과한 구성</div></div>
+            <div style="text-align:left;"><div style="color:#fff; font-family:var(--font); font-weight:800; font-size:20px;">검증 완료</div><div style="color:rgba(255,255,255,.6); font-size:14px; margin-top:2px;">조건·호환·예산을 통과한 구성</div></div>
           </div>
           <div style="position:relative; display:flex; align-items:center; gap:24px;">
-            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:'JetBrains Mono';">Verified Pick</div><div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">—</span><span style="font-size:18px; font-weight:700;">원</span></div></div>
+            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:var(--font-num);">Verified Pick</div><div style="color:#fff; font-family:var(--font); font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">—</span><span style="font-size:18px; font-weight:700;">원</span></div></div>
             <button style="background:#65A1D4; color:#fff; border:none; width:56px; height:56px; border-radius:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" data-cta="start"><span class="msym" style="font-size:26px;">arrow_forward</span></button>
           </div>
         </div>
@@ -166,8 +166,8 @@
       <!-- LIVE QUOTE EXAMPLE -->
       <section id="engine" data-reveal style="padding:20px 0 88px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:36px; flex-wrap:wrap; gap:16px;">
-          <div><h2 style="margin:0 0 8px; font-family:'Hanken Grotesk'; font-weight:800; font-size:32px; color:#111827;">검증 엔진</h2><p style="margin:0; font-size:15px; color:#64748B;">자체 재고 DB와 결정론 엔진의 결합</p></div>
-          <span style="font-family:'JetBrains Mono'; font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:700; color:#65A1D4; background:rgba(101,161,212,.12); padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:50%; background:#65A1D4; animation:pulseDot 1.4s infinite;"></span>Live Analysis</span>
+          <div><h2 style="margin:0 0 8px; font-family:var(--font); font-weight:800; font-size:32px; color:#111827;">검증 엔진</h2><p style="margin:0; font-size:15px; color:#64748B;">자체 재고 DB와 결정론 엔진의 결합</p></div>
+          <span style="font-family:var(--font-num); font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:700; color:#65A1D4; background:rgba(101,161,212,.12); padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:50%; background:#65A1D4; animation:pulseDot 1.4s infinite;"></span>Live Analysis</span>
         </div>
         <div style="display:grid; grid-template-columns:7fr 5fr; gap:26px;">
           <div style="display:flex; flex-direction:column; gap:20px;">
@@ -192,7 +192,7 @@
                 </div>
                 <div style="margin-top:12px; font-size:12.5px; color:#64748B; line-height:1.5;">3개 AI가 같은 문장을 읽고 <b style="color:#334155;">의도가 하나로 수렴</b>했습니다. 견적은 아래 검증 엔진이 만듭니다.</div>
               </div>
-              <div style="margin-top:26px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;"><span style="font-size:14px; font-weight:600; color:#475569;">부품 정합성 및 성능 분석률</span><span style="font-family:'JetBrains Mono'; font-size:14px; font-weight:700; color:#65A1D4;">98%</span></div>
+              <div style="margin-top:26px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;"><span style="font-size:14px; font-weight:600; color:#475569;">부품 정합성 및 성능 분석률</span><span style="font-family:var(--font-num); font-size:14px; font-weight:700; color:#65A1D4;">98%</span></div>
               <div style="height:9px; background:#E2EAF2; border-radius:999px; overflow:hidden;"><div style="height:100%; width:98%; background:linear-gradient(90deg,#65A1D4,#4A90E2); border-radius:999px; transform-origin:left; animation:growX 1.6s cubic-bezier(.22,1,.36,1) both; box-shadow:0 0 14px rgba(101,161,212,.55);"></div></div>
             </div>
             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
@@ -202,37 +202,37 @@
             </div>
           </div>
           <div style="background:linear-gradient(160deg,#1A202C,#0F172A); border-radius:28px; padding:38px; position:relative; overflow:hidden; box-shadow:0 30px 60px -30px rgba(15,23,42,.7); display:flex; flex-direction:column;">
-            <div style="position:absolute; top:0; right:0; background:#65A1D4; color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:12px; letter-spacing:.12em; padding:9px 18px; border-radius:0 0 0 18px;">TOP PICK</div>
+            <div style="position:absolute; top:0; right:0; background:#65A1D4; color:#fff; font-family:var(--font); font-weight:900; font-size:12px; letter-spacing:.12em; padding:9px 18px; border-radius:0 0 0 18px;">TOP PICK</div>
             <div style="color:rgba(255,255,255,.55); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;" data-bind="showcase_caption">검증 통과 견적</div>
-            <div style="color:#fff; font-family:'Hanken Grotesk'; font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;"><span data-bind="showcase_total">—</span><span style="font-size:22px;">원</span></div>
+            <div style="color:#fff; font-family:var(--font); font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;"><span data-bind="showcase_total">—</span><span style="font-size:22px;">원</span></div>
             <div style="display:flex; flex-direction:column; gap:2px;" data-repeat="showcase_items">
-              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">CPU · Ryzen 5 7600</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">—</span></div>
-              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">GPU · RTX 4060 Ti</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">—</span></div>
-              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">RAM · DDR5-5600 32GB</span><span style="color:#fff; font-family:'JetBrains Mono'; font-size:14px;">—</span></div>
+              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">CPU · Ryzen 5 7600</span><span style="color:#fff; font-family:var(--font-num); font-size:14px;">—</span></div>
+              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">GPU · RTX 4060 Ti</span><span style="color:#fff; font-family:var(--font-num); font-size:14px;">—</span></div>
+              <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">RAM · DDR5-5600 32GB</span><span style="color:#fff; font-family:var(--font-num); font-size:14px;">—</span></div>
             </div>
-            <button style="margin-top:auto; width:100%; padding:16px; background:#fff; color:#111827; border:none; border-radius:14px; font-family:'Hanken Grotesk'; font-weight:800; font-size:17px; cursor:pointer;" data-cta="start">상세 견적 보기</button>
+            <button style="margin-top:auto; width:100%; padding:16px; background:#fff; color:#111827; border:none; border-radius:14px; font-family:var(--font); font-weight:800; font-size:17px; cursor:pointer;" data-cta="start">상세 견적 보기</button>
           </div>
         </div>
       </section>
 
       <!-- TESTIMONIALS -->
       <section id="reviews" data-reveal style="padding:20px 0 88px;">
-        <div style="text-align:center; margin-bottom:48px;"><div style="font-family:'JetBrains Mono'; font-size:13px; letter-spacing:.24em; color:#65A1D4; font-weight:600; text-transform:uppercase; margin-bottom:12px;">REVIEWS</div><h2 style="margin:0; font-family:'Hanken Grotesk'; font-weight:800; font-size:40px; letter-spacing:-0.025em; color:#111827;">먼저 받아본 사람들<br><span style="font-size:13px;font-weight:600;color:#9a968d;">오픈 전 시연 참가자 후기 — 정식 오픈 후 실제 구매 후기로 교체됩니다</span></h2></div>
+        <div style="text-align:center; margin-bottom:48px;"><div style="font-family:var(--font-num); font-size:13px; letter-spacing:.24em; color:#65A1D4; font-weight:600; text-transform:uppercase; margin-bottom:12px;">REVIEWS</div><h2 style="margin:0; font-family:var(--font); font-weight:800; font-size:40px; letter-spacing:-0.025em; color:#111827;">먼저 받아본 사람들<br><span style="font-size:13px;font-weight:600;color:#9a968d;">오픈 전 시연 참가자 후기 — 정식 오픈 후 실제 구매 후기로 교체됩니다</span></h2></div>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
           <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:26px; padding:32px;">
             <div style="display:flex; gap:3px; color:#F5B301; margin-bottom:18px;"><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span></div>
             <p style="margin:0 0 24px; font-size:16px; line-height:1.65; color:#334155;">"부품 이름을 하나도 모르는데 '영상편집용'이라고만 썼어요. 왜 이 부품인지 설명이 다 붙어 나오는 게 신기했습니다."</p>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:'Hanken Grotesk'; font-weight:800; color:#65A1D4;">김</div><div><div style="font-weight:700; font-size:15px; color:#111827;">김서연</div><div style="font-size:13px; color:#64748B;">첫 조립 PC · 영상 편집</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:var(--font); font-weight:800; color:#65A1D4;">김</div><div><div style="font-weight:700; font-size:15px; color:#111827;">김서연</div><div style="font-size:13px; color:#64748B;">첫 조립 PC · 영상 편집</div></div></div>
           </div>
           <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:26px; padding:32px;">
             <div style="display:flex; gap:3px; color:#F5B301; margin-bottom:18px;"><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span></div>
             <p style="margin:0 0 24px; font-size:16px; line-height:1.65; color:#334155;">"견적은 늘 직접 짜는데, 파워 여유율 지적은 인정할 수밖에 없었어요. 근거가 붙어 나오니 검토가 빨라집니다."</p>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:'Hanken Grotesk'; font-weight:800; color:#65A1D4;">박</div><div><div style="font-weight:700; font-size:15px; color:#111827;">박준호</div><div style="font-size:13px; color:#64748B;">10년차 · 하이엔드 게이밍</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:var(--font); font-weight:800; color:#65A1D4;">박</div><div><div style="font-weight:700; font-size:15px; color:#111827;">박준호</div><div style="font-size:13px; color:#64748B;">10년차 · 하이엔드 게이밍</div></div></div>
           </div>
           <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:26px; padding:32px;">
             <div style="display:flex; gap:3px; color:#F5B301; margin-bottom:18px;"><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span style="font-size:14px; font-weight:800; color:#8a8578; margin-left:4px;">4.5</span></div>
             <p style="margin:0 0 24px; font-size:16px; line-height:1.65; color:#334155;">"사무용 20대를 동일 사양으로 한 번에 받았습니다. 도입 검토 문서에 근거 리포트를 그대로 붙였어요."</p>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:'Hanken Grotesk'; font-weight:800; color:#65A1D4;">이</div><div><div style="font-weight:700; font-size:15px; color:#111827;">이현우</div><div style="font-size:13px; color:#64748B;">스타트업 IT 담당</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:42px; height:42px; border-radius:50%; background:#DCE7F2; display:flex; align-items:center; justify-content:center; font-family:var(--font); font-weight:800; color:#65A1D4;">이</div><div><div style="font-weight:700; font-size:15px; color:#111827;">이현우</div><div style="font-size:13px; color:#64748B;">스타트업 IT 담당</div></div></div>
           </div>
         </div>
       </section>
@@ -244,17 +244,17 @@
       <div style="position:relative; padding:72px 64px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap;">
         <div>
           <div style="display:flex; gap:10px; margin-bottom:22px;"><span style="width:11px; height:11px; border-radius:50%; background:var(--success-teal, #10a37f);"></span><span style="width:11px; height:11px; border-radius:50%; background:#D97757;"></span><span style="width:11px; height:11px; border-radius:50%; background:#4285F4;"></span></div>
-          <h2 style="margin:0; font-family:'Hanken Grotesk'; font-weight:900; font-size:46px; line-height:1.1; letter-spacing:-0.03em; color:#fff;">이유 있는 견적,<br>지금 받아보세요.</h2>
+          <h2 style="margin:0; font-family:var(--font); font-weight:900; font-size:46px; line-height:1.1; letter-spacing:-0.03em; color:#fff;">이유 있는 견적,<br>지금 받아보세요.</h2>
           <p style="margin:20px 0 0; font-size:18px; color:rgba(255,255,255,.72); max-width:480px; line-height:1.6;">질문 하나면 됩니다. 지금 재고에서 조건을 통과한 구성으로 답합니다.</p>
         </div>
-        <button style="background:#65A1D4; color:#fff; border:none; padding:22px 40px; border-radius:18px; font-family:'Hanken Grotesk'; font-weight:800; font-size:20px; cursor:pointer; white-space:nowrap; box-shadow:0 22px 44px rgba(101,161,212,.45); display:flex; align-items:center; gap:12px;" data-cta="start">무료로 견적 받기 <span class="msym" style="font-size:24px;">arrow_forward</span></button>
+        <button style="background:#65A1D4; color:#fff; border:none; padding:22px 40px; border-radius:18px; font-family:var(--font); font-weight:800; font-size:20px; cursor:pointer; white-space:nowrap; box-shadow:0 22px 44px rgba(101,161,212,.45); display:flex; align-items:center; gap:12px;" data-cta="start">무료로 견적 받기 <span class="msym" style="font-size:24px;">arrow_forward</span></button>
       </div>
     </section>
 
     <!-- FOOTER -->
     <footer style="max-width:1240px; margin:0 auto; padding:80px 56px 64px; display:flex; justify-content:space-between; gap:60px; flex-wrap:wrap;">
       <div style="max-width:340px;">
-        <div style="font-family:'Pretendard','Hanken Grotesk'; font-weight:900; font-size:24px; color:#111827; letter-spacing:-0.02em;">팝콘PC <span style="color:#65A1D4;">AI</span></div>
+        <div style="font-family:var(--font); font-weight:900; font-size:24px; color:#111827; letter-spacing:-0.02em;">팝콘PC <span style="color:#65A1D4;">AI</span></div>
         <p style="margin:18px 0 24px; font-size:14px; line-height:1.8; color:#64748B;">© 2026 팝콘PC AI. 실시간 재고로 견적하는 용산 팝콘PC. 모든 견적에는 이유가 있습니다.</p>
         <div style="display:flex; gap:12px;"><div style="width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,.05); display:flex; align-items:center; justify-content:center; color:#475569;"><span class="msym" style="font-size:20px;">share</span></div><div style="width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,.05); display:flex; align-items:center; justify-content:center; color:#475569;"><span class="msym" style="font-size:20px;">alternate_email</span></div></div>
       </div>
@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
   setTimeout(function () { reveals.forEach(show); }, 1800);
 });
 </script>
-<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:var(--font);font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
 <script>

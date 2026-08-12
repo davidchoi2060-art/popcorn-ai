@@ -28,7 +28,7 @@
       "z-index:100000;display:flex;align-items:center;gap:9px;padding:9px 18px;" +
       "border-radius:0 0 12px 12px;font-size:13px;font-weight:800;color:#fff;" +
       "background:#141824;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:transform .18s;" +
-      "font-family:'Pretendard','Pretendard Variable',-apple-system,sans-serif;max-width:92vw;";
+      "font-family:var(--font);max-width:92vw;";
     (document.body || document.documentElement).appendChild(b);
     return b;
   }

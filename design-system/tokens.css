@@ -33,9 +33,18 @@
   --success-container:#e9f6ef;      /* 연한 배경 */
   --success-container-line:#d4e9dd; /* 연한 배경의 경계 */
   --on-success:#ffffff;
-  --font:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;
-  --font-head:'Hanken Grotesk','Pretendard','Noto Sans KR',system-ui,sans-serif;
-  --font-num:'JetBrains Mono','Inter',monospace;
+  /* 서체 — **Noto Sans KR 로 통일**(사용자 지시 2026-08-12).
+     전에는 본문 Inter+Pretendard · 제목 Hanken Grotesk 로 셋이 섞여 있었다.
+     'Noto Sans KR' 이 폴백 자리에 이름만 적혀 있었고 **파일이 없어 죽은 폴백**이었다 —
+     이제 자체 호스팅한다(mockups/shared/fonts/notosanskr.css · 124 서브셋 3.36MB).
+     Pretendard 는 지우지 않고 폴백으로 남긴다: 서브셋이 아직 안 받아진 순간에도 한글이 뜬다. */
+  /* Phoenix 테마가 `--phoenix-font-sans-serif` 로 본문 서체를 잡는다. 관리자 목업 37개가
+     그 값을 **각자 인라인으로 복제**하고 있었다(같은 것을 37벌 — 이 리포의 고질병).
+     여기서 토큰에 잇는다: 화면은 tokens.css 만 읽으면 서체가 따라온다. */
+  --phoenix-font-sans-serif:var(--font);
+  --font:'Noto Sans KR','Pretendard',system-ui,sans-serif;
+  --font-head:'Noto Sans KR','Pretendard',system-ui,sans-serif;
+  --font-num:'Noto Sans KR','Pretendard',system-ui,sans-serif;
   --r-sm:.25rem; --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-full:9999px;
   --sp-xs:4px; --sp-sm:8px; --sp-md:16px; --sp-lg:24px; --sp-xl:32px;
   --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);

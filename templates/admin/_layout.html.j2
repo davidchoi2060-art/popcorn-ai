@@ -55,7 +55,9 @@
        레이아웃에 두면 이 축의 모든 화면이 자동으로 읽는다. #}
     <link rel="stylesheet" href="/design-system/tokens.css">
     <style>
-      :root{--phoenix-font-sans-serif:"Pretendard","Nunito Sans",-apple-system,sans-serif;}
+      {# `--phoenix-font-sans-serif` 는 이제 tokens.css 가 준다(= var(--font)).
+         여기서 다시 정의하면 **토큰보다 뒤에 와서 이겨** 서체 통일이 이 축에서만 깨진다.
+         2026-08-12 에 지웠다 — 값이 아니라 적용(body 규칙)만 남긴다. #}
       body{font-family:var(--phoenix-font-sans-serif);}
       /* 넓은 표(min-width 1140px)를 담은 카드가 좁은 화면에서 페이지를 가로로 밀어내던 것.
          `.card` 는 flex 컨테이너인데 그 아이템(.card-header/.card-body)의 min-width 가

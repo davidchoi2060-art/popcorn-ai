@@ -85,8 +85,12 @@ def _roster() -> list[dict]:
                     name = line.split(":", 1)[1].strip() or name
                 elif line.startswith("description:"):
                     desc = line.split(":", 1)[1].strip()
+        desc = re.sub(r"\*\*", "", desc)
+        # 카드에 보일 한 줄. 정의의 첫 마디가 곧 역할이라 «—» 앞까지 자른다.
+        # **여기서 역할을 새로 쓰지 않는다** — 정의 파일이 정본이고 화면은 옮기기만 한다.
+        role = re.split(r"\s+—\s+|\.\s", desc)[0].strip()
         out.append({"name": name, "ko": TEAM_KO.get(name, name),
-                    "desc": re.sub(r"\*\*", "", desc)[:110], "defined": True})
+                    "role": role[:44], "desc": desc[:180], "defined": True})
     return out
 
 
@@ -141,7 +145,7 @@ def _scan(path: Path) -> dict:
                 if c.get("name") in ("Agent", "Task"):
                     inp = c.get("input") or {}
                     who = str(inp.get("subagent_type") or "?")
-                    r = runs.setdefault(who, {"open": {}, "today": 0, "last": None})
+                    r = runs.setdefault(who, {"open": {}, "today": 0, "fail": 0, "last": None})
                     r["open"][c.get("id")] = {"desc": str(inp.get("description") or "")[:70],
                                               "ts": ts}
                     r["last"] = ts
@@ -160,7 +164,14 @@ def _scan(path: Path) -> dict:
                         for r in runs.values():
                             if tid in r["open"]:
                                 r["open"].pop(tid, None)
-                                if same_day:
+                                if not same_day:
+                                    continue
+                                # **실패를 완료로 세지 않는다.** 2026-08-12 에 `copy-auditor`
+                                # 호출이 «Agent type not found» 로 죽었는데 화면이 그걸
+                                # 「오늘 완료 1회」로 세고 있었다 — 사장님 질문으로 드러났다.
+                                if c.get("is_error"):
+                                    r["fail"] = r.get("fail", 0) + 1
+                                else:
                                     r["today"] += 1
     return _SCAN
 
@@ -175,20 +186,25 @@ def _team() -> tuple[list[dict], dict]:
     for who in sorted(runs):
         if who not in known:
             roster.append({"name": who, "ko": TEAM_KO.get(who, who), "defined": False,
-                           "desc": "정의 파일이 없다 — 이름이 바뀌었거나 내장 에이전트다"})
-    done = running = 0
+                           "role": "정의 파일 없음",
+                           "desc": "`.claude/agents/` 에 정의가 없다 — 이름이 바뀌었거나 하네스 내장이다"})
+    done = running = failed = 0
     for a in roster:
         r = runs.get(a["name"]) or {}
         opened = r.get("open") or {}
         a["running"] = len(opened)
         a["today"] = r.get("today", 0)
+        a["fail"] = r.get("fail", 0)
         a["last"] = r.get("last")
         a["doing"] = sorted((v["desc"] for v in opened.values()))[:2]
-        a["state"] = "실행 중" if a["running"] else ("오늘 완료" if a["today"] else "대기")
+        a["state"] = ("실행 중" if a["running"] else
+                      "오늘 완료" if a["today"] else
+                      "실패" if a["fail"] else "대기")
         done += a["today"]
         running += a["running"]
+        failed += a["fail"]
     return roster, {"tools": sc["tools"], "says": sc["says"], "day": sc["day"],
-                    "agent_done": done, "agent_running": running}
+                    "agent_done": done, "agent_running": running, "agent_fail": failed}
 
 
 def _latest_session() -> Path | None:
@@ -358,7 +374,8 @@ def _today(tot: dict) -> dict:
     (다른 창에서 돈 세션은 포함되지 않는다 — 화면이 그 사실을 적는다).
     """
     out = {"day": tot.get("day"), "tools": tot.get("tools", 0), "says": tot.get("says", 0),
-           "agent_done": tot.get("agent_done", 0), "agent_running": tot.get("agent_running", 0)}
+           "agent_done": tot.get("agent_done", 0), "agent_running": tot.get("agent_running", 0),
+           "agent_fail": tot.get("agent_fail", 0)}
     try:
         n = subprocess.run(["git", "log", "--since=midnight", "--oneline"],
                            cwd=str(ROOT), capture_output=True, timeout=10)

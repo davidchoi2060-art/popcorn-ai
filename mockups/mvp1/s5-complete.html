@@ -5,13 +5,14 @@
 <title>팝콘PC AI · 주문 완료</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;padding:0}
-body{background:#f1eee8;font-family:'Pretendard',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1e}
+body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialiased;color:#1a1a1e}
 .msym{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
 .card{background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:22px}
 @media(max-width:768px){.grid2{grid-template-columns:1fr!important}}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
-  </head>
+    <link rel="stylesheet" href="../../design-system/tokens.css">
+</head>
 <body>
 
 <header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;">
@@ -239,7 +240,7 @@ body{background:#f1eee8;font-family:'Pretendard',-apple-system,sans-serif;-webki
  });
 })();
 </script>
-<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:'Pretendard','Pretendard Variable',sans-serif;font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
+<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" style="position:fixed;left:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:var(--font);font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
 <span class="msym" style="font-size:17px;">grid_view</span>허브</a>
 <style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
 <script src="../shared/auth.js"></script>

@@ -20,7 +20,7 @@ h2{font-family:var(--font-head);font-size:16px;font-weight:700;margin:28px 0 12p
 .ptable{width:100%;border-collapse:collapse;font-size:13px}
 .ptable th,.ptable td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--container)}
 .ptable th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-variant);font-weight:700}
-.ptable td.num{font-family:'JetBrains Mono',monospace;text-align:right}
+.ptable td.num{font-family:var(--font-num);text-align:right}
 .ptable tr.win td{color:var(--primary);font-weight:700}
 .ico{stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 </style>
@@ -101,7 +101,7 @@ h2{font-family:var(--font-head);font-size:16px;font-weight:700;margin:28px 0 12p
         <div class="vslot__body">
           <svg viewBox="0 0 380 90" width="100%" role="img" aria-label="배송 타임라인: 결제, 검수, 번인, 포장, 당일출고">
             <line x1="30" y1="30" x2="350" y2="30" stroke="var(--outline-variant)" stroke-width="3"/>
-            <g font-family="Inter" font-size="10" fill="var(--on-variant)" text-anchor="middle">
+            <g style="font-family:var(--font)" font-size="10" fill="var(--on-variant)" text-anchor="middle">
               <g><circle cx="30" cy="30" r="7" fill="var(--primary)"/><text x="30" y="55" fill="var(--on)" font-weight="700">결제</text></g>
               <g><circle cx="110" cy="30" r="7" fill="var(--primary)"/><text x="110" y="55" fill="var(--on)" font-weight="700">검수</text></g>
               <g><circle cx="190" cy="30" r="7" fill="var(--primary)"/><text x="190" y="55" fill="var(--on)" font-weight="700">24h 번인</text></g>
@@ -139,7 +139,7 @@ h2{font-family:var(--font-head);font-size:16px;font-weight:700;margin:28px 0 12p
   var c=document.getElementById('c-fps'); if(!c)return; var x=c.getContext('2d');
   var data=[['롤',240],['오버워치',210],['배그',165],['로스트아크',150],['사이버펑크',96]];
   var max=260,W=c.width,H=c.height,pad=28,bw=42,gap=(W-pad*2-bw*data.length)/(data.length-1);
-  x.font="11px Inter"; x.textAlign="center";
+  x.font="11px "+(getComputedStyle(document.documentElement).getPropertyValue("--font").trim()||"sans-serif"); x.textAlign="center";
   data.forEach(function(d,i){
     var bx=pad+i*(bw+gap), bh=(d[1]/max)*(H-pad-20), by=H-20-bh;
     x.fillStyle="#65A1D4"; x.beginPath(); x.roundRect(bx,by,bw,bh,4); x.fill();

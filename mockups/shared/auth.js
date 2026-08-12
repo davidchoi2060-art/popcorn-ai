@@ -12,7 +12,7 @@ var KEY='popcorn-member';
 function member(){try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;}}
 function save(m){localStorage.setItem(KEY,JSON.stringify(m));}
 function clear(){localStorage.removeItem(KEY);}
-function toast(m){var t=document.getElementById('pa-toast');if(!t){t=document.createElement('div');t.id='pa-toast';t.style.cssText='position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#17171b;color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:12px;z-index:99999;opacity:0;transition:.25s;font-family:Pretendard,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3);';document.body.appendChild(t);}t.textContent=m;t.style.opacity='1';clearTimeout(t._x);t._x=setTimeout(function(){t.style.opacity='0';},2400);}
+function toast(m){var t=document.getElementById('pa-toast');if(!t){t=document.createElement('div');t.id='pa-toast';t.style.cssText='position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#17171b;color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:12px;z-index:99999;opacity:0;transition:.25s;font-family:var(--font);box-shadow:0 10px 30px rgba(0,0,0,.3);';document.body.appendChild(t);}t.textContent=m;t.style.opacity='1';clearTimeout(t._x);t._x=setTimeout(function(){t.style.opacity='0';},2400);}
 
 // 서버 로그인 — 성공 시 캐시 동기화. API 부재는 null을 돌려 로컬 mock으로 폴백시킨다.
 function apiLogin(email,nick,provider){
@@ -26,7 +26,7 @@ function close(){var ov=document.getElementById('pa-ov');if(ov)ov.remove();}
 function open(mode,after){
  close();mode=mode||'login';
  var ov=document.createElement('div');ov.id='pa-ov';
- ov.style.cssText='position:fixed;inset:0;z-index:99990;background:rgba(23,23,27,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font-family:Pretendard,-apple-system,sans-serif;padding:16px;';
+ ov.style.cssText='position:fixed;inset:0;z-index:99990;background:rgba(23,23,27,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font-family:var(--font);padding:16px;';
  ov.innerHTML=''
  +'<div style="width:min(400px,94vw);background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 24px 70px rgba(0,0,0,.35);box-sizing:border-box;">'
  +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
@@ -122,7 +122,7 @@ function refreshFab(){
  var f=document.getElementById('pa-fab');
  if(location.pathname.indexOf('my-page')>-1){if(f)f.remove();return;}
  if(!f){f=document.createElement('a');f.id='pa-fab';
-  f.style.cssText='position:fixed;right:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:999px;background:rgba(23,23,27,.82);color:#fff;font-size:12.5px;font-weight:800;text-decoration:none;font-family:Pretendard,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(4px);cursor:pointer;';
+  f.style.cssText='position:fixed;right:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:999px;background:rgba(23,23,27,.82);color:#fff;font-size:12.5px;font-weight:800;text-decoration:none;font-family:var(--font);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(4px);cursor:pointer;';
   document.body.appendChild(f);}
  var m=member();
  if(m){f.innerHTML='<span style="width:20px;height:20px;border-radius:50%;background:#2b5fd9;display:inline-flex;align-items:center;justify-content:center;font-size:11px;">'+(m.nick||'?').charAt(0)+'</span>마이페이지';f.href='my-page.html';f.onclick=null;}

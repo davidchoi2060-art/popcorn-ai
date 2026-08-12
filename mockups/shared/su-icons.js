@@ -40,7 +40,7 @@ function sweep(){swapMS();swapFT();}
 function credit(){
  if(document.getElementById('su-credit'))return;
  var d=document.createElement('div');d.id='su-credit';
- d.style.cssText='text-align:center;font-size:11px;color:#9a968d;padding:12px 0 16px;font-family:Pretendard,sans-serif;';
+ d.style.cssText='text-align:center;font-size:11px;color:#9a968d;padding:12px 0 16px;font-family:var(--font);';
  d.innerHTML='아이콘: <a href="https://www.streamlinehq.com" target="_blank" rel="noopener" style="color:#8a8578;">Streamline Ultimate Color</a> · CC BY 4.0';
  document.body.appendChild(d);
 }
