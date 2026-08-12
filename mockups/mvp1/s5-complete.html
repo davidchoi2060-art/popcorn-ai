@@ -236,7 +236,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
  document.querySelectorAll('a[href*="ORD-84216"], a[href^="my-orders.html"]').forEach(function(a){
   a.href=H.cart_url||'#';
   a.target='_blank';a.rel='noopener';
-  a.innerHTML='<span class="msym" style="font-size:19px;">shopping_cart</span>쇼핑몰 장바구니 열기';
+  /* shopping_cart 는 아이콘 맵(su/_map.json 121종)에 없어 글자로 떴다 — 회귀가 잡음.
+     receipt_long 은 매핑돼 있고 이 버튼의 원래 아이콘이다. */
+  a.innerHTML='<span class="msym" style="font-size:19px;">receipt_long</span>쇼핑몰 장바구니 열기';
  });
 })();
 </script>

@@ -1110,8 +1110,15 @@ def test_doc_counts():
             seen_any = seen_any or bool(said)
             check(f"{doc}가 말하는 호환 규칙 수 = DB 실측",
                   said == [] or all(n == rules_db for n in said), rules_db, said)
-        # 어느 문서도 말하지 않으면 위 검사는 전부 공허하다 — 그 상태를 실패로 본다.
-        check("문서 중 최소 하나는 호환 규칙 수를 말한다", seen_any, "1곳 이상", "없음")
+        # 정책 개정(2026-08-12 사용자 결정): **낡는 수는 문서에 적지 않는다** — CLAUDE.md 의
+        # 규칙 수 셋이 전부 틀린 채 발견된 날이다. 이 수를 말하는 정본은 이제
+        # scripts/state.py 이고, DB 를 직접 읽으므로 어긋날 수가 없다.
+        # 「최소 한 문서는 말한다」는 그 정책과 충돌해 폐기한다. 공허-통과 우려는
+        # 아래로 대신한다: ① 문서가 굳이 적으면 맞아야 한다(위 검사 유지)
+        # ② state.py 가 이 수를 실제로 잰다 — 아무도 안 재는 상태를 막는다.
+        sp = io.open(os.path.join(ROOT, "scripts", "state.py"), encoding="utf-8").read()
+        check("호환 규칙 수는 state.py 가 DB에서 잰다(문서 대신)",
+              "compat_rules" in sp and "WHERE active" in sp, "compat_rules 조회", "없음")
 
     # 없는 테이블을 근거로 적지 않는다 — 이전 판의 backlog가 `sale_prices`를 들고 있었다.
     if _engine is None:
@@ -4635,29 +4642,42 @@ def test_ops():
     check("운영 모드 5종 존재", set(base) == {"member", "pay", "settle", "ship", "refund"},
           "5종", sorted(base))
 
+    # **기준 상태를 가정하지 않는다** (2026-08-12). 이 검사는 「기본 = 자체 결제」를
+    # 박아 두고 있었는데, 범위 확정으로 운영 기준이 쇼핑몰 인계(pay=mall)가 되자
+    # 두 건이 깨졌다 — 스위치가 어느 쪽이든 성립하는 관계로 고친다(A-13 원칙:
+    # 값이 아니라 관계를 검사한다).
     order_body = {"session_id": 1, "tier": "value", "periph": [],
                   "member": {"nick": "회귀", "email": "ops-regress@popcornpc.local"},
                   "shipping": {"name": "회귀", "phone": "010-0000-0000", "addr": "서울"}}
-    undo_ids = []
-    try:
-        # ① 상호 제약: 환불만 '자체'로 요청해도 결제가 쇼핑몰이면 서버가 보정한다
-        st, d = post("/api/admin/ops-settings", {"modes": {"pay": "mall"}})
-        undo_ids.append(d.get("undo_id"))
-        check("결제 전환 시 정산도 함께 이동(정산은 결제를 따른다)",
-              d.get("changed", {}).get("settle", {}).get("to") == "mall",
-              "settle=mall", d.get("changed"))
+    opp = "own" if base["pay"] == "mall" else "mall"
+
+    def gate_err():
+        st, r = post("/api/orders", order_body)
+        detail = r.get("detail") if isinstance(r, dict) else None
+        return st, (detail.get("error") if isinstance(detail, dict) else None)
+
+    def mall_checks(undo_ids):
+        """pay=mall 인 순간에만 성립하는 둘 — 환불 보정 · 자체 주문 차단."""
         st, d2 = post("/api/admin/ops-settings", {"modes": {"refund": "own"}})
         if d2.get("undo_id"):
             undo_ids.append(d2["undo_id"])
         check("쇼핑몰 결제 상태에서 환불 '자체'는 보정된다",
               d2.get("modes", {}).get("refund") == "mall", "refund=mall", d2.get("modes"))
-
-        # ② 스위치가 주문 흐름을 실제로 막는가
-        st, r = post("/api/orders", order_body)
-        detail = r.get("detail") if isinstance(r, dict) else None
-        err = detail.get("error") if isinstance(detail, dict) else None
+        st, err = gate_err()
         check("쇼핑몰 결제 모드에서 자체 주문 409", st == 409 and err == "pay_mode_mall",
               "409 pay_mode_mall", f"{st} {err}")
+
+    undo_ids = []
+    try:
+        if base["pay"] == "mall":
+            mall_checks(undo_ids)                    # 기준이 이미 mall — 그대로 검사
+        st, d = post("/api/admin/ops-settings", {"modes": {"pay": opp}})
+        undo_ids.append(d.get("undo_id"))
+        check("결제 전환 시 정산도 함께 이동(정산은 결제를 따른다)",
+              d.get("changed", {}).get("settle", {}).get("to") == opp,
+              "settle=" + opp, d.get("changed"))
+        if opp == "mall":
+            mall_checks(undo_ids)                    # 기준이 own — 전환해 놓고 검사
     finally:
         for lid in reversed([i for i in undo_ids if i]):
             post(f"/api/admin/ops-settings/undo/{lid}")
@@ -4665,11 +4685,13 @@ def test_ops():
     after = get("/api/admin/ops-settings")["modes"]
     check("되돌리기로 원상 복구", after == base, base, after)
 
-    # ③ 원복 상태에서는 결제 게이트를 통과한다(이후 실패 사유는 견적·재고여야 한다)
-    st, r = post("/api/orders", order_body)
-    detail = r.get("detail") if isinstance(r, dict) else None
-    err = detail.get("error") if isinstance(detail, dict) else None
-    check("원복 후 결제 게이트 통과", err != "pay_mode_mall", "pay_mode_mall 아님", err)
+    # ③ 원복 후 게이트는 **기준 상태의 규칙**을 따라야 한다 — 통과가 아니라 일치가 불변식이다
+    st, err = gate_err()
+    if base["pay"] == "mall":
+        check("원복 후 게이트가 기준 상태(쇼핑몰 인계)를 지킨다",
+              err == "pay_mode_mall", "pay_mode_mall", err)
+    else:
+        check("원복 후 결제 게이트 통과", err != "pay_mode_mall", "pay_mode_mall 아님", err)
 
 
 # ────────── 10. 부품 교체(S3) — 대안·적용·원장 (슬라이스 46) ──────────
