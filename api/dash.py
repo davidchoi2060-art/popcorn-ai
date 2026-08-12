@@ -50,8 +50,13 @@ QUEUE = ROOT / ".claude" / "dash-queue.jsonl"      # 화면 -> 세션 (우리가
 TEAM_KO = {
     "investigator": "조사자", "maker": "제작자", "checker": "확인자",
     "writer": "문장가", "dba": "DBA", "crosschecker": "검증자", "sweeper": "점검자",
-    "general-purpose": "범용", "Explore": "탐색", "Plan": "계획",
+    "general-purpose": "하네스", "Explore": "하네스", "Plan": "하네스",
 }
+
+# 옛 이름 -> 지금 이름. 팀원 이름을 바꾸면 전사본에는 옛 이름의 호출이 남는다 —
+# 그걸 별도 카드로 세우면 같은 사람이 둘로 보인다(사용자 지적 2026-08-12: copy-auditor).
+# 접되 지우지는 않는다: 호출·실패 수는 지금 이름의 카드에 그대로 계산된다.
+ALIAS = {"copy-auditor": "writer", "surveyor": "investigator"}
 
 
 # ── 팀원 명단 · 활동 ────────────────────────────────────────────────────
@@ -73,7 +78,7 @@ def _roster() -> list[dict]:
     if not AGENTS_DIR.is_dir():
         return out
     for p in sorted(AGENTS_DIR.glob("*.md")):
-        name, desc = p.stem, ""
+        name, desc, role = p.stem, "", ""
         try:
             txt = io.open(p, encoding="utf-8", errors="ignore").read()
         except OSError:
@@ -83,12 +88,14 @@ def _roster() -> list[dict]:
             for line in m.group(1).splitlines():
                 if line.startswith("name:"):
                     name = line.split(":", 1)[1].strip() or name
+                elif line.startswith("role:"):
+                    role = line.split(":", 1)[1].strip()
                 elif line.startswith("description:"):
                     desc = line.split(":", 1)[1].strip()
         desc = re.sub(r"\*\*", "", desc)
-        # 카드에 보일 한 줄. 정의의 첫 마디가 곧 역할이라 «—» 앞까지 자른다.
-        # **여기서 역할을 새로 쓰지 않는다** — 정의 파일이 정본이고 화면은 옮기기만 한다.
-        role = re.split(r"\s+—\s+|\.\s", desc)[0].strip()
+        # 카드의 역할 줄은 정의의 `role:`(명사구)만 쓴다 — description 산문을 잘라 쓰다가
+        # 「~한다」 서술문이 카드에 그대로 흘렀다(사용자 지적 2026-08-12: 시스템 UI 는
+        # 명사구다). role 이 없으면 **지어내지 않고 빈칸**으로 둔다 — 정의에 채울 일이다.
         out.append({"name": name, "ko": TEAM_KO.get(name, name),
                     "role": role[:44], "desc": desc[:180], "defined": True})
     return out
@@ -145,6 +152,7 @@ def _scan(path: Path) -> dict:
                 if c.get("name") in ("Agent", "Task"):
                     inp = c.get("input") or {}
                     who = str(inp.get("subagent_type") or "?")
+                    who = ALIAS.get(who, who)          # 옛 이름은 지금 이름으로 접는다
                     r = runs.setdefault(who, {"open": {}, "today": 0, "fail": 0, "last": None})
                     r["open"][c.get("id")] = {"desc": str(inp.get("description") or "")[:70],
                                               "ts": ts}
@@ -185,10 +193,17 @@ def _team() -> tuple[list[dict], dict]:
     known = {a["name"] for a in roster}
     for who in sorted(runs):
         if who not in known:
+            builtin = who in ("general-purpose", "Explore", "Plan", "claude")
             roster.append({"name": who, "ko": TEAM_KO.get(who, who), "defined": False,
-                           "role": "정의 파일 없음",
-                           "desc": "`.claude/agents/` 에 정의가 없다 — 이름이 바뀌었거나 하네스 내장이다"})
-    done = running = failed = 0
+                           "role": "Claude Code 기본 제공" if builtin else "정의 없음",
+                           "desc": ("Claude Code(하네스)가 기본으로 제공하는 에이전트 (%s)" % who)
+                                   if builtin else "`.claude/agents/` 에 정의가 없는 이름"})
+    # 신호등 (사용자 지시 2026-08-12): 대기=회색 · 실행=노랑 깜빡 · 지연·오류=빨강 · 완료=초록.
+    # 「지연」에는 기준이 있어야 한다 — 실행 시작 후 10분. 오늘 실측에서 팀원 한 건이
+    # 37초에 끝났고, 이 리포의 가장 긴 단일 작업이 회귀 8분이다. 10분이면 물린 것이다.
+    DELAY_S = 600
+    now = datetime.datetime.now(datetime.timezone.utc)
+    done = running = failed = delayed = 0
     for a in roster:
         r = runs.get(a["name"]) or {}
         opened = r.get("open") or {}
@@ -197,14 +212,30 @@ def _team() -> tuple[list[dict], dict]:
         a["fail"] = r.get("fail", 0)
         a["last"] = r.get("last")
         a["doing"] = sorted((v["desc"] for v in opened.values()))[:2]
-        a["state"] = ("실행 중" if a["running"] else
-                      "오늘 완료" if a["today"] else
-                      "실패" if a["fail"] else "대기")
+        age = 0
+        for v in opened.values():
+            try:
+                ts = datetime.datetime.fromisoformat(str(v["ts"]).replace("Z", "+00:00"))
+                age = max(age, int((now - ts).total_seconds()))
+            except Exception:                                # noqa: BLE001
+                pass
+        if a["running"] and age > DELAY_S:
+            a["sig"], a["state"] = "delay", "지연 %d분" % (age // 60)
+            delayed += 1
+        elif a["running"]:
+            a["sig"], a["state"] = "run", "실행 중"
+        elif a["fail"] and not a["today"]:
+            a["sig"], a["state"] = "fail", "실패"
+        elif a["today"]:
+            a["sig"], a["state"] = "done", "완료"
+        else:
+            a["sig"], a["state"] = "wait", "대기"
         done += a["today"]
         running += a["running"]
         failed += a["fail"]
     return roster, {"tools": sc["tools"], "says": sc["says"], "day": sc["day"],
-                    "agent_done": done, "agent_running": running, "agent_fail": failed}
+                    "agent_done": done, "agent_running": running,
+                    "agent_fail": failed, "agent_delayed": delayed}
 
 
 def _latest_session() -> Path | None:
@@ -471,6 +502,70 @@ def say(body: Say):
     with io.open(QUEUE, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return {"ok": True, "verdict": "전달 완료 · 작업 완료 후 읽음"}
+
+
+# ── 메모 (0044 · 사용자 요청 2026-08-12) ─────────────────────────────────
+# 진행 흐름에서 항목을 골라 저장했다가, 나중에 찾아 **다시 세션에 보낸다**(큐 재투입).
+# 개인 메모라 삭제를 연다 — 원장이 아니다. 재실행 이력(used_at·used_count)은 남긴다.
+
+
+class MemoBody(BaseModel):
+    content: str
+    event_ts: str = ""
+    who: str = ""
+
+
+@router.get("/memos")
+def memos():
+    from api.db import engine
+    from sqlalchemy import text as _t
+    with engine.connect() as conn:
+        rows = conn.execute(_t(
+            "SELECT memo_id, event_ts, who, content, created_at, used_at, used_count"
+            " FROM dash_memos ORDER BY memo_id DESC LIMIT 50")).mappings().all()
+    return {"ok": True, "memos": [dict(r) for r in rows]}
+
+
+@router.post("/memos")
+def memo_add(body: MemoBody):
+    t = (body.content or "").strip()
+    if not t:
+        return {"ok": False, "verdict": "내용 없음"}
+    from api.db import engine
+    from sqlalchemy import text as _t
+    with engine.begin() as conn:
+        mid = conn.execute(_t(
+            "INSERT INTO dash_memos (event_ts, who, content) VALUES (:ts, :w, :c)"
+            " RETURNING memo_id"),
+            {"ts": body.event_ts[:40], "w": body.who[:16], "c": t[:4000]}).scalar()
+    return {"ok": True, "memo_id": mid, "verdict": "메모 저장됨"}
+
+
+@router.post("/memos/{memo_id}/send")
+def memo_send(memo_id: int):
+    """메모를 큐에 다시 넣는다 — 재실행. 이력을 남긴다."""
+    from api.db import engine
+    from sqlalchemy import text as _t
+    with engine.begin() as conn:
+        row = conn.execute(_t(
+            "UPDATE dash_memos SET used_at=now(), used_count=used_count+1"
+            " WHERE memo_id=:i RETURNING content"), {"i": memo_id}).mappings().first()
+    if row is None:
+        return {"ok": False, "verdict": "메모 없음"}
+    QUEUE.parent.mkdir(parents=True, exist_ok=True)
+    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": row["content"][:2000], "read": False}
+    with io.open(QUEUE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return {"ok": True, "verdict": "전달 완료 · 작업 완료 후 읽음"}
+
+
+@router.delete("/memos/{memo_id}")
+def memo_del(memo_id: int):
+    from api.db import engine
+    from sqlalchemy import text as _t
+    with engine.begin() as conn:
+        n = conn.execute(_t("DELETE FROM dash_memos WHERE memo_id=:i"), {"i": memo_id}).rowcount
+    return {"ok": bool(n), "verdict": "삭제됨" if n else "메모 없음"}
 
 
 @router.post("/mark-read")

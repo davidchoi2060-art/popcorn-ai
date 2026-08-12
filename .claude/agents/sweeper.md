@@ -1,5 +1,6 @@
 ---
 name: sweeper
+role: 기존 자산 순회 · 조용히 틀린 것
 description: **이미 있는 것** 중 조용히 틀린 것을 훑는다 — 한 번도 안 걸린 검사 · 낡은 문서 · 안 쓰이는 정의 · 제어문자 · 정본 중복. 확인자는 방금 지은 것을 보고, 점검자는 오래된 것을 순회한다. 고치지 않고 목록만 돌려준다.
 tools: Bash, Read, Grep, Glob
 model: sonnet

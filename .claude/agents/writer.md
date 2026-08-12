@@ -1,5 +1,6 @@
 ---
 name: writer
+role: 사용자 노출 문자열 전수 판정
 description: 사용자에게 보이는 한국어 문자열을 **전수 추출해** 관리도구 용어에 맞는지 판정한다. 화면·DB 시드·API 응답 어디든 대상이다. 눈에 띄는 것만 고치면 반드시 남으므로 기계적으로 훑는다. 판정만 하고 고치지 않는다.
 tools: Bash, Read, Grep, Glob
 model: sonnet

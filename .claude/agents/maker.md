@@ -1,5 +1,6 @@
 ---
 name: maker
+role: 코드 · 화면 · 마이그레이션 · 도구
 description: 팝콘AI 의 코드·화면·마이그레이션을 짓는다. **한 번에 하나만 띄운다** — 이 저장소는 정본이 여러 곳에 엮여 있어 둘이 동시에 지으면 각자 사본을 만든다. 조사는 investigator 가, 검증은 checker 가 한다.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet

@@ -76,21 +76,30 @@ a{color:inherit;text-decoration:none}
 .team::-webkit-scrollbar-thumb{background:var(--outline-variant);border-radius:3px}
 .tcard{flex:0 0 auto;min-width:134px;background:var(--card);border-radius:8px;padding:8px 10px;
        border:1px solid var(--outline-variant)}
-.tcard[data-run="y"]{border-color:var(--primary);
-       box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent)}
-.tcard[data-idle="y"]{opacity:.66}
+/* 신호등 (사용자 지시 2026-08-12) — 대기=회색 · 실행=노랑 깜빡 · 지연·오류=빨강 · 완료=초록.
+   색은 tokens.css 의 --state-* 만 쓰고 **항상 글자를 병기**한다(색약 배려). */
+.tcard[data-sig="run"]{border-color:var(--state-run);
+       box-shadow:0 0 0 2px color-mix(in srgb, var(--state-run) 16%, transparent)}
+.tcard[data-sig="delay"],.tcard[data-sig="fail"]{border-color:var(--state-fail);
+       box-shadow:0 0 0 2px color-mix(in srgb, var(--state-fail) 14%, transparent)}
+.tcard[data-sig="wait"]{opacity:.66}
 .tcard[data-def="n"]{border-style:dashed}
 .tcard{min-width:168px;max-width:196px}
 .tcard .who{display:flex;align-items:center;gap:6px;font:600 12.5px/1.35 var(--font)}
-/* 역할 — 두 줄까지 보이고 넘치면 자른다. 이름만 있으면 무슨 팀원인지 알 수 없다 */
+/* 역할 — 명사구 한 줄. 정본은 정의 파일의 role: 이다. description 산문을 잘라 쓰다
+   「~한다」 서술문이 카드에 흘렀다(사용자 지적) — 화면은 role 만 옮긴다 */
 .tcard .role{font:400 10.5px/1.45 var(--font);color:var(--on-variant);margin:3px 0 4px;
-       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.sig{width:8px;height:8px;border-radius:50%;flex:none;background:var(--outline)}
-.sig.run{background:var(--primary);animation:sigpulse 1.4s ease-in-out infinite}
-.sig.done{background:var(--on-variant)}
-@keyframes sigpulse{0%,100%{opacity:1}50%{opacity:.3}}
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sig{width:8px;height:8px;border-radius:50%;flex:none;background:var(--state-wait)}
+.sig.run{background:var(--state-run);animation:sigpulse 1.1s ease-in-out infinite}
+.sig.delay,.sig.fail{background:var(--state-fail)}
+.sig.done{background:var(--state-done)}
+@keyframes sigpulse{0%,100%{opacity:1}50%{opacity:.25}}
 @media (prefers-reduced-motion:reduce){.sig.run{animation:none}}
 .tcard .st{font:500 10.5px/1.6 var(--font-num);color:var(--on-variant)}
+.tcard[data-sig="run"] .st{color:color-mix(in srgb, var(--state-run) 82%, var(--on))}
+.tcard[data-sig="delay"] .st,.tcard[data-sig="fail"] .st{color:var(--state-fail)}
+.tcard[data-sig="done"] .st{color:var(--success-dark)}
 .tcard .dg{font:400 10px/1.4 var(--font);color:var(--on-variant);margin-top:2px;
        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
 
@@ -109,6 +118,27 @@ a{color:inherit;text-decoration:none}
 .flow-hd{padding:10px 12px;border-bottom:1px solid var(--outline-variant);flex:none;
          display:flex;align-items:baseline;gap:8px}
 .flow-body{flex:1;min-height:0;overflow:auto;padding:8px 12px 14px}
+.flow-ft{flex:none;display:flex;align-items:center;gap:6px;padding:7px 12px;
+         border-top:1px solid var(--outline-variant)}
+.fbtn{padding:4px 10px;border:1px solid var(--outline-variant);border-radius:5px;
+      background:var(--card);color:var(--on-variant);font:500 11px/1.4 var(--font);cursor:pointer}
+.fbtn:hover{color:var(--on);border-color:var(--outline)}
+.fbtn[aria-pressed="true"]{background:var(--on);color:var(--bg);border-color:var(--on)}
+/* 사건 행의 [메모] — 평소엔 숨고 행에 올리면 보인다. 늘 보이면 흐름이 버튼밭이 된다 */
+.ev .mbtn{flex:none;align-self:flex-start;margin-left:6px;padding:1px 7px;border-radius:4px;
+    border:1px solid var(--outline-variant);background:var(--card);color:var(--on-variant);
+    font:500 10px/1.5 var(--font);cursor:pointer;visibility:hidden}
+.ev:hover .mbtn{visibility:visible}
+.ev .mbtn:hover{color:var(--on);border-color:var(--outline)}
+/* 메모 카드 */
+.memo{padding:7px 0;border-bottom:1px solid var(--container)}
+.memo .tx{font:400 11.5px/1.5 var(--font);white-space:pre-wrap;word-break:break-word;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.memo .mt{display:flex;align-items:baseline;gap:7px;margin-top:3px}
+.memo .mt .note{flex:1}
+.memo .mt button{padding:1px 8px;border-radius:4px;border:1px solid var(--outline-variant);
+    background:var(--card);color:var(--on-variant);font:500 10px/1.6 var(--font);cursor:pointer}
+.memo .mt button:hover{color:var(--on);border-color:var(--outline)}
 .ev{padding:6px 0;border-bottom:1px solid var(--container);display:flex;gap:9px;
     align-items:flex-start}
 .ev .t{width:52px;flex:none;font:400 10px/1.6 var(--font-num);color:var(--on-variant)}
@@ -212,6 +242,14 @@ a{color:inherit;text-decoration:none}
         <span class="note" data-bind="flow-note">전사본 갱신 시 자동 표시</span>
       </div>
       <div class="flow-body" data-repeat="events"></div>
+      <!-- 흐름이 길어지면 여기서 줄인다(사용자 요청 2026-08-12).
+           **기록(전사본)은 지우지 않는다** — 화면 표시만 조절한다. -->
+      <div class="flow-ft">
+        <button type="button" class="fbtn" data-action="flow-compact">간략히</button>
+        <button type="button" class="fbtn" data-action="flow-clear">화면 비우기</button>
+        <button type="button" class="fbtn" data-action="flow-all" hidden>모두 보기</button>
+        <span class="note" data-bind="flow-hidden" style="margin-left:auto"></span>
+      </div>
     </section>
 
     <aside class="side">
@@ -225,6 +263,12 @@ a{color:inherit;text-decoration:none}
              구분하지 않는다(`api/dash._bg_tasks` 주석). 화면이 아는 것만 말한다 -->
         <div class="cap">백그라운드 작업</div>
         <div data-repeat="agents"></div>
+      </div>
+
+      <!-- 메모 — 흐름에서 [메모]로 저장한 것. [보내기]가 큐 재투입(재실행)이다 -->
+      <div class="card" style="padding:10px 12px;flex:none;max-height:200px;overflow:auto">
+        <div class="cap">메모</div>
+        <div data-repeat="memos"><span class="note">저장된 메모 없음</span></div>
       </div>
 
       <div class="card say-box" style="padding:10px 12px">
@@ -264,6 +308,14 @@ a{color:inherit;text-decoration:none}
   // 방금 보낸 것의 확인 문구. `render()` 가 주기적으로 도는데 그때 지워지면
   // 사장님은 «보내진 건가?» 를 알 수 없다. 큐가 비면(= 세션이 읽으면) 그때 지운다.
   var sayMsg = null;
+
+  // 흐름 표시 상태 — 세션 저장(새로고침에도 유지 · 다른 PC 와는 무관한 개인 표시 설정)
+  var flowClear = null, flowCompact = false;
+  try {
+    flowClear = sessionStorage.getItem('dash-flow-clear') || null;
+    flowCompact = sessionStorage.getItem('dash-flow-compact') === 'y';
+  } catch (e) { /* 무시 */ }
+  var lastEvTs = null;                       // 「화면 비우기」의 기준 시각
 
   // 8543초처럼 원시 단위를 그대로 내밀지 않는다 — 읽는 사람이 나눗셈을 해야 한다
   function ago(s) {
@@ -313,22 +365,19 @@ a{color:inherit;text-decoration:none}
     // 그 밖의 방법으로는 알 수 없다 — tasks/*.output 은 셸 명령과 구분되지 않는다.
     var team = d.roster || [];
     $('team').innerHTML = team.length ? team.map(function (a) {
-      var cls = a.running ? 'run' : (a.today ? 'done' : '');
-      return '<div class="tcard" data-run="' + (a.running ? 'y' : 'n') + '"'
-        + ' data-idle="' + (!a.running && !a.today ? 'y' : 'n') + '"'
+      var sig = a.sig || 'wait';
+      return '<div class="tcard" data-sig="' + esc(sig) + '"'
         + ' data-def="' + (a.defined ? 'y' : 'n') + '"'
         + ' title="' + esc(a.desc || '') + '">'
-        + '<div class="who"><span class="sig ' + cls + '"></span>' + esc(a.ko) + '</div>'
-        // 이름 아래 «무슨 일을 하는 사람인가». 정본은 .claude/agents/*.md 의 description 이고
-        // 화면은 옮기기만 한다 — 여기서 역할을 새로 쓰면 정의와 갈라진다
+        + '<div class="who"><span class="sig ' + esc(sig) + '"></span>' + esc(a.ko) + '</div>'
+        // 역할은 정의 파일의 role:(명사구)만 옮긴다 — 화면이 지어내지 않는다
         + '<div class="role">' + esc(a.role || '') + '</div>'
-        // 색 옆에 **항상 글자**를 붙인다. 상태를 색으로만 말하지 않는다
-        // 「실패 · 실패 1」처럼 겹쳐 적지 않는다 — 상태가 이미 실패면 수만 붙인다
+        // 색 옆에 **항상 글자**. 상태(서버 판정) + 수만 붙인다
         + '<div class="st">' + esc(a.state)
         + (a.running ? ' ' + a.running + '건'
            : a.today ? ' ' + a.today + '회'
            : a.fail ? ' ' + a.fail + '회' : '')
-        + (a.fail && a.state !== '실패' ? ' · 실패 ' + a.fail : '') + '</div>'
+        + (a.fail && sig !== 'fail' ? ' · 실패 ' + a.fail : '') + '</div>'
         + (a.doing && a.doing.length ? '<div class="dg">' + esc(a.doing[0]) + '</div>' : '')
         + '</div>';
     }).join('') : '<div class="note">팀원 정의가 없습니다 — .claude/agents/</div>';
@@ -339,8 +388,8 @@ a{color:inherit;text-decoration:none}
     var num = function (v) { return v == null ? '<i>못 쟀음</i>' : '<b>' + v + '</b>'; };
     $('today').innerHTML =
       [['커밋', T.commits], ['팀원 완료', T.agent_done], ['팀원 실행 중', T.agent_running],
-       ['팀원 실패', T.agent_fail], ['도구 호출', T.tools], ['사장님 발화', T.says],
-       ['현황판 메시지', T.dash_msgs]]
+       ['팀원 지연', T.agent_delayed], ['팀원 실패', T.agent_fail], ['도구 호출', T.tools],
+       ['사장님 발화', T.says], ['현황판 메시지', T.dash_msgs]]
         .map(function (r) {
           return '<span class="m"><i>' + esc(r[0]) + '</i>' + num(r[1]) + '</span>';
         }).join('')
@@ -359,18 +408,45 @@ a{color:inherit;text-decoration:none}
 
     var box = $('events');
     var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-    box.innerHTML = (d.events || []).map(function (e) {
+    // ── 표시 조절 (사용자 요청 2026-08-12) — **기록은 못 지운다. 표시만 줄인다** ──
+    //   화면 비우기: 그 시점 이전 사건을 숨긴다 (ISO 시각은 문자열 비교가 시간 비교다)
+    //   간략히    : 도구·결과 줄을 빼고 발화만 남긴다
+    var all = d.events || [];
+    if (all.length) lastEvTs = all[all.length - 1].ts || lastEvTs;
+    var evs = all.filter(function (e) { return !flowClear || (e.ts || '') > flowClear; });
+    var hiddenN = all.length - evs.length;
+    if (flowCompact)
+      evs = evs.filter(function (e) {
+        return (e.blocks || []).some(function (b) { return b.kind === 'say'; });
+      });
+    $('flow-hidden').textContent =
+      (hiddenN ? '이전 ' + hiddenN + '건 숨김 · 기록은 보존됨' : '') +
+      (flowCompact ? (hiddenN ? ' · ' : '') + '발화만 표시' : '');
+    var clearBtn = document.querySelector('[data-action="flow-all"]');
+    if (clearBtn) clearBtn.hidden = !flowClear;
+    box.innerHTML = evs.map(function (e) {
       var w = WHO[e.who] || ['who-result', e.who];
       var inner = (e.blocks || []).map(function (b) {
-        if (b.kind === 'tool')
+        if (b.kind === 'tool') {
+          if (flowCompact) return '';
           return '<span class="tool"><span class="n">' + esc(b.name) + '</span>'
                + '<span class="d">' + esc(b.detail) + '</span></span>';
-        if (b.kind === 'result') return '<div class="res">' + esc(b.text) + '</div>';
+        }
+        if (b.kind === 'result') return flowCompact ? '' : '<div class="res">' + esc(b.text) + '</div>';
         return '<div class="say">' + esc(b.text) + '</div>';
       }).join('');
-      return '<div class="ev"><span class="t">' + hhmm(e.ts) + '</span><span class="b">'
-        + '<span class="who ' + w[0] + '">' + w[1] + '</span>' + inner + '</span></div>';
-    }).join('');
+      // [메모] — 이 사건의 발화·내용을 저장한다. 내용이 없는 줄(도구만)엔 도구 요약을 담는다
+      var memoTxt = (e.blocks || []).map(function (b) {
+        return b.kind === 'tool' ? (b.name + ' ' + (b.detail || '')) : (b.text || '');
+      }).join('\n').trim();
+      return '<div class="ev" data-ts="' + esc(e.ts || '') + '" data-who="' + esc(e.who || '') + '">'
+        + '<span class="t">' + hhmm(e.ts) + '</span><span class="b">'
+        + '<span class="who ' + w[0] + '">' + w[1] + '</span>' + inner + '</span>'
+        + (memoTxt ? '<button type="button" class="mbtn" data-action="memo-save"'
+           + ' data-memo="' + esc(memoTxt).replace(/"/g, '&quot;') + '" title="메모 저장">메모</button>' : '')
+        + '</div>';
+    }).join('') || '<div class="note" style="padding:8px 0">표시할 사건 없음'
+        + (flowClear ? ' · [모두 보기]로 되돌림' : '') + '</div>';
     if (atBottom) box.scrollTop = box.scrollHeight;
 
     var q = (d.queued || []).length;
@@ -438,6 +514,71 @@ a{color:inherit;text-decoration:none}
           + esc(e.status === 401 ? '세션 만료 · 로그인 필요' : e.message) + '</div>';
       });
   });
+
+  // ── 흐름 표시 버튼 ─────────────────────────────────────────────────
+  document.querySelector('[data-action="flow-compact"]').addEventListener('click', function () {
+    flowCompact = !flowCompact;
+    this.setAttribute('aria-pressed', String(flowCompact));
+    try { sessionStorage.setItem('dash-flow-compact', flowCompact ? 'y' : 'n'); } catch (e) { /* 무시 */ }
+    load();
+  });
+  document.querySelector('[data-action="flow-clear"]').addEventListener('click', function () {
+    if (!lastEvTs) return;
+    flowClear = lastEvTs;                    // 기록은 그대로다 — 이 시각 이전을 안 그릴 뿐
+    try { sessionStorage.setItem('dash-flow-clear', flowClear); } catch (e) { /* 무시 */ }
+    load();
+  });
+  document.querySelector('[data-action="flow-all"]').addEventListener('click', function () {
+    flowClear = null;
+    try { sessionStorage.removeItem('dash-flow-clear'); } catch (e) { /* 무시 */ }
+    load();
+  });
+
+  // ── 메모 ──────────────────────────────────────────────────────────
+  // 행이 매번 다시 그려지므로 버튼이 아니라 **상자에** 리스너를 건다(위임)
+  function loadMemos() {
+    fetch('/api/admin/dash/memos', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var ms = j.memos || [];
+        $('memos').innerHTML = ms.length ? ms.map(function (m) {
+          return '<div class="memo"><div class="tx">' + esc(m.content) + '</div>'
+            + '<div class="mt"><span class="note">' + esc((m.event_ts || '').slice(11, 16))
+            + (m.used_count ? ' · 재실행 ' + m.used_count + '회' : '') + '</span>'
+            + '<button type="button" data-memo-send="' + m.memo_id + '">보내기</button>'
+            + '<button type="button" data-memo-del="' + m.memo_id + '">삭제</button></div></div>';
+        }).join('') : '<span class="note">저장된 메모 없음</span>';
+      })
+      .catch(function () { $('memos').innerHTML = '<span class="note">메모 조회 실패</span>'; });
+  }
+  $('events').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-action="memo-save"]');
+    if (!b) return;
+    var row = b.closest('.ev');
+    b.disabled = true;
+    fetch('/api/admin/dash/memos', {method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: b.getAttribute('data-memo') || '',
+                              event_ts: row.getAttribute('data-ts') || '',
+                              who: row.getAttribute('data-who') || ''})})
+      .then(function (r) { return r.json(); })
+      .then(function (j) { b.textContent = j.ok ? '저장됨' : '실패'; loadMemos(); })
+      .catch(function () { b.textContent = '실패'; b.disabled = false; });
+  });
+  $('memos').addEventListener('click', function (ev) {
+    var s = ev.target.closest('[data-memo-send]'), x = ev.target.closest('[data-memo-del]');
+    if (!s && !x) return;
+    var id = (s || x).getAttribute(s ? 'data-memo-send' : 'data-memo-del');
+    var url = '/api/admin/dash/memos/' + id + (s ? '/send' : '');
+    fetch(url, {method: s ? 'POST' : 'DELETE', credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (s && j.ok) { sayMsg = j.verdict; }
+        loadMemos(); load();
+      })
+      .catch(function () { /* 다음 새로고침이 알린다 */ });
+  });
+  loadMemos();
 
   // 좌측 메뉴 아코디언 — 접힘을 세션에 남긴다(조감도와 같은 규약)
   var KEY = 'admin2.lnb.closed';
