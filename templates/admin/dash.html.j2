@@ -69,6 +69,34 @@ a{color:inherit;text-decoration:none}
 .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--outline)}
 .dot.live{background:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent)}
 .dot.wait{background:var(--tertiary)}
+/* 팀원 카드 — 신호는 «색 + 글자» 둘 다다. 관리자 화면은 통과·활동을 --primary 로 쓴다
+   (U-01: 초록은 고객 화면 전용). **색만으로 상태를 말하지 않는다** — 색약 배려. */
+.team{flex:none;padding:12px 16px 0;display:flex;gap:8px;overflow-x:auto}
+.team::-webkit-scrollbar{height:5px}
+.team::-webkit-scrollbar-thumb{background:var(--outline-variant);border-radius:3px}
+.tcard{flex:0 0 auto;min-width:134px;background:var(--card);border-radius:8px;padding:8px 10px;
+       border:1px solid var(--outline-variant)}
+.tcard[data-run="y"]{border-color:var(--primary);
+       box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent)}
+.tcard[data-idle="y"]{opacity:.66}
+.tcard[data-def="n"]{border-style:dashed}
+.tcard .who{display:flex;align-items:center;gap:6px;font:600 12.5px/1.35 var(--font)}
+.sig{width:8px;height:8px;border-radius:50%;flex:none;background:var(--outline)}
+.sig.run{background:var(--primary);animation:sigpulse 1.4s ease-in-out infinite}
+.sig.done{background:var(--on-variant)}
+@keyframes sigpulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.sig.run{animation:none}}
+.tcard .st{font:500 10.5px/1.6 var(--font-num);color:var(--on-variant)}
+.tcard .dg{font:400 10px/1.4 var(--font);color:var(--on-variant);margin-top:2px;
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+
+/* 오늘 처리 — 세는 방법이 있는 것만. 못 쟀으면 0 이 아니라 「못 쟀음」이다 */
+.today{flex:none;padding:10px 16px 0;display:flex;gap:16px;flex-wrap:wrap;align-items:baseline}
+.today .m{display:flex;align-items:baseline;gap:5px;font:400 11.5px/1.5 var(--font)}
+.today .m b{font:600 15px/1 var(--font-num);font-variant-numeric:tabular-nums}
+.today .m i{font-style:normal;color:var(--on-variant)}
+.today .src{font:400 10.5px/1.5 var(--font);color:var(--on-variant);margin-left:auto}
+
 .body{flex:1;min-height:0;display:flex;gap:12px;padding:14px 16px 16px}
 .card{background:var(--card);border:1px solid var(--outline-variant);border-radius:8px}
 
@@ -166,6 +194,12 @@ a{color:inherit;text-decoration:none}
     <span style="flex:1"></span>
     <span class="num" style="font-size:11px;color:var(--on-variant)" data-bind="session">—</span>
   </header>
+
+  <!-- 팀원 명단 — 정본은 `.claude/agents/*.md` 다. 화면이 이름을 지어내지 않는다 -->
+  <section class="team" data-repeat="team" aria-label="팀원 상태"></section>
+
+  <!-- 오늘 처리 -->
+  <div class="today" data-repeat="today"></div>
 
   <div class="body">
     <section class="card flow">
@@ -270,6 +304,37 @@ a{color:inherit;text-decoration:none}
 
     // 창(기본 30분) 밖의 출력 파일은 지난 일이다. 「없다」와 「창 밖에 있다」를 구분해 적는다 —
     // 안 그러면 4일 전 파일이 지금 도는 작업처럼 맨 위에 앉는다(2026-08-12 실측).
+    // ── 팀원 카드 ────────────────────────────────────────────────────
+    // 「실행 중」은 **잰 값이다**: Agent 호출은 있는데 결과가 아직 없는 것(api/dash._scan).
+    // 그 밖의 방법으로는 알 수 없다 — tasks/*.output 은 셸 명령과 구분되지 않는다.
+    var team = d.roster || [];
+    $('team').innerHTML = team.length ? team.map(function (a) {
+      var cls = a.running ? 'run' : (a.today ? 'done' : '');
+      return '<div class="tcard" data-run="' + (a.running ? 'y' : 'n') + '"'
+        + ' data-idle="' + (!a.running && !a.today ? 'y' : 'n') + '"'
+        + ' data-def="' + (a.defined ? 'y' : 'n') + '"'
+        + ' title="' + esc(a.desc || '') + '">'
+        + '<div class="who"><span class="sig ' + cls + '"></span>' + esc(a.ko) + '</div>'
+        // 색 옆에 **항상 글자**를 붙인다. 상태를 색으로만 말하지 않는다
+        + '<div class="st">' + esc(a.state)
+        + (a.running ? ' ' + a.running + '건' : (a.today ? ' ' + a.today + '회' : '')) + '</div>'
+        + (a.doing && a.doing.length ? '<div class="dg">' + esc(a.doing[0]) + '</div>' : '')
+        + (a.defined ? '' : '<div class="dg">정의 없음</div>')
+        + '</div>';
+    }).join('') : '<div class="note">팀원 정의가 없습니다 — .claude/agents/</div>';
+
+    // ── 오늘 처리 ────────────────────────────────────────────────────
+    // 못 쟀으면 **0 이 아니라 「못 쟀음」**이다. 둘을 섞으면 «오늘 아무 일도 없었다»가 된다.
+    var T = d.today || {};
+    var num = function (v) { return v == null ? '<i>못 쟀음</i>' : '<b>' + v + '</b>'; };
+    $('today').innerHTML =
+      [['커밋', T.commits], ['팀원 완료', T.agent_done], ['팀원 실행 중', T.agent_running],
+       ['도구 호출', T.tools], ['사장님 발화', T.says], ['현황판 메시지', T.dash_msgs]]
+        .map(function (r) {
+          return '<span class="m"><i>' + esc(r[0]) + '</i>' + num(r[1]) + '</span>';
+        }).join('')
+      + '<span class="src">' + esc(T.day || '') + ' · 커밋은 git · 나머지는 이 세션 전사본</span>';
+
     var ag = d.agents || [], win = d.agents_window_min || 30, older = d.agents_older || 0;
     var tailNote = older ? '<div class="note" style="margin-top:6px">최근 ' + win
                          + '분 밖 ' + older + '건은 표시하지 않음</div>' : '';

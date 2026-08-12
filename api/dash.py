@@ -24,10 +24,12 @@
   전사본을 고치지 않는다. 큐 파일만 쓴다(우리가 만든 파일이다).
 """
 import asyncio
+import datetime
 import io
 import json
 import os
 import re
+import subprocess
 import time
 from pathlib import Path
 
@@ -38,6 +40,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/admin/dash", tags=["admin-dash"])
 
 ROOT = Path(__file__).resolve().parent.parent
+AGENTS_DIR = ROOT / ".claude" / "agents"          # 팀원 정의 정본
 # 프로젝트 키 — Claude Code 가 cwd 를 이 규칙으로 접는다 (E:\DEV -> E--DEV)
 PROJ_KEY = "E--DEV"
 SESS_DIR = Path(os.path.expanduser("~")) / ".claude" / "projects" / PROJ_KEY
@@ -49,6 +52,143 @@ TEAM_KO = {
     "writer": "문장가", "dba": "DBA", "crosschecker": "검증자", "sweeper": "점검자",
     "general-purpose": "범용", "Explore": "탐색", "Plan": "계획",
 }
+
+
+# ── 팀원 명단 · 활동 ────────────────────────────────────────────────────
+#
+# **「실행 중」을 지어내지 않는다.** 전사본에서 이렇게 판정한다:
+#     Agent tool_use 가 있고 같은 tool_use_id 의 tool_result 가 **아직 없으면** 실행 중
+#     결과가 도착했으면 완료
+# 그 밖의 방법은 없다 — `tasks/*.output` 파일은 서브에이전트와 백그라운드 셸을
+# 구분하지 못한다(2026-08-12 실측: 목록에 뜬 것이 uvicorn 재시작 명령이었다).
+#
+# 전사본이 24MB 라 매초 통째로 읽지 않는다. **읽은 바이트 위치를 기억해 새로 자란 만큼만**
+# 읽어 누적한다(아래 `_SCAN`). 파일이 바뀌거나 줄어들면 처음부터 다시 센다.
+_SCAN: dict = {"path": None, "off": 0, "runs": {}, "tools": 0, "says": 0, "day": None}
+
+
+def _roster() -> list[dict]:
+    """`.claude/agents/*.md` 의 앞머리(frontmatter)를 읽는다. 정의 파일이 정본이다."""
+    out = []
+    if not AGENTS_DIR.is_dir():
+        return out
+    for p in sorted(AGENTS_DIR.glob("*.md")):
+        name, desc = p.stem, ""
+        try:
+            txt = io.open(p, encoding="utf-8", errors="ignore").read()
+        except OSError:
+            continue
+        m = re.match(r"\s*---\s*\n(.*?)\n---", txt, re.S)
+        if m:
+            for line in m.group(1).splitlines():
+                if line.startswith("name:"):
+                    name = line.split(":", 1)[1].strip() or name
+                elif line.startswith("description:"):
+                    desc = line.split(":", 1)[1].strip()
+        out.append({"name": name, "ko": TEAM_KO.get(name, name),
+                    "desc": re.sub(r"\*\*", "", desc)[:110], "defined": True})
+    return out
+
+
+def _kst_day(ts: str) -> str:
+    """전사본 시각은 UTC(Z) 다. 「오늘」은 한국 날짜로 센다 — 안 그러면 오전 9시에 날이 바뀐다."""
+    try:
+        d = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return (d + datetime.timedelta(hours=9)).strftime("%Y-%m-%d")
+    except Exception:                                        # noqa: BLE001
+        return ""
+
+
+def _scan(path: Path) -> dict:
+    """전사본을 **자란 만큼만** 읽어 누적한다. 오늘이 바뀌면 오늘치를 비운다."""
+    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=9)).strftime("%Y-%m-%d")
+    if _SCAN["path"] != str(path) or _SCAN["day"] != today:
+        _SCAN.update({"path": str(path), "off": 0, "runs": {}, "tools": 0,
+                      "says": 0, "day": today})
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return _SCAN
+    if size < _SCAN["off"]:                 # 파일이 줄었다 = 다른 세션이거나 잘렸다
+        _SCAN.update({"off": 0, "runs": {}, "tools": 0, "says": 0})
+    if size == _SCAN["off"]:
+        return _SCAN
+    with io.open(path, "rb") as f:
+        f.seek(_SCAN["off"])
+        chunk = f.read(size - _SCAN["off"])
+    # 마지막 줄이 잘렸을 수 있다 — 개행까지만 먹고 나머지는 다음번에
+    cut = chunk.rfind(b"\n")
+    if cut < 0:
+        return _SCAN
+    _SCAN["off"] += cut + 1
+    runs = _SCAN["runs"]
+    for line in chunk[:cut].decode("utf-8", "ignore").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            o = json.loads(line)
+        except Exception:                                    # noqa: BLE001
+            continue
+        t, ts = o.get("type"), o.get("timestamp") or ""
+        same_day = _kst_day(ts) == today
+        if t == "assistant":
+            for c in (o.get("message") or {}).get("content") or []:
+                if c.get("type") != "tool_use":
+                    continue
+                if same_day:
+                    _SCAN["tools"] += 1
+                if c.get("name") in ("Agent", "Task"):
+                    inp = c.get("input") or {}
+                    who = str(inp.get("subagent_type") or "?")
+                    r = runs.setdefault(who, {"open": {}, "today": 0, "last": None})
+                    r["open"][c.get("id")] = {"desc": str(inp.get("description") or "")[:70],
+                                              "ts": ts}
+                    r["last"] = ts
+        elif t == "user":
+            cc = (o.get("message") or {}).get("content")
+            if isinstance(cc, str) and same_day:
+                _SCAN["says"] += 1
+            elif isinstance(cc, list):
+                for c in cc:
+                    if not isinstance(c, dict):
+                        continue
+                    if c.get("type") == "text" and same_day:
+                        _SCAN["says"] += 1
+                    elif c.get("type") == "tool_result":
+                        tid = c.get("tool_use_id")
+                        for r in runs.values():
+                            if tid in r["open"]:
+                                r["open"].pop(tid, None)
+                                if same_day:
+                                    r["today"] += 1
+    return _SCAN
+
+
+def _team() -> tuple[list[dict], dict]:
+    """명단 + 활동. 정의에 없는데 불린 이름도 **숨기지 않고** 뒤에 붙인다."""
+    p = _latest_session()
+    sc = _scan(p) if p else _SCAN
+    runs = sc["runs"]
+    roster = _roster()
+    known = {a["name"] for a in roster}
+    for who in sorted(runs):
+        if who not in known:
+            roster.append({"name": who, "ko": TEAM_KO.get(who, who), "defined": False,
+                           "desc": "정의 파일이 없다 — 이름이 바뀌었거나 내장 에이전트다"})
+    done = running = 0
+    for a in roster:
+        r = runs.get(a["name"]) or {}
+        opened = r.get("open") or {}
+        a["running"] = len(opened)
+        a["today"] = r.get("today", 0)
+        a["last"] = r.get("last")
+        a["doing"] = sorted((v["desc"] for v in opened.values()))[:2]
+        a["state"] = "실행 중" if a["running"] else ("오늘 완료" if a["today"] else "대기")
+        done += a["today"]
+        running += a["running"]
+    return roster, {"tools": sc["tools"], "says": sc["says"], "day": sc["day"],
+                    "agent_done": done, "agent_running": running}
 
 
 def _latest_session() -> Path | None:
@@ -194,6 +334,7 @@ def state(limit: int = 40):
             evts.append(e)
     st = p.stat()
     agents, agents_older = _bg_tasks()
+    roster, tot = _team()
     return {
         "ok": True,
         "session": p.stem,
@@ -204,7 +345,39 @@ def state(limit: int = 40):
         "agents_older": agents_older,        # 창 밖 — 「없다」와 구분해 화면이 적는다
         "agents_window_min": AGENT_WINDOW_S // 60,
         "queued": _queue_pending(),
+        "roster": roster,                    # 팀원 명단 + 신호
+        "today": _today(tot),                # 오늘 처리한 것 — 셀 수 있는 것만
     }
+
+
+def _today(tot: dict) -> dict:
+    """오늘 처리한 업무 — **세는 방법이 있는 것만 센다.**
+
+    「업무 건수」는 정의가 없는 말이라, 무엇을 세었는지 이름으로 밝힌다.
+    커밋과 인계는 원장·이력이라 정확하고, 도구·발화는 이 세션 전사본 기준이다
+    (다른 창에서 돈 세션은 포함되지 않는다 — 화면이 그 사실을 적는다).
+    """
+    out = {"day": tot.get("day"), "tools": tot.get("tools", 0), "says": tot.get("says", 0),
+           "agent_done": tot.get("agent_done", 0), "agent_running": tot.get("agent_running", 0)}
+    try:
+        n = subprocess.run(["git", "log", "--since=midnight", "--oneline"],
+                           cwd=str(ROOT), capture_output=True, timeout=10)
+        out["commits"] = len([x for x in n.stdout.decode("utf-8", "ignore").splitlines() if x.strip()])
+    except Exception:                                        # noqa: BLE001
+        out["commits"] = None                                # 못 쟀음 — 0 과 구분한다
+    if QUEUE.exists():
+        try:
+            said = 0
+            for line in io.open(QUEUE, encoding="utf-8"):
+                line = line.strip()
+                if line and (json.loads(line).get("ts") or "").startswith(str(out["day"])):
+                    said += 1
+            out["dash_msgs"] = said
+        except Exception:                                    # noqa: BLE001
+            out["dash_msgs"] = None
+    else:
+        out["dash_msgs"] = 0
+    return out
 
 
 @router.get("/stream")
