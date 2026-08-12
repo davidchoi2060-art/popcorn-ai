@@ -22,6 +22,7 @@
 | 화면 셸(관리자) | `templates/admin/_layout.html.j2` | 새 `/admin2/*` 는 상속한다. 독립 페이지로 두지 않는다 |
 | 디자인 브리프 서식 | `.claude/BRIEF.md` | 화면을 클로드 디자인에 맡길 때 · 받은 뒤 배선 규약 |
 | Phoenix 원본 좌표 | `docs/design/phoenix-template-map.md` | 옆 화면을 베끼지 말고 여기서 찾는다 |
+| 화면 흐름 | `docs/design/screen-flow.md` | 흐름도. 화면·이동을 바꾸면 **여기부터** 고친다 |
 | 결정 이력 | `docs/decisions/decision-log.md` | 확정/미정의 단일 원천 |
 | 회귀 | `tests/regression.py` | 861건. 값이 아니라 **관계**를 검사한다 |
 
