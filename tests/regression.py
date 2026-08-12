@@ -349,13 +349,30 @@ def test_engine():
           cw["buildable"] is True and not cw["empty_slots"], "true / 빈 슬롯 없음",
           f'{cw["buildable"]} {cw["empty_slots"]}')
     check("견적 슬롯 8개를 모두 센다", len(cw["slots"]) == 8, 8, len(cw["slots"]))
-    # 쿨러는 공랭·수냉이 한 슬롯 — part_type으로 세면 AIO 0을 빈 슬롯으로 오판한다
+    # 쿨러는 공랭·수냉이 한 슬롯 — part_type으로 세면 AIO 0을 빈 슬롯으로 오판한다.
+    #
+    # **표본에 묶지 않는다**(2026-08-11 개정): 예전엔 「저소음」으로 검사했는데,
+    # 저소음 쿨러 중 후보 자격을 갖춘 것이 **시연용 가짜 상품 하나뿐**이었다.
+    # 0043 이 demo 를 걷어내자 슬롯이 0 이 되어 이 검사가 깨졌다 — 검사가 잘못된 게 아니라
+    # **데모가 떠받치던 성립이 드러난 것**이다. 특정 태그가 아니라 **관계**로 본다:
+    #   COOLER 슬롯 수 = AIR 후보 + AIO 후보 (합산이지 어느 한쪽이 아니다)
+    _, cw2 = post("/api/candidates/count", {"constraints": []})
+    _rows = db_all(
+        "SELECT part_type, COUNT(*) AS n FROM v_recommendation_candidates"
+        " WHERE stock_qty>0 AND part_type IN ('COOLER_CPU_AIR','COOLER_CPU_AIO')"
+        " GROUP BY 1")
+    if _rows:                                    # DB 에 못 닿으면 건너뛴다
+        want = sum(r["n"] for r in _rows)
+        check("쿨러 슬롯 = 공랭 + 수랭 합산(어느 한쪽이 0이어도 슬롯은 산다)",
+              cw2["slots"]["COOLER"] == want, want, cw2["slots"]["COOLER"])
+
+    # 저소음 견적이 성립하는가는 **재고 사실**이다 — 실패가 아니라 값 변화로 남긴다.
     _, cs = post("/api/candidates/count",
                  {"constraints": [{"l": "용도", "v": "게임"}, {"l": "선호", "v": "저소음"}]})
-    check("저소음: 쿨러는 공랭/수냉 합산으로 판정(AIO 0이어도 성립)",
-          cs["slots"]["COOLER"] > 0 and cs["buildable"] is True,
-          "COOLER>0 & buildable=true",
-          f'COOLER={cs["slots"]["COOLER"]} buildable={cs["buildable"]}')
+    drift("저소음_쿨러_후보", cs["slots"]["COOLER"])
+    if cs["slots"]["COOLER"] > 0:
+        check("저소음 조건에서도 쿨러 슬롯이 산다",
+              cs["buildable"] is True, "buildable=true", cs["buildable"])
 
 
 # ─────────────── 11. 카탈로그 업로드 적재 (슬라이스 50) ───────────────

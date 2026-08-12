@@ -26,6 +26,12 @@ REASONS = [("no_specs", "사양 미등록(행 없음)", "products.html"),
            ("no_price", "가격 검토 대기", "price-review.html"),
            ("oos", "재고 없음 · 매입", "stock-inbound.html")]
 
+# **시연용(`data_origin='demo'`)은 모집단에서 뺀다 — 버킷이 아니다.**
+#   0043 이 추천 뷰에서 demo 를 막았는데(몰에 없는 가짜 상품이 견적에 들어가고 있었다),
+#   이 쿼리는 뷰를 쓰지 않고 `products` 를 직접 읽어 게이트를 파이썬으로 다시 구현한다.
+#   그래서 뷰만 고치자 `ok_total`(여기) 과 `pool_total`(뷰) 이 3,219 대 3,242 로 갈라졌다.
+#   demo 를 사유 버킷으로 만들지 않는 이유: 사유는 «왜 추천에 못 쓰이는지»를 운영자에게
+#   보여 고치게 하는 목록인데, demo 는 **고칠 것이 아니라 우리 상품이 아니다.**
 _Q = """
     SELECT p.product_code, p.sku, p.product_name, p.part_type, p.status, p.stock_qty,
            p.sale_price, p.review_required_yn, p.ai_candidate_yn,
@@ -33,6 +39,7 @@ _Q = """
            s.tag_white, s.rated_watt
     FROM products p LEFT JOIN product_specs s USING (product_code)
     WHERE p.category_group = 'core_part' AND p.part_type = ANY(:types)
+      AND p.data_origin IS DISTINCT FROM 'demo'
 """
 
 
