@@ -1,0 +1,413 @@
+{#
+  작업 현황판 (ADM-AI-010) — 2026-08-12
+
+  ■ 이 화면이 답하는 질문
+    "지금 무엇을 하고 있나" 그리고 "말을 걸려면 어디에"
+
+  ■ 어디서 오나 — 새 배선이 없다
+    Claude Code 가 세션 전사본을 이미 디스크에 쌓는다(`~/.claude/projects/…/*.jsonl`).
+    이 화면은 그걸 읽을 뿐이다. `api/dash.py` 가 파서다.
+
+  ■ 「도중에」는 못 읽는다 — 화면이 그 사실을 먼저 말한다
+    단일 스레드라 도구가 도는 중에는 끼어들 수 없다. 큐에 넣고 턴이 끝나면 읽는다.
+    기다리는 사람이 «왜 답이 없지»를 겪지 않도록 입력창 옆에 항상 적어 둔다.
+
+  ■ 숫자는 전부 `/api/admin/dash/state` 응답만 쓴다.
+#}<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC 관리자 · 작업 현황판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --shell:#f7f4ee; --card:#fffdf9; --ink:#26231e; --nav:#211f1b;
+  --nav-fg:#a29b8d; --nav-on:#f4f1ea;
+  --mut:#6f6a61; --mut2:#8a8377; --mut3:#a09889; --line:rgba(0,0,0,.11);
+  --sans:'IBM Plex Sans KR',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --live:oklch(0.56 0.11 165); --wait:oklch(0.68 0.15 62); --off:#a09889;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--shell);color:var(--ink);font-family:var(--sans);
+     -webkit-font-smoothing:antialiased;display:flex;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 좌측 메뉴 — 정본 admin_nav */
+.lnb{width:212px;flex:none;background:var(--nav);color:#cfc9bd;display:flex;
+     flex-direction:column;overflow:hidden}
+.lnb-top{padding:16px 16px 12px;font:600 14px/1 var(--sans);color:var(--nav-on);flex:none}
+.lnb-scroll{flex:1;min-height:0;overflow-y:auto;padding-bottom:16px}
+.lnb-scroll::-webkit-scrollbar{width:6px}
+.lnb-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+.lnb-grp{border-bottom:1px solid rgba(255,255,255,.045)}
+.lnb-g{width:100%;display:flex;align-items:center;gap:7px;padding:9px 14px;background:none;
+       border:0;cursor:pointer;text-align:left;font:600 10px/1.2 var(--mono);
+       letter-spacing:.11em;color:#8b8478}
+.lnb-g:hover{color:var(--nav-on);background:rgba(255,255,255,.045)}
+.lnb-g .t{flex:1;text-transform:uppercase}
+.lnb-g .c{font:500 9.5px/1 var(--mono);color:#5f5a51}
+.lnb-g .x{font-size:8px;transition:transform .15s}
+.lnb-grp[data-open="n"] .lnb-b{display:none}
+.lnb-grp[data-open="n"] .lnb-g .x{transform:rotate(-90deg)}
+.lnb-b{padding-bottom:5px}
+.lnb a,.lnb .off{display:block;padding:7px 16px;font:500 12.5px/1.35 var(--sans);
+       color:var(--nav-fg);border-left:3px solid transparent}
+.lnb a:hover{color:var(--nav-on);background:rgba(255,255,255,.05)}
+.lnb a.on{color:var(--nav-on);background:rgba(255,255,255,.09);
+          border-left-color:oklch(0.68 0.13 165)}
+.lnb .off{color:#57534b;cursor:default}
+.lnb .tag{font:500 9px/1 var(--mono);padding:1px 4px;border-radius:3px;
+          background:rgba(255,255,255,.06);color:#6d675c;margin-left:5px;vertical-align:1px}
+
+/* 셸 */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:var(--card);
+    display:flex;align-items:center;padding:0 18px;gap:12px}
+.hd .crumb{font:400 12px/1 var(--sans);color:var(--mut2)}
+.hd .sep{color:#c4bdae}
+.hd .now{font:600 13px/1 var(--sans)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--off)}
+.dot.live{background:var(--live);box-shadow:0 0 0 3px oklch(0.56 0.11 165/.18)}
+.dot.wait{background:var(--wait)}
+.body{flex:1;min-height:0;display:flex;gap:12px;padding:14px 16px 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px}
+
+/* 흐름 */
+.flow{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.flow-hd{padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);flex:none;
+         display:flex;align-items:baseline;gap:8px}
+.flow-body{flex:1;min-height:0;overflow:auto;padding:8px 12px 14px}
+.ev{padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05);display:flex;gap:9px;
+    align-items:flex-start}
+.ev .t{width:52px;flex:none;font:400 10px/1.6 var(--mono);color:var(--mut3)}
+.ev .b{flex:1;min-width:0}
+.ev .who{display:inline-block;font:600 9.5px/1.5 var(--mono);padding:0 5px;border-radius:4px;
+         margin-right:6px;vertical-align:1px}
+.who-user{background:var(--nav);color:var(--nav-on)}
+.who-claude{background:oklch(0.95 0.035 165);color:oklch(0.42 0.1 165);
+            border:1px solid oklch(0.84 0.06 165)}
+.who-result{background:rgba(0,0,0,.05);color:var(--mut2)}
+.tool{display:inline-flex;align-items:baseline;gap:6px;font:500 11px/1.6 var(--mono)}
+.tool .n{color:oklch(0.46 0.12 285)}
+.tool .d{color:var(--mut);font-family:var(--sans);font-size:11.5px}
+.say{font:400 12.5px/1.6 var(--sans);white-space:pre-wrap;word-break:break-word}
+.res{font:400 11px/1.5 var(--mono);color:var(--mut2);white-space:pre-wrap;
+     word-break:break-all}
+
+/* 우측 */
+.side{width:330px;flex:none;display:flex;flex-direction:column;gap:12px;min-height:0}
+.cap{font:500 10.5px/1 var(--mono);letter-spacing:.1em;color:var(--mut3);margin-bottom:8px}
+.kv{display:flex;align-items:baseline;gap:8px;padding:3px 0;font:400 11.5px/1.5 var(--sans)}
+.kv .k{width:74px;flex:none;color:var(--mut2)}
+.kv .v{flex:1;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.agent{padding:7px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.agent .h{display:flex;align-items:baseline;gap:7px}
+.agent .id{font:600 10.5px/1.4 var(--mono)}
+.agent .tail{font:400 10.5px/1.45 var(--mono);color:var(--mut2);margin-top:2px;
+             white-space:pre-wrap;word-break:break-all}
+.say-box{flex:none;display:flex;flex-direction:column}
+.say-box textarea{width:100%;min-height:78px;resize:vertical;border:1px solid var(--line);
+  border-radius:6px;padding:8px 9px;font:400 12.5px/1.5 var(--sans);background:var(--shell)}
+.say-box textarea:focus{outline:2px solid oklch(0.68 0.13 165/.4);outline-offset:1px}
+.btn{padding:8px 16px;border-radius:6px;background:var(--ink);color:var(--shell);border:0;
+     cursor:pointer;font:500 12px/1 var(--sans)}
+.btn:disabled{opacity:.45;cursor:default}
+.note{font:400 10.5px/1.5 var(--sans);color:var(--mut2)}
+.pending{font:500 11px/1.5 var(--sans);color:oklch(0.5 0.14 62);
+         background:oklch(0.96 0.045 75);border:1px solid oklch(0.85 0.08 70);
+         border-radius:5px;padding:5px 8px;margin-top:8px}
+.err{font:400 11.5px/1.6 var(--sans);color:oklch(0.5 0.15 25)}
+
+@media (max-width:1000px){
+  body{overflow:auto;display:block}
+  .lnb{width:100%;max-height:170px}
+  .body{flex-direction:column}
+  .side{width:100%}
+  .flow{height:460px;flex:none}
+}
+</style>
+</head>
+<body data-screen-id="ADM-AI-010" data-domain="dash">
+
+<nav class="lnb" aria-label="주메뉴">
+  <div class="lnb-top">admin2</div>
+  <div class="lnb-scroll">
+    {% for g in nav %}
+      <div class="lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
+        <button type="button" class="lnb-g" data-action="lnb-group"
+                aria-expanded="{{ 'true' if g.active else 'false' }}">
+          <span class="t">{{ g.title }}</span>
+          <span class="c">{{ g.done }}/{{ g.total }}</span>
+          <span class="x" aria-hidden="true">▼</span>
+        </button>
+        <div class="lnb-b">
+          {% for it in g["items"] %}
+            {% if it.href %}
+              <a href="{{ it.href }}" class="{% if it.active %}on{% endif %}"
+                 {% if it.active %}aria-current="page"{% endif %}>{{ it.label }}</a>
+            {% else %}
+              <span class="off" title="{{ '기존 화면 있음 · 재구축 전' if it.state == 'old' else '신설 예정' }}"
+                >{{ it.label }}<span class="tag">{{ '기존' if it.state == 'old' else '신설' }}</span></span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</nav>
+
+<div class="main">
+  <header class="hd">
+    <span class="crumb">AI 관리</span>
+    <span class="sep">/</span>
+    <span class="now">작업 현황판</span>
+    <span class="dot" data-bind="dot" title="상태"></span>
+    <span class="num" style="font-size:11.5px;color:var(--mut2)" data-bind="status">연결 중…</span>
+    <span style="flex:1"></span>
+    <span class="num" style="font-size:11px;color:var(--mut3)" data-bind="session">—</span>
+  </header>
+
+  <div class="body">
+    <section class="card flow">
+      <div class="flow-hd">
+        <h5 style="margin:0;font:600 12px/1.2 var(--sans)">진행 흐름</h5>
+        <span class="note" data-bind="flow-note">전사본 갱신 시 자동 표시</span>
+      </div>
+      <div class="flow-body" data-repeat="events"></div>
+    </section>
+
+    <aside class="side">
+      <div class="card" style="padding:10px 12px;flex:none">
+        <div class="cap">현황</div>
+        <div data-repeat="stats"></div>
+      </div>
+
+      <div class="card" style="padding:10px 12px;flex:1;min-height:0;overflow:auto">
+        <!-- 「팀원 작업」이 아니다 — 이 파일들은 서브에이전트와 백그라운드 셸 명령을
+             구분하지 않는다(`api/dash._bg_tasks` 주석). 화면이 아는 것만 말한다 -->
+        <div class="cap">백그라운드 작업</div>
+        <div data-repeat="agents"></div>
+      </div>
+
+      <div class="card say-box" style="padding:10px 12px">
+        <div class="cap">메시지 전송</div>
+        <!-- placeholder 는 **사용자가 칠 말의 예시**라 구어가 맞다. 라벨·안내와는 성격이 다르다 -->
+        <textarea data-bind="say-text" placeholder="예: 회귀 돌려줘 / 지금 상태 정리해줘"
+                  aria-label="보낼 내용"></textarea>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <button class="btn" type="button" data-action="say">보내기</button>
+          <span class="note" style="flex:1">작업 실행 중 읽기 불가 · 완료 후 자동 읽음</span>
+        </div>
+        <div data-bind="say-result"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+{% raw %}
+<script>
+(function () {
+  'use strict';
+  var $ = function (k) {
+    return document.querySelector('[data-bind="' + k + '"],[data-repeat="' + k + '"]');
+  };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+  var hhmm = function (iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return isNaN(d) ? '' : ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'
+                          + ('0'+d.getSeconds()).slice(-2);
+  };
+  var WHO = {user:['who-user','사장님'], claude:['who-claude','클로드'], result:['who-result','결과']};
+  // 방금 보낸 것의 확인 문구. `render()` 가 주기적으로 도는데 그때 지워지면
+  // 사장님은 «보내진 건가?» 를 알 수 없다. 큐가 비면(= 세션이 읽으면) 그때 지운다.
+  var sayMsg = null;
+
+  // 8543초처럼 원시 단위를 그대로 내밀지 않는다 — 읽는 사람이 나눗셈을 해야 한다
+  function ago(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    if (s < 60) return s + '초 전';
+    if (s < 3600) return Math.floor(s / 60) + '분 전';
+    if (s < 86400) return Math.floor(s / 3600) + '시간 ' + Math.floor((s % 3600) / 60) + '분 전';
+    return Math.floor(s / 86400) + '일 전';
+  }
+  function size(b) {
+    b = Math.max(0, Math.floor(b || 0));
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+
+  function render(d) {
+    var dot = $('dot'), st = $('status');
+    if (!d.ok) {
+      dot.className = 'dot';
+      st.textContent = d.reason || '조회 실패';
+      st.style.color = 'oklch(0.5 0.15 25)';
+      $('events').innerHTML = '<div class="err">전사본 없음 — ' + esc(d.dir || '') + '</div>';
+      return;
+    }
+    st.style.color = '';
+    var idle = d.idle_s;
+    dot.className = 'dot ' + (idle < 8 ? 'live' : (idle < 120 ? 'wait' : ''));
+    st.textContent = idle < 8 ? '작업 중' : (idle < 120 ? ('대기 ' + idle + '초') : ('멈춤 ' + ago(idle).replace(' 전', '')));
+    $('session').textContent = d.session ? (d.session.slice(0, 8) + ' · ' + d.size_mb + 'MB') : '';
+
+    $('stats').innerHTML = [
+      ['세션', d.session ? d.session.slice(0, 8) : '—'],
+      ['마지막 기록', ago(idle)],
+      ['전사본', d.size_mb + ' MB'],
+      ['사건', d.events.length + '건'],
+      ['전달 대기', (d.queued || []).length + '건']
+    ].map(function (r) {
+      return '<div class="kv"><span class="k">' + esc(r[0]) + '</span>'
+           + '<span class="v">' + esc(r[1]) + '</span></div>';
+    }).join('');
+
+    // 창(기본 30분) 밖의 출력 파일은 지난 일이다. 「없다」와 「창 밖에 있다」를 구분해 적는다 —
+    // 안 그러면 4일 전 파일이 지금 도는 작업처럼 맨 위에 앉는다(2026-08-12 실측).
+    var ag = d.agents || [], win = d.agents_window_min || 30, older = d.agents_older || 0;
+    var tailNote = older ? '<div class="note" style="margin-top:6px">최근 ' + win
+                         + '분 밖 ' + older + '건은 표시하지 않음</div>' : '';
+    $('agents').innerHTML = (ag.length ? ag.map(function (a) {
+      return '<div class="agent"><div class="h">'
+        + '<span class="id">' + esc(a.id) + '</span>'
+        + '<span class="note"> · ' + (a.live ? '실행 중' : '멈춤') + ' · '
+        + ago(a.age_s) + ' · ' + size(a.bytes) + '</span></div>'
+        + (a.tail ? '<div class="tail">' + esc(a.tail) + '</div>' : '') + '</div>';
+    }).join('') : '<div class="note">최근 ' + win + '분 내 작업 없음</div>') + tailNote;
+
+    var box = $('events');
+    var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    box.innerHTML = (d.events || []).map(function (e) {
+      var w = WHO[e.who] || ['who-result', e.who];
+      var inner = (e.blocks || []).map(function (b) {
+        if (b.kind === 'tool')
+          return '<span class="tool"><span class="n">' + esc(b.name) + '</span>'
+               + '<span class="d">' + esc(b.detail) + '</span></span>';
+        if (b.kind === 'result') return '<div class="res">' + esc(b.text) + '</div>';
+        return '<div class="say">' + esc(b.text) + '</div>';
+      }).join('');
+      return '<div class="ev"><span class="t">' + hhmm(e.ts) + '</span><span class="b">'
+        + '<span class="who ' + w[0] + '">' + w[1] + '</span>' + inner + '</span></div>';
+    }).join('');
+    if (atBottom) box.scrollTop = box.scrollHeight;
+
+    var q = (d.queued || []).length;
+    var r = $('say-result');
+    if (q) {
+      r.innerHTML = '<div class="pending">전달 대기 ' + q + '건 · 작업 완료 후 읽음</div>';
+    } else if (sayMsg) {
+      // 큐가 비었다 = 세션이 읽었다. 그 사실을 말하고 나서 지운다
+      r.innerHTML = '<div class="note">읽음 처리됨</div>';
+      sayMsg = null;
+    } else {
+      r.innerHTML = '';
+    }
+  }
+
+  function load() {
+    fetch('/api/admin/dash/state?limit=60', {credentials: 'same-origin'})
+      .then(function (r) {
+        if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+        return r.json();
+      })
+      .then(render)
+      .catch(function (err) {
+        var st = $('status');
+        st.textContent = err.status === 401 ? '세션 만료 — 로그인 필요' : ('조회 실패 ' + err.message);
+        st.style.color = 'oklch(0.5 0.15 25)';
+        $('dot').className = 'dot';
+      });
+  }
+
+  // **잠금 해제를 한 경로에만 걸지 않는다.** `.finally` 하나에 의존했다가
+  // 한 번 보내면 버튼이 잠긴 채 남는 것을 실측으로 봤다(2026-08-12). 원인이 무엇이든
+  // 사용자에게는 «두 번째부터 안 보내지는 화면»이라 결과가 같다.
+  //   ① then/catch 양쪽에서 푼다  ② 타이머로 한 번 더 받친다
+  var sayBusy = false;
+  document.querySelector('[data-action="say"]').addEventListener('click', function () {
+    var ta = $('say-text'), btn = this, box = $('say-result');
+    var t = (ta.value || '').trim();
+    if (!t) { ta.focus(); return; }
+    if (sayBusy) return;
+    sayBusy = true;
+    btn.disabled = true;
+    var release = function () { sayBusy = false; btn.disabled = false; };
+    var guard = setTimeout(function () {           // 응답이 영영 안 와도 화면은 살아난다
+      release();
+      box.innerHTML = '<div class="err">응답 없음 · 재시도 필요</div>';
+    }, 8000);
+    fetch('/api/admin/dash/say', {method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text: t})})
+      .then(function (r) {
+        if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+        return r.json();
+      })
+      .then(function (j) {
+        clearTimeout(guard); release();
+        if (j.ok) ta.value = '';
+        sayMsg = j.verdict;                        // render 가 덮어쓰지 않게 남겨 둔다
+        box.innerHTML = '<div class="pending">' + esc(j.verdict) + '</div>';
+        load();
+      })
+      .catch(function (e) {
+        clearTimeout(guard); release();
+        sayMsg = null;
+        box.innerHTML = '<div class="err">전송 실패 — '
+          + esc(e.status === 401 ? '세션 만료 · 로그인 필요' : e.message) + '</div>';
+      });
+  });
+
+  // 좌측 메뉴 아코디언 — 접힘을 세션에 남긴다(조감도와 같은 규약)
+  var KEY = 'admin2.lnb.closed';
+  var closed = (function(){ try { return JSON.parse(sessionStorage.getItem(KEY)) || []; }
+                            catch(e){ return []; } })();
+  document.querySelectorAll('.lnb-grp').forEach(function (g) {
+    var k = g.getAttribute('data-grp');
+    if (closed.indexOf(k) >= 0) {
+      g.setAttribute('data-open', 'n');
+      g.querySelector('[data-action="lnb-group"]').setAttribute('aria-expanded', 'false');
+    }
+    var b = g.querySelector('[data-action="lnb-group"]');
+    b.addEventListener('click', function () {
+      var open = g.getAttribute('data-open') === 'y';
+      g.setAttribute('data-open', open ? 'n' : 'y');
+      b.setAttribute('aria-expanded', String(!open));
+      var i = closed.indexOf(k);
+      if (open && i < 0) closed.push(k);
+      if (!open && i >= 0) closed.splice(i, 1);
+      try { sessionStorage.setItem(KEY, JSON.stringify(closed)); } catch (e) { /* 무시 */ }
+    });
+  });
+
+  load();
+  // 전사본이 자라면 알려준다. SSE 가 끊기면 폴링으로 내려앉는다 — 조용히 멈추지 않게.
+  // **폴링은 한 번만 세운다.** `onerror` 는 재연결 시도마다 뜰 수 있어 그대로 두면
+  // 타이머가 겹쳐 쌓이고 요청이 배로 늘어난다(서버 재시작 때 실제로 이 경로를 탔다).
+  var polling = false;
+  function fallback() {
+    if (polling) return;
+    polling = true;
+    setInterval(load, 3000);
+  }
+  try {
+    var es = new EventSource('/api/admin/dash/stream');
+    es.onmessage = function () { load(); };
+    es.onerror = function () { es.close(); fallback(); };
+  } catch (e) { fallback(); }
+})();
+</script>
+{% endraw %}
+</body>
+</html>

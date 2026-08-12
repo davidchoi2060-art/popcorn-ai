@@ -44,3 +44,7 @@ tests/.regression-snapshot.json
 
 # 텔레그램 폴링 오프셋 — PC마다 다르다. 공유하면 메시지를 건너뛰거나 다시 읽는다
 references/telegram_offset.json
+
+# 작업 현황판이 화면 -> 세션으로 넘기는 큐. 실행 중 생기는 상태이고 PC마다 다르다.
+# 커밋하면 남의 PC에서 이미 처리한 말을 다시 읽는다(텔레그램 오프셋과 같은 이유).
+.claude/dash-queue.jsonl

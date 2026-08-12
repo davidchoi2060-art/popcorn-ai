@@ -108,3 +108,19 @@ def build_map(request: Request) -> HTMLResponse:
     정본(`admin_nav`)을 그대로 싣는다 — 나가는 길을 잃지 않게.
     """
     return _render(request, "admin/build_map.html.j2")
+
+
+@router.get("/dash", response_class=HTMLResponse)
+def dash(request: Request) -> HTMLResponse:
+    """작업 현황판(ADM-AI-010) — **신설**. 사용자 요청 2026-08-12.
+
+    "해당 업무가 어떻게 진행되는지를 보면서 직접 대화할 수 있는 웹 대시보드."
+
+    새 배선이 없다 — Claude Code 가 세션 전사본을 이미 디스크에 쌓고(`~/.claude/projects/`)
+    이 화면은 그걸 읽는다. 말을 거는 쪽은 큐 파일이고, 텔레그램과 같은 구조·같은 한계다
+    (도구가 도는 중에는 못 읽는다 — 화면이 그 사실을 먼저 말한다).
+
+    파서는 `api/dash.py`. 조감도와 같은 전체 화면 셸이라 `_layout` 을 상속하지 않되,
+    좌측 메뉴는 정본(`admin_nav`)을 그대로 싣는다.
+    """
+    return _render(request, "admin/dash.html.j2")

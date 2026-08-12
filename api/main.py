@@ -40,6 +40,7 @@ from .admin_swap_logs import router as admin_swap_logs_router
 from .admin_system import router as admin_system_router
 from .admin_std import router as admin_std_router
 from .handoff import router as handoff_router
+from .dash import router as dash_router
 from .admin_ui import router as admin_ui_router
 from .admin_reviews import router as admin_reviews_router
 from .candidates import router as candidates_router
@@ -75,6 +76,7 @@ def health():
 
 app.include_router(admin_std_router)
 app.include_router(handoff_router)
+app.include_router(dash_router)
 app.include_router(auth_router)
 app.include_router(grades_router)
 app.include_router(customer_auth_router)

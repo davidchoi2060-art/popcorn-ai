@@ -98,6 +98,7 @@ NAV = [
     ]),
 
     ("AI 관리", "cpu", [
+        ("작업 현황판", "/admin2/dash", None, "신설 · 진행 보기 + 말 걸기"),
         ("AI 작업 설정", None, None, "신설 — 작업↔모델 · 폴백"),
         ("AI 연동 설정", None, None, "신설 — 키는 서버 env"),
         ("AI 사용량 · 비용", None, "/admin/ai-cost.html", None),
