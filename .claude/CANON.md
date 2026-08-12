@@ -18,7 +18,9 @@
 | 부품 어휘 · 슬롯 | `api/taxonomy.py` | `PART_LABELS` · `CORE_TYPES` · `slot_of` |
 | 마진 상속 | `api/pricing.py` | `resolve_margins` 밖에서 계산 금지 |
 | 견적 표시용 상품명 | `api/product_name.py` | `display_name`. 고객 응답에만 쓴다 |
-| 디자인 토큰 | `design-system/tokens.css` | 임의 HEX/px 금지. 토큰 이름으로 쓴다 |
+| 디자인 토큰 | `design-system/tokens.css` | 임의 HEX/px 금지. 토큰 이름으로 쓴다 (44개) |
+| 화면 셸(관리자) | `templates/admin/_layout.html.j2` | 새 `/admin2/*` 는 상속한다. 독립 페이지로 두지 않는다 |
+| 디자인 브리프 서식 | `.claude/BRIEF.md` | 화면을 클로드 디자인에 맡길 때 · 받은 뒤 배선 규약 |
 | Phoenix 원본 좌표 | `docs/design/phoenix-template-map.md` | 옆 화면을 베끼지 말고 여기서 찾는다 |
 | 결정 이력 | `docs/decisions/decision-log.md` | 확정/미정의 단일 원천 |
 | 회귀 | `tests/regression.py` | 861건. 값이 아니라 **관계**를 검사한다 |
@@ -33,6 +35,11 @@
 | 운영 모드 스위치 | `ops_settings` (5행 — `pay`·`ship`·`refund`·`member`·`settle`) |
 | 조립 표준(신) | `std.spec_defs` (49) · `std.compat_pairs` (28) |
 | 추천 후보 | 뷰 `v_recommendation_candidates` · `v_companion_candidates` |
+
+> **손으로 짠 두 화면은 아직 셸·토큰 밖에 있다** — `build_map`(조감도) 자체 변수 12개 ·
+> `dash`(현황판) 15개, 둘 다 `tokens.css` 를 안 읽는다(2026-08-12 실측). 토큰이 모자라서가
+> 아니라 안 쓴 것이다. **고칠지는 미결이라 임의로 옮기지 마라** — 근거와 선택지는
+> `.claude/BRIEF.md` §C-4.
 
 > **`std.*` 와 `public.product_specs` 는 다른 저장소다.** 엔진이 읽는 것은 `public` 이고
 > `std` 는 새로 세우는 표준이다. 2026-08-11 에 이 둘의 채움률을 섞어 오진했다
