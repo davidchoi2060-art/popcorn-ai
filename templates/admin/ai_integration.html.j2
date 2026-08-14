@@ -1,0 +1,688 @@
+{#
+  AI 연동 설정 (ADM-AI-040) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    "이 프로바이더 키가 서버에 있는가"와 "얼마까지 쓰게 할 것인가"만 다룬다. 키 값 자체는
+    입력·표시하지 않는다(CANON §2-5) — 있으면 서버 .env에만 있고, 이 화면은 그 존재
+    여부만 판정한다(env 조회뿐, 프로바이더 호출 없음 — 화면을 여는 것으로 과금이 생기지
+    않는다).
+
+  ■ 출처 — 사장님이 확정한 원안
+    파일: `docs/design/dc-ai-integration.html`(`<x-dc>` + `DCLogic` + `support.js` 런타임 —
+    여기서는 돌지 않는다). `reviews.html.j2`와 같은 원칙: **화면 구성·색·서체·간격·
+    인터랙션은 원안 그대로 옮기고, 런타임만 순수 JS로 바꿨다.** 더미 배열(`INIT_LIMITS`·
+    `LIVE_STATE`)은 걷어내고 `GET/POST /api/admin/ai-integration/*` 실측 응답만 쓴다.
+    요구사항 정본: `docs/design/req/req-ai-integration.md`.
+
+  ■ 원안과 다르게 구현한 지점 (보고서에도 남긴다)
+    ① **역할 스위처(헤더의 owner/viewer 토글) 폐지** — 원안은 화면 안에서 등급을 눌러
+       바꿔볼 수 있었다(디자인 도구가 두 상태를 시연하려던 장치). 실제 화면은 로그인
+       세션의 진짜 등급(`GET /api/admin/auth/me`, `Admin2Shell.meReady`)만 쓴다 — 조회
+       등급인데 버튼으로 owner인 척 저장 버튼을 켤 수 있다면 그 자체가 화면 정직성 위반이다
+       (`reviews.html.j2`가 같은 이유로 같은 것을 뺐다 — 그 화면의 ② 참조).
+    ② **"실측 현재 / 키 투입 후 가정" 미리보기 토글 폐지** — 원안은 "키가 있다면" 이라는
+       가상의 상태(ok/fail)를 보여주는 토글이 있었다(디자인 시연용). 요구사항은 "상태
+       판정은 env 키 존재 여부만 본다"고 못박는다 — 실제로 일어나지 않은 가상의 상태를
+       화면에 띄우면 그 자체가 숫자/상태를 지어내는 것이다. 지금 이 화면에는 **실측 상태
+       하나**만 있다.
+    ③ **저장 성공/실패 알림은 공용 진행 바(`/shared/ui-progress.js`)가 맡는다** — 원안은
+       자체 토스트 스택으로 저장 결과까지 알렸다. 이 저장소는 쓰기 요청에 자동으로 상단
+       진행 바를 붙이고 서버가 준 `message`/`detail`을 그대로 보여준다(전 43화면 공통,
+       CLAUDE.md §관리자 화면 규약). 같은 사실을 두 번 다른 말로 띄우지 않으려고 좌하단
+       토스트(`Admin2Shell.toast`)는 **클라이언트에서만 일어나는 일**(권한 부족으로 시도도
+       못 함·저장 안 된 채 다른 프로바이더로 이동 시도·되돌리기)에만 쓴다.
+    ④ **드로어 위치를 헤더 높이에 고정하지 않는다** — 원안은 `top:52px` 고정값이었다.
+       공용 셸의 헤더는 `min-height:52px`이라 내용이 길어지면 늘어날 수 있어(`flex-wrap`),
+       고정 픽셀 대신 헤더 **아래** 영역을 감싸는 `position:relative` 래퍼 안에서
+       `inset:0`으로 덮는다 — 헤더가 몇 줄이든 항상 정확히 그 아래부터 덮인다.
+    ⑤ **서체** — 원안은 IBM Plex Sans KR/Mono(Google Fonts CDN). 외부 CDN 금지(A-30) —
+       admin2 공용 팔레트(`--rv-font`=Pretendard, `--rv-mono`=JetBrains Mono)를 그대로 쓴다
+       (이 화면 원안 자체가 admin2 공용 셸의 원본 재료 중 하나였다 — `_admin2_shell.html.j2`
+       머리말 참조 — 그래서 팔레트 값 자체는 거의 그대로다).
+
+  ■ 정본 — 좌측 메뉴·헤더·팔레트는 `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`가
+    그린다. 프로바이더 3사·작업 4종·동작 4종 카탈로그는 DB 테이블이 없다(조사자 datamap
+    실측) — 정본은 `docs/decisions/decision-log.md` A-35 + 원안이고, 그 값은
+    `api/admin_ai_integration.py` 한 곳에서만 정의해 API 응답에 실어 보낸다. 이 템플릿은
+    그 응답만 그린다(카탈로그를 다시 정의하지 않는다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}AI 연동 설정{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input{font-family:var(--rv-mono)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* 원안 BLUE — Codex 점 색. admin2 공용 팔레트엔 세 번째 액센트가 없어 원안 값을 그대로 둔다. */
+:root{ --dot-blue: oklch(0.5 0.12 250); }
+
+.a2-hd .hint{font:400 11px/1 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 헤더 아래를 감싸는 relative 래퍼 — 드로어가 이 안에서 inset:0으로 덮인다(위 ④) ── */
+.ai-body{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.ai-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+
+/* 키 안내 배너 */
+.keynote{flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.14);background:var(--rv-panel2);
+        border-left:3px solid var(--rv-faint);border-radius:7px;padding:10px 13px;
+        display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.keynote .tag{font:600 11px/1 var(--rv-mono);color:var(--rv-muted);flex:none}
+.keynote .main{font:600 11.5px/1.4 var(--rv-font)}
+.keynote .main code{font-family:var(--rv-mono)}
+.keynote .sub{font:400 10.5px/1.5 var(--rv-font);color:#5b564d;flex:1;min-width:260px}
+
+/* 통계 카드 */
+.stats{flex:none;padding:12px 18px 0;display:flex;gap:10px}
+.stat{flex:1;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:9px 12px;min-width:0}
+.stat .row1{display:flex;align-items:center;gap:7px}
+.stat .mark{font:600 11px/1 var(--rv-mono)}
+.stat .lb{font:500 10.5px/1.3 var(--rv-font);color:#7d7669}
+.stat .row2{display:flex;align-items:baseline;gap:7px;margin-top:3px}
+.stat .v{font:600 24px/1.15 var(--rv-mono);font-variant-numeric:tabular-nums}
+.stat .nt{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim)}
+
+/* 프로바이더 표 */
+.pwrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 18px}
+.phead{flex:none;display:grid;grid-template-columns:196px 176px 152px 116px 132px 1fr;gap:12px;
+      align-items:center;padding:9px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+      border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:#7d7669}
+.ptable{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
+       border-radius:0 0 7px 7px;overflow:hidden}
+.prow{display:grid;grid-template-columns:196px 176px 152px 116px 132px 1fr;gap:12px;align-items:center;
+     padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;border-left:3px solid transparent;
+     background:transparent;-webkit-tap-highlight-color:transparent}
+.prow:last-child{border-bottom:none}
+.prow:hover{background:rgba(0,0,0,.02)}
+.prow.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.prow .vend{display:flex;align-items:center;gap:9px;min-width:0}
+.prow .dot{width:9px;height:9px;flex:none;border-radius:50%}
+.prow .vn{font:600 12.5px/1.3 var(--rv-font)}
+.prow .cp{font:400 11px/1.3 var(--rv-font);color:var(--rv-faint)}
+.prow .envk{font:400 11px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .mdl{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .lim{font:500 11px/1.3 var(--rv-mono)}
+.prow .lim.dim{color:var(--rv-dim)}
+.prow .rate{font:400 10.5px/1.3 var(--rv-mono);color:#6f6a61}
+.prow .stwrap{display:flex;align-items:center;gap:9px;min-width:0}
+.chip{font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:5px 8px;white-space:nowrap;border:1px solid;flex:none}
+.chip.ok{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:rgba(0,0,0,.14)}
+.chip.fail{color:var(--rv-amber);background:var(--rv-amber-bg);border-color:var(--rv-amber-line)}
+.chip.unset{color:#8a8377;background:var(--rv-panel2);border-color:rgba(0,0,0,.16)}
+.prow .stnote{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 하단 2단 패널(정적 안내 — 원안 LEGEND/outOfScope 그대로) */
+.panels{flex:1;min-height:0;display:flex;gap:14px;margin-top:14px}
+.panel{flex:1;min-width:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;
+      padding:13px 15px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.panel.alt{background:var(--rv-panel2)}
+.panel .cap{font:600 10.5px/1 var(--rv-font);color:#8a8377;letter-spacing:.04em}
+.leg-item{display:flex;align-items:flex-start;gap:9px}
+.leg-item .desc{font:400 11px/1.6 var(--rv-font);color:#4a463e;flex:1}
+.panel .foot{font:400 10.5px/1.6 var(--rv-font);color:#8a8377;margin-top:auto;padding-top:9px;
+            border-top:1px solid rgba(0,0,0,.08)}
+.oos-item{display:flex;align-items:baseline;gap:8px}
+.oos-item .dash{font:600 10px/1.4 var(--rv-mono);color:var(--rv-dim)}
+.oos-item .t{font:400 11px/1.6 var(--rv-font);color:#4a463e;flex:1}
+
+/* 드로어 */
+.backdrop{position:absolute;inset:0;background:rgba(38,35,30,.22);z-index:7}
+.backdrop[hidden]{display:none}
+.drawer{position:absolute;top:0;right:0;bottom:0;width:552px;max-width:92vw;background:var(--rv-card);
+       border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);
+       display:flex;flex-direction:column;z-index:8}
+.drawer[hidden]{display:none}
+.dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.dw-hd .row1{display:flex;align-items:center;gap:9px}
+.dw-hd .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dw-hd .vn{font:600 14.5px/1.3 var(--rv-font)}
+.dw-hd .cp{font:400 11.5px/1.3 var(--rv-font);color:#8a8377}
+.dw-hd .close{margin-left:auto;font:400 15px/1 var(--rv-font);color:#8a8377;cursor:pointer;
+             padding:2px 4px;background:none;border:0}
+.dw-hd .meta{display:flex;align-items:center;gap:10px;margin-top:7px}
+.dw-hd .envk{font:400 11px/1.3 var(--rv-mono);color:#6f6a61}
+.dw-hd .chkat{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
+.dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:15px}
+.keybox{border:1px solid rgba(0,0,0,.12);border-left:3px solid #bdb6a8;background:var(--rv-panel2);
+       border-radius:6px;padding:10px 12px;font:400 11px/1.65 var(--rv-font);color:#4a463e}
+.sect .schead{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.sect .schead .cap{font:600 10.5px/1 var(--rv-font);color:#8a8377;letter-spacing:.04em}
+.sect .schead .src{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
+.lfields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.lfield{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:9px 11px;background:#faf7f0}
+.lfield .lb{font:400 10.5px/1.3 var(--rv-font);color:#8a8377;margin-bottom:6px}
+.lfield .row{display:flex;align-items:baseline;gap:5px}
+.lfield .pfx{font:500 13px/1.2 var(--rv-mono);color:#8a8377}
+.lfield input{width:76px;font:600 15px/1.2 var(--rv-mono);color:var(--rv-ink);background:transparent;
+             border:none;border-bottom:1px solid rgba(0,0,0,.24);outline:none;padding:0 0 2px}
+.lfield input::placeholder{color:var(--rv-dim3)}
+.lfield input:disabled{color:var(--rv-dim2)}
+.lfield .unit{font:400 10.5px/1.3 var(--rv-font);color:#8a8377}
+.sublist{display:flex;flex-direction:column;gap:6px}
+.subrow{display:grid;grid-template-columns:132px 1fr 92px;gap:10px;align-items:center;
+       border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:8px 11px;background:#faf7f0}
+.subrow .nm{font:500 11.5px/1.3 var(--rv-font)}
+.subrow .track{height:5px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden;display:block}
+.subrow .bar{display:block;height:100%;background:var(--rv-ink)}
+.subrow .valwrap{display:flex;align-items:baseline;gap:4px;justify-content:flex-end}
+.subrow .pfx{font:400 10.5px/1.3 var(--rv-mono);color:#8a8377}
+.subrow input{width:52px;text-align:right;font:600 12px/1.2 var(--rv-mono);color:var(--rv-ink);
+             background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,.24);outline:none;padding:0 0 2px}
+.subrow input:disabled{color:var(--rv-dim2)}
+.subnote{font:400 10.5px/1.6 var(--rv-font);margin-top:8px}
+.actlist{display:flex;flex-direction:column;gap:5px}
+.actrow{display:flex;align-items:flex-start;gap:9px;border:1px solid rgba(0,0,0,.12);border-radius:7px;
+       padding:9px 11px;cursor:pointer;background:#faf7f0}
+.actrow.on{border-color:var(--rv-ink);background:#f6f2e8}
+.actrow .mk{font:600 11px/1 var(--rv-mono);color:#bdb6a8;margin-top:2px;flex:none}
+.actrow.on .mk{color:var(--rv-ink)}
+.actrow .body{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.actrow .lb{font:500 11.5px/1.3 var(--rv-font)}
+.actrow .ds{font:400 10.5px/1.5 var(--rv-font);color:#8a8377}
+.diffbox{border:1px solid var(--rv-ink);border-left:3px solid var(--rv-ink);background:#f6f2e8;
+        border-radius:6px;padding:10px 12px}
+.diffbox[hidden]{display:none}
+.diffbox .t{font:600 11px/1.4 var(--rv-font);margin-bottom:6px}
+.diffbox .line{font:400 10.5px/1.5 var(--rv-mono);color:#4a463e}
+.dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;
+        gap:8px;background:var(--rv-panel2)}
+.dw-foot .note{font:400 10.5px/1.4 var(--rv-font);flex:1;min-width:0}
+.dw-foot .note.warn{color:var(--rv-red)}
+.btn-revert{font:500 11.5px/1 var(--rv-font);color:#5b564d;background:var(--rv-card);
+           border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer}
+.btn-revert:disabled{color:#b3ac9e;cursor:default}
+.btn-save{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+         border:none;border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-save:disabled{color:#f0ece2;background:#bdb6a8;cursor:default}
+
+.loading,.errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.errbox .ti{font:600 14px/1.4 var(--rv-font)}
+.errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);text-align:center;max-width:420px}
+.errbox a,.errbox button{display:inline-block;padding:8px 18px;border-radius:6px;background:var(--rv-ink);
+          color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+@media (max-width:768px){
+  .panels{flex-direction:column}
+  .drawer{position:fixed;top:0;width:100%;max-width:100vw}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="hint" id="ownerHint">한도 변경은 owner 등급만 가능합니다</span>
+{% endblock %}
+
+{% block content %}
+<div class="ai-body" id="aiBody">
+  <div class="ai-scroll" id="aiScroll">
+
+    <div class="keynote">
+      <span class="tag">키</span>
+      <span class="main">키 값은 서버 <code>.env</code>에만 있습니다 — 이 화면은 키를 입력받지 않습니다</span>
+      <span class="sub">CANON §2-5. 이 화면은 "그 키가 있는가"와 "얼마까지 쓰게 할 것인가"만 다룹니다.
+        연결 확인은 env 키 존재 여부만 보고 프로바이더에 호출을 보내지 않으므로,
+        이 화면을 여는 것으로 과금이 생기지 않습니다.</span>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat"><div class="row1"><span class="lb">불러오는 중…</span></div></div>
+    </div>
+
+    <div class="pwrap">
+      <div class="phead">
+        <span>프로바이더</span><span>env 키 이름</span><span>모델</span><span>일 한도</span><span>호출 제한</span><span>상태</span>
+      </div>
+      <div class="ptable" id="ptable">
+        <div class="loading">불러오는 중…</div>
+      </div>
+
+      <div class="panels">
+        <div class="panel">
+          <div class="cap">상태 표기 규칙 — "없음"과 "못 함"은 다르다</div>
+          <div class="leg-item"><span class="chip unset">○ 미설정</span>
+            <span class="desc">env에 해당 키 항목 자체가 없습니다 — 확인 대상이 아닙니다.</span></div>
+          <div class="leg-item"><span class="chip ok">● 설정됨</span>
+            <span class="desc">env에 키가 있습니다. 값은 화면에 오지 않습니다.</span></div>
+          <div class="leg-item"><span class="chip fail">▲ 확인 실패</span>
+            <span class="desc">키는 있는데 값이 비어 있습니다 — "없음"과 절대 같은 말로 쓰지 않습니다.</span></div>
+          <div class="foot">연결 확인은 <b>env 키 존재 여부만</b> 봅니다 — 프로바이더에 호출을 보내지 않으므로
+            이 화면을 여는 것으로 과금이 생기지 않습니다.</div>
+        </div>
+        <div class="panel alt">
+          <div class="cap">이 화면이 하지 않는 일</div>
+          <div class="oos-item"><span class="dash">—</span><span class="t">키 값 입력·수정·삭제 — 서버 .env에만 둡니다(CANON §2-5)</span></div>
+          <div class="oos-item"><span class="dash">—</span><span class="t">개별 호출 로그(무엇을 묻고 뭐라 답했는지) — AI 응답 기록 소관</span></div>
+          <div class="oos-item"><span class="dash">—</span><span class="t">비용 추이·용도별 분석 — AI 사용량·비용 소관</span></div>
+          <div class="oos-item"><span class="dash">—</span><span class="t">작업↔모델 배정·폴백 순서 — AI 작업 설정 소관</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="backdrop" id="backdrop" data-keep="1" hidden></div>
+  <aside class="drawer" id="drawer" data-keep="1" hidden>
+    <div class="dw-hd">
+      <div class="row1">
+        <span class="dot" id="dwDot"></span>
+        <span class="vn" id="dwVendor">—</span>
+        <span class="cp" id="dwCompany">—</span>
+        <span class="chip" id="dwState">—</span>
+        <button type="button" class="close" data-action="close-drawer" aria-label="닫기">✕</button>
+      </div>
+      <div class="meta">
+        <span class="envk" id="dwEnvKey">—</span>
+        <span class="chkat" id="dwCheckedAt">—</span>
+      </div>
+    </div>
+    <div class="dw-body">
+      <div class="keybox" id="dwKeyNote">—</div>
+
+      <div class="sect">
+        <div class="schead"><span class="cap">프로바이더 한도</span><span class="src">cost_thresholds · rate_limit_policies</span></div>
+        <div class="lfields">
+          <div class="lfield">
+            <div class="lb">일 한도</div>
+            <div class="row"><span class="pfx">$</span>
+              <input id="fDaily" data-field="daily" inputmode="decimal" placeholder="미설정" style="width:64px">
+              <span class="unit">/ 일</span></div>
+          </div>
+          <div class="lfield">
+            <div class="lb">분당 호출</div>
+            <div class="row"><input id="fPerMin" data-field="perMin" inputmode="numeric" placeholder="미설정" style="width:60px">
+              <span class="unit">회 / 분</span></div>
+          </div>
+          <div class="lfield">
+            <div class="lb">일 호출</div>
+            <div class="row"><input id="fPerDay" data-field="perDay" inputmode="numeric" placeholder="미설정" style="width:76px">
+              <span class="unit">회 / 일</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sect">
+        <div class="schead"><span class="cap">작업별 부분 한도</span><span class="src" id="dwSubSum">—</span></div>
+        <div class="sublist" id="dwSubList"></div>
+        <div class="subnote" id="dwSubNote"></div>
+      </div>
+
+      <div class="sect" data-keep="1">
+        <div class="schead"><span class="cap">한도 초과 시 동작</span></div>
+        <div class="actlist" id="dwActions"></div>
+      </div>
+
+      <div class="diffbox" id="dwDiff" hidden>
+        <div class="t">변경됨 · 저장 필요</div>
+        <div id="dwDiffLines"></div>
+      </div>
+    </div>
+    <div class="dw-foot">
+      <span class="note" id="dwFootNote">—</span>
+      <button type="button" class="btn-revert" id="dwRevert" data-action="revert" disabled>되돌리기</button>
+      <button type="button" class="btn-save" id="dwSave" data-action="save" disabled>저장</button>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var PROVIDER_DOT = { codex: 'var(--dot-blue)', claude: 'var(--rv-amber)', gemini: 'var(--rv-green)' };
+
+  var S = {
+    data: null, loadErr: null,
+    sel: null, drawerOpen: false,
+    draft: null, saved: null,
+    me: null,
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtMoney(v) { return (v === null || v === undefined) ? '—' : ('$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })); }
+  function fmtInt(v) { return (v === null || v === undefined) ? '—' : Number(v).toLocaleString('en-US'); }
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return iso; }
+  }
+  function parseNum(v) {
+    if (v === '' || v === null || v === undefined) return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+  function toInput(v) { return (v === null || v === undefined) ? '' : String(v); }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+
+  function toast(msg, kind) { window.Admin2Shell && window.Admin2Shell.toast(msg, kind); }
+  function canWrite() { return !!(window.Admin2Shell && window.Admin2Shell.canWrite('owner')); }
+
+  // ── 초기 로드 ────────────────────────────────────────────────────
+  function boot() {
+    bindStatic();
+    window.Admin2Shell.meReady.then(function (me) {
+      S.me = me;
+      $('ownerHint').textContent = me
+        ? ('한도 변경은 owner 등급만 가능합니다 · 현재 ' + (me.role === 'owner' ? 'owner' : me.role))
+        : '한도 변경은 owner 등급만 가능합니다 · 로그인 필요';
+      renderFoot();
+    });
+    load();
+  }
+
+  function load() {
+    apiGet('/api/admin/ai-integration/status').then(function (j) {
+      S.data = j; S.loadErr = null;
+      // 드로어가 열려 있었으면 같은 프로바이더의 최신 값으로 다시 맞춘다(다른 창에서 바뀌었을 수 있다)
+      if (S.sel && findProvider(S.sel)) {
+        var dirty = diffOf().length > 0;
+        if (!dirty) { S.saved = cloneLimit(findProvider(S.sel).limit); S.draft = cloneLimit(S.saved); }
+      }
+      renderAll();
+    }).catch(function (err) {
+      S.data = null; S.loadErr = err;
+      renderAll();
+    });
+  }
+
+  function findProvider(key) {
+    if (!S.data) return null;
+    var found = null;
+    S.data.providers.forEach(function (p) { if (p.key === key) found = p; });
+    return found;
+  }
+
+  function cloneLimit(l) {
+    // sub도 daily/perMin/perDay와 같이 **문자열로 정규화**한다 — 입력이 문자열이라
+    // (onInputChange가 e.target.value를 그대로 쓴다), draft가 숫자 그대로면 사용자가
+    // 같은 값을 다시 타이핑했을 때 20(number) !== "20"(string)으로 오탐한다.
+    var sub = {};
+    Object.keys(l.sub || {}).forEach(function (k) { sub[k] = toInput(l.sub[k]); });
+    return { daily: toInput(l.daily_usd), perMin: toInput(l.per_minute), perDay: toInput(l.per_day),
+      action: l.action, sub: sub };
+  }
+
+  function renderAll() {
+    if (S.loadErr) { renderLoadError(); return; }
+    if (!S.data) return;
+    renderStats();
+    renderTable();
+    renderDrawerFull();
+  }
+  function renderLoadError() {
+    var un = S.loadErr.status === 401;
+    $('ptable').innerHTML = '<div class="errbox"><div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
+      '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.' : ('연동 상태를 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>' +
+      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry">다시 시도</button>') + '</div>';
+    $('stats').innerHTML = '';
+  }
+
+  // ── 통계 카드 ────────────────────────────────────────────────────
+  function renderStats() {
+    var c = S.data.counts;
+    var defs = [
+      ['설정됨', c.ok, 'env에 키 있음', 'var(--rv-green)'],
+      ['확인 실패', c.fail, '키는 있으나 확인 실패', 'var(--rv-amber)'],
+      ['미설정', c.unset, '키 항목 자체가 없음', '#8a8377'],
+    ];
+    $('stats').innerHTML = defs.map(function (d) {
+      return '<div class="stat"><div class="row1"><span class="mark" style="color:' + d[3] + '">●</span>' +
+        '<span class="lb">' + esc(d[0]) + '</span></div>' +
+        '<div class="row2"><span class="v num">' + d[1] + '</span></div>' +
+        '<div class="nt">' + esc(d[2]) + '</div></div>';
+    }).join('');
+  }
+
+  // ── 프로바이더 표 ────────────────────────────────────────────────
+  function chipHtml(state, label) {
+    return '<span class="chip ' + state + '">' + (state === 'ok' ? '● ' : state === 'fail' ? '▲ ' : '○ ') + esc(label) + '</span>';
+  }
+  function renderTable() {
+    $('ptable').innerHTML = S.data.providers.map(function (p) {
+      var on = p.key === S.sel && S.drawerOpen;
+      var limitTxt = p.limit.daily_usd === null ? '<span class="lim dim">미설정</span>' : '<span class="lim">' + fmtMoney(p.limit.daily_usd) + ' / 일</span>';
+      var rateTxt = (p.limit.per_minute === null && p.limit.per_day === null) ? '—'
+        : (fmtInt(p.limit.per_minute) + '/분 · ' + fmtInt(p.limit.per_day) + '/일');
+      return '<div class="prow' + (on ? ' on' : '') + '" data-action="select-provider" data-key="' + esc(p.key) + '">' +
+        '<span class="vend"><span class="dot" style="background:' + PROVIDER_DOT[p.key] + '"></span>' +
+        '<span class="vn">' + esc(p.vendor) + '</span><span class="cp">' + esc(p.company) + '</span></span>' +
+        '<span class="envk">' + esc(p.env_key) + '</span>' +
+        '<span class="mdl">' + esc(p.model) + '</span>' +
+        '<span>' + limitTxt + '</span>' +
+        '<span class="rate">' + esc(rateTxt) + '</span>' +
+        '<span class="stwrap">' + chipHtml(p.state, p.state_label) +
+        '<span class="stnote">' + esc(p.state_note) + '</span></span></div>';
+    }).join('');
+  }
+
+  // ── 드로어 ───────────────────────────────────────────────────────
+  function select(key) {
+    if (S.sel && diffOf().length) {
+      toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn');
+      return;
+    }
+    var p = findProvider(key);
+    if (!p) return;
+    S.sel = key; S.saved = cloneLimit(p.limit); S.draft = cloneLimit(p.limit);
+    S.drawerOpen = true;
+    $('backdrop').hidden = false; $('drawer').hidden = false;
+    renderTable();
+    renderDrawerFull();
+  }
+  function closeDrawer() {
+    // 원안 onClose와 같은 동작: 저장하지 않은 편집은 조용히 버린다(경고 없음) — 그래서
+    // 선택 자체도 완전히 지운다. sel만 남기고 draft를 안 지우면, 바로 다른 프로바이더를
+    // 골랐을 때 "이미 닫은 드로어의 편집"이 새 선택을 막는 오탐이 생긴다.
+    S.drawerOpen = false; S.sel = null; S.saved = null; S.draft = null;
+    $('backdrop').hidden = true; $('drawer').hidden = true;
+    renderTable();
+  }
+
+  function diffOf() {
+    if (!S.sel || !S.saved || !S.draft) return [];
+    var a = S.saved, b = S.draft, out = [];
+    if (a.daily !== b.daily) out.push({ f: 'daily_usd', from: a.daily, to: b.daily,
+      line: S.sel + '.daily_usd: ' + fmtMoney(parseNum(a.daily)) + ' → ' + fmtMoney(parseNum(b.daily)) });
+    if (a.perMin !== b.perMin) out.push({ f: 'per_minute', from: a.perMin, to: b.perMin,
+      line: S.sel + '.per_minute: ' + (a.perMin || '없음') + ' → ' + (b.perMin || '없음') });
+    if (a.perDay !== b.perDay) out.push({ f: 'per_day', from: a.perDay, to: b.perDay,
+      line: S.sel + '.per_day: ' + (a.perDay || '없음') + ' → ' + (b.perDay || '없음') });
+    if (a.action !== b.action) out.push({ f: 'action', from: a.action, to: b.action,
+      line: S.sel + '.action: ' + (a.action || '없음') + ' → ' + (b.action || '없음') });
+    (S.data.tasks || []).forEach(function (t) {
+      if (a.sub[t.key] !== b.sub[t.key]) out.push({ f: 'sub.' + t.key, from: a.sub[t.key], to: b.sub[t.key],
+        line: S.sel + '.sub[' + t.label + ']: ' + fmtMoney(parseNum(a.sub[t.key])) + ' → ' + fmtMoney(parseNum(b.sub[t.key])) });
+    });
+    return out;
+  }
+
+  function renderDrawerFull() {
+    if (!S.sel) return;
+    var p = findProvider(S.sel);
+    if (!p) { closeDrawer(); return; }
+    $('dwDot').style.background = PROVIDER_DOT[p.key];
+    $('dwVendor').textContent = p.vendor;
+    $('dwCompany').textContent = p.company;
+    $('dwState').className = 'chip ' + p.state;
+    $('dwState').textContent = (p.state === 'ok' ? '● ' : p.state === 'fail' ? '▲ ' : '○ ') + p.state_label;
+    $('dwEnvKey').textContent = p.env_key;
+    $('dwCheckedAt').textContent = fmtTime(p.checked_at) + ' 확인';
+    $('dwKeyNote').textContent = p.state_note;
+
+    $('fDaily').value = S.draft.daily;
+    $('fPerMin').value = S.draft.perMin;
+    $('fPerDay').value = S.draft.perDay;
+
+    $('dwSubList').innerHTML = (S.data.tasks || []).map(function (t) {
+      return '<div class="subrow" data-task="' + esc(t.key) + '">' +
+        '<span class="nm">' + esc(t.label) + '</span>' +
+        '<span class="track"><span class="bar" id="bar-' + esc(t.key) + '"></span></span>' +
+        '<span class="valwrap"><span class="pfx">$</span>' +
+        '<input data-sub="' + esc(t.key) + '" value="' + esc(S.draft.sub[t.key]) + '" placeholder="0" inputmode="decimal"></span></div>';
+    }).join('');
+
+    $('dwActions').innerHTML = (S.data.actions || []).map(function (a) {
+      var on = S.draft.action === a.key;
+      return '<div class="actrow' + (on ? ' on' : '') + '" data-action="pick-action" data-key="' + esc(a.key) + '">' +
+        '<span class="mk">' + (on ? '●' : '○') + '</span>' +
+        '<span class="body"><span class="lb">' + esc(a.label) + '</span><span class="ds">' + esc(a.desc) + '</span></span></div>';
+    }).join('');
+
+    renderDrawerDynamic();
+  }
+
+  /** 입력값·되돌리기·선택 상태만 갱신한다 — input의 value는 건드리지 않는다(타이핑 중 커서 유지). */
+  function renderDrawerDynamic() {
+    if (!S.sel) return;
+    var diffs = diffOf();
+    var dirty = diffs.length > 0;
+    var daily = parseNum($('fDaily').value);
+    var subTotal = (S.data.tasks || []).reduce(function (sum, t) {
+      var el = document.querySelector('[data-sub="' + t.key + '"]');
+      var v = el ? parseNum(el.value) : parseNum(S.draft.sub[t.key]);
+      return sum + (v || 0);
+    }, 0);
+    var overSub = daily !== null && subTotal > daily;
+    var cap = daily || 1;
+
+    (S.data.tasks || []).forEach(function (t) {
+      var bar = $('bar-' + t.key);
+      if (!bar) return;
+      var el = document.querySelector('[data-sub="' + t.key + '"]');
+      var v = el ? parseNum(el.value) : 0;
+      bar.style.width = Math.max(0, Math.min(100, Math.round((v || 0) / cap * 100))) + '%';
+      bar.style.background = overSub ? 'var(--rv-red)' : PROVIDER_DOT[S.sel];
+    });
+
+    $('dwSubSum').textContent = '합계 ' + fmtMoney(subTotal) + ' / 프로바이더 한도 ' + (daily === null ? '미설정' : fmtMoney(daily));
+    $('dwSubSum').style.color = overSub ? 'var(--rv-red)' : '';
+    $('dwSubNote').textContent = overSub
+      ? '부분 한도 합계가 프로바이더 한도를 넘습니다 — 이대로 저장하면 400을 받습니다'
+      : (daily === null ? '일 한도를 먼저 정하면 배분 여유가 표시됩니다'
+        : '부분 한도는 프로바이더 한도 안에서만 배분됩니다 (남은 여유 ' + fmtMoney(daily - subTotal) + ')');
+    $('dwSubNote').style.color = overSub ? 'var(--rv-red)' : '#8a8377';
+
+    var owner = canWrite();
+    $('dwDiff').hidden = !dirty;
+    if (dirty) {
+      $('dwDiffLines').innerHTML = diffs.map(function (d) { return '<div class="line">' + esc(d.line) + '</div>'; }).join('');
+    }
+    $('dwRevert').disabled = !dirty;
+    $('dwSave').disabled = !(owner && dirty);
+    var note = $('dwFootNote');
+    if (!owner) {
+      note.textContent = '권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ') — 연결 상태 조회만 가능합니다';
+      note.className = 'note warn';
+    } else {
+      note.textContent = dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다';
+      note.className = 'note';
+    }
+  }
+
+  function onInputChange(e) {
+    var field = e.target.getAttribute('data-field');   // 'daily' | 'perMin' | 'perDay'
+    var sub = e.target.getAttribute('data-sub');
+    if (field) S.draft[field] = e.target.value;
+    if (sub) S.draft.sub[sub] = e.target.value;
+    renderDrawerDynamic();
+  }
+
+  function pickAction(key) {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
+    S.draft.action = key;
+    Array.prototype.forEach.call(document.querySelectorAll('.actrow'), function (row) {
+      var on = row.getAttribute('data-key') === key;
+      row.classList.toggle('on', on);
+      row.querySelector('.mk').textContent = on ? '●' : '○';
+    });
+    renderDrawerDynamic();
+  }
+
+  function doRevert() {
+    if (!diffOf().length) { toast('되돌릴 변경이 없습니다', 'warn'); return; }
+    // S.saved는 이미 입력형(cloneLimit 결과) — 그대로 복제해 draft에 되돌린다
+    S.draft = { daily: S.saved.daily, perMin: S.saved.perMin, perDay: S.saved.perDay,
+      action: S.saved.action, sub: Object.assign({}, S.saved.sub) };
+    renderDrawerFull();
+    toast('저장 전 상태로 되돌렸습니다', 'ok');
+  }
+
+  function doSave() {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
+    var diffs = diffOf();
+    if (!diffs.length) { toast('변경 사항이 없습니다', 'warn'); return; }
+    var daily = parseNum(S.draft.daily);
+    if (daily === null || daily <= 0) { toast('일 한도는 0보다 커야 합니다', 'err'); return; }
+    var sub = {};
+    (S.data.tasks || []).forEach(function (t) { sub[t.key] = parseNum(S.draft.sub[t.key]); });
+    var subTotal = Object.keys(sub).reduce(function (s, k) { return s + (sub[k] || 0); }, 0);
+    if (subTotal > daily) { toast('부분 한도 합계 $' + subTotal + '가 프로바이더 한도 $' + daily + '를 넘습니다', 'err'); return; }
+    var body = { daily_usd: daily, per_minute: parseNum(S.draft.perMin), per_day: parseNum(S.draft.perDay),
+      action: S.draft.action, sub: sub };
+    apiPost('/api/admin/ai-integration/limits/' + encodeURIComponent(S.sel), body).then(function (j) {
+      // 진행 바(ui-progress.js)가 j.message를 이미 보여준다 — 값만 반영한다
+      var p = findProvider(S.sel);
+      if (p) p.limit = j.limit;
+      S.saved = cloneLimit(j.limit); S.draft = cloneLimit(j.limit);
+      renderTable(); renderDrawerFull();
+    }).catch(function () { /* ui-progress.js가 오류를 이미 표시한다 */ });
+  }
+
+  // ── 정적 바인딩 ──────────────────────────────────────────────────
+  function bindStatic() {
+    document.addEventListener('click', function (ev) {
+      var sel = ev.target.closest('[data-action="select-provider"]');
+      if (sel) { select(sel.getAttribute('data-key')); return; }
+      var pick = ev.target.closest('[data-action="pick-action"]');
+      if (pick) { pickAction(pick.getAttribute('data-key')); return; }
+      if (ev.target.closest('[data-action="close-drawer"]')) { closeDrawer(); return; }
+      if (ev.target.closest('[data-action="revert"]')) { doRevert(); return; }
+      if (ev.target.closest('[data-action="save"]')) { doSave(); return; }
+      if (ev.target.closest('[data-action="retry"]')) { load(); return; }
+      if (ev.target === $('backdrop')) { closeDrawer(); return; }
+    });
+    document.addEventListener('input', function (ev) {
+      if (ev.target.matches('[data-field]') || ev.target.matches('[data-sub]')) onInputChange(ev);
+    });
+  }
+  function renderFoot() { if (S.sel) renderDrawerDynamic(); }
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

@@ -1,0 +1,890 @@
+{#
+  AI 작업 설정 (ADM-AI-030) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    "AI 연동이 재개되면 어느 작업에 어느 모델을 쓰고, 실패하면 무엇으로 대체하는가"를
+    코드 재배포 없이 미리 정해 두는 자리. 지금은 "휴면"이다(2026-07-21 LLM 실연동
+    보류 — 별도 승인 필요) — 값을 바꿔도 오늘은 어떤 실행도 바뀌지 않는다. 저장한
+    값은 연동이 재개되는 순간 그대로 살아난다(요구사항 정의서 ①).
+
+  ■ 출처 — 사장님이 Claude Design에서 확정한 원안
+    파일: `docs/design/dc-ai-task-settings.html` (`<x-dc>` + `DCLogic` + `support.js`
+    런타임 — 여기서는 돌지 않는다). `reviews`·`build_map`과 같은 원칙: **화면 구성·색·
+    서체·간격·인터랙션은 원안 그대로 옮기고, 런타임만 순수 JS로 바꿨다.** 데이터는
+    원안의 더미 상수(TASK_CATALOG·INIT_TASKS·INIT_HISTORY·PROMPTS·PROMPT_BODY)를 전부
+    걷어내고 `GET/POST/PATCH/DELETE /api/admin/ai-task-settings*`(`api/admin_ai_tasks.py`)
+    실측 응답만 쓴다. 요구사항 기준은 `docs/design/req/req-ai-task-settings.md` +
+    decision-log.md **A-35**(2026-08-13 사장님 확정 — 3사 역할분담+폴백 채택, 작업 종류
+    닫힌 4종).
+
+  ■ 2026-08-13 셸 통합 — `templates/admin/_admin2_shell.html.j2`를 상속한다. 사이드바·
+    헤더·팔레트·토스트 컨테이너·서체 변수(`--rv-*`)는 셸/`admin2.css`가 그린다 — 이
+    화면 자신(dc-ai-task-settings.html)이 그 셸의 원본 재료 중 하나였다(셸 파일 상단
+    주석 실측). 그래서 admin2.css를 다시 읽지 않고 그대로 `var(--rv-*)`를 쓴다.
+    **좌측 메뉴 항목 구성(IA)은 이 화면 소관이 아니다** — 정본은 `api/admin_nav.py`.
+
+  ■ 원안과 다르게 구현한 지점 (전부 이유가 있다 — 제작 보고서에도 남긴다)
+    ① **역할 스위처 폐지** — 원안은 헤더에 「owner/operator」 버튼을 두어 화면 안에서
+       역할을 바꿔볼 수 있었다(디자인 도구가 두 상태를 시연하려던 장치). 실제 화면은
+       로그인 세션의 **진짜 등급**(`GET /api/admin/auth/me`, 셸의 `Admin2Shell.meReady`/
+       `canWrite('owner')`)만 쓴다 — `reviews.html.j2`가 이미 같은 이유로 같은 결정을
+       내렸다(화면 정직성 규약 — 조회 등급이 버튼만으로 owner인 척 쓸 수 있으면 안 된다).
+    ② **변경 이력을 전용 테이블에 담지 않는다** — 마이그레이션 0046 docstring 참조.
+       `ops_settings_history`(라이브 writer 없음, 시드 2행뿐)를 다시 만드는 대신, 실제로
+       쓰이고 있는 `admin_operator_activity_logs`(target_kind='ai_task')에 얹었다.
+    ③ **프롬프트 버전은 "고르는 드롭다운"이 아니라 "입력 + 과거값 참고"다** — 원안의
+       `PROMPTS` 상수(prompt/s1-parse@v4 등 + 등록일)는 순수 JS 하드코딩이고 이 저장소
+       어디에도 실체 파일이 없다(조사자 실측). 존재하지 않는 버전 목록을 실재하는 양
+       보여주면, 이 화면은 "휴면"이라 그 값이 연동 재개 시 **그대로 살아나므로** 지어낸
+       식별자가 실제 프롬프트 참조로 둔갑한다. 그래서 텍스트 입력으로 새 식별자를
+       적게 하고, 그 아래 "과거값" 칩은 **이 작업의 실제 변경 이력에서 파생**한다
+       (`prompt_options` — 지어낸 카탈로그가 아니라 실제로 저장됐던 값).
+    ④ **프롬프트 "본문"은 표시하지 않는다** — 원안의 `PROMPT_BODY`도 순수 JS 하드코딩
+       (실체 없음). 지금 켜면 그럴듯한 시스템 프롬프트 문장이 실재하는 것처럼 보이고,
+       역시 "그대로 살아나는" 값이라 위험이 크다. 대신 정직한 안내 문구로 대체했다
+       (요구사항 §비범위 "본문 텍스트의 작성·편집 UI는 비범위"와 정합).
+    ⑤ **"+ 작업 추가"는 원안과 달리 즉시 반영 + 이력 기록이다** — 원안은 추가를 로컬
+       state에만 넣고 토스트로 "저장해야 이력에 남습니다"라 말했지만, 정작 로컬
+       `tasks`(저장본) 배열에 바로 들어가 다음 diff 비교에서 항상 무변경으로 나오는
+       자기모순이 있었다. 실제 화면은 "작업 삭제"(원안도 이미 즉시반영+이력기록)와
+       같은 급의 행위로 통일했다 — 추가·삭제는 즉시, 필드 편집(프로바이더·모드·폴백·
+       프롬프트버전)만 초안(draft)+명시적 저장.
+    ⑥ **이력의 "버전(vN)" 배지 = 작업별이 아니라 화면 전체 공유 카운터** — 원안
+       `state.ver`가 이미 그렇게 동작한다(태스크마다 따로가 아니라 전역 1개). 서버는
+       `admin_operator_activity_logs`에 실제로 쌓인 최댓값+1로 이걸 재현한다(지어낸
+       숫자가 아니라 실제 이력 행 수에서 파생).
+    ⑦ **화살표는 ASCII `->`만 쓴다** — 서버 stdout이 cp949라 유니코드 화살표가 요청을
+       500으로 만든 전례가 있다(CLAUDE.md 「함정」). diff 문자열이 로그·예외 경로에
+       실릴 가능성을 원천 차단한다.
+    ⑧ **토스트는 셸의 `Admin2Shell.toast()`를 그대로 쓴다** — `reviews.html.j2`는
+       검증된 자체 구현을 이미 갖고 있어 유지했지만, 이 화면은 새로 짓는 것이라
+       중복 구현 없이 셸이 제공하는 것을 쓴다(`.claude/CANON.md` §1).
+
+  ■ 정본 토큰과 어긋나는 지점 — 없음. `design-system/tokens.css`(고객용)는 애초에
+    admin2 화면의 대상이 아니다(셸의 `/shared/admin2/admin2.css`만 읽는다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}AI 작업 설정{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input{font-family:var(--rv-mono)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 좌측 메뉴·헤더 뼈대·팔레트는 admin2 공용 셸이 그린다 — 여기는 이 화면 본문만. ── */
+
+.ats-tabsbar{flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:var(--rv-card);
+  display:flex;align-items:stretch;padding:0 18px;gap:18px;z-index:4}
+.ats-tab{display:flex;align-items:center;gap:7px;font:400 12.5px/1 var(--rv-font);color:var(--rv-faint);
+  border-bottom:2px solid transparent;cursor:pointer;padding:0 2px;background:none;border-top:0;border-left:0;border-right:0}
+.ats-tab.on{font-weight:600;color:var(--rv-ink);border-bottom-color:var(--rv-ink)}
+.ats-tab .cnt{font:500 10.5px/1 var(--rv-mono);color:var(--rv-dim);background:var(--rv-panel2);border-radius:4px;padding:3px 5px}
+.ats-tab.on .cnt{color:var(--rv-muted)}
+
+.ats-view{flex:1;min-height:0;display:none;flex-direction:column}
+.ats-view.on{display:flex}
+
+.ats-banner{flex:none;margin:12px 18px 0;border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+  border-left:3px solid var(--rv-amber);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px}
+.ats-banner .mk{font:600 11px/1 var(--rv-mono);color:oklch(0.5 0.14 55)}
+.ats-banner .hd{font:600 11.5px/1.4 var(--rv-font)}
+.ats-banner .ds{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:0}
+
+.ats-notready{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px;text-align:center}
+.ats-notready[hidden]{display:none}
+.ats-notready .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.ats-notready .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);max-width:420px}
+
+.ats-body{flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px}
+.ats-left{width:392px;flex:none;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+
+.ats-taskbox{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden;position:relative}
+.ats-taskbox-hd{height:34px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;padding:0 12px;background:var(--rv-panel)}
+.ats-taskbox-hd .t{font:600 11px/1 var(--rv-font);color:var(--rv-muted)}
+.ats-taskbox-hd .tag{font:400 10px/1 var(--rv-font);color:var(--rv-dim)}
+.ats-trow{padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;border-left:3px solid transparent}
+.ats-trow.on{background:var(--rv-panel2);border-left-color:var(--rv-ink)}
+.ats-trow .r1{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ats-trow .nm{font:500 12.5px/1.3 var(--rv-font);flex:1;min-width:0}
+.ats-trow .dirty{font:600 10px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border-radius:4px;padding:4px 6px}
+.ats-trow .mode{font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap;border:1px solid}
+.ats-trow .r2{display:flex;align-items:center;gap:6px}
+.ats-trow .sm{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ats-trow .un{font:500 10px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel2);border-radius:4px;padding:3px 6px}
+.ats-empty-mini{padding:26px 16px;text-align:center}
+.ats-empty-mini .ti{font:600 12.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.ats-empty-mini .ds{font:400 11px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:5px}
+.ats-addrow{display:flex;align-items:center;gap:8px;padding:10px 13px;border-top:1px dashed rgba(0,0,0,.14);position:relative}
+.ats-addrow .nt{font:500 11px/1 var(--rv-font);color:var(--rv-faint);flex:1}
+.ats-addbtn{font:600 11px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border-radius:5px;padding:7px 11px;cursor:pointer;user-select:none}
+.ats-addbtn.dis{color:var(--rv-panel2);background:var(--rv-dim3)}
+.ats-dmenu{position:absolute;left:12px;right:12px;bottom:46px;z-index:30;background:var(--rv-card);border:1px solid rgba(0,0,0,.2);
+  border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.ats-dmenu[hidden]{display:none}
+.ats-dmenu-item{display:flex;align-items:center;gap:8px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+  padding:7px 9px;border-radius:5px;cursor:pointer}
+.ats-dmenu-item:hover{background:var(--rv-panel)}
+.ats-dmenu-item .k{font:400 10px/1 var(--rv-mono);color:var(--rv-dim)}
+.ats-dmenu-item.dis{color:var(--rv-dim2);cursor:default}
+.ats-dmenu-item.dis:hover{background:none}
+
+.ats-conflictbox{flex:1;min-height:0;background:var(--rv-panel);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 13px;overflow:auto}
+.ats-conflictbox .cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:9px}
+.ats-cf{border-radius:6px;padding:9px 11px;background:var(--rv-card);margin-bottom:7px}
+.ats-cf.adopted{border:1.5px solid var(--rv-ink)}
+.ats-cf:not(.adopted){border:1px solid rgba(0,0,0,.12)}
+.ats-cf .r1{display:flex;align-items:baseline;gap:7px}
+.ats-cf .dt{font:600 10.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.ats-cf .ti{font:600 11.5px/1.3 var(--rv-font);flex:1;min-width:0}
+.ats-cf .bd{font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap}
+.ats-cf.adopted .bd{color:var(--rv-canvas);background:var(--rv-ink)}
+.ats-cf:not(.adopted) .bd{color:var(--rv-muted);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.12)}
+.ats-cf .ds{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);margin-top:4px}
+.ats-conflict-note{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);margin-top:10px;padding-top:9px;border-top:1px solid rgba(0,0,0,.1)}
+
+.ats-right{flex:1;min-width:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.ats-dethd{flex:none;padding:14px 16px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ats-dethd .nm{font:600 14.5px/1.3 var(--rv-font)}
+.ats-dethd .k{font:400 11px/1 var(--rv-mono);color:var(--rv-faint)}
+.ats-modeswitch{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden}
+.ats-modeswitch span{font:500 10.5px/1 var(--rv-font);padding:7px 10px;cursor:pointer;user-select:none}
+.ats-modeswitch span.on{color:var(--rv-canvas);background:var(--rv-ink)}
+.ats-modeswitch span:not(.on){color:var(--rv-muted);background:var(--rv-card)}
+.ats-delbtn{font:500 11px/1 var(--rv-font);border-radius:5px;padding:7px 10px;cursor:pointer;background:var(--rv-card);border:1px solid}
+
+.ats-detbody{flex:1;min-height:0;overflow:auto;padding:15px 16px;display:flex;flex-direction:column;gap:15px}
+.ats-cap{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.ats-cap .t{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em}
+.ats-cap .n{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
+
+.ats-prow{display:grid;grid-template-columns:16px 76px 1fr 124px 22px;gap:10px;align-items:center;border:1px solid rgba(0,0,0,.12);
+  border-radius:7px;padding:9px 11px;background:var(--rv-panel2);margin-bottom:6px}
+.ats-prow .dot{width:9px;height:9px;border-radius:50%}
+.ats-prow .ve{font:600 12px/1.3 var(--rv-font)}
+.ats-prow .md{font:400 11px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ats-role{display:flex;align-items:center;justify-content:space-between;gap:6px;font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:6px 8px;user-select:none;position:relative}
+.ats-role.click{cursor:pointer}
+.ats-role .car{font-size:8px;opacity:.5}
+.ats-rmv{font:400 12px/1 var(--rv-font);text-align:center;cursor:pointer;color:var(--rv-faint)}
+.ats-rmv.dis{color:var(--rv-dim3);cursor:not-allowed}
+.ats-addln{position:relative;margin-top:2px}
+.ats-addlink{display:inline-flex;font:500 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px dashed rgba(0,0,0,.24);border-radius:5px;padding:8px 11px;cursor:pointer;user-select:none}
+.ats-addlink.dis{color:var(--rv-dim2);cursor:not-allowed}
+.ats-catmenu{position:absolute;top:32px;left:0;z-index:30;min-width:280px;background:var(--rv-card);border:1px solid rgba(0,0,0,.2);
+  border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.ats-catmenu[hidden]{display:none}
+.ats-catitem{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:5px;cursor:pointer}
+.ats-catitem:hover{background:var(--rv-panel)}
+.ats-catitem.dis{cursor:not-allowed;opacity:.45}
+.ats-catitem .dot{width:8px;height:8px;flex:none;border-radius:50%}
+.ats-catitem .ve{font:500 11.5px/1.3 var(--rv-font);width:60px;flex:none}
+.ats-catitem .md{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);flex:1;min-width:0}
+.ats-catitem .st{font:400 10px/1 var(--rv-font);color:var(--rv-dim)}
+
+.ats-fbwrap{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ats-fbchip{display:inline-flex;align-items:center;gap:6px;background:var(--rv-panel2);border-radius:5px;padding:6px 9px;border:1px solid;border-left-width:3px}
+.ats-fbchip .arrow{font:400 11px/1 var(--rv-mono);color:var(--rv-dim3);margin-right:2px}
+.ats-fbchip .lb{font:500 11px/1 var(--rv-font)}
+.ats-fbchip .up,.ats-fbchip .dn,.ats-fbchip .rm{font:500 10px/1 var(--rv-mono);cursor:pointer;color:var(--rv-muted);margin-left:2px}
+.ats-fbchip .up.dis,.ats-fbchip .dn.dis{color:var(--rv-dim3);cursor:not-allowed}
+.ats-fbempty{font:400 11px/1.4 var(--rv-font);color:var(--rv-dim)}
+.ats-fbmenu{position:absolute;top:32px;left:0;z-index:30;min-width:200px;background:var(--rv-card);border:1px solid rgba(0,0,0,.2);
+  border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.ats-fbmenu[hidden]{display:none}
+
+.ats-promptbox{border:1px solid rgba(0,0,0,.12);border-radius:7px;background:var(--rv-panel2);overflow:hidden}
+.ats-prompt-r1{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid rgba(0,0,0,.09);position:relative;flex-wrap:wrap}
+.ats-prompt-r1 .v{font:500 11.5px/1.3 var(--rv-mono);flex:1;min-width:0}
+.ats-prompt-r1 .at{font:400 10.5px/1 var(--rv-font);color:var(--rv-faint)}
+.ats-prompt-btn{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:4px 8px;cursor:pointer}
+.ats-prompt-body{padding:10px 12px;font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel)}
+.ats-prompt-foot{padding:7px 11px;font:400 10px/1.4 var(--rv-font);color:var(--rv-dim);border-top:1px solid rgba(0,0,0,.09)}
+.ats-prompt-edit{position:absolute;top:36px;right:11px;z-index:30;min-width:260px;background:var(--rv-card);border:1px solid rgba(0,0,0,.2);
+  border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:9px}
+.ats-prompt-edit[hidden]{display:none}
+.ats-prompt-edit input{width:100%;font:500 12px/1 var(--rv-mono);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.28);border-radius:5px;padding:8px 9px;outline:none;box-sizing:border-box}
+.ats-prompt-edit .row{display:flex;gap:6px;margin-top:8px}
+.ats-prompt-past{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.ats-prompt-chip{font:400 10px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-card);border:1px solid rgba(0,0,0,.14);
+  border-radius:4px;padding:4px 6px;cursor:pointer}
+.ats-btn-commit{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;border-radius:5px;padding:8px 10px;cursor:pointer;flex:1}
+.ats-btn-cancel{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 10px;cursor:pointer}
+
+.ats-diffbox{border:1px solid var(--rv-ink);border-left:3px solid var(--rv-ink);background:var(--rv-panel2);border-radius:6px;padding:10px 12px}
+.ats-diffbox .hd{font:600 11px/1.4 var(--rv-font);margin-bottom:6px}
+.ats-diffbox .ln{font:400 10.5px/1.5 var(--rv-mono);color:var(--rv-ink-soft)}
+
+.ats-detfoot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 16px;display:flex;align-items:center;gap:8px;background:var(--rv-panel);flex-wrap:wrap}
+.ats-detfoot .nt{font:400 10.5px/1.4 var(--rv-font);flex:1;min-width:160px}
+.ats-detfoot .nt.warn{color:var(--rv-red)}
+.ats-btn-revert{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.18);
+  border-radius:5px;padding:8px 11px;cursor:pointer}
+.ats-btn-revert.dis{color:var(--rv-dim2);cursor:not-allowed}
+.ats-pill-unapplied{font:500 10px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.12);
+  border-radius:4px;padding:6px 8px}
+.ats-btn-save{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;border-radius:5px;
+  padding:9px 15px;cursor:pointer}
+.ats-btn-save.dis{color:var(--rv-panel2);background:var(--rv-dim3);cursor:not-allowed}
+
+.ats-nosel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:40px;text-align:center}
+.ats-nosel .ti{font:600 13.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.ats-nosel .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);max-width:320px}
+
+.ats-histwrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 18px}
+.ats-histhd{flex:none;display:grid;grid-template-columns:150px 96px 1fr 1fr 90px;gap:10px;padding:8px 14px;background:var(--rv-panel);
+  border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.ats-histbody{flex:1;min-height:0;overflow:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px}
+.ats-histrow{display:grid;grid-template-columns:150px 96px 1fr 1fr 90px;gap:10px;align-items:center;padding:9px 14px;
+  border-bottom:1px solid rgba(0,0,0,.06)}
+.ats-histrow .at{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted)}
+.ats-histrow .who{font:400 11px/1.3 var(--rv-font)}
+.ats-histrow .what{font:400 10.5px/1.5 var(--rv-mono);color:#4a463e;overflow-wrap:anywhere}
+.ats-histrow .why{font:400 11px/1.4 var(--rv-font);color:var(--rv-ink-soft)}
+.ats-histrow .ver{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.ats-hist-empty{padding:34px;text-align:center}
+.ats-hist-empty .ti{font:600 13px/1.4 var(--rv-font);color:var(--rv-muted)}
+.ats-hist-empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:5px}
+
+@media (max-width:768px){
+  .ats-body{flex-direction:column}
+  .ats-left{width:100%}
+  .ats-histhd,.ats-histrow{grid-template-columns:120px 80px 1fr}
+  .ats-histhd span:nth-child(4),.ats-histhd span:nth-child(5),
+  .ats-histrow .why,.ats-histrow .ver{display:none}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ats-tabsbar" role="tablist">
+  <button type="button" class="ats-tab on" id="tabAssign" data-action="switch-tab" data-tab="assign" role="tab" aria-selected="true">
+    <span>배정</span><span class="cnt num" id="tabAssignCnt">—</span>
+  </button>
+  <button type="button" class="ats-tab" id="tabHistory" data-action="switch-tab" data-tab="history" role="tab" aria-selected="false">
+    <span>변경 이력</span><span class="cnt num" id="tabHistoryCnt">—</span>
+  </button>
+</div>
+
+<div class="ats-banner">
+  <span class="mk">▲ 휴면</span>
+  <span class="hd">이 설정은 지금 어떤 실행도 제어하지 않습니다</span>
+  <span class="ds">실 LLM 연동 보류(2026-07-21 결정, 별도 승인 필요) — 저장한 값은 연동이 재개되는 순간 그대로 살아납니다.</span>
+</div>
+
+<section class="ats-view on" id="viewAssign" role="tabpanel">
+  <div class="ats-notready" id="notReady" hidden>
+    <div class="ti">원천 준비 중</div>
+    <div class="ds" id="notReadyMsg">설정 테이블이 아직 준비되지 않았습니다.</div>
+  </div>
+  <div class="ats-notready" id="loadErrorBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="loadErrorMsg">배정 정보를 불러오지 못했습니다.</div>
+    <button type="button" class="ats-btn-revert" data-action="retry-load" style="margin-top:6px">다시 시도</button>
+  </div>
+
+  <div class="ats-body" id="assignBody">
+    <aside class="ats-left">
+      <div class="ats-taskbox">
+        <div class="ats-taskbox-hd">
+          <span class="t">작업 종류 <span id="taskCount" class="num">—</span></span>
+          <span style="flex:1"></span>
+          <span class="tag">닫힌 목록 · A-02·A-03</span>
+        </div>
+        <div id="taskRows"></div>
+        <div class="ats-empty-mini" id="noTasksMsg" hidden>
+          <div class="ti">배정된 작업이 없습니다</div>
+          <div class="ds">작업을 추가하면 여기에 쌓입니다.</div>
+        </div>
+        <div class="ats-addrow" data-keep="1">
+          <span class="nt" id="addTaskNote"></span>
+          <span class="ats-addbtn" id="addTaskBtn" data-action="toggle-menu" data-menu="addTask">+ 작업 추가</span>
+          <div class="ats-dmenu" id="menuAddTask" hidden></div>
+        </div>
+      </div>
+
+      <div class="ats-conflictbox">
+        <div class="cap">문서 간 불일치 — 결정 필요</div>
+        <div id="conflictsList"></div>
+        <div class="ats-conflict-note">랜딩(<span style="font-family:var(--rv-mono)">main-landing.html</span>)이 이미 "3개 AI가 같은 문장을 읽는다"를 고객에게 약속 중입니다 — 이 화면은 그 약속과 맞는 쪽(집합 + 수렴)으로 그려져 있습니다. decision-log <b>A-35</b>(2026-08-13)가 이 안을 정식 채택했습니다.</div>
+      </div>
+    </aside>
+
+    <div class="ats-right" id="rightPanel"></div>
+  </div>
+</section>
+
+<section class="ats-view" id="viewHistory" role="tabpanel">
+  <div class="ats-histwrap">
+    <div class="ats-histhd">
+      <span>변경 시각</span><span>변경자</span><span>무엇을</span><span>왜</span><span>버전</span>
+    </div>
+    <div class="ats-histbody" id="histBody">
+      <div class="ats-hist-empty"><div class="ti">불러오는 중…</div></div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var GREEN = 'oklch(0.5 0.11 165)', AMBER = 'oklch(0.62 0.15 55)', RED = 'oklch(0.52 0.16 30)', BLUE = 'oklch(0.5 0.12 250)';
+  var VENDOR_COLOR = { Codex: BLUE, Claude: AMBER, Gemini: GREEN };
+
+  var S = {
+    tab: 'assign',
+    data: null, loadErr: null,
+    selKey: null, draft: null,
+    openMenu: null, promptDraftValue: null,
+    history: null, historyErr: null, historyLoading: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function fmtDt(isoStr) {
+    if (!isoStr) return '—';
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    function p(n) { return String(n).padStart(2, '0'); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiJson(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+  function apiPost(path, body) { return apiJson('POST', path, body); }
+  function apiPatch(path, body) { return apiJson('PATCH', path, body); }
+  function apiDelete(path) { return fetch(path, { method: 'DELETE', credentials: 'same-origin' }).then(handle); }
+
+  // ── 권한 · 토스트 — 셸(admin2-shell.js)의 것을 그대로 쓴다(중복 구현 없음) ──────
+  function canWrite() { return window.Admin2Shell.canWrite('owner'); }
+  function toast(msg, kind) { window.Admin2Shell.toast(msg, kind); }
+  function guard() {
+    if (!canWrite()) {
+      var me = window.Admin2Shell.getMe();
+      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+
+  // ── 서식 ─────────────────────────────────────────────────────────
+  function modeLabel(m) { return m === 'concurrent' ? '동시 호출·수렴' : '단일 + 폴백'; }
+  function fmtProviders(ps) { return '[' + (ps || []).map(function (p) { return p.vendor + '(' + p.role + ')'; }).join(', ') + ']'; }
+  function fmtFallback(fb) { return '[' + (fb || []).join(', ') + ']'; }
+  function fmtPrompt(v) { return v || '미지정'; }
+
+  function diffLines(saved, draft, key) {
+    if (!saved || !draft) return [];
+    var out = [];
+    if (saved.mode !== draft.mode) out.push(key + '.mode: ' + modeLabel(saved.mode) + ' -> ' + modeLabel(draft.mode));
+    var bp = fmtProviders(saved.providers), ap = fmtProviders(draft.providers);
+    if (bp !== ap) out.push(key + '.providers: ' + bp + ' -> ' + ap);
+    var bf = fmtFallback(saved.fallback_order), af = fmtFallback(draft.fallback_order);
+    if (bf !== af) out.push(key + '.fallback: ' + bf + ' -> ' + af);
+    var bpv = saved.prompt_version || null, apv = draft.prompt_version || null;
+    if (bpv !== apv) out.push(key + '.prompt_version: ' + fmtPrompt(bpv) + ' -> ' + fmtPrompt(apv));
+    return out;
+  }
+
+  function findTask(key) { return S.data ? (S.data.tasks || []).filter(function (t) { return t.task_key === key; })[0] : undefined; }
+  function cloneTask(t) {
+    return {
+      mode: t.mode,
+      providers: t.providers.map(function (p) { return { vendor: p.vendor, model: p.model, role: p.role }; }),
+      fallback_order: t.fallback_order.slice(),
+      prompt_version: t.prompt_version
+    };
+  }
+
+  // ── 초기 로드 ────────────────────────────────────────────────────
+  function boot() {
+    window.Admin2Shell.meReady.then(function () { renderAll(); });
+    loadSettings();
+  }
+
+  function loadSettings() {
+    apiGet('/api/admin/ai-task-settings').then(function (j) {
+      S.data = j; S.loadErr = null;
+      var t = S.selKey ? findTask(S.selKey) : null;
+      if (!t) {
+        var first = (j.tasks || [])[0];
+        S.selKey = first ? first.task_key : null;
+        S.draft = first ? cloneTask(first) : null;
+      } else {
+        var wasDirty = diffLines(t, S.draft, S.selKey).length > 0;
+        if (!wasDirty) S.draft = cloneTask(t);
+      }
+      renderAll();
+    }).catch(function (err) {
+      S.loadErr = err;
+      renderAll();
+    });
+  }
+
+  function renderAll() {
+    renderTabsCount();
+    var notReady = $('notReady'), errBox = $('loadErrorBox'), body = $('assignBody');
+    if (S.loadErr) {
+      notReady.hidden = true; body.style.display = 'none'; errBox.hidden = false;
+      $('loadErrorMsg').textContent = S.loadErr.message;
+      return;
+    }
+    errBox.hidden = true;
+    if (!S.data) return;
+    var ready = S.data.ready;
+    notReady.hidden = ready;
+    if (!ready) $('notReadyMsg').textContent = S.data.reason || '설정 테이블이 아직 준비되지 않았습니다.';
+    body.style.display = ready ? '' : 'none';
+    if (!ready) return;
+    renderTaskList();
+    renderConflicts();
+    renderDetail();
+  }
+
+  function renderTabsCount() {
+    $('tabAssignCnt').textContent = S.data ? fmt((S.data.tasks || []).length) : '—';
+    $('tabHistoryCnt').textContent = S.data ? fmt(S.data.history_count || 0) : '—';
+  }
+
+  // ── 좌측 — 작업 목록 ─────────────────────────────────────────────
+  function renderTaskList() {
+    var tasks = S.data.tasks || [];
+    $('taskCount').textContent = fmt(tasks.length);
+    $('noTasksMsg').hidden = tasks.length !== 0;
+    $('taskRows').innerHTML = tasks.map(function (t) {
+      var on = t.task_key === S.selKey;
+      var dirty = on && diffLines(t, S.draft, S.selKey).length > 0;
+      var modeColor = t.mode === 'concurrent' ? GREEN : 'var(--rv-muted)';
+      var modeBg = t.mode === 'concurrent' ? 'oklch(0.95 0.03 165)' : 'var(--rv-panel2)';
+      return '<div class="ats-trow' + (on ? ' on' : '') + '" data-action="select-task" data-key="' + esc(t.task_key) + '">' +
+        '<div class="r1"><span class="nm">' + esc(t.label) + '</span>' +
+        (dirty ? '<span class="dirty">변경됨</span>' : '') +
+        '<span class="mode" style="color:' + modeColor + ';background:' + modeBg + ';border-color:' + modeColor + '55">' + esc(t.mode_label) + '</span></div>' +
+        '<div class="r2"><span class="sm">' + esc(t.providers.map(function (p) { return p.vendor; }).join(' · ')) +
+        (t.fallback_order.length ? ' -&gt; 폴백 ' + t.fallback_order.length + '단' : ' · 폴백 없음') + '</span>' +
+        '<span class="un">미적용</span></div></div>';
+    }).join('');
+
+    var unassigned = S.data.unassigned || [];
+    $('addTaskNote').textContent = unassigned.length === 0 ? '4종 모두 배정됨 — 목록은 닫혀 있습니다' : '배정되지 않은 작업이 있습니다';
+    $('addTaskBtn').classList.toggle('dis', !canWrite());
+    $('menuAddTask').innerHTML = unassigned.length
+      ? unassigned.map(function (t) {
+        return '<div class="ats-dmenu-item" data-action="add-task" data-key="' + esc(t.key) + '">' +
+          '<span style="flex:1;min-width:0">' + esc(t.label) + '</span><span class="k">' + esc(t.key) + '</span></div>';
+      }).join('')
+      : '<div class="ats-dmenu-item dis">추가할 작업이 없습니다 — 목록은 4종으로 닫혀 있습니다</div>';
+    $('menuAddTask').hidden = S.openMenu !== 'addTask';
+  }
+
+  function renderConflicts() {
+    $('conflictsList').innerHTML = (S.data.conflicts || []).map(function (c) {
+      return '<div class="ats-cf' + (c.adopted ? ' adopted' : '') + '">' +
+        '<div class="r1"><span class="dt">' + esc(c.date) + '</span><span class="ti">' + esc(c.title) + '</span>' +
+        '<span class="bd">' + esc(c.badge) + '</span></div>' +
+        '<div class="ds">' + esc(c.desc) + '</div></div>';
+    }).join('');
+  }
+
+  // ── 우측 — 상세 편집 ─────────────────────────────────────────────
+  function renderDetail() {
+    var panel = $('rightPanel');
+    var t = findTask(S.selKey);
+    var d = S.draft;
+    if (!t || !d) {
+      panel.innerHTML = '<div class="ats-nosel"><div class="ti">왼쪽에서 작업을 고르세요</div>' +
+        '<div class="ds">작업 종류는 닫힌 목록입니다 — 견적을 만드는 일은 엔진 소관(A-02·A-03).</div></div>';
+      return;
+    }
+    var owner = canWrite();
+    var diffs = diffLines(t, d, t.task_key);
+    var dirty = diffs.length > 0;
+
+    var html = '';
+    html += '<div class="ats-dethd">' +
+      '<span class="nm">' + esc(t.label) + '</span><span class="k">' + esc(t.task_key) + '</span>' +
+      '<span style="flex:1"></span>' +
+      '<span class="ats-modeswitch" data-keep="1">' +
+      ['concurrent', 'single'].map(function (m) {
+        return '<span class="' + (d.mode === m ? 'on' : '') + '" data-action="set-mode" data-mode="' + m + '">' + esc(modeLabel(m)) + '</span>';
+      }).join('') + '</span>' +
+      '<span class="ats-delbtn" data-action="delete-task" style="color:' + (owner ? RED : 'var(--rv-dim2)') +
+      ';border-color:' + (owner ? RED + '55' : 'rgba(0,0,0,.12)') + '">작업 삭제</span>' +
+      '</div>';
+
+    html += '<div class="ats-detbody">';
+
+    // 프로바이더 집합
+    html += '<div>';
+    html += '<div class="ats-cap"><span class="t">' + (d.mode === 'concurrent' ? '참여 프로바이더 — 동시 호출 후 수렴 판정' : '배정 프로바이더') + '</span>' +
+      '<span class="n">' + (d.mode === 'concurrent' ? '집합에는 순서가 없습니다 — 역할만 바꿉니다' : '주 프로바이더 1곳 + 폴백') + '</span></div>';
+    html += d.providers.map(function (p, i) {
+      var last = d.providers.length <= 1;
+      var color = VENDOR_COLOR[p.vendor] || '#8a8377';
+      var roleMenuOpen = owner && S.openMenu === 'role' + i;
+      var roleAttrs = owner ? ' class="ats-role click" data-keep="1" data-action="toggle-menu" data-menu="role' + i + '"' : ' class="ats-role" data-keep="1"';
+      return '<div class="ats-prow">' +
+        '<span class="dot" style="background:' + color + '"></span>' +
+        '<span class="ve">' + esc(p.vendor) + '</span>' +
+        '<span class="md">' + esc(p.model) + '</span>' +
+        '<span' + roleAttrs + '><span>' + esc(p.role) + '</span>' + (owner ? '<span class="car">▼</span>' : '') +
+        '<div class="ats-catmenu" style="top:28px;right:0;left:auto;min-width:132px"' + (roleMenuOpen ? '' : ' hidden') + '>' +
+        (S.data.role_options || []).map(function (r) {
+          return '<div class="ats-dmenu-item" data-action="set-role" data-i="' + i + '" data-role="' + esc(r) + '">' + esc(r) + '</div>';
+        }).join('') + '</div></span>' +
+        '<span class="ats-rmv' + (last || !owner ? ' dis' : '') + '" data-action="remove-provider" data-i="' + i +
+        '" title="' + (last ? '최소 1개는 남아야 합니다' : '이 프로바이더 제거') + '">✕</span>' +
+        '</div>';
+    }).join('');
+    html += '<div class="ats-addln" data-keep="1"><span class="ats-addlink' + (owner ? '' : ' dis') + '" data-action="toggle-menu" data-menu="addProv">+ 프로바이더</span>';
+    if (owner && S.openMenu === 'addProv') {
+      html += '<div class="ats-catmenu">' + (S.data.provider_catalog || []).map(function (c) {
+        var used = d.providers.some(function (p) { return p.model === c.model; });
+        var color = VENDOR_COLOR[c.vendor] || '#8a8377';
+        return '<div class="ats-catitem' + (used ? ' dis' : '') + '"' + (used ? '' : ' data-action="add-provider" data-vendor="' + esc(c.vendor) + '" data-model="' + esc(c.model) + '"') + '>' +
+          '<span class="dot" style="background:' + color + '"></span><span class="ve">' + esc(c.vendor) + '</span>' +
+          '<span class="md">' + esc(c.model) + '</span><span class="st">' + (used ? '이미 참여' : '') + '</span></div>';
+      }).join('') + '</div>';
+    }
+    html += '</div></div>';
+
+    // 폴백 순서
+    html += '<div>';
+    html += '<div class="ats-cap"><span class="t">폴백 순서</span><span class="n">' +
+      (d.fallback_order.length ? '순서가 곧 1·2·3차입니다 — ↑↓로 바꿉니다' : '폴백을 추가하지 않으면 실패를 그대로 남깁니다') + '</span></div>';
+    html += '<div class="ats-fbwrap">';
+    if (d.fallback_order.length) {
+      html += d.fallback_order.map(function (v, i) {
+        var color = VENDOR_COLOR[v] || '#8a8377';
+        return '<span class="ats-fbchip" style="border-color:' + color + '66;border-left-color:' + color + '">' +
+          (i ? '<span class="arrow">-&gt;</span>' : '') +
+          '<span class="lb">' + (i + 1) + '차 ' + esc(v) + '</span>' +
+          '<span class="up' + (i === 0 ? ' dis' : '') + '" data-action="fb-up" data-i="' + i + '">↑</span>' +
+          '<span class="dn' + (i === d.fallback_order.length - 1 ? ' dis' : '') + '" data-action="fb-down" data-i="' + i + '">↓</span>' +
+          '<span class="rm" data-action="fb-remove" data-i="' + i + '">✕</span></span>';
+      }).join('');
+    } else {
+      html += '<span class="ats-fbempty">폴백 없음 — 1차가 실패하면 그대로 실패로 남깁니다</span>';
+    }
+    html += '</div>';
+    html += '<div class="ats-addln" data-keep="1"><span class="ats-addlink' + (owner ? '' : ' dis') + '" data-action="toggle-menu" data-menu="addFb">+ 폴백 추가</span>';
+    if (owner && S.openMenu === 'addFb') {
+      var seenV = {}; var cands = [];
+      d.providers.forEach(function (p) { seenV[p.vendor] = true; });
+      Object.keys(seenV).forEach(function (v) { if (d.fallback_order.indexOf(v) < 0) cands.push(v); });
+      html += '<div class="ats-fbmenu">' + (cands.length
+        ? cands.map(function (v) { return '<div class="ats-dmenu-item" data-action="add-fallback" data-vendor="' + esc(v) + '">' + esc(v) + '</div>'; }).join('')
+        : '<div class="ats-dmenu-item dis">추가할 프로바이더가 없습니다 — 먼저 집합에 넣으세요</div>') + '</div>';
+    }
+    html += '</div></div>';
+
+    // 프롬프트 버전
+    html += renderPromptBox(d, t, owner);
+
+    if (dirty) {
+      html += '<div class="ats-diffbox"><div class="hd">변경됨 · 저장 필요</div>' +
+        diffs.map(function (line) { return '<div class="ln">' + esc(line) + '</div>'; }).join('') + '</div>';
+    }
+
+    html += '</div>'; // detbody
+
+    var note = owner
+      ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다 — 다만 연동 보류라 호출은 아직 없습니다' : '변경 사항이 없습니다')
+      : ('권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
+    html += '<div class="ats-detfoot">' +
+      '<span class="nt' + (owner ? '' : ' warn') + '">' + esc(note) + '</span>' +
+      '<button type="button" class="ats-btn-revert' + (dirty ? '' : ' dis') + '" data-action="revert">되돌리기</button>' +
+      '<span class="ats-pill-unapplied">미적용</span>' +
+      '<button type="button" class="ats-btn-save' + (owner && dirty ? '' : ' dis') + '" data-action="save-task">저장</button>' +
+      '</div>';
+
+    panel.innerHTML = html;
+  }
+
+  function renderPromptBox(d, t, owner) {
+    var editing = owner && S.openMenu === 'promptEdit';
+    var opts = t.prompt_options || [];
+    var curMeta = d.prompt_version ? opts.filter(function (o) { return o.version === d.prompt_version; })[0] : null;
+    var html = '<div><div class="ats-cap"><span class="t">프롬프트 버전</span></div>';
+    html += '<div class="ats-promptbox">';
+    html += '<div class="ats-prompt-r1" data-keep="1"><span class="v">' + esc(d.prompt_version || '미지정') + '</span>';
+    if (curMeta && curMeta.at) html += '<span class="at">' + esc(fmtDt(curMeta.at)) + ' 등록</span>';
+    if (owner) html += '<span class="ats-prompt-btn" data-action="toggle-menu" data-menu="promptEdit">버전 바꾸기</span>';
+    if (editing) {
+      html += '<div class="ats-prompt-edit">' +
+        '<input id="promptInput" value="' + esc(S.promptDraftValue != null ? S.promptDraftValue : (d.prompt_version || '')) + '" placeholder="예: prompt/s1-parse@v5">' +
+        (opts.length ? '<div class="ats-prompt-past">' + opts.map(function (o) {
+          return '<span class="ats-prompt-chip" data-action="pick-prompt" data-v="' + esc(o.version) + '" title="이 작업에 실제로 쓰였던 값">' + esc(o.version) + '</span>';
+        }).join('') + '</div>' : '') +
+        '<div class="row"><button type="button" class="ats-btn-commit" data-action="prompt-apply">적용</button>' +
+        '<button type="button" class="ats-btn-cancel" data-action="prompt-cancel">취소</button></div></div>';
+    }
+    html += '</div>';
+    html += '<div class="ats-prompt-body">이 저장소에는 프롬프트 본문을 저장하는 곳이 아직 없습니다 — 지금은 버전 식별자만 관리합니다.</div>';
+    html += '<div class="ats-prompt-foot">본문 작성·편집은 이 화면의 범위 밖입니다(요구사항 §비범위).</div>';
+    html += '</div></div>';
+    return html;
+  }
+
+  // ── 동작 ─────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    if (S.tab === tab) return;
+    S.tab = tab; S.openMenu = null;
+    $('tabAssign').classList.toggle('on', tab === 'assign');
+    $('tabHistory').classList.toggle('on', tab === 'history');
+    $('tabAssign').setAttribute('aria-selected', String(tab === 'assign'));
+    $('tabHistory').setAttribute('aria-selected', String(tab === 'history'));
+    $('viewAssign').classList.toggle('on', tab === 'assign');
+    $('viewHistory').classList.toggle('on', tab === 'history');
+    if (tab === 'history' && S.history === null && !S.historyLoading) loadHistory();
+  }
+
+  function selectTask(key) {
+    if (S.selKey === key) return;
+    var cur = findTask(S.selKey);
+    if (cur && diffLines(cur, S.draft, S.selKey).length) {
+      toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn');
+      return;
+    }
+    var t = findTask(key);
+    S.selKey = key; S.draft = t ? cloneTask(t) : null; S.openMenu = null; S.promptDraftValue = null;
+    renderTaskList(); renderDetail();
+  }
+
+  function addTask(key) {
+    if (!key || !guard()) return;
+    apiPost('/api/admin/ai-task-settings/tasks', { task_key: key }).then(function (res) {
+      S.openMenu = null; S.selKey = key; S.draft = null;
+      toast(res.message, 'ok');
+      loadSettings();
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function setMode(m) {
+    if (!guard() || !S.draft) return;
+    if (m === 'concurrent' && S.draft.providers.length < 2) {
+      toast('동시 호출은 프로바이더가 2곳 이상이어야 합니다', 'warn');
+      return;
+    }
+    S.draft.mode = m;
+    renderDetail(); renderTaskList();
+  }
+
+  function deleteTask() {
+    if (!guard()) return;
+    var t = findTask(S.selKey);
+    if (!t) return;
+    apiDelete('/api/admin/ai-task-settings/tasks/' + encodeURIComponent(t.task_key)).then(function (res) {
+      S.selKey = null; S.draft = null; S.openMenu = null;
+      toast(res.message, 'ok');
+      loadSettings();
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function setRole(i, role) {
+    if (!guard() || !S.draft || !S.draft.providers[i]) return;
+    S.draft.providers[i].role = role;
+    S.openMenu = null;
+    renderDetail(); renderTaskList();
+  }
+
+  function removeProvider(i) {
+    if (!guard()) return;
+    var d = S.draft; if (!d) return;
+    if (d.providers.length <= 1) { toast('최소 1개의 프로바이더가 필요합니다 — 지우면 이 작업이 미배정이 됩니다', 'warn'); return; }
+    var removedVendor = d.providers[i].vendor;
+    d.providers.splice(i, 1);
+    if (!d.providers.some(function (p) { return p.vendor === removedVendor; })) {
+      d.fallback_order = d.fallback_order.filter(function (v) { return v !== removedVendor; });
+    }
+    if (d.providers.length < 2 && d.mode === 'concurrent') d.mode = 'single';
+    renderDetail(); renderTaskList();
+  }
+
+  function addProvider(vendor, model) {
+    if (!guard()) return;
+    var d = S.draft; if (!d) return;
+    if (d.providers.some(function (p) { return p.model === model; })) return;
+    d.providers.push({ vendor: vendor, model: model, role: d.providers.length ? '교차 확인' : '주' });
+    S.openMenu = null;
+    renderDetail(); renderTaskList();
+  }
+
+  function moveFallback(i, dir) {
+    if (!guard()) return;
+    var d = S.draft; if (!d) return;
+    var j = i + dir;
+    if (j < 0 || j >= d.fallback_order.length) return;
+    var tmp = d.fallback_order[i]; d.fallback_order[i] = d.fallback_order[j]; d.fallback_order[j] = tmp;
+    renderDetail();
+  }
+  function removeFallback(i) {
+    if (!guard()) return;
+    var d = S.draft; if (!d) return;
+    d.fallback_order.splice(i, 1);
+    renderDetail();
+  }
+  function addFallback(vendor) {
+    if (!guard()) return;
+    var d = S.draft; if (!d) return;
+    if (d.fallback_order.indexOf(vendor) >= 0) return;
+    d.fallback_order.push(vendor);
+    S.openMenu = null;
+    renderDetail();
+  }
+
+  function applyPromptEdit() {
+    if (!guard()) return;
+    var el = $('promptInput');
+    var v = (el ? el.value : (S.promptDraftValue || '')).trim();
+    S.draft.prompt_version = v || null;
+    S.openMenu = null; S.promptDraftValue = null;
+    renderDetail(); renderTaskList();
+  }
+
+  function revertDraft() {
+    var t = findTask(S.selKey);
+    if (!t) return;
+    if (!diffLines(t, S.draft, S.selKey).length) { toast('되돌릴 변경이 없습니다', 'warn'); return; }
+    S.draft = cloneTask(t);
+    S.openMenu = null;
+    toast('저장 전 상태로 되돌렸습니다', 'ok');
+    renderDetail(); renderTaskList();
+  }
+
+  function saveTask() {
+    if (!guard()) return;
+    var t = findTask(S.selKey); var d = S.draft;
+    if (!t || !d) return;
+    var diffs = diffLines(t, d, t.task_key);
+    if (!diffs.length) { toast('변경 사항이 없습니다', 'warn'); return; }
+    if (d.mode === 'concurrent' && d.providers.length < 2) {
+      toast('동시 호출은 프로바이더가 2곳 이상이어야 합니다 (400)', 'err');
+      return;
+    }
+    apiPatch('/api/admin/ai-task-settings/tasks/' + encodeURIComponent(t.task_key), {
+      mode: d.mode, providers: d.providers, fallback_order: d.fallback_order, prompt_version: d.prompt_version
+    }).then(function (res) {
+      toast(res.message, 'ok');
+      loadSettings();
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── 변경 이력 탭 ─────────────────────────────────────────────────
+  function loadHistory() {
+    S.historyLoading = true;
+    $('histBody').innerHTML = '<div class="ats-hist-empty"><div class="ti">불러오는 중…</div></div>';
+    apiGet('/api/admin/ai-task-settings/history?limit=200').then(function (j) {
+      S.history = j; S.historyErr = null; S.historyLoading = false;
+      renderHistory();
+    }).catch(function (err) {
+      S.historyErr = err; S.historyLoading = false;
+      renderHistory();
+    });
+  }
+  function renderHistory() {
+    if (S.historyErr) {
+      $('histBody').innerHTML = '<div class="ats-hist-empty"><div class="ti">조회 실패</div>' +
+        '<div class="ds">' + esc(S.historyErr.message) + '</div>' +
+        '<button type="button" class="ats-btn-revert" style="margin-top:10px" data-action="retry-history">다시 시도</button></div>';
+      return;
+    }
+    if (!S.history) return;
+    var items = S.history.items || [];
+    if (!items.length) {
+      $('histBody').innerHTML = '<div class="ats-hist-empty"><div class="ti">아직 변경 이력이 없습니다</div>' +
+        '<div class="ds">배정을 추가·수정·삭제하면 여기에 쌓입니다.</div></div>';
+      return;
+    }
+    $('histBody').innerHTML = items.map(function (h, i) {
+      return '<div class="ats-histrow" style="background:' + (i === 0 ? 'var(--rv-panel2)' : 'transparent') + '">' +
+        '<span class="at">' + esc(fmtDt(h.at)) + '</span>' +
+        '<span class="who">' + esc(h.who) + '</span>' +
+        '<span class="what">' + esc(h.what) + '</span>' +
+        '<span class="why">' + esc(h.why) + '</span>' +
+        '<span class="ver">' + esc(h.ver) + '</span></div>';
+    }).join('');
+  }
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-keep]') && S.openMenu) {
+      S.openMenu = null;
+      renderDetail(); renderTaskList();
+    }
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch (action) {
+      case 'switch-tab': switchTab(t.getAttribute('data-tab')); break;
+      case 'retry-load': loadSettings(); break;
+      case 'retry-history': loadHistory(); break;
+      case 'toggle-menu': {
+        e.stopPropagation();
+        var key = t.getAttribute('data-menu');
+        S.openMenu = S.openMenu === key ? null : key;
+        if (S.openMenu !== 'promptEdit') S.promptDraftValue = null;
+        renderDetail(); renderTaskList();
+        break;
+      }
+      case 'select-task': selectTask(t.getAttribute('data-key')); break;
+      case 'add-task': addTask(t.getAttribute('data-key')); break;
+      case 'set-mode': setMode(t.getAttribute('data-mode')); break;
+      case 'delete-task': deleteTask(); break;
+      case 'set-role': { e.stopPropagation(); setRole(Number(t.getAttribute('data-i')), t.getAttribute('data-role')); break; }
+      case 'remove-provider': { e.stopPropagation(); removeProvider(Number(t.getAttribute('data-i'))); break; }
+      case 'add-provider': { e.stopPropagation(); addProvider(t.getAttribute('data-vendor'), t.getAttribute('data-model')); break; }
+      case 'fb-up': { e.stopPropagation(); moveFallback(Number(t.getAttribute('data-i')), -1); break; }
+      case 'fb-down': { e.stopPropagation(); moveFallback(Number(t.getAttribute('data-i')), 1); break; }
+      case 'fb-remove': { e.stopPropagation(); removeFallback(Number(t.getAttribute('data-i'))); break; }
+      case 'add-fallback': { e.stopPropagation(); addFallback(t.getAttribute('data-vendor')); break; }
+      case 'pick-prompt': { e.stopPropagation(); S.promptDraftValue = t.getAttribute('data-v'); renderDetail(); var pi = $('promptInput'); if (pi) { pi.focus(); pi.select(); } break; }
+      case 'prompt-cancel': { e.stopPropagation(); S.openMenu = null; S.promptDraftValue = null; renderDetail(); break; }
+      case 'prompt-apply': { e.stopPropagation(); applyPromptEdit(); break; }
+      case 'revert': revertDraft(); break;
+      case 'save-task': saveTask(); break;
+      default: break;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.openMenu) { S.openMenu = null; renderDetail(); renderTaskList(); }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

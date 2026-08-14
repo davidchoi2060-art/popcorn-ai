@@ -1,0 +1,461 @@
+{#
+  AI 사용량 · 비용 (ADM-AI-050) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    프로바이더별 실 API 호출 비용이 얼마나 쌓였는가 — **읽기 전용**(쓰기 액션 없음).
+    한도를 "정하는" 것은 AI 연동 설정 소관이고, 이 화면은 그 대비 실적만 보여준다.
+
+  ■ 출처 — 사장님이 확정한 원안
+    파일: `docs/design/dc-ai-usage-cost.html`(`<x-dc>` + `DCLogic` + `support.js` 런타임 —
+    여기서는 돌지 않는다). `reviews.html.j2`·`ai_integration.html.j2`와 같은 원칙: 화면
+    구성·색·서체·간격·인터랙션은 원안 그대로, 데이터는 `GET /api/admin/ai-usage-cost/summary`
+    실측만. 요구사항 정본: `docs/design/req/req-ai-usage-cost.md`.
+
+  ■ 원안과 다르게 구현한 지점 (보고서에도 남긴다)
+    ① **모든 자리를 "항상 원천 없음"으로 고정하지 않는다** — 원안은 정적 목업이라
+       KPI·게이지·추이·분해가 전부 "원천 없음"으로 하드코딩돼 있었다(2026-08-13 실측이
+       그 상태였다). 실제 화면은 매 조회마다 `api_cost_logs`·`cost_thresholds` 행수를
+       다시 재고, **행이 실제로 쌓이면 그 순간부터 실값을 보여준다**(서버
+       `api/admin_ai_usage.py`의 `source_exists` 분기). "작업 종류별 분해"만은 컬럼 자체가
+       없어(스키마 결측) 행이 쌓여도 계산할 수 없다는 사실을 원안 그대로 고정 표기한다 —
+       이 하나만 항상 "스키마 없음"이고 나머지는 실측을 따라간다.
+       **추이 막대 개수도 고정 14가 아니라 선택한 기간(오늘=1일 · 7일 · 30일 · 이번 달의
+       실제 경과일)만큼 실시간으로 계산한다** — 원안은 기간과 무관하게 항상 14칸이었다.
+    ② **"마지막 조회" 시각은 서버 응답의 `generated_at`을 쓴다** — 원안은 클라이언트가
+       지어낸 임의 시각 문자열(`'2026-08-13 15:' + ...`)이었다. 지어낸 시각을 그대로
+       옮기면 그 자체가 숫자를 지어내는 것이다.
+    ③ **일 한도 게이지는 이제 진짜로 채워질 수 있다** — 원안은 "한도도 사용액도 원천이
+       없다"만 그렸다. 실제로는 AI 연동 설정에서 owner가 한도를 저장하면 `cost_thresholds`
+       에 즉시 값이 생기므로, 이 화면은 그 값을 읽어 "한도는 있는데 사용액 원천이 없다"
+       같은 **중간 상태**도 구분해 보여준다(요구사항 ⑦의 "0/원천 없음/스키마 없음" 3분류를
+       한도-사용액 조합에도 그대로 적용한 것 — 사장님이 승인한 것은 화면 배치이지 상태
+       하나만 존재한다는 뜻은 아니라고 판단했다. 검증 대상 — 보고서 참조).
+    ④ **Claude Code 세션 비용 행은 실수치를 계산하지 않는다** — 원안도 이 표의 `tokens`
+       열을 실제 숫자가 아니라 "세션 전사본 기준"이라는 방법론 문구로 그린다(원안
+       `CC_ROWS`의 두 번째 배열값이 실제로는 안 쓰이고 고정 라벨만 렌더된다 — 원안 JS
+       실측). 그래서 이 화면도 같은 고정 라벨을 쓴다 — `api/dash.py`의 세션 토큰 집계는
+       밑줄 접두어(모듈 내부 전용) 함수라 가져다 쓰지 않았다(모듈 경계를 넘어 사적 함수를
+       재사용하는 것은 또 다른 종류의 결합이다). 범위 판단이며 제작 보고서에 남긴다.
+    ⑤ **필터 드롭다운은 서버가 준 카탈로그로 그린다** — 원안은 `PROVIDERS`/`MODELS` JS
+       상수를 이 화면에서 직접 정의했다. 실제로는 `api/admin_ai_integration.py`의 카탈로그
+       (프로바이더 3사·모델명)를 API 응답(`filters`)에 실어 보내고 이 화면은 그것만 그린다
+       — 두 AI 화면이 서로 다른 프로바이더 이름을 보여주는 사고를 막는다.
+    ⑥ **서체** — 원안 IBM Plex 계열 → admin2 공용 팔레트(Pretendard/JetBrains Mono),
+       `ai_integration.html.j2`와 같은 이유(외부 CDN 금지, A-30).
+
+  ■ 정본 — 좌측 메뉴·헤더·팔레트는 `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`.
+    "0 vs 원천 없음 vs 스키마 없음" 판정 로직은 `api/admin_ai_usage.py` 한 곳에서만
+    계산한다 — 이 템플릿은 그 판정 결과(`kind`/`available`/`value`)만 그리고 다시
+    판정하지 않는다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}AI 사용량 · 비용{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+.a2-hd .ro-badge{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+                border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.a2-hd .lastat{font:400 11px/1 var(--rv-font);color:#8a8377;white-space:nowrap}
+.a2-hd .refresh{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+               border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+.a2-hd .refresh:disabled{opacity:.6;cursor:default}
+
+.au-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 18px 18px}
+
+/* 원천 없음 배너 — rows==0일 때만 나온다 */
+.srcband{flex:none;border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);
+        border-left:3px solid var(--rv-amber);border-radius:7px;padding:11px 14px;
+        display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.srcband .tag{font:600 11px/1 var(--rv-mono);color:oklch(0.5 0.14 55);flex:none}
+.srcband .main{font:600 12px/1.4 var(--rv-font)}
+.srcband .sub{font:400 11px/1.5 var(--rv-font);color:#5b564d;flex:1;min-width:260px}
+.srcband .sub code{font-family:var(--rv-mono)}
+
+/* 필터 바 */
+.filterbar{flex:none;display:flex;align-items:center;gap:7px;flex-wrap:wrap;position:relative;z-index:6}
+.pillgroup{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:14px;overflow:hidden;background:var(--rv-card)}
+.pillgroup span{font:500 11px/1 var(--rv-font);color:#6f6a61;padding:7px 11px;cursor:pointer;user-select:none}
+.pillgroup span.on{color:var(--rv-canvas);background:var(--rv-ink)}
+.filter-group{position:relative}
+.pill-filter{display:flex;align-items:center;gap:6px;font:500 11.5px/1 var(--rv-font);color:#4a463e;
+            background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:14px;padding:7px 11px;
+            cursor:pointer;user-select:none}
+.pill-filter.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.pill-filter .car{font-size:8px;opacity:.55}
+.dmenu{position:absolute;top:32px;left:0;z-index:30;min-width:200px;max-height:264px;overflow:auto;
+      background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.dmenu[hidden]{display:none}
+.dmenu-item{display:flex;align-items:center;gap:8px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+           padding:7px 9px;border-radius:5px;cursor:pointer}
+.dmenu-item:hover{background:var(--rv-panel)}
+.dmenu-item.on{font-weight:600}
+.filterbar .scope{font:400 11px/1.4 var(--rv-font);color:#8a8377;margin-left:auto}
+
+/* KPI */
+.kpis{flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpi{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:11px 13px;
+    display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi .lb{font:500 10.5px/1.3 var(--rv-font);color:#7d7669}
+.kpi .valrow{display:flex;align-items:baseline;gap:7px}
+.kpi .val{font:600 17px/1.2 var(--rv-font);color:#a09889}
+.kpi .val.real{font:600 20px/1.15 var(--rv-mono);color:var(--rv-ink);font-variant-numeric:tabular-nums}
+.kpi .unit{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-dim3)}
+.kpi .botrow{display:flex;align-items:center;gap:6px;margin-top:auto}
+.kpichip{font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap;flex:none;border:1px solid}
+.kpichip.nosource{color:var(--rv-amber);background:var(--rv-amber-bg);border-color:var(--rv-amber-line)}
+.kpichip.noschema{color:#5b564d;background:var(--rv-panel2);border-color:rgba(0,0,0,.16)}
+.kpichip.value{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:rgba(0,0,0,.12)}
+.kpi .note{font:400 10px/1.45 var(--rv-font);color:#a09889;flex:1;min-width:0}
+
+/* 게이지 */
+.gaugebox{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px}
+.gaugebox .head{display:flex;align-items:baseline;gap:9px;margin-bottom:11px;flex-wrap:wrap}
+.gaugebox .t{font:600 11.5px/1.3 var(--rv-font)}
+.gaugebox .src{font:400 10.5px/1.3 var(--rv-mono);color:#8a8377}
+.gaugebox .chip{margin-left:auto}
+.gtrack{height:14px;border-radius:7px;border:1px solid rgba(0,0,0,.09);position:relative;overflow:hidden;
+       background:repeating-linear-gradient(135deg,var(--rv-panel2) 0 8px,#ece7db 8px 16px)}
+.gtrack .fill{position:absolute;inset:0 auto 0 0;background:var(--rv-ink);border-radius:7px 0 0 7px}
+.gtrack .fill.over{background:var(--rv-red)}
+.gtrack .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+            font:500 9.5px/1 var(--rv-font);color:#a09889}
+.gfoot{display:flex;justify-content:space-between;margin-top:7px;font:400 10px/1.3 var(--rv-mono);color:#b3ac9e}
+
+/* 분해 */
+.breakdowns{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bpanel{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.bpanel .bhd{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-panel);flex-wrap:wrap}
+.bpanel .bhd .t{font:600 11.5px/1.3 var(--rv-font)}
+.bpanel .bhd .src{font:400 10px/1.3 var(--rv-mono);color:#8a8377}
+.bpanel .bhd .chip{margin-left:auto}
+.brow{display:grid;grid-template-columns:1fr 96px 88px;gap:10px;align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.05)}
+.brow .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.brow .dot{width:8px;height:8px;flex:none;border-radius:50%}
+.brow .name{font:500 11.5px/1.3 var(--rv-font)}
+.brow .sub{font:400 10px/1.3 var(--rv-mono);color:#a09889;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .tok{font:400 11px/1.3 var(--rv-mono);color:#b3ac9e;text-align:right}
+.brow .cost{font:400 11px/1.3 var(--rv-mono);color:#b3ac9e;text-align:right}
+.brow .tok.real,.brow .cost.real{color:var(--rv-ink);font-weight:500}
+.bfoot{padding:9px 13px;font:400 10px/1.55 var(--rv-font);color:#a09889;background:#faf7f0;border-top:1px solid rgba(0,0,0,.07)}
+.bfoot.schema{color:#5b564d;background:var(--rv-panel2)}
+.bfoot[hidden]{display:none}
+
+/* 추이 */
+.trendbox{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px}
+.trendbox .head{display:flex;align-items:baseline;gap:9px;margin-bottom:10px;flex-wrap:wrap}
+.trendbox .t{font:600 11.5px/1.3 var(--rv-font)}
+.trendbox .src{font:400 10.5px/1.3 var(--rv-mono);color:#8a8377}
+.trendbox .chip{margin-left:auto}
+.tchart{height:132px;border:1px solid rgba(0,0,0,.08);border-radius:6px;background:#faf7f0;
+       display:flex;align-items:stretch;padding:10px 12px;gap:6px;position:relative}
+.taxis{display:flex;flex-direction:column;justify-content:space-between;font:400 9.5px/1 var(--rv-mono);
+      color:#c4bdae;flex:none;padding:2px 0;min-width:34px;text-align:right}
+.tbars{flex:1;display:flex;align-items:flex-end;gap:5px;border-left:1px solid rgba(0,0,0,.09);
+      border-bottom:1px solid rgba(0,0,0,.09);padding:0 6px 0 8px}
+.tbar{flex:1;height:5px;background:#efeade;border-radius:2px 2px 0 0;min-height:2px}
+.tbar.real{background:var(--rv-ink)}
+.tchart .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+                font:500 11px/1.5 var(--rv-font);color:#a09889;pointer-events:none}
+
+/* 하단 2단 */
+.bottom2{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.legpanel{background:var(--rv-panel);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;
+         display:flex;flex-direction:column;gap:9px}
+.legpanel .cap{font:600 10.5px/1 var(--rv-font);color:#8a8377;letter-spacing:.04em}
+.leg-item{display:flex;align-items:flex-start;gap:9px}
+.leg-item .desc{font:400 11px/1.6 var(--rv-font);color:#4a463e;flex:1}
+
+.ccpanel{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;
+        display:flex;flex-direction:column;gap:9px}
+.ccpanel .head{display:flex;align-items:baseline;gap:9px}
+.ccpanel .t{font:600 11.5px/1.3 var(--rv-font)}
+.cctag{margin-left:auto;font:600 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+      border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:4px 7px}
+.ccpanel .desc{font:400 10.5px/1.65 var(--rv-font);color:#5b564d}
+.ccrow{display:grid;grid-template-columns:1fr 104px 96px;gap:10px;align-items:center;border:1px solid rgba(0,0,0,.1);
+      border-radius:6px;padding:8px 11px;background:#faf7f0}
+.ccrow .nm{font:500 11.5px/1.3 var(--rv-font)}
+.ccrow .tok{font:400 10.5px/1.3 var(--rv-mono);color:#6f6a61;text-align:right}
+.ccrow .cost{font:400 10.5px/1.3 var(--rv-font);color:#a09889;text-align:right}
+.ccpanel .note2{font:400 10px/1.55 var(--rv-font);color:#a09889;margin-top:auto}
+
+.loading,.errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.errbox .ti{font:600 14px/1.4 var(--rv-font)}
+.errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);text-align:center;max-width:420px}
+.errbox a,.errbox button{display:inline-block;padding:8px 18px;border-radius:6px;background:var(--rv-ink);
+          color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+@media (max-width:768px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .breakdowns,.bottom2{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="ro-badge">읽기 전용 · 쓰기 액션 없음</span>
+<span class="lastat" id="lastAt">마지막 조회 —</span>
+<button type="button" class="refresh" id="refreshBtn" data-action="refresh">다시 조회</button>
+{% endblock %}
+
+{% block content %}
+<div class="au-scroll" id="auScroll">
+  <div class="loading" id="loading">불러오는 중…</div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = { period: 'today', provider: null, model: null, menu: null, data: null, loadErr: null };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtInt(v) { return (v === null || v === undefined) ? '—' : Number(v).toLocaleString('en-US'); }
+  function fmtUsd(v) { return (v === null || v === undefined) ? '$—' : ('$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); }
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return iso; }
+  }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function toast(msg, kind) { window.Admin2Shell && window.Admin2Shell.toast(msg, kind); }
+
+  function qstr(obj) {
+    var parts = [];
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v === '' || v === null || v === undefined) return;
+      parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+    });
+    return parts.join('&');
+  }
+
+  function boot() {
+    document.addEventListener('click', onDocClick);
+    load();
+  }
+
+  function load() {
+    $('refreshBtn').disabled = true;
+    apiGet('/api/admin/ai-usage-cost/summary?' + qstr({ period: S.period, provider: S.provider, model: S.model }))
+      .then(function (j) { S.data = j; S.loadErr = null; render(); })
+      .catch(function (err) { S.data = null; S.loadErr = err; render(); })
+      .then(function () { $('refreshBtn').disabled = false; });
+  }
+
+  function render() {
+    if (S.loadErr) { renderError(); return; }
+    if (!S.data) return;
+    var d = S.data;
+    $('lastAt').textContent = '마지막 조회 ' + fmtTime(d.generated_at);
+    $('auScroll').innerHTML = tplBanner(d) + tplFilterBar(d) + tplKpis(d) + tplGauge(d) +
+      tplBreakdowns(d) + tplTrend(d) + tplBottom(d);
+    bindMenus();
+  }
+  function renderError() {
+    var un = S.loadErr.status === 401;
+    $('auScroll').innerHTML = '<div class="errbox"><div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
+      '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.' : ('집계를 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>' +
+      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry">다시 시도</button>') + '</div>';
+  }
+
+  // ── 배너(원천 없음 — rows==0일 때만) ─────────────────────────────
+  function tplBanner(d) {
+    if (d.source.api_cost_logs_rows > 0) return '';
+    return '<div class="srcband"><span class="tag">▲ 원천 없음</span>' +
+      '<span class="main">비용이 쌓이는 경로 자체가 아직 없습니다 — 접속 문제가 아닙니다</span>' +
+      '<span class="sub">' + esc(d.source.reason) + ' 실측 <code>api_cost_logs ' + d.source.api_cost_logs_rows +
+      '행 · cost_thresholds ' + d.source.cost_thresholds_rows + '행</code> — ' + esc(d.source.built_at) +
+      ' 구축 시점부터 ' + d.source.weeks_since_build + '주째 그대로입니다.</span></div>';
+  }
+
+  // ── 필터 바 ──────────────────────────────────────────────────────
+  function tplFilterBar(d) {
+    var periods = (d.periods || []).map(function (p) {
+      return '<span class="' + (S.period === p.key ? 'on' : '') + '" data-action="set-period" data-v="' + esc(p.key) + '">' + esc(p.label) + '</span>';
+    }).join('');
+    var provLabel = S.provider ? ('프로바이더: ' + (d.filters.providers.filter(function (x) { return x.key === S.provider; })[0] || {}).label) : '프로바이더: 전체';
+    var modelLabel = S.model ? ('모델: ' + S.model) : '모델: 전체';
+    return '<div class="filterbar" data-keep="1">' +
+      '<span class="pillgroup">' + periods + '</span>' +
+      filterDropdown('prov', provLabel, !!S.provider, provItems(d)) +
+      filterDropdown('model', modelLabel, !!S.model, modelItems(d)) +
+      '<span class="scope">' + esc(d.scope_note) + '</span></div>';
+  }
+  function provItems(d) {
+    return [{ v: '', label: '전체' }].concat((d.filters.providers || []).map(function (p) { return { v: p.key, label: p.label }; }));
+  }
+  function modelItems(d) {
+    return [{ v: '', label: '전체' }].concat((d.filters.models || []).map(function (m) { return { v: m.key, label: m.label }; }));
+  }
+  function filterDropdown(key, label, on, items) {
+    var open = S.menu === key;
+    return '<span class="filter-group" data-keep="1">' +
+      '<span class="pill-filter' + (on ? ' on' : '') + '" data-action="toggle-menu" data-menu="' + key + '">' +
+      '<span>' + esc(label) + '</span><span class="car">▼</span></span>' +
+      '<div class="dmenu" ' + (open ? '' : 'hidden') + '>' +
+      items.map(function (i) {
+        return '<div class="dmenu-item" data-action="set-' + key + '" data-v="' + esc(i.v) + '">' + esc(i.label) + '</div>';
+      }).join('') + '</div></span>';
+  }
+
+  // ── KPI ──────────────────────────────────────────────────────────
+  function tplKpis(d) {
+    return '<div class="kpis">' + d.kpis.map(function (k) {
+      var real = k.kind === 'value';
+      var val = real ? fmtUsd(k.value) : esc(k.value);
+      return '<div class="kpi"><div class="lb">' + esc(k.label) + '</div>' +
+        '<div class="valrow"><span class="val' + (real ? ' real' : '') + '">' + val + '</span>' +
+        (k.unit && !real ? '<span class="unit">' + esc(k.unit) + '</span>' : '') + '</div>' +
+        '<div class="botrow">' +
+        (real ? '' : '<span class="kpichip ' + k.kind + '">' + esc(k.value) + '</span>') +
+        '<span class="note">' + esc(k.note) + '</span></div></div>';
+    }).join('') + '</div>';
+  }
+
+  // ── 게이지 ───────────────────────────────────────────────────────
+  function tplGauge(d) {
+    var g = d.gauge;
+    var chip = g.available
+      ? ('<span class="kpichip ' + (g.pct > 100 ? 'nosource' : 'value') + '">' + g.pct + '%</span>')
+      : '<span class="kpichip nosource">원천 없음</span>';
+    var track;
+    if (g.available) {
+      var over = g.pct > 100;
+      track = '<div class="gtrack"><span class="fill' + (over ? ' over' : '') + '" style="width:' + Math.min(100, g.pct) + '%"></span></div>';
+    } else {
+      track = '<div class="gtrack"><span class="msg">' + esc(g.note) + '</span></div>';
+    }
+    var foot = g.available
+      ? ('<span>' + fmtUsd(g.used_usd) + '</span><span>한도 ' + fmtUsd(g.limit_usd) + ' / 일</span>')
+      : ('<span>' + (g.used_usd !== null ? fmtUsd(g.used_usd) : '$—') + '</span>' +
+         '<span>' + (g.limit_usd !== null ? ('한도 ' + fmtUsd(g.limit_usd) + ' / 일') : '일 한도 미설정') + '</span>');
+    return '<div class="gaugebox"><div class="head"><span class="t">일 한도 대비 오늘 사용률</span>' +
+      '<span class="src">cost_thresholds · api_cost_logs</span><span class="chip">' + chip + '</span></div>' +
+      track + '<div class="gfoot">' + foot + '</div></div>';
+  }
+
+  // ── 분해 ─────────────────────────────────────────────────────────
+  function tplBreakdowns(d) {
+    var prov = d.breakdowns.provider, task = d.breakdowns.task;
+    return '<div class="breakdowns">' + bpanel('프로바이더별 분해', prov.source, prov.available, prov.reason, prov.rows, false) +
+      bpanel('작업 종류별 분해', task.source, false, task.reason, task.rows, true) + '</div>';
+  }
+  function bpanel(title, source, available, reason, rows, schema) {
+    var chip = available ? '' : ('<span class="kpichip ' + (schema ? 'noschema' : 'nosource') + '">' +
+      (schema ? '스키마 없음' : '원천 없음') + '</span>');
+    var body = rows.map(function (r) {
+      var tok = (available && r.tokens !== null && r.tokens !== undefined) ? fmtInt(r.tokens) : '—';
+      var cost = (available && r.cost !== null && r.cost !== undefined) ? fmtUsd(r.cost) : '$—';
+      return '<div class="brow"><span class="nm">' +
+        (r.key ? '<span class="dot" style="background:' + dotColor(r.key) + '"></span>' : '') +
+        '<span class="name">' + esc(r.name) + '</span>' +
+        (r.sub ? '<span class="sub">' + esc(r.sub) + '</span>' : '') + '</span>' +
+        '<span class="tok' + (available ? ' real' : '') + '">' + tok + '</span>' +
+        '<span class="cost' + (available ? ' real' : '') + '">' + cost + '</span></div>';
+    }).join('');
+    return '<div class="bpanel"><div class="bhd"><span class="t">' + esc(title) + '</span>' +
+      '<span class="src">' + esc(source || '') + '</span>' + (chip ? '<span class="chip">' + chip + '</span>' : '') +
+      '</div><div>' + body + '</div>' +
+      (reason ? ('<div class="bfoot' + (schema ? ' schema' : '') + '">' + esc(reason) + '</div>') : '') +
+      '</div>';
+  }
+  function dotColor(key) {
+    return key === 'codex' ? 'var(--dot-blue,oklch(0.5 0.12 250))' : key === 'claude' ? 'var(--rv-amber)' : key.indexOf('task.') === 0 ? '#d3cec2' : 'var(--rv-green)';
+  }
+
+  // ── 추이 ─────────────────────────────────────────────────────────
+  function tplTrend(d) {
+    var t = d.trend;
+    var chip = t.available ? '' : '<span class="kpichip nosource">원천 없음</span>';
+    var max = 0;
+    if (t.available) t.points.forEach(function (p) { if (p.cost !== null && p.cost > max) max = p.cost; });
+    var bars = (t.points || []).map(function (p) {
+      if (!t.available || p.cost === null) return '<div class="tbar" title="' + esc(p.date) + '"></div>';
+      var h = max > 0 ? Math.max(4, Math.round(p.cost / max * 100)) : 4;
+      return '<div class="tbar real" style="height:' + h + '%" title="' + esc(p.date) + ' · ' + fmtUsd(p.cost) + '"></div>';
+    }).join('');
+    var axis = t.available && max > 0
+      ? ('<span>' + fmtUsd(max) + '</span><span>' + fmtUsd(max / 2) + '</span><span>$0</span>')
+      : '<span>$—</span><span>$—</span><span>$—</span>';
+    var overlay = t.available ? '' : '<div class="overlay">' + esc(t.note) + '</div>';
+    return '<div class="trendbox"><div class="head"><span class="t">최근 ' + esc(t.period_label) + ' 추이</span>' +
+      '<span class="src">api_cost_logs.created_at</span>' + (chip ? '<span class="chip">' + chip + '</span>' : '') + '</div>' +
+      '<div class="tchart"><div class="taxis">' + axis + '</div><div class="tbars">' + bars + '</div>' + overlay + '</div></div>';
+  }
+
+  // ── 하단 2단(범례 + Claude Code 세션) ────────────────────────────
+  function tplBottom(d) {
+    var legend = d.legend.map(function (l) {
+      return '<div class="leg-item"><span class="kpichip ' + legendKind(l.chip) + '">' + esc(l.chip) + '</span>' +
+        '<span class="desc">' + esc(l.desc) + '</span></div>';
+    }).join('');
+    var cc = d.claude_code_session;
+    var ccrows = cc.rows.map(function (r) {
+      return '<div class="ccrow"><span class="nm">' + esc(r.name) + '</span>' +
+        '<span class="tok">' + esc(r.tokens_label) + '</span><span class="cost">' + esc(r.cost_label) + '</span></div>';
+    }).join('');
+    return '<div class="bottom2">' +
+      '<div class="legpanel"><div class="cap">빈 값 표기 규칙 — "0"과 "원천 없음"은 다르다</div>' + legend + '</div>' +
+      '<div class="ccpanel"><div class="head"><span class="t">Claude Code 세션 비용 (별도 구역)</span>' +
+      '<span class="cctag">다른 종류의 비용</span></div>' +
+      '<div class="desc">' + esc(cc.note) + '</div>' + ccrows +
+      '<div class="note2">' + esc(cc.note2) + '</div></div></div>';
+  }
+  function legendKind(chip) { return chip === '0' ? 'value' : chip === '스키마 없음' ? 'noschema' : 'nosource'; }
+
+  // ── 이벤트 ───────────────────────────────────────────────────────
+  function bindMenus() {
+    // 메뉴는 매 render()마다 새로 그려지므로 별도 바인딩이 필요 없다(위임 클릭으로 처리)
+  }
+  function onDocClick(ev) {
+    var t = ev.target;
+    var per = t.closest('[data-action="set-period"]');
+    if (per) { S.period = per.getAttribute('data-v'); S.menu = null; load(); return; }
+    var tog = t.closest('[data-action="toggle-menu"]');
+    if (tog) { var m = tog.getAttribute('data-menu'); S.menu = (S.menu === m) ? null : m; render(); return; }
+    var sp = t.closest('[data-action="set-prov"]');
+    if (sp) { S.provider = sp.getAttribute('data-v') || null; S.menu = null; load(); return; }
+    var sm = t.closest('[data-action="set-model"]');
+    if (sm) { S.model = sm.getAttribute('data-v') || null; S.menu = null; load(); return; }
+    if (t.closest('[data-action="refresh"]')) { load(); return; }
+    if (t.closest('[data-action="retry"]')) { load(); return; }
+    if (S.menu && !t.closest('[data-keep]')) { S.menu = null; render(); }
+  }
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

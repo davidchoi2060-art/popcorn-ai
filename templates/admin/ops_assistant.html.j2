@@ -1,0 +1,656 @@
+{#
+  운영 도우미 설정 (ADM-AI-070) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    운영 도우미(admin-helper.js) 위젯이 보여주는 FAQ·바로가기·답할 범위를 코드 배포
+    없이 바꿀 수 있는 유일한 자리. 지금은 FAQ 5개가 JS 코드 상수로만 존재해 바꾸려면
+    코드를 고쳐 배포해야 한다(`docs/design/req/req-ops-assistant.md` ③).
+
+  ■ 출처 — 사장님이 Claude 디자인에서 확정한 원안
+    파일: `docs/design/dc-ops-assistant.html`. `reviews`·`build_map`과 같은 원칙 —
+    화면 구성·색·서체·간격·인터랙션은 원안 그대로 옮기고, 런타임만 순수 JS로 바꿨다.
+
+  ■ 원안과 다르게 구현한 지점 (제작 보고서에도 남긴다)
+    ① 좌측 메뉴·헤더 뼈대 — admin2 공용 셸 상속, 항목 구성은 `admin_nav.py`가 정본.
+    ② **역할 스위처를 뺐다** — 원안은 헤더에 owner/viewer 버튼을 두어 화면 안에서
+       권한을 바꿔볼 수 있었다(디자인 도구의 시연 장치). 실제 화면은 로그인 세션의
+       진짜 등급(`GET /api/admin/auth/me`, `Admin2Shell.canWrite('owner')`)만 쓴다 —
+       `reviews.html.j2`가 같은 이유로 이미 뺀 것과 같다.
+    ③ **"저장하면 위젯에 즉시 반영됩니다"라는 원안 문구를 쓰지 않는다.**
+       `mockups/shared/admin-helper.js`(위젯 본체)는 이번 제작 범위 밖이라 손대지
+       않았다 — 위젯은 여전히 자기 코드 상수(FAQ 5개)를 읽는다. 이 화면에서 저장하면
+       DB에는 즉시 반영되고 이력도 남지만, **위젯에는 아직 연결돼 있지 않다.**
+       화면 곳곳(저장 완료 토스트·위젯 미리보기 캡션)에서 이 사실을 그대로 밝힌다.
+    ④ 바로가기 경로 드롭다운은 원안의 `ROUTES` 상수 대신 서버가 매 요청 `request.app.
+       routes`를 훑어 만든 실제 목록을 쓴다 — 그 상수는 제작 시점 실측으로 이미 낡아
+       있었다(`/admin2/reviews`를 "없음"으로 적어 뒀는데 실제로는 있었다,
+       `ai-screens-datamap.md` §5).
+    ⑤ **마이그레이션(0048) 미적용 상태를 견딘다** — `ops_assistant_faqs` 테이블이
+       아직 없으면(DBA가 `alembic upgrade`를 돌리기 전) 500으로 죽지 않고 "원천
+       준비 중" 배너로 안내한다.
+    ⑥ 토스트는 화면 자체 구현 대신 admin2 공용 셸의 `Admin2Shell.toast()`를 쓴다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}운영 도우미 설정{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input,textarea{font-family:var(--rv-font)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+.a2-hd .scopechip{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+                border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+
+.info-row{flex:none;margin:12px 18px 0;display:flex;gap:10px}
+.info-card{flex:1;border-radius:7px;padding:10px 13px;border:1px solid rgba(0,0,0,.14);
+          background:var(--rv-panel2);border-left:3px solid var(--rv-faint)}
+.info-card.warn{border-color:var(--rv-amber-line);background:var(--rv-amber-bg);border-left-color:var(--rv-amber)}
+.info-card .t{font:600 11.5px/1.4 var(--rv-font);margin-bottom:3px}
+.info-card .d{font:400 10.5px/1.6 var(--rv-font);color:#5b564d}
+.notready{flex:none;margin:10px 18px 0;border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+         border-left:3px solid var(--rv-amber);border-radius:7px;padding:10px 13px}
+.notready .t{font:600 11.5px/1.4 var(--rv-font);margin-bottom:3px}
+.notready .d{font:400 10.5px/1.6 var(--rv-font);color:#5b564d}
+.notready[hidden]{display:none}
+
+.body-cols{flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px}
+.col-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.col-right{width:352px;flex:none;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.card-hd{flex:none;min-height:38px;border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-panel);
+        display:flex;align-items:center;padding:0 13px;gap:9px;flex-wrap:wrap}
+.card-hd .t{font:600 11.5px/1 var(--rv-font)}
+.card-hd .s{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.card-hd .grow{flex:1}
+
+/* ── FAQ 목록 ── */
+.faq-card{flex:1;min-height:230px}
+.faq-list{flex:1;min-height:0;overflow:auto}
+.faq-row{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06);
+        cursor:pointer;border-left:3px solid transparent}
+.faq-row:hover{background:rgba(0,0,0,.02)}
+.faq-row.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.faq-order{display:flex;flex-direction:column;gap:2px;flex:none;padding-top:1px}
+.faq-order button{font:600 9px/1 var(--rv-mono);background:none;border:0;cursor:pointer;color:var(--rv-muted);padding:2px}
+.faq-order button:disabled{color:var(--rv-dim3);cursor:not-allowed}
+.faq-body{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.faq-qrow{display:flex;align-items:center;gap:8px}
+.faq-no{font:600 10px/1 var(--rv-mono);color:var(--rv-dim)}
+.faq-q{font:500 12.5px/1.35 var(--rv-font);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.faq-a{font:400 11px/1.5 var(--rv-font);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.faq-links{display:flex;gap:6px;flex-wrap:wrap}
+.faq-link{font:400 10px/1.3 var(--rv-mono);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.1);border-radius:4px;padding:4px 7px}
+.faq-link.broken{color:oklch(0.5 0.14 55);background:var(--rv-amber-bg);border-color:var(--rv-amber-line)}
+.faq-del{font:400 12px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;flex:none;padding-top:2px;background:none;border:0}
+.faq-del:disabled{color:var(--rv-dim3);cursor:not-allowed}
+.chip{font:600 10px/1 var(--rv-font);border-radius:4px;padding:5px 8px;white-space:nowrap;border:1px solid}
+.addbtn{font:600 11px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:0;border-radius:5px;padding:7px 11px;cursor:pointer}
+.addbtn:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+.faq-empty{flex:1;display:flex;align-items:center;justify-content:center;padding:30px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+
+/* ── 답할 범위 ── */
+.scope-card{flex:none;padding:13px 15px}
+.scope-hd{display:flex;align-items:baseline;gap:9px;margin-bottom:10px}
+.scope-hd .t{font:600 11.5px/1.3 var(--rv-font)}
+.scope-hd .d{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.scope-wrap{display:flex;flex-wrap:wrap;gap:7px}
+.scope-chip{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--rv-font);border-radius:14px;
+           padding:8px 12px;cursor:pointer;user-select:none;border:1px solid}
+.scope-chip .mark{font:600 10px/1 var(--rv-mono)}
+.scope-chip.locked{cursor:not-allowed;color:var(--rv-dim);background:var(--rv-panel2);border-color:rgba(0,0,0,.1)}
+.scope-chip.state-on{background:#f6f2e8;border-color:var(--rv-ink);color:var(--rv-ink)}
+.scope-chip.state-off{background:var(--rv-card);border-color:rgba(0,0,0,.18);color:var(--rv-ink)}
+
+/* ── 우측 컬럼 ── */
+.audit-card{padding:13px 15px}
+.audit-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:9px}
+.audit-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.audit-desc{font:400 10.5px/1.5 var(--rv-font);color:#4a463e;flex:1}
+.audit-foot{font:400 10.5px/1.65 var(--rv-font);color:#5b564d;margin-top:9px;padding-top:9px;border-top:1px solid rgba(0,0,0,.1)}
+
+.preview-card{flex:1;min-height:230px;padding:13px 15px}
+.preview-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:10px}
+.chatbox{flex:1;min-height:0;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--rv-panel);
+        display:flex;flex-direction:column;overflow:hidden}
+.chat-hd{flex:none;padding:10px 12px;background:var(--rv-nav);color:var(--rv-nav-ink);display:flex;align-items:center;gap:8px}
+.chat-dot{width:7px;height:7px;border-radius:50%;background:var(--rv-green)}
+.chat-title{font:600 11.5px/1.3 var(--rv-font)}
+.chat-tag{font:400 10px/1 var(--rv-font);opacity:.65}
+.chat-body{flex:1;min-height:0;overflow:auto;padding:11px;display:flex;flex-direction:column;gap:7px}
+.bubble-bot{align-self:flex-start;max-width:88%;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+          border-radius:8px 8px 8px 3px;padding:8px 10px;font:400 11px/1.6 var(--rv-font)}
+.bubble-chip{align-self:flex-end;max-width:92%;background:var(--rv-nav);color:var(--rv-nav-ink);
+           border-radius:8px 8px 3px 8px;padding:7px 10px;font:400 10.5px/1.5 var(--rv-font)}
+.bubble-dash{align-self:flex-start;max-width:88%;background:var(--rv-card);border:1px dashed rgba(0,0,0,.18);
+           border-radius:8px;padding:8px 10px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint)}
+.preview-note{font:400 10px/1.5 var(--rv-font);color:var(--rv-dim);margin-top:8px}
+
+/* ── 상세 서랍 — top:52px는 원안(dc-ops-assistant.html 153·154행)의 값을 그대로
+   옮긴 것이다. `.a2-main`(position:relative, 셸 정본) 기준으로 첫 자식 `.a2-hd`
+   (min-height:52px)를 덮지 않으려면 이만큼 내려야 한다. ── */
+.scrim{position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7}
+.scrim[hidden]{display:none}
+.drawer{position:absolute;top:52px;right:0;bottom:0;width:560px;background:var(--rv-card);
+       border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);
+       display:flex;flex-direction:column;z-index:8}
+.drawer[hidden]{display:none}
+.dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px}
+.dw-hd .title{font:600 14px/1.3 var(--rv-font);flex:1;min-width:0}
+.dw-hd .no{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.dw-hd .close{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 4px;background:none;border:0}
+.dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px}
+.dw-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:7px}
+.dw-cap .hint{font-weight:400;color:var(--rv-dim)}
+.f-input{width:100%;font:500 13px/1.5 var(--rv-font);color:var(--rv-ink);background:var(--rv-panel2);
+        border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none}
+.f-input:disabled{color:var(--rv-dim);cursor:not-allowed}
+.f-textarea{width:100%;height:92px;resize:none;font:400 12px/1.7 var(--rv-font);color:var(--rv-ink);
+           background:var(--rv-panel2);border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none}
+.f-textarea:disabled{color:var(--rv-dim);cursor:not-allowed}
+.linkrow{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:9px 11px;background:var(--rv-panel2);position:relative;margin-bottom:6px}
+.linkrow .row1{display:flex;align-items:center;gap:9px}
+.linkrow input{flex:1;min-width:0;font:500 11.5px/1.3 var(--rv-font);color:var(--rv-ink);background:transparent;
+              border:none;border-bottom:1px solid rgba(0,0,0,.18);outline:none;padding:0 0 3px}
+.linkrow input:disabled{color:var(--rv-dim);cursor:not-allowed}
+.pathbtn{display:flex;align-items:center;gap:6px;font:400 10.5px/1 var(--rv-mono);background:var(--rv-card);
+        border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 8px;cursor:pointer;max-width:208px;
+        overflow:hidden;white-space:nowrap}
+.pathbtn.broken{color:oklch(0.5 0.14 55);border-color:var(--rv-amber-line)}
+.linkrow .rm{font:400 11px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;background:none;border:0}
+.linkrow .warn{font:400 10px/1.5 var(--rv-font);color:oklch(0.5 0.14 55);margin-top:7px}
+.pathmenu{position:absolute;top:40px;right:34px;z-index:30;min-width:246px;max-height:230px;overflow:auto;
+         background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.pathmenu[hidden]{display:none}
+.pathmenu .item{display:flex;align-items:center;gap:9px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+               padding:7px 9px;border-radius:5px;cursor:pointer}
+.pathmenu .item:hover{background:var(--rv-panel)}
+.pathmenu .item .p{font:400 10px/1 var(--rv-mono);color:var(--rv-dim)}
+.addlink{display:inline-flex;font:500 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+        border:1px dashed rgba(0,0,0,.24);border-radius:5px;padding:8px 11px;cursor:pointer}
+.addlink:disabled{color:var(--rv-dim3);cursor:not-allowed}
+.diffbox{border:1px solid var(--rv-ink);border-left:3px solid var(--rv-ink);background:#f6f2e8;border-radius:6px;padding:10px 12px}
+.diffbox .t{font:600 11px/1.4 var(--rv-font);margin-bottom:6px}
+.diffbox .line{font:400 10.5px/1.5 var(--rv-mono);color:#4a463e}
+.dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:var(--rv-panel)}
+.dw-foot .note{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.dw-foot .note.warn{color:var(--rv-red)}
+.btn-ghost{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+         border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer}
+.btn-ghost:disabled{color:var(--rv-dim3);cursor:not-allowed}
+.btn-save{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+        border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-save:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+
+@media (max-width:768px){
+  .body-cols{flex-direction:column}
+  .col-right{width:100%}
+  .drawer{position:fixed;top:0;width:100%}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="scopechip">편집 owner 전용 · 열람 viewer 이상</span>
+{% endblock %}
+
+{% block content %}
+<div class="info-row" data-keep="1">
+  <div class="info-card">
+    <div class="t">도우미는 읽기만 합니다 — 시스템에 쓰기 액션은 없습니다</div>
+    <div class="d">첫 릴리스 고정값이라 이 화면에 끄고 켜는 옵션 자체를 두지 않습니다. 이 화면에서 하는 편집은 <b>도우미가 답할 내용</b>을 고치는 것입니다.</div>
+  </div>
+  <div class="info-card warn">
+    <div class="t">자유 질문에는 아직 답하지 않습니다</div>
+    <div class="d">LLM 연동 보류(2026-07-21). 위젯은 FAQ 문자열 매칭만 하고, 매칭이 안 되면 "아직 자유 질문에는 답할 수 없습니다"라고 답합니다.</div>
+  </div>
+</div>
+
+<div class="notready" id="notReady" hidden data-keep="1">
+  <div class="t">▲ 원천 준비 중</div>
+  <div class="d" id="notReadyMsg">FAQ 원천이 아직 준비되지 않았습니다.</div>
+</div>
+
+<div class="body-cols">
+  <div class="col-left">
+    <div class="card faq-card">
+      <div class="card-hd">
+        <span class="t" id="faqCount">FAQ —개</span>
+        <span class="s">위젯이 위에서부터 이 순서로 보여줍니다</span>
+        <span class="grow"></span>
+        <span class="chip" id="brokenChip">—</span>
+        <button type="button" class="addbtn" id="addBtn" data-action="add-faq">+ FAQ 추가</button>
+      </div>
+      <div class="faq-list" id="faqList"><div class="faq-empty">불러오는 중…</div></div>
+    </div>
+
+    <div class="card scope-card">
+      <div class="scope-hd">
+        <span class="t">답할 범위</span>
+        <span class="d">도우미가 읽어도 되는 데이터입니다. 잠긴 항목은 켤 수 없습니다 — 개인정보·매입 원가는 답변 대상이 아닙니다.</span>
+      </div>
+      <div class="scope-wrap" id="scopeWrap"></div>
+    </div>
+  </div>
+
+  <div class="col-right">
+    <div class="card audit-card">
+      <div class="audit-cap">바로가기 점검</div>
+      <div id="auditRows"></div>
+      <div class="audit-foot">위젯은 admin2 공통 레이아웃이 아니라 구 관리자 화면(<code>templates/admin/_layout.html.j2</code>)에 실려 있습니다. 옛 링크는 상대경로라 admin2에서 열리면 없는 주소로 풀립니다 — 서랍에서 실제 admin2 경로로 바꾸세요.</div>
+    </div>
+
+    <div class="card preview-card">
+      <div class="preview-cap">위젯 미리보기 — 참고용</div>
+      <div class="chatbox">
+        <div class="chat-hd">
+          <span class="chat-dot"></span><span class="chat-title">운영 도우미</span><span class="grow"></span>
+          <span class="chat-tag">읽기 전용</span>
+        </div>
+        <div class="chat-body" id="chatBody"></div>
+      </div>
+      <div class="preview-note">이 미리보기는 지금 저장된 FAQ 순서를 보여줄 뿐입니다 — 실제 위젯(admin-helper.js)은 아직 이 목록을 읽지 않고 자체 코드 상수를 씁니다.</div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden data-action="close-drawer"></div>
+<aside class="drawer" id="drawer" data-keep="1" hidden>
+  <div class="dw-hd">
+    <span class="title">FAQ 편집</span>
+    <span class="no" id="dwNo">—</span>
+    <button type="button" class="close" data-action="close-drawer">✕</button>
+  </div>
+  <div class="dw-body" id="dwBody"></div>
+  <div class="dw-foot">
+    <span class="note" id="dwFoot">—</span>
+    <button type="button" class="btn-ghost" id="revertBtn" data-action="revert">되돌리기</button>
+    <button type="button" class="btn-save" id="saveBtn" data-action="save">저장</button>
+  </div>
+</aside>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var AMBER = 'var(--rv-amber)', GREEN = 'var(--rv-green)';
+  var MAX_LINKS = 2;
+
+  var S = {
+    ready: null, faqs: [], scopes: [], routes: [], brokenLinks: 0,
+    note: '', widgetSyncNote: '', loadErr: null,
+    sel: null, drawerOpen: false, draft: null, openMenu: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiSend(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+  function toast(msg, kind) { window.Admin2Shell.toast(msg, kind); }
+  function canWrite() { return window.Admin2Shell.canWrite('owner'); }
+  function guard() {
+    if (!canWrite()) {
+      var me = window.Admin2Shell.getMe();
+      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '로그인 필요') + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+
+  function routeOf(path) { return S.routes.filter(function (r) { return r.path === path; })[0]; }
+  function findFaq(id) { return S.faqs.filter(function (f) { return f.faq_id === id; })[0]; }
+  function cloneDraft(f) { return { question: f.question, answer: f.answer, links: f.links.map(function (l) { return { label: l.label, path: l.path }; }) }; }
+
+  function diffs() {
+    if (S.sel == null || !S.draft) return [];
+    var orig = findFaq(S.sel);
+    if (!orig) return [];
+    var out = [];
+    if (orig.question !== S.draft.question) out.push('질문: "' + orig.question + '" → "' + S.draft.question + '"');
+    if (orig.answer !== S.draft.answer) out.push('답변: 본문 수정됨');
+    var fmtLinks = function (links) { return links.map(function (l) { return l.label + '→' + l.path; }).join(', ') || '없음'; };
+    var a = fmtLinks(orig.links.map(function (l) { return { label: l.label, path: l.path }; }));
+    var b = fmtLinks(S.draft.links);
+    if (a !== b) out.push('바로가기: [' + a + '] → [' + b + ']');
+    return out;
+  }
+  // ── 로드 ─────────────────────────────────────────────────────────
+  function load() {
+    $('faqList').innerHTML = '<div class="faq-empty">불러오는 중…</div>';
+    apiGet('/api/admin/ops-assistant').then(function (j) {
+      S.ready = j.ready; S.faqs = j.faqs || []; S.scopes = j.scopes || [];
+      S.routes = j.routes || []; S.brokenLinks = j.broken_links || 0;
+      S.note = j.note || ''; S.widgetSyncNote = j.widget_sync_note || '';
+      S.loadErr = null;
+      if (S.sel != null && !findFaq(S.sel)) { S.sel = null; S.drawerOpen = false; S.draft = null; }
+      renderAll();
+    }).catch(function (err) {
+      S.loadErr = err; renderAll();
+    });
+  }
+
+  function renderAll() {
+    renderNotReady();
+    renderFaqList();
+    renderScopes();
+    renderAudit();
+    renderPreview();
+    renderDrawer();
+  }
+
+  function renderNotReady() {
+    var box = $('notReady');
+    if (S.loadErr) {
+      box.hidden = false;
+      $('notReadyMsg').textContent = (S.loadErr.status === 401 ? '세션이 만료됐습니다 — 다시 로그인하세요.' : ('조회에 실패했습니다 — ' + S.loadErr.message));
+      return;
+    }
+    box.hidden = S.ready !== false;
+    if (S.ready === false) $('notReadyMsg').textContent = S.note || 'FAQ 원천이 아직 준비되지 않았습니다.';
+  }
+
+  // ── FAQ 목록 ─────────────────────────────────────────────────────
+  function renderFaqList() {
+    var owner = canWrite();
+    $('faqCount').textContent = 'FAQ ' + S.faqs.length + '개';
+    $('brokenChip').textContent = S.brokenLinks ? ('⚠ 깨진 바로가기 ' + S.brokenLinks + '곳') : '✓ 바로가기 정상';
+    $('brokenChip').style.color = S.brokenLinks ? AMBER : GREEN;
+    $('brokenChip').style.background = S.brokenLinks ? 'var(--rv-amber-bg)' : 'oklch(0.95 0.03 165)';
+    $('brokenChip').style.borderColor = S.brokenLinks ? 'var(--rv-amber-line)' : (GREEN + '55');
+    $('addBtn').disabled = !owner || S.ready === false;
+
+    if (S.loadErr) {
+      $('faqList').innerHTML = '<div class="faq-empty">' + esc(S.loadErr.message) + '</div>';
+      return;
+    }
+    if (!S.faqs.length) {
+      $('faqList').innerHTML = '<div class="faq-empty">' +
+        (S.ready === false ? '원천이 준비되면 FAQ가 여기 나타납니다.' : 'FAQ가 없습니다 — 위젯이 답할 것이 없는 상태입니다.') + '</div>';
+      return;
+    }
+    $('faqList').innerHTML = S.faqs.map(function (f, i) {
+      var on = f.faq_id === S.sel && S.drawerOpen;
+      var last = S.faqs.length <= 1;
+      return '<div class="faq-row' + (on ? ' on' : '') + '" data-action="open-faq" data-id="' + f.faq_id + '">' +
+        '<span class="faq-order">' +
+        '<button type="button" data-action="faq-up" data-id="' + f.faq_id + '"' + (i === 0 || !owner ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" data-action="faq-down" data-id="' + f.faq_id + '"' + (i === S.faqs.length - 1 || !owner ? ' disabled' : '') + '>↓</button>' +
+        '</span>' +
+        '<span class="faq-body">' +
+        '<span class="faq-qrow"><span class="faq-no">FAQ ' + (i + 1) + '</span><span class="faq-q">' + esc(f.question) + '</span></span>' +
+        '<span class="faq-a">' + esc(f.answer.replace(/<[^>]+>/g, '')) + '</span>' +
+        '<span class="faq-links">' + f.links.map(function (l) {
+          return '<span class="faq-link' + (l.exists ? '' : ' broken') + '">' + (l.exists ? '→ ' : '⚠ ') + esc(l.label) + ' · ' + esc(l.path) + '</span>';
+        }).join('') + '</span></span>' +
+        '<button type="button" class="faq-del" data-action="faq-delete" data-id="' + f.faq_id + '"' +
+        (last || !owner ? ' disabled title="FAQ는 최소 1개가 남아야 합니다"' : ' title="이 FAQ 삭제"') + '>✕</button></div>';
+    }).join('');
+  }
+
+  function moveFaq(id, dir) {
+    if (!guard()) return;
+    apiSend('POST', '/api/admin/ops-assistant/faqs/' + id + '/move', { direction: dir })
+      .then(function () { load(); }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function deleteFaq(id) {
+    if (!guard()) return;
+    apiSend('DELETE', '/api/admin/ops-assistant/faqs/' + id, null)
+      .then(function () {
+        toast('FAQ를 삭제했습니다 — DB에 즉시 반영됩니다(위젯은 아직 별도 연동 전).', 'ok');
+        if (S.sel === id) { S.sel = null; S.drawerOpen = false; S.draft = null; }
+        load();
+      }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function addFaq() {
+    if (!guard()) return;
+    if (diffs().length) { toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 추가하세요', 'warn'); return; }
+    apiSend('POST', '/api/admin/ops-assistant/faqs', { question: '새 질문', answer: '답변을 입력하세요.', links: [] })
+      .then(function (j) {
+        toast('FAQ를 추가했습니다 — 질문·답변을 채우고 저장하세요.', 'ok');
+        load();
+        setTimeout(function () { openFaq(j.faq_id); }, 0);
+      }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── 답할 범위 ────────────────────────────────────────────────────
+  function renderScopes() {
+    $('scopeWrap').innerHTML = S.scopes.map(function (s) {
+      var mark = s.locked ? '🔒' : (s.enabled ? '●' : '○');
+      var cls = s.locked ? 'locked' : (s.enabled ? 'state-on' : 'state-off');
+      var hint = s.locked ? (s.lock_note || '잠긴 항목입니다') : (s.enabled ? '답변에 쓸 수 있음' : '답변에 쓰지 않음');
+      return '<span class="scope-chip ' + cls + '" data-action="toggle-scope" data-key="' + esc(s.scope_key) + '" title="' + esc(hint) + '">' +
+        '<span class="mark">' + mark + '</span><span>' + esc(s.label) + '</span></span>';
+    }).join('') || '<span style="font:400 11px/1.5 var(--rv-font);color:var(--rv-muted)">원천이 준비되면 목록이 나타납니다.</span>';
+  }
+  function toggleScope(key) {
+    var s = S.scopes.filter(function (x) { return x.scope_key === key; })[0];
+    if (!s) return;
+    if (s.locked) { toast(s.label + '은(는) 답변 대상이 될 수 없습니다 — 잠긴 항목입니다', 'warn'); return; }
+    if (!guard()) return;
+    apiSend('PATCH', '/api/admin/ops-assistant/scopes/' + encodeURIComponent(key), { enabled: !s.enabled })
+      .then(function (j) { toast(j.note, 'ok'); load(); }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── 바로가기 점검 ────────────────────────────────────────────────
+  function renderAudit() {
+    var rows = [
+      { chip: (S.brokenLinks ? '⚠ ' + S.brokenLinks + '곳' : '✓ 0곳'), color: S.brokenLinks ? AMBER : GREEN,
+        desc: 'admin2에 없는 주소를 가리킵니다(상대경로로 저장돼 있음).' },
+      { chip: S.routes.length + '개', color: 'var(--rv-ink-soft)', desc: '지금 고를 수 있는 admin2 경로 수입니다 — 화면이 늘면 자동으로 늘어납니다.' }
+    ];
+    $('auditRows').innerHTML = rows.map(function (r) {
+      return '<div class="audit-row"><span class="chip" style="color:' + r.color + ';background:var(--rv-panel2);border-color:' + r.color + '55">' + esc(r.chip) + '</span>' +
+        '<span class="audit-desc">' + esc(r.desc) + '</span></div>';
+    }).join('');
+  }
+
+  // ── 위젯 미리보기 ────────────────────────────────────────────────
+  function renderPreview() {
+    var body = $('chatBody');
+    var html = '<div class="bubble-bot">운영 중 막히는 게 있으면 물어보세요. <b>아직 자동 답변은 준비 중</b>이라, 지금은 자주 묻는 것에 대한 바로가기를 드립니다.</div>';
+    S.faqs.slice(0, 5).forEach(function (f) { html += '<div class="bubble-chip">' + esc(f.question) + '</div>'; });
+    html += '<div class="bubble-dash">아직 자유 질문에는 답할 수 없습니다 — 답변 기능은 준비 중입니다.</div>';
+    body.innerHTML = html;
+  }
+
+  // ── 상세 서랍 ────────────────────────────────────────────────────
+  function openFaq(id) {
+    if (diffs().length) { toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn'); return; }
+    if (S.sel === id && S.drawerOpen) { closeDrawer(); return; }
+    var f = findFaq(id); if (!f) return;
+    S.sel = id; S.drawerOpen = true; S.draft = cloneDraft(f); S.openMenu = null;
+    renderFaqList(); renderDrawer();
+  }
+  function closeDrawer() {
+    if (diffs().length) { toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 닫으세요', 'warn'); return; }
+    S.drawerOpen = false; S.sel = null; S.draft = null; S.openMenu = null;
+    renderFaqList(); renderDrawer();
+  }
+
+  function linkRowHtml(l, i, owner) {
+    var r = routeOf(l.path);
+    var open = S.openMenu === 'link' + i;
+    return '<div class="linkrow">' +
+      '<div class="row1">' +
+      '<input data-action="link-label" data-i="' + i + '" value="' + esc(l.label) + '"' + (owner ? '' : ' disabled') + '>' +
+      '<span class="pathbtn' + (r ? '' : ' broken') + '" data-action="toggle-path-menu" data-i="' + i + '">' +
+      '<span>' + esc(l.path) + '</span><span style="font-size:8px;opacity:.55">▼</span></span>' +
+      (owner ? '<button type="button" class="rm" data-action="link-remove" data-i="' + i + '">✕</button>' : '') +
+      '</div>' +
+      (r ? '' : '<div class="warn">admin2에는 없는 주소입니다 — 아래 목록에서 실제 경로를 고르세요</div>') +
+      (open ? ('<div class="pathmenu" data-keep="1">' + S.routes.map(function (o) {
+        return '<div class="item" data-action="link-pick" data-i="' + i + '" data-path="' + esc(o.path) + '">' +
+          '<span style="flex:1;min-width:0">' + esc(o.label) + '</span><span class="p">' + esc(o.path) + '</span></div>';
+      }).join('') + '</div>') : '') +
+      '</div>';
+  }
+
+  function renderDrawer() {
+    var d = S.draft, owner = canWrite();
+    $('scrim').hidden = !S.drawerOpen; $('drawer').hidden = !S.drawerOpen;
+    if (!S.drawerOpen || !d) return;
+    var idx = S.faqs.map(function (f) { return f.faq_id; }).indexOf(S.sel);
+    $('dwNo').textContent = idx >= 0 ? ('FAQ ' + (idx + 1)) : '';
+    var dl = diffs();
+    $('dwBody').innerHTML =
+      '<div><div class="dw-cap">질문</div><input class="f-input" id="fQuestion" value="' + esc(d.question) + '"' + (owner ? '' : ' disabled') + '></div>' +
+      '<div><div class="dw-cap">답변</div><textarea class="f-textarea" id="fAnswer"' + (owner ? '' : ' disabled') + '>' + esc(d.answer) + '</textarea></div>' +
+      '<div data-keep="1"><div class="dw-cap">바로가기 (최대 ' + MAX_LINKS + '개) <span class="hint">지금 존재하는 화면만 고를 수 있습니다</span></div>' +
+      '<div id="linkRows">' + d.links.map(function (l, i) { return linkRowHtml(l, i, owner); }).join('') + '</div>' +
+      (owner ? ('<button type="button" class="addlink" id="addLinkBtn" data-action="add-link"' + (d.links.length >= MAX_LINKS ? ' disabled' : '') + '>+ 바로가기 추가</button>') : '') +
+      '</div>' +
+      (dl.length ? ('<div class="diffbox"><div class="t">변경됨 · 저장 필요</div>' +
+        dl.map(function (x) { return '<div class="line">' + esc(x) + '</div>'; }).join('') + '</div>') : '');
+
+    var qEl = $('fQuestion'), aEl = $('fAnswer');
+    if (qEl) qEl.addEventListener('input', function () { editDraftField('question', qEl.value); });
+    if (aEl) aEl.addEventListener('input', function () { editDraftField('answer', aEl.value); });
+
+    $('saveBtn').disabled = !owner || !dl.length;
+    $('revertBtn').disabled = !dl.length;
+    var foot = $('dwFoot');
+    if (!owner) { foot.textContent = '권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '로그인 필요') + ') — 조회만 가능합니다'; foot.classList.add('warn'); }
+    else { foot.textContent = dl.length ? (S.widgetSyncNote || '저장하면 DB에 즉시 반영됩니다.') : '변경 사항이 없습니다'; foot.classList.remove('warn'); }
+  }
+
+  // 입력 중에는 dwBody 전체를 다시 그리지 않는다(포커스·커서 위치가 튄다) — diff
+  // 박스·저장/되돌리기 버튼·foot 문구만 다시 그린다. 질문·답변·바로가기 라벨 입력이
+  // 전부 이 한 함수를 공유한다(제작 중 링크 라벨만 diff에 안 반영되던 것을 고침).
+  function refreshDiffUI() {
+    var dl = diffs();
+    $('saveBtn').disabled = !canWrite() || !dl.length;
+    $('revertBtn').disabled = !dl.length;
+    var existing = document.querySelector('#dwBody .diffbox');
+    var html = dl.length ? ('<div class="diffbox"><div class="t">변경됨 · 저장 필요</div>' +
+      dl.map(function (x) { return '<div class="line">' + esc(x) + '</div>'; }).join('') + '</div>') : '';
+    if (existing) { existing.outerHTML = html; } else if (html) { $('dwBody').insertAdjacentHTML('beforeend', html); }
+    var foot = $('dwFoot');
+    foot.textContent = dl.length ? (S.widgetSyncNote || '저장하면 DB에 즉시 반영됩니다.') : '변경 사항이 없습니다';
+  }
+  function editDraftField(key, val) {
+    if (!S.draft) return;
+    S.draft[key] = val;
+    refreshDiffUI();
+  }
+
+  function addLink() {
+    if (!guard() || !S.draft) return;
+    if (S.draft.links.length >= MAX_LINKS) { toast('바로가기는 최대 ' + MAX_LINKS + '개입니다', 'warn'); return; }
+    var first = S.routes[0];
+    S.draft.links.push({ label: first ? first.label : '바로가기', path: first ? first.path : '/admin2' });
+    renderDrawer();
+  }
+  function removeLink(i) {
+    if (!guard() || !S.draft) return;
+    S.draft.links.splice(i, 1);
+    renderDrawer();
+  }
+  function pickLink(i, path) {
+    if (!guard() || !S.draft) return;
+    var r = routeOf(path);
+    S.draft.links[i].path = path;
+    if (!S.draft.links[i].label || S.draft.links[i].label === '바로가기') S.draft.links[i].label = r ? r.label : path;
+    S.openMenu = null;
+    renderDrawer();
+  }
+
+  function saveFaq() {
+    if (!guard() || S.sel == null || !S.draft) return;
+    if (!S.draft.question.trim()) { toast('질문이 비었습니다 (400)', 'err'); return; }
+    if (!S.draft.answer.trim()) { toast('답변이 비었습니다 (400)', 'err'); return; }
+    var broken = S.draft.links.filter(function (l) { return !routeOf(l.path); });
+    if (broken.length) { toast('존재하지 않는 admin2 경로입니다: ' + broken.map(function (l) { return l.path; }).join(', ') + ' (400)', 'err'); return; }
+    apiSend('PATCH', '/api/admin/ops-assistant/faqs/' + S.sel, S.draft)
+      .then(function (j) { toast(j.note, 'ok'); load(); }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function revertFaq() {
+    var orig = findFaq(S.sel);
+    if (!orig) return;
+    if (!diffs().length) { toast('되돌릴 변경이 없습니다', 'warn'); return; }
+    S.draft = cloneDraft(orig);
+    toast('저장 전 상태로 되돌렸습니다', 'ok');
+    renderDrawer();
+  }
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    var keep = window.Admin2Shell && window.Admin2Shell.isKeepClick(e.target);
+    // 빈 공간(=data-action이 없는 곳) 클릭만 서랍을 닫는다 — 행·버튼 클릭은 각자의
+    // 핸들러(openFaq 등)가 이미 같은 더티 검사를 하므로, 여기서도 같이 닫으려 들면
+    // 경고 토스트가 두 번 뜬다(중복, 제작 중 발견해 고침).
+    if (!keep && S.drawerOpen && !t) { closeDrawer(); }
+    if (!e.target.closest('.linkrow')) { if (S.openMenu) { S.openMenu = null; renderDrawer(); } }
+
+    if (!t) return;
+    var a = t.getAttribute('data-action');
+    switch (a) {
+      case 'open-faq': openFaq(Number(t.getAttribute('data-id'))); break;
+      case 'close-drawer': closeDrawer(); break;
+      case 'faq-up': e.stopPropagation(); moveFaq(Number(t.getAttribute('data-id')), 'up'); break;
+      case 'faq-down': e.stopPropagation(); moveFaq(Number(t.getAttribute('data-id')), 'down'); break;
+      case 'faq-delete': e.stopPropagation(); deleteFaq(Number(t.getAttribute('data-id'))); break;
+      case 'add-faq': addFaq(); break;
+      case 'toggle-scope': toggleScope(t.getAttribute('data-key')); break;
+      case 'add-link': addLink(); break;
+      case 'link-remove': e.stopPropagation(); removeLink(Number(t.getAttribute('data-i'))); break;
+      case 'toggle-path-menu': {
+        e.stopPropagation();
+        var k = 'link' + t.getAttribute('data-i');
+        S.openMenu = S.openMenu === k ? null : k;
+        renderDrawer();
+        break;
+      }
+      case 'link-pick': e.stopPropagation(); pickLink(Number(t.getAttribute('data-i')), t.getAttribute('data-path')); break;
+      case 'save': saveFaq(); break;
+      case 'revert': revertFaq(); break;
+      default: break;
+    }
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.matches('[data-action="link-label"]')) {
+      var i = Number(e.target.getAttribute('data-i'));
+      if (S.draft && S.draft.links[i]) {
+        S.draft.links[i].label = e.target.value;
+        refreshDiffUI();
+      }
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.drawerOpen && !diffs().length) closeDrawer();
+  });
+
+  window.Admin2Shell.meReady.then(function () { renderFaqList(); renderDrawer(); });
+  load();
+})();
+</script>
+{% endraw %}
+{% endblock %}
