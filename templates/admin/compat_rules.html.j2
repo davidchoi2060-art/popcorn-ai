@@ -1,0 +1,770 @@
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}조립 호환 규칙{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ADM-ENG-010 조립 호환 규칙 - 화면 전용 스타일. 팔레트·서체는 admin2.css 토큰만
+     쓴다(:root 재정의 없음). 접두어 cr- 로 이름공간을 둔다. */
+  .cr-wrap{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;
+    position:relative;padding:16px 20px 14px;gap:12px;overflow:hidden}
+
+  .cr-banner{display:flex;align-items:flex-start;gap:12px;border-radius:8px;
+    border:1px solid rgba(0,0,0,.12);border-left-width:3px;padding:10px 13px;flex:none}
+  .cr-banner[hidden]{display:none}
+  .cr-banner--danger{border-color:rgba(0,0,0,.1);border-left-color:var(--error);
+    background:var(--container)}
+  .cr-banner-icon{flex:none;font:600 13px/1.4 var(--font);color:inherit}
+  .cr-banner-body{flex:1;min-width:0}
+  .cr-banner-title{font:600 12px/1.4 var(--font)}
+  .cr-banner--danger .cr-banner-title{color:var(--error)}
+  .cr-banner-text{font:400 11.5px/1.7 var(--font);color:var(--on);margin-top:3px}
+  .cr-banner-text code{font-family:var(--font-num);font-size:10.5px;
+    background:var(--container-low);border-radius:3px;padding:1px 4px}
+
+  .cr-principle{flex:none;border:1px solid rgba(0,0,0,.11);border-left:3px solid var(--rv-link, var(--secondary));
+    border-radius:8px;background:var(--card);padding:10px 13px}
+  .cr-principle-title{font:600 11.5px/1.4 var(--font);color:var(--on)}
+  .cr-principle-text{font:400 11.5px/1.7 var(--font);color:var(--on-variant);margin-top:4px;
+    white-space:pre-line}
+
+  .cr-kpis{flex:none;display:flex;gap:10px;flex-wrap:wrap}
+  .cr-kpi{flex:1 1 190px;min-width:170px;background:var(--card);border:1px solid rgba(0,0,0,.11);
+    border-left:3px solid var(--on);border-radius:8px;padding:10px 13px}
+  .cr-kpi--gap{border-left-color:var(--error)}
+  .cr-kpi-label{font:500 10.5px/1.3 var(--font);color:var(--on-variant)}
+  .cr-kpi-val{font:600 22px/1.2 var(--font-num);font-variant-numeric:tabular-nums;color:var(--on)}
+  .cr-kpi--gap .cr-kpi-val{font-size:15px;color:var(--error)}
+  .cr-kpi-row{display:flex;align-items:baseline;gap:7px;margin-top:2px}
+  .cr-kpi-note{font:400 10px/1.4 var(--font);color:var(--on-variant)}
+
+  .cr-table-region{flex:1;min-height:0;display:flex;flex-direction:column;
+    border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:hidden;background:var(--card)}
+  .cr-table-scroll{flex:1;min-height:0;overflow:auto;position:relative}
+  .cr-grid{display:grid;grid-template-columns:44px 96px minmax(150px,1.3fr) 56px
+    minmax(150px,1.3fr) 126px 70px 70px 108px;column-gap:10px;align-items:center}
+  .cr-row--head{position:sticky;top:0;z-index:2;background:var(--container);
+    padding:8px 13px;font:600 10px/1.2 var(--font);color:var(--on-variant);
+    border-bottom:1px solid rgba(0,0,0,.1);min-width:920px}
+  .cr-row--head span{white-space:nowrap;cursor:default}
+  .cr-row{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid rgba(0,0,0,.06);
+    background:var(--card);text-align:left;padding:9px 13px;cursor:pointer;font:inherit;
+    color:inherit;min-width:920px}
+  .cr-row:hover{background:var(--container-low)}
+  .cr-row:focus-visible{outline:2px solid var(--tertiary);outline-offset:-2px}
+  .cr-row .num{color:var(--on-variant);text-align:center}
+  .cr-mono{font-family:var(--font-num);font-size:11px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  .cr-key{font-weight:600}
+  .cr-op{text-align:center;font-weight:600}
+  .cr-part{font:400 10px/1.3 var(--font);color:var(--on-variant)}
+  .cr-part--limited{font-weight:600;color:var(--tertiary)}
+
+  .cr-badge{display:inline-block;font:600 9.5px/1 var(--font);border-radius:4px;
+    padding:4px 6px;text-align:center;white-space:nowrap}
+  .cr-badge--block{color:var(--error);background:var(--container-low);border:1px solid rgba(0,0,0,.08)}
+  .cr-badge--warn{color:var(--on-variant);background:var(--container-low);border:1px solid rgba(0,0,0,.08)}
+  .cr-badge--on{color:var(--success-dark);background:var(--container-low);border:1px solid rgba(0,0,0,.08)}
+  .cr-badge--off{color:var(--on-variant);background:var(--container-low);border:1px solid rgba(0,0,0,.08)}
+  .cr-badge--unknown{color:var(--on-variant);background:var(--container-low);
+    border:1px dashed rgba(0,0,0,.25)}
+  .cr-badge--skip{color:var(--error);background:var(--container-low);
+    border:1px solid var(--error);font-weight:700}
+  .cr-badge[hidden]{display:none}
+
+  .cr-state{display:flex;align-items:center;justify-content:center;gap:8px;flex-direction:column;
+    padding:26px 14px;font:400 12px/1.5 var(--font);color:var(--on-variant);text-align:center}
+  .cr-state[hidden]{display:none}
+  .cr-state-detail{font:400 11px/1.6 var(--font-num);color:var(--error);white-space:pre-wrap;
+    max-width:640px}
+  .cr-retry{margin-top:4px}
+
+  .cr-foot{flex:none;font:400 10px/1.6 var(--font);color:var(--on-variant);
+    border-top:1px solid rgba(0,0,0,.08);background:var(--container);
+    padding:7px 14px;border-radius:0 0 8px 8px}
+
+  .cr-overlay{position:absolute;inset:0;background:rgba(38,35,30,.28);z-index:9}
+  .cr-overlay[hidden]{display:none}
+
+  .cr-drawer{position:absolute;top:0;right:0;bottom:0;width:min(560px,100%);
+    background:var(--card);border-left:1px solid rgba(0,0,0,.14);
+    box-shadow:-18px 0 40px rgba(38,35,30,.22);display:flex;flex-direction:column;z-index:10}
+  .cr-drawer[hidden]{display:none}
+  .cr-drawer-head{flex:none;padding:14px 16px 11px;border-bottom:1px solid rgba(0,0,0,.09)}
+  .cr-drawer-head-row{display:flex;align-items:center;gap:9px}
+  .cr-drawer-key{font:600 15px/1.3 var(--font-num);flex:1;min-width:0;overflow:hidden;
+    text-overflow:ellipsis}
+  .cr-x{flex:none;border:0;background:none;font:400 16px/1 var(--font);color:var(--on-variant);
+    cursor:pointer;padding:3px 5px;border-radius:4px}
+  .cr-x:hover{background:var(--container-low)}
+  .cr-drawer-sentence{font:400 12.5px/1.65 var(--font);color:var(--on);margin-top:7px}
+  .cr-drawer-raw{font:400 10px/1.5 var(--font-num);color:var(--on-variant);margin-top:5px;
+    word-break:break-all}
+
+  .cr-drawer-body{flex:1;min-height:0;overflow:auto;padding:14px 16px;display:flex;
+    flex-direction:column;gap:12px}
+
+  .cr-edit{border:2px solid var(--on);border-radius:8px;padding:12px 14px}
+  .cr-edit-title{font:600 11px/1 var(--font);margin-bottom:10px}
+  .cr-field-grid{display:grid;grid-template-columns:76px 1fr;gap:9px 12px;align-items:center}
+  .cr-field-label{font:500 10.5px/1.4 var(--font);color:var(--on-variant)}
+  .cr-field-pair{display:flex;gap:7px}
+  .cr-input{font:500 11px/1 var(--font-num);border:1px solid rgba(0,0,0,.22);border-radius:5px;
+    padding:8px 9px;background:var(--card);color:var(--on);width:100%;box-sizing:border-box}
+  .cr-input--ref{border-color:rgba(0,0,0,.32);background:var(--container-low)}
+  select.cr-input{font-family:var(--font-num)}
+  .cr-order-row{display:flex;align-items:center;gap:8px}
+  .cr-order-row .cr-input{width:70px;flex:none}
+  .cr-order-hint{font:400 10px/1.5 var(--font);color:var(--on-variant)}
+
+  .cr-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+  .cr-chip{font:600 10.5px/1 var(--font);border-radius:4px;padding:6px 9px;cursor:pointer;
+    border:1px solid rgba(0,0,0,.18);background:var(--card);color:var(--on-variant)}
+  .cr-chip--on{background:var(--on);color:var(--bg);border-color:var(--on)}
+  .cr-chip-hint{font:400 10px/1.6 var(--font);color:var(--on-variant)}
+
+  .cr-toggle{display:inline-flex;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden}
+  .cr-toggle-opt{font:500 10.5px/1 var(--font);color:var(--on-variant);background:var(--card);
+    border:0;padding:8px 11px;cursor:pointer}
+  .cr-toggle-opt--on{font-weight:600;background:var(--on);color:var(--bg)}
+
+  .cr-note-box{border-radius:8px;padding:11px 13px;font:400 10.5px/1.7 var(--font)}
+  .cr-note-box--neutral{border:1px solid rgba(0,0,0,.11);background:var(--container)}
+  .cr-note-box--warn{border:1px solid oklch(0.72 0.12 62 / .5);border-left:3px solid var(--tertiary);
+    background:var(--container)}
+  .cr-note-box-title{font:600 11px/1.4 var(--font)}
+  .cr-note-box--warn .cr-note-box-title{color:var(--tertiary)}
+  .cr-fieldlist{display:flex;flex-direction:column;gap:5px;margin-top:7px}
+  .cr-fieldlist-row{display:flex;align-items:baseline;gap:8px}
+  .cr-fieldlist-tag{font:600 10px/1.4 var(--font);color:var(--on-variant);width:70px;flex:none}
+  .cr-fieldlist-val{font:500 10.5px/1.5 var(--font-num);color:var(--on)}
+
+  .cr-drawer-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 16px;
+    display:flex;align-items:center;gap:8px;background:var(--container)}
+  .cr-drawer-foot-note{flex:1;font:400 10.5px/1.4 var(--font);color:var(--on-variant)}
+  .cr-btn{font:500 11.5px/1 var(--font);border-radius:5px;padding:9px 13px;cursor:pointer}
+  .cr-btn--ghost{color:var(--on);background:var(--card);border:1px solid rgba(0,0,0,.24)}
+  .cr-btn--locked{color:var(--bg);background:var(--outline);border:none;cursor:not-allowed}
+
+  @media (max-width:768px){
+    .cr-wrap{padding:12px 12px 10px}
+    .cr-kpi{flex-basis:140px}
+    .cr-drawer{width:100%}
+  }
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="cr-hd-note" style="font:400 12px/1.5 var(--font);color:var(--on-variant)">
+  열람 등급 무관 · 편집은 백엔드 신설 후 operator 이상 예정
+</span>
+{% endblock %}
+
+{% block content %}
+<div class="cr-wrap" data-screen-id="ADM-ENG-010" data-domain="호환">
+
+  <div class="cr-banner cr-banner--danger" id="cr-skip-banner" hidden role="alert">
+    <span class="cr-banner-icon" aria-hidden="true">▲</span>
+    <div class="cr-banner-body">
+      <div class="cr-banner-title" id="cr-skip-banner-title"></div>
+      <div class="cr-banner-text" id="cr-skip-banner-text"></div>
+    </div>
+  </div>
+
+  <div class="cr-banner cr-banner--danger" id="cr-zero-banner" hidden role="alert">
+    <span class="cr-banner-icon" aria-hidden="true">▲</span>
+    <div class="cr-banner-body">
+      <div class="cr-banner-title">활성 규칙이 0건입니다</div>
+      <div class="cr-banner-text">
+        규칙이 0건이면 엔진은 실패하지 않고 <b>전부 통과</b>시킵니다 - 그 순간부터
+        <b>조립 불가 조합이 정상 견적으로 나갑니다.</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="cr-principle" id="cr-principle" hidden>
+    <div class="cr-principle-title">판정 원칙</div>
+    <div class="cr-principle-text" id="cr-principle-text" data-bind="compat.note"></div>
+  </div>
+
+  <div class="cr-kpis" id="cr-kpis" aria-live="polite">
+    <div class="cr-kpi">
+      <div class="cr-kpi-label">등록된 규칙</div>
+      <div class="cr-kpi-row"><span class="cr-kpi-val" id="cr-kpi-total" data-bind="compat.checks.length">…</span></div>
+      <div class="cr-kpi-note" id="cr-kpi-total-note"></div>
+    </div>
+    <div class="cr-kpi" id="cr-kpi-load-card">
+      <div class="cr-kpi-label">로드 성공 규칙</div>
+      <div class="cr-kpi-row"><span class="cr-kpi-val" id="cr-kpi-load">…</span></div>
+      <div class="cr-kpi-note" id="cr-kpi-load-note"></div>
+    </div>
+    <div class="cr-kpi">
+      <div class="cr-kpi-label">경고 전용 규칙</div>
+      <div class="cr-kpi-row"><span class="cr-kpi-val" id="cr-kpi-warn">…</span></div>
+      <div class="cr-kpi-note">판정 = 경고(막지 않음)인 규칙 수</div>
+    </div>
+    <div class="cr-kpi">
+      <div class="cr-kpi-label">추천 후보 풀</div>
+      <div class="cr-kpi-row"><span class="cr-kpi-val" id="cr-kpi-pool" data-bind="tiers.pool_size">…</span></div>
+      <div class="cr-kpi-note">재고&gt;0 기준 · 이 규칙들이 얹힙니다</div>
+    </div>
+  </div>
+
+  <div class="cr-table-region">
+    <div class="cr-table-scroll" data-keep="1">
+      <div class="cr-grid cr-row--head">
+        <span>순서</span><span>규칙 키</span><span>대상(슬롯.필드)</span><span>연산</span>
+        <span>비교 대상</span><span>부품 한정</span><span>판정</span><span>활성</span>
+        <span title="ref_slot이 slot보다 탐색 순서상 뒤면 엔진이 조용히 건너뜁니다 - 정상이면 이 칸은 비어 있고, 건너뛰면 사유와 함께 배지가 뜹니다">로드</span>
+      </div>
+      <div id="cr-rows" data-repeat="rule"></div>
+      <div class="cr-state" id="cr-state-loading" hidden>불러오는 중입니다</div>
+      <div class="cr-state" id="cr-state-empty" hidden>규칙이 없습니다</div>
+      <div class="cr-state" id="cr-state-error" hidden>
+        <div id="cr-error-msg"></div>
+        <div class="cr-state-detail" id="cr-error-detail" hidden></div>
+        <button type="button" class="cr-btn cr-btn--ghost cr-retry" id="cr-retry-btn">다시 조회</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cr-foot">
+    active=false 규칙은 로드되지 않습니다 · 탐색 순서를 어긴 규칙(ref_slot이 slot보다
+    탐색 순서상 뒤)은 경고 로그만 남기고 건너뜁니다 - 「로드」 열이 규칙별로 그 결과를
+    보여줍니다(정상이면 빈 칸, 건너뛰면 사유와 함께 배지가 뜹니다) ·
+    규칙을 바꾸면 견적 결과가 바뀌므로 회귀 검증 대상입니다 · 필수 사양 자체를 고치는 일은
+    상품 사양 정의 소관 · 「조립 호환 지도」(std.compat_pairs)는 다른 저장소이며 엔진 판정은
+    이 표가 합니다.
+  </div>
+
+  <div class="cr-overlay" id="cr-overlay" hidden data-action="close-drawer"></div>
+
+  <aside class="cr-drawer" id="cr-drawer" hidden role="dialog" aria-modal="true"
+         aria-labelledby="cr-drawer-key" data-keep="1">
+    <div class="cr-drawer-head">
+      <div class="cr-drawer-head-row">
+        <span class="cr-drawer-key" id="cr-drawer-key"></span>
+        <span class="cr-badge" id="cr-drawer-loadbadge" hidden></span>
+        <button type="button" class="cr-x" id="cr-drawer-close" data-action="close-drawer" aria-label="닫기">✕</button>
+      </div>
+      <div class="cr-drawer-sentence" id="cr-drawer-sentence"></div>
+      <div class="cr-drawer-raw" id="cr-drawer-raw"></div>
+    </div>
+
+    <div class="cr-drawer-body">
+      <div class="cr-note-box" id="cr-drawer-loadbox">
+        <div class="cr-note-box-title" id="cr-drawer-loadtitle"></div>
+        <div style="font:400 10.5px/1.7 var(--font);color:var(--on);margin-top:4px" id="cr-drawer-loaddetail"></div>
+      </div>
+
+      <div class="cr-edit">
+        <div class="cr-edit-title">편집 - 토글 · 값 · 순서</div>
+        <div class="cr-field-grid">
+          <span class="cr-field-label">대상</span>
+          <span class="cr-field-pair">
+            <select class="cr-input" id="cr-edit-slot"></select>
+            <input class="cr-input" id="cr-edit-field" type="text">
+          </span>
+          <span class="cr-field-label">연산</span>
+          <select class="cr-input" id="cr-edit-op">
+            <option value="=">= (eq)</option>
+            <option value="≥">≥ (gte)</option>
+            <option value="≤">≤ (lte)</option>
+            <option value="포함">포함 (contains)</option>
+          </select>
+          <span class="cr-field-label">비교 대상</span>
+          <span class="cr-field-pair">
+            <select class="cr-input cr-input--ref" id="cr-edit-refslot"></select>
+            <input class="cr-input" id="cr-edit-reffield" type="text">
+          </span>
+          <span class="cr-field-label">부품 한정</span>
+          <span class="cr-chips" id="cr-edit-parts">
+            <span class="cr-chip-hint">비우면 슬롯 전체</span>
+          </span>
+          <span class="cr-field-label">판정 · 활성</span>
+          <span style="display:flex;gap:8px">
+            <div class="cr-toggle" role="group" aria-label="판정">
+              <button type="button" class="cr-toggle-opt" data-toggle="block" data-val="block">막음</button>
+              <button type="button" class="cr-toggle-opt" data-toggle="block" data-val="warn">경고</button>
+            </div>
+            <div class="cr-toggle" role="group" aria-label="활성">
+              <button type="button" class="cr-toggle-opt" data-toggle="active" data-val="on">켜짐</button>
+              <button type="button" class="cr-toggle-opt" data-toggle="active" data-val="off">꺼짐</button>
+            </div>
+          </span>
+          <span class="cr-field-label">순서</span>
+          <span class="cr-order-row">
+            <input class="cr-input" id="cr-edit-order" type="number" min="1">
+            <span class="cr-order-hint">현재 목록에서의 순서입니다 - 참조 슬롯이 대상보다 앞이 되도록 맞춰야 건너뛰지 않습니다</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="cr-note-box cr-note-box--neutral">
+        <div class="cr-note-box-title" style="font-weight:600">이 규칙이 읽는 필드</div>
+        <div class="cr-fieldlist" id="cr-fieldlist"></div>
+        <div style="font:400 10px/1.6 var(--font);color:var(--on-variant);margin-top:6px">
+          필드를 새로 쓰려면 ① product_specs 컬럼 ② 엔진 풀 SELECT(recommend._load_pool)
+          ③ 스왑 SPEC_COLS 세 곳에 모두 실려 있어야 합니다 - 하나만 빠지면 조용히
+          결과가 0건이 됩니다. 이 화면은 세 곳 각각의 현재 상태를 조회하지 않습니다
+          (지어내지 않습니다) - 확인하려면 해당 코드를 직접 봐야 합니다.
+        </div>
+      </div>
+
+      <div class="cr-note-box cr-note-box--warn">
+        <div class="cr-note-box-title">저장하면 이전 값이 남지 않습니다</div>
+        <div style="font:400 10.5px/1.7 var(--font);color:var(--on);margin-top:4px">
+          이력화 없이 단일 행을 갱신하기로 확정했습니다(2026-08-14) - 과거 견적을
+          "그때 규칙"으로 재현할 수는 없습니다. 다만 누가 언제 무엇을 바꿨는지는
+          작업 기록에 남습니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="cr-drawer-foot">
+      <span class="cr-drawer-foot-note">쓰기 API가 붙기 전까지 저장은 막혀 있습니다</span>
+      <button type="button" class="cr-btn cr-btn--ghost" data-action="close-drawer">취소</button>
+      <button type="button" class="cr-btn cr-btn--locked" disabled
+              title="compat_rules 쓰기 API가 아직 없습니다 - 백엔드 신설 후 저장할 수 있습니다">저장 - 서버 API 대기 중</button>
+    </div>
+  </aside>
+</div>
+
+<template id="cr-row-tpl">
+  <button type="button" class="cr-grid cr-row" data-action="open-rule">
+    <span class="num" data-f="ord"></span>
+    <span class="cr-mono cr-key" data-f="key"></span>
+    <span class="cr-mono" data-f="target"></span>
+    <span class="cr-mono cr-op" data-f="op"></span>
+    <span class="cr-mono" data-f="ref"></span>
+    <span class="cr-part" data-f="part"></span>
+    <span data-f="block"></span>
+    <span data-f="active"></span>
+    <span data-f="load"></span>
+  </button>
+</template>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function(){
+  "use strict";
+  var API_URL = "/api/admin/engine-rules";
+  var LOGIN_URL = "/admin/login.html";
+
+  var els = {
+    zeroBanner: document.getElementById("cr-zero-banner"),
+    skipBanner: document.getElementById("cr-skip-banner"),
+    skipBannerTitle: document.getElementById("cr-skip-banner-title"),
+    skipBannerText: document.getElementById("cr-skip-banner-text"),
+    principle: document.getElementById("cr-principle"),
+    principleText: document.getElementById("cr-principle-text"),
+    kpiTotal: document.getElementById("cr-kpi-total"),
+    kpiTotalNote: document.getElementById("cr-kpi-total-note"),
+    kpiWarn: document.getElementById("cr-kpi-warn"),
+    kpiPool: document.getElementById("cr-kpi-pool"),
+    kpiLoadCard: document.getElementById("cr-kpi-load-card"),
+    kpiLoad: document.getElementById("cr-kpi-load"),
+    kpiLoadNote: document.getElementById("cr-kpi-load-note"),
+    rows: document.getElementById("cr-rows"),
+    rowTpl: document.getElementById("cr-row-tpl"),
+    stLoading: document.getElementById("cr-state-loading"),
+    stEmpty: document.getElementById("cr-state-empty"),
+    stError: document.getElementById("cr-state-error"),
+    errMsg: document.getElementById("cr-error-msg"),
+    errDetail: document.getElementById("cr-error-detail"),
+    retryBtn: document.getElementById("cr-retry-btn"),
+    overlay: document.getElementById("cr-overlay"),
+    drawer: document.getElementById("cr-drawer"),
+    drawerKey: document.getElementById("cr-drawer-key"),
+    drawerSentence: document.getElementById("cr-drawer-sentence"),
+    drawerRaw: document.getElementById("cr-drawer-raw"),
+    drawerLoadBadge: document.getElementById("cr-drawer-loadbadge"),
+    drawerLoadBox: document.getElementById("cr-drawer-loadbox"),
+    drawerLoadTitle: document.getElementById("cr-drawer-loadtitle"),
+    drawerLoadDetail: document.getElementById("cr-drawer-loaddetail"),
+    fieldlist: document.getElementById("cr-fieldlist"),
+    editSlot: document.getElementById("cr-edit-slot"),
+    editField: document.getElementById("cr-edit-field"),
+    editOp: document.getElementById("cr-edit-op"),
+    editRefSlot: document.getElementById("cr-edit-refslot"),
+    editRefField: document.getElementById("cr-edit-reffield"),
+    editParts: document.getElementById("cr-edit-parts"),
+    editOrder: document.getElementById("cr-edit-order"),
+    drawerClose: document.getElementById("cr-drawer-close")
+  };
+
+  var lastSlots = [];
+  var lastRows = [];   // 파싱된 표시용 행(원본 checks가 아니라 화면이 이미 나눈 대상/연산/비교대상)
+  var lastFocusEl = null;
+
+  function fmtNum(n){
+    if (n === null || n === undefined) return "확인 불가";
+    return Number(n).toLocaleString("ko-KR");
+  }
+
+  // API가 미리 합쳐 준 "SLOT.field op REF.ref_field" 문자열을 표 칸으로 도로 나눈다.
+  // 서버가 준 값을 그대로 쓰는 것이지 새 값을 지어내는 것이 아니다 - slot/field에는
+  // 공백이 없으므로(식별자) 공백 기준 분리가 안전하다. 연산 기호(=·≥·≤·포함)는 서버
+  // OP_KO가 이미 한글로 바꿔 rule 문자열에 넣어 보낸다 - 예전엔 "contains"만 OP_KO에
+  // 없어(2026-08-14까지) 여기서 dispOp()로 "포함"을 보정해 땜질했는데, 2026-08-15
+  // 서버 OP_KO에 "contains":"포함"이 보강돼 이제 서버가 이미 번역해 보낸다(실측:
+  // GET /api/admin/engine-rules의 rule 필드가 "CASE.form_factor_list 포함 MB.form_factor"
+  // 처럼 온다). 클라이언트 patch는 중복이라 걷어냈다(API 제작자 지적).
+  function parseRule(ruleStr){
+    var parts = (ruleStr || "").trim().split(/\s+/);
+    if (parts.length !== 3) {
+      return { target: ruleStr || "", op: "", ref: "" };
+    }
+    return { target: parts[0], op: parts[1], ref: parts[2] };
+  }
+
+  function resetKpis(text){
+    els.kpiTotal.textContent = text;
+    els.kpiTotalNote.textContent = "";
+    els.kpiWarn.textContent = text;
+    els.kpiPool.textContent = text;
+    els.kpiLoad.textContent = text;
+    els.kpiLoadNote.textContent = "";
+    els.kpiLoadCard.classList.remove("cr-kpi--gap");
+  }
+
+  function setState(kind, info){
+    els.stLoading.hidden = kind !== "loading";
+    els.stEmpty.hidden = kind !== "empty";
+    els.stError.hidden = kind !== "error";
+    if (kind === "loading") {
+      resetKpis("…");
+      els.skipBanner.hidden = true;
+    }
+    if (kind === "error") {
+      resetKpis("확인 불가");
+      els.skipBanner.hidden = true;
+      info = info || {};
+      if (info.kind === "auth") {
+        els.errMsg.innerHTML = "로그인이 필요합니다 - " +
+          "<a href=\"" + LOGIN_URL + "\" style=\"text-decoration:underline\">로그인 화면으로 이동</a>";
+        els.errDetail.hidden = true;
+      } else if (info.kind === "network") {
+        els.errMsg.textContent = "네트워크 오류 - 서버에 연결할 수 없습니다";
+        els.errDetail.hidden = false;
+        els.errDetail.textContent = info.detail || "";
+      } else {
+        els.errMsg.textContent = "서버 오류로 규칙을 불러오지 못했습니다";
+        els.errDetail.hidden = false;
+        els.errDetail.textContent = info.detail || "";
+      }
+    }
+  }
+
+  function detailFromBody(status, body){
+    if (body && body.detail) {
+      return typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+    }
+    return "상태 코드 " + status;
+  }
+
+  function buildRow(check, ord, total){
+    var parsed = parseRule(check.rule);
+    var partTypes = Array.isArray(check.part_types) ? check.part_types : [];
+    return {
+      ord: ord, total: total, key: check.key, label: check.label,
+      target: parsed.target, op: parsed.op, ref: parsed.ref,
+      partTypes: partTypes,
+      partDisp: partTypes.length ? partTypes.join(", ") : "슬롯 전체",
+      blocking: !!check.blocking, active: !!check.active,
+      // UX-28(2026-08-15) - load_skipped가 boolean이 아니면(옛 캐시·API 변경 등)
+      // false로 단정하지 않는다. 지어내면 실제로 건너뛴 규칙을 "정상"으로 오인시킬
+      // 수 있다 - 그럴 땐 null로 남겨 "확인 불가"를 그대로 보여준다.
+      loadSkipped: (typeof check.load_skipped === "boolean") ? check.load_skipped : null,
+      loadSkipReason: check.load_skip_reason || null
+    };
+  }
+
+  // 로드 배지 - false(정상)면 조용히 아무것도 보여주지 않는다(지금 9건 전부 false라
+  // 정상 시나리오에서는 배지가 하나도 안 뜨는 게 맞다). true(건너뜀)일 때만 사유와
+  // 함께 경고 배지가 뜬다 - "나쁜 규칙이 들어오면 즉시 배지가 뜨는" 구조.
+  function loadBadgeInfo(row){
+    if (row.loadSkipped === null) {
+      return { text: "확인 불가", cls: "cr-badge cr-badge--unknown",
+        title: "엔진 로드 성공 여부를 응답에서 찾지 못했습니다" };
+    }
+    if (row.loadSkipped) {
+      return { text: "건너뜀", cls: "cr-badge cr-badge--skip",
+        title: row.loadSkipReason || "탐색 순서 위반으로 엔진이 이 규칙을 건너뜁니다" };
+    }
+    return { text: "", cls: "", title: "" };
+  }
+
+  function renderRows(rows){
+    els.rows.innerHTML = "";
+    rows.forEach(function(row){
+      var frag = els.rowTpl.content.cloneNode(true);
+      var rootBtn = frag.querySelector(".cr-row");
+      var loadSuffix = row.loadSkipped === true ? ", 로드 건너뜀(" + (row.loadSkipReason || "사유 없음") + ")"
+        : row.loadSkipped === null ? ", 로드 확인 불가" : "";
+      rootBtn.setAttribute("aria-label",
+        row.ord + "번째 규칙 " + row.key + " 자세히 보기 - 판정 " +
+        (row.blocking ? "막음" : "경고") + ", 활성 " + (row.active ? "켜짐" : "꺼짐") + loadSuffix);
+      rootBtn.addEventListener("click", function(){ openDrawer(row); });
+
+      frag.querySelector('[data-f="ord"]').textContent = row.ord;
+      frag.querySelector('[data-f="key"]').textContent = row.key;
+      frag.querySelector('[data-f="target"]').textContent = row.target;
+      frag.querySelector('[data-f="target"]').title = row.target;
+      frag.querySelector('[data-f="op"]').textContent = row.op;
+      frag.querySelector('[data-f="ref"]').textContent = row.ref;
+      frag.querySelector('[data-f="ref"]').title = row.ref;
+
+      var partEl = frag.querySelector('[data-f="part"]');
+      partEl.textContent = row.partDisp;
+      if (row.partTypes.length) partEl.classList.add("cr-part--limited");
+
+      var blockEl = frag.querySelector('[data-f="block"]');
+      blockEl.textContent = row.blocking ? "막음" : "경고";
+      blockEl.className = "cr-badge " + (row.blocking ? "cr-badge--block" : "cr-badge--warn");
+
+      var activeEl = frag.querySelector('[data-f="active"]');
+      activeEl.textContent = row.active ? "켜짐" : "꺼짐";
+      activeEl.className = "cr-badge " + (row.active ? "cr-badge--on" : "cr-badge--off");
+
+      var loadInfo = loadBadgeInfo(row);
+      var loadEl = frag.querySelector('[data-f="load"]');
+      loadEl.textContent = loadInfo.text;
+      loadEl.className = loadInfo.cls;
+      if (loadInfo.title) loadEl.title = loadInfo.title;
+
+      els.rows.appendChild(frag);
+    });
+  }
+
+  function setToggle(name, val){
+    var opts = els.drawer.querySelectorAll('[data-toggle="' + name + '"]');
+    opts.forEach(function(btn){
+      btn.classList.toggle("cr-toggle-opt--on", btn.getAttribute("data-val") === val);
+    });
+  }
+
+  function fillSlotSelect(sel, current){
+    sel.innerHTML = "";
+    var opts = lastSlots.length ? lastSlots : [current];
+    opts.forEach(function(s){
+      var o = document.createElement("option");
+      o.value = s; o.textContent = s;
+      if (s === current) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  // 서랍의 "로드 진단" 자리 - false(정상)면 조용한 중립 문구, true(건너뜀)면 경고
+  // 배지 + 서버가 준 사유(load_skip_reason)를 그대로 보여준다. 지어내지 않는다.
+  function renderLoadDiagnosis(row){
+    if (row.loadSkipped === null) {
+      els.drawerLoadBadge.hidden = false;
+      els.drawerLoadBadge.textContent = "확인 불가";
+      els.drawerLoadBadge.className = "cr-badge cr-badge--unknown";
+      els.drawerLoadBadge.title = "엔진 로드 성공 여부를 응답에서 찾지 못했습니다";
+      els.drawerLoadBox.className = "cr-note-box cr-note-box--warn";
+      els.drawerLoadTitle.textContent = "로드 진단 - 확인 불가";
+      els.drawerLoadDetail.textContent =
+        "이 규칙의 load_skipped 값을 응답에서 찾지 못했습니다 - 지어내지 않고 확인 불가로 남깁니다.";
+      return;
+    }
+    if (row.loadSkipped) {
+      els.drawerLoadBadge.hidden = false;
+      els.drawerLoadBadge.textContent = "건너뜀";
+      els.drawerLoadBadge.className = "cr-badge cr-badge--skip";
+      els.drawerLoadBadge.title = row.loadSkipReason || "탐색 순서 위반";
+      els.drawerLoadBox.className = "cr-note-box cr-note-box--warn";
+      els.drawerLoadTitle.textContent = "▲ 로드에서 건너뜁니다";
+      els.drawerLoadDetail.textContent = row.loadSkipReason ||
+        "탐색 순서(ref_slot이 slot보다 앞이어야 함) 위반으로 엔진이 이 규칙을 건너뜁니다.";
+      return;
+    }
+    els.drawerLoadBadge.hidden = true;
+    els.drawerLoadBox.className = "cr-note-box cr-note-box--neutral";
+    els.drawerLoadTitle.textContent = "로드 진단 - 정상";
+    els.drawerLoadDetail.textContent =
+      "이 규칙은 탐색 순서 조건(ref_slot이 slot보다 앞)을 만족해 엔진에 정상 로드됩니다" +
+      "(recommend.load_compat_rules()와 같은 판정 - UX-28).";
+  }
+
+  function openDrawer(row){
+    lastFocusEl = document.activeElement;
+    els.drawerKey.textContent = row.key;
+    els.drawerSentence.textContent = row.label || "";
+    els.drawerRaw.textContent = row.target + " " + row.op + " " + row.ref +
+      " · part_types=" + JSON.stringify(row.partTypes) +
+      " · 현재 순서 " + row.ord + "/" + row.total;
+    renderLoadDiagnosis(row);
+
+    var targetParts = row.target.split(".");
+    var refParts = row.ref.split(".");
+    fillSlotSelect(els.editSlot, targetParts[0] || "");
+    els.editField.value = targetParts[1] || "";
+    els.editOp.value = row.op || "=";
+    fillSlotSelect(els.editRefSlot, refParts[0] || "");
+    els.editRefField.value = refParts[1] || "";
+    els.editOrder.value = row.ord;
+
+    els.editParts.innerHTML = "";
+    if (row.partTypes.length) {
+      row.partTypes.forEach(function(pt){
+        var chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "cr-chip cr-chip--on";
+        chip.textContent = pt;
+        chip.addEventListener("click", function(){ chip.classList.toggle("cr-chip--on"); });
+        els.editParts.appendChild(chip);
+      });
+      var hint = document.createElement("span");
+      hint.className = "cr-chip-hint";
+      hint.textContent = "비우면 슬롯 전체";
+      els.editParts.appendChild(hint);
+    } else {
+      var hint2 = document.createElement("span");
+      hint2.className = "cr-chip-hint";
+      hint2.textContent = "슬롯 전체 적용 중 - 비어 있습니다";
+      els.editParts.appendChild(hint2);
+    }
+
+    setToggle("block", row.blocking ? "block" : "warn");
+    setToggle("active", row.active ? "on" : "off");
+
+    var fieldNames = [];
+    if (targetParts[1]) fieldNames.push({ tag: "이 규칙 필드", val: targetParts[1] });
+    if (refParts[1] && refParts[1] !== targetParts[1]) fieldNames.push({ tag: "비교 필드", val: refParts[1] });
+    els.fieldlist.innerHTML = "";
+    fieldNames.forEach(function(f){
+      var r = document.createElement("div");
+      r.className = "cr-fieldlist-row";
+      var tag = document.createElement("span");
+      tag.className = "cr-fieldlist-tag"; tag.textContent = f.tag;
+      var val = document.createElement("span");
+      val.className = "cr-fieldlist-val"; val.textContent = f.val;
+      r.appendChild(tag); r.appendChild(val);
+      els.fieldlist.appendChild(r);
+    });
+
+    els.overlay.hidden = false;
+    els.drawer.hidden = false;
+    els.drawerClose.focus();
+  }
+
+  function closeDrawer(){
+    els.overlay.hidden = true;
+    els.drawer.hidden = true;
+    if (lastFocusEl && typeof lastFocusEl.focus === "function") lastFocusEl.focus();
+  }
+
+  document.addEventListener("click", function(ev){
+    var trigger = ev.target.closest && ev.target.closest('[data-action="close-drawer"]');
+    if (trigger) closeDrawer();
+  });
+  document.addEventListener("keydown", function(ev){
+    if (ev.key === "Escape" && !els.drawer.hidden) closeDrawer();
+  });
+  els.drawer.querySelectorAll('[data-toggle]').forEach(function(btn){
+    btn.addEventListener("click", function(){
+      setToggle(btn.getAttribute("data-toggle"), btn.getAttribute("data-val"));
+    });
+  });
+  els.retryBtn.addEventListener("click", load);
+
+  function applyData(data){
+    var compat = data.compat || {};
+    var checks = Array.isArray(compat.checks) ? compat.checks : [];
+    lastSlots = Array.isArray(compat.slots) ? compat.slots : [];
+
+    var total = checks.length;
+    var activeCount = checks.filter(function(c){ return !!c.active; }).length;
+    var warnCount = checks.filter(function(c){ return !c.blocking; }).length;
+    var skipRows = checks.filter(function(c){ return c.load_skipped === true; });
+    var unknownCount = checks.filter(function(c){ return typeof c.load_skipped !== "boolean"; }).length;
+    var poolSize = (data.tiers && data.tiers.pool_size != null) ? data.tiers.pool_size : null;
+
+    els.zeroBanner.hidden = activeCount !== 0;
+    renderSkipBanner(skipRows, total);
+
+    if (compat.note) {
+      els.principleText.textContent = compat.note;
+      els.principle.hidden = false;
+    } else {
+      els.principle.hidden = true;
+    }
+
+    els.kpiTotal.textContent = fmtNum(total);
+    els.kpiTotalNote.textContent = "활성 " + fmtNum(activeCount) + "건 · 경고전용 " + fmtNum(warnCount) + "건";
+    els.kpiWarn.textContent = fmtNum(warnCount);
+    els.kpiPool.textContent = fmtNum(poolSize);
+    renderLoadKpi(total, skipRows.length, unknownCount);
+
+    lastRows = checks.map(function(c, i){ return buildRow(c, i + 1, total); });
+    renderRows(lastRows);
+
+    if (total === 0) {
+      setState("empty");
+    } else {
+      setState("none");
+    }
+  }
+
+  // 로드 성공 규칙 KPI - 값이 응답에 없을 때(unknownCount)는 "확인 불가"로 정직하게
+  // 남긴다(전부 모를 때만). 건너뛴 규칙이 있으면 빨간 강조(cr-kpi--gap)로 바꾼다 -
+  // 나쁜 규칙이 들어오면 이 카드가 즉시 경고로 바뀌는 구조.
+  function renderLoadKpi(total, skipCount, unknownCount){
+    if (unknownCount === total && total > 0) {
+      els.kpiLoad.textContent = "확인 불가";
+      els.kpiLoadNote.textContent = "API 응답에 load_skipped 값이 없습니다";
+      els.kpiLoadCard.classList.remove("cr-kpi--gap");
+      return;
+    }
+    var okCount = total - skipCount - unknownCount;
+    els.kpiLoad.textContent = fmtNum(okCount) + " / " + fmtNum(total);
+    if (skipCount > 0) {
+      els.kpiLoadNote.textContent = fmtNum(skipCount) + "건 건너뜀 - 아래 표에서 확인";
+      els.kpiLoadCard.classList.add("cr-kpi--gap");
+    } else if (unknownCount > 0) {
+      els.kpiLoadNote.textContent = fmtNum(unknownCount) + "건 확인 불가(응답에 값 없음)";
+      els.kpiLoadCard.classList.remove("cr-kpi--gap");
+    } else {
+      els.kpiLoadNote.textContent = "전부 정상 로드";
+      els.kpiLoadCard.classList.remove("cr-kpi--gap");
+    }
+  }
+
+  // 상단 위험 배너 - 건너뛴 규칙이 하나도 없으면(지금 9건 전부 그렇다) 조용히 숨는다.
+  function renderSkipBanner(skipRows, total){
+    els.skipBanner.hidden = skipRows.length === 0;
+    if (!skipRows.length) return;
+    els.skipBannerTitle.textContent = "로드에서 건너뛴 규칙 " + skipRows.length + "건 / " + total + "건";
+    els.skipBannerText.textContent = skipRows.map(function(c){
+      return c.key + " - " + (c.load_skip_reason || "사유 없음");
+    }).join(" · ");
+  }
+
+  function load(){
+    setState("loading");
+    fetch(API_URL, { credentials: "same-origin" }).then(function(res){
+      if (res.status === 401) {
+        setState("error", { kind: "auth" });
+        return null;
+      }
+      if (!res.ok) {
+        return res.json().catch(function(){ return null; }).then(function(body){
+          setState("error", { kind: "server", detail: detailFromBody(res.status, body) });
+          return null;
+        });
+      }
+      return res.json();
+    }).then(function(data){
+      if (data) applyData(data);
+    }).catch(function(err){
+      setState("error", { kind: "network", detail: (err && err.message) || String(err) });
+    });
+  }
+
+  load();
+})();
+</script>
+{% endblock %}

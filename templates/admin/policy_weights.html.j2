@@ -1,0 +1,409 @@
+{#
+  추천 기준 보기 (ADM-ENG-020) — 2026-08-14 신설, 조회 전용
+
+  ■ 이 화면이 답하는 질문
+    "가성비형·추천형·고성능형은 각각 무엇을 기준으로 정렬되고, 예산은 부품별로 어떻게
+    쪼개지고, 저소음·화이트 태그는 어느 부품에만 적용되는가" — 이 화면이 없으면 운영자가
+    "왜 이 부품을 골랐나"를 코드를 읽지 않고는 설명할 수 없다(정의서 §③).
+
+  ■ 계약 — `docs/design/spec-policy-weights.md`(1a "티어 3열 대조" 확정, 1b 탈락).
+    정의서 — `docs/design/req/req-policy-weights.md`. 원문(Claude Design)은 하네스만 연다
+    (`docs/design/MAKER-CHECKLIST.md` §1) — 이 화면은 계약 요약을 그대로 따랐다.
+
+  ■ 이 화면의 존재 이유 — 실상을 정직하게 드러낸다
+    `policy_weights` 표는 실존하지만 0행이고, **견적 엔진(`api/recommend.py`)이 이 값을
+    읽지 않는다**(직접 확인 — `grep policy_weights api/recommend.py` 0건). **이걸 "죽은
+    표"·"아무도 읽지 않는다"로 적지 않는다** — `api/admin_engine_rules.py`가 바로 **이
+    화면에 보여주려고** `SELECT ... FROM policy_weights`로 읽는다(직접 확인 — 54행·136행).
+    그래서 화면 문구는 정확히 "추천 엔진이 읽지 않습니다"다(2026-08-14 계약 정정 —
+    하네스 초안의 "죽은 표" 표기가 틀렸었다: 그렇게 적으면 다음 사람이 표를 지우고,
+    지우면 이 화면이 깨진다). **이걸 "설정을 못 불러왔다"처럼 보이게 하면 안 된다** — 0행은
+    오류가 아니라 지금의 정상 상태이고, 이 화면은 그 사실 자체를 결과로 보여준다. 그래서
+    상단 배너는 실패 배너가 아니라 항상 뜨는 설명 배너다. 추천을 실제로 결정하는 것은
+    티어별 정렬 규칙 + 총액 가지치기 + 예산 배분율 + 태그 스코프이고, 이 화면은 그 넷만
+    보여준다.
+
+  ■ 데이터 경계 (반드시 지킨다) — `GET /api/admin/engine-rules`는 호환 규칙(compat)·
+    추천 기준(tiers·budget)·가격 정책(pricing)·가중치(weights) **네 화면분**을 한 응답에
+    싣는다. 이 화면은 **`tiers`·`budget`만** 그린다. `compat`(「조립 호환 규칙」 소관)·
+    `pricing`(「판매가」 소관)은 응답에 있어도 표시·편집하지 않는다 — 두 화면이 같은 값을
+    다르게 고치면 아무도 못 믿는다. `weights`는 "행 수(0)"만 배너·사실 목록에 인용한다.
+
+  ■ 화면 이름 — 미확정 (사장님 확인 대기)
+    디자인이 "추천 기준 설정" → "추천 기준 보기"를 제안했다(근거 — 지금 바꿀 수 있는 값이
+    하나도 없다, 전부 코드 상수). 확정 전까지 이 화면 **안에서만** "추천 기준 보기"를 쓰고,
+    좌측 메뉴 정본 라벨(`api/admin_nav.py`)은 건드리지 않는다 — 확정되면 하네스가 메뉴
+    라벨과 decision-log를 함께 고친다.
+
+  ■ 코드 상수 실측 (2026-08-14, 이 화면 제작 시점) — 계약과 대조
+    `api/candidates.py BUDGET_ALLOC`  = CPU .25 · GPU .40 · MB .15 · RAM .10 · SSD .12 ·
+      HDD .08 · POWER .10 · CASE .08 · COOLER_CPU_AIR .08 · COOLER_CPU_AIO .08
+      → 계약의 "그래픽카드40·CPU25·메인보드15·SSD12·메모리10·파워10·HDD8·케이스8·
+      공랭8·수랭8"과 **일치**.
+    `api/recommend.py HIGHEND_CAP_X` = 1.5 → 계약의 "추천형 총액의 1.5배" **일치**.
+    `api/recommend.py TIER_LABELS`   = value:가성비형 견적 · recommend:추천형 견적 ·
+      highend:고성능형 견적. `api/admin_engine_rules.py TIER_RULES`(= `GET
+      /api/admin/engine-rules`의 `tiers.rules`)의 order/cap/note 문구가 계약 표의
+      "정렬 기준"·"예산 상한" 두 열과 **일치**(그대로 서버값을 쓴다, 아래 참조).
+
+  ■★ 2026-08-15 갱신 — "총액 처리" 열을 서버 필드로 교체(하드코딩 「1.5배」 걷어냄)
+    제작 시점(위)에는 계약의 "총액 처리" 열(슬롯별 최저가 합산 / DFS 조합 탐색 / 1.5배
+    폭주 제한)이 `engine-rules` 응답에 없어 이 화면 소유 파일 밖(`api/admin_engine_rules.py`)
+    수정이 필요했다 — 그래서 코드를 대조해 확인한 정적 문구(JS `TOTAL_HANDLING` 상수,
+    highend에 "1.5배" 리터럴 포함)를 화면에 직접 박아 두었다. **API 제작자가 그 사이
+    `tiers.rules[*].total_handling`(문구, 실측: highend="추천형 총액의 1.5배로 폭주
+    제한")과 `tiers.highend_cap_x`(원본 상수, 실측 1.5 — `recommend.HIGHEND_CAP_X`를
+    그대로 읽어 만든 값이지 복제가 아니다)를 추가했다.** 화면의 `TOTAL_HANDLING`
+    상수와 하드코딩된 "1.5배" 문구를 걷어내고 `r.total_handling`을 직접 쓰도록
+    고쳤다 — 이제 그 상수가 바뀌어도 이 화면은 재배포 없이 저절로 따라간다.
+
+  ■ 부품 라벨 — `taxonomy.PART_LABELS`를 라우트(`api/admin_ui_policy_weights.py`)가
+    렌더 시점에 읽어 `PW_PART_LABELS`로 실어 보낸다. 이 화면이 어휘를 다시 정의하지 않는다
+    (`.claude/CANON.md` §1). `budget.alloc[].part_type`·`budget.tag_scope[].scope[]`는
+    코드(GPU·MB·COOLER_CPU_AIR 등)만 주므로 이 맵으로만 한글을 붙인다.
+
+  ■ "마지막 조회" 시각을 표시하지 않는다 — `engine-rules` 응답에 서버 타임스탬프
+    (`generated_at` 류)가 없다. 클라이언트 시계로 지어내면 그 자체가 지어낸 값이다
+    (`ai_usage_cost.html.j2`가 이미 겪은 실수 — 원안 참조).
+
+  ■ 셸/팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`만 읽는다.
+    본문은 손으로 짠 admin2 화면(reviews·dash·ai_usage_cost)과 같은 방식 — Phoenix
+    자산을 불러오지 않는다. 클래스는 `.pw-` 접두어(이름공간 충돌 방지, admin2.css 상단 규약).
+
+  ■ 판단이 필요한 곳(검증 대상 — 계약 요약만 받았고 원안 dc-*.html이 없어 치수 대조 불가,
+    `docs/design/MAKER-CHECKLIST.md` §1 ①/② 참조):
+    ① "티어 3열" — 계약 안의 마크다운 표는 티어가 행이지만, "가성비형·추천형·고성능형을
+       나란히" + 절 제목 "3열"이라는 표현을 따라 **티어를 열(세로 칸)로**, 정렬 기준/예산
+       상한/총액 처리를 행으로 삼은 비교 표로 만들었다(가격 비교표 UI와 같은 배치).
+    ② 좌하/우상/우하만 이름 붙고 좌상이 없어, **왼쪽 열 = 예산 배분율 카드 하나(세로로
+       김) / 오른쪽 열 = 태그 스코프 + 사실 목록 두 장 스택**으로 읽었다.
+    ③ 배분율 막대 폭 정규화는 계약이 "40%를 100%로"라 했지만, 40을 화면에 박지 않고
+       **응답에서 최댓값을 구해** 정규화했다(오늘 값은 결과가 같다 — 서버 값이 훗날
+       바뀌어도 이 화면이 스스로 맞춰진다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}추천 기준 보기{% endblock %}
+
+{% block head_extra %}
+<script>window.PW_PART_LABELS = {{ part_labels_json | safe }};</script>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+code{font-family:var(--rv-mono)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+.pw-vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ── 헤더 위젯 ── */
+.a2-hd .ro-badge{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+                border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.a2-hd .poolinfo{font:400 11.5px/1.3 var(--rv-font);color:#4a463e;white-space:nowrap}
+.a2-hd .poolinfo b{font-family:var(--rv-mono);font-weight:600;color:var(--rv-ink)}
+.a2-hd .refresh{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+               border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+.a2-hd .refresh:disabled{opacity:.6;cursor:default}
+
+/* ── 스크롤 컨테이너 ── */
+.pw-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 18px 18px}
+
+/* ── 상단 배너(앰버 — 실패가 아니라 항상 뜨는 설명) ── */
+.pw-banner{flex:none;border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+        border-left:3px solid var(--rv-amber);border-radius:7px;padding:12px 15px;
+        display:flex;gap:12px;align-items:flex-start}
+.pw-banner .tag{font:600 11px/1.3 var(--rv-mono);color:oklch(0.5 0.14 55);flex:none;padding-top:1px}
+.pw-banner .pw-bannertext{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pw-banner .main{font:600 12.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.pw-banner .sub{font:400 11.5px/1.65 var(--rv-font);color:#4a463e}
+.pw-banner .sub code{font:500 11px/1 var(--rv-mono);color:oklch(0.5 0.14 55);background:rgba(0,0,0,.05);
+        border-radius:3px;padding:1px 5px}
+.pw-banner .name{font:400 11px/1.6 var(--rv-font);color:#6f6a61;border-top:1px solid var(--rv-amber-line);padding-top:7px}
+
+/* ── 공통 카드 ── */
+.pw-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden;
+       display:flex;flex-direction:column}
+.pw-cardhd{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid rgba(0,0,0,.09);
+        background:var(--rv-panel);flex-wrap:wrap}
+.pw-cardhd .t{font:600 11.5px/1.3 var(--rv-font)}
+.pw-cardhd .src{font:400 10px/1.3 var(--rv-mono);color:#8a8377}
+.pw-cardnote{padding:9px 13px;font:400 10.5px/1.55 var(--rv-font);color:#8a8377;background:#faf7f0;
+          border-top:1px solid rgba(0,0,0,.07)}
+
+/* ── 잠금 배지(향후 사용예정) ── */
+.pw-lock{margin-left:auto;font:600 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+       border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:4px 7px;white-space:nowrap;
+       cursor:help;flex:none}
+
+/* ── 티어 3열 대조 표 ── */
+.pw-tablewrap{overflow-x:auto}
+.pw-tiertable{width:100%;border-collapse:collapse;min-width:560px}
+.pw-tiertable th,.pw-tiertable td{padding:11px 13px;text-align:left;vertical-align:top;
+       border-bottom:1px solid rgba(0,0,0,.07);font-size:11.5px}
+.pw-tiertable thead th{background:var(--rv-panel2);font:600 11px/1.3 var(--rv-font);color:#4a463e;
+       border-bottom:1px solid rgba(0,0,0,.12)}
+.pw-tiertable thead th.lbl{width:104px}
+.pw-tiertable .tn{display:block;font:600 12px/1.3 var(--rv-font);color:var(--rv-ink)}
+.pw-tiertable .tk{display:inline-block;margin-top:3px;font:500 9.5px/1 var(--rv-mono);color:#8a8377;
+       background:rgba(0,0,0,.05);border-radius:3px;padding:2px 5px}
+.pw-tiertable tbody th{font:600 10.5px/1.3 var(--rv-font);color:#6f6a61;background:var(--rv-panel);
+       white-space:nowrap}
+.pw-tiertable tbody td{font:400 11.5px/1.6 var(--rv-font);color:#26231e}
+.pw-tiertable .capword{font-weight:600}
+.pw-tiertable .capnote{margin-top:3px;font:400 10.5px/1.5 var(--rv-font);color:#8a8377}
+.pw-tiertable tbody tr:last-child th,.pw-tiertable tbody tr:last-child td{border-bottom:0}
+
+/* ── 하단 2단(좌: 예산 배분율 / 우: 태그 스코프 + 사실) ── */
+.pw-lower{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.pw-lower-l{flex:1 1 380px;min-width:320px}
+.pw-lower-r{flex:1 1 380px;min-width:320px;display:flex;flex-direction:column;gap:12px}
+
+/* ── 예산 배분율 막대 ── */
+.pw-bars{display:flex;flex-direction:column;gap:8px;padding:13px}
+.pw-barrow{display:grid;grid-template-columns:120px 1fr 52px;gap:10px;align-items:center}
+.pw-barrow .nm{font:500 11.5px/1.3 var(--rv-font);color:var(--rv-ink);display:flex;align-items:center;
+        gap:6px;min-width:0}
+.pw-barrow .nm .top{flex:none;font:600 9px/1 var(--rv-font);color:oklch(0.5 0.14 55);background:var(--rv-amber-bg);
+        border:1px solid var(--rv-amber-line);border-radius:3px;padding:2px 5px}
+.pw-barrow .track{height:12px;border-radius:6px;background:var(--rv-panel2);border:1px solid rgba(0,0,0,.08);
+        overflow:hidden}
+.pw-barrow .fill{display:block;height:100%;background:var(--rv-ink);border-radius:6px 0 0 6px}
+.pw-barrow .pct{text-align:right;font-size:11px;color:#4a463e}
+
+/* ── 태그 스코프 ── */
+.pw-tagrow{padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.07)}
+.pw-tagrow:last-of-type{border-bottom:0}
+.pw-tagrow .hd{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.pw-tagrow .hd .nm{font:600 12px/1.3 var(--rv-font)}
+.pw-tagrow .hd .fk{font:500 10px/1 var(--rv-mono);color:#8a8377;background:rgba(0,0,0,.05);
+        border-radius:3px;padding:2px 6px}
+.pw-tagrow .scope{font:400 11.5px/1.6 var(--rv-font);color:#4a463e}
+.pw-tagrow .ft{margin-top:3px;font:400 10.5px/1.5 var(--rv-font);color:#8a8377}
+
+/* ── 사실 목록 ── */
+.pw-facts{margin:0;padding:13px 13px 13px 30px;display:flex;flex-direction:column;gap:8px}
+.pw-facts li{font:400 11.5px/1.6 var(--rv-font);color:#26231e}
+
+/* ── 하단 고지 ── */
+.pw-foot{flex:none;font:400 10.5px/1.7 var(--rv-font);color:#8a8377;padding:2px 2px 6px}
+.pw-foot b{color:#5b564d;font-weight:600}
+
+.loading,.errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.errbox .ti{font:600 14px/1.4 var(--rv-font)}
+.errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);text-align:center;max-width:420px}
+.errbox a,.errbox button{display:inline-block;padding:8px 18px;border-radius:6px;background:var(--rv-ink);
+          color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+@media (max-width:768px){
+  .a2-hd .poolinfo{white-space:normal}
+  .pw-lower-l,.pw-lower-r{flex-basis:100%;min-width:0}
+  .pw-barrow{grid-template-columns:96px 1fr 44px;gap:7px}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="ro-badge">조회 전용</span>
+<span class="poolinfo" id="poolInfo">추천 후보 풀 조회 중…</span>
+<button type="button" class="refresh" id="refreshBtn" data-action="refresh">다시 조회</button>
+{% endblock %}
+
+{% block content %}
+<div class="pw-scroll" id="pwScroll">
+  <div class="loading" id="loading">불러오는 중…</div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = { data: null, loadErr: null };
+  var LABELS = window.PW_PART_LABELS || {};
+
+  // 계약이 "총액 처리"로 요구하는 셋째 열 — 2026-08-15부터 engine-rules 응답이
+  // tiers.rules[*].total_handling으로 직접 준다(서버가 candidates.py BUDGET_ALLOC ·
+  // recommend.py HIGHEND_CAP_X를 읽어 만든 문구). 예전엔 이 필드가 없어 화면이 같은
+  // 문구를 상수로 박아 두고 있었다("1.5배" 리터럴 포함) — 상수가 서버에 생겼으니
+  // 걷어내고 서버 값을 그대로 쓴다(아래 tplTiers의 r.total_handling).
+  var TAG_FOOTNOTE = {
+    tag_silent: '스코프 밖 부품(CPU·메모리·SSD 등)은 무조건 통과합니다.',
+    tag_white: '다른 부품 색상은 판정하지 않습니다.'
+  };
+  var LOCK_TITLE = '배분율·티어 정렬 기준 편집은 향후 사용예정입니다 — 값을 코드에서 DB로' +
+    " 옮기고 '바꿔도 이미 만든 견적은 그대로'라는 원칙(용도 하한과 동일)을 새 API에 적용해야 합니다.";
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function label(t) { return LABELS[t] || t; }
+  function fmtInt(v) { return (v === null || v === undefined) ? '못 쟀음' : Number(v).toLocaleString('ko-KR'); }
+  function fmtPct(v) {
+    var n = Number(v);
+    return (Math.round(n * 10) % 10 === 0 ? n.toFixed(0) : n.toFixed(1)) + '%';
+  }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  function boot() {
+    load();
+  }
+
+  function load() {
+    $('refreshBtn').disabled = true;
+    apiGet('/api/admin/engine-rules')
+      .then(function (j) { S.data = j; S.loadErr = null; render(); })
+      .catch(function (err) { S.data = null; S.loadErr = err; render(); })
+      .then(function () { $('refreshBtn').disabled = false; });
+  }
+
+  function render() {
+    if (S.loadErr) { renderError(); renderPoolHeader(null); return; }
+    if (!S.data) return;
+    var d = S.data;
+    renderPoolHeader(d);
+    $('pwScroll').innerHTML = tplBanner(d) + tplTiers(d) +
+      '<div class="pw-lower">' +
+      '<div class="pw-lower-l">' + tplBudget(d) + '</div>' +
+      '<div class="pw-lower-r">' + tplTags(d) + tplFacts(d) + '</div>' +
+      '</div>' + tplFoot();
+  }
+
+  function renderPoolHeader(d) {
+    var el = $('poolInfo');
+    if (!d || !d.tiers) { el.textContent = '추천 후보 풀 조회 실패'; return; }
+    el.innerHTML = '추천 후보 풀 <b class="num">' + fmtInt(d.tiers.pool_size) + '</b>개(재고&gt;0)에 이 기준이 얹힙니다';
+  }
+
+  function renderError() {
+    var un = S.loadErr.status === 401;
+    $('pwScroll').innerHTML = '<div class="errbox"><div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
+      '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.' : ('추천 기준을 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>' +
+      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry">다시 시도</button>') + '</div>';
+  }
+
+  // ── 상단 배너 ────────────────────────────────────────────────────
+  function tplBanner(d) {
+    var n = (d.weights && d.weights.rows) ? d.weights.rows.length : 0;
+    return '<div class="pw-banner"><span class="tag">▲ 가중치 아님</span>' +
+      '<div class="pw-bannertext">' +
+      '<div class="main">지금 추천은 「가중치」가 아닙니다</div>' +
+      '<div class="sub">policy_weights 표는 실존하지만 <code>' + n + '행</code>입니다 —' +
+      ' <b>추천 엔진(recommend.py)이 이 값을 읽지 않습니다.</b> 지금 이 표를 읽는 코드는' +
+      ' 이 화면의 조회 API뿐입니다(그 사실을 보여주려고 조회합니다 — 견적에는 반영하지 않습니다).' +
+      ' ' + n + '행은 오류가 아니라 지금의 정상 상태입니다 — 이 화면은 표가 비어 있다는 사실 자체를' +
+      ' 결과로 보여줍니다. 추천은 실제로 이 넷이 결정합니다 — 티어별 정렬 규칙 · 총액 가지치기 ·' +
+      ' 예산 배분율 · 태그 스코프.</div>' +
+      '<div class="name">화면 이름을 「추천 기준 보기」로 표시합니다 — 지금 이 화면에서 바꿀 수 있는' +
+      ' 값은 하나도 없습니다(전부 코드 상수). 좌측 메뉴의 정본 라벨은 사장님 확정 전이라' +
+      ' 「추천 기준 설정」 그대로입니다.</div>' +
+      '</div></div>';
+  }
+
+  // ── 티어 3열 대조 ────────────────────────────────────────────────
+  function tplTiers(d) {
+    var rules = (d.tiers && d.tiers.rules) || [];
+    var head = rules.map(function (r) {
+      return '<th scope="col"><span class="tn">' + esc(r.label) + '</span>' +
+        '<code class="tk">' + esc(r.key) + '</code></th>';
+    }).join('');
+    function row(rowLabel, get) {
+      return '<tr><th scope="row">' + esc(rowLabel) + '</th>' +
+        rules.map(function (r) { return '<td>' + get(r) + '</td>'; }).join('') + '</tr>';
+    }
+    var body =
+      row('정렬 기준', function (r) { return esc(r.order); }) +
+      row('예산 상한', function (r) {
+        return '<span class="capword">' + esc(r.cap) + '</span><div class="capnote">' + esc(r.note) + '</div>';
+      }) +
+      row('총액 처리', function (r) { return esc(r.total_handling || '—'); });
+    return '<div class="pw-card"><div class="pw-cardhd"><span class="t">티어별 정렬 · 예산 상한 · 총액 처리</span>' +
+      '<span class="src">GET /api/admin/engine-rules → tiers</span></div>' +
+      '<div class="pw-tablewrap"><table class="pw-tiertable"><thead><tr>' +
+      '<th scope="col" class="lbl"><span class="pw-vh">구분</span></th>' + head + '</tr></thead>' +
+      '<tbody>' + body + '</tbody></table></div>' +
+      '<div class="pw-cardnote">' + esc((d.tiers && d.tiers.tie_break) || '') + ' · ' +
+      esc((d.tiers && d.tiers.performance_proxy) || '') + '</div>' +
+      '</div>';
+  }
+
+  // ── 부품별 예산 배분율 ──────────────────────────────────────────
+  function tplBudget(d) {
+    var alloc = ((d.budget && d.budget.alloc) || []).slice().sort(function (a, b) { return b.pct - a.pct; });
+    var max = alloc.reduce(function (m, a) { return Math.max(m, a.pct); }, 0) || 1;
+    var rows = alloc.map(function (a, i) {
+      var w = Math.max(2, a.pct / max * 100);
+      return '<div class="pw-barrow"><span class="nm">' + esc(label(a.part_type)) +
+        (i === 0 ? '<span class="top">가장 큰 몫</span>' : '') + '</span>' +
+        '<span class="track"><span class="fill" style="width:' + w + '%"></span></span>' +
+        '<span class="pct num">' + fmtPct(a.pct) + '</span></div>';
+    }).join('');
+    return '<div class="pw-card"><div class="pw-cardhd"><span class="t">부품별 예산 배분율</span>' +
+      '<span class="pw-lock" title="' + esc(LOCK_TITLE) + '">편집 — 향후 사용예정</span></div>' +
+      '<div class="pw-bars">' + rows + '</div>' +
+      '<div class="pw-cardnote">' + esc((d.budget && d.budget.note) || '') + '</div></div>';
+  }
+
+  // ── 태그 조건 스코프 ─────────────────────────────────────────────
+  function tplTags(d) {
+    var scopes = (d.budget && d.budget.tag_scope) || [];
+    var body = scopes.map(function (s) {
+      var names = (s.scope || []).map(label).join(' · ');
+      return '<div class="pw-tagrow"><div class="hd"><span class="nm">' + esc(s.tag) + '</span>' +
+        '<code class="fk">' + esc(s.field) + '</code></div>' +
+        '<div class="scope">적용 범위 — ' + esc(names || '(대상 없음)') + '</div>' +
+        '<div class="ft">' + esc(TAG_FOOTNOTE[s.field] || '') + '</div></div>';
+    }).join('');
+    return '<div class="pw-card"><div class="pw-cardhd"><span class="t">태그 조건이 적용되는 범위</span></div>' +
+      body + '<div class="pw-cardnote">' + esc((d.budget && d.budget.tag_note) || '') + '</div></div>';
+  }
+
+  // ── 이 화면이 밝히는 사실 ────────────────────────────────────────
+  function tplFacts(d) {
+    var n = (d.weights && d.weights.rows) ? d.weights.rows.length : 0;
+    var items = [
+      '동률이면 상품코드 오름차순으로 정합니다 — 같은 입력·같은 재고면 항상 같은 결과입니다(재현성).',
+      '벤치마크 원천이 없어 가격을 성능의 대리 지표로 씁니다 — 부품 등급 축이 엔진에 연결되면 교체될 예정입니다.',
+      '가성비형에서 최소 구성이 예산을 넘으면 세 티어 전부 불성립입니다 — 성립한 척하지 않습니다.',
+      'policy_weights는 ' + n + '행이며 추천 엔진이 읽지 않습니다 — 오류가 아니라 지금의 정상 상태입니다.',
+      '배분율은 예산 상한이 있는 견적에만 적용됩니다 — 숫자 없는 예산 표현에는 적용되지 않습니다.'
+    ];
+    return '<div class="pw-card"><div class="pw-cardhd"><span class="t">이 화면이 밝히는 사실</span></div>' +
+      '<ol class="pw-facts">' + items.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol></div>';
+  }
+
+  // ── 하단 고지 ────────────────────────────────────────────────────
+  function tplFoot() {
+    return '<div class="pw-foot">마진율 · 카드 수수료(pricing)는 같은 API 응답에 있어도 <b>「판매가」</b>' +
+      ' 그룹 소관입니다 · 호환 규칙(compat)은 <b>「조립 호환 규칙」</b> 소관입니다 · 부품 등급' +
+      '(part_grades)은 아직 엔진에 연결되지 않았습니다 · 조회 실패 시 사유를 그대로 밝힙니다.</div>';
+  }
+
+  document.addEventListener('click', function (ev) {
+    if (ev.target.closest('[data-action="refresh"]')) { load(); return; }
+    if (ev.target.closest('[data-action="retry"]')) { load(); return; }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

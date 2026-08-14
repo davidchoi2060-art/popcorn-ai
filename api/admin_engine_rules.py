@@ -18,23 +18,46 @@ from .timeutil import iso
 from .pricing import sale_from_purchase, formula_text
 from .candidates import BUDGET_ALLOC, SILENT_SCOPE, WHITE_SCOPE
 from .db import engine
-from .recommend import SLOTS, TIER_LABELS
+from .recommend import SLOTS, TIER_LABELS, HIGHEND_CAP_X
 
 router = APIRouter(prefix="/api/admin")
 
 # 호환 규칙은 이제 compat_rules 테이블이 단일 원천(슬라이스 34) — 하드코딩 제거.
-OP_KO = {"eq": "=", "gte": "≥", "lte": "≤"}
+# "contains"가 빠져 있었다(조립 호환 규칙 화면이 클라이언트에서 보정해 땜질했다 —
+# 2026-08-15 확인자·제작자 실측). DB 실측 op 4종(eq·gte·lte·contains) 전수 대조로 채웠다.
+# 의미는 recommend._cmp의 그대로다: v(다중값 목록)에 r이 있는가(쿨러 socket_list 등).
+OP_KO = {"eq": "=", "gte": "≥", "lte": "≤", "contains": "포함"}
 from .taxonomy import PART_LABELS as PART_KO   # 단일 원천(슬라이스 A)
 
+# 총액 처리 — spec-policy-weights.md 1a 표의 「총액 처리」 열과 같은 문구(UX-31).
+# highend만 상수를 문장에 꽂는다 — recommend.HIGHEND_CAP_X를 복제하지 않고 그 모듈에서 읽는다.
 TIER_RULES = [
     {"key": "value", "label": TIER_LABELS["value"], "order": "슬롯별 가격 오름차순",
-     "cap": "예산 상한 적용", "note": "최소 구성이 예산 밖이면 전 티어 불성립"},
+     "cap": "예산 상한 적용", "note": "최소 구성이 예산 밖이면 전 티어 불성립",
+     "total_handling": "슬롯별 최저가 합산"},
     {"key": "recommend", "label": TIER_LABELS["recommend"],
      "order": "캡 내 가격 내림차순 + 총액 가지치기(DFS)",
-     "cap": "예산 상한 적용", "note": "캡 내 최고가 합산이 예산을 넘지 않도록 총액으로 다시 자른다"},
+     "cap": "예산 상한 적용", "note": "캡 내 최고가 합산이 예산을 넘지 않도록 총액으로 다시 자른다",
+     "total_handling": "DFS로 조합 탐색해 예산 안 최댓값"},
     {"key": "highend", "label": TIER_LABELS["highend"], "order": "전체 풀 가격 내림차순",
-     "cap": "예산 상한 미적용", "note": "예산 초과 시 'over'로 정직 표기 — 숨기지 않는다"},
+     "cap": "예산 상한 미적용", "note": "예산 초과 시 'over'로 정직 표기 — 숨기지 않는다",
+     "total_handling": f"추천형 총액의 {HIGHEND_CAP_X:g}배로 폭주 제한"},
 ]
+
+
+def _load_skip_reason(r) -> str | None:
+    """recommend.load_compat_rules()와 **정확히 같은 조건**으로 판정한다(UX-28).
+
+    다른 계산을 쓰면 화면이 "적용됨"이라 말하는데 엔진은 건너뛰는 일이 난다 — 그래서
+    엔진의 슬롯 인덱스 비교를 그대로 옮겼다(고치지 않고 읽기만 했다). active 여부와는
+    별개의 구조적 사실이다 — 규칙을 켜는 순간 이 조건이 함께 걸린다.
+    """
+    if r["slot"] not in SLOTS or r["ref_slot"] not in SLOTS:
+        return f"알 수 없는 슬롯({r['slot']} 또는 {r['ref_slot']})이라 엔진이 이 규칙을 건너뜁니다"
+    if SLOTS.index(r["ref_slot"]) >= SLOTS.index(r["slot"]):
+        return (f"ref_slot({r['ref_slot']})이 slot({r['slot']})보다 탐색 순서상 뒤라"
+                " 엔진이 이 규칙을 건너뜁니다(경고 로그만 남기고 조용히 통과)")
+    return None
 
 
 @router.get("/engine-rules")
@@ -59,15 +82,22 @@ def engine_rules():
             " part_types"
             " FROM compat_rules ORDER BY sort_order, rule_id")).mappings().all()
 
-    checks = [{
-        "key": r["rule_key"], "label": r["label"],
-        "rule": f"{r['slot']}.{r['field']} {OP_KO.get(r['op'], r['op'])} {r['ref_slot']}.{r['ref_field']}",
-        "source": f"product_specs.{r['field']} / {r['ref_field']}",
-        "blocking": r["blocking"], "active": r["active"],
-        # 빈 목록 = 슬롯 전체. 값이 있으면 그 종류에만 걸린다 — 쿨러 슬롯처럼 성격이
-        # 다른 부품이 섞이는 자리에서 겨냥하지 않은 부품까지 죽이지 않기 위한 조건이다.
-        "part_types": r["part_types"] or [],
-    } for r in rule_rows]
+    checks = []
+    for r in rule_rows:
+        skip_reason = _load_skip_reason(r)
+        checks.append({
+            "key": r["rule_key"], "label": r["label"],
+            "rule": f"{r['slot']}.{r['field']} {OP_KO.get(r['op'], r['op'])} {r['ref_slot']}.{r['ref_field']}",
+            "source": f"product_specs.{r['field']} / {r['ref_field']}",
+            "blocking": r["blocking"], "active": r["active"],
+            # 빈 목록 = 슬롯 전체. 값이 있으면 그 종류에만 걸린다 — 쿨러 슬롯처럼 성격이
+            # 다른 부품이 섞이는 자리에서 겨냥하지 않은 부품까지 죽이지 않기 위한 조건이다.
+            "part_types": r["part_types"] or [],
+            # UX-28 — ref_slot이 탐색 순서상 slot보다 뒤면 엔진이 조용히 건너뛴다.
+            # 화면이 이걸 안 보여주면 "공랭 쿨러 높이를 아무도 안 막는 상태"가 안 드러난다.
+            "load_skipped": skip_reason is not None,
+            "load_skip_reason": skip_reason,
+        })
 
     # 카테고리별 필수 사양 — 화면이 표를 하드코딩하고 있었다(존재하지 않는 {igpu}·{m2_slots}·
     # {pcie_power}·{slot_width}까지). 게이트가 실제로 읽는 것은 spec_field_defs 메타다.
@@ -92,10 +122,10 @@ def engine_rules():
             "checks": checks,
             "slots": SLOTS,
             "required": required,
-            "note": ("호환 규칙은 **compat_rules 테이블이 단일 원천**입니다(슬라이스 34) —"
+            "note": ("호환 규칙은 compat_rules 테이블이 단일 원천입니다(슬라이스 34) —"
                      " 엔진이 매 견적마다 이 표를 읽어 판정합니다. NULL 값은 불통과(값을 모르는"
                      " 부품을 호환으로 판정하지 않음) · 규칙 편집 UI·버전 발행은 이관."),
-            "required_note": ("필수 사양은 **spec_field_defs 메타가 단일 원천**입니다 —"
+            "required_note": ("필수 사양은 spec_field_defs 메타가 단일 원천입니다 —"
                               " 게이트가 읽는 그 목록입니다. '읽는 규칙'이 비어 있으면"
                               " 어떤 호환 검사도 그 값을 쓰지 않는다는 뜻입니다"
                               " — 근거 없이 상품을 검수 대기로 묶고 있는 것입니다."),
@@ -103,8 +133,11 @@ def engine_rules():
         "tiers": {
             "rules": TIER_RULES,
             "tie_break": "동일 조건이면 product_code 오름차순 — 같은 입력·같은 재고면 항상 같은 결과(A-02)",
-            "performance_proxy": "성능 지표는 벤치마크 원천이 없어 **가격**을 대리값으로 씁니다(정직 명기 — 스코어 엔진 도입 시 교체)",
+            "performance_proxy": "성능 지표는 벤치마크 원천이 없어 가격을 대리값으로 씁니다(정직 명기 — 스코어 엔진 도입 시 교체)",
             "pool_size": pool,
+            # UX-31 — highend 티어의 "추천형 총액의 1.5배" 사실을 상수 그대로 노출한다.
+            # 화면이 이 숫자를 하드코딩하지 않고 여기서 읽게 한다(recommend.HIGHEND_CAP_X 원본).
+            "highend_cap_x": HIGHEND_CAP_X,
         },
         "budget": {
             "alloc": [{"part_type": k, "pct": round(v * 100, 1)} for k, v in BUDGET_ALLOC.items()],
@@ -134,7 +167,7 @@ def engine_rules():
         "weights": {
             "rows": [{"key": w["key"], "weight": float(w["weight"])} for w in weights],
             "note": ("추천 가중치 저장소(policy_weights)는 비어 있습니다 — 현재 추천은"
-                     " 가중치 스코어가 아니라 **티어별 정렬 + 호환 제약**으로 결정됩니다."
+                     " 가중치 스코어가 아니라 티어별 정렬 + 호환 제약으로 결정됩니다."
                      " 스코어 엔진 도입 시 이 표가 실값으로 채워집니다."),
         },
     }
@@ -197,8 +230,8 @@ def save_pricing(body: PricingBody):
     return {"ok": True, "undo_id": log_id, "affected_candidates": affected,
             "note": ("정책을 새 버전으로 저장했습니다."
                      f" 매입가가 있는 {affected:,}건이 다음 단가표 반영 때 이 값으로 산정됩니다."
-                     " **기존 판매가는 지금 바뀌지 않습니다** —"
-                     " 지금 맞추려면 [판매가 재산정](reprice.html)에서 미리보기 후 반영하세요."),
+                     " 기존 판매가는 지금 바뀌지 않습니다 —"
+                     " 지금 맞추려면 판매가 재산정(reprice.html)에서 미리보기 후 반영하세요."),
             "reprice_href": "reprice.html"}
 
 
