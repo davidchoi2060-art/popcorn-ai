@@ -145,6 +145,17 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
 .a2-content-pad{padding:1.75rem;overflow-y:auto;flex:1;min-height:0}
 
 @media (max-width:768px){
-  .a2-shell{overflow:auto;height:auto;min-height:100vh}
+  /* 결함 수정(2026-08-15): .a2-shell 이 이 폭에서도 기본값 row 로 남아 있었다.
+     .a2-lnb 의 width:100% 는 flex:none(flex-basis:auto->width값) 이라 가로축
+     flex-basis 100% 가 되고, flex-grow:0/flex-shrink:0 이라 줄어들지 않는다.
+     형제 .a2-main 은 flex:1(flex-basis:0%, flex-grow:1) 인데, 컨테이너의 남은
+     공간이 100%(부모) - 100%(.a2-lnb) - 0%(.a2-main 자신의 basis) = 0 이라
+     grow 할 몫이 없어 0px 로 붕괴했다(실측: .a2-main 폭 0, .a2-lnb 폭 = 뷰포트
+     전체 — checker 실측 5/5 재현, 900px 초과에서는 0/5 — 미디어쿼리 조건과 일치).
+     flex-direction:column 으로 바꾸면 .a2-lnb 의 width:100% 는 cross-axis(가로)
+     값이 되어 그대로 유지되고, .a2-main 은 기본 align-items:stretch 로 가로를
+     꽉 채우며 flex:1 은 세로(남은 높이)에 적용된다. 769px 이상 규칙은 이 블록
+     밖이라 영향 없음. */
+  .a2-shell{overflow:auto;height:auto;min-height:100vh;flex-direction:column}
   .a2-lnb{width:100%;height:auto;max-height:180px}
 }
