@@ -1,0 +1,397 @@
+{#
+  추천 가능 재고 현황 (ADM-ENG-030) — 2026-08-14 신설, **조회 전용**
+
+  ■ 계약 — docs/design/spec-candidate-pool.md(사장님 확정 1a) · docs/design/req/req-candidate-pool.md
+    원안: Claude Design 프로젝트 22248237-152f-4f13-8201-54afca75ebe4,
+    "추천 가능 재고 현황.dc.html"(2안 캔버스) — 1a(카테고리 × 사유 격자) 확정, 1b(게이트 흐름형) 탈락.
+    이 화면은 그 원안을 직접 옮기지 않고(원안은 `<x-dc>`+React 형식) **계약 요약(spec 문서)의
+    구조·확정 문구만** 옮긴다 — MAKER-CHECKLIST §1 "계약 요약으로 받는 경우"에 해당.
+
+  ■ 데이터 — 단일 API, 조회 1회: GET /api/admin/candidate-pool (`api/admin_pool.py`, 담당 밖).
+    이 화면은 그 응답을 그대로 그리고, **카테고리별 통과율(ok/total)만** 자체 계산한다
+    (서버가 전체 rate를 구하는 것과 같은 나눗셈 — 서버가 아직 행마다 내려주지 않는 값이라
+    화면에서 계산했다. 그 밖의 건수·판정은 전부 서버 값 그대로).
+
+  ■ "통과 합계 = S1 후보 카운터" 정합 — 응답의 `ok_total`(이 화면의 배타 게이트 합계)과
+    `pool_total`(`v_recommendation_candidates ∧ stock>0`, S1이 쓰는 것과 같은 집합)을
+    나란히 확인할 수 있게, 통과 카드의 title 툴팁에 두 값과 일치 여부를 함께 적는다
+    (원안이 못박은 시각 요소는 "부제 문구" 하나뿐이라 새 시각 요소를 만들지 않고 툴팁에 둔다).
+
+  ■ 사유별 "갈 화면" 필터 전달(스펙 ②)은 **짓지 않았다** — req-candidate-pool.md ⑥이 스스로
+    "결정 필요 지점"으로 남긴 미결 사항이다(목적지 화면과 별도 합의 필요). 지금은 화면
+    이동만 되고, 어떤 사유·부품으로 왔는지는 넘어가지 않는다. 이동 대상 자체는 화면이 짓지
+    않고 라우트(`api/admin_ui_candidate_pool.py`)가 정본(`api/admin_nav.NAV`)에서 찾아
+    `REASON_TARGETS`로 내려준다 — admin2에 없는 화면(가격 검토 대기·재고 입고)은 href가
+    없어 자동으로 비활성이 된다.
+
+  ■ 얇은 카테고리 vs 결합 조건 2종 — API의 `thin` 배열 하나에 **카테고리 임계값 미만 항목** +
+    **화이트 케이스·750W 이상 파워(둘은 조건과 무관하게 항상 포함)** 이 섞여 온다
+    (`api/admin_pool.py` 실측: 뒤 둘은 이름이 고정 문자열이고 무조건 append된다). 화면은
+    이름으로 그 둘을 갈라 "우측 상단(얇은 카테고리)"과 "우측 중단(결합 조건)"에 나눠
+    보여준다 — API가 순서를 바꾸지 않는 한 유지되는, 이름 매칭에 기대는 분리라 취약하다
+    (제작 보고서에 남김).
+
+  ■ 색 — admin2 공통 팔레트(`/shared/admin2/admin2.css`)의 기존 별칭만 쓴다. 통과율
+    20%/30% 삼색 규정(스펙 원문)은 build_map.html.j2의 barColor/pctColor와 같은 계열의
+    수치 색상이라 이 화면만의 새 규칙이 아니다 — `--error`(붉게)·`--tertiary`(앰버)·
+    `--success-dark`(초록). 색은 언제나 숫자 자체와 함께 나온다(색만으로 말하지 않는다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}추천 가능 재고 현황{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+.body{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto}
+.kicker{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.kicker b{color:var(--on);font-weight:600}
+
+/* ── 카드 공통 ── */
+.card{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px}
+.card[hidden]{display:none}
+
+/* ── 상단 카드 줄 ── */
+.cards{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+.pass-card{flex:1 1 210px;min-width:210px;padding:16px 18px;display:flex;flex-direction:column;gap:5px;justify-content:center}
+.pass-card .lbl{font:600 12px/1.2 var(--font);color:var(--on-variant)}
+.pass-card .v{font:700 42px/1.05 var(--font-num);font-variant-numeric:tabular-nums}
+.pass-card .sub{font:500 11px/1.4 var(--font);color:var(--on-variant)}
+.reason-cards{display:flex;gap:10px;flex:3 1 560px;flex-wrap:wrap}
+.rc{flex:1 1 150px;min-width:150px;padding:12px 13px;display:flex;flex-direction:column;gap:7px}
+.rc .hd{display:flex;align-items:center;gap:7px}
+.mark{flex:none;width:19px;height:19px;border-radius:5px;background:var(--container);
+      display:flex;align-items:center;justify-content:center;font:700 10.5px/1 var(--font);color:var(--on-variant)}
+.rc .lbl{font:600 12px/1.25 var(--font)}
+.rc .v{font:700 25px/1.1 var(--font-num);font-variant-numeric:tabular-nums}
+.rc .note{font:400 10px/1.45 var(--font);color:var(--tertiary)}
+.go-btn{font:500 10.5px/1 var(--font);padding:5px 9px;border-radius:5px;white-space:nowrap;align-self:flex-start}
+a.go-btn{background:var(--on);color:var(--bg)}
+span.go-btn{background:var(--container);color:var(--on-variant);cursor:default}
+
+/* ── 배타 안내 띠 ── */
+.band{display:flex;align-items:baseline;gap:14px;background:var(--container);border-radius:8px;
+      padding:10px 14px;font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+.band .right{flex:none;white-space:nowrap;font:400 11.5px/1 var(--font)}
+.band .right .n{font:700 12.5px/1 var(--font-num);color:var(--on)}
+
+/* ── 본표 + 레일 ── */
+.split{display:flex;gap:12px;align-items:flex-start}
+.main{flex:1;min-width:0}
+.rail{width:328px;flex:none;display:flex;flex-direction:column;gap:12px}
+.grid-wrap{padding:13px 14px 15px}
+.grid-title{font:600 12.5px/1.3 var(--font);margin-bottom:9px}
+.tbl-wrap{overflow-x:auto}
+/* table-layout 을 fixed 로 두지 않는다 — 내용이 폭보다 넓으면 열이 0px 로 접히지
+   않고(그럴 걱정이 없다), 대신 표 전체가 tbl-wrap 안에서 가로 스크롤된다. */
+table.grid{width:100%;min-width:640px;border-collapse:collapse;font-size:12px}
+table.grid th{font:600 10.5px/1.3 var(--font);color:var(--on-variant);text-align:right;
+       padding:7px 9px;border-bottom:1px solid var(--outline-variant);white-space:nowrap}
+table.grid th:first-child,table.grid td:first-child{text-align:left;min-width:96px}
+table.grid td{padding:7px 9px;border-bottom:1px solid var(--outline-variant);text-align:right;
+       font-family:var(--font-num);font-variant-numeric:tabular-nums}
+table.grid tbody tr:hover{background:var(--container-low)}
+table.grid tfoot td{font-weight:700;border-top:2px solid var(--outline);border-bottom:none;
+       background:var(--container-low)}
+table.grid td.r0{color:var(--on-variant);font-family:var(--font)}
+table.grid a.cell-link{color:var(--on);text-decoration:underline;text-decoration-color:var(--outline);text-underline-offset:2px}
+table.grid a.cell-link:hover{color:var(--primary)}
+table.grid td.nolink{color:var(--on-variant);cursor:default}
+.rate-hi{color:var(--success-dark)}
+.rate-mid{color:var(--tertiary)}
+.rate-lo{color:var(--error);font-weight:700}
+
+/* ── 우측 레일 ── */
+.rail-sec{padding:12px 14px}
+.rail-sec h3{margin:0 0 9px;font:600 12px/1.3 var(--font);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lock{font:500 9.5px/1 var(--font-num);padding:3px 6px;border-radius:4px;background:var(--container);
+      color:var(--on-variant);border:1px solid var(--outline-variant);cursor:default;white-space:nowrap}
+.thin-empty{font:400 11.5px/1.65 var(--font);color:var(--on-variant)}
+.thin-empty b{color:var(--on);font-weight:600}
+.thin-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:7px 0;
+          border-bottom:1px solid var(--outline-variant);font:400 11.5px/1.4 var(--font)}
+.thin-row:last-child{border-bottom:0}
+.thin-row .nm{font-weight:600;color:var(--on)}
+.thin-row .wh{color:var(--on-variant);font-size:10.5px;margin-top:2px}
+.thin-row .ct{flex:none;font-family:var(--font-num);font-weight:700;font-size:13px}
+.combo-intro{font:400 11px/1.55 var(--font);color:var(--on-variant);margin-bottom:8px}
+
+.go-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--outline-variant)}
+.go-row:last-child{border-bottom:0}
+.go-row .lbl{flex:1;min-width:0;font:500 11.5px/1.3 var(--font)}
+.go-row .ct{flex:none;font-family:var(--font-num);font-weight:600;font-size:11.5px;color:var(--on-variant);width:40px;text-align:right}
+
+.note-line{font:400 10.5px/1.7 var(--font);color:var(--on-variant)}
+.foot{padding-top:11px;border-top:1px solid var(--outline-variant);font:400 10.5px/1.75 var(--font);color:var(--on-variant)}
+
+.err-card{margin:auto;max-width:460px;padding:22px 24px;text-align:center}
+
+@media (max-width:768px){
+  .split{flex-direction:column}
+  .rail{width:100%}
+  .pass-card{flex-basis:100%}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="a2-badge" title="이 화면은 집계만 보여줍니다 — 값을 바꾸려면 사유가 가리키는 다른 화면으로 이동합니다">조회 전용</span>
+<span class="a2-badge" data-bind="asof" style="display:none">—</span>
+{% endblock %}
+
+{% block content %}
+<div class="body">
+  <div class="kicker">이 화면이 답하는 질문 — <b>「우리 카탈로그에서 지금 견적에 쓸 수 있는 것이 얼마나 되고, 나머지는 왜 못 쓰나」</b></div>
+
+  <div data-bind="content-area">
+    <div class="cards">
+      <div class="card pass-card" data-bind="pass-card">
+        <div class="lbl">추천 가능(통과)</div>
+        <div class="v" data-bind="pass-v">—</div>
+        <div class="sub">S1 후보 카운터와 같은 정의</div>
+      </div>
+      <div class="reason-cards" data-repeat="reason-cards">불러오는 중…</div>
+    </div>
+
+    <div class="band">
+      <span>사양 없음 → 검수 대기 → 후보 미승격 → 가격 검토 → 재고 없음 순서로 첫 미충족 사유
+        하나만 셉니다. 그래서 사유 합계 + 통과 = 판정 대상 전체입니다. 시연용(demo) 데이터는
+        애초에 세지 않습니다.</span>
+      <span style="flex:1"></span>
+      <span class="right" data-bind="band-right">대상 — · 통과 —</span>
+    </div>
+
+    <div class="split">
+      <div class="main">
+        <div class="card grid-wrap">
+          <div class="grid-title">부품 종류 × 사유</div>
+          <div class="tbl-wrap">
+            <table class="grid" aria-label="부품 종류별 추천 가능 사유 집계">
+              <colgroup>
+                <col style="width:15%"><col style="width:9%"><col style="width:11%">
+                <col style="width:11%"><col style="width:11%"><col style="width:11%">
+                <col style="width:11%"><col style="width:9%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">부품 종류</th><th scope="col">통과</th><th scope="col">사양 없음</th>
+                  <th scope="col">검수 대기</th><th scope="col">후보 미승격</th><th scope="col">가격 검토</th>
+                  <th scope="col">재고 없음</th><th scope="col">통과율</th>
+                </tr>
+              </thead>
+              <tbody data-repeat="grid-body">
+                <tr><td colspan="8" style="text-align:center;color:var(--on-variant)">불러오는 중…</td></tr>
+              </tbody>
+              <tfoot data-repeat="grid-total"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <aside class="rail">
+        <div class="card rail-sec">
+          <h3>얇은 카테고리
+            <span class="lock" data-bind="thin-threshold">기준 —</span>
+            <span class="lock" title="임계값 3개는 dev 재고 규모 기준 코드 상수입니다 — 운영 전환 시 반드시 다시 정해야 합니다.">임계값 조정 — 향후 사용예정</span>
+          </h3>
+          <div data-repeat="thin-body">불러오는 중…</div>
+        </div>
+
+        <div class="card rail-sec">
+          <h3>제약이 겹치면 사정이 달라진다</h3>
+          <div class="combo-intro">카테고리 총량만 보면 안 보이는 조합을 항상 함께 실측합니다 —
+            예: 화이트 케이스 · 750W 이상 파워</div>
+          <div data-repeat="combined-body">불러오는 중…</div>
+        </div>
+
+        <div class="card rail-sec">
+          <h3>사유별로 가야 하는 화면</h3>
+          <div data-repeat="go-list">불러오는 중…</div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="note-line" data-bind="note-line">—</div>
+
+    <div class="foot">
+      "후보 수 &gt; 0"은 "견적 가능"이 아닙니다 — 슬롯 하나가 0이면 조립 자체가 불가능합니다 ·
+      통과 합계는 S1 후보 카운터와 정확히 같아야 합니다(어긋나면 두 계산이 서로 다른 말을 하는 것) ·
+      이 화면에서 고치는 것은 없습니다
+    </div>
+  </div>
+
+  <div class="card err-card" data-bind="load-error" hidden>
+    <div style="font:600 14px/1.4 var(--font);margin-bottom:6px" data-bind="err-title">데이터 조회 실패</div>
+    <div style="font:400 12px/1.6 var(--font);color:var(--on-variant);margin-bottom:14px" data-bind="err-msg"></div>
+    <div data-bind="err-actions"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>window.REASON_TARGETS = {{ reason_targets_json | safe }};</script>
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (k) { return document.querySelector('[data-bind="' + k + '"],[data-repeat="' + k + '"]'); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+  var num = function (n) { return (n == null ? '—' : Number(n).toLocaleString('ko-KR')); };
+  var set = function (k, html) { var e = $(k); if (e) e.innerHTML = html; };
+
+  // 게이트 순서 그대로 — 본표 열 순서·배타 안내 띠 순서와 같다.
+  var REASON_KEYS = ['no_specs', 'need_review', 'not_candidate', 'no_price', 'oos'];
+  var MARKS = {no_specs: '1', need_review: '2', not_candidate: '3', no_price: '4', oos: '5'};
+
+  // admin_pool.py 의 `thin` 배열은 "임계값 미만 카테고리"와 "결합 조건 2종(항상 포함)"이
+  // 한 배열에 섞여 온다. 결합 조건 둘은 이름이 고정 문자열이라 이걸로 가른다 — API가
+  // 이 두 이름을 바꾸면 이 분리도 함께 깨진다(제작 보고서에 남김).
+  var COMBINED_NAMES = ['케이스(화이트 태그)', '750W 이상 파워'];
+
+  function goBtn(target) {
+    // target = {label, href|null} | undefined(정본에 그 라벨 자체가 없음 — 이론상 발생 안 함)
+    if (!target) return '<span class="go-btn">이동</span>';
+    if (!target.href) {
+      return '<span class="go-btn" title="' + esc(target.label) + ' — admin2 미구축(신설 예정)">이동</span>';
+    }
+    return '<a class="go-btn" href="' + esc(target.href) + '" title="' + esc(target.label) + '로 이동">이동</a>';
+  }
+
+  function reasonCell(count, key) {
+    // "0 은 — 로, 커서를 바꾸지 않는다(누를 것이 없다)" — 본표 칸에만 적용되는 규칙.
+    if (!count) return '<td class="r0">—</td>';
+    var t = window.REASON_TARGETS[key];
+    if (t && t.href) {
+      return '<td><a class="cell-link" href="' + esc(t.href) + '" title="' + esc(t.label) + '(으)로 이동">' +
+        num(count) + '</a></td>';
+    }
+    return '<td class="nolink" title="' + esc(t ? t.label : '') + ' — admin2 미구축(신설 예정)">' +
+      num(count) + '</td>';
+  }
+
+  function rateClass(p) {
+    // 스펙 원문: 20% 미만 붉게 · 30% 미만 앰버 · 그 이상 초록. 숫자는 항상 함께 나온다.
+    return p < 20 ? 'rate-lo' : (p < 30 ? 'rate-mid' : 'rate-hi');
+  }
+  function rateCell(ok, total) {
+    if (!total) return '<td class="r0">—</td>';
+    var p = Math.round(ok / total * 1000) / 10;
+    return '<td class="' + rateClass(p) + '">' + p.toFixed(1) + '%</td>';
+  }
+
+  function render(d) {
+    // ── 상단 카드 줄 ──────────────────────────────────────────
+    set('pass-v', num(d.ok_total));
+    var passCard = document.querySelector('[data-bind="pass-card"]');
+    if (passCard) {
+      var match = d.pool_total === d.ok_total;
+      passCard.title = 'S1 후보 카운터(추천 후보 풀 전체 · 재고>0) ' + num(d.pool_total) + '건 — ' +
+        (match ? '통과 합계와 일치' : '통과 합계(' + num(d.ok_total) + ')와 불일치 · 확인 필요');
+    }
+
+    set('reason-cards', (d.reasons || []).map(function (r) {
+      var t = window.REASON_TARGETS[r.key];
+      var note = r.key === 'not_candidate'
+        ? '<div class="note">검수가 끝났는데 후보가 되지 못한 상품 — 정상적으로는 드뭅니다. 0이 아니면 확인이 필요합니다.</div>'
+        : '';
+      return '<div class="card rc">' +
+        '<div class="hd"><span class="mark">' + MARKS[r.key] + '</span><span class="lbl">' + esc(r.label) + '</span></div>' +
+        '<div class="v">' + num(r.count) + '</div>' + note + goBtn(t) + '</div>';
+    }).join(''));
+
+    // ── 배타 안내 띠 ──────────────────────────────────────────
+    set('band-right', '대상 <span class="n">' + num(d.core_total) + '</span> · 통과 <span class="n">' + num(d.ok_total) + '</span>');
+
+    // ── 본표 ──────────────────────────────────────────────────
+    set('grid-body', (d.categories || []).map(function (c) {
+      return '<tr><td>' + esc(c.name) + '</td><td>' + num(c.ok) + '</td>' +
+        REASON_KEYS.map(function (k) { return reasonCell(c[k], k); }).join('') +
+        rateCell(c.ok, c.total) + '</tr>';
+    }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--on-variant)">판정 대상이 없습니다</td></tr>');
+
+    var reasonTotals = {};
+    (d.reasons || []).forEach(function (r) { reasonTotals[r.key] = r.count; });
+    set('grid-total', '<tr><td>합계</td><td>' + num(d.ok_total) + '</td>' +
+      REASON_KEYS.map(function (k) { return reasonCell(reasonTotals[k], k); }).join('') +
+      rateCell(d.ok_total, d.core_total) + '</tr>');
+
+    // ── 얇은 카테고리 / 결합 조건 ─────────────────────────────
+    var thin = d.thin || [];
+    var thinCats = thin.filter(function (t) { return COMBINED_NAMES.indexOf(t.name) < 0; });
+    var combined = thin.filter(function (t) { return COMBINED_NAMES.indexOf(t.name) >= 0; });
+
+    set('thin-threshold', '기준 통과 ' + num(d.thin_threshold) + '개 이하');
+    if (thinCats.length) {
+      set('thin-body', thinCats.map(function (t) {
+        return '<div class="thin-row"><div><div class="nm">' + esc(t.name) + '</div>' +
+          '<div class="wh">' + esc(t.why) + '</div></div><div class="ct">' + num(t.count) + '</div></div>';
+      }).join(''));
+    } else {
+      set('thin-body', '<div class="thin-empty">지금 <b>위험 카테고리 없음</b> — 열 부품 모두 임계값을 넘습니다. ' +
+        '다만 <b>슬롯 하나가 0이면 조립 자체가 불가능</b>하므로, 0에 가까워지는 축은 계속 지켜봐야 합니다.</div>');
+    }
+
+    set('combined-body', combined.map(function (t) {
+      return '<div class="thin-row"><div><div class="nm">' + esc(t.name) + '</div>' +
+        '<div class="wh">' + esc(t.why) + '</div></div><div class="ct">' + num(t.count) + '</div></div>';
+    }).join('') || '<div class="thin-empty">응답에 결합 조건 항목이 없습니다.</div>');
+
+    // ── 사유별로 가야 하는 화면 ───────────────────────────────
+    set('go-list', (d.reasons || []).map(function (r) {
+      var t = window.REASON_TARGETS[r.key];
+      return '<div class="go-row"><span class="mark">' + MARKS[r.key] + '</span>' +
+        '<span class="lbl">' + esc(r.label) + '</span><span class="ct">' + num(r.count) + '</span>' + goBtn(t) + '</div>';
+    }).join(''));
+
+    // ── 서버 메모(주변기기 풀 준비 중 등) — 서버 문구 그대로 ────
+    set('note-line', d.note ? esc(d.note) : '');
+
+    var asof = $('asof');
+    if (asof) {
+      asof.style.display = '';
+      asof.textContent = '조회 ' + new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'});
+    }
+  }
+
+  function showError(title, msg, actionsHtml) {
+    var ca = $('content-area');
+    if (ca) ca.hidden = true;
+    var box = $('load-error');
+    if (!box) return;
+    box.hidden = false;
+    set('err-title', esc(title));
+    set('err-msg', esc(msg));
+    set('err-actions', actionsHtml);
+  }
+
+  fetch('/api/admin/candidate-pool', {credentials: 'same-origin'})
+    .then(function (r) {
+      if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+      return r.json();
+    })
+    .then(function (j) { render(j); })
+    .catch(function (err) {
+      // 실패를 조용히 삼키지 않는다 — 빈 화면은 "집계가 0이다"로 읽힌다.
+      var un = err && err.status === 401;
+      if (un) {
+        showError('세션 만료', '관리자 로그인 후 다시 조회합니다.',
+          '<a href="/admin/login.html" style="display:inline-block;padding:8px 18px;border-radius:6px;' +
+          'background:var(--on);color:var(--bg);font:500 12px/1 var(--font)">로그인</a>');
+      } else {
+        showError('데이터 조회 실패',
+          '집계를 받지 못했습니다 — ' + (err && err.message ? err.message : String(err)),
+          '<button type="button" data-action="retry" style="padding:8px 18px;border-radius:6px;' +
+          'background:var(--on);color:var(--bg);border:0;cursor:pointer;font:500 12px/1 var(--font)">다시 시도</button>');
+        var again = $('err-actions').querySelector('[data-action="retry"]');
+        if (again) again.addEventListener('click', function () { location.reload(); });
+      }
+    });
+})();
+</script>
+{% endraw %}
+{% endblock %}
