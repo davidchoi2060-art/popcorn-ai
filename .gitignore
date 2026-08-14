@@ -31,6 +31,13 @@ docs/mockup-source/**/*.png
 # 비공개 내부 문서 (커밋 금지)
 docs/patent/
 docs/partners/
+
+# 법무·행정 서류는 저장소에 두지 않는다 (2026-08-14 사장님 지시).
+# docs/patent/ 규칙이 이미 있었는데 특허 출원 서류 4개가 docs/ 바로 밑에 떨어져
+# 규칙을 그대로 빠져나갔다 — 폴더가 아니라 확장자로도 막는다.
+# 지금 추적 중인 PDF 는 하나도 없으므로 이 규칙이 기존 파일을 가리지 않는다.
+# 실물은 저장소 밖 E:\DEV\_private\ 로 옮겼다.
+*.pdf
 __pycache__/
 *.pyc
 
@@ -48,3 +55,6 @@ references/telegram_offset.json
 # 작업 현황판이 화면 -> 세션으로 넘기는 큐. 실행 중 생기는 상태이고 PC마다 다르다.
 # 커밋하면 남의 PC에서 이미 처리한 말을 다시 읽는다(텔레그램 오프셋과 같은 이유).
 .claude/dash-queue.jsonl
+
+# 감시자가 살아 있음을 알리는 흔적. 위 큐와 같은 성격 — 실행 중 상태이고 PC마다 다르다.
+.claude/dash-watch.heartbeat
