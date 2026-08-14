@@ -1,0 +1,889 @@
+{#
+  작업 기록 (ADM-SYS-030) — 2026-08-14 신설
+
+  ■ 이 화면이 답하는 질문
+    "14개 이상의 관리자 모듈이 admin_orders._log() 한 함수로 admin_operator_activity_logs
+    한 테이블에 남기는 기록을, 누가·언제·무엇을·어느 도메인에서 했는지 사람이 볼 수 있는
+    유일한 창구." 쓰기 기능이 없는 순수 조회 화면 — 원장은 이 화면에서 지우거나 고치지
+    않는다(요구사항 정의서 §① "조회 화면(읽기 전용) — 전 도메인 감사 원장").
+
+  ■ 출처
+    사장님 승인 디자인: `docs/design/dc-activity-logs.html`(`<x-dc>` + `DCLogic` +
+    `support.js` 런타임 — 여기서는 돌지 않는다). 요구사항 정의서:
+    `docs/design/req/req-activity-logs.md`. 화면 구성·색·서체·간격·인터랙션은 원안을
+    최대한 그대로 옮기고, 런타임은 이 저장소의 admin2 관례(product_category_map.html.j2·
+    reviews.html.j2와 같은 순수 JS 렌더 함수 + `data-action` 위임)로 바꿨다. 원안은
+    5,118행짜리 더미 배열을 메모리에 전부 들고 클라이언트에서 자유롭게 걸렀지만, 실제
+    API는 그렇게 주지 않는다 — 아래 "데이터 계약"과 "원안과 다르게 만든 지점"이 그 간극을
+    다룬다.
+
+  ■★ 데이터 API — 새로 만들지 않았다(실측: `api/admin_activity_logs.py`, 읽기만)
+    정본: `GET /api/admin/activity-logs?date_from=&date_to=`. 코드를 직접 읽어 확인한
+    계약(문서를 믿지 않고 함수 시그니처·SQL·반환 dict를 대조했다):
+
+      파라미터    date_from · date_to 둘뿐(둘 다 KST 날짜 YYYY-MM-DD, 옵션). 운영자·
+                  도메인(kind)·행위(action)·되돌림 여부·자유검색 파라미터는 **없다**.
+      정렬        log_id DESC 고정
+      상한        LIMIT 500(모듈 상수) — 응답 `limit` 필드로 그대로 내려온다
+      total       같은 기간 조건의 **전체 건수**(500건 초과 여부를 판단하는 유일한 값)
+      items[]     log_id · at(ISO, tz 있음) · operator · kind · kind_label · action_label ·
+                  is_undo · target · summary · undone(boolean)
+      **없는 필드**  raw `action`(영문 코드) · `detail`(jsonb 원문) — `action_label`·
+                  `summary`만 서버가 이미 해석해 내려준다
+
+    즉 이 화면이 쓸 수 있는 유일한 서버 필터는 **기간**이다. 운영자·도메인·행위·되돌림
+    여부·자유검색은 **이번에 불러온 배치(최대 500건, 없어도 500건 아래인 경우 그 기간의
+    전부) 안에서 클라이언트가 거른다** — 아래 "원안과 다르게 만든 지점" ①에서 이 결정의
+    근거를 설명한다.
+
+  ■★ 필터 선택지는 서버 상수를 복제하지 않는다
+    원안은 `KINDS`·`OPERATORS`·`ACTIONS`라는 고정 배열(전역 5,118건 기준 카운트 포함)을
+    자바스크립트에 박아 두고 있었다. 그 값은 `api/admin_activity_logs.py`의
+    `KIND_LABELS`·`ACTION_LABELS`(약 30개 키)를 사람이 다시 옮겨 적은 것과 같은 모양이 될
+    수밖에 없는데, 그러면 그 두 딕셔너리가 이 화면과 두 벌의 정본이 된다(`.claude/CANON.md`
+    §1이 경계하는 바로 그 병 — 정본이 갈라진다) — 게다가 `operator_*` 같은 kind='operator'
+    액션 다수는 애초에 `ACTION_LABELS`에 없어(서버가 원문 영문 스네이크케이스를 그대로
+    노출) 정적 목록으로는 완전히 옮겨 적을 수조차 없다. 그래서 운영자·도메인·행위 필터의
+    선택지는 **지금 불러온 배치에 실제로 나타난 값만** 동적으로 모은다(`optsFor()`).
+    선택지 옆 건수는 전역이 아니라 **이 배치 안에서의 건수**다 — 필터 바 아래 안내 문구가
+    그 사실을 그대로 밝힌다(전역 건수처럼 보이면 지어낸 숫자를 내미는 것과 같다).
+
+  ■★★ 알려진 결함 — "되돌려짐" 배지가 일부 원본에서 판정되지 않는다(제작 지시 ③ 확인 결과)
+    **결함이 지금도 실재함을 코드와 데이터 양쪽으로 확인했다(2026-08-14, 이 화면을 만들며
+    직접 재현):**
+
+      코드   `list_activity_logs()`의 undone 판정 SQL은
+             `EXISTS(... WHERE u.action LIKE '%undo' AND u.detail->>'ref_log_id' = ...)`.
+             `LIKE '%undo'`는 **영문 접미사로 끝나는 action만** 잡는다.
+      데이터  `.venv/Scripts/python`으로 `api.db.engine`에 직접 SELECT해 재현:
+             action이 "카테고리 매핑 이동 되돌림"인 행이 137건(+ "판매가 재산정 되돌림" 2건
+             + "상품 상태 일괄 변경 되돌림" 1건 — 요구사항 정의서 2026-08-13 스냅샷의
+             129+2+1=132건에서 카테고리 쪽만 137로 늘어 있었다. 이 화면은 이 수를 **어디에도
+             박지 않는다** — 그새 더 늘어난 사실 자체가 "숫자를 문서에 적으면 낡는다"는
+             `.claude/CANON.md`의 경고를 다시 보여준다). 실제 원본(log_id=3433, action=
+             "카테고리 매핑 이동")과 그것을 되돌린 행(log_id=3434, action="카테고리 매핑
+             이동 되돌림", detail.ref_log_id="3433")을 현재 API의 SQL을 그대로 재실행해
+             대조하면 undone=**False**를 반환한다(LIKE 조건에 '%되돌림'을 더하면 True로
+             바뀐다) — 실제로는 되돌려졌는데 배지가 뜨지 않는, 지금 이 순간 살아있는 결함이다.
+
+    **이 화면이 한 일 — API는 고치지 않고(담당 파일 밖), 화면이 사실을 숨기지 않게 했다:**
+    서버의 `undone` 불리언 하나만 믿지 않는다. `_summary()`를 다시 읽어 보면, 되돌림류
+    행위는(영문 `_undo` 접미사든 한글 "…되돌림"이든 관계없이) `detail.ref_log_id`가 있으면
+    **공통 폴백 문장** `"원 기록 #{ref_log_id} 되돌림"`을 그대로 요약에 싣는다(이름이 매칭
+    되는 개별 분기가 없는 한 전부 이 문장이다) — 즉 원문 `detail`을 못 받아도 **이미 받은
+    `summary` 문자열에서 역참조를 읽어낼 수 있다.** 그래서 이 화면은 불러온 배치 안에서
+    모든 행의 `summary`를 `/^원 기록 #(\S+) 되돌림$/`로 훑어 "이 log_id를 가리키는 되돌림
+    행이 실제로 있다"는 목록을 직접 만들고(`buildRefMap()`), 서버의 `undone=false`와
+    그 목록이 어긋나는 행만 **"판정 불가(결함)"**로 표시한다(`annotate()`→`_state`):
+
+        undone===true                        → "되돌려짐"(서버 판정 신뢰 — 정상 케이스도 이 경로다)
+        undone===false, 그런데 참조 증거 있음   → "판정 불가(결함)" — 바로 이 결함의 실측 사례
+        undone===false, 참조 증거도 없음        → "되돌려지지 않음"(단, 아래 정직성 한계 참조)
+
+    **정직성의 한계 — 감추지 않고 남긴다:** 이 대조는 **지금 불러온 배치(최대 500건) 안에서만
+    가능하다.** 원본과 되돌림 행이 같은 배치에 함께 실리지 않으면(예: 기간을 좁게 잡아 원본만
+    보이고 되돌림 행은 다른 날짜라 빠진 경우, 또는 전체 5천여 건 중 최근 500건 밖에 원본이
+    있는 경우) 이 화면도 "되돌려지지 않음"과 "실은 결함으로 놓친 되돌려짐"을 구분하지
+    못한다 — 그래서 "되돌려지지 않음"은 화면 문구에서 "이 화면이 불러온 범위 안에서는
+    되돌림 기록을 찾지 못했다"로 적었지, "되돌려진 적이 없다"고 단정하지 않는다(제작 지시
+    ③의 요구: "되돌리지 않음인 것처럼 보이게 하지 마라"). 배너·드로어 양쪽에서 이 한계를
+    반복해 밝힌다.
+
+  ■★★★ 2026-08-14 후속 — 배너를 정적 경고문에서 실측 신호로 전환(확인자 결함 지적 반영)
+    위 "알려진 결함"은 이 화면을 지은 시점엔 실제로 재현됐지만, **같은 배치에서
+    api/admin_activity_logs.py가 undone 판정 SQL을 action 문자열 매칭에서 ref_log_id
+    EXISTS 역참조로 이미 교체했다**(그 파일 상단 주석 "★ undone/is_undo 판정은 action
+    문자열을 절대 보지 않는다" — 실측 확인, 이 화면은 그 API를 고치지 않는다). 이 화면의
+    배너는 정적 텍스트라 원인이 고쳐져도 반응하지 않아, **이미 사실이 아닌 원인 지목
+    ("action LIKE '%undo'" + 되돌림 action 3종 열거)을 영구히 띄우고 있었다** — 바로 옆
+    alBannerMeta가 "확인된 사례 0건"이라 스스로 반박하는데도. 그대로 두면 ⓐ 정상적으로
+    뜨는 "되돌려짐" 배지까지 의심받고 ⓑ 나중에 진짜 회귀가 나도 "원래 있던 결함이려니"
+    하고 못 알아챈다.
+    **고친 것 — 판정 로직은 새로 만들지 않았다.** buildRefMap/annotate(511-532행)가 이미
+    내는 `_state`를 renderBanner()의 표시 조건으로 그대로 썼다: 불일치(`_state==='unknown'`)
+    0건이면 배너를 `hidden`(`.al-banner[hidden]{display:none}` 오버라이드 포함), N>0이면
+    띄우되 문구에서 특정 SQL·특정 action 3종 열거를 빼고 "서버 판정과 배치 내 재구성 결과가
+    다른 행이 있다"는 관측 사실 + 집계 범위(지금 불러온 배치 안에서만)만 남겼다. 드로어
+    stateCopy()의 unknown 분기와 행 툴팁(undoneCellHtml)도 같은 옛 SQL 문구를 반복하고
+    있어 배너와 같은 원칙으로 함께 정리했다(그대로 두면 배너는 "모른다"는데 드로어는
+    "안다"고 말하는 모순이 생긴다).
+
+  ■ 원안과 다르게 만든 지점 (전부 이유가 있다 — 제작 보고서에도 남긴다)
+    ① **운영자·도메인(kind)·행위(action)·되돌림 여부 필터가 서버 파라미터가 아니라
+       클라이언트 필터다** — 실제 API가 기간 파라미터만 지원한다(위 데이터 계약 참조).
+       요구사항 정의서 §④·⑦이 이 부재를 이미 실측으로 지적했고 "이 문서가 아니라 뒤따르는
+       구현 작업" 몫으로 남겨 뒀다 — 이 화면이 그 구현이다. 서버 필터가 생기기 전까지는
+       "불러온 배치 안에서" 거른다는 한계를 상태줄·필터 안내 문구에서 always 밝힌다.
+    ② **자동화 흔적 숨김/표시 토글이 없다** — 원안은 `isAuto` 더미 플래그로 "회귀·자동화가
+       남긴 N건을 숨겼습니다" 토글을 뒀지만, 실제 API 응답에는 행 단위로 "이게 자동화
+       흔적인가"를 말해 주는 필드가 없다(`kind`·`action_label`·`operator`뿐). 요구사항
+       정의서 §③도 "operator의 대부분은 실사용이 아니라 반복 테스트로 보인다"고 **추정**
+       으로만 적었고, 원장에서 구분 표시할지는 "사장님 결정이 필요한 지점" ③으로 남아 있다
+       (미결정). 결정되지 않은 분류를 화면이 임의로 만들어 붙이면 그 자체가 지어낸 판정이라
+       토글을 넣지 않았다 — 대신 상태줄에 이 한계를 문장으로 밝힌다(아래 참조).
+    ③ **"detail(jsonb) 원문" 상자를 뺐다** — 원안은 드로어에 가짜 JSON 미리보기를 보여줬지만
+       (더미 데이터라 가능했다), 실제 목록 API는 `detail` 원문을 내려주지 않는다(위 데이터
+       계약 참조). 없는 걸 지어내 보여줄 수 없어, 그 자리에 "이 API는 detail 원문을 내려주지
+       않는다 — summary는 서버가 detail을 해석해 만든 결과다"라는 설명으로 대체했다. 원안의
+       원래 취지("화면이 detail을 다시 해석해 다른 문장을 만들지 않는다 — 해석이 두 곳으로
+       갈리는 것을 막기 위해서")는 정확히 지켰다: 이 화면은 `summary` 문자열을 그대로 보여줄
+       뿐, 어떤 필드도 재해석해 새 문장을 만들지 않는다(위 결함 판정도 문자열 매칭이지
+       재해석이 아니다 — 서버가 이미 만든 문장 안에서 사실을 읽어낼 뿐이다).
+    ④ **집계 배지(운영자·도메인 카운트)가 전역이 아니라 배치 기준이다** — ①과 같은 이유.
+       원안의 정적 상수는 5,118건 전체를 안다는 전제였다. 서버에 전체 집계 API가 없어
+       "지금 불러온 500건 중" 값만 정확히 말할 수 있다 — 그렇게만 표시한다.
+    ⑤ **기간 칩을 눌러도 다른 필터(운영자·도메인·행위·되돌림·검색어)를 지우지 않는다** —
+       원안 그대로다(`period` 변경 핸들러가 다른 필터 상태를 건드리지 않는다). "필터
+       초기화"만 전부(기간 포함) 되돌린다.
+    ⑥ **페이지네이션은 서버 오프셋이 아니라 불러온 배치를 화면에서 16건씩 나눠 보여주는
+       것**이다(원안과 같은 페이지당 16건). 요구사항 정의서 §④가 이미 지적했듯 지금 API는
+       오프셋 파라미터가 없어 "다음 500건"으로 넘어갈 수단이 없다 — 그래서 상한 초과 사실을
+       숨기지 않고 캡 칩으로 밝힌다("최근 500건만 표시 — 서버 상한").
+    ⑦ **검색은 즉시 반응한다(디바운스·재요청 없음)** — 이미 불러온 배치 안에서 거르는
+       순수 클라이언트 연산이라(최대 500건) 네트워크 왕복이 필요 없다. product_category_map
+       처럼 입력마다 서버에 다시 묻는 화면과는 성격이 다르다(그 화면은 서버 페이지네이션).
+    ⑧ **기간 칩을 다시 눌러도(이미 선택된 칩이라도) 다시 불러온다** — 이 원장은 계속
+       쌓이는 로그라 "새로고침" 수단이 필요한데 원안엔 새로고침 개념이 아예 없었다(더미라
+       고정 데이터). 상태줄 옆에 별도 "새로고침" 글자단추도 뒀다(`data-action="refresh"`).
+    ⑨ **서체·색은 admin2 공용 셸의 토큰(`--rv-*`, `/shared/admin2/admin2.css`)을 그대로
+       쓴다** — 원안이 IBM Plex Sans KR/Mono를 Google Fonts CDN에서 받아 쓰지만 이 저장소는
+       외부 CDN을 금지한다(A-30). admin2.css의 값 자체가 이 원안 계열(dc-review-screen.html
+       외 2벌)의 oklch 베이지 팔레트에서 뽑혀 있어(`_admin2_shell.html.j2` 상단 주석 참조)
+       거의 그대로 대응된다 — `#e8e4dc`→`--rv-page`, `#f7f4ee`→`--rv-canvas`,
+       `#26231e`→`--rv-ink` 식으로 맞추고, 정확히 대응하는 토큰이 없는 한두 개 회색조만
+       (`#5b564d`·`#faf7f0`) reviews.html.j2 선례를 따라 리터럴로 남겼다(:root 재정의는
+       하지 않았다 — 이미 있는 값을 그대로 쓴 것뿐이다).
+    ⑩ **표 헤더·본문 정렬 결함을 처음부터 예방했다** — `product_category_map.html.j2`가
+       겪은 결함(1fr 열이 헤더·본문에서 다르게 계산돼 9px씩 어긋난 사고, 그 파일 :290-339
+       주석 참조)과 같은 원인(네이티브 버튼 appearance·`overflow` 비대칭)을 처음부터 막았다:
+       `button{appearance:none}` 리셋, 요약 열은 `1fr`이 아니라 `minmax(220px,1fr)`, 헤더·
+       본문 둘 다 `overflow-y:auto;scrollbar-gutter:stable`, 행에 `min-width:min-content`,
+       본문 가로 스크롤을 헤더에 동기화하는 스크롤 리스너까지 그 파일의 최종 해법을 그대로
+       옮겼다(재발견하지 않고 검증된 해법을 재사용했다).
+
+  ■ 권한 — 이 화면에는 쓰기 동작이 없다
+    `GET /api/admin/activity-logs`는 `api/auth.py`를 코드로 확인한 결과 GET 기본 규칙
+    (viewer 이상)을 그대로 따른다 — `OWNER_WRITE_PREFIXES`에 이 경로가 없다(실측). 그래서
+    이 화면은 역할별로 잠그는 버튼이 하나도 없다(product_category_map의 이동·되돌리기 같은
+    operator 이상 전용 동작이 이 화면엔 없다).
+
+  ■ 2026-08-14 셸 통합 — `templates/admin/_admin2_shell.html.j2`를 상속한다. 사이드바·
+    헤더 뼈대·팔레트·토스트 컨테이너는 셸/`admin2.css`가 그린다. **좌측 메뉴 항목 구성
+    (IA)은 이 화면 소관이 아니다** — 정본은 `api/admin_nav.py`. 그 파일의 "작업 기록"
+    항목은 이 라우트가 만들어진 시점에도 여전히 `href=None`(신설 예정)이다 — 담당 파일
+    밖이라 고치지 않았다(제작 보고서에 남김. `api/admin_nav.py`를 건드리지 말라는 지시가
+    이 화면 지시서에 명시돼 있다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}작업 기록{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+/* 네이티브 버튼 appearance 리셋 — product_category_map.html.j2:160의 검증된 해법을
+   그대로 재사용한다(appearance:auto가 그리드 안 버튼의 width:100% 계산을 어긋나게 만든
+   전례가 있다). 실제 여백·테두리·배경은 이 화면의 각 버튼 클래스가 다시 정한다. */
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  margin:0;padding:0;border:0;background:none}
+input{font-family:var(--rv-font)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+.al-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 부가물 ── */
+.al-ro{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.al-scopeline{font:400 11px/1.4 var(--rv-font);color:var(--rv-muted);white-space:nowrap}
+
+/* ── 루트 ── */
+.al-root{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;background:var(--rv-canvas)}
+.al-loading,.al-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.al-loading[hidden],.al-errbox[hidden]{display:none}
+.al-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.al-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.al-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+.al-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.al-body[hidden]{display:none}
+
+/* ── 판정 불일치 배너 — 정적 경고문이 아니라 실측 신호다. 표시 조건은 renderBanner()가
+   511-532행 annotate() 결과(_state)를 그대로 센 값으로 정한다. hidden 속성이 실제로 먹도록
+   [hidden] 오버라이드를 명시한다 — UA 기본 [hidden]{display:none}은 author 선언(display:flex)에
+   항상 밀린다(오리진 우선 규칙), author 쪽에 [hidden]을 다시 선언해야 이긴다. ── */
+.al-banner{flex:none;margin:12px 18px 0;border:1px solid oklch(0.72 0.12 62 / .55);background:var(--rv-amber-bg);
+  border-left:3px solid var(--rv-amber);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.al-banner[hidden]{display:none}
+.al-banner .mk{font:600 11px/1 var(--rv-mono);color:oklch(0.5 0.14 55);white-space:nowrap}
+.al-banner .hd{font:600 11.5px/1.4 var(--rv-font);white-space:nowrap}
+.al-banner .ds{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:260px}
+.al-banner .meta{font:400 10px/1.5 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
+
+/* ── 필터 바 ── */
+.al-filterbar{flex:none;padding:12px 18px 0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;position:relative;z-index:6}
+.al-periods{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:14px;overflow:hidden;background:var(--rv-card)}
+.al-period{font:500 11px/1 var(--rv-font);color:var(--rv-muted);background:transparent;padding:7px 11px;cursor:pointer;user-select:none}
+.al-period.on{color:var(--rv-canvas);background:var(--rv-ink)}
+.al-fbox{position:relative}
+.al-fbtn{display:flex;align-items:center;gap:6px;font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:14px;padding:7px 11px;cursor:pointer;user-select:none}
+.al-fbtn.set{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.al-fbtn .car{font-size:8px;opacity:.55}
+.al-fdrop{position:absolute;top:34px;left:0;z-index:30;min-width:210px;max-height:280px;overflow:auto;
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.al-fdrop[hidden]{display:none}
+.al-fitem{display:flex;align-items:center;gap:8px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+  padding:7px 9px;border-radius:5px;cursor:pointer}
+.al-fitem:hover{background:var(--rv-panel)}
+.al-fitem.on{font-weight:600;background:#f0ece1}
+.al-fitem .lb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-fitem .n{font:500 10px/1 var(--rv-mono);color:var(--rv-dim);white-space:nowrap}
+.al-search{display:flex;align-items:center;gap:7px;background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:14px;padding:6px 11px}
+.al-search.on{border-color:var(--rv-ink)}
+.al-search .ic{font:400 11px/1 var(--rv-mono);color:var(--rv-dim)}
+.al-search input{width:250px;font:400 11.5px/1 var(--rv-font);color:var(--rv-ink);background:transparent;border:none;outline:none;padding:0}
+.al-search .clx{font:400 10px/1 var(--rv-font);color:var(--rv-muted);cursor:pointer;padding:0 2px}
+.al-resetlink{font:500 10.5px/1 var(--rv-font);color:var(--rv-dim2);background:transparent;
+  border:1px solid rgba(0,0,0,.08);border-radius:5px;padding:8px 10px;cursor:pointer;user-select:none}
+.al-resetlink.active{color:var(--rv-ink-soft);border-color:rgba(0,0,0,.16)}
+
+.al-note{flex:none;padding:6px 18px 0;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 상태줄(건수 · 캡 · 새로고침) ── */
+.al-statusbar{flex:none;display:flex;align-items:center;gap:9px;padding:9px 18px 0;flex-wrap:wrap}
+.al-cntline{font:400 11px/1.4 var(--rv-font);color:var(--rv-muted)}
+.al-capchip{font:600 10px/1 var(--rv-font);color:var(--rv-green);background:oklch(0.95 0.03 165);
+  border:1px solid var(--rv-green)55;border-radius:4px;padding:5px 8px;white-space:nowrap}
+.al-capchip.warn{color:oklch(0.5 0.14 55);background:var(--rv-amber-bg);border-color:var(--rv-amber)55}
+.al-refresh{font:500 10.5px/1 var(--rv-font);color:var(--rv-link);cursor:pointer;user-select:none;background:none;border:0;padding:2px}
+.al-filternote{margin-left:auto;font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);text-align:right;max-width:420px}
+
+/* ── 표 ── */
+.al-tablewrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:9px 18px 0}
+.al-thead{flex:none;display:grid;grid-template-columns:142px 96px 92px 128px minmax(220px,1fr) 104px;gap:12px;
+  align-items:center;padding:9px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+  border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);
+  overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
+.al-tbody{flex:1;min-height:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
+  border-radius:0 0 7px 7px;overflow:auto;scrollbar-gutter:stable;display:flex;flex-direction:column}
+.al-row{display:grid;grid-template-columns:142px 96px 92px 128px minmax(220px,1fr) 104px;gap:12px;align-items:center;
+  padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:transparent;
+  border-left:3px solid transparent;width:100%;min-width:min-content;text-align:left;border-top:0;border-right:0;border-radius:0}
+.al-row:hover{background:rgba(0,0,0,.02)}
+.al-row.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.al-row .at{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-row .who{display:flex;align-items:center;gap:6px;min-width:0}
+.al-row .who .nm{font:400 11px/1.3 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-row .kd{font:600 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);border:1px solid rgba(0,0,0,.12);
+  border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center;justify-self:start}
+.al-row .ac{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-row .sm{font:400 10.5px/1.45 var(--rv-mono);color:var(--rv-ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-row .ud{font:600 10px/1 var(--rv-font);text-align:center;color:var(--rv-dim3);background:transparent;
+  border-radius:4px;padding:5px 7px;white-space:nowrap;justify-self:start}
+.al-row .ud.undone{color:var(--rv-muted);background:var(--rv-panel2)}
+.al-row .ud.unknown{color:oklch(0.5 0.14 55);background:var(--rv-amber-bg);border:1px solid var(--rv-amber)55}
+
+.al-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.al-empty[hidden]{display:none}
+.al-empty .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.al-empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:380px}
+.al-empty button{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:8px 13px;cursor:pointer}
+
+/* ── 페이저 ── */
+.al-pager{flex:none;height:42px;display:flex;align-items:center;gap:8px;padding:0 2px;margin:9px 18px 18px}
+.al-pager .info{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.al-pagebtn{font:500 10.5px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:6px 9px;cursor:pointer;user-select:none}
+.al-pagebtn.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+
+/* ── 상세 드로어 ── */
+#alDrawerWrap[hidden]{display:none}
+.al-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7}
+.al-drawer{position:absolute;top:0;right:0;bottom:0;width:560px;max-width:100%;background:var(--rv-card);
+  border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8}
+.al-drawer-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.al-drawer-hd .row1{display:flex;align-items:center;gap:9px}
+.al-drawer-hd .ac{font:600 13.5px/1.3 var(--rv-font);flex:1;min-width:0}
+.al-drawer-hd .x{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 4px;background:none;border:0}
+.al-drawer-meta{display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint);flex-wrap:wrap}
+.al-drawer-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px}
+.al-block .lbl{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:7px}
+.al-summarybox{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0;
+  font:400 11.5px/1.7 var(--rv-mono);color:var(--rv-ink)}
+.al-note-sm{font:400 10px/1.55 var(--rv-font);color:var(--rv-dim);margin-top:6px}
+.al-statebox{border:1px solid rgba(0,0,0,.12);border-left:3px solid var(--rv-dim3);background:#faf7f0;border-radius:7px;padding:11px 13px}
+.al-statebox.undone{border-color:rgba(0,0,0,.12);border-left-color:var(--rv-muted)}
+.al-statebox.unknown{border:1px solid var(--rv-amber)55;border-left:3px solid var(--rv-amber);background:oklch(0.96 0.03 70)}
+.al-statebox .t{font:600 11px/1.4 var(--rv-font);margin-bottom:5px}
+.al-statebox .d{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.al-detailnote{border:1px solid rgba(0,0,0,.11);border-left:3px solid var(--rv-dim3);background:var(--rv-panel2);
+  border-radius:6px;padding:10px 12px;font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.al-drawer-ft{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:var(--rv-panel)}
+.al-drawer-ft .note{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.al-drawer-ft button{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:8px 12px;cursor:pointer}
+
+@media (max-width:768px){
+  .al-thead,.al-row{grid-template-columns:98px minmax(150px,1fr) 88px}
+  .al-thead span:nth-child(2),.al-thead span:nth-child(3),.al-thead span:nth-child(4),
+  .al-row .who,.al-row .kd,.al-row .ac{display:none}
+  .al-drawer{width:100%}
+  .al-filternote{margin-left:0;text-align:left;max-width:none}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="al-ro">읽기 전용 원장 · 삭제·수정 없음</span>
+<span class="al-scopeline" id="alScopeLine"></span>
+{% endblock %}
+
+{% block content %}
+<div class="al-root">
+  <div class="al-loading" id="alLoading"><div>불러오는 중…</div></div>
+
+  <div class="al-errbox" id="alErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="alErrMsg"></div>
+    <button type="button" data-action="retry-boot">다시 시도</button>
+  </div>
+
+  <div class="al-body" id="alBody" hidden>
+    <div class="al-banner" id="alBanner" hidden>
+      <span class="mk">▲ 판정 불일치</span>
+      <span class="hd">서버 판정과 배치 내 재구성 결과가 다른 기록이 있습니다</span>
+      <span class="ds">서버가 내려준 되돌림 여부(<span class="num">undone</span>)와, 이 화면이 불러온
+        배치 안에서 요약 문장을 대조해 재구성한 되돌림 증거가 서로 다른 행입니다. 해당 행은 목록·
+        상세에서 <b>판정 불가</b>로 표시합니다 — 원인은 이 화면에서 단정하지 않으며, 아래 건수는
+        지금 불러온 배치 안에서만 집계한 값입니다(배치 밖의 사례는 이 화면도 확인할 수 없습니다).</span>
+      <span class="meta" id="alBannerMeta"></span>
+    </div>
+
+    <div class="al-filterbar" data-keep="1">
+      <span class="al-periods" role="group" aria-label="조회 기간">
+        <button type="button" class="al-period" data-action="pick-period" data-period="today">오늘</button>
+        <button type="button" class="al-period" data-action="pick-period" data-period="7d">최근 7일</button>
+        <button type="button" class="al-period" data-action="pick-period" data-period="30d">최근 30일</button>
+        <button type="button" class="al-period" data-action="pick-period" data-period="all">전체 기간</button>
+      </span>
+
+      <div class="al-fbox">
+        <button type="button" class="al-fbtn" id="alFOperatorBtn" data-action="toggle-filter" data-key="alFOperator"
+                aria-haspopup="listbox" aria-expanded="false"><span id="alFOperatorLabel">운영자: 전체</span><span class="car">▼</span></button>
+        <div class="al-fdrop" id="alFOperatorDrop" role="listbox" hidden></div>
+      </div>
+      <div class="al-fbox">
+        <button type="button" class="al-fbtn" id="alFKindBtn" data-action="toggle-filter" data-key="alFKind"
+                aria-haspopup="listbox" aria-expanded="false"><span id="alFKindLabel">도메인: 전체</span><span class="car">▼</span></button>
+        <div class="al-fdrop" id="alFKindDrop" role="listbox" hidden></div>
+      </div>
+      <div class="al-fbox">
+        <button type="button" class="al-fbtn" id="alFActionBtn" data-action="toggle-filter" data-key="alFAction"
+                aria-haspopup="listbox" aria-expanded="false"><span id="alFActionLabel">행위: 전체</span><span class="car">▼</span></button>
+        <div class="al-fdrop" id="alFActionDrop" role="listbox" hidden></div>
+      </div>
+      <div class="al-fbox">
+        <button type="button" class="al-fbtn" id="alFUndoneBtn" data-action="toggle-filter" data-key="alFUndone"
+                aria-haspopup="listbox" aria-expanded="false"><span id="alFUndoneLabel">되돌림: 전체</span><span class="car">▼</span></button>
+        <div class="al-fdrop" id="alFUndoneDrop" role="listbox" hidden></div>
+      </div>
+
+      <span class="al-search" id="alSearchBox">
+        <label class="al-sr" for="alSearch">대상 ID · 요약 검색</label>
+        <span class="ic" aria-hidden="true">⌕</span>
+        <input type="text" id="alSearch" placeholder="대상 ID · 요약 검색 (SKU · 주문번호 · product_code)" autocomplete="off">
+        <span class="clx" id="alSearchClear" data-action="clear-search">✕</span>
+      </span>
+      <button type="button" class="al-resetlink" id="alResetBtn" data-action="reset-filters">필터 초기화</button>
+    </div>
+
+    <div class="al-note">참고 — 자동화·회귀 흔적을 구분해 숨기는 기능은 이 화면에 없습니다: 서버 응답이 행 단위로
+      자동화 여부를 내려주지 않습니다(kind=운영자 이력의 상당수가 자동화 흔적으로 추정되나, 서버가 구분하지
+      않는 값을 화면이 임의로 나누지 않습니다 — 요구사항 정의서 「사장님 결정이 필요한 지점」③ 참조).</div>
+
+    <div class="al-statusbar">
+      <span class="al-cntline" id="alCountLine"></span>
+      <span class="al-capchip" id="alCapChip"></span>
+      <button type="button" class="al-refresh" data-action="refresh">새로고침</button>
+      <span class="al-filternote" id="alFilterNote"></span>
+    </div>
+
+    <div class="al-tablewrap">
+      <div class="al-thead" role="row">
+        <span role="columnheader">시각</span><span role="columnheader">운영자</span><span role="columnheader">도메인</span>
+        <span role="columnheader">행위</span><span role="columnheader">요약 — 서버 문장 그대로</span><span role="columnheader">되돌림</span>
+      </div>
+      <div class="al-tbody" id="alTbody" data-keep="1"></div>
+      <div class="al-empty" id="alEmpty" hidden>
+        <div class="ti" id="alEmptyTitle"></div>
+        <div class="ds" id="alEmptyDesc"></div>
+        <button type="button" data-action="reset-filters">필터 초기화</button>
+      </div>
+    </div>
+
+    <div class="al-pager" data-keep="1">
+      <span class="info num" id="alPageInfo"></span>
+      <span style="flex:1"></span>
+      <span id="alPagerNums" style="display:flex;gap:6px"></span>
+    </div>
+  </div>
+</div>
+
+<div id="alDrawerWrap" hidden>
+  <div class="al-overlay" data-action="close-drawer"></div>
+  <div class="al-drawer" data-keep="1" role="dialog" aria-modal="true" aria-label="작업 기록 상세">
+    <div class="al-drawer-hd">
+      <div class="row1">
+        <span class="al-row" style="display:inline-flex;padding:0" id="alDKindWrap"><span class="kd" id="alDKind"></span></span>
+        <span class="ac" id="alDAction"></span>
+        <span class="ud" id="alDUndone"></span>
+        <button type="button" class="x" data-action="close-drawer" aria-label="닫기">✕</button>
+      </div>
+      <div class="al-drawer-meta">
+        <span id="alDId"></span><span id="alDAt"></span><span id="alDWho"></span><span id="alDTarget"></span>
+      </div>
+    </div>
+    <div class="al-drawer-body">
+      <div class="al-block">
+        <div class="lbl">요약 — 서버가 만든 문장</div>
+        <div class="al-summarybox" id="alDSummary"></div>
+        <div class="al-note-sm">화면이 detail JSON을 다시 해석해 문장을 만들지 않습니다 — 해석이 두 곳으로 갈리는 것을 막기 위해서입니다.</div>
+      </div>
+      <div class="al-statebox" id="alDStateBox">
+        <div class="t" id="alDStateTitle"></div>
+        <div class="d" id="alDStateDesc"></div>
+      </div>
+      <div class="al-block">
+        <div class="lbl">detail (jsonb) — 원문</div>
+        <div class="al-detailnote">이 목록 API(<span class="num">GET /api/admin/activity-logs</span>)는 detail 원문을 내려주지
+          않습니다 — 위 요약 문장은 서버(<span class="num">api/admin_activity_logs.py::_summary</span>)가 detail을 해석해
+          만든 결과이고, 이 화면은 없는 원문을 지어내 보여주지 않습니다.</div>
+      </div>
+    </div>
+    <div class="al-drawer-ft">
+      <span class="note">원장은 지우거나 고치지 않습니다 — 이 화면에는 쓰기 동작이 없습니다.</span>
+      <button type="button" data-action="copy-logid">log_id 복사</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var GREEN = 'var(--rv-green)', AMBER = 'var(--rv-amber)';
+  var PER = 16;
+
+  var S = {
+    period: 'all', data: null, err: null,
+    fOperator: null, fKind: null, fAction: null, fUndone: null, q: '',
+    page: 1, openMenu: null, sel: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function p2(n) { return String(n).padStart(2, '0'); }
+  function fmtAt(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+
+  // ── KST 날짜 계산 — 브라우저 로컬 tz와 무관하게 항상 서울 날짜를 만든다 ──────
+  var KST_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }); // 'YYYY-MM-DD'
+  function kstToday() { return KST_FMT.format(new Date()); }
+  function kstShift(dateStr, days) {
+    var d = new Date(dateStr + 'T12:00:00+09:00');
+    d.setUTCDate(d.getUTCDate() + days);
+    return KST_FMT.format(d);
+  }
+  function rangeFor(period) {
+    var today = kstToday();
+    if (period === 'today') return { from: today, to: today };
+    if (period === '7d') return { from: kstShift(today, -6), to: today };
+    if (period === '30d') return { from: kstShift(today, -29), to: today };
+    return { from: null, to: null };
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  // ── 결함 대조 — summary 문자열에서 "원 기록 #<id> 되돌림" 패턴을 읽어 되돌림
+  //    역참조를 재구성한다(detail JSON을 못 받아도 이미 받은 summary로 충분하다).
+  //    api/admin_activity_logs.py::_summary()의 공통 폴백이 되돌림류 행위(영문 _undo든
+  //    한글 "…되돌림"이든)마다 정확히 이 문장을 만든다는 사실에 기반한다. ──────────
+  var REF_RE = /^원\s*기록\s*#(\S+)\s*되돌림$/;
+  function buildRefMap(items) {
+    var map = {};
+    items.forEach(function (r) {
+      var m = REF_RE.exec(r.summary || '');
+      if (m) map[String(m[1])] = r;
+    });
+    return map;
+  }
+  function annotate(items) {
+    var refBy = buildRefMap(items);
+    items.forEach(function (r) {
+      var evidence = refBy[String(r.log_id)] || null;
+      r._evidence = evidence;
+      r._state = r.undone ? 'undone' : (evidence ? 'unknown' : 'none');
+    });
+    return items;
+  }
+
+  // ── 로드 ─────────────────────────────────────────────────────────
+  function loadPeriod(period) {
+    S.period = period; S.err = null; S.openMenu = null;
+    var r = rangeFor(period);
+    var qs = [];
+    if (r.from) qs.push('date_from=' + encodeURIComponent(r.from));
+    if (r.to) qs.push('date_to=' + encodeURIComponent(r.to));
+    renderAll();
+    return apiGet('/api/admin/activity-logs' + (qs.length ? '?' + qs.join('&') : ''))
+      .then(function (resp) {
+        resp.items = annotate(resp.items || []);
+        S.data = resp; S.page = 1;
+        renderAll();
+      })
+      .catch(function (err) { S.err = err; renderAll(); });
+  }
+
+  // ── 필터링 ───────────────────────────────────────────────────────
+  function filtered() {
+    var items = (S.data && S.data.items) || [];
+    var q = (S.q || '').trim().toLowerCase();
+    return items.filter(function (r) {
+      if (S.fOperator != null && r.operator !== S.fOperator) return false;
+      if (S.fKind != null && (r.kind || '__none__') !== S.fKind) return false;
+      if (S.fAction != null && r.action_label !== S.fAction) return false;
+      if (S.fUndone != null && r._state !== S.fUndone) return false;
+      if (q) {
+        var hay = (String(r.target || '') + ' ' + String(r.summary || '')).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function optsFor(items, keyFn, labelFn) {
+    var map = {}, order = [];
+    items.forEach(function (r) {
+      var raw = keyFn(r);
+      var k = raw == null ? '__none__' : String(raw);
+      if (!map[k]) { map[k] = { key: k, label: labelFn(r) || '(없음)', count: 0 }; order.push(k); }
+      map[k].count++;
+    });
+    return order.map(function (k) { return map[k]; }).sort(function (a, b) { return b.count - a.count; });
+  }
+
+  // ── 렌더 ─────────────────────────────────────────────────────────
+  function renderAll() {
+    var loading = $('alLoading'), errBox = $('alErrBox'), body = $('alBody');
+    if (S.err) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('alErrMsg').textContent = S.err.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+
+    renderPeriods();
+    renderBanner();
+    renderFilters();
+    renderScopeLine();
+    renderStatusBar();
+    renderTable();
+    renderPager();
+    renderDrawer();
+  }
+
+  function renderPeriods() {
+    document.querySelectorAll('.al-period').forEach(function (el) {
+      el.classList.toggle('on', el.getAttribute('data-period') === S.period);
+    });
+  }
+
+  // 배너 표시 조건 = annotate()가 이미 낸 판정(_state)을 그대로 센 값. 새 판정 로직을
+  // 만들지 않는다 — 511-532행 buildRefMap/annotate 결과를 표시 조건으로 쓰기만 한다.
+  // 불일치 0건이면 배너 자체를 렌더하지 않는다(hidden) — 정상 상태에 경고가 없어야
+  // 다음에 진짜 회귀(0건 -> N건 전환)가 났을 때 신호로 읽힌다.
+  function renderBanner() {
+    var items = (S.data && S.data.items) || [];
+    var n = items.filter(function (r) { return r._state === 'unknown'; }).length;
+    var banner = $('alBanner');
+    banner.hidden = (n === 0);
+    if (n === 0) return;
+    $('alBannerMeta').textContent = '지금 표시 범위(불러온 ' + fmt(items.length) + '건)에서 확인된 불일치: ' + fmt(n) + '건';
+  }
+
+  function renderScopeLine() {
+    var d = S.data;
+    if (!d) { $('alScopeLine').textContent = ''; return; }
+    $('alScopeLine').textContent = '원장 조건 내 ' + fmt(d.total) + '건 · 표시 ' + fmt((d.items || []).length) + '건';
+  }
+
+  function renderFilterDropdown(prefix, label, current, opts, pickAction) {
+    var btn = $(prefix + 'Btn'), drop = $(prefix + 'Drop'), lbl = $(prefix + 'Label');
+    var curOpt = current == null ? null : opts.filter(function (o) { return o.key === current; })[0];
+    lbl.textContent = label + ': ' + (current == null ? '전체' : (curOpt ? curOpt.label : current));
+    btn.classList.toggle('set', current != null);
+    btn.setAttribute('aria-expanded', S.openMenu === prefix ? 'true' : 'false');
+    drop.hidden = S.openMenu !== prefix;
+    if (S.openMenu === prefix) {
+      var rows = [{ key: null, label: '전체', count: null }].concat(opts);
+      drop.innerHTML = rows.map(function (o) {
+        return '<div class="al-fitem' + (current === o.key ? ' on' : '') + '" role="option" aria-selected="' +
+          (current === o.key ? 'true' : 'false') + '" data-action="' + pickAction + '" data-k="' + esc(o.key == null ? '' : o.key) + '">' +
+          '<span class="lb">' + esc(o.label) + '</span>' + (o.count != null ? '<span class="n num">' + fmt(o.count) + '</span>' : '') + '</div>';
+      }).join('');
+    }
+  }
+
+  function renderFilters() {
+    var searchEl = $('alSearch');
+    if (document.activeElement !== searchEl) searchEl.value = S.q;
+    $('alSearchBox').classList.toggle('on', !!S.q);
+    $('alSearchClear').style.color = S.q ? 'var(--rv-muted)' : 'transparent';
+    $('alSearchClear').style.pointerEvents = S.q ? 'auto' : 'none';
+
+    var items = (S.data && S.data.items) || [];
+    var opOpts = optsFor(items, function (r) { return r.operator; }, function (r) { return r.operator; });
+    var kindOpts = optsFor(items, function (r) { return r.kind; }, function (r) { return r.kind_label || '(없음)'; });
+    var actOpts = optsFor(items, function (r) { return r.action_label; }, function (r) { return r.action_label; });
+    var undoneOpts = [
+      { key: 'undone', label: '되돌려짐', count: items.filter(function (r) { return r._state === 'undone'; }).length },
+      { key: 'unknown', label: '판정 불가(결함)', count: items.filter(function (r) { return r._state === 'unknown'; }).length },
+      { key: 'none', label: '되돌려지지 않음', count: items.filter(function (r) { return r._state === 'none'; }).length }
+    ];
+    renderFilterDropdown('alFOperator', '운영자', S.fOperator, opOpts, 'pick-operator');
+    renderFilterDropdown('alFKind', '도메인', S.fKind, kindOpts, 'pick-kind');
+    renderFilterDropdown('alFAction', '행위', S.fAction, actOpts, 'pick-action');
+    renderFilterDropdown('alFUndone', '되돌림', S.fUndone, undoneOpts, 'pick-undone');
+
+    var narrowed = !!(S.q || S.fOperator || S.fKind || S.fAction || S.fUndone);
+    $('alResetBtn').classList.toggle('active', narrowed || S.period !== 'all');
+  }
+
+  function renderStatusBar() {
+    var d = S.data, all = filtered();
+    var total = d.total || 0, shown = (d.items || []).length, limit = d.limit || 500;
+    $('alCountLine').textContent = '이 조건 ' + fmt(all.length) + '건 (불러온 ' + fmt(shown) + '건 중)';
+    var capped = total > shown;
+    var chip = $('alCapChip');
+    chip.textContent = capped ? ('최근 ' + fmt(limit) + '건만 표시 — 서버 상한(전체 ' + fmt(total) + '건 중)') : ('전부 표시됨 · ' + fmt(total) + '건');
+    chip.classList.toggle('warn', capped);
+    var range = '';
+    if (shown) range = '표시된 기록 시각 범위 ' + fmtAt(d.items[shown - 1].at) + ' ~ ' + fmtAt(d.items[0].at);
+    $('alFilterNote').textContent = '운영자·도메인·행위 필터의 건수는 지금 불러온 ' + fmt(shown) + '건 안에서만 집계됩니다(전역 집계 API가 없습니다).'
+      + (range ? ' · ' + range : '');
+  }
+
+  function undoneCellHtml(state) {
+    var label = state === 'undone' ? '되돌려짐' : (state === 'unknown' ? '판정 불가' : '');
+    var cls = state === 'undone' ? ' undone' : (state === 'unknown' ? ' unknown' : '');
+    var title = state === 'undone' ? 'ref_log_id 역참조로 확인됨'
+      : (state === 'unknown' ? '서버 판정과 배치 내 재구성 결과가 다릅니다(판정 불가) — 자세히 보려면 행을 클릭하세요' : '');
+    return '<span class="ud' + cls + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(label) + '</span>';
+  }
+
+  function renderTable() {
+    var all = filtered();
+    var pages = Math.max(1, Math.ceil(all.length / PER));
+    if (S.page > pages) S.page = pages;
+    if (S.page < 1) S.page = 1;
+    var pageRows = all.slice((S.page - 1) * PER, S.page * PER);
+
+    var box = $('alTbody');
+    var empty = $('alEmpty');
+    if (!pageRows.length) {
+      box.innerHTML = '';
+      empty.hidden = false;
+      $('alEmptyTitle').textContent = S.q ? ('"' + S.q + '"와 맞는 기록이 없습니다') : '이 조건에는 기록이 없습니다';
+      $('alEmptyDesc').textContent = '기간이나 필터를 넓혀 보세요.';
+      return;
+    }
+    empty.hidden = true;
+    box.innerHTML = pageRows.map(function (r) {
+      var on = S.sel === r.log_id;
+      var kindLabel = r.kind_label || '(없음)';
+      return '<button type="button" class="al-row' + (on ? ' on' : '') + '" data-action="open-drawer" data-id="' + r.log_id +
+        '" aria-label="' + esc(fmtAt(r.at) + ' ' + r.operator + ' ' + kindLabel + ' ' + r.action_label + ' ' + r.summary) + '">' +
+        '<span class="at num">' + esc(fmtAt(r.at)) + '</span>' +
+        '<span class="who"><span class="nm">' + esc(r.operator) + '</span></span>' +
+        '<span class="kd">' + esc(kindLabel) + '</span>' +
+        '<span class="ac" title="' + esc(r.action_label) + '">' + esc(r.action_label) + '</span>' +
+        '<span class="sm" title="' + esc(r.summary) + '">' + esc(r.summary) + '</span>' +
+        undoneCellHtml(r._state) +
+        '</button>';
+    }).join('');
+  }
+
+  function renderPager() {
+    var all = filtered();
+    var pages = Math.max(1, Math.ceil(all.length / PER));
+    var page0 = S.page - 1;
+    var start = all.length ? page0 * PER + 1 : 0;
+    var end = Math.min(all.length, (page0 + 1) * PER);
+    $('alPageInfo').textContent = fmt(start) + '–' + fmt(end) + ' / ' + fmt(all.length);
+
+    var first = Math.max(0, Math.min(page0 - 1, pages - 3));
+    var nums = [];
+    for (var i = first; i < Math.min(first + 3, pages); i++) nums.push(i);
+    var items = [{ label: '‹', p: Math.max(0, page0 - 1) }]
+      .concat(nums.map(function (i) { return { label: String(i + 1), p: i, on: i === page0 }; }))
+      .concat(pages > 3 ? [{ label: '…', p: page0 }, { label: String(pages), p: pages - 1 }] : [])
+      .concat([{ label: '›', p: Math.min(pages - 1, page0 + 1) }]);
+    $('alPagerNums').innerHTML = items.map(function (x) {
+      return '<button type="button" class="al-pagebtn' + (x.on ? ' on' : '') + '" data-action="goto-page" data-p="' + x.p + '">' + esc(x.label) + '</button>';
+    }).join('');
+  }
+
+  function stateCopy(r) {
+    if (r._state === 'undone') {
+      var extra = r._evidence ? ('되돌림 기록: log_id ' + r._evidence.log_id + ' · ' + r._evidence.action_label + ' · ' + fmtAt(r._evidence.at) + '.')
+        : '서버가 ref_log_id 역참조로 판정한 결과입니다.';
+      return { cls: 'undone', title: '이 기록은 되돌려졌습니다', desc: extra };
+    }
+    if (r._state === 'unknown') {
+      var ev = r._evidence;
+      return { cls: 'unknown', title: '서버 판정과 배치 내 재구성 결과가 다릅니다(판정 불가)',
+        desc: '되돌림 기록: log_id ' + (ev ? ev.log_id : '?') + ' · ' + (ev ? ev.action_label : '') + ' · ' + (ev ? fmtAt(ev.at) : '') +
+          '. 서버가 내려준 undone=false와 달리, 이 화면이 불러온 배치 안에서는 위 기록이 이 log_id를 가리키는 되돌림 증거로 확인됩니다. 원인은 이 화면에서 단정하지 않습니다.' };
+    }
+    return { cls: 'none', title: '이 화면이 불러온 범위 안에서는 되돌림 기록을 찾지 못했습니다',
+      desc: '다만 이 화면은 최근 표시 범위 밖의 되돌림은 확인할 수 없고, 애초에 되돌릴 수 없는 처리(예: 환불 완료)와 아직 되돌리지 않은 처리를 서버가 구분해 내려주지 않습니다.' };
+  }
+
+  function renderDrawer() {
+    var wrap = $('alDrawerWrap');
+    var r = (S.sel != null && S.data) ? (S.data.items || []).filter(function (x) { return x.log_id === S.sel; })[0] : null;
+    wrap.hidden = !r;
+    if (!r) return;
+    var kindLabel = r.kind_label || '(없음)';
+    $('alDKind').textContent = kindLabel;
+    $('alDAction').textContent = r.action_label;
+    var label = r._state === 'undone' ? '되돌려짐' : (r._state === 'unknown' ? '판정 불가' : '되돌려지지 않음');
+    var udCls = r._state === 'undone' ? ' undone' : (r._state === 'unknown' ? ' unknown' : '');
+    var ud = $('alDUndone'); ud.textContent = label; ud.className = 'ud' + udCls;
+    $('alDId').textContent = 'log_id ' + r.log_id;
+    $('alDAt').textContent = fmtAt(r.at);
+    $('alDWho').textContent = r.operator;
+    $('alDTarget').textContent = r.target || '(없음)';
+    $('alDSummary').textContent = r.summary;
+    var sc = stateCopy(r);
+    var box = $('alDStateBox'); box.className = 'al-statebox' + (sc.cls === 'none' ? '' : ' ' + sc.cls);
+    $('alDStateTitle').textContent = sc.title;
+    $('alDStateDesc').textContent = sc.desc;
+  }
+
+  // ── 동작 ─────────────────────────────────────────────────────────
+  function closeMenus() { S.openMenu = null; }
+
+  document.addEventListener('click', function (e) {
+    var openThings = !!(S.openMenu || S.sel != null);
+    if (openThings && !window.Admin2Shell.isKeepClick(e.target)) {
+      S.openMenu = null; S.sel = null; renderAll();
+    }
+
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch (action) {
+      case 'retry-boot': S.err = null; loadPeriod(S.period); break;
+      case 'refresh': loadPeriod(S.period); break;
+      case 'pick-period': loadPeriod(t.getAttribute('data-period')); break;
+      case 'toggle-filter': e.stopPropagation(); S.openMenu = (S.openMenu === t.getAttribute('data-key')) ? null : t.getAttribute('data-key'); renderFilters(); break;
+      case 'pick-operator': e.stopPropagation(); S.fOperator = t.getAttribute('data-k') || null; S.openMenu = null; S.page = 1; renderAll(); break;
+      case 'pick-kind': {
+        e.stopPropagation();
+        var kv = t.getAttribute('data-k') || null;
+        S.fKind = kv === '__none__' ? '__none__' : kv;
+        S.openMenu = null; S.page = 1; renderAll(); break;
+      }
+      case 'pick-action': e.stopPropagation(); S.fAction = t.getAttribute('data-k') || null; S.openMenu = null; S.page = 1; renderAll(); break;
+      case 'pick-undone': e.stopPropagation(); S.fUndone = t.getAttribute('data-k') || null; S.openMenu = null; S.page = 1; renderAll(); break;
+      case 'clear-search': e.stopPropagation(); S.q = ''; S.page = 1; renderAll(); $('alSearch').focus(); break;
+      case 'reset-filters': {
+        S.fOperator = null; S.fKind = null; S.fAction = null; S.fUndone = null; S.q = ''; S.page = 1; S.openMenu = null;
+        if (S.period !== 'all') { loadPeriod('all'); } else { renderAll(); }
+        break;
+      }
+      case 'open-drawer': {
+        var lid = Number(t.getAttribute('data-id'));
+        S.openMenu = null;
+        S.sel = (S.sel === lid) ? null : lid;
+        renderAll();
+        break;
+      }
+      case 'close-drawer': S.sel = null; renderAll(); break;
+      case 'goto-page': S.page = Number(t.getAttribute('data-p')) + 1; renderTable(); renderPager(); break;
+      case 'copy-logid': {
+        var row = (S.sel != null && S.data) ? (S.data.items || []).filter(function (x) { return x.log_id === S.sel; })[0] : null;
+        if (!row) break;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(String(row.log_id))
+            .then(function () { window.Admin2Shell.toast('log_id ' + row.log_id + '를 복사했습니다', 'ok'); })
+            .catch(function () { window.Admin2Shell.toast('복사하지 못했습니다', 'err'); });
+        } else {
+          window.Admin2Shell.toast('복사하지 못했습니다 — 브라우저가 클립보드 접근을 지원하지 않습니다', 'err');
+        }
+        break;
+      }
+      default: break;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (S.openMenu || S.sel != null) { S.openMenu = null; S.sel = null; renderAll(); }
+  });
+
+  document.addEventListener('input', function (e) {
+    if (e.target.id !== 'alSearch') return;
+    S.q = e.target.value; S.page = 1;
+    renderStatusBar(); renderTable(); renderPager();
+    $('alSearchBox').classList.toggle('on', !!S.q);
+    $('alSearchClear').style.color = S.q ? 'var(--rv-muted)' : 'transparent';
+    $('alSearchClear').style.pointerEvents = S.q ? 'auto' : 'none';
+  });
+
+  // 가로 스크롤 동기화 — product_category_map.html.j2의 검증된 해법(:1250 부근 주석)을
+  // 그대로 재사용한다: minmax(220px,1fr) 요약 열 때문에 좁은 화면에서 본문이 가로로
+  // 흘러넘칠 수 있는데, 헤더(overflow-x:hidden)는 자체 스크롤이 없어 본문 스크롤에 맞춰
+  // scrollLeft를 옮겨줘야 라벨과 셀이 같은 열을 계속 가리킨다.
+  var alTbodyEl = $('alTbody');
+  if (alTbodyEl) {
+    alTbodyEl.addEventListener('scroll', function () {
+      var thead = document.querySelector('.al-thead');
+      if (thead) thead.scrollLeft = alTbodyEl.scrollLeft;
+    });
+  }
+
+  loadPeriod('all');
+})();
+</script>
+{% endraw %}
+{% endblock %}

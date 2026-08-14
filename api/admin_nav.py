@@ -112,10 +112,10 @@ NAV = [
     ]),
 
     ("시스템", "server", [
-        ("오픈 단계 설정", None, None),
-        ("운영자 · 권한", None, None),
-        ("작업 기록", None, None),
-        ("엑셀 다운로드 관리", None, "신설 — 비동기 큐"),
+        ("오픈 단계 설정", "/admin2/ops-settings", None),
+        ("운영자 · 권한", "/admin2/operators", None),
+        ("작업 기록", "/admin2/activity-logs", None),
+        ("엑셀 다운로드 관리", "/admin2/excel-exports", "신설 — 정적 뼈대(큐·API 없음)"),
     ]),
 ]
 

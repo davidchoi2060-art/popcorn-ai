@@ -1,0 +1,995 @@
+{#
+  오픈 단계 설정 (ADM-OPS-010) — 2026-08-14 신설
+
+  ■ 출처 — 사장님이 Claude Design에서 확정한 원안
+    `docs/design/dc-ops-stage.html`(AXES 상수, 2026-08-13 16:10 확정). 요구사항 정의서:
+    `docs/design/req/req-ops-switch.md`. 재정의 근거: `docs/decisions/decision-log.md` A-34.
+
+  ■★ 데이터 — 실시간과 정적 스냅샷을 섞어 쓴다(전부 admin_ui_ops_stage.py 상단
+    docstring에 상세). 요약:
+      실시간(GET/POST /api/admin/ops-settings, 브라우저가 직접 호출)
+        전환 축 5종의 모드·갱신 시각·최근 변경 이력·프리셋 3종·서버측 예상 영향(effects)
+      실시간(이 라우트가 admin_ui_common.render()로부터 물려받는 nav/nav_counts)
+        구축 축 8그룹 37항목 — 정본 api/admin_nav.py, 좌측 메뉴와 같은 데이터를 재사용
+      정적 스냅샷(AXIS_META, 2026-08-13 코드 감사 — 자동 판정 아님, 화면에 그 사실을 노출)
+        축별 판정(동작 중/잠듦/미구현)·단계 배정(MVP2/MVP3)·"동작 중이 되려면"·판정 근거 인용
+
+  ■ 원안과 의도적으로 다르게 만든 지점(제작 보고서에도 남긴다)
+    ① 축별 "바뀌면 무엇이 달라지나"(built/gone 태그)를 원안처럼 따로 만들지 않고,
+       서버가 실제로 돌려주는 GET 응답의 `effects`(where/effect 7행)를 축별로 필터링해
+       보여준다 — 원안의 built/gone 표기는 화면이 판단해 지어내는 값이라 뺐다.
+    ② 프리셋 설명문은 서버 응답에 없다(label만 있다) — 원안의 desc 문장은 화면이
+       지어낸 것이라 옮기지 않았다.
+    ③ 헤더의 "판정 커밋 해시"는 지금 HEAD를 보여주면 판정 시점 코드와 달라 오히려
+       오도한다 — 대신 판정 근거 문서 경로를 title 툴팁으로 노출한다.
+    ④ 구축 축은 원안의 grid(헤더/본문 분리)가 아니라 네이티브 `<table>`을 쓴다 —
+       최근 두 형제 화면(product_category_map.html.j2 등)이 grid 헤더/본문 열 정렬
+       결함을 세 차례 겪은 뒤였다(지시서 함정 목록). table은 같은 엘리먼트라 애초에
+       어긋날 수 없다.
+    ⑤ 축 카드 전체를 클릭 가능한 `div`로 두지 않고, 이름·요약 부분만 실제 `<button>`
+       으로 분리했다(own/mall 토글 버튼과 형제로 — 버튼 안에 버튼을 넣지 않는다,
+       접근성).
+    ⑥ "이 화면 자신도 미구축입니다" 사실 카드는 정적 문장이 아니라
+       `admin_nav.NAV`를 실측(`_self_built()`)해 조건부로 그린다 — 하네스가 메뉴
+       링크를 붙이는 순간 이 문서가 낡지 않게.
+
+  ■ 좌측 메뉴(LNB) — `api/admin_nav.py`의 "오픈 단계 설정" 항목은 이 라우트가 만들어진
+    시점에도 여전히 `href=None`(신설 예정)이다. 그 파일은 담당 범위 밖이라 고치지
+    않았다(지시서: "메뉴 링크는 내가 따로 붙인다") — href를 `/admin2/ops-settings`로
+    올려야 LNB에서 이 화면으로 갈 수 있다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}오픈 단계 설정{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;margin:0;padding:0;border:0;background:none}
+input{font-family:var(--rv-font)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.os-root{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.os-root [hidden]{display:none!important}
+
+.os-loading,.os-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px;font:400 12px/1.6 var(--rv-font);color:var(--rv-dim)}
+.os-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.os-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.os-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);font:500 12px/1 var(--rv-font);cursor:pointer}
+
+.os-body{flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* 헤더 부가물 */
+.os-stagechip{font:600 10px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.os-verdictnote{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);text-align:right;white-space:nowrap;cursor:help}
+
+/* 탭 */
+.os-tabs{flex:none;height:40px;border-bottom:1px solid rgba(0,0,0,.1);background:var(--rv-card);display:flex;align-items:stretch;padding:0 18px;gap:20px;overflow-x:auto}
+.os-tab{display:flex;align-items:center;gap:7px;font:400 12.5px/1 var(--rv-font);color:var(--rv-faint);border-bottom:2px solid transparent;cursor:pointer;padding:0 2px;white-space:nowrap}
+.os-tab.on{font-weight:600;color:var(--rv-ink);border-bottom-color:var(--rv-ink)}
+.os-tab .chip{font:500 9.5px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.1);border-radius:3px;padding:3px 5px;white-space:nowrap}
+.os-tab.on .chip{color:var(--rv-ink);background:oklch(0.95 0.03 165);border-color:var(--rv-green)}
+
+/* 단계 안내 배너 */
+.os-stagenote{flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.13);background:var(--rv-panel2);border-left:3px solid var(--rv-dim3);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.os-stagenote.cur{border-color:var(--rv-green);background:oklch(0.97 0.02 165);border-left-color:var(--rv-green)}
+.os-stagenote .mark{font:600 10.5px/1.4 var(--rv-mono);white-space:nowrap;color:var(--rv-faint)}
+.os-stagenote.cur .mark{color:var(--rv-green)}
+.os-stagenote .ti{font:600 11.5px/1.4 var(--rv-font)}
+.os-stagenote .ds{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:220px}
+
+/* 본문 분할 */
+.os-split{flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 12px}
+.os-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.os-rail{width:312px;flex:none;display:flex;flex-direction:column;gap:12px;overflow:auto}
+
+/* 패널 공통 */
+.os-panel{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden}
+.os-panel.pad{padding:13px 15px}
+.os-panel.grow{flex:1;min-height:0;display:flex;flex-direction:column;gap:9px;overflow:auto;background:var(--rv-panel2)}
+.os-panel-hd{min-height:36px;border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-panel);display:flex;align-items:center;flex-wrap:wrap;padding:8px 13px;gap:9px}
+.os-panel-hd .ti{font:600 11.5px/1 var(--rv-font)}
+.os-panel-hd .sub{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.os-panel-hd .mono{font-family:var(--rv-mono)}
+.os-panel-hd .grow{flex:1}
+.os-panel .lbl{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:9px}
+.os-panel .note{font:400 10px/1.55 var(--rv-font);color:var(--rv-dim);margin-top:8px}
+
+/* 전환 축 행 */
+.os-axis{display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06)}
+.os-axis:last-child{border-bottom:0}
+.os-axis.on{background:var(--rv-panel2);border-left:3px solid var(--rv-ink);padding-left:10px}
+.os-axis-open{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;text-align:left}
+.os-axis-open:focus-visible{outline:2px solid var(--rv-link);outline-offset:2px;border-radius:4px}
+.os-axis .row1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.os-axis .nm{font:600 12.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.os-axis .key{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.os-axis .dirty{font:600 10px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border-radius:4px;padding:4px 6px}
+.os-axis .summary{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-muted)}
+.os-axis .upd{font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim);flex:none;width:120px;text-align:right}
+.os-axistoggle{display:flex;align-items:center;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden;flex:none}
+.os-axisopt{font:500 11px/1 var(--rv-font);color:var(--rv-muted);background:var(--rv-card);padding:8px 13px;cursor:pointer}
+.os-axisopt.on{color:var(--rv-canvas);background:var(--rv-ink)}
+.os-axisopt:disabled{cursor:not-allowed;opacity:.6}
+
+.os-noaxes{padding:18px 16px;display:flex;flex-direction:column;gap:5px;background:var(--rv-panel2)}
+.os-noaxes .ti{font:600 12px/1.45 var(--rv-font);color:var(--rv-ink-soft)}
+.os-noaxes .ds{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft);max-width:760px}
+
+/* 판정 배지 */
+.os-badge{flex:none;font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center;border:1px solid transparent}
+.os-badge.live{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:var(--rv-green)}
+.os-badge.dormant{color:var(--rv-amber);background:var(--rv-amber-bg);border-color:var(--rv-amber)}
+.os-badge.missing{color:var(--rv-faint);background:var(--rv-panel2);border-color:rgba(0,0,0,.14)}
+
+/* 구축 축 */
+.os-buildmsg{padding:18px 16px;background:var(--rv-panel2)}
+.os-buildmsg .ds{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft);max-width:760px}
+.os-hints{padding:13px;display:flex;flex-direction:column;gap:9px}
+.os-hints .note{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.os-hints .hint{display:flex;align-items:flex-start;gap:10px;border:1px dashed rgba(0,0,0,.2);background:var(--rv-panel2);border-radius:7px;padding:10px 12px}
+.os-hints .hint .chip{flex:none;font:600 9.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel);border:1px solid rgba(0,0,0,.14);border-radius:3px;padding:4px 6px;white-space:nowrap}
+.os-hints .hint .body{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.os-hints .hint .nm{font:500 11.5px/1.35 var(--rv-font)}
+.os-hints .hint .ds{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+
+.os-buildtable{width:100%;border-collapse:collapse}
+.os-buildtable th,.os-buildtable td{padding:9px 13px;text-align:left;vertical-align:middle;border-bottom:1px solid rgba(0,0,0,.06)}
+.os-buildtable thead th{font:600 10px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel);border-bottom:1px solid rgba(0,0,0,.09)}
+.os-buildtable tbody th{font:500 12px/1.3 var(--rv-font);width:150px;white-space:nowrap}
+.os-buildtable td.num{white-space:nowrap;font-family:var(--rv-mono)}
+.os-cells{display:inline-flex;flex-wrap:wrap;gap:3px}
+.os-cell{width:11px;height:16px;border-radius:2px;display:inline-block;background:#e2ddd0;border:1px solid rgba(0,0,0,.12)}
+.os-cell.done{background:var(--rv-green);border-color:var(--rv-green);cursor:pointer}
+.os-cell.todo{cursor:default}
+.os-buildtable tfoot td{background:var(--rv-panel);border-bottom:0}
+.os-buildtable tfoot .ti{font:600 11.5px/1.3 var(--rv-font);margin-right:10px}
+.os-buildtable tfoot .mono{font:500 11px/1.3 var(--rv-mono);color:var(--rv-muted);margin-right:10px}
+.os-buildtable tfoot .ds{display:block;font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);margin-top:6px;max-width:820px}
+
+.os-chip{font:600 10px/1 var(--rv-font);text-align:center;border-radius:4px;padding:5px 8px;white-space:nowrap;display:inline-block;border:1px solid transparent}
+.os-chip.done{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:var(--rv-green)}
+.os-chip.part,.os-chip.none,.os-chip.stage{color:var(--rv-ink-soft);background:var(--rv-panel2);border-color:rgba(0,0,0,.12)}
+
+/* 이력 */
+.os-histtable{width:100%;border-collapse:collapse}
+.os-histtable th,.os-histtable td{padding:9px 13px;text-align:left;border-bottom:1px solid rgba(0,0,0,.06);vertical-align:middle}
+.os-histtable thead th{font:600 10px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel);border-bottom:1px solid rgba(0,0,0,.09)}
+.os-histtable td{font:400 11px/1.3 var(--rv-font)}
+.os-histtable td.num{font-family:var(--rv-mono);color:var(--rv-muted);white-space:nowrap}
+.os-histtable .what{display:flex;align-items:center;gap:8px;min-width:0}
+.os-histtable .what .txt{font:400 10.5px/1.4 var(--rv-mono);color:var(--rv-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.os-histtable .undone{flex:none;font:600 10px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:4px 7px;white-space:nowrap}
+.os-undobtn{font:500 10.5px/1 var(--rv-font);text-align:center;color:var(--rv-ink);background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:6px 9px;cursor:pointer;white-space:nowrap}
+.os-undobtn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+.os-histempty{padding:24px 13px;text-align:center;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim)}
+
+/* 프리셋 */
+.os-preset{display:flex;align-items:center;gap:9px;width:100%;border:1px solid rgba(0,0,0,.12);background:var(--rv-card);border-radius:6px;padding:9px 11px;cursor:pointer;margin-bottom:6px;text-align:left}
+.os-preset:last-child{margin-bottom:0}
+.os-preset.cur{border-color:var(--rv-green)}
+.os-preset:disabled{cursor:not-allowed;opacity:.65}
+.os-preset .body{flex:1;min-width:0}
+.os-preset .nm{font:500 11.5px/1.3 var(--rv-font)}
+.os-preset .mark{flex:none;font:600 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.os-preset.cur .mark{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:var(--rv-green)}
+
+/* 판정 기준 */
+.os-legend .row{display:flex;align-items:flex-start;gap:9px;margin-bottom:9px}
+.os-legend .row:last-child{margin-bottom:0}
+.os-legend .ds{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);flex:1}
+
+/* 감추지 않는 사실 */
+.os-facts{display:flex;flex-direction:column;gap:9px}
+.os-facts .fact{border:1px solid rgba(0,0,0,.11);border-left:3px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:9px 11px}
+.os-facts .fact.warn{border-left-color:var(--rv-amber)}
+.os-facts .fact .ti{font:600 11px/1.4 var(--rv-font);margin-bottom:4px}
+.os-facts .fact .ds{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+
+/* 하단 저장 바 */
+.os-foot{flex:none;border-top:1px solid rgba(0,0,0,.1);background:var(--rv-panel);padding:11px 18px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.os-foot .note{font:400 11px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.os-foot .note.err{color:var(--rv-red)}
+.os-btn{font:500 11.5px/1 var(--rv-font);border-radius:5px;padding:9px 15px;cursor:pointer}
+.os-btn.ghost{color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.18)}
+.os-btn.ghost:disabled{color:var(--rv-dim2);cursor:not-allowed}
+.os-btn.dark{font-weight:600;color:var(--rv-canvas);background:var(--rv-ink)}
+.os-btn.dark:disabled{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+.os-btn.danger2{font-weight:600;color:var(--rv-canvas);background:var(--rv-red)}
+.os-btn.danger2:disabled{background:var(--rv-dim2);color:#f0ece2;cursor:not-allowed}
+
+/* 드로어 */
+.os-drawer-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7}
+.os-drawer{position:absolute;top:0;right:0;bottom:0;width:560px;max-width:92vw;background:var(--rv-card);border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8}
+.os-drawer .hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.os-drawer .hd .nm{font:600 14.5px/1.3 var(--rv-font)}
+.os-drawer .hd .key{font:400 11px/1 var(--rv-mono);color:var(--rv-faint)}
+.os-drawer .hd .grow{flex:1}
+.os-drawer .hd .x{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 4px}
+.os-drawer .bd{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px}
+.os-drawer .lbl{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.os-drawer .opts{display:flex;gap:8px}
+.os-optcard{flex:1;text-align:left;border:1px solid rgba(0,0,0,.14);background:var(--rv-panel2);border-radius:7px;padding:11px 12px;cursor:pointer}
+.os-optcard.on{border-color:var(--rv-ink);background:#f6f2e8}
+.os-optcard:disabled{cursor:not-allowed;opacity:.65}
+.os-optcard .row1{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.os-optcard .mark{font:600 11px/1 var(--rv-mono);color:var(--rv-dim3)}
+.os-optcard.on .mark{color:var(--rv-ink)}
+.os-optcard .lb{font:600 12px/1.3 var(--rv-font)}
+.os-optcard .ds{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-muted)}
+.os-verdictbox{border:1px solid rgba(0,0,0,.14);border-left:3px solid var(--rv-dim3);background:var(--rv-panel2);border-radius:7px;padding:11px 13px}
+.os-verdictbox.live{border-color:var(--rv-green);border-left-color:var(--rv-green);background:var(--rv-card)}
+.os-verdictbox.dormant{border-color:var(--rv-amber-line);border-left-color:var(--rv-amber);background:var(--rv-card)}
+.os-verdictbox.missing{border-left-color:var(--rv-dim3);background:var(--rv-panel2)}
+.os-verdictbox .ti{font:600 11.5px/1.4 var(--rv-font);margin-bottom:5px}
+.os-verdictbox .ds{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.os-verdictbox .src{font:400 10px/1.5 var(--rv-mono);color:var(--rv-faint);margin-top:7px}
+.os-needbox{border:1px solid rgba(0,0,0,.12);border-left:3px solid var(--rv-dim3);background:var(--rv-panel2);border-radius:7px;padding:11px 13px}
+.os-needbox .ti{font:600 11px/1.4 var(--rv-font);margin-bottom:5px}
+.os-needbox .ds{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.os-efflist{display:flex;flex-direction:column;gap:5px}
+.os-efflist .row{display:flex;align-items:flex-start;gap:9px;border:1px solid rgba(0,0,0,.11);border-radius:6px;padding:9px 11px;background:var(--rv-panel2)}
+.os-efflist .where{flex:none;font:600 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);width:130px}
+.os-efflist .eff{font:400 11px/1.6 var(--rv-font);flex:1}
+.os-efflist .empty{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim)}
+.os-coercebox{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-left:3px solid var(--rv-amber);border-radius:6px;padding:10px 12px;font:400 11px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+
+/* 확인 모달 */
+.os-confirm-overlay{position:absolute;inset:0;background:rgba(38,35,30,.42);z-index:12}
+.os-confirm{position:absolute;top:40px;left:50%;transform:translateX(-50%);width:648px;max-width:94vw;max-height:88%;background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:10px;box-shadow:0 24px 60px rgba(38,35,30,.34);display:flex;flex-direction:column;z-index:13;overflow:hidden}
+.os-confirm .hd{flex:none;padding:15px 18px 13px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px}
+.os-confirm .hd .ti{font:600 14.5px/1.3 var(--rv-font)}
+.os-confirm .hd .grow{flex:1}
+.os-confirm .hd .x{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 4px}
+.os-confirm .bd{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:13px}
+.os-confirm .lbl{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.os-warnbox{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-left:3px solid var(--rv-amber);border-radius:7px;padding:11px 13px}
+.os-warnbox .ti{font:600 11.5px/1.4 var(--rv-font);margin-bottom:4px}
+.os-warnbox .ds{font:400 10.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.os-applyrows{display:flex;flex-direction:column;gap:5px}
+.os-applyrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:9px 11px;background:var(--rv-panel2)}
+.os-applyrow.warn{border-color:var(--rv-amber-line)}
+.os-applyrow .nm{font:500 11.5px/1.3 var(--rv-font);width:88px;flex:none}
+.os-applyrow .chg{font:400 11px/1.3 var(--rv-mono);color:var(--rv-muted);flex:1;min-width:160px}
+.os-applyrow .tag{flex:none;font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap;color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.14)}
+.os-applyrow.warn .tag{color:var(--rv-amber);background:var(--rv-amber-bg);border-color:var(--rv-amber)}
+.os-coercenote{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-amber);margin-top:8px}
+.os-noopnote{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:9px 11px;margin-top:9px}
+.os-dangerbox{border:1.5px solid var(--rv-red);background:oklch(0.97 0.02 30);border-radius:7px;padding:12px 14px}
+.os-dangerbox .ti{font:600 12px/1.45 var(--rv-font);color:var(--rv-red);margin-bottom:6px}
+.os-dangerbox .ds{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft);margin-bottom:10px}
+.os-dangerbox .phraselbl{display:block;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);margin-bottom:7px}
+.os-dangerbox .strong{font-weight:600}
+.os-phraseinput{width:100%;font:500 12.5px/1.4 var(--rv-mono);color:var(--rv-ink);background:var(--rv-card);border:1px solid rgba(0,0,0,.24);border-radius:6px;padding:9px 11px;outline:none}
+.os-phraseinput.ok{border-color:var(--rv-green)}
+.os-confirm .ft{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:var(--rv-panel);flex-wrap:wrap}
+.os-confirm .ft .note{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:160px}
+
+@media (max-width:768px){
+  .os-split{flex-direction:column;padding:10px 12px}
+  .os-rail{width:100%}
+  .os-axis{flex-wrap:wrap}
+  .os-axis .upd{display:none}
+  .os-buildtable thead{display:none}
+  .os-buildtable td,.os-buildtable th{padding:7px 10px}
+  .os-histtable thead th:nth-child(1),.os-histtable td:nth-child(1){display:none}
+  .os-confirm{width:94vw}
+  .os-drawer{width:100%}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="os-stagechip">현재 단계 MVP1 — 팝콘PC 인계로 판매</span>
+<span class="os-verdictnote" title="{{ verdict_source }}">판정 기준일 {{ verdict_at }} · 자동 판정 아님</span>
+{% endblock %}
+
+{% block content %}
+<div class="os-root">
+  <div class="os-loading" id="osLoading"><div>불러오는 중…</div></div>
+
+  <div class="os-errbox" id="osErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="osErrMsg"></div>
+    <button type="button" data-action="retry-boot">다시 시도</button>
+  </div>
+
+  <div class="os-body" id="osBody" hidden>
+
+    <div class="os-tabs" id="osTabs" role="tablist" aria-label="MVP 단계"
+         data-nav-groups="{{ nav_counts.groups }}" data-nav-total="{{ nav_counts.total }}"
+         data-nav-new="{{ nav_counts.new }}" data-nav-todo="{{ nav_counts.todo }}"></div>
+
+    <div class="os-stagenote" id="osStageNote"></div>
+
+    <div class="os-split">
+      <div class="os-left">
+
+        <section class="os-panel" aria-labelledby="osAxesTitle">
+          <div class="os-panel-hd">
+            <span class="ti" id="osAxesTitle">전환 축</span>
+            <span class="sub">정책 스위치 — 사람이 켜고 끕니다</span>
+            <span class="grow"></span>
+            <span class="sub" id="osSwitchNote"></span>
+          </div>
+          <div id="osAxesList"></div>
+          <div class="os-noaxes" id="osNoAxes" hidden>
+            <div class="ti" id="osNoAxesTi"></div>
+            <div class="ds" id="osNoAxesDs"></div>
+          </div>
+        </section>
+
+        <section class="os-panel" aria-labelledby="osBuildTitle">
+          <div class="os-panel-hd">
+            <span class="ti" id="osBuildTitle">구축 축</span>
+            <span class="sub">진척 현황 — 지어야 바뀝니다, 여기서 켜고 끌 수 없습니다</span>
+            <span class="grow"></span>
+            <span class="mono sub">정본 api/admin_nav.py</span>
+          </div>
+
+          <div class="os-buildmsg" data-tabpanel="mvp1" hidden>
+            <div class="ds">이 단계에 배정된 관리자 화면 목록이 아직 없습니다 — 단계 매핑 원천이 정해지지 않아 {{ nav_counts.total }}항목 전부가 "단계 미정"에 있습니다. 지어진 화면은 그 탭에서 확인하세요.</div>
+          </div>
+
+          <div class="os-hints" data-tabpanel="mvp2" hidden>
+            <div class="note">admin_nav.py에 있는 미구축 {{ nav_counts.todo }}항목은 아직 어느 단계에도 배정되지 않았습니다. 아래는 admin_nav.py 모듈 docstring에서 읽히는 "정황상 대응"이며 확정이 아닙니다.</div>
+            {% for h in hints_by_stage.mvp2 %}
+            <div class="hint">
+              <span class="chip">정황상 대응 · 확정 아님</span>
+              <span class="body"><span class="nm">{{ h.name }}</span><span class="ds">{{ h.desc }}</span></span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="os-hints" data-tabpanel="mvp3" hidden>
+            <div class="note">MVP3 대응도 정황상 읽힌 것뿐입니다 — 확정이 아닙니다.</div>
+            {% for h in hints_by_stage.mvp3 %}
+            <div class="hint">
+              <span class="chip">정황상 대응 · 확정 아님</span>
+              <span class="body"><span class="nm">{{ h.name }}</span><span class="ds">{{ h.desc }}</span></span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div data-tabpanel="unmapped" hidden>
+            <table class="os-buildtable">
+              <thead>
+                <tr><th scope="col">그룹</th><th scope="col">구축 / 전체</th><th scope="col">항목</th><th scope="col">상태</th></tr>
+              </thead>
+              <tbody>
+                {% for g in nav %}
+                <tr>
+                  <th scope="row">{{ g.title }}</th>
+                  <td class="num">{{ g.done }} / {{ g.total }}</td>
+                  <td>
+                    <span class="os-cells">
+                    {% for it in g["items"] %}
+                      {% if it.href %}
+                      <a href="{{ it.href }}" class="os-cell done" title="{{ it.label }} · 구축됨"></a>
+                      {% else %}
+                      <span class="os-cell todo" title="{{ it.label }} · 미구축{{ (' · ' ~ it.note) if it.note else '' }}"></span>
+                      {% endif %}
+                    {% endfor %}
+                    </span>
+                  </td>
+                  <td>
+                    {% if g.done == g.total %}
+                    <span class="os-chip done">전부 구축됨</span>
+                    {% elif g.done > 0 %}
+                    <span class="os-chip part">일부 구축</span>
+                    {% else %}
+                    <span class="os-chip none">미구축</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4">
+                    <span class="ti">합계 {{ nav_counts.groups }}그룹 {{ nav_counts.total }}항목</span>
+                    <span class="mono">구축 {{ nav_counts.new }} · 미구축 {{ nav_counts.todo }}</span>
+                    <span class="ds">단계 구분이 코드에 없어 "MVP1 잔여 N건"을 셀 수 없습니다 — {{ nav_counts.todo }}건 전체만 보여줍니다.{% if not self_built %} 이 화면 자신도 아직 미구축 {{ nav_counts.todo }}건 중 하나입니다(admin_nav.py가 href를 아직 갖고 있지 않습니다).{% endif %}</span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <section class="os-panel" aria-labelledby="osHistTitle">
+          <div class="os-panel-hd">
+            <span class="ti" id="osHistTitle">최근 변경 이력 — 전환 축만</span>
+            <span class="grow"></span>
+            <span class="mono sub">admin_operator_activity_logs · target_kind=ops · 최근 20건</span>
+          </div>
+          <table class="os-histtable">
+            <thead>
+              <tr><th scope="col">시각</th><th scope="col">담당자</th><th scope="col">무엇이 바뀌었나</th><th scope="col">되돌리기</th></tr>
+            </thead>
+            <tbody id="osHistBody"></tbody>
+          </table>
+          <div class="os-histempty" id="osHistEmpty" hidden>변경 이력이 없습니다</div>
+        </section>
+
+      </div>
+
+      <div class="os-rail">
+        <div class="os-panel pad">
+          <div class="lbl">단계 프리셋 — 전환 축만</div>
+          <div id="osPresets"></div>
+          <div class="note">프리셋은 값만 채웁니다 — 구축 축은 손대지 않고, 저장은 확인 단계를 거칩니다.</div>
+        </div>
+
+        <div class="os-panel pad">
+          <div class="lbl">판정 기준</div>
+          <div class="os-legend">
+            <div class="row"><span class="os-badge live">● 동작 중</span><span class="ds">전환 축 — 값을 읽는 코드가 있고 처리가 갈립니다. 환불은 문구만 갈리지만 소비는 되므로 여기에 셉니다.</span></div>
+            <div class="row"><span class="os-badge dormant">◆ 잠듦</span><span class="ds">전환 축 — 축은 살아 있으나 이 단계에서 쓰지 않습니다.</span></div>
+            <div class="row"><span class="os-badge missing">○ 미구현</span><span class="ds">전환 축 — 스위치는 있는데 읽는 코드가 없습니다. 켜도 서버는 아무 일도 하지 않습니다.</span></div>
+            <div class="row"><span class="os-chip done">■ 구축됨</span><span class="ds">구축 축 — 화면이 지어져 라우트가 있습니다(admin_nav.py의 href 유무로 판정).</span></div>
+            <div class="row"><span class="os-chip none">□ 미구축</span><span class="ds">구축 축 — 아직 짓지 않았습니다. 여기서 켜고 끌 수 없고, 지어야 바뀝니다.</span></div>
+          </div>
+        </div>
+
+        <div class="os-panel pad grow">
+          <div class="lbl">이 화면이 감추지 않는 사실</div>
+          <div class="os-facts">
+            <div class="fact"><div class="ti">두 축은 성격이 다릅니다</div><div class="ds">전환 축은 사람이 켜고 끄는 정책 스위치, 구축 축은 지어야 바뀌는 진척입니다. 구축 축에 스위치를 붙이면 "켰는데 아무 일이 없다"가 되돌아옵니다 — 그래서 조회만 합니다.</div></div>
+            <div class="fact"><div class="ti">구축 축 목록은 여기서 정의하지 않습니다</div><div class="ds">정본은 api/admin_nav.py이고 이 화면은 파생해 읽습니다. 목록을 화면에 복제하면 2026-08-05 사고(메뉴가 36화면에 갈라짐)가 재현됩니다.</div></div>
+            {% if not self_built %}
+            <div class="fact"><div class="ti">이 화면 자신도 미구축입니다</div><div class="ds">admin_nav.py가 아직 이 화면의 href를 갖고 있지 않아, {{ nav_counts.todo }}건 미구축 중 하나로 잡힙니다 — 자기 이름도 가리지 않습니다.</div></div>
+            {% else %}
+            <div class="fact"><div class="ti">이 화면은 이제 구축됨으로 잡힙니다</div><div class="ds">admin_nav.py에 이 화면의 href가 등록되어 {{ nav_counts.new }}건 구축 안에 포함됩니다.</div></div>
+            {% endif %}
+            <div class="fact"><div class="ti">MVP1 잔여는 아직 셀 수 없습니다</div><div class="ds">NAV 튜플에 단계 필드가 없어 {{ nav_counts.todo }}건 중 무엇이 MVP1인지 코드로 판정할 방법이 없습니다. "{{ nav_counts.todo }}개 미구축"까지만 말하고 임의로 나누지 않습니다.</div></div>
+            <div class="fact warn"><div class="ti">판정은 자동이 아니라 스냅샷입니다</div><div class="ds">동작 중/잠듦/미구현 판정과 단계 배정은 {{ verdict_at }} 코드 감사를 그대로 옮긴 값입니다 — 서버가 매 요청 다시 판정하지 않습니다. 근거: {{ verdict_source }}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="os-foot">
+      <span class="note" id="osFootNote"></span>
+      <button type="button" class="os-btn ghost" id="osRevertBtn" data-action="revert">되돌리기</button>
+      <button type="button" class="os-btn dark" id="osSaveBtn" data-action="open-confirm">저장 — 확인 단계로</button>
+    </div>
+  </div>
+
+  <div class="os-drawer-backdrop" id="osDrawerBackdrop" hidden></div>
+  <div class="os-drawer" id="osDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="osDrawerName">
+    <div class="hd">
+      <span class="nm" id="osDrawerName"></span>
+      <span class="key mono" id="osDrawerKey"></span>
+      <span class="os-badge" id="osDrawerVerdict"></span>
+      <span class="os-chip stage" id="osDrawerStage"></span>
+      <span class="grow"></span>
+      <button type="button" class="x" data-action="close-drawer" aria-label="닫기">✕</button>
+    </div>
+    <div class="bd">
+      <div>
+        <div class="lbl">값</div>
+        <div class="opts" id="osDrawerOpts"></div>
+      </div>
+      <div class="os-verdictbox" id="osDrawerVerdictBox">
+        <div class="ti" id="osDrawerVerdictTitle"></div>
+        <div class="ds" id="osDrawerVerdictDesc"></div>
+        <div class="src mono" id="osDrawerVerdictSrc"></div>
+      </div>
+      <div class="os-needbox" id="osDrawerNeedBox" hidden>
+        <div class="ti">동작 중이 되려면</div>
+        <div class="ds" id="osDrawerNeed"></div>
+      </div>
+      <div>
+        <div class="lbl">이 값이 바뀌면 — 서버 응답(effects) 그대로</div>
+        <div class="os-efflist" id="osDrawerEffects"></div>
+      </div>
+      <div class="os-coercebox" id="osDrawerCoerce" hidden></div>
+    </div>
+  </div>
+
+  <div class="os-confirm-overlay" id="osConfirmOverlay" hidden></div>
+  <div class="os-confirm" id="osConfirm" hidden role="dialog" aria-modal="true" aria-labelledby="osConfirmTitle">
+    <div class="hd">
+      <span class="ti" id="osConfirmTitle">저장 전 확인</span>
+      <span class="grow"></span>
+      <button type="button" class="x" data-action="cancel-confirm" aria-label="닫기">✕</button>
+    </div>
+    <div class="bd">
+      <div class="os-warnbox">
+        <div class="ti">이 저장은 배포된 고객 서버에도 즉시 반영됩니다</div>
+        <div class="ds">로컬 개발 환경과 배포 서버가 같은 Cloud SQL을 씁니다. 2026-08-12에 이 경로로 사고가 났습니다 — 스위치는 바뀌었지만 배포된 코드가 그 값을 처리하지 못하는 상태가 됐습니다. 저장 전에 배포된 코드가 이 값을 감당할 수 있는지 확인하세요.</div>
+      </div>
+      <div>
+        <div class="lbl">요청한 것 vs 실제 적용될 것</div>
+        <div class="os-applyrows" id="osApplyRows"></div>
+        <div class="os-coercenote" id="osCoerceNote" hidden></div>
+        <div class="os-noopnote" id="osNoopNote" hidden></div>
+      </div>
+      <div class="os-dangerbox" id="osDangerBox" hidden>
+        <div class="ti">위험 — 자체 결제로 전환하면 팝콘PC 인계가 즉시 막힙니다</div>
+        <div class="ds">인계(POST /api/handoff)는 그 순간부터 409를 돌려줍니다. 인계는 지금 단계(MVP1)에서 확정된 유일한 구매 경로이고, 되살아나는 자체 결제 파이프라인은 2026-08-11 결정에서 "범위 밖"으로 뺀 코드입니다. 게다가 그 주문을 처리할 관리자 화면(주문·클레임)도 아직 지어지지 않았습니다.</div>
+        <label class="phraselbl" for="osPhrase">계속하려면 아래 문구를 그대로 입력하세요 — <span class="mono strong" id="osPhraseTarget"></span></label>
+        <input type="text" id="osPhrase" class="os-phraseinput" autocomplete="off">
+      </div>
+    </div>
+    <div class="ft">
+      <span class="note" id="osConfirmNote"></span>
+      <button type="button" class="os-btn ghost" data-action="cancel-confirm">취소</button>
+      <button type="button" class="os-btn danger2" id="osCommitBtn" data-action="commit"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+var AXIS_META = {{ axis_meta_json | safe }};
+var STAGE_LABEL = {{ stage_label_json | safe }};
+</script>
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var PHRASE = '인계를 막습니다';
+  var V = {
+    live: { label: '동작 중', mark: '●', cls: 'live' },
+    dormant: { label: '잠듦', mark: '◆', cls: 'dormant' },
+    missing: { label: '미구현', mark: '○', cls: 'missing' }
+  };
+  var TAB_DEFS = [
+    ['mvp1', 'MVP1', '현재 단계'],
+    ['mvp2', 'MVP2', '준비 현황'],
+    ['mvp3', 'MVP3', '준비 현황'],
+    ['unmapped', '단계 미정', '']
+  ];
+
+  var S = {
+    ops: null, opsErr: null,
+    tab: 'mvp1',
+    saved: null, draft: null,
+    drawerKey: null, drawerOpen: false,
+    confirm: false, phrase: ''
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+
+  function owner() { return window.Admin2Shell.canWrite('owner'); }
+  function toast(msg, kind) { window.Admin2Shell.toast(msg, kind); }
+  function permText() {
+    var me = window.Admin2Shell.getMe();
+    return '권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+  }
+  function guard() {
+    if (!owner()) { toast(permText(), 'err'); return false; }
+    return true;
+  }
+
+  // 서버 admin_ops.py `_enforce()`의 클라이언트 미리보기 — 그 모듈 docstring: "화면에도
+  // 같은 보정이 있지만 그건 UX다 ... 서버가 다시 강제한다". 확인 모달을 열기 전
+  // 미리보기로만 쓰고, 최종 진실은 항상 POST 응답이다(아래 doCommit이 boot()로 재조회).
+  function enforce(modes) {
+    var out = Object.assign({}, modes), notes = [];
+    if (out.settle !== out.pay) {
+      notes.push('정산은 결제 주체를 따릅니다 — 결제와 동일하게 보정했습니다');
+      out.settle = out.pay;
+    }
+    if (out.refund === 'own' && out.pay !== 'own') {
+      notes.push('쇼핑몰 결제 건은 PG 취소 권한이 없어 환불도 쇼핑몰 창구로 보정했습니다');
+      out.refund = 'mall';
+    }
+    return { modes: out, notes: notes };
+  }
+
+  function changedKeys() {
+    if (!S.saved || !S.draft) return [];
+    return Object.keys(S.saved).filter(function (k) { return S.saved[k] !== S.draft[k]; });
+  }
+
+  function axisMerged(key) {
+    var meta = AXIS_META[key] || {};
+    var item = ((S.ops && S.ops.items) || []).filter(function (it) { return it.key === key; })[0] || {};
+    return Object.assign({ key: key }, meta, {
+      mode: S.draft ? S.draft[key] : item.mode,
+      updated_at: item.updated_at
+    });
+  }
+
+  function tabAxes(tab) {
+    return Object.keys(AXIS_META).filter(function (k) { return AXIS_META[k].stage === tab; });
+  }
+
+  // ── 부팅 ─────────────────────────────────────────────────────────
+  function boot() {
+    $('osLoading').hidden = false; $('osErrBox').hidden = true; $('osBody').hidden = true;
+    apiGet('/api/admin/ops-settings').then(function (j) {
+      S.ops = j; S.opsErr = null;
+      S.saved = Object.assign({}, j.modes); S.draft = Object.assign({}, j.modes);
+      S.confirm = false; S.phrase = '';
+      $('osLoading').hidden = true; $('osBody').hidden = false;
+      renderAll();
+    }).catch(function (err) {
+      S.opsErr = err;
+      $('osLoading').hidden = true; $('osErrBox').hidden = false;
+      $('osErrMsg').textContent = (err && err.message) ? err.message : '알 수 없는 오류';
+    });
+  }
+
+  // ── 렌더 ─────────────────────────────────────────────────────────
+  function renderTabs() {
+    var el = $('osTabs');
+    var total = el.getAttribute('data-nav-total') || '0';
+    el.innerHTML = TAB_DEFS.map(function (d) {
+      var key = d[0], label = d[1];
+      var chip = key === 'unmapped' ? (total + '항목') : d[2];
+      var on = S.tab === key;
+      return '<button type="button" class="os-tab' + (on ? ' on' : '') + '" role="tab" aria-selected="' +
+        on + '" data-action="set-tab" data-tab="' + key + '">' +
+        '<span class="lb">' + esc(label) + '</span><span class="chip">' + esc(chip) + '</span></button>';
+    }).join('');
+  }
+
+  function renderStageNote() {
+    var tab = S.tab, box = $('osStageNote');
+    box.classList.toggle('cur', tab === 'mvp1');
+    var mark = tab === 'mvp1' ? '● 현재 단계' : (tab === 'unmapped' ? '· 단계 미정' : '· 준비 현황');
+    var title = tab === 'mvp1' ? '지금은 MVP1 — 팝콘PC 인계로 판매하는 단계입니다'
+      : (tab === 'mvp2' ? 'MVP2는 아직 오지 않은 단계입니다'
+      : (tab === 'mvp3' ? 'MVP3은 입점 포털 단계입니다' : '아직 단계가 배정되지 않은 항목들입니다'));
+    var desc = tab === 'mvp1' ? '이 탭의 항목이 지금 급한 것입니다. 다른 탭의 미구축은 "빠뜨린 것"이 아니라 "지금 안 해도 되는 것"입니다.'
+      : (tab === 'unmapped' ? '단계 매핑의 원천(코드 필드 vs 별도 표)이 아직 정해지지 않아, 임의로 어느 탭에도 밀어 넣지 않았습니다.'
+      : '여기 미구축은 경고가 아닙니다 — 지금 단계가 아니어서 비어 있는 것이 정상입니다.');
+    box.innerHTML = '<span class="mark">' + esc(mark) + '</span><span class="ti">' + esc(title) + '</span><span class="ds">' + esc(desc) + '</span>';
+  }
+
+  function showTabPanels() {
+    document.querySelectorAll('[data-tabpanel]').forEach(function (el) {
+      el.hidden = el.getAttribute('data-tabpanel') !== S.tab;
+    });
+  }
+
+  function optBtn(key, val, ax) {
+    var on = ax.mode === val;
+    var label = val === 'own' ? (ax.own_label || '자체') : (ax.mall_label || '쇼핑몰');
+    var lockedSettle = key === 'settle';
+    var disabled = lockedSettle || !owner();
+    var title = lockedSettle ? '정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다'
+      : (!owner() ? permText() : '');
+    return '<button type="button" class="os-axisopt' + (on ? ' on' : '') + '" data-action="set-mode" data-key="' + key + '" data-val="' + val + '"' +
+      (disabled ? ' disabled' : '') + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(label) + '</button>';
+  }
+
+  function renderAxes() {
+    var keys = tabAxes(S.tab);
+    var listEl = $('osAxesList'), noEl = $('osNoAxes');
+    $('osSwitchNote').textContent = S.tab === 'unmapped' ? '이 탭에는 전환 축이 없습니다'
+      : (keys.length ? (STAGE_LABEL[S.tab] || S.tab) + ' 소속 ' + keys.length + '종' : '');
+    if (!keys.length) {
+      listEl.innerHTML = ''; listEl.hidden = true; noEl.hidden = false;
+      if (S.tab === 'mvp1') {
+        $('osNoAxesTi').textContent = 'MVP1에는 전환 축이 없습니다 — 빠진 것이 아니라 정상입니다';
+        $('osNoAxesDs').textContent = '전환 축은 "자체 서비스를 켜는 스위치"입니다. 인계로 판매하는 MVP1에는 켤 것이 원래 없고, 지금 값(결제·환불·정산·배송 = 쇼핑몰)이 그 정상 상태입니다. 5종은 각각 MVP2·MVP3 탭에 있습니다.';
+      } else {
+        $('osNoAxesTi').textContent = '이 탭에는 전환 축이 배정되지 않았습니다';
+        $('osNoAxesDs').textContent = '전환 축 5종은 MVP2(결제·환불·배송·회원)와 MVP3(정산)에 확정 배정돼 있습니다.';
+      }
+      return;
+    }
+    listEl.hidden = false; noEl.hidden = true;
+    listEl.innerHTML = keys.map(function (key) {
+      var ax = axisMerged(key);
+      var v = V[ax.verdict] || V.missing;
+      var dirty = S.saved[key] !== S.draft[key];
+      var openState = (S.drawerOpen && S.drawerKey === key);
+      return '' +
+        '<div class="os-axis' + (openState ? ' on' : '') + '">' +
+          '<span class="os-badge ' + v.cls + '">' + v.mark + ' ' + esc(v.label) + '</span>' +
+          '<button type="button" class="os-axis-open" data-action="open-drawer" data-key="' + key + '" aria-expanded="' + openState + '">' +
+            '<span class="row1"><span class="nm">' + esc(ax.name) + '</span><span class="key num">' + esc(key) + '</span>' +
+              (dirty ? '<span class="dirty">변경됨</span>' : '') + '</span>' +
+            '<span class="summary">' + esc(ax.summary) + '</span>' +
+          '</button>' +
+          '<span class="upd num">' + esc(ax.updated_at || '—') + '</span>' +
+          '<span class="os-axistoggle" data-keep="1">' + optBtn(key, 'own', ax) + optBtn(key, 'mall', ax) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function renderHistory() {
+    var body = $('osHistBody'), empty = $('osHistEmpty');
+    var hist = (S.ops && S.ops.history) || [];
+    if (!hist.length) { body.innerHTML = ''; empty.hidden = false; return; }
+    empty.hidden = true;
+    body.innerHTML = hist.map(function (h) {
+      var what = h.changed ? Object.keys(h.changed).map(function (k) {
+        return k + ': ' + h.changed[k].from + ' → ' + h.changed[k].to;
+      }).join(' · ') : '—';
+      var canUndo = h.action === 'ops_change' && !h.undone;
+      var undoDisabled = !canUndo || !owner();
+      var reasonTitle = h.undone ? '이미 되돌린 변경입니다'
+        : (h.action !== 'ops_change' ? '되돌림 기록은 다시 되돌릴 수 없습니다' : (!owner() ? permText() : ''));
+      return '<tr>' +
+        '<td class="num">' + esc(h.at || '—') + '</td>' +
+        '<td>' + esc(h.operator || '—') + '</td>' +
+        '<td class="what"><span class="txt">' + esc(what) + '</span>' +
+          (h.undone ? '<span class="undone">되돌려짐</span>' : '') + '</td>' +
+        '<td><button type="button" class="os-undobtn" data-action="undo" data-logid="' + h.log_id + '"' +
+          (undoDisabled ? ' disabled title="' + esc(reasonTitle) + '"' : '') + '>되돌리기</button></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function renderPresets() {
+    var el = $('osPresets');
+    var presets = (S.ops && S.ops.presets) || [];
+    if (!presets.length) { el.innerHTML = '<div class="note">프리셋 정보를 불러오지 못했습니다</div>'; return; }
+    el.innerHTML = presets.map(function (p) {
+      var same = Object.keys(p.modes).every(function (k) { return S.draft[k] === p.modes[k]; });
+      var disabled = !owner();
+      return '<button type="button" class="os-preset' + (same ? ' cur' : '') + '" data-action="apply-preset" data-preset="' + esc(p.key) + '"' +
+        (disabled ? ' disabled title="' + esc(permText()) + '"' : '') + '>' +
+        '<span class="body"><span class="nm">' + esc(p.label) + '</span></span>' +
+        '<span class="mark">' + (same ? '● 현재 값' : '값 채우기') + '</span>' +
+      '</button>';
+    }).join('');
+  }
+
+  function renderFoot() {
+    var changed = changedKeys();
+    var note = $('osFootNote'), revertBtn = $('osRevertBtn'), saveBtn = $('osSaveBtn');
+    if (!owner()) {
+      note.textContent = permText() + ' — 값 조회만 가능합니다';
+      note.classList.add('err');
+    } else {
+      note.textContent = changed.length
+        ? changed.length + '개 전환 축이 변경 대기 중입니다 — 저장하면 즉시 발효됩니다(구축 축은 저장 대상이 아닙니다)'
+        : '변경 사항이 없습니다 · 구축 축은 조회 전용입니다';
+      note.classList.remove('err');
+    }
+    revertBtn.disabled = !changed.length;
+    saveBtn.disabled = !owner() || !changed.length;
+    if (!owner()) saveBtn.title = permText(); else saveBtn.removeAttribute('title');
+  }
+
+  function renderDrawer() {
+    var backdrop = $('osDrawerBackdrop'), panel = $('osDrawer');
+    if (!S.drawerOpen || !S.drawerKey) { backdrop.hidden = true; panel.hidden = true; return; }
+    var ax = axisMerged(S.drawerKey);
+    var v = V[ax.verdict] || V.missing;
+    backdrop.hidden = false; panel.hidden = false;
+
+    $('osDrawerName').textContent = ax.name || ax.key;
+    $('osDrawerKey').textContent = ax.key;
+    var badge = $('osDrawerVerdict'); badge.className = 'os-badge ' + v.cls; badge.textContent = v.mark + ' ' + v.label;
+    $('osDrawerStage').textContent = (STAGE_LABEL[ax.stage] || ax.stage) + ' 소속';
+
+    $('osDrawerOpts').innerHTML = ['own', 'mall'].map(function (val) {
+      var on = ax.mode === val;
+      var label = val === 'own' ? ax.own_label : ax.mall_label;
+      var desc = val === 'own' ? ax.own_desc : ax.mall_desc;
+      var lockedSettle = ax.key === 'settle';
+      var disabled = lockedSettle || !owner();
+      var title = lockedSettle ? '정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다' : (!owner() ? permText() : '');
+      return '<button type="button" class="os-optcard' + (on ? ' on' : '') + '" data-action="set-mode" data-key="' + ax.key + '" data-val="' + val + '"' +
+        (disabled ? ' disabled' : '') + (title ? ' title="' + esc(title) + '"' : '') + '>' +
+        '<span class="row1"><span class="mark">' + (on ? '●' : '○') + '</span><span class="lb">' + esc(label) + '</span></span>' +
+        '<span class="ds">' + esc(desc) + '</span></button>';
+    }).join('');
+
+    var vbox = $('osDrawerVerdictBox'); vbox.className = 'os-verdictbox ' + v.cls;
+    $('osDrawerVerdictTitle').textContent = ax.verdict_title || '';
+    $('osDrawerVerdictDesc').textContent = ax.verdict_desc || '';
+    $('osDrawerVerdictSrc').textContent = ax.verdict_src || '';
+
+    var needBox = $('osDrawerNeedBox');
+    if (ax.need) { needBox.hidden = false; $('osDrawerNeed').textContent = ax.need; }
+    else { needBox.hidden = true; }
+
+    var effects = ((S.ops && S.ops.effects) || []).filter(function (e) {
+      return (ax.effect_match || []).indexOf(e.where) >= 0;
+    });
+    var effEl = $('osDrawerEffects');
+    effEl.innerHTML = effects.length ? effects.map(function (e) {
+      return '<div class="row"><span class="where">' + esc(e.where) + '</span><span class="eff">' + esc(e.effect) + '</span></div>';
+    }).join('') : '<div class="empty">서버 응답에서 이 축과 연결된 예상 영향을 찾지 못했습니다</div>';
+
+    var coerceBox = $('osDrawerCoerce');
+    if (ax.key === 'settle') {
+      coerceBox.hidden = false;
+      coerceBox.textContent = '서버가 settle을 pay와 같은 값으로 강제 보정합니다 — 이 화면에서 따로 고를 수 없습니다.';
+    } else if (ax.key === 'refund') {
+      coerceBox.hidden = false;
+      coerceBox.textContent = 'refund=own은 pay=own일 때만 유지됩니다. pay가 mall이면 서버가 refund를 mall로 되돌립니다.';
+    } else {
+      coerceBox.hidden = true;
+    }
+  }
+
+  function renderConfirm() {
+    var overlay = $('osConfirmOverlay'), panel = $('osConfirm');
+    if (!S.confirm) { overlay.hidden = true; panel.hidden = true; return; }
+    overlay.hidden = false; panel.hidden = false;
+
+    var applied = enforce(S.draft);
+    var changed = changedKeys();
+    var appliedKeys = Object.keys(S.saved).filter(function (k) { return S.saved[k] !== applied.modes[k]; });
+
+    $('osApplyRows').innerHTML = appliedKeys.map(function (k) {
+      var ax = AXIS_META[k] || {};
+      var v = V[ax.verdict] || V.missing;
+      var coerced = S.draft[k] !== applied.modes[k] || changed.indexOf(k) < 0;
+      return '<div class="os-applyrow' + (coerced ? ' warn' : '') + '">' +
+        '<span class="nm">' + esc(ax.name || k) + '</span>' +
+        '<span class="chg num">' + k + ': ' + esc(S.saved[k]) + ' → ' + esc(applied.modes[k]) + '</span>' +
+        (ax.verdict ? '<span class="os-badge ' + v.cls + '">' + v.mark + ' ' + v.label + '</span>' : '') +
+        '<span class="tag">' + (coerced ? '서버 보정' : '요청대로') + '</span>' +
+      '</div>';
+    }).join('');
+
+    var coerceEl = $('osCoerceNote');
+    if (applied.notes.length) { coerceEl.hidden = false; coerceEl.textContent = applied.notes.join(' · '); }
+    else coerceEl.hidden = true;
+
+    var deadNames = appliedKeys.filter(function (k) { var ax = AXIS_META[k]; return ax && ax.verdict === 'missing'; })
+      .map(function (k) { return AXIS_META[k].name; });
+    var noopEl = $('osNoopNote');
+    if (deadNames.length) {
+      noopEl.hidden = false;
+      noopEl.textContent = deadNames.join('·') + ' 축은 미구현입니다 — 값과 이력은 남지만 서버 처리는 달라지지 않습니다.';
+    } else noopEl.hidden = true;
+
+    var needPhrase = applied.modes.pay === 'own' && S.saved.pay !== 'own';
+    var dangerBox = $('osDangerBox');
+    dangerBox.hidden = !needPhrase;
+    var input = $('osPhrase');
+    if (needPhrase) {
+      $('osPhraseTarget').textContent = PHRASE;
+      input.placeholder = PHRASE;
+      if (input.value !== S.phrase) input.value = S.phrase;
+      input.classList.toggle('ok', S.phrase === PHRASE);
+    }
+
+    $('osConfirmNote').textContent = needPhrase
+      ? (S.phrase === PHRASE ? '확인 문구가 일치합니다' : '위 문구를 그대로 입력해야 저장할 수 있습니다')
+      : '저장 즉시 고객 서버에 반영됩니다';
+
+    var commitBtn = $('osCommitBtn');
+    commitBtn.textContent = needPhrase ? '위험을 확인했습니다 — 저장' : '저장 — 즉시 적용';
+    commitBtn.disabled = needPhrase && S.phrase !== PHRASE;
+  }
+
+  function renderAll() {
+    renderTabs();
+    renderStageNote();
+    showTabPanels();
+    renderAxes();
+    renderHistory();
+    renderPresets();
+    renderFoot();
+    renderDrawer();
+    renderConfirm();
+  }
+
+  // ── 액션 ─────────────────────────────────────────────────────────
+  function setTab(tab) {
+    S.tab = tab; S.drawerOpen = false; S.drawerKey = null;
+    renderAll();
+  }
+  function openDrawer(key) {
+    if (S.drawerOpen && S.drawerKey === key) { closeDrawer(); return; }
+    S.drawerKey = key; S.drawerOpen = true;
+    renderAxes(); renderDrawer();
+  }
+  function closeDrawer() {
+    S.drawerOpen = false; S.drawerKey = null;
+    renderAxes(); renderDrawer();
+  }
+  function setMode(key, val) {
+    if (!guard()) return;
+    if (key === 'settle') { toast('정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다', 'warn'); return; }
+    S.draft[key] = val;
+    renderAxes(); renderDrawer(); renderFoot();
+  }
+  function applyPreset(presetKey) {
+    if (!guard()) return;
+    var preset = ((S.ops && S.ops.presets) || []).filter(function (p) { return p.key === presetKey; })[0];
+    if (!preset) return;
+    S.draft = Object.assign({}, preset.modes);
+    toast(preset.label + ' 값을 채웠습니다 — 저장해야 적용됩니다(구축 축은 바뀌지 않습니다)', 'ok');
+    renderAxes(); renderDrawer(); renderFoot(); renderPresets();
+  }
+  function doRevert() {
+    if (!changedKeys().length) { toast('되돌릴 변경이 없습니다', 'warn'); return; }
+    S.draft = Object.assign({}, S.saved);
+    toast('저장 전 상태로 되돌렸습니다', 'ok');
+    renderAxes(); renderDrawer(); renderFoot(); renderPresets();
+  }
+  function openConfirm() {
+    if (!guard()) return;
+    if (!changedKeys().length) { toast('변경할 항목이 없습니다 — 빈 변경은 이력에 남기지 않습니다', 'err'); return; }
+    S.confirm = true; S.phrase = ''; S.drawerOpen = false;
+    renderAxes(); renderDrawer(); renderConfirm();
+  }
+  function closeConfirm() {
+    S.confirm = false; S.phrase = '';
+    renderConfirm();
+  }
+  function doUndo(logId) {
+    if (!guard()) return;
+    apiPost('/api/admin/ops-settings/undo/' + logId, {}).then(function () {
+      toast('되돌렸습니다 — 즉시 적용되었고 배포된 고객 서버에도 반영됩니다', 'ok');
+      boot();
+    }).catch(function (err) { toast(err.message || '되돌리기에 실패했습니다', 'err'); });
+  }
+  function doCommit() {
+    if (!guard()) return;
+    var applied = enforce(S.draft);
+    var needPhrase = applied.modes.pay === 'own' && S.saved.pay !== 'own';
+    if (needPhrase && S.phrase !== PHRASE) {
+      toast('확인 문구가 일치하지 않습니다 — 저장하지 않았습니다', 'err');
+      return;
+    }
+    var body = {};
+    changedKeys().forEach(function (k) { body[k] = S.draft[k]; });
+    apiPost('/api/admin/ops-settings', { modes: body }).then(function (resp) {
+      var noteText = (resp.notes && resp.notes.length) ? ' 서버 보정: ' + resp.notes.join(' · ') : '';
+      toast('저장했습니다 — 즉시 적용되었고 배포된 고객 서버에도 반영됩니다.' + noteText,
+        resp.modes && resp.modes.pay === 'own' ? 'warn' : 'ok');
+      boot();
+    }).catch(function (err) { toast(err.message || '저장에 실패했습니다', 'err'); });
+  }
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    var el;
+    if ((el = t.closest('[data-action="close-drawer"]'))) { closeDrawer(); return; }
+    if ((el = t.closest('[data-action="set-mode"]'))) { setMode(el.getAttribute('data-key'), el.getAttribute('data-val')); return; }
+    if ((el = t.closest('[data-action="set-tab"]'))) { setTab(el.getAttribute('data-tab')); return; }
+    if ((el = t.closest('[data-action="open-drawer"]'))) { openDrawer(el.getAttribute('data-key')); return; }
+    if ((el = t.closest('[data-action="apply-preset"]'))) { applyPreset(el.getAttribute('data-preset')); return; }
+    if ((el = t.closest('[data-action="undo"]'))) { doUndo(Number(el.getAttribute('data-logid'))); return; }
+    if ((el = t.closest('[data-action="retry-boot"]'))) { boot(); return; }
+    if ((el = t.closest('[data-action="revert"]'))) { doRevert(); return; }
+    if ((el = t.closest('[data-action="open-confirm"]'))) { openConfirm(); return; }
+    if ((el = t.closest('[data-action="cancel-confirm"]'))) { closeConfirm(); return; }
+    if ((el = t.closest('[data-action="commit"]'))) { doCommit(); return; }
+    if (t.closest('#osConfirmOverlay')) { closeConfirm(); return; }
+    if (S.drawerOpen && !window.Admin2Shell.isKeepClick(t) && !t.closest('.os-drawer')) { closeDrawer(); }
+  });
+
+  document.addEventListener('input', function (ev) {
+    if (ev.target && ev.target.id === 'osPhrase') {
+      S.phrase = ev.target.value;
+      renderConfirm();
+    }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
