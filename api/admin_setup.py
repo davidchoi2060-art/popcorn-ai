@@ -24,7 +24,7 @@ from sqlalchemy import text
 
 from .db import engine
 from .recommend import SLOTS, SLOT_TYPES
-from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천(슬라이스 A)
+from .taxonomy import SLOT_LABELS as SLOT_KO, PART_LABELS   # 단일 원천(슬라이스 A)
 
 router = APIRouter(prefix="/api/admin")
 
@@ -80,6 +80,10 @@ def _steps(conn) -> list:
     filled = [s for s in SLOTS if slots[s] > 0]
     empty = [s for s in SLOTS if slots[s] == 0]
 
+    # ETC 라벨은 taxonomy.PART_LABELS가 정본이다 — 여기 문자열로 박으면 라벨이
+    # 바뀔 때 이 화면만 따로 남는다.
+    etc_label = PART_LABELS["ETC"]
+
     return [
         {"no": 1, "key": "operators", "title": "운영자 계정",
          "screen": "operators.html", "screen_label": "시스템 > 운영자 · 권한",
@@ -102,8 +106,8 @@ def _steps(conn) -> list:
         {"no": 4, "key": "products", "title": "상품 등록",
          "screen": "products.html", "screen_label": "상품 > 상품 관리",
          "done": core >= 1, "value": f"부품 {core:,}건",
-         "why": "분류가 '미분류'면 그 상품은 영원히 추천에 들어가지 않습니다 —"
-                " 추천 대상은 부품(core_part)뿐입니다"},
+         "why": f"부품 종류를 정하지 못한 상품({etc_label})은 영원히 추천 후보에"
+                " 들어가지 않습니다 — 추천 대상은 부품(core_part)뿐입니다"},
 
         {"no": 5, "key": "specs", "title": "사양 검수",
          "screen": "review-queue.html", "screen_label": "상품 > 상품 검수",

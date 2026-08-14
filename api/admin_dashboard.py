@@ -16,7 +16,7 @@ from sqlalchemy import text
 from .timeutil import iso
 from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
 from .db import engine
-from .taxonomy import CORE_TYPES
+from .taxonomy import CORE_TYPES, PART_LABELS
 
 router = APIRouter(prefix="/api/admin")
 
@@ -238,6 +238,9 @@ def worklist():
             "SELECT COUNT(*) FROM v_recommendation_candidates"
             " WHERE stock_qty > 0")).scalar_one()
 
+    # ETC 라벨은 taxonomy.PART_LABELS가 정본이다 — 여기 문자열로 박으면 라벨이
+    # 바뀔 때 이 화면만 따로 남는다.
+    etc_label = PART_LABELS["ETC"]
     items = [
         {"key": "review", "label": "상품 검수", "count": p["review"],
          "focus": review_focus, "focus_label": "판매중·재고 있는 것",
@@ -264,7 +267,8 @@ def worklist():
         # 미분류는 적재가 부품 종류를 못 정해 `미분류`에 들어간 것. 둘을 합치면
         # "0건"으로 보이는데 실제로는 5천 건이 쌓여 있을 수 있다(슬라이스 C 실제 상황).
         {"key": "category", "label": "카테고리 매핑", "count": p["unmapped"] + p["unclassified"],
-         "focus": p["unclassified"], "focus_label": "미분류(부품 종류 미정)",
-         "href": "category-mapping.html", "hint": "판매 분류가 없거나 미분류인 상품"},
+         "focus": p["unclassified"], "focus_label": etc_label,
+         "href": "category-mapping.html",
+         "hint": f"판매 분류가 없거나 부품 종류가 {etc_label}인 상품"},
     ]
     return {"items": items, "total": sum(i["count"] for i in items), "pool": pool}

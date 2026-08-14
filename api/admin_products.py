@@ -405,7 +405,9 @@ def get_product(product_code: int):
     gate = [
         {"key": "category", "label": "부품 분류",
          "ok": r["category_group"] == "core_part" and r["part_type"] in PART_TYPE_LABELS,
-         "value": PART_TYPE_LABELS.get(r["part_type"], r["part_type"] or "미분류"),
+         # 폴백은 "ETC(분류됨)"와 다른 사실이다 — part_type 자체가 없다는 뜻이라
+         # PART_TYPE_LABELS(정본) 값과 같은 글자를 쓰지 않는다(화면 정직성 규약).
+         "value": PART_TYPE_LABELS.get(r["part_type"], r["part_type"] or "미지정"),
          "fix": "상세에서 분류를 고칩니다 — 바꾸기 전에 영향을 먼저 보여줍니다",
          "fix_screen": None},
         {"key": "spec_row", "label": "사양 정보",
