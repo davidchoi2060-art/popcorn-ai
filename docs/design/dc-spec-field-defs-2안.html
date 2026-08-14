@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+input,select{font-family:'IBM Plex Sans KR',sans-serif}
+</style>
+</helmet>
+
+<section style="padding:34px 40px 60px;display:flex;flex-direction:column;gap:22px">
+  <div style="max-width:1240px">
+    <div style="font:600 20px/1.3 'IBM Plex Sans KR',sans-serif">상품 사양 정의 (ADM-PRD-050) 신설 — 2안</div>
+    <div style="font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px">공통 확정: 항목 추가 시 <b>추천 뷰 둘 다 재생성 요구</b>(v_recommendation_candidates + v_companion_candidates — 지금은 하나만 해서 주변기기 엔진 필드가 생기면 조용히 값을 못 읽음) · <b>unrecorded는 상시 경고 배너 + 해당 항목에 위험 표시</b>("재구축 시 사라짐" + 조치 지시문) · 무효화는 <b>감추기만</b>(part_types 비움, 컬럼 삭제 없음) · 추가는 owner 전용, 열람은 등급 무관 · <b>이 화면은 std.spec_defs(조립 사양 표준)와 다른 저장소</b> — 엔진이 실제로 읽는 살아있는 스키마입니다. 두 안의 차이는 <b>부품 축 vs 항목 축</b>. 수치는 2026-08-13 실측(31항목·커스텀 1·ghosts 0·unrecorded 0).</div>
+  </div>
+  <div style="display:flex;gap:44px;align-items:flex-start">
+
+    <!-- 1a -->
+    <div id="1a" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1a</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">항목 축 — 전체 표 + 건강 상태</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">31항목을 한 표로, ghosts·unrecorded를 상단에 · 추가는 owner 전용 모달</span>
+      </div>
+      <div data-screen-label="1a 항목 축" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="20">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품사양관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 사양 정의</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-PRD-050</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">spec_field_defs · product_specs</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:4px;padding:4px 7px">owner</span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">열람 등급 무관 · 추가 owner 전용(스키마 변경)</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;margin:12px 18px 0;border:1px solid oklch(0.5 0.11 165 / .45);border-left:3px solid oklch(0.5 0.11 165);background:oklch(0.97 0.02 165);border-radius:8px;padding:10px 13px;display:flex;align-items:center;gap:14px">
+            <span style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.36 0.09 165);white-space:nowrap">✓ 건강 상태 정상</span>
+            <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">메타는 있는데 실제 컬럼이 없는 항목(ghosts) <b>0건</b> · 코드 이력이 없는 커스텀 항목(unrecorded) <b>0건</b>. 둘 중 하나라도 생기면 이 자리가 붉은 경고로 바뀌고 해당 항목에 위험 표시가 붙습니다 — 재구축·복구 시 그 컬럼이 사라지기 때문입니다.</span>
+            <span style="font:400 10px/1.4 'IBM Plex Mono',monospace;color:#8a8377">방금 계산 15:07</span>
+          </div>
+
+          <div style="flex:none;padding:12px 18px 0;display:flex;gap:10px">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <div style="{{ k.style }}">
+                <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">{{ k.label }}</div>
+                <div style="display:flex;align-items:baseline;gap:6px"><span style="{{ k.valStyle }}">{{ k.value }}</span><span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ k.note }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="flex:none;display:flex;align-items:center;gap:9px;padding:12px 18px 0">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+              <span style="{{ f.style }}">{{ f.label }} <span style="font-family:'IBM Plex Mono',monospace;opacity:.7">{{ f.count }}</span></span>
+            </sc-for>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">삭제 기능은 없습니다 — 적용 부품을 비우면 판정·화면에서 빠지고 값은 남습니다</span>
+            <button style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:10px 14px;cursor:pointer">+ 사양 항목 만들기</button>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;margin:10px 18px 0">
+            <div style="flex:none;display:grid;grid-template-columns:146px 1fr 78px 52px 128px 96px 74px 104px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>키</span><span>표시 이름 · 이 값을 읽는 곳</span><span>자료형</span><span>단위</span><span>적용 부품</span><span>필수 부품</span><span>엔진</span><span>채움</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto;margin-bottom:12px">
+              <sc-for list="{{ fields }}" as="f" hint-placeholder-count="14">
+                <div style="{{ f.style }}">
+                  <span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font:500 10.5px/1.3 'IBM Plex Mono',monospace;overflow:hidden;text-overflow:ellipsis">{{ f.key }}</span><span style="{{ f.customStyle }}">커스텀</span></span>
+                  <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                    <span style="font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.label }}</span>
+                    <span style="{{ f.usedStyle }}">{{ f.used }}</span>
+                  </span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ f.type }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#a09889">{{ f.unit }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.parts }}</span>
+                  <span style="{{ f.reqStyle }}">{{ f.req }}</span>
+                  <span style="{{ f.engineStyle }}">{{ f.engine }}</span>
+                  <span style="display:flex;align-items:center;gap:7px">
+                    <span style="flex:1;height:5px;background:rgba(0,0,0,.08);border-radius:3px"><span style="{{ f.barStyle }}"></span></span>
+                    <span style="{{ f.pctStyle }}">{{ f.pct }}</span>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:7px 18px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">채움률 분모는 판매중·재고&gt;0 상품입니다(전체 카탈로그를 분모로 하면 품절 때문에 영원히 낮게 보입니다) · 이 화면은 값을 넣지 않습니다 — 값 입력은 상품 상세, 검수는 상품 사양 검수 소관 · 「조립 사양 표준」(std.spec_defs)은 다른 저장소이고 엔진이 아직 읽지 않습니다</div>
+
+          <div style="position:absolute;inset:0;background:rgba(38,35,30,.3);display:flex;align-items:center;justify-content:center">
+            <div style="width:660px;background:#fffdf9;border-radius:11px;box-shadow:0 24px 60px rgba(38,35,30,.34);overflow:hidden;display:flex;flex-direction:column">
+              <div style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px">
+                <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;flex:1">사양 항목 만들기 — 스키마가 실제로 바뀝니다</span>
+                <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:3px;padding:4px 6px">owner 전용</span>
+                <span style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer">✕</span>
+              </div>
+              <div style="padding:15px 18px;display:flex;flex-direction:column;gap:11px">
+                <div style="display:grid;grid-template-columns:96px 1fr;gap:9px 12px;align-items:center">
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">키</span>
+                  <input value="panel_type" style="font:400 11.5px/1 'IBM Plex Mono',monospace;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:9px 10px;background:#fffdf9">
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">표시 이름</span>
+                  <input value="패널 방식" style="font:400 11.5px/1 'IBM Plex Sans KR',sans-serif;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:9px 10px;background:#fffdf9">
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">자료형 · 단위</span>
+                  <span style="display:flex;gap:8px"><select style="flex:1;font:400 11.5px/1.3 'IBM Plex Sans KR',sans-serif;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:8px 9px;background:#fffdf9"><option>짧은 글자(VARCHAR)</option></select><input placeholder="단위 없음" style="width:110px;font:400 11.5px/1 'IBM Plex Mono',monospace;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:9px 10px;background:#fffdf9"></span>
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">적용 부품</span>
+                  <span style="display:flex;flex-wrap:wrap;gap:5px"><span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;border-radius:4px;padding:6px 9px">모니터 ✓</span><span style="font:400 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:6px 9px;cursor:pointer">+ 부품 고르기</span></span>
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">필수로 만들 부품</span>
+                  <span style="display:flex;flex-wrap:wrap;gap:5px;align-items:center"><span style="font:400 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;border:1px dashed rgba(0,0,0,.22);border-radius:4px;padding:6px 9px">없음</span><span style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#a09889">적용 대상에 있는 부품만 고를 수 있습니다 — 어기면 400(그 부품이 영원히 검수 대기가 됩니다)</span></span>
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">엔진이 읽음</span>
+                  <span style="display:flex;align-items:center;gap:9px"><span style="display:flex;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden;width:170px"><span style="flex:1;text-align:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;padding:9px 0">예</span><span style="flex:1;text-align:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;padding:9px 0;cursor:pointer">아니오</span></span><span style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#a09889">추천 뷰 <b>두 개</b>가 함께 다시 만들어집니다</span></span>
+                  <span style="font:500 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">적재가 채움</span>
+                  <span style="display:flex;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden;width:170px"><span style="flex:1;text-align:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;padding:9px 0;cursor:pointer">예</span><span style="flex:1;text-align:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;padding:9px 0">아니오</span></span>
+                </div>
+                <div style="border:1px solid oklch(0.72 0.12 62 / .5);border-left:3px solid oklch(0.62 0.15 55);background:oklch(0.96 0.035 70);border-radius:7px;padding:11px 13px">
+                  <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.13 55);margin-bottom:5px">만들면 넷이 함께 일어납니다 — 하나라도 빠지면 값은 있는데 엔진이 못 읽습니다</div>
+                  <div style="font:400 10.5px/1.8 'IBM Plex Sans KR',sans-serif;color:#4a463e">① product_specs 컬럼 추가 &nbsp;② 메타 행 기록 &nbsp;③ 추천 뷰 <b>둘 다</b> 재생성(v_recommendation_candidates · v_companion_candidates) &nbsp;④ 마이그레이션 파일 기록 + 버전 스탬프</div>
+                  <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:5px">④가 실패해도 ①~③의 성공을 취소하지 않습니다 — 대신 「코드 이력 없음」으로 계속 표시하고, 개발 PC에서 마이그레이션을 추가하라고 지시합니다. 이 항목은 <b>모니터(주변기기) + 엔진 사용</b>이라 컴패니언 뷰 재생성이 반드시 필요합니다.</div>
+                </div>
+              </div>
+              <div style="border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;gap:8px;justify-content:flex-end;background:#f4f0e7">
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 14px;cursor:pointer">취소</button>
+                <button style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:9px 15px;cursor:pointer">만들기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1b -->
+    <div id="1b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">부품 축 — 부품별 필수 사양과 진척</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">부품 10종을 좌측에, 고른 부품의 필수·선택 사양과 그 값을 읽는 규칙을 우측에 · unrecorded 발생 상태 시연</span>
+      </div>
+      <div data-screen-label="1b 부품 축" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="20">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품사양관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 사양 정의</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-PRD-050</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:4px;padding:4px 7px">owner</span>
+            <button style="font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:9px 12px;cursor:pointer">+ 사양 항목 만들기</button>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;margin:12px 18px 0;border:1px solid oklch(0.52 0.16 30 / .5);border-left:3px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:8px;padding:11px 14px">
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30);white-space:nowrap">▲ 코드 이력 없음 1건 — 서버를 다시 세우면 이 항목이 사라집니다</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10px/1.4 'IBM Plex Mono',monospace;color:#8a8377">unrecorded=[panel_type]</span>
+            </div>
+            <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-top:5px"><b>panel_type «패널 방식»</b> — 컬럼·메타·추천 뷰는 이미 반영됐지만 마이그레이션 파일 기록(④)이 실패했습니다(배포 서버는 리포 폴더에 파일을 쓸 수 없습니다). <b>조치:</b> 개발 PC에서 <span style="font-family:'IBM Plex Mono',monospace">db/migrations/versions/</span>에 이 컬럼 추가 마이그레이션을 만들고 버전을 스탬프해야 합니다. 그때까지 이 배너와 항목의 위험 표시는 사라지지 않습니다.</div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 0">
+            <div style="width:300px;flex:none;display:flex;flex-direction:column;min-height:0">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">조립 부품 10종 — 필수 사양 충족</div>
+              <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px">
+                <sc-for list="{{ partRows }}" as="p" hint-placeholder-count="10">
+                  <div style="{{ p.style }}">
+                    <div style="display:flex;align-items:baseline;gap:8px">
+                      <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0">{{ p.name }}</span>
+                      <span style="font:600 12px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:{{ p.pctColor }}">{{ p.pct }}</span>
+                    </div>
+                    <div style="height:5px;background:rgba(0,0,0,.08);border-radius:3px;margin:6px 0 5px"><span style="{{ p.barStyle }}"></span></div>
+                    <div style="font:400 10px/1.5 'IBM Plex Mono',monospace;color:#8a8377">{{ p.meta }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;gap:10px">
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 15px;display:flex;align-items:center;gap:14px">
+                <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">케이스 — 필수 3 · 선택 2</span>
+                <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1">판매중·재고&gt;0 케이스 <b style="font-family:'IBM Plex Mono',monospace">866</b>종을 분모로 계산합니다. 카탈로그 전체는 2,104종이지만 대부분 품절이라 분모에 넣지 않습니다.</span>
+                <span style="font:600 24px/1 'IBM Plex Mono',monospace">72%</span>
+              </div>
+              <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:auto;padding:12px 15px;display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ caseSpecs }}" as="s" hint-placeholder-count="5">
+                  <div style="{{ s.style }}">
+                    <div style="display:flex;align-items:baseline;gap:9px">
+                      <span style="{{ s.reqStyle }}">{{ s.req }}</span>
+                      <span style="font:600 12px/1.35 'IBM Plex Sans KR',sans-serif">{{ s.label }}</span>
+                      <span style="font:400 10px/1.4 'IBM Plex Mono',monospace;color:#a09889">{{ s.key }} · {{ s.type }}</span>
+                      <span style="flex:1"></span>
+                      <span style="{{ s.engineStyle }}">{{ s.engine }}</span>
+                      <span style="{{ s.pctStyle }}">{{ s.pct }}</span>
+                    </div>
+                    <div style="height:5px;background:rgba(0,0,0,.08);border-radius:3px;margin:7px 0 6px"><span style="{{ s.barStyle }}"></span></div>
+                    <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ s.used }}</div>
+                    <sc-if value="{{ s.risk }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:6px;border:1px solid oklch(0.52 0.16 30 / .4);background:oklch(0.97 0.02 30);border-radius:6px;padding:8px 10px;font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:oklch(0.4 0.13 30)">▲ 코드 이력 없음 — 재구축·복구 시 이 컬럼이 사라집니다. 개발 PC에서 마이그레이션을 추가하세요.</div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:7px 18px;margin-top:12px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">항목 삭제·이름 변경은 없습니다 — 안 쓰려면 적용 부품을 비웁니다(값은 남고 판정·화면에서만 빠집니다) · 응답의 undo_id는 감사 참조번호일 뿐 되돌리기 버튼이 아닙니다(소비하는 API가 없습니다) · 사양 값 입력·검수는 다른 화면 소관</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:3100,&quot;height&quot;:1180}}">
+class Component extends DCLogic {
+  renderVals() {
+    const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)', BLUE='oklch(0.5 0.12 250)';
+    const NAVL=[['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['삭제 상품 조회','삭'],['조립 호환 지도','지'],['조립 사양 표준','표'],['상품 사양 정의','정'],['상품 사양 검수','검'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+    const nav = NAVL.map(([label,icon]) => {
+      const on = label==='상품 사양 정의';
+      return { label, icon,
+        style:"display:flex;align-items:center;gap:10px;padding:3px 16px;font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif;color:"+(on?'#f4f1ea':'#a29b8d')+';background:'+(on?'rgba(255,255,255,.09)':'transparent')+';border-left:2px solid '+(on?GREEN:'transparent')+';cursor:pointer',
+        iconStyle:"flex:none;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:"+(on?'#211f1b':'#cfc9bd')+';background:'+(on?GREEN:'rgba(255,255,255,.07)') };
+    });
+    const kpis=[
+      ['전체 항목','31','자료형 5종','#26231e'],
+      ['엔진이 읽는 항목','22','전부 8슬롯 부품 필드',BLUE],
+      ['필수 판정에 쓰이는 항목','17','required_for 비어있지 않음','#26231e'],
+      ['사람이 만든 항목','1','cpu_gpu · 2026-07-28',GREEN]
+    ].map(([label,value,note,col]) => ({ label, value, note,
+      valStyle:"font:600 24px/1.15 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:"+col,
+      style:"flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid "+col+";border-radius:8px;padding:10px 13px" }));
+    const filters=[['전체','31',true],['엔진 사용','22',false],['필수 있음','17',false],['커스텀','1',false],['적용 부품 없음','0',false]]
+      .map(([label,count,on]) => ({ label, count,
+        style:"font:"+(on?'600':'500')+" 11px/1 'IBM Plex Sans KR',sans-serif;color:"+(on?'#f4f1ea':'#5b564d')+";background:"+(on?'#26231e':'#fffdf9')+";border:1px solid "+(on?'#26231e':'rgba(0,0,0,.16)')+";border-radius:5px;padding:8px 11px;cursor:pointer" }));
+    const F=[
+      ['socket','소켓','VARCHAR','—','CPU·MB','CPU·MB',true,93,'호환 규칙 socket · cooler_socket이 읽습니다',false],
+      ['mem_type','메모리 규격','VARCHAR','—','MB·RAM','MB·RAM',true,95,'호환 규칙 mem이 읽습니다',false],
+      ['tdp_watt','설계 전력','INTEGER','W','CPU','CPU',true,76,'호환 규칙 cooler_tdp가 읽습니다',false],
+      ['rated_watt','정격 출력','INTEGER','W','POWER','POWER',true,98,'호환 규칙 power가 읽습니다',false],
+      ['required_power_watt','권장 전원 용량','INTEGER','W','GPU','GPU',true,91,'호환 규칙 power가 읽습니다',false],
+      ['length_mm','길이','INTEGER','mm','GPU','GPU',true,96,'호환 규칙 gpu_len이 읽습니다',false],
+      ['gpu_max_mm','GPU 최대 길이','INTEGER','mm','CASE','CASE',true,95,'호환 규칙 gpu_len이 읽습니다',false],
+      ['form_factor','폼팩터','VARCHAR','—','MB·SSD·HDD·POWER','MB·SSD·HDD·POWER',true,93,'호환 규칙 case_board가 읽습니다',false],
+      ['form_factor_list','수용 보드 규격','JSONB','—','CASE','CASE',true,97,'호환 규칙 case_board가 읽습니다',false],
+      ['cooler_height_mm','쿨러 높이','INTEGER','mm','CASE·COOLER_CPU_AIR','CASE·AIR',true,94,'호환 규칙 cooler_height(공랭 한정)가 읽습니다',false],
+      ['capacity_gb','용량','INTEGER','GB','RAM·SSD·HDD','RAM·SSD·HDD',true,97,'호환 규칙에는 안 쓰이지만 용도 하한(게임용 SSD 500GB)이 읽습니다',false],
+      ['cpu_gpu','내장그래픽','BOOLEAN','—','CPU','—',false,91,'표시용 — 규칙·하한 어디에도 안 쓰입니다',true],
+      ['panel_type','패널 방식','VARCHAR','—','MONITOR','—',true,0,'주변기기 엔진 필드 — 컴패니언 뷰 재생성이 필요합니다',true],
+      ['refresh_hz','주사율','INTEGER','Hz','MONITOR','—',false,12,'표시용 프리셋 — 엔진이 읽지 않습니다',false]
+    ];
+    const fields = F.map(([key,label,type,unit,parts,req,engine,pct,used,custom]) => ({
+      key, label, type, unit, parts, pct: pct+'%',
+      req: req==='—'?'없음':req,
+      reqStyle:"font:"+(req==='—'?'400':'500')+" 10px/1.3 'IBM Plex Sans KR',sans-serif;color:"+(req==='—'?'#b3ac9e':'#4a463e')+";overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
+      engine: engine?'✓ 엔진':'표시용',
+      engineStyle:"font:600 9px/1 'IBM Plex Sans KR',sans-serif;text-align:center;border-radius:4px;padding:4px 0;"+(engine?"color:"+BLUE+";background:oklch(0.96 0.02 250);border:1px solid "+BLUE+"3a":"color:#8a8377;background:#f2eee5;border:1px solid rgba(0,0,0,.1)"),
+      used,
+      usedStyle:"font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
+      customStyle: custom ? "font:600 8.5px/1 'IBM Plex Sans KR',sans-serif;color:"+GREEN+";background:oklch(0.95 0.03 165);border:1px solid "+GREEN+"3a;border-radius:3px;padding:3px 4px;white-space:nowrap" : 'display:none',
+      barStyle:"display:block;height:100%;border-radius:3px;width:"+Math.max(pct,1)+"%;background:"+(pct===0?RED:pct<50?AMBER:pct<90?'#7d766e':GREEN),
+      pctStyle:"width:34px;text-align:right;font:600 10.5px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:"+(pct===0?RED:pct<50?'oklch(0.45 0.13 55)':'#26231e'),
+      style:"display:grid;grid-template-columns:146px 1fr 78px 52px 128px 96px 74px 104px;gap:10px;align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:"+(pct===0?'oklch(0.985 0.008 30)':'transparent')
+    }));
+    const PR=[
+      ['CPU','socket·tdp_watt',289,85],['메인보드','socket·chipset·mem_type·form_factor',541,89],
+      ['메모리','mem_type·capacity_gb·clock_mhz',448,92],['그래픽카드','required_power_watt·length_mm·pcie_gen',383,94],
+      ['SSD','capacity_gb·form_factor·interface',290,96],['하드디스크','capacity_gb·form_factor·interface',69,79],
+      ['파워','rated_watt·form_factor',525,97],['케이스','gpu_max_mm·cooler_height_mm·form_factor_list',866,72],
+      ['공랭 쿨러','socket_list·cooler_height_mm·cooler_tdp',276,82],['수랭 쿨러','socket_list·cooler_tdp',222,60]
+    ];
+    const partRows = PR.map(([name,req,stock,pct]) => {
+      const on = name==='케이스';
+      const col = pct<70?AMBER:pct<90?'#7d766e':GREEN;
+      return { name, pct: pct+'%', pctColor: col,
+        meta: '판매중·재고>0 '+stock.toLocaleString('ko-KR')+'종 · 필수 '+req,
+        barStyle:"display:block;height:100%;border-radius:3px;width:"+pct+"%;background:"+col,
+        style:"background:#fffdf9;border:"+(on?'2px':'1px')+" solid "+(on?'#26231e':'rgba(0,0,0,.11)')+";border-radius:7px;padding:10px 12px;cursor:pointer" };
+    });
+    const CS=[
+      ['form_factor_list','수용 보드 규격','JSONB',true,true,97,'호환 규칙 case_board가 MB.form_factor와 대조합니다',false],
+      ['gpu_max_mm','GPU 최대 길이','INTEGER',true,true,95,'호환 규칙 gpu_len이 GPU.length_mm와 대조합니다',false],
+      ['cooler_height_mm','쿨러 높이','INTEGER',true,true,94,'호환 규칙 cooler_height(공랭 한정)가 읽습니다 — 수랭에는 걸리지 않습니다',false],
+      ['radiator_max_rows','라디에이터 최대 열 수','INTEGER',false,true,69,'호환 규칙 radiator(수랭 한정)가 읽습니다',false],
+      ['panel_type','패널 방식','VARCHAR',false,true,0,'주변기기 엔진 필드 — 컴패니언 뷰 재생성 대상입니다',true]
+    ];
+    const caseSpecs = CS.map(([key,label,type,required,engine,pct,used,risk]) => ({
+      key, label, type, used, risk, pct: pct+'%',
+      req: required?'필수':'선택',
+      reqStyle:"font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;border-radius:4px;padding:4px 7px;"+(required?"color:oklch(0.42 0.13 30);background:oklch(0.96 0.02 30);border:1px solid "+RED+"33":"color:#8a8377;background:#f2eee5;border:1px solid rgba(0,0,0,.1)"),
+      engine: engine?'✓ 엔진':'표시용',
+      engineStyle:"font:600 9px/1 'IBM Plex Sans KR',sans-serif;border-radius:4px;padding:4px 6px;"+(engine?"color:"+BLUE+";background:oklch(0.96 0.02 250);border:1px solid "+BLUE+"3a":"color:#8a8377;background:#f2eee5;border:1px solid rgba(0,0,0,.1)"),
+      barStyle:"display:block;height:100%;border-radius:3px;width:"+Math.max(pct,1)+"%;background:"+(pct===0?RED:pct<80?AMBER:GREEN),
+      pctStyle:"font:600 13px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:"+(pct===0?RED:'#26231e'),
+      style:"border:1px solid "+(risk?RED+'55':'rgba(0,0,0,.11)')+";border-left:3px solid "+(pct===0?RED:pct<80?AMBER:GREEN)+";border-radius:7px;padding:11px 13px;background:"+(risk?'oklch(0.985 0.008 30)':'#faf7f0')
+    }));
+    return { nav, kpis, filters, fields, partRows, caseSpecs };
+  }
+}
+</script>
+</body>
+</html>

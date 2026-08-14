@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+input{font-family:'IBM Plex Sans KR',sans-serif}
+</style>
+</helmet>
+
+<section style="padding:34px 40px 60px;display:flex;flex-direction:column;gap:22px">
+  <div style="max-width:1240px">
+    <div style="font:600 20px/1.3 'IBM Plex Sans KR',sans-serif">삭제 상품 조회 (ADM-DEL-010) 신설 — 2안 + 빈 상태</div>
+    <div style="font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px">공통 확정: 화면 ID <b>ADM-DEL-010</b> · <b>단종도 함께</b>(탭 분리) · 완전 삭제 포함, <b>지금 수준 유지</b>(operator + force 2단계 확인) · 경로 판정 실패 시 <b>항상 대안</b>("상태만 판매중으로 되돌리기" — 재고·공급처는 복원되지 않음을 명시) · 빈 상태도 시안에 포함. 두 안의 차이는 <b>경로·되돌리기를 보여주는 방식</b>입니다. 실데이터 기준 지금 삭제대기·단종 모두 0건이며, 아래 목록 행은 기능 확인용 예시입니다.</div>
+  </div>
+  <div style="display:flex;gap:44px;align-items:flex-start">
+
+    <!-- 1a -->
+    <div id="1a" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1a</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">경로 열 + 행 내 되돌리기</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">표에 "왜 내려갔나" 열을 두고 알맞은 되돌리기 버튼을 행에서 바로 · 완전 삭제는 2단계 확인 모달</span>
+      </div>
+      <div data-screen-label="1a 경로 열" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="19">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">삭제 상품 조회</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-DEL-010</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/deleted-products</span>
+            <span style="flex:1"></span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">조회 viewer · 되돌리기·완전 삭제 operator</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:18px">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+              <div style="{{ t.style }}"><span>{{ t.label }}</span><span style="{{ t.countStyle }}">{{ t.count }}</span></div>
+            </sc-for>
+            <span style="flex:1"></span>
+            <span style="align-self:center;font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">삭제대기 = 편입·정리로 내려간 것 · 단종 = 그냥 더 안 파는 것 — 개념이 달라 탭을 나눕니다</span>
+          </div>
+
+          <div style="flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.12);border-left:3px solid #bdb6a8;background:#f4f0e7;border-radius:8px;padding:10px 13px;display:flex;align-items:center;gap:11px">
+            <span style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif">이 화면은 상태만 다룹니다</span>
+            <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1">이름·가격·사양을 고치려면 상품 관리로 넘어갑니다. 되돌리기는 그 상품이 <b>어느 경로로 내려갔는지</b>에 따라 부르는 API가 다릅니다 — 화면이 먼저 판정해 알맞은 버튼만 보여줍니다.</span>
+            <span style="font:400 10px/1.4 'IBM Plex Mono',monospace;color:#8a8377">merge / product_edit / 일괄 변경</span>
+          </div>
+
+          <div style="flex:none;display:flex;align-items:center;gap:9px;padding:12px 18px 0">
+            <input placeholder="상품번호 · SKU · 상품명" style="width:280px;font:400 11.5px/1 'IBM Plex Sans KR',sans-serif;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;background:#fffdf9;color:#26231e">
+            <sc-for list="{{ pathFilters }}" as="f" hint-placeholder-count="4">
+              <span style="{{ f.style }}">{{ f.label }} <span style="font-family:'IBM Plex Mono',monospace;opacity:.7">{{ f.count }}</span></span>
+            </sc-for>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">선택 1건</span>
+            <button style="font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 12px;cursor:pointer">선택 되돌리기</button>
+            <button style="font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30);background:#fffdf9;border:1px solid oklch(0.52 0.16 30 / .5);border-radius:5px;padding:9px 12px;cursor:pointer">완전 삭제…</button>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;margin:10px 18px 0">
+            <div style="flex:none;display:grid;grid-template-columns:32px 88px 1fr 96px 176px 66px 88px 120px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span></span><span>상품번호</span><span>상품명</span><span>분류</span><span>왜 삭제대기인가</span><span style="text-align:right">재고</span><span>내려간 시각</span><span>되돌리기</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto;margin-bottom:12px">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="{{ r.chkStyle }}">{{ r.chk }}</span>
+                  <span style="font:500 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.code }}</span>
+                  <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</span><span style="font:400 9.5px/1.3 'IBM Plex Mono',monospace;color:#a09889">{{ r.sku }}</span></span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.cat }}</span>
+                  <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                    <span style="{{ r.pathStyle }}">{{ r.path }}</span>
+                    <span style="font:400 9.5px/1.45 'IBM Plex Sans KR',sans-serif;color:#8a8377;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.pathNote }}</span>
+                  </span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.stock }}</span>
+                  <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="{{ r.btnStyle }}">{{ r.btn }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:7px 18px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">되돌리면 이 목록에서 사라집니다(상태가 삭제대기를 벗어남) · 이미 되돌린 기록은 409로 막힙니다 · 동시 정리 시 뒤 요청은 404/409를 그대로 보여줍니다 · 완전 삭제는 주문 이력이 있으면 force와 무관하게 항상 막힙니다</div>
+
+          <div style="position:absolute;inset:0;background:rgba(38,35,30,.3);display:flex;align-items:center;justify-content:center">
+            <div style="width:600px;background:#fffdf9;border-radius:11px;box-shadow:0 24px 60px rgba(38,35,30,.34);overflow:hidden">
+              <div style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px;background:oklch(0.97 0.02 30)">
+                <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;color:oklch(0.4 0.15 30);flex:1">완전 삭제 — 2단계 중 2단계</span>
+                <span style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer">✕</span>
+              </div>
+              <div style="padding:15px 18px;display:flex;flex-direction:column;gap:11px">
+                <div style="font:500 12.5px/1.6 'IBM Plex Sans KR',sans-serif">PD91027 «테스트 그래픽카드 (중복)» 을 완전히 지웁니다. <b style="color:oklch(0.45 0.15 30)">되돌릴 수 없습니다.</b></div>
+                <div style="border:1px solid oklch(0.52 0.16 30 / .4);border-left:3px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:7px;padding:11px 13px">
+                  <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30);margin-bottom:6px">함께 지워지는 것 — 서버가 먼저 알려준 참조 6종</div>
+                  <div style="font:400 10.5px/1.85 'IBM Plex Mono',monospace;color:#4a463e">stock_movements(재고 원장) 4행 · product_price_history 3행 · product_specs 12행<br>member_favorites 1행 · supplier_product_map 2행 · product_reviews 0행</div>
+                  <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px"><b>재고 원장까지 함께 사라집니다</b> — 이 프로젝트에서 원장을 실제로 지우는 유일한 경로입니다. 주문 이력(order_items)은 0건이라 차단되지 않았습니다.</div>
+                </div>
+                <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">1단계에서 서버가 참조 목록(409)을 돌려줬고, 지금 확인하면 <span style="font-family:'IBM Plex Mono',monospace">force=true</span>로 재요청합니다. 대안: 지우지 않고 삭제대기로 계속 두거나, 다른 상품으로 편입하는 방법이 있습니다.</div>
+              </div>
+              <div style="border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+                <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1">operator 등급이면 실행됩니다 — 권한 강화는 하지 않기로 확정(2026-08-14)</span>
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 14px;cursor:pointer">그냥 두기</button>
+                <button style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:oklch(0.42 0.15 30);border:none;border-radius:5px;padding:9px 15px;cursor:pointer">참조까지 지우고 완전 삭제</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1b -->
+    <div id="1b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">경로 그룹 + 서랍</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">경로별로 묶어 보여주고, 행을 누르면 서랍에서 이력·복원 범위·판정 근거를 확인 후 실행</span>
+      </div>
+      <div data-screen-label="1b 경로 그룹 서랍" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="19">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">삭제 상품 조회</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-DEL-010</span>
+            <span style="flex:1"></span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">조회 viewer · 되돌리기·완전 삭제 operator</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+          <div style="flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:18px">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+              <div style="{{ t.style }}"><span>{{ t.label }}</span><span style="{{ t.countStyle }}">{{ t.count }}</span></div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:14px 18px 16px;display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+              <div>
+                <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:8px">
+                  <span style="{{ g.markStyle }}">{{ g.mark }}</span>
+                  <span style="font:600 12.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ g.title }}</span>
+                  <span style="font:600 12px/1 'IBM Plex Mono',monospace;color:#6f6a61">{{ g.count }}</span>
+                  <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1;min-width:0">{{ g.desc }}</span>
+                  <span style="font:400 10px/1.4 'IBM Plex Mono',monospace;color:#a09889">{{ g.api }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="2">
+                    <div style="{{ r.cardStyle }}">
+                      <span style="font:500 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;width:80px;flex:none">{{ r.code }}</span>
+                      <span style="font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</span>
+                      <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377;width:88px;flex:none">{{ r.cat }}</span>
+                      <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#8a8377;width:84px;flex:none">{{ r.at }}</span>
+                      <span style="font:400 10px/1.45 'IBM Plex Sans KR',sans-serif;color:#5b564d;width:210px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.pathNote }}</span>
+                      <span style="{{ r.btnStyle }}">{{ r.btn }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:7px 18px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">경로를 판정하지 못한 그룹도 숨기지 않습니다 — "왜 내려갔는지 모른다"는 사실을 밝히고 상태만 되돌리는 대안을 함께 둡니다</div>
+
+          <div style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.2)"></div>
+          <div style="position:absolute;top:52px;right:0;bottom:0;width:560px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column">
+            <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font:600 14px/1.35 'IBM Plex Sans KR',sans-serif;flex:1">DDR5-5600 16GB (중복 등록분)</span>
+                <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:4px 7px">삭제대기</span>
+                <span style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+              </div>
+              <div style="display:flex;gap:11px;margin-top:6px;font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377"><span>PD91024</span><span>ME-D5-16G-DUP</span><span>메모리</span><span>재고 0</span></div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:12px">
+              <div style="border:1px solid oklch(0.5 0.12 250 / .4);border-left:3px solid oklch(0.5 0.12 250);background:oklch(0.97 0.02 250);border-radius:8px;padding:11px 13px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.4 0.11 250)">경로 판정 — 중복 편입(product_merge)</div>
+                <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-top:4px">2026-08-12 11:04 · 김선호 · 활동 로그 <span style="font-family:'IBM Plex Mono',monospace">log_id 8841</span>. 재고 4개와 공급처 2곳이 원본으로 옮겨졌고 이 상품은 삭제대기로 내려갔습니다.</div>
+                <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-top:5px">옮겨간 원본 → <a href="#1b" style="border-bottom:1px solid rgba(0,0,0,.3);font-family:'IBM Plex Mono',monospace">PD01584</a> DDR5-5600 16GB (상품 관리에서 보기)</div>
+              </div>
+              <div>
+                <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">되돌리면 함께 복원되는 것</div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <sc-for list="{{ restore }}" as="x" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:baseline;gap:9px;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 11px;background:#faf7f0">
+                      <span style="font:600 10.5px/1.5 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">✓</span>
+                      <span style="font:500 11px/1.5 'IBM Plex Sans KR',sans-serif;width:88px">{{ x.what }}</span>
+                      <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1">{{ x.detail }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:11px 13px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif">활동 이력</div>
+                <div style="font:400 10.5px/1.85 'IBM Plex Mono',monospace;color:#5b564d;margin-top:5px">08-12 11:04 product_merge → 삭제대기<br>08-12 11:03 product_edit → 상태 판매중(등록 직후)<br>08-12 11:03 register_product → 생성</div>
+              </div>
+              <div style="border:1px solid oklch(0.52 0.16 30 / .4);border-left:3px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:8px;padding:11px 13px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30)">완전 삭제 — 되돌릴 수 없습니다</div>
+                <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-top:4px">누르면 먼저 서버가 함께 지워질 참조 목록을 돌려주고(409), 그 목록을 확인한 뒤에만 실행됩니다. 재고 원장(stock_movements)도 함께 사라집니다. 주문 이력이 있으면 그 자리에서 막힙니다.</div>
+              </div>
+            </div>
+            <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1">되돌리면 이 목록에서 사라집니다</span>
+              <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30);background:#fffdf9;border:1px solid oklch(0.52 0.16 30 / .45);border-radius:5px;padding:9px 13px;cursor:pointer">완전 삭제…</button>
+              <button style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:9px 15px;cursor:pointer">편입 되돌리기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1c 빈 상태 -->
+    <div id="1c" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1c</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">빈 상태 — 실데이터 기준 지금 모습</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">삭제대기 0건 · 단종 0건 — 고장이 아니라 그런 상품이 없다는 사실을 정확히 전달</span>
+      </div>
+      <div data-screen-label="1c 빈 상태" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="19">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">삭제 상품 조회</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-DEL-010</span>
+            <span style="flex:1"></span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">조회 viewer · 되돌리기·완전 삭제 operator</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+          <div style="flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:18px">
+            <sc-for list="{{ tabsEmpty }}" as="t" hint-placeholder-count="2">
+              <div style="{{ t.style }}"><span>{{ t.label }}</span><span style="{{ t.countStyle }}">{{ t.count }}</span></div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:40px">
+            <div style="max-width:660px;display:flex;flex-direction:column;align-items:center;gap:13px;text-align:center">
+              <div style="font:600 16px/1.4 'IBM Plex Sans KR',sans-serif">삭제 대기 중인 상품이 없습니다</div>
+              <div style="font:400 12px/1.8 'IBM Plex Sans KR',sans-serif;color:#5b564d">지금 카탈로그 22,840건은 <b>판매중 7,602 · 품절 15,238</b>이고 삭제대기·단종은 각각 0건입니다. 조회가 실패한 것이 아니라 그런 상품이 실제로 없습니다.</div>
+              <div style="border:1px solid rgba(0,0,0,.12);background:#fffdf9;border-radius:8px;padding:13px 16px;text-align:left;width:100%">
+                <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">여기에 상품이 생기는 경로 셋</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ paths }}" as="p" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:baseline;gap:9px">
+                      <span style="{{ p.markStyle }}">{{ p.mark }}</span>
+                      <span style="font:500 11px/1.6 'IBM Plex Sans KR',sans-serif;width:100px">{{ p.title }}</span>
+                      <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1">{{ p.desc }}</span>
+                      <span style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:#a09889">{{ p.where }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#8a8377">과거 활동 로그에는 편입 2건·편입 되돌림 1건·완전 삭제 6건이 남아 있지만, 상품코드·시각 패턴상 회귀 테스트 흔적입니다 — 실제 업무로 이 경로를 탄 기록은 아직 없습니다.</div>
+              <a href="#1a" style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 13px">상품 관리로 가기 →</a>
+            </div>
+          </div>
+          <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:7px 18px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">조회 실패는 이 빈 상태와 다른 문구로 구분합니다 — 실패 시 사유(네트워크 / 세션 만료 401 / 서버 오류)를 그대로 밝히고 「—」로 표시합니다</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:4600,&quot;height&quot;:1180}}">
+class Component extends DCLogic {
+  renderVals() {
+    const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)', BLUE='oklch(0.5 0.12 250)';
+    const NAVL=[['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['삭제 상품 조회','삭'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+    const nav = NAVL.map(([label,icon]) => {
+      const on = label==='삭제 상품 조회';
+      return { label, icon,
+        style:"display:flex;align-items:center;gap:10px;padding:4px 16px;font:500 12px/1.35 'IBM Plex Sans KR',sans-serif;color:"+(on?'#f4f1ea':'#a29b8d')+';background:'+(on?'rgba(255,255,255,.09)':'transparent')+';border-left:2px solid '+(on?GREEN:'transparent')+';cursor:pointer',
+        iconStyle:"flex:none;width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:"+(on?'#211f1b':'#cfc9bd')+';background:'+(on?GREEN:'rgba(255,255,255,.07)') };
+    });
+    const tabOf = (list) => list.map(([label,count,on]) => ({ label, count,
+      style:"display:flex;align-items:center;gap:7px;padding:11px 2px;font:"+(on?'600':'500')+" 12px/1 'IBM Plex Sans KR',sans-serif;color:"+(on?'#26231e':'#8a8377')+";border-bottom:2px solid "+(on?'#26231e':'transparent')+";cursor:pointer",
+      countStyle:"font:600 10px/1 'IBM Plex Mono',monospace;color:"+(count==='0'?'#b3ac9e':(on?'#f4f1ea':'#6f6a61'))+";background:"+(on?'#26231e':'#f2eee5')+";border-radius:8px;padding:3px 7px" }));
+    const P={
+      merge:['편입',BLUE,'oklch(0.96 0.02 250)','편입 되돌리기'],
+      edit:['단건 상태 수정','#7d7669','#f2eee5','상태 되돌리기'],
+      bulk:['일괄 상태 변경',AMBER,'oklch(0.96 0.035 70)','일괄 되돌리기'],
+      unknown:['판정 불가',RED,'oklch(0.97 0.02 30)','상태만 되돌리기']
+    };
+    const R=[
+      ['PD91024','DDR5-5600 16GB (중복 등록분)','ME-D5-16G-DUP','메모리','merge','PD01584로 재고 4·공급처 2 옮김 · log 8841','0','08-12 11:04',true],
+      ['PD91027','테스트 그래픽카드 (중복)','GC-TEST-DUP','그래픽카드','merge','PD03047로 옮김 · log 8839','0','08-12 11:03',false],
+      ['PD88110','구형 케이스 재고 소진분','CA-OLD-01','케이스','edit','상세에서 상태만 삭제대기로 · log 8802','0','08-09 16:20',false],
+      ['PD88041','단종 예정 파워 450W','PW-450-OLD','파워','bulk','일괄 변경 14건 중 하나 · log 8790','0','08-07 10:11',false],
+      ['PD87550','수랭 쿨러 240 (구모델)','AIO-240-OLD','수랭 쿨러','bulk','일괄 변경 14건 중 하나 · log 8790','0','08-07 10:11',false],
+      ['PD80012','정체 미상 SSD 512GB','SD-UNK-512','SSD','unknown','세 로그 어느 것과도 안 맞음 — 적재가 갱신했을 가능성','0','07-26 21:48',false]
+    ];
+    const rows = R.map(([code,name,sku,cat,p,pathNote,stock,at,sel]) => ({
+      code, name, sku, cat, pathNote, stock, at,
+      chk: sel?'☑':'☐',
+      chkStyle:"font:400 13px/1 'IBM Plex Sans KR',sans-serif;color:"+(sel?'#26231e':'#b3ac9e')+";cursor:pointer;text-align:center",
+      path: P[p][0],
+      pathStyle:"font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:"+P[p][1]+";background:"+P[p][2]+";border:1px solid "+P[p][1]+"3a;border-radius:4px;padding:4px 6px;width:fit-content;white-space:nowrap",
+      btn: P[p][3],
+      btnStyle:"font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;text-align:center;border-radius:5px;padding:8px 0;cursor:pointer;"+(p==='unknown'?"color:oklch(0.42 0.15 30);background:#fffdf9;border:1px solid "+RED+"70":"color:#f7f4ee;background:#26231e"),
+      style:"display:grid;grid-template-columns:32px 88px 1fr 96px 176px 66px 88px 120px;gap:10px;align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:"+(sel?'oklch(0.97 0.01 250)':'transparent')
+    }));
+    const GROUPS=[
+      ['merge','중복 편입으로 내려간 것','재고·공급처를 원본으로 옮기고 내려간 것 — 되돌리면 그 이전 상태로 전부 복원됩니다','POST /products/merge/undo/{log_id}',['PD91024','PD91027']],
+      ['edit','단건 상태 수정','상세에서 상태만 삭제대기로 바꾼 것 — 상태값만 되돌립니다','POST /products/undo/{log_id}',['PD88110']],
+      ['bulk','일괄 상태 변경','목록에서 여러 건을 한 번에 내린 것 — 그 일괄 작업 단위로 되돌립니다','POST /products/bulk-status/undo',['PD88041','PD87550']],
+      ['unknown','경로를 판정하지 못한 것','세 로그 어느 것과도 맞지 않습니다(로그 소실·적재 갱신 등). 자동 되돌리기는 없고, 상태만 판매중으로 바꾸는 대안만 제공합니다 — 재고·공급처는 복원되지 않습니다','대안: PATCH /products/{code}',['PD80012']]
+    ];
+    const groups = GROUPS.map(([k,title,desc,api,codes]) => ({
+      title, desc, api, count: codes.length+'건',
+      mark: k==='merge'?'◆':k==='bulk'?'▣':k==='edit'?'●':'▲',
+      markStyle:"font:600 12px/1 'IBM Plex Mono',monospace;color:"+P[k][1],
+      items: codes.map(c => {
+        const r = rows.find(x => x.code===c);
+        return { code:r.code, name:r.name, cat:r.cat, at:r.at, pathNote:r.pathNote, btn:P[k][3],
+          btnStyle:"flex:none;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;border-radius:5px;padding:8px 11px;cursor:pointer;"+(k==='unknown'?"color:oklch(0.42 0.15 30);background:#fffdf9;border:1px solid "+RED+"70":"color:#f7f4ee;background:#26231e"),
+          cardStyle:"display:flex;align-items:center;gap:11px;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid "+P[k][1]+";border-radius:7px;padding:10px 13px;cursor:pointer" };
+      })
+    }));
+    const pathFilters=[['전체','6',true],['편입','2',false],['상태 수정','3',false],['판정 불가','1',false]]
+      .map(([label,count,on]) => ({ label, count,
+        style:"font:"+(on?'600':'500')+" 11px/1 'IBM Plex Sans KR',sans-serif;color:"+(on?'#f4f1ea':'#5b564d')+";background:"+(on?'#26231e':'#fffdf9')+";border:1px solid "+(on?'#26231e':'rgba(0,0,0,.16)')+";border-radius:5px;padding:8px 11px;cursor:pointer" }));
+    const restore=[
+      { what:'상태', detail:'삭제대기 → 판매중(편입 이전 값)' },
+      { what:'재고', detail:'원본에서 4개를 되돌려 이 상품으로 — 원장에 역방향 전이로 기록됩니다' },
+      { what:'공급처', detail:'컴퓨존·대원CTS 매입가 2건이 이 상품으로 돌아옵니다' }
+    ];
+    const paths=[
+      { mark:'◆', markStyle:"font:600 11px/1.6 'IBM Plex Mono',monospace;color:"+BLUE, title:'중복 편입', desc:'닮은 상품을 원본으로 합치면 중복분이 여기로 내려옵니다', where:'상품 관리 상세' },
+      { mark:'●', markStyle:"font:600 11px/1.6 'IBM Plex Mono',monospace;color:#7d7669", title:'단건 상태 수정', desc:'상세에서 상태를 삭제대기로 바꾸면 여기로 옵니다', where:'상품 관리 상세' },
+      { mark:'▣', markStyle:"font:600 11px/1.6 'IBM Plex Mono',monospace;color:"+AMBER, title:'일괄 상태 변경', desc:'목록에서 여러 건을 한 번에 내리면 여기로 옵니다', where:'상품 관리 목록' }
+    ];
+    return { nav, rows, groups, pathFilters, restore, paths,
+      tabs: tabOf([['삭제대기','6',true],['단종','0',false]]),
+      tabsEmpty: tabOf([['삭제대기','0',true],['단종','0',false]]) };
+  }
+}
+</script>
+</body>
+</html>

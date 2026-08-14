@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="조립 호환 지도 v2" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+    <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+      <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+    </sc-for>
+  </nav>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품사양관리</span><span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">조립 호환 지도</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-STD-020</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/build-map</span>
+      <span data-keep="1" onClick="{{ onPinSSD }}" title="SSD가 걸린 유일한 관계 A8에 활성 규칙이 없습니다 — 클릭하면 SSD를 고정합니다" style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.14 55);background:oklch(0.95 0.04 70);border:1px solid oklch(0.62 0.15 55 / .45);border-radius:4px;padding:4px 7px;cursor:pointer">▲ SSD 무규칙 (A8)</span>
+      <span style="flex:1"></span>
+      <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8a8377">방금 받음 15:07 · 매 방문 재조회</span>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div style="flex:none;height:44px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:16px">
+      <sc-for list="{{ viewTabs }}" as="t" hint-placeholder-count="3">
+        <div data-keep="1" onClick="{{ t.onClick }}" style="{{ t.style }}">
+          <span>{{ t.label }}</span>
+          <span style="font:400 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ t.sub }}</span>
+        </div>
+      </sc-for>
+      <span style="flex:1"></span>
+      <sc-if value="{{ hasPin }}" hint-placeholder-val="{{ false }}">
+        <div data-keep="1" onClick="{{ onClearPin }}" style="align-self:center;display:flex;align-items:center;gap:7px;font:500 11px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;border-radius:6px;padding:8px 11px;cursor:pointer">
+          <span style="font-family:'IBM Plex Mono',monospace">📌 {{ pinLabel }}</span>
+          <span style="opacity:.6">고정됨 — 탭을 바꿔도 유지 · 클릭해 해제</span>
+          <span>✕</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noPin }}" hint-placeholder-val="{{ true }}">
+        <span style="align-self:center;font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">부품을 <b>클릭</b>하면 고정되어 탭을 바꿔도 유지됩니다 · 올려두기(hover)는 미리보기</span>
+      </sc-if>
+    </div>
+
+    <!-- 지도형 -->
+    <div style="{{ viewMapStyle }}">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 16px 10px">
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+            <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:9px 11px">
+              <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ s.label }}</div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span style="font:600 25px/1.15 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ s.value }}</span>
+                <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ s.note }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1;min-height:0;position:relative;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden">
+          <svg viewBox="0 0 960 640" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%">
+            <path d="{{ pathOut }}" fill="none" stroke="#bdb6a8" stroke-width="1.3" stroke-dasharray="5 5"></path>
+            <path d="{{ pathMissing }}" fill="none" stroke="oklch(0.62 0.11 285)" stroke-width="1.8"></path>
+            <path d="{{ pathNorule }}" fill="none" stroke="oklch(0.68 0.15 62)" stroke-width="2.6"></path>
+            <path d="{{ pathChecking }}" fill="none" stroke="oklch(0.56 0.11 165)" stroke-width="2.6"></path>
+            <path d="{{ pathHi }}" fill="none" stroke="#26231e" stroke-width="3.4"></path>
+          </svg>
+          <sc-for list="{{ edgeLabels }}" as="e" hint-placeholder-count="28">
+            <div style="{{ e.style }}">{{ e.id }}</div>
+          </sc-for>
+          <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="15">
+            <div data-keep="1" onClick="{{ n.onClick }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" style="{{ n.style }}">
+              <span style="font:600 11.5px/1 'IBM Plex Mono',monospace">{{ n.key }}</span>
+              <span style="font:400 10.5px/1 'IBM Plex Sans KR',sans-serif;opacity:.68">{{ n.name }}</span>
+              <sc-if value="{{ n.pinned }}" hint-placeholder-val="{{ false }}"><span style="font:600 9px/1 'IBM Plex Mono',monospace">📌</span></sc-if>
+            </div>
+          </sc-for>
+          <div style="position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:5px;background:rgba(255,253,249,.94);border:1px solid rgba(0,0,0,.1);border-radius:7px;padding:8px 10px">
+            <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:7px;font:500 11px/1 'IBM Plex Sans KR',sans-serif">
+                <span style="{{ l.swatchStyle }}"></span>
+                <span style="font-family:'IBM Plex Mono',monospace">{{ l.mark }}</span>
+                <span>{{ l.label }}</span>
+                <span style="font:500 11px/1 'IBM Plex Mono',monospace;color:#8a8377;font-variant-numeric:tabular-nums">{{ l.count }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <aside style="width:352px;flex:none;border-left:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;flex-direction:column;min-height:0">
+        <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(0,0,0,.09)">
+          <div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#a09889;margin-bottom:8px">부품 10종 · 충족률 — 클릭해 고정</div>
+          <sc-for list="{{ parts }}" as="p" hint-placeholder-count="10">
+            <div data-keep="1" onClick="{{ p.onClick }}" onMouseEnter="{{ p.onEnter }}" onMouseLeave="{{ p.onLeave }}" style="{{ p.railStyle }}">
+              <span style="width:126px;font:600 11px/1.2 'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.keyLabel }}</span>
+              <span style="flex:1;height:5px;background:rgba(0,0,0,.08);border-radius:3px"><span style="{{ p.barStyle }}"></span></span>
+              <span style="width:34px;text-align:right;font:500 11px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ p.fillText }}</span>
+              <span style="width:42px;text-align:right;font:400 10.5px/1.2 'IBM Plex Mono',monospace;color:#a09889;font-variant-numeric:tabular-nums">{{ p.stockText }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:10px 14px 16px">
+          <div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#a09889;margin-bottom:8px">{{ railTitle }}</div>
+          <sc-for list="{{ railRels }}" as="r" hint-placeholder-count="8">
+            <div style="{{ r.rowStyle }}">
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ r.id }}</span>
+                <span style="font:600 12px/1.2 'IBM Plex Sans KR',sans-serif">{{ r.pair }}</span>
+                <span style="flex:1"></span>
+                <span style="{{ r.pillStyle }}"><span style="font-family:'IBM Plex Mono',monospace">{{ r.mark }}</span>{{ r.statusLabel }}</span>
+              </div>
+              <div style="font:400 11.5px/1.45 'IBM Plex Sans KR',sans-serif;color:#5c574e;margin-top:2px">{{ r.what }}</div>
+              <div style="font:400 10.5px/1.4 'IBM Plex Mono',monospace;color:#a09889;margin-top:3px">{{ r.specSummary }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 진단형 -->
+    <div style="{{ viewDiagStyle }}">
+      <div style="display:flex;gap:12px;background:#211f1b;color:#f4f1ea;border-radius:9px;padding:14px 16px;align-items:center;margin-bottom:12px">
+        <div style="display:flex;align-items:baseline;gap:8px;font-variant-numeric:tabular-nums">
+          <span style="font:600 46px/0.9 'IBM Plex Mono',monospace;color:oklch(0.72 0.13 165)">9</span>
+          <span style="font:400 18px/1 'IBM Plex Mono',monospace;color:#8a8377">/</span>
+          <span style="font:500 24px/1 'IBM Plex Mono',monospace">22</span>
+        </div>
+        <div style="font:400 13px/1.5 'IBM Plex Sans KR',sans-serif;max-width:420px">검사해야 할 관계 22개 중 9개만 엔진이 막고 있다.<br><b style="font-weight:600">나머지 13개는 지금 아무도 안 막고 있다.</b></div>
+        <span style="flex:1"></span>
+        <div style="display:flex;gap:18px">
+          <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+            <div>
+              <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ s.label }}</div>
+              <div style="font:600 22px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ s.value }}</div>
+              <div style="font:400 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ s.note }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;gap:10px">
+        <div style="flex:1;min-width:0;display:flex;gap:10px">
+          <sc-for list="{{ lanes }}" as="ln" hint-placeholder-count="4">
+            <div style="{{ ln.style }}">
+              <div style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-bottom:1px solid rgba(0,0,0,.1)">
+                <span style="{{ ln.markStyle }}">{{ ln.mark }}</span>
+                <span style="font:600 12px/1.2 'IBM Plex Sans KR',sans-serif">{{ ln.label }}</span>
+                <span style="flex:1"></span>
+                <span style="font:600 15px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ ln.count }}</span>
+              </div>
+              <div style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding:6px 10px 0">{{ ln.desc }}</div>
+              <div style="flex:1;min-height:0;overflow:auto;padding:8px 10px 10px;display:flex;flex-direction:column;gap:7px">
+                <sc-for list="{{ ln.items }}" as="r" hint-placeholder-count="6">
+                  <div style="{{ r.laneStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:6px">
+                      <span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ r.id }}</span>
+                      <span style="font:600 11.5px/1.25 'IBM Plex Sans KR',sans-serif">{{ r.pair }}</span>
+                    </div>
+                    <div style="font:400 11px/1.45 'IBM Plex Sans KR',sans-serif;color:#5c574e;margin-top:3px">{{ r.what }}</div>
+                    <sc-if value="{{ r.hasSpecs }}" hint-placeholder-val="{{ true }}">
+                      <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">
+                        <sc-for list="{{ r.specs }}" as="sp" hint-placeholder-count="3">
+                          <div style="display:flex;align-items:baseline;gap:6px">
+                            <span style="flex:1;min-width:0;font:400 10.5px/1.35 'IBM Plex Sans KR',sans-serif;color:#6f6a61;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sp.label }}</span>
+                            <span style="{{ sp.pctStyle }}">{{ sp.pctText }}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:6px;font:400 10.5px/1.45 'IBM Plex Sans KR',sans-serif;color:#8a8377">↳ {{ r.note }}</div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <aside style="width:330px;flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;min-height:0">
+          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);font:600 12px/1.2 'IBM Plex Sans KR',sans-serif">사양을 채우면 풀리는 순서 <span style="font:400 10px/1.2 'IBM Plex Sans KR',sans-serif;color:#a09889">— 클릭해 고정</span></div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:8px 12px 12px">
+            <sc-for list="{{ parts }}" as="p" hint-placeholder-count="10">
+              <div data-keep="1" onClick="{{ p.onClick }}" onMouseEnter="{{ p.onEnter }}" onMouseLeave="{{ p.onLeave }}" style="{{ p.diagStyle }}">
+                <div style="display:flex;align-items:baseline;gap:7px">
+                  <span style="font:600 12px/1.2 'IBM Plex Mono',monospace">{{ p.keyLabel }}</span>
+                  <span style="font:400 10.5px/1.2 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ p.name }}</span>
+                  <span style="flex:1"></span>
+                  <span style="font:600 13px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ p.fillText }}</span>
+                </div>
+                <div style="height:5px;background:rgba(0,0,0,.08);border-radius:3px;margin:5px 0 4px"><span style="{{ p.barStyle }}"></span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">
+                  <span style="font-family:'IBM Plex Mono',monospace">재고 {{ p.stockText }} · 막는 사양 {{ p.blocking }}/{{ p.specCount }}</span>
+                </div>
+                <sc-if value="{{ p.hasZeros }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">
+                    <sc-for list="{{ p.zeros }}" as="z" hint-placeholder-count="2">
+                      <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.48 0.13 25);background:oklch(0.95 0.03 25);border:1px solid oklch(0.87 0.05 25);border-radius:4px;padding:1px 5px">{{ z }} 0%</span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- 매트릭스형 -->
+    <div style="{{ viewMatrixStyle }}">
+      <div style="display:flex;gap:10px;align-items:stretch">
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:10px 12px">
+          <div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#a09889;margin-bottom:6px">격차</div>
+          <div style="display:flex;align-items:baseline;gap:6px;font-variant-numeric:tabular-nums">
+            <span style="font:600 30px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">9</span>
+            <span style="font:400 14px/1 'IBM Plex Mono',monospace;color:#a09889">/ 22</span>
+          </div>
+          <div style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;margin-top:3px">13개는 아무도 안 막는다</div>
+        </div>
+        <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+          <div style="{{ l.cardStyle }}">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="{{ l.swatchStyle }}"></span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px">{{ l.mark }}</span>
+              <span style="font:500 11.5px/1.2 'IBM Plex Sans KR',sans-serif">{{ l.label }}</span>
+            </div>
+            <div style="font:600 24px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;margin-top:4px">{{ l.count }}</div>
+            <div style="font:400 10.5px/1.35 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ l.desc }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:12px;flex:1;min-height:0">
+        <div style="flex:0 1 auto;min-width:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:10px 12px 12px;overflow:auto">
+          <div style="font:600 12px/1.2 'IBM Plex Sans KR',sans-serif;margin-bottom:8px">부품 × 부품 관계 격자 <span style="font-weight:400;color:#8a8377;font-size:11px">— 행 라벨 클릭 = 고정</span></div>
+          <div style="display:grid;grid-template-columns:70px repeat(14,minmax(0,1fr));align-items:end">
+            <div></div>
+            <sc-for list="{{ matrixCols }}" as="c" hint-placeholder-count="14">
+              <div style="{{ c.headStyle }}">{{ c.short }}</div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ matrixRows }}" as="row" hint-placeholder-count="14">
+            <div data-keep="1" onClick="{{ row.onClick }}" onMouseEnter="{{ row.onEnter }}" onMouseLeave="{{ row.onLeave }}" style="{{ row.style }}">
+              <div style="{{ row.labelStyle }}">{{ row.key }}</div>
+              <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="14">
+                <div style="{{ cell.style }}">
+                  <sc-for list="{{ cell.items }}" as="it" hint-placeholder-count="1">
+                    <span style="{{ it.style }}">{{ it.text }}</span>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1 0 500px;min-width:500px;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;min-height:0">
+          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:baseline;gap:8px">
+            <span style="font:600 12px/1.2 'IBM Plex Sans KR',sans-serif">부품 × 사양 채움</span>
+            <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">막음 사양은 진하게, 경고 사양은 옅게. 0% 는 붉게 — 판정이 막힌 자리다</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:6px 12px 12px">
+            <sc-for list="{{ parts }}" as="p" hint-placeholder-count="10">
+              <div data-keep="1" onClick="{{ p.onClick }}" onMouseEnter="{{ p.onEnter }}" onMouseLeave="{{ p.onLeave }}" style="{{ p.heatRowStyle }}">
+                <div style="width:150px;flex:none;display:flex;align-items:baseline;gap:6px">
+                  <span style="font:600 11.5px/1.2 'IBM Plex Mono',monospace">{{ p.keyLabel }}</span>
+                  <span style="font:400 10px/1.2 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ p.stockText }}</span>
+                </div>
+                <div style="width:46px;flex:none;font:600 12px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right">{{ p.fillText }}</div>
+                <div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px">
+                  <sc-for list="{{ p.rows }}" as="row" hint-placeholder-count="6">
+                    <span style="{{ row.chipStyle }}">
+                      <span>{{ row.name }}</span>
+                      <span style="{{ row.chipPctStyle }}">{{ row.pctText }}</span>
+                      <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#a09889">{{ row.rel }}</span>
+                    </span>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:7px 18px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">읽기 전용 — 규칙 편집은 「조립 호환 규칙」, 값 입력은 「조립 사양 표준」·「상품 사양 검수」 소관 · "검사 적용(●)"은 compat_rules 기준이지 std 스키마의 엔진 반영이 아님 · 세 표현은 한 번의 조회로 함께 그려지고 탭 전환은 숨김만 바꿈 · 실패 시 401(세션 만료)과 그 밖의 조회 실패를 구분해 안내</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const STATUS = {
+  checking: { label:'검사 중', mark:'●', color:'oklch(0.48 0.11 165)', line:'oklch(0.56 0.11 165)', bg:'oklch(0.95 0.035 165)', bd:'oklch(0.84 0.06 165)', desc:'엔진이 막고 있다' },
+  norule:   { label:'값 있음·규칙 없음', mark:'◆', color:'oklch(0.5 0.14 62)', line:'oklch(0.68 0.15 62)', bg:'oklch(0.96 0.045 75)', bd:'oklch(0.85 0.08 70)', desc:'판정할 수 있는데 안 하고 있다' },
+  missing:  { label:'값이 모자라다', mark:'○', color:'oklch(0.46 0.12 285)', line:'oklch(0.62 0.11 285)', bg:'oklch(0.96 0.025 285)', bd:'oklch(0.86 0.05 285)', desc:'사양을 채워야 판정이 된다' },
+  out:      { label:'범위 밖', mark:'·', color:'#7d7669', line:'#bdb6a8', bg:'rgba(0,0,0,.04)', bd:'rgba(0,0,0,.14)', desc:'빠뜨린 게 아니라 미룬 것' }
+};
+const ORDER = ['norule','missing','checking','out'];
+const REL = [
+  ['A1','CPU ↔ MB','소켓 규격이 같은가','checking','CPU.소켓 94 · MB.소켓 93',''],
+  ['A2','CPU ↔ MB','칩셋이 그 CPU 세대를 지원하는가','missing','CPU.CPU 세대 89 · MB.칩셋 94 · MB.지원 CPU 세대 0','보드의 지원 세대 목록이 아직 비어 있다'],
+  ['A3','CPU ↔ MB','BIOS 버전이 그 CPU를 받는가','missing','MB.세대별 최소 BIOS 0','막지 않고 경고한다 — 보드의 현재 BIOS 는 출고 시점마다 달라 알 수 없다(0039)'],
+  ['A4','RAM ↔ MB','메모리 규격(DDR4/DDR5)','checking','CPU.지원 메모리 규격 90 · MB.메모리 규격 96 · RAM.메모리 규격 95',''],
+  ['A5','RAM ↔ MB','모듈 개수 ≤ 슬롯 수 · 최대 용량','norule','MB.메모리 슬롯 수 93 · MB.최대 메모리 용량 89 · RAM.모듈 개수 87',''],
+  ['A6','RAM ↔ MB','램 클럭 ≤ 보드 지원 상한','norule','MB.지원 최대 클럭 93 · RAM.동작 클럭 96','초과해도 조립은 된다(다운클럭) — 경고 축'],
+  ['A7','GPU ↔ MB','PCIe 세대','missing','GPU.PCIe 세대 97 · MB.x16 슬롯 세대 55 · SSD.PCIe 세대 0','하위호환이라 막지 않는다. 느릴 뿐 동작한다'],
+  ['A8','SSD ↔ MB','NVMe면 M.2 슬롯, SATA면 포트가 있는가','missing','HDD.인터페이스 80 · MB.M.2 슬롯 수 94 · MB.SATA 포트 수 92 · MB.M.2 지원 규격 0 · MB.M.2/SATA 레인 공유 0 · SSD.인터페이스 94','SSD 는 견적 슬롯인데 지금 호환 규칙이 0개다'],
+  ['A9','MB ↔ CASE','보드 규격(ATX/mATX/ITX) 수용','checking','CASE.수용 보드 규격 97 · HDD.폼팩터 67 · MB.폼팩터 93 · POWER.폼팩터 97 · SSD.폼팩터 93',''],
+  ['B1','GPU ↔ CASE','카드 길이 ≤ 케이스 허용','checking','CASE.GPU 최대 길이 95 · GPU.길이 96 · POWER.길이 21',''],
+  ['B2','GPU ↔ CASE','카드 두께(슬롯) · 높이','missing','CASE.GPU 최대 두께 0 · CASE.GPU 최대 높이 0 · GPU.높이 0 · GPU.두께(슬롯) 0 · RAM.높이 0','양쪽 다 값이 0% — 케이스 최대 높이는 2026-08-11 에 신설했다'],
+  ['B3','COOLER_CPU_AIR ↔ CASE','쿨러 높이 ≤ 케이스 허용','checking','CASE.쿨러 높이 94 · COOLER_CPU_AIR.쿨러 높이 96',''],
+  ['B4','COOLER_CPU_AIO ↔ CASE','라디에이터 열 수 · 두께','checking','CASE.라디에이터 최대 열 수 69 · CASE.라디에이터 최대 두께 0 · COOLER_CPU_AIO.라디에이터 열 수 94 · COOLER_CPU_AIO.라디에이터 두께 0','두께는 2026-08-11 에 신설했다 — 상단 장착 시 보드·램과 간섭한다'],
+  ['B5','POWER ↔ CASE','파워 규격(ATX/SFX) · 길이','missing','CASE.수용 파워 규격 84 · CASE.파워 최대 길이 0 · GPU.길이 96 · POWER.길이 21',''],
+  ['B6','HDD ↔ CASE','3.5" / 2.5" 베이가 남는가','missing','CASE.3.5" 베이 수 74 · CASE.2.5" 베이 수 56 · HDD.크기 0',''],
+  ['C1','POWER ↔ GPU','정격 출력 ≥ GPU 권장 전원','checking','GPU.권장 전원 용량 91 · POWER.정격 출력 98',''],
+  ['C2','POWER ↔ 구성 전체','CPU + GPU + 여유 20~30%','missing','','사양이 아니라 규칙 상수로 푼다. 부품마다 소비전력을 받으면 못 채울 항목이 는다'],
+  ['C3','POWER ↔ GPU','보조전원 커넥터(8핀 · 12V-2x6)','norule','GPU.요구 보조전원 9 · POWER.제공 보조전원 22',''],
+  ['C4','POWER ↔ MB','EPS 12V 커넥터 개수','missing','MB.EPS 12V 커넥터 0 · POWER.EPS 12V 커넥터 14',''],
+  ['D1','COOLER_CPU_AIR ↔ CPU','지원 소켓 목록에 그 소켓이 있는가','checking','COOLER_CPU_AIO.지원 소켓 목록 98 · COOLER_CPU_AIR.지원 소켓 목록 99',''],
+  ['D2','COOLER_CPU_AIR ↔ CPU','냉각 성능(W) ≥ CPU 발열(TDP)','checking','COOLER_CPU_AIO.쿨러 냉각 성능 22 · COOLER_CPU_AIR.쿨러 냉각 성능 52 · CPU.설계 전력(TDP) 76','규칙은 있는데 값이 없어 상당수가 자동 탈락한다'],
+  ['D3','COOLER_CPU_AIR ↔ RAM','램 방향 여유 ≥ 램 높이','missing','COOLER_CPU_AIR.램 방향 여유 0 · GPU.높이 0 · RAM.높이 0','PCPartPicker 도 못 한다고 밝히는 항목이다'],
+  ['E1','GPU ↔ MONITOR','출력 포트가 목표 해상도·주사율을 내는가','out','','주변기기 사양이 사실상 비어 있어 판정 불가'],
+  ['F1','FAN ↔ CASE','팬 크기·두께 vs 케이스 장착 위치','out','','분류가 없어 ETC 에 묻혀 있다 — 재고 194종'],
+  ['F2','FAN ↔ MB','팬 커넥터 vs 보드 팬 헤더 수','out','',''],
+  ['F3','EXPANSION ↔ MB','요구 슬롯(PCIe x1/x4/x16) vs 여유 슬롯','out','','재고 84종'],
+  ['F4','EXPANSION ↔ GPU','3슬롯 두께 GPU 가 아래 PCIe 를 막는다','out','','둘 다 파는데 이걸 안 보면 «둘 다 샀는데 하나는 못 꽂는» 일이 난다'],
+  ['F5','ODD ↔ CASE','5.25" 베이 · SATA 포트','out','','재고 10종']
+];
+const PARTS = [
+  ['MB','메인보드',541,15,11,68,['지원 CPU 세대','M.2 지원 규격','EPS 12V 커넥터'],[
+    ['메모리 규격','—','A4','막음',96],['칩셋','—','A2','막음',94],['M.2 슬롯 수','개','A8','막음',94],
+    ['소켓','—','A1','막음',93],['메모리 슬롯 수','개','A5','막음',93],['폼팩터','—','A9','막음',93],
+    ['지원 최대 클럭','MHz','A6','경고',93],['SATA 포트 수','개','A8','막음',92],['최대 메모리 용량','GB','A5','막음',89],
+    ['x16 슬롯 세대','—','A7','경고',55],['지원 CPU 세대','—','A2','막음',0],['M.2 지원 규격','—','A8','막음',0],
+    ['EPS 12V 커넥터','개','C4','막음',0],['세대별 최소 BIOS','—','A3','경고',0],['M.2/SATA 레인 공유','—','A8','경고',0]]],
+  ['CASE','케이스',866,11,11,52,['GPU 최대 두께','파워 최대 길이','GPU 최대 높이','라디에이터 최대 두께'],[
+    ['수용 보드 규격','—','A9','막음',97],['GPU 최대 길이','mm','B1','막음',95],['쿨러 높이','mm','B3','막음',94],
+    ['수용 파워 규격','—','B5','막음',84],['3.5" 베이 수','개','B6','막음',74],['라디에이터 최대 열 수','—','B4','막음',69],
+    ['2.5" 베이 수','개','B6','막음',56],['GPU 최대 두께','슬롯','B2','막음',0],['파워 최대 길이','mm','B5','막음',0],
+    ['GPU 최대 높이','mm','B2','막음',0],['라디에이터 최대 두께','mm','B4','막음',0]]],
+  ['GPU','그래픽카드',383,6,5,39,['높이','두께(슬롯)'],[
+    ['PCIe 세대','—','A7','경고',97],['길이','mm','B1, B5','막음',96],['권장 전원 용량','W','C1','막음',91],
+    ['요구 보조전원','—','C3','막음',9],['높이','mm','B2, D3','막음',0],['두께(슬롯)','슬롯','B2','막음',0]]],
+  ['POWER','파워',525,6,6,55,[],[
+    ['정격 출력','W','C1','막음',98],['폼팩터','—','A9','막음',97],['SATA 전원 커넥터','개','—','막음',77],
+    ['제공 보조전원','—','C3','막음',22],['길이','mm','B1, B5','막음',21],['EPS 12V 커넥터','개','C4','막음',14]]],
+  ['CPU','프로세서',289,5,4,87,[],[
+    ['소켓','—','A1','막음',94],['내장그래픽','—','—','경고',91],['지원 메모리 규격','—','A4','막음',90],
+    ['CPU 세대','—','A2','막음',89],['설계 전력(TDP)','W','D2','막음',76]]],
+  ['RAM','메모리',448,5,3,61,['높이'],[
+    ['동작 클럭','MHz','A6','경고',96],['메모리 규격','—','A4','막음',95],['용량','GB','—','경고',94],
+    ['모듈 개수','개','A5','막음',87],['높이','mm','B2, D3','막음',0]]],
+  ['COOLER_CPU_AIO','수랭 쿨러',222,4,4,54,['라디에이터 두께'],[
+    ['지원 소켓 목록','—','D1','막음',98],['라디에이터 열 수','—','B4','막음',94],
+    ['쿨러 냉각 성능','W','D2','막음',22],['라디에이터 두께','mm','B4','막음',0]]],
+  ['COOLER_CPU_AIR','공랭 쿨러',276,4,4,62,['램 방향 여유'],[
+    ['지원 소켓 목록','—','D1','막음',99],['쿨러 높이','mm','B3','막음',96],
+    ['쿨러 냉각 성능','W','D2','막음',52],['램 방향 여유','mm','D3','막음',0]]],
+  ['HDD','하드디스크',69,4,3,49,['크기'],[
+    ['용량','GB','—','경고',90],['인터페이스','—','A8','막음',80],['폼팩터','—','A9','막음',67],['크기','inch','B6','막음',0]]],
+  ['SSD','SSD',290,4,2,94,[],[
+    ['용량','GB','—','경고',100],['인터페이스','—','A8','막음',94],['폼팩터','—','A9','막음',93],['PCIe 세대','—','A7','경고',0]]]
+];
+const NODES = [
+  ['CPU','프로세서',480,80],['MB','메인보드',470,300],['RAM','메모리',722,168],['GPU','그래픽카드',762,330],
+  ['SSD','SSD',690,470],['HDD','하드디스크',500,528],['CASE','케이스',252,420],['POWER','파워',150,288],
+  ['COOLER_CPU_AIR','공랭 쿨러',258,132],['COOLER_CPU_AIO','수랭 쿨러',92,152],
+  ['구성 전체','합산 전력',96,432],['MONITOR','모니터',888,214],['FAN','팬',330,600],
+  ['EXPANSION','확장카드',632,600],['ODD','광학드라이브',92,556]
+];
+const SHORT = { COOLER_CPU_AIR:'AIR', COOLER_CPU_AIO:'AIO', EXPANSION:'EXP', MONITOR:'MON', '구성 전체':'전체' };
+
+class Component extends DCLogic {
+  state = { pin: null, hover: null, view: 'map' };
+
+  pinToggle(k) { this.setState(s => ({ pin: s.pin === k ? null : k })); }
+
+  parseSpecs(str) {
+    if (!str) return [];
+    return str.split(' · ').map(s => {
+      const m = s.match(/^(.*)\s(\d+)$/);
+      const label = m ? m[1] : s, pct = m ? +m[2] : 0;
+      const col = pct === 0 ? 'oklch(0.53 0.15 25)' : pct < 60 ? 'oklch(0.52 0.13 62)' : '#4a463e';
+      return { label, pct, pctText: pct + '%',
+        pctStyle: "font:500 10.5px/1.35 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;width:34px;text-align:right;color:" + col };
+    });
+  }
+
+  build() {
+    return REL.map(([id, pair, what, st, specs, note]) => {
+      const S = STATUS[st], list = this.parseSpecs(specs);
+      return { id, pair, what, note, status: st, S, specs: list, hasSpecs: list.length > 0,
+        parts: pair.split(' ↔ ').map(s => s.trim()),
+        statusLabel: S.label, mark: S.mark,
+        specSummary: list.length ? list.map(s => s.label + ' ' + s.pctText).join('  ·  ') : '사양 없이 규칙 상수 / 범위 밖',
+        pillStyle: "display:inline-flex;align-items:center;gap:5px;font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:" + S.color + ';background:' + S.bg + ';border:1px solid ' + S.bd + ';border-radius:4px;padding:3px 6px;white-space:nowrap' };
+    });
+  }
+
+  geometry(rels, sel) {
+    const pos = {}; NODES.forEach(([k, n, x, y]) => pos[k] = { x, y, name: n });
+    const buckets = {}; rels.forEach(r => {
+      const key = r.parts.slice().sort().join('|');
+      (buckets[key] = buckets[key] || []).push(r);
+    });
+    const paths = { checking: '', norule: '', missing: '', out: '', hi: '' };
+    const labels = [];
+    Object.keys(buckets).forEach(key => {
+      const group = buckets[key];
+      group.forEach((r, i) => {
+        const a = pos[r.parts[0]], b = pos[r.parts[1]];
+        if (!a || !b) return;
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const base = group.length === 1 ? (r.status === 'out' ? 58 : 0) : (i - (group.length - 1) / 2) * 52;
+        const others = NODES.filter(([k]) => k !== r.parts[0] && k !== r.parts[1]);
+        const clear = o => {
+          const qx = mx - dy / len * o, qy = my + dx / len * o;
+          const px = 0.25 * a.x + 0.5 * qx + 0.25 * b.x, py = 0.25 * a.y + 0.5 * qy + 0.25 * b.y;
+          return others.every(([, , nx, ny]) => Math.abs(px - nx) > 56 || Math.abs(py - ny) > 34);
+        };
+        let off = base;
+        [base, base + 62, base - 62, base + 116, base - 116, base + 170].some(o => { if (clear(o)) { off = o; return true; } return false; });
+        const cx = mx - dy / len * off, cy = my + dx / len * off;
+        const d = 'M' + a.x + ' ' + a.y + ' Q' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ' ' + b.x + ' ' + b.y + ' ';
+        const hit = sel && r.parts.indexOf(sel) >= 0;
+        paths[r.status] += d;
+        if (hit) paths.hi += d;
+        const lx = 0.25 * a.x + 0.5 * cx + 0.25 * b.x, ly = 0.25 * a.y + 0.5 * cy + 0.25 * b.y;
+        labels.push({ id: r.id,
+          style: 'position:absolute;left:' + (lx / 960 * 100).toFixed(2) + '%;top:' + (ly / 640 * 100).toFixed(2) +
+            "%;transform:translate(-50%,-50%);font:600 10px/1 'IBM Plex Mono',monospace;padding:2px 4px;border-radius:4px;background:" +
+            (hit ? '#26231e' : '#fffdf9') + ';color:' + (hit ? '#f7f4ee' : r.S.color) + ';border:1px solid ' +
+            (hit ? '#26231e' : r.S.bd) + ';opacity:' + (sel && !hit ? .3 : 1) + ';pointer-events:none' });
+      });
+    });
+    const linked = {};
+    rels.forEach(r => { if (sel && r.parts.indexOf(sel) >= 0) r.parts.forEach(p => linked[p] = 1); });
+    const nodes = NODES.map(([k, n, x, y]) => {
+      const isOut = ['MONITOR', 'FAN', 'EXPANSION', 'ODD', '구성 전체'].indexOf(k) >= 0;
+      const on = sel === k, near = !!linked[k], pinned = this.state.pin === k;
+      return { key: k, name: n, pinned,
+        onClick: e => { e.stopPropagation(); this.pinToggle(k); },
+        onEnter: () => this.setState({ hover: k }), onLeave: () => this.setState({ hover: null }),
+        style: 'position:absolute;left:' + (x / 960 * 100).toFixed(2) + '%;top:' + (y / 640 * 100).toFixed(2) +
+          '%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:8px;cursor:pointer;white-space:nowrap;background:' +
+          (on ? '#26231e' : isOut ? 'rgba(247,244,238,.9)' : '#fffdf9') + ';color:' + (on ? '#f7f4ee' : isOut ? '#8a8377' : '#26231e') +
+          ';border:' + (pinned ? '2px solid #26231e' : '1.5px ' + (isOut ? 'dashed' : 'solid') + ' ' + (on ? '#26231e' : near ? '#26231e' : 'rgba(0,0,0,.22)')) +
+          ';box-shadow:0 1px 2px rgba(0,0,0,.06);opacity:' + (sel && !near ? .38 : 1) };
+    });
+    return { paths, labels, nodes };
+  }
+
+  renderVals() {
+    const pin = this.state.pin, sel = this.state.hover || pin, view = this.state.view;
+    const rels = this.build();
+    const counts = {}; Object.keys(STATUS).forEach(k => counts[k] = rels.filter(r => r.status === k).length);
+    const geo = this.geometry(rels, sel);
+
+    const GREEN = 'oklch(0.5 0.11 165)';
+    const NAVL = [['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+    const nav = NAVL.map(([label, icon]) => {
+      const on = label === '조립 호환 지도';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:4px 16px;font:500 12px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') + ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)') };
+    });
+
+    const railRels = (sel ? rels.filter(r => r.parts.indexOf(sel) >= 0) : rels)
+      .slice().sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
+      .map(r => Object.assign({}, r, {
+        rowStyle: 'padding:8px 9px;border-radius:6px;border:1px solid rgba(0,0,0,.08);margin-bottom:7px;background:#fffdf9' }));
+
+    const parts = PARTS.map(([key, name, stock, specCount, blocking, fill, zeros, rows]) => {
+      const on = sel === key, pinned = pin === key;
+      const bar = 'display:block;height:100%;border-radius:3px;width:' + fill + '%;background:' +
+        (fill < 55 ? 'oklch(0.62 0.16 25)' : fill < 75 ? 'oklch(0.68 0.14 62)' : 'oklch(0.58 0.1 165)');
+      return { key, keyLabel: (pinned ? '📌 ' : '') + key, name, stock, specCount, blocking, zeros, hasZeros: zeros.length > 0,
+        stockText: stock.toLocaleString('ko-KR'), fillText: fill + '%', barStyle: bar,
+        onClick: e => { e.stopPropagation(); this.pinToggle(key); },
+        onEnter: () => this.setState({ hover: key }), onLeave: () => this.setState({ hover: null }),
+        railStyle: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;cursor:pointer;background:' + (on ? '#26231e' : 'transparent') +
+          ';color:' + (on ? '#f7f4ee' : '#26231e') + ';outline:' + (pinned && !on ? '1.5px solid #26231e' : 'none') + ';opacity:' + (sel && !on ? .45 : 1),
+        diagStyle: 'padding:8px 9px;border:' + (pinned ? '2px' : '1px') + ' solid ' + (on || pinned ? '#26231e' : 'rgba(0,0,0,.1)') + ';border-radius:7px;margin-bottom:7px;cursor:pointer;background:' +
+          (on ? 'rgba(0,0,0,.035)' : '#fffdf9') + ';opacity:' + (sel && !on ? .5 : 1),
+        heatRowStyle: 'display:flex;align-items:flex-start;gap:8px;padding:6px 6px;border-radius:6px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.06);outline:' + (pinned ? '1.5px solid #26231e' : 'none') + ';background:' +
+          (on ? 'rgba(0,0,0,.05)' : 'transparent') + ';opacity:' + (sel && !on ? .45 : 1),
+        rows: rows.map(([n, unit, rel, kind, pct]) => {
+          const col = pct === 0 ? 'oklch(0.5 0.15 25)' : pct < 60 ? 'oklch(0.5 0.13 62)' : '#3f3b34';
+          const bg = pct === 0 ? 'oklch(0.95 0.03 25)' : pct < 60 ? 'oklch(0.96 0.03 75)' : 'rgba(0,0,0,.035)';
+          const bd = pct === 0 ? 'oklch(0.87 0.05 25)' : pct < 60 ? 'oklch(0.88 0.05 70)' : 'rgba(0,0,0,.1)';
+          return { name: n, unit, rel, kind, pctText: pct + '%',
+            chipStyle: "display:inline-flex;align-items:baseline;gap:5px;padding:2px 6px;border-radius:5px;font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;background:" +
+              bg + ';border:1px solid ' + bd + ';color:' + col + ';opacity:' + (kind === '경고' ? .72 : 1),
+            chipPctStyle: "font:600 10.5px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:" + col };
+        }) };
+    });
+
+    const lanes = ORDER.map(k => {
+      const S = STATUS[k], items = rels.filter(r => r.status === k);
+      return { label: S.label, mark: S.mark, count: items.length, desc: S.desc,
+        style: 'flex:1;min-width:0;display:flex;flex-direction:column;background:#fffdf9;border:1px solid ' + S.bd +
+          ';border-top:3px solid ' + S.line + ';border-radius:8px;min-height:0',
+        markStyle: "display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;font:500 11px/1 'IBM Plex Mono',monospace;background:" +
+          S.bg + ';color:' + S.color + ';border:1px solid ' + S.bd,
+        items: items.map(r => {
+          const on = sel && r.parts.indexOf(sel) >= 0;
+          return Object.assign({}, r, {
+            laneStyle: 'padding:8px 9px;border-radius:6px;border:1px solid ' + (on ? '#26231e' : 'rgba(0,0,0,.1)') +
+              ';background:' + (on ? 'rgba(0,0,0,.04)' : '#fffdf9') + ';opacity:' + (sel && !on ? .42 : 1) });
+        }) };
+    });
+
+    const cols = NODES.map(([k]) => k);
+    const cell = {};
+    rels.forEach(r => { const key = r.parts.slice().sort().join('|'); (cell[key] = cell[key] || []).push(r); });
+    const matrixCols = cols.map(k => ({ short: SHORT[k] || k,
+      headStyle: "min-width:0;font:500 9.5px/1.2 'IBM Plex Mono',monospace;color:" + (sel === k ? '#26231e' : '#8a8377') +
+        ';text-align:center;padding-bottom:5px;white-space:nowrap;overflow:hidden;font-weight:' + (sel === k ? 700 : 500) }));
+    const matrixRows = cols.map(rk => ({
+      key: (pin === rk ? '📌' : '') + (SHORT[rk] || rk),
+      onClick: e => { e.stopPropagation(); this.pinToggle(rk); },
+      onEnter: () => this.setState({ hover: rk }), onLeave: () => this.setState({ hover: null }),
+      style: 'display:grid;grid-template-columns:70px repeat(14,minmax(0,1fr));align-items:stretch;cursor:pointer;background:' + (sel === rk ? 'rgba(0,0,0,.05)' : 'transparent') + ';outline:' + (pin === rk ? '1.5px solid #26231e' : 'none'),
+      labelStyle: "min-width:0;display:flex;align-items:center;font:600 10.5px/1.2 'IBM Plex Mono',monospace;padding:0 6px;color:" +
+        (sel && sel !== rk ? '#a09889' : '#26231e'),
+      cells: cols.map(ck => {
+        const list = ck === rk ? [] : (cell[[rk, ck].sort().join('|')] || []);
+        const hot = sel && (sel === rk || sel === ck) && list.length > 0;
+        return { style: 'min-width:0;height:38px;border:1px solid rgba(0,0,0,.07);display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:2px;background:' +
+            (rk === ck ? 'rgba(0,0,0,.05)' : list.length ? (hot ? 'rgba(0,0,0,.06)' : '#fffdf9') : 'transparent'),
+          items: list.map(r => ({ text: r.mark + r.id,
+            style: "font:600 9px/1 'IBM Plex Mono',monospace;padding:2px 3px;border-radius:3px;background:" + r.S.bg +
+              ';color:' + r.S.color + ';border:1px solid ' + r.S.bd + ';opacity:' + (sel && !(sel === rk || sel === ck) ? .35 : 1) })) };
+      })
+    }));
+
+    const VIEWS = [['map','지도형','제약의 그물'],['diag','진단형','격차를 일감으로'],['matrix','매트릭스형','빈칸 = 미검사']];
+    const viewTabs = VIEWS.map(([k, label, sub]) => ({ label, sub,
+      onClick: e => { e.stopPropagation(); this.setState({ view: k }); },
+      style: "display:flex;align-items:center;gap:7px;padding:0 2px;font:" + (view === k ? '600' : '500') + " 12px/1 'IBM Plex Sans KR',sans-serif;color:" +
+        (view === k ? '#26231e' : '#8a8377') + ';border-bottom:2px solid ' + (view === k ? '#26231e' : 'transparent') + ';cursor:pointer' }));
+
+    const pinNode = NODES.find(([k]) => k === pin);
+    return {
+      nav, viewTabs,
+      stats: [
+        { label: '호환 관계', value: '22', note: '범위 밖 6 포함 시 28' },
+        { label: '엔진이 검사 중', value: '9', note: '코드가 막고 있는 것' },
+        { label: '판정할 값 준비됨', value: '11', note: '양쪽에 값이 있다' },
+        { label: '사양 항목', value: '64', note: '부품별 사양 수의 합' }
+      ],
+      legend: ORDER.map(k => { const S = STATUS[k]; return { label: S.label, mark: S.mark, count: counts[k], desc: S.desc,
+        swatchStyle: 'width:14px;height:6px;border-radius:2px;display:inline-block;background:' + (k === 'out' ? 'repeating-linear-gradient(45deg,#c9c3b7 0 3px,#e6e1d7 3px 6px)' : S.line),
+        cardStyle: 'flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid ' + S.line + ';border-radius:8px;padding:10px 12px' }; }),
+      pathChecking: geo.paths.checking, pathNorule: geo.paths.norule, pathMissing: geo.paths.missing,
+      pathOut: geo.paths.out, pathHi: geo.paths.hi,
+      edgeLabels: geo.labels, nodes: geo.nodes,
+      parts, lanes, matrixCols, matrixRows, railRels,
+      railTitle: sel ? sel + ' 이(가) 걸린 관계 ' + railRels.length + '건' + (pin === sel ? ' — 고정됨' : '') : '관계 28건 — 아까운 순',
+      viewMapStyle: 'flex:1;min-height:0;display:' + (view === 'map' ? 'flex' : 'none'),
+      viewDiagStyle: 'flex:1;min-height:0;flex-direction:column;padding:14px 16px 12px;display:' + (view === 'diag' ? 'flex' : 'none'),
+      viewMatrixStyle: 'flex:1;min-height:0;flex-direction:column;gap:12px;padding:14px 16px 12px;display:' + (view === 'matrix' ? 'flex' : 'none'),
+      hasPin: !!pin, noPin: !pin,
+      pinLabel: pin ? pin + (pinNode ? ' ' + pinNode[1] : '') : '',
+      onClearPin: e => { e.stopPropagation(); this.setState({ pin: null }); },
+      onPinSSD: e => { e.stopPropagation(); this.setState({ pin: 'SSD' }); },
+      onRootClick: e => { if (e.target.closest && e.target.closest('[data-keep]')) return; if (this.state.pin) this.setState({ pin: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
