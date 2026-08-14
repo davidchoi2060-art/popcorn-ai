@@ -158,4 +158,14 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
      밖이라 영향 없음. */
   .a2-shell{overflow:auto;height:auto;min-height:100vh;flex-direction:column}
   .a2-lnb{width:100%;height:auto;max-height:180px}
+  /* 잔여 결함 수정(2026-08-15): .a2-lnb.collapsed{width:64px}(admin2.css:80, 특정성
+     0,2,0·데스크톱용, 건드리지 않음)가 이 블록의 .a2-lnb{width:100%}(특정성 0,1,0)보다
+     항상 이겨서, 세로 스택(위 flex-direction:column) 상태에서도 접으면 LNB가 64px
+     짜리 섬처럼 왼쪽에만 붙고 나머지 폭이 배경으로 남았다. 데스크톱(row)에서는 64px가
+     사이드바 폭 축소로 자연스럽지만, 모바일(column)에서 width는 cross-axis라 «폭이
+     아니라 위쪽 막대의 일부만 칠해지는» 것으로 보인다. 이 규칙은 이 미디어쿼리 안에서만
+     .collapsed 를 이겨 폭을 100%로 되돌린다(라벨·그룹 숨김 등 다른 접힘 동작은 기존
+     .a2-lnb.collapsed 하위 규칙이 그대로 처리 — 그 규칙들은 건드리지 않았다). 769px
+     이상·64px 값 자체·클래스 이름은 이 블록 밖이라 영향 없음. */
+  .a2-lnb.collapsed{width:100%}
 }
