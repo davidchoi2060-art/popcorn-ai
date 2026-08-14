@@ -2777,8 +2777,54 @@ def test_screen_assets():
     check("OFL 라이선스 원문을 함께 둔다", len(_ofl) >= 4, ">= 4", len(_ofl))
 
     # 폰트를 쓰던 화면은 로컬 시트를 링크해야 한다 — 안 그러면 시스템 글꼴로 조용히 바뀐다.
-    _nolink = [os.path.relpath(p, ROOT) for p, s in _all
-               if ("Pretendard" in s or "Hanken" in s) and "shared/fonts/fonts.css" not in s]
+    #
+    # 2026-08-13 admin2 셸 상속(`{% extends %}`) 도입 이후 이 검사가 두 가지를 오탐했다
+    # (제작팀 B 실측 — `ai_integration.html.j2`·`ai_usage_cost.html.j2`·`reviews.html.j2`
+    # 셋이 걸렸는데 셋 다 화면은 멀쩡했다):
+    #   ① 실제 폰트 링크(`<link … fonts.css>`)는 부모 `_admin2_shell.html.j2` 가 담당하는데,
+    #      이 검사는 **자식 파일의 원문 텍스트만** 보고 "링크가 없다"고 판정했다.
+    #   ② Jinja 주석(`{# … #}`) 안의 설계 근거 서술("Pretendard 로 대체했다" 같은 메모)을
+    #      실제 CSS 참조로 오인해 "이 화면은 폰트를 쓴다"는 판정부터 잘못 냈다 — 렌더되면
+    #      주석은 사라지므로 판정 재료가 아니다.
+    #   실측(curl)으로 세 화면 모두 `/shared/fonts/fonts.css` 200 을 받고 있었다.
+    #
+    # 고친 것: (a) 주석을 지우고 본다. (b) `.j2` 는 `{% extends %}` 를 따라가 **조상까지
+    # 합친 텍스트**로 링크 유무를 본다 — 실제 렌더 결과의 <head> 가 그 합집합이기 때문이다.
+    # **여전히 파일을 읽는 정적 검사다**(서버 없이도 돈다) — 대안으로 실제 렌더 결과를
+    # `get_html()`([41]의 선례)로 받아 검사하는 방법도 있지만, 그러려면 템플릿마다
+    # "어느 URL이 이 파일을 렌더하는가"를 새로 매핑해야 한다(정본 없음 — 만들면 그 목록이
+    # 또 낡는다). 정적 상속 추적이 지금은 더 안전하다.
+    # **다음에 또 낡을 지점**: 상속이 2단 이상(셸이 다른 셸을 상속) 되면 `_ancestor_text`
+    # 는 이미 재귀라 그대로 따라가지만, `{% extends %}` 문법 자체가 바뀌거나(예: 매크로로
+    # 대체) 템플릿 루트(`TEMPLATES_DIR`, `api/admin_ui_common.py`)가 `templates/` 밖으로
+    # 옮겨지면 이 정규식·경로 계산을 다시 봐야 한다.
+    _EXTENDS_RE = _re7.compile(r'\{%-?\s*extends\s+["\']([^"\']+)["\']\s*-?%\}')
+    _COMMENT_RE = _re7.compile(r'\{#.*?#\}', _re7.DOTALL)
+
+    def _strip_comments(text):
+        return _COMMENT_RE.sub('', text)
+
+    def _ancestor_text(path, seen=None):
+        """`{% extends %}` 로 이어진 조상 템플릿까지 주석을 뺀 원문을 이어 붙인다."""
+        seen = seen if seen is not None else set()
+        if path in seen or not os.path.exists(path):
+            return ""
+        seen.add(path)
+        nc = _strip_comments(io.open(path, encoding="utf-8").read())
+        m = _EXTENDS_RE.search(nc)
+        if not m:
+            return nc
+        parent = os.path.normpath(os.path.join(ROOT, "templates", m.group(1)))
+        return nc + "\n" + _ancestor_text(parent, seen)
+
+    _nolink = []
+    for p, s in _all:
+        s_nc = _strip_comments(s)
+        if not ("Pretendard" in s_nc or "Hanken" in s_nc):
+            continue
+        combined = _ancestor_text(p) if p.endswith(".j2") else s_nc
+        if "shared/fonts/fonts.css" not in combined:
+            _nolink.append(os.path.relpath(p, ROOT))
     check("폰트를 쓰는 화면이 로컬 시트를 링크한다", _nolink == [], [], _nolink[:5])
 
     # ⑥ Material Symbols 폰트를 뗐으므로, 매핑이 없는 글리프는 **글자가 그대로 뜬다**
@@ -5115,10 +5161,33 @@ def test_rebuild_screens():
         #   아니다. 전체 화면 셸(ADM-STD-020)은 Phoenix 레이아웃을 상속하지 않아
         #   `nav-link-text` 가 없다 — 그때 0을 세고 실패하면 검사가 사실이 아니라
         #   구현 방식을 지키는 것이 된다.
-        items = (len(_re41.findall(r'<span class="nav-link-text">', html))   # Phoenix 레이아웃
-                 or (len(_re41.findall(r'class="lnb-g"', html))              # 자체 셸 — 그룹 제목
-                     + len(_re41.findall(r'class="off"', html))              #          준비 중
-                     + len(_re41.findall(r'<a href="[^"]*"\s+class="[^"]*"', html))))  # 링크
+        #
+        #   2026-08-13 셸 정본화로 그룹 헤더 클래스가 `lnb-g` → `a2-lnb-g` 로 바뀌었는데
+        #   이 검사는 옛 이름을 그대로 찾아 그룹 헤더 8개를 통째로 못 세고 45 대신 37을
+        #   냈다(제작팀 B 실측 — `a2-lnb-g` 8건 매치=그룹 수와 일치, `lnb-g` 0건). 게다가
+        #   링크 셈이 **문서 전체**에서 `<a href="…" class="…">` 를 찾고 있어서, 상품 관리
+        #   화면은 39(11 대신 13 링크)가 나왔다 — LNB 밖 "상품 단건 등록" 버튼과 목록 행을
+        #   그리는 JS 템플릿 리터럴(`<a href="…?code=${p.product_code}" class="name …">`,
+        #   서버 렌더 시점엔 아직 문자열이라 그대로 남아 있다)이 같은 정규식에 걸렸다.
+        #   **원인은 검사의 기대값(45)이 아니라 검사가 셈을 문서 전체에서 한 것이었다** —
+        #   그래서 화면 콘텐츠에 링크가 늘 때마다 이 검사는 다시 낡을 소지가 있었다.
+        #
+        #   고친 것: (a) 셈을 **`<nav id="lnb">…</nav>` 안쪽으로 한정**해 화면 본문의
+        #   링크를 원천 차단한다. (b) 그룹 헤더는 **클래스명이 아니라
+        #   `data-action="lnb-group"`** (admin2-shell.js 가 아코디언 토글을 붙잡는 훅)로
+        #   센다 — CSS 클래스는 이름만 바꿔도 조용히 깨지지만, 이 속성이 바뀌면 메뉴가
+        #   안 접혀 눈에 바로 띈다. (c) 링크는 `class=` 인접을 요구하지 않고 `<a href="`
+        #   자체만 센다 — 속성 순서가 바뀌어도 안 흔들린다.
+        #   **그래도 여전히 마크업을 정규식으로 센다** — `_admin2_shell.html.j2` 가
+        #   `<nav>` 를 더 쓰거나 LNB 의 `id="lnb"` 를 바꾸면 이 판정도 다시 낡는다
+        #   (그때는 `nav_m is None` 이 되어 items=0 으로 요란하게 실패한다 — 조용히
+        #   넘어가지는 않는다).
+        nav_m = _re41.search(r'<nav\b[^>]*\bid="lnb"[^>]*>(.*?)</nav>', html, _re41.DOTALL)
+        nav_html = nav_m.group(1) if nav_m else ""
+        items = (len(_re41.findall(r'<span class="nav-link-text">', html))     # Phoenix 레이아웃(구 _layout.html.j2)
+                 or (len(_re41.findall(r'data-action="lnb-group"', nav_html))  # 자체 셸 — 그룹 헤더(JS 훅)
+                     + len(_re41.findall(r'class="off"', nav_html))            #          준비 중
+                     + len(_re41.findall(r'<a\s+href="', nav_html))))          #          링크 있는 항목
         want = nav_counts()["total"] + len(NAV)      # 항목 + 그룹 제목
         check(f"[41] {path} LNB 항목 수 = IA", items == want, want, items)
 
@@ -5136,10 +5205,11 @@ def test_rebuild_screens():
     dup = sorted({x for x in labels if labels.count(x) > 1})
     check("[41] NAV 라벨 중복 없음", not dup, "없음", ", ".join(dup) or "-")
 
+    # `old` 폐지(2026-08-12 전면 재구축 확정) — 합계식도 두 항이다
     c = nav_counts()
-    check("[41] NAV 합계 = new+old+todo",
-          c["total"] == c["new"] + c["old"] + c["todo"],
-          c["total"], c["new"] + c["old"] + c["todo"])
+    check("[41] NAV 합계 = new+todo",
+          c["total"] == c["new"] + c["todo"],
+          c["total"], c["new"] + c["todo"])
 
 
 def main():
