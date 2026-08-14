@@ -50,7 +50,7 @@
 | 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) | `dc-compat-rules-2안.html` | **구축 중** (ADM-ENG-010 · UX-28 → 1b) |
 | 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고) |
 | 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **구축 중** (ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력) |
-| 14 | **추천 기준 설정** | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **구축 중** (ADM-ENG-020 · UX-31 → 1a · 조회 전용) |
+| 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **구축 중** (ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명) |
 | 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용) |
 | 16 | **견적 상담 기록** | [req-consult-sessions.md](req-consult-sessions.md) | `spec-consult-sessions.md`(계약) | **구축 중** (ADM-ORD-010 · UX-33 → 1a + 우측 서랍) |
 | 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | — | 정의서 |
@@ -140,7 +140,7 @@
 |---|------|----------|------|
 | 12 | 용도별 최소 사양 | [spec-usage-floors.md](../spec-usage-floors.md) | 구축 중 · UX-29 → 두 안 참고 |
 | 13 | 부품 등급 관리 | [spec-part-grade.md](../spec-part-grade.md) | 구축 중 · UX-30 → 1a + 1b 우측 입력 |
-| 14 | 추천 기준 설정 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
+| 14 | 추천 기준 보기 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
 | 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 구축 중 · UX-32 → 1a · 조회 전용 |
 | 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 구축 중 · UX-33 → 1a + 우측 서랍 |
 

@@ -67,7 +67,7 @@ NAV = [
         ("조립 호환 규칙", None, None),
         ("용도별 최소 사양", None, None),
         ("부품 등급 관리", None, None),
-        ("추천 기준 설정", None, None),
+        ("추천 기준 보기", None, None),
         ("추천 가능 재고 현황", None, None),
         ("견적 상담 기록", None, None),
         ("부품 교체 · 클릭 기록", None, None),
