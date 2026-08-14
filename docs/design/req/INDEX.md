@@ -22,6 +22,15 @@
 > 완전히 연동된 화면**이다(정의서 작성 중 실호출로 확인). 셸 정본화 보고를 화면별로 확인하지
 > 않고 하네스가 넷을 묶어 적은 것이 원인이다 — **상태는 적지 말고 재서 안다**는 규칙을
 > 목차 자신이 어겼다.
+>
+> ⚠ **2026-08-15 발견 — 「마진 정책」화면이 이 목차에 아예 없다.** 실측:
+> `templates/admin/margin_policy.html.j2` · `api/admin_ui_margin_policy.py`
+> (라우트 `/admin2/margin-policy`) · `docs/design/req/req-margin-policy.md` ·
+> `docs/design/spec-margin-policy.md` 넷 다 존재하는데, 이 목차에도 `api/admin_nav.py`
+> (「판매가」 그룹 3항목뿐)에도 행이 없다. **행을 추가하려면 화면 ID·그룹 내 순서를
+> 정해야 하는데 그건 기계적 편집 범위 밖이라 여기서 임의로 채우지 않는다** — 하네스
+> 확인 필요(위 §① 「가격 검토 대기」 정정과 같은 병이지만, 이건 상태가 아니라 **행
+> 자체가 없는** 경우라 한 단계 더 나쁘다).
 
 ## 1. 대시보드
 
@@ -37,7 +46,7 @@
 | 3 | **상품 관리** | [req-products.md](req-products.md) | `dc-products-3안.html` | **재구축 대기** (ADM-PRD-010 · UX-23 → 1a) |
 | 4 | **상품 분류 매핑** | [req-product-category-map.md](req-product-category-map.md) | `dc-product-category-map.html` | **지음** (`/admin2/category-mapping`) |
 | 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **구축 중** (ADM-CSV-010 · UX-21 → 1b) |
-| 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **신설 대기** (ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c) |
+| 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **구축 중** (ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c · 2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
 
 ## 3. 상품사양관리
 
@@ -47,13 +56,13 @@
 | 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 중** (`/admin2/spec-standard` · UX-24 → **1a**) |
 | 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **디자인** (ADM-PRD-050 · UX-27 → 1a) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
-| 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) | `dc-compat-rules-2안.html` | **구축 중** (ADM-ENG-010 · UX-28 → 1b) |
-| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고) |
-| 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **구축 중** (ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력) |
-| 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **구축 중** (ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명) |
-| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용) |
-| 16 | **견적 상담 기록** | [req-consult-sessions.md](req-consult-sessions.md) | `spec-consult-sessions.md`(계약) | **구축 중** (ADM-ORD-010 · UX-33 → 1a + 우측 서랍) |
-| 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | — | 정의서 |
+| 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
+| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고 · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
+| 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **지음** (`/admin2/part-grade` · ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력 · 확인자 검증 통과 · 커밋 `112c5a7` · 메뉴 연결 `7949c98`) |
+| 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **지음** (`/admin2/policy-weights` · ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명 · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
+| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용 · 템플릿은 확인자 검증 통과·커밋 `ec4b7ba`, 라우트 파일이 지금 다른 작업으로 미커밋 수정 중이라 메뉴 미연결) |
+| 16 | **견적 상담 기록** | [req-consult-sessions.md](req-consult-sessions.md) | `spec-consult-sessions.md`(계약) | **지음** (`/admin2/consult-sessions` · ADM-ORD-010 · UX-33 → 1a + 우측 서랍 · 재검증 «결함 0» · 커밋 `d792434` · 메뉴 연결 `68daf6e`) |
+| 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
 
 ## 4. 매입 · 소싱
 
@@ -67,23 +76,23 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | — | 정의서 |
-| 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | — | 정의서 |
-| 23 | 가격 이력 | [req-price-history.md](req-price-history.md) | — | 정의서 |
+| 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
+| 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · ⚠ 아직 미커밋) |
+| 23 | 가격 이력 | [req-price-history.md](req-price-history.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
 
 ## 6. 인계 · 성과
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | — | 정의서 |
-| 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | — | 정의서 |
+| 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
+| 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
 | 26 | 유입 성과 | [req-funnel-performance.md](req-funnel-performance.md) | — | 정의서 |
 
 ## 7. AI 관리
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 대기** (`/admin2/dash` · UX-25 단일안) |
+| 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
 | 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md) (구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | — | **재정의** (`/admin2/spec-fill` 존재) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
 | 30 | **AI 연동 설정** | [req-ai-integration.md](req-ai-integration.md) | `dc-ai-integration.html` | **지음** (`/admin2/ai-integration`) |
