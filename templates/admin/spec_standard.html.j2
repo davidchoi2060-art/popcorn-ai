@@ -1,383 +1,891 @@
 {#
-  조립 사양 표준 (ADM-STD-010) — 2026-08-11
+  조립 사양 표준 (ADM-STD-010) — 재구축 2026-08-14/15 (UX-24 → **1a** 결핍 패널 + 표 · 모달)
 
-  **이 화면은 「무엇이 비었는가」를 먼저 말한다.** 목록이 아니라 그것이 이 화면의 일이다.
-  항목이 있다는 것과 값이 있다는 것은 다른데, 둘을 섞어 보여주면 "표준을 세웠다"는
-  착각을 만든다. 그래서 상단 4칸이 전부 **충족**에 대한 것이고 항목 수는 하나뿐이다.
+  ⚠ **2026-08-15 확정 변경**: 처음엔 1b(결핍 큐 + 항목 서랍)로 확정됐었으나, 사장님이
+  **1a(결핍 패널 + 표 · 모달)로 확정을 바꿨다.** 이 파일은 그 재작업 결과다. 데이터·
+  로직·정직성 처리(승격 조건 계산, API 갭 정직 비활성, 실측 401 처리)는 1b 버전에서
+  **그대로 옮겼다** — 바뀐 것은 레이아웃뿐이다:
 
-  **사람이 항목을 추가할 수 있다.** 사용자 방침(2026-08-11):
-  *"모자란 사양이 있다면 사용자가 직접 추가할 수 있도록 UI를 만들면 된다.
-    없는 스펙을 전부 맞출려고 하지 마라 — 일부는 사람에게 남겨두면 된다."*
-  EAV 라 정의 행 하나면 끝이다 — 컬럼 추가도, 마이그레이션 파일 기록도 없다
-  (그 파일 쓰기가 배포 서버에서 실패한 전례가 있다. 슬라이스 81 `cpu_gpu`).
+      결핍 표시   좌측 「채울 일」 큐(카드 목록)   →  **상단 결핍 칩 패널**(값 0% 항목을
+                  칩으로 나열, 부품 코드 병기)
+      표          5열 · 좌우 분할                →  **9열**(키·이름·자료형·단위·판정·
+                  적용 부품·호환 관계·충족률·수정) · 전체 폭
+      입력        우측 슬라이드 서랍              →  **가운데 모달**(오버레이 중앙 정렬)
+      필터·KPI    변화 없음(필 5종 그대로, KPI 4칸 그대로)
 
-  **삭제 버튼은 없다.** 정의를 지우면 그 값이 어디에도 안 남는다. 쓰지 않을 항목은
-  적용 대상을 비워 감춘다 — 값은 남고 판정에서만 빠진다.
+  ■ 출처 — 사장님이 Claude Design에서 확정한 원안
+    파일: `docs/design/dc-spec-standard-2안.html`(캔버스에 1a/1b 두 안 — **지금은 1a가
+    정본, 1b는 탈락**). decision-log UX-24(2026-08-14, 2026-08-15 레이아웃 변경 반영).
 
-  숫자는 전부 서버 응답만 쓴다(`/api/admin/std/spec-defs`). 선택지(부품 종류·자료형·
-  관계 번호)도 서버가 준다 — 화면에 하드코딩하면 서버가 늘어도 화면이 모른다.
+  ■★ 이 화면은 "셸만"이 아니었다 — 실측 정정(요구사항 정의서 ①)
+    본문은 원래 Phoenix(Bootstrap)였지만 데이터·쓰기는 이미 전부 실 API였다
+    (`GET/POST /api/admin/std/spec-defs`, `PATCH .../part-types`). 2026-08-14 재구축에서
+    Phoenix/Bootstrap 이디엄을 걷어내고 admin2 손짜기 이디엄(`reviews`·`operators_roles`
+    ·`ops_assistant`와 같은 결 — `admin2.css`의 `--rv-*` 변수만 쓰고 벤더 CSS/JS는
+    싣지 않는다)으로 갈아입혔다. Phoenix 벤더 스크립트 15개(bootstrap·popper·list.js·
+    choices 등)를 전부 걷어냈다 — 이 화면은 그 어느 것에도 의존하지 않는다.
+    ⚠ `mockups/shared/admin2/admin2.css` 상단 주석은 아직 이 화면을 "Phoenix 자산도
+    함께 로드하는 화면" 목록에 넣어 두고 있다 — 그 파일은 담당 밖이라 고치지 않았다.
 
-  ■ 2026-08-13 셸 통합 — LNB·헤더·팔레트는 admin2 공통 셸(`_admin2_shell.html.j2`)로
-    옮겼다. 본문은 여전히 Phoenix(Bootstrap) 카드·표·모달이라 `head_extra`/
-    `foot_extra` 블록으로 그 벤더 CSS·JS를 함께 싣는다. `data-screen-id`/`data-domain`
-    /빵부스러기는 이제 라우트(`api/admin_ui_spec_standard.py`)가 컨텍스트로 준다
-    (예전엔 이 화면만 `body_attrs` 블록을 아예 안 채워 `<body>`에 그 속성이 빠져
-    있었다 — 이번에 셸이 자동으로 채우므로 그 빈틈도 해소됐다).
+  ■★ API 실측 — 화면이 요구하는 필드 중 실제로 모자란 것 (제작 보고서에도 남긴다)
+    `GET /api/admin/std/spec-defs` 응답(dev-login 세션으로 직접 호출 확인)은
+    `field_key·label·data_type·unit·part_types·compat_pairs·is_blocking·is_custom·
+    note·need·got·pct·part_labels`를 전부 준다 — 표·모달이 요구하는 대부분은 이
+    필드만으로 실측 그대로 그릴 수 있다. **2026-08-14 시점 모자란 것 셋** — ①·③은
+    2026-08-15 API 보강으로 해소됐다(아래 갱신 문단 참조):
+      ① ~~이름·단위·메모를 저장하는 API가 없다~~ → **2026-08-15 해소.**
+         `PATCH /api/admin/std/spec-defs/{field_key}`가 신설됐다(label·unit·note
+         세 필드만 받는다 — field_key·data_type은 모델에 그 자리 자체가 없다, 코드
+         확인). "수정" 모달의 편집 카드를 정직 비활성에서 실제 저장으로 바꿨다.
+      ② **정본 승격(std.spec_defs → spec_field_defs) API가 없다.** 목차(#9 "상품 사양
+         정의")도 아직 화면이 없다(`href=None`). 승격 조건(값≥1·적용 부품≥1종·관계
+         지정됨)은 **실 데이터로 계산**해 "수정" 모달에 보여주지만, 조건을 충족해도
+         버튼은 계속 잠긴 채 "이관 기능 준비 중"이라고 말한다 — 조건 미달과
+         "기능 자체가 없음"을 문구로 구분한다. **1a는 이 계산 결과를 표의 "승격 후보"
+         배지로도 함께 보여준다**(사장님 확정 — 서랍 안 카드 대신 표 배지 + 모달 상세).
+         **이 항목은 그대로 남아 있다 — 이번 갱신 범위 밖.**
+      ③ ~~부품 종류 한글 라벨을 API가 안 준다~~ → **2026-08-15 해소.** 응답에
+         `part_labels`(실측 10종 — CASE·COOLER_CPU_AIO·COOLER_CPU_AIR·CPU·GPU·HDD·
+         MB·POWER·RAM·SSD)가 추가돼 표·칩이 이제 한글 라벨을 쓴다(`partLabel()`).
+         `taxonomy.PART_LABELS`를 클라이언트에서 다시 베끼지 않는다(CANON §1) —
+         서버가 준 맵만 읽고, 없는 키는 지어내지 않고 코드를 그대로 보여준다.
+    `api/admin_std.py`는 이 화면과 "조립 호환 지도"(다른 제작자 작업 중·절대 열지
+    말라고 지시받음)가 함께 쓰는 파일이라 담당 밖이다 — 고치지 않았다.
+
+  ■★ 2026-08-15 쓰기 실측 — PATCH /api/admin/std/spec-defs/{field_key}
+    dev-login 세션으로 실패 네 경로 + 정상 경로 1건을 직접 호출해 확인했다(쓰기
+    시험은 이 화면의 이 엔드포인트 하나만 허용됨 — 시험 후 원값으로 복원하고
+    재조회로 복원까지 확인했다):
+      401 무쿠키               {"detail":"로그인이 필요합니다"}
+      404 없는 field_key       {"detail":"없는 항목입니다"}
+      400 공백 라벨            {"detail":"이름(라벨)을 적어 주세요"}
+      422 label 필드 자체 누락  {"detail":[{"type":"missing","loc":["body","label"],…}]}
+      200 정상("socket" 항목)  label·unit·note 저장 확인 → 원값(label="소켓"·unit=null·
+                               note="가장 기본. 안 맞으면 물리적으로 안 꽂힌다")으로
+                               복원, 재조회로 일치 확인(before/after JSON 동일)
+    네 실패 모두 공용 `window.popcornProgress.errText()`(담당 밖, 이미 문자열/배열
+    detail을 둘 다 사유별로 풀어낸다)가 처리한다 — 이 화면에서 새로 분기하지 않았다
+    (중복 방지, 확인 화면·회귀와 같은 방식).
+
+  ■ 1a 원안과 다르게 구현한 지점
+    ① "수정" 모달은 원안 캔버스에 없다(1a는 "수정" 텍스트 스텁만 있고 그 뒤가
+       비어 있다) — **1b에서 이미 만든 편집 카드·적용 부품 칩·정본 승격 카드를
+       그대로 가져와** 같은 시각 언어(모달)로 담았다(사장님 지시: "승격 조건 계산과
+       잠금 사유 문구는 네가 이미 만든 것을 그대로 살려라").
+    ② 결핍 칩 패널은 원안처럼 12개 고정 예시가 아니라 **실측 pct===0 전체**를 보여준다
+       (지금 실측 13개 — 디자인 예시 12개와 다르다, 서버 값을 쓴 것이 맞다).
+    ③ "부품 전체" 등 필터 필 숫자·"N건은 한 번에 받아…" 문구의 N은 **실 데이터**
+       (`S.items.length`)로 계산한다.
+    ④ 추가 모달의 "추가하면 이렇게 됩니다" 미리보기 문장은 서버가 성공 시 실제로
+       돌려주는 `verdict` 문장과 같은 서식으로 **클라이언트가 미리 조합**한다(서버
+       템플릿 그대로 — 지어낸 문구 아님). 예약어 개수도 `meta.reserved.length` 실값.
+
+  ■ 2026-08-13 셸 통합 — `_admin2_shell.html.j2` 상속. 좌측 메뉴·헤더·토스트 컨테이너·
+    `/shared/ui-progress.js`(쓰기 자동 진행바)·`/shared/admin2/admin2-shell.js`
+    (`Admin2Shell.canWrite`·`Admin2Shell.toast`·`Admin2Shell.meReady`)는 셸이 싣는다 —
+    이 화면은 벤더 스크립트를 하나도 추가로 싣지 않는다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
 {% block title %}조립 사양 표준{% endblock %}
 
 {% block head_extra %}
-{# Phoenix(Bootstrap) 벤더 자산 — 본문 카드·표·모달이 여전히 이 컴포넌트에 의존한다. #}
-<link rel="apple-touch-icon" sizes="180x180" href="/admin/assets/img/favicons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/admin/assets/img/favicons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/admin/assets/img/favicons/favicon-16x16.png">
-<link rel="shortcut icon" type="image/x-icon" href="/admin/assets/img/favicons/favicon.ico">
-<meta name="theme-color" content="#ffffff">
-<script src="/admin/vendors/simplebar/simplebar.min.js"></script>
-<script src="/admin/assets/js/config.js"></script>
-<link href="/admin/vendors/simplebar/simplebar.min.css" rel="stylesheet">
-<link href="/admin/vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
-<script src="/shared/ui-choices.js"></script>
-<script src="/shared/ui-list.js"></script>
-<link href="/admin/assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
-<link href="/admin/assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
 <style>
-  :root{ --phoenix-font-sans-serif: var(--font); }
-  .card > .card-header, .card > .card-body { min-width: 0; }
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+/* 네이티브 버튼 렌더링을 끈다 — 켜져 있으면 그리드 안 버튼(.ss-row 등)의 width:100%가
+   실제보다 좁게 계산돼 헤더와 데이터 행의 열이 어긋난다(operators_roles.html.j2가
+   실측으로 겪고 고친 결함과 같은 원인 — 처음부터 적용한다). */
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  margin:0;padding:0;border:0;background:none}
+input,select,textarea{font-family:var(--rv-font)}
+.ss-mono{font-family:var(--rv-mono)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+.ss-hint{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+
+/* ── 루트 · 상태 스위칭 ── */
+.ss-root{--ss-blue:oklch(0.5 0.12 250);flex:1;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.ss-loading,.ss-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;text-align:center}
+.ss-loading[hidden],.ss-errbox[hidden],.ss-body[hidden]{display:none}
+.ss-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.ss-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);max-width:420px}
+.ss-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+.ss-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── 상단 소개 ── */
+.ss-intro{flex:none;padding:16px 18px 0}
+.ss-intro h2{margin:0 0 4px;font:600 18px/1.3 var(--rv-font);color:var(--rv-ink)}
+.ss-intro p{margin:0;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted);max-width:66ch}
+
+/* ── KPI (변화 없음) ── */
+.ss-kpis{flex:none;padding:12px 18px 0;display:flex;gap:10px;flex-wrap:wrap}
+.ss-kpi{flex:1;min-width:150px;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);
+  border-left:3px solid var(--rv-dim3);border-radius:8px;padding:10px 13px}
+.ss-kpi.red{border-left-color:var(--rv-red)}
+.ss-kpi.amber{border-left-color:var(--rv-amber)}
+.ss-kpi-label{font:500 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.ss-kpi-row{display:flex;align-items:baseline;gap:6px;margin-top:3px;flex-wrap:wrap}
+.ss-kpi-value{font:600 24px/1.15 var(--rv-mono);color:var(--rv-ink)}
+.ss-kpi.red .ss-kpi-value{color:var(--rv-red)}
+.ss-kpi.amber .ss-kpi-value{color:oklch(0.45 0.13 55)}
+.ss-kpi-note{font:400 10px/1.4 var(--rv-font);color:var(--rv-dim)}
+
+/* ── 결핍 칩 패널 (1a — 1b의 좌측 큐를 대신한다) ── */
+.ss-zeropanel{flex:none;margin:12px 18px 0;border:1px solid var(--rv-amber-line);border-left:3px solid var(--rv-amber);
+  background:var(--rv-amber-bg);border-radius:8px;padding:11px 14px}
+.ss-zeropanel[hidden]{display:none}
+.ss-zeropanel-top{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.ss-zeropanel-title{font:600 11.5px/1.4 var(--rv-font);color:oklch(0.42 0.13 55)}
+.ss-zeropanel-sub{font:400 10px/1.4 var(--rv-font);color:#5b564d}
+.ss-zerochips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.ss-zerochip{font:500 10.5px/1 var(--rv-font);color:oklch(0.45 0.14 30);background:var(--rv-card);
+  border:1px solid oklch(0.62 0.15 55 / .45);border-radius:4px;padding:5px 8px;cursor:pointer}
+.ss-zerochip-part{font-family:var(--rv-mono);color:var(--rv-dim)}
+
+/* ── 필터 행 ── */
+.ss-filterrow{flex:none;display:flex;align-items:center;gap:9px;padding:12px 18px 0;flex-wrap:wrap}
+.ss-pills{display:flex;gap:6px;flex-wrap:wrap}
+.ss-pill{font:500 11px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:8px 11px;cursor:pointer;white-space:nowrap}
+.ss-pill.on{font-weight:600;color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.ss-grow{flex:1}
+.ss-pagenote{font:400 10px/1.4 var(--rv-font);color:var(--rv-dim);white-space:nowrap}
+.ss-btn-dark{font:600 11px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+  border-radius:5px;padding:9px 13px;cursor:pointer;white-space:nowrap}
+.ss-btn-dark:disabled{background:var(--rv-dim2);color:#f0ece2;cursor:not-allowed}
+.ss-btn-line{font:500 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 13px;cursor:pointer}
+
+/* ── 표 — 9열 · 전체 폭 ── */
+.ss-tablewrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px 18px 0}
+.ss-grid-head{flex:none;display:grid;
+  grid-template-columns:168px minmax(160px,1fr) 84px 60px 72px minmax(130px,170px) 108px 112px 64px;
+  gap:10px;align-items:center;padding:8px 13px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+  border-radius:7px 7px 0 0;font:600 10px/1 var(--rv-font);color:var(--rv-faint);
+  overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
+.ss-grid-body{flex:1;min-height:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
+  border-radius:0 0 7px 7px;overflow:auto;scrollbar-gutter:stable;margin-bottom:12px}
+.ss-row{display:grid;grid-template-columns:168px minmax(160px,1fr) 84px 60px 72px minmax(130px,170px) 108px 112px 64px;
+  gap:10px;align-items:center;width:100%;text-align:left;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer}
+.ss-row.zero{background:oklch(0.985 0.008 30)}
+.ss-row-key{display:flex;align-items:center;gap:6px;min-width:0}
+.ss-row-keytx{font:500 10.5px/1.3 var(--rv-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-row-label{font:500 11.5px/1.35 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-row-type{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-row-unit{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-dim)}
+.ss-badge{font:600 9.5px/1 var(--rv-font);text-align:center;border-radius:4px;padding:4px 0;border:1px solid rgba(0,0,0,.06)}
+.ss-badge-block{color:oklch(0.42 0.13 30);background:oklch(0.96 0.02 30)}
+.ss-badge-warn{color:#7d7669;background:var(--rv-panel2);border-color:rgba(0,0,0,.12)}
+.ss-row-parts{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-row-pairs{font:500 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-row-pairs.dim{color:var(--rv-dim);font-family:var(--rv-font);font-weight:400}
+.ss-bar-wrap{display:flex;align-items:center;gap:7px}
+.ss-bar-bg{flex:1;height:5px;background:rgba(0,0,0,.08);border-radius:3px}
+.ss-bar-fill{display:block;height:100%;border-radius:3px}
+.ss-pct-tx{width:34px;text-align:right;font:600 10.5px/1 var(--rv-mono);flex:none}
+.ss-promo-tag{font:600 8.5px/1 var(--rv-font);color:var(--ss-blue);background:oklch(0.96 0.02 250);
+  border:1px solid rgba(0,0,0,.06);border-radius:3px;padding:3px 4px;white-space:nowrap;flex:none}
+.ss-editlink{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);border:1px solid rgba(0,0,0,.22);
+  border-radius:5px;padding:6px 0;text-align:center;display:block}
+.ss-empty{padding:30px;text-align:center;font:400 11px/1.6 var(--rv-font);color:var(--rv-dim)}
+
+.ss-footnote{flex:none;border-top:1px solid rgba(0,0,0,.09);background:var(--rv-panel);
+  padding:8px 18px;font:400 10px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 모달 (1a — 1b의 우측 서랍을 대신한다. 내용은 1b에서 그대로 옮김) ── */
+.ss-modal-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(38,35,30,.28);
+  z-index:7;display:flex;align-items:center;justify-content:center;padding:24px}
+.ss-modal-overlay[hidden]{display:none}
+.ss-modal{width:660px;max-width:100%;max-height:100%;background:var(--rv-card);border-radius:11px;
+  box-shadow:0 24px 60px rgba(38,35,30,.34);display:flex;flex-direction:column;overflow:hidden;z-index:8}
+.ss-modal[hidden]{display:none}
+.ss-modal-hd{flex:none;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.09)}
+.ss-modal-hdrow{display:flex;align-items:center;gap:9px}
+.ss-modal-title{font:600 14px/1.35 var(--rv-font);flex:1;min-width:0}
+.ss-modal-sub{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim);white-space:nowrap}
+.ss-status-badge{font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;border:1px solid;white-space:nowrap;flex:none}
+.ss-modal-close{font:400 15px/1 var(--rv-font);color:var(--rv-faint);background:none;border:0;cursor:pointer;padding:2px 4px;flex:none}
+.ss-modal-meta{display:flex;gap:11px;margin-top:7px;font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint);flex-wrap:wrap}
+.ss-modal-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:13px}
+.ss-modal-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;background:var(--rv-panel);
+  font:400 10.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+
+.ss-card{border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:12px 14px}
+.ss-card-strong{border:2px solid var(--rv-ink);box-shadow:0 4px 14px rgba(38,35,30,.1)}
+.ss-card-blue{border-color:oklch(0.5 0.12 250 / .45);border-left:3px solid var(--ss-blue);background:oklch(0.97 0.02 250)}
+.ss-card-title-row{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.ss-card-title{font:600 11px/1 var(--rv-font)}
+.ss-card-hint{font:400 9.5px/1.4 var(--rv-font);color:var(--rv-dim)}
+
+.ss-form-grid{display:grid;grid-template-columns:78px 1fr;gap:9px 12px;align-items:center}
+.ss-form-label{font:500 10.5px/1.4 var(--rv-font);color:var(--rv-faint)}
+.ss-input,.ss-select,.ss-textarea{font:400 11.5px/1.3 var(--rv-font);border:1px solid rgba(0,0,0,.22);
+  border-radius:5px;padding:9px 10px;background:var(--rv-card);width:100%}
+.ss-input:disabled,.ss-select:disabled,.ss-textarea:disabled{background:var(--rv-panel2);color:var(--rv-muted);cursor:not-allowed}
+.ss-textarea{resize:vertical;min-height:44px;font-family:var(--rv-font)}
+.ss-fixedline{font:400 11px/1.5 var(--rv-mono);color:var(--rv-dim);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.1);border-radius:5px;padding:9px 10px}
+.ss-btns-end{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+
+.ss-chiprow{display:flex;flex-wrap:wrap;gap:5px}
+.ss-chip{font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:6px 9px;cursor:pointer;
+  border:1px solid rgba(0,0,0,.16);background:var(--rv-card);color:var(--rv-ink-soft)}
+.ss-chip.on{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink)}
+.ss-chip:disabled{cursor:not-allowed;opacity:.55}
+.ss-chiphint{font:400 9.5px/1.55 var(--rv-font);color:var(--rv-dim);margin-top:7px}
+
+.ss-previewbox{border:1px solid rgba(0,0,0,.12);background:var(--rv-panel);border-radius:7px;
+  padding:10px 12px;font:400 10.5px/1.7 var(--rv-font);color:#4a463e}
+
+.ss-promo-body{font:400 10.5px/1.7 var(--rv-font);color:#4a463e;margin-top:4px}
+.ss-promo-condrow{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
+.ss-promo-cond{font:400 10px/1.5 var(--rv-mono);color:var(--rv-faint);flex:1;min-width:190px}
+.ss-promo-btn{font:600 11px/1 var(--rv-font);color:#f0ece2;background:var(--rv-dim2);border:none;
+  border-radius:5px;padding:9px 13px;cursor:not-allowed;white-space:nowrap}
+
+.ss-errline{border:1px solid rgba(0,0,0,.14);border-left:3px solid var(--rv-red);background:oklch(0.97 0.02 30);
+  border-radius:7px;padding:9px 12px;font:400 11px/1.6 var(--rv-font);color:#4a2620;margin-top:4px}
+.ss-errline[hidden]{display:none}
+
+@media (max-width:768px){
+  .ss-grid-head,.ss-row{grid-template-columns:minmax(120px,1fr) 72px 100px}
+  .ss-c-key,.ss-c-type,.ss-c-unit,.ss-c-parts,.ss-c-pairs,.ss-c-edit{display:none}
+  .ss-modal-overlay{padding:0}
+  .ss-modal{width:100%;max-width:100%;height:100%;border-radius:0}
+}
 </style>
 {% endblock %}
 
+{% block header_extra %}
+<span class="ss-hint">조회 viewer · 추가·수정 operator</span>
+<span class="ss-hint ss-mono">std.spec_defs</span>
+{% endblock %}
+
 {% block content %}
-<div class="a2-content-pad">
-<div data-screen-id="ADM-STD-010" data-domain="spec-standard">
+<div class="ss-root">
+  <div class="ss-loading" id="ssLoading">불러오는 중…</div>
 
-  <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
-    <div>
-      <h2 class="mb-1">조립 사양 표준</h2>
-      <p class="text-body-tertiary mb-0" style="max-width:62ch">
-        부품이 서로 맞는지 판정하려면 부품마다 정해진 사양이 있어야 합니다.
-        <b>없으면 조립을 보증할 수 없습니다.</b> 모자란 항목은 아래에서 직접 추가하십시오.
-      </p>
-    </div>
-    <button class="btn btn-primary" data-action="open-add">
-      <span class="fas fa-plus me-2"></span>사양 항목 추가
-    </button>
+  <div class="ss-errbox" id="ssErrBox" hidden>
+    <div class="ti">불러오지 못했습니다</div>
+    <div class="ds" id="ssErrMsg"></div>
+    <button type="button" data-action="retry-boot">다시 시도</button>
   </div>
 
-  <div class="row g-3 mb-4" data-bind="kpis">
-    <div class="col-6 col-lg-3">
-      <div class="card h-100"><div class="card-body">
-        <h6 class="text-body-tertiary mb-2">표준 항목</h6>
-        <div class="fs-4 fw-bold" data-bind="k-total">—</div>
-        <div class="text-body-quaternary fs-9" data-bind="k-total-sub">&nbsp;</div>
-      </div></div>
+  <div class="ss-body" id="ssBody" hidden>
+    <div class="ss-intro">
+      <h2>조립 사양 표준</h2>
+      <p>부품이 서로 맞는지 판정하려면 부품마다 정해진 사양이 있어야 합니다. 없으면
+      조립을 보증할 수 없습니다. 값이 하나도 없는 항목은 아래 결핍 패널에서 먼저
+      확인하십시오 — 항목을 새로 만들어도 값이 쌓이고 정본으로 승격되기 전까지는
+      견적·추천 판정에 쓰이지 않습니다.</p>
     </div>
-    <div class="col-6 col-lg-3">
-      <div class="card h-100"><div class="card-body">
-        <h6 class="text-body-tertiary mb-2">값이 거의 다 찬 항목</h6>
-        <div class="fs-4 fw-bold" data-bind="k-good">—</div>
-        <div class="text-body-quaternary fs-9">90% 이상</div>
-      </div></div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card h-100"><div class="card-body">
-        <h6 class="text-body-tertiary mb-2">절반도 못 찬 항목</h6>
-        <div class="fs-4 fw-bold text-warning" data-bind="k-mid">—</div>
-        <div class="text-body-quaternary fs-9">1~49%</div>
-      </div></div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card h-100"><div class="card-body">
-        <h6 class="text-body-tertiary mb-2">값이 하나도 없는 항목</h6>
-        <div class="fs-4 fw-bold text-danger" data-bind="k-zero">—</div>
-        <div class="text-body-quaternary fs-9">사람이 넣어야 합니다</div>
-      </div></div>
-    </div>
-  </div>
 
-  <div class="card mb-4" data-bind="empty-panel" hidden>
-    <div class="card-body">
-      <h5 class="mb-2"><span class="fas fa-triangle-exclamation text-danger me-2"></span>값이 하나도 없는 항목</h5>
-      <p class="text-body-tertiary fs-9 mb-3">
-        원문(상품 스펙 텍스트)에 없어 파싱으로는 못 채웁니다.
-        제조사 자료를 보거나 사람이 넣어야 합니다.
-      </p>
-      <div class="d-flex flex-wrap gap-2" data-bind="empty-list"></div>
-    </div>
-  </div>
+    <div class="ss-kpis" id="ssKpis"></div>
 
-  <div class="card">
-    <div class="card-header border-bottom d-flex flex-wrap gap-2 align-items-center">
-      <select class="form-select form-select-sm w-auto" data-bind="filter-part">
-        <option value="">부품 전체</option>
-      </select>
-      <select class="form-select form-select-sm w-auto" data-bind="filter-state">
-        <option value="">충족 상태 전체</option>
-        <option value="zero">값 없음 (0%)</option>
-        <option value="low">절반 미만 (1~49%)</option>
-        <option value="mid">50~89%</option>
-        <option value="good">90% 이상</option>
-      </select>
-      <span class="ms-auto text-body-tertiary fs-9" data-bind="count">—</span>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0 fs-9">
-          <colgroup>
-            <col style="width:24%"><col style="width:9%"><col style="width:20%">
-            <col style="width:11%"><col style="width:8%"><col style="width:16%"><col style="width:12%">
-          </colgroup>
-          <thead class="border-bottom">
-            <tr>
-              <th class="ps-3">사양</th><th>자료형</th><th>적용 부품</th>
-              <th>호환 관계</th><th>판정</th><th>충족</th><th class="pe-3">출처</th>
-            </tr>
-          </thead>
-          <tbody data-repeat="defs"></tbody>
-        </table>
+    <div class="ss-zeropanel" id="ssZeroPanel" hidden>
+      <div class="ss-zeropanel-top">
+        <span class="ss-zeropanel-title" id="ssZeroTitle"></span>
+        <span class="ss-grow"></span>
+        <span class="ss-zeropanel-sub">원문에 없어 파싱으로는 못 채웁니다 — 제조사 자료를 보거나 사람이 넣어야 합니다</span>
       </div>
-      <div class="p-4 text-center text-body-tertiary" data-bind="empty" hidden>
-        조건에 맞는 항목이 없습니다.
-      </div>
+      <div class="ss-zerochips" id="ssZeroChips"></div>
     </div>
+
+    <div class="ss-filterrow">
+      <div class="ss-pills" id="ssPills"></div>
+      <span class="ss-grow"></span>
+      <span class="ss-pagenote" id="ssPageNote"></span>
+      <button type="button" class="ss-btn-dark" id="ssAddBtn" data-action="open-add" disabled>+ 사양 항목 추가</button>
+    </div>
+
+    <div class="ss-tablewrap">
+      <div class="ss-grid-head">
+        <span class="ss-c-key">키</span><span class="ss-c-name">이름</span><span class="ss-c-type">자료형</span>
+        <span class="ss-c-unit">단위</span><span class="ss-c-block">판정</span><span class="ss-c-parts">적용 부품</span>
+        <span class="ss-c-pairs">호환 관계</span><span class="ss-c-pct">충족률</span><span class="ss-c-edit"></span>
+      </div>
+      <div class="ss-grid-body" id="ssGridBody" data-keep="1"></div>
+    </div>
+
+    <div class="ss-footnote">삭제는 없습니다 — 적용 부품을 비우면 판정에서 빠지고 값은
+    남습니다("없음 — 감춰짐") · 새 호환 관계는 이 화면에서 만들지 않습니다(28개 중 선택) ·
+    항목 추가 ≠ 엔진 반영 · 조회 실패는 401(세션 만료)과 그 밖의 오류를 구분해 안내</div>
   </div>
 
-  <!-- 추가 폼 -->
-  <div class="modal fade" tabindex="-1" data-bind="add-modal" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">사양 항목 추가</h5>
-          <button type="button" class="btn-close" data-action="close-add" aria-label="닫기"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-body-tertiary fs-9">
-            값을 담을 자리를 만듭니다. <b>컬럼을 만들지 않으므로 즉시 쓸 수 있습니다.</b>
-            추가해도 값은 0건이라 당장 판정에 쓰이지는 않습니다.
-          </p>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fs-9">키 <span class="text-body-quaternary">(영문 소문자·숫자·밑줄)</span></label>
-              <input class="form-control form-control-sm" data-bind="f-key" placeholder="radiator_thickness_mm">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fs-9">이름</label>
-              <input class="form-control form-control-sm" data-bind="f-label" placeholder="라디에이터 두께">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fs-9">자료형</label>
-              <select class="form-select form-select-sm" data-bind="f-type"></select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fs-9">단위 <span class="text-body-quaternary">(선택)</span></label>
-              <input class="form-control form-control-sm" data-bind="f-unit" placeholder="mm">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fs-9">판정</label>
-              <select class="form-select form-select-sm" data-bind="f-block">
-                <option value="1">막음 — 없으면 조립 보증 불가</option>
-                <option value="0">경고 — 조립은 되지만 알린다</option>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label fs-9">적용 부품 <span class="text-body-quaternary">(여럿 선택)</span></label>
-              <div class="d-flex flex-wrap gap-2" data-bind="f-parts"></div>
-            </div>
-            <div class="col-12">
-              <label class="form-label fs-9">
-                호환 관계 <span class="text-body-quaternary">(선택 — 이 사양이 어느 판정에 쓰이는지)</span>
-              </label>
-              <div class="d-flex flex-wrap gap-2" data-bind="f-pairs"></div>
-            </div>
-            <div class="col-12">
-              <label class="form-label fs-9">메모 <span class="text-body-quaternary">(왜 필요한지)</span></label>
-              <input class="form-control form-control-sm" data-bind="f-note"
-                     placeholder="27mm 와 45mm 는 상단 장착 시 보드·램 간섭이 다르다">
-            </div>
-          </div>
-          <div class="alert alert-danger mt-3 mb-0 py-2 fs-9" data-bind="f-error" hidden></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-phoenix-secondary btn-sm" data-action="close-add">취소</button>
-          <button class="btn btn-primary btn-sm" data-action="submit-add">추가</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
+  <div class="ss-modal-overlay" id="ssModalOverlay" hidden data-action="close-modal"></div>
+  <div class="ss-modal" id="ssModal" hidden data-keep="1" role="dialog" aria-modal="true" aria-label="사양 항목"></div>
 </div>
 {% endblock %}
 
 {% block foot_extra %}
-<script src="/admin/vendors/popper/popper.min.js"></script>
-<script src="/admin/vendors/bootstrap/bootstrap.min.js"></script>
-<script src="/admin/vendors/anchorjs/anchor.min.js"></script>
-<script src="/admin/vendors/is/is.min.js"></script>
-<script src="/admin/vendors/fontawesome/all.min.js"></script>
-<script src="/admin/vendors/lodash/lodash.min.js"></script>
-<script src="/admin/vendors/list.js/list.min.js"></script>
-<script src="/admin/vendors/feather-icons/feather.min.js"></script>
-<script src="/admin/vendors/dayjs/dayjs.min.js"></script>
-<script src="/admin/vendors/choices/choices.min.js"></script>
-<script src="/admin/assets/js/phoenix.js"></script>
-<script src="/shared/admin-panel.js"></script>
-<script src="/shared/admin-helper.js"></script>
-<script src="/shared/su-icons.js"></script>
+{% raw %}
 <script>
-(function(){
-  var $ = function(k){ return document.querySelector('[data-bind="'+k+'"]'); };
-  var STATE = { all: [], meta: null };
+(function () {
+  'use strict';
 
-  function pctClass(p){
-    if (p === null) return 'text-body-quaternary';
-    if (p === 0) return 'text-danger';
-    if (p < 50) return 'text-warning';
-    return 'text-body';
-  }
-  function bar(p){
-    if (p === null) return '<span class="text-body-quaternary fs-9">적용 대상 없음</span>';
-    var c = p === 0 ? 'bg-danger' : (p < 50 ? 'bg-warning' : (p < 90 ? 'bg-info' : 'bg-success'));
-    return '<div class="d-flex align-items-center gap-2">'
-         + '<div class="progress" style="width:64px;height:5px">'
-         + '<div class="progress-bar '+c+'" style="width:'+Math.max(p,2)+'%"></div></div>'
-         + '<span class="'+pctClass(p)+' fs-9" style="font-variant-numeric:tabular-nums">'+p+'%</span></div>';
-  }
-  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){
-    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[m]; }); }
+  var S = {
+    items: [], meta: null,
+    filter: '',              // '' | 'zero' | 'low' | 'mid' | 'good' — 표 전용 필터
+    modalOpen: false, modalMode: null,  // 'edit' | 'add'
+    selKey: null,             // 수정 중인 field_key
+    addDraft: null,           // 추가 모달 임시 입력값
+    addErr: null,
+    editDraft: null,          // 수정 모달 — 이름·단위·메모 임시 입력값(2026-08-15 신설)
+    editErr: null,
+    editSaving: false,
+    patchingKey: null         // 적용 대상 PATCH 진행 중인 field_key(중복 클릭 방지)
+  };
 
-  function render(){
-    var part = $('filter-part').value, st = $('filter-state').value;
-    var rows = STATE.all.filter(function(d){
-      if (part && d.part_types.indexOf(part) < 0) return false;
-      if (!st) return true;
-      var p = d.pct;
-      if (st === 'zero') return p === 0;
-      if (st === 'low')  return p !== null && p > 0 && p < 50;
-      if (st === 'mid')  return p !== null && p >= 50 && p < 90;
-      if (st === 'good') return p !== null && p >= 90;
-      return true;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
-    var tb = document.querySelector('[data-repeat="defs"]');
-    tb.innerHTML = rows.map(function(d){
-      return '<tr>'
-        + '<td class="ps-3"><div class="fw-semibold">'+esc(d.label)+'</div>'
-        +   '<div class="text-body-quaternary font-monospace fs-10">'+esc(d.field_key)+'</div></td>'
-        + '<td>'+esc((STATE.meta.types||{})[d.data_type] || d.data_type)
-        +   (d.unit ? ' <span class="text-body-quaternary">('+esc(d.unit)+')</span>' : '')+'</td>'
-        + '<td>'+(d.part_types.length
-              ? d.part_types.map(function(p){ return '<span class="badge badge-phoenix badge-phoenix-secondary me-1">'+esc(p)+'</span>'; }).join('')
-              : '<span class="text-body-quaternary">없음 — 감춰짐</span>')+'</td>'
-        + '<td>'+(d.compat_pairs.length
-              ? d.compat_pairs.map(function(p){ return '<span class="badge badge-phoenix badge-phoenix-info me-1">'+esc(p)+'</span>'; }).join('')
-              : '<span class="text-body-quaternary fs-10">정보</span>')+'</td>'
-        + '<td>'+(d.is_blocking
-              ? '<span class="badge badge-phoenix badge-phoenix-danger">막음</span>'
-              : '<span class="badge badge-phoenix badge-phoenix-warning">경고</span>')+'</td>'
-        + '<td>'+bar(d.pct)+'</td>'
-        + '<td class="pe-3">'+(d.is_custom
-              ? '<span class="badge badge-phoenix badge-phoenix-primary">사람이 추가</span>'
-              : '<span class="text-body-quaternary fs-10">표준</span>')+'</td>'
-        + '</tr>';
+  }
+  // 부품 종류 한글 라벨 — 서버가 준 part_labels만 쓴다(taxonomy.PART_LABELS를 화면이
+  // 다시 정의하지 않는다, CANON §1: 부품 어휘는 taxonomy.py 밖에서 정의 금지). 없는
+  // 키는 지어내지 않고 코드를 그대로 보여준다.
+  function partLabel(code) {
+    var m = S.meta && S.meta.part_labels;
+    return (m && m[code]) || code;
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+  function apiPatch(path, body) {
+    return fetch(path, { method: 'PATCH', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+
+  // ── 부팅 ─────────────────────────────────────────────────────────
+  function setView(v) {
+    $('ssLoading').hidden = v !== 'loading';
+    $('ssErrBox').hidden = v !== 'error';
+    $('ssBody').hidden = v !== 'body';
+  }
+
+  function boot() {
+    setView('loading');
+    Promise.all([apiGet('/api/admin/std/spec-defs'), window.Admin2Shell.meReady]).then(function (res) {
+      var resp = res[0];
+      S.items = resp.items || []; S.meta = resp;
+      setView('body');
+      renderPills(); computeKpis(); renderZeroPanel(); renderTable();
+      syncPermissionUI();
+    }).catch(function (err) {
+      setView('error');
+      if (err && err.status === 401) {
+        $('ssErrMsg').textContent = '세션이 만료됐습니다 — 다시 로그인한 뒤 새로고침하십시오.';
+      } else {
+        $('ssErrMsg').textContent = (err && err.message) ? err.message : '알 수 없는 오류입니다.';
+      }
+    });
+  }
+
+  function syncPermissionUI() {
+    var can = window.Admin2Shell.canWrite('operator');
+    var btn = $('ssAddBtn');
+    if (!btn) return;
+    btn.disabled = !can;
+    if (can) btn.removeAttribute('title'); else btn.setAttribute('title', '권한 부족 — operator 이상 필요');
+  }
+
+  function reload(keepKey) {
+    apiGet('/api/admin/std/spec-defs').then(function (resp) {
+      S.items = resp.items || []; S.meta = resp;
+      renderPills(); computeKpis(); renderZeroPanel(); renderTable();
+      if (S.modalMode === 'edit') {
+        var fresh = keepKey ? fieldByKey(keepKey) : null;
+        if (fresh) {
+          S.selKey = keepKey;
+          // 서버가 확정한 값으로 편집 임시값도 다시 맞춘다 — 적용 부품 토글처럼
+          // 다른 동작이 reload를 불러도 이름·단위·메모 입력값이 서버 진실과 어긋나지 않게.
+          S.editDraft = { label: fresh.label, unit: fresh.unit || '', note: fresh.note || '' };
+          renderModal();
+        } else {
+          closeModal();
+        }
+      }
+    }).catch(function (err) {
+      window.Admin2Shell.toast('다시 불러오지 못했습니다 — ' + err.message, 'err');
+    });
+  }
+
+  function fieldByKey(key) {
+    for (var i = 0; i < S.items.length; i++) if (S.items[i].field_key === key) return S.items[i];
+    return null;
+  }
+
+  // ── 판정 공통 ────────────────────────────────────────────────────
+  function bucketOf(p) {
+    if (p === null) return null;
+    if (p === 0) return 'zero';
+    if (p < 50) return 'low';
+    if (p < 90) return 'mid';
+    return 'good';
+  }
+  function barColor(p) {
+    if (p === 0) return 'var(--rv-red)';
+    if (p < 50) return 'var(--rv-amber)';
+    if (p < 90) return '#7d766e';
+    return 'var(--rv-green)';
+  }
+  function pctColor(p) {
+    if (p === 0) return 'var(--rv-red)';
+    if (p < 50) return 'oklch(0.45 0.13 55)';
+    return 'var(--rv-ink)';
+  }
+  function promoStatus(d) {
+    var missing = [];
+    if (!(d.got >= 1)) missing.push('값 0건');
+    if (!(d.part_types.length >= 1)) missing.push('적용 부품 0종');
+    if (!(d.compat_pairs.length >= 1)) missing.push('관계 미지정');
+    return { ok: missing.length === 0, missing: missing };
+  }
+
+  // ── KPI (변화 없음) ──────────────────────────────────────────────
+  function computeKpis() {
+    var items = S.items;
+    var withPct = items.filter(function (d) { return d.pct !== null; });
+    var zero = withPct.filter(function (d) { return d.pct === 0; });
+    var low = withPct.filter(function (d) { return d.pct > 0 && d.pct < 50; });
+    var custom = items.filter(function (d) { return d.is_custom; });
+    var avg = withPct.length
+      ? Math.round(withPct.reduce(function (s, d) { return s + d.pct; }, 0) / withPct.length)
+      : null;
+    var cards = [
+      { label: '값 0%인 항목', value: String(zero.length), note: '항목은 있으나 판정 불가', cls: 'red' },
+      { label: '절반 미만(1~49%)', value: String(low.length), note: '판정이 자주 탈락', cls: 'amber' },
+      { label: '평균 충족률', value: (avg === null ? '못 쟀음' : avg + '%'), note: '재고 있는 판매중 기준', cls: '' },
+      { label: '표준 항목', value: String(items.length), note: '사람이 추가한 것 ' + custom.length + '개', cls: '' }
+    ];
+    $('ssKpis').innerHTML = cards.map(function (c) {
+      return '<div class="ss-kpi ' + c.cls + '"><div class="ss-kpi-label">' + esc(c.label) + '</div>' +
+        '<div class="ss-kpi-row"><span class="ss-kpi-value num">' + esc(c.value) + '</span>' +
+        '<span class="ss-kpi-note">' + esc(c.note) + '</span></div></div>';
     }).join('');
-    $('empty').hidden = rows.length > 0;
-    $('count').textContent = '전체 ' + STATE.all.length + '개 중 ' + rows.length + '개';
   }
 
-  function fillKpis(){
-    var a = STATE.all;
-    var withNeed = a.filter(function(d){ return d.pct !== null; });
-    var zero = withNeed.filter(function(d){ return d.pct === 0; });
-    $('k-total').textContent = a.length;
-    $('k-total-sub').textContent = '사람이 추가한 것 ' + a.filter(function(d){ return d.is_custom; }).length + '개';
-    $('k-good').textContent = withNeed.filter(function(d){ return d.pct >= 90; }).length;
-    $('k-mid').textContent  = withNeed.filter(function(d){ return d.pct > 0 && d.pct < 50; }).length;
-    $('k-zero').textContent = zero.length;
-    if (zero.length){
-      $('empty-panel').hidden = false;
-      $('empty-list').innerHTML = zero.map(function(d){
-        return '<span class="badge badge-phoenix badge-phoenix-danger">'+esc(d.label)
-             + ' <span class="opacity-75">'+esc(d.part_types.join(','))+'</span></span>';
-      }).join('');
-    }
+  // ── 결핍 칩 패널 ─────────────────────────────────────────────────
+  function renderZeroPanel() {
+    var zero = S.items.filter(function (d) { return d.pct === 0; });
+    var panel = $('ssZeroPanel');
+    panel.hidden = zero.length === 0;
+    if (!zero.length) { $('ssZeroChips').innerHTML = ''; return; }
+    $('ssZeroTitle').textContent = '▲ 값이 하나도 없는 항목 ' + zero.length + '개 — 항목은 있는데 판정은 못 합니다';
+    $('ssZeroChips').innerHTML = zero.map(function (d) {
+      return '<button type="button" class="ss-zerochip" data-action="open-edit" data-key="' + esc(d.field_key) + '">' +
+        esc(d.label) + ' <span class="ss-zerochip-part">' + esc(d.part_types.map(partLabel).join(', ') || '없음') + '</span></button>';
+    }).join('');
   }
 
-  function buildForm(){
-    var m = STATE.meta;
-    $('f-type').innerHTML = Object.keys(m.types).map(function(k){
-      return '<option value="'+k+'">'+esc(m.types[k])+' ('+k+')</option>'; }).join('');
-    $('f-parts').innerHTML = m.part_types.map(function(p){
-      return '<label class="btn btn-sm btn-phoenix-secondary mb-0">'
-           + '<input type="checkbox" class="form-check-input me-1" value="'+esc(p)+'" data-part>'
-           + esc(p)+'</label>'; }).join('');
-    $('f-pairs').innerHTML = m.pairs.map(function(p){
-      return '<label class="btn btn-sm btn-phoenix-secondary mb-0">'
-           + '<input type="checkbox" class="form-check-input me-1" value="'+esc(p)+'" data-pair>'
-           + esc(p)+'</label>'; }).join('');
-    $('filter-part').innerHTML = '<option value="">부품 전체</option>'
-      + m.part_types.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
+  // ── 필터 필 ──────────────────────────────────────────────────────
+  function bucketCounts() {
+    var c = { all: S.items.length, zero: 0, low: 0, mid: 0, good: 0 };
+    S.items.forEach(function (d) {
+      var b = bucketOf(d.pct);
+      if (b) c[b]++;
+    });
+    return c;
+  }
+  function renderPills() {
+    var c = bucketCounts();
+    var defs = [
+      ['', '부품 전체', c.all], ['zero', '값 없음', c.zero], ['low', '~49%', c.low],
+      ['mid', '50~89%', c.mid], ['good', '90%+', c.good]
+    ];
+    $('ssPills').innerHTML = defs.map(function (x) {
+      var on = S.filter === x[0];
+      return '<button type="button" class="ss-pill' + (on ? ' on' : '') + '" data-action="pick-filter" data-f="' + x[0] + '">' +
+        esc(x[1]) + ' <span class="num" style="opacity:.7">' + x[2] + '</span></button>';
+    }).join('');
+    $('ssPageNote').textContent = c.all + '건은 한 번에 받아 화면에서 거릅니다 — 항목이 크게 늘면 서버 페이지네이션으로 바꿉니다';
   }
 
-  function load(){
-    fetch('/api/admin/std/spec-defs').then(function(r){ return r.json(); }).then(function(d){
-      STATE.all = d.items; STATE.meta = d;
-      buildForm(); fillKpis(); render();
-    }).catch(function(e){
-      $('count').textContent = '불러오지 못했습니다 — ' + e;
+  // ── 표 — 전체 항목 (9열) ─────────────────────────────────────────
+  function matchesFilter(d) {
+    if (!S.filter) return true;
+    var b = bucketOf(d.pct);
+    return b === S.filter;
+  }
+  function barCell(p) {
+    if (p === null) return '<span class="ss-row-parts">적용 대상 없음</span>';
+    return '<span class="ss-bar-wrap"><span class="ss-bar-bg"><span class="ss-bar-fill" style="width:' +
+      Math.max(p, 2) + '%;background:' + barColor(p) + '"></span></span>' +
+      '<span class="ss-pct-tx num" style="color:' + pctColor(p) + '">' + p + '%</span></span>';
+  }
+  function rowHtml(d) {
+    var promo = promoStatus(d).ok;
+    var cls = 'ss-row' + (d.pct === 0 ? ' zero' : '');
+    var typeLabel = (S.meta.types && S.meta.types[d.data_type]) || d.data_type;
+    return '<button type="button" class="' + cls + '" data-action="open-edit" data-key="' + esc(d.field_key) +
+      '" aria-label="' + esc(d.label) + ' 수정">' +
+      '<span class="ss-c-key ss-row-key"><span class="ss-row-keytx">' + esc(d.field_key) + '</span>' +
+      (promo ? '<span class="ss-promo-tag">승격 후보</span>' : '') + '</span>' +
+      '<span class="ss-c-name ss-row-label">' + esc(d.label) + '</span>' +
+      '<span class="ss-c-type ss-row-type">' + esc(typeLabel) + '</span>' +
+      '<span class="ss-c-unit ss-row-unit">' + (d.unit ? esc(d.unit) : '—') + '</span>' +
+      '<span class="ss-c-block ss-badge ' + (d.is_blocking ? 'ss-badge-block' : 'ss-badge-warn') + '">' +
+      (d.is_blocking ? '막음' : '경고') + '</span>' +
+      '<span class="ss-c-parts ss-row-parts">' + (d.part_types.length ? esc(d.part_types.map(partLabel).join(', ')) : '없음 — 감춰짐') + '</span>' +
+      '<span class="ss-c-pairs ss-row-pairs' + (d.compat_pairs.length ? '' : ' dim') + '">' +
+      (d.compat_pairs.length ? esc(d.compat_pairs.join(', ')) : '정보') + '</span>' +
+      '<span class="ss-c-pct">' + barCell(d.pct) + '</span>' +
+      '<span class="ss-c-edit"><span class="ss-editlink">수정</span></span>' +
+      '</button>';
+  }
+  function renderTable() {
+    var rows = S.items.filter(matchesFilter);
+    var box = $('ssGridBody');
+    if (!rows.length) { box.innerHTML = '<div class="ss-empty">조건에 맞는 항목이 없습니다.</div>'; return; }
+    box.innerHTML = rows.map(rowHtml).join('');
+  }
+
+  // ── 모달 ─────────────────────────────────────────────────────────
+  function closeModal() {
+    S.modalOpen = false; S.modalMode = null; S.selKey = null; S.addDraft = null; S.addErr = null;
+    S.editDraft = null; S.editErr = null; S.editSaving = false;
+    $('ssModalOverlay').hidden = true; $('ssModal').hidden = true; $('ssModal').innerHTML = '';
+  }
+  function openEdit(key) {
+    var d = fieldByKey(key);
+    if (!d) return;
+    S.modalMode = 'edit'; S.selKey = key; S.modalOpen = true;
+    S.editDraft = { label: d.label, unit: d.unit || '', note: d.note || '' };
+    S.editErr = null; S.editSaving = false;
+    renderModal();
+  }
+  function openAdd() {
+    if (!window.Admin2Shell.canWrite('operator')) return;
+    var firstType = (S.meta && S.meta.types) ? Object.keys(S.meta.types)[0] : 'TEXT';
+    S.modalMode = 'add'; S.selKey = null; S.modalOpen = true;
+    S.addDraft = { field_key: '', label: '', data_type: firstType || 'TEXT', unit: '',
+      is_blocking: true, part_types: [], compat_pairs: [], note: '' };
+    S.addErr = null;
+    renderModal();
+  }
+  function renderModal() {
+    var open = S.modalOpen && (S.modalMode === 'add' || (S.modalMode === 'edit' && fieldByKey(S.selKey)));
+    $('ssModalOverlay').hidden = !open;
+    $('ssModal').hidden = !open;
+    if (!open) { $('ssModal').innerHTML = ''; return; }
+    $('ssModal').innerHTML = S.modalMode === 'add' ? addModalHtml() : editModalHtml(fieldByKey(S.selKey));
+  }
+
+  function statusBadge(p) {
+    if (p === null) return '<span class="ss-status-badge" style="color:var(--rv-faint);border-color:rgba(0,0,0,.14)">적용 대상 없음</span>';
+    if (p === 0) return '<span class="ss-status-badge" style="color:var(--rv-red);border-color:var(--rv-red)">○ 값 0%</span>';
+    if (p < 90) return '<span class="ss-status-badge" style="color:oklch(0.45 0.13 55);border-color:var(--rv-amber)">◐ 값 ' + p + '%</span>';
+    return '<span class="ss-status-badge" style="color:var(--rv-green);border-color:var(--rv-green)">● 값 ' + p + '%</span>';
+  }
+
+  // 「추가하면 이렇게 됩니다」 미리보기 — 서버가 성공 시 돌려주는 verdict와 같은 서식으로
+  // 클라이언트가 미리 조합한다(서버 문구를 베낀 것 — 지어낸 문장이 아니다).
+  function addPreviewText(d) {
+    var partsN = d.part_types.length;
+    var blockWord = d.is_blocking ? '조립을 막는' : '경고만 하는';
+    var label = (d.label || '').trim() || '(이름 없음)';
+    var reservedN = (S.meta && S.meta.reserved) ? S.meta.reserved.length : 0;
+    return '추가하면 이렇게 됩니다 — 항목 «' + label + '»가 생기고 적용 대상 ' + partsN + '종, ' +
+      blockWord + ' 항목입니다. 값은 아직 0건이라 지금은 판정에 쓰이지 않습니다. 실패하면 이 창을 ' +
+      '닫지 않고 서버가 준 사유를 그대로 보여줍니다(키 형식·예약어 ' + reservedN + '개 충돌·중복 키 409 등).';
+  }
+
+  function editModalHtml(d) {
+    var canWrite = window.Admin2Shell.canWrite('operator');
+    var ps = promoStatus(d);
+    var typeLabel = (S.meta.types && S.meta.types[d.data_type]) || d.data_type;
+    var writeTitle = canWrite ? '' : ' title="권한 부족 — operator 이상 필요"';
+    var busy = S.patchingKey === d.field_key;
+    var allParts = (S.meta.part_types || []);
+    var chips = allParts.map(function (p) {
+      var on = d.part_types.indexOf(p) >= 0;
+      return '<button type="button" class="ss-chip' + (on ? ' on' : '') + '" data-action="toggle-part" ' +
+        'data-key="' + esc(d.field_key) + '" data-part="' + esc(p) + '"' +
+        ((!canWrite || busy) ? ' disabled' : '') + writeTitle + ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        esc(partLabel(p)) + (on ? ' ✓' : '') + '</button>';
+    }).join('');
+    // 2026-08-15 — PATCH /api/admin/std/spec-defs/{field_key} 신설로 이름·단위·메모
+    // 편집이 열렸다(실측 확인, 제작 보고서 "쓰기 실측" 참조). S.editDraft가 타이핑
+    // 중인 값을 들고 있다 - d.label 등 서버 원본을 직접 바인딩하면 다른 동작(적용
+    // 부품 토글 등)이 모달을 다시 그릴 때 입력 중이던 값이 사라진다.
+    var draft = S.editDraft || { label: d.label, unit: d.unit || '', note: d.note || '' };
+    var savingEdit = !!S.editSaving;
+    var fieldsLocked = !canWrite || savingEdit;
+    var fieldsAttr = (fieldsLocked ? ' disabled' : '') + (!canWrite ? writeTitle : '');
+    var canSave = canWrite && !savingEdit && !!(draft.label || '').trim();
+    var saveTitle = !canWrite ? '권한 부족 — operator 이상 필요' : (canSave ? '' : '이름을 입력하세요');
+    return ''
+      + '<div class="ss-modal-hd"><div class="ss-modal-hdrow">'
+      + '<span class="ss-modal-title">' + esc(d.label) + '</span>'
+      + statusBadge(d.pct)
+      + '<button type="button" class="ss-modal-close" data-action="close-modal" aria-label="닫기">✕</button>'
+      + '</div>'
+      + '<div class="ss-modal-meta"><span class="ss-mono">' + esc(d.field_key) + '</span>'
+      + '<span>' + esc(typeLabel) + (d.unit ? ' · ' + esc(d.unit) : '') + '</span>'
+      + '<span>' + (d.is_blocking ? '막음' : '경고') + '</span>'
+      + '<span>' + (d.compat_pairs.length ? '관계 ' + esc(d.compat_pairs.join(', ')) : '관계 없음(정보용)') + '</span>'
+      + '</div></div>'
+      + '<div class="ss-modal-body">'
+      + '<div class="ss-card ss-card-strong">'
+      + '<div class="ss-card-title-row"><span class="ss-card-title" id="ssEditTitleLabel">편집 — 이름 · 단위 · 메모</span>'
+      + '<span class="ss-card-hint">키와 자료형은 고칠 수 없습니다 — 이미 저장된 값의 해석이 깨집니다</span></div>'
+      + '<div class="ss-form-grid">'
+      + '<label class="ss-form-label" for="ssEditName">이름</label>'
+      + '<input id="ssEditName" class="ss-input" value="' + esc(draft.label) + '"' + fieldsAttr + '>'
+      + '<label class="ss-form-label" for="ssEditUnit">단위</label>'
+      + '<input id="ssEditUnit" class="ss-input ss-mono" value="' + esc(draft.unit) + '"' + fieldsAttr + '>'
+      + '<label class="ss-form-label" for="ssEditNote">메모</label>'
+      + '<textarea id="ssEditNote" class="ss-textarea" rows="2"' + fieldsAttr + '>' + esc(draft.note) + '</textarea>'
+      + '<span class="ss-form-label" id="ssEditFixedLabel">키·자료형</span>'
+      + '<span class="ss-fixedline" aria-labelledby="ssEditFixedLabel">' + esc(d.field_key) + ' · ' + esc(d.data_type) + ' — 고정</span>'
+      + '</div>'
+      + '<div class="ss-errline" id="ssEditErr"' + (S.editErr ? '' : ' hidden') + '>' + esc(S.editErr || '') + '</div>'
+      + '<div class="ss-btns-end"><button type="button" class="ss-btn-dark" data-action="submit-edit"' +
+        (canSave ? '' : ' disabled') + (saveTitle ? ' title="' + esc(saveTitle) + '"' : '') + '>' +
+        (savingEdit ? '저장 중…' : '저장') + '</button></div>'
+      + '</div>'
+      + '<div class="ss-card">'
+      + '<div class="ss-card-title-row"><span class="ss-card-title" id="ssEditPartsLabel">적용 부품 — 비우면 감춰집니다(값은 남습니다)</span></div>'
+      + '<div class="ss-chiprow" role="group" aria-labelledby="ssEditPartsLabel">' + (chips || '<span class="ss-chiphint">선택 가능한 부품 종류가 없습니다.</span>') + '</div>'
+      + '<div class="ss-chiphint">클릭하면 즉시 반영되고 문장으로 응답합니다 — "적용 대상 변경 — 추가 SSD · 제외 HDD (값은 남습니다)"'
+      + (canWrite ? '' : ' · 지금 등급으로는 바꿀 수 없습니다(operator 이상 필요)') + '</div>'
+      + '</div>'
+      + '<div class="ss-card ss-card-blue">'
+      + '<div class="ss-card-title">정본으로 승격 — 엔진이 읽게 하려면</div>'
+      + '<div class="ss-promo-body">이 항목은 <b>실험 표준(std.spec_defs)</b>에 있습니다. 견적·추천 엔진은 '
+      + '<b>public.product_specs</b>만 읽으므로, 항목을 만들었다고 판정이 바뀌지는 않습니다. 값이 쌓이고 판정 축으로 '
+      + '쓸 만하다고 판단되면 <b>상품 사양 정의(정본)</b>로 승격해야 합니다 — 두 표준은 결국 하나로 합류합니다.</div>'
+      + '<div class="ss-promo-condrow">'
+      + '<span class="ss-promo-cond">승격 조건 — 값 ≥ 1건 · 적용 부품 ≥ 1종 · 관계 지정됨<br>'
+      + (ps.ok ? '지금: 조건을 충족합니다.' : ('지금: ' + esc(ps.missing.join(' · ')) + ' → 아직 승격 불가')) + '</span>'
+      + '<button type="button" class="ss-promo-btn" disabled title="'
+      + (ps.ok ? '조건은 충족했지만 이관 화면(상품 사양 정의)과 승격 API가 아직 없어 요청을 접수할 수 없습니다.'
+                : esc('승격 조건 미달: ' + ps.missing.join(' · ')))
+      + '">' + (ps.ok ? '승격 요청 — 이관 기능 준비 중' : '승격 요청 — ' + esc(ps.missing.join(' · ')) + '이라 잠김') + '</button>'
+      + '</div>'
+      + '</div>'
+      + '</div>'
+      + '<div class="ss-modal-foot">값을 채우는 것은 이 화면 소관이 아닙니다 — 상품 사양 검수·상품 관리에서 넣습니다. 이 화면은 그릇만 만듭니다.</div>';
+  }
+
+  function addModalHtml() {
+    var m = S.meta, d = S.addDraft;
+    var typeOpts = Object.keys(m.types || {}).map(function (k) {
+      return '<option value="' + esc(k) + '"' + (d.data_type === k ? ' selected' : '') + '>' + esc(m.types[k]) + ' (' + k + ')</option>';
+    }).join('');
+    var partChips = (m.part_types || []).map(function (p) {
+      var on = d.part_types.indexOf(p) >= 0;
+      return '<button type="button" class="ss-chip' + (on ? ' on' : '') + '" data-action="toggle-add-part" data-part="' + esc(p) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(partLabel(p)) + (on ? ' ✓' : '') + '</button>';
+    }).join('');
+    var pairChips = (m.pairs || []).map(function (p) {
+      var on = d.compat_pairs.indexOf(p) >= 0;
+      return '<button type="button" class="ss-chip ss-mono' + (on ? ' on' : '') + '" data-action="toggle-add-pair" data-pair="' + esc(p) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(p) + (on ? ' ✓' : '') + '</button>';
+    }).join('');
+    var canSubmit = !!((d.field_key || '').trim() && (d.label || '').trim());
+    var reservedHint = '예약어(다른 뜻으로 이미 쓰는 이름) — 못 씁니다: ' + ((m.reserved || []).join(', '));
+    return ''
+      + '<div class="ss-modal-hd"><div class="ss-modal-hdrow">'
+      + '<span class="ss-modal-title">사양 항목 추가</span>'
+      + '<span class="ss-modal-sub">컬럼 추가·마이그레이션 없이 정의 행 하나로 끝납니다</span>'
+      + '<button type="button" class="ss-modal-close" data-action="close-modal" aria-label="닫기">✕</button>'
+      + '</div></div>'
+      + '<div class="ss-modal-body">'
+      + '<div class="ss-form-grid">'
+      + '<label class="ss-form-label" for="ssAddKey">키</label>'
+      + '<input id="ssAddKey" class="ss-input ss-mono" placeholder="radiator_thickness_mm" value="' + esc(d.field_key) + '" title="' + esc(reservedHint) + '">'
+      + '<label class="ss-form-label" for="ssAddLabel">이름</label>'
+      + '<input id="ssAddLabel" class="ss-input" placeholder="라디에이터 두께" value="' + esc(d.label) + '">'
+      + '<span class="ss-form-label" id="ssAddTypeUnitLabel">자료형 · 단위</span>'
+      + '<span style="display:flex;gap:8px">'
+      + '<select id="ssAddType" class="ss-select" style="flex:1" aria-label="자료형">' + typeOpts + '</select>'
+      + '<input id="ssAddUnit" class="ss-input ss-mono" style="width:96px" placeholder="mm" value="' + esc(d.unit) + '" aria-label="단위">'
+      + '</span>'
+      + '<span class="ss-form-label" id="ssAddBlockLabel">판정</span>'
+      + '<span class="ss-chiprow" role="group" aria-labelledby="ssAddBlockLabel">'
+      + '<button type="button" class="ss-chip' + (d.is_blocking ? ' on' : '') + '" data-action="set-add-block" data-v="1" aria-pressed="' + (d.is_blocking ? 'true' : 'false') + '">막음 — 없으면 조립 보증 불가</button>'
+      + '<button type="button" class="ss-chip' + (!d.is_blocking ? ' on' : '') + '" data-action="set-add-block" data-v="0" aria-pressed="' + (!d.is_blocking ? 'true' : 'false') + '">경고 — 조립은 되지만 알린다</button>'
+      + '</span>'
+      + '<span class="ss-form-label" id="ssAddPartsLabel">적용 부품</span>'
+      + '<span class="ss-chiprow" role="group" aria-labelledby="ssAddPartsLabel">' + (partChips || '<span class="ss-chiphint">선택지가 없습니다.</span>') + '</span>'
+      + '<span class="ss-form-label" id="ssAddPairsLabel">호환 관계</span>'
+      + '<span class="ss-chiprow" role="group" aria-labelledby="ssAddPairsLabel">' + pairChips + '</span>'
+      + '<label class="ss-form-label" for="ssAddNote">메모</label>'
+      + '<input id="ssAddNote" class="ss-input" placeholder="왜 필요한지" value="' + esc(d.note) + '">'
+      + '</div>'
+      + '<div class="ss-chiphint">호환 관계는 기존 ' + (m.pairs || []).length + '개 중에서만 고릅니다 — 새 관계는 설계 문서에서 먼저 정합니다.</div>'
+      + '<div class="ss-previewbox" id="ssAddPreview">' + esc(addPreviewText(d)) + '</div>'
+      + '<div class="ss-errline" id="ssAddErr"' + (S.addErr ? '' : ' hidden') + '>' + esc(S.addErr || '') + '</div>'
+      + '</div>'
+      + '<div class="ss-modal-foot" style="display:flex;gap:8px;justify-content:flex-end">'
+      + '<button type="button" class="ss-btn-line" data-action="close-modal">취소</button>'
+      + '<button type="button" class="ss-btn-dark" data-action="submit-add"' + (canSubmit ? '' : ' disabled title="키와 이름을 입력하세요"') + '>추가</button>'
+      + '</div>';
+  }
+
+  // ── 모달 동작 ────────────────────────────────────────────────────
+  function doTogglePart(fieldKey, part) {
+    if (!window.Admin2Shell.canWrite('operator') || S.patchingKey) return;
+    var d = fieldByKey(fieldKey); if (!d) return;
+    var next = d.part_types.slice();
+    var i = next.indexOf(part);
+    if (i >= 0) next.splice(i, 1); else next.push(part);
+    S.patchingKey = fieldKey;
+    apiPatch('/api/admin/std/spec-defs/' + encodeURIComponent(fieldKey) + '/part-types', { part_types: next })
+      .then(function (res) {
+        S.patchingKey = null;
+        window.Admin2Shell.toast(res.verdict || '적용 대상을 바꿨습니다', 'ok');
+        reload(fieldKey);
+      })
+      .catch(function (err) {
+        S.patchingKey = null;
+        window.Admin2Shell.toast(err.message, 'err');
+        renderModal();
+      });
+  }
+  function toggleAddPart(part) {
+    var i = S.addDraft.part_types.indexOf(part);
+    if (i >= 0) S.addDraft.part_types.splice(i, 1); else S.addDraft.part_types.push(part);
+    renderModal();
+  }
+  function toggleAddPair(pair) {
+    var i = S.addDraft.compat_pairs.indexOf(pair);
+    if (i >= 0) S.addDraft.compat_pairs.splice(i, 1); else S.addDraft.compat_pairs.push(pair);
+    renderModal();
+  }
+  function submitAdd() {
+    if (!window.Admin2Shell.canWrite('operator')) return;
+    var d = S.addDraft;
+    var key = (d.field_key || '').trim(), label = (d.label || '').trim();
+    if (!key || !label) return;
+    var body = {
+      field_key: key, label: label, data_type: d.data_type, unit: (d.unit || '').trim() || null,
+      is_blocking: !!d.is_blocking, note: (d.note || '').trim() || null,
+      part_types: d.part_types.slice(), compat_pairs: d.compat_pairs.slice()
+    };
+    S.addErr = null;
+    apiPost('/api/admin/std/spec-defs', body).then(function (res) {
+      window.Admin2Shell.toast(res.verdict || '항목을 추가했습니다', 'ok');
+      closeModal();
+      reload();
+    }).catch(function (err) {
+      S.addErr = err.message;
+      renderModal();
     });
   }
 
-  function modal(show){
-    var el = $('add-modal');
-    el.classList.toggle('show', show);
-    el.style.display = show ? 'block' : 'none';
-    el.setAttribute('aria-hidden', show ? 'false' : 'true');
-    document.body.classList.toggle('modal-open', show);
-    if (show) $('f-key').focus();
+  // 2026-08-15 신설 — PATCH /api/admin/std/spec-defs/{field_key}(이름·단위·메모만).
+  // 키·자료형은 이 경로가 받지 않는다(서버 모델에 그 필드 자체가 없다) — 그래서 body에도
+  // 넣지 않는다. 오류는 서버 사유를 그대로 보여준다(404 없는 키·400 빈 라벨·422 필드
+  // 누락·401 미로그인 — 실측, 제작 보고서 참조). if(!res.ok) return; 로 삼키지 않는다.
+  function submitEdit() {
+    if (!window.Admin2Shell.canWrite('operator')) return;
+    var d = fieldByKey(S.selKey);
+    if (!d || !S.editDraft) return;
+    var label = (S.editDraft.label || '').trim();
+    if (!label) return;
+    var body = {
+      label: label,
+      unit: (S.editDraft.unit || '').trim() || null,
+      note: (S.editDraft.note || '').trim() || null
+    };
+    S.editErr = null; S.editSaving = true;
+    renderModal();
+    apiPatch('/api/admin/std/spec-defs/' + encodeURIComponent(d.field_key), body).then(function (res) {
+      S.editSaving = false;
+      window.Admin2Shell.toast(res.verdict || '저장했습니다', 'ok');
+      reload(d.field_key);
+    }).catch(function (err) {
+      S.editSaving = false;
+      S.editErr = err.message;
+      renderModal();
+    });
   }
 
-  document.addEventListener('click', function(ev){
-    var a = ev.target.closest('[data-action]');
-    if (!a) return;
-    var act = a.getAttribute('data-action');
-    if (act === 'open-add'){ $('f-error').hidden = true; modal(true); }
-    if (act === 'close-add'){ modal(false); }
-    if (act === 'submit-add'){
-      var body = {
-        field_key: $('f-key').value.trim(),
-        label: $('f-label').value.trim(),
-        data_type: $('f-type').value,
-        unit: $('f-unit').value.trim() || null,
-        is_blocking: $('f-block').value === '1',
-        note: $('f-note').value.trim() || null,
-        part_types: [].map.call(document.querySelectorAll('[data-part]:checked'), function(x){ return x.value; }),
-        compat_pairs: [].map.call(document.querySelectorAll('[data-pair]:checked'), function(x){ return x.value; })
-      };
-      fetch('/api/admin/std/spec-defs', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
-      }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
-        .then(function(res){
-          if (!res.ok){
-            // 실패를 삼키지 않는다 — 무엇이 왜 틀렸는지 그대로 보여준다
-            var d = res.j && res.j.detail;
-            $('f-error').textContent = (typeof d === 'string') ? d : JSON.stringify(d);
-            $('f-error').hidden = false;
-            return;
-          }
-          modal(false);
-          ['f-key','f-label','f-unit','f-note'].forEach(function(k){ $(k).value = ''; });
-          document.querySelectorAll('[data-part]:checked,[data-pair]:checked')
-            .forEach(function(x){ x.checked = false; });
-          load();
-        });
+  // ── 이벤트 ───────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var act = t.getAttribute('data-action');
+    switch (act) {
+      case 'retry-boot': boot(); break;
+      case 'pick-filter': S.filter = t.getAttribute('data-f'); renderPills(); renderTable(); break;
+      case 'open-edit': openEdit(t.getAttribute('data-key')); break;
+      case 'open-add': openAdd(); break;
+      case 'close-modal': closeModal(); break;
+      case 'toggle-part': doTogglePart(t.getAttribute('data-key'), t.getAttribute('data-part')); break;
+      case 'toggle-add-part': toggleAddPart(t.getAttribute('data-part')); break;
+      case 'toggle-add-pair': toggleAddPair(t.getAttribute('data-pair')); break;
+      case 'set-add-block': S.addDraft.is_blocking = t.getAttribute('data-v') === '1'; renderModal(); break;
+      case 'submit-add': submitAdd(); break;
+      case 'submit-edit': submitEdit(); break;
+      default: break;
     }
   });
-  $('filter-part').addEventListener('change', render);
-  $('filter-state').addEventListener('change', render);
-  load();
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.modalOpen) closeModal();
+  });
+
+  // 텍스트 입력은 상태만 갱신한다 — 매 입력마다 모달을 다시 그리면 커서·포커스를 잃는다
+  // (operators_roles.html.j2와 같은 이유). 이름만 예외로 미리보기 문장을 targeted 갱신한다.
+  document.addEventListener('input', function (e) {
+    var id = e.target.id;
+    if (S.addDraft) {
+      if (id === 'ssAddKey') { S.addDraft.field_key = e.target.value; updateSubmitState(); return; }
+      if (id === 'ssAddLabel') {
+        S.addDraft.label = e.target.value; updateSubmitState();
+        var pv = $('ssAddPreview'); if (pv) pv.textContent = addPreviewText(S.addDraft);
+        return;
+      }
+      if (id === 'ssAddUnit') { S.addDraft.unit = e.target.value; return; }
+      if (id === 'ssAddNote') { S.addDraft.note = e.target.value; return; }
+    }
+    if (S.editDraft) {
+      if (id === 'ssEditName') { S.editDraft.label = e.target.value; updateEditSubmitState(); return; }
+      if (id === 'ssEditUnit') { S.editDraft.unit = e.target.value; return; }
+      if (id === 'ssEditNote') { S.editDraft.note = e.target.value; return; }
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.id === 'ssAddType' && S.addDraft) S.addDraft.data_type = e.target.value;
+  });
+  function updateSubmitState() {
+    var btn = document.querySelector('[data-action="submit-add"]');
+    if (!btn || !S.addDraft) return;
+    var can = !!((S.addDraft.field_key || '').trim() && (S.addDraft.label || '').trim());
+    btn.disabled = !can;
+    if (can) btn.removeAttribute('title'); else btn.setAttribute('title', '키와 이름을 입력하세요');
+  }
+  function updateEditSubmitState() {
+    var btn = document.querySelector('[data-action="submit-edit"]');
+    if (!btn || !S.editDraft) return;
+    var can = !!(S.editDraft.label || '').trim();
+    btn.disabled = !can;
+    if (can) btn.removeAttribute('title'); else btn.setAttribute('title', '이름을 입력하세요');
+  }
+
+  boot();
 })();
 </script>
+{% endraw %}
 {% endblock %}

@@ -99,10 +99,16 @@ def list_defs(part: str | None = None):
             "need": need, "got": got,
             "pct": round(got * 100 / need) if need else None,
         })
+    # /compat-map과 같은 방식(UX-24 ③ · taxonomy.PART_LABELS를 화면이 베끼지 않는다) —
+    # 선택지(types)와 각 항목이 실제로 물고 있는 part_types를 함께 훑는다. 지금은
+    # 후자가 전자의 부분집합이지만(실측: referenced ⊆ types) 미래에도 맞는 계산이다.
+    referenced = set(types) | {pt for r in rows for pt in (r["part_types"] or [])}
     return {"items": out, "total": len(out), "part_types": types,
             "types": TYPES, "pairs": PAIRS,
             # 화면이 선택지를 하드코딩하지 않도록 서버가 준다(슬라이스 54 전례)
-            "reserved": sorted(RESERVED)}
+            "reserved": sorted(RESERVED),
+            "part_labels": {k: PART_LABELS.get(k, PENDING_LABELS.get(k, k))
+                            for k in sorted(referenced)}}
 
 
 class DefBody(BaseModel):
@@ -162,6 +168,37 @@ def add_def(body: DefBody):
                        f"적용 대상 {len(body.part_types)}종 · "
                        f"{'조립을 막는' if body.is_blocking else '경고만 하는'} 항목입니다. "
                        "값은 아직 0건이라 지금은 판정에 쓰이지 않습니다."}
+
+
+class DefEditBody(BaseModel):
+    """UX-24 확정: 편집은 **이름·단위·메모만**. 키·자료형은 여기서 받지 않는다 —
+    받아 놓고 무시하면 다음 사람이 «되는 줄» 안다. 이미 저장된 값(std.part_specs)의
+    해석이 깨지기 때문에 막은 것이지 빠뜨린 것이 아니다. 적용 부품은 `/part-types`가
+    맡는다(다른 동사·다른 위험이라 갈랐다 — 이름을 고치다 부품을 잘못 건드리지 않는다)."""
+    label: str
+    unit: str | None = None
+    note: str | None = None
+
+
+@router.patch("/spec-defs/{field_key}")
+def edit_def(field_key: str, body: DefEditBody):
+    """이름·단위·메모를 고친다. 키·자료형·적용 부품·호환 관계는 이 경로로 못 바꾼다."""
+    label = (body.label or "").strip()
+    if not label:
+        raise HTTPException(400, "이름(라벨)을 적어 주세요")
+    with engine.begin() as conn:
+        cur = conn.execute(text(
+            "SELECT label FROM std.spec_defs WHERE field_key=:k"),
+            {"k": field_key}).first()
+        if not cur:
+            raise HTTPException(404, "없는 항목입니다")
+        conn.execute(text(
+            "UPDATE std.spec_defs SET label=:l, unit=:u, note=:n WHERE field_key=:k"),
+            {"k": field_key, "l": label[:60],
+             "u": (body.unit or "").strip()[:10] or None,
+             "n": (body.note or "").strip() or None})
+    return {"ok": True, "field_key": field_key,
+            "verdict": f"«{label}» 이름·단위·메모를 저장했습니다 — 키·자료형은 그대로입니다."}
 
 
 class ApplyBody(BaseModel):
