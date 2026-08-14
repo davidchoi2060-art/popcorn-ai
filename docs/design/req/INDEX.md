@@ -44,7 +44,7 @@
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 7 | **조립 호환 지도** | [req-build-map.md](req-build-map.md) | `dc-build-map-v2.html` | **재구축 대기** (`/admin2/build-map` · UX-20 → v2 클릭 고정) |
-| 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 대기** (`/admin2/spec-standard` · UX-24 → 1b) |
+| 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 중** (`/admin2/spec-standard` · UX-24 → **1a**) |
 | 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **디자인** (ADM-PRD-050 · UX-27 → 1a) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
 | 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) | `dc-compat-rules-2안.html` | **구축 중** (ADM-ENG-010 · UX-28 → 1b) |
@@ -124,7 +124,7 @@
 | 3 | 상품 관리 **(3안 비교본)** | [dc-products-3안.html](../dc-products-3안.html) | 재구축 대기 · UX-23 → 1a |
 | 5 | 상품 일괄 등록 | [dc-product-bulk-import.html](../dc-product-bulk-import.html) | 구축 중 · UX-21 → 1b |
 | 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 신설 대기 · UX-26 → 1b + 빈 상태 1c |
-| 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 대기 · UX-24 → 1b |
+| 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 중 · UX-24 → **1a** |
 | 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 디자인 · UX-27 → 1a |
 | 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 구축 중 · UX-28 → 1b |
 | 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 대기 · UX-25 |
