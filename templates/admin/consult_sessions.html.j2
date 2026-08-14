@@ -1,0 +1,751 @@
+{#
+  견적 상담 기록 (ADM-ORD-010) — 2026-08-14 신설, 2026-08-15 handoffs 인계 연결, 조회 전용
+
+  ■ 계약 — `docs/design/spec-consult-sessions.md`(1a 기준 + 우측 서랍은 1b 구성 전부를
+    가져온다). 요구사항 원본은 `docs/design/req/req-consult-sessions.md`.
+    사장님 확정: "1a 안을 기준으로 만드는데, 오른편에서 상세 창이 나오는 것은 포함시켜줘."
+
+  ■ 데이터 원천은 여전히 `api/admin_sessions.py`(`GET /api/admin/sessions`) — 이 화면은
+    페이지 라우트(`api/admin_ui_consult_sessions.py`)만 갖고, 조회 API 를 새로 만들지
+    않는다(계약: 이 화면의 담당 파일이 아니다).
+
+  ■ 2026-08-15 — API 가 handoffs·user_id·전체 집계를 갖춰 이전의 간극 넷을 해소했다
+    (실측: dev-login 후 `GET /api/admin/sessions` 직접 호출 + DB 직접 COUNT 대조):
+
+      ① handoffs 연결        `handoff_no·handoff_status·handoff_total_quoted·
+                             handoff_total_mall·handoff_price_checked·handoff_at` 6키가
+                             세션당 최신 인계 1건으로 채워진다(세션 4315·4247 실측 —
+                             4247 은 인계 2건 중 최신 HO-1002 선택 확인). 목록 상태칩·
+                             서랍 ④가 이제 "완주 → 인계(handoffs)"를 실제로 구성한다.
+                             **서버 `status` 문자열 자체는 여전히 주문 전용 계산이라
+                             인계 세션도 "완주"로만 온다** — 이 화면은 원래도 `status`
+                             원문을 그대로 쓰지 않고 `snapshots`/`order_no` 로 자체
+                             파생해 왔으므로(`statusMeta()`), 그 파생에 `handoff_no`
+                             가지를 추가했다. 서버 값은 덮어쓰지 않는다.
+      ② 전체 건수            `total`(전체 세션 수, 실측 4,821건 — 매일 증가)·
+                             `done_total`·`drop_total`(전체 기준 완주/이탈, 둘의 합은
+                             항상 total)이 추가됐다. "전체 세션" KPI 와 완주율/이탈의
+                             1차 분모를 전체 기준으로 채운다.
+      ③ 창(窓) 기준 병기      기존 `done`/`drop`(이 페이지 LIMIT 행 안에서만 집계)은
+                             그대로 남아 있다 — 전체 기준과 섞지 않고 각 KPI 에 두
+                             기준을 함께 표기한다(어느 분모인지 라벨로 밝힌다).
+      ④ 방문자 키            `user_id`(FK users, 익명 발급 — **회원 아님**)가
+                             아이템에 채워진다. 서랍 머리에 "방문자 키"로 표기.
+
+    `offset` 파라미터도 추가돼(기본 0) 실제 이전/다음 페이지 이동을 붙였다 — 서버가
+    지원하는데 화면만 잠가 두면 "백엔드 확장 후 열립니다" 안내 자체가 거짓이 된다.
+    기간 필터는 API 가 여전히 받지 않으므로 그 잠금만 유지한다.
+
+    이 화면은 API 가 실제로 주는 값만으로 조립했고, 계약 문구(원안 예시 수치
+    4,419·154·93.1%·303·16·3·3,488·928·3·0 등)를 코드에 박지 않았다(MAKER-CHECKLIST §1).
+
+  ■ 2026-08-15 (같은 날 2차) — 확인자가 실측으로 잡은 결함 둘을 고쳤다:
+
+      ① 페이지네이션 자기모순    `rows`(LIMIT/OFFSET)와 `total`이 서버에서 별개 SELECT라
+        (레이스)                 그 사이 세션이 늘면 어긋난다(서버는 `api/admin_sessions.py`
+                                 를 REPEATABLE READ로 열어 대부분 막았다 — 그 파일 주석
+                                 참조). 화면도 견디게 만들었다: `renderPagerInfo()`가
+                                 "이 페이지가 마지막인가"를 total과의 비교가 아니라
+                                 **이번 응답 자체**(N < limit)로만 판단해 `pnow`와
+                                 `nextBtn`이 항상 같은 근거를 쓴다 — "25/25인데 다음
+                                 버튼은 활성" 같은 자기모순이 구조적으로 불가능해진다.
+                                 표시 total도 실제 반환 범위보다 작게 보이지 않게
+                                 `Math.max(total, off+N)`로 clamp한다.
+      ② 769~1130px 가로 넘침    6열 그리드 최소 합이 866px인데 `@media`가 768px 이하만
+                                 걸어 그 사이(사이드바 있는 축소 창·작은 노트북)에서
+                                 `#csScroll`이 몰래 가로 스크롤됐다(문서 레벨 오버플로는
+                                 0이라 겉보기엔 멀쩡했다 — 확인자 실측 1000×900:
+                                 scrollWidth 899 vs clientWidth 788). `@media`를 확인자가
+                                 잰 실측 상한(1130px)까지 넓혀 이미 검증된 단일 열 표기로
+                                 막는다(1200px는 그대로 6열 — 손대지 않는다).
+
+  ■ 우측 서랍은 admin2 기존 화면들(`ai_response_log.html.j2`)의 `.drawer{position:
+    absolute;top:52px;right:0;bottom:0}` + `.scrim` 패턴을 그대로 옮겼다 — `.a2-hd`
+    가 52px 고정이라 이 화면도 그 값을 쓴다(탭바·필터바 등 추가 크롬이 없다).
+
+  ■ 좌측 메뉴 항목("견적 상담 기록")은 `api/admin_nav.py`의 "상품사양관리" 그룹, "추천
+    가능 재고 현황" 다음(정본 그대로 — 이 화면이 다시 정의하지 않는다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}견적 상담 기록{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 위젯 ── */
+.a2-hd .ro-badge{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+              border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.a2-hd .lastat{font:400 11px/1 var(--rv-font);color:var(--rv-faint);white-space:nowrap}
+.a2-hd .refresh{font:500 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+             border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:7px 11px;cursor:pointer}
+.a2-hd .refresh:disabled{opacity:.5;cursor:default}
+
+/* ── 스크롤 본문 ── */
+.cs-scroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:16px 18px 22px}
+
+/* ── 배너 ── */
+.ledger-banner{flex:none;border:1px solid rgba(0,0,0,.14);border-left:3px solid var(--rv-ink);
+             background:var(--rv-panel2);border-radius:7px;padding:12px 14px;display:flex;
+             align-items:center;gap:16px;flex-wrap:wrap}
+.ledger-banner .lb-main{flex:1;min-width:260px}
+.ledger-banner .lb-title{font:600 12.5px/1.4 var(--rv-font);margin-bottom:3px}
+.ledger-banner .lb-desc{font:400 11px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.ledger-banner .lb-side{flex:none;font:600 11.5px/1.4 var(--rv-font);color:var(--rv-ink);
+             background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:6px;padding:8px 12px}
+
+/* ── KPI ── */
+.kpis{flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpi{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 13px;
+    display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi .lb{font:500 10.5px/1.3 var(--rv-font);color:#7d7669}
+.kpi .valrow{display:flex;align-items:baseline;gap:6px}
+.kpi .val{font:600 17px/1.2 var(--rv-font);color:#a09889}
+.kpi .val.real{font:600 20px/1.15 var(--rv-mono);color:var(--rv-ink);font-variant-numeric:tabular-nums}
+.kpi .unit{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-dim3)}
+.kpi .botrow{display:flex;align-items:center;gap:6px;margin-top:auto}
+.kpi .note{font:400 10px/1.5 var(--rv-font);color:#a09889}
+.kpichip{font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap;flex:none;border:1px solid}
+.kpichip.sample{color:#5b564d;background:var(--rv-panel2);border-color:rgba(0,0,0,.16)}
+.dual{display:flex;flex-direction:column;gap:5px}
+.dline{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.dline .dk{font:500 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.dline .dv.real{font:600 15px/1.2 var(--rv-mono);color:var(--rv-ink)}
+.kpi-loading{grid-column:1/-1;padding:24px;text-align:center;font:400 12px/1.5 var(--rv-font);color:var(--rv-muted)}
+
+/* ── 방식 칩 ── */
+.mchip-row{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mchip-cap{font:400 11px/1.4 var(--rv-font);color:var(--rv-faint);margin-right:2px}
+.mchip{display:flex;align-items:center;gap:7px;font:500 11.5px/1 var(--rv-font);color:#4a463e;
+      background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:14px;padding:7px 12px;
+      cursor:pointer;user-select:none}
+.mchip.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.mchip.zero{opacity:.5}
+.mchip .mchip-n{font:600 10.5px/1 var(--rv-mono);color:inherit;opacity:.75}
+
+/* ── 목록 — 6열 최소 합 866px(60+150+92+180+152+182+gap 5×10). 769~1130px 구간(사이드바
+   있는 상태의 축소 창·작은 노트북)에서는 콘텐츠 폭이 866px에 못 미쳐 #csScroll 전체가
+   가로 스크롤되며 KPI·배너까지 끌려가고 「상태」 열이 처음부터 화면 밖에 있었다(확인자
+   실측 1000×900: #csScroll scrollWidth 899 vs clientWidth 788). 아래 @media 를 그
+   실측 상한(1130px)까지 넓혀 이 구간도 768px 이하와 같은 단일 열 표기로 막는다. ── */
+.listwrap{flex:1;min-height:340px;display:flex;flex-direction:column}
+.thead{flex:none;display:grid;grid-template-columns:60px 150px 92px minmax(180px,1fr) 152px 182px;gap:10px;
+      align-items:center;padding:9px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+      border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.tbody{flex:1;min-height:0;overflow:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+      border-top:none;border-radius:0 0 7px 7px;display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:60px 150px 92px minmax(180px,1fr) 152px 182px;gap:10px;
+    align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;
+    background:transparent;border-left:3px solid transparent}
+.row:hover{background:rgba(0,0,0,.02)}
+.row.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.row .sid{font:500 11px/1.3 var(--rv-mono);color:var(--rv-muted)}
+.row .at{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-ink-soft)}
+.row .modecell{display:flex;align-items:center;gap:6px;font:400 11px/1.3 var(--rv-font);min-width:0}
+.row .modedot{width:7px;height:7px;border-radius:50%;flex:none}
+.row .cons{font:400 11px/1.35 var(--rv-font);color:var(--rv-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .result{font:500 11.5px/1.3 var(--rv-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stchip{font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center;
+       border:1px solid;justify-self:start}
+.stchip.done{color:var(--rv-purple);background:oklch(0.95 0.03 285);border-color:oklch(0.5 0.11 285 / .35)}
+.stchip.ordered{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:oklch(0.5 0.11 165 / .35)}
+.stchip.handoff{color:var(--rv-link);background:oklch(0.95 0.03 250);border-color:oklch(0.5 0.13 250 / .35)}
+.stchip.drop{color:var(--rv-dim);background:var(--rv-panel2);border-color:rgba(0,0,0,.14)}
+.empty,.loaderr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.empty .ti,.loaderr .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.empty .ds,.loaderr .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.loaderr button{margin-top:2px;padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+             font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+/* ── 페이지네이션(offset 기반 — 기간 필터만 잠김) ── */
+.pager{flex:none;height:42px;border-top:1px solid rgba(0,0,0,.1);background:var(--rv-panel);
+      display:flex;align-items:center;padding:0 14px;gap:10px;border-radius:0 0 7px 7px}
+.pager .pinfo{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.pager .grow{flex:1}
+.pager-controls{display:flex;align-items:center;gap:6px}
+.pbtn{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+     border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 10px;cursor:pointer}
+.pbtn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.14);cursor:not-allowed}
+.pnow{font:500 10.5px/1 var(--rv-mono);color:var(--rv-muted)}
+.limit-note,.boundary-note{flex:none;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);padding:2px 2px}
+.boundary-note{border-top:1px solid rgba(0,0,0,.08);padding-top:10px}
+
+/* ── 상세 서랍 — top:52px 는 `.a2-hd`(min-height 52px) 바로 아래를 덮는 기준
+   (`ai_response_log.html.j2`와 같은 계산 근거 — 이 화면도 추가 탭바·필터바가 없다). ── */
+.drawer{position:absolute;top:52px;right:0;bottom:0;width:580px;background:var(--rv-card);
+       border-left:1px solid rgba(0,0,0,.16);box-shadow:-20px 0 44px rgba(38,35,30,.2);
+       display:flex;flex-direction:column;z-index:8}
+.drawer[hidden]{display:none}
+.scrim{position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.2);z-index:7}
+.scrim[hidden]{display:none}
+.dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.dw-hd .row1{display:flex;align-items:center;gap:9px}
+.dwstatus{font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:5px 8px;white-space:nowrap;border:1px solid}
+.dwstatus.done{color:var(--rv-purple);background:oklch(0.95 0.03 285);border-color:oklch(0.5 0.11 285 / .35)}
+.dwstatus.ordered{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:oklch(0.5 0.11 165 / .35)}
+.dwstatus.handoff{color:var(--rv-link);background:oklch(0.95 0.03 250);border-color:oklch(0.5 0.13 250 / .35)}
+.dwstatus.drop{color:var(--rv-dim);background:var(--rv-panel2);border-color:rgba(0,0,0,.14)}
+.dw-hd .title{font:600 13.5px/1.3 var(--rv-font);flex:1;min-width:0}
+.dw-hd .close{font:400 16px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 5px;background:none;border:0}
+.dw-hd .meta{display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint);flex-wrap:wrap}
+.dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:16px}
+.dw-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.dw-note{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim);margin:-4px 0 8px}
+.dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:var(--rv-panel);
+        font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+.cchips{display:flex;flex-wrap:wrap;gap:6px}
+.cchip{font:400 10.5px/1 var(--rv-mono);border-radius:5px;padding:6px 8px;background:#faf7f0;
+      border:1px solid rgba(0,0,0,.16);color:var(--rv-ink)}
+.cchip.empty{color:var(--rv-dim)}
+
+.tiercards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.tiercard{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:10px 11px;background:var(--rv-panel2)}
+.tiercard.rep{border:1.5px solid var(--rv-ink);background:#f6f2e8}
+.tc-top{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.tc-name{font:600 11.5px/1.3 var(--rv-font);flex:1;min-width:0}
+.tc-badge{font:600 9px/1 var(--rv-font);background:var(--rv-ink);color:var(--rv-canvas);border-radius:4px;padding:3px 6px}
+.tc-total{font:600 15px/1.2 var(--rv-mono)}
+.tc-parts{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted);margin-top:3px}
+
+.partsbox{border:1px solid rgba(0,0,0,.1);border-radius:7px;overflow:hidden}
+.partrow{display:grid;grid-template-columns:96px 1fr 116px;gap:8px;padding:8px 11px;align-items:center;
+        border-bottom:1px solid rgba(0,0,0,.06);background:var(--rv-card)}
+.partrow:last-child{border-bottom:none}
+.partrow.head{background:var(--rv-panel);font:600 10px/1 var(--rv-font);color:var(--rv-muted)}
+.partrow .pc{font:500 10.5px/1.3 var(--rv-font);color:var(--rv-muted)}
+.partrow .pn{font:400 11px/1.35 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partrow .pp{font:500 11px/1.3 var(--rv-mono);text-align:right}
+.partrow-empty{padding:12px;font:400 11px/1.5 var(--rv-font);color:var(--rv-dim);background:var(--rv-card);
+              border:1px solid rgba(0,0,0,.1);border-radius:7px}
+
+.complist{display:flex;flex-direction:column;gap:5px}
+.comprow{display:flex;justify-content:space-between;gap:8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;
+        padding:7px 10px;background:var(--rv-panel2);font:400 11px/1.3 var(--rv-font)}
+.comprow .cp{font:500 11px/1.3 var(--rv-mono)}
+
+.dropbox{border:1px solid rgba(0,0,0,.12);border-left:3px solid var(--rv-dim3);background:var(--rv-panel2);
+        border-radius:7px;padding:11px 13px}
+.dp1{font:500 11.5px/1.6 var(--rv-font);margin-bottom:6px}
+.dp2{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+
+.ledgerline{display:flex;gap:10px;align-items:flex-start;border:1px solid rgba(0,0,0,.11);border-radius:6px;
+           padding:9px 11px;background:var(--rv-panel2);margin-bottom:6px}
+.ledgerline:last-child{margin-bottom:0}
+.ll-k{font:600 10px/1.4 var(--rv-mono);color:var(--rv-muted);flex:none;width:64px}
+.ll-v{font:400 11px/1.5 var(--rv-font);flex:1;min-width:0}
+
+.distbox{display:flex;flex-direction:column;gap:7px}
+.distrow{display:grid;grid-template-columns:66px 1fr 100px;gap:10px;align-items:center}
+.distrow.zero{border:1px dashed rgba(0,0,0,.2);border-radius:6px;padding:5px 8px;opacity:.72}
+.dr-name{font:500 11px/1.3 var(--rv-font);color:var(--rv-ink-soft)}
+.disttrack{height:8px;border-radius:4px;background:rgba(0,0,0,.07);overflow:hidden}
+.distbar{height:100%;border-radius:4px}
+.dr-n{font:500 10.5px/1 var(--rv-mono);color:var(--rv-muted);text-align:right;white-space:nowrap}
+.unused-tag{margin-left:6px;font:600 9px/1 var(--rv-font);color:var(--rv-dim2);border:1px solid rgba(0,0,0,.16);
+           border-radius:3px;padding:2px 5px}
+
+/* 768px 이하만 걸던 것을 1130px까지 넓혔다(2026-08-15, 확인자 실측 재현 대응 — 위
+   .listwrap 주석 참조). 769~1130px 은 이전엔 이 규칙 밖이라 6열 그리드가 그대로 남아
+   콘텐츠 패널 안에서 몰래 가로 스크롤이 생겼다(문서 레벨은 오버플로 0이라 겉보기엔
+   멀쩡했다). 1130px 위(확인자 실측 1200px)는 이 규칙에 안 걸리므로 그대로 6열 표를 쓴다
+   — 이미 정상 확인된 폭이라 손대지 않는다. */
+@media (max-width:1130px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .thead{display:none}
+  .row{grid-template-columns:1fr;gap:3px;padding:10px 12px}
+  .tiercards{grid-template-columns:1fr}
+  .partrow{grid-template-columns:1fr;gap:2px}
+  .drawer{position:fixed;top:0;width:100%}
+  .scrim{position:fixed;top:0}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="ro-badge">조회 전용 · 쓰기 없음</span>
+<span class="lastat" id="lastAt">마지막 조회 —</span>
+<button type="button" class="refresh" id="refreshBtn" data-action="refresh">다시 조회</button>
+{% endblock %}
+
+{% block content %}
+<div class="cs-scroll" id="csScroll">
+
+  <div class="ledger-banner" data-keep="1">
+    <div class="lb-main">
+      <div class="lb-title">완주 이후 상태는 두 원장을 함께 확인해야 합니다</div>
+      <div class="lb-desc">orders는 2026-08-10 이후 갱신이 없는 옛 원장이고, handoffs가 지금 쌓이는 인계 원장입니다. 한쪽만 보면 최근 인계가 이 화면에서 사라집니다.</div>
+    </div>
+    <div class="lb-side">우리는 팔지 않고 인계합니다</div>
+  </div>
+
+  <div class="kpis" id="kpis"><div class="kpi-loading">불러오는 중…</div></div>
+
+  <div class="mchip-row" id="mchipRow" data-keep="1"></div>
+
+  <div class="listwrap">
+    <div class="thead">
+      <span>세션</span><span>시각</span><span>방식</span><span>제약 요약</span><span>대표 견적</span><span>상태</span>
+    </div>
+    <div class="tbody" id="tbody"><div class="loaderr">불러오는 중…</div></div>
+    <div class="pager" data-keep="1">
+      <span class="pinfo" id="pagerInfo">—</span>
+      <span class="grow"></span>
+      <div class="pager-controls">
+        <button type="button" class="pbtn" id="prevBtn" disabled data-action="prev-page">◀ 이전</button>
+        <span class="pnow" id="pnow">— / —</span>
+        <button type="button" class="pbtn" id="nextBtn" disabled data-action="next-page">다음 ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="limit-note">한 번에 최대 200건씩 조회합니다 — 아래 페이지 이동으로 이전 기록을 확인할 수 있습니다. 기간 필터·검색은 아직 지원되지 않습니다(백엔드 확장 대기).</div>
+
+  <div class="boundary-note">결제·배송·환불은 쇼핑몰 소관이라 이 화면에 없습니다 · 인계 상세 관리는 「인계 기록」 화면 소관입니다.</div>
+</div>
+
+<div class="scrim" id="scrim" hidden data-action="close-drawer"></div>
+<aside class="drawer" id="drawer" data-keep="1" hidden>
+  <div class="dw-hd">
+    <div class="row1">
+      <span class="dwstatus" id="dwStatus">—</span>
+      <span class="title" id="dwTitle">—</span>
+      <button type="button" class="close" data-action="close-drawer">✕</button>
+    </div>
+    <div class="meta">
+      <span id="dwAt">—</span><span id="dwMode">—</span><span id="dwMember">—</span><span id="dwVisitor">—</span>
+    </div>
+  </div>
+  <div class="dw-body" id="dwBody"></div>
+  <div class="dw-foot" id="dwFoot">—</div>
+</aside>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var MODE_ORDER = ['guided', 'chat', 'talk', 'expert'];
+  var MODE_META = {
+    guided: { label: '맡김', color: 'var(--rv-link)' },
+    chat: { label: '함께', color: 'var(--rv-purple)' },
+    talk: { label: '팝콘톡', color: 'var(--rv-amber)' },
+    expert: { label: '직접', color: 'var(--rv-dim2)' }
+  };
+  var TIER_ORDER = { value: 0, recommend: 1, highend: 2 };
+
+  var S = { data: null, loadErr: null, sel: null, drawerOpen: false, modeFilter: null, offset: 0 };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtInt(n) { return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function fmtWon(n) { return (n === null || n === undefined) ? '—' : (Number(n).toLocaleString('ko-KR') + '원'); }
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return iso; }
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  // ── 파생 ─────────────────────────────────────────────────────────
+  function modeCounts() {
+    var c = { guided: 0, chat: 0, talk: 0, expert: 0 };
+    (S.data.items || []).forEach(function (it) {
+      c[it.mode] = (c[it.mode] || 0) + 1;
+    });
+    return c;
+  }
+  function statusMeta(it) {
+    // 서버 status 문자열은 여전히 주문 전용 계산이라 인계 세션도 "완주"로 온다(덮어쓰지
+    // 않는다) — 이 화면은 원래도 status 원문을 그대로 쓰지 않고 snapshots/order_no/
+    // handoff_no 유무로 계약의 "상태 4종"을 직접 파생한다.
+    if (!it.snapshots || !it.snapshots.length) return { cls: 'drop', label: '— 이탈' };
+    if (it.handoff_no) return { cls: 'handoff', label: '완주 → 인계(handoffs)' };
+    if (it.order_no) return { cls: 'ordered', label: '완주 → 주문(orders)' };
+    return { cls: 'done', label: '✓ 완주' };
+  }
+  function handoffTip(it) {
+    if (!it.handoff_no) return '';
+    return it.handoff_no + ' · ' + (it.handoff_status || '상태 없음') +
+      ' · 우리 합계 ' + fmtWon(it.handoff_total_quoted) + ' · 몰 합계 ' + fmtWon(it.handoff_total_mall) +
+      ' · ' + (it.handoff_price_checked ? '가격 확인 완료' : '가격 미확인') +
+      ' · ' + fmtTime(it.handoff_at);
+  }
+  function findItem(sid) {
+    if (!S.data) return null;
+    var found = null;
+    (S.data.items || []).forEach(function (it) { if (it.session_id === sid) found = it; });
+    return found;
+  }
+
+  // ── 조회 ─────────────────────────────────────────────────────────
+  // offset 을 주면 그 페이지를 조회한다(서버가 ?offset= 을 지원 — 제작자가 items[0]@offset=5
+  // == items[5]@offset=0 을 HTTP 레벨로 검증). 생략하면 현재 S.offset(다시 조회·재시도 시
+  // 지금 보던 페이지를 유지)을 그대로 쓴다.
+  function load(offset) {
+    if (typeof offset === 'number') S.offset = Math.max(0, offset);
+    var off = S.offset || 0;
+    var btn = $('refreshBtn'); if (btn) btn.disabled = true;
+    $('kpis').innerHTML = '<div class="kpi-loading">불러오는 중…</div>';
+    $('mchipRow').innerHTML = '';
+    $('tbody').innerHTML = '<div class="loaderr">불러오는 중…</div>';
+    apiGet('/api/admin/sessions?offset=' + off).then(function (j) {
+      S.data = j; S.loadErr = null; S.offset = (typeof j.offset === 'number') ? j.offset : off;
+      if (S.sel !== null && !findItem(S.sel)) { S.sel = null; S.drawerOpen = false; }
+      renderAll();
+      $('lastAt').textContent = '마지막 조회 ' + fmtTime(new Date().toISOString());
+    }).catch(function (err) {
+      S.data = null; S.loadErr = err;
+      renderAll();
+    }).then(function () { if (btn) btn.disabled = false; });
+  }
+  function gotoPage(dir) {
+    var lim = (S.data && S.data.limit) || 200;
+    var base = S.offset || 0;
+    load(base + dir * lim);
+  }
+
+  function renderAll() {
+    if (S.loadErr) { renderLoadError(); return; }
+    if (!S.data) return;
+    renderKpis();
+    renderModeChips();
+    renderTable();
+    renderPagerInfo();
+    renderDrawer();
+  }
+
+  function renderLoadError() {
+    var un = S.loadErr && S.loadErr.status === 401;
+    var msg = S.loadErr ? S.loadErr.message : '알 수 없는 오류';
+    $('kpis').innerHTML = '';
+    $('mchipRow').innerHTML = '';
+    $('tbody').innerHTML = '<div class="loaderr"><div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
+      '<div class="ds">' + esc(un ? '관리자 로그인이 만료됐습니다 — 다시 로그인 후 조회합니다.' : ('목록을 불러오지 못했습니다 — ' + msg)) + '</div>' +
+      '<button type="button" data-action="retry">다시 시도</button></div>';
+    $('pagerInfo').textContent = '—';
+    $('pnow').textContent = '— / —';
+    var prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
+    if (prevBtn) { prevBtn.disabled = true; prevBtn.title = '목록을 불러오지 못해 페이지 이동을 쓸 수 없습니다'; }
+    if (nextBtn) { nextBtn.disabled = true; nextBtn.title = '목록을 불러오지 못해 페이지 이동을 쓸 수 없습니다'; }
+  }
+
+  // ── KPI ──────────────────────────────────────────────────────────
+  function kpiCard(label, valueHtml, botHtml, noteHtml) {
+    return '<div class="kpi"><div class="lb">' + esc(label) + '</div>' +
+      '<div class="valrow">' + valueHtml + '</div>' +
+      (botHtml ? '<div class="botrow">' + botHtml + '</div>' : '') +
+      (noteHtml ? '<div class="note">' + esc(noteHtml) + '</div>' : '') +
+      '</div>';
+  }
+  function renderKpis() {
+    var items = S.data.items || [];
+    var N = items.length;
+    var todayN = S.data.today, doneN = S.data.done, dropN = S.data.drop;
+    var total = S.data.total, doneTotal = S.data.done_total, dropTotal = S.data.drop_total;
+    var ordersN = items.filter(function (it) { return !!it.order_no; }).length;
+    var handoffN = items.filter(function (it) { return !!it.handoff_no; }).length;
+    // 완주율·이탈은 전체 기준(done_total/drop_total ÷ total)을 1차 값으로 보이고,
+    // 이 페이지(LIMIT 창) 기준은 note 줄에 병기한다 — 두 분모를 섞지 않는다.
+    var pctTotal = total ? (doneTotal / total * 100).toFixed(1) : '—';
+    var pctWindow = N ? (doneN / N * 100).toFixed(1) : '—';
+    $('kpis').innerHTML =
+      kpiCard('전체 세션', '<span class="val real">' + fmtInt(total) + '</span><span class="unit">건</span>',
+        '', '이 페이지 ' + fmtInt(N) + '건 표시 중(페이지당 상한 ' + fmtInt(S.data.limit) + '건)') +
+      kpiCard('오늘', '<span class="val real">' + fmtInt(todayN) + '</span><span class="unit">건</span>', '', '') +
+      kpiCard('완주율', '<span class="val real">' + pctTotal + '%</span>',
+        '<span class="kpichip sample">전체 ' + fmtInt(total) + '건 기준</span>',
+        '이 페이지 ' + fmtInt(N) + '건 기준 ' + pctWindow + '%') +
+      kpiCard('이탈', '<span class="val real">' + fmtInt(dropTotal) + '</span><span class="unit">건</span>',
+        '<span class="kpichip sample">전체 ' + fmtInt(total) + '건 기준</span>',
+        '이 페이지 ' + fmtInt(N) + '건 기준 ' + fmtInt(dropN) + '건') +
+      kpiCard('완주 이후(orders·handoffs)',
+        '<div class="dual"><span class="dline"><span class="dk">orders</span><span class="dv real num">' + fmtInt(ordersN) + '건</span></span>' +
+        '<span class="dline"><span class="dk">handoffs</span><span class="dv real num">' + fmtInt(handoffN) + '건</span></span></div>',
+        '<span class="kpichip sample">이 페이지 ' + fmtInt(N) + '건 기준</span>', '');
+  }
+
+  // ── 방식 칩 ──────────────────────────────────────────────────────
+  function renderModeChips() {
+    var box = $('mchipRow');
+    var counts = modeCounts();
+    var total = (S.data.items || []).length;
+    var chips = [{ key: '', label: '전체', n: total }].concat(MODE_ORDER.map(function (k) {
+      return { key: k, label: MODE_META[k].label + '(' + k + ')', n: counts[k] || 0 };
+    }));
+    box.innerHTML = '<span class="mchip-cap">방식 — 이 페이지 ' + fmtInt(total) + '건 안에서 집계(필터도 이 범위 안에서만 동작)</span>' +
+      chips.map(function (c) {
+        var on = (S.modeFilter || '') === c.key;
+        var zero = c.n === 0;
+        return '<button type="button" class="mchip' + (on ? ' on' : '') + (zero ? ' zero' : '') +
+          '" data-action="set-mode-filter" data-mode="' + esc(c.key) + '">' + esc(c.label) +
+          ' <span class="mchip-n num">' + fmtInt(c.n) + '건</span></button>';
+      }).join('');
+  }
+  function setModeFilter(mode) {
+    S.modeFilter = (S.modeFilter === mode) ? null : (mode || null);
+    renderModeChips();
+    renderTable();
+  }
+
+  // ── 목록 ─────────────────────────────────────────────────────────
+  function rowHtml(it) {
+    var sm = statusMeta(it);
+    var on = S.drawerOpen && S.sel === it.session_id;
+    var color = MODE_META[it.mode] ? MODE_META[it.mode].color : 'var(--rv-dim3)';
+    var tip = handoffTip(it);
+    return '<div class="row' + (on ? ' on' : '') + '" data-action="open-row" data-sid="' + it.session_id + '">' +
+      '<span class="sid num">#' + it.session_id + '</span>' +
+      '<span class="at">' + esc(fmtTime(it.at)) + '</span>' +
+      '<span class="modecell"><span class="modedot" style="background:' + color + '"></span>' + esc(it.mode_label || it.mode) + '</span>' +
+      '<span class="cons" title="' + esc(it.summary || '') + '">' + esc(it.summary || '제약 없음') + '</span>' +
+      '<span class="result num">' + (it.rep ? esc(it.result) : '—') + '</span>' +
+      '<span class="stchip ' + sm.cls + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(sm.label) + '</span>' +
+      '</div>';
+  }
+  function renderTable() {
+    if (S.loadErr) { renderLoadError(); return; }
+    if (!S.data) return;
+    var items = S.data.items || [];
+    var list = S.modeFilter ? items.filter(function (it) { return it.mode === S.modeFilter; }) : items;
+    if (!list.length) {
+      var off = S.data.offset || 0;
+      var msg;
+      if (S.modeFilter) {
+        msg = '이 방식으로 필터링된 세션이 이 페이지 조회 범위 안에 없습니다 — 「전체」를 눌러 필터를 해제하거나 다른 페이지를 확인할 수 있습니다.';
+      } else if (off > 0) {
+        // rows·total이 별개 쿼리 스냅샷이라(서버는 REPEATABLE READ로 대부분 막지만
+        // 화면도 자기모순 없이 견딘다) total이 정확히 lim의 배수일 때 이 빈 페이지에
+        // 실제로 도달할 수 있다 — "0건"을 "오류"로 오독하지 않게 원인을 밝힌다.
+        msg = '이 페이지에는 세션이 없습니다 — 전체 목록의 끝에 도달했습니다. 「이전」을 눌러 앞 페이지로 돌아갈 수 있습니다.';
+      } else {
+        msg = '조회된 세션이 없습니다.';
+      }
+      $('tbody').innerHTML = '<div class="empty"><div class="ti">표시할 세션이 없습니다</div>' +
+        '<div class="ds">' + msg + '</div></div>';
+      return;
+    }
+    $('tbody').innerHTML = list.map(rowHtml).join('');
+  }
+  function renderPagerInfo() {
+    var prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
+    if (!S.data) {
+      $('pagerInfo').textContent = '—'; $('pnow').textContent = '— / —';
+      if (prevBtn) prevBtn.disabled = true; if (nextBtn) nextBtn.disabled = true;
+      return;
+    }
+    var N = (S.data.items || []).length;
+    var off = S.data.offset || 0;
+    var lim = S.data.limit || 200;
+    var total = S.data.total;
+    // rows(items)와 total은 서버에서 별개 SELECT로 온다 — 그 사이 세션이 느는 레이스가
+    // 있으면(서버는 REPEATABLE READ로 대부분 막지만 100% 배제는 못 한다) total이 이번
+    // 응답의 실제 items 범위와 어긋날 수 있다. "이 페이지가 마지막인가"는 total과의
+    // 비교가 아니라 **이번 응답 자체**(N < lim, 요청한 상한보다 적게 왔다)로만 판단한다
+    // — pnow(페이지 번호)와 nextBtn(다음 버튼)이 항상 같은 근거를 쓰게 되어 "25/25인데
+    // 다음 버튼은 눌린다" 같은 자기모순이 나오지 않는다. total은 표시(안내 문구)에만
+    // 쓰고 내비게이션 결정에는 쓰지 않는다.
+    var isLastPage = N < lim;
+    var end = off + N;
+    // 화면에 보이는 total은 실제 반환분(end)보다 작게 보이지 않게 한다 — 레이스로 total이
+    // 살짝 작게 온 경우에도 "전체 4,917건 중 …5000번째"처럼 total을 넘는 범위를 보이지 않는다.
+    var totalShown = (total != null) ? Math.max(total, end) : null;
+    if (!N) {
+      $('pagerInfo').textContent = (totalShown != null)
+        ? ('전체 ' + fmtInt(totalShown) + '건 중 이 페이지에는 표시할 세션이 없음')
+        : '표시할 세션이 없습니다';
+    } else {
+      $('pagerInfo').textContent = (totalShown != null)
+        ? ('전체 ' + fmtInt(totalShown) + '건 중 ' + fmtInt(off + 1) + '–' + fmtInt(end) + '번째 표시')
+        : ('이 페이지 ' + fmtInt(N) + '건 표시');
+    }
+    var pageNow = Math.floor(off / lim) + 1;
+    var pageMax = isLastPage ? pageNow : Math.max(pageNow + 1, totalShown ? Math.ceil(totalShown / lim) : pageNow + 1);
+    $('pnow').textContent = fmtInt(pageNow) + ' / ' + fmtInt(pageMax);
+    // 비활성은 진짜 disabled + 이유를 title로 병기한다(MAKER-CHECKLIST §3) — 색(회색)에만
+    // 기대지 않는다.
+    if (prevBtn) { prevBtn.disabled = off <= 0; prevBtn.title = prevBtn.disabled ? '첫 페이지입니다' : '이전 페이지로 이동'; }
+    if (nextBtn) { nextBtn.disabled = isLastPage; nextBtn.title = nextBtn.disabled ? '마지막 페이지입니다' : '다음 페이지로 이동'; }
+  }
+
+  // ── 상세 서랍 ────────────────────────────────────────────────────
+  function openDrawer(sid) {
+    if (S.sel === sid && S.drawerOpen) { closeDrawer(); return; }
+    S.sel = sid; S.drawerOpen = true;
+    renderTable(); renderDrawer();
+  }
+  function closeDrawer() {
+    if (!S.drawerOpen && S.sel === null) return;
+    S.drawerOpen = false; S.sel = null;
+    renderTable(); renderDrawer();
+  }
+
+  function tierCardHtml(s, repId) {
+    var isRep = repId != null && s.id === repId;
+    return '<div class="tiercard' + (isRep ? ' rep' : '') + '">' +
+      '<div class="tc-top"><span class="tc-name">' + esc(s.tier_label) + '</span>' + (isRep ? '<span class="tc-badge">대표</span>' : '') + '</div>' +
+      '<div class="tc-total num">' + fmtWon(s.total) + '</div>' +
+      '<div class="tc-parts">부품 ' + fmtInt(s.part_count) + '개</div></div>';
+  }
+
+  function distRows() {
+    var counts = modeCounts();
+    var max = Math.max(1, counts.guided, counts.chat, counts.talk, counts.expert);
+    return MODE_ORDER.map(function (k) {
+      var n = counts[k] || 0;
+      var zero = n === 0;
+      var pct = zero ? 0 : Math.max(4, Math.round((n / max) * 100));
+      return '<div class="distrow' + (zero ? ' zero' : '') + '">' +
+        '<span class="dr-name">' + esc(MODE_META[k].label) + '</span>' +
+        '<div class="disttrack"><div class="distbar" style="width:' + pct + '%;background:' + MODE_META[k].color + '"></div></div>' +
+        '<span class="dr-n num">' + fmtInt(n) + '건' + (zero ? '<span class="unused-tag">미사용</span>' : '') + '</span></div>';
+    }).join('');
+  }
+
+  function renderDrawer() {
+    var item = (S.drawerOpen && S.sel != null) ? findItem(S.sel) : null;
+    $('scrim').hidden = !item;
+    $('drawer').hidden = !item;
+    if (!item) return;
+
+    var sm = statusMeta(item);
+    var dwStatusEl = $('dwStatus');
+    dwStatusEl.textContent = sm.label;
+    dwStatusEl.className = 'dwstatus ' + sm.cls;
+    $('dwTitle').textContent = '세션 #' + item.session_id;
+    $('dwAt').textContent = fmtTime(item.at);
+    $('dwMode').textContent = '방식 ' + (item.mode_label || item.mode);
+    $('dwMember').textContent = '회원 ' + (item.member ? item.member : '비로그인 세션');
+    $('dwVisitor').textContent = (item.user_id != null)
+      ? ('방문자 키 #' + item.user_id + '(회원 아님 — 익명 발급)')
+      : '방문자 키 미발급';
+
+    var dropped = !item.snapshots || !item.snapshots.length;
+    var html = '';
+
+    html += '<div><div class="dw-cap">① 제약 객체 — 원문 그대로</div>' +
+      '<div class="dw-note">상담 시작 시점의 제약을 그대로 저장합니다 — 나중에 이 값이 바뀌지 않습니다.</div>' +
+      '<div class="cchips">' + ((item.constraints && item.constraints.length)
+        ? item.constraints.map(function (c) { return '<span class="cchip">' + esc(c) + '</span>'; }).join('')
+        : '<span class="cchip empty">제약 없음</span>') + '</div></div>';
+
+    if (!dropped) {
+      var sorted = item.snapshots.slice().sort(function (a, b) {
+        var oa = TIER_ORDER.hasOwnProperty(a.tier) ? TIER_ORDER[a.tier] : 9;
+        var ob = TIER_ORDER.hasOwnProperty(b.tier) ? TIER_ORDER[b.tier] : 9;
+        return oa - ob;
+      });
+      var repId = item.rep ? item.rep.id : null;
+      html += '<div><div class="dw-cap">② 티어 스냅샷</div>' +
+        '<div class="tiercards">' + sorted.map(function (s) { return tierCardHtml(s, repId); }).join('') + '</div></div>';
+
+      if (item.rep) {
+        var parts = item.rep.parts || [];
+        html += '<div><div class="dw-cap">대표 스냅샷(' + esc(item.rep.tier_label || '-') + ') 부품 구성</div>' +
+          (parts.length
+            ? '<div class="partsbox"><div class="partrow head"><span>슬롯</span><span>상품명</span><span>당시 가격</span></div>' +
+              parts.map(function (p) {
+                return '<div class="partrow"><span class="pc">' + esc(p.cat || '-') + '</span>' +
+                  '<span class="pn">' + esc(p.name || '-') + '</span>' +
+                  '<span class="pp num">' + fmtWon(p.price) + '</span></div>';
+              }).join('') + '</div>'
+            : '<div class="partrow-empty">부품 구성이 비어 있습니다</div>') + '</div>';
+
+        var companion = (item.rep.companion || []).filter(function (c) { return c; });
+        if (companion.length) {
+          html += '<div><div class="dw-cap">컴패니언 제안</div><div class="complist">' +
+            companion.map(function (c) {
+              return '<div class="comprow"><span class="cn">' + esc(c.name || '-') + '</span><span class="cp num">' + fmtWon(c.price) + '</span></div>';
+            }).join('') + '</div></div>';
+        }
+      }
+    } else {
+      html += '<div><div class="dw-cap">③ 스냅샷 없음 — 이탈</div><div class="dropbox">' +
+        '<div class="dp1">스냅샷이 하나도 없습니다 — 이탈로 봅니다. 상담은 시작됐지만 견적이 만들어지지 않았습니다.</div>' +
+        '<div class="dp2">예산과 용도 하한이 충돌했을 가능성이 있습니다. 다만 이 화면은 추정을 단정으로 적지 않습니다.</div>' +
+        '</div></div>';
+    }
+
+    var ordersLine, handoffsLine;
+    if (dropped) {
+      ordersLine = '연결된 주문 없음 — 견적 자체가 없으므로 주문할 것도 없습니다.';
+      handoffsLine = '인계 없음 — 견적 자체가 없으므로 인계할 것도 없습니다.';
+    } else {
+      ordersLine = item.order_no ? (esc(item.order_no) + ' · ' + esc(item.order_status || '상태 없음')) : '연결된 주문 없음(orders 기준).';
+      handoffsLine = item.handoff_no
+        ? (esc(item.handoff_no) + ' · ' + esc(item.handoff_status || '상태 없음') +
+           ' · 우리 합계 ' + esc(fmtWon(item.handoff_total_quoted)) + ' · 몰 합계 ' + esc(fmtWon(item.handoff_total_mall)) +
+           ' · ' + (item.handoff_price_checked ? '가격 확인 완료' : '가격 미확인') +
+           ' · ' + esc(fmtTime(item.handoff_at)))
+        : '인계 없음 — 아직 이 세션은 인계되지 않았습니다(handoffs 기준).';
+    }
+    html += '<div><div class="dw-cap">④ 완주 이후 상태 — 두 원장 모두 확인</div>' +
+      '<div class="ledgerline"><span class="ll-k">orders</span><span class="ll-v">' + ordersLine + '</span></div>' +
+      '<div class="ledgerline"><span class="ll-k">handoffs</span><span class="ll-v">' + handoffsLine + '</span></div></div>';
+
+    html += '<div><div class="dw-cap">⑤ 상담 방식 분포(이 페이지 ' + fmtInt((S.data.items || []).length) + '건 기준)</div>' +
+      '<div class="distbox">' + distRows() + '</div></div>';
+
+    $('dwBody').innerHTML = html;
+
+    var allItems = S.data.items || [];
+    var nullCnt = allItems.filter(function (it) { return !it.member; }).length;
+    var pct = allItems.length ? (nullCnt / allItems.length * 100).toFixed(2) : '0.00';
+    $('dwFoot').textContent = '회원 귀속이 없는 세션은 오류가 아닙니다 — 실 인증이 붙기 전이라 정상입니다(이 목록 기준 ' + pct + '% 비로그인 · 이 페이지 ' + fmtInt(allItems.length) + '건 기준).';
+  }
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    if (!(window.Admin2Shell && window.Admin2Shell.isKeepClick(e.target))) {
+      if (S.drawerOpen) closeDrawer();
+    }
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    switch (t.getAttribute('data-action')) {
+      case 'open-row': openDrawer(Number(t.getAttribute('data-sid'))); break;
+      case 'close-drawer': closeDrawer(); break;
+      case 'set-mode-filter': setModeFilter(t.getAttribute('data-mode') || null); break;
+      case 'refresh': load(); break;
+      case 'retry': load(); break;
+      case 'prev-page': if (!t.disabled) gotoPage(-1); break;
+      case 'next-page': if (!t.disabled) gotoPage(1); break;
+      default: break;
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.drawerOpen) closeDrawer();
+  });
+
+  function boot() { load(); }
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
