@@ -214,6 +214,30 @@
 > 그래서 **이 서버에서는 부작용 있는 검사를 해도 된다** — 오염돼도 되는 곳이 됐다.
 > 반대로 운영 서버가 서면 그곳에서는 절대 하지 않는다.
 
+### 로컬 브라우저 자동화 도구 — 있는 줄 알면 헛수고한다 (2026-08-15 확인)
+
+제작자 둘의 보고가 어긋났다 — 한쪽은 "Playwright 패키지가 이 PC 어디에도 없다",
+다른 쪽은 "이미 캐시된 Playwright 를 썼다"고 했다. **기록자 실측으로 정정한다.**
+
+**`playwright` 패키지는 설치돼 있지 않다.** `.venv` site-packages · 시스템 Python
+(`py`·`python` 양쪽) `pip show playwright` · 전역 `npm ls -g --depth=0` ·
+`where playwright` · pipx · `popcorn-ai`·`E:\DEV` 상위 2단계 `node_modules` 를
+전부 확인했고 **어디에도 없다.** 있는 것은 **브라우저 바이너리 캐시뿐**이다
+(`%LOCALAPPDATA%\ms-playwright\chromium-1234` 등) — 이 캐시가 정확히 어디서 왔는지는
+모른다(다른 도구·다른 프로젝트의 흔적일 수 있다). **캐시가 있다고 패키지가 있는
+것은 아니다** — `import playwright` 는 이 캐시만으로는 안 되고, 다음 사람이 "있다"고
+믿고 시작하면 그 자리에서 막힌다.
+
+**그래도 브라우저 실측 자체는 됐다** — 셸(`admin2.css`) 반응형 수정 확인자는
+**Edge 를 CDP(Chrome DevTools Protocol)로 직접 구동**해 우회했다: Playwright
+패키지 없이 브라우저를 원격 디버깅 모드로 띄우고 그 포트로 직접 붙는 방식이다.
+Playwright 설치 없이 화면을 실측해야 하면 이 방법을 쓴다 — **재현 스크립트는
+리포에 없다**(그 확인자 세션에서 그때그때 만든 것이라, 다음에 쓰는 사람이 절차를
+다시 세워야 한다).
+
+**확인법**: `.venv/Scripts/python -m pip show playwright` · `npm ls -g --depth=0` ·
+`where playwright` 셋 다 "없음"을 돌려주면 이 기록이 아직 유효하다.
+
 ---
 
 ## 4. 지금 막혀 있는 것
