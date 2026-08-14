@@ -58,6 +58,10 @@ erDiagram
   consult_sessions ||--o{ quote_snapshots : "견적 스냅샷"
   members ||--o{ member_reviews : "후기(구매 인증)"
   members ||--o{ member_favorites : "관심 부품"
+
+  %% 9차 개정 (2026-08-13) — 웹 검색 사양 채움
+  products ||--o{ spec_web_suggestions : "웹 검색 사양 제안"
+  product_reviews |o--o{ spec_web_suggestions : "반영 참조(선택)"
 ```
 
 ---
@@ -462,6 +466,51 @@ ALTER TABLE product_specs ADD COLUMN form_factor_list JSONB;   -- 마이그레�
 **추천 게이트는 실질 5중이다**(슬라이스 39에서 확인): 뷰 WHERE가
 `판매중 ∧ ai_candidate ∧ ¬review_required ∧ category_group='core_part' ∧ part_type 10종`,
 호출부가 `stock_qty>0`. 적재가 `category_group`을 채우지 않으면 사양이 완전해도 풀에 못 든다.
+
+### 3.14 [9차 개정] spec_web_suggestions — 웹 검색 사양 제안 (2026-08-13)
+
+**해소한 모순**: 다나와 수집(A-18)이 못 채우는 필드가 실재한다 — `cooler_tdp`는 다나와
+상세 페이지 자체에 그 항목이 없다(판매중·재고 있는 대기 중 최다 덩어리, 307건 실측).
+이 필드는 사람 검수 또는 **제조사 공식 자료 등 웹 검색**으로만 채울 수 있다.
+
+danawa_fetch.py는 출처가 다나와 한 곳이라 `product_reviews.detail` 문자열에 출처를
+녹여 넣는 것으로 충분했다. 웹 검색은 매 제안마다 출처(제조사 사이트·리테일러 등)가
+달라 **구조화된 컬럼으로 남겨야** 다음 사람이 되짚는다(crosschecker 규칙 "근거 URL을
+반드시 붙인다"와 같은 이유).
+
+```sql
+CREATE TABLE spec_web_suggestions (
+  id                 BIGSERIAL PRIMARY KEY,
+  product_code       BIGINT NOT NULL REFERENCES products(product_code),
+  field_name         VARCHAR(50) NOT NULL,
+  suggested_value    VARCHAR(255) NOT NULL,   -- product_reviews와 같은 표기 규약
+                                               -- (JSONB 대상 필드는 JSON 배열 문자열)
+  source_url         TEXT NOT NULL,           -- 근거 없는 제안은 없다
+  source_name        VARCHAR(100),            -- '제조사 공식' / '다나와' 등 출처 종류
+  confidence         NUMERIC(4,2),
+  note               TEXT,
+  fetched_at         TIMESTAMP NOT NULL DEFAULT now(),
+  applied_review_id  BIGINT REFERENCES product_reviews(review_id),  -- 어느 검수 행에 반영됐나
+  created_at         TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_spec_web_suggestions_product ON spec_web_suggestions (product_code, field_name);
+CREATE INDEX idx_spec_web_suggestions_applied ON spec_web_suggestions (applied_review_id);
+```
+(마이그레이션 0045)
+
+**계약 — danawa_fetch.py와 동일선상, A-18의 연장**
+
+① **이 테이블에 쓴다고 정본이 되지 않는다.** `product_reviews.suggested_value`에도
+함께 올려야 검수 화면(ADM-PRD-020)에 보이고, 승인 액션이 그제서야 `product_specs`에
+쓴다. 적용은 `tools/spec_fill_apply.py`(사람 확인 전제, `--apply`가 없으면 드라이런).
+
+② **`product_specs`는 절대 이 파이프라인이 직접 쓰지 않는다.** 다나와 제안과 마찬가지로
+사람 확인이 강제다 — 남의 페이지 값이 견적 근거가 되면 "모든 견적에는 이유가 있습니다"가
+무너진다.
+
+③ **`field_name`은 `spec_field_defs.field_key`의 어휘를 따른다**(하드 FK는 아니다 —
+`product_reviews.field_name`도 마찬가지로 소프트 참조다. 적용 스크립트가 검증한다).
 
 ---
 
@@ -942,3 +991,61 @@ CREATE TABLE pricing_settings (           -- 판매가 산정 파라미터 (§6.
 ```
 
 **정합 규칙(A-10, 화면 ADM-OPS-010과 동일):** ① settle은 pay를 따라간다(자동 보정). ② refund=own은 pay=own 전제. ③ 스위치 변경은 관리자 전용 + history 필수. ④ 재고 예약(hold)은 pay=own에서만 활성.
+
+---
+
+## 14. [10차 개정] ai_task_assignments — AI 작업 종류 ↔ 프로바이더 배정 (2026-08-13, ADM-AI-030 · A-35)
+
+**해소한 모순**: AI 작업 설정 화면(`/admin2/ai-task-settings`)이 "어느 작업에 어느
+모델을 쓰고, 실패하면 무엇으로 대체하는지"를 저장할 테이블이 없었다(실측:
+`api_cost_logs`·`cost_thresholds`·`rate_limit_policies`·`ops_settings_history` 어디에도
+이 배정을 담는 컬럼이 없다 — `docs/design/req/req-ai-task-settings.md` ④,
+2026-08-13 조사자 데이터맵). 작업 종류 4종·프로바이더 3사(Codex·Claude·Gemini)
+역할분담+폴백 방침은 **A-35**(decision-log.md, 2026-08-13 사장님 확정)가 정본이다.
+
+```sql
+CREATE TABLE ai_task_assignments (
+  task_key        VARCHAR(50) PRIMARY KEY
+                    CHECK (task_key IN (
+                      'task.s1_parse', 'task.s2_explain',
+                      'task.ops_assist', 'task.spec_fill')),   -- A-35 닫힌 4종, DB단 강제
+  mode            VARCHAR(20) NOT NULL DEFAULT 'single'
+                    CHECK (mode IN ('concurrent', 'single')),
+  providers       JSONB NOT NULL,        -- [{"vendor":"Codex","model":"gpt-5-codex","role":"주"}, ...]
+  fallback_order  JSONB NOT NULL DEFAULT '[]'::jsonb,   -- ["Claude","Codex",...] 벤더명 순서
+  prompt_version  VARCHAR(100),          -- NULL = 미지정(지어낸 버전 기본값 없음)
+  updated_by      VARCHAR(100),
+  updated_at      TIMESTAMP NOT NULL DEFAULT now(),
+  created_at      TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+(마이그레이션 0046 — DBA 적용 대기. 미적용 상태에서는 API가 `ready:false`로 응답하고
+화면은 "원천 준비 중"을 말한다. 500으로 죽지 않는다.)
+
+**변경 이력은 전용 테이블을 새로 만들지 않는다.** `ops_settings_history`가 "현재값
+테이블 + 전용 이력 테이블" 쌍의 선례이지만, 실측 결과 그 이력 테이블에는 **라이브
+writer가 없다**(`admin_ops.py`의 UPDATE 두 곳 모두 이 표에 INSERT하지 않는다 — 2행은
+시드 기원). 대신 실제로 5,118행이 쌓이고 있는 `admin_operator_activity_logs`
+(`target_kind='ai_task'`)에 얹었다 — 운영 전환 설정(ADM-SYS-010, §13)이 이미 같은
+표를 `target_kind='ops'`로 실사용 중인 것과 같은 방식이다(§같은 것을 두 벌 두지
+않는다). 조회는 `api/admin_ai_tasks.py`의 `GET /api/admin/ai-task-settings/history`.
+
+**계약**
+
+① **providers·fallback_order는 정규화하지 않고 JSONB 배열로 둔다.** 조회·수정 단위가
+항상 "작업 하나 전체"이고 하위 행 단위 조회가 없다 — 이 규모에서는 정규화 이득보다
+단일 행 원자적 갱신의 단순함이 크다. 최소 1개 이상·동시 호출 모드는 2개 이상 등의
+규칙은 API(`api/admin_ai_tasks.py`)가 검증한다(DB CHECK 아님).
+
+② **벤더+모델 구체 문자열(`gpt-5-codex` 등)의 정본은 DB가 아니다.** A-35 원문에는
+"Codex·Claude·Gemini 3사"만 있고 구체 모델 ID는 없다 — 화면 정본
+`docs/design/dc-ai-task-settings.html`의 JS 상수가 유일한 소재였다(조사자 실측). 이
+화면은 배정을 저장할 뿐 프로바이더 카탈로그를 관리하지 않는다(비범위) — 카탈로그가
+DB화될 자리는 AI 연동 설정(ADM-AI-040)이다.
+
+③ **prompt_version은 NULL을 허용한다.** 이 저장소에는 프롬프트 "본문"을 관리하는
+실제 파일도 DB도 없다 — 원안의 `PROMPTS`/`PROMPT_BODY` 상수는 순수 JS 하드코딩이라
+지어낸 값이다. 이 화면은 "휴면"이라(2026-07-21 LLM 실연동 보류) 저장한 값이 연동
+재개 시 그대로 살아나므로, 채워지지 않은 상태를 지어낸 기본값이 아니라 NULL로
+정직하게 남긴다. "과거 버전" 목록은 화면이 `admin_operator_activity_logs`의 실제
+변경 이력에서 파생한다(카탈로그 테이블 없음).

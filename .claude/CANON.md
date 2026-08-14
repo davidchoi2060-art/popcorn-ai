@@ -18,8 +18,11 @@
 | 부품 어휘 · 슬롯 | `api/taxonomy.py` | `PART_LABELS` · `CORE_TYPES` · `slot_of` |
 | 마진 상속 | `api/pricing.py` | `resolve_margins` 밖에서 계산 금지 |
 | 견적 표시용 상품명 | `api/product_name.py` | `display_name`. 고객 응답에만 쓴다 |
-| 디자인 토큰 | `design-system/tokens.css` | 임의 HEX/px 금지. 토큰 이름으로 쓴다 (44개) |
-| 화면 셸(관리자) | `templates/admin/_layout.html.j2` | 새 `/admin2/*` 는 상속한다. 독립 페이지로 두지 않는다 |
+| 디자인 토큰(고객 화면) | `design-system/tokens.css` | 임의 HEX/px 금지. 토큰 이름으로 쓴다 (44개) |
+| 화면 셸(admin2) | `templates/admin/_admin2_shell.html.j2` | 새 `/admin2/*` 는 이걸 상속한다(2026-08-13부터 — 옛 `_layout.html.j2`는 폐기, 파일 상단에 안내). 독립 페이지로 두지 않는다 |
+| admin2 팔레트·서체 | `mockups/shared/admin2/admin2.css` | admin2 화면은 이 파일만 읽는다. `design-system/tokens.css`(고객용)와는 별개 — 섞지 않는다 |
+| admin2 셸 동작(JS) | `mockups/shared/admin2/admin2-shell.js` | 사이드바 접기·그룹 아코디언·권한 표시. 화면이 다시 구현하지 않는다 |
+| admin2 페이지 라우트 | `api/admin_ui_<screen>.py` (`api/admin_ui_common.py`=렌더 헬퍼) | 화면 하나 = 파일 하나. `api/main.py`가 `router`(APIRouter) 있는 모듈을 자동으로 훑어 싣는다(주석 참조) — `main.py`를 고치지 않는다. API 모듈(`api/*.py`)도 같은 방식 |
 | 디자인 브리프 서식 | `.claude/BRIEF.md` | 화면을 클로드 디자인에 맡길 때 · 받은 뒤 배선 규약 |
 | Phoenix 원본 좌표 | `docs/design/phoenix-template-map.md` | 옆 화면을 베끼지 말고 여기서 찾는다 |
 | 화면 흐름 | `docs/design/screen-flow.md` | 흐름도. 화면·이동을 바꾸면 **여기부터** 고친다 |
@@ -37,10 +40,15 @@
 | 조립 표준(신) | `std.spec_defs` (49) · `std.compat_pairs` (28) |
 | 추천 후보 | 뷰 `v_recommendation_candidates` · `v_companion_candidates` |
 
-> **손으로 짠 두 화면은 아직 셸·토큰 밖에 있다** — `build_map`(조감도) 자체 변수 12개 ·
-> `dash`(현황판) 15개, 둘 다 `tokens.css` 를 안 읽는다(2026-08-12 실측). 토큰이 모자라서가
-> 아니라 안 쓴 것이다. **고칠지는 미결이라 임의로 옮기지 마라** — 근거와 선택지는
-> `.claude/BRIEF.md` §C-4.
+> **2026-08-12 실측으로 남아 있던 「손으로 짠 두 화면」 노트는 2026-08-13 셸 통합으로
+> 해소됐다.** `build_map`·`dash`·`reviews`는 이제 셋 다 `_admin2_shell.html.j2`를
+> 상속하고 `mockups/shared/admin2/admin2.css` 하나만 읽는다(자체 `:root`·LNB 사본
+> 없음). `.claude/BRIEF.md` §C-4가 미결로 남겼던 질문("`design-system/tokens.css`로
+> 옮길까")과는 다른 답을 택했다 — tokens.css(고객용)로 옮기지 않고 **admin2 전용
+> 새 파일**을 만들었다(팔레트는 reviews.html.j2가 그날 승인받은 oklch 베이지 그대로).
+> `--bg`·`--card`·`--state-run` 같은 변수 **이름**은 옛 것을 유지하되(본문 CSS·JS가
+> 수백 곳에서 이미 그 이름으로 생성 마크업을 만들고 있어 이름까지 바꾸는 것은 위험이
+> 더 컸다) **값**만 이 팔레트로 새로 정의했다.
 
 > **`std.*` 와 `public.product_specs` 는 다른 저장소다.** 엔진이 읽는 것은 `public` 이고
 > `std` 는 새로 세우는 표준이다. 2026-08-11 에 이 둘의 채움률을 섞어 오진했다
