@@ -25,6 +25,13 @@ def build_map(request: Request) -> HTMLResponse:
     그렸다. 지금은 `templates/admin/_admin2_shell.html.j2`(reviews.html.j2에서 뽑은
     admin2 공통 셸 — 사이드바·헤더·팔레트)를 상속한다. 지도·격자 같은 전체 화면
     구성은 그대로 `content` 블록 안에 있다.
+
+    **2026-08-14 v2 재구축(UX-20 보강, `decision-log.md`)**: 원안이
+    `docs/design/dc-build-map-v2.html`로 교체됐다 — 대상 유지를 hover 대신
+    click 고정(pin)으로 바꾼 것이 유일한 실질 차이다. 이 라우트 자체(screen_id·
+    domain·breadcrumb)는 그대로다 — 바뀐 것은 템플릿의 클라이언트 상태(hover/pin)와
+    마크업뿐이라 여기 손댈 것이 없다. 데이터는 여전히 `GET /api/admin/std/compat-map`
+    (`api/admin_std.py`) 하나뿐이고, 이 화면은 그 응답을 읽기만 한다(쓰기 API 없음).
     """
     return render(request, "admin/build_map.html.j2",
                   screen_id="ADM-STD-020", domain="compat-map",

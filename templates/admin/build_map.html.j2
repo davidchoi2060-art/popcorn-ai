@@ -40,6 +40,16 @@
     옮겨졌다 — 이름(`--bg`·`--card`·`--nav` 등)은 그대로, 값만 이 팔레트로 맞췄다(본문
     지도·격자 SVG가 그 이름들을 그대로 쓰고 있어 이름은 두고 값만 바꿨다 — 제작 보고서
     참조). 3안 탭(`.tabs`)은 이 화면만의 헤더 위젯이라 `header_extra` 블록에 남았다.
+
+  ■ 2026-08-14 v2 재구축 — UX-20·UX-20 보강(decision-log) 반영. 원안이
+    `조립 호환 조감도.dc.html`(3안 나열)에서 `docs/design/dc-build-map-v2.html`로
+    교체됐고(v2 가 정본), 유일한 실질 차이는 **대상 유지 방식**이다: hover 만으로는
+    탭을 넘어가는 순간 마우스가 부품을 벗어나 강조가 풀렸다 — v2 는 click 으로
+    **고정(pin)**한다(다시 누르면 해제, 바깥 클릭도 해제, `data-keep="1"` 이 붙은
+    사이드바·탭·부품 요소는 바깥 클릭 판정에서 제외). 세 표현이 여전히 한 번의
+    `GET /api/admin/std/compat-map` 조회로 함께 그려지고 탭 전환은 숨김만 바꾸는
+    구조는 그대로다 — pin 은 그 위에 얹은 상태 하나(`hover || pin`)일 뿐이다.
+    v2 하단의 "읽기 전용" 고지 문구도 그대로 옮겼다(`.foot-note`).
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -75,13 +85,28 @@ a{color:inherit;text-decoration:none}
       font:500 10.5px/1.6 var(--font)}
 .dim{opacity:.4}
 
+/* ── 대상 고정(pin) — UX-20 보강. hover=미리보기, click=고정(탭 전환에도 유지) ──── */
+.pinbar{display:flex;align-items:center;gap:10px;flex:none;margin-bottom:10px;padding:8px 12px;
+        font:400 11px/1.4 var(--font);color:var(--on-variant)}
+.pin-chip{display:flex;align-items:center;gap:8px;font:500 11.5px/1.3 var(--font);color:var(--on)}
+.pin-chip .num{font:600 12.5px/1 var(--font-num)}
+.pin-note{color:var(--on-variant)}
+.pin-clear{font:500 11px/1 var(--font);padding:5px 10px;border-radius:6px;border:0;
+           background:var(--on);color:var(--bg);cursor:pointer}
+.pin-hint{font:400 10.5px/1.4 var(--font);color:var(--on-variant)}
+.pin-hint b{color:var(--on);font-weight:600}
+.foot-note{flex:none;margin-top:10px;padding-top:8px;border-top:1px solid var(--outline-variant);
+           font:400 10.5px/1.6 var(--font);color:var(--on-variant)}
+.foot-note code{font-family:var(--font-num);background:var(--container);border-radius:3px;
+                padding:1px 4px}
+
 /* ── 1a 지도형 ───────────────────────────────────────────────── */
 .map-area{flex:1;min-height:0;position:relative;overflow:hidden}
 .map-area svg{position:absolute;inset:0;width:100%;height:100%}
 .elabel{position:absolute;transform:translate(-50%,-50%);font:600 10px/1 var(--font-num);
         padding:2px 4px;border-radius:4px;pointer-events:none;white-space:nowrap}
 .node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
-      align-items:center;gap:2px;padding:7px 11px;border-radius:8px;cursor:default;
+      align-items:center;gap:2px;padding:7px 11px;border-radius:8px;cursor:pointer;
       white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .node b{font:600 11.5px/1 var(--font-num)}
 .node i{font:400 10.5px/1 var(--font);font-style:normal;opacity:.68}
@@ -93,7 +118,7 @@ a{color:inherit;text-decoration:none}
 .rail{width:352px;flex:none;border-left:1px solid var(--outline-variant);background:var(--card);
       display:flex;flex-direction:column;min-height:0}
 .cap{font:500 10.5px/1 var(--font-num);letter-spacing:.1em;color:var(--on-variant);margin-bottom:8px}
-.prow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px}
+.prow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;cursor:pointer}
 .rrow{padding:7px 0;border-bottom:1px solid var(--outline-variant)}
 
 /* ── 1b 진단형 ───────────────────────────────────────────────── */
@@ -124,7 +149,7 @@ a{color:inherit;text-decoration:none}
 {% endblock %}
 
 {% block header_extra %}
-<div class="tabs" role="tablist" aria-label="보기 방식">
+<div class="tabs" role="tablist" aria-label="보기 방식" data-keep="1">
   <button class="tab" role="tab" data-action="view" data-view="map"
           aria-selected="true">지도형</button>
   <button class="tab" role="tab" data-action="view" data-view="diag"
@@ -138,6 +163,7 @@ a{color:inherit;text-decoration:none}
 
 {% block content %}
   <div class="body">
+    <div class="card pinbar" data-repeat="pinbar" data-keep="1">불러오는 중…</div>
 
     {# ── 1a 지도형 ─────────────────────────────────────────── #}
     <section class="view" data-view-panel="map" role="tabpanel" aria-label="지도형">
@@ -182,7 +208,7 @@ a{color:inherit;text-decoration:none}
         <span style="flex:1"></span>
         <div style="display:flex;gap:18px" data-repeat="g-stats"></div>
       </div>
-      <div style="flex:1;min-height:0;display:flex;gap:10px">
+      <div class="split" style="flex:1;min-height:0;display:flex;gap:10px">
         <div class="lanes" style="flex:1;min-width:0;display:flex;gap:10px" data-repeat="lanes"></div>
         <aside class="card" style="width:330px;flex:none;display:flex;flex-direction:column;min-height:0">
           <div style="padding:10px 12px;border-bottom:1px solid var(--outline-variant);
@@ -230,6 +256,10 @@ a{color:inherit;text-decoration:none}
       </div>
     </section>
 
+    <div class="foot-note">읽기 전용 — 규칙 편집은 「조립 호환 규칙」, 값 입력은 「조립 사양
+      표준」·「상품 사양 검수」 소관 · "검사 적용(●)"은 <code>compat_rules</code> 기준이지
+      <code>std</code> 스키마의 엔진 반영이 아님 · 세 표현은 한 번의 조회로 함께 그려지고
+      탭 전환은 숨김만 바꿈 · 실패 시 401(세션 만료)과 그 밖의 조회 실패를 구분해 안내</div>
   </div>
 {% endblock %}
 
@@ -277,7 +307,7 @@ a{color:inherit;text-decoration:none}
     return p < 55 ? 'oklch(0.62 0.16 25)' : p < 75 ? 'oklch(0.68 0.14 62)' : 'oklch(0.58 0.1 165)';
   };
 
-  var DATA = null, sel = null, view = 'map';
+  var DATA = null, pin = null, hover = null, sel = null, view = 'map';
 
   // ── 지도 기하 — 같은 두 부품을 잇는 관계가 여럿이면 부채꼴로 벌리고,
   //    다른 노드를 덮으면 더 크게 비켜 간다(원안 알고리즘 그대로).
@@ -332,22 +362,32 @@ a{color:inherit;text-decoration:none}
       if (sel && r.parts.indexOf(sel) >= 0) r.parts.forEach(function (p) { linked[p] = 1; });
     });
     var nodes = Object.keys(POS).map(function (k) {
-      var isOut = OUT_NODES.indexOf(k) >= 0, on = sel === k, near = !!linked[k];
+      var isOut = OUT_NODES.indexOf(k) >= 0, on = sel === k, near = !!linked[k], pinned = pin === k;
       var p = POS[k];
-      return '<div class="node" data-part="' + esc(k) + '" style="left:' +
+      return '<div class="node" data-part="' + esc(k) + '" data-keep="1" style="left:' +
         (p[0] / 960 * 100).toFixed(2) + '%;top:' + (p[1] / 640 * 100).toFixed(2) +
         '%;background:' + (on ? '#26231e' : isOut ? 'rgba(247,244,238,.9)' : '#fffdf9') +
         ';color:' + (on ? '#f7f4ee' : isOut ? '#8a8377' : '#26231e') +
-        ';border:1.5px ' + (isOut ? 'dashed' : 'solid') + ' ' +
-        (on || near ? '#26231e' : 'rgba(0,0,0,.22)') +
+        ';border:' + (pinned ? '2px solid #26231e' : '1.5px ' + (isOut ? 'dashed' : 'solid') + ' ' +
+        (on || near ? '#26231e' : 'rgba(0,0,0,.22)')) +
         ';opacity:' + (sel && !near ? .38 : 1) + '">' +
-        '<b>' + esc(SHORT[k] || k) + '</b><i>' + esc(DATA.part_labels[k] || k) + '</i></div>';
+        '<b>' + esc(SHORT[k] || k) + '</b><i>' + esc(DATA.part_labels[k] || k) + '</i>' +
+        (pinned ? '<span style="font:600 9px/1 var(--font-num)">📌</span>' : '') + '</div>';
     });
     return {paths: paths, labels: labels, nodes: nodes};
   }
 
   function render() {
+    sel = hover || pin;   // 미리보기(hover)가 고정(pin)을 덮는다 — 마우스를 올리면 잠깐
+                           // 보이고, 손을 떼면 고정으로 돌아간다. 세 표현이 이 값 하나를 같이 본다.
     var d = DATA, s = d.summary;
+    set('pinbar', pin
+      ? '<span class="pin-chip"><span class="num">📌 ' + esc(pin) + '</span><span style="color:var(--on-variant)">' +
+        esc(DATA.part_labels[pin] || '') + '</span></span>' +
+        '<span class="pin-note">고정됨 — 탭을 바꿔도 유지</span><span style="flex:1"></span>' +
+        '<button type="button" class="pin-clear" data-action="clear-pin">해제 ✕</button>'
+      : '<span class="pin-hint">부품을 <b>클릭</b>하면 고정되어 탭을 바꿔도 유지됩니다 · ' +
+        '올려두기(hover)는 미리보기</span>');
     var rels = d.pairs.map(function (p) {
       var S = STATUS[p.status];
       return {
@@ -393,12 +433,13 @@ a{color:inherit;text-decoration:none}
     }).join(''));
 
     set('rail-parts', d.parts.map(function (p) {
-      var on = sel === p.part_type;
-      return '<div class="prow" data-part="' + esc(p.part_type) + '" style="background:' +
+      var on = sel === p.part_type, pinned = pin === p.part_type;
+      return '<div class="prow" data-part="' + esc(p.part_type) + '" data-keep="1" style="background:' +
         (on ? '#26231e' : 'transparent') + ';color:' + (on ? '#f7f4ee' : '#26231e') +
+        ';outline:' + (pinned && !on ? '1.5px solid #26231e' : 'none') +
         ';opacity:' + (sel && !on ? .45 : 1) + '">' +
         '<span style="width:126px;font:600 11px/1.2 var(--font-num);white-space:nowrap;' +
-        'overflow:hidden;text-overflow:ellipsis">' + esc(p.part_type) + '</span>' +
+        'overflow:hidden;text-overflow:ellipsis">' + (pinned ? '📌 ' : '') + esc(p.part_type) + '</span>' +
         '<span class="track"><span class="bar" style="width:' + (p.pct || 0) +
         '%;background:' + barColor(p.pct || 0) + '"></span></span>' +
         '<span class="num" style="width:34px;text-align:right;font-size:11px;font-weight:500">' +
@@ -409,7 +450,8 @@ a{color:inherit;text-decoration:none}
 
     var railRels = (sel ? rels.filter(function (r) { return r.parts.indexOf(sel) >= 0; }) : rels)
       .slice().sort(function (a, b) { return ORDER.indexOf(a.status) - ORDER.indexOf(b.status); });
-    set('rail-title', sel ? esc(sel) + ' 연관 관계 ' + railRels.length + '건'
+    set('rail-title', sel ? esc(sel) + ' 연관 관계 ' + railRels.length + '건' +
+                            (pin && pin === sel ? ' — 고정됨' : '')
                           : '관계 ' + rels.length + '건 · 우선순위순');
     set('rail-rels', railRels.map(function (r) {
       var summary = r.specs.length
@@ -479,13 +521,14 @@ a{color:inherit;text-decoration:none}
     }).join(''));
 
     set('diag-parts', d.parts.map(function (p) {
-      var on = sel === p.part_type;
+      var on = sel === p.part_type, pinned = pin === p.part_type;
       var zeros = (p.specs || []).filter(function (x) { return x.is_blocking && x.pct === 0; });
-      return '<div data-part="' + esc(p.part_type) + '" style="padding:8px 9px;border:1px solid ' +
-        (on ? '#26231e' : 'rgba(0,0,0,.1)') + ';border-radius:7px;margin-bottom:7px;background:' +
+      return '<div data-part="' + esc(p.part_type) + '" data-keep="1" style="cursor:pointer;padding:8px 9px;border:' +
+        (pinned ? '2px' : '1px') + ' solid ' + (on || pinned ? '#26231e' : 'rgba(0,0,0,.1)') +
+        ';border-radius:7px;margin-bottom:7px;background:' +
         (on ? 'rgba(0,0,0,.035)' : '#fffdf9') + ';opacity:' + (sel && !on ? .5 : 1) + '">' +
         '<div style="display:flex;align-items:baseline;gap:7px">' +
-        '<span style="font:600 12px/1.2 var(--font-num)">' + esc(p.part_type) + '</span>' +
+        '<span style="font:600 12px/1.2 var(--font-num)">' + (pinned ? '📌 ' : '') + esc(p.part_type) + '</span>' +
         '<span style="font:400 10.5px/1.2 var(--font);color:var(--on-variant)">' + esc(p.name) + '</span>' +
         '<span style="flex:1"></span><span class="num" style="font:600 13px/1 var(--font-num)">' +
         (p.pct == null ? '—' : p.pct + '%') + '</span></div>' +
@@ -530,11 +573,13 @@ a{color:inherit;text-decoration:none}
         esc(SHORT[k] || k) + '</div>';
     }).join(''));
     set('mx-rows', cols.map(function (rk) {
-      return '<div data-part="' + esc(rk) + '" style="display:flex;align-items:stretch;background:' +
+      var pinned = pin === rk;
+      return '<div data-part="' + esc(rk) + '" data-keep="1" style="cursor:pointer;display:flex;align-items:stretch;outline:' +
+        (pinned ? '1.5px solid #26231e' : 'none') + ';background:' +
         (sel === rk ? 'var(--container)' : 'transparent') + '">' +
         '<div style="width:80px;flex:none;display:flex;align-items:center;font:600 10.5px/1.2 var(--font-num);' +
         'padding:0 6px;color:' + (sel && sel !== rk ? '#a09889' : '#26231e') + '">' +
-        esc(SHORT[rk] || rk) + '</div>' +
+        (pinned ? '📌' : '') + esc(SHORT[rk] || rk) + '</div>' +
         cols.map(function (ck) {
           var list = ck === rk ? [] : (cellMap[[rk, ck].sort().join('|')] || []);
           var hot = sel && (sel === rk || sel === ck) && list.length > 0;
@@ -550,12 +595,13 @@ a{color:inherit;text-decoration:none}
     }).join(''));
 
     set('heat-rows', d.parts.map(function (p) {
-      var on = sel === p.part_type;
-      return '<div data-part="' + esc(p.part_type) + '" style="display:flex;align-items:flex-start;' +
-        'gap:8px;padding:6px;border-radius:6px;border-bottom:1px solid var(--outline-variant);background:' +
+      var on = sel === p.part_type, pinned = pin === p.part_type;
+      return '<div data-part="' + esc(p.part_type) + '" data-keep="1" style="cursor:pointer;display:flex;align-items:flex-start;' +
+        'gap:8px;padding:6px;border-radius:6px;border-bottom:1px solid var(--outline-variant);outline:' +
+        (pinned ? '1.5px solid #26231e' : 'none') + ';background:' +
         (on ? 'var(--container)' : 'transparent') + ';opacity:' + (sel && !on ? .45 : 1) + '">' +
         '<div style="width:150px;flex:none;display:flex;align-items:baseline;gap:6px">' +
-        '<span style="font:600 11.5px/1.2 var(--font-num)">' + esc(p.part_type) + '</span>' +
+        '<span style="font:600 11.5px/1.2 var(--font-num)">' + (pinned ? '📌 ' : '') + esc(p.part_type) + '</span>' +
         '<span class="num" style="font-size:10px;color:var(--on-variant)">' + num(p.stock) + '</span></div>' +
         '<div class="num" style="width:46px;flex:none;font:600 12px/1.2 var(--font-num);text-align:right">' +
         (p.pct == null ? '—' : p.pct + '%') + '</div>' +
@@ -576,20 +622,42 @@ a{color:inherit;text-decoration:none}
     }).join(''));
   }
 
-  // ── 상호 하이라이트. **세 안이 같은 sel 을 본다** — 탭을 바꿔도 선택이 남아
-  //    같은 상태로 세 표현을 비교할 수 있다(원안의 요구를 탭 구조로 옮긴 것).
+  // ── 미리보기(hover) + 고정(pin, UX-20 보강). **세 표현이 같은 pin 을 본다** — 탭을
+  //    바꿔도 고정이 남아 같은 대상으로 세 표현을 비교할 수 있다(v2 규약 그대로).
+  //    hover = 일시 미리보기, click = 고정(다시 누르면 해제), 바깥 클릭도 해제.
   document.addEventListener('mouseover', function (e) {
     var t = e.target.closest('[data-part]');
     if (!t || !DATA) return;
     var k = t.getAttribute('data-part');
-    if (k !== sel) { sel = k; render(); }
+    if (k !== hover) { hover = k; render(); }
   });
   document.addEventListener('mouseout', function (e) {
-    if (!DATA || !sel) return;
+    if (!DATA || !hover) return;
     var t = e.target.closest('[data-part]');
     if (t && !t.contains(e.relatedTarget) && !(e.relatedTarget && e.relatedTarget.closest('[data-part]'))) {
-      sel = null; render();
+      hover = null; render();
     }
+  });
+  document.addEventListener('click', function (e) {
+    if (!DATA) return;
+    if (e.target.closest('[data-action="clear-pin"]')) {
+      if (pin) { pin = null; render(); }
+      return;
+    }
+    var t = e.target.closest('[data-part]');
+    if (t) {
+      var k = t.getAttribute('data-part');
+      pin = (pin === k) ? null : k;
+      render();
+      return;
+    }
+    // 바깥 클릭 = 고정 해제. `data-keep` 이 붙은 영역(사이드바·탭·부품 요소 자신)은
+    // 선택을 지우지 않는다 — admin2 공용 규약(`Admin2Shell.isKeepClick`)을 그대로 쓴다.
+    var kept = (window.Admin2Shell && window.Admin2Shell.isKeepClick)
+      ? window.Admin2Shell.isKeepClick(e.target)
+      : !!e.target.closest('[data-keep]');
+    if (kept) return;
+    if (pin) { pin = null; render(); }
   });
 
   // 좌측 메뉴 접기·그룹 아코디언은 공용 셸(`/shared/admin2/admin2-shell.js`)이 맡는다
@@ -630,6 +698,7 @@ a{color:inherit;text-decoration:none}
       var t = $('asof');
       if (t) { t.textContent = un ? '세션 만료' : '조회 실패'; t.style.color = 'var(--error)'; }
       document.querySelectorAll('[data-view-panel]').forEach(function (p) { p.hidden = true; });
+      set('pinbar', '');
       var box = document.createElement('div');
       box.className = 'card';
       box.setAttribute('data-bind', 'load-error');
