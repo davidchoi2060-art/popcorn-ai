@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+</style>
+</helmet>
+
+<section style="padding:34px 40px 26px;display:flex;flex-direction:column;gap:22px;border-bottom:1px dashed rgba(0,0,0,.2)">
+  <div style="max-width:1240px">
+    <div style="font:600 20px/1.3 'IBM Plex Sans KR',sans-serif">턴 2 — 정의서 재반영: 상태 흐름 4장</div>
+    <div style="font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px">1차 3안에 빠져 있던 정의서 요구를 채웠습니다: <b>업로드 최초 진입 상태</b>(⑥ 순서 강제의 시작점), 드라이런의 <b>부품 종류별 분포</b>(⑤), 적용 완료 후 <b>배치 번호 + 지금 카탈로그·추천 후보·검수 대기 총량</b>(⑥), <b>viewer 비대칭 권한 상태</b>(①·⑦ 403), 서랍의 <b>반영 상품(SKU) 탭</b>과 배치 합 ≠ 반영 차이 안내(⑤·⑦). 스타일은 <a href="#1b">1b 문장 보고서형</a> 기반 — <a href="#1a">1a</a>/<a href="#1c">1c</a>를 고르시면 같은 상태들을 그 방식으로 재적용합니다.</div>
+  </div>
+  <div style="display:flex;gap:44px;align-items:flex-start">
+
+    <!-- ── 2a 최초 진입 (owner) ── -->
+    <div id="2a" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">2a</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">최초 진입 — 업로드 (owner)</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">여기가 파일 등록 기능 · 고정 헤더 계약과 한도를 올리기 전에 보여줌</span>
+      </div>
+      <div data-screen-label="2a 최초 진입 업로드" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/catalog-import</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:4px;padding:4px 7px">owner</span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">업로드·적용 가능 · 이력 조회는 전 등급</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:432px;display:flex;border-bottom:1px solid rgba(0,0,0,.12)">
+            <div style="flex:1.25;min-width:0;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">새 일괄 등록 — 업로드 → 미리보기 → 확인 → 적용 순서가 강제됩니다</div>
+              <div style="flex:1;border:2px dashed rgba(0,0,0,.28);border-radius:9px;background:#fffdf9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;cursor:pointer">
+                <div style="font:600 13px/1 'IBM Plex Mono',monospace;color:#8a8377;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:8px 10px;background:#f4f0e7">CSV</div>
+                <div style="font:600 14px/1.4 'IBM Plex Sans KR',sans-serif">마스터 CSV를 끌어다 놓거나 클릭해서 선택</div>
+                <div style="font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377">필수 · 최대 64MB · UTF-8 · 헤더 14열이 정확히 일치해야 합니다</div>
+                <button style="font:600 12px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:11px 16px;cursor:pointer;margin-top:2px">파일 선택</button>
+              </div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;border:1px dashed rgba(0,0,0,.24);border-radius:7px;background:#fffdf9;padding:10px 13px;cursor:pointer">
+                  <div style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#5b564d">+ 사양 EAV 세트 (선택)</div>
+                  <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:3px">db_products + db_specs 두 파일을 <b>함께</b> — 하나만 올리면 그 자리에서 막힙니다(400). 안 올리면 사양은 "스펙" 열에서만 추출되고 기존 확인값은 유지됩니다.</div>
+                </div>
+                <div style="width:250px;flex:none;border:1px solid rgba(0,0,0,.14);border-radius:7px;background:#fffdf9;padding:10px 13px">
+                  <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;margin-bottom:7px">데이터 원천 — 명시적으로 선택</div>
+                  <div style="display:flex;border:1px solid rgba(0,0,0,.16);border-radius:6px;overflow:hidden">
+                    <div style="flex:1;text-align:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;padding:9px 0">실데이터</div>
+                    <div style="flex:1;text-align:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;padding:9px 0;cursor:pointer">데모</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <aside style="width:392px;flex:none;background:#f4f0e7;border-left:1px solid rgba(0,0,0,.1);padding:15px 16px;display:flex;flex-direction:column;gap:9px;overflow:hidden">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">올리기 전에 — 고정 계약</div>
+              <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:7px;padding:10px 12px">
+                <div style="font:600 10.5px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">헤더 14열이 정확히 있어야 합니다 — 열 매핑 기능 없음</div>
+                <div style="font:400 10px/1.7 'IBM Plex Mono',monospace;color:#5b564d">자체상품코드 · 상품명 · 카테고리1 · 카테고리2 · 카테고리3 · 상태값 · 매입가 · 일반회원 · 시중가 · 공급처 · 스펙 · 제조사 · 모델명 · 다나와No</div>
+                <div style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:4px">하나라도 없으면 즉시 거부(400)되고 무엇이 없는지 그대로 알려줍니다. 헤더가 다르면 파일을 고쳐 재업로드해야 합니다.</div>
+              </div>
+              <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:7px;padding:10px 12px">
+                <div style="font:600 10.5px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">자체상품코드 = 쇼핑몰 상품코드(pd_no)</div>
+                <div style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d">이 코드가 정본 코드를 그대로 결정합니다 — 잘못된 코드는 라이브 몰 상품과 충돌하거나 엉뚱한 상품을 덮어씁니다.</div>
+              </div>
+              <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:7px;padding:10px 12px">
+                <div style="font:400 10px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">삭제는 없습니다 — 올린다고 기존 상품이 사라지지 않습니다. 운영자가 잠근 값(locked_fields)은 덮지 않습니다. 미리보기 후 <b>1시간</b> 안에 적용하지 않으면 파일이 청소되어 처음부터 다시 합니다.</div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="border:1px solid oklch(0.52 0.16 30 / .45);border-left:3px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:7px;padding:10px 12px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30)">적용 후 되돌리기가 없습니다</div>
+                <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:3px">이 admin의 다른 쓰기와 달리 이 화면의 적용만 비가역입니다 — 그래서 미리보기 없이 반영하는 경로가 없습니다.</div>
+              </div>
+            </aside>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 11건 · 실데이터 6 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">현재 카탈로그 실측 <b style="font-family:'IBM Plex Mono',monospace">22,840</b>건 (실데이터 22,718 · 데모 122) — 배치 합계와 다를 수 있습니다</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+              <div style="padding:9px 13px;font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889">실패한 시도(400·413·404·409)는 이력에 남지 않습니다 — 이 목록은 실제로 반영까지 끝난 배치만 갖습니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2b 드라이런 확인 ── -->
+    <div id="2b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">2b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">드라이런 확인</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">문장 먼저 + 부품 종류별 분포 추가(⑤) · DB 미변경</span>
+      </div>
+      <div data-screen-label="2b 드라이런 확인" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:4px;padding:4px 7px">owner</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:474px;display:flex;border-bottom:1px solid rgba(0,0,0,.12)">
+            <aside style="width:300px;flex:none;background:#f4f0e7;border-right:1px solid rgba(0,0,0,.1);padding:15px 15px;display:flex;flex-direction:column;gap:9px">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">파일</div>
+              <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:10px 12px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">✓</span><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;flex:1">마스터 CSV</span><span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.2)">교체</span></div>
+                <div style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:#6f6a61;margin-top:4px">master_0813.csv · 1,411행 · 2.1MB<br>14열 헤더 일치 · UTF-8 확인</div>
+              </div>
+              <div style="background:#fffdf9;border:1px dashed rgba(0,0,0,.25);border-radius:7px;padding:10px 12px">
+                <div style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">사양 EAV 세트 — 없음</div>
+                <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:4px">사양은 "스펙" 열에서만 추출 · 기존 확인값 유지</div>
+              </div>
+              <div style="display:flex;border:1px solid rgba(0,0,0,.16);border-radius:6px;overflow:hidden">
+                <div style="flex:1;text-align:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;padding:9px 0">실데이터</div>
+                <div style="flex:1;text-align:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;padding:9px 0">데모</div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="border:1px solid oklch(0.52 0.16 30 / .45);border-left:3px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:7px;padding:10px 12px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30)">적용 후 되돌리기가 없습니다</div>
+                <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:3px">다른 화면의 쓰기(상품 수정·카테고리 이동·검수 처리)와 달리 이 화면만 비가역입니다.</div>
+              </div>
+            </aside>
+
+            <div style="flex:1;min-width:0;padding:15px 20px;display:flex;flex-direction:column;gap:9px;overflow:hidden">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">드라이런 보고 — DB는 아직 그대로입니다 · stg-8f3a · 16:03 만료(1시간)</div>
+              <div style="font:400 15px/1.7 'IBM Plex Sans KR',sans-serif;text-wrap:pretty;max-width:830px">이 파일을 적용하면 정본 22,840건 중 <b style="font-family:'IBM Plex Mono',monospace">1,032</b>건이 갱신되고 <b style="font-family:'IBM Plex Mono',monospace">214</b>건이 새로 만들어집니다. 상품 <b style="font-family:'IBM Plex Mono',monospace">87</b>건이 검수에 새로 회부되고, 추천 후보는 <b style="font-family:'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">12건 진입</b>·<b style="font-family:'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">3건 이탈</b>합니다. 삭제되는 상품은 없습니다.</div>
+              <div style="display:flex;align-items:center;gap:7px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px">
+                <span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:none">부품 종류별 분포</span>
+                <span style="font:400 10.5px/1.5 'IBM Plex Mono',monospace;color:#4a463e">그래픽카드 388 · CPU 212 · 메모리 164 · SSD 141 · 메인보드 118 · 케이스 98 · 파워 74 · 기타 51</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;max-width:880px">
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:#8a8377">제외 156</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">원천이 취급 제외로 표시한 행 — 삭제대기 132 · 내부관리용 21 · 고객님 개인결제 3. <b style="color:oklch(0.5 0.14 55)">이 사유는 적용 후 다시 볼 수 없습니다 — 지금 확인하세요.</b> (상품 상태 "삭제대기"와는 다른 개념 — 이 행들은 정본에 들어온 적이 없습니다)</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid oklch(0.52 0.16 30 / .35);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">오류 9</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">매입가 비숫자 4 · 코드 중복 2 · 코드 없음 2 · 카테고리1 없음 1 — 반영되지 않고 원본·사유가 전량 저장됩니다(2026-08-14 확정). <a href="#2b" style="border-bottom:1px solid rgba(0,0,0,.3)">행별로 보기</a></span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:#8a8377">잠금</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">운영자가 손으로 고쳐 잠근 값(locked_fields)은 덮지 않습니다 · 재고는 델타로만 기록합니다(판매중=1·품절=0 고정 산정).</span>
+                </div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="flex:none;display:flex;align-items:center;gap:11px;border-top:1px solid rgba(0,0,0,.1);padding-top:11px">
+                <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377;max-width:500px">적용 시 확인한 건수(expect_ok=1,246)를 함께 보냅니다 — 그 사이 DB가 바뀌면 409로 거부되고 다시 검증합니다.</span>
+                <span style="flex:1"></span>
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:10px 14px;cursor:pointer">처음부터 다시</button>
+                <button style="font:600 12px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:oklch(0.42 0.13 30);border:none;border-radius:5px;padding:11px 16px;cursor:pointer">되돌릴 수 없음을 알고 1,246건 적용</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 11건 · 실데이터 6 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">현재 카탈로그 실측 <b style="font-family:'IBM Plex Mono',monospace">22,840</b>건 (실데이터 22,718 · 데모 122)</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2c 적용 완료 ── -->
+    <div id="2c" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">2c</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">적용 완료</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">배치 번호 + 지금 카탈로그·추천 후보·검수 대기 총량(⑥) · 이력 맨 위에 #12 등장</span>
+      </div>
+      <div data-screen-label="2c 적용 완료" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:4px;padding:4px 7px">owner</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:372px;padding:16px 18px;display:flex;gap:14px;border-bottom:1px solid rgba(0,0,0,.12)">
+            <div style="flex:1.3;background:oklch(0.97 0.02 165);border:1px solid oklch(0.5 0.11 165 / .5);border-left:3px solid oklch(0.5 0.11 165);border-radius:9px;padding:16px 19px;display:flex;flex-direction:column;gap:8px">
+              <div style="font:600 15px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.36 0.09 165)">✓ 배치 #12로 반영되었습니다</div>
+              <div style="font:400 12px/1.75 'IBM Plex Sans KR',sans-serif;color:#4a463e;text-wrap:pretty">master_0813.csv 1,411행 중 <b style="font-family:'IBM Plex Mono',monospace">1,246건 반영</b>(신규 214 · 갱신 1,032), <b style="font-family:'IBM Plex Mono',monospace">87건 검수 회부</b>, <b style="font-family:'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">9건 거부</b>(아래 이력 #12에서 행별 확인), 156건 제외.</div>
+              <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#8a8377">제외 156건의 사유는 저장되지 않았습니다 — 드라이런 화면에서만 볼 수 있었습니다. 반영 행의 원본 셀도 보관하지 않습니다(원본 CSV가 정본). 잘못 반영했다면 되돌리기는 없고, 고친 CSV를 다시 올려 upsert로 바로잡습니다.</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;gap:9px">
+                <button style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:10px 15px;cursor:pointer">배치 #12 상세 (거부 9행)</button>
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:10px 15px;cursor:pointer">새 일괄 등록 시작</button>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">적용 직후 실측 — 지금 서버가 돌려준 총량</div>
+              <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 15px;display:flex;flex-direction:column;justify-content:center;gap:2px">
+                <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">카탈로그 전체</div>
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font:600 24px/1.2 'IBM Plex Mono',monospace">23,054</span><span style="font:500 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">+214</span></div>
+                <div style="font:400 10px/1.4 'IBM Plex Mono',monospace;color:#a09889">실데이터 22,932 · 데모 122</div>
+              </div>
+              <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 15px;display:flex;flex-direction:column;justify-content:center;gap:2px">
+                <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">추천 후보</div>
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font:600 24px/1.2 'IBM Plex Mono',monospace">1,893</span><span style="font:500 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">+9</span></div>
+                <div style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">진입 12 · 이탈 3 — 드라이런 예고와 일치</div>
+              </div>
+              <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 15px;display:flex;flex-direction:column;justify-content:center;gap:2px">
+                <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">검수 대기</div>
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font:600 24px/1.2 'IBM Plex Mono',monospace">5,135</span><span style="font:500 11px/1 'IBM Plex Mono',monospace;color:oklch(0.62 0.15 55)">+87</span></div>
+                <div style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">상품 사양 검수 화면에서 처리합니다 →</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 12건 · 실데이터 7 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">배치 합계는 재실행분이 중복 계상되어 현재 실측과 다를 수 있습니다</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rows12 }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2d viewer 열람 ── -->
+    <div id="2d" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">2d</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">viewer 열람 — 비대칭 권한</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">업로드 잠김·조회는 열림(① 확정) · 서랍은 #7 반영 상품(SKU) 탭</span>
+      </div>
+      <div data-screen-label="2d viewer 열람" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:4px 7px">viewer</span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">조회 전용 — 업로드·적용은 owner만</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.12)">
+            <div style="border:1px dashed rgba(0,0,0,.24);border-radius:9px;background:#f4f0e7;padding:16px 19px;display:flex;align-items:center;gap:14px">
+              <span style="font:600 12px/1 'IBM Plex Mono',monospace;color:#8a8377;border:1px solid rgba(0,0,0,.16);border-radius:6px;padding:8px 10px;background:#fffdf9">잠김</span>
+              <span style="flex:1;min-width:0">
+                <span style="display:block;font:600 12.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#4a463e">새 일괄 등록은 owner 등급만 할 수 있습니다</span>
+                <span style="display:block;font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#8a8377;margin-top:2px">파일 하나가 정본 22,840건을 되돌리기 없이 덮을 수 있어 업로드·적용은 owner 전용입니다(시도 시 403). 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다(2026-08-14 확정).</span>
+              </span>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 11건 · 실데이터 6 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">현재 카탈로그 실측 <b style="font-family:'IBM Plex Mono',monospace">22,840</b>건 (실데이터 22,718 · 데모 122)</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rows7 }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.2)"></div>
+          <div style="position:absolute;top:52px;right:0;bottom:0;width:560px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column">
+            <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;flex:1">배치 #7 — danawa_full_0726.csv</span>
+                <span style="font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.12 250);background:oklch(0.95 0.03 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:3px;padding:3px 5px">최초 대량 적재</span>
+                <span style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+              </div>
+              <div style="display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377"><span>2026-07-26 21:48</span><span>김선호</span><span>실데이터</span><span>24,303행 → 반영 22,808 · 검수 169 · 오류 0</span></div>
+            </div>
+            <div style="flex:none;display:flex;gap:16px;padding:0 18px;border-bottom:1px solid rgba(0,0,0,.09)">
+              <div style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding:11px 2px;cursor:pointer">거부 행 <span style="font-family:'IBM Plex Mono',monospace">0</span></div>
+              <div style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;padding:11px 2px;border-bottom:2px solid #26231e">반영 상품 <span style="font-family:'IBM Plex Mono',monospace">22,808</span></div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:13px 18px;display:flex;flex-direction:column;gap:11px">
+              <div style="border:1px solid oklch(0.72 0.12 62 / .5);border-left:3px solid oklch(0.62 0.15 55);background:oklch(0.95 0.04 70);border-radius:7px;padding:10px 12px">
+                <div style="font:600 11px/1.5 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.13 55)">업로드 24,303행 ≠ 반영 22,808건 — 차이 1,495행</div>
+                <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:3px">제외(skip)된 행들입니다. 제외 사유는 저장되지 않아 지금은 되짚을 수 없습니다 — 사유는 드라이런 화면에서만 보입니다.</div>
+              </div>
+              <div>
+                <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">반영된 상품 — SKU만 보관합니다</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <sc-for list="{{ skus }}" as="s" hint-placeholder-count="16">
+                    <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#4a463e;background:#f4f0e7;border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:5px 8px;cursor:pointer">{{ s }}</span>
+                  </sc-for>
+                  <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#a09889;padding:5px 2px">… 외 22,792건</span>
+                </div>
+                <div style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:8px">원본 CSV 셀은 보관하지 않습니다 — 원본 파일이 정본입니다. SKU를 누르면 상품 관리의 해당 상품으로 이동합니다.</div>
+              </div>
+            </div>
+            <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:#f4f0e7;font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">viewer도 이 서랍까지 전부 볼 수 있습니다 — 막히는 것은 업로드·적용뿐입니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section style="padding:34px 40px 60px;display:flex;flex-direction:column;gap:22px">
+  <div style="max-width:1200px">
+    <div style="font:600 20px/1.3 'IBM Plex Sans KR',sans-serif">상품 일괄 등록 (ADM-CSV-010) — 3안</div>
+    <div style="font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px">공통 확정: 화면 ID <b>ADM-CSV-010</b> 단일화 · 롤백 <b>없음 확정</b> · 거부 행 <b>전량 보존</b>(구현 변경 필요) · 이력·오류 조회 <b>viewer 개방</b> · 배치는 위 마법사 / 아래 이력 / 우측 서랍. 세 안의 차이는 <b>드라이런 보고와 적용 확인 방식</b>입니다. 화면 속 수치는 실측 스냅샷 예시이며 실제 화면은 서버 응답만 씁니다.</div>
+  </div>
+
+  <div style="display:flex;gap:44px;align-items:flex-start">
+
+    <!-- ══════════ 1a 단계 레일형 ══════════ -->
+    <div id="1a" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1a</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">단계 레일형</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">왼쪽 레일이 순서 강제(업로드→드라이런→적용)를 눈에 박아줌 · 보고는 수치 카드 중심</span>
+      </div>
+      <div data-screen-label="1a 단계 레일형" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/catalog-import</span>
+            <span style="flex:1"></span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">업로드·적용 <b>owner 전용</b> · 이력·오류 조회는 전 등급</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:432px;display:flex;border-bottom:1px solid rgba(0,0,0,.12)">
+            <aside style="width:224px;flex:none;background:#f4f0e7;border-right:1px solid rgba(0,0,0,.1);padding:16px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:5px">새 일괄 등록 — 순서 고정</div>
+              <div style="border:1px solid oklch(0.5 0.11 165 / .45);border-left:3px solid oklch(0.5 0.11 165);background:#fffdf9;border-radius:6px;padding:9px 11px">
+                <div style="font:600 11px/1.3 'IBM Plex Sans KR',sans-serif"><span style="color:oklch(0.5 0.11 165)">✓ 1</span> 파일</div>
+                <div style="font:400 10px/1.5 'IBM Plex Mono',monospace;color:#6f6a61;margin-top:3px">master_0813.csv · 1,411행<br>14열 헤더 일치 · UTF-8</div>
+                <div style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:2px">사양 EAV 2파일 — 없음</div>
+              </div>
+              <div style="border:1px solid oklch(0.5 0.11 165 / .45);border-left:3px solid oklch(0.5 0.11 165);background:#fffdf9;border-radius:6px;padding:9px 11px">
+                <div style="font:600 11px/1.3 'IBM Plex Sans KR',sans-serif"><span style="color:oklch(0.5 0.11 165)">✓ 2</span> 데이터 원천</div>
+                <div style="font:400 10px/1.5 'IBM Plex Mono',monospace;color:#6f6a61;margin-top:3px">실데이터 (origin=real)</div>
+              </div>
+              <div style="border:2px solid #26231e;background:#fffdf9;border-radius:6px;padding:9px 11px;box-shadow:0 4px 12px rgba(38,35,30,.12)">
+                <div style="font:600 11px/1.3 'IBM Plex Sans KR',sans-serif"><span style="color:oklch(0.5 0.12 250)">◐ 3</span> 드라이런 확인 — 지금</div>
+                <div style="font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:3px">DB는 아직 그대로입니다. 오른쪽 계획을 확인하세요.</div>
+                <div style="font:400 9.5px/1.5 'IBM Plex Mono',monospace;color:#a09889;margin-top:3px">staging_id stg-8f3a · 16:03 만료</div>
+              </div>
+              <div style="border:1px dashed rgba(0,0,0,.22);border-radius:6px;padding:9px 11px;color:#a09889">
+                <div style="font:600 11px/1.3 'IBM Plex Sans KR',sans-serif">4 적용</div>
+                <div style="font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;margin-top:3px">확인 후에만 열립니다 — 적용 뒤 되돌리기 없음</div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889">미리보기 없이 바로 반영하는 경로는 없습니다. 1시간 내 미적용 시 파일이 청소됩니다(404).</div>
+            </aside>
+
+            <div style="flex:1;min-width:0;padding:15px 18px;display:flex;flex-direction:column;gap:11px;overflow:hidden">
+              <div style="font:500 13.5px/1.55 'IBM Plex Sans KR',sans-serif;text-wrap:pretty">이 파일은 정본 22,840건 중 <b style="font-family:'IBM Plex Mono',monospace">1,032</b>건을 고치고 <b style="font-family:'IBM Plex Mono',monospace">214</b>건을 새로 만듭니다. <b style="color:oklch(0.52 0.16 30)">적용하면 되돌릴 수 없습니다.</b></div>
+              <div style="display:flex;gap:9px">
+                <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid oklch(0.5 0.11 165);border-radius:7px;padding:9px 12px"><div style="font:500 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">신규</div><div style="font:600 21px/1.2 'IBM Plex Mono',monospace">214</div></div>
+                <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid oklch(0.5 0.12 250);border-radius:7px;padding:9px 12px"><div style="font:500 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">갱신</div><div style="font:600 21px/1.2 'IBM Plex Mono',monospace">1,032</div></div>
+                <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:9px 12px"><div style="font:500 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">검수 새 회부</div><div style="font:600 21px/1.2 'IBM Plex Mono',monospace">87</div></div>
+                <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-left:3px solid #bdb6a8;border-radius:7px;padding:9px 12px"><div style="font:500 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">제외(skip)</div><div style="font:600 21px/1.2 'IBM Plex Mono',monospace">156</div></div>
+                <div style="flex:1;background:#fffdf9;border:1px solid oklch(0.52 0.16 30 / .4);border-left:3px solid oklch(0.52 0.16 30);border-radius:7px;padding:9px 12px"><div style="font:500 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">오류</div><div style="font:600 21px/1.2 'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">9</div></div>
+                <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:7px;padding:9px 12px"><div style="font:500 10px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">추천 후보</div><div style="font:600 15px/1.5 'IBM Plex Mono',monospace"><span style="color:oklch(0.5 0.11 165)">+12</span> / <span style="color:oklch(0.52 0.16 30)">−3</span></div></div>
+              </div>
+              <div style="flex:1;min-height:0;display:flex;gap:11px">
+                <div style="flex:1;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:7px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+                  <div style="font:600 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">제외 156건 — 사유는 <b style="color:oklch(0.5 0.14 55)">지금만</b> 볼 수 있습니다</div>
+                  <div style="font:400 11px/1.9 'IBM Plex Mono',monospace;color:#4a463e">카테고리1 "삭제대기" &nbsp;132<br>카테고리1 "내부관리용" &nbsp;21<br>카테고리1 "고객님 개인결제" &nbsp;3</div>
+                  <div style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:auto">원천이 취급 대상이 아니라고 표시한 행 — 적용 후 이력에는 사유가 남지 않습니다.</div>
+                </div>
+                <div style="flex:1.4;background:#fffdf9;border:1px solid oklch(0.52 0.16 30 / .35);border-radius:7px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;overflow:hidden">
+                  <div style="font:600 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:oklch(0.52 0.16 30)">오류 9건 — 이 행들은 반영되지 않습니다 (전량 보존)</div>
+                  <div style="font:400 10.5px/1.85 'IBM Plex Mono',monospace;color:#4a463e;overflow:hidden">행 214 &nbsp;PD10422 &nbsp;매입가가 숫자가 아님 "문의"<br>행 380 &nbsp;(없음) &nbsp;&nbsp;&nbsp;자체상품코드 비어 있음<br>행 771 &nbsp;PD08113 &nbsp;같은 파일 안 코드 중복(행 512)<br>행 902 &nbsp;PD11207 &nbsp;카테고리1 없음 &nbsp;… 외 5건</div>
+                </div>
+                <div style="flex:1;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:7px;padding:10px 12px">
+                  <div style="font:600 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">사양 파일 없이 진행</div>
+                  <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-top:5px">사양은 마스터의 "스펙" 열에서만 추출됩니다. 이미 확인된 기존 사양값은 <b>그대로 유지</b>되고 지워지지 않습니다.</div>
+                </div>
+              </div>
+              <div style="flex:none;display:flex;align-items:center;gap:11px;border-top:1px solid rgba(0,0,0,.1);padding-top:11px">
+                <span style="font:500 11px/1.5 'IBM Plex Sans KR',sans-serif;color:oklch(0.52 0.16 30)">▲ 이 화면의 적용은 이 admin에서 유일하게 되돌리기가 없는 쓰기입니다</span>
+                <span style="flex:1"></span>
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:10px 14px;cursor:pointer">처음부터 다시</button>
+                <button style="font:600 12px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:11px 16px;cursor:pointer">1,246건 적용 (expect_ok=1246)</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 11건 · 실데이터 6 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">현재 카탈로그 실측 <b style="font-family:'IBM Plex Mono',monospace">22,840</b>건 — 배치 합계와 다를 수 있습니다(재실행분 중복 계상)</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+              <div style="padding:9px 13px;font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889">실패한 시도(400·413·404·409)는 이력에 남지 않습니다 — 이 목록은 실제로 반영까지 끝난 배치만 갖습니다. 배치를 누르면 오른쪽 서랍에 거부 행·반영 행 상세가 열립니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 1b 문장 보고서형 ══════════ -->
+    <div id="1b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">문장 보고서형</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">드라이런이 "무엇이 바뀌는가"를 문장으로 먼저 말함(정의서 ⑥ 그대로) · 서랍 열린 상태 시연</span>
+      </div>
+      <div data-screen-label="1b 문장 보고서형" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/catalog-import</span>
+            <span style="flex:1"></span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">업로드·적용 <b>owner 전용</b> · 이력·오류 조회는 전 등급</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:432px;display:flex;border-bottom:1px solid rgba(0,0,0,.12)">
+            <aside style="width:300px;flex:none;background:#f4f0e7;border-right:1px solid rgba(0,0,0,.1);padding:15px 15px;display:flex;flex-direction:column;gap:9px">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">파일</div>
+              <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:10px 12px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">✓</span><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;flex:1">마스터 CSV (필수)</span></div>
+                <div style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:#6f6a61;margin-top:4px">master_0813.csv · 1,411행 · 2.1MB<br>14열 헤더 일치 · UTF-8 확인</div>
+              </div>
+              <div style="background:#fffdf9;border:1px dashed rgba(0,0,0,.25);border-radius:7px;padding:10px 12px">
+                <div style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">사양 EAV 세트 (선택 · 2파일 함께)</div>
+                <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:4px">db_products + db_specs — 둘 중 하나만 올리면 그 자리에서 막힙니다(400). 지금 비어 있음.</div>
+              </div>
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-top:3px">데이터 원천</div>
+              <div style="display:flex;border:1px solid rgba(0,0,0,.16);border-radius:6px;overflow:hidden">
+                <div style="flex:1;text-align:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;background:#26231e;color:#f4f1ea;padding:9px 0">실데이터</div>
+                <div style="flex:1;text-align:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669;padding:9px 0;cursor:pointer">데모</div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="border:1px solid oklch(0.52 0.16 30 / .45);border-left:3px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:7px;padding:10px 12px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.15 30)">적용 후 되돌리기가 없습니다</div>
+                <div style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:3px">상품 수정·카테고리 이동·검수 처리와 달리, 이 화면의 적용만은 비가역입니다. 자체상품코드는 라이브 몰 상품코드(pd_no)와 같은 값입니다.</div>
+              </div>
+            </aside>
+
+            <div style="flex:1;min-width:0;padding:16px 20px;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">드라이런 보고 — DB는 아직 그대로입니다 · stg-8f3a · 16:03 만료</div>
+              <div style="font:400 15.5px/1.75 'IBM Plex Sans KR',sans-serif;text-wrap:pretty;max-width:820px">이 파일을 적용하면 정본 22,840건 중 <b style="font-family:'IBM Plex Mono',monospace">1,032</b>건이 갱신되고 <b style="font-family:'IBM Plex Mono',monospace">214</b>건이 새로 만들어집니다. 상품 <b style="font-family:'IBM Plex Mono',monospace">87</b>건이 검수에 새로 회부되고, 추천 후보는 <b style="font-family:'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">12건 진입</b>·<b style="font-family:'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">3건 이탈</b>합니다. 삭제되는 상품은 없습니다.</div>
+              <div style="display:flex;flex-direction:column;gap:6px;max-width:860px">
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:#8a8377">제외 156</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">원천이 취급 제외로 표시한 행 — 삭제대기 132 · 내부관리용 21 · 고객님 개인결제 3. <b style="color:oklch(0.5 0.14 55)">이 사유는 적용 후 다시 볼 수 없으니 지금 확인하세요.</b></span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid oklch(0.52 0.16 30 / .35);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">오류 9</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">매입가 비숫자 4 · 코드 중복 2 · 코드 없음 2 · 카테고리1 없음 1 — 반영되지 않고 원본과 사유가 전량 저장됩니다. <a href="#1b" style="border-bottom:1px solid rgba(0,0,0,.3)">행별로 보기</a></span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:#8a8377">사양</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">사양 파일이 없어 "스펙" 열에서만 추출합니다 — 이미 확인된 기존 사양값은 유지되고 지워지지 않습니다.</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:9px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px">
+                  <span style="font:600 10.5px/1.7 'IBM Plex Mono',monospace;color:#8a8377">잠금</span>
+                  <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">운영자가 손으로 고쳐 잠근 값(locked_fields)은 파일이 무엇을 담았든 덮지 않습니다.</span>
+                </div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="flex:none;display:flex;align-items:center;gap:11px;border-top:1px solid rgba(0,0,0,.1);padding-top:12px">
+                <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377;max-width:520px">적용 시 확인한 건수(expect_ok=1,246)를 함께 보냅니다 — 그 사이 DB가 바뀌어 계획이 달라지면 반영이 거부(409)되고 다시 검증해야 합니다.</span>
+                <span style="flex:1"></span>
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:10px 14px;cursor:pointer">처음부터 다시</button>
+                <button style="font:600 12px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:oklch(0.42 0.13 30);border:none;border-radius:5px;padding:11px 16px;cursor:pointer">되돌릴 수 없음을 알고 1,246건 적용</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 11건 · 실데이터 6 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">현재 카탈로그 실측 <b style="font-family:'IBM Plex Mono',monospace">22,840</b>건 — 배치 합계와 다를 수 있습니다</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rowsSel }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.2)"></div>
+          <div style="position:absolute;top:52px;right:0;bottom:0;width:560px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column">
+            <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;flex:1">배치 #11 — master_0812.csv</span>
+                <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px">✓ 완료</span>
+                <span style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+              </div>
+              <div style="display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377"><span>2026-08-12 14:02</span><span>김선호</span><span>실데이터</span><span>1,411행 → 반영 1,246 · 검수 87 · 오류 9</span></div>
+            </div>
+            <div style="flex:none;display:flex;gap:16px;padding:0 18px;border-bottom:1px solid rgba(0,0,0,.09)">
+              <div style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;padding:11px 2px;border-bottom:2px solid #26231e">거부 행 <span style="font-family:'IBM Plex Mono',monospace;color:oklch(0.52 0.16 30)">9</span></div>
+              <div style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding:11px 2px;cursor:pointer">반영 상품 <span style="font-family:'IBM Plex Mono',monospace">1,246</span></div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:13px 18px;display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ rejects }}" as="e" hint-placeholder-count="5">
+                <div style="border:1px solid rgba(0,0,0,.11);border-left:3px solid oklch(0.52 0.16 30);border-radius:6px;padding:9px 12px;background:#faf7f0">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="font:600 10px/1.3 'IBM Plex Mono',monospace;color:#8a8377">행 {{ e.line }}</span>
+                    <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">{{ e.code }}</span>
+                    <span style="font:500 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30);flex:1">{{ e.reason }}</span>
+                  </div>
+                  <div style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:#8a8377;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ e.raw }}</div>
+                </div>
+              </sc-for>
+              <div style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:3px">거부 행 원본은 전량 보존됩니다(2026-08-14 확정). 제외(skip) 156건의 사유는 저장되지 않아 여기서는 볼 수 없습니다 — 드라이런 화면에서만 보입니다.</div>
+            </div>
+            <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:#f4f0e7;font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">반영 행의 원본 셀은 보관하지 않습니다 — 원본 CSV 파일이 정본입니다. 반영 상품은 SKU로 상품 관리에서 다시 찾습니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 1c 원장형 ══════════ -->
+    <div id="1c" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1c</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">원장형</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">끝난 단계가 시각과 함께 원장 행으로 쌓임 · 적용은 확인 체크 전까지 잠김</span>
+      </div>
+      <div data-screen-label="1c 원장형" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;display:flex;position:relative;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="18">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 일괄 등록</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CSV-010</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/catalog-import</span>
+            <span style="flex:1"></span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">업로드·적용 <b>owner 전용</b> · 이력·오류 조회는 전 등급</span>
+            <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+          </header>
+
+          <div style="flex:none;height:432px;padding:15px 18px;display:flex;flex-direction:column;gap:7px;border-bottom:1px solid rgba(0,0,0,.12);overflow:hidden">
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">새 일괄 등록</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">stg-8f3a · 16:03 만료 · 미리보기 없이 반영하는 경로 없음</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-left:3px solid oklch(0.5 0.11 165);border-radius:6px;padding:9px 13px">
+              <span style="font:600 10px/1.7 'IBM Plex Mono',monospace;color:#8a8377">15:02</span>
+              <span style="font:600 11px/1.7 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">✓</span>
+              <span style="font:500 11.5px/1.7 'IBM Plex Sans KR',sans-serif;width:96px">파일 접수</span>
+              <span style="font:400 11px/1.7 'IBM Plex Mono',monospace;color:#4a463e;flex:1">master_0813.csv · 1,411행 · 14열 헤더 일치 · UTF-8 · 사양 EAV 없음(기존 확인값 유지)</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-left:3px solid oklch(0.5 0.11 165);border-radius:6px;padding:9px 13px">
+              <span style="font:600 10px/1.7 'IBM Plex Mono',monospace;color:#8a8377">15:02</span>
+              <span style="font:600 11px/1.7 'IBM Plex Mono',monospace;color:oklch(0.5 0.11 165)">✓</span>
+              <span style="font:500 11.5px/1.7 'IBM Plex Sans KR',sans-serif;width:96px">원천 선택</span>
+              <span style="font:400 11px/1.7 'IBM Plex Mono',monospace;color:#4a463e;flex:1">실데이터 (origin=real)</span>
+            </div>
+            <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-left:3px solid oklch(0.5 0.12 250);border-radius:6px;padding:9px 13px">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <span style="font:600 10px/1.7 'IBM Plex Mono',monospace;color:#8a8377">15:03</span>
+                <span style="font:600 11px/1.7 'IBM Plex Mono',monospace;color:oklch(0.5 0.12 250)">✓</span>
+                <span style="font:500 11.5px/1.7 'IBM Plex Sans KR',sans-serif;width:96px">드라이런</span>
+                <span style="font:400 11px/1.75 'IBM Plex Mono',monospace;color:#4a463e;flex:1">신규 <b>214</b> · 갱신 <b>1,032</b> · 검수 새 회부 <b>87</b> · 제외 <b>156</b> · 오류 <b style="color:oklch(0.52 0.16 30)">9</b> · 추천 후보 <b style="color:oklch(0.5 0.11 165)">+12</b>/<b style="color:oklch(0.52 0.16 30)">−3</b> · 삭제 0</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px;margin-left:116px">
+                <div style="flex:1;border:1px solid rgba(0,0,0,.1);border-radius:5px;padding:7px 10px;background:#f4f0e7"><span style="font:600 10px/1.6 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.14 55)">제외 사유 — 지금만 보임:</span> <span style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:#5b564d">삭제대기 132 · 내부관리용 21 · 고객님 개인결제 3</span></div>
+                <div style="flex:1;border:1px solid oklch(0.52 0.16 30 / .3);border-radius:5px;padding:7px 10px;background:#faf7f0"><span style="font:600 10px/1.6 'IBM Plex Sans KR',sans-serif;color:oklch(0.52 0.16 30)">오류 9(전량 보존):</span> <span style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:#5b564d">매입가 비숫자 4 · 코드 중복 2 · 코드 없음 2 · 카테고리1 없음 1 — <u>행별 보기</u></span></div>
+              </div>
+            </div>
+            <div style="background:#fffdf9;border:2px solid #26231e;border-radius:6px;padding:11px 13px;box-shadow:0 4px 14px rgba(38,35,30,.1)">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <span style="font:600 10px/1.7 'IBM Plex Mono',monospace;color:#c4bdae">— : —</span>
+                <span style="font:600 11px/1.7 'IBM Plex Mono',monospace;color:#8a8377">▢</span>
+                <span style="font:500 11.5px/1.7 'IBM Plex Sans KR',sans-serif;width:96px">적용</span>
+                <span style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">확인한 계획 그대로 보냅니다(expect_ok=1,246). 그 사이 DB가 바뀌었으면 409로 거부되고 다시 검증합니다.</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;margin-top:9px;margin-left:116px">
+                <label style="display:flex;align-items:center;gap:8px;font:500 11.5px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30);cursor:pointer"><span style="width:15px;height:15px;border:1.5px solid oklch(0.52 0.16 30);border-radius:3px;background:#fffdf9"></span>적용 후 되돌리기가 없음을 확인했습니다</label>
+                <span style="flex:1"></span>
+                <button style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:10px 14px;cursor:pointer">처음부터 다시</button>
+                <button style="font:600 12px/1 'IBM Plex Sans KR',sans-serif;color:#f0ece2;background:#bdb6a8;border:none;border-radius:5px;padding:11px 16px;cursor:default">1,246건 적용 — 체크 전에는 잠김</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 16px">
+            <div style="flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px">
+              <span style="font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">배치 이력</span>
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6f6a61">전체 11건 · 실데이터 6 · 데모 5</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">현재 카탈로그 실측 <b style="font-family:'IBM Plex Mono',monospace">22,840</b>건 — 배치 합계와 다를 수 있습니다</span>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:8px 13px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+              <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span><span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span><span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+            </div>
+            <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <div style="{{ r.style }}">
+                  <span style="font:600 11px/1.3 'IBM Plex Mono',monospace">#{{ r.no }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0"><span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.file }}</span><span style="{{ r.tagStyle }}">{{ r.tag }}</span></span>
+                  <span style="{{ r.originStyle }}">{{ r.origin }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.total }}</span>
+                  <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;text-align:right">{{ r.ok }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:#6f6a61">{{ r.review }}</span>
+                  <span style="{{ r.errStyle }}">{{ r.err }}</span>
+                  <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center">✓ 완료</span>
+                </div>
+              </sc-for>
+              <div style="padding:9px 13px;font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889">실패한 시도(400·413·404·409)는 이력에 남지 않습니다. 배치를 누르면 오른쪽 서랍에 거부 행·반영 행 상세가 열립니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:4600,&quot;height&quot;:1180}}">
+class Component extends DCLogic {
+  renderVals() {
+    const GREEN='oklch(0.5 0.11 165)', RED='oklch(0.52 0.16 30)';
+    const NAV=[['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+    const nav = NAV.map(([label,icon]) => {
+      const on = label==='상품 일괄 등록';
+      return { label, icon,
+        style:"display:flex;align-items:center;gap:10px;padding:4px 16px;font:500 12px/1.35 'IBM Plex Sans KR',sans-serif;color:"+(on?'#f4f1ea':'#a29b8d')+';background:'+(on?'rgba(255,255,255,.09)':'transparent')+';border-left:2px solid '+(on?GREEN:'transparent')+';cursor:pointer',
+        iconStyle:"flex:none;width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:"+(on?'#211f1b':'#cfc9bd')+';background:'+(on?GREEN:'rgba(255,255,255,.07)') };
+    });
+    const DATA=[
+      [11,'2026-08-12 14:02','김선호','master_0812.csv','실데이터','1,411','1,246','87','9',''],
+      [10,'2026-08-05 09:40','김선호','master_0805.csv','실데이터','302','302','4','0',''],
+      [9,'2026-08-01 16:12','김선호','demo_case_b.csv','데모','40','40','0','0',''],
+      [8,'2026-07-29 11:05','김선호','demo_case_a.csv','데모','31','31','0','0',''],
+      [7,'2026-07-26 21:48','김선호','danawa_full_0726.csv','실데이터','24,303','22,808','169','0','최초 대량 적재'],
+      [6,'2026-07-25 18:30','김선호','danawa_pre_0725.csv','실데이터','412','410','12','0',''],
+      [5,'2026-07-24 15:21','김선호','demo_seed_3.csv','데모','21','21','0','0','']
+    ];
+    const mk = (list,selNo) => list.map(([no,at,who,file,origin,total,ok,review,err,tag]) => {
+      const on = no===selNo;
+      return { no:String(no), at, who, file, origin, total, ok, review, err, tag,
+        tagStyle: tag ? "font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.5 0.12 250);background:oklch(0.95 0.03 250);border:1px solid oklch(0.5 0.12 250 / .3);border-radius:3px;padding:3px 5px;white-space:nowrap" : 'display:none',
+        originStyle:"font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;text-align:center;border-radius:4px;padding:4px 0;"+(origin==='데모'?'color:#7d7669;background:#f2eee5;border:1px solid rgba(0,0,0,.12)':'color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .25)'),
+        errStyle:"font:"+(err!=='0'?'600':'400')+" 11px/1.3 'IBM Plex Mono',monospace;text-align:right;color:"+(err!=='0'?RED:'#b3ac9e'),
+        style:"display:grid;grid-template-columns:52px 118px 76px 1fr 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:10px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:"+(on?'#f0ece1':'transparent')+";border-left:3px solid "+(on?'#26231e':'transparent') };
+    });
+    const rejects=[
+      { line:'214', code:'PD10422', reason:'매입가가 숫자가 아닙니다', raw:'PD10422,RTX5060 게이밍PC 스탠다드,PC부품,그래픽카드,,판매중,문의,890000,…' },
+      { line:'380', code:'(없음)', reason:'자체상품코드가 비어 있습니다', raw:',중고 B급 케이스,PC부품,케이스,미들타워,판매중,12000,19000,…' },
+      { line:'512', code:'PD08113', reason:'같은 파일 안에서 코드 중복(행 771과 동일)', raw:'PD08113,DDR5-5600 16GB,PC부품,메모리,DDR5,판매중,52000,64000,…' },
+      { line:'771', code:'PD08113', reason:'같은 파일 안에서 코드 중복(행 512와 동일)', raw:'PD08113,DDR5-5600 16GB (중복),PC부품,메모리,DDR5,판매중,52000,64000,…' },
+      { line:'902', code:'PD11207', reason:'카테고리1이 없습니다', raw:'PD11207,무선 키보드 K380,,주변기기,키보드,판매중,21000,29000,…' }
+    ];
+    const DATA12=[[12,'2026-08-14 15:07','김선호','master_0813.csv','실데이터','1,411','1,246','87','9','방금 적용']].concat(DATA);
+    const skus=['PD00119','PD00358','PD01022','PD01584','PD02291','PD03047','PD03680','PD04125','PD04976','PD05513','PD06208','PD06841','PD07399','PD07952','PD08466','PD09031'];
+    return { nav, rows:mk(DATA,0), rowsSel:mk(DATA,11), rows12:mk(DATA12,12), rows7:mk(DATA,7), rejects, skus };
+  }
+}
+</script>
+</body>
+</html>
