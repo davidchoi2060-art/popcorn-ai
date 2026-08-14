@@ -45,14 +45,14 @@
 |---|------|----------------|--------|------|
 | 7 | **조립 호환 지도** | [req-build-map.md](req-build-map.md) | `dc-build-map-v2.html` | **재구축 대기** (`/admin2/build-map` · UX-20 → v2 클릭 고정) |
 | 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 대기** (`/admin2/spec-standard` · UX-24 → 1b) |
-| 9 | 상품 사양 정의 | [req-spec-field-defs.md](req-spec-field-defs.md) | — | 정의서 |
+| 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **디자인** (ADM-PRD-050 · UX-27 → 1a) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
-| 11 | 조립 호환 규칙 | [req-compat-rules.md](req-compat-rules.md) | — | 정의서 |
-| 12 | 용도별 최소 사양 | [req-usage-floors.md](req-usage-floors.md) | — | 정의서 |
-| 13 | 부품 등급 관리 | [req-part-grade.md](req-part-grade.md) | — | 정의서 |
-| 14 | 추천 기준 설정 | [req-policy-weights.md](req-policy-weights.md) | — | 정의서 |
-| 15 | 추천 가능 재고 현황 | [req-candidate-pool.md](req-candidate-pool.md) | — | 정의서 |
-| 16 | 견적 상담 기록 | [req-consult-sessions.md](req-consult-sessions.md) | — | 정의서 |
+| 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) | `dc-compat-rules-2안.html` | **구축 중** (ADM-ENG-010 · UX-28 → 1b) |
+| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고) |
+| 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **구축 중** (ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력) |
+| 14 | **추천 기준 설정** | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **구축 중** (ADM-ENG-020 · UX-31 → 1a · 조회 전용) |
+| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용) |
+| 16 | **견적 상담 기록** | [req-consult-sessions.md](req-consult-sessions.md) | `spec-consult-sessions.md`(계약) | **구축 중** (ADM-ORD-010 · UX-33 → 1a + 우측 서랍) |
 | 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | — | 정의서 |
 
 ## 4. 매입 · 소싱
@@ -125,7 +125,24 @@
 | 5 | 상품 일괄 등록 | [dc-product-bulk-import.html](../dc-product-bulk-import.html) | 구축 중 · UX-21 → 1b |
 | 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 신설 대기 · UX-26 → 1b + 빈 상태 1c |
 | 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 대기 · UX-24 → 1b |
+| 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 디자인 · UX-27 → 1a |
+| 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 구축 중 · UX-28 → 1b |
 | 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 대기 · UX-25 |
+
+### 계약 요약으로 전달된 승인 디자인
+
+**원안은 Claude Design 서버에 있고, 팀에는 계약 요약(`docs/design/spec-*.md`)으로 전달한다.**
+`DesignSync` 가 서브에이전트에서 막혀 있어(2026-08-14 확인) 제작자가 원안을 직접 못 받기
+때문이다 — **위 `dc-*.html` 과 성격이 다른 것이 아니라 전달 경로만 다르다.** 그 제약이
+풀리면 이 표는 위 표로 합쳐진다.
+
+| # | 화면 | 계약 요약 | 구축 |
+|---|------|----------|------|
+| 12 | 용도별 최소 사양 | [spec-usage-floors.md](../spec-usage-floors.md) | 구축 중 · UX-29 → 두 안 참고 |
+| 13 | 부품 등급 관리 | [spec-part-grade.md](../spec-part-grade.md) | 구축 중 · UX-30 → 1a + 1b 우측 입력 |
+| 14 | 추천 기준 설정 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
+| 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 구축 중 · UX-32 → 1a · 조회 전용 |
+| 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 구축 중 · UX-33 → 1a + 우측 서랍 |
 
 **7번은 완성본이 아니라 「3안 비교본」이다.** 지도형(1a)·진단형(1b)·매트릭스형(1c) 셋이
 한 캔버스에 있다. 사장님이 **셋을 다 탭으로 두고 운영자가 고르게** 하기로 확정했다(UX-20).
