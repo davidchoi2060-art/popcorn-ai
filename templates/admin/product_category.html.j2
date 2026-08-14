@@ -1,0 +1,1236 @@
+{#
+  상품 분류 관리 (ADM-CAT-010) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    "상품을 옮길 자리(판매 분류 트리)를 어떻게 세우고 다듬는가" — 트리 자체를 보는
+    조회와, 노드를 추가·이동·삭제하고 마진을 거는 쓰기가 한 화면에 있다. 실제 상품을
+    분류에 배정하는 일은 이 화면이 하지 않는다("상품 분류 매핑" 화면 소관 — 이 화면은
+    "옮길 자리"만 만든다).
+
+  ■ 출처 — 사장님이 Claude Design에서 확정한 원안
+    파일: `docs/design/dc-product-category.html`(`<x-dc>` + `DCLogic` + `support.js`
+    런타임 — 여기서는 돌지 않는다). `reviews`·`ai_task_settings`와 같은 원칙: 화면
+    구성·색·서체·간격·인터랙션은 원안 그대로 옮기고, 런타임만 순수 JS로 바꿨다.
+    요구사항 정의서: `docs/design/req/req-product-category.md`.
+
+  ■★ 데이터 API 정정(2026-08-13, 작업 도중 하네스가 긴급 정정) — **처음 지시서의
+    `/api/admin/product-category/*` 경로·`capabilities`·`history.available` 필드는
+    존재하지 않는 것이 지시서에 잘못 적혀 있었다.** 카테고리 백엔드는 이미 전부
+    구현돼 있었고, 정본은 **`GET/POST/PATCH/DELETE /api/admin/categories`,
+    `PUT /api/admin/categories/{cid}/margin`**(`api/admin_categories.py`, 읽기만—
+    수정하지 않았다)다. 이 파일은 그 실제 응답 스키마를 그대로 소비한다. 아래는
+    실측으로 확인한 필드 이름과 몇 가지 함정이다.
+
+    ① **노드 식별자는 `category_id`다**(`id`가 아니다). 목록은 `items[]`이고 최상위
+       "요약" 객체는 없다 — 통계(전체 수·대분류 수·위반 합계·마진 걸린 수)는 이 화면이
+       `items[]`를 순회해 **직접 합산**한다(서버가 준 실제 수를 더하는 것이지 새 값을
+       지어내는 게 아니다 — CANON §2-1과 배치되지 않는다고 판단했다).
+    ② **상품 수는 두 필드로 온다**: `product_count`(이 노드 직속) ·
+       `subtree_count`(이 노드 + 자손 전체 합산, 서버가 재귀 CTE로 이미 계산). 목록의
+       "직속 / 자손" 열은 이 둘을 그대로 쓴다 — 원안의 `totalOf()`(자기 직속 +
+       자손 재귀합)가 실제로는 `subtree_count`와 같은 정의였다.
+    ③ **재고 있음(`in_stock_count`)은 직속만 온다**(자손 미포함, SQL 확인:
+       `p.category_id = c.category_id`만 본다). 원안은 이 열도 자손까지 합친 값을
+       보여준다 — 서버에 자손 합산 필드가 따로 없어, **이 화면이 트리를 걸으며
+       클라이언트에서 합산**한다(`stockUnder()`). 실제 서버 값(직속)과 화면 표시값
+       (자손 포함 합계)이 다르다는 뜻이라 향후 서버에 전용 집계 필드가 생기면 이
+       클라이언트 합산을 지우는 편이 낫다 — 검증 대상으로 보고서에 남긴다.
+    ④ **허용 부품 종류는 두 형태로 온다**: `allowed_part_types`(저장용 실제
+       part_type 코드 배열, 예: 공랭·수랭이 따로) · `allowed_labels`(화면 표시용으로
+       접힌 라벨, 예: "CPU쿨러" 한 줄). **이 화면은 `allowed_part_types`를 전혀 읽지
+       않는다** — 표시·수정 상태 판정 전부 `allowed_labels`(및 그것을 고르는 자리인
+       루트의 `part_types:[{key,label}]`)만으로 한다. 저장할 때는 `part_types[].key`
+       값을 보낸다(`_clean_types`가 `DISPLAY_LABELS`의 키를 기대함 — 라벨 문자열을
+       그대로 보내면 400이 난다).
+    ⑤ **마진은 세 값이 온다**: `margin_rate`(이 노드에 직접 건 값, 없으면 null) ·
+       `margin_effective`(실제 적용값) · `margin_source`(어디서 왔는지 서버가 이미
+       문장으로 만들어 줌 — "전역 기본" | "이 분류" | "상속: 상위이름", 세 형태가
+       전부다). 화면은 이 문장을 그대로 쓰거나 살짝 풀어 쓸 뿐 상속 경로를 다시
+       계산하지 않는다 — 계산 원천은 여전히 `api/pricing.resolve_margins` 하나다.
+    ⑥ **마진 설정·해제는 같은 엔드포인트다** — `PUT .../margin`에
+       `{margin_rate:0.12}`(설정)와 `{margin_rate:null}`(해제=상속으로 되돌리기)을
+       **같은 PUT**으로 보낸다. 별도 DELETE가 없다(처음 지시서는 DELETE로 잘못
+       적었었다).
+    ⑦ **PATCH의 이동에는 함정이 하나 있다** — `parent_id`를 `null`로 보내는 것과
+       "부모를 바꾸지 않음"을 서버가 구분할 수 없어(둘 다 필드 미변경처럼 보임),
+       최상위로 옮길 때는 `parent_id`가 아니라 **`move_to_root:true`**를 보낸다.
+       허용 종류를 완전히 지울 때도 같은 이유로 `allowed_part_types:[]`가 아니라
+       **`clear_part_types:true`**를 보낸다.
+    ⑧ **응답의 안내 문장 키는 `verdict`다**(다른 화면들의 `message`가 아니다 — 모듈마다
+       이름이 다를 수 있다는 CANON의 경고를 여기서도 확인했다). 마진 PUT 응답에는
+       추가로 `note`(마크다운 **볼드** 포함 — 재산정 안내)와 `products`(영향받는
+       상품 수, `subtree_count`와 같은 개념)가 온다.
+    ⑨ **삭제 409는 이미 완성된 한국어 문장**(`detail`)으로 온다 — "하위 카테고리
+       3개를 먼저 옮기거나 지우세요" 식으로 건수가 문장 안에 있다. 그래서 이 화면은
+       409를 따로 구조 분해하지 않고 `window.popcornProgress.errText()`가 뽑아준
+       문장을 그대로 보여준다. 단, 같은 조건(직속 자식 수·직속 상품 수)을 화면이 이미
+       알고 있어 **저장 요청 전에 같은 문구로 먼저 알린다**(왕복 없이 즉시 피드백,
+       서버 문구와 한 글자도 다르지 않게 맞췄다).
+
+  ■★ 되돌리기 — "미구현"이다(꺼짐도 변경없음도 아니다)
+    카테고리 **트리 편집**(추가·수정·삭제·마진)에는 되돌리기 엔드포인트가 없다
+    (`api/admin_categories.py` 실측 — undo 라우트 0개). 변경은
+    `admin_operator_activity_logs`(`target_kind='category'`)에 남지만 역방향으로
+    되돌리는 API가 없다. 그래서 헤더의 "되돌리기" 버튼과 이력 목록의 각 항목 버튼은
+    **항상 비활성 + "미구현" 표시**다(`docs/design/dc-ops-stage.html`의 기존 "미구현"
+    표기 관례 — 옅은 회색·점선 테두리 — 를 그대로 옮겼다). 참고로 "상품 분류 매핑"
+    화면의 `POST /api/admin/category-mapping/undo`는 **상품 이동**을 되돌리는
+    것이라 이것과 다른 기능이다 — 화면 문구에서 섞어 쓰지 않았다.
+
+  ■★ 변경 이력 — 카테고리 전용 조회 API가 없다
+    `GET /api/admin/activity-logs`(`api/admin_activity_logs.py`, 날짜 필터만 있고
+    종류 필터는 없음, 최근 500건·전 도메인 혼합)를 그대로 불러 이 화면에서
+    `kind === 'category'`로 걸러 보여준다. **500건 밖에 있는 과거 카테고리 이력은
+    안 보일 수 있다** — 그래서 빈 목록 문구도 "이력이 없습니다"가 아니라 "최근
+    N건(전체 M건 중) 안에는 카테고리 변경이 없습니다"로, 범위를 명시해 적었다. 이
+    화면이 표시하는 "무엇을 바꿨는지" 문장(`action_label`/`summary`)도 이 공용
+    로그가 category 종류에 특화된 문장을 만들어 주지 않아(`_summary()`가 다른
+    도메인 action만 분기 처리) 원안만큼 풍부하지 않다 — 지어내지 않고 서버가 준
+    문장만 그대로 쓴다.
+
+  ■ 미매핑 상품 — 정의가 셋이라는 지적을 반영해 라벨에 조건을 명시했다
+    이 화면(과 이 API)이 세는 "미배정"은 **`category_id IS NULL`** 기준(2건 수준,
+    2026-08-13 스냅샷 실측)뿐이다. "미분류 노드(id 17)에 배정됨"·"part_type='ETC'"는
+    다른 정의이고 이 API에 그 수를 주는 필드가 없어 **화면에 숫자로 올리지 않았다**
+    (지어내지 않는다는 규약) — 대신 사각지대 카드에 "다른 정의도 있다"는 사실만
+    텍스트로 밝힌다.
+
+  ■ ETC(기타) 부품 종류만 허용하는 소분류 — **코드**로 판정한다(2026-08-13 개정)
+    `api/taxonomy.py`: 내부 코드 `"ETC"`의 표시 라벨이 사장님 확정으로 "미분류" ->
+    "기타(ETC)"로 바뀌었다(2026-08-13). **판정을 표시 라벨 문자열로 하면 라벨이 바뀔
+    때마다 깨진다** — 이 개정 작업 자체가 그 사고를 실측했다: 구판정
+    `allowed_labels[0]==='미분류'`를 새 라벨 아래 그대로 두면 13개 소분류 전량이
+    매치에 실패해 `etcCount`가 오류 없이 조용히 0이 된다. 그래서 지금은
+    **`allowed_part_types`(저장용 실제 part_type 코드 배열)가 정확히 `['ETC']`인지**로
+    판정한다(`isEtcOnly`) — 코드는 DB `products.part_type`에 박힌 값이라 라벨이
+    몇 번을 더 바뀌어도 흔들리지 않는다. 화면에 보여줄 라벨 자체는 여전히 서버
+    (`part_types:[{key,label}]`)에서 끌어온다(`etcLabel()`) — 문자열을 이 파일에
+    다시 박지 않는다(`api/taxonomy.py`가 단일 원천).
+    **주의**: 판매 분류 트리에도 실제로 "미분류"라는 **이름의 노드**가 있을 수 있어
+    (요구사항 정의서 예시, category_id 17 — 이 이름은 이번 라벨 개정과 무관한 다른
+    축이라 그대로다), "이 노드의 허용 종류가 ETC뿐이다"와 "이 노드의 **이름**이
+    미분류다"는 서로 다른 사실이다 — 화면 문구에서 항상 "허용 종류가 (ETC 라벨)뿐"
+    이라고 축을 밝혀 섞이지 않게 했다.
+
+  ■ 2026-08-13 셸 통합 — `templates/admin/_admin2_shell.html.j2`를 상속한다. 사이드바·
+    헤더·팔레트·토스트 컨테이너·서체 변수(`--rv-*`)는 셸/`admin2.css`가 그린다.
+    **좌측 메뉴 항목 구성(IA)은 이 화면 소관이 아니다** — 정본은 `api/admin_nav.py`.
+    그 파일의 "상품 분류 관리" 항목은 여전히 `href=None`(신설 예정)이다 — 담당 파일
+    밖이라 고치지 않았다. `api/admin_nav.py`의 href를 `/admin2/categories`로 올려야
+    LNB에서 이 화면에 들어올 수 있다(제작 보고서에 남김).
+
+  ■ 원안과 다르게 구현한 지점 (전부 이유가 있다 — 제작 보고서에도 남긴다)
+    ① **역할 스위처 폐지** — 원안 헤더의 owner/operator/viewer 버튼은 화면 안에서
+       역할을 바꿔볼 수 있는 디자인 도구 시연 장치였다. 실제 화면은 로그인 세션의
+       진짜 등급(`Admin2Shell.canWrite('owner')`)만 쓴다(reviews·ai_task_settings와
+       같은 이유 — 화면 정직성 규약).
+    ② **되돌리기 = 항상 미구현** — 위에서 설명한 대로 API 자체가 없다.
+    ③ **상위 분류 선택지는 최상위(대분류) 노드만** — 원안 그대로다. 실제 스키마는
+       `parent_id`만으로 깊이 제한이 없지만(`api/admin_categories.py` 독스트링:
+       "고정 깊이 없음"), 지금 실데이터는 정확히 2단(대분류 6·소분류 28)이고 원안의
+       상위-선택 드롭다운도 최상위 노드만 후보로 준다 — 그 UI 단순화를 그대로
+       옮겼다(서버는 더 깊은 이동도 받아 줄 수 있지만, 서랍의 "상위 분류 — 이동"
+       드롭다운은 그 선택지를 내밀지 않는다 — **이 제한은 이동 드롭다운에만
+       적용된다.** "+ 대분류 추가" 하나로 항상 최상위로만 만들던 초판(2026-08-13)
+       동작은 2026-08-14 (가)안으로 바뀌어 지금은 "트리에서 아무것도 안 골랐을 때"
+       에 한정된다 — 분류를 고른 상태에선 같은 버튼이 그 아래에 만든다(새 버튼을
+       만들지 않았다는 사실은 그대로다 — 버튼 자체가 상태에 따라 바뀐다). 상세는
+       아래 "■★ 소분류 직접 생성 — (가)안" 참고.
+    ④ **토스트는 셸의 `Admin2Shell.toast()`를 그대로 쓴다**(action 콜백 인자도 이미
+       지원 — `admin2-shell.js` 실측) — 화면이 따로 토스트를 구현하지 않는다.
+    ⑤ **이름·정렬순서·마진율 입력은 전체 재렌더를 하지 않는다** — `innerHTML`을
+       키 입력마다 통째로 바꾸면 커서·포커스가 매번 날아간다(실사용 시 한 글자
+       치면 입력창 밖으로 포커스가 튕기는 사고). 그래서 이 세 입력은 `input` 이벤트에서
+       상태만 갱신하고, 저장 여부·차이 목록처럼 **입력창이 아닌 영역만** 부분
+       갱신한다(`patchFooter()`).
+    ⑥ **서랍은 화면 콘텐츠 영역 기준으로 덮는다** — 원안은 `top:52px`(원안 자체
+       헤더 높이) 고정값을 썼다. 셸 헤더는 `min-height:52px`로 위젯이 늘면 줄바꿈될
+       수 있어, 고정 픽셀 대신 이 화면의 콘텐츠 래퍼(`position:relative`) 안에서
+       `inset`으로 덮는다 — 헤더 높이가 얼마든 콘텐츠 영역만 정확히 덮는다.
+    ⑦ **색은 admin2 토큰(`--rv-*`)으로 옮겼다** — 원안의 IBM Plex 색 중
+       `#4a463e`·`#5b564d`(본문 보조색) 두 값은 정확히 일치하는 토큰이 없어 가장
+       가까운 `--rv-ink-soft`(#403c35)로 합쳤다(이미 ai_task_settings·reviews가
+       설명 텍스트에 쓰는 것과 같은 역할의 토큰) · `#d3cec2`(leaf 캐럿 비활성색)는
+       `--rv-dim4`(#cfc9bd)로 · 마진 "직접" 칩의 강조 배경(`#e6e0d2`)은 대응 토큰이
+       없어 배경 대신 `1.5px solid var(--rv-ink)` 테두리로 강조를 옮겼다(같은
+       "직접 값" 강조 목적을 ai_task_settings의 `.ats-cf.adopted`가 테두리로 표현하는
+       것과 같은 방식). 확인자가 치수·색 대조표를 만들 때 이 목록을 참고하면 된다.
+    ⑧ **화살표는 diff 줄에서만 ASCII `->`** — 서버 stdout cp949 함정 전례(CLAUDE.md
+       「함정」)를 따라 ai_task_settings와 같은 원칙을 지켰다. 그 외 순수 표시용
+       유니코드 기호(▸▾·▲●○▼✕)는 다른 admin2 화면들도 이미 쓰고 있어(예:
+       ai_task_settings의 ✕·↑·↓) 그대로 썼다 — 전부 브라우저에서만 렌더되고
+       서버로 되돌아가지 않는다.
+
+  ■★ 소분류 직접 생성 — (가)안 (2026-08-14 사장님 확정, ADM-CAT-010 후속)
+    초판(2026-08-13)은 생성 버튼이 "+ 대분류 추가" 하나뿐이었다 — 소분류를 만들려면
+    대분류를 만든 뒤 서랍의 "상위 분류 — 이동"으로 내리는 두 단계였다(위 ③). 사장님이
+    (가)안을 택했다: **버튼을 새로 만들지 않고 있는 버튼 하나가 상황에 따라 바뀐다.**
+
+        아무것도 안 고름          + 대분류 추가                parent_id: null
+        분류를 고름(대·소 무관)   + 하위 분류 추가 — <이름>    parent_id: 고른 분류의 category_id
+
+    "트리에서 분류를 고른 상태"는 이 화면이 이미 쓰는 선택 상태(`S.selId` + 서랍
+    열림, `selectNode()`가 관리)와 같다 — 새 상태를 만들지 않았다. 어느 분류
+    아래에 붙는지가 버튼에서 드러나야 한다는 요구라 고른 분류의 **이름을 버튼
+    라벨에 직접 넣는다**(`renderAddBtn()`) — 길면 `truncName()`으로 줄이고 잘린
+    이름은 `title`(호버)로 전체를 밝힌다.
+
+    **깊이 제한을 새로 걸지 않았다** — 고른 분류가 이미 소분류(2단)여도 그 아래에
+    또 만들 수 있다. 서버(`api/admin_categories.py` 독스트링 "고정 깊이 없음")가
+    막지 않고, 확인 절차도 대분류·소분류 양쪽 선택에서 같은 동작을 요구했다. 다만
+    ③의 "상위 분류 — 이동" 드롭다운 제한(최상위 노드만 후보)은 그대로다 — 이렇게
+    만들어진 3단 이상 노드를 그 드롭다운으로 다른 대분류 밑으로 옮기는 경로는
+    여전히 없다(이 작업 범위 밖 — 건드리지 않았다).
+
+    **연속 추가 가드를 하위에도 걸었다** — 같은 부모 아래 기본 이름("새 소분류")이
+    이미 있으면 만들지 않고 그 노드를 연다(`addSubCategory()`). 문구는 서버 409
+    (`api/admin_categories.py`의 중복 검사)와 **한 글자도 다르지 않게**
+    "같은 위치에 같은 이름의 카테고리가 이미 있습니다"로 맞췄다 — 기존 대분류
+    가드(`addTopCategory()`)도 이번에 같은 문구로 통일했다(전에는 "새 대분류"
+    이름을 박은 다른 문구였다).
+
+    **권한 판정은 바꾸지 않았다.** 이 화면은 여전히 `owner()`(`Admin2Shell.
+    canWrite('owner')`) 하나로 쓰기를 막는다 — 서버는 2026-08-13부터 owner·operator를
+    함께 받지만(`_operator()` 실측), 화면의 권한 표시·잠금을 operator까지 넓히는 일은
+    별도 작업 소관이라 이번엔 손대지 않았다. 새 버튼(정확히는 버튼의 새 상태)도 같은
+    기준을 그대로 쓴다 — 비활성(`owner`가 아님)일 때는 CSS `.dis`뿐 아니라 진짜
+    `disabled` 속성 + `title`(결함 3과 같은 이유, `disAttrs()` 위 주석 참고)로 막는다.
+
+  ■ 붙지 않은 것 — "상품 분류 매핑"·"작업 기록" 화면은 admin_nav.py에서 아직
+    `href=None`(신설 예정)이라 이 화면에서 그 화면으로 가는 실제 링크를 만들지
+    않았다(P-09: 없는 화면으로 링크하지 않는다) — 원안처럼 화면 이름을 **글자로만**
+    언급한다(토스트·서랍 문구에서 "상품 분류 매핑"이라고 부르되 클릭은 안 됨).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}상품 분류 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input{font-family:var(--rv-mono)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 좌측 메뉴·헤더 뼈대·팔레트는 admin2 공용 셸이 그린다 — 여기는 이 화면 본문만. ── */
+
+.pc-undo-hd{font:500 11.5px/1 var(--rv-font);border-radius:5px;padding:6px 9px;
+  background:var(--rv-panel2);border:1px dashed rgba(0,0,0,.22);color:var(--rv-faint);cursor:not-allowed}
+
+.pc-root{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.pc-banner{flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.13);background:var(--rv-panel2);
+  border-left:3px solid var(--rv-faint);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.pc-banner .mk{font:600 11px/1 var(--rv-mono);color:var(--rv-muted);white-space:nowrap}
+.pc-banner .hd{font:600 11.5px/1.4 var(--rv-font)}
+.pc-banner .ds{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:200px}
+
+.pc-loading,.pc-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.pc-loading[hidden],.pc-errbox[hidden]{display:none}
+.pc-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.pc-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.pc-errbox button{display:inline-block;padding:8px 18px;border-radius:6px;background:var(--rv-ink);
+  color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+.pc-body{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.pc-body[hidden]{display:none}
+
+.pc-stats{flex:none;padding:12px 18px 0;display:flex;gap:10px;flex-wrap:wrap}
+.pc-stat{flex:1;min-width:180px;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:9px 12px}
+.pc-stat.warn{border-color:var(--rv-amber-line)}
+.pc-stat .lb{font:500 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.pc-stat .row{display:flex;align-items:baseline;gap:6px;margin-top:3px}
+.pc-stat .v{font:600 21px/1.15 var(--rv-mono);font-variant-numeric:tabular-nums;color:var(--rv-ink)}
+.pc-stat.warn .v{color:var(--rv-amber)}
+.pc-stat .nt{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim)}
+
+.pc-split{flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px}
+.pc-listcol{flex:1;min-width:0;display:flex;flex-direction:column}
+.pc-thead{flex:none;display:grid;grid-template-columns:1fr 132px 96px 96px 128px;gap:12px;align-items:center;
+  padding:9px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;
+  font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);overflow:hidden;scrollbar-gutter:stable}
+.pc-tbody{flex:1;min-height:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
+  border-radius:0 0 7px 7px;overflow:auto;scrollbar-gutter:stable}
+.pc-row{display:grid;grid-template-columns:1fr 132px 96px 96px 128px;gap:12px;align-items:center;
+  padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;background:transparent;
+  border-left:3px solid transparent}
+.pc-row.top{background:#faf7f0}
+.pc-row.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.pc-row .nm-wrap{display:flex;align-items:center;gap:7px;min-width:0}
+.pc-row .indent{flex:none}
+.pc-row .caret{flex:none;width:14px;text-align:center;font:500 10px/1 var(--rv-mono);color:var(--rv-muted);cursor:pointer}
+.pc-row .caret.leaf{color:var(--rv-dim4);cursor:default}
+.pc-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--rv-font)}
+.pc-row .nm.top{font:600 12.5px/1.3 var(--rv-font)}
+.pc-row .nm.sub{font:400 12px/1.3 var(--rv-font)}
+.pc-row .bdg{font:600 9.5px/1 var(--rv-font);border-radius:3px;padding:3px 5px;white-space:nowrap;flex:none}
+.pc-row .bdg.hidden-b{color:var(--rv-faint);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.12)}
+.pc-row .bdg.viol-b{color:var(--rv-amber);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+.pc-row .types{font:400 10px/1.3 var(--rv-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-row .types.none{color:var(--rv-dim)}
+.pc-row .types.set{color:var(--rv-muted)}
+.pc-row .types.etc{color:var(--rv-amber)}
+.pc-row .counts,.pc-row .stock{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);text-align:right}
+.pc-row .margin{font:400 10px/1.3 var(--rv-font);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-row .margin.own{color:var(--rv-ink)}
+.pc-row .margin.inh{color:var(--rv-dim)}
+
+.pc-tree-empty{padding:40px;text-align:center}
+.pc-tree-empty[hidden]{display:none}
+.pc-tree-empty .ti{font:600 13.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.pc-tree-empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:6px}
+
+.pc-addrow{flex:none;display:flex;align-items:center;gap:9px;margin-top:10px}
+.pc-addtop{font:600 11px/1 var(--rv-font);border-radius:5px;padding:8px 12px;cursor:pointer;user-select:none;
+  flex:none;color:var(--rv-canvas);background:var(--rv-ink);border:none}
+.pc-addtop.dis{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+.pc-etcnote{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+
+.pc-rail{width:316px;flex:none;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.pc-mgbox{flex:none;background:var(--rv-panel);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px}
+.pc-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:9px}
+.pc-mgbox .bd{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.pc-mgbox .ft{font:400 10px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:7px}
+
+.pc-blindbox{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;
+  padding:13px 15px;display:flex;flex-direction:column;gap:9px}
+.pc-blind-item{border:1px solid rgba(0,0,0,.12);border-left:3px solid var(--rv-dim2);background:#faf7f0;
+  border-radius:6px;padding:10px 12px}
+.pc-blind-item.warn{border-color:var(--rv-amber-line);border-left-color:var(--rv-amber);background:var(--rv-amber-bg)}
+.pc-blind-item .hd{font:600 11px/1.4 var(--rv-font);margin-bottom:4px}
+.pc-blind-item .ds{font:400 10.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+
+.pc-histbox{flex:1;min-height:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;
+  display:flex;flex-direction:column;overflow:hidden}
+.pc-histhd{flex:none;height:32px;border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-panel);
+  display:flex;align-items:center;padding:0 12px;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.pc-histbody{flex:1;min-height:0;overflow:auto}
+.pc-hist-row{padding:9px 12px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;flex-direction:column;gap:4px}
+.pc-hist-row .r1{display:flex;align-items:center;gap:7px}
+.pc-hist-row .at{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.pc-hist-row .undone-b{font:600 9.5px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel2);
+  border-radius:3px;padding:3px 5px;white-space:nowrap}
+.pc-hist-row .undo-a{font:500 10px/1 var(--rv-font);border-radius:4px;padding:5px 7px;white-space:nowrap;
+  color:var(--rv-faint);background:var(--rv-panel2);border:1px dashed rgba(0,0,0,.18);cursor:not-allowed}
+.pc-hist-row .what{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft)}
+.pc-hist-empty,.pc-hist-err{padding:16px 12px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center}
+.pc-hist-retry{text-decoration:underline;cursor:pointer;color:var(--rv-link)}
+
+/* 서랍 */
+.pc-backdrop{position:absolute;inset:0;background:rgba(38,35,30,.22);z-index:7}
+.pc-backdrop[hidden]{display:none}
+.pc-drawer{position:absolute;top:0;right:0;bottom:0;width:568px;background:var(--rv-card);
+  border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8}
+.pc-drawer[hidden]{display:none}
+.pc-dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.pc-dw-hd .row1{display:flex;align-items:center;gap:9px}
+.pc-dw-hd .nm{font:600 14.5px/1.3 var(--rv-font);flex:1;min-width:0}
+.pc-dw-hd .depth{font:600 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.pc-dw-hd .x{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 4px;background:none;border:0}
+.pc-dw-hd .meta{display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint);flex-wrap:wrap}
+
+.pc-dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px}
+.pc-field .lb{display:block;font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:7px}
+.pc-namerow{display:flex;align-items:center;gap:8px}
+.pc-namerow input{flex:1;min-width:0;font:500 13px/1.4 var(--rv-font);color:var(--rv-ink);background:#faf7f0;
+  border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none}
+.pc-namerow input.bad{border-color:var(--rv-red)}
+.pc-namerow .cnt{font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim);flex:none}
+
+.pc-pgrid{display:grid;grid-template-columns:1fr 132px;gap:10px}
+.pc-parentbox{position:relative}
+.pc-parentsel{display:flex;align-items:center;gap:7px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+  background:#faf7f0;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;cursor:pointer;user-select:none}
+.pc-parentsel .car{font-size:8px;opacity:.55}
+.pc-pdrop{position:absolute;top:56px;left:0;right:0;z-index:30;max-height:236px;overflow:auto;background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.pc-pdrop[hidden]{display:none}
+.pc-popt{display:flex;align-items:center;gap:8px;font:400 11.5px/1.3 var(--rv-font);padding:7px 9px;border-radius:5px;cursor:pointer}
+.pc-popt.on{font-weight:600;background:#f0ece1}
+.pc-popt.bad{color:var(--rv-dim2);cursor:not-allowed}
+.pc-popt .warn{font:600 9.5px/1 var(--rv-font);color:var(--rv-red)}
+.pc-sortbox input{width:100%;font:500 12px/1.3 var(--rv-mono);color:var(--rv-ink);background:#faf7f0;
+  border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none}
+
+.pc-typeshd{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.pc-typeshd .lb{margin-bottom:0}
+.pc-typeshd .nt{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim);flex:1;min-width:0}
+.pc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pc-chip{font:500 10.5px/1 var(--rv-font);border-radius:13px;padding:7px 11px;cursor:pointer;user-select:none;
+  color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.18)}
+.pc-chip.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+
+.pc-mgfield{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0}
+.pc-mgfield .row1{display:flex;align-items:center;gap:9px}
+.pc-mgchip{font:600 10.5px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap;flex:none}
+.pc-mgchip.own{color:var(--rv-ink);background:var(--rv-card);border:1.5px solid var(--rv-ink)}
+.pc-mgfield .src{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:0}
+.pc-mgfield .row2{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.pc-mgfield .row2 label{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
+.pc-mgfield input{width:96px;font:500 12px/1.3 var(--rv-mono);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:8px 10px;outline:none}
+.pc-mgbtn{font:500 11px/1 var(--rv-font);background:var(--rv-card);border:1px solid rgba(0,0,0,.22);border-radius:5px;
+  padding:8px 11px;cursor:pointer;color:var(--rv-ink)}
+.pc-mgbtn.dis{color:var(--rv-dim2);cursor:not-allowed}
+.pc-mgclear{font:500 11px/1 var(--rv-font);background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:5px;
+  padding:8px 11px;cursor:pointer;color:var(--rv-ink-soft)}
+.pc-mgclear.dis{color:var(--rv-dim2);cursor:not-allowed}
+.pc-mgfield .hint{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:8px}
+
+.pc-visbox{display:flex;align-items:flex-start;gap:9px;border:1px solid rgba(0,0,0,.12);border-radius:7px;
+  padding:10px 12px;background:#faf7f0;cursor:pointer;width:100%;text-align:left}
+.pc-vismark{font:600 11px/1 var(--rv-mono);margin-top:2px;flex:none}
+.pc-vismark.on{color:var(--rv-green)}
+.pc-vismark.off{color:var(--rv-dim)}
+.pc-vistxt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.pc-vistxt .lb2{font:500 11.5px/1.35 var(--rv-font);color:var(--rv-ink)}
+.pc-vistxt .ds{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+.pc-violnote{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-left:3px solid var(--rv-amber);
+  border-radius:7px;padding:11px 13px;font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+
+.pc-diffbox{border:1px solid var(--rv-ink);border-left:3px solid var(--rv-ink);background:var(--rv-panel2);
+  border-radius:6px;padding:10px 12px}
+.pc-diffbox .hd{font:600 11px/1.4 var(--rv-font);margin-bottom:6px}
+.pc-diffbox .ln{font:400 10.5px/1.5 var(--rv-mono);color:var(--rv-ink-soft)}
+
+.pc-dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;
+  gap:8px;background:var(--rv-panel);flex-wrap:wrap}
+.pc-dw-foot .nt{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:160px}
+.pc-dw-foot .nt.warn{color:var(--rv-red)}
+.pc-btn-del{font:500 11.5px/1 var(--rv-font);background:var(--rv-card);border-radius:5px;padding:8px 11px;cursor:pointer;
+  color:var(--rv-red);border:1px solid oklch(0.52 0.16 30 / .33)}
+.pc-btn-del.dis{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+.pc-btn-revert{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer}
+.pc-btn-revert.dis{color:var(--rv-dim2);cursor:not-allowed}
+.pc-btn-save{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+  border-radius:5px;padding:9px 14px;cursor:pointer}
+.pc-btn-save.dis{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+
+@media (max-width:768px){
+  .pc-split{flex-direction:column}
+  .pc-rail{width:100%}
+  .pc-drawer{position:fixed;top:0;width:100%}
+  .pc-thead,.pc-row{grid-template-columns:1fr 96px}
+  .pc-thead span:nth-child(2),.pc-thead span:nth-child(4),.pc-thead span:nth-child(5),
+  .pc-row .types,.pc-row .stock,.pc-row .margin{display:none}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<button type="button" class="pc-undo-hd" disabled
+        title="카테고리 변경 되돌리기 API가 아직 없습니다 — 변경 이력에는 남지만 역방향으로 되돌리는 엔드포인트가 없습니다">
+  되돌리기 (미구현)
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="pc-root">
+  <div class="pc-banner">
+    <span class="mk">경계</span>
+    <span class="hd">엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다</span>
+    <span class="ds" id="pcNote">부품 종류(part_type, 엔진이 읽는 닫힌 집합)와 다른 축입니다. 이 화면이 하는 일은 판매 탐색·마진 상속·오분류 경고입니다.</span>
+  </div>
+
+  <div class="pc-loading" id="pcLoading"><div>불러오는 중…</div></div>
+
+  <div class="pc-errbox" id="pcErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="pcErrMsg"></div>
+    <button type="button" data-action="retry-load">다시 시도</button>
+  </div>
+
+  <div class="pc-body" id="pcBody" hidden>
+    <div class="pc-stats" id="pcStats"></div>
+
+    <div class="pc-split">
+      <div class="pc-listcol">
+        <div class="pc-thead">
+          <span>분류</span><span>허용 부품 종류</span><span>직속 / 자손</span><span>재고 있음</span><span>마진</span>
+        </div>
+        <div class="pc-tbody" id="pcRows"></div>
+        <div class="pc-tree-empty" id="pcTreeEmpty" hidden>
+          <div class="ti">분류가 없습니다</div>
+          <div class="ds">모든 분류가 지워졌습니다 — 상품 등록·매핑 화면에서 고를 분류가 없는 상태입니다. 아래에서 대분류를 추가하세요.</div>
+        </div>
+        <div class="pc-addrow" data-keep="1">
+          <button type="button" class="pc-addtop" id="pcAddTop" data-action="add-top">+ 대분류 추가</button>
+          <span class="pc-etcnote" id="pcEtcNote"></span>
+        </div>
+      </div>
+
+      <aside class="pc-rail">
+        <div class="pc-mgbox">
+          <div class="pc-cap">마진 상속</div>
+          <div class="bd" id="pcMarginInfo"></div>
+          <div class="ft" id="pcMarginNote"></div>
+        </div>
+
+        <div class="pc-blindbox">
+          <div class="pc-cap">알려진 사각지대</div>
+          <div class="pc-blind-item warn">
+            <div class="hd" id="pcEtcBlindHd">허용 종류가 기타(ETC)뿐인 소분류는 서로 구분되지 않습니다</div>
+            <div class="ds">이런 소분류는 실제로는 서로 다른 상품을 담고 있어도(예: 케이블 · 쿨링용품 · 프린터), 허용 종류 위반 판정으로는 구분되지 않습니다. 이 화면은 이 사실을 밝히기만 하고 2차 판별은 하지 않습니다.</div>
+          </div>
+          <div class="pc-blind-item">
+            <div class="hd">"미배정 상품" 수는 정의가 하나가 아닙니다</div>
+            <div class="ds">위 지표의 "분류 미배정 상품"은 <span style="font-family:var(--rv-mono)">category_id</span>가 아예 없는 상품만 셉니다. "미분류" 이름의 노드에 배정된 상품이나, 부품 종류 자체를 못 정한(<span style="font-family:var(--rv-mono)">part_type=ETC</span>) 상품은 다른 개념이라 이 화면은 그 수를 세지 않습니다.</div>
+          </div>
+          <div class="pc-blind-item">
+            <div class="hd">노출 토글은 지금 효과가 없습니다</div>
+            <div class="ds"><span style="font-family:var(--rv-mono)">is_visible</span>을 읽어 걸러내는 소비처가 코드에 없습니다(실측: 목록 API가 값과 무관하게 전 노드를 돌려줍니다) — 꺼도 관리자 화면에서 사라지지 않습니다. 값은 저장되고 이력에 남습니다.</div>
+          </div>
+        </div>
+
+        <div class="pc-histbox">
+          <div class="pc-histhd">최근 변경 · 되돌리기</div>
+          <div class="pc-histbody" id="pcHistBody">
+            <div class="pc-hist-empty">불러오는 중…</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="pc-backdrop" id="pcBackdrop" hidden data-action="close-drawer"></div>
+    <div class="pc-drawer" id="pcDrawer" hidden data-keep="1" role="dialog" aria-label="분류 상세"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = {
+    data: null, loadErr: null,
+    history: null, historyErr: null,
+    selId: null, draft: null, drawerOpen: false,
+    collapsed: {}, parentOpen: false, marginDraft: ''
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function mdBold(s) { return esc(s || '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+  function fmt(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function pct(r) { return (r == null) ? '—' : (Number(r) * 100).toFixed(1).replace(/\.0$/, '') + '%'; }
+  function fmtDt(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    function p(n) { return String(n).padStart(2, '0'); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  // "+ 하위 분류 추가 — <이름>" 버튼 라벨용 — 길면 줄인다(표 열 폭 치수와는 무관,
+  // 버튼 텍스트 표시만). 잘려도 title 속성에 전체 이름을 남긴다(renderAddBtn).
+  function truncName(s, max) {
+    s = String(s == null ? '' : s);
+    return s.length > max ? (s.slice(0, max - 1) + '…') : s;
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiJson(method, path, body) {
+    return fetch(path, { method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+  function apiPost(path, body) { return apiJson('POST', path, body); }
+  function apiPatch(path, body) { return apiJson('PATCH', path, body); }
+  function apiPut(path, body) { return apiJson('PUT', path, body); }
+  function apiDelete(path) { return fetch(path, { method: 'DELETE', credentials: 'same-origin' }).then(handle); }
+
+  // ── 권한 · 토스트 — 셸(admin2-shell.js)의 것을 그대로 쓴다(중복 구현 없음) ──
+  function owner() { return window.Admin2Shell.canWrite('owner'); }
+  function toast(msg, kind, action, onAction) { window.Admin2Shell.toast(msg, kind, action, onAction); }
+  function guard() {
+    if (!owner()) {
+      var me = window.Admin2Shell.getMe();
+      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+
+  // 결함 3(2026-08-13 확인자 지적): CSS `.dis` 클래스만으로는 버튼이 진짜
+  // disabled가 아니라 키보드 Tab·Enter로 눌리고 스크린리더가 "누를 수 있다"고
+  // 읽는다. 진짜 disabled 속성을 붙이면 click 이벤트가 안 와 guard() 토스트가
+  // 못 뜨므로, 막힌 이유를 title로 항상(호버·포커스) 알 수 있게 한다 —
+  // 색에만 의존하지 않는다. 기존 `.pc-undo-hd`/`.undo-a`(미구현 버튼)가 이미
+  // 쓰던 disabled+title 방식을 그대로 따른다.
+  function permText() {
+    var me = window.Admin2Shell.getMe();
+    return '권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+  }
+  function disAttrs(disabled, title) {
+    return disabled ? (' disabled title="' + esc(title) + '"') : '';
+  }
+
+  // ── 트리 데이터 헬퍼 ─────────────────────────────────────────────
+  function items() { return (S.data && S.data.items) || []; }
+  function nodeById(id) {
+    var arr = items();
+    for (var i = 0; i < arr.length; i++) if (arr[i].category_id === id) return arr[i];
+    return null;
+  }
+  function childrenOf(pid) {
+    return items().filter(function (n) { return n.parent_id === pid; })
+      .sort(function (a, b) { return (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name)); });
+  }
+  function isDescendant(id, maybeAncestorId) {
+    var cur = nodeById(id), n = 0;
+    while (cur && cur.parent_id != null && n < 500) {
+      if (cur.parent_id === maybeAncestorId) return true;
+      cur = nodeById(cur.parent_id);
+      n++;
+    }
+    return false;
+  }
+  function stockUnder(id) {
+    var n = nodeById(id);
+    var total = (n && n.in_stock_count) || 0;
+    childrenOf(id).forEach(function (c) { total += stockUnder(c.category_id); });
+    return total;
+  }
+  // ETC 전용 소분류 판정 — **코드**(allowed_part_types)로 한다. 표시 라벨 문자열로
+  // 판정하면 라벨이 바뀔 때마다(2026-08-13: "미분류" -> "기타(ETC)") 전 소분류가
+  // 매치 실패해 카운트가 조용히 0이 된다. 코드 "ETC"는 DB products.part_type에
+  // 박힌 값이라 라벨이 몇 번을 더 바꿔도 흔들리지 않는다.
+  function isEtcOnly(types) { return !!(types && types.length === 1 && types[0] === 'ETC'); }
+
+  function typeOptions() { return (S.data && S.data.part_types) || []; }
+  function etcLabel() {
+    // ETC 표시 라벨은 taxonomy.py(PART_LABELS)가 정본이다 — 문자열을 이 파일에 다시
+    // 박지 않고 서버가 고른 선택지(part_types)에서 코드 'ETC'의 라벨을 그대로 끌어온다.
+    var opts = typeOptions();
+    for (var i = 0; i < opts.length; i++) { if (opts[i].key === 'ETC') return opts[i].label; }
+    return 'ETC';   // part_types 응답에 ETC 키가 없을 때만(폴백 — 라벨을 지어내지 않는다)
+  }
+  function typeKeysFromLabels(labels) {
+    var opts = typeOptions();
+    if (!labels || !labels.length) return null;
+    var set = {};
+    labels.forEach(function (lb) { set[lb] = true; });
+    var out = opts.filter(function (o) { return set[o.label]; }).map(function (o) { return o.key; });
+    return out.length ? out : null;
+  }
+  function typeKeysToText(keys) {
+    if (!keys || !keys.length) return 'null(제한없음)';
+    var byKey = {};
+    typeOptions().forEach(function (o) { byKey[o.key] = o.label; });
+    return '[' + keys.map(function (k) { return byKey[k] || k; }).join(', ') + ']';
+  }
+
+  function draftFromNode(n) {
+    return {
+      category_id: n.category_id, parent_id: n.parent_id, name: n.name,
+      sort_order: n.sort_order, is_visible: n.is_visible,
+      type_keys: typeKeysFromLabels(n.allowed_labels)
+    };
+  }
+
+  function currentDiffs() {
+    if (!S.draft || S.selId == null) return [];
+    var a = nodeById(S.selId), d = S.draft;
+    if (!a) return [];
+    var out = [];
+    if (a.name !== d.name) out.push('name: "' + a.name + '" -> "' + d.name + '"');
+    var ap = a.parent_id == null ? 'null' : String(a.parent_id);
+    var dp = d.parent_id == null ? 'null' : String(d.parent_id);
+    if (ap !== dp) out.push('parent_id: ' + ap + ' -> ' + dp);
+    if ((a.sort_order || 0) !== (d.sort_order || 0)) out.push('sort_order: ' + (a.sort_order || 0) + ' -> ' + (d.sort_order || 0));
+    if (!!a.is_visible !== !!d.is_visible) out.push('is_visible: ' + !!a.is_visible + ' -> ' + !!d.is_visible);
+    var origKeys = typeKeysFromLabels(a.allowed_labels);
+    var ta = typeKeysToText(origKeys), td = typeKeysToText(d.type_keys);
+    if (ta !== td) out.push('allowed_part_types: ' + ta + ' -> ' + td);
+    return out;
+  }
+
+  function marginRowText(n) {
+    return pct(n.margin_effective) + ' ' + (n.margin_source || '—');
+  }
+  function marginSourceSentence(n) {
+    if (n.margin_rate != null) return '이 분류에 직접 걸린 값입니다.';
+    var s = n.margin_source || '';
+    if (s === '전역 기본') return '전역 기본값에서 상속하고 있습니다(개별 값 없음).';
+    if (s.indexOf('상속: ') === 0) return '상위 "' + s.slice(4) + '"에서 상속하고 있습니다.';
+    return s || '—';
+  }
+
+  // ── 로드 ─────────────────────────────────────────────────────────
+  function loadTree() {
+    return apiGet('/api/admin/categories').then(function (j) {
+      S.data = j; S.loadErr = null;
+    }).catch(function (err) { S.loadErr = err; });
+  }
+  function loadHistory() {
+    return apiGet('/api/admin/activity-logs').then(function (j) {
+      S.history = j; S.historyErr = null;
+    }).catch(function (err) { S.historyErr = err; });
+  }
+  function reloadAll() {
+    S.loadErr = null; S.historyErr = null;
+    renderAll();
+    Promise.all([loadTree(), loadHistory()]).then(renderAll);
+  }
+  function refreshAfterWrite(keepId) {
+    return Promise.all([loadTree(), loadHistory()]).then(function () {
+      if (keepId != null) {
+        var fresh = nodeById(keepId);
+        if (fresh) { S.selId = keepId; S.draft = draftFromNode(fresh); S.drawerOpen = true; }
+        else { S.selId = null; S.draft = null; S.drawerOpen = false; }
+      }
+      renderAll();
+    });
+  }
+
+  function boot() {
+    renderAll();
+    window.Admin2Shell.meReady.then(renderAll);
+    Promise.all([loadTree(), loadHistory()]).then(renderAll);
+  }
+
+  // ── 렌더 ─────────────────────────────────────────────────────────
+  function renderAll() {
+    var loading = $('pcLoading'), errBox = $('pcErrBox'), body = $('pcBody');
+    if (S.loadErr) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('pcErrMsg').textContent = S.loadErr.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+    if (S.data.note) $('pcNote').innerHTML = mdBold(S.data.note);
+    renderStats();
+    renderTree();
+    renderRail();
+    renderDrawer();
+    renderAddBtn();
+  }
+
+  function renderStats() {
+    var arr = items();
+    var total = arr.length;
+    var top = arr.filter(function (n) { return n.parent_id == null; }).length;
+    var marginSet = arr.filter(function (n) { return n.margin_rate != null; }).length;
+    var violTotal = arr.reduce(function (s, n) { return s + (n.violations || 0); }, 0);
+    var cards = [
+      { lb: '분류', v: fmt(total), nt: '대분류 ' + fmt(top) + ' · 소분류 ' + fmt(total - top), warn: false },
+      { lb: '개별 마진이 걸린 분류', v: fmt(marginSet), nt: marginSet ? '나머지는 상속' : '전부 전역 상속', warn: false },
+      { lb: '허용 종류 위반', v: fmt(violTotal), nt: '경고이지 금지가 아닙니다', warn: violTotal > 0 },
+      { lb: '분류 미배정 상품', v: fmt(S.data.unmapped),
+        nt: 'category_id 미지정 기준 · 재고 있음 ' + fmt(S.data.unmapped_in_stock) + '건 포함', warn: false }
+    ];
+    $('pcStats').innerHTML = cards.map(function (c) {
+      return '<div class="pc-stat' + (c.warn ? ' warn' : '') + '"><div class="lb">' + esc(c.lb) + '</div>' +
+        '<div class="row"><span class="v num">' + c.v + '</span><span class="nt">' + esc(c.nt) + '</span></div></div>';
+    }).join('');
+  }
+
+  function renderTree() {
+    var arr = items();
+    $('pcTreeEmpty').hidden = arr.length !== 0;
+    $('pcRows').style.display = arr.length === 0 ? 'none' : '';
+    var rows = [];
+    function walk(pid, depth) {
+      childrenOf(pid).forEach(function (n) {
+        var kids = childrenOf(n.category_id);
+        var isCol = !!S.collapsed[n.category_id];
+        var on = (n.category_id === S.selId && S.drawerOpen);
+        var etc = isEtcOnly(n.allowed_part_types);
+        var typesText = (n.allowed_labels && n.allowed_labels.length) ? n.allowed_labels.join(' · ') : '제한 없음';
+        var typesCls = (!n.allowed_labels || !n.allowed_labels.length) ? 'none' : (etc ? 'etc' : 'set');
+        rows.push(
+          '<div class="pc-row' + (depth === 0 ? ' top' : '') + (on ? ' on' : '') + '" data-keep="1" data-action="select-node" data-id="' + n.category_id + '">' +
+            '<span class="nm-wrap">' +
+              '<span class="indent" style="width:' + (depth * 18) + 'px"></span>' +
+              '<span class="caret' + (kids.length ? '' : ' leaf') + '"' + (kids.length ? ' data-action="toggle-collapse" data-id="' + n.category_id + '" role="button" aria-label="하위 분류 ' + (isCol ? '펼치기' : '접기') + '"' : '') + '>' +
+                (kids.length ? (isCol ? '▸' : '▾') : '·') + '</span>' +
+              '<span class="nm ' + (depth === 0 ? 'top' : 'sub') + '">' + esc(n.name) + '</span>' +
+              (n.is_visible === false ? '<span class="bdg hidden-b">노출 꺼짐</span>' : '') +
+              (n.violations ? '<span class="bdg viol-b">▲ 위반 ' + fmt(n.violations) + '</span>' : '') +
+            '</span>' +
+            '<span class="types ' + typesCls + '">' + esc(typesText) + '</span>' +
+            '<span class="counts num">' + fmt(n.product_count) + ' / ' + fmt(n.subtree_count) + '</span>' +
+            '<span class="stock num">' + fmt(stockUnder(n.category_id)) + '</span>' +
+            '<span class="margin ' + (n.margin_rate != null ? 'own' : 'inh') + '">' + esc(marginRowText(n)) + '</span>' +
+          '</div>'
+        );
+        if (!isCol) walk(n.category_id, depth + 1);
+      });
+    }
+    walk(null, 0);
+    $('pcRows').innerHTML = rows.join('');
+  }
+
+  // (가)안(2026-08-14 사장님 확정) — 버튼을 새로 만들지 않고 하나가 상태에 따라
+  // 바뀐다. 트리에서 아무것도 안 골랐으면 "+ 대분류 추가"(parent_id: null),
+  // 분류를 골랐으면(대분류·소분류 무관) "+ 하위 분류 추가 — <그 분류 이름>"으로
+  // 바뀌고 그 분류가 부모가 된다. 어느 분류 아래에 붙는지가 버튼 자체에서
+  // 드러나야 한다는 요구라 이름을 라벨에 직접 넣는다(길면 truncName으로 줄이고
+  // title에 전체 이름을 남긴다). 문서는 파일 상단 "■★ 소분류 직접 생성" 참고.
+  function renderAddBtn() {
+    var btn = $('pcAddTop');
+    if (!btn) return;
+    var sel = (S.drawerOpen && S.selId != null) ? nodeById(S.selId) : null;
+    var own = owner();
+    if (sel) {
+      btn.textContent = '+ 하위 분류 추가 — ' + truncName(sel.name, 16);
+      btn.setAttribute('data-action', 'add-sub');
+    } else {
+      btn.textContent = '+ 대분류 추가';
+      btn.setAttribute('data-action', 'add-top');
+    }
+    // 결함 3과 같은 이유(disAttrs() 위 주석 참고) — 진짜 disabled + title로 이유를
+    // 밝힌다. 권한 판정은 이 화면이 이미 쓰는 owner() 그대로다(다른 기준을 새로
+    // 쓰지 않는다).
+    btn.classList.toggle('dis', !own);
+    btn.disabled = !own;
+    if (!own) btn.title = permText();
+    else if (sel) btn.title = sel.name;
+    else btn.removeAttribute('title');
+  }
+
+  function renderRail() {
+    var arr = items();
+    var marginSet = arr.filter(function (n) { return n.margin_rate != null; }).length;
+    var total = arr.length;
+    var g = S.data.default_margin;
+    var infoTxt;
+    if (marginSet === 0) {
+      infoTxt = '노드에 값을 걸지 않으면 조상 방향으로 찾다가 없으면 전역 기본값으로 떨어집니다. 지금은 개별 마진이 걸린 노드가 0개라 ' +
+        fmt(total) + '개 전부가 전역 기본 ' + pct(g) + '를 상속합니다.';
+    } else {
+      infoTxt = '노드에 값을 걸지 않으면 조상 방향으로 찾다가 없으면 전역 기본값으로 떨어집니다. 지금은 개별 마진이 걸린 노드가 ' +
+        fmt(marginSet) + '개이고, 나머지 ' + fmt(total - marginSet) + '개는 조상 또는 전역 기본 ' + pct(g) + '를 상속합니다.';
+    }
+    $('pcMarginInfo').textContent = infoTxt;
+    $('pcMarginNote').innerHTML = S.data.margin_note ? mdBold(S.data.margin_note)
+      : '계산 원천은 api/pricing.resolve_margins 하나입니다 — 이 화면이 따로 계산하지 않습니다.';
+
+    var etcCount = arr.filter(function (n) { return isEtcOnly(n.allowed_part_types); }).length;
+    $('pcEtcBlindHd').textContent = '허용 종류가 ' + etcLabel() + '뿐인 소분류 ' + fmt(etcCount) + '개는 서로 구분되지 않습니다';
+
+    renderHistoryList();
+  }
+
+  function renderHistoryList() {
+    var box = $('pcHistBody');
+    if (S.historyErr) {
+      box.innerHTML = '<div class="pc-hist-err">불러오지 못했습니다 — ' + esc(S.historyErr.message) +
+        '<br><span class="pc-hist-retry" data-action="retry-history">다시 시도</span></div>';
+      return;
+    }
+    if (!S.history) { box.innerHTML = '<div class="pc-hist-empty">불러오는 중…</div>'; return; }
+    var all = S.history.items || [];
+    var entries = all.filter(function (h) { return h.kind === 'category'; }).slice(0, 20);
+    if (!entries.length) {
+      var shown = Math.min(S.history.total || 0, S.history.limit || 0);
+      box.innerHTML = '<div class="pc-hist-empty">최근 ' + fmt(shown) + '건의 관리자 작업(전체 ' + fmt(S.history.total) +
+        '건 중) 안에는 카테고리 변경이 없습니다.</div>';
+      return;
+    }
+    box.innerHTML = entries.map(function (h) {
+      return '<div class="pc-hist-row">' +
+        '<div class="r1"><span class="at num">' + esc(fmtDt(h.at)) + '</span><span style="flex:1"></span>' +
+        (h.undone ? '<span class="undone-b">되돌려짐</span>' : '') +
+        '<button type="button" class="undo-a" disabled title="카테고리 되돌리기 기능은 아직 구현되지 않았습니다">미구현</button></div>' +
+        '<div class="what">' + esc(h.action_label || h.summary || '') +
+        (h.target ? ' · #' + esc(h.target) : '') +
+        (h.operator ? ' · ' + esc(h.operator) : '') + '</div></div>';
+    }).join('');
+  }
+
+  // ── 서랍 ─────────────────────────────────────────────────────────
+  function diffBoxHtml(diffs) {
+    if (!diffs.length) return '';
+    return '<div class="pc-diffbox"><div class="hd">변경됨 · 저장 필요</div>' +
+      diffs.map(function (l) { return '<div class="ln">' + esc(l) + '</div>'; }).join('') + '</div>';
+  }
+
+  function renderDrawer() {
+    var el = $('pcDrawer'), bd = $('pcBackdrop');
+    if (!S.drawerOpen || !S.draft) { el.hidden = true; bd.hidden = true; el.innerHTML = ''; return; }
+    var n = nodeById(S.selId), d = S.draft;
+    if (!n) { S.drawerOpen = false; S.draft = null; el.hidden = true; bd.hidden = true; el.innerHTML = ''; return; }
+    bd.hidden = false; el.hidden = false;
+
+    var own = owner();
+    var diffs = currentDiffs();
+    var dirty = diffs.length > 0;
+    var parent = d.parent_id == null ? null : nodeById(d.parent_id);
+    var isTop = d.parent_id == null;
+    var typesOpts = typeOptions();
+    var nameOk = !!(d.name || '').trim() && d.name.length <= 80;
+
+    var html = '';
+    html += '<div class="pc-dw-hd"><div class="row1">' +
+      '<span class="nm">' + esc(d.name || '(이름 없음)') + '</span>' +
+      '<span class="depth">' + (isTop ? '대분류' : '소분류') + '</span>' +
+      '<button type="button" class="x" data-action="close-drawer" aria-label="닫기">✕</button>' +
+      '</div>' +
+      '<div class="meta"><span>category_id ' + n.category_id + '</span>' +
+      '<span>' + esc((parent ? parent.name + ' / ' : '') + n.name) + '</span>' +
+      '<span>직속 ' + fmt(n.product_count) + ' · 자손 ' + fmt(n.subtree_count) + '</span></div></div>';
+
+    html += '<div class="pc-dw-body">';
+
+    // 이름
+    html += '<div class="pc-field"><label class="lb" for="pcNameInput">이름</label><div class="pc-namerow">' +
+      '<input id="pcNameInput" value="' + esc(d.name || '') + '" maxlength="200"' + (own ? '' : ' disabled') +
+      ' class="' + (nameOk ? '' : 'bad') + '">' +
+      '<span class="cnt num" id="pcNameCount">' + (d.name || '').length + '/80</span></div></div>';
+
+    // 상위분류 + 정렬
+    html += '<div class="pc-pgrid">';
+    html += '<div class="pc-parentbox"><span class="lb" id="pcParentLb">상위 분류 — 이동</span>' +
+      '<div class="pc-parentsel" data-action="toggle-parent" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="' + (S.parentOpen ? 'true' : 'false') + '" aria-labelledby="pcParentLb">' +
+      '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+      esc(parent ? parent.name : '(최상위 — 대분류)') + '</span><span class="car">▼</span></div>';
+    if (S.parentOpen) {
+      var opts = [{ pid: null, label: '(최상위 — 대분류로 두기)' }]
+        .concat(childrenOf(null).map(function (p) { return { pid: p.category_id, label: p.name }; }));
+      html += '<div class="pc-pdrop" role="listbox">' + opts.map(function (o) {
+        var bad = (o.pid === d.category_id) || (o.pid != null && isDescendant(o.pid, d.category_id));
+        var isOn = d.parent_id === o.pid;
+        return '<div class="pc-popt' + (isOn ? ' on' : '') + (bad ? ' bad' : '') + '" role="option" aria-selected="' + (isOn ? 'true' : 'false') +
+          '"' + (bad ? '' : ' data-action="pick-parent" data-pid="' + (o.pid == null ? '' : o.pid) + '"') + '>' +
+          '<span style="flex:1;min-width:0">' + esc(o.label) + '</span>' + (bad ? '<span class="warn">순환</span>' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="pc-sortbox"><label class="lb" for="pcSortInput">정렬순서</label>' +
+      '<input id="pcSortInput" value="' + (d.sort_order != null ? d.sort_order : 0) + '"' + (own ? '' : ' disabled') + '></div>';
+    html += '</div>';
+
+    // 허용 부품 종류
+    var typeNote = d.type_keys && d.type_keys.length
+      ? (d.type_keys.length + '종 선택 — 비우면 제한 없음')
+      : '제한 없음 — 어떤 부품 종류든 들어올 수 있습니다';
+    html += '<div class="pc-field" role="group" aria-label="허용 부품 종류"><div class="pc-typeshd"><span class="lb">허용 부품 종류</span><span class="nt">' + esc(typeNote) + '</span></div>';
+    if (typesOpts.length) {
+      html += '<div class="pc-chips">' + typesOpts.map(function (t) {
+        var isOn = d.type_keys && d.type_keys.indexOf(t.key) >= 0;
+        return '<span class="pc-chip' + (isOn ? ' on' : '') + '" data-action="toggle-type" data-t="' + esc(t.key) + '" role="checkbox" aria-checked="' + (isOn ? 'true' : 'false') + '">' + esc(t.label) + '</span>';
+      }).join('') + '</div>';
+    } else {
+      html += '<div style="font:400 10.5px/1.5 var(--rv-font);color:var(--rv-dim)">선택지를 불러오지 못했습니다 — part_types 응답이 비어 있습니다.</div>';
+    }
+    html += '</div>';
+
+    // 마진
+    var mrOwn = n.margin_rate != null;
+    var mgChip = mrOwn ? ('직접 ' + pct(n.margin_rate)) : ('상속 ' + pct(n.margin_effective));
+    var mgbtnDis = !own;
+    var mgclearDis = !(own && mrOwn);
+    html += '<div class="pc-field"><span class="lb">마진</span><div class="pc-mgfield">' +
+      '<div class="row1"><span class="pc-mgchip' + (mrOwn ? ' own' : '') + '">' + esc(mgChip) + '</span>' +
+      '<span class="src">' + esc(marginSourceSentence(n)) + '</span></div>' +
+      '<div class="row2"><label for="pcMarginInput">마진율</label>' +
+      '<input id="pcMarginInput" value="' + esc(S.marginDraft || '') + '" placeholder="예: 0.18"' + (own ? '' : ' disabled') + '>' +
+      '<button type="button" class="pc-mgbtn' + (own ? '' : ' dis') + '"' + disAttrs(mgbtnDis, permText()) + ' data-action="set-margin">이 분류에 걸기</button>' +
+      '<button type="button" class="pc-mgclear' + (own && mrOwn ? '' : ' dis') + '"' + disAttrs(mgclearDis, !own ? permText() : '이 분류에 직접 걸린 마진이 없습니다') + ' data-action="clear-margin">상속으로 되돌리기</button></div>' +
+      '<div class="hint">0 이상 1 미만. 걸면 이 분류와 하위 <b>' + fmt(n.subtree_count) + '건</b>이 다음 재산정에서 이 값을 씁니다 — <b>판매가는 지금 바뀌지 않습니다.</b></div>' +
+      '</div></div>';
+
+    // 노출
+    html += '<div class="pc-field"><span class="lb">노출</span>' +
+      '<button type="button" class="pc-visbox" data-action="toggle-visible" role="switch" aria-checked="' + (d.is_visible ? 'true' : 'false') + '"' + (own ? '' : ' disabled') + '>' +
+      '<span class="pc-vismark ' + (d.is_visible ? 'on' : 'off') + '">' + (d.is_visible ? '●' : '○') + '</span>' +
+      '<span class="pc-vistxt"><span class="lb2">' + (d.is_visible ? '노출 켜짐 (is_visible=true)' : '노출 꺼짐 (is_visible=false)') + '</span>' +
+      '<span class="ds">지금은 이 값을 읽는 소비처가 없어 꺼도 목록에서 사라지지 않습니다 — 값과 이력만 남습니다.</span></span></button></div>';
+
+    // 위반 안내
+    if (n.violations) {
+      html += '<div class="pc-violnote">이 분류에 허용 종류를 어기는 상품 ' + fmt(n.violations) +
+        '건이 이미 있습니다 — 경고일 뿐 저장은 막지 않습니다. 옮기는 것은 "상품 분류 매핑" 화면에서 합니다.</div>';
+    }
+
+    html += '<div id="pcDiffArea">' + diffBoxHtml(diffs) + '</div>';
+
+    html += '</div>'; // dw-body
+
+    var footNoteText = own ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
+      : ('권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
+    var delDis = !own;
+    var revDis = !dirty;
+    var saveDis = !(own && dirty);
+    var saveTitle = !own ? permText() : (!dirty ? '변경 사항이 없습니다' : '');
+    var revTitle = dirty ? '' : '되돌릴 변경이 없습니다';
+    html += '<div class="pc-dw-foot">' +
+      '<span class="nt' + (own ? '' : ' warn') + '" id="pcFootNote">' + esc(footNoteText) + '</span>' +
+      '<button type="button" class="pc-btn-del' + (own ? '' : ' dis') + '"' + disAttrs(delDis, permText()) + ' data-action="delete-node">삭제</button>' +
+      '<button type="button" class="pc-btn-revert' + (dirty ? '' : ' dis') + '" id="pcRevertBtn"' + disAttrs(revDis, revTitle) + ' data-action="revert-draft">되돌리기</button>' +
+      '<button type="button" class="pc-btn-save' + (own && dirty ? '' : ' dis') + '" id="pcSaveBtn"' + disAttrs(saveDis, saveTitle) + ' data-action="save-draft">저장</button>' +
+      '</div>';
+
+    el.innerHTML = html;
+  }
+
+  function patchFooter() {
+    var diffs = currentDiffs();
+    var dirty = diffs.length > 0;
+    var own = owner();
+    var saveBtn = $('pcSaveBtn'), revBtn = $('pcRevertBtn'), diffArea = $('pcDiffArea'), footNote = $('pcFootNote');
+    if (saveBtn) {
+      var saveDis = !(own && dirty);
+      saveBtn.classList.toggle('dis', saveDis);
+      saveBtn.disabled = saveDis;
+      saveBtn.title = saveDis ? (!own ? permText() : '변경 사항이 없습니다') : '';
+    }
+    if (revBtn) {
+      var revDis = !dirty;
+      revBtn.classList.toggle('dis', revDis);
+      revBtn.disabled = revDis;
+      revBtn.title = revDis ? '되돌릴 변경이 없습니다' : '';
+    }
+    if (diffArea) diffArea.innerHTML = diffBoxHtml(diffs);
+    if (footNote) {
+      footNote.textContent = own ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
+        : ('권한이 부족합니다 (필요: owner) — 조회만 가능합니다');
+      footNote.classList.toggle('warn', !own);
+    }
+  }
+
+  // ── 동작 ─────────────────────────────────────────────────────────
+  function toggleCollapse(id) {
+    S.collapsed[id] = !S.collapsed[id];
+    renderTree();
+  }
+
+  function selectNode(id) {
+    if (currentDiffs().length) {
+      toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn');
+      return;
+    }
+    if (S.selId === id && S.drawerOpen) { closeDrawer(); return; }
+    var n = nodeById(id);
+    if (!n) return;
+    S.selId = id; S.draft = draftFromNode(n); S.drawerOpen = true; S.parentOpen = false; S.marginDraft = '';
+    renderTree(); renderDrawer(); renderAddBtn();
+  }
+  function closeDrawer() {
+    S.drawerOpen = false; S.selId = null; S.draft = null; S.parentOpen = false;
+    renderTree(); renderDrawer(); renderAddBtn();
+  }
+
+  function addTopCategory() {
+    if (!guard()) return;
+    // 결함 5(2026-08-13 확인자 지적): 항상 고정 이름 "새 대분류"로 POST하면
+    // 두 번째부터 서버가 409로 거부한다(같은 위치·같은 이름). 일련번호를 붙여
+    // 새로 만들지 않는다(이름만 다른 빈 분류가 쌓인다) — 대신 이미 있는 그
+    // 노드를 열어 다음에 뭘 할지(이름을 바꾼 뒤 다시 추가) 알린다. 문구는 서버
+    // 409(api/admin_categories.py)와 한 글자도 다르지 않게 맞춘다 — 2026-08-14
+    // 이전에는 "새 대분류" 이름을 박은 별도 문구였는데, 하위 분류 가드
+    // (addSubCategory)를 같은 문구로 새로 만들면서 여기도 맞췄다.
+    var dupe = childrenOf(null).filter(function (n) { return n.name === '새 대분류'; })[0];
+    if (dupe) {
+      toast('같은 위치에 같은 이름의 카테고리가 이미 있습니다', 'warn');
+      if (!(S.selId === dupe.category_id && S.drawerOpen)) selectNode(dupe.category_id);
+      return;
+    }
+    var sortDefault = childrenOf(null).length;
+    apiPost('/api/admin/categories', { name: '새 대분류', parent_id: null, sort_order: sortDefault, allowed_part_types: null })
+      .then(function (res) {
+        toast((res && res.verdict) || '대분류를 추가했습니다', 'ok');
+        return refreshAfterWrite(res && res.category_id);
+      }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function addSubCategory() {
+    if (!guard()) return;
+    // (가)안(2026-08-14) — 버튼이 "+ 하위 분류 추가"로 바뀌어 있을 때만 눌리지만,
+    // data-action은 렌더 시점 값이라 방어적으로 다시 확인한다.
+    if (S.selId == null || !S.drawerOpen) { toast('먼저 트리에서 상위로 삼을 분류를 고르세요', 'warn'); return; }
+    var parent = nodeById(S.selId);
+    if (!parent) return;
+    // 선택한 분류(부모)에 저장하지 않은 변경이 있는 채로 만들면 refreshAfterWrite가
+    // 새로 만든 노드로 선택을 옮기면서 그 변경을 조용히 버린다 — selectNode()가
+    // 이미 같은 이유로 막는 것과 같은 취지로 여기서도 막는다.
+    if (currentDiffs().length) {
+      toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 추가하세요', 'warn');
+      return;
+    }
+    var pid = parent.category_id;
+    // addTopCategory()와 같은 연속 추가 가드 — 문구는 서버 409와 한 글자도
+    // 다르지 않게(api/admin_categories.py의 중복 검사 메시지).
+    var dupe = childrenOf(pid).filter(function (n) { return n.name === '새 소분류'; })[0];
+    if (dupe) {
+      toast('같은 위치에 같은 이름의 카테고리가 이미 있습니다', 'warn');
+      if (!(S.selId === dupe.category_id && S.drawerOpen)) selectNode(dupe.category_id);
+      return;
+    }
+    var sortDefault = childrenOf(pid).length;
+    apiPost('/api/admin/categories', { name: '새 소분류', parent_id: pid, sort_order: sortDefault, allowed_part_types: null })
+      .then(function (res) {
+        toast((res && res.verdict) || '소분류를 추가했습니다', 'ok');
+        return refreshAfterWrite(res && res.category_id);
+      }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function saveDraft() {
+    if (!guard()) return;
+    var n = nodeById(S.selId), d = S.draft;
+    if (!n || !d) return;
+    var diffs = currentDiffs();
+    if (!diffs.length) { toast('변경 사항이 없습니다', 'warn'); return; }
+    var nm = (d.name || '').trim();
+    if (!nm) { toast('카테고리 이름을 입력하세요', 'err'); return; }
+    if (nm.length > 80) { toast('이름은 80자 이내여야 합니다', 'err'); return; }
+    var dup = items().some(function (x) { return x.category_id !== d.category_id && x.parent_id === d.parent_id && x.name === nm; });
+    if (dup) { toast('같은 위치에 같은 이름의 카테고리가 이미 있습니다', 'err'); return; }
+
+    var body = {};
+    if (nm !== n.name) body.name = nm;
+    if (d.parent_id !== n.parent_id) {
+      if (d.parent_id == null) body.move_to_root = true;
+      else body.parent_id = d.parent_id;
+    }
+    if ((d.sort_order || 0) !== (n.sort_order || 0)) body.sort_order = d.sort_order;
+    if (!!d.is_visible !== !!n.is_visible) body.is_visible = !!d.is_visible;
+    var origKeys = typeKeysFromLabels(n.allowed_labels);
+    if (typeKeysToText(origKeys) !== typeKeysToText(d.type_keys)) {
+      if (!d.type_keys || !d.type_keys.length) body.clear_part_types = true;
+      else body.allowed_part_types = d.type_keys;
+    }
+
+    apiPatch('/api/admin/categories/' + d.category_id, body).then(function (res) {
+      toast((res && res.verdict) || (nm + '을(를) 저장했습니다'), 'ok');
+      return refreshAfterWrite(d.category_id);
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function revertDraft() {
+    var diffs = currentDiffs();
+    if (!diffs.length) { toast('되돌릴 변경이 없습니다', 'warn'); return; }
+    var n = nodeById(S.selId);
+    if (!n) return;
+    S.draft = draftFromNode(n);
+    toast('저장 전 상태로 되돌렸습니다', 'ok');
+    renderDrawer();
+  }
+
+  function deleteNode() {
+    if (!guard() || S.selId == null) return;
+    var n = nodeById(S.selId);
+    if (!n) return;
+    var kids = childrenOf(n.category_id).length;
+    if (kids) { toast('하위 카테고리 ' + kids + '개를 먼저 옮기거나 지우세요', 'err'); return; }
+    if (n.product_count) { toast('상품 ' + fmt(n.product_count) + '건이 이 카테고리에 있습니다 — 먼저 옮기세요', 'err'); return; }
+    apiDelete('/api/admin/categories/' + n.category_id).then(function (res) {
+      toast((res && res.verdict) || (n.name + '을(를) 지웠습니다'), 'ok');
+      S.selId = null; S.draft = null; S.drawerOpen = false;
+      return refreshAfterWrite(null);
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function setMargin() {
+    if (!guard() || S.selId == null) return;
+    var v = parseFloat(S.marginDraft);
+    if (isNaN(v) || v < 0 || v >= 1) { toast('마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)', 'err'); return; }
+    apiPut('/api/admin/categories/' + S.selId + '/margin', { margin_rate: v }).then(function (res) {
+      toast((res && res.verdict) || '마진을 설정했습니다', 'ok');
+      S.marginDraft = '';
+      return refreshAfterWrite(S.selId);
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function clearMargin() {
+    if (!guard() || S.selId == null) return;
+    var n = nodeById(S.selId);
+    if (n && n.margin_rate == null) { toast('이 분류에 직접 걸린 마진이 없습니다', 'err'); return; }
+    apiPut('/api/admin/categories/' + S.selId + '/margin', { margin_rate: null }).then(function (res) {
+      toast((res && res.verdict) || '상속으로 되돌렸습니다', 'ok');
+      S.marginDraft = '';
+      return refreshAfterWrite(S.selId);
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── 입력(포커스 보존 — 통 재렌더 대신 부분 갱신) ────────────────────
+  document.addEventListener('input', function (e) {
+    if (e.target.id === 'pcNameInput') {
+      if (!S.draft) return;
+      S.draft.name = e.target.value;
+      var ok = !!e.target.value.trim() && e.target.value.length <= 80;
+      e.target.classList.toggle('bad', !ok);
+      var cnt = $('pcNameCount'); if (cnt) cnt.textContent = e.target.value.length + '/80';
+      patchFooter();
+    } else if (e.target.id === 'pcSortInput') {
+      if (!S.draft) return;
+      S.draft.sort_order = parseInt(e.target.value, 10) || 0;
+      patchFooter();
+    } else if (e.target.id === 'pcMarginInput') {
+      S.marginDraft = e.target.value;
+    }
+  });
+
+  // ── 클릭 위임 ────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    if (S.parentOpen && !e.target.closest('.pc-parentbox')) { S.parentOpen = false; renderDrawer(); }
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch (action) {
+      case 'retry-load': reloadAll(); break;
+      case 'retry-history': S.historyErr = null; renderRail(); loadHistory().then(renderRail); break;
+      case 'toggle-collapse': { e.stopPropagation(); toggleCollapse(Number(t.getAttribute('data-id'))); break; }
+      case 'select-node': selectNode(Number(t.getAttribute('data-id'))); break;
+      case 'close-drawer': closeDrawer(); break;
+      case 'add-top': addTopCategory(); break;
+      case 'add-sub': addSubCategory(); break;
+      case 'toggle-parent': { e.stopPropagation(); if (!guard()) break; S.parentOpen = !S.parentOpen; renderDrawer(); break; }
+      case 'pick-parent': {
+        e.stopPropagation(); if (!guard() || !S.draft) break;
+        var pidRaw = t.getAttribute('data-pid');
+        S.draft.parent_id = pidRaw === '' ? null : Number(pidRaw);
+        S.parentOpen = false; renderDrawer();
+        break;
+      }
+      case 'toggle-type': {
+        e.stopPropagation(); if (!guard() || !S.draft) break;
+        var tk = t.getAttribute('data-t');
+        if (!S.draft.type_keys) S.draft.type_keys = [];
+        var i = S.draft.type_keys.indexOf(tk);
+        if (i >= 0) S.draft.type_keys.splice(i, 1); else S.draft.type_keys.push(tk);
+        if (!S.draft.type_keys.length) S.draft.type_keys = null;
+        renderDrawer();
+        break;
+      }
+      case 'toggle-visible': { if (!guard() || !S.draft) break; S.draft.is_visible = !S.draft.is_visible; renderDrawer(); break; }
+      case 'set-margin': setMargin(); break;
+      case 'clear-margin': clearMargin(); break;
+      case 'delete-node': deleteNode(); break;
+      case 'revert-draft': revertDraft(); break;
+      case 'save-draft': saveDraft(); break;
+      default: break;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.parentOpen) { S.parentOpen = false; renderDrawer(); }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
