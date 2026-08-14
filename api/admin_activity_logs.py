@@ -8,6 +8,19 @@ undone(되돌려짐) 배지를 파생한다(ref_log_id 역참조 EXISTS — 각 
 운영자 주체는 슬라이스 37부터 로그인 세션의 운영자다(그 전 기록은 시드 운영자 1 고정 —
 과거 행은 원장이므로 소급 수정하지 않는다).
 이관: 페이지네이션·created_at 인덱스·기간/운영자 필터·CSV 내보내기.
+
+★ undone/is_undo 판정은 action 문자열을 절대 보지 않는다 — ref_log_id 보유/역참조 EXISTS만
+본다(2026-08-14 결함 수정). 예전엔 undone SQL에 `AND u.action LIKE '%undo'`가 섞여 있었는데,
+되돌림 action이 전부 영문 "_undo" 접미사인 게 아니다 — 도메인 코드가 `_log(conn, "카테고리
+매핑 이동 되돌림", ...)`처럼 한국어 문자열을 action 컬럼에 직접 쓰는 경로가 있고(카테고리
+매핑 이동·판매가 재산정·상품 상태 일괄 변경 3종), "되돌림"이라는 낱말조차 없이 같은 일을
+하는 것도 있다(`sourcing_unlink` — admin_reviews.py가 "이미 되돌린 연결입니다"로 이중 실행을
+막는, undo와 동일한 이중 가드 패턴을 쓰는 domain 동사). 실측(2026-08-14, .venv/Scripts/python
+으로 api.db.engine 직접 SELECT)으로 ref_log_id를 detail에 쓰는 action 17종 전 행(수천 건)에
+예외 없이 100% 붙어 있었다 — 빠진 행이 하나도 없어 이 키 하나로 판정이 충분하다. 반대로
+action 이름으로 좁히면 좁힐수록 새 도메인이 되돌림을 다른 동사로 지을 때마다 다시 샌다
+(사람이 놓친 게 아니라 방식 자체가 깨지기 쉽다 — 문자열 접미사 매칭이므로). action 이름
+필터를 다시 넣지 마라. `_summary()`의 폴백(`d.get("ref_log_id")`)과 같은 근거를 쓴다.
 """
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
@@ -118,9 +131,11 @@ def list_activity_logs(date_from: str | None = None, date_to: str | None = None)
         rows = conn.execute(text(
             "SELECT l.log_id, l.action, l.target_kind, l.target_id, l.detail, l.created_at,"
             " COALESCE(o.name, '—') AS operator,"
+            # action 이름을 보지 않는다 — ref_log_id 역참조 EXISTS 하나가 판정 전부다(근거는
+            # 파일 상단 주석). action LIKE로 좁히면 한국어로 지어진 되돌림·"되돌림"이라는
+            # 낱말이 없는 되돌림류(sourcing_unlink 등)를 놓친다.
             " EXISTS(SELECT 1 FROM admin_operator_activity_logs u"
-            "        WHERE u.action LIKE '%undo'"
-            "          AND u.detail->>'ref_log_id' = CAST(l.log_id AS TEXT)) AS undone"
+            "        WHERE u.detail->>'ref_log_id' = CAST(l.log_id AS TEXT)) AS undone"
             " FROM admin_operator_activity_logs l"
             " LEFT JOIN admin_operators o USING (operator_id)"
             " WHERE TRUE" + _RANGE +
@@ -132,7 +147,10 @@ def list_activity_logs(date_from: str | None = None, date_to: str | None = None)
         "kind": r["target_kind"],
         "kind_label": KIND_LABELS.get(r["target_kind"], r["target_kind"]),
         "action_label": ACTION_LABELS.get(r["action"], r["action"]),
-        "is_undo": r["action"].endswith("_undo"),
+        # 이 행 자체가 되돌림 행인가 — 같은 근거(자기 detail의 ref_log_id 보유)로 본다.
+        # action이 "_undo"로 끝나는지로 보면 위 undone과 같은 이유로 한국어 되돌림 action을
+        # 놓친다(SQL 없이 이미 읽어 온 detail로 판정 — 별도 쿼리가 필요 없다).
+        "is_undo": bool((r["detail"] or {}).get("ref_log_id")),
         "target": r["target_id"],
         "summary": _summary(r["action"], r["detail"]),
         "undone": r["undone"],
