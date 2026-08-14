@@ -4988,7 +4988,7 @@ def test_std_schema():
 
 
 def test_display_name():
-    """[42] 견적 표시용 상품명 — 판매조건 꼬리가 고객에게 새지 않는다 (A-11 ⑤ · 2026-08-10)
+    """[42] 견적 표시용 상품명 — 판매조건 꼬리가 고객에게 새지 않는다 (A-38 ⑤ · 2026-08-10)
 
     ■ 왜 검사가 필요한가
       `products.product_name` 은 마켓에 내보내는 **판매용 제목**이라 "… 회원가입 계좌이체
@@ -5006,7 +5006,7 @@ def test_display_name():
       내미느니 광고를 내미는 게 낫다. 그런 상품은 **검수로 풀 문제**라 여기서는
       '예외가 늘지 않았는지'만 본다.
     """
-    print("\n[42] 견적 표시용 상품명 — 판매조건 꼬리 차단 (A-11 ⑤)")
+    print("\n[42] 견적 표시용 상품명 — 판매조건 꼬리 차단 (A-38 ⑤)")
     sys.path.insert(0, ROOT)
     from api.product_name import display_name
 
