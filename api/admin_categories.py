@@ -13,8 +13,9 @@
     NULL이면 제한 없음. **위반을 막지는 않되 근거와 함께 경고한다** — 막으면 운영자가
     이유도 모른 채 벽을 만나고, 안 알리면 저쪽처럼 `위메이드`가 부품 밑에 들어간다.
 
-owner 전용(compat_rules·spec_field_defs·usage_floors와 같은 취급 — 분류를 바꾸면
-고객이 상품을 찾는 길이 바뀐다).
+쓰기는 owner·operator(2026-08-13 사장님 결정 — "operator도 권한을 줘도 됩니다" —
+`admin_category_mapping.py`의 매핑 이동·되돌리기와 같은 등급으로 확대했다). viewer는
+여전히 막는다 — 분류를 바꾸면 고객이 상품을 찾는 길이 바뀐다는 이유 자체는 그대로다.
 """
 import json
 
@@ -48,10 +49,15 @@ def _margins(conn, rows):
     return own, eff, default
 
 
-def _owner():
+def _operator():
+    """카테고리 쓰기 게이트 — owner·operator(2026-08-13 확대). viewer는 403.
+
+    `admin_category_mapping.py`의 `_operator()`와 판정·문구 관례를 맞춘다(공용 헬퍼는
+    아직 없다 — 각 파일이 자기 `_operator()`를 갖는 구조를 그대로 따른다).
+    """
     me = current_operator() or {}
-    if me.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 카테고리를 바꿀 수 있습니다")
+    if me.get("role") not in ("owner", "operator"):
+        raise HTTPException(403, "운영자 이상만 카테고리를 바꿀 수 있습니다")
     return me
 
 
@@ -181,7 +187,7 @@ class CreateBody(BaseModel):
 
 @router.post("/categories")
 def create(body: CreateBody):
-    _owner()
+    _operator()
     name = _clean_name(body.name)
     types = _clean_types(body.allowed_part_types)
     with engine.begin() as conn:
@@ -216,7 +222,7 @@ class PatchBody(BaseModel):
 
 @router.patch("/categories/{cid}")
 def patch(cid: int, body: PatchBody):
-    _owner()
+    _operator()
     with engine.begin() as conn:
         rows = _rows(conn)
         cur = next((r for r in rows if r["category_id"] == cid), None)
@@ -289,7 +295,7 @@ def patch(cid: int, body: PatchBody):
 
 @router.delete("/categories/{cid}")
 def remove(cid: int):
-    _owner()
+    _operator()
     with engine.begin() as conn:
         cur = conn.execute(text(
             "SELECT name FROM categories WHERE category_id=:i"), {"i": cid}).mappings().first()
@@ -338,7 +344,7 @@ def set_margin(cid: int, body: MarginBody):
     영향을 받는 상품 수를 함께 말한다. 값만 저장하고 조용히 있으면 운영자는
     가격이 이미 바뀐 줄 안다.
     """
-    _owner()
+    _operator()
     r = body.margin_rate
     if r is not None and not (0 <= float(r) < 1):
         raise HTTPException(400, "마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)")

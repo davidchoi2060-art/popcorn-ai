@@ -1,0 +1,1277 @@
+{#
+  상품 분류 매핑 (ADM-CAT-020) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    "카테고리가 없는(미매핑) · 허용 종류를 어기는(위반) · 부품 종류를 못 정한(미분류,
+    part_type='ETC') 상품 덩어리를 사람이 갈라 옮기는 자리." 분류 트리의 이름·구조·
+    허용 부품 종류·마진은 "상품 분류 관리"(ADM-CAT-010) 소관이라 여기서는 트리를
+    읽기 전용으로만 쓰고, 이 화면은 **상품을 옮기는 동작 하나**만 한다.
+
+  ■ 출처 — 사장님이 Claude Design에서 확정한 원안
+    파일: `docs/design/dc-product-category-map.html`(`<x-dc>` + `DCLogic` + `support.js`
+    런타임 — 여기서는 돌지 않는다). `product_category`와 같은 원칙: 화면 구성·색·서체·
+    간격·인터랙션은 원안 그대로 옮기고, 런타임만 순수 JS로 바꿨다. 요구사항 정의서:
+    `docs/design/req/req-product-category-map.md`.
+
+  ■★ 데이터 API — 새로 만들지 않았다(실측: `api/admin_category_mapping.py`, 읽기만)
+    정본: `GET /api/admin/category-mapping` · `POST /api/admin/category-mapping/move` ·
+    `POST /api/admin/category-mapping/undo`. 아래는 실측으로 확인한 함정이다.
+
+    ① **범위(scope)는 실제로 6종이다** — `unmapped`·`violation`·`unclassified`·
+       `category`·`subtree`·`all`. 원안은 "카테고리" 탭 하나에 `treeMode`(직속만/하위
+       포함)를 UI 토글로만 두고 클라이언트에서 걸러 셌지만, 실제 서버는 `category`
+       (직속만)와 `subtree`(그 노드+자손 전체)를 **서로 다른 scope 값**으로 받는다.
+       그래서 이 화면은 "카테고리" 탭을 하나의 UI 개념으로 유지하되, 트리 모드
+       토글값을 그대로 실제 `scope` 파라미터로 보낸다(`apiScopeFor()`).
+    ② **범위별 배지 4종(`counts.unmapped`·`violation`·`unclassified`·`all_products`)은
+       검색어·부품 종류·재고 필터의 영향을 받지 않는다** — 실측: 서버의 `counts` 하위
+       질의는 `_filters()`가 만든 WHERE 절을 전혀 받지 않고 `products` 테이블 전체를
+       센다(`admin_category_mapping.py:mapping()` 안 `counts = conn.execute(...)` 호출에
+       필터 파라미터가 넘어가지 않는다). **오직 현재 열린 범위의 `total`만 그 범위의
+       scope+검색어+부품 종류+재고 필터를 전부 반영한다.** 원안의 `counts()`는 이걸
+       전 탭에 대해 클라이언트에서 매번 다시 계산했지만(더미 데이터라 공짜였다), 실제
+       서버는 그런 왕복을 주지 않는다 — 그래서 **비활성 탭의 큰 수는 항상 전체 기준
+       배지**, **활성 탭의 큰 수만 지금 필터가 반영된 `total`**로 그린다(각각 정확히
+       서버가 준 값이고, 어느 쪽도 지어내지 않는다). 필터 바 안내 문구가 이 구분을
+       그대로 밝힌다.
+    ③ **이동 상한은 `max_move` 응답 필드를 쓴다**(코드 상수 `MAX_MOVE = 2000`,
+       `api/admin_category_mapping.py` 41번째 줄 부근 — 화면은 이 숫자를 박지 않고
+       매 응답의 `max_move`를 그대로 읽는다. 상수가 바뀌어도 화면이 저절로 맞다).
+    ④ **"조건 전체 선택"은 실제로 여러 페이지를 긁어 모은다** — 서버는 "이 범위
+       전체를 옮겨라" 같은 축약 API를 주지 않는다(`move`는 `product_codes` 배열을
+       그대로 받는다). 그래서 "조건 전체 N건 선택"을 고르면, 지금 범위·필터로 최대
+       `max_move`건까지 상품코드를 페이지 단위(500건씩)로 실제 조회해 모은 뒤 그
+       코드 배열로 이동을 실행한다(`collectCodes()`). `total`이 `max_move`보다 크면
+       모으는 시점에 이미 "남는 만큼"이 정확한 수로 정해진다 — 서버 응답을 기다릴
+       필요 없이 화면이 미리 "남은 N건"을 보여줄 수 있는 이유다. 남은 건은 **자동으로
+       이어 옮기지 않는다** — "남은 건 다시 선택"을 다시 눌러야 다음 배치를 모은다.
+    ⑤ **되돌리기 이중 방지는 `ref_log_id` 역참조**다(원장 규약과 동일) — 이미 되돌린
+       기록을 다시 되돌리려 하면 서버가 409를 준다. 이 화면은 그 409를 세션 목록에서
+       미리 막지 않고(서버가 최종 판정한다) 그대로 토스트로 보여준다.
+
+  ■★ 카테고리 트리는 `/api/admin/category-mapping`의 `categories[]`가 아니라
+    **`GET /api/admin/categories`**(읽기 전용, `api/admin_categories.py`)에서 온다.
+    이유 — 그쪽만 주는 세 가지가 이 화면에 필요하다: `allowed_labels`(표시용으로 이미
+    접힌 라벨 — "CPU쿨러(공랭)"·"CPU쿨러(수랭)" 두 줄이 아니라 "CPU쿨러" 한 줄) ·
+    `violations`(이 노드**직속**의 허용 종류 위반 수 — 트리 배지에 씀) ·
+    `in_stock_count`. `/category-mapping`의 `categories[]`는 `allowed_part_types`(원시
+    코드)만 주고 이 셋이 없다 — 같은 트리를 두 벌 만들지 않으려 더 풍부한 쪽 하나만
+    쓴다. **이동 대상 선택지 · 좌측 트리 둘 다 이 하나의 fetch 결과를 공유한다.**
+
+  ■★ "미분류"가 이 화면에서 두 뜻으로 쓰인다 — **코드값으로만 판정하고, 표시 라벨은
+    서버에서 끌어온다**(2026-08-14 결함 수정 — 아래 진술이 그 전까지는 틀렸다)
+    `api/taxonomy.py`: 내부 코드 `"ETC"`의 표시 라벨은 사장님 확정으로 "미분류" ->
+    "기타(ETC)"로 바뀌었고(2026-08-13), `GET /api/admin/category-mapping`의
+    `part_types`는 이미 `{"key":"ETC","label":"기타(ETC)"}`를 정확히 내려준다.
+    **이 문단은 예전에 "그 문자열은 실제로 쓰이지 않는다(실측 확인, 손대지 않음)"라고
+    적어 두었는데 이제는 틀린 진술이다** — 필터 드롭다운(`renderFilters()`)은 이미
+    그 라벨을 쓰고 있었는데, 탭(`renderTabs()`)·범위 배지 툴팁·빈 상태 문구
+    (`emptyStateFor()`)·행 툴팁(`renderTable()`) 넷만 문자열 리터럴 `'미분류'`를
+    하드코딩해 두어서, **같은 화면 같은 축인데 탭은 옛 라벨, 드롭다운은 새 라벨로
+    서로 다르게 떴다**(확인자 실측). 그런데 판매 분류 트리에도 실제로 "미분류"라는
+    **이름의 카테고리 노드**가 있을 수 있다(요구사항 정의서 예시). 이 둘은 서로
+    다른 축이라 **판정은 여전히 라벨 문자열로 하지 않는다** — ETC 전용 카테고리
+    판정은 `allowed_part_types.length===1 && allowed_part_types[0]==='ETC'`
+    (코드값)로만 한다(`isEtcOnlyCat()`, 이번에도 변경 없음). **화면에 보여줄 라벨만
+    하드코딩을 걷어내 매 응답의 `part_types`에서 `key==='ETC'`의 `label`을 그대로
+    읽는다**(`etcLabel()`) — 라벨이 다시 바뀌어도(사장님이 정본에서 바꾸기로
+    하셨고 다음 이름은 미정) 판정도 표시도 함께 안 깨진다. 형제 화면
+    `product_category.html.j2`의 같은 이름 헬퍼(`:578`)와 같은 방식이다(그쪽은
+    `S.data.part_types`, 이 화면은 `S.list.part_types`에서 읽는다 — 원본 API가
+    다를 뿐 방식은 같다). 화면에서도 "미분류" 탭에 "part_type = ETC 기준"이라고
+    코드값을 그대로 적어 축을 밝힌다(변경 없음).
+
+  ■★ "상품 분류 관리"와의 경계 — 이 화면은 **상품을 옮기기만** 한다
+    분류 트리는 읽기 전용(캐럿을 눌러 접고 펴는 것 외에 트리를 고치는 동작이 없다).
+    쓰기는 이동(`move`)·되돌리기(`undo`) 둘뿐이고 **operator 이상**이면 된다
+    (`_operator()` 실측 — "상품 분류 관리"는 owner 전용이라 다르다. 화면 문구에서
+    섞어 쓰지 않는다).
+
+  ■★ 딥링크 — 주소의 질의 문자열로 초기 범위·필터를 연다(2026-08-13 추가 지시)
+    "상품 분류 관리" 화면이 나중에 이 화면으로 넘어오는 이음새를 놓을 수 있도록,
+    부팅 시 `location.search`를 읽어 초기 상태를 잡는다. **파라미터 이름은 서버가
+    이미 쓰는 것 그대로**다 — 새 이름을 만들지 않았다.
+
+        scope         unmapped·violation·unclassified·category·subtree·all 중 하나
+        category_id   scope가 category·subtree일 때 필수(정수)
+        q             검색어
+        part_type     `part_types[].key` 중 하나(표시 종류 키, 예: "COOLER")
+        in_stock      "1" 이면 재고 있는 것만
+
+    값이 이상하면(모르는 scope · category 계열인데 category_id 없음 · 트리에 없는
+    category_id · part_types에 없는 part_type) **조용히 무시하지 않는다** — 서버가
+    판정하는 기본 범위(`open_at`)로 떨어뜨리고, 무엇이 왜 무시됐는지 토스트로 밝힌다
+    (`parseUrlParams()` → `boot()`의 검증 분기, `notices` 배열). 파라미터가 아예
+    없을 때의 동작(= 서버 `open_at` 우선순위를 그대로 따름)은 기존 설계 그대로 손대지
+    않았다. 화면 안에서 범위·필터가 바뀔 때마다 `syncUrl()`이 주소를 갱신하되
+    `history.replaceState`만 쓴다 — 검색창에 한 글자씩 칠 때마다 뒤로 가기 스택이
+    쌓이면 안 된다(현재 항목 교체만).
+
+  ■ 원안과 다르게 만든 지점 (전부 이유가 있다 — 제작 보고서에도 남긴다)
+    ① **역할 스위처 없음** — 실제 로그인 세션의 등급(`Admin2Shell.canWrite('operator')`)
+       만 쓴다. 원안 헤더의 owner/operator/viewer 버튼은 디자인 도구 시연 장치였다.
+    ② **다음 페이지는 진짜로 서버에 다시 요청한다** — 원안은 더미 배열이라 "프로토
+       타입은 첫 페이지 표본만 그립니다"라는 안내를 뒀지만, 이 화면은 실제 서버
+       페이지네이션(`page`/`size`, 상한 500/페이지)을 그대로 쓴다 — 그 안내문은
+       옮기지 않았다.
+    ③ **"최근 이동"은 세션 안에서 실행한 이동만 담는다** — `GET /api/admin/
+       activity-logs`(범용 감사 로그)를 재사용하는 방법도 검토했지만, 그 API의
+       "되돌려짐" 판정(`admin_activity_logs.py`: `u.action LIKE '%undo'`)은 **영문
+       접미사 `_undo`를 가정**한다. 이 화면의 되돌리기 액션명은 한국어 "카테고리
+       매핑 이동 되돌림"이라 그 LIKE 조건에 절대 걸리지 않는다 — 재사용하면 실제로는
+       되돌린 이동에도 "되돌려짐" 배지가 영영 안 붙는, 검증되지 않은 결함을 화면에
+       심는 셈이다. 그래서 원안의 의도(세션 로그) 그대로 두되, 원안이 곁들인 "실측
+       활동 로그에는 이동 141건·되돌림 129건" 같은 스냅샷 수치는 옮기지 않았다 —
+       시간이 지나면 반드시 틀리는 값이다(CANON §숫자를 지어내지 않는다).
+    ④ **선택은 페이지 단위로 초기화한다** — 원안은 더미 배열이라 페이지를 넘겨도
+       체크 상태가 그대로 남았지만, 실 서버 페이지네이션에서 이걸 그대로 두면
+       "지금 안 보이는 행이 선택된 채로 남는" 상태를 만든다. 대량 선택은 "조건 전체
+       N건 선택"이 이미 정직하게 처리하므로, 개별 체크는 범위·필터·페이지가 바뀌면
+       비운다.
+    ⑤ **이동 대상 선택지는 최상위(대분류) 노드를 제외한다** — 원안 그대로다(`parent_id
+       != null`인 노드만 후보). 실제 스키마는 최상위 노드에도 상품을 직접 붙일 수
+       있어 기술적 제약은 아니지만, 대분류는 보통 하위를 갖는 우산 노드라 그 아래
+       옮기는 것이 맞다는 원안의 판단을 그대로 따랐다 — 검증 대상으로 보고서에 남긴다.
+    ⑥ **화살표는 diff류 표기가 없어 전부 순수 표시용** — 유니코드 기호(▸▾▲●○▼✕‹›)는
+       다른 admin2 화면과 같은 관례로 그대로 썼다(전부 브라우저 렌더용, 서버로
+       되돌아가지 않는다 — 로그 문자열 ASCII 규칙과 무관).
+
+  ■ 2026-08-13 셸 통합 — `templates/admin/_admin2_shell.html.j2`를 상속한다. 사이드바·
+    헤더·팔레트·토스트 컨테이너·서체 변수(`--rv-*`)는 셸/`admin2.css`가 그린다.
+    **좌측 메뉴 항목 구성(IA)은 이 화면 소관이 아니다** — 정본은 `api/admin_nav.py`.
+    그 파일의 "상품 분류 매핑" 항목은 여전히 `href=None`(신설 예정)이다 — 담당 파일
+    밖이라 고치지 않았다. `api/admin_nav.py`의 href를 `/admin2/category-mapping`으로
+    올려야 LNB에서 이 화면에 들어올 수 있다(제작 보고서에 남김).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}상품 분류 매핑{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+/* 네이티브 버튼 렌더링(appearance:auto)을 끈다 — 켜져 있으면 그리드 안 버튼(.cm-row)의
+   width:100%가 실제보다 좁게 계산돼 헤더(.cm-thead, <div>)와 데이터 행의 열이 어긋난다
+   (결함 2, 2026-08-14 수정 — 확인자 실측: 헤더 718px vs 행 709px, 1fr 열이 행에서만
+   0px로 붕괴). margin·padding·border·background는 0/none으로 시작값만 통일하고, 실제
+   여백·테두리·배경은 이 화면의 모든 button 클래스가 각자 다시 정한다(전수 확인 —
+   지금 시각적으로 바뀌는 버튼은 없다). */
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  margin:0;padding:0;border:0;background:none}
+input{font-family:var(--rv-font)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 부가물 ── */
+.cm-permhint{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.cm-recentpush{margin-left:auto;position:relative}
+.cm-recentbtn{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+.cm-recentbtn.open{background:var(--rv-panel)}
+.cm-recentpop{position:absolute;top:36px;right:0;width:412px;max-height:320px;overflow:auto;
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:8px;
+  box-shadow:0 10px 26px rgba(38,35,30,.16);z-index:30}
+.cm-recentpop[hidden]{display:none}
+.cm-recentpop .hd{padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-panel);
+  font:600 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.cm-recent-row{padding:10px 13px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;flex-direction:column;gap:5px}
+.cm-recent-row .r1{display:flex;align-items:center;gap:8px}
+.cm-recent-row .at{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.cm-recent-row .lg{font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim)}
+.cm-recent-row .what{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft)}
+.cm-undone-b{font:600 9.5px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel2);
+  border-radius:3px;padding:3px 5px;white-space:nowrap}
+.cm-undo-a{font:500 10px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:5px 7px;cursor:pointer;white-space:nowrap}
+.cm-undo-a:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+.cm-recent-empty{padding:18px 13px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center}
+
+/* ── 루트 ── */
+.cm-root{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.cm-loading,.cm-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.cm-loading[hidden],.cm-errbox[hidden]{display:none}
+.cm-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.cm-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.cm-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+.cm-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.cm-body[hidden]{display:none}
+
+/* ── 경계 배너 ── */
+.cm-banner{flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.13);background:var(--rv-panel2);
+  border-left:3px solid var(--rv-faint);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.cm-banner .mk{font:600 11px/1 var(--rv-mono);color:var(--rv-muted);white-space:nowrap}
+.cm-banner .hd{font:600 11.5px/1.4 var(--rv-font);white-space:nowrap}
+.cm-banner .ds{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:220px}
+.cm-banner .meta{font:400 10px/1.5 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
+
+/* ── 탭 ── */
+.cm-tabs{flex:none;padding:12px 18px 0;display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+.cm-tab{flex:1;min-width:150px;text-align:left;background:var(--rv-panel2);border:1px solid rgba(0,0,0,.11);
+  border-radius:8px;padding:9px 12px;cursor:pointer;user-select:none}
+.cm-tab.on{background:var(--rv-card);border:1px solid var(--rv-ink);box-shadow:inset 0 -3px 0 var(--rv-ink)}
+.cm-tab.dim{cursor:pointer}
+.cm-tab .row1{display:flex;align-items:center;gap:6px}
+.cm-tab .mark{font:600 10px/1 var(--rv-mono)}
+.cm-tab .lbl{font:600 11px/1 var(--rv-font);white-space:nowrap}
+.cm-tab .openbadge{font:600 9.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:#e6e0d2;
+  border-radius:3px;padding:3px 5px;white-space:nowrap}
+.cm-tab .row2{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.cm-tab .val{font:600 21px/1.15 var(--rv-mono);font-variant-numeric:tabular-nums}
+.cm-tab .val.small{font-size:17px}
+.cm-tab .note{font:400 10px/1.4 var(--rv-font);color:var(--rv-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 필터 바 ── */
+.cm-filters{flex:none;padding:10px 18px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cm-search{width:268px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;outline:none}
+.cm-partbox{position:relative}
+.cm-partbtn{display:flex;align-items:center;gap:7px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;
+  cursor:pointer;user-select:none;min-width:158px}
+.cm-partbtn.set{border-color:rgba(0,0,0,.28)}
+.cm-partbtn .car{font-size:8px;opacity:.55;margin-left:auto}
+.cm-partdrop{position:absolute;top:36px;left:0;width:196px;max-height:264px;overflow:auto;
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:7px;
+  box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px;z-index:30}
+.cm-partdrop[hidden]{display:none}
+.cm-partopt{font:400 11px/1.3 var(--rv-font);padding:7px 9px;border-radius:5px;cursor:pointer}
+.cm-partopt.on{font-weight:600;background:#f0ece1}
+.cm-stockbtn{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--rv-font);color:var(--rv-ink-soft);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer;user-select:none}
+.cm-stockbtn[aria-checked="true"]{border-color:rgba(0,0,0,.28)}
+.cm-stockbtn .mk{font:600 10px/1 var(--rv-mono);color:var(--rv-dim)}
+.cm-stockbtn[aria-checked="true"] .mk{color:var(--rv-green)}
+.cm-resetlink{font:500 10.5px/1 var(--rv-font);color:var(--rv-dim2);background:transparent;
+  border:1px solid rgba(0,0,0,.08);border-radius:5px;padding:8px 10px;cursor:pointer;user-select:none}
+.cm-resetlink.active{color:var(--rv-ink-soft);border-color:rgba(0,0,0,.16)}
+.cm-filternote{margin-left:auto;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint);text-align:right;max-width:420px}
+
+/* ── 본문 분할 ── */
+.cm-split{flex:1;min-height:0;display:flex;gap:14px;padding:10px 18px 0}
+
+/* 트리 */
+.cm-tree{width:300px;flex:none;display:flex;flex-direction:column;background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden}
+.cm-tree-hd{flex:none;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-panel);
+  display:flex;flex-direction:column;gap:8px}
+.cm-tree-hd .row1{display:flex;align-items:center;gap:8px}
+.cm-tree-hd .lbl{font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);flex:1}
+.cm-tree-hd .ro{font:400 10px/1 var(--rv-mono);color:var(--rv-dim)}
+.cm-modes{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden}
+.cm-mode{flex:1;text-align:center;font:500 10.5px/1 var(--rv-font);color:var(--rv-muted);background:var(--rv-card);
+  padding:7px 6px;cursor:pointer;user-select:none;border:0}
+.cm-mode.on{color:var(--rv-canvas);background:var(--rv-ink)}
+.cm-tree-note{font:400 10px/1.55 var(--rv-font);color:var(--rv-faint)}
+.cm-tree-body{flex:1;min-height:0;overflow:auto}
+.cm-tree-row{display:flex;align-items:center;gap:6px;padding:7px 11px;border-bottom:1px solid rgba(0,0,0,.05);
+  cursor:pointer;background:transparent;border-left:3px solid transparent;width:100%;text-align:left;border-top:0;border-right:0}
+.cm-tree-row.top{background:#faf7f0}
+.cm-tree-row.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.cm-tree-row .indent{flex:none}
+.cm-tree-row .caret{flex:none;width:13px;text-align:center;font:500 10px/1 var(--rv-mono);color:var(--rv-muted);
+  cursor:pointer;background:none;border:0;padding:0}
+.cm-tree-row .caret.leaf{color:var(--rv-dim4);cursor:default}
+.cm-tree-row .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--rv-font)}
+.cm-tree-row .name.top{font:600 11.5px/1.3 var(--rv-font)}
+.cm-tree-row .name.sub{font:400 11px/1.3 var(--rv-font)}
+.cm-tree-row .viol{font:600 9.5px/1 var(--rv-font);color:var(--rv-amber);white-space:nowrap}
+.cm-tree-row .cnt{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
+.cm-tree-empty,.cm-tree-err{padding:24px 14px;text-align:center;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim)}
+.cm-tree-retry{text-decoration:underline;cursor:pointer;color:var(--rv-link)}
+
+/* 목록 */
+.cm-listcol{flex:1;min-width:0;display:flex;flex-direction:column}
+/* 결함2 재수정(2026-08-14, 확인자 재측정으로 두 번째 시도) — 세 가지가 함께 필요했다.
+   appearance는 원인이 아니었다(1차 수정 — appearance:none을 넣은 뒤에도 헤더/행 폭이
+   9px 그대로 벌어져 있었다, 확인자 재측정으로 반려됨).
+   ① 컨테이너 폭 불일치(9px): scrollbar-gutter:stable은 그 축의 overflow가 실제로
+      스크롤바를 만들 수 있는 auto/scroll일 때만 거터를 예약하고 hidden(스크롤바가
+      절대 안 생기는 값)에는 효과가 없다. .cm-tbody(overflow:auto)는 세로축 거터를
+      늘 예약해(스크롤 유무 무관 — stable의 정의) .cm-row 가용폭이 9px 줄어드는데
+      .cm-thead(옛 overflow:hidden)는 거터가 전혀 안 걸려 있었다 — 그래서 세로만
+      auto로 바꿨다(가로는 hidden 유지, 라운드 코너 클리핑 그대로). 이 수정만으로는
+      **부족했다**(아래 실측 참고) — .cm-thead·.cm-tbody 의 offsetWidth/clientWidth는
+      맞아떨어지지만 그 안의 그리드 정렬은 따로 어긋나 있었다. 형제 화면
+      product_category.html.j2 의 .pc-thead 도 overflow:hidden 그대로라 같은 결함을
+      안고 있을 수 있다(읽기만 했다 — 담당 밖이라 고치지 않음, 제작 보고서에 남김).
+   ② 시작 위치 3px 오차: .cm-row 는 border-left:3px solid transparent(선택 강조용,
+      :313)를 쓰는데 .cm-thead 에는 대응하는 여백이 없어 0열이 3px 어긋났다. 테두리
+      선을 늘리면 헤더 카드 윤곽선이 달라지므로(오른쪽 테두리까지 손대야 해서 안
+      좋음) **테두리 대신 padding-left 를 13->16 으로 3px 늘려** 시각적으로 티 안 나게
+      맞췄다(getBoundingClientRect 로 0열·1열 시작 x 가 정확히 같아짐을 확인).
+   ③ 1fr 트랙 자체가 안 맞음(2차 수정, 이후 폐기): ①②를 다 넣어도 .cm-thead 자신의
+      grid-template-columns 계산값(1fr 트랙)이 실제 가용폭·뷰포트 변화와 무관하게
+      굳어 있는 사례를 Playwright 로 직접 재현했다(폭을 700px 로 강제해도 같은 값이
+      나왔다 — .cm-thead 가 grid 인 동시에 .cm-listcol 의 stretch 되는 flex 항목인
+      조합에서 생기는 렌더링 현상으로 보인다). 그때는 CSS만으로 못 잡아 JS로 실제
+      행의 계산값을 헤더에 복사하는 `syncTheadCols()` 를 넣었었다 — **그런데 이 조치가
+      결함3을 낳았다**: 순수 1fr(최소폭 없음)라 어긋남을 없애는 방향이 결국 이름 열을
+      헤더·행 양쪽 다 0px 로 접는 쪽으로 수렴해, "정렬은 맞는데 상품명이 안 보이는"
+      상태로 통과 보고를 냈다(확인자가 잡음). 원인은 어긋남이 아니라애초에 618(고정폭
+      합)+70(간격)+26(패딩)=714 가 709~718 폭보다 커서 1fr 에 줄 자리가 없었던 것.
+   ④ 결함3 수정(2026-08-14, 3차) — 이름 열에 최소폭을 주고 넘치면 가로 스크롤:
+      `grid-template-columns` 의 `1fr` 을 **`minmax(180px,1fr)`** 로 바꿨다(.cm-thead·
+      .cm-row 둘 다, :317·:327). 180px 근거 — 1440px(이 화면이 기준으로 삼은 폭)에서
+      순수 1fr 이 자연히 갖던 값이 152px 였다(실측, 확인자가 산수로 추정한 "약 160px"과
+      근접) → 그보다 작은 값(120~160px)은 실제 상품명 표본(중앙값 34자, "(휴먼그리고)
+      모니터 받침대 MT600 화이트 /모니터주변기기" 등)에서 모델번호가 채 안 보이는
+      지점(예 152px="…MT6", 160px="…MT60")에서 끊겼다. 180px 은 "…MT600 화"까지
+      보여줘 모델번호 전체가 읽힌다(Canvas measureText 로 실측: 23자). 그 대신 1440
+      에서도(자연폭 152<180) 가로 스크롤이 생긴다 — "원안 그대로"가 항상 스크롤 0 을
+      뜻하진 않는다고 판단했다(1920px 처럼 실제로 넉넉한 폭에서는 632px 로 펴져
+      스크롤이 없다, 실측 확인). `.cm-row` 는 `min-width:min-content` 를 추가해(:328)
+      `width:100%` 가 그리드의 최소 요구폭보다 좁아지지 못하게 막았다 — 그래야
+      `.cm-tbody`(overflow:auto)가 진짜로 가로 스크롤을 인식한다. **`syncTheadCols()`
+      는 이번에 제거했다**: minmax 로 트랙에 바닥값을 준 뒤로는 ③의 "굳어버림" 현상이
+      재현되지 않았다(뷰포트 1024·1280·1440·1920, 스크롤 있음/없음, 라이브 리사이즈
+      양방향 전부 어긋남 0px 를 함수 없이 실측 확인) — CSS만으로 풀리는데 매 렌더·
+      리사이즈마다 도는 JS 보정을 남겨 두면 그 자체가 다음 결함의 씨앗이 된다(확인자
+      지시). 헤더는 `overflow-x:hidden` 이라 자체 스크롤 막대는 없지만 내부 그리드는
+      행과 똑같이 넓어서 잘려 있을 뿐이다 — 본문 스크롤과 같은 위치를 보여주려면
+      `#cmTbody` 의 `scroll` 이벤트에서 헤더의 `scrollLeft` 를 맞춰야 한다(하단 스크립트,
+      "가로 스크롤 동기화" 참고). **열 구성·순서·고정폭 값(30·116·92·176·84·54·66)은
+      그대로다** — 바뀐 것은 이름 열의 하한뿐이다. */
+.cm-thead{flex:none;display:grid;grid-template-columns:30px minmax(180px,1fr) 116px 92px 176px 84px 54px 66px;gap:10px;
+  align-items:center;padding:9px 13px 9px 16px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+  border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);
+  overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
+.cm-tbody{flex:1;min-height:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
+  overflow:auto;scrollbar-gutter:stable}
+.cm-selectbar{display:flex;align-items:center;gap:9px;padding:9px 13px;background:#f6f2e8;border-bottom:1px solid rgba(0,0,0,.08)}
+.cm-selectbar .tx{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:0}
+.cm-selectbar button{font:600 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.cm-row{display:grid;grid-template-columns:30px minmax(180px,1fr) 116px 92px 176px 84px 54px 66px;gap:10px;align-items:center;
+  padding:8px 13px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;background:transparent;
+  border-left:3px solid transparent;width:100%;min-width:min-content;text-align:left;border-top:0;border-right:0;border-radius:0}
+.cm-row.on{background:#f6f2e8}
+.cm-row.flag{border-left-color:var(--rv-amber)}
+.cm-check{flex:none;width:15px;height:15px;border-radius:3px;display:flex;align-items:center;justify-content:center;
+  font:600 9px/1 var(--rv-mono);color:var(--rv-canvas);background:var(--rv-card);border:1px solid rgba(0,0,0,.28);
+  cursor:pointer;padding:0}
+.cm-check.on{background:var(--rv-ink);border-color:var(--rv-ink)}
+.cm-row .nm{font:500 11.5px/1.3 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-row .cd{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-row .pt{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-row .pt.etc{color:var(--rv-link)}
+.cm-row .ct{display:flex;align-items:center;gap:5px;font:400 10.5px/1.3 var(--rv-font);color:var(--rv-ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-row .ct.warn{color:var(--rv-amber)}
+.cm-row .pr{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-ink-soft);text-align:right;font-variant-numeric:tabular-nums}
+.cm-row .sk{font:400 10.5px/1.3 var(--rv-mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--rv-dim)}
+.cm-row .sk.has{color:var(--rv-ink-soft)}
+.cm-row .st{font:500 9.5px/1 var(--rv-font);color:var(--rv-muted);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.1);border-radius:3px;padding:4px 6px;white-space:nowrap;justify-self:start}
+.cm-row .st.live{color:var(--rv-green);background:oklch(0.95 0.03 165)}
+.cm-listempty{padding:44px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+.cm-listempty[hidden]{display:none}
+.cm-listempty .ti{font:600 12.5px/1.4 var(--rv-font)}
+.cm-listempty .ds{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-dim);max-width:460px}
+.cm-listempty button{font:600 11px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+  border:0;border-radius:5px;padding:8px 12px;cursor:pointer;margin-top:4px}
+.cm-pager{flex:none;display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--rv-panel);
+  border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px}
+.cm-pager .rg{font:400 10.5px/1.4 var(--rv-mono);color:var(--rv-muted)}
+.cm-pager .nt{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim)}
+.cm-pager .sp{flex:1}
+.cm-pager button{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:7px 9px;cursor:pointer}
+.cm-pager button:disabled{color:var(--rv-dim2);cursor:not-allowed}
+.cm-pager .lb{font:500 10.5px/1 var(--rv-mono);color:var(--rv-ink-soft)}
+
+/* ── 하단 이동 바 ── */
+.cm-bar{flex:none;margin:12px 18px 18px;background:var(--rv-panel2);border:1px solid rgba(0,0,0,.11);
+  border-radius:8px;padding:12px 14px}
+.cm-bar.active{background:var(--rv-card);border-color:var(--rv-ink);box-shadow:0 -6px 18px rgba(38,35,30,.08)}
+.cm-bar-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cm-selcount{font:600 12.5px/1 var(--rv-font);color:var(--rv-dim)}
+.cm-bar.active .cm-selcount{color:var(--rv-ink)}
+.cm-limit{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint)}
+.cm-limit.over{font-weight:600;color:var(--rv-amber)}
+.cm-clearsel{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:6px 9px;cursor:pointer}
+.cm-bar-note{margin-left:auto;font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint)}
+.cm-bar-move{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
+.cm-targetbox{position:relative;flex:1;min-width:220px}
+.cm-targetbtn{display:flex;align-items:center;gap:9px;width:100%;font:500 11.5px/1.3 var(--rv-font);
+  color:var(--rv-ink-soft);background:var(--rv-panel);border:1px solid rgba(0,0,0,.18);border-radius:6px;
+  padding:9px 12px;cursor:pointer;user-select:none}
+.cm-targetbtn.set{color:var(--rv-ink);border-color:rgba(0,0,0,.28)}
+.cm-targetbtn:disabled{cursor:not-allowed;opacity:.6}
+.cm-targetbtn .lb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.cm-targetbtn .wn{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
+.cm-targetdrop{position:absolute;bottom:42px;left:0;width:100%;max-height:300px;overflow:auto;
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:7px;
+  box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px;z-index:30}
+.cm-targetdrop[hidden]{display:none}
+.cm-targetopt{display:flex;align-items:center;gap:8px;font:400 11px/1.3 var(--rv-font);padding:7px 9px;
+  border-radius:5px;cursor:pointer}
+.cm-targetopt.on{font-weight:600;background:#f0ece1}
+.cm-targetopt .lb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-targetopt .ty{font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim)}
+.cm-movebtn{flex:none;font:600 12px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+  border:none;border-radius:5px;padding:11px 18px;cursor:pointer;white-space:nowrap}
+.cm-movebtn:disabled{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+.cm-remainder{display:flex;align-items:center;gap:9px;margin-top:9px;border:1px solid var(--rv-amber-line);
+  background:var(--rv-amber-bg);border-left:3px solid var(--rv-amber);border-radius:6px;padding:9px 12px;flex-wrap:wrap}
+.cm-remainder .mk{font:600 10.5px/1 var(--rv-mono);color:var(--rv-amber);white-space:nowrap}
+.cm-remainder .ds{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:200px}
+.cm-remainder button{font:600 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.cm-blocked{margin-top:9px;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-red)}
+
+@media (max-width:768px){
+  .cm-split{flex-direction:column}
+  .cm-tree{width:100%}
+  .cm-thead,.cm-row{grid-template-columns:30px 1fr 92px}
+  .cm-thead span:nth-child(4),.cm-thead span:nth-child(5),.cm-thead span:nth-child(6),.cm-thead span:nth-child(7),
+  .cm-row .ct,.cm-row .pr,.cm-row .sk{display:none}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="cm-permhint">조회 viewer 이상 · 이동·되돌리기 operator 이상</span>
+<div class="cm-recentpush" data-keep="1">
+  <button type="button" class="cm-recentbtn" id="cmRecentBtn" data-action="toggle-recent"
+          aria-haspopup="true" aria-expanded="false">최근 이동 <span id="cmRecentCount"></span></button>
+  <div class="cm-recentpop" id="cmRecentPop" hidden></div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="cm-root">
+  <div class="cm-loading" id="cmLoading"><div>불러오는 중…</div></div>
+
+  <div class="cm-errbox" id="cmErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="cmErrMsg"></div>
+    <button type="button" data-action="retry-boot">다시 시도</button>
+  </div>
+
+  <div class="cm-body" id="cmBody" hidden>
+    <div class="cm-banner">
+      <span class="mk">경계</span>
+      <span class="hd">이 화면은 상품을 옮기기만 합니다 — 분류 자체는 고치지 않습니다</span>
+      <span class="ds">이름·구조·허용 부품 종류·마진은 "상품 분류 관리" 소관입니다. 카탈로그 적재는 category_id를 다루지 않으므로, 카테고리 배정은 오직 이 화면의 이동으로만 일어납니다.</span>
+      <span class="meta" id="cmBannerMeta"></span>
+    </div>
+
+    <div class="cm-tabs" id="cmTabs"></div>
+
+    <div class="cm-filters" data-keep="1">
+      <label class="sr-only" for="cmSearch">상품명 · 상품코드 검색</label>
+      <input type="text" id="cmSearch" class="cm-search" placeholder="상품명 · 상품코드 검색" autocomplete="off">
+      <div class="cm-partbox">
+        <button type="button" class="cm-partbtn" id="cmPartBtn" data-action="toggle-part"
+                aria-haspopup="listbox" aria-expanded="false">
+          <span id="cmPartLabel">부품 종류 · 전체</span><span class="car">▼</span>
+        </button>
+        <div class="cm-partdrop" id="cmPartDrop" role="listbox" hidden></div>
+      </div>
+      <button type="button" class="cm-stockbtn" id="cmStockBtn" data-action="toggle-stock"
+              role="switch" aria-checked="false">
+        <span class="mk" id="cmStockMark">○</span><span>재고 있는 것만</span>
+      </button>
+      <button type="button" class="cm-resetlink" id="cmResetBtn" data-action="reset-filters">필터 초기화</button>
+      <span class="cm-filternote" id="cmFilterNote"></span>
+    </div>
+
+    <div class="cm-split">
+      <div class="cm-tree" data-keep="1">
+        <div class="cm-tree-hd">
+          <div class="row1"><span class="lbl">분류 트리</span><span class="ro">읽기 전용</span></div>
+          <div class="cm-modes" role="group" aria-label="트리 범위">
+            <button type="button" class="cm-mode" id="cmModeCat" data-action="set-treemode" data-m="category">직속만</button>
+            <button type="button" class="cm-mode" id="cmModeSub" data-action="set-treemode" data-m="subtree">하위 포함</button>
+          </div>
+          <div class="cm-tree-note" id="cmTreeNote"></div>
+        </div>
+        <div class="cm-tree-body" id="cmTreeBody"></div>
+      </div>
+
+      <div class="cm-listcol">
+        <div class="cm-thead">
+          <button type="button" class="cm-check" id="cmHeadCheck" data-action="toggle-page-all"
+                  role="checkbox" aria-checked="false" aria-label="이 페이지 전체 선택" data-keep="1"></button>
+          <span>상품명</span><span>상품코드</span><span>부품 종류</span><span>현재 분류</span>
+          <span style="text-align:right">판매가</span><span style="text-align:right">재고</span><span>상태</span>
+        </div>
+        <div class="cm-tbody" id="cmTbody" data-keep="1"></div>
+        <div class="cm-pager" data-keep="1">
+          <span class="rg num" id="cmPageRange"></span>
+          <span class="nt" id="cmPageNote"></span>
+          <span class="sp"></span>
+          <button type="button" id="cmPrevBtn" data-action="page-prev">‹ 이전</button>
+          <span class="lb" id="cmPageLabel"></span>
+          <button type="button" id="cmNextBtn" data-action="page-next">다음 ›</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-bar" id="cmBar" data-keep="1">
+      <div class="cm-bar-top">
+        <span class="cm-selcount" id="cmSelCount">0건 선택</span>
+        <span class="cm-limit" id="cmLimitNote"></span>
+        <button type="button" class="cm-clearsel" id="cmClearSelBtn" data-action="clear-sel" hidden>선택 해제</button>
+        <span class="cm-bar-note">대상 분류로 옮깁니다 — 트리 자체는 바뀌지 않습니다</span>
+      </div>
+      <div class="cm-bar-move">
+        <div class="cm-targetbox">
+          <button type="button" class="cm-targetbtn" id="cmTargetBtn" data-action="toggle-target"
+                  aria-haspopup="listbox" aria-expanded="false">
+            <span class="lb" id="cmTargetLabel">대상 분류 선택</span>
+            <span class="wn" id="cmTargetWarn"></span><span style="font-size:8px;opacity:.55">▲</span>
+          </button>
+          <div class="cm-targetdrop" id="cmTargetDrop" role="listbox" hidden></div>
+        </div>
+        <button type="button" class="cm-movebtn" id="cmMoveBtn" data-action="do-move">이동</button>
+      </div>
+      <div class="cm-remainder" id="cmRemainder" hidden>
+        <span class="mk">▲ 남은 <span id="cmRemainderN"></span>건</span>
+        <span class="ds">상한 때문에 남았습니다. 자동으로 이어 옮기지 않습니다 — 남은 건을 다시 골라 한 번 더 실행하세요.</span>
+        <button type="button" data-action="reselect-remainder">남은 건 다시 선택</button>
+      </div>
+      <div class="cm-blocked" id="cmBlockedNote" hidden></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var VALID_SCOPES = ['unmapped', 'violation', 'unclassified', 'category', 'subtree', 'all'];
+  var GREEN = 'var(--rv-green)', AMBER = 'var(--rv-amber)';
+
+  var S = {
+    tree: null, treeErr: null,
+    list: null, listErr: null,
+    scope: 'unmapped', catId: null, treeMode: 'subtree',
+    q: '', part: null, inStock: false, page: 1, pageSize: 100,
+    sel: {}, selectAllScope: false, remainder: 0,
+    target: null,
+    moves: [],
+    collapsed: {},
+    partOpen: false, targetOpen: false, recentOpen: false,
+    busy: false
+  };
+  var searchDebounce = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+
+  function owner() { return window.Admin2Shell.canWrite('operator'); }
+  function toast(msg, kind, action, onAction) { window.Admin2Shell.toast(msg, kind, action, onAction); }
+  function guard() {
+    if (!owner()) {
+      var me = window.Admin2Shell.getMe();
+      toast('권한이 부족합니다 (필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+  function permText() {
+    var me = window.Admin2Shell.getMe();
+    return '권한이 부족합니다 (필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+  }
+
+  // ── 트리 헬퍼(/api/admin/categories) ────────────────────────────────
+  function treeItems() { return (S.tree && S.tree.items) || []; }
+  function nodeById(id) {
+    var arr = treeItems();
+    for (var i = 0; i < arr.length; i++) if (arr[i].category_id === id) return arr[i];
+    return null;
+  }
+  function childrenOf(pid) {
+    return treeItems().filter(function (n) { return n.parent_id === pid; })
+      .sort(function (a, b) { return (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name)); });
+  }
+  function catPath(id) {
+    var n = nodeById(id);
+    if (!n) return '(알 수 없음)';
+    var p = n.parent_id == null ? null : nodeById(n.parent_id);
+    return (p ? p.name + ' / ' : '') + n.name;
+  }
+  function violUnder(id) {
+    var n = nodeById(id);
+    var total = (n && n.violations) || 0;
+    childrenOf(id).forEach(function (c) { total += violUnder(c.category_id); });
+    return total;
+  }
+  // ETC 전용 소분류 판정 — **코드값만** 본다(라벨 문자열 금지, taxonomy.py 라벨 변경에 안전).
+  function isEtcOnlyCat(n) {
+    return !!(n && n.allowed_part_types && n.allowed_part_types.length === 1 && n.allowed_part_types[0] === 'ETC');
+  }
+  // ETC 표시 라벨 — taxonomy.py(PART_LABELS)가 정본이다. 문자열을 이 파일에 다시
+  // 박지 않고 서버가 매 응답에 실어 보내는 선택지(part_types)에서 코드 'ETC'의
+  // label을 그대로 끌어온다. 형제 화면 product_category.html.j2의 etcLabel()(:578)과
+  // 같은 방식 — 그쪽은 S.data.part_types, 이 화면은 S.list.part_types에서 읽는다.
+  function etcLabel() {
+    var opts = (S.list && S.list.part_types) || [];
+    for (var i = 0; i < opts.length; i++) { if (opts[i].key === 'ETC') return opts[i].label; }
+    return 'ETC';   // part_types 응답에 ETC 키가 없을 때만(폴백 — 라벨을 지어내지 않는다)
+  }
+
+  // ── scope 매핑 — UI 5탭 개념 ↔ 서버 실제 scope 6종 ───────────────────
+  function apiScopeFor(uiScope, treeMode) { return uiScope === 'category' ? treeMode : uiScope; }
+  function activeApiScope() { return apiScopeFor(S.scope, S.treeMode); }
+  function activeCategoryId() { return S.scope === 'category' ? S.catId : null; }
+
+  function buildListUrl(p) {
+    var sp = new URLSearchParams();
+    sp.set('scope', p.scope);
+    if (p.category_id != null) sp.set('category_id', String(p.category_id));
+    if (p.q) sp.set('q', p.q);
+    if (p.part_type) sp.set('part_type', p.part_type);
+    if (p.in_stock) sp.set('in_stock', 'true');
+    sp.set('page', String(p.page || 1));
+    sp.set('size', String(p.size || S.pageSize));
+    return '/api/admin/category-mapping?' + sp.toString();
+  }
+  function fetchListRaw(p) { return apiGet(buildListUrl(p)); }
+
+  function fetchCurrent(page) {
+    return fetchListRaw({
+      scope: activeApiScope(), category_id: activeCategoryId(),
+      q: S.q, part_type: S.part, in_stock: S.inStock, page: page || (S.list && S.list.page) || 1, size: S.pageSize
+    });
+  }
+
+  function collectCodes(limit) {
+    var codes = [];
+    function next(page) {
+      return fetchListRaw({
+        scope: activeApiScope(), category_id: activeCategoryId(),
+        q: S.q, part_type: S.part, in_stock: S.inStock, page: page, size: 500
+      }).then(function (resp) {
+        (resp.items || []).forEach(function (it) { if (codes.length < limit) codes.push(it.product_code); });
+        var items = resp.items || [];
+        if (codes.length >= limit || page >= resp.pages || items.length === 0) {
+          return { codes: codes, total: resp.total };
+        }
+        return next(page + 1);
+      });
+    }
+    return next(1);
+  }
+
+  // ── 딥링크 ───────────────────────────────────────────────────────
+  function parseUrlParams() {
+    var sp = new URLSearchParams(location.search);
+    var rawScope = sp.get('scope');
+    var out = { q: (sp.get('q') || '').trim(), partType: sp.get('part_type') || null,
+      inStock: sp.get('in_stock') === '1' || sp.get('in_stock') === 'true',
+      fromUrl: false, invalidReason: null, scope: null, catId: null, treeMode: 'subtree' };
+    if (!rawScope) return out;
+    if (VALID_SCOPES.indexOf(rawScope) < 0) {
+      out.invalidReason = '알 수 없는 범위(scope=' + rawScope + ')입니다';
+      return out;
+    }
+    var needsCat = (rawScope === 'category' || rawScope === 'subtree');
+    if (needsCat) {
+      var catRaw = sp.get('category_id');
+      if (!catRaw || !/^\d+$/.test(catRaw)) {
+        out.invalidReason = 'scope=' + rawScope + '인데 category_id가 없습니다';
+        return out;
+      }
+      out.catId = Number(catRaw);
+      out.treeMode = rawScope;
+      out.scope = 'category';
+    } else {
+      out.scope = rawScope;
+    }
+    out.fromUrl = true;
+    return out;
+  }
+  function syncUrl() {
+    var sp = new URLSearchParams();
+    sp.set('scope', activeApiScope());
+    var cid = activeCategoryId();
+    if (cid != null) sp.set('category_id', String(cid));
+    if (S.q) sp.set('q', S.q);
+    if (S.part) sp.set('part_type', S.part);
+    if (S.inStock) sp.set('in_stock', '1');
+    var qs = sp.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  }
+
+  // ── 로드 ─────────────────────────────────────────────────────────
+  function loadTree() {
+    return apiGet('/api/admin/categories').then(function (j) { S.tree = j; S.treeErr = null; })
+      .catch(function (err) { S.treeErr = err; });
+  }
+
+  function applyListResponse(resp) {
+    S.list = resp; S.listErr = null;
+    S.sel = {}; S.selectAllScope = false;
+  }
+
+  function boot() {
+    renderAll();
+    window.Admin2Shell.meReady.then(renderRail);
+    loadTree().then(function () {
+      var parsed = parseUrlParams();
+      var notices = [];
+      var wantScope = null, wantCatId = null, wantTreeMode = 'subtree';
+
+      if (parsed.invalidReason) {
+        notices.push('요청한 조건을 이해할 수 없어 기본 범위로 엽니다 — ' + parsed.invalidReason);
+      } else if (parsed.fromUrl) {
+        if (S.treeErr) {
+          notices.push('카테고리 목록을 불러오지 못해 요청한 범위(category_id ' + parsed.catId + ')를 확인할 수 없습니다 — 기본 범위로 엽니다');
+        } else if (parsed.catId != null && !nodeById(parsed.catId)) {
+          notices.push('요청한 카테고리(id ' + parsed.catId + ')를 찾을 수 없어 기본 범위로 엽니다');
+        } else {
+          wantScope = parsed.scope; wantCatId = parsed.catId; wantTreeMode = parsed.treeMode;
+        }
+      }
+
+      S.q = parsed.q; S.inStock = parsed.inStock;
+      var provScope = wantScope || 'unmapped';
+      var provTreeMode = wantScope ? wantTreeMode : S.treeMode;
+      var provCatId = wantScope ? wantCatId : null;
+
+      fetchListRaw({
+        scope: apiScopeFor(provScope, provTreeMode), category_id: provScope === 'category' ? provCatId : null,
+        q: S.q, part_type: parsed.partType, in_stock: S.inStock, page: 1, size: S.pageSize
+      }).then(function (resp) {
+        var okPart = !parsed.partType || (resp.part_types || []).some(function (t) { return t.key === parsed.partType; });
+        if (parsed.partType && !okPart) notices.push('요청한 부품 종류(' + parsed.partType + ')를 찾을 수 없어 필터를 해제했습니다');
+        var finalPart = okPart ? parsed.partType : null;
+        var finalScope = wantScope || resp.open_at;
+        var needRefetch = (!wantScope && resp.open_at !== provScope) || (parsed.partType && !okPart);
+
+        function finish(finalResp) {
+          S.scope = finalScope; S.treeMode = provTreeMode; S.catId = provCatId; S.part = finalPart;
+          applyListResponse(finalResp);
+          syncUrl(); renderAll();
+          notices.forEach(function (n) { toast(n, 'warn'); });
+        }
+        if (needRefetch) {
+          fetchListRaw({
+            scope: apiScopeFor(finalScope, provTreeMode), category_id: finalScope === 'category' ? provCatId : null,
+            q: S.q, part_type: finalPart, in_stock: S.inStock, page: 1, size: S.pageSize
+          }).then(finish).catch(function (err) { S.listErr = err; renderAll(); });
+        } else {
+          finish(resp);
+        }
+      }).catch(function (err) { S.listErr = err; renderAll(); });
+    });
+  }
+
+  function reloadKeepView(page) {
+    S.listErr = null;
+    return fetchCurrent(page).then(function (resp) {
+      applyListResponse(resp);
+      syncUrl(); renderAll();
+    }).catch(function (err) { S.listErr = err; renderAll(); });
+  }
+
+  // ── 상태 전환 ────────────────────────────────────────────────────
+  function setScope(scope, catId) {
+    S.scope = scope;
+    if (catId !== undefined) S.catId = catId;
+    S.page = 1; S.sel = {}; S.selectAllScope = false; S.target = null; S.targetOpen = false; S.remainder = 0;
+    reloadKeepView(1);
+  }
+  function setTreeMode(m) {
+    if (S.treeMode === m) return;
+    S.treeMode = m;
+    if (S.scope === 'category') { S.page = 1; S.sel = {}; S.selectAllScope = false; S.remainder = 0; reloadKeepView(1); }
+    else { renderAll(); }
+  }
+
+  // ── 렌더 ─────────────────────────────────────────────────────────
+  function renderAll() {
+    var loading = $('cmLoading'), errBox = $('cmErrBox'), body = $('cmBody');
+    if (S.listErr) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('cmErrMsg').textContent = S.listErr.message;
+      return;
+    }
+    if (!S.list) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+
+    var counts = S.list.counts || {};
+    $('cmBannerMeta').textContent = '전체 ' + fmt(counts.all_products) + '건';
+
+    renderTabs(counts);
+    renderFilters();
+    renderTree();
+    renderTable();
+    renderPager();
+    renderBar();
+    renderRail();
+  }
+
+  function tabIsActive(key) {
+    if (key === 'category') return S.scope === 'category';
+    return S.scope === key;
+  }
+  function tabValueFor(key, counts) {
+    if (key === 'category') return (S.scope === 'category' && S.list) ? S.list.total : null;
+    if (tabIsActive(key) && S.list) return S.list.total;
+    var map = { unmapped: 'unmapped', violation: 'violation', unclassified: 'unclassified', all: 'all_products' };
+    return counts[map[key]];
+  }
+
+  function renderTabs(counts) {
+    var openAt = S.list.open_at;
+    var etcOnlyN = treeItems().filter(isEtcOnlyCat).length;
+    var TABS = [
+      { key: 'unmapped', mark: '○', label: '미매핑', note: 'category_id 없음' },
+      { key: 'violation', mark: '▲', label: '허용 종류 위반', note: '막지 않고 알리기만' },
+      { key: 'unclassified', mark: '◆', label: etcLabel(), note: "part_type = 'ETC' 기준 · 카테고리 축과 다름" },
+      { key: 'category', mark: '●', label: '카테고리',
+        note: S.catId == null ? '트리에서 고르세요' : catPath(S.catId) + (S.treeMode === 'subtree' ? ' · 하위 포함' : ' · 직속') },
+      { key: 'all', mark: '·', label: '전체', note: '상품 전량' }
+    ];
+    $('cmTabs').innerHTML = TABS.map(function (t) {
+      var on = tabIsActive(t.key);
+      var dim = t.key === 'category' && S.catId == null;
+      var v = tabValueFor(t.key, counts);
+      var small = t.key === 'category';
+      return '<button type="button" class="cm-tab' + (on ? ' on' : '') + (dim ? ' dim' : '') +
+        '" data-action="pick-tab" data-scope="' + t.key + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<div class="row1"><span class="mark">' + t.mark + '</span><span class="lbl">' + esc(t.label) + '</span>' +
+        (openAt === t.key ? '<span class="openbadge">기본</span>' : '') + '</div>' +
+        '<div class="row2"><span class="val' + (small ? ' small' : '') + '">' + (v == null ? '—' : fmt(v)) + '</span>' +
+        '<span class="note" title="' + esc(t.note) + '">' + esc(t.note) + '</span></div></button>';
+    }).join('');
+    // 미분류 탭 근처 노트에 ETC 전용 소분류 수를 실측으로 붙인다(하드코딩 금지 — 트리에서 직접 센다).
+    var uc = $('cmTabs').querySelector('[data-scope="unclassified"] .note');
+    if (uc && etcOnlyN) uc.title += ' · 허용 종류가 ' + etcLabel() + '뿐인 소분류 ' + etcOnlyN + '개는 이 판정으로 서로 구분되지 않습니다';
+  }
+
+  function renderFilters() {
+    var searchEl = $('cmSearch');
+    if (document.activeElement !== searchEl) searchEl.value = S.q;
+    var partTypes = (S.list && S.list.part_types) || [];
+    var curLabel = '전체(' + partTypes.length + '종)';
+    if (S.part) {
+      var found = partTypes.filter(function (t) { return t.key === S.part; })[0];
+      curLabel = found ? found.label : S.part;
+    }
+    $('cmPartLabel').textContent = '부품 종류 · ' + curLabel;
+    $('cmPartBtn').classList.toggle('set', !!S.part);
+    $('cmPartBtn').setAttribute('aria-expanded', S.partOpen ? 'true' : 'false');
+    $('cmPartDrop').hidden = !S.partOpen;
+    if (S.partOpen) {
+      var opts = [{ key: null, label: '전체(' + partTypes.length + '종)' }].concat(partTypes);
+      $('cmPartDrop').innerHTML = opts.map(function (o) {
+        return '<div class="cm-partopt' + (S.part === o.key ? ' on' : '') + '" role="option" aria-selected="' +
+          (S.part === o.key ? 'true' : 'false') + '" data-action="pick-part" data-k="' + esc(o.key || '') + '">' +
+          esc(o.label) + '</div>';
+      }).join('');
+    }
+    $('cmStockBtn').setAttribute('aria-checked', S.inStock ? 'true' : 'false');
+    $('cmStockMark').textContent = S.inStock ? '●' : '○';
+    var narrowed = !!(S.q || S.part || S.inStock);
+    $('cmResetBtn').classList.toggle('active', narrowed);
+    $('cmFilterNote').textContent = narrowed
+      ? '지금 열린 범위(' + fmt(S.list.total) + '건)에는 이 필터가 반영됩니다 — 다른 탭의 배지 숫자는 검색어·부품 종류·재고 필터와 무관하게 항상 전체 기준입니다.'
+      : '탭 배지는 페이지가 아니라 각 범위 전체 기준입니다 · 목록은 서버 페이지네이션';
+  }
+
+  function renderTree() {
+    $('cmModeCat').classList.toggle('on', S.treeMode === 'category');
+    $('cmModeCat').setAttribute('aria-pressed', S.treeMode === 'category' ? 'true' : 'false');
+    $('cmModeSub').classList.toggle('on', S.treeMode === 'subtree');
+    $('cmModeSub').setAttribute('aria-pressed', S.treeMode === 'subtree' ? 'true' : 'false');
+    $('cmTreeNote').textContent = S.treeMode === 'subtree'
+      ? '노드를 누르면 그 분류와 하위 전체(scope=subtree)를 봅니다.'
+      : '노드를 누르면 그 분류 직속만(scope=category) 봅니다.';
+
+    var box = $('cmTreeBody');
+    if (S.treeErr) {
+      box.innerHTML = '<div class="cm-tree-err">불러오지 못했습니다 — ' + esc(S.treeErr.message) +
+        '<br><span class="cm-tree-retry" data-action="retry-tree">다시 시도</span></div>';
+      return;
+    }
+    if (!S.tree) { box.innerHTML = '<div class="cm-tree-empty">불러오는 중…</div>'; return; }
+    if (!treeItems().length) { box.innerHTML = '<div class="cm-tree-empty">분류가 없습니다 — "상품 분류 관리"에서 먼저 만드세요.</div>'; return; }
+
+    var rows = [];
+    function walk(pid, depth) {
+      childrenOf(pid).forEach(function (n) {
+        var kids = childrenOf(n.category_id);
+        var isCol = !!S.collapsed[n.category_id];
+        var on = S.scope === 'category' && S.catId === n.category_id;
+        var viol = violUnder(n.category_id);
+        var cnt = S.treeMode === 'subtree' ? n.subtree_count : n.product_count;
+        rows.push(
+          '<button type="button" class="cm-tree-row' + (depth === 0 ? ' top' : '') + (on ? ' on' : '') +
+          '" data-action="pick-node" data-id="' + n.category_id + '">' +
+            '<span class="indent" style="width:' + (depth * 14) + 'px"></span>' +
+            '<span class="caret' + (kids.length ? '' : ' leaf') + '"' +
+              (kids.length ? ' data-action="toggle-collapse" data-id="' + n.category_id + '" role="button" aria-label="하위 분류 ' + (isCol ? '펼치기' : '접기') + '"' : '') + '>' +
+              (kids.length ? (isCol ? '▸' : '▾') : '·') + '</span>' +
+            '<span class="name ' + (depth === 0 ? 'top' : 'sub') + '">' + esc(n.name) + '</span>' +
+            (viol ? '<span class="viol">▲' + viol + '</span>' : '') +
+            '<span class="cnt num">' + fmt(cnt) + '</span>' +
+          '</button>'
+        );
+        if (!isCol) walk(n.category_id, depth + 1);
+      });
+    }
+    walk(null, 0);
+    box.innerHTML = rows.join('');
+  }
+
+  function renderTable() {
+    var head = $('cmHeadCheck');
+    var items = (S.list && S.list.items) || [];
+    var pageSelected = items.length > 0 && items.every(function (p) { return S.selectAllScope || S.sel[p.product_code]; });
+    head.classList.toggle('on', pageSelected);
+    head.setAttribute('aria-checked', pageSelected ? 'true' : 'false');
+    head.textContent = pageSelected ? '✓' : '';
+
+    var box = $('cmTbody');
+    var html = '';
+    var total = S.list.total || 0;
+    if (items.length > 0 && total > items.length) {
+      html += '<div class="cm-selectbar">' +
+        '<span class="tx">' + (S.selectAllScope
+          ? '이 조건 전체 ' + fmt(total) + '건을 선택했습니다 — 상한 ' + fmt(S.list.max_move) + '건을 넘는 만큼은 이번에 옮기지 않습니다.'
+          : '이 페이지 ' + fmt(items.length) + '건만 보입니다 — 조건 전체는 ' + fmt(total) + '건입니다.') + '</span>' +
+        '<button type="button" data-action="toggle-scope-sel">' +
+          (S.selectAllScope ? '전체 선택 해제' : '조건 전체 ' + fmt(total) + '건 선택') + '</button></div>';
+    }
+    if (!items.length) {
+      var em = emptyStateFor();
+      html += '<div class="cm-listempty"><div class="ti">' + esc(em[0]) + '</div><div class="ds">' + esc(em[1]) + '</div>' +
+        (em[2] ? '<button type="button" data-action="go-open-at">' + esc(em[2]) + '</button>' : '') + '</div>';
+    } else {
+      html += items.map(function (p) {
+        var on = S.selectAllScope || !!S.sel[p.product_code];
+        var bad = !!p.violates || p.category_id == null;
+        var etc = p.part_type === 'ETC';
+        var statusLive = p.status === '판매중';
+        return '<button type="button" class="cm-row' + (on ? ' on' : '') + (bad ? ' flag' : '') +
+          '" data-action="toggle-row" data-code="' + p.product_code + '" role="checkbox" aria-checked="' + (on ? 'true' : 'false') +
+          '" aria-label="' + esc(p.name) + ' 선택">' +
+          '<span class="cm-check' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '✓' : '') + '</span>' +
+          '<span class="nm">' + esc(p.name) + '</span>' +
+          '<span class="cd num">' + esc(p.product_code) + '</span>' +
+          '<span class="pt' + (etc ? ' etc' : '') + '"' + (etc ? ' title="부품 종류 축: ' + esc(etcLabel()) + ' (part_type=ETC)"' : '') + '>' + esc(p.part_label) + '</span>' +
+          '<span class="ct' + (bad ? ' warn' : '') + '">' + esc(p.category_id == null ? '(없음)' : p.category) +
+            (p.violates ? ' <span title="이 카테고리의 허용 부품 종류와 다릅니다">▲</span>' : '') + '</span>' +
+          '<span class="pr num">' + fmt(p.sale_price) + '</span>' +
+          '<span class="sk num' + (p.stock_qty ? ' has' : '') + '">' + fmt(p.stock_qty) + '</span>' +
+          '<span class="st' + (statusLive ? ' live' : '') + '">' + esc(p.status) + '</span>' +
+        '</button>';
+      }).join('');
+    }
+    box.innerHTML = html;
+  }
+
+  function emptyStateFor() {
+    var openAt = S.list.open_at;
+    var etcOnlyN = treeItems().filter(isEtcOnlyCat).length;
+    var byScope = {
+      unmapped: ['미매핑이 0건입니다', '이 범위에 남은 일이 없다는 뜻일 뿐, 처리할 일이 전혀 없다는 뜻은 아닙니다 — 다른 범위(위반·' + etcLabel() + ')에 남아 있을 수 있습니다.'],
+      violation: ['허용 종류 위반이 0건입니다', '지금 조건에서 이 카테고리들의 허용 부품 종류를 어기는 매핑이 없습니다.' +
+        (etcOnlyN ? ' 허용 종류가 ' + etcLabel() + '뿐인 소분류가 ' + etcOnlyN + '개 있습니다 — 그 안에서는 이 판정으로 서로 구분되지 않습니다.' : '')],
+      unclassified: [etcLabel() + '가 0건입니다', "part_type='ETC'인 상품이 지금 조건에 없습니다."],
+      category: [S.catId == null ? '카테고리를 고르지 않았습니다' : '이 분류에 상품이 없습니다',
+        S.catId == null ? '왼쪽 트리에서 분류를 누르면 그 분류의 상품을 봅니다.'
+          : (S.treeMode === 'subtree' ? '하위 전체 기준입니다 — 직속만 보려면 트리 위 토글을 바꾸세요.' : '직속 기준입니다 — 하위까지 보려면 트리 위 토글을 바꾸세요.')],
+      all: ['조건에 맞는 상품이 없습니다', '검색어·부품 종류·재고 필터를 지우면 다시 보입니다.']
+    };
+    var em = byScope[S.scope] || byScope.all;
+    if (S.scope !== openAt) {
+      var lbl = { unmapped: '미매핑', violation: '허용 종류 위반', unclassified: etcLabel(), all: '전체' }[openAt] || openAt;
+      return [em[0], em[1], '기본 범위(' + lbl + ')로 가기'];
+    }
+    return [em[0], em[1], ''];
+  }
+
+  function renderPager() {
+    var total = S.list.total || 0, size = S.list.size || S.pageSize, page = S.list.page || 1, pages = S.list.pages || 1;
+    $('cmPageRange').textContent = total ? (((page - 1) * size + 1).toLocaleString('ko-KR') + '–' +
+      Math.min(page * size, total).toLocaleString('ko-KR') + ' / ' + fmt(total)) : '0 / 0';
+    $('cmPageNote').textContent = '서버 페이지네이션 · ' + size + '건/페이지';
+    $('cmPageLabel').textContent = page + ' / ' + pages;
+    $('cmPrevBtn').disabled = page <= 1;
+    $('cmPrevBtn').title = page <= 1 ? '첫 페이지입니다' : '';
+    $('cmNextBtn').disabled = page >= pages;
+    $('cmNextBtn').title = page >= pages ? '마지막 페이지입니다' : '';
+  }
+
+  function selCount() {
+    if (S.selectAllScope) return Math.min(S.list.total || 0, S.list.max_move || Infinity);
+    return Object.keys(S.sel).filter(function (k) { return S.sel[k]; }).length;
+  }
+  function selCountRaw() { return S.selectAllScope ? (S.list.total || 0) : selCount(); }
+
+  function renderBar() {
+    var canWrite = owner();
+    var sc = selCount();
+    var maxMove = S.list.max_move;
+    var bar = $('cmBar');
+    bar.classList.toggle('active', sc > 0);
+    $('cmSelCount').textContent = fmt(sc) + '건 선택';
+    var overLimit = selCountRaw() > maxMove;
+    $('cmLimitNote').textContent = overLimit
+      ? '상한 ' + fmt(maxMove) + '건 초과 — 이번에는 ' + fmt(maxMove) + '건만 옮기고 나머지 ' + fmt(selCountRaw() - maxMove) + '건은 남습니다'
+      : '한 번에 ' + fmt(maxMove) + '건까지';
+    $('cmLimitNote').classList.toggle('over', overLimit);
+    $('cmClearSelBtn').hidden = sc === 0;
+
+    var target = S.target == null ? null : nodeById(S.target);
+    var tbtn = $('cmTargetBtn');
+    tbtn.disabled = !canWrite;
+    tbtn.title = canWrite ? '' : permText();
+    tbtn.classList.toggle('set', !!target);
+    tbtn.setAttribute('aria-expanded', S.targetOpen ? 'true' : 'false');
+    $('cmTargetLabel').textContent = target ? catPath(target.category_id) : '대상 분류 선택';
+    $('cmTargetWarn').textContent = target
+      ? (target.allowed_labels && target.allowed_labels.length ? '허용 ' + target.allowed_labels.join(' · ') : '제한 없음') : '';
+    $('cmTargetDrop').hidden = !S.targetOpen;
+    if (S.targetOpen) {
+      var opts = treeItems().filter(function (x) { return x.parent_id != null; })
+        .sort(function (a, b) { return catPath(a.category_id).localeCompare(catPath(b.category_id)); });
+      $('cmTargetDrop').innerHTML = opts.map(function (o) {
+        var types = o.allowed_labels && o.allowed_labels.length ? o.allowed_labels.join(', ') : '제한 없음';
+        return '<div class="cm-targetopt' + (S.target === o.category_id ? ' on' : '') + '" role="option" aria-selected="' +
+          (S.target === o.category_id ? 'true' : 'false') + '" data-action="pick-target" data-id="' + o.category_id + '">' +
+          '<span class="lb">' + esc(catPath(o.category_id)) + '</span><span class="ty">' + esc(types) + '</span></div>';
+      }).join('');
+    }
+
+    var mbtn = $('cmMoveBtn');
+    var canMove = canWrite && sc > 0 && target;
+    mbtn.disabled = !canMove;
+    mbtn.textContent = target ? (target.name + '(으)로 이동') : '이동';
+    mbtn.title = !canWrite ? permText() : (sc === 0 ? '옮길 상품을 먼저 선택하세요' : (!target ? '대상 분류를 먼저 고르세요' : ''));
+
+    var remBox = $('cmRemainder');
+    remBox.hidden = !S.remainder;
+    if (S.remainder) $('cmRemainderN').textContent = fmt(S.remainder);
+
+    var blocked = $('cmBlockedNote');
+    blocked.hidden = canWrite;
+    if (!canWrite) blocked.textContent = permText() + ' — 조회는 되지만 이동·되돌리기는 막힙니다.';
+  }
+
+  function renderRail() {
+    var btn = $('cmRecentBtn');
+    btn.classList.toggle('open', S.recentOpen);
+    btn.setAttribute('aria-expanded', S.recentOpen ? 'true' : 'false');
+    $('cmRecentCount').textContent = S.moves.length ? String(S.moves.length) : '';
+    var pop = $('cmRecentPop');
+    pop.hidden = !S.recentOpen;
+    if (!S.recentOpen) return;
+    if (!S.moves.length) {
+      pop.innerHTML = '<div class="hd">최근 이동 · 되돌리기</div>' +
+        '<div class="cm-recent-empty">이 세션에서 옮긴 것이 없습니다.<br>이 화면은 세션 중 실행한 이동만 보여줍니다.</div>';
+      return;
+    }
+    var canWrite = owner();
+    pop.innerHTML = '<div class="hd">최근 이동 · 되돌리기</div>' + S.moves.map(function (m) {
+      return '<div class="cm-recent-row"><div class="r1"><span class="at num">' + esc(m.at) + '</span>' +
+        '<span class="lg num">log_id ' + m.logId + '</span><span style="flex:1"></span>' +
+        (m.undone ? '<span class="cm-undone-b">되돌려짐</span>' : '') +
+        '<button type="button" class="cm-undo-a" data-action="undo-move" data-lid="' + m.logId + '"' +
+          ((m.undone || !canWrite) ? ' disabled title="' + esc(m.undone ? '이미 되돌린 기록입니다' : permText()) + '"' : '') +
+          '>되돌리기</button></div>' +
+        '<div class="what">' + esc(m.what) + '</div></div>';
+    }).join('');
+  }
+
+  // ── 동작 ─────────────────────────────────────────────────────────
+  function closePopovers() { S.partOpen = false; S.targetOpen = false; S.recentOpen = false; }
+
+  function doMove() {
+    if (!guard()) return;
+    var sc = selCount();
+    if (sc === 0) { toast('옮길 상품을 선택해야 합니다', 'err'); return; }
+    if (S.target == null) { toast('대상 분류를 고르세요', 'err'); return; }
+    var maxMove = S.list.max_move;
+
+    var codesPromise = S.selectAllScope
+      ? collectCodes(maxMove)
+      : Promise.resolve({ codes: Object.keys(S.sel).filter(function (k) { return S.sel[k]; }).map(Number), total: sc });
+
+    codesPromise.then(function (r) {
+      var codes = r.codes;
+      var remainder = Math.max(0, (r.total || codes.length) - codes.length);
+      if (!codes.length) { toast('옮길 상품을 선택해야 합니다', 'err'); return; }
+      apiPost('/api/admin/category-mapping/move', { product_codes: codes, category_id: S.target }).then(function (res) {
+        var at = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        S.moves.unshift({ logId: res.log_id, at: at, undone: false, what: res.verdict });
+        S.selectAllScope = false; S.sel = {}; S.remainder = remainder;
+        reloadKeepView(1).then(function () { renderRail(); });
+      }).catch(function (err) { toast(err.message, 'err'); });
+    });
+  }
+
+  function doUndo(logId) {
+    if (!guard()) return;
+    var m = S.moves.filter(function (x) { return x.logId === logId; })[0];
+    if (!m || m.undone) return;
+    apiPost('/api/admin/category-mapping/undo', { log_id: logId }).then(function (res) {
+      m.undone = true;
+      reloadKeepView((S.list && S.list.page) || 1).then(function () { renderRail(); });
+      toast(res.verdict || '되돌렸습니다', 'ok');
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  document.addEventListener('click', function (e) {
+    var open = S.partOpen || S.targetOpen || S.recentOpen;
+    if (open && !window.Admin2Shell.isKeepClick(e.target)) { closePopovers(); renderFilters(); renderBar(); renderRail(); }
+
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch (action) {
+      case 'retry-boot': S.list = null; S.listErr = null; S.tree = null; S.treeErr = null; boot(); break;
+      case 'retry-tree': S.treeErr = null; renderTree(); loadTree().then(function () { renderTree(); renderBar(); }); break;
+      case 'pick-tab': {
+        var scope = t.getAttribute('data-scope');
+        if (scope === 'category' && S.catId == null) { toast('scope=category에는 category_id가 필요합니다 — 왼쪽 트리에서 분류를 고르세요', 'warn'); break; }
+        setScope(scope); break;
+      }
+      case 'toggle-part': e.stopPropagation(); S.partOpen = !S.partOpen; S.targetOpen = false; S.recentOpen = false; renderFilters(); break;
+      case 'pick-part': {
+        e.stopPropagation();
+        var k = t.getAttribute('data-k') || null;
+        S.part = k; S.partOpen = false; S.page = 1; S.remainder = 0;
+        reloadKeepView(1); break;
+      }
+      case 'toggle-stock': S.inStock = !S.inStock; S.page = 1; S.remainder = 0; reloadKeepView(1); break;
+      case 'reset-filters': S.q = ''; S.part = null; S.inStock = false; S.page = 1; S.remainder = 0; reloadKeepView(1); break;
+      case 'set-treemode': setTreeMode(t.getAttribute('data-m')); break;
+      case 'toggle-collapse': {
+        e.stopPropagation();
+        var cid = Number(t.getAttribute('data-id'));
+        S.collapsed[cid] = !S.collapsed[cid];
+        renderTree(); break;
+      }
+      case 'pick-node': {
+        var nid = Number(t.getAttribute('data-id'));
+        setScope('category', nid); break;
+      }
+      case 'toggle-page-all': {
+        e.stopPropagation();
+        var items = (S.list && S.list.items) || [];
+        var pageSelected = items.length > 0 && items.every(function (p) { return S.selectAllScope || S.sel[p.product_code]; });
+        if (pageSelected) { S.sel = {}; } else {
+          var next = {}; items.forEach(function (p) { next[p.product_code] = true; });
+          S.sel = next;
+        }
+        S.selectAllScope = false;
+        renderTable(); renderBar(); break;
+      }
+      case 'toggle-row': {
+        var code = Number(t.getAttribute('data-code'));
+        if (S.selectAllScope) { S.selectAllScope = false; S.sel = {}; }
+        S.sel[code] = !S.sel[code];
+        renderTable(); renderBar(); break;
+      }
+      case 'toggle-scope-sel': {
+        e.stopPropagation();
+        S.selectAllScope = !S.selectAllScope;
+        S.sel = {};
+        renderTable(); renderBar(); break;
+      }
+      case 'go-open-at': setScope(S.list.open_at); break;
+      case 'page-prev': if ((S.list.page || 1) > 1) { S.sel = {}; S.selectAllScope = false; reloadKeepView((S.list.page || 1) - 1); } break;
+      case 'page-next': if ((S.list.page || 1) < (S.list.pages || 1)) { S.sel = {}; S.selectAllScope = false; reloadKeepView((S.list.page || 1) + 1); } break;
+      case 'clear-sel': S.sel = {}; S.selectAllScope = false; renderTable(); renderBar(); break;
+      case 'toggle-target': e.stopPropagation(); if (!guard()) break; S.targetOpen = !S.targetOpen; S.partOpen = false; S.recentOpen = false; renderBar(); break;
+      case 'pick-target': {
+        e.stopPropagation();
+        S.target = Number(t.getAttribute('data-id')); S.targetOpen = false;
+        renderBar(); break;
+      }
+      case 'do-move': doMove(); break;
+      case 'reselect-remainder': {
+        S.selectAllScope = true; S.sel = {}; S.remainder = 0;
+        renderTable(); renderBar();
+        toast('남은 건을 다시 선택했습니다 — 대상 분류를 확인하고 실행하세요', 'ok');
+        break;
+      }
+      case 'toggle-recent': e.stopPropagation(); S.recentOpen = !S.recentOpen; S.partOpen = false; S.targetOpen = false; renderRail(); break;
+      case 'undo-move': doUndo(Number(t.getAttribute('data-lid'))); break;
+      default: break;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (S.partOpen || S.targetOpen || S.recentOpen) { closePopovers(); renderFilters(); renderBar(); renderRail(); }
+  });
+
+  document.addEventListener('input', function (e) {
+    if (e.target.id !== 'cmSearch') return;
+    S.q = e.target.value;
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(function () { S.page = 1; S.remainder = 0; reloadKeepView(1); }, 300);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.target.id === 'cmSearch' && e.key === 'Enter') {
+      clearTimeout(searchDebounce); S.page = 1; S.remainder = 0; reloadKeepView(1);
+    }
+  });
+
+  // 가로 스크롤 동기화 — 결함2 3차 수정(2026-08-14): 이름 열(:317,:327 부근
+  // minmax(180px,1fr))에 최소폭을 주면서 좁은 화면에서 목록이 가로로 흘러넘친다
+  // (.cm-tbody가 overflow:auto라 자동으로 스크롤 막대가 생긴다). 헤더(.cm-thead)는
+  // overflow-x:hidden이라 자체 스크롤 막대는 없지만 내부 그리드 폭은 행과 똑같이
+  // 넓어서 잘려 있을 뿐이다 — 본문을 가로로 움직이면 헤더도 같은 만큼 scrollLeft를
+  // 옮겨야 라벨과 셀이 계속 같은 열을 가리킨다(실측: 동기화 전에는 본문을 스크롤해도
+  // 헤더가 전혀 안 움직여 라벨-데이터가 어긋났다). #cmTbody는 매 렌더마다 innerHTML만
+  // 바뀌고 엘리먼트 자체는 재생성되지 않으므로 리스너를 한 번만 붙인다.
+  // (참고 — JS 폭 보정은 뺐다: 이전엔 .cm-thead 의 grid-template-columns 계산값이
+  // 뷰포트를 바꿔도 안 바뀌는 브라우저 현상이 있어 매 렌더·리사이즈마다 행의 계산값을
+  // 헤더에 복사하는 syncTheadCols() 를 뒀는데, 이름 열에 minmax(180px,1fr) 최소폭을
+  // 준 뒤로는 그 현상이 재현되지 않았다 — 함수를 끈 채 뷰포트 1024·1280·1440·1920,
+  // 스크롤 있음/없음, 라이브 리사이즈(1440→1024, 1024→1920)까지 전부 어긋남 0px를
+  // 실측으로 확인하고 제거했다. 코드가 스스로 도는 보정은 리사이즈·필터·페이지 전환
+  // 마다 다시 어긋날 여지를 남기므로, CSS만으로 풀리면 남겨두지 않는다.)
+  var cmTbodyScrollEl = $('cmTbody');
+  if (cmTbodyScrollEl) {
+    cmTbodyScrollEl.addEventListener('scroll', function () {
+      var thead = document.querySelector('.cm-thead');
+      if (thead) thead.scrollLeft = cmTbodyScrollEl.scrollLeft;
+    });
+  }
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
