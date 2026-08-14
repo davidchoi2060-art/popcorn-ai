@@ -1502,6 +1502,29 @@ UI 는 이 화면에 없다** — `merge|편입|MergeBody|중복 정리` 전수 
 (0건이면 이 정정이 아직 유효) · `activity_logs WHERE action IN ('product_merge',
 'product_merge_undo')` 로 2026-07-28 자 행이 있는지 대조(API 실재 여부).
 
+### ⑤ 필수 사양 안내 — 확정 디자인에 자리가 없어 미구현 · 정의서 작성됨(2026-08-15) · 디자인 대기
+
+⚠ **결함이 아니라 설계 간극이다.** `api/admin_engine_rules.py`가 `compat.required`(부품군별
+실측)·`compat.required_note`(안내 문구)를 응답에 이미 싣고 있는데, 조립 호환 규칙
+(ADM-ENG-010) 확정 디자인(1b)에는 이 구역이 들어갈 자리가 없었다. 요구사항 정의서
+(`req-compat-rules.md` ⑤)가 요구했던 구역인데 확정 디자인 단계에서 빠졌고, 화면은 그
+디자인 그대로 지어졌다 — **코드가 응답을 흘린 게 아니라, 그 값을 받을 자리가 애초에
+없었다.** (확인: `templates/admin/compat_rules.html.j2` 전수 검색 `required` 0건.)
+
+**정의서 작성됨**: `docs/design/req/req-compat-required.md`(2026-08-15). 이 구역의 존재
+이유는 건수가 아니라 사실이다 — `required_note` 원문: *"「읽는 규칙」이 비어 있으면 어떤
+호환 검사도 그 값을 쓰지 않는다는 뜻입니다 — 근거 없이 상품을 검수 대기로 묶고 있는
+것입니다."* 필수로 지정됐는데 그 값을 읽는 호환 규칙이 하나도 없으면, 아무도 안 쓰는
+값 때문에 상품이 추천에서 계속 빠져 있다는 뜻이다.
+
+**디자인 대기 — 사장님 결정 필요 셋**(정의서 말미 표): ① 구역 위치(규칙 9종 표 아래 / 별도
+탭 / 우측 패널) ② 「읽는 규칙 없음」 경고 강도(조용한 배지 / 경고 배너 / 요약 수치 — 실제
+빈 건수를 재는 중이라 0건이면 배너 자체가 불필요) ③ 부품군을 기본으로 펼쳐 둘지 접어 둘지.
+
+**확인법**: `grep -n "required" templates/admin/compat_rules.html.j2`(렌더 코드 0건이면
+이 간극이 아직 유효) · `api/admin_engine_rules.py`에서 `compat.required`·`compat.required_note`
+가 응답에 실리는지 확인 · `docs/design/req/req-compat-required.md` 존재 확인.
+
 ---
 
 ## 팝콘PC 쇼핑몰 인계 — 실측 (2026-08-11)
