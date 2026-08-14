@@ -1,0 +1,1013 @@
+{#
+  부품 등급 관리 (ADM-ENG-050) — 2026-08-14/15 신설
+
+  ■ 계약 = docs/design/spec-part-grade.md. **확정이 세 번 말해졌다** —
+      2026-08-14 ①  1b만
+      2026-08-14 ②  "두 화면을 참조해서 오른쪽에서 나오는 형식은 취해서"
+      2026-08-15 ③  "1b로 가되 다른 화면도 참조" ← 최종(계약 문서 머리가 이 확정)
+    ②를 좇아 한 차례 "본문을 1a 표(등급 있음/없음 한 표 + 구분선)로" 지었다가,
+    ③ 지시로 **1b 골격(좌측 서열 사다리 + 자동 수집분 · 우측 입력 패널)으로 되돌렸다.**
+    1a에서 가져오는 것은 상단 **슬롯 칩 줄 + 카드 3장**, 그리고 "등급 없는 것도 함께
+    보이고 비싼 것부터"라는 **성질**뿐이다 — 그래서 서열 사다리 아래에 별도 섹션으로
+    "등급 없는 것"을 **목록으로도** 보여준다(우측 패널의 "지금 매길 상품"이 무엇 중에서
+    온 것인지 알 수 있게). 이 목록도 행 안에서 입력받지 않는다 — 「등급 매기기」 버튼은
+    우측 패널을 그 상품으로 여는 것까지만 한다(1a·1b 공통 확정 — 입력은 우측 패널 하나뿐).
+    사장님 원문(③): "1b 로 가되 다른 화면도 참조". 원안은 Claude Design 프로젝트
+    22248237-152f-4f13-8201-54afca75ebe4의 `부품 등급 관리.dc.html`(1a·1b 두 캔버스) —
+    DesignSync 서브에이전트가 막혀 있어(MAKER-CHECKLIST §1) 계약 요약만 옮겼다.
+    요구사항 = docs/design/req/req-part-grade.md.
+
+  ■ 구조 요약
+    상단          슬롯 칩 줄(9개 — 조립 부품 10종 중 공랭·수랭이 한 슬롯) · 후보 수는 서버 값
+    안내 박스      engine_reads=false 설명(헤더 배지·저장 응답과 합쳐 세 곳)
+    좌측 상단      카드 3장(1a) — 이 슬롯의 등급 채움 · 척도 · 보기 필터(전체/등급 있음/없음)
+                  — 여기서 필터는 아래 두 섹션 중 어느 쪽을 보일지만 가른다(재조회 없음)
+    좌측 서열      이미 매긴 서열 사다리(1b, 같은 슬롯 안) — 점수·상품명·근거·출처·날짜·
+                  「고치기」·「삭제」. **행 안에서 입력받지 않는다.**
+    좌측 미매김    등급 없는 것 — 비싼 것부터(1a 성질을 1b에 얹음) — 상품코드·상품명·
+                  판매가·「등급 매기기」(누르면 우측 패널이 그 상품으로 바뀐다)
+    좌측 하단      자동 수집분(사람 확인 대기, 1b) — 아래 "part_grades 표가 계약을
+                  못 채우는 지점" 참조
+    우측 상단      지금 매길 상품 하나(1b) — **유일한 입력 자리**(점수·근거·출처,
+                  건너뛰기·저장하고 다음)
+    우측 하단      "왜 이 축이 필요한가" 4줄(계약 원문 그대로)
+    하단           등급 0건은 정상 상태 · 삭제는 직접 동작이라는 안내
+
+  ■ part_grades 표가 계약을 못 채우는 지점 (제작 중 발견 — 그대로 짓지 않고 밝힌다)
+    계약 "자동 수집 병행"은 행마다 출처 배지(예: 다나와 벤치마크) · 「확인」·「고쳐서
+    확인」 버튼을 요구한다. 그런데 `part_grades`(마이그레이션 0032) 컬럼은
+    product_code·grade·basis·source(자유 입력 TEXT)·graded_by·graded_at·updated_at
+    일곱뿐이다 — **"원천에서 자동으로 뽑아왔다"와 "사람이 확인했다"를 구분하는 칸이
+    없다.** 저장소 전체에서 `part_grades`를 쓰는 곳은 `api/grades.py` · 마이그레이션
+    0032 · `tests/regression.py`뿐이고 다나와·벤치마크류 수집 파이프라인이 이 표로
+    이어지는 코드는 존재하지 않는다(요구사항 문서 자신도 "사장님 결정이 필요한 지점 3"
+    으로 "사람 입력만 유지할지 자동 수집을 병행할지"를 **미결정**으로 남겼다).
+    그래서 이 구역은 빈 표를 만들거나 죽은 버튼을 달지 않고 **"원천 없음"** 상태로
+    정직하게 렌더링한다 — 계약 "등급 0건도 정상"(원천은 있는데 지금 0건)과는 다른
+    종류의 빈 상태다: 여기는 원천 자체가 없다. MAKER-CHECKLIST §1의 "빈 값의 종류를
+    가르는 장치" 규칙을 따른 것. 자동 수집이 실제로 연결되면 이 구역의 정적 카피만
+    표+버튼으로 바꾸면 된다(레이아웃 자리는 이미 잡아 두었다).
+
+  ■ 숫자는 전부 서버 응답만 쓴다 — 슬롯칩 후보 수 · 채움 카드 · 서열 · 서열 미리보기
+    전부 `/api/admin/grades*` 응답값이고, 원안 예시(334·211·... · 13,311 · 1건 · 0.3%)는
+    코드에 없다. "이 한 건이 유일한 증거" 캡션의 리터럴 문구는 계약대로 옮기되, 등장
+    조건은 `coverage.graded === 1`(서버 실측)로 판단한다 — 스냅샷 수를 박지 않는다.
+
+  ■ 권한 — 열람은 등급 무관, 입력·삭제는 operator 이상(`Admin2Shell.canWrite('operator')`).
+    서버(`api/auth.required_role`)가 이중으로 막는다 — 화면은 안내 텍스트로 먼저 말한다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}부품 등급 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input,textarea{font-family:var(--rv-font)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* 헤더 위젯 — 엔진 미연결 고지(계약 ②, 헤더 배지 채널) */
+.a2-hd .pg-badge{font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:4px 8px;white-space:nowrap}
+.a2-hd .pg-badge--warn{color:oklch(0.5 0.14 55);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+.a2-hd .pg-hdcaption{font:400 11px/1 var(--rv-font);color:var(--rv-muted)}
+
+/* 본문 뼈대 */
+.pg-wrap{flex:1;min-height:0;overflow-y:auto;padding:18px 20px 30px;display:flex;flex-direction:column;gap:16px}
+
+/* 슬롯 칩 줄 */
+.pg-slotbar{display:flex;flex-wrap:wrap;gap:8px}
+.pg-chip{display:flex;align-items:center;gap:8px;font:500 12px/1 var(--rv-font);color:#4a463e;
+        background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:20px;
+        padding:8px 13px;cursor:pointer}
+.pg-chip:hover{border-color:rgba(0,0,0,.32)}
+.pg-chip.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.pg-chip .n{font:600 11.5px/1 var(--rv-mono);color:var(--rv-dim2)}
+.pg-chip.on .n{color:var(--rv-dim4)}
+
+/* 안내 박스(계약 ②, 안내 박스 채널) */
+.pg-notice{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-radius:9px;
+          padding:13px 15px}
+.pg-notice p{margin:0;font:400 12px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.pg-notice-mark{color:oklch(0.5 0.14 55);font-weight:700;margin-right:2px}
+
+/* 좌우 컬럼 */
+.pg-body{display:flex;gap:16px;align-items:flex-start}
+.pg-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
+.pg-right{width:392px;flex:none;display:flex;flex-direction:column;gap:16px}
+
+/* 카드 공통 */
+.pg-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:10px;overflow:hidden}
+.pg-card-hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:13px 15px;
+           border-bottom:1px solid rgba(0,0,0,.08);background:var(--rv-panel2)}
+.pg-card-hd h3{margin:0;font:600 13.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.pg-note{font:400 11px/1.4 var(--rv-font);color:var(--rv-muted)}
+.pg-tag{font:500 9.5px/1 var(--rv-font);color:var(--rv-muted);background:rgba(0,0,0,.06);
+       border-radius:4px;padding:3px 6px;margin-left:6px}
+
+/* 카드 3장(1a) */
+.pg-cards3{display:flex;gap:14px;flex-wrap:wrap}
+.pg-statcard{flex:1;min-width:200px}
+.pg-statcard-bd{padding:13px 15px 15px}
+.pg-statcard-bd .big{font:700 26px/1.15 var(--rv-mono);color:var(--rv-ink)}
+.pg-statcard-bd .big .of{font:500 13px/1 var(--rv-mono);color:var(--rv-dim2)}
+.pg-statcard-bd .sub{margin:7px 0 0;font:400 11px/1.6 var(--rv-font);color:var(--rv-muted)}
+.pg-statcard-bd .sub strong{color:var(--rv-ink-soft);font-weight:600}
+.pg-viewfilter{display:flex;gap:6px;flex-wrap:wrap}
+.pg-vf-btn{font:500 11.5px/1 var(--rv-font);color:#4a463e;background:var(--rv-canvas);
+          border:1px solid rgba(0,0,0,.16);border-radius:14px;padding:8px 12px;cursor:pointer}
+.pg-vf-btn.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+
+/* 서열 사다리(1b) — 헤더·본문이 같은 스크롤 컨테이너 안에 있어야 거터가 맞는다
+   (MAKER-CHECKLIST 지킬 것) — 그래서 하나로 감싼다. */
+.pg-ladder-scroll,.pg-ungraded-scroll{overflow-x:auto}
+.pg-lrow{display:grid;grid-template-columns:56px minmax(150px,1.3fr) minmax(170px,1.7fr) minmax(84px,100px) 86px minmax(140px,150px);
+        gap:10px;align-items:center;min-width:720px;padding:9px 15px;border-bottom:1px solid rgba(0,0,0,.06)}
+.pg-lrow--head{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel);
+              border-bottom:1px solid rgba(0,0,0,.1);padding:8px 15px}
+.pg-lrow .sc{font:600 13px/1.2 var(--rv-mono);color:var(--rv-ink)}
+.pg-lrow .nm{min-width:0;font:400 12px/1.35 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-lrow .nm .pt{display:block;font:400 10px/1.3 var(--rv-font);color:var(--rv-dim)}
+.pg-lrow .bs{min-width:0;font:400 11.5px/1.4 var(--rv-font);color:var(--rv-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-lrow .src{font:400 11px/1.3 var(--rv-font);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-lrow .src .dim{color:var(--rv-dim3)}
+.pg-lrow .dt{font:400 10.5px/1.2 var(--rv-mono);color:var(--rv-faint)}
+.pg-lrow .ac{display:flex;gap:6px;flex-wrap:wrap}
+
+/* 등급 없는 것 — 비싼 것부터(1a 성질을 1b에 얹음) */
+.pg-urow{display:grid;grid-template-columns:70px minmax(180px,1fr) 96px 132px;
+        gap:10px;align-items:center;min-width:520px;padding:9px 15px;border-bottom:1px solid rgba(0,0,0,.06)}
+.pg-urow--head{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel);
+              border-bottom:1px solid rgba(0,0,0,.1);padding:8px 15px}
+.pg-urow .cd{font:500 11px/1.2 var(--rv-mono);color:var(--rv-faint)}
+.pg-urow .nm{min-width:0;font:400 12px/1.35 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-urow .nm .pt{display:block;font:400 10px/1.3 var(--rv-font);color:var(--rv-dim)}
+.pg-urow .pr{font:500 12px/1.2 var(--rv-mono);text-align:right}
+.pg-urow .ac{display:flex}
+
+.pg-first-badge{margin:10px 15px;padding:9px 11px;border:1px dashed var(--rv-dim3);border-radius:7px;
+                font:400 11px/1.6 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);min-width:690px}
+
+.pg-mini{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+        border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer;white-space:nowrap}
+.pg-mini:hover{border-color:rgba(0,0,0,.34)}
+.pg-mini:disabled{color:var(--rv-dim3);border-color:rgba(0,0,0,.08);cursor:not-allowed}
+.pg-mini--danger{color:var(--rv-red);border-color:oklch(0.52 0.16 30 / .35)}
+.pg-mini--danger:disabled{color:var(--rv-dim3);border-color:rgba(0,0,0,.08)}
+.pg-mini--primary{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.pg-mini--primary:disabled{color:#f0ece2;background:var(--rv-dim3);border-color:var(--rv-dim3)}
+
+.pg-pager{display:flex;align-items:center;gap:8px;padding:10px 15px;border-top:1px solid rgba(0,0,0,.08);
+         background:var(--rv-panel)}
+.pg-pageinfo{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint);flex:1;min-width:0}
+
+/* 자동 수집분 — "원천 없음" 정직 상태(위 안내 참조) */
+.pg-auto-body{padding:14px 15px 16px}
+.pg-auto-lead{margin:0 0 10px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.pg-auto-empty{border:1px dashed var(--rv-dim3);border-radius:8px;padding:12px 13px;background:var(--rv-panel2)}
+.pg-auto-empty strong{font:600 11.5px/1.3 var(--rv-font);color:var(--rv-muted)}
+.pg-auto-empty p{margin:6px 0 0;font:400 11px/1.6 var(--rv-font);color:var(--rv-dim)}
+.pg-auto-empty code{font-family:var(--rv-mono);font-size:10.5px}
+
+/* 우측 패널(1b) — 유일한 입력 자리 */
+.pg-editflag{font:500 10.5px/1 var(--rv-font);color:oklch(0.5 0.14 55);background:var(--rv-amber-bg);
+            border:1px solid var(--rv-amber-line);border-radius:5px;padding:5px 8px;display:flex;align-items:center;gap:6px}
+.pg-editflag[hidden]{display:none}
+.pg-linkbtn{font:500 10.5px/1 var(--rv-font);color:var(--rv-link);background:none;border:0;
+           text-decoration:underline;cursor:pointer;padding:0}
+
+#panelBody{padding:15px}
+.pg-pitem{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,.08)}
+.pg-pitem-nm{font:600 14.5px/1.35 var(--rv-font);color:var(--rv-ink);margin-bottom:6px}
+.pg-pitem-meta{display:flex;flex-wrap:wrap;gap:10px;font:400 11px/1.3 var(--rv-font);color:var(--rv-muted)}
+
+.pg-badge{display:inline-block;font:500 10px/1 var(--rv-font);border-radius:4px;padding:3px 6px}
+.pg-badge--dim{color:var(--rv-dim2);background:rgba(0,0,0,.06)}
+
+.pg-field{margin-bottom:13px}
+.pg-field label{display:block;font:600 11px/1.3 var(--rv-font);color:var(--rv-ink-soft);margin-bottom:6px}
+.pg-field input[type=number],.pg-field input[type=text],.pg-field textarea{
+  width:100%;font:500 13px/1.4 var(--rv-mono);color:var(--rv-ink);background:var(--rv-canvas);
+  border:1px solid rgba(0,0,0,.22);border-radius:6px;padding:9px 10px;outline:none}
+.pg-field input[type=text]{font-family:var(--rv-font);font-weight:400}
+.pg-field textarea{font-family:var(--rv-font);font-weight:400;resize:vertical;min-height:64px}
+.pg-field input:focus,.pg-field textarea:focus{border-color:var(--rv-ink)}
+.pg-field input:disabled,.pg-field textarea:disabled{background:var(--rv-panel2);color:var(--rv-dim2);cursor:not-allowed}
+.pg-help{margin-top:6px;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+.pg-bar{margin-top:9px;height:8px;border-radius:4px;background:rgba(0,0,0,.08);overflow:hidden}
+.pg-bar-fill{height:100%;background:var(--rv-ink);border-radius:4px;transition:width .12s ease;width:0%}
+.pg-preview{margin-top:8px;min-height:15px;font:400 11.5px/1.5 var(--rv-font);color:var(--rv-ink-soft)}
+
+.pg-formerr{margin-bottom:12px;padding:9px 11px;border:1px solid oklch(0.52 0.16 30 / .4);
+           background:oklch(0.96 0.03 30);border-radius:7px;font:400 11.5px/1.5 var(--rv-font);
+           color:oklch(0.4 0.16 30)}
+.pg-formerr[hidden]{display:none}
+
+.pg-btnrow{display:flex;gap:8px;justify-content:flex-end}
+.pg-btn{font:600 12px/1 var(--rv-font);border-radius:6px;padding:10px 15px;cursor:pointer}
+.pg-btn--primary{color:var(--rv-canvas);background:var(--rv-ink);border:none}
+.pg-btn--primary:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+.pg-btn--ghost{color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.2)}
+.pg-btn--ghost:disabled{color:var(--rv-dim3);border-color:rgba(0,0,0,.08);cursor:not-allowed}
+
+.pg-readonlynote{margin-top:10px;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint);text-align:right}
+.pg-readonlynote[hidden]{display:none}
+
+/* 저장 응답 채널(계약 ②의 세 번째 채널) — 지우거나 숨기지 않는다: hidden 은 "아직
+   한 번도 저장 안 함" 상태에만 쓰고, 저장 성공 뒤에는 다시 hidden 처리하지 않는다. */
+.pg-savednote{margin-top:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.14);
+             background:var(--rv-panel2);border-radius:7px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.pg-savednote[hidden]{display:none}
+
+/* 왜 이 축이 필요한가 */
+.pg-why ol{margin:0;padding:14px 17px 16px 30px;display:flex;flex-direction:column;gap:9px}
+.pg-why li{font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.pg-why li strong{color:var(--rv-ink);font-weight:600}
+
+/* 하단 안내 */
+.pg-footnote{font:400 11px/1.7 var(--rv-font);color:var(--rv-faint);padding:2px 2px 6px}
+.pg-footnote b{color:var(--rv-muted);font-weight:600}
+
+/* 공용 상태 */
+.pg-loading,.pg-empty{padding:26px 16px;text-align:center;font:400 12px/1.6 var(--rv-font);color:var(--rv-dim)}
+.pg-errbox{padding:26px 16px;text-align:center}
+.pg-errbox-ti{font:600 13px/1.4 var(--rv-font);color:var(--rv-ink-soft);margin-bottom:5px}
+.pg-errbox-ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted);margin-bottom:10px}
+.pg-errbox a,.pg-errbox button{display:inline-block;padding:8px 16px;border-radius:6px;background:var(--rv-ink);
+              color:var(--rv-canvas);font:500 11.5px/1 var(--rv-font);border:0;cursor:pointer}
+
+@media (max-width:768px){
+  .pg-body{flex-direction:column}
+  /* .pg-right 만 width:100% 를 받고 있었다 — .pg-body 가 align-items:flex-start(stretch가
+     아님)라 폭을 못 받은 .pg-left 는 column 모드에서 «자기 콘텐츠 폭»으로 셈해진다.
+     서열 사다리(.pg-lrow min-width:720px)가 그 콘텐츠라 .pg-left 가 720px+ 로 부풀고
+     #pgWrap 이 통째로 가로로 밀렸다(확인자 실측 2026-08-15, 768×900: scrollWidth 788 vs
+     clientWidth 761). .pg-lrow 의 min-width:720px 은 유지한다 — 표를 좁히면 못 읽는다.
+     .pg-left 에도 같은 width:100% 를 줘 폭을 확정하면, 안쪽 .pg-ladder-scroll/.pg-ungraded-
+     -scroll(overflow-x:auto) 이 «표만» 가로 스크롤하고 바깥(#pgWrap)은 더는 안 밀린다. */
+  .pg-left,.pg-right{width:100%;min-width:0}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="pg-badge pg-badge--warn" id="engineBadge">엔진 미연결</span>
+<span class="pg-hdcaption" id="engineCaption">매겨도 지금 견적은 바뀌지 않습니다</span>
+{% endblock %}
+
+{% block content %}
+<div class="pg-wrap" id="pgWrap">
+
+  <div class="pg-slotbar" id="slotBar">
+    <div class="pg-loading">슬롯 불러오는 중…</div>
+  </div>
+
+  <div class="pg-notice" id="noticeBox">
+    <p><span class="pg-notice-mark">▲</span>견적 엔진은 아직 이 값을 읽지 않습니다. 지금 매긴 등급은
+    견적 결과를 바꾸지 않습니다. 값이 어느 정도 찬 뒤에 연결하기로 한 <strong>의도된 순서</strong>입니다
+    — 지금 연결하면 등급 없는 절대다수가 0점 취급되거나 극소수만 추천됩니다. 연결되면 동급 후보
+    정렬 + 하한 둘 다에 쓰입니다.</p>
+  </div>
+
+  <div class="pg-body">
+    <div class="pg-left">
+
+      <div class="pg-cards3">
+        <section class="pg-card pg-statcard">
+          <div class="pg-card-hd"><h3>이 슬롯의 등급 채움</h3></div>
+          <div class="pg-statcard-bd" id="cardFill"><div class="pg-loading">불러오는 중…</div></div>
+        </section>
+        <section class="pg-card pg-statcard">
+          <div class="pg-card-hd"><h3>척도</h3></div>
+          <div class="pg-statcard-bd" id="cardScale"><div class="pg-loading">불러오는 중…</div></div>
+        </section>
+        <section class="pg-card pg-statcard">
+          <div class="pg-card-hd"><h3>보기</h3></div>
+          <div class="pg-statcard-bd" id="cardView"><div class="pg-loading">불러오는 중…</div></div>
+        </section>
+      </div>
+
+      <section class="pg-card" id="ladderSection">
+        <div class="pg-card-hd"><h3>이미 매긴 서열 사다리</h3></div>
+        <div class="pg-ladder-scroll">
+          <div class="pg-lrow pg-lrow--head">
+            <span>점수</span><span>상품명</span><span>근거</span><span>출처</span><span>날짜</span><span>동작</span>
+          </div>
+          <div id="ladderBody">
+            <div class="pg-loading">불러오는 중…</div>
+          </div>
+        </div>
+        <div class="pg-pager" id="ladderPager"></div>
+      </section>
+
+      <section class="pg-card" id="ungradedSection">
+        <div class="pg-card-hd">
+          <h3>등급 없는 것</h3>
+          <span class="pg-note">비쌀수록 견적에 미치는 영향이 커서 먼저 매길 값이 있습니다 — 비싼 것부터 보여줍니다</span>
+        </div>
+        <div class="pg-ungraded-scroll">
+          <div class="pg-urow pg-urow--head">
+            <span>상품코드</span><span>상품명</span><span>판매가</span><span>작업</span>
+          </div>
+          <div id="ungradedBody">
+            <div class="pg-loading">불러오는 중…</div>
+          </div>
+        </div>
+        <div class="pg-pager" id="ungradedPager"></div>
+      </section>
+
+      <section class="pg-card pg-auto-card">
+        <div class="pg-card-hd">
+          <h3>자동 수집분 <span class="pg-tag">사람 확인 대기</span></h3>
+        </div>
+        <div class="pg-auto-body">
+          <p class="pg-auto-lead">원천에서 뽑아온 값입니다. 확인하면 서열에 들어갑니다 — 확인 전에는
+            서열로 취급하지 않습니다.</p>
+          <div class="pg-auto-empty">
+            <strong>원천 없음</strong>
+            <p>지금은 자동 수집 경로가 연결되어 있지 않습니다 — 지금까지 매겨진 등급은 전부 사람이
+              직접 입력한 값입니다. <code>part_grades</code> 표에는 출처를 적는 자유 입력 칸
+              (<code>source</code>)만 있고, "자동으로 뽑아왔는지" · "사람이 확인했는지"를 구분하는
+              칸은 아직 없습니다. 이 축이 연결되면 이 자리에 확인 대기 항목이 나타납니다.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <aside class="pg-right">
+      <section class="pg-card pg-panel" id="gradePanel">
+        <div class="pg-card-hd">
+          <h3>지금 매길 상품</h3>
+          <span class="pg-editflag" id="editFlag" hidden></span>
+        </div>
+        <div id="panelBody">
+          <div class="pg-loading">불러오는 중…</div>
+        </div>
+      </section>
+
+      <section class="pg-card pg-why">
+        <div class="pg-card-hd"><h3>왜 이 축이 필요한가</h3></div>
+        <ol>
+          <li>엔진이 읽는 사양 22종은 전부 호환(소켓·전력·길이)과 취향(RGB·저소음)입니다 —
+            <strong>CPU·GPU에 성능을 나타내는 값이 하나도 없습니다.</strong></li>
+          <li>그래서 거르고 남은 것 중 항상 가장 싼 것이 뽑힙니다 —
+            <strong>"최선의 부품"이라 말하면서 실제로는 최저가를 고르고 있습니다.</strong></li>
+          <li>점수는 슬롯 밖에서 비교되면 안 됩니다 — GPU 80점과 CPU 80점은 같은 뜻이 아니고
+            환산 근거가 없습니다.</li>
+          <li>근거 없는 등급은 지어낸 태그와 같은 문제를 만듭니다 — "왜 55점인가"가 없으면
+            나중에 아무도 검증할 수 없습니다.</li>
+        </ol>
+      </section>
+    </aside>
+  </div>
+
+  <div class="pg-footnote">
+    등급 0건도 정상 상태입니다 — <b>"몇 %를 채웠는가"가 아니라 "지금부터 채울 목록"</b>으로
+    보여줍니다. 삭제는 값이 사라지는 직접 동작입니다(다시 매기면 복원되지만 점수·근거를
+    다시 입력해야 합니다).
+  </div>
+
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var LADDER_SIZE = 40;
+  var UNGRADED_SIZE = 30;
+
+  var S = {
+    meta: null,
+    slots: [],
+    chipCounts: {},
+    slot: null,
+    view: '',                 // '' | 'graded' | 'ungraded' — 아래 두 섹션 중 보일 것만 가른다
+    ladder: null, ladderErr: null, ladderPage: 1,      // 서열 사다리(1b, 보이는 목록)
+    ladderTop: null,                                    // only=graded 1페이지 — 서열 미리보기 전용(사다리가 다른 페이지를 보고 있어도 정확해야 한다)
+    ungraded: null, ungradedErr: null, ungradedPage: 1, // 등급 없는 것(1a 성질, 보이는 목록)
+    queue: null, queueErr: null, queuePage: 1,          // 우측 패널의 "다음 매길 상품" 자동 포인터(독립)
+    mode: 'queue',            // 'queue'(자동 다음 상품) | 'target'(목록에서 직접 고름)
+    targetItem: null,
+    saving: false,
+    savedNote: '',
+    me: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function ymd(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d)) return '—';
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  /* 서버 note 문구는 **markdown 굵게(**..**)** 를 그대로 담아 온다(예: 척도 설명) —
+     escape 뒤에만 치환해 안전하게 강조를 살린다. */
+  function mdBold(s) {
+    return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPut(path, body) {
+    return fetch(path, {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+  function apiDelete(path) {
+    return fetch(path, { method: 'DELETE', credentials: 'same-origin' }).then(handle);
+  }
+
+  function errboxHtml(err, retryAction) {
+    var un = err && err.status === 401;
+    return '<div class="pg-errbox">'
+      + '<div class="pg-errbox-ti">' + (un ? '세션 만료' : '조회 실패') + '</div>'
+      + '<div class="pg-errbox-ds">' + (un ? '관리자 로그인 후 다시 시도합니다.'
+          : esc((err && err.message) || '알 수 없는 오류')) + '</div>'
+      + (un ? '<a href="/admin/login.html">로그인</a>'
+             : '<button type="button" data-action="' + retryAction + '">다시 시도</button>')
+      + '</div>';
+  }
+
+  function writable() { return !!(window.Admin2Shell && window.Admin2Shell.canWrite('operator')); }
+
+  // ── 헤더 배지 · 안내 박스 — 정적 기본값(엔진 미연결)을 Jinja가 이미 그려 둔다.
+  //    JS는 실제로 engine_reads===true 인 드문 경우에만 내용을 바꾼다(방어적 — JS가
+  //    실패해도 화면이 "엔진 미연결"이라는 사실 자체는 항상 보인다). ──────────────
+  function renderEngineBadge() {
+    if (S.meta.engine_reads) {
+      var b = $('engineBadge'); b.textContent = '엔진 연결됨'; b.classList.remove('pg-badge--warn');
+      $('engineCaption').textContent = '';
+    }
+  }
+  function renderNoticeBox() {
+    if (S.meta.engine_reads) {
+      $('noticeBox').innerHTML = '<p><strong>엔진 연결됨</strong> — 견적 엔진이 이 값을 읽습니다.</p>';
+    }
+  }
+
+  // ── 슬롯 칩 줄 ───────────────────────────────────────────────────
+  function renderChips() {
+    var box = $('slotBar');
+    if (!S.slots.length) return;
+    box.innerHTML = S.slots.map(function (s) {
+      var raw = S.chipCounts[s.key];
+      var cnt = raw === undefined ? '…' : (raw === 'ERR' ? '조회 실패' : fmt(raw));
+      var on = s.key === S.slot;
+      return '<button type="button" class="pg-chip' + (on ? ' on' : '') + '" data-action="select-slot"'
+        + ' data-slot="' + esc(s.key) + '" aria-pressed="' + (on ? 'true' : 'false') + '">'
+        + '<span class="lb">' + esc(s.label) + '</span><span class="n num">' + cnt + '</span></button>';
+    }).join('');
+  }
+  function updateChipCount(slot, pool) {
+    S.chipCounts[slot] = pool;
+    renderChips();
+  }
+  function loadAllChipCounts() {
+    S.slots.forEach(function (s) {
+      apiGet('/api/admin/grades?slot=' + encodeURIComponent(s.key) + '&size=1')
+        .then(function (res) { updateChipCount(s.key, res.coverage.pool); })
+        .catch(function () { S.chipCounts[s.key] = 'ERR'; renderChips(); });
+    });
+  }
+
+  // ── 카드 3장(1a) ─────────────────────────────────────────────────
+  function renderCards() {
+    var fillEl = $('cardFill');
+    var covSrc = S.ladder || S.ungraded;   // 둘 다 같은 슬롯의 coverage(같은 값)를 담고 있다
+    if (covSrc) {
+      var cov = covSrc.coverage;
+      fillEl.innerHTML =
+        '<div class="big num">' + fmt(cov.pool_graded) + ' <span class="of">/ ' + fmt(cov.pool) + '</span></div>'
+        + '<p class="sub">' + mdBold(covSrc.note || '') + '</p>';
+    } else if (S.ladderErr || S.ungradedErr) {
+      fillEl.innerHTML = '<p class="sub">조회 실패</p>';
+    } else {
+      fillEl.innerHTML = '<div class="pg-loading">불러오는 중…</div>';
+    }
+
+    var scaleEl = $('cardScale');
+    if (S.meta) {
+      scaleEl.innerHTML = '<div class="big num">' + S.meta.scale.min + '~' + S.meta.scale.max + '</div>'
+        + '<p class="sub">' + mdBold(S.meta.scale.note || '') + '</p>';
+    }
+
+    renderViewFilter();
+  }
+  function renderViewFilter() {
+    var el = $('cardView');
+    var opts = [['', '전체'], ['graded', '등급 있음'], ['ungraded', '등급 없음']];
+    el.innerHTML = '<div class="pg-viewfilter">' + opts.map(function (o) {
+      var on = S.view === o[0];
+      return '<button type="button" class="pg-vf-btn' + (on ? ' on' : '') + '" data-action="set-view"'
+        + ' data-view="' + o[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + o[1] + '</button>';
+    }).join('') + '</div>'
+      + '<p class="sub">재고&gt;0 추천 후보를 분모로 채움을 셉니다(카탈로그 전체가 아닙니다).</p>';
+  }
+  /* 보기 필터는 재조회를 하지 않는다 — 서열 사다리 · 등급 없는 것 두 섹션은 이미
+     각자 로드돼 있고, 필터는 둘 중 어느 섹션을 보일지만 가른다. */
+  function applyViewFilter() {
+    var ladderSec = $('ladderSection'), ungradedSec = $('ungradedSection');
+    if (ladderSec) ladderSec.hidden = (S.view === 'ungraded');
+    if (ungradedSec) ungradedSec.hidden = (S.view === 'graded');
+  }
+
+  // ── 서열 사다리(1b) — 이미 매긴 것만, 같은 슬롯 안 ──────────────
+  function ladderRowHtml(it, canW) {
+    return '<div class="pg-lrow" data-code="' + it.product_code + '">'
+      + '<span class="sc num">' + it.grade + '</span>'
+      + '<span class="nm" title="' + esc(it.product_name) + '">' + esc(it.product_name)
+          + '<span class="pt">' + esc(it.part_label) + '</span></span>'
+      + '<span class="bs" title="' + esc(it.basis || '') + '">' + esc(it.basis || '') + '</span>'
+      + '<span class="src">' + (it.source ? esc(it.source) : '<span class="dim">출처 없음</span>') + '</span>'
+      + '<span class="dt num">' + ymd(it.graded_at) + '</span>'
+      + '<span class="ac">'
+        + '<button type="button" class="pg-mini" data-action="row-edit" data-code="' + it.product_code + '"'
+            + (canW ? '' : ' disabled title="열람 권한 — 운영자 이상만 고칠 수 있습니다"') + '>고치기</button>'
+        + '<button type="button" class="pg-mini pg-mini--danger" data-action="row-delete" data-code="' + it.product_code + '"'
+            + (canW ? '' : ' disabled title="열람 권한 — 운영자 이상만 삭제할 수 있습니다"') + '>삭제</button>'
+      + '</span></div>';
+  }
+  function findLadderItem(code) {
+    var items = (S.ladder && S.ladder.items) || [];
+    for (var i = 0; i < items.length; i++) { if (String(items[i].product_code) === String(code)) return items[i]; }
+    return null;
+  }
+  function renderLadder() {
+    var body = $('ladderBody');
+    if (S.ladderErr) { body.innerHTML = errboxHtml(S.ladderErr, 'retry-ladder'); renderLadderPager(); return; }
+    if (!S.ladder) { body.innerHTML = '<div class="pg-loading">불러오는 중…</div>'; return; }
+    var items = S.ladder.items || [];
+    if (!items.length) {
+      body.innerHTML = '<div class="pg-empty">아직 이 슬롯에 매긴 등급이 없습니다. 서열은 여기서부터 쌓입니다 '
+        + '— 첫 등급을 매기면 이 자리에 나타납니다.</div>';
+    } else {
+      var canW = writable();
+      var html = items.map(function (it) { return ladderRowHtml(it, canW); }).join('');
+      // ⚠ 실측 그대로: 등급이 슬롯 전체에서 1건뿐이면 그 한 건이 "이 기능이 실제로
+      // 동작한다는 유일한 증거"라는 계약 원문 캡션을 붙인다. 트리거는 라이브
+      // coverage.graded===1(서버 실측)이지, 계약 문서의 스냅샷 수(13,311/1)가 아니다.
+      if (S.ladder.coverage.graded === 1 && S.ladder.page === 1) {
+        html += '<div class="pg-first-badge">이 한 건이 지금 이 기능이 실제로 동작한다는 유일한 증거입니다 '
+          + '— 서열은 여기서부터 쌓입니다.</div>';
+      }
+      body.innerHTML = html;
+    }
+    renderLadderPager();
+  }
+  function renderLadderPager() {
+    var el = $('ladderPager'); var d = S.ladder;
+    if (!d || !d.total) { el.innerHTML = ''; return; }
+    el.innerHTML = '<span class="pg-pageinfo">전체 ' + fmt(d.total) + '건 중 ' + d.page + ' / ' + d.pages + '페이지</span>'
+      + '<button type="button" class="pg-mini" data-action="ladder-prev"' + (d.page <= 1 ? ' disabled' : '') + '>이전</button>'
+      + '<button type="button" class="pg-mini" data-action="ladder-next"' + (d.page >= d.pages ? ' disabled' : '') + '>다음</button>';
+  }
+
+  // ── 등급 없는 것 — 비싼 것부터(1a 성질) ─────────────────────────
+  function ungradedRowHtml(it, canW) {
+    var priceTxt = it.sale_price == null ? '—' : (fmt(it.sale_price) + '원');
+    return '<div class="pg-urow" data-code="' + it.product_code + '">'
+      + '<span class="cd num">' + it.product_code + '</span>'
+      + '<span class="nm" title="' + esc(it.product_name) + '">' + esc(it.product_name)
+          + '<span class="pt">' + esc(it.part_label) + (it.in_pool === false ? ' · 후보 아님' : '') + '</span></span>'
+      + '<span class="pr num">' + priceTxt + '</span>'
+      + '<span class="ac"><button type="button" class="pg-mini pg-mini--primary" data-action="row-grade" data-code="' + it.product_code + '"'
+          + (canW ? '' : ' disabled title="열람 권한 — 운영자 이상만 등급을 매길 수 있습니다"') + '>등급 매기기</button></span>'
+      + '</div>';
+  }
+  function findUngradedItem(code) {
+    var items = (S.ungraded && S.ungraded.items) || [];
+    for (var i = 0; i < items.length; i++) { if (String(items[i].product_code) === String(code)) return items[i]; }
+    return null;
+  }
+  function renderUngraded() {
+    var body = $('ungradedBody');
+    if (S.ungradedErr) { body.innerHTML = errboxHtml(S.ungradedErr, 'retry-ungraded'); renderUngradedPager(); return; }
+    if (!S.ungraded) { body.innerHTML = '<div class="pg-loading">불러오는 중…</div>'; return; }
+    var items = S.ungraded.items || [];
+    if (!items.length) {
+      body.innerHTML = '<div class="pg-empty">이 슬롯은 등급 없는 상품이 없습니다 — 매길 항목이 모두 채워졌습니다.</div>';
+    } else {
+      var canW = writable();
+      body.innerHTML = items.map(function (it) { return ungradedRowHtml(it, canW); }).join('');
+    }
+    renderUngradedPager();
+  }
+  function renderUngradedPager() {
+    var el = $('ungradedPager'); var d = S.ungraded;
+    if (!d || !d.total) { el.innerHTML = ''; return; }
+    el.innerHTML = '<span class="pg-pageinfo">전체 ' + fmt(d.total) + '건 중 ' + d.page + ' / ' + d.pages + '페이지</span>'
+      + '<button type="button" class="pg-mini" data-action="ungraded-prev"' + (d.page <= 1 ? ' disabled' : '') + '>이전</button>'
+      + '<button type="button" class="pg-mini" data-action="ungraded-next"' + (d.page >= d.pages ? ' disabled' : '') + '>다음</button>';
+  }
+
+  // ── 우측 패널(1b) — 유일한 입력 자리 ────────────────────────────
+  function currentItem() {
+    if (S.mode === 'target' && S.targetItem) return S.targetItem;
+    if (S.queue && S.queue.items && S.queue.items.length) return S.queue.items[0];
+    return null;
+  }
+  function previewText(score) {
+    if (score == null || isNaN(score)) return '';
+    var cur = currentItem();
+    var list = ((S.ladderTop && S.ladderTop.items) || []).filter(function (it) {
+      return !(cur && it.product_code === cur.product_code);
+    });
+    if (!list.length) {
+      var cov = S.ladderTop && S.ladderTop.coverage;
+      if (cov && (cov.graded === 0 || (cur && cov.graded === 1))) {
+        return '이 슬롯의 첫 등급이 됩니다 — 서열은 여기서부터 쌓입니다.';
+      }
+      return '';
+    }
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (score === it.grade) {
+        return '지금 서열: ' + it.grade + '점(' + it.product_name + ')과 동점입니다';
+      }
+      if (score > it.grade) {
+        if (i === 0) {
+          return '지금 서열: ' + it.grade + '점(' + it.product_name + ') 위 · 이 슬롯 최고점이 됩니다';
+        }
+        var prev = list[i - 1];
+        return '지금 서열: ' + prev.grade + '점(' + prev.product_name + ') 아래 · '
+          + it.grade + '점(' + it.product_name + ') 위';
+      }
+    }
+    var last = list[list.length - 1];
+    var morePages = S.ladderTop && S.ladderTop.page < S.ladderTop.pages;
+    if (morePages) {
+      return '지금 불러온 목록(최저 ' + last.grade + '점) 보다 낮습니다 — 다음 페이지에서 정확한 위치를 확인하세요';
+    }
+    return '지금 서열: ' + last.grade + '점(' + last.product_name + ') 아래 · 이 슬롯 최저점이 됩니다';
+  }
+  function updateBarAndPreview() {
+    var scoreEl = $('scoreInput');
+    if (!scoreEl) return;
+    var fill = $('barFill'), prevEl = $('previewBox');
+    var raw = scoreEl.value;
+    var n = raw === '' ? null : Number(raw);
+    if (n !== null && !isNaN(n)) {
+      fill.style.width = Math.max(0, Math.min(100, n)) + '%';
+    } else {
+      fill.style.width = '0%';
+    }
+    prevEl.textContent = previewText(n);
+  }
+  function renderPanel() {
+    var flag = $('editFlag');
+    if (S.mode === 'target' && S.targetItem) {
+      var already = S.targetItem.grade != null;
+      flag.hidden = false;
+      flag.innerHTML = (already ? '고치는 중' : '목록에서 고른 상품')
+        + ' <button type="button" class="pg-linkbtn" data-action="edit-cancel">취소</button>';
+    } else {
+      flag.hidden = true; flag.innerHTML = '';
+    }
+
+    var body = $('panelBody');
+    if (S.mode === 'queue') {
+      if (S.queueErr) { body.innerHTML = errboxHtml(S.queueErr, 'retry-queue'); return; }
+      if (!S.queue) { body.innerHTML = '<div class="pg-loading">불러오는 중…</div>'; return; }
+      if (!S.queue.items.length) {
+        body.innerHTML = '<div class="pg-empty">이 슬롯은 등급 없는 상품이 없습니다 — 매길 항목이 모두 채워졌습니다.</div>';
+        return;
+      }
+    }
+    var item = currentItem();
+    if (!item) { body.innerHTML = '<div class="pg-empty">불러올 상품이 없습니다.</div>'; return; }
+
+    var priceTxt = item.sale_price == null ? '가격 정보 없음' : (fmt(item.sale_price) + '원');
+    var stockNote = item.in_pool === false ? '<span class="pg-badge pg-badge--dim">추천 후보 아님(품절 등)</span>' : '';
+    var skipLabel = S.mode === 'target' ? '취소하고 다음' : '건너뛰기';
+
+    body.innerHTML =
+      '<div class="pg-pitem">'
+        + '<div class="pg-pitem-nm">' + esc(item.product_name) + '</div>'
+        + '<div class="pg-pitem-meta">'
+          + '<span class="num">#' + item.product_code + '</span>'
+          + '<span>' + esc(item.part_label) + '</span>'
+          + '<span class="num">' + priceTxt + '</span>'
+          + stockNote
+        + '</div>'
+      + '</div>'
+      + '<div class="pg-field">'
+        + '<label for="scoreInput">점수(0~100)</label>'
+        + '<input type="number" id="scoreInput" min="0" max="100" step="1" inputmode="numeric" aria-describedby="previewBox" disabled>'
+        + '<div class="pg-bar"><div class="pg-bar-fill" id="barFill"></div></div>'
+        + '<div class="pg-preview" id="previewBox"></div>'
+      + '</div>'
+      + '<div class="pg-field">'
+        + '<label for="basisInput">근거(필수)</label>'
+        + '<textarea id="basisInput" rows="3" required placeholder="예: 같은 세대 중위권 · 1080p 기준" disabled></textarea>'
+        + '<div class="pg-help">근거를 적어 주세요 — 근거 없는 등급은 저장하지 않습니다</div>'
+      + '</div>'
+      + '<div class="pg-field">'
+        + '<label for="sourceInput">출처(선택)</label>'
+        + '<input type="text" id="sourceInput" placeholder="예: 운영자 판단 · 다나와 벤치마크" disabled>'
+      + '</div>'
+      + '<div class="pg-formerr" id="formErr" role="alert" hidden></div>'
+      + '<div class="pg-btnrow">'
+        + '<button type="button" class="pg-btn pg-btn--ghost" data-action="queue-skip">' + skipLabel + '</button>'
+        + '<button type="button" class="pg-btn pg-btn--primary" data-action="queue-save" disabled>저장하고 다음</button>'
+      + '</div>'
+      + '<div class="pg-readonlynote" id="readonlyNote" hidden>열람 권한입니다 — 등급 입력·삭제는 운영자 이상만 할 수 있습니다.</div>'
+      + '<div class="pg-savednote" id="savedNoteBox" role="status" aria-live="polite"' + (S.savedNote ? '' : ' hidden') + '>'
+        + esc(S.savedNote) + '</div>';
+
+    var scoreEl = $('scoreInput'), basisEl = $('basisInput'), sourceEl = $('sourceInput');
+    if (S.mode === 'target' && S.targetItem && S.targetItem.grade != null) {
+      scoreEl.value = S.targetItem.grade;
+      basisEl.value = S.targetItem.basis || '';
+      sourceEl.value = S.targetItem.source || '';
+    } else {
+      scoreEl.value = ''; basisEl.value = ''; sourceEl.value = '';
+    }
+    scoreEl.addEventListener('input', updateBarAndPreview);
+    updateBarAndPreview();
+    applyWritability();
+  }
+  function applyWritability() {
+    var w = writable();
+    ['scoreInput', 'basisInput', 'sourceInput'].forEach(function (id) {
+      var el = $(id);
+      if (el) { el.disabled = !w; el.title = w ? '' : '열람 권한 — 운영자 이상만 입력할 수 있습니다'; }
+    });
+    var saveBtn = document.querySelector('[data-action="queue-save"]');
+    if (saveBtn && !S.saving) {
+      saveBtn.disabled = !w;
+      saveBtn.title = w ? '' : '열람 권한 — 운영자 이상만 저장할 수 있습니다';
+    }
+    var note = $('readonlyNote');
+    if (note) note.hidden = w;
+  }
+
+  // ── 데이터 로드 ──────────────────────────────────────────────────
+  function selectSlot(key) {
+    S.slot = key;
+    S.view = '';
+    S.mode = 'queue'; S.targetItem = null;
+    S.ladderPage = 1; S.ladder = null; S.ladderErr = null; S.ladderTop = null;
+    S.ungradedPage = 1; S.ungraded = null; S.ungradedErr = null;
+    S.queuePage = 1; S.queue = null; S.queueErr = null;
+    S.savedNote = '';
+    renderChips();
+    renderCards();
+    renderLadder();
+    renderUngraded();
+    applyViewFilter();
+    renderPanel();
+    loadLadder(1);
+    loadUngraded(1);
+    loadQueue(1);
+    loadLadderTop();
+  }
+  function setView(v) {
+    if (S.view === v) return;
+    S.view = v;
+    renderViewFilter();
+    applyViewFilter();
+  }
+  function loadLadder(page) {
+    var slot = S.slot;
+    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=graded&page=' + page + '&size=' + LADDER_SIZE)
+      .then(function (res) {
+        if (slot !== S.slot) return;
+        S.ladder = res; S.ladderErr = null; S.ladderPage = page;
+        updateChipCount(slot, res.coverage.pool);
+        renderCards(); renderLadder();
+      })
+      .catch(function (err) {
+        if (slot !== S.slot) return;
+        S.ladderErr = err; renderCards(); renderLadder();
+      });
+  }
+  function loadUngraded(page) {
+    var slot = S.slot;
+    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=ungraded&page=' + page + '&size=' + UNGRADED_SIZE)
+      .then(function (res) {
+        if (slot !== S.slot) return;
+        S.ungraded = res; S.ungradedErr = null; S.ungradedPage = page;
+        renderUngraded();
+      })
+      .catch(function (err) {
+        if (slot !== S.slot) return;
+        S.ungradedErr = err; renderUngraded();
+      });
+  }
+  function loadQueue(page) {
+    var slot = S.slot;
+    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=ungraded&page=' + page + '&size=1')
+      .then(function (res) {
+        if (slot !== S.slot) return;
+        S.queue = res; S.queueErr = null; S.queuePage = page;
+        if (S.mode === 'queue') renderPanel();
+      })
+      .catch(function (err) {
+        if (slot !== S.slot) return;
+        S.queueErr = err;
+        if (S.mode === 'queue') renderPanel();
+      });
+  }
+  function loadLadderTop() {
+    var slot = S.slot;
+    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=graded&page=1&size=' + LADDER_SIZE)
+      .then(function (res) {
+        if (slot !== S.slot) return;
+        S.ladderTop = res;
+        updateBarAndPreview();
+      })
+      .catch(function () { if (slot === S.slot) S.ladderTop = null; /* 미리보기 전용 — 실패해도 화면은 안 죽는다 */ });
+  }
+
+  // ── 동작 ─────────────────────────────────────────────────────────
+  function onRowGrade(code) {          // 「등급 매기기」 — 등급 없는 것 목록에서
+    var item = findUngradedItem(code);
+    if (!item) return;
+    S.mode = 'target'; S.targetItem = item;
+    renderPanel();
+    scrollToPanel();
+  }
+  function onRowEdit(code) {           // 「고치기」 — 서열 사다리에서
+    var item = findLadderItem(code);
+    if (!item) return;
+    S.mode = 'target'; S.targetItem = item;
+    renderPanel();
+    scrollToPanel();
+  }
+  function scrollToPanel() {
+    var el = $('gradePanel');
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function onRowDelete(code) {         // 「삭제」 — 서열 사다리에서
+    if (!writable()) return;
+    var item = findLadderItem(code);
+    var label = item ? item.product_name : ('상품 ' + code);
+    if (!confirm('『' + label + '』의 등급을 삭제합니다. 다시 매기려면 점수·근거를 새로 입력해야 합니다. 계속할까요?')) return;
+    apiDelete('/api/admin/grades/' + code).then(function () {
+      if (S.mode === 'target' && S.targetItem && String(S.targetItem.product_code) === String(code)) {
+        S.mode = 'queue'; S.targetItem = null;
+        renderPanel();
+      }
+      loadLadder(1);
+      loadUngraded(1);
+      loadQueue(1);
+      loadLadderTop();
+    }).catch(function () { /* 상단 진행 바(ui-progress.js)가 실패 사유를 이미 보여준다 */ });
+  }
+  function onSkip() {
+    if (S.mode === 'target') {
+      S.mode = 'queue'; S.targetItem = null;
+      renderPanel();
+      return;
+    }
+    var nextPage = (S.queuePage || 1) + 1;
+    if (S.queue && S.queue.pages && nextPage > S.queue.pages) nextPage = 1;
+    $('panelBody').innerHTML = '<div class="pg-loading">불러오는 중…</div>';
+    loadQueue(nextPage);
+  }
+  function onSave() {
+    if (S.saving) return;
+    if (!writable()) return;
+    var item = currentItem();
+    if (!item) return;
+    var scoreEl = $('scoreInput'), basisEl = $('basisInput'), sourceEl = $('sourceInput');
+    var errBox = $('formErr');
+    var raw = scoreEl.value;
+    var grade = raw === '' ? NaN : Math.round(Number(raw));
+    var basis = (basisEl.value || '').trim();
+    var source = (sourceEl.value || '').trim();
+    if (isNaN(grade) || grade < 0 || grade > 100) {
+      errBox.hidden = false; errBox.textContent = '등급은 0~100 사이입니다'; return;
+    }
+    if (!basis) {
+      errBox.hidden = false; errBox.textContent = '근거를 적어 주세요 — 근거 없는 등급은 저장하지 않습니다'; return;
+    }
+    errBox.hidden = true;
+    S.saving = true;
+    document.querySelectorAll('[data-action="queue-save"],[data-action="queue-skip"]').forEach(function (b) { b.disabled = true; });
+    apiPut('/api/admin/grades/' + item.product_code, { grade: grade, basis: basis, source: source || null })
+      .then(function (res) {
+        S.saving = false;
+        // ⚠ 계약: 저장 응답에 "견적 엔진은 아직 이 값을 읽지 않습니다"가 항상 함께 온다 —
+        // 서버 note 를 그대로 쓰고, 다음 저장 전까지 지우지 않는다(패널 재렌더에도 유지).
+        S.savedNote = res.note || ('등급 ' + res.grade + '(으)로 저장했습니다.');
+        S.mode = 'queue'; S.targetItem = null;
+        loadLadder(1);
+        loadUngraded(1);
+        loadQueue(1);
+        loadLadderTop();
+      })
+      .catch(function (err) {
+        S.saving = false;
+        document.querySelectorAll('[data-action="queue-save"],[data-action="queue-skip"]').forEach(function (b) { b.disabled = false; });
+        errBox.hidden = false;
+        errBox.textContent = err.message;
+        applyWritability();
+      });
+  }
+
+  // ── 이벤트 위임(한 번만 건다 — retry 로 boot() 이 다시 불려도 리스너는 늘지 않는다) ──
+  function bindEvents() {
+    document.addEventListener('click', function (ev) {
+      var chip = ev.target.closest('[data-action="select-slot"]');
+      if (chip) { selectSlot(chip.getAttribute('data-slot')); return; }
+      var vf = ev.target.closest('[data-action="set-view"]');
+      if (vf) { setView(vf.getAttribute('data-view')); return; }
+      var skip = ev.target.closest('[data-action="queue-skip"]');
+      if (skip) { onSkip(); return; }
+      var save = ev.target.closest('[data-action="queue-save"]');
+      if (save) { onSave(); return; }
+      var grd = ev.target.closest('[data-action="row-grade"]');
+      if (grd) { onRowGrade(grd.getAttribute('data-code')); return; }
+      var edt = ev.target.closest('[data-action="row-edit"]');
+      if (edt) { onRowEdit(edt.getAttribute('data-code')); return; }
+      var del = ev.target.closest('[data-action="row-delete"]');
+      if (del) { onRowDelete(del.getAttribute('data-code')); return; }
+      var cancelEdit = ev.target.closest('[data-action="edit-cancel"]');
+      if (cancelEdit) { S.mode = 'queue'; S.targetItem = null; renderPanel(); return; }
+      var lprev = ev.target.closest('[data-action="ladder-prev"]');
+      if (lprev) { if (S.ladder && S.ladder.page > 1) loadLadder(S.ladder.page - 1); return; }
+      var lnext = ev.target.closest('[data-action="ladder-next"]');
+      if (lnext) { if (S.ladder && S.ladder.page < S.ladder.pages) loadLadder(S.ladder.page + 1); return; }
+      var uprev = ev.target.closest('[data-action="ungraded-prev"]');
+      if (uprev) { if (S.ungraded && S.ungraded.page > 1) loadUngraded(S.ungraded.page - 1); return; }
+      var unext = ev.target.closest('[data-action="ungraded-next"]');
+      if (unext) { if (S.ungraded && S.ungraded.page < S.ungraded.pages) loadUngraded(S.ungraded.page + 1); return; }
+      var retryQ = ev.target.closest('[data-action="retry-queue"]');
+      if (retryQ) { loadQueue(S.queuePage || 1); return; }
+      var retryL = ev.target.closest('[data-action="retry-ladder"]');
+      if (retryL) { loadLadder(S.ladderPage || 1); return; }
+      var retryU = ev.target.closest('[data-action="retry-ungraded"]');
+      if (retryU) { loadUngraded(S.ungradedPage || 1); return; }
+      var retryB = ev.target.closest('[data-action="retry-boot"]');
+      if (retryB) { boot(); return; }
+    });
+  }
+
+  // ── 부팅 ─────────────────────────────────────────────────────────
+  function renderBootError(err) {
+    var html = errboxHtml(err, 'retry-boot');
+    $('slotBar').innerHTML = html;
+    $('cardFill').innerHTML = ''; $('cardScale').innerHTML = ''; $('cardView').innerHTML = '';
+    $('ladderBody').innerHTML = '<div class="pg-empty">슬롯 정보를 불러오지 못해 서열을 그릴 수 없습니다.</div>';
+    $('ungradedBody').innerHTML = '<div class="pg-empty">슬롯 정보를 불러오지 못해 목록을 그릴 수 없습니다.</div>';
+    $('panelBody').innerHTML = '<div class="pg-empty">슬롯 정보를 불러오지 못해 입력 패널을 열 수 없습니다.</div>';
+    $('ladderPager').innerHTML = ''; $('ungradedPager').innerHTML = '';
+  }
+  function boot() {
+    apiGet('/api/admin/grades/meta').then(function (meta) {
+      S.meta = meta;
+      S.slots = meta.slots || [];
+      renderEngineBadge();
+      renderNoticeBox();
+      if (!S.slots.length) {
+        $('slotBar').innerHTML = '<div class="pg-empty">등급을 매길 수 있는 부품 종류가 없습니다.</div>';
+        return;
+      }
+      renderChips();
+      loadAllChipCounts();
+      selectSlot(S.slots[0].key);
+    }).catch(function (err) {
+      renderBootError(err);
+    });
+  }
+
+  bindEvents();
+  window.Admin2Shell.meReady.then(function (me) {
+    S.me = me;
+    renderLadder();       // 「고치기·삭제」 비활성 여부를 다시 계산
+    renderUngraded();     // 「등급 매기기」 비활성 여부를 다시 계산
+    applyWritability();    // 패널 입력·저장 버튼
+  });
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
