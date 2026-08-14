@@ -62,8 +62,16 @@ def _crit(part_type: str, target_field: str | None, review_type: str, specs: dic
 
 @router.get("/reviews")
 def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: str = "",
-                 sellable: int = 0, suggested: int = 0, field: str = ""):
+                 sellable: int = 0, suggested: int = 0, field: str = "",
+                 keyword: str = "", status: str = "대기"):
     """검수 큐 — 실데이터 적재 후 대기 건수가 수천이 되므로 서버 페이지네이션이 필수다(슬라이스 39).
+
+    admin2 상품 사양 검수(ADM-PRD-020) 신설에 맞춰 최소 추가한 필터 셋(2026-08-13):
+      `suggested=-1` 제안이 **없는** 것만("B·값 없음" 묶음 — 기존 0=필터없음/1=있음과 구분).
+      `keyword=`      상품명·product_code·사양 필드명을 함께 훑는 검색.
+      `status=`       검수 상태를 바꿔 본다(기본 '대기' — 기존 호출과 동일해 하위호환).
+                      집계(`queue`·`by_field`·`by_type`)는 상태와 무관하게 **항상 대기 큐**를
+                      설명한다 — "지금 무엇을 할 수 있는지"는 지금 보는 상태와 별개다.
 
     단가표發 편입 대기(sourcing_hold)는 **파생 목록**이라 페이지네이션 밖이다 —
     항목 수가 공급처 최신 파일 규모(수백)로 제한되므로 1페이지에만 덧붙인다.
@@ -81,30 +89,55 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
     """
     size = max(1, min(size, 500))
     page = max(1, page)
+    keyword = keyword.strip()
+    status = status.strip() or "대기"
+    # 허용 범위 밖 값은 "필터 없음"으로 되돌린다 — SQL의 (:suggested=-1 OR :suggested=1 OR ...)
+    # 어느 쪽도 안 맞으면 조건이 통째로 거짓이 돼 **전 행이 조용히 사라진다**(예전 코드의
+    # `1 if suggested else 0` 관용을 유지 + -1 신설).
+    suggested = 1 if suggested > 0 else (-1 if suggested < 0 else 0)
     q = text("""
         SELECT r.review_id, r.product_code, r.review_type, r.field_name, r.detail,
                r.origin_value, r.suggested_value, r.confidence, r.created_at,
-               p.sku, p.product_name, p.part_type, to_jsonb(ps) AS specs
+               p.sku, p.product_name, p.part_type, to_jsonb(ps) AS specs,
+               sw.confidence AS web_confidence, sw.note AS web_note,
+               sw.source_url AS web_source_url, sw.source_name AS web_source_name
         FROM product_reviews r
         JOIN products p USING (product_code)          -- product_code NULL(csv_error류)은 자연 제외
         LEFT JOIN product_specs ps USING (product_code)
-        WHERE r.review_status = '대기'
+        -- 진짜 신뢰 신호는 spec_web_suggestions에만 있다 — product_reviews.confidence는
+        -- 최초 등록 시점 값이라 웹 제안 38건이 전부 0.8로 뭉뚱그려 보였다(admin2 상품
+        -- 사양 검수 요구사항 §신뢰도 취급, 2026-08-13). 재수집돼 값이 여럿이면 최신만.
+        LEFT JOIN LATERAL (
+            SELECT confidence, note, source_url, source_name
+            FROM spec_web_suggestions sw0
+            WHERE sw0.product_code = r.product_code AND sw0.field_name = r.field_name
+            ORDER BY sw0.fetched_at DESC LIMIT 1
+        ) sw ON true
+        WHERE r.review_status = :status
           AND (:part_type = '' OR p.part_type = :part_type)
           AND (:origin = '' OR p.data_origin = :origin)
           AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
-          AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
+          AND (:suggested = 0 OR (:suggested = 1 AND r.suggested_value IS NOT NULL)
+                              OR (:suggested = -1 AND r.suggested_value IS NULL))
           AND (:field = '' OR r.field_name = :field)
+          AND (:keyword = '' OR p.product_name ILIKE '%%' || :keyword || '%%'
+                             OR CAST(p.product_code AS TEXT) ILIKE '%%' || :keyword || '%%'
+                             OR r.field_name ILIKE '%%' || :keyword || '%%')
         ORDER BY r.created_at, r.review_id
         LIMIT :size OFFSET :offset
     """)
     qc = text("""
         SELECT count(*) FROM product_reviews r JOIN products p USING (product_code)
-         WHERE r.review_status = '대기'
+         WHERE r.review_status = :status
            AND (:part_type = '' OR p.part_type = :part_type)
            AND (:origin = '' OR p.data_origin = :origin)
            AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
-           AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
+           AND (:suggested = 0 OR (:suggested = 1 AND r.suggested_value IS NOT NULL)
+                               OR (:suggested = -1 AND r.suggested_value IS NULL))
            AND (:field = '' OR r.field_name = :field)
+           AND (:keyword = '' OR p.product_name ILIKE '%%' || :keyword || '%%'
+                              OR CAST(p.product_code AS TEXT) ILIKE '%%' || :keyword || '%%'
+                              OR r.field_name ILIKE '%%' || :keyword || '%%')
     """)
     # 종류별 집계는 **지금 보고 있는 범위**를 따른다. 필터를 켰는데 전체 분포를 보여주면
     # 화면의 숫자와 배너의 숫자가 다른 말을 한다(슬라이스 49). part_type 필터만 제외한다 —
@@ -114,7 +147,11 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
          WHERE r.review_status = '대기'
            AND (:origin = '' OR p.data_origin = :origin)
            AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
-           AND (:suggested = 0 OR r.suggested_value IS NOT NULL)
+           AND (:suggested = 0 OR (:suggested = 1 AND r.suggested_value IS NOT NULL)
+                               OR (:suggested = -1 AND r.suggested_value IS NULL))
+           AND (:keyword = '' OR p.product_name ILIKE '%%' || :keyword || '%%'
+                              OR CAST(p.product_code AS TEXT) ILIKE '%%' || :keyword || '%%'
+                              OR r.field_name ILIKE '%%' || :keyword || '%%')
          GROUP BY 1 ORDER BY 2 DESC
     """)
     # 큐 구성 — "6,490건"만 보여주면 운영자는 언젠가 처리하면 줄어들 줄 안다.
@@ -132,20 +169,36 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
                count(*) FILTER (WHERE r.origin_value IS NULL) AS manual,
                count(*) FILTER (WHERE p.status = '판매중' AND p.stock_qty > 0) AS sellable,
                -- 외부 제안이 붙어 승인/기각 판단만 하면 되는 것(슬라이스 52)
-               count(*) FILTER (WHERE r.suggested_value IS NOT NULL) AS suggested
+               count(*) FILTER (WHERE r.suggested_value IS NOT NULL) AS suggested,
+               -- 사양이 아니라 분류·코드 정체성이 틀린 것 — 이 화면의 승인 경로로 못 닫는다
+               -- (admin2 상품 사양 검수 요구사항 §⑤ 덩어리 C, 2026-08-13). 기각(보류)만 된다.
+               count(*) FILTER (WHERE (r.review_type = 'spec_conflict' AND r.field_name = 'danawa_code')
+                                   OR r.review_type = 'name_invalid') AS identity_conflict
         FROM product_reviews r JOIN products p USING (product_code)
         WHERE r.review_status = '대기'
     """)
+    # 필드별 대기도 **지금 보고 있는 범위**를 따른다(qg와 같은 이유, 2026-08-13 추가) —
+    # field 자기 자신만 제외한다. LIMIT은 12→24(실측 상위 15개 전부를 담기 위함).
     qf = text("""
         SELECT r.field_name, count(*) n,
                count(*) FILTER (WHERE p.status = '판매중' AND p.stock_qty > 0) sell
         FROM product_reviews r JOIN products p USING (product_code)
         WHERE r.review_status = '대기' AND r.field_name IS NOT NULL
-        GROUP BY 1 ORDER BY n DESC LIMIT 12
+          AND (:part_type = '' OR p.part_type = :part_type)
+          AND (:origin = '' OR p.data_origin = :origin)
+          AND (:sellable = 0 OR (p.status = '판매중' AND p.stock_qty > 0))
+          AND (:suggested = 0 OR (:suggested = 1 AND r.suggested_value IS NOT NULL)
+                              OR (:suggested = -1 AND r.suggested_value IS NULL))
+          AND (:keyword = '' OR p.product_name ILIKE '%%' || :keyword || '%%'
+                             OR CAST(p.product_code AS TEXT) ILIKE '%%' || :keyword || '%%'
+                             OR r.field_name ILIKE '%%' || :keyword || '%%')
+        GROUP BY 1 ORDER BY n DESC LIMIT 24
     """)
+    # 상태별 건수 — admin2 「처리 상태」 필터 드롭다운의 실측 카운트(2026-08-13 추가).
+    qsc = text("SELECT review_status, count(*) FROM product_reviews GROUP BY 1")
     p = {"part_type": part_type.strip(), "origin": origin.strip(),
-         "field": field.strip(),
-         "sellable": 1 if sellable else 0, "suggested": 1 if suggested else 0,
+         "field": field.strip(), "keyword": keyword, "status": status,
+         "sellable": 1 if sellable else 0, "suggested": suggested,
          "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
         rows = conn.execute(q, p).mappings().all()
@@ -154,28 +207,54 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
                    for r in conn.execute(qg, p).all()]
         s = conn.execute(qs).mappings().first()
         by_field = [{"field": r[0], "n": r[1], "sellable": r[2]}
-                    for r in conn.execute(qf).all()]
-    items = [{
-        "review_id": r["review_id"],
-        "sku": r["sku"],
-        "name": r["product_name"],
-        "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
-        "part_type": r["part_type"],
-        "type": r["review_type"],
-        "field": r["field_name"],
-        "detail": r["detail"],
-        "origin_value": r["origin_value"],
-        "suggested_value": r["suggested_value"],
+                    for r in conn.execute(qf, p).all()]
+        status_counts = dict(conn.execute(qsc).all())
+    items = []
+    for r in rows:
+        detail_text = r["detail"] or ""
         # 제안값의 출처를 밝힌다 — 다나와에서 온 값을 'AI 지식'이라 부르면 거짓이다
         # (슬라이스 51). 스키마 무개정이라 detail의 표기에서 파생한다.
-        "suggest_source": ("danawa" if "다나와 제안" in (r["detail"] or "") else
-                           ("ai" if r["suggested_value"] is not None else None)),
-        "confidence": float(r["confidence"]) if r["confidence"] is not None else None,
-        "created_at": iso(r["created_at"]),
-        "risk": _risk(r["review_type"], r["field_name"]),
-        "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
-    } for r in rows]
-    if page == 1 and not part_type and not sellable and not suggested and not field:
+        # "웹 제안" 분기(2026-08-13, B안 부수 수정) — `tools/spec_fill_apply.py`가 남기는
+        # 표기(`[웹 제안: ... · 출처 ... — 확인 후 승인하세요]`)가 없으면 웹 제안이
+        # "다나와"가 아니라는 이유만으로 "ai"(AI 지식)로 오표시되고 있었다.
+        is_danawa = "다나와 제안" in detail_text
+        is_web = "웹 제안" in detail_text
+        suggest_source = ("danawa" if is_danawa else
+                          ("web" if is_web else
+                          ("ai" if r["suggested_value"] is not None else None)))
+        # 진짜 신뢰 신호(admin2 상품 사양 검수 §신뢰도 취급, 2026-08-13). 웹 제안은
+        # spec_web_suggestions 실측값 — 다나와는 유사도가 product_reviews.confidence
+        # 자리에 이미 있다(별도 표 없음). **없으면 만들지 않고 null로 둔다.**
+        if r["web_source_url"] is not None:
+            signal = {"confidence": float(r["web_confidence"]) if r["web_confidence"] is not None else None,
+                      "note": r["web_note"], "source_name": r["web_source_name"],
+                      "source_url": r["web_source_url"], "kind": "web"}
+        elif is_danawa:
+            signal = {"confidence": float(r["confidence"]) if r["confidence"] is not None else None,
+                      "note": None, "source_name": "다나와 유사도", "source_url": None, "kind": "danawa"}
+        else:
+            signal = None
+        items.append({
+            "review_id": r["review_id"],
+            "product_code": r["product_code"],
+            "sku": r["sku"],
+            "name": r["product_name"],
+            "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
+            "part_type": r["part_type"],
+            "type": r["review_type"],
+            "field": r["field_name"],
+            "detail": r["detail"],
+            "origin_value": r["origin_value"],
+            "suggested_value": r["suggested_value"],
+            "suggest_source": suggest_source,
+            "confidence": float(r["confidence"]) if r["confidence"] is not None else None,
+            "created_at": iso(r["created_at"]),
+            "risk": _risk(r["review_type"], r["field_name"]),
+            "crit": _crit(r["part_type"], r["field_name"], r["review_type"], r["specs"]),
+            "signal": signal,
+        })
+    if (page == 1 and not part_type and not sellable and not suggested and not field
+            and not keyword and status == "대기"):
         items.extend(_sourcing_items())
     # 오늘 내가 처리한 건수 — **서버가 센다**(슬라이스 96).
     # 화면은 `let done = 0`이라는 JS 변수로 세고 있었다. 새로고침하면 0이 되므로
@@ -206,6 +285,9 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
             "remaining": total,
             "my_today": my_today,
             "field": field.strip(),        # 화면이 지금 무엇으로 좁혔는지 되돌려 말한다
+            "keyword": keyword,
+            "status": status,
+            "status_counts": status_counts,  # {review_status: n} — 상태 필터 드롭다운 실측 카운트
             "queue": {
                 "total": s["total"],
                 "bulkable": s["bulkable"],      # 일괄 확정 버튼이 실제로 처리하는 수
@@ -213,6 +295,7 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
                 "manual": s["manual"],          # 원문에 값이 없다 — 사람이 찾아 넣어야 한다
                 "sellable": s["sellable"],      # 판매중 ∧ 재고>0 — 지금 매출에 영향
                 "suggested": s["suggested"],    # 외부 제안 대기 — 승인/기각만 하면 된다
+                "identity_conflict": s["identity_conflict"],  # 사양이 아니라 정체성 문제(덩어리 C)
                 "by_field": by_field,
                 "verdict": (
                     f"대기 {s['total']:,}건 중 일괄 확정으로 끝낼 수 있는 건 {s['bulkable']:,}건, "
@@ -222,9 +305,13 @@ def list_reviews(page: int = 1, size: int = 100, part_type: str = "", origin: st
                     f"지금 매출에 영향을 주는 건 판매중·재고 있는 {s['sellable']:,}건입니다."
                 ),
             },
-            "note": ("검수 대기는 서버에서 나눠 보냅니다 — by_type·queue는 전체 집계입니다."
-                     " 단가표發 편입 대기는 파생 목록이라 1페이지에만 붙습니다."
-                     " sellable=1이면 판매중·재고>0만, suggested=1이면 외부 제안이 붙은 것만 봅니다.")}
+            "note": ("검수 대기는 서버에서 나눠 보냅니다 — by_type·by_field·queue는 상태와"
+                     " 무관하게 항상 대기 큐 전체 집계입니다(부품 종류·사양 필드는 자기 자신을"
+                     " 제외한 다른 필터를 반영합니다). 단가표發 편입 대기는 파생 목록이라"
+                     " 기본 조회(1페이지·필터 없음·대기)에만 붙습니다."
+                     " sellable=1이면 판매중·재고>0만, suggested=1이면 외부 제안이 붙은 것만,"
+                     " suggested=-1이면 제안이 없는 것만, keyword는 상품명·product_code·사양"
+                     " 필드명을 함께 봅니다.")}
 
 
 # ---- 슬라이스 16: 단가표 신규(sourcing_hold) — 저장 없는 파생 큐 ----
@@ -266,7 +353,13 @@ def _sourcing_items():
     return [{
         "review_id": None, "sku": None, "type": "sourcing_hold",
         "src_row_id": r["row_id"], "supplier_id": r["supplier_id"],
-        "name": r["model_name"], "cat": "미분류", "part_type": None,
+        # cat: 이 행은 아직 카탈로그에 상품이 없는 원시 단가표 줄이라 부품 종류
+        # 자체가 없다("값이 없다") — ETC(part_type이 정해져 "기타(ETC)"로 뜨는 것,
+        # "값이 있다")와는 다른 사실이라 같은 글자를 쓰지 않는다. taxonomy.part_label(None)이
+        # 이미 "값 없음"을 '—'로 표기하는 관례이고(part_type도 바로 아래 None),
+        # reviews.html.j2도 이 필드를 `r.cat || '—'`로 그린다(r.src.sup과 같은 패턴) —
+        # 그래서 falsy만 넘기면 화면쪽 수정 없이 '—'로 뜬다.
+        "name": r["model_name"], "cat": None, "part_type": None,
         "field": None, "origin_value": None, "suggested_value": None, "confidence": None,
         "created_at": iso(r["received_at"]), "risk": "경미", "crit": [],
         "detail": ("단가표 신규 행 — 카탈로그에 같은 모델이 없습니다. 이름 유사 후보가 있어 연결 검토가 우선입니다."

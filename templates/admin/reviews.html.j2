@@ -1,0 +1,1251 @@
+{#
+  상품 사양 검수 (ADM-PRD-020) — 2026-08-13 신설
+
+  ■ 이 화면이 답하는 질문
+    "웹·다나와가 찾은 값을 누가, 무엇을 근거로 정본(product_specs)에 반영하는가" —
+    이 화면의 승인 동작만이 검수 대기 상품을 추천 후보 풀에 들여보내는 유일한 문이다.
+
+  ■ 출처 — 사장님이 Claude 디자인에서 확정한 원안
+    파일: `docs/design/dc-review-screen.html` (`<x-dc>` + `DCLogic` + `support.js` 런타임 —
+    여기서는 돌지 않는다). `build_map`·`dash`와 같은 원칙: **화면 구성·색·서체·간격·
+    인터랙션은 원안 그대로 옮기고, 런타임만 순수 JS로 바꿨다.** 데이터는 원안의 더미
+    배열(`buildQueue()` 등)을 전부 걷어내고 실측 API 응답만 쓴다(화면 정직성 규약).
+    요구사항의 기준은 `docs/design/req-admin2-reviews-2026-08-13.md`.
+
+  ■ 좌측 메뉴 — 2026-08-13 사장님 확정 규격(CLAUDE.md §관리자 화면 규약)
+    항목 구성(IA)은 이 화면의 소관이 아니다 — 정본은 `api/admin_nav.py`(8그룹 37항목)를
+    그대로 읽어 그린다(원안의 11항목 사이드바는 목업용 축약이었다). 규격으로 삼는 것은
+    **동작**뿐이다: 펼침 212px ↔ 접힘 64px(`width .16s ease`) · 최하단 「메뉴창 접기」 ·
+    접힘 아이콘 « / » · 접히면 라벨을 숨기고 `title` 툴팁만 남긴다 · 브랜드 admin2 ↔ a2.
+    그룹(8개) 아코디언은 `build_map`과 같은 방식(세션에 접힘 상태 저장)을 쓰되, **접힌
+    64px 상태에서는 그룹 아이콘만 남긴다** — 낱개 항목(37개)까지 아이콘화할 근거(정본
+    아이콘)가 없어, 접었을 때는 그룹 단위로만 다시 펼 수 있게 했다(제작자 판단 — 검증
+    대상, 보고서 참조).
+
+  ■ 원안과 다르게 구현한 지점 (전부 이유가 있다 — 보고서에도 남긴다)
+    ① **좌측 메뉴 항목** — 위 설명대로 정본으로 교체.
+    ② **역할 스위처 폐지** — 원안은 헤더에 「운영자/조회」 버튼을 두어 화면 안에서 역할을
+       바꿔볼 수 있었다(디자인 도구가 두 상태를 시연하려고 넣은 장치). 실제 화면은 로그인
+       세션의 **진짜 등급**(`GET /api/admin/auth/me`)만 쓴다 — 내가 조회 등급인데 버튼을
+       눌러 운영자인 척 화면을 켤 수 있다면 그 자체가 화면 정직성 위반이다.
+    ③ **승인 전 "게이트 미리보기" 상자를 뺐다** — 원안은 `row.id % 3 !== 0`처럼 지어낸
+       값으로 "승인하면 후보 풀에 들어갑니다"를 **승인 전에** 예측해 보여줬다. 실제로는
+       그 상품에 남은 검수 행이 몇 개인지를 승인 시점 전에는 서버도 이 화면도 모른다
+       (다른 결측 사양이 별도 검수 행으로 더 있을 수 있다) — 지어낸 예측은 숫자를
+       지어내지 않는다는 규약을 어긴다. 대신 요구사항 §⑥이 요구하는 대로 **승인 "후"**
+       서버가 돌려주는 실제 `pool_added`로 토스트에서 사실만 말한다.
+    ④ **신뢰 신호가 실측값이다** — 원안은 신뢰도를 더미 0.25~0.92 난수로 보여줬다.
+       실제로는 `product_reviews.confidence`가 웹 제안 38건 전부에 동일하게 남아 있어
+       (요구사항 §신뢰도 취급) 그대로 쓰면 화면이 낮은/높은 신뢰도를 구분하지 못한다.
+       `api/admin_reviews.list_reviews`에 `spec_web_suggestions` LATERAL JOIN을 추가해
+       웹 제안은 그 표의 실제 confidence·note·source_url·source_name을, 다나와 제안은
+       `product_reviews.confidence`(= 유사도)를 쓴다(2026-08-13, admin_reviews.py 최소 추가).
+    ⑤ **선택(체크박스) 상태는 페이지·필터가 바뀌면 초기화된다** — 원안은 전체 더미
+       데이터가 메모리에 있어 페이지를 넘겨도 선택이 그대로였다. 이 화면은 서버
+       페이지네이션이라 화면에 없는 행의 제안값을 메모리에 갖고 있지 않다 — 안 보이는
+       선택을 그대로 실행하면 무엇을 승인하는지 아무도 확인할 수 없다.
+    ⑥ **"선택 항목 함께 적용"은 새 API가 아니라 기존 승인 API를 선택 건수만큼 반복
+       호출한다**(행마다 제안값이 있는 것만, 없는 건 사유와 함께 건너뜀 — 목록 화면
+       규약의 "일괄 동작은 자격 없는 대상을 막지 않고 사유와 함께 건너뛴다"). 서버에
+       "여러 review_id를 한 번에 승인"하는 API가 없고 새로 만들지 말라는 지시가 있어
+       (A-18·되돌림 규약), 화면에서 기존 단건 API를 순서대로 불러 묶었다 — 되돌리기는
+       건별로 남는다(부분 원복 없음은 "형제 동시 적용"에만 해당).
+    ⑦ **서체** — 원안은 IBM Plex Sans KR/Mono(Google Fonts CDN)를 썼다. 이 저장소는
+       외부 CDN을 금지한다(A-30·회귀가 막는다). 자체 호스팅 폰트 중 가장 가까운
+       Pretendard(본문)·JetBrains Mono(숫자)로 대체했다 — 통합 여부는 사장님 결정 필요
+       (보고서 「토큰 충돌」 참조).
+    ⑧ **단가표 편입 대기 탭의 "연결" 동작을 실제로 배선했다** — 원안은 클릭하면 로컬
+       상태만 토글하는 더미였다(`st.linked`). 실제 `POST /api/admin/reviews/sourcing/link`·
+       `/sourcing/unlink/{log_id}`가 이미 있어(요구사항 §④ "쓰는 API") 그대로 불렀다.
+       유사 후보가 없는 행은 연결 대상이 없어 버튼을 비활성으로 둔다(신규 상품 등록은
+       비범위 — 요구사항 §비범위).
+
+  ■ 정본 토큰과 어긋나는 지점(임의로 합치지 않았다 — 사장님 결정 필요)
+    이 화면은 `design-system/tokens.css`를 읽지 않는다. 원안 자체가 Popcorn Light와는
+    다른 팔레트(oklch 베이지)·다른 서체(IBM Plex 계열)를 쓰기 때문이다(사용자 지시:
+    "이번에는 디자인을 기준으로"). 구체적 충돌 목록은 제작 보고서에 남긴다.
+
+  ■ 2026-08-13 셸 통합 — 이 화면이 admin2 공통 셸의 "원본"이었다
+    사이드바·헤더·팔레트·서체 변수를 이 화면에서 그대로 뽑아 `templates/admin/
+    _admin2_shell.html.j2` + `/shared/admin2/admin2.css` + `/shared/admin2/admin2-
+    shell.js`를 만들었다(다른 admin2 화면들이 각자 셸을 들고 있어 좌측 메뉴가 36화면에
+    복제됐던 것과 같은 병이 admin2에서 재발하는 중이었다 — `.claude/CANON.md` §1).
+    이 화면도 이제 그 공용 셸을 상속한다 — 자기 자신에서 뽑아낸 것을 자기가 다시
+    상속하는 모양이지만, 그래야 사본이 둘로 남지 않는다. `:root` 팔레트 변수·사이드바·
+    헤더(크럼·배지·역할표시)·토스트 컨테이너는 이제 셸/`admin2.css`가 그린다. 아래
+    `<style>`은 검수 화면 **본문**(필터·표·서랍·단가표 탭)만 담는다. 「오늘 처리·
+    되돌리기」는 이 화면만의 헤더 위젯이라 `header_extra` 블록에 남았다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}상품 사양 검수{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rv-page);color:var(--rv-ink);font-family:var(--rv-font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input{font-family:var(--rv-mono)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 좌측 메뉴·헤더 뼈대·팔레트는 admin2 공용 셸이 그린다(`_admin2_shell.html.j2`,
+   `/shared/admin2/admin2.css`) — 여기서는 이 화면만의 헤더 위젯과 본문만 남긴다. ── */
+.a2-hd .donetoday{font:400 11.5px/1 var(--rv-font);color:var(--rv-muted)}
+.a2-hd .donetoday b{font-family:var(--rv-mono)}
+.a2-hd .undo-btn{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+              border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+.a2-hd .undo-btn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:default}
+
+.tabsbar{flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:var(--rv-card);
+         display:flex;align-items:stretch;padding:0 18px;gap:18px;z-index:4}
+.tabitem{display:flex;align-items:center;gap:7px;font:400 12.5px/1 var(--rv-font);color:var(--rv-faint);
+         border-bottom:2px solid transparent;cursor:pointer;padding:0 2px;background:none;border-top:0;border-left:0;border-right:0}
+.tabitem.on{font-weight:600;color:var(--rv-ink);border-bottom-color:var(--rv-ink)}
+.tabitem .cnt{font:500 10.5px/1 var(--rv-mono);color:var(--rv-dim);background:var(--rv-panel2);border-radius:4px;padding:3px 5px}
+.tabitem.on .cnt{color:var(--rv-muted)}
+
+.view{flex:1;min-height:0;display:none}
+.view.on{display:flex}
+
+/* ── 검수 탭 ── */
+.review-body{flex:1;min-height:0;display:flex}
+.qside{width:216px;flex:none;border-right:1px solid rgba(0,0,0,.1);background:var(--rv-panel);
+       padding:15px 14px;display:flex;flex-direction:column;gap:15px;overflow:auto}
+.qcap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.scope-n{display:flex;align-items:baseline;gap:6px}
+.scope-n .v{font:600 30px/1 var(--rv-mono)}
+.scope-n .l{font:400 11px/1.3 var(--rv-font);color:var(--rv-dim2)}
+.live-line{font:400 11px/1.5 var(--rv-font);margin-top:4px;cursor:pointer;color:var(--rv-red)}
+.live-line.on{color:var(--rv-ink);text-decoration:underline}
+.chunks{display:flex;flex-direction:column;gap:4px}
+.chunk-row{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:6px;cursor:pointer;
+           background:transparent;border:1px solid transparent}
+.chunk-row.on{background:var(--rv-card);border-color:rgba(0,0,0,.2)}
+.chunk-dot{width:7px;height:7px;flex:none;border-radius:50%}
+.chunk-title{font:500 11.5px/1.35 var(--rv-font);flex:1;min-width:0}
+.chunk-count{font:600 12px/1.2 var(--rv-mono)}
+.idbox{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-radius:7px;padding:9px 10px}
+.idbox .row1{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
+.idbox .n{font:600 10.5px/1.2 var(--rv-mono);color:oklch(0.5 0.14 55)}
+.idbox .t{font:600 11px/1.3 var(--rv-font)}
+.idbox .d{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft)}
+.idbox .link{display:inline-block;margin-top:6px;font:500 10.5px/1 var(--rv-font);color:var(--rv-link);
+             border-bottom:1px solid oklch(0.45 0.13 250 / .4);cursor:pointer}
+.idbox[hidden]{display:none}
+.fstats{flex:1;min-height:0;display:flex;flex-direction:column}
+.fstats-hd{display:flex;align-items:baseline;gap:6px;margin-bottom:8px}
+.fstats-clear{font:500 10px/1 var(--rv-font);color:var(--rv-dim3);cursor:pointer}
+.fstats-clear.on{color:var(--rv-ink)}
+.fstats-list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px}
+.fstat-row{display:flex;flex-direction:column;gap:3px;cursor:pointer}
+.fstat-top{display:flex;align-items:baseline;gap:6px}
+.fstat-name{font:400 10.5px/1.2 var(--rv-mono);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4a463e}
+.fstat-row.on .fstat-name{font-weight:600;color:var(--rv-ink)}
+.fstat-n{font:500 10.5px/1.2 var(--rv-mono);color:var(--rv-dim2)}
+.fstat-track{height:3px;background:rgba(0,0,0,.08);border-radius:2px;overflow:hidden}
+.fstat-bar{height:100%;background:oklch(0.5 0.11 285 / .67)}
+.fstat-row.on .fstat-bar{background:var(--rv-ink)}
+
+.listcol{flex:1;min-width:0;display:flex;flex-direction:column}
+.filterbar{flex:none;padding:12px 16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+          border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-card);position:relative;z-index:9}
+.searchbox{display:flex;align-items:center;gap:7px;background:var(--rv-card);border:1px solid rgba(0,0,0,.16);
+          border-radius:14px;padding:6px 11px}
+.searchbox.on{border-color:var(--rv-ink)}
+.searchbox .sicon{font:400 11px/1 var(--rv-mono);color:var(--rv-dim)}
+.searchbox input{width:232px;font:400 11.5px/1 var(--rv-font);color:var(--rv-ink);background:transparent;border:none;outline:none;padding:0}
+.searchbox .clearx{font:400 10px/1 var(--rv-font);color:var(--rv-muted);cursor:pointer;padding:0 2px}
+.filter-group{position:relative}
+.pill-filter{display:flex;align-items:center;gap:6px;font:500 11.5px/1 var(--rv-font);color:#4a463e;
+            background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:14px;padding:7px 11px;
+            cursor:pointer;user-select:none}
+.pill-filter.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.pill-filter .car{font-size:8px;opacity:.55}
+.dmenu{position:absolute;top:32px;left:0;z-index:30;min-width:186px;max-height:264px;overflow:auto;
+      background:var(--rv-card);border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px}
+.dmenu[hidden]{display:none}
+.dmenu-item{display:flex;align-items:center;gap:8px;font:400 11.5px/1.3 var(--rv-font);color:var(--rv-ink);
+           padding:7px 9px;border-radius:5px;cursor:pointer}
+.dmenu-item:hover{background:var(--rv-panel)}
+.dmenu-item.on{font-weight:600}
+.dmenu-item .lb{flex:1;min-width:0}
+.dmenu-item .n{font:500 10px/1 var(--rv-mono);color:var(--rv-dim)}
+.vsep{width:1px;height:20px;background:rgba(0,0,0,.12);margin:0 3px}
+.selcount{font:400 11px/1 var(--rv-font);color:var(--rv-faint)}
+.bulk-btn{font:500 11.5px/1 var(--rv-font);color:var(--rv-dim2);background:var(--rv-card);
+         border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:7px 11px;cursor:default}
+.bulk-btn.active{color:var(--rv-ink);border-color:rgba(0,0,0,.28);cursor:pointer}
+
+.thead{flex:none;display:grid;grid-template-columns:32px 1fr 120px 92px 118px 116px 78px;gap:10px;
+      align-items:center;padding:8px 14px;background:var(--rv-panel);border-bottom:1px solid rgba(0,0,0,.1);
+      font:600 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.chk{width:15px;height:15px;border-radius:3px;display:flex;align-items:center;justify-content:center;
+    font:600 10px/1 var(--rv-mono);color:var(--rv-card);cursor:pointer;background:transparent;
+    border:1.5px solid rgba(0,0,0,.24)}
+.chk.on{background:var(--rv-ink);border-color:var(--rv-ink)}
+
+.tbody{flex:1;min-height:0;overflow:auto;background:var(--rv-card);display:flex;flex-direction:column;position:relative}
+.row{display:grid;grid-template-columns:32px 1fr 120px 92px 118px 116px 78px;gap:10px;align-items:center;
+    padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:transparent;
+    border-left:3px solid transparent}
+.row:hover{background:rgba(0,0,0,.02)}
+.row.on{background:#f0ece1;border-left-color:var(--rv-ink)}
+.row .rname{display:flex;align-items:center;gap:7px;min-width:0}
+.row .rname .nm{font:400 11.5px/1.35 var(--rv-font);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.on .rname .nm{font-weight:500}
+.row .live{font:600 11px/1 var(--rv-mono);color:var(--rv-red)}
+.row .fld{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ov{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ov.empty{color:var(--rv-dim2)}
+.row .sv{font:600 10.5px/1.3 var(--rv-mono);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sv.empty{font-weight:400;color:var(--rv-dim2)}
+.row .cf{font:600 10.5px/1.3 var(--rv-mono)}
+.row .st{font:400 10px/1.3 var(--rv-font);color:var(--rv-dim)}
+
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.empty .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:340px}
+.empty .bt{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+          border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:8px 13px;cursor:pointer}
+.loading,.errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.errbox .ti{font:600 14px/1.4 var(--rv-font)}
+.errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);text-align:center;max-width:420px}
+.errbox a,.errbox button{display:inline-block;padding:8px 18px;border-radius:6px;background:var(--rv-ink);
+          color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+.pager{flex:none;height:40px;border-top:1px solid rgba(0,0,0,.1);background:var(--rv-panel);
+      display:flex;align-items:center;padding:0 14px;gap:8px}
+.pager .pinfo{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.pager .grow{flex:1}
+.pnum{font:500 10.5px/1 var(--rv-mono);color:var(--rv-muted);border-radius:4px;padding:5px 7px;cursor:pointer;user-select:none}
+.pnum.on{color:var(--rv-canvas);background:var(--rv-ink)}
+.pnum.dim{color:var(--rv-dim3);cursor:default}
+
+/* ── 단가표 편입 대기 탭 ── */
+.sourcing{flex:1;min-height:0;display:flex;flex-direction:column;padding:18px}
+.src-banner{flex:none;border:1px solid rgba(0,0,0,.12);border-left:3px solid var(--rv-faint);background:var(--rv-panel2);
+           border-radius:7px;padding:11px 13px;margin-bottom:14px}
+.src-banner .t{font:600 11.5px/1.4 var(--rv-font);margin-bottom:3px}
+.src-banner .d{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.src-banner code{font-family:var(--rv-mono)}
+.src-head{flex:none;display:grid;grid-template-columns:1fr 150px 110px 96px 150px;gap:10px;padding:8px 14px;
+         background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;
+         font:600 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.src-body{flex:1;min-height:0;overflow:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+         border-top:none;border-radius:0 0 7px 7px}
+.src-row{display:grid;grid-template-columns:1fr 150px 110px 96px 150px;gap:10px;align-items:center;
+        padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.src-row .nm{font:400 11.5px/1.35 var(--rv-font);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src-row .sup{font:400 11px/1.3 var(--rv-font);color:var(--rv-muted)}
+.src-row .pt{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted)}
+.src-row .pr{font:500 11px/1.3 var(--rv-mono)}
+.src-btn{font:500 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+        border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:7px 10px;cursor:pointer;text-align:center}
+.src-btn.linked{color:var(--rv-green);border-color:oklch(0.5 0.11 165 / .4)}
+.src-btn.dis{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:default}
+
+/* ── 상세 서랍 ── */
+.drawer{position:absolute;top:143px;right:0;bottom:0;width:536px;background:var(--rv-card);
+       border-left:1px solid rgba(0,0,0,.16);box-shadow:-18px 0 40px rgba(38,35,30,.12);
+       display:flex;flex-direction:column;z-index:8}
+.drawer[hidden]{display:none}
+.dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.dw-hd .row1{display:flex;align-items:center;gap:8px}
+.dw-hd .title{font:600 14.5px/1.35 var(--rv-font);flex:1;min-width:0}
+.dw-hd .live{font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap}
+.dw-hd .close{font:400 17px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 6px;background:none;border:0}
+.dw-hd .meta{display:flex;gap:12px;margin-top:6px;font:400 11px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px}
+.risk-badge{font:600 10px/1 var(--rv-mono);border-radius:4px;padding:3px 6px;margin-left:6px}
+.compare-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.compare-cap .fk{font-family:var(--rv-mono);font-weight:400}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cbox{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:10px 12px;background:var(--rv-panel2)}
+.cbox.suggest{background:#f6f2e8;border:1.5px solid rgba(0,0,0,.22)}
+.cbox.suggest.low{border-color:var(--rv-amber);background:var(--rv-amber-bg)}
+.cbox .lb{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint);margin-bottom:5px}
+.cbox .vv{font:600 21px/1.15 var(--rv-mono)}
+.cbox .vv.empty{font:400 14px/1.3 var(--rv-font);color:var(--rv-dim)}
+.sig-box{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0}
+.sig-box.low{border-color:var(--rv-amber);background:oklch(0.96 0.035 70)}
+.sig-row1{display:flex;align-items:center;gap:8px}
+.sig-chip{font:600 11px/1 var(--rv-mono);background:var(--rv-card);border:1px solid;border-radius:4px;padding:4px 6px}
+.sig-head{font:600 11.5px/1.35 var(--rv-font);flex:1;min-width:0}
+.sig-kind{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted)}
+.sig-track{height:4px;border-radius:2px;background:rgba(0,0,0,.1);margin:9px 0 8px;overflow:hidden}
+.sig-bar{height:100%}
+.sig-note{font:400 11px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.sig-src{display:flex;align-items:center;gap:8px;margin-top:9px;cursor:pointer}
+.sig-src .url{font:500 11px/1.3 var(--rv-font);color:var(--rv-link);border-bottom:1px solid oklch(0.45 0.13 250 / .4);
+             overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:360px}
+.sig-src .seen{font:500 10px/1 var(--rv-font);border:1px solid;border-radius:4px;padding:3px 6px}
+.manual-box{border:1.5px solid var(--rv-ink);border-radius:7px;padding:11px 13px;background:#f6f2e8}
+.manual-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.manual-row{display:flex;align-items:center;gap:8px}
+.manual-row input{flex:1;min-width:0;font:500 13px/1 var(--rv-mono);color:var(--rv-ink);background:var(--rv-card);
+                  border:1px solid rgba(0,0,0,.28);border-radius:5px;padding:9px 10px;outline:none}
+.btn-commit{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+           border-radius:5px;padding:9px 14px;cursor:pointer}
+.btn-cancel{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+           border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:9px 11px;cursor:pointer}
+.manual-err{margin-top:8px;font:400 10.5px/1.5 var(--rv-font);color:oklch(0.52 0.16 30)}
+.specs-cap{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.specs-cap .t{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em}
+.specs-cap .s{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
+.specs-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.spec-chip{font:400 10.5px/1 var(--rv-mono);border-radius:5px;padding:5px 7px;background:#faf7f0;border:1px solid}
+.sib-cap{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.sib-cap .t{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em}
+.sib-cap .s{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
+.sib-list{display:flex;flex-direction:column;gap:5px}
+.sib-row{display:flex;align-items:center;gap:9px;border:1px solid rgba(0,0,0,.11);border-radius:6px;
+        padding:7px 10px;background:var(--rv-panel2);cursor:pointer}
+.sib-row .nm{font:400 11.5px/1.3 var(--rv-font);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sib-row .cd{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;background:var(--rv-panel)}
+.dw-foot .row1{display:flex;align-items:center;gap:8px}
+.dw-foot .note{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.dw-foot .note.warn{color:var(--rv-red)}
+.btn-reject{font:600 11.5px/1 var(--rv-font);color:#5b564d;background:var(--rv-card);
+           border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-manual{font:600 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+           border:1px solid rgba(0,0,0,.28);border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-approve{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+            border:none;border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-approve.dim{background:var(--rv-dim3);color:#f0ece2}
+.dis-btn{opacity:.55;cursor:not-allowed!important}
+
+/* ── 토스트 — 컨테이너(.a2-toasts, 위치 고정)는 셸이 그린다. 이 화면은 기존에 검증된
+   자체 렌더 로직(toast()/renderToasts())을 그대로 쓰므로 안쪽 카드 클래스만 남긴다. ── */
+.toast{display:flex;align-items:center;gap:10px;background:var(--rv-nav);color:var(--rv-nav-ink);border-radius:7px;
+      padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);border-left:3px solid;max-width:460px}
+.toast .mark{font:600 11px/1 var(--rv-mono)}
+.toast .msg{font:400 11.5px/1.5 var(--rv-font);max-width:340px}
+.toast .act{font:600 11px/1 var(--rv-font);color:var(--rv-nav-ink);border:1px solid rgba(255,255,255,.3);
+           border-radius:5px;padding:6px 9px;cursor:pointer;white-space:nowrap;background:none}
+.toast .cx{font:400 12px/1 var(--rv-font);opacity:.55;cursor:pointer;background:none;border:0;color:inherit}
+
+@media (max-width:768px){
+  .review-body{flex-direction:column}
+  .qside{width:100%}
+  .drawer{position:fixed;top:0;width:100%}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="donetoday">오늘 처리 <b class="num" id="doneToday">—</b>건</span>
+<button type="button" class="undo-btn" id="undoBtn" data-action="undo-last" disabled>되돌리기</button>
+{% endblock %}
+
+{% block content %}
+    <div class="tabsbar">
+      <button type="button" class="tabitem on" id="tabReview" data-action="switch-tab" data-tab="review">
+        <span>사양 검수</span><span class="cnt" id="tabReviewCnt">—</span>
+      </button>
+      <button type="button" class="tabitem" id="tabSourcing" data-action="switch-tab" data-tab="sourcing">
+        <span>단가표 편입 대기</span><span class="cnt" id="tabSourcingCnt">—</span>
+      </button>
+    </div>
+
+    <section class="view on" id="viewReview">
+      <div class="review-body">
+        <aside class="qside">
+          <div>
+            <div class="qcap">이 필터 범위</div>
+            <div class="scope-n"><span class="v" id="scopeCount">—</span><span class="l">건 대기</span></div>
+            <div class="live-line" id="liveLine" data-action="toggle-live">● 판매중·재고&gt;0 —건 — 지금 매출에 영향</div>
+          </div>
+          <div>
+            <div class="qcap">할 수 있는 일</div>
+            <div class="chunks" id="chunks"></div>
+          </div>
+          <div class="idbox" id="idBox" hidden>
+            <div class="row1"><span class="n" id="idCount">▲ —</span><span class="t">정체성 충돌</span></div>
+            <div class="d">사양이 아니라 다나와코드·상품명 문제라 이 화면에서는 못 닫습니다.</div>
+            <div class="link" data-action="go-identity">정체성 검수 화면으로 →</div>
+          </div>
+          <div class="fstats">
+            <div class="fstats-hd">
+              <span class="qcap" style="margin-bottom:0">사양 필드별 대기</span>
+              <span style="flex:1"></span>
+              <span class="fstats-clear" id="fstatsClear" data-action="clear-field">해제</span>
+            </div>
+            <div class="fstats-list" id="fstatsList"></div>
+          </div>
+        </aside>
+
+        <div class="listcol">
+          <div class="filterbar" data-keep="1">
+            <div class="searchbox" id="searchBox">
+              <span class="sicon">⌕</span>
+              <input id="searchInput" placeholder="상품명 · product_code · 사양 필드 검색" autocomplete="off">
+              <span class="clearx" id="clearSearch" data-action="clear-search" hidden>✕</span>
+            </div>
+            <div class="filter-group">
+              <button type="button" class="pill-filter" id="pillPart" data-action="toggle-menu" data-menu="part">
+                <span id="pillPartLabel">부품 종류: 전체</span><span class="car">▼</span>
+              </button>
+              <div class="dmenu" id="menuPart" hidden></div>
+            </div>
+            <button type="button" class="pill-filter" id="pillLive" data-action="toggle-live-filter">판매중·재고 있는 것만</button>
+            <div class="filter-group">
+              <button type="button" class="pill-filter" id="pillField" data-action="toggle-menu" data-menu="field">
+                <span id="pillFieldLabel">사양 필드: 전체</span><span class="car">▼</span>
+              </button>
+              <div class="dmenu" id="menuField" hidden></div>
+            </div>
+            <div class="filter-group">
+              <button type="button" class="pill-filter" id="pillStatus" data-action="toggle-menu" data-menu="status">
+                <span id="pillStatusLabel">처리 상태: 대기</span><span class="car">▼</span>
+              </button>
+              <div class="dmenu" id="menuStatus" hidden></div>
+            </div>
+            <span class="vsep"></span>
+            <span class="selcount" id="selCount">0건 선택</span>
+            <button type="button" class="bulk-btn" id="bulkBtn" data-action="bulk-apply">선택 항목 함께 적용</button>
+            <span class="grow"></span>
+          </div>
+
+          <div class="thead">
+            <span class="chk" id="checkAll" data-action="toggle-all"></span>
+            <span>상품</span><span>사양 필드</span><span>원문값</span><span>제안값</span><span>신뢰 신호</span><span>상태</span>
+          </div>
+
+          <div class="tbody" id="tbody">
+            <div class="loading">불러오는 중…</div>
+          </div>
+
+          <div class="pager" id="pager">
+            <span class="pinfo" id="pageInfo">0 / 0</span>
+            <span class="grow"></span>
+            <div id="pagerNums" style="display:flex;gap:2px"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="viewSourcing">
+      <div class="sourcing">
+        <div class="src-banner">
+          <div class="t">이 탭은 사양 검수가 아닙니다 — 단가표(supplier_price_rows) 파생 항목입니다</div>
+          <div class="d">현재 <code>GET /api/admin/reviews</code>가 1페이지에 함께 반환하고 있어 여기 남겨 두었습니다.
+            매입·소싱 축(단가표 반영)으로 분리할지는 별도 결정 사항입니다.</div>
+        </div>
+        <div class="src-head">
+          <span>단가표 행</span><span>공급사</span><span>부품 종류</span><span>단가</span><span>동작</span>
+        </div>
+        <div class="src-body" id="srcBody">
+          <div class="loading">불러오는 중…</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="drawer" id="drawer" data-keep="1" hidden>
+      <div class="dw-hd">
+        <div class="row1">
+          <span class="title" id="dwName">—</span>
+          <span class="live" id="dwLive"></span>
+          <button type="button" class="close" data-action="close-drawer">✕</button>
+        </div>
+        <div class="meta">
+          <span id="dwCode">—</span><span id="dwPart">—</span><span id="dwCreated">—</span>
+        </div>
+      </div>
+      <div class="dw-body" id="dwBody"></div>
+      <div class="dw-foot">
+        <div class="row1">
+          <span class="note" id="dwNote">—</span>
+          <button type="button" class="btn-reject" data-action="reject">기각(보류)</button>
+          <button type="button" class="btn-manual" data-action="manual-open">직접 입력…</button>
+          <button type="button" class="btn-approve" id="dwApprove" data-action="approve">제안값 승인</button>
+        </div>
+      </div>
+    </aside>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var STATUS_ORDER = ['대기', '승인', '수정', '보류', '처리'];
+
+  var S = {
+    tab: 'review',
+    page: 1, size: 100,
+    f: { part_type: '', field: '', sellable: 0, status: '대기', keyword: '' },
+    chunk: 'all',                       // all|A|B -> suggested 0/1/-1
+    openMenu: null,
+    data: null, loadErr: null,
+    sel: null, drawerOpen: false,
+    checked: {},
+    manual: false, manualValue: '', manualError: '',
+    sourceSeen: false, sibChecked: {}, siblings: null,
+    me: null, fieldMeta: {},
+    undoQ: [], toasts: [], toastSeq: 0,
+    sourcing: { rows: null, loading: false, err: null }
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function qstr(obj) {
+    var parts = [];
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v === '' || v === null || v === undefined) return;
+      parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+    });
+    return parts.join('&');
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+
+  // ── 토스트 ───────────────────────────────────────────────────────
+  function toast(msg, kind, action, onAction) {
+    var id = ++S.toastSeq;
+    S.toasts.push({ id: id, msg: msg, kind: kind, action: action, onAction: onAction });
+    renderToasts();
+    setTimeout(function () {
+      S.toasts = S.toasts.filter(function (t) { return t.id !== id; });
+      renderToasts();
+    }, 7000);
+  }
+  function renderToasts() {
+    var box = $('toasts');
+    box.innerHTML = S.toasts.map(function (t) {
+      var color = t.kind === 'err' ? 'oklch(0.52 0.16 30)' : (t.kind === 'warn' ? 'oklch(0.62 0.15 55)' : 'oklch(0.5 0.11 165)');
+      var mark = t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓');
+      return '<div class="toast" style="border-left-color:' + color + '" data-tid="' + t.id + '">' +
+        '<span class="mark" style="color:' + color + '">' + mark + '</span>' +
+        '<span class="msg">' + esc(t.msg) + '</span>' +
+        (t.action ? '<button type="button" class="act" data-action="toast-act" data-tid="' + t.id + '">' + esc(t.action) + '</button>' : '') +
+        '<button type="button" class="cx" data-action="toast-close" data-tid="' + t.id + '">✕</button></div>';
+    }).join('');
+  }
+  var TOAST_HANDLERS = {};
+
+  // ── 권한 — 판정은 공용 셸(admin2-shell.js)이 한다. 역할 자체(S.me)는 이 화면도
+  //    쓰므로(버튼 문구·되돌리기 노트 등) meReady 로 받아 두는 로컬 사본이다. ──────
+  function canWrite() { return window.Admin2Shell.canWrite('operator'); }
+  function guard() {
+    if (!canWrite()) {
+      var cur = S.me ? S.me.role : '(로그인 필요)';
+      toast('권한이 부족합니다 (필요: operator, 현재: ' + cur + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+
+  // ── 필드 메타 ────────────────────────────────────────────────────
+  function fieldLabel(k) { var m = S.fieldMeta[k]; return (m && m.label) ? m.label : k; }
+  function fieldUnit(k) { var m = S.fieldMeta[k]; return (m && m.unit) ? m.unit : ''; }
+  function fieldNumeric(k) {
+    var m = S.fieldMeta[k];
+    return !!(m && (m.data_type === 'INTEGER' || m.data_type === 'NUMERIC'));
+  }
+  function withUnit(v, field) {
+    if (v === null || v === undefined || v === '') return null;
+    var u = fieldUnit(field);
+    return String(v) + (u ? ' ' + u : '');
+  }
+
+  var RISK_KO = { '치명': 'oklch(0.52 0.16 30)', '주의': 'oklch(0.62 0.15 55)', '경미': '#8a8377' };
+
+  // ── LNB(사이드바 접기·그룹 아코디언)는 공용 셸(`/shared/admin2/admin2-shell.js`)이
+  //    맡는다 — 이 화면이 따로 갖고 있던 initLnb/toggleLnb/toggleLnbGroup은 셸 통합
+  //    (2026-08-13)으로 걷어냈다. `data-keep="1"`는 셸의 LNB 마크업에 그대로 있으므로
+  //    아래 바깥클릭 규약은 그대로 유효하다.
+
+  // ── 선택 해제(바깥 클릭) ─────────────────────────────────────────
+  function clearSelection() {
+    if (!S.drawerOpen && S.sel === null && S.openMenu === null) return;
+    S.drawerOpen = false; S.sel = null; S.openMenu = null; S.manual = false;
+    renderDrawer(); renderTableSelection(); renderFilterMenus();
+  }
+
+  // ── 초기 로드 ────────────────────────────────────────────────────
+  function boot() {
+    bindStatic();
+    // 권한 표시(역할 배지)는 셸이 그린다 — 이 화면은 값만 받아서 버튼 활성/비활성에 쓴다.
+    window.Admin2Shell.meReady.then(function (me) { S.me = me; renderDrawer(); });
+    loadFieldMeta();
+    loadList();
+  }
+
+  function loadFieldMeta() {
+    apiGet('/api/admin/spec-fields').then(function (j) {
+      var map = {};
+      (j.items || []).forEach(function (f) { map[f.field_key] = f; });
+      S.fieldMeta = map;
+      renderFieldStats(); renderTable(); renderDrawer(); renderFilterMenus();
+    }).catch(function () { /* 필드 라벨이 키로 폴백된다 — 화면은 죽지 않는다 */ });
+  }
+
+  // ── 목록 조회 ────────────────────────────────────────────────────
+  function currentQuery() {
+    return {
+      page: S.page, size: S.size,
+      part_type: S.f.part_type, field: S.f.field,
+      sellable: S.f.sellable, status: S.f.status, keyword: S.f.keyword,
+      suggested: S.chunk === 'A' ? 1 : (S.chunk === 'B' ? -1 : 0)
+    };
+  }
+  function loadList() {
+    S.checked = {};                 // 서버 페이지네이션 — 안 보이는 선택은 실행할 수 없다(위 문서 ⑤)
+    var tbody = $('tbody');
+    tbody.innerHTML = '<div class="loading">불러오는 중…</div>';
+    apiGet('/api/admin/reviews?' + qstr(currentQuery())).then(function (j) {
+      S.data = j; S.loadErr = null;
+      if (S.sel !== null && !findItem(S.sel)) { S.sel = null; S.drawerOpen = false; }
+      renderAll();
+    }).catch(function (err) {
+      S.data = null; S.loadErr = err;
+      renderAll();
+    });
+  }
+  function findItem(review_id) {
+    if (!S.data) return null;
+    var found = null;
+    S.data.items.forEach(function (it) { if (it.review_id === review_id) found = it; });
+    return found;
+  }
+
+  function renderAll() {
+    renderTabsCount();
+    if (S.loadErr) { renderLoadError(); return; }
+    if (!S.data) return;
+    renderAside();
+    renderFilterBar();
+    renderTable();
+    renderPager();
+    renderDrawer();
+  }
+  function renderLoadError() {
+    var un = S.loadErr.status === 401;
+    var tbody = $('tbody');
+    tbody.innerHTML = '<div class="errbox"><div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
+      '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.' : ('검수 목록을 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>' +
+      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry-list">다시 시도</button>') +
+      '</div>';
+    $('scopeCount').textContent = '—';
+    $('chunks').innerHTML = ''; $('fstatsList').innerHTML = ''; $('idBox').hidden = true;
+    $('pageInfo').textContent = '0 / 0'; $('pagerNums').innerHTML = '';
+  }
+
+  // ── 좌측 집계 패널 ───────────────────────────────────────────────
+  function renderAside() {
+    var d = S.data, q = d.queue;
+    $('scopeCount').textContent = fmt(d.remaining);
+    var live = q.sellable;
+    var liveEl = $('liveLine');
+    liveEl.innerHTML = '● 판매중·재고&gt;0 ' + fmt(live) + '건 — 지금 매출에 영향';
+    liveEl.classList.toggle('on', !!S.f.sellable);
+
+    var chunkDefs = [
+      ['all', '전체 대기', q.total, '#bdb6a8'],
+      ['A', 'A · 제안 있음', q.suggested, 'oklch(0.5 0.11 165)'],
+      ['B', 'B · 값 없음', q.total - q.suggested, 'oklch(0.5 0.11 285)']
+    ];
+    $('chunks').innerHTML = chunkDefs.map(function (c) {
+      var on = S.chunk === c[0];
+      return '<div class="chunk-row' + (on ? ' on' : '') + '" data-action="set-chunk" data-chunk="' + c[0] + '">' +
+        '<span class="chunk-dot" style="background:' + c[3] + '"></span>' +
+        '<span class="chunk-title">' + esc(c[1]) + '</span>' +
+        '<span class="chunk-count num">' + fmt(c[2]) + '</span></div>';
+    }).join('');
+
+    var idc = q.identity_conflict || 0;
+    $('idBox').hidden = idc === 0;
+    $('idCount').textContent = '▲ ' + fmt(idc);
+
+    renderFieldStats();
+  }
+  function renderFieldStats() {
+    if (!S.data) return;
+    var rows = (S.data.queue.by_field || []).slice();
+    var max = rows.length ? Math.max.apply(null, rows.map(function (r) { return r.n; })) : 1;
+    $('fstatsClear').classList.toggle('on', !!S.f.field);
+    $('fstatsList').innerHTML = rows.map(function (r) {
+      var on = S.f.field === r.field;
+      return '<div class="fstat-row' + (on ? ' on' : '') + '" data-action="set-field" data-field="' + esc(r.field) + '">' +
+        '<div class="fstat-top"><span class="fstat-name">' + esc(fieldLabel(r.field)) + '</span>' +
+        '<span class="fstat-n num">' + fmt(r.n) + '</span></div>' +
+        '<div class="fstat-track"><div class="fstat-bar" style="width:' + Math.round(r.n / max * 100) + '%"></div></div></div>';
+    }).join('');
+  }
+
+  // ── 탭 ───────────────────────────────────────────────────────────
+  function renderTabsCount() {
+    if (S.data) $('tabReviewCnt').textContent = fmt(S.data.queue ? S.data.queue.total : S.data.remaining);
+    if (S.sourcing.rows) $('tabSourcingCnt').textContent = fmt(S.sourcing.rows.length);
+  }
+  function switchTab(tab) {
+    if (S.tab === tab) return;
+    S.tab = tab;
+    $('tabReview').classList.toggle('on', tab === 'review');
+    $('tabSourcing').classList.toggle('on', tab === 'sourcing');
+    $('viewReview').classList.toggle('on', tab === 'review');
+    $('viewSourcing').classList.toggle('on', tab === 'sourcing');
+    if (tab === 'sourcing' && !S.sourcing.rows && !S.sourcing.loading) loadSourcing();
+  }
+
+  // ── 필터 바 ──────────────────────────────────────────────────────
+  function renderFilterBar() {
+    var d = S.data;
+    $('pillPartLabel').textContent = S.f.part_type ? '부품: ' + S.f.part_type : '부품 종류: 전체';
+    $('pillPart').classList.toggle('on', !!S.f.part_type);
+    $('pillFieldLabel').textContent = S.f.field ? '필드: ' + fieldLabel(S.f.field) : '사양 필드: 전체';
+    $('pillField').classList.toggle('on', !!S.f.field);
+    $('pillStatusLabel').textContent = '처리 상태: ' + S.f.status;
+    $('pillStatus').classList.toggle('on', S.f.status !== '대기');
+    $('pillLive').classList.toggle('on', !!S.f.sellable);
+    var nSel = Object.keys(S.checked).length;
+    $('selCount').textContent = nSel + '건 선택';
+    $('bulkBtn').classList.toggle('active', nSel > 0);
+    renderFilterMenus();
+  }
+  function renderFilterMenus() {
+    var d = S.data; if (!d) return;
+    // 부품 종류
+    var partItems = [{ v: '', label: '전체', n: d.remaining }].concat(
+      (d.by_type || []).map(function (r) { return { v: r.part_type, label: r.label, n: r.n }; }));
+    $('menuPart').innerHTML = menuHtml(partItems, S.f.part_type, 'set-part');
+    // 사양 필드
+    var fieldItems = [{ v: '', label: '전체', n: '' }].concat(
+      (d.queue.by_field || []).map(function (r) { return { v: r.field, label: fieldLabel(r.field), n: r.n }; }));
+    $('menuField').innerHTML = menuHtml(fieldItems, S.f.field, 'set-field-filter');
+    // 처리 상태
+    var sc = d.status_counts || {};
+    var statusItems = STATUS_ORDER.map(function (s) { return { v: s, label: s, n: sc[s] || 0 }; });
+    $('menuStatus').innerHTML = menuHtml(statusItems, S.f.status, 'set-status');
+
+    $('menuPart').hidden = S.openMenu !== 'part';
+    $('menuField').hidden = S.openMenu !== 'field';
+    $('menuStatus').hidden = S.openMenu !== 'status';
+  }
+  function menuHtml(items, current, action) {
+    return items.map(function (i) {
+      var on = i.v === current;
+      return '<div class="dmenu-item' + (on ? ' on' : '') + '" data-action="' + action + '" data-v="' + esc(i.v) + '">' +
+        '<span class="lb">' + esc(i.label) + '</span>' +
+        (i.n !== '' ? '<span class="n num">' + fmt(i.n) + '</span>' : '') + '</div>';
+    }).join('');
+  }
+
+  // ── 목록 표 ──────────────────────────────────────────────────────
+  function confOf(row) {
+    var sig = row.signal;
+    var c = sig ? sig.confidence : null;
+    if (c === null || c === undefined) return { c: '#a09889', label: '—', tier: null };
+    var tier = c < 0.5 ? 'low' : (c < 0.8 ? 'mid' : 'high');
+    var color = tier === 'low' ? 'oklch(0.62 0.15 55)' : (tier === 'mid' ? '#6f6a61' : 'oklch(0.5 0.11 165)');
+    var mark = tier === 'low' ? '▲ ' : (tier === 'mid' ? '◆ ' : '● ');
+    return { c: color, label: mark + c.toFixed(2), tier: tier };
+  }
+  function stateText(row) {
+    if (row.type === 'sourcing_hold') return '편입 대기';
+    if (S.f.status !== '대기') return row.type ? (STATUS_ORDER.indexOf(S.f.status) >= 0 ? S.f.status : row.type) : S.f.status;
+    return row.suggested_value ? '대기 · 제안' : '대기 · 값없음';
+  }
+  function renderTable() {
+    var d = S.data; if (!d) return;
+    var items = (d.items || []).filter(function (it) { return it.type !== 'sourcing_hold'; });
+    var tbody = $('tbody');
+    if (!items.length) {
+      var totalWaiting = d.queue.total;
+      var title = totalWaiting === 0 ? '검수 대기가 없습니다'
+        : (S.f.keyword ? '"' + S.f.keyword + '"와 맞는 검수 건이 없습니다' : '이 필터에는 없습니다');
+      var desc = totalWaiting === 0 ? '지금 큐가 비어 있습니다 — 새 수집 결과가 들어오면 여기에 쌓입니다.'
+        : (S.f.keyword
+          ? '상품명·product_code·사양 필드명으로만 찾습니다. 검색어를 지우면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.'
+          : '필터 범위를 넓히면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.');
+      tbody.innerHTML = '<div class="empty"><div class="ti">' + esc(title) + '</div>' +
+        '<div class="ds">' + esc(desc) + '</div>' +
+        '<div class="bt" data-action="reset-filters">필터 초기화</div></div>';
+      return;
+    }
+    tbody.innerHTML = items.map(function (r) {
+      var on = r.review_id === S.sel && S.drawerOpen;
+      var ck = !!S.checked[r.review_id];
+      var cd = confOf(r);
+      var ov = withUnit(r.origin_value, r.field);
+      var sv = withUnit(r.suggested_value, r.field);
+      return '<div class="row' + (on ? ' on' : '') + '" data-keep="1" data-action="open-row" data-id="' + r.review_id + '">' +
+        '<span class="chk' + (ck ? ' on' : '') + '" data-action="check-row" data-id="' + r.review_id + '">' + (ck ? '✓' : '') + '</span>' +
+        '<span class="rname"><span class="nm">' + esc(r.name) + '</span>' +
+        (r.live ? '<span class="live">●</span>' : '') + '</span>' +
+        '<span class="fld">' + esc(r.field || '—') + '</span>' +
+        '<span class="ov' + (ov ? '' : ' empty') + '">' + esc(ov || '없음') + '</span>' +
+        '<span class="sv' + (sv ? '' : ' empty') + '">' + esc(sv || '—') + '</span>' +
+        '<span class="cf" style="color:' + cd.c + '">' + esc(cd.label) + '</span>' +
+        '<span class="st">' + esc(stateText(r)) + '</span></div>';
+    }).join('');
+    var nSel = Object.keys(S.checked).length;
+    var allOn = items.length > 0 && items.every(function (r) { return S.checked[r.review_id]; });
+    $('checkAll').classList.toggle('on', allOn);
+    $('checkAll').textContent = allOn ? '✓' : '';
+  }
+  function renderTableSelection() {
+    document.querySelectorAll('#tbody .row').forEach(function (el) {
+      var id = Number(el.getAttribute('data-id'));
+      el.classList.toggle('on', id === S.sel && S.drawerOpen);
+    });
+  }
+
+  function renderPager() {
+    var d = S.data;
+    var from = d.total ? (d.page - 1) * d.size + 1 : 0;
+    var to = Math.min(d.total, d.page * d.size);
+    $('pageInfo').textContent = (d.total ? (from + '–' + to + ' / ' + fmt(d.total)) : '0 / 0');
+    var totalPages = Math.max(1, d.pages || 1);
+    var cur = d.page;
+    var nums = [];
+    var first = Math.max(1, Math.min(cur - 1, totalPages - 2));
+    for (var i = first; i < Math.min(first + 3, totalPages + 1); i++) nums.push(i);
+    var html = '';
+    html += pagerBtn('‹', Math.max(1, cur - 1), cur <= 1);
+    nums.forEach(function (n) { html += pagerBtn(String(n), n, false, n === cur); });
+    if (totalPages > 3 && nums.indexOf(totalPages) < 0) {
+      html += '<span class="pnum dim">…</span>' + pagerBtn(String(totalPages), totalPages, false);
+    }
+    html += pagerBtn('›', Math.min(totalPages, cur + 1), cur >= totalPages);
+    $('pagerNums').innerHTML = html;
+  }
+  function pagerBtn(label, page, dim, on) {
+    return '<span class="pnum' + (on ? ' on' : '') + (dim ? ' dim' : '') + '"' +
+      (dim ? '' : ' data-action="go-page" data-page="' + page + '"') + '>' + esc(label) + '</span>';
+  }
+
+  // ── 단가표 편입 대기 ─────────────────────────────────────────────
+  function loadSourcing() {
+    S.sourcing.loading = true;
+    $('srcBody').innerHTML = '<div class="loading">불러오는 중…</div>';
+    apiGet('/api/admin/reviews?page=1').then(function (j) {
+      S.sourcing.rows = (j.items || []).filter(function (it) { return it.type === 'sourcing_hold'; });
+      S.sourcing.loading = false; S.sourcing.err = null;
+      renderSourcing(); renderTabsCount();
+    }).catch(function (err) {
+      S.sourcing.loading = false; S.sourcing.err = err;
+      renderSourcing();
+    });
+  }
+  function renderSourcing() {
+    if (S.sourcing.err) {
+      $('srcBody').innerHTML = '<div class="errbox"><div class="ti">조회 실패</div>' +
+        '<div class="ds">' + esc(S.sourcing.err.message) + '</div>' +
+        '<button type="button" data-action="retry-sourcing">다시 시도</button></div>';
+      return;
+    }
+    var rows = S.sourcing.rows || [];
+    if (!rows.length) {
+      $('srcBody').innerHTML = '<div class="empty"><div class="ti">단가표 편입 대기가 없습니다</div></div>';
+      return;
+    }
+    $('srcBody').innerHTML = rows.map(function (r) {
+      var linked = !!r._linked;
+      var price = r.src && r.src.cost != null ? fmt(r.src.cost) + '원' : '—';
+      var btn;
+      if (linked) {
+        btn = '<span class="src-btn linked" data-action="sourcing-unlink" data-rid="' + esc(r.src_row_id) + '">연결됨 · 해제</span>';
+      } else if (r.cand) {
+        btn = '<span class="src-btn" data-action="sourcing-link" data-rid="' + esc(r.src_row_id) +
+          '" data-sku="' + esc(r.cand.sku) + '" title="후보: ' + esc(r.cand.name) + ' (유사도 ' + r.cand.sim.toFixed(2) + ')">후보에 연결</span>';
+      } else {
+        btn = '<span class="src-btn dis" title="유사 후보 없음 — 신규 상품 등록 필요(비범위)">연결 대상 없음</span>';
+      }
+      // r.cat 폴백 '—'는 "값이 비어 있다"는 뜻이다 — "부품 종류가 ETC(기타)다"와는
+      // 다른 사실이라 taxonomy.py의 ETC 표시 라벨과 같은 글자를 쓰지 않는다
+      // (2026-08-13: ETC 라벨이 "미분류" -> "기타(ETC)"로 바뀌면서 이 자리도 함께 점검).
+      return '<div class="src-row"><span class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</span>' +
+        '<span class="sup">' + esc((r.src && r.src.sup) || '—') + '</span>' +
+        '<span class="pt">' + esc(r.cat || '—') + '</span>' +
+        '<span class="pr num">' + price + '</span>' + btn + '</div>';
+    }).join('');
+  }
+  function sourcingLink(rowId, sku) {
+    if (!guard()) return;
+    apiPost('/api/admin/reviews/sourcing/link', { row_id: Number(rowId), sku: sku, via: 'candidate' }).then(function (j) {
+      var row = (S.sourcing.rows || []).filter(function (r) { return String(r.src_row_id) === String(rowId); })[0];
+      if (row) { row._linked = true; row._undoId = j.undo_id; }
+      S.undoQ.push({ kind: 'sourcing', id: j.undo_id, label: '단가표 연결 · ' + sku });
+      renderUndoBtn();
+      toast('상품에 연결했습니다 — ' + sku, 'ok', '되돌리기', function () { sourcingUnlink(j.undo_id); });
+      renderSourcing();
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function sourcingUnlink(logId) {
+    apiPost('/api/admin/reviews/sourcing/unlink/' + logId, {}).then(function () {
+      (S.sourcing.rows || []).forEach(function (r) { if (r._undoId === logId) { r._linked = false; r._undoId = null; } });
+      toast('연결을 해제했습니다', 'ok');
+      renderSourcing();
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── 상세 서랍 ────────────────────────────────────────────────────
+  function openRow(id) {
+    if (S.sel === id && S.drawerOpen) { S.drawerOpen = false; S.sel = null; renderTableSelection(); renderDrawer(); return; }
+    S.sel = id; S.drawerOpen = true; S.manual = false; S.manualValue = ''; S.manualError = '';
+    S.sourceSeen = false; S.sibChecked = {}; S.siblings = null;
+    renderTableSelection(); renderDrawer();
+    loadSiblings(id);
+  }
+  function closeDrawer() { S.drawerOpen = false; S.sel = null; renderTableSelection(); renderDrawer(); }
+
+  function loadSiblings(id) {
+    apiGet('/api/admin/reviews/' + id + '/siblings').then(function (j) {
+      if (S.sel !== id) return;
+      S.siblings = j.siblings || [];
+      S.siblings.forEach(function (s, i) { S.sibChecked[i] = true; });
+      renderDrawer();
+    }).catch(function () { if (S.sel === id) { S.siblings = []; renderDrawer(); } });
+  }
+
+  function renderDrawer() {
+    var drawer = $('drawer');
+    var row = S.drawerOpen ? findItem(S.sel) : null;
+    if (!row || S.tab !== 'review') { drawer.hidden = true; return; }
+    drawer.hidden = false;
+    $('dwName').textContent = row.name;
+    var liveEl = $('dwLive');
+    liveEl.textContent = row.live ? '● 판매중·재고 있음' : '○ 판매중지';
+    liveEl.style.color = row.live ? 'oklch(0.52 0.16 30)' : '#8a8377';
+    liveEl.style.background = row.live ? 'oklch(0.94 0.04 30)' : '#efeade';
+    $('dwCode').textContent = row.product_code != null ? ('product_code ' + row.product_code) : '';
+    $('dwPart').textContent = row.part_type || '';
+    $('dwCreated').textContent = '등록 ' + (row.created_at ? row.created_at.slice(0, 10) : '—');
+
+    var isIdentity = (row.type === 'spec_conflict' && row.field === 'danawa_code') || row.type === 'name_invalid';
+    var cd = confOf(row);
+    var ov = withUnit(row.origin_value, row.field);
+    var sv = withUnit(row.suggested_value, row.field);
+    var riskColor = RISK_KO[row.risk] || '#8a8377';
+
+    var html = '';
+    html += '<div><div class="compare-cap">대조 — ' + esc(fieldLabel(row.field || '')) +
+      ' <span class="fk">' + esc(row.field || '—') + '</span>' +
+      '<span class="risk-badge" style="color:' + riskColor + ';background:' + riskColor + '1a;border:1px solid ' + riskColor + '55">' +
+      esc(row.risk || '') + '</span></div>' +
+      '<div class="compare-grid">' +
+      '<div class="cbox"><div class="lb">원문 추출값</div><div class="vv' + (ov ? '' : ' empty') + '">' + esc(ov || '없음') + '</div></div>' +
+      '<div class="cbox suggest' + (cd.tier === 'low' ? ' low' : '') + '"><div class="lb">' +
+      (row.suggested_value ? '제안값 · ' + esc(labelForSource(row.suggest_source)) : '제안 없음 — 사람이 찾아 입력') + '</div>' +
+      '<div class="vv' + (sv ? '' : ' empty') + '">' + esc(sv || '값 없음') + '</div></div></div></div>';
+
+    if (row.suggested_value) {
+      var sig = row.signal;
+      var conf = sig && sig.confidence != null ? sig.confidence : null;
+      var head = cd.tier === 'low' ? '신뢰도 낮음 — 검증 없이 승인하지 마세요'
+        : (cd.tier === 'mid' ? '신뢰도 보통 — 출처를 확인한 뒤 승인하세요'
+        : (cd.tier === 'high' ? '신뢰도 높음 — 교차 확인된 값' : '신뢰 신호 없음'));
+      html += '<div class="sig-box' + (cd.tier === 'low' ? ' low' : '') + '">' +
+        '<div class="sig-row1"><span class="sig-chip" style="color:' + cd.c + ';border-color:' + cd.c + '">' + esc(cd.label) + '</span>' +
+        '<span class="sig-head">' + esc(head) + '</span>' +
+        '<span class="sig-kind">' + esc((sig && sig.source_name) || labelForSource(row.suggest_source)) + '</span></div>' +
+        '<div class="sig-track"><div class="sig-bar" style="width:' + Math.round((conf || 0) * 100) + '%;background:' + cd.c + '"></div></div>' +
+        '<div class="sig-note">' + esc((sig && sig.note) || (row.detail || '')) + '</div>';
+      if (sig && sig.source_url) {
+        html += '<div class="sig-src" data-action="open-source" data-url="' + esc(sig.source_url) + '">' +
+          '<span class="url">' + esc(sig.source_url) + '</span>' +
+          '<span class="seen" style="color:' + (S.sourceSeen ? 'oklch(0.5 0.11 165)' : '#a09889') +
+          ';border-color:' + (S.sourceSeen ? 'oklch(0.5 0.11 165 / .4)' : 'rgba(0,0,0,.14)') + '">' +
+          (S.sourceSeen ? '원문 검증함' : '원문 검증') + '</span></div>';
+      }
+      html += '</div>';
+    }
+
+    if (S.manual) {
+      html += '<div class="manual-box"><div class="manual-cap">직접 입력 — ' + esc(row.field || '') + '</div>' +
+        '<div class="manual-row"><input id="manualInput" value="' + esc(S.manualValue) +
+        '" placeholder="' + esc(fieldNumeric(row.field) ? '숫자만 · 단위 ' + (fieldUnit(row.field) || '') : '값 입력') + '">' +
+        '<button type="button" class="btn-commit" data-action="manual-commit">확정</button>' +
+        '<button type="button" class="btn-cancel" data-action="manual-cancel">취소</button></div>' +
+        (S.manualError ? '<div class="manual-err">' + esc(S.manualError) + '</div>' : '') + '</div>';
+    }
+
+    var crit = row.crit || [];
+    var filled = crit.filter(function (c) { return c.ok === true; }).length;
+    var summary = crit.length ? ('필수 ' + crit.length + '개 중 ' + filled + '개 채워짐'
+      + (filled < crit.length ? ' · ' + (crit.length - filled) + '개 비어 있음' : '')) : '';
+    html += '<div><div class="specs-cap"><span class="t">이 상품의 필수 사양</span>' +
+      '<span class="s">' + esc(summary) + '</span></div><div class="specs-wrap">' +
+      crit.map(function (c) {
+        var mark = c.ok === true ? '✓' : (c.ok === false ? '○' : '△');
+        var color = c.ok === true ? 'oklch(0.5 0.11 165)' : (c.ok === false ? 'oklch(0.5 0.11 285)' : 'oklch(0.62 0.15 55)');
+        return '<span class="spec-chip" style="color:' + color + ';border-color:' + color + '44">' +
+          mark + ' ' + esc(fieldLabel(c.field)) + ' ' + esc(c.value) + '</span>';
+      }).join('') + '</div></div>';
+
+    if (S.siblings === null) {
+      html += '<div style="font:400 11px/1.5 var(--rv-font);color:var(--rv-dim)">형제 후보 확인 중…</div>';
+    } else if (S.siblings.length) {
+      html += '<div><div class="sib-cap"><span class="t">형제 — 같은 모델의 대기 건</span>' +
+        '<span class="s">함께 적용하면 되돌리기도 한 덩어리</span></div><div class="sib-list">' +
+        S.siblings.map(function (s, i) {
+          var on = !!S.sibChecked[i];
+          return '<div class="sib-row" data-action="toggle-sib" data-i="' + i + '">' +
+            '<span class="chk' + (on ? ' on' : '') + '">' + (on ? '✓' : '') + '</span>' +
+            '<span class="nm">' + esc(s.name) + '</span>' +
+            '<span class="cd">' + esc(s.product_code) + '</span></div>';
+        }).join('') + '</div></div>';
+    }
+
+    if (isIdentity) {
+      html += '<div style="font:400 11px/1.6 var(--rv-font);color:oklch(0.52 0.16 30);' +
+        'background:oklch(0.95 0.03 25);border:1px solid oklch(0.87 0.05 25);border-left:3px solid oklch(0.52 0.16 30);' +
+        'border-radius:6px;padding:9px 11px">이 화면은 사양이 아니라 정체성(다나와코드·상품명)이 틀린 건이라 승인 경로로' +
+        ' 못 닫습니다 — 기각(보류)만 됩니다. ' + esc(row.detail || '') + '</div>';
+    }
+
+    $('dwBody').innerHTML = html;
+
+    // 하단 동작
+    var viewer = !canWrite();
+    var noValue = !row.suggested_value;
+    $('dwApprove').textContent = row.suggested_value ? '제안값 승인' : '값 없음 — 직접 입력 필요';
+    $('dwApprove').classList.toggle('dim', noValue);
+    document.querySelectorAll('.dw-foot button').forEach(function (b) { b.classList.toggle('dis-btn', viewer); });
+    var sibOn = (S.siblings || []).filter(function (s, i) { return S.sibChecked[i]; }).length;
+    var note;
+    if (viewer) { note = '권한이 부족합니다 (필요: operator, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')'; }
+    else if (isIdentity) { note = '기각(보류)만 가능합니다 — 정체성 문제는 상품 관리에서 고칩니다'; }
+    else if (sibOn) { note = '형제 포함 ' + (1 + sibOn) + '건이 한 번에 적용되고, 되돌리기도 함께 묶입니다'; }
+    else { note = '되돌리기는 값·잠금·게이트·검수상태를 전부 되돌립니다'; }
+    var noteEl = $('dwNote');
+    noteEl.textContent = note; noteEl.classList.toggle('warn', viewer);
+    if (isIdentity) $('dwApprove').classList.add('dis-btn');
+  }
+
+  function labelForSource(src) {
+    return src === 'danawa' ? '다나와' : (src === 'web' ? '웹' : (src === 'ai' ? 'AI' : '—'));
+  }
+
+  function siblingIdsChecked() {
+    return (S.siblings || []).filter(function (s, i) { return S.sibChecked[i]; }).map(function (s) { return s.review_id; });
+  }
+
+  function afterProcess(res, label, statusKind) {
+    S.undoQ.push({ kind: 'review', id: res.undo_id, label: label });
+    renderUndoBtn();
+    var gateNote = res.pool_added > 0
+      ? '추천 후보 풀에 들어갔습니다(ai_candidate_yn: true)'
+      : (statusKind === '기각' ? '' : '다른 필수 사양이 비어 있어 후보 승격은 아직입니다');
+    toast(label + (gateNote ? ' · ' + gateNote : ''), statusKind === '기각' ? 'warn' : 'ok', '되돌리기',
+      function () { undoOne(res.undo_id, 'review'); });
+    loadList();
+  }
+
+  function approveSuggested() {
+    if (!guard()) return;
+    var row = findItem(S.sel); if (!row) return;
+    if (!row.suggested_value) {
+      toast('확정할 값이 없습니다 — 원문값·제안값·직접입력이 모두 비었습니다. (400)', 'err');
+      return;
+    }
+    var also = siblingIdsChecked();
+    apiPost('/api/admin/reviews/' + row.review_id + '/process', { action: 'suggested', also: also })
+      .then(function (res) {
+        var n = 1 + also.length;
+        afterProcess(res, '제안값 승인 ' + n + '건 · ' + row.field + ' = ' + row.suggested_value, '승인');
+      }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function reject() {
+    if (!guard()) return;
+    var row = findItem(S.sel); if (!row) return;
+    apiPost('/api/admin/reviews/' + row.review_id + '/process', { action: 'reject' })
+      .then(function (res) { afterProcess(res, '기각(보류) 1건 · ' + row.name, '기각'); })
+      .catch(function (err) { toast(err.message, 'err'); });
+  }
+  function manualCommit() {
+    var row = findItem(S.sel); if (!row) return;
+    var input = $('manualInput');
+    var v = (input ? input.value : S.manualValue || '').trim();
+    if (!v) { S.manualError = '400 — 확정할 값이 없습니다.'; renderDrawer(); return; }
+    if (fieldNumeric(row.field) && !/^\d+(\.\d+)?$/.test(v)) {
+      S.manualError = '400 — 값 형식 오류: "' + v + '" → ' + row.field + ' (숫자만 입력)';
+      renderDrawer(); return;
+    }
+    if (!guard()) return;
+    var also = siblingIdsChecked();
+    apiPost('/api/admin/reviews/' + row.review_id + '/process', { action: 'manual', value: v, also: also })
+      .then(function (res) {
+        var n = 1 + also.length;
+        afterProcess(res, '직접 입력 확정 ' + n + '건 · ' + row.field + ' = ' + v, '수정');
+      }).catch(function (err) { S.manualError = err.message; renderDrawer(); });
+  }
+  function undoOne(logId, kind) {
+    var path = kind === 'sourcing' ? '/api/admin/reviews/sourcing/unlink/' + logId : '/api/admin/reviews/undo/' + logId;
+    apiPost(path, {}).then(function () {
+      S.undoQ = S.undoQ.filter(function (u) { return u.id !== logId; });
+      renderUndoBtn();
+      toast('되돌렸습니다', 'ok');
+      if (kind === 'sourcing') renderSourcing(); else loadList();
+    }).catch(function (err) { toast(err.message, 'err'); });
+  }
+  function undoLast() {
+    var last = S.undoQ[S.undoQ.length - 1];
+    if (!last) { toast('되돌릴 처리가 없습니다', 'warn'); return; }
+    undoOne(last.id, last.kind);
+  }
+  function renderUndoBtn() {
+    $('undoBtn').disabled = S.undoQ.length === 0;
+  }
+
+  // ── 선택 항목 함께 적용 — 기존 단건 승인 API를 선택 건수만큼 반복(위 문서 ⑥) ──
+  function bulkApplySelected() {
+    if (!guard()) return;
+    var ids = Object.keys(S.checked).map(Number);
+    if (!ids.length) { toast('선택된 항목이 없습니다', 'warn'); return; }
+    var rows = ids.map(findItem).filter(Boolean);
+    var eligible = rows.filter(function (r) { return !!r.suggested_value; });
+    var skipped = rows.length - eligible.length;
+    if (!eligible.length) { toast('확정할 값이 없습니다 — 선택한 항목에 제안값이 없습니다. (400)', 'err'); return; }
+    var ok = 0, fail = 0;
+    function next(i) {
+      if (i >= eligible.length) {
+        var msg = '선택 승인 ' + ok + '건 완료' + (fail ? (' · 실패 ' + fail + '건') : '') +
+          (skipped ? (' · 제안값 없어 건너뜀 ' + skipped + '건') : '');
+        toast(msg, fail ? 'warn' : 'ok');
+        S.checked = {};
+        renderUndoBtn();     // 이번 배치에서 undoQ가 늘었을 수 있다 — 버튼 상태를 다시 맞춘다
+        loadList();
+        return;
+      }
+      var r = eligible[i];
+      apiPost('/api/admin/reviews/' + r.review_id + '/process', { action: 'suggested' })
+        .then(function (res) { ok++; S.undoQ.push({ kind: 'review', id: res.undo_id, label: '선택 일괄 · ' + r.field }); })
+        .catch(function () { fail++; })
+        .then(function () { next(i + 1); });
+    }
+    next(0);
+  }
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-keep]')) clearSelection();
+    if (!e.target.closest('.filter-group')) { S.openMenu = null; renderFilterMenus(); }
+
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+
+    switch (action) {
+      case 'switch-tab': switchTab(t.getAttribute('data-tab')); break;
+      case 'toggle-menu': {
+        var key = t.getAttribute('data-menu');
+        S.openMenu = S.openMenu === key ? null : key;
+        renderFilterMenus();
+        break;
+      }
+      case 'set-part': S.f.part_type = t.getAttribute('data-v'); S.page = 1; S.openMenu = null; loadList(); break;
+      case 'set-field-filter': S.f.field = t.getAttribute('data-v'); S.page = 1; S.openMenu = null; loadList(); break;
+      case 'set-status': S.f.status = t.getAttribute('data-v') || '대기'; S.page = 1; S.openMenu = null; loadList(); break;
+      case 'toggle-live-filter': S.f.sellable = S.f.sellable ? 0 : 1; S.page = 1; loadList(); break;
+      case 'toggle-live': S.f.sellable = S.f.sellable ? 0 : 1; S.page = 1; loadList(); break;
+      case 'set-chunk': S.chunk = t.getAttribute('data-chunk'); S.page = 1; loadList(); break;
+      case 'set-field': {
+        var f = t.getAttribute('data-field');
+        S.f.field = S.f.field === f ? '' : f; S.page = 1; loadList();
+        break;
+      }
+      case 'clear-field': S.f.field = ''; S.page = 1; loadList(); break;
+      case 'clear-search': $('searchInput').value = ''; S.f.keyword = ''; S.page = 1; loadList(); $('clearSearch').hidden = true; break;
+      case 'reset-filters':
+        S.f = { part_type: '', field: '', sellable: 0, status: '대기', keyword: '' };
+        S.chunk = 'all'; S.page = 1; $('searchInput').value = ''; $('clearSearch').hidden = true; loadList();
+        break;
+      case 'go-page': { var p = Number(t.getAttribute('data-page')); if (p) { S.page = p; loadList(); } break; }
+      case 'toggle-all': {
+        var items = (S.data.items || []).filter(function (it) { return it.type !== 'sourcing_hold'; });
+        var nSel = Object.keys(S.checked).length;
+        if (nSel) { S.checked = {}; } else { items.forEach(function (r) { S.checked[r.review_id] = true; }); }
+        renderTable(); renderFilterBar();
+        break;
+      }
+      case 'check-row': {
+        e.stopPropagation();
+        var id = Number(t.getAttribute('data-id'));
+        if (S.checked[id]) delete S.checked[id]; else S.checked[id] = true;
+        renderTable(); renderFilterBar();
+        break;
+      }
+      case 'open-row': openRow(Number(t.getAttribute('data-id'))); break;
+      case 'bulk-apply': bulkApplySelected(); break;
+      case 'close-drawer': closeDrawer(); break;
+      case 'approve': approveSuggested(); break;
+      case 'reject': reject(); break;
+      case 'manual-open': if (guard()) { S.manual = true; S.manualValue = ''; S.manualError = ''; renderDrawer(); var mi = $('manualInput'); if (mi) mi.focus(); } break;
+      case 'manual-cancel': S.manual = false; S.manualError = ''; renderDrawer(); break;
+      case 'manual-commit': manualCommit(); break;
+      case 'toggle-sib': { var i = Number(t.getAttribute('data-i')); S.sibChecked[i] = !S.sibChecked[i]; renderDrawer(); break; }
+      case 'open-source': S.sourceSeen = true; toast('출처 원문을 새 창에서 엽니다 — ' + t.getAttribute('data-url'), 'ok'); window.open(t.getAttribute('data-url'), '_blank', 'noopener'); renderDrawer(); break;
+      case 'go-identity': toast('정체성 검수 화면(별도)으로 이동 — 다나와코드·상품명은 여기서 못 고칩니다', 'warn'); break;
+      case 'undo-last': undoLast(); break;
+      case 'toast-close': { var tid = Number(t.getAttribute('data-tid')); S.toasts = S.toasts.filter(function (x) { return x.id !== tid; }); renderToasts(); break; }
+      case 'toast-act': {
+        var atid = Number(t.getAttribute('data-tid'));
+        var found = S.toasts.filter(function (x) { return x.id === atid; })[0];
+        if (found && found.onAction) found.onAction();
+        S.toasts = S.toasts.filter(function (x) { return x.id !== atid; });
+        renderToasts();
+        break;
+      }
+      case 'retry-list': loadList(); break;
+      case 'retry-sourcing': loadSourcing(); break;
+      case 'sourcing-link': sourcingLink(t.getAttribute('data-rid'), t.getAttribute('data-sku')); break;
+      case 'sourcing-unlink': {
+        var row = (S.sourcing.rows || []).filter(function (r) { return String(r.src_row_id) === t.getAttribute('data-rid'); })[0];
+        if (row && row._undoId) sourcingUnlink(row._undoId);
+        break;
+      }
+      default: break;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { S.drawerOpen = false; S.sel = null; S.openMenu = null; S.manual = false; renderDrawer(); renderFilterMenus(); renderTableSelection(); }
+  });
+
+  function bindStatic() {
+    var input = $('searchInput');
+    var t = null;
+    input.addEventListener('input', function () {
+      $('searchBox').classList.toggle('on', !!input.value);
+      $('clearSearch').hidden = !input.value;
+      clearTimeout(t);
+      t = setTimeout(function () { S.f.keyword = input.value.trim(); S.page = 1; loadList(); }, 320);
+    });
+  }
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
