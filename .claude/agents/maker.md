@@ -2,7 +2,7 @@
 name: maker
 role: 코드 · 화면 · 마이그레이션 · 도구
 description: 팝콘AI 의 코드·화면·마이그레이션을 짓는다. **제작팀 — 파일 소유권이 겹치지 않으면 여럿을 동시에 띄운다**(정본 파일은 언제나 한 명만). 지시에 적힌 담당 파일 밖은 절대 건드리지 않는다. 조사는 investigator 가, 검증은 checker 가 한다.
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Edit, Bash, Grep, Glob, DesignSync
 model: sonnet
 ---
 

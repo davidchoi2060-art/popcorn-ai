@@ -2,7 +2,7 @@
 name: designchecker
 role: 디자인 · 정의서 · 결정 ↔ 코드 대조
 description: 지어진 것이 **약속과 맞는지** 대조한다 — 승인 디자인 · 요구사항 정의서 · 결정 로그 · 규약. 확인자는 「도는가」를, 검증자는 「실물과 맞는가」를 본다. 계약자는 **「우리가 하기로 한 것과 같은가」**를 본다. 고치지 않고 어긋난 곳만 돌려준다.
-tools: Bash, Read, Grep, Glob
+tools: Bash, Read, Grep, Glob, DesignSync
 model: sonnet
 ---
 
