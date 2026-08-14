@@ -1,0 +1,104 @@
+{#
+  admin2 공통 셸 — 정본 (2026-08-13)
+
+  ■ 왜 있는가
+    admin2 화면(reviews·dash·build_map·spec_fill·spec_standard·products·홈)이 각자
+    좌측 메뉴·헤더·팔레트를 손으로 복제해 갖고 있었다 — 좌측 메뉴가 36화면에 복제돼
+    갈라졌던 사고(`.claude/CANON.md` §1)와 같은 병이 admin2에서 재발하는 중이었다.
+    이 파일이 그 골격(사이드바·헤더) 하나를 정본으로 만든다. 화면은 이 파일을
+    `{% extends %}` 하고 아래 블록만 채운다.
+
+  ■ 기준 — `templates/admin/reviews.html.j2`(2026-08-13 사장님 승인 디자인)에서
+    사이드바·헤더 마크업·CSS·스크립트를 그대로 뽑았다. 원안은 `docs/design/dc-review-
+    screen.html`·`dc-ai-task-settings.html`·`dc-ai-integration.html` 세 화면이 공유하는
+    셸(팔레트 `#e8e4dc`/`#f7f4ee`/`#26231e` 등, LNB `data-keep` + "메뉴창 접기" 구조,
+    헤더 crumb/now/badge 구성)이다 — 세 파일을 대조해 공통분모만 이 파일에 남겼다.
+
+  ■ 좌측 메뉴(LNB) 동작 규격 — admin2 전 화면 공통(2026-08-13 사장님 확정,
+    CLAUDE.md §관리자 화면 규약): 펼침 212px ↔ 접힘 64px(`width .16s ease`) · 최하단
+    「메뉴창 접기」 · 접힘 아이콘 «/» · 접히면 라벨 숨김 + `title` 툴팁 · 브랜드
+    admin2 ↔ a2 · 사이드바 클릭은 화면의 선택 상태를 풀지 않는다(`data-keep`).
+    **항목 구성(IA)은 이 파일 소관이 아니다** — 정본은 `api/admin_nav.py`(`nav_for`).
+
+  ■ 팔레트·서체 단일 원천 = `/shared/admin2/admin2.css`. `design-system/tokens.css`
+    (고객 화면 정본)는 여기서 절대 읽지 않는다 — 두 톤이 다르고, 섞으면 어느 쪽도
+    정본이 아니게 된다.
+
+  ■ 블록
+    title             <title> 뒤쪽("팝콘PC 관리자 · "는 여기서 붙인다)
+    head_extra        <head> 안 추가 자산 — Phoenix/Bootstrap 벤더 CSS(구 화면 이관용)
+                       또는 화면 전용 <style>(본문 색은 admin2.css 별칭을, 레이아웃만 이걸로)
+    body_attrs_extra   <body> 추가 속성(예: data-dummy-fallback)
+    header_extra       헤더의 권한 표시 뒤 · 아바타 앞 — 화면별 위젯(탭·상태 표시 등)
+    content            본문. 헤더 바로 아래, `.a2-main` 안에 그대로 들어간다
+    foot_extra         </body> 직전 — Phoenix/Bootstrap 벤더 JS 또는 화면 자체 <script>
+
+  ■ 컨텍스트(라우터가 준다 — `api/admin_ui.py`): nav, nav_counts(공통),
+    screen_id, domain, crumb_group, crumb_now(화면별 — 각 라우트가 넘긴다).
+    화면이 헤더 문구를 마크업에 박지 않는 이유는 §단일 원천과 같다: 라우트 하나가
+    화면 하나의 사실(ID·소속 그룹·이름)을 말하는 유일한 곳이어야 한다.
+#}<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC 관리자 · {% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="/shared/fonts/fonts.css">
+<link rel="stylesheet" href="/shared/admin2/admin2.css">
+{% block head_extra %}{% endblock %}
+</head>
+<body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" {% block body_attrs_extra %}{% endblock %}>
+<div class="a2-shell" id="shell">
+
+  <nav class="a2-lnb" id="lnb" data-keep="1" aria-label="주메뉴">
+    <div class="a2-lnb-brand" id="lnbBrand">admin2</div>
+    <div class="a2-lnb-scroll">
+      {% for g in nav %}
+      <div class="a2-lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
+        <button type="button" class="a2-lnb-g" data-action="lnb-group" title="{{ g.title }}"
+                aria-expanded="{{ 'true' if g.active else 'false' }}">
+          <span class="a2-gi" aria-hidden="true">{{ g.title[0] }}</span>
+          <span class="a2-t">{{ g.title }}</span>
+          <span class="a2-c">{{ g.done }}/{{ g.total }}</span>
+          <span class="a2-x" aria-hidden="true">▼</span>
+        </button>
+        <div class="a2-lnb-b">
+          {% for it in g["items"] %}
+            {% if it.href %}
+              <a href="{{ it.href }}" class="{% if it.active %}on{% endif %}"
+                 {% if it.active %}aria-current="page"{% endif %}>{{ it.label }}</a>
+            {% else %}
+              <span class="off" title="신설 예정">{{ it.label }}<span class="tag">신설</span></span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="a2-lnb-toggle" id="lnbToggle" data-action="toggle-lnb">
+      <span class="ic" id="lnbToggleIcon">«</span><span class="lb">메뉴창 접기</span>
+    </button>
+  </nav>
+
+  <div class="a2-main" id="main">
+    <header class="a2-hd">
+      <span class="a2-crumb">{{ crumb_group }}</span><span class="a2-sep">/</span><span class="a2-now">{{ crumb_now }}</span>
+      <span class="a2-badge">{{ screen_id }}</span>
+      {% block header_extra %}{% endblock %}
+      <span class="a2-grow"></span>
+      <span class="a2-roles" id="roleBox">확인 중…</span>
+      <span class="a2-avatar"></span>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <div class="a2-toasts" id="toasts"></div>
+  </div>
+
+</div>
+
+<script src="/shared/ui-progress.js"></script>
+<script src="/shared/admin2/admin2-shell.js"></script>
+{% block foot_extra %}{% endblock %}
+</body>
+</html>

@@ -26,65 +26,34 @@
        공랭 쿨러» 대신 «CPU·HDD·CPU쿨러(공랭)» 이다.
 
   ■ 전체 화면인 이유 — 사용자 결정(2026-08-11, 선택지 (나))
-    그래서 `_layout.html.j2` 를 상속하지 않고 자체 셸을 그린다. 대신 **나가는 길**을
-    잃지 않도록 좌측 메뉴 전량과 상단 이동 경로를 그대로 싣는다.
+    Phoenix(`_layout.html.j2`)의 카드 그리드에는 안 맞아 지도·격자를 화면 전체로
+    쓰는 자체 레이아웃이 필요했다. 2026-08-13부터는 그 레이아웃을 admin2 공통 셸
+    (`_admin2_shell.html.j2`) 위에 올린다 — 셸이 좌측 메뉴 전량과 상단 이동 경로를
+    대신 그려 **나가는 길**을 잃지 않는다(아래 §셸 통합 참조).
 
   ■ 숫자는 전부 `/api/admin/std/compat-map` 응답만 쓴다. 화면은 상태를 파생조차 하지 않는다
     (`status` 를 서버가 준다) — 세 안이 같은 값을 각자 계산하면 세 곳에서 어긋난다.
-#}<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>팝콘PC 관리자 · 조립 호환 조감도</title>
-{# 색·서체는 **정본만 쓴다**(㉯·㈏ 확정 2026-08-12). 이 화면도 :root 를 자기가 들고
-   구글 CDN 에서 서체를 받고 있었다 — 현황판과 값이 12개 전부 같았으므로 팔레트가
-   하나인데 사본이 둘이었던 것이다. 정본은 design-system/tokens.css 하나다. #}
-<link rel="stylesheet" href="/shared/fonts/fonts.css">
-<link rel="stylesheet" href="/design-system/tokens.css">
+
+  ■ 2026-08-13 셸 통합 — 사이드바·헤더·팔레트를 admin2 공통 셸로 옮겼다
+    (`templates/admin/_admin2_shell.html.j2` + `/shared/admin2/admin2.css`, reviews.
+    html.j2에서 뽑은 정본). `design-system/tokens.css`를 읽던 것도 admin2 전용 파일로
+    옮겨졌다 — 이름(`--bg`·`--card`·`--nav` 등)은 그대로, 값만 이 팔레트로 맞췄다(본문
+    지도·격자 SVG가 그 이름들을 그대로 쓰고 있어 이름은 두고 값만 바꿨다 — 제작 보고서
+    참조). 3안 탭(`.tabs`)은 이 화면만의 헤더 위젯이라 `header_extra` 블록에 남았다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}조립 호환 조감도{% endblock %}
+
+{% block head_extra %}
 <style>
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);
-     -webkit-font-smoothing:antialiased;display:flex;overflow:hidden}
+     -webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
 
-/* ── 좌측 메뉴 (정본 admin_nav) ───────────────────────────────── */
-.lnb{width:212px;flex:none;background:var(--nav);color:var(--on-nav-muted);display:flex;
-     flex-direction:column;overflow:hidden}
-.lnb-top{padding:16px 16px 12px;font:600 14px/1 var(--font);color:var(--on-nav);
-         letter-spacing:-.01em;flex:none}
-.lnb-scroll{flex:1;min-height:0;overflow-y:auto;padding-bottom:16px}
-.lnb-scroll::-webkit-scrollbar{width:6px}
-.lnb-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
-.lnb-grp{border-bottom:1px solid rgba(255,255,255,.045)}
-.lnb-g{width:100%;display:flex;align-items:center;gap:7px;padding:9px 14px;
-       background:none;border:0;cursor:pointer;text-align:left;
-       font:600 10px/1.2 var(--font-num);letter-spacing:.11em;color:var(--on-nav-muted)}
-.lnb-g:hover{color:var(--on-nav);background:rgba(255,255,255,.045)}
-.lnb-g .t{flex:1;text-transform:uppercase}
-.lnb-g .c{font:500 9.5px/1 var(--font-num);color:var(--on-nav-muted);font-variant-numeric:tabular-nums}
-.lnb-g .x{font-size:8px;transition:transform .15s ease}
-.lnb-grp[data-open="n"] .lnb-b{display:none}
-.lnb-grp[data-open="n"] .lnb-g .x{transform:rotate(-90deg)}
-.lnb-b{padding-bottom:5px}
-.lnb a,.lnb .off{display:block;padding:7px 16px;font:500 12.5px/1.35 var(--font);
-       color:var(--on-nav-muted);border-left:3px solid transparent}
-.lnb a:hover{color:var(--on-nav);background:rgba(255,255,255,.05)}
-.lnb a.on{color:var(--on-nav);background:rgba(255,255,255,.09);
-          border-left-color:var(--primary)}
-.lnb .off{color:var(--on-nav-muted);cursor:default}
-.lnb .tag{font:500 9px/1 var(--font-num);padding:1px 4px;border-radius:3px;
-          background:rgba(255,255,255,.06);color:var(--on-nav-muted);margin-left:5px;vertical-align:1px}
-
-/* ── 셸 ─────────────────────────────────────────────────────── */
-.main{flex:1;min-width:0;display:flex;flex-direction:column}
-.hd{height:52px;flex:none;border-bottom:1px solid var(--outline-variant);background:var(--card);
-    display:flex;align-items:center;padding:0 18px;gap:12px}
-.hd .crumb{font:400 12px/1 var(--font);color:var(--on-variant)}
-.hd .sep{color:var(--outline)}
-.hd .now{font:600 13px/1 var(--font)}
 .tabs{display:flex;gap:2px;margin-left:18px}
 .tab{font:500 12px/1 var(--font);padding:7px 13px;border-radius:6px;border:1px solid transparent;
      background:none;color:var(--on-variant);cursor:pointer}
@@ -147,70 +116,27 @@ a{color:inherit;text-decoration:none}
       font:400 10.5px/1.5 var(--font)}
 
 @media (max-width:900px){
-  body{overflow:auto;display:block}
-  .lnb{width:100%;height:auto;max-height:180px}
   .rail{width:100%;border-left:0;border-top:1px solid var(--outline-variant)}
   .split,.lanes{flex-direction:column!important}
   .map-area{height:520px;flex:none}
 }
 </style>
-</head>
-<body data-screen-id="ADM-STD-020" data-domain="compat-map">
+{% endblock %}
 
-<nav class="lnb" aria-label="주메뉴">
-  <div class="lnb-top">admin2</div>
-  {#
-    대분류는 접힌다. 12그룹 · 54항목을 모두 펼치면 세로로 넘쳐 아래쪽 그룹은 스크롤
-    없이는 보이지도 않는다. 지금 있는 그룹만 펼치고 나머지는 접어 둔다.
-    접힘 상태는 `sessionStorage` 에 남긴다 — 화면을 옮길 때마다 다시 접히면 쓸모가 없다.
+{% block header_extra %}
+<div class="tabs" role="tablist" aria-label="보기 방식">
+  <button class="tab" role="tab" data-action="view" data-view="map"
+          aria-selected="true">지도형</button>
+  <button class="tab" role="tab" data-action="view" data-view="diag"
+          aria-selected="false">진단형</button>
+  <button class="tab" role="tab" data-action="view" data-view="matrix"
+          aria-selected="false">매트릭스형</button>
+</div>
+<span style="flex:1"></span>
+<span class="num" style="font-size:11.5px;color:var(--on-variant)" data-bind="asof">—</span>
+{% endblock %}
 
-    링크는 재구축된 화면(`/admin2/*`)에만 붙는다(`admin_nav.nav_for` 의 결정).
-    나머지는 「기존」(구화면은 있으나 재구축 전) · 「신설」(아무 데도 없음)로 구분해
-    표시만 한다 — 둘은 다른 사실이고, 재구축 순서를 정할 때 근거가 된다.
-  #}
-  <div class="lnb-scroll">
-    {% for g in nav %}
-      <div class="lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
-        <button type="button" class="lnb-g" data-action="lnb-group"
-                aria-expanded="{{ 'true' if g.active else 'false' }}">
-          <span class="t">{{ g.title }}</span>
-          <span class="c">{{ g.done }}/{{ g.total }}</span>
-          <span class="x" aria-hidden="true">▼</span>
-        </button>
-        <div class="lnb-b">
-          {% for it in g["items"] %}
-            {% if it.href %}
-              <a href="{{ it.href }}" class="{% if it.active %}on{% endif %}"
-                 {% if it.active %}aria-current="page"{% endif %}>{{ it.label }}</a>
-            {% else %}
-              <span class="off"
-                    title="{{ '기존 화면 있음 · 재구축 전' if it.state == 'old' else '신설 예정' }}"
-                >{{ it.label }}<span class="tag">{{ '기존' if it.state == 'old' else '신설' }}</span></span>
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-</nav>
-
-<div class="main">
-  <header class="hd">
-    <span class="crumb">상품사양관리</span>
-    <span class="sep">/</span>
-    <span class="now">조립 호환 조감도</span>
-    <div class="tabs" role="tablist" aria-label="보기 방식">
-      <button class="tab" role="tab" data-action="view" data-view="map"
-              aria-selected="true">지도형</button>
-      <button class="tab" role="tab" data-action="view" data-view="diag"
-              aria-selected="false">진단형</button>
-      <button class="tab" role="tab" data-action="view" data-view="matrix"
-              aria-selected="false">매트릭스형</button>
-    </div>
-    <span style="flex:1"></span>
-    <span class="num" style="font-size:11.5px;color:var(--on-variant)" data-bind="asof">—</span>
-  </header>
-
+{% block content %}
   <div class="body">
 
     {# ── 1a 지도형 ─────────────────────────────────────────── #}
@@ -305,8 +231,9 @@ a{color:inherit;text-decoration:none}
     </section>
 
   </div>
-</div>
+{% endblock %}
 
+{% block foot_extra %}
 {% raw %}
 <script>
 (function () {
@@ -665,35 +592,8 @@ a{color:inherit;text-decoration:none}
     }
   });
 
-  // ── 좌측 메뉴 아코디언. 접힘 상태를 세션에 남겨 화면을 옮겨도 유지한다.
-  //    저장에 실패해도(프라이빗 모드 등) 메뉴는 그대로 동작해야 하므로 전부 감싼다.
-  var LNB_KEY = 'admin2.lnb.closed';
-  var closed = (function () {
-    try { return JSON.parse(sessionStorage.getItem(LNB_KEY)) || []; } catch (e) { return []; }
-  })();
-  var saveLnb = function () {
-    try { sessionStorage.setItem(LNB_KEY, JSON.stringify(closed)); } catch (e) { /* 무시 */ }
-  };
-  document.querySelectorAll('.lnb-grp').forEach(function (g) {
-    var key = g.getAttribute('data-grp');
-    // 접은 것은 접힌 채로 둔다 — **명시적 조작이 기본값을 이긴다.** 현재 그룹이라고
-    // 도로 펴면 운영자가 방금 한 일을 화면이 되돌리는 셈이다.
-    // 그 밖의 기본(현재 그룹만 펼침)은 서버가 이미 `data-open` 으로 정해 보낸다.
-    if (closed.indexOf(key) >= 0) {
-      g.setAttribute('data-open', 'n');
-      g.querySelector('[data-action="lnb-group"]').setAttribute('aria-expanded', 'false');
-    }
-    var btn = g.querySelector('[data-action="lnb-group"]');
-    btn.addEventListener('click', function () {
-      var open = g.getAttribute('data-open') === 'y';
-      g.setAttribute('data-open', open ? 'n' : 'y');
-      btn.setAttribute('aria-expanded', String(!open));
-      var i = closed.indexOf(key);
-      if (open && i < 0) closed.push(key);
-      if (!open && i >= 0) closed.splice(i, 1);
-      saveLnb();
-    });
-  });
+  // 좌측 메뉴 접기·그룹 아코디언은 공용 셸(`/shared/admin2/admin2-shell.js`)이 맡는다
+  // (2026-08-13 셸 통합 — 이 화면이 따로 갖고 있던 아코디언 스크립트를 걷어냈다).
 
   document.querySelectorAll('[data-action="view"]').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -753,5 +653,4 @@ a{color:inherit;text-decoration:none}
 })();
 </script>
 {% endraw %}
-</body>
-</html>
+{% endblock %}

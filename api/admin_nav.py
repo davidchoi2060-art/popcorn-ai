@@ -21,12 +21,16 @@
   **우리가 팔지 않으므로 매출·정산·클레임이 발생하지 않는다.** 대신 재야 할 것이
   생겼다 — 몇 건을 넘겨 몇 건이 팔렸는가(유입 성과). 그 축이 통째로 없었다.
 
-■ `new` / `old` 를 함께 들고 있는 이유 — **링크는 `new` 에만 붙는다**
+■ 구화면 링크 정보 삭제 — 개정 기록 (2026-08-12 사장님 지시)
+  *"모든 admin/ 연결된 링크는 삭제하고 신규로 만드니까.. 그렇게 변경해줘"*
+  전 화면을 admin2 로 신규 재구축하기로 확정되면서 항목이 들고 있던
+  old(`/admin/*.html`) 값을 전부 지웠다. 「기존 화면 있음/없음」 구분은
+  재구축 **순서**를 정할 때의 근거였는데, 전면 재구축이 확정되어 그 근거가
+  소멸했다 — 어차피 전부 새로 짓는다면 구화면 유무는 순서를 가르지 않는다.
+  기존 화면 파일(`mockups/admin/*.html`)은 지우지 않는다(병행 신축 ·
+  직접 열기는 계속 가능) — 메뉴 정본이 그 경로를 더 들고 있지 않을 뿐이다.
       new  재구축된 화면(`/admin2/...`). **링크는 이것만**
-      old  기존 화면(`/admin/*.html`)은 있으나 재구축 전 — 링크 없이 「기존」 표시
-      (둘 다 없으면) 신설 예정 — 링크 없이 「신설」 표시
-
-  `old` 를 지우지 않는 이유는 `nav_for()` 주석에 적었다.
+      (없으면) 신설 예정 — 링크 없이 「신설」 표시
 
 ■ 이름은 문서를 따른다
   「상품 매핑」→ 상품 분류 매핑, 「사양 항목 정의」→ 상품 사양 정의,
@@ -40,42 +44,42 @@
 """
 
 # 그룹: (제목, 아이콘, [항목])
-# 항목: (라벨, new, old, 비고)  — new/old 가 None 이면 없음
+# 항목: (라벨, new, 비고)  — new 가 None 이면 아직 없다(신설 예정)
 NAV = [
     ("대시보드", "pie-chart", [
-        ("대시보드", "/admin2/", "/admin/index.html", None),
+        ("대시보드", "/admin2/", None),
     ]),
 
     ("상품관리", "box", [
-        ("상품 분류 관리", None, "/admin/categories.html", None),
-        ("상품 관리", "/admin2/products", "/admin/products.html", None),
-        ("상품 분류 매핑", None, "/admin/category-mapping.html", None),
-        ("상품 일괄 등록", None, "/admin/csv-upload.html", "이력·오류건 통합 예정"),
-        ("삭제 상품 조회", None, None, "신설"),
+        ("상품 분류 관리", "/admin2/categories", None),
+        ("상품 관리", "/admin2/products", None),
+        ("상품 분류 매핑", "/admin2/category-mapping", None),
+        ("상품 일괄 등록", None, "이력·오류건 통합 예정"),
+        ("삭제 상품 조회", None, "신설"),
     ]),
 
     # 도매꾹에 대응물이 통째로 없는 축. 파는 일이 아니라 **추천되게 하는 일**이다.
     ("상품사양관리", "sliders", [
-        ("조립 호환 지도", "/admin2/build-map", None, "신설 · 관계 22쌍 한 장"),
-        ("조립 사양 표준", "/admin2/spec-standard", None, "신설 · 사람이 항목을 늘린다"),
-        ("상품 사양 정의", None, "/admin/spec-fields.html", None),
-        ("상품 사양 검수", None, "/admin/review-queue.html", None),
-        ("조립 호환 규칙", None, "/admin/compat-rules.html", None),
-        ("용도별 최소 사양", None, "/admin/usage-floors.html", None),
-        ("부품 등급 관리", None, "/admin/grade-board.html", None),
-        ("추천 기준 설정", None, "/admin/policy-weights.html", None),
-        ("추천 가능 재고 현황", None, "/admin/candidate-pool.html", None),
-        ("견적 상담 기록", None, "/admin/sessions.html", None),
-        ("부품 교체 · 클릭 기록", None, "/admin/swap-logs.html", None),
+        ("조립 호환 지도", "/admin2/build-map", "신설 · 관계 22쌍 한 장"),
+        ("조립 사양 표준", "/admin2/spec-standard", "신설 · 사람이 항목을 늘린다"),
+        ("상품 사양 정의", None, None),
+        ("상품 사양 검수", "/admin2/reviews", "신설 · 사장님 확정 화면(2026-08-13)"),
+        ("조립 호환 규칙", None, None),
+        ("용도별 최소 사양", None, None),
+        ("부품 등급 관리", None, None),
+        ("추천 기준 설정", None, None),
+        ("추천 가능 재고 현황", None, None),
+        ("견적 상담 기록", None, None),
+        ("부품 교체 · 클릭 기록", None, None),
     ]),
 
     # 소싱은 **우리 일이다.** 가격 원천은 몰이지만, 직접 공급사에서 소싱하는 경우
     # 공급가·판매가를 우리가 덮어쓴다(결정 2026-08-11). 그래서 이 축은 남는다.
     # 「재고 입고」만 뺐다 — 재고 원장은 쇼핑몰이 갖는다. 두 곳이 세면 반드시 어긋난다.
     ("매입 · 소싱", "truck", [
-        ("공급처", None, "/admin/suppliers.html", None),
-        ("매입 견적(용산)", None, "/admin/sourcing.html", None),
-        ("단가표 반영", None, "/admin/price-import.html", None),
+        ("공급처", None, None),
+        ("매입 견적(용산)", None, None),
+        ("단가표 반영", None, None),
     ]),
 
     # **성격이 바뀐 축이다.** 가격을 «정하는» 화면이 아니라 «예외를 잡는» 화면이다.
@@ -83,34 +87,35 @@ NAV = [
     #   경보 = 잠기지 않았는데 몰과 어긋난 건 → 동기화 누락
     # 지금은 값이 하나뿐이라 셋을 구분할 수 없다(2026-08-11 실측: 표본 10건 중 2건 불일치).
     ("판매가", "dollar-sign", [
-        ("판매가 관리", None, "/admin/margin-policy.html", "몰값·우리값·낡은값 구분 필요"),
-        ("가격 검토 대기", None, "/admin/price-review.html", None),
-        ("가격 이력", None, "/admin/price-history.html", None),
+        ("판매가 관리", None, "몰값·우리값·낡은값 구분 필요"),
+        ("가격 검토 대기", None, None),
+        ("가격 이력", None, None),
     ]),
 
     # ── 신설 축 — 유입 채널의 성적표 ──────────────────────────────────
     # 자체 판매 전제로 짜인 IA 라 「매출 집계」가 있고 「인계 성과」가 없었다.
     # 우리는 팔지 않는다. 넘길 뿐이다. 그러면 재야 할 것은 매출이 아니라 **전환**이다.
     ("인계 · 성과", "share-2", [
-        ("쇼핑몰 동기화", None, None, "신설 — 받아온 시각 · 어긋난 건수"),
-        ("인계 기록", None, None, "신설 — 무엇을 언제 어떤 견적으로 넘겼나"),
-        ("유입 성과", None, None, "신설 — 인계 → 구매 전환"),
+        ("쇼핑몰 동기화", None, "신설 — 받아온 시각 · 어긋난 건수"),
+        ("인계 기록", None, "신설 — 무엇을 언제 어떤 견적으로 넘겼나"),
+        ("유입 성과", None, "신설 — 인계 → 구매 전환"),
     ]),
 
     ("AI 관리", "cpu", [
-        ("작업 현황판", "/admin2/dash", None, "신설 · 진행 보기 + 말 걸기"),
-        ("AI 작업 설정", None, None, "신설 — 작업↔모델 · 폴백"),
-        ("AI 연동 설정", None, None, "신설 — 키는 서버 env"),
-        ("AI 사용량 · 비용", None, "/admin/ai-cost.html", None),
-        ("AI 응답 기록", None, None, "신설"),
-        ("운영 도우미 설정", None, None, "신설 — 처음엔 조회 전용"),
+        ("작업 현황판", "/admin2/dash", "신설 · 진행 보기 + 말 걸기"),
+        ("웹 사양 채움", "/admin2/spec-fill", "신설(ADM-AI-020) · B안 확정 2026-08-13"),
+        ("AI 작업 설정", "/admin2/ai-task-settings", "신설 — 작업↔모델 · 폴백"),
+        ("AI 연동 설정", "/admin2/ai-integration", "신설 — 키는 서버 env"),
+        ("AI 사용량 · 비용", "/admin2/ai-usage-cost", None),
+        ("AI 응답 기록", "/admin2/ai-response-log", "신설"),
+        ("운영 도우미 설정", "/admin2/ops-assistant", "신설 — 처음엔 조회 전용"),
     ]),
 
     ("시스템", "server", [
-        ("운영 전환 설정", None, "/admin/ops-settings.html", None),
-        ("운영자 · 권한", None, "/admin/operators.html", None),
-        ("작업 기록", None, "/admin/activity-logs.html", None),
-        ("엑셀 다운로드 관리", None, None, "신설 — 비동기 큐"),
+        ("오픈 단계 설정", None, None),
+        ("운영자 · 권한", None, None),
+        ("작업 기록", None, None),
+        ("엑셀 다운로드 관리", None, "신설 — 비동기 큐"),
     ]),
 ]
 
@@ -118,30 +123,26 @@ NAV = [
 def nav_for(current_path: str = "") -> list:
     """템플릿이 쓰기 좋은 형태로 편다.
 
-    `state` 세 가지 — 화면이 어디까지 왔는지를 메뉴가 정직하게 말한다:
+    `state` 두 가지 — 화면이 어디까지 왔는지를 메뉴가 정직하게 말한다:
       new   재구축 완료. `/admin2/` 로 간다. **링크는 이것만 붙는다**
-      old   기존 화면(`/admin/*.html`)은 있으나 재구축 전. 링크 없음
-      todo  아무 데도 없다. 링크 없음
+      todo  신설 예정. 링크 없음
 
-    ■ 기존 화면으로 링크하지 않는다 (사용자 결정 2026-08-11)
-      전에는 `href = new or old` 였다. 재구축된 화면이 둘뿐일 때 나머지를 죽은 링크로
-      두면 새 메뉴가 구경거리가 되니, 기존 37화면으로 이어 두자는 판단이었다.
-
-      **뒤집는다.** 사용자 지시: *"확정된 화면만 링크를 붙이되, admin2 로 모두 붙여
+    ■ 구화면(`/admin/*.html`)으로는 잇지 않는다
+      2026-08-11 사용자 지시: *"확정된 화면만 링크를 붙이되, admin2 로 모두 붙여
       나갑시다."* 새 메뉴가 옛 시스템으로 데려가면 **어디까지 지었는지가 흐려진다** —
       운영자는 자기가 신·구 어느 쪽에 있는지 모른 채 일하게 된다. 지금 이 프로젝트가
       고치고 있는 병이 바로 그것(화면이 사실을 흐리는 것)이다.
 
-      `old` 정보는 지운 게 아니라 **`state` 로 남긴다.** 「기존 화면은 있다」와
-      「아무 데도 없다」는 다른 사실이고, 재구축 순서를 정할 때 그 차이가 근거가 된다.
-      기존 화면은 계속 `/admin/*.html` 에서 직접 열 수 있다(병행 신축).
+      그때는 `old`(구화면 있음)를 state 로 남겨 재구축 순서의 근거로 썼다.
+      2026-08-12 전면 재구축 확정으로 그 근거가 소멸해 `old` 자체를 폐지했다
+      (모듈 docstring 개정 기록). 구화면은 계속 `/admin/*.html` 에서 직접 열 수 있다.
     """
     out = []
     for title, icon, items in NAV:
         rows = []
-        for label, new, old, note in items:
-            href = new           # `old` 로는 잇지 않는다 — 위 결정
-            state = "new" if new else ("old" if old else "todo")
+        for label, new, note in items:
+            href = new           # 구화면으로는 잇지 않는다 — 위 결정
+            state = "new" if new else "todo"
             rows.append({
                 "label": label, "href": href, "state": state, "note": note,
                 "active": bool(href) and current_path.rstrip("/") == href.rstrip("/"),
@@ -156,9 +157,7 @@ def nav_for(current_path: str = "") -> list:
 
 
 def counts() -> dict:
-    """진척 — 화면이 지어내지 않게 여기서 센다."""
+    """진척 — 화면이 지어내지 않게 여기서 센다. `old` 키는 폐지(2026-08-12)."""
     total = sum(len(i) for _t, _ic, i in NAV)
-    new = sum(1 for _t, _ic, items in NAV for _l, n, _o, _nt in items if n)
-    old = sum(1 for _t, _ic, items in NAV for _l, n, o, _nt in items if not n and o)
-    return {"groups": len(NAV), "total": total, "new": new,
-            "old": old, "todo": total - new - old}
+    new = sum(1 for _t, _ic, items in NAV for _l, n, _nt in items if n)
+    return {"groups": len(NAV), "total": total, "new": new, "todo": total - new}

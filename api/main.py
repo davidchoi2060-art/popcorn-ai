@@ -3,58 +3,18 @@
 실행: .venv/Scripts/python -m uvicorn api.main:app --port 8000
 목업은 같은 오리진에서 서빙(/admin/products.html 등) → CORS 불필요.
 """
+import importlib
+import pkgutil
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from .admin_activity_logs import router as admin_activity_logs_router
-from .admin_dashboard import router as admin_dashboard_router
-from .admin_engine_rules import router as admin_engine_rules_router
-from .admin_usage_floors import router as admin_usage_floors_router
-from .admin_member_reviews import router as admin_member_reviews_router
-from .admin_members import router as admin_members_router
-from .admin_operators import router as admin_operators_router
-from .admin_profile import router as admin_profile_router
-from .admin_imports import router as admin_imports_router
-from .admin_ops import router as admin_ops_router
-from .admin_orders import router as admin_orders_router
-from .admin_refunds import router as admin_refunds_router
-from .admin_payments import router as admin_payments_router
-from .admin_categories import router as admin_categories_router
-from .admin_category_mapping import router as admin_category_mapping_router
-from .admin_reprice import router as admin_reprice_router
-from .admin_pool import router as admin_pool_router
-from .admin_price_import import router as admin_price_import_router
-from .admin_price_history import router as admin_price_history_router
-from .admin_price_review import router as admin_price_review_router
-from .admin_products import router as admin_products_router
-from .grades import router as grades_router
-from .admin_sessions import router as admin_sessions_router
-from .admin_setup import router as admin_setup_router
-from .admin_sourcing import router as admin_sourcing_router
-from .admin_stock import router as admin_stock_router
-from .admin_suppliers import router as admin_suppliers_router
-from .admin_swap_logs import router as admin_swap_logs_router
-from .admin_system import router as admin_system_router
-from .admin_std import router as admin_std_router
-from .handoff import router as handoff_router
-from .dash import router as dash_router
-from .admin_ui import router as admin_ui_router
-from .admin_reviews import router as admin_reviews_router
-from .candidates import router as candidates_router
-from .admin_catalog_import import router as admin_catalog_import_router
-from .admin_spec_fields import router as admin_spec_fields_router
-from .clicks import router as clicks_router
-from .my_account import router as my_account_router
-from .my_orders import router as my_orders_router
-from .my_payments import router as my_payments_router
-from .orders import router as orders_router
-from .recommend import router as recommend_router
-from .swap import router as swap_router
-from .auth import auth_middleware, router as auth_router
-from .customer_auth import member_middleware, router as customer_auth_router
+# 미들웨어는 라우터가 아니라서 자동 탐색 대상이 아니다 — 명시적으로만 건다(순서가 계약).
+from .auth import auth_middleware
+from .customer_auth import member_middleware
 from .db import engine
 
 app = FastAPI(title="popcorn-pc-ai (local slice)")
@@ -74,55 +34,62 @@ def health():
     return {"ok": True}
 
 
-app.include_router(admin_std_router)
-app.include_router(handoff_router)
-app.include_router(dash_router)
-app.include_router(auth_router)
-app.include_router(grades_router)
-app.include_router(customer_auth_router)
-app.include_router(admin_operators_router)
-app.include_router(admin_profile_router)
-app.include_router(admin_suppliers_router)
-app.include_router(admin_setup_router)
-app.include_router(admin_ops_router)
-app.include_router(admin_imports_router)
-app.include_router(admin_products_router)
-app.include_router(admin_reviews_router)
-app.include_router(admin_orders_router)
-app.include_router(admin_refunds_router)
-app.include_router(admin_payments_router)
-app.include_router(admin_activity_logs_router)
-app.include_router(admin_member_reviews_router)
-app.include_router(admin_members_router)
-app.include_router(admin_price_import_router)
-app.include_router(admin_price_review_router)
-app.include_router(admin_stock_router)
-app.include_router(admin_swap_logs_router)
-app.include_router(admin_categories_router)
-app.include_router(admin_category_mapping_router)
-app.include_router(admin_reprice_router)
-app.include_router(admin_pool_router)
-app.include_router(admin_sessions_router)
-app.include_router(admin_price_history_router)
-app.include_router(admin_dashboard_router)
-app.include_router(admin_engine_rules_router)
-app.include_router(admin_usage_floors_router)
-app.include_router(admin_system_router)
-app.include_router(admin_sourcing_router)
-app.include_router(candidates_router)
-app.include_router(admin_catalog_import_router)
-app.include_router(admin_spec_fields_router)
-app.include_router(clicks_router)
-app.include_router(recommend_router)
-app.include_router(orders_router)
-app.include_router(swap_router)
-app.include_router(my_orders_router)
-app.include_router(my_payments_router)
-app.include_router(my_account_router)
+# ══════════════════════════════════════════════════════════════════════════
+# 라우터 자동 등록 (2026-08-13 사장님 지시 — 제작자 병렬화)
+#
+# ■ 왜 있는가
+#   예전엔 API 모듈 하나(`api/admin_*.py`)를 새로 지을 때마다 **이 파일**에 import
+#   한 줄 + `include_router` 한 줄을 추가해야 했다. admin2 페이지 라우트(`admin_ui.py`)
+#   도 마찬가지였다 — 새 화면을 지을 때마다 그 한 파일을 같이 고쳤다. 제작자 둘이
+#   동시에 화면을 지으면 이 두 "공유 파일"에서 매번 충돌해, 결국 한 번에 한 명만
+#   돌리는 병목이 됐다(2026-08-13 사장님 지적).
+#
+#   그래서 `api/` 안의 각 모듈을 훑어 **module-level `router`(APIRouter)가 있으면
+#   자동으로 싣는다.** 새 API·새 admin2 페이지 라우트는 새 `api/*.py` 파일 하나만
+#   만들면 되고, 이 파일(main.py)을 더는 고치지 않는다. admin2 페이지 라우트도 같은
+#   원리다 — `api/admin_ui_*.py`(화면 하나당 파일 하나, 각자 `router = APIRouter(
+#   prefix="/admin2")`)가 이 스캔에 함께 걸린다. 공용 헬퍼(`admin_ui_common.py`
+#   등)는 `router`가 없어 자동으로 빠진다 — 로직만 있는 모듈까지 실을 이유가 없다.
+#
+# ■ 조용한 실패를 만들지 않는다
+#   임포트가 실패하면 **그대로 예외를 올려 서버 기동을 멈춘다**(삼키지 않는다). 이
+#   저장소가 가장 자주 겪은 사고가 "화면·자산이 조용히 빠졌는데 아무도 몰랐다"
+#   (`.claude/CANON.md` §1 — 좌측 메뉴 36화면 복제, 자산 404 등)라서, 라우터 하나가
+#   빠지는 것도 시끄럽게 실패해야 한다. 무엇을 실었는지는 기동 로그 한 줄 +
+#   `GET /api/health/routers`(조회 가능한 목록)로 확인한다.
+def _discover_routers() -> list[tuple[str, APIRouter]]:
+    here = Path(__file__).resolve().parent
+    found: list[tuple[str, APIRouter]] = []
+    for modinfo in sorted(pkgutil.iter_modules([str(here)]), key=lambda m: m.name):
+        name = modinfo.name
+        if name == "main" or name.startswith("_"):
+            continue
+        module = importlib.import_module(f"api.{name}")  # 실패하면 그대로 터진다 (의도)
+        candidate = getattr(module, "router", None)
+        if isinstance(candidate, APIRouter):
+            found.append((name, candidate))
+    return found
 
-# 관리자 화면 서버 렌더(A/B 시험판, 2026-08-08). `/admin2/*`.
-# **캐치올 마운트보다 먼저** 걸어야 한다 — 뒤에 걸면 `/` 마운트가 먼저 잡아 404 다.
-app.include_router(admin_ui_router)
+
+_DISCOVERED_ROUTERS = _discover_routers()
+
+# admin2 페이지 라우트(`admin_ui_*`)는 **정적 캐치올 마운트보다 먼저** 걸려야 한다 —
+# 뒤에 걸면 `/` 마운트가 먼저 잡아 404 다. 아래 for 루프가 정적 마운트(파일 맨 아래)
+# 보다 앞에 있기만 하면 되고, 발견 순서(모듈명 알파벳순)는 서로 다른 prefix를 쓰는
+# 라우터끼리는 영향이 없다 — 같은 경로를 두 라우터가 등록하는 경우만 순서가 의미를
+# 갖는데, 지금 목록엔 그런 중복이 없다(제작 보고서에 라우트 전수 대조 기록).
+for _mod_name, _router in _DISCOVERED_ROUTERS:
+    app.include_router(_router)
+
+print("[main] auto-included %d routers: %s" % (
+    len(_DISCOVERED_ROUTERS), ", ".join(n for n, _ in _DISCOVERED_ROUTERS)))
+
+
+@app.get("/api/health/routers", include_in_schema=False)
+def _discovered_routers_debug():
+    """기동 시 자동 등록된 라우터 모듈 목록 — 무엇이 실렸는지(빠졌는지) 조회용."""
+    return {"count": len(_DISCOVERED_ROUTERS), "modules": [n for n, _ in _DISCOVERED_ROUTERS]}
+
 
 # 정적 마운트는 반드시 마지막 — 먼저 걸면 /api/*가 캐치올에 잡힌다.
 # mockups 전체를 마운트해야 admin/의 ../shared/su-icons.js 참조가 유지된다.
@@ -162,5 +129,114 @@ class NoCacheStatic(StaticFiles):
 TOKENS_DIR = Path(__file__).resolve().parent.parent / "design-system"
 if TOKENS_DIR.is_dir():
     app.mount("/design-system", NoCacheStatic(directory=TOKENS_DIR), name="design-system")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 구 관리자 화면(`mockups/admin/*.html`) 접근 차단 (2026-08-13 사장님 지시)
+#
+# ■ 배경 — P-09(CLAUDE.md)는 구 `/admin/*.html` 37화면을 "백업용 동결"(수정·안내·
+#   링크 연결 금지)로 정했는데, 아래 캐치올 정적 마운트가 여전히 그대로 서빙하고
+#   있어 지금도 그냥 열렸다(규약과 실제가 어긋남). 파일은 지우지 않는다(P-09 "구
+#   화면 파일 자체는 지우지 않는다") — **접근만** 막는다. 캐치올 마운트 자체를
+#   고치는 대신, 그보다 먼저 잡히는 라우트로 `/admin/<이름>.html` 만 가로챈다
+#   (Starlette는 등록 순서대로 매치하므로, 이 라우트가 아래 `app.mount("/", …)`
+#   보다 앞에 있기만 하면 된다 — admin2 페이지 라우터를 마운트보다 먼저 건
+#   §라우터 자동 등록과 같은 원리).
+#
+# ■ 왜 `/admin/` 전체가 아니라 `<이름>.html` 만인가 — 실측(2026-08-13) 결과 admin2의
+#   `templates/admin/{home,products,spec_fill,spec_standard}.html.j2` 넷은 **지금도
+#   Phoenix 벤더 스택(Bootstrap·simplebar·feather-icons 등)과 파비콘을
+#   `/admin/assets/*`·`/admin/vendors/*` 에서 그대로 읽는다**(폐기된 `_layout.html.j2`
+#   가 쓰던 경로를 각 화면의 head_extra/foot_extra 블록으로 그대로 옮겨 실었다 —
+#   `home.html.j2` 는 다름아닌 `/admin2/` 자기 자신이다). `/admin/` 전체를 막으면
+#   **`/admin2/`(홈)·`/admin2/products`·`/admin2/spec-fill`·`/admin2/spec-standard`
+#   가 스타일·스크립트 없이 깨진다** — `theme.css` 참조 누락으로 화면이 이틀간
+#   스타일 없이 돌았던 슬라이스 100 사고와 같은 종류다. 그래서 이 라우트는
+#   `/admin/<이름>.html`(슬래시 없는 단일 세그먼트 + `.html`)만 잡는다 —
+#   `/admin/assets/...`·`/admin/vendors/...` 처럼 세그먼트가 더 있는 경로는 FastAPI
+#   기본 문자열 컨버터가 `/` 를 허용하지 않아 이 패턴에 안 걸리고, 캐치올 마운트로
+#   그대로 넘어가 계속 서빙된다.
+#
+# ■ 410 인 이유 — "없었다"(404)가 아니라 "치웠다"(410)가 사실이다. 본문은 admin2로
+#   옮겨졌다는 안내 한 줄과 `/admin2/` 링크 하나뿐이다 — 화면 설계는 이 작업의
+#   몫이 아니다.
+_ADMIN_LEGACY_GONE_HTML = (
+    "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
+    "<title>이전된 화면</title></head><body>"
+    "<p>이 화면은 admin2로 이전되었습니다. "
+    "<a href=\"/admin2/\">admin2로 이동</a></p>"
+    "</body></html>"
+)
+
+
+# ── 인증·세션 화면은 "치우는 대상"이 아니라 "들어오는 문"이다 (2026-08-13 긴급) ──
+#
+# ■ 무슨 사고였나 — 위 410 차단이 `/admin/login.html`까지 막아 **세션이 만료되면
+#   아무도 재로그인할 수 없는 상태**가 됐다. 실측: admin2 화면 넷(reviews·
+#   ai_integration·ai_usage_cost·build_map)이 401을 받으면 이 경로로 안내하는데,
+#   그 안내가 막다른 길이었다(`/admin2/login`은 애초에 없다 — 404). 사장님이 막으라고
+#   한 것은 "이전 관리 화면"(admin2로 대체된 콘텐츠 열람)이지 인증 진입점이 아니다.
+#
+# ■ 예외 셋 — 기준은 "이 화면이 없으면 사람이 이 시스템에 (재)진입할 방법이
+#   원천적으로 없어지는가"다. admin2 쪽 페이지 라우트(`api/admin_ui_*.py`, 공용 헬퍼
+#   `admin_ui_common.py` 제외 14개 — 기동 로그 "auto-included" 목록으로 실측)를
+#   확인한 결과 operators·my-profile에 대응하는 admin2 화면이 아직 없다 — 대체 화면이
+#   생기기 전까지는 이 셋이 유일한 경로다. `index.html`(구 대시보드)은 admin2에 이미
+#   대체 화면(`admin_ui_home.py` → `/admin2/`)이 있어 예외에 넣지 않았다(그대로 410 →
+#   "admin2로 이동" 안내 — 의도된 동작, P-09).
+#     · login.html      로그인 화면 그 자체.
+#     · my-profile.html 본인 비밀번호 변경(`POST /api/admin/auth/password`)의 유일한
+#                        화면. login.html이 임시 비밀번호 로그인 뒤 "내 정보에서
+#                        비밀번호를 바꿔 주세요"라고 안내하는 그 화면 — 막으면 그
+#                        안내마저 막다른 길이 된다.
+#     · operators.html  신규 운영자 **승인**(`POST /api/admin/operators/{id}/approve`)과
+#                        **임시 비밀번호 발급**(`POST /api/admin/auth/operators/{id}/
+#                        password`)의 유일한 화면. 자기 스스로 푸는 "비밀번호 찾기"가
+#                        없으므로(`api/auth.py`), 비밀번호를 잊은 운영자의 유일한 복구
+#                        경로이기도 하다 — owner가 여기서 재발급해야 들어올 수 있다.
+#
+# ■ 왜 안전한가 — 이 셋을 여는 것은 데이터를 여는 게 아니다. 세 화면 다 서버 렌더
+#   데이터를 담지 않고, 화면이 부르는 API(`/api/admin/*`)는 `auth.py`의 미들웨어가
+#   세션·권한을 **별도로** 검사한다(예: `/api/admin/operators`는 조회조차 owner 필요).
+#   정적 HTML 껍데기를 열어도 API는 여전히 401/403을 준다 — 여기서 여는 것은 "문"이지
+#   "방"이 아니다. 그래서 이 예외는 P-09("구화면 기능이 필요하면 admin2에 새로
+#   짓는다")를 어기는 게 아니라 — 그 규칙이 다루는 대상(콘텐츠 화면)과 이 셋(진입·
+#   복구 경로)이 다른 종류라는 판단이다.
+_ADMIN_AUTH_DOOR_SCREENS = {"login", "my-profile", "operators"}
+
+
+@app.get("/admin", include_in_schema=False)
+@app.get("/admin/", include_in_schema=False)
+@app.get("/admin/{page_name}.html", include_in_schema=False)
+def _legacy_admin_page_gone(page_name: str = ""):
+    """구 관리자 화면(`mockups/admin/*.html`) 접근 차단 — 위 블록 주석 참조.
+
+    `/admin/assets/*`·`/admin/vendors/*` 는 이 경로 패턴에 걸리지 않아 캐치올
+    마운트가 그대로 서빙한다 — admin2 4화면이 아직 그 자산에 기대고 있어서다.
+
+    `_ADMIN_AUTH_DOOR_SCREENS`(로그인·내 정보·운영자 관리)는 차단하지 않고 실제
+    파일을 그대로 서빙한다 — 위 "인증·세션 화면" 블록 참조. `NoCacheStatic`이 이
+    캐치올 대신 여기서 먼저 잡히므로, 캐시 미적용 정책(no-cache)도 동일하게 직접
+    건다 — 옛 로그인 화면이 브라우저에 캐시돼 새 배포가 안 보이는 사고(슬라이스 71)를
+    이 경로에서도 반복하지 않는다.
+
+    ■ 410 응답도 같은 정책이 필요하다 (2026-08-14 발견) — HTTP 규격상 410 Gone은
+      기본적으로 캐시 가능한 상태코드다. 이 차단이 걸려 있던 동안(예: login.html이
+      아직 예외에 없던 시점) 그 주소를 연 브라우저가 410을 저장했고, 차단을 풀어
+      200을 돌려주기 시작한 뒤에도 브라우저가 캐시된 410을 계속 보여줘 재진입이
+      막혔다(no-store로 강제 재요청해야만 200을 받았다). 그래서 위 door-screens
+      분기와 **같은 두 헤더·같은 값**을 410에도 직접 건다 — 이 파일 안에서 캐시
+      금지 방식을 두 가지로 두지 않는다.
+    """
+    if page_name in _ADMIN_AUTH_DOOR_SCREENS:
+        resp = FileResponse(MOCKUPS_DIR / "admin" / f"{page_name}.html")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        return resp
+    resp = HTMLResponse(content=_ADMIN_LEGACY_GONE_HTML, status_code=410)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
 
 app.mount("/", NoCacheStatic(directory=MOCKUPS_DIR, html=True), name="mockups")

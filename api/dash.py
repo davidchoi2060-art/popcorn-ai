@@ -37,6 +37,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from .timeutil import now_iso
+
 router = APIRouter(prefix="/api/admin/dash", tags=["admin-dash"])
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -45,11 +47,13 @@ AGENTS_DIR = ROOT / ".claude" / "agents"          # 팀원 정의 정본
 PROJ_KEY = "E--DEV"
 SESS_DIR = Path(os.path.expanduser("~")) / ".claude" / "projects" / PROJ_KEY
 QUEUE = ROOT / ".claude" / "dash-queue.jsonl"      # 화면 -> 세션 (우리가 만든 파일)
+WATCH_HEARTBEAT = ROOT / ".claude" / "dash-watch.heartbeat"   # 감시자(로컬) 생존 신호
 
 # 팀원 이름 -> 한글. `.claude/agents/*.md` 가 정본이고 여기는 표시용이다.
 TEAM_KO = {
     "investigator": "조사자", "maker": "제작자", "checker": "확인자",
     "writer": "문장가", "dba": "DBA", "crosschecker": "검증자", "sweeper": "점검자",
+    "specfiller": "웹크롤링",
     "general-purpose": "하네스", "Explore": "하네스", "Plan": "하네스",
 }
 
@@ -57,6 +61,51 @@ TEAM_KO = {
 # 그걸 별도 카드로 세우면 같은 사람이 둘로 보인다(사용자 지적 2026-08-12: copy-auditor).
 # 접되 지우지는 않는다: 호출·실패 수는 지금 이름의 카드에 그대로 계산된다.
 ALIAS = {"copy-auditor": "writer", "surveyor": "investigator"}
+
+# Claude Code 기본 제공 서브에이전트 — 이 셋은 「팀원」이 아니라 **하네스(주 세션) 자신이
+# 위임하는 호출**이다. TEAM_KO 가 셋 다 "하네스"로 표기하면서도 `_roster()` 는 이 이름을
+# 모르므로, 예전 코드는 이걸 몰라 별도 "정의 없음" 카드를 또 만들었다 — roster 에 "하네스"
+# 이름 카드가 둘 서는 결함이었다(2026-08-13 실측: 10장 중 2장). 지금은 별도 카드를 만들지
+# 않고 `_team()` 의 harness 카드로, `_event_agents()` 의 태그로 합산한다.
+HARNESS_BUILTINS = ("general-purpose", "Explore", "Plan")
+
+
+# ── 감시자(dash_watch.py) 생존 표시 ─────────────────────────────────────
+#
+# 로컬 PC: `scripts/dash_watch.py` 가 5초마다 `WATCH_HEARTBEAT` 파일을 덮어쓴다.
+#   → 파일 mtime 이 15초 이내면 살아 있다.
+# 배포 서버: 로컬 파일이 없다(다른 프로세스). 대신 감시자가 30초마다
+#   `?watcher=1` 을 붙여 이 서버를 부른다 — 그 요청이 온 시각을 여기 적어 둔다.
+#   → 마지막 핑이 90초 이내면 살아 있다.
+# **지어내지 않는다** — 둘 다 없으면(또는 둘 다 낡았으면) alive=False, last=None.
+_WATCH_PING: dict = {"ts": None, "iso": None}
+
+HEARTBEAT_FRESH_S = 15
+PING_FRESH_S = 90
+
+
+def _watcher() -> dict:
+    cands = []                                 # (age_s, last_iso, src)
+    try:
+        st = WATCH_HEARTBEAT.stat()
+        age = time.time() - st.st_mtime
+        if age <= HEARTBEAT_FRESH_S:
+            try:
+                last = io.open(WATCH_HEARTBEAT, encoding="utf-8", errors="ignore").read().strip() or None
+            except OSError:
+                last = None
+            cands.append((age, last, "heartbeat"))
+    except OSError:
+        pass
+    if _WATCH_PING["ts"] is not None:
+        age = time.time() - _WATCH_PING["ts"]
+        if age <= PING_FRESH_S:
+            cands.append((age, _WATCH_PING["iso"], "ping"))
+    if not cands:
+        return {"alive": False, "last": None, "src": None}
+    cands.sort(key=lambda c: c[0])              # 더 신선한(나이 적은) 쪽을 쓴다
+    age, last, src = cands[0]
+    return {"alive": True, "last": last, "src": src}
 
 
 # ── 팀원 명단 · 활동 ────────────────────────────────────────────────────
@@ -69,7 +118,11 @@ ALIAS = {"copy-auditor": "writer", "surveyor": "investigator"}
 #
 # 전사본이 24MB 라 매초 통째로 읽지 않는다. **읽은 바이트 위치를 기억해 새로 자란 만큼만**
 # 읽어 누적한다(아래 `_SCAN`). 파일이 바뀌거나 줄어들면 처음부터 다시 센다.
-_SCAN: dict = {"path": None, "off": 0, "runs": {}, "tools": 0, "says": 0, "day": None}
+# `agent_ids` — Agent/Task 호출의 tool_use_id -> 에이전트 정본 이름. `runs[*]["open"]`
+# 과 달리 **결과가 와도 지우지 않는다**(하루 내내 누적) — 팀원 카드 클릭 필터가
+# 꼬리(최근 N줄) 밖에서 열린 호출의 결과를 만나도 누구 것인지 이 맵으로 알아낸다.
+_SCAN: dict = {"path": None, "off": 0, "runs": {}, "tools": 0, "says": 0, "day": None,
+               "agent_ids": {}}
 
 
 def _roster() -> list[dict]:
@@ -115,13 +168,13 @@ def _scan(path: Path) -> dict:
     today = (datetime.datetime.utcnow() + datetime.timedelta(hours=9)).strftime("%Y-%m-%d")
     if _SCAN["path"] != str(path) or _SCAN["day"] != today:
         _SCAN.update({"path": str(path), "off": 0, "runs": {}, "tools": 0,
-                      "says": 0, "day": today})
+                      "says": 0, "day": today, "agent_ids": {}})
     try:
         size = path.stat().st_size
     except OSError:
         return _SCAN
     if size < _SCAN["off"]:                 # 파일이 줄었다 = 다른 세션이거나 잘렸다
-        _SCAN.update({"off": 0, "runs": {}, "tools": 0, "says": 0})
+        _SCAN.update({"off": 0, "runs": {}, "tools": 0, "says": 0, "agent_ids": {}})
     if size == _SCAN["off"]:
         return _SCAN
     with io.open(path, "rb") as f:
@@ -157,6 +210,8 @@ def _scan(path: Path) -> dict:
                     r["open"][c.get("id")] = {"desc": str(inp.get("description") or "")[:70],
                                               "ts": ts}
                     r["last"] = ts
+                    # 팀원 카드 필터(사건 태깅)가 쓴다 — 결과가 와도 지우지 않는다(위 주석)
+                    _SCAN["agent_ids"][c.get("id")] = who
         elif t == "user":
             cc = (o.get("message") or {}).get("content")
             if isinstance(cc, str) and same_day:
@@ -192,8 +247,10 @@ def _team() -> tuple[list[dict], dict]:
     roster = _roster()
     known = {a["name"] for a in roster}
     for who in sorted(runs):
+        if who in HARNESS_BUILTINS:
+            continue        # 의사 카드를 만들지 않는다 — 아래서 harness 카드로 합산한다
         if who not in known:
-            builtin = who in ("general-purpose", "Explore", "Plan", "claude")
+            builtin = who == "claude"
             roster.append({"name": who, "ko": TEAM_KO.get(who, who), "defined": False,
                            "role": "Claude Code 기본 제공" if builtin else "정의 없음",
                            "desc": ("Claude Code(하네스)가 기본으로 제공하는 에이전트 (%s)" % who)
@@ -233,6 +290,60 @@ def _team() -> tuple[list[dict], dict]:
         done += a["today"]
         running += a["running"]
         failed += a["fail"]
+    # 하네스 카드 — 팀원이 아니라 **이 화면을 채우는 주 세션 자체**. 위 루프를 태우면
+    # `runs.get("harness")` 가 비어 있어 대기로 덮인다 — 그래서 루프 밖에서 따로 만들어
+    # 맨 앞에 꽂는다.
+    #
+    # **결함 수정(2026-08-13)**: `general-purpose`/`Explore`/`Plan` 호출은 TEAM_KO 에서
+    # 이미 "하네스"로 표기되는데, 예전 코드는 위 루프 앞에서 이 이름들을 모르는 이름으로
+    # 보고 별도 "정의 없음" 카드를 또 만들었다 — roster 에 "하네스" 카드가 둘 서는
+    # 결함이었다(실측: 10장 중 2장). 지금은 그 셋을 별도 카드로 세우지 않고(위에서 continue)
+    # 여기서 running/today/fail/last/doing 을 이 하네스 카드 하나에 합산한다.
+    idle_s = int(time.time() - p.stat().st_mtime) if p else None
+    h_running = h_fail = h_today = 0
+    h_last = None
+    h_doing: list[str] = []
+    h_age = 0
+    for b in HARNESS_BUILTINS:
+        r = runs.get(b) or {}
+        opened = r.get("open") or {}
+        h_running += len(opened)
+        h_today += r.get("today", 0)
+        h_fail += r.get("fail", 0)
+        if r.get("last") and (h_last is None or r["last"] > h_last):
+            h_last = r["last"]
+        for v in opened.values():
+            h_doing.append(v["desc"])
+            try:
+                ts = datetime.datetime.fromisoformat(str(v["ts"]).replace("Z", "+00:00"))
+                h_age = max(h_age, int((now - ts).total_seconds()))
+            except Exception:                                    # noqa: BLE001
+                pass
+    harness = {
+        "name": "harness", "ko": "하네스", "defined": True,
+        "role": "주 세션 · 사장님과 대화 · 팀원 호출",
+        "desc": ("이 현황판을 채우는 주 세션 자체다 — general-purpose/Explore/Plan 호출"
+                 "(TEAM_KO 의 \"하네스\" 별칭)의 활동은 별도 카드 없이 이 카드에 합산된다."),
+        "running": h_running, "fail": h_fail, "today": h_today, "last": h_last,
+        "doing": sorted(h_doing)[:2] if h_doing else
+                 ["오늘 도구 %d · 발화 %d" % (sc.get("tools", 0), sc.get("says", 0))],
+    }
+    # 신호는 둘을 겹친다 — **위임한 호출이 있으면 그 실행/지연 상태**를 우선하고,
+    # 없으면 세션 자체의 idle_s(전사본 최종 수정 후 경과 — /state 가 쓰는 것과 같은 정의).
+    if h_running and h_age > DELAY_S:
+        harness["sig"], harness["state"] = "delay", "지연 %d분" % (h_age // 60)
+    elif h_running:
+        harness["sig"], harness["state"] = "run", "실행 중"
+    elif idle_s is not None and idle_s <= 120:
+        harness["sig"], harness["state"] = "run", "활동 중"
+    else:
+        harness["sig"], harness["state"] = "idle", "대기"
+    done += h_today
+    running += h_running
+    failed += h_fail
+    if h_running and h_age > DELAY_S:
+        delayed += 1
+    roster.insert(0, harness)
     return roster, {"tools": sc["tools"], "says": sc["says"], "day": sc["day"],
                     "agent_done": done, "agent_running": running,
                     "agent_fail": failed, "agent_delayed": delayed}
@@ -274,7 +385,9 @@ def _event(d: dict) -> dict | None:
                 out.append({"kind": "tool", "name": c.get("name"),
                             "detail": _tool_detail(c.get("name"), c.get("input") or {})})
             elif c.get("type") == "text" and (c.get("text") or "").strip():
-                out.append({"kind": "say", "text": (c["text"] or "").strip()[:600]})
+                # 4000자 — 현황판이 발화 속 마크다운 표를 렌더한다(2026-08-12).
+                # 600자로 자르면 표가 중간에서 끊긴다. user say·result 절단은 그대로다.
+                out.append({"kind": "say", "text": (c["text"] or "").strip()[:4000]})
         if not out:
             return None
         u = m.get("usage") or {}
@@ -310,11 +423,101 @@ def _tool_detail(name: str, inp: dict) -> str:
     if name in ("Grep", "Glob"):
         return str(inp.get("pattern") or "")[:70]
     if name == "Agent":
-        who = TEAM_KO.get(str(inp.get("subagent_type") or ""), inp.get("subagent_type") or "")
+        raw = str(inp.get("subagent_type") or "")
+        canon = ALIAS.get(raw, raw)                    # 옛 이름은 지금 이름으로 접는다
+        who = TEAM_KO.get(canon, canon)
         return "%s — %s" % (who, str(inp.get("description") or "")[:60])
     if name == "Skill":
         return str(inp.get("skill") or "")
     return re.sub(r"\s+", " ", json.dumps(inp, ensure_ascii=False))[:90]
+
+
+def _event_agents(d: dict, id2agent: dict) -> list[str]:
+    """이 사건이 어느 팀원 것인가 — 팀원 카드 클릭 필터가 쓴다.
+
+    **지어내지 않는다.** 전사본에 실제로 있는 것만 본다: Agent/Task 호출 자신과
+    그 결과(tool_result)만 그 팀원으로 태그하고, 나머지(하네스 자신의 도구 호출·발화,
+    사장님 발화)는 전부 'harness' 로 태그한다. 서브에이전트 **내부** 도구 호출은 이
+    전사본에 없다 — 별도 출력 파일(`tasks/*.output`)이고 그나마도 백그라운드 셸 명령과
+    구분이 안 된다(`_bg_tasks` 주석과 같은 한계). 한 메시지에 서로 다른 팀원 호출이
+    여럿이면(병렬 호출) 전부 담는다 — 하나만 골라 나머지를 숨기지 않는다.
+    """
+    t = d.get("type")
+    out: list[str] = []
+    if t == "assistant":
+        for c in (d.get("message") or {}).get("content") or []:
+            if c.get("type") == "tool_use" and c.get("name") in ("Agent", "Task"):
+                who = str((c.get("input") or {}).get("subagent_type") or "?")
+                who = ALIAS.get(who, who)
+                # 결함 1 수정: general-purpose/Explore/Plan 은 별도 카드가 없다 —
+                # 하네스 필터가 이 사건들을 잡도록 "harness" 로 태그한다.
+                if who in HARNESS_BUILTINS:
+                    who = "harness"
+                if who not in out:
+                    out.append(who)
+    elif t == "user":
+        m = d.get("message") or {}
+        c = m.get("content")
+        if isinstance(c, list):
+            for x in c:
+                if isinstance(x, dict) and x.get("type") == "tool_result":
+                    who = id2agent.get(x.get("tool_use_id"))
+                    if who in HARNESS_BUILTINS:
+                        who = "harness"
+                    if who and who not in out:
+                        out.append(who)
+    return out or ["harness"]
+
+
+def _agent_events(path: Path, agent: str, cap: int = 200) -> list[dict]:
+    """팀원 카드 클릭 필터 — **당일 전사본 전체**에서 이 팀원의 사건만 모은다(윈도 무관).
+
+    **결함 2 (2026-08-13 조사자 실측으로 원인 확정)**: 카드의 `today` 집계(`_scan`)는
+    당일 전사본 전체를 누적하는데, 기본 사건 목록(`state()` 의 windowed 경로)은
+    `_tail_lines(limit*6)` — 끝 240줄짜리 창만 본다. 새벽에 호출된 팀원의 호출·결과
+    쌍이 파일 앞쪽(창 밖)에 있으면 카드는 「오늘 2건」인데 필터는 0건을 보여준다
+    (limit=200 이면 4장 모두 today 와 일치하는 사건이 나온다 — 실측 확인).
+
+    이 경로는 창을 쓰지 않는다 — 파일 전체를 한 번 훑어 오늘(KST) 것만, 이 팀원
+    태그(`_event_agents` 와 같은 판정)가 붙은 사건만 담는다. id2agent 매핑도 이 함수
+    안에서 처음부터 다시 쌓는다(`_SCAN["agent_ids"]` 에 기대지 않는다 — 이 요청이
+    세션 재시작·파일 교체 이후에 와도 스스로 맞는다). 상한(cap)은 두되 「없다」와
+    「상한에 잘렸다」를 섞지 않도록 호출부가 반환 건수를 그대로 화면에 보인다.
+    """
+    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=9)).strftime("%Y-%m-%d")
+    try:
+        data = io.open(path, "rb").read()
+    except OSError:
+        return []
+    id2agent: dict = {}
+    out: list[dict] = []
+    for line in data.decode("utf-8", "ignore").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            o = json.loads(line)
+        except Exception:                                        # noqa: BLE001
+            continue
+        if _kst_day(o.get("timestamp") or "") != today:
+            continue
+        # 이 사건 이전의 Agent/Task 호출로 tool_use_id -> 팀원 매핑을 앞에서부터 쌓는다
+        # (전사본은 호출이 결과보다 항상 먼저 온다 — `_scan()` 과 같은 가정).
+        if o.get("type") == "assistant":
+            for c in (o.get("message") or {}).get("content") or []:
+                if c.get("type") == "tool_use" and c.get("name") in ("Agent", "Task"):
+                    who = str((c.get("input") or {}).get("subagent_type") or "?")
+                    who = ALIAS.get(who, who)
+                    if who in HARNESS_BUILTINS:
+                        who = "harness"
+                    id2agent[c.get("id")] = who
+        e = _event(o)
+        if e is None:
+            continue
+        e["agents"] = _event_agents(o, id2agent)
+        if agent in e["agents"]:
+            out.append(e)
+    return out[-cap:]
 
 
 # 백그라운드 작업 출력을 「지금 도는 것」으로 볼 수 있는 창. 넘으면 지난 일이다.
@@ -360,40 +563,71 @@ def _bg_tasks() -> tuple[list[dict], int]:
     return out[:8], older
 
 
+AGENT_EVENTS_CAP = 200          # 팀원 필터(당일 전체 스캔) 상한 — 결함 2
+
+
 @router.get("/state")
-def state(limit: int = 40):
-    """현황 한 벌. 화면이 주기적으로 부른다."""
+def state(limit: int = 40, watcher: int = 0, agent: str = ""):
+    """현황 한 벌. 화면이 주기적으로 부른다.
+
+    `watcher=1` 이 붙으면 감시자(배포 서버 쪽)가 방금 이 서버를 불렀다는 뜻이라
+    시각을 적어 둔다(`_WATCH_PING`) — 세션 유무와 무관하게 항상 기록한다.
+
+    `agent=이름` 이 붙으면 사건 목록을 **당일 전사본 전체**에서 그 팀원 것만 모아
+    돌려준다(`_agent_events`, 창 무관 · 상한 `AGENT_EVENTS_CAP`) — 결함 2 수정.
+    기본(파라미터 없음)은 그대로 최근 `limit*6` 줄짜리 창(`_tail_lines`)이다.
+    화면은 팀원 카드를 누르면 이 파라미터를 붙여 재조회하고, 해제하면 다시 없이
+    부른다(폴링·SSE 갱신도 같은 `load()` 를 타므로 필터가 계속 걸린 채 갱신된다).
+    """
+    if watcher:
+        _WATCH_PING["ts"] = time.time()
+        _WATCH_PING["iso"] = now_iso()          # 타임존 포함 — naive면 배포 서버(UTC)를 브라우저가 로컬로 오독한다(timeutil)
     p = _latest_session()
     if p is None:
         return {"ok": False, "reason": "세션 전사본 없음", "dir": str(SESS_DIR),
                 "events": [], "agents": [], "agents_older": 0,
-                "agents_window_min": AGENT_WINDOW_S // 60, "queued": _queue_pending()}
-    evts = []
-    for line in _tail_lines(p, limit * 6):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            e = _event(json.loads(line))
-        except Exception:                                    # noqa: BLE001
-            continue
-        if e:
+                "agents_window_min": AGENT_WINDOW_S // 60, "queued": _queue_pending(),
+                "watcher": _watcher()}
+    # 팀원 명단·활동을 먼저 잰다 — `_scan()` 이 이때 `_SCAN["agent_ids"]`(사건 태깅용
+    # tool_use_id -> 팀원 이름 맵)을 채운다. 사건 목록보다 먼저 불러야 아래 태깅이
+    # 최신 상태를 쓴다.
+    roster, tot = _team()
+    agent = (agent or "").strip()
+    if agent:
+        evts = _agent_events(p, agent, cap=AGENT_EVENTS_CAP)
+    else:
+        id2agent = _SCAN.get("agent_ids", {})
+        evts = []
+        for line in _tail_lines(p, limit * 6):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                o = json.loads(line)
+            except Exception:                                    # noqa: BLE001
+                continue
+            e = _event(o)
+            if e is None:
+                continue
+            e["agents"] = _event_agents(o, id2agent)   # 팀원 카드 필터가 쓴다(클라 추측 없음)
             evts.append(e)
+        evts = evts[-limit:]
     st = p.stat()
     agents, agents_older = _bg_tasks()
-    roster, tot = _team()
     return {
         "ok": True,
         "session": p.stem,
         "idle_s": int(time.time() - st.st_mtime),
         "size_mb": round(st.st_size / 1e6, 1),
-        "events": evts[-limit:],
+        "events": evts,
+        "agent_filter": agent or None,       # 서버가 실제로 적용한 필터 — 화면 추측 방지
         "agents": agents,
         "agents_older": agents_older,        # 창 밖 — 「없다」와 구분해 화면이 적는다
         "agents_window_min": AGENT_WINDOW_S // 60,
         "queued": _queue_pending(),
         "roster": roster,                    # 팀원 명단 + 신호
         "today": _today(tot),                # 오늘 처리한 것 — 셀 수 있는 것만
+        "watcher": _watcher(),               # 감시자 생존 — heartbeat 또는 ping, 신선한 쪽
     }
 
 

@@ -1,0 +1,144 @@
+/* ══════════════════════════════════════════════════════════════════════
+   admin2 공통 셸 — 팔레트 · 서체 · 좌측 메뉴(LNB) · 헤더 · 토스트 (단일 원천)
+
+   2026-08-13 사장님 승인 디자인(`templates/admin/reviews.html.j2`,
+   원안 `docs/design/dc-review-screen.html` 외 2벌)에서 뽑았다. admin2 화면은
+   전부 이 파일 **하나만** 읽는다 — 좌측 메뉴가 36화면에 복제돼 갈라졌던 사고
+   (`.claude/CANON.md` §1)가 셸·팔레트 축에서 재발하지 않게 하는 것이 이 파일의 목적이다.
+
+   ⚠ `design-system/tokens.css`(고객 화면 정본)는 여기서 절대 베끼거나 건드리지 않는다.
+     admin2는 톤이 다르다(오klch 베이지 vs Popcorn Light) — 별개 파일로 분리해 두 정본이
+     서로를 오염시키지 않는다.
+
+   ■ 클래스는 `a2-` 접두어를 쓴다 — 단, admin2 중 두 화면(products·spec_fill·spec_standard·
+     대시보드)은 아직 Phoenix(Bootstrap) 자산도 함께 로드한다(본문 카드·표가 그 CSS에
+     의존). Phoenix도 `.card`·`.main`처럼 흔한 이름을 쓰므로, 접두어 없이 셸 클래스를
+     지으면 그 화면들의 본문 스타일과 충돌한다. `a2-`는 그 충돌을 피하기 위한 이름공간이다.
+   ■ id는 접두어를 붙이지 않았다 — 기존 reviews.html.j2 스크립트가 `getElementById('lnb')`
+     처럼 그대로 참조하던 것들이라, 바꾸면 그 화면의 검증된 동작을 다시 흔든다.
+
+   ■ 이 파일이 담지 않는 것: 화면 본문(콘텐츠) 스타일. `.card`·`.row`·`.flow`처럼 화면마다
+     의미가 다른 클래스는 각 템플릿 자신의 <style>(head_extra 블록)에 남는다.
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* ── 원시 팔레트 — reviews.html.j2 원안 그대로(oklch 베이지) ── */
+  --rv-page:#e8e4dc; --rv-canvas:#f7f4ee; --rv-card:#fffdf9; --rv-panel:#f4f0e7; --rv-panel2:#f2eee5;
+  --rv-ink:#26231e; --rv-ink-soft:#403c35; --rv-muted:#6f6a61; --rv-faint:#8a8377;
+  --rv-dim:#a09889; --rv-dim2:#b3ac9e; --rv-dim3:#c4bdae; --rv-dim4:#cfc9bd;
+  --rv-nav:#211f1b; --rv-nav-ink:#f4f1ea; --rv-nav-muted:#a29b8d;
+  --rv-amber:oklch(0.62 0.15 55); --rv-amber-bg:oklch(0.95 0.04 70); --rv-amber-line:oklch(0.72 0.12 62 / .5);
+  --rv-green:oklch(0.5 0.11 165); --rv-red:oklch(0.52 0.16 30); --rv-purple:oklch(0.5 0.11 285);
+  --rv-link:oklch(0.45 0.13 250);
+  --rv-font:'Pretendard','Noto Sans KR',system-ui,sans-serif;
+  --rv-mono:'JetBrains Mono','Pretendard',monospace;
+
+  /* ── 의미별 별칭 — dash·build_map이 이미 `var(--bg)`·`var(--card)`처럼 쓰고 있던
+     이름들(옛 Popcorn Light 토큰과 같은 이름)을 그대로 살려 두고 **값만** 이 팔레트로
+     맞췄다. 두 화면의 본문 CSS·JS 생성 마크업 수백 곳을 이름째 바꾸는 대신, 정의만
+     바꿔 위험을 줄였다(2026-08-13 제작자 판단 — 검증 대상, 보고서 참조).
+     `.claude/BRIEF.md` §C-4가 "미결"로 남겨 둔 질문(build_map·dash를 tokens.css로
+     옮길지)과는 다른 질문이다 — 거기로 옮기지 않고, admin2 전용의 새 파일로 옮겼다. ── */
+  --bg: var(--rv-canvas); --surface: var(--rv-canvas);
+  --card: var(--rv-card); --container: var(--rv-panel); --container-low: var(--rv-panel2);
+  --on: var(--rv-ink); --on-variant: var(--rv-muted);
+  --outline: var(--rv-dim3); --outline-variant: rgba(0,0,0,.1);
+  --nav: var(--rv-nav); --on-nav: var(--rv-nav-ink); --on-nav-muted: var(--rv-nav-muted);
+  --primary: var(--rv-ink); --primary-container: var(--rv-panel2);
+  --primary-bright: var(--rv-ink); --on-primary: var(--rv-canvas);
+  --secondary: var(--rv-purple); --tertiary: var(--rv-amber);
+  --error: var(--rv-red); --success-dark: var(--rv-green);
+  --state-wait: var(--rv-dim3); --state-run: var(--rv-amber);
+  --state-fail: var(--rv-red); --state-done: var(--rv-green);
+  --font: var(--rv-font); --font-num: var(--rv-mono); --font-head: var(--rv-font);
+}
+
+/* ── 기본 리셋 — 화면 본문 CSS가 각자 갖고 있던 것과 값이 같다(중복이지만 무해) ── */
+.a2-shell,.a2-shell *{box-sizing:border-box}
+/* admin2 화면은 전부 body 바로 아래 .a2-shell 하나만 둔다(셸 정본의 계약) — 그래서
+   :has() 같은 조건 선택자 없이 body 전역에 걸어도 다른 페이지를 건드리지 않는다. */
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webkit-font-smoothing:antialiased}
+.a2-shell a{color:inherit;text-decoration:none}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+
+/* ── 셸 뼈대 ── */
+.a2-shell{width:100%;height:100vh;overflow:hidden;display:flex;position:relative}
+
+/* ── 좌측 메뉴(LNB) — 동작 규격(2026-08-13 사장님 확정, admin2 전 화면 공통):
+   펼침 212px ↔ 접힘 64px · `width .16s ease` · 최하단 「메뉴창 접기」 · 아이콘 «/» ·
+   접히면 라벨 숨김+`title` 툴팁 · 브랜드 admin2↔a2. IA(항목 구성)는 이 파일 소관이
+   아니다 — 정본은 `api/admin_nav.py`(`nav_for`). ── */
+.a2-lnb{width:212px;flex:none;background:var(--nav);color:var(--on-nav-muted);padding:16px 0 10px;
+     display:flex;flex-direction:column;gap:1px;transition:width .16s ease;overflow:hidden}
+.a2-lnb.collapsed{width:64px}
+.a2-lnb-brand{padding:0 16px 14px;font:600 14px/1 var(--font);color:var(--on-nav);letter-spacing:-.01em;flex:none}
+.a2-lnb.collapsed .a2-lnb-brand{padding:0 0 14px;text-align:center}
+.a2-lnb-scroll{flex:1;min-height:0;overflow-y:auto}
+.a2-lnb-grp{border-bottom:1px solid rgba(255,255,255,.045)}
+.a2-lnb-g{width:100%;display:flex;align-items:center;gap:9px;padding:9px 16px;background:none;border:0;
+       cursor:pointer;text-align:left;font:600 10.5px/1.2 var(--font-num);letter-spacing:.06em;color:var(--on-nav-muted)}
+.a2-lnb-g:hover{color:var(--on-nav);background:rgba(255,255,255,.06)}
+.a2-lnb-g .a2-gi{flex:none;width:20px;height:20px;border-radius:5px;background:rgba(255,255,255,.07);
+           display:flex;align-items:center;justify-content:center;font:600 10px/1 var(--font);color:var(--rv-dim4)}
+.a2-lnb-g .a2-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none;letter-spacing:0}
+.a2-lnb-g .a2-c{font:500 9.5px/1 var(--font-num);color:var(--on-nav-muted)}
+.a2-lnb-g .a2-x{font-size:8px;transition:transform .15s ease;flex:none}
+.a2-lnb-grp[data-open="n"] .a2-lnb-b{display:none}
+.a2-lnb-grp[data-open="n"] .a2-lnb-g .a2-x{transform:rotate(-90deg)}
+.a2-lnb-b{padding-bottom:4px}
+.a2-lnb-b a,.a2-lnb-b .off{display:flex;align-items:center;gap:8px;padding:7px 16px 7px 29px;font:500 12.5px/1.35 var(--font);
+       color:var(--on-nav-muted);border-left:2px solid transparent;cursor:pointer}
+.a2-lnb-b a:hover{color:var(--on-nav);background:rgba(255,255,255,.05)}
+.a2-lnb-b a.on{color:var(--on-nav);background:rgba(255,255,255,.09);border-left-color:var(--rv-green)}
+.a2-lnb-b .off{color:var(--on-nav-muted);cursor:default}
+.a2-lnb-b .tag{font:500 9px/1 var(--font-num);padding:1px 4px;border-radius:3px;background:rgba(255,255,255,.06);
+            color:var(--on-nav-muted)}
+.a2-lnb.collapsed .a2-lnb-g .a2-t,.a2-lnb.collapsed .a2-lnb-g .a2-c,.a2-lnb.collapsed .a2-lnb-g .a2-x{display:none}
+.a2-lnb.collapsed .a2-lnb-g{justify-content:center;padding:8px 0}
+.a2-lnb.collapsed .a2-lnb-b{display:none!important}
+.a2-lnb-toggle{display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:9px 11px;border:1px solid rgba(255,255,255,.14);
+            border-radius:6px;color:var(--on-nav-muted);cursor:pointer;user-select:none;background:none;flex:none;width:auto}
+.a2-lnb-toggle:hover{color:var(--on-nav);border-color:rgba(255,255,255,.28)}
+.a2-lnb.collapsed .a2-lnb-toggle{justify-content:center;margin:8px 8px 0;padding:9px 0}
+.a2-lnb-toggle .ic{font:500 12px/1 var(--font-num);flex:none}
+.a2-lnb.collapsed .a2-lnb-toggle .lb{display:none}
+
+/* ── 본문 컬럼 ── */
+.a2-main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;min-height:0}
+
+/* ── 헤더 — 그룹/화면명/화면ID 배지/권한 표시(2026-08-13 사장님 지시: 화면마다 다르던
+   헤더를 이 규격으로 통일). 화면별 추가 위젯은 `header_extra` 블록(권한 표시 바로 뒤,
+   아바타 앞)에 얹는다. ── */
+.a2-hd{min-height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:var(--card);
+    display:flex;align-items:center;flex-wrap:wrap;padding:8px 18px;row-gap:4px;column-gap:10px;z-index:5}
+.a2-hd .a2-crumb{font:400 12px/1 var(--font);color:var(--rv-faint)}
+.a2-hd .a2-sep{color:var(--rv-dim3)}
+.a2-hd .a2-now{font:600 13px/1 var(--font)}
+.a2-hd .a2-badge{font:500 10px/1 var(--font-num);color:var(--rv-faint);padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px}
+.a2-hd .a2-grow{flex:1}
+.a2-roles{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden;padding:6px 10px;
+       font:500 10.5px/1 var(--font);color:var(--on)}
+.a2-avatar{width:26px;height:26px;border-radius:50%;background:var(--rv-dim4);border:1px solid rgba(0,0,0,.12);flex:none}
+
+/* ── 토스트 — 사용은 선택. `.a2-main`에 상대 위치, 좌하단 고정. ── */
+.a2-toasts{position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px}
+.a2-toast{display:flex;align-items:center;gap:10px;background:var(--nav);color:var(--on-nav);border-radius:7px;
+      padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);border-left:3px solid;max-width:460px}
+.a2-toast-mark{font:600 11px/1 var(--font-num)}
+.a2-toast-msg{font:400 11.5px/1.5 var(--font);max-width:340px}
+.a2-toast-act{font:600 11px/1 var(--font);color:var(--on-nav);border:1px solid rgba(255,255,255,.3);
+           border-radius:5px;padding:6px 9px;cursor:pointer;white-space:nowrap;background:none}
+.a2-toast-x{font:400 12px/1 var(--font);opacity:.55;cursor:pointer;background:none;border:0;color:inherit}
+
+/* ── 콘텐츠 여백 — Phoenix(Bootstrap) 기반 화면(products·spec_fill·spec_standard·홈)이
+   쓴다. 옛 `_layout.html.j2`의 `<div class="content">`가 Phoenix CSS로 주던 바깥
+   여백을, 그 클래스를 더는 쓰지 않으므로 여기서 대신 준다. 손으로 짠 화면(reviews·
+   dash·build_map)은 자기 콘텐츠가 자체 padding을 관리하므로 이 클래스를 쓰지 않는다
+   — **checker 확인 필요**: 실제 Phoenix 여백과 육안 대조(제작 보고서 참조). ── */
+.a2-content-pad{padding:1.75rem;overflow-y:auto;flex:1;min-height:0}
+
+@media (max-width:768px){
+  .a2-shell{overflow:auto;height:auto;min-height:100vh}
+  .a2-lnb{width:100%;height:auto;max-height:180px}
+}

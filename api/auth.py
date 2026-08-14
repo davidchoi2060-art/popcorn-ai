@@ -118,7 +118,13 @@ OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
                         # 용도 하한·마진은 견적과 가격을 직접 바꾼다 — owner만(슬라이스 74·75)
                         "/api/admin/usage-floors",
                         "/api/admin/pricing-settings",
-                        "/api/admin/category-margins")
+                        "/api/admin/category-margins",
+                        # AI 관리 3화면 — 배정·연동 한도·FAQ 저장은 정책 발행급 쓰기다.
+                        # 각 모듈이 자체 _owner() 이중 가드를 갖고 있었고(등록 전 방어),
+                        # 여기 등록으로 미들웨어가 먼저 막는다 — 같은 판정이라 충돌 없음.
+                        "/api/admin/ai-task-settings",
+                        "/api/admin/ai-integration",
+                        "/api/admin/ops-assistant")
 
 
 def required_role(method: str, path: str) -> str:

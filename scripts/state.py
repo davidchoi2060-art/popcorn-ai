@@ -190,8 +190,8 @@ def main() -> int:
     try:
         from api.admin_nav import counts
         c = counts()
-        row("LNB", "%d그룹 %d항목 — 재구축 %d · 기존만 %d · 신설예정 %d"
-            % (c["groups"], c["total"], c["new"], c["old"], c["todo"]))
+        row("LNB", "%d그룹 %d항목 — 재구축 %d · 신설예정 %d"
+            % (c["groups"], c["total"], c["new"], c["todo"]))
     except Exception as e:                                   # noqa: BLE001
         row("LNB", "%s (%s)" % (MISS, type(e).__name__))
 

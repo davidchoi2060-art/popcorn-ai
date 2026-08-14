@@ -18,21 +18,44 @@
   ■ 가져온 템플릿 자산
     `assets/js/dashboards/ecommerce-dashboard.js`(차트 초기화) ·
     `vendors/leaflet*` 3종(지역 지도). 우리에게 없던 것이라 템플릿에서 복사했다.
+
+  ■ 2026-08-13 셸 통합 — LNB·헤더·팔레트는 admin2 공통 셸(`_admin2_shell.html.j2`)로
+    옮겼다. 본문(Phoenix 이커머스 대시보드 견본)은 손대지 않는다(사용자 원칙 2026-
+    08-09: "템플릿 틀을 고치지 않는다") — 그래서 `head_extra`/`foot_extra` 블록으로
+    그 벤더 CSS·JS를 함께 싣는다. `data-screen-id`/`data-domain`/빵부스러기는 이제
+    라우트(`api/admin_ui_home.py`)가 컨텍스트로 준다.
 #}
-{% extends "admin/_layout.html.j2" %}
+{% extends "admin/_admin2_shell.html.j2" %}
 
 {% block title %}대시보드{% endblock %}
-{% block body_attrs %}data-screen-id="NEW-DASH-010" data-domain="dashboard" data-dummy-fallback="none"{% endblock %}
 
 {% block head_extra %}
+{# Phoenix(Bootstrap) 벤더 자산 — 이 화면 전체가 Phoenix 이커머스 대시보드 견본이라
+   손대지 않는다(위 문서 참조). #}
+<link rel="apple-touch-icon" sizes="180x180" href="/admin/assets/img/favicons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/admin/assets/img/favicons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/admin/assets/img/favicons/favicon-16x16.png">
+<link rel="shortcut icon" type="image/x-icon" href="/admin/assets/img/favicons/favicon.ico">
+<meta name="theme-color" content="#ffffff">
+<script src="/admin/vendors/simplebar/simplebar.min.js"></script>
+<script src="/admin/assets/js/config.js"></script>
+<link href="/admin/vendors/simplebar/simplebar.min.css" rel="stylesheet">
+<link href="/admin/vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
+<script src="/shared/ui-choices.js"></script>
+<script src="/shared/ui-list.js"></script>
+<link href="/admin/assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
+<link href="/admin/assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
+<style>
+  :root{ --phoenix-font-sans-serif: var(--font); }
+  .card > .card-header, .card > .card-body { min-width: 0; }
+</style>
 <link href="/admin/vendors/leaflet/leaflet.css" rel="stylesheet">
 <link href="/admin/vendors/leaflet.markercluster/MarkerCluster.css" rel="stylesheet">
 <link href="/admin/vendors/leaflet.markercluster/MarkerCluster.Default.css" rel="stylesheet">
 {% endblock %}
 
-{% block breadcrumb %}{% endblock %}
-
 {% block content %}
+<div class="a2-content-pad">
 {# 견본임을 먼저 말한다 — 아래 수치는 우리 것이 아니다. #}
 <div class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="status">
   <span data-feather="alert-triangle" class="flex-shrink-0 mt-1" style="width:18px;height:18px;"></span>
@@ -1162,10 +1185,27 @@
             </div>
           </div>
         </div>
-        
+
+</div>
 {% endblock %}
 
 {% block foot_extra %}
+{# 표준 Phoenix 벤더 번들 — 예전엔 _layout.html.j2가 자동으로 줬다. echarts·leaflet·
+   대시보드 초기화 스크립트가 phoenix.js(전역 유틸)를 쓸 수 있으므로 먼저 싣는다. #}
+<script src="/admin/vendors/popper/popper.min.js"></script>
+<script src="/admin/vendors/bootstrap/bootstrap.min.js"></script>
+<script src="/admin/vendors/anchorjs/anchor.min.js"></script>
+<script src="/admin/vendors/is/is.min.js"></script>
+<script src="/admin/vendors/fontawesome/all.min.js"></script>
+<script src="/admin/vendors/lodash/lodash.min.js"></script>
+<script src="/admin/vendors/list.js/list.min.js"></script>
+<script src="/admin/vendors/feather-icons/feather.min.js"></script>
+<script src="/admin/vendors/dayjs/dayjs.min.js"></script>
+<script src="/admin/vendors/choices/choices.min.js"></script>
+<script src="/admin/assets/js/phoenix.js"></script>
+<script src="/shared/admin-panel.js"></script>
+<script src="/shared/admin-helper.js"></script>
+<script src="/shared/su-icons.js"></script>
 <script src="/admin/vendors/echarts/echarts.min.js"></script>
 <script src="/admin/vendors/leaflet/leaflet.js"></script>
 <script src="/admin/vendors/leaflet.markercluster/leaflet.markercluster.js"></script>

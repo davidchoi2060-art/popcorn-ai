@@ -1,4 +1,17 @@
 {#
+  ⚠ 폐기(2026-08-13) — admin2 화면의 정본 셸은 이제 `_admin2_shell.html.j2`다.
+
+  이 파일을 `{% extends %}` 하는 admin2 템플릿은 더 없다(products·spec_fill·
+  spec_standard·home 4벌이 마지막까지 이 파일을 썼다 — 2026-08-13에 전부
+  `_admin2_shell.html.j2`로 옮겼다. 사이드바·헤더·팔레트는 admin2 공용 셸이
+  그리고, 이 4화면의 본문(Phoenix/Bootstrap 카드·표)에 필요한 벤더 CSS·JS는
+  각 화면의 `head_extra`/`foot_extra` 블록으로 옮겨 실었다).
+
+  **새 admin2 화면은 이 파일이 아니라 `_admin2_shell.html.j2`를 상속한다.**
+  지우지 않고 남겨 둔 이유는 이 파일 자체가 "화면마다 셸을 복제하던 병을
+  한 벌로 모아 고친" 선행 사례라 구조 참고용으로 값어치가 있어서다 — 아래
+  본문은 그 시점(2026-08-08)의 기록이므로 지금 상태와는 다르다.
+
   관리자 화면 공통 셸 — Phoenix `Layout.pug` 이식 (A/B 시험판, 2026-08-08)
 
   이 파일이 존재하는 이유: 지금 `mockups/admin/*.html` 37벌이 아래 마크업을
@@ -78,10 +91,10 @@
          모든 화면이 자동으로 같은 메뉴를 받는다 — 화면마다 복제되던 병이 구조적으로 사라진다.
          그래서 이 레이아웃은 `admin-menu.js` 를 **로드하지 않는다**(로드하면 덮어쓴다).
 
-         state 세 가지를 메뉴가 정직하게 말한다:
+         state 두 가지를 메뉴가 정직하게 말한다(「기존」 구분은 2026-08-12
+         전면 재구축 확정으로 폐지 — admin_nav 개정 기록):
            new  재구축 완료 → /admin2/
-           old  아직 안 지음 → 기존 화면으로 보낸다(지금도 쓸 수 있다)
-           todo 아무 데도 없다 → 링크 없이 '준비 중' #}
+           todo 신설 예정 → 링크 없이 「신설」 #}
       <nav class="navbar navbar-vertical navbar-expand-lg">
         <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
           <div class="navbar-vertical-content">
@@ -114,13 +127,13 @@
                         {% else %}
                         {# 링크는 재구축된 화면에만 붙는다(사용자 결정 2026-08-11 · `nav_for`).
                            숨기지 않는 이유: 이 메뉴가 곧 IA 이고, 무엇이 아직 없는지도 사실이다.
-                           **「기존」과 「신설」을 가른다** — 구화면이 있는 것과 아무 데도 없는
-                           것은 다른 사실이고, 재구축 순서를 정할 때 그 차이가 근거가 된다. #}
+                           「기존」 구분은 2026-08-12 전면 재구축 확정으로 폐지 —
+                           링크 없는 항목은 전부 「신설」이다(admin_nav 개정 기록). #}
                         <span class="nav-link disabled text-body-quaternary" style="cursor:default;"
-                              title="{{ it.note or ('기존 화면 있음 · 재구축 전' if it.state == 'old' else '신설 예정') }}">
+                              title="{{ it.note or '신설 예정' }}">
                           <div class="d-flex align-items-center">
                             <span class="nav-link-text">{{ it.label }}</span>
-                            <span class="badge badge-phoenix badge-phoenix-secondary ms-2 fs-10">{{ '기존' if it.state == 'old' else '신설' }}</span>
+                            <span class="badge badge-phoenix badge-phoenix-secondary ms-2 fs-10">신설</span>
                           </div>
                         </span>
                         {% endif %}
@@ -137,7 +150,7 @@
               <p class="fs-10 text-body-quaternary mb-0">
                 {{ nav_counts.groups }}그룹 {{ nav_counts.total }}화면 ·
                 <b class="text-primary">완료 {{ nav_counts.new }}</b> ·
-                기존 {{ nav_counts.old }} · 준비 중 {{ nav_counts.todo }}
+                준비 중 {{ nav_counts.todo }}
               </p>
             </div>
           </div>

@@ -19,6 +19,7 @@
   [현황판·로컬] / [현황판·서버] 접두어로 어느 쪽에서 온 말인지 구분한다 —
   읽음 처리를 그쪽에 해야 하기 때문이다(로컬은 로컬 API, 서버는 서버 API).
 """
+import datetime
 import io
 import json
 import os
@@ -30,11 +31,38 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCAL_Q = os.path.join(ROOT, ".claude", "dash-queue.jsonl")
+HEARTBEAT = os.path.join(ROOT, ".claude", "dash-watch.heartbeat")
 SERVER = "https://admin.popcornai.co.kr"
 POLL_LOCAL_S = 5
 POLL_SERVER_S = 30
 
 sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+
+# 하트비트 파일에 적는 시각도 `api/timeutil.now_iso()` 와 같은 표기여야 한다 — `_watcher()`
+# (api/dash.py)가 이 문자열을 그대로 화면에 내보내는데, 타임존 없는 isoformat 은 배포
+# 서버(UTC)에서 브라우저가 로컬 시각으로 오독한다(슬라이스 62와 같은 함정). 이 스크립트는
+# `api` 패키지 밖에서 단독 실행되므로 ROOT 를 sys.path 에 넣어 정본을 그대로 쓰되,
+# 경로 문제로 실패하면 **같은 규칙(타임존 UTC 명시)** 의 자체 구현으로 물러난다.
+try:
+    sys.path.insert(0, ROOT)
+    from api.timeutil import now_iso
+except Exception:                                              # noqa: BLE001
+    def now_iso() -> str:
+        return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def write_heartbeat() -> None:
+    """감시자 생존 신호 — 매 반복 덮어쓴다. 실패해도 감시는 계속돼야 하니 조용히 넘어간다.
+
+    출력 계약(머리 주석 참고: 출력 한 줄 = 알림 한 번)을 어기지 않으려면 여기서
+    **절대 print 하지 않는다** — 서버(api/dash.py)가 파일 mtime/15초로 생존을 판정한다.
+    """
+    try:
+        os.makedirs(os.path.dirname(HEARTBEAT), exist_ok=True)
+        with io.open(HEARTBEAT, "w", encoding="utf-8") as f:
+            f.write(now_iso())
+    except Exception:                                        # noqa: BLE001
+        pass
 
 
 def say(src: str, ts: str, text: str) -> None:
@@ -98,7 +126,9 @@ class Server:
 
     def poll(self, seen: set) -> None:
         try:
-            r = self.op.open(SERVER + "/api/admin/dash/state?limit=1", timeout=20)
+            # watcher=1 — 배포 서버가 «감시자가 마지막으로 부른 시각」을 기록하게 한다
+            # (배포 PC엔 로컬 하트비트 파일이 없으니 이 핑이 유일한 생존 신호다).
+            r = self.op.open(SERVER + "/api/admin/dash/state?limit=1&watcher=1", timeout=20)
             body = r.read()
         except urllib.error.HTTPError as e:                  # 401 = 세션 만료 → 재로그인
             if e.code == 401 and self.login():
@@ -125,6 +155,7 @@ def main() -> None:
     srv.login()
     last_srv = 0.0
     while True:
+        write_heartbeat()
         read_local(seen)
         if time.time() - last_srv >= POLL_SERVER_S:
             last_srv = time.time()
