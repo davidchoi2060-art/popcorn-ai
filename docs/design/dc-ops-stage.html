@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+input{font-family:'IBM Plex Sans KR',sans-serif}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="오픈 단계 설정" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="16">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px;z-index:5">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">시스템</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">오픈 단계 설정</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-OPS-010</span>
+      <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border-radius:4px;padding:5px 8px">현재 단계 MVP1 — 팝콘PC 인계로 판매</span>
+      <span style="flex:1"></span>
+      <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;text-align:right">판정 {{ verdictAt }}<br>커밋 <span style="font-family:'IBM Plex Mono',monospace">{{ verdictCommit }}</span></span>
+      <div data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+        <sc-for list="{{ roles }}" as="r" hint-placeholder-count="2">
+          <div onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div data-keep="1" style="flex:none;height:40px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:20px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.onClick }}" style="{{ t.style }}">
+          <span>{{ t.label }}</span>
+          <span style="{{ t.chipStyle }}">{{ t.chip }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="{{ stageNoteStyle }}">
+      <span style="{{ stageMarkStyle }}">{{ stageMark }}</span>
+      <span style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif">{{ stageTitle }}</span>
+      <span style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1;min-width:0">{{ stageDesc }}</span>
+    </div>
+
+    <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 12px">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;overflow:auto">
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden">
+          <div style="height:36px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7;display:flex;align-items:center;padding:0 13px;gap:9px">
+            <span style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif">전환 축</span>
+            <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">정책 스위치 — 사람이 켜고 끕니다</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ switchNote }}</span>
+          </div>
+          <sc-for list="{{ axes }}" as="a" hint-placeholder-count="4">
+            <div onClick="{{ a.onClick }}" data-keep="1" style="{{ a.style }}">
+              <span style="{{ a.verdictStyle }}">{{ a.verdict }}</span>
+              <span style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
+                <span style="display:flex;align-items:center;gap:8px">
+                  <span style="font:600 12.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ a.name }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">{{ a.key }}</span>
+                  <span style="{{ a.dirtyStyle }}">{{ a.dirty }}</span>
+                </span>
+                <span style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ a.summary }}</span>
+              </span>
+              <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#a09889;flex:none;width:96px;text-align:right">{{ a.updated }}</span>
+              <span data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden;flex:none">
+                <sc-for list="{{ a.options }}" as="o" hint-placeholder-count="2">
+                  <span onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</span>
+                </sc-for>
+              </span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noAxes }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:18px 16px;display:flex;flex-direction:column;gap:5px;background:#faf7f0">
+              <div style="font:600 12px/1.45 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ noAxesTitle }}</div>
+              <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;max-width:760px">{{ noAxesDesc }}</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden">
+          <div style="height:36px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7;display:flex;align-items:center;padding:0 13px;gap:9px">
+            <span style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif">구축 축</span>
+            <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">진척 현황 — 지어야 바뀝니다, 여기서 켜고 끌 수 없습니다</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#a09889">정본 api/admin_nav.py</span>
+          </div>
+
+          <sc-if value="{{ showGroups }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="8">
+                <div style="display:grid;grid-template-columns:168px 92px 1fr 152px;gap:12px;align-items:center;padding:10px 13px;border-bottom:1px solid rgba(0,0,0,.06)">
+                  <span style="font:500 12px/1.3 'IBM Plex Sans KR',sans-serif">{{ g.name }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ g.ratio }}</span>
+                  <span style="display:flex;align-items:center;gap:3px">
+                    <sc-for list="{{ g.cells }}" as="c" hint-placeholder-count="5">
+                      <span style="{{ c.style }}" title="{{ c.title }}"></span>
+                    </sc-for>
+                  </span>
+                  <span style="{{ g.chipStyle }}">{{ g.chip }}</span>
+                </div>
+              </sc-for>
+              <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:#f4f0e7;border-top:1px solid rgba(0,0,0,.08)">
+                <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">합계 8그룹 37항목</span>
+                <span style="font:500 11px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">구축 11 · 미구축 26</span>
+                <span style="flex:1"></span>
+                <span style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;max-width:620px">단계 구분이 코드에 없어 "MVP1 잔여 N건"을 셀 수 없습니다 — 26건 전체만 보여줍니다. 이 화면 자신도 아직 미구축 26건 중 하나입니다(admin_nav.py가 여전히 구 라벨 · href 없음).</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showHints }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:13px;display:flex;flex-direction:column;gap:9px">
+              <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ buildNote }}</div>
+              <sc-for list="{{ hints }}" as="h" hint-placeholder-count="2">
+                <div style="display:flex;align-items:flex-start;gap:10px;border:1px dashed rgba(0,0,0,.2);background:#faf7f0;border-radius:7px;padding:10px 12px">
+                  <span style="{{ h.chipStyle }}">{{ h.chip }}</span>
+                  <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                    <span style="font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif">{{ h.name }}</span>
+                    <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ h.desc }}</span>
+                  </span>
+                </div>
+              </sc-for>
+              <div onClick="{{ onGoUnmapped }}" style="align-self:flex-start;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:8px 12px;cursor:pointer">단계 미정 37항목 보기 →</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+          <div style="flex:none;height:34px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7;display:flex;align-items:center;padding:0 13px;gap:8px">
+            <span style="font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61">최근 변경 이력 — 전환 축만</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#8a8377">activity_logs · target_kind=ops · 최근 20건</span>
+          </div>
+          <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:130px 72px 1fr 90px;gap:10px;align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06)">
+              <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ h.at }}</span>
+              <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif">{{ h.who }}</span>
+              <span style="display:flex;align-items:center;gap:8px;min-width:0">
+                <span style="font:400 10.5px/1.4 'IBM Plex Mono',monospace;color:#4a463e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.what }}</span>
+                <span style="{{ h.undoneStyle }}">{{ h.undone }}</span>
+              </span>
+              <span onClick="{{ h.onUndo }}" style="{{ h.undoStyle }}">되돌리기</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="width:312px;flex:none;display:flex;flex-direction:column;gap:12px;overflow:auto">
+        <div style="flex:none;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">단계 프리셋 — 전환 축만 · 2종</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ presets }}" as="p" hint-placeholder-count="3">
+              <div onClick="{{ p.onClick }}" style="{{ p.style }}">
+                <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                  <span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ p.name }}</span>
+                  <span style="font:400 10px/1.45 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ p.desc }}</span>
+                </span>
+                <span style="{{ p.markStyle }}">{{ p.mark }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:8px">프리셋은 값만 채웁니다 — 구축 축은 손대지 않고, 저장은 확인 단계를 거칩니다.</div>
+        </div>
+
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">판정 기준</div>
+          <sc-for list="{{ legend }}" as="l" hint-placeholder-count="5">
+            <div style="display:flex;align-items:flex-start;gap:9px">
+              <span style="{{ l.chipStyle }}">{{ l.chip }}</span>
+              <span style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ l.desc }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="flex:1;min-height:0;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px;overflow:auto">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">이 화면이 감추지 않는 사실</div>
+          <sc-for list="{{ facts }}" as="f" hint-placeholder-count="4">
+            <div style="border:1px solid rgba(0,0,0,.11);border-left:3px solid #bdb6a8;background:#faf7f0;border-radius:6px;padding:9px 11px">
+              <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">{{ f.title }}</div>
+              <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ f.desc }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:none;border-top:1px solid rgba(0,0,0,.1);background:#f4f0e7;padding:11px 18px;display:flex;align-items:center;gap:9px">
+      <span style="{{ footNoteStyle }}">{{ footNote }}</span>
+      <button onClick="{{ onRevert }}" style="{{ revertStyle }}">되돌리기</button>
+      <button onClick="{{ onOpenConfirm }}" style="{{ saveStyle }}">저장 — 확인 단계로</button>
+    </div>
+
+    <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ onClose }}" style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7"></div>
+      <div data-keep="1" style="position:absolute;top:52px;right:0;bottom:0;width:560px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8">
+        <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px">
+          <span style="font:600 14.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ d.name }}</span>
+          <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ d.key }}</span>
+          <span style="{{ d.verdictStyle }}">{{ d.verdict }}</span>
+          <span style="{{ d.stageStyle }}">{{ d.stage }}</span>
+          <span style="flex:1"></span>
+          <span onClick="{{ onClose }}" style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px">
+          <div data-keep="1">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">값</div>
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ d.options }}" as="o" hint-placeholder-count="2">
+                <div onClick="{{ o.onClick }}" style="{{ o.cardStyle }}">
+                  <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+                    <span style="{{ o.markStyle }}">{{ o.mark }}</span>
+                    <span style="font:600 12px/1.3 'IBM Plex Sans KR',sans-serif">{{ o.label }}</span>
+                  </div>
+                  <div style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ o.desc }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="{{ d.verdictBoxStyle }}">
+            <div style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:5px">{{ d.verdictTitle }}</div>
+            <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ d.verdictDesc }}</div>
+            <div style="font:400 10px/1.5 'IBM Plex Mono',monospace;color:#8a8377;margin-top:7px">{{ d.verdictSrc }}</div>
+          </div>
+
+          <sc-if value="{{ d.hasNeed }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid rgba(0,0,0,.12);border-left:3px solid #bdb6a8;background:#f2eee5;border-radius:7px;padding:11px 13px">
+              <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:5px">동작 중이 되려면</div>
+              <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ d.need }}</div>
+            </div>
+          </sc-if>
+
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">바뀌면 무엇이 달라지나 — 서버 문구 그대로</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <sc-for list="{{ d.effects }}" as="e" hint-placeholder-count="3">
+                <div style="{{ e.style }}">
+                  <span style="{{ e.markStyle }}">{{ e.mark }}</span>
+                  <span style="font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ e.text }}</span>
+                  <span style="{{ e.chipStyle }}">{{ e.chip }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <sc-if value="{{ d.hasCoercion }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:6px;padding:10px 12px;font:400 11px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ d.coercion }}</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ onCancelConfirm }}" style="position:absolute;inset:0;background:rgba(38,35,30,.42);z-index:12"></div>
+      <div data-keep="1" style="position:absolute;top:92px;left:50%;transform:translateX(-50%);width:648px;max-height:776px;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:10px;box-shadow:0 24px 60px rgba(38,35,30,.34);display:flex;flex-direction:column;z-index:13;overflow:hidden">
+        <div style="flex:none;padding:15px 18px 13px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px">
+          <span style="font:600 14.5px/1.3 'IBM Plex Sans KR',sans-serif">저장 전 확인</span>
+          <span style="flex:1"></span>
+          <span onClick="{{ onCancelConfirm }}" style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:13px">
+          <div style="border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:11px 13px">
+            <div style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">이 저장은 배포된 고객 서버에도 즉시 반영됩니다</div>
+            <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e">로컬 개발 환경과 배포 서버가 같은 Cloud SQL을 씁니다. 2026-08-12에 이 경로로 사고가 났습니다 — 스위치는 바뀌었지만 배포된 코드가 그 값을 처리하지 못하는 상태가 됐습니다. 저장 전에 배포된 코드가 이 값을 감당할 수 있는지 확인하세요.</div>
+          </div>
+
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">요청한 것 vs 실제 적용될 것</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <sc-for list="{{ applyRows }}" as="a" hint-placeholder-count="2">
+                <div style="{{ a.style }}">
+                  <span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;width:88px;flex:none">{{ a.name }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;flex:1;min-width:0">{{ a.change }}</span>
+                  <span style="{{ a.verdictChipStyle }}">{{ a.verdictChip }}</span>
+                  <span style="{{ a.chipStyle }}">{{ a.chip }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{ coerceNoteStyle }}">{{ coerceNote }}</div>
+            <div style="{{ noopNoteStyle }}">{{ noopNote }}</div>
+          </div>
+
+          <sc-if value="{{ needPhrase }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1.5px solid oklch(0.52 0.16 30);background:oklch(0.97 0.02 30);border-radius:7px;padding:12px 14px">
+              <div style="font:600 12px/1.45 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.16 30);margin-bottom:6px">위험 — 자체 결제로 전환하면 팝콘PC 인계가 즉시 막힙니다</div>
+              <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-bottom:10px">인계(POST /api/handoff)는 그 순간부터 409를 돌려줍니다. 인계는 지금 단계(MVP1)에서 확정된 유일한 구매 경로이고, 되살아나는 자체 결제 파이프라인은 2026-08-11 결정에서 "범위 밖"으로 뺀 코드입니다. 게다가 그 주문을 처리할 관리자 화면(주문·클레임)도 아직 지어지지 않았습니다.</div>
+              <div style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-bottom:7px">계속하려면 아래 문구를 그대로 입력하세요 — <span style="font-family:'IBM Plex Mono',monospace;font-weight:600">{{ phraseTarget }}</span></div>
+              <input value="{{ phrase }}" onChange="{{ onPhrase }}" placeholder="{{ phraseTarget }}" style="{{ phraseInputStyle }}">
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+          <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1;min-width:0">{{ confirmNote }}</span>
+          <button onClick="{{ onCancelConfirm }}" style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#fffdf9;border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:9px 13px;cursor:pointer">취소</button>
+          <button onClick="{{ onCommit }}" style="{{ commitStyle }}">{{ commitLabel }}</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:470px">{{ t.msg }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)';
+const PHRASE = '인계를 막습니다';
+const VERDICT_AT = '2026-08-13 16:10';
+const VERDICT_COMMIT = '9f3c1ad';
+
+const V = {
+  live: { label:'동작 중', color:GREEN, bg:'oklch(0.95 0.03 165)', mark:'●' },
+  dormant: { label:'잠듦', color:AMBER, bg:'oklch(0.95 0.04 70)', mark:'◆' },
+  missing: { label:'미구현', color:'#8a8377', bg:'#f2eee5', mark:'○' }
+};
+
+const AXES = [
+  { key:'pay', name:'결제', verdict:'live', stage:'mvp2', updated:'2026-08-12 17:11',
+    summary:'주문과 인계를 배타적으로 여닫습니다 — 고객 장바구니가 이 값을 실시간으로 따릅니다.',
+    own:['자체 결제','POST /api/orders 가 열리고 인계는 409로 막힙니다'],
+    mall:['쇼핑몰 인계','POST /api/handoff 가 열리고 자체 결제는 409로 막힙니다'],
+    verdictTitle:'동작 중 — 값이 바뀌면 서버 처리가 실제로 갈립니다',
+    verdictDesc:'주문(orders.py)과 인계(handoff.py)가 각각 이 값을 확인해 반대 모드면 409를 돌려줍니다. 고객 화면도 GET /api/ops로 읽어 버튼 문구와 호출 대상을 바꿉니다.',
+    verdictSrc:'api/orders.py L71-74 · api/handoff.py L65-69 · s4-cart.html L242·416·432·478',
+    need:'', effects:[['자체 결제 주문·재고예약·PG승인이 한 트랜잭션으로 실행됩니다','built'],
+      ['팝콘PC 쇼핑몰 인계가 막힙니다(409)','built'],
+      ['고객 장바구니의 결제 버튼 문구가 바뀝니다','built']] },
+  { key:'refund', name:'환불', verdict:'live', stage:'mvp2', updated:'2026-07-23',
+    summary:'값에 따라 고객·운영자 안내 문구가 갈립니다 — 처리(상태 전이·재고 복귀)는 동일합니다.',
+    own:['자체 환불','수거 접수·PG 환불 예약으로 문구가 바뀝니다'],
+    mall:['쇼핑몰 환불','쇼핑몰 인계 처리 기록으로 문구가 바뀝니다'],
+    verdictTitle:'동작 중 — 단, 갈리는 것은 문구까지입니다',
+    verdictDesc:'my_orders.py가 orders.ops_snapshot의 값을 읽어 refunds.refund_mode에 저장하고, 완료된 MVP1 고객 화면(my-orders.html)이 값에 따라 다른 안내 문장을 보여줍니다. 처리 모듈(admin_refunds.py)은 "문구 분기, 전이 동일"이라고 스스로 명시합니다. 적용 대상은 자체 결제로 만들어진 과거 주문 20건뿐입니다.',
+    verdictSrc:'api/my_orders.py L73·L107 · my-orders.html L146-149 · admin_refunds.py docstring L6',
+    need:'', effects:[['새 주문 스냅샷에 이 값이 찍히고 고객 안내 문구가 갈립니다','built'],
+      ['환불·클레임 관리 화면으로 접수가 들어옵니다','gone']] },
+  { key:'ship', name:'배송', verdict:'missing', stage:'mvp2', updated:'2026-07-26',
+    summary:'값은 저장되지만 읽어서 처리를 가르는 코드가 없습니다.',
+    own:['자체 배송','배송 상태를 우리가 관리합니다'],
+    mall:['쇼핑몰 배송','배송은 팝콘PC 쪽에서 관리합니다'],
+    verdictTitle:'미구현 — 스위치는 있는데 읽는 코드가 아직 없습니다',
+    verdictDesc:'admin_orders.py가 주문 스냅샷의 ship 값을 shipments.ship_mode에 저장하기는 하지만, 그 컬럼을 읽어 배송 처리를 분기하는 코드가 0건입니다. 배송사는 CJ대한통운으로 항상 고정돼 있습니다.',
+    verdictSrc:'api/admin_orders.py L181-185 (저장만) · 소비 코드 0건',
+    need:'배송 처리 코드가 shipments.ship_mode를 읽어 자체/인계를 분기해야 합니다. 배송사 고정값도 함께 풀려야 합니다.',
+    effects:[['배송 관리 화면에서 송장을 입력합니다','gone'],['고객 주문 상세에 배송 추적이 붙습니다','gone']] },
+  { key:'member', name:'회원·가입', verdict:'missing', stage:'mvp2', updated:'2026-07-23',
+    summary:'응답에 값을 실어 보낼 뿐 매핑 동작을 바꾸지 않습니다.',
+    own:['자체 회원','회원을 우리가 관리합니다'],
+    mall:['쇼핑몰 회원','회원은 팝콘PC 계정을 씁니다'],
+    verdictTitle:'미구현 — 유일한 소비처가 동결된 구 화면입니다',
+    verdictDesc:'admin_members.py가 값을 읽어 member_mode로 응답에 싣지만, 매핑 요청은 운영 모드와 무관하게 허용된다고 모듈 자신이 명시합니다. 그 값을 실제로 쓰는 곳은 동결된 구 admin 화면(customers.html)뿐입니다.',
+    verdictSrc:'api/admin_members.py L66·L98 · customers.html L291(P-09 동결)',
+    need:'회원 매핑·가입 흐름이 이 값을 읽어 자체/쇼핑몰 경로를 가르도록 구현돼야 합니다.',
+    effects:[['회원 매핑 요청 발송 기준이 바뀝니다','none']] },
+  { key:'settle', name:'정산', verdict:'dormant', stage:'mvp3', updated:'2026-08-12 17:11',
+    summary:'서버가 결제(pay)와 같은 값으로 강제 보정합니다 — 따로 고를 수 없습니다.',
+    own:['자체 정산','정산을 우리가 계산합니다'],
+    mall:['쇼핑몰 정산','정산은 팝콘PC 쪽에서 처리합니다'],
+    verdictTitle:'잠듦 — 축은 살아 있지만 이 단계에서 쓰지 않습니다',
+    verdictDesc:'_enforce()가 pay와 항상 같도록 붙잡습니다. 정산 마감 기능(admin_payments.py)은 이미 있지만 이 값이 아니라 payments.pay_mode를 승계해 자기 모드를 정합니다.',
+    verdictSrc:'admin_ops.py L52-54 · admin_payments.py L11 주석',
+    need:'admin_payments.py의 정산 마감이 payments.pay_mode 대신(또는 함께) ops_settings.settle을 읽도록 연결돼야 합니다.',
+    effects:[['정산 대시보드 계산 기준이 바뀝니다','gone'],['매출·세무 화면의 집계 방식이 바뀝니다','gone']] }
+];
+
+const GROUPS = [['대시보드',1,1],['상품관리',5,1],['상품사양관리',11,2],['매입 · 소싱',3,0],['판매가',3,0],['인계 · 성과',3,0],['AI 관리',7,7],['시스템',4,0]];
+
+const HINTS = {
+  mvp2: [
+    { name:'주문 관리 5항목', desc:'A-33 본문의 "주문"에 대응하는 것으로 읽힙니다 — 2026-08-11에 IA에서 빠진 22항목 안에 있고 지금 admin_nav.py에는 항목 자체가 없습니다.' },
+    { name:'클레임(환불·취소) 4항목', desc:'같은 근거로 "취소"에 대응하는 것으로 읽힙니다. 확정이 아니라 정황상 대응입니다.' }
+  ],
+  mvp3: [
+    { name:'매출 · 세무 4항목', desc:'UX-14의 "수수료"가 가리키는 옛 정산 그룹으로 읽힙니다 — 역시 admin_nav.py 밖이고 확정이 아닙니다.' }
+  ],
+  mvp1: []
+};
+
+const PRESETS = [
+  ['MVP1 현행', '지금 단계 — 인계로 판매하고 결제·환불·정산·배송은 쇼핑몰에 맡깁니다(회원만 자체). 실측 스냅샷과 같은 값입니다.',
+    { member:'own', pay:'mall', refund:'mall', settle:'mall', ship:'mall' }],
+  ['MVP2·MVP3 전면 자체', 'MVP2만 켜는 프리셋은 만들 수 없습니다 — 서버가 정산(MVP3 소속)을 결제에 강제로 묶기 때문에 결제를 자체로 켜면 정산도 함께 자체가 됩니다.',
+    { member:'own', pay:'own', refund:'own', settle:'own', ship:'own' }]
+];
+
+const INIT = { member:'own', pay:'mall', refund:'mall', settle:'mall', ship:'mall' };
+const INIT_HISTORY = [
+  { at:'2026-08-12 17:11', who:'사장님', what:'pay: own → mall · settle: own → mall(보정)', undone:false, before:{ pay:'own', settle:'own' } },
+  { at:'2026-08-12 16:48', who:'사장님', what:'pay: mall → own · settle: mall → own(보정)', undone:true, before:{ pay:'mall', settle:'mall' } },
+  { at:'2026-07-26 09:30', who:'사장님', what:'ship: own → mall', undone:false, before:{ ship:'own' } },
+  { at:'2026-07-23 11:02', who:'사장님', what:'member: mall → own · refund: own → mall(보정)', undone:false, before:{ member:'mall', refund:'own' } }
+];
+
+const enforce = m => {
+  const out = Object.assign({}, m), notes = [];
+  if (out.settle !== out.pay) { notes.push('settle은 pay를 따릅니다 — ' + out.settle + ' → ' + out.pay + '로 보정'); out.settle = out.pay; }
+  if (out.pay !== 'own' && out.refund === 'own') { notes.push('refund=own은 pay=own일 때만 가능합니다 — own → mall로 보정'); out.refund = 'mall'; }
+  return { modes: out, notes };
+};
+const axisOf = k => AXES.find(a => a.key === k);
+const STAGE_LABEL = { mvp1:'MVP1', mvp2:'MVP2', mvp3:'MVP3' };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { saved: Object.assign({}, INIT), draft: Object.assign({}, INIT), sel:null, drawer:false,
+      tab:'mvp1', confirm:false, phrase:'', role:'owner', navCollapsed:false, toasts:[],
+      history: INIT_HISTORY.map(h => Object.assign({}, h)) };
+    this.tid = 0;
+  }
+
+  toast(msg, kind) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 7000);
+  }
+
+  guard() {
+    if (this.state.role !== 'owner') { this.toast('권한이 부족합니다 (필요: owner, 현재: ' + this.state.role + ')', 'err'); return false; }
+    return true;
+  }
+
+  changedKeys() { const st = this.state; return Object.keys(st.saved).filter(k => st.saved[k] !== st.draft[k]); }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed, owner = st.role === 'owner';
+    const changed = this.changedKeys();
+    const applied = enforce(st.draft);
+    const appliedKeys = Object.keys(st.saved).filter(k => st.saved[k] !== applied.modes[k]);
+    const needPhrase = applied.modes.pay === 'own' && st.saved.pay !== 'own';
+    const sel = st.sel ? axisOf(st.sel) : null;
+    const tab = st.tab;
+    const isUnmapped = tab === 'unmapped';
+    const tabAxes = isUnmapped ? [] : AXES.filter(a => a.stage === tab);
+
+    const vChip = (kind, big) => "font:600 " + (big ? '10.5px' : '10px') + "/1 'IBM Plex Sans KR',sans-serif;color:" + V[kind].color +
+      ";background:" + V[kind].bg + ";border:1px solid " + V[kind].color + "44;border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center";
+    const vLabel = kind => V[kind].mark + ' ' + V[kind].label;
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === '오픈 단계 설정';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '5px 0;justify-content:center' : '5px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const setMode = (key, v) => {
+      if (!this.guard()) return;
+      if (key === 'settle') { this.toast('정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다', 'warn'); return; }
+      this.setState(s => { const d = Object.assign({}, s.draft); d[key] = v; return { draft: d }; });
+    };
+
+    const axes = tabAxes.map(ax => {
+      const cur = st.draft[ax.key], on = st.sel === ax.key && st.drawer, isDirty = st.saved[ax.key] !== cur;
+      return { name: ax.name, key: ax.key, summary: ax.summary, updated: ax.updated,
+        verdict: vLabel(ax.verdict), verdictStyle: vChip(ax.verdict),
+        dirty: isDirty ? '변경됨' : '',
+        dirtyStyle: isDirty ? "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border-radius:4px;padding:4px 6px" : 'display:none',
+        onClick: () => this.setState(s => (s.sel === ax.key && s.drawer) ? { sel:null, drawer:false } : { sel: ax.key, drawer:true }),
+        style: "display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:" +
+          (on ? '#f0ece1' : 'transparent') + ";border-left:3px solid " + (on ? '#26231e' : 'transparent'),
+        options: [['own','자체'],['mall','쇼핑몰']].map(([v, label]) => ({ label,
+          onClick: e => { e.stopPropagation(); setMode(ax.key, v); },
+          style: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (cur === v ? '#f7f4ee' : '#6f6a61') +
+            ";background:" + (cur === v ? '#26231e' : '#fffdf9') + ";padding:8px 13px;cursor:" + (ax.key === 'settle' ? 'not-allowed' : 'pointer') + ";user-select:none" })) };
+    });
+
+    const effectChip = kind => kind === 'built' ? { label:'구축됨', color:GREEN, bg:'oklch(0.95 0.03 165)' } : { label:'미구축', color:'#8a8377', bg:'#f2eee5' };
+
+    const groups = GROUPS.map(([name, total, built]) => {
+      const cells = [];
+      for (let i = 0; i < total; i++) {
+        const done = i < built;
+        cells.push({ title: done ? '구축됨' : '미구축',
+          style: "width:11px;height:16px;border-radius:2px;display:inline-block;background:" + (done ? GREEN : '#e2ddd0') + ";border:1px solid " + (done ? GREEN : 'rgba(0,0,0,.12)') });
+      }
+      const all = built === total;
+      return { name, ratio: built + ' / ' + total, cells,
+        chip: all ? '전부 구축됨' : (built ? '일부 구축' : '미구축'),
+        chipStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;text-align:center;color:" + (all ? GREEN : '#5b564d') +
+          ";background:" + (all ? 'oklch(0.95 0.03 165)' : '#f2eee5') + ";border:1px solid " + (all ? GREEN + '55' : 'rgba(0,0,0,.12)') + ";border-radius:4px;padding:5px 8px" };
+    });
+
+    const tabDefs = [
+      ['mvp1', 'MVP1', '현재 단계'],
+      ['mvp2', 'MVP2', '준비 현황'],
+      ['mvp3', 'MVP3', '준비 현황'],
+      ['unmapped', '단계 미정', '37항목']
+    ];
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 11px;text-align:center' : '0 16px 11px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed })); },
+      onRootClick: e => { if (e.target.closest && e.target.closest('[data-keep]')) return; if (st.drawer) this.setState({ drawer:false, sel:null }); },
+      onClose: e => { e.stopPropagation(); this.setState({ drawer:false, sel:null }); },
+
+      verdictAt: VERDICT_AT, verdictCommit: VERDICT_COMMIT,
+      roles: [['owner','owner'],['viewer','viewer']].map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ role:k }); },
+        style: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.role === k ? '#f7f4ee' : '#6f6a61') + ";background:" + (st.role === k ? '#26231e' : '#fffdf9') + ";padding:6px 9px;cursor:pointer;user-select:none" })),
+
+      tabs: tabDefs.map(([k, label, chip]) => {
+        const on = tab === k, current = k === 'mvp1';
+        return { label, chip,
+          onClick: e => { e.stopPropagation(); this.setState({ tab:k, drawer:false, sel:null }); },
+          style: "display:flex;align-items:center;gap:7px;font:" + (on ? '600' : '400') + " 12.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#26231e' : '#8a8377') +
+            ";border-bottom:2px solid " + (on ? '#26231e' : 'transparent') + ";cursor:pointer;padding:0 2px;user-select:none",
+          chipStyle: "font:500 9.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (current ? '#26231e' : '#8a8377') + ";background:" + (current ? 'oklch(0.95 0.03 165)' : '#f2eee5') +
+            ";border:1px solid " + (current ? GREEN + '55' : 'rgba(0,0,0,.1)') + ";border-radius:3px;padding:3px 5px;white-space:nowrap" };
+      }),
+
+      stageMark: tab === 'mvp1' ? '● 현재 단계' : (isUnmapped ? '· 단계 미정' : '· 준비 현황'),
+      stageMarkStyle: "font:600 10.5px/1 'IBM Plex Mono',monospace;white-space:nowrap;color:" + (tab === 'mvp1' ? GREEN : '#8a8377'),
+      stageTitle: tab === 'mvp1' ? '지금은 MVP1 — 팝콘PC 인계로 판매하는 단계입니다'
+        : (tab === 'mvp2' ? 'MVP2는 아직 오지 않은 단계입니다'
+          : (tab === 'mvp3' ? 'MVP3은 입점 포털 단계입니다' : '아직 단계가 배정되지 않은 항목들입니다')),
+      stageDesc: tab === 'mvp1' ? '이 탭의 항목이 지금 급한 것입니다. 다른 탭의 미구축은 "빠뜨린 것"이 아니라 "지금 안 해도 되는 것"입니다.'
+        : (tab === 'unmapped' ? '단계 매핑의 원천(코드 필드 vs 별도 표)이 아직 정해지지 않아, 임의로 어느 탭에도 밀어 넣지 않았습니다.'
+          : '여기 미구축은 경고가 아닙니다 — 지금 단계가 아니어서 비어 있는 것이 정상입니다.'),
+      stageNoteStyle: "flex:none;margin:12px 18px 0;border:1px solid " + (tab === 'mvp1' ? GREEN + '44' : 'rgba(0,0,0,.13)') +
+        ";background:" + (tab === 'mvp1' ? 'oklch(0.97 0.02 165)' : '#f2eee5') + ";border-left:3px solid " + (tab === 'mvp1' ? GREEN : '#bdb6a8') +
+        ";border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px",
+
+      axes, noAxes: axes.length === 0,
+      switchNote: isUnmapped ? '이 탭에는 전환 축이 없습니다' : STAGE_LABEL[tab] + ' 소속 ' + tabAxes.length + '종',
+      noAxesTitle: tab === 'mvp1' ? 'MVP1에는 전환 축이 없습니다 — 빠진 것이 아니라 정상입니다'
+        : '이 탭에는 전환 축이 배정되지 않았습니다',
+      noAxesDesc: tab === 'mvp1' ? '전환 축은 "자체 서비스를 켜는 스위치"입니다. 인계로 판매하는 MVP1에는 켤 것이 원래 없고, 지금 값(결제·환불·정산·배송 = 쇼핑몰)이 그 정상 상태입니다. 5종은 각각 MVP2·MVP3 탭에 있습니다.'
+        : '전환 축 5종은 MVP2(결제·환불·배송·회원)와 MVP3(정산)에 확정 배정돼 있습니다.',
+
+      showGroups: isUnmapped,
+      showHints: !isUnmapped,
+      groups,
+      buildNote: tab === 'mvp1' ? '이 단계에 배정된 관리자 화면 목록이 아직 없습니다 — 단계 매핑 원천이 정해지지 않아 37항목 전부가 "단계 미정"에 있습니다. 지어진 화면은 그 탭에서 확인하세요.'
+        : (tab === 'mvp2' ? 'admin_nav.py에 있는 미구축 26항목은 아직 어느 단계에도 배정되지 않았습니다. 아래는 결정 로그에서 읽히는 "정황상 대응"이며 확정이 아닙니다.'
+          : 'MVP3 대응도 정황상 읽힌 것뿐입니다 — 확정이 아닙니다.'),
+      hints: (HINTS[tab] || []).map(h => ({ name:h.name, desc:h.desc, chip:'정황상 대응 · 확정 아님',
+        chipStyle:"font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:3px;padding:4px 6px;white-space:nowrap;flex:none" })),
+      onGoUnmapped: e => { e.stopPropagation(); this.setState({ tab:'unmapped', drawer:false, sel:null }); },
+
+      presets: PRESETS.map(([name, desc, modes]) => {
+        const same = Object.keys(modes).every(k => st.draft[k] === modes[k]);
+        return { name, desc, mark: same ? '● 현재 값' : '값 채우기',
+          markStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (same ? GREEN : '#5b564d') + ";background:" + (same ? 'oklch(0.95 0.03 165)' : '#fffdf9') +
+            ";border:1px solid " + (same ? GREEN + '55' : 'rgba(0,0,0,.18)') + ";border-radius:4px;padding:5px 8px;white-space:nowrap;flex:none",
+          onClick: e => { e.stopPropagation(); if (!this.guard()) return;
+            this.setState({ draft: Object.assign({}, modes) });
+            this.toast(name + ' 값을 채웠습니다 — 저장해야 적용됩니다(구축 축은 바뀌지 않습니다)', 'ok'); },
+          style: "display:flex;align-items:center;gap:9px;border:1px solid " + (same ? GREEN + '55' : 'rgba(0,0,0,.12)') + ";background:#fffdf9;border-radius:6px;padding:9px 11px;cursor:pointer" };
+      }),
+
+      legend: [
+        { chip: vLabel('live'), style: vChip('live', true), desc:'전환 축 — 값을 읽는 코드가 있고 처리가 갈립니다. 환불은 문구만 갈리지만 소비는 되므로 여기에 셉니다.' },
+        { chip: vLabel('dormant'), style: vChip('dormant', true), desc:'전환 축 — 축은 살아 있으나 이 단계에서 쓰지 않습니다.' },
+        { chip: vLabel('missing'), style: vChip('missing', true), desc:'전환 축 — 스위치는 있는데 읽는 코드가 없습니다. 켜도 서버는 아무 일도 하지 않습니다.' },
+        { chip:'■ 구축됨', style:"font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + GREEN + ";background:oklch(0.95 0.03 165);border:1px solid " + GREEN + "44;border-radius:4px;padding:5px 8px;white-space:nowrap", desc:'구축 축 — 화면이 지어져 라우트가 있습니다(admin_nav.py의 href 유무로 판정).' },
+        { chip:'□ 미구축', style:"font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap", desc:'구축 축 — 아직 짓지 않았습니다. 여기서 켜고 끌 수 없고, 지어야 바뀝니다.' }
+      ].map(l => ({ chip:l.chip, chipStyle:l.style, desc:l.desc })),
+
+      facts: [
+        { title:'두 축은 성격이 다릅니다', desc:'전환 축은 사람이 켜고 끄는 정책 스위치, 구축 축은 지어야 바뀌는 진척입니다. 구축 축에 스위치를 붙이면 "켰는데 아무 일이 없다"가 되돌아옵니다 — 그래서 조회만 합니다.' },
+        { title:'구축 축 목록은 여기서 정의하지 않습니다', desc:'정본은 api/admin_nav.py이고 이 화면은 파생해 읽습니다. 판정도 그 파일의 href 유무를 그대로 씁니다 — 목록을 화면에 복제하면 2026-08-05 사고(메뉴가 36화면에 갈라짐)가 재현됩니다.' },
+        { title:'이 화면 자신도 미구축입니다', desc:'admin_nav.py가 아직 구 라벨(운영 전환 설정)이고 href가 없어, 26건 미구축 중 하나로 잡힙니다 — 자기 이름도 가리지 않습니다.' },
+        { title:'MVP1 잔여는 아직 셀 수 없습니다', desc:'NAV 튜플에 단계 필드가 없어 26건 중 무엇이 MVP1인지 코드로 판정할 방법이 없습니다. "26개 미구축"까지만 말하고 임의로 나누지 않습니다.' }
+      ],
+
+      history: st.history.map((h, i) => ({ at:h.at, who:h.who, what:h.what,
+        undone: h.undone ? '되돌려짐' : '',
+        undoneStyle: h.undone ? "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;background:#f2eee5;border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:4px 7px;white-space:nowrap" : 'display:none',
+        undoStyle: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;text-align:center;color:" + (h.undone || !owner ? '#b3ac9e' : '#26231e') +
+          ";background:#fffdf9;border:1px solid rgba(0,0,0," + (h.undone || !owner ? '.1' : '.2') + ");border-radius:5px;padding:6px 9px;cursor:pointer;user-select:none",
+        onUndo: e => {
+          e.stopPropagation();
+          if (!this.guard()) return;
+          if (h.undone) { this.toast('이미 되돌린 변경입니다 (409)', 'err'); return; }
+          const res = enforce(Object.assign({}, st.saved, h.before));
+          this.setState(s => ({ saved: res.modes, draft: Object.assign({}, res.modes),
+            history: s.history.map((x, j) => j === i ? Object.assign({}, x, { undone:true }) : x) }));
+          this.toast('되돌렸습니다 — ' + h.what + ' (즉시 적용, 고객 서버 포함)', 'ok');
+        } })),
+
+      drawerOpen: st.drawer && !!sel,
+      d: sel ? {
+        name: sel.name, key: sel.key, verdict: vLabel(sel.verdict), verdictStyle: vChip(sel.verdict, true),
+        stage: STAGE_LABEL[sel.stage] + ' 소속',
+        stageStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap",
+        options: [['own', sel.own], ['mall', sel.mall]].map(([v, [label, desc]]) => {
+          const on = st.draft[sel.key] === v;
+          return { label, desc, mark: on ? '●' : '○',
+            markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (on ? '#26231e' : '#bdb6a8'),
+            onClick: e => { e.stopPropagation(); setMode(sel.key, v); },
+            cardStyle: "flex:1;border:1px solid " + (on ? '#26231e' : 'rgba(0,0,0,.14)') + ";background:" + (on ? '#f6f2e8' : '#faf7f0') +
+              ";border-radius:7px;padding:11px 12px;cursor:" + (sel.key === 'settle' ? 'not-allowed' : 'pointer') };
+        }),
+        verdictTitle: sel.verdictTitle, verdictDesc: sel.verdictDesc, verdictSrc: sel.verdictSrc,
+        verdictBoxStyle: "border:1px solid " + V[sel.verdict].color + "55;border-left:3px solid " + V[sel.verdict].color +
+          ";background:" + (sel.verdict === 'missing' ? '#f2eee5' : '#faf7f0') + ";border-radius:7px;padding:11px 13px",
+        hasNeed: !!sel.need, need: sel.need,
+        effects: sel.effects.map(([text, kind]) => {
+          const c = effectChip(kind);
+          return { text, chip: c.label, mark: kind === 'built' ? '→' : '·',
+            markStyle: "font:600 11px/1.5 'IBM Plex Mono',monospace;color:" + (kind === 'built' ? GREEN : '#c4bdae'),
+            chipStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + c.color + ";background:" + c.bg + ";border:1px solid " + c.color + "44;border-radius:4px;padding:4px 7px;white-space:nowrap;flex:none",
+            style: "display:flex;align-items:flex-start;gap:9px;border:1px solid rgba(0,0,0,.11);border-radius:6px;padding:9px 11px;background:" + (kind === 'built' ? '#faf7f0' : '#f4f0e7') };
+        }),
+        hasCoercion: sel.key === 'settle' || sel.key === 'refund',
+        coercion: sel.key === 'settle' ? '서버가 settle을 pay와 같은 값으로 강제 보정합니다 — 이 화면에서 따로 고를 수 없습니다.'
+          : 'refund=own은 pay=own일 때만 유지됩니다. pay가 mall이면 서버가 refund를 mall로 되돌립니다.'
+      } : {},
+
+      footNote: owner ? (changed.length ? changed.length + '개 전환 축이 변경 대기 중입니다 — 저장하면 즉시 발효됩니다(구축 축은 저장 대상이 아닙니다)' : '변경 사항이 없습니다 · 구축 축은 조회 전용입니다')
+        : '권한이 부족합니다 (필요: owner, 현재: viewer) — 값 조회만 가능합니다',
+      footNoteStyle: "font:400 11px/1.4 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#8a8377' : RED) + ";flex:1;min-width:0",
+      revertStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (changed.length ? '#5b564d' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 12px;cursor:pointer",
+      saveStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner && changed.length ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner && changed.length ? '#26231e' : '#bdb6a8') + ";border:none;border-radius:5px;padding:9px 15px;cursor:pointer",
+      onRevert: e => { e.stopPropagation(); if (!changed.length) { this.toast('되돌릴 변경이 없습니다', 'warn'); return; }
+        this.setState(s => ({ draft: Object.assign({}, s.saved) })); this.toast('저장 전 상태로 되돌렸습니다', 'ok'); },
+      onOpenConfirm: e => {
+        e.stopPropagation();
+        if (!this.guard()) return;
+        if (!changed.length) { this.toast('변경할 항목이 없습니다 (400) — 빈 변경은 이력에 남기지 않습니다', 'err'); return; }
+        this.setState({ confirm:true, phrase:'', drawer:false });
+      },
+
+      confirmOpen: st.confirm,
+      applyRows: appliedKeys.map(k => {
+        const ax = axisOf(k);
+        const coerced = st.draft[k] !== applied.modes[k] || changed.indexOf(k) < 0;
+        return { name: ax ? ax.name : k, change: k + ': ' + st.saved[k] + ' → ' + applied.modes[k],
+          verdictChip: ax ? vLabel(ax.verdict) : '', verdictChipStyle: ax ? vChip(ax.verdict) : 'display:none',
+          chip: coerced ? '서버 보정' : '요청대로',
+          chipStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (coerced ? AMBER : GREEN) + ";background:" + (coerced ? 'oklch(0.95 0.04 70)' : 'oklch(0.95 0.03 165)') +
+            ";border:1px solid " + (coerced ? AMBER : GREEN) + "55;border-radius:4px;padding:4px 7px;white-space:nowrap;flex:none",
+          style: "display:flex;align-items:center;gap:9px;border:1px solid " + (coerced ? AMBER + '55' : 'rgba(0,0,0,.12)') + ";border-radius:6px;padding:9px 11px;background:#faf7f0" };
+      }),
+      coerceNote: applied.notes.join(' · '),
+      coerceNoteStyle: applied.notes.length ? "font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:" + AMBER + ";margin-top:8px" : 'display:none',
+      noopNote: (() => {
+        const dead = appliedKeys.filter(k => { const ax = axisOf(k); return ax && ax.verdict === 'missing'; }).map(k => (axisOf(k) || {}).name);
+        return dead.length ? dead.join('·') + ' 축은 미구현입니다 — 값과 이력은 남지만 서버 처리는 달라지지 않습니다.' : '';
+      })(),
+      noopNoteStyle: appliedKeys.some(k => { const ax = axisOf(k); return ax && ax.verdict === 'missing'; })
+        ? "font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:9px 11px;margin-top:9px" : 'display:none',
+      needPhrase, phraseTarget: PHRASE, phrase: st.phrase,
+      phraseInputStyle: "width:100%;font:500 12.5px/1.4 'IBM Plex Mono',monospace;color:#26231e;background:#fffdf9;border:1px solid " +
+        (st.phrase === PHRASE ? GREEN : 'rgba(0,0,0,.24)') + ";border-radius:6px;padding:9px 11px;outline:none",
+      onPhrase: e => this.setState({ phrase: e.target.value }),
+      confirmNote: needPhrase ? (st.phrase === PHRASE ? '확인 문구가 일치합니다' : '위 문구를 그대로 입력해야 저장할 수 있습니다') : '저장 즉시 고객 서버에 반영됩니다',
+      commitLabel: needPhrase ? '위험을 확인했습니다 — 저장' : '저장 — 즉시 적용',
+      commitStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:" +
+        (needPhrase ? (st.phrase === PHRASE ? RED : '#bdb6a8') : '#26231e') + ";border:none;border-radius:5px;padding:9px 15px;cursor:pointer",
+      onCancelConfirm: e => { e.stopPropagation(); this.setState({ confirm:false, phrase:'' }); },
+      onCommit: e => {
+        e.stopPropagation();
+        if (!this.guard()) return;
+        if (needPhrase && st.phrase !== PHRASE) { this.toast('확인 문구가 일치하지 않습니다 — 저장하지 않았습니다', 'err'); return; }
+        const what = appliedKeys.map(k => k + ': ' + st.saved[k] + ' → ' + applied.modes[k] + (st.draft[k] !== applied.modes[k] || changed.indexOf(k) < 0 ? '(보정)' : '')).join(' · ');
+        const before = {}; appliedKeys.forEach(k => { before[k] = st.saved[k]; });
+        this.setState(s => ({ saved: Object.assign({}, applied.modes), draft: Object.assign({}, applied.modes), confirm:false, phrase:'',
+          history: [{ at:'2026-08-13 16:12', who:'사장님', what, undone:false, before }].concat(s.history) }));
+        this.toast('저장했습니다 — 즉시 적용되었고 배포된 고객 서버에도 반영됩니다. ' + (applied.notes.length ? '서버 보정: ' + applied.notes.join(' · ') : ''), applied.modes.pay === 'own' ? 'warn' : 'ok');
+      },
+
+      toasts: st.toasts.map(t => ({ msg:t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'),
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

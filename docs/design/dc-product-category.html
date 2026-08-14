@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+input{font-family:'IBM Plex Sans KR',sans-serif}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="상품 분류 관리" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="17">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px;z-index:5">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">상품관리</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">상품 분류 관리</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-CAT-010</span>
+      <span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px">조회 viewer · 쓰기 owner</span>
+      <span style="flex:1"></span>
+      <button onClick="{{ onUndo }}" data-keep="1" style="{{ undoStyle }}">되돌리기</button>
+      <div data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+        <sc-for list="{{ roles }}" as="r" hint-placeholder-count="3">
+          <div onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div style="flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.13);background:#f2eee5;border-left:3px solid #8a8377;border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px">
+      <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6f6a61;white-space:nowrap">경계</span>
+      <span style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif">엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다</span>
+      <span style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1;min-width:0">부품 종류(part_type, 엔진이 읽는 닫힌 19종)와 다른 축입니다. 이 화면이 하는 일은 판매 탐색·마진 상속·오분류 경고입니다. 마진을 바꿔도 판매가는 "판매가 재산정"에서 확정해야 바뀝니다.</span>
+    </div>
+
+    <div style="flex:none;padding:12px 18px 0;display:flex;gap:10px">
+      <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+        <div style="{{ s.style }}">
+          <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">{{ s.label }}</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:3px">
+            <span style="{{ s.valueStyle }}">{{ s.value }}</span>
+            <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ s.note }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div style="flex:none;display:grid;grid-template-columns:1fr 132px 96px 96px 128px;gap:12px;align-items:center;padding:9px 14px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+          <span>분류</span><span>허용 부품 종류</span><span>직속 / 자손</span><span>재고 있음</span><span>마진</span>
+        </div>
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="20">
+            <div onClick="{{ r.onClick }}" data-keep="1" style="{{ r.style }}">
+              <span style="display:flex;align-items:center;gap:7px;min-width:0">
+                <span style="{{ r.indentStyle }}"></span>
+                <span onClick="{{ r.onToggle }}" style="{{ r.caretStyle }}">{{ r.caret }}</span>
+                <span style="{{ r.nameStyle }}">{{ r.name }}</span>
+                <span style="{{ r.hiddenStyle }}">{{ r.hidden }}</span>
+                <span style="{{ r.violStyle }}">{{ r.viol }}</span>
+              </span>
+              <span style="{{ r.typesStyle }}">{{ r.types }}</span>
+              <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;text-align:right">{{ r.counts }}</span>
+              <span style="{{ r.stockStyle }}">{{ r.stock }}</span>
+              <span style="{{ r.marginStyle }}">{{ r.margin }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:9px;margin-top:10px">
+          <span onClick="{{ onAddTop }}" style="{{ addTopStyle }}">+ 대분류 추가</span>
+          <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1;min-width:0">{{ etcNote }}</span>
+        </div>
+      </div>
+
+      <div style="width:316px;flex:none;display:flex;flex-direction:column;gap:12px;overflow:auto">
+        <div style="flex:none;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">마진 상속</div>
+          <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">노드에 값을 걸지 않으면 조상 방향으로 찾다가 없으면 전역 기본값으로 떨어집니다. 지금은 <b>개별 마진이 걸린 노드가 0개</b>라 34개 전부가 전역 기본 <span style="font-family:'IBM Plex Mono',monospace">{{ globalMargin }}</span>를 상속합니다.</div>
+          <div style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:7px">계산 원천은 api/pricing.resolve_margins 하나입니다 — 이 화면이 따로 계산하지 않습니다.</div>
+        </div>
+
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">알려진 사각지대</div>
+          <div style="border:1px solid oklch(0.72 0.12 62 / .5);background:oklch(0.96 0.03 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:6px;padding:10px 12px">
+            <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">ETC 소분류 11개는 서로 구분되지 않습니다</div>
+            <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d">전부 <span style="font-family:'IBM Plex Mono',monospace">allowed_part_types=["ETC"]</span>라, 쿨링·튜닝 분류에 케이블이 잘못 들어가도 위반 경고가 뜨지 않습니다. 이 화면은 그 사실을 밝히기만 하고 2차 판별은 하지 않습니다.</div>
+          </div>
+          <div style="border:1px solid rgba(0,0,0,.12);border-left:3px solid #bdb6a8;background:#faf7f0;border-radius:6px;padding:10px 12px">
+            <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">노출 토글은 지금 효과가 없습니다</div>
+            <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d"><span style="font-family:'IBM Plex Mono',monospace">is_visible</span>을 읽어 걸러내는 소비처가 코드에 없습니다 — 꺼도 관리자 화면에서 사라지지 않습니다. 값은 저장되고 이력에 남습니다.</div>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+          <div style="flex:none;height:32px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7;display:flex;align-items:center;padding:0 12px">
+            <span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61">최근 변경 · 되돌리기</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="3">
+              <div style="padding:9px 12px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#8a8377">{{ h.at }}</span>
+                  <span style="flex:1"></span>
+                  <span style="{{ h.undoneStyle }}">{{ h.undone }}</span>
+                  <span onClick="{{ h.onUndo }}" style="{{ h.undoStyle }}">되돌리기</span>
+                </div>
+                <div style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ h.what }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noHistory }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:16px 12px;font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;text-align:center">이 세션에서 바꾼 것이 없습니다.<br>카테고리 되돌리기는 신규 API가 필요합니다(지금 백엔드에 undo 없음).</div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ onClose }}" style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7"></div>
+      <div data-keep="1" style="position:absolute;top:52px;right:0;bottom:0;width:568px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8">
+        <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font:600 14.5px/1.3 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0">{{ d.name }}</span>
+            <span style="{{ d.depthStyle }}">{{ d.depth }}</span>
+            <span onClick="{{ onClose }}" style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">
+            <span>category_id {{ d.id }}</span><span>{{ d.path }}</span><span>직속 {{ d.direct }} · 자손 {{ d.total }}</span>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px">
+          <div data-keep="1">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:7px">이름</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input value="{{ nameDraft }}" onChange="{{ onName }}" style="{{ d.inputStyle }}">
+              <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#a09889">{{ nameLen }}/80</span>
+            </div>
+          </div>
+
+          <div data-keep="1" style="display:grid;grid-template-columns:1fr 132px;gap:10px">
+            <div style="position:relative">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:7px">상위 분류 — 이동</div>
+              <div onClick="{{ onOpenParent }}" style="{{ d.parentStyle }}">
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.parentLabel }}</span>
+                <span style="font-size:8px;opacity:.55">▼</span>
+              </div>
+              <sc-if value="{{ parentOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;top:56px;left:0;right:0;z-index:30;max-height:236px;overflow:auto;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px">
+                  <sc-for list="{{ parentOptions }}" as="p" hint-placeholder-count="7">
+                    <div onClick="{{ p.onClick }}" style="{{ p.style }}">
+                      <span style="flex:1;min-width:0">{{ p.label }}</span>
+                      <span style="{{ p.warnStyle }}">{{ p.warn }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div>
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:7px">정렬순서</div>
+              <input value="{{ sortDraft }}" onChange="{{ onSort }}" style="{{ d.sortStyle }}">
+            </div>
+          </div>
+
+          <div data-keep="1">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+              <span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">허용 부품 종류</span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889;flex:1;min-width:0">{{ d.typesNote }}</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ typeChips }}" as="t" hint-placeholder-count="18">
+                <span onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+
+          <div data-keep="1">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">마진</div>
+            <div style="border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ d.marginChipStyle }}">{{ d.marginChip }}</span>
+                <span style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1;min-width:0">{{ d.marginSource }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:9px">
+                <input value="{{ marginDraft }}" onChange="{{ onMargin }}" placeholder="예: 0.18" style="{{ d.marginInputStyle }}">
+                <button onClick="{{ onSetMargin }}" style="{{ d.marginBtnStyle }}">이 분류에 걸기</button>
+                <button onClick="{{ onClearMargin }}" style="{{ d.marginClearStyle }}">상속으로 되돌리기</button>
+              </div>
+              <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377;margin-top:8px">0 이상 1 미만. 걸면 이 분류와 하위 <b>{{ d.total }}건</b>이 다음 재산정에서 이 값을 씁니다 — <b>판매가는 지금 바뀌지 않습니다.</b></div>
+            </div>
+          </div>
+
+          <div data-keep="1">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">노출</div>
+            <div onClick="{{ onToggleVisible }}" style="{{ d.visibleStyle }}">
+              <span style="{{ d.visibleMarkStyle }}">{{ d.visibleMark }}</span>
+              <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+                <span style="font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif">{{ d.visibleLabel }}</span>
+                <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">지금은 이 값을 읽는 소비처가 없어 꺼도 목록에서 사라지지 않습니다 — 값과 이력만 남습니다.</span>
+              </span>
+            </div>
+          </div>
+
+          <sc-if value="{{ d.hasViol }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.72 0.12 62 / .5);background:oklch(0.96 0.03 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:11px 13px;font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ d.violNote }}</div>
+          </sc-if>
+
+          <sc-if value="{{ dirty }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid #26231e;border-left:3px solid #26231e;background:#f6f2e8;border-radius:6px;padding:10px 12px">
+              <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:6px">변경됨 · 저장 필요</div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <sc-for list="{{ diffs }}" as="x" hint-placeholder-count="2">
+                  <div style="font:400 10.5px/1.5 'IBM Plex Mono',monospace;color:#4a463e">{{ x }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+          <span style="{{ footNoteStyle }}">{{ footNote }}</span>
+          <button onClick="{{ onDelete }}" style="{{ d.deleteStyle }}">삭제</button>
+          <button onClick="{{ onRevert }}" style="{{ revertStyle }}">되돌리기</button>
+          <button onClick="{{ onSave }}" style="{{ saveStyle }}">저장</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:470px">{{ t.msg }}</span>
+          <span onClick="{{ t.onAction }}" style="{{ t.actionStyle }}">{{ t.action }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)';
+const GLOBAL_MARGIN = 0.15;
+const PART_TYPES = ['CPU','메인보드','메모리','그래픽카드','SSD','HDD','파워','케이스','CPU쿨러','케이스팬','모니터','키보드','마우스','스피커','헤드셋','완제품 PC','베어본','기타(ETC)'];
+
+const RAW = [
+  [51, null, '부품', 0, true, null, 0, 0],
+  [1, 51, 'CPU', 0, true, ['CPU'], 1284, 1102],
+  [2, 51, '메인보드', 1, true, ['메인보드'], 1876, 1503],
+  [3, 51, '메모리', 2, true, ['메모리'], 742, 690],
+  [4, 51, '그래픽카드', 3, true, ['그래픽카드'], 1130, 902],
+  [5, 51, 'SSD', 4, true, ['SSD'], 866, 780],
+  [6, 51, 'HDD', 5, true, ['HDD'], 214, 180],
+  [7, 51, '파워', 6, true, ['파워'], 693, 620],
+  [8, 51, '케이스', 7, true, ['케이스'], 1042, 880],
+  [9, 51, 'CPU쿨러', 8, true, ['CPU쿨러'], 1418, 1210],
+  [52, null, '주변기기', 1, true, null, 0, 0],
+  [10, 52, '모니터', 0, true, ['모니터'], 1204, 1010],
+  [11, 52, '키보드 · 마우스', 1, true, ['키보드','마우스'], 1660, 1402],
+  [12, 52, '스피커 · 헤드셋', 2, true, ['스피커','헤드셋'], 940, 812],
+  [13, 52, '마우스패드', 3, true, ['기타(ETC)'], 268, 240, 'etc'],
+  [14, 52, '모니터 주변기기', 4, false, ['기타(ETC)'], 322, 268, 'etc'],
+  [53, null, '확장 · 연결', 2, true, null, 0, 0],
+  [15, 53, '케이블 · 젠더', 0, true, ['기타(ETC)'], 1146, 1004, 'etc'],
+  [16, 53, 'USB · 허브', 1, true, ['기타(ETC)'], 604, 552, 'etc'],
+  [17, 53, '네트워크', 2, true, ['기타(ETC)'], 388, 340, 'etc'],
+  [18, 53, '외장 저장장치', 3, true, ['기타(ETC)'], 296, 262, 'etc'],
+  [54, null, '쿨링 · 튜닝용품', 3, true, null, 0, 0],
+  [19, 54, '케이스팬', 0, true, ['케이스팬'], 812, 720],
+  [20, 54, '쿨링 · 튜닝', 1, true, ['기타(ETC)'], 470, 402, 'etc'],
+  [55, null, '완제품', 4, true, null, 0, 0],
+  [21, 55, '완제품 PC', 0, true, ['완제품 PC'], 386, 312],
+  [22, 55, '미니PC · 베어본', 1, true, ['베어본'], 208, 176],
+  [23, 55, '프린터 · 복합기', 2, true, ['기타(ETC)'], 262, 214, 'etc'],
+  [56, null, '기타', 5, true, null, 0, 0],
+  [24, 56, '휴대폰 · 모바일', 0, true, ['기타(ETC)'], 344, 296, 'etc'],
+  [25, 56, '소프트웨어', 1, true, ['기타(ETC)'], 176, 140, 'etc'],
+  [26, 56, '미분류', 2, true, ['기타(ETC)'], 288, 210, 'etc'],
+  [27, 56, '사무용품', 3, true, ['기타(ETC)'], 132, 96, 'etc'],
+  [28, 56, '기타 부속', 4, true, ['기타(ETC)'], 96, 70, 'etc']
+];
+
+const mk = r => ({ id:r[0], parent:r[1], name:r[2], sort:r[3], visible:r[4], types:r[5] ? r[5].slice() : null,
+  direct:r[6], stock:r[7], etc:r[8] === 'etc', margin:null, viol: r[0] === 15 ? 12 : (r[0] === 11 ? 3 : 0) });
+
+const clone = n => ({ id:n.id, parent:n.parent, name:n.name, sort:n.sort, visible:n.visible,
+  types:n.types ? n.types.slice() : null, direct:n.direct, stock:n.stock, etc:n.etc, margin:n.margin, viol:n.viol });
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { nodes: RAW.map(mk), sel:null, drawer:false, draft:null, role:'owner',
+      collapsed:{}, parentOpen:false, navCollapsed:false, toasts:[], history:[], seq:100 };
+    this.tid = 0;
+  }
+
+  toast(msg, kind, action, onAction) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind, action, onAction }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 7000);
+  }
+
+  guard() {
+    const r = this.state.role;
+    if (r === 'viewer') { this.toast('권한이 부족합니다(필요: operator, 현재: viewer)', 'err'); return false; }
+    if (r === 'operator') { this.toast('관리자(owner)만 카테고리를 바꿀 수 있습니다 (403) — 보는 것은 됩니다', 'err'); return false; }
+    return true;
+  }
+
+  node(id) { return this.state.nodes.find(n => n.id === id); }
+  childrenOf(id) { return this.state.nodes.filter(n => n.parent === id).sort((a, b) => a.sort - b.sort); }
+  totalOf(id) { return this.node(id).direct + this.childrenOf(id).reduce((s, c) => s + this.totalOf(c.id), 0); }
+  stockOf(id) { return this.node(id).stock + this.childrenOf(id).reduce((s, c) => s + this.stockOf(c.id), 0); }
+  isDescendant(id, maybeAncestor) {
+    let cur = this.node(id);
+    while (cur && cur.parent != null) { if (cur.parent === maybeAncestor) return true; cur = this.node(cur.parent); }
+    return false;
+  }
+  resolvedMargin(id) {
+    let cur = this.node(id);
+    while (cur) {
+      if (cur.margin != null) return { rate: cur.margin, from: cur.id === id ? 'self' : cur.name };
+      cur = cur.parent == null ? null : this.node(cur.parent);
+    }
+    return { rate: GLOBAL_MARGIN, from: 'global' };
+  }
+
+  diffs() {
+    const st = this.state;
+    if (!st.draft || st.sel == null) return [];
+    const a = this.node(st.sel), b = st.draft, out = [];
+    if (!a) return [];
+    if (a.name !== b.name) out.push('name: "' + a.name + '" → "' + b.name + '"');
+    if (a.parent !== b.parent) out.push('parent_id: ' + (a.parent == null ? 'null' : a.parent) + ' → ' + (b.parent == null ? 'null' : b.parent));
+    if (a.sort !== b.sort) out.push('sort_order: ' + a.sort + ' → ' + b.sort);
+    if (a.visible !== b.visible) out.push('is_visible: ' + a.visible + ' → ' + b.visible);
+    const fmt = t => t ? '[' + t.join(', ') + ']' : 'null(제한없음)';
+    if (fmt(a.types) !== fmt(b.types)) out.push('allowed_part_types: ' + fmt(a.types) + ' → ' + fmt(b.types));
+    return out;
+  }
+
+  edit(fn) { this.setState(s => { const d = clone(s.draft); fn(d); return { draft:d }; }); }
+
+  pushHistory(what, before) {
+    this.setState(s => ({ history: [{ id: s.seq + 1, at:'2026-08-13 16:' + String(20 + s.history.length).slice(-2), what, before, undone:false }].concat(s.history), seq: s.seq + 1 }));
+  }
+
+  restore(entry) {
+    this.setState(s => ({
+      nodes: s.nodes.map(n => entry.before[n.id] ? Object.assign({}, n, entry.before[n.id]) : n)
+        .concat(Object.keys(entry.before).filter(k => !s.nodes.some(n => String(n.id) === k)).map(k => entry.before[k].__full).filter(Boolean)),
+      history: s.history.map(h => h.id === entry.id ? Object.assign({}, h, { undone:true }) : h),
+      draft: null, sel:null, drawer:false
+    }));
+    this.toast('되돌렸습니다 — ' + entry.what, 'ok');
+  }
+
+  open(id) {
+    if (this.diffs().length) { this.toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn'); return; }
+    this.setState(s => (s.sel === id && s.drawer) ? { sel:null, drawer:false, draft:null }
+      : { sel:id, drawer:true, draft: clone(this.node(id)), parentOpen:false, marginDraft:'' });
+  }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed, owner = st.role === 'owner';
+    const diffs = this.diffs();
+    const d = st.draft;
+    const sel = st.sel != null ? this.node(st.sel) : null;
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === '상품 분류 관리';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '5px 0;justify-content:center' : '5px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const rows = [];
+    const walk = (parent, depth) => {
+      this.childrenOf(parent).forEach(n => {
+        const kids = this.childrenOf(n.id);
+        const isCol = !!st.collapsed[n.id];
+        const on = n.id === st.sel && st.drawer;
+        const m = this.resolvedMargin(n.id);
+        rows.push({
+          name: n.name,
+          nameStyle: "font:" + (depth === 0 ? '600 12.5px' : '400 12px') + "/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
+          indentStyle: "flex:none;width:" + (depth * 18) + "px",
+          caret: kids.length ? (isCol ? '▸' : '▾') : '·',
+          caretStyle: "flex:none;width:14px;text-align:center;font:500 10px/1 'IBM Plex Mono',monospace;color:" + (kids.length ? '#6f6a61' : '#d3cec2') + ";cursor:" + (kids.length ? 'pointer' : 'default'),
+          onToggle: e => { e.stopPropagation(); if (!kids.length) return; this.setState(s => ({ collapsed: Object.assign({}, s.collapsed, { [n.id]: !s.collapsed[n.id] }) })); },
+          hidden: n.visible ? '' : '노출 꺼짐',
+          hiddenStyle: n.visible ? 'display:none' : "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;background:#f2eee5;border:1px solid rgba(0,0,0,.12);border-radius:3px;padding:3px 5px;white-space:nowrap",
+          viol: n.viol ? '▲ 위반 ' + n.viol : '',
+          violStyle: n.viol ? "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:" + AMBER + ";background:oklch(0.95 0.04 70);border:1px solid " + AMBER + "55;border-radius:3px;padding:3px 5px;white-space:nowrap" : 'display:none',
+          types: n.types ? n.types.join(' · ') : '제한 없음',
+          typesStyle: "font:400 10px/1.3 'IBM Plex Mono',monospace;color:" + (n.types ? (n.etc ? AMBER : '#6f6a61') : '#a09889') + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
+          counts: n.direct.toLocaleString() + ' / ' + this.totalOf(n.id).toLocaleString(),
+          stock: this.stockOf(n.id).toLocaleString(),
+          stockStyle: "font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;text-align:right",
+          margin: (m.rate * 100).toFixed(0) + '%' + (m.from === 'self' ? ' 직접' : (m.from === 'global' ? ' 전역' : ' ← ' + m.from)),
+          marginStyle: "font:400 10px/1.3 'IBM Plex Sans KR',sans-serif;text-align:right;color:" + (m.from === 'self' ? '#26231e' : '#a09889'),
+          onClick: () => this.open(n.id),
+          style: "display:grid;grid-template-columns:1fr 132px 96px 96px 128px;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;background:" +
+            (on ? '#f0ece1' : (depth === 0 ? '#faf7f0' : 'transparent')) + ";border-left:3px solid " + (on ? '#26231e' : 'transparent')
+        });
+        if (!isCol) walk(n.id, depth + 1);
+      });
+    };
+    walk(null, 0);
+
+    const totalNodes = st.nodes.length;
+    const etcCount = st.nodes.filter(n => n.etc).length;
+    const violTotal = st.nodes.reduce((s, n) => s + n.viol, 0);
+    const marginSet = st.nodes.filter(n => n.margin != null).length;
+
+    const stats = [
+      { label:'분류', value: totalNodes + '개', note:'대분류 ' + this.childrenOf(null).length + ' · 소분류 ' + (totalNodes - this.childrenOf(null).length), kind:'plain' },
+      { label:'개별 마진이 걸린 분류', value: String(marginSet), note: marginSet ? '나머지는 상속' : '전부 전역 상속', kind:'plain' },
+      { label:'허용 종류 위반', value: String(violTotal), note:'경고이지 금지가 아닙니다', kind: violTotal ? 'warn' : 'plain' },
+      { label:'미매핑 상품', value:'2', note:'22,840건 중 · 상품 분류 매핑 소관', kind:'plain' }
+    ].map(s => ({ label:s.label, value:s.value, note:s.note,
+      style:"flex:1;background:#fffdf9;border:1px solid " + (s.kind === 'warn' ? AMBER + '55' : 'rgba(0,0,0,.11)') + ";border-radius:8px;padding:9px 12px",
+      valueStyle:"font:600 21px/1.15 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:" + (s.kind === 'warn' ? AMBER : '#26231e') }));
+
+    const selMargin = sel ? this.resolvedMargin(sel.id) : null;
+
+    const parentOptions = d ? [{ id:null, label:'(최상위 — 대분류로 두기)' }]
+      .concat(st.nodes.filter(n => n.parent === null).map(n => ({ id:n.id, label:n.name })))
+      .map(o => {
+        const bad = d && (o.id === d.id || (o.id != null && this.isDescendant(o.id, d.id)));
+        return { label:o.label, warn: bad ? '순환' : '',
+          warnStyle: bad ? "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:" + RED : 'display:none',
+          style: "display:flex;align-items:center;gap:8px;font:" + (d.parent === o.id ? '600' : '400') + " 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:" +
+            (bad ? '#b3ac9e' : '#26231e') + ";padding:7px 9px;border-radius:5px;cursor:" + (bad ? 'not-allowed' : 'pointer') + ";background:" + (d.parent === o.id ? '#f0ece1' : 'transparent'),
+          onClick: e => {
+            e.stopPropagation();
+            if (bad) { this.toast('자기 자신이나 하위 카테고리 밑으로는 옮길 수 없습니다 (400)', 'err'); return; }
+            this.edit(x => { x.parent = o.id; }); this.setState({ parentOpen:false });
+          } };
+      }) : [];
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 11px;text-align:center' : '0 16px 11px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed })); },
+      onRootClick: e => { if (e.target.closest && e.target.closest('[data-keep]')) return; if (st.drawer || st.parentOpen) this.setState({ drawer:false, sel:null, parentOpen:false }); },
+      onClose: e => { e.stopPropagation(); this.setState({ drawer:false, sel:null, parentOpen:false }); },
+
+      roles: [['owner','owner'],['operator','operator'],['viewer','viewer']].map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ role:k }); },
+        style: "font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.role === k ? '#f7f4ee' : '#6f6a61') + ";background:" + (st.role === k ? '#26231e' : '#fffdf9') + ";padding:6px 8px;cursor:pointer;user-select:none" })),
+
+      undoStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.history.some(h => !h.undone) ? '#26231e' : '#b3ac9e') +
+        ";background:#fffdf9;border:1px solid rgba(0,0,0," + (st.history.some(h => !h.undone) ? '.18' : '.1') + ");border-radius:5px;padding:6px 9px;cursor:pointer",
+      onUndo: e => {
+        e.stopPropagation();
+        const last = st.history.find(h => !h.undone);
+        if (!last) { this.toast('되돌릴 변경이 없습니다', 'warn'); return; }
+        if (!this.guard()) return;
+        this.restore(last);
+      },
+
+      stats, rows,
+      globalMargin: (GLOBAL_MARGIN * 100).toFixed(0) + '%',
+      etcNote: 'ETC 소분류 ' + etcCount + '개는 허용 종류가 모두 ETC라 서로 구분되지 않습니다 — 위반 경고의 사각지대입니다.',
+      addTopStyle: "font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner ? '#26231e' : '#bdb6a8') + ";border-radius:5px;padding:8px 12px;cursor:pointer;user-select:none;flex:none",
+      onAddTop: e => {
+        e.stopPropagation();
+        if (!this.guard()) return;
+        const id = st.seq + 1;
+        const created = { id, parent:null, name:'새 대분류', sort:this.childrenOf(null).length, visible:true, types:null, direct:0, stock:0, etc:false, margin:null, viol:0 };
+        this.setState(s => ({ nodes: s.nodes.concat([created]), seq:id, sel:id, drawer:true, draft: clone(created) }));
+        this.pushHistory("'새 대분류'를 추가했습니다", {});
+        this.toast('대분류를 추가했습니다 — 이름과 허용 종류를 채우고 저장하세요', 'ok');
+      },
+
+      drawerOpen: st.drawer && !!d,
+      d: d ? (() => {
+        const parent = d.parent == null ? null : this.node(d.parent);
+        const total = sel ? this.totalOf(sel.id) : 0;
+        const kids = sel ? this.childrenOf(sel.id).length : 0;
+        return {
+          id: d.id, name: d.name, path: (parent ? parent.name + ' / ' : '') + d.name,
+          depth: d.parent == null ? '대분류' : '소분류',
+          depthStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap",
+          direct: d.direct.toLocaleString(), total: total.toLocaleString(),
+          inputStyle: "flex:1;min-width:0;font:500 13px/1.4 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#faf7f0;border:1px solid " +
+            (d.name.trim() && d.name.length <= 80 ? 'rgba(0,0,0,.18)' : RED) + ";border-radius:6px;padding:9px 11px;outline:none",
+          parentLabel: parent ? parent.name : '(최상위 — 대분류)',
+          parentStyle: "display:flex;align-items:center;gap:7px;font:400 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#faf7f0;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;cursor:pointer;user-select:none",
+          sortStyle: "width:100%;font:500 12px/1.3 'IBM Plex Mono',monospace;color:#26231e;background:#faf7f0;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none",
+          typesNote: d.types ? d.types.length + '종 선택 — 비우면 제한 없음' : '제한 없음 — 어떤 부품 종류든 들어올 수 있습니다',
+          marginChip: sel && sel.margin != null ? '직접 ' + (sel.margin * 100).toFixed(0) + '%' : '상속 ' + (selMargin ? (selMargin.rate * 100).toFixed(0) : '') + '%',
+          marginChipStyle: "font:600 10.5px/1 'IBM Plex Mono',monospace;color:" + (sel && sel.margin != null ? '#26231e' : '#6f6a61') +
+            ";background:" + (sel && sel.margin != null ? '#e6e0d2' : '#f2eee5') + ";border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap",
+          marginSource: sel && sel.margin != null ? '이 분류에 직접 걸린 값입니다.'
+            : (selMargin && selMargin.from === 'global' ? '전역 기본값에서 상속하고 있습니다(개별 값 없음).' : '상위 "' + (selMargin ? selMargin.from : '') + '"에서 상속하고 있습니다.'),
+          marginInputStyle: "width:96px;font:500 12px/1.3 'IBM Plex Mono',monospace;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:8px 10px;outline:none",
+          marginBtnStyle: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#26231e' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:8px 11px;cursor:pointer",
+          marginClearStyle: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (sel && sel.margin != null ? '#5b564d' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:8px 11px;cursor:pointer",
+          visibleMark: d.visible ? '●' : '○',
+          visibleMarkStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (d.visible ? GREEN : '#a09889') + ";margin-top:2px",
+          visibleLabel: d.visible ? '노출 켜짐 (is_visible=true)' : '노출 꺼짐 (is_visible=false)',
+          visibleStyle: "display:flex;align-items:flex-start;gap:9px;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:10px 12px;background:#faf7f0;cursor:pointer",
+          hasViol: !!(sel && sel.viol),
+          violNote: sel && sel.viol ? '이 분류에 허용 종류를 어기는 상품 ' + sel.viol + '건이 이미 있습니다 — 경고일 뿐 저장은 막지 않습니다. 옮기는 것은 "상품 분류 매핑" 화면에서 합니다.' : '',
+          deleteStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? RED : '#b3ac9e') + ";background:#fffdf9;border:1px solid " + (owner ? RED + '55' : 'rgba(0,0,0,.1)') + ";border-radius:5px;padding:8px 11px;cursor:pointer"
+        };
+      })() : {},
+
+      nameDraft: d ? d.name : '', nameLen: d ? String(d.name.length) : '0',
+      onName: e => { const v = e.target.value; if (!this.guard()) return; this.edit(x => { x.name = v; }); },
+      sortDraft: d ? String(d.sort) : '',
+      onSort: e => { const v = e.target.value; if (!this.guard()) return; this.edit(x => { x.sort = parseInt(v, 10) || 0; }); },
+      parentOpen: st.parentOpen, parentOptions,
+      onOpenParent: e => { e.stopPropagation(); if (!this.guard()) return; this.setState(s => ({ parentOpen: !s.parentOpen })); },
+
+      typeChips: PART_TYPES.map(t => {
+        const on = d && d.types && d.types.indexOf(t) >= 0;
+        return { label:t,
+          onClick: e => { e.stopPropagation(); if (!this.guard()) return;
+            this.edit(x => {
+              if (!x.types) x.types = [];
+              const i = x.types.indexOf(t);
+              if (i >= 0) x.types.splice(i, 1); else x.types.push(t);
+              if (!x.types.length) x.types = null;
+            }); },
+          style: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f7f4ee' : '#4a463e') + ";background:" + (on ? '#26231e' : '#fffdf9') +
+            ";border:1px solid " + (on ? '#26231e' : 'rgba(0,0,0,.18)') + ";border-radius:13px;padding:7px 11px;cursor:pointer;user-select:none" };
+      }),
+
+      marginDraft: st.marginDraft || '',
+      onMargin: e => this.setState({ marginDraft: e.target.value }),
+      onSetMargin: e => {
+        e.stopPropagation();
+        if (!this.guard() || !sel) return;
+        const v = parseFloat(st.marginDraft);
+        if (isNaN(v) || v < 0 || v >= 1) { this.toast('마진율은 0 이상 1 미만이어야 합니다 (400)', 'err'); return; }
+        const before = {}; before[sel.id] = { margin: sel.margin };
+        this.setState(s => ({ nodes: s.nodes.map(n => n.id === sel.id ? Object.assign({}, n, { margin:v }) : n), marginDraft:'' }));
+        this.pushHistory("'" + sel.name + "' 마진 " + (v * 100).toFixed(0) + '% 설정', before);
+        this.toast("'" + sel.name + "'과 하위 " + this.totalOf(sel.id).toLocaleString() + '건이 다음 재산정에서 이 마진을 씁니다 — 판매가는 아직 바뀌지 않았습니다("판매가 재산정"에서 확정)', 'ok');
+      },
+      onClearMargin: e => {
+        e.stopPropagation();
+        if (!this.guard() || !sel) return;
+        if (sel.margin == null) { this.toast('이 분류에 직접 걸린 마진이 없습니다 (400)', 'err'); return; }
+        const before = {}; before[sel.id] = { margin: sel.margin };
+        this.setState(s => ({ nodes: s.nodes.map(n => n.id === sel.id ? Object.assign({}, n, { margin:null }) : n) }));
+        this.pushHistory("'" + sel.name + "' 마진 해제(상속으로)", before);
+        this.toast('상속으로 되돌렸습니다 — 다음 재산정부터 상위/전역 값을 씁니다', 'ok');
+      },
+      onToggleVisible: e => { e.stopPropagation(); if (!this.guard()) return; this.edit(x => { x.visible = !x.visible; }); },
+
+      dirty: diffs.length > 0, diffs,
+      footNote: owner ? (diffs.length ? '저장하면 즉시 반영되고 이력에 남습니다' : (st.role === 'owner' ? '변경 사항이 없습니다' : ''))
+        : (st.role === 'operator' ? '관리자(owner)만 카테고리를 바꿀 수 있습니다 — 보는 것은 됩니다' : '권한이 부족합니다(필요: operator, 현재: viewer)'),
+      footNoteStyle: "font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#8a8377' : RED) + ";flex:1;min-width:0",
+      revertStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (diffs.length ? '#5b564d' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer",
+      saveStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner && diffs.length ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner && diffs.length ? '#26231e' : '#bdb6a8') + ";border:none;border-radius:5px;padding:9px 14px;cursor:pointer",
+      onRevert: e => { e.stopPropagation(); if (!diffs.length) { this.toast('되돌릴 변경이 없습니다', 'warn'); return; }
+        this.setState({ draft: clone(this.node(st.sel)), parentOpen:false }); this.toast('저장 전 상태로 되돌렸습니다', 'ok'); },
+      onSave: e => {
+        e.stopPropagation();
+        if (!this.guard() || !d) return;
+        if (!diffs.length) { this.toast('변경 사항이 없습니다', 'warn'); return; }
+        const nm = d.name.trim();
+        if (!nm) { this.toast('이름이 비었습니다 (400)', 'err'); return; }
+        if (nm.length > 80) { this.toast('이름이 80자를 넘습니다 (400)', 'err'); return; }
+        if (st.nodes.some(n => n.id !== d.id && n.parent === d.parent && n.name === nm)) {
+          this.toast('같은 상위 분류에 같은 이름이 이미 있습니다 (409)', 'err'); return;
+        }
+        const cur = this.node(d.id);
+        const before = {}; before[d.id] = { name:cur.name, parent:cur.parent, sort:cur.sort, visible:cur.visible, types:cur.types ? cur.types.slice() : null };
+        this.setState(s => ({ nodes: s.nodes.map(n => n.id === d.id ? Object.assign({}, n, { name:nm, parent:d.parent, sort:d.sort, visible:d.visible, types:d.types }) : n) }));
+        this.pushHistory("'" + nm + "' 수정 · " + diffs.length + '건', before);
+        this.toast("'" + nm + "'을 저장했습니다" + (cur.visible !== d.visible ? ' — 노출 값은 저장됐지만 지금 읽는 소비처가 없습니다' : ''), 'ok', '되돌리기', () => {
+          const entry = this.state.history[0]; if (entry) this.restore(entry);
+        });
+      },
+      onDelete: e => {
+        e.stopPropagation();
+        if (!this.guard() || !sel) return;
+        const kids = this.childrenOf(sel.id).length;
+        if (kids) { this.toast('하위 카테고리 ' + kids + '개가 있어 삭제할 수 없습니다 (409) — 먼저 옮기거나 지워야 합니다', 'err'); return; }
+        if (sel.direct) { this.toast('상품 ' + sel.direct.toLocaleString() + '건이 있어 삭제할 수 없습니다 (409) — "상품 분류 매핑"에서 먼저 옮겨야 합니다', 'err'); return; }
+        const before = {}; before[sel.id] = { __full: clone(sel) };
+        this.setState(s => ({ nodes: s.nodes.filter(n => n.id !== sel.id), sel:null, drawer:false, draft:null }));
+        this.pushHistory("'" + sel.name + "' 삭제", before);
+        this.toast("'" + sel.name + "'을 삭제했습니다", 'ok');
+      },
+
+      history: st.history.map(h => ({ at:h.at, what:h.what,
+        undone: h.undone ? '되돌려짐' : '',
+        undoneStyle: h.undone ? "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;background:#f2eee5;border-radius:3px;padding:3px 5px;white-space:nowrap" : 'display:none',
+        undoStyle: "font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (h.undone ? '#b3ac9e' : '#26231e') + ";background:#fffdf9;border:1px solid rgba(0,0,0," + (h.undone ? '.1' : '.2') + ");border-radius:4px;padding:5px 7px;cursor:pointer;white-space:nowrap",
+        onUndo: e => { e.stopPropagation(); if (h.undone) { this.toast('이미 되돌린 변경입니다 (409)', 'err'); return; } if (!this.guard()) return;
+          const entry = st.history.find(x => x.at === h.at && x.what === h.what); if (entry) this.restore(entry); } })),
+      noHistory: st.history.length === 0,
+
+      toasts: st.toasts.map(t => ({ msg:t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'), action: t.action || '',
+        onAction: e => { e.stopPropagation(); if (t.onAction) t.onAction(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        actionStyle: t.action ? "font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:6px 9px;cursor:pointer;white-space:nowrap" : 'display:none' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

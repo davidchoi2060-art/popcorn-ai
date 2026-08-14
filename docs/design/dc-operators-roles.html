@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+input{font-family:'IBM Plex Mono',monospace}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="운영자 권한" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="14">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px;z-index:5">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">시스템</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">운영자 · 권한</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-SYS-020</span>
+      <span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px">조회조차 owner 전용</span>
+      <span style="flex:1"></span>
+      <span data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+        <sc-for list="{{ modes }}" as="m" hint-placeholder-count="2">
+          <span onClick="{{ m.onClick }}" style="{{ m.style }}">{{ m.label }}</span>
+        </sc-for>
+      </span>
+      <span style="font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">현재</span>
+      <div data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+        <sc-for list="{{ roles }}" as="r" hint-placeholder-count="2">
+          <div onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <sc-if value="{{ denied }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px">
+        <div style="font:600 15px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.52 0.16 30)">권한이 부족합니다 (필요: owner, 현재: operator)</div>
+        <div style="font:400 11.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#6f6a61;text-align:center;max-width:420px">계정 목록은 민감해서 조회조차 관리자만 허용됩니다. 이 화면은 목록을 캐시해 두거나 일부만 보여주지 않습니다 — 403이면 아무것도 보여주지 않습니다.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ allowed }}" hint-placeholder-val="{{ true }}">
+      <div data-keep="1" style="flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:18px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+          <div onClick="{{ t.onClick }}" style="{{ t.style }}">
+            <span>{{ t.label }}</span>
+            <span style="{{ t.countStyle }}">{{ t.count }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showAccounts }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;padding:12px 18px 0;display:flex;gap:10px">
+        <sc-for list="{{ stats }}" as="s" hint-placeholder-count="5">
+          <div style="{{ s.style }}">
+            <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">{{ s.label }}</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:3px">
+              <span style="{{ s.valueStyle }}">{{ s.value }}</span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ s.note }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 18px">
+        <div style="flex:none;display:grid;grid-template-columns:1fr 108px 92px 132px 78px 96px;gap:12px;align-items:center;padding:9px 14px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+          <span>계정</span><span>등급</span><span>상태</span><span>로그인</span><span>세션</span><span>작업 수</span>
+        </div>
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="18">
+            <div onClick="{{ r.onClick }}" data-keep="1" style="{{ r.style }}">
+              <span style="display:flex;align-items:center;gap:9px;min-width:0">
+                <span style="{{ r.avatarStyle }}">{{ r.initial }}</span>
+                <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <span style="display:flex;align-items:center;gap:7px;min-width:0">
+                    <span style="font:500 12px/1.3 'IBM Plex Sans KR',sans-serif">{{ r.name }}</span>
+                    <span style="{{ r.pendingStyle }}">{{ r.pendingChip }}</span>
+                    <span style="{{ r.meStyle }}">{{ r.me }}</span>
+                  </span>
+                  <span style="{{ r.emailStyle }}">{{ r.email }}</span>
+                </span>
+              </span>
+              <span style="{{ r.roleStyle }}">{{ r.role }}</span>
+              <span style="{{ r.statusStyle }}">{{ r.status }}</span>
+              <span style="{{ r.loginStyle }}">{{ r.login }}</span>
+              <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;text-align:right">{{ r.sessions }}</span>
+              <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;text-align:right">{{ r.logs }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showIps }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px">
+          <div style="{{ enforceBoxStyle }}">
+            <div style="display:flex;align-items:center;gap:11px">
+              <span style="{{ enforceMarkStyle }}">{{ enforceMark }}</span>
+              <span style="font:600 12px/1.4 'IBM Plex Sans KR',sans-serif">{{ enforceTitle }}</span>
+              <span style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1;min-width:0">{{ enforceDesc }}</span>
+              <span data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden;flex:none">
+                <sc-for list="{{ enforceOptions }}" as="o" hint-placeholder-count="3">
+                  <span onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</span>
+                </sc-for>
+              </span>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+            <div style="flex:none;height:36px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7;display:flex;align-items:center;padding:0 13px;gap:9px">
+              <span style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif">허용 목록 {{ ipCount }}개</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">CIDR 표기 · 관리자 API 전체에 적용</span>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto">
+              <sc-for list="{{ ipRows }}" as="r" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:150px 1fr 132px 128px 62px;gap:12px;align-items:center;padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06)">
+                  <span style="font:500 11.5px/1.3 'IBM Plex Mono',monospace">{{ r.cidr }}</span>
+                  <span style="display:flex;align-items:center;gap:8px;min-width:0">
+                    <span style="font:400 11.5px/1.35 'IBM Plex Sans KR',sans-serif;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+                    <span style="{{ r.hereStyle }}">{{ r.here }}</span>
+                  </span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ r.addedBy }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#a09889">{{ r.lastSeen }}</span>
+                  <span onClick="{{ r.onRemove }}" title="{{ r.removeHint }}" style="{{ r.removeStyle }}">삭제</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);background:#f4f0e7;padding:10px 13px;display:flex;align-items:center;gap:8px">
+              <input value="{{ newCidr }}" onChange="{{ onNewCidr }}" placeholder="203.0.113.0/24 또는 203.0.113.7" style="{{ cidrInputStyle }}">
+              <input value="{{ newLabel }}" onChange="{{ onNewLabel }}" placeholder="설명 (예: 사무실 고정회선)" style="{{ labelInputStyle }}">
+              <button onClick="{{ onAddIp }}" style="{{ addIpStyle }}">추가</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:320px;flex:none;display:flex;flex-direction:column;gap:12px">
+          <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">지금 접속한 곳</div>
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font:600 17px/1.2 'IBM Plex Mono',monospace">{{ myIp }}</span>
+              <span style="{{ myIpChipStyle }}">{{ myIpChip }}</span>
+            </div>
+            <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:7px">{{ myIpNote }}</div>
+          </div>
+
+          <div style="flex:1;min-height:0;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px;overflow:auto">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">잠금 방지 규칙</div>
+            <sc-for list="{{ ipRules }}" as="r" hint-placeholder-count="4">
+              <div style="border:1px solid rgba(0,0,0,.11);border-left:3px solid #bdb6a8;background:#faf7f0;border-radius:6px;padding:9px 11px">
+                <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">{{ r.title }}</div>
+                <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ r.desc }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ onClose }}" style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7"></div>
+      <div data-keep="1" style="position:absolute;top:52px;right:0;bottom:0;width:576px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8">
+        <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="{{ d.avatarStyle }}">{{ d.initial }}</span>
+            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+              <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">{{ d.name }}</span>
+              <span style="{{ d.emailStyle }}">{{ d.email }}</span>
+            </span>
+            <span style="{{ d.roleStyle }}">{{ d.role }}</span>
+            <span style="{{ d.statusStyle }}">{{ d.status }}</span>
+            <span onClick="{{ onClose }}" style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">
+            <span>operator_id {{ d.id }}</span><span>세션 {{ d.sessions }}</span><span>작업 {{ d.logs }}</span><span>{{ d.lastLogin }}</span>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">신원 · 승인 근거 — 서버가 만든 문장</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <sc-for list="{{ d.identity }}" as="i" hint-placeholder-count="3">
+                <div style="{{ i.style }}">
+                  <span style="{{ i.markStyle }}">{{ i.mark }}</span>
+                  <span style="font:400 11px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ i.text }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <sc-if value="{{ d.isPending }}" hint-placeholder-val="{{ false }}">
+            <div data-keep="1" style="border:1.5px solid #26231e;background:#f6f2e8;border-radius:7px;padding:12px 14px">
+              <div style="font:600 12px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:8px">승인 — 등급을 정해서 승인합니다</div>
+              <div style="display:flex;gap:7px;margin-bottom:10px">
+                <sc-for list="{{ approveRoles }}" as="a" hint-placeholder-count="3">
+                  <span onClick="{{ a.onClick }}" style="{{ a.style }}">{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <div style="{{ ownerWarnStyle }}">{{ ownerWarn }}</div>
+              <button onClick="{{ onApprove }}" style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:9px 15px;cursor:pointer">승인하기</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ d.isActive }}" hint-placeholder-val="{{ true }}">
+            <div data-keep="1">
+              <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">등급 변경 — 활성 계정만</div>
+              <div style="display:flex;gap:7px">
+                <sc-for list="{{ roleOptions }}" as="o" hint-placeholder-count="3">
+                  <span onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">비밀번호</div>
+            <div style="{{ d.pwBoxStyle }}">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ d.pwChipStyle }}">{{ d.pwChip }}</span>
+                <span style="font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ d.pwNote }}</span>
+                <button onClick="{{ onIssuePassword }}" style="{{ d.pwBtnStyle }}">임시 비밀번호 발급</button>
+              </div>
+            </div>
+          </div>
+
+          <div data-keep="1">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">이메일 정정</div>
+            <div style="border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0">
+              <div style="display:flex;align-items:center;gap:8px">
+                <input value="{{ emailDraft }}" onChange="{{ onEmailChange }}" style="{{ d.emailInputStyle }}">
+                <button onClick="{{ onEmailFix }}" style="{{ d.emailBtnStyle }}">정정</button>
+              </div>
+              <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:oklch(0.55 0.14 55);margin-top:8px">주소를 바꾸면 <b>비밀번호가 초기화되고 이 계정의 세션 {{ d.sessions }}개가 즉시 끊깁니다</b> — 새 주소의 주인이 맞는지 다시 확인받아야 하기 때문입니다.</div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">정지</div>
+            <div style="{{ d.suspendBoxStyle }}">
+              <div style="font:400 11px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e;margin-bottom:9px">{{ d.suspendNote }}</div>
+              <button onClick="{{ onSuspend }}" style="{{ d.suspendBtnStyle }}">{{ d.suspendLabel }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:470px">{{ t.msg }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['운영 전환 설정','운'],['운영자 · 권한','권']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)', BLUE='oklch(0.5 0.12 250)';
+const ROLES = [['viewer','조회'],['operator','운영자'],['owner','관리자']];
+const ME = 1;
+
+const BASE = [
+  [1,'김선호','sunho@proteam13.co.kr','owner','활성',true,false,'bootstrap',2,412,'2026-08-13 09:12'],
+  [2,'박도현','dohyun@proteam13.co.kr','owner','활성',true,true,'approved',1,168,'2026-08-13 08:40'],
+  [3,'이하늘','haneul@proteam13.co.kr','owner','활성',true,true,'approved',1,96,'2026-08-12 18:22'],
+  [4,'정우진','woojin@proteam13.co.kr','owner','활성',true,true,'approved',0,74,'2026-08-12 11:05'],
+  [5,'최민서','minseo@proteam13.co.kr','owner','활성',true,true,'approved',1,61,'2026-08-11 17:31'],
+  [6,'강지후','jihu@proteam13.co.kr','owner','활성',true,true,'approved',0,44,'2026-08-11 10:02'],
+  [7,'윤서아','seoa@proteam13.co.kr','owner','활성',true,true,'approved',0,38,'2026-08-08 14:19'],
+  [8,'임채원','chaewon@proteam13.co.kr','owner','활성',true,true,'approved',1,27,'2026-08-07 09:55'],
+  [9,'한지민','jimin@proteam13.co.kr','owner','활성',true,true,'approved',0,19,'2026-08-05 16:44'],
+  [10,'오세훈','sehun@proteam13.co.kr','owner','활성',true,true,'approved',0,12,'2026-08-04 13:20'],
+  [11,'이수아','lsa@proteam13@@','owner','활성',true,true,'approved',0,8,'2026-08-02 10:11'],
+  [12,'신재현','jaehyun@proteam13.co.kr','owner','활성',false,false,'approved',0,0,'로그인한 적 없음'],
+  [13,'문가온','gaon@proteam13.co.kr','owner','활성',true,false,'bootstrap',0,31,'2026-07-30 15:08'],
+  [14,'배시우','siwoo@proteam13.co.kr','owner','정지',true,false,'approved',0,220,'2026-07-22 09:30'],
+  [15,'서다인','dain@proteam13.co.kr','owner','정지',true,false,'bootstrap',0,140,'2026-07-19 11:47'],
+  [16,'노예린','yerin@proteam13.co.kr','operator','정지',true,false,'approved',0,58,'2026-07-15 14:03'],
+  [17,'류하준','hajun@proteam13.co.kr','viewer','정지',true,false,'approved',0,9,'2026-07-10 10:26'],
+  [18,'권나윤','nayoon@proteam13.co.kr','viewer','정지',false,false,'approved',0,0,'로그인한 적 없음']
+];
+const PENDING = [19,'조은우','eunwoo@gmail.com','viewer','대기',false,false,'pending',0,0,'로그인한 적 없음'];
+
+const ipToInt = ip => ip.split('.').reduce((n, o) => (n << 8) + (parseInt(o, 10) || 0), 0) >>> 0;
+const inRange = (ip, cidr) => {
+  const [base, bitsRaw] = cidr.split('/');
+  const bits = bitsRaw === undefined ? 32 : parseInt(bitsRaw, 10);
+  if (bits <= 0) return true;
+  const mask = bits >= 32 ? 0xffffffff : (0xffffffff << (32 - bits)) >>> 0;
+  return (ipToInt(ip) & mask) === (ipToInt(base) & mask);
+};
+
+const mk = a => ({ id:a[0], name:a[1], email:a[2], role:a[3], status:a[4], hasPw:a[5], mustChange:a[6], origin:a[7], sessions:a[8], logs:a[9], lastLogin:a[10] });
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { accounts: BASE.map(mk), mode:'measured', sel:null, drawer:false, role:'owner',
+      approveRole:'operator', emailDraft:'', navCollapsed:false, toasts:[],
+      tab:'accounts', enforce:'warn', newCidr:'', newLabel:'',
+      ips: [
+        { cidr:'211.36.140.0/24', label:'사무실 고정회선', addedBy:'김선호', lastSeen:'2026-08-13 09:12' },
+        { cidr:'34.64.0.0/16', label:'GCP 배포 서버(Cloud Run)', addedBy:'김선호', lastSeen:'2026-08-13 08:02' },
+        { cidr:'121.190.44.18', label:'사장님 자택', addedBy:'김선호', lastSeen:'2026-08-12 22:41' }
+      ] };
+    this.myIp = '211.36.140.72';
+    this.tid = 0;
+  }
+
+  toast(msg, kind) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 7000);
+  }
+
+  list() {
+    const st = this.state;
+    const arr = st.mode === 'pending' ? [mk(PENDING)].concat(st.accounts) : st.accounts.slice();
+    return arr.sort((a, b) => (b.status === '대기' ? 1 : 0) - (a.status === '대기' ? 1 : 0));
+  }
+
+  current() { const l = this.list(); return l.find(a => a.id === this.state.sel) || null; }
+
+  update(id, fn) {
+    this.setState(s => ({ accounts: s.accounts.map(a => a.id === id ? Object.assign({}, a, fn(a)) : a) }));
+  }
+
+  activeOwners() { return this.state.accounts.filter(a => a.role === 'owner' && a.status === '활성').length; }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed;
+    const allowed = st.role === 'owner';
+    const list = this.list();
+    const a = this.current();
+    const roleLabel = r => (ROLES.find(x => x[0] === r) || [r, r])[1];
+    const covered = st.ips.some(x => inRange(this.myIp, x.cidr));
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === '운영자 · 권한';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '6px 0;justify-content:center' : '6px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const roleChip = (r, big) => "font:600 " + (big ? '10.5px' : '10px') + "/1 'IBM Plex Sans KR',sans-serif;color:" +
+      (r === 'owner' ? '#26231e' : '#5b564d') + ";background:" + (r === 'owner' ? '#e6e0d2' : '#f2eee5') +
+      ";border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center";
+    const statusChip = s => {
+      const c = s === '활성' ? GREEN : (s === '대기' ? AMBER : '#8a8377');
+      const bg = s === '활성' ? 'oklch(0.95 0.03 165)' : (s === '대기' ? 'oklch(0.95 0.04 70)' : '#f2eee5');
+      const mark = s === '활성' ? '●' : (s === '대기' ? '▲' : '○');
+      return { style:"font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + c + ";background:" + bg + ";border:1px solid " + c + "44;border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center", label: mark + ' ' + s };
+    };
+
+    const rows = list.map(x => {
+      const on = x.id === st.sel && st.drawer, sc = statusChip(x.status);
+      const badEmail = x.email.split('@').length > 2;
+      const login = !x.hasPw ? '✕ 비밀번호 없음' : (x.status !== '활성' ? '— 차단됨' : (x.mustChange ? '△ 변경 필요' : '✓ 가능'));
+      const loginColor = !x.hasPw ? RED : (x.status !== '활성' ? '#a09889' : (x.mustChange ? AMBER : GREEN));
+      return {
+        name:x.name, email:x.email, initial:x.name.slice(0, 1),
+        role: roleLabel(x.role), roleStyle: roleChip(x.role),
+        status: sc.label, statusStyle: sc.style,
+        login, loginStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + loginColor,
+        sessions: String(x.sessions), logs: x.logs.toLocaleString(),
+        me: x.id === ME ? '나' : '',
+        meStyle: x.id === ME ? "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border-radius:3px;padding:3px 5px" : 'display:none',
+        pendingChip: x.status === '대기' ? '신청' : '',
+        pendingStyle: x.status === '대기' ? "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:" + AMBER + ";background:oklch(0.95 0.04 70);border:1px solid " + AMBER + "55;border-radius:3px;padding:3px 5px" : 'display:none',
+        emailStyle: "font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:" + (badEmail ? AMBER : '#8a8377') + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
+        avatarStyle: "width:28px;height:28px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#4a463e;background:#e6e0d2;border:1px solid rgba(0,0,0,.1)",
+        onClick: () => this.setState(s => (s.sel === x.id && s.drawer) ? { sel:null, drawer:false }
+          : { sel:x.id, drawer:true, emailDraft:x.email, approveRole:'operator' }),
+        style: "display:grid;grid-template-columns:1fr 108px 92px 132px 78px 96px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:" +
+          (on ? '#f0ece1' : (x.status === '대기' ? 'oklch(0.98 0.015 70)' : 'transparent')) + ";border-left:3px solid " + (on ? '#26231e' : (x.status === '대기' ? AMBER : 'transparent'))
+      };
+    });
+
+    const active = st.accounts.filter(x => x.status === '활성');
+    const stats = [
+      { label:'활성 계정', value:String(active.length), note:'관리자 ' + active.filter(x => x.role === 'owner').length + ' · 운영자 ' + active.filter(x => x.role === 'operator').length + ' · 조회 ' + active.filter(x => x.role === 'viewer').length, kind:'plain' },
+      { label:'승인 대기', value: String(list.filter(x => x.status === '대기').length), note: list.some(x => x.status === '대기') ? '승인 필요' : '승인할 것 없음', kind:'plain' },
+      { label:'정지', value:String(st.accounts.filter(x => x.status === '정지').length), note:'세션 전부 무효', kind:'plain' },
+      { label:'비밀번호 없음', value:String(active.filter(x => !x.hasPw).length), note:'활성인데 로그인 불가', kind: active.some(x => !x.hasPw) ? 'warn' : 'plain' },
+      { label:'살아있는 세션', value:String(st.accounts.reduce((n, x) => n + x.sessions, 0)), note:'8시간 절대 · 30분 유휴', kind:'plain' }
+    ].map(s => ({ label:s.label, value:s.value, note:s.note,
+      style:"flex:1;background:#fffdf9;border:1px solid " + (s.kind === 'warn' ? RED + '55' : 'rgba(0,0,0,.11)') + ";border-radius:8px;padding:9px 12px",
+      valueStyle:"font:600 24px/1.15 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:" + (s.kind === 'warn' ? RED : '#26231e') }));
+
+    const isSelf = a && a.id === ME;
+    const lastOwner = a && a.role === 'owner' && a.status === '활성' && this.activeOwners() <= 1;
+    const badEmail = a && a.email.split('@').length > 2;
+
+    const identity = a ? (
+      a.status === '대기'
+        ? [['신청 접수 — 아직 어떤 데이터도 보지 못합니다', 'info'],
+           ['로그인 방식: 이메일(구글 제공자 이름은 클라이언트가 보낸 값을 그대로 기록한 것입니다 — id_token 검증은 아직 하지 않습니다)', 'warn'],
+           ['신원이 검증되지 않았습니다 — 승인 전에 신청자에게 직접 확인하십시오', 'warn']]
+        : (a.origin === 'bootstrap'
+          ? [['부트스트랩(자동) — ADMIN_BOOTSTRAP_EMAILS에 있어 승인 절차 없이 활성 관리자로 생성됐습니다', 'info'],
+             ['승인자: 없음(자동)', 'info']]
+          : [['다른 관리자가 등급을 정해 승인했습니다', 'ok'],
+             ['승인자: 김선호', 'info']])
+    ) : [];
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:14px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 12px;text-align:center' : '0 16px 12px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed })); },
+      onRootClick: e => { if (e.target.closest && e.target.closest('[data-keep]')) return; if (st.drawer) this.setState({ drawer:false, sel:null }); },
+      onClose: e => { e.stopPropagation(); this.setState({ drawer:false, sel:null }); },
+
+      roles: [['owner','owner'],['operator','operator']].map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ role:k, drawer:false }); },
+        style: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.role === k ? '#f7f4ee' : '#6f6a61') + ";background:" + (st.role === k ? '#26231e' : '#fffdf9') + ";padding:6px 9px;cursor:pointer;user-select:none" })),
+      modes: [['measured','실측 — 대기 0건'],['pending','신청 1건 예시']].map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ mode:k, drawer:false, sel:null }); },
+        style: "font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.mode === k ? '#f7f4ee' : '#6f6a61') + ";background:" + (st.mode === k ? '#26231e' : '#fffdf9') + ";padding:6px 9px;cursor:pointer;user-select:none;white-space:nowrap" })),
+
+      allowed, denied: !allowed, stats, rows,
+      showAccounts: allowed && st.tab === 'accounts',
+      showIps: allowed && st.tab === 'ips',
+      tabs: [['accounts','계정 목록', String(list.length)], ['ips','접근 IP 허용', String(st.ips.length)]].map(([k, label, count]) => {
+        const on = st.tab === k;
+        return { label, count, onClick: e => { e.stopPropagation(); this.setState({ tab:k, drawer:false, sel:null }); },
+          style: "display:flex;align-items:center;gap:7px;font:" + (on ? '600' : '400') + " 12.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#26231e' : '#8a8377') +
+            ";border-bottom:2px solid " + (on ? '#26231e' : 'transparent') + ";cursor:pointer;padding:0 2px;user-select:none",
+          countStyle: "font:500 10.5px/1 'IBM Plex Mono',monospace;color:" + (on ? '#6f6a61' : '#a09889') + ";background:#f2eee5;border-radius:4px;padding:3px 5px" };
+      }),
+      ipCount: st.ips.length,
+      myIp: this.myIp,
+      myIpChip: covered ? '✓ 허용 목록에 있음' : '✕ 허용 목록에 없음',
+      myIpChipStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (covered ? GREEN : RED) + ";background:" + (covered ? 'oklch(0.95 0.03 165)' : 'oklch(0.96 0.03 30)') +
+        ";border:1px solid " + (covered ? GREEN : RED) + "55;border-radius:4px;padding:5px 8px;white-space:nowrap",
+      myIpNote: covered ? '차단으로 올려도 지금 이 접속은 끊기지 않습니다.'
+        : '지금 IP가 목록에 없어 차단으로 올릴 수 없습니다 — 올리는 순간 본인이 잠깁니다.',
+      enforceMark: st.enforce === 'block' ? '● 차단 중' : (st.enforce === 'warn' ? '▲ 경고만' : '○ 끔'),
+      enforceMarkStyle: "font:600 11px/1 'IBM Plex Mono',monospace;white-space:nowrap;color:" +
+        (st.enforce === 'block' ? RED : (st.enforce === 'warn' ? AMBER : '#8a8377')),
+      enforceTitle: st.enforce === 'block' ? '허용 목록 밖의 IP는 관리자 페이지에 접근할 수 없습니다'
+        : (st.enforce === 'warn' ? '지금은 막지 않고 기록만 합니다' : 'IP 제한이 꺼져 있습니다'),
+      enforceDesc: st.enforce === 'block' ? '목록 밖에서 오는 요청은 403(허용되지 않은 IP)으로 거부되고 작업 기록에 남습니다. 로그인 성공 여부와 무관하게 막힙니다.'
+        : (st.enforce === 'warn' ? '목록 밖 접속도 그대로 통과하되 작업 기록에 남깁니다 — 차단으로 올리기 전에 누가 어디서 들어오는지 먼저 보세요.'
+          : '어느 IP에서든 접근할 수 있습니다. 목록은 저장되지만 적용되지 않습니다.'),
+      enforceBoxStyle: "flex:none;border:1px solid " + (st.enforce === 'block' ? RED + '55' : (st.enforce === 'warn' ? AMBER + '55' : 'rgba(0,0,0,.14)')) +
+        ";border-left:3px solid " + (st.enforce === 'block' ? RED : (st.enforce === 'warn' ? AMBER : '#8a8377')) +
+        ";background:" + (st.enforce === 'block' ? 'oklch(0.97 0.02 30)' : (st.enforce === 'warn' ? 'oklch(0.96 0.03 70)' : '#f2eee5')) + ";border-radius:8px;padding:11px 14px",
+      enforceOptions: [['off','끔'],['warn','경고만'],['block','차단']].map(([k, label]) => ({ label,
+        onClick: e => {
+          e.stopPropagation();
+          if (k === 'block' && !covered) { this.toast('지금 접속한 IP(' + this.myIp + ')가 허용 목록에 없습니다 — 차단으로 올리면 본인이 즉시 잠깁니다. 먼저 목록에 추가하세요.', 'err'); return; }
+          if (k === 'block' && !st.ips.length) { this.toast('허용 목록이 비어 있습니다 — 차단으로 올릴 수 없습니다 (400)', 'err'); return; }
+          this.setState({ enforce:k });
+          this.toast(k === 'block' ? 'IP 차단을 켰습니다 — 목록 밖 접속은 403으로 막힙니다' : (k === 'warn' ? '경고만 기록하는 모드로 바꿨습니다' : 'IP 제한을 껐습니다'), k === 'block' ? 'warn' : 'ok');
+        },
+        style: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.enforce === k ? '#f7f4ee' : '#6f6a61') +
+          ";background:" + (st.enforce === k ? '#26231e' : '#fffdf9') + ";padding:8px 13px;cursor:pointer;user-select:none" })),
+      ipRows: st.ips.map((ip, i) => {
+        const here = inRange(this.myIp, ip.cidr);
+        const locking = st.enforce === 'block' && here && st.ips.filter(x => inRange(this.myIp, x.cidr)).length <= 1;
+        return { cidr: ip.cidr, label: ip.label, addedBy: '추가 ' + ip.addedBy, lastSeen: ip.lastSeen,
+          here: here ? '지금 여기' : '',
+          hereStyle: here ? "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:" + GREEN + ";background:oklch(0.95 0.03 165);border:1px solid " + GREEN + "55;border-radius:3px;padding:3px 5px;white-space:nowrap" : 'display:none',
+          removeHint: locking ? '이 규칙을 지우면 본인이 잠깁니다' : '허용 목록에서 제거',
+          removeStyle: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;text-align:center;color:" + (locking ? '#b3ac9e' : '#5b564d') +
+            ";background:#fffdf9;border:1px solid rgba(0,0,0," + (locking ? '.1' : '.2') + ");border-radius:5px;padding:6px 8px;cursor:" + (locking ? 'not-allowed' : 'pointer'),
+          onRemove: e => {
+            e.stopPropagation();
+            if (locking) { this.toast('차단이 켜진 상태에서 지금 접속 중인 IP 규칙은 지울 수 없습니다 — 지우면 본인이 잠깁니다 (409)', 'err'); return; }
+            this.setState(s => ({ ips: s.ips.filter((_, j) => j !== i) }));
+            this.toast(ip.cidr + ' 규칙을 삭제했습니다', 'ok');
+          } };
+      }),
+      newCidr: st.newCidr, newLabel: st.newLabel,
+      onNewCidr: e => this.setState({ newCidr: e.target.value }),
+      onNewLabel: e => this.setState({ newLabel: e.target.value }),
+      cidrInputStyle: "width:212px;font:500 11.5px/1.3 'IBM Plex Mono',monospace;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:8px 10px;outline:none",
+      labelInputStyle: "flex:1;min-width:0;font:400 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:8px 10px;outline:none",
+      addIpStyle: "font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border:none;border-radius:5px;padding:9px 14px;cursor:pointer",
+      onAddIp: e => {
+        e.stopPropagation();
+        const cidr = (st.newCidr || '').trim(), label = (st.newLabel || '').trim();
+        if (!cidr) { this.toast('IP 또는 대역을 입력하세요 (400)', 'err'); return; }
+        if (!/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(cidr)) { this.toast('형식 오류: "' + cidr + '" — 203.0.113.7 또는 203.0.113.0/24 형태여야 합니다 (400)', 'err'); return; }
+        const [addrPart, prefixPart] = cidr.split('/');
+        const octets = addrPart.split('.').map(o => parseInt(o, 10));
+        if (octets.some(o => o > 255)) { this.toast('형식 오류: "' + cidr + '" — 각 자리는 0–255여야 합니다 (400)', 'err'); return; }
+        if (prefixPart !== undefined) {
+          const p = parseInt(prefixPart, 10);
+          if (p < 0 || p > 32) { this.toast('형식 오류: "' + cidr + '" — 프리픽스는 0–32여야 합니다 (400)', 'err'); return; }
+        }
+        if (st.ips.some(x => x.cidr === cidr)) { this.toast('이미 목록에 있는 규칙입니다 (409)', 'err'); return; }
+        this.setState(s => ({ ips: s.ips.concat([{ cidr, label: label || '설명 없음', addedBy:'김선호', lastSeen:'접속 기록 없음' }]), newCidr:'', newLabel:'' }));
+        this.toast(cidr + '을(를) 허용 목록에 추가했습니다', 'ok');
+      },
+      ipRules: [
+        { title:'본인을 잠그는 설정은 막습니다', desc:'지금 접속한 IP가 목록에 없으면 차단으로 올릴 수 없고, 차단 중에는 지금 접속을 지탱하는 마지막 규칙을 지울 수 없습니다.' },
+        { title:'경고만 → 차단 순서로 올립니다', desc:'먼저 경고만 모드로 두어 누가 어디서 들어오는지 기록을 쌓은 뒤 차단으로 올리는 것을 권합니다.' },
+        { title:'IP는 등급을 대신하지 않습니다', desc:'허용된 IP에서 접속해도 등급별 권한은 그대로 적용됩니다 — 두 겹이지 한 겹이 아닙니다.' },
+        { title:'거부도 기록에 남습니다', desc:'차단된 접근 시도는 작업 기록에 남아 나중에 되짚을 수 있습니다 — 조용히 사라지지 않습니다.' }
+      ],
+
+      drawerOpen: allowed && st.drawer && !!a,
+      d: a ? {
+        id: a.id, name: a.name, email: a.email, initial: a.name.slice(0, 1),
+        role: roleLabel(a.role), roleStyle: roleChip(a.role, true),
+        status: statusChip(a.status).label, statusStyle: statusChip(a.status).style,
+        sessions: a.sessions, logs: a.logs.toLocaleString(), lastLogin: '마지막 로그인 ' + a.lastLogin,
+        avatarStyle: "width:34px;height:34px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 13px/1 'IBM Plex Sans KR',sans-serif;color:#4a463e;background:#e6e0d2;border:1px solid rgba(0,0,0,.1)",
+        emailStyle: "font:400 11px/1.3 'IBM Plex Mono',monospace;color:" + (badEmail ? AMBER : '#8a8377'),
+        isPending: a.status === '대기', isActive: a.status === '활성',
+        identity: identity.map(([text, kind]) => ({ text,
+          mark: kind === 'warn' ? '▲' : (kind === 'ok' ? '✓' : '·'),
+          markStyle: "font:600 11px/1.6 'IBM Plex Mono',monospace;color:" + (kind === 'warn' ? AMBER : (kind === 'ok' ? GREEN : '#a09889')),
+          style: "display:flex;align-items:flex-start;gap:9px;border:1px solid " + (kind === 'warn' ? AMBER + '55' : 'rgba(0,0,0,.11)') +
+            ";border-left:3px solid " + (kind === 'warn' ? AMBER : (kind === 'ok' ? GREEN : '#bdb6a8')) + ";border-radius:6px;padding:9px 11px;background:" + (kind === 'warn' ? 'oklch(0.96 0.03 70)' : '#faf7f0') })),
+        pwChip: a.hasPw ? (a.mustChange ? '△ 변경 필요' : '✓ 설정됨') : '✕ 없음',
+        pwChipStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (a.hasPw ? (a.mustChange ? AMBER : GREEN) : RED) +
+          ";background:" + (a.hasPw ? (a.mustChange ? 'oklch(0.95 0.04 70)' : 'oklch(0.95 0.03 165)') : 'oklch(0.96 0.03 30)') +
+          ";border:1px solid " + (a.hasPw ? (a.mustChange ? AMBER : GREEN) : RED) + "55;border-radius:4px;padding:5px 8px;white-space:nowrap",
+        pwNote: a.hasPw ? (a.mustChange ? '임시 비밀번호를 받은 뒤 아직 바꾸지 않았습니다 — 최초 로그인에서 강제로 바뀝니다.' : '해시만 저장돼 있습니다. 원문은 어디에도 남지 않습니다.')
+          : '활성이지만 비밀번호가 없어 로그인이 403으로 막힙니다 — 발급이 필요합니다.',
+        pwBoxStyle: "border:1px solid " + (a.hasPw ? 'rgba(0,0,0,.12)' : RED + '55') + ";border-radius:7px;padding:11px 13px;background:" + (a.hasPw ? '#faf7f0' : 'oklch(0.97 0.02 30)'),
+        pwBtnStyle: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (a.status === '활성' ? '#26231e' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0," + (a.status === '활성' ? '.22' : '.1') + ");border-radius:5px;padding:8px 11px;cursor:pointer;white-space:nowrap",
+        emailInputStyle: "flex:1;min-width:0;font:500 11.5px/1.3 'IBM Plex Mono',monospace;color:#26231e;background:#fffdf9;border:1px solid " + (badEmail ? AMBER : 'rgba(0,0,0,.2)') + ";border-radius:5px;padding:8px 10px;outline:none",
+        emailBtnStyle: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:8px 12px;cursor:pointer",
+        suspendNote: isSelf ? '자기 자신은 정지할 수 없습니다 — 서버가 409로 거부합니다.'
+          : (lastOwner ? '마지막 활성 관리자는 정지할 수 없습니다 — 시스템이 관리자 없이 잠깁니다(409).'
+            : (a.status === '정지' ? '이미 정지된 계정입니다. 다시 쓰려면 승인 절차가 필요합니다.'
+              : '정지하면 이 계정의 살아있는 세션 ' + a.sessions + '개가 즉시 끊기고, 이후 로그인은 403이 됩니다. 기록은 지우지 않고 revoked_at으로 남깁니다.')),
+        suspendBoxStyle: "border:1px solid " + (isSelf || lastOwner || a.status !== '활성' ? 'rgba(0,0,0,.12)' : RED + '55') +
+          ";border-left:3px solid " + (isSelf || lastOwner || a.status !== '활성' ? '#bdb6a8' : RED) + ";border-radius:7px;padding:11px 13px;background:" +
+          (isSelf || lastOwner || a.status !== '활성' ? '#f2eee5' : 'oklch(0.97 0.02 30)'),
+        suspendLabel: a.status === '정지' ? '이미 정지됨' : '정지 — 세션 ' + a.sessions + '개 끊기',
+        suspendBtnStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (isSelf || lastOwner || a.status !== '활성' ? '#f0ece2' : '#f7f4ee') +
+          ";background:" + (isSelf || lastOwner || a.status !== '활성' ? '#bdb6a8' : RED) + ";border:none;border-radius:5px;padding:9px 14px;cursor:pointer"
+      } : {},
+
+      approveRoles: ROLES.map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ approveRole:k }); },
+        style: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.approveRole === k ? '#f7f4ee' : '#4a463e') +
+          ";background:" + (st.approveRole === k ? '#26231e' : '#fffdf9') + ";border:1px solid " + (st.approveRole === k ? '#26231e' : 'rgba(0,0,0,.2)') +
+          ";border-radius:14px;padding:8px 13px;cursor:pointer;user-select:none" })),
+      ownerWarn: st.approveRole === 'owner' ? '관리자(owner)로 승인하면 계정 관리·운영 전환 설정까지 전부 열립니다 — 승인자 한 명의 선택으로 즉시 부여됩니다.' : '',
+      ownerWarnStyle: st.approveRole === 'owner' ? "font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:" + AMBER + ";margin-bottom:10px" : 'display:none',
+      onApprove: e => {
+        e.stopPropagation();
+        if (!a) return;
+        if (a.status !== '대기') { this.toast('이미 활성 계정입니다 — 권한 변경을 사용하세요 (409)', 'err'); return; }
+        const approved = Object.assign({}, a, { status:'활성', role: st.approveRole, origin:'approved' });
+        this.setState(s => ({ accounts: [approved].concat(s.accounts), mode:'measured', drawer:false, sel:null }));
+        this.toast(a.name + '을(를) ' + roleLabel(st.approveRole) + ' 등급으로 승인했습니다 — 비밀번호가 없어 아직 로그인할 수 없습니다(발급 필요)', 'ok');
+      },
+
+      roleOptions: ROLES.map(([k, label]) => {
+        const on = a && a.role === k;
+        return { label,
+          onClick: e => {
+            e.stopPropagation();
+            if (!a) return;
+            if (a.status !== '활성') { this.toast('대기·정지 계정의 권한은 바꿀 수 없습니다 — 먼저 승인하세요 (409)', 'err'); return; }
+            if (isSelf && k !== 'owner') { this.toast('자기 자신을 강등할 수 없습니다 (409)', 'err'); return; }
+            if (on) return;
+            this.update(a.id, () => ({ role:k }));
+            this.toast(a.name + ' 등급을 ' + roleLabel(k) + '(으)로 바꿨습니다', 'ok');
+          },
+          style: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f7f4ee' : '#4a463e') +
+            ";background:" + (on ? '#26231e' : '#fffdf9') + ";border:1px solid " + (on ? '#26231e' : 'rgba(0,0,0,.2)') +
+            ";border-radius:14px;padding:8px 13px;cursor:pointer;user-select:none" };
+      }),
+
+      emailDraft: st.emailDraft,
+      onEmailChange: e => this.setState({ emailDraft: e.target.value }),
+      onEmailFix: e => {
+        e.stopPropagation();
+        if (!a) return;
+        const v = (st.emailDraft || '').trim();
+        if (v === a.email) { this.toast('바뀐 내용이 없습니다', 'warn'); return; }
+        if (v.split('@').length !== 2 || !v.split('@')[0] || !v.split('@')[1]) { this.toast('이메일 형식이 올바르지 않습니다 (400)', 'err'); return; }
+        this.update(a.id, () => ({ email:v, hasPw:false, mustChange:false, sessions:0 }));
+        this.toast('이메일을 정정했습니다 — 비밀번호가 초기화되고 세션이 전부 끊겼습니다. 임시 비밀번호를 다시 발급하세요.', 'warn');
+      },
+
+      onIssuePassword: e => {
+        e.stopPropagation();
+        if (!a) return;
+        if (a.status !== '활성') { this.toast('활성 계정에만 발급할 수 있습니다 (409)', 'err'); return; }
+        this.update(a.id, () => ({ hasPw:true, mustChange:true }));
+        this.toast('임시 비밀번호를 발급했습니다 — 값은 이 화면에 다시 나타나지 않습니다. 별도 채널로 전달하세요. 받은 사람은 최초 로그인에서 반드시 바꿔야 합니다.', 'ok');
+      },
+
+      onSuspend: e => {
+        e.stopPropagation();
+        if (!a) return;
+        if (a.status === '정지') { this.toast('이미 정지된 계정입니다 (409)', 'err'); return; }
+        if (isSelf) { this.toast('자기 자신을 정지할 수 없습니다 (409)', 'err'); return; }
+        if (lastOwner) { this.toast('마지막 활성 관리자는 정지할 수 없습니다 (409)', 'err'); return; }
+        const n = a.sessions;
+        this.update(a.id, () => ({ status:'정지', sessions:0 }));
+        this.setState({ drawer:false, sel:null });
+        this.toast(a.name + '을(를) 정지했습니다 — 세션 ' + n + '개가 즉시 끊겼습니다(삭제가 아니라 revoked_at 기록)', 'warn');
+      },
+
+      toasts: st.toasts.map(t => ({ msg:t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'),
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

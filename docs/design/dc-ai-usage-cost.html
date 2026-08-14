@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="AI 사용량 비용" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="15">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px;z-index:5">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">AI 관리</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">AI 사용량 · 비용</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-AI-050</span>
+      <span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px">읽기 전용 · 쓰기 액션 없음</span>
+      <span style="flex:1"></span>
+      <span style="font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">마지막 조회 {{ lastAt }}</span>
+      <button onClick="{{ onRefresh }}" data-keep="1" style="font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer">다시 조회</button>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div style="flex:none;margin:12px 18px 0;border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:11px 14px;display:flex;align-items:center;gap:12px">
+      <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.14 55)">▲ 원천 없음</span>
+      <span style="font:600 12px/1.4 'IBM Plex Sans KR',sans-serif">비용이 쌓이는 경로 자체가 아직 없습니다 — 접속 문제가 아닙니다</span>
+      <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1;min-width:0">실 LLM 연동 보류(2026-07-21 결정, 별도 승인 필요). 실측 <span style="font-family:'IBM Plex Mono',monospace">api_cost_logs 0행 · cost_thresholds 0행</span> — 2026-07-23 구축 시점부터 5주째 그대로입니다.</span>
+    </div>
+
+    <div data-keep="1" style="flex:none;padding:12px 18px 0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;position:relative;z-index:6">
+      <span data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:14px;overflow:hidden;background:#fffdf9">
+        <sc-for list="{{ periods }}" as="p" hint-placeholder-count="4">
+          <span onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.label }}</span>
+        </sc-for>
+      </span>
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="2">
+        <span style="position:relative">
+          <span onClick="{{ f.onClick }}" style="{{ f.style }}">
+            <span>{{ f.label }}</span>
+            <span style="font-size:8px;opacity:.55">▼</span>
+          </span>
+          <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute;top:32px;left:0;z-index:30;min-width:180px;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px;display:flex;flex-direction:column">
+              <sc-for list="{{ f.items }}" as="i" hint-placeholder-count="4">
+                <span onClick="{{ i.onClick }}" style="{{ i.style }}">{{ i.label }}</span>
+              </sc-for>
+            </span>
+          </sc-if>
+        </span>
+      </sc-for>
+      <span style="flex:1"></span>
+      <span style="font:400 11px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ scopeNote }}</span>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow:auto;padding:12px 18px 18px;display:flex;flex-direction:column;gap:12px">
+
+      <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="5">
+          <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+            <div style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">{{ k.label }}</div>
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="{{ k.valueStyle }}">{{ k.value }}</span>
+              <span style="{{ k.unitStyle }}">{{ k.unit }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:auto">
+              <span style="{{ k.chipStyle }}">{{ k.chip }}</span>
+              <span style="font:400 10px/1.45 'IBM Plex Sans KR',sans-serif;color:#a09889;flex:1;min-width:0">{{ k.note }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+        <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+          <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">일 한도 대비 오늘 사용률</span>
+          <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">cost_thresholds · api_cost_logs</span>
+          <span style="flex:1"></span>
+          <span style="{{ gaugeChipStyle }}">{{ gaugeChip }}</span>
+        </div>
+        <div style="height:14px;border-radius:7px;background:repeating-linear-gradient(135deg,#f2eee5 0 8px,#ece7db 8px 16px);border:1px solid rgba(0,0,0,.09);position:relative;overflow:hidden">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">한도도 사용액도 원천이 없습니다 — 게이지를 그릴 근거가 없습니다</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:7px;font:400 10px/1.3 'IBM Plex Mono',monospace;color:#b3ac9e">
+          <span>$—</span><span>일 한도 미설정</span>
+        </div>
+      </div>
+
+      <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <sc-for list="{{ breakdowns }}" as="b" hint-placeholder-count="2">
+          <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7">
+              <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ b.title }}</span>
+              <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#8a8377">{{ b.source }}</span>
+              <span style="flex:1"></span>
+              <span style="{{ b.chipStyle }}">{{ b.chip }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:1fr 96px 88px;gap:10px;align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.05)">
+                  <span style="display:flex;align-items:center;gap:8px;min-width:0">
+                    <span style="{{ r.dotStyle }}"></span>
+                    <span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ r.name }}</span>
+                    <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#a09889;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.sub }}</span>
+                  </span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#b3ac9e;text-align:right">{{ r.tokens }}</span>
+                  <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#b3ac9e;text-align:right">{{ r.cost }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{ b.footStyle }}">{{ b.foot }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+        <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:10px">
+          <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">최근 {{ periodDays }} 추이</span>
+          <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">api_cost_logs.created_at</span>
+          <span style="flex:1"></span>
+          <span style="{{ trendChipStyle }}">원천 없음</span>
+        </div>
+        <div style="height:132px;border:1px solid rgba(0,0,0,.08);border-radius:6px;background:#faf7f0;display:flex;align-items:stretch;padding:10px 12px;gap:6px;position:relative">
+          <div style="display:flex;flex-direction:column;justify-content:space-between;font:400 9.5px/1 'IBM Plex Mono',monospace;color:#c4bdae;flex:none;padding:2px 0">
+            <span>$—</span><span>$—</span><span>$—</span>
+          </div>
+          <div style="flex:1;display:flex;align-items:flex-end;gap:5px;border-left:1px solid rgba(0,0,0,.09);border-bottom:1px solid rgba(0,0,0,.09);padding:0 6px 0 8px">
+            <sc-for list="{{ trendSlots }}" as="t" hint-placeholder-count="14">
+              <div style="flex:1;height:5px;background:#efeade;border-radius:2px 2px 0 0"></div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#a09889">그릴 점이 없습니다 — 0이 아니라 기록 자체가 없습니다</div>
+        </div>
+      </div>
+
+      <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">빈 값 표기 규칙 — "0"과 "원천 없음"은 다르다</div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ legend }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:9px">
+                <span style="{{ l.chipStyle }}">{{ l.chip }}</span>
+                <span style="font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ l.desc }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:9px">
+            <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">Claude Code 세션 비용 (별도 구역)</span>
+            <span style="flex:1"></span>
+            <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:4px 7px">다른 종류의 비용</span>
+          </div>
+          <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d">specfiller 같은 배치는 Claude Code 세션 안에서 돕니다 — 우리 서버가 프로바이더에 직접 호출한 것이 아니므로 <span style="font-family:'IBM Plex Mono',monospace">api_cost_logs</span>에 잡히지 않습니다. 위 지표와 절대 합산하지 않습니다.</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ ccRows }}" as="c" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:1fr 104px 96px;gap:10px;align-items:center;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 11px;background:#faf7f0">
+                <span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ c.name }}</span>
+                <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;text-align:right">{{ c.tokens }}</span>
+                <span style="{{ c.costStyle }}">{{ c.cost }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:auto">원천은 세션 전사본(작업 현황판 ADM-AI-010과 같은 원천)입니다 — 토큰은 셀 수 있지만 금액 환산 기준이 없어 비용은 비워 둡니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:460px">{{ t.msg }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['매입·소싱','매'],['재고','재'],['견적','견'],['사용자','사'],['설정','설']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)', BLUE='oklch(0.5 0.12 250)';
+const PERIODS = [['today','오늘','오늘'],['d7','7일','최근 7일'],['d30','30일','최근 30일'],['month','이번 달','이번 달']];
+const PROVIDERS = [['Codex','OpenAI',BLUE],['Claude','Anthropic',AMBER],['Gemini','Google',GREEN]];
+const MODELS = [['gpt-5-codex','Codex',BLUE],['claude-opus-4-8','Claude',AMBER],['gemini-2.5-pro','Gemini',GREEN]];
+const TASKS = [['입력 파싱','task.s1_parse'],['근거 설명','task.s2_explain'],['운영 도우미','task.ops_assist'],['웹 사양 채움','task.spec_fill']];
+const CC_ROWS = [['웹 사양 채움 배치(specfiller)','—'],['개발 세션(maker·checker 등)','—'],['합계','—']];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { period:'today', fProvider:null, fModel:null, menu:null, navCollapsed:false,
+      lastAt:'2026-08-13 15:24', toasts:[] };
+    this.tid = 0;
+  }
+
+  toast(msg, kind) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 6000);
+  }
+
+  requery(what) {
+    this.setState(s => ({ lastAt: '2026-08-13 15:' + String(24 + (s.toasts.length + 1) % 30).padStart(2, '0') }));
+    this.toast(what + ' — 집계를 다시 요청했습니다. 결과는 여전히 원천 없음(api_cost_logs 0행)입니다.', 'warn');
+  }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed;
+    const noSourceChip = "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + AMBER + ";background:oklch(0.95 0.04 70);border:1px solid " + AMBER + "55;border-radius:4px;padding:4px 7px;white-space:nowrap";
+    const noSchemaChip = "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:4px 7px;white-space:nowrap";
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === 'AI 사용량·비용';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '6px 0;justify-content:center' : '6px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const menuItem = (label, active, onClick) => ({ label, onClick,
+      style: "display:flex;align-items:center;font:" + (active ? '600' : '400') + " 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#26231e;padding:7px 9px;border-radius:5px;cursor:pointer;background:" + (active ? '#f0ece1' : 'transparent') });
+
+    const periodLabel = (PERIODS.find(p => p[0] === st.period) || PERIODS[0])[2];
+
+    const kpis = [
+      { label:'오늘 사용액', unit:'USD', note:'api_cost_logs 0행', kind:'nosource' },
+      { label:'이번 달 누계', unit:'USD', note:'api_cost_logs 0행', kind:'nosource' },
+      { label:'상담 1건당 평균', unit:'USD', note:'분모(상담)·분자(비용) 모두 없음', kind:'nosource' },
+      { label:'배치당 평균', unit:'USD', note:'배치는 세션 비용 구역 참조', kind:'nosource' },
+      { label:'작업 종류별 분해', unit:'', note:'api_cost_logs에 작업 종류 컬럼 없음', kind:'noschema' }
+    ].map(k => ({
+      label:k.label, unit:k.unit, value: k.kind === 'noschema' ? '스키마 없음' : '원천 없음',
+      valueStyle: "font:600 " + (k.kind === 'noschema' ? '15px' : '17px') + "/1.2 'IBM Plex Sans KR',sans-serif;color:#a09889",
+      unitStyle: k.unit ? "font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#c4bdae" : 'display:none',
+      chip: k.kind === 'noschema' ? '스키마 없음' : '원천 없음',
+      chipStyle: k.kind === 'noschema' ? noSchemaChip : noSourceChip,
+      note:k.note }));
+
+    const breakdowns = [
+      { title:'프로바이더별 분해', source:'api_cost_logs.provider', chip:'원천 없음', chipStyle:noSourceChip,
+        rows: PROVIDERS.map(([name, sub, color]) => ({ name, sub, tokens:'—', cost:'$—',
+          dotStyle:"width:8px;height:8px;flex:none;border-radius:50%;background:" + color + "66" })),
+        foot:'컬럼(provider·model·cost_usd)은 이미 있습니다 — 행만 쌓이면 그대로 계산됩니다.',
+        footStyle:"padding:9px 13px;font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;color:#a09889;background:#faf7f0;border-top:1px solid rgba(0,0,0,.07)" },
+      { title:'작업 종류별 분해', source:'컬럼 없음', chip:'스키마 없음', chipStyle:noSchemaChip,
+        rows: TASKS.map(([name, sub]) => ({ name, sub, tokens:'—', cost:'$—',
+          dotStyle:"width:8px;height:8px;flex:none;border-radius:50%;background:#d3cec2" })),
+        foot:'이 분해는 데이터가 쌓여도 계산되지 않습니다 — api_cost_logs에 작업 종류 컬럼을 먼저 추가해야 합니다(스키마 변경 필요).',
+        footStyle:"padding:9px 13px;font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;background:#f2eee5;border-top:1px solid rgba(0,0,0,.07)" }
+    ];
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:14px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 12px;text-align:center' : '0 16px 12px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed, menu: null })); },
+      onRootClick: e => { if (e.target.closest && e.target.closest('[data-keep]')) return; if (st.menu) this.setState({ menu: null }); },
+
+      lastAt: st.lastAt,
+      onRefresh: e => { e.stopPropagation(); this.requery('다시 조회'); },
+
+      periods: PERIODS.map(([k, label]) => {
+        const on = st.period === k;
+        return { label, onClick: e => { e.stopPropagation(); this.setState({ period: k, menu: null }); this.requery(label + ' 범위'); },
+          style: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f7f4ee' : '#6f6a61') + ";background:" + (on ? '#26231e' : 'transparent') + ";padding:7px 11px;cursor:pointer;user-select:none" };
+      }),
+      filters: [
+        { key:'prov', label: st.fProvider ? '프로바이더: ' + st.fProvider : '프로바이더: 전체', on: !!st.fProvider,
+          items: [menuItem('전체', !st.fProvider, e => { e.stopPropagation(); this.setState({ fProvider:null, menu:null }); this.requery('프로바이더 전체'); })]
+            .concat(PROVIDERS.map(([v]) => menuItem(v, st.fProvider === v, e => { e.stopPropagation(); this.setState({ fProvider:v, menu:null }); this.requery('프로바이더 ' + v); }))) },
+        { key:'model', label: st.fModel ? '모델: ' + st.fModel : '모델: 전체', on: !!st.fModel,
+          items: [menuItem('전체', !st.fModel, e => { e.stopPropagation(); this.setState({ fModel:null, menu:null }); this.requery('모델 전체'); })]
+            .concat(MODELS.map(([m]) => menuItem(m, st.fModel === m, e => { e.stopPropagation(); this.setState({ fModel:m, menu:null }); this.requery('모델 ' + m); }))) }
+      ].map(f => ({ label:f.label, open: st.menu === f.key, items:f.items,
+        onClick: e => { e.stopPropagation(); this.setState(s => ({ menu: s.menu === f.key ? null : f.key })); },
+        style: "display:flex;align-items:center;gap:6px;font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (f.on ? '#f7f4ee' : '#4a463e') +
+          ";background:" + (f.on ? '#26231e' : '#fffdf9') + ";border:1px solid " + (f.on ? '#26231e' : 'rgba(0,0,0,.16)') + ";border-radius:14px;padding:7px 11px;cursor:pointer;user-select:none" })),
+      scopeNote: '이 화면은 우리 서버가 프로바이더에 직접 호출한 비용만 셉니다 · 범위 ' + periodLabel,
+
+      kpis, breakdowns,
+      gaugeChip: '원천 없음', gaugeChipStyle: noSourceChip,
+      trendChipStyle: noSourceChip,
+      periodDays: (PERIODS.find(p => p[0] === st.period) || PERIODS[0])[2],
+      trendSlots: Array.from({ length: 14 }, (_, i) => i),
+
+      legend: [
+        { chip:'0', color:'#6f6a61', bg:'#f2eee5', desc:'원천은 있는데 값이 0 — 실제로 아무도 쓰지 않았다는 뜻입니다. 지금은 이 상태가 아닙니다.' },
+        { chip:'원천 없음', color:AMBER, bg:'oklch(0.95 0.04 70)', desc:'쌓이는 경로 자체가 없어 셀 대상이 없습니다. 오늘 이 화면 전 구간이 이 상태입니다(LLM 연동 보류).' },
+        { chip:'스키마 없음', color:'#5b564d', bg:'#f2eee5', desc:'데이터가 쌓여도 계산되지 않습니다 — 컬럼을 먼저 추가해야 합니다(작업 종류별 분해).' }
+      ].map(l => ({ chip:l.chip, desc:l.desc,
+        chipStyle:"font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + l.color + ";background:" + l.bg + ";border:1px solid " + l.color + "44;border-radius:4px;padding:5px 8px;white-space:nowrap;flex:none" })),
+
+      ccRows: CC_ROWS.map(([name]) => ({ name, tokens:'세션 전사본 기준',
+        cost:'환산 기준 없음',
+        costStyle:"font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#a09889;text-align:right" })),
+
+      toasts: st.toasts.map(t => ({ msg:t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'),
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

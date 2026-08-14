@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="AI 작업 설정" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="13">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">AI 관리</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">AI 작업 설정</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-AI-030</span>
+      <span style="flex:1"></span>
+      <span style="font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">쓰기 owner 전용 · 현재</span>
+      <div data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+        <sc-for list="{{ roles }}" as="r" hint-placeholder-count="2">
+          <div onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div data-keep="1" style="flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:#fffdf9;display:flex;align-items:stretch;padding:0 18px;gap:18px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+        <div onClick="{{ t.onClick }}" style="{{ t.style }}">
+          <span>{{ t.label }}</span>
+          <span style="{{ t.countStyle }}">{{ t.count }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex:none;margin:12px 18px 0;border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px">
+      <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.14 55)">▲ 휴면</span>
+      <span style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif">이 설정은 지금 어떤 실행도 제어하지 않습니다</span>
+      <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1;min-width:0">실 LLM 연동 보류(2026-07-21 결정, 별도 승인 필요) — 저장한 값은 연동이 재개되는 순간 그대로 살아납니다.</span>
+    </div>
+
+    <sc-if value="{{ isAssignTab }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px">
+        <div style="width:392px;flex:none;display:flex;flex-direction:column;gap:12px">
+          <div data-keep="1" style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;overflow:hidden;position:relative">
+            <div style="height:34px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;padding:0 12px;background:#f4f0e7">
+              <span style="font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61">작업 종류 {{ taskCount }}</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">닫힌 목록 · A-02·A-03</span>
+            </div>
+            <sc-for list="{{ taskRows }}" as="t" hint-placeholder-count="4">
+              <div onClick="{{ t.onClick }}" style="{{ t.style }}">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="font:500 12.5px/1.3 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0">{{ t.name }}</span>
+                  <span style="{{ t.dirtyStyle }}">{{ t.dirty }}</span>
+                  <span style="{{ t.modeStyle }}">{{ t.mode }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.summary }}</span>
+                  <span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;background:#f2eee5;border-radius:4px;padding:3px 6px">미적용</span>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noTasks }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:26px 16px;text-align:center">
+                <div style="font:600 12.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">배정된 작업이 없습니다</div>
+                <div style="font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:5px">작업을 추가하면 여기에 쌓입니다.</div>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-top:1px dashed rgba(0,0,0,.14)">
+              <span style="font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1">{{ addTaskNote }}</span>
+              <span onClick="{{ onOpenAddTask }}" style="{{ addTaskStyle }}">+ 작업 추가</span>
+            </div>
+            <sc-if value="{{ addTaskOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:12px;right:12px;bottom:46px;z-index:30;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px">
+                <sc-for list="{{ addTaskItems }}" as="i" hint-placeholder-count="2">
+                  <div onClick="{{ i.onClick }}" style="{{ i.style }}">
+                    <span style="flex:1;min-width:0">{{ i.label }}</span>
+                    <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#a09889">{{ i.key }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="flex:1;min-height:0;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 13px;overflow:hidden">
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">문서 간 불일치 — 결정 필요</div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <sc-for list="{{ conflicts }}" as="c" hint-placeholder-count="2">
+                <div style="{{ c.style }}">
+                  <div style="display:flex;align-items:baseline;gap:7px">
+                    <span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ c.date }}</span>
+                    <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0">{{ c.title }}</span>
+                    <span style="{{ c.badgeStyle }}">{{ c.badge }}</span>
+                  </div>
+                  <div style="font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:4px">{{ c.desc }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:10px;padding-top:9px;border-top:1px solid rgba(0,0,0,.1)">랜딩(<span style="font-family:'IBM Plex Mono',monospace">main-landing.html</span>)이 이미 "3개 AI가 같은 문장을 읽는다"를 고객에게 약속 중입니다 — 이 화면은 그 약속과 맞는 쪽(집합 + 수렴)으로 그려져 있습니다.</div>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+          <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;padding:14px 16px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px">
+              <span style="font:600 14.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ sel.name }}</span>
+              <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ sel.key }}</span>
+              <span style="flex:1"></span>
+              <span data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+                <sc-for list="{{ modeOptions }}" as="m" hint-placeholder-count="2">
+                  <span onClick="{{ m.onClick }}" style="{{ m.style }}">{{ m.label }}</span>
+                </sc-for>
+              </span>
+              <span onClick="{{ onDeleteTask }}" style="{{ deleteTaskStyle }}">작업 삭제</span>
+            </div>
+
+            <div style="flex:1;min-height:0;overflow:auto;padding:15px 16px;display:flex;flex-direction:column;gap:15px">
+              <div data-keep="1">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+                  <span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">{{ sel.setLabel }}</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ sel.setNote }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ providers }}" as="p" hint-placeholder-count="3">
+                    <div style="{{ p.rowStyle }}">
+                      <span style="{{ p.dotStyle }}"></span>
+                      <span style="font:600 12px/1.3 'IBM Plex Sans KR',sans-serif">{{ p.vendor }}</span>
+                      <span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.model }}</span>
+                      <span style="position:relative">
+                        <span onClick="{{ p.onRole }}" style="{{ p.roleStyle }}">
+                          <span>{{ p.role }}</span>
+                          <span style="font-size:8px;opacity:.5">▼</span>
+                        </span>
+                        <sc-if value="{{ p.menuOpen }}" hint-placeholder-val="{{ false }}">
+                          <span style="position:absolute;top:28px;right:0;z-index:30;min-width:132px;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px;display:flex;flex-direction:column">
+                            <sc-for list="{{ p.roleItems }}" as="i" hint-placeholder-count="4">
+                              <span onClick="{{ i.onClick }}" style="{{ i.style }}">{{ i.label }}</span>
+                            </sc-for>
+                          </span>
+                        </sc-if>
+                      </span>
+                      <span onClick="{{ p.onRemove }}" title="{{ p.removeHint }}" style="{{ p.removeStyle }}">✕</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="position:relative;margin-top:7px">
+                  <span onClick="{{ onOpenAddProvider }}" style="{{ addProviderStyle }}">+ 프로바이더</span>
+                  <sc-if value="{{ addProviderOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:32px;left:0;z-index:30;min-width:280px;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px">
+                      <sc-for list="{{ catalogItems }}" as="i" hint-placeholder-count="5">
+                        <div onClick="{{ i.onClick }}" style="{{ i.style }}">
+                          <span style="{{ i.dotStyle }}"></span>
+                          <span style="font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;width:60px;flex:none">{{ i.vendor }}</span>
+                          <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61;flex:1;min-width:0">{{ i.model }}</span>
+                          <span style="font:400 10px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ i.state }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+
+              <div data-keep="1">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+                  <span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">폴백 순서</span>
+                  <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ sel.fallbackNote }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                  <sc-for list="{{ fallback }}" as="f" hint-placeholder-count="3">
+                    <span style="{{ f.style }}">
+                      <span style="{{ f.arrowStyle }}">{{ f.arrow }}</span>
+                      <span style="font:500 11px/1 'IBM Plex Sans KR',sans-serif">{{ f.label }}</span>
+                      <span onClick="{{ f.onUp }}" style="{{ f.upStyle }}">↑</span>
+                      <span onClick="{{ f.onDown }}" style="{{ f.downStyle }}">↓</span>
+                      <span onClick="{{ f.onRemove }}" style="{{ f.removeStyle }}">✕</span>
+                    </span>
+                  </sc-for>
+                  <sc-if value="{{ fallbackEmpty }}" hint-placeholder-val="{{ false }}">
+                    <span style="font:400 11px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">폴백 없음 — 1차가 실패하면 그대로 실패로 남깁니다</span>
+                  </sc-if>
+                </div>
+                <div style="position:relative;margin-top:8px">
+                  <span onClick="{{ onOpenAddFallback }}" style="{{ addFallbackStyle }}">+ 폴백 추가</span>
+                  <sc-if value="{{ addFallbackOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:32px;left:0;z-index:30;min-width:200px;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px">
+                      <sc-for list="{{ fallbackCandidates }}" as="i" hint-placeholder-count="3">
+                        <div onClick="{{ i.onClick }}" style="{{ i.style }}">{{ i.label }}</div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+
+              <div data-keep="1">
+                <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">프롬프트 버전</div>
+                <div style="border:1px solid rgba(0,0,0,.12);border-radius:7px;background:#faf7f0;overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid rgba(0,0,0,.09);position:relative">
+                    <span style="font:500 11.5px/1.3 'IBM Plex Mono',monospace;flex:1;min-width:0">{{ sel.prompt }}</span>
+                    <span style="font:400 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ sel.promptAt }} 등록</span>
+                    <span onClick="{{ onOpenPrompt }}" style="{{ promptBtnStyle }}">버전 바꾸기</span>
+                    <sc-if value="{{ promptOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:36px;right:11px;z-index:30;min-width:220px;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px">
+                        <sc-for list="{{ promptItems }}" as="i" hint-placeholder-count="3">
+                          <div onClick="{{ i.onClick }}" style="{{ i.style }}">
+                            <span style="flex:1;min-width:0">{{ i.label }}</span>
+                            <span style="font:400 10px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">{{ i.at }}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div style="padding:10px 12px;font:400 10.5px/1.7 'IBM Plex Mono',monospace;color:#5b564d;background:#f4f0e7;max-height:82px;overflow:hidden">{{ sel.promptBody }}</div>
+                  <div style="padding:7px 11px;font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889;border-top:1px solid rgba(0,0,0,.09)">본문은 읽기 전용입니다 — 편집은 이 화면 밖(비범위)</div>
+                </div>
+              </div>
+
+              <sc-if value="{{ dirty }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid #26231e;border-left:3px solid #26231e;background:#f6f2e8;border-radius:6px;padding:10px 12px">
+                  <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:6px">변경됨 · 저장 필요</div>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <sc-for list="{{ diffs }}" as="d" hint-placeholder-count="2">
+                      <div style="font:400 10.5px/1.5 'IBM Plex Mono',monospace;color:#4a463e">{{ d }}</div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 16px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+              <span style="{{ footNoteStyle }}">{{ footNote }}</span>
+              <button onClick="{{ onRevert }}" style="{{ revertStyle }}">되돌리기</button>
+              <span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;background:#efeade;border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:6px 8px">미적용</span>
+              <button onClick="{{ onSave }}" style="{{ saveStyle }}">저장</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ noSel }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:40px">
+              <div style="font:600 13.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">왼쪽에서 작업을 고르세요</div>
+              <div style="font:400 11.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#a09889;text-align:center;max-width:320px">작업 종류는 닫힌 목록입니다 — 견적을 만드는 일은 엔진 소관(A-02·A-03).</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isHistoryTab }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 18px">
+        <div style="flex:none;display:grid;grid-template-columns:150px 96px 1fr 1fr 90px;gap:10px;padding:8px 14px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+          <span>변경 시각</span><span>변경자</span><span>무엇을</span><span>왜</span><span>버전</span>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px">
+          <sc-for list="{{ history }}" as="h" hint-placeholder-count="5">
+            <div style="{{ h.style }}">
+              <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ h.at }}</span>
+              <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif">{{ h.who }}</span>
+              <span style="font:400 10.5px/1.5 'IBM Plex Mono',monospace;color:#4a463e">{{ h.what }}</span>
+              <span style="font:400 11px/1.4 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ h.why }}</span>
+              <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">{{ h.ver }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:460px">{{ t.msg }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['매입·소싱','매'],['재고','재'],['견적','견'],['사용자','사'],['설정','설']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)', BLUE='oklch(0.5 0.12 250)';
+const VENDOR_COLOR = { Codex: BLUE, Claude: AMBER, Gemini: GREEN };
+const ROLES = ['기준 해석','교차 확인','주','폴백 전용'];
+const CATALOG = [['Codex','gpt-5-codex'],['Codex','gpt-5-mini'],['Claude','claude-opus-4-8'],['Claude','claude-sonnet-4-5'],['Gemini','gemini-2.5-pro']];
+const PROMPTS = {
+  'task.s1_parse':[['prompt/s1-parse@v4','2026-07-18'],['prompt/s1-parse@v3','2026-06-02'],['prompt/s1-parse@v2','2026-04-27']],
+  'task.s2_explain':[['prompt/s2-explain@v7','2026-08-01'],['prompt/s2-explain@v6','2026-06-19']],
+  'task.ops_assist':[['prompt/ops-assist@v2','2026-08-11'],['prompt/ops-assist@v1','2026-05-30']],
+  'task.spec_fill':[['prompt/spec-fill@v3','2026-07-06'],['prompt/spec-fill@v2','2026-05-14']]
+};
+const PROMPT_BODY = {
+  'task.s1_parse':'너는 PC 견적 상담 입력을 구조화하는 파서다. 사용자 문장에서 용도·예산·선호 브랜드·보유 부품만 뽑아 JSON으로 돌려준다. 부품 조합을 고르거나 추천하지 않는다 — 그것은 엔진이 한다. 확신이 없는 항목은 비워 두고 추측하지 않는다.',
+  'task.s2_explain':'너는 엔진이 이미 고른 조합을 사람 말로 설명한다. 다른 조합을 제안하거나 값을 바꾸지 않는다. 근거 표에 없는 사실을 지어내지 않는다.',
+  'task.ops_assist':'너는 운영자의 질문에 답한다. 견적을 만들지 않고, 가격·재고를 바꾸지 않는다. 모르면 모른다고 답한다.',
+  'task.spec_fill':'너는 부품 사양을 웹에서 찾아 제안한다. 정본에 직접 쓰지 않는다 — 근거 URL을 반드시 붙이고, 값이 갈리면 갈린다고 밝힌다.'
+};
+const TASK_CATALOG = [
+  ['task.s1_parse','입력 파싱','고객 문장을 구조화 입력으로 — 견적은 만들지 않는다(A-02)'],
+  ['task.s2_explain','근거 설명','엔진이 고른 조합을 말로 설명 — 선택은 하지 않는다(A-03)'],
+  ['task.ops_assist','운영 도우미 질의','운영자 질문 응답 — 같은 경계 규칙을 받는다'],
+  ['task.spec_fill','웹 사양 채움','specfiller 배치가 쓰는 모델 — 실행은 ADM-AI-020 소관']
+];
+const INIT_TASKS = [
+  { key:'task.s1_parse', mode:'concurrent', providers:[['Codex','gpt-5-codex','기준 해석'],['Claude','claude-opus-4-8','교차 확인'],['Gemini','gemini-2.5-pro','교차 확인']], fallback:['Claude','Codex','Gemini'], prompt:'prompt/s1-parse@v4' },
+  { key:'task.s2_explain', mode:'single', providers:[['Claude','claude-opus-4-8','주']], fallback:['Claude','Codex'], prompt:'prompt/s2-explain@v7' },
+  { key:'task.ops_assist', mode:'single', providers:[['Codex','gpt-5-codex','주']], fallback:['Codex','Claude'], prompt:'prompt/ops-assist@v2' },
+  { key:'task.spec_fill', mode:'single', providers:[['Gemini','gemini-2.5-pro','주']], fallback:['Gemini'], prompt:'prompt/spec-fill@v3' }
+];
+const INIT_HISTORY = [
+  ['2026-08-13 14:02','사장님','task.s1_parse.providers: [Claude] → [Codex, Claude, Gemini]','랜딩이 약속한 3개 동시 해석과 맞추기','v5'],
+  ['2026-08-12 09:41','사장님','task.s2_explain.fallback: [] → [Claude, Codex]','설명 실패 시 침묵 방지','v4'],
+  ['2026-08-11 17:20','사장님','task.ops_assist.prompt: v1 → v2','경계 규칙 문구 보강','v3'],
+  ['2026-08-09 11:05','사장님','task.spec_fill 신규 배정 · Gemini','specfiller 배치 대상 지정','v2']
+];
+
+const clone = t => ({ key: t.key, mode: t.mode, prompt: t.prompt,
+  providers: t.providers.map(p => p.slice()), fallback: t.fallback.slice() });
+const meta = key => TASK_CATALOG.find(t => t[0] === key) || [key, key, ''];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const tasks = INIT_TASKS.map(clone);
+    this.state = {
+      tasks, draft: clone(tasks[0]), selKey: 'task.s1_parse', tab: 'assign',
+      role: 'owner', navCollapsed: false, menu: null, toasts: [], ver: 5,
+      history: INIT_HISTORY.map(([at, who, what, why, ver]) => ({ at, who, what, why, ver }))
+    };
+    this.tid = 0;
+  }
+
+  toast(msg, kind) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 7000);
+  }
+
+  saved() { return this.state.tasks.find(t => t.key === this.state.selKey); }
+
+  diffs() {
+    const a = this.saved(), b = this.state.draft;
+    if (!a || !b) return [];
+    const out = [];
+    if (a.mode !== b.mode) out.push(b.key + '.mode: ' + (a.mode === 'concurrent' ? '동시 호출' : '단일+폴백') + ' → ' + (b.mode === 'concurrent' ? '동시 호출' : '단일+폴백'));
+    const key = p => p[0] + '(' + p[2] + ')';
+    const av = a.providers.map(key).join(', '), bv = b.providers.map(key).join(', ');
+    if (av !== bv) out.push(b.key + '.providers: [' + av + '] → [' + bv + ']');
+    if (a.fallback.join(',') !== b.fallback.join(',')) out.push(b.key + '.fallback: [' + a.fallback.join(', ') + '] → [' + b.fallback.join(', ') + ']');
+    if (a.prompt !== b.prompt) out.push(b.key + '.prompt: ' + a.prompt.split('@')[1] + ' → ' + b.prompt.split('@')[1]);
+    return out;
+  }
+
+  edit(fn) {
+    this.setState(s => { const d = clone(s.draft); fn(d); return { draft: d, menu: null }; });
+  }
+
+  guard() {
+    if (this.state.role !== 'owner') { this.toast('권한이 부족합니다 (필요: owner, 현재: ' + this.state.role + ')', 'err'); return false; }
+    return true;
+  }
+
+  select(key) {
+    if (this.diffs().length) { this.toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn'); return; }
+    const t = this.state.tasks.find(x => x.key === key);
+    this.setState({ selKey: key, draft: t ? clone(t) : null, menu: null });
+  }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed, d = st.draft, diffs = this.diffs();
+    const owner = st.role === 'owner';
+    const usedTaskKeys = st.tasks.map(t => t.key);
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === 'AI 작업 설정';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '8px 0;justify-content:center' : '8px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const menuItem = (label, active, onClick, extra) => ({ label, onClick,
+      style: "display:flex;align-items:center;gap:8px;font:" + (active ? '600' : '400') + " 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#26231e;padding:7px 9px;border-radius:5px;cursor:pointer;background:" + (active ? '#f0ece1' : 'transparent') + (extra || '') });
+
+    const taskRows = st.tasks.map(t => {
+      const on = t.key === st.selKey;
+      const isDirty = on && diffs.length > 0;
+      const m = meta(t.key);
+      return { name: m[1],
+        summary: t.providers.map(p => p[0]).join(' · ') + (t.fallback.length ? ' → 폴백 ' + t.fallback.length + '단' : ' · 폴백 없음'),
+        mode: t.mode === 'concurrent' ? '동시 호출 · 수렴' : '단일 + 폴백',
+        modeStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (t.mode === 'concurrent' ? GREEN : '#6f6a61') +
+          ";background:" + (t.mode === 'concurrent' ? 'oklch(0.95 0.03 165)' : '#f2eee5') + ";border:1px solid " + (t.mode === 'concurrent' ? GREEN + '55' : 'rgba(0,0,0,.12)') +
+          ";border-radius:4px;padding:4px 7px;white-space:nowrap",
+        dirty: isDirty ? '변경됨' : '',
+        dirtyStyle: isDirty ? "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border-radius:4px;padding:4px 6px" : 'display:none',
+        onClick: () => this.select(t.key),
+        style: "padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:" + (on ? '#f0ece1' : 'transparent') +
+          ";border-left:3px solid " + (on ? '#26231e' : 'transparent') };
+    });
+
+    const providers = d ? d.providers.map((p, i) => {
+      const last = d.providers.length <= 1;
+      return {
+        vendor: p[0], model: p[1], role: p[2], menuOpen: st.menu === 'role' + i,
+        rowStyle: "display:grid;grid-template-columns:16px 76px 1fr 124px 22px;gap:10px;align-items:center;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:9px 11px;background:#faf7f0",
+        dotStyle: "width:9px;height:9px;border-radius:50%;background:" + (VENDOR_COLOR[p[0]] || '#8a8377'),
+        roleStyle: "display:flex;align-items:center;justify-content:space-between;gap:6px;font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:6px 8px;cursor:pointer;user-select:none",
+        onRole: e => { e.stopPropagation(); if (!this.guard()) return; this.setState(s => ({ menu: s.menu === 'role' + i ? null : 'role' + i })); },
+        roleItems: ROLES.map(r => menuItem(r, r === p[2], e => { e.stopPropagation(); this.edit(x => { x.providers[i][2] = r; }); })),
+        removeHint: last ? '최소 1개는 남아야 합니다' : '이 프로바이더 제거',
+        removeStyle: "font:400 12px/1 'IBM Plex Sans KR',sans-serif;text-align:center;color:" + (last || !owner ? '#d3cec2' : '#8a8377') + ";cursor:" + (last || !owner ? 'not-allowed' : 'pointer'),
+        onRemove: e => {
+          e.stopPropagation();
+          if (!this.guard()) return;
+          if (last) { this.toast('최소 1개의 프로바이더가 필요합니다 — 지우면 이 작업이 미배정이 됩니다', 'warn'); return; }
+          this.edit(x => {
+            const v = x.providers[i][0];
+            x.providers.splice(i, 1);
+            if (!x.providers.some(q => q[0] === v)) x.fallback = x.fallback.filter(f => f !== v);
+            if (x.providers.length < 2 && x.mode === 'concurrent') x.mode = 'single';
+          });
+        }
+      };
+    }) : [];
+
+    const fallback = d ? d.fallback.map((v, i) => ({
+      label: (i + 1) + '차 ' + v, arrow: i ? '→' : '',
+      arrowStyle: i ? "font:400 11px/1 'IBM Plex Mono',monospace;color:#bdb6a8;margin-right:2px" : 'display:none',
+      style: "display:inline-flex;align-items:center;gap:6px;background:#faf7f0;border:1px solid " + (VENDOR_COLOR[v] || '#8a8377') + "66;border-left:3px solid " + (VENDOR_COLOR[v] || '#8a8377') + ";border-radius:5px;padding:6px 9px",
+      upStyle: "font:500 10px/1 'IBM Plex Mono',monospace;color:" + (i === 0 ? '#d3cec2' : '#6f6a61') + ";cursor:" + (i === 0 ? 'not-allowed' : 'pointer'),
+      downStyle: "font:500 10px/1 'IBM Plex Mono',monospace;color:" + (i === d.fallback.length - 1 ? '#d3cec2' : '#6f6a61') + ";cursor:" + (i === d.fallback.length - 1 ? 'not-allowed' : 'pointer'),
+      removeStyle: "font:400 10px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;margin-left:2px",
+      onUp: e => { e.stopPropagation(); if (i === 0 || !this.guard()) return; this.edit(x => { const t = x.fallback[i - 1]; x.fallback[i - 1] = x.fallback[i]; x.fallback[i] = t; }); },
+      onDown: e => { e.stopPropagation(); if (i === d.fallback.length - 1 || !this.guard()) return; this.edit(x => { const t = x.fallback[i + 1]; x.fallback[i + 1] = x.fallback[i]; x.fallback[i] = t; }); },
+      onRemove: e => { e.stopPropagation(); if (!this.guard()) return; this.edit(x => { x.fallback.splice(i, 1); }); }
+    })) : [];
+
+    const catalogItems = CATALOG.map(([vendor, model]) => {
+      const used = d && d.providers.some(p => p[1] === model);
+      return { vendor, model, state: used ? '이미 참여' : '',
+        dotStyle: "width:8px;height:8px;flex:none;border-radius:50%;background:" + VENDOR_COLOR[vendor],
+        style: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:5px;cursor:" + (used ? 'not-allowed' : 'pointer') + ";opacity:" + (used ? '.45' : '1'),
+        onClick: e => { e.stopPropagation(); if (used || !this.guard()) return;
+          this.edit(x => { x.providers.push([vendor, model, x.providers.length ? '교차 확인' : '주']); }); } };
+    });
+
+    const fallbackCandidates = d ? Array.from(new Set(d.providers.map(p => p[0]))).filter(v => d.fallback.indexOf(v) < 0)
+      .map(v => menuItem(v, false, e => { e.stopPropagation(); if (!this.guard()) return; this.edit(x => { x.fallback.push(v); }); })) : [];
+    if (d && !fallbackCandidates.length) fallbackCandidates.push(menuItem('추가할 프로바이더가 없습니다 — 먼저 집합에 넣으세요', false, e => e.stopPropagation()));
+
+    const promptList = d ? (PROMPTS[d.key] || []) : [];
+    const promptAt = d ? ((promptList.find(p => p[0] === d.prompt) || ['', ''])[1]) : '';
+
+    const addTaskItems = TASK_CATALOG.filter(t => usedTaskKeys.indexOf(t[0]) < 0).map(t =>
+      Object.assign(menuItem(t[1], false, e => {
+        e.stopPropagation();
+        if (!this.guard()) return;
+        const created = { key: t[0], mode: 'single', providers: [['Claude', 'claude-opus-4-8', '주']], fallback: [], prompt: (PROMPTS[t[0]] || [['—', '']])[0][0] };
+        this.setState(s => ({ tasks: s.tasks.concat([created]), selKey: t[0], draft: clone(created), menu: null }));
+        this.toast(t[1] + ' 작업을 추가했습니다 — 저장해야 이력에 남습니다', 'ok');
+      }), { key: t[0] }));
+    if (!addTaskItems.length) addTaskItems.push(Object.assign(menuItem('추가할 작업이 없습니다 — 목록은 4종으로 닫혀 있습니다', false, e => e.stopPropagation()), { key: '' }));
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:16px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 14px;text-align:center' : '0 16px 14px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed, menu: null })); },
+      onRootClick: () => { if (st.menu) this.setState({ menu: null }); },
+
+      roles: [['owner', 'owner'], ['operator', 'operator']].map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ role: k, menu: null }); },
+        style: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.role === k ? '#f7f4ee' : '#6f6a61') + ";background:" + (st.role === k ? '#26231e' : '#fffdf9') + ";padding:6px 9px;cursor:pointer;user-select:none" })),
+
+      tabs: [['assign', '배정', String(st.tasks.length)], ['history', '변경 이력', String(st.history.length)]].map(([k, label, count]) => {
+        const on = st.tab === k;
+        return { label, count, onClick: e => { e.stopPropagation(); this.setState({ tab: k, menu: null }); },
+          style: "display:flex;align-items:center;gap:7px;font:" + (on ? '600' : '400') + " 12.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#26231e' : '#8a8377') +
+            ";border-bottom:2px solid " + (on ? '#26231e' : 'transparent') + ";cursor:pointer;padding:0 2px;user-select:none",
+          countStyle: "font:500 10.5px/1 'IBM Plex Mono',monospace;color:" + (on ? '#6f6a61' : '#a09889') + ";background:#f2eee5;border-radius:4px;padding:3px 5px" };
+      }),
+      isAssignTab: st.tab === 'assign', isHistoryTab: st.tab === 'history',
+
+      taskCount: st.tasks.length, taskRows, noTasks: st.tasks.length === 0,
+      addTaskNote: st.tasks.length >= TASK_CATALOG.length ? '4종 모두 배정됨 — 목록은 닫혀 있습니다' : '배정되지 않은 작업이 있습니다',
+      addTaskStyle: "font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner ? '#26231e' : '#bdb6a8') + ";border-radius:5px;padding:7px 11px;cursor:pointer;user-select:none",
+      onOpenAddTask: e => { e.stopPropagation(); this.setState(s => ({ menu: s.menu === 'addTask' ? null : 'addTask' })); },
+      addTaskOpen: st.menu === 'addTask', addTaskItems,
+
+      hasSel: !!d, noSel: !d,
+      sel: d ? {
+        name: meta(d.key)[1], key: d.key, prompt: d.prompt, promptAt, promptBody: PROMPT_BODY[d.key] || '',
+        setLabel: d.mode === 'concurrent' ? '참여 프로바이더 — 동시 호출 후 수렴 판정' : '배정 프로바이더',
+        setNote: d.mode === 'concurrent' ? '집합에는 순서가 없습니다 — 역할만 바꿉니다' : '주 프로바이더 1곳 + 폴백',
+        fallbackNote: d.fallback.length ? '순서가 곧 1·2·3차입니다 — ↑↓로 바꿉니다' : '폴백을 추가하지 않으면 실패를 그대로 남깁니다'
+      } : {},
+      modeOptions: [['concurrent', '동시 호출·수렴'], ['single', '단일 + 폴백']].map(([k, label]) => {
+        const on = d && d.mode === k;
+        return { label,
+          onClick: e => { e.stopPropagation(); if (!this.guard() || !d) return;
+            if (k === 'concurrent' && d.providers.length < 2) { this.toast('동시 호출은 프로바이더가 2곳 이상이어야 합니다', 'warn'); return; }
+            this.edit(x => { x.mode = k; }); },
+          style: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f7f4ee' : '#6f6a61') + ";background:" + (on ? '#26231e' : '#fffdf9') + ";padding:7px 10px;cursor:pointer;user-select:none" };
+      }),
+      deleteTaskStyle: "font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? RED : '#b3ac9e') + ";background:#fffdf9;border:1px solid " + (owner ? RED + '55' : 'rgba(0,0,0,.12)') + ";border-radius:5px;padding:7px 10px;cursor:pointer;user-select:none",
+      onDeleteTask: e => {
+        e.stopPropagation();
+        if (!this.guard() || !d) return;
+        const name = meta(d.key)[1];
+        this.setState(s => {
+          const tasks = s.tasks.filter(t => t.key !== d.key);
+          const next = tasks[0] || null;
+          return { tasks, selKey: next ? next.key : null, draft: next ? clone(next) : null, menu: null,
+            history: [{ at: '2026-08-13 15:' + String(10 + s.history.length).slice(-2), who: '사장님', what: d.key + ' 배정 삭제', why: '작업 배정 해제', ver: 'v' + (s.ver + 1) }].concat(s.history),
+            ver: s.ver + 1 };
+        });
+        this.toast(name + ' 배정을 삭제했습니다 — 이력에 남았습니다 (실행에는 여전히 미적용)', 'ok');
+      },
+
+      providers, fallback, fallbackEmpty: !!d && d.fallback.length === 0,
+      addProviderStyle: "display:inline-flex;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#26231e' : '#b3ac9e') + ";background:#fffdf9;border:1px dashed rgba(0,0,0,.24);border-radius:5px;padding:8px 11px;cursor:pointer;user-select:none",
+      onOpenAddProvider: e => { e.stopPropagation(); if (!this.guard()) return; this.setState(s => ({ menu: s.menu === 'addProv' ? null : 'addProv' })); },
+      addProviderOpen: st.menu === 'addProv', catalogItems,
+      addFallbackStyle: "display:inline-flex;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#26231e' : '#b3ac9e') + ";background:#fffdf9;border:1px dashed rgba(0,0,0,.24);border-radius:5px;padding:8px 11px;cursor:pointer;user-select:none",
+      onOpenAddFallback: e => { e.stopPropagation(); if (!this.guard()) return; this.setState(s => ({ menu: s.menu === 'addFb' ? null : 'addFb' })); },
+      addFallbackOpen: st.menu === 'addFb', fallbackCandidates,
+
+      promptBtnStyle: "font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#5b564d' : '#b3ac9e') + ";border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:4px 8px;cursor:pointer;user-select:none",
+      onOpenPrompt: e => { e.stopPropagation(); if (!this.guard()) return; this.setState(s => ({ menu: s.menu === 'prompt' ? null : 'prompt' })); },
+      promptOpen: st.menu === 'prompt',
+      promptItems: promptList.map(([label, at]) => Object.assign(
+        menuItem(label, d && d.prompt === label, e => { e.stopPropagation(); this.edit(x => { x.prompt = label; }); }), { at })),
+
+      dirty: diffs.length > 0, diffs,
+      footNote: owner ? (diffs.length ? '저장하면 즉시 반영되고 이력에 남습니다 — 다만 연동 보류라 호출은 아직 없습니다' : '변경 사항이 없습니다')
+        : '권한이 부족합니다 (필요: owner, 현재: operator) — 조회만 가능합니다',
+      footNoteStyle: "font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#8a8377' : RED) + ";flex:1;min-width:0",
+      revertStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (diffs.length ? '#5b564d' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer",
+      saveStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner && diffs.length ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner && diffs.length ? '#26231e' : '#bdb6a8') + ";border:none;border-radius:5px;padding:9px 15px;cursor:pointer",
+      onRevert: e => { e.stopPropagation(); const t = this.saved(); if (!t) return;
+        if (!diffs.length) { this.toast('되돌릴 변경이 없습니다', 'warn'); return; }
+        this.setState({ draft: clone(t), menu: null }); this.toast('저장 전 상태로 되돌렸습니다', 'ok'); },
+      onSave: e => {
+        e.stopPropagation();
+        if (!this.guard() || !d) return;
+        if (!diffs.length) { this.toast('변경 사항이 없습니다', 'warn'); return; }
+        if (d.mode === 'concurrent' && d.providers.length < 2) { this.toast('동시 호출은 프로바이더가 2곳 이상이어야 합니다 (400)', 'err'); return; }
+        const entries = diffs.map((what, i) => ({ at: '2026-08-13 15:' + String(20 + i).slice(-2), who: '사장님', what, why: '화면에서 직접 변경', ver: 'v' + (st.ver + 1) }));
+        this.setState(s => ({ tasks: s.tasks.map(t => t.key === d.key ? clone(d) : t), ver: s.ver + 1, menu: null, history: entries.concat(s.history) }));
+        this.toast('저장했습니다 — 이력 ' + entries.length + '건 기록. 연동 보류 상태라 실행에는 미적용입니다.', 'ok');
+      },
+
+      history: st.history.map((h, i) => ({ at: h.at, who: h.who, what: h.what, why: h.why, ver: h.ver,
+        style: "display:grid;grid-template-columns:150px 96px 1fr 1fr 90px;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.06);background:" + (i === 0 ? '#f0ece1' : 'transparent') })),
+
+      conflicts: [
+        { date:'2026-07-21', title:'LLM 실연동 파일럿 보류', badge:'프로바이더 1개', desc:'Claude Opus 4.8 단일, 팝콘톡 파일럿 한정. 별도 승인 전까지 실행 없음.',
+          style:"border:1px solid rgba(0,0,0,.12);background:#fffdf9;border-radius:6px;padding:9px 11px",
+          badgeStyle:"font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61;background:#f2eee5;border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:4px 7px" },
+        { date:'2026-08-09', title:'UX-14 부속 · AI 축', badge:'프로바이더 3개 — 이 화면이 채택', desc:'Codex·Claude·Gemini 역할분담 + 폴백. 교차 검증은 주목적이 아님.',
+          style:"border:1.5px solid #26231e;background:#fffdf9;border-radius:6px;padding:9px 11px",
+          badgeStyle:"font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#f7f4ee;background:#26231e;border-radius:4px;padding:4px 7px" }
+      ],
+
+      toasts: st.toasts.map(t => ({ msg: t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'),
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

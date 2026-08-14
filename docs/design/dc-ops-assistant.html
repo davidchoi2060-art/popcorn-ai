@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+input,textarea{font-family:'IBM Plex Sans KR',sans-serif}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="운영 도우미 설정" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="12">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px;z-index:5">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">AI 관리</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">운영 도우미 설정</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-AI-070</span>
+      <span style="flex:1"></span>
+      <span style="font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">편집 owner 전용 · 현재</span>
+      <div data-keep="1" style="display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden">
+        <sc-for list="{{ roles }}" as="r" hint-placeholder-count="2">
+          <div onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div style="flex:none;margin:12px 18px 0;display:flex;gap:10px">
+      <div style="flex:1;border:1px solid rgba(0,0,0,.14);background:#f2eee5;border-left:3px solid #8a8377;border-radius:7px;padding:10px 13px">
+        <div style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:3px">도우미는 읽기만 합니다 — 시스템에 쓰기 액션은 없습니다</div>
+        <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">첫 릴리스 고정값이라 이 화면에 끄고 켜는 옵션 자체를 두지 않습니다. 이 화면에서 하는 편집은 <b>도우미가 답할 내용</b>을 고치는 것입니다.</div>
+      </div>
+      <div style="flex:1;border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:10px 13px">
+        <div style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:3px">자유 질문에는 아직 답하지 않습니다</div>
+        <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">LLM 연동 보류(2026-07-21). 위젯은 FAQ 문자열 매칭만 하고, 매칭이 안 되면 "아직 자유 질문에는 답할 수 없습니다"라고 답합니다.</div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px">
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+          <div style="flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.09);background:#f4f0e7;display:flex;align-items:center;padding:0 13px;gap:9px">
+            <span style="font:600 11.5px/1 'IBM Plex Sans KR',sans-serif">FAQ {{ faqCount }}개</span>
+            <span style="font:400 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#8a8377">위젯이 위에서부터 이 순서로 보여줍니다</span>
+            <span style="flex:1"></span>
+            <span style="{{ brokenChipStyle }}">{{ brokenChip }}</span>
+            <span onClick="{{ onAdd }}" style="{{ addStyle }}">+ FAQ 추가</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto">
+            <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="5">
+              <div onClick="{{ f.onClick }}" data-keep="1" style="{{ f.style }}">
+                <span style="display:flex;flex-direction:column;gap:2px;flex:none;padding-top:1px">
+                  <span onClick="{{ f.onUp }}" style="{{ f.upStyle }}">↑</span>
+                  <span onClick="{{ f.onDown }}" style="{{ f.downStyle }}">↓</span>
+                </span>
+                <span style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0">
+                  <span style="display:flex;align-items:center;gap:8px">
+                    <span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#a09889">{{ f.no }}</span>
+                    <span style="font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.question }}</span>
+                  </span>
+                  <span style="font:400 11px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.answer }}</span>
+                  <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <sc-for list="{{ f.links }}" as="l" hint-placeholder-count="1">
+                      <span style="{{ l.style }}">{{ l.label }}</span>
+                    </sc-for>
+                  </span>
+                </span>
+                <span onClick="{{ f.onDelete }}" title="{{ f.deleteHint }}" style="{{ f.deleteStyle }}">✕</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+          <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:10px">
+            <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">답할 범위</span>
+            <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1;min-width:0">도우미가 읽어도 되는 데이터입니다. 잠긴 항목은 끌 수 없습니다 — 개인정보·매입 원가는 답변 대상이 아닙니다.</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:7px">
+            <sc-for list="{{ scopes }}" as="s" hint-placeholder-count="8">
+              <span onClick="{{ s.onClick }}" title="{{ s.hint }}" style="{{ s.style }}">
+                <span style="{{ s.markStyle }}">{{ s.mark }}</span>
+                <span>{{ s.label }}</span>
+              </span>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:352px;flex:none;display:flex;flex-direction:column;gap:12px">
+        <div style="flex:none;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">바로가기 점검</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ linkAudit }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="{{ l.chipStyle }}">{{ l.chip }}</span>
+                <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ l.desc }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:9px;padding-top:9px;border-top:1px solid rgba(0,0,0,.1)">위젯은 admin2 공통 레이아웃에 이미 실려 모든 화면에 떠 있습니다. 기존 링크는 상대경로라 admin2에서는 없는 주소로 풀립니다 — 서랍에서 실제 경로로 바꾸세요.</div>
+        </div>
+
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:10px">위젯 미리보기</div>
+          <div style="flex:1;min-height:0;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:#f4f0e7;display:flex;flex-direction:column;overflow:hidden">
+            <div style="flex:none;padding:10px 12px;background:#211f1b;color:#f4f1ea;display:flex;align-items:center;gap:8px">
+              <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.6 0.13 165)"></span>
+              <span style="font:600 11.5px/1.3 'IBM Plex Sans KR',sans-serif">운영 도우미</span>
+              <span style="flex:1"></span>
+              <span style="font:400 10px/1 'IBM Plex Sans KR',sans-serif;opacity:.6">읽기 전용</span>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:11px;display:flex;flex-direction:column;gap:7px">
+              <div style="align-self:flex-start;max-width:88%;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-radius:8px 8px 8px 3px;padding:8px 10px;font:400 11px/1.6 'IBM Plex Sans KR',sans-serif">무엇을 도와드릴까요? 아래에서 골라 주세요.</div>
+              <sc-for list="{{ previewChips }}" as="p" hint-placeholder-count="5">
+                <span style="align-self:flex-end;max-width:92%;background:#26231e;color:#f4f1ea;border-radius:8px 8px 3px 8px;padding:7px 10px;font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif">{{ p }}</span>
+              </sc-for>
+              <div style="align-self:flex-start;max-width:88%;background:#fffdf9;border:1px dashed rgba(0,0,0,.18);border-radius:8px;padding:8px 10px;font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377">그 밖의 질문에는 아직 답할 수 없습니다 — 자유 질문 응답은 연동 후에 열립니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ onClose }}" style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7"></div>
+      <div data-keep="1" style="position:absolute;top:52px;right:0;bottom:0;width:560px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8">
+        <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px">
+          <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0">FAQ 편집</span>
+          <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ d.no }}</span>
+          <span onClick="{{ onClose }}" style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:7px">질문</div>
+            <input value="{{ d.question }}" onChange="{{ onQuestion }}" style="{{ d.inputStyle }}">
+          </div>
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:7px">답변</div>
+            <textarea value="{{ d.answer }}" onChange="{{ onAnswer }}" style="{{ d.textareaStyle }}"></textarea>
+          </div>
+
+          <div data-keep="1">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+              <span style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">바로가기 (최대 2개)</span>
+              <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889">지금 존재하는 화면만 고를 수 있습니다</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ d.links }}" as="l" hint-placeholder-count="2">
+                <div style="border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:9px 11px;background:#faf7f0;position:relative">
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <input value="{{ l.label }}" onChange="{{ l.onLabel }}" style="{{ l.labelStyle }}">
+                    <span onClick="{{ l.onOpen }}" style="{{ l.pathStyle }}">
+                      <span>{{ l.path }}</span>
+                      <span style="font-size:8px;opacity:.55">▼</span>
+                    </span>
+                    <span onClick="{{ l.onRemove }}" style="font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer">✕</span>
+                  </div>
+                  <div style="{{ l.warnStyle }}">{{ l.warn }}</div>
+                  <sc-if value="{{ l.open }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:40px;right:34px;z-index:30;min-width:246px;max-height:250px;overflow:auto;background:#fffdf9;border:1px solid rgba(0,0,0,.2);border-radius:7px;box-shadow:0 10px 26px rgba(38,35,30,.16);padding:4px">
+                      <sc-for list="{{ l.options }}" as="o" hint-placeholder-count="6">
+                        <div onClick="{{ o.onClick }}" style="{{ o.style }}">
+                          <span style="flex:1;min-width:0">{{ o.label }}</span>
+                          <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#a09889">{{ o.path }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <span onClick="{{ onAddLink }}" style="{{ addLinkStyle }}">+ 바로가기 추가</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ dirty }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid #26231e;border-left:3px solid #26231e;background:#f6f2e8;border-radius:6px;padding:10px 12px">
+              <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:6px">변경됨 · 저장 필요</div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <sc-for list="{{ diffs }}" as="x" hint-placeholder-count="2">
+                  <div style="font:400 10.5px/1.5 'IBM Plex Mono',monospace;color:#4a463e">{{ x }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+          <span style="{{ footNoteStyle }}">{{ footNote }}</span>
+          <button onClick="{{ onRevert }}" style="{{ revertStyle }}">되돌리기</button>
+          <button onClick="{{ onSave }}" style="{{ saveStyle }}">저장</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:460px">{{ t.msg }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)';
+
+const ROUTES = [
+  ['대시보드','/admin2', true],
+  ['상품 관리','/admin2/products', true],
+  ['조립 호환 지도','/admin2/build-map', true],
+  ['조립 사양 표준','/admin2/spec-standard', true],
+  ['작업 현황판','/admin2/dash', true],
+  ['웹 사양 채움','/admin2/spec-fill', true],
+  ['상품 사양 검수','/admin2/reviews', false],
+  ['매입·소싱(단가표)','/admin2/sourcing', false],
+  ['재고 입고','/admin2/stock-inbound', false],
+  ['활동 로그','/admin2/activity-logs', false]
+];
+
+const INIT_FAQS = [
+  { q:'검수 대기가 왜 안 줄어드나요?', a:'수집이 계속 들어와 대기가 유지될 수 있습니다. 상품 사양 검수에서 덩어리별 건수를 먼저 확인하세요.',
+    links:[['검수 큐 열기','review-queue.html'],['후보 풀 보기','candidate-pool.html']] },
+  { q:'이 상품이 왜 추천 후보에 없나요?', a:'필수 사양이 비었거나 검수 대기가 남아 있으면 후보 게이트가 열리지 않습니다.',
+    links:[['후보 풀 보기','candidate-pool.html']] },
+  { q:'마진율은 어디서 바꾸나요?', a:'카테고리 마진 정책에서 바꿉니다. 변경은 이력에 남습니다.',
+    links:[['마진 정책','margin-policy.html']] },
+  { q:'단가표를 반영하려면?', a:'단가표를 올린 뒤 검토 화면에서 확정해야 반영됩니다.',
+    links:[['단가표 올리기','price-import.html'],['단가 검토','price-review.html']] },
+  { q:'입고 등록은 어디서 하나요?', a:'재고 입고에서 등록하고, 처리 결과는 활동 로그에서 확인합니다.',
+    links:[['재고 입고','stock-inbound.html'],['활동 로그','activity-logs.html']] }
+];
+
+const SCOPES = [
+  ['상품 사양', true, false, ''], ['재고 수량', true, false, ''], ['검수 상태', true, false, ''],
+  ['조립 호환 판정', true, false, ''], ['주문 상태', false, false, ''], ['판매가', false, false, ''],
+  ['회원 개인정보', false, true, '개인정보 — 답변 대상이 될 수 없습니다'],
+  ['매입가·마진', false, true, '원가 정보 — 답변 대상이 될 수 없습니다'],
+  ['관리자 계정', false, true, '권한 정보 — 답변 대상이 될 수 없습니다']
+];
+
+const routeOf = path => ROUTES.find(r => r[1] === path);
+const clone = f => ({ q:f.q, a:f.a, links: f.links.map(l => l.slice()) });
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const faqs = INIT_FAQS.map(clone);
+    this.state = { faqs, sel:null, drawer:false, draft:null, role:'owner', navCollapsed:false,
+      menu:null, toasts:[], scopes: SCOPES.map(s => s[1]) };
+    this.tid = 0;
+  }
+
+  toast(msg, kind) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 6500);
+  }
+
+  guard() {
+    if (this.state.role !== 'owner') { this.toast('권한이 부족합니다 (필요: owner, 현재: viewer) — 조회만 가능합니다', 'err'); return false; }
+    return true;
+  }
+
+  diffs() {
+    const st = this.state;
+    if (st.sel == null || !st.draft) return [];
+    const a = st.faqs[st.sel], b = st.draft, out = [];
+    if (!a) return [];
+    if (a.q !== b.q) out.push('question: "' + a.q + '" → "' + b.q + '"');
+    if (a.a !== b.a) out.push('answer: 본문 수정됨');
+    const fmt = ls => ls.map(l => l[0] + '→' + l[1]).join(', ') || '없음';
+    if (fmt(a.links) !== fmt(b.links)) out.push('links: [' + fmt(a.links) + '] → [' + fmt(b.links) + ']');
+    return out;
+  }
+
+  edit(fn) { this.setState(s => { const d = clone({ q:s.draft.q, a:s.draft.a, links:s.draft.links }); fn(d); return { draft:d }; }); }
+
+  open(i) {
+    if (this.diffs().length) { this.toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 옮기세요', 'warn'); return; }
+    this.setState(s => (s.sel === i && s.drawer) ? { sel:null, drawer:false, draft:null }
+      : { sel:i, drawer:true, draft: clone(s.faqs[i]), menu:null });
+  }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed, owner = st.role === 'owner';
+    const diffs = this.diffs();
+    const d = st.draft;
+    const brokenCount = st.faqs.reduce((n, f) => n + f.links.filter(l => !routeOf(l[1])).length, 0);
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === '운영 도우미 설정';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '7px 0;justify-content:center' : '7px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const faqs = st.faqs.map((f, i) => {
+      const on = i === st.sel && st.drawer, last = st.faqs.length <= 1;
+      return {
+        no: 'FAQ ' + (i + 1), question: f.q, answer: f.a,
+        links: f.links.map(l => {
+          const r = routeOf(l[1]);
+          return { label: (r ? '→ ' : '⚠ ') + l[0] + ' · ' + l[1],
+            style: "font:400 10px/1.3 'IBM Plex Mono',monospace;color:" + (r ? '#6f6a61' : AMBER) +
+              ";background:" + (r ? '#f2eee5' : 'oklch(0.95 0.04 70)') + ";border:1px solid " + (r ? 'rgba(0,0,0,.1)' : AMBER + '55') + ";border-radius:4px;padding:4px 7px" };
+        }),
+        onClick: () => this.open(i),
+        style: "display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:" +
+          (on ? '#f0ece1' : 'transparent') + ";border-left:3px solid " + (on ? '#26231e' : 'transparent'),
+        upStyle: "font:500 9px/1 'IBM Plex Mono',monospace;color:" + (i === 0 ? '#d3cec2' : '#6f6a61') + ";cursor:" + (i === 0 ? 'not-allowed' : 'pointer'),
+        downStyle: "font:500 9px/1 'IBM Plex Mono',monospace;color:" + (i === st.faqs.length - 1 ? '#d3cec2' : '#6f6a61') + ";cursor:" + (i === st.faqs.length - 1 ? 'not-allowed' : 'pointer'),
+        onUp: e => { e.stopPropagation(); if (i === 0 || !this.guard()) return;
+          this.setState(s => { const arr = s.faqs.slice(); const t = arr[i - 1]; arr[i - 1] = arr[i]; arr[i] = t; return { faqs: arr, sel: s.sel === i ? i - 1 : s.sel }; }); },
+        onDown: e => { e.stopPropagation(); if (i === st.faqs.length - 1 || !this.guard()) return;
+          this.setState(s => { const arr = s.faqs.slice(); const t = arr[i + 1]; arr[i + 1] = arr[i]; arr[i] = t; return { faqs: arr, sel: s.sel === i ? i + 1 : s.sel }; }); },
+        deleteHint: last ? 'FAQ는 최소 1개가 남아야 합니다' : '이 FAQ 삭제',
+        deleteStyle: "font:400 12px/1 'IBM Plex Sans KR',sans-serif;flex:none;padding-top:2px;color:" + (last || !owner ? '#d3cec2' : '#8a8377') + ";cursor:" + (last || !owner ? 'not-allowed' : 'pointer'),
+        onDelete: e => {
+          e.stopPropagation();
+          if (!this.guard()) return;
+          if (last) { this.toast('FAQ는 최소 1개가 남아야 합니다 — 0개가 되면 위젯이 답할 것이 없습니다', 'warn'); return; }
+          this.setState(s => ({ faqs: s.faqs.filter((_, j) => j !== i), sel:null, drawer:false, draft:null }));
+          this.toast('FAQ를 삭제했습니다 — 위젯에 즉시 반영됩니다', 'ok');
+        }
+      };
+    });
+
+    const linkAudit = [
+      { chip:'⚠ ' + brokenCount + '곳', color:AMBER, bg:'oklch(0.95 0.04 70)', desc:'admin2에 없는 주소를 가리킵니다(상대경로로 저장돼 있음).' },
+      { chip:'미구축', color:'#5b564d', bg:'#f2eee5', desc:'상품 사양 검수·매입·소싱처럼 아직 안 지은 화면은 목록에서 고를 수 없습니다.' },
+      { chip:'✓ 정상', color:GREEN, bg:'oklch(0.95 0.03 165)', desc:'지금 존재하는 admin2 경로만 저장할 수 있습니다.' }
+    ].map(l => ({ chip:l.chip, desc:l.desc,
+      chipStyle:"font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + l.color + ";background:" + l.bg + ";border:1px solid " + l.color + "44;border-radius:4px;padding:5px 8px;white-space:nowrap;flex:none" }));
+
+    const scopes = SCOPES.map(([label, , locked, hint], i) => {
+      const on = locked ? false : st.scopes[i];
+      return { label, hint: locked ? hint : (on ? '답변에 쓸 수 있음' : '답변에 쓰지 않음'),
+        mark: locked ? '🔒' : (on ? '●' : '○'),
+        markStyle: "font:600 10px/1 'IBM Plex Mono',monospace;color:" + (locked ? '#a09889' : (on ? GREEN : '#bdb6a8')),
+        onClick: e => {
+          e.stopPropagation();
+          if (locked) { this.toast(label + '은(는) 답변 대상이 될 수 없습니다 — 잠긴 항목입니다', 'warn'); return; }
+          if (!this.guard()) return;
+          this.setState(s => { const arr = s.scopes.slice(); arr[i] = !arr[i]; return { scopes: arr }; });
+          this.toast(label + (on ? '을(를) 답변 범위에서 뺐습니다' : '을(를) 답변 범위에 넣었습니다'), 'ok');
+        },
+        style: "display:flex;align-items:center;gap:7px;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (locked ? '#a09889' : '#26231e') +
+          ";background:" + (locked ? '#f2eee5' : (on ? '#f6f2e8' : '#fffdf9')) + ";border:1px solid " + (locked ? 'rgba(0,0,0,.1)' : (on ? '#26231e' : 'rgba(0,0,0,.18)')) +
+          ";border-radius:14px;padding:8px 12px;cursor:" + (locked ? 'not-allowed' : 'pointer') + ";user-select:none" };
+    });
+
+    const links = d ? d.links.map((l, i) => {
+      const r = routeOf(l[1]);
+      return { label: l[0], path: l[1], open: st.menu === 'link' + i,
+        labelStyle: "flex:1;min-width:0;font:500 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#26231e;background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,.18);outline:none;padding:0 0 3px",
+        pathStyle: "display:flex;align-items:center;gap:6px;font:400 10.5px/1 'IBM Plex Mono',monospace;color:" + (r ? '#26231e' : AMBER) +
+          ";background:#fffdf9;border:1px solid " + (r ? 'rgba(0,0,0,.18)' : AMBER) + ";border-radius:5px;padding:6px 8px;cursor:pointer;max-width:208px;overflow:hidden;white-space:nowrap",
+        warn: r ? '' : 'admin2에는 없는 주소입니다 — 아래 목록에서 실제 경로를 고르세요',
+        warnStyle: r ? 'display:none' : "font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:" + AMBER + ";margin-top:7px",
+        onLabel: e => { const v = e.target.value; if (!this.guard()) return; this.edit(x => { x.links[i][0] = v; }); },
+        onOpen: e => { e.stopPropagation(); if (!this.guard()) return; this.setState(s => ({ menu: s.menu === 'link' + i ? null : 'link' + i })); },
+        onRemove: e => { e.stopPropagation(); if (!this.guard()) return; this.edit(x => { x.links.splice(i, 1); }); },
+        options: ROUTES.map(([label, path, exists]) => ({ label, path,
+          style: "display:flex;align-items:center;gap:9px;font:" + (l[1] === path ? '600' : '400') + " 11.5px/1.3 'IBM Plex Sans KR',sans-serif;color:" +
+            (exists ? '#26231e' : '#b3ac9e') + ";padding:7px 9px;border-radius:5px;cursor:" + (exists ? 'pointer' : 'not-allowed') +
+            ";background:" + (l[1] === path ? '#f0ece1' : 'transparent'),
+          onClick: e => { e.stopPropagation();
+            if (!exists) { this.toast(label + ' 화면은 아직 없습니다 — 지어진 뒤에 연결할 수 있습니다', 'warn'); return; }
+            this.edit(x => { x.links[i][1] = path; }); } }))
+      };
+    }) : [];
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:14px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 12px;text-align:center' : '0 16px 12px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed, menu:null })); },
+      onRootClick: e => {
+        if (e.target.closest && e.target.closest('[data-keep]')) return;
+        if (st.menu || st.drawer) this.setState({ menu:null, drawer:false });
+      },
+      onClose: e => { e.stopPropagation(); this.setState({ drawer:false, menu:null }); },
+
+      roles: [['owner','owner'],['viewer','viewer']].map(([k, label]) => ({ label,
+        onClick: e => { e.stopPropagation(); this.setState({ role:k }); },
+        style: "font:500 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (st.role === k ? '#f7f4ee' : '#6f6a61') + ";background:" + (st.role === k ? '#26231e' : '#fffdf9') + ";padding:6px 9px;cursor:pointer;user-select:none" })),
+
+      faqCount: st.faqs.length, faqs,
+      brokenChip: brokenCount ? '⚠ 깨진 바로가기 ' + brokenCount + '곳' : '✓ 바로가기 정상',
+      brokenChipStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:" + (brokenCount ? AMBER : GREEN) +
+        ";background:" + (brokenCount ? 'oklch(0.95 0.04 70)' : 'oklch(0.95 0.03 165)') + ";border:1px solid " + (brokenCount ? AMBER : GREEN) + "55;border-radius:4px;padding:5px 8px",
+      addStyle: "font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner ? '#26231e' : '#bdb6a8') + ";border-radius:5px;padding:7px 11px;cursor:pointer;user-select:none",
+      onAdd: e => {
+        e.stopPropagation();
+        if (!this.guard()) return;
+        const created = { q:'새 질문', a:'답변을 입력하세요.', links:[] };
+        this.setState(s => ({ faqs: s.faqs.concat([created]), sel: s.faqs.length, drawer:true, draft: clone(created), menu:null }));
+        this.toast('FAQ를 추가했습니다 — 질문·답변을 채우고 저장하세요', 'ok');
+      },
+
+      scopes, linkAudit,
+      previewChips: st.faqs.slice(0, 5).map(f => f.q),
+
+      drawerOpen: st.drawer && !!d,
+      d: d ? {
+        no: st.sel != null ? 'FAQ ' + (st.sel + 1) : '',
+        question: d.q, answer: d.a, links,
+        inputStyle: "width:100%;font:500 13px/1.5 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#faf7f0;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none",
+        textareaStyle: "width:100%;height:96px;resize:none;font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#faf7f0;border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:9px 11px;outline:none"
+      } : {},
+      onQuestion: e => { const v = e.target.value; if (!this.guard()) return; this.edit(x => { x.q = v; }); },
+      onAnswer: e => { const v = e.target.value; if (!this.guard()) return; this.edit(x => { x.a = v; }); },
+      addLinkStyle: "display:inline-flex;font:500 11px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#26231e' : '#b3ac9e') + ";background:#fffdf9;border:1px dashed rgba(0,0,0,.24);border-radius:5px;padding:8px 11px;cursor:pointer;user-select:none",
+      onAddLink: e => {
+        e.stopPropagation();
+        if (!this.guard() || !d) return;
+        if (d.links.length >= 2) { this.toast('바로가기는 최대 2개입니다', 'warn'); return; }
+        this.edit(x => { x.links.push(['바로가기', '/admin2']); });
+      },
+
+      dirty: diffs.length > 0, diffs,
+      footNote: owner ? (diffs.length ? '저장하면 위젯에 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
+        : '권한이 부족합니다 (필요: owner, 현재: viewer) — 조회만 가능합니다',
+      footNoteStyle: "font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:" + (owner ? '#8a8377' : RED) + ";flex:1;min-width:0",
+      revertStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (diffs.length ? '#5b564d' : '#b3ac9e') + ";background:#fffdf9;border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer",
+      saveStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (owner && diffs.length ? '#f7f4ee' : '#f0ece2') + ";background:" + (owner && diffs.length ? '#26231e' : '#bdb6a8') + ";border:none;border-radius:5px;padding:9px 15px;cursor:pointer",
+      onRevert: e => { e.stopPropagation(); if (!diffs.length) { this.toast('되돌릴 변경이 없습니다', 'warn'); return; }
+        this.setState(s => ({ draft: clone(s.faqs[s.sel]), menu:null })); this.toast('저장 전 상태로 되돌렸습니다', 'ok'); },
+      onSave: e => {
+        e.stopPropagation();
+        if (!this.guard() || !d) return;
+        if (!diffs.length) { this.toast('변경 사항이 없습니다', 'warn'); return; }
+        if (!d.q.trim()) { this.toast('질문이 비었습니다 (400: 값 형식 오류 → question)', 'err'); return; }
+        const broken = d.links.filter(l => !routeOf(l[1]));
+        if (broken.length) { this.toast('존재하지 않는 경로가 있습니다: ' + broken.map(l => l[1]).join(', ') + ' (400)', 'err'); return; }
+        this.setState(s => ({ faqs: s.faqs.map((f, i) => i === s.sel ? clone(d) : f), menu:null }));
+        this.toast('저장했습니다 — 위젯에 즉시 반영되고 이력에 남았습니다', 'ok');
+      },
+
+      toasts: st.toasts.map(t => ({ msg:t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'),
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

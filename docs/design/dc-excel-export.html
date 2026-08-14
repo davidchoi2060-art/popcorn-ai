@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes barMove{from{background-position:0 0}to{background-position:24px 0}}
+</style>
+</helmet>
+
+<div onClick="{{ onRootClick }}" data-screen-label="엑셀 다운로드 관리" style="width:1440px;height:960px;margin:0 auto;background:#f7f4ee;overflow:hidden;display:flex;position:relative;font-family:'IBM Plex Sans KR',sans-serif">
+  <nav data-keep="1" style="{{ navStyle }}">
+    <div style="{{ brandStyle }}">{{ brand }}</div>
+    <sc-for list="{{ nav }}" as="m" hint-placeholder-count="16">
+      <div title="{{ m.label }}" style="{{ m.style }}">
+        <span style="{{ m.iconStyle }}">{{ m.icon }}</span>
+        <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+      </div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div onClick="{{ onToggleNav }}" style="{{ navToggleStyle }}">
+      <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ navToggleIcon }}</span>
+      <span style="{{ navToggleLabelStyle }}">메뉴창 접기</span>
+    </div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px;z-index:5">
+      <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">시스템</span>
+      <span style="color:#c4bdae">/</span>
+      <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">엑셀 다운로드 관리</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-SYS-050</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/excel-exports</span>
+      <span style="flex:1"></span>
+      <span style="font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61">내 요청만 보입니다 · 파일 보관 30일</span>
+      <span style="width:26px;height:26px;border-radius:50%;background:#ddd7c9;border:1px solid rgba(0,0,0,.12)"></span>
+    </header>
+
+    <div style="flex:none;margin:12px 18px 0;border:1px solid oklch(0.72 0.12 62 / .55);background:oklch(0.95 0.04 70);border-left:3px solid oklch(0.62 0.15 55);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px">
+      <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.5 0.14 55);white-space:nowrap">● 가상 데이터</span>
+      <span style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif">아직 실제 요청은 0건입니다 — 아래 목록은 큐가 붙은 뒤의 모습입니다</span>
+      <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#5b564d;flex:1;min-width:0">비동기 실행 수단(큐·워커)이 0종이고 "내보내기" 발신 버튼이 붙은 화면도 아직 없습니다. 실제 화면은 서버가 돌려준 요청만 표시하며 이런 예시 행을 만들지 않습니다.</span>
+    </div>
+
+    <div style="flex:none;padding:12px 18px 0;display:flex;gap:10px">
+      <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+        <div onClick="{{ s.onClick }}" style="{{ s.style }}">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="{{ s.markStyle }}">{{ s.mark }}</span>
+            <span style="font:500 10.5px/1.3 'IBM Plex Sans KR',sans-serif;color:#7d7669">{{ s.label }}</span>
+            <span style="font:600 19px/1 'IBM Plex Mono',monospace;margin-left:auto;font-variant-numeric:tabular-nums">{{ s.count }}</span>
+          </div>
+          <div style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:4px">{{ s.note }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div style="flex:none;display:grid;grid-template-columns:1fr 118px 132px 96px 116px 104px;gap:12px;align-items:center;padding:9px 14px;background:#f4f0e7;border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#7d7669">
+          <span>대상 · 조건</span><span>요청자</span><span>요청 시각</span><span>행 수</span><span>상태</span><span>받기</span>
+        </div>
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px;overflow:auto;display:flex;flex-direction:column">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+            <div onClick="{{ r.onClick }}" data-keep="1" style="{{ r.style }}">
+              <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                <span style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="font:500 12px/1.3 'IBM Plex Sans KR',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.source }}</span>
+                  <span style="{{ r.formatStyle }}">{{ r.format }}</span>
+                </span>
+                <span style="font:400 10.5px/1.45 'IBM Plex Mono',monospace;color:#8a8377;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.filters }}</span>
+              </span>
+              <span style="font:400 11px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ r.who }}</span>
+              <span style="font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#6f6a61">{{ r.at }}</span>
+              <span style="{{ r.rowsStyle }}">{{ r.rowCount }}</span>
+              <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                <span style="{{ r.statusStyle }}">{{ r.status }}</span>
+                <sc-if value="{{ r.showBar }}" hint-placeholder-val="{{ false }}">
+                  <span style="height:4px;border-radius:2px;background:rgba(0,0,0,.09);overflow:hidden;display:block">
+                    <span style="{{ r.barStyle }}"></span>
+                  </span>
+                </sc-if>
+              </span>
+              <span onClick="{{ r.onAction }}" style="{{ r.actionStyle }}">{{ r.action }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px">
+              <div style="font:600 14px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ emptyTitle }}</div>
+              <div style="font:400 11.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#a09889;text-align:center;max-width:420px">{{ emptyDesc }}</div>
+              <div onClick="{{ onResetFilter }}" style="{{ emptyBtnStyle }}">전체 보기</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="width:328px;flex:none;display:flex;flex-direction:column;gap:12px">
+        <div style="flex:none;background:#f4f0e7;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:9px">이 화면의 규칙</div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;align-items:flex-start;gap:9px">
+                <span style="font:600 10px/1.6 'IBM Plex Mono',monospace;color:#a09889">—</span>
+                <span style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e;flex:1">{{ r }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:9px;overflow:auto">
+          <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em">왜 비동기인가 — 실측 근거</div>
+          <sc-for list="{{ reasons }}" as="r" hint-placeholder-count="4">
+            <div style="border:1px solid rgba(0,0,0,.11);border-left:3px solid #bdb6a8;background:#faf7f0;border-radius:6px;padding:9px 11px">
+              <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:4px">{{ r.title }}</div>
+              <div style="font:400 10.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ r.desc }}</div>
+              <div style="font:400 10px/1.5 'IBM Plex Mono',monospace;color:#a09889;margin-top:5px">{{ r.src }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ onClose }}" style="position:absolute;top:52px;left:0;right:0;bottom:0;background:rgba(38,35,30,.22);z-index:7"></div>
+      <div data-keep="1" style="position:absolute;top:52px;right:0;bottom:0;width:552px;background:#fffdf9;border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:8">
+        <div style="flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;flex:1;min-width:0">{{ d.source }}</span>
+            <span style="{{ d.statusStyle }}">{{ d.status }}</span>
+            <span onClick="{{ onClose }}" style="font:400 15px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;cursor:pointer;padding:2px 4px">✕</span>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 'IBM Plex Mono',monospace;color:#8a8377">
+            <span>export_id {{ d.id }}</span><span>{{ d.who }}</span><span>{{ d.at }}</span><span>{{ d.format }}</span>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:7px">요청 조건 — 요청 시점에 고정됩니다</div>
+            <div style="border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0;font:400 10.5px/1.75 'IBM Plex Mono',monospace;color:#4a463e;white-space:pre-wrap">{{ d.conditions }}</div>
+            <div style="font:400 10px/1.55 'IBM Plex Sans KR',sans-serif;color:#a09889;margin-top:6px">파일은 이 조건으로 만들어집니다 — 이후 원본 데이터가 바뀌어도 이미 만든 파일은 그대로입니다.</div>
+          </div>
+
+          <div>
+            <div style="font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;letter-spacing:.04em;margin-bottom:8px">진행</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <sc-for list="{{ d.steps }}" as="s" hint-placeholder-count="4">
+                <div style="{{ s.style }}">
+                  <span style="{{ s.markStyle }}">{{ s.mark }}</span>
+                  <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+                    <span style="font:500 11.5px/1.35 'IBM Plex Sans KR',sans-serif">{{ s.label }}</span>
+                    <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ s.note }}</span>
+                  </span>
+                  <span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#a09889">{{ s.at }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="{{ d.resultBoxStyle }}">
+            <div style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;margin-bottom:5px">{{ d.resultTitle }}</div>
+            <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ d.resultDesc }}</div>
+            <div style="{{ d.resultMetaStyle }}">{{ d.resultMeta }}</div>
+          </div>
+        </div>
+
+        <div style="flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;background:#f4f0e7">
+          <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377;flex:1;min-width:0">{{ d.footNote }}</span>
+          <button onClick="{{ onRetry }}" style="{{ d.retryStyle }}">재시도</button>
+          <button onClick="{{ onDownload }}" style="{{ d.downloadStyle }}">{{ d.downloadLabel }}</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;bottom:20px;z-index:20;display:flex;flex-direction:column-reverse;gap:8px">
+      <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+        <div style="{{ t.style }}">
+          <span style="{{ t.markStyle }}">{{ t.mark }}</span>
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;max-width:470px">{{ t.msg }}</span>
+          <span onClick="{{ t.onClose }}" style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;opacity:.55;cursor:pointer">✕</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+const NAV = [['대시보드','대'],['상품 관리','상'],['상품 사양 검수','검'],['조립 호환 지도','지'],['조립 사양 표준','표'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+const GREEN='oklch(0.5 0.11 165)', AMBER='oklch(0.62 0.15 55)', RED='oklch(0.52 0.16 30)', BLUE='oklch(0.5 0.12 250)';
+
+const S = {
+  queued:  { label:'○ 대기',   color:'#8a8377', bg:'#f2eee5' },
+  running: { label:'◐ 처리 중', color:BLUE,     bg:'oklch(0.95 0.03 250)' },
+  done:    { label:'✓ 완료',   color:GREEN,    bg:'oklch(0.95 0.03 165)' },
+  failed:  { label:'✕ 실패',   color:RED,      bg:'oklch(0.96 0.03 30)' },
+  expired: { label:'— 만료',   color:'#8a8377', bg:'#f2eee5' }
+};
+
+const INIT = [
+  { id:1043, source:'상품 관리 — 전체 카탈로그', format:'xlsx', who:'김선호(나)', at:'2026-08-13 15:41',
+    conditions:'source: products\nfilters:\n  data_origin: 실데이터\n  status: 판매중\n  part_type: 전체\nrows_estimated: 22,840',
+    status:'running', progress:38, rowCount:null, expiresAt:'', failReason:'' },
+  { id:1042, source:'작업 기록 — 2026-08 전체', format:'csv', who:'김선호(나)', at:'2026-08-13 14:02',
+    conditions:'source: activity_logs\nfilters:\n  date_from: 2026-08-01\n  date_to: 2026-08-13\n  hide_automation: false\nrows_estimated: 3,118',
+    status:'done', progress:100, rowCount:3118, expiresAt:'2026-09-12', failReason:'' },
+  { id:1041, source:'재고 이동 원장 — 창고 A', format:'xlsx', who:'김선호(나)', at:'2026-08-13 11:20',
+    conditions:'source: stock_moves\nfilters:\n  warehouse: A\n  date_from: 2026-07-01\nrows_estimated: 7,771',
+    status:'failed', progress:64, rowCount:null, expiresAt:'',
+    failReason:'배포로 API 프로세스가 재시작되며 처리 중이던 작업이 끊겼습니다. 재시작 전 상태를 완료로 처리하지 않고 실패로 남겼습니다.' },
+  { id:1040, source:'상품 사양 검수 — 대기 큐', format:'xlsx', who:'김선호(나)', at:'2026-08-13 09:55',
+    conditions:'source: product_reviews\nfilters:\n  review_status: 대기\n  chunk: B(값 없음)\nrows_estimated: 5,048',
+    status:'done', progress:100, rowCount:5048, expiresAt:'2026-09-12', failReason:'' },
+  { id:1039, source:'상품 관리 — 검수 필요분', format:'csv', who:'김선호(나)', at:'2026-07-14 16:31',
+    conditions:'source: products\nfilters:\n  review_required_yn: true\nrows_estimated: 3,234',
+    status:'expired', progress:100, rowCount:3234, expiresAt:'2026-08-13', failReason:'' },
+  { id:1038, source:'단가표 반영 이력', format:'xlsx', who:'김선호(나)', at:'2026-08-13 15:52',
+    conditions:'source: price_files\nfilters:\n  supplier: 전체\n  date_from: 2026-06-01\nrows_estimated: 14',
+    status:'queued', progress:0, rowCount:null, expiresAt:'', failReason:'' }
+];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { jobs: INIT.map(j => Object.assign({}, j)), sel:null, drawer:false, filter:null,
+      navCollapsed:false, toasts:[] };
+    this.tid = 0;
+  }
+
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      this.setState(s => ({ jobs: s.jobs.map(j => {
+        if (j.status === 'running') {
+          const p = j.progress + 6;
+          if (p >= 100) return Object.assign({}, j, { status:'done', progress:100, rowCount:22840, expiresAt:'2026-09-12' });
+          return Object.assign({}, j, { progress:p });
+        }
+        return j;
+      }) }));
+    }, 1400);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  toast(msg, kind) {
+    const id = ++this.tid;
+    this.setState(s => ({ toasts: s.toasts.concat([{ id, msg, kind }]) }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 6500);
+  }
+
+  visible() {
+    const st = this.state;
+    return st.filter ? st.jobs.filter(j => j.status === st.filter) : st.jobs;
+  }
+
+  renderVals() {
+    const st = this.state, col = st.navCollapsed;
+    const list = this.visible();
+    const sel = st.sel != null ? st.jobs.find(j => j.id === st.sel) : null;
+
+    const nav = NAV.map(([label, icon]) => {
+      const on = label === '엑셀 다운로드 관리';
+      return { label, icon,
+        style: "display:flex;align-items:center;gap:10px;padding:" + (col ? '5px 0;justify-content:center' : '5px 16px') +
+          ";font:500 12.5px/1.35 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') +
+          ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent') + ';border-left:2px solid ' + (on ? GREEN : 'transparent') + ';cursor:pointer',
+        iconStyle: "flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;color:" +
+          (on ? '#211f1b' : '#cfc9bd') + ';background:' + (on ? GREEN : 'rgba(255,255,255,.07)'),
+        labelStyle: col ? 'display:none' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis' };
+    });
+
+    const chip = (s, big) => "font:600 " + (big ? '10.5px' : '10px') + "/1 'IBM Plex Sans KR',sans-serif;color:" + S[s].color +
+      ";background:" + S[s].bg + ";border:1px solid " + S[s].color + "44;border-radius:4px;padding:5px 8px;white-space:nowrap;text-align:center";
+
+    const rows = list.map(j => {
+      const on = j.id === st.sel && st.drawer;
+      const canGet = j.status === 'done';
+      return {
+        source: j.source, filters: j.conditions.split('\n')[0].replace('source: ', 'source ') + ' · ' + (j.rowCount ? j.rowCount.toLocaleString() + '행' : '예상 ' + (j.conditions.match(/rows_estimated: ([\d,]+)/) || [,'—'])[1] + '행'),
+        format: j.format.toUpperCase(),
+        formatStyle: "font:600 9.5px/1 'IBM Plex Mono',monospace;color:#5b564d;background:#f2eee5;border:1px solid rgba(0,0,0,.12);border-radius:3px;padding:3px 5px;white-space:nowrap",
+        who: j.who, at: j.at,
+        rowCount: j.rowCount ? j.rowCount.toLocaleString() : '—',
+        rowsStyle: "font:400 11px/1.3 'IBM Plex Mono',monospace;color:" + (j.rowCount ? '#26231e' : '#b3ac9e') + ";text-align:right",
+        status: S[j.status].label, statusStyle: chip(j.status),
+        showBar: j.status === 'running',
+        barStyle: "display:block;height:100%;width:" + j.progress + "%;background:" + BLUE,
+        action: canGet ? '받기' : (j.status === 'failed' ? '재시도' : (j.status === 'expired' ? '다시 요청' : '—')),
+        actionStyle: "font:600 10.5px/1 'IBM Plex Sans KR',sans-serif;text-align:center;color:" +
+          (canGet ? '#f7f4ee' : (j.status === 'failed' || j.status === 'expired' ? '#26231e' : '#c4bdae')) +
+          ";background:" + (canGet ? '#26231e' : '#fffdf9') + ";border:1px solid rgba(0,0,0," + (canGet ? '0' : (j.status === 'running' || j.status === 'queued' ? '.1' : '.22')) +
+          ");border-radius:5px;padding:7px 9px;cursor:" + (j.status === 'running' || j.status === 'queued' ? 'default' : 'pointer'),
+        onAction: e => {
+          e.stopPropagation();
+          if (j.status === 'done') { this.toast('export_' + j.id + '.' + j.format + ' 내려받기 — 한 번만 쓰는 서명 링크이고 본인 요청만 받을 수 있습니다', 'ok'); return; }
+          if (j.status === 'failed') { this.retry(j.id); return; }
+          if (j.status === 'expired') { this.toast('보관 30일이 지나 파일이 지워졌습니다 — 같은 조건으로 새로 요청해야 합니다', 'warn'); return; }
+          this.toast('아직 처리 중입니다 — 완료되면 받기가 열립니다', 'warn');
+        },
+        onClick: () => this.setState(s => (s.sel === j.id && s.drawer) ? { sel:null, drawer:false } : { sel:j.id, drawer:true }),
+        style: "display:grid;grid-template-columns:1fr 118px 132px 96px 116px 104px;gap:12px;align-items:center;padding:11px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:" +
+          (on ? '#f0ece1' : 'transparent') + ";border-left:3px solid " + (on ? '#26231e' : 'transparent')
+      };
+    });
+
+    const countOf = s => st.jobs.filter(j => j.status === s).length;
+    const stats = [
+      { key:'running', label:'처리 중', note:'별도 워커가 만드는 중', count: countOf('queued') + countOf('running') },
+      { key:'done', label:'받을 수 있음', note:'보관 30일 안', count: countOf('done') },
+      { key:'failed', label:'실패', note:'사유를 감추지 않습니다', count: countOf('failed') },
+      { key:'expired', label:'만료', note:'완료했지만 파일이 지워짐', count: countOf('expired') }
+    ].map(s => ({ label:s.label, note:s.note, count:String(s.count), mark:S[s.key].label.slice(0, 1),
+      markStyle:"font:600 11px/1 'IBM Plex Mono',monospace;color:" + S[s.key].color,
+      onClick: e => { e.stopPropagation(); this.setState(x => ({ filter: x.filter === s.key ? null : s.key, drawer:false, sel:null })); },
+      style:"flex:1;background:#fffdf9;border:1px solid " + (st.filter === s.key ? '#26231e' : S[s.key].color + '44') + ";border-left:3px solid " + S[s.key].color +
+        ";border-radius:8px;padding:10px 13px;cursor:pointer" }));
+
+    const stepDefs = j => {
+      const done = j.status === 'done' || j.status === 'expired';
+      return [
+        { label:'요청 접수', note:'조건을 고정해 큐에 넣었습니다', at:j.at, state:'ok' },
+        { label:'큐 대기', note: j.status === 'queued' ? '앞선 작업이 끝나기를 기다립니다' : '워커가 집어갔습니다', at: j.status === 'queued' ? '진행 중' : '', state: j.status === 'queued' ? 'now' : 'ok' },
+        { label:'파일 생성', note: j.status === 'running' ? j.progress + '% — 전 행을 한 파일로 묶는 중입니다' : (j.status === 'failed' ? '중단됨' : (done ? j.rowCount ? j.rowCount.toLocaleString() + '행 기록' : '완료' : '대기')), at:'',
+          state: j.status === 'running' ? 'now' : (j.status === 'failed' ? 'bad' : (done ? 'ok' : 'wait')) },
+        { label: j.status === 'expired' ? '보관 만료' : '받기 가능', note: j.status === 'expired' ? j.expiresAt + '에 파일이 지워졌습니다' : (done ? '보관 만료 ' + j.expiresAt : '아직 아닙니다'), at:'',
+          state: j.status === 'expired' ? 'bad' : (j.status === 'done' ? 'ok' : 'wait') }
+      ];
+    };
+
+    return {
+      nav,
+      navStyle: "width:" + (col ? '64px' : '212px') + ";flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px;transition:width .16s ease",
+      brand: col ? 'a2' : 'admin2',
+      brandStyle: "padding:" + (col ? '0 0 11px;text-align:center' : '0 16px 11px') + ";font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;letter-spacing:-.01em",
+      navToggleIcon: col ? '»' : '«',
+      navToggleLabelStyle: col ? 'display:none' : "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      navToggleStyle: "display:flex;align-items:center;gap:9px;margin:8px 10px 0;padding:" + (col ? '9px 0;justify-content:center' : '9px 11px') +
+        ";border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#a29b8d;cursor:pointer;user-select:none",
+      onToggleNav: e => { e.stopPropagation(); this.setState(s => ({ navCollapsed: !s.navCollapsed })); },
+      onRootClick: e => { if (e.target.closest && e.target.closest('[data-keep]')) return; if (st.drawer) this.setState({ drawer:false, sel:null }); },
+      onClose: e => { e.stopPropagation(); this.setState({ drawer:false, sel:null }); },
+
+      stats, rows, isEmpty: rows.length === 0,
+      emptyTitle: st.filter ? '이 상태의 요청이 없습니다' : '요청이 하나도 없습니다',
+      emptyDesc: st.filter ? '상태 카드를 다시 눌러 전체를 보세요.'
+        : '"내보내기" 발신 버튼이 붙은 화면이 아직 없어 요청이 생기지 않습니다 — 오류가 아니라 정상 초기 상태입니다.',
+      emptyBtnStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:#26231e;background:#fffdf9;border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:8px 13px;cursor:pointer",
+      onResetFilter: e => { e.stopPropagation(); this.setState({ filter:null }); },
+
+      rules: [
+        '내 요청만 보입니다 — 다른 운영자의 파일은 목록에도 나오지 않습니다.',
+        '받기 링크는 한 번만 쓰는 서명 URL입니다 — 정적 경로를 공유해 세션 없이 내려받는 일을 막습니다.',
+        '완료 파일은 30일 보관 후 지워집니다 — 만료는 "완료"와 다른 상태로 표시합니다.',
+        '실패한 요청은 재시도 버튼으로 같은 조건으로 다시 넣습니다(자동 재시도는 없습니다).',
+        '요청 조건은 접수 시점에 고정됩니다 — 이후 데이터가 바뀌어도 만든 파일은 그대로입니다.'
+      ],
+      reasons: [
+        { title:'전 행 반환 금지 원칙과 충돌하지 않으려면', desc:'다운로드는 정의상 필터에 맞는 전 행을 한 파일로 묶어야 해서, 목록 페이지네이션 방식으로는 풀리지 않습니다. 접수는 즉시, 생성은 따로.', src:'CLAUDE.md · 슬라이스 54' },
+        { title:'API 프로세스가 1개뿐', desc:'uvicorn을 --workers 없이 띄우고 고객 API까지 같은 인스턴스에 올립니다. 동기로 파일을 만들면 그 시간 동안 고객 견적·결제까지 함께 멈춥니다.', src:'deploy/popcorn-api.service · api/main.py' },
+        { title:'nginx가 120초에 끊음', desc:'클라이언트는 타임아웃을 받는데 서버는 작업을 계속 붙잡습니다 — 사용자는 재시도하고 서버는 더 막힙니다.', src:'proxy_read_timeout 120s' },
+        { title:'쓸 수 있는 폴더가 한 곳', desc:'systemd 강화 옵션으로 앱이 파일을 쓸 수 있는 경로가 .cache 한 곳뿐입니다 — 생성 파일 저장 위치도 이 제약 안에서 정해야 합니다.', src:'ProtectSystem=strict · ReadWritePaths' }
+      ],
+
+      drawerOpen: st.drawer && !!sel,
+      d: sel ? {
+        id: sel.id, source: sel.source, who: sel.who, at: sel.at, format: sel.format.toUpperCase(),
+        status: S[sel.status].label, statusStyle: chip(sel.status, true),
+        conditions: sel.conditions,
+        steps: stepDefs(sel).map(s => ({ label:s.label, note:s.note, at:s.at,
+          mark: s.state === 'ok' ? '✓' : (s.state === 'now' ? '◐' : (s.state === 'bad' ? '✕' : '·')),
+          markStyle: "font:600 11px/1.5 'IBM Plex Mono',monospace;color:" + (s.state === 'ok' ? GREEN : (s.state === 'now' ? BLUE : (s.state === 'bad' ? RED : '#c4bdae'))),
+          style: "display:flex;align-items:flex-start;gap:9px;border:1px solid " + (s.state === 'bad' ? RED + '44' : 'rgba(0,0,0,.11)') + ";border-left:3px solid " +
+            (s.state === 'ok' ? GREEN : (s.state === 'now' ? BLUE : (s.state === 'bad' ? RED : '#d3cec2'))) +
+            ";border-radius:6px;padding:9px 11px;background:" + (s.state === 'bad' ? 'oklch(0.97 0.02 30)' : (s.state === 'wait' ? '#f4f0e7' : '#faf7f0')) })),
+        resultTitle: sel.status === 'failed' ? '실패 사유' : (sel.status === 'expired' ? '보관 기한이 지났습니다' : (sel.status === 'done' ? '받을 수 있습니다' : '아직 만들고 있습니다')),
+        resultDesc: sel.status === 'failed' ? sel.failReason
+          : (sel.status === 'expired' ? '완료까지 갔지만 30일 보관이 끝나 파일이 지워졌습니다. 완료 자체를 안 한 것과 다른 상태로 남깁니다 — 같은 조건으로 새로 요청하세요.'
+            : (sel.status === 'done' ? '한 번만 쓰는 서명 링크로 내려받습니다. 본인 요청만 받을 수 있고, 링크를 남에게 넘겨도 열리지 않습니다.'
+              : '완료 시점은 앞선 작업 수에 달려 있습니다 — 이 화면을 다시 조회하면 진행이 갱신됩니다.')),
+        resultMeta: sel.status === 'done' ? sel.rowCount.toLocaleString() + '행 · 보관 만료 ' + sel.expiresAt
+          : (sel.status === 'expired' ? '만료 ' + sel.expiresAt : (sel.status === 'running' ? sel.progress + '% 진행' : '')),
+        resultMetaStyle: "font:400 10px/1.5 'IBM Plex Mono',monospace;color:#8a8377;margin-top:7px",
+        resultBoxStyle: "border:1px solid " + (sel.status === 'failed' ? RED + '55' : (sel.status === 'done' ? GREEN + '55' : 'rgba(0,0,0,.12)')) +
+          ";border-left:3px solid " + (sel.status === 'failed' ? RED : (sel.status === 'done' ? GREEN : '#bdb6a8')) +
+          ";background:" + (sel.status === 'failed' ? 'oklch(0.97 0.02 30)' : (sel.status === 'done' ? 'oklch(0.97 0.02 165)' : '#f2eee5')) + ";border-radius:7px;padding:11px 13px",
+        footNote: sel.status === 'failed' ? '재시도는 같은 조건으로 큐에 다시 넣습니다 — 자동 재시도는 없습니다'
+          : (sel.status === 'expired' ? '만료된 파일은 되살릴 수 없습니다' : '이 화면에는 요청을 새로 만드는 버튼이 없습니다 — 발신은 각 목록 화면에서 합니다'),
+        retryStyle: "font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (sel.status === 'failed' ? '#26231e' : '#b3ac9e') +
+          ";background:#fffdf9;border:1px solid rgba(0,0,0," + (sel.status === 'failed' ? '.22' : '.1') + ");border-radius:5px;padding:9px 13px;cursor:pointer",
+        downloadLabel: sel.status === 'expired' ? '만료됨' : '받기',
+        downloadStyle: "font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;color:" + (sel.status === 'done' ? '#f7f4ee' : '#f0ece2') +
+          ";background:" + (sel.status === 'done' ? '#26231e' : '#bdb6a8') + ";border:none;border-radius:5px;padding:9px 15px;cursor:pointer"
+      } : {},
+      onRetry: e => { e.stopPropagation(); if (sel) this.retry(sel.id); },
+      onDownload: e => {
+        e.stopPropagation();
+        if (!sel) return;
+        if (sel.status === 'done') { this.toast('export_' + sel.id + '.' + sel.format + ' 내려받기 — 한 번만 쓰는 서명 링크입니다', 'ok'); return; }
+        if (sel.status === 'expired') { this.toast('보관 30일이 지나 파일이 지워졌습니다 — 새로 요청해야 합니다', 'warn'); return; }
+        this.toast('아직 만들고 있습니다 — 완료되면 받기가 열립니다', 'warn');
+      },
+
+      toasts: st.toasts.map(t => ({ msg:t.msg, mark: t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓'),
+        onClose: e => { e.stopPropagation(); this.setState(s => ({ toasts: s.toasts.filter(x => x.id !== t.id) })); },
+        style: "display:flex;align-items:center;gap:10px;background:#26231e;color:#f4f1ea;border-radius:7px;padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);animation:toastIn .18s ease-out;border-left:3px solid " +
+          (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)),
+        markStyle: "font:600 11px/1 'IBM Plex Mono',monospace;color:" + (t.kind === 'err' ? RED : (t.kind === 'warn' ? AMBER : GREEN)) }))
+    };
+  }
+
+  retry(id) {
+    this.setState(s => ({ jobs: s.jobs.map(j => j.id === id ? Object.assign({}, j, { status:'queued', progress:0, failReason:'' }) : j) }));
+    this.toast('같은 조건으로 큐에 다시 넣었습니다 — 자동 재시도는 없으므로 또 실패하면 다시 눌러야 합니다', 'ok');
+  }
+}
+</script>
+</body>
+</html>
