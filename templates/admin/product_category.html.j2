@@ -122,8 +122,9 @@
   ■ 원안과 다르게 구현한 지점 (전부 이유가 있다 — 제작 보고서에도 남긴다)
     ① **역할 스위처 폐지** — 원안 헤더의 owner/operator/viewer 버튼은 화면 안에서
        역할을 바꿔볼 수 있는 디자인 도구 시연 장치였다. 실제 화면은 로그인 세션의
-       진짜 등급(`Admin2Shell.canWrite('owner')`)만 쓴다(reviews·ai_task_settings와
-       같은 이유 — 화면 정직성 규약).
+       진짜 등급(`Admin2Shell.canWrite(...)`)만 쓴다(reviews·ai_task_settings와
+       같은 이유 — 화면 정직성 규약). 문턱 자체는 2026-08-14에 owner -> operator로
+       넓어졌다 — 아래 "■★ 권한 확대 반영" 참고.
     ② **되돌리기 = 항상 미구현** — 위에서 설명한 대로 API 자체가 없다.
     ③ **상위 분류 선택지는 최상위(대분류) 노드만** — 원안 그대로다. 실제 스키마는
        `parent_id`만으로 깊이 제한이 없지만(`api/admin_categories.py` 독스트링:
@@ -189,12 +190,53 @@
     가드(`addTopCategory()`)도 이번에 같은 문구로 통일했다(전에는 "새 대분류"
     이름을 박은 다른 문구였다).
 
-    **권한 판정은 바꾸지 않았다.** 이 화면은 여전히 `owner()`(`Admin2Shell.
-    canWrite('owner')`) 하나로 쓰기를 막는다 — 서버는 2026-08-13부터 owner·operator를
-    함께 받지만(`_operator()` 실측), 화면의 권한 표시·잠금을 operator까지 넓히는 일은
-    별도 작업 소관이라 이번엔 손대지 않았다. 새 버튼(정확히는 버튼의 새 상태)도 같은
-    기준을 그대로 쓴다 — 비활성(`owner`가 아님)일 때는 CSS `.dis`뿐 아니라 진짜
-    `disabled` 속성 + `title`(결함 3과 같은 이유, `disAttrs()` 위 주석 참고)로 막는다.
+    **권한 판정은 이 항목(가안) 당시엔 바꾸지 않았었다.** 이 화면은 그때까지
+    `owner()`(`Admin2Shell.canWrite('owner')`) 하나로 쓰기를 막았다 — 서버는
+    2026-08-13부터 owner·operator를 함께 받았지만(`_operator()` 실측), 화면의 권한
+    표시·잠금을 operator까지 넓히는 일은 별도 작업 소관이라 그때는 손대지 않았었다.
+    **그 별도 작업이 같은 날(2026-08-14) 뒤이어 들어왔다** — 아래 "■★ 권한 확대
+    반영" 참고. 새 버튼(버튼의 새 상태)도 `owner()` 하나를 그대로 쓰므로 자동으로
+    operator까지 열렸다 — 비활성(operator 미만)일 때는 CSS `.dis`뿐 아니라 진짜
+    `disabled` 속성 + `title`(결함 3과 같은 이유, `disAttrs()` 위 주석 참고)로 막는
+    방식 자체는 그대로다.
+
+  ■★ 권한 확대 반영 — owner 전용에서 operator 이상으로 (2026-08-14, A-36)
+    서버는 2026-08-13부터 카테고리 쓰기를 owner·operator 양쪽에 열었다
+    (`api/admin_categories.py`의 `_operator()` — "쓰기는 owner·operator(2026-08-13
+    사장님 결정)... viewer는 여전히 막는다"). 화면은 그동안 `owner()`
+    (`Admin2Shell.canWrite('owner')`) 문턱을 그대로 두고 있었다 — 서버보다 화면이
+    더 엄격한 상태였다. `owner()`의 인자를 `'operator'`로 바꿨다 — 함수 이름은
+    그대로 owner()이지만(콜 사이트가 대분류/하위분류 추가·이름·정렬·상위이동·
+    허용종류·노출·삭제·마진 걸기/해제까지 십여 곳이라, 리네임보다 함수 정의부
+    주석으로 실제 문턱을 밝히는 편을 택했다) 이 화면의 모든 쓰기 잠금이 이 함수
+    하나를 거치므로 한 곳만 고치면 전부 operator까지 열린다. **viewer는 그대로
+    막힌다** — `_operator()`가 owner·operator만 받고, viewer는 여전히 403이다.
+
+    **문구도 서버 기준으로 맞췄다 — 단, admin_categories.py가 아니라
+    api/auth.py였다.** 지시서는 "서버 403 문구를 admin_categories.py에서 직접
+    확인하라"고 했지만, 실제로 그 파일을 열어 요청 흐름을 끝까지 따라가 보면
+    `_operator()`의 `HTTPException(403, "운영자 이상만 카테고리를 바꿀 수
+    있습니다")`는 **지금 라우팅 구조에서 도달 불가능한 코드다.** `/api/admin/*`
+    전체를 감싸는 `api/auth.py`의 `auth_middleware`가 라우트 핸들러보다 먼저
+    돌며(`required_role()`이 카테고리 쓰기에 operator를 요구), owner·operator는
+    이미 미들웨어를 통과해 `_operator()`에 걸릴 일이 없고, viewer는 `_operator()`
+    에 닿기도 전에 미들웨어가 먼저 막는다 — 그래서 브라우저가 실제로 받는 403
+    본문은 언제나 미들웨어의 `f"권한이 부족합니다(필요: {need}, 현재:
+    {role})"`(괄호 앞에 공백 없음)다. 이 화면의 `guard()`·`permText()`·저장 서랍
+    푸터 문구를 전부 이 형식으로 맞췄다(전에는 괄호 앞에 공백이 있었고 역할도
+    owner로 적혀 있었다). `docs/design/req/req-product-category.md`(§⑦, A-36 이전
+    작성이라 지금은 낡은 문서)가 이 두 겹 403 구조를 이미 실측해 뒀던 것이 이
+    판단의 근거다 — admin_categories.py 것만 보고 옮겼다면 화면에 절대 나타나지
+    않는 문구를 title에 박을 뻔했다.
+
+    **헤더 배지를 새로 달았다** — `pc-permhint`, "조회 viewer 이상 · 쓰기
+    operator 이상". 원안(`docs/design/dc-product-category.html`)의 헤더에는 이
+    배지("조회 viewer · 쓰기 owner")가 있었는데, 2026-08-13 최초 구현이 역할
+    스위처를 지우면서(위 ①) 배지까지 함께 빠져 이 화면엔 아예 없었다(문서만
+    "폐지"를 설명했지 배지 자체가 마크업에 없었다 — 실측으로 확인). "상품 분류
+    매핑" 화면의 `cm-permhint`("조회 viewer 이상 · 이동·되돌리기 operator
+    이상")와 같은 자리·같은 스타일로 새로 달아, 두 ADM-CAT 화면의 권한 표시
+    관례를 맞췄다.
 
   ■ 붙지 않은 것 — "상품 분류 매핑"·"작업 기록" 화면은 admin_nav.py에서 아직
     `href=None`(신설 예정)이라 이 화면에서 그 화면으로 가는 실제 링크를 만들지
@@ -216,6 +258,11 @@ input{font-family:var(--rv-mono)}
 ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
 
 /* ── 좌측 메뉴·헤더 뼈대·팔레트는 admin2 공용 셸이 그린다 — 여기는 이 화면 본문만. ── */
+
+/* "상품 분류 매핑" 화면의 .cm-permhint와 같은 자리·같은 스타일(2026-08-14 신설 —
+   아래 "■★ 권한 확대 반영" 참고). */
+.pc-permhint{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
 
 .pc-undo-hd{font:500 11.5px/1 var(--rv-font);border-radius:5px;padding:6px 9px;
   background:var(--rv-panel2);border:1px dashed rgba(0,0,0,.22);color:var(--rv-faint);cursor:not-allowed}
@@ -424,6 +471,7 @@ input{font-family:var(--rv-mono)}
 {% endblock %}
 
 {% block header_extra %}
+<span class="pc-permhint">조회 viewer 이상 · 쓰기 operator 이상</span>
 <button type="button" class="pc-undo-hd" disabled
         title="카테고리 변경 되돌리기 API가 아직 없습니다 — 변경 이력에는 남지만 역방향으로 되돌리는 엔드포인트가 없습니다">
   되돌리기 (미구현)
@@ -561,12 +609,20 @@ input{font-family:var(--rv-mono)}
   function apiDelete(path) { return fetch(path, { method: 'DELETE', credentials: 'same-origin' }).then(handle); }
 
   // ── 권한 · 토스트 — 셸(admin2-shell.js)의 것을 그대로 쓴다(중복 구현 없음) ──
-  function owner() { return window.Admin2Shell.canWrite('owner'); }
+  // 2026-08-14: A-36(2026-08-13 사장님 확정)으로 카테고리 트리 쓰기 문턱이
+  // owner 전용 -> operator 이상으로 넓어졌다(`api/admin_categories.py`의
+  // `_operator()` 실측 — owner·operator를 함께 받고 viewer만 막는다). 함수 이름은
+  // 그대로 owner()이지만(콜 사이트 다수를 리네임하는 위험보다 이 주석으로 설명하는
+  // 편을 택했다) 실제 문턱은 operator다 — 이 화면의 모든 쓰기 잠금(대분류/하위분류
+  // 추가·이름·정렬·상위이동·허용종류·노출·삭제·마진 걸기/해제)이 이 함수 하나를
+  // 거치므로 여기 한 곳만 고치면 전부 따라온다. 상세는 파일 상단
+  // "■★ 권한 확대 반영" 참고.
+  function owner() { return window.Admin2Shell.canWrite('operator'); }
   function toast(msg, kind, action, onAction) { window.Admin2Shell.toast(msg, kind, action, onAction); }
   function guard() {
     if (!owner()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
@@ -580,7 +636,7 @@ input{font-family:var(--rv-mono)}
   // 쓰던 disabled+title 방식을 그대로 따른다.
   function permText() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
   }
   function disAttrs(disabled, title) {
     return disabled ? (' disabled title="' + esc(title) + '"') : '';
@@ -971,7 +1027,7 @@ input{font-family:var(--rv-mono)}
     html += '</div>'; // dw-body
 
     var footNoteText = own ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
-      : ('권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
+      : ('권한이 부족합니다(필요: operator, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
     var delDis = !own;
     var revDis = !dirty;
     var saveDis = !(own && dirty);
@@ -1007,7 +1063,7 @@ input{font-family:var(--rv-mono)}
     if (diffArea) diffArea.innerHTML = diffBoxHtml(diffs);
     if (footNote) {
       footNote.textContent = own ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
-        : ('권한이 부족합니다 (필요: owner) — 조회만 가능합니다');
+        : ('권한이 부족합니다(필요: operator, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
       footNote.classList.toggle('warn', !own);
     }
   }
