@@ -46,3 +46,47 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     return resp
+
+
+# ── admin2 인증 게이트 안내 HTML (2026-08-15) ───────────────────────────────
+#
+# 원래 `admin_ui_home.py`에만 있던 `_login_required_html()`을 여기로 옮겼다.
+# `api/auth.py`의 `auth_middleware`가 `/admin2/*`도 막게 되면서(그전엔 `/api/admin/*`
+# 만 막았다) 그 미들웨어도 같은 HTML을 써야 하는데, `auth.py`가 `admin_ui_home.py`를
+# 직접 import하면 순환이 된다 — `admin_ui_home.py`가 이미 최상단에서
+# `from .auth import resolve_session, COOKIE`를 하기 때문이다(auth 모듈이 COOKIE·
+# resolve_session을 정의하기 전에 admin_ui_home이 그걸 찾으려다 ImportError).
+# 이 파일(`admin_ui_common.py`)은 `.admin_nav`만 import하고 `auth.py`를 전혀
+# 참조하지 않으므로(실측 — 이 파일과 `admin_nav.py` 양쪽 다 `auth` import 0건),
+# `auth.py`와 `admin_ui_home.py` 둘 다 여기서 가져오면 순환이 생기지 않는다.
+# 같은 것을 두 벌 두지 않는다(CANON.md §1) — 문구를 바꿀 일이 생기면 여기 한 곳만 고친다.
+_LOGIN_PAGE = "/admin/login.html"
+
+
+def login_required_html() -> str:
+    """admin2 인증 실패 안내 — 사유를 그대로 밝히고 로그인 화면으로 보낸다.
+
+    `/api/admin/*`가 막힐 때는 순수 JSON(`{"detail": "..."}`)을 그대로 쓴다 — 기존
+    화면 스크립트가 그 형식을 읽으므로 바꾸지 않는다(`api/auth.py` 참조). 이 HTML은
+    **`/admin2/*` 페이지 요청**이 막힐 때만 쓴다 — 브라우저가 주소창으로 직접 여는
+    자리라 날것의 JSON을 보여줄 수 없다. 문구는 특정 화면(대시보드 등) 이름을 박지
+    않는다 — 이 함수를 쓰는 화면이 여럿이라서다.
+    """
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="1;url={_LOGIN_PAGE}">
+<title>로그인이 필요합니다 · 팝콘PC 관리자</title>
+<link rel="stylesheet" href="/shared/admin2/admin2.css"></head>
+<body style="display:flex;align-items:center;justify-content:center;height:100vh">
+<div style="background:var(--card);border:1px solid rgba(0,0,0,.12);border-radius:8px;
+        padding:26px 30px;text-align:center;font-family:var(--font);color:var(--on);
+        max-width:360px">
+  <div style="font:600 15px/1.4 var(--font);margin-bottom:8px">로그인이 필요합니다</div>
+  <div style="font:400 12px/1.6 var(--font);color:var(--rv-faint);margin-bottom:16px">
+    이 화면은 로그인한 운영자만 볼 수 있습니다. 1초 뒤 로그인 화면으로 이동합니다.
+  </div>
+  <a href="{_LOGIN_PAGE}" style="font:600 12px/1 var(--font);color:var(--on-primary);
+      background:var(--rv-ink);border-radius:5px;padding:9px 14px;text-decoration:none;
+      display:inline-block">로그인 화면으로 이동</a>
+</div>
+</body></html>"""

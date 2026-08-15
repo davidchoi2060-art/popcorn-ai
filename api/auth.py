@@ -42,6 +42,80 @@ _current: ContextVar[dict | None] = ContextVar("current_operator", default=None)
 # 게이트 예외 — 인증 자체와 정적 파일
 OPEN_PREFIXES = ("/api/admin/auth/",)
 
+# admin2 페이지 라우트 접두어 — 아래 `_is_gated`/`auth_middleware` 참조.
+ADMIN2_PREFIX = "/admin2"
+
+# `/admin2/*` 안에 있지만 "화면"이 아니라 AJAX가 읽는 "데이터" 엔드포인트 — 거절 응답도
+# HTML이 아니라 JSON이어야 한다(2026-08-15, 제작자 신고). `handoff_log.html.j2`의
+# 프런트가 `res.clone().json().catch(()=>null)`로 응답을 파싱하는데, 무세션 요청이
+# HTML(로그인 안내 페이지)을 받으면 파싱이 조용히 null이 되어 "오류 401"로만 뭉개진다
+# (크래시는 아니지만 실패 사유가 지워진다). AJAX에는 화면과 같은 이유로 JSON을 줘야
+# 프런트가 실패 사유를 읽을 수 있다.
+#
+# 실측(2026-08-15, `admin_ui_handoff_log.py` 본문·나머지 `admin_ui_*.py` 라우트 대조):
+# `/admin2` 아래 데이터 엔드포인트는 `/admin2/handoff-log/data` 하나뿐이다 — 나머지
+# admin2 화면의 데이터 API는 전부 `/api/admin/...`(이미 `_is_gated`가 JSON으로 막는
+# 경로)에 있다. 하나뿐이므로 **규칙**("경로 끝이 `/data`" 등)이 아니라 **명시적 예외
+# 목록**으로 좁힌다 — 규칙으로 잡으면 다음에 생기는 진짜 "화면" 라우트가 우연히
+# `/data`로 끝날 때 자동으로 걸려 그 화면이 HTML 대신 JSON을 받는다(그게 더 나쁘다 —
+# 화면이 로그인 안내 대신 JSON 텍스트를 그대로 보여준다). 새 admin2 데이터 엔드포인트를
+# 만들 때는 가능하면 `/api/admin/*` 아래 두는 쪽을 먼저 검토하고(그러면 이 목록에 넣을
+# 필요가 없다), 불가피하면 여기 추가한다.
+ADMIN2_JSON_DATA_PATHS = ("/admin2/handoff-log/data",)
+
+
+def _is_admin2_path(path: str) -> bool:
+    """이 요청이 `/admin2/*` 아래(화면이든 `ADMIN2_JSON_DATA_PATHS`의 데이터 엔드포인트든
+    전부)인가 — **게이트 대상** 판정(`_is_gated`) 전용. 거절 «형식»(HTML/JSON)은 건드리지
+    않는다 — 그건 `_is_admin2_page()`가 별도로 고른다. 이 함수와 그 함수를 하나로 합치면
+    안 된다: 데이터 엔드포인트를 형식 판정에서 빼면서 게이트 판정에서도 같이 빠져
+    미들웨어가 그 경로를 아예 통과시켜 버리는(=자체 게이트에만 의존하게 되는) 사고가
+    난다(2026-08-15, 이 파일을 고치며 자체 발견 — 처음에 `_is_admin2_page` 하나로
+    두 질문을 다 답하다가 `_is_gated`가 덩달아 False가 되는 것을 새 인터프리터로
+    재현해서 잡았다).
+
+    admin2 라우터는 `prefix="/admin2"` + `@router.get("")`/`@router.get("/")`로
+    등록돼(`admin_ui_home.py` 실측) `/admin2`(슬래시 없음)와 `/admin2/`(있음) 둘 다
+    유효한 경로다 — `startswith("/admin2/")`만으로는 슬래시 없는 루트를 놓친다.
+    """
+    return path == ADMIN2_PREFIX or path.startswith(ADMIN2_PREFIX + "/")
+
+
+def _is_admin2_page(path: str) -> bool:
+    """이 요청이 `/admin2/*` "화면" 라우트인가 — **거절 응답 형식**(HTML vs JSON) 분기
+    전용. 게이트 대상 여부는 이 함수가 아니라 `_is_admin2_path()`/`_is_gated()`가 정한다
+    (위 `_is_admin2_path` 참조 — 이 둘을 합치면 안 되는 이유가 거기 있다).
+
+    화면이면 True(HTML 거절) · `ADMIN2_JSON_DATA_PATHS`에 있는 데이터 엔드포인트면
+    False(JSON 거절, 위 주석 참조) — **그 경로도 계속 게이트된다**: `_is_gated()`는
+    `_is_admin2_path()`를 보므로 세션이 없으면 미들웨어가 여전히 401을 (이번엔 JSON으로)
+    돌려준다. "게이트를 푸는" 함수가 아니라 "거절 문서를 뭘로 줄지"만 고르는 함수다.
+    """
+    if path in ADMIN2_JSON_DATA_PATHS:
+        return False
+    return _is_admin2_path(path)
+
+
+def _is_gated(path: str) -> bool:
+    """인증 게이트 대상 경로인가 — `/api/admin/*`(2026-07-26부터) + `/admin2/*`
+    (2026-08-15부터, 아래 참조).
+
+    2026-08-15까지는 `/api/admin/*`만이었다. 그런데 `admin_ui_reprice.py`·
+    `admin_ui_margin_policy.py`·`admin_ui_mall_sync.py` 세 화면이 `admin_ui_home.py`
+    와 같은 방식(서버 렌더 시점에 실데이터를 페이지 셸에 직접 싣는다)이면서
+    **자체 로그인 게이트가 없어서**, 무세션으로 열면 회차·정책·인계 실데이터가 그대로
+    나갔다(조사자 실측, 2026-08-15 — 응답 전수를 개인정보 패턴으로 스캔해 고객
+    개인정보는 0건이었지만 운영 내부 사실·집계가 새고 있었다). 화면마다 자체 게이트를
+    추가하는 대신(반복이고, 실제로 셋이 빠뜨렸다) 여기 한 곳에서 `/admin2/*` 전체를
+    막는다 — 새 `/admin2/*` 화면은 짓는 사람이 잊어도 자동으로 보호된다.
+    `admin_ui_home.py`·`admin_ui_handoff_log.py`의 자체 게이트는 지우지 않았다
+    (이중 방어는 해가 없다 — 각 파일 참조).
+
+    **`_is_admin2_page()`가 아니라 `_is_admin2_path()`를 쓴다** — `/admin2/handoff-log/data`
+    처럼 거절 형식만 JSON으로 다른 경로도 게이트 대상에서 빠지면 안 되기 때문이다.
+    """
+    return path.startswith("/api/admin/") or _is_admin2_path(path)
+
 
 def cookie_secure() -> bool:
     """HTTPS 전용 쿠키 여부 — 환경변수로 켠다(COOKIE_SECURE=1).
@@ -144,20 +218,44 @@ def required_role(method: str, path: str) -> str:
 
 
 async def auth_middleware(request: Request, call_next):
-    """/api/admin/* 게이트. 예외는 인증 엔드포인트뿐 — 승인 전에는 어떤 데이터도 주지 않는다."""
+    """`/api/admin/*` + `/admin2/*` 게이트(§`_is_gated`). 예외는 인증 엔드포인트뿐 —
+    승인 전에는 어떤 데이터도 주지 않는다.
+
+    거절 응답은 **경로로 형식을 가른다**(2026-08-15): `/api/admin/*`는 그대로 JSON
+    (기존 화면 스크립트가 그 형식을 읽으므로 바꾸지 않는다) · `/admin2/*`는 브라우저가
+    주소창으로 직접 여는 페이지라 HTML 안내로 로그인 화면으로 보낸다
+    (`admin_ui_common.login_required_html()` — `admin_ui_home.py`가 쓰던 것을 그리로
+    옮겨 여기서도 같이 쓴다. 단일 원천, 복제하지 않는다 — `admin_ui_home.py` 모듈
+    docstring 「2026-08-15 정정」 절 참조).
+    **예외 하나**: `/admin2/*` 안에도 화면이 아니라 AJAX가 읽는 데이터 엔드포인트가
+    하나 있다(`ADMIN2_JSON_DATA_PATHS` — 지금은 `/admin2/handoff-log/data`뿐).
+    그 경로는 **게이트는 그대로 받되**(무세션이면 여전히 401) 거절 문서만 JSON이다 —
+    `is_page`(아래) 판정을 `_is_admin2_page()`가 홀로 진다.
+    """
     path = request.url.path
     token = _current.set(None)
     try:
-        if path.startswith("/api/admin/") and not path.startswith(OPEN_PREFIXES):
+        if _is_gated(path) and not path.startswith(OPEN_PREFIXES):
+            is_page = _is_admin2_page(path)
             # 동기 DB 호출을 스레드풀로 넘긴다 — 미들웨어는 항상 이벤트 루프에서
             # 돌아 라우트처럼 자동 오프로드되지 않는다(2026-08-15). resolve_session()
             # 본체는 그대로 두고 부르는 방식만 바꾼다.
             op = await run_in_threadpool(resolve_session, request.cookies.get(COOKIE, ""))
             if op is None:
+                if is_page:
+                    from fastapi.responses import HTMLResponse
+
+                    from .admin_ui_common import login_required_html
+                    return HTMLResponse(login_required_html(), status_code=401)
                 from fastapi.responses import JSONResponse
                 return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
             need = required_role(request.method, path)
             if ROLE_RANK.get(op["role"], 0) < ROLE_RANK[need]:
+                if is_page:
+                    from fastapi.responses import HTMLResponse
+
+                    from .admin_ui_common import login_required_html
+                    return HTMLResponse(login_required_html(), status_code=403)
                 from fastapi.responses import JSONResponse
                 return JSONResponse(
                     {"detail": f"권한이 부족합니다(필요: {need}, 현재: {op['role']})"},
