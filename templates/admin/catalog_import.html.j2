@@ -232,8 +232,14 @@
 </div>
 
 <script>window.__ciRawFetch = window.fetch.bind(window);</script>
-<script src="/shared/ui-progress.js"></script>
-<script src="/shared/admin2/admin2-shell.js"></script>
+{% endblock %}
+{#  ui-progress.js · admin2-shell.js는 셸(_admin2_shell.html.j2)이 이미 싣는다(100~101행).
+    content 블록은 그 두 스크립트보다 문서상 "먼저" 렌더링되므로, 아래 로직 스크립트를
+    여기(foot_extra)로 옮겨 셸 스크립트 다음에 실행되게 한다 — 안 그러면 admin2-shell.js가
+    두 번 실행돼 window.Admin2Shell 인스턴스가 둘 생기고, 이 화면의 meReady 콜백이 먼저 뜬
+    인스턴스에 걸려 나중에 덮어써진 뒤로는 영영 resolve되지 않는다(owner인데도 업로드
+    카드가 계속 잠긴 채였던 원인 — 2026-08-15 확인자 실측). #}
+{% block foot_extra %}
 <script>
 (function () {
   'use strict';
