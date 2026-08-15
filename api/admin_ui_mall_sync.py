@@ -266,7 +266,12 @@ def _fetch(status_filter: str, page: int) -> dict:
 
         total_products = conn.execute(text("SELECT COUNT(*) FROM products")).scalar() or 0
         # 분모(total_products)와 같은 모집단(=products에 실제로 있는 상품)으로 분자를 맞춘다.
-        # 조립비(pd_no 92983)처럼 우리 카탈로그에 없는 코드는 분자에서 자연히 빠진다.
+        # (정정 2026-08-15, 확인자·조사자 독립 실측 일치) 조립비(pd_no 92983)는 products에
+        # 실재한다("제작 공임1", status='판매중', data_origin='real' — 직접 SELECT로 확인,
+        # 참조 handoff_items에도 3행) — 이 JOIN에서 자연히 빠지지 않고 분자에 포함된다.
+        # 위 주석이 전에 들었던 예시("92983은 카탈로그에 없어 빠진다")는 틀린 예시였다.
+        # 집계 쿼리(JOIN 자체)는 실재 여부를 정확히 반영하므로 화면이 보여주는 값은 맞다 —
+        # 틀렸던 것은 이 주석뿐이었다.
         checked_products = conn.execute(text(
             "SELECT COUNT(DISTINCT hi.product_code) FROM handoff_items hi"
             " JOIN products p ON p.product_code = hi.product_code")
