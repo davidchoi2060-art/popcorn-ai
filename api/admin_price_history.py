@@ -2,6 +2,10 @@
 
 원장 원칙: 가격 변경은 삭제하지 않는다 — 되돌림도 역방향 이력 행으로 남는다(슬라이스 3부터).
 reason 어휘(ERD §3.4·§6.3): csv / sourcing / margin_policy / manual / price_import(+_undo).
+⚠ "manual_match"는 위 ERD 어휘 밖의 신규 사유다(2026-08-15, admin_ui_sale_price.py의
+판매가 관리 화면 — 몰 값 맞춤). ERD 문서(정본, 이 파일 담당 밖)는 아직 안 늘었으니
+새 사유를 또 추가할 땐 REASON_KO만 보지 말고 이 docstring과 실 DB(SELECT DISTINCT
+reason)를 같이 대조한다 — margin_policy_undo가 그렇게 3주간 빠졌었다(아래 참조).
 정직 표기 2건:
   ① **공급처별 매입가 분리 불가** — product_price_history에 supplier 구분 컬럼이 없다.
      purchase 이력은 공급처 간 재판정 결과(최저가)이므로 차트는 판매가·매입가 2선만 그린다
@@ -49,12 +53,31 @@ router = APIRouter(prefix="/api/admin")
 # ref_id 유무로 라벨을 가른다 — 안 그러면 대량 재산정 14,478건(전체 이력의 49.9%)을
 # "가격 검토 승인"(개별 운영자가 하나하나 판단했다는 뜻)이라 표시해, 원장이 누가 왜
 # 이 값을 정했는지를 뒤바꿔 보여준다.
+#
+# ⚠⚠⚠ 2026-08-15 세 번째 재확인(같은 날, 확인자 실측) — "manual_match"가 이 표에
+# 빠져 있었다. admin_ui_sale_price.py의 POST /api/admin/sale-price/{code}/match가
+# product_price_history에 reason='manual_match'로 쓰는데(실측: 상품 119253,
+# history_id 28995, ref_id 7306 — old_price 853,200 -> new_price 904,700) 여기 없어서
+# 위 "번역 미비" 방어 장치(§25-51행 주석)가 그대로 작동해 원문 코드가 노출됐다 —
+# 장치는 설계대로 동작한 것이고(3주간 조용히 틀렸던 margin_policy_undo 사고의 재발
+# 방지용) 결함은 이 표에 항목이 없다는 것뿐이다. 라벨("몰 값 맞춤")은
+# admin_ui_sale_price.py:321의 로컬 REASON_KO(그 화면 서랍의 이력 표시용, 별도 파일 —
+# "화면 하나 = 파일 하나" 규약이라 공유 import하지 않는다)와 문구를 맞췄다 — 같은
+# 사유를 두 화면이 다르게 부르면 그것도 결함이라 판단했다.
+# target_path는 None: 이 사유의 출처 화면은 /admin2/sale-price인데 admin_nav.py에
+# 아직 안 걸려 있다(실측: NAV href 목록에 없음 — 128행이 href=None인 채 "몰값·우리값·
+# 낡은값 구분 필요"로 보류 중). admin_ui_price_history.py의 REASON_TARGETS와 같은
+# "경로 없으면 None, 화면이 생기고 NAV에 걸리면 그때 채운다" 원칙을 따른다 — 다만 이
+# 표는 그 파일처럼 매 요청 NAV를 다시 훑어 자동 판정하는 로직이 없다(그 로직은
+# admin_ui_price_history.py 소관이라 복제하지 않는다). 그래서 여기 값은 정적이고,
+# NAV가 나중에 연결돼도 이 파일을 다시 실측해 고쳐야 한다 — 자동으로는 안 바뀐다.
 REASON_KO = {
     "price_import": ("단가표 반영", "price-import.html"),
     "price_import_undo": ("단가표 반영 되돌림", "price-import.html"),
     "margin_policy": ("가격 검토 승인", "price-review.html"),           # ref_id 있을 때만 — _reason_label() 참조
     "margin_policy_undo": ("가격 검토 승인 되돌림", "price-review.html"),  # 〃
     "manual": ("운영자 직접 수정", "activity-logs.html"),
+    "manual_match": ("몰 값 맞춤", None),  # 판매가 관리(/admin2/sale-price) — NAV 미연결, 위 주석 참조
     "sourcing": ("매입 확정", "sourcing.html"),
     "csv": ("일괄 등록", "csv-jobs.html"),
 }
