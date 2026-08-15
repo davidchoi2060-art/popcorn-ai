@@ -75,10 +75,29 @@
     배너를 대신하지는 않는다.
 
   ■ 표 정렬 — `.uf-thead`/`.uf-row`가 같은 `grid-template-columns`(minmax 최소폭)를
-    쓴다. 헤더·본문 둘 다 `scrollbar-gutter:stable`로 세로 스크롤바 유무와 무관하게
-    같은 거터를 갖는다(연달아 두 화면이 지적받은 문제의 재발 방지). 행 펼침(`.uf-exp`)은
-    그리드 셀이 아니라 `.uf-row` 뒤에 붙는 별도의 전폭 블록이다 — `.uf-tbody`는 grid가
-    아니라 행들이 세로로 쌓이는 보통 블록 흐름이라 열 정렬에 영향을 주지 않는다.
+    쓴다. 행 펼침(`.uf-exp`)은 그리드 셀이 아니라 `.uf-row` 뒤에 붙는 별도의 전폭
+    블록이다 — `.uf-tbody`는 grid가 아니라 행들이 세로로 쌓이는 보통 블록 흐름이라
+    열 정렬에 영향을 주지 않는다.
+
+  ■ 2026-08-15 수정 — 헤더·본문 가로 스크롤 어긋남(확인자 실측). 위 문단이 "같은
+    grid-template-columns를 쓴다"고만 적고 "같은 스크롤 컨테이너"라고는 안 적었던
+    이유가 있었다 — 실제로 `.uf-thead`/`.uf-tbody`가 **각자 `overflow-y`만 지정**해
+    (CSS 스펙상 `overflow-x`가 암묵적으로 `auto`가 된다) 서로 다른 두 가로 스크롤
+    상자였다. 1024px 확인자 실측: `getComputedStyle().overflowX==='auto'`(둘 다) ·
+    `tbody.scrollLeft=322`으로 설정해도 `thead.scrollLeft`는 0 그대로 · 넘침
+    129~150px(clientWidth 759 vs scrollWidth 888~909). 본문만 밀리고 헤더가 안
+    따라와 "통과율" 열을 다른 행 하한 옆에서 읽는 사고였다. 768px에서는 열 폭이
+    좁아져 넘침이 0이 되어 그 폭에서만 통과처럼 보였다(아래 768px 미디어쿼리 주석도
+    참고 — 그 주석이 다룬 건 이 문제가 아니라 버튼 줄바꿈이었다).
+
+    고친 방식은 **컨테이너 통합**(swap_click_logs.html.j2 `.sc-table`/`.sc-thead`와
+    같은 구조 — 그 화면이 처음부터 이 문제를 구조적으로 차단했다, 파일 상단 "■ 표·격자
+    정렬" 참조). `.uf-tablewrap` 하나만 `overflow:auto`(가로·세로 둘 다)이고
+    `.uf-thead`는 그 안에서 `position:sticky;top:0`로 붙는다. 스크롤 동기화(JS로
+    scrollLeft를 맞추는 방식)를 택하지 않은 이유: 두 컨테이너로 남기면 이 병이
+    "동기화를 깜빡함"으로 다시 재발할 수 있고, 이 저장소가 같은 병을
+    `product_category_map.html.j2`·`activity_logs.html.j2`에서 이미 두 번
+    겪었다 — 아예 컨테이너를 하나로 만들면 동기화라는 개념 자체가 없어진다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -116,19 +135,27 @@
 .uf-guard-list li{font:400 10.8px/1.5 var(--rv-font);color:var(--rv-ink-soft)}
 
 /* ── 표 ────────────────────────────────────────────────────────────
-   헤더·본문이 같은 grid-template-columns를 쓴다. scrollbar-gutter로
-   세로 스크롤바 유무와 무관하게 두 컨테이너의 거터를 맞춘다. ── */
+   2026-08-15: `.uf-tablewrap` 하나가 가로·세로 스크롤을 모두 갖는 유일한
+   컨테이너다(swap_click_logs.html.j2 `.sc-table`와 같은 구조). `.uf-thead`는
+   그 안에서 position:sticky로 위에 붙어 세로 스크롤에는 고정되고 가로 스크롤에는
+   `.uf-row`와 같이 움직인다 — 헤더·본문이 같은 스크롤 오프셋을 공유하므로 어긋날
+   수 없다(예전엔 `.uf-thead`/`.uf-tbody`가 각자 overflow-y만 지정해 overflow-x가
+   암묵적으로 auto가 되어 서로 다른 가로 스크롤 상자였다 — 위 "2026-08-15 수정"
+   참조). `.uf-thead`/`.uf-row`는 같은 grid-template-columns와 같은 min-width를
+   쓴다 — min-width는 그 columns의 최소 합(210+150+108+118+132+92 + gap 5*10 +
+   padding 14*2 = 888)과 같게 맞춰, 좁은 화면에서는 그리드가 찌그러지지 않고
+   `.uf-tablewrap`가 대신 가로로 스크롤된다(swap_click_logs `.sc-thead,.sc-row`의
+   min-width:660px과 같은 목적). ── */
 .uf-tablecol{flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 18px 16px;min-height:0}
-.uf-thead{flex:none;display:grid;
+.uf-tablewrap{flex:1;min-height:0;overflow:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+    border-radius:8px;scrollbar-gutter:stable}
+.uf-thead{position:sticky;top:0;z-index:1;display:grid;
     grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 92px;
-    gap:10px;align-items:center;padding:8px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
-    border-bottom:none;border-radius:8px 8px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);
-    overflow-y:hidden;scrollbar-gutter:stable}
-.uf-tbody{flex:1;min-height:0;overflow-y:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
-    border-radius:0 0 8px 8px;scrollbar-gutter:stable}
+    gap:10px;align-items:center;padding:8px 14px;background:var(--rv-panel);
+    border-bottom:1px solid rgba(0,0,0,.1);font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);min-width:888px}
 .uf-row{display:grid;
     grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 92px;
-    gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+    gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);min-width:888px}
 .uf-row-group{background:var(--rv-panel2);border-top:1px solid rgba(0,0,0,.1)}
 .uf-row-group:first-child{border-top:none}
 .uf-row-item:hover{background:rgba(0,0,0,.02)}
@@ -210,18 +237,26 @@
   .uf-tablecol{padding:10px 12px 14px}
   .uf-thead,.uf-row{
     grid-template-columns:minmax(150px,1.1fr) minmax(110px,.9fr) 86px minmax(96px,110px) minmax(104px,.9fr) 76px;
-    padding:8px 10px}
+    padding:8px 10px;min-width:692px}
   .uf-thead{font-size:9.5px}
   .uf-exp-inner{grid-template-columns:1fr}
   .uf-guard-list{grid-template-columns:1fr}
-  /* 그룹 헤더 행 "문구 편집" 버튼 — 확인자 실측(768px): .uf-thead/.uf-tbody scrollWidth
-     747 > clientWidth 712(35px 넘침), 8개 그룹 헤더 행 전부 동일 — 이번 미리보기
-     배너 작업과 무관한 기존 결함(이 CSS는 그 작업에서 손대지 않았다). 항목 행
-     (.uf-btn-change — "바꾸기"/"닫기" 두세 글자)은 이 76px 열에 들어가지만, 이 버튼은
-     "문구 편집" + .uf-tag "향후 사용예정"이 white-space:nowrap이라 넘친다. 열 폭은
-     항목 행과 반드시 같아야 하므로(파일 상단 "표 정렬" 규약 — 헤더·항목·그룹이 같은
-     grid-template-columns) 열을 넓히지 않고 버튼 내용만 줄바꿈을 허용해 세로로
-     늘어나게 한다 — 이 버튼은 항상 disabled라 클릭 동작엔 영향 없다. */
+  /* ⚠ 아래 주석은 "그룹 헤더 행 문구 편집 버튼의 줄바꿈"만 다룬다 — 헤더·본문이
+     서로 다른 가로 스크롤 컨테이너였던 문제(2026-08-15 수정, 파일 상단 참조)와는
+     별개다. 착각하기 쉬운 지점이라 밝혀 둔다: 아래 747/712 수치는 이 버튼 줄바꿈을
+     고치기 "전" 상태의 실측이고, 헤더·본문 동기화 여부는 이 주석이 검토한 적이
+     없다. min-width(위 692px)는 이 미디어쿼리의 좁아진 grid-template-columns 합과
+     맞춰 두었다 — 안 맞추면 768px에서도 데스크톱 min-width(888px)가 강제돼 전에
+     없던 가로 스크롤이 새로 생긴다. */
+  /* 그룹 헤더 행 "문구 편집" 버튼 — 확인자 실측(768px, 이 버튼을 고치기 전):
+     .uf-thead/.uf-tbody scrollWidth 747 > clientWidth 712(35px 넘침), 8개 그룹
+     헤더 행 전부 동일 — 그 작업 당시 "미리보기 배너 작업과 무관한 기존 결함"이라고만
+     적었다. 항목 행(.uf-btn-change — "바꾸기"/"닫기" 두세 글자)은 이 76px 열에
+     들어가지만, 이 버튼은 "문구 편집" + .uf-tag "향후 사용예정"이 white-space:nowrap
+     이라 넘친다. 열 폭은 항목 행과 반드시 같아야 하므로(파일 상단 "표 정렬" 규약 —
+     헤더·항목·그룹이 같은 grid-template-columns) 열을 넓히지 않고 버튼 내용만
+     줄바꿈을 허용해 세로로 늘어나게 한다 — 이 버튼은 항상 disabled라 클릭 동작엔
+     영향 없다. */
   .uf-lockbtn-sm{white-space:normal;flex-wrap:wrap;justify-content:center;text-align:center;
       overflow-wrap:anywhere;gap:2px 6px;padding:5px 6px}
   .uf-lockbtn-sm .uf-tag{white-space:normal;overflow-wrap:anywhere}
@@ -266,12 +301,14 @@
   </div>
 
   <div class="uf-tablecol">
-    <div class="uf-thead">
-      <span>용도 · 매칭 문구</span><span>슬롯 · 필드</span><span>지금 하한</span>
-      <span>통과 · 전체</span><span>통과율</span><span>바꾸기</span>
-    </div>
-    <div class="uf-tbody" id="ufTbody">
-      <div class="uf-loading">불러오는 중…</div>
+    <div class="uf-tablewrap">
+      <div class="uf-thead">
+        <span>용도 · 매칭 문구</span><span>슬롯 · 필드</span><span>지금 하한</span>
+        <span>통과 · 전체</span><span>통과율</span><span>바꾸기</span>
+      </div>
+      <div class="uf-tbody" id="ufTbody">
+        <div class="uf-loading">불러오는 중…</div>
+      </div>
     </div>
     <div class="uf-tablenote">
       용도 문구는 먼저 맞는 것 하나만 적용됩니다 — '고사양 게임'이 '게임'보다 앞에 있어야
