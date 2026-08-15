@@ -59,6 +59,25 @@ def find_similar(conn, name: str, part_type: str | None = None,
 
     22,841건 전체를 파이썬으로 훑을 수는 없다. 상품명의 **의미 있는 토큰**으로
     먼저 거른다 — 하나도 안 겹치면 닮았을 리가 없다.
+
+    **`part_type`은 더 이상 WHERE로 걸지 않는다 — ORDER BY 우선순위로만 쓴다**
+    (결함 ⓐ-1, 2026-08-15). 예전엔 `WHERE p.part_type = :pt`로 후보 자체를 그
+    분류 안에서만 뽑았다. 그런데 분류 변경(슬라이스 67)이 상세에서 열려 있어서,
+    상품을 재분류한 뒤 **그 상품이 빠져나간 옛 분류로 같은 이름을 다시 등록하면**
+    검색 범위가 새 분류만 보느라 후보 SQL 단계에서부터 진짜 중복을 놓쳤다
+    (재현: CPU쿨러(공랭)로 등록 → CPU쿨러(수랭)로 재분류 → 같은 이름을 다시
+    CPU쿨러(공랭)로 등록 시도 → 막혀야 하는데 200 OK로 통과).
+    이 필터를 언제 왜 넣었는지는 이력(최초 커밋 f9b8af0)에 설명이 없다 — 재분류
+    기능(c07e02c)이 같은 날 그 14분 전에 들어갔는데도 상호작용을 검토한 흔적이
+    없다. 실카탈로그 800건 표본으로 분류 제한 없이 돌려보면 **분류가 다른 후보가
+    걸리는 경우는 0.25%(2/800)뿐**이고, 그 둘도 노이즈가 아니라 진짜 같은 상품
+    (ETC 오분류 vs 정상 분류)이었다 — 막아야 했던 오탐이 애초에 실증되지 않는다.
+    다만 완전히 걷어내면 다른 문제가 생긴다: 토큰 OR 매칭 자체가 이미 헐거워서
+    (최대 6개 토큰 중 하나만 겹쳐도 후보) 후보가 400건 한도에 걸리는 경우가
+    (표본 기준) 분류 제한이 있어도 60%, 없으면 86%로 더 늘어난다 — 흔한 이름일수록
+    진짜 중복이 400건 밖으로 밀릴 위험이 커진다. 그래서 **막지 않고 앞세운다**:
+    같은 분류 후보를 항상 먼저 채우므로(정밀도는 그대로) 이미 검증된 동일 분류
+    동작은 바뀌지 않고, 여유가 있을 때 다른 분류로 옮겨간 진짜 중복도 함께 잡힌다.
     """
     toks = [t for t in norm(name).split() if len(t) >= 2][:6]
     if not toks:
@@ -66,17 +85,18 @@ def find_similar(conn, name: str, part_type: str | None = None,
     where = ["(" + " OR ".join(
         f"p.product_name ILIKE '%%' || :t{i} || '%%'" for i in range(len(toks))) + ")"]
     params = {f"t{i}": t for i, t in enumerate(toks)}
-    if part_type:
-        where.append("p.part_type = :pt")
-        params["pt"] = part_type
     if exclude is not None:
         where.append("p.product_code <> :ex")
         params["ex"] = exclude
+    order_by = "p.product_code"
+    if part_type:
+        order_by = "(p.part_type = :pt) DESC, p.product_code"
+        params["pt"] = part_type
     rows = conn.execute(text(
         "SELECT p.product_code, p.sku, p.product_name, p.part_type, p.maker,"
         " p.sale_price, p.stock_qty, p.status"
         " FROM products p WHERE " + " AND ".join(where)
-        + " ORDER BY p.product_code LIMIT 400"), params).mappings().all()
+        + " ORDER BY " + order_by + " LIMIT 400"), params).mappings().all()
 
     out = []
     for r in rows:

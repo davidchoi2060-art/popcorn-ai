@@ -1,473 +1,1247 @@
 {#
-  상품 관리 (ADM-PRD-010) — Jinja2 + Phoenix 이디엄 A/B 시험판 (2026-08-08)
+  상품 관리 (ADM-PRD-010) — 재구축 (2026-08-14, UX-23 확정 1a 탭형 서랍)
 
-  기존 `mockups/admin/products.html` 과 **같은 API·같은 배선**을 쓴다.
-  비교 대상이 디자인이어야 하므로 데이터 경로는 한 글자도 바꾸지 않았다.
+  승인 디자인 docs/design/dc-products-3안.html 의 **1a(탭형 서랍)만 정본**이다(1b·1c 는
+  참조하지 않았다). MAKER-CHECKLIST §0(2026-08-14 사장님 지시)에 따라 **Phoenix(Bootstrap)
+  는 이 재구축부터 참조하지 않는다** — 옛 버전은 이 화면과 mockups/admin/products.html 이
+  "같은 API·같은 배선"을 쓰는 A/B 비교판이었지만, 이제 본문도 admin2 고유 마크업(admin2.css
+  토큰만 사용)으로 새로 짰다. 남는 공용 자산은 셸(_admin2_shell.html.j2)과 admin2.css 뿐이다.
 
-  기존 대비 달라진 것 넷 (전부 Phoenix 원본 `apps/e-commerce/admin/products.html` 이디엄):
+  UX-23 이 안과 무관하게 확정한 것(1a/1b/1c 공통, 목록은 셋 다 같다):
+    · 잠긴 기능 6종(상세·수정·신규 등록·공급처 매입가·사양 입력·분류 변경) 전부 이번에 연다
+    · 상세·편집은 우측 서랍 — 목록의 자리를 잃지 않는다
+    · 일괄 변경에 되돌리기 버튼 — 서버 API(POST bulk-status/undo)는 이미 있었고 화면만 없었다
+    · 상태 탭은 서버 재조회로 바꾼다 — 예전엔 현재 페이지 안에서만 다시 그려 배지 수(전체
+      집계)와 화면에 보이는 행 수(현재 페이지)가 어긋났다. 이제 탭 클릭이 status 파라미터를
+      서버에 보내고, 그 응답의 kpis 로 배지도 같이 갱신하므로 항상 같은 값이다.
+    · 매입 견적·가격 검토 이동은 대상 화면(admin2)이 없어 계속 비활성 + title 로 사유 표기
 
-    ① 분류 아이콘 열 — Phoenix 원본은 제품 사진을 싣는데 **우리는 이미지 원천이
-       없다**(products 테이블에도 목록 API 에도 이미지 컬럼이 없다). 사진을 지어내는
-       대신 실제 `cat` 값에서 파생하는 아이콘을 쓴다. 지어낸 값이 아니라 실데이터의
-       시각 부호다.
-    ② 행 액션을 btn-reveal 드롭다운으로 — 원본은 [검수]+[수정] 버튼 둘을 나란히
-       놓았고 폭 96px 에서 **100행 중 76행이 넘쳤다**(2026-08-07 실사고, CLAUDE.md
-       「감사 문서보다 코드가 먼저다」). `…` 하나로 접으면 120px → 56px 이 되고
-       남는 64px 은 상품명이 받는다.
-    ③ KPI 카드에 아이콘 — 숫자만 있던 4칸을 Phoenix `ecommerce` 카드 이디엄으로.
-       **값은 그대로 서버 kpis 뿐이다.**
-    ④ 검색 입력을 Phoenix search-box 로 — 돋보기 아이콘이 붙는다.
+  1a 고유(서랍 내부 구조): 기본 정보 / 사양 / 공급처 / 분류 변경 네 탭. 기본은 읽기이고
+  [수정]이 **현재 탭만** 그 자리에서 편집으로 바꾼다(페이지 이동 없음) — 저장하면 그 탭만
+  읽기로 복귀한다(슬라이스 55 "보기와 고치기를 나눈다" 규약의 서랍판).
 
-  **버그 하나를 고쳤다**: 원본 `catToPartType` 이 선언된 적 없는 `PMETA` 를 읽어
-  분류 필터를 고르는 순간 ReferenceError 가 났다. 501행 catch 가 그것을 삼켜
-  서버가 멀쩡한데도 "연결 안 됨"으로 보였다. 실제 변수명은 `META` 다.
+  구조적으로 바뀐 것(옛 Phoenix idiom 대비):
+    · KPI 카드 4개 + 상태 필터 pill 을 **하나의 탭 스트립**으로 합쳤다 — 디자인에 별도 KPI
+      카드가 없고, 두 UI 가 같은 5버킷을 두 번 보여주던 중복이었다.
+    · <table> 대신 CSS Grid 행. 헤더·본문이 **하나의 스크롤 컨테이너**를 공유하고 헤더는
+      position:sticky 로 고정한다 — 좁은 화면에서도 두 스크롤이 어긋나 열이 밀리는 사고가
+      구조적으로 생기지 않는다(MAKER-CHECKLIST "표·격자 열 정렬"). 빈/실패 상태는 행이 아니라
+      메시지 한 줄이라 colspan 어긋남 버그 자체가 없다.
+    · list.js(Phoenix 정렬 라이브러리) 대신 자체 정렬(클릭 시 현재 페이지 안에서만, 서버
+      재조회 아님 — 기존 규약 그대로).
+    · choices.js(제조사 620개 검색) 대신 <input list> + <datalist> — 외부 vendor 자산 없이
+      네이티브 브라우저 자동완성을 쓴다.
+    · 색·폰트는 디자인 원안의 리터럴 값(IBM Plex, #f7f4ee 등 — 디자인 툴 캔버스 표기)을
+      **admin2.css 팔레트의 같은 값 토큰**으로 옮겨 썼다(예: #f7f4ee → var(--card),
+      oklch(0.62 0.15 55) → var(--rv-amber)) — reviews.html.j2 가 이미 세운 선례와 같은 방식.
+      IBM Plex Sans/Mono 링크(Google Fonts)는 admin2 화면이 쓰지 않는 서체라 가져오지 않았다
+      (A-30 외부 CDN 금지와도 겹친다) — var(--font)/var(--font-num) 를 쓴다.
 
-  열 수 9개 — colgroup · thead · 행 · 빈 상태 colspan 이 전부 같아야 한다
-  (「목록 화면 규약」: 어긋나면 표가 조용히 뒤틀린다).
-
-  ■ 2026-08-13 셸 통합 — LNB·헤더·팔레트는 admin2 공통 셸(`_admin2_shell.html.j2`)로
-    옮겼다. 본문(표·카드·드롭다운)은 여전히 Phoenix(Bootstrap) 컴포넌트라
-    `head_extra`/`foot_extra` 블록으로 그 벤더 CSS·JS를 함께 싣는다.
-    `data-screen-id`/`data-domain`/빵부스러기는 이제 라우트(`api/admin_ui_products.py`)
-    가 컨텍스트로 준다. 옛 빵부스러기의 `/admin/index.html` 링크는 admin2 홈
-    (`/admin2/`)으로 바꿨다 — admin2 화면에서 구화면으로 잇지 않는다(P-09).
+  data-screen-id/data-domain/빵부스러기/역할 표시는 공용 셸이 이미 렌더한다(요청 컨텍스트는
+  api/admin_ui_products.py 가 그대로 준다) — 본문에서 다시 만들지 않는다(옛 버전은 <h2>로
+  같은 정보를 중복해서 그리고 있었다).
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
 {% block title %}상품 관리{% endblock %}
 
+{# 셸의 header_extra 블록에 역할 표시 옆으로 붙는다 — 2026-08-15 실측(dev-login 세션으로
+   /admin2/products 를 직접 열어 렌더된 HTML에서 "/admin2/products"·"조회 viewer 이상 ·
+   쓰기 operator 이상" 문구와 두 번째 a2-badge 를 확인) 확정, 짐작이 아니다. 값은 디자인
+   원안 그대로(스냅샷 수치가 아니라 권한 설명 문장이라 지어낸 값이 아니다). #}
+{% block header_extra %}
+<span class="a2-badge">/admin2/products</span>
+<span class="a2-roles">조회 viewer 이상 · 쓰기 operator 이상</span>
+{% endblock %}
+
 {% block head_extra %}
-{# Phoenix(Bootstrap) 벤더 자산 — 본문 표·카드·드롭다운이 여전히 이 컴포넌트에 의존한다. #}
-<link rel="apple-touch-icon" sizes="180x180" href="/admin/assets/img/favicons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/admin/assets/img/favicons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/admin/assets/img/favicons/favicon-16x16.png">
-<link rel="shortcut icon" type="image/x-icon" href="/admin/assets/img/favicons/favicon.ico">
-<meta name="theme-color" content="#ffffff">
-<script src="/admin/vendors/simplebar/simplebar.min.js"></script>
-<script src="/admin/assets/js/config.js"></script>
-<link href="/admin/vendors/simplebar/simplebar.min.css" rel="stylesheet">
-<link href="/admin/vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
-<script src="/shared/ui-choices.js"></script>
-<script src="/shared/ui-list.js"></script>
-<link href="/admin/assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
-<link href="/admin/assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
 <style>
-  :root{ --phoenix-font-sans-serif: var(--font); }
-  .card > .card-header, .card > .card-body { min-width: 0; }
+/* pp = 상품 관리(ADM-PRD-010) 전용 클래스. admin2.css 토큰만 쓰고 :root 는 다시 정의하지
+   않는다. 외부 CDN 없음 — 글꼴·아이콘은 전부 var(--font)/var(--font-num)와 유니코드 글리프. */
+
+.pp{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* 상태 탭 — 5버킷. 클릭 = 서버 재조회(status 파라미터) → 배지·행 수 항상 일치 */
+.pp-tabs{flex:none;display:flex;align-items:stretch;gap:18px;border-bottom:1px solid rgba(0,0,0,.1);
+     background:var(--card);padding:0 18px;overflow-x:auto}
+.pp-tab{display:flex;align-items:center;gap:7px;padding:11px 2px;font:500 11.5px/1 var(--font);
+    color:var(--rv-faint);border:0;border-bottom:2px solid transparent;background:none;
+    cursor:pointer;white-space:nowrap}
+.pp-tab:hover{color:var(--on)}
+.pp-tab.on{color:var(--on);border-bottom-color:var(--on);font-weight:600}
+.pp-tab .n{font:500 10px/1 var(--font-num);color:var(--rv-faint);background:var(--container);
+       border-radius:999px;padding:3px 7px}
+.pp-tab.on .n{color:var(--on);background:var(--container-low)}
+.pp-tabs-note{margin-left:auto;align-self:center;font:400 10px/1.3 var(--font);color:var(--rv-dim);
+          white-space:nowrap;padding-left:12px}
+
+/* 필터 행 */
+.pp-filters{flex:none;display:flex;align-items:center;gap:9px;padding:11px 18px 0;flex-wrap:wrap}
+.pp-input,.pp-select{font:400 11.5px/1.3 var(--font);border:1px solid rgba(0,0,0,.18);
+    border-radius:6px;padding:9px 11px;background:var(--card);color:var(--on)}
+.pp-input{width:300px;max-width:100%;line-height:1}
+.pp-select{padding:8px 9px}
+.pp-mfr{width:170px;max-width:100%}
+.pp-grow{flex:1}
+.pp-btn-dark{font:600 11.5px/1 var(--font);color:var(--on-primary);background:var(--primary);
+         border:none;border-radius:5px;padding:10px 14px;cursor:pointer}
+.pp-btn-dark:hover{opacity:.9}
+.pp-btn-ghost{font:500 11px/1 var(--font);color:var(--rv-dim2);background:var(--container-low);
+          border:1px solid rgba(0,0,0,.08);border-radius:5px;padding:9px 12px;cursor:default}
+.pp-btn-outline{font:600 10.5px/1 var(--font);color:var(--on);background:var(--card);
+            border:1px solid rgba(0,0,0,.26);border-radius:5px;padding:8px 11px;cursor:pointer}
+.pp-btn-outline:hover{background:var(--container-low)}
+.pp-filters-note{flex:none;padding:5px 18px 0;font:400 9.5px/1.5 var(--font);color:var(--rv-dim)}
+
+/* 일괄 변경 바 */
+.pp-bulk{flex:none;margin:9px 18px 0}
+.pp-bulk-hint{font:400 11px/1.4 var(--font);color:var(--rv-dim)}
+.pp-bulk-active{display:flex;align-items:center;gap:10px;border:1px solid rgba(0,0,0,.12);
+            background:var(--container);border-radius:7px;padding:8px 13px;flex-wrap:wrap}
+.pp-bulk-active[hidden]{display:none}
+.pp-bulk-active b{font-family:var(--font-num)}
+.pp-bulk-count{font:500 11px/1.4 var(--font)}
+#btnBulk{padding:10px 12px}
+#bulkStatus{padding:7px 8px}
+.pp-bulk-note{font:400 10px/1.4 var(--font);color:var(--rv-dim)}
+.pp-bulk-result{font:400 10.5px/1.4 var(--font);color:var(--rv-ink-soft)}
+
+/* 표 — CSS Grid 행. 헤더·본문이 하나의 스크롤 컨테이너를 공유(sticky 헤더)라
+   좁은 화면에서도 두 스크롤이 어긋나 열이 밀리는 사고가 나지 않는다. */
+.pp-table-wrap{flex:1;min-height:0;margin:10px 18px 0;overflow:auto;border:1px solid rgba(0,0,0,.1);
+           border-radius:7px;background:var(--card)}
+.pp-row-head,.pp-row{display:grid;
+    grid-template-columns:34px 92px minmax(200px,1fr) 110px 82px 62px 92px 96px 40px;
+    gap:10px;align-items:center;min-width:900px}
+.pp-row-head{position:sticky;top:0;z-index:2;padding:8px 13px;background:var(--container);
+         font:600 10px/1 var(--font);color:var(--rv-muted);border-bottom:1px solid rgba(0,0,0,.1)}
+.pp-row{padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06);font:400 11px/1.3 var(--font)}
+.pp-row:hover{background:var(--container-low)}
+.pp-th-sort{cursor:pointer;user-select:none}
+.pp-th-sort:hover{color:var(--on)}
+.pp-right{text-align:right}
+.pp-row .pp-right{font-family:var(--font-num)}
+.pp-code{font:500 10.5px/1.3 var(--font-num);color:var(--rv-muted)}
+.pp-name-wrap{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pp-name{font:500 11.5px/1.35 var(--font);color:var(--on);overflow:hidden;text-overflow:ellipsis;
+     white-space:nowrap;cursor:pointer;text-decoration:underline;text-decoration-color:rgba(0,0,0,.18);
+     text-underline-offset:3px;text-align:left;background:none;border:0;padding:0;display:block;width:100%}
+.pp-sku{font:400 9.5px/1.3 var(--font-num);color:var(--rv-dim)}
+.pp-cat{font:400 10.5px/1.3 var(--font);color:var(--rv-muted)}
+.pp-stock.zero{color:var(--error);font-weight:700}
+.pp-price{font:400 11px/1.3 var(--font-num);text-align:right}
+.pp-menu-btn{font:600 13px/1 var(--font-num);color:var(--rv-faint);background:none;border:0;
+         cursor:pointer;text-align:center;padding:6px 2px;width:100%}
+.pp-menu-btn:hover{color:var(--on)}
+
+.pp-badge{display:inline-flex;align-items:center;font:600 10px/1 var(--font);border-radius:4px;
+      padding:4px 7px;white-space:nowrap}
+.pp-badge[hidden]{display:none}
+.pp-badge-ok{color:var(--on);border:1px solid var(--outline)}
+.pp-badge-warn{color:var(--rv-amber);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+.pp-badge-bad{color:var(--error);border:1px solid var(--error)}
+.pp-dim-text{color:var(--rv-dim);font:400 10px/1 var(--font)}
+
+.pp-foot{flex:none;display:flex;align-items:center;gap:10px;margin:0 18px;padding:8px 13px;
+     background:var(--card);border:1px solid rgba(0,0,0,.1);border-top:none;border-radius:0 0 7px 7px}
+.pp-foot .cnt{font:400 10.5px/1 var(--font);color:var(--rv-faint)}
+.pp-foot .cnt b{font-family:var(--font-num);color:var(--on-variant)}
+.pp-pager{display:flex;align-items:center;gap:8px;margin-left:auto}
+.pp-pager button{font:500 11px/1 var(--font);color:var(--on);background:var(--card);
+             border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 10px;cursor:pointer}
+.pp-pager button:disabled{opacity:.4;cursor:default}
+.pp-pages{font:500 11px/1 var(--font-num);color:var(--on)}
+
+.pp-legend{flex:none;border-top:1px solid rgba(0,0,0,.09);background:var(--container);
+       padding:7px 18px;font:400 10px/1.5 var(--font);color:var(--rv-faint)}
+
+.pp-empty{padding:40px 20px;text-align:center;color:var(--rv-dim);font:400 11.5px/1.5 var(--font)}
+
+/* 서랍(상세/등록 공용 셸) */
+.pp-veil{position:absolute;inset:0;background:rgba(38,35,30,.2);z-index:9}
+.pp-veil[hidden]{display:none}
+.pp-drawer{position:absolute;top:0;right:0;bottom:0;width:560px;max-width:92vw;background:var(--card);
+       border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);
+       display:flex;flex-direction:column;z-index:10}
+.pp-drawer[hidden]{display:none}
+.pp-dr-head{flex:none;padding:14px 18px 0;border-bottom:1px solid rgba(0,0,0,.09)}
+.pp-dr-title-row{display:flex;align-items:center;gap:9px}
+.pp-dr-title{font:600 14px/1.35 var(--font);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+         white-space:nowrap}
+.pp-dr-close{font:400 15px/1 var(--font);color:var(--rv-faint);cursor:pointer;padding:2px 4px;
+         background:none;border:0}
+.pp-dr-close:hover{color:var(--on)}
+.pp-dr-sub{display:flex;gap:11px;margin:6px 0 10px;font:400 10.5px/1.3 var(--font-num);
+       color:var(--rv-faint);flex-wrap:wrap}
+.pp-dr-tabs{display:flex;gap:15px;flex-wrap:wrap}
+.pp-dr-tab{font:500 11.5px/1 var(--font);color:var(--rv-faint);padding:10px 2px;cursor:pointer;
+       border:0;background:none;border-bottom:2px solid transparent}
+.pp-dr-tab.on{font-weight:600;color:var(--on);border-bottom-color:var(--on)}
+.pp-dr-body{flex:1;min-height:0;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:2px}
+.pp-field{display:grid;grid-template-columns:104px 1fr auto;gap:12px;align-items:baseline;
+      padding:9px 2px;border-bottom:1px solid rgba(0,0,0,.06)}
+.pp-field .lb{font:500 10.5px/1.4 var(--font);color:var(--rv-faint)}
+.pp-field .val{font:400 11.5px/1.5 var(--font);color:var(--on);word-break:break-all}
+.pp-field .val.dim{color:var(--rv-dim)}
+.pp-field .lock{font-size:11px}
+.pp-field .lock .lock{display:inline-flex;align-items:center;font:600 9px/1 var(--font);
+    color:var(--rv-link);background:oklch(0.95 0.03 250);border:1px solid oklch(0.5 0.13 250 / .35);
+    border-radius:3px;padding:3px 6px;white-space:nowrap}
+.pp-field input,.pp-field select{font:400 11.5px/1.3 var(--font);border:1px solid rgba(0,0,0,.18);
+    border-radius:5px;padding:7px 9px;background:var(--card);width:100%}
+.pp-dr-hint{font:400 10px/1.65 var(--font);color:var(--rv-dim);margin-top:9px}
+.pp-dr-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;
+        align-items:center;gap:8px;background:var(--container);flex-wrap:wrap}
+.pp-dr-foot .note{font:400 10.5px/1.4 var(--font);color:var(--rv-faint);flex:1;min-width:120px}
+.pp-btn-primary{font:600 11.5px/1 var(--font);color:var(--on-primary);background:var(--primary);
+            border:none;border-radius:5px;padding:9px 15px;cursor:pointer}
+.pp-btn-primary:hover{opacity:.9}
+.pp-btn-line{font:500 11.5px/1 var(--font);color:var(--on);background:var(--card);
+         border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 13px;cursor:pointer;
+         text-decoration:none;display:inline-block}
+.pp-btn-line:hover{background:var(--container-low)}
+.pp-btn-primary:disabled,.pp-btn-line:disabled{cursor:not-allowed;opacity:.55;pointer-events:none}
+/* 공용 진행 배너는 preview:true 요청엔 뜨지 않는다(ui-progress.js가 스스로 제외 — ㉯
+   확정 2026-08-15). 그래서 이 화면이 자기 자리에서 진행을 보여준다 — 결함 ⓐ-4. */
+.pp-inline-busy{display:inline-flex;align-items:center;gap:7px;font:500 10.5px/1 var(--font);
+    color:var(--rv-faint)}
+.pp-inline-busy-sp{width:12px;height:12px;border:2px solid rgba(0,0,0,.16);border-top-color:var(--on);
+    border-radius:50%;display:inline-block;animation:ppInlineSpin .7s linear infinite}
+@keyframes ppInlineSpin{to{transform:rotate(360deg)}}
+
+.pp-gate{border:1px solid rgba(0,0,0,.1);border-radius:7px;padding:10px 12px;margin-bottom:6px;
+     background:var(--container-low)}
+.pp-gate-note{font:500 11px/1.5 var(--font);color:var(--on)}
+.pp-gate-list{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.pp-gate-item{display:flex;align-items:center;gap:8px;font:400 10.5px/1.3 var(--font)}
+.pp-gate-dot{flex:none;width:8px;height:8px;border-radius:50%}
+.pp-gate-item.ok .pp-gate-dot{background:var(--on)}
+.pp-gate-item.bad .pp-gate-dot{background:var(--error)}
+.pp-gate-item .k{color:var(--rv-faint);min-width:76px}
+.pp-gate-item .v{color:var(--on)}
+
+.pp-sup-row{display:grid;grid-template-columns:1fr 96px 64px 118px 48px;gap:10px;align-items:center;
+        padding:8px 2px;border-bottom:1px solid rgba(0,0,0,.06);font:400 11px/1.3 var(--font)}
+.pp-sup-row.head{font:600 10px/1 var(--font);color:var(--rv-faint)}
+.pp-sup-add{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.pp-sup-add select,.pp-sup-add input{font:400 11px/1.3 var(--font);border:1px solid rgba(0,0,0,.18);
+    border-radius:5px;padding:7px 9px;background:var(--card)}
+.pp-row-del{font:500 10.5px/1 var(--font);color:var(--error);background:none;
+        border:1px solid var(--error);border-radius:4px;padding:5px 8px;cursor:pointer}
+
+.pp-impact{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-radius:7px;
+       padding:11px 13px;margin-top:8px;font:400 11px/1.6 var(--font);color:var(--on)}
+
+@media (max-width:768px){
+  .pp-filters{align-items:stretch}
+  .pp-input,.pp-mfr{width:100%}
+  .pp-drawer{width:100%;max-width:100%}
+  .pp-field{grid-template-columns:96px 1fr auto}
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="a2-content-pad">
-<div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-  <div>
-    <h2 class="mb-1">상품 관리
-      <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-PRD-010</span>
-      <span id="dataSrc" class="badge badge-phoenix badge-phoenix-secondary align-middle fs-10">불러오는 중…</span>
-    </h2>
-    <p class="text-body-tertiary mb-0">정본(단일 진실)의 현재 상태입니다. 각 상품이 <b class="text-body-secondary">왜 추천 가능/불가인지</b>가 함께 표시됩니다.</p>
+<div class="pp">
+  <div class="pp-tabs" id="tabs" role="tablist" aria-label="상태" data-keep="1"></div>
+
+  <div class="pp-filters" data-keep="1">
+    <label class="visually-hidden" for="q">상품 검색</label>
+    <input id="q" class="pp-input" type="search"
+           placeholder="상품번호 · SKU · 상품명 (300ms 후 서버 질의)" aria-label="상품 검색">
+    <label class="visually-hidden" for="fcat">분류 필터</label>
+    <select id="fcat" class="pp-select" aria-label="분류 필터"><option value="all">분류 전체</option></select>
+    <label class="visually-hidden" for="fmfr">제조사 필터</label>
+    <input id="fmfr" class="pp-select pp-mfr" type="text" list="fmfrList" autocomplete="off"
+           placeholder="제조사 전체" aria-label="제조사 필터">
+    <datalist id="fmfrList"></datalist>
+    <span class="pp-grow"></span>
+    <button type="button" class="pp-btn-ghost" disabled aria-disabled="true"
+            title="이 화면은 아직 admin2에 없습니다">매입 견적으로</button>
+    <button type="button" class="pp-btn-ghost" disabled aria-disabled="true"
+            title="이 화면은 아직 admin2에 없습니다">가격 검토로</button>
+    <button type="button" class="pp-btn-dark" id="btnNew">+ 상품 등록</button>
   </div>
-  {# 상품 단건 등록 화면(product-edit.html?new=1)은 admin2에 아직 없다(2026-08-13 실측 —
-     /admin2/product-edit 404). 구 admin(/admin/*.html)은 410으로 막혔다(P-09) — 그리로
-     되돌리지 않는다. 자리는 그대로 두고 **진짜 disabled** + title로 무엇이 없는지 밝힌다. #}
-  <button type="button" class="btn btn-primary btn-sm" disabled aria-disabled="true" title="이 화면은 아직 admin2에 없습니다"><span data-feather="plus" style="width:14px;height:14px;"></span> 상품 단건 등록</button>
-</div>
+  <div class="pp-filters-note">등록·상세·수정이 이번 재구축으로 활성화됩니다 — 등록은 빈 분류
+    선택을 강제하고 유사 상품 검사(임계 0.97)를 거칩니다 · 매입 견적·가격 검토 이동은 대상
+    화면이 없어 비활성</div>
 
-<div class="row g-2 mb-3" id="kpis"></div>
-
-<div class="card">
-  <div class="card-header border-bottom border-translucent">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-      <ul class="nav nav-pills gap-2 fs-9 mb-0" id="pills"></ul>
-      <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
-        <select id="fcat" class="form-select form-select-sm" style="max-width:132px;" title="분류 필터" aria-label="분류 필터"></select>
-        <select id="fmfr" class="form-select form-select-sm" style="max-width:132px;" title="제조사 필터" aria-label="제조사 필터"></select>
-        <div class="search-box" style="width:248px;">
-          <form class="position-relative" onsubmit="return false;">
-            <input id="q" class="form-control form-control-sm search-input" type="search" placeholder="상품번호 · SKU · 상품명" aria-label="상품 검색">
-            <span class="fas fa-search search-box-icon"></span>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    {# 일괄 선택 액션 바 — 선택이 없을 때는 안내만 보인다.
-       `bulk-replace` / `bulk-actions` 이름은 Phoenix BulkSelect 규약이다. #}
-    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-      <div id="bulk-replace">
-        <span class="fs-10 text-body-tertiary">행을 선택하면 상태를 한 번에 바꿀 수 있습니다.</span>
-      </div>
-      <div class="d-none align-items-center gap-2" id="bulk-actions">
-        <span class="fs-9"><b id="selCount">0</b>건 선택</span>
-        <select class="form-select form-select-sm w-auto" id="bulkStatus" aria-label="바꿀 상태"></select>
-        <button class="btn btn-primary btn-sm" type="button" id="btnBulk">상태 바꾸기</button>
-        <button class="btn btn-link btn-sm p-0 ms-1 fs-9" type="button" id="btnBulkClear">선택 해제</button>
-        <span class="fs-10 text-body-tertiary" id="bulkHint"></span>
-      </div>
+  <div class="pp-bulk" data-keep="1">
+    <div id="bulkHintWrap"><span class="pp-bulk-hint">행을 선택하면 상태를 한 번에 바꿀 수 있습니다.</span></div>
+    <div class="pp-bulk-active" id="bulkActive" hidden>
+      <span class="pp-bulk-count">선택 <b id="selCount">0</b>건</span>
+      <label class="visually-hidden" for="bulkStatus">바꿀 상태</label>
+      <select id="bulkStatus" class="pp-select" aria-label="바꿀 상태"></select>
+      <button type="button" class="pp-btn-dark" id="btnBulk">상태 바꾸기</button>
+      <span class="pp-bulk-note">확인 대화상자 후 실행 · 최대 2,000건 · 잠긴 상품은 사유와 함께 건너뜀</span>
+      <span class="pp-grow"></span>
+      <span class="pp-bulk-result" id="bulkResult" role="status" aria-live="polite"></span>
+      <button type="button" class="pp-btn-outline" id="btnUndo" hidden>↩ 되돌리기</button>
     </div>
   </div>
 
-  <div class="card-body p-0">
-    {# data-list = **현재 페이지 안에서의** 검색·정렬(헤더 클릭). 페이지 이동은 서버가 한다 —
-       page/pagination 옵션을 넣지 않는다(넣으면 서버가 나눈 100건을 또 쪼갠다).
-       판매가만 attr 로 정렬한다: 표시값 "239,000원"은 문자열 정렬이 쉼표에서 어긋나
-       1,299,000 을 239,000 보다 작다고 놓는다. data-num(원 단위 정수)이 그걸 막는다. #}
-    <div id="prodList" data-list='{"valueNames":["name","cat","spec","stock",{"name":"price","attr":"data-num"},"status"]}'>
-      {# 열 너비: 상품명이 나머지 전부를 받는다. 액션 열이 120px → 56px 로 줄어
-         상품명이 그만큼 더 받는다(btn-reveal 로 접었기 때문). #}
-      <div class="table-responsive">
-        <table class="table table-sm align-middle fs-9 mb-0" style="table-layout:fixed;min-width:1140px;">
-          <colgroup>
-            <col style="width:36px"><col style="width:44px"><col>
-            <col style="width:84px"><col style="width:104px"><col style="width:56px">
-            <col style="width:96px"><col style="width:128px"><col style="width:56px">
-          </colgroup>
-          <thead>
-            <tr class="text-body-tertiary">
-              <th style="width:36px;" class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" id="chkAll" data-bulk-select='{"body":"rows","actions":"bulk-actions","replacedElement":"bulk-replace"}' aria-label="이 페이지 전체 선택"></div></th>
-              <th><span class="visually-hidden">분류 아이콘</span></th>
-              <th class="sort" data-sort="name">상품명</th>
-              <th class="sort" data-sort="cat">분류</th>
-              <th class="sort" data-sort="spec">필수 사양</th>
-              <th class="sort text-end" data-sort="stock">재고</th>
-              <th class="sort text-end" data-sort="price">판매가</th>
-              <th class="sort" data-sort="status">상태</th>
-              <th class="pe-3"><span class="visually-hidden">작업</span></th>
-            </tr>
-          </thead>
-          <tbody class="list" id="rows"></tbody>
-        </table>
+  <div class="pp-table-wrap" data-keep="1">
+    <div class="pp-row-head" id="thead">
+      <span><input type="checkbox" id="chkAll" aria-label="이 페이지 전체 선택"></span>
+      <span>상품번호</span>
+      <span class="pp-th-sort" data-sort="name" tabindex="0" role="button">상품명 ↕</span>
+      <span class="pp-th-sort" data-sort="cat" tabindex="0" role="button">분류 ↕</span>
+      <span class="pp-th-sort" data-sort="spec" tabindex="0" role="button">필수사양 ↕</span>
+      <span class="pp-th-sort pp-right" data-sort="stock" tabindex="0" role="button">재고 ↕</span>
+      <span class="pp-th-sort pp-right" data-sort="price" tabindex="0" role="button">판매가 ↕</span>
+      <span class="pp-th-sort" data-sort="status" tabindex="0" role="button">상태 ↕</span>
+      <span></span>
+    </div>
+    <div id="rows"></div>
+  </div>
+  <div class="pp-foot" id="pgBar"></div>
+  <div class="pp-legend">요청 전 KPI·배지는 「—」 · 실패는 사유를 구분해 밝힙니다(네트워크 ·
+    세션 만료 401 · 서버 오류) · 빈 결과는 "조건에 맞는 상품이 없습니다."</div>
+
+  <div class="pp-veil" id="veil" hidden></div>
+
+  <aside class="pp-drawer" id="drawer" data-keep="1" hidden role="dialog" aria-modal="true" aria-label="상품 상세">
+    <div class="pp-dr-head">
+      <div class="pp-dr-title-row">
+        <span class="pp-dr-title" id="drTitle"></span>
+        <span class="pp-badge" id="drStatusBadge" hidden></span>
+        <button type="button" class="pp-dr-close" id="drClose" aria-label="닫기">✕</button>
+      </div>
+      <div class="pp-dr-sub" id="drSub"></div>
+      <div class="pp-dr-tabs" id="drTabs" role="tablist"></div>
+    </div>
+    <div class="pp-dr-body" id="drBody"></div>
+    <div class="pp-dr-foot" id="drFoot"></div>
+  </aside>
+
+  <aside class="pp-drawer" id="regDrawer" data-keep="1" hidden role="dialog" aria-modal="true" aria-label="상품 등록">
+    <div class="pp-dr-head">
+      <div class="pp-dr-title-row">
+        <span class="pp-dr-title">상품 등록</span>
+        <button type="button" class="pp-dr-close" id="regClose" aria-label="닫기">✕</button>
       </div>
     </div>
-  </div>
-</div>
+    <div class="pp-dr-body" id="regBody"></div>
+    <div class="pp-dr-foot" id="regFoot"></div>
+  </aside>
 </div>
 {% endblock %}
 
 {% block foot_extra %}
-<script src="/admin/vendors/popper/popper.min.js"></script>
-<script src="/admin/vendors/bootstrap/bootstrap.min.js"></script>
-<script src="/admin/vendors/anchorjs/anchor.min.js"></script>
-<script src="/admin/vendors/is/is.min.js"></script>
-<script src="/admin/vendors/fontawesome/all.min.js"></script>
-<script src="/admin/vendors/lodash/lodash.min.js"></script>
-<script src="/admin/vendors/list.js/list.min.js"></script>
-<script src="/admin/vendors/feather-icons/feather.min.js"></script>
-<script src="/admin/vendors/dayjs/dayjs.min.js"></script>
-<script src="/admin/vendors/choices/choices.min.js"></script>
-<script src="/admin/assets/js/phoenix.js"></script>
-<script src="/shared/admin-panel.js"></script>
-<script src="/shared/admin-helper.js"></script>
-<script src="/shared/su-icons.js"></script>
-{% raw %}
-<script>
+{# 쓰기 요청 자동 진행·완료 표시(전 admin2 공통, CLAUDE.md "쓰기 요청은 자동으로 진행·완료를
+   표시한다"). 멱등 가드(window.__pcProgress)가 있어 셸이 이미 로드했어도 중복 부작용이
+   없다 — 그래도 이 화면이 실제로 의존하므로 명시적으로 싣는다(부르기 전에 있는지 보는 것과
+   같은 이유로, 있는 줄 가정하지 않는다). #}
+<script src="/shared/ui-progress.js"></script>
+<script>{% raw %}
 (function(){
-  // 상태: ok(추천 가능) / review(검수 대기) / oos(재고 없음→매입) / price(가격 검토)
-  function skuTail(p){
-    var sku = p.sku == null ? "" : String(p.sku);
-    return (sku && sku !== String(p.product_code)) ? " · SKU " + esc(sku) : "";
-  }
-  // 속성 안에 들어가는 값이라 따옴표를 반드시 막는다 — 안 막으면 이름에 " 가 있는
-  // 상품 하나가 그 행의 마크업을 통째로 깨뜨린다.
+  "use strict";
+  var API = "/api/admin";
+
   function esc(v){
     return String(v == null ? "" : v).replace(/[&<>"]/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
     });
   }
-  /* link: 실제 URL(admin2, 활성) · false(admin2에 아직 없음 — 진짜 disabled로 표시) · null(이 상태엔 바로가기가 없음, ok).
-     구 admin(/admin/*.html)은 410으로 막혔다(P-09). 검수 큐만 /admin2/reviews 가 실재해 그쪽으로 잇는다
-     (2026-08-13 실측 200). 매입 견적·가격 검토는 admin2에 아직 없다(/admin2/sourcing·/admin2/price-review 둘 다 404). */
-  const NOTE_NO_ADMIN2="이 화면은 아직 admin2에 없습니다";
-  const ST={ok:["추천 가능","primary",null,null],review:["검수 대기","warning","/admin2/reviews","검수 큐로"],oos:["재고 없음 · 매입 대기","info",false,"매입 견적으로"],price:["가격 검토 대기","warning",false,"가격 검토로"]};
-
-  /* 분류 아이콘 — Phoenix 원본의 제품 사진 자리를 대신한다.
-     우리에겐 이미지 원천이 없다(스키마·API 어디에도 없다). 사진을 지어내는 대신
-     **서버가 준 `cat` 값에서 파생**한다. 모르는 분류는 기본 아이콘으로 떨어지고,
-     그건 "분류가 없다"가 아니라 "아이콘을 아직 안 정했다"는 뜻이다. */
-  const ICON={"CPU":"cpu","메인보드":"grid","메모리":"server","SSD":"hard-drive","HDD":"hard-drive",
-              "그래픽카드":"layers","파워":"zap","케이스":"box","CPU쿨러":"wind","쿨러":"wind",
-              "모니터":"monitor","키보드":"type","마우스":"mouse-pointer","스피커":"volume-2"};
-  function catIcon(cat){
-    var name = ICON[cat] || "box";
-    return '<span class="d-inline-flex flex-center rounded-2 bg-body-secondary text-body-tertiary" style="width:30px;height:30px;" title="'+esc(cat)+'"><span data-feather="'+name+'" style="width:15px;height:15px;"></span></span>';
+  function fmtWon(n){ return n == null ? "—" : n.toLocaleString("ko-KR") + "원"; }
+  function fmtDate(s){ return s ? String(s).slice(0,16).replace("T"," ") : "—"; }
+  function errText(j, status){
+    return window.popcornProgress ? window.popcornProgress.errText(j, status, "") : ("오류 " + status);
+  }
+  function asJson(r){
+    return r.json().catch(function(){ return null; }).then(function(j){ return {ok:r.ok, status:r.status, j:j}; });
   }
 
-  let cur="all", q="", fcat="all", fmfr="all";
-  // 정규화 어댑터 — API 계약 JSON을 화면 객체형으로. **원천은 서버뿐이다.**
-  const fromApi=it=>({product_code:String(it.product_code),sku:it.sku,name:it.name,cat:it.cat,maker:it.maker||"—",spec_done:it.spec_done,spec_total:it.spec_total,spec_row_missing:it.spec_row_missing,stock:it.stock,supplier_count:it.supplier_count,price_text:it.sale_price==null?"—":it.sale_price.toLocaleString("ko-KR")+"원",status_key:it.status_key});
-  let DATA=[];
-  // 화면 상태 — loading: 요청 전·요청 중 / ok: 서버 응답 / fail: 못 불러옴.
-  // 수치를 말해도 되는 때는 ok 하나뿐이다.
-  let STATE="loading";
-  /* 필터 선택지는 **서버가 준다**(슬라이스 66). 현재 페이지에서 뽑으면
-     한 페이지(100건)에 없는 분류·제조사가 목록에 아예 안 나온다. */
-  let META=null;
-  function fillSelects(){
-    const cats = META && META.used_parts ? META.used_parts.map(x=>x.label) : [];
-    const mfrs = META && META.makers ? META.makers : [];
-    // 제조사는 실측 620개다 — 평범한 셀렉트로는 못 찾는다. 검색을 붙인다.
-    var PC = window.popcornChoices;
-    var fillCat = function(sel){ sel.innerHTML=`<option value="all">전체 분류</option>`+cats.map(c=>`<option${fcat===c?" selected":""}>${c}</option>`).join(""); };
-    var fillMfr = function(sel){ sel.innerHTML=`<option value="all">전체 제조사</option>`+mfrs.map(m=>`<option${fmfr===m?" selected":""}>${m}</option>`).join(""); };
-    if(PC){ PC.refill("fcat", fillCat, {searchEnabled: cats.length > 10});
-            PC.refill("fmfr", fillMfr, {searchEnabled: true, searchPlaceholderValue: "제조사 검색"}); }
-    else { fillCat(document.getElementById("fcat"));
-           fillMfr(document.getElementById("fmfr")); }
-  }
+  /* ══════════════════════ 메타(선택지) — 서버가 준다 ══════════════════════ */
+  var META = null, SPEC_FIELDS = null, SUPPLIERS = null;
+
   function loadMeta(){
-    return fetch("/api/admin/product-meta")
-      .then(r=>r.ok?r.json():null)
-      .then(m=>{ if(m){ META=m; fillSelects(); fillBulkStatus(m.status_options); } })
-      .catch(()=>{});
+    return fetch(API + "/product-meta").then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(m){ if(m){ META = m; fillFilterSelects(); fillBulkStatusSelect(); } })
+      .catch(function(){});
+  }
+  function loadSpecFields(){
+    return fetch(API + "/spec-fields").then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ SPEC_FIELDS = (j && j.items) || []; })
+      .catch(function(){ SPEC_FIELDS = []; });
+  }
+  function loadSuppliers(){
+    return fetch(API + "/suppliers").then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ SUPPLIERS = (j && j.items) || []; })
+      .catch(function(){ SUPPLIERS = []; });
+  }
+  function fillFilterSelects(){
+    var cats = (META && META.used_parts) || [];
+    var mfrs = (META && META.makers) || [];
+    var selCat = document.getElementById("fcat");
+    if(selCat) selCat.innerHTML = '<option value="all">분류 전체 (' + cats.length + '종)</option>'
+      + cats.map(function(c){ return '<option value="' + esc(c.part_type) + '">' + esc(c.label) + '</option>'; }).join("");
+    var dl = document.getElementById("fmfrList");
+    if(dl) dl.innerHTML = mfrs.map(function(m){ return '<option value="' + esc(m) + '">'; }).join("");
+  }
+  function fillBulkStatusSelect(){
+    var sel = document.getElementById("bulkStatus");
+    if(!sel || !META) return;
+    sel.innerHTML = (META.status_options || []).map(function(o){
+      return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join("");
+  }
+  function specLabel(key){
+    var f = (SPEC_FIELDS || []).filter(function(x){ return x.field_key === key; })[0];
+    return f ? f.label : key;
+  }
+  function fieldsForPartType(pt){
+    return (SPEC_FIELDS || []).filter(function(f){
+      return !f.part_types || !f.part_types.length || f.part_types.indexOf(pt) >= 0;
+    }).map(function(f){
+      return Object.assign({}, f, {required: (f.required_for || []).indexOf(pt) >= 0});
+    }).sort(function(a,b){ return (a.sort_order || 0) - (b.sort_order || 0); });
   }
 
-  /* KPI — 서버 kpis(상호배타 버킷)만 쓴다. k 가 없으면(요청 전·실패) 전부 "—".
-     Phoenix ecommerce 카드 이디엄으로 아이콘을 붙였다. **값은 그대로다.** */
-  const KPI=[["total","전체 상품","개","box","secondary"],
-             ["ok","추천 가능","개","check-circle","primary"],
-             ["review","검수 대기","건","clipboard","warning"],
-             ["oos","재고 없음","개","alert-circle","info"]];
-  function renderKpis(k){
-    const host=document.getElementById("kpis"); if(!host) return;
-    const n=v=>(v==null?"—":v.toLocaleString("ko-KR"));
-    host.innerHTML=KPI.map(([key,label,unit,icon,tone])=>
-      `<div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-3">
-         <div class="d-flex align-items-center gap-2">
-           <span class="d-inline-flex flex-center rounded-2 bg-${tone}-subtle text-${tone}" style="width:32px;height:32px;"><span data-feather="${icon}" style="width:16px;height:16px;"></span></span>
-           <div><p class="fs-10 text-body-tertiary mb-0">${label}</p>
-           <h4 class="mb-0">${n(k&&k[key])}<span class="fs-10 fw-semibold text-body-tertiary"> ${unit}</span></h4></div>
-         </div></div></div></div>`).join("");
-    if(window.feather)feather.replace();
-  }
-  function counts(){const c={all:DATA.length};DATA.forEach(p=>c[p.status_key]=(c[p.status_key]||0)+1);return c;}
-  function pills(){
-    const host=document.getElementById("pills"); if(!host) return;
-    const c=counts(), known=STATE==="ok";   // 서버 응답 전에는 0 도 사실이 아니다
-    const order=[["all","전체","dark"],["ok","추천 가능","primary"],["review","검수 대기","warning"],["oos","재고 없음","info"],["price","가격 검토","warning"]];
-    host.innerHTML=order.map(([k,l,col])=>{
-      const on=k===cur;
-      return `<li class="nav-item"><a href="#!" data-f="${k}" class="nav-link py-1 px-3 ${on?"active":""}" style="${on?"":"background:var(--phoenix-secondary-bg-subtle);color:var(--phoenix-body-color);"}">${l} <span class="badge ${on?"bg-body-emphasis text-body-emphasis-inverse":"badge-phoenix badge-phoenix-"+col} ms-1">${known?(c[k]||0):"—"}</span></a></li>`;
-    }).join("");
-    document.querySelectorAll("#pills [data-f]").forEach(a=>a.onclick=e=>{e.preventDefault();cur=a.dataset.f;render();});
-  }
-  function specBadge(done,total,rowMissing){
-    if(total===0)return `<span class="fs-10 text-body-tertiary">—</span>`; // 필수 사양 매트릭스 미등록 분류
-    // 사양 행 자체 부재는 값 미확인(0/N)과 구분 — 추천 뷰가 specs를 조인하므로 재고·가격이 채워져도 미진입
-    if(rowMissing)return `<span class="badge badge-phoenix badge-phoenix-danger">사양 미등록</span> <span class="fs-10 text-body-tertiary">행 없음</span>`;
-    const ok=done===total;
-    return `<span class="badge badge-phoenix badge-phoenix-${ok?"primary":"warning"}">${ok?"확인 완료":"미확인 "+(total-done)}</span> <span class="fs-10 text-body-tertiary">${done}/${total}</span>`;
-  }
-  // 판매가 정렬 키 — 표시 문자열에서 숫자만 남긴다(값을 새로 만들지 않는다. "—"는 빈 값 그대로).
-  const priceNum=t=>String(t==null?"":t).replace(/[^0-9]/g,"");
-
-  /* ── 현재 페이지 정렬(list.js) — 공용 헬퍼가 전담한다(shared/ui-list.js).
-     서버 페이지네이션은 그대로: page/pagination 옵션 없음 → 현재 페이지만 다룬다.
-     재고는 순수 정수라 문자열 비교로는 12 가 9 보다 앞선다 → numeric 으로 넘긴다.
-     검색 입력(#q)은 list.js 검색이 아니라 **서버 질의**다 — searchInput 으로 넘기지 않는다. */
-  const LIST_VALUE_NAMES=["name","cat","spec","stock",{name:"price",attr:"data-num"},"status"];
-  function wireList(){
-    if(!window.popcornList) return;   // 헬퍼가 없으면 정렬만 포기하고 렌더는 계속 간다
-    window.popcornList.wire("prodList", LIST_VALUE_NAMES, {numeric:["stock"]});
-  }
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",wireList);
-  else wireList();
-
-  /* ── 일괄 선택 ────────────────────────────────────────────────
-   * `bulkSelectInit` 은 docReady 때 1회만 돈다. 우리 표는 fetch 뒤에 그려지므로
-   * 그때는 존재하지 않는다 → 전역 `phoenix.BulkSelect` 로 직접 붙인다.
-   * BulkSelect 는 카운터도 이벤트도 주지 않으므로 선택 상태는 우리가 들고 있는다.
-   */
-  var SEL={}, BULK=null;
-  function selCount(){ return Object.keys(SEL).length; }
-  function syncBulk(){
-    var c=selCount(), act=document.getElementById("bulk-actions");
-    if(!act) return;
-    document.getElementById("selCount").textContent=c.toLocaleString("ko-KR");
-    act.classList.toggle("d-none", c===0);
-    act.classList.toggle("d-flex", c>0);
-    document.getElementById("bulk-replace").classList.toggle("d-none", c>0);
-    var h=document.getElementById("bulkHint");
-    h.textContent = c>2000 ? "한 번에 2,000건까지 바꿉니다 — 나머지는 다시 선택하세요" : "";
-  }
-  function wireBulk(){
-    var head=document.getElementById("chkAll");
-    if(window.phoenix && window.phoenix.BulkSelect && head){
-      head.checked=false; head.indeterminate=false;
-      try{ BULK=new window.phoenix.BulkSelect(head); BULK.init(); }catch(e){ BULK=null; }
+  /* 2단 선택 — taxonomy.choice_tree() 가 준 트리를 그대로 그린다(무엇이 접히는지는
+     화면이 모른다 — CANON: 부품 어휘는 taxonomy.py 단일 원천). */
+  function findLeafGroup(tree, leafKey){
+    for(var i=0;i<tree.length;i++){
+      if(tree[i].key === leafKey) return {top:tree[i], sub:null};
+      if(tree[i].options){
+        for(var j=0;j<tree[i].options.length;j++){
+          if(tree[i].options[j].key === leafKey) return {top:tree[i], sub:tree[i].options[j]};
+        }
+      }
     }
-    syncBulk();
+    return null;
   }
-  document.addEventListener("change",function(ev){
-    var cb=ev.target.closest && ev.target.closest("#rows input[data-pc]");
-    if(!cb) return;
-    var pc=cb.getAttribute("data-pc");
-    if(cb.checked){ SEL[pc]=true; } else { delete SEL[pc]; }
-    syncBulk();
-  });
-  function fillBulkStatus(opts){
-    var sel=document.getElementById("bulkStatus");
-    if(!sel || sel.options.length || !opts || !opts.length) return;
-    // 선택지는 **서버가 준다**(product-meta.status_options) — 화면이 지어내지 않는다
-    sel.innerHTML=opts.map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join("");
-  }
-  var BULK_UNDO=null;
-  function bulkApply(){
-    var codes=Object.keys(SEL).map(Number);
-    if(!codes.length) return;
-    var st=document.getElementById("bulkStatus").value;
-    if(!st){ alert("바꿀 상태를 고르세요"); return; }
-    if(!confirm(codes.length.toLocaleString("ko-KR")+"건을 '"+st+"'(으)로 바꿉니다. 계속할까요?")) return;
-    fetch("/api/admin/products/bulk-status",{method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({product_codes:codes,status:st})})
-      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
-      .then(function(res){
-        // 실패를 삼키지 않는다 — 공용 헬퍼가 만든 같은 문장을 쓴다
-        if(!res.ok){ alert((window.popcornProgress&&window.popcornProgress.errText)
-                           ? window.popcornProgress.errText(res.j,"") : "바꾸지 못했습니다"); return; }
-        BULK_UNDO=res.j.log_id; SEL={}; syncBulk(); load();
-      })
-      .catch(function(e){ alert("바꾸지 못했습니다 — "+e.message); });
+  function buildChoiceSelect(host, tree, currentKey, onChange){
+    var found = currentKey ? findLeafGroup(tree, currentKey) : null;
+    var sel1 = document.createElement("select");
+    sel1.setAttribute("aria-label", "분류(1단)");
+    sel1.innerHTML = '<option value="">분류를 선택하세요</option>' + tree.map(function(t){
+      return '<option value="' + esc(t.key) + '"' + (found && found.top.key===t.key ? " selected" : "") + '>' + esc(t.label) + '</option>';
+    }).join("");
+    var sel2 = document.createElement("select");
+    sel2.setAttribute("aria-label", "분류(2단)");
+    sel2.style.marginLeft = "6px";
+    host.innerHTML = "";
+    host.appendChild(sel1);
+    host.appendChild(sel2);
+    function syncSel2(){
+      var top = tree.filter(function(t){ return t.key === sel1.value; })[0];
+      if(top && top.options){
+        sel2.style.display = "";
+        sel2.innerHTML = top.options.map(function(o){
+          return '<option value="' + esc(o.key) + '"' + (found && found.sub && found.sub.key===o.key ? " selected" : "") + '>' + esc(o.label) + '</option>';
+        }).join("");
+        onChange(sel2.value || null);
+      } else {
+        sel2.style.display = "none"; sel2.innerHTML = "";
+        onChange(top ? top.key : null);
+      }
+    }
+    sel1.onchange = syncSel2;
+    sel2.onchange = function(){ onChange(sel2.value || null); };
+    syncSel2();
   }
 
-  // 표가 비는 이유를 표가 직접 말한다(colspan=9 — 위 colgroup·thead 와 같은 열 수)
-  const STATE_MSG={loading:"불러오는 중…",fail:"서버에 연결되지 않아 불러오지 못했습니다."};
-  function render(){
-    pills();
-    const host=document.getElementById("rows"); if(!host) return;
+  /* ══════════════════════ 목록 — 상태 5종 ══════════════════════ */
+  var STATUS_TABS = [
+    {key:"all", label:"전체", param:""},
+    {key:"ok", label:"추천 가능", param:"ok"},
+    {key:"review", label:"검수 대기", param:"review"},
+    {key:"oos", label:"재고 없음", param:"oos"},
+    {key:"price", label:"가격 검토", param:"price"}
+  ];
+  var ST = {
+    ok:{label:"추천 가능", cls:"pp-badge-ok"},
+    review:{label:"검수 대기", cls:"pp-badge-warn"},
+    oos:{label:"재고 없음", cls:"pp-badge-bad"},
+    price:{label:"가격 검토", cls:"pp-badge-warn"}
+  };
+
+  var PAGE=1, SIZE=100, TOTAL=0, PAGES=1, STATE="loading", FAIL_MSG="", DATA=[], KPIS=null;
+  var cur="all", q="", fcat="all", fmfr="all";
+  var sortKey=null, sortDir=1;
+  var SEL = {};
+
+  function fromApi(it){
+    return {product_code:String(it.product_code), sku:it.sku, name:it.name, cat:it.cat,
+      maker: it.maker || "—", spec_done:it.spec_done, spec_total:it.spec_total,
+      spec_row_missing:it.spec_row_missing, stock:it.stock, sale_price:it.sale_price,
+      status_key:it.status_key};
+  }
+
+  function load(){
+    var tab = STATUS_TABS.filter(function(t){ return t.key===cur; })[0] || STATUS_TABS[0];
+    var url = API + "/products?page=" + PAGE + "&size=" + SIZE
+      + "&q=" + encodeURIComponent(q || "")
+      + "&part_type=" + encodeURIComponent(fcat==="all" ? "" : fcat)
+      + "&maker=" + encodeURIComponent(fmfr==="all" ? "" : fmfr)
+      + "&status=" + encodeURIComponent(tab.param);
+    fetch(url).then(function(r){
+      if(r.status===401){ STATE="fail401"; DATA=[]; renderAll(); return null; }
+      if(!r.ok){
+        return asJson(r).then(function(res){ STATE="failOther"; DATA=[]; FAIL_MSG=errText(res.j,res.status); renderAll(); return null; });
+      }
+      return r.json();
+    }).then(function(d){
+      if(!d) return;
+      STATE="ok"; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size; KPIS=d.kpis;
+      DATA = d.items.map(fromApi);
+      renderAll();
+    }).catch(function(){
+      STATE="failNet"; DATA=[]; renderAll();
+    });
+  }
+
+  function renderAll(){ renderTabs(); renderTable(); renderPager(); }
+
+  function renderTabs(){
+    var host = document.getElementById("tabs"); if(!host) return;
+    var known = STATE==="ok";
+    host.innerHTML = STATUS_TABS.map(function(t){
+      var n = known ? (t.key==="all" ? KPIS.total : (KPIS[t.key]||0)) : "—";
+      var on = t.key===cur;
+      return '<button type="button" class="pp-tab' + (on?" on":"") + '" data-k="' + t.key + '"'
+        + ' role="tab" aria-selected="' + (on?"true":"false") + '">'
+        + '<span>' + t.label + '</span><span class="n">' + (typeof n==="number"?n.toLocaleString("ko-KR"):n) + '</span></button>';
+    }).join("") + '<span class="pp-tabs-note">탭 클릭 = 서버 재조회 — 배지와 행 수가 항상 일치합니다</span>';
+    host.querySelectorAll("[data-k]").forEach(function(b){
+      b.onclick = function(){ if(cur===b.dataset.k) return; cur=b.dataset.k; PAGE=1; load(); };
+    });
+  }
+
+  var SORT_GETTERS = {
+    name: function(p){ return (p.name||"").toLowerCase(); },
+    cat: function(p){ return p.cat||""; },
+    spec: function(p){ return p.spec_total ? p.spec_done/p.spec_total : -1; },
+    stock: function(p){ return p.stock; },
+    price: function(p){ return p.sale_price==null ? -1 : p.sale_price; },
+    status: function(p){ return p.status_key||""; }
+  };
+  function applySort(list){
+    if(!sortKey) return list;
+    var g=SORT_GETTERS[sortKey], dir=sortDir;
+    return list.slice().sort(function(a,b){
+      var av=g(a), bv=g(b);
+      if(av<bv) return -1*dir; if(av>bv) return 1*dir; return 0;
+    });
+  }
+
+  function specBadge(p){
+    if(!p.spec_total) return '<span class="pp-dim-text">—</span>';
+    if(p.spec_row_missing) return '<span class="pp-badge pp-badge-bad">사양 미등록</span>';
+    var ok = p.spec_done===p.spec_total;
+    return '<span class="pp-badge ' + (ok?"pp-badge-ok":"pp-badge-warn") + '">'
+      + (ok?"확인 완료":"미확인 " + (p.spec_total-p.spec_done)) + '</span> '
+      + '<span class="pp-dim-text">' + p.spec_done + '/' + p.spec_total + '</span>';
+  }
+  function rowHtml(p){
+    var st = ST[p.status_key] || {label:p.status_key||"—", cls:"pp-badge-ok"};
+    var skuLine = (p.sku && String(p.sku)!==p.product_code) ? ("SKU " + esc(p.sku)) : esc(p.product_code);
+    return '<div class="pp-row" data-pc="' + p.product_code + '">'
+      + '<span><input type="checkbox" class="pp-chk" data-pc="' + p.product_code + '"'
+        + (SEL[p.product_code]?" checked":"") + ' aria-label="선택"></span>'
+      + '<span class="pp-code">' + p.product_code + '</span>'
+      + '<span class="pp-name-wrap"><button type="button" class="pp-name" data-open="' + p.product_code + '" title="' + esc(p.name) + '">' + esc(p.name) + '</button>'
+        + '<span class="pp-sku">' + skuLine + '</span></span>'
+      + '<span class="pp-cat">' + esc(p.cat) + '</span>'
+      + '<span>' + specBadge(p) + '</span>'
+      + '<span class="pp-right' + (p.stock===0?" pp-stock zero":"") + '">' + p.stock + '</span>'
+      + '<span class="pp-price">' + fmtWon(p.sale_price) + '</span>'
+      + '<span><span class="pp-badge ' + st.cls + '">' + esc(st.label) + '</span></span>'
+      + '<button type="button" class="pp-menu-btn" data-open="' + p.product_code + '" title="상세 보기" aria-label="상세 보기">⋯</button>'
+      + '</div>';
+  }
+  function renderTable(){
+    var host = document.getElementById("rows"); if(!host) return;
     if(STATE!=="ok"){
-      host.innerHTML=`<tr><td colspan="9" class="text-center text-body-tertiary py-4">${STATE_MSG[STATE]}</td></tr>`;
+      var msg = STATE==="loading" ? "불러오는 중…"
+        : STATE==="fail401" ? "세션이 만료됐습니다 — 다시 로그인해 주세요."
+        : STATE==="failNet" ? "서버에 연결되지 않아 불러오지 못했습니다."
+        : ("불러오지 못했습니다" + (FAIL_MSG ? (" — " + FAIL_MSG) : ""));
+      host.innerHTML = '<div class="pp-empty">' + esc(msg) + '</div>';
       return;
     }
-    const list=DATA.filter(p=>(cur==="all"||p.status_key===cur)
-      &&(fcat==="all"||p.cat===fcat)
-      &&(fmfr==="all"||p.maker===fmfr)
-      &&(q===""||p.sku.toLowerCase().includes(q)||p.name.toLowerCase().includes(q)||p.product_code.includes(q)));
-    host.innerHTML=list.length?list.map(p=>{
-      const [lab,col,link,act]=ST[p.status_key];
-      /* 행 액션 — Phoenix btn-reveal 이디엄. 예전에는 [검수]+[수정] 버튼 둘을
-         96px 열에 나란히 넣어 100행 중 76행이 넘쳤다(실측 필요폭 119px).
-         `…` 하나로 접으면 56px 로 충분하고 남는 폭은 상품명이 받는다. */
-      /* 상세·수정(product-edit.html)은 admin2에 아직 없다(2026-08-13 실측 — /admin2/product-edit
-         404). 구 admin(/admin/*.html)은 410으로 막혔다(P-09) — 그리로 잇지 않는다. 자리는
-         그대로 두고 **진짜 disabled** 버튼 + title로 무엇이 없는지 밝힌다. */
-      const menu = (link?`<a class="dropdown-item" href="${link}">${act}</a>`
-                   :link===false?`<button type="button" class="dropdown-item" disabled title="${NOTE_NO_ADMIN2}">${act}</button>`:"")
-        + `<button type="button" class="dropdown-item" disabled title="${NOTE_NO_ADMIN2}">상세 보기</button>`
-        + `<button type="button" class="dropdown-item" disabled title="${NOTE_NO_ADMIN2}">수정</button>`;
-      return `<tr class="position-static">
-        <td class="ps-3"><div class="form-check mb-0 fs-8"><input class="form-check-input" type="checkbox" data-pc="${p.product_code}" data-bulk-select-row='{"code":${p.product_code}}'${SEL[p.product_code]?" checked":""} aria-label="선택"></div></td>
-        <td class="py-1">${catIcon(p.cat)}</td>
-        <td class="fw-semibold text-body-highlight"><span class="name text-decoration-none text-body-highlight line-clamp-2" title="${esc(p.name)} · ${NOTE_NO_ADMIN2}">${p.name}</span><div class="fs-10 text-body-tertiary text-nowrap"><code>${p.product_code}</code>${skuTail(p)}</div></td>
-        <td class="cat text-body-tertiary">${p.cat}</td>
-        <td class="spec">${specBadge(p.spec_done,p.spec_total,p.spec_row_missing)}</td>
-        <td class="stock text-end ${p.stock===0?"text-danger fw-bold":""}">${p.stock}</td>
-        <td class="price text-end" data-num="${priceNum(p.price_text)}">${p.price_text}</td>
-        <td><span class="status badge badge-phoenix badge-phoenix-${col} text-nowrap">${lab}</span></td>
-        <td class="pe-3 text-end btn-reveal-trigger">
-          <div class="btn-reveal-trigger position-static">
-            <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent" aria-label="이 상품 작업"><span class="fas fa-ellipsis-h fs-10"></span></button>
-            <div class="dropdown-menu dropdown-menu-end py-2">${menu}</div>
-          </div>
-        </td>
-      </tr>`;
-    }).join(""):`<tr><td colspan="9" class="text-center text-body-tertiary py-5">조건에 맞는 상품이 없습니다.</td></tr>`;
-    wireList();   // 행을 다시 그렸으니 정렬 색인도 다시 잡는다
-    wireBulk();   // 체크박스도 새로 생겼다 — 헤더 전체선택을 다시 건다
-    if(window.feather)feather.replace();   // 분류 아이콘은 행마다 새로 생긴다
+    var list = applySort(DATA);
+    if(!list.length){ host.innerHTML = '<div class="pp-empty">조건에 맞는 상품이 없습니다.</div>'; return; }
+    host.innerHTML = list.map(rowHtml).join("");
+    syncHeadCheckbox();
   }
-
-  // 요청 전 상태 — 아직 아무것도 모른다("불러오는 중…" · KPI "—").
-  fillSelects();renderKpis(null);render();if(window.feather)feather.replace();
-  const srcBadge=document.getElementById("dataSrc");
-
-  // ---- 서버 페이지네이션(슬라이스 39). 검색·분류 필터도 서버로 보낸다.
-  var PAGE=1, SIZE=100, TOTAL=0, PAGES=1;
-  function bar(){
-    var el=document.getElementById("pgBar");
-    if(!el){
-      el=document.createElement("div");el.id="pgBar";
-      el.className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-3 pb-3";
-      var host=document.querySelector(".table-responsive");
-      if(host&&host.parentNode) host.parentNode.appendChild(el);
-    }
-    el.innerHTML='<div class="fs-9 text-body-tertiary">전체 <b class="text-body-secondary">'
-      + TOTAL.toLocaleString() + '</b>건 · ' + PAGE + ' / ' + PAGES + ' 페이지'
-      + ' <span class="ms-2">(한 페이지 ' + SIZE + '건 — 서버에서 나눠 보냅니다)</span></div>'
-      + '<div class="btn-group btn-group-sm">'
-      + '<button class="btn btn-phoenix-secondary" id="pgPrev"' + (PAGE<=1?" disabled":"") + '>← 이전</button>'
-      + '<button class="btn btn-phoenix-secondary" id="pgNext"' + (PAGE>=PAGES?" disabled":"") + '>다음 →</button></div>';
+  function syncHeadCheckbox(){
+    var head = document.getElementById("chkAll"); if(!head) return;
+    var list = applySort(DATA);
+    var total = list.length, sel = list.filter(function(p){ return SEL[p.product_code]; }).length;
+    head.checked = total>0 && sel===total;
+    head.indeterminate = sel>0 && sel<total;
+  }
+  function renderPager(){
+    var foot = document.getElementById("pgBar"); if(!foot) return;
+    if(STATE!=="ok"){ foot.innerHTML=""; return; }
+    var from = TOTAL ? ((PAGE-1)*SIZE+1) : 0;
+    var to = Math.min(PAGE*SIZE, TOTAL);
+    foot.innerHTML =
+      '<span class="cnt">전체 <b>' + TOTAL.toLocaleString("ko-KR") + '</b>건 중 ' + from + '–' + to + '</span>'
+      + '<div class="pp-pager">'
+      + '<button type="button" id="pgPrev"' + (PAGE<=1?" disabled":"") + '>‹ 이전</button>'
+      + '<span class="pp-pages">' + PAGE + ' / ' + PAGES + '</span>'
+      + '<button type="button" id="pgNext"' + (PAGE>=PAGES?" disabled":"") + '>다음 ›</button>'
+      + '</div>';
     var pv=document.getElementById("pgPrev"), nx=document.getElementById("pgNext");
-    if(pv) pv.onclick=function(){ if(PAGE>1){PAGE--;load();} };
-    if(nx) nx.onclick=function(){ if(PAGE<PAGES){PAGE++;load();} };
+    if(pv) pv.onclick=function(){ if(PAGE>1){ PAGE--; load(); } };
+    if(nx) nx.onclick=function(){ if(PAGE<PAGES){ PAGE++; load(); } };
   }
-  document.addEventListener("click",function(ev){
-    if(ev.target.closest && ev.target.closest("#btnBulk")){ ev.preventDefault(); bulkApply(); return; }
-    if(ev.target.closest && ev.target.closest("#btnBulkClear")){
-      ev.preventDefault(); SEL={}; syncBulk(); render(); return;
-    }
-  });
-  function load(){
-    var url="/api/admin/products?page="+PAGE+"&size="+SIZE
-      + "&q=" + encodeURIComponent(q||"")
-      + "&part_type=" + encodeURIComponent(fcat==="all"?"":catToPartType(fcat))
-      // 제조사도 서버에서 거른다 — 예전에는 현재 페이지 안에서만 걸러
-      // 22,841건 중 100건에만 필터가 먹었다(슬라이스 66)
-      + "&maker=" + encodeURIComponent(fmfr==="all"?"":fmfr);
-    fetch(url)
-      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
-      .then(d=>{
-        STATE="ok"; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size;
-        DATA=d.items.map(fromApi);
-        if(srcBadge){
-          srcBadge.textContent="실데이터 · Cloud SQL";
-          srcBadge.classList.replace("badge-phoenix-secondary","badge-phoenix-primary");
-        }
-        renderKpis(d.kpis);
-        render();       // 서버가 이미 필터했으므로 클라이언트 필터는 통과만 한다
-        bar();
-        if(window.feather)feather.replace();
+
+  /* ══════════════════════ 일괄 상태 변경 + 되돌리기 ══════════════════════ */
+  var MAX_BULK_HINT = 2000;   // 서버 상한(admin_products.MAX_BULK) — 문구 표시에만 쓴다, 클라이언트가 막지 않는다
+  var BULK_UNDO_ID = null;
+
+  function selCount(){ return Object.keys(SEL).length; }
+  function syncBulk(){
+    var active=document.getElementById("bulkActive"), hint=document.getElementById("bulkHintWrap");
+    var c=selCount();
+    if(active) active.hidden = c===0;
+    if(hint) hint.hidden = c!==0;
+    var sc=document.getElementById("selCount"); if(sc) sc.textContent=c.toLocaleString("ko-KR");
+  }
+  function setBulkResult(text, bad){
+    var el=document.getElementById("bulkResult"); if(!el) return;
+    el.textContent = text || "";
+    el.style.color = bad ? "var(--error)" : "";
+  }
+  function showUndo(v){ var b=document.getElementById("btnUndo"); if(b) b.hidden=!v; }
+
+  function bulkApply(){
+    var codes = Object.keys(SEL).map(Number);
+    if(!codes.length) return;
+    var st = document.getElementById("bulkStatus").value;
+    if(!st){ window.alert("바꿀 상태를 고르세요"); return; }
+    if(!window.confirm(codes.length.toLocaleString("ko-KR") + "건을 '" + st + "'(으)로 바꿉니다. 계속할까요?")) return;
+    fetch(API + "/products/bulk-status", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({product_codes:codes, status:st})})
+      .then(asJson).then(function(res){
+        if(!res.ok){ setBulkResult(errText(res.j, res.status), true); return; }
+        BULK_UNDO_ID = res.j.log_id;
+        SEL = {};
+        setBulkResult(res.j.verdict || "완료됐습니다", false);
+        showUndo(true);
+        syncBulk();
+        load();
       })
-      // 실패하면 이유를 말하고 수치는 전부 "—"로 되돌린다.
-      .catch(()=>{
-        STATE="fail"; DATA=[];
-        if(srcBadge){
-          srcBadge.textContent="연결 안 됨";   // 원천은 있는데 못 불러온 상태
-          srcBadge.classList.replace("badge-phoenix-primary","badge-phoenix-secondary");
+      .catch(function(err){ setBulkResult("바꾸지 못했습니다 — " + (err && err.message || "네트워크 오류"), true); });
+  }
+  function bulkUndo(){
+    if(!BULK_UNDO_ID) return;
+    fetch(API + "/products/bulk-status/undo", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({log_id: BULK_UNDO_ID})})
+      .then(asJson).then(function(res){
+        if(!res.ok){ setBulkResult(errText(res.j, res.status), true); return; }
+        setBulkResult(res.j.verdict || "되돌렸습니다", false);
+        BULK_UNDO_ID = null; showUndo(false);
+        load();
+      })
+      .catch(function(err){ setBulkResult("되돌리지 못했습니다 — " + (err && err.message || "네트워크 오류"), true); });
+  }
+
+  /* ══════════════════════ 상세/편집 서랍 ══════════════════════ */
+  var DR_TABS = [["basic","기본 정보"],["spec","사양"],["supplier","공급처"],["parttype","분류 변경"]];
+  var DRAWER = {
+    code:null, data:null, activeTab:"basic",
+    editing:{basic:false, spec:false, supplier:false, parttype:false},
+    partSel:null, partPreview:null,
+    // 탭을 옮겼다 돌아와도 입력 중이던 값이 안 사라지게 하는 임시 버퍼(결함 ⓐ-2).
+    // null이면 "이 편집 회차에서 아직 버퍼를 안 채움" — 그때만 basicTabHtml/
+    // specTabHtml이 서버 값(d)으로 한 번 채운다. 새로 [수정]을 누르거나 취소·
+    // 저장하면 비워서 다음 편집은 항상 최신 서버 값에서 다시 시작한다.
+    editDraft:{basic:null, spec:null},
+    // 분류 변경 미리보기(preview:true) 요청이 진행 중인가(결함 ⓐ-4). 공용 진행
+    // 배너는 preview:true 본문엔 뜨지 않으므로(ui-progress.js가 스스로 제외 — ㉯
+    // 확정) 이 화면이 자기 자리에서 진행을 보여준다: 클릭 즉시 버튼 비활성 + 인라인
+    // "미리보기 중…". renderDrawerFooter가 이 값을 읽는다.
+    previewBusy:false
+  };
+
+  function showVeilDrawer(v){
+    var veil=document.getElementById("veil"), dr=document.getElementById("drawer");
+    if(veil) veil.hidden = !v;
+    if(dr) dr.hidden = !v;
+  }
+  function showVeilReg(v){
+    var veil=document.getElementById("veil"), dr=document.getElementById("regDrawer");
+    if(veil) veil.hidden = !v;
+    if(dr) dr.hidden = !v;
+  }
+  function openDrawer(code){
+    closeRegDrawer();
+    DRAWER.code=String(code); DRAWER.data=null; DRAWER.activeTab="basic";
+    DRAWER.editing={basic:false, spec:false, supplier:false, parttype:false};
+    DRAWER.partSel=null; DRAWER.partPreview=null;
+    DRAWER.editDraft={basic:null, spec:null};
+    DRAWER.previewBusy=false;
+    showVeilDrawer(true);
+    renderDrawerLoading();
+    fetchDrawerData();
+    var closeBtn=document.getElementById("drClose"); if(closeBtn) closeBtn.focus();
+  }
+  function closeDrawer(){
+    DRAWER.code=null; DRAWER.data=null;
+    showVeilDrawer(false);
+  }
+  function renderDrawerLoading(){
+    document.getElementById("drTitle").textContent = "불러오는 중…";
+    document.getElementById("drStatusBadge").hidden = true;
+    document.getElementById("drSub").innerHTML = "";
+    document.getElementById("drTabs").innerHTML = "";
+    document.getElementById("drBody").innerHTML = '<div class="pp-empty">불러오는 중…</div>';
+    document.getElementById("drFoot").innerHTML = "";
+  }
+  function renderDrawerError(msg){
+    document.getElementById("drBody").innerHTML = '<div class="pp-empty">' + esc(msg) + '</div>';
+    document.getElementById("drFoot").innerHTML = '<button type="button" class="pp-btn-line" id="drCloseErr">닫기</button>';
+    var b=document.getElementById("drCloseErr"); if(b) b.onclick=closeDrawer;
+  }
+  function fetchDrawerData(){
+    var code = DRAWER.code;
+    fetch(API + "/products/" + encodeURIComponent(code)).then(function(r){
+      if(r.status===401){ if(DRAWER.code===code) renderDrawerError("세션이 만료됐습니다 — 다시 로그인해 주세요."); return null; }
+      if(!r.ok){ return asJson(r).then(function(res){ if(DRAWER.code===code) renderDrawerError(errText(res.j, res.status)); return null; }); }
+      return r.json();
+    }).then(function(d){
+      if(!d || DRAWER.code !== code) return;   // 그 사이 닫혔거나 다른 상품을 열었으면 버린다
+      DRAWER.data = d;
+      renderDrawer();
+    }).catch(function(){});
+  }
+
+  function renderDrawer(){
+    var d = DRAWER.data; if(!d) return;
+    var t = document.getElementById("drTitle"); t.textContent = d.name; t.title = d.name;
+    var badge = document.getElementById("drStatusBadge");
+    // 목록 배지와 같은 신호(status_key, derive_status 단일 원천) — 결함 ⓐ-3.
+    // review_pending(검수 큐 실행 건수)은 살아있는 신호가 아니다: 신규 등록은
+    // 검수행을 아예 안 만들고, 사양 편집을 되돌려도 닫힌 검수행은 안 열린다.
+    // 그래서 review_pending=0인데 실제로는 검수 대기인 상품이 생긴다(실측 6건).
+    if(d.status_key === "review"){ badge.hidden=false; badge.className="pp-badge pp-badge-warn"; badge.textContent="검수 대기"; }
+    else if(d.in_pool){ badge.hidden=false; badge.className="pp-badge pp-badge-ok"; badge.textContent="추천 가능"; }
+    else { badge.hidden=false; badge.className="pp-badge pp-badge-bad"; badge.textContent="추천 제외"; }
+    document.getElementById("drSub").innerHTML = [d.product_code, d.sku, d.cat, d.maker||"제조사 미상"]
+      .map(function(s){ return '<span>' + esc(s) + '</span>'; }).join("");
+    var tabHost = document.getElementById("drTabs");
+    tabHost.innerHTML = DR_TABS.map(function(tt){
+      var extra = tt[0]==="spec" ? (" " + d.spec_done + "/" + d.spec_total)
+        : tt[0]==="supplier" ? (" " + (d.suppliers ? d.suppliers.length : 0)) : "";
+      var on = DRAWER.activeTab===tt[0];
+      return '<button type="button" class="pp-dr-tab' + (on?" on":"") + '" data-tab="' + tt[0] + '"'
+        + ' role="tab" aria-selected="' + (on?"true":"false") + '">' + tt[1] + extra + '</button>';
+    }).join("");
+    tabHost.querySelectorAll("[data-tab]").forEach(function(b){
+      b.onclick = function(){ DRAWER.activeTab=b.dataset.tab; renderDrawerBody(); renderDrawerFooter(); renderDrawer_tabsOnly(); };
+    });
+    renderDrawerBody();
+    renderDrawerFooter();
+  }
+  // 탭 버튼 자체의 on/aria-selected 만 다시 칠한다(본문 재조회 없이) — 전체 renderDrawer()를
+  // 다시 부르면 탭 목록이 통째로 새로 그려져 방금 붙인 onclick도 다시 붙어야 해서 낭비다.
+  function renderDrawer_tabsOnly(){
+    var tabHost = document.getElementById("drTabs");
+    tabHost.querySelectorAll("[data-tab]").forEach(function(b){
+      var on = b.dataset.tab === DRAWER.activeTab;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  function renderDrawerBody(){
+    var host = document.getElementById("drBody"); if(!host) return;
+    var d = DRAWER.data;
+    if(DRAWER.activeTab==="basic") host.innerHTML = basicTabHtml(d);
+    else if(DRAWER.activeTab==="spec") host.innerHTML = specTabHtml(d);
+    else if(DRAWER.activeTab==="supplier") host.innerHTML = supplierTabHtml(d);
+    else host.innerHTML = partTypeTabHtml(d);
+    wireDrawerBody();
+  }
+
+  var BASIC_FIELDS = [
+    ["name","상품명","text","product_name"], ["maker","제조사","text","maker"],
+    ["sale_price","판매가","number","sale_price"], ["purchase_price","매입가","number","purchase_price"],
+    ["stock_qty","재고","number","stock_qty"], ["status","상태","select","status"]
+  ];
+  function basicTabHtml(d){
+    var editing = DRAWER.editing.basic;
+    // 편집 중 값은 DRAWER.editDraft.basic 버퍼에서 온다(결함 ⓐ-2) — 이 편집 회차에서
+    // 처음 그리는 것이면(버퍼가 비어 있으면) 서버 값으로 한 번 채운다. 탭을 옮겼다
+    // 돌아와도 이 버퍼가 그대로라 입력하던 값이 안 사라진다.
+    if(editing && !DRAWER.editDraft.basic){
+      DRAWER.editDraft.basic = {};
+      BASIC_FIELDS.forEach(function(f){ DRAWER.editDraft.basic[f[0]] = d[f[0]]; });
+    }
+    var draft = DRAWER.editDraft.basic;
+    var locked = d.locked_fields || [];
+    var rows = BASIC_FIELDS.map(function(f){
+      var key=f[0], label=f[1], type=f[2], col=f[3];
+      var raw = editing ? draft[key] : d[key];
+      var lockMark = locked.indexOf(col)>=0 ? '<span class="lock" title="잠김 — 다음 적재가 덮지 않습니다">🔒 잠김</span>' : "";
+      var valHtml;
+      if(editing){
+        if(type==="select"){
+          valHtml = '<select data-f="' + key + '">' + (d.status_options||[]).map(function(o){
+            return '<option value="' + esc(o) + '"' + (o===raw?" selected":"") + '>' + esc(o) + '</option>'; }).join("") + '</select>';
+        } else if(type==="number"){
+          valHtml = '<input type="number" data-f="' + key + '" value="' + (raw==null?"":raw) + '" min="0">';
+        } else {
+          valHtml = '<input type="text" data-f="' + key + '" value="' + esc(raw==null?"":raw) + '">';
         }
-        renderKpis(null);
-        render();
-        var pg=document.getElementById("pgBar"); if(pg) pg.remove();   // 못 받은 '전체 N건'을 남기지 않는다
+      } else {
+        if(key==="sale_price" || key==="purchase_price") valHtml = '<span class="val' + (raw==null?" dim":"") + '">' + fmtWon(raw) + '</span>';
+        else if(key==="stock_qty") valHtml = '<span class="val">' + (raw==null?0:raw) + '개</span>';
+        else valHtml = '<span class="val' + (raw==null||raw===""?" dim":"") + '">' + esc(raw==null||raw===""?"—":raw) + '</span>';
+      }
+      return '<div class="pp-field"><span class="lb">' + label + '</span>' + valHtml + '<span class="lock">' + lockMark + '</span></div>';
+    }).join("");
+
+    var gate = d.gate || [];
+    var gateHtml = '<div class="pp-gate"><div class="pp-gate-note">' + esc(d.gate_note||"") + '</div>'
+      + '<div class="pp-gate-list">' + gate.map(function(g){
+          return '<div class="pp-gate-item ' + (g.ok?"ok":"bad") + '"><span class="pp-gate-dot"></span>'
+            + '<span class="k">' + esc(g.label) + '</span><span class="v">' + esc(g.value) + '</span></div>';
+        }).join("") + '</div></div>';
+
+    var infoRows = [
+      ["데이터 출처", d.origin==="real"?"실데이터":(d.origin==="demo"?"데모":(d.origin||"—"))],
+      ["모델명", d.model_name||"—"],
+      ["다나와 코드", d.danawa_code||"—"],
+      ["시장가", d.market_price==null?"—":fmtWon(d.market_price)],
+      ["사양 원문", d.spec_source_text||"—"],
+      ["등록일", fmtDate(d.created_at)],
+      ["수정일", fmtDate(d.updated_at)]
+    ].map(function(r){
+      return '<div class="pp-field"><span class="lb">' + r[0] + '</span><span class="val dim">' + esc(r[1]) + '</span><span></span></div>';
+    }).join("");
+
+    return gateHtml + rows + infoRows + '<div class="pp-dr-hint">' + (editing
+      ? "고친 필드는 저장하면 잠깁니다 — 다음 적재가 덮어쓰지 않습니다."
+      : "읽기 전용입니다. [수정]을 누르면 이 탭이 그 자리에서 편집으로 바뀌고, 저장하면 읽기로 복귀합니다.") + '</div>';
+  }
+
+  function specValText(f, v){
+    if(v==null || v==="") return "—";
+    if(f.data_type==="BOOLEAN") return (v===true || v==="true") ? "예" : "아니오";
+    if(f.data_type==="JSONB") return Array.isArray(v) ? v.join(", ") : String(v);
+    return String(v) + (f.unit ? " " + f.unit : "");
+  }
+  // [data-sf] 입력 요소 → 저장용 타입 변환. 저장(onDrSaveClick)과 편집 버퍼 동기화
+  // (결함 ⓐ-2)가 같은 규칙을 써야 다시 그렸을 때 값이 안 바뀐다.
+  function specElValue(el){
+    var v = el.value;
+    if(el.dataset.json){ return v.trim() ? v.split(",").map(function(s){ return s.trim(); }).filter(Boolean) : null; }
+    if(el.tagName==="SELECT"){ return v===""? null : (v==="true"); }
+    if(el.type==="number"){ return v===""? null : Number(v); }
+    return v===""? null : v;
+  }
+  function specTabHtml(d){
+    var editing = DRAWER.editing.spec;
+    var fields = fieldsForPartType(d.part_type);
+    var specs = d.specs || {};
+    var locked = d.locked_fields || [];
+    if(!fields.length) return '<div class="pp-empty">이 분류에 등록된 사양 항목이 없습니다.</div>';
+    // 기본 정보 탭과 같은 이유로 편집 버퍼를 쓴다(결함 ⓐ-2) — 이 편집 회차 첫 렌더면
+    // 서버 값으로 채운다.
+    if(editing && !DRAWER.editDraft.spec){
+      DRAWER.editDraft.spec = {};
+      fields.forEach(function(f){ DRAWER.editDraft.spec[f.field_key] = specs[f.field_key]; });
+    }
+    var draft = DRAWER.editDraft.spec;
+    var head = '<div class="pp-dr-hint">필수 사양 ' + d.spec_done + '/' + d.spec_total + '</div>';
+    var rows = fields.map(function(f){
+      var v = editing ? draft[f.field_key] : specs[f.field_key];
+      var lockMark = locked.indexOf(f.field_key)>=0 ? '<span class="lock" title="잠김">🔒 잠김</span>' : "";
+      var reqMark = f.required ? '<span class="pp-badge pp-badge-warn" style="margin-right:5px">필수</span>' : "";
+      var valHtml;
+      if(editing){
+        if(f.data_type==="BOOLEAN"){
+          valHtml = '<select data-sf="' + f.field_key + '">'
+            + '<option value=""' + (v==null?" selected":"") + '>—</option>'
+            + '<option value="true"' + (v===true?" selected":"") + '>예</option>'
+            + '<option value="false"' + (v===false?" selected":"") + '>아니오</option></select>';
+        } else if(f.data_type==="JSONB"){
+          valHtml = '<input type="text" data-sf="' + f.field_key + '" data-json="1" value="' + esc(Array.isArray(v)?v.join(", "):(v||"")) + '" placeholder="쉼표로 구분 — 예: AM4, AM5">';
+        } else if(f.data_type==="INTEGER" || f.data_type==="NUMERIC"){
+          valHtml = '<input type="number" data-sf="' + f.field_key + '" value="' + (v==null?"":v) + '"' + (f.data_type==="NUMERIC"?' step="0.1"':'') + '>';
+        } else {
+          valHtml = '<input type="text" data-sf="' + f.field_key + '" value="' + esc(v==null?"":v) + '">';
+        }
+      } else {
+        valHtml = '<span class="val' + (v==null?" dim":"") + '">' + reqMark + esc(specValText(f,v)) + '</span>';
+      }
+      return '<div class="pp-field"><span class="lb">' + esc(f.label) + '</span>' + valHtml + '<span class="lock">' + lockMark + '</span></div>';
+    }).join("");
+    return head + rows + '<div class="pp-dr-hint">' + (editing
+      ? "값을 저장하면 그 필드가 잠기고, 채워진 필드의 검수 대기가 함께 해소됩니다."
+      : "읽기 전용입니다. [수정]으로 이 부품 종류에서 쓰는 사양을 채웁니다.") + '</div>';
+  }
+
+  function supplierTabHtml(d){
+    var editing = DRAWER.editing.supplier;
+    var sups = d.suppliers || [];
+    var rows = '<div class="pp-sup-row head"><span>공급처</span><span class="pp-right">매입가</span><span>상태</span><span>갱신</span><span></span></div>'
+      + (sups.length ? sups.map(function(s){
+          return '<div class="pp-sup-row"><span>' + esc(s.supplier) + '</span>'
+            + '<span class="pp-right">' + fmtWon(s.cost_price) + '</span>'
+            + '<span>' + esc(s.state||"—") + '</span>'
+            + '<span class="pp-dim-text">' + fmtDate(s.at) + '</span>'
+            + '<span>' + (editing ? ('<button type="button" class="pp-row-del" data-del-sup="' + s.supplier_id + '">삭제</button>') : "") + '</span></div>';
+        }).join("") : '<div class="pp-empty" style="padding:20px 0">등록된 공급처가 없습니다.</div>');
+    var addForm = editing ? (
+        '<div class="pp-sup-add">'
+        + '<label class="visually-hidden" for="supAddSel">공급처 선택</label><select id="supAddSel" aria-label="공급처 선택"></select>'
+        + '<label class="visually-hidden" for="supAddCost">매입가</label><input id="supAddCost" type="number" min="0" placeholder="매입가" style="width:110px">'
+        + '<label class="visually-hidden" for="supAddState">공급 상태</label><select id="supAddState" aria-label="공급 상태"><option value="가능">가능</option><option value="품절">품절</option></select>'
+        + '<button type="button" class="pp-btn-line" id="btnSupAdd">추가</button>'
+        + '</div>'
+      ) : "";
+    return rows + addForm + '<div class="pp-dr-hint">' + (editing
+      ? "같은 공급처를 다시 추가하면 매입가가 갱신됩니다."
+      : "읽기 전용입니다. [수정]으로 매입가를 추가·삭제합니다.") + '</div>';
+  }
+
+  function partTypeTabHtml(d){
+    var editing = DRAWER.editing.parttype;
+    if(!editing){
+      return '<div class="pp-field"><span class="lb">현재 분류</span><span class="val">' + esc(d.cat) + '</span><span></span></div>'
+        + '<div class="pp-dr-hint">[수정]으로 분류를 바꿉니다. 바꾸기 전에 영향(필요 사양·추천 후보 변화)을 먼저 보여줍니다.</div>';
+    }
+    var treeHtml = '<div class="pp-field"><span class="lb">새 분류</span><span id="ptChoiceHost"></span><span></span></div>';
+    var previewHtml = "";
+    if(DRAWER.partPreview){
+      var im = DRAWER.partPreview.impact;
+      var addList = (im.required_add && im.required_add.length) ? im.required_add.map(specLabel).join(", ") : null;
+      var dropList = (im.required_drop && im.required_drop.length) ? im.required_drop.map(specLabel).join(", ") : null;
+      previewHtml = '<div class="pp-impact"><b>' + esc(im.from.label) + ' → ' + esc(im.to.label) + '</b><br>' + esc(im.note)
+        + (addList ? ('<br>새로 필요한 사양: ' + esc(addList)) : "")
+        + (dropList ? ('<br>더는 쓰지 않는 사양: ' + esc(dropList)) : "")
+        + '</div>';
+    }
+    return treeHtml + previewHtml;
+  }
+
+  function wireDrawerBody(){
+    // 편집 버퍼 동기화(결함 ⓐ-2) — 타이핑·선택할 때마다 버퍼를 갱신해 둬야
+    // 다른 탭을 봤다 돌아와도 그 값으로 다시 그릴 수 있다.
+    if(DRAWER.activeTab==="basic" && DRAWER.editing.basic){
+      document.querySelectorAll("#drBody [data-f]").forEach(function(el){
+        var sync = function(){ if(DRAWER.editDraft.basic) DRAWER.editDraft.basic[el.dataset.f] = el.value; };
+        el.addEventListener("input", sync);
+        el.addEventListener("change", sync);
       });
+    }
+    if(DRAWER.activeTab==="spec" && DRAWER.editing.spec){
+      document.querySelectorAll("#drBody [data-sf]").forEach(function(el){
+        var sync = function(){ if(DRAWER.editDraft.spec) DRAWER.editDraft.spec[el.dataset.sf] = specElValue(el); };
+        el.addEventListener("input", sync);
+        el.addEventListener("change", sync);
+      });
+    }
+    if(DRAWER.activeTab==="parttype" && DRAWER.editing.parttype){
+      var host = document.getElementById("ptChoiceHost");
+      if(host) buildChoiceSelect(host, (META && META.all_choices) || [], DRAWER.partSel || DRAWER.data.part_type,
+        function(pt){ DRAWER.partSel = pt; });
+    }
+    if(DRAWER.activeTab==="supplier" && DRAWER.editing.supplier){
+      var sel = document.getElementById("supAddSel");
+      if(sel){
+        var actives = (SUPPLIERS||[]).filter(function(s){ return s.status==="활성"; });
+        sel.innerHTML = actives.length ? actives.map(function(s){ return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join("")
+          : '<option value="">활성 공급처가 없습니다</option>';
+      }
+      var btn = document.getElementById("btnSupAdd");
+      if(btn) btn.onclick = supplierAdd;
+      document.querySelectorAll("#drBody [data-del-sup]").forEach(function(b){
+        b.onclick = function(){ supplierDelete(b.dataset.delSup); };
+      });
+    }
   }
-  /* 화면 분류 라벨 → part_type (서버 필터용).
-     **버그 수정**: 원본은 여기서 `PMETA` 를 읽었는데 그런 변수는 선언된 적이 없다.
-     분류 필터를 고르는 순간 ReferenceError 가 나고 load() 의 catch 가 그것을 삼켜
-     서버가 멀쩡한데도 "연결 안 됨"으로 보였다. 실제 이름은 `META` 다. */
-  function catToPartType(label){
-    var all = [].concat(
-      (META && META.part_labels) || [],
-      (META && META.peripheral_labels) || [],
-      (META && META.built_labels) || [],
-      (META && META.used_parts) || []);
-    for(var i=0;i<all.length;i++){ if(all[i].label === label) return all[i].part_type; }
-    return "";
+
+  function renderDrawerFooter(){
+    var host = document.getElementById("drFoot"); if(!host) return;
+    var d = DRAWER.data, tab = DRAWER.activeTab;
+    // 배지와 같은 신호를 쓴다(결함 ⓐ-3) — review_pending>0만 보면, 검수행이 아직
+    // 없는 신규 등록·검수행이 재오픈 안 된 되돌리기 케이스에서 이 바로가기가
+    // 정작 필요할 때 사라진다.
+    var reviewBtn = (d.status_key === "review") ? '<a class="pp-btn-line" href="/admin2/reviews">검수 큐로 →</a>' : "";
+    var note="", buttons="";
+    if(tab==="basic" || tab==="spec"){
+      if(DRAWER.editing[tab]){
+        note = "고친 값은 저장 후 잠깁니다.";
+        buttons = '<button type="button" class="pp-btn-line" id="drCancel">취소</button>'
+          + '<button type="button" class="pp-btn-primary" id="drSave">저장</button>';
+      } else {
+        note = "검수 승인·반려는 상품 사양 검수 소관";
+        buttons = '<button type="button" class="pp-btn-primary" id="drEdit">수정</button>';
+      }
+    } else if(tab==="supplier"){
+      note = "공급처별 매입가는 등록·삭제가 즉시 반영됩니다.";
+      buttons = DRAWER.editing.supplier
+        ? '<button type="button" class="pp-btn-primary" id="drEdit">완료</button>'
+        : '<button type="button" class="pp-btn-primary" id="drEdit">수정</button>';
+    } else {
+      if(!DRAWER.editing.parttype){
+        note = "분류 변경은 영향을 먼저 보여준 뒤 확정합니다.";
+        buttons = '<button type="button" class="pp-btn-primary" id="drEdit">수정</button>';
+      } else if(!DRAWER.partPreview){
+        var pBusy = !!DRAWER.previewBusy;
+        note = "새 분류를 고르고 미리보기를 확인하세요.";
+        // preview:true 요청엔 공용 배너가 안 뜬다 — 클릭 즉시 버튼을 비활성하고
+        // 인라인 "미리보기 중…"을 낸다(결함 ⓐ-4). 저장류(preview:false)는 배너가
+        // 그대로 뜨므로 여기서 손대지 않는다.
+        buttons = '<button type="button" class="pp-btn-line" id="drCancel"'
+            + (pBusy ? ' disabled title="요청을 처리하는 중입니다"' : '') + '>취소</button>'
+          + '<button type="button" class="pp-btn-primary" id="drPreview"'
+            + (pBusy ? ' disabled title="요청을 처리하는 중입니다"' : '') + '>미리보기</button>'
+          + (pBusy ? '<span class="pp-inline-busy" role="status" aria-live="polite">'
+                     + '<span class="pp-inline-busy-sp"></span>미리보기 중…</span>' : '');
+      } else {
+        note = "확정하면 분류가 즉시 바뀝니다.";
+        buttons = '<button type="button" class="pp-btn-line" id="drReselect">다시 선택</button>'
+          + '<button type="button" class="pp-btn-primary" id="drConfirm">확정 변경</button>';
+      }
+    }
+    host.innerHTML = '<span class="note">' + esc(note) + '</span>' + reviewBtn + buttons;
+    var e;
+    if((e=document.getElementById("drEdit"))) e.onclick=onDrEditClick;
+    if((e=document.getElementById("drCancel"))) e.onclick=onDrCancelClick;
+    if((e=document.getElementById("drSave"))) e.onclick=onDrSaveClick;
+    if((e=document.getElementById("drPreview"))) e.onclick=onDrPreviewClick;
+    if((e=document.getElementById("drReselect"))) e.onclick=function(){ DRAWER.partPreview=null; renderDrawerBody(); renderDrawerFooter(); };
+    if((e=document.getElementById("drConfirm"))) e.onclick=onDrConfirmClick;
   }
-  var typing=null;
-  // 검색·필터는 **항상 서버 질의**다.
-  document.getElementById("q").addEventListener("input",e=>{
-    q=e.target.value.trim().toLowerCase();
-    clearTimeout(typing); typing=setTimeout(function(){PAGE=1;load();},300);
+
+  function onDrEditClick(){
+    var tab = DRAWER.activeTab;
+    if(tab==="supplier" && DRAWER.editing.supplier){ DRAWER.editing.supplier=false; }
+    else {
+      DRAWER.editing[tab]=true;
+      if(tab==="parttype"){ DRAWER.partSel=null; DRAWER.partPreview=null; DRAWER.previewBusy=false; }
+      // 새로 시작하는 편집은 항상 최신 서버 값에서 — 이전 편집을 취소하고 다시
+      // 열었을 때 옛 버퍼가 남아 있으면 안 된다(결함 ⓐ-2).
+      if(tab==="basic" || tab==="spec"){ DRAWER.editDraft[tab] = null; }
+    }
+    renderDrawerBody(); renderDrawerFooter();
+  }
+  function onDrCancelClick(){
+    var tab = DRAWER.activeTab;
+    DRAWER.editing[tab] = false;
+    if(tab==="parttype"){ DRAWER.partSel=null; DRAWER.partPreview=null; DRAWER.previewBusy=false; }
+    // 취소는 서버 값으로 되돌아간다는 뜻 — 편집 버퍼도 함께 비운다(결함 ⓐ-2).
+    if(tab==="basic" || tab==="spec"){ DRAWER.editDraft[tab] = null; }
+    renderDrawerBody(); renderDrawerFooter();
+  }
+
+  function collectBasicChanges(){
+    var out = {};
+    document.querySelectorAll("#drBody [data-f]").forEach(function(el){
+      var k=el.dataset.f, v=el.value;
+      if(k==="sale_price" || k==="purchase_price"){ out[k] = v===""? "" : Number(v); }
+      else if(k==="stock_qty"){ out[k] = v===""? 0 : Number(v); }
+      else { out[k]=v; }
+    });
+    return out;
+  }
+  // 실패 시 전역 진행 바(ui-progress.js)가 서버 사유를 이미 보여준다 — 여기서 되풀이하지
+  // 않는다(CLAUDE.md "공용 진행 바가 말해 주는 자리만 예외"). 편집 상태는 그대로 둬 재시도할 수 있게 한다.
+  function onDrSaveClick(){
+    var tab = DRAWER.activeTab, code = DRAWER.code;
+    if(tab==="basic"){
+      fetch(API + "/products/" + encodeURIComponent(code), {method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({changes: collectBasicChanges(), lock:true})})
+        .then(asJson).then(function(res){
+          if(!res.ok) return;
+          DRAWER.editing.basic=false;
+          DRAWER.editDraft.basic=null;   // 저장 성공 — 다음 편집은 새 서버 값에서(결함 ⓐ-2)
+          fetchDrawerData(); load();
+        }).catch(function(){});
+    } else if(tab==="spec"){
+      var values = {};
+      document.querySelectorAll("#drBody [data-sf]").forEach(function(el){ values[el.dataset.sf] = specElValue(el); });
+      fetch(API + "/products/" + encodeURIComponent(code) + "/specs", {method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({values:values, lock:true})})
+        .then(asJson).then(function(res){
+          if(!res.ok) return;
+          DRAWER.editing.spec=false;
+          DRAWER.editDraft.spec=null;    // 저장 성공 — 다음 편집은 새 서버 값에서(결함 ⓐ-2)
+          fetchDrawerData(); load();
+        }).catch(function(){});
+    }
+  }
+  function onDrPreviewClick(){
+    if(!DRAWER.partSel){ window.alert("분류를 선택하세요"); return; }
+    if(DRAWER.previewBusy) return;   // 중복 클릭 — 이미 요청 중
+    // preview:true 요청엔 공용 진행 배너가 안 뜬다(ui-progress.js가 본문을 읽고
+    // 스스로 제외 — ㉯ 확정 2026-08-15). 그래서 응답을 기다리지 않고 클릭 즉시
+    // 이 화면이 직접 버튼을 비활성하고 인라인 "미리보기 중…"을 그린다(결함 ⓐ-4).
+    // v_recommendation_candidates를 두 번 훑는 요청이라 몇 초 걸릴 수 있는데,
+    // 아무 반응이 없으면 운영자가 다시 누르거나 "안 된다"고 신고하게 된다.
+    DRAWER.previewBusy = true;
+    renderDrawerFooter();
+    fetch(API + "/products/" + encodeURIComponent(DRAWER.code) + "/part-type", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify({part_type:DRAWER.partSel, preview:true})})
+      .then(asJson).then(function(res){
+        DRAWER.previewBusy = false;
+        // preview:true는 성공이든 실패든 전역 배너 대상이 아니다 — 여기서 새 실패
+        // 표시를 만들지는 않는다(이 화면의 다른 쓰기 동작과 같은 관례: 되풀이하지
+        // 않는다). 버튼을 다시 누를 수 있는 상태로 되돌리는 것까지가 ⓐ-4의 범위다.
+        if(!res.ok){ renderDrawerFooter(); return; }
+        DRAWER.partPreview = res.j;
+        renderDrawerBody(); renderDrawerFooter();
+      }).catch(function(){ DRAWER.previewBusy = false; renderDrawerFooter(); });
+  }
+  function onDrConfirmClick(){
+    fetch(API + "/products/" + encodeURIComponent(DRAWER.code) + "/part-type", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify({part_type:DRAWER.partSel, preview:false})})
+      .then(asJson).then(function(res){
+        if(!res.ok) return;
+        DRAWER.editing.parttype=false; DRAWER.partPreview=null; DRAWER.partSel=null;
+        fetchDrawerData(); load();
+      }).catch(function(){});
+  }
+  function supplierAdd(){
+    var sel=document.getElementById("supAddSel"), cost=document.getElementById("supAddCost"), st=document.getElementById("supAddState");
+    if(!sel || !sel.value){ window.alert("공급처를 고르세요"); return; }
+    if(!cost || cost.value===""){ window.alert("매입가를 입력하세요"); return; }
+    fetch(API + "/products/" + encodeURIComponent(DRAWER.code) + "/suppliers", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({supplier_id:Number(sel.value), cost_price:Number(cost.value), state:st.value})})
+      .then(asJson).then(function(res){
+        if(!res.ok) return;
+        fetchDrawerData(); load();
+      }).catch(function(){});
+  }
+  function supplierDelete(supplierId){
+    if(!window.confirm("이 공급처 매입가를 삭제할까요?")) return;
+    fetch(API + "/products/" + encodeURIComponent(DRAWER.code) + "/suppliers/" + encodeURIComponent(supplierId), {method:"DELETE"})
+      .then(asJson).then(function(res){
+        if(!res.ok) return;
+        fetchDrawerData();
+      }).catch(function(){});
+  }
+
+  /* ══════════════════════ 신규 등록 서랍 ══════════════════════ */
+  var REG = {name:"", maker:"", partSel:null, similar:null};
+
+  function openRegDrawer(){
+    closeDrawer();
+    REG = {name:"", maker:"", partSel:null, similar:null};
+    showVeilReg(true);
+    renderRegDrawer();
+    var nm; window.setTimeout(function(){ nm=document.getElementById("regName"); if(nm) nm.focus(); }, 0);
+  }
+  function closeRegDrawer(){ showVeilReg(false); }
+  function similarBlockHtml(){
+    var items = REG.similar || [];
+    return '<div class="pp-impact"><b>이름이 거의 같은 상품이 있습니다</b> — 같은 상품이면 등록 대신 기존 상품을 수정하세요.'
+      + items.map(function(it){
+          return '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08)">'
+            + esc(it.name) + ' <span class="pp-dim-text">(' + esc(it.sku) + ' · 일치도 ' + Math.round(it.score*100) + '%)</span></div>';
+        }).join("") + '</div>';
+  }
+  function renderRegDrawer(){
+    var host = document.getElementById("regBody"); if(!host) return;
+    host.innerHTML =
+      '<div class="pp-field"><span class="lb">상품명</span><input id="regName" type="text" value="' + esc(REG.name) + '" placeholder="상품명을 입력하세요"><span></span></div>'
+      + '<div class="pp-field"><span class="lb">분류</span><span id="regChoiceHost"></span><span></span></div>'
+      + '<div class="pp-field"><span class="lb">제조사</span><input id="regMaker" type="text" value="' + esc(REG.maker) + '" placeholder="제조사(선택)"><span></span></div>'
+      + (REG.similar ? similarBlockHtml() : "")
+      + '<div class="pp-dr-hint">등록하면 검수 대기 상태로 시작하고 추천 후보에는 들어가지 않습니다. 사양 검수와 판매가 산정을 통과해야 추천에 쓰입니다.</div>';
+    var chost = document.getElementById("regChoiceHost");
+    if(chost) buildChoiceSelect(chost, (META && META.part_choices) || [], REG.partSel, function(pt){ REG.partSel = pt; });
+    var nm=document.getElementById("regName"); if(nm) nm.oninput=function(e){ REG.name=e.target.value; };
+    var mk=document.getElementById("regMaker"); if(mk) mk.oninput=function(e){ REG.maker=e.target.value; };
+    renderRegFooter();
+  }
+  function renderRegFooter(){
+    var host = document.getElementById("regFoot"); if(!host) return;
+    host.innerHTML = '<span class="note">분류를 선택하지 않으면 등록할 수 없습니다.</span>'
+      + '<button type="button" class="pp-btn-line" id="regCancel">취소</button>'
+      + (REG.similar
+          ? '<button type="button" class="pp-btn-primary" id="regForce">그래도 등록</button>'
+          : '<button type="button" class="pp-btn-primary" id="regSubmit">등록</button>');
+    var c;
+    if((c=document.getElementById("regCancel"))) c.onclick=closeRegDrawer;
+    if((c=document.getElementById("regSubmit"))) c.onclick=function(){ regSubmit(false); };
+    if((c=document.getElementById("regForce"))) c.onclick=function(){ regSubmit(true); };
+  }
+  function regSubmit(force){
+    var name=(REG.name||"").trim();
+    if(!name){ window.alert("상품명을 입력하세요"); return; }
+    if(!REG.partSel){ window.alert("분류를 선택하세요"); return; }
+    var body={name:name, part_type:REG.partSel, maker:(REG.maker||"").trim()||null, confirm_similar: !!force};
+    fetch(API + "/products", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})
+      .then(asJson).then(function(res){
+        if(!res.ok){
+          if(res.status===409 && res.j && res.j.detail && res.j.detail.items){
+            REG.similar = res.j.detail.items;
+            renderRegDrawer();
+          }
+          return;   // 그 밖의 실패는 전역 진행 바가 사유를 보여준다
+        }
+        closeRegDrawer();
+        load(); loadMeta();
+      }).catch(function(){});
+  }
+
+  /* ══════════════════════ 초기 배선(한 번만) ══════════════════════ */
+  var typing=null, typingM=null;
+  document.getElementById("q").addEventListener("input", function(e){
+    q = e.target.value.trim();
+    clearTimeout(typing);
+    typing = setTimeout(function(){ PAGE=1; load(); }, 300);
   });
-  document.getElementById("fcat").addEventListener("change",e=>{
-    fcat=e.target.value; PAGE=1; load();
+  document.getElementById("fcat").addEventListener("change", function(e){ fcat=e.target.value; PAGE=1; load(); });
+  document.getElementById("fmfr").addEventListener("input", function(e){
+    var v=e.target.value.trim();
+    fmfr = v===""? "all" : v;
+    clearTimeout(typingM);
+    typingM = setTimeout(function(){ PAGE=1; load(); }, 300);
   });
-  document.getElementById("fmfr").addEventListener("change",e=>{
-    fmfr=e.target.value; PAGE=1; load();
+  document.querySelectorAll("#thead [data-sort]").forEach(function(el){
+    function doSort(){
+      var k=el.dataset.sort;
+      if(sortKey===k) sortDir=-sortDir; else { sortKey=k; sortDir=1; }
+      renderTable();
+    }
+    el.addEventListener("click", doSort);
+    el.addEventListener("keydown", function(ev){ if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); doSort(); } });
   });
-  loadMeta();   // 필터 선택지는 서버 원천 — 목록과 별개로 한 번만 받는다
+  document.getElementById("chkAll").addEventListener("change", function(ev){
+    var on = ev.target.checked;
+    applySort(DATA).forEach(function(p){ if(on) SEL[p.product_code]=true; else delete SEL[p.product_code]; });
+    renderTable(); syncBulk();
+  });
+  // #rows 는 매 load()/정렬마다 다시 그려지지만 이 리스너는 #rows(고정 컨테이너)에
+  // 한 번만 붙는다 — 위임(delegation)이라 자식이 바뀌어도 다시 붙일 필요가 없다.
+  document.getElementById("rows").addEventListener("change", function(ev){
+    var cb = ev.target.closest && ev.target.closest(".pp-chk");
+    if(!cb) return;
+    var pc = cb.dataset.pc;
+    if(cb.checked) SEL[pc]=true; else delete SEL[pc];
+    syncBulk(); syncHeadCheckbox();
+  });
+  document.getElementById("rows").addEventListener("click", function(ev){
+    var t = ev.target.closest && ev.target.closest("[data-open]");
+    if(t) openDrawer(t.dataset.open);
+  });
+  document.getElementById("btnNew").addEventListener("click", openRegDrawer);
+  document.getElementById("btnBulk").addEventListener("click", bulkApply);
+  document.getElementById("btnUndo").addEventListener("click", bulkUndo);
+  document.getElementById("veil").addEventListener("click", function(){ closeDrawer(); closeRegDrawer(); });
+  document.getElementById("drClose").addEventListener("click", closeDrawer);
+  document.getElementById("regClose").addEventListener("click", closeRegDrawer);
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Escape"){ closeDrawer(); closeRegDrawer(); }
+  });
+
+  // 요청 전 상태
+  renderAll();
+  loadMeta();
+  loadSpecFields();
+  loadSuppliers();
   load();
 })();
-</script>
-{% endraw %}
+{% endraw %}</script>
 {% endblock %}
