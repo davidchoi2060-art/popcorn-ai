@@ -25,6 +25,7 @@ from contextvars import ContextVar
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
+from starlette.concurrency import run_in_threadpool
 
 from .db import engine
 
@@ -40,7 +41,49 @@ _current: ContextVar[dict | None] = ContextVar("current_member", default=None)
 
 # 게이트 대상 = 회원 전용 경로. 인증 엔드포인트 자체는 예외.
 GUARDED_PREFIX = "/api/my/"
-OPEN_PREFIXES = ("/api/auth/",)
+
+# OPEN_PREFIXES = 이 미들웨어가 고객 세션을 조회하지 않는 경로 (2026-08-15 확장).
+#
+# 예전엔 "/api/auth/" 하나뿐이었다 — 그 밖의 "모든" 요청(정적 CSS·폰트·admin2 화면·
+# 관리자 API까지)이 매번 resolve_session()으로 DB를 쳤다. member_middleware가 비동기
+# 함수인데 그 안의 DB 호출이 스레드풀 오프로드 없이 직접 돌아, 커넥션 풀이 마르면
+# (pool_size=5+max_overflow=10, pool_timeout=30초) 이벤트 루프 전체가 최대 30초
+# 멈춘다 — 그 30초 동안은 이 요청만이 아니라 서버의 "모든" 요청이 멈춘다(1코어
+# uvicorn 단일 프로세스). 아래 항목은 전부 "고객 회원 세션을 실제로 읽는 코드가
+# 있는지" grep으로 확인한 뒤 추가했다(전수: current_member()/require_member() 호출부는
+# clicks.py·handoff.py·orders.py·my_account.py·my_payments.py·my_orders.py 여섯 곳뿐이고
+# 전부 "/api/..."이며 아래 접두어 어디에도 속하지 않는다 — GUARDED_PREFIX("/api/my/")와도
+# 겹치지 않는다).
+#
+#   /shared/         정적 자산(css·js·폰트·아이콘). mockups/shared/*를 캐치올
+#                     StaticFiles가 서빙 — 이 경로를 처리하는 파이썬 라우트가 아예 없다
+#                     (grep 확인: "/shared" 를 매칭하는 @router 없음). DB를 칠 코드 자체가 없다.
+#   /design-system/   정적 토큰 CSS(design-system/tokens.css) — 마찬가지로 전용
+#                     StaticFiles 마운트뿐, 라우트 없음.
+#   /admin2/          관리자 화면 셸(Jinja 렌더). api/admin_ui_*.py 19개 전부 grep했고
+#                     current_member/require_member 호출 0곳 — 관리자 화면은 고객
+#                     세션을 쓰지 않는다.
+#   /admin/           구 관리자 화면(P-09 동결: login·my-profile·operators 문·자산)
+#                     + 남은 vendor 자산. 마찬가지로 고객 세션 미사용.
+#   /api/admin/       관리자 API 전체. api/admin_*.py 전부 grep했고 current_member/
+#                     require_member 호출 0곳 — 관리자 게이트(auth.py)가 별도로
+#                     세션·권한을 검사하므로 여기서 고객 세션을 조회할 이유가 없다.
+#                     ⚠ "/api/admin/auth/*"(관리자 로그인 자체)도 이 접두어에 포함된다 —
+#                     장애 복구 중 관리자가 재로그인해야 하는 상황에서 고객 세션 DB
+#                     조회가 그 로그인마저 막는 것은 특히 나쁘다.
+#
+# 위 다섯은 "고객이 접근하는 경로"가 아니다 — 그래서 뺐다. 고객 화면(/mvp1/*)과
+# 게스트 허용 API(/api/orders·/api/handoff·/api/promo-click 등)는 그대로 둔다:
+# 저 경로들은 current_member()로 "로그인했으면 회원으로, 아니면 게스트로" 붙이는
+# 동작이 실제로 쓰이므로 세션 조회를 건너뛰면 안 된다.
+OPEN_PREFIXES = (
+    "/api/auth/",
+    "/shared/",
+    "/design-system/",
+    "/admin2/",
+    "/admin/",
+    "/api/admin/",
+)
 
 
 def cookie_secure() -> bool:
@@ -105,7 +148,10 @@ async def member_middleware(request: Request, call_next):
     token = _current.set(None)
     try:
         if not path.startswith(OPEN_PREFIXES):
-            m = resolve_session(request.cookies.get(COOKIE, ""))
+            # 동기 DB 호출(engine.begin())을 스레드풀로 넘긴다 — 미들웨어는 항상
+            # 이벤트 루프에서 돌아 라우트처럼 자동 오프로드되지 않는다(2026-08-15).
+            # resolve_session() 본체는 그대로 두고 부르는 방식만 바꾼다.
+            m = await run_in_threadpool(resolve_session, request.cookies.get(COOKIE, ""))
             if m is not None:
                 _current.set(m)          # 게스트 경로에서도 세션이 있으면 주체를 안다
             elif path.startswith(GUARDED_PREFIX):

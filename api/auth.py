@@ -21,6 +21,7 @@ from contextvars import ContextVar
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
+from starlette.concurrency import run_in_threadpool
 
 from datetime import datetime
 
@@ -148,7 +149,10 @@ async def auth_middleware(request: Request, call_next):
     token = _current.set(None)
     try:
         if path.startswith("/api/admin/") and not path.startswith(OPEN_PREFIXES):
-            op = resolve_session(request.cookies.get(COOKIE, ""))
+            # 동기 DB 호출을 스레드풀로 넘긴다 — 미들웨어는 항상 이벤트 루프에서
+            # 돌아 라우트처럼 자동 오프로드되지 않는다(2026-08-15). resolve_session()
+            # 본체는 그대로 두고 부르는 방식만 바꾼다.
+            op = await run_in_threadpool(resolve_session, request.cookies.get(COOKIE, ""))
             if op is None:
                 from fastapi.responses import JSONResponse
                 return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
