@@ -130,6 +130,48 @@ def drift(key, value):
     return value
 
 
+# ── 자기 은폐 방지 (C안, 2026-08-15, 하네스 판단 — 최소 구현) ───────────────────
+# 46158 사고: 검사가 정본 상품을 고쳤는데 되돌리기가 안 됐고, 그 상품이 다음 회차
+# 선택자의 시작 조건(status='판매중' 등)에서 빠져나가 **검사 자신의 시야에서
+# 사라졌다.** try/finally(같은 날 앞서 추가)가 원인 대부분(undo 누락)을 줄였지만,
+# "finally조차 못 도는" 잔여 위험은 남는다 — 그리고 그 잔여 위험은 이론이 아니라
+# 오늘 밤 이 저장소에서 서버가 세 번 죽으며 실제로 일어났다(T-05).
+#
+# 막는 법은 하나뿐이다 — 지난 회차가 고른 대상이 **지금도 이 검사의 시작 조건을
+# 만족하는지**를 다음 회차가 직접 확인하고, 아니면 조용히 다음 상품으로 넘어가지
+# 않고 실패로 찍는다. 「이 검사가 남긴 흔적」과 「운영자가 정당히 건드린 값」은
+# **구분하지 않는다** — 구분하려 들면 복잡해지고 아무도 안 믿는 검사가 된다
+# (하네스 판단). 오탐이 나면 실패 메시지의 해소법대로 스냅샷 키를 지우고 다시
+# 돌리면 된다 — 조용한 은폐보다 시끄러운 오탐이 낫다(이 서버는 개발/스테이징,
+# I-01 — 시끄러워도 되는 곳이다).
+def _selftest_no_orphan(key, still_ok_sql, state_sql):
+    """이 검사가 지난 회차에 고른 대상(product_code)이 지금도 건강한지 본다.
+
+    새 표를 만들지 않는다 — 이미 있는 `tests/.regression-snapshot.json`
+    (`_snap_old`/`_snap_new`) 을 그대로 쓴다. 키가 없으면(첫 실행 · 스냅샷
+    파일이 gitignore라 없는 환경) 조용히 통과한다 — 죽지 않는다.
+    """
+    last_pc = _snap_old.get(key)
+    if last_pc is None or _engine is None:
+        return
+    ok = db_one(still_ok_sql, p=last_pc)
+    state = None if ok else db_all(state_sql, p=last_pc)
+    check(f"자기 은폐 확인({key}) — 지난 회차 대상 product_code={last_pc}이 지금도 정상",
+          bool(ok), "이 검사의 시작 조건을 계속 만족함",
+          "유지됨" if ok else {
+              "product_code": last_pc,
+              "지금 상태": state[0] if state else "상품이 없거나 조회 실패",
+              "해소법": f"운영자가 정당히 바꾼 값이면 tests/.regression-snapshot.json에서"
+                       f" '{key}' 키를 지우고 다시 돌리세요"})
+
+
+def _selftest_remember(key, pc):
+    """이번 회차가 고른 대상을 다음 회차가 볼 수 있게 남긴다(성공/실패와 무관하게 —
+    선택한 순간 기록해야 다음 회차가 '그 상품에 무슨 일이 있었는지'를 잴 수 있다)."""
+    if pc is not None:
+        _snap_new[key] = pc
+
+
 def check(name, ok, expect=None, got=None, kind="INVARIANT"):
     results.append({"name": name, "ok": bool(ok), "expect": expect, "got": got, "kind": kind})
     if not QUIET or not ok:
@@ -733,11 +775,42 @@ def test_compat():
 # ──────────────────────── 3. 4중 게이트 (추천 풀 진입) ────────────────────────
 def test_product_edit():
     print("\n[12] 단건 상품 수정 — 잠금·원장·되돌리기 (슬라이스 53)")
+    # ⚠ 정본(data_origin='real') 상품을 쓴다 — data_origin='demo' 필터는 «측정 후»
+    # 넣지 않기로 했다(2026-08-15, 46158 사고 조사 후속). 사양 입력·분류 변경 검사와
+    # 달리 이건 "데모 표본이 부족해서"가 아니라 **구조적으로 데모로는 못 한다**:
+    # v_recommendation_candidates 뷰 정의(WHERE 절)에
+    #   p.data_origin::text IS DISTINCT FROM 'demo'::character varying::text
+    # 가 박혀 있어 데모 상품은 원천적으로 이 뷰에 안 잡힌다(실측 — pg_get_viewdef).
+    # admin_products.get_product의 in_pool도, api/recommend._load_pool(실제 견적 엔진)도
+    # 같은 뷰를 본다 — **데모 상품은 편집 전에도 이미 in_pool=False**라는 뜻이다.
+    # 그러면 아래 "판매중이 아니면 추천에서 빠진다"(True→False 전이) 검사가 데모로는
+    # 편집과 무관하게 항상 통과해 **아무것도 검증하지 못한 채 통과한 것처럼 보인다**
+    # (그게 SKIP보다 나쁘다는 지시를 받았다). 데이터를 더 만들어도 못 고치는 종류라
+    # DBA에게 넘기지 않는다 — 뷰의 이 배제 자체가 의도된 설계이기 때문이다(데모가 실제
+    # 고객 견적에 절대 섞이지 않게 하는 장치, CLAUDE.md "데모/실데이터는 data_origin으로
+    # 구분"과 정확히 같은 취지). 그래서 이 선택자는 그대로 두고, 위험 구간만 줄인다:
+    # 수정 성공 → 확인 → 되돌리기를 try/finally로 감싸 그 사이 무엇이 터져도 되돌리기가
+    # 반드시 시도되게 하고, 되돌린 뒤 DB로 직접 재확인한다(test_stock_ledger와 같은 결).
+    # 46158은 이 보장이 없어서 191번째 사이클(활동 로그 log_id 4965, 190회는 정상
+    # 맞물렸다)에서 undo 없이 끊긴 채 8일간 방치됐다 — 그리고 그 순간 v_recommendation_
+    # candidates에서도 빠져 아래 선택자(ORDER BY product_code LIMIT 1)가 조용히 다음
+    # 상품으로 넘어가는 바람에 "회귀 자신이 만든 피해가 회귀 자신의 시야에서 사라지는"
+    # 자기 은폐가 겹쳤다. try/finally는 그 첫 번째 원인(undo 누락)을 막는다.
+    #
+    # 두 번째 원인(선택자가 피해 상품을 다시 안 본다)은 **C안**으로 막는다(하네스 판단,
+    # 2026-08-15) — try/finally도 못 도는 잔여 위험(서버 프로세스가 죽는 경우 등)이
+    # 이론이 아니라 오늘 밤 세 번 실재했다(T-05). _selftest_no_orphan 참조.
+    _selftest_no_orphan(
+        "last_target_product_edit",
+        "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:p AND stock_qty > 0",
+        "SELECT status, stock_qty, sale_price, locked_fields"
+        " FROM products WHERE product_code=:p")
     pc = db_one("SELECT product_code FROM v_recommendation_candidates"
                 " WHERE stock_qty > 0 ORDER BY product_code LIMIT 1")
     if pc is None:
         print("  [SKIP] (I) 단건 수정 — DB 미연결")
         return
+    _selftest_remember("last_target_product_edit", pc)
     d = get(f"/api/admin/products/{pc}")
     check("상세는 추천 여부를 문장으로 밝힌다", bool(d.get("verdict")), "verdict", d.get("verdict"))
     check("상세에 수정 가능 필드 목록이 있다", bool(d.get("editable")), "editable", d.get("editable"))
@@ -754,31 +827,49 @@ def test_product_edit():
                      {"Content-Type": "application/json"}, method="PATCH")
     check("수정 불가 필드는 400", st == 400, 400, st)
 
-    st, r = post_raw(f"/api/admin/products/{pc}",
-                     json.dumps({"changes": {"sale_price": (d["sale_price"] or 0) + 1000,
-                                             "status": "품절"}}).encode(),
-                     {"Content-Type": "application/json"}, method="PATCH")
-    check("수정 성공", st == 200, 200, st)
-    if st != 200:
-        return
-    check("수정한 필드는 잠긴다(다음 적재가 덮지 않게)",
-          {"sale_price", "status"} <= set(r["locked_fields"]),
-          "sale_price·status 잠금", r["locked_fields"])
-    d2 = get(f"/api/admin/products/{pc}")
-    check("상태로 빠진 이유를 정확히 말한다", "품절" in d2["verdict"], "'품절' 언급", d2["verdict"])
-    check("판매중이 아니면 추천에서 빠진다", d2["in_pool"] is False, False, d2["in_pool"])
-
-    # 되돌림은 삭제가 아니라 역방향 복원 — 잠금도 함께 되돌아가야 한다
-    st, _ = post(f"/api/admin/products/undo/{r['undo_id']}")
-    check("되돌리기 성공", st == 200, 200, st)
-    d3 = get(f"/api/admin/products/{pc}")
-    check("값이 원복된다", d3["sale_price"] == before["sale_price"]
-          and d3["status"] == before["status"],
-          before, {"sale_price": d3["sale_price"], "status": d3["status"]})
-    check("잠금도 원복된다(안 그러면 적재가 영영 못 채운다)",
-          d3["locked_fields"] == before["locked"], before["locked"], d3["locked_fields"])
-    st, _ = post(f"/api/admin/products/undo/{r['undo_id']}")
-    check("이중 되돌리기는 409", st == 409, 409, st)
+    # ── 수정 → 되돌리기: try/finally로 감싼다(2026-08-15, 46158 재발 방지) ─────────
+    # 이 사이(원래는 check 3회)에 예외가 나면 main()의 함수 단위 예외 처리가 그걸
+    # 삼키고 다음 테스트로 넘어가 되돌리기가 영영 실행되지 않는다 — 그게 46158에서
+    # 실제로 벌어진 일이다. finally는 그 무엇이 터져도 되돌리기를 반드시 시도한다.
+    undo_id = None
+    try:
+        st, r = post_raw(f"/api/admin/products/{pc}",
+                         json.dumps({"changes": {"sale_price": (d["sale_price"] or 0) + 1000,
+                                                 "status": "품절"}}).encode(),
+                         {"Content-Type": "application/json"}, method="PATCH")
+        check("수정 성공", st == 200, 200, st)
+        if st == 200:
+            undo_id = (r or {}).get("undo_id")
+            check("수정한 필드는 잠긴다(다음 적재가 덮지 않게)",
+                  {"sale_price", "status"} <= set(r["locked_fields"]),
+                  "sale_price·status 잠금", r["locked_fields"])
+            d2 = get(f"/api/admin/products/{pc}")
+            check("상태로 빠진 이유를 정확히 말한다", "품절" in d2["verdict"],
+                  "'품절' 언급", d2["verdict"])
+            check("판매중이 아니면 추천에서 빠진다", d2["in_pool"] is False, False, d2["in_pool"])
+    finally:
+        if undo_id is not None:
+            try:
+                st, _ = post(f"/api/admin/products/undo/{undo_id}")
+            except Exception as e:                           # noqa: BLE001
+                check("되돌리기 성공(예외 없이 응답한다)", False, "정상 응답", repr(e))
+                st = None
+            else:
+                check("되돌리기 성공(try 중 예외가 나도 finally에서 반드시 시도)",
+                      st == 200, 200, st)
+            # DB로 직접 재확인 — API가 200을 말해도 실제로 안 바뀌었을 수 있다.
+            # 되돌림은 삭제가 아니라 역방향 복원 — 잠금도 함께 되돌아가야 한다.
+            now_price = db_one("SELECT sale_price FROM products WHERE product_code=:p", p=pc)
+            now_status = db_one("SELECT status FROM products WHERE product_code=:p", p=pc)
+            now_locked = db_one("SELECT locked_fields FROM products WHERE product_code=:p", p=pc)
+            check("값이 원복된다(DB 직접 재확인)",
+                  now_price == before["sale_price"] and now_status == before["status"],
+                  before, {"sale_price": now_price, "status": now_status})
+            check("잠금도 원복된다(DB 직접 재확인 — 안 그러면 적재가 영영 못 채운다)",
+                  now_locked == before["locked"], before["locked"], now_locked)
+            if st == 200:
+                st2, _ = post(f"/api/admin/products/undo/{undo_id}")
+                check("이중 되돌리기는 409", st2 == 409, 409, st2)
 
     # 등록 화면에 남의 상품 값이 기본으로 들어 있으면 그대로 저장된다(사용자 지적, 슬라이스 55).
     # 마크업에 예시 값이 박혀 있지 않은지 회귀가 지킨다.
@@ -915,6 +1006,27 @@ def test_spec_fields():
 
     # 사양 값 입력 — 화면에서 만든 항목에 값을 넣을 길이 있어야 한다(슬라이스 57).
     # 검수 큐는 '검수 행이 있는 필드'만 다루므로 새 항목은 영영 비어 있게 된다.
+    #
+    # ⚠ 정본(data_origin='real') 상품을 쓴다 — data_origin='demo' 필터는 «측정 후»
+    # 넣지 않기로 했다(2026-08-15, 46158 사고 조사 후속). 실측: 데모 POWER 상품은
+    # 3건뿐이고 셋 다 이미 rated_watt가 채워져 있다(form_factor 있음·rated_watt 없음인
+    # 표본이 데모엔 0건) — 이 검사가 정확히 필요로 하는 "채울 빈칸"이 데모엔 없다.
+    # 필터를 걸면 이 검사는 매번 조용히 SKIP되는데, 그건 정본을 건드리는 것보다
+    # 나쁘다(아무것도 검증하지 않으면서 통과한 것처럼 보인다) — 그래서 필터는 걸지
+    # 않고 DBA에게 필요한 데모 표본(POWER · form_factor 있음 · rated_watt 없음)을
+    # 보고한다. 대신 위험 구간을 줄인다: PATCH → 되돌리기를 try/finally로 감싸 그
+    # 사이 무엇이 터져도 되돌리기가 반드시 시도되게 하고, 되돌린 뒤 DB로 직접
+    # 재확인한다(test_stock_ledger와 같은 결 — 46158은 이 보장 없이 8일 방치됐다).
+    # + C안(하네스 판단, 2026-08-15): 지난 회차 대상이 지금도 건강한지 먼저 본다 —
+    # try/finally도 못 도는 잔여 위험(서버가 죽는 등, 오늘 밤 세 번 실재 — T-05)의
+    # 유일한 방어다.
+    _selftest_no_orphan(
+        "last_target_spec_fields",
+        "SELECT 1 FROM products p JOIN product_specs s USING (product_code)"
+        " WHERE p.product_code=:p AND p.part_type='POWER' AND p.status='판매중'"
+        "   AND p.stock_qty>0 AND s.form_factor IS NOT NULL AND s.rated_watt IS NULL",
+        "SELECT p.status, p.stock_qty, p.locked_fields, s.rated_watt, s.form_factor"
+        "  FROM products p JOIN product_specs s USING (product_code) WHERE p.product_code=:p")
     pc = db_one("""
         SELECT p.product_code FROM products p JOIN product_specs s USING (product_code)
          WHERE p.part_type='POWER' AND p.status='판매중' AND p.stock_qty>0
@@ -923,30 +1035,46 @@ def test_spec_fields():
     if pc is None:
         print("  [SKIP] (I) 사양 값 입력 — 대상 없음")
     else:
+        _selftest_remember("last_target_spec_fields", pc)
         pool0 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
         st, w = post_raw(f"/api/admin/products/{pc}/specs",
                          json.dumps({"values": {"size_inch": 27}}).encode(),
                          {"Content-Type": "application/json"}, method="PATCH")
         check("다른 부품 종류의 사양은 400", st == 400, 400, st)
-        st, r = post_raw(f"/api/admin/products/{pc}/specs",
-                         json.dumps({"values": {"rated_watt": 650}}).encode(),
-                         {"Content-Type": "application/json"}, method="PATCH")
-        check("사양 입력 성공", st == 200, 200, st)
-        if st == 200:
-            check("입력한 사양은 잠긴다", "rated_watt" in r["locked_fields"],
-                  "rated_watt 잠금", r["locked_fields"])
-            check("채운 필드의 검수 대기가 해소된다", r["reviews_closed"] >= 0,
-                  ">= 0", r["reviews_closed"])
-            st2, _ = post(f"/api/admin/products/specs/undo/{r['undo_id']}")
-            check("사양 입력 되돌리기", st2 == 200, 200, st2)
-            back = db_one("SELECT rated_watt FROM product_specs WHERE product_code=:p", p=pc)
-            check("값이 원복된다", back is None, None, back)
-            lf = db_one("SELECT locked_fields::text FROM products WHERE product_code=:p", p=pc)
-            check("잠금도 원복된다", "rated_watt" not in (lf or ""), "잠금 없음", lf)
-            pool1 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
-            check("되돌린 뒤 추천 후보가 제자리", pool1 == pool0, pool0, pool1)
-            st3, _ = post(f"/api/admin/products/specs/undo/{r['undo_id']}")
-            check("사양 이중 되돌리기는 409", st3 == 409, 409, st3)
+
+        # ── PATCH → 되돌리기: try/finally로 감싼다(2026-08-15, 46158 재발 방지) ──
+        undo_id = None
+        try:
+            st, r = post_raw(f"/api/admin/products/{pc}/specs",
+                             json.dumps({"values": {"rated_watt": 650}}).encode(),
+                             {"Content-Type": "application/json"}, method="PATCH")
+            check("사양 입력 성공", st == 200, 200, st)
+            if st == 200:
+                undo_id = (r or {}).get("undo_id")
+                check("입력한 사양은 잠긴다", "rated_watt" in r["locked_fields"],
+                      "rated_watt 잠금", r["locked_fields"])
+                check("채운 필드의 검수 대기가 해소된다", r["reviews_closed"] >= 0,
+                      ">= 0", r["reviews_closed"])
+        finally:
+            if undo_id is not None:
+                try:
+                    st2, _ = post(f"/api/admin/products/specs/undo/{undo_id}")
+                except Exception as e:                       # noqa: BLE001
+                    check("사양 입력 되돌리기(예외 없이 응답한다)", False, "정상 응답", repr(e))
+                    st2 = None
+                else:
+                    check("사양 입력 되돌리기(try 중 예외가 나도 finally에서 반드시 시도)",
+                          st2 == 200, 200, st2)
+                # DB로 직접 재확인 — API가 200을 말해도 실제로 안 바뀌었을 수 있다
+                back = db_one("SELECT rated_watt FROM product_specs WHERE product_code=:p", p=pc)
+                check("값이 원복된다(DB 직접 재확인)", back is None, None, back)
+                lf = db_one("SELECT locked_fields::text FROM products WHERE product_code=:p", p=pc)
+                check("잠금도 원복된다(DB 직접 재확인)", "rated_watt" not in (lf or ""), "잠금 없음", lf)
+                pool1 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
+                check("되돌린 뒤 추천 후보가 제자리(DB 직접 재확인)", pool1 == pool0, pool0, pool1)
+                if st2 == 200:
+                    st3, _ = post(f"/api/admin/products/specs/undo/{undo_id}")
+                    check("사양 이중 되돌리기는 409", st3 == 409, 409, st3)
     _spec_field_guards()
 
 
@@ -3927,11 +4055,30 @@ def test_part_type_change():
     # 규약은 "상세에서 분류는 고치지 않는다"였다. 그런데 적재가 잘못 넣은 분류를
     # 바로잡을 길이 없어 그 상품들이 영영 추천에서 빠졌다. 열되, 눈 감고 바꾸게 하지
     # 않는다 — 분류가 바뀌면 필수 사양이 통째로 바뀌고 추천 슬롯도 달라진다.
+    #
+    # ⚠ 정본(data_origin='real') 상품을 쓴다 — data_origin='demo' 필터는 «측정 후»
+    # 넣지 않기로 했다(2026-08-15, 46158 사고 조사 후속). 실측: 이 조건(part_type='ETC'
+    # AND status='판매중')을 만족하는 데모 상품이 **0건**이다 — 데모 ETC 상품 6건이
+    # 전부 '품절'이다. 필터를 걸면 이 검사는 매번 조용히 SKIP되는데, 그건 정본을
+    # 건드리는 것보다 나쁘다(아무것도 검증하지 않으면서 통과한 것처럼 보인다) — 그래서
+    # 필터는 걸지 않고 DBA에게 데모 표본(ETC · 판매중)을 보고한다. 대신 위험 구간을
+    # 줄인다: 적용 → 가드 확인 → 되돌리기를 try/finally로 감싸 그 사이 무엇이 터져도
+    # 되돌리기가 반드시 시도되게 하고, 되돌린 뒤 DB로 직접 재확인한다(test_stock_ledger와
+    # 같은 결 — 46158은 이 보장 없이 8일 방치됐다).
+    # + C안(하네스 판단, 2026-08-15): 지난 회차 대상이 지금도 건강한지 먼저 본다 —
+    # try/finally도 못 도는 잔여 위험(서버가 죽는 등, 오늘 밤 세 번 실재 — T-05)의
+    # 유일한 방어다. 이 함수가 «가장» 필요하다 — demo 필터를 못 넣어 정본을 계속 쓴다.
+    _selftest_no_orphan(
+        "last_target_part_type_change",
+        "SELECT 1 FROM products WHERE product_code=:p AND part_type='ETC'"
+        " AND status='판매중'",
+        "SELECT part_type, status, locked_fields FROM products WHERE product_code=:p")
     pc = db_one("SELECT product_code FROM products WHERE part_type='ETC'"
                 " AND status='판매중' ORDER BY product_code LIMIT 1")
     if pc is None:
         print("  [SKIP] (I) 분류 변경 — 대상 없음")
         return
+    _selftest_remember("last_target_part_type_change", pc)
     was = db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
     pool0 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
 
@@ -3948,33 +4095,45 @@ def test_part_type_change():
         check("영향에 필수 사양 변화가 있다",
               "required_add" in i and "missing_after" in i, "필드 있음", sorted(i))
 
-    st2, ap = post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})
-    check("분류 변경 적용", st2 == 200, 200, st2)
-    if st2 == 200:
-        check("products와 product_specs의 분류가 같다",
-              db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
-              == (db_one("SELECT part_type FROM product_specs WHERE product_code=:p", p=pc)
-                  or "CASE"),
-              "일치", "다름")
-        check("같은 분류로 또 바꾸면 400",
-              post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})[0] == 400,
-              400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})[0])
-        check("없는 분류는 400",
-              post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0] == 400,
-              400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0])
-        uid = ap.get("undo_id")
-        st3, _ = post(f"/api/admin/products/part-type/undo/{uid}")
-        check("분류 변경 되돌리기", st3 == 200, 200, st3)
-        check("분류가 원복된다",
-              db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc) == was,
-              was, db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc))
-        check("되돌린 뒤 추천 풀이 제자리",
-              db_one("SELECT count(*) FROM v_recommendation_candidates"
-                     " WHERE stock_qty>0") == pool0, pool0,
-              db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0"))
-        check("이중 되돌리기는 409",
-              post(f"/api/admin/products/part-type/undo/{uid}")[0] == 409, 409,
-              post(f"/api/admin/products/part-type/undo/{uid}")[0])
+    # ── 적용 → 되돌리기: try/finally로 감싼다(2026-08-15, 46158 재발 방지) ─────────
+    # 원래 이 사이엔 check 4회 + POST 2회가 더 있었다 — 46158에서 정확히 이런 구간의
+    # 예외가 undo를 건너뛰게 했다. finally는 그 무엇이 터져도 되돌리기를 반드시 시도한다.
+    uid = None
+    try:
+        st2, ap = post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})
+        check("분류 변경 적용", st2 == 200, 200, st2)
+        if st2 == 200:
+            uid = (ap or {}).get("undo_id")
+            check("products와 product_specs의 분류가 같다",
+                  db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
+                  == (db_one("SELECT part_type FROM product_specs WHERE product_code=:p", p=pc)
+                      or "CASE"),
+                  "일치", "다름")
+            check("같은 분류로 또 바꾸면 400",
+                  post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})[0] == 400,
+                  400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "CASE"})[0])
+            check("없는 분류는 400",
+                  post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0] == 400,
+                  400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0])
+    finally:
+        if uid is not None:
+            try:
+                st3, _ = post(f"/api/admin/products/part-type/undo/{uid}")
+            except Exception as e:                           # noqa: BLE001
+                check("분류 변경 되돌리기(예외 없이 응답한다)", False, "정상 응답", repr(e))
+                st3 = None
+            else:
+                check("분류 변경 되돌리기(try 중 예외가 나도 finally에서 반드시 시도)",
+                      st3 == 200, 200, st3)
+            # DB로 직접 재확인 — undo 응답이 200이라 말해도 실제로 안 바뀌었을 수 있다
+            now_pt = db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
+            check("분류가 원복된다(DB 직접 재확인)", now_pt == was, was, now_pt)
+            now_pool = db_one("SELECT count(*) FROM v_recommendation_candidates"
+                              " WHERE stock_qty>0")
+            check("되돌린 뒤 추천 풀이 제자리(DB 직접 재확인)", now_pool == pool0, pool0, now_pool)
+            if st3 == 200:
+                st4, _ = post(f"/api/admin/products/part-type/undo/{uid}")
+                check("이중 되돌리기는 409", st4 == 409, 409, st4)
 
     # ── 중복 등록 확인 (슬라이스 68) ────────────────────────────────
     # 기존 danawa.title_similarity는 이 용도에 못 쓴다: 모델명 토큰이 겹치면 점수를
@@ -4465,6 +4624,71 @@ def test_ledgers():
             check("매입가 이력에 old/new 모두 기록", h["new"] is not None,
                   "new 존재", h)
             break
+
+    # ── 가격 = 원장 마지막 값 (2026-08-15) ──────────────────────────────────────
+    # 재고는 원장 전체를 SUM해 맞추는 불변식이 있고(슬라이스 98, 아래 "[26] 재고
+    # 원장") 회귀가 전 상품에서 검사한다. 가격은 지금까지 그 대응이 없었다 —
+    # 위 두 검사는 "이력이 도착하는가"만 보고 "지금 값과 이력이 맞는가"는 한
+    # 번도 보지 않았다. 그래서 "PATCH가 가격 이력을 안 남긴다" 결함이 사장님이
+    # 직접 겪으실 때까지 안 잡혔다 — 재고였다면 회귀가 즉시 잡았을 것이다.
+    # ERD §6 3원칙 3항: "모든 가격 변경은 product_price_history에 reason·ref_id와
+    # 함께 기록한다"(docs/06_db-erd.md:580).
+    #
+    # 불변식: **이력이 있는 상품**에서 products의 현재가 = 그 상품의 마지막
+    # new_price(field별로 따로 — sale/purchase). 이력이 아예 없는 상품은 여기서
+    # 다루지 않는다 — "적재가 이력을 안 남긴다"는 별개 문제이고 바로 아래 코드
+    # 존재 검사가 다룬다.
+    #
+    # ⚠ 기대값을 0으로 박지 않는다(고정 기대값(FIXED)은 폐지 — A-13, 2026-07-27).
+    # 지금 이미 실측 드리프트가 있다 — product_code 119253(하네스가 PATCH로
+    # 되돌릴 때 이력 미기록 버그가 살아 있던 흔적, 지금은 고쳐짐) · 46158(이
+    # 회귀 자신이 남긴 잔재 — [12] test_product_edit의 product_edit/undo 쌍이
+    # 191회 중 마지막 1회를 undo 없이 끊었다). 0을 박으면 이 검사가 심는 순간부터
+    # 실패한다. 대신 **스냅샷보다 늘면 실패**(새로 새는 경로가 생겼다는 뜻) ·
+    # **줄면 알림**(정리됐다는 뜻 — 재고의 drift()처럼 실패로 세지 않는다).
+    # 재고와 달리 가격은 정상적으로 늘어날 이유가 없는 신호라 "늘면 실패"를
+    # 더한다. 스냅샷(gitignore)에 키가 없는 첫 실행은 지금 값을 기준선으로
+    # 채택하고 통과시킨다 — 그 파일이 없는 환경에서도 죽지 않는다.
+    if _engine is None:
+        print("  [SKIP] (I) 가격 원장 드리프트 — DB 미연결")
+    else:
+        for _field, _col in (("sale", "sale_price"), ("purchase", "purchase_price")):
+            _rows = db_all(f"""
+                SELECT p.product_code AS pc
+                  FROM products p
+                  JOIN LATERAL (
+                         SELECT new_price FROM product_price_history
+                          WHERE product_code = p.product_code AND field = :f
+                          ORDER BY changed_at DESC, history_id DESC LIMIT 1
+                       ) h ON TRUE
+                 WHERE p.{_col} IS DISTINCT FROM h.new_price
+                 ORDER BY p.product_code
+            """, f=_field)
+            codes = [r["pc"] for r in _rows]
+            key = f"price_drift_{_field}"
+            drift(key, len(codes))            # 스냅샷 기록 + 방향 무관 알림([값 변화])
+            base = _snap_old.get(key)
+            check(f"가격 원장 드리프트({_field}) — 스냅샷보다 늘지 않는다",
+                  True if base is None else len(codes) <= base,
+                  "기준선 없음(최초 기록)" if base is None else f"<= {base}건(스냅샷)",
+                  {"count": len(codes), "product_code": codes[:30]})
+            if codes:
+                print(f"  [정보] 가격 드리프트({_field}) product_code: {codes[:30]}")
+
+    # 적재가 가격 이력을 남기는 코드가 살아 있는가 — 재고 검사([26] :3172-3176)를
+    # 본뜬다. ⚠ 2026-08-15 실측 당시 api/catalog_ingest.py는 이 표를 0건
+    # 참조했다(다른 제작자가 같은 시각에 이 파일을 고치는 중이었다 — 그가
+    # 끝나면 통과한다. 이 회귀 파일은 그 파일을 고치지 않는다).
+    try:
+        import re as _reL
+        ci = io.open(os.path.join(ROOT, "api", "catalog_ingest.py"), encoding="utf-8").read()
+        check("적재가 가격 변경을 이력에 남긴다(ERD §6 3원칙 3항)",
+              "product_price_history" in ci and "'csv'" in ci, "있음", "없음")
+        _m = _reL.search(r"INSERT INTO product_price_history[\s\S]{0,300}", ci)
+        check("적재의 가격 이력에 ref_id가 있다(어느 적재에서 왔는지 추적)",
+              bool(_m) and "ref_id" in _m.group(0), "있음", "없음")
+    except OSError as e:                                 # noqa: BLE001
+        print(f"  [SKIP] (I) 적재 가격 이력 계약 - {e}")
 
     logs = get("/api/admin/activity-logs")
     undo_rows = [i for i in logs["items"] if i["is_undo"]]
