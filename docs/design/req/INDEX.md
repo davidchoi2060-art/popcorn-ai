@@ -23,14 +23,18 @@
 > 않고 하네스가 넷을 묶어 적은 것이 원인이다 — **상태는 적지 말고 재서 안다**는 규칙을
 > 목차 자신이 어겼다.
 >
-> ⚠ **2026-08-15 발견 — 「마진 정책」화면이 이 목차에 아예 없다.** 실측:
+> ⚠ **2026-08-15 발견(03:19) → 그날 안에 해소(11:44, 행 22B) — 그런데 이 발견
+> 노트 자신은 안 고쳐진 채 남아 있었다.** 발견 당시 실측:
 > `templates/admin/margin_policy.html.j2` · `api/admin_ui_margin_policy.py`
 > (라우트 `/admin2/margin-policy`) · `docs/design/req/req-margin-policy.md` ·
-> `docs/design/spec-margin-policy.md` 넷 다 존재하는데, 이 목차에도 `api/admin_nav.py`
-> (「판매가」 그룹 3항목뿐)에도 행이 없다. **행을 추가하려면 화면 ID·그룹 내 순서를
-> 정해야 하는데 그건 기계적 편집 범위 밖이라 여기서 임의로 채우지 않는다** — 하네스
-> 확인 필요(위 §① 「가격 검토 대기」 정정과 같은 병이지만, 이건 상태가 아니라 **행
-> 자체가 없는** 경우라 한 단계 더 나쁘다).
+> `docs/design/spec-margin-policy.md` 넷 다 존재하는데 이 목차에도
+> `api/admin_nav.py`에도 행이 없었다. **커밋 `eaaec25`가 화면 ID `ADM-PRC-020`·
+> 그룹 내 순서(010 다음·030 앞)를 정해 22B로 편입했다** — 아래 §5. 판매가 표에
+> 있다. **다만 이 발견 노트 자체는 그 뒤로도 지워지지 않아, 한 파일 안에서
+> 「없다」와 「22B에 있다」가 동시에 남는 자기모순이 됐다** — 행을 고쳐도 그
+> 행을 가리키던 다른 문단이 저절로 안 고쳐진다는 것을 이 목차 스스로 보여준
+> 사례다. 지우지 않고 여기서 정정한다(CANON §5 — 폐기된 것은 지우지 말고
+> 폐기라고 적는다. 이 노트는 폐기가 아니라 해소된 발견이라 「해소」로 적는다).
 
 ## 0. 로그인 — LNB 밖
 
@@ -55,8 +59,8 @@
 | 2 | **상품 분류 관리** | [req-product-category.md](req-product-category.md) | `dc-product-category.html` | **지음** (`/admin2/categories` · ADM-CAT-010) |
 | 3 | **상품 관리** | [req-products.md](req-products.md) | `dc-products-3안.html` | **재구축 대기** (ADM-PRD-010 · UX-23 → 1a) |
 | 4 | **상품 분류 매핑** | [req-product-category-map.md](req-product-category-map.md) | `dc-product-category-map.html` | **지음** (`/admin2/category-mapping`) |
-| 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **구축 중** (ADM-CSV-010 · UX-21 → 1b) |
-| 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **구축 중** (ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c · 2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
+| 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **구축 중** (ADM-CSV-010 · UX-21 → 1b · 라우트·템플릿 커밋됨(`82a55a1`) · 메뉴 미연결) |
+| 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **구축 중** (ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c · 라우트·템플릿 커밋됨(`82a55a1`), 검증 전 · 메뉴 미연결) |
 
 ## 3. 상품사양관리
 
@@ -64,23 +68,23 @@
 |---|------|----------------|--------|------|
 | 7 | **조립 호환 지도** | [req-build-map.md](req-build-map.md) | `dc-build-map-v2.html` | **재구축 대기** (`/admin2/build-map` · UX-20 → v2 클릭 고정) |
 | 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 중** (`/admin2/spec-standard` · UX-24 → **1a**) |
-| 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **디자인** (ADM-PRD-050 · UX-27 → 1a) |
+| 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **구축 중** (ADM-PRD-050 · UX-27 → 1a · 라우트·템플릿 커밋됨(`82a55a1`), 검증 전 · 메뉴 미연결) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
 | 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) · [req-compat-required.md](req-compat-required.md)(「필수 사양 안내」 탭) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`. **+2026-08-15: 「필수 사양 안내」 탭 신설**(`spec-compat-required.md` 계약 — 결정 로그 ⑤ 설계 간극을 채움) · 확인자 2차 검증 결함 0 · 커밋 `89019e2`. 메뉴는 안 바뀜 — 기존 화면 안 탭 추가) |
-| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고 · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
+| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고 · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전 · 메뉴 미연결) |
 | 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **지음** (`/admin2/part-grade` · ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력 · 확인자 검증 통과 · 커밋 `112c5a7` · 메뉴 연결 `7949c98`) |
 | 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **지음** (`/admin2/policy-weights` · ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명 · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
-| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용 · 템플릿은 확인자 검증 통과·커밋 `ec4b7ba`, 라우트 파일이 지금 다른 작업으로 미커밋 수정 중이라 메뉴 미연결) |
+| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용 · 템플릿은 확인자 검증 통과·커밋 `ec4b7ba`, 라우트 파일도 커밋됨(`82a55a1`, 2026-08-15 17:46) · 검증 기록 없음 · 메뉴 미연결) |
 | 16 | **견적 상담 기록** | [req-consult-sessions.md](req-consult-sessions.md) | `spec-consult-sessions.md`(계약) | **지음** (`/admin2/consult-sessions` · ADM-ORD-010 · UX-33 → 1a + 우측 서랍 · 재검증 «결함 0» · 커밋 `d792434` · 메뉴 연결 `68daf6e`) |
-| 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
+| 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | `spec-swap-click-logs.md`(계약 · 커밋 `c75656e` 2026-08-14 23:47 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트·템플릿 커밋됨(`82a55a1`), 검증 전 · 메뉴 미연결) |
 
 ## 4. 매입 · 소싱
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 18 | 공급처 | [req-suppliers.md](req-suppliers.md) | `spec-suppliers.md`(계약 · 1b 안) | **제작 완료 · 검증 중** (`/admin2/suppliers` · **ADM-SRC-030** — 라우트 실측 등록됨. 담당 파일 `api/admin_ui_suppliers.py`·`templates/admin/suppliers.html.j2` 실측 존재, 미커밋. 2026-08-15 착수) |
-| 19 | 매입 견적(용산) | [req-sourcing-quote.md](req-sourcing-quote.md) | `spec-sourcing.md`(계약 · 1a 안) | **제작 완료 · 검증 중** (`/admin2/sourcing` · **ADM-SRC-010** — 라우트 실측 등록됨. 담당 파일 `api/admin_ui_sourcing.py`·`templates/admin/sourcing.html.j2` 실측 존재, 미커밋. 2026-08-15 착수) |
-| 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | `spec-price-import.md`(계약 · 1b 안) | **제작 중** (`/admin2/price-import` · **ADM-PRC-040** — 라우트 실측 등록됨(`api/admin_ui_price_import.py`, 미커밋), 템플릿(`templates/admin/price_import.html.j2`)은 아직 없음. 2026-08-15 착수) |
+| 18 | 공급처 | [req-suppliers.md](req-suppliers.md) | `spec-suppliers.md`(계약 · 1b 안) | **지음** (`/admin2/suppliers` · **ADM-SRC-030** · 커밋 `e5572eb` · 확인자 재검증 통과(하네스 통보 2026-08-15 — 커밋 자신은 "제작 완료·검증 중"이라 적었으나 그 뒤 통과) · 메뉴 연결 `6b3d637`) |
+| 19 | 매입 견적(용산) | [req-sourcing-quote.md](req-sourcing-quote.md) | `spec-sourcing.md`(계약 · 1a 안) | **지음** (`/admin2/sourcing` · **ADM-SRC-010** · 커밋 `d53732c` · 확인자 재검증 통과(하네스 통보 2026-08-15 — 위와 같은 경위) · 메뉴 연결 `6b3d637` · ⚠ 마이그레이션 `0053_sourcing_confirmed_at`은 스키마만이고 DB 미적용 — 적용 전까지 「오늘 확정 N건」은 `null`+사유 문구로 대신 응답한다) |
+| 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | `spec-price-import.md`(계약 · 1b 안) | **지음** (`/admin2/price-import` · **ADM-PRC-040** · 커밋 `4b23e78`(라우트·템플릿 함께) — 그 커밋 메시지 자신은 "재검증 진행 중"이라 적었으나 그 뒤 확인자 재검증 통과(하네스 통보 2026-08-15) · 메뉴 연결 `6b3d637`) |
 
 ## 5. 판매가
 
@@ -98,26 +102,26 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
-| 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · ⚠ 아직 미커밋) |
+| 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | `spec-sale-price.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트 커밋 `096aec2`(결함 3건 수정 포함) · 템플릿 커밋 `82a55a1` · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전 · 메뉴 미연결) |
+| 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · 커밋 `28c49dd`(뒤늦게 반영, 내용 변경 없음 — 이 목차 최종 편집 뒤에 커밋돼 그 사이 "미커밋"으로 남아 있었다. 조사자 목록엔 없던 여덟 번째 사례, 기록자가 같은 검사 중 발견)) |
 | 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61`) |
 | 23 | 가격 이력 | [req-price-history.md](req-price-history.md) · [spec-price-history.md](../spec-price-history.md)(2026-08-15 「(신규)」 표기 정정) | — | **지음** — 구현 `/admin2/price-history`(커밋 `140a5ba`·`77dbbef`·`bdf7e7c`) · 검증 확인자 브라우저 실측 통과 3라운드(①7행 3종 판정·ref_id null 실값·401/400/404 경계·768px ②마이그레이션 0050 「비움」 표시 — DB↔DOM 5행 대조·new_price=0 실데이터로 0과 NULL 구분 확인 ③「부품 종류」 확인 중… 고정 결함 — 10ms 폴링 프레임 단위 캡처로 재발 0·정상 로딩 노출은 유지 확인) · 계약 정정 `8e35508` · 연결 `api/admin_nav.py` `91dd3a1` |
-| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안) | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` — spec-reprice.md 자신도 "대조 필요"로 표시, ID·경로는 여전히 확정 아님. **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). 라우트 커밋됨(`api/admin_ui_reprice.py`) · 템플릿 실측 존재(`templates/admin/reprice.html.j2`, 미커밋)) |
+| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안, 커밋 `82a55a1`) | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` — spec-reprice.md 자신도 "대조 필요"로 표시, ID·경로는 여전히 확정 아님. **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). 라우트·템플릿 둘 다 커밋됨(`82a55a1`) · 검증 전 · **nav 항목 자체가 없다**(`api/admin_nav.py` — 검증 기록 없이는 만들지 않는다는 규약, 2026-08-15 5차 노트 참조)) |
 
 ## 6. 인계 · 성과
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
-| 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
-| 26 | 유입 성과 | [req-funnel-performance.md](req-funnel-performance.md) | `spec-funnel.md`(계약 · 1a 안) | **제작 중** (경로 `/admin2/funnel-performance` — spec-funnel.md의 「가칭」 그대로 라우트 실측 등록됨. **ADM-HND-030 후보 — 화면 ID 미배정**(spec-funnel.md 자신이 명시). 담당 파일 `api/admin_ui_funnel.py`·`api/admin_funnel.py`·`templates/admin/funnel.html.j2` 실측 존재, 미커밋·검증 전. 2026-08-15 착수) |
+| 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | `spec-mall-sync.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트 커밋 `0eaa890` · 템플릿 커밋 `82a55a1`, 검증 전 · 메뉴 미연결) |
+| 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | `spec-handoff-log.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트·템플릿 커밋 `82a55a1`, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전 · 메뉴 미연결) |
+| 26 | 유입 성과 | [req-funnel-performance.md](req-funnel-performance.md) | `spec-funnel.md`(계약 · 1a 안) | **지음** (경로 `/admin2/funnel-performance` — spec-funnel.md의 「가칭」 그대로 확정 표기를 따른다. **ADM-HND-030 후보 — 화면 ID는 여전히 미배정**(spec-funnel.md 자신이 명시. ID 미정이 메뉴 연결을 막지는 않는다). 커밋 `adb6d4d` · 확인자 재검증 통과(하네스 통보 2026-08-15) · 메뉴 연결 `6b3d637`) |
 
 ## 7. AI 관리
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
-| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **재구축 중** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 제작 착수** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 모두 수정 중(미커밋). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.**) |
+| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **재구축 중** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 재구축** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 커밋됨(`04a99dc`), 이 1a 버전은 확인자 검증 전(그 커밋 메시지 자신이 "재구축 중(제작 착수, 확인자 검증 전)"이라 적음). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.** ⚠⚠ **메뉴는 이미 연결돼 있다**(`api/admin_nav.py`의 기존 href — 오늘 이 물결과 무관하게 그 전부터 있었다) — **검증 전 1a 버전이 지금도 운영자 메뉴에 노출된 상태**다. 이번 기록자 작업(admin_nav.py 5차)은 이 화면의 href를 새로 만들지도 끊지도 않았다(범위 밖으로 판단) — 하네스 보고에 남긴다.) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
 | 30 | **AI 연동 설정** | [req-ai-integration.md](req-ai-integration.md) | `dc-ai-integration.html` | **지음** (`/admin2/ai-integration`) |
 | 31 | **AI 사용량 · 비용** | [req-ai-usage-cost.md](req-ai-usage-cost.md) | `dc-ai-usage-cost.html` | **지음** (`/admin2/ai-usage-cost`) |
@@ -156,10 +160,10 @@
 | 1 | 대시보드 **(3안 비교본)** | [dc-dashboard-3안.html](../dc-dashboard-3안.html) | 재구축 중 · UX-22 → 1b |
 | 3 | 상품 관리 **(3안 비교본)** | [dc-products-3안.html](../dc-products-3안.html) | 재구축 대기 · UX-23 → 1a |
 | 5 | 상품 일괄 등록 | [dc-product-bulk-import.html](../dc-product-bulk-import.html) | 구축 중 · UX-21 → 1b |
-| 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 신설 대기 · UX-26 → 1b + 빈 상태 1c |
+| 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 구축 중 · UX-26 → 1b + 빈 상태 1c |
 | 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 중 · UX-24 → **1a** |
-| 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 디자인 · UX-27 → 1a |
-| 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 구축 중 · UX-28 → 1b |
+| 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 구축 중 · UX-27 → 1a |
+| 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 지음 |
 | 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 대기 · UX-25 |
 
 ### 계약 요약으로 전달된 승인 디자인
@@ -176,12 +180,16 @@
 | 14 | 추천 기준 보기 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
 | 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 구축 중 · UX-32 → 1a · 조회 전용 |
 | 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 구축 중 · UX-33 → 1a + 우측 서랍 |
-| 18 | 공급처 | [spec-suppliers.md](../spec-suppliers.md) | 제작 완료 · 검증 중 · 1b 안 |
-| 19 | 매입 견적(용산) | [spec-sourcing.md](../spec-sourcing.md) | 제작 완료 · 검증 중 · 1a 안 |
-| 20 | 단가표 반영 | [spec-price-import.md](../spec-price-import.md) | 제작 중 · 1b 안 |
-| 23B | 판매가 재산정 | [spec-reprice.md](../spec-reprice.md) | 구축 중 · 1a 안 확정 |
-| 26 | 유입 성과 | [spec-funnel.md](../spec-funnel.md) | 제작 중 · 1a 안 · 화면 ID 미배정 |
-| 28 | 웹 사양 채움 | [spec-spec-fill.md](../spec-spec-fill.md) | 재구축 중 · 1a 안 |
+| 17 | 부품 교체 · 클릭 기록 | [spec-swap-click-logs.md](../spec-swap-click-logs.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `c75656e`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 18 | 공급처 | [spec-suppliers.md](../spec-suppliers.md) | 지음 · 1b 안 · 메뉴 연결 |
+| 19 | 매입 견적(용산) | [spec-sourcing.md](../spec-sourcing.md) | 지음 · 1a 안 · 메뉴 연결 |
+| 20 | 단가표 반영 | [spec-price-import.md](../spec-price-import.md) | 지음 · 1b 안 · 메뉴 연결 |
+| 21 | 판매가 관리 | [spec-sale-price.md](../spec-sale-price.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 23B | 판매가 재산정 | [spec-reprice.md](../spec-reprice.md) | 구축 중 · 1a 안 확정 · nav 항목 없음 |
+| 24 | 쇼핑몰 동기화 | [spec-mall-sync.md](../spec-mall-sync.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 25 | 인계 기록 | [spec-handoff-log.md](../spec-handoff-log.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 26 | 유입 성과 | [spec-funnel.md](../spec-funnel.md) | 지음 · 1a 안 · 화면 ID 미배정 · 메뉴 연결 |
+| 28 | 웹 사양 채움 | [spec-spec-fill.md](../spec-spec-fill.md) | 재구축 중 · 1a 안 · ⚠ 메뉴 연결(기존 href, 검증 전 1a가 그대로 노출 중) |
 
 **7번은 완성본이 아니라 「3안 비교본」이다.** 지도형(1a)·진단형(1b)·매트릭스형(1c) 셋이
 한 캔버스에 있다. 사장님이 **셋을 다 탭으로 두고 운영자가 고르게** 하기로 확정했다(UX-20).
