@@ -106,7 +106,7 @@
 | 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · 커밋 `28c49dd`(뒤늦게 반영, 내용 변경 없음 — 이 목차 최종 편집 뒤에 커밋돼 그 사이 "미커밋"으로 남아 있었다. 조사자 목록엔 없던 여덟 번째 사례, 기록자가 같은 검사 중 발견)) |
 | 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61`) |
 | 23 | 가격 이력 | [req-price-history.md](req-price-history.md) · [spec-price-history.md](../spec-price-history.md)(2026-08-15 「(신규)」 표기 정정) | — | **지음** — 구현 `/admin2/price-history`(커밋 `140a5ba`·`77dbbef`·`bdf7e7c`) · 검증 확인자 브라우저 실측 통과 3라운드(①7행 3종 판정·ref_id null 실값·401/400/404 경계·768px ②마이그레이션 0050 「비움」 표시 — DB↔DOM 5행 대조·new_price=0 실데이터로 0과 NULL 구분 확인 ③「부품 종류」 확인 중… 고정 결함 — 10ms 폴링 프레임 단위 캡처로 재발 0·정상 로딩 노출은 유지 확인) · 계약 정정 `8e35508` · 연결 `api/admin_nav.py` `91dd3a1` |
-| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안, 커밋 `82a55a1`) | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` — spec-reprice.md 자신도 "대조 필요"로 표시, ID·경로는 여전히 확정 아님. **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). 라우트·템플릿 둘 다 커밋됨(`82a55a1`) · 검증 전 · **nav 항목 자체가 없다**(`api/admin_nav.py` — 검증 기록 없이는 만들지 않는다는 규약, 2026-08-15 5차 노트 참조)) |
+| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안, 커밋 `82a55a1`) | **지음** (`/admin2/reprice` · **ADM-PRC-050** — ID·경로 대조 완료(spec-reprice.md가 남겨 둔 "대조 필요"를 이걸로 해소 — `api/admin_ui_reprice.py`의 `APIRouter(prefix="/admin2")` + `@router.get("/reprice")`로 실측). **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). **확인자 검증 통과(2026-08-15)** — 「지난 회차」 표가 맨 앞·`note` 열 실재·간격 "1분 1.5초" 형식 확인, 금지 문구(「99.99%」·「세 번째도」 등) grep 전수 0건, **apply(7,174건)->undo 왕복 실완주(log_id 7720)로 구 화면의 핵심 결함("새로고침하면 되돌릴 방법이 사라진다") 해소 확인**, 되돌린 뒤 수치 원값과 완전 일치(7,279/6,899/275/105/0), 미로그인 401을 preview·apply·undo·페이지 네 곳 모두 확인(계약 §⑧ "무세션 실측 못 함" 항목 해소), 콘솔 에러 0·404 자원 0·외부 CDN 0. **nav 항목 자체가 없던 유일한 화면**이었는데 이번에 신설 + 메뉴 연결(`api/admin_nav.py` 커밋 `c6d662e` — 「판매가」 그룹 물리적 끝에 배치, 근거는 그 커밋의 6차 노트). ⚠ 남은 결함 하나(마크다운 별표 노출)는 다른 제작자가 수정 중이고 ⓐ류(문구 렌더링)라 연결을 막지 않았다) |
 
 ## 6. 인계 · 성과
 
@@ -121,7 +121,7 @@
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
-| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **재구축 중** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 재구축** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 커밋됨(`04a99dc`), 이 1a 버전은 확인자 검증 전(그 커밋 메시지 자신이 "재구축 중(제작 착수, 확인자 검증 전)"이라 적음). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.** ⚠⚠ **메뉴는 이미 연결돼 있다**(`api/admin_nav.py`의 기존 href — 오늘 이 물결과 무관하게 그 전부터 있었다) — **검증 전 1a 버전이 지금도 운영자 메뉴에 노출된 상태**다. 이번 기록자 작업(admin_nav.py 5차)은 이 화면의 href를 새로 만들지도 끊지도 않았다(범위 밖으로 판단) — 하네스 보고에 남긴다.) |
+| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **지음** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 재구축** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 커밋 `04a99dc`(그 커밋 메시지 자신은 당시 "재구축 중(제작 착수, 확인자 검증 전)"이라 적었다). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.** ⚠⚠ **해소(2026-08-15, 기록자 6차)** — 커밋 `04a99dc`의 1a 버전이 "검증 전인데 메뉴에 이미 노출돼 있다"는 우려를 남겨 뒀었다(admin_nav.py 5차 노트 — 그때는 이 화면의 href를 새로 만들지도 끊지도 않고 범위 밖으로 판단해 하네스 보고에만 남겼다). **그 뒤 확인자 재검증이 통과했다** — `review_pending_empty` 렌더 · DOM 순서 · `scrollLeft` 리셋 셋 다 해소 확인, 47.6%→100%. 메뉴 연결은 이번에 새로 한 것이 없다(기존 href 그대로 — 검증이 뒤늦게 노출을 따라잡았을 뿐이다)) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
 | 30 | **AI 연동 설정** | [req-ai-integration.md](req-ai-integration.md) | `dc-ai-integration.html` | **지음** (`/admin2/ai-integration`) |
 | 31 | **AI 사용량 · 비용** | [req-ai-usage-cost.md](req-ai-usage-cost.md) | `dc-ai-usage-cost.html` | **지음** (`/admin2/ai-usage-cost`) |
@@ -185,11 +185,11 @@
 | 19 | 매입 견적(용산) | [spec-sourcing.md](../spec-sourcing.md) | 지음 · 1a 안 · 메뉴 연결 |
 | 20 | 단가표 반영 | [spec-price-import.md](../spec-price-import.md) | 지음 · 1b 안 · 메뉴 연결 |
 | 21 | 판매가 관리 | [spec-sale-price.md](../spec-sale-price.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
-| 23B | 판매가 재산정 | [spec-reprice.md](../spec-reprice.md) | 구축 중 · 1a 안 확정 · nav 항목 없음 |
+| 23B | 판매가 재산정 | [spec-reprice.md](../spec-reprice.md) | 지음 · 1a 안 · 검증 통과 · 메뉴 연결(`c6d662e`) |
 | 24 | 쇼핑몰 동기화 | [spec-mall-sync.md](../spec-mall-sync.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
 | 25 | 인계 기록 | [spec-handoff-log.md](../spec-handoff-log.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
 | 26 | 유입 성과 | [spec-funnel.md](../spec-funnel.md) | 지음 · 1a 안 · 화면 ID 미배정 · 메뉴 연결 |
-| 28 | 웹 사양 채움 | [spec-spec-fill.md](../spec-spec-fill.md) | 재구축 중 · 1a 안 · ⚠ 메뉴 연결(기존 href, 검증 전 1a가 그대로 노출 중) |
+| 28 | 웹 사양 채움 | [spec-spec-fill.md](../spec-spec-fill.md) | 지음 · 1a 안 · 검증 통과(2026-08-15) · 메뉴 연결(기존 href) |
 
 **7번은 완성본이 아니라 「3안 비교본」이다.** 지도형(1a)·진단형(1b)·매트릭스형(1c) 셋이
 한 캔버스에 있다. 사장님이 **셋을 다 탭으로 두고 운영자가 고르게** 하기로 확정했다(UX-20).
