@@ -10,6 +10,11 @@
   · apply_plan은 한 트랜잭션이다 — 중간에 실패하면 통째로 없던 일이 된다.
   · 적재는 product_code 기준 upsert이고 **삭제가 없다**. 올린다고 기존 상품이 사라지지 않는다.
   · `locked_fields`로 잠근 값은 덮지 않는다(운영자가 손으로 고친 값 보호 — ERD §4.3).
+  · 가격(purchase_price·sale_price)이 바뀌면 product_price_history에 reason='csv'로 남긴다
+    (ERD §6 3원칙 3항 · §189 reason 열거값). 값이 같거나 잠긴 필드면 남기지 않고, 신규
+    상품의 최초 가격은 비교할 이전 값이 없어 이력 대상이 아니다(등록 화면과 같은 규약).
+    **이 규칙은 앞으로의 적재부터만 적용된다** — 이미 이력 없이 지금 값이 된 과거분은
+    소급해 채우지 않는다(지어낸 이력은 원장을 통째로 못 믿게 만든다).
 """
 import csv
 import io
@@ -327,16 +332,22 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
           review_required_yn = EXCLUDED.review_required_yn,
           -- locked_fields는 JSONB 배열이다 — 요소 존재는 `?` 연산자로 본다.
           -- 운영자가 손으로 고친 값을 적재가 덮으면 검수 노동이 무효가 된다(ERD §4.3).
+          -- 잠기지 않았어도 COALESCE로 기존 값을 지킨다 — 원천 CSV가 이 행에 매입가·판매가를
+          -- 안 실었을 뿐인데(_int()가 None) 그걸 그대로 넣으면 멀쩡한 가격이 NULL로 지워진다.
+          -- '적재는 채우기만 하고 지우지 않는다'는 아래 product_specs와 이미 같은 원칙이었는데
+          -- 가격 두 컬럼만 빠져 있었다. market_price·다른 컬럼은 이번 범위가 아니다(가격 둘만).
           purchase_price = CASE WHEN products.locked_fields ? 'purchase_price'
-                                THEN products.purchase_price ELSE EXCLUDED.purchase_price END,
+                                THEN products.purchase_price
+                                ELSE COALESCE(EXCLUDED.purchase_price, products.purchase_price) END,
           sale_price = CASE WHEN products.locked_fields ? 'sale_price'
-                            THEN products.sale_price ELSE EXCLUDED.sale_price END,
+                            THEN products.sale_price
+                            ELSE COALESCE(EXCLUDED.sale_price, products.sale_price) END,
           market_price = EXCLUDED.market_price, supplier = EXCLUDED.supplier,
           danawa_code = EXCLUDED.danawa_code, stock_qty = EXCLUDED.stock_qty,
           spec_source_text = EXCLUDED.spec_source_text, data_origin = EXCLUDED.data_origin,
           updated_at = now()
     """)
-    # ── 재고 델타를 원장에 남긴다 (슬라이스 98) ─────────────────────────
+    # ── 재고 델타·가격 변경 전 값을 함께 읽는다 (슬라이스 98 + 가격 이력 결손 보완) ──
     # 적재는 `stock_qty = EXCLUDED.stock_qty`로 **덮어쓴다**. 그런데 원장에는 아무것도
     # 남지 않아, 재고>0인데 원장이 없는 상품이 7,547건 쌓여 있었다. `stock_movements`
     # 합으로 재고를 검증할 수 없다는 뜻이고, "이 재고가 어디서 왔나"에 답할 수 없다.
@@ -344,12 +355,23 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     # 절대값이 아니라 **델타**를 남긴다 — 재적재가 8을 5로 바꾸면 -3이다.
     # 종류: 처음 우리 재고로 기록되면(0 -> N) `inbound`, 이후 원천과 맞추는 것은 `adjust`.
     #       적재가 물리적 입고를 목격한 것은 아니므로 후자를 입고라고 부르지 않는다.
+    #
+    # 매입가·판매가·잠금도 같은 조회에 담는다 — UPSERT는 "바뀌기 전 값"을 알려주지 않으므로
+    # 아래 가격 이력도 이 스냅샷 없이는 old_price를 채울 수 없다(재고 델타와 같은 문제).
+    #
+    # 왕복(조회)은 하나로 합치되 **쓰는 쪽은 가른다** — `stock_before`는 재고 델타 전용으로
+    # 이름·모양을 그대로 유지한다(회귀 [26]이 이 파일에 이 리터럴이 있는지로 "적재가 절대값이
+    # 아니라 델타를 남긴다"를 판정한다 — 슬라이스 98). 가격 이력은 별도 `price_before`를 쓴다.
     pcs = [p["pc"] for p in prods]
-    stock_before = {}
+    stock_before, price_before = {}, {}
     if pcs:
-        stock_before = {r[0]: (r[1] or 0) for r in conn.execute(text(
-            "SELECT product_code, stock_qty FROM products WHERE product_code = ANY(:c)"),
-            {"c": pcs}).all()}
+        rows = conn.execute(text(
+            "SELECT product_code, stock_qty, purchase_price, sale_price, locked_fields"
+            " FROM products WHERE product_code = ANY(:c)"),
+            {"c": pcs}).all()
+        stock_before = {r[0]: (r[1] or 0) for r in rows}
+        price_before = {r[0]: {"purchase_price": r[2], "sale_price": r[3],
+                               "locked": set(r[4] or [])} for r in rows}
 
     for i in range(0, len(prods), BATCH):
         conn.execute(ins_p, prods[i:i + BATCH])
@@ -369,6 +391,46 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
             " VALUES (:pc, :t, :q, 'catalog', :ref)")
         for i in range(0, len(moves), BATCH):
             conn.execute(ins_mv, moves[i:i + BATCH])
+
+    # ── 가격 변경을 이력에 남긴다 (ERD §6 3원칙 3항 · reason='csv') ─────────────────
+    # 지금까지 적재는 가격을 바꾸면서도 product_price_history에 아무것도 남기지 않았다
+    # (실측: reason='csv' 0건 — ERD가 요구한 값인데 코드에 그 문자열 자체가 없었다).
+    # **앞으로의 적재부터만** 남긴다 — 이미 이력 없이 지금 값이 된 상품(sale 15,594건·
+    # purchase 18,744건, 실측)은 언제 그 값이 됐는지 모르므로 소급해 채우지 않는다
+    # (지어낸 이력은 원장 전체를 못 믿게 만든다 — CLAUDE.md 원장 규약과 같은 이유).
+    #
+    # · 신규 상품(이번에 처음 INSERT됨)은 대상에서 제외한다 — 비교할 '이전 값'이 없다.
+    #   상품 등록(admin_products.register_product)도 최초 매입가를 이력에 남기지 않는
+    #   같은 규약이다(등록 시점엔 old_price가 존재한 적이 없다).
+    # · 잠긴 필드는 건너뛴다 — 위 UPSERT의 CASE가 실제로 값을 안 바꾸므로 남길 변경이 없다.
+    # · 값이 같으면(원천에 값이 없어 COALESCE로 기존 값을 지킨 경우 포함) 행을 남기지
+    #   않는다(선례: admin_price_import.py:166,183 `if new_purchase != ...` ·
+    #   admin_products.py:572 `if before[k]==v: continue`) — 안 지키면 적재 1회에 최대
+    #   22,840행이 두 필드분 쌓여, 지금 28,994행인 원장이 한 번에 두 배 가까이 된다.
+    # · market_price는 이번 범위가 아니다(가격 둘만) — 이력 없이 계속 무조건 덮어쓴다.
+    price_moves = []
+    for p in prods:
+        b = price_before.get(p["pc"])
+        if b is None:
+            continue                        # 신규 상품 — 최초 가격은 이력 대상이 아니다
+        for col, field, key in (("purchase_price", "purchase", "pp"),
+                                 ("sale_price", "sale", "sp2")):
+            if col in b["locked"]:
+                continue                    # 잠긴 값 — 실제로 바뀌지 않는다
+            old = b[col]
+            raw_new = p[key]
+            new = raw_new if raw_new is not None else old   # 위 COALESCE와 동일 규칙
+            if new == old:
+                continue                    # 값이 안 바뀌면 남기지 않는다
+            price_moves.append({"pc": p["pc"], "field": field, "old": old, "new": new,
+                                "ref": job_id, "op": operator_id})
+    if price_moves:
+        ins_ph = text(
+            "INSERT INTO product_price_history"
+            " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
+            " VALUES (:pc, :field, :old, :new, 'csv', :ref, :op)")
+        for i in range(0, len(price_moves), BATCH):
+            conn.execute(ins_ph, price_moves[i:i + BATCH])
 
     # **적재는 채우기만 하고 지우지 않는다.** 새 파일에서 못 뽑은 필드가 기존 값을 NULL로
     # 덮으면, EAV를 빼고 마스터만 올린 한 번의 적재가 추천 후보를 통째로 무너뜨린다
