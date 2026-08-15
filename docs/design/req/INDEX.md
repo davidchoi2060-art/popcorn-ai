@@ -74,11 +74,25 @@
 
 ## 5. 판매가
 
+> ⚠ **번호는 `api/admin_nav.py` 순서를 그대로 따르되, 새로 끼워 넣은 화면은 뒤 섹션
+> 전체를 밀어 renumbering 하지 않고 `22B`처럼 옆에 붙인다** — 이 목차의 번호를 그대로
+> 인용하는 아래 「디자인 원안」·「계약 요약」 두 표를 전부 손대는 것은 이번 작업 범위
+> 밖이라 판단해 미뤘다(연쇄 갱신 위험 대비 최소 변경).
+>
+> **`docs/design/req/req-reprice.md` §②의 판매가 그룹 번호**(010 가격 검토 대기 ·
+> 020 마진 정책 · 030 가격 이력 · 040 단가표 일일 반영 · 050 판매가 재산정 ·
+> 060 판매가 관리)와 이 표의 번호는 **다른 채번 체계다** — 저건 화면 ID 접두어
+> `ADM-PRC-0nn`의 순번이고 이 표는 LNB 노출 순서다. `040`(단가표 일일 반영)은
+> 이 표에서는 **20번 "단가표 반영"**(매입·소싱 그룹)과 같은 화면이다 — 그룹이
+> 다르게 잡혀 있을 뿐 화면은 하나다.
+
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
-| 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · ⚠ 아직 미커밋) |
-| 23 | 가격 이력 | [req-price-history.md](req-price-history.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
+| 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · ⚠ 아직 미커밋) |
+| 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61`) |
+| 23 | 가격 이력 | [req-price-history.md](req-price-history.md) | — | **구축 중** (템플릿·라우트 있음 · 커밋 `140a5ba` · 제작자 자기 검증까지만, 브라우저 실측 확인자 배정됨 · ⚠ 그래서 href 미연결 — 의도적) |
+| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | — | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` 둘 다 req-reprice.md 자신이 「제안」·「관례상」으로 표시 — 확정 아님. 2026-08-15 제작 착수) |
 
 ## 6. 인계 · 성과
 
