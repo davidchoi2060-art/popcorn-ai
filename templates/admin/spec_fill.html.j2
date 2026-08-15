@@ -118,15 +118,25 @@
     <h5 class="mb-0">결과 미리보기</h5>
     <span class="fs-9 text-body-tertiary" id="sfListNote"></span>
     <!-- ④ 적용(승인) — 승인 로직은 여기 없다. A-18 계약대로 검수 화면(ADM-PRD-020)으로
-         필터 링크만 연결하는 것이 설계지만, 그 화면은 admin2에 아직 없다(2026-08-13
-         P-09: 구 /admin/*.html은 백업용 동결 — 링크 연결 금지, review-queue.html로
-         안내했다가 지적받은 전례). admin2/reviews가 서기 전까지는 비활성으로 둔다. -->
+         필터 링크만 연결한다. 2026-08-14 18:40 두 화면이 같은 시각대에 섰고(이 화면 커밋
+         b1dca5e · 검수 화면 커밋 fa659e6, 1초 차이), 같은 날 22:14 커밋 304e39f로 검수
+         화면이 `?suggested=1&field=` 딥링크를 실제로 읽기 시작했다(그 커밋의 주석이 이
+         화면 이름을 직접 지목한다) — "admin2/reviews가 서기 전까지 비활성"이라는 옛
+         전제가 더는 사실이 아니라 2026-08-15 열었다. 대상 경로는 admin_nav.py 라벨이
+         아니라 검수 화면의 실제 라우트(api/admin_ui_reviews.py, `/admin2` + `/reviews`)
+         문자열을 그대로 쓴다 — 라벨이 바뀌어도 이 링크는 안 죽는다. 이 화면은 곧
+         승인 디자인으로 재구축되므로(CLAUDE.md §관리자 화면 규약) 버튼 하나만 연다 —
+         admin_ui_price_history.py의 _reason_links()처럼 admin_nav.NAV를 매 요청 다시
+         읽어 자동 판정하는 방식은 여기서 복제하지 않았다: 그 파일은 목적지 화면이 아직
+         없을 수도 있는 7종 사유를 판정해야 했지만, 여기는 목적지 하나가 이미 실측
+         확인됐고 이 화면의 라우트 파일(api/admin_ui_spec_fill.py)은 이번 작업 담당
+         밖이라 서버 쪽 판정 로직을 새로 심을 수도 없다. -->
     <div class="ms-auto text-end">
       <button type="button" class="btn btn-phoenix-secondary btn-sm" id="sfApproveLink" disabled
-              title="상품 사양 검수(admin2)가 아직 구축되지 않아 이동할 수 없습니다">
+              title="대상 필드를 먼저 선택하세요">
         검수 화면에서 승인하기
       </button>
-      <div class="fs-9 text-body-tertiary mt-1">검수 화면(admin2) 구축 중</div>
+      <div class="fs-9 text-body-tertiary mt-1" id="sfApproveNote">대상 필드를 선택하면 활성화됩니다</div>
     </div>
   </div>
   <div class="card-body p-0">
@@ -201,6 +211,7 @@
         var sel = document.getElementById('sfField');
         if (!items.length) {
           sel.innerHTML = '<option value="">사양 항목 없음</option>';
+          updateApproveLink();
           return;
         }
         sel.innerHTML = items.map(function (f) {
@@ -209,15 +220,52 @@
         }).join('');
         var has = items.some(function (f) { return f.field_key === DEFAULT_FIELD; });
         sel.value = has ? DEFAULT_FIELD : items[0].field_key;
+        updateApproveLink();
       })
       .catch(function (e) {
         document.getElementById('sfField').innerHTML =
           '<option value="">필드 목록 조회 실패 — ' + esc(e.message) + '</option>';
+        updateApproveLink();
       });
   }
 
-  // ── ④ 승인 링크 — admin2/reviews가 서기 전까지 버튼은 비활성(disabled)이라
-  //    href를 맞출 대상이 없다. 화면 쪽 마크업 참고.
+  // ── ④ 승인 링크 — /admin2/reviews로 이동한다. 2026-08-14 22:14 커밋 304e39f로 그
+  //    화면이 `?suggested=1&field=` 딥링크를 읽기 시작했다(그 커밋 주석이 이 화면
+  //    이름을 직접 지목한다) — "admin2/reviews가 서기 전까지 비활성"이라는 옛 전제는
+  //    더 이상 사실이 아니라 열었다(위 마크업 주석 참조). 대상 경로는 admin_nav.py의
+  //    라벨이 아니라 검수 화면의 실제 라우트 문자열(api/admin_ui_reviews.py,
+  //    `/admin2` + `/reviews`)을 그대로 쓴다 — 라벨이 바뀌어도 이 링크는 안 죽는다.
+  //
+  //    활성 조건은 "대상 필드가 선택돼 있을 때"뿐이다. "제안이 1건 이상일 때"도
+  //    후보였지만 GET /api/admin/spec-fill/status가 field로 거르지 않아(그 API의
+  //    라우트 파일 api/admin_spec_fill.py는 이 작업 담당 밖) 필드별 건수를 이 화면이
+  //    믿을 수 있게 셀 방법이 없다 — 0건이어도 검수 화면 자체가 빈 상태를 보여주므로
+  //    미리 막을 이유가 없다고 판단했다. 새 탭으로 연다 — 이 화면은 실행 요청이 감시자
+  //    폴링으로 진행 중일 수 있어(위 ① 실행), 같은 탭으로 이동하면 그 진행 상황을
+  //    잃는다(출처 링크가 이미 쓰는 target="_blank" 관례를 그대로 따른다).
+  function updateApproveLink() {
+    var btn = document.getElementById('sfApproveLink');
+    var note = document.getElementById('sfApproveNote');
+    var sel = document.getElementById('sfField');
+    var opt = sel.options[sel.selectedIndex];
+    var field = (sel.value || '').trim();
+    if (field) {
+      btn.disabled = false;
+      btn.removeAttribute('title');
+      btn.dataset.href = '/admin2/reviews?suggested=1&field=' + encodeURIComponent(field);
+      note.textContent = '새 탭에서 검수 화면을 엽니다 · 대상: ' + (opt ? opt.textContent : field);
+    } else {
+      btn.disabled = true;
+      btn.title = '대상 필드를 먼저 선택하세요';
+      delete btn.dataset.href;
+      note.textContent = '대상 필드를 선택하면 활성화됩니다';
+    }
+  }
+  document.getElementById('sfField').addEventListener('change', updateApproveLink);
+  document.getElementById('sfApproveLink').addEventListener('click', function () {
+    if (this.disabled || !this.dataset.href) return;
+    window.open(this.dataset.href, '_blank', 'noopener,noreferrer');
+  });
 
   // ── 감시자 상태 — /api/admin/dash/state 의 watcher 필드만 쓴다(지어내지 않는다).
   function pollWatcher() {
