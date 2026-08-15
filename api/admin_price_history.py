@@ -9,6 +9,11 @@ reason 어휘(ERD §3.4·§6.3): csv / sourcing / margin_policy / manual / price
   ② **6주 고정 축 아님** — 실데이터 구간이 짧아 이력 전체를 시간축에 그린다(구간 필터 이관).
 ref_id는 사유별 의미가 다르다(price_import=file_id, margin_policy·manual=활동로그 log_id,
 sourcing=sourcing_id) — 화면 링크도 사유별로 분기한다.
+⚠ margin_policy·margin_policy_undo는 그 "활동로그 log_id"가 **항상 있는 게 아니다** —
+개별 승인(admin_price_review.py)만 채우고, 대량 재산정(admin_reprice.py `/reprice/apply`·
+`/reprice/undo`)은 INSERT 컬럼 목록에 ref_id가 아예 없어 NULL이다(2026-08-15 계약자 실측
+결함 보고 반영 — 아래 REASON_KO_BULK 참조). ref_id 유무가 "개별 승인 vs 대량 재산정"을
+가르는 유일한 신호라, 이 둘만 라벨을 ref_id로 한 번 더 가른다.
 """
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
@@ -18,15 +23,58 @@ from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
+# ⚠ 2026-08-15 점검자 실측(product_price_history 전수 SELECT reason, count(*)) —
+# "margin_policy_undo"가 빠져 있었다: 28,993행 중 14,478행(49.9%)이 이 코드라, 화면
+# 절반이 영문 원본을 그대로 보여주고 있었다. 링크는 원본과 같은 화면(price-review.html)
+# 으로 보낸다 — 되돌림도 같은 화면에서 다시 승인/직접수정할 수 있어야 하므로.
+#
+# ⚠⚠ 2026-08-15 재확인(같은 날, 계약자가 새 결함으로 잡음) — 바로 위 문단이 이미 그
+# 혼동의 일부였다: "margin_policy는 admin_reprice.py 판매가 재산정에서 씀"이라고만
+# 적었는데, 실제로는 **두 화면이 같은 reason 문자열을 함께 쓴다**.
+#   개별 승인   admin_price_review.py:102 `_reprice(conn, pc, fee, margin,
+#               "margin_policy", log_id)` -> ref_id = 그 결정의 활동로그 log_id(실값 —
+#               admin_price_import._reprice가 INSERT마다 ref_id를 채운다. 168-191행)
+#   대량 재산정  admin_reprice.py `/reprice/apply`(218-222행) · `/reprice/undo`(279-283행)
+#               -> INSERT 컬럼 목록 자체에 ref_id가 없다(코드 확인) -> 항상 NULL.
+#               (이 두 쓰기 엔드포인트는 지금 admin2 어느 화면에서도 호출되지 않는다 —
+#               `/admin2/margin-policy`가 같은 재산정 기능을 쓰지만 `/reprice/preview`
+#               (읽기 전용 미리보기)만 부른다. 기존 14,478건이 어떻게 쌓였는지는
+#               이 화면의 담당 범위 밖이라 더 캐지 않았다 — admin_reprice.py는 읽기만
+#               하기로 했다)
+# 실측(전수, 2026-08-15): margin_policy 14,480건 중 ref_id NOT NULL **2건**(개별 승인) ·
+# NULL 14,478건(대량 재산정). margin_policy_undo는 14,478건 **전량** ref_id NULL(대량
+# 되돌림 — 개별 승인의 단건 되돌림 경로는 아직 없다). 상품 20489102로 재현:
+# history_id 34·35(ref_id 81·82, 개별) · 6995·21480(ref_id NULL, 대량) ·
+# 14234·28719(margin_policy_undo, ref_id NULL, 대량 되돌림).
+# ref_id 유무로 라벨을 가른다 — 안 그러면 대량 재산정 14,478건(전체 이력의 49.9%)을
+# "가격 검토 승인"(개별 운영자가 하나하나 판단했다는 뜻)이라 표시해, 원장이 누가 왜
+# 이 값을 정했는지를 뒤바꿔 보여준다.
 REASON_KO = {
     "price_import": ("단가표 반영", "price-import.html"),
     "price_import_undo": ("단가표 반영 되돌림", "price-import.html"),
-    "margin_policy": ("가격 검토 승인", "price-review.html"),
+    "margin_policy": ("가격 검토 승인", "price-review.html"),           # ref_id 있을 때만 — _reason_label() 참조
+    "margin_policy_undo": ("가격 검토 승인 되돌림", "price-review.html"),  # 〃
     "manual": ("운영자 직접 수정", "activity-logs.html"),
     "sourcing": ("매입 확정", "sourcing.html"),
     "csv": ("일괄 등록", "csv-jobs.html"),
 }
+# margin_policy(_undo)인데 ref_id가 NULL(대량 재산정)일 때만 쓰는 예외 라벨.
+# REASON_KO와 같은 dict에 욱여넣지 않는다 — REASON_KO의 키는 "이 reason 코드가 무엇을
+# 뜻하는가"이고, 이건 "그중 ref_id가 없는 경우엔 다른 말을 써야 한다"는 조건부 예외라
+# 성격이 다르다(섞으면 다음 사람이 "reason만 보고 찾으면 된다"고 오해한다).
+REASON_KO_BULK = {
+    "margin_policy": "대량 재산정",
+    "margin_policy_undo": "대량 재산정 되돌림",
+}
 FIELD_KO = {"sale": "판매가", "purchase": "매입가"}
+
+
+def _reason_label(reason: str | None, ref_id: int | None) -> str:
+    """사유 코드 -> 한글 라벨. margin_policy·margin_policy_undo만 ref_id로 한 번 더
+    가른다(위 REASON_KO_BULK 설명 참조) — 나머지 5종은 REASON_KO 그대로 쓴다."""
+    if reason in REASON_KO_BULK and ref_id is None:
+        return REASON_KO_BULK[reason]
+    return REASON_KO.get(reason, (reason, "activity-logs.html"))[0]
 
 
 @router.get("/price-history")
@@ -87,10 +135,17 @@ def price_history(product_code: int | None = None,
         "old": r["old_price"], "new": r["new_price"],
         "delta": (r["new_price"] - r["old_price"]) if (r["old_price"] is not None and r["new_price"] is not None) else None,
         "reason": r["reason"],
-        "reason_label": REASON_KO.get(r["reason"], (r["reason"], "activity-logs.html"))[0],
+        "reason_label": _reason_label(r["reason"], r["ref_id"]),
         "reason_link": REASON_KO.get(r["reason"], (r["reason"], "activity-logs.html"))[1],
         "ref_id": r["ref_id"], "supplier": r["supplier"],
     } for r in reversed(rows)]   # 최신 우선
+    # 2026-08-15 추가 — 이 상품의 이력 안에서 REASON_KO에 없어 원문이 그대로 노출되는
+    # reason. 빈 배열이면 지금 보이는 이력은 전부 번역됐다는 뜻이다(다른 상품·기간의
+    # reason까지 보장하지는 않는다). 기존 필드는 그대로 두고 **추가만** 한다 — 새 reason이
+    # 조용히 영문으로 새는 것을 다음에는 이 필드로 알아챈다(margin_policy_undo가 49.9%를
+    # 3주간 조용히 틀리게 만든 것과 같은 패턴의 재발 방지).
+    unmapped_reasons = sorted({r["reason"] for r in rows
+                               if r["reason"] and r["reason"] not in REASON_KO})
     return {
         "products": [{"product_code": p["product_code"], "sku": p["sku"],
                       "name": p["product_name"], "count": p["cnt"]} for p in prods],
@@ -103,4 +158,5 @@ def price_history(product_code: int | None = None,
                  " 복수 공급처 상품은 추정하지 않고 그대로 둡니다 ·"
                  " 구간 필터는 준비 중이며 현재는 이력 전체를 시간축에 그립니다 ·"
                  " 되돌림도 역방향 행으로 남습니다."),
+        "unmapped_reasons": unmapped_reasons,
     }

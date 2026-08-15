@@ -1,0 +1,771 @@
+{#
+  가격 이력 (ADM-PRC-030) — 2026-08-15 신설, 조회 전용, 1a "상품 목록 + 추이"
+
+  ■ 이 화면의 정체 — "왜 이 가격인가"의 근거 원장입니다. 여기서는 가격을 고칠 수
+    없습니다. 값 정정은 판매가 관리·상품 관리 소관입니다(계약 §이 화면의 정체).
+
+  ■ 출처 — 계약 요약만 받았다(원안 dc-*.html 없음). `docs/design/spec-price-history.md`
+    (사장님 확정 **1a**, 2026-08-15 — 1b "사유 축 피드 + 서랍"은 탈락). 원문(Claude
+    Design)은 하네스만 연다(`docs/design/MAKER-CHECKLIST.md` §1) — 로컬 원안이 없어
+    치수 대조 대상이 아니다.
+
+  ■ 데이터 — `GET /api/admin/price-history?product_code=&date_from=&date_to=`
+    (`api/admin_price_history.py`, 담당 파일 밖이라 고치지 않고 읽기만 했다) 한 번으로
+    좌측 상품 목록(이미 그 기간 기준으로 계산됨)과 선택 상품의 전체 이력·현재가가
+    함께 온다. 이 화면은 쓰기 API를 하나도 부르지 않는다. 부품 종류만 별도로
+    `GET /api/admin/products/{code}`(역시 읽기 전용·기존 API)를 한 번 더 불러 채운다 —
+    가격 이력 API 응답에 분류 정보가 없다(코드로 확인).
+
+  ■★★ "지금 값에 기여한 이력만 / 되돌림 포함 전체" — 서버에 이 필터를 위한 별도
+    엔드포인트가 없다(담당 밖 파일이라 새로 만들지 않았다). 대신 서버가 이미 준
+    원본 사실(`items[]`의 id·field·reason·changed_at)만으로 화면이 매 렌더 다시 계산한다:
+    같은 상품·같은 field 안에서 시간순으로 훑으며, 사유가 `_undo`로 끝나는 행을 그
+    직전의 미매칭 원본 사유(예: margin_policy ← margin_policy_undo)와 짝짓는다(스택
+    매칭). 짝지어진 양쪽을 "되돌려짐"으로 표시하고 기본 보기에서 뺀다. 하드코딩한
+    건수는 없다(28,993·14,480·14,478·16 같은 계약 예시값은 코드에 없다) — 이 페이지를
+    처음 열 때마다 서버 응답에서 다시 센다. 이 짝짓기 방식을 실제 DB 전수(28,993행)로
+    검증했다: margin_policy 14,480건 중 정확히 14,478건, price_import 16건 중 16건이
+    이 알고리즘으로도 "되돌려짐"으로 잡혀 계약의 실측치와 정확히 일치했다(제작
+    보고서 참조 — 판단한 것).
+
+  ■★★ 사유 라벨 — 서버 `reason_label`을 그대로 쓰고, 자체 번역표를 만들지 않는다
+    (2026-08-15 점검자 실측 반영). 착수 시점엔 `api/admin_price_history.py`의
+    `REASON_KO`에 `margin_policy_undo`가 빠져 있어(담당 밖, 고치지 않음) 그 사유의
+    `reason_label`이 원본 코드 문자열 그대로 왔다(실측: 전체 28,993행 중 14,478행·
+    49.9%) — **같은 날 안에 다른 제작자가 고쳤다**(재확인 완료, `admin_ui_price_
+    history.py` 참조). 그래도 이 화면은 `reason_label === reason`(서버 폴백이 원문을
+    그대로 돌려준 경우)이면 코드 원문을 "번역 미비" 표시와 함께 그대로 보여주는 방어
+    로직을 남겨 둔다 — 지금 안 걸린다고 지우면 다음에 같은 일이 또 조용히 반복된다.
+    지어낸 한글 라벨을 대신 넣지 않는다는 원칙 자체는 그대로다.
+    이동 링크용 화면 이름(REASON_TARGETS)은 이것과 다른 표다 — 사유의 "뜻"을 다시
+    번역하지 않고 "어느 화면으로 보내는가"만 담는다(admin_ui_price_history.py 참조).
+
+  ■★ 사유별 이동 링크 — 서버(`admin_ui_price_history.py`)가 매 렌더 admin_nav.py를
+    **경로로** 훑어 판정한 결과(`reason_links_json`)를 그대로 쓴다. 라벨로 다시
+    조회하지 않는다(admin_ui_swap_click_logs.py의 사고 — 라벨 리네임으로 조회가
+    조용히 깨진 전례 — 와 같은 이유).
+
+  ■★★ margin_policy(_undo)는 두 화면에서 온다 — `moveCell()`이 `ref_id`로 가른다
+    (2026-08-15 계약자 결함 보고 반영). `reason='margin_policy'`는 개별 승인
+    (`admin_price_review.py`, ref_id=그 결정의 활동로그 log_id)과 대량 재산정
+    (`admin_reprice.py`, ref_id 컬럼 자체가 INSERT에 없어 항상 NULL — 실측 14,480건 중
+    14,478건·99.99%)이 함께 쓰는 코드다(`api/admin_price_history.py` 실측). 목적지가
+    서로 달라(개별→가격 검토 대기, 대량→아직 없음) `it.reason` 하나만으로는 옳게 못
+    가르므로, `moveCell()`이 그 행의 `ref_id`(서버가 이미 내려주는 필드 — 새로 만들지
+    않음)를 봐서 `PH_REASON_LINKS`의 어느 버킷(`margin_policy` 또는 `margin_policy_bulk`)
+    을 볼지만 고른다. **텍스트를 새로 만들지 않는다** — 두 버킷 다 서버(`admin_ui_price_
+    history.py`의 REASON_TARGETS)가 미리 계산해 준 것을 그대로 쓴다. `reasonCell()`
+    (사유 라벨)은 이 문제와 무관하다 — 서버 `reason_label`이 이미 ref_id로 갈라 와서
+    템플릿은 그대로 표시하기만 하면 된다(위 §사유 라벨 원칙 그대로).
+
+  ■★ 필터 줄 우측 요약 — 계약은 "전체 이력 N건 중 되돌려지지 않은 것만 기본 표시 ·
+    최신 이력 YYYY-MM-DD"라 적었다. 이 화면은 그중 "전체 이력 N건"(상품 개수 포함)은
+    좌측 목록 응답의 `count`를 전부 더해 보여준다(그 기간 전체 · 정직하게 계산 가능).
+    "최신 이력 날짜"는 **전역** 값으로는 못 채운다 — `admin_price_history.py`의 SQL은
+    상품별 최신 시각(`last_at`)을 계산하지만 응답 JSON에는 담지 않는다(코드로 확인,
+    담당 밖이라 고치지 않음). 그래서 이 화면은 "최신 이력"을 전역이 아니라 **선택
+    상품 기준**으로 옮겨 상품 카드 옆에 보여준다(그 값은 실제로 있다 — 선택 상품의
+    items[0]이 최신순 정렬이라 그 시각을 그대로 쓴다). 스코프를 바꿨다는 사실을
+    라벨 문구("선택 상품 최신 이력")로 밝힌다 — 전역인 척하지 않는다.
+
+  ■ 1b 참조 사실("매입가 이력은 N건뿐 · 그중 N건은 공급처 미기록") — 전역 수치는
+    같은 이유로 못 채운다(위와 동일한 API 제약). 대신 **선택 상품 기준**으로
+    "이 상품의 매입가 이력 N건 · 그중 M건 공급처 미기록"을 추이 영역에 보여준다
+    (스코프를 선택 상품으로 명시). 전역 수치가 필요하면 `admin_price_history.py`
+    확장이 있어야 한다(담당 밖 — 넣지 않아도 결함은 아니라고 계약이 명시).
+
+  ■ 왼쪽 상품 목록은 서버가 페이지네이션하지 않는다(코드로 확인 — 담당 밖 API가
+    그 기간의 전 상품을 한 번에 준다, 무필터 시 7,241개 실측). 화면이 새 API를
+    부르지 않고, 이미 받은 목록 안에서만 걸러 찾는 검색 상자를 얹었다(서버 호출
+    없음 · 새 숫자를 만들지 않음 — 이미 받은 실데이터를 문자열로 좁힐 뿐이다).
+
+  ■ 빈 상태 셋을 구분한다: ① 그 기간에 이력이 있는 상품이 아예 없음(200 + 빈 배열,
+    "최근 N일은 정당하게 빈 결과") ② 상품은 있지만 지금 필터("지금 값에 기여한
+    이력만")로는 걸러져 0건(걸러진 것이지 지운 것이 아니라는 문장을 그 자리에 다시
+    보여준다) ③ 날짜 형식 오류(400)·지정 상품에 그 기간 이력 없음(404) — 서버 문구를
+    그대로 보여주고 "조회 실패"로 놀라게 하지 않는다.
+
+  ■ 표·격자 정렬 — 헤더(`.ph-thead`)와 행(`.ph-row`)이 같은 `grid-template-columns`를
+    같은 비분리 스크롤 컨테이너(`.ph-tablewrap`) 안에서 쓴다(동기화 어긋남 원천 차단 —
+    `product_category_map.html.j2` 등이 겪은 버그 계열). 좁은 화면은 열을 숨기지
+    않고 표를 가로 스크롤한다. 768px 이하에서는 좌측 목록 + 우측 상세 2열
+    (`.ph-grid`)을 세로로 쌓는다.
+
+  ■ 팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`(oklch 베이지,
+    `--rv-*`)만 읽는다. `:root`를 다시 정의하지 않는다. 외부 CDN 0건.
+
+  ■ 권한 — 조회는 로그인만 되면 등급 무관. 쓰기 버튼 없음.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}가격 이력{% endblock %}
+
+{% block head_extra %}
+<script>window.PH_REASON_LINKS = {{ reason_links_json | safe }};</script>
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;margin:0;padding:0;border:0;background:none;cursor:pointer}
+code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;border-radius:3px;font-size:.95em}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 위젯 ── */
+.ph-ro{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.ph-tagline{font:400 11.5px/1.4 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 루트 ── */
+.ph-scroll{flex:1;min-height:0;overflow:auto;padding:14px 18px 22px;display:flex;flex-direction:column;gap:14px}
+.ph-loading,.ph-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:60px 20px}
+.ph-loading[hidden],.ph-errbox[hidden],.ph-body[hidden]{display:none}
+.ph-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.ph-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.ph-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);cursor:pointer}
+.ph-body{display:flex;flex-direction:column;gap:14px}
+
+/* ── 필터 줄 ── */
+.ph-filterbar{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:12px 14px;
+  display:flex;flex-direction:column;gap:8px}
+.ph-filter-row1{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ph-filter-row1 label{display:flex;align-items:center;gap:6px;font:500 11.5px/1 var(--rv-font);color:var(--rv-ink-soft)}
+.ph-filter-row1 input[type=date]{font:500 12px/1 var(--rv-mono);color:var(--rv-ink);background:var(--rv-panel);
+  border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:6px 8px}
+.ph-dash{color:var(--rv-faint)}
+.ph-btn{font:600 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:5px;padding:7px 11px;cursor:pointer}
+.ph-btn:hover{background:var(--rv-panel)}
+.ph-seg{display:inline-flex;border:1px solid rgba(0,0,0,.16);border-radius:6px;overflow:hidden}
+.ph-seg button{font:600 11px/1 var(--rv-font);color:var(--rv-ink-soft);padding:7px 11px;background:var(--rv-card)}
+.ph-seg button.on{background:var(--rv-ink);color:var(--rv-canvas)}
+.ph-filter-right{margin-left:auto;font:400 11px/1.6 var(--rv-font);color:var(--rv-faint);text-align:right}
+.ph-note{font:600 11px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.ph-rangeerr{font:500 11px/1.5 var(--rv-font);color:var(--rv-red)}
+.ph-rangeerr[hidden]{display:none}
+
+/* ── 2열 본문 ── */
+.ph-grid{display:grid;grid-template-columns:296px minmax(0,1fr);gap:14px;align-items:start;min-height:0}
+
+.ph-left{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:12px;
+  display:flex;flex-direction:column;gap:8px;min-width:0;max-height:calc(100vh - 260px);min-height:320px}
+.ph-left-hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.ph-left-hd h2{font:600 13px/1.3 var(--rv-font);margin:0;color:var(--rv-ink)}
+.ph-count{font:500 10.5px/1 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
+.ph-search{font:400 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-panel);
+  border:1px solid rgba(0,0,0,.14);border-radius:5px;padding:7px 9px;width:100%}
+.ph-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.ph-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;border-radius:6px;
+  border:1px solid transparent;text-align:left;cursor:pointer;width:100%}
+.ph-item:hover{background:var(--rv-panel)}
+.ph-item.on{background:var(--rv-panel2);border-color:rgba(0,0,0,.16)}
+.ph-item-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.ph-item .nm{font:500 11.5px/1.35 var(--rv-font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:100%}
+.ph-item .cd{font:400 10px/1.2 var(--rv-mono);color:var(--rv-faint)}
+.ph-item .cnt{flex:none;font:600 10.5px/1.2 var(--rv-mono);color:var(--rv-ink-soft)}
+
+.ph-right{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ph-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:13px 15px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ph-card-name{font:600 14px/1.3 var(--rv-font);color:var(--rv-ink)}
+.ph-card-sub{font:400 11px/1.5 var(--rv-font);color:var(--rv-faint);margin-top:2px}
+.ph-card-price{display:flex;gap:16px;font:500 12px/1.3 var(--rv-font);color:var(--rv-ink-soft);flex-wrap:wrap}
+.ph-card-price b{color:var(--rv-ink);font-weight:700}
+
+.ph-panel{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:13px 15px;min-width:0}
+.ph-panelhd{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.ph-panelhd h2{font:600 12.5px/1.3 var(--rv-font);color:var(--rv-ink);margin:0}
+.ph-panelsub{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 추이 막대 그래프 (SVG 없이 CSS만) ── */
+.ph-chart{overflow-x:auto;overflow-y:hidden}
+.ph-chart-bars{display:flex;align-items:flex-end;gap:6px;min-width:min-content;padding:4px 4px 0}
+.ph-bar-col{display:flex;flex-direction:column;align-items:center;gap:4px;width:24px;flex:none}
+.ph-bar-track{width:100%;height:120px;display:flex;align-items:flex-end;justify-content:center}
+.ph-bar{width:16px;border-radius:3px 3px 0 0;min-height:2px}
+.ph-bar.sale{background:var(--rv-link)}
+.ph-bar.pknown{background:var(--rv-amber)}
+.ph-bar.pnone{background:transparent;border:1px dashed var(--rv-dim3);align-self:flex-end}
+.ph-bar.dim{opacity:.4}
+.ph-bar-lbl{font:400 8.5px/1.2 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
+.ph-chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.ph-leg-item{display:flex;align-items:center;gap:5px;font:400 10.5px/1 var(--rv-font);color:var(--rv-ink-soft)}
+.ph-leg-sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.ph-leg-sw.sale{background:var(--rv-link)}
+.ph-leg-sw.pknown{background:var(--rv-amber)}
+.ph-leg-sw.pnone{background:transparent;border:1px dashed var(--rv-dim3)}
+.ph-chart-note{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:9px;padding-top:8px;
+  border-top:1px dashed rgba(0,0,0,.12)}
+.ph-chart-sourcing{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:4px}
+.ph-chart-empty{padding:16px 4px}
+
+/* ── 변동 표 7열 ── */
+.ph-tablewrap{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;overflow:auto}
+.ph-thead,.ph-row{display:grid;
+  grid-template-columns:132px 60px minmax(88px,1fr) minmax(88px,1fr) minmax(88px,1fr) minmax(160px,1.6fr) 96px;
+  gap:8px;min-width:800px;align-items:center}
+.ph-thead{background:var(--rv-panel);padding:9px 12px;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);
+  position:sticky;top:0}
+.ph-thead span{cursor:default}
+.ph-row{padding:9px 12px;border-top:1px solid rgba(0,0,0,.06);font:500 11.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.ph-row.undo{background:rgba(120,110,90,.07)}
+.ph-row .num.up{color:var(--rv-link)}
+.ph-row .num.down{color:var(--rv-red)}
+.ph-row .num.flat{color:var(--rv-muted)}
+.ph-untranslated{display:inline-flex;align-items:center;gap:4px;font-size:10.5px}
+.ph-untranslated .tag{font:600 8.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-muted);
+  border-radius:3px;padding:2px 4px;font-family:var(--rv-font)}
+.ph-move{display:inline-flex;align-items:center;font:600 10.5px/1 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-panel2);border-radius:5px;padding:5px 8px;cursor:pointer}
+.ph-move.off{color:var(--rv-muted);cursor:default}
+.ph-move .tag{font:500 9px/1 var(--rv-font);background:rgba(0,0,0,.08);border-radius:3px;padding:2px 4px;margin-left:4px}
+.ph-empty{padding:18px 6px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-faint)}
+.ph-empty-sub{margin-top:4px}
+.ph-linklike{display:inline-block;margin-top:8px;font:600 11px/1 var(--rv-font);color:var(--rv-link);
+  cursor:pointer;text-decoration:underline}
+
+/* ── 하단 고지 ── */
+.ph-foot{font:400 11px/1.7 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.09);padding-top:12px}
+
+@media (max-width:1000px){
+  .ph-filter-right{margin-left:0;text-align:left}
+}
+@media (max-width:768px){
+  .ph-grid{grid-template-columns:1fr}
+  .ph-left{max-height:280px}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="ph-ro">조회 전용</span>
+<span class="ph-tagline">&quot;왜 이 가격인가&quot;의 근거 원장입니다</span>
+{% endblock %}
+
+{% block content %}
+<div class="ph-scroll">
+  <div class="ph-loading" id="phLoading" aria-live="polite"><div>불러오는 중…</div></div>
+
+  <div class="ph-errbox" id="phErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="phErrMsg"></div>
+    <button type="button" data-action="retry">다시 시도</button>
+  </div>
+
+  <div class="ph-body" id="phBody" hidden>
+
+    <div class="ph-filterbar">
+      <div class="ph-filter-row1">
+        <label>기간
+          <input type="date" id="phFrom" aria-label="시작일">
+          <span class="ph-dash">—</span>
+          <input type="date" id="phTo" aria-label="종료일">
+        </label>
+        <button type="button" class="ph-btn" data-action="apply-range">조회</button>
+        <button type="button" class="ph-btn" data-action="reset-range">초기화</button>
+        <div class="ph-seg" role="group" aria-label="이력 범위">
+          <button type="button" class="on" aria-pressed="true" data-action="set-mode" data-mode="kept">지금 값에 기여한 이력만</button>
+          <button type="button" aria-pressed="false" data-action="set-mode" data-mode="all">되돌림 포함 전체</button>
+        </div>
+        <div class="ph-filter-right" id="phGlobalSummary"></div>
+      </div>
+      <div class="ph-rangeerr" id="phRangeErr" hidden></div>
+      <div class="ph-note">걸러 보여주는 것과 삭제는 다릅니다 — 원장은 지우지 않습니다.</div>
+    </div>
+
+    <div class="ph-grid">
+      <section class="ph-left" aria-labelledby="phLeftH">
+        <div class="ph-left-hd">
+          <h2 id="phLeftH">이 기간에 변동이 있던 상품</h2>
+          <span class="ph-count" id="phProdCount"></span>
+        </div>
+        <input type="text" class="ph-search" id="phSearch" placeholder="지금 목록 안에서 상품명·코드 검색">
+        <div class="ph-list" id="phList" role="list"></div>
+      </section>
+
+      <div class="ph-right">
+        <div class="ph-card" id="phCard"></div>
+
+        <section class="ph-panel" aria-labelledby="phChartH">
+          <div class="ph-panelhd">
+            <h2 id="phChartH">판매가 · 매입가 추이</h2>
+            <span class="ph-panelsub" id="phLatestNote"></span>
+          </div>
+          <div id="phChartWrap"></div>
+        </section>
+
+        <section class="ph-panel" aria-labelledby="phTableH">
+          <div class="ph-panelhd"><h2 id="phTableH">변동 이력</h2></div>
+          <div class="ph-tablewrap">
+            <div class="ph-table" id="phTable" role="table" aria-label="가격 변동 이력"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="ph-foot" id="phFoot"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = {
+    data: null, err: null,
+    dateFrom: '', dateTo: '',
+    productCode: null,     // null = 서버 기본 선택(그 기간 상위 상품)에 맡긴다
+    mode: 'kept',          // 'kept' | 'all'
+    search: '',
+    partType: null         // {code, label}
+  };
+  var lastListKey = null;  // 좌측 목록을 다시 그릴 필요가 있는지 판단하는 키(기간 조합)
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '0' : Number(n).toLocaleString('ko-KR'); }
+  function won(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR') + '원'; }
+  function deltaWon(n) {
+    if (n == null) return '신규';
+    var sign = n > 0 ? '+' : (n < 0 ? '-' : '');
+    return sign + Math.abs(n).toLocaleString('ko-KR') + '원';
+  }
+  function deltaCls(n) { return n == null ? 'flat' : (n > 0 ? 'up' : (n < 0 ? 'down' : 'flat')); }
+  function fmtDT(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      var p = function (n) { return String(n).padStart(2, '0'); };
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    } catch (e) { return iso; }
+  }
+  function fmtDShort(iso) {
+    if (!iso || iso.length < 10) return '—';
+    return iso.slice(5, 10);   // "08-05"
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, 'GET /api/admin/price-history') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  function qs() {
+    var p = [];
+    if (S.productCode != null) p.push('product_code=' + encodeURIComponent(S.productCode));
+    if (S.dateFrom) p.push('date_from=' + encodeURIComponent(S.dateFrom));
+    if (S.dateTo) p.push('date_to=' + encodeURIComponent(S.dateTo));
+    return p.length ? ('?' + p.join('&')) : '';
+  }
+
+  function load() {
+    S.err = null;
+    renderAll();
+    return apiGet('/api/admin/price-history' + qs())
+      .then(function (resp) { S.data = resp; afterLoad(); })
+      .catch(function (err) {
+        // 계약: 지정한 상품에 그 기간 이력이 없으면 404 — 목록에서 골랐던 선택이
+        // 기간이 바뀌며 낡은 것이다. 오류로 놀라게 하지 않고 서버 기본 선택으로
+        // 한 번 다시 시도한다(무한 루프 방지: productCode가 이미 null이면 재시도하지 않는다).
+        if (err.status === 404 && S.productCode != null) {
+          S.productCode = null;
+          return load();
+        }
+        S.err = err;
+        renderAll();
+      });
+  }
+
+  function afterLoad() {
+    var rangeKey = S.dateFrom + '|' + S.dateTo;
+    var rebuildList = rangeKey !== lastListKey;
+    lastListKey = rangeKey;
+    S.partType = null;
+    renderAll(rebuildList);
+    loadPartType();
+  }
+
+  function loadPartType() {
+    var p = S.data && S.data.product;
+    if (!p) return;
+    var code = p.product_code;
+    fetch('/api/admin/products/' + encodeURIComponent(code), { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!S.data || !S.data.product || S.data.product.product_code !== code) return; // 그 사이 선택이 바뀌었다
+        S.partType = { code: code, label: (j && j.cat) ? j.cat : null };
+        var el = $('phCardCat');
+        if (el) el.textContent = S.partType.label || '부품 종류 확인 불가';
+      })
+      .catch(function () {
+        if (!S.data || !S.data.product || S.data.product.product_code !== code) return;
+        S.partType = { code: code, label: null };
+        var el = $('phCardCat');
+        if (el) el.textContent = '부품 종류 확인 불가';
+      });
+  }
+
+  // ── 되돌림 짝짓기 — 서버 원본 사실(items)만으로 매 렌더 다시 계산한다 ──────────
+  // 같은 상품(이미 items가 그 상품으로 좁혀져 있다) · 같은 field 안에서 시간순으로
+  // 훑으며 "_undo"로 끝나는 사유를 그 직전 미매칭 원본 사유와 짝짓는다(스택 매칭).
+  // 실제 DB 전수(28,993행)로 검증됨 — 제작 보고서 참조.
+  function computeReverted(items) {
+    var byField = {};
+    items.forEach(function (it) { (byField[it.field] = byField[it.field] || []).push(it); });
+    var reverted = {};
+    Object.keys(byField).forEach(function (f) {
+      var seq = byField[f].slice().sort(function (a, b) {
+        if (a.at < b.at) return -1;
+        if (a.at > b.at) return 1;
+        return a.id - b.id;
+      });
+      var stack = [];
+      seq.forEach(function (it) {
+        var reason = it.reason || '';
+        if (/_undo$/.test(reason)) {
+          var base = reason.slice(0, -5);
+          var idx = -1;
+          for (var k = stack.length - 1; k >= 0; k--) {
+            if (stack[k].reason === base) { idx = k; break; }
+          }
+          if (idx >= 0) {
+            reverted[stack[idx].id] = true;
+            reverted[it.id] = true;
+            stack.splice(idx, 1);
+          } else {
+            reverted[it.id] = true;   // 되돌릴 원본이 없다(짝이 필터 밖에 있음) — 그래도 되돌리기 행 자체다
+          }
+        } else {
+          stack.push(it);
+        }
+      });
+    });
+    return reverted;
+  }
+
+  function allItems() { return (S.data && S.data.items) || []; }
+  function visibleItems() {
+    var items = allItems();
+    if (S.mode === 'all') return items;
+    var reverted = computeReverted(items);
+    return items.filter(function (it) { return !reverted[it.id]; });
+  }
+
+  // ── 빈 상태 — 세 가지를 구분한다 ─────────────────────────────────
+  function emptyReasonHtml() {
+    var d = S.data;
+    if (!d) return '';
+    if (!d.product) {
+      return '<div>' + esc(d.note || '이 기간에는 가격 변동 이력이 없습니다.') + '</div>'
+        + '<div class="ph-empty-sub">최근 며칠처럼 짧은 기간을 고르면 정당하게 빈 결과가 나올 수 있습니다(오류가 아닙니다).</div>';
+    }
+    var total = allItems().length;
+    if (!total) {
+      return '<div>이 상품에는 조회 조건에 해당하는 가격 이력이 없습니다.</div>';
+    }
+    if (S.mode === 'kept') {
+      return '<div>이 조건에서는 지금 값에 기여한 이력이 없습니다 — ' + fmt(total) + '건이 모두 되돌려졌습니다.</div>'
+        + '<div class="ph-empty-sub">걸러 보여주는 것과 삭제는 다릅니다 — 원장은 지우지 않습니다.</div>'
+        + '<button type="button" class="ph-linklike" data-action="set-mode" data-mode="all">되돌림 포함 전체 보기 →</button>';
+    }
+    return '<div>표시할 이력이 없습니다.</div>';
+  }
+
+  // ── 필터 줄 우측 요약 ────────────────────────────────────────────
+  function renderSummary() {
+    var box = $('phGlobalSummary');
+    var d = S.data;
+    if (!d) { box.textContent = ''; return; }
+    var prods = d.products || [];
+    var total = prods.reduce(function (s, p) { return s + (p.count || 0); }, 0);
+    box.textContent = '전체 이력 ' + fmt(total) + '건(상품 ' + fmt(prods.length) + '개) 중 '
+      + '지금 값에 기여한 이력만 기본 표시';
+  }
+
+  // ── 좌측 상품 목록 ───────────────────────────────────────────────
+  function renderList() {
+    var box = $('phList');
+    var prods = (S.data && S.data.products) || [];
+    $('phProdCount').textContent = fmt(prods.length) + '개 상품';
+    var term = S.search.trim().toLowerCase();
+    var filtered = term ? prods.filter(function (p) {
+      return (p.name || '').toLowerCase().indexOf(term) >= 0
+        || String(p.sku || '').toLowerCase().indexOf(term) >= 0
+        || String(p.product_code).indexOf(term) >= 0;
+    }) : prods;
+    if (!filtered.length) {
+      box.innerHTML = '<div class="ph-empty">' + (term ? '검색 결과가 없습니다.' : '이 기간에 변동이 있던 상품이 없습니다.') + '</div>';
+      return;
+    }
+    var curCode = S.data && S.data.product ? S.data.product.product_code : null;
+    box.innerHTML = filtered.map(function (p) {
+      var on = p.product_code === curCode;
+      return '<button type="button" class="ph-item' + (on ? ' on' : '') + '" role="listitem"'
+        + ' aria-current="' + (on ? 'true' : 'false') + '"'
+        + ' data-action="select-product" data-code="' + p.product_code + '">'
+        + '<span class="ph-item-info"><span class="nm">' + esc(p.name || '(상품명 없음)') + '</span>'
+        + '<span class="cd num">' + esc(p.sku || String(p.product_code)) + '</span></span>'
+        + '<span class="cnt num">' + fmt(p.count) + '건</span>'
+        + '</button>';
+    }).join('');
+  }
+  function updateListSelection() {
+    var box = $('phList');
+    var curCode = S.data && S.data.product ? S.data.product.product_code : null;
+    Array.prototype.forEach.call(box.querySelectorAll('.ph-item'), function (btn) {
+      var code = Number(btn.getAttribute('data-code'));
+      var on = code === curCode;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-current', on ? 'true' : 'false');
+    });
+  }
+
+  // ── 선택 상품 카드 ───────────────────────────────────────────────
+  function renderCard() {
+    var box = $('phCard');
+    var p = S.data && S.data.product;
+    if (!p) { box.innerHTML = '<div class="ph-empty">선택된 상품이 없습니다.</div>'; return; }
+    box.innerHTML =
+      '<div>'
+      + '<div class="ph-card-name">' + esc(p.name || '(상품명 없음)') + '</div>'
+      + '<div class="ph-card-sub"><span class="num">' + esc(p.sku || String(p.product_code)) + '</span>'
+      + ' · <span id="phCardCat">확인 중…</span></div>'
+      + '</div>'
+      + '<div class="ph-card-price">'
+      + '<span>지금 판매가 <b class="num">' + esc(won(p.sale)) + '</b></span>'
+      + '<span>매입가 <b class="num">' + esc(won(p.purchase)) + '</b></span>'
+      + '</div>';
+  }
+
+  // ── 추이 막대 그래프 ────────────────────────────────────────────
+  function seriesPoints(items) {
+    var asc = items.slice().sort(function (a, b) {
+      if (a.at < b.at) return -1;
+      if (a.at > b.at) return 1;
+      return a.id - b.id;
+    });
+    return asc.map(function (it) {
+      var cat, label;
+      if (it.field === 'sale') { cat = 'sale'; label = '판매가'; }
+      else if (it.supplier) { cat = 'purchase:' + it.supplier; label = '매입가 · ' + it.supplier; }
+      else { cat = 'purchase:none'; label = '매입가 · 출처 미기록'; }
+      return { it: it, cat: cat, label: label };
+    });
+  }
+  function catCls(cat) { return cat === 'sale' ? 'sale' : (cat === 'purchase:none' ? 'pnone' : 'pknown'); }
+  function legendHtml(pts) {
+    var seen = {}, out = [];
+    pts.forEach(function (p) {
+      if (seen[p.cat]) return;
+      seen[p.cat] = true;
+      out.push('<span class="ph-leg-item"><span class="ph-leg-sw ' + catCls(p.cat) + '"></span>' + esc(p.label) + '</span>');
+    });
+    return out.join('');
+  }
+  function renderChart(items) {
+    var wrap = $('phChartWrap');
+    var pts = seriesPoints(items);
+    if (!pts.length) {
+      wrap.innerHTML = '<div class="ph-chart-empty">' + emptyReasonHtml() + '</div>';
+      return;
+    }
+    var revertedMap = computeReverted(allItems());
+    var max = pts.reduce(function (m, p) { return (p.it.new == null) ? m : Math.max(m, p.it.new); }, 1);
+    var bars = pts.map(function (p) {
+      var v = p.it.new;
+      var h = (v == null) ? 0 : Math.max(2, Math.round(v * 100 / max));
+      var dim = revertedMap[p.it.id] ? ' dim' : '';
+      var title = fmtDT(p.it.at) + ' · ' + p.label + ' · ' + won(v) + (revertedMap[p.it.id] ? ' · 되돌려진 변경입니다' : '');
+      return '<div class="ph-bar-col" title="' + esc(title) + '">'
+        + '<div class="ph-bar-track"><div class="ph-bar ' + catCls(p.cat) + dim + '" style="height:' + h + '%"></div></div>'
+        + '<div class="ph-bar-lbl">' + esc(fmtDShort(p.it.at)) + '</div>'
+        + '</div>';
+    }).join('');
+    wrap.innerHTML =
+      '<div class="ph-chart"><div class="ph-chart-bars">' + bars + '</div></div>'
+      + '<div class="ph-chart-legend">' + legendHtml(pts) + '</div>'
+      + '<div class="ph-chart-note">구간 축은 고정 길이가 아닙니다 — 실데이터 구간을 그대로 그립니다.</div>'
+      + purchaseNoteHtml();
+  }
+  // 1b 참조 사실을 선택 상품 스코프로: "이 상품의 매입가 이력은 N건 · 그중 M건 공급처 미기록"
+  function purchaseNoteHtml() {
+    var purchaseItems = allItems().filter(function (it) { return it.field === 'purchase'; });
+    if (!purchaseItems.length) return '';
+    var noSup = purchaseItems.filter(function (it) { return !it.supplier; }).length;
+    return '<div class="ph-chart-sourcing">이 상품의 매입가 이력은 ' + fmt(purchaseItems.length) + '건이고'
+      + ' 그중 ' + fmt(noSup) + '건은 공급처 미기록입니다 — 실제 공급처인 것처럼 표시하지 않습니다.</div>';
+  }
+
+  // ── 변동 표 ──────────────────────────────────────────────────────
+  function reasonCell(it) {
+    var raw = it.reason || '';
+    var label = (it.reason_label != null && it.reason_label !== '') ? it.reason_label : raw;
+    var untranslated = (label === raw && raw !== '');
+    if (untranslated) {
+      return '<span class="ph-untranslated" title="서버가 이 사유 코드의 한글 라벨을 아직 주지 않습니다(번역 미비) — 화면이 임의로 번역해 넣지 않습니다">'
+        + '<code>' + esc(raw) + '</code><span class="tag">번역 미비</span></span>';
+    }
+    return esc(label);
+  }
+  // margin_policy(_undo)는 두 화면(개별 승인 · 대량 재산정)에서 온다 — ref_id 유무로
+  // PH_REASON_LINKS의 어느 버킷을 볼지만 고른다(위 모듈 docstring §margin_policy는 두
+  // 화면에서 온다 참조). 텍스트를 새로 만들지 않는다 — 버킷은 서버가 이미 계산해 뒀다.
+  var MOVE_BULK_KEY = {margin_policy: 'margin_policy_bulk', margin_policy_undo: 'margin_policy_bulk_undo'};
+  function moveCell(it) {
+    var links = window.PH_REASON_LINKS || {};
+    var bulkKey = MOVE_BULK_KEY[it.reason];
+    var key = (bulkKey && it.ref_id == null) ? bulkKey : it.reason;
+    var target = links[key];
+    if (!target) {
+      return '<span class="ph-move off" title="이 사유는 이동 대상 화면 정보가 없습니다">이동<span class="tag">불가</span></span>';
+    }
+    if (target.available) {
+      return '<a class="ph-move" href="' + esc(target.href) + '">이동 →</a>';
+    }
+    return '<span class="ph-move off" title="' + esc(target.reason || '') + '">이동<span class="tag">불가</span></span>';
+  }
+  function rowHtml(it) {
+    var isUndo = /_undo$/.test(it.reason || '');
+    var oldTxt = it.old == null ? '(신규)' : won(it.old);
+    var deltaTxt = it.old == null ? '신규' : deltaWon(it.delta);
+    var dCls = it.old == null ? 'flat' : deltaCls(it.delta);
+    return '<div class="ph-row' + (isUndo ? ' undo' : '') + '" role="row">'
+      + '<span class="num" role="cell">' + esc(fmtDT(it.at)) + '</span>'
+      + '<span role="cell">' + esc(it.field_label || it.field) + '</span>'
+      + '<span class="num" role="cell">' + esc(oldTxt) + '</span>'
+      + '<span class="num" role="cell">' + esc(won(it.new)) + '</span>'
+      + '<span class="num ' + dCls + '" role="cell">' + esc(deltaTxt) + '</span>'
+      + '<span role="cell">' + reasonCell(it) + '</span>'
+      + '<span role="cell">' + moveCell(it) + '</span>'
+      + '</div>';
+  }
+  function renderTable(items) {
+    var box = $('phTable');
+    if (!items.length) {
+      box.innerHTML = '<div class="ph-empty">' + emptyReasonHtml() + '</div>';
+      return;
+    }
+    var head = '<div class="ph-thead" role="row">'
+      + '<span role="columnheader">시각</span>'
+      + '<span role="columnheader">구분</span>'
+      + '<span role="columnheader">이전</span>'
+      + '<span role="columnheader">이후</span>'
+      + '<span role="columnheader">증감</span>'
+      + '<span role="columnheader" title="이 항목은 \'누가\' 정보를 포함하지 않습니다 — 조회 API가 담당자를 내려주지 않습니다(담당 밖)">사유</span>'
+      + '<span role="columnheader">이동</span>'
+      + '</div>';
+    box.innerHTML = head + items.map(rowHtml).join('');
+  }
+
+  // ── 하단 고지 ────────────────────────────────────────────────────
+  function renderFoot() {
+    $('phFoot').textContent =
+      '기간을 바꾸면 좌측 상품 목록도 같은 기간으로 다시 계산됩니다 · 날짜 형식이 틀리면 400 · '
+      + '그 기간에 이력이 없는 상품을 지정하면 404 · 최근 N일은 정당하게 빈 결과입니다(오류가 아닙니다).';
+  }
+
+  // ── 선택 상품 최신 이력(스코프를 선택 상품으로 명시 — 위 모듈 docstring 참조) ──
+  function renderLatestNote() {
+    var el = $('phLatestNote');
+    var items = allItems();
+    if (!items.length) { el.textContent = ''; return; }
+    // items는 서버가 이미 "최신 우선"으로 정렬해 준다(최신순 — admin_price_history.py 확인)
+    el.textContent = '선택 상품 최신 이력 ' + fmtDT(items[0].at).slice(0, 10);
+  }
+
+  // ── 전체 렌더 ─────────────────────────────────────────────────────
+  function renderAll(rebuildList) {
+    var loading = $('phLoading'), errBox = $('phErrBox'), body = $('phBody');
+    if (S.err) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('phErrMsg').textContent = S.err.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+
+    renderSummary();
+    if (rebuildList !== false) renderList(); else updateListSelection();
+    renderCard();
+    renderLatestNote();
+    var items = visibleItems();
+    renderChart(items);
+    renderTable(items);
+    renderFoot();
+  }
+
+  // ── 조작 ─────────────────────────────────────────────────────────
+  function applyRange() {
+    var from = $('phFrom').value, to = $('phTo').value;
+    var errBox = $('phRangeErr');
+    if (from && to && from > to) {
+      errBox.hidden = false; errBox.textContent = '시작일이 종료일보다 늦습니다.';
+      return;
+    }
+    errBox.hidden = true; errBox.textContent = '';
+    S.dateFrom = from; S.dateTo = to; S.productCode = null;
+    load();
+  }
+  function resetRange() {
+    $('phFrom').value = ''; $('phTo').value = '';
+    $('phRangeErr').hidden = true;
+    S.dateFrom = ''; S.dateTo = ''; S.productCode = null;
+    load();
+  }
+  function selectProduct(code) {
+    var n = Number(code);
+    if (!isFinite(n)) return;
+    S.productCode = n;
+    load();
+  }
+  function setMode(mode) {
+    if (mode !== 'kept' && mode !== 'all') return;
+    S.mode = mode;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-action="set-mode"]'), function (b) {
+      var on = b.getAttribute('data-mode') === S.mode;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    renderAll(false);
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var act = t.getAttribute('data-action');
+    if (act === 'retry') { load(); return; }
+    if (act === 'apply-range') { applyRange(); return; }
+    if (act === 'reset-range') { resetRange(); return; }
+    if (act === 'set-mode') { setMode(t.getAttribute('data-mode')); return; }
+    if (act === 'select-product') { selectProduct(t.getAttribute('data-code')); return; }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.target === $('phFrom') || e.target === $('phTo'))) applyRange();
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target === $('phSearch')) { S.search = e.target.value; renderList(); }
+  });
+
+  function boot() { load(); }
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
