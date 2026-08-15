@@ -1,0 +1,1050 @@
+{#
+  마진 정책 (ADM-PRC-020) — 2026-08-15 신설
+
+  ■ 계약 — `docs/design/spec-margin-policy.md`(사장님 확정 1a "정책판" — 값 넷을 영향이
+    큰 순서로 쌓는다: 카드수수료 → 전역 마진 → 분류별 예외 → 배분율. 예외 편집 서랍만
+    1b에서 가져온다). 정의서 `docs/design/req/req-margin-policy.md`.
+    원문(Claude Design)은 하네스만 연다 — 이 화면은 계약 요약 텍스트로 지었다.
+
+  ■★★ 상단 붉은 경고 — 2026-08-15 이 제작자가 서버(8002)·전수 grep으로 재확인, 지금도
+    사실이다: 가격 검토 승인(`admin_price_review.py:62`)·단가표 일일 반영
+    (`admin_price_import.py:180`)은 둘 다 `_settings()`(전역만)에서 얻은 fee/margin으로
+    `sale_from_purchase`를 부른다 — `resolve_margins`/`category_margin_policies`를 부르지
+    않는다(두 파일 전수 grep, admin_price_review.py의 유일한 매치는 9행 **주석**뿐).
+    분류별 예외는 대량 재산정(`admin_reprice.py`, 이 화면이 쓰는 `/reprice/preview`)에만
+    먹는다. `resolve_margins(`를 실제로 **호출**하는 곳은 저장소 전체에 2곳뿐
+    (`admin_categories.py`·`admin_reprice.py:92`) — `api/admin_ui_margin_policy.py` 상단
+    docstring에 근거를 남겼다.
+
+  ■★★ 계약이 가정했지만 코드가 다른 곳 둘(신규 발견, 이 제작자 코드 확인) — 문구를
+    계약 그대로 옮기지 않고 이 사실에 맞춰 조정했다:
+      ① 분류별 예외 서랍의 "저장하면 이렇게 바뀝니다" 4줄 — `GET /reprice/preview`에는
+         분류로 좁히는 파라미터가 없다(scope 셋만 받는다, `_classify()` item에
+         category_id 없음, `_summary()` 응답에 분류별 집계 없음 — 코드 전문 확인).
+         지어내지 않고 "이 API로는 분류별로 좁혀 셀 수 없습니다"라고 적는다.
+      ② "해당 없음"(공급처 0곳) — 이 화면이 쓰는 `/reprice/preview`(admin_reprice.py)는
+         `product_supplier_prices`를 전혀 읽지 않는다(매입가는 products.purchase_price
+         직접 사용) — "공급처 0곳" 조건은 개별 승인·단가표반영 전용의 **다른** 함수
+         (`admin_price_import._reprice`) 얘기다. target = up+down+same+locked로 이미
+         완전히 나뉘어(예: 7279=6899+275+105+0) 남는 몫이 없다. 0으로 위장하지 않고
+         "못 셈" + 이유를 함께 적는다.
+
+  ■ 미리보기는 "이미 저장된 값"만 계산한다(`dry_run` 파라미터 없음, 계약이 요구한
+    고지를 6칸 표 아래 그대로 둔다) — 그래서 실제 순서는 저장 → 확인 → (분류별 예외는
+    되돌리기 API 자체가 없어) 삭제뿐이다. `save_pricing`(전역)은 저장 즉시 유효해진다 —
+    미리보기 단계에서 쓰기 API를 부르지 않는다(값 변경 없이 GET만).
+
+  ■ 데이터 — 전부 기존 API: `GET /api/admin/categories`(트리 + margin_rate·
+    margin_effective·margin_source) · `GET /api/admin/reprice/preview?scope=`
+    (live=판매중·재고있음 / all=매입가 있는 전 상품 — 카드수수료 절이 후자를 쓴다,
+    범위가 다르다는 것을 드러내려고) · 쓰기는 `POST /api/admin/pricing-settings`(owner) ·
+    `PUT /api/admin/categories/{cid}/margin`(owner+operator, margin_rate:null=삭제).
+    새 쓰기 API를 만들지 않았다. 이 화면 전용 읽기 전용 보강 값(margin_policy 이력 집계 ·
+    경로 기반 링크 판정)은 `api/admin_ui_margin_policy.py`가 렌더 시점에 계산해 얹는다
+    (근거는 그 파일 docstring — swap_click_logs.py의 `_policy_links()` 선례를 따름).
+
+  ■ 미리보기 배너(2026-08-15 확정) — `GET /reprice/preview`는 GET이라 공용 진행 배너
+    대상에서 원천 제외된다(`ui-progress.js`는 GET·인증 폴링을 뺀 나머지에만 붙는다).
+    그래서 이 화면의 "미리보기" 버튼은 클릭 즉시(응답 전) 버튼을 잠그고 인라인
+    「미리보기 중…」을 그린다(`templates/admin/usage_floors.html.j2`의 `.uf-exp-busy`
+    패턴 그대로 — 참고만 하고 고치지 않았다). "저장"(POST/PUT, preview 아님)은 공용
+    배너가 그대로 뜬다 — 인라인 표시는 저장에도 같이 걸어 배너가 뜨기 전 짧은 틈의
+    중복 클릭만 막는다.
+
+  ■ 판단한 것(계약이 명시하지 않아 이 제작자가 정함, 검증 대상):
+      · 카드수수료·전역 마진은 `PricingBody` 하나(두 필드 필수)로 저장되므로 "확인하고
+        저장"/"취소" 버튼을 두 절 아래 **하나만** 둔다(둘 중 하나만 고쳐도 나머지는
+        저장된 값을 그대로 실어 보낸다).
+      · 분류 34행 중 어느 것을 서랍에 열지 고르는 자리로 상위 6칩 아래 34행 목록을
+        둔다(계약은 칩만 명시했다 — 서랍을 열 구체적 대상 선택 UI는 명시가 없었다).
+      · "파랑"(전역 마진) 색은 admin2.css에 파랑 토큰이 없어 가장 가까운 기존 토큰
+        `--rv-link`(oklch 파랑 계열, hue 250)를 썼다 — 새 HEX를 만들지 않았다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}마진 정책{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+
+.mp-page{flex:1;min-height:0;overflow-y:auto;padding:16px 18px 40px}
+
+/* ── 상단 붉은 경고 ─────────────────────────────────────────────── */
+.mp-warn{border:1.5px solid var(--rv-red);background:oklch(0.95 0.04 30 / .45);border-radius:9px;
+    padding:13px 16px;margin-bottom:12px}
+.mp-warn-t{font:700 13px/1.4 var(--rv-font);color:oklch(0.4 0.14 30);margin-bottom:5px}
+.mp-warn-d{font:400 12px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-warn-d strong{font-weight:700;color:var(--rv-ink)}
+.mp-warn-ref{margin-top:7px;font:400 10.8px/1.6 var(--rv-mono);color:var(--rv-faint)}
+.mp-warn code,.mp-card code,.mp-drawer code{font:500 10.5px/1 var(--rv-mono);background:rgba(0,0,0,.06);
+    padding:1px 4px;border-radius:3px;color:var(--rv-ink-soft)}
+
+/* ── 권한 배지 ──────────────────────────────────────────────────── */
+.mp-permnote{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font:400 11.5px/1.6 var(--rv-font);
+    color:var(--rv-muted);background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);border-radius:7px;
+    padding:9px 13px;margin-bottom:16px}
+.mp-permnote-i{flex:none;font:600 10px/1 var(--rv-font);letter-spacing:.04em;color:var(--rv-faint);
+    border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:3px 6px}
+.mp-permnote b{color:var(--rv-ink);font-weight:700}
+
+/* ── 레이아웃 ───────────────────────────────────────────────────── */
+.mp-layout{display:grid;grid-template-columns:1fr 336px;gap:16px;align-items:start}
+.mp-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.mp-aside{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* ── 카드 공통 ──────────────────────────────────────────────────── */
+.mp-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:16px 18px;
+    border-left:4px solid var(--rv-dim3)}
+.mp-card-red{border-left-color:var(--rv-red)}
+.mp-card-blue{border-left-color:var(--rv-link)}
+.mp-card-green{border-left-color:var(--rv-green)}
+.mp-card-gray{border-left-color:var(--rv-dim3);border-left-style:dashed}
+.mp-card-hd{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:8px}
+.mp-card-hd h2{margin:0;font:700 14.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.mp-badge{font:600 10px/1 var(--rv-font);padding:4px 8px;border-radius:5px;white-space:nowrap}
+.mp-badge-red{background:oklch(0.95 0.04 30 / .6);color:oklch(0.42 0.15 30);border:1px solid oklch(0.6 0.14 30 / .4)}
+.mp-badge-green{background:oklch(0.94 0.05 165 / .55);color:oklch(0.38 0.11 165);border:1px solid oklch(0.55 0.11 165 / .4)}
+.mp-badge-gray{background:var(--rv-panel);color:var(--rv-faint);border:1px dashed rgba(0,0,0,.22)}
+.mp-card-note{margin:0 0 10px;font:400 12px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-card-note b{font-weight:700;color:var(--rv-ink)}
+.mp-card-note2{margin:8px 0 0;font:400 11px/1.6 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 입력 필드 ──────────────────────────────────────────────────── */
+.mp-field{margin-bottom:10px}
+.mp-field-label{display:block;font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);margin-bottom:6px}
+.mp-field-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.mp-field-saved{font:500 11.5px/1 var(--rv-mono);color:var(--rv-muted)}
+.mp-field-saved b{color:var(--rv-ink);font-weight:700}
+.mp-field-arrow{color:var(--rv-dim3)}
+.mp-input{width:110px;font:700 14px/1 var(--rv-mono);color:var(--rv-ink);background:var(--rv-canvas);
+    border:1px solid rgba(0,0,0,.26);border-radius:6px;padding:8px 10px;outline:none}
+.mp-input:disabled{color:var(--rv-dim2);background:var(--rv-panel);cursor:not-allowed}
+.mp-input.err{border-color:var(--rv-red)}
+.mp-field-unit{font:500 11px/1 var(--rv-font);color:var(--rv-muted)}
+.mp-inline-err{margin-top:5px;font:400 10.8px/1.5 var(--rv-font);color:var(--rv-red)}
+.mp-formula{margin:2px 0 10px;font:500 11.3px/1.6 var(--rv-mono);color:var(--rv-ink-soft);
+    background:var(--rv-panel2);border-radius:6px;padding:8px 10px}
+.mp-hint{font:400 10.8px/1.6 var(--rv-font);color:var(--rv-faint);margin:0 0 10px}
+
+/* ── 6칸 영향 표 ────────────────────────────────────────────────── */
+.mp-impact{margin:6px 0 10px}
+.mp-impact-scope{font:500 10.8px/1.4 var(--rv-font);color:var(--rv-faint);margin-bottom:6px}
+.mp-impact-grid{display:grid;grid-template-columns:repeat(6,minmax(70px,1fr));gap:6px}
+.mp-impact-cell{background:var(--rv-panel);border:1px solid rgba(0,0,0,.09);border-radius:7px;
+    padding:8px 6px;text-align:center}
+.mp-impact-cell.na{border-style:dashed}
+.mp-impact-n{display:block;font:700 15px/1.2 var(--rv-mono);color:var(--rv-ink)}
+.mp-impact-n.up{color:oklch(0.5 0.14 25)}
+.mp-impact-n.down{color:var(--rv-link)}
+.mp-impact-n.na{font-size:11px;color:var(--rv-dim2)}
+.mp-impact-l{display:block;margin-top:3px;font:500 9.5px/1.3 var(--rv-font);color:var(--rv-muted)}
+.mp-impact-na-note{margin-top:6px;font:400 10.3px/1.55 var(--rv-font);color:var(--rv-faint)}
+.mp-impact-err{font:400 11px/1.6 var(--rv-font);color:var(--rv-red);padding:8px}
+.mp-impact-empty{font:400 11px/1.6 var(--rv-font);color:var(--rv-faint);padding:8px}
+
+/* ── 필수 고지 박스 ─────────────────────────────────────────────── */
+.mp-notice{border:1px solid rgba(0,0,0,.14);background:var(--rv-panel2);border-radius:7px;
+    padding:9px 12px;margin:6px 0 12px;font:400 11px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-notice b{font-weight:700;color:var(--rv-ink)}
+.mp-notice-adj{margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08);color:var(--rv-faint);font-size:10.3px}
+
+/* ── 버튼 · 진행 표시 ───────────────────────────────────────────── */
+.mp-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:8px}
+.mp-btn{font:600 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.26);border-radius:6px;padding:9px 14px;cursor:pointer}
+.mp-btn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.12);cursor:not-allowed;background:var(--rv-card)}
+.mp-btn-primary{background:var(--rv-ink);color:var(--rv-canvas);border:none}
+.mp-btn-primary:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+.mp-btn-danger{background:var(--rv-red);color:var(--rv-canvas);border:none}
+.mp-btn-danger:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+.mp-btn-ghost{background:none;border:1px solid rgba(0,0,0,.18);color:var(--rv-muted)}
+.mp-busy{display:inline-flex;align-items:center;gap:7px;font:500 11.3px/1 var(--rv-font);color:var(--rv-muted)}
+.mp-busy[hidden]{display:none}
+.mp-busy-sp{width:12px;height:12px;border:2px solid rgba(0,0,0,.16);border-top-color:var(--rv-ink);
+    border-radius:50%;display:inline-block;animation:mpSpin .7s linear infinite}
+@keyframes mpSpin{to{transform:rotate(360deg)}}
+.mp-savenote{margin-top:8px;font:400 10.6px/1.6 var(--rv-font);color:var(--rv-faint)}
+.mp-saveerr{margin-top:8px;font:400 11.2px/1.6 var(--rv-font);color:var(--rv-red)}
+.mp-savedok{margin-top:8px;font:500 10.8px/1.5 var(--rv-font);color:oklch(0.4 0.1 165);
+    background:oklch(0.95 0.04 165 / .5);border:1px solid oklch(0.5 0.11 165 / .35);border-radius:6px;padding:7px 9px}
+
+/* ── ③ 분류별 예외 ──────────────────────────────────────────────── */
+.mp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 12px}
+.mp-chip{display:flex;align-items:center;gap:7px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+    border-radius:20px;padding:7px 12px 7px 13px}
+.mp-chip-name{font:600 11.5px/1 var(--rv-font);color:var(--rv-ink)}
+.mp-chip-count{font:500 10.5px/1 var(--rv-mono);color:var(--rv-muted)}
+.mp-chip-tag{font:600 9px/1 var(--rv-font);padding:2px 6px;border-radius:9px;background:var(--rv-panel2);
+    color:var(--rv-faint)}
+.mp-chip-tag.ex{background:oklch(0.94 0.05 165 / .6);color:oklch(0.38 0.11 165)}
+
+.mp-catlist{border:1px solid rgba(0,0,0,.1);border-radius:8px;max-height:340px;overflow-y:auto;
+    background:var(--rv-card);transition:box-shadow .3s ease}
+.mp-catlist.flash{box-shadow:0 0 0 3px oklch(0.6 0.14 30 / .35)}
+.mp-cat-row{display:grid;grid-template-columns:minmax(120px,1.6fr) 70px minmax(120px,1.3fr) 84px;
+    gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(0,0,0,.06)}
+.mp-cat-row:last-child{border-bottom:none}
+.mp-cat-row.top{background:var(--rv-panel2);cursor:default}
+.mp-cat-row.top .mp-cat-name{font-weight:700}
+.mp-cat-row:not(.top):hover{background:rgba(0,0,0,.02)}
+.mp-cat-name{font:500 12px/1.3 var(--rv-font);color:var(--rv-ink);padding-left:0}
+.mp-cat-row:not(.top) .mp-cat-name{padding-left:14px}
+.mp-cat-n{font:500 11px/1 var(--rv-mono);color:var(--rv-muted);text-align:right}
+.mp-cat-src{font:500 10.8px/1.3 var(--rv-font);color:var(--rv-muted)}
+.mp-cat-src.own{color:oklch(0.4 0.1 165);font-weight:700}
+.mp-cat-btn{font:600 10.8px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:7px 9px;cursor:pointer;white-space:nowrap}
+.mp-cat-btn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+
+.mp-cat-bottom{margin-top:11px;display:flex;flex-direction:column;gap:6px}
+.mp-cat-bottom p{margin:0;font:400 11px/1.6 var(--rv-font);color:var(--rv-faint)}
+.mp-cat-bottom .warn{color:var(--rv-red)}
+
+/* ── ④ 배분율 ───────────────────────────────────────────────────── */
+.mp-budget-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:10px 0 12px}
+.mp-budget-chip{background:var(--rv-panel);border:1px dashed rgba(0,0,0,.2);border-radius:8px;
+    padding:9px 8px;text-align:center}
+.mp-budget-pct{display:block;font:700 15px/1.2 var(--rv-mono);color:var(--rv-ink-soft)}
+.mp-budget-label{display:block;margin-top:3px;font:500 10px/1.3 var(--rv-font);color:var(--rv-muted)}
+.mp-card-gray .mp-card-note{font-size:11.3px}
+
+/* ── 링크 · 비활성 링크 ─────────────────────────────────────────── */
+.mp-link{color:var(--rv-link);font-weight:600;cursor:pointer}
+.mp-link:hover{text-decoration:underline}
+.mp-link-off{color:var(--rv-dim2);font-weight:500;cursor:not-allowed;border-bottom:1px dashed var(--rv-dim3)}
+
+/* ── aside ──────────────────────────────────────────────────────── */
+.mp-aside-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:14px 15px}
+.mp-aside-amber{border-left:3px solid var(--rv-amber)}
+.mp-aside-t{font:700 12.5px/1.4 var(--rv-font);color:var(--rv-ink);margin-bottom:8px}
+.mp-aside-big{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.mp-aside-big .n{font:700 20px/1 var(--rv-mono);color:var(--rv-ink)}
+.mp-aside-big .n2{font:700 20px/1 var(--rv-mono);color:oklch(0.6 0.13 55)}
+.mp-aside-big .lbl{font:500 11px/1 var(--rv-font);color:var(--rv-muted)}
+.mp-aside-d{font:400 11.3px/1.65 var(--rv-font);color:var(--rv-ink-soft);margin-bottom:8px}
+.mp-aside-p{margin:0 0 8px;font:400 11.3px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-aside-p b{font-weight:700;color:var(--rv-ink)}
+.mp-aside-warn{color:var(--rv-red);font-weight:600}
+.mp-scope-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;
+    padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);font:400 11px/1.5 var(--rv-font)}
+.mp-scope-row:last-child{border-bottom:none}
+.mp-scope-row .k{color:var(--rv-muted)}
+.mp-scope-row .v{color:var(--rv-ink);text-align:right}
+.mp-todo-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;font:400 10.8px/1.5 var(--rv-font)}
+.mp-todo-row .k{color:var(--rv-muted)}
+.mp-todo-row .v{color:var(--rv-faint);text-align:right;white-space:nowrap}
+
+/* ── 하단 고지 ──────────────────────────────────────────────────── */
+.mp-footnote{margin-top:18px;padding-top:12px;border-top:1px solid rgba(0,0,0,.1);
+    font:400 10.6px/1.75 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 서랍 ───────────────────────────────────────────────────────── */
+.mp-scrim{position:fixed;inset:0;background:rgba(38,35,30,.35);z-index:40}
+.mp-scrim[hidden]{display:none}
+.mp-drawer{position:fixed;top:0;right:0;bottom:0;width:492px;max-width:100vw;background:var(--rv-canvas);
+    border-left:1px solid rgba(0,0,0,.14);box-shadow:-14px 0 30px rgba(38,35,30,.18);z-index:41;
+    display:flex;flex-direction:column;overflow-y:auto}
+.mp-drawer[hidden]{display:none}
+.mp-drawer-hd{flex:none;padding:16px 18px 12px;border-bottom:1px solid rgba(0,0,0,.1);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mp-drawer-title{font:700 15px/1.3 var(--rv-font);color:var(--rv-ink)}
+.mp-drawer-sub{margin-top:4px;font:400 11.3px/1.6 var(--rv-font);color:var(--rv-muted)}
+.mp-drawer-x{flex:none;font:400 16px/1 var(--rv-font);color:var(--rv-faint);background:none;border:0;
+    cursor:pointer;padding:4px}
+.mp-drawer-body{flex:1;padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px}
+.mp-drawer-foot{flex:none;padding:13px 18px;border-top:1px solid rgba(0,0,0,.1);display:flex;
+    flex-direction:column;gap:9px}
+.mp-drawer-footbtns{display:flex;gap:9px;justify-content:flex-end}
+.mp-redbox{border:1.5px solid var(--rv-red);background:oklch(0.95 0.04 30 / .4);border-radius:8px;
+    padding:11px 13px;font:400 11.5px/1.65 var(--rv-font);color:oklch(0.4 0.14 30)}
+.mp-redbox b{font-weight:700}
+.mp-delbox{border:1px solid rgba(0,0,0,.14);background:var(--rv-panel);border-radius:8px;padding:11px 13px}
+.mp-delbox p{margin:0 0 8px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+
+@media (max-width:768px){
+  .mp-page{padding:12px 12px 32px}
+  .mp-layout{grid-template-columns:1fr}
+  .mp-impact-grid{grid-template-columns:repeat(3,minmax(64px,1fr))}
+  .mp-cat-row{grid-template-columns:minmax(96px,1.4fr) 56px;row-gap:4px}
+  .mp-cat-src,.mp-cat-btn{grid-column:1 / -1}
+  .mp-cat-btn{justify-self:start}
+  .mp-drawer{width:100vw}
+  .mp-budget-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mp-page" data-screen-id="ADM-PRC-020" data-domain="margin-policy">
+
+  <div class="mp-warn" role="alert">
+    <div class="mp-warn-t">분류별 마진이 안 먹는 경로가 둘 있습니다</div>
+    <div class="mp-warn-d">
+      <strong>가격 검토 승인</strong>과 <strong>단가표 일일 반영</strong>은 전역값만 읽습니다
+      (<code>_settings()</code> — <code>resolve_margins</code>를 부르지 않음).
+      여기서 분류별 예외를 걸어도 <strong>그 두 경로에는 적용되지 않고 대량 재산정에만 적용됩니다.</strong>
+      의도인지 누락인지 근거가 없어 화면이 사실만 적어 둡니다.
+    </div>
+    <div class="mp-warn-ref">근거 — <code>admin_price_review.py:62</code> · <code>admin_price_import.py:180</code></div>
+  </div>
+
+  <div class="mp-permnote">
+    <span class="mp-permnote-i">권한</span>
+    <span>카드수수료·전역 마진 수정은 <b>관리자(owner)</b>만 · 분류별 예외 등록·수정·삭제는
+    <b>관리자·운영자(owner+operator)</b> — 같은 화면 안에서 등급이 다릅니다.</span>
+  </div>
+
+  <div class="mp-layout">
+    <div class="mp-main">
+
+      <!-- ① 카드수수료 -->
+      <section class="mp-card mp-card-red" data-keep="1">
+        <div class="mp-card-hd">
+          <h2>① 카드수수료</h2>
+          <span class="mp-badge mp-badge-red">전 상품 공통 — 마진보다 영향이 큽니다</span>
+        </div>
+        <p class="mp-card-note"><b>카드사와의 계약값입니다</b> — 운영자가 임의로 정하는 숫자가 아닙니다.</p>
+        <div class="mp-field">
+          <label class="mp-field-label" for="mpCardInput">카드수수료</label>
+          <div class="mp-field-row">
+            <span class="mp-field-saved">저장된 값 <b id="mpCardSaved">—</b>%</span>
+            <span class="mp-field-arrow">→</span>
+            <input type="number" id="mpCardInput" class="mp-input" min="0" max="99.999" step="0.001" inputmode="decimal">
+            <span class="mp-field-unit">%</span>
+          </div>
+          <div class="mp-inline-err" id="mpCardInputErr" hidden></div>
+        </div>
+        <div class="mp-impact" id="mpCardImpact">
+          <div class="mp-impact-empty">「미리보기」를 누르면 지금 저장된 카드수수료가 전 상품(매입가 있는 상품)에
+            미치는 영향을 서버가 셉니다.</div>
+        </div>
+        <p class="mp-card-note2" id="mpCardCompareNote">미리보기를 누르면 «전 상품(매입가 있는 상품)» 건수로 세어
+          아래 전역 마진 미리보기(판매중 · 재고 있음 기준)와 범위가 다르다는 것을 드러냅니다.</p>
+        <div class="mp-actions">
+          <button type="button" class="mp-btn" id="mpCardPreviewBtn" data-action="preview-card">미리보기</button>
+          <span class="mp-busy" id="mpCardBusy" role="status" aria-live="polite" hidden>
+            <span class="mp-busy-sp"></span>미리보기 중…</span>
+        </div>
+      </section>
+
+      <!-- ② 전역 기본 마진율 -->
+      <section class="mp-card mp-card-blue" data-keep="1">
+        <div class="mp-card-hd">
+          <h2>② 전역 기본 마진율</h2>
+        </div>
+        <p class="mp-card-note">예외가 없는 모든 분류에 걸립니다.</p>
+        <div class="mp-field">
+          <label class="mp-field-label" for="mpMarginInput">전역 기본 마진율</label>
+          <div class="mp-field-row">
+            <span class="mp-field-saved">저장된 값 <b id="mpMarginSaved">—</b>%</span>
+            <span class="mp-field-arrow">→</span>
+            <input type="number" id="mpMarginInput" class="mp-input" min="0" max="99.999" step="0.001" inputmode="decimal">
+            <span class="mp-field-unit">%</span>
+          </div>
+          <div class="mp-inline-err" id="mpMarginInputErr" hidden></div>
+        </div>
+        <p class="mp-hint">스키마 허용 0% 이상 100% 미만.</p>
+        <div class="mp-formula" id="mpFormula">제안가 = 매입가 × (1 + 카드수수료 — % + 마진 — %) → 1,000원 단위 반올림</div>
+        <div class="mp-impact" id="mpMarginImpact">
+          <div class="mp-impact-empty">불러오는 중…</div>
+        </div>
+        <div class="mp-notice">
+          <b>⚠ 미리보기 전용 경로가 아직 없습니다.</b> 지금 있는 <code>GET /reprice/preview</code>는
+          <b>이미 저장된 값</b>으로만 계산합니다 — 그래서 위 숫자는 <b>저장된 값 기준 실측</b>이고,
+          바꾼 값의 결과는 저장 후에야 셀 수 있습니다. <b>실제 순서는 저장 → 확인 → 되돌림입니다.</b>
+        </div>
+        <div class="mp-actions">
+          <button type="button" class="mp-btn" id="mpMarginPreviewBtn" data-action="preview-margin">미리보기</button>
+          <span class="mp-busy" id="mpMarginBusy" role="status" aria-live="polite" hidden>
+            <span class="mp-busy-sp"></span>미리보기 중…</span>
+        </div>
+
+        <div class="mp-actions" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(0,0,0,.1)">
+          <button type="button" class="mp-btn mp-btn-primary" id="mpPricingSaveBtn" data-action="save-pricing">확인하고 저장</button>
+          <button type="button" class="mp-btn mp-btn-ghost" id="mpPricingCancelBtn" data-action="cancel-pricing">변경 취소</button>
+          <span class="mp-busy" id="mpPricingBusy" role="status" aria-live="polite" hidden>
+            <span class="mp-busy-sp"></span>저장하는 중…</span>
+        </div>
+        <p class="mp-savenote">카드수수료와 전역 마진은 <code>pricing_settings</code> 한 곳에 함께 저장됩니다 —
+          위 버튼이 두 값을 같이 반영합니다(하나만 고쳤어도 나머지는 저장된 값 그대로 실어 보냅니다).
+          저장하면 <b>다음 견적부터</b> 적용됩니다 — 이미 만든 견적은 그대로입니다.</p>
+        <div class="mp-saveerr" id="mpPricingErr" hidden></div>
+        <div class="mp-savedok" id="mpPricingOk" hidden></div>
+      </section>
+
+      <!-- ③ 분류별 예외 -->
+      <section class="mp-card mp-card-green" data-keep="1">
+        <div class="mp-card-hd">
+          <h2>③ 분류별 예외</h2>
+          <span class="mp-badge mp-badge-green" id="mpCatBadge">불러오는 중…</span>
+        </div>
+        <p class="mp-card-note" id="mpCatText">불러오는 중…</p>
+        <div class="mp-chips" id="mpCatChips"></div>
+        <div class="mp-catlist" id="mpCatList" data-keep="1">
+          <div class="mp-impact-empty">불러오는 중…</div>
+        </div>
+        <div class="mp-cat-bottom">
+          <p id="mpCatBottom1">&nbsp;</p>
+          <p class="warn">⚠ 「상품 분류 관리」의 마진 칸은 <b>읽기 전용으로 바뀌고 이 화면을 가리킵니다</b> —
+            두 곳에서 같은 값을 고치면 어느 쪽이 맞는지 모르게 됩니다. <span id="mpLinkCategories"></span></p>
+        </div>
+        <div class="mp-actions">
+          <button type="button" class="mp-btn" data-action="add-exception">예외 추가</button>
+        </div>
+      </section>
+
+      <!-- ④ 부품별 예산 배분율 -->
+      <section class="mp-card mp-card-gray" data-keep="1">
+        <div class="mp-card-hd">
+          <h2>④ 부품별 예산 배분율</h2>
+          <span class="mp-badge mp-badge-gray">읽기 전용 · 향후 사용예정</span>
+        </div>
+        <div class="mp-budget-grid" id="mpBudgetChips"></div>
+        <p class="mp-card-note">이 값은 <b>DB에 없습니다</b> — 코드 상수라 쓰기 경로가 없고, 편집을 열려면
+          코드에서 DB로 옮기는 작업이 먼저입니다. 그전까지 여기서도 못 고칩니다.
+          「추천 기준 보기」의 잠긴 편집은 이 자리를 가리키게 바뀝니다. <span id="mpLinkPolicyWeights"></span></p>
+        <p class="mp-card-note2">"이상"이나 숫자 없는 예산 표현("AI 추천 예산")에는 이 배분율이
+          <b>적용되지 않습니다</b> · <b>가성비형은 배분율을 받지 않습니다.</b></p>
+      </section>
+
+    </div>
+
+    <aside class="mp-aside">
+      <div class="mp-aside-card mp-aside-amber">
+        <div class="mp-aside-t">지난 마진 변경은 거의 전부 되돌려졌습니다</div>
+        <div class="mp-aside-big" id="mpHistBig"><span class="n">—</span><span class="lbl">불러오는 중</span></div>
+        <div class="mp-aside-d">대량 재산정이 실제로 돌았고 거의 전부 물러졌다는 뜻입니다.
+          <b>왜 그랬는지 아직 아무 화면도 말하지 않습니다</b> — 값을 바꾸기 전에 지난 변경이
+          어떻게 됐는지 먼저 보십시오.</div>
+        <div id="mpHistLink"></div>
+      </div>
+
+      <div class="mp-aside-card">
+        <div class="mp-aside-t">저장하면 무엇이 언제 바뀌나</div>
+        <p class="mp-aside-p"><b>다음 견적부터 적용됩니다</b> — 이미 만든 견적은 그대로입니다. 이 문장은
+          <b>코드로 지켜집니다</b>(<code>quote_snapshots.items</code>에 판매가를 박아 저장하고
+          그 표를 UPDATE하는 코드가 저장소 전체에 <b>0건</b> — 2026-08-15 이 제작자 grep 재확인).</p>
+        <p class="mp-aside-p">전역 마진·카드수수료는 <b>이력형</b>입니다(INSERT만 · 행 누적) —
+          이전 행으로 되돌릴 수 있습니다.<br><span class="mp-aside-warn">⚠ 그런데 분류별 예외는 되돌리기
+          API 자체가 없습니다.</span></p>
+      </div>
+
+      <div class="mp-aside-card">
+        <div class="mp-aside-t">이 화면에서 안 하는 것</div>
+        <div class="mp-scope-row"><span class="k">개별 상품 판매가 확정</span><span class="v" id="mpGoPriceReview">→ 가격 검토 대기</span></div>
+        <div class="mp-scope-row"><span class="k">대량 재계산 실행</span><span class="v">→ 판매가 재산정 — 화면 없음</span></div>
+        <div class="mp-scope-row"><span class="k">예외 잡기 · 잠금</span><span class="v" id="mpGoSalePrice">→ 판매가 관리</span></div>
+        <div class="mp-scope-row"><span class="k">마진 이력 조회</span><span class="v" id="mpGoPriceHistory">→ 가격 이력</span></div>
+        <div class="mp-aside-t" style="margin-top:12px">아직 정해지지 않은 것</div>
+        <div class="mp-todo-row"><span class="k">마진율 상한을 화면이 더 좁힐까</span><span class="v">미정</span></div>
+        <div class="mp-todo-row"><span class="k">같은 분류에 예외가 둘이면</span><span class="v">미정</span></div>
+        <div class="mp-todo-row"><span class="k">미리보기 전용 API를 새로 만들까</span><span class="v">미정</span></div>
+        <div class="mp-todo-row"><span class="k">분류별 마진 되돌리기를 만들까</span><span class="v">API 없음</span></div>
+        <div class="mp-todo-row"><span class="k">권한 비대칭을 맞출까</span><span class="v">미정</span></div>
+        <div class="mp-todo-row"><span class="k">마진율 음수</span><span class="v">거부</span></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="mp-footnote">
+    미리보기 요청에는 공용 진행 배너가 뜨지 않습니다 — 버튼 비활성 + 인라인 「미리보기 중…」 ·
+    조회·저장 실패는 사유를 갈라 그대로 보입니다(401은 「세션이 만료됐습니다」) ·
+    owner 미만이면 입력칸·버튼이 비활성이고 사유를 title로 병기합니다.
+  </div>
+</div>
+
+<div class="mp-scrim" id="mpScrim" hidden></div>
+<div class="mp-drawer" id="mpDrawer" hidden data-keep="1" role="dialog" aria-label="분류별 예외 마진">
+  <div class="mp-drawer-hd">
+    <div>
+      <div class="mp-drawer-title" id="mpDrawerTitle">분류별 예외 마진</div>
+      <div class="mp-drawer-sub" id="mpDrawerSub"></div>
+    </div>
+    <button type="button" class="mp-drawer-x" data-action="close-drawer" aria-label="닫기">✕</button>
+  </div>
+  <div class="mp-drawer-body" id="mpDrawerBody"></div>
+  <div class="mp-drawer-foot" id="mpDrawerFoot"></div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  'use strict';
+
+  var LINKS = {{ links_json | safe }};
+  var HIST = {{ history_json | safe }};
+  var BUDGET = {{ budget_json | safe }};
+
+  var S = {
+    me: null,
+    saved: { cardFee: null, marginRate: null },
+    input: { cardFee: null, marginRate: null },
+    previewedFor: null,
+    cardImpact: null, cardErr: null, cardBusy: false,
+    marginImpact: null, marginErr: null, marginBusy: false,
+    pricingBusy: false, pricingErr: null, pricingOk: null,
+    cats: null, catsErr: null,
+    drawer: { open: false, cid: null, value: null, deleting: false,
+              busy: false, err: null, ok: null }
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n === null || n === undefined) ? '못 쟀음' : Number(n).toLocaleString('ko-KR'); }
+  function pctOf(dec) { return (dec === null || dec === undefined) ? null : Math.round(dec * 100000) / 1000; }
+  function pctStr(p) { return (p === null || p === undefined) ? '—' : (Math.round(p * 1000) / 1000).toString(); }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiSend(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+
+  // 401(세션 만료) 판정은 여기 한 곳뿐이다 — 이 화면 안 일곱 곳(①②③ 미리보기·저장·서랍
+  // 저장/삭제 + 분류 목록 조회)이 각자 err.status===401 을 따로 적으면, 같은 세션 만료가
+  // 자리마다 다른 문구(서버 원문 "로그인이 필요합니다" 대 안내문)로 보인다. 401 이 아니면
+  // 서버 원문(err.message)을 그대로 낸다 — 뭉개지 않는다.
+  function friendlyErr(err) {
+    return err.status === 401 ? '세션이 만료됐습니다 — 다시 로그인해 주세요.' : err.message;
+  }
+
+  function canOwner() { return window.Admin2Shell.canWrite('owner'); }
+  function canOperator() { return window.Admin2Shell.canWrite('operator'); }
+
+  function linkHtml(key, label) {
+    var t = LINKS[key];
+    if (!t) return esc(label || key);
+    var text = label || t.label;
+    if (t.available) return '<a class="mp-link" href="' + t.href + '">' + esc(text) + ' →</a>';
+    return '<span class="mp-link-off" title="' + esc(t.reason || '') + '">' + esc(text) + '</span>';
+  }
+
+  // ── ① · ② 6칸 영향 표(공용) ──────────────────────────────────────
+  function impactCellsHtml(imp) {
+    var cells = [
+      ['대상', fmt(imp.target), ''],
+      ['오름', fmt(imp.up_count), 'up'],
+      ['내림', fmt(imp.down_count), 'down'],
+      ['변화없음', fmt(imp.same), ''],
+      ['잠김', fmt(imp.locked_count), ''],
+    ];
+    var html = '<div class="mp-impact-grid">';
+    cells.forEach(function (c) {
+      html += '<div class="mp-impact-cell"><span class="mp-impact-n ' + c[2] + '">' + c[1] + '</span>'
+            + '<span class="mp-impact-l">' + c[0] + '</span></div>';
+    });
+    html += '<div class="mp-impact-cell na"><span class="mp-impact-n na">못 셈</span>'
+          + '<span class="mp-impact-l">해당 없음</span></div>';
+    html += '</div>';
+    html += '<div class="mp-impact-na-note">⚠ 「해당 없음」(공급처 0곳이라 안 움직이는 상품)은 이 API가 세지'
+          + ' 않습니다 — <code>/reprice/preview</code>는 <code>product_supplier_prices</code>를 읽지 않고'
+          + ' 매입가를 <code>products.purchase_price</code>에서 바로 씁니다. 대상(' + fmt(imp.target)
+          + ')은 이미 오름·내림·변화없음·잠김의 합과 같아(남는 몫 없음) 0으로 위장하지 않고 못 셈으로 둡니다.</div>';
+    return html;
+  }
+  function impactHtml(imp, err, busy, scopeLabel) {
+    if (busy && !imp && !err) return '<div class="mp-impact-empty">불러오는 중…</div>';
+    if (err) return '<div class="mp-impact-err">미리보기를 받지 못했습니다 — ' + esc(err) + '</div>';
+    if (!imp) return '<div class="mp-impact-empty">「미리보기」를 눌러 확인하십시오.</div>';
+    return '<div class="mp-impact-scope">' + esc(scopeLabel) + ' · 저장된 값 기준(서버가 센 값)</div>'
+         + impactCellsHtml(imp);
+  }
+
+  // ── ① 카드수수료 ─────────────────────────────────────────────────
+  function renderCard() {
+    var inp = $('mpCardInput');
+    if (document.activeElement !== inp) inp.value = (S.input.cardFee === null ? '' : S.input.cardFee);
+    inp.disabled = !canOwner();
+    inp.title = canOwner() ? '' : '관리자(owner)만 바꿀 수 있습니다';
+    $('mpCardSaved').textContent = pctStr(S.saved.cardFee);
+    $('mpCardImpact').innerHTML = impactHtml(S.cardImpact, S.cardErr, S.cardBusy,
+      '전 상품(매입가 있는 상품) 전체 기준');
+    var btn = $('mpCardPreviewBtn');
+    btn.disabled = S.cardBusy;
+    btn.title = S.cardBusy ? '요청을 처리하는 중입니다' : '';
+    $('mpCardBusy').hidden = !S.cardBusy;
+    if (S.cardImpact) {
+      $('mpCardCompareNote').textContent = '방금 미리본 «전 상품(매입가 있는 상품) ' + fmt(S.cardImpact.target)
+        + '건»은 전역 마진 미리보기(판매중 · 재고 있음 기준)의 대상 ' + fmt(S.marginImpact ? S.marginImpact.target : null)
+        + '건과 범위가 다릅니다 — 카드수수료가 더 넓게 걸린다는 뜻입니다.';
+    }
+  }
+
+  // ── ② 전역 마진 ──────────────────────────────────────────────────
+  function renderMargin() {
+    var inp = $('mpMarginInput');
+    if (document.activeElement !== inp) inp.value = (S.input.marginRate === null ? '' : S.input.marginRate);
+    inp.disabled = !canOwner();
+    inp.title = canOwner() ? '' : '관리자(owner)만 바꿀 수 있습니다';
+    $('mpMarginSaved').textContent = pctStr(S.saved.marginRate);
+    var cf = S.input.cardFee, mr = S.input.marginRate;
+    if (cf !== null && mr !== null && !isNaN(cf) && !isNaN(mr)) {
+      var mult = Math.round((1 + cf / 100 + mr / 100) * 100000) / 100000;
+      $('mpFormula').textContent = '제안가 = 매입가 × (1 + 카드수수료 ' + pctStr(cf) + '% + 마진 ' + pctStr(mr)
+        + '%) = 매입가 × ' + mult + ' → 1,000원 단위 반올림 (지금 입력된 값 기준)';
+    } else {
+      $('mpFormula').textContent = '제안가 = 매입가 × (1 + 카드수수료 + 마진) → 1,000원 단위 반올림';
+    }
+    $('mpMarginImpact').innerHTML = impactHtml(S.marginImpact, S.marginErr, S.marginBusy, '판매중 · 재고 있음 기준');
+    var btn = $('mpMarginPreviewBtn');
+    btn.disabled = S.marginBusy;
+    btn.title = S.marginBusy ? '요청을 처리하는 중입니다' : '';
+    $('mpMarginBusy').hidden = !S.marginBusy;
+  }
+
+  function pricingSig() { return S.input.cardFee + '|' + S.input.marginRate; }
+  function pricingChanged() {
+    return S.input.cardFee !== S.saved.cardFee || S.input.marginRate !== S.saved.marginRate;
+  }
+  function pricingValid() {
+    var cf = S.input.cardFee, mr = S.input.marginRate;
+    return cf !== null && !isNaN(cf) && cf >= 0 && cf < 100
+        && mr !== null && !isNaN(mr) && mr >= 0 && mr < 100;
+  }
+  function renderPricingActions() {
+    var save = $('mpPricingSaveBtn'), cancel = $('mpPricingCancelBtn');
+    var owner = canOwner();
+    var previewed = S.previewedFor === pricingSig();
+    var can = owner && !S.pricingBusy && pricingChanged() && pricingValid() && previewed;
+    save.disabled = !can;
+    if (!owner) save.title = '관리자(owner)만 저장할 수 있습니다';
+    else if (!pricingChanged()) save.title = '고친 값이 없습니다';
+    else if (!pricingValid()) save.title = '0% 이상 100% 미만의 숫자를 입력하세요(음수는 거부됩니다)';
+    else if (!previewed) save.title = '먼저 카드수수료 또는 전역 마진 미리보기를 눌러 지금 값으로 확인해야 합니다';
+    else save.title = '';
+    cancel.disabled = S.pricingBusy || !pricingChanged();
+    $('mpPricingBusy').hidden = !S.pricingBusy;
+    $('mpPricingErr').hidden = !S.pricingErr;
+    if (S.pricingErr) $('mpPricingErr').textContent = S.pricingErr;
+    $('mpPricingOk').hidden = !S.pricingOk;
+    if (S.pricingOk) $('mpPricingOk').textContent = S.pricingOk;
+    // 입력칸별 인라인 오류 — 값을 입력한 뒤에만 보인다(비워 둔 상태는 오류가 아니다).
+    var e1 = $('mpCardInputErr'), e2 = $('mpMarginInputErr'), inp1 = $('mpCardInput'), inp2 = $('mpMarginInput');
+    var cf = S.input.cardFee, mr = S.input.marginRate;
+    var cfBad = cf !== null && (isNaN(cf) || cf < 0 || cf >= 100);
+    var mrBad = mr !== null && (isNaN(mr) || mr < 0 || mr >= 100);
+    e1.hidden = !cfBad;
+    if (cfBad) e1.textContent = '0% 이상 100% 미만의 숫자를 입력하세요(음수는 거부됩니다)';
+    inp1.classList.toggle('err', cfBad);
+    e2.hidden = !mrBad;
+    if (mrBad) e2.textContent = '0% 이상 100% 미만의 숫자를 입력하세요(음수는 거부됩니다)';
+    inp2.classList.toggle('err', mrBad);
+  }
+
+  function loadPricingBaseline() {
+    S.marginBusy = true; renderMargin();
+    return apiGet('/api/admin/reprice/preview?scope=live').then(function (j) {
+      S.saved.cardFee = pctOf(j.card_fee_rate);
+      S.saved.marginRate = pctOf(j.margin_rate);
+      if (S.input.cardFee === null) S.input.cardFee = S.saved.cardFee;
+      if (S.input.marginRate === null) S.input.marginRate = S.saved.marginRate;
+      S.marginImpact = j; S.marginErr = null; S.marginBusy = false;
+      renderMargin(); renderCard(); renderPricingActions();
+    }).catch(function (err) {
+      S.marginBusy = false; S.marginErr = friendlyErr(err);
+      renderMargin(); renderPricingActions();
+    });
+  }
+
+  function doPreviewCard() {
+    if (S.cardBusy) return;
+    S.cardBusy = true; renderCard();
+    apiGet('/api/admin/reprice/preview?scope=all').then(function (j) {
+      S.cardBusy = false; S.cardImpact = j; S.cardErr = null;
+      S.previewedFor = pricingSig();
+      renderCard(); renderPricingActions();
+    }).catch(function (err) {
+      S.cardBusy = false; S.cardErr = friendlyErr(err);
+      renderCard();
+    });
+  }
+  function doPreviewMargin() {
+    if (S.marginBusy) return;
+    S.marginBusy = true; renderMargin();
+    apiGet('/api/admin/reprice/preview?scope=live').then(function (j) {
+      S.marginBusy = false; S.marginImpact = j; S.marginErr = null;
+      S.previewedFor = pricingSig();
+      renderMargin(); renderCard(); renderPricingActions();
+    }).catch(function (err) {
+      S.marginBusy = false; S.marginErr = friendlyErr(err);
+      renderMargin();
+    });
+  }
+  function doSavePricing() {
+    if (!canOwner() || S.pricingBusy) return;
+    if (!pricingChanged() || !pricingValid() || S.previewedFor !== pricingSig()) return;
+    S.pricingBusy = true; S.pricingErr = null; S.pricingOk = null; renderPricingActions();
+    apiSend('POST', '/api/admin/pricing-settings', {
+      card_fee_rate: S.input.cardFee / 100, margin_rate: S.input.marginRate / 100,
+    }).then(function () {
+      S.pricingBusy = false;
+      S.pricingOk = '저장했습니다 — 다음 견적부터 적용됩니다.';
+      S.previewedFor = null; S.cardImpact = null; S.marginImpact = null;
+      return loadPricingBaseline();
+    }).then(function () {
+      renderPricingActions();
+    }).catch(function (err) {
+      S.pricingBusy = false; S.pricingErr = friendlyErr(err);
+      renderPricingActions();
+    });
+  }
+  function doCancelPricing() {
+    S.input.cardFee = S.saved.cardFee; S.input.marginRate = S.saved.marginRate;
+    S.previewedFor = null; S.pricingErr = null; S.pricingOk = null;
+    renderCard(); renderMargin(); renderPricingActions();
+  }
+
+  // ── ③ 분류별 예외 ────────────────────────────────────────────────
+  function findCat(cid) {
+    if (!S.cats) return null;
+    for (var i = 0; i < S.cats.items.length; i++) if (S.cats.items[i].category_id === cid) return S.cats.items[i];
+    return null;
+  }
+  function childrenOf(cid) {
+    return (S.cats ? S.cats.items : []).filter(function (c) { return c.parent_id === cid; })
+      .sort(function (a, b) { return a.sort_order - b.sort_order; });
+  }
+  function topCats() {
+    return (S.cats ? S.cats.items : []).filter(function (c) { return c.parent_id === null; })
+      .sort(function (a, b) { return a.sort_order - b.sort_order; });
+  }
+
+  function loadCategories() {
+    $('mpCatBadge').textContent = '불러오는 중…';
+    $('mpCatText').textContent = '불러오는 중…';
+    $('mpCatList').innerHTML = '<div class="mp-impact-empty">불러오는 중…</div>';
+    return apiGet('/api/admin/categories').then(function (j) {
+      S.cats = j; S.catsErr = null;
+      renderCategories();
+    }).catch(function (err) {
+      S.cats = null; S.catsErr = err;
+      renderCategories();
+    });
+  }
+
+  function renderCategories() {
+    var linkCat = $('mpLinkCategories'); if (linkCat) linkCat.innerHTML = linkHtml('categories');
+    var linkPw = $('mpLinkPolicyWeights'); if (linkPw) linkPw.innerHTML = linkHtml('policy_weights');
+    $('mpGoPriceReview').innerHTML = linkHtml('price_review', '→ 가격 검토 대기');
+    $('mpGoSalePrice').innerHTML = linkHtml('sale_price', '→ 판매가 관리');
+    $('mpGoPriceHistory').innerHTML = linkHtml('price_history', '→ 가격 이력');
+
+    if (S.catsErr) {
+      var un = S.catsErr.status === 401;
+      $('mpCatBadge').textContent = un ? '세션 만료' : '조회 실패';
+      $('mpCatText').textContent = un ? friendlyErr(S.catsErr)
+        : ('분류 목록을 받지 못했습니다 — ' + friendlyErr(S.catsErr));
+      $('mpCatChips').innerHTML = '';
+      $('mpCatList').innerHTML = '<div class="mp-impact-err">' + esc($('mpCatText').textContent) + '</div>';
+      return;
+    }
+    if (!S.cats) return;
+    var exCount = S.cats.items.filter(function (c) { return c.margin_rate !== null; }).length;
+    var total = S.cats.items.length;
+    $('mpCatBadge').textContent = exCount + '건 — 정상입니다';
+    if (exCount === 0) {
+      $('mpCatText').textContent = '아직 예외를 두지 않았고 ' + total + '개 분류 전부가 전역값 '
+        + pctStr(S.saved.marginRate) + '%를 씁니다. 설정을 못 불러온 것이 아닙니다 — '
+        + 'category_margin_policies가 비어 있는 것이 지금의 정상 상태입니다.';
+    } else {
+      $('mpCatText').textContent = exCount + '개 분류에 예외가 걸려 있습니다. 나머지 ' + (total - exCount)
+        + '개 분류는 전역값 ' + pctStr(S.saved.marginRate) + '%를 씁니다.';
+    }
+
+    // 상위 6칩 — 상품 수 + 전역/예외 표시
+    var chipsHtml = '';
+    topCats().forEach(function (t) {
+      var kids = childrenOf(t.category_id);
+      var allGlobal = t.margin_source === '전역 기본' && kids.every(function (k) { return k.margin_source === '전역 기본'; });
+      chipsHtml += '<div class="mp-chip"><span class="mp-chip-name">' + esc(t.name) + '</span>'
+        + '<span class="mp-chip-count">' + fmt(t.subtree_count) + '건</span>'
+        + '<span class="mp-chip-tag' + (allGlobal ? '' : ' ex') + '">' + (allGlobal ? '전역' : '예외 있음') + '</span></div>';
+    });
+    $('mpCatChips').innerHTML = chipsHtml;
+
+    // 34행 목록 — 클릭으로 서랍 연다
+    var writeOk = canOperator();
+    var listHtml = '';
+    topCats().forEach(function (t) {
+      listHtml += catRowHtml(t, true, writeOk);
+      childrenOf(t.category_id).forEach(function (c) { listHtml += catRowHtml(c, false, writeOk); });
+    });
+    $('mpCatList').innerHTML = listHtml;
+
+    var unmapped = S.cats.unmapped || 0;
+    var totalProducts = topCats().reduce(function (a, t) { return a + (t.subtree_count || 0); }, 0) + unmapped;
+    $('mpCatBottom1').textContent = '분류가 없는 상품 ' + fmt(unmapped) + '건(category_id IS NULL / 전체 '
+      + fmt(totalProducts) + '건)에는 예외를 걸 수 없고 전역값이 걸립니다.';
+  }
+
+  function catRowHtml(node, isTop, writeOk) {
+    var hasOwn = node.margin_rate !== null;
+    var count = isTop ? node.subtree_count : node.product_count;
+    return '<div class="mp-cat-row' + (isTop ? ' top' : '') + '" data-cid="' + node.category_id + '">'
+      + '<span class="mp-cat-name">' + esc(node.name) + '</span>'
+      + '<span class="mp-cat-n">' + fmt(count) + '건</span>'
+      + '<span class="mp-cat-src' + (hasOwn ? ' own' : '') + '">' + pctStr(node.margin_effective * 100)
+      +   '% · ' + esc(node.margin_source) + '</span>'
+      + '<button type="button" class="mp-cat-btn" data-action="open-drawer" data-cid="' + node.category_id + '"'
+      +   (writeOk ? '' : ' disabled title="관리자·운영자(owner+operator)만 바꿀 수 있습니다"') + '>'
+      +   (hasOwn ? '수정' : '예외 걸기') + '</button>'
+      + '</div>';
+  }
+
+  function flashCatList() {
+    var box = $('mpCatList');
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.classList.add('flash');
+    setTimeout(function () { box.classList.remove('flash'); }, 900);
+  }
+
+  // ── 서랍 ─────────────────────────────────────────────────────────
+  function openDrawer(cid) {
+    var cat = findCat(cid);
+    if (!cat) return;
+    S.drawer = { open: true, cid: cid, value: Math.round(cat.margin_effective * 100000) / 1000,
+                 deleting: false, busy: false, err: null, ok: null };
+    renderDrawer();
+    $('mpScrim').hidden = false; $('mpDrawer').hidden = false;
+    var inp = $('mpDrawerValueInput'); if (inp) inp.focus();
+  }
+  function closeDrawer() {
+    S.drawer = { open: false, cid: null, value: null, deleting: false, busy: false, err: null, ok: null };
+    $('mpScrim').hidden = true; $('mpDrawer').hidden = true;
+  }
+
+  function drawerValid() {
+    var v = S.drawer.value;
+    return v !== null && !isNaN(v) && v >= 0 && v < 100;
+  }
+
+  function renderDrawer() {
+    if (!S.drawer.open) return;
+    var cat = findCat(S.drawer.cid);
+    if (!cat) { closeDrawer(); return; }
+    var parent = cat.parent_id ? findCat(cat.parent_id) : null;
+    var path = parent ? (parent.name + ' > ' + cat.name) : cat.name;
+    var hasChildren = childrenOf(cat.category_id).length > 0;
+    var hasOwn = cat.margin_rate !== null;
+    var count = cat.parent_id === null ? cat.subtree_count : cat.product_count;
+    var srcText = hasOwn ? '자기 값' : cat.margin_source;
+
+    $('mpDrawerTitle').textContent = '분류별 예외 마진 — ' + cat.name;
+    $('mpDrawerSub').textContent = path + ' · 상품 ' + fmt(count) + '건 · 지금은 ' + srcText + ' '
+      + pctStr(cat.margin_effective * 100) + '%를 ' + (hasOwn ? '쓰고 있습니다' : '상속하고 있습니다');
+
+    var writeOk = canOperator();
+    var body = '';
+
+    if (S.drawer.deleting) {
+      body += '<div class="mp-delbox"><p><b>예외를 지우면</b> 이 분류는 전역 기본값 ' + pctStr(S.saved.marginRate)
+        + '%로 돌아갑니다. 지우는 것 자체가 값 변경이라 삭제도 같은 확인 단계를 지납니다.</p></div>';
+      body += '<div class="mp-redbox"><b>저장하면 이 예외는 되돌릴 수 없습니다.</b> 분류별 마진은 되돌리기 API'
+        + ' 자체가 없습니다. 잘못 걸었으면 예외를 삭제해 전역값으로 되돌리는 것이 유일한 길이고, 그 사이에'
+        + ' 돈 재산정 결과는 남습니다.</div>';
+      $('mpDrawerBody').innerHTML = body;
+      var footD = '<div class="mp-savenote">삭제하면 다음 견적부터 전역값이 적용됩니다 — 이미 만든 견적은'
+        + ' 그대로입니다.</div>';
+      footD += '<div class="mp-drawer-footbtns">';
+      footD += '<button type="button" class="mp-btn mp-btn-ghost" data-action="cancel-delete">취소</button>';
+      footD += '<button type="button" class="mp-btn mp-btn-danger" data-action="confirm-delete"'
+        + (writeOk && !S.drawer.busy ? '' : ' disabled') + '>확인하고 삭제</button>';
+      footD += '</div>';
+      if (S.drawer.busy) footD += '<span class="mp-busy" role="status" aria-live="polite"><span class="mp-busy-sp"></span>저장하는 중…</span>';
+      if (S.drawer.err) footD += '<div class="mp-saveerr">' + esc(S.drawer.err) + '</div>';
+      $('mpDrawerFoot').innerHTML = footD;
+      return;
+    }
+
+    body += '<div class="mp-field"><label class="mp-field-label" for="mpDrawerValueInput">새 마진율(%)</label>';
+    body += '<div class="mp-field-row"><input type="number" id="mpDrawerValueInput" class="mp-input" min="0"'
+      + ' max="99.999" step="0.001" value="' + (S.drawer.value === null ? '' : S.drawer.value) + '"'
+      + (writeOk ? '' : ' disabled title="관리자·운영자(owner+operator)만 바꿀 수 있습니다"') + '>'
+      + '<span class="mp-field-unit">%</span></div>';
+    body += '<div class="mp-hint">스키마 허용 0% 이상 100% 미만 · 음수는 거부(역마진) · 화면이 더 좁힐지는 미정</div></div>';
+
+    var v = S.drawer.value;
+    if (v !== null && !isNaN(v)) {
+      var cf = S.saved.cardFee === null ? 0 : S.saved.cardFee;
+      var mult = Math.round((1 + cf / 100 + v / 100) * 100000) / 100000;
+      body += '<div class="mp-formula">제안가 = 매입가 × (1 + 카드수수료 ' + pctStr(cf) + '% + 이 분류 마진 '
+        + pctStr(v) + '%) = 매입가 × ' + mult + ' → 1,000원 단위 반올림</div>';
+    }
+    body += '<div class="mp-card-note2">' + (hasChildren
+      ? ('하위 분류 ' + childrenOf(cat.category_id).length + '개 중 자기 값이 없는 곳은 이 값을 상속합니다.')
+      : '하위 분류가 없어 이 값은 이 노드에만 걸립니다.') + '</div>';
+
+    body += '<div><div class="mp-field-label" style="margin-bottom:6px">저장하면 이렇게 바뀝니다</div>';
+    body += '<div class="mp-impact-grid" style="grid-template-columns:repeat(2,minmax(90px,1fr))">';
+    ['이 분류에서 제안가가 바뀌는 상품', '그중 오름 / 내림', '해당 없음 — 공급처 0곳이라 안 움직임', '잠겨서 제외']
+      .forEach(function (l) {
+        body += '<div class="mp-impact-cell na"><span class="mp-impact-n na">못 셈</span>'
+          + '<span class="mp-impact-l">' + esc(l) + '</span></div>';
+      });
+    body += '</div>';
+    body += '<div class="mp-impact-na-note">이 API(<code>GET /reprice/preview</code>)는 <code>scope</code>'
+      + '(live/selling/all)만 받고 분류로 좁히는 파라미터가 없습니다 — 그래서 위 4칸은 지어내지 않고'
+      + ' 전부 못 셈으로 둡니다. 전체 영향은 위 「전역 기본 마진율」 절의 미리보기(판매중·재고 있음 /'
+      + ' 전 상품 범위)로 참고하십시오.</div></div>';
+
+    body += '<div class="mp-notice">⚠ 이 숫자는 서버가 「저장 전」에 센 값이 아닙니다. 가상의 마진값을 받아'
+      + ' 미리 계산해 주는 경로가 아직 없고(<code>dry_run</code> 파라미터 없음), 게다가 분류로 좁혀 셀 방법도'
+      + ' 지금은 없습니다. 저장한 뒤 실제 결과를 「전역 기본 마진율」 절이나 「가격 이력」에서 다시 확인해야'
+      + ' 합니다.</div>';
+
+    body += '<div class="mp-redbox"><b>저장하면 이 예외는 되돌릴 수 없습니다.</b> 분류별 마진은 되돌리기 API'
+      + ' 자체가 없습니다. 잘못 걸었으면 예외를 삭제해 전역값으로 되돌리는 것이 유일한 길이고, 그 사이에'
+      + ' 돈 재산정 결과는 남습니다. 공급처가 0곳인 상품은 정책을 바꿔도 움직이지 않습니다 — 다만 그 건수는'
+      + ' 지금 API로 셀 수 없어 위 「해당 없음」이 못 셈으로 표시돼 있습니다.</div>';
+
+    if (hasOwn) {
+      body += '<div class="mp-delbox"><p><b>예외를 지우면</b> 이 분류는 전역 기본값 ' + pctStr(S.saved.marginRate)
+        + '%로 돌아갑니다. 지우는 것 자체가 값 변경이라 삭제도 같은 확인 단계를 지납니다.</p>'
+        + '<button type="button" class="mp-btn mp-btn-ghost" data-action="start-delete"'
+        + (writeOk ? '' : ' disabled') + '>예외 삭제</button></div>';
+    }
+
+    $('mpDrawerBody').innerHTML = body;
+
+    var can = writeOk && !S.drawer.busy && drawerValid() && v !== Math.round(cat.margin_effective * 100000) / 1000;
+    var foot = '<div class="mp-savenote">저장하면 <b>다음 견적부터</b> 적용됩니다 — 이미 만든 견적은 그대로입니다.</div>';
+    foot += '<div class="mp-drawer-footbtns">';
+    foot += '<button type="button" class="mp-btn mp-btn-ghost" data-action="close-drawer">취소</button>';
+    foot += '<button type="button" class="mp-btn mp-btn-primary" data-action="confirm-save"'
+      + (can ? '' : ' disabled title="' + (writeOk ? (drawerValid() ? '고친 값이 없습니다' : '0% 이상 100% 미만의 숫자를 입력하세요')
+          : '관리자·운영자(owner+operator)만 저장할 수 있습니다') + '"') + '>확인하고 저장</button>';
+    foot += '</div>';
+    if (S.drawer.busy) foot += '<span class="mp-busy" role="status" aria-live="polite"><span class="mp-busy-sp"></span>저장하는 중…</span>';
+    if (S.drawer.err) foot += '<div class="mp-saveerr">' + esc(S.drawer.err) + '</div>';
+    $('mpDrawerFoot').innerHTML = foot;
+  }
+
+  function drawerSave() {
+    if (!canOperator() || S.drawer.busy || !drawerValid()) return;
+    S.drawer.busy = true; S.drawer.err = null; renderDrawer();
+    apiSend('PUT', '/api/admin/categories/' + S.drawer.cid + '/margin', { margin_rate: S.drawer.value / 100 })
+      .then(function () {
+        return loadCategories().then(function () {
+          closeDrawer();
+        });
+      })
+      .catch(function (err) {
+        S.drawer.busy = false; S.drawer.err = friendlyErr(err);
+        renderDrawer();
+      });
+  }
+  function drawerDelete() {
+    if (!canOperator() || S.drawer.busy) return;
+    S.drawer.busy = true; S.drawer.err = null; renderDrawer();
+    apiSend('PUT', '/api/admin/categories/' + S.drawer.cid + '/margin', { margin_rate: null })
+      .then(function () {
+        return loadCategories().then(function () {
+          closeDrawer();
+        });
+      })
+      .catch(function (err) {
+        S.drawer.busy = false; S.drawer.err = friendlyErr(err);
+        renderDrawer();
+      });
+  }
+
+  // ── ④ 배분율 ─────────────────────────────────────────────────────
+  function renderBudget() {
+    $('mpBudgetChips').innerHTML = BUDGET.map(function (b) {
+      return '<div class="mp-budget-chip"><span class="mp-budget-pct">' + pctStr(b.pct * 100)
+        + '%</span><span class="mp-budget-label">' + esc(b.label) + '</span></div>';
+    }).join('');
+  }
+
+  // ── aside 카드① 이력 요약 ────────────────────────────────────────
+  function renderHistCard() {
+    var box = $('mpHistBig');
+    if (!HIST || !HIST.forward) {
+      box.innerHTML = '<span class="n">0</span><span class="lbl">margin_policy 이력이 아직 없습니다</span>';
+    } else {
+      box.innerHTML = '<span class="n">' + fmt(HIST.forward) + '</span><span class="lbl">건 중 →</span>'
+        + '<span class="n2">' + fmt(HIST.reverted) + '</span>'
+        + '<span class="lbl">건이 되돌려졌습니다' + (HIST.pct !== null ? (' (' + HIST.pct + '%)') : '') + '</span>';
+    }
+    $('mpHistLink').innerHTML = linkHtml('price_history', '가격 이력에서 margin_policy 보기');
+  }
+
+  // ── 이벤트 ───────────────────────────────────────────────────────
+  function bind() {
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest('[data-action]');
+      if (t) {
+        var act = t.getAttribute('data-action');
+        if (act === 'preview-card') doPreviewCard();
+        else if (act === 'preview-margin') doPreviewMargin();
+        else if (act === 'save-pricing') doSavePricing();
+        else if (act === 'cancel-pricing') doCancelPricing();
+        else if (act === 'add-exception') flashCatList();
+        else if (act === 'open-drawer') { if (!t.disabled) openDrawer(Number(t.getAttribute('data-cid'))); }
+        else if (act === 'close-drawer') closeDrawer();
+        else if (act === 'confirm-save') drawerSave();
+        else if (act === 'start-delete') { S.drawer.deleting = true; renderDrawer(); }
+        else if (act === 'cancel-delete') { S.drawer.deleting = false; renderDrawer(); }
+        else if (act === 'confirm-delete') drawerDelete();
+        return;
+      }
+      if (ev.target === $('mpScrim')) closeDrawer();
+    });
+    document.addEventListener('input', function (ev) {
+      if (ev.target.id === 'mpCardInput') {
+        var v = ev.target.value;
+        S.input.cardFee = v === '' ? null : Number(v);
+        S.previewedFor = null;
+        renderPricingActions();
+      } else if (ev.target.id === 'mpMarginInput') {
+        var v2 = ev.target.value;
+        S.input.marginRate = v2 === '' ? null : Number(v2);
+        S.previewedFor = null;
+        renderMargin(); renderPricingActions();
+      } else if (ev.target.id === 'mpDrawerValueInput') {
+        var v3 = ev.target.value;
+        S.drawer.value = v3 === '' ? null : Number(v3);
+        renderDrawer();
+      }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      if (ev.target.id === 'mpCardInput') { ev.preventDefault(); doPreviewCard(); }
+      else if (ev.target.id === 'mpMarginInput') { ev.preventDefault(); doPreviewMargin(); }
+      else if (ev.target.id === 'mpDrawerValueInput') { ev.preventDefault(); if (!S.drawer.deleting) drawerSave(); }
+    });
+  }
+
+  function boot() {
+    bind();
+    renderBudget();
+    renderHistCard();
+    window.Admin2Shell.meReady.then(function (me) {
+      S.me = me; renderCard(); renderMargin(); renderPricingActions(); renderCategories();
+    });
+    loadPricingBaseline();
+    loadCategories();
+  }
+
+  boot();
+})();
+</script>
+{% endblock %}
