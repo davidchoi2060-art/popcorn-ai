@@ -73,6 +73,10 @@
 ■ 배분율 — `candidates.BUDGET_ALLOC`(코드 상수, 쓰기 경로 없음)을 그대로 읽는다. 값을
   화면에 베끼지 않고 원본을 import해서 쓴다. 라벨은 `taxonomy.PART_LABELS`(부품 어휘
   단일 원천, `.claude/CANON.md` §1)에서 가져온다 — 두 번째 어휘를 만들지 않는다.
+
+■★ 인증 전제(2026-08-15) — 이 화면은 서버 렌더 시점에 실데이터를 싣는다 — 미들웨어가
+  `/admin2/` 를 막는 것이 전제다(`api/auth.py` `auth_middleware`/`_is_gated`). 이 파일
+  자신은 로그인을 확인하지 않는다 — 확인하지 않아도 되는 이유가 이 한 줄이다.
 """
 import json
 
