@@ -45,16 +45,35 @@ class SupplierBody(BaseModel):
     status: str | None = None
 
 
+# 공급처 목록·단건이 함께 쓰는 SELECT 몸통 — ADM-SRC-030(공급처 화면) 신설로 추가.
+# 화면 목록 8열 중 "파서 프리셋"이 기존 `_rows()`엔 없었다(연결 상품·단가표 파일만
+# 셌다) — supplier_presets를 세지 않으면 화면이 그 열을 지어내야 했다(금지 사항).
+_SELECT_BODY = (
+    "SELECT s.supplier_id, s.name, s.platform, s.brands, s.status, s.created_at,"
+    " (SELECT COUNT(*) FROM product_supplier_prices p"
+    "    WHERE p.supplier_id = s.supplier_id) AS linked_products,"
+    " (SELECT COUNT(*) FROM supplier_price_files f"
+    "    WHERE f.supplier_id = s.supplier_id) AS price_files,"
+    " (SELECT COUNT(*) FROM supplier_presets pr"
+    "    WHERE pr.supplier_id = s.supplier_id) AS preset_count"
+    " FROM suppliers s"
+)
+
+
 def _rows(conn):
     """공급처 + 실제로 쓰이고 있는 정도. 화면이 세지 않는다 — 서버가 센다."""
     return conn.execute(text(
-        "SELECT s.supplier_id, s.name, s.platform, s.brands, s.status, s.created_at,"
-        " (SELECT COUNT(*) FROM product_supplier_prices p"
-        "    WHERE p.supplier_id = s.supplier_id) AS linked_products,"
-        " (SELECT COUNT(*) FROM supplier_price_files f"
-        "    WHERE f.supplier_id = s.supplier_id) AS price_files"
-        " FROM suppliers s"
-        " ORDER BY (s.status = '중지'), s.name")).mappings().all()
+        _SELECT_BODY + " ORDER BY (s.status = '중지'), s.name")).mappings().all()
+
+
+def _one(conn, supplier_id):
+    """단건 — 등록·수정 응답에 목록과 같은 모양(_shape)을 실어 보낸다.
+
+    등록/수정 각자 손으로 SELECT를 다시 짜던 것을 하나로 모았다(예전엔 등록 응답이
+    `0 AS price_files`를 하드코딩해, 등록 직후 갱신된 값이 있어도 항상 0으로 보였다).
+    """
+    return conn.execute(text(
+        _SELECT_BODY + " WHERE s.supplier_id = :i"), {"i": supplier_id}).mappings().first()
 
 
 def _shape(r):
@@ -62,7 +81,8 @@ def _shape(r):
             "platform": r["platform"], "brands": r["brands"],
             "status": r["status"], "created": iso(r["created_at"]),
             "linked_products": r["linked_products"],
-            "price_files": r["price_files"]}
+            "price_files": r["price_files"],
+            "preset_count": r["preset_count"]}
 
 
 @router.get("/suppliers")
@@ -74,10 +94,17 @@ def list_suppliers():
     with engine.connect() as conn:
         items = [_shape(r) for r in _rows(conn)]
     active = [i for i in items if i["status"] == "활성"]
+    inactive = [i for i in items if i["status"] == "중지"]
+    # 프리셋 없는 공급처 — ADM-SRC-030 하단 경고("파서 프리셋이 없는 공급처 {n}곳")가
+    # 쓴다. 활성·중지를 가리지 않고 센다 — 프리셋 유무는 상태와 무관한 별개 속성이고,
+    # 지금 중지된 공급처도 나중에 되살리면 그대로 이 문제를 안고 있기 때문이다.
+    no_preset = [i for i in items if not i["preset_count"]]
     return {
         "items": items,
         "total": len(items),
         "active": len(active),
+        "inactive": len(inactive),
+        "no_preset_count": len(no_preset),
         # 빈 상태를 화면이 정확히 말할 수 있게 서버가 판정해 준다.
         "empty": len(active) == 0,
         "note": ("공급처가 없으면 매입가를 넣을 대상이 없고, 매입가가 없으면 판매가가"
@@ -97,33 +124,44 @@ def create_supplier(body: SupplierBody):
     status = (body.status or "활성").strip()
     if status not in STATES:
         raise HTTPException(400, "상태는 " + " · ".join(STATES) + " 중 하나입니다")
+    # DB 컬럼 정의(db/migrations/versions/0001_initial_schema.py:396-397)
+    # platform VARCHAR(50) · brands VARCHAR(200). 넘기면 여기서 400으로 막지 않으면
+    # INSERT가 StringDataRightTruncation으로 500을 냈다(확인자 둘이 각각 재현—
+    # platform 60자 · brands 250자, 2026-08-15).
+    platform = (body.platform or "").strip() or None
+    if platform and len(platform) > 50:
+        raise HTTPException(400, "플랫폼은 50자 이하로 입력하세요")
+    brands = (body.brands or "").strip() or None
+    if brands and len(brands) > 200:
+        raise HTTPException(400, "취급 브랜드는 200자 이하로 입력하세요")
 
     with engine.begin() as conn:
         # 같은 이름을 먼저 잡아 사람이 읽을 수 있는 문구로 돌려준다.
         # (인덱스에 맡기면 IntegrityError 원문이 그대로 나가 운영자가 못 읽는다)
+        # platform·brands 도 함께 돌려준다 — ADM-SRC-030의 "중지 상태면 되살리기"
+        # 버튼이 PATCH로 되살릴 때 이 값을 그대로 실어 보내야 한다. update_supplier는
+        # 전체 덮어쓰기라(부분 PATCH가 아니다) platform·brands를 안 보내면 NULL로
+        # 지워진다 — 화면이 되살리기 버튼 하나로 기존 취급 브랜드를 지우는 사고를 막는다.
         dup = conn.execute(text(
-            "SELECT supplier_id, name, status FROM suppliers"
+            "SELECT supplier_id, name, status, platform, brands FROM suppliers"
             " WHERE lower(btrim(name)) = lower(btrim(:n))"), {"n": name}).mappings().first()
         if dup:
             raise HTTPException(409, {
                 "error": "duplicate_name",
                 "message": f"이미 있는 공급처입니다 — {dup['name']}({dup['status']})."
                            " 중지된 공급처라면 목록에서 다시 활성으로 바꾸세요.",
-                "supplier_id": dup["supplier_id"]})
+                "supplier_id": dup["supplier_id"], "name": dup["name"], "status": dup["status"],
+                "platform": dup["platform"], "brands": dup["brands"]})
         try:
             sid = conn.execute(text(
                 "INSERT INTO suppliers (name, platform, brands, status)"
                 " VALUES (:n, :p, :b, :s) RETURNING supplier_id"),
-                {"n": name, "p": (body.platform or "").strip() or None,
-                 "b": (body.brands or "").strip() or None, "s": status}).scalar()
+                {"n": name, "p": platform, "b": brands, "s": status}).scalar()
         except IntegrityError:                     # 동시 요청으로 인덱스가 먼저 잡은 경우
             raise HTTPException(409, "이미 있는 공급처입니다")
         _log(conn, "supplier_create", name,
              {"platform": body.platform, "brands": body.brands}, kind="supplier")
-        row = conn.execute(text(
-            "SELECT s.supplier_id, s.name, s.platform, s.brands, s.status, s.created_at,"
-            " 0 AS linked_products, 0 AS price_files"
-            " FROM suppliers s WHERE s.supplier_id = :i"), {"i": sid}).mappings().first()
+        row = _one(conn, sid)
 
     out = _shape(row)
     out["note"] = f"{name} 등록했습니다 — 상품 상세의 [공급처별 매입가]에서 선택할 수 있습니다"
@@ -135,9 +173,21 @@ def update_supplier(supplier_id: int, body: SupplierBody):
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, "공급처 이름을 입력하세요")
+    if len(name) > 100:
+        raise HTTPException(400, "이름은 100자 이하로 입력하세요")
     status = (body.status or "활성").strip()
     if status not in STATES:
         raise HTTPException(400, "상태는 " + " · ".join(STATES) + " 중 하나입니다")
+    # DB 컬럼 정의(db/migrations/versions/0001_initial_schema.py:396-397)
+    # platform VARCHAR(50) · brands VARCHAR(200). 등록(POST)엔 이미 있던 길이 검사가
+    # 수정(PATCH)엔 없었다 — 같은 병(길이 초과 → 500)이 이 파일 안에서도 갈라져
+    # 있었다(확인자 실측 2026-08-15). name 100자 검사도 이 함수엔 없어서 함께 더한다.
+    platform = (body.platform or "").strip() or None
+    if platform and len(platform) > 50:
+        raise HTTPException(400, "플랫폼은 50자 이하로 입력하세요")
+    brands = (body.brands or "").strip() or None
+    if brands and len(brands) > 200:
+        raise HTTPException(400, "취급 브랜드는 200자 이하로 입력하세요")
 
     with engine.begin() as conn:
         before = conn.execute(text(
@@ -146,50 +196,48 @@ def update_supplier(supplier_id: int, body: SupplierBody):
         if before is None:
             raise HTTPException(404, "공급처를 찾을 수 없습니다")
 
+        # 등록(POST)의 409와 같은 모양으로 맞췄다(요구사항 정의서 §⑦ "이름 중복(등록·
+        # 수정 공통): 409, 기존 공급처명·상태·id를 함께 반환") — 예전엔 문자열 하나만
+        # 돌려줘 화면이 어느 공급처와 부딪혔는지 보여줄 수 없었다.
         dup = conn.execute(text(
-            "SELECT supplier_id FROM suppliers"
+            "SELECT supplier_id, name, status, platform, brands FROM suppliers"
             " WHERE lower(btrim(name)) = lower(btrim(:n)) AND supplier_id <> :i"),
-            {"n": name, "i": supplier_id}).scalar()
+            {"n": name, "i": supplier_id}).mappings().first()
         if dup:
-            raise HTTPException(409, "같은 이름의 공급처가 이미 있습니다")
+            raise HTTPException(409, {
+                "error": "duplicate_name",
+                "message": f"같은 이름의 공급처가 이미 있습니다 — {dup['name']}({dup['status']})",
+                "supplier_id": dup["supplier_id"], "name": dup["name"], "status": dup["status"],
+                "platform": dup["platform"], "brands": dup["brands"]})
 
         changed = {}
         for key, new in (("name", name),
-                         ("platform", (body.platform or "").strip() or None),
-                         ("brands", (body.brands or "").strip() or None),
+                         ("platform", platform),
+                         ("brands", brands),
                          ("status", status)):
             if (before[key] or None) != new:
                 changed[key] = {"before": before[key], "after": new}
 
-        linked = conn.execute(text(
-            "SELECT COUNT(*) FROM product_supplier_prices WHERE supplier_id = :i"),
-            {"i": supplier_id}).scalar()
-
         if not changed:
-            row = conn.execute(text(
-                "SELECT s.supplier_id, s.name, s.platform, s.brands, s.status, s.created_at,"
-                " :lp AS linked_products, 0 AS price_files FROM suppliers s"
-                " WHERE s.supplier_id = :i"), {"i": supplier_id, "lp": linked}).mappings().first()
+            row = _one(conn, supplier_id)
             out = _shape(row)
             out["note"] = "바뀐 값이 없습니다"
             out["changed"] = {}
             return out
 
+        # 상태를 '중지'로 바꾸는 경우의 안내 문구에만 쓴다 — 안 바뀌는 경로(위)는
+        # 필요 없어 여기로 옮겼다(예전엔 그 경로에서도 매번 이 COUNT를 돌렸다).
+        linked = conn.execute(text(
+            "SELECT COUNT(*) FROM product_supplier_prices WHERE supplier_id = :i"),
+            {"i": supplier_id}).scalar()
+
         conn.execute(text(
             "UPDATE suppliers SET name=:n, platform=:p, brands=:b, status=:s"
             " WHERE supplier_id=:i"),
-            {"n": name, "p": (body.platform or "").strip() or None,
-             "b": (body.brands or "").strip() or None, "s": status, "i": supplier_id})
+            {"n": name, "p": platform, "b": brands, "s": status, "i": supplier_id})
         _log(conn, "supplier_update", before["name"], {"changed": changed}, kind="supplier")
 
-        row = conn.execute(text(
-            "SELECT s.supplier_id, s.name, s.platform, s.brands, s.status, s.created_at,"
-            " (SELECT COUNT(*) FROM product_supplier_prices p"
-            "    WHERE p.supplier_id = s.supplier_id) AS linked_products,"
-            " (SELECT COUNT(*) FROM supplier_price_files f"
-            "    WHERE f.supplier_id = s.supplier_id) AS price_files"
-            " FROM suppliers s WHERE s.supplier_id = :i"),
-            {"i": supplier_id}).mappings().first()
+        row = _one(conn, supplier_id)
 
     out = _shape(row)
     out["changed"] = changed

@@ -1,0 +1,749 @@
+{#
+  공급처(ADM-SRC-030) — 2026-08-15 신설.
+
+  ■ 계약 — `docs/design/spec-suppliers.md`(1b 안, 사장님 확정 2026-08-15) ·
+    정의서 `docs/design/req/req-suppliers.md`. admin2 «신규» 구축이다 — 구화면
+    (`mockups/admin/suppliers.html`)은 백업용 동결(P-09), 옮기지 않고 새로 지었다.
+
+  ■ 골격(1b) — 계약 그대로:
+      ① 상단 등록줄(늘 열려 있다) + 성공/409 안내 두 슬롯
+      ② 집계 줄 — 공급처 N곳 · 활성 N · 중지 N
+      ③ 전폭 목록 8열 — 이름(+id) · 플랫폼 · 취급 브랜드 · 상태 · 연결 상품 ·
+         단가표 파일 · 파서 프리셋 · 작업
+      ④ 하단 2단 — 파서 프리셋 경고 | 이 목록이 판단하지 않는 것
+      ⑤ 중지 확인 모달 — 이 화면의 핵심("누르고 나서 알면 늦습니다")
+
+  ■ 기본키는 `id`다(`supplier_id`가 아니다) — 목록/등록/수정 응답 전부. 이 저장소가
+    정확히 이 화면에서 그 혼동으로 사고를 낸 전례(2026-08-05, `s.supplier_id` →
+    undefined → NaN → 저장마다 422)가 있어 목록 행에 `id {{ }}`를 그대로 보이게
+    둔다. ⚠ `.../impact` 응답 하나만 최상위 키가 `supplier_id`다 — JS가 그 차이를
+    구분해서 읽는다(아래 `openDeactivateModal`/`deactivateModalHtml`는 `id`를 모달
+    상태(`m.id`)에서, 카드 숫자는 impact 응답의 `linked_products`/`price_files`/
+    `sole_source_products`에서 읽는다).
+
+  ■ PATCH는 전체 덮어쓰기다(부분 패치가 아니다) — `api/admin_suppliers.py`의
+    `update_supplier`가 name·platform·brands·status 네 값을 항상 같이 받아 그대로
+    UPDATE한다. 그래서 상태만 바꾸는 [중지]/[활성으로]/되살리기 버튼도 그 공급처의
+    **현재 이름·플랫폼·브랜드를 함께 실어 보낸다** — 상태 하나만 보내면 나머지
+    둘이 NULL로 지워진다(제작 중 실제로 짚은 함정, 보고서 참조).
+
+  ■ 문구는 계약을 그대로 옮긴다. 서버가 이미 조립해 주는 문장(등록 성공 note,
+    빈 상태 note)은 **서버 문자열을 그대로** 쓰고, 화면이 새로 조립해야 하는
+    고정 문구(모달 제목·409 안내의 「」 인용문)만 여기서 붙인다 — 계약의 「」
+    표기는 이 저장소의 다른 화면(`price_review.html.j2`·`sale_price.html.j2`)도
+    실제 UI 문구에 그대로 옮긴 전례를 따른 것이다.
+
+  ■ 숫자는 전부 서버 응답값이다. `GET /api/admin/suppliers`가 주는 `total`·
+    `active`·`inactive`·`no_preset_count`·행별 `linked_products`/`price_files`/
+    `preset_count`, `GET .../impact`가 주는 세 값 — 화면은 이것들을 세지 않고
+    그대로 보여준다(이번 작업으로 `preset_count`·`inactive`·`no_preset_count`를
+    `api/admin_suppliers.py`에 보강했다 — 원래 없었다, 제작 보고서 참조).
+
+  ■ 삭제는 없다 — 참조 테이블 6개(0025 마이그레이션 docstring 실측: supplier_presets ·
+    supplier_price_files · supplier_product_map · product_supplier_prices ·
+    product_price_history · product_sourcing_quotes). 활성 ↔ 중지 상태 전이만 있다.
+    화면 어디에도 삭제 버튼을 두지 않았다.
+
+  ■ 반응형 768px — `.sp-thead`를 숨기고 `.sp-row`를 세로 스택으로 바꾼다. 열이
+    안 사라지게 각 칸에 `.sp-lbl`(라벨)을 미리 마크업해 두고 CSS로만 노출을
+    바꾼다(JS 재렌더 없이 순수 CSS 브레이크포인트) — 최근 두 화면이 "칸 하나만
+    100%를 받고 나머지는 안 받아 가로로 밀리는" 결함을 냈던 전례의 재발 방지로,
+    `.sp-row`의 8개 직계 자식 전부를 명시적으로 다룬다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}공급처{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+
+.sp-page{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
+
+/* ── 헤더 배지 ── */
+.sp-headbadge{font:500 10.5px/1 var(--font);color:var(--rv-faint);border:1px solid rgba(0,0,0,.14);
+    border-radius:5px;padding:5px 9px;white-space:nowrap}
+
+/* ── ① 등록줄 ── */
+.sp-register{flex:none;margin:16px 18px 0;border:1px solid rgba(0,0,0,.14);background:var(--rv-card);
+    border-radius:8px;padding:14px 16px}
+.sp-register-hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:11px}
+.sp-register-title{font:600 13px/1.3 var(--font);color:var(--rv-ink)}
+.sp-register-sub{font:400 11px/1.5 var(--font);color:var(--rv-faint)}
+.sp-register-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.sp-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.sp-field label{font:600 10.5px/1 var(--font);color:var(--rv-muted)}
+.sp-field .req{color:var(--rv-red);margin-left:2px}
+.sp-field input{font:500 12.5px/1 var(--font);color:var(--rv-ink);background:var(--rv-canvas);
+    border:1px solid rgba(0,0,0,.24);border-radius:6px;padding:9px 10px;outline:none;min-width:0;width:100%}
+.sp-field input:focus{border-color:var(--rv-ink)}
+.sp-f-name{flex:1 1 220px;min-width:180px}
+.sp-f-platform{flex:1 1 150px;min-width:130px}
+.sp-f-brands{flex:1 1 180px;min-width:150px}
+.sp-btn-register{flex:none;font:600 12px/1 var(--font);color:var(--rv-canvas);background:var(--rv-ink);
+    border:none;border-radius:6px;padding:10.5px 18px;cursor:pointer;white-space:nowrap}
+.sp-btn-register:disabled{background:var(--rv-dim3);cursor:not-allowed}
+
+/* ── 성공 / 409 안내 두 슬롯 ── */
+.sp-notice{display:flex;align-items:flex-start;gap:9px;margin-top:11px;border-radius:7px;padding:11px 13px}
+.sp-notice[hidden]{display:none}
+.sp-notice .mk{font:700 13px/1.4 var(--font);flex:none}
+.sp-notice .bd{flex:1;min-width:0;font:400 11.5px/1.6 var(--font);color:var(--rv-ink-soft)}
+.sp-notice .bd b{color:var(--rv-ink)}
+.sp-notice .bd .q{display:block;font:600 12px/1.5 var(--font);color:var(--rv-ink)}
+.sp-notice-ok{border:1px solid oklch(0.5 0.11 165 / .35);background:oklch(0.96 0.03 165 / .5)}
+.sp-notice-ok .mk{color:oklch(0.4 0.1 165)}
+.sp-notice-dup{border:1px solid oklch(0.52 0.16 30 / .4);background:oklch(0.97 0.02 30)}
+.sp-notice-dup .mk{color:oklch(0.42 0.15 30)}
+.sp-notice-actions{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+
+/* ── ② 집계 줄 ── */
+.sp-summary{flex:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:13px 18px 0}
+.sp-sum-main{font:600 12.5px/1 var(--font);color:var(--rv-ink)}
+.sp-sum-note{font:400 10.5px/1.5 var(--font);color:var(--rv-faint)}
+
+/* ── 빈 상태(활성 0) 배너 ── */
+.sp-emptybanner{flex:none;margin:11px 18px 0;border:1.5px solid oklch(0.62 0.15 55 / .5);
+    background:var(--rv-amber-bg);border-radius:8px;padding:13px 15px;display:flex;gap:11px;align-items:flex-start}
+.sp-emptybanner[hidden]{display:none}
+.sp-emptybanner .mk{font:700 16px/1.2 var(--font);color:oklch(0.5 0.13 55);flex:none}
+.sp-emptybanner .bd{flex:1;min-width:0}
+.sp-emptybanner .t{font:600 13px/1.4 var(--font);color:var(--rv-ink);margin-bottom:4px}
+.sp-emptybanner .d{font:400 11.5px/1.65 var(--font);color:var(--rv-ink-soft)}
+.sp-emptybanner .cta{margin-top:10px}
+
+/* ── ③ 목록 ── */
+.sp-listcol{flex:1;min-height:280px;display:flex;flex-direction:column;padding:13px 18px 0}
+.sp-grid-cols{grid-template-columns:minmax(180px,1.4fr) minmax(92px,.8fr) minmax(112px,1fr) 78px
+    92px 98px 100px minmax(148px,176px)}
+.sp-thead{display:grid;gap:10px;align-items:center;padding:8px 14px;background:var(--rv-panel);
+    border:1px solid rgba(0,0,0,.1);border-bottom:none;border-radius:8px 8px 0 0;
+    font:600 10.5px/1 var(--font);color:var(--rv-muted);overflow-y:hidden;scrollbar-gutter:stable}
+.sp-tbody{flex:1;min-height:0;overflow-y:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+    border-radius:0 0 8px 8px;scrollbar-gutter:stable}
+.sp-row{display:grid;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.07)}
+.sp-row.unused{background:var(--rv-panel2)}
+.sp-row:hover{background:rgba(0,0,0,.025)}
+.sp-row.inactive{opacity:.72}
+.sp-c-name{display:flex;align-items:center;gap:7px;min-width:0;flex-wrap:wrap}
+.sp-name{font:600 12.5px/1.3 var(--font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;min-width:0}
+.sp-idtag{flex:none;font:500 9.5px/1 var(--font-num);color:var(--rv-faint);background:rgba(0,0,0,.05);
+    border-radius:4px;padding:3px 6px}
+.sp-c-platform,.sp-c-brands{overflow:hidden}
+.sp-c-platform > span:last-child,.sp-c-brands > span:last-child{display:block;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;font:400 11.5px/1.4 var(--font);color:var(--rv-ink-soft)}
+.sp-badge{display:inline-block;font:600 10.5px/1 var(--font);border-radius:4px;padding:4px 8px;white-space:nowrap}
+.sp-badge-on{color:var(--rv-ink);background:var(--rv-panel2);border:1px solid rgba(0,0,0,.14)}
+.sp-badge-off{color:var(--rv-faint);background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.08)}
+.sp-preset-yes{font:500 11.5px/1 var(--font);color:var(--rv-ink-soft)}
+.sp-preset-no{font:700 11.5px/1 var(--font);color:var(--rv-red)}
+.sp-c-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.sp-btn{font:600 10.5px/1 var(--font);color:var(--rv-ink);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.sp-btn:hover{background:var(--rv-panel2)}
+.sp-btn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed;background:var(--rv-card)}
+.sp-btn-danger{color:oklch(0.42 0.15 30);border-color:oklch(0.52 0.16 30 / .45)}
+.sp-btn-primary{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.sp-btn-primary:disabled{background:var(--rv-dim3);border-color:var(--rv-dim3);color:#f0ece2}
+.sp-lbl{display:none}
+
+.sp-loading,.sp-errbox,.sp-empty-row{padding:36px 20px;text-align:center;color:var(--rv-muted);
+    font:400 12px/1.6 var(--font)}
+.sp-errbox .t{font:600 14px/1.4 var(--font);color:var(--rv-ink);margin-bottom:6px}
+.sp-errbox .d{font:400 12px/1.6 var(--font);color:var(--rv-muted);max-width:440px;margin:0 auto 10px}
+.sp-errbox a,.sp-errbox button{display:inline-block;padding:8px 16px;border-radius:6px;background:var(--rv-ink);
+    color:var(--rv-canvas);font:500 12px/1 var(--font);border:0;cursor:pointer;text-decoration:none}
+
+/* ── ④ 하단 2단 ── */
+.sp-footpanels{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 18px 0}
+.sp-panel{border:1px solid rgba(0,0,0,.12);background:var(--rv-card);border-radius:8px;padding:13px 15px}
+.sp-panel-warn{border-color:oklch(0.62 0.15 55 / .45);background:oklch(0.97 0.03 70 / .5)}
+.sp-panel-t{font:600 11px/1 var(--font);color:var(--rv-faint);letter-spacing:.03em;margin-bottom:9px}
+.sp-panel .q{font:600 12px/1.5 var(--font);color:var(--rv-ink);margin-bottom:6px}
+.sp-panel p{margin:0 0 5px;font:400 11px/1.65 var(--font);color:var(--rv-ink-soft)}
+.sp-panel p:last-child{margin-bottom:0}
+
+.sp-footnote{flex:none;margin:14px 18px 18px;border-top:1px solid rgba(0,0,0,.09);padding-top:10px;
+    font:400 10.5px/1.6 var(--font);color:var(--rv-faint)}
+.sp-footnote b{color:var(--rv-ink-soft);font-weight:600}
+
+/* ── ⑤ 모달(수정 · 중지 확인 공용) ── */
+.sp-modal-overlay{position:fixed;inset:0;background:rgba(38,35,30,.34);display:flex;align-items:center;
+    justify-content:center;z-index:50;padding:20px}
+.sp-modal-overlay[hidden]{display:none}
+.sp-modal{width:560px;max-width:100%;max-height:calc(100vh - 40px);overflow:auto;background:var(--rv-card);
+    border-radius:11px;box-shadow:0 24px 60px rgba(38,35,30,.34)}
+.sm-hd{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:flex-start;gap:10px}
+.sm-title{font:600 14px/1.4 var(--font);color:var(--rv-ink);flex:1;min-width:0}
+.sm-title .tag{display:block;font:500 11px/1.6 var(--font);color:var(--rv-muted);margin-top:3px}
+.sm-idtag{flex:none;margin-top:2px;font:500 10px/1 var(--font-num);color:var(--rv-faint);
+    border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:4px 7px}
+.sm-close{flex:none;font:400 16px/1 var(--font);color:var(--rv-faint);cursor:pointer;background:none;border:0}
+.sm-body{padding:15px 18px;display:flex;flex-direction:column;gap:13px}
+.sm-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.sm-card{border:1px solid rgba(0,0,0,.13);background:var(--rv-panel2);border-radius:8px;padding:12px}
+.sm-card .n{font:700 22px/1 var(--font-num);color:var(--rv-ink)}
+.sm-card .l{font:500 10px/1.4 var(--font);color:var(--rv-faint);margin-top:7px}
+.sm-card.danger{border:1.5px solid oklch(0.52 0.16 30 / .55);background:oklch(0.96 0.025 30)}
+.sm-card.danger .n{color:oklch(0.42 0.15 30)}
+.sm-callout{border:1px solid oklch(0.52 0.16 30 / .4);border-left:3px solid oklch(0.52 0.16 30);
+    background:oklch(0.97 0.02 30);border-radius:7px;padding:11px 13px}
+.sm-callout .q{font:600 12px/1.5 var(--font);color:oklch(0.42 0.15 30);margin-bottom:5px}
+.sm-callout .d{font:400 11px/1.65 var(--font);color:#4a463e}
+.sm-result{font:400 11.5px/1.7 var(--font);color:var(--rv-ink-soft)}
+.sm-result b{color:var(--rv-ink)}
+.sm-loading,.sm-err{padding:22px 10px;text-align:center;font:400 12px/1.6 var(--font);color:var(--rv-muted)}
+.sm-err{color:oklch(0.42 0.15 30)}
+.sm-foot{border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:9px;
+    background:var(--rv-panel);flex-wrap:wrap}
+.sm-foot .note{font:400 10.3px/1.4 var(--font);color:var(--rv-faint);flex:1;min-width:140px;text-align:right}
+.sm-formfield{display:flex;flex-direction:column;gap:5px}
+.sm-formfield label{font:600 10.5px/1 var(--font);color:var(--rv-muted)}
+.sm-formfield input{font:500 12.5px/1 var(--font);color:var(--rv-ink);background:var(--rv-canvas);
+    border:1px solid rgba(0,0,0,.24);border-radius:6px;padding:9px 10px;outline:none}
+.sm-inlineerr{font:400 11px/1.6 var(--font);color:oklch(0.42 0.15 30)}
+.sm-inlinenote{font:400 11px/1.6 var(--font);color:var(--rv-muted)}
+
+@media (max-width:768px){
+  .sp-register-row{flex-direction:column;align-items:stretch}
+  .sp-field,.sp-btn-register{width:100%}
+  .sp-footpanels{grid-template-columns:1fr}
+  .sp-thead{display:none}
+  .sp-row{grid-template-columns:1fr!important;row-gap:6px;padding:12px 13px}
+  .sp-row > *{width:100%}
+  .sp-lbl{display:inline-block;font:600 9.5px/1 var(--font);color:var(--rv-faint);width:78px;flex:none}
+  .sp-c-platform,.sp-c-brands,.sp-c-status,.sp-c-linked,.sp-c-preset{display:flex;align-items:center;gap:8px}
+  .sp-c-files{display:flex;align-items:center;gap:8px}
+  .sp-c-actions{justify-content:flex-start}
+  .sm-cards{grid-template-columns:1fr}
+  .sp-modal{width:100%}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="sp-headbadge">등록 · 수정 · 중지 — 삭제는 없습니다</span>
+{% endblock %}
+
+{% block content %}
+<div class="sp-page" data-screen-id="ADM-SRC-030" data-domain="suppliers">
+
+  <!-- ① 등록줄 -->
+  <div class="sp-register" data-keep="1">
+    <div class="sp-register-hd">
+      <span class="sp-register-title">새 공급처 등록</span>
+      <span class="sp-register-sub">이름만 필수 — 플랫폼·브랜드는 나중에 수정할 수 있습니다 · 상태는 활성으로 만들어집니다</span>
+    </div>
+    <div class="sp-register-row">
+      <div class="sp-field sp-f-name">
+        <label for="spName">이름<span class="req">*</span></label>
+        <input id="spName" type="text" maxlength="100" placeholder="예: 이엠텍" autocomplete="off">
+      </div>
+      <div class="sp-field sp-f-platform">
+        <label for="spPlatform">플랫폼</label>
+        <input id="spPlatform" type="text" maxlength="50" placeholder="예: 다나와" autocomplete="off">
+      </div>
+      <div class="sp-field sp-f-brands">
+        <label for="spBrands">취급 브랜드</label>
+        <input id="spBrands" type="text" maxlength="200" placeholder="예: MSI, GIGABYTE" autocomplete="off">
+      </div>
+      <button type="button" class="sp-btn-register" id="spRegisterBtn" data-action="register">등록</button>
+    </div>
+    <div class="sp-notice sp-notice-ok" id="spOkNotice" hidden></div>
+    <div class="sp-notice sp-notice-dup" id="spDupNotice" hidden></div>
+  </div>
+
+  <!-- ② 집계 줄 -->
+  <div class="sp-summary" id="spSummary">
+    <span class="sp-sum-main" id="spSummaryMain">불러오는 중…</span>
+    <span class="sp-sum-note">연결 상품 수 · 단가표 파일 수는 서버가 센 값입니다</span>
+  </div>
+
+  <!-- 빈 상태(활성 0) 배너 -->
+  <div class="sp-emptybanner" id="spEmptyBanner" hidden></div>
+
+  <!-- ③ 목록 -->
+  <div class="sp-listcol">
+    <div class="sp-thead sp-grid-cols">
+      <span>이름(+ id)</span><span>플랫폼</span><span>취급 브랜드</span><span>상태</span>
+      <span>연결 상품</span><span>단가표 파일</span><span>파서 프리셋</span><span>작업</span>
+    </div>
+    <div class="sp-tbody" id="spTbody">
+      <div class="sp-loading">불러오는 중…</div>
+    </div>
+  </div>
+
+  <!-- ④ 하단 2단 -->
+  <div class="sp-footpanels">
+    <div class="sp-panel sp-panel-warn">
+      <div class="sp-panel-t">파서 프리셋 경고</div>
+      <div class="q" id="spPresetWarnLine">파서 프리셋이 없는 공급처 <span id="spPresetWarnCount">—</span>곳 —
+        「단가표 일일 반영」을 쓸 수 없습니다</div>
+      <p>프리셋(파일명 인식 규칙 · 열 매핑)을 만드는 화면·API가 코드 전체에 없습니다.</p>
+      <p>여기서 등록해도 누군가 DB 에 직접 넣어야 그 공급처의 단가표를 반영할 수 있습니다 —
+        이 화면은 그 경로를 제공하지 않습니다(사장님 결정 1).</p>
+    </div>
+    <div class="sp-panel">
+      <div class="sp-panel-t">이 목록이 판단하지 않는 것</div>
+      <p>연결 0건 · 파일 0건인 공급처는 아직 실사용 흔적이 없다는 사실만 보여줍니다.</p>
+      <p>점검용인지 실거래처인지 화면이 단정하지 않습니다 — 정리 여부는 사람이 정합니다(사장님 결정 2).</p>
+    </div>
+  </div>
+
+  <div class="sp-footnote"><b>삭제 → 없습니다</b>(참조 테이블 6개, 원장 보존). 활성 ↔ 중지 상태 전이만 가능합니다.</div>
+</div>
+
+<div class="sp-modal-overlay" id="spModalOverlay" hidden>
+  <div class="sp-modal" id="spModal" data-keep="1"></div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  'use strict';
+
+  var S = {
+    loadErr: null,
+    data: null,
+    modal: null   // {kind:'edit'|'deactivate', id, ...}
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  // 못 잰 값(null/undefined)은 0이 아니라 "못 쟀음"이라고 말한다 — 이 화면의 카운트는
+  // 전부 COUNT(*) 기반이라 실제로는 거의 발생하지 않지만, 다른 화면과 같은 관행을 지킨다.
+  function fmt(n) { return (n === null || n === undefined) ? '못 쟀음' : Number(n).toLocaleString('ko-KR'); }
+
+  // 한글 받침 유무로 을/를을 고른다. 한글 음절이 아닌 문자(영문·괄호·숫자 등)로 끝나면
+  // 받침 판정이 안 되므로 관용적으로 '를'을 쓴다 — 완벽하지 않은 근사다(검증 대상).
+  function josaUl(name) {
+    var s = String(name || '');
+    var ch = s.length ? s.charCodeAt(s.length - 1) : 0;
+    if (ch >= 0xAC00 && ch <= 0xD7A3) {
+      return ((ch - 0xAC00) % 28 === 0) ? '를' : '을';
+    }
+    return '를';
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiCall(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+
+  function canWrite() { return !!(window.Admin2Shell && window.Admin2Shell.canWrite('operator')); }
+  function toast(msg, kind) { if (window.Admin2Shell) window.Admin2Shell.toast(msg, kind); }
+
+  // ── 목록 로드 ────────────────────────────────────────────────────
+  function loadList() {
+    return apiGet('/api/admin/suppliers').then(function (j) {
+      S.data = j; S.loadErr = null; renderAll();
+    }).catch(function (err) {
+      S.data = null; S.loadErr = err; renderAll();
+    });
+  }
+
+  function findItem(id) {
+    if (!S.data) return null;
+    var out = null;
+    S.data.items.forEach(function (it) { if (it.id === id) out = it; });
+    return out;
+  }
+
+  function renderAll() {
+    renderSummary();
+    renderEmptyBanner();
+    renderTable();
+    renderFootPanel();
+  }
+
+  function renderSummary() {
+    var el = $('spSummaryMain');
+    if (S.loadErr) { el.textContent = '집계를 불러오지 못했습니다'; return; }
+    if (!S.data) { el.textContent = '불러오는 중…'; return; }
+    el.textContent = '공급처 ' + fmt(S.data.total) + '곳 · 활성 ' + fmt(S.data.active)
+      + ' · 중지 ' + fmt(S.data.inactive);
+  }
+
+  function renderEmptyBanner() {
+    var box = $('spEmptyBanner');
+    if (!S.data || !S.data.empty) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    // note는 서버가 판정해 준 문구를 그대로 쓴다 — 화면이 다시 쓰지 않는다.
+    box.innerHTML = '<span class="mk">!</span><div class="bd">'
+      + '<div class="t">활성 공급처가 없습니다</div>'
+      + '<div class="d">' + esc(S.data.note) + '</div>'
+      + '<button type="button" class="sp-btn sp-btn-primary cta" data-action="focus-register">'
+      + '위 등록줄에서 등록하기</button></div>';
+  }
+
+  function renderFootPanel() {
+    $('spPresetWarnCount').textContent = S.data ? fmt(S.data.no_preset_count) : '—';
+  }
+
+  // ── 표 ──────────────────────────────────────────────────────────
+  function rowHtml(it) {
+    var inactive = it.status === '중지';
+    var unused = it.linked_products === 0 && it.price_files === 0;
+    var cls = 'sp-row sp-grid-cols' + (inactive ? ' inactive' : '') + (unused ? ' unused' : '');
+    var writeAllowed = canWrite();
+    var dis = writeAllowed ? '' : ' disabled title="운영자 이상만 바꿀 수 있습니다"';
+    var actions;
+    if (inactive) {
+      actions = '<button type="button" class="sp-btn sp-btn-primary" data-action="reactivate" data-id="'
+        + it.id + '"' + dis + '>활성으로</button>';
+    } else {
+      actions = '<button type="button" class="sp-btn" data-action="open-edit" data-id="' + it.id + '"'
+        + dis + '>수정</button>'
+        + '<button type="button" class="sp-btn sp-btn-danger" data-action="open-deactivate" data-id="'
+        + it.id + '"' + dis + '>중지</button>';
+    }
+    var presetHtml = it.preset_count > 0
+      ? '<span class="sp-preset-yes">있음</span>'
+      : '<span class="sp-preset-no">없음 ✕</span>';
+    var badgeHtml = inactive
+      ? '<span class="sp-badge sp-badge-off">중지</span>'
+      : '<span class="sp-badge sp-badge-on">활성</span>';
+    var platform = it.platform ? esc(it.platform) : '—';
+    var brands = it.brands ? esc(it.brands) : '—';
+    return '<div class="' + cls + '" data-id="' + it.id + '">'
+      + '<div class="sp-c-name"><span class="sp-name" title="' + esc(it.name) + '">' + esc(it.name) + '</span>'
+      +   '<span class="sp-idtag">id ' + it.id + '</span></div>'
+      + '<div class="sp-c-platform"><span class="sp-lbl">플랫폼</span><span title="' + platform + '">' + platform + '</span></div>'
+      + '<div class="sp-c-brands"><span class="sp-lbl">취급 브랜드</span><span title="' + brands + '">' + brands + '</span></div>'
+      + '<div class="sp-c-status"><span class="sp-lbl">상태</span>' + badgeHtml + '</div>'
+      + '<div class="sp-c-linked"><span class="sp-lbl">연결 상품</span><span class="num">' + fmt(it.linked_products) + '</span></div>'
+      + '<div class="sp-c-files"><span class="sp-lbl">단가표 파일</span><span class="num">' + fmt(it.price_files) + '</span></div>'
+      + '<div class="sp-c-preset"><span class="sp-lbl">파서 프리셋</span>' + presetHtml + '</div>'
+      + '<div class="sp-c-actions">' + actions + '</div>'
+      + '</div>';
+  }
+
+  function renderTable() {
+    var box = $('spTbody');
+    if (S.loadErr) {
+      var un = S.loadErr.status === 401;
+      box.innerHTML = '<div class="sp-errbox"><div class="t">' + (un ? '세션 만료' : '조회 실패') + '</div>'
+        + '<div class="d">' + (un ? '관리자 로그인 후 다시 조회합니다.'
+            : ('공급처 목록을 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>'
+        + (un ? '<a href="/admin/login.html">로그인</a>'
+              : '<button type="button" data-action="retry-load">다시 시도</button>') + '</div>';
+      return;
+    }
+    if (!S.data) { box.innerHTML = '<div class="sp-loading">불러오는 중…</div>'; return; }
+    if (!S.data.items.length) {
+      box.innerHTML = '<div class="sp-empty-row">표시할 공급처가 없습니다.</div>';
+      return;
+    }
+    box.innerHTML = S.data.items.map(rowHtml).join('');
+  }
+
+  // ── ① 등록 ──────────────────────────────────────────────────────
+  function regValues() {
+    return {
+      name: ($('spName').value || '').trim(),
+      platform: ($('spPlatform').value || '').trim(),
+      brands: ($('spBrands').value || '').trim()
+    };
+  }
+  function clearRegNotices() {
+    $('spOkNotice').hidden = true; $('spOkNotice').innerHTML = '';
+    $('spDupNotice').hidden = true; $('spDupNotice').innerHTML = '';
+  }
+  function syncRegisterBtn(busy) {
+    $('spRegisterBtn').disabled = !regValues().name || !!busy;
+  }
+  function renderOkNotice(note) {
+    var box = $('spOkNotice');
+    box.hidden = false;
+    box.innerHTML = '<span class="mk">✓</span><div class="bd">' + esc(note) + '</div>';
+  }
+  function renderDupNotice(detail) {
+    var box = $('spDupNotice');
+    box.hidden = false;
+    if (detail && typeof detail === 'object' && detail.error === 'duplicate_name') {
+      var isInactive = detail.status === '중지';
+      var html = '<span class="mk">✕</span><div class="bd">';
+      html += '<div>이미 있는 공급처입니다 — <b>' + esc(detail.name) + '</b> '
+        + '<span class="sp-badge ' + (isInactive ? 'sp-badge-off' : 'sp-badge-on') + '">' + esc(detail.status) + '</span> '
+        + '<span class="sp-idtag">id ' + detail.supplier_id + '</span></div>';
+      if (isInactive) {
+        html += '<div class="q" style="margin-top:8px">「중지 상태입니다 — 새로 만들지 말고 되살리세요.」</div>'
+          + '<div>되살리면 이미 연결된 매입가·단가표가 그대로 이어집니다.</div>'
+          + '<div class="sp-notice-actions">'
+          + '<button type="button" class="sp-btn sp-btn-primary" data-action="revive-dup" data-id="'
+          +   detail.supplier_id + '" data-name="' + esc(detail.name) + '" data-platform="'
+          +   esc(detail.platform || '') + '" data-brands="' + esc(detail.brands || '') + '">'
+          +   '이 공급처를 활성으로 되돌리기</button>'
+          + '<button type="button" class="sp-btn" data-action="fix-name">이름 고치기</button></div>';
+      } else {
+        html += '<div style="margin-top:6px">이미 활성 상태인 공급처입니다 — 위 목록에서 확인하세요.</div>'
+          + '<div class="sp-notice-actions"><button type="button" class="sp-btn" data-action="fix-name">이름 고치기</button></div>';
+      }
+      html += '</div>';
+      box.innerHTML = html;
+    } else {
+      // 동시 등록으로 유니크 인덱스가 먼저 잡은 경우 — 서버가 문자열 하나만 준다
+      // (누구와 부딪혔는지 이 화면이 추측하지 않는다).
+      var msg = (typeof detail === 'string' && detail) ? detail : '이미 있는 공급처입니다';
+      box.innerHTML = '<span class="mk">✕</span><div class="bd">' + esc(msg)
+        + '<div class="sp-notice-actions"><button type="button" class="sp-btn" data-action="fix-name">이름 고치기</button></div></div>';
+    }
+  }
+
+  function doRegister() {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: operator 이상)', 'err'); return; }
+    var v = regValues();
+    if (!v.name) return;
+    clearRegNotices();
+    syncRegisterBtn(true);
+    apiCall('POST', '/api/admin/suppliers',
+      { name: v.name, platform: v.platform || null, brands: v.brands || null })
+      .then(function (res) {
+        renderOkNotice(res.note || (v.name + ' 등록했습니다'));
+        $('spName').value = ''; $('spPlatform').value = ''; $('spBrands').value = '';
+        syncRegisterBtn(false);
+        return loadList();
+      })
+      .catch(function (err) {
+        syncRegisterBtn(false);
+        if (err.status === 409) {
+          renderDupNotice(err.body && err.body.detail);
+        } else {
+          toast(err.message, 'err');
+        }
+      });
+  }
+
+  function reviveDup(id, name, platform, brands) {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: operator 이상)', 'err'); return; }
+    apiCall('PATCH', '/api/admin/suppliers/' + id,
+      { name: name, platform: platform || null, brands: brands || null, status: '활성' })
+      .then(function (res) {
+        toast(res.note || '활성으로 되돌렸습니다', 'ok');
+        clearRegNotices();
+        $('spName').value = ''; $('spPlatform').value = ''; $('spBrands').value = '';
+        syncRegisterBtn(false);
+        return loadList();
+      })
+      .catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── ⑤ 모달 — 수정 / 중지 확인 공용 ────────────────────────────────
+  function closeModal() { S.modal = null; $('spModalOverlay').hidden = true; $('spModal').innerHTML = ''; }
+
+  function openEditModal(id) {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: operator 이상)', 'err'); return; }
+    var it = findItem(id); if (!it) return;
+    S.modal = { kind: 'edit', id: id, status: it.status,
+                name: it.name, platform: it.platform || '', brands: it.brands || '',
+                busy: false, err: null };
+    $('spModalOverlay').hidden = false;
+    renderModal();
+  }
+
+  function openDeactivateModal(id) {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: operator 이상)', 'err'); return; }
+    var it = findItem(id); if (!it) return;
+    S.modal = { kind: 'deactivate', id: id, name: it.name, platform: it.platform, brands: it.brands,
+                impact: null, impactErr: null, busy: false };
+    $('spModalOverlay').hidden = false;
+    renderModal();
+    apiGet('/api/admin/suppliers/' + id + '/impact')
+      .then(function (res) {
+        if (!S.modal || S.modal.kind !== 'deactivate' || S.modal.id !== id) return;
+        S.modal.impact = res; renderModal();
+      })
+      .catch(function (err) {
+        if (!S.modal || S.modal.kind !== 'deactivate' || S.modal.id !== id) return;
+        S.modal.impactErr = err.message; renderModal();
+      });
+  }
+
+  function renderModal() {
+    var m = S.modal; if (!m) return;
+    $('spModal').innerHTML = (m.kind === 'edit') ? editModalHtml(m) : deactivateModalHtml(m);
+  }
+
+  function editModalHtml(m) {
+    var html = '<div class="sm-hd"><div class="sm-title">' + esc(m.name) + ' 수정</div>'
+      + '<span class="sm-idtag">id ' + m.id + '</span>'
+      + '<button type="button" class="sm-close" data-action="close-modal" aria-label="닫기">✕</button></div>';
+    html += '<div class="sm-body">';
+    if (m.err) html += '<div class="sm-inlineerr">' + esc(m.err) + '</div>';
+    html += '<div class="sm-formfield"><label for="smName">이름</label>'
+      + '<input id="smName" type="text" maxlength="100" value="' + esc(m.name) + '"></div>';
+    html += '<div class="sm-formfield"><label for="smPlatform">플랫폼</label>'
+      + '<input id="smPlatform" type="text" maxlength="50" value="' + esc(m.platform) + '"></div>';
+    html += '<div class="sm-formfield"><label for="smBrands">취급 브랜드</label>'
+      + '<input id="smBrands" type="text" maxlength="200" value="' + esc(m.brands) + '"></div>';
+    html += '<div class="sm-inlinenote">상태 변경은 목록의 [중지]/[활성으로] 버튼을 씁니다 — 여기서는 바꾸지 않습니다.</div>';
+    html += '</div>';
+    html += '<div class="sm-foot">'
+      + '<button type="button" class="sp-btn" data-action="close-modal">취소</button>'
+      + '<button type="button" class="sp-btn sp-btn-primary" data-action="save-edit"'
+      + (m.busy ? ' disabled' : '') + '>저장</button>'
+      + '<span class="note">' + (m.busy ? '저장하는 중…' : '') + '</span></div>';
+    return html;
+  }
+
+  function deactivateModalHtml(m) {
+    var html = '<div class="sm-hd"><div class="sm-title">「' + esc(m.name) + josaUl(m.name) + ' 중지하기 전에」'
+      + '<span class="tag">「삭제가 아닙니다 — 언제든 되돌립니다」</span></div>'
+      + '<span class="sm-idtag">id ' + m.id + '</span>'
+      + '<button type="button" class="sm-close" data-action="close-modal" aria-label="닫기">✕</button></div>';
+    html += '<div class="sm-body">';
+    if (m.impactErr) {
+      html += '<div class="sm-err">영향을 불러오지 못했습니다 — ' + esc(m.impactErr) + '</div>';
+    } else if (!m.impact) {
+      html += '<div class="sm-loading">영향을 확인하는 중…</div>';
+    } else {
+      var im = m.impact;
+      html += '<div class="sm-cards">'
+        + '<div class="sm-card"><div class="n">' + fmt(im.linked_products) + '건</div><div class="l">연결된 매입가</div></div>'
+        + '<div class="sm-card"><div class="n">' + fmt(im.price_files) + '건</div><div class="l">업로드된 단가표 파일</div></div>'
+        + '<div class="sm-card danger"><div class="n">' + fmt(im.sole_source_products) + '개</div>'
+        +   '<div class="l">이 공급처가 «유일한» 매입처인 상품</div></div></div>';
+      if (im.sole_source_products > 0) {
+        html += '<div class="sm-callout"><div class="q">「상품 ' + fmt(im.sole_source_products)
+          + '개는 이 공급처가 «유일한» 매입처입니다」</div>'
+          + '<div class="d">중지하면 이 상품들은 새 매입가를 넣을 곳이 없어집니다 —'
+          + ' 판매가 산정의 근거도 함께 끊깁니다.</div></div>';
+      }
+      html += '<div class="sm-result"><b>중지하면:</b> 새 매입가 입력의 선택지에서 빠집니다.<br>'
+        + '<b>이미 연결된 매입가 ' + fmt(im.linked_products) + '건과 단가표 파일 ' + fmt(im.price_files)
+        + '건은 그대로 남습니다</b> — 과거 기록은 지워지지 않습니다.</div>';
+    }
+    html += '</div>';
+    var canConfirm = !!m.impact && !m.impactErr && !m.busy;
+    html += '<div class="sm-foot">'
+      + '<button type="button" class="sp-btn" data-action="close-modal">그만두기</button>'
+      + '<button type="button" class="sp-btn sp-btn-danger" data-action="confirm-deactivate"'
+      + (canConfirm ? '' : ' disabled') + '>중지로 바꿉니다</button>'
+      + '<span class="note">되돌리기는 목록의 「활성으로」 버튼 한 번입니다</span></div>';
+    return html;
+  }
+
+  function saveEdit() {
+    var m = S.modal; if (!m || m.kind !== 'edit') return;
+    var name = ($('smName').value || '').trim();
+    var platform = ($('smPlatform').value || '').trim();
+    var brands = ($('smBrands').value || '').trim();
+    if (!name) { m.err = '공급처 이름을 입력하세요'; renderModal(); return; }
+    m.busy = true; m.err = null; renderModal();
+    apiCall('PATCH', '/api/admin/suppliers/' + m.id,
+      { name: name, platform: platform || null, brands: brands || null, status: m.status })
+      .then(function (res) {
+        toast(res.note || '저장했습니다', 'ok');
+        closeModal();
+        loadList();
+      })
+      .catch(function (err) {
+        m.busy = false;
+        var d = err.body && err.body.detail;
+        m.err = (d && typeof d === 'object' && d.message) ? d.message : err.message;
+        renderModal();
+      });
+  }
+
+  function confirmDeactivate() {
+    var m = S.modal; if (!m || m.kind !== 'deactivate' || !m.impact) return;
+    m.busy = true; renderModal();
+    apiCall('PATCH', '/api/admin/suppliers/' + m.id,
+      { name: m.name, platform: m.platform || null, brands: m.brands || null, status: '중지' })
+      .then(function (res) {
+        toast(res.note || '중지했습니다', 'ok');
+        closeModal();
+        loadList();
+      })
+      .catch(function (err) {
+        m.busy = false;
+        toast(err.message, 'err');
+        renderModal();
+      });
+  }
+
+  function reactivate(id) {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: operator 이상)', 'err'); return; }
+    var it = findItem(id); if (!it) return;
+    apiCall('PATCH', '/api/admin/suppliers/' + id,
+      { name: it.name, platform: it.platform || null, brands: it.brands || null, status: '활성' })
+      .then(function (res) {
+        toast(res.note || '활성으로 되돌렸습니다', 'ok');
+        loadList();
+      })
+      .catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // ── 이벤트 ──────────────────────────────────────────────────────
+  function bind() {
+    $('spName').addEventListener('input', function () { clearRegNotices(); syncRegisterBtn(false); });
+    $('spPlatform').addEventListener('input', clearRegNotices);
+    $('spBrands').addEventListener('input', clearRegNotices);
+    $('spName').addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); doRegister(); }
+    });
+
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest('[data-action]');
+      if (!t) return;
+      var act = t.getAttribute('data-action');
+      switch (act) {
+        case 'register': doRegister(); break;
+        case 'retry-load': loadList(); break;
+        case 'focus-register':
+          $('spName').scrollIntoView({ block: 'center', behavior: 'smooth' });
+          $('spName').focus();
+          break;
+        case 'fix-name':
+          clearRegNotices();
+          $('spName').focus(); $('spName').select();
+          break;
+        case 'revive-dup':
+          reviveDup(Number(t.getAttribute('data-id')), t.getAttribute('data-name'),
+                    t.getAttribute('data-platform'), t.getAttribute('data-brands'));
+          break;
+        case 'open-edit': openEditModal(Number(t.getAttribute('data-id'))); break;
+        case 'open-deactivate': openDeactivateModal(Number(t.getAttribute('data-id'))); break;
+        case 'reactivate': reactivate(Number(t.getAttribute('data-id'))); break;
+        case 'close-modal': closeModal(); break;
+        case 'save-edit': saveEdit(); break;
+        case 'confirm-deactivate': confirmDeactivate(); break;
+        default: break;
+      }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && S.modal) closeModal();
+    });
+  }
+
+  function boot() {
+    bind();
+    syncRegisterBtn(false);
+    if (window.Admin2Shell) window.Admin2Shell.meReady.then(function () { renderTable(); });
+    loadList();
+  }
+
+  boot();
+})();
+</script>
+{% endblock %}
