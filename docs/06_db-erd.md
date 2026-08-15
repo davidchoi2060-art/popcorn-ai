@@ -1059,3 +1059,205 @@ DB화될 자리는 AI 연동 설정(ADM-AI-040)이다.
 재개 시 그대로 살아나므로, 채워지지 않은 상태를 지어낸 기본값이 아니라 NULL로
 정직하게 남긴다. "과거 버전" 목록은 화면이 `admin_operator_activity_logs`의 실제
 변경 이력에서 파생한다(카탈로그 테이블 없음).
+
+---
+
+## 15. [11차 개정] 관리자 세션 — 접속 IP 기록 · 기기 기억(device trust) (2026-08-15)
+
+사장님이 같은 날 세 가지를 지시했는데, **스키마에 닿는 것은 이 중 둘뿐**이다:
+
+    유휴 8시간   세션이 자주 안 끊기게      api/auth.py IDLE_MINUTES 상수 변경뿐
+                                          — 스키마 변경 없음(이 문서의 범위 밖)
+    IP 기록      감사 기록                  §A (아래) — 컬럼은 이미 있었다, 이번에 채우기 시작
+    기기 기억    비밀번호를 덜 치게          §B (아래) — 이번에 신설
+
+### §A. admin_sessions.login_ip — 뒤늦은 문서화 (컬럼은 2026-08-14 이미 생김)
+
+마이그레이션 0049(`db/migrations/versions/0049_admin_session_login_ip.py`,
+2026-08-14 적용됨)가 `admin_sessions.login_ip INET`을 이미 추가했지만 **이
+문서에는 반영되지 않았다** — §3.9(admin_sessions 원 정의, 2026-07-26 스냅샷)
+이후로 이 표에 생긴 컬럼 변경이 여기 없었다(그 사이 슬라이스 70이 추가한
+`admin_operators.password_hash` 등도 마찬가지로 문서화되지 않은 채였다 —
+이번 개정은 그것까지 되짚지는 않는다, 별도 확인 필요). 이번 작업(§B)이 같은
+표를 또 확장하면서 이 사실을 뒤늦게 남긴다.
+
+```sql
+-- 0049(2026-08-14, 이미 적용됨) — 자리만 만든다. 기존 행은 전부 NULL(모르는
+-- 과거 접속지를 지어내지 않는다). 채우는 코드(아래)는 이 리비전과 별개로 이번에 들어간다.
+ALTER TABLE admin_sessions ADD COLUMN login_ip INET;
+```
+
+**계약**: ① **기록만 한다 — 차단하지 않는다**(사장님 확정: "먼저 IP를 기록부터").
+② 값은 `api/auth._client_ip()`가 고른다 — `request.client.host`를 그대로 쓴다
+(운영 배포는 uvicorn `--proxy-headers --forwarded-allow-ips=127.0.0.1`라 nginx를
+거치며 이미 실제 클라이언트 IP로 치환돼 있다 — 애플리케이션이 `X-Forwarded-For`를
+또 읽으면 그 신뢰 검증을 우회하는 것이라 하지 않는다). ③ IP를 못 알아내거나 형식이
+안 맞으면(`inet` 타입이라 형식이 틀리면 INSERT 자체가 실패한다) **NULL로 남기고
+로그인은 그대로 진행한다** — 부가 기록 때문에 로그인이 막히면 안 된다.
+
+### §B. admin_operator_devices · admin_sessions.password_verified — 기기 기억
+
+**✅ 이 절이 다루는 스키마는 2026-08-15 DB에 적용됐다**(기록자 확인 — 아래
+확인법). 작성 시점에는 공유 Cloud SQL에 대한 DDL 실행이 하네스 권한 분류기에
+막혀 있었다(`CLAUDE.md` "`.env`의 `DATABASE_URL`이 Cloud SQL이라 로컬과 배포가
+DB를 공유한다"와 같은 이유로 신중을 요구한 것) — 그 뒤 같은 날 사람 승인을 거쳐
+`alembic upgrade head`가 실제로 실행됐다. `api/auth._schema_ready()`가 이제 이
+스키마를 "있음"으로 판정하므로 아래 계약이 실제로 살아 있다(로그인 자체는 이
+스키마와 무관하게 항상 동작한다 — 아래 계약 ⑥).
+
+**확인법(2026-08-15, `api.db.engine`으로 직접 SELECT·읽기 전용)**:
+`SELECT version_num FROM alembic_version` → `0051` ·
+`SELECT to_regclass('admin_operator_devices')` → NULL 아님 ·
+`information_schema.columns`에 `admin_sessions.password_verified` 존재.
+⚠ **이 절은 오늘 우선 이 문서에 "미적용"으로 초안이 잡혔다가, 실제로는 적용된
+뒤에도 그 문구가 그대로 남아 있었다** — 신설 직후 상태를 적으면 이렇게
+바로 낡는다. 다음에 스키마 절을 쓸 때는 "지금 적용됐는가"를 문구가 아니라
+위와 같은 직접 조회로 확인한다.
+
+```sql
+-- 0051 (db/migrations/versions/0051_admin_operator_devices.py, 2026-08-15 적용됨)
+CREATE TABLE admin_operator_devices (
+  device_id     VARCHAR(32) PRIMARY KEY,      -- 셀렉터. 비밀이 아니다(아래 계약 ②)
+  operator_id   BIGINT NOT NULL REFERENCES admin_operators(operator_id),
+  token_hash    VARCHAR(255) NOT NULL,        -- scrypt(api/passwords.py) — 원문 저장 없음
+  user_agent    VARCHAR(300),
+  created_at    TIMESTAMP NOT NULL DEFAULT now(),
+  last_used_at  TIMESTAMP NOT NULL DEFAULT now(),
+  expires_at    TIMESTAMP NOT NULL,           -- 슬라이딩 30일(REMEMBER_DEVICE_DAYS)
+  revoked_at    TIMESTAMP                     -- 철회 — 삭제하지 않는다(감사)
+);
+CREATE INDEX idx_operator_devices_operator ON admin_operator_devices (operator_id, revoked_at);
+
+ALTER TABLE admin_sessions
+  ADD COLUMN password_verified BOOLEAN NOT NULL DEFAULT true;  -- 기본 true: 이 컬럼이
+  -- 생기기 전 세션은 전부 실제로 비밀번호 검증을 거쳤다(사실이지 지어낸 값이 아니다)
+```
+
+**왜 admin_sessions에 얹지 않고 새 표를 만드는가**: admin_sessions의 한 행은
+"로그인 한 번"이고 수명은 최대 8시간(`ABSOLUTE_HOURS`)이다. 기기 기억은 그보다
+훨씬 긴 수명(30일, 쓸 때마다 슬라이딩)을 가지며, 같은 기기가 시간이 지나며
+여러 세션을 반복해서 만들어낸다(1 기기 : N 세션). 한 표에 두 생명주기를
+담으면 `expires_at`이 "이 로그인은 8시간 뒤 끝난다"와 "이 기기는 30일 뒤 다시
+확인해야 한다"라는 서로 다른 두 의미를 동시에 져야 하고, "기기를 잊는 것"과
+"지금 세션을 끊는 것"의 경계도 모호해진다(실제로는 다른 일이다 — 기기를 잊어도
+지금 열려 있는 세션은 그대로 산다). 근거 상세는 마이그레이션 파일 docstring 참조.
+
+**계약**: ① 셀렉터(`device_id`, 비밀 아님)+검증값(`token_hash`, scrypt 해시)
+패턴 — 쿠키에는 `device_id:secret`(평문 secret)이 담기지만 DB는 해시만 갖는다.
+같은 입력도 scrypt는 매번 다른 salt로 다른 해시를 내므로 `token_hash`로 직접
+WHERE 조회는 불가능하다 — 그래서 `device_id`로 먼저 행을 찾고 `secret`은
+애플리케이션에서 `verify_password()`로 대조한다(비밀번호와 같은 해시 방식,
+새로 발명하지 않는다).
+② `device_id`는 노출해도 안전하다 — 그것만으로는 로그인할 수 없다
+(`api/admin_profile.py`의 기기 목록 응답이 그대로 낸다).
+③ **비밀번호 검증을 실제로 통과한 로그인에서만** 기기를 등록한다
+(`api/auth._remember_device()` — 부트스트랩·dev-login·기기 로그인 자체에서는
+등록하지 않는다). ④ 계정이 '정지'되면 다음 기기 로그인부터 자동으로 막힌다
+(매번 `admin_operators.status`를 조인해서 본다 — 별도 무효화 불필요).
+⑤ 비밀번호를 바꾸거나(`change_my_password`) owner가 재발급하면
+(`issue_password`) 그 계정의 기기 기억을 전부 철회한다(유출 의심 시나리오에서
+훔친 device 쿠키가 새 비밀번호 없이 계속 로그인을 만들어내는 것을 막는다).
+⑥ **스키마가 없어도 로그인은 깨지지 않는다** — `api/auth._schema_ready()`가
+`information_schema`를 1회 확인해 캐싱하고, 없으면 `password_verified` 관련
+SELECT/INSERT 절 자체를 아예 만들지 않는다(그 컬럼을 참조하는 SQL을 미적용
+DB에 보내면 "column does not exist"로 **모든** 로그인이 죽는다 — 인증은 이
+저장소에서 가장 되돌리기 비싼 실패 지점이라 가장 보수적으로 다룬다).
+⑦ `password_verified=false`인 세션(기기 기억으로 만든 세션)이 정책 발행급
+쓰기(`OWNER_WRITE_PREFIXES`, §3.9 이후 확장)를 시도하면 `POST
+/api/admin/auth/reauth`로 비밀번호를 한 번 더 확인해야 통과한다 — 통과하면
+그 세션이 `password_verified=true`로 승격되어 남은 세션 수명 동안 다시 묻지
+않는다.
+
+---
+
+## 16. [12차 개정] spec_fill_runs · product_sourcing_quotes.confirmed_at (2026-08-15, 둘 다 미적용)
+
+같은 날 신설된 마이그레이션 둘이 이 문서에 반영되지 않고 있었다(기록자 2026-08-15
+발견) — §15(0051)는 이미 이 문서에 있었는데 그 뒤에 생긴 0052·0053이 빠져 있었다.
+**통상 규약은 `CLAUDE.md`가 못박은 "스키마 변경은 ERD 개정 → 새 마이그레이션"
+순서인데, 이번엔 역순이 됐다** — 마이그레이션 파일이 먼저 생기고 이 문서가 뒤늦게
+따라간다.
+
+⚠⚠ **이 절이 다루는 스키마는 이 문서 작성 시점(2026-08-15)에 «둘 다» DB에
+적용되지 않았다**(기록자 확인, `api.db.engine`으로 직접 SELECT·읽기 전용:
+`to_regclass('spec_fill_runs')` → NULL · `product_sourcing_quotes`에
+`confirmed_at` 컬럼 없음). **§15(0051)와 헷갈리지 않는다** — 0051은 같은 날
+이미 적용까지 끝났지만(위 §15 확인법 참조), 0052·0053은 파일만 있다. 이유는
+같다: 공유 Cloud SQL에 대한 `alembic upgrade` 실행이 하네스 권한 분류기에
+막혀 있어, 화면·API 코드는 스키마 없이 먼저 "정직하게 실패하는 법"
+(`_schema_ready()` 패턴)을 갖춰 두고, 실제 DDL 실행은 사람 승인을 기다린다.
+`api/admin_spec_fill.py`·`api/admin_sourcing.py`가 각각 이 방식으로 존재 여부를
+매 요청 확인하고, 없으면 화면이 "0건"을 자신 있게 말하는 대신 그 사실을 그대로
+드러낸다.
+
+### §16-A. spec_fill_runs — 웹 사양 채움 실행 원장 (ADM-AI-020)
+
+```sql
+-- 0052 (db/migrations/versions/0052_spec_fill_runs.py, DBA 적용 대기)
+CREATE TABLE spec_fill_runs (
+  run_id           BIGSERIAL PRIMARY KEY,
+  field_name       VARCHAR(50) NOT NULL,
+  requested_count  INTEGER NOT NULL CHECK (requested_count BETWEEN 1 AND 500),
+  requested_by     BIGINT REFERENCES admin_operators(operator_id),
+  status           VARCHAR(20) NOT NULL DEFAULT '진행중'
+                     CHECK (status IN ('진행중', '완료', '실패', '응답없음')),
+  found_count      INTEGER,
+  not_found_count  INTEGER,
+  started_at       TIMESTAMP NOT NULL DEFAULT now(),
+  finished_at      TIMESTAMP,
+  note             TEXT,
+  created_at       TIMESTAMP NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_spec_fill_runs_started ON spec_fill_runs (started_at DESC);
+CREATE INDEX idx_spec_fill_runs_field ON spec_fill_runs (field_name);
+```
+
+**왜 필요한가**: "몇 번 돌았는지조차 아무도 모른다"가 실측 사실이었다
+(2026-08-15) — `spec_web_suggestions`(§3.14)에는 실행 단위 식별자가 없어
+9시간짜리 수집 구간이 1회인지 여러 번인지 시각 군집으로 짐작만 했다. 사람이
+지켜보지 않는 실행일수록 "언제·누가 요청·몇 건 찾음·몇 건 못 찾음"이 구조로
+남아야 한다 — 그게 이 표다.
+
+**계약**: ① `found_count`/`not_found_count`는 NULL = "아직 모른다"이지 0이
+아니다 — 0건 찾음과 "모름"은 다른 사실이다. ② **이 표에 실제로 쓰는 코드는
+아직 없다**(`api/admin_spec_fill.py`는 읽기만 한다) — 채움 담당을 API로 부를
+수 있는 독립 실행 경로가 없어서다(요구사항 정의서 `docs/design/req/
+req-spec-fill.md` §①, decision-log **A-47**). ③ `field_name`은
+`spec_web_suggestions.field_name`과 같은 규약으로 FK를 걸지 않는다(정의 테이블
+사정으로 원장 조회가 막히지 않게 — 그 표도 마찬가지 이유로 소프트 참조다).
+
+### §16-B. product_sourcing_quotes.confirmed_at — 매입 확정 시각 (ADM-SRC-010)
+
+```sql
+-- 0053 (db/migrations/versions/0053_sourcing_confirmed_at.py, DBA 적용 대기)
+ALTER TABLE product_sourcing_quotes
+  ADD COLUMN confirmed_at TIMESTAMP;
+
+CREATE INDEX idx_sourcing_quotes_confirmed_at
+  ON product_sourcing_quotes (confirmed_at)
+  WHERE confirmed_at IS NOT NULL;
+```
+
+**왜 필요한가**: 화면 헤더 「오늘 확정 {n}건」(`docs/design/spec-sourcing.md`)이
+`created_at`(견적을 처음 "요청"한 날짜)으로 세고 있었다 — 확인자 실측
+(2026-08-15): 상품 39948·45551을 당일 확정했는데도(활동 로그 sourcing_confirm
+2건, 07:09·07:22) done_today가 세 번 조회 모두 0이었다. §3.10의
+`confirm_quote()`(`api/admin_sourcing.py`)는 상태만 UPDATE하고 어떤 타임스탬프도
+남기지 않고, 같은 절의 `replied_at`은 "회신을 적은 시각"이라 대안이 못 된다
+(회신·확정이 다른 날일 수 있다).
+
+**계약**: ① `confirmed_at`은 nullable — 이 마이그레이션이 적용되기 «전에» 이미
+'확정' 상태였던 행(예: quote_id 2·6·8)은 정확히 언제 확정됐는지 모른다.
+**지어내지 않고 NULL로 남긴다**(§3.12 ④ "모르는 과거는 지어내지 않는다"와
+같은 원칙 — 이 문서가 이미 다른 표에 쓴 규칙을 이 컬럼에도 그대로 적용한다).
+적용 이후 `confirm_quote()`가 새로 확정하는 건부터 실제 시각이 찍힌다.
+② 부분 인덱스(`WHERE confirmed_at IS NOT NULL`)만 걸고 `status` 조건은 함께
+걸지 않는다 — status는 인덱스 후보 컬럼이 아니라 실제 쿼리의 상수 리터럴
+(`status='확정'`)이라, Postgres가 조건 포함(imply) 관계로 이 부분 인덱스를
+그대로 태울 수 있어서다.
+
+**확인법(공통, 0052·0053 둘 다)**: `SELECT version_num FROM alembic_version`이
+`0053`으로 올라갔는지, `to_regclass('spec_fill_runs')`·
+`information_schema.columns`의 `product_sourcing_quotes.confirmed_at`이
+생겼는지를 직접 조회한다(§15 확인법과 같은 방식). 셋 중 하나라도 없으면 이
+절은 여전히 "파일만 있음" 상태다.
