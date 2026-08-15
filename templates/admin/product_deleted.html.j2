@@ -1,0 +1,703 @@
+{#
+  삭제 상품 조회(ADM-DEL-010) — 2026-08-15 신설. decision-log UX-26.
+
+  ■ 출처 — 사장님이 확정한 원안
+    파일: `docs/design/dc-product-deleted-2안.html`(`<x-dc>` + `DCLogic` + `support.js`
+    런타임 — 여기서는 돌지 않는다). **본체 = 1b(경로 그룹 + 서랍)** · **빈 상태만 = 1c**
+    (1a는 탈락 · 빈 상태는 1c 하나만 채택 — 1a의 빈 상태 안은 쓰지 않는다).
+    `reviews.html.j2`·`build_map`과 같은 원칙: 화면 구성·색·서체·간격·인터랙션은
+    원안 그대로 옮기고 런타임만 순수 JS로 바꿨다. 데이터는 전부
+    `GET /api/admin/deleted-products`(이 화면 전용 신설 API, `admin_ui_product_deleted.py`)
+    응답만 쓴다 — 원안의 예시 수치(6/2/1/3/22,840/7,602/15,238 등)는 전부 스냅샷
+    예시라 코드에 없다.
+
+  ■ 1b 원안에는 검색창·경로 필터 칩·체크박스·상단 툴바가 **없다**(그건 탈락한 1a
+    전용이다). 그대로 없앴다 — 승인 디자인에 없는 배치를 만들지 않는다
+    (`docs/design/MAKER-CHECKLIST.md` §0). 1b는 [탭] → [경로별 그룹 카드] →
+    (행 클릭) → [우측 서랍] 이 전부다.
+
+  ■ 좌측 메뉴·헤더·팔레트·서체 — admin2 공용 셸을 상속한다(`_admin2_shell.html.j2`,
+    `/shared/admin2/admin2.css`). 이 화면은 `:root`를 다시 정의하지 않고 셸이 이미
+    정의한 `--rv-*` 변수만 쓴다. 좌측 메뉴 항목 구성은 `api/admin_nav.py`가 정본이고
+    "삭제 상품 조회"는 아직 `href=None`(신설 표시)이다 — LNB 연결은 이 작업의 소관이
+    아니다(지시서 명시), 주소를 직접 입력해 들어간다: `/admin2/deleted-products`.
+
+  ■ 완전 삭제 2단계 확인 모달 — 1b 캔버스 자체에는 "완전 삭제…" 버튼만 있고 다음
+    단계 모달은 그려져 있지 않다(캔버스 밖). decision-log UX-26이 "완전 삭제 포함
+    하되 지금 수준 유지(operator + force 2단계 확인)"를 명시했고, 그 확인 문구·구조는
+    같은 원안 파일의 1a 모달에 있다 — "1a/1b 차이는 경로·되돌리기를 보여주는 방식
+    뿐"(UX-26 원문)이라 완전 삭제 자체의 확인 절차는 두 안이 공유하는 것으로 읽어
+    1a 모달의 문구·구조를 가져오되, 하드코딩된 예시(PD91027 등)는 서버가 준 실제
+    참조 목록(`refs`)으로 대체했다. 참조가 정확히 0건이면 1단계 확인만으로 즉시
+    삭제되고(정의서 ⑥ 경계값), 주문 이력이 있으면(`error:"has_history"`) force와
+    무관하게 항상 막히는 것도 정의서 ⑦ 그대로 구현했다.
+
+  ■ 쓰기는 전부 `api/admin_products.py`의 기존 엔드포인트를 그대로 부른다 — 이
+    화면·이 화면의 API 모듈이 새 쓰기 엔드포인트를 만들지 않는다(담당 파일 범위 밖).
+    되돌리기 3종은 서버가 각 항목에 실어 보낸 `undo_api`/`undo_method`/`undo_body`를
+    그대로 쓰고, "판정 불가" 항목은 `fallback`(PATCH로 상태만 판매중으로)을 쓴다.
+    완전 삭제는 `DELETE /api/admin/products/{code}[?force=true]`를 직접 부른다.
+
+  ■ 반응형 768px — 그룹 카드 행(`.dp-card`)의 고정 폭 열은 미디어쿼리에서 전부
+    `width:100%`로 풀어 세로 스택으로 바꾼다(최근 두 화면이 한쪽 열만 100%를 받고
+    다른 쪽은 못 받아 페이지가 가로로 밀린 결함의 재발 방지 — 지시서 경고 반영).
+    서랍·모달도 이 지점에서 전체 폭 고정 오버레이로 바뀐다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}삭제 상품 조회{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+
+/* ── 탭 ── */
+.dp-tabsbar{flex:none;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:var(--rv-card);
+           display:flex;align-items:stretch;padding:0 18px;gap:18px}
+.dp-tab{display:flex;align-items:center;gap:7px;font:500 12.5px/1 var(--rv-font);color:var(--rv-faint);
+       border:0;border-bottom:2px solid transparent;background:none;cursor:pointer;padding:0 2px}
+.dp-tab.on{font-weight:600;color:var(--rv-ink);border-bottom-color:var(--rv-ink)}
+.dp-tab-cnt{font:600 10.5px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-panel);
+           border-radius:8px;padding:3px 7px}
+.dp-tab.on .dp-tab-cnt{color:var(--rv-canvas);background:var(--rv-ink)}
+
+/* ── 본문 ── */
+.dp-main{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.dp-loading,.dp-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+                       gap:9px;padding:40px;text-align:center}
+.dp-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-ink)}
+.dp-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);max-width:420px}
+.dp-errbox button,.dp-errbox a{display:inline-block;padding:8px 18px;border-radius:6px;
+                               background:var(--rv-ink);color:var(--rv-canvas);
+                               font:500 12px/1 var(--rv-font);border:0;cursor:pointer;text-decoration:none}
+
+/* ── 빈 상태(1c) ── */
+.dp-empty{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:40px;overflow:auto}
+.dp-empty-inner{max-width:660px;display:flex;flex-direction:column;align-items:center;gap:13px;text-align:center}
+.dp-empty-title{font:600 16px/1.4 var(--rv-font);color:var(--rv-ink)}
+.dp-empty-desc{font:400 12px/1.8 var(--rv-font);color:var(--rv-ink-soft)}
+.dp-empty-box{border:1px solid rgba(0,0,0,.12);background:var(--rv-card);border-radius:8px;
+             padding:13px 16px;text-align:left;width:100%}
+.dp-empty-box-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.dp-path-row{display:flex;align-items:baseline;gap:9px;padding:4px 0;flex-wrap:wrap}
+.dp-path-mark{font:600 11px/1.6 var(--rv-mono);flex:none}
+.dp-path-title{font:500 11px/1.6 var(--rv-font);width:110px;flex:none}
+.dp-path-desc{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:160px}
+.dp-path-where{font:400 10px/1.6 var(--rv-mono);color:var(--rv-dim)}
+.dp-empty-hist{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-faint)}
+.dp-empty-link{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);border:1px solid rgba(0,0,0,.24);
+               border-radius:5px;padding:9px 13px;text-decoration:none}
+
+/* ── 경로 그룹 목록 ── */
+.dp-groups{flex:1;min-height:0;overflow:auto;padding:14px 18px 16px;display:flex;flex-direction:column;gap:14px}
+.dp-group-hd{display:flex;align-items:baseline;gap:9px;margin-bottom:8px;flex-wrap:wrap}
+.dp-mark{font:600 12px/1 var(--rv-mono)}
+.dp-gtitle{font:600 12.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.dp-gcount{font:600 12px/1 var(--rv-mono);color:var(--rv-muted)}
+.dp-gdesc{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint);flex:1;min-width:220px}
+.dp-gapi{font:400 10px/1.4 var(--rv-mono);color:var(--rv-dim)}
+.dp-items{display:flex;flex-direction:column;gap:6px}
+.dp-card{display:flex;align-items:center;gap:11px;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);
+        border-left:3px solid transparent;border-radius:7px;padding:10px 13px;cursor:pointer}
+.dp-card:hover{background:var(--rv-panel2)}
+.dp-card.sel{background:oklch(0.97 0.01 250)}
+.dp-c-code{font:500 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);width:80px;flex:none}
+.dp-c-name{font:500 11.5px/1.35 var(--rv-font);color:var(--rv-ink);flex:1;min-width:0;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+.dp-c-cat{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint);width:88px;flex:none}
+.dp-c-at{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);width:84px;flex:none}
+.dp-c-note{font:400 10px/1.45 var(--rv-font);color:var(--rv-ink-soft);width:210px;flex:none;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+.dp-c-btn{flex:none;font:600 10.5px/1 var(--rv-font);text-align:center;border-radius:5px;padding:8px 11px;
+         color:var(--rv-canvas);background:var(--rv-ink);border:1px solid transparent}
+.dp-c-btn.unk{color:oklch(0.42 0.15 30);background:var(--rv-card);border-color:oklch(0.52 0.16 30 / .45)}
+
+.dp-foot-note{flex:none;border-top:1px solid rgba(0,0,0,.09);background:var(--rv-panel);padding:7px 18px;
+             font:400 10px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 서랍 ── */
+.dp-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(38,35,30,.2);z-index:7}
+.dp-overlay[hidden]{display:none}
+.dp-drawer{position:absolute;top:0;right:0;bottom:0;width:560px;background:var(--rv-card);
+          border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);
+          display:flex;flex-direction:column;z-index:8}
+.dp-drawer[hidden]{display:none}
+.dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.dw-hd .row1{display:flex;align-items:center;gap:8px}
+.dw-hd .title{font:600 14.5px/1.35 var(--rv-font);color:var(--rv-ink);flex:1;min-width:0;overflow:hidden;
+             text-overflow:ellipsis;white-space:nowrap}
+.dw-pill{font:600 10px/1 var(--rv-font);color:var(--rv-muted);background:var(--rv-panel2);
+        border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:4px 7px;white-space:nowrap}
+.dw-hd .close{font:400 17px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 6px;
+             background:none;border:0}
+.dw-hd .meta{display:flex;gap:11px;margin-top:6px;font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint);
+            flex-wrap:wrap}
+.dw-body{flex:1;min-height:0;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.dw-decision{border:1px solid;border-left-width:3px;border-radius:8px;padding:11px 13px}
+.dw-decision-t{font:600 11px/1.4 var(--rv-font)}
+.dw-decision-d{font:400 10.5px/1.7 var(--rv-font);color:#4a463e;margin-top:4px}
+.dw-decision-link{display:block;font:400 10.5px/1.7 var(--rv-font);color:#4a463e;margin-top:5px}
+.dw-decision-link a{border-bottom:1px solid rgba(0,0,0,.3)}
+.dw-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
+.dw-restore-list{display:flex;flex-direction:column;gap:5px}
+.dw-restore-row{display:flex;align-items:baseline;gap:9px;border:1px solid rgba(0,0,0,.1);border-radius:6px;
+               padding:8px 11px;background:var(--rv-panel2)}
+.dw-restore-check{font:600 10.5px/1.5 var(--rv-mono);color:var(--rv-green)}
+.dw-restore-what{font:500 11px/1.5 var(--rv-font);width:70px;flex:none;color:var(--rv-ink)}
+.dw-restore-detail{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:0}
+.dw-restore-none{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim)}
+.dw-hist-box{border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:11px 13px}
+.dw-hist-t{font:600 11px/1.4 var(--rv-font);color:var(--rv-ink)}
+.dw-hist-line{font:400 10.5px/1.85 var(--rv-mono);color:var(--rv-ink-soft);margin-top:5px}
+.dw-danger-box{border:1px solid oklch(0.52 0.16 30 / .4);border-left:3px solid oklch(0.52 0.16 30);
+              background:oklch(0.97 0.02 30);border-radius:8px;padding:11px 13px}
+.dw-danger-t{font:600 11px/1.4 var(--rv-font);color:oklch(0.42 0.15 30)}
+.dw-danger-d{font:400 10.5px/1.7 var(--rv-font);color:#4a463e;margin-top:4px}
+.dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;
+        gap:8px;background:var(--rv-panel)}
+.dw-foot .note{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.btn-delete{font:500 11.5px/1 var(--rv-font);color:oklch(0.42 0.15 30);background:var(--rv-card);
+           border:1px solid oklch(0.52 0.16 30 / .45);border-radius:5px;padding:9px 13px;cursor:pointer}
+.btn-primary{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+            border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-primary:disabled,.btn-delete:disabled{opacity:.5;cursor:default}
+
+/* ── 완전 삭제 모달 ── */
+.dp-modal-overlay{position:fixed;inset:0;background:rgba(38,35,30,.34);display:flex;align-items:center;
+                  justify-content:center;z-index:50}
+.dp-modal-overlay[hidden]{display:none}
+.dp-modal{width:600px;max-width:calc(100% - 32px);max-height:calc(100% - 32px);overflow:auto;
+         background:var(--rv-card);border-radius:11px;box-shadow:0 24px 60px rgba(38,35,30,.34)}
+.dm-hd{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:9px;
+      background:oklch(0.97 0.02 30)}
+.dm-title{font:600 14px/1.3 var(--rv-font);color:oklch(0.4 0.15 30);flex:1}
+.dm-close{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;background:none;border:0}
+.dm-body{padding:15px 18px;display:flex;flex-direction:column;gap:11px}
+.dm-text{font:500 12.5px/1.6 var(--rv-font);color:var(--rv-ink)}
+.dm-text b{color:oklch(0.45 0.15 30)}
+.dm-refs-box{border:1px solid oklch(0.52 0.16 30 / .4);border-left:3px solid oklch(0.52 0.16 30);
+            background:oklch(0.97 0.02 30);border-radius:7px;padding:11px 13px}
+.dm-refs-t{font:600 11px/1.4 var(--rv-font);color:oklch(0.42 0.15 30);margin-bottom:6px}
+.dm-refs-list{font:400 10.5px/1.85 var(--rv-mono);color:#4a463e}
+.dm-refs-warn{font:400 10px/1.6 var(--rv-font);color:#5b564d;margin-top:6px}
+.dm-alt{font:400 10.5px/1.7 var(--rv-font);color:#5b564d}
+.dm-foot{border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;align-items:center;gap:8px;
+        background:var(--rv-panel)}
+.dm-note{font:400 10px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
+.btn-cancel{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+           border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 14px;cursor:pointer}
+.btn-danger{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:oklch(0.42 0.15 30);
+           border:none;border-radius:5px;padding:9px 15px;cursor:pointer}
+.btn-danger:disabled{opacity:.5;cursor:default}
+
+/* ── 토스트(공용 컨테이너 #toasts는 셸이 그린다 — 카드 스타일만 이 화면이 갖는다) ── */
+.toast{display:flex;align-items:center;gap:10px;background:var(--rv-nav);color:var(--rv-nav-ink);border-radius:7px;
+      padding:11px 13px;box-shadow:0 8px 22px rgba(38,35,30,.28);border-left:3px solid;max-width:460px}
+.toast .mark{font:600 11px/1 var(--rv-mono)}
+.toast .msg{font:400 11.5px/1.5 var(--rv-font);max-width:340px}
+.toast .cx{font:400 12px/1 var(--rv-font);opacity:.55;cursor:pointer;background:none;border:0;color:inherit}
+
+@media (max-width:768px){
+  /* .dp-card는 row->column으로 뒤집힌다 — 열 하나만 100%를 받고 나머지(특히
+     white-space:nowrap인 이름 열)가 내용 폭 그대로 남으면 그 열만큼 페이지가
+     가로로 밀린다(최근 두 화면이 겪은 결함과 동일 패턴). 그래서 **`.dp-card`의
+     직계 자식 6개 전부**를 여기서 명시적으로 100%/stretch 시킨다 — 하나도
+     빠뜨리지 않는다. */
+  .dp-c-code,.dp-c-cat,.dp-c-at,.dp-c-note,.dp-c-name{width:100%;white-space:normal}
+  .dp-card{flex-direction:column;align-items:stretch;gap:4px}
+  .dp-card .dp-c-btn{align-self:stretch;text-align:center}
+  .dp-group-hd{flex-direction:column;align-items:stretch;gap:3px}
+  .dp-gdesc,.dp-gapi{width:100%;min-width:0}
+  .dp-drawer{position:fixed;inset:0;width:100%}
+  .dp-overlay{position:fixed}
+  .dw-hd .meta{gap:8px}
+  .dp-modal{width:calc(100% - 24px)}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="dp-tabsbar" data-keep="1">
+      <button type="button" class="dp-tab on" id="dpTab-삭제대기" data-action="switch-tab" data-status="삭제대기">
+        <span>삭제대기</span><span class="dp-tab-cnt num" id="dpCnt-삭제대기">—</span>
+      </button>
+      <button type="button" class="dp-tab" id="dpTab-단종" data-action="switch-tab" data-status="단종">
+        <span>단종</span><span class="dp-tab-cnt num" id="dpCnt-단종">—</span>
+      </button>
+    </div>
+
+    <div class="dp-main" id="dpMain">
+      <div class="dp-loading" id="dpLoading">불러오는 중…</div>
+
+      <div class="dp-overlay" id="dpOverlay" hidden></div>
+      <aside class="dp-drawer" id="dpDrawer" data-keep="1" hidden>
+        <div class="dw-hd">
+          <div class="row1">
+            <span class="title" id="dwName">—</span>
+            <span class="dw-pill" id="dwStatusPill">—</span>
+            <button type="button" class="close" data-action="close-drawer" aria-label="닫기">✕</button>
+          </div>
+          <div class="meta">
+            <span id="dwSku">—</span><span id="dwCode">—</span><span id="dwCat">—</span><span id="dwStock">—</span>
+          </div>
+        </div>
+        <div class="dw-body" id="dwBody"></div>
+        <div class="dw-foot">
+          <span class="note" id="dwFootNote">되돌리면 이 목록에서 사라집니다</span>
+          <button type="button" class="btn-delete" data-action="open-delete">완전 삭제…</button>
+          <button type="button" class="btn-primary" id="dwActionBtn" data-action="do-undo">되돌리기</button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="dp-modal-overlay" id="dpModalOverlay" hidden>
+      <div class="dp-modal" id="dpModal" data-keep="1"></div>
+    </div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var STATUSES = ['삭제대기', '단종'];
+
+  var S = {
+    status: '삭제대기',
+    data: null, loadErr: null,
+    sel: null, drawerOpen: false,
+    me: null,
+    toasts: [], toastSeq: 0,
+    del: null   // 완전 삭제 진행 상태 — {code, sku, name, step, refs, blocked, busy}
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function fmtAt(isoStr) {
+    if (!isoStr) return '—';
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '—';
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiCall(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: 'same-origin',
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    }).then(handle);
+  }
+
+  // ── 토스트 ───────────────────────────────────────────────────────
+  function toast(msg, kind) {
+    var id = ++S.toastSeq;
+    S.toasts.push({ id: id, msg: msg, kind: kind });
+    renderToasts();
+    setTimeout(function () {
+      S.toasts = S.toasts.filter(function (t) { return t.id !== id; });
+      renderToasts();
+    }, 7000);
+  }
+  function renderToasts() {
+    var box = $('toasts'); if (!box) return;
+    box.innerHTML = S.toasts.map(function (t) {
+      var color = t.kind === 'err' ? 'oklch(0.52 0.16 30)' : (t.kind === 'warn' ? 'oklch(0.62 0.15 55)' : 'oklch(0.5 0.11 165)');
+      var mark = t.kind === 'err' ? '✕' : (t.kind === 'warn' ? '▲' : '✓');
+      return '<div class="toast" style="border-left-color:' + color + '">' +
+        '<span class="mark" style="color:' + color + '">' + mark + '</span>' +
+        '<span class="msg">' + esc(t.msg) + '</span>' +
+        '<button type="button" class="cx" data-action="toast-close" data-tid="' + t.id + '">✕</button></div>';
+    }).join('');
+  }
+
+  // ── 권한 ─────────────────────────────────────────────────────────
+  function guard() {
+    if (!window.Admin2Shell || !window.Admin2Shell.canWrite('operator')) {
+      var cur = S.me ? S.me.role : '(로그인 필요)';
+      toast('권한이 부족합니다 (필요: operator, 현재: ' + cur + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+
+  // ── 초기 로드 ────────────────────────────────────────────────────
+  function boot() {
+    if (window.Admin2Shell) window.Admin2Shell.meReady.then(function (me) { S.me = me; });
+    loadList();
+  }
+
+  function loadList() {
+    S.sel = null; S.drawerOpen = false;
+    $('dpMain').querySelectorAll('.dp-groups,.dp-empty,.dp-errbox').forEach(function (n) { n.remove(); });
+    $('dpLoading').hidden = false; $('dpLoading').textContent = '불러오는 중…';
+    apiGet('/api/admin/deleted-products?status=' + encodeURIComponent(S.status))
+      .then(function (j) { S.data = j; S.loadErr = null; renderAll(); })
+      .catch(function (err) { S.data = null; S.loadErr = err; renderAll(); });
+  }
+
+  function findItem(code) {
+    if (!S.data) return null;
+    var found = null;
+    (S.data.groups || []).forEach(function (g) {
+      g.items.forEach(function (it) { if (it.code === code) found = it; });
+    });
+    return found;
+  }
+
+  // ── 전체 렌더 ────────────────────────────────────────────────────
+  function renderAll() {
+    renderTabs();
+    var main = $('dpMain');
+    main.querySelectorAll('.dp-groups,.dp-empty,.dp-foot-note,.dp-errbox').forEach(function (n) { n.remove(); });
+    $('dpLoading').hidden = true;
+    if (S.loadErr) { renderLoadError(); return; }
+    if (!S.data) return;
+    if (S.data.total === 0) { renderEmpty(); } else { renderGroups(); }
+    renderDrawer();
+  }
+
+  function renderTabs() {
+    var tabs = (S.data && S.data.tabs) || [];
+    tabs.forEach(function (t) {
+      var el = $('dpCnt-' + t.key);
+      if (el) el.textContent = fmt(t.count);
+    });
+    STATUSES.forEach(function (s) {
+      var b = $('dpTab-' + s);
+      if (b) b.classList.toggle('on', s === S.status);
+    });
+  }
+
+  function renderLoadError() {
+    var un = S.loadErr && S.loadErr.status === 401;
+    var box = document.createElement('div');
+    box.className = 'dp-errbox';
+    box.innerHTML = '<div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
+      '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.'
+        : ('삭제 상품 목록을 받지 못했습니다 — ' + esc(S.loadErr ? S.loadErr.message : ''))) + '</div>' +
+      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry-list">다시 시도</button>');
+    $('dpMain').appendChild(box);
+  }
+
+  // ── 빈 상태(1c) ──────────────────────────────────────────────────
+  var PATHS = [
+    { mark: '◆', color: 'oklch(0.5 0.12 250)', title: '중복 편입',
+      desc: '닮은 상품을 원본으로 합치면 중복분이 여기로 내려옵니다', where: '상품 관리 상세' },
+    { mark: '●', color: '#7d7669', title: '단건 상태 수정',
+      desc: '상세에서 상태를 삭제대기·단종으로 바꾸면 여기로 옵니다', where: '상품 관리 상세' },
+    { mark: '▣', color: 'oklch(0.62 0.15 55)', title: '일괄 상태 변경',
+      desc: '목록에서 여러 건을 한 번에 내리면 여기로 옵니다', where: '상품 관리 목록' }
+  ];
+  function renderEmpty() {
+    var d = S.data;
+    var by = d.catalog.by_status || {};
+    var box = document.createElement('div');
+    box.className = 'dp-empty';
+    var title = S.status === '단종' ? '단종 상품이 없습니다' : '삭제 대기 중인 상품이 없습니다';
+    var otherStatus = S.status === '단종' ? '삭제대기' : '단종';
+    var otherCount = (d.tabs.filter(function (t) { return t.key === otherStatus; })[0] || {}).count || 0;
+    var desc = '지금 카탈로그 ' + fmt(d.catalog.total) + '건은 판매중 ' + fmt(by['판매중'] || 0) +
+      ' · 품절 ' + fmt(by['품절'] || 0) + '이고, ' + S.status + ' ' + fmt(d.total) + '건 · ' +
+      otherStatus + ' ' + fmt(otherCount) + '건입니다. 조회가 실패한 것이 아니라 그런 상품이 실제로 없습니다.';
+    var hn = d.history_note || {};
+    var histTotal = (hn.product_merge || 0) + (hn.product_merge_undo || 0) + (hn.product_delete || 0);
+    var histLine = histTotal === 0
+      ? '이 화면이 다루는 세 동작(편입·편입 되돌림·완전 삭제)의 활동 로그도 지금은 없습니다.'
+      : ('활동 로그에는 편입 ' + fmt(hn.product_merge) + '건 · 편입 되돌림 ' + fmt(hn.product_merge_undo) +
+         '건 · 완전 삭제 ' + fmt(hn.product_delete) + '건이 남아 있지만, 지금 목록에는 없습니다' +
+         '(되돌려졌거나 완전 삭제로 이미 사라진 것입니다).');
+    box.innerHTML =
+      '<div class="dp-empty-inner">' +
+        '<div class="dp-empty-title">' + esc(title) + '</div>' +
+        '<div class="dp-empty-desc">' + esc(desc) + '</div>' +
+        '<div class="dp-empty-box"><div class="dp-empty-box-cap">여기에 상품이 생기는 경로 셋</div>' +
+          PATHS.map(function (p) {
+            return '<div class="dp-path-row"><span class="dp-path-mark" style="color:' + p.color + '">' + p.mark + '</span>' +
+              '<span class="dp-path-title">' + esc(p.title) + '</span>' +
+              '<span class="dp-path-desc">' + esc(p.desc) + '</span>' +
+              '<span class="dp-path-where">' + esc(p.where) + '</span></div>';
+          }).join('') +
+        '</div>' +
+        '<div class="dp-empty-hist">' + esc(histLine) + '</div>' +
+        '<a href="/admin2/products" class="dp-empty-link">상품 관리로 가기 →</a>' +
+      '</div>';
+    $('dpMain').appendChild(box);
+  }
+
+  // ── 경로 그룹(1b) ────────────────────────────────────────────────
+  function renderGroups() {
+    var d = S.data;
+    var wrap = document.createElement('div');
+    wrap.className = 'dp-groups';
+    wrap.innerHTML = (d.groups || []).map(function (g) {
+      return '<div class="dp-group">' +
+        '<div class="dp-group-hd">' +
+          '<span class="dp-mark" style="color:' + g.color + '">' + g.mark + '</span>' +
+          '<span class="dp-gtitle">' + esc(g.title) + '</span>' +
+          '<span class="dp-gcount num">' + fmt(g.count) + '건</span>' +
+          '<span class="dp-gdesc">' + esc(g.desc) + '</span>' +
+          '<span class="dp-gapi">' + esc(g.api) + '</span>' +
+        '</div>' +
+        '<div class="dp-items">' +
+          g.items.map(function (it) {
+            var sel = it.code === S.sel && S.drawerOpen;
+            return '<div class="dp-card' + (sel ? ' sel' : '') + '" data-keep="1" data-action="open-item" data-code="' + it.code + '" style="border-left-color:' + g.color + '">' +
+              '<span class="dp-c-code">' + esc(it.sku) + '</span>' +
+              '<span class="dp-c-name">' + esc(it.name) + '</span>' +
+              '<span class="dp-c-cat">' + esc(it.cat) + '</span>' +
+              '<span class="dp-c-at num">' + fmtAt(it.at) + '</span>' +
+              '<span class="dp-c-note">' + esc(it.note) + '</span>' +
+              '<span class="dp-c-btn' + (it.path === 'unknown' ? ' unk' : '') + '">' + esc(it.btn) + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div></div>';
+    }).join('');
+    $('dpMain').appendChild(wrap);
+    var foot = document.createElement('div');
+    foot.className = 'dp-foot-note';
+    foot.textContent = '경로를 판정하지 못한 그룹도 숨기지 않습니다 — "왜 내려갔는지 모른다"는 사실을 밝히고 상태만 되돌리는 대안을 함께 둡니다' +
+      (d.note ? ' · ' + d.note : '');
+    $('dpMain').appendChild(foot);
+  }
+
+  // ── 서랍 ─────────────────────────────────────────────────────────
+  function closeDrawer() { S.sel = null; S.drawerOpen = false; renderDrawer(); }
+  function openItem(code) {
+    var it = findItem(code);
+    if (!it) return;
+    S.sel = code; S.drawerOpen = true;
+    renderDrawer();
+    // 카드 강조도 함께 갱신(전체 재렌더 없이 클래스만)
+    document.querySelectorAll('.dp-card').forEach(function (c) {
+      c.classList.toggle('sel', Number(c.getAttribute('data-code')) === code);
+    });
+  }
+
+  var PATH_TITLE = { merge: '중복 편입(product_merge)', edit: '단건 상태 수정(product_edit)',
+    bulk: '일괄 상태 변경', unknown: '판정 불가' };
+
+  function renderDrawer() {
+    $('dpOverlay').hidden = !S.drawerOpen;
+    $('dpDrawer').hidden = !S.drawerOpen;
+    if (!S.drawerOpen) return;
+    var it = findItem(S.sel);
+    if (!it) { closeDrawer(); return; }
+
+    $('dwName').textContent = it.name;
+    $('dwStatusPill').textContent = it.status;
+    $('dwSku').textContent = it.sku;
+    $('dwCode').textContent = it.code;
+    $('dwCat').textContent = it.cat;
+    $('dwStock').textContent = '재고 ' + fmt(it.stock);
+
+    var decisionColor = it.color, decisionBg = it.bg;
+    var decisionBody = it.log_id
+      ? (fmtAt(it.at) + ' · ' + esc(it.operator || '—') + ' · 활동 로그 <span style="font-family:var(--rv-mono)">log_id ' + it.log_id + '</span>. ' + esc(it.note))
+      : esc(it.note);
+    var into = it.into
+      ? '<div class="dw-decision-link">옮겨간 원본 → <a href="/admin2/products">' + esc(it.into.sku) + ' ' + esc(it.into.name || '') + ' (상품 관리에서 확인)</a></div>'
+      : '';
+    var decision = '<div class="dw-decision" style="border-color:' + decisionColor + '66;background:' + decisionBg + ';border-left-color:' + decisionColor + '">' +
+      '<div class="dw-decision-t" style="color:' + decisionColor + '">경로 판정 — ' + esc(PATH_TITLE[it.path] || it.path) + '</div>' +
+      '<div class="dw-decision-d">' + decisionBody + '</div>' + into + '</div>';
+
+    var restore = '<div><div class="dw-cap">되돌리면 함께 복원되는 것</div>' +
+      (it.restore.length
+        ? '<div class="dw-restore-list">' + it.restore.map(function (x) {
+            return '<div class="dw-restore-row"><span class="dw-restore-check">✓</span>' +
+              '<span class="dw-restore-what">' + esc(x.what) + '</span>' +
+              '<span class="dw-restore-detail">' + esc(x.detail) + '</span></div>';
+          }).join('') + '</div>'
+        : '<div class="dw-restore-none">자동으로 되돌릴 근거가 없습니다 — 아래 "상태만 되돌리기"만 가능하고, 재고·공급처는 복원되지 않습니다.</div>') +
+      '</div>';
+
+    var hist = '<div class="dw-hist-box"><div class="dw-hist-t">활동 이력</div>' +
+      (it.history.length
+        ? it.history.map(function (h) { return '<div class="dw-hist-line">' + fmtAt(h.at) + ' ' + esc(h.line) + '</div>'; }).join('')
+        : '<div class="dw-hist-line">이 상품에 대한 다른 기록이 없습니다.</div>') +
+      '</div>';
+
+    var danger = '<div class="dw-danger-box"><div class="dw-danger-t">완전 삭제 — 되돌릴 수 없습니다</div>' +
+      '<div class="dw-danger-d">누르면 먼저 서버가 함께 지워질 참조 목록을 확인합니다(참조가 있으면 409). 그 목록을 확인한 뒤에만 실행됩니다. 재고 원장(stock_movements)도 함께 사라집니다. 주문 이력이 있으면 그 자리에서 막힙니다.</div></div>';
+
+    $('dwBody').innerHTML = decision + restore + hist + danger;
+    $('dwActionBtn').textContent = it.btn;
+    $('dwActionBtn').disabled = false;
+  }
+
+  function doUndo() {
+    if (!guard()) return;
+    var it = findItem(S.sel); if (!it) return;
+    var call = it.undo_api
+      ? { method: it.undo_method, url: it.undo_api, body: it.undo_body || undefined }
+      : (it.fallback ? { method: it.fallback.method, url: it.fallback.url, body: it.fallback.body } : null);
+    if (!call) { toast('되돌릴 방법이 없습니다', 'err'); return; }
+    $('dwActionBtn').disabled = true;
+    apiCall(call.method, call.url, call.body)
+      .then(function (res) {
+        toast(res.note || res.verdict || '되돌렸습니다', 'ok');
+        closeDrawer();
+        loadList();
+      })
+      .catch(function (err) {
+        toast(err.message, 'err');
+        $('dwActionBtn').disabled = false;
+      });
+  }
+
+  // ── 완전 삭제 2단계 확인 ─────────────────────────────────────────
+  function openDeleteModal() {
+    if (!guard()) return;
+    var it = findItem(S.sel); if (!it) return;
+    S.del = { code: it.code, sku: it.sku, name: it.name, step: 1, refs: null, blocked: null, busy: false };
+    renderDeleteModal();
+    $('dpModalOverlay').hidden = false;
+  }
+  function closeDeleteModal() {
+    S.del = null;
+    $('dpModalOverlay').hidden = true;
+  }
+  function renderDeleteModal() {
+    var d = S.del; if (!d) return;
+    var body, foot, title;
+    if (d.blocked) {
+      title = '완전 삭제 — 지울 수 없습니다';
+      body = '<div class="dm-text">' + esc(d.blocked) + '</div>' +
+        '<div class="dm-alt">주문 이력이 있으면 <span style="font-family:var(--rv-mono)">force</span>와 무관하게 항상 막힙니다(과거 주문서 보호) — 편입하거나 상태만 바꿔 두는 방법이 있습니다.</div>';
+      foot = '<span class="dm-note">operator 등급이면 여기까지 실행됩니다</span>' +
+        '<button type="button" class="btn-cancel" data-action="cancel-delete">확인</button>';
+    } else if (d.step === 1) {
+      title = '완전 삭제 확인';
+      body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(d.name) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
+        '<div class="dm-alt">먼저 서버에서 참조 현황(재고 원장·가격 이력·찜 등)을 확인합니다. 참조가 없으면 바로 삭제됩니다.</div>';
+      foot = '<span class="dm-note">operator 등급이면 실행됩니다 — 권한 강화는 하지 않기로 확정(2026-08-14)</span>' +
+        '<button type="button" class="btn-cancel" data-action="cancel-delete">취소</button>' +
+        '<button type="button" class="btn-danger" id="dmGo" data-action="delete-step1"' + (d.busy ? ' disabled' : '') + '>참조 확인</button>';
+    } else {
+      title = '완전 삭제 — 2단계 중 2단계';
+      var refs = d.refs || [];
+      var hasStock = refs.some(function (r) { return r.table === 'stock_movements'; });
+      body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(d.name) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
+        '<div class="dm-refs-box"><div class="dm-refs-t">함께 지워지는 것 — 서버가 알려준 참조 ' + refs.length + '종</div>' +
+        '<div class="dm-refs-list">' + refs.map(function (r) { return esc(r.label) + ' ' + fmt(r.count) + '행'; }).join('<br>') + '</div>' +
+        (hasStock ? '<div class="dm-refs-warn"><b>재고 원장까지 함께 사라집니다</b> — 이 프로젝트에서 원장을 실제로 지우는 유일한 경로입니다.</div>' : '') +
+        '</div>' +
+        '<div class="dm-alt">1단계에서 서버가 참조 목록(409)을 돌려줬고, 지금 확인하면 <span style="font-family:var(--rv-mono)">force=true</span>로 재요청합니다. 대안: 지우지 않고 이 상태로 계속 두거나, 다른 상품으로 편입하는 방법이 있습니다.</div>';
+      foot = '<span class="dm-note">operator 등급이면 실행됩니다 — 권한 강화는 하지 않기로 확정(2026-08-14)</span>' +
+        '<button type="button" class="btn-cancel" data-action="cancel-delete">그냥 두기</button>' +
+        '<button type="button" class="btn-danger" id="dmGo" data-action="delete-step2"' + (d.busy ? ' disabled' : '') + '>참조까지 지우고 완전 삭제</button>';
+    }
+    $('dpModal').innerHTML =
+      '<div class="dm-hd"><span class="dm-title">' + esc(title) + '</span>' +
+      '<button type="button" class="dm-close" data-action="cancel-delete">✕</button></div>' +
+      '<div class="dm-body">' + body + '</div>' +
+      '<div class="dm-foot">' + foot + '</div>';
+  }
+  function deleteStep1() {
+    var d = S.del; if (!d) return;
+    d.busy = true; renderDeleteModal();
+    apiCall('DELETE', '/api/admin/products/' + d.code)
+      .then(function (res) {
+        toast(res.note || '삭제했습니다', 'ok');
+        closeDeleteModal(); closeDrawer(); loadList();
+      })
+      .catch(function (err) {
+        d.busy = false;
+        var body = err.body || {};
+        if (body.error === 'has_history') {
+          d.blocked = (body.message || err.message);
+        } else if (body.error === 'has_refs') {
+          d.step = 2; d.refs = body.refs || [];
+        } else {
+          toast(err.message, 'err');
+          closeDeleteModal();
+          return;
+        }
+        renderDeleteModal();
+      });
+  }
+  function deleteStep2() {
+    var d = S.del; if (!d) return;
+    d.busy = true; renderDeleteModal();
+    apiCall('DELETE', '/api/admin/products/' + d.code + '?force=true')
+      .then(function (res) {
+        toast(res.note || '삭제했습니다', 'ok');
+        closeDeleteModal(); closeDrawer(); loadList();
+      })
+      .catch(function (err) {
+        d.busy = false;
+        toast(err.message, 'err');
+        renderDeleteModal();
+      });
+  }
+
+  // ── 선택 해제(바깥 클릭) ─────────────────────────────────────────
+  function clearSelectionIfOpen() {
+    if (!S.drawerOpen) return;
+    closeDrawer();
+  }
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    if (!$('dpModalOverlay').hidden) {
+      // 모달이 떠 있는 동안은 모달 밖 클릭도 화면 뒤 상태를 건드리지 않는다(닫기는 버튼으로만).
+    } else if (!e.target.closest('[data-keep]')) {
+      clearSelectionIfOpen();
+    }
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch (action) {
+      case 'switch-tab': {
+        var s = t.getAttribute('data-status');
+        if (s !== S.status) { S.status = s; loadList(); }
+        break;
+      }
+      case 'open-item': openItem(Number(t.getAttribute('data-code'))); break;
+      case 'close-drawer': closeDrawer(); break;
+      case 'do-undo': doUndo(); break;
+      case 'open-delete': openDeleteModal(); break;
+      case 'cancel-delete': closeDeleteModal(); break;
+      case 'delete-step1': deleteStep1(); break;
+      case 'delete-step2': deleteStep2(); break;
+      case 'retry-list': loadList(); break;
+      case 'toast-close': {
+        var tid = Number(t.getAttribute('data-tid'));
+        S.toasts = S.toasts.filter(function (x) { return x.id !== tid; });
+        renderToasts();
+        break;
+      }
+      default: break;
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (S.del) { closeDeleteModal(); return; }
+    if (S.drawerOpen) closeDrawer();
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

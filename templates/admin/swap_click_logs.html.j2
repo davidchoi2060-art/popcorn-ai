@@ -1,0 +1,582 @@
+{#
+  부품 교체 · 클릭 기록 (ADM-ORD-030) — 2026-08-14 신설, 조회 전용
+
+  ■ 이 화면이 답하는 질문
+    "추천이 맞았다면 고객은 그대로 결제하고, 틀렸다면 부품을 바꿉니다 — 교체 자체가
+    추천 정확도의 직접 증거입니다." 가격 변화 방향(상향/하향/변화없음)은 그 자체로
+    어느 정책 화면(용도별 최소 사양·추천 기준·부품 등급 관리)을 봐야 하는지를 가리킨다
+    — 결과 -> 정책 피드백 루프의 종점이자 시작점(계약 §공통 확정 ①).
+
+  ■ 출처 — 계약 요약만 받았다(원안 dc-*.html 없음)
+    `docs/design/spec-swap-click-logs.md`(사장님 확정 **1a**, 2026-08-14 — 1b"패턴
+    카드+최근 원본"은 탈락). 정의서 `docs/design/req/req-swap-click-logs.md`. 원문
+    (Claude Design 프로젝트 `22248237-152f-4f13-8201-54afca75ebe4`)은 하네스만 연다
+    (`docs/design/MAKER-CHECKLIST.md` §1) — 로컬 원안이 없어 **치수 대조 대상이
+    아니다**(같은 문서 CLAUDE.md §관리자 화면 규약 "원안이 있는 화면은 치수까지" 규정은
+    원안이 있을 때만 적용된다).
+
+  ■ 데이터 — `GET /api/admin/swap-logs?limit=500`(`api/admin_swap_logs.py`, 담당
+    파일 밖이라 고치지 않고 읽기만 했다) 한 번으로 전부 온다: total · pairs[] · rate[]
+    (분모=quote_snapshots, recommendation_items 0행은 쓰지 않음 — 서버가 이미 방어적으로
+    구현) · by_slot[] · clicks{count,identified,unidentified,top[],reason} · note.
+    이 화면은 쓰기 API를 하나도 부르지 않는다(견적 API·스왑 API·근거 클릭 API 미호출).
+
+  ■★ 1a에는 없는 것 — "최근 교체 원본" 표를 넣지 않았다. 정의서 §⑤·⑥이 "최근 교체
+    20건을 원본으로 본다"를 기능으로 적었지만, 그건 **탈락한 1b**("패턴 카드 + 최근
+    원본")의 요소다. 계약 §1a구조에는 상단 경고 박스 / 좌상 슬롯별 교체율 / 좌하 교체
+    쌍 / 우상 근거 클릭 상위 / 우중 클릭-교체 상관 / 우하 "지키는 것" 4줄, 이 여섯
+    구역만 있다 — 확정 안(1a)이 정본이라 정의서보다 계약을 따랐다(`api/admin_swap_logs.
+    py`가 주는 `recent[]`는 그래서 이 화면이 쓰지 않는다).
+
+  ■★ 판단이 필요했던 지점(전부 이유가 있다 — 원안이 없어 계약 문구만으로 해석했다)
+    ① **"슬롯별 교체율 (카드 4개)"** — `rate[]`는 실제로 8슬롯 전부를 준다(분모가
+       quote_snapshots라 모든 슬롯에 항상 존재). 그런데 `swapped>0`인 슬롯은 지금도
+       과거 정의서 스냅샷 때도 **정확히 4개**(GPU·MB·CPU·RAM)였다 — 우연이 아니라고
+       보고, 이 화면은 **8슬롯 전부를 카드로 그리되 4열 그리드**로 배치했다(교체가
+       실제로 있는 슬롯이 자연히 먼저 오도록 swapped 내림차순 정렬). 슬롯을 숨기면
+       "0건 슬롯 = 제안이 그대로 받아들여졌다"는 긍정적 해석(정의서 §⑦, 계약 하단
+       문구)을 보여줄 자리가 없어진다 — 데이터를 감추지 않는 쪽을 택했다.
+       **하네스 확인(2026-08-15): 이 판단이 맞다.** 다만 계약이 요구하는 또 하나의
+       구분("애초에 제안된 적이 없는 경우(분모 0)와 구분")은 `rate[]`만으로는 못
+       한다 — proposed=0인 슬롯은 SQL 구조상 행 자체가 없어(§아래 "분모 0" 참조),
+       "교체 0건(제안됨)"과 "분모 0(제안 자체가 없음)"이 똑같이 "카드 없음"으로
+       뭉개지고 있었다. 그래서 `SC_ALL_SLOTS`(서버가 `taxonomy.SLOT_LABELS` 그대로
+       실어 보냄)를 모집단으로 두고, `rate[]`에 없는 슬롯은 **"분모 0" 카드**로
+       명시하도록 고쳤다(`renderRateCards()`) — 지금 데이터는 8슬롯 전부가
+       proposed>0라 이 카드가 실제로 뜨지는 않지만, 구조는 이제 두 상태를 구분한다.
+    ② **"식별/비식별 배지"** — `clicks.top[]`은 상품별 클릭수(`n`)만 주고, 식별
+       여부는 **전역 합계**(`clicks.identified`/`unidentified`)로만 온다(상품별 분해
+       없음). 그래서 배지는 패널 헤더에 전역 2개로 달았다 — 있지도 않은 "상품별
+       식별 몇 · 비식별 몇" 분해를 화면이 지어내 만들지 않는다.
+    ③ **정책 버튼 href — 경로로 조회한다, 라벨이 아니라.** `rate[].fix.href`(서버값,
+       예: `usage-floors.html`)는 옛 목업 상대경로라 admin2에서 죽은 링크가 된다.
+       이 화면은 그 href를 버리고 실제 admin2 경로를 다시 계산한다. **처음엔
+       `api/admin_nav.py`를 라벨로 조회했는데, 2026-08-14 사장님이 "추천 기준
+       설정"→"추천 기준 보기"로 라벨을 확정하면서 그 조회가 조용히 깨졌다**(하향
+       신호 버튼만 죽었는데 "비활성"과 구분이 안 돼 결함으로 안 보였다) — 라벨은
+       표시 문구일 뿐 조회 키가 될 수 없다는 교훈(ETC 라벨 사고와 같은 병). 지금은
+       `admin_ui_swap_click_logs.py::_policy_links`가 **경로 문자열**(각 정책
+       화면의 `@router.get(...)`을 직접 읽어 확인한 값)로 admin_nav.py를 훑는다 —
+       라벨이 다시 바뀌어도 이 조회는 안 깨진다. `fix.why`(해석 문장)는 여전히
+       서버 문구를 그대로 쓴다 — 판정 자체는 버리지 않는다.
+    ④ **상품 상세로 이동하는 링크를 넣지 않았다** — 정의서 §⑥이 "있으면 좋다"로만
+       적었고 admin2 상품 화면의 정확한 쿼리 파라미터 규약을 이 화면 제작 중에
+       확인하지 못했다. 확인 안 된 경로로 링크를 걸면 깨진 링크를 내미는 것이라,
+       상품명은 이 화면에서 텍스트로만 남긴다(제작 보고서에 남김).
+
+  ■★★ 원안 예시 문구를 못 채우는 자리 — 지어내지 않고 "못 잰다"고 밝힌다
+    계약 상단 경고 박스의 원안 예시("273개 서로 다른 세션 · 26명 방문자 · 12일에 걸쳐
+    반복")에 해당하는 **특정 교체 쌍의 distinct 세션 수·distinct 방문자 수·발생
+    기간**은 `GET /api/admin/swap-logs` 응답 어디에도 없다(`pairs[]`는 건수만,
+    `recent[]`는 쌍 단위로 안 좁혀진 전역 최근 20건이고 애초에 1a에 쓰지 않는다 —
+    위 참조). 이 화면은 총 건수·슬롯 비중·조합 건수까지는 서버 값으로 계산해 보여주고,
+    세션/방문자/기간 분해는 **"이 API가 세지 않는다"는 사실 문장**으로 남긴다
+    (`renderBanner()`의 `sc-bannernote`) — 화면이 숫자를 지어내지 않는다는 원칙 그대로.
+
+  ■ 실측 오기 — `api/admin_swap_logs.py` 모듈 docstring은 자신을 "ADM-ANL-020"이라
+    적었지만, 이 화면(마크업 계약)과 카탈로그(`docs/decisions/admin-identity.md`)
+    둘 다 "ADM-ORD-030"으로 일치한다(정의서 §② 그대로). 그 파일은 담당 밖이라
+    고치지 않았다.
+
+  ■ 표·격자 정렬 — 헤더·본문을 분리된 스크롤 컨테이너로 만들지 않았다(`product_
+    category_map.html.j2`·`activity_logs.html.j2`가 겪은 "헤더·본문이 서로 다른
+    스크롤 오프셋을 가져 열이 어긋나는" 버그 계열을 애초에 만들 여지를 없앴다) —
+    `.sc-thead`와 `.sc-row`가 **같은 `grid-template-columns`를 같은 비分리 컨테이너
+    안에서** 써서 동기화 문제 자체가 생기지 않는다. 좁은 화면에서는 열을 숨기지
+    않고 `.sc-table`을 가로 스크롤한다(768px 이하에서 헤더·행이 서로 다른 열을
+    숨기는 사고를 피한다 — `CLAUDE.md` §관리자 화면 규약).
+
+  ■ 팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`(oklch 베이지,
+    `--rv-*`)만 읽는다. `design-system/tokens.css`(고객 화면 정본)는 참조하지 않는다.
+    `:root`를 다시 정의하지 않는다(전부 `var(--rv-*)` 참조뿐). 외부 CDN 0건 — 이
+    파일이 추가하는 자산은 인라인 `<style>`/`<script>`뿐이다.
+
+  ■ 권한 — 조회는 로그인만 되면 등급 무관(viewer 이상, `api/auth.py` 실측). 쓰기
+    버튼이 하나도 없다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}부품 교체 · 클릭 기록{% endblock %}
+
+{% block head_extra %}
+<script>window.SC_POLICY_LINKS = {{ policy_links_json | safe }};
+window.SC_ALL_SLOTS = {{ all_slots_json | safe }};</script>
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;margin:0;padding:0;border:0;background:none}
+code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;border-radius:3px;font-size:.95em}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 위젯 ── */
+.sc-ro{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.sc-refresh{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+
+/* ── 루트 ── */
+.sc-scroll{flex:1;min-height:0;overflow:auto;padding:14px 18px 22px;display:flex;flex-direction:column;gap:14px}
+.sc-loading,.sc-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:60px 20px}
+.sc-loading[hidden],.sc-errbox[hidden],.sc-body[hidden]{display:none}
+.sc-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.sc-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.sc-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);cursor:pointer}
+.sc-body{display:flex;flex-direction:column;gap:14px}
+
+/* ── 상단 총계 줄 ── */
+.sc-topline{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;font:400 11.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.sc-topline .strong{font-weight:700;color:var(--rv-ink);font-size:12.5px}
+
+/* ── 상단 경고 박스 ── */
+.sc-banner{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+  border-left:3px solid var(--rv-amber);border-radius:8px;padding:13px 16px;display:flex;flex-direction:column;gap:5px}
+.sc-bannerhd{font:600 13.5px/1.5 var(--rv-font);color:var(--rv-ink)}
+.sc-bannerhd2{font:500 12.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.sc-bannerds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.sc-bannernote{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:5px;padding-top:7px;border-top:1px dashed rgba(0,0,0,.14)}
+
+/* ── 2열 본문 ── */
+.sc-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+.sc-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sc-panel{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:14px 15px;min-width:0}
+.sc-panelhd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.sc-panelhd h2{font:600 13.5px/1.3 var(--rv-font);margin:0;color:var(--rv-ink)}
+.sc-panelsub{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+.sc-panelnote{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:11px;padding-top:9px;border-top:1px solid rgba(0,0,0,.07)}
+.sc-emptyline,.sc-emptyrow{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-faint);padding:14px 4px}
+
+/* ── 슬롯별 교체율 카드 ── */
+.sc-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.sc-card{border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:10px 11px;background:var(--rv-panel);
+  display:flex;flex-direction:column;gap:7px;min-width:0}
+.sc-cardhd{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.sc-slot{font:600 12px/1.3 var(--rv-font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-pct{font:700 16px/1 var(--rv-mono);color:var(--rv-ink);flex:none}
+.sc-track{height:5px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden}
+.sc-bar{display:block;height:100%;background:var(--rv-amber);border-radius:3px}
+.sc-ratio{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted)}
+.sc-cardfoot{display:flex;align-items:center;gap:6px}
+.sc-cardfoot.none{color:var(--rv-muted)}
+.sc-dirbadge{font:700 11px/1 var(--rv-mono);width:18px;height:18px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;flex:none}
+.sc-dirbadge.down{color:var(--rv-red);background:oklch(0.94 0.035 30)}
+.sc-dirbadge.up{color:var(--rv-link);background:oklch(0.94 0.025 250)}
+.sc-dirbadge.flat{color:var(--rv-muted);background:var(--rv-panel2)}
+.sc-reading{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-ink-soft)}
+.sc-cardbtn{margin-top:1px}
+.sc-fixbtn{display:inline-flex;align-items:center;gap:5px;font:600 10.5px/1 var(--rv-font);color:var(--rv-canvas);
+  background:var(--rv-ink);border-radius:5px;padding:6px 9px;cursor:pointer}
+.sc-fixbtn.off{color:var(--rv-muted);background:var(--rv-panel2);cursor:default}
+.sc-fixbtn .tag{font:500 9px/1 var(--rv-font);background:rgba(0,0,0,.08);border-radius:3px;padding:2px 4px}
+/* 분모 0 — 애초에 제안된 적이 없는 슬롯(계약 §"이 화면이 지키는 것" 1과 "교체 0건"을
+   구분하는 카드). rate[]에 행 자체가 없어 별도로 그린다 — 점선 테두리로 "이 카드는
+   교체율이 아니라 부재 사실을 보여준다"는 것을 시각적으로도 가른다. */
+.sc-card.nodenom{background:transparent;border-style:dashed;opacity:.82}
+.sc-card.nodenom .sc-pct{color:var(--rv-faint)}
+
+/* ── 교체 쌍 표 — 헤더·행이 같은 컨테이너·같은 grid-template(동기화 문제 원천 차단) ── */
+.sc-table{border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:auto}
+.sc-thead,.sc-row{display:grid;grid-template-columns:minmax(190px,1fr) minmax(190px,1fr) 92px 150px;gap:10px;min-width:660px}
+.sc-thead{background:var(--rv-panel);padding:9px 12px;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);position:sticky;top:0}
+.sc-row{padding:10px 12px;border-top:1px solid rgba(0,0,0,.06);align-items:center}
+.sc-cell.prod .nm{font:500 11.5px/1.4 var(--rv-font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sc-cell.prod .cd{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);margin-top:2px}
+.sc-chip{display:inline-block;font:600 9.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border-radius:4px;padding:3px 6px;margin-bottom:4px}
+.sc-cell.num{font:500 12px/1.3 var(--rv-mono);text-align:right}
+.sc-cell .sub{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);font-weight:400}
+.sc-cell.num.down{color:var(--rv-red)}
+.sc-cell.num.up{color:var(--rv-link)}
+.sc-cell.num.flat{color:var(--rv-muted)}
+
+/* ── 근거 클릭 상위 ── */
+.sc-badges{display:flex;gap:6px;flex-wrap:wrap}
+.sc-badge{font:600 10px/1 var(--rv-font);border-radius:20px;padding:5px 9px;background:var(--rv-panel2);color:var(--rv-ink-soft);white-space:nowrap}
+.sc-note{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin:0 0 10px}
+.sc-cliprow{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid rgba(0,0,0,.06)}
+.sc-cliprow:first-child{border-top:0}
+.sc-cliprank{width:16px;text-align:center;font:700 10.5px/1 var(--rv-mono);color:var(--rv-faint);flex:none}
+.sc-clipinfo{flex:1;min-width:0}
+.sc-clipinfo .nm{font:500 11.5px/1.3 var(--rv-font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-clipinfo .cd{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);margin-top:1px}
+.sc-cliptrack{width:64px;height:5px;border-radius:3px;background:rgba(0,0,0,.08);flex:none;overflow:hidden}
+.sc-clipbar{display:block;height:100%;background:var(--rv-purple);border-radius:3px}
+.sc-clipn{font:600 11px/1 var(--rv-mono);color:var(--rv-ink-soft);flex:none;width:54px;text-align:right}
+
+/* ── 클릭-교체 상관 ── */
+.sc-ovrow{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid rgba(0,0,0,.06)}
+.sc-ovrow:first-child{border-top:0}
+.sc-ovrow .lbl{font:600 10px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.03em}
+.sc-ovrow .val{font:500 12px/1.4 var(--rv-font);color:var(--rv-ink)}
+.sc-ovmark{margin-top:9px;font:700 11.5px/1 var(--rv-font);padding:8px 10px;border-radius:6px;text-align:center}
+.sc-ovmark.yes{color:var(--rv-ink);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+.sc-ovmark.no{color:var(--rv-muted);background:var(--rv-panel2)}
+
+/* ── 이 화면이 지키는 것 ── */
+.sc-keeplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.sc-keeplist li{display:flex;gap:8px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.sc-keeplist .n{flex:none;width:18px;height:18px;border-radius:50%;background:var(--rv-panel2);color:var(--rv-ink-soft);
+  font:700 10px/18px var(--rv-mono);text-align:center}
+
+/* ── 하단 고지 ── */
+.sc-foot{font:400 11px/1.7 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.09);padding-top:12px}
+
+@media (max-width:1100px){
+  .sc-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:768px){
+  .sc-grid{grid-template-columns:1fr}
+}
+@media (max-width:520px){
+  .sc-cards{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="sc-ro">읽기 전용 · 쓰기 없음</span>
+<button type="button" class="sc-refresh" data-action="refresh">새로고침</button>
+{% endblock %}
+
+{% block content %}
+<div class="sc-scroll">
+  <div class="sc-loading" id="scLoading" aria-live="polite"><div>불러오는 중…</div></div>
+
+  <div class="sc-errbox" id="scErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="scErrMsg"></div>
+    <button type="button" data-action="retry">다시 시도</button>
+  </div>
+
+  <div class="sc-body" id="scBody" hidden>
+    <div class="sc-topline">
+      <span class="strong" id="scTotalLine"></span>
+      <span id="scLimitNote"></span>
+    </div>
+
+    <div class="sc-banner" id="scBanner" role="status" aria-label="가장 뚜렷한 신호"></div>
+
+    <div class="sc-grid">
+      <div class="sc-col">
+        <section class="sc-panel" aria-labelledby="scRateH">
+          <div class="sc-panelhd">
+            <h2 id="scRateH">슬롯별 교체율</h2>
+            <span class="sc-panelsub">분모 = 견적 스냅샷에 실제로 제안된 횟수</span>
+          </div>
+          <div class="sc-cards" id="scRateCards"></div>
+          <div class="sc-panelnote">교체율이 높은 슬롯이 우리가 가장 못 고르는 부품입니다. 방향 배지는 평균 가격 변화(하향 ▼ · 상향 ▲ · 변화 없음 —)를 나타내고, 「열기」 버튼은 그 신호가 가리키는 정책 화면으로 이동합니다.</div>
+        </section>
+
+        <section class="sc-panel" aria-labelledby="scPairH">
+          <div class="sc-panelhd"><h2 id="scPairH">교체 쌍 — 빈도순</h2></div>
+          <div class="sc-table" role="table" aria-label="교체 쌍 목록">
+            <div class="sc-thead" role="row">
+              <span role="columnheader">원래 추천</span>
+              <span role="columnheader">고객이 바꾼 것</span>
+              <span role="columnheader">건수</span>
+              <span role="columnheader">평균 가격 변화</span>
+            </div>
+            <div id="scPairsBody"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="sc-col">
+        <section class="sc-panel" aria-labelledby="scClickH">
+          <div class="sc-panelhd">
+            <h2 id="scClickH">근거 클릭 상위</h2>
+            <div class="sc-badges">
+              <span class="sc-badge" id="scClickBadgeId"></span>
+              <span class="sc-badge" id="scClickBadgeUn"></span>
+            </div>
+          </div>
+          <div class="sc-note" id="scClickNote"></div>
+          <div id="scClickList"></div>
+        </section>
+
+        <section class="sc-panel" aria-labelledby="scOvH">
+          <div class="sc-panelhd"><h2 id="scOvH">클릭과 교체가 같은 상품을 가리킨다</h2></div>
+          <div id="scOverlap"></div>
+          <div class="sc-panelnote">화면은 사실만 보여주고 단정하지 않습니다.</div>
+        </section>
+
+        <section class="sc-panel" aria-labelledby="scKeepH">
+          <div class="sc-panelhd"><h2 id="scKeepH">이 화면이 지키는 것</h2></div>
+          <ol class="sc-keeplist">
+            <li><span class="n">1</span><span>교체율의 분모는 그 슬롯이 실제로 제안된 횟수(견적 스냅샷)입니다 — <code>recommendation_items</code>는 0행이라 분모로 쓸 수 없습니다.</span></li>
+            <li><span class="n">2</span><span>이 화면은 신호를 드러내고 어느 화면으로 가야 하는지 안내할 뿐, 조치는 용도별 최소 사양·추천 기준·부품 등급 소관입니다.</span></li>
+            <li><span class="n">3</span><span>클릭은 비로그인 방문자도 기록됩니다 — 로그인은 조건이 아니고 <code>user_id</code>는 익명 방문자 키입니다.</span></li>
+            <li><span class="n">4</span><span>지금은 오프셋이 없어 다음 페이지 개념이 없습니다(최대 500건) — 데이터가 늘면 실제 페이지네이션이 필요합니다.</span></li>
+          </ol>
+        </section>
+      </div>
+    </div>
+
+    <div class="sc-foot">
+      교체 0건인 슬롯은 「제안이 그대로 받아들여졌다」로 읽되, 애초에 제안된 적이 없는 경우(분모 0)와 구분합니다 · 이 화면은 신호를 드러내고 어디로 갈지 안내할 뿐, 실제 조치는 각 정책 화면 소관입니다.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = { data: null, err: null };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '0' : Number(n).toLocaleString('ko-KR'); }
+  function fmtPct1(n) { return (n == null ? 0 : Number(n)).toFixed(1) + '%'; }
+  function won(n) {
+    if (n == null) return '가격 정보 없음';
+    var sign = n > 0 ? '+' : (n < 0 ? '-' : '');
+    return sign + Math.abs(n).toLocaleString('ko-KR') + '원';
+  }
+  function deltaCls(n) {
+    if (n == null) return 'flat';
+    return n < 0 ? 'down' : (n > 0 ? 'up' : 'flat');
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, 'GET /api/admin/swap-logs') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  function boot() {
+    S.err = null;
+    renderAll();
+    return apiGet('/api/admin/swap-logs?limit=500')
+      .then(function (resp) { S.data = resp; renderAll(); })
+      .catch(function (err) { S.err = err; renderAll(); });
+  }
+
+  // ── 정책 버튼 — admin_nav.py 실측(SC_POLICY_LINKS, 서버가 렌더 시점에 실어 보냄) ──
+  function fixDir(r) {
+    if (!r.fix) return null;
+    if (r.avg_delta > 0) return 'up';
+    if (r.avg_delta < 0) return 'down';
+    return 'flat';
+  }
+  function policyBtnHtml(dir, why) {
+    var pl = (window.SC_POLICY_LINKS || {})[dir];
+    if (!pl) return '';
+    var why2 = why ? esc(why) : '';
+    if (pl.available) {
+      return '<a class="sc-fixbtn" href="' + esc(pl.href) + '"' + (why2 ? ' title="' + why2 + '"' : '') + '>'
+        + esc(pl.label) + ' 열기</a>';
+    }
+    var reason = esc(pl.reason || '신설 예정');
+    var title = why2 ? (why2 + ' · ' + reason) : reason;
+    return '<span class="sc-fixbtn off" title="' + title + '">' + esc(pl.label) + ' 열기<span class="tag">신설 예정</span></span>';
+  }
+
+  // ── 상단 경고 박스 ───────────────────────────────────────────────
+  function renderBanner(d) {
+    var box = $('scBanner');
+    if (!d.total) {
+      box.innerHTML =
+        '<div class="sc-bannerhd">아직 교체 기록이 없습니다</div>'
+        + '<div class="sc-bannerds">지금까지 제안된 부품이 전부 그대로 받아들여지고 있습니다. 해석은 운영자가 하고, 이 화면은 사실만 보여줍니다.</div>';
+      return;
+    }
+    var bySlot = d.by_slot || [];
+    if (!bySlot.length) {
+      box.innerHTML = '<div class="sc-bannerhd">교체 ' + fmt(d.total) + '건이 있지만 슬롯 정보가 없는 기록입니다.</div>';
+      return;
+    }
+    var dom = bySlot[0];
+    var domPairs = (d.pairs || []).filter(function (p) { return p.slot === dom.slot; });
+    var domPair = domPairs.length ? domPairs[0] : null;
+    var head = '교체 ' + fmt(d.total) + '건 중 ' + fmt(dom.n) + '건이 ' + esc(dom.label) + '입니다(' + fmt(dom.pct) + '%).';
+    var sub = '';
+    if (domPair) {
+      var pctOfSlot = dom.n ? Math.round(domPair.n * 100 / dom.n) : null;
+      sub = '그중 한 조합 — ' + esc(domPair.from_name || '(상품 정보 없음)') + '(' + esc(domPair.from_sku || '—') + ') → '
+        + esc(domPair.to_name || '(상품 정보 없음)') + '(' + esc(domPair.to_sku || '—') + ') — 이 ' + fmt(domPair.n) + '건'
+        + (pctOfSlot != null ? '(' + esc(dom.label) + ' 교체의 ' + pctOfSlot + '%)' : '') + '을 차지합니다.';
+    }
+    box.innerHTML =
+      '<div class="sc-bannerhd">' + head + '</div>'
+      + (sub ? '<div class="sc-bannerhd2">' + sub + '</div>' : '')
+      + '<div class="sc-bannerds">해석은 운영자가 하고, 이 화면은 사실만 보여줍니다.</div>'
+      + '<div class="sc-bannernote">이 조합이 서로 다른 몇 개의 세션·방문자에 걸쳐 나타나는지, 며칠에 걸쳐 반복됐는지는 지금 이 API(GET /api/admin/swap-logs)가 집계해 주지 않습니다 — 필요하면 별도 집계 확장이 있어야 합니다.</div>';
+  }
+
+  // ── 슬롯별 교체율 카드 ────────────────────────────────────────────
+  // "분모 0"(애초에 제안된 적이 없음) 카드 — rate[]는 quote_snapshots에 실제로
+  // 나타난 슬롯만 행으로 주므로(proposed=0인 슬롯은 SQL 구조상 행 자체가 없다),
+  // rate[]만 그리면 "교체 0건(제안은 됐음)"과 "분모 0(제안 자체가 없음)"이 똑같이
+  // "카드가 안 보인다"로 뭉개진다. SC_ALL_SLOTS(taxonomy.SLOT_LABELS, 서버가 실어
+  // 보냄)를 모집단으로 두고, rate[]에 없는 슬롯을 찾아 별도 카드로 명시한다.
+  function missingSlots(rate) {
+    var known = window.SC_ALL_SLOTS || {};
+    var present = {};
+    (rate || []).forEach(function (r) { present[r.slot] = true; });
+    return Object.keys(known).filter(function (s) { return !present[s]; })
+      .map(function (s) { return { slot: s, label: known[s] }; })
+      .sort(function (a, b) { return String(a.label).localeCompare(String(b.label), 'ko'); });
+  }
+  function noDenomCardHtml(m) {
+    return '<div class="sc-card nodenom">'
+      + '<div class="sc-cardhd"><span class="sc-slot" title="' + esc(m.label) + '">' + esc(m.label) + '</span>'
+      + '<span class="sc-pct num">—</span></div>'
+      + '<div class="sc-ratio num">분모 0 (제안 0건)</div>'
+      + '<div class="sc-cardfoot none"><span class="sc-reading">애초에 제안된 적이 없습니다 — 분모가 0이라 교체율 자체가 뜻이 없습니다.</span></div>'
+      + '</div>';
+  }
+  function renderRateCards(rate) {
+    var box = $('scRateCards');
+    var missing = missingSlots(rate);
+    if ((!rate || !rate.length) && !missing.length) {
+      box.innerHTML = '<div class="sc-emptyline">교체율을 계산할 슬롯이 없습니다 — 견적 스냅샷이 아직 없습니다.</div>';
+      return;
+    }
+    var sorted = (rate || []).slice().sort(function (a, b) {
+      if (b.swapped !== a.swapped) return b.swapped - a.swapped;
+      if (b.pct !== a.pct) return b.pct - a.pct;
+      return String(a.label || '').localeCompare(String(b.label || ''), 'ko');
+    });
+    var html = sorted.map(function (r) {
+      var dir = fixDir(r);
+      var dirMark = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : (dir === 'flat' ? '—' : ''));
+      var dirCls = dir === 'up' ? 'up' : (dir === 'down' ? 'down' : 'flat');
+      var bottom;
+      if (r.fix) {
+        bottom = '<div class="sc-cardfoot"><span class="sc-dirbadge ' + dirCls + '">' + dirMark + '</span>'
+          + '<span class="sc-reading">' + esc(r.reading) + '</span></div>'
+          + '<div class="sc-cardbtn">' + policyBtnHtml(dir, r.fix.why) + '</div>';
+      } else {
+        bottom = '<div class="sc-cardfoot none"><span class="sc-reading">' + esc(r.reading) + '</span></div>';
+      }
+      return '<div class="sc-card">'
+        + '<div class="sc-cardhd"><span class="sc-slot" title="' + esc(r.label) + '">' + esc(r.label) + '</span>'
+        + '<span class="sc-pct num">' + fmtPct1(r.pct) + '</span></div>'
+        + '<div class="sc-track"><span class="sc-bar" style="width:' + Math.max(0, Math.min(100, r.pct)) + '%"></span></div>'
+        + '<div class="sc-ratio num">' + fmt(r.swapped) + ' / ' + fmt(r.proposed) + '건</div>'
+        + bottom
+        + '</div>';
+    }).join('');
+    html += missing.map(noDenomCardHtml).join('');
+    box.innerHTML = html;
+  }
+
+  // ── 교체 쌍(빈도순) ──────────────────────────────────────────────
+  function renderPairs(pairs) {
+    var body = $('scPairsBody');
+    if (!pairs || !pairs.length) {
+      body.innerHTML = '<div class="sc-emptyrow">아직 교체 쌍이 없습니다.</div>';
+      return;
+    }
+    body.innerHTML = pairs.map(function (p) {
+      var dcls = deltaCls(p.avg_delta);
+      return '<div class="sc-row" role="row">'
+        + '<div class="sc-cell prod" role="cell"><span class="sc-chip">' + esc(p.slot_label || '—') + '</span>'
+        + '<div class="nm">' + esc(p.from_name || '(상품 정보 없음)') + '</div>'
+        + '<div class="cd num">' + esc(p.from_sku || '—') + '</div></div>'
+        + '<div class="sc-cell prod" role="cell">'
+        + '<div class="nm">' + esc(p.to_name || '(상품 정보 없음)') + '</div>'
+        + '<div class="cd num">' + esc(p.to_sku || '—') + '</div></div>'
+        + '<div class="sc-cell num" role="cell">' + fmt(p.n) + '건<div class="sub">전체의 ' + fmt(p.pct) + '%</div></div>'
+        + '<div class="sc-cell num ' + dcls + '" role="cell">' + esc(won(p.avg_delta)) + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── 근거 클릭 상위 ───────────────────────────────────────────────
+  function renderClicks(clicks) {
+    $('scClickBadgeId').textContent = '식별 ' + fmt(clicks.identified) + '건';
+    $('scClickBadgeUn').textContent = '비식별 ' + fmt(clicks.unidentified) + '건';
+    $('scClickNote').textContent = clicks.reason || '';
+    var list = $('scClickList');
+    if (clicks.empty || !clicks.top || !clicks.top.length) {
+      list.innerHTML = '<div class="sc-emptyrow">아직 클릭된 상품이 없습니다.</div>';
+      return;
+    }
+    var max = clicks.top.reduce(function (m, c) { return Math.max(m, c.n || 0); }, 1);
+    list.innerHTML = clicks.top.map(function (c, i) {
+      var width = max ? Math.round((c.n || 0) * 100 / max) : 0;
+      return '<div class="sc-cliprow">'
+        + '<span class="sc-cliprank num">' + (i + 1) + '</span>'
+        + '<div class="sc-clipinfo"><div class="nm">' + esc(c.name || '(상품 정보 없음)') + '</div>'
+        + '<div class="cd num">' + esc(c.label || c.part_type || '—') + ' · ' + esc(String(c.sku != null ? c.sku : (c.product_code != null ? c.product_code : '—'))) + '</div></div>'
+        + '<div class="sc-cliptrack"><span class="sc-clipbar" style="width:' + width + '%"></span></div>'
+        + '<span class="sc-clipn num">' + fmt(c.n) + '건</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── 클릭과 교체가 같은 상품을 가리킨다(사실 비교만 — 단정하지 않는다) ──────────
+  function renderOverlap(d) {
+    var box = $('scOverlap');
+    var topClick = d.clicks && d.clicks.top && d.clicks.top.length ? d.clicks.top[0] : null;
+    var topPair = d.pairs && d.pairs.length ? d.pairs[0] : null;
+    if (!topClick || !topPair) {
+      box.innerHTML = '<div class="sc-emptyrow">비교할 데이터가 아직 충분하지 않습니다.</div>';
+      return;
+    }
+    var clickKey = String(topClick.sku != null ? topClick.sku : topClick.product_code);
+    var pairKey = String(topPair.to_sku != null ? topPair.to_sku : '');
+    var match = clickKey !== '' && clickKey === pairKey;
+    box.innerHTML =
+      '<div class="sc-ovrow"><span class="lbl">근거 클릭 1위</span>'
+      + '<span class="val">' + esc(topClick.name || '(상품 정보 없음)') + ' <span class="num">(' + esc(clickKey) + ')</span> — ' + fmt(topClick.n) + '건</span></div>'
+      + '<div class="sc-ovrow"><span class="lbl">교체 목적지 1위</span>'
+      + '<span class="val">' + esc(topPair.to_name || '(상품 정보 없음)') + ' <span class="num">(' + esc(pairKey || '—') + ')</span> — ' + fmt(topPair.n) + '건</span></div>'
+      + '<div class="sc-ovmark ' + (match ? 'yes' : 'no') + '">' + (match ? '같은 상품입니다' : '다른 상품입니다') + '</div>';
+  }
+
+  // ── 전체 렌더 ─────────────────────────────────────────────────────
+  function renderAll() {
+    var loading = $('scLoading'), errBox = $('scErrBox'), body = $('scBody');
+    if (S.err) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('scErrMsg').textContent = S.err.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+
+    var d = S.data;
+    var clickCount = (d.clicks && d.clicks.count) || 0;
+    $('scTotalLine').textContent = '교체 ' + fmt(d.total) + '건 · 근거 클릭 ' + fmt(clickCount) + '건';
+    $('scLimitNote').textContent = d.note || '';
+
+    renderBanner(d);
+    renderRateCards(d.rate || []);
+    renderPairs(d.pairs || []);
+    renderClicks(d.clicks || { empty: true, count: 0, identified: 0, unidentified: 0, top: [], reason: '' });
+    renderOverlap(d);
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var act = t.getAttribute('data-action');
+    if (act === 'retry' || act === 'refresh') boot();
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

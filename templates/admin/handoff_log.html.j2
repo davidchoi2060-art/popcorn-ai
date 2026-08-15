@@ -1,0 +1,552 @@
+{#
+  인계 기록 (ADM-HND-020) — 2026-08-15 신설, 조회 전용
+
+  ■ 이 화면이 답하는 질문
+    "누가 언제 무엇을 얼마에 쇼핑몰로 넘겼는가." 그리고 **그만큼 중요하게** —
+    "인계"는 "구매"가 아니라는 사실. 지금 시스템은 고객에게 몰 장바구니 목록 페이지
+    링크를 열어줄 뿐이고, 그 상품을 실제로 담는 요청은 어디에도 보내지 않는다
+    (`api/handoff.py` 실측 — 담당 파일 밖이라 읽기만 했다. 이 화면 API
+    `api/admin_ui_handoff_log.py` 모듈 docstring 참조).
+
+  ■ 출처 — 계약 요약만 받았다(원안 .dc.html은 서브에이전트에서 못 연다)
+    `docs/design/spec-handoff-log.md`(사장님 확정 **1a** "인계 건 축", 2026-08-15 —
+    1b "세션 축"은 탈락). `docs/design/MAKER-CHECKLIST.md` §1 "확정 안만 정본이다".
+
+  ■ 데이터 — `GET /admin2/handoff-log/data`(이 화면 전용, `api/admin_ui_handoff_log.py`
+    가 직접 낸다 — 별도 API 파일을 새로 만들 수 없는 담당 범위라 같은 파일 안에 뒀다).
+    **이 경로는 `/api/admin/*` 인증 미들웨어 밖이라 엔드포인트 자신이 세션을 확인한다**
+    (401이면 로그인 필요 — 그 사실 자체가 이 화면이 발견해 스스로 메운 구멍이다,
+    API 모듈 docstring "인증 구멍" 절 참조).
+
+  ■★ 정직성 셋 — 계약이 요구한 그대로 구현했다
+    ① 「몰 0원」≠「확인 못함」 — `mall_status`를 화면이 다시 판정하지 않고 그대로
+       옮긴다. 실제로 같은 데모 상품이 한 인계에선 0원(팔 수 없는 값을 읽음), 다른
+       인계에선 확인못함(아예 못 읽음)으로 **다르게** 저장돼 있다 — 시각적으로도
+       구분한다(0원은 앰버, 확인못함은 적색).
+    ② 총액 비교는 순수 비교가 아니다 — 확인 못한 라인은 몰 총액 계산에 우리 값으로
+       대체된다(`api/handoff.py` L124). 서랍의 몰 총액 카드 밑에 "N라인은 우리
+       값으로 대체"를 반드시 붙인다(N>0일 때).
+    ③ 상태는 사실상 "인계" 하나뿐 — 실측(DISTINCT)으로 확인했다. 상태 필터·배지를
+       과하게 만들지 않았다.
+
+  ■ 세션 이동 · 쇼핑몰 동기화 링크 — 경로로 판정한다(라벨 아님). `NAV_TARGETS`가
+    각 화면의 실제 `@router.get(...)` 선언을 읽어 확정한 경로이고, `admin_nav.NAV`에
+    그 경로가 지금 `href`로 걸려 있는지만 매 요청 확인한다. 지금(2026-08-15)은 둘 다
+    아직 메뉴에 연결되지 않아 비활성 + 사유로 뜬다(정상 — `api/admin_ui_swap_click_logs.py`
+    가 겪은 사고와 같은 이유로 라벨이 아니라 경로로 짰다).
+
+  ■ 표·격자 정렬 — 헤더·행이 **같은 스크롤 컨테이너 안에서 같은 grid-template-columns**
+    를 쓴다(`.hl-thead`/`.hl-row`) — 헤더·본문이 서로 다른 스크롤 오프셋을 가져 열이
+    어긋나는 사고(`product_category_map.html.j2` 등에서 겪음)를 애초에 만들 여지를
+    없앴다. 좁은 화면에서는 열을 숨기지 않고 `.hl-table`을 가로 스크롤한다.
+
+  ■ 팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`(oklch 베이지,
+    `--rv-*`)만 읽는다. `:root`를 다시 정의하지 않는다. 외부 CDN 0건 — 이 파일이
+    추가하는 자산은 인라인 `<style>`/`<script>`뿐이다. U-01("관리자 화면은 통과=
+    --primary, 초록은 고객 화면 용법")에 따라 "확인됨" 상태에 초록을 쓰지 않았다.
+
+  ■ 권한 — 조회는 로그인만 되면 등급 무관(계약 그대로). 쓰기 버튼이 하나도 없다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}인계 기록{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;margin:0;padding:0;border:0;background:none}
+code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;border-radius:3px;font-size:.95em}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 위젯 ── */
+.hl-ro{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.hl-hdsub{font:400 11px/1.3 var(--rv-font);color:var(--rv-faint);white-space:nowrap}
+.hl-refresh{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+
+/* ── 루트 ── */
+.hl-scroll{flex:1;min-height:0;overflow:auto;padding:14px 18px 22px;display:flex;flex-direction:column;gap:14px;position:relative}
+.hl-loading,.hl-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:60px 20px}
+.hl-loading[hidden],.hl-errbox[hidden],.hl-body[hidden]{display:none}
+.hl-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.hl-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.hl-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);cursor:pointer}
+.hl-body{display:flex;flex-direction:column;gap:14px}
+
+/* ── 상단 총계 줄 ── */
+.hl-topline{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;font:400 11.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.hl-topline .strong{font-weight:700;color:var(--rv-ink);font-size:12.5px}
+
+/* ── 경고 배너 ── */
+.hl-banner{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+  border-left:3px solid var(--rv-amber);border-radius:8px;padding:13px 16px;
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.hl-bannertxt{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.hl-bannerhd{font:600 13.5px/1.5 var(--rv-font);color:var(--rv-ink)}
+.hl-bannerds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.hl-bannerpill{flex:none;font:600 10.5px/1.4 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.14);border-radius:20px;padding:7px 12px;white-space:nowrap}
+
+/* ── KPI 5장 ── */
+.hl-kpis{display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:10px}
+.hl-kpi{border:1px solid rgba(0,0,0,.1);border-radius:9px;background:var(--rv-card);
+  padding:12px 14px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.hl-kpi .lbl{font:600 10.5px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em}
+.hl-kpi .val{font:700 20px/1.15 var(--rv-mono);color:var(--rv-ink)}
+.hl-kpi .val.muted{color:var(--rv-muted);font-family:var(--rv-font);font-size:17px}
+.hl-kpi .sub{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.hl-kpi .sub b{font-weight:700;color:var(--rv-ink-soft)}
+
+/* ── 표 — 헤더·행이 같은 컨테이너·같은 grid-template(동기화 문제 원천 차단) ── */
+.hl-panel{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:14px 15px;min-width:0}
+.hl-panelhd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.hl-panelhd h2{font:600 13.5px/1.3 var(--rv-font);margin:0;color:var(--rv-ink)}
+.hl-panelsub{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+.hl-table{border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:auto}
+.hl-thead,.hl-row{display:grid;
+  grid-template-columns:100px 130px 92px 62px minmax(96px,110px) minmax(112px,142px) 96px minmax(210px,1fr);
+  gap:10px;min-width:900px}
+.hl-thead{background:var(--rv-panel);padding:9px 12px;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);position:sticky;top:0}
+.hl-row{padding:11px 12px;border-top:1px solid rgba(0,0,0,.06);align-items:center;cursor:pointer}
+.hl-row:hover{background:var(--rv-panel2)}
+.hl-row.sel{background:var(--rv-panel2);box-shadow:inset 3px 0 0 var(--rv-ink)}
+.hl-cell{font:500 11.5px/1.35 var(--rv-font);color:var(--rv-ink);min-width:0}
+.hl-cell.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+.hl-cell.mall.unk{color:var(--rv-red)}
+.hl-cell.mall .sub{display:block;font:400 9.5px/1.4 var(--rv-font);color:var(--rv-faint);margin-top:1px}
+.hl-cell.note{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+.hl-emptyrow{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-faint);padding:20px 4px;text-align:center}
+
+.hl-tier{display:inline-flex;align-items:center;gap:5px;font:600 10.5px/1 var(--rv-font);border-radius:20px;padding:5px 9px;white-space:nowrap}
+.hl-tier::before{content:"";width:7px;height:7px;border-radius:50%;display:inline-block}
+.hl-tier.hi{color:var(--rv-red);background:oklch(0.94 0.035 30)}
+.hl-tier.hi::before{background:var(--rv-red)}
+.hl-tier.re{color:var(--rv-link);background:oklch(0.94 0.025 250)}
+.hl-tier.re::before{background:var(--rv-link)}
+.hl-tier.va{color:var(--rv-green);background:oklch(0.94 0.05 165)}
+.hl-tier.va::before{background:var(--rv-green)}
+.hl-tier.unk{color:var(--rv-muted);background:var(--rv-panel2)}
+.hl-tier.unk::before{background:var(--rv-dim3)}
+
+.hl-chk{display:inline-flex;align-items:center;gap:4px;font:600 10.5px/1 var(--rv-font);white-space:nowrap}
+.hl-chk.ok{color:var(--rv-ink)}
+.hl-chk.part{color:var(--rv-amber)}
+
+/* ── 표 아래 안내 / 하단 고지 ── */
+.hl-notice{font:400 11px/1.7 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.09);padding-top:12px}
+.hl-notice b{color:var(--rv-ink-soft);font-weight:600}
+
+/* ── 우측 서랍 ── */
+.hl-backdrop{position:fixed;inset:0;background:rgba(20,18,14,.28);opacity:0;pointer-events:none;
+  transition:opacity .15s ease;z-index:29}
+.hl-backdrop.show{opacity:1;pointer-events:auto}
+.hl-drawer{position:fixed;top:0;right:0;bottom:0;width:560px;max-width:100vw;background:var(--rv-card);
+  box-shadow:-10px 0 28px rgba(20,18,14,.18);z-index:30;display:flex;flex-direction:column;
+  transform:translateX(105%);transition:transform .18s ease}
+.hl-drawer.open{transform:translateX(0)}
+.hl-dwhead{flex:none;display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid rgba(0,0,0,.09)}
+.hl-dwhead .no{font:700 15px/1 var(--rv-mono);color:var(--rv-ink)}
+.hl-dwhead .grow{flex:1}
+.hl-dwx{font:400 18px/1 var(--rv-font);color:var(--rv-muted);cursor:pointer;padding:4px}
+.hl-dwbody{flex:1;min-height:0;overflow:auto;padding:16px 18px 26px;display:flex;flex-direction:column;gap:16px}
+.hl-dwmeta{display:flex;flex-wrap:wrap;gap:8px 18px;font:400 11.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.hl-dwmeta b{color:var(--rv-ink-soft);font-weight:600}
+.hl-dwnote{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel);
+  border-radius:7px;padding:10px 12px}
+
+.hl-totals{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hl-totalcard{border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:11px 12px;background:var(--rv-panel)}
+.hl-totalcard .lbl{font:600 10px/1.2 var(--rv-font);color:var(--rv-faint)}
+.hl-totalcard .val{font:700 17px/1.3 var(--rv-mono);color:var(--rv-ink);margin-top:4px}
+.hl-totalcard .val.unk{color:var(--rv-amber)}
+.hl-totalcard .repl{margin-top:5px;font:600 10px/1.4 var(--rv-font);color:var(--rv-amber)}
+
+.hl-sessnav{display:flex;flex-direction:column;gap:6px}
+.hl-navbtn{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font:600 11px/1 var(--rv-font);
+  color:var(--rv-canvas);background:var(--rv-ink);border-radius:6px;padding:8px 12px;cursor:pointer}
+.hl-navbtn.off{color:var(--rv-muted);background:var(--rv-panel2);cursor:default}
+.hl-navbtn .tag{font:500 9px/1 var(--rv-font);background:rgba(0,0,0,.08);border-radius:3px;padding:2px 5px;margin-left:2px}
+.hl-sessgroup{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);max-width:100%}
+
+.hl-lines{display:flex;flex-direction:column;border:1px solid rgba(0,0,0,.09);border-radius:8px;overflow:hidden}
+.hl-line{display:flex;flex-direction:column;gap:5px;padding:10px 12px;border-top:1px solid rgba(0,0,0,.06)}
+.hl-line:first-child{border-top:0}
+.hl-linehd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.hl-linebadges{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:3px}
+.hl-badge{display:inline-block;font:600 9.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border-radius:4px;padding:3px 6px}
+.hl-badge.demo{color:var(--rv-ink);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+.hl-linenm{font:500 11.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.hl-linecd{font:400 10px/1.3 var(--rv-mono);color:var(--rv-faint);margin-top:1px}
+.hl-lineprice{display:flex;gap:14px;font:400 10.5px/1.4 var(--rv-font);color:var(--rv-muted);flex-wrap:wrap}
+.hl-lineprice .num{color:var(--rv-ink-soft);font-weight:500}
+.hl-linestatus{font:600 10.5px/1 var(--rv-font);white-space:nowrap;flex:none}
+.hl-linestatus.ok{color:var(--rv-ink)}
+.hl-linestatus.chg{color:var(--rv-amber)}
+.hl-linestatus.unk{color:var(--rv-red)}
+.hl-mallval.unk{color:var(--rv-red);font-weight:600}
+.hl-mallval.zero{color:var(--rv-amber);font-weight:600}
+
+.hl-perip{border:1px dashed rgba(0,0,0,.16);border-radius:7px;padding:10px 12px;font:400 11px/1.6 var(--rv-font);color:var(--rv-faint)}
+.hl-dwfoot{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.08);padding-top:10px}
+
+@media (max-width:1100px){
+  .hl-kpis{grid-template-columns:repeat(3,minmax(150px,1fr))}
+}
+@media (max-width:768px){
+  .hl-kpis{grid-template-columns:repeat(2,minmax(140px,1fr))}
+  .hl-totals{grid-template-columns:1fr}
+  .hl-drawer{width:100vw}
+}
+@media (max-width:520px){
+  .hl-kpis{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="hl-hdsub">무엇을 언제 어떤 견적으로 넘겼나</span>
+<span class="hl-ro">조회 전용</span>
+<button type="button" class="hl-refresh" data-action="refresh">새로고침</button>
+{% endblock %}
+
+{% block content %}
+<div class="hl-scroll">
+  <div class="hl-loading" id="hlLoading" aria-live="polite"><div>불러오는 중…</div></div>
+
+  <div class="hl-errbox" id="hlErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="hlErrMsg"></div>
+    <button type="button" data-action="retry">다시 시도</button>
+  </div>
+
+  <div class="hl-body" id="hlBody" hidden>
+    <div class="hl-topline">
+      <span class="strong" id="hlTotalLine"></span>
+      <span id="hlPeriodLine"></span>
+    </div>
+
+    <div class="hl-banner" role="status" aria-label="이 화면이 지키는 사실">
+      <div class="hl-bannertxt">
+        <div class="hl-bannerhd">넘긴 기록입니다 — 장바구니 도달 여부는 모릅니다</div>
+        <div class="hl-bannerds">지금 시스템은 고객에게 몰의 <b>장바구니 목록 페이지 링크를 열어줄 뿐</b>이고, 그 상품을 실제로 담는 요청은 <b>어디에서도 보내지 않습니다.</b> 고객이 링크를 눌렀는지도 추적하지 않습니다 — <b>이 목록을 구매 기록으로 읽으면 사실과 다릅니다.</b></div>
+      </div>
+      <span class="hl-bannerpill">몰 장바구니에 담는 요청을 보내지 않습니다</span>
+    </div>
+
+    <div class="hl-kpis" id="hlKpis"></div>
+
+    <section class="hl-panel" aria-labelledby="hlTableH">
+      <div class="hl-panelhd">
+        <h2 id="hlTableH">인계 건 — 최신순</h2>
+        <span class="hl-panelsub">행을 누르면 라인 상세가 열립니다</span>
+      </div>
+      <div class="hl-table" role="table" aria-label="인계 건 목록">
+        <div class="hl-thead" role="row">
+          <span role="columnheader">인계 번호</span>
+          <span role="columnheader">시각</span>
+          <span role="columnheader">티어</span>
+          <span role="columnheader">라인</span>
+          <span role="columnheader">우리 총액</span>
+          <span role="columnheader">몰 총액</span>
+          <span role="columnheader">확인</span>
+          <span role="columnheader">비고</span>
+        </div>
+        <div id="hlRowsBody"></div>
+      </div>
+    </section>
+
+    <div class="hl-notice">
+      <b>인계 기능은 2026-08-11부터 존재합니다</b> — 그 이전 기간을 조회하면 반드시 0건이며, 이는 <b>「조회 실패」가 아니라 「그 기간엔 인계가 없었다」</b>는 뜻입니다.<br>
+      상태는 지금 <b>「인계」 하나뿐</b>이라 상태 필터를 두지 않았습니다.
+    </div>
+
+    <div class="hl-notice">
+      <b>인계를 취소하거나 되돌리는 기능은 없습니다</b>(그런 경로가 코드에 없다는 사실을 짚어 둡니다) · 회원 귀속은 없습니다(익명 방문자 키만) — 실 인증 이전이라 정상입니다 · <b>인계 이후 결제 여부는 유입 성과에서도 알 수 없습니다.</b>
+    </div>
+  </div>
+</div>
+
+<div class="hl-backdrop" id="hlBackdrop"></div>
+<aside class="hl-drawer" id="hlDrawer" data-keep="1" aria-hidden="true">
+  <div id="hlDrawerInner"></div>
+</aside>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = { data: null, err: null, openId: null };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '0' : Number(n).toLocaleString('ko-KR'); }
+  function won(n) { return (n == null) ? '—' : fmt(n) + '원'; }
+  function p2(n) { return String(n).padStart(2, '0'); }
+  function fmtAt(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return String(iso).slice(0, 10);
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, 'GET /admin2/handoff-log/data') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  function boot() {
+    S.err = null;
+    renderAll();
+    return apiGet('/admin2/handoff-log/data')
+      .then(function (resp) { S.data = resp; renderAll(); })
+      .catch(function (err) { S.err = err; renderAll(); });
+  }
+
+  // ── KPI 5장 ──────────────────────────────────────────────────────
+  function renderKpis(d) {
+    var k = d.kpi;
+    var period = d.period ? (fmtDate(d.period.min) + ' ~ ' + fmtDate(d.period.max)) : '인계 없음';
+    var lines = k.lines;
+    var html = '';
+    html += '<div class="hl-kpi"><span class="lbl">인계 건</span><span class="val">' + fmt(k.handoff_count) + '건</span>'
+      + '<span class="sub">' + esc(period) + '</span></div>';
+    html += '<div class="hl-kpi"><span class="lbl">라인</span><span class="val">' + fmt(lines.total) + '</span>'
+      + '<span class="sub">부품 <b>' + fmt(lines.core_part) + '</b> · 조립비 <b>' + fmt(lines.assembly_service)
+      + '</b> · 주변기기 <b>' + fmt(lines.peripheral) + '</b></span></div>';
+    html += '<div class="hl-kpi"><span class="lbl">어긋난 라인</span><span class="val">' + k.mismatch.pct.toFixed(1) + '%</span>'
+      + '<span class="sub">표본 ' + fmt(k.mismatch.sample) + '라인 중 ' + fmt(k.mismatch.n) + '라인(가격변동)</span></div>';
+    html += '<div class="hl-kpi"><span class="lbl">우리 총액 합계</span><span class="val">' + won(k.quoted_sum.sum) + '</span>'
+      + '<span class="sub"><b>표본 ' + fmt(k.quoted_sum.sample) + '건 — 객단가로 읽지 않습니다</b></span></div>';
+    html += '<div class="hl-kpi"><span class="lbl">장바구니 도달</span><span class="val muted">모름</span>'
+      + '<span class="sub">추적 경로가 없습니다</span></div>';
+    $('hlKpis').innerHTML = html;
+  }
+
+  // ── 표 ───────────────────────────────────────────────────────────
+  function tierHtml(t) {
+    return '<span class="hl-tier ' + esc(t.cls) + '">' + esc(t.label) + '</span>';
+  }
+  function chkHtml(row) {
+    if (row.price_checked) return '<span class="hl-chk ok">✓ 전 라인</span>';
+    return '<span class="hl-chk part" title="인계 시점에 몰 가격을 확인하지 못했습니다">▲ 일부 못함</span>';
+  }
+  function renderRows(d) {
+    var body = $('hlRowsBody');
+    if (!d.rows.length) {
+      body.innerHTML = '<div class="hl-emptyrow">이 기간에는 인계 기록이 없습니다 — 조회 실패가 아니라 실제로 없었던 것입니다.</div>';
+      return;
+    }
+    body.innerHTML = d.rows.map(function (r) {
+      var mallCls = r.price_checked ? '' : 'unk';
+      var mallSub = (!r.price_checked && r.unknown_count > 0)
+        ? ('<span class="sub">' + r.unknown_count + '라인 대체</span>') : '';
+      return '<div class="hl-row' + (S.openId === r.handoff_id ? ' sel' : '') + '" data-keep="1" data-id="' + r.handoff_id + '" role="row" tabindex="0">'
+        + '<div class="hl-cell num">' + esc(r.handoff_no) + '</div>'
+        + '<div class="hl-cell num">' + fmtAt(r.created_at) + '</div>'
+        + '<div class="hl-cell">' + tierHtml(r.tier) + '</div>'
+        + '<div class="hl-cell num">' + fmt(r.line_count) + '</div>'
+        + '<div class="hl-cell num">' + won(r.total_quoted) + '</div>'
+        + '<div class="hl-cell num mall ' + mallCls + '">' + won(r.total_mall) + mallSub + '</div>'
+        + '<div class="hl-cell">' + chkHtml(r) + '</div>'
+        + '<div class="hl-cell note">' + esc(r.note) + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── 서랍 ─────────────────────────────────────────────────────────
+  function navBtnHtml(navInfo, sessionId) {
+    if (sessionId == null) {
+      return '<span class="hl-navbtn off" title="이 인계에는 연결된 세션 번호가 없습니다">이 상담 세션 보기</span>';
+    }
+    if (!navInfo) return '';
+    if (navInfo.available) {
+      return '<a class="hl-navbtn" href="' + esc(navInfo.path) + '?session_id=' + sessionId + '">이 상담 세션 보기</a>';
+    }
+    return '<span class="hl-navbtn off" title="' + esc(navInfo.reason || '') + '">이 상담 세션 보기<span class="tag">신설 예정</span></span>';
+  }
+  function mallSyncLinkHtml(navInfo) {
+    if (navInfo && navInfo.available) {
+      return '<a href="' + esc(navInfo.path) + '">「쇼핑몰 동기화」</a>';
+    }
+    return '「쇼핑몰 동기화」' + (navInfo && navInfo.reason ? '(' + esc(navInfo.reason) + ')' : '');
+  }
+  function sessionGroupNote(row) {
+    var sg = row.session_group;
+    if (!sg) return '';
+    var uniq = sg.user_ids.filter(function (v, i) { return sg.user_ids.indexOf(v) === i; });
+    var visitorNote = uniq.length > 1 ? ('방문자 키가 ' + uniq.join(' → ') + '로 다릅니다')
+      : ('방문자 키는 ' + uniq[0] + '로 동일합니다');
+    var gapNote = sg.gap_min.length ? ('간격 약 ' + sg.gap_min.map(function (g) { return g + '분'; }).join(', ')) : '';
+    return '이 세션은 인계 ' + sg.count + '건과 연결돼 있습니다(' + sg.handoffs.join(' · ') + ')'
+      + (gapNote ? (' — ' + gapNote) : '') + ' — ' + visitorNote
+      + '. 재시도인지 중복 클릭인지 별도 방문자의 재상담인지는 이 데이터만으로 알 수 없습니다.';
+  }
+  function lineHtml(it) {
+    var badges = '<span class="hl-badge">' + esc(it.item_kind_label) + '</span>';
+    if (it.part_type) badges += '<span class="hl-badge">' + esc(it.part_type) + '</span>';
+    if (it.is_demo) badges += '<span class="hl-badge demo">시연용</span>';
+    var mallHtml;
+    if (it.price_mall == null) {
+      mallHtml = '<span class="hl-mallval unk">못 읽음</span>';
+    } else if (it.price_mall === 0) {
+      // 계약 원문 그대로: "0원"이 아니라 「0」 — 정상가처럼 읽히지 않게 다르게 표기한다.
+      mallHtml = '<span class="hl-mallval zero num">0</span>';
+    } else {
+      mallHtml = '<span class="num">' + won(it.price_mall) + '</span>';
+    }
+    return '<div class="hl-line">'
+      + '<div class="hl-linehd"><div><div class="hl-linebadges">' + badges + '</div>'
+      + '<div class="hl-linenm">' + esc(it.name || '(상품 정보 없음)') + '</div>'
+      + '<div class="hl-linecd">' + esc(String(it.product_code != null ? it.product_code : '—')) + (it.qty > 1 ? (' · 수량 ' + it.qty) : '') + '</div></div>'
+      + '<span class="hl-linestatus ' + esc(it.mall_cls) + '"'
+      + (it.mall_status === '확인못함' ? ' title="인계 시점에 몰 가격을 확인하지 못했습니다"' : '')
+      + '>' + esc(it.mall_mark) + ' ' + esc(it.mall_text) + '</span></div>'
+      + '<div class="hl-lineprice"><span>우리 값 <span class="num">' + won(it.price_quoted) + '</span></span>'
+      + '<span>몰 값 ' + mallHtml + '</span></div>'
+      + '</div>';
+  }
+  function renderDrawer() {
+    var drawer = $('hlDrawer'), backdrop = $('hlBackdrop');
+    if (S.openId == null || !S.data) {
+      drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true');
+      backdrop.classList.remove('show');
+      return;
+    }
+    var row = S.data.rows.filter(function (r) { return r.handoff_id === S.openId; })[0];
+    if (!row) { S.openId = null; return renderDrawer(); }
+    var nav = S.data.nav || {};
+    var totalMallCls = row.price_checked ? '' : 'unk';
+    var replNote = (!row.price_checked && row.unknown_count > 0)
+      ? ('<div class="repl">' + row.unknown_count + '라인은 우리 값으로 대체</div>') : '';
+    var periphBox = (S.data.kpi.lines.peripheral === 0)
+      ? ('<div class="hl-perip">주변기기를 함께 넘기는 기능은 있지만 인계 ' + fmt(S.data.kpi.handoff_count)
+         + '건 중 하나도 담지 않았습니다 — 기능은 있고 실사용이 아직 없는 정상 상태입니다(오류가 아닙니다).</div>') : '';
+    var sgNote = sessionGroupNote(row);
+
+    var html = ''
+      + '<div class="hl-dwhead"><span class="no">' + esc(row.handoff_no) + '</span>' + chkHtml(row)
+      + '<span class="grow"></span><span class="hl-dwx" data-action="close-drawer" role="button" aria-label="닫기">✕</span></div>'
+      + '<div class="hl-dwbody">'
+      + '<div class="hl-dwmeta">'
+      + '<span><b>시각</b> ' + fmtAt(row.created_at) + '</span>'
+      + '<span><b>티어</b> ' + tierHtml(row.tier) + '</span>'
+      + '<span><b>세션 번호</b> ' + esc(row.session_id != null ? row.session_id : '—') + '</span>'
+      + '<span><b>방문자 키</b> ' + esc(row.user_id != null ? row.user_id : '—') + '</span>'
+      + '</div>'
+      + '<div class="hl-dwnote">넘긴 기록입니다 — 이 견적이 고객의 몰 장바구니에 실제로 담겼는지는 알 수 없습니다.</div>'
+      + '<div class="hl-totals">'
+      + '<div class="hl-totalcard"><div class="lbl">우리 총액</div><div class="val">' + won(row.total_quoted) + '</div></div>'
+      + '<div class="hl-totalcard"><div class="lbl">몰 총액</div><div class="val ' + totalMallCls + '">' + won(row.total_mall) + '</div>' + replNote + '</div>'
+      + '</div>'
+      + '<div class="hl-sessnav">' + navBtnHtml(nav.consult_sessions, row.session_id)
+      + (sgNote ? ('<div class="hl-sessgroup">' + esc(sgNote) + '</div>') : '') + '</div>'
+      + '<div><div class="hl-panelsub" style="margin-bottom:8px">라인 목록 — 당시 표시명 그대로</div>'
+      + '<div class="hl-lines">' + row.items.map(lineHtml).join('') + '</div></div>'
+      + '<div class="hl-dwnote">「몰 0원」과 「확인 못함」은 다릅니다 — 0원은 팔 수 없는 값을 읽은 것이고, 확인 못함은 값을 아예 읽지 못한 것입니다. 화면이 새로 판정하지 않고 저장된 값을 그대로 씁니다.</div>'
+      + periphBox
+      + '<div class="hl-dwfoot">인계를 취소·되돌리는 기능은 없습니다 · 가격 재확인 자체의 건강 상태는 ' + mallSyncLinkHtml(nav.mall_sync) + ' 소관입니다.</div>'
+      + '</div>';
+    $('hlDrawerInner').innerHTML = html;
+    drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false');
+    backdrop.classList.add('show');
+  }
+
+  // 서랍을 닫는 «단일 경로». 닫기 버튼(✕) · 바깥 클릭 · ESC 셋 다 여기를 부른다.
+  // renderDrawer()만 부르고 renderRows()를 빠뜨리면 목록의 .sel 강조가 안 지워진다
+  // (행을 다시 눌러 토글로 닫을 때만 두 렌더를 다 불러 정상이었다 — 확인자 실측,
+  // 2026-08-15). 닫는 경로를 하나로 모아 같은 버그가 다시 생길 자리를 없앤다.
+  function closeDrawer() {
+    if (S.openId == null) return;
+    S.openId = null;
+    if (S.data) renderRows(S.data);
+    renderDrawer();
+  }
+
+  // ── 전체 렌더 ─────────────────────────────────────────────────────
+  function renderAll() {
+    var loading = $('hlLoading'), errBox = $('hlErrBox'), body = $('hlBody');
+    if (S.err) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('hlErrMsg').textContent = S.err.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+
+    var d = S.data;
+    var pageNote = (d.total > d.page.returned)
+      ? ('전체 ' + fmt(d.total) + '건 중 ' + fmt(d.page.returned) + '건 표시') : ('전체 ' + fmt(d.total) + '건');
+    $('hlTotalLine').textContent = pageNote;
+    $('hlPeriodLine').textContent = d.status_distinct && d.status_distinct.length > 1
+      ? ('상태 ' + d.status_distinct.length + '종 관측됨 — 필터가 필요할 수 있습니다') : '';
+
+    renderKpis(d);
+    renderRows(d);
+    renderDrawer();
+  }
+
+  document.addEventListener('click', function (e) {
+    var closeBtn = e.target.closest('[data-action="close-drawer"]');
+    if (closeBtn) { closeDrawer(); return; }
+
+    var act = e.target.closest('[data-action]');
+    if (act) {
+      var a = act.getAttribute('data-action');
+      if (a === 'retry' || a === 'refresh') { boot(); return; }
+    }
+
+    var row = e.target.closest('.hl-row[data-id]');
+    if (row) {
+      var id = Number(row.getAttribute('data-id'));
+      S.openId = (S.openId === id) ? null : id;
+      renderRows(S.data); renderDrawer();
+      return;
+    }
+
+    if (e.target.closest('[data-keep]')) return;
+
+    closeDrawer();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeDrawer();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement
+        && document.activeElement.classList && document.activeElement.classList.contains('hl-row')) {
+      e.preventDefault();
+      document.activeElement.click();
+    }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

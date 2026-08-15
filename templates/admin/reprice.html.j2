@@ -1,0 +1,700 @@
+{#
+  판매가 재산정 (ADM-PRC-050) — 2026-08-15 신설
+
+  ■ 계약 — `docs/design/spec-reprice.md`(사장님 확정 **1a안** — 회차 표 -> 범위 -> 미리보기
+    -> 실행이 한 줄기로 내려온다. 위험 갈래는 우측). 정의서 `docs/design/req/req-reprice.md`.
+    원문(Claude Design)은 하네스만 연다 — 이 화면은 계약 요약 텍스트로 지었다.
+
+  ■★★ 이 화면의 «축» — 경고 배너가 아니라 「지난 회차」가 맨 앞이다. 디자인 원안은
+    "지난 재산정 99.99%가 되돌려졌다"는 붉은 경고를 세웠지만, 조사자 실측이 그 전제를
+    뒤집었다(회차 1·2 둘 다 apply 후 1분여 만에 undo — note에 "슬라이스 E 검증"·
+    "점검 반영"이 이미 적혀 있었다. 사고가 아니라 검증 작업이었다). 그래서 경고 톤을
+    빼고, note 열과 되돌림까지의 간격을 가진 표를 맨 앞에 둔다 — 그 둘이 "이건 검증이었다"를
+    스스로 말한다. 근거·판단은 `api/admin_ui_reprice.py` 모듈 docstring 참조.
+
+  ■ 회차 데이터는 서버 렌더 시점에 계산돼 `rounds_json`으로 들어온다(별도 JSON API 없음 —
+    admin_ui_margin_policy.py의 _history_summary() 선례와 같은 결). before(상품별 이전
+    값 배열)는 실려 있지 않다 — 이 화면은 "언제·누가·몇 건·왜·되돌렸나"만 보여준다.
+
+  ■ 데이터 — 전부 기존 API(새로 만들지 않았다, `api/admin_reprice.py`는 손대지 않는다):
+      GET  /api/admin/reprice/preview?scope=   저장된 정책으로 **실제** 영향을 계산(진짜
+                                                미리보기 — 마진 정책 화면과 다른 점)
+      POST /api/admin/reprice/apply            실행 · owner만 · 직전 미리보기의
+                                                scope·changed를 그대로 재전송
+      POST /api/admin/reprice/undo             되돌림 · owner만 · log_id 하나로 회차 전체
+
+  ■ 미리보기 배너 — `GET /reprice/preview`는 GET이라 공용 진행 배너 대상에서 원천
+    제외된다(`ui-progress.js`는 GET·인증 폴링을 뺀 나머지에만 붙는다, A-41). 그래서
+    「미리보기」 버튼은 클릭 즉시 버튼을 잠그고 인라인 「미리보기 중…」을 그린다.
+    실행(POST apply)·되돌리기(POST undo)는 공용 배너가 그대로 뜬다(verb()가 undo URL을
+    보고 "되돌리는"으로, 그 외엔 기본 "저장하는"으로 문구를 고른다 — `mockups/shared/
+    ui-progress.js`는 담당 밖이라 고치지 않았다).
+
+  ■ 상한(MAX_APPLY=20,000) — 넘으면 거부가 아니라 앞 20,000건만 반영하고 나머지는
+    `dropped`로 알린다(HTTP 200). 값을 하드코딩하지 않고 매 미리보기 응답의
+    `max_apply`·`changed`(오름+내림, target이 아니다)로 화면이 직접 비교해 실행 전에
+    미리 경고한다(지금 실측 셋 다 상한 미만이라 평상시엔 안 뜬다).
+
+  ■ 판단한 것(계약이 명시하지 않아 이 제작자가 정함, 검증 대상) — 상세 근거는
+    `api/admin_ui_reprice.py` 모듈 docstring:
+      · 범위 라디오 3개의 캡션은 `admin_reprice.SCOPES` 문자열을 그대로 옮겼다(닫힌 3종
+        상수 — margin_policy.html.j2도 같은 문자열을 이미 하드코딩한 선례가 있다).
+      · 회차 표의 "되돌리기"는 두 번 눌러야 실행된다(1차 = 확인 문구, 2차 = 실행) —
+        네이티브 confirm() 대신 인앱 확인(margin_policy 서랍의 삭제 확인과 같은 결).
+      · 실행·되돌리기 성공 후 페이지를 새로고침한다 — 회차 목록에 별도 JSON API가 없어,
+        최신 상태를 반영하는 가장 정직한 방법은 그 렌더 시점을 다시 만드는 것이다.
+      · 미리보기의 `examples`(상위 6건씩)를 노출한다 — "이상치 206건"처럼 총 건수만
+        보면 무엇이 바뀌는지 알 수 없다(계약 §⑤ 근거 그대로).
+      · 「단가표 일일 반영」은 링크 판정(`_screen_links`) 대상에 넣지 않았다 — admin2
+        라우트 자체가 아직 없다(구 화면만 있음). 화면 안내 문구로만 고정 노출한다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}판매가 재산정{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+
+.rp-page{flex:1;min-height:0;overflow-y:auto;padding:16px 18px 40px}
+
+/* ── 권한 안내 ──────────────────────────────────────────────────── */
+.rp-permnote{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font:400 11.5px/1.6 var(--rv-font);
+    color:var(--rv-muted);background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);border-radius:7px;
+    padding:9px 13px;margin-bottom:16px}
+.rp-permnote-i{flex:none;font:600 10px/1 var(--rv-font);letter-spacing:.04em;color:var(--rv-faint);
+    border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:3px 6px}
+.rp-permnote b{color:var(--rv-ink);font-weight:700}
+
+/* ── 레이아웃 — 1a: 회차->범위->미리보기->실행 한 줄기, 위험 갈래는 우측 ─────────── */
+.rp-layout{display:grid;grid-template-columns:1fr 336px;gap:16px;align-items:start}
+.rp-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.rp-aside{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* ── 카드 공통 ──────────────────────────────────────────────────── */
+.rp-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:16px 18px;
+    border-left:4px solid var(--rv-dim3)}
+.rp-card-red{border-left-color:var(--rv-red)}
+.rp-card-hd{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:10px}
+.rp-card-hd h2{margin:0;font:700 14.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.rp-badge{font:600 10.5px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-panel);
+    border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:5px 9px}
+.rp-card-note2{margin:10px 0 0;font:400 11.3px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.rp-card-note2 code{font:500 10.5px/1 var(--rv-mono);background:rgba(0,0,0,.06);padding:1px 4px;
+    border-radius:3px;color:var(--rv-ink-soft)}
+
+/* ── 지난 회차 표 ───────────────────────────────────────────────── */
+.rp-table-wrap{overflow-x:auto;border:1px solid rgba(0,0,0,.1);border-radius:8px}
+.rp-round-table{width:100%;min-width:760px;border-collapse:collapse}
+.rp-round-table th{text-align:left;font:600 10.3px/1.3 var(--rv-font);color:var(--rv-faint);
+    background:var(--rv-panel2);padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.1);white-space:nowrap}
+.rp-round-table td{font:400 11.8px/1.5 var(--rv-font);color:var(--rv-ink);padding:9px 10px;
+    border-bottom:1px solid rgba(0,0,0,.07);vertical-align:top}
+.rp-round-table tr:last-child td{border-bottom:none}
+.rp-round-table td.num{font-family:var(--rv-mono)}
+.rp-c-round{white-space:nowrap}
+.rp-round-no{margin-top:3px;font:500 10px/1 var(--rv-mono);color:var(--rv-faint)}
+.rp-c-note{max-width:220px;word-break:break-word}
+.rp-muted{color:var(--rv-faint);font-size:10.8px}
+.rp-interval{display:inline-block;margin-top:2px;color:var(--rv-muted);font-size:10.8px}
+.rp-badge-done{display:inline-block;font:600 9.5px/1 var(--rv-font);padding:3px 7px;border-radius:9px;
+    background:oklch(0.94 0.05 165 / .55);color:oklch(0.38 0.11 165);border:1px solid oklch(0.55 0.11 165 / .4)}
+.rp-badge-live{display:inline-block;font:600 9.5px/1 var(--rv-font);padding:3px 7px;border-radius:9px;
+    background:oklch(0.95 0.05 70 / .6);color:oklch(0.5 0.13 62);border:1px solid oklch(0.6 0.13 62 / .4)}
+.rp-row-err{margin-top:5px;font:400 10.3px/1.5 var(--rv-font);color:var(--rv-red);max-width:150px}
+.rp-empty{padding:14px 4px;font:400 12px/1.6 var(--rv-font);color:var(--rv-faint)}
+
+/* ── ① 범위 선택 ────────────────────────────────────────────────── */
+.rp-scope-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.rp-scope-opt{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);
+    border-radius:8px;cursor:pointer}
+.rp-scope-opt.on{border-color:var(--rv-ink);background:var(--rv-panel2)}
+.rp-scope-opt input{flex:none;margin:2px 0 0}
+.rp-scope-name{font:700 12.5px/1.3 var(--rv-font);color:var(--rv-ink);flex:none}
+.rp-scope-desc{font:400 11px/1.5 var(--rv-font);color:var(--rv-muted)}
+
+/* ── 버튼 · 진행 표시(공용) ─────────────────────────────────────── */
+.rp-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:4px}
+.rp-btn{font:600 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.26);border-radius:6px;padding:9px 14px;cursor:pointer}
+.rp-btn:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.12);cursor:not-allowed;background:var(--rv-card)}
+.rp-btn-primary{background:var(--rv-ink);color:var(--rv-canvas);border:none}
+.rp-btn-primary:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+.rp-btn-danger{background:var(--rv-red);color:var(--rv-canvas);border:none}
+.rp-btn-danger:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+.rp-btn-ghost{background:none;border:1px solid rgba(0,0,0,.18);color:var(--rv-muted)}
+.rp-btn-sm{padding:6px 9px;font-size:10.8px}
+.rp-busy{display:inline-flex;align-items:center;gap:7px;font:500 11.3px/1 var(--rv-font);color:var(--rv-muted)}
+.rp-busy-sp{width:12px;height:12px;border:2px solid rgba(0,0,0,.16);border-top-color:var(--rv-ink);
+    border-radius:50%;display:inline-block;animation:rpSpin .7s linear infinite}
+@keyframes rpSpin{to{transform:rotate(360deg)}}
+
+/* ── ② 미리보기 결과 ────────────────────────────────────────────── */
+.rp-impact-scope{font:500 10.8px/1.4 var(--rv-font);color:var(--rv-faint);margin-bottom:8px}
+.rp-impact-grid{display:grid;grid-template-columns:repeat(6,minmax(74px,1fr));gap:6px;margin-bottom:8px}
+.rp-impact-cell{background:var(--rv-panel);border:1px solid rgba(0,0,0,.09);border-radius:7px;
+    padding:8px 6px;text-align:center}
+.rp-impact-cell.na{border-style:dashed}
+.rp-impact-n{display:block;font:700 15px/1.2 var(--rv-mono);color:var(--rv-ink)}
+.rp-impact-n.up{color:oklch(0.5 0.14 25)}
+.rp-impact-n.down{color:var(--rv-link)}
+.rp-impact-n.na{font-size:11px;color:var(--rv-dim2)}
+.rp-impact-l{display:block;margin-top:3px;font:500 9.5px/1.3 var(--rv-font);color:var(--rv-muted)}
+.rp-impact-sum{font:500 11px/1.6 var(--rv-mono);color:var(--rv-ink-soft);margin-bottom:8px}
+.rp-impact-sum b.up{color:oklch(0.5 0.14 25)}
+.rp-impact-sum b.down{color:var(--rv-link)}
+.rp-impact-na-note{margin:0 0 10px;font:400 10.3px/1.55 var(--rv-font);color:var(--rv-faint)}
+.rp-impact-na-note code{font:500 10.2px/1 var(--rv-mono);background:rgba(0,0,0,.06);padding:1px 4px;
+    border-radius:3px;color:var(--rv-ink-soft)}
+.rp-impact-empty{font:400 11px/1.6 var(--rv-font);color:var(--rv-faint);padding:8px 0}
+.rp-impact-err{font:400 11px/1.6 var(--rv-font);color:var(--rv-red);padding:8px 0}
+.rp-formula{margin:2px 0 10px;font:500 11.3px/1.6 var(--rv-mono);color:var(--rv-ink-soft);
+    background:var(--rv-panel2);border-radius:6px;padding:8px 10px}
+.rp-notice{border:1px solid rgba(0,0,0,.14);background:var(--rv-panel2);border-radius:7px;
+    padding:9px 12px;margin:0 0 10px;font:400 11px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.rp-warnbox{border:1.5px solid var(--rv-amber);background:oklch(0.95 0.04 70 / .5);border-radius:8px;
+    padding:10px 12px;margin:0 0 10px;font:400 11.5px/1.6 var(--rv-font);color:oklch(0.4 0.1 62)}
+
+/* ── 예시 목록 ──────────────────────────────────────────────────── */
+.rp-examples{margin-top:6px;padding-top:10px;border-top:1px solid rgba(0,0,0,.08)}
+.rp-ex-group{margin-bottom:10px}
+.rp-ex-group:last-child{margin-bottom:0}
+.rp-ex-title{font:600 10.8px/1.3 var(--rv-font);color:var(--rv-faint);margin-bottom:6px}
+.rp-ex-row{display:grid;grid-template-columns:minmax(110px,1.4fr) minmax(90px,1fr) minmax(150px,1.2fr);
+    gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.rp-ex-row:last-child{border-bottom:none}
+.rp-ex-name{font:500 11.3px/1.3 var(--rv-font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+.rp-ex-code{font:400 10.3px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.rp-ex-price{font:500 10.6px/1.3 var(--rv-mono);color:var(--rv-ink-soft);text-align:right;white-space:nowrap}
+
+/* ── ③ 실행 ─────────────────────────────────────────────────────── */
+.rp-field{margin-bottom:12px}
+.rp-field-label{display:block;font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);margin-bottom:6px}
+.rp-input{width:100%;font:500 12.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-canvas);
+    border:1px solid rgba(0,0,0,.26);border-radius:6px;padding:9px 10px;outline:none}
+.rp-hint{margin-top:5px;font:400 10.6px/1.55 var(--rv-font);color:var(--rv-faint)}
+.rp-safety{margin:9px 0 0;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.rp-safety b{font-weight:700;color:var(--rv-ink)}
+.rp-safetybox{margin-top:9px;border:1px solid rgba(0,0,0,.16);background:var(--rv-panel);border-radius:8px;
+    padding:11px 13px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.rp-safetybox b{font-weight:700;color:var(--rv-ink)}
+.rp-safetybox-detail{margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08);color:var(--rv-faint);
+    font-size:10.3px}
+.rp-saveerr{margin-top:9px;font:400 11.2px/1.6 var(--rv-font);color:var(--rv-red)}
+.rp-savedok{margin-top:9px;font:500 10.8px/1.5 var(--rv-font);color:oklch(0.4 0.1 165);
+    background:oklch(0.95 0.04 165 / .5);border:1px solid oklch(0.5 0.11 165 / .35);border-radius:6px;
+    padding:7px 9px}
+
+/* ── aside — 위험 갈래 · 공식 · 권한 · 이 화면에서 안 하는 것 ─────────────── */
+.rp-aside-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:14px 15px}
+.rp-aside-t{font:700 12.5px/1.4 var(--rv-font);color:var(--rv-ink);margin-bottom:8px}
+.rp-aside-p{margin:0 0 8px;font:400 11.3px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.rp-aside-p:last-child{margin-bottom:0}
+.rp-aside-p b{font-weight:700;color:var(--rv-ink)}
+.rp-aside-p code{font:500 10.3px/1 var(--rv-mono);background:rgba(0,0,0,.06);padding:1px 4px;border-radius:3px;
+    color:var(--rv-ink-soft)}
+.rp-aside-p2{margin:8px 0 0;font:400 10.6px/1.6 var(--rv-font);color:var(--rv-faint)}
+.rp-risk-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;
+    padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);font:400 11px/1.5 var(--rv-font)}
+.rp-risk-row:last-child{border-bottom:none}
+.rp-risk-row .k{color:var(--rv-muted)}
+.rp-risk-row .v{color:var(--rv-ink);text-align:right;font-family:var(--rv-mono)}
+.rp-risk-row .v.rp-na{color:var(--rv-dim2);font-family:var(--rv-font)}
+
+/* ── 링크 · 비활성 링크 ─────────────────────────────────────────── */
+.rp-link{color:var(--rv-link);font-weight:600;cursor:pointer}
+.rp-link:hover{text-decoration:underline}
+.rp-link-off{color:var(--rv-dim2);font-weight:500;cursor:not-allowed;border-bottom:1px dashed var(--rv-dim3)}
+
+/* ── 하단 고지 ──────────────────────────────────────────────────── */
+.rp-footnote{margin-top:18px;padding-top:12px;border-top:1px solid rgba(0,0,0,.1);
+    font:400 10.6px/1.75 var(--rv-font);color:var(--rv-faint)}
+
+@media (max-width:768px){
+  .rp-page{padding:12px 12px 32px}
+  .rp-layout{grid-template-columns:1fr}
+  .rp-impact-grid{grid-template-columns:repeat(3,minmax(64px,1fr))}
+  .rp-ex-row{grid-template-columns:1fr;row-gap:2px}
+  .rp-ex-price{text-align:left}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rp-page" data-screen-id="ADM-PRC-050" data-domain="reprice">
+
+  <div class="rp-permnote">
+    <span class="rp-permnote-i">권한</span>
+    <span><b>미리보기</b>는 로그인한 운영자 누구나 조회할 수 있습니다 ·
+      <b>실행·되돌리기</b>는 <b>관리자(owner)</b>만 할 수 있습니다.</span>
+  </div>
+
+  <div class="rp-layout">
+    <div class="rp-main">
+
+      <!-- 지난 회차 — 이 화면의 축. 경고 배너가 아니라 표다. -->
+      <section class="rp-card" data-keep="1">
+        <div class="rp-card-hd">
+          <h2>지난 회차</h2>
+          <span class="rp-badge" id="rpRoundBadge">불러오는 중…</span>
+        </div>
+        <div id="rpRoundsArea"></div>
+        <p class="rp-card-note2">되돌림은 삭제가 아니라 <b>역방향 이력 행</b>입니다
+          (<code>margin_policy_undo</code>) — 값이 원래대로 돌아가고 두 행이 함께 남습니다.</p>
+      </section>
+
+      <!-- ① 범위 -->
+      <section class="rp-card" data-keep="1">
+        <div class="rp-card-hd"><h2>① 범위를 고릅니다</h2></div>
+        <div id="rpScopeArea"></div>
+      </section>
+
+      <!-- ② 미리보기 -->
+      <section class="rp-card" data-keep="1">
+        <div class="rp-card-hd"><h2>② 미리보기</h2></div>
+        <div id="rpPreviewBody">
+          <div class="rp-impact-empty">범위를 고르고 「미리보기」를 눌러 확인하십시오.</div>
+        </div>
+      </section>
+
+      <!-- ③ 실행 -->
+      <section class="rp-card rp-card-red" data-keep="1">
+        <div class="rp-card-hd"><h2>③ 확인하고 실행</h2></div>
+        <div id="rpExecBody">
+          <div class="rp-impact-empty">먼저 위에서 미리보기를 하십시오.</div>
+        </div>
+      </section>
+
+    </div>
+
+    <aside class="rp-aside">
+      <div class="rp-aside-card">
+        <div class="rp-aside-t">위험 갈래</div>
+        <div id="rpRisk"></div>
+      </div>
+
+      <div class="rp-aside-card">
+        <div class="rp-aside-t">공식 · 안 바뀌는 것</div>
+        <p class="rp-aside-p">제안가 = 매입가 × (1 + 카드수수료 + 마진) → 1,000원 단위 반올림. 분류별
+          예외가 실제로 걸리는 유일한 경로가 이 화면의 재산정입니다.</p>
+        <p class="rp-aside-p"><b>이미 만든 견적은 그대로입니다</b> — <code>quote_snapshots.items</code>를
+          고치는 코드가 저장소 전체 0건입니다.</p>
+        <p class="rp-aside-p">한 번에 반영하는 상한은 <b>20,000건</b>입니다(오름+내림 기준). 넘으면
+          거부하지 않고 앞 20,000건만 반영한 뒤 남은 건수를 알립니다 — 자동 재처리는 없습니다.</p>
+      </div>
+
+      <div class="rp-aside-card">
+        <div class="rp-aside-t">권한</div>
+        <div class="rp-risk-row"><span class="k">미리보기</span><span class="v" style="font-family:var(--rv-font)">로그인한 운영자 누구나</span></div>
+        <div class="rp-risk-row"><span class="k">실행 · 되돌리기</span><span class="v" style="font-family:var(--rv-font)">관리자(owner)만</span></div>
+      </div>
+
+      <div class="rp-aside-card">
+        <div class="rp-aside-t">이 화면에서 안 하는 것</div>
+        <div class="rp-risk-row"><span class="k">정책 정하기</span><span class="v" id="rpGoMargin" style="font-family:var(--rv-font)"></span></div>
+        <div class="rp-risk-row"><span class="k">개별 상품 확정</span><span class="v" id="rpGoReview" style="font-family:var(--rv-font)"></span></div>
+        <div class="rp-risk-row"><span class="k">예외 잡기 · 잠금</span><span class="v" id="rpGoSale" style="font-family:var(--rv-font)"></span></div>
+        <div class="rp-risk-row"><span class="k">이력 읽기</span><span class="v" id="rpGoHistory" style="font-family:var(--rv-font)"></span></div>
+        <div class="rp-risk-row"><span class="k">매입가 바꾸기</span><span class="v" style="font-family:var(--rv-font)">
+          <span class="rp-link-off" title="아직 admin2 화면이 없습니다 — 구 화면(/admin/price-import.html)만 있습니다">단가표 일일 반영</span></span></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="rp-footnote">
+    미리보기 요청에는 공용 진행 배너가 뜨지 않습니다 — 버튼 비활성 + 인라인 「미리보기 중…」 ·
+    조회·실행·되돌리기 실패는 사유를 갈라 그대로 보입니다(401은 「세션이 만료됐습니다」) ·
+    owner 미만이면 실행·되돌리기 버튼이 비활성이고 사유를 title로 병기합니다.
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  'use strict';
+
+  var LINKS = {{ links_json | safe }};
+  var ROUNDS = {{ rounds_json | safe }};
+
+  // 서버 SCOPES(admin_reprice.py)의 캡션을 그대로 옮겼다 — 닫힌 3종 상수라서 화면이
+  // 미리보기 전에도 라디오 캡션을 보여줘야 하는데, scope_label은 "미리본 그 범위"에만
+  // 실려 온다(margin_policy.html.j2도 같은 이유로 같은 문자열을 하드코딩한 선례가 있다).
+  var SCOPES = [
+    { key: 'live', label: '판매중 · 재고 있음', desc: '판매 중이고 재고가 있는 상품만 — 기본값' },
+    { key: 'selling', label: '판매중 전체', desc: '판매 상태인 상품 전체 — 재고 유무는 보지 않습니다' },
+    { key: 'all', label: '전체', desc: '매입가가 있는 전 상품 — 품절 · 판매중지 포함' }
+  ];
+
+  var EX_META = {
+    up: '오름 상위', down: '내림 상위',
+    outlier: '이상치(매입가 2배 이상) 상위', negative: '역마진(판매가 낮음) 상위',
+    locked: '잠김(바뀌지 않음) 상위'
+  };
+
+  var S = {
+    scope: 'live',
+    preview: null, previewErr: null, previewBusy: false,
+    note: '',
+    applyBusy: false, applyErr: null, applyErr409: null, applyOk: null,
+    undoArmed: null, undoBusy: {}, undoErr: {}
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n === null || n === undefined) ? '못 쟀음' : Number(n).toLocaleString('ko-KR'); }
+  function fmtWon(n) { return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('ko-KR') + '원'; }
+  function pct(dec) {
+    if (dec === null || dec === undefined) return '—';
+    var p = Math.round(dec * 100 * 1000) / 1000;
+    return p.toString();
+  }
+  function fmtAt(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' '
+      + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
+  }
+  function fmtInterval(sec) {
+    if (sec === null || sec === undefined) return null;
+    if (sec < 60) return (Math.round(sec * 100) / 100) + '초';
+    var m = Math.floor(sec / 60), s = Math.round((sec - m * 60) * 10) / 10;
+    return m + '분 ' + s + '초';
+  }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiSend(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+  function friendlyErr(err) {
+    return err.status === 401 ? '세션이 만료됐습니다 — 다시 로그인해 주세요.' : err.message;
+  }
+  function canOwner() { return window.Admin2Shell.canWrite('owner'); }
+
+  function linkHtml(key, label) {
+    var t = LINKS[key];
+    if (!t) return esc(label || key);
+    var text = label || t.label;
+    if (t.available) return '<a class="rp-link" href="' + t.href + '">' + esc(text) + ' →</a>';
+    return '<span class="rp-link-off" title="' + esc(t.reason || '') + '">' + esc(text) + '</span>';
+  }
+
+  // ── 지난 회차 ────────────────────────────────────────────────────
+  function roundRowHtml(r) {
+    var badge = r.undone
+      ? '<span class="rp-badge-done">되돌려짐</span>'
+      : '<span class="rp-badge-live">적용 중</span>';
+
+    var undoCell;
+    if (r.undone) {
+      undoCell = fmtAt(r.undo_at) + '<div class="rp-muted">' + esc(r.undo_operator || '—') + '</div>'
+        + '<span class="rp-interval">되돌림까지 ' + esc(fmtInterval(r.interval_seconds) || '못 쟀음') + '</span>';
+    } else {
+      undoCell = '<span class="rp-muted">되돌리지 않음</span>';
+    }
+
+    var mu = r.margins_used || {};
+    var muKeys = Object.keys(mu);
+    var policyCell = '마진 ' + pct(r.margin_rate) + '% · 수수료 ' + pct(r.card_fee_rate) + '%';
+    if (muKeys.length > 1) policyCell += '<div class="rp-muted">분류마다 다름(' + muKeys.length + '종)</div>';
+
+    var actionCell;
+    if (r.undone) {
+      actionCell = '<span class="rp-muted">—</span>';
+    } else if (S.undoBusy[r.log_id]) {
+      actionCell = '<span class="rp-busy" role="status" aria-live="polite"><span class="rp-busy-sp"></span>되돌리는 중…</span>';
+    } else if (S.undoArmed === r.log_id) {
+      actionCell = '<button type="button" class="rp-btn rp-btn-danger rp-btn-sm" data-action="undo-confirm" data-log="'
+        + r.log_id + '">정말 되돌립니까? 확인</button> '
+        + '<button type="button" class="rp-btn rp-btn-ghost rp-btn-sm" data-action="undo-cancel">취소</button>';
+    } else {
+      var can = canOwner();
+      actionCell = '<button type="button" class="rp-btn rp-btn-sm" data-action="undo-arm" data-log="' + r.log_id + '"'
+        + (can ? '' : ' disabled title="관리자(owner)만 되돌릴 수 있습니다"') + '>되돌리기</button>';
+    }
+    var errHtml = S.undoErr[r.log_id] ? '<div class="rp-row-err">' + esc(S.undoErr[r.log_id]) + '</div>' : '';
+
+    return '<tr>'
+      + '<td class="rp-c-round">' + badge + '<div class="rp-round-no">#' + esc(r.log_id) + '</div></td>'
+      + '<td>' + fmtAt(r.at) + '<div class="rp-muted">' + esc(r.operator || '—') + '</div></td>'
+      + '<td>' + esc(r.scope_label) + '</td>'
+      + '<td>' + policyCell + '</td>'
+      + '<td class="num">' + fmt(r.changed) + '<div class="rp-muted">오름 ' + fmt(r.up) + ' · 내림 ' + fmt(r.down) + '</div></td>'
+      + '<td>' + undoCell + '</td>'
+      + '<td class="rp-c-note">' + (r.note ? esc(r.note) : '<span class="rp-muted">(메모 없음)</span>') + '</td>'
+      + '<td>' + actionCell + errHtml + '</td>'
+      + '</tr>';
+  }
+
+  function renderRounds() {
+    var undoneCount = ROUNDS.filter(function (r) { return r.undone; }).length;
+    $('rpRoundBadge').textContent = fmt(ROUNDS.length) + '건 · 되돌림 ' + fmt(undoneCount) + '건';
+
+    var box = $('rpRoundsArea');
+    if (!ROUNDS.length) {
+      box.innerHTML = '<div class="rp-empty">아직 재산정을 실행한 적이 없습니다.</div>';
+      return;
+    }
+    box.innerHTML = '<div class="rp-table-wrap"><table class="rp-round-table"><thead><tr>'
+      + '<th>회차</th><th>일시 · 운영자</th><th>범위</th><th>정책</th><th>변동 건수</th>'
+      + '<th>되돌림</th><th>메모</th><th>동작</th></tr></thead><tbody>'
+      + ROUNDS.map(roundRowHtml).join('') + '</tbody></table></div>';
+  }
+
+  // ── ① 범위 ──────────────────────────────────────────────────────
+  function renderScope() {
+    var html = SCOPES.map(function (s) {
+      return '<label class="rp-scope-opt' + (S.scope === s.key ? ' on' : '') + '">'
+        + '<input type="radio" name="rpScope" value="' + s.key + '"' + (S.scope === s.key ? ' checked' : '') + '>'
+        + '<span><span class="rp-scope-name">' + esc(s.label) + '</span><br>'
+        + '<span class="rp-scope-desc">' + esc(s.desc) + '</span></span>'
+        + '</label>';
+    }).join('');
+    html += '<div class="rp-actions"><button type="button" class="rp-btn rp-btn-primary" data-action="do-preview"'
+      + (S.previewBusy ? ' disabled' : '') + '>미리보기</button>';
+    if (S.previewBusy) {
+      html += '<span class="rp-busy" role="status" aria-live="polite"><span class="rp-busy-sp"></span>미리보기 중…</span>';
+    }
+    html += '</div>';
+    $('rpScopeArea').innerHTML = html;
+  }
+
+  // ── ② 미리보기 결과 ────────────────────────────────────────────
+  function exampleRowHtml(item) {
+    return '<div class="rp-ex-row">'
+      + '<span class="rp-ex-name" title="' + esc(item.name || '') + '">' + esc(item.name || '') + '</span>'
+      + '<span class="rp-ex-code">' + esc(item.product_code) + ' · ' + esc(item.part_label || '') + '</span>'
+      + '<span class="rp-ex-price">' + fmt(item.purchase) + ' → ' + fmt(item.current) + ' → ' + fmt(item.proposed) + '원</span>'
+      + '</div>';
+  }
+  function examplesHtml(examples) {
+    if (!examples) return '';
+    var out = '';
+    ['up', 'down', 'outlier', 'negative', 'locked'].forEach(function (k) {
+      var list = examples[k];
+      if (!list || !list.length) return;
+      out += '<div class="rp-ex-group"><div class="rp-ex-title">' + esc(EX_META[k]) + ' (예시 ' + list.length + '건)</div>'
+        + list.map(exampleRowHtml).join('') + '</div>';
+    });
+    return out ? '<div class="rp-examples">' + out + '</div>' : '';
+  }
+  function renderPreview() {
+    var box = $('rpPreviewBody');
+    if (S.previewBusy && !S.preview && !S.previewErr) {
+      box.innerHTML = '<div class="rp-impact-empty">불러오는 중…</div>';
+      return;
+    }
+    if (S.previewErr) {
+      box.innerHTML = '<div class="rp-impact-err">미리보기를 받지 못했습니다 — ' + esc(S.previewErr) + '</div>';
+      return;
+    }
+    if (!S.preview) {
+      box.innerHTML = '<div class="rp-impact-empty">범위를 고르고 「미리보기」를 눌러 확인하십시오.</div>';
+      return;
+    }
+    var p = S.preview;
+    var html = '<div class="rp-impact-scope">' + esc(p.scope_label) + ' 기준 · 저장된 정책으로 실제 계산한 값입니다'
+      + (p.scope !== S.scope ? ' <span class="rp-muted">— 지금 고른 범위와 다릅니다. 다시 미리보기 하십시오.</span>' : '') + '</div>';
+    html += '<div class="rp-impact-grid">';
+    [['대상', fmt(p.target), ''], ['오름', fmt(p.up_count), 'up'], ['내림', fmt(p.down_count), 'down'],
+     ['변화없음', fmt(p.same), ''], ['잠김', fmt(p.locked_count), '']].forEach(function (c) {
+      html += '<div class="rp-impact-cell"><span class="rp-impact-n ' + c[2] + '">' + c[1] + '</span>'
+        + '<span class="rp-impact-l">' + c[0] + '</span></div>';
+    });
+    html += '<div class="rp-impact-cell na"><span class="rp-impact-n na">못 셈</span><span class="rp-impact-l">해당 없음</span></div>';
+    html += '</div>';
+    html += '<div class="rp-impact-sum">오름 총액 <b class="up">+' + fmtWon(p.up_sum) + '</b> · 내림 총액 '
+      + '<b class="down">' + fmtWon(p.down_sum) + '</b></div>';
+    html += '<div class="rp-impact-na-note">「해당 없음」(공급처 0곳이라 정책을 바꿔도 안 움직이는 상품)은 이 API가'
+      + ' 세지 않습니다 — <code>/reprice/preview</code>는 <code>product_supplier_prices</code>를 읽지 않고'
+      + ' 매입가를 <code>products.purchase_price</code>에서 바로 씁니다. 대상(' + fmt(p.target) + ')은 이미'
+      + ' 오름·내림·변화없음·잠김의 합과 같아(남는 몫 없음) 0으로 위장하지 않고 못 셈으로 둡니다.</div>';
+    html += '<div class="rp-formula">' + esc(p.formula) + '</div>';
+    if (p.note) html += '<div class="rp-notice">' + esc(p.note) + '</div>';
+    if (p.changed > p.max_apply) {
+      var dropped = p.changed - p.max_apply;
+      html += '<div class="rp-warnbox">⚠ 상한 ' + fmt(p.max_apply) + '건을 넘습니다 — 이번 실행은 앞 '
+        + fmt(p.max_apply) + '건만 반영되고 나머지 ' + fmt(dropped) + '건은 이번에 처리되지 않습니다.'
+        + ' 자동 재처리는 없습니다 — 실행 후 새로 미리보기 하십시오.</div>';
+    }
+    html += examplesHtml(p.examples);
+    box.innerHTML = html;
+  }
+
+  // ── ③ 실행 ──────────────────────────────────────────────────────
+  function previewMatchesScope() { return !!S.preview && S.preview.scope === S.scope; }
+  function canExecute() {
+    return canOwner() && !S.applyBusy && previewMatchesScope() && S.preview.changed > 0;
+  }
+  function renderExecute() {
+    var box = $('rpExecBody');
+    if (!S.preview) {
+      box.innerHTML = '<div class="rp-impact-empty">먼저 위에서 미리보기를 하십시오.</div>';
+      return;
+    }
+    if (!previewMatchesScope()) {
+      box.innerHTML = '<div class="rp-impact-empty">범위를 바꿨습니다 — 다시 미리보기 하십시오.</div>';
+      return;
+    }
+    var p = S.preview;
+    var html = '<div class="rp-field"><label class="rp-field-label" for="rpNoteInput">메모</label>'
+      + '<input type="text" id="rpNoteInput" class="rp-input" maxlength="200" placeholder="예: 슬라이스 E 검증"'
+      + ' value="' + esc(S.note) + '">'
+      + '<div class="rp-hint">다음 사람이 왜 실행했는지 알 수 있도록 남깁니다 — 「지난 회차」 표의 메모 열에'
+      + ' 그대로 남습니다(선택 입력이지만 남기기를 권합니다).</div></div>';
+
+    if (p.changed === 0) {
+      html += '<div class="rp-impact-empty">바뀔 것이 0건입니다 — 정책이 이미 반영돼 있습니다. 실행할 것이 없습니다.</div>';
+      box.innerHTML = html;
+      return;
+    }
+
+    var can = canExecute();
+    var title = '';
+    if (!canOwner()) title = '관리자(owner)만 실행할 수 있습니다';
+    else if (S.applyBusy) title = '요청을 처리하는 중입니다';
+    html += '<div class="rp-actions"><button type="button" class="rp-btn rp-btn-danger" data-action="do-apply"'
+      + (can ? '' : ' disabled') + (title ? ' title="' + esc(title) + '"' : '') + '>'
+      + fmt(p.changed) + '건 실행</button>';
+    if (S.applyBusy) html += '<span class="rp-busy" role="status" aria-live="polite"><span class="rp-busy-sp"></span>실행하는 중…</span>';
+    html += '</div>';
+    html += '<p class="rp-safety">되돌릴 수 있지만 <b>그 사이에 나간 견적은 그 값으로 나갑니다.</b></p>';
+
+    if (S.applyErr409) {
+      html += '<div class="rp-safetybox"><b>미리보기 이후 값이 바뀌었습니다 — 다시 미리보기 하십시오.</b><br>'
+        + '오류가 아니라 안전장치입니다 — 미리보기와 실행 사이에 다른 누군가(또는 다른 작업)가 값을 바꿨다는 뜻입니다.'
+        + '<div class="rp-safetybox-detail">서버 응답: ' + esc(S.applyErr409) + '</div></div>';
+    } else if (S.applyErr) {
+      html += '<div class="rp-saveerr">' + esc(S.applyErr) + '</div>';
+    }
+    if (S.applyOk) html += '<div class="rp-savedok">' + esc(S.applyOk) + '</div>';
+    box.innerHTML = html;
+  }
+
+  // ── aside: 위험 갈래 · 링크 ────────────────────────────────────
+  function renderRisk() {
+    var box = $('rpRisk');
+    if (!S.preview) {
+      box.innerHTML = '<div class="rp-impact-empty">미리보기를 하면 나타납니다.</div>';
+      return;
+    }
+    var p = S.preview;
+    box.innerHTML =
+        '<div class="rp-risk-row"><span class="k">이상치(매입가 2배 이상)</span><span class="v">' + fmt(p.outlier_count) + '건</span></div>'
+      + '<div class="rp-risk-row"><span class="k">역마진(판매가 낮음)</span><span class="v">' + fmt(p.negative_count) + '건</span></div>'
+      + '<div class="rp-risk-row"><span class="k">잠김(운영자가 고정)</span><span class="v">' + fmt(p.locked_count) + '건</span></div>'
+      + '<div class="rp-risk-row"><span class="k">해당 없음(공급처 0곳)</span><span class="v rp-na">못 셈</span></div>'
+      + '<p class="rp-aside-p2">정책을 바꾸면 이 수가 달라집니다 — 왼쪽 「미리보기」 결과의 예시 목록에서 실제'
+      + ' 상품을 확인하십시오. 실행에서 빼는 경로는 아직 없습니다(세는 데까지만).</p>';
+  }
+  function renderLinks() {
+    $('rpGoMargin').innerHTML = linkHtml('margin_policy', '마진 정책');
+    $('rpGoReview').innerHTML = linkHtml('price_review', '가격 검토 대기');
+    $('rpGoSale').innerHTML = linkHtml('sale_price', '판매가 관리');
+    $('rpGoHistory').innerHTML = linkHtml('price_history', '가격 이력');
+  }
+
+  function renderAll() {
+    renderRounds();
+    renderScope();
+    renderPreview();
+    renderExecute();
+    renderRisk();
+    renderLinks();
+  }
+
+  // ── 동작 ────────────────────────────────────────────────────────
+  function doPreview() {
+    if (S.previewBusy) return;
+    S.previewBusy = true; S.previewErr = null; renderAll();
+    apiGet('/api/admin/reprice/preview?scope=' + encodeURIComponent(S.scope)).then(function (j) {
+      S.previewBusy = false; S.preview = j; S.previewErr = null;
+      S.applyErr = null; S.applyErr409 = null; S.applyOk = null;
+      renderAll();
+    }).catch(function (err) {
+      S.previewBusy = false; S.previewErr = friendlyErr(err);
+      renderAll();
+    });
+  }
+  function doApply() {
+    if (!canExecute()) return;
+    var p = S.preview;
+    S.applyBusy = true; S.applyErr = null; S.applyErr409 = null; S.applyOk = null; renderAll();
+    apiSend('POST', '/api/admin/reprice/apply',
+      { scope: p.scope, expect_changed: p.changed, note: (S.note || '').trim() }).then(function (j) {
+      S.applyBusy = false;
+      S.applyOk = (j.verdict || '실행했습니다') + ' — 곧 새로고침해 「지난 회차」에 반영합니다…';
+      renderAll();
+      setTimeout(function () { location.reload(); }, 1500);
+    }).catch(function (err) {
+      S.applyBusy = false;
+      if (err.status === 409) { S.applyErr409 = err.message; } else { S.applyErr = friendlyErr(err); }
+      renderAll();
+    });
+  }
+  function armUndo(logId) { S.undoArmed = logId; renderRounds(); }
+  function cancelUndo() { S.undoArmed = null; renderRounds(); }
+  function confirmUndo(logId) {
+    if (!canOwner() || S.undoBusy[logId]) return;
+    S.undoArmed = null; S.undoBusy[logId] = true; S.undoErr[logId] = null; renderRounds();
+    apiSend('POST', '/api/admin/reprice/undo', { log_id: logId }).then(function (j) {
+      $('rpRoundBadge').textContent = (j.verdict || '되돌렸습니다') + ' — 새로고침합니다…';
+      setTimeout(function () { location.reload(); }, 1500);
+    }).catch(function (err) {
+      S.undoBusy[logId] = false; S.undoErr[logId] = friendlyErr(err);
+      renderRounds();
+    });
+  }
+
+  function bind() {
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest('[data-action]');
+      if (!t) return;
+      var act = t.getAttribute('data-action');
+      if (act === 'do-preview') doPreview();
+      else if (act === 'do-apply') doApply();
+      else if (act === 'undo-arm') { if (!t.disabled) armUndo(Number(t.getAttribute('data-log'))); }
+      else if (act === 'undo-cancel') cancelUndo();
+      else if (act === 'undo-confirm') confirmUndo(Number(t.getAttribute('data-log')));
+    });
+    document.addEventListener('change', function (ev) {
+      if (ev.target.name === 'rpScope') {
+        S.scope = ev.target.value;
+        renderAll();
+      }
+    });
+    document.addEventListener('input', function (ev) {
+      if (ev.target.id === 'rpNoteInput') S.note = ev.target.value;
+    });
+  }
+
+  function boot() {
+    bind();
+    renderAll();                                  // 회차·범위는 즉시(서버 렌더 데이터) — 권한 확인을 기다리지 않는다
+    window.Admin2Shell.meReady.then(function () { renderAll(); });   // owner 여부가 정해지면 버튼 상태를 다시 그린다
+  }
+
+  boot();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,702 @@
+{# ADM-CSV-010 상품 일괄 등록 — templates/admin/catalog_import.html.j2
+
+   원안: docs/design/dc-product-bulk-import.html (캔버스, 턴1 = 1a/1b/1c 3안 · 턴2 = 2a~2d 상태 4장)
+   확정: docs/decisions/decision-log.md UX-21 (2026-08-14 사장님 확정) — **1b 문장 보고서형**.
+   턴2 상태 4장(2a 최초 진입 · 2b 드라이런 확인 · 2c 적용 완료 · 2d viewer 열람)이 이미 1b 기준이라
+   그 네 상태를 그대로 구현했다(정의서 재반영판이라 1a/1c 대신 이걸 따른다).
+   요구사항 정의서: docs/design/req/req-product-bulk-import.md.
+
+   ■ 데이터 계약(전부 실측 · 새 API 없음)
+     POST /api/admin/catalog-import/dryrun  (multipart: master 필수, db_products/db_specs 선택 쌍,
+       origin=real|demo) → {staging_id, file_name, origin, eav_included, summary, impact, verdict,
+       warning, note}  (api/admin_catalog_import.py, owner 전용)
+     POST /api/admin/catalog-import/apply   (form: staging_id, expect_ok) → {job_id, ok, review,
+       error, after, verdict}  (owner 전용)
+     GET  /api/admin/import-jobs            → {items[], summary, note}  (viewer 이상)
+     GET  /api/admin/import-jobs/{id}/rows  → {job, rows[](kind=error|kept), shown, note} (viewer 이상)
+     GET  /api/admin/product-meta           → part_labels/peripheral_labels/built_labels (부품 라벨,
+       "부품 종류별 분포"에만 쓴다 — taxonomy.PART_LABELS를 여기 다시 옮기지 않는다)
+
+   ■ 화면이 "지어내지 않는" 것들 — 서버가 안 주면 화면도 모른다고 말한다
+     · 드라이런 오류 표본(error_samples)은 row_no·reason만 온다(상품코드·원본 셀 없음) — 적용 전
+       단계에서는 그 이상을 보여줄 수 없다. 상품코드·원본 셀은 **적용 후** 배치 상세(job rows)에서만
+       나온다(csv_import_errors에 실제로 적재된 뒤에야 존재하는 데이터라서다).
+     · 오류 원본은 배치당 최대 200행까지만 저장된다(코드 상수 `errors[:200]`, catalog_ingest.py) —
+       decision-log는 "전량 보존"을 확정했지만 **구현은 아직 200행 상한 그대로**다. 총 오류 수(job.error)가
+       저장된 표본 수보다 크면 화면이 그 차이를 밝힌다.
+     · 반영 상품 원본(product_imports)은 설계상 항상 0행이다(req 정의서 실측) — "반영 상품" 탭은 SKU
+       원본이 없을 때 총 반영 건수(job.ok)만 말하고 "상품 관리에서 SKU로 조회"로 안내한다. 실제로 행이
+       오는 경우(향후 구현 변경)에도 그대로 렌더링되게 만들었다(개수 0을 가정해 하드코딩하지 않았다).
+     · "최초 대량 적재" 배지(원안 배치 #7)는 서버 필드가 아니라 원안이 아는 배경 지식이라 **넣지 않았다**.
+     · SKU 칩에 상품 상세로 가는 링크를 걸지 않았다 — 상품 관리(ADM-PRD-010) 화면은 이 작업과 동시에
+       재구축 중이라 실제 쿼리 계약(예: ?code=)을 이 화면 담당 범위에서 확인할 수 없었다.
+     · 배치 이력 원천-분리 배지("전체 N · 실데이터 X · 데모 Y")는 API가 배치를 원천별로 세어 주지 않는다
+       (요약은 행수 합계·현재 카탈로그 실측만 준다) — 그래서 로드된 배치(최대 50건)에서 직접 세되,
+       50건을 넘겨 잘렸으면 "(최근 50건 표시)"를 붙인다. 전체 배치 수(summary.batches)는 항상 서버 값이다.
+
+   ■ 권한 — /api/admin/catalog-import 는 owner 전용(쓰기), 이력·오류 조회는 viewer 이상(비대칭,
+     decision-log UX-21 확정). 화면은 admin2-shell.js 의 `Admin2Shell.canWrite('owner')`로 잠금 여부를
+     판정한다(역할 판정을 이 화면이 다시 구현하지 않는다) — 서버가 최종 방어(403)이므로 이 판정을 못
+     구하면 안전하게 잠금(업로드 숨김) 쪽으로 기본값을 둔다.
+
+   ■ 진행 배너 — 2026-08-15 확정: 미리보기(드라이런) 요청에는 공용 진행 배너(shared/ui-progress.js가
+     비-GET fetch를 감싸 자동으로 띄우는 상단 바)를 띄우지 않는다. 그 파일은 이 작업 시점에 다른
+     제작자가 고치는 중이라 내용을 열어 API를 확인할 수 없었다 — 그래서 `<script src=ui-progress.js>`가
+     로드되기 **전에** 원본 fetch 참조를 붙잡아 두고(`window.__ciRawFetch`), 이 화면의 모든 요청(GET
+     포함)이 그 원본 fetch만 쓰게 했다. 배너가 걸릴 여지 자체가 없다 — 대신 버튼 비활성 + 인라인 문구
+     ("확인하는 중…"/"적용하는 중…")로 진행을 알린다. `window.popcornProgress.errText`는 존재할 때만
+     방어적으로 쓴다(있고 없고 둘 다 화면이 죽지 않게).
+
+   ■ 원안과 다르게 만든 구조적 지점
+     · 배치 이력 표는 원안처럼 헤더/본문을 별도 스크롤 컨테이너 두 개로 나누지 않고, 헤더를
+       `position:sticky`로 한 스크롤 컨테이너 안에 함께 두었다 — 두 스크롤 컨테이너의 거터가 어긋나던
+       기존 결함 패턴(MAKER-CHECKLIST §3)을 애초에 구조적으로 없앤다.
+     · 좌측 aside는 국면(업로드/보고/완료)에 따라 내용을 바꾸지 않고 "올리기 전에 — 고정 계약" 참고
+       카드로 고정했다(비owner는 aside 자체를 숨긴다) — 파일·원천 요약은 패널 쪽 문구에 이미 있어
+       중복하지 않았다.
+     · 적용 확인은 원안 1c의 체크박스 대신 1b대로 버튼 문구("되돌릴 수 없음을 알고 N건 적용")로만
+       확인시킨다(decision-log UX-21 "왜 1b인가" 항목이 이미 이걸 명시).
+
+   ■ 오류 상태 화면(400/413/404/409/403)은 사장님이 그리지 않은 영역이라(decision-log UX-21) 이
+     admin2의 기존 관례(인라인 텍스트 + 색 + 문장, 새 표현 발명 금지)를 그대로 따랐다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+{% block title %}상품 일괄 등록{% endblock %}
+{% block content %}
+<style>
+.ci-body{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;position:relative}
+.ci-scope{flex:none;padding:9px 18px 0;font:400 11.5px/1.5 var(--font);color:var(--rv-faint)}
+.ci-scope b{color:var(--on);font-weight:600}
+.ci-wrap{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:12px;padding:10px 18px 16px;overflow:hidden}
+
+.ci-top{flex:none;min-height:300px;display:flex;border:1px solid rgba(0,0,0,.12);border-radius:9px;overflow:hidden;background:var(--card)}
+.ci-aside{width:280px;flex:none;background:var(--container);border-right:1px solid rgba(0,0,0,.1);padding:15px;display:flex;flex-direction:column;gap:9px;overflow:auto}
+.ci-aside[hidden]{display:none}
+.ci-panel{flex:1;min-width:0;padding:16px 20px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+
+.ci-cap{font:600 10.5px/1 var(--font);color:var(--rv-faint);letter-spacing:.04em}
+.ci-card{background:var(--card);border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:10px 12px}
+.ci-drop{flex:1;border:2px dashed rgba(0,0,0,.28);border-radius:9px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:22px;min-height:150px}
+.ci-drop.over{border-color:var(--on);background:var(--container-low)}
+.ci-drop .tag{font:600 13px/1 var(--font-num);color:var(--rv-faint);border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:8px 10px;background:var(--container)}
+.ci-drop .t{font:600 14px/1.4 var(--font)}
+.ci-drop .d{font:400 11px/1.6 var(--font);color:var(--rv-faint);text-align:center;max-width:420px}
+.ci-btn{font:600 12px/1 var(--font);color:var(--rv-canvas);background:var(--on);border:none;border-radius:5px;padding:11px 16px;cursor:pointer}
+.ci-btn.ghost{color:var(--on);background:var(--card);border:1px solid rgba(0,0,0,.24)}
+.ci-btn.danger{background:var(--rv-red)}
+.ci-btn:disabled{opacity:.5;cursor:default}
+.ci-eav{border:1px dashed rgba(0,0,0,.24);border-radius:7px;background:var(--card);padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.ci-eav .lb{font:600 11px/1.3 var(--font);color:#5b564d}
+.ci-eav .d{font:400 10px/1.6 var(--font);color:var(--rv-dim)}
+.ci-filerow{display:flex;align-items:center;gap:8px;font:400 11px/1.4 var(--font);color:var(--rv-muted)}
+.ci-origin{display:flex;border:1px solid rgba(0,0,0,.16);border-radius:6px;overflow:hidden}
+.ci-origin button{flex:1;text-align:center;font:600 11px/1 var(--font);padding:9px 0;border:none;cursor:pointer;background:var(--card);color:#7d7669}
+.ci-origin button.on{background:var(--nav);color:var(--on-nav)}
+.ci-foot-row{flex:none;display:flex;align-items:center;gap:11px;border-top:1px solid rgba(0,0,0,.1);padding-top:11px;flex-wrap:wrap}
+.ci-err{font:400 11px/1.5 var(--font);color:var(--rv-red)}
+.ci-verdict{font:400 15px/1.7 var(--font)}
+.ci-verdict b.num{font-weight:600;font-family:var(--font-num)}
+.ci-warn{border:1px solid rgba(0,0,0,.1);border-left:3px solid var(--rv-red);background:oklch(0.97 0.02 30);border-radius:7px;padding:9px 12px;font:400 11px/1.6 var(--font);color:#4a463e}
+.ci-warn b{color:oklch(0.42 0.15 30)}
+.ci-note{font:400 10.5px/1.6 var(--font);color:var(--rv-dim)}
+.ci-chip{display:flex;align-items:flex-start;gap:9px;background:var(--card);border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px}
+.ci-chip.err{border-color:oklch(0.52 0.16 30 / .35)}
+.ci-chip .k{font:600 10.5px/1.7 var(--font-num);color:var(--rv-faint);flex:none}
+.ci-chip.err .k{color:var(--rv-red)}
+.ci-chip .v{font:400 11px/1.7 var(--font);color:#4a463e;flex:1;min-width:0}
+.ci-dist{display:flex;align-items:baseline;gap:7px;background:var(--card);border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:8px 12px;flex-wrap:wrap}
+.ci-dist .k{font:600 10.5px/1 var(--font);color:var(--rv-faint);flex:none}
+.ci-dist .v{font:400 10.5px/1.5 var(--font-num);color:#4a463e}
+
+.ci-donewrap{flex:1;display:flex;gap:14px;min-height:0}
+.ci-done{flex:1.3;min-width:0;background:oklch(0.97 0.02 165);border:1px solid oklch(0.5 0.11 165 / .5);border-left:3px solid oklch(0.5 0.11 165);border-radius:9px;padding:16px 19px;display:flex;flex-direction:column;gap:8px}
+.ci-done .t{font:600 15px/1.4 var(--font);color:oklch(0.36 0.09 165)}
+.ci-done .d{font:400 12px/1.75 var(--font);color:#4a463e}
+.ci-done .d b.num{font-family:var(--font-num);font-weight:600}
+.ci-stats{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.ci-stat{flex:1;background:var(--card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 15px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.ci-stat .lb{font:500 10.5px/1.3 var(--font);color:#7d7669}
+.ci-stat .row{display:flex;align-items:baseline;gap:8px}
+.ci-stat .vv{font:600 24px/1.2 var(--font-num)}
+.ci-stat .dd{font:500 11px/1 var(--font-num);color:oklch(0.5 0.11 165)}
+.ci-stat .dd.down{color:oklch(0.62 0.15 55)}
+.ci-stat .sub{font:400 10px/1.4 var(--font);color:var(--rv-dim)}
+
+.ci-lock{flex:1;border:1px dashed rgba(0,0,0,.24);border-radius:9px;background:var(--container);padding:16px 19px;display:flex;align-items:center;gap:14px}
+.ci-lock .tag{font:600 12px/1 var(--font-num);color:var(--rv-faint);border:1px solid rgba(0,0,0,.16);border-radius:6px;padding:8px 10px;background:var(--card);flex:none}
+.ci-lock .t{display:block;font:600 12.5px/1.4 var(--font);color:#4a463e}
+.ci-lock .d{display:block;font:400 10.5px/1.65 var(--font);color:var(--rv-faint);margin-top:2px}
+
+.ci-hist{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
+.ci-hist-hd{flex:none;display:flex;align-items:baseline;gap:11px;margin-bottom:9px;flex-wrap:wrap}
+.ci-hist-title{font:600 12.5px/1 var(--font)}
+.ci-hist-count{font:400 10.5px/1 var(--font-num);color:var(--rv-muted)}
+.ci-hist-cat{font:400 10.5px/1.4 var(--font);color:var(--rv-muted)}
+.ci-grow{flex:1}
+.ci-hist-scroll{flex:1;min-height:0;overflow:auto;background:var(--card);border:1px solid rgba(0,0,0,.1);border-radius:7px}
+.ci-row{display:grid;grid-template-columns:52px 118px 76px minmax(140px,1fr) 64px 84px 84px 64px 64px 72px;gap:10px;align-items:center;padding:9px 13px}
+.ci-row-head{position:sticky;top:0;z-index:1;background:var(--container);border-bottom:1px solid rgba(0,0,0,.1);font:600 10px/1 var(--font);color:#7d7669}
+.ci-row-body{border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;border-left:3px solid transparent;background:var(--card)}
+.ci-row-body:hover{background:rgba(0,0,0,.02)}
+.ci-row-body.on{background:#f0ece1;border-left-color:var(--on)}
+.ci-row-body .no{font:600 11px/1.3 var(--font-num)}
+.ci-row-body .at{font:400 10.5px/1.3 var(--font-num);color:var(--rv-muted)}
+.ci-row-body .who{font:400 11px/1.3 var(--font);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-row-body .file{font:500 11.5px/1.3 var(--font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ci-row-body .num{font:400 11px/1.3 var(--font-num);text-align:right;color:var(--on)}
+.ci-row-body .num.ok{font-weight:500}
+.ci-row-body .num.err.has{font-weight:600;color:var(--rv-red)}
+.ci-origin-tag{font:600 9.5px/1 var(--font);text-align:center;border-radius:4px;padding:4px 0}
+.ci-origin-tag.real{color:oklch(0.42 0.1 250);background:oklch(0.96 0.02 250);border:1px solid oklch(0.5 0.12 250 / .25)}
+.ci-origin-tag.demo{color:#7d7669;background:var(--container-low);border:1px solid rgba(0,0,0,.12)}
+.ci-status{font:600 10px/1 var(--font);color:oklch(0.5 0.11 165);background:oklch(0.95 0.03 165);border:1px solid oklch(0.5 0.11 165 / .3);border-radius:4px;padding:4px 7px;text-align:center}
+.ci-empty{padding:24px;text-align:center;font:400 11.5px/1.6 var(--font);color:var(--rv-dim)}
+.ci-errbox{padding:24px;text-align:center;font:400 11.5px/1.6 var(--font);color:var(--rv-red)}
+.ci-foot-note{padding:9px 13px;font:400 10px/1.6 var(--font);color:var(--rv-dim);border-top:1px solid rgba(0,0,0,.06)}
+
+.ci-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(38,35,30,.2);z-index:6}
+.ci-backdrop[hidden]{display:none}
+.ci-drawer{position:absolute;top:0;right:0;bottom:0;width:560px;max-width:92vw;background:var(--card);border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);display:flex;flex-direction:column;z-index:7}
+.ci-drawer[hidden]{display:none}
+.ci-dw-hd{flex:none;padding:14px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.ci-dw-row1{display:flex;align-items:center;gap:9px}
+.ci-dw-title{font:600 14px/1.3 var(--font);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-dw-close{font:400 15px/1 var(--font);color:var(--rv-faint);cursor:pointer;padding:2px 6px;background:none;border:0}
+.ci-dw-meta{display:flex;gap:12px;margin-top:7px;flex-wrap:wrap;font:400 10.5px/1.3 var(--font-num);color:var(--rv-faint)}
+.ci-dw-tabs{flex:none;display:flex;gap:16px;padding:0 18px;border-bottom:1px solid rgba(0,0,0,.09)}
+.ci-dw-tab{font:500 11.5px/1 var(--font);color:var(--rv-faint);padding:11px 2px;cursor:pointer;background:none;border:none;border-bottom:2px solid transparent}
+.ci-dw-tab.on{font-weight:600;color:var(--on);border-bottom-color:var(--on)}
+.ci-dw-tab .num{font-family:var(--font-num)}
+.ci-dw-body{flex:1;min-height:0;overflow:auto;padding:13px 18px;display:flex;flex-direction:column;gap:8px}
+.ci-dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:var(--container);font:400 10.5px/1.6 var(--font);color:var(--rv-muted)}
+.ci-rej{border:1px solid rgba(0,0,0,.11);border-left:3px solid var(--rv-red);border-radius:6px;padding:9px 12px;background:#faf7f0}
+.ci-rej .row1{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.ci-rej .ln{font:600 10px/1.3 var(--font-num);color:var(--rv-faint)}
+.ci-rej .rs{font:500 11px/1.4 var(--font);color:oklch(0.45 0.15 30);flex:1;min-width:0}
+.ci-rej .cells{display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:5px}
+.ci-rej .cell{font:400 10px/1.5 var(--font-num);color:var(--rv-faint)}
+.ci-rej .cell b{color:#4a463e;font-weight:500}
+.ci-sku{display:flex;flex-wrap:wrap;gap:6px}
+.ci-sku span{font:500 10.5px/1 var(--font-num);color:#4a463e;background:var(--container);border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:5px 8px}
+
+.ci-loading{flex:1;display:flex;align-items:center;justify-content:center;padding:30px;font:400 11.5px/1.6 var(--font);color:var(--rv-dim);text-align:center}
+
+@media (max-width:768px){
+  .ci-top{flex-direction:column;min-height:0}
+  .ci-aside{width:100%;border-right:none;border-bottom:1px solid rgba(0,0,0,.1)}
+  .ci-donewrap{flex-direction:column}
+  .ci-drawer{width:100%;max-width:100%}
+}
+</style>
+
+<div class="ci-body">
+  <div class="ci-scope" id="ciScope">권한 확인 중…</div>
+
+  <div class="ci-wrap">
+    <section class="ci-top">
+      <aside class="ci-aside" id="ciAside" hidden></aside>
+      <div class="ci-panel" id="ciPanel"><div class="ci-loading">불러오는 중…</div></div>
+    </section>
+
+    <section class="ci-hist">
+      <div class="ci-hist-hd">
+        <span class="ci-hist-title">배치 이력</span>
+        <span class="ci-hist-count" id="ciHistCount">—</span>
+        <span class="ci-grow"></span>
+        <span class="ci-hist-cat" id="ciHistCat"></span>
+      </div>
+      <div class="ci-hist-scroll" id="ciHistScroll">
+        <div class="ci-row ci-row-head">
+          <span>배치</span><span>시각</span><span>업로더</span><span>파일명</span><span>원천</span>
+          <span style="text-align:right">업로드 행</span><span style="text-align:right">반영</span>
+          <span style="text-align:right">검수</span><span style="text-align:right">오류</span><span>상태</span>
+        </div>
+        <div id="ciJobsBody"><div class="ci-empty">불러오는 중…</div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="ci-backdrop" id="ciBackdrop" hidden></div>
+  <aside class="ci-drawer" id="ciDrawer" data-keep="1" hidden>
+    <div class="ci-dw-hd">
+      <div class="ci-dw-row1">
+        <span class="ci-dw-title" id="ciDwTitle">—</span>
+        <button type="button" class="ci-dw-close" data-action="ci-drawer-close">✕</button>
+      </div>
+      <div class="ci-dw-meta" id="ciDwMeta"></div>
+    </div>
+    <div class="ci-dw-tabs" id="ciDwTabs"></div>
+    <div class="ci-dw-body" id="ciDwBody"></div>
+    <div class="ci-dw-foot" id="ciDwFoot"></div>
+  </aside>
+</div>
+
+<script>window.__ciRawFetch = window.fetch.bind(window);</script>
+<script src="/shared/ui-progress.js"></script>
+<script src="/shared/admin2/admin2-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var S = {
+    meLoaded: false, canUpload: false,
+    phase: 'form',
+    masterFile: null, eavProducts: null, eavSpecs: null, origin: 'real',
+    dryrunLoading: false, dryrunError: null, staging: null,
+    applyLoading: false, applyError: null, applied: null,
+    lastImpact: null, lastSkipTotal: 0,
+    jobs: null, jobsErr: null,
+    drawerJobId: null, drawerListMeta: null, drawerData: null, drawerErr: null,
+    drawerLoading: false, drawerTab: null
+  };
+  var PART_LABELS = {};
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function mdBold(s) { return s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+  function numBold(s) { return s.replace(/\d[\d,]*/g, function (m) { return '<b class="num">' + m + '</b>'; }); }
+  function rich(s) { return numBold(mdBold(esc(s))); }
+  function fmt(n) { return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function fmtDate(s) {
+    if (!s) return '—';
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return String(s);
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function partLabel(pt) { return PART_LABELS[pt] || pt; }
+  function friendlyErr(e) {
+    if (e && e.status === 401) return '세션이 만료되었습니다 — 새로고침 후 다시 로그인해 주세요.';
+    if (e && e.status === 403) return '권한이 없습니다 — owner 등급만 할 수 있습니다.';
+    if (e && e.status) return e.message || ('오류 ' + e.status);
+    return '네트워크 오류 — 연결을 확인하고 다시 시도하세요.';
+  }
+
+  // ── API — 공용 진행 배너를 걸지 않는 원본 fetch만 쓴다(상단 캡처, ui-progress.js 로드 전) ──
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = '';
+        try {
+          if (window.popcornProgress && window.popcornProgress.errText) {
+            msg = window.popcornProgress.errText(j, res.status, '') || '';
+          }
+        } catch (e2) { msg = ''; }
+        if (!msg && j) {
+          if (j.detail && typeof j.detail === 'object' && typeof j.detail.detail === 'string') msg = j.detail.detail;
+          else if (typeof j.detail === 'string') msg = j.detail;
+          else if (j.detail) msg = JSON.stringify(j.detail);
+        }
+        if (!msg) msg = '오류 ' + res.status;
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return window.__ciRawFetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPostBody(path, body) {
+    return window.__ciRawFetch(path, { method: 'POST', credentials: 'same-origin', body: body }).then(handle);
+  }
+
+  // ── 좌측 상단 권한 안내 ─────────────────────────────────────────────
+  function renderScope() {
+    var el = $('ciScope');
+    if (!S.meLoaded) { el.textContent = '권한 확인 중…'; return; }
+    el.innerHTML = S.canUpload
+      ? '업로드·적용은 <b>owner</b> 등급만 가능합니다 · 이력·오류 조회는 로그인한 모든 등급에 열려 있습니다.'
+      : '조회 전용입니다 — 업로드·적용은 <b>owner</b> 등급만 가능합니다. 아래 이력·오류 조회는 그대로 이용할 수 있습니다.';
+  }
+
+  // ── 좌측 aside — 국면과 무관한 고정 계약 참고 카드 ──────────────────
+  function renderAside() {
+    var el = $('ciAside');
+    if (!S.meLoaded || !S.canUpload) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = ''
+      + '<div class="ci-cap">올리기 전에 — 고정 계약</div>'
+      + '<div class="ci-card"><div style="font-weight:600;font-size:11px;margin-bottom:4px">헤더 14열이 정확히 있어야 합니다 — 열 매핑 기능 없음</div>'
+      + '<div style="font-family:var(--font-num);font-size:10px;line-height:1.7;color:var(--rv-muted)">자체상품코드 · 상품명 · 카테고리1 · 카테고리2 · 카테고리3 · 상태값 · 매입가 · 일반회원 · 시중가 · 공급처 · 스펙 · 제조사 · 모델명 · 다나와No</div>'
+      + '<div class="ci-note" style="margin-top:4px">하나라도 없으면 즉시 거부되고 무엇이 없는지 그대로 알려줍니다.</div></div>'
+      + '<div class="ci-card"><div style="font-weight:600;font-size:11px;margin-bottom:4px">자체상품코드 = 쇼핑몰 상품코드(pd_no)</div>'
+      + '<div class="ci-note">이 코드가 정본 코드를 그대로 결정합니다 — 잘못된 코드는 라이브 몰 상품과 충돌하거나 엉뚱한 상품을 덮어씁니다.</div></div>'
+      + '<div class="ci-card"><div class="ci-note">삭제는 없습니다 — 올린다고 기존 상품이 사라지지 않습니다. 운영자가 잠근(locked) 값은 덮지 않습니다. 미리보기 후 <b style="color:var(--on)">1시간</b> 안에 적용하지 않으면 파일이 청소되어 처음부터 다시 합니다.</div></div>';
+  }
+
+  // ── 중앙 패널 — 국면별 렌더 ──────────────────────────────────────────
+  function renderPanel() {
+    var el = $('ciPanel');
+    if (!S.meLoaded) { el.innerHTML = '<div class="ci-loading">권한 확인 중…</div>'; return; }
+    if (!S.canUpload) { el.innerHTML = lockedHtml(); return; }
+    if (S.phase === 'report' && S.staging) { el.innerHTML = reportHtml(S.staging); return; }
+    if (S.phase === 'done' && S.applied) { el.innerHTML = doneHtml(S.applied); return; }
+    el.innerHTML = formHtml();
+  }
+
+  function lockedHtml() {
+    return '<div class="ci-lock"><span class="tag">잠김</span>'
+      + '<span style="flex:1;min-width:0">'
+      + '<span class="t">새 일괄 등록은 owner 등급만 할 수 있습니다</span>'
+      + '<span class="d">파일 하나가 정본 카탈로그 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 owner 전용입니다(시도 시 403). 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
+      + '</span></div>';
+  }
+
+  function eavRowHtml(label, suffix, file) {
+    return '<div class="ci-filerow"><span style="flex:none;width:14px">' + (file ? '✓' : '○') + '</span>'
+      + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(label) + (file ? (' · ' + esc(file.name)) : '') + '</span>'
+      + '<button type="button" class="ci-btn ghost" data-action="ci-pick-' + suffix + '" style="padding:5px 9px;font-size:10.5px;flex:none">' + (file ? '교체' : '선택') + '</button>'
+      + (file ? ('<button type="button" class="ci-btn ghost" data-action="ci-clear-' + suffix + '" style="padding:5px 9px;font-size:10.5px;flex:none">지우기</button>') : '')
+      + '</div>';
+  }
+
+  function formHtml() {
+    var m = S.masterFile, eavP = S.eavProducts, eavS = S.eavSpecs;
+    var eavMismatch = (!!eavP !== !!eavS);
+    var canGo = !!m && !eavMismatch && !S.dryrunLoading;
+    return ''
+      + '<div class="ci-cap">새 일괄 등록 — 업로드 → 미리보기 → 확인 → 적용 순서가 강제됩니다</div>'
+      + (m
+        ? ('<div class="ci-card"><div style="display:flex;align-items:center;gap:8px">'
+          + '<span style="color:oklch(0.5 0.11 165);font-weight:600">✓</span>'
+          + '<span style="flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(m.name) + '</span>'
+          + '<button type="button" class="ci-btn ghost" data-action="ci-clear-master" style="padding:6px 10px;font-size:11px;flex:none">지우기</button>'
+          + '</div><div class="ci-note" style="margin-top:4px">' + (m.size / 1048576).toFixed(1) + 'MB</div></div>')
+        : ('<div class="ci-drop" data-drop="master" data-action="ci-pick-master">'
+          + '<span class="tag">CSV</span>'
+          + '<span class="t">마스터 CSV를 끌어다 놓거나 클릭해서 선택</span>'
+          + '<span class="d">필수 · 최대 64MB · UTF-8 · 헤더 14열이 정확히 일치해야 합니다</span>'
+          + '</div>'))
+      + '<input type="file" id="ciMasterInput" accept=".csv,text/csv" hidden>'
+      + '<div class="ci-eav">'
+      + '<div class="lb">사양 EAV 세트 (선택 · 2파일 함께)</div>'
+      + '<div class="d">db_products + db_specs — 둘 중 하나만 올리면 그 자리에서 막힙니다. 안 올리면 사양은 "스펙" 열에서만 추출되고 기존 확인값은 유지됩니다.</div>'
+      + eavRowHtml('db_products (상품 매핑)', 'eavp', eavP)
+      + eavRowHtml('db_specs (사양 값)', 'eavs', eavS)
+      + (eavMismatch ? '<div class="ci-err">두 파일을 모두 선택하거나 모두 비워야 합니다.</div>' : '')
+      + '</div>'
+      + '<input type="file" id="ciEavPInput" hidden>'
+      + '<input type="file" id="ciEavSInput" hidden>'
+      + '<div class="ci-cap" style="margin-top:2px">데이터 원천 — 명시적으로 선택</div>'
+      + '<div class="ci-origin">'
+      + '<button type="button" class="' + (S.origin === 'real' ? 'on' : '') + '" data-action="ci-origin-real">실데이터</button>'
+      + '<button type="button" class="' + (S.origin === 'demo' ? 'on' : '') + '" data-action="ci-origin-demo">데모</button>'
+      + '</div>'
+      + '<div class="ci-warn"><b>적용 후 되돌리기가 없습니다.</b> 자체상품코드는 라이브 몰 상품코드(pd_no)와 같은 값입니다 — 잘못된 코드로 올리면 다른 상품을 덮어쓸 수 있습니다.</div>'
+      + '<span class="ci-grow"></span>'
+      + '<div class="ci-foot-row">'
+      + '<span class="ci-grow"></span>'
+      + (S.dryrunError ? ('<span class="ci-err" style="flex:none;max-width:360px">' + esc(S.dryrunError) + '</span>') : '')
+      + (S.dryrunLoading ? '<span class="ci-note">확인하는 중…</span>' : '')
+      + '<button type="button" class="ci-btn" data-action="ci-preview" ' + (canGo ? '' : 'disabled') + '>미리보기(드라이런)</button>'
+      + '</div>';
+  }
+
+  function reportHtml(st) {
+    var s = st.summary || {}, imp = st.impact || {};
+    var distHtml = (s.by_type && s.by_type.length)
+      ? s.by_type.map(function (t) { return esc(partLabel(t.part_type)) + ' ' + fmt(t.n); }).join(' · ')
+      : '';
+    var skipKeys = Object.keys(s.skipped || {});
+    var skipHtml = skipKeys.length
+      ? skipKeys.sort(function (a, b) { return s.skipped[b] - s.skipped[a]; })
+        .map(function (k) { return esc(k) + ' ' + fmt(s.skipped[k]); }).join(' · ')
+      : '없음';
+    var errGroups = {};
+    (s.error_samples || []).forEach(function (e) { errGroups[e.reason] = (errGroups[e.reason] || 0) + 1; });
+    var errKeys = Object.keys(errGroups);
+    var errHtml = errKeys.length
+      ? errKeys.sort(function (a, b) { return errGroups[b] - errGroups[a]; })
+        .map(function (k) { return esc(k) + ' ' + fmt(errGroups[k]); }).join(' · ')
+      : '없음';
+    var sampleShown = (s.error_samples || []).length;
+    var errSampleNote = (s.error > sampleShown)
+      ? ('<div class="ci-note" style="margin-top:3px">표본 ' + fmt(sampleShown) + '건 기준(총 ' + fmt(s.error) + '건) — 전량은 적용 후 배치 상세에서 확인합니다.</div>')
+      : '';
+    return ''
+      + '<div class="ci-cap">드라이런 보고 — DB는 아직 그대로입니다 · staging ' + esc(st.staging_id) + '</div>'
+      + '<div class="ci-verdict">' + rich(st.verdict || '') + '</div>'
+      + (distHtml ? ('<div class="ci-dist"><span class="k">부품 종류별 분포</span><span class="v">' + distHtml + '</span></div>') : '')
+      + '<div class="ci-chip"><span class="k">제외 ' + fmt(s.skipped_total) + '</span><span class="v">' + skipHtml + (s.skipped_total ? ' — <b style="color:oklch(0.5 0.14 55)">이 사유는 적용 후 다시 볼 수 없습니다. 지금 확인하세요.</b>' : '') + '</span></div>'
+      + '<div class="ci-chip err"><span class="k">오류 ' + fmt(s.error) + '</span><span class="v">' + errHtml + (s.error ? ' — 반영되지 않고 원본·사유가 저장됩니다.' : '') + errSampleNote + '</span></div>'
+      + '<div class="ci-chip"><span class="k">사양</span><span class="v">' + (st.eav_included ? '사양 EAV 파일을 반영합니다.' : '사양 파일이 없어 "스펙" 열에서만 추출합니다 — 이미 확인된 기존 사양값은 유지됩니다.') + '</span></div>'
+      + '<div class="ci-chip"><span class="k">잠금</span><span class="v">운영자가 손으로 고쳐 잠근 값(locked_fields)은 파일 내용과 무관하게 덮지 않습니다.</span></div>'
+      + (st.warning ? ('<div class="ci-warn">' + rich(st.warning) + '</div>') : '')
+      + (st.note ? ('<div class="ci-note">' + esc(st.note) + '</div>') : '')
+      + '<span class="ci-grow"></span>'
+      + '<div class="ci-foot-row">'
+      + '<span class="ci-note" style="max-width:420px">적용 시 확인한 건수(expect_ok=' + fmt(s.ok) + ')를 함께 보냅니다 — 그 사이 DB가 바뀌면 거부되고 다시 검증합니다.</span>'
+      + '<span class="ci-grow"></span>'
+      + (S.applyError ? ('<span class="ci-err" style="flex:none;max-width:300px">' + esc(S.applyError) + '</span>') : '')
+      + (S.applyLoading ? '<span class="ci-note">적용하는 중…</span>' : '')
+      + '<button type="button" class="ci-btn ghost" data-action="ci-reset" ' + (S.applyLoading ? 'disabled' : '') + '>처음부터 다시</button>'
+      + '<button type="button" class="ci-btn danger" data-action="ci-apply" ' + (S.applyLoading ? 'disabled' : '') + '>되돌릴 수 없음을 알고 ' + fmt(s.ok) + '건 적용</button>'
+      + '</div>';
+  }
+
+  function statCard(label, value, delta, sub) {
+    var deltaHtml = (delta === null || delta === undefined) ? '' : ('<span class="dd' + (delta < 0 ? ' down' : '') + '">' + (delta >= 0 ? '+' : '') + fmt(delta) + '</span>');
+    return '<div class="ci-stat"><div class="lb">' + esc(label) + '</div>'
+      + '<div class="row"><span class="vv num">' + fmt(value) + '</span>' + deltaHtml + '</div>'
+      + '<div class="sub">' + esc(sub || '') + '</div></div>';
+  }
+
+  function doneHtml(ap) {
+    var a = ap.after || {};
+    var im = S.lastImpact || {};
+    return ''
+      + '<div class="ci-donewrap">'
+      + '<div class="ci-done">'
+      + '<div class="t">✓ 배치 #' + fmt(ap.job_id) + '로 반영되었습니다</div>'
+      + '<div class="d">' + rich(ap.verdict || '') + '</div>'
+      + '<div class="ci-note">' + (S.lastSkipTotal ? ('제외 ' + fmt(S.lastSkipTotal) + '건의 사유는 저장되지 않았습니다 — 드라이런 화면에서만 볼 수 있었습니다. ') : '') + '반영 행의 원본 셀도 보관하지 않습니다(원본 CSV가 정본). 되돌리기는 없습니다 — 고친 CSV를 다시 올려 upsert로 바로잡습니다.</div>'
+      + '<span class="ci-grow"></span>'
+      + '<div style="display:flex;gap:9px;flex-wrap:wrap">'
+      + '<button type="button" class="ci-btn" data-action="ci-open-applied">배치 #' + fmt(ap.job_id) + ' 상세</button>'
+      + '<button type="button" class="ci-btn ghost" data-action="ci-reset">새 일괄 등록 시작</button>'
+      + '</div>'
+      + '</div>'
+      + '<div class="ci-stats">'
+      + statCard('카탈로그 전체', a.catalog, (im.new !== undefined ? im.new : null), '실데이터 · 데모 합계')
+      + statCard('추천 후보', a.pool, (im.pool_in !== undefined ? (im.pool_in - im.pool_out) : null), (im.pool_in !== undefined ? ('진입 ' + fmt(im.pool_in) + ' · 이탈 ' + fmt(im.pool_out) + ' — 드라이런 예고와 일치') : ''))
+      + statCard('검수 대기', a.review, (im.review_new !== undefined ? im.review_new : null), '상품 사양 검수 화면에서 처리합니다')
+      + '</div>'
+      + '</div>';
+  }
+
+  // ── 부품 라벨 — product-meta 재사용(코드→한글을 이 화면에서 다시 정의하지 않는다) ──
+  function loadMeta() {
+    apiGet('/api/admin/product-meta').then(function (j) {
+      ['part_labels', 'peripheral_labels', 'built_labels'].forEach(function (k) {
+        (j[k] || []).forEach(function (x) { PART_LABELS[x.part_type] = x.label; });
+      });
+    }).catch(function () { /* 라벨 없이도 화면은 동작 — 코드값 그대로 표시 */ });
+  }
+
+  // ── 배치 이력 ────────────────────────────────────────────────────────
+  function loadJobs() {
+    S.jobsErr = null;
+    apiGet('/api/admin/import-jobs').then(function (j) {
+      S.jobs = j; renderJobs();
+    }).catch(function (e) {
+      S.jobsErr = friendlyErr(e); renderJobs();
+    });
+  }
+  function rowHtml(it) {
+    var errHas = it.error > 0;
+    return '<div class="ci-row ci-row-body' + (S.drawerJobId === it.job_id ? ' on' : '') + '" data-jobid="' + it.job_id + '" data-action="ci-open-job">'
+      + '<span class="no">#' + it.job_id + '</span>'
+      + '<span class="at">' + fmtDate(it.at) + '</span>'
+      + '<span class="who">' + esc(it.operator || '—') + '</span>'
+      + '<span class="file">' + esc(it.file || '—') + '</span>'
+      + '<span class="ci-origin-tag ' + (it.origin === 'demo' ? 'demo' : 'real') + '">' + esc(it.origin_label || it.origin || '—') + '</span>'
+      + '<span class="num">' + fmt(it.total) + '</span>'
+      + '<span class="num ok">' + fmt(it.ok) + '</span>'
+      + '<span class="num">' + fmt(it.review) + '</span>'
+      + '<span class="num err' + (errHas ? ' has' : '') + '">' + fmt(it.error) + '</span>'
+      + '<span class="ci-status">' + esc(it.status || '—') + '</span>'
+      + '</div>';
+  }
+  function renderJobs() {
+    var body = $('ciJobsBody');
+    if (S.jobsErr) {
+      body.innerHTML = '<div class="ci-errbox">이력을 불러오지 못했습니다 — ' + esc(S.jobsErr) + '</div>';
+      $('ciHistCount').textContent = '—'; $('ciHistCat').textContent = '';
+      return;
+    }
+    if (!S.jobs) { body.innerHTML = '<div class="ci-empty">불러오는 중…</div>'; return; }
+    var items = S.jobs.items || [], sum = S.jobs.summary || {};
+    var realN = 0, demoN = 0;
+    items.forEach(function (it) { if (it.origin === 'demo') demoN++; else realN++; });
+    var trunc = (sum.batches && items.length < sum.batches);
+    $('ciHistCount').textContent = '전체 ' + fmt(sum.batches) + '건 · 실데이터 ' + fmt(realN) + ' · 데모 ' + fmt(demoN) + (trunc ? ' (최근 ' + items.length + '건 표시)' : '');
+    $('ciHistCat').innerHTML = sum.catalog !== undefined
+      ? ('현재 카탈로그 실측 <b class="num">' + fmt(sum.catalog) + '</b>건 (실데이터 ' + fmt(sum.real) + ' · 데모 ' + fmt(sum.demo) + ') — 배치 합계와 다를 수 있습니다')
+      : '';
+    if (!items.length) { body.innerHTML = '<div class="ci-empty">등록된 배치가 없습니다.</div>'; return; }
+    body.innerHTML = items.map(rowHtml).join('')
+      + (S.jobs.note ? ('<div class="ci-foot-note">' + esc(S.jobs.note) + '</div>') : '');
+  }
+
+  // ── 미리보기 / 적용 / 초기화 ────────────────────────────────────────
+  function runPreview() {
+    if (!S.masterFile || S.dryrunLoading) return;
+    if (!!S.eavProducts !== !!S.eavSpecs) { S.dryrunError = '사양 EAV는 두 파일을 함께 올리거나 모두 비워야 합니다.'; renderPanel(); return; }
+    S.dryrunLoading = true; S.dryrunError = null; renderPanel();
+    var fd = new FormData();
+    fd.append('master', S.masterFile);
+    if (S.eavProducts) fd.append('db_products', S.eavProducts);
+    if (S.eavSpecs) fd.append('db_specs', S.eavSpecs);
+    fd.append('origin', S.origin);
+    apiPostBody('/api/admin/catalog-import/dryrun', fd).then(function (j) {
+      S.dryrunLoading = false; S.staging = j; S.phase = 'report'; renderPanel();
+    }).catch(function (e) {
+      S.dryrunLoading = false; S.dryrunError = friendlyErr(e); renderPanel();
+    });
+  }
+  function resetForm() {
+    S.masterFile = null; S.eavProducts = null; S.eavSpecs = null; S.origin = 'real';
+    S.staging = null; S.dryrunError = null; S.applyError = null; S.applied = null;
+    S.phase = 'form'; renderPanel();
+  }
+  function runApply() {
+    if (!S.staging || S.applyLoading) return;
+    S.applyLoading = true; S.applyError = null; renderPanel();
+    var body = new URLSearchParams();
+    body.append('staging_id', S.staging.staging_id);
+    body.append('expect_ok', String(S.staging.summary.ok));
+    apiPostBody('/api/admin/catalog-import/apply', body).then(function (j) {
+      S.applyLoading = false;
+      S.lastImpact = S.staging.impact; S.lastSkipTotal = S.staging.summary.skipped_total;
+      S.applied = j; S.staging = null; S.phase = 'done'; renderPanel();
+      loadJobs();
+    }).catch(function (e) {
+      S.applyLoading = false; S.applyError = friendlyErr(e); renderPanel();
+    });
+  }
+
+  // ── 배치 상세 서랍 ──────────────────────────────────────────────────
+  function openDrawer(jobId, listMeta) {
+    S.drawerJobId = jobId; S.drawerListMeta = listMeta || null;
+    S.drawerData = null; S.drawerErr = null; S.drawerLoading = true; S.drawerTab = null;
+    $('ciBackdrop').hidden = false; $('ciDrawer').hidden = false;
+    renderJobs(); renderDrawer();
+    apiGet('/api/admin/import-jobs/' + jobId + '/rows?limit=500').then(function (j) {
+      S.drawerLoading = false; S.drawerData = j;
+      var errs = (j.rows || []).filter(function (r) { return r.kind === 'error'; });
+      S.drawerTab = errs.length ? 'error' : 'kept';
+      renderDrawer();
+    }).catch(function (e) {
+      S.drawerLoading = false; S.drawerErr = friendlyErr(e); renderDrawer();
+    });
+  }
+  function closeDrawer() {
+    S.drawerJobId = null;
+    $('ciBackdrop').hidden = true; $('ciDrawer').hidden = true;
+    renderJobs();
+  }
+  function renderDrawer() {
+    if (!S.drawerJobId) return;
+    var lm = S.drawerListMeta;
+    $('ciDwTitle').textContent = '배치 #' + S.drawerJobId + (lm && lm.file ? (' — ' + lm.file) : '');
+    if (S.drawerLoading) {
+      $('ciDwMeta').textContent = ''; $('ciDwTabs').innerHTML = '';
+      $('ciDwBody').innerHTML = '<div class="ci-loading">불러오는 중…</div>'; $('ciDwFoot').textContent = '';
+      return;
+    }
+    if (S.drawerErr) {
+      $('ciDwMeta').textContent = ''; $('ciDwTabs').innerHTML = '';
+      $('ciDwBody').innerHTML = '<div class="ci-errbox">' + esc(S.drawerErr) + '</div>'; $('ciDwFoot').textContent = '';
+      return;
+    }
+    var d = S.drawerData; if (!d || !d.job) return;
+    var job = d.job;
+    var metaParts = [fmtDate(job.at)];
+    if (lm && lm.operator) metaParts.push(esc(lm.operator));
+    metaParts.push(job.origin === 'demo' ? '데모' : '실데이터');
+    metaParts.push(fmt(job.total) + '행 → 반영 ' + fmt(job.ok) + ' · 검수 ' + fmt(job.review) + ' · 오류 ' + fmt(job.error));
+    $('ciDwMeta').innerHTML = metaParts.map(function (x) { return '<span>' + x + '</span>'; }).join('');
+
+    var rows = d.rows || [];
+    var errs = rows.filter(function (r) { return r.kind === 'error'; });
+    var kept = rows.filter(function (r) { return r.kind === 'kept'; });
+    $('ciDwTabs').innerHTML = ''
+      + '<button type="button" class="ci-dw-tab' + (S.drawerTab === 'error' ? ' on' : '') + '" data-action="ci-dw-tab-error">거부 행 <span class="num">' + fmt(job.error) + '</span></button>'
+      + '<button type="button" class="ci-dw-tab' + (S.drawerTab === 'kept' ? ' on' : '') + '" data-action="ci-dw-tab-kept">반영 상품 <span class="num">' + fmt(job.ok) + '</span></button>';
+
+    var bodyHtml = '';
+    if (S.drawerTab === 'error') {
+      if (!job.error) bodyHtml = '<div class="ci-empty">거부된 행이 없습니다.</div>';
+      else if (!errs.length) bodyHtml = '<div class="ci-empty">저장된 원본이 없습니다.</div>';
+      else {
+        bodyHtml = errs.map(function (e) {
+          var cells = (e.cells || []).map(function (c) { return '<span class="cell"><b>' + esc(c.col) + '</b> ' + esc(c.value) + '</span>'; }).join('');
+          return '<div class="ci-rej"><div class="row1"><span class="ln">행 ' + fmt(e.row_no) + '</span><span class="rs">' + esc(e.reason || '') + '</span></div>'
+            + (cells ? ('<div class="cells">' + cells + '</div>') : '') + '</div>';
+        }).join('');
+        if (job.error > errs.length) {
+          bodyHtml += '<div class="ci-note">표시 ' + fmt(errs.length) + '건 / 총 ' + fmt(job.error) + '건 — 배치당 원본은 최대 200행까지만 저장됩니다.</div>';
+        }
+      }
+    } else {
+      if (!job.ok) bodyHtml = '<div class="ci-empty">반영된 상품이 없습니다.</div>';
+      else if (!kept.length) {
+        bodyHtml = '<div class="ci-note">원본 셀은 보관하지 않습니다 — 반영 총 ' + fmt(job.ok) + '건은 상품 관리에서 SKU로 조회하세요.</div>';
+      } else {
+        bodyHtml = '<div class="ci-sku">' + kept.map(function (k) { return '<span>' + esc(k.sku || '—') + '</span>'; }).join('') + '</div>';
+      }
+    }
+    $('ciDwBody').innerHTML = bodyHtml;
+    $('ciDwFoot').textContent = d.note || '';
+  }
+
+  // ── 이벤트 위임 (data-action) ────────────────────────────────────────
+  document.addEventListener('click', function (ev) {
+    if (ev.target.closest && ev.target.closest('#ciBackdrop')) { closeDrawer(); return; }
+    var a = ev.target.closest && ev.target.closest('[data-action]');
+    if (!a) return;
+    switch (a.getAttribute('data-action')) {
+      case 'ci-pick-master': $('ciMasterInput').click(); break;
+      case 'ci-clear-master': S.masterFile = null; renderPanel(); break;
+      case 'ci-pick-eavp': $('ciEavPInput').click(); break;
+      case 'ci-clear-eavp': S.eavProducts = null; renderPanel(); break;
+      case 'ci-pick-eavs': $('ciEavSInput').click(); break;
+      case 'ci-clear-eavs': S.eavSpecs = null; renderPanel(); break;
+      case 'ci-origin-real': S.origin = 'real'; renderPanel(); break;
+      case 'ci-origin-demo': S.origin = 'demo'; renderPanel(); break;
+      case 'ci-preview': runPreview(); break;
+      case 'ci-reset': resetForm(); break;
+      case 'ci-apply': runApply(); break;
+      case 'ci-open-applied':
+        if (S.applied) openDrawer(S.applied.job_id, null);
+        break;
+      case 'ci-open-job':
+        var jid = Number(a.getAttribute('data-jobid'));
+        var meta = ((S.jobs && S.jobs.items) || []).filter(function (x) { return x.job_id === jid; })[0] || null;
+        openDrawer(jid, meta);
+        break;
+      case 'ci-drawer-close': closeDrawer(); break;
+      case 'ci-dw-tab-error': S.drawerTab = 'error'; renderDrawer(); break;
+      case 'ci-dw-tab-kept': S.drawerTab = 'kept'; renderDrawer(); break;
+    }
+  });
+  document.addEventListener('change', function (ev) {
+    if (ev.target.id === 'ciMasterInput') { S.masterFile = ev.target.files[0] || null; S.dryrunError = null; renderPanel(); }
+    else if (ev.target.id === 'ciEavPInput') { S.eavProducts = ev.target.files[0] || null; renderPanel(); }
+    else if (ev.target.id === 'ciEavSInput') { S.eavSpecs = ev.target.files[0] || null; renderPanel(); }
+  });
+  var panelEl = $('ciPanel');
+  panelEl.addEventListener('dragover', function (ev) {
+    var dz = ev.target.closest && ev.target.closest('[data-drop="master"]');
+    if (dz) { ev.preventDefault(); dz.classList.add('over'); }
+  });
+  panelEl.addEventListener('dragleave', function (ev) {
+    var dz = ev.target.closest && ev.target.closest('[data-drop="master"]');
+    if (dz) dz.classList.remove('over');
+  });
+  panelEl.addEventListener('drop', function (ev) {
+    var dz = ev.target.closest && ev.target.closest('[data-drop="master"]');
+    if (!dz) return;
+    ev.preventDefault(); dz.classList.remove('over');
+    var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) { S.masterFile = f; S.dryrunError = null; renderPanel(); }
+  });
+
+  // ── 부트스트랩 ──────────────────────────────────────────────────────
+  renderScope(); renderAside(); renderPanel(); renderJobs();
+  loadMeta(); loadJobs();
+  if (window.Admin2Shell && window.Admin2Shell.meReady) {
+    window.Admin2Shell.meReady.then(function () {
+      S.meLoaded = true;
+      S.canUpload = window.Admin2Shell.canWrite('owner');
+      renderScope(); renderAside(); renderPanel();
+    });
+  } else {
+    S.meLoaded = true; S.canUpload = false;
+    renderScope(); renderAside(); renderPanel();
+  }
+})();
+</script>
+{% endblock %}

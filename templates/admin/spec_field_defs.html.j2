@@ -1,0 +1,808 @@
+{#
+  상품 사양 정의 (ADM-PRD-050) — 신설 (2026-08-15)
+
+  ■ 출처 — 사장님이 Claude Design에서 확정한 원안
+    파일: `docs/design/dc-spec-field-defs-2안.html`(캔버스에 1a/1b 두 안 — **1a(항목 축)만
+    정본**, 1b(부품 축)는 탈락). decision-log UX-27(2026-08-14). 화면 구성·색·서체·간격·
+    인터랙션의 뼈대는 1a를 그대로 옮기고, 런타임만 순수 JS로 바꿨다(원안은
+    `<x-dc>`+`DCLogic`+`support.js` 런타임 목업이라 여기서는 돌지 않는다). 본문 CSS·JS
+    이디엄은 같은 축(항목 정의 화면) 구조인 `spec_standard.html.j2`(조립 사양 표준,
+    2026-08-14 재구축)에서 검증된 패턴(로딩/오류 전환, KPI 카드, 필터 필, 그리드 정렬,
+    오버레이)을 그대로 가져와 클래스만 `sd-` 접두어로 옮겼다 — 매번 새로 발명하지 않는다.
+
+  ■★ UX-27의 핵심 발견 — 1b에서 옮겨온 것은 «셋뿐»이다(1a는 정상 상태만 그렸다)
+    ① 상시 경고 배너(정상=초록 한 줄 / 위험=붉은 배너, `renderHealth()`)
+    ② 해당 항목의 위험 표시(표의 키 옆 「▲ 미기록」 배지, `unrecorded` 포함 시)
+    ③ 조치 지시문("개발 PC에서 마이그레이션을 추가해야 합니다" — `sd-health-item`)
+    1b의 **부품 축 구조**(좌측 부품 리스트 + 우측 부품별 사양 드로어)는 가져오지 않았다
+    — 지시받은 대로 1a의 «항목 축 전체 표» 구조를 그대로 유지한다.
+
+  ■★ API 실측(2026-08-14, dev-login 세션으로 `GET /api/admin/spec-fields` 직접 호출) —
+    실제 값 31항목·엔진 22·필수 17·커스텀 1·ghosts 0·unrecorded 0(문서 스냅샷과 일치,
+    2026-08-13 실측 그대로 유효). **이 화면은 이 수를 코드에 박지 않는다** — 전부
+    `items`/`ghosts`/`unrecorded` 배열 길이로 매 로드마다 다시 센다.
+
+  ■★ 실측된 결함 — «추천 뷰 둘 다 재생성»이 지금 코드에는 없다(읽기만, 담당 밖이라
+    고치지 않았다). `api/admin_spec_fields.py`의 `add_spec_field`는
+    `_add_col_to_view(conn, "v_recommendation_candidates", key)` **한 곳만** 부른다 —
+    `v_companion_candidates`는 손대지 않는다(요구사항 정의서 §엔진 계약의 「실측된 결함」과
+    일치). 지금까지 문제가 없었던 것은 `is_engine=true` 22개가 전부 8슬롯(core) 필드라서다.
+    이 화면(모달)의 "엔진이 읽음" 힌트 문구는 **UX-27이 확정한 계약**("추천 뷰 두 개가
+    함께 다시 만들어집니다")을 그대로 옮겼다 — 그게 되어야 하는 동작이기 때문이다. 다만
+    지금 API로 주변기기 부품에 엔진 필드를 만들면 컴패니언 뷰가 조용히 안 갱신된다.
+    **이 API 수정은 담당 밖**(`api/admin_spec_fields.py`) — 제작 보고서에 남긴다.
+
+  ■ 1a 원안과 다르게 구현한 지점(전부 근거 있음 — 지어낸 자리가 아니다)
+    ① KPI·필터·건강 배너의 모든 수는 원안의 스냅샷 예시(31·22·17·1·0건·"15:07")가 아니라
+       `items`/`ghosts`/`unrecorded`를 매번 다시 센 값과, 로드 시각(`new Date()`)이다.
+    ② "표시 이름 · 이 값을 읽는 곳"의 서브 라인은 원안처럼 지어낸 문장이 아니라
+       `parts[].fields[].used_by`(호환 규칙 rule_key · "용도 하한")를 항목별로 모아
+       만든 문장이다 — 규칙이 없으면 "표시용" 또는 "엔진 후보에는 실리지만…"으로
+       사실대로 구분한다(엔진 후보(`is_engine`)와 실제 판정 사용(`used_by`)은 다른
+       사실이다 — `chipset`·`clock_mhz`가 그 예: 엔진 필드지만 지금 읽는 규칙이 없다).
+    ③ "채움" 퍼센트는 항목별 저장값이 API에 없어(원안은 필드마다 정적 예시 %를 뒀다),
+       그 항목이 걸리는 모든 부품의 `filled`/`live`(판매중·재고&gt;0)를 합산해 계산한다
+       — `spec_standard.html.j2`의 KPI 평균 충족률과 같은 방식("서버가 준 실값을 화면에서
+       집계하는 것이지 지어내는 것이 아니다").
+    ④ "적용 부품"·"필수 부품" 열은 원안처럼 부품 코드를 그대로 이어 붙인다(`CPU·MB`)
+       — 라벨로 옮기면 `taxonomy.PART_LABELS`를 화면이 다시 정의하는 셈이라 CANON을
+       어긴다. 대신 `title` 툴팁에는 API가 준 한글 라벨(`parts[].label`)을 그대로 쓴다
+       (다시 정의하지 않고 서버 값을 그대로 옮기는 것이라 허용).
+    ⑤ 표의 행은 클릭할 수 없다(원안은 `cursor:pointer`이지만, 이 화면의 API에는 항목을
+       고치는 엔드포인트가 없다 — `PATCH`가 없다. 없는 기능을 누르게 하지 않는다).
+    ⑥ "+ 사양 항목 만들기" 모달의 적용 부품 선택은 원안의 "+ 부품 고르기"(검색 추가형)
+       대신 **전체 토글 칩**으로 구현했다(`spec_standard.html.j2`의 적용 부품 칩과 같은
+       패턴 — 앱 안에서 이미 검증된 상호작용이고, 숨은 검색 단계 없이 선택지 전부가
+       한눈에 보인다). 부품은 `parts[].group`(core/built/peripheral)으로 3단 구분했다.
+    ⑦ 모달 기본값은 **전부 빈 값**이다(키·표시 이름·적용 부품 없음, 엔진=아니오,
+       적재=아니오). 원안 캔버스는 `panel_type`/"모니터"가 채워진 **작성 예시**를
+       보여주지만, 그 값을 기본값으로 두면 "등록 폼에 남의 값이 기본으로 남아 그대로
+       저장될 뻔한" 전례(CLAUDE.md)를 반복한다. 엔진 기본값을 "아니오"로 둔 것도
+       같은 이유 — 스키마를 바꾸는 동작은 명시적으로 켜야 한다.
+    ⑧ "엔진이 읽는 항목" KPI의 보조문은 실측으로 계산한다: 지금 엔진 필드가 전부
+       core(8슬롯) 부품에만 걸려 있으면 "전부 8슬롯 부품 필드", 하나라도 주변기기에
+       걸리면 "▲ 주변기기 대상 포함 — 컴패니언 뷰 확인 필요"로 바뀐다(위 실측된 결함이
+       실제로 발동하는 조건과 정확히 같다 — 화면이 그 순간을 놓치지 않게 했다).
+
+  ■ 2026-08-13 셸 통합 — `_admin2_shell.html.j2` 상속. 좌측 메뉴·헤더·토스트 컨테이너·
+    `/shared/ui-progress.js`·`/shared/admin2/admin2-shell.js`(`Admin2Shell.canWrite`·
+    `Admin2Shell.toast`·`Admin2Shell.meReady`)는 셸이 싣는다 — 벤더 스크립트를 추가로
+    싣지 않는다. 외부 CDN 0건.
+
+  ■ 권한 — 열람 viewer 이상(로그인만 하면 됨), 항목 추가는 **owner 전용**. 서버가
+    `auth.OWNER_WRITE_PREFIXES`로 `/api/admin/spec-fields` POST를 이미 막는다(실측
+    확인) — 이 화면은 그 사실을 버튼 비활성 + 사유(`title`)로 반영할 뿐이다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}상품 사양 정의{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  margin:0;padding:0;border:0;background:none}
+input,select,textarea{font-family:var(--rv-font)}
+.sd-mono{font-family:var(--rv-mono)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+.sd-hint{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.sd-tag{font:500 10px/1 var(--rv-mono);color:var(--rv-faint);padding:4px 7px;
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap}
+
+/* ── 루트 · 상태 스위칭 ── */
+.sd-root{--sd-blue:oklch(0.5 0.12 250);flex:1;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.sd-loading,.sd-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;text-align:center}
+.sd-loading[hidden],.sd-errbox[hidden],.sd-body[hidden]{display:none}
+.sd-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.sd-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);max-width:420px}
+.sd-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+.sd-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── 건강 상태 배너 — UX-27이 1b에서 옮기라고 확정한 셋 중 «상시 경고 배너» ── */
+.sd-health{flex:none;margin:12px 18px 0;border-radius:8px;padding:10px 13px;
+  display:flex;flex-direction:column;gap:6px;border:1px solid transparent}
+.sd-health.ok{flex-direction:row;align-items:center;gap:14px;
+  border-color:oklch(0.5 0.11 165 / .45);border-left:3px solid var(--rv-green);background:oklch(0.97 0.02 165)}
+.sd-health.err{border-color:oklch(0.52 0.16 30 / .5);border-left:3px solid var(--rv-red);background:oklch(0.97 0.02 30)}
+.sd-health-title{font:600 11px/1.4 var(--rv-font);white-space:nowrap}
+.sd-health.ok .sd-health-title{color:oklch(0.36 0.09 165)}
+.sd-health.err .sd-health-title{color:oklch(0.42 0.15 30)}
+.sd-health-body{font:400 10.5px/1.6 var(--rv-font);color:#4a463e;flex:1}
+.sd-health-time{font:400 10px/1.4 var(--rv-mono);color:var(--rv-faint);white-space:nowrap;flex:none}
+.sd-health-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sd-health-keys{font:400 10px/1.4 var(--rv-mono);color:var(--rv-faint)}
+.sd-health-detail{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow:auto}
+.sd-health-item{font:400 10.5px/1.7 var(--rv-font);color:#4a463e}
+
+/* ── KPI ── */
+.sd-kpis{flex:none;padding:12px 18px 0;display:flex;gap:10px;flex-wrap:wrap}
+.sd-kpi{flex:1;min-width:170px;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);
+  border-left:3px solid var(--rv-dim3);border-radius:8px;padding:10px 13px}
+.sd-kpi.blue{border-left-color:var(--sd-blue)}
+.sd-kpi.green{border-left-color:var(--rv-green)}
+.sd-kpi-label{font:500 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.sd-kpi-row{display:flex;align-items:baseline;gap:6px;margin-top:3px;flex-wrap:wrap}
+.sd-kpi-value{font:600 24px/1.15 var(--rv-mono);color:var(--rv-ink)}
+.sd-kpi.blue .sd-kpi-value{color:var(--sd-blue)}
+.sd-kpi.green .sd-kpi-value{color:var(--rv-green)}
+.sd-kpi-note{font:400 10px/1.4 var(--rv-font);color:var(--rv-dim);overflow:hidden;text-overflow:ellipsis}
+
+/* ── 도구모음 — 총계 · 필터 · 삭제 없음 안내 · 추가 버튼 ── */
+.sd-toolbar{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px 0}
+.sd-total{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;white-space:nowrap}
+.sd-pills{display:flex;gap:6px;flex-wrap:wrap}
+.sd-pill{font:500 11px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:8px 11px;cursor:pointer;white-space:nowrap}
+.sd-pill.on{font-weight:600;color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.sd-grow{flex:1}
+.sd-nodelete{font:400 10px/1.4 var(--rv-font);color:var(--rv-dim);max-width:300px}
+.sd-btn-dark{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+  border-radius:5px;padding:10px 14px;cursor:pointer;white-space:nowrap}
+.sd-btn-dark:disabled{background:var(--rv-dim2);color:#f0ece2;cursor:not-allowed}
+.sd-btn-line{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 14px;cursor:pointer}
+
+/* ── 표 — 항목 축(31행 실측) ──
+   1fr 열이 0px로 붕괴하지 않게 minmax()로 최소 폭을 준다(MAKER-CHECKLIST §3).
+   헤더·본문 둘 다 스크롤 컨테이너 + scrollbar-gutter로 거터를 맞춘다. */
+.sd-grid-head{flex:none;display:grid;grid-template-columns:146px minmax(210px,1fr) 78px 60px 130px 100px 76px 108px;
+  gap:10px;align-items:center;padding:8px 13px;margin:10px 18px 0;background:var(--rv-panel);
+  border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 var(--rv-font);color:var(--rv-faint);
+  overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
+.sd-grid-body{flex:1;min-height:0;margin:0 18px 12px;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+  border-top:none;border-radius:0 0 7px 7px;overflow:auto;scrollbar-gutter:stable}
+.sd-row{display:grid;grid-template-columns:146px minmax(210px,1fr) 78px 60px 130px 100px 76px 108px;gap:10px;
+  align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06)}
+.sd-row.zero{background:oklch(0.985 0.008 30)}
+.sd-row-key{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+.sd-row-keytx{font:500 10.5px/1.3 var(--rv-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd-badge-custom{font:600 8.5px/1 var(--rv-font);color:var(--rv-green);background:oklch(0.95 0.03 165);
+  border:1px solid rgba(0,0,0,.06);border-radius:3px;padding:3px 4px;white-space:nowrap}
+.sd-badge-risk{font:600 8.5px/1 var(--rv-font);color:var(--rv-red);background:oklch(0.96 0.02 30);
+  border:1px solid rgba(0,0,0,.06);border-radius:3px;padding:3px 4px;white-space:nowrap;cursor:help}
+.sd-row-labelwrap{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sd-row-label{font:500 11.5px/1.35 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd-row-used{font:400 9.5px/1.4 var(--rv-font);color:var(--rv-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd-row-type{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted)}
+.sd-row-unit{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-dim)}
+.sd-row-parts,.sd-row-req{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sd-badge{font:600 9px/1 var(--rv-font);text-align:center;border-radius:4px;padding:4px 0}
+.sd-badge-engine{color:var(--sd-blue);background:oklch(0.96 0.02 250);border:1px solid rgba(0,0,0,.06)}
+.sd-badge-warn{color:#8a8377;background:var(--rv-panel2);border:1px solid rgba(0,0,0,.1)}
+.sd-fillwrap{display:flex;align-items:center;gap:7px}
+.sd-bar-bg{flex:1;height:5px;background:rgba(0,0,0,.08);border-radius:3px}
+.sd-bar-fill{display:block;height:100%;border-radius:3px}
+.sd-pct-tx{width:34px;text-align:right;font:600 10.5px/1 var(--rv-mono);flex:none}
+.sd-noparts{font:400 10px/1.3 var(--rv-font);color:var(--rv-dim)}
+.sd-empty{padding:30px;text-align:center;font:400 11px/1.6 var(--rv-font);color:var(--rv-dim)}
+
+.sd-footnote{flex:none;border-top:1px solid rgba(0,0,0,.09);background:var(--rv-panel);
+  padding:8px 18px;font:400 10px/1.5 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 오버레이 · 모달(가운데) — 원안은 드로어가 아니라 중앙 다이얼로그다 ── */
+.sd-overlay{position:absolute;inset:0;background:rgba(38,35,30,.3);z-index:7}
+.sd-overlay[hidden]{display:none}
+.sd-modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:8;padding:24px}
+.sd-modal[hidden]{display:none}
+.sd-modal-card{width:660px;max-width:100%;max-height:100%;overflow:auto;background:var(--rv-card);
+  border-radius:11px;box-shadow:0 24px 60px rgba(38,35,30,.34);display:flex;flex-direction:column}
+.sd-modal-hd{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;
+  gap:9px;flex:none}
+.sd-modal-title{font:600 14px/1.3 var(--rv-font);flex:1;min-width:0}
+.sd-modal-ownertag{font:600 9.5px/1 var(--rv-font);color:var(--sd-blue);background:oklch(0.96 0.02 250);
+  border:1px solid rgba(0,0,0,.06);border-radius:3px;padding:4px 6px;white-space:nowrap;flex:none}
+.sd-modal-close{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:4px;flex:none}
+.sd-modal-body{padding:15px 18px;display:flex;flex-direction:column;gap:12px}
+.sd-form-grid{display:grid;grid-template-columns:96px 1fr;gap:9px 12px;align-items:start}
+.sd-form-label{font:500 10.5px/1.4 var(--rv-font);color:var(--rv-faint);padding-top:9px}
+.sd-input,.sd-select,.sd-textarea{font:400 11.5px/1 var(--rv-font);border:1px solid rgba(0,0,0,.22);
+  border-radius:5px;padding:9px 10px;background:var(--rv-card);width:100%}
+.sd-fieldhint{font:400 10px/1.5 var(--rv-font);color:var(--rv-dim);margin-top:5px}
+.sd-typeunit-row{display:flex;gap:8px}
+.sd-typeunit-row .sd-select{flex:1;min-width:0}
+.sd-typeunit-row .sd-input{width:120px;flex:none}
+.sd-group-block{margin-bottom:7px}
+.sd-group-block:last-child{margin-bottom:0}
+.sd-group-label{font:600 9.5px/1 var(--rv-font);color:var(--rv-dim);letter-spacing:.03em;margin-bottom:5px}
+.sd-chiprow{display:flex;flex-wrap:wrap;gap:5px}
+.sd-chip{font:600 10.5px/1 var(--rv-font);border-radius:4px;padding:6px 9px;cursor:pointer;
+  border:1px solid rgba(0,0,0,.16);background:var(--rv-card);color:var(--rv-ink-soft)}
+.sd-chip.on{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink)}
+.sd-chip:disabled{cursor:not-allowed;opacity:.55}
+.sd-chiphint{font:400 10px/1.5 var(--rv-font);color:var(--rv-dim)}
+.sd-toggle2-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:2px}
+.sd-toggle2{display:flex;border:1px solid rgba(0,0,0,.18);border-radius:6px;overflow:hidden;width:150px;flex:none}
+.sd-toggle2 button{flex:1;text-align:center;font:500 11px/1 var(--rv-font);color:#7d7669;padding:9px 0;cursor:pointer}
+.sd-toggle2 button.on{font-weight:600;background:var(--rv-ink);color:var(--rv-canvas)}
+.sd-toggle2-hint{font:400 10px/1.5 var(--rv-font);color:var(--rv-dim)}
+.sd-warnbox{border:1px solid oklch(0.72 0.12 62 / .5);border-left:3px solid var(--rv-amber);
+  background:var(--rv-amber-bg);border-radius:7px;padding:11px 13px}
+.sd-warnbox-title{font:600 11px/1.4 var(--rv-font);color:oklch(0.42 0.13 55);margin-bottom:5px}
+.sd-warnbox-body{font:400 10.5px/1.8 var(--rv-font);color:#4a463e}
+.sd-warnbox-note{font:400 10px/1.6 var(--rv-font);color:#5b564d;margin-top:5px}
+.sd-errline{border:1px solid rgba(0,0,0,.14);border-left:3px solid var(--rv-red);background:oklch(0.97 0.02 30);
+  border-radius:7px;padding:9px 12px;font:400 11px/1.6 var(--rv-font);color:#4a2620}
+.sd-errline[hidden]{display:none}
+.sd-modal-foot{border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;gap:8px;
+  justify-content:flex-end;background:var(--rv-panel);flex:none}
+
+@media (max-width:768px){
+  .sd-grid-head,.sd-row{grid-template-columns:minmax(140px,1fr) 70px 96px}
+  .sd-h-key,.sd-h-type,.sd-h-unit,.sd-h-parts,.sd-h-req,
+  .sd-row-key,.sd-row-type,.sd-row-unit,.sd-row-parts,.sd-row-req{display:none}
+  .sd-modal{padding:0}
+  .sd-modal-card{width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0}
+  .sd-form-grid{grid-template-columns:1fr}
+  .sd-form-label{padding-top:0}
+  .sd-kpis{flex-direction:column}
+  .sd-kpi{min-width:0}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="sd-hint">열람 등급 무관 · 추가 owner 전용(스키마 변경)</span>
+<span class="sd-tag">spec_field_defs · product_specs</span>
+{% endblock %}
+
+{% block content %}
+<div class="sd-root">
+  <div class="sd-loading" id="sdLoading">불러오는 중…</div>
+
+  <div class="sd-errbox" id="sdErrBox" hidden>
+    <div class="ti">불러오지 못했습니다</div>
+    <div class="ds" id="sdErrMsg"></div>
+    <button type="button" data-action="retry-boot">다시 시도</button>
+  </div>
+
+  <div class="sd-body" id="sdBody" hidden>
+    <div class="sd-health" id="sdHealth"></div>
+
+    <div class="sd-kpis" id="sdKpis"></div>
+
+    <div class="sd-toolbar">
+      <span class="sd-total" id="sdTotalLabel">전체 항목 —</span>
+      <div class="sd-pills" id="sdPills"></div>
+      <span class="sd-grow"></span>
+      <span class="sd-nodelete">삭제 기능은 없습니다 — 적용 부품을 비우면 판정·화면에서 빠지고 값은 남습니다</span>
+      <button type="button" class="sd-btn-dark" id="sdAddBtn" data-action="open-add" disabled>+ 사양 항목 만들기</button>
+    </div>
+
+    <div class="sd-grid-head">
+      <span class="sd-h-key">키</span>
+      <span class="sd-h-label">표시 이름 · 이 값을 읽는 곳</span>
+      <span class="sd-h-type">자료형</span>
+      <span class="sd-h-unit">단위</span>
+      <span class="sd-h-parts">적용 부품</span>
+      <span class="sd-h-req">필수 부품</span>
+      <span class="sd-h-engine">엔진</span>
+      <span class="sd-h-fill">채움</span>
+    </div>
+    <div class="sd-grid-body" id="sdGridBody"></div>
+
+    <div class="sd-footnote">채움률 분모는 판매중·재고&gt;0 상품입니다(전체 카탈로그를 분모로
+    하면 품절 때문에 영원히 낮게 보입니다) · 이 화면은 값을 넣지 않습니다 — 값 입력은
+    상품 상세, 검수는 상품 사양 검수 소관 · 「조립 사양 표준」(std.spec_defs)은 다른
+    저장소이고 엔진이 아직 읽지 않습니다 · 항목 삭제·이름 변경은 없습니다(적용 부품을
+    비우면 값은 남고 판정·화면에서만 빠집니다)</div>
+  </div>
+
+  <div class="sd-overlay" id="sdOverlay" hidden data-action="close-modal" data-keep="1"></div>
+  <div class="sd-modal" id="sdModal" hidden data-keep="1" role="dialog" aria-modal="true" aria-label="사양 항목 만들기"></div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var GROUP_KO = { core: '조립 부품(8슬롯 견적)', built: '완성품', peripheral: '주변기기' };
+  var GROUP_ORDER = ['core', 'built', 'peripheral'];
+
+  var S = {
+    meta: null, items: [], ghosts: [], unrecorded: [],
+    usedByMap: {}, fillMap: {}, partGroup: {}, partLabelMap: {}, loadedAt: null,
+    filter: '',
+    modalOpen: false, draft: null, err: null, submitting: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtTime(d) {
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+
+  // ── 부팅 ─────────────────────────────────────────────────────────
+  function setView(v) {
+    $('sdLoading').hidden = v !== 'loading';
+    $('sdErrBox').hidden = v !== 'error';
+    $('sdBody').hidden = v !== 'body';
+  }
+
+  function buildUsedByMap(parts) {
+    var acc = {};
+    (parts || []).forEach(function (p) {
+      (p.fields || []).forEach(function (fl) {
+        var set = acc[fl.field_key] || (acc[fl.field_key] = {});
+        (fl.used_by || []).forEach(function (name) { set[name] = true; });
+      });
+    });
+    var out = {};
+    Object.keys(acc).forEach(function (k) { out[k] = Object.keys(acc[k]).sort(); });
+    return out;
+  }
+  function buildFillMap(parts) {
+    var acc = {};
+    (parts || []).forEach(function (p) {
+      (p.fields || []).forEach(function (fl) {
+        var m = acc[fl.field_key] || (acc[fl.field_key] = { filled: 0, live: 0 });
+        m.filled += (fl.filled || 0);
+        m.live += (p.live || 0);
+      });
+    });
+    return acc;
+  }
+  function fieldByKey(key) {
+    for (var i = 0; i < S.items.length; i++) if (S.items[i].field_key === key) return S.items[i];
+    return null;
+  }
+
+  function applyResp(resp) {
+    S.meta = resp;
+    S.items = resp.items || [];
+    S.ghosts = resp.ghosts || [];
+    S.unrecorded = resp.unrecorded || [];
+    S.usedByMap = buildUsedByMap(resp.parts);
+    S.fillMap = buildFillMap(resp.parts);
+    S.partGroup = {}; S.partLabelMap = {};
+    (resp.parts || []).forEach(function (p) { S.partGroup[p.part_type] = p.group; S.partLabelMap[p.part_type] = p.label; });
+    S.loadedAt = new Date();
+  }
+  function renderAll() {
+    renderHealth(); renderKpis(); renderPills(); renderTable();
+  }
+
+  function boot() {
+    setView('loading');
+    Promise.all([apiGet('/api/admin/spec-fields'), window.Admin2Shell.meReady]).then(function (res) {
+      applyResp(res[0]);
+      setView('body');
+      renderAll();
+      syncPermissionUI();
+    }).catch(function (err) {
+      setView('error');
+      $('sdErrMsg').textContent = (err && err.status === 401)
+        ? '세션이 만료됐습니다 — 다시 로그인한 뒤 새로고침하십시오.'
+        : ((err && err.message) ? err.message : '알 수 없는 오류입니다.');
+    });
+  }
+  function reload() {
+    apiGet('/api/admin/spec-fields').then(function (resp) {
+      applyResp(resp);
+      renderAll();
+    }).catch(function (err) {
+      window.Admin2Shell.toast('다시 불러오지 못했습니다 — ' + ((err && err.message) || '오류'), 'err');
+    });
+  }
+  function syncPermissionUI() {
+    var can = window.Admin2Shell.canWrite('owner');
+    var btn = $('sdAddBtn');
+    if (!btn) return;
+    btn.disabled = !can;
+    if (can) btn.removeAttribute('title');
+    else btn.setAttribute('title', '권한 부족 — owner 등급 필요(스키마를 바꾸는 작업입니다)');
+  }
+
+  // ── 건강 상태 배너 ───────────────────────────────────────────────
+  function renderHealth() {
+    var box = $('sdHealth');
+    var g = S.ghosts.slice(), u = S.unrecorded.slice();
+    var bad = g.length > 0 || u.length > 0;
+    box.className = 'sd-health ' + (bad ? 'err' : 'ok');
+    var time = fmtTime(S.loadedAt || new Date());
+    if (!bad) {
+      box.innerHTML = ''
+        + '<span class="sd-health-title">✓ 건강 상태 정상</span>'
+        + '<span class="sd-health-body">메타는 있는데 실제 컬럼이 없는 항목(ghosts) <b>0건</b> · '
+        + '코드 이력이 없는 커스텀 항목(unrecorded) <b>0건</b>. 둘 중 하나라도 생기면 이 자리가 '
+        + '붉은 경고로 바뀌고 해당 항목에 위험 표시가 붙습니다 — 재구축·복구 시 그 컬럼이 사라지기 때문입니다.</span>'
+        + '<span class="sd-health-time num">방금 계산 ' + time + '</span>';
+      return;
+    }
+    var marks = [];
+    if (u.length) marks.push('▲ 코드 이력 없음 ' + u.length + '건 — 서버를 다시 세우면 이 항목이 사라집니다');
+    if (g.length) marks.push('▲ 메타는 있는데 실제 컬럼이 없음 ' + g.length + '건');
+    var keys = [];
+    if (u.length) keys.push('unrecorded=[' + u.join(', ') + ']');
+    if (g.length) keys.push('ghosts=[' + g.join(', ') + ']');
+    var detail = u.map(function (key) {
+      var it = fieldByKey(key);
+      var label = it ? it.label : key;
+      return '<div class="sd-health-item"><b>' + esc(key) + ' «' + esc(label) + '»</b> — 컬럼·메타·추천 뷰는 '
+        + '이미 반영됐지만 마이그레이션 파일 기록이 실패했습니다(배포 서버는 리포 폴더에 파일을 쓸 수 '
+        + '없습니다). <b>조치:</b> 개발 PC에서 <span class="sd-mono">db/migrations/versions/</span>에 이 컬럼 '
+        + '추가 마이그레이션을 만들고 버전을 스탬프해야 합니다. 그때까지 이 배너와 항목의 위험 표시는 '
+        + '사라지지 않습니다.</div>';
+    }).concat(g.map(function (key) {
+      return '<div class="sd-health-item"><b>' + esc(key) + '</b> — 메타는 있는데 실제 컬럼이 없습니다(캐시가 '
+        + '앞서거나 DB에서 직접 지워졌을 수 있습니다). 값을 읽을 수 없고 아래 표에도 나타나지 않습니다.</div>';
+    })).join('');
+    box.innerHTML = ''
+      + '<div class="sd-health-row"><span class="sd-health-title">' + esc(marks.join(' · ')) + '</span>'
+      + '<span class="sd-grow"></span><span class="sd-health-keys num">' + esc(keys.join('  ')) + '</span></div>'
+      + '<div class="sd-health-detail">' + detail + '</div>';
+  }
+
+  // ── KPI ──────────────────────────────────────────────────────────
+  function renderKpis() {
+    var items = S.items;
+    var engineItems = items.filter(function (i) { return i.is_engine; });
+    var reqItems = items.filter(function (i) { return (i.required_for || []).length > 0; });
+    var customItems = items.filter(function (i) { return i.is_custom; });
+    var typeSet = {}; items.forEach(function (i) { typeSet[i.data_type] = 1; });
+    var typeCount = Object.keys(typeSet).length;
+    var allCore = engineItems.length > 0 && engineItems.every(function (i) {
+      return (i.part_types || []).every(function (pt) { return S.partGroup[pt] === 'core'; });
+    });
+    var engineNote = engineItems.length === 0 ? '엔진 사양 없음'
+      : (allCore ? '전부 8슬롯 부품 필드' : '▲ 주변기기 대상 포함 — 컴패니언 뷰 확인 필요');
+    var customNote = customItems.length ? customItems.map(function (i) { return i.field_key; }).join(', ') : '없음';
+    var cards = [
+      { label: '전체 항목', value: String(items.length), note: '자료형 ' + typeCount + '종', cls: '' },
+      { label: '엔진이 읽는 항목', value: String(engineItems.length), note: engineNote, cls: 'blue' },
+      { label: '필수 판정에 쓰이는 항목', value: String(reqItems.length), note: 'required_for 비어있지 않음', cls: '' },
+      { label: '사람이 만든 항목', value: String(customItems.length), note: customNote, cls: 'green' }
+    ];
+    $('sdKpis').innerHTML = cards.map(function (c) {
+      return '<div class="sd-kpi ' + c.cls + '"><div class="sd-kpi-label">' + esc(c.label) + '</div>'
+        + '<div class="sd-kpi-row"><span class="sd-kpi-value num">' + esc(c.value) + '</span>'
+        + '<span class="sd-kpi-note" title="' + esc(c.note) + '">' + esc(c.note) + '</span></div></div>';
+    }).join('');
+  }
+
+  // ── 필터 필 ──────────────────────────────────────────────────────
+  function bucketCounts() {
+    var c = { all: S.items.length, engine: 0, required: 0, custom: 0, noparts: 0 };
+    S.items.forEach(function (i) {
+      if (i.is_engine) c.engine++;
+      if ((i.required_for || []).length) c.required++;
+      if (i.is_custom) c.custom++;
+      if (!(i.part_types || []).length) c.noparts++;
+    });
+    return c;
+  }
+  function matchesFilter(i) {
+    switch (S.filter) {
+      case 'engine': return !!i.is_engine;
+      case 'required': return (i.required_for || []).length > 0;
+      case 'custom': return !!i.is_custom;
+      case 'noparts': return !(i.part_types || []).length;
+      default: return true;
+    }
+  }
+  function renderPills() {
+    var c = bucketCounts();
+    $('sdTotalLabel').textContent = '전체 항목 ' + c.all;
+    var defs = [
+      ['', '전체', c.all], ['engine', '엔진 사용', c.engine], ['required', '필수 있음', c.required],
+      ['custom', '커스텀', c.custom], ['noparts', '적용 부품 없음', c.noparts]
+    ];
+    $('sdPills').innerHTML = defs.map(function (x) {
+      var on = S.filter === x[0];
+      return '<button type="button" class="sd-pill' + (on ? ' on' : '') + '" data-action="pick-filter" data-f="' + x[0] + '">'
+        + esc(x[1]) + ' <span class="num" style="opacity:.7">' + x[2] + '</span></button>';
+    }).join('');
+  }
+
+  // ── 표 — 항목 축 ─────────────────────────────────────────────────
+  function barColor(p) {
+    if (p === 0) return 'var(--rv-red)';
+    if (p < 50) return 'var(--rv-amber)';
+    if (p < 90) return '#7d766e';
+    return 'var(--rv-green)';
+  }
+  function pctColor(p) {
+    if (p === 0) return 'var(--rv-red)';
+    if (p < 50) return 'oklch(0.45 0.13 55)';
+    return 'var(--rv-ink)';
+  }
+  function pctOf(item) {
+    var m = S.fillMap[item.field_key];
+    if (!m || m.live <= 0) return null;
+    return Math.round(100 * m.filled / m.live);
+  }
+  function usedLine(item) {
+    var names = S.usedByMap[item.field_key] || [];
+    if (names.length) return '이 값을 읽는 규칙: ' + names.join(', ');
+    if (item.is_engine) return '엔진 후보에는 실리지만 이 값을 직접 읽는 규칙은 없습니다.';
+    return '표시용 — 규칙·하한 어디에도 쓰이지 않습니다.';
+  }
+  function fillCell(p) {
+    if (p === null) return '<span class="sd-noparts">적용 대상 없음</span>';
+    return '<span class="sd-fillwrap"><span class="sd-bar-bg"><span class="sd-bar-fill" style="width:'
+      + Math.max(p, 2) + '%;background:' + barColor(p) + '"></span></span>'
+      + '<span class="sd-pct-tx num" style="color:' + pctColor(p) + '">' + p + '%</span></span>';
+  }
+  function rowHtml(item) {
+    var p = pctOf(item);
+    var cls = 'sd-row' + (p === 0 ? ' zero' : '');
+    var partsRaw = item.part_types || [];
+    var partsTx = partsRaw.length ? partsRaw.join('·') : '없음';
+    var partsTitle = partsRaw.length ? partsRaw.map(function (pt) { return S.partLabelMap[pt] || pt; }).join(', ') : '없음';
+    var reqRaw = item.required_for || [];
+    var reqTx = reqRaw.length ? reqRaw.join('·') : '없음';
+    var used = usedLine(item);
+    var risky = S.unrecorded.indexOf(item.field_key) >= 0;
+    var typeHelp = (S.meta.data_type_help || {})[item.data_type] || '';
+    return '<div class="' + cls + '">'
+      + '<span class="sd-row-key">'
+      + '<span class="sd-row-keytx">' + esc(item.field_key) + '</span>'
+      + (item.is_custom ? '<span class="sd-badge-custom">커스텀</span>' : '')
+      + (risky ? '<span class="sd-badge-risk" title="코드 이력 없음 — 서버 재구축·복구 시 사라집니다">▲ 미기록</span>' : '')
+      + '</span>'
+      + '<span class="sd-row-labelwrap">'
+      + '<span class="sd-row-label">' + esc(item.label) + '</span>'
+      + '<span class="sd-row-used" title="' + esc(used) + '">' + esc(used) + '</span>'
+      + '</span>'
+      + '<span class="sd-row-type num" title="' + esc(typeHelp) + '">' + esc(item.data_type) + '</span>'
+      + '<span class="sd-row-unit num">' + esc(item.unit || '—') + '</span>'
+      + '<span class="sd-row-parts" title="' + esc(partsTitle) + '">' + esc(partsTx) + '</span>'
+      + '<span class="sd-row-req" title="' + esc(reqTx) + '">' + esc(reqTx) + '</span>'
+      + '<span class="sd-badge ' + (item.is_engine ? 'sd-badge-engine' : 'sd-badge-warn') + '">'
+      + (item.is_engine ? '✓ 엔진' : '표시용') + '</span>'
+      + fillCell(p)
+      + '</div>';
+  }
+  function renderTable() {
+    var box = $('sdGridBody');
+    if (!S.items.length) {
+      box.innerHTML = '<div class="sd-empty">사양 정의가 비어 있습니다 — DB 연결 또는 마이그레이션 상태를 확인하십시오.</div>';
+      return;
+    }
+    var rows = S.items.filter(matchesFilter);
+    if (!rows.length) {
+      box.innerHTML = '<div class="sd-empty">조건에 맞는 항목이 없습니다.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(rowHtml).join('');
+  }
+
+  // ── 모달 — 사양 항목 만들기(owner 전용) ─────────────────────────
+  function toggle2(action, val, yesLabel, noLabel) {
+    return '<span class="sd-toggle2" role="group">'
+      + '<button type="button" class="' + (val ? 'on' : '') + '" data-action="' + action + '" data-v="1" aria-pressed="' + (val ? 'true' : 'false') + '">' + esc(yesLabel) + '</button>'
+      + '<button type="button" class="' + (!val ? 'on' : '') + '" data-action="' + action + '" data-v="0" aria-pressed="' + (!val ? 'true' : 'false') + '">' + esc(noLabel) + '</button>'
+      + '</span>';
+  }
+  function openAdd() {
+    if (!window.Admin2Shell.canWrite('owner')) return;
+    var firstType = (S.meta.data_types && S.meta.data_types[0]) || 'VARCHAR';
+    S.draft = { field_key: '', label: '', data_type: firstType, unit: '',
+      part_types: [], required_for: [], is_engine: false, in_ingest: false };
+    S.err = null; S.submitting = false; S.modalOpen = true;
+    renderModal();
+  }
+  function closeModal() {
+    S.modalOpen = false; S.draft = null; S.err = null; S.submitting = false;
+    $('sdOverlay').hidden = true; $('sdModal').hidden = true; $('sdModal').innerHTML = '';
+  }
+  function renderModal() {
+    var open = S.modalOpen && S.draft;
+    $('sdOverlay').hidden = !open;
+    $('sdModal').hidden = !open;
+    if (!open) { $('sdModal').innerHTML = ''; return; }
+    $('sdModal').innerHTML = modalHtml();
+    var el = $('sdKey');
+    if (el) { try { el.focus(); } catch (e) { /* 무시 */ } }
+  }
+  function modalHtml() {
+    var d = S.draft, m = S.meta;
+    var typeOpts = (m.data_types || []).map(function (t) {
+      var help = (m.data_type_help || {})[t] || '';
+      return '<option value="' + esc(t) + '"' + (d.data_type === t ? ' selected' : '') + '>'
+        + esc(t) + (help ? ' — ' + esc(help) : '') + '</option>';
+    }).join('');
+    var partsByGroup = {};
+    (m.parts || []).forEach(function (p) { (partsByGroup[p.group] || (partsByGroup[p.group] = [])).push(p); });
+    var partsHtml = GROUP_ORDER.filter(function (g) { return partsByGroup[g]; }).map(function (g) {
+      var chips = partsByGroup[g].map(function (p) {
+        var on = d.part_types.indexOf(p.part_type) >= 0;
+        return '<button type="button" class="sd-chip' + (on ? ' on' : '') + '" data-action="toggle-part" '
+          + 'data-pt="' + esc(p.part_type) + '" aria-pressed="' + (on ? 'true' : 'false') + '">'
+          + esc(p.label) + (on ? ' ✓' : '') + '</button>';
+      }).join('');
+      return '<div class="sd-group-block"><div class="sd-group-label">' + esc(GROUP_KO[g] || g) + '</div>'
+        + '<div class="sd-chiprow" role="group">' + chips + '</div></div>';
+    }).join('');
+    var reqBlock;
+    if (!d.part_types.length) {
+      reqBlock = '<span class="sd-chiphint">적용 부품을 먼저 선택하십시오.</span>';
+    } else {
+      var reqChips = d.part_types.map(function (pt) {
+        var on = d.required_for.indexOf(pt) >= 0;
+        var label = S.partLabelMap[pt] || pt;
+        return '<button type="button" class="sd-chip' + (on ? ' on' : '') + '" data-action="toggle-required" '
+          + 'data-pt="' + esc(pt) + '" aria-pressed="' + (on ? 'true' : 'false') + '">'
+          + esc(label) + (on ? ' ✓' : '') + '</button>';
+      }).join('');
+      reqBlock = '<div class="sd-chiprow">' + reqChips + '</div>';
+    }
+    var keyTrim = (d.field_key || '').trim().toLowerCase();
+    var dup = keyTrim && fieldByKey(keyTrim);
+    var canSubmit = !!(keyTrim && (d.label || '').trim()) && !S.submitting;
+    return ''
+      + '<div class="sd-modal-card" role="document">'
+      + '<div class="sd-modal-hd">'
+      + '<span class="sd-modal-title">사양 항목 만들기 — 스키마가 실제로 바뀝니다</span>'
+      + '<span class="sd-modal-ownertag">owner 전용</span>'
+      + '<button type="button" class="sd-modal-close" data-action="close-modal" aria-label="닫기">✕</button>'
+      + '</div>'
+      + '<div class="sd-modal-body">'
+      + '<div class="sd-form-grid">'
+      + '<label class="sd-form-label" for="sdKey">키</label>'
+      + '<span><input id="sdKey" class="sd-input sd-mono" placeholder="radiator_thickness_mm" value="' + esc(d.field_key) + '" maxlength="39">'
+      + '<div class="sd-fieldhint" id="sdKeyHint">영문 소문자로 시작 · 소문자·숫자·밑줄만 · 2~39자'
+      + (dup ? (' — 이미 있는 키입니다(' + esc(dup.label) + ')') : '') + '</div></span>'
+      + '<label class="sd-form-label" for="sdLabel">표시 이름</label>'
+      + '<input id="sdLabel" class="sd-input" placeholder="라디에이터 두께" value="' + esc(d.label) + '" maxlength="60">'
+      + '<span class="sd-form-label" id="sdTypeUnitLabel">자료형 · 단위</span>'
+      + '<span class="sd-typeunit-row">'
+      + '<select id="sdType" class="sd-select" aria-label="자료형">' + typeOpts + '</select>'
+      + '<input id="sdUnit" class="sd-input sd-mono" placeholder="단위 없음" value="' + esc(d.unit) + '" maxlength="20" aria-label="단위">'
+      + '</span>'
+      + '<span class="sd-form-label" id="sdPartsLabel">적용 부품</span>'
+      + '<div role="group" aria-labelledby="sdPartsLabel">' + (partsHtml || '<span class="sd-chiphint">선택지가 없습니다.</span>') + '</div>'
+      + '<span class="sd-form-label" id="sdReqLabel">필수로 만들 부품</span>'
+      + '<div role="group" aria-labelledby="sdReqLabel">' + reqBlock
+      + '<div class="sd-fieldhint">적용 대상에 있는 부품만 고를 수 있습니다 — 어기면 400(그 부품이 영원히 검수 대기가 됩니다)</div></div>'
+      + '<span class="sd-form-label" id="sdEngineLabel">엔진이 읽음</span>'
+      + '<span class="sd-toggle2-row">' + toggle2('set-engine', d.is_engine, '예', '아니오')
+      + '<span class="sd-toggle2-hint">추천 뷰 <b>두 개</b>가 함께 다시 만들어집니다(엔진 사양 → 견적·추천 판정에 씁니다)</span></span>'
+      + '<span class="sd-form-label" id="sdIngestLabel">적재가 채움</span>'
+      + '<span class="sd-toggle2-row">' + toggle2('set-ingest', d.in_ingest, '예', '아니오')
+      + '<span class="sd-toggle2-hint">카탈로그 일괄 등록(엑셀 적재)이 이 값을 채울지 여부입니다</span></span>'
+      + '</div>'
+      + '<div class="sd-warnbox">'
+      + '<div class="sd-warnbox-title">만들면 넷이 함께 일어납니다 — 하나라도 빠지면 값은 있는데 엔진이 못 읽습니다</div>'
+      + '<div class="sd-warnbox-body">① product_specs 컬럼 추가 &nbsp;② 메타 행 기록 &nbsp;③ 추천 뷰 <b>둘 다</b> '
+      + '재생성(v_recommendation_candidates · v_companion_candidates) &nbsp;④ 마이그레이션 파일 기록 + 버전 스탬프</div>'
+      + '<div class="sd-warnbox-note">④이 실패해도 ①~③의 성공을 취소하지 않습니다 — 대신 이 화면 상단 배너에 '
+      + '"코드 이력 없음"으로 계속 표시되고, 개발 PC에서 마이그레이션을 추가해야 합니다.</div>'
+      + '</div>'
+      + '<div class="sd-errline" id="sdErrLine"' + (S.err ? '' : ' hidden') + '>' + esc(S.err || '') + '</div>'
+      + '</div>'
+      + '<div class="sd-modal-foot">'
+      + '<button type="button" class="sd-btn-line" data-action="close-modal">취소</button>'
+      + '<button type="button" class="sd-btn-dark" data-action="submit-add"' + (canSubmit ? '' : ' disabled title="키와 표시 이름을 입력하십시오"') + '>'
+      + (S.submitting ? '만드는 중…' : '만들기') + '</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function toggleDraftPart(pt) {
+    var i = S.draft.part_types.indexOf(pt);
+    if (i >= 0) {
+      S.draft.part_types.splice(i, 1);
+      var ri = S.draft.required_for.indexOf(pt);
+      if (ri >= 0) S.draft.required_for.splice(ri, 1);   // 적용 해제하면 그 부품의 필수 지정도 함께 풀린다
+    } else {
+      S.draft.part_types.push(pt);
+    }
+    renderModal();
+  }
+  function toggleDraftRequired(pt) {
+    if (S.draft.part_types.indexOf(pt) < 0) return;      // 적용 대상 밖은 고를 수 없다(서버 400과 일관)
+    var i = S.draft.required_for.indexOf(pt);
+    if (i >= 0) S.draft.required_for.splice(i, 1); else S.draft.required_for.push(pt);
+    renderModal();
+  }
+  function updateSubmitState() {
+    var btn = document.querySelector('[data-action="submit-add"]');
+    if (!btn || !S.draft) return;
+    var can = !!((S.draft.field_key || '').trim() && (S.draft.label || '').trim());
+    btn.disabled = !can;
+    if (can) btn.removeAttribute('title'); else btn.setAttribute('title', '키와 표시 이름을 입력하십시오');
+  }
+  function updateKeyHint() {
+    var hintEl = $('sdKeyHint');
+    if (!hintEl || !S.draft) return;
+    var keyTrim = (S.draft.field_key || '').trim().toLowerCase();
+    var dup = keyTrim && fieldByKey(keyTrim);
+    hintEl.textContent = '영문 소문자로 시작 · 소문자·숫자·밑줄만 · 2~39자'
+      + (dup ? (' — 이미 있는 키입니다(' + dup.label + ')') : '');
+  }
+  function submitAdd() {
+    if (!window.Admin2Shell.canWrite('owner') || S.submitting || !S.draft) return;
+    var d = S.draft;
+    var key = (d.field_key || '').trim().toLowerCase();
+    var label = (d.label || '').trim();
+    if (!key || !label) return;
+    var body = {
+      field_key: key, label: label, data_type: d.data_type,
+      unit: (d.unit || '').trim() || null,
+      part_types: d.part_types.slice(), required_for: d.required_for.slice(),
+      is_engine: !!d.is_engine, in_ingest: !!d.in_ingest
+    };
+    S.err = null; S.submitting = true; renderModal();
+    apiPost('/api/admin/spec-fields', body).then(function (res) {
+      S.submitting = false;
+      window.Admin2Shell.toast(res.note || ((res.field_key || key) + ' 항목을 만들었습니다'), 'ok');
+      closeModal();
+      reload();
+    }).catch(function (err) {
+      S.submitting = false;
+      S.err = (err && err.status === 401)
+        ? '세션이 만료됐습니다 — 다시 로그인한 뒤 새로고침하십시오.'
+        : ((err && err.message) || '알 수 없는 오류입니다.');
+      renderModal();
+    });
+  }
+
+  // ── 이벤트 ───────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var act = t.getAttribute('data-action');
+    switch (act) {
+      case 'retry-boot': boot(); break;
+      case 'pick-filter': S.filter = t.getAttribute('data-f'); renderPills(); renderTable(); break;
+      case 'open-add': openAdd(); break;
+      case 'close-modal': closeModal(); break;
+      case 'toggle-part': toggleDraftPart(t.getAttribute('data-pt')); break;
+      case 'toggle-required': toggleDraftRequired(t.getAttribute('data-pt')); break;
+      case 'set-engine': S.draft.is_engine = t.getAttribute('data-v') === '1'; renderModal(); break;
+      case 'set-ingest': S.draft.in_ingest = t.getAttribute('data-v') === '1'; renderModal(); break;
+      case 'submit-add': submitAdd(); break;
+      default: break;
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.modalOpen) closeModal();
+  });
+  // 텍스트 입력은 상태만 갱신한다 — 매 입력마다 모달을 다시 그리면 커서·포커스를 잃는다
+  // (spec_standard.html.j2 · operators_roles.html.j2와 같은 이유).
+  document.addEventListener('input', function (e) {
+    if (!S.draft) return;
+    if (e.target.id === 'sdKey') { S.draft.field_key = e.target.value; updateSubmitState(); updateKeyHint(); return; }
+    if (e.target.id === 'sdLabel') { S.draft.label = e.target.value; updateSubmitState(); return; }
+    if (e.target.id === 'sdUnit') { S.draft.unit = e.target.value; return; }
+  });
+  document.addEventListener('change', function (e) {
+    if (S.draft && e.target.id === 'sdType') S.draft.data_type = e.target.value;
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

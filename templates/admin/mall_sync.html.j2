@@ -1,0 +1,373 @@
+{# 쇼핑몰 동기화(ADM-HND-010) — 계약 docs/design/spec-mall-sync.md(1a 라인 축, 2026-08-15 확정).
+   조회 전용. 값을 고치지 않는다(정정은 판매가 관리) · 실서비스에 쓰기 요청을 보내지 않는다.
+   담당: api/admin_ui_mall_sync.py 만. _admin2_shell.html.j2 는 상속만 하고 열어보지 않았다
+   (지시서 금지) — head_extra/header_extra 블록 이름은 mockups/shared/admin2/admin2.css의
+   주석에서 확인했고, 본문 블록 이름(content)은 Jinja 관례 추정이다(라우트 파일 docstring 참조). #}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block head_extra %}
+<style>
+  .ms-wrap{padding:1.75rem;display:flex;flex-direction:column;gap:18px;max-width:1360px}
+
+  /* ── 경고 배너 ── */
+  .ms-banner{display:flex;gap:14px;padding:14px 16px;border-radius:8px;
+    background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+  .ms-banner-ic{flex:none;font:700 18px/1 var(--font);color:var(--rv-amber)}
+  .ms-banner-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .ms-banner-title{margin:0;font:700 13.5px/1.4 var(--font);color:var(--on)}
+  .ms-banner-body p{margin:0;font:400 12.5px/1.6 var(--font);color:var(--on-variant)}
+  .ms-banner-body strong{color:var(--on);font-weight:600}
+  .ms-banner-side{flex:none;min-width:150px;padding-left:14px;border-left:1px solid var(--rv-amber-line);
+    display:flex;flex-direction:column;justify-content:center;gap:2px}
+  .ms-banner-last{font:600 10.5px/1.2 var(--font);color:var(--on-variant);text-transform:uppercase;letter-spacing:.03em}
+  .ms-banner-lasttime{font:600 13px/1.3 var(--font-num);color:var(--on)}
+  .ms-banner-lastno{font:500 11.5px/1.3 var(--font-num);color:var(--on-variant)}
+
+  /* ── KPI 5장 ── */
+  .ms-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  .ms-kpi{background:var(--card);border:1px solid var(--outline-variant);border-radius:8px;padding:14px 16px;
+    display:flex;flex-direction:column;gap:5px;min-width:0}
+  .ms-kpi-label{font:600 11px/1.2 var(--font);color:var(--on-variant)}
+  .ms-kpi-value{font:700 22px/1.2 var(--font-num);color:var(--on)}
+  .ms-kpi-caption{font:400 11px/1.4 var(--font);color:var(--on-variant)}
+
+  /* ── 필터 칩 ── */
+  .ms-filter-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  .ms-chips{display:flex;flex-wrap:wrap;gap:8px}
+  .ms-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+    border:1px solid var(--outline-variant);background:var(--card);color:var(--on-variant);
+    font:500 12px/1 var(--font);cursor:pointer}
+  .ms-chip:hover{border-color:var(--outline);color:var(--on)}
+  .ms-chip.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+  .ms-chip .num{font:600 11px/1 var(--font-num)}
+  .ms-soldout-note{font:400 11px/1.4 var(--font);color:var(--on-variant)}
+
+  /* ── 표 (CSS grid 기반 — 헤더·본문이 한 grid 라 거터가 어긋나지 않는다) ── */
+  .ms-table-wrap{overflow-x:auto;border:1px solid var(--outline-variant);border-radius:8px;background:var(--card)}
+  .ms-table{display:grid;grid-template-columns:130px 100px minmax(240px,1fr) 110px 110px 110px 130px;min-width:940px}
+  .ms-thead{display:contents}
+  .ms-th{position:sticky;top:0;background:var(--container);color:var(--on-variant);z-index:1;
+    font:600 11px/1.2 var(--font);padding:10px 12px;border-bottom:1px solid var(--outline)}
+  .ms-th.ms-num{text-align:right}
+  .ms-row{display:contents;cursor:pointer}
+  .ms-row:hover .ms-td,.ms-row:focus-visible .ms-td{background:var(--container-low)}
+  .ms-row:focus-visible .ms-td{outline:2px solid var(--rv-link);outline-offset:-2px}
+  .ms-td{padding:9px 12px;border-bottom:1px solid var(--outline-variant);font:400 12.5px/1.4 var(--font);
+    color:var(--on);display:flex;align-items:center;min-width:0;background:var(--card)}
+  .ms-td.ms-num{justify-content:flex-end;font-family:var(--font-num)}
+  .ms-td.ms-name{white-space:normal;word-break:break-word;flex-wrap:wrap;gap:6px}
+  .ms-td-stack{flex-direction:column;align-items:flex-start;gap:1px}
+  .ms-handoff-no{font-weight:600}
+  .ms-handoff-time{font-size:10.5px;color:var(--on-variant)}
+  .ms-badge-demo{display:inline-block;padding:2px 6px;border-radius:4px;background:var(--rv-red);
+    color:var(--on-primary);font:600 10px/1.4 var(--font)}
+  .ms-empty{grid-column:1/-1;padding:28px 16px;text-align:center;color:var(--on-variant);
+    font:400 12.5px/1.6 var(--font)}
+
+  .ms-status{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;
+    font:600 11.5px/1.3 var(--font);white-space:nowrap}
+  .ms-s-done{color:var(--success-dark);background:var(--container)}
+  .ms-s-run{color:var(--rv-amber);background:var(--rv-amber-bg)}
+  .ms-s-wait{color:var(--on-variant);background:var(--container)}
+
+  /* ── 페이지네이션 ── */
+  .ms-pager{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  .ms-pager-info{font:400 11.5px/1.4 var(--font-num);color:var(--on-variant)}
+  .ms-pager-btns{display:flex;gap:8px}
+  .ms-pgbtn{padding:6px 14px;border-radius:6px;border:1px solid var(--outline-variant);background:var(--card);
+    color:var(--on);font:500 12px/1 var(--font);cursor:pointer}
+  .ms-pgbtn:hover{border-color:var(--outline)}
+  .ms-pgbtn.disabled{color:var(--on-variant);opacity:.45;cursor:not-allowed}
+
+  .ms-footnote{margin:0;padding-top:14px;border-top:1px solid var(--outline-variant);
+    font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+
+  /* ── 우측 서랍 ── */
+  .ms-scrim{position:fixed;inset:0;background:rgba(38,35,30,.32);z-index:30}
+  .ms-scrim[hidden]{display:none}
+  .ms-drawer{position:fixed;top:0;right:0;bottom:0;width:560px;max-width:100vw;background:var(--card);
+    box-shadow:-10px 0 28px rgba(38,35,30,.22);z-index:31;display:flex;flex-direction:column;overflow-y:auto}
+  .ms-drawer[hidden]{display:none}
+  .ms-drawer-head{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+    padding:16px 18px 10px;border-bottom:1px solid var(--outline-variant)}
+  .ms-drawer-title{font:700 15px/1.3 var(--font-head);color:var(--on);margin-bottom:6px}
+  .ms-drawer-x{flex:none;width:28px;height:28px;border-radius:6px;border:1px solid var(--outline-variant);
+    background:var(--card);color:var(--on-variant);cursor:pointer;font:400 13px/1 var(--font)}
+  .ms-drawer-x:hover{color:var(--on);border-color:var(--outline)}
+  .ms-drawer-meta{flex:none;padding:10px 18px;border-bottom:1px solid var(--outline-variant);
+    font:400 11.5px/1.6 var(--font-num);color:var(--on-variant)}
+  .ms-drawer-body{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:18px}
+  .ms-incident{border:1px solid var(--rv-red);border-left:4px solid var(--rv-red);border-radius:6px;
+    padding:12px 14px;background:var(--container-low)}
+  .ms-incident[hidden]{display:none}
+  .ms-incident strong{display:block;margin-bottom:6px;font:700 12.5px/1.4 var(--font);color:var(--rv-red)}
+  .ms-incident p{margin:0;font:400 12px/1.6 var(--font);color:var(--on)}
+  .ms-drawer-sec{border-top:1px solid var(--outline-variant);padding-top:16px}
+  .ms-drawer-sec:first-child{border-top:0;padding-top:0}
+  .ms-drawer-sec h4{margin:0 0 6px;font:700 12.5px/1.3 var(--font);color:var(--on)}
+  .ms-drawer-sub{margin:0 0 10px;font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+  .ms-history{display:flex;flex-direction:column;gap:6px}
+  .ms-history-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;
+    background:var(--container-low);border-radius:6px;font:400 11.5px/1.4 var(--font)}
+  .ms-hist-time{color:var(--on-variant);flex:none}
+  .ms-hist-desc{color:var(--on);flex:1;min-width:120px}
+  .ms-history-empty{color:var(--on-variant);font:400 11.5px/1.6 var(--font)}
+  .ms-drawer-check{border:1px solid var(--outline);border-radius:8px;padding:14px;background:var(--container-low)}
+  .ms-check-progress{display:flex;align-items:center;gap:10px;margin:10px 0}
+  .ms-check-bar{flex:1;height:6px;border-radius:99px;background:var(--container);overflow:hidden}
+  .ms-check-bar span{display:block;width:0;height:100%;background:var(--state-wait)}
+  .ms-check-sec{color:var(--on-variant);font-size:11px}
+  .ms-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;
+    border-radius:7px;border:1px solid var(--outline);font:600 12.5px/1 var(--font);cursor:pointer;
+    background:var(--card);color:var(--on)}
+  .ms-btn-primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+  .ms-btn-locked{cursor:not-allowed;color:var(--on-variant);background:var(--container)}
+  .ms-btn-locked:disabled{opacity:.7}
+  .ms-lock-note{margin:8px 0 0;font:400 11px/1.6 var(--font);color:var(--on-variant)}
+  .ms-drawer-foot{flex:none;padding:12px 18px;border-top:1px solid var(--outline-variant);
+    font:400 11px/1.6 var(--font);color:var(--on-variant)}
+  .ms-noscript{padding:10px 14px;border-radius:6px;background:var(--rv-amber-bg);
+    color:var(--on);font:400 12px/1.5 var(--font)}
+
+  @media (max-width:768px){
+    .ms-wrap{padding:1rem}
+    .ms-banner{flex-direction:column}
+    .ms-banner-side{border-left:0;border-top:1px solid var(--rv-amber-line);padding-left:0;padding-top:10px}
+    .ms-kpi-grid{grid-template-columns:1fr 1fr}
+    .ms-drawer{width:100vw}
+  }
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="a2-badge">조회 전용</span>
+<span class="ms-hd-note" style="font:400 11.5px/1.4 var(--font);color:var(--rv-faint)">실서비스는 읽기만 합니다 — 담기·저장 요청을 보내지 않습니다</span>
+{% endblock %}
+
+{% block content %}
+<div class="ms-wrap" data-screen-id="{{ screen_id }}" data-domain="{{ domain }}">
+
+  <noscript><div class="ms-noscript">이 화면의 상세 보기(우측 서랍)는 JavaScript가 필요합니다. 표 자체는 계속 보입니다.</div></noscript>
+
+  <div class="ms-banner" data-keep="1">
+    <div class="ms-banner-ic" aria-hidden="true">⚠</div>
+    <div class="ms-banner-body">
+      <p class="ms-banner-title">주기적으로 도는 동기화가 아직 없습니다</p>
+      <p>몰 가격은 <strong>고객이 인계를 누르는 그 순간, 그때 담기는 상품에 대해서만</strong> 확인됩니다.</p>
+      <p>그래서 여기 「받아온 시각」은 <strong>마지막 인계 시점에 확인한 상품만</strong>의 시각입니다 — 나머지 {{ banner.uncovered_fmt }}개 상품은 <strong>마지막으로 받아온 시각 자체가 없습니다.</strong></p>
+      <p>카탈로그 전체 동기화는 윈윈소프트 API(10~30분 주기 배치로 요청) 도착 후에나 가능합니다.</p>
+    </div>
+    <div class="ms-banner-side">
+      {% if banner.has_any %}
+      <div class="ms-banner-last">마지막 확인</div>
+      <div class="ms-banner-lasttime num">{{ banner.last_time }}</div>
+      <div class="ms-banner-lastno num">{{ banner.last_no }}</div>
+      {% else %}
+      <div class="ms-banner-last">인계 기록 없음</div>
+      <div class="ms-banner-lasttime">그 기간엔 인계가 없었습니다</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="ms-kpi-grid">
+    {% for c in kpi_cards %}
+    <div class="ms-kpi">
+      <div class="ms-kpi-label">{{ c.label }}</div>
+      <div class="ms-kpi-value num">{{ c.value }}</div>
+      <div class="ms-kpi-caption">{{ c.caption }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="ms-filter-bar" data-keep="1">
+    <div class="ms-chips">
+      {% for chip in chips %}
+      <a class="ms-chip{% if chip.active %} on{% endif %}" href="{{ chip.href }}">{{ chip.label }} <span class="num">{{ chip.count }}</span></a>
+      {% endfor %}
+    </div>
+    <div class="ms-soldout-note">「확인 못함」은 시도했으나 실패한 라인만 셉니다 — 아직 한 번도 확인해 본 적 없는 나머지 상품(미확인)은 포함하지 않습니다 · 품절 집계는 표시하지 않습니다(판정 로직이 없어 항상 0입니다)</div>
+  </div>
+
+  <div class="ms-table-wrap">
+    <div class="ms-table" role="table" aria-label="확인해 본 라인 목록">
+      <div class="ms-thead" role="rowgroup">
+        <div class="ms-th" role="columnheader">인계</div>
+        <div class="ms-th" role="columnheader">상품번호</div>
+        <div class="ms-th" role="columnheader">당시 표시명</div>
+        <div class="ms-th ms-num" role="columnheader">우리 값</div>
+        <div class="ms-th ms-num" role="columnheader">몰 값</div>
+        <div class="ms-th ms-num" role="columnheader">차액</div>
+        <div class="ms-th" role="columnheader">결과</div>
+      </div>
+      {% if items %}
+        {% for it in items %}
+        <div class="ms-row" role="row" tabindex="0" data-keep="1" data-idx="{{ loop.index0 }}">
+          <div class="ms-td ms-td-stack" role="cell"><span class="ms-handoff-no num">{{ it.handoff_no }}</span><span class="ms-handoff-time num">{{ it.created_at_kst }}</span></div>
+          <div class="ms-td ms-num" role="cell">{{ it.product_code if it.product_code is not none else "—" }}</div>
+          <div class="ms-td ms-name" role="cell">
+            <span>{{ it.name_snap }}</span>
+            {% if it.is_demo %}<span class="ms-badge-demo">시연용</span>{% endif %}
+          </div>
+          <div class="ms-td ms-num" role="cell">{{ it.price_quoted_fmt }}</div>
+          <div class="ms-td ms-num" role="cell">{{ it.price_mall_fmt }}</div>
+          <div class="ms-td ms-num" role="cell">{{ it.diff_fmt }}</div>
+          <div class="ms-td" role="cell"><span class="ms-status ms-s-{{ it.status_cls }}">{{ it.status_symbol }} {{ it.status_label }}</span></div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="ms-empty" role="row">
+          {% if status_filter == "all" %}아직 인계 기록이 없습니다 — 인계가 발생하면 이 표에 나타납니다(그 기간엔 인계가 없었다는 뜻이며, 「동기화 실패」가 아닙니다).
+          {% else %}이 조건에 해당하는 라인이 없습니다.
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="ms-pager">
+    <div class="ms-pager-info">전체 {{ pager.total_rows_fmt }}건 중 {{ pager.start }}–{{ pager.end }}행 · {{ pager.page }}/{{ pager.total_pages }}페이지</div>
+    <div class="ms-pager-btns">
+      {% if pager.prev_href %}<a class="ms-pgbtn" href="{{ pager.prev_href }}">← 이전</a>
+      {% else %}<span class="ms-pgbtn disabled" aria-disabled="true">← 이전</span>{% endif %}
+      {% if pager.next_href %}<a class="ms-pgbtn" href="{{ pager.next_href }}">다음 →</a>
+      {% else %}<span class="ms-pgbtn disabled" aria-disabled="true">다음 →</span>{% endif %}
+    </div>
+  </div>
+
+  <p class="ms-footnote">확인 못함에는 몰에 없는 상품 · 가격 필드 없음 · 몰 가격 0원 · 타임아웃 네 가지 사유가 있습니다 — 다만 인계 원장은 이 사유를 라인별로 저장하지 않아, 이 화면은 통합된 「확인 못함」으로만 표시합니다(세부 사유는 원천 없음) · 이 화면은 값을 고치지 않습니다(정정은 판매가 관리) · 인계가 없던 기간은 「동기화 실패」가 아니라 「그 기간엔 인계가 없었다」로 표시합니다.</p>
+</div>
+
+<div id="msScrim" class="ms-scrim" hidden></div>
+<aside id="msDrawer" class="ms-drawer" hidden data-keep="1" role="dialog" aria-modal="true" aria-label="라인 상세">
+  <div class="ms-drawer-head">
+    <div>
+      <div class="ms-drawer-title" id="msDName">—</div>
+      <span class="ms-status" id="msDStatus"></span>
+    </div>
+    <button type="button" class="ms-drawer-x" id="msDClose" aria-label="닫기">✕</button>
+  </div>
+  <div class="ms-drawer-meta" id="msDMeta"></div>
+
+  <div class="ms-drawer-body">
+    <div id="msIncidentBox" class="ms-incident" hidden>
+      <strong>이 라인이 사고를 드러낸 자리입니다</strong>
+      <p>시연용 상품이 실제 고객 견적에 섞여 있던 결함이 인계를 만들다 몰 가격이 0원으로 와서 드러났습니다. 인계가 없었으면 오픈 후 고객이 먼저 발견했을 것입니다 — 이 화면이 그 재확인을 상시로 감시하는 자리입니다.</p>
+    </div>
+
+    <section class="ms-drawer-sec">
+      <h4>확인 기록 — 같은 상품인데 결과가 달랐습니다</h4>
+      <p class="ms-drawer-sub">실시간 조회라 같은 상품도 시점에 따라 결과가 다릅니다. 다만 「확인 못함」의 세부 사유(몰에 없음 · 가격 필드 없음 · 0원 · 타임아웃)는 인계 원장에 라인별로 저장되지 않아, 이 기록에서도 통합된 「확인 못함」으로만 표시합니다.</p>
+      <div id="msHistory" class="ms-history"></div>
+    </section>
+
+    <section class="ms-drawer-sec ms-drawer-check">
+      <h4>지금 확인</h4>
+      <p>이 상품의 몰 가격을 지금 한 번 읽어옵니다. 최대 6초가 걸릴 수 있고 실패할 수 있습니다(동시 4건 제한 — 남의 서버라 늘리지 않습니다). 실패하면 사유를 그대로 보여주고 「일치」로 취급하지 않습니다.</p>
+      <div class="ms-check-progress" aria-hidden="true">
+        <div class="ms-check-bar"><span></span></div>
+        <span class="ms-check-sec num">0.0초</span>
+      </div>
+      <button type="button" class="ms-btn ms-btn-locked" disabled title="향후 사용예정 — 실서비스 조회 API 준비 중">지금 확인</button>
+      <p class="ms-lock-note">향후 사용예정 — 실서비스 조회 API 준비 중(작업 목록 #38). 판매가 관리의 「지금 물어보기」와 같은 예정 API를 함께 씁니다 — 이 화면은 스크래퍼를 따로 만들지 않습니다.</p>
+    </section>
+
+    <section class="ms-drawer-sec">
+      <h4>값을 고치려면</h4>
+      <p>이 화면은 동기화가 얼마나 건강한지만 봅니다. 우리 판매가를 몰 값으로 맞추거나 잠그는 일은 판매가 관리 소관입니다 — 같은 건들을 두 화면이 각자 고치면 정본이 갈라집니다.</p>
+      {% if sale_price_link.available %}
+      <a class="ms-btn ms-btn-primary" href="{{ sale_price_link.href }}">판매가 관리에서 열기 →</a>
+      {% else %}
+      <button type="button" class="ms-btn ms-btn-locked" disabled title="{{ sale_price_link.reason }}">판매가 관리에서 열기 →</button>
+      <p class="ms-lock-note">{{ sale_price_link.reason }}</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="ms-drawer-foot">품절 여부는 판정하지 않습니다 — 재고 원장은 쇼핑몰이 갖습니다.</div>
+</aside>
+
+<script id="msDetailData" type="application/json">{{ detail_json | safe }}</script>
+<script>
+(function(){
+  var scrim = document.getElementById('msScrim');
+  var drawer = document.getElementById('msDrawer');
+  if (!scrim || !drawer) return;
+
+  var DETAIL = [];
+  try {
+    var raw = document.getElementById('msDetailData');
+    DETAIL = raw ? JSON.parse(raw.textContent || '[]') : [];
+  } catch (e) { DETAIL = []; }
+
+  function closeDrawer(){ drawer.hidden = true; scrim.hidden = true; }
+
+  function openDrawer(idx){
+    var it = DETAIL[idx];
+    if (!it) return;
+
+    document.getElementById('msDName').textContent = it.name_snap || '(이름 없음)';
+    var statusEl = document.getElementById('msDStatus');
+    statusEl.className = 'ms-status ms-s-' + it.status_cls;
+    statusEl.textContent = it.status_symbol + ' ' + it.status_label;
+
+    var meta = document.getElementById('msDMeta');
+    meta.textContent = '상품번호 ' + (it.product_code != null ? it.product_code : '—') +
+      ' · ' + it.part_label + ' · 데이터 출처: ' + it.origin_label +
+      ' · 인계 ' + it.handoff_no;
+
+    document.getElementById('msIncidentBox').hidden = !it.is_incident;
+
+    var hist = document.getElementById('msHistory');
+    hist.innerHTML = '';
+    if (!it.history || !it.history.length) {
+      var empty = document.createElement('div');
+      empty.className = 'ms-history-empty';
+      empty.textContent = '이 상품의 확인 기록이 없습니다.';
+      hist.appendChild(empty);
+    } else {
+      it.history.forEach(function(h){
+        var row = document.createElement('div');
+        row.className = 'ms-history-row';
+
+        var t = document.createElement('span');
+        t.className = 'num ms-hist-time';
+        t.textContent = (h.created_at || '—') + ' (' + h.handoff_no + ')';
+
+        var s = document.createElement('span');
+        s.className = 'ms-status ms-s-' + h.status_cls;
+        s.textContent = h.status_symbol + ' ' + h.status_label;
+
+        var d = document.createElement('span');
+        d.className = 'ms-hist-desc';
+        d.textContent = h.desc;
+
+        row.appendChild(t); row.appendChild(s); row.appendChild(d);
+        hist.appendChild(row);
+      });
+    }
+
+    scrim.hidden = false;
+    drawer.hidden = false;
+  }
+
+  document.querySelectorAll('.ms-row[data-idx]').forEach(function(row){
+    row.addEventListener('click', function(){
+      openDrawer(parseInt(row.getAttribute('data-idx'), 10));
+    });
+    row.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openDrawer(parseInt(row.getAttribute('data-idx'), 10));
+      }
+    });
+  });
+
+  var closeBtn = document.getElementById('msDClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && !drawer.hidden) closeDrawer();
+  });
+})();
+</script>
+{% endblock %}

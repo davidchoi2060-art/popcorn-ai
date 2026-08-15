@@ -1,0 +1,646 @@
+{#
+  판매가 관리 (ADM-PRC-060) — 2026-08-15 신설
+
+  ■ 계약 — `docs/design/spec-sale-price.md`. 사장님 확정: "1b 안으로 하되, 상세 화면
+    오른쪽 슬라이더는 포함" — 골격은 1b(신뢰 지표 상단 + 처리할 예외 큐 좌 + 사실 패널
+    우 400px), 1a에서는 우측 서랍(560px) **하나만** 가져온다. 1a의 3분류 탭·표 격자는
+    만들지 않았다.
+
+  ■ 이 화면의 정체 — 값을 «정하는» 곳이 아니라 «예외를 잡는» 곳
+    기본 = 몰 가격 그대로 · 예외 = 직접 소싱해 덮어쓰고 잠근 값 · 경보 = 잠기지 않았는데
+    몰과 어긋난 건(동기화 누락). 정상(일치·손대지 않음)은 목록에 올리지 않는다.
+
+  ■ 데이터 실측 요약(전문은 api/admin_ui_sale_price.py 모듈 docstring)
+    몰값은 저장 컬럼이 아니다 — 인계(handoff_items.price_mall) 관측분만 있다.
+    「지금 물어보기」는 관리자 API가 없고(api/mall.py는 api/handoff.py 내부 전용),
+    사장님 확정(2026-08-15)으로 "API로 만들 예정 업무"로 이관돼 이 화면에서는 잠근다.
+    매입가 토글도 잠근다 — 몰에는 비교할 매입가 개념 자체가 없다.
+
+  ■ 문구 판단 기록 — CLAUDE.md §문구 표준("「우리」 대화체 주어 금지"·"의문형 금지")과
+    원안 예시 문장이 어긋나는 지점은 "우리"를 빼고 명사형으로 바꿨다(모듈 docstring 참조).
+    "「이 화면이 지키는 것」 5줄"은 계약이 "그대로 쓴다"고 명시해 원문 그대로 옮겼다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}판매가 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+.sp-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;background:var(--rv-canvas)}
+
+/* ── 상태 3종(로딩·오류·본문) ── */
+.sp-loading,.sp-err{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:9px;padding:40px;font:400 12.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+.sp-err{color:var(--rv-red)}
+.sp-loading[hidden],.sp-err[hidden],.sp-body[hidden],.sp-drawer[hidden],
+.sp-queue-empty[hidden]{display:none}
+.sp-err .retry{margin-top:4px;font:500 12px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.22);border-radius:6px;padding:8px 14px;cursor:pointer}
+.sp-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
+
+/* ── 헤더 토글(판매가 | 매입가) ── */
+.sp-toggle{display:flex;align-items:center;border:1px solid rgba(0,0,0,.18);border-radius:7px;overflow:hidden;margin-left:14px}
+.sp-toggle-btn{font:500 12px/1 var(--rv-font);color:var(--rv-muted);background:var(--rv-card);
+  border:0;padding:7px 13px;cursor:pointer}
+.sp-toggle-btn+.sp-toggle-btn{border-left:1px solid rgba(0,0,0,.14)}
+.sp-toggle-btn.on{background:var(--rv-ink);color:var(--rv-canvas);font-weight:600}
+.sp-toggle-btn:disabled{color:var(--rv-dim3);cursor:not-allowed;background:var(--rv-panel2)}
+
+/* ── 상단: 신뢰 카드 + KPI 4장 ── */
+.sp-top{flex:none;display:flex;gap:14px;padding:18px 22px 6px}
+.sp-trust{flex:0 0 320px;border-radius:10px;background:var(--rv-nav);color:var(--rv-nav-ink);
+  padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.sp-trust .rate{font:700 40px/1 var(--rv-mono)}
+.sp-trust .headline{font:500 13px/1.5 var(--rv-font)}
+.sp-trust .sample-note{font:400 11px/1.6 var(--rv-font);color:var(--rv-nav-muted);border-top:1px solid rgba(255,255,255,.14);padding-top:8px}
+.sp-kpis{flex:1;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px}
+.sp-kpi{border:1px solid rgba(0,0,0,.12);border-radius:9px;background:var(--rv-card);padding:13px 15px;
+  display:flex;flex-direction:column;gap:5px;min-width:0}
+.sp-kpi .lb{font:600 10.5px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em}
+.sp-kpi .v{font:700 24px/1.1 var(--rv-mono)}
+.sp-kpi .note{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim)}
+.sp-kpi .sub{font:400 10px/1.5 var(--rv-mono);color:var(--rv-dim2)}
+.sp-kpi.warn .v{color:var(--rv-red)}
+.sp-kpi.lock .v{color:var(--rv-purple)}
+.sp-kpi.unk .v{color:var(--rv-amber)}
+
+/* ── 본문: 큐(좌) + 사실 패널(우 400px) ── */
+.sp-main{flex:1;min-height:0;display:flex;gap:14px;padding:14px 22px}
+.sp-queue-col{flex:1;min-width:0;display:flex;flex-direction:column;border:1px solid rgba(0,0,0,.1);
+  border-radius:10px;background:var(--rv-card);overflow:hidden}
+.sp-queue-hd{flex:none;display:flex;align-items:baseline;gap:8px;padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);
+  background:var(--rv-panel);font:600 12.5px/1 var(--rv-font)}
+.sp-queue-cnt{color:var(--rv-muted);font-weight:500}
+.sp-queue-list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.sp-queue-empty{flex:1;display:flex;align-items:center;justify-content:center;padding:30px;
+  font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center}
+
+.sp-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(96px,auto);gap:4px 12px;
+  padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;background:transparent}
+.sp-card:hover{background:rgba(0,0,0,.02)}
+.sp-card.on{background:#f0ece1}
+.sp-badge{grid-column:1/2;justify-self:start;font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;
+  display:inline-flex;align-items:center;gap:4px}
+.sp-badge-alert{background:var(--rv-amber-bg);color:var(--rv-red);border:1px solid rgba(178,40,40,.28)}
+.sp-badge-unknown{background:var(--rv-panel2);color:var(--rv-faint);border:1px solid rgba(0,0,0,.16)}
+.sp-badge-locked{background:#f1ecf7;color:var(--rv-purple);border:1px solid oklch(0.5 0.11 285 / .3)}
+.sp-badge-neutral{background:var(--rv-canvas);color:var(--rv-dim);border:1px solid rgba(0,0,0,.12)}
+.sp-card-diff{grid-row:1/2;grid-column:2/3;justify-self:end;font:700 14px/1.2 var(--rv-mono)}
+.sp-card-diff.up{color:var(--rv-red)}
+.sp-card-diff.down{color:var(--rv-link)}
+.sp-card-diff.na{font:500 11px/1.2 var(--rv-font);color:var(--rv-dim2)}
+.sp-card-name{grid-column:1/3;font:500 12.5px/1.4 var(--rv-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-card-sub{grid-column:1/3;font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.sp-card-reason{grid-column:1/3;font:400 11px/1.55 var(--rv-font);color:var(--rv-ink-soft)}
+.sp-card-meta{grid-column:1/3;font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim2)}
+
+.sp-aside{flex:0 0 400px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.sp-abox{border:1px solid rgba(0,0,0,.1);border-radius:9px;background:var(--rv-card);padding:14px 16px}
+.sp-acap{font:600 11px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em;margin-bottom:8px}
+.sp-abox p{margin:0;font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.sp-freshline{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.6 var(--rv-font);margin-bottom:4px}
+.sp-freshline .g{font:600 12px/1 var(--rv-mono);flex:none;width:16px}
+.sp-abox ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px}
+.sp-abox ol li{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+
+.sp-foot{flex:none;padding:12px 22px 18px;display:flex;flex-direction:column;gap:3px}
+.sp-foot p{margin:0;font:400 11px/1.6 var(--rv-font);color:var(--rv-dim)}
+
+/* ── 우측 서랍(560px, 1a에서 가져온 유일한 조각) ── */
+.sp-drawer{position:absolute;top:0;right:0;bottom:0;width:560px;background:var(--rv-card);
+  border-left:1px solid rgba(0,0,0,.16);box-shadow:-18px 0 40px rgba(38,35,30,.14);
+  display:flex;flex-direction:column;z-index:8}
+.dw-hd{flex:none;padding:15px 18px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.dw-hd .row1{display:flex;align-items:center;gap:8px}
+.dw-hd .title{font:600 14.5px/1.35 var(--rv-font);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dw-hd .close{font:400 18px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 6px;background:none;border:0}
+.dw-hd .meta{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:7px;font:400 11px/1.4 var(--rv-mono);color:var(--rv-faint)}
+.dw-hd .meta b{font-weight:600;color:var(--rv-ink-soft)}
+.dw-body{flex:1;min-height:0;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:16px}
+
+.sp-vals{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sp-vcard{border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:12px 13px;background:var(--rv-panel2);min-width:0}
+.sp-vcard .lb{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint);margin-bottom:5px}
+.sp-vcard .v{font:700 20px/1.2 var(--rv-mono)}
+.sp-vcard .v.empty{font:400 13px/1.3 var(--rv-font);color:var(--rv-dim)}
+.sp-vcard .sub{margin-top:5px;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-dim)}
+.sp-livebtn{margin-top:9px;width:100%;font:500 11px/1 var(--rv-font);color:var(--rv-dim2);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:8px 9px;cursor:not-allowed;text-align:center}
+.sp-livebtn small{display:block;margin-top:3px;font:400 10px/1.4 var(--rv-font);color:var(--rv-dim3)}
+
+.sp-actions{border:1px solid rgba(0,0,0,.14);border-radius:8px;padding:13px 14px;background:#faf7f0}
+.sp-actions-cap{font:600 11px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em;margin-bottom:10px}
+.sp-action-row{display:flex;align-items:center;gap:10px;padding:9px 0}
+.sp-action-row+.sp-action-row{border-top:1px solid rgba(0,0,0,.08)}
+.sp-action-txt{flex:1;min-width:0;font:400 11.5px/1.5 var(--rv-font);color:var(--rv-ink-soft)}
+.sp-action-txt b{font-family:var(--rv-mono);font-weight:600;color:var(--rv-ink)}
+.sp-btn{flex:none;font:600 11.5px/1 var(--rv-font);border-radius:6px;padding:9px 13px;cursor:pointer;white-space:nowrap}
+.sp-btn-primary{background:var(--rv-ink);color:var(--rv-canvas);border:none}
+.sp-btn-secondary{background:var(--rv-card);color:var(--rv-ink);border:1px solid rgba(0,0,0,.24)}
+.sp-btn-warn{background:var(--rv-red);color:#fff;border:none}
+.sp-btn:disabled{background:var(--rv-dim4);color:#f0ece2;border:none;cursor:not-allowed}
+.sp-action-warn{margin:-2px 0 2px;font:500 10.5px/1.6 var(--rv-font);color:var(--rv-red)}
+.sp-lockwarn{margin-top:10px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);border-top:1px solid rgba(0,0,0,.08);padding-top:9px}
+
+.sp-hist-cap{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.sp-hist-cap .t{font:600 11px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em}
+.sp-hist-list{display:flex;flex-direction:column;gap:6px}
+.sp-hist-row{display:grid;grid-template-columns:96px 1fr auto;gap:8px;align-items:baseline;
+  padding:8px 10px;border:1px solid rgba(0,0,0,.08);border-radius:6px;background:var(--rv-panel2)}
+.sp-hist-row .at{font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim)}
+.sp-hist-row .rs{font:500 11px/1.3 var(--rv-font)}
+.sp-hist-row .chg{font:600 11px/1.3 var(--rv-mono);text-align:right;white-space:nowrap}
+.sp-hist-empty{font:400 11px/1.6 var(--rv-font);color:var(--rv-dim);padding:8px 2px}
+
+.dw-boundary{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:var(--rv-panel)}
+.dw-boundary p{margin:0;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint)}
+
+@media (max-width:768px){
+  .sp-top{flex-direction:column;padding:14px}
+  .sp-trust{flex:none}
+  .sp-kpis{grid-template-columns:repeat(2,minmax(120px,1fr))}
+  .sp-main{flex-direction:column;padding:0 14px 14px}
+  .sp-aside{flex:none}
+  .sp-drawer{position:fixed;top:0;width:100%}
+  .sp-vals{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<div class="sp-toggle" role="group" aria-label="가격 구분" data-keep="1">
+  <button type="button" class="sp-toggle-btn on" data-action="axis" data-axis="sale">판매가</button>
+  <button type="button" class="sp-toggle-btn" data-action="axis" data-axis="purchase" disabled
+          title="향후 사용예정 — 몰에는 매입가 개념이 없어 비교 대상이 없습니다">매입가</button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="sp-wrap">
+  <div class="sp-loading" id="spLoading">불러오는 중…</div>
+  <div class="sp-err" id="spErr" hidden></div>
+
+  <div class="sp-body" id="spBody" hidden>
+    <div class="sp-top">
+      <div class="sp-trust" id="spTrust"></div>
+      <div class="sp-kpis" id="spKpis"></div>
+    </div>
+
+    <div class="sp-main">
+      <section class="sp-queue-col">
+        <div class="sp-queue-hd">처리할 예외 큐(차액 큰 순)<span class="sp-queue-cnt" id="spQueueCnt"></span></div>
+        <div class="sp-queue-list" id="spQueueList" data-keep="1"></div>
+        <div class="sp-queue-empty" id="spQueueEmpty" hidden>처리할 예외가 없습니다 — 정상(일치·손대지 않음)은 목록에 올리지 않습니다.</div>
+      </section>
+
+      <aside class="sp-aside">
+        <div class="sp-abox">
+          <div class="sp-acap">전 상품 상시 비교는 불가능합니다</div>
+          <p id="spSourceNote"></p>
+        </div>
+        <div class="sp-abox">
+          <div class="sp-acap">낡은값</div>
+          <div class="sp-freshline"><span class="g num">✓</span><span>30일 이상 갱신 없음</span></div>
+          <div class="sp-freshline"><span class="g num">◐</span><span>8~30일</span></div>
+          <div class="sp-freshline"><span class="g num">?</span><span>이력 자체가 없음 — 「모름」</span></div>
+          <p>이력이 아예 없는 건은 기준 시점이 없어 「모름」입니다 — 낡았다고도, 최신이라고도 말하지 않습니다.</p>
+        </div>
+        <div class="sp-abox">
+          <div class="sp-acap">이 화면이 지키는 것</div>
+          <ol>
+            <li>기본은 몰 가격을 그대로 쓰는 것입니다 — 우리가 값을 만드는 화면이 아닙니다.</li>
+            <li>직접 소싱한 경우만 우리가 덮어쓰고 잠급니다(예외). 잠기면 어떤 자동 경로도 못 건드립니다.</li>
+            <li>잠기지 않았는데 몰과 어긋난 건은 동기화 누락(경보)으로 봅니다.</li>
+            <li>비율에는 표본을 함께 적습니다 — 확인해 본 라인 기준이지 전체 건수 기준이 아닙니다.</li>
+            <li>값을 고치면 사유와 함께 가격 이력에 남습니다 — 원장은 지우지 않습니다.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+
+    <div class="sp-foot">
+      <p>「확인 못함」은 「일치함」이 아닙니다 — 몰에 없는 상품 · 가격 필드 없음 · 몰 가격 0원 · 타임아웃을 「일치함」과 구분합니다.</p>
+      <p>실서비스는 읽기 전용으로만 접근합니다(담기·저장 요청 없음).</p>
+    </div>
+  </div>
+
+  <aside class="sp-drawer" id="spDrawer" data-keep="1" hidden>
+    <div class="dw-hd">
+      <div class="row1">
+        <span class="sp-badge" id="dwBadge"></span>
+        <span class="title" id="dwTitle"></span>
+        <button type="button" class="close" data-action="close-drawer" aria-label="닫기">✕</button>
+      </div>
+      <div class="meta" id="dwMeta"></div>
+    </div>
+    <div class="dw-body">
+      <div class="sp-vals">
+        <div class="sp-vcard">
+          <div class="lb">판매가</div>
+          <div class="v" id="dwOurPrice">—</div>
+          <div class="sub" id="dwOurUpdated"></div>
+        </div>
+        <div class="sp-vcard">
+          <div class="lb">몰 값</div>
+          <div class="v" id="dwMallPrice">—</div>
+          <div class="sub" id="dwMallObserved"></div>
+          <button type="button" class="sp-livebtn" disabled title="향후 사용예정 — 실서비스 조회 API 준비 중">
+            지금 물어보기
+            <small>최대 6초 · 실서비스는 읽기만 · 실서비스 조회 API 준비 중</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="sp-actions">
+        <div class="sp-actions-cap">처리 방법</div>
+        <div class="sp-action-row">
+          <div class="sp-action-txt" id="dwMatchTxt">몰 값으로 맞춤</div>
+          <button type="button" class="sp-btn sp-btn-primary" id="dwMatchBtn" data-action="match">맞추기</button>
+        </div>
+        <div class="sp-action-warn" id="dwMatchWarn" hidden></div>
+        <div class="sp-action-row">
+          <div class="sp-action-txt" id="dwLockTxt">지금 값 유지 — 소싱한 값이라 잠급니다</div>
+          <button type="button" class="sp-btn sp-btn-secondary" id="dwLockBtn" data-action="lock">잠그기</button>
+        </div>
+        <div class="sp-lockwarn">
+          잠그면 단가표 반영·매입 확정·대량 재산정 어떤 자동 경로도 이 값을 못 건드립니다.
+          <span id="dwLockedTotal"></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="sp-hist-cap"><span class="t">가격 이력 — 이 상품</span></div>
+        <div class="sp-hist-list" id="dwHistList"></div>
+      </div>
+    </div>
+    <div class="dw-boundary">
+      <p>이 화면에서 고치면 사유와 함께 여기에 남습니다 — 되돌림도 삭제가 아니라 역방향 기록입니다.<br>
+      이 화면은 예외만 다룹니다 — 상품 정보 전반 수정은 상품 관리, 마진율은 마진 정책, 정책대로 대량 재계산은 판매가 재산정 소관입니다.</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  'use strict';
+
+  var S = { summary: null, drawerOpen: false, selCode: null, detail: null, busy: false,
+            matchArmed: false, armTimer: null };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function won(n) { return (n === null || n === undefined) ? null : n.toLocaleString('ko-KR') + '원'; }
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function fmtDT(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function fmtDate(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function apiGet(url) {
+    return fetch(url, { credentials: 'same-origin' }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (j) {
+        if (!res.ok) {
+          var msg = (window.popcornProgress && window.popcornProgress.errText)
+            ? window.popcornProgress.errText(j, res.status, url) : ('오류 ' + res.status);
+          throw new Error(msg);
+        }
+        return j;
+      });
+    });
+  }
+  function apiPost(url, payload) {
+    return fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {})
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (j) {
+        if (!res.ok) {
+          var msg = (window.popcornProgress && window.popcornProgress.errText)
+            ? window.popcornProgress.errText(j, res.status, url) : ('오류 ' + res.status);
+          throw new Error(msg);
+        }
+        return j;
+      });
+    });
+  }
+
+  // ── 로드 ──────────────────────────────────────────────────────────────
+  function load() {
+    $('spLoading').hidden = false;
+    $('spErr').hidden = true;
+    $('spBody').hidden = true;
+    apiGet('/api/admin/sale-price/summary').then(function (j) {
+      S.summary = j;
+      renderAll();
+      $('spLoading').hidden = true;
+      $('spBody').hidden = false;
+    }).catch(function (e) {
+      $('spLoading').hidden = true;
+      $('spErr').hidden = false;
+      $('spErr').innerHTML = esc(e.message || '불러오지 못했습니다')
+        + '<button type="button" class="retry" data-action="retry">다시 시도</button>';
+    });
+  }
+
+  function renderAll() {
+    renderTrust();
+    renderKpis();
+    renderQueue();
+    $('spSourceNote').textContent = S.summary.mall_source_note;
+  }
+
+  function renderTrust() {
+    var t = S.summary.trust;
+    var box = $('spTrust');
+    var rate = (t.mismatch_rate === null || t.mismatch_rate === undefined) ? '—' : t.mismatch_rate + '%';
+    box.innerHTML =
+      '<div class="rate num">' + esc(rate) + '</div>' +
+      '<div class="headline">' + esc(t.headline) + '</div>' +
+      '<div class="sample-note">' + esc(t.sample_note) + '</div>';
+  }
+
+  function renderKpis() {
+    var k = S.summary.kpi;
+    var recent = k.recent;
+    var lastDate = fmtDate(recent.last_at);
+    var box = $('spKpis');
+    box.innerHTML =
+      '<div class="sp-kpi warn"><div class="lb">어긋난 라인</div><div class="v num">' + k.alert.value +
+        '</div><div class="note">' + esc(k.alert.note) + '</div></div>' +
+      '<div class="sp-kpi lock"><div class="lb">우리가 잠근 값</div><div class="v num">' + k.locked.value +
+        '</div><div class="note">' + esc(k.locked.note) + '</div></div>' +
+      '<div class="sp-kpi unk"><div class="lb">확인 못함</div><div class="v num">' + k.unknown.value +
+        '</div><div class="note">' + esc(k.unknown.note) + '</div></div>' +
+      '<div class="sp-kpi"><div class="lb">최근 확인</div><div class="v num">' + esc(lastDate || '—') +
+        '</div><div class="note">' + esc(recent.note) + '</div>' +
+        '<div class="sub">✓ ' + recent.stale_30d + ' · ◐ ' + recent.mid_8_30d + ' · ? ' + recent.no_history.toLocaleString('ko-KR') + '</div></div>';
+  }
+
+  // 큐 카드는 alert/unknown/locked 셋뿐이다. 서랍은 카드 없이 임의 상품코드로도 열릴 수
+  // 있어(직접 열람) no_check(미확인)·normal(정상)까지 다섯 상태를 전부 받는다.
+  var BADGE_CLS = {
+    alert: 'sp-badge-alert', unknown: 'sp-badge-unknown', locked: 'sp-badge-locked',
+    no_check: 'sp-badge-neutral', normal: 'sp-badge-neutral'
+  };
+
+  function cardHtml(c) {
+    var diffHtml;
+    if (c.diff === null || c.diff === undefined) {
+      diffHtml = '<div class="sp-card-diff na">' + (c.kind === 'unknown' ? '확인 못함' : '확인 이력 없음') + '</div>';
+    } else {
+      diffHtml = '<div class="sp-card-diff ' + (c.diff > 0 ? 'up' : 'down') + ' num">' + esc(c.diff_display) + '</div>';
+    }
+    var metaBits = [];
+    metaBits.push(c.handoff_no ? esc(c.handoff_no) : '인계 기록 없음');
+    metaBits.push(c.observed_at ? '확인 ' + fmtDT(c.observed_at) : '확인 시각 없음');
+    metaBits.push('갱신 ' + (c.last_change_at ? fmtDate(c.last_change_at) : '이력 없음'));
+    return (
+      '<div class="sp-card' + (S.selCode === c.product_code ? ' on' : '') + '" data-action="open-card" data-code="' + c.product_code + '">' +
+      '<span class="sp-badge ' + BADGE_CLS[c.kind] + '">' + esc(c.kind_label) + '</span>' +
+      diffHtml +
+      '<div class="sp-card-name">' + esc(c.name) + '</div>' +
+      '<div class="sp-card-sub num">' + c.product_code + ' · ' + esc(c.cat) + '</div>' +
+      '<div class="sp-card-reason">' + esc(c.reason) + '</div>' +
+      '<div class="sp-card-meta">' + esc(metaBits.join(' · ')) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderQueue() {
+    var q = S.summary.queue;
+    $('spQueueCnt').textContent = q.length ? (q.length + '건') : '';
+    $('spQueueList').innerHTML = q.map(cardHtml).join('');
+    $('spQueueEmpty').hidden = q.length !== 0;
+  }
+
+  // ── 서랍 ──────────────────────────────────────────────────────────────
+  function openDrawer(code) {
+    S.selCode = code;
+    S.drawerOpen = true;
+    // 로딩 전환 중에는 상세가 없다 — doMatch/doLock의 !S.detail 가드가 즉시 막아 주지만,
+    // 이전 상품의 「무장」 상태(다시 누르면 잠금 해제)가 새 상품 화면에 잠깐이라도 남아
+    // 보이면 안 된다. 새로 열 때마다 먼저 지운다(afterWrite 경로는 renderDrawer가 처리).
+    S.detail = null;
+    clearTimeout(S.armTimer);
+    S.armTimer = null;
+    S.matchArmed = false;
+    renderQueue();
+    $('spDrawer').hidden = false;
+    $('dwTitle').textContent = '불러오는 중…';
+    $('dwHistList').innerHTML = '';
+    apiGet('/api/admin/sale-price/' + code).then(function (d) {
+      if (S.selCode !== code) return;   // 그 사이 다른 카드를 열었으면 버린다
+      S.detail = d;
+      renderDrawer();
+    }).catch(function (e) {
+      if (S.selCode !== code) return;
+      $('dwTitle').textContent = '불러오지 못했습니다';
+      $('dwMeta').textContent = e.message || '';
+    });
+  }
+  function closeDrawer() {
+    S.drawerOpen = false;
+    S.selCode = null;
+    S.detail = null;
+    clearTimeout(S.armTimer);
+    S.armTimer = null;
+    S.matchArmed = false;
+    $('spDrawer').hidden = true;
+    renderQueue();
+  }
+
+  function renderDrawer() {
+    var d = S.detail;
+    if (!d) return;
+    $('dwBadge').className = 'sp-badge ' + (BADGE_CLS[d.kind] || 'sp-badge-unknown');
+    $('dwBadge').textContent = d.kind_label;
+    $('dwTitle').textContent = d.name;
+    var metaBits = [
+      '<b>상품번호</b> ' + d.product_code,
+      '<b>부품 종류</b> ' + esc(d.cat),
+      '<b>잠금</b> ' + (d.locked ? '잠김' : '해제'),
+      '<b>데이터 출처</b> ' + esc(d.data_origin_label),
+    ];
+    $('dwMeta').innerHTML = metaBits.join(' &nbsp;·&nbsp; ');
+
+    $('dwOurPrice').textContent = won(d.sale_price) || '값 없음';
+    $('dwOurPrice').className = 'v' + (d.sale_price === null ? ' empty' : '');
+    var histAt = d.history && d.history.length ? d.history[0].at : null;
+    $('dwOurUpdated').textContent = histAt ? ('마지막 갱신 ' + fmtDate(histAt)) : '가격 변경 이력 없음';
+
+    if (d.mall.known) {
+      $('dwMallPrice').textContent = won(d.mall.price);
+      $('dwMallPrice').className = 'v';
+      $('dwMallObserved').textContent = '인계 ' + (d.mall.handoff_no || '—') + ' 시점 · ' + (fmtDT(d.mall.observed_at) || '—');
+    } else {
+      $('dwMallPrice').textContent = (d.kind === 'unknown') ? '확인 못함' : '미확인';
+      $('dwMallPrice').className = 'v empty';
+      $('dwMallObserved').textContent = (d.kind === 'unknown')
+        ? ('인계 ' + (d.mall.handoff_no || '—') + ' 시점에 확인 실패')
+        : '몰 값을 확인한 적이 없습니다';
+    }
+
+    // 잠금 여부와 무관하게 매 로드마다 「무장」 상태를 새로 시작한다 — 이전 상품에서
+    // 팔이 세워진 채로 남아, 다른 상품에서 한 번만 눌러도 잠금이 풀리면 안 된다.
+    S.matchArmed = false;
+    clearTimeout(S.armTimer);
+    S.armTimer = null;
+
+    var canWrite = window.Admin2Shell && window.Admin2Shell.canWrite('operator');
+    var lockBtn = $('dwLockBtn');
+    if (!canWrite) {
+      lockBtn.disabled = true; lockBtn.title = '운영자 권한이 필요합니다';
+    } else {
+      lockBtn.disabled = !!d.locked; lockBtn.title = d.locked ? '이미 잠긴 값입니다' : '';
+    }
+    $('dwLockTxt').innerHTML = '지금 값 유지 — 소싱한 값이라 잠급니다 &nbsp;<b>' + esc(won(d.sale_price) || '값 없음') + '</b>에서';
+    $('dwLockedTotal').textContent = d.locked_note;
+
+    renderMatchButton(d);
+
+    $('dwHistList').innerHTML = (d.history && d.history.length)
+      ? d.history.map(function (h) {
+          var chg = (h.old === null) ? '' : (won(h.old) + ' → ');
+          return '<div class="sp-hist-row">' +
+            '<span class="at">' + esc(fmtDT(h.at) || '') + '</span>' +
+            '<span class="rs">' + esc(h.reason_label) + '</span>' +
+            '<span class="chg">' + esc(chg) + esc(won(h.new) || '—') + '</span></div>';
+        }).join('')
+      : '<div class="sp-hist-empty">가격 변경 이력이 없습니다.</div>';
+  }
+
+  // 맞추기 버튼 — 서버는 잠긴 상품을 맞추면 잠금도 함께 해제한다(api/admin_ui_sale_price.py
+  // match_to_mall — "기본=몰 가격 그대로" 철학상 타당한 동작, 여기서 바꾸지 않는다). 다만
+  // **누르기 전에 그 사실을 몰랐다** — 화면이 미리 말하게 한다(확인자 지적, 2026-08-15).
+  // ① 문구·버튼 라벨이 잠금 해제를 항상 밝히고 ② 잠긴 상품은 한 번 더 눌러야 실행된다.
+  // ⚠ 사후 고지(toast)에 기대지 않는다 — ui-progress.js는 지금 다른 제작자가 고치는 중이라
+  // 그 파일의 동작에 안전 고지를 의존시키면 안 된다. 아래는 전부 이 파일 안에서 끝난다.
+  function renderMatchButton(d) {
+    var canWrite = window.Admin2Shell && window.Admin2Shell.canWrite('operator');
+    var btn = $('dwMatchBtn'), warn = $('dwMatchWarn');
+    var willUnlock = !!(d.locked && d.mall.known);
+
+    warn.hidden = !willUnlock;
+    if (willUnlock) {
+      warn.textContent = '이 상품은 직접 소싱해 잠근 예외입니다 — 맞추면 잠금이 함께 풀리고,'
+        + ' 이후 자동 경로(단가표 반영·매입 확정·대량 재산정)가 이 값을 다시 건드릴 수 있습니다.';
+    }
+    $('dwMatchTxt').innerHTML = d.mall.known
+      ? ('몰 값으로 맞춤 &nbsp;<b>' + esc(won(d.sale_price) || '값 없음') + '</b> → <b>' + esc(won(d.mall.price)) + '</b>'
+         + (willUnlock ? ' &nbsp;<b>· 누르면 잠금 해제</b>' : ''))
+      : '몰 값으로 맞춤 — 확인된 몰 값이 없어 지금은 할 수 없습니다';
+
+    if (!canWrite) {
+      btn.disabled = true; btn.title = '운영자 권한이 필요합니다';
+      btn.textContent = '맞추기'; btn.className = 'sp-btn sp-btn-primary';
+    } else if (!d.mall.known) {
+      btn.disabled = true; btn.title = '몰 값을 확인한 적이 없어 맞출 수 없습니다';
+      btn.textContent = '맞추기'; btn.className = 'sp-btn sp-btn-primary';
+    } else if (S.matchArmed) {
+      btn.disabled = false; btn.title = '';
+      btn.textContent = '다시 누르면 잠금 해제 후 맞춥니다';
+      btn.className = 'sp-btn sp-btn-warn';
+    } else {
+      btn.disabled = false;
+      btn.title = willUnlock ? '이 상품은 잠겨 있습니다 — 누르면 잠금이 함께 해제됩니다' : '';
+      btn.textContent = willUnlock ? '맞추기(잠금 해제)' : '맞추기';
+      btn.className = 'sp-btn sp-btn-primary';
+    }
+  }
+  function armMatch() {
+    S.matchArmed = true;
+    if (S.detail) renderMatchButton(S.detail);
+    clearTimeout(S.armTimer);
+    S.armTimer = setTimeout(disarmMatch, 4000);   // 누르고 방치하면 원상태로 되돌린다
+  }
+  function disarmMatch() {
+    clearTimeout(S.armTimer);
+    S.armTimer = null;
+    if (!S.matchArmed) return;
+    S.matchArmed = false;
+    if (S.detail) renderMatchButton(S.detail);
+  }
+
+  function afterWrite() {
+    var code = S.selCode;
+    load();  // 큐 전체를 다시 계산해야 정확하다(잠금·값이 바뀌면 분류가 바뀐다)
+    if (code) {
+      // summary가 다시 오면 그 카드가 큐에서 빠졌을 수 있다 — 서랍은 상세만 새로 읽는다
+      apiGet('/api/admin/sale-price/' + code).then(function (d) {
+        if (S.selCode !== code) return;
+        S.detail = d;
+        renderDrawer();
+      }).catch(function () { /* 큐에서 사라졌으면(정상 전환) 서랍은 마지막 값을 유지한다 */ });
+    }
+  }
+
+  function doMatch() {
+    if (S.busy || !S.detail) return;
+    S.busy = true;
+    // 서랍이 읽었던 몰 값을 함께 보낸다 — 그 사이 값이 바뀌었으면 서버가 409로 막는다
+    // (동시성 가드. api/admin_ui_sale_price.py match_to_mall 참조).
+    apiPost('/api/admin/sale-price/' + S.detail.product_code + '/match',
+            { mall_price: S.detail.mall.price })
+      .then(function () { S.busy = false; afterWrite(); })
+      .catch(function () { S.busy = false; });
+  }
+  function doLock() {
+    if (S.busy || !S.detail) return;
+    S.busy = true;
+    apiPost('/api/admin/sale-price/' + S.detail.product_code + '/lock')
+      .then(function () { S.busy = false; afterWrite(); })
+      .catch(function () { S.busy = false; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var retry = e.target.closest('[data-action="retry"]');
+    if (retry) { load(); return; }
+    var open = e.target.closest('[data-action="open-card"]');
+    if (open) { openDrawer(Number(open.getAttribute('data-code'))); return; }
+    var close = e.target.closest('[data-action="close-drawer"]');
+    if (close) { closeDrawer(); return; }
+    var match = e.target.closest('[data-action="match"]');
+    if (match && !match.disabled) {
+      var willUnlock = !!(S.detail && S.detail.locked && S.detail.mall.known);
+      if (willUnlock && !S.matchArmed) { armMatch(); } else { disarmMatch(); doMatch(); }
+      return;
+    }
+    var lock = e.target.closest('[data-action="lock"]');
+    if (lock && !lock.disabled) { doLock(); return; }
+    var axis = e.target.closest('[data-action="axis"]');
+    if (axis) {
+      // 매입가 축은 `disabled` 라 클릭이 애초에 여기 안 들어온다 — 지금은 판매가만 실제
+      // 축이라 전환할 데이터가 없다. 나중에 매입가 축을 열 때는 여기서 summary를
+      // field=purchase로 다시 부르고 .sp-toggle-btn 의 on 클래스를 바꿔야 한다(지금은
+      // 죽은 위임이 되지 않게 최소한 잠긴 축을 눌러도 조용히 무시되게만 막아 둔다).
+      if (!axis.disabled) {
+        document.querySelectorAll('.sp-toggle-btn').forEach(function (b) { b.classList.remove('on'); });
+        axis.classList.add('on');
+      }
+      return;
+    }
+    if (S.drawerOpen && !e.target.closest('[data-keep]')) closeDrawer();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.drawerOpen) closeDrawer();
+  });
+
+  load();
+})();
+</script>
+{% endblock %}
