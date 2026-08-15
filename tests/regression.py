@@ -1550,8 +1550,24 @@ def test_taxonomy_single_source():
             # 422 의 `detail` 배열을 못 읽어 "오류 422" 만 뜨던 것과 같은 병이다.
             _up = pathlib.Path(ROOT, "mockups", "shared", "ui-progress.js").read_text(encoding="utf-8")
             # ① 응답 본문의 **맨 위**도 본다 — `{"error": ...}` 로 오는 것들이 있다.
-            check("오류 문구가 본문 맨 위(error/message)도 읽는다",
-                  "j.error || j.message" in _up, True, "j.error || j.message" in _up)
+            # 2026-08-15: 이 검사가 문자열 리터럴 "j.error || j.message"(고정 순서) 하나만
+            # 찾고 있었다. 같은 날 다른 제작자가 사람이 읽는 우선순위를 바로잡으며(message/
+            # note 문장이 있는데도 error 코드가 뜨던 병 — 위 docstring §142행대 참조)
+            # 순서를 `j.message || j.note || j.error`로 고쳤다. **동작은 그대로인데(셋 다
+            # 여전히 읽는다) 검사만 형태(문자열 순서)로 실패했다** — 이 저장소의 알려진
+            # 병(작업 #44 "회귀가 «이름/형태»로 «동작»을 추정한다", #43과 같은 부류).
+            # 그래서 순서에 매이지 않고, "본문 맨 위" 폴백을 만드는 실제 문장
+            # (`var top = j && ...;`)을 정규식으로 찾아 **그 문장이 error·message·note
+            # 세 키를 전부 읽는지**(집합 비교 — 순서 무관)를 본다. `d.*`(중첩 detail
+            # 객체용 별도 변수 `inner`, 131행대)는 다른 문장이라 `j.` 접두를 요구하는 이
+            # 정규식에 안 걸린다 — 섞이면 안 되는 다른 폴백 경로라 의도적으로 배제했다.
+            _top_m = _re8.search(r"var\s+top\s*=\s*[^;]*;", _up)
+            _top_src = _top_m.group(0) if _top_m else ""
+            _top_keys = set(_re8.findall(r"\bj\.(message|note|error)\b", _top_src))
+            check("오류 문구가 본문 맨 위에서 error·message·note 를 전부 읽는다(순서 무관)",
+                  _top_keys == {"message", "note", "error"},
+                  {"message", "note", "error"},
+                  _top_keys if _top_src else "'var top = j && ...;' 문장을 못 찾음(변수명이 바뀌었을 수 있다)")
             # ② 읽을 문장이 없으면 **무엇이 실패했는지라도** 말한다. 상태 코드만 띄우면
             #    운영자도 개발자도 추측만 하게 된다.
             check("읽을 문장이 없으면 실패한 요청을 밝힌다",
@@ -2873,7 +2889,30 @@ def test_screen_assets():
                + sorted(_g7.glob(os.path.join(ROOT, "templates", "**", "*.j2"), recursive=True))):
         _s = io.open(_p, encoding="utf-8").read()
         # 화면이 정의하는 커스텀 속성 중 정본에 있는 이름을 다시 정의하는가
-        _defs = set(_re7.findall(r"(--[a-z-]+)\s*:\s*[^;]+;", _s)) & _canon
+        #
+        # 2026-08-15 (작업 #43 — 회귀 자기 검토): `part_grade.html.j2` 가
+        # `--primary` 를 재정의한다고 잡혔는데 **실측해 보니 거짓 경보(㉮)였다.**
+        # 원인은 `[^;]+` 가 CSS 문법을 모르고 텍스트만 본다는 것 — 이 파일엔
+        # `.pg-mini--primary:disabled{color:#f0ece2;...}` 처럼 BEM 수식자
+        # (`--primary`) 뒤에 가상클래스 `:disabled{` 가 바로 붙는 선택자가 있고,
+        # 예전 정규식은 `--primary:disabled{color:#f0ece2` 를 "값" 으로 삼켜
+        # 그 뒤의 세미콜론까지 진짜 커스텀 속성 선언(`--primary: 값;`)으로
+        # 오인했다. 파일에는 `:root` 블록도, `--primary` 를 실제 속성으로 쓰는
+        # 곳도 없다(확인: grep으로 `:root` 0건).
+        #
+        # 고친 것: 값 부분에서 `{`·`}` 를 금지했다(`[^;{}]+`) — 진짜 속성값은
+        # 중괄호를 포함하지 않고, `X--이름:가상클래스{...}` 형태의 선택자만
+        # 중괄호를 포함하므로 이 한 글자 차이로 구분된다.
+        #
+        # 검증(반대 방향 포함, 4가지):
+        #   · part_grade.html.j2 그대로              -> 이제 매치 없음 (거짓 경보 해소)
+        #   · `.card--card:hover{color:red;}` (같은 부류 변형) -> 매치 없음
+        #   · `:root{--card:#fff;}` (2026-08-12 dash·build_map 실제 사고 재현) -> 여전히 매치
+        #   · `:root{ --font-num : "Courier New", monospace ; }` (2026-08-05 실제 사고 재현) -> 여전히 매치
+        # 즉 **옛 결함(값에 중괄호가 없는 진짜 재정의)은 그대로 잡고, 이번
+        # 거짓 경보(값에 중괄호가 낀 선택자 오인식)만 없앴다** — 검사를 약하게
+        # 만든 것이 아니라 오탐 원인 한 가지를 좁혀 없앤 것이다.
+        _defs = set(_re7.findall(r"(--[a-z-]+)\s*:\s*[^;{}]+;", _s)) & _canon
         if _defs:
             _copies.append(os.path.basename(_p) + ":" + ",".join(sorted(_defs)[:3]))
     check("화면이 디자인 토큰을 다시 정의하지 않는다", _copies == [], [], _copies[:4])
@@ -3298,10 +3337,44 @@ def test_stock_ledger():
         check("기초 재고는 입고를 주장하지 않는다", bad_open == 0, 0, bad_open)
     # 적재가 원장을 남기는 코드가 살아 있는가 — 지워지면 다시 7,547건이 쌓인다
     try:
+        import re as _re16
         ci = io.open(os.path.join(ROOT, "api", "catalog_ingest.py"), encoding="utf-8").read()
         check("적재가 재고 델타를 원장에 남긴다",
               "stock_movements" in ci and "'catalog'" in ci, "있음", "없음")
-        check("적재는 절대값이 아니라 델타를 남긴다", "stock_before" in ci, "델타", "절대값")
+        # 2026-08-15 (작업 #44 — 회귀가 «이름»으로 «동작»을 추정하는지 재검토):
+        # 예전엔 `"stock_before" in ci` — 파일 어딘가에 이 **이름**이 있는지만
+        # 봤다(바로 위 §왕복 절 주석이 스스로 "회귀 [26]이 이 리터럴이 있는지로
+        # 판정한다"고 적어 둔 그 검사 — 자백이 있었다).
+        #
+        # 무엇을 놓치는지 실측(반대 방향 검증, 3가지 — 아래는 스크립트로 재현):
+        #   · 현재 코드(`"q": a - b`, a=신규 b=이전)         -> 옛 검사 PASS, 새 검사 PASS
+        #   · 절대값으로 되돌아간 옛 결함(`"q": a`)            -> 옛 검사 **PASS(오탐!)**, 새 검사 FAIL
+        #   · 뺄셈 순서가 뒤집힌 부호 버그(`"q": b - a`)       -> 옛 검사 **PASS(오탐!)**, 새 검사 FAIL
+        # `stock_before` 라는 글자는 델타 계산이 사라지거나 부호가 뒤집혀도
+        # `if a == b:` 비교 등 다른 자리에 계속 남는다 — 옛 검사는 그 두 사고를
+        # **하나도 못 잡는다.** 슬라이스 98이 겪은 사고(원장에 절대값이 쌓여
+        # `SUM(qty_delta)`가 실제 재고와 어긋나는 것)가 재발해도 이 파일 안에서는
+        # 이 검사가 유일한 방어선이다 — 회귀는 apply를 실행하지 않으므로([11]
+        # 참조, 정본 오염 방지) 실제 DB 왕복으로는 못 잡고, 사고가 real apply로
+        # 이미 벌어진 뒤 "재고 = 원장 합"(위 §3290행대)으로만 사후 발견된다.
+        #
+        # 고친 것: ① `stock_before.get(...)` 결과를 받는 변수를 실제로 찾고,
+        # ② `stock_movements` INSERT의 `:q`(= qty_delta) 자리 식이 **그 변수를
+        # 정확히 빼는 항으로 삼는 뺄셈**(신규값 - 이전값 순서)인지 함께 본다.
+        # 전후 값의 변수명이 바뀌어도(리팩터링) 구조가 같으면 계속 통과한다.
+        # 한계(고의로 남김): `delta = a - b`처럼 뺄셈을 중간 변수에 먼저 담고
+        # `"q": delta`로 참조하면 이 검사는 못 찾는다 — 그런 리팩터링을 하면
+        # FAIL로 드러나므로(조용히 통과하는 것보다 낫다) 그때 이 정규식을 같이 고친다.
+        _before_m = _re16.search(r"([A-Za-z_]\w*)\s*=\s*stock_before\.get\(", ci)
+        _q_m = _re16.search(
+            r'"q"\s*:\s*\(?\s*([A-Za-z_]\w*)\s*-\s*([A-Za-z_]\w*)\s*\)?\s*,', ci)
+        _delta_ok = (bool(_before_m) and bool(_q_m)
+                     and _q_m.group(1) != _q_m.group(2)
+                     and _q_m.group(2) == _before_m.group(1))
+        check("적재는 절대값이 아니라 델타를 남긴다(뺄셈식 실측 — 신규값-이전값 순서)",
+              _delta_ok, "이전재고 변수를 신규값에서 빼는 식",
+              {"이전재고 변수": _before_m.group(1) if _before_m else None,
+               "q 식": (_q_m.group(0).rstrip(", ") if _q_m else None)})
     except OSError as e:                                 # noqa: BLE001
         print(f"  [SKIP] (I) 적재 원장 계약 - {e}")
 
