@@ -22,7 +22,10 @@ from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
-VIA_KO = {"email": "이메일", "kakao": "카카오", "naver": "네이버"}
+# ⚠ 2026-08-15 점검자 실측(members 전수 SELECT joined_via, count(*)) — "google"이
+# 빠져 있었다(회원 1명이 영문 "google" 그대로 노출). 전수 조회로 다른 값(email·kakao·
+# naver)엔 누락이 없음을 함께 확인했다.
+VIA_KO = {"email": "이메일", "kakao": "카카오", "naver": "네이버", "google": "구글"}
 
 
 def _note(r) -> str:
@@ -78,7 +81,12 @@ def list_members():
             "last": iso(last) if last else None,
             "note": _note(r),
         })
-    return {"items": items, "member_mode": mode}
+    # 2026-08-15 추가 — VIA_KO에 없어 원문이 그대로 노출되는 joined_via. 기존 필드는
+    # 그대로 두고 **추가만** 한다 — 새 가입 경로(예: 애플 로그인)가 조용히 영문으로
+    # 새는 것을 다음에는 이 필드로 알아챈다("google" 1건이 3주 넘게 몰랐던 것과 같은
+    # 재발 방지).
+    unmapped_via = sorted({r["joined_via"] for r in rows if r["joined_via"] not in VIA_KO})
+    return {"items": items, "member_mode": mode, "unmapped_via": unmapped_via}
 
 
 @router.post("/members/{member_id}/map-request")
