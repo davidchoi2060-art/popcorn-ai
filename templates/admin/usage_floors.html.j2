@@ -1,0 +1,642 @@
+{#
+  용도별 최소 사양 (ADM-ENG-040) — 2026-08-14 신설
+
+  ■ 계약 — `docs/design/spec-usage-floors.md`(요약본, DesignSync가 서브에이전트에서
+    막혀 원문 대신 하네스가 옮긴 계약)와 `docs/design/req/req-usage-floors.md`(정의서).
+    원문은 Claude Design 프로젝트 22248237-152f-4f13-8201-54afca75ebe4의
+    `용도별 최소 사양.dc.html`(2안 캔버스)이고 그것이 아카이브다 — 여기 옮기지 않는다.
+
+  ■ 화면 ID — 040이다(030이 아니다). `api/admin_usage_floors.py`의 모듈 docstring이
+    자신을 "ADM-ENG-030"이라 적었는데, 030은 이미 "추천 가능 재고 현황"의 ID다
+    (복사 오기, req 문서 "실측 메모" 참조). 이 화면은 마크업 계약(`data-screen-id`)을
+    따라 040을 쓴다 — 셸이 라우트(`api/admin_ui_usage_floors.py`)가 넘긴 값을 그린다.
+
+  ■ 배치 — **1a(행 내 미리보기) 기준, 2026-08-14 사장님 재확정.**
+    처음엔 "두 화면을 다 참고"로 배치가 제작자에게 열려 있어 우측 시뮬레이터 패널(1b)로
+    지었는데, 곧바로 "1a 안으로 가되 다른 화면도 참조"로 배치가 정해져 **패널을 걷어내고
+    행 내 펼침으로 옮겼다.** "바꾸기"를 누르면 표의 그 행 바로 아래에 편집·미리보기
+    영역이 펼쳐진다(한 번에 하나만 — 다른 행을 열면 이전 행은 닫힌다).
+
+    1a 자신의 것: 툴바 "+ 용도 만들기 — 향후 사용예정" 잠금 · 그룹 헤더 "문구 편집 —
+    향후 사용예정" 잠금 · 표 하단 고지(우선순위·빈 하한·GPU 없는 용도).
+
+    1b에서 **반드시 가져와 행 내 펼침에 넣은 것 셋** (사장님 지시, 배치가 1a로 바뀌어도
+    이 셋은 빠지면 안 된다):
+      ① 후보 0 위험 경고 — 1a 원안은 "0이 되지 않는" 안전한 경우만 그렸다. 0이 되는
+         경우의 붉은 경고 + "위험을 알고 저장" 버튼은 `previewSentence()`가 `pass_after
+         === 0`일 때 분기해 그린다(아래 `.uf-exp-preview-box.risky`).
+      ② "활성 · 비활성" 토글 — 행 펼침 안의 체크박스, 끄면 판정에서 빠지고 값은 남는다.
+      ③ "이 화면이 지키는 것" 5줄 — 패널이 없어졌으므로 표 위에 **항상 보이는 고정
+         박스**로 옮겼다(계약이 이 항목엔 "행 내에" 넣으라는 지시가 따로 없었다 —
+         ①과 달리 위치가 정해지지 않아 상시 노출을 택했다. 매번 행을 펼쳐야만 보이면
+         "지키는 것"이 오히려 안 보이는 게 되기 때문).
+    1b의 하단 API 고지(400/404/후보 0/빈 하한)는 표 전체 고지(1a 하단)와 성격이 달라
+    합치지 않고, **행 펼침의 저장 버튼 근처**로 옮겼다 — 그 문구가 설명하는 것이
+    정확히 그 버튼을 눌렀을 때 벌어지는 일이기 때문이다.
+
+  ■ 위험 문구는 항상 넣는다 — 미리보기 결과가 "후보 0"이면 계약 §반드시 들어갈
+    문구의 문장을 **그대로** 쓴다(사무용 RAM 하한 전례). "후보가 줄지만 0은 아닌"
+    경우의 문장은 계약이 준 예시(61→18)의 **표현 패턴만** 따르고 숫자는 서버가 그때
+    돌려준 `pass_before`/`pass_after`로 채운다 — 61·18은 원안의 시연값이라 코드에
+    박지 않는다(§0 "디자인 안의 수치는 스냅샷 예시" 경고와 화면 정직성 규약). 후보가
+    "늘어나는" 방향(하한 완화)과 "그대로"인 경우는 계약에 예시가 없어 같은 원칙
+    (실측·정직)으로 대칭 문구를 만들었다 — 검증 대상.
+
+  ■ 데이터 — 기존 API를 그대로 쓴다(이 화면의 담당 파일이 아니다, 고치지 않았다):
+      GET  /api/admin/usage-floors            열람 viewer 이상. 표 6열에 필요한 값을
+                                               전부 준다: usage_label·match_terms(그룹) /
+                                               slot_label·field_label·unit·value·active /
+                                               pass_count·slot_total(항목).
+      POST /api/admin/usage-floors/{floor_id}  owner 전용(`OWNER_WRITE_PREFIXES`).
+                                               `preview:true`면 저장 없이 impact만 계산.
+    두 엔드포인트 다 모자란 것 없이 계약의 표를 그릴 수 있었다(제작 보고서에 기록).
+
+  ■ 미리보기→확인→저장 강제 — 서버는 `preview` 바디 필드로만 나뉘어 있어, 화면이
+    막지 않으면 미리보기 없이 바로 저장 요청을 보낼 *수는* 있는 API다. 그래서 이
+    화면은 클라이언트에서 `S.exp.previewedFor`(마지막으로 미리본 값·활성 조합)가
+    지금 입력값과 **정확히 같을 때만** 저장 버튼을 활성화한다 — 값·활성을 조금이라도
+    고치면 즉시 무효화되고 다시 미리봐야 한다(`invalidatePreviewLight`).
+
+  ■ 입력 포커스 보존 — 값 입력칸에 타이핑하는 동안은 표를 통째로 다시 그리지 않는다
+    (다시 그리면 `<input>`이 새 DOM 노드로 바뀌어 커서가 끊긴다). "미리보기"·"저장"·
+    행 펼침/닫힘처럼 **클릭으로 일어나는 전이**에서만 표 전체를 다시 그린다.
+
+  ■ 해소(2026-08-15, ㉯ 확정) — 이전엔 `/shared/ui-progress.js`(전 화면 공용)가 모든
+    비-GET 요청에 상단 진행 바를 씌워, 미리보기 POST도 저장 POST와 같은 경로라
+    "저장하는 중…" → "완료되었습니다"로 떴다 — 미리보기인데 저장한 것처럼 보였다
+    (반복되면 알람 피로로 진짜 저장 때도 무시하거나, 거꾸로 미리보기만 하고 실제
+    저장을 빼먹는 두 방향 위험). 지금은 `ui-progress.js`가 요청 본문의 `preview:true`
+    를 스스로 읽어 미리보기 요청을 배너 대상에서 제외한다 — 이 화면이 알려주는 게
+    아니다(URL만으로는 저장과 못 가르므로 그 파일이 본문을 직접 읽는다). 배너가 빠진
+    자리는 이 화면이 자기 영역에서 채운다: "미리보기"·저장 버튼을 클릭 즉시(응답을
+    기다리지 않고) 비활성하고 `.uf-exp-busy` 인라인 표시("미리보기 중…"/"저장하는
+    중…")를 낸다(아래 doPreview·doSave, expansionHtml). 저장 요청은 배너가 그대로
+    뜬다(`preview:false`는 제외 대상이 아니다) — 인라인 표시는 저장에도 같이 걸지만
+    배너를 대신하지는 않는다.
+
+  ■ 표 정렬 — `.uf-thead`/`.uf-row`가 같은 `grid-template-columns`(minmax 최소폭)를
+    쓴다. 헤더·본문 둘 다 `scrollbar-gutter:stable`로 세로 스크롤바 유무와 무관하게
+    같은 거터를 갖는다(연달아 두 화면이 지적받은 문제의 재발 방지). 행 펼침(`.uf-exp`)은
+    그리드 셀이 아니라 `.uf-row` 뒤에 붙는 별도의 전폭 블록이다 — `.uf-tbody`는 grid가
+    아니라 행들이 세로로 쌓이는 보통 블록 흐름이라 열 정렬에 영향을 주지 않는다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}용도별 최소 사양{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+
+.uf-page{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── 상단 안내 배너(GPU 성능 지표 없음) ───────────────────────────── */
+.uf-banner{flex:none;margin:16px 18px 0;border:1px solid rgba(0,0,0,.14);border-left:3px solid var(--rv-ink);
+    background:var(--rv-panel2);border-radius:8px;padding:12px 15px}
+.uf-banner-t{font:600 12px/1.4 var(--rv-font);margin-bottom:4px;color:var(--rv-ink)}
+.uf-banner-d{font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.uf-banner-d strong{font-weight:700;color:var(--rv-ink)}
+
+/* ── 툴바 · 잠긴 기능 안내 ─────────────────────────────────────────── */
+.uf-toolbar{flex:none;display:flex;align-items:center;gap:10px;padding:14px 18px 0}
+.uf-count{font:500 12px/1 var(--rv-font);color:var(--rv-muted)}
+.uf-grow{flex:1}
+.uf-lockbtn{display:flex;align-items:center;gap:7px;font:600 11.5px/1 var(--rv-font);color:var(--rv-dim2);
+    background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:6px;padding:8px 12px;cursor:not-allowed}
+.uf-tag{font:500 9px/1 var(--rv-mono);padding:2px 5px;border-radius:3px;background:rgba(0,0,0,.06);color:var(--rv-faint)}
+.uf-locked-note{flex:none;margin:8px 18px 0;border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+    border-radius:7px;padding:9px 12px;font:400 11px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.uf-locked-note b{font-weight:700;color:var(--rv-ink)}
+
+/* ── "이 화면이 지키는 것" 5줄 — 패널이 없어져 표 위 고정 박스로(항상 노출) ── */
+.uf-guard{flex:none;margin:10px 18px 0;border:1px solid rgba(0,0,0,.12);background:var(--rv-card);
+    border-radius:8px;padding:12px 14px}
+.uf-guard-t{font:600 11px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.03em;margin-bottom:8px}
+.uf-guard-list{margin:0;padding-left:18px;display:grid;grid-template-columns:1fr 1fr;column-gap:22px;row-gap:6px}
+.uf-guard-list li{font:400 10.8px/1.5 var(--rv-font);color:var(--rv-ink-soft)}
+
+/* ── 표 ────────────────────────────────────────────────────────────
+   헤더·본문이 같은 grid-template-columns를 쓴다. scrollbar-gutter로
+   세로 스크롤바 유무와 무관하게 두 컨테이너의 거터를 맞춘다. ── */
+.uf-tablecol{flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 18px 16px;min-height:0}
+.uf-thead{flex:none;display:grid;
+    grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 92px;
+    gap:10px;align-items:center;padding:8px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
+    border-bottom:none;border-radius:8px 8px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);
+    overflow-y:hidden;scrollbar-gutter:stable}
+.uf-tbody{flex:1;min-height:0;overflow-y:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
+    border-radius:0 0 8px 8px;scrollbar-gutter:stable}
+.uf-row{display:grid;
+    grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 92px;
+    gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.uf-row-group{background:var(--rv-panel2);border-top:1px solid rgba(0,0,0,.1)}
+.uf-row-group:first-child{border-top:none}
+.uf-row-item:hover{background:rgba(0,0,0,.02)}
+.uf-row-item.on{background:#f0ece1;box-shadow:inset 3px 0 0 var(--rv-ink)}
+.uf-usage-label{font:600 12.5px/1.3 var(--rv-font);color:var(--rv-ink)}
+.uf-usage-terms{font:400 10.5px/1.4 var(--rv-mono);color:var(--rv-muted);margin-top:2px}
+.uf-slot{font:500 12px/1.3 var(--rv-font);color:var(--rv-ink)}
+.uf-field{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-muted);margin-top:1px}
+.uf-value{font:700 13px/1 var(--rv-mono);color:var(--rv-ink)}
+.uf-unit{font:400 10.5px/1 var(--rv-font);color:var(--rv-muted);margin-left:3px}
+.uf-c4{font:500 11.5px/1.2 var(--rv-mono);color:var(--rv-ink-soft)}
+.uf-sep{color:var(--rv-dim3);margin:0 2px}
+.uf-rate-pct{font:600 12px/1 var(--rv-mono)}
+.uf-rate-track{height:4px;background:rgba(0,0,0,.08);border-radius:2px;overflow:hidden;margin-top:5px}
+.uf-rate-bar{display:block;height:100%}
+.uf-lockbtn-sm{font:500 10.5px/1 var(--rv-font);color:var(--rv-dim2);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.14);border-radius:5px;padding:6px 9px;cursor:not-allowed;display:flex;
+    align-items:center;gap:6px;white-space:nowrap}
+.uf-btn-change{font:600 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:7px 12px;cursor:pointer}
+.uf-btn-change.open{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink)}
+.uf-btn-change:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed;background:var(--rv-card)}
+
+.uf-loading{padding:40px;text-align:center;color:var(--rv-muted);font:400 12px/1.6 var(--rv-font)}
+.uf-errbox{padding:40px 20px;text-align:center}
+.uf-errbox .t{font:600 14px/1.4 var(--rv-font);color:var(--rv-ink);margin-bottom:6px}
+.uf-errbox .d{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);max-width:440px;margin:0 auto 10px}
+.uf-errbox a,.uf-errbox button{display:inline-block;padding:8px 16px;border-radius:6px;background:var(--rv-ink);
+    color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer;text-decoration:none}
+
+.uf-tablenote{flex:none;margin-top:10px;font:400 10.5px/1.7 var(--rv-font);color:var(--rv-faint)}
+
+/* ── 행 내 펼침(1a) — "바꾸기"를 누르면 그 행 바로 아래 붙는 전폭 블록.
+   `.uf-tbody`는 grid가 아니라 보통 블록 흐름이라 열 그리드에 영향을 주지 않는다. ── */
+.uf-exp{background:var(--rv-panel2);border-bottom:1px solid rgba(0,0,0,.08);padding:14px 16px 15px 34px}
+.uf-exp-inner{display:grid;grid-template-columns:200px 1fr;gap:26px}
+.uf-exp-col{display:flex;flex-direction:column;gap:8px;min-width:0}
+.uf-exp-label{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint)}
+.uf-exp-inrow{display:flex;align-items:center;gap:8px}
+.uf-exp-input{width:120px;font:600 14px/1 var(--rv-mono);color:var(--rv-ink);background:var(--rv-canvas);
+    border:1px solid rgba(0,0,0,.26);border-radius:6px;padding:9px 10px;outline:none}
+.uf-exp-unit{font:500 11px/1 var(--rv-font);color:var(--rv-muted)}
+.uf-exp-toggle{display:flex;align-items:center;gap:7px;font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);
+    cursor:pointer;margin-top:6px}
+.uf-exp-togglenote{font:400 10.3px/1.5 var(--rv-font);color:var(--rv-dim)}
+.uf-exp-result[hidden]{display:none}
+.uf-exp-preview-box{border:1px solid rgba(0,0,0,.14);background:var(--rv-card);border-radius:7px;
+    padding:10px 12px;margin-bottom:10px}
+.uf-exp-preview-box.risky{border:1.5px solid var(--rv-red);background:oklch(0.95 0.04 30 / .55)}
+.uf-exp-risk-mark{font:700 11px/1 var(--rv-font);color:var(--rv-red);margin-bottom:5px}
+.uf-exp-preview-text{font:400 11.8px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.uf-exp-err{border:1px solid var(--rv-red);background:oklch(0.95 0.04 30 / .4);border-radius:7px;padding:9px 10px;
+    font:400 11px/1.6 var(--rv-font);color:oklch(0.4 0.14 30);margin-bottom:10px}
+.uf-exp-saved{font:500 10.8px/1.5 var(--rv-font);color:oklch(0.4 0.1 165);background:oklch(0.95 0.04 165 / .5);
+    border:1px solid oklch(0.5 0.11 165 / .35);border-radius:6px;padding:7px 9px;margin-bottom:10px}
+.uf-exp-actions{display:flex;gap:8px}
+.uf-exp-btn-preview{font:600 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+    border:1px solid rgba(0,0,0,.26);border-radius:6px;padding:9px 14px;cursor:pointer}
+.uf-exp-btn-preview:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.12);cursor:not-allowed;background:var(--rv-card)}
+.uf-exp-btn-save{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+    border:none;border-radius:6px;padding:9px 14px;cursor:pointer}
+.uf-exp-btn-save.risky{background:var(--rv-red)}
+.uf-exp-btn-save:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
+/* 공용 진행 배너는 미리보기 요청(본문 preview:true)엔 뜨지 않는다(ui-progress.js가
+   스스로 제외 — ㉯ 확정 2026-08-15). 그래서 이 화면이 자기 자리에서 진행을 보여준다:
+   버튼 비활성 + 이 인라인 표시. 저장 요청은 배너가 그대로 뜨지만, 버튼 비활성·인라인
+   표시는 저장에도 같이 건다 — doPreview·doSave가 같은 busy 플래그를 공유하므로
+   자연스럽고, 배너가 뜨기 전 순간에 버튼이 다시 눌리는 것도 막는다. */
+.uf-exp-busy{display:inline-flex;align-items:center;gap:7px;font:500 11.5px/1 var(--rv-font);
+    color:var(--rv-muted);margin-left:2px}
+.uf-exp-busy-sp{width:12px;height:12px;border:2px solid rgba(0,0,0,.16);border-top-color:var(--rv-ink);
+    border-radius:50%;display:inline-block;animation:ufExpSpin .7s linear infinite}
+@keyframes ufExpSpin{to{transform:rotate(360deg)}}
+.uf-exp-savenote{font:400 10.3px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:10px}
+.uf-exp-apinote{font:400 10.2px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:7px;padding-top:8px;
+    border-top:1px solid rgba(0,0,0,.08)}
+
+@media (max-width:768px){
+  .uf-tablecol{padding:10px 12px 14px}
+  .uf-thead,.uf-row{
+    grid-template-columns:minmax(150px,1.1fr) minmax(110px,.9fr) 86px minmax(96px,110px) minmax(104px,.9fr) 76px;
+    padding:8px 10px}
+  .uf-thead{font-size:9.5px}
+  .uf-exp-inner{grid-template-columns:1fr}
+  .uf-guard-list{grid-template-columns:1fr}
+  /* 그룹 헤더 행 "문구 편집" 버튼 — 확인자 실측(768px): .uf-thead/.uf-tbody scrollWidth
+     747 > clientWidth 712(35px 넘침), 8개 그룹 헤더 행 전부 동일 — 이번 미리보기
+     배너 작업과 무관한 기존 결함(이 CSS는 그 작업에서 손대지 않았다). 항목 행
+     (.uf-btn-change — "바꾸기"/"닫기" 두세 글자)은 이 76px 열에 들어가지만, 이 버튼은
+     "문구 편집" + .uf-tag "향후 사용예정"이 white-space:nowrap이라 넘친다. 열 폭은
+     항목 행과 반드시 같아야 하므로(파일 상단 "표 정렬" 규약 — 헤더·항목·그룹이 같은
+     grid-template-columns) 열을 넓히지 않고 버튼 내용만 줄바꿈을 허용해 세로로
+     늘어나게 한다 — 이 버튼은 항상 disabled라 클릭 동작엔 영향 없다. */
+  .uf-lockbtn-sm{white-space:normal;flex-wrap:wrap;justify-content:center;text-align:center;
+      overflow-wrap:anywhere;gap:2px 6px;padding:5px 6px}
+  .uf-lockbtn-sm .uf-tag{white-space:normal;overflow-wrap:anywhere}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="uf-page" data-screen-id="ADM-ENG-040" data-domain="usage-floors">
+
+  <div class="uf-banner">
+    <div class="uf-banner-t">GPU는 성능 지표가 없습니다</div>
+    <div class="uf-banner-d">GPU는 성능 지표가 없습니다. 권장 전원(W)을 성능의 대리 지표로 씁니다 —
+      "고사양 게임 GPU 등급"이 아니라 <strong>"그래픽카드 550W 이상"</strong>처럼 숫자로 말합니다.
+      300W대 2.8만~19만원 · 550W대 29.7만~83만원 · 750W대 105만~256만원 가격대와 단조 대응하지만
+      완전한 성능 지표는 아닙니다.</div>
+  </div>
+
+  <div class="uf-toolbar" data-keep="1">
+    <span class="uf-count" id="ufCount">—</span>
+    <span class="uf-grow"></span>
+    <button type="button" class="uf-lockbtn" data-action="locked-note" disabled
+            title="향후 사용예정 — 아래 안내를 참고하세요">
+      + 용도 만들기<span class="uf-tag">향후 사용예정</span>
+    </button>
+  </div>
+  <div class="uf-locked-note">
+    <b>용도 신설 · 매칭 문구 편집 · 순서 변경 — 향후 사용예정.</b>
+    열기로 확정했지만 쓰기 API가 아직 없습니다. 순서를 바꾸면 어느 용도 문구가 이기는지
+    뒤바뀌므로, 붙일 때 그 경고를 함께 넣습니다.
+  </div>
+
+  <div class="uf-guard">
+    <div class="uf-guard-t">이 화면이 지키는 것</div>
+    <ol class="uf-guard-list">
+      <li>미리보기 없이 바로 저장하는 경로를 만들지 않습니다 — 값 하나가 견적을 통째로 막을 수 있습니다.</li>
+      <li>후보 0은 오류가 아니라 정상 응답 안의 강한 경고입니다 — 일반 안내와 같은 톤으로 흐리지 않습니다.</li>
+      <li>저장은 다음 견적부터 적용됩니다 — 이미 만든 견적(스냅샷)은 소급 변경되지 않습니다.</li>
+      <li>후보 카운터(S1)와 견적 엔진이 같은 표를 읽습니다 — 저장 직후 캐시를 비워 다음 견적에 반영합니다.</li>
+      <li>하한을 걸 수 있는 필드는 지금 2종(GPU 권장 전원 W · 용량 GB)뿐입니다 — CPU 등급 같은 축은 아직 없습니다.</li>
+    </ol>
+  </div>
+
+  <div class="uf-tablecol">
+    <div class="uf-thead">
+      <span>용도 · 매칭 문구</span><span>슬롯 · 필드</span><span>지금 하한</span>
+      <span>통과 · 전체</span><span>통과율</span><span>바꾸기</span>
+    </div>
+    <div class="uf-tbody" id="ufTbody">
+      <div class="uf-loading">불러오는 중…</div>
+    </div>
+    <div class="uf-tablenote">
+      용도 문구는 먼저 맞는 것 하나만 적용됩니다 — '고사양 게임'이 '게임'보다 앞에 있어야
+      이깁니다(순서를 바꾸면 어느 문구가 이기는지 조용히 뒤바뀝니다) · 하한이 비면 그 용도의
+      필터링이 통째로 사라집니다 · 디자인·개발·사무는 GPU 하한이 없습니다(그래픽 성능이
+      기준이 아닌 용도)
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  'use strict';
+
+  var S = {
+    groups: null, loadErr: null, me: null,
+    // 한 번에 하나의 행만 펼친다("바꾸기" 클릭 → 그 행 바로 아래에 편집·미리보기 영역).
+    // busyKind: 'preview'|'save'|null — 인라인 진행 문구를 무엇으로 낼지(아래 expansionHtml).
+    exp: { floorId: null, value: null, active: null,
+           previewedFor: null, preview: null, previewErr: null, busy: false, busyKind: null, savedNote: null }
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  // 못 잰 값(null/undefined)은 0이 아니라 "못 쟀음"이라고 말한다(숫자를 지어내지 않는다).
+  function fmt(n) { return (n === null || n === undefined) ? '못 쟀음' : Number(n).toLocaleString('ko-KR'); }
+
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+
+  function canOwnerWrite() { return window.Admin2Shell.canWrite('owner'); }
+
+  // ── 데이터 로드 ──────────────────────────────────────────────────
+  function loadFloors() {
+    $('ufTbody').innerHTML = '<div class="uf-loading">불러오는 중…</div>';
+    return apiGet('/api/admin/usage-floors').then(function (j) {
+      S.groups = j.groups || []; S.loadErr = null;
+      renderAll();
+    }).catch(function (err) {
+      S.groups = null; S.loadErr = err;
+      renderAll();
+    });
+  }
+
+  function findItem(floorId) {
+    if (!S.groups) return null;
+    var out = null;
+    S.groups.forEach(function (g) {
+      g.items.forEach(function (it) { if (it.floor_id === floorId) out = { item: it, group: g }; });
+    });
+    return out;
+  }
+
+  function renderAll() { renderToolbar(); renderTable(); }
+
+  function renderToolbar() {
+    if (!S.groups) { $('ufCount').textContent = '—'; return; }
+    var items = S.groups.reduce(function (a, g) { return a + g.items.length; }, 0);
+    $('ufCount').textContent = '용도 ' + S.groups.length + '종 · 하한 ' + items + '건';
+  }
+
+  // ── 표 ──────────────────────────────────────────────────────────
+  function rateColor(pct) {
+    if (pct === null) return '#8a8377';
+    if (pct < 25) return 'var(--rv-red)';
+    if (pct < 60) return 'var(--rv-amber)';
+    return 'var(--rv-green)';
+  }
+
+  function groupRowHtml(g) {
+    var terms = (g.match_terms || []).join(' · ');
+    return '<div class="uf-row uf-row-group">'
+      + '<div><div class="uf-usage-label">' + esc(g.usage_label) + '</div>'
+      +   '<div class="uf-usage-terms">' + esc(terms) + '</div></div>'
+      + '<div></div><div></div><div></div><div></div>'
+      + '<div><button type="button" class="uf-lockbtn-sm" data-action="locked-note" disabled '
+      +   'title="향후 사용예정 — 아래 안내를 참고하세요">문구 편집<span class="uf-tag">향후 사용예정</span></button></div>'
+      + '</div>';
+  }
+
+  // 계약이 준 문장 패턴을 쓰되 숫자는 서버가 그때 돌려준 값으로 채운다(61→18 같은
+  // 원안 시연값을 코드에 박지 않는다). 하한을 완화해 후보가 느는 방향·불변인 경우는
+  // 계약에 예시가 없어 같은 원칙(정직·실측)으로 대칭 문구를 만들었다 — 검증 대상.
+  function previewSentence(impact) {
+    if (impact.pass_after === 0) {
+      return '후보가 0이 되어 이 용도로는 견적을 만들 수 없습니다. 사무용 RAM 하한을 잘못 올려 '
+        + '최저가 메모리를 전부 걸러 견적이 불성립했던 전례가 있습니다 — 그때는 이 경고가 없었습니다.';
+    }
+    if (impact.pass_after < impact.pass_before) {
+      return '후보가 ' + fmt(impact.pass_before) + '개 → ' + fmt(impact.pass_after) + '개로 줄어듭니다. '
+        + '0이 되지는 않아 견적은 계속 만들어집니다. 다만 이 용도의 ' + esc(impact.slot)
+        + ' 선택폭이 크게 좁아져, 예산이 낮은 요청에서는 불성립이 늘 수 있습니다.';
+    }
+    if (impact.pass_after > impact.pass_before) {
+      return '후보가 ' + fmt(impact.pass_before) + '개 → ' + fmt(impact.pass_after) + '개로 늘어납니다. '
+        + '하한을 완화해 이 용도의 ' + esc(impact.slot) + ' 선택폭이 넓어집니다.';
+    }
+    return '변경해도 후보 수는 ' + fmt(impact.pass_after) + '개로 그대로입니다(전체 ' + fmt(impact.slot_total) + '개 중).';
+  }
+
+  // "바꾸기"를 누른 행 바로 아래 붙는 전폭 블록 — 그리드 셀이 아니라 `.uf-row` 뒤에
+  // 오는 별도 블록이다(위 CSS 주석 참조). 1b에서 가져온 셋(위험 경고·활성 토글·저장
+  // 2단계 강제)이 전부 여기 있다.
+  function expansionHtml(it) {
+    var busy = !!S.exp.busy;
+    var risky = !!(S.exp.preview && S.exp.preview.pass_after === 0);
+    var canSave = !busy && !!S.exp.preview && sameSig(S.exp.previewedFor, { value: S.exp.value, active: S.exp.active });
+    var saveLabel = risky ? '위험을 알고 저장' : '확인했습니다 — 저장';
+    // 공용 배너는 미리보기 요청엔 뜨지 않는다(ui-progress.js가 본문 preview:true로 스스로
+    // 제외 — ㉯ 확정). 그래서 여기서 자기 자리 진행 표시를 낸다. 저장 요청은 배너가
+    // 그대로 뜨지만, 버튼 비활성·인라인 표시는 저장에도 같이 건다(같은 busy 플래그를
+    // doPreview·doSave가 공유하므로 자연스럽다 — 중복 클릭에 버튼이 반응 없어 보이던
+    // 것을 없앤다).
+    var busyLabel = S.exp.busyKind === 'save' ? '저장하는 중…' : '미리보기 중…';
+
+    var html = '<div class="uf-exp" data-floor-id="' + it.floor_id + '"><div class="uf-exp-inner">';
+
+    html += '<div class="uf-exp-col">';
+    html += '<label class="uf-exp-label" for="expValueInput">새 하한 값' + (it.unit ? ' (' + esc(it.unit) + ')' : '') + '</label>';
+    html += '<div class="uf-exp-inrow"><input type="number" min="0" step="1" id="expValueInput" class="uf-exp-input" value="'
+          + (S.exp.value === null || S.exp.value === undefined ? '' : S.exp.value) + '">'
+          + '<span class="uf-exp-unit">' + esc(it.unit || '') + '</span></div>';
+    html += '<label class="uf-exp-toggle"><input type="checkbox" id="expActiveInput"'
+          + (S.exp.active ? ' checked' : '') + '> 활성</label>';
+    html += '<div class="uf-exp-togglenote">끄면 이 하한이 판정에서 빠집니다 — 값은 남습니다</div>';
+    html += '</div>';
+
+    html += '<div class="uf-exp-col">';
+    html += '<div id="expResult" class="uf-exp-result"' + ((S.exp.preview || S.exp.previewErr) ? '' : ' hidden') + '>';
+    if (S.exp.previewErr) {
+      html += '<div class="uf-exp-err">미리보기를 받지 못했습니다 — ' + esc(S.exp.previewErr) + '</div>';
+    } else if (S.exp.preview) {
+      html += '<div class="uf-exp-preview-box' + (risky ? ' risky' : '') + '">'
+            + (risky ? '<div class="uf-exp-risk-mark">▲ 강한 경고</div>' : '')
+            + '<div class="uf-exp-preview-text">' + esc(previewSentence(S.exp.preview)) + '</div></div>';
+    }
+    html += '</div>';
+    if (S.exp.savedNote) { html += '<div class="uf-exp-saved">' + esc(S.exp.savedNote) + '</div>'; }
+    html += '<div class="uf-exp-actions">';
+    html += '<button type="button" class="uf-exp-btn-preview" id="expPreviewBtn" data-action="do-preview"'
+          + (busy ? ' disabled title="요청을 처리하는 중입니다"' : '') + '>미리보기</button>';
+    html += '<button type="button" class="uf-exp-btn-save' + (risky ? ' risky' : '') + '" id="expSaveBtn" data-action="do-save"'
+          + (canSave ? '' : ' disabled title="' + (busy ? '요청을 처리하는 중입니다' : '먼저 미리보기를 실행해 지금 값으로 확인해야 합니다') + '"')
+          + '>' + esc(saveLabel) + '</button>';
+    if (busy) {
+      html += '<span class="uf-exp-busy" role="status" aria-live="polite"><span class="uf-exp-busy-sp"></span>' + esc(busyLabel) + '</span>';
+    }
+    html += '</div>';
+    html += '<div class="uf-exp-savenote">저장하면 다음 견적부터 적용됩니다 — 이미 만든 견적은 그대로입니다. '
+          + '미리보기 없이 바로 저장하는 경로는 없습니다.</div>';
+    html += '<div class="uf-exp-apinote">음수는 400으로 막힙니다 · 없는 하한은 404 · 후보 0은 오류가 아니라 강한 '
+          + '경고로 옵니다 · 하한이 비면 그 용도의 필터링이 통째로 사라집니다</div>';
+    html += '</div>';
+
+    html += '</div></div>';
+    return html;
+  }
+
+  function itemRowHtml(it) {
+    var total = (it.slot_total === null || it.slot_total === undefined) ? null : it.slot_total;
+    var pass = (it.pass_count === null || it.pass_count === undefined) ? null : it.pass_count;
+    var pct = (total === null || pass === null || total === 0) ? null
+      : Math.round((pass / total) * 1000) / 10;
+    var color = rateColor(pct);
+    var writeAllowed = canOwnerWrite();
+    var expanded = S.exp.floorId === it.floor_id;
+    var rateHtml = pct === null
+      ? '<span class="uf-rate-pct" style="color:#8a8377">못 쟀음</span>'
+      : ('<span class="uf-rate-pct" style="color:' + color + '">' + pct + '%</span>'
+         + '<div class="uf-rate-track"><span class="uf-rate-bar" style="width:'
+         + Math.max(pct, 2) + '%;background:' + color + '"></span></div>');
+    var row = '<div class="uf-row uf-row-item' + (expanded ? ' on' : '') + '" data-floor-id="' + it.floor_id + '">'
+      + '<div></div>'
+      + '<div><div class="uf-slot">' + esc(it.slot_label) + '</div>'
+      +   '<div class="uf-field">' + esc(it.field_label) + (it.active ? '' : ' · 비활성') + '</div></div>'
+      + '<div><span class="uf-value">' + fmt(it.value) + '</span><span class="uf-unit">' + esc(it.unit || '') + '</span></div>'
+      + '<div class="uf-c4">' + fmt(pass) + '<span class="uf-sep">/</span>' + fmt(total) + '</div>'
+      + '<div>' + rateHtml + '</div>'
+      + '<div><button type="button" class="uf-btn-change' + (expanded ? ' open' : '') + '" data-action="toggle-expand" '
+      +   'data-floor-id="' + it.floor_id + '"'
+      +   (writeAllowed ? '' : ' disabled title="관리자(owner)만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '바꾸기') + '</button></div>'
+      + '</div>';
+    if (expanded) row += expansionHtml(it);
+    return row;
+  }
+
+  function renderTable() {
+    var box = $('ufTbody');
+    if (S.loadErr) {
+      var un = S.loadErr.status === 401;
+      box.innerHTML = '<div class="uf-errbox"><div class="t">' + (un ? '세션 만료' : '조회 실패') + '</div>'
+        + '<div class="d">' + (un ? '관리자 로그인 후 다시 조회합니다.'
+            : ('용도별 최소 사양을 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>'
+        + (un ? '<a href="/admin/login.html">로그인</a>'
+              : '<button type="button" data-action="retry-load">다시 시도</button>') + '</div>';
+      return;
+    }
+    if (!S.groups) return;
+    if (!S.groups.length) {
+      box.innerHTML = '<div class="uf-errbox"><div class="t">규칙이 비어 있습니다</div>'
+        + '<div class="d">용도별 하한이 0건입니다 — 정상 상태가 아닙니다(부트스트랩이 21행을 심어야 '
+        + '합니다). 이 상태에서는 용도 필터링이 전부 빠진 채 견적이 나갑니다 — 마이그레이션 적용 '
+        + '여부를 확인해야 합니다.</div></div>';
+      return;
+    }
+    var html = '';
+    S.groups.forEach(function (g) {
+      html += groupRowHtml(g);
+      g.items.forEach(function (it) { html += itemRowHtml(it); });
+    });
+    box.innerHTML = html;
+  }
+
+  // ── 행 펼침 · 미리보기 · 저장 ────────────────────────────────────
+  function sameSig(a, b) { return !!a && !!b && a.value === b.value && a.active === b.active; }
+
+  function toggleExpand(floorId) {
+    if (S.exp.floorId === floorId) { closeExpand(); return; }
+    var found = findItem(floorId);
+    if (!found) return;
+    S.exp = { floorId: floorId, value: found.item.value, active: found.item.active,
+              previewedFor: null, preview: null, previewErr: null, busy: false, busyKind: null, savedNote: null };
+    renderTable();
+    var inp = $('expValueInput');
+    if (inp) inp.focus();
+  }
+
+  function closeExpand() {
+    S.exp = { floorId: null, value: null, active: null,
+              previewedFor: null, preview: null, previewErr: null, busy: false, busyKind: null, savedNote: null };
+    renderTable();
+  }
+
+  // 값·활성 토글만 바뀔 때는 입력 포커스를 지키려고 표를 통째로 다시 그리지 않고
+  // 미리보기 결과·저장 버튼만 갱신한다(다시 그리면 <input>이 새로 생겨 커서가 끊긴다).
+  function invalidatePreviewLight() {
+    S.exp.previewedFor = null; S.exp.preview = null; S.exp.previewErr = null; S.exp.savedNote = null;
+    var res = $('expResult');
+    if (res) { res.hidden = true; res.innerHTML = ''; }
+    var saved = document.querySelector('.uf-exp-saved');
+    if (saved) saved.remove();
+    var saveBtn = $('expSaveBtn');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.title = '먼저 미리보기를 실행해 지금 값으로 확인해야 합니다';
+      saveBtn.classList.remove('risky');
+      saveBtn.textContent = '확인했습니다 — 저장';
+    }
+  }
+
+  function doPreview() {
+    if (!canOwnerWrite() || S.exp.busy || !S.exp.floorId) return;
+    var v = S.exp.value;
+    if (v === null || v === undefined || !Number.isInteger(v) || v < 0) {
+      S.exp.preview = null; S.exp.previewErr = '정수 0 이상을 입력하세요(음수는 서버도 400으로 막습니다)';
+      renderTable();
+      return;
+    }
+    S.exp.busy = true; S.exp.busyKind = 'preview';
+    // 공용 배너가 미리보기엔 뜨지 않으므로(ui-progress.js 제외) 클릭 즉시 — 응답을
+    // 기다리지 않고 — 이 화면이 직접 버튼 비활성·인라인 "미리보기 중…"을 그린다.
+    renderTable();
+    apiPost('/api/admin/usage-floors/' + S.exp.floorId, { value: v, active: S.exp.active, preview: true })
+      .then(function (res) {
+        S.exp.busy = false; S.exp.busyKind = null;
+        S.exp.previewedFor = { value: v, active: S.exp.active };
+        S.exp.preview = res.impact; S.exp.previewErr = null;
+        renderTable();
+      })
+      .catch(function (err) {
+        S.exp.busy = false; S.exp.busyKind = null;
+        S.exp.preview = null; S.exp.previewErr = err.message;
+        renderTable();
+      });
+  }
+
+  function doSave() {
+    if (!canOwnerWrite() || S.exp.busy || !S.exp.floorId) return;
+    if (!S.exp.preview || !sameSig(S.exp.previewedFor, { value: S.exp.value, active: S.exp.active })) return;
+    S.exp.busy = true; S.exp.busyKind = 'save';
+    var fid = S.exp.floorId;
+    // 저장 요청은 공용 배너가 그대로 뜬다(preview:false — ui-progress.js 제외 대상이
+    // 아니다). 여기서도 클릭 즉시 버튼을 비활성해, 배너가 뜨기 전 짧은 틈에 다시
+    // 눌리는 것까지 막는다.
+    renderTable();
+    apiPost('/api/admin/usage-floors/' + fid, { value: S.exp.value, active: S.exp.active, preview: false })
+      .then(function (res) {
+        S.exp.busy = false; S.exp.busyKind = null;
+        // 저장 직후 목록을 다시 읽어 통과 건수를 갱신한다(캐시를 비운 서버가 이미
+        // 새 값을 반영 — 화면은 그 값을 다시 세지 않고 그대로 받아 보여준다).
+        return loadFloors().then(function () {
+          var found = findItem(fid);
+          if (!found) { closeExpand(); return; }
+          S.exp.floorId = fid;
+          S.exp.value = found.item.value; S.exp.active = found.item.active;
+          S.exp.previewedFor = null; S.exp.preview = null; S.exp.previewErr = null;
+          S.exp.savedNote = (res && res.note) || '저장했습니다.';
+          renderTable();
+        });
+      })
+      .catch(function (err) {
+        S.exp.busy = false; S.exp.busyKind = null;
+        S.exp.previewErr = err.message;
+        renderTable();
+      });
+  }
+
+  // ── 이벤트 ──────────────────────────────────────────────────────
+  function bind() {
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest('[data-action]');
+      if (!t) return;
+      var act = t.getAttribute('data-action');
+      if (act === 'toggle-expand') { if (!t.disabled) toggleExpand(Number(t.getAttribute('data-floor-id'))); }
+      else if (act === 'do-preview') { doPreview(); }
+      else if (act === 'do-save') { doSave(); }
+      else if (act === 'retry-load') { loadFloors(); }
+      // 'locked-note' — 향후 사용예정 버튼. 동작 없음, title 로 이유를 밝힌다(위 안내문이 전문).
+    });
+    document.addEventListener('input', function (ev) {
+      if (ev.target.id === 'expValueInput') {
+        var raw = ev.target.value;
+        S.exp.value = raw === '' ? null : Number(raw);
+        invalidatePreviewLight();
+      }
+    });
+    document.addEventListener('change', function (ev) {
+      if (ev.target.id === 'expActiveInput') {
+        S.exp.active = ev.target.checked;
+        invalidatePreviewLight();
+      }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.target.id === 'expValueInput' && ev.key === 'Enter') { ev.preventDefault(); doPreview(); }
+    });
+  }
+
+  function boot() {
+    bind();
+    window.Admin2Shell.meReady.then(function (me) { S.me = me; renderAll(); });
+    loadFloors();
+  }
+
+  boot();
+})();
+</script>
+{% endblock %}
