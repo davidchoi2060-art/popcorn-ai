@@ -8,7 +8,7 @@
 > `imports.html`(아래 ②의 ID 참조)은 **백업용 동결** — 참고만 하고 옮기지 않는다(P-09).
 >
 > **이 화면은 옛 3화면(업로드 · 이력 · 오류건/원본자료)을 하나로 합친다** —
-> `docs/design/admin-ia-draft-2026-08-09.md`(✅ 확정, decision-log UX-14) 5번 행:
+> `docs/design/admin-ia-draft-2026-08-09.md`(✅ 확정, decision-log UX-34, 구 UX-14) 5번 행:
 > "일괄 등록 + 이력 + 적재 오류건 3화면을 하나로. 올리고 → 결과 보고 → 틀린 것 확인이
 > 연속 동작이다." `api/admin_nav.py`의 LNB 비고도 "이력·오류건 통합 예정"이라 못박는다.
 >

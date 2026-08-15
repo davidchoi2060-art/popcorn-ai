@@ -3,7 +3,7 @@
 > 2026-08-09 · **분석만. 결정 없음.** 사용자 지시: *"일단 정말 상세하게 정리하고 갑시다.
 > 당장 급하게 뭘 하지 말고"*
 > 관련: `docs/research/legacy-admin-2026-08-04.md`(임대 관리자) ·
-> `docs/research/domeggook-sc-2026-08-05.md`(도매꾹) · `decision-log` A-02 · UX-14
+> `docs/research/domeggook-sc-2026-08-05.md`(도매꾹) · `decision-log` A-02 · UX-34(구 UX-14)
 
 ## 0. 세 줄 요약
 

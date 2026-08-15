@@ -365,7 +365,7 @@ scss 변수명이 궁금할 때(`src/scss/_variables.scss` 등) 정도다.
 
 **LNB 는 템플릿에서 가져오지 않는다** — `api/admin_nav.NAV` 가 단일 원천이고 레이아웃이
 서버에서 그린다. Phoenix 의 좌측 메뉴 마크업 구조(`dropdown-indicator`·`parent-wrapper`)만
-따르고 내용은 우리 IA(UX-14)다.
+따르고 내용은 우리 IA(UX-34, 구 UX-14)다.
 
 ---
 
