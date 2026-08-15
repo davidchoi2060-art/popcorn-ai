@@ -101,6 +101,53 @@
     중복되어 지웠다. SELECT 확장은 여전히 하지 않는다 — '누가' 열을 새로 만드는 것은
     배치 변경이라 팀 소관이 아니다(§화면 작업의 경계).
 
+  ■★★ new_price NULL("비움") 표기 — 2026-08-15 마이그레이션 0050 반영(하네스 지시).
+    `product_price_history.new_price`가 이제 NULL을 받는다(ERD §3.4·§6 원칙3 개정 —
+    "new_price IS NULL인 행은 그 시점부터 값이 없다는 정상 기록"). `won()`의 '—'는 이
+    화면 곳곳에서 "값을 못 받았다/자리가 원래 없다"는 뜻으로도 쓰이므로, 이력 행에
+    그대로 쓰면 ①값을 비웠다(조작이 있었고 원장에 남음)와 ②데이터가 없다(화면 결측·
+    원래 없음)가 같은 글자로 보인다 — 이번 작업 전체가 "원장이 사실과 다르게 보인다"를
+    고치는 일이라 같은 병을 표시 계층에서 새로 만들면 안 된다고 판단했다. 이력 행
+    전용으로 `priceEventHtml()`(이후 값 NULL -> "비움" 배지) · `noPriorHtml()`(이전
+    값 NULL -> "이전 값 없음" 배지)을 따로 둬 `won()`과 갈랐다. `won(0)`과의 충돌도
+    실제 확인했다 — `won(0)`은 "0원"을 반환하고(0은 값, null은 값 없음) 두 배지와
+    글자·모양이 겹치지 않는다. `renderCard()`의 "지금 판매가/매입가"는 그대로 뒀다 —
+    거긴 현재 상태 하나만 보여주므로("이 화면이 못 받았다"는 API 계약상 있을 수 없다,
+    §데이터 참조) "비웠다"와 "원래 없다"가 구분할 대상 자체가 없다(원장·이력이 아니라
+    현재값 조회 — 두 사실이 이미 하나로 수렴한다).
+
+  ■★ 증감(delta) 열의 결함 — 위 작업 중 발견해 함께 고쳤다. 서버는 old·new 어느
+    한쪽이라도 NULL이면 delta를 NULL로 준다(`admin_price_history.py:136`). 기존 코드는
+    `it.old==null`만 보고 delta 텍스트를 골라, old는 있고 new만 비워진 행(예: 16,500원
+    -> 비움)도 `deltaWon(null)`로 떨어져 **"신규"라고 표시하고 있었다** — 값이 사라진
+    행을 "새로 생겼다"고 반대로 말한 것이다(NaN·Infinity는 아니었지만 뜻이 틀렸다).
+    이제 "비움"(`new==null`)을 최우선으로 먼저 보고, 그다음 "이전 값 없음"(`old==null`)
+    을 본다 — 서버 계약상 둘 다 NULL인 행은 없지만(patch_product·catalog_ingest 모두
+    "값이 안 바뀌면 남기지 않는다") 방어적으로 비움을 우선한다.
+
+  ■ 이전 값 없음(old NULL)은 원인이 둘일 수 있어 한쪽으로 단정하지 않는다. `old_price`는
+    `0001_initial_schema.py`부터 이미 NULL 허용이었다(마이그레이션 0050 본문 — old는
+    손대지 않았다는 확인). 그래서 old==null 행은 ①이 필드에 값이 처음 매겨진 행
+    ②직전에 "비움"됐다가 다시 값이 매겨진 행(NULL -> 값, history_id 29030 실측) 둘 다일
+    수 있다 — 특히 기간 필터가 걸리면 직전 행이 조회 범위 밖일 수 있어 이 화면이 받은
+    `items`만으로는 어느 쪽인지 항상 확신할 수 없다. 그래서 "신규"처럼 한쪽으로 단정하지
+    않고 사실만 말하는 "이전 값 없음"으로 통일했다. 기존 "되돌려짐"(reason이 `_undo`로
+    끝나 나중에 취소된 행, `computeReverted()` 참조)과는 다른 개념이라 그 단어를
+    재사용하지 않았다 — 섞으면 이 화면의 두 표시가 서로 다른 것을 가리키게 된다.
+
+  ■ 차트 — 이 컴포넌트는 점을 잇는 선이 아니라 점마다 칸을 세우는 막대 그래프라
+    "null 지점을 건너뛰어 선이 그 지점을 가로질러 이어지는" 문제 자체가 없다(각 이력
+    행이 항상 자기 칸을 갖는다 — 스킵하지 않는다). 다만 기존 코드는 비움 지점도 색이
+    있는 막대로 그리되 높이만 0%로 둬 `min-height:2px`인 아주 짧은 막대가 됐다 —
+    "값이 없다"가 아니라 "가격이 아주 낮다"로 오독될 수 있다. 그래서 비움 지점은 높이
+    계산에서 완전히 빼고(카테고리 색 막대 대신) 점선 원 마커로 따로 그린다 — 모양
+    자체가 달라 "이건 값이 아니라 빈 상태를 나타내는 표식"임을 막대와 구분할 수 있게
+    했다. 범례에 "비움(값 없음)" 항목이 자동으로 추가되고(기존 범례 중복 제거 로직
+    그대로 재사용), 이 조회 범위에 비움이 하나라도 있을 때만 설명 문구를 보탠다
+    (`clearedNoteHtml()` — 없는 상품에까지 매번 보이면 잡음이라 조건부로 뒀다, §1b
+    참조 사실과 같은 방식). 배치 자체(막대 그래프라는 형태)는 바꾸지 않았다 —
+    표시 방식만 바꾼 것이라 팀 소관 밖 설계 변경이 아니라고 판단했다.
+
   ■ 팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`(oklch 베이지,
     `--rv-*`)만 읽는다. `:root`를 다시 정의하지 않는다. 외부 CDN 0건.
 
@@ -198,6 +245,8 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
 .ph-bar.sale{background:var(--rv-link)}
 .ph-bar.pknown{background:var(--rv-amber)}
 .ph-bar.pnone{background:transparent;border:1px dashed var(--rv-dim3);align-self:flex-end}
+.ph-bar.cleared{width:10px;height:10px;min-height:0;border-radius:50%;background:var(--rv-canvas);
+  border:2px dashed var(--rv-red)}
 .ph-bar.dim{opacity:.4}
 .ph-bar-lbl{font:400 8.5px/1.2 var(--rv-mono);color:var(--rv-faint);white-space:nowrap}
 .ph-chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
@@ -206,6 +255,7 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
 .ph-leg-sw.sale{background:var(--rv-link)}
 .ph-leg-sw.pknown{background:var(--rv-amber)}
 .ph-leg-sw.pnone{background:transparent;border:1px dashed var(--rv-dim3)}
+.ph-leg-sw.cleared{background:var(--rv-canvas);border:2px dashed var(--rv-red);border-radius:50%}
 .ph-chart-note{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:9px;padding-top:8px;
   border-top:1px dashed rgba(0,0,0,.12)}
 .ph-chart-sourcing{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:4px}
@@ -224,9 +274,16 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
 .ph-row .num.up{color:var(--rv-link)}
 .ph-row .num.down{color:var(--rv-red)}
 .ph-row .num.flat{color:var(--rv-muted)}
+.ph-row .num.cleared{color:var(--rv-red)}
 .ph-untranslated{display:inline-flex;align-items:center;gap:4px;font-size:10.5px}
 .ph-untranslated .tag{font:600 8.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-muted);
   border-radius:3px;padding:2px 4px;font-family:var(--rv-font)}
+/* ── 이력 행의 NULL 배지 — "비움"(원장에 기록된 조작)과 "이전 값 없음"을
+   won()의 일반 '—'(데이터 없음)과 글자·모양으로 구분한다 ── */
+.ph-evt{display:inline-flex;align-items:center;font:600 10.5px/1 var(--rv-font);border-radius:4px;
+  padding:3px 7px;white-space:nowrap}
+.ph-evt.cleared{color:var(--rv-red);background:var(--rv-panel2);border:1px dashed var(--rv-red)}
+.ph-evt.noprior{color:var(--rv-faint);background:var(--rv-panel2);border:1px dashed rgba(0,0,0,.14)}
 .ph-move{display:inline-flex;align-items:center;font:600 10.5px/1 var(--rv-font);color:var(--rv-ink);
   background:var(--rv-panel2);border-radius:5px;padding:5px 8px;cursor:pointer}
 .ph-move.off{color:var(--rv-muted);cursor:default}
@@ -345,6 +402,19 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
   }
   function fmt(n) { return (n == null) ? '0' : Number(n).toLocaleString('ko-KR'); }
   function won(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR') + '원'; }
+  // ⚠ won(0)과 won(null)은 겹치지 않는다 — 확인함: won(0)='0원'(값), won(null)='—'
+  // (값 없음). 다만 이력 행에서 won()의 '—'를 그대로 쓰면 "비웠다"(원장에 기록된
+  // 조작)와 "화면이 못 받았다/자리가 없다"가 같은 글자로 보인다 — 아래 두 함수가
+  // 이력 이벤트 전용으로 갈라 쓴다(모듈 docstring §new_price NULL("비움") 표기 참조).
+  function priceEventHtml(n) {
+    if (n == null) {
+      return '<span class="ph-evt cleared" title="이 변경으로 값이 비워졌습니다 — 데이터가 없는 것이 아니라 원장에 기록된 조작입니다">비움</span>';
+    }
+    return esc(won(n));
+  }
+  function noPriorHtml() {
+    return '<span class="ph-evt noprior" title="이 시점 이전에는 이 항목에 값이 없었습니다">이전 값 없음</span>';
+  }
   function deltaWon(n) {
     if (n == null) return '신규';
     var sign = n > 0 ? '+' : (n < 0 ? '-' : '');
@@ -553,11 +623,20 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
     var box = $('phCard');
     var p = S.data && S.data.product;
     if (!p) { box.innerHTML = '<div class="ph-empty">선택된 상품이 없습니다.</div>'; return; }
+    // 부품 종류 — S.partType은 loadPartType()이 "상품코드"까지 함께 확인해 채우는 캐시다
+    // ({code, label} — 위 state 선언 참조). 지금 상품과 코드가 일치하면 이미 아는 값이므로
+    // 그대로 쓰고, 리렌더(예: setMode의 모드 토글)마다 "확인 중…"으로 되돌리지 않는다.
+    // afterLoad()가 상품을 새로 고를 때마다 S.partType을 null로 비우므로, 코드가 다르거나
+    // 아직 없을 때만 실제로 확인 중인 것이고 그때만 이 문구를 쓴다 — 값을 이미 아는데
+    // 모른다고 말하지 않는다.
+    var catText = (S.partType && S.partType.code === p.product_code)
+      ? (S.partType.label || '부품 종류 확인 불가')
+      : '확인 중…';
     box.innerHTML =
       '<div>'
       + '<div class="ph-card-name">' + esc(p.name || '(상품명 없음)') + '</div>'
       + '<div class="ph-card-sub"><span class="num">' + esc(p.sku || String(p.product_code)) + '</span>'
-      + ' · <span id="phCardCat">확인 중…</span></div>'
+      + ' · <span id="phCardCat">' + esc(catText) + '</span></div>'
       + '</div>'
       + '<div class="ph-card-price">'
       + '<span>지금 판매가 <b class="num">' + esc(won(p.sale)) + '</b></span>'
@@ -573,14 +652,28 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
       return a.id - b.id;
     });
     return asc.map(function (it) {
+      // fieldLabel은 비움 여부와 무관하게 항상 "판매가/매입가"를 정확히 말한다(말풍선
+      // 전용) — cat(막대 색·범례 묶음)과는 다른 축이라 따로 둔다.
+      var fieldLabel = (it.field === 'sale') ? '판매가' : ('매입가' + (it.supplier ? ' · ' + it.supplier : ' · 출처 미기록'));
       var cat, label;
-      if (it.field === 'sale') { cat = 'sale'; label = '판매가'; }
-      else if (it.supplier) { cat = 'purchase:' + it.supplier; label = '매입가 · ' + it.supplier; }
-      else { cat = 'purchase:none'; label = '매입가 · 출처 미기록'; }
-      return { it: it, cat: cat, label: label };
+      if (it.new == null) {
+        // 비움은 판매가·매입가·공급처 구분보다 먼저 본다 — 이 지점은 "어느 계열이
+        // 얼마인가"가 아니라 "값이 없다"는 사실 자체를 그려야 한다.
+        cat = 'cleared'; label = '비움(값 없음)';
+      } else if (it.field === 'sale') {
+        cat = 'sale'; label = '판매가';
+      } else if (it.supplier) {
+        cat = 'purchase:' + it.supplier; label = '매입가 · ' + it.supplier;
+      } else {
+        cat = 'purchase:none'; label = '매입가 · 출처 미기록';
+      }
+      return { it: it, cat: cat, label: label, fieldLabel: fieldLabel };
     });
   }
-  function catCls(cat) { return cat === 'sale' ? 'sale' : (cat === 'purchase:none' ? 'pnone' : 'pknown'); }
+  function catCls(cat) {
+    if (cat === 'cleared') return 'cleared';
+    return cat === 'sale' ? 'sale' : (cat === 'purchase:none' ? 'pnone' : 'pknown');
+  }
   function legendHtml(pts) {
     var seen = {}, out = [];
     pts.forEach(function (p) {
@@ -589,6 +682,14 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
       out.push('<span class="ph-leg-item"><span class="ph-leg-sw ' + catCls(p.cat) + '"></span>' + esc(p.label) + '</span>');
     });
     return out.join('');
+  }
+  // "비움"이 이 조회 범위에 하나라도 있을 때만 설명을 보탠다 — 없는 상품에까지 매번
+  // 보이면 잡음이 된다(§1b 참조 사실과 같은 조건부 안내 방식).
+  function clearedNoteHtml(items) {
+    var hasCleared = items.some(function (it) { return it.new == null; });
+    if (!hasCleared) return '';
+    return '<div class="ph-chart-sourcing">점선 원(비움) 표시와 표의 「비움」은 판매가·매입가를 값 없음으로 지운 조작이'
+      + ' 원장에 남은 것입니다 — 값이 낮다는 뜻도, 화면이 데이터를 못 받아왔다는 뜻도 아닙니다.</div>';
   }
   function renderChart(items) {
     var wrap = $('phChartWrap');
@@ -601,11 +702,18 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
     var max = pts.reduce(function (m, p) { return (p.it.new == null) ? m : Math.max(m, p.it.new); }, 1);
     var bars = pts.map(function (p) {
       var v = p.it.new;
-      var h = (v == null) ? 0 : Math.max(2, Math.round(v * 100 / max));
+      var cleared = (v == null);
       var dim = revertedMap[p.it.id] ? ' dim' : '';
-      var title = fmtDT(p.it.at) + ' · ' + p.label + ' · ' + won(v) + (revertedMap[p.it.id] ? ' · 되돌려진 변경입니다' : '');
+      // 비움 지점은 높이 0%짜리 색 막대로 그리지 않는다 — min-height:2px와 겹쳐
+      // "아주 싼 값"으로 오독될 수 있다. 대신 고정 크기 점선 원 마커로 "값이 없다"는
+      // 사실 자체를 그린다(모듈 docstring §차트 참조) — 막대 계열과 모양부터 다르다.
+      var barHtml = cleared
+        ? '<div class="ph-bar cleared' + dim + '"></div>'
+        : '<div class="ph-bar ' + catCls(p.cat) + dim + '" style="height:' + Math.max(2, Math.round(v * 100 / max)) + '%"></div>';
+      var valueTxt = cleared ? '비움 — 이 시점에 값이 지워졌습니다' : won(v);
+      var title = fmtDT(p.it.at) + ' · ' + p.fieldLabel + ' · ' + valueTxt + (revertedMap[p.it.id] ? ' · 되돌려진 변경입니다' : '');
       return '<div class="ph-bar-col" title="' + esc(title) + '">'
-        + '<div class="ph-bar-track"><div class="ph-bar ' + catCls(p.cat) + dim + '" style="height:' + h + '%"></div></div>'
+        + '<div class="ph-bar-track">' + barHtml + '</div>'
         + '<div class="ph-bar-lbl">' + esc(fmtDShort(p.it.at)) + '</div>'
         + '</div>';
     }).join('');
@@ -613,6 +721,7 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
       '<div class="ph-chart"><div class="ph-chart-bars">' + bars + '</div></div>'
       + '<div class="ph-chart-legend">' + legendHtml(pts) + '</div>'
       + '<div class="ph-chart-note">구간 축은 고정 길이가 아닙니다 — 실데이터 구간을 그대로 그립니다.</div>'
+      + clearedNoteHtml(items)
       + purchaseNoteHtml();
   }
   // 1b 참조 사실을 선택 상품 스코프로: "이 상품의 매입가 이력은 N건 · 그중 M건 공급처 미기록"
@@ -654,14 +763,22 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
   }
   function rowHtml(it) {
     var isUndo = /_undo$/.test(it.reason || '');
-    var oldTxt = it.old == null ? '(신규)' : won(it.old);
-    var deltaTxt = it.old == null ? '신규' : deltaWon(it.delta);
-    var dCls = it.old == null ? 'flat' : deltaCls(it.delta);
+    var oldHtml = it.old == null ? noPriorHtml() : esc(won(it.old));
+    var newHtml = priceEventHtml(it.new);
+    // 비움(new==null)을 최우선으로 본다 — old 유무와 무관하게 이 행의 결과가 "값
+    // 없음"이면 비움이다. old==null(이전 값 없음)은 new가 있을 때만 그다음으로 본다.
+    // 서버 계약상 둘 다 NULL인 행은 없다(patch_product·catalog_ingest 모두 "값이 안
+    // 바뀌면 남기지 않는다") — 그래도 방어적으로 비움을 먼저 확인한다(모듈 docstring
+    // §증감 열의 결함 참조 — 예전 코드는 이 순서가 없어 "비움"을 "신규"라고 표시했다).
+    var deltaTxt, dCls;
+    if (it.new == null) { deltaTxt = '비움'; dCls = 'cleared'; }
+    else if (it.old == null) { deltaTxt = '설정'; dCls = 'flat'; }
+    else { deltaTxt = deltaWon(it.delta); dCls = deltaCls(it.delta); }
     return '<div class="ph-row' + (isUndo ? ' undo' : '') + '" role="row">'
       + '<span class="num" role="cell">' + esc(fmtDT(it.at)) + '</span>'
       + '<span role="cell">' + esc(it.field_label || it.field) + '</span>'
-      + '<span class="num" role="cell">' + esc(oldTxt) + '</span>'
-      + '<span class="num" role="cell">' + esc(won(it.new)) + '</span>'
+      + '<span class="num" role="cell">' + oldHtml + '</span>'
+      + '<span class="num" role="cell">' + newHtml + '</span>'
       + '<span class="num ' + dCls + '" role="cell">' + esc(deltaTxt) + '</span>'
       + '<span role="cell">' + reasonCell(it) + '</span>'
       + '<span role="cell">' + moveCell(it) + '</span>'
