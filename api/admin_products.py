@@ -90,18 +90,34 @@ _KPI = text(f"""
 """)
 
 
-def derive_status(row) -> str:
+def derive_status(review_required_yn, stock_qty, status, sale_price) -> str:
     """화면 상태 4종 파생. 우선순위 순 — 한 상품은 정확히 한 버킷.
 
     한계(주석으로 명시): sale_price=0은 NULL이 아니라 ok로 흐른다.
+
+    **목록·상세가 같은 신호를 보게 하는 단일 원천**(결함 ⓐ-3, 2026-08-15).
+    예전엔 상세 서랍(`get_product`)이 이 함수를 안 쓰고 `review_pending`
+    (`product_reviews` 대기행 실count)을 따로 봤다. 그런데 그 수는 살아있는
+    신호가 아니다 — 실측: ① 신규 등록은 review 행을 아예 만들지 않는다(이
+    화면에서 등록한 상품은 전부 review_pending=0으로 시작하는데도 검수가
+    필요하다) ② `undo_spec_edit`는 사양 값과 `review_required_yn`은 되돌리지만
+    그 편집이 닫았던 `product_reviews` 행은 다시 열지 않는다(105481·105489
+    실사례 — 값은 다시 비었는데 검수행만 '처리'로 남았다). 반대로
+    `review_required_yn`은 등록·분류변경·사양완료 승격 세 지점에서만 바뀌고
+    되돌리기도 그 컬럼 자체를 원래 값으로 복원하므로 어긋나지 않는다. 그래서
+    이 함수(=`review_required_yn` 기준)를 목록과 상세 양쪽의 단일 원천으로 쓴다.
+
+    row 객체 대신 낱개 인자를 받는다 — 목록은 `.all()`의 Row(속성 접근),
+    상세(`get_product`)는 `.mappings()`의 dict(첨자 접근)라 하나의 시그니처로
+    둘 다 못 받는다. 호출부가 각자 방식으로 값을 꺼내 넘긴다.
     """
-    if row.review_required_yn:
+    if review_required_yn:
         return "review"
-    if row.stock_qty == 0 or row.status == "품절":
+    if stock_qty == 0 or status == "품절":
         return "oos"
-    if row.sale_price is None:
+    if sale_price is None:
         return "price"
-    if row.status == "판매중":
+    if status == "판매중":
         return "ok"
     return "review"  # 단종·삭제대기 안전망 — 행을 숨기지 않고 운영자 확인 대상으로
 
@@ -153,7 +169,7 @@ def list_products(q: str = "", part_type: str = "", status: str = "", origin: st
             "review": kpi_rows.get("review", 0), "oos": kpi_rows.get("oos", 0),
             "price": kpi_rows.get("price", 0)}
     for r in rows:
-        status_key = derive_status(r)
+        status_key = derive_status(r.review_required_yn, r.stock_qty, r.status, r.sale_price)
         done, total = spec_progress(r.part_type, r.specs)
         items.append({
             "product_code": r.product_code,
@@ -318,6 +334,13 @@ STATUS_OK = ("판매중", "품절", "단종", "삭제대기")
 LIMIT = {"sale_price": (0, 100_000_000), "purchase_price": (0, 100_000_000),
          "stock_qty": (0, 100_000)}
 
+# EDITABLE의 가격 필드 -> product_price_history.field 값(실측: 이 테이블은 'sale'/
+# 'purchase' 둘만 쓴다 — 'sale_price' 문자열 그대로가 아니다). PATCH가 이 필드들을
+# 바꾸면서도 이 원장에 안 남기고 있었다(2026-08-15 실측 결함 — 판매가 관리 제작자가
+# 46158로 먼저 지목, 119253으로 재현). stock_qty를 stock_movements에 남기는 것과
+# 같은 이유로 같은 자리(PATCH·undo)에서 함께 남긴다.
+PRICE_HISTORY_FIELD = {"sale_price": "sale", "purchase_price": "purchase"}
+
 
 @router.get("/product-meta")
 def product_meta():
@@ -392,6 +415,9 @@ def get_product(product_code: int):
             " ORDER BY sp.cost_price NULLS LAST, sp.psp_id"), {"pc": product_code}).mappings()]
     done, total = spec_progress(r["part_type"], r["specs"])
     locked = list(r["locked_fields"] or [])
+    # 목록 배지와 같은 신호(결함 ⓐ-3) — `review_pending`(검수 큐 실행 건수)은
+    # 부수 정보일 뿐 배지 판정 기준이 아니다. derive_status 독스트링 참고.
+    status_key = derive_status(r["review_required_yn"], r["stock_qty"], r["status"], r["sale_price"])
 
     # ── 게이트 체크리스트 (슬라이스 95) ─────────────────────────────
     # 왜 필요했나: `verdict`는 **막힌 이유를 하나씩만** 말한다(elif 사슬).
@@ -461,6 +487,8 @@ def get_product(product_code: int):
         "maker": r["maker"], "model_name": r["model_name"],
         "part_type": r["part_type"], "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
         "category_group": r["category_group"], "status": r["status"],
+        # 목록(items[].status_key)과 같은 값·같은 판정 함수 — 결함 ⓐ-3
+        "status_key": status_key,
         "purchase_price": r["purchase_price"], "sale_price": r["sale_price"],
         "market_price": r["market_price"], "stock_qty": r["stock_qty"],
         "supplier": r["supplier"], "danawa_code": r["danawa_code"],
@@ -587,6 +615,39 @@ def patch_product(product_code: int, body: PatchBody):
                     " VALUES (:pc, 'adjust', :q, 'manual', :ref)"),
                     {"pc": product_code, "q": delta, "ref": log_id})
 
+        # ── 가격을 고치면 이력에 남긴다 (결함 발견 2026-08-15) ──────────────────
+        # 여기서 sale_price·purchase_price를 바꿀 수 있는데 product_price_history에
+        # 아무것도 남지 않았다 — 위 stock_qty와 같은 병이다(슬라이스 97). 실측 증거:
+        # 상품 119253을 판매가 관리에서 853,200→904,700으로 맞춘 뒤(이력 O, reason
+        # manual_match) 이 PATCH로 904,700→853,200으로 되돌리자(이력 X) 원장 마지막
+        # 행이 904,700을 가리키는데 실제 값은 853,200인 상태가 됐다 — 원장이 거짓을
+        # 말한다. 상품 46158도 같은 증상(판매가 관리 제작자가 먼저 지목).
+        #
+        # reason은 새로 만들지 않고 기존 8종 중 'manual'을 쓴다 — 가격 검토 화면의
+        # price_review_decide 로그(활동 로그 79)가 이미 이 값을 "운영자가 직접 값을
+        # 넣었다"는 뜻으로 쓰고 있고, 여기도 정확히 그 뜻이다(재산정·단가표 반영처럼
+        # 자동 계산이 아니라 사람이 상세 화면에서 직접 입력).
+        #
+        # 2026-08-15 후속(사장님 확정 — new_price를 비울 수 있게, 마이그레이션 0050):
+        # 예전엔 "new_price가 NOT NULL이니 값을 지우는(빈 문자열 -> NULL) 패치는
+        # 이 표에 못 담는다"며 건너뛰었다 — "products.sale_price 자체는 정상적으로
+        # NULL이 되고 활동 로그에 남으니 괜찮다"고 판단했는데 틀렸다. 확인자가 데모
+        # 상품 93720으로 재현: PATCH sale_price="" 가 changed:1로 성공해도 이 표엔
+        # 행이 0개였고, 그동안 가격 이력 화면은 마지막 기록(예: 16,501원)을 지금
+        # 가격인 것처럼 보여준다 — 실제로는 비어 있는데도. ERD §6 원칙 3("모든 가격
+        # 변경을 기록한다")이 깨지는 사례였다(원장 공백). 이제는 값을 지우는 것도
+        # 그대로 기록한다 — `k in after`만으로 충분하다: 위에서 `before[k] == v`인
+        # 필드는 이미 걸러(572-573행) `after`에 실제로 값이 바뀐 필드만 남으므로,
+        # NULL -> NULL(변경 아님)은 애초에 이 루프에 들어오지 않는다.
+        for k, field in PRICE_HISTORY_FIELD.items():
+            if k in after:
+                conn.execute(text(
+                    "INSERT INTO product_price_history"
+                    " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
+                    " VALUES (:pc, :f, :old, :new, 'manual', :ref, :op)"),
+                    {"pc": product_code, "f": field, "old": before[k], "new": after[k],
+                     "ref": log_id, "op": current_operator_id()})
+
         in_pool = conn.execute(text(
             "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
             " AND stock_qty > 0"), {"pc": product_code}).first() is not None
@@ -647,6 +708,28 @@ def undo_product_edit(log_id: int):
                     " (product_code, movement_type, qty_delta, ref_kind, ref_id)"
                     " VALUES (:pc, 'adjust', :q, 'manual', :ref)"),
                     {"pc": pc, "q": back, "ref": log_id})
+        # 가격을 되돌리면 이력도 역방향 행으로 남긴다 — 바로 위 재고와 같은 이유
+        # (결함 발견 2026-08-15, PRICE_HISTORY_FIELD 정의부 참고). 되돌린 뒤의 값은
+        # chg[k]["from"], 되돌리기 직전 값은 chg[k]["to"]다.
+        #
+        # 2026-08-15 후속(마이그레이션 0050): 예전엔 new_price가 NOT NULL이라 "값을
+        # 지우는 패치"를 되돌리는 경우(from이 NULL — 원래 비어 있던 필드에 값을
+        # 넣었다가, 그 되돌리기로 다시 비우는 경우)를 이 표에 못 담아 건너뛰었다.
+        # 그러면 products.{field}는 UPDATE로 정상 NULL이 되는데 이 표의 마지막
+        # 행은 여전히 지워지기 전 값을 가리켜 원장이 어긋난다 — patch_product
+        # 쪽 결함과 같은 모양이다(가격 원장 드리프트, tests/regression.py). 이제는
+        # 건너뛰지 않는다. old_v != new_v는 항상 보장된다 — chg[k]는
+        # patch_product가 `before[k] != after[k]`인 필드만 `changes`에 남긴
+        # 결과이므로 "값이 안 바뀐" 되돌리기 행은 애초에 여기 들어오지 않는다.
+        for k, field in PRICE_HISTORY_FIELD.items():
+            if k in chg:
+                new_v, old_v = chg[k].get("from"), chg[k].get("to")
+                conn.execute(text(
+                    "INSERT INTO product_price_history"
+                    " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
+                    " VALUES (:pc, :f, :old, :new, 'manual', :ref, :op)"),
+                    {"pc": pc, "f": field, "old": old_v, "new": new_v,
+                     "ref": log_id, "op": current_operator_id()})
         _log(conn, "product_edit_undo", str(d.get("sku") or pc),
              {"ref_log_id": log_id, "product_code": pc,
               "restored": {k: v.get("from") for k, v in chg.items()}}, kind="product")

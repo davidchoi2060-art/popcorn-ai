@@ -185,7 +185,16 @@ CREATE TABLE product_price_history (
   product_code BIGINT NOT NULL REFERENCES products(product_code),
   field        VARCHAR(20) NOT NULL,   -- 'purchase' / 'sale' / 'market'
   old_price    BIGINT,
-  new_price    BIGINT NOT NULL,
+  new_price    BIGINT,                 -- [2026-08-15 개정] NOT NULL 해제(마이그레이션 0050).
+                                       --   값을 "비움"도 가격 변경이다 — PATCH가 판매가·매입가를
+                                       --   빈 문자열로 지울 때(products.{field} -> NULL) 이 표가
+                                       --   NOT NULL이라 그 변경을 기록할 수 없었다(원장 공백).
+                                       --   확인자 실측(2026-08-15, 데모 상품 93720): PATCH
+                                       --   sale_price="" -> changed:1 성공 응답 + products.
+                                       --   sale_price NULL, 그런데 이력 행은 0개 — §6 원칙 3
+                                       --   ("모든 가격 변경을 기록한다")이 깨진 사례였다.
+                                       --   new_price가 NULL이면 "그 시점부터 값이 없다"는
+                                       --   뜻이지 "기록을 안 했다"는 뜻이 아니다.
   reason       VARCHAR(30) NOT NULL,   -- 'csv' / 'sourcing' / 'margin_policy' / 'manual' / 'price_import'(+_undo)
   ref_id       BIGINT,                 -- sourcing_id, job_id, file_id, 활동로그 log_id (사유별 의미 상이)
   supplier_id  BIGINT REFERENCES suppliers(supplier_id),
@@ -578,6 +587,7 @@ CREATE INDEX idx_spec_web_suggestions_applied ON spec_web_suggestions (applied_r
 2. **판매가 재계산은 제안 + 승인 방식이다.** 매입가 변경 시 시스템은 `카테고리 마진 정책 기준 권장 판매가`를 산출해 상품 마스터에 제안 배지로 노출한다. 운영자 승인 시에만 `sale_price` 반영, `history(reason='margin_policy')`. 자동 집행하지 않는다 — 가격 결정권은 운영자에게 있다.
    - UI 파급: ADM-DSH-010 대시보드에 "가격 검토 대기 N건" 미니 위젯 추가.
 3. **모든 가격 변경은 `product_price_history`에 reason·ref_id와 함께 기록한다.** 근거 리포트("모든 견적에는 이유가 있습니다")의 가격 출처 추적 기반이다. **[Ver 4.0] reason에 `price_import`(단가표 일일 반영) 추가** — ref_id = supplier_price_files.file_id.
+   **[2026-08-15 개정] "모든"에는 값을 비우는 변경도 포함된다.** `new_price`를 NOT NULL로 둬 값을 지우는 변경(빈 값 저장)을 이 원장에 아예 담지 못했던 결함을 마이그레이션 0050(`new_price` NOT NULL 해제)으로 고쳤다 — §3.4 참조. `new_price IS NULL`인 행은 "그 시점부터 값이 없다"는 정상 기록이다.
 
 `sale_price`가 locked_fields에 등록된 상품은 제안 배지만 노출하고 CSV·정책에 의한 변경을 차단한다.
 
