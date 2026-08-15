@@ -91,7 +91,7 @@
 | 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
 | 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · ⚠ 아직 미커밋) |
 | 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61`) |
-| 23 | 가격 이력 | [req-price-history.md](req-price-history.md) | — | **구축 중** (템플릿·라우트 있음 · 커밋 `140a5ba` · 제작자 자기 검증까지만, 브라우저 실측 확인자 배정됨 · ⚠ 그래서 href 미연결 — 의도적) |
+| 23 | 가격 이력 | [req-price-history.md](req-price-history.md) | — | **지음** — 구현 `/admin2/price-history`(커밋 `140a5ba`·`77dbbef`) · 검증 확인자 브라우저 실측 통과(7행 3종 판정·ref_id null 실값·401/400/404 경계·768px·가로 스크롤 300px 안내줄 안 끌려감 — 전부 실측) · 연결 `api/admin_nav.py` `91dd3a1` |
 | 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | — | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` 둘 다 req-reprice.md 자신이 「제안」·「관례상」으로 표시 — 확정 아님. 2026-08-15 제작 착수) |
 
 ## 6. 인계 · 성과
