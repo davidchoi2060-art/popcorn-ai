@@ -91,6 +91,16 @@
     않고 표를 가로 스크롤한다. 768px 이하에서는 좌측 목록 + 우측 상세 2열
     (`.ph-grid`)을 세로로 쌓는다.
 
+  ■ 사유 열의 '누가' 결측 — 2026-08-15 확인자 결함 ⓐ 반영. `product_price_history.
+    changed_by` 컬럼은 스키마에 실재하지만(`0001_initial_schema.py`) `admin_price_
+    history.py`의 SELECT 목록에 없어(담당 밖, 넣지 않음) 이 화면이 받지 못한다.
+    전에는 `title` 속성(호버 전용)에만 그 사실을 적어 평상시 안 보였다 — 이제
+    "변동 이력" 패널 헤더 아래 상시 노출 줄로 옮겼다(문구·스타일은 §1b 참조 사실
+    "매입가 이력 N건…" 안내와 같은 `.ph-chart-sourcing`). "데이터가 없다"가 아니라
+    "값은 있지만 이 화면이 안 받아온다"는 사실을 분명히 한다. `title`은 상시 노출과
+    중복되어 지웠다. SELECT 확장은 여전히 하지 않는다 — '누가' 열을 새로 만드는 것은
+    배치 변경이라 팀 소관이 아니다(§화면 작업의 경계).
+
   ■ 팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`(oklch 베이지,
     `--rv-*`)만 읽는다. `:root`를 다시 정의하지 않는다. 외부 CDN 0건.
 
@@ -298,6 +308,7 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
 
         <section class="ph-panel" aria-labelledby="phTableH">
           <div class="ph-panelhd"><h2 id="phTableH">변동 이력</h2></div>
+          <div class="ph-chart-sourcing">사유 열은 담당자(누가 변경했는지)를 표시하지 않습니다 — 이 값은 원장에 기록돼 있으나 조회 API 응답에는 포함되지 않습니다.</div>
           <div class="ph-tablewrap">
             <div class="ph-table" id="phTable" role="table" aria-label="가격 변동 이력"></div>
           </div>
@@ -668,7 +679,7 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
       + '<span role="columnheader">이전</span>'
       + '<span role="columnheader">이후</span>'
       + '<span role="columnheader">증감</span>'
-      + '<span role="columnheader" title="이 항목은 \'누가\' 정보를 포함하지 않습니다 — 조회 API가 담당자를 내려주지 않습니다(담당 밖)">사유</span>'
+      + '<span role="columnheader">사유</span>'
       + '<span role="columnheader">이동</span>'
       + '</div>';
     box.innerHTML = head + items.map(rowHtml).join('');
