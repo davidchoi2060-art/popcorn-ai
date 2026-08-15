@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
 from .admin_orders import _log
-from .auth import COOKIE, current_operator
+from .auth import COOKIE, DEVICE_COOKIE, _schema_ready, current_operator
 from .db import engine
 from .timeutil import iso
 
@@ -266,7 +266,7 @@ def my_sessions(request: Request):
     cur = request.cookies.get(COOKIE, "")
     with engine.connect() as conn:
         rows = conn.execute(text(
-            "SELECT session_id, created_at, last_seen_at, expires_at, user_agent"
+            "SELECT session_id, created_at, last_seen_at, expires_at, user_agent, login_ip"
             " FROM admin_sessions"
             " WHERE operator_id = :op AND revoked_at IS NULL AND expires_at > now()"
             " ORDER BY last_seen_at DESC"), {"op": me["operator_id"]}).mappings().all()
@@ -278,6 +278,10 @@ def my_sessions(request: Request):
         "last_seen": iso(r["last_seen_at"]),
         "expires": iso(r["expires_at"]),
         "agent": (r["user_agent"] or "")[:120] or None,
+        # 접속 IP — 기록만 한다(차단 아님, 2026-08-15 사장님 확정 · api/auth.py
+        # _client_ip 참조). 이 컬럼이 생기기 전 로그인이거나 IP를 못 알아낸
+        # 경우는 NULL이다 — 화면이 그 이유를 지어내지 않고 null 그대로 받는다.
+        "ip": str(r["login_ip"]) if r["login_ip"] is not None else None,
     } for r in rows]
     others = [i for i in items if not i["current"]]
     return {"items": items, "total": len(items), "others": len(others),
@@ -312,3 +316,70 @@ def revoke_other_sessions(request: Request):
     return {"ok": True, "revoked": n, "remaining": left,
             "note": (f"{n}개를 끊었습니다 — 지금 기기는 그대로 쓸 수 있습니다."
                      if n else "끊을 다른 세션이 없습니다.")}
+
+
+# ---- 2026-08-15: 기기 기억(비밀번호 생략) 목록·철회 ----
+# admin_sessions("다른 기기에서 로그아웃", 위)와 같은 결을 따르되 다른 점 하나:
+# 세션은 "다른 것 전부"를 한 번에 끊지만, 기기는 **하나씩** 잊는다(사장님 지시
+# 원문 "그 기기 잊어버려" — 단수). 그래서 revoke가 device_id 하나를 받는다.
+
+
+@router.get("/my-profile/devices")
+def my_devices(request: Request):
+    """기억된 기기 목록 — 시크릿(secret)은 서버도 갖고 있지 않다(해시만 저장,
+    api/auth.py `_remember_device` 참조). 여기서 내보내는 `device_id`는 조회용
+    식별자일 뿐 그것만으로는 로그인할 수 없다 — 세션 식별자(session_id)와
+    달리 노출해도 안전하다.
+    """
+    me = current_operator()
+    if not me:
+        raise HTTPException(401, "로그인이 필요합니다")
+    if not _schema_ready():
+        # 마이그레이션 0051 미적용 — api/auth.py _schema_ready 참조. 화면은
+        # "아직 없다"고 정직하게 말한다(0건을 지어내는 것과는 다르다 — 이유가
+        # 있는 빈 상태다).
+        return {"items": [], "total": 0, "ready": False,
+                "note": "기기 기억 기능이 아직 이 서버에 적용되지 않았습니다."}
+    cur_device_id = request.cookies.get(DEVICE_COOKIE, "").partition(":")[0]
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT device_id, created_at, last_used_at, expires_at, user_agent"
+            " FROM admin_operator_devices"
+            " WHERE operator_id = :op AND revoked_at IS NULL AND expires_at > now()"
+            " ORDER BY last_used_at DESC"), {"op": me["operator_id"]}).mappings().all()
+    items = [{
+        "device_id": r["device_id"],
+        "current": bool(cur_device_id) and r["device_id"] == cur_device_id,
+        "created": iso(r["created_at"]),
+        "last_used": iso(r["last_used_at"]),
+        "expires": iso(r["expires_at"]),
+        "agent": (r["user_agent"] or "")[:120] or None,
+    } for r in rows]
+    return {"items": items, "total": len(items), "ready": True,
+            "note": (f"비밀번호 없이 로그인할 수 있는 기기 {len(items)}개가 등록돼 있습니다."
+                     if items else "등록된 기기가 없습니다.")}
+
+
+@router.post("/my-profile/devices/{device_id}/revoke")
+def revoke_device(device_id: str, request: Request):
+    """기기 하나를 잊는다 — 삭제가 아니라 철회(`revoked_at`, 되돌림은 삭제가
+    아니라 역방향 전이). 지금 열려 있는 세션은 끊지 않는다 — 그 기기로 다음에
+    다시 들어올 때부터 비밀번호를 묻는다는 뜻이다(세션 자체를 끊고 싶으면
+    위 `/sessions/revoke-others`를 따로 쓴다 — 이 둘은 서로 다른 일이다).
+    """
+    me = current_operator()
+    if not me:
+        raise HTTPException(401, "로그인이 필요합니다")
+    if not _schema_ready():
+        raise HTTPException(404, "기기 기억 기능이 아직 이 서버에 적용되지 않았습니다")
+    with engine.begin() as conn:
+        n = conn.execute(text(
+            "UPDATE admin_operator_devices SET revoked_at = now()"
+            " WHERE device_id = :d AND operator_id = :op AND revoked_at IS NULL"),
+            {"d": device_id, "op": me["operator_id"]}).rowcount
+        if n:
+            _log(conn, "device_forget", me.get("email") or str(me["operator_id"]),
+                 {"device_id": device_id}, kind="operator")
+    if not n:
+        raise HTTPException(404, "기기를 찾을 수 없습니다")
+    return {"ok": True, "note": "이 기기는 다음부터 로그인할 때 비밀번호를 다시 물어봅니다."}
