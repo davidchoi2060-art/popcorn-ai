@@ -151,6 +151,104 @@
     .cr-kpi{flex-basis:140px}
     .cr-drawer{width:100%}
   }
+
+  /* ── 1b: 탭 줄 + 「필수 사양」 구역 (2026-08-15, spec-compat-required.md) ─────────
+     위의 .cr-* 규칙(호환 규칙 9종 표)은 한 글자도 건드리지 않는다. 탭 줄을 그 위에
+     형제로 얹고, 두 번째 패널(.cr-req-wrap)을 그 뒤에 형제로 더한다. 두 패널 다
+     .cr-wrap 클래스를 그대로 써서 바깥 여백·flex 처리를 하나의 규칙으로 공유한다 -
+     .cr-wrap[hidden] 규칙 하나가 탭 전환에 필요한 숨김을 두 패널 모두에 준다
+     (저작 display:flex 가 UA [hidden]{display:none}을 이기므로 override 필수 -
+     MAKER-CHECKLIST §3, 기존 .cr-banner[hidden]·.cr-state[hidden]와 같은 이유). */
+  .cr-wrap[hidden]{display:none}
+
+  .cr-tabsbar{flex:none;display:flex;gap:4px;border-bottom:1px solid rgba(0,0,0,.1);
+    background:var(--card);padding:0 20px}
+  .cr-tabitem{display:flex;align-items:center;gap:7px;font:500 12.5px/1 var(--font);
+    color:var(--on-variant);background:none;border:0;border-bottom:2px solid transparent;
+    padding:13px 5px;margin:0 12px 0 0;cursor:pointer}
+  .cr-tabitem:hover{color:var(--on)}
+  .cr-tabitem.on{font-weight:600;color:var(--on);border-bottom-color:var(--on)}
+  .cr-tab-badge{display:inline-block;font:700 10px/1 var(--font-num);color:var(--bg);
+    background:var(--error);border-radius:9px;padding:3px 6px;min-width:8px;text-align:center}
+  .cr-tab-badge[hidden]{display:none}
+
+  .cr-req-wrap{overflow:auto}
+  .cr-req-body{display:flex;flex-direction:column;gap:12px}
+  .cr-req-body[hidden]{display:none}
+  .cr-req-datasections{display:flex;flex-direction:column;gap:12px}
+  .cr-req-datasections[hidden]{display:none}
+
+  .cr-req-banner{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;
+    border-radius:8px;border:1px solid rgba(0,0,0,.12);border-left-width:3px;padding:14px 17px;flex:none}
+  .cr-req-banner[hidden]{display:none}
+  .cr-req-banner--danger{border-left-color:var(--error);background:var(--container)}
+  .cr-req-banner--ok{border-left-color:var(--success-dark);background:var(--container)}
+  .cr-req-banner-body{flex:1;min-width:0}
+  .cr-req-banner-lead{font:500 13px/1.5 var(--font);color:var(--on-variant)}
+  .cr-req-banner-num{font:700 16px/1 var(--font-num);color:var(--on)}
+  .cr-req-banner-num--bad{color:var(--error)}
+  .cr-req-banner-title{font:700 17px/1.3 var(--font-head);color:var(--on);margin-top:3px}
+  .cr-req-banner--ok .cr-req-banner-title{color:var(--success-dark)}
+  .cr-req-banner-text{font:400 12px/1.7 var(--font);color:var(--on);margin-top:8px}
+  .cr-req-banner-text code{font-family:var(--font-num);font-size:11px;background:var(--container-low);
+    border-radius:3px;padding:1px 4px}
+  .cr-req-banner-cta{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .cr-req-banner-path{font:400 10px/1.4 var(--font-num);color:var(--on-variant)}
+
+  .cr-req-section{flex:none;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:var(--card);
+    padding:14px 17px}
+  .cr-req-section-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:9px;
+    font:600 12.5px/1.4 var(--font);color:var(--on)}
+  .cr-req-count{font:700 11px/1 var(--font-num);color:var(--error);background:var(--container-low);
+    border-radius:4px;padding:3px 7px}
+  .cr-req-section-note{flex-basis:100%;font:400 10.5px/1.6 var(--font);color:var(--on-variant)}
+  .cr-req-section-note code{font-family:var(--font-num);font-size:10px;background:var(--container-low);
+    border-radius:3px;padding:1px 4px}
+  .cr-req-common-note{margin-top:10px;font:400 11.5px/1.7 var(--font);color:var(--on);
+    background:var(--container);border-radius:6px;padding:9px 12px}
+
+  .cr-req-table{margin-top:11px;border:1px solid rgba(0,0,0,.08);border-radius:6px;overflow:hidden}
+  .cr-req-thead{display:grid;grid-template-columns:minmax(88px,.8fr) minmax(150px,1.4fr)
+    minmax(110px,1fr) minmax(140px,1fr);gap:10px;background:var(--container);
+    padding:8px 12px;font:600 10px/1.3 var(--font);color:var(--on-variant)}
+  .cr-req-row{display:grid;grid-template-columns:minmax(88px,.8fr) minmax(150px,1.4fr)
+    minmax(110px,1fr) minmax(140px,1fr);gap:10px;padding:8px 12px;font:400 11.5px/1.4 var(--font);
+    border-top:1px solid rgba(0,0,0,.06);align-items:center}
+  .cr-req-row .part{color:var(--on-variant);font-size:10.5px}
+  .cr-req-row .key{font-family:var(--font-num);font-size:11px;font-weight:600}
+  .cr-req-none{color:var(--error);font-weight:700}
+  .cr-req-empty-note{margin-top:11px;font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+  .cr-req-interp{margin-top:9px;font:400 11.5px/1.6 var(--font);color:var(--on)}
+
+  .cr-req-grid{margin-top:11px;display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .cr-req-group{border:1px solid rgba(0,0,0,.08);border-radius:6px;padding:10px 12px;
+    background:var(--container)}
+  .cr-req-group-name{font:600 12px/1.3 var(--font);color:var(--on)}
+  .cr-req-group-fields{margin-top:7px;display:flex;flex-direction:column;gap:6px}
+  .cr-req-field-row{display:flex;align-items:baseline;gap:8px;font:400 11px/1.5 var(--font)}
+  .cr-req-field-label{color:var(--on);flex:1;min-width:0;word-break:keep-all;
+    overflow-wrap:break-word}
+  .cr-req-field-key{font-family:var(--font-num);font-size:10px;color:var(--on-variant);flex:none}
+  .cr-req-field-used{font-size:10.5px;color:var(--on-variant);flex:1;min-width:0;text-align:right}
+  .cr-req-field-used--none{color:var(--error);font-weight:700}
+
+  .cr-req-foot2{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .cr-req-foot2-col{border-top:1px solid rgba(0,0,0,.08);padding-top:10px}
+  .cr-req-foot2-title{font:600 11px/1.4 var(--font);color:var(--on)}
+  .cr-req-foot2-text{font:400 10.5px/1.7 var(--font);color:var(--on-variant);margin-top:5px}
+  .cr-req-foot2-text a{color:var(--on);text-decoration:underline}
+  .cr-req-link-btn{font:inherit;color:var(--on);text-decoration:underline;background:none;border:0;
+    padding:0;cursor:pointer}
+
+  @media (max-width:768px){
+    .cr-req-grid{grid-template-columns:1fr}
+    .cr-req-foot2{grid-template-columns:1fr;gap:10px}
+    .cr-req-thead,.cr-req-row{grid-template-columns:minmax(64px,.7fr) minmax(110px,1.3fr)
+      minmax(80px,.9fr) minmax(90px,1fr)}
+    .cr-req-banner{flex-direction:column}
+    .cr-req-banner-cta{align-items:flex-start}
+    .cr-tabsbar{padding:0 12px}
+  }
 </style>
 {% endblock %}
 
@@ -161,7 +259,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="cr-wrap" data-screen-id="ADM-ENG-010" data-domain="호환">
+<div class="cr-tabsbar" role="tablist" aria-label="구역" data-keep="1">
+  <button type="button" class="cr-tabitem on" id="cr-tab-compat" data-action="cr-switch-tab"
+          data-tab="compat" role="tab" aria-selected="true">
+    <span id="cr-tab-compat-label">호환 규칙</span>
+  </button>
+  <button type="button" class="cr-tabitem" id="cr-tab-required" data-action="cr-switch-tab"
+          data-tab="required" role="tab" aria-selected="false">
+    <span>필수 사양</span><span class="cr-tab-badge" id="cr-tab-badge" hidden></span>
+  </button>
+</div>
+
+<div class="cr-wrap" id="cr-panel-compat" data-screen-id="ADM-ENG-010" data-domain="호환">
 
   <div class="cr-banner cr-banner--danger" id="cr-skip-banner" hidden role="alert">
     <span class="cr-banner-icon" aria-hidden="true">▲</span>
@@ -330,6 +439,110 @@
   </aside>
 </div>
 
+<div class="cr-wrap cr-req-wrap" id="cr-panel-required" hidden role="tabpanel" aria-label="필수 사양">
+
+  <div class="cr-state" id="cr-req-state-loading">불러오는 중입니다</div>
+  <div class="cr-state" id="cr-req-state-error" hidden>
+    <div id="cr-req-error-msg"></div>
+    <div class="cr-state-detail" id="cr-req-error-detail" hidden></div>
+    <button type="button" class="cr-btn cr-btn--ghost cr-retry" id="cr-req-retry-btn">다시 조회</button>
+  </div>
+
+  <div class="cr-req-body" id="cr-req-body" hidden>
+
+    <div class="cr-state" id="cr-req-total-empty" hidden>아직 필수로 지정된 사양이 없습니다.</div>
+
+    <div class="cr-req-datasections" id="cr-req-datasections" hidden>
+
+      <div class="cr-req-banner cr-req-banner--danger" id="cr-req-banner-warn" hidden role="alert">
+        <div class="cr-req-banner-body">
+          <div class="cr-req-banner-lead">
+            <span class="cr-req-banner-num" id="cr-req-b-total">-</span>개 중
+            <span class="cr-req-banner-num cr-req-banner-num--bad" id="cr-req-b-unread">-</span>개는
+          </div>
+          <div class="cr-req-banner-title">어떤 호환 검사도 읽지 않습니다</div>
+          <div class="cr-req-banner-text">
+            <b>근거 없이 상품을 검수 대기로 묶고 있다는 뜻입니다.</b> 필수 사양은
+            <code>spec_field_defs</code> 메타가 단일 원천이고 게이트가 읽는 그 목록입니다 -
+            읽는 규칙이 비어 있으면 그 값을 쓰는 호환 검사가 하나도 없다는 뜻입니다.
+          </div>
+        </div>
+        <div class="cr-req-banner-cta">
+          <a class="cr-btn cr-btn--ghost" href="/admin2/spec-field-defs">필수 지정을 고치러 가기 →</a>
+          <div class="cr-req-banner-path">/admin2/spec-field-defs</div>
+        </div>
+      </div>
+
+      <div class="cr-req-banner cr-req-banner--ok" id="cr-req-banner-ok" hidden>
+        <div class="cr-req-banner-body">
+          <div class="cr-req-banner-title">전부 실제로 쓰이고 있습니다</div>
+          <div class="cr-req-banner-text">
+            - 필수 사양 <span class="num" id="cr-req-ok-total">-</span>개 모두 최소 하나의 호환
+            규칙이 읽습니다. 근거 없이 검수 대기에 묶인 것이 없다는 뜻입니다.
+            <b>정상 상태입니다.</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="cr-req-section">
+        <div class="cr-req-section-head">
+          <b>읽는 규칙이 없는 필수 사양</b>
+          <span class="cr-req-count" id="cr-req-problem-count">0개</span>
+          <span class="cr-req-section-note">
+            응답의 <code>used_by</code> 가 빈 것만 모았습니다 - 세지 않고 응답에서 걸러 온 목록입니다
+          </span>
+        </div>
+        <div class="cr-req-common-note" id="cr-req-common-note" hidden>
+          필수라서 값이 없으면 상품이 검수 대기에 묶이는데, 이 값을 읽는 호환 검사가 하나도 없습니다.
+        </div>
+        <div class="cr-req-table" id="cr-req-problem-table" hidden data-repeat="requiredUnread">
+          <div class="cr-req-thead">
+            <span>부품군</span><span>필수 사양</span><span>키</span><span>읽는 규칙</span>
+          </div>
+          <div id="cr-req-problem-rows"></div>
+        </div>
+        <div class="cr-req-empty-note" id="cr-req-problem-empty" hidden>
+          읽는 규칙이 없는 필수 사양이 없습니다 - 전부 최소 하나의 규칙이 읽습니다.
+        </div>
+        <div class="cr-req-interp" id="cr-req-interp" hidden></div>
+      </div>
+
+      <div class="cr-req-section">
+        <div class="cr-req-section-head">
+          <b>부품군 <span id="cr-req-group-count">0</span>개 - 전체 목록</b>
+          <span class="cr-req-section-note">
+            부품 이름은 <code>part_label</code> 그대로 씁니다(다시 정의하지 않습니다)
+          </span>
+        </div>
+        <div class="cr-req-grid" id="cr-req-groups" data-repeat="requiredGroup"></div>
+      </div>
+
+    </div>
+
+    <div class="cr-req-foot2">
+      <div class="cr-req-foot2-col">
+        <div class="cr-req-foot2-title">이 화면에서 안 하는 것</div>
+        <div class="cr-req-foot2-text">
+          필수 지정 고치기 → 「상품 사양 정의」(<a href="/admin2/spec-field-defs">/admin2/spec-field-defs</a>) ·
+          사양 값 채우기 → 「상품 사양 검수」(<a href="/admin2/reviews">/admin2/reviews</a>) ·
+          호환 규칙 고치기 →
+          <button type="button" class="cr-req-link-btn" data-action="cr-switch-tab" data-tab="compat">옆 탭</button>(편집
+          미개방). <b>이동은 경로로 판정합니다</b> - 라벨로 찾지 않습니다.
+        </div>
+      </div>
+      <div class="cr-req-foot2-col">
+        <div class="cr-req-foot2-title">빈 상태는 실패가 아닙니다</div>
+        <div class="cr-req-foot2-text">
+          필수 사양이 0개면 「아직 필수로 지정된 사양이 없습니다」 ·
+          <b>읽는 규칙 없음이 0개면 「전부 실제로 쓰이고 있습니다」</b> - 그때는 위 배너 대신 좋은
+          상태로 말하고 탭 배지도 없습니다.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <template id="cr-row-tpl">
   <button type="button" class="cr-grid cr-row" data-action="open-rule">
     <span class="num" data-f="ord"></span>
@@ -394,6 +607,36 @@
     drawerClose: document.getElementById("cr-drawer-close")
   };
 
+  // 1b - 탭 줄 + 「필수 사양」 구역(spec-compat-required.md). 같은 GET /api/admin/engine-rules
+  // 응답의 compat.required · compat.required_note를 읽는다 - 별도 fetch를 만들지 않는다.
+  els.tabCompat = document.getElementById("cr-tab-compat");
+  els.tabCompatLabel = document.getElementById("cr-tab-compat-label");
+  els.tabRequired = document.getElementById("cr-tab-required");
+  els.tabBadge = document.getElementById("cr-tab-badge");
+  els.panelCompat = document.getElementById("cr-panel-compat");
+  els.panelRequired = document.getElementById("cr-panel-required");
+  els.reqStLoading = document.getElementById("cr-req-state-loading");
+  els.reqStError = document.getElementById("cr-req-state-error");
+  els.reqErrMsg = document.getElementById("cr-req-error-msg");
+  els.reqErrDetail = document.getElementById("cr-req-error-detail");
+  els.reqRetryBtn = document.getElementById("cr-req-retry-btn");
+  els.reqBody = document.getElementById("cr-req-body");
+  els.reqTotalEmpty = document.getElementById("cr-req-total-empty");
+  els.reqDatasections = document.getElementById("cr-req-datasections");
+  els.reqBannerWarn = document.getElementById("cr-req-banner-warn");
+  els.reqBTotal = document.getElementById("cr-req-b-total");
+  els.reqBUnread = document.getElementById("cr-req-b-unread");
+  els.reqBannerOk = document.getElementById("cr-req-banner-ok");
+  els.reqOkTotal = document.getElementById("cr-req-ok-total");
+  els.reqProblemCount = document.getElementById("cr-req-problem-count");
+  els.reqCommonNote = document.getElementById("cr-req-common-note");
+  els.reqProblemTable = document.getElementById("cr-req-problem-table");
+  els.reqProblemRows = document.getElementById("cr-req-problem-rows");
+  els.reqProblemEmpty = document.getElementById("cr-req-problem-empty");
+  els.reqInterp = document.getElementById("cr-req-interp");
+  els.reqGroupCount = document.getElementById("cr-req-group-count");
+  els.reqGroups = document.getElementById("cr-req-groups");
+
   var lastSlots = [];
   var lastRows = [];   // 파싱된 표시용 행(원본 checks가 아니라 화면이 이미 나눈 대상/연산/비교대상)
   var lastFocusEl = null;
@@ -433,26 +676,44 @@
     els.stLoading.hidden = kind !== "loading";
     els.stEmpty.hidden = kind !== "empty";
     els.stError.hidden = kind !== "error";
+    // 필수 사양 탭은 같은 fetch 하나를 공유한다 - 조회 실패는 이 화면 다른 구역과
+    // 같은 에러 경로를 쓴다(spec-compat-required.md ⑦, 이 구역만 따로 만들지 않는다).
+    // 로딩·오류는 두 탭 공통이고, 성공 이후의 내용은 renderRequired()가 채운다.
+    els.reqStLoading.hidden = kind !== "loading";
+    els.reqStError.hidden = kind !== "error";
+    els.reqBody.hidden = (kind === "loading" || kind === "error");
     if (kind === "loading") {
       resetKpis("…");
       els.skipBanner.hidden = true;
+      els.tabBadge.hidden = true;
+      els.tabCompatLabel.textContent = "호환 규칙";
     }
     if (kind === "error") {
       resetKpis("확인 불가");
       els.skipBanner.hidden = true;
+      els.tabBadge.hidden = true;
+      els.tabCompatLabel.textContent = "호환 규칙";
       info = info || {};
       if (info.kind === "auth") {
         els.errMsg.innerHTML = "로그인이 필요합니다 - " +
           "<a href=\"" + LOGIN_URL + "\" style=\"text-decoration:underline\">로그인 화면으로 이동</a>";
         els.errDetail.hidden = true;
+        els.reqErrMsg.innerHTML = els.errMsg.innerHTML;
+        els.reqErrDetail.hidden = true;
       } else if (info.kind === "network") {
         els.errMsg.textContent = "네트워크 오류 - 서버에 연결할 수 없습니다";
         els.errDetail.hidden = false;
         els.errDetail.textContent = info.detail || "";
+        els.reqErrMsg.textContent = els.errMsg.textContent;
+        els.reqErrDetail.hidden = false;
+        els.reqErrDetail.textContent = els.errDetail.textContent;
       } else {
         els.errMsg.textContent = "서버 오류로 규칙을 불러오지 못했습니다";
         els.errDetail.hidden = false;
         els.errDetail.textContent = info.detail || "";
+        els.reqErrMsg.textContent = els.errMsg.textContent;
+        els.reqErrDetail.hidden = false;
+        els.reqErrDetail.textContent = els.errDetail.textContent;
       }
     }
   }
@@ -670,6 +931,149 @@
     });
   });
   els.retryBtn.addEventListener("click", load);
+  els.reqRetryBtn.addEventListener("click", load);
+
+  // 탭 전환 - 「호환 규칙」(기존, 손대지 않음) <-> 「필수 사양」(신설). 데이터는 이미
+  // 한 번의 fetch로 둘 다 받아 두었으므로 전환은 hidden만 뒤집는다(재조회 없음).
+  function switchTab(tab){
+    var toRequired = tab === "required";
+    els.tabCompat.classList.toggle("on", !toRequired);
+    els.tabCompat.setAttribute("aria-selected", toRequired ? "false" : "true");
+    els.tabRequired.classList.toggle("on", toRequired);
+    els.tabRequired.setAttribute("aria-selected", toRequired ? "true" : "false");
+    els.panelCompat.hidden = toRequired;
+    els.panelRequired.hidden = !toRequired;
+  }
+  document.addEventListener("click", function(ev){
+    var tabTrigger = ev.target.closest && ev.target.closest('[data-action="cr-switch-tab"]');
+    if (tabTrigger) switchTab(tabTrigger.getAttribute("data-tab"));
+  });
+
+  // 필수 사양 탭 - compat.required를 그대로 읽고 total·unread·groupCount는 이 응답에서
+  // 센다(spec-compat-required.md ⑥⑦ · 「표를 하드코딩하지 마라」). 「그래서 무슨 일이
+  // 생기나」 열·해석 문장은 옮기지 않는다(계약 §디자인에서 빼는 것) - 공통 문장 한 줄만
+  // 두고, 부품군별 해석은 응답을 센 결과로만 만든다.
+  function renderRequired(compat){
+    var required = Array.isArray(compat.required) ? compat.required : [];
+    var groupCount = required.length;
+    var totalFields = 0;
+    var problemRows = [];
+    var perGroupUnread = [];
+
+    required.forEach(function(g){
+      var fields = Array.isArray(g.fields) ? g.fields : [];
+      var unreadInGroup = 0;
+      fields.forEach(function(f){
+        totalFields += 1;
+        var usedBy = Array.isArray(f.used_by) ? f.used_by : [];
+        if (usedBy.length === 0) {
+          unreadInGroup += 1;
+          problemRows.push({ partLabel: g.part_label, fieldLabel: f.label, key: f.key });
+        }
+      });
+      if (unreadInGroup > 0) perGroupUnread.push({ label: g.part_label, count: unreadInGroup });
+    });
+
+    var unreadCount = problemRows.length;
+
+    els.tabBadge.hidden = unreadCount === 0;
+    if (unreadCount > 0) els.tabBadge.textContent = fmtNum(unreadCount);
+
+    els.reqTotalEmpty.hidden = totalFields !== 0;
+    els.reqDatasections.hidden = totalFields === 0;
+    if (totalFields === 0) return;
+
+    var showDanger = unreadCount > 0;
+    els.reqBannerWarn.hidden = !showDanger;
+    els.reqBannerOk.hidden = showDanger;
+    if (showDanger) {
+      els.reqBTotal.textContent = fmtNum(totalFields);
+      els.reqBUnread.textContent = fmtNum(unreadCount);
+    } else {
+      els.reqOkTotal.textContent = fmtNum(totalFields);
+    }
+
+    els.reqProblemCount.textContent = fmtNum(unreadCount) + "개";
+    els.reqCommonNote.hidden = unreadCount === 0;
+    els.reqProblemTable.hidden = unreadCount === 0;
+    els.reqProblemEmpty.hidden = unreadCount !== 0;
+    renderProblemRows(problemRows);
+
+    if (unreadCount > 0) {
+      var maxCount = 0;
+      perGroupUnread.forEach(function(p){ if (p.count > maxCount) maxCount = p.count; });
+      var top = perGroupUnread.filter(function(p){ return p.count === maxCount; });
+      var names = top.map(function(p){ return p.label; }).join("·");
+      els.reqInterp.textContent = top.length > 1
+        ? ("가장 많이 걸린 부품군은 " + names + "(각 " + fmtNum(maxCount) + "개)입니다.")
+        : ("가장 많이 걸린 부품군은 " + names + "(" + fmtNum(maxCount) + "개)입니다.");
+      els.reqInterp.hidden = false;
+    } else {
+      els.reqInterp.hidden = true;
+    }
+
+    els.reqGroupCount.textContent = fmtNum(groupCount);
+    renderGroups(required);
+  }
+
+  function renderProblemRows(rows){
+    els.reqProblemRows.innerHTML = "";
+    rows.forEach(function(row){
+      var r = document.createElement("div");
+      r.className = "cr-req-row";
+      var part = document.createElement("span");
+      part.className = "part"; part.textContent = row.partLabel;
+      var field = document.createElement("span");
+      field.textContent = row.fieldLabel;
+      var key = document.createElement("span");
+      key.className = "key"; key.textContent = row.key;
+      var used = document.createElement("span");
+      used.className = "cr-req-none"; used.textContent = "없음 ✕";
+      r.appendChild(part); r.appendChild(field); r.appendChild(key); r.appendChild(used);
+      els.reqProblemRows.appendChild(r);
+    });
+  }
+
+  // 「전체 목록」 - 부품군 전부를 펼쳐서 보여준다(접기 없음). part_label은 서버 값
+  // 그대로(다시 정의하지 않는다) - used_by가 비면 "없음 ✕"를 텍스트로 병기한다(색만으로
+  // 말하지 않는다 - 이 저장소 규약).
+  function renderGroups(required){
+    els.reqGroups.innerHTML = "";
+    required.forEach(function(g){
+      var card = document.createElement("div");
+      card.className = "cr-req-group";
+      var name = document.createElement("div");
+      name.className = "cr-req-group-name";
+      name.textContent = g.part_label;
+      card.appendChild(name);
+
+      var list = document.createElement("div");
+      list.className = "cr-req-group-fields";
+      (Array.isArray(g.fields) ? g.fields : []).forEach(function(f){
+        var row = document.createElement("div");
+        row.className = "cr-req-field-row";
+        var label = document.createElement("span");
+        label.className = "cr-req-field-label";
+        label.textContent = f.label;
+        var key = document.createElement("span");
+        key.className = "cr-req-field-key";
+        key.textContent = f.key;
+        var used = document.createElement("span");
+        var usedBy = Array.isArray(f.used_by) ? f.used_by : [];
+        if (usedBy.length) {
+          used.className = "cr-req-field-used";
+          used.textContent = usedBy.join(", ");
+        } else {
+          used.className = "cr-req-field-used cr-req-field-used--none";
+          used.textContent = "없음 ✕";
+        }
+        row.appendChild(label); row.appendChild(key); row.appendChild(used);
+        list.appendChild(row);
+      });
+      card.appendChild(list);
+      els.reqGroups.appendChild(card);
+    });
+  }
 
   function applyData(data){
     var compat = data.compat || {};
@@ -707,6 +1111,11 @@
     } else {
       setState("none");
     }
+
+    // 탭 1 라벨 - "9종" 같은 개수는 지어내지 않는다. cr-kpi-total과 같은 원천
+    // (compat.checks.length)에서 그대로 센다.
+    els.tabCompatLabel.textContent = "호환 규칙 " + fmtNum(total) + "종";
+    renderRequired(compat);
   }
 
   // 로드 성공 규칙 KPI - 값이 응답에 없을 때(unknownCount)는 "확인 불가"로 정직하게
