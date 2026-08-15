@@ -2,12 +2,45 @@
    조회 전용. 값을 고치지 않는다(정정은 판매가 관리) · 실서비스에 쓰기 요청을 보내지 않는다.
    담당: api/admin_ui_mall_sync.py 만. _admin2_shell.html.j2 는 상속만 하고 열어보지 않았다
    (지시서 금지) — head_extra/header_extra 블록 이름은 mockups/shared/admin2/admin2.css의
-   주석에서 확인했고, 본문 블록 이름(content)은 Jinja 관례 추정이다(라우트 파일 docstring 참조). #}
+   주석에서 확인했고, 본문 블록 이름(content)은 Jinja 관례 추정이다(라우트 파일 docstring 참조).
+
+   ■ 스크롤 결함 수정(2026-08-15, 확인자 실측 근거) — `.ms-wrap`에 `flex:1;min-height:0;
+   overflow-y:auto`가 없어 데스크톱 폭에서 넘치는 콘텐츠가 스크롤 가능한 조상 없이 잘려
+   사라졌다(html·body·.a2-shell·.a2-main·.ms-wrap 전부 visible/hidden뿐). 자매 화면 둘을
+   먼저 대조했다: 판매가 관리(`sale_price.html.j2`)는 `.sp-wrap`(position:relative, 서랍이
+   `position:absolute`라 기준 조상 필요) 밑에 `.sp-body{overflow:auto}`를 따로 두지만,
+   인계 기록(`handoff_log.html.j2`)은 `.hl-scroll{flex:1;min-height:0;overflow:auto}`를
+   콘텐츠 최상위 래퍼 자신에 바로 건다 — 이 화면의 `.ms-drawer`도 `position:fixed`라
+   `.hl-scroll` 쪽과 구조가 같다(래퍼 하나가 전 콘텐츠를 담고, 서랍·스크림은 형제로
+   fixed 배치). 그래서 새 래퍼를 두지 않고 `.hl-scroll`과 같은 방식으로 `.ms-wrap` 자체에
+   걸었다 — `.hl-scroll`처럼 굳이 필요하지도 않은 `position:relative`는 추가하지 않았다
+   (이 화면에 `.ms-wrap`을 포함 블록으로 삼는 `position:absolute` 요소가 없다).
+
+   ■ 표 자체 스크롤 결함 수정(2026-08-15, 위 수정의 부작용 — 제작 단계에서 헤드리스
+   브라우저로 재검증 후 확인자 제시안과 다르게 적용) — `.ms-wrap`이 `flex:1;min-height:0`를
+   갖게 되자 `.ms-table-wrap{overflow-x:auto}`(overflow-y 미명시)가 CSS 계산값 규칙
+   (overflow-x/-y 중 하나가 visible이 아니면 나머지 visible 쪽은 선언 여부와 무관하게
+   auto로 승격)에 걸려 overflow-y가 암묵적 auto가 되고, flexbox의 "스크롤 컨테이너의
+   자동 최소 크기는 0" 규칙 때문에 `.ms-table-wrap`만 형제(배너·KPI·필터·페이저·각주 —
+   전부 스크롤 컨테이너가 아니라 내용 크기 밑으로 안 줄어든다)와 달리 내용 크기 밑으로
+   눌려 그 안에서 따로 스크롤됐다(확인자 실측 약 356px, 한 화면에 6~7행).
+   **확인자가 제시한 `.ms-table-wrap{overflow-y:visible}` 명시는 이 승격을 피하지
+   못한다** — 이 화면과 같은 구조(`.ms-wrap` 등가 + `overflow-x:auto`인 자식)를 헤드리스
+   Edge(CDP)로 직접 올려 대조한 결과, `overflow-y:visible`을 추가해도
+   `getComputedStyle(.ms-table-wrap).overflowY`는 추가 전후 모두 `"auto"`로 동일했고
+   표 높이도 그대로 눌려 있었다 — overflow-x가 auto(비visible)인 이상 반대쪽에
+   `visible`을 명시하든 안 하든 승격 결과는 같기 때문이다. 그래서 대신
+   **`.ms-table-wrap`에 `flex-shrink:0`**을 걸었다 — 다른 형제들처럼 내용 크기 밑으로
+   줄어들지 않게 하는 것이라 overflow 계산값과 무관하게 동작한다. 같은 헤드리스 재현으로
+   재검증: 표가 내용 전체 높이로 회복되고 `.ms-wrap`이 스스로 스크롤 컨테이너가 되어
+   인계 기록(`handoff_log.html.j2`)과 같은 방식(전체가 통짜로 스크롤)이 된다.
+   `overflow-x:auto`는 그대로 둬 가로 스크롤은 유지된다. #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
 {% block head_extra %}
 <style>
-  .ms-wrap{padding:1.75rem;display:flex;flex-direction:column;gap:18px;max-width:1360px}
+  .ms-wrap{padding:1.75rem;display:flex;flex-direction:column;gap:18px;max-width:1360px;
+    flex:1;min-height:0;overflow-y:auto}
 
   /* ── 경고 배너 ── */
   .ms-banner{display:flex;gap:14px;padding:14px 16px;border-radius:8px;
@@ -43,7 +76,7 @@
   .ms-soldout-note{font:400 11px/1.4 var(--font);color:var(--on-variant)}
 
   /* ── 표 (CSS grid 기반 — 헤더·본문이 한 grid 라 거터가 어긋나지 않는다) ── */
-  .ms-table-wrap{overflow-x:auto;border:1px solid var(--outline-variant);border-radius:8px;background:var(--card)}
+  .ms-table-wrap{overflow-x:auto;flex-shrink:0;border:1px solid var(--outline-variant);border-radius:8px;background:var(--card)}
   .ms-table{display:grid;grid-template-columns:130px 100px minmax(240px,1fr) 110px 110px 110px 130px;min-width:940px}
   .ms-thead{display:contents}
   .ms-th{position:sticky;top:0;background:var(--container);color:var(--on-variant);z-index:1;
