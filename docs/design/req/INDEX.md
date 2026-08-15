@@ -107,7 +107,7 @@
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
-| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md) (구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | — | **재정의** (`/admin2/spec-fill` 존재) |
+| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | — | **재정의** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 37개 중 유일하게 Phoenix 벤더를 실제 로드하는 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정, 이후 커밋 0건. **「고칠 것」이 아니라 승인 디자인 받아 「새로 지을 것」.** ⚠ 검수 화면 딥링크는 이미 지원된다(커밋 `304e39f`, 2026-08-14) — 승인 경로 완결, 막고 있던 이유는 사라졌고 남은 건 이 화면의 [검수로 보내기] 버튼 잠금 해제뿐) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
 | 30 | **AI 연동 설정** | [req-ai-integration.md](req-ai-integration.md) | `dc-ai-integration.html` | **지음** (`/admin2/ai-integration`) |
 | 31 | **AI 사용량 · 비용** | [req-ai-usage-cost.md](req-ai-usage-cost.md) | `dc-ai-usage-cost.html` | **지음** (`/admin2/ai-usage-cost`) |
