@@ -84,7 +84,7 @@
 |---|------|----------------|--------|------|
 | 18 | 공급처 | [req-suppliers.md](req-suppliers.md) | `spec-suppliers.md`(계약 · 1b 안) | **지음** (`/admin2/suppliers` · **ADM-SRC-030** · 커밋 `e5572eb` · 확인자 재검증 통과(하네스 통보 2026-08-15 — 커밋 자신은 "제작 완료·검증 중"이라 적었으나 그 뒤 통과) · 메뉴 연결 `6b3d637`) |
 | 19 | 매입 견적(용산) | [req-sourcing-quote.md](req-sourcing-quote.md) | `spec-sourcing.md`(계약 · 1a 안) | **지음** (`/admin2/sourcing` · **ADM-SRC-010** · 커밋 `d53732c` · 확인자 재검증 통과(하네스 통보 2026-08-15 — 위와 같은 경위) · 메뉴 연결 `6b3d637` · ⚠ 마이그레이션 `0053_sourcing_confirmed_at`은 스키마만이고 DB 미적용 — 적용 전까지 「오늘 확정 N건」은 `null`+사유 문구로 대신 응답한다) |
-| 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | `spec-price-import.md`(계약 · 1b 안) | **지음** (`/admin2/price-import` · **ADM-PRC-040** · 커밋 `4b23e78`(라우트·템플릿 함께) — 그 커밋 메시지 자신은 "재검증 진행 중"이라 적었으나 그 뒤 확인자 재검증 통과(하네스 통보 2026-08-15) · 메뉴 연결 `6b3d637`) |
+| 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | `spec-price-import.md`(계약 · 1b 안) | **지음** (`/admin2/price-import` · **ADM-PRC-040** · 커밋 `4b23e78`(라우트·템플릿 함께) — 그 커밋 메시지 자신은 "재검증 진행 중"이라 적었다. **decision-log `T-11`**: 같은 시각 다른 제작자가 배포를 막던 결함 둘(0행 복원 no-op·되돌리기 버튼 소실)을 같은 두 파일에서 고치다 working tree가 겹쳐 이 커밋에 조용히 함께 들어갔다 — A-46이 그 결함을 처음 실행 가능하게 만들어서야 드러난 잠복 결함이었다. 그 뒤 확인자 재검증 통과(하네스 통보 2026-08-15) · 메뉴 연결 `6b3d637`) |
 
 ## 5. 판매가
 
