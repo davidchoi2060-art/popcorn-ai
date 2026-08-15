@@ -50,10 +50,15 @@ QUEUE = ROOT / ".claude" / "dash-queue.jsonl"      # 화면 -> 세션 (우리가
 WATCH_HEARTBEAT = ROOT / ".claude" / "dash-watch.heartbeat"   # 감시자(로컬) 생존 신호
 
 # 팀원 이름 -> 한글. `.claude/agents/*.md` 가 정본이고 여기는 표시용이다.
+# ⚠ 2026-08-15 점검자 실측 — 신설 팀원 둘(archivist·designchecker)이 빠져 있어
+# 응답이 "ko":"archivist"·"ko":"designchecker"로 영문 그대로 나오고 있었다(.claude/
+# agents/ 10명 전수 대조로 확인 — 10명 전원이 이제 있다). 한글은 CLAUDE.md
+# "★ 확인은 세 축이고..."·"하네스가 손으로 하던 넷을 기록자에게 넘긴다" 항목과
+# 각 정의 파일(archivist.md·designchecker.md)의 description 문구를 그대로 따랐다.
 TEAM_KO = {
     "investigator": "조사자", "maker": "제작자", "checker": "확인자",
     "writer": "문장가", "dba": "DBA", "crosschecker": "검증자", "sweeper": "점검자",
-    "specfiller": "웹크롤링",
+    "specfiller": "웹크롤링", "archivist": "기록자", "designchecker": "계약자",
     "general-purpose": "하네스", "Explore": "하네스", "Plan": "하네스",
 }
 
@@ -149,8 +154,14 @@ def _roster() -> list[dict]:
         # 카드의 역할 줄은 정의의 `role:`(명사구)만 쓴다 — description 산문을 잘라 쓰다가
         # 「~한다」 서술문이 카드에 그대로 흘렀다(사용자 지적 2026-08-12: 시스템 UI 는
         # 명사구다). role 이 없으면 **지어내지 않고 빈칸**으로 둔다 — 정의에 채울 일이다.
+        #
+        # `ko_mapped` — 2026-08-15 추가(조기 발견 장치). TEAM_KO 에 없어 `ko`가 원문
+        # 이름으로 폴백됐는지를 **여기서 표시해 둔다**(archivist·designchecker 가 3주
+        # 가까이 영문으로 새고도 아무 데도 안 걸렸던 것과 같은 재발을 막는다). 기존
+        # 키(name·ko·role·desc·defined)는 그대로 두고 **추가만** 한다.
         out.append({"name": name, "ko": TEAM_KO.get(name, name),
-                    "role": role[:44], "desc": desc[:180], "defined": True})
+                    "role": role[:44], "desc": desc[:180], "defined": True,
+                    "ko_mapped": name in TEAM_KO})
     return out
 
 
@@ -592,6 +603,11 @@ def state(limit: int = 40, watcher: int = 0, agent: str = ""):
     # tool_use_id -> 팀원 이름 맵)을 채운다. 사건 목록보다 먼저 불러야 아래 태깅이
     # 최신 상태를 쓴다.
     roster, tot = _team()
+    # 2026-08-15 추가(조기 발견 장치) — `.claude/agents/*.md`에 정의는 있는데 TEAM_KO에
+    # 없어 `ko`가 영문 이름으로 폴백된 팀원. archivist·designchecker가 이 상태로 있다가
+    # 화면에 그대로 노출됐다(폴백이 에러를 안 내 조용히 틀렸다). 비어 있으면 지금은
+    # 전원 한글 매핑이 있다는 뜻이다.
+    team_unmapped = [a["name"] for a in roster if a.get("defined") and not a.get("ko_mapped", True)]
     agent = (agent or "").strip()
     if agent:
         evts = _agent_events(p, agent, cap=AGENT_EVENTS_CAP)
@@ -628,6 +644,7 @@ def state(limit: int = 40, watcher: int = 0, agent: str = ""):
         "roster": roster,                    # 팀원 명단 + 신호
         "today": _today(tot),                # 오늘 처리한 것 — 셀 수 있는 것만
         "watcher": _watcher(),               # 감시자 생존 — heartbeat 또는 ping, 신선한 쪽
+        "team_unmapped": team_unmapped,       # 정의는 있으나 TEAM_KO 미등록(위 주석) — 추가만
     }
 
 
@@ -640,7 +657,13 @@ def _today(tot: dict) -> dict:
     """
     out = {"day": tot.get("day"), "tools": tot.get("tools", 0), "says": tot.get("says", 0),
            "agent_done": tot.get("agent_done", 0), "agent_running": tot.get("agent_running", 0),
-           "agent_fail": tot.get("agent_fail", 0)}
+           "agent_fail": tot.get("agent_fail", 0),
+           # 2026-08-15 추가 — `_team()`은 이미 지연(실행 10분 초과) 팀원 수를 세고
+           # `tot["agent_delayed"]`에 담아 왔지만, 이 함수가 그 값을 응답에 안 실어
+           # 계산만 하고 나가지 않는 코드로 남아 있었다. 지금 화면이 안 쓰더라도 값
+           # 자체는 이미 정확하므로(지어낸 수가 아니다) 추가만 한다 — 나중에 지연
+           # 카운터 UI를 붙일 때 이 필드를 바로 쓸 수 있다.
+           "agent_delayed": tot.get("agent_delayed", 0)}
     try:
         n = subprocess.run(["git", "log", "--since=midnight", "--oneline"],
                            cwd=str(ROOT), capture_output=True, timeout=10)
