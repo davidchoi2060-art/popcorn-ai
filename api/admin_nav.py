@@ -164,6 +164,45 @@
   확인법: `.venv/Scripts/python -c "from api.admin_nav import counts; print(counts())"`
   — `new`(href 있음)가 이번에 연 수만큼 늘고 `todo`가 그만큼 줄었는지 본다.
   (판매가 재산정 신설은 예외 — 위 참조. `total` 도 함께 늘어야 정상이다.)
+
+■ href 연결 추가 — 상품관리 둘 · 상품사양관리 셋 · 판매가 하나 · 인계·성과 둘,
+  «검증 통과 여덟» (2026-08-15, 같은 날 7차)
+  하네스의 「확인자 재검증 통과」 통보(2026-08-15)를 받고 연다. **여덟 다 nav 항목이
+  이미 있었다 — 새로 만들지 않고 href 만 채웠다.** 비고의 「신설」·「…예정」류 문구는
+  지웠다 — 이제 사실이 아니다(실측: `catalog_import.html.j2`에 배치 이력·거부 행
+  조회가, `sale_price.html.j2`에 몰값·낡은값 구분이 이미 들어가 있다. 화면이 다
+  동작한다).
+
+      상품 일괄 등록        /admin2/catalog-import         커밋 08541f7
+        ⚠⚠ owner 인데 업로드가 영구히 잠기던 결함을 고쳤다 — 화면이 셸의 스크립트를
+        중복 로드해 `window.Admin2Shell` 인스턴스가 둘 생겼고, 먼저 뜬 것에 걸렸는데
+        나중 것이 덮어써 권한이 영영 갱신 안 됐다. 재검증: `script[src]` 정확히 2개 ·
+        잠금 문구 사라짐 · 파일 입력 3개 열림 · `canWrite('owner')===true`.
+      삭제 상품 조회        /admin2/deleted-products       커밋 107e819
+        로딩 표시가 안 사라지던 CSS 결함 해소(`hidden` 인데 `display:flex` 였다).
+        화면 수치 ↔ API 응답 전수 대조 일치.
+      상품 사양 정의        /admin2/spec-field-defs        결함 없음
+      추천 가능 재고 현황    /admin2/candidate-pool         결함 없음
+      부품 교체 · 클릭 기록  /admin2/swap-click-logs        결함 없음
+      판매가 관리           /admin2/sale-price             결함 없음
+      쇼핑몰 동기화         /admin2/mall-sync              커밋 f3cec63
+        콘텐츠가 스크롤 수단 없이 잘리던 것 해소 — 배너~각주까지 한 덩어리로 스크롤.
+        ⚠ 부작용 하나가 남았다(표 헤더 sticky 무력화, 작업 #51) — 확인자 판정
+        「화면 기능은 정상, 배포를 막을 사유 아님」.
+      인계 기록             /admin2/handoff-log            결함 없음
+
+  회귀 868건 전부 통과(실패 0).
+
+  **연결하지 않는다 — 용도별 최소 사양(`/admin2/usage-floors`).** 헤더·본문이 서로
+  다른 가로 스크롤 컨테이너였던 결함은 고쳤지만(`.uf-tablewrap` 단일 컨테이너 +
+  `.uf-thead` sticky 로 구조 변경, 커밋 917baea), 확인자가 아직 «눈으로» 못 봤다 —
+  「검증 통과가 조건」이라 이번엔 뺀다. href=None · note=None 그대로 둔다(원래도
+  신설류 문구가 없었다). 상태는 `docs/design/req/INDEX.md`에서 「수정 완료 ·
+  확인자 재검증 대기」로 관리한다.
+
+  확인법: `.venv/Scripts/python -c "from api.admin_nav import counts; print(counts())"`
+  — `new`(href 있음) 30 -> 38 · `todo` 9 -> 1(남는 하나 = 용도별 최소 사양) ·
+  `total` 39 불변(여덟 다 라벨이 이미 있어 href만 채웠다).
 """
 
 # 그룹: (제목, 아이콘, [항목])
@@ -177,23 +216,23 @@ NAV = [
         ("상품 분류 관리", "/admin2/categories", None),
         ("상품 관리", "/admin2/products", None),
         ("상품 분류 매핑", "/admin2/category-mapping", None),
-        ("상품 일괄 등록", None, "이력·오류건 통합 예정"),
-        ("삭제 상품 조회", None, "신설"),
+        ("상품 일괄 등록", "/admin2/catalog-import", None),
+        ("삭제 상품 조회", "/admin2/deleted-products", None),
     ]),
 
     # 도매꾹에 대응물이 통째로 없는 축. 파는 일이 아니라 **추천되게 하는 일**이다.
     ("상품사양관리", "sliders", [
         ("조립 호환 지도", "/admin2/build-map", "신설 · 관계 22쌍 한 장"),
         ("조립 사양 표준", "/admin2/spec-standard", "신설 · 사람이 항목을 늘린다"),
-        ("상품 사양 정의", None, None),
+        ("상품 사양 정의", "/admin2/spec-field-defs", None),
         ("상품 사양 검수", "/admin2/reviews", "신설 · 사장님 확정 화면(2026-08-13)"),
         ("조립 호환 규칙", "/admin2/compat-rules", None),
         ("용도별 최소 사양", None, None),
         ("부품 등급 관리", "/admin2/part-grade", None),
         ("추천 기준 보기", "/admin2/policy-weights", None),
-        ("추천 가능 재고 현황", None, None),
+        ("추천 가능 재고 현황", "/admin2/candidate-pool", None),
         ("견적 상담 기록", "/admin2/consult-sessions", None),
-        ("부품 교체 · 클릭 기록", None, None),
+        ("부품 교체 · 클릭 기록", "/admin2/swap-click-logs", None),
     ]),
 
     # 소싱은 **우리 일이다.** 가격 원천은 몰이지만, 직접 공급사에서 소싱하는 경우
@@ -210,7 +249,7 @@ NAV = [
     #   경보 = 잠기지 않았는데 몰과 어긋난 건 → 동기화 누락
     # 지금은 값이 하나뿐이라 셋을 구분할 수 없다(2026-08-11 실측: 표본 10건 중 2건 불일치).
     ("판매가", "dollar-sign", [
-        ("판매가 관리", None, "몰값·우리값·낡은값 구분 필요"),
+        ("판매가 관리", "/admin2/sale-price", None),
         ("가격 검토 대기", "/admin2/price-review", None),
         ("마진 정책", "/admin2/margin-policy", None),
         ("가격 이력", "/admin2/price-history", None),
@@ -221,8 +260,8 @@ NAV = [
     # 자체 판매 전제로 짜인 IA 라 「매출 집계」가 있고 「인계 성과」가 없었다.
     # 우리는 팔지 않는다. 넘길 뿐이다. 그러면 재야 할 것은 매출이 아니라 **전환**이다.
     ("인계 · 성과", "share-2", [
-        ("쇼핑몰 동기화", None, "신설 — 받아온 시각 · 어긋난 건수"),
-        ("인계 기록", None, "신설 — 무엇을 언제 어떤 견적으로 넘겼나"),
+        ("쇼핑몰 동기화", "/admin2/mall-sync", None),
+        ("인계 기록", "/admin2/handoff-log", None),
         ("유입 성과", "/admin2/funnel-performance", "신설 — 인계 → 구매 전환"),
     ]),
 
