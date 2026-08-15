@@ -103,7 +103,7 @@ def dashboard():
 
 @router.get("/quote-quality")
 def quote_quality():
-    """견적 품질 — **AI 가 제 일을 하는가**(재구축 대시보드의 수요 축 · UX-14).
+    """견적 품질 — **AI 가 제 일을 하는가**(재구축 대시보드의 수요 축 · UX-34).
 
     기존 `/dashboard` 의 `sessions_today` 는 **오늘치**만 본다. 재구축 대시보드는
     **누적 성립률**을 중심 지표로 삼기로 했다 — "AI 제안이 얼마나 효율적인가"에
@@ -127,10 +127,18 @@ def quote_quality():
             "SELECT mode, COUNT(*) FROM consult_sessions GROUP BY 1 ORDER BY 2 DESC")).all()
         tiers = conn.execute(text(
             "SELECT quote_type, COUNT(*) FROM quote_snapshots GROUP BY 1 ORDER BY 2 DESC")).all()
+        # 상관 서브쿼리(상품 22,840건 × 매 행마다 stock_movements 전량 스캔)가
+        # EXPLAIN ANALYZE 실측 13.7초 — quote-quality 응답 시간의 사실상 전부였다
+        # (loops=22840짜리 SubPlan, stock_movements(product_code)에 인덱스 없음).
+        # GROUP BY로 미리 한 번만 집계해 LEFT JOIN하면 같은 식·같은 결과를 20ms대로
+        # 낸다(약 680배) — 인덱스 추가 없이 쿼리 형태만 바꿔 해결된다(실측 후 판단).
+        # 결과가 한 건도 달라지면 안 된다 — 재고 정합 판정(불변식 stock_qty=SUM(qty_delta))이다.
         drift = one(
-            "SELECT COUNT(*) FROM products p WHERE p.stock_qty <> COALESCE("
-            " (SELECT SUM(m.qty_delta) FROM stock_movements m"
-            "  WHERE m.product_code = p.product_code), 0)")
+            "SELECT COUNT(*) FROM products p LEFT JOIN ("
+            " SELECT product_code, SUM(qty_delta) AS total_delta"
+            " FROM stock_movements GROUP BY product_code"
+            " ) m ON m.product_code = p.product_code"
+            " WHERE p.stock_qty <> COALESCE(m.total_delta, 0)")
         members = one("SELECT COUNT(*) FROM members")
         payments = one("SELECT COUNT(*) FROM payments")
 

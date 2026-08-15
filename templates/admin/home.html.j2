@@ -1,1214 +1,257 @@
 {#
-  운영 대시보드 — Phoenix 「Ecommerce Dashboard」(`public/index.html`) **원본 그대로**.
+  운영 대시보드(ADM-DASH-010) — 승인 디자인 `docs/design/dc-dashboard-3안.html` **1b 카드
+  그리드형**(UX-22, 2026-08-14 사장님 확정). 세 안(1a 큐 목록형·1b·1c 브리핑형)은 "지금 할
+  일" 표현 방식만 다르고 콘텐츠 6종은 같다 — 이 화면은 1b 구간만 옮겼다.
 
-  사용자 원칙(2026-08-09): 템플릿 틀을 고치지 않는다. 가장 알맞은 포맷을 찾아
-  **제목만** 우리 것으로 바꾸고, 못 채우는 칸은 지우지 않는다.
+  ■ 재구축(2026-08-15) — 옛 Phoenix(Bootstrap) 이커머스 대시보드 견본을 걷어냈다.
+    Bootstrap · list.js · choices.js · feather · 외부 CDN(vendors/leaflet 등) 전부 제거.
+    admin2.css 토큰만 쓴다 — `:root`를 다시 정의하지 않는다(회귀 [30]). 옛 `:root` 브릿지
+    (Phoenix 서체 변수 하나를 admin2 서체 토큰에 연결하던 한 줄)도 함께 지웠다 — Phoenix를
+    걷어내면 그 변수를 참조하는 CSS가 없어 브릿지 자체가 필요 없다.
+    승인 디자인이 물고 있던 구글 폰트(IBM Plex)는 Claude Design 캔버스 공통 서문이라
+    옮기지 않았다(판단) — `var(--font)`/`var(--font-num)`(Pretendard·Noto Sans KR·JetBrains
+    Mono, 전부 자체 호스팅)로 대신한다.
 
-  ■ 이 화면은 지금 **레이아웃 견본**이다 — 상단 배너가 그렇게 말한다
-    본문의 수치·차트는 전부 **Phoenix 템플릿 예시값**이고 우리 데이터가 아니다.
-    실데이터 연결은 나중이다(사용자 결정: "기존 데이터를 연계하는 것은 큰 의미가 없음").
-    **그래서 배너가 필수다.** 이 프로젝트는 화면에 남은 예시값을 사람이 사실로 읽어
-    26,480 · 호환성 5종 · 645,000원 같은 거짓을 오래 달고 있었다.
-    견본이라고 **먼저 밝히면** 그 숫자는 거짓말이 아니라 견본이 된다.
-
-  ■ 바꾼 것은 둘뿐
-    ① 자산 경로 — 템플릿은 `assets/…` 상대경로, 우리는 `/admin/…` 로 서빙한다.
-    ② 제목 21곳 — 값·구조·차트·클래스는 한 글자도 안 건드렸다.
-
-  ■ 가져온 템플릿 자산
-    `assets/js/dashboards/ecommerce-dashboard.js`(차트 초기화) ·
-    `vendors/leaflet*` 3종(지역 지도). 우리에게 없던 것이라 템플릿에서 복사했다.
-
-  ■ 2026-08-13 셸 통합 — LNB·헤더·팔레트는 admin2 공통 셸(`_admin2_shell.html.j2`)로
-    옮겼다. 본문(Phoenix 이커머스 대시보드 견본)은 손대지 않는다(사용자 원칙 2026-
-    08-09: "템플릿 틀을 고치지 않는다") — 그래서 `head_extra`/`foot_extra` 블록으로
-    그 벤더 CSS·JS를 함께 싣는다. `data-screen-id`/`data-domain`/빵부스러기는 이제
-    라우트(`api/admin_ui_home.py`)가 컨텍스트로 준다.
+  ■ 데이터 — 전부 `api/admin_ui_home.py`가 `api/admin_dashboard.py`의 기존 실집계 함수
+    넷을 직접 불러 채운다(방문마다 서버 재조회 · 서버가 「—」/사유를 준 자리는 그대로
+    옮긴다 — 화면이 숫자를 지어내지 않는다). 이 파일은 표시만 한다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
 {% block title %}대시보드{% endblock %}
 
 {% block head_extra %}
-{# Phoenix(Bootstrap) 벤더 자산 — 이 화면 전체가 Phoenix 이커머스 대시보드 견본이라
-   손대지 않는다(위 문서 참조). #}
-<link rel="apple-touch-icon" sizes="180x180" href="/admin/assets/img/favicons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/admin/assets/img/favicons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/admin/assets/img/favicons/favicon-16x16.png">
-<link rel="shortcut icon" type="image/x-icon" href="/admin/assets/img/favicons/favicon.ico">
-<meta name="theme-color" content="#ffffff">
-<script src="/admin/vendors/simplebar/simplebar.min.js"></script>
-<script src="/admin/assets/js/config.js"></script>
-<link href="/admin/vendors/simplebar/simplebar.min.css" rel="stylesheet">
-<link href="/admin/vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
-<script src="/shared/ui-choices.js"></script>
-<script src="/shared/ui-list.js"></script>
-<link href="/admin/assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
-<link href="/admin/assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
 <style>
-  :root{ --phoenix-font-sans-serif: var(--font); }
-  .card > .card-header, .card > .card-body { min-width: 0; }
+/* admin2.css(:root)의 토큰만 var()로 읽는다 — 이 화면은 --custom-property 를 다시
+   선언하지 않는다(회귀 [30]이 templates/**/*.j2 전체에서 "--이름: 값;" 형태를 훑어
+   design-system/tokens.css 의 정본 이름과 겹치는지 본다 — :root 안팎을 가리지 않는다).
+   아래는 전부 "값으로 읽기"(var(--x))뿐이고 "다시 선언"(--x: ...;)이 없다.
+
+   admin2.css 팔레트에 없는 강조 틴트(성공/경고 배지 배경)만 승인 디자인의 리터럴 값을
+   그대로 옮겼다 — --rv-green/--rv-red 는 있지만 그 옅은 배경색 토큰은 admin2.css 에
+   없다(고객용 tokens.css 의 --success-container 를 admin2 화면이 빌려 쓰면 안 된다 —
+   두 팔레트를 섞지 않는다, admin2.css 파일 상단 경고). */
+.dash-root{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.dash-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:14px 18px 16px}
+.dash-err{flex:none;background:oklch(0.95 0.03 30);border:1px solid oklch(0.55 0.16 30 / .4);
+      border-radius:8px;padding:10px 14px;font:400 11.5px/1.6 var(--font);color:var(--rv-ink-soft)}
+.dash-err b{color:var(--error)}
+.dash-todo-hd{flex:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dash-todo-hd .t{font:600 13px/1.3 var(--font)}
+.dash-todo-hd .n{font:400 11px/1 var(--font-num);color:var(--rv-muted)}
+.dash-todo-hd .n b{font-weight:600}
+.dash-todo-hd .note{font:400 10px/1.4 var(--font);color:var(--rv-dim)}
+.dash-grid{flex:none;display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:10px}
+.dash-card{display:block;background:var(--card);border:1px solid rgba(0,0,0,.13);
+       border-left:3px solid var(--rv-green);border-radius:8px;padding:12px 15px;
+       text-decoration:none;color:inherit}
+.dash-card.urgent{border-left-color:var(--tertiary)}
+/* 원안 좌측 테두리는 #d3cec2 — admin2.css에 이 값과 일치하는 토큰이 없다(가장 가까운
+   --rv-dim3=#c4bdae/--rv-dim4=#cfc9bd 모두 다른 값). 위 30~33행과 같은 이유로 리터럴을
+   그대로 옮긴다(강조 틴트처럼 admin2 팔레트가 아직 못 채운 자리 — 토큰 신설은 admin2.css
+   소관이라 여기서 하지 않는다). */
+.dash-card.off{border-color:rgba(0,0,0,.07);border-left-color:#d3cec2;cursor:default}
+.dash-card .row{display:flex;align-items:center;gap:7px}
+.dash-card .name{font:600 11.5px/1.35 var(--font);color:var(--on)}
+.dash-card.off .name{color:var(--rv-dim)}
+.dash-card .grow{flex:1}
+.dash-card .badge{font:600 9.5px/1 var(--font);border-radius:4px;padding:4px 7px;
+              color:var(--on-primary);background:var(--rv-ink)}
+.dash-card.off .badge{color:var(--rv-dim2);background:var(--container-low);border:1px solid rgba(0,0,0,.08)}
+.dash-card .count{font:600 30px/1.25 var(--font-num);font-variant-numeric:tabular-nums;margin:7px 0 4px;color:var(--on)}
+.dash-card.off .count{color:var(--rv-dim2)}
+.dash-card .sub{font:400 10px/1.5 var(--font);color:var(--rv-faint)}
+.dash-flow{flex:none;background:var(--card);border:1px solid rgba(0,0,0,.11);border-radius:8px;
+       padding:11px 15px;display:flex;align-items:center;gap:22px;flex-wrap:wrap;row-gap:8px}
+.dash-flow .lbl{font:600 10.5px/1 var(--font);color:var(--rv-faint);letter-spacing:.04em}
+.dash-flow .metric{display:flex;align-items:baseline;gap:6px}
+.dash-flow .metric b{font:600 19px/1 var(--font-num)}
+.dash-flow .metric span{font:400 10.5px/1 var(--font);color:var(--rv-ink-soft)}
+.dash-flow .arrow{color:var(--rv-dim3)}
+.dash-flow .grow{flex:1}
+.dash-flow .pending{display:flex;align-items:center;gap:7px;color:var(--rv-dim)}
+.dash-flow .pending .tag{font:600 9.5px/1 var(--font);border:1px solid rgba(0,0,0,.16);border-radius:3px;padding:3px 6px}
+.dash-flow .stock{display:flex;align-items:center;gap:7px}
+.dash-flow .stock .lbl2{font:600 10.5px/1 var(--font);color:var(--rv-faint)}
+.dash-flow .stock .badge{font:600 10px/1 var(--font);border-radius:4px;padding:3px 6px;border:1px solid}
+.dash-flow .stock .badge.ok{color:var(--rv-green);background:oklch(0.95 0.03 165);border-color:oklch(0.5 0.11 165 / .3)}
+.dash-flow .stock .badge.warn{color:var(--error);background:oklch(0.95 0.03 30);border-color:oklch(0.52 0.16 30 / .35)}
+.dash-flow .stock .badge.error{color:var(--rv-dim);background:var(--container-low);border-color:rgba(0,0,0,.12)}
+.dash-row3{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:10px}
+.dash-panel{background:var(--card);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:12px 15px;
+        display:flex;flex-direction:column;min-height:0}
+.dash-panel .hd{font:600 10.5px/1 var(--font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:9px;
+             display:flex;align-items:baseline;gap:8px}
+.dash-panel .hd .sample{flex:1;text-align:right;font:400 9.5px/1 var(--font-num);color:var(--rv-dim)}
+.dash-panel .hd .link{font:400 9.5px/1;color:var(--rv-dim)}
+.dash-panel .hd .link a{text-decoration:underline;color:inherit}
+.dash-rate{display:flex;align-items:baseline;gap:7px}
+.dash-rate b{font:600 30px/1 var(--font-num)}
+.dash-rate span{font:400 10.5px/1.4 var(--font);color:var(--rv-ink-soft)}
+.dash-modes{display:flex;flex-direction:column;gap:6px;margin-top:11px}
+.dash-modes .row{display:flex;align-items:center;gap:8px}
+.dash-modes .name{font:400 10px/1 var(--font);color:var(--rv-muted);width:34px;flex:none}
+.dash-modes .bar{flex:1;height:7px;background:rgba(0,0,0,.07);border-radius:3px;overflow:hidden}
+.dash-modes .bar i{display:block;height:100%;background:var(--rv-link)}
+.dash-modes .pct{font:500 10px/1 var(--font-num);color:var(--rv-muted);width:36px;text-align:right;flex:none}
+.dash-funnel{display:flex;flex-direction:column;gap:6px}
+.dash-funnel .row{display:flex;align-items:center;gap:8px}
+.dash-funnel .name{font:400 10px/1.3 var(--font);color:var(--rv-muted);width:64px;flex:none}
+.dash-funnel .bar{flex:1;height:15px;background:rgba(0,0,0,.05);border-radius:3px;overflow:hidden}
+.dash-funnel .bar i{display:block;height:100%;background:var(--rv-ink-soft);box-sizing:border-box}
+.dash-funnel .bar i.dashed{background:transparent;border:1px dashed rgba(0,0,0,.2)}
+.dash-funnel .val{width:58px;text-align:right;font:500 10.5px/1 var(--font-num);color:var(--rv-ink-soft)}
+.dash-funnel .val.empty{font:600 9px/1 var(--font);color:var(--rv-dim2);white-space:nowrap}
+.dash-foot-note{font:400 9.5px/1.55 var(--font);color:var(--rv-dim);margin-top:auto;padding-top:7px}
+.dash-logs{display:flex;flex-direction:column;min-height:0;overflow:auto}
+.dash-logs .row{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.dash-logs .at{font:400 9.5px/1.4 var(--font-num);color:var(--rv-dim);flex:none}
+.dash-logs .msg{font:400 10.5px/1.5 var(--font);color:var(--rv-ink-soft);flex:1}
+.dash-empty{font:400 11px/1.6 var(--font);color:var(--rv-dim)}
+.dash-refresh{font:500 11px/1 var(--font);color:var(--on);border:1px solid rgba(0,0,0,.2);
+           border-radius:5px;padding:7px 10px;cursor:pointer;background:none}
+.dash-refresh:hover{background:var(--container-low)}
+.dash-time{font-family:var(--font-num)}
+.dash-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);background:var(--container);
+       padding:8px 18px;font:400 10px/1.5 var(--font);color:var(--rv-faint)}
+@media (max-width:768px){
+  .dash-root{overflow:visible;height:auto}
+  .dash-scroll{overflow:visible}
+  .dash-grid{grid-template-columns:1fr}
+  .dash-row3{grid-template-columns:1fr;overflow:visible}
+  .dash-flow{gap:12px}
+}
 </style>
-<link href="/admin/vendors/leaflet/leaflet.css" rel="stylesheet">
-<link href="/admin/vendors/leaflet.markercluster/MarkerCluster.css" rel="stylesheet">
-<link href="/admin/vendors/leaflet.markercluster/MarkerCluster.Default.css" rel="stylesheet">
+{% endblock %}
+
+{% block header_extra %}
+<span class="a2-badge dash-time">{{ generated_at }} 조회</span>
+<button type="button" class="dash-refresh" onclick="location.reload()">새로 고침</button>
 {% endblock %}
 
 {% block content %}
-<div class="a2-content-pad">
-{# 견본임을 먼저 말한다 — 아래 수치는 우리 것이 아니다. #}
-<div class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="status">
-  <span data-feather="alert-triangle" class="flex-shrink-0 mt-1" style="width:18px;height:18px;"></span>
-  <div>
-    <b>레이아웃 견본입니다.</b>
-    아래 수치·그래프·표는 전부 <b>Phoenix 템플릿의 예시값</b>이고 팝콘PC 데이터가 아닙니다.
-    제목만 우리 것으로 바꿔 <b>배치를 확인하기 위한 화면</b>입니다 — 실데이터 연결은 다음 단계입니다.
+<div class="dash-root">
+  <div class="dash-scroll">
+
+    {% if errors %}
+    <div class="dash-err" role="status">
+      <b>일부 항목을 불러오지 못했습니다.</b>
+      {% for e in errors %}<div>{{ e }}</div>{% endfor %}
+      <div>값이 비어 있는 자리는 실제 0이 아니라 조회 실패입니다 — 각 값에 마우스를 올리면 사유가 보입니다.</div>
+    </div>
+    {% endif %}
+
+    <div class="dash-todo-hd">
+      <span class="t">지금 할 일</span>
+      <span class="n">admin2에서 처리 가능 <b>{{ active_total_fmt }}</b>건</span>
+      <span class="grow"></span>
+      <span class="note">주문·환불 계열은 인계 확정으로 표시하지 않습니다</span>
+    </div>
+
+    {% if work_items %}
+    <div class="dash-grid">
+      {% for w in work_items %}
+      {% if w.active %}
+      <a class="dash-card{{ ' urgent' if w.urgent else '' }}" href="{{ w.href }}">
+        <div class="row">
+          <span class="name">{{ w.name }}</span>
+          <span class="grow"></span>
+          <span class="badge">{{ w.badge }}</span>
+        </div>
+        <div class="count">{{ w.count_fmt }}</div>
+        <div class="sub">{{ w.sub }}</div>
+      </a>
+      {% else %}
+      <div class="dash-card off" title="{{ w.reason }}">
+        <div class="row">
+          <span class="name">{{ w.name }}</span>
+          <span class="grow"></span>
+          <span class="badge">{{ w.badge }}</span>
+        </div>
+        <div class="count">{{ w.count_fmt }}</div>
+        <div class="sub">{{ w.sub }}</div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="dash-empty">지금 할 일을 불러오지 못했습니다{{ ' — ' + work_error if work_error else '' }}.</div>
+    {% endif %}
+
+    <div class="dash-flow">
+      <span class="lbl">오늘의 흐름</span>
+      <span class="metric" title="{{ flow.consult.reason or '' }}">
+        <b>{{ flow.consult.value_fmt }}</b><span>상담{% if flow.consult.status == 'ok' %} (이탈 {{ flow.drop_fmt }}){% endif %}</span>
+      </span>
+      <span class="arrow">→</span>
+      <span class="metric" title="{{ flow.quoted.reason or '' }}">
+        <b>{{ flow.quoted.value_fmt }}</b><span>견적 성립 (오늘 기준)</span>
+      </span>
+      <span class="arrow">→</span>
+      <span class="pending">
+        <span>몰 인계</span><span class="tag">향후 사용예정</span><span>handoffs API 재정비 후 연결</span>
+      </span>
+      <span class="grow"></span>
+      <span class="stock">
+        <span class="lbl2">재고 정합</span>
+        <span class="badge {{ flow.stock.status }}" title="{{ flow.stock.reason or '' }}">{{ flow.stock.label }}</span>
+      </span>
+    </div>
+
+    <div class="dash-row3">
+      <div class="dash-panel">
+        <div class="hd">
+          <span>견적 품질 — 누적</span>
+          {% if quality.status == 'ok' %}<span class="sample">{{ quality.quoted_fmt }} / {{ quality.sessions_fmt }}</span>{% endif %}
+        </div>
+        {% if quality.status == 'ok' %}
+        <div class="dash-rate"><b>{{ quality.rate_fmt }}</b><span>견적 성립률</span></div>
+        <div class="dash-modes">
+          {% for mo in quality.modes %}
+          <div class="row">
+            <span class="name">{{ mo.label }}</span>
+            <span class="bar"><i style="width:{{ mo.pct }}%"></i></span>
+            <span class="pct">{{ mo.pct }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="dash-empty">견적 품질을 불러오지 못했습니다 — {{ quality.reason }}</div>
+        {% endif %}
+      </div>
+
+      <div class="dash-panel">
+        <div class="hd"><span>유입 깔때기 — 접속 → 인계</span></div>
+        <div class="dash-funnel">
+          {% for f in funnel_steps %}
+          <div class="row" title="{{ f.reason or '' }}">
+            <span class="name">{{ f.label }}</span>
+            <span class="bar"><i class="{{ '' if f.status == 'ok' else 'dashed' }}" style="width:{{ f.pct }}%"></i></span>
+            <span class="val{{ ' empty' if f.status != 'ok' else '' }}">{{ f.value_fmt }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="dash-foot-note">장바구니는 <b>원천 없음</b>(0이 아닙니다) · 몰 인계는 handoffs API 재정비 후 연결 — 그 전에는 숫자를 표시하지 않습니다.</div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="hd"><span>최근 운영자 활동</span><span class="link">· 전체는 <a href="/admin2/activity-logs">작업 기록</a>에서</span></div>
+        {% if logs %}
+        <div class="dash-logs">
+          {% for l in logs %}
+          <div class="row">
+            <span class="at">{{ l.at }}</span>
+            <span class="msg">{{ l.msg }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="dash-empty">{{ ('최근 활동을 불러오지 못했습니다 — ' + dash_error) if dash_error else '최근 활동이 없습니다' }}</div>
+        {% endif %}
+      </div>
+    </div>
+
   </div>
+  <div class="dash-foot">서버 조회 실패는 사유를 그대로 밝히고 해당 값은 「—」로 표시합니다 · 미로그인 접근은 401 → 로그인으로 보냅니다 · 외부 CDN 자산 없음(A-30)</div>
 </div>
-
-        <div class="pb-5">
-          <div class="row g-4">
-            <div class="col-12 col-xxl-6">
-              <div class="mb-8">
-                <h2 class="mb-2">팝콘PC 운영 대시보드</h2>
-                <h5 class="text-body-tertiary fw-semibold">지금 팝콘PC에서 일어나는 일입니다</h5>
-              </div>
-              <div class="row align-items-center g-4">
-                <div class="col-12 col-md-auto">
-                  <div class="d-flex align-items-center"><span class="fa-stack" style="min-height: 46px;min-width: 46px;"><span class="fa-solid fa-square fa-stack-2x dark__text-opacity-50 text-success-light" data-fa-transform="down-4 rotate--10 left-4"></span><span class="fa-solid fa-circle fa-stack-2x stack-circle text-stats-circle-success" data-fa-transform="up-4 right-3 grow-2"></span><span class="fa-stack-1x fa-solid fa-star text-success " data-fa-transform="shrink-2 up-8 right-6"></span></span>
-                    <div class="ms-3">
-                      <h4 class="mb-0">신규 주문 57건</h4>
-                      <p class="text-body-secondary fs-9 mb-0">처리 대기</p>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-auto">
-                  <div class="d-flex align-items-center"><span class="fa-stack" style="min-height: 46px;min-width: 46px;"><span class="fa-solid fa-square fa-stack-2x dark__text-opacity-50 text-warning-light" data-fa-transform="down-4 rotate--10 left-4"></span><span class="fa-solid fa-circle fa-stack-2x stack-circle text-stats-circle-warning" data-fa-transform="up-4 right-3 grow-2"></span><span class="fa-stack-1x fa-solid fa-pause text-warning " data-fa-transform="shrink-2 up-8 right-6"></span></span>
-                    <div class="ms-3">
-                      <h4 class="mb-0">보류 5건</h4>
-                      <p class="text-body-secondary fs-9 mb-0">보류</p>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-auto">
-                  <div class="d-flex align-items-center"><span class="fa-stack" style="min-height: 46px;min-width: 46px;"><span class="fa-solid fa-square fa-stack-2x dark__text-opacity-50 text-danger-light" data-fa-transform="down-4 rotate--10 left-4"></span><span class="fa-solid fa-circle fa-stack-2x stack-circle text-stats-circle-danger" data-fa-transform="up-4 right-3 grow-2"></span><span class="fa-stack-1x fa-solid fa-xmark text-danger " data-fa-transform="shrink-2 up-8 right-6"></span></span>
-                    <div class="ms-3">
-                      <h4 class="mb-0">재고 없음 15개</h4>
-                      <p class="text-body-secondary fs-9 mb-0">재고 없음</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <hr class="bg-body-secondary mb-6 mt-4" />
-              <div class="row flex-between-center mb-4 g-3">
-                <div class="col-auto">
-                  <h3>매출 추이</h3>
-                  <p class="text-body-tertiary lh-sm mb-0">전 채널 결제 수령액</p>
-                </div>
-                <div class="col-8 col-sm-4">
-                  <select class="form-select form-select-sm" id="select-gross-revenue-month">
-                    <option>2026년 6월</option>
-                    <option>2026년 7월</option>
-                    <option>2026년 8월</option>
-                  </select>
-                </div>
-              </div>
-              <div class="echart-total-sales-chart" style="min-height:320px;width:100%"></div>
-            </div>
-            <div class="col-12 col-xxl-6">
-              <div class="row g-3">
-                <div class="col-12 col-md-6">
-                  <div class="card h-100">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between">
-                        <div>
-                          <h5 class="mb-1">주문<span class="badge badge-phoenix badge-phoenix-warning rounded-pill fs-9 ms-2"><span class="badge-label">-6.8%</span></span></h5>
-                          <h6 class="text-body-tertiary">최근 7일</h6>
-                        </div>
-                        <h4>16,247</h4>
-                      </div>
-                      <div class="d-flex justify-content-center px-4 py-6">
-                        <div class="echart-total-orders" style="height:85px;width:115px"></div>
-                      </div>
-                      <div class="mt-2">
-                        <div class="d-flex align-items-center mb-2">
-                          <div class="bullet-item bg-primary me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">완료</h6>
-                          <h6 class="text-body fw-semibold mb-0">52%</h6>
-                        </div>
-                        <div class="d-flex align-items-center">
-                          <div class="bullet-item bg-primary-subtle me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">결제 대기</h6>
-                          <h6 class="text-body fw-semibold mb-0">48%</h6>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-6">
-                  <div class="card h-100">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between">
-                        <div>
-                          <h5 class="mb-1">신규 회원<span class="badge badge-phoenix badge-phoenix-warning rounded-pill fs-9 ms-2"> <span class="badge-label">+26.5%</span></span></h5>
-                          <h6 class="text-body-tertiary">최근 7일</h6>
-                        </div>
-                        <h4>356</h4>
-                      </div>
-                      <div class="pb-0 pt-4">
-                        <div class="echarts-new-customers" style="height:180px;width:100%;"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-6">
-                  <div class="card h-100">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between">
-                        <div>
-                          <h5 class="mb-2">왜 추천에 못 들어가나</h5>
-                          <h6 class="text-body-tertiary">최근 7일</h6>
-                        </div>
-                      </div>
-                      <div class="pb-4 pt-3">
-                        <div class="echart-top-coupons" style="height:115px;width:100%;"></div>
-                      </div>
-                      <div>
-                        <div class="d-flex align-items-center mb-2">
-                          <div class="bullet-item bg-primary me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">사양 미등록</h6>
-                          <h6 class="text-body fw-semibold mb-0">72%</h6>
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                          <div class="bullet-item bg-primary-lighter me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">검수 대기</h6>
-                          <h6 class="text-body fw-semibold mb-0">18%</h6>
-                        </div>
-                        <div class="d-flex align-items-center">
-                          <div class="bullet-item bg-info-dark me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">가격 미산정</h6>
-                          <h6 class="text-body fw-semibold mb-0">10%</h6>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-6">
-                  <div class="card h-100">
-                    <div class="card-body d-flex flex-column">
-                      <div class="d-flex justify-content-between">
-                        <div>
-                          <h5 class="mb-2">견적 성립 vs 불성립</h5>
-                          <h6 class="text-body-tertiary">최근 7일</h6>
-                        </div>
-                      </div>
-                      <div class="d-flex justify-content-center pt-3 flex-1">
-                        <div class="echarts-paying-customer-chart" style="height:100%;width:100%;"></div>
-                      </div>
-                      <div class="mt-3">
-                        <div class="d-flex align-items-center mb-2">
-                          <div class="bullet-item bg-primary me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">견적 나옴</h6>
-                          <h6 class="text-body fw-semibold mb-0">30%</h6>
-                        </div>
-                        <div class="d-flex align-items-center">
-                          <div class="bullet-item bg-primary-subtle me-2"></div>
-                          <h6 class="text-body fw-semibold flex-1 mb-0">견적 못 냄</h6>
-                          <h6 class="text-body fw-semibold mb-0">70%</h6>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mx-n4 px-4 mx-lg-n6 px-lg-6 bg-body-emphasis pt-7 border-y">
-          <div data-list='{"valueNames":["product","customer","rating","review","time"],"page":6}'>
-            <div class="row align-items-end justify-content-between pb-5 g-3">
-              <div class="col-auto">
-                <h3>최근 후기</h3>
-                <p class="text-body-tertiary lh-sm mb-0">전 채널 결제 수령액</p>
-              </div>
-              <div class="col-12 col-md-auto">
-                <div class="row g-2 gy-3">
-                  <div class="col-auto flex-1">
-                    <div class="search-box">
-                      <form class="position-relative">
-                        <input class="form-control search-input search form-control-sm" type="search" placeholder="Search" aria-label="Search" />
-                        <span class="fas fa-search search-box-icon"></span>
-
-                      </form>
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <button class="btn btn-sm btn-phoenix-secondary bg-body-emphasis bg-body-hover me-2" type="button">전체 부품</button>
-                    <button class="btn btn-sm btn-phoenix-secondary bg-body-emphasis bg-body-hover action-btn" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h" data-fa-transform="shrink-2"></span></button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      <li><a class="dropdown-item" href="#">작업</a></li>
-                      <li><a class="dropdown-item" href="#">다른 작업</a></li>
-                      <li><a class="dropdown-item" href="#">기타</a></li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="table-responsive mx-n1 px-1 scrollbar">
-              <table class="table fs-9 mb-0 border-top border-translucent">
-                <thead>
-                  <tr>
-                    <th class="white-space-nowrap fs-9 ps-0 align-middle">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" id="checkbox-bulk-reviews-select" type="checkbox" data-bulk-select='{"body":"table-latest-review-body"}' />
-                      </div>
-                    </th>
-                    <th class="sort white-space-nowrap align-middle" scope="col"></th>
-                    <th class="sort white-space-nowrap align-middle" scope="col" style="min-width:360px;" data-sort="product">부품</th>
-                    <th class="sort align-middle" scope="col" data-sort="customer" style="min-width:200px;">고객</th>
-                    <th class="sort align-middle" scope="col" data-sort="rating" style="min-width:110px;">평점</th>
-                    <th class="sort align-middle" scope="col" style="max-width:350px;" data-sort="review">후기</th>
-                    <th class="sort text-start ps-5 align-middle" scope="col" data-sort="status">상태</th>
-                    <th class="sort text-end align-middle" scope="col" data-sort="time">시각</th>
-                    <th class="sort text-end pe-0 align-middle" scope="col"></th>
-                  </tr>
-                </thead>
-                <tbody class="list" id="table-latest-review-body">
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Fitbit Sense Advanced Smartwatch with Tools for Heart Health, Stress Management & Skin Temperature Trends, Carbon/Graphite, One Size (S & L Bands)","productImage":"/products/60x60/1.png","customer":{"name":"Richard Dawkins","avatar":""},"rating":5,"review":"This Fitbit is fantastic! I was trying to be in better shape and needed some motivation, so I decided to treat myself to a new Fitbit.","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Just now"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/1.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">인텔 코어i5-14400F (랩터레이크 리프레시)</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l">
-                          <div class="avatar-name rounded-circle"><span>R</span></div>
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">김민준</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">This Fitbit is fantastic! I was trying to be in better shape and needed some motivation, so I decided to treat myself to a new Fitbit.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">방금</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"iPhone 13 pro max-Pacific Blue-128GB storage","productImage":"/products/60x60/2.png","customer":{"name":"Ashley Garrett","avatar":"/team/40x40/59.webp"},"rating":3,"review":"예정보다 빨리 도착했습니다. 조립 상태도 깔끔하고 케이블 정리까지 돼 있어서 바로 썼습니다.","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Just now"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/2.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">삼성전자 DDR5-5600 32GB (16x2)</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/59.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">이서연</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">예정보다 빨리 도착했습니다. 조립 상태도 깔끔하고 케이블 정리까지 돼 있어서 바로 썼습니다.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">방금</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Apple MacBook Pro 13 inch-M1-8/256GB-space","productImage":"/products/60x60/3.png","customer":{"name":"Woodrow Burton","avatar":"/team/40x40/58.webp"},"rating":4.5,"review":"It&#39;s a Mac, after all. Once you&#39;ve gone Mac, there&#39;s no going back. My first Mac lasted over nine years, and this is my second.","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Just now"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/3.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">MSI 지포스 RTX 4060 Ti 벤투스 2X</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/58.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">박지훈</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star-half-alt star-icon text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">견적서에 왜 이 부품인지 다 적혀 있어서 믿고 샀습니다. 조립도 문제없이 한 번에 됐습니다.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">방금</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Apple iMac 24\" 4K Retina Display M1 8 Core CPU, 7 Core GPU, 256GB SSD, Green (MJV83ZP/A) 2021","productImage":"/products/60x60/4.png","customer":{"name":"Eric McGee","avatar":"/team/40x40/avatar.webp","avatarPlaceholder":true},"rating":3,"review":"Personally, I like the minimalist style, but I wouldn&#39;t choose it if I were searching for a computer that I would use frequently. It&#39;s not horrible in terms of speed and power, but the","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 09, 3:23 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/4.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">ASUS PRIME B760M-A D5 메인보드</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle avatar-placeholder" src="/admin/assets/img/team/40x40/avatar.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">최수아</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">Personally, I like the minimalist style, but I wouldn't choose it if I were searching for a computer that I would use frequently. It's...<a href='#!'>더 보기</a></p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 09일 3:23</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Razer Kraken v3 x Wired 7.1 Surroung Sound Gaming headset","productImage":"/products/60x60/5.png","customer":{"name":"Kim Carroll","avatar":"/team/40x40/avatar.webp","avatarPlaceholder":true},"rating":4,"review":"기대한 만큼 성능이 나옵니다. 같은 구성으로 사무실에 세 대 더 맞췄습니다.","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 09, 2:15 PM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/5.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">마이크로닉스 Classic II 850W 80PLUS</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle avatar-placeholder" src="/admin/assets/img/team/40x40/avatar.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">정도현</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">기대한 만큼 성능이 나옵니다. 같은 구성으로 사무실에 세 대 더 맞췄습니다.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 09일 2:15</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"PlayStation 5 DualSense Wireless Controller","productImage":"/products/60x60/6.png","customer":{"name":"Barbara Lucas","avatar":"/team/40x40/57.webp"},"rating":4,"review":"쿨러가 생각보다 조용합니다. 케이스 안이 넉넉해서 나중에 그래픽카드 바꾸기도 좋겠습니다.","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Nov 08, 8:53 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/6.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">삼성전자 990 PRO M.2 NVMe 1TB</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/57.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">강예은</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">쿨러가 생각보다 조용합니다. 케이스 안이 넉넉해서 나중에 그래픽카드 바꾸기도 좋겠습니다.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 08일 8:53</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"2021 Apple 12.9-inch iPad Pro (Wi‑Fi, 128GB) - Space Gray","productImage":"/products/60x60/7.png","customer":{"name":"Ansolo Lazinatov","avatar":"/team/40x40/3.webp"},"rating":4.5,"review":"The response time and service I received when contacted the designers were Phenomenal!","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 07, 9:00 PM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/7.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">darkFlash DLM21 MESH 화이트 케이스</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/3.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">조성민</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star-half-alt star-icon text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">The response time and service I received when contacted the designers were Phenomenal!</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 07일 9:00</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Amazon Basics Matte Black Wired Keyboard - US Layout (QWERTY)","productImage":"/products/60x60/8.png","customer":{"name":"Emma watson","avatar":"/team/40x40/26.webp"},"rating":3,"review":"I have started using this theme in the last week and it has really impressed me very much, the support is second to none.","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 07, 11:20 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/8.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">쿨러마스터 하이퍼 212 블랙 공랭쿨러</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/26.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">윤하늘</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">I have started using this theme in the last week and it has really impressed me very much, the support is second to none.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 07일 11:20</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Amazon Basics Mesh, Mid-Back, Swivel Office Desk Chair with Armrests, Black","productImage":"/products/60x60/9.png","customer":{"name":"Rowen Atkinson","avatar":"/team/40x40/29.webp"},"rating":5,"review":"The best experience we could hope for. Customer service team is amazing and the quality of their products is unsurpassed. Great theme too!","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Nov 07, 2:00 PM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/9.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">잘만 CNPS10X 퍼포마 ST 쿨러</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/29.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">임채원</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">The best experience we could hope for. Customer service team is amazing and the quality of their products is unsurpassed. Great theme ...<a href='#!'>더 보기</a></p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 07일 2:00</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Apple Magic Mouse (Wireless, Rechargable) - Silver","productImage":"/products/60x60/10.png","customer":{"name":"Anthony Hopkins","avatar":""},"rating":4,"review":"This template has allowed me to convert my existing web app into a great looking, easy to use UI in less than 2 weeks. Very easy to use and understand and has a wide range of ready to use elements. ","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Nov 06, 8:00 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/10.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">WD Blue SN580 M.2 NVMe 500GB</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l">
-                          <div class="avatar-name rounded-circle"><span>A</span></div>
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">한지우</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">This template has allowed me to convert my existing web app into a great looking, easy to use UI in less than 2 weeks. Very easy to us...<a href='#!'>더 보기</a></p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 06일 8:00</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Echo Dot (4th Gen) _ Smart speaker with Alexa _ Glacier White","productImage":"/products/60x60/11.png","customer":{"name":"Jennifer Schramm","avatar":"/team/40x40/8.webp"},"rating":4.5,"review":"The theme is really beautiful and the support answer very quickly and is friendly. Buy it, you will not regret it.","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 05, 4:00 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/11.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">AMD 라이젠5 7600X (라파엘)</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/8.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">오현우</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star-half-alt star-icon text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">The theme is really beautiful and the support answer very quickly and is friendly. Buy it, you will not regret it.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 05일 4:00</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"HORI Racing Wheel Apex for PlayStation 4_3, and PC","productImage":"/products/60x60/12.png","customer":{"name":"Raymond Mims","avatar":"/team/40x40/avatar.webp","avatarPlaceholder":true},"rating":4,"review":"As others mentioned, the team behind this theme is super responsive. I sent a message during the weekend, fully expecting a response after the weekend, but I got one within minutes, and I was unblocked.","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Nov 04, 6:53 PM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/12.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">GIGABYTE B650M DS3H 메인보드</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle avatar-placeholder" src="/admin/assets/img/team/40x40/avatar.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">서다인</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">As others mentioned, the team behind this theme is super responsive. I sent a message during the weekend, fully expecting a response a...<a href='#!'>더 보기</a></p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 04일 6:53</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Nintendo Switch with Neon Blue and Neon Red Joy‑Con - HAC-001(-01)","productImage":"/products/60x60/13.png","customer":{"name":"Michael Jenkins","avatar":"/team/40x40/9.webp"},"rating":5,"review":"I had a bit of a hard time at first but after I contacted the team they were able to help me set up the theme. It&#39;s really good and I highly recommend it to everyone.","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 04, 12:00 PM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/13.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">TeamGroup DDR4-3200 16GB CL22</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/9.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">신태양</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">I had a bit of a hard time at first but after I contacted the team they were able to help me set up the theme. It's really good and I ...<a href='#!'>더 보기</a></p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 04일 12:00</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Oculus Rift S PC-Powered VR Gaming Headset","productImage":"/products/60x60/14.png","customer":{"name":"Kristine Cadena","avatar":"/team/40x40/avatar.webp","avatarPlaceholder":true},"rating":5,"review":"Excellent. All my doubts were answered by the team quickly. I highly recommend it.","status":{"title":"Pending","badge":"warning","icon":"clock"},"time":"Nov 03, 8:53 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/14.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">시게이트 바라쿠다 2TB HDD</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle avatar-placeholder" src="/admin/assets/img/team/40x40/avatar.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">배소율</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">Excellent. All my doubts were answered by the team quickly. I highly recommend it.</p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-warning"><span class="badge-label">대기</span><span class="ms-1" data-feather="clock" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 03일 8:53</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="hover-actions-trigger btn-reveal-trigger position-static">
-                    <td class="fs-9 align-middle ps-0">
-                      <div class="form-check mb-0 fs-8">
-                        <input class="form-check-input" type="checkbox" data-bulk-select-row='{"product":"Sony X85J 75 Inch Sony 4K Ultra HD LED Smart Google TV","productImage":"/products/60x60/15.png","customer":{"name":"Suzanne Martinez","avatar":"/team/40x40/24.webp"},"rating":3.5,"review":"This theme is great. Clean and easy to understand. Perfect for those who don&#39;t have time to start everything from scratch. The support is simply phenomenal! Highly recommended!","status":{"title":"Approved","badge":"success","icon":"check"},"time":"Nov 03, 10:43 AM"}' />
-                      </div>
-                    </td>
-                    <td class="align-middle product white-space-nowrap py-0"><a class="d-block rounded-2 border border-translucent" href="apps/e-commerce/landing/product-details.html"><img src="/admin/assets/img//products/60x60/15.png" alt="" width="53" /></a></td>
-                    <td class="align-middle product white-space-nowrap"><a class="fw-semibold" href="apps/e-commerce/landing/product-details.html">NZXT Kraken 240 수랭쿨러</a></td>
-                    <td class="align-middle customer white-space-nowrap"><a class="d-flex align-items-center text-body" href="apps/e-commerce/landing/profile.html">
-                        <div class="avatar avatar-l"><img class="rounded-circle" src="/admin/assets/img/team/40x40/24.webp" alt="" />
-                        </div>
-                        <h6 class="mb-0 ms-3 text-body">홍지안</h6>
-                      </a></td>
-                    <td class="align-middle rating white-space-nowrap fs-10"><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star text-warning"></span><span class="fa fa-star-half-alt star-icon text-warning"></span><span class="fa-regular fa-star text-warning-light" data-bs-theme="light"></span>
-                    </td>
-                    <td class="align-middle review" style="min-width:350px;">
-                      <p class="fs-9 fw-semibold text-body-highlight mb-0">This theme is great. Clean and easy to understand. Perfect for those who don't have time to start everything from scratch. The support...<a href='#!'>더 보기</a></p>
-                    </td>
-                    <td class="align-middle text-start ps-5 status"><span class="badge badge-phoenix fs-10 badge-phoenix-success"><span class="badge-label">승인</span><span class="ms-1" data-feather="check" style="height:12.8px;width:12.8px;"></span></span></td>
-                    <td class="align-middle text-end time white-space-nowrap">
-                      <div class="hover-hide">
-                        <h6 class="text-body-highlight mb-0">8월 03일 10:43</h6>
-                      </div>
-                    </td>
-                    <td class="align-middle white-space-nowrap text-end pe-0">
-                      <div class="position-relative">
-                        <div class="hover-actions">
-                          <button class="btn btn-sm btn-phoenix-secondary me-1 fs-10"><span class="fas fa-check"></span></button>
-                          <button class="btn btn-sm btn-phoenix-secondary fs-10"><span class="fas fa-trash"></span></button>
-                        </div>
-                      </div>
-                      <div class="btn-reveal-trigger position-static">
-                        <button class="btn btn-sm dropdown-toggle dropdown-caret-none transition-none btn-reveal fs-10" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false" data-bs-reference="parent"><span class="fas fa-ellipsis-h fs-10"></span></button>
-                        <div class="dropdown-menu dropdown-menu-end py-2"><a class="dropdown-item" href="#!">보기</a><a class="dropdown-item" href="#!">내보내기</a>
-                          <div class="dropdown-divider"></div><a class="dropdown-item text-danger" href="#!">삭제</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="row align-items-center py-1">
-              <div class="pagination d-none"></div>
-              <div class="col d-flex fs-9">
-                <p class="mb-0 d-none d-sm-block me-3 fw-semibold text-body" data-list-info="data-list-info"></p><a class="fw-semibold" href="#!" data-list-view="*">전체 보기<span class="fas fa-angle-right ms-1" data-fa-transform="down-1"></span></a><a class="fw-semibold d-none" href="#!" data-list-view="less">접기</a>
-              </div>
-              <div class="col-auto d-flex">
-
-                <button class="btn btn-link px-1 me-1" type="button" title="Previous" data-list-pagination="prev"><span class="fas fa-chevron-left me-2"></span>이전</button>
-                <button class="btn btn-link px-1 ms-1" type="button" title="Next" data-list-pagination="next">다음<span class="fas fa-chevron-right ms-2"></span></button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="row gx-6">
-          <div class="col-12 col-xl-6">
-            <div data-list='{"valueNames":["country","users","transactions","revenue","conv-rate"],"page":5}'>
-              <div class="mb-5 mt-7">
-                <h3>슬롯별 추천 가능 부품</h3>
-                <p class="text-body-tertiary">매출이 가장 많이 난 곳</p>
-              </div>
-              <div class="table-responsive scrollbar">
-                <table class="table fs-10 mb-0">
-                  <thead>
-                    <tr>
-                      <th class="sort border-top border-translucent ps-0 align-middle" scope="col" data-sort="country" style="width:32%">슬롯</th>
-                      <th class="sort border-top border-translucent align-middle" scope="col" data-sort="users" style="width:17%">후보 수</th>
-                      <th class="sort border-top border-translucent text-end align-middle" scope="col" data-sort="transactions" style="width:16%">견적 사용</th>
-                      <th class="sort border-top border-translucent text-end align-middle" scope="col" data-sort="revenue" style="width:20%">매출 기여</th>
-                      <th class="sort border-top border-translucent text-end pe-0 align-middle" scope="col" data-sort="conv-rate" style="width:17%">채택률</th>
-                    </tr>
-                  </thead>
-                  <tr>
-                    <td></td>
-                    <td class="align-middle py-4">
-                      <h4 class="mb-0 fw-normal">377,620</h4>
-                    </td>
-                    <td class="align-middle text-end py-4">
-                      <h4 class="mb-0 fw-normal">236</h4>
-                    </td>
-                    <td class="align-middle text-end py-4">
-                      <h4 class="mb-0 fw-normal">$15,758</h4>
-                    </td>
-                    <td class="align-middle text-end py-4 pe-0">
-                      <h4 class="mb-0 fw-normal">10.32%</h4>
-                    </td>
-                  </tr>
-                  <tbody class="list" id="table-regions-by-revenue">
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">1. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/india.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">그래픽카드</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">92896<span class="text-body-tertiary fw-semibold ms-2">(41.6%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">67<span class="text-body-tertiary fw-semibold ms-2">(34.3%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$7560<span class="text-body-tertiary fw-semibold ms-2">(36.9%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>14.01%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">2. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/china.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">CPU</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">50496<span class="text-body-tertiary fw-semibold ms-2">(32.8%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">54<span class="text-body-tertiary fw-semibold ms-2">(23.8%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$6532<span class="text-body-tertiary fw-semibold ms-2">(26.5%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>23.56%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">3. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/usa.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">메인보드</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">45679<span class="text-body-tertiary fw-semibold ms-2">(24.3%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">35<span class="text-body-tertiary fw-semibold ms-2">(19.7%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$5432<span class="text-body-tertiary fw-semibold ms-2">(16.9%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>10.23%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">4. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/south-korea.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">메모리</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">36453<span class="text-body-tertiary fw-semibold ms-2">(19.7%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">22<span class="text-body-tertiary fw-semibold ms-2">(9.54%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$4673<span class="text-body-tertiary fw-semibold ms-2">(11.6%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>8.85%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">5. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/vietnam.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">SSD</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">15007<span class="text-body-tertiary fw-semibold ms-2">(11.9%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">17<span class="text-body-tertiary fw-semibold ms-2">(6.91%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$2456<span class="text-body-tertiary fw-semibold ms-2">(10.2%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>6.01%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">6. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/russia.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">파워</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">54215<span class="text-body-tertiary fw-semibold ms-2">(32.9%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">38<span class="text-body-tertiary fw-semibold ms-2">(7.91%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$3254<span class="text-body-tertiary fw-semibold ms-2">(12.4%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>6.21%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">7. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/australia.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">케이스</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">54789<span class="text-body-tertiary fw-semibold ms-2">(12.7%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">32<span class="text-body-tertiary fw-semibold ms-2">(14.0%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$3215<span class="text-body-tertiary fw-semibold ms-2">(5.72%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>12.02%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">8. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/england.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">공랭쿨러</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">14785<span class="text-body-tertiary fw-semibold ms-2">(12.9%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">11<span class="text-body-tertiary fw-semibold ms-2">(32.91%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$4745<span class="text-body-tertiary fw-semibold ms-2">(10.2%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>8.01%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">9. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/indonesia.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">수랭쿨러</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">32156<span class="text-body-tertiary fw-semibold ms-2">(32.2%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">89<span class="text-body-tertiary fw-semibold ms-2">(12.0%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$2456<span class="text-body-tertiary fw-semibold ms-2">(23.2%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>9.07%</h6>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="white-space-nowrap ps-0 country" style="width:32%">
-                        <div class="d-flex align-items-center">
-                          <h6 class="mb-0 me-3">10. </h6><a href="#!">
-                            <div class="d-flex align-items-center"><img src="/admin/assets/img/country/japan.png" alt="" width="24" />
-                              <p class="mb-0 ps-3 text-primary fw-bold fs-9">HDD</p>
-                            </div>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="align-middle users" style="width:17%">
-                        <h6 class="mb-0">12547<span class="text-body-tertiary fw-semibold ms-2">(12.7%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end transactions" style="width:17%">
-                        <h6 class="mb-0">21<span class="text-body-tertiary fw-semibold ms-2">(14.91%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end revenue" style="width:17%">
-                        <h6 class="mb-0">$2541<span class="text-body-tertiary fw-semibold ms-2">(23.2%)</span></h6>
-                      </td>
-                      <td class="align-middle text-end pe-0 conv-rate" style="width:17%">
-                        <h6>20.01%</h6>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="row align-items-center py-1">
-                <div class="pagination d-none"></div>
-                <div class="col d-flex fs-9">
-                  <p class="mb-0 d-none d-sm-block me-3 fw-semibold text-body" data-list-info="data-list-info"></p>
-                </div>
-                <div class="col-auto d-flex">
-
-                  <button class="btn btn-link px-1 me-1" type="button" title="Previous" data-list-pagination="prev"><span class="fas fa-chevron-left me-2"></span>이전</button>
-                  <button class="btn btn-link px-1 ms-1" type="button" title="Next" data-list-pagination="next">다음<span class="fas fa-chevron-right ms-2"></span></button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-xl-6">
-            <div class="mx-n4 mx-lg-n6 ms-xl-0 h-100">
-              <div class="h-100 w-100">
-                <div class="h-100 bg-body-emphasis" id="map" style="min-height: 300px;"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mx-n4 px-4 mx-lg-n6 px-lg-6 bg-body-emphasis pt-6 pb-9 border-top">
-          <div class="row g-6">
-            <div class="col-12 col-xl-6">
-              <div class="me-xl-4">
-                <div>
-                  <h3>판매가 재산정 — 예상 대 실제</h3>
-                  <p class="mb-1 text-body-tertiary">실제 대 예상</p>
-                </div>
-                <div class="echart-projection-actual" style="height:300px; width:100%"></div>
-              </div>
-            </div>
-            <div class="col-12 col-xl-6">
-              <div>
-                <h3>재구매율</h3>
-                <p class="mb-1 text-body-tertiary">재방문 고객 비율 추이</p>
-              </div>
-              <div class="echart-returning-customer" style="height:300px;"></div>
-            </div>
-          </div>
-        </div>
-
-</div>
-{% endblock %}
-
-{% block foot_extra %}
-{# 표준 Phoenix 벤더 번들 — 예전엔 _layout.html.j2가 자동으로 줬다. echarts·leaflet·
-   대시보드 초기화 스크립트가 phoenix.js(전역 유틸)를 쓸 수 있으므로 먼저 싣는다. #}
-<script src="/admin/vendors/popper/popper.min.js"></script>
-<script src="/admin/vendors/bootstrap/bootstrap.min.js"></script>
-<script src="/admin/vendors/anchorjs/anchor.min.js"></script>
-<script src="/admin/vendors/is/is.min.js"></script>
-<script src="/admin/vendors/fontawesome/all.min.js"></script>
-<script src="/admin/vendors/lodash/lodash.min.js"></script>
-<script src="/admin/vendors/list.js/list.min.js"></script>
-<script src="/admin/vendors/feather-icons/feather.min.js"></script>
-<script src="/admin/vendors/dayjs/dayjs.min.js"></script>
-<script src="/admin/vendors/choices/choices.min.js"></script>
-<script src="/admin/assets/js/phoenix.js"></script>
-<script src="/shared/admin-panel.js"></script>
-<script src="/shared/admin-helper.js"></script>
-<script src="/shared/su-icons.js"></script>
-<script src="/admin/vendors/echarts/echarts.min.js"></script>
-<script src="/admin/vendors/leaflet/leaflet.js"></script>
-<script src="/admin/vendors/leaflet.markercluster/leaflet.markercluster.js"></script>
-<script src="/admin/vendors/leaflet.tilelayer.colorfilter/leaflet-tilelayer-colorfilter.min.js"></script>
-<script src="/admin/assets/js/dashboards/ecommerce-dashboard.js"></script>
 {% endblock %}
