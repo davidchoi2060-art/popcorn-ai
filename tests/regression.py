@@ -5116,7 +5116,11 @@ def test_rebuild_screens():
         sys.path.insert(0, ROOT)
     from api.admin_nav import NAV, counts as nav_counts
 
-    SCREENS = [("/admin2/", "NEW-DASH-010"), ("/admin2/products", "ADM-PRD-010"),
+    # "/admin2/" 의 화면 ID는 ADM-DASH-010 이다 — decision-log UX-22(2026-08-14)가
+    # "구 NEW-DASH-010 정정(유래가 불확실한 폐기 개념의 잔재였다)"이라고 명시했다.
+    # 실제 화면(api/admin_ui_home.py)도 ADM-DASH-010 이다. 여기 있던 NEW-DASH-010은
+    # 그 정정을 반영하지 못한 낡은 기대값이었다(2026-08-15 회귀 감사에서 발견).
+    SCREENS = [("/admin2/", "ADM-DASH-010"), ("/admin2/products", "ADM-PRD-010"),
                ("/admin2/spec-standard", "ADM-STD-010"),
                ("/admin2/build-map", "ADM-STD-020")]
 
