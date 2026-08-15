@@ -1,0 +1,856 @@
+{#
+  매입 견적(용산) (ADM-SRC-010) — 2026-08-15 신설
+
+  ■ 이 화면이 답하는 질문
+    재고 0 또는 안전재고 미달 상품에 대해, 여러 공급처의 매입가를 비교해 최저가로
+    매입을 확정하는 자리다. 확정은 **가격 결정**일 뿐 입고가 아니다 — 그래서 확정해도
+    이 상품은 대기 목록에서 사라지지 않는다(req-sourcing-quote.md ③·⑤·⑥).
+
+  ■ 출처 — 계약 요약 `docs/design/spec-sourcing.md`(원문은 Claude Design 서버, 사장님
+    확정 2026-08-15 · **1a 안**: 좌 목록 + 우 작업 패널 400px). 요구사항 정의서
+    `docs/design/req/req-sourcing-quote.md`.
+
+  ■ 정직 4건(계약이 "화면이 말해야 하는 사실"로 못박은 것) — 전부 이 파일 안에서 문구로 지킨다:
+    ① 「견적 요청 기록」은 메일을 보내지 않는다 — 원장 기록일 뿐(버튼 문구 자체가 "기록").
+    ② 회신은 자동 수신이 아니라 사람이 대행 입력한다.
+    ③ 확정은 가격 결정이지 입고가 아니다 — **두 곳**(목록 하단 · 확정 결과 패널)에 적는다.
+    ④ 대기 목록은 저장하지 않고 매 조회마다 계산한다(배너 문구).
+
+  ■ 확정 결과 패널(㉰)이 계약의 "가장 중요한 자리"다 — `purchase_changed`·`sale_changed`·
+    `sale_locked`와 이번에 `admin_sourcing.py`에 더한 `purchase_before/after`·
+    `sale_before/after`를 **그대로** 적는다. `sale_locked`면 "변동 없음 · 잠김"으로 명시한다
+    (조용히 스킵되는 것이 이 화면이 막으려는 것 — 계약 ㉰).
+
+  ■ 활성 공급처 0곳 — 요청 폼 대신 "공급처를 먼저 등록하세요 → /admin2/suppliers" 안내로
+    바꾼다(계약 ㉮). 지금 실측 활성 4곳이라 이 분기는 오늘은 안 타지만, 계약이 명시한
+    경계라 구현한다.
+
+  ■ 결함 수정 2건(확인자 지적 2026-08-15)
+    ① 헤더 「오늘 확정 {n}건」이 `created_at`(요청일)으로 세고 있어 거의 항상 0이었다
+      (요청→확정까지 며칠 걸리는 것이 정상 흐름). `confirmed_at` 컬럼(마이그레이션 0053,
+      파일만·미적용)이 필요해서, 없는 동안은 0을 지어내지 않고 서버가 준
+      `done_today_reason`을 그대로 보여준다(`renderHeadNote()` 참조. 컬럼이 생기면
+      done_today가 다시 숫자로 돌아온다 — 화면은 그 전환을 `S.doneToday == null`로만
+      가른다).
+    ② `note` 필드(정직 4건을 한 문단으로 요약)는 이 파일이 한 번도 읽지 않은 죽은
+      필드였고, 계약 문구와도 어긋났다(예: "대기 목록에서 사라지지 않는다"는 ⚠⚠ 필수
+      고지가 빠짐) — `admin_sourcing.py`에서 제거했다(그 파일 주석 참조). 이 화면은
+      "정직 4건"을 여전히 계약의 정확한 인용문 그대로 리터럴로 담는다(위 블록) — 서버
+      note를 요약본으로 다시 쓰지 않는다.
+
+  ■ 제작 전에 잰 것(하네스 말이 아니라 코드·DB 실측 — MAKER-CHECKLIST §8)
+    · 서버 페이지네이션 — 이미 됨(슬라이스 86). size=50 요청 시 13,699바이트·50건만
+      (전체 15,338건 중). 예전 "15,261건·3.6MB 통째 전송" 사고 재발 안 함.
+    · 확정 응답 — `purchase_changed`·`sale_changed`·`sale_locked`는 이미 준다.
+      전·후 실값(`purchase_before/after`·`sale_before/after`)은 없어서
+      `api/admin_sourcing.py`의 `confirm_quote()`에 추가했다(그 파일 주석 참조).
+    · `sourcing_batches`(6건 — 진행5·완료1)·`product_sourcing_quotes`(12건 — 요청9·
+      회신1·확정1·취소1) — 이미 스키마에 있다(0006 마이그레이션). 안전재고는
+      `products.safety_stock`(0004) — API가 이미 읽는다.
+    · 대기 모집단 15,338건(2026-08-15 재측정, req 문서 08-13 스냅샷과 동일) ·
+      진행 중 상품 5건(신설 `in_progress_total` 필드로 확인) · 활성 공급처 4곳(전체 5).
+
+  ■ 셸 — admin2 공통 셸을 그대로 상속한다. 좌측 메뉴 href 연결은 검증 통과 후
+    기록자 소관(`api/admin_nav.py`는 이 화면이 건드리지 않는다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}매입 견적(용산){% endblock %}
+
+{% block head_extra %}
+<style>
+.src-root{padding:20px 22px 26px;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;gap:14px}
+.src-loading{padding:48px 20px;text-align:center;color:var(--on-variant);font:400 13px/1.6 var(--font)}
+.src-error{padding:16px 18px;color:var(--rv-ink);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line);
+      border-radius:9px;font:500 13px/1.7 var(--font)}
+.src-error a,.src-error button{color:inherit;text-decoration:underline;cursor:pointer;background:none;border:0;
+      font:inherit;padding:0}
+
+.src-headnote{font:500 11.5px/1 var(--font);color:var(--on-variant)}
+
+.src-main{display:flex;flex-direction:column;gap:14px;flex:1;min-height:0}
+.src-main[hidden]{display:none}
+
+/* 툴바 — ① 검색 + 부품 종류 필터 */
+.src-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex:none}
+.src-search{display:flex;gap:6px}
+.src-search input{font:400 12.5px/1 var(--font);padding:8px 10px;border-radius:6px;border:1px solid var(--outline);
+      min-width:240px;background:var(--card);color:var(--on)}
+.src-filter-label{font:500 11.5px/1 var(--font);color:var(--on-variant)}
+.src-toolbar select{font:400 12.5px/1 var(--font);padding:8px 10px;border-radius:6px;border:1px solid var(--outline);
+      background:var(--card);color:var(--on)}
+
+/* ② 대기 요약 배너 */
+.src-banner{background:var(--container-low);border:1px solid var(--outline-variant);border-radius:10px;
+      padding:12px 15px;flex:none}
+.src-banner p{margin:0 0 3px;font:400 12.5px/1.6 var(--font);color:var(--on)}
+.src-banner p:last-child{margin-bottom:0}
+.src-banner .num{font:700 13px/1 var(--font-num);color:var(--on)}
+.src-banner .src-banner-note{color:var(--on-variant);font-size:11.5px}
+
+/* 본문 2단 — 좌 목록 · 우 작업 패널 */
+.src-body{display:flex;gap:16px;flex:1;min-height:0}
+.src-listcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
+
+/* ③ 목록 6열 */
+.src-tablewrap{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;overflow:hidden;
+      display:flex;flex-direction:column;flex:1;min-height:0}
+.src-thead,.src-row{display:grid;
+      grid-template-columns:minmax(220px,2.3fr) minmax(90px,120px) minmax(56px,74px)
+                             minmax(74px,94px) minmax(96px,122px) minmax(170px,1.8fr);
+      align-items:center;column-gap:10px}
+.src-thead{padding:10px 16px;border-bottom:1px solid var(--outline-variant);background:var(--container-low);
+      font:600 11px/1.2 var(--font);color:var(--on-variant)}
+.src-tbody{overflow-y:auto;flex:1;min-height:140px}
+.src-row{padding:10px 16px;border-bottom:1px solid var(--outline-variant);cursor:pointer;
+      font:400 12.5px/1.4 var(--font);color:var(--on)}
+.src-row:hover{background:var(--container-low)}
+.src-row.selected{background:var(--container-low);box-shadow:inset 3px 0 0 var(--primary)}
+.src-row.inprogress{background:var(--rv-amber-bg)}
+.src-row .c-name{display:flex;flex-direction:column;gap:2px;overflow:hidden;min-width:0}
+.src-row .c-name .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src-row .c-name .cat{font:400 10.5px/1.3 var(--font);color:var(--on-variant)}
+.src-row .c-num{text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.src-row .c-num.zero{color:var(--rv-red);font-weight:700}
+.src-row .c-why{display:flex;flex-direction:column;gap:2px;overflow:hidden;min-width:0}
+.src-row .c-why .why{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src-row .c-why .prog{font:500 10.5px/1.3 var(--font);color:var(--on-variant)}
+.src-mlbl{display:none}
+.src-inline-loading,.src-inline-error,.src-empty{padding:34px 20px;text-align:center;color:var(--on-variant);
+      font:400 12.5px/1.6 var(--font)}
+.src-inline-error{color:var(--rv-red)}
+.src-inline-error a,.src-inline-error button{color:inherit;text-decoration:underline;background:none;border:0;
+      cursor:pointer;font:inherit;padding:0}
+
+/* 페이저 */
+.src-pager{display:flex;align-items:center;justify-content:space-between;flex:none;
+      font:500 11.5px/1 var(--font-num);color:var(--on-variant)}
+.src-pager-btns{display:flex;gap:6px}
+
+/* 버튼 공통 */
+.src-btn{font:600 12px/1 var(--font);padding:8px 13px;border-radius:6px;border:1px solid var(--outline);
+      background:var(--card);color:var(--on);cursor:pointer}
+.src-btn:hover{background:var(--container-low)}
+.src-btn:disabled{opacity:.45;cursor:not-allowed}
+.src-btn.primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.src-btn.sm{padding:5px 9px;font-size:11px}
+
+/* ④ 하단 2단 */
+.src-footer{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:12px;flex:none}
+.src-footer-box{background:var(--container-low);border:1px solid var(--outline-variant);border-radius:9px;
+      padding:12px 14px}
+.src-footer-box h4{margin:0 0 5px;font:600 12px/1.3 var(--font);color:var(--on)}
+.src-footer-box p{margin:0;font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+.src-footer-box b{color:var(--on)}
+
+/* 우측 작업 패널(400px) */
+.src-panel{width:400px;flex:none;background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;
+      overflow-y:auto;padding:16px 17px}
+.src-panel-empty{padding:26px 6px;text-align:center;color:var(--on-variant);font:400 12.5px/1.6 var(--font)}
+.src-ph-name{font:700 15px/1.3 var(--font-head);color:var(--on);overflow:hidden;text-overflow:ellipsis;
+      white-space:nowrap}
+.src-ph-meta{font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+.src-badge{display:inline-block;margin-top:8px;font:600 10.5px/1 var(--font-num);padding:4px 8px;border-radius:5px;
+      background:var(--container-low);color:var(--on-variant)}
+.src-badge.cmp{background:var(--rv-amber-bg);color:var(--rv-ink)}
+.src-badge.done{background:var(--container-low);color:var(--rv-green)}
+
+.src-panel-body{margin-top:14px;display:flex;flex-direction:column;gap:12px}
+.src-stage-title{font:700 13.5px/1.3 var(--font-head);color:var(--on)}
+.src-sub{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.src-note{font:400 11.5px/1.65 var(--font);color:var(--on-variant);background:var(--container-low);
+      border-radius:7px;padding:9px 11px}
+.src-warn{background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line);border-radius:9px;padding:12px 13px}
+.src-warn .t{font:700 12.5px/1.4 var(--font);color:var(--rv-ink)}
+.src-warn .d{font:400 12px/1.6 var(--font);color:var(--rv-ink-soft);margin-top:5px}
+.src-warn .d a{color:inherit;font-weight:600}
+.src-warn.mini{background:var(--container-low);border-color:var(--outline-variant)}
+.src-warn.mini .t{color:var(--on)}
+.src-warn.mini .d{color:var(--on-variant)}
+
+.src-sup-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.src-sup-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid var(--outline-variant);
+      border-radius:7px;cursor:pointer;font:400 12.5px/1.4 var(--font)}
+.src-sup-item:hover{background:var(--container-low)}
+.src-sup-item .nm{flex:none;font-weight:600;color:var(--on)}
+.src-sup-item .brands{color:var(--on-variant);font-size:11px;overflow:hidden;text-overflow:ellipsis;
+      white-space:nowrap}
+
+.src-qtable{display:flex;flex-direction:column;border:1px solid var(--outline-variant);border-radius:9px;
+      overflow:hidden}
+.src-qhead{display:grid;grid-template-columns:minmax(120px,1.5fr) minmax(70px,1fr) 74px;gap:8px;padding:8px 11px;
+      background:var(--container-low);font:600 10.5px/1.2 var(--font);color:var(--on-variant)}
+.src-qrow{display:grid;grid-template-columns:minmax(120px,1.5fr) minmax(70px,1fr) 74px;gap:8px;
+      align-items:center;padding:9px 11px;border-top:1px solid var(--outline-variant)}
+.src-qrow .sup{display:flex;flex-direction:column;gap:1px;min-width:0}
+.src-qrow .sup .nm{font:600 12px/1.3 var(--font);color:var(--on);overflow:hidden;text-overflow:ellipsis;
+      white-space:nowrap}
+.src-qrow .sup .st{font:400 10.5px/1.3 var(--font);color:var(--on-variant)}
+.src-qrow .price{font:700 12.5px/1 var(--font-num)}
+.src-qrow .price.muted{font-weight:400;color:var(--on-variant)}
+.src-qrow .price.best{color:var(--rv-green)}
+.src-qrow .act{text-align:right}
+.src-price-tag{margin-left:6px;font:600 9.5px/1 var(--font-num);color:var(--rv-green);background:var(--container-low);
+      padding:2px 5px;border-radius:4px;vertical-align:middle;white-space:nowrap}
+.src-reply-form{grid-column:1 / -1;margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.src-reply-form[hidden]{display:none}
+.src-reply-price{width:110px;font:600 12px/1 var(--font-num);padding:7px 9px;border-radius:6px;
+      border:1px solid var(--outline)}
+.src-reply-memo{flex:1;min-width:120px;font:400 12px/1 var(--font);padding:7px 9px;border-radius:6px;
+      border:1px solid var(--outline)}
+
+.src-vtable{display:flex;flex-direction:column;border:1px solid var(--outline-variant);border-radius:9px;
+      overflow:hidden}
+.src-vrow{display:flex;justify-content:space-between;gap:10px;padding:11px 13px;border-top:1px solid var(--outline-variant)}
+.src-vrow:first-child{border-top:0}
+.src-vrow .vl .lb{font:600 12px/1.3 var(--font);color:var(--on)}
+.src-vrow .vl .ds{font:400 10.5px/1.5 var(--font);color:var(--on-variant);margin-top:1px;max-width:180px}
+.src-vrow .vv{font:700 13px/1.4 var(--font-num);color:var(--on);text-align:right;white-space:nowrap}
+.src-vrow .vv .unchanged{font:500 10.5px/1 var(--font);color:var(--on-variant)}
+.src-vrow .vv .locked{color:var(--rv-amber);font-family:var(--font)}
+
+.src-inline-err{font:500 11px/1.5 var(--font);color:var(--rv-red)}
+
+@media (max-width:768px){
+  .src-body{flex-direction:column}
+  .src-panel{width:100%}
+  .src-thead{display:none}
+  .src-row{grid-template-columns:1fr;row-gap:5px;padding:12px 14px}
+  .src-row .c-num{text-align:left}
+  .src-mlbl{display:inline;color:var(--on-variant);font-weight:500}
+  .src-footer{grid-template-columns:1fr}
+  .src-toolbar{flex-direction:column;align-items:stretch}
+  .src-search input{min-width:0;flex:1}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="src-headnote" id="srcHeadNote">불러오는 중…</span>
+{% endblock %}
+
+{% block content %}
+<div class="src-root" data-screen-id="ADM-SRC-010" data-domain="sourcing">
+  <div class="src-loading" id="srcLoading">불러오는 중…</div>
+  <div class="src-error" id="srcError" hidden></div>
+
+  <div class="src-main" id="srcMain" hidden>
+    <div class="src-toolbar">
+      <div class="src-search">
+        <label for="srcSearchInput" style="position:absolute;left:-9999px">검색</label>
+        <input type="search" id="srcSearchInput" placeholder="상품명·SKU·상품코드 검색">
+        <button type="button" class="src-btn" data-action="src-search-go">검색</button>
+      </div>
+      <label class="src-filter-label" for="srcPartTypeSelect">부품 종류</label>
+      <select id="srcPartTypeSelect"><option value="">전체 부품 종류</option></select>
+    </div>
+
+    <div class="src-banner" id="srcBanner"></div>
+
+    <div class="src-body">
+      <div class="src-listcol">
+        <div class="src-tablewrap">
+          <div class="src-thead" role="row">
+            <span role="columnheader">상품</span>
+            <span role="columnheader">SKU</span>
+            <span role="columnheader" class="c-num">재고</span>
+            <span role="columnheader" class="c-num">안전재고</span>
+            <span role="columnheader" class="c-num">현재 매입가</span>
+            <span role="columnheader">대기 사유 · 진행</span>
+          </div>
+          <div class="src-tbody" id="srcTbody" role="table" aria-label="매입 견적 대기 목록"></div>
+        </div>
+
+        <div class="src-pager">
+          <span class="src-pager-info" id="srcPagerInfo">—</span>
+          <span class="src-pager-btns">
+            <button type="button" class="src-btn" id="srcPrevBtn" data-action="src-prev">이전</button>
+            <button type="button" class="src-btn" id="srcNextBtn" data-action="src-next">다음</button>
+          </span>
+        </div>
+
+        <div class="src-footer">
+          <div class="src-footer-box">
+            <h4>확정해도 목록에서 사라지지 않습니다</h4>
+            <p>확정은 가격 결정이지 입고가 아닙니다. 재고가 늘지 않으니 대기 조건은 그대로입니다 —
+              확정가·확정 공급처를 달고 계속 보입니다.</p>
+          </div>
+          <div class="src-footer-box">
+            <h4>이 화면이 하지 않는 일</h4>
+            <p>발주 메일·API 전송(요청은 <b>기록</b>입니다) · 회신 자동 수신 ·
+              재고 입고 처리(별도 화면 · LNB에서 의도적으로 제외) · 공급처 등록</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="src-panel" id="srcPanel">
+        <div class="src-panel-empty" id="srcPanelEmpty">왼쪽 목록에서 상품을 선택하세요.</div>
+        <div class="src-panel-content" id="srcPanelContent" hidden>
+          <div class="src-panel-head" id="srcPanelHead"></div>
+          <div class="src-panel-body" id="srcPanelBody"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var API_LIST = '/api/admin/sourcing';
+  var API_META = '/api/admin/product-meta';
+  var API_REQUEST = '/api/admin/sourcing/request';
+  function API_REPLY(id) { return '/api/admin/sourcing/quotes/' + id + '/reply'; }
+  function API_CONFIRM(id) { return '/api/admin/sourcing/quotes/' + id + '/confirm'; }
+  var LOGIN_URL = '/admin/login.html';
+  var PAGE_SIZE = 50;
+
+  var S = {
+    everLoaded: false, items: [], total: 0, page: 1, size: PAGE_SIZE, pages: 0,
+    q: '', partType: '', suppliers: [], inProgressTotal: 0, doneToday: 0, doneTodayReason: null,
+    partTypeOptions: [], selectedCode: null, confirmResult: null, busy: false,
+    searchDebounce: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function fmtWon(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR') + '원'; }
+  function fmtNum(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function errText(j, status, where) {
+    if (window.popcornProgress && window.popcornProgress.errText) return window.popcornProgress.errText(j, status, where);
+    return '오류 ' + status;
+  }
+  function netErrMsg(err) { return '네트워크 오류 — ' + (err && err.message ? err.message : '서버에 연결할 수 없습니다'); }
+
+  function fetchJSON(url, opts) {
+    return fetch(url, opts).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    });
+  }
+
+  // ── 부품 종류 필터 선택지(서버가 준다) ─────────────────────────────
+  function loadMeta() {
+    return fetchJSON(API_META).then(function (r) {
+      if (r.ok && r.body) {
+        S.partTypeOptions = r.body.used_parts || [];
+        renderPartTypeOptions();
+      }
+    }, function () { /* 선택지 없이도 목록 자체는 열려야 한다 */ });
+  }
+
+  function renderPartTypeOptions() {
+    var sel = $('srcPartTypeSelect');
+    var cur = sel.value;
+    var html = '<option value="">전체 부품 종류</option>';
+    S.partTypeOptions.forEach(function (o) {
+      html += '<option value="' + esc(o.part_type) + '">' + esc(o.label) + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = cur;
+  }
+
+  // ── 목록 조회 ───────────────────────────────────────────────────
+  function buildListUrl() {
+    var params = new URLSearchParams();
+    params.set('page', S.page);
+    params.set('size', S.size);
+    if (S.q) params.set('q', S.q);
+    if (S.partType) params.set('part_type', S.partType);
+    return API_LIST + '?' + params.toString();
+  }
+
+  function showTopError(msg, opts) {
+    $('srcLoading').hidden = true;
+    $('srcMain').hidden = true;
+    var box = $('srcError');
+    box.hidden = false;
+    box.innerHTML = esc(msg) + (opts && opts.relogin
+      ? ' <a href="' + LOGIN_URL + '">다시 로그인</a>'
+      : ' <button type="button" data-action="src-retry">다시 시도</button>');
+  }
+
+  function loadList() {
+    if (S.everLoaded) {
+      $('srcTbody').innerHTML = '<div class="src-inline-loading">불러오는 중…</div>';
+    }
+    return fetchJSON(buildListUrl()).then(function (r) {
+      if (!r.ok) {
+        if (r.status === 401) {
+          if (!S.everLoaded) { showTopError('세션이 만료되었습니다 — 다시 로그인해야 합니다.', { relogin: true }); return; }
+          $('srcTbody').innerHTML = '<div class="src-inline-error">세션이 만료되었습니다 — '
+            + '<a href="' + LOGIN_URL + '">다시 로그인</a></div>';
+          return;
+        }
+        var msg = '목록을 불러오지 못했습니다 — ' + errText(r.body, r.status, 'GET /api/admin/sourcing');
+        if (!S.everLoaded) { showTopError(msg); return; }
+        $('srcTbody').innerHTML = '<div class="src-inline-error">' + esc(msg)
+          + ' <button type="button" data-action="src-retry">다시 시도</button></div>';
+        return;
+      }
+      var d = r.body;
+      S.items = d.items || [];
+      S.total = d.total; S.page = d.page; S.size = d.size; S.pages = d.pages;
+      S.q = d.q || ''; S.partType = d.part_type || '';
+      S.suppliers = d.suppliers || [];
+      S.inProgressTotal = d.in_progress_total;
+      S.doneToday = d.done_today;
+      S.doneTodayReason = d.done_today_reason || null;
+      S.everLoaded = true;
+      $('srcLoading').hidden = true;
+      $('srcError').hidden = true;
+      $('srcMain').hidden = false;
+      renderHeadNote();
+      renderBanner();
+      renderTable();
+      renderPager();
+      renderPanel();
+    }, function (err) {
+      var msg = netErrMsg(err);
+      if (!S.everLoaded) { showTopError(msg); return; }
+      $('srcTbody').innerHTML = '<div class="src-inline-error">' + esc(msg)
+        + ' <button type="button" data-action="src-retry">다시 시도</button></div>';
+    });
+  }
+
+  function renderHeadNote() {
+    var n = $('srcHeadNote');
+    if (!n) return;
+    // 결함 수정(2026-08-15, 확인자 지적): done_today는 confirmed_at 컬럼이 없으면 서버가
+    // null로 준다(마이그레이션 0053 미적용 — api/admin_sourcing.py `_confirmed_at_ready()`).
+    // 그때 "오늘 확정 0건"이라 자신 있게 말하면 거짓이 된다 — 요청→회신 대기→확정까지
+    // 며칠 걸리는 것이 이 화면의 정상 흐름이라 실제로 오늘 확정된 건이 있어도 created_at
+    // 기준으로는 항상 0으로 보였다(확인자 실측: 상품 39948·45551을 당일 확정 → 세 번
+    // 조회 모두 0). 숫자를 지어내는 대신 서버가 준 이유를 그대로 보여준다.
+    if (S.doneToday == null) {
+      var msg = S.doneTodayReason || '오늘 확정 집계 불가';
+      n.textContent = msg;
+      n.title = msg;
+      return;
+    }
+    n.textContent = '오늘 확정 ' + fmtNum(S.doneToday) + '건';
+    n.title = '';
+  }
+
+  function renderBanner() {
+    var box = $('srcBanner');
+    var ratio = S.total > 0 ? (S.inProgressTotal / S.total) : 0;
+    var untouchedNote = (S.total > 0 && ratio < 0.5) ? ' — 거의 전부가 아직 손대지 않은 상태입니다.' : '';
+    box.innerHTML =
+      '<p><b class="num">' + fmtNum(S.total) + '</b>건 대기 — 재고 0 또는 안전재고 미달인 상품을 '
+      + '매 조회마다 계산합니다(별도 큐 테이블 없음).</p>'
+      + '<p>이 중 진행 중인 견적이 있는 상품은 <b class="num">' + fmtNum(S.inProgressTotal) + '</b>건'
+      + esc(untouchedNote) + '</p>'
+      // 결정 1(2026-08-15 확정): 대기 조건은 좁히지 않고 그대로 둔다 — 그래서 서버
+      // 페이지네이션(50건씩)과 검색·부품 종류 필터가 이 규모를 다루는 유일한 수단이다.
+      + '<p class="src-banner-note">이 조건(재고 0 또는 안전재고 미달)은 그대로 유지됩니다 — '
+      + '검색·부품 종류 필터로 좁혀 씁니다.</p>';
+  }
+
+  function progressLabel(item) {
+    if (item.state === 'reply' || item.state === 'wait') {
+      var replied = item.quotes.filter(function (q) { return q.status === '회신'; }).length;
+      var waiting = item.quotes.filter(function (q) { return q.status === '요청'; }).length;
+      if (replied > 0) return '회신 ' + replied + (waiting ? ' · 요청 ' + waiting : '');
+      return '요청 ' + waiting + ' · 회신 대기';
+    }
+    if (item.last_fix) return '확정 — 입고 대기';
+    return '아직 요청 없음';
+  }
+
+  function rowHtml(item) {
+    var stockCls = item.stock === 0 ? ' zero' : '';
+    var inprog = item.quotes && item.quotes.length ? ' inprogress' : '';
+    var sel = String(item.product_code) === String(S.selectedCode) ? ' selected' : '';
+    return '<div class="src-row' + inprog + sel + '" role="row" tabindex="0" data-code="' + esc(item.product_code) + '">'
+      + '<span role="cell" class="c-name" title="' + esc(item.name) + '">'
+      + '<span class="nm">' + esc(item.name) + '</span>'
+      + '<span class="cat">' + esc(item.cat) + '</span></span>'
+      + '<span role="cell"><span class="src-mlbl">SKU: </span>' + esc(item.sku) + '</span>'
+      + '<span role="cell" class="c-num' + stockCls + '"><span class="src-mlbl">재고: </span>'
+      + fmtNum(item.stock) + '</span>'
+      + '<span role="cell" class="c-num"><span class="src-mlbl">안전재고: </span>'
+      + fmtNum(item.safety_stock) + '</span>'
+      + '<span role="cell" class="c-num"><span class="src-mlbl">현재 매입가: </span>'
+      + fmtWon(item.purchase) + '</span>'
+      + '<span role="cell" class="c-why"><span class="why">' + esc(item.why) + '</span>'
+      + '<span class="prog">' + esc(progressLabel(item)) + '</span></span>'
+      + '</div>';
+  }
+
+  function renderTable() {
+    var tbody = $('srcTbody');
+    if (S.total === 0) {
+      if (S.q || S.partType) {
+        tbody.innerHTML = '<div class="src-empty">검색 결과 0건입니다 — 조건에 맞는 상품이 없습니다. '
+          + '검색어·필터를 바꿔 보세요.</div>';
+      } else {
+        tbody.innerHTML = '<div class="src-empty">대기가 원래 없습니다 — 재고 0 또는 안전재고 미달인 상품이 '
+          + '지금 없습니다. 조회가 실패한 것이 아닙니다.</div>';
+      }
+      return;
+    }
+    tbody.innerHTML = S.items.map(rowHtml).join('');
+  }
+
+  function renderPager() {
+    var start = S.total === 0 ? 0 : (S.page - 1) * S.size + 1;
+    var end = Math.min(S.page * S.size, S.total);
+    $('srcPagerInfo').textContent = (S.total === 0 ? '0 – 0' : (start + ' – ' + end)) + ' / ' + fmtNum(S.total) + '건';
+    $('srcPrevBtn').disabled = S.page <= 1;
+    $('srcNextBtn').disabled = S.page >= S.pages;
+  }
+
+  function findItem(code) {
+    for (var i = 0; i < S.items.length; i++) {
+      if (String(S.items[i].product_code) === String(code)) return S.items[i];
+    }
+    return null;
+  }
+
+  // ── 우측 작업 패널 ──────────────────────────────────────────────
+  function selectRow(code) {
+    S.selectedCode = code;
+    S.confirmResult = null;
+    renderTable();
+    renderPanel();
+  }
+
+  function stageBadge(item) {
+    if (item.state === 'reply') return { cls: 'cmp', label: '비교 대기' };
+    if (item.state === 'wait') return { cls: 'wait', label: '회신 대기' };
+    if (item.last_fix) return { cls: 'done', label: '확정 완료 · 입고 대기' };
+    return { cls: 'new', label: '요청 전' };
+  }
+
+  function renderPanelHead(item, badge) {
+    $('srcPanelHead').innerHTML =
+      '<div class="src-ph-name" title="' + esc(item.name) + '">' + esc(item.name) + '</div>'
+      + '<div class="src-ph-meta">No.' + esc(item.product_code) + ' · SKU ' + esc(item.sku) + ' · ' + esc(item.cat) + '</div>'
+      + '<div class="src-ph-meta">재고 ' + fmtNum(item.stock) + ' · 안전재고 ' + fmtNum(item.safety_stock) + '</div>'
+      + '<span class="src-badge ' + badge.cls + '">' + esc(badge.label) + '</span>';
+  }
+
+  function renderPanel() {
+    var empty = $('srcPanelEmpty'), content = $('srcPanelContent');
+    if (S.confirmResult) {
+      empty.hidden = true; content.hidden = false;
+      renderPanelHead(S.confirmResult.item, { cls: 'done', label: '확정 완료' });
+      $('srcPanelBody').innerHTML = stageResultHtml(S.confirmResult);
+      return;
+    }
+    var item = S.selectedCode == null ? null : findItem(S.selectedCode);
+    if (!item) {
+      empty.hidden = false; content.hidden = true;
+      S.selectedCode = null;
+      return;
+    }
+    empty.hidden = true; content.hidden = false;
+    renderPanelHead(item, stageBadge(item));
+    $('srcPanelBody').innerHTML = (item.state === 'req') ? stageRequestHtml(item) : stageCompareHtml(item);
+    var btn = $('srcReqBtn');
+    if (btn) updateRequestBtn();
+  }
+
+  // ㉮ 공급처 고르기 · 요청
+  function stageRequestHtml(item) {
+    var lastFixNote = item.last_fix
+      ? '<div class="src-note">최근 확정 — ' + fmtWon(item.last_fix.price) + ' · '
+        + esc(item.last_fix.supplier || '—') + ' (입고 대기, 대기 목록에는 계속 남습니다)</div>'
+      : '';
+    if (!S.suppliers.length) {
+      return lastFixNote
+        + '<div class="src-warn"><div class="t">활성 공급처가 없습니다</div>'
+        + '<div class="d">고를 공급처가 없어 견적을 요청할 수 없습니다. '
+        + '<a href="/admin2/suppliers">공급처를 먼저 등록하세요 → 공급처 관리</a></div></div>';
+    }
+    var list = S.suppliers.map(function (s) {
+      return '<label class="src-sup-item">'
+        + '<input type="checkbox" class="src-sup-chk" value="' + esc(s.id) + '">'
+        + '<span class="nm">' + esc(s.name) + '</span>'
+        + (s.brands ? '<span class="brands">' + esc(s.brands) + '</span>' : '')
+        + '</label>';
+    }).join('');
+    return lastFixNote
+      + '<div class="src-stage-title">공급처 고르기 · 요청</div>'
+      + '<div class="src-sub">공급처를 하나 이상 선택하세요 — 여러 곳을 고르면 배치 하나로 묶여 '
+      + '나중에 나란히 비교됩니다.</div>'
+      + '<div class="src-sup-list" id="srcSupList">' + list + '</div>'
+      + '<div class="src-note">「견적 요청 기록」은 메일을 보내지 않습니다 — 요청한 사실을 원장에 남길 뿐이고, '
+      + '실제 연락은 전화·메일로 사람이 합니다.</div>'
+      + '<div class="src-inline-err" id="srcReqErr" hidden></div>'
+      + '<button type="button" class="src-btn primary" id="srcReqBtn" data-action="src-do-request" disabled>'
+      + '공급처 0곳에 견적 요청 기록</button>';
+  }
+
+  // ㉯ 회신 비교 · 확정
+  function stageCompareHtml(item) {
+    var rows = item.quotes.map(function (q) {
+      var priceCell, actionCell;
+      if (q.price == null) {
+        priceCell = '<span class="price muted">—</span>';
+        actionCell = '<button type="button" class="src-btn sm" data-action="src-open-reply" '
+          + 'data-quote="' + esc(q.quote_id) + '">회신 입력</button>';
+      } else {
+        priceCell = '<span class="price' + (q.best ? ' best' : '') + '">' + fmtWon(q.price) + '</span>'
+          + (q.best ? '<span class="src-price-tag">최저가</span>' : '');
+        actionCell = '<button type="button" class="src-btn sm primary" data-action="src-do-confirm" '
+          + 'data-quote="' + esc(q.quote_id) + '" data-supplier="' + esc(q.supplier) + '" '
+          + 'data-price="' + esc(q.price) + '">확정</button>';
+      }
+      return '<div class="src-qrow" data-quote-row="' + esc(q.quote_id) + '">'
+        + '<span class="sup"><span class="nm">' + esc(q.supplier) + '</span><span class="st">'
+        + esc(q.status) + '</span></span>'
+        + '<span>' + priceCell + '</span>'
+        + '<span class="act">' + actionCell + '</span>'
+        + '<div class="src-reply-form" id="srcReplyForm' + esc(q.quote_id) + '" hidden></div>'
+        + '</div>';
+    }).join('');
+    return '<div class="src-stage-title">회신 비교 · 확정</div>'
+      // 사장님 결정 2(2026-08-15 확정): 매입가 잠금은 만들지 않는다 — "지금대로 둔다".
+      // 다만 그 사실은 누르기 «전에» 알려야 한다는 것이 함께 확정됐다 — 판매가엔 잠금이
+      // 있는데 매입가엔 없는 비대칭이 오해를 부르므로, 5단계 목록에 묻어 두지 않고
+      // 확정 버튼 앞에 별도 경고로 뺀다(결과 패널 ㉰에도 같은 사실을 한 번 더 적는다).
+      + '<div class="src-warn"><div class="t">매입가에는 잠금이 없습니다</div>'
+      + '<div class="d">확정할 때마다 공급처 최저가로 <b>항상</b> 재판정됩니다 — 직접 소싱해 정한 '
+      + '매입가도 다음 확정에서 덮어써집니다. 판매가는 잠글 수 있지만(사양 검수 등에서 '
+      + '잠근 경우) <b>매입가는 잠글 수 없습니다</b>.</div></div>'
+      + '<div class="src-qtable"><div class="src-qhead"><span>공급처 · 상태</span><span>회신가</span>'
+      + '<span>확정</span></div>' + rows + '</div>'
+      + '<div class="src-note">회신은 사람이 옮겨 적습니다 — 전화·메일로 받은 값을 대행 입력하는 자리이고, '
+      + '자동으로 들어오지 않습니다.</div>'
+      + '<div class="src-note">확정을 누르면 한 번에 다섯 가지가 일어납니다 — '
+      + '① 이 공급처의 매입가 저장 ② 매입가는 잠금과 무관하게 항상 공급처 최저가로 재판정 '
+      + '③ 판매가는 잠겨 있지 않을 때만 정책 공식으로 갱신 ④ 같은 배치의 나머지 견적은 자동 취소 '
+      + '⑤ 가격 이력에 근거(sourcing)로 기록</div>'
+      + '<div class="src-inline-err" id="srcCmpErr" hidden></div>';
+  }
+
+  // ㉰ 확정 결과 — 이 화면에서 가장 중요한 자리
+  function stageResultHtml(ctx) {
+    var r = ctx.response;
+    function row(label, desc, valueHtml) {
+      return '<div class="src-vrow"><div class="vl"><div class="lb">' + esc(label) + '</div>'
+        + '<div class="ds">' + desc + '</div></div>'
+        + '<div class="vv">' + valueHtml + '</div></div>';
+    }
+    var purchaseVal = r.purchase_changed
+      ? fmtWon(r.purchase_before) + ' → ' + fmtWon(r.purchase_after)
+      : fmtWon(r.purchase_after) + ' <span class="unchanged">(변동 없음)</span>';
+    var saleVal;
+    if (r.sale_locked) {
+      saleVal = '<span class="locked">변동 없음 · 잠김</span>';
+    } else if (r.sale_changed) {
+      saleVal = fmtWon(r.sale_before) + ' → ' + fmtWon(r.sale_after);
+    } else {
+      saleVal = fmtWon(r.sale_after) + ' <span class="unchanged">(변동 없음)</span>';
+    }
+    var stockVal = fmtNum(ctx.item.stock) + ' <span class="unchanged">(변동 없음)</span>';
+    return '<div class="src-stage-title">확정 결과 — ' + esc(ctx.supplierName) + ' · ' + fmtWon(ctx.price) + '</div>'
+      + '<div class="src-vtable">'
+      + row('매입가', '공급처 최저가로 재판정 — 잠금과 무관하게 항상', purchaseVal)
+      + row('판매가', r.sale_locked ? '잠겨 있어 반영이 스킵됐습니다' : '정책 공식으로 갱신', saleVal)
+      + row('재고', '확정은 가격 결정 — 입고는 별도', stockVal)
+      + '</div>'
+      + '<div class="src-warn mini"><div class="t">판매가만 보고 있었다면 놓칠 수 있는 것</div>'
+      + '<div class="d">공급처가 둘 이상인 상품은 매입가도 함께 바뀔 수 있고, 판매가가 잠겨 있으면 '
+      + '반영이 조용히 스킵됩니다.</div></div>'
+      + '<div class="src-note">이 상품은 대기 목록에서 사라지지 않습니다 — 확정은 가격 결정이며 입고는 '
+      + '별도입니다. 확정가·확정 공급처를 달고 계속 보입니다.</div>'
+      + '<button type="button" class="src-btn" data-action="src-clear-result">다른 상품 선택</button>';
+  }
+
+  function updateRequestBtn() {
+    var btn = $('srcReqBtn');
+    if (!btn) return;
+    var checked = document.querySelectorAll('.src-sup-chk:checked');
+    btn.disabled = checked.length === 0;
+    btn.textContent = '공급처 ' + checked.length + '곳에 견적 요청 기록';
+  }
+
+  // ── 쓰기 동작 ───────────────────────────────────────────────────
+  function doRequest() {
+    if (S.busy) return;
+    var item = findItem(S.selectedCode);
+    if (!item) return;
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.src-sup-chk:checked'))
+      .map(function (el) { return Number(el.value); });
+    if (!checked.length) return;
+    var errBox = $('srcReqErr'); if (errBox) errBox.hidden = true;
+    S.busy = true;
+    fetchJSON(API_REQUEST, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_code: item.product_code, supplier_ids: checked })
+    }).then(function (r) {
+      S.busy = false;
+      if (r.ok) { loadList(); return; }
+      if (!errBox) return;
+      if (r.status === 401) { errBox.hidden = false; errBox.innerHTML = '세션이 만료되었습니다 — '
+        + '<a href="' + LOGIN_URL + '">다시 로그인</a>'; return; }
+      errBox.hidden = false;
+      errBox.textContent = errText(r.body, r.status, 'POST /api/admin/sourcing/request');
+    }, function (err) {
+      S.busy = false;
+      if (errBox) { errBox.hidden = false; errBox.textContent = netErrMsg(err); }
+    });
+  }
+
+  function openReplyForm(quoteId) {
+    var box = $('srcReplyForm' + quoteId);
+    if (!box) return;
+    box.hidden = false;
+    box.innerHTML =
+      '<label style="position:absolute;left:-9999px">회신 매입가</label>'
+      + '<input type="number" min="1" step="1" class="src-reply-price" id="srcReplyPrice' + quoteId
+      + '" placeholder="회신 매입가">'
+      + '<label style="position:absolute;left:-9999px">메모</label>'
+      + '<input type="text" class="src-reply-memo" id="srcReplyMemo' + quoteId
+      + '" placeholder="메모(선택) — 납기·수량 등">'
+      + '<button type="button" class="src-btn sm primary" data-action="src-save-reply" data-quote="' + quoteId + '">저장</button>'
+      + '<button type="button" class="src-btn sm" data-action="src-cancel-reply" data-quote="' + quoteId + '">취소</button>'
+      + '<div class="src-inline-err" id="srcReplyErr' + quoteId + '" hidden style="flex-basis:100%"></div>';
+  }
+
+  function closeReplyForm(quoteId) {
+    var box = $('srcReplyForm' + quoteId);
+    if (box) { box.hidden = true; box.innerHTML = ''; }
+  }
+
+  function saveReply(quoteId) {
+    if (S.busy) return;
+    var priceInput = $('srcReplyPrice' + quoteId);
+    var memoInput = $('srcReplyMemo' + quoteId);
+    var errBox = $('srcReplyErr' + quoteId);
+    if (!priceInput) return;
+    var v = Number(priceInput.value);
+    if (!priceInput.value || !(v > 0) || !isFinite(v)) {
+      if (errBox) { errBox.hidden = false; errBox.textContent = '0보다 큰 값을 입력하세요.'; }
+      return;
+    }
+    S.busy = true;
+    fetchJSON(API_REPLY(quoteId), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ price: v, memo: memoInput && memoInput.value ? memoInput.value.trim() : null })
+    }).then(function (r) {
+      S.busy = false;
+      if (r.ok) { loadList(); return; }
+      if (!errBox) return;
+      if (r.status === 401) { errBox.hidden = false; errBox.innerHTML = '세션이 만료되었습니다 — '
+        + '<a href="' + LOGIN_URL + '">다시 로그인</a>'; return; }
+      errBox.hidden = false;
+      errBox.textContent = errText(r.body, r.status, 'POST /api/admin/sourcing/quotes/' + quoteId + '/reply');
+    }, function (err) {
+      S.busy = false;
+      if (errBox) { errBox.hidden = false; errBox.textContent = netErrMsg(err); }
+    });
+  }
+
+  function doConfirm(quoteId, supplierName, price) {
+    if (S.busy) return;
+    var item = findItem(S.selectedCode);
+    if (!item) return;
+    var errBox = $('srcCmpErr');
+    S.busy = true;
+    fetchJSON(API_CONFIRM(quoteId), { method: 'POST' }).then(function (r) {
+      S.busy = false;
+      if (r.ok) {
+        S.confirmResult = { item: item, supplierName: supplierName, price: price, response: r.body };
+        renderPanelHead(item, { cls: 'done', label: '확정 완료' });
+        $('srcPanelBody').innerHTML = stageResultHtml(S.confirmResult);
+        loadList();   // 목록도 최신화(같은 배치 나머지 취소 반영) — 패널은 이 확정 스냅샷을 유지한다
+        return;
+      }
+      if (!errBox) return;
+      if (r.status === 401) { errBox.hidden = false; errBox.innerHTML = '세션이 만료되었습니다 — '
+        + '<a href="' + LOGIN_URL + '">다시 로그인</a>'; return; }
+      errBox.hidden = false;
+      errBox.textContent = errText(r.body, r.status, 'POST /api/admin/sourcing/quotes/' + quoteId + '/confirm');
+    }, function (err) {
+      S.busy = false;
+      if (errBox) { errBox.hidden = false; errBox.textContent = netErrMsg(err); }
+    });
+  }
+
+  // ── 페이지 · 검색 · 필터 ────────────────────────────────────────
+  function gotoPage(p) {
+    if (p < 1 || p > S.pages) return;
+    S.page = p; S.selectedCode = null; S.confirmResult = null;
+    loadList();
+  }
+
+  function applySearch() {
+    var v = $('srcSearchInput').value.trim();
+    S.q = v; S.page = 1; S.selectedCode = null; S.confirmResult = null;
+    loadList();
+  }
+
+  function retryLoad() {
+    if (!S.everLoaded) { $('srcError').hidden = true; $('srcLoading').hidden = false; }
+    loadList();
+  }
+
+  // ── 이벤트 배선 ─────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-action]');
+    if (a) {
+      var act = a.getAttribute('data-action');
+      if (act === 'src-retry') { retryLoad(); return; }
+      if (act === 'src-prev') { gotoPage(S.page - 1); return; }
+      if (act === 'src-next') { gotoPage(S.page + 1); return; }
+      if (act === 'src-search-go') { applySearch(); return; }
+      if (act === 'src-do-request') { doRequest(); return; }
+      if (act === 'src-open-reply') { openReplyForm(a.getAttribute('data-quote')); return; }
+      if (act === 'src-cancel-reply') { closeReplyForm(a.getAttribute('data-quote')); return; }
+      if (act === 'src-save-reply') { saveReply(a.getAttribute('data-quote')); return; }
+      if (act === 'src-do-confirm') {
+        doConfirm(a.getAttribute('data-quote'), a.getAttribute('data-supplier'), Number(a.getAttribute('data-price')));
+        return;
+      }
+      if (act === 'src-clear-result') {
+        S.confirmResult = null; S.selectedCode = null; renderTable(); renderPanel();
+        return;
+      }
+    }
+    var row = e.target.closest('.src-row');
+    if (row) { selectRow(row.getAttribute('data-code')); return; }
+  });
+
+  document.addEventListener('change', function (e) {
+    if (e.target.id === 'srcPartTypeSelect') {
+      S.partType = e.target.value; S.page = 1; S.selectedCode = null; S.confirmResult = null;
+      loadList();
+      return;
+    }
+    if (e.target.classList && e.target.classList.contains('src-sup-chk')) { updateRequestBtn(); return; }
+  });
+
+  document.addEventListener('input', function (e) {
+    if (e.target.id === 'srcSearchInput') {
+      clearTimeout(S.searchDebounce);
+      S.searchDebounce = setTimeout(applySearch, 350);
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target.id === 'srcSearchInput' && e.key === 'Enter') { clearTimeout(S.searchDebounce); applySearch(); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.src-row')) {
+      e.preventDefault();
+      selectRow(e.target.closest('.src-row').getAttribute('data-code'));
+    }
+  });
+
+  loadMeta();
+  loadList();
+})();
+</script>
+{% endraw %}
+{% endblock %}

@@ -45,12 +45,56 @@ _PENDING = """
     ORDER BY p.stock_qty, p.product_code
     LIMIT :size OFFSET :offset
 """
+# 대기 요약 배너(ADM-SRC-010 계약 §②)가 "이 중 진행 중인 견적이 있는 상품은 {n}건"을
+# 말하려면 **현재 페이지가 아니라 전체 대기 모집단**에서 활성 견적(요청·회신)이 있는
+# distinct 상품 수가 필요하다 — 기존 코드는 그 페이지의 상품에 대해서만 견적을 읽었다
+# (아래 sourcing() 주석 "이 페이지의 상품에 대해서만"). _WHERE를 그대로 서브쿼리로
+# 재사용해 큐 정의를 두 곳에 다시 적지 않는다(같은 것을 두 벌 두지 않는다).
+_IN_PROGRESS = ("SELECT COUNT(*) FROM ("
+                "SELECT DISTINCT q.product_code FROM product_sourcing_quotes q"
+                " WHERE q.status IN ('요청','회신')"
+                " AND q.product_code IN (SELECT p.product_code" + _WHERE + ")"
+                ") t")
 
 
 def _why(r) -> str:
     if r["stock_qty"] == 0:
         return "재고 0 — 자동 등록"
     return f"재고 {r['stock_qty']} → 안전재고 {r['safety_stock']} 미달 — 자동 등록"
+
+
+_confirmed_at_col_ready: bool | None = None    # 프로세스 수명 동안 캐싱 — auth.py의 _schema_ready()와 같은 이유
+
+
+def _confirmed_at_ready() -> bool:
+    """마이그레이션 0053(product_sourcing_quotes.confirmed_at)이 이 DB에 실제로 적용됐는가.
+
+    결함 수정(확인자 실측 2026-08-15): 헤더 「오늘 확정 {n}건」이 지금까지 `created_at`
+    (견적을 처음 "요청"한 날짜)으로 세고 있었다. 요청 → 회신 대기 → 확정까지 며칠
+    걸리는 것이 이 화면의 **정상 흐름**이라 그 컬럼으로 세면 거의 항상 0이 된다 —
+    실측: 상품 39948·45551을 오늘(2026-08-15) 실제로 확정했는데(활동 로그
+    `sourcing_confirm` 2건, 07:09·07:22) `created_at::date=오늘`인 요청은 0건이라
+    done_today가 세 번 조회 모두 0이었다. `replied_at`도 대안이 못 된다 — "회신을 적은
+    시각"이지 "확정한 시각"이 아니라서 같은 날 회신·다음 날 확정이면 또 어긋난다.
+    그래서 "확정한 시각" 자체를 남기는 `confirmed_at` 컬럼이 필요하다.
+
+    ⚠⚠ 이 컬럼의 마이그레이션(0053)은 파일만 만들고 DB에는 적용하지 않는다 —
+    하네스 권한 분류기가 `alembic upgrade` 실행을 막고 있다(0051·0052와 같은 상태).
+    우회하지 않는다. 그래서 컬럼이 실제로 생기기 전까지는 "오늘 확정 0건"을 자신
+    있게 말하지 않는다 — 없는 컬럼을 무조건 SELECT/UPDATE하면 이 화면 전체
+    (목록 조회·확정)가 500으로 죽는다(api/auth.py의 _schema_ready()와 같은 이유로
+    같은 방식을 쓴다). 매 요청 무조건 information_schema를 다시 읽지 않도록 결과를
+    프로세스 안에서 캐싱한다 — 스키마는 이 프로세스가 떠 있는 동안 바뀌지 않는다
+    (마이그레이션은 항상 재배포로 적용된다).
+    """
+    global _confirmed_at_col_ready
+    if _confirmed_at_col_ready is None:
+        with engine.connect() as conn:
+            _confirmed_at_col_ready = bool(conn.execute(text(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.columns"
+                " WHERE table_name='product_sourcing_quotes' AND column_name='confirmed_at')"
+            )).scalar())
+    return _confirmed_at_col_ready
 
 
 @router.get("/sourcing")
@@ -76,11 +120,23 @@ def sourcing(page: int = 1, size: int = 100, q: str = "", part_type: str = ""):
             " FROM product_sourcing_quotes q LEFT JOIN suppliers s USING (supplier_id)"
             " WHERE q.status IN ('요청','회신') AND q.product_code = ANY(:c)"
             " ORDER BY q.quote_id"), {"c": codes}).mappings().all() if codes else []
+        # 활성 공급처만 — 견적 요청 화면(ADM-SRC-010)이 "고를 수 있는 곳"을 물으면 중지된
+        # 곳은 선택지가 아니다(admin_setup.py의 부트스트랩 판정과 같은 기준: status='활성').
+        # brands(취급 브랜드)도 함께 준다 — 계약 §㉮ "목록에 이름 + 취급 브랜드".
         sups = conn.execute(text(
-            "SELECT supplier_id, name FROM suppliers ORDER BY supplier_id")).mappings().all()
-        done = conn.execute(text(
-            "SELECT COUNT(*) FROM product_sourcing_quotes"
-            " WHERE status='확정' AND created_at::date = CURRENT_DATE")).scalar_one()
+            "SELECT supplier_id, name, brands FROM suppliers"
+            " WHERE status='활성' ORDER BY name")).mappings().all()
+        in_progress_total = conn.execute(text(_IN_PROGRESS), p).scalar_one()
+        # done_today — _confirmed_at_ready() 참조. 컬럼이 없는 동안은 "0건"을 지어내지
+        # 않고 왜 못 세는지를 함께 돌려준다(done_today_reason).
+        if _confirmed_at_ready():
+            done = conn.execute(text(
+                "SELECT COUNT(*) FROM product_sourcing_quotes"
+                " WHERE status='확정' AND confirmed_at::date = CURRENT_DATE")).scalar_one()
+            done_today_reason = None
+        else:
+            done = None
+            done_today_reason = "확정 시각 기록이 없어 오늘 확정 건수를 셀 수 없습니다 — 마이그레이션 0053 미적용"
         # 최근 확정 — 확정해도 재고가 0이면 대기에 남으므로(가격 결정 ≠ 입고) 이력을 함께 보여준다
         confirmed = conn.execute(text(
             "SELECT DISTINCT ON (q.product_code) q.product_code, q.price, q.replied_at,"
@@ -116,16 +172,23 @@ def sourcing(page: int = 1, size: int = 100, q: str = "", part_type: str = ""):
                 "memo": q["memo"], "best": q["price"] is not None and q["price"] == best,
             } for q in qs],
         })
-    return {"items": items, "done_today": done,
+    # note 필드는 여기서 주지 않는다(결함 수정 2026-08-15, 확인자 지적) — sourcing.html.j2는
+    # 이 필드를 한 번도 읽지 않았다(죽은 필드, 소비자 0). 화면이 실제로 보여줘야 하는
+    # "정직 4건"은 이미 계약(docs/design/spec-sourcing.md)의 인용문을 그대로 리터럴로
+    # 담고 있다 — 요청은 기록일 뿐(버튼 문구 자체가 "기록") · 회신은 대행 입력 ·
+    # 확정은 가격 결정(입고 아님) · 대기 목록은 매 조회 파생. 지웠던 이 note는 그 넷을
+    # 한 문단으로 다시 요약하려 했지만 계약 문구와 어긋났다 — 예를 들어 확정 사실을
+    # "재고는 입고 화면에서 늘어납니다"로만 적고, 계약이 ⚠⚠로 못박은 "그래서 이 상품은
+    # 대기 목록에서 사라지지 않는다"는 빠뜨렸다. 화면 문구를 더 손볼 일이 있으면 계약
+    # 문장을 그대로 옮겨야지 이 필드를 되살려 다시 요약하지 않는다(CANON §1 "같은 것을
+    # 두 벌 두지 않는다").
+    return {"items": items, "done_today": done, "done_today_reason": done_today_reason,
+            "in_progress_total": in_progress_total,
             "page": page, "size": size, "total": total,
             "pages": (total + size - 1) // size,
             "q": kw, "part_type": p["part_type"],
-            "suppliers": [{"id": s["supplier_id"], "name": s["name"]} for s in sups],
-            "note": (f"전체 {total:,}건 중 {page}페이지 ·"
-                     " 대기 목록은 재고·안전재고에서 파생합니다(별도 큐 테이블 없음) ·"
-                     " 견적 요청·회신은 **기록**이며 실제 발송·자동 수신 연동은 준비 중입니다"
-                     " — 공급처 회신은 운영자가 대행 입력합니다 ·"
-                     " 확정은 가격 결정이며 재고는 입고 화면에서 늘어납니다.")}
+            "suppliers": [{"id": s["supplier_id"], "name": s["name"], "brands": s["brands"]}
+                          for s in sups]}
 
 
 class RequestBody(BaseModel):
@@ -214,6 +277,13 @@ def confirm_quote(quote_id: int):
             "SELECT cost_price, supply_state FROM product_supplier_prices"
             " WHERE product_code=:pc AND supplier_id=:s"),
             {"pc": q["product_code"], "s": q["supplier_id"]}).first()
+        # 확정 결과 패널(ADM-SRC-010 계약 ㉰)은 "148,000 → 142,000" 같은 **실제 전·후 값**을
+        # 요구하는데 _reprice()는 불리언만 돌려준다(admin_price_import.py:161 — 카탈로그
+        # 재적재·가격 검토도 같이 쓰는 함수라 반환 계약을 넓히지 않는다). 그래서 여기서
+        # 같은 트랜잭션 안에서 전·후를 한 번씩 더 읽는다(추가 쓰기 없음, 읽기 2회뿐).
+        prod_before = conn.execute(text(
+            "SELECT purchase_price, sale_price FROM products WHERE product_code=:pc"),
+            {"pc": q["product_code"]}).mappings().one()
         conn.execute(text(
             "INSERT INTO product_supplier_prices (product_code, supplier_id, cost_price, supply_state)"
             " VALUES (:pc, :s, :c, '가능')"
@@ -221,8 +291,21 @@ def confirm_quote(quote_id: int):
             " DO UPDATE SET cost_price=:c, supply_state='가능', updated_at=now()"),
             {"pc": q["product_code"], "s": q["supplier_id"], "c": q["price"]})
         rp = _reprice(conn, q["product_code"], fee, margin, "sourcing", q["quote_id"])
-        conn.execute(text(
-            "UPDATE product_sourcing_quotes SET status='확정' WHERE quote_id=:i"), {"i": quote_id})
+        prod_after = conn.execute(text(
+            "SELECT purchase_price, sale_price FROM products WHERE product_code=:pc"),
+            {"pc": q["product_code"]}).mappings().one()
+        # 결함 수정(2026-08-15): status만 바꾸고 시각을 안 남기면 "오늘 확정 {n}건"을 셀
+        # 방법이 없다(_confirmed_at_ready() 참조). 컬럼이 아직 없으면(마이그레이션 0053
+        # 미적용) 이 UPDATE는 지금까지처럼 status만 바꾼다 — 적용 후 재배포되면 그 뒤로
+        # 확정되는 건부터 confirmed_at이 찍힌다(그 이전 확정 건은 언제인지 모르므로
+        # 지어내지 않고 NULL로 남는다).
+        if _confirmed_at_ready():
+            conn.execute(text(
+                "UPDATE product_sourcing_quotes SET status='확정', confirmed_at=now()"
+                " WHERE quote_id=:i"), {"i": quote_id})
+        else:
+            conn.execute(text(
+                "UPDATE product_sourcing_quotes SET status='확정' WHERE quote_id=:i"), {"i": quote_id})
         conn.execute(text(
             "UPDATE product_sourcing_quotes SET status='취소'"
             " WHERE batch_id=:b AND quote_id<>:i AND status IN ('요청','회신')"),
@@ -236,4 +319,8 @@ def confirm_quote(quote_id: int):
                        "reprice": rp}, kind="sourcing")
         return {"ok": True, "sku": q["sku"], "price": q["price"],
                 "purchase_changed": rp["purchase_changed"], "sale_changed": rp["sale_changed"],
-                "sale_locked": rp["sale_locked"], "undo_id": log_id}
+                "sale_locked": rp["sale_locked"],
+                "purchase_before": prod_before["purchase_price"],
+                "purchase_after": prod_after["purchase_price"],
+                "sale_before": prod_before["sale_price"], "sale_after": prod_after["sale_price"],
+                "undo_id": log_id}
