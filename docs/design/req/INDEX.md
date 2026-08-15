@@ -32,6 +32,16 @@
 > 확인 필요(위 §① 「가격 검토 대기」 정정과 같은 병이지만, 이건 상태가 아니라 **행
 > 자체가 없는** 경우라 한 단계 더 나쁘다).
 
+## 0. 로그인 — LNB 밖
+
+> 로그인 화면은 좌측 메뉴에 없다(실측: `api/admin_nav.py` 전수 검색 "로그인" 0건 —
+> 인증 전 화면이라 메뉴 대상이 아니다). 번호 `0`은 목차 맨 앞에 두기 위한 표기일
+> 뿐 LNB 순번이 아니다.
+
+| # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
+|---|------|----------------|--------|------|
+| 0 | 로그인 | [req-login.md](req-login.md) | — | **정의서 작성 완료 · 승인 디자인 대기** (제안 ID `ADM-SYS-021`(기존 재사용) · 제안 경로 `/admin2/login` — 인증 게이트 예외 신설 필요, 정의서 §⑦ ㉮ 참조) |
+
 ## 1. 대시보드
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
@@ -68,9 +78,9 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 18 | 공급처 | [req-suppliers.md](req-suppliers.md) | — | 정의서 |
-| 19 | 매입 견적(용산) | [req-sourcing-quote.md](req-sourcing-quote.md) | — | 정의서 |
-| 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | — | 정의서 |
+| 18 | 공급처 | [req-suppliers.md](req-suppliers.md) | `spec-suppliers.md`(계약 · 1b 안) | **제작 완료 · 검증 중** (`/admin2/suppliers` · **ADM-SRC-030** — 라우트 실측 등록됨. 담당 파일 `api/admin_ui_suppliers.py`·`templates/admin/suppliers.html.j2` 실측 존재, 미커밋. 2026-08-15 착수) |
+| 19 | 매입 견적(용산) | [req-sourcing-quote.md](req-sourcing-quote.md) | `spec-sourcing.md`(계약 · 1a 안) | **제작 완료 · 검증 중** (`/admin2/sourcing` · **ADM-SRC-010** — 라우트 실측 등록됨. 담당 파일 `api/admin_ui_sourcing.py`·`templates/admin/sourcing.html.j2` 실측 존재, 미커밋. 2026-08-15 착수) |
+| 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | `spec-price-import.md`(계약 · 1b 안) | **제작 중** (`/admin2/price-import` · **ADM-PRC-040** — 라우트 실측 등록됨(`api/admin_ui_price_import.py`, 미커밋), 템플릿(`templates/admin/price_import.html.j2`)은 아직 없음. 2026-08-15 착수) |
 
 ## 5. 판매가
 
@@ -92,7 +102,7 @@
 | 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · ⚠ 아직 미커밋) |
 | 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61`) |
 | 23 | 가격 이력 | [req-price-history.md](req-price-history.md) · [spec-price-history.md](../spec-price-history.md)(2026-08-15 「(신규)」 표기 정정) | — | **지음** — 구현 `/admin2/price-history`(커밋 `140a5ba`·`77dbbef`·`bdf7e7c`) · 검증 확인자 브라우저 실측 통과 3라운드(①7행 3종 판정·ref_id null 실값·401/400/404 경계·768px ②마이그레이션 0050 「비움」 표시 — DB↔DOM 5행 대조·new_price=0 실데이터로 0과 NULL 구분 확인 ③「부품 종류」 확인 중… 고정 결함 — 10ms 폴링 프레임 단위 캡처로 재발 0·정상 로딩 노출은 유지 확인) · 계약 정정 `8e35508` · 연결 `api/admin_nav.py` `91dd3a1` |
-| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | — | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` 둘 다 req-reprice.md 자신이 「제안」·「관례상」으로 표시 — 확정 아님. 2026-08-15 제작 착수) |
+| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안) | **구축 중** (ADM-PRC-050·경로 `/admin2/reprice` — spec-reprice.md 자신도 "대조 필요"로 표시, ID·경로는 여전히 확정 아님. **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). 라우트 커밋됨(`api/admin_ui_reprice.py`) · 템플릿 실측 존재(`templates/admin/reprice.html.j2`, 미커밋)) |
 
 ## 6. 인계 · 성과
 
@@ -100,14 +110,14 @@
 |---|------|----------------|--------|------|
 | 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 전) |
 | 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | — | **구축 중** (2026-08-15 실측: 템플릿·라우트 있음, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
-| 26 | 유입 성과 | [req-funnel-performance.md](req-funnel-performance.md) | — | 정의서 |
+| 26 | 유입 성과 | [req-funnel-performance.md](req-funnel-performance.md) | `spec-funnel.md`(계약 · 1a 안) | **제작 중** (경로 `/admin2/funnel-performance` — spec-funnel.md의 「가칭」 그대로 라우트 실측 등록됨. **ADM-HND-030 후보 — 화면 ID 미배정**(spec-funnel.md 자신이 명시). 담당 파일 `api/admin_ui_funnel.py`·`api/admin_funnel.py`·`templates/admin/funnel.html.j2` 실측 존재, 미커밋·검증 전. 2026-08-15 착수) |
 
 ## 7. AI 관리
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
-| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | — | **재구축 대기** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 37개 중 유일하게 Phoenix 벤더를 실제 로드하는 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정, 이후 커밋 0건. **화면 자체는 「고칠 것」이 아니라 승인 디자인 받아 「새로 지을 것」이라 승인 디자인 대기 중.** ⚠ 그런데 **[검수 화면에서 승인하기] 버튼은 이미 열렸다**(커밋 `e84d61f`, 결함 0) — 재구축을 기다리는 동안 막아 둘 이유가 없다는 사장님 판단(`spec_web_suggestions` 38건·정본 반영 0/38이던 것이 이제 검수 화면으로 갈 수 있다). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.** 같은 물결에서 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=지금 개방(나머지 ③④⑥은 미정으로 남음, req-spec-fill.md 참조)) |
+| 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **재구축 중** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 제작 착수** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 모두 수정 중(미커밋). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.**) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
 | 30 | **AI 연동 설정** | [req-ai-integration.md](req-ai-integration.md) | `dc-ai-integration.html` | **지음** (`/admin2/ai-integration`) |
 | 31 | **AI 사용량 · 비용** | [req-ai-usage-cost.md](req-ai-usage-cost.md) | `dc-ai-usage-cost.html` | **지음** (`/admin2/ai-usage-cost`) |
@@ -166,6 +176,12 @@
 | 14 | 추천 기준 보기 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
 | 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 구축 중 · UX-32 → 1a · 조회 전용 |
 | 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 구축 중 · UX-33 → 1a + 우측 서랍 |
+| 18 | 공급처 | [spec-suppliers.md](../spec-suppliers.md) | 제작 완료 · 검증 중 · 1b 안 |
+| 19 | 매입 견적(용산) | [spec-sourcing.md](../spec-sourcing.md) | 제작 완료 · 검증 중 · 1a 안 |
+| 20 | 단가표 반영 | [spec-price-import.md](../spec-price-import.md) | 제작 중 · 1b 안 |
+| 23B | 판매가 재산정 | [spec-reprice.md](../spec-reprice.md) | 구축 중 · 1a 안 확정 |
+| 26 | 유입 성과 | [spec-funnel.md](../spec-funnel.md) | 제작 중 · 1a 안 · 화면 ID 미배정 |
+| 28 | 웹 사양 채움 | [spec-spec-fill.md](../spec-spec-fill.md) | 재구축 중 · 1a 안 |
 
 **7번은 완성본이 아니라 「3안 비교본」이다.** 지도형(1a)·진단형(1b)·매트릭스형(1c) 셋이
 한 캔버스에 있다. 사장님이 **셋을 다 탭으로 두고 운영자가 고르게** 하기로 확정했다(UX-20).
