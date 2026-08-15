@@ -73,7 +73,7 @@ CONFLICTS = [
     {"date": "2026-07-21", "title": "LLM 실연동 파일럿 보류", "badge": "프로바이더 1개",
      "desc": "Claude Opus 4.8 단일, 팝콘톡 파일럿 한정. 별도 승인 전까지 실행 없음.",
      "adopted": False},
-    {"date": "2026-08-09", "title": "UX-14 부속 · AI 축", "badge": "프로바이더 3개 - A-35가 채택",
+    {"date": "2026-08-09", "title": "UX-34 부속 · AI 축", "badge": "프로바이더 3개 - A-35가 채택",
      "desc": "Codex·Claude·Gemini 역할분담 + 폴백. 교차 검증은 주목적이 아님.",
      "adopted": True},
 ]
