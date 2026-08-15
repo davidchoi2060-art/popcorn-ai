@@ -152,6 +152,7 @@
     background:var(--rv-panel2);border-radius:6px;padding:8px 10px}
 .rp-notice{border:1px solid rgba(0,0,0,.14);background:var(--rv-panel2);border-radius:7px;
     padding:9px 12px;margin:0 0 10px;font:400 11px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.rp-notice strong{font-weight:700;color:var(--rv-ink)}
 .rp-warnbox{border:1.5px solid var(--rv-amber);background:oklch(0.95 0.04 70 / .5);border-radius:8px;
     padding:10px 12px;margin:0 0 10px;font:400 11.5px/1.6 var(--rv-font);color:oklch(0.4 0.1 62)}
 
@@ -347,6 +348,14 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  // 서버 note(admin_reprice.py::_summary)가 **볼드** 마크다운을 문자 그대로 담아 보낸다
+  // (전수 확인 — 그 함수가 쓰는 마크다운 문법은 볼드 하나뿐, 기울임·코드·링크 없음).
+  // esc()로 «전체»를 먼저 이스케이프해 이스케이프를 깨지 않은 채로 만든 뒤, 그 결과
+  // 위에서 `**text**` 쌍만 <strong>으로 바꾼다 — 서버 문자열을 innerHTML에 직접 흘리지
+  // 않으므로 <script> 등을 넣어도 계속 이스케이프된 채(&lt;script&gt;)로 남는다.
+  function mdBold(s) {
+    return esc(s).replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  }
   function fmt(n) { return (n === null || n === undefined) ? '못 쟀음' : Number(n).toLocaleString('ko-KR'); }
   function fmtWon(n) { return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('ko-KR') + '원'; }
   function pct(dec) {
@@ -530,7 +539,7 @@
       + ' 매입가를 <code>products.purchase_price</code>에서 바로 씁니다. 대상(' + fmt(p.target) + ')은 이미'
       + ' 오름·내림·변화없음·잠김의 합과 같아(남는 몫 없음) 0으로 위장하지 않고 못 셈으로 둡니다.</div>';
     html += '<div class="rp-formula">' + esc(p.formula) + '</div>';
-    if (p.note) html += '<div class="rp-notice">' + esc(p.note) + '</div>';
+    if (p.note) html += '<div class="rp-notice">' + mdBold(p.note) + '</div>';
     if (p.changed > p.max_apply) {
       var dropped = p.changed - p.max_apply;
       html += '<div class="rp-warnbox">⚠ 상한 ' + fmt(p.max_apply) + '건을 넘습니다 — 이번 실행은 앞 '
