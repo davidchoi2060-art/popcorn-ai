@@ -1,403 +1,735 @@
 {#
-  웹 사양 채움 (ADM-AI-020) — 2026-08-13, B안(전용 실행 화면) 사장님 확정
+  웹 사양 채움 (ADM-AI-020) — **1a안 재구축** (2026-08-15, Phoenix 잔재 제거)
 
-  제안서(docs/design/spec-fill-ui-direction-2026-08-13.md)는 A안(화면 신설 없음)을
-  추천했다. 사장님이 B안을 택해 이 화면이 선다 — 대신 B의 단점(정본 복제)을 줄이려고
-  **이 화면은 로직을 하나도 새로 짓지 않는다.** 계약 넷을 배선만 한다:
+  ■ 이 화면은 «이미 있었다» — 다시 지었다
+    2026-08-14 18:40(커밋 b1dca5e)에 B안(전용 실행 화면)으로 섰다. 4시간 59분 뒤
+    (23:39:38) 사장님이 "피닉스 디자인은 참고하지 말고 내가 주는 화면 UI 대로"를
+    확정했는데, 이 화면만 그 전에 지어져 Phoenix(Bootstrap) 카드·표·폼 + 벤더 자산
+    25개 + `--phoenix-font-sans-serif` 재정의를 그대로 들고 있었다(요구사항 정의서
+    `docs/design/req/req-spec-fill.md` 실측 — admin2 37개 템플릿 중 Phoenix 벤더를
+    실제로 로드하던 **마지막 하나**, 회귀 [30]이 그 재정의를 잡고 있었다). 이 파일이
+    그것을 걷어내고 admin2 네이티브(셸 `_admin2_shell.html.j2` + `admin2.css` 토큰,
+    `mockups/shared/admin2/admin2-shell.js`)로 다시 짓는다 — 벤더 CSS·JS를 **0개**
+    싣는다(아래 head_extra/foot_extra에 자체 <style>/<script>뿐).
 
-    실행   기존 대시보드 큐(POST /api/admin/dash/say, api/dash.py) — 새 실행 엔진 없음
-    진행   신규 읽기 API 하나(GET /api/admin/spec-fill/status, 집계 SELECT만)
-    미리보기 위 API의 페이지네이션 목록(전 행 반환 금지 규약)
-    승인   여기서 하지 않는다 — 상품 사양 검수(ADM-PRD-020)로 필터 링크만(A-18 계약)
+  ■ 계약 — `docs/design/spec-spec-fill.md`(1a안, 사장님 확정 2026-08-15)
+    골격: ① 실행 줄 ② 정본 반영 0건 경고(+검수 화면 링크) ③ 실행 원장 ④ 통계 카드 4장
+    ⑤ 최근 제안 표(6열). 사장님 확정 셋이 전제다 — ① 사람 없이 도는 실행 ② 대상
+    필드는 `cooler_tdp` 하나 ⑤ 승인 경로는 지금 연다.
 
-  숫자는 전부 서버 응답만 쓴다. 화면이 후보 수·건수·비율을 계산하지 않는다.
+  ■ 이 화면은 로직을 갖지 않는다 — 계약대로 배선만 한다(B안 원칙, 여전히 유효)
+    실행 = 기존 대시보드 큐(`POST /api/admin/dash/say`, `api/dash.py` — 담당 밖, 무변경)
+    조회 = `api/admin_spec_fill.py`(이번 작업에서 note SELECT 추가 + `/runs`·
+           `/field-context` 신설)
+    승인 = 여기서 하지 않는다 — 상품 사양 검수(ADM-PRD-020)로 필터 링크만(A-18 계약)
 
-  ■ 2026-08-13 셸 통합 — LNB·헤더·팔레트는 admin2 공통 셸(`_admin2_shell.html.j2`)로
-    옮겼다. 본문은 여전히 Phoenix(Bootstrap) 카드·표·폼이라 `head_extra`/`foot_extra`
-    블록으로 그 벤더 CSS·JS를 함께 싣는다(본문까지 admin2 팔레트로 새로 짜는 것은
-    이번 작업 범위 밖 — 제작 보고서 참조). `data-screen-id`/`data-domain`/빵부스러기는
-    이제 라우트(`api/admin_ui_spec_fill.py`)가 컨텍스트로 준다.
+  ■ ⚠⚠ "① 사람 없이 도는 실행"을 문면 그대로 구현하지 않았다 — 근거를 남긴다
+    요구사항 정의서 §① 자체가 "채움 담당을 API로 부를 수 있는 독립 실행 경로 —
+    지금은 없다"고 명시한다. 그 경로를 새로 짓는 것은 이번 작업의 담당 파일
+    (`admin_ui_spec_fill.py`·`admin_spec_fill.py`·템플릿·마이그레이션 0052)의 범위
+    밖이다 — 실행 큐(`api/dash.py`)도, 채움 담당 호출부(`tools/spec_fill_apply.py`)도
+    담당 밖이라 고칠 수 없다. 그래서:
+      · [실행] 버튼은 **여전히** `POST /api/admin/dash/say`로 큐에 문장 하나를 넣는다
+        (그 큐를 사람이 읽어 채움 담당을 부르는 기존 체인 그대로 — 바꾸지 않았다).
+      · 대신 **실행 원장**(`spec_fill_runs`, 마이그레이션 0052 — 파일만, 미적용)을
+        만들어 "몇 번 돌았는지조차 모른다"는 문제(계약 ③)에 스키마 자리를 마련했다.
+      · 지금 그 표에 실제로 쓰는 코드가 없으므로(쓰는 것도 이번 담당 밖), 화면은
+        "실행 중 «{n}건 중 {m}건 처리»"를 **지어내지 않는다** — 원장이 없으면
+        "원장 신설 필요"를, 원장이 있어도 진행 중 행이 없으면 정직하게 "대기"를 보인다.
+        `m`(처리 중 건수)은 어떤 코드도 갱신하지 않으므로 애초에 표시하지 않는다
+        (없는 숫자를 지어내는 것보다 항목 자체를 안 보이는 쪽을 택했다).
+
+  ■ 선행 작업 — `note` SELECT 추가(계약 §④)
+    `spec_web_suggestions.note`는 38/38 값이 있는데 `api/admin_spec_fill.py`가 SELECT에
+    안 넣어 화면까지 온 적이 없었다("같은 모델인데 유통처마다 TDP가 다르다" 같은 경고가
+    사라졌다). 이번에 SELECT·응답·마크업 세 곳 모두에 추가했다 — 감추지 않는다.
+
+  ■ 숫자는 전부 서버 응답이다 — 디자인 스냅샷(제안 38·정본 반영 0/38·확신도 0.25~0.90·
+    note 38/38·결측 77.6%=1,066/1,374·검수 대기 5,156 중 5,048)을 코드에 박지 않았다.
+    2026-08-15 측정 시 실제로 이 값들이 재현됐다(제작 보고서 참조) — 그날 이후 신규
+    데이터가 없었다는 뜻이지, 하드코딩했다는 뜻이 아니다. `/field-context`가 "결측률
+    1위" 순위를 `is_engine` 필드 22개를 다시 질의해 그때그때 계산한다(정적 문구 아님).
+
+  ■ 대상 필드 선택 상자 — 사장님 확정 ②("cooler_tdp 하나")를 반영해 목록을 그 키
+    하나로 좁혔다. 다만 **목록 자체는 여전히 `GET /api/admin/spec-fields`
+    (`spec_field_defs` 정본)에서 읽는다** — 화면이 라벨·단위 같은 필드 정의를
+    다시 만들지 않는다. 허용 목록(`TARGET_FIELDS`)만 이 화면이 갖고 있고, 나중에
+    범위를 넓히기로 결정되면(요구사항 §② 미결) 그 배열 하나만 늘리면 된다.
+
+  ■ 권한 — 서버가 이미 강제한다(`api/auth.py` `required_role()`, 이 파일 밖 · 무변경).
+    GET은 viewer, POST(`/dash/say`)는 기본 규칙으로 operator 이상이 자동으로 걸린다.
+    이 화면은 **추가로** 클라이언트 쪽에서 선제 차단(버튼 비활성 + 사유 표시)만 얹는다
+    — 서버 403(`권한이 부족합니다(필요: operator, 현재: …)`)이 최종 방어선이다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
 {% block title %}웹 사양 채움{% endblock %}
 
 {% block head_extra %}
-{# Phoenix(Bootstrap) 벤더 자산 — 본문 카드·표·폼이 여전히 이 컴포넌트에 의존한다. #}
-<link rel="apple-touch-icon" sizes="180x180" href="/admin/assets/img/favicons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/admin/assets/img/favicons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/admin/assets/img/favicons/favicon-16x16.png">
-<link rel="shortcut icon" type="image/x-icon" href="/admin/assets/img/favicons/favicon.ico">
-<meta name="theme-color" content="#ffffff">
-<script src="/admin/vendors/simplebar/simplebar.min.js"></script>
-<script src="/admin/assets/js/config.js"></script>
-<link href="/admin/vendors/simplebar/simplebar.min.css" rel="stylesheet">
-<link href="/admin/vendors/choices/choices.min.css" type="text/css" rel="stylesheet">
-<script src="/shared/ui-choices.js"></script>
-<script src="/shared/ui-list.js"></script>
-<link href="/admin/assets/css/theme.min.css" type="text/css" rel="stylesheet" id="style-default">
-<link href="/admin/assets/css/user.min.css" type="text/css" rel="stylesheet" id="user-style-default">
 <style>
-  /* Phoenix가 읽는 서체 변수를 admin2 팔레트로 돌린다(옛 _layout.html.j2가
-     tokens.css로 하던 일과 같은 방식 — 이제 admin2.css). */
-  :root{ --phoenix-font-sans-serif: var(--font); }
-  .card > .card-header, .card > .card-body { min-width: 0; }
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+input,select{font-family:var(--rv-font)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* 좌측 메뉴·헤더·팔레트는 admin2 공용 셸이 그린다 — 여기는 이 화면 본문만.
+   옛 템플릿은 Phoenix 서체 변수를 admin2 폰트로 우회하려고 최상위 선택자 블록에서
+   그 변수를 재정의했다 — 그 블록을 통째로 지웠다(이 파일에 최상위 선택자 블록 자체가
+   없다). admin2.css의 --rv-* 토큰만 쓴다. */
+
+.sf-wrap{display:flex;flex-direction:column;gap:16px;max-width:1180px}
+.sf-intro h1{font:600 17px/1.3 var(--rv-font);margin:0 0 4px;color:var(--rv-ink)}
+.sf-intro p{font:400 12px/1.6 var(--rv-font);color:var(--rv-muted);margin:0;max-width:760px}
+.sf-intro code{font:500 11px/1 var(--rv-mono);background:var(--rv-panel2);border-radius:3px;padding:2px 5px}
+
+.sf-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:9px;overflow:hidden}
+.sf-card-hd{padding:12px 15px;border-bottom:1px solid rgba(0,0,0,.09);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--rv-panel)}
+.sf-card-hd h2{font:600 13px/1 var(--rv-font);margin:0;color:var(--rv-ink)}
+.sf-card-hd .n{font:400 10.5px/1 var(--rv-font);color:var(--rv-faint)}
+.sf-card-body{padding:14px 15px}
+
+/* ── ① 실행 줄 ── */
+.sf-run-row{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.sf-field-box,.sf-count-box{display:flex;flex-direction:column;gap:5px}
+.sf-field-box label,.sf-count-box label{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em}
+.sf-field-box select{min-width:220px;font:500 12.5px/1 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.22);border-radius:6px;padding:9px 10px}
+.sf-count-box input{width:100px;font:500 12.5px/1 var(--rv-mono);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.22);border-radius:6px;padding:9px 10px}
+.sf-field-hint{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim);max-width:260px}
+.sf-btn-primary{font:600 12px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+  border:none;border-radius:6px;padding:10px 16px;cursor:pointer;white-space:nowrap}
+.sf-btn-primary[disabled]{background:var(--rv-dim3);color:var(--rv-panel2);cursor:not-allowed}
+.sf-btn-secondary{font:600 11.5px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.2);border-radius:6px;padding:9px 13px;cursor:pointer;white-space:nowrap}
+.sf-btn-secondary[disabled]{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+.sf-run-status{margin-top:12px;font:500 12px/1.5 var(--rv-font);min-height:1.4em}
+.sf-run-status.ok{color:var(--rv-ink-soft)}
+.sf-run-status.err{color:var(--rv-red)}
+.sf-run-status.wait{color:var(--rv-amber)}
+.sf-run-note{margin-top:5px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim)}
+.sf-run-note.warn{color:var(--rv-red)}
+.sf-watcher-warn{display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px 10px;
+  border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-radius:6px;
+  font:400 10.5px/1.5 var(--rv-font);color:oklch(0.4 0.13 55)}
+.sf-watcher-warn[hidden]{display:none}
+.sf-watcher-warn a{font-weight:600;text-decoration:underline}
+
+/* ── ② 정본 반영 경고 배너 ── */
+.sf-banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:13px 16px;
+  border:1px solid var(--rv-amber-line);border-left:4px solid var(--rv-amber);
+  background:var(--rv-amber-bg);border-radius:9px}
+.sf-banner.sf-banner-ok{border-color:rgba(0,0,0,.12);border-left-color:var(--rv-green);background:var(--rv-card)}
+.sf-banner-text strong{font:600 13px/1.4 var(--rv-font);color:var(--rv-ink)}
+.sf-banner-text .d{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);margin-top:2px}
+.sf-banner .sf-btn-secondary{flex:none;margin-left:auto}
+
+/* ── 왜 이 필드인가 ── */
+.sf-why{padding:12px 15px;background:var(--rv-panel2);border:1px solid rgba(0,0,0,.08);
+  border-radius:9px;font:400 11.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.sf-why b{color:var(--rv-ink)}
+.sf-why .num{font-family:var(--rv-mono)}
+
+/* ── ④ 통계 카드 4장 ── */
+.sf-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sf-kpi{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:13px 14px}
+.sf-kpi .lb{font:500 10.5px/1.3 var(--rv-font);color:var(--rv-faint)}
+.sf-kpi .v{font:700 21px/1.3 var(--rv-mono);color:var(--rv-ink);margin-top:5px}
+.sf-kpi .sub{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-dim);margin-top:3px}
+.sf-kpi.warn .v{color:var(--rv-red)}
+
+/* ── 표 공통 (실행 원장·최근 제안) — 헤더·행이 같은 grid-template-columns를 쓰고
+   하나의 overflow-x:auto 조상 안에서 함께 스크롤한다. thead/tbody를 따로 스크롤시켜
+   거터가 어긋나는 문제(MAKER-CHECKLIST 경고)를 원천적으로 피한다. ── */
+.sf-tbl-scroll{overflow-x:auto}
+.sf-tbl-h,.sf-tbl-row{display:grid;align-items:center;gap:10px;padding:9px 15px}
+.sf-tbl-h{font:600 10.5px/1.2 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel);
+  border-bottom:1px solid rgba(0,0,0,.1);position:sticky;top:0}
+.sf-tbl-row{font:400 12px/1.5 var(--rv-font);color:var(--rv-ink-soft);border-bottom:1px solid rgba(0,0,0,.06)}
+.sf-tbl-row:last-child{border-bottom:none}
+.sf-tbl-row.sf-row-run{background:var(--rv-amber-bg)}
+.sf-tbl-row.sf-row-warn{background:oklch(0.96 0.03 30)}
+.sf-num{font-family:var(--rv-mono);text-align:right}
+.sf-badge{display:inline-flex;align-items:center;font:600 10px/1 var(--rv-font);border-radius:4px;padding:4px 7px;white-space:nowrap}
+.sf-badge-wait{color:var(--rv-muted);background:var(--rv-panel2)}
+.sf-badge-run{color:oklch(0.4 0.13 55);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)}
+.sf-badge-done{color:var(--rv-green);background:oklch(0.95 0.04 165)}
+.sf-badge-fail,.sf-badge-none{color:var(--rv-red);background:oklch(0.96 0.04 30)}
+.sf-mono{font-family:var(--rv-mono)}
+.sf-prod{color:var(--rv-ink);font-weight:500}
+.sf-prod .code{display:block;font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim);margin-top:2px}
+.sf-conf{font-family:var(--rv-mono)}
+.sf-conf.low{color:var(--rv-red);font-weight:700;font-size:13px}
+.sf-note-cell{white-space:normal;word-break:break-word;color:var(--rv-ink-soft)}
+.sf-note-empty{color:var(--rv-dim)}
+.sf-src-official{font-weight:700;color:var(--rv-ink)}
+.sf-src-other{color:var(--rv-red)}
+.sf-src-link{display:block;font:400 10px/1.3 var(--rv-font);color:var(--rv-link);margin-top:2px;text-decoration:underline}
+
+.sf-ledger-grid{grid-template-columns:128px 96px 118px 76px 68px 76px 84px 88px;min-width:820px}
+.sf-sugg-grid{grid-template-columns:minmax(190px,1.3fr) 96px minmax(150px,1fr) 84px minmax(170px,1.2fr) 96px;min-width:960px}
+
+.sf-empty{padding:34px 16px;text-align:center}
+.sf-empty .ti{font:600 13px/1.4 var(--rv-font);color:var(--rv-muted)}
+.sf-empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:5px;max-width:420px;margin-left:auto;margin-right:auto}
+
+.sf-foot{padding:9px 15px;display:flex;align-items:center;gap:8px;border-top:1px solid rgba(0,0,0,.08);background:var(--rv-panel)}
+.sf-foot .n{font:400 10.5px/1 var(--rv-font);color:var(--rv-faint)}
+.sf-pg{font:600 11px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:7px 10px;cursor:pointer}
+.sf-pg[disabled]{color:var(--rv-dim2);cursor:not-allowed}
+
+@media (max-width:768px){
+  .sf-kpis{grid-template-columns:repeat(2,1fr)}
+  .sf-run-row{align-items:stretch}
+  .sf-field-box select,.sf-count-box input{width:100%}
+  .sf-banner .sf-btn-secondary{margin-left:0}
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="a2-content-pad">
-<div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
-  <div>
-    <h2 class="mb-1">웹 사양 채움
-      <span class="badge badge-phoenix badge-phoenix-warning align-middle fs-10">ADM-AI-020</span>
-    </h2>
-    <p class="text-body-tertiary mb-0">
-      미충족 사양을 웹에서 찾아 검수 큐에 <b class="text-body-secondary">제안</b>으로만 올립니다.
-      정본(<code>product_specs</code>)에는 이 화면이 쓰지 않습니다 — 반영은 사람이
-      상품 사양 검수에서 승인해야 됩니다.
-    </p>
-  </div>
-</div>
+<div class="sf-wrap">
 
-<div class="row g-3">
-  <!-- ① 실행 -->
-  <div class="col-12 col-xl-5">
-    <div class="card h-100">
-      <div class="card-header border-bottom border-translucent">
-        <h5 class="mb-0">웹 사양 채움 실행</h5>
-      </div>
-      <div class="card-body">
-        <p class="fs-9 text-body-tertiary">
-          누르면 <b>작업 현황판 큐</b>에 실행 요청 메시지를 넣습니다 — 이 화면이 직접
-          검색하지 않습니다. 감시자가 큐를 보고 세션을 깨우면, 그 세션이 채움 담당(스펙크롤러)을
-          불러 처리합니다(<a href="/admin2/dash">작업 현황판</a>에서 진행을 볼 수 있습니다).
-        </p>
-        <div class="mb-2">
-          <label class="form-label fs-9" for="sfField">대상 필드</label>
-          <select id="sfField" class="form-select form-select-sm" aria-label="대상 필드">
-            <option value="">불러오는 중…</option>
-          </select>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fs-9" for="sfCount">건수</label>
-          <input id="sfCount" type="number" class="form-control form-control-sm"
-                 min="1" max="500" value="30" aria-label="건수">
-        </div>
-        <button type="button" class="btn btn-primary btn-sm" id="sfRun">웹 사양 채움 실행</button>
-        <div class="mt-2" id="sfWatcherWarn" hidden>
-          <span class="fs-9 text-danger">
-            ⚠ 감시자가 꺼져 있으면 전달되지 않습니다 — <a href="/admin2/dash">작업 현황판</a>에서
-            감시자 상태를 확인하세요.
-          </span>
-        </div>
-        <div class="mt-2 fs-9" id="sfRunResult"></div>
-      </div>
-    </div>
+  <div class="sf-intro">
+    <h1>웹 사양 채움</h1>
+    <p>미충족 사양을 웹에서 찾아 검수 큐에 제안으로만 올립니다. 정본(<code>product_specs</code>)에는
+      이 화면이 쓰지 않습니다 — 반영은 사람이 상품 사양 검수에서 승인해야 합니다.</p>
   </div>
 
-  <!-- ② 진행 -->
-  <div class="col-12 col-xl-7">
-    <div class="card h-100">
-      <div class="card-header border-bottom border-translucent d-flex align-items-center">
-        <h5 class="mb-0">진행</h5>
-        <span class="fs-9 text-body-tertiary ms-auto" id="sfProgNote">불러오는 중…</span>
-      </div>
-      <div class="card-body">
-        <div class="row g-3" id="sfProgKpi">
-          <div class="col-12"><span class="fs-9 text-body-tertiary">불러오는 중…</span></div>
+  <!-- ① 실행 줄 -->
+  <section class="sf-card">
+    <div class="sf-card-hd"><h2>웹 사양 채움 실행</h2></div>
+    <div class="sf-card-body">
+      <div class="sf-run-row">
+        <div class="sf-field-box">
+          <label for="sfField">채울 사양 항목</label>
+          <select id="sfField" aria-label="채울 사양 항목"><option value="">불러오는 중…</option></select>
         </div>
+        <div class="sf-count-box">
+          <label for="sfCount">건수</label>
+          <input id="sfCount" type="number" min="1" max="500" value="30" aria-label="건수">
+        </div>
+        <button type="button" class="sf-btn-primary" id="sfRun" data-action="run" disabled>웹 사양 채움 실행</button>
+        <div class="sf-field-hint">지금은 <code>cooler_tdp</code> 하나만 대상입니다 — 목록은 사양 항목
+          정의(<code>spec_field_defs</code>)에서 읽습니다.</div>
+      </div>
+      <div class="sf-run-status" id="sfRunStatus" aria-live="polite"></div>
+      <div class="sf-run-note" id="sfRunNote"></div>
+      <div class="sf-watcher-warn" id="sfWatcherWarn" hidden>
+        ⚠ 감시자가 꺼져 있으면 전달되지 않습니다 — <a href="/admin2/dash">작업 현황판</a>에서 감시자 상태를 확인하세요.
       </div>
     </div>
-  </div>
-</div>
+  </section>
 
-<!-- ③ 결과 미리보기 -->
-<div class="card mt-3">
-  <div class="card-header border-bottom border-translucent d-flex flex-wrap align-items-center gap-2">
-    <h5 class="mb-0">결과 미리보기</h5>
-    <span class="fs-9 text-body-tertiary" id="sfListNote"></span>
-    <!-- ④ 적용(승인) — 승인 로직은 여기 없다. A-18 계약대로 검수 화면(ADM-PRD-020)으로
-         필터 링크만 연결한다. 2026-08-14 18:40 두 화면이 같은 시각대에 섰고(이 화면 커밋
-         b1dca5e · 검수 화면 커밋 fa659e6, 1초 차이), 같은 날 22:14 커밋 304e39f로 검수
-         화면이 `?suggested=1&field=` 딥링크를 실제로 읽기 시작했다(그 커밋의 주석이 이
-         화면 이름을 직접 지목한다) — "admin2/reviews가 서기 전까지 비활성"이라는 옛
-         전제가 더는 사실이 아니라 2026-08-15 열었다. 대상 경로는 admin_nav.py 라벨이
-         아니라 검수 화면의 실제 라우트(api/admin_ui_reviews.py, `/admin2` + `/reviews`)
-         문자열을 그대로 쓴다 — 라벨이 바뀌어도 이 링크는 안 죽는다. 이 화면은 곧
-         승인 디자인으로 재구축되므로(CLAUDE.md §관리자 화면 규약) 버튼 하나만 연다 —
-         admin_ui_price_history.py의 _reason_links()처럼 admin_nav.NAV를 매 요청 다시
-         읽어 자동 판정하는 방식은 여기서 복제하지 않았다: 그 파일은 목적지 화면이 아직
-         없을 수도 있는 7종 사유를 판정해야 했지만, 여기는 목적지 하나가 이미 실측
-         확인됐고 이 화면의 라우트 파일(api/admin_ui_spec_fill.py)은 이번 작업 담당
-         밖이라 서버 쪽 판정 로직을 새로 심을 수도 없다. -->
-    <div class="ms-auto text-end">
-      <button type="button" class="btn btn-phoenix-secondary btn-sm" id="sfApproveLink" disabled
-              title="대상 필드를 먼저 선택하세요">
-        검수 화면에서 승인하기
-      </button>
-      <div class="fs-9 text-body-tertiary mt-1" id="sfApproveNote">대상 필드를 선택하면 활성화됩니다</div>
+  <!-- ② 정본 반영 경고 -->
+  <section class="sf-banner" id="sfApplyBanner">
+    <div class="sf-banner-text">
+      <strong id="sfBannerHead">불러오는 중…</strong>
+      <div class="d" id="sfBannerDesc"></div>
     </div>
-  </div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-sm align-middle fs-9 mb-0" style="min-width:820px;">
-        <thead>
-          <tr class="text-body-tertiary">
-            <th>상품명</th>
-            <th>필드</th>
-            <th>제안값</th>
-            <th>출처</th>
-            <th class="text-end">확신도</th>
-            <th>적용 시각</th>
-            <th>검수 상태</th>
-          </tr>
-        </thead>
-        <tbody id="sfRows">
-          <tr><td colspan="7" class="text-center text-body-tertiary py-3">불러오는 중…</td></tr>
-        </tbody>
-      </table>
+    <button type="button" class="sf-btn-secondary" id="sfApproveLink" data-action="approve-link" disabled title="불러오는 중…">검수 화면에서 승인하기 →</button>
+  </section>
+
+  <!-- 왜 이 필드인가 -->
+  <div class="sf-why" id="sfWhy">불러오는 중…</div>
+
+  <!-- ③ 실행 원장 — 계약 골격(1a) 순서: ① ② ③실행원장 ④통계카드 ⑤최근제안.
+       2026-08-15까지 ④가 ③보다 위에 있었다(1a안 자체가 "실행 원장 중심"인데 원장이
+       카드보다 아래로 밀려 있었다) — 계약대로 되돌렸다. -->
+  <section class="sf-card">
+    <div class="sf-card-hd"><h2>실행 원장</h2><span class="n" id="sfRunsNote"></span></div>
+    <div id="sfRunsBox">
+      <div class="sf-empty"><div class="ti">불러오는 중…</div></div>
     </div>
-  </div>
-  <div class="card-footer d-flex align-items-center gap-2 py-2">
-    <button type="button" class="btn btn-phoenix-secondary btn-sm" id="sfPrev" disabled>← 이전</button>
-    <span class="fs-9 text-body-tertiary" id="sfPageNote">—</span>
-    <button type="button" class="btn btn-phoenix-secondary btn-sm" id="sfNext" disabled>다음 →</button>
-  </div>
+  </section>
+
+  <!-- ④ 통계 카드 4장 -->
+  <section class="sf-kpis" id="sfKpis">
+    <div class="sf-kpi"><div class="lb">제안 총 건수</div><div class="v">—</div></div>
+    <div class="sf-kpi"><div class="lb">정본 반영</div><div class="v">—</div></div>
+    <div class="sf-kpi"><div class="lb">검수 대기 중인 제안</div><div class="v">—</div></div>
+    <div class="sf-kpi"><div class="lb">결측(전체 상품 기준)</div><div class="v">—</div></div>
+  </section>
+
+  <!-- ⑤ 최근 제안 표 -->
+  <section class="sf-card">
+    <div class="sf-card-hd"><h2>최근 제안</h2><span class="n" id="sfListNote"></span></div>
+    <div class="sf-tbl-scroll" id="sfSuggScroll">
+      <div class="sf-tbl-h sf-sugg-grid">
+        <span>상품</span><span>제안값</span><span>출처</span><span style="text-align:right">확신도</span><span>메모</span><span>검수 상태</span>
+      </div>
+      <div id="sfRows">
+        <div class="sf-empty"><div class="ti">불러오는 중…</div></div>
+      </div>
+    </div>
+    <div class="sf-foot">
+      <button type="button" class="sf-pg" id="sfPrev" data-action="page-prev" disabled>← 이전</button>
+      <span class="n" id="sfPageNote">—</span>
+      <button type="button" class="sf-pg" id="sfNext" data-action="page-next" disabled>다음 →</button>
+    </div>
+  </section>
+
 </div>
 </div>
 {% endblock %}
 
 {% block foot_extra %}
-<script src="/admin/vendors/popper/popper.min.js"></script>
-<script src="/admin/vendors/bootstrap/bootstrap.min.js"></script>
-<script src="/admin/vendors/anchorjs/anchor.min.js"></script>
-<script src="/admin/vendors/is/is.min.js"></script>
-<script src="/admin/vendors/fontawesome/all.min.js"></script>
-<script src="/admin/vendors/lodash/lodash.min.js"></script>
-<script src="/admin/vendors/list.js/list.min.js"></script>
-<script src="/admin/vendors/feather-icons/feather.min.js"></script>
-<script src="/admin/vendors/dayjs/dayjs.min.js"></script>
-<script src="/admin/vendors/choices/choices.min.js"></script>
-<script src="/admin/assets/js/phoenix.js"></script>
-<script src="/shared/admin-panel.js"></script>
-<script src="/shared/admin-helper.js"></script>
-<script src="/shared/su-icons.js"></script>
 {% raw %}
 <script>
 (function () {
   'use strict';
+
+  // 사장님 확정 ②("대상 필드는 cooler_tdp 하나") — 목록 자체는 spec_field_defs에서
+  // 읽되(loadFields), 이 화면이 실제로 고를 수 있게 두는 키만 여기서 좁힌다.
+  // 범위가 넓어지기로 결정되면 이 배열만 늘리면 된다(요구사항 정의서 §② 미결).
+  var TARGET_FIELDS = ['cooler_tdp'];
+
+  function $(id) { return document.getElementById(id); }
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
   }
-  function hhmm(iso) {
+  function fmtNum(n) { return n == null ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function fmtDt(iso) {
     if (!iso) return '—';
     var d = new Date(iso);
-    if (isNaN(d)) return '—';
-    return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2)
-         + ' ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+    if (isNaN(d.getTime())) return '—';
+    function p(n) { return String(n).padStart(2, '0'); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+         + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function fmtDuration(startIso, endIso) {
+    if (!startIso || !endIso) return '—';
+    var ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+    if (!isFinite(ms) || ms < 0) return '—';
+    var s = Math.round(ms / 1000);
+    if (s < 60) return s + '초';
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + '분 ' + (s % 60) + '초';
+    return Math.floor(m / 60) + '시간 ' + (m % 60) + '분';
+  }
+  // #sfSuggScroll의 헤더(.sf-tbl-h.sf-sugg-grid)는 항상 정적으로 존재하고 min-width:960px라
+  // 스크롤 컨테이너 너비를 고정한다. #sfRows만 빈/에러 메시지로 바뀌면(그 메시지엔
+  // min-width가 없다) 컨테이너의 scrollLeft가 그대로 남아 메시지 앞부분이 잘려 보인다 —
+  // 실행 원장 표(#sfRunsBox)는 빈/에러 시 .sf-tbl-scroll 전체(헤더 포함)를 새로 만들어
+  // 이 문제가 없다(항상 scrollLeft=0인 새 요소). 여기서는 헤더를 그대로 두는 대신
+  // 메시지로 바뀌는 시점에 스크롤 위치를 명시적으로 되돌린다.
+  function resetSuggScroll() {
+    var el = $('sfSuggScroll');
+    if (el) el.scrollLeft = 0;
   }
 
-  // ── ① 대상 필드 선택지 — 정본은 spec_field_defs (api/spec_fields.py), 여기서 다시
-  //    정의하지 않는다. 기존 사양 항목 정의 API(GET /api/admin/spec-fields)를 그대로 읽는다.
-  var DEFAULT_FIELD = 'cooler_tdp';
-  function loadFields() {
-    fetch('/api/admin/spec-fields', {credentials: 'same-origin'})
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (j) {
-        var items = j.items || [];
-        var sel = document.getElementById('sfField');
-        if (!items.length) {
-          sel.innerHTML = '<option value="">사양 항목 없음</option>';
-          updateApproveLink();
-          return;
-        }
-        sel.innerHTML = items.map(function (f) {
-          return '<option value="' + esc(f.field_key) + '">' + esc(f.label || f.field_key)
-               + ' (' + esc(f.field_key) + ')</option>';
-        }).join('');
-        var has = items.some(function (f) { return f.field_key === DEFAULT_FIELD; });
-        sel.value = has ? DEFAULT_FIELD : items[0].field_key;
-        updateApproveLink();
-      })
-      .catch(function (e) {
-        document.getElementById('sfField').innerHTML =
-          '<option value="">필드 목록 조회 실패 — ' + esc(e.message) + '</option>';
-        updateApproveLink();
-      });
+  // ── 공용 fetch — 401은 화면 전체에서 같은 문장("세션이 만료되었습니다")을 쓴다. ──
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = res.status === 401 ? '세션이 만료되었습니다'
+          : (window.popcornProgress ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status));
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
   }
-
-  // ── ④ 승인 링크 — /admin2/reviews로 이동한다. 2026-08-14 22:14 커밋 304e39f로 그
-  //    화면이 `?suggested=1&field=` 딥링크를 읽기 시작했다(그 커밋 주석이 이 화면
-  //    이름을 직접 지목한다) — "admin2/reviews가 서기 전까지 비활성"이라는 옛 전제는
-  //    더 이상 사실이 아니라 열었다(위 마크업 주석 참조). 대상 경로는 admin_nav.py의
-  //    라벨이 아니라 검수 화면의 실제 라우트 문자열(api/admin_ui_reviews.py,
-  //    `/admin2` + `/reviews`)을 그대로 쓴다 — 라벨이 바뀌어도 이 링크는 안 죽는다.
-  //
-  //    활성 조건은 "대상 필드가 선택돼 있을 때"뿐이다. "제안이 1건 이상일 때"도
-  //    후보였지만 GET /api/admin/spec-fill/status가 field로 거르지 않아(그 API의
-  //    라우트 파일 api/admin_spec_fill.py는 이 작업 담당 밖) 필드별 건수를 이 화면이
-  //    믿을 수 있게 셀 방법이 없다 — 0건이어도 검수 화면 자체가 빈 상태를 보여주므로
-  //    미리 막을 이유가 없다고 판단했다. 새 탭으로 연다 — 이 화면은 실행 요청이 감시자
-  //    폴링으로 진행 중일 수 있어(위 ① 실행), 같은 탭으로 이동하면 그 진행 상황을
-  //    잃는다(출처 링크가 이미 쓰는 target="_blank" 관례를 그대로 따른다).
-  function updateApproveLink() {
-    var btn = document.getElementById('sfApproveLink');
-    var note = document.getElementById('sfApproveNote');
-    var sel = document.getElementById('sfField');
-    var opt = sel.options[sel.selectedIndex];
-    var field = (sel.value || '').trim();
-    if (field) {
-      btn.disabled = false;
-      btn.removeAttribute('title');
-      btn.dataset.href = '/admin2/reviews?suggested=1&field=' + encodeURIComponent(field);
-      note.textContent = '새 탭에서 검수 화면을 엽니다 · 대상: ' + (opt ? opt.textContent : field);
-    } else {
-      btn.disabled = true;
-      btn.title = '대상 필드를 먼저 선택하세요';
-      delete btn.dataset.href;
-      note.textContent = '대상 필드를 선택하면 활성화됩니다';
-    }
-  }
-  document.getElementById('sfField').addEventListener('change', updateApproveLink);
-  document.getElementById('sfApproveLink').addEventListener('click', function () {
-    if (this.disabled || !this.dataset.href) return;
-    window.open(this.dataset.href, '_blank', 'noopener,noreferrer');
-  });
-
-  // ── 감시자 상태 — /api/admin/dash/state 의 watcher 필드만 쓴다(지어내지 않는다).
-  function pollWatcher() {
-    fetch('/api/admin/dash/state', {credentials: 'same-origin'})
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (j) {
-        var w = j.watcher || {};
-        document.getElementById('sfWatcherWarn').hidden = !!w.alive;
-      })
-      .catch(function () { /* 조회 실패는 경고를 지우지 않는다 — 다음 폴링이 다시 시도 */ });
-  }
-
-  // ── ① 실행 — 새 실행 엔진을 만들지 않는다. 기존 대시보드 큐에 구조화된 메시지만 넣는다.
-  var runBusy = false;
-  document.getElementById('sfRun').addEventListener('click', function () {
-    var btn = this, box = document.getElementById('sfRunResult');
-    var field = (document.getElementById('sfField').value || '').trim();
-    var count = parseInt(document.getElementById('sfCount').value, 10);
-    if (!field) { box.innerHTML = '<span class="text-danger">대상 필드를 고르세요</span>'; return; }
-    if (!count || count < 1) { box.innerHTML = '<span class="text-danger">건수를 확인하세요</span>'; return; }
-    if (runBusy) return;
-    runBusy = true; btn.disabled = true;
-    var release = function () { runBusy = false; btn.disabled = false; };
-    var guard = setTimeout(function () {
-      release();
-      box.innerHTML = '<span class="text-danger">응답 없음 · 재시도 필요</span>';
-    }, 8000);
-    var text = '스펙크롤러 배치 실행: ' + field + ' ' + count + '건';
-    fetch('/api/admin/dash/say', {
+  function apiGet(path) { return fetch(path, {credentials: 'same-origin'}).then(handle); }
+  function apiPost(path, body) {
+    return fetch(path, {
       method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text: text})
-    })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (j) {
-        clearTimeout(guard); release();
-        if (j.ok) {
-          box.innerHTML = '<span class="text-body-emphasis">' + esc(j.verdict || '전달 완료') + '</span>'
-            + '<div class="text-body-tertiary">보낸 내용: ' + esc(text) + '</div>';
-        } else {
-          box.innerHTML = '<span class="text-danger">' + esc(j.verdict || '전달 실패') + '</span>';
-        }
-        pollWatcher();
-      })
-      .catch(function (e) {
-        clearTimeout(guard); release();
-        box.innerHTML = '<span class="text-danger">전송 실패 — '
-          + esc(e.status === 401 ? '세션 만료 · 로그인 필요' : e.message) + '</span>';
-      });
-  });
-
-  // ── ②③ 진행 · 결과 미리보기 — 단일 API(GET /api/admin/spec-fill/status), 서버 페이지네이션.
-  var sfPage = 1, sfPages = 1;
-  function loadStatus() {
-    fetch('/api/admin/spec-fill/status?page=' + sfPage + '&size=20', {credentials: 'same-origin'})
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(renderStatus)
-      .catch(function (e) {
-        document.getElementById('sfProgNote').textContent = '조회 실패';
-        document.getElementById('sfProgNote').className = 'fs-9 text-danger ms-auto';
-        document.getElementById('sfRows').innerHTML =
-          '<tr><td colspan="7" class="text-center text-danger py-3">불러오기 실패 — '
-          + esc(e.message) + '</td></tr>';
-      });
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})
+    }).then(handle);
   }
 
-  function renderStatus(d) {
-    if (d.ok === false) {
-      document.getElementById('sfProgNote').textContent = d.reason || '조회 실패';
-      document.getElementById('sfProgNote').className = 'fs-9 text-danger ms-auto';
-      document.getElementById('sfProgKpi').innerHTML =
-        '<div class="col-12"><span class="fs-9 text-danger">' + esc(d.reason || '조회 실패') + '</span></div>';
-      document.getElementById('sfRows').innerHTML =
-        '<tr><td colspan="7" class="text-center text-body-tertiary py-3">데이터 없음</td></tr>';
+  var S = { field: null, fieldLabel: '', fieldsErr: null,
+            statusData: null, statusErr: null,
+            fieldCtx: null, fieldCtxErr: null,
+            runsData: null, runsErr: null,
+            page: 1, pages: 1 };
+
+  // ── ① 대상 필드 — spec_field_defs를 읽고 TARGET_FIELDS로 좁힌다. ──
+  function loadFields() {
+    apiGet('/api/admin/spec-fields').then(function (j) {
+      var items = (j.items || []).filter(function (f) { return TARGET_FIELDS.indexOf(f.field_key) >= 0; });
+      var sel = $('sfField');
+      if (!items.length) {
+        sel.innerHTML = '<option value="">사양 항목 없음</option>';
+        S.field = null; S.fieldsErr = '대상 사양 항목(' + TARGET_FIELDS.join(', ') + ')을 찾을 수 없습니다';
+        afterFieldReady();
+        return;
+      }
+      sel.innerHTML = items.map(function (f) {
+        return '<option value="' + esc(f.field_key) + '">' + esc(f.label || f.field_key)
+             + ' (' + esc(f.field_key) + ')</option>';
+      }).join('');
+      sel.value = items[0].field_key;
+      S.field = items[0].field_key; S.fieldLabel = items[0].label || items[0].field_key; S.fieldsErr = null;
+      afterFieldReady();
+    }).catch(function (e) {
+      $('sfField').innerHTML = '<option value="">필드 목록 조회 실패</option>';
+      S.field = null; S.fieldsErr = e.message;
+      afterFieldReady();
+    });
+  }
+  function afterFieldReady() {
+    updateApproveLink();
+    updateRunButton();
+    loadStatus(); loadFieldContext(); loadRuns();
+  }
+  $('sfField').addEventListener('change', function () {
+    S.field = this.value || null;
+    var opt = this.options[this.selectedIndex];
+    S.fieldLabel = opt ? opt.textContent : (S.field || '');
+    S.page = 1;
+    updateApproveLink(); updateRunButton();
+    loadStatus(); loadFieldContext(); loadRuns();
+  });
+
+  // ── 실행 권한 — 서버가 최종 판정한다(operator 미만은 dash/say가 403). 여기서는
+  //    선제 안내만 — canWrite가 아직 안 정해졌으면(meReady 전) 막지 않는다. ──
+  function updateRunButton() {
+    var btn = $('sfRun');
+    // me가 아직 안 풀렸으면(meReady 전) 권한으로는 막지 않는다 — field 조건만 본다.
+    // 최종 방어선은 서버(dash/say의 403)다 — 이건 선제 안내일 뿐이다.
+    var can = window.Admin2Shell.canWrite ? window.Admin2Shell.canWrite('operator') : true;
+    var me = window.Admin2Shell.getMe ? window.Admin2Shell.getMe() : null;
+    if (!S.field) {
+      btn.disabled = true; btn.title = S.fieldsErr || '대상 사양 항목을 확인할 수 없습니다';
       return;
     }
-    document.getElementById('sfProgNote').textContent = d.note || '';
-    document.getElementById('sfProgNote').className = 'fs-9 text-body-tertiary ms-auto';
-
-    document.getElementById('sfProgKpi').innerHTML = [
-      ['제안 총 행 수', d.total.toLocaleString()],
-      ['최근 채움 시각', hhmm(d.latest_fetched_at)],
-      ['검수 대기 중인 제안', d.pending_review.toLocaleString() + '건']
-    ].map(function (r) {
-      return '<div class="col-6 col-md-4"><div class="fs-9 text-body-tertiary">' + esc(r[0]) + '</div>'
-           + '<div class="fs-5 fw-bolder">' + esc(r[1]) + '</div></div>';
-    }).join('');
-
-    var items = d.items || [];
-    document.getElementById('sfRows').innerHTML = items.length ? items.map(function (it) {
-      var conf = it.confidence == null ? '—' : Math.round(it.confidence * 100) + '%';
-      var src = it.source_url
-        ? '<a href="' + esc(it.source_url) + '" target="_blank" rel="noopener noreferrer">'
-          + esc(it.source_name || '출처 보기') + '</a>'
-        : '<span class="text-body-tertiary">출처 없음</span>';
-      var rs = it.review_status
-        ? esc(it.review_status)
-        : '<span class="text-body-tertiary">검수 행 없음</span>';
-      return '<tr>'
-        + '<td class="text-body-highlight">' + esc(it.name) + '<div class="fs-10 text-body-tertiary"><code>'
-        +   esc(it.product_code) + '</code></div></td>'
-        + '<td><code>' + esc(it.field) + '</code></td>'
-        + '<td>' + esc(it.value) + '</td>'
-        + '<td>' + src + '</td>'
-        + '<td class="text-end">' + conf + '</td>'
-        + '<td>' + hhmm(it.fetched_at) + '</td>'
-        + '<td>' + rs + '</td>'
-        + '</tr>';
-    }).join('') : '<tr><td colspan="7" class="text-center text-body-tertiary py-3">제안 없음</td></tr>';
-
-    sfPages = d.pages || 1;
-    document.getElementById('sfListNote').textContent = '전체 ' + (d.total || 0).toLocaleString() + '건';
-    document.getElementById('sfPageNote').textContent =
-      (d.total ? (d.page + ' / ' + sfPages + ' 페이지') : '—');
-    document.getElementById('sfPrev').disabled = sfPage <= 1;
-    document.getElementById('sfNext').disabled = sfPage >= sfPages;
+    if (me && !can) {
+      btn.disabled = true;
+      btn.title = '권한이 부족합니다(필요: operator, 현재: ' + me.role + ')';
+      return;
+    }
+    btn.disabled = false; btn.removeAttribute('title');
   }
 
-  document.getElementById('sfPrev').addEventListener('click', function () {
-    if (sfPage <= 1) return;
-    sfPage -= 1; loadStatus();
-  });
-  document.getElementById('sfNext').addEventListener('click', function () {
-    if (sfPage >= sfPages) return;
-    sfPage += 1; loadStatus();
+  // ── ② 검수 화면 링크 — /admin2/reviews로 새 탭. field가 정해졌을 때만 활성. ──
+  function updateApproveLink() {
+    var btn = $('sfApproveLink');
+    if (S.field) {
+      btn.disabled = false; btn.removeAttribute('title');
+      btn.dataset.href = '/admin2/reviews?suggested=1&field=' + encodeURIComponent(S.field);
+    } else {
+      btn.disabled = true; btn.title = S.fieldsErr || '대상 필드를 확인할 수 없습니다';
+      delete btn.dataset.href;
+    }
+  }
+  function openApproveLink(btn) {
+    if (btn.disabled || !btn.dataset.href) return;
+    window.open(btn.dataset.href, '_blank', 'noopener,noreferrer');
+  }
+
+  // ── 감시자 상태 — /api/admin/dash/state의 watcher 필드만 쓴다(지어내지 않는다). ──
+  function pollWatcher() {
+    apiGet('/api/admin/dash/state').then(function (j) {
+      var w = j.watcher || {};
+      $('sfWatcherWarn').hidden = !!w.alive;
+    }).catch(function () { /* 조회 실패는 경고를 지우지 않는다 — 다음 폴링이 다시 시도 */ });
+  }
+
+  // ── ① 실행 — 큐(dash/say)에 문장 하나를 넣는다. 새 실행 엔진은 여기서 짓지 않는다
+  //    (담당 파일 밖 — 상단 주석 참조). "실행 완료"라고 말하지 않는다. ──
+  var runBusy = false;
+  function runFill() {
+    var btn = $('sfRun');
+    if (btn.disabled || runBusy) return;
+    var count = parseInt($('sfCount').value, 10);
+    if (!S.field) { setStatus('대상 사양 항목을 확인할 수 없습니다', 'err'); return; }
+    if (!count || count < 1 || count > 500) { setStatus('건수는 1~500 사이로 입력하세요', 'err'); return; }
+    runBusy = true; btn.disabled = true;
+    var release = function () { runBusy = false; updateRunButton(); };
+    var settled = false;
+    var guard = setTimeout(function () {
+      if (settled) return;
+      release();
+      setStatus('8초 동안 응답이 없었습니다', 'wait');
+    }, 8000);
+    var text = '스펙크롤러 배치 실행: ' + S.field + ' ' + count + '건';
+    apiPost('/api/admin/dash/say', {text: text}).then(function (j) {
+      settled = true; clearTimeout(guard); release();
+      if (j.ok) {
+        setStatus(j.verdict || '전달 완료', 'ok');
+      } else {
+        setStatus(j.verdict || '전달 실패', 'err');
+      }
+      $('sfRunNote').textContent = '보낸 내용: ' + text;
+      pollWatcher(); loadRuns();
+    }).catch(function (e) {
+      settled = true; clearTimeout(guard); release();
+      setStatus('전송 실패 — ' + e.message, 'err');
+    });
+  }
+  function setStatus(msg, kind) {
+    var box = $('sfRunStatus');
+    box.textContent = msg;
+    box.className = 'sf-run-status ' + (kind || '');
+  }
+
+  // ── ②④ 진행·정본 반영·통계 카드·최근 제안 — GET /status, 15초마다 재조회. ──
+  function loadStatus() {
+    if (!S.field) { renderStatus(null); return; }
+    apiGet('/api/admin/spec-fill/status?field=' + encodeURIComponent(S.field)
+         + '&page=' + S.page + '&size=20')
+      .then(function (j) { S.statusData = j; S.statusErr = null; renderStatus(j); })
+      .catch(function (e) { S.statusErr = e; renderStatus(null); });
+  }
+  function renderStatus(d) {
+    if (!d) {
+      var msg = S.statusErr ? S.statusErr.message : (S.fieldsErr || '조회 실패');
+      $('sfBannerHead').textContent = '조회 실패';
+      $('sfBannerDesc').textContent = msg;
+      $('sfRows').innerHTML = '<div class="sf-empty"><div class="ti">조회 실패</div><div class="ds">' + esc(msg) + '</div></div>';
+      resetSuggScroll();
+      $('sfListNote').textContent = '';
+      renderKpis(null);
+      return;
+    }
+    if (d.ok === false) {
+      $('sfBannerHead').textContent = '조회 실패';
+      $('sfBannerDesc').textContent = d.reason || '알 수 없는 오류';
+      $('sfRows').innerHTML = '<div class="sf-empty"><div class="ti">조회 실패</div><div class="ds">' + esc(d.reason || '') + '</div></div>';
+      resetSuggScroll();
+      $('sfListNote').textContent = '';
+      renderKpis(null);
+      return;
+    }
+
+    // ② 정본 반영 배너 — 실제 수치에 맞춰 문구를 고른다(0건일 때만 "전부 검수 대기"라고
+    //    말한다 — applied_count가 늘면 그 문구는 더 이상 사실이 아니므로 쓰지 않는다).
+    var banner = $('sfApplyBanner');
+    if (d.total === 0) {
+      banner.classList.add('sf-banner-ok');
+      $('sfBannerHead').textContent = '아직 제안이 없습니다';
+      $('sfBannerDesc').textContent = '이 항목으로 채움을 실행하면 여기 제안 현황이 쌓입니다.';
+    } else if (d.applied_count === 0) {
+      banner.classList.remove('sf-banner-ok');
+      $('sfBannerHead').innerHTML = '제안 ' + fmtNum(d.total) + '건 중 정본 반영 <span class="sf-mono">0건</span>';
+      $('sfBannerDesc').textContent = '전부 「검수 대기」입니다 — 제안은 쌓였는데 승인 경로를 거치지 않아'
+        + ' 반영되지 않았습니다. 받는 쪽(검수 화면)은 이미 준비돼 있습니다.';
+    } else {
+      banner.classList.add('sf-banner-ok');
+      $('sfBannerHead').textContent = '제안 ' + fmtNum(d.total) + '건 중 정본 반영 ' + fmtNum(d.applied_count) + '건';
+      $('sfBannerDesc').textContent = '검수 대기 ' + fmtNum(d.pending_review) + '건이 남아 있습니다.';
+    }
+
+    renderKpis(d);
+
+    var items = d.items || [];
+    $('sfRows').innerHTML = items.length ? items.map(renderSuggestionRow).join('')
+      : '<div class="sf-empty"><div class="ti">제안 없음</div><div class="ds">이 필드로 채움을 실행하면 제안이 여기 쌓입니다.</div></div>';
+    if (!items.length) resetSuggScroll();
+
+    S.pages = d.pages || 1;
+    $('sfListNote').textContent = '전체 ' + fmtNum(d.total || 0) + '건';
+    $('sfPageNote').textContent = d.total ? (d.page + ' / ' + S.pages + ' 페이지') : '—';
+    $('sfPrev').disabled = S.page <= 1;
+    $('sfNext').disabled = S.page >= S.pages;
+  }
+
+  function renderSuggestionRow(it) {
+    var conf = it.confidence == null ? null : it.confidence;
+    var confText = conf == null ? '—' : conf.toFixed(2);
+    var low = conf != null && conf < 0.6;
+    var src = it.source_url
+      ? '<a class="sf-src-link" href="' + esc(it.source_url) + '" target="_blank" rel="noopener noreferrer">원문 열기</a>'
+      : '';
+    var srcName = it.source_name
+      ? '<span class="' + (it.source_official ? 'sf-src-official' : 'sf-src-other') + '">' + esc(it.source_name) + '</span>'
+      : '<span class="sf-note-empty">출처 없음</span>';
+    var rs = it.review_status
+      ? '<span class="sf-badge ' + reviewBadgeClass(it.review_status) + '">' + esc(it.review_status) + '</span>'
+      : '<span class="sf-note-empty">검수 행 없음</span>';
+    var note = it.note
+      ? '<span class="sf-note-cell">' + esc(it.note) + '</span>'
+      : '<span class="sf-note-empty">—</span>';
+    var rowCls = 'sf-tbl-row sf-sugg-grid' + (low ? ' sf-row-warn' : '');
+    return '<div class="' + rowCls + '">'
+      + '<div class="sf-prod">' + esc(it.name) + '<span class="code">' + esc(it.product_code) + '</span></div>'
+      + '<div class="sf-mono">' + esc(it.value) + '</div>'
+      + '<div>' + srcName + src + '</div>'
+      + '<div class="sf-conf' + (low ? ' low' : '') + '" style="text-align:right">' + confText + '</div>'
+      + '<div>' + note + '</div>'
+      + '<div>' + rs + '</div>'
+      + '</div>';
+  }
+  function reviewBadgeClass(st) {
+    if (st === '대기') return 'sf-badge-wait';
+    if (st === '승인' || st === '수정') return 'sf-badge-done';
+    if (st === '반려') return 'sf-badge-fail';
+    return 'sf-badge-wait';
+  }
+
+  function renderKpis(d) {
+    var box = $('sfKpis');
+    var cards = box.querySelectorAll('.sf-kpi');
+    var ctx = S.fieldCtx;
+    var vals = [
+      d ? fmtNum(d.total) : '—',
+      d ? fmtNum(d.applied_count) : '—',
+      d ? fmtNum(d.pending_review) : '—',
+      (ctx && ctx.applicable) ? (fmtNum(ctx.missing) + ' / ' + fmtNum(ctx.total)) : '—'
+    ];
+    var subs = [
+      d && d.latest_fetched_at ? '최근 채움 ' + fmtDt(d.latest_fetched_at) : (d ? '아직 채움 없음' : ''),
+      '',
+      '',
+      (ctx && ctx.applicable && ctx.missing_pct != null) ? (ctx.missing_pct + '%') : ''
+    ];
+    cards.forEach(function (c, i) {
+      c.querySelector('.v').textContent = vals[i];
+      var sub = c.querySelector('.sub');
+      if (!sub) { sub = document.createElement('div'); sub.className = 'sub'; c.appendChild(sub); }
+      sub.textContent = subs[i];
+      c.classList.toggle('warn', i === 1 && d && d.total > 0 && d.applied_count === 0);
+    });
+  }
+
+  // ── 왜 이 필드인가 — 화면 로드 시 한 번만(구조적 사실이라 폴링하지 않는다). ──
+  function loadFieldContext() {
+    if (!S.field) { renderWhy(); return; }
+    apiGet('/api/admin/spec-fill/field-context?field=' + encodeURIComponent(S.field))
+      .then(function (j) { S.fieldCtx = j; S.fieldCtxErr = null; renderWhy(); renderKpis(S.statusData); })
+      .catch(function (e) { S.fieldCtx = null; S.fieldCtxErr = e; renderWhy(); });
+  }
+  function renderWhy() {
+    var el = $('sfWhy');
+    var ctx = S.fieldCtx;
+    if (!ctx) { el.textContent = S.fieldCtxErr ? ('조회 실패 — ' + S.fieldCtxErr.message) : '불러오는 중…'; return; }
+    if (ctx.ok === false || !ctx.found) {
+      el.textContent = ctx.reason || '항목 정의를 찾을 수 없습니다';
+      return;
+    }
+    if (!ctx.applicable) {
+      el.textContent = ctx.reason || '이 항목은 결측 통계를 계산할 대상이 없습니다';
+      return;
+    }
+    var rankText = ctx.rank === 1
+      ? '엔진이 읽는 사양 필드 ' + ctx.rank_total + '개 중 <b>결측률 1위</b>'
+      : '엔진이 읽는 사양 필드 ' + ctx.rank_total + '개 중 결측률 ' + ctx.rank + '위';
+    el.innerHTML = '<b>' + esc(ctx.label || ctx.field_key) + '</b> 결측 '
+      + '<span class="num">' + fmtNum(ctx.missing) + '/' + fmtNum(ctx.total) + ' (' + ctx.missing_pct + '%)</span> — '
+      + rankText + '입니다. 그리고 다나와가 이 필드를 구조적으로 못 채웁니다 — 검수 대기 '
+      + '<span class="num">' + fmtNum(ctx.review_pending) + '건</span> 중 다나와 제안이 붙은 것 '
+      + '<span class="num">' + fmtNum(ctx.danawa_suggested_pending) + '건</span>. 웹 검색이 유일한 자동화 경로입니다. '
+      // 계약 §④ "「대기 N건」만 보면 오판한다" — review_pending_empty는 서버가 이미
+      // 계산해 내려주는데(field-context) 화면 어디에도 없었다. 대기 수가 곧 "할 수
+      // 있는 일의 크기"가 아니라는 사실을 여기서 함께 말한다.
+      + '검수 대기 <span class="num">' + fmtNum(ctx.review_pending) + '건</span> 중 '
+      + '<b><span class="num">' + fmtNum(ctx.review_pending_empty) + '건</span>은 원문에도 제안에도 값이 없습니다.</b> '
+      + '<b>대기 수는 「할 수 있는 일의 크기」가 아닙니다.</b>';
+  }
+
+  // ── ③ 실행 원장 — GET /runs, 15초마다 재조회. 스키마 없으면 "원장 신설 필요". ──
+  function loadRuns() {
+    apiGet('/api/admin/spec-fill/runs?page=1&size=20')
+      .then(function (j) { S.runsData = j; S.runsErr = null; renderRuns(j); })
+      .catch(function (e) { S.runsErr = e; renderRuns(null); });
+  }
+  function renderRuns(d) {
+    var box = $('sfRunsBox');
+    if (!d) {
+      box.innerHTML = '<div class="sf-empty"><div class="ti">조회 실패</div><div class="ds">'
+        + esc(S.runsErr ? S.runsErr.message : '') + '</div></div>';
+      $('sfRunsNote').textContent = '';
+      renderRunStatusText(null);
+      return;
+    }
+    if (d.ok === false) {
+      box.innerHTML = '<div class="sf-empty"><div class="ti">원장 신설 필요</div><div class="ds">'
+        + esc(d.reason || '실행 원장이 아직 없습니다') + ' — 이 화면은 그동안 "0건"이라고'
+        + ' 말하지 않고 이 상태를 그대로 보입니다.</div></div>';
+      $('sfRunsNote').textContent = '';
+      renderRunStatusText(d);
+      return;
+    }
+    $('sfRunsNote').textContent = '전체 ' + fmtNum(d.total) + '건';
+    var items = d.items || [];
+    if (!items.length) {
+      box.innerHTML = '<div class="sf-empty"><div class="ti">실행 이력이 없습니다</div>'
+        + '<div class="ds">실행하면 여기 쌓입니다.</div></div>';
+    } else {
+      var head = '<div class="sf-tbl-h sf-ledger-grid">'
+        + '<span>시작</span><span>요청자</span><span>대상 필드</span><span style="text-align:right">요청 건수</span>'
+        + '<span style="text-align:right">찾음</span><span style="text-align:right">못 찾음</span>'
+        + '<span>소요</span><span>상태</span></div>';
+      var rows = items.map(renderRunRow).join('');
+      box.innerHTML = '<div class="sf-tbl-scroll">' + head + rows + '</div>';
+    }
+    renderRunStatusText(d);
+  }
+  function renderRunRow(r) {
+    var found = r.status === '진행중' ? '—' : fmtNum(r.found_count);
+    var notFoundBad = r.found_count != null && r.not_found_count != null && r.not_found_count > r.found_count;
+    var notFound = r.status === '진행중' ? '—' : fmtNum(r.not_found_count);
+    var rowCls = 'sf-tbl-row sf-ledger-grid' + (r.status === '진행중' ? ' sf-row-run' : '');
+    return '<div class="' + rowCls + '">'
+      + '<div>' + esc(fmtDt(r.started_at)) + '</div>'
+      + '<div>' + esc(r.requested_by || '—') + '</div>'
+      + '<div><code>' + esc(r.field) + '</code></div>'
+      + '<div class="sf-num">' + fmtNum(r.requested_count) + '</div>'
+      + '<div class="sf-num" style="color:var(--rv-green)">' + found + '</div>'
+      + '<div class="sf-num"' + (notFoundBad ? ' style="color:var(--rv-red);font-weight:700"' : '') + '>' + notFound + '</div>'
+      + '<div>' + esc(fmtDuration(r.started_at, r.finished_at)) + '</div>'
+      + '<div><span class="sf-badge ' + runBadgeClass(r.status) + '">' + esc(r.status) + '</span></div>'
+      + '</div>';
+  }
+  function runBadgeClass(st) {
+    if (st === '진행중') return 'sf-badge-run';
+    if (st === '완료') return 'sf-badge-done';
+    if (st === '실패' || st === '응답없음') return 'sf-badge-fail';
+    return 'sf-badge-wait';
+  }
+
+  // ── ① 실행 상태 텍스트(실행 중/대기/원장 없음) — /runs 응답을 그대로 반영한다.
+  //    "{n}건 중 {m}건 처리" 같은 진행률은 어떤 코드도 갱신하지 않으므로 표시하지
+  //    않는다(위 헤더 주석 참조) — 아는 것만 말한다. ──
+  function renderRunStatusText(d) {
+    var note = $('sfRunNote');
+    if (runBusy) return;                      // 방금 누른 클릭의 결과 문구를 덮지 않는다
+    if (!d || d.ok === false) {
+      note.textContent = '실행 상태를 확인할 수 없습니다 — 실행 원장 신설이 필요합니다'
+        + '(마이그레이션 0052 미적용).';
+      note.className = 'sf-run-note warn';
+      return;
+    }
+    note.className = 'sf-run-note';
+    if (d.running) {
+      note.textContent = '실행 중 · ' + d.running.field_name + ' ' + fmtNum(d.running.requested_count)
+        + '건 요청 · ' + fmtDt(d.running.started_at) + '부터';
+      return;
+    }
+    var last = (d.items || [])[0];
+    note.textContent = last
+      ? '마지막 실행 ' + fmtDt(last.started_at) + ' · ' + last.field + ' ' + fmtNum(last.requested_count) + '건 (' + last.status + ')'
+      : '실행 이력이 없습니다.';
+  }
+
+  function pagePrev() { if (S.page > 1) { S.page -= 1; loadStatus(); } }
+  function pageNext() { if (S.page < S.pages) { S.page += 1; loadStatus(); } }
+
+  // ── data-action 위임 — admin2 네이티브 화면 공통 관례(ai_task_settings.html.j2와
+  //    같은 방식). 폼 입력(select change)만 예외로 직접 리스너를 쓴다(클릭이 아니다). ──
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    switch (t.getAttribute('data-action')) {
+      case 'run': runFill(); break;
+      case 'approve-link': openApproveLink(t); break;
+      case 'page-prev': pagePrev(); break;
+      case 'page-next': pageNext(); break;
+      default: break;
+    }
   });
 
+  window.Admin2Shell.meReady.then(updateRunButton);
   loadFields();
   pollWatcher();
-  loadStatus();
-  // 주기 폴링 — 실행 결과가 다른 사람 세션(하네스)에서 진행되므로 이 화면이 스스로 갱신돼야 한다.
   setInterval(pollWatcher, 15000);
-  setInterval(loadStatus, 15000);
+  setInterval(function () { loadStatus(); loadRuns(); }, 15000);
 })();
 </script>
 {% endraw %}
