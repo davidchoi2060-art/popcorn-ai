@@ -1,0 +1,596 @@
+{#
+  유입 성과 (ADM-HND-030 후보) — 2026-08-15 신설, 조회 전용. **완전 신규 화면.**
+
+  ■ 이 화면의 전부 — 두 구간을 정직하게 가른다
+    (A) 지금 우리 데이터만으로 잴 수 있는 구간   상담 -> 완주 -> 인계 (실 데이터)
+    (B) 몰 데이터가 있어야 재는 구간             인계 -> 클릭 -> 구매 ([향후 사용예정] 정적 문구뿐,
+        숫자·차트 없음 — 화면을 잘못 지어서가 아니라 몰 쪽 데이터가 우리에게 없어서다)
+
+  ■ 출처 — 계약 요약만 받았다(원안 .dc.html은 서브에이전트에서 못 연다)
+    `docs/design/spec-funnel.md`(사장님 확정 2026-08-15, **1a 안** "끊긴 깔때기를 그대로
+    그린다"). 정의서 `docs/design/req/req-funnel-performance.md`.
+
+  ■ 화면 ID·경로는 아직 후보다 — 헤더 배지(화면 ID·경로)를 점선 테두리로 표시해
+    미확정임을 화면이 스스로 말한다(계약 지시 그대로). §하단 "아직 정해지지 않은 것"에
+    사장님 결정 대기 4건을 그대로 적었다.
+
+  ■ 데이터 — `GET /api/admin/funnel-performance`(`api/admin_funnel.py`). `/api/admin/*`
+    접두어라 `api/auth.py`의 전역 게이트가 이미 로그인을 확인한다(이 화면은 자체 게이트를
+    두지 않는다 — 그 파일 담당 밖이라 절대 고치지 않았다, 읽기만 했다).
+
+  ■★ 정직성 — 계약이 요구한 그대로 구현했다
+    ① 기간 경고 — 인계 기능 존재 기간(서버가 실측한 날짜) 이전을 포함하는 기간을 고르면
+       경고 배너가 뜬다. 배수·비율은 전부 서버가 계산해서 내려보낸다 — 이 템플릿의 JS는
+       나눗셈을 하지 않는다(문자열 조립만 한다).
+    ② 깔때기 가운데 끊김 — (A) 3단계 뒤에 점선 구분 + "여기서 끊깁니다"가 오고, (B) 2단계는
+       회색 점선 테두리로 다르게 그린다. (B) 칸에는 숫자를 절대 넣지 않는다.
+    ③ 표본이 작으면 나누지 않는다 — 인계 총액은 합계·건수만 보여주고 "평균 객단가"를
+       계산하지 않는다(§`renderTiers`). 완주 대비 인계 비율은 P-08대로 항상 분모를
+       병기하고, 표본이 작으면(서버 판단 — 인계 세션 30 미만) 신뢰도 캐비어트를 붙인다.
+    ④ 근거 클릭·부품 교체 결합의 "0" — 표가 비어서가 아니라 겹치는 사례가 없어서라는
+       사실을 숫자로 함께 보여준다(전체 로그 건수 vs 결합 건수를 같이 낸다).
+
+  ■ 표·격자 정렬 — `.fn-cards`/`.fn-blocked`는 헤더가 따로 없는 카드 그리드라 `handoff_log`
+    가 겪은 "헤더·본문 스크롤 어긋남" 문제 자체가 없다(같은 그리드 안에 카드가 바로 있다).
+
+  ■ 팔레트 — `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`(oklch 베이지, `--rv-*`)만
+    읽는다. `:root`를 다시 정의하지 않는다(아래 스타일은 전부 기존 `--rv-*`/`--font*` 토큰만
+    참조). 외부 CDN 0건 — 이 파일이 추가하는 자산은 인라인 `<style>`/`<script>`뿐이다.
+    U-01("관리자 화면은 통과=--primary, 초록은 고객 화면 용법")에 따라 상태 표시에 초록을
+    쓰지 않았다 — 티어 색만 `handoff_log.html.j2`의 `.hl-tier` 배색(가성비=초록)을 그대로
+    이어받았다(카테고리 색이지 성공/실패 판정이 아니다).
+
+  ■ 헤더 배지 "점선" — `.a2-badge`는 공용 셸 클래스라 직접 고치지 않고, 이 화면의
+    `body[data-screen-id="ADM-HND-030"]`로만 좁혀 테두리 스타일만 덧씌운다(공용 셸·CSS
+    파일 자체는 건드리지 않았다 — 담당 밖).
+
+  ■ 권한 — 조회는 로그인만 되면 등급 무관(계약 §결정 3 "미로그인 401은 확정", 등급 자체는
+    사장님 결정 대기). 쓰기 버튼이 하나도 없다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}유입 성과{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearance:none;margin:0;padding:0;border:0;background:none}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+/* ── 헤더 배지 — 이 화면만 점선(계약 "화면 ID·경로 배지는 점선 테두리로") ── */
+body[data-screen-id="ADM-HND-030"] .a2-badge{border-style:dashed}
+
+/* ── 헤더 위젯 ── */
+.fn-hdsub{font:400 11px/1.3 var(--rv-font);color:var(--rv-faint);white-space:nowrap}
+.fn-ro{font:500 10px/1 var(--rv-font);color:#5b564d;background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+.fn-pathbadge{font:500 10px/1 var(--rv-mono);color:var(--rv-faint);padding:4px 7px;
+  border:1px dashed rgba(0,0,0,.22);border-radius:4px;white-space:nowrap}
+.fn-refresh{font:500 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:6px 9px;cursor:pointer}
+
+/* ── 루트 ── */
+.fn-scroll{flex:1;min-height:0;overflow:auto;padding:14px 18px 26px;display:flex;flex-direction:column;gap:14px}
+.fn-loading,.fn-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:60px 20px}
+.fn-loading[hidden],.fn-errbox[hidden],.fn-body[hidden]{display:none}
+.fn-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.fn-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.fn-errbox button{padding:8px 18px;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);
+  font:500 12px/1 var(--rv-font);cursor:pointer}
+.fn-body{display:flex;flex-direction:column;gap:16px}
+
+/* ── 인라인 오류 — 탭·기간 입력칸은 그대로 둔 채 실패 사유만 알린다.
+   전체화면 오류(.fn-errbox)로 덮으면 사용자가 탭도 날짜칸도 못 보는 화면에 갇힌다
+   (확인자 실측 2026-08-15 — 시작일>종료일로 적용하면 나가는 유일한 방법이 F5였다).
+   이 화면은 «데이터가 이미 있으면(최초 로드든 이전 값이든) 본문을 계속 보여주고,
+   실패는 이 줄로만 알린다»로 고쳤다 ── */
+.fn-inlineerr{font:500 11.5px/1.5 var(--rv-font);color:var(--rv-ink);background:var(--rv-amber-bg);
+  border:1px solid var(--rv-amber-line);border-left:3px solid var(--rv-red);border-radius:7px;
+  padding:9px 12px}
+.fn-inlineerr[hidden]{display:none}
+.fn-tabbusy{font:400 11px/1.4 var(--rv-font);color:var(--rv-faint)}
+.fn-tabbusy[hidden]{display:none}
+.fn-results{display:flex;flex-direction:column;gap:16px;transition:opacity .15s ease}
+.fn-results.stale{opacity:.5}
+
+/* ── ① 기간 탭 줄 ── */
+.fn-tabrow{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px}
+.fn-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.fn-tab{font:600 11.5px/1 var(--rv-font);color:var(--rv-muted);background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.16);border-radius:20px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.fn-tab:hover{color:var(--rv-ink);border-color:rgba(0,0,0,.28)}
+.fn-tab.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
+.fn-tabnote{font:400 11px/1.4 var(--rv-font);color:var(--rv-faint);white-space:nowrap}
+.fn-periodlabel{font:400 11px/1.5 var(--rv-font);color:var(--rv-muted);width:100%}
+.fn-customrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fn-customrow[hidden]{display:none}
+.fn-customrow input[type=date]{font:400 11.5px/1 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:7px 9px}
+.fn-customrow button{font:600 11px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+  border-radius:5px;padding:8px 13px;cursor:pointer}
+.fn-customrow .tilde{color:var(--rv-faint)}
+
+/* ── ② 경고 배너 ── */
+.fn-banner{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
+  border-left:3px solid var(--rv-amber);border-radius:8px;padding:13px 16px}
+.fn-banner[hidden]{display:none}
+.fn-bannertxt{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fn-bannerhd{font:600 13.5px/1.5 var(--rv-font);color:var(--rv-ink)}
+.fn-bannerds{font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.fn-bannerds b{font-weight:700;color:var(--rv-ink)}
+
+/* ── ③ (A)+(B) 깔때기 ── */
+.fn-panel{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;padding:16px 16px 14px}
+.fn-panelhd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.fn-panelhd h2{font:600 13.5px/1.3 var(--rv-font);margin:0;color:var(--rv-ink)}
+.fn-panelsub{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+.fn-funnel{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+.fn-stage{flex:1 1 120px;min-width:110px;border:1px solid rgba(0,0,0,.12);border-radius:8px;
+  background:var(--rv-panel);padding:12px 13px;display:flex;flex-direction:column;gap:4px}
+.fn-stage.end{background:var(--rv-panel2);border-color:rgba(0,0,0,.18)}
+.fn-stage.b{background:var(--rv-panel2);border-style:dashed;border-color:var(--rv-dim3);opacity:.85}
+.fn-stage-lbl{font:600 10.5px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em}
+.fn-stage-val{font:700 19px/1.2 var(--rv-mono);color:var(--rv-ink)}
+.fn-stage-val.muted{color:var(--rv-dim2);font-family:var(--rv-font);font-size:12.5px;font-weight:600}
+.fn-stage-sub{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.fn-conn{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:44px}
+.fn-conn-pct{font:700 11.5px/1 var(--rv-mono);color:var(--rv-ink-soft)}
+.fn-conn-arrow{font:400 15px/1 var(--rv-font);color:var(--rv-dim2)}
+.fn-conn.b .fn-conn-arrow{color:var(--rv-dim3)}
+.fn-break{flex:1 1 120px;min-width:110px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;padding:6px 4px}
+.fn-break-line{width:1px;flex:1;min-height:8px;border-left:2px dashed var(--rv-dim3)}
+.fn-break-label{font:600 10px/1.3 var(--rv-font);color:var(--rv-muted);background:var(--rv-panel);
+  border:1px dashed var(--rv-dim3);border-radius:20px;padding:5px 10px;white-space:nowrap}
+.fn-denom-note{font:400 11.5px/1.7 var(--rv-font);color:var(--rv-muted);border-top:1px solid rgba(0,0,0,.08);
+  margin-top:13px;padding-top:11px}
+
+/* ── ④ 3단 카드 ── */
+.fn-cards{display:grid;grid-template-columns:repeat(3,minmax(230px,1fr));gap:12px}
+.fn-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:9px;
+  padding:14px 15px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.fn-card h3{font:600 12.5px/1.3 var(--rv-font);margin:0;color:var(--rv-ink)}
+.fn-card-foot{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.07);
+  padding-top:9px;margin-top:auto}
+
+.fn-tierrow{display:flex;align-items:center;gap:8px;font:500 11px/1.3 var(--rv-font)}
+.fn-tierrow-lbl{flex:none;width:52px;color:var(--rv-ink-soft)}
+.fn-tierbar-track{flex:1;height:9px;border-radius:5px;background:var(--rv-panel2);overflow:hidden}
+.fn-tierbar-fill{display:block;height:100%;border-radius:5px}
+.fn-tierbar-fill.highend{background:var(--rv-red)}
+.fn-tierbar-fill.recommend{background:var(--rv-link)}
+.fn-tierbar-fill.value{background:var(--rv-green)}
+.fn-tiercount{flex:none;width:40px;text-align:right;color:var(--rv-ink)}
+#fnAmount{font:400 11px/1.65 var(--rv-font);color:var(--rv-muted)}
+
+.fn-pricechips{display:flex;flex-direction:column;gap:7px}
+.fn-pricechip{display:flex;align-items:center;gap:8px;font:500 11.5px/1.3 var(--rv-font);
+  border-radius:6px;padding:8px 10px;background:var(--rv-panel)}
+.fn-pricechip .lbl{flex:1;color:var(--rv-ink-soft)}
+.fn-pricechip .n{font:700 13px/1 var(--rv-mono);color:var(--rv-ink)}
+.fn-pricechip .n .denom{font:500 10.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.fn-pricechip .p{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint);min-width:38px;text-align:right}
+.fn-pricechip.unk .n{color:var(--rv-red)}
+.fn-pricechip.chg .n{color:var(--rv-amber)}
+
+#fnSignals p{margin:0 0 8px;font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+#fnSignals p:last-child{margin-bottom:0}
+#fnSignals b{font-weight:700;color:var(--rv-ink)}
+.fn-signal-sub{color:var(--rv-faint)!important;font-size:10.5px!important}
+
+/* ── ⑤ (B) 막힌 구간 ── */
+.fn-blocked{display:grid;grid-template-columns:repeat(3,minmax(210px,1fr));gap:12px}
+.fn-blockcard{background:var(--rv-panel);border:1px dashed var(--rv-dim3);border-radius:9px;
+  padding:14px 15px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.fn-blockcard .q{font:600 12px/1.4 var(--rv-font);color:var(--rv-ink-soft)}
+.fn-blockcard .a{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+.fn-blockcard .a b{color:var(--rv-ink-soft);font-weight:600}
+.fn-blockcard .dep{font:500 10px/1.5 var(--rv-font);color:var(--rv-faint);margin-top:2px}
+.fn-blockcard .dep::before{content:"의존 — "}
+
+/* ── 하단 고지 ── */
+.fn-notice{font:400 11px/1.7 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.09);padding-top:12px}
+.fn-notice b{color:var(--rv-ink-soft);font-weight:600}
+.fn-notice ul{margin:6px 0 0;padding-left:18px}
+.fn-notice li{margin-bottom:3px}
+.fn-decisions{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.fn-decisions li{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted);
+  border-left:2px solid var(--rv-dim3);padding-left:10px}
+.fn-decisions b{color:var(--rv-ink-soft);font-weight:600}
+#fnOrphanNote{color:var(--rv-amber)}
+#fnOrphanNote[hidden]{display:none}
+
+@media (max-width:1100px){
+  .fn-cards{grid-template-columns:1fr}
+  .fn-blocked{grid-template-columns:1fr}
+}
+@media (max-width:768px){
+  .fn-funnel{flex-direction:column}
+  .fn-conn{flex-direction:row;min-width:0;padding:2px 0}
+  .fn-conn-arrow{transform:rotate(90deg)}
+  .fn-break{flex-direction:row;padding:4px 0}
+  .fn-break-line{width:auto;flex:1;min-height:0;border-left:0;border-top:2px dashed var(--rv-dim3)}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="fn-hdsub">넘긴 견적이 실제로 얼마나 팔렸는지 — 지금 잴 수 있는 절반만</span>
+<span class="fn-ro">조회 전용</span>
+<span class="fn-pathbadge" title="화면 ID·경로 미확정 — 사장님 결정 대기">/admin2/funnel-performance</span>
+<button type="button" class="fn-refresh" data-action="refresh">새로고침</button>
+{% endblock %}
+
+{% block content %}
+<div class="fn-scroll">
+  <div class="fn-loading" id="fnLoading" aria-live="polite"><div>불러오는 중…</div></div>
+
+  <div class="fn-errbox" id="fnErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="fnErrMsg"></div>
+    <button type="button" data-action="retry">다시 시도</button>
+  </div>
+
+  <div class="fn-body" id="fnBody" hidden>
+
+    <!-- ① 기간 탭 -->
+    <div class="fn-tabrow">
+      <div class="fn-tabs" id="fnTabs"></div>
+      <span class="fn-tabnote" id="fnTabNote"></span>
+      <span class="fn-periodlabel" id="fnPeriodLabel"></span>
+      <div class="fn-customrow" id="fnCustomRow" hidden>
+        <input type="date" id="fnDateFrom" aria-label="시작일">
+        <span class="tilde">~</span>
+        <input type="date" id="fnDateTo" aria-label="종료일">
+        <button type="button" data-action="apply-custom">적용</button>
+      </div>
+      <span class="fn-tabbusy" id="fnTabBusy" hidden>갱신 중…</span>
+    </div>
+
+    <!-- 인라인 오류 — 탭·날짜칸은 위에 그대로 남는다(§트랩 수정, 2026-08-15) -->
+    <div class="fn-inlineerr" id="fnInlineErr" role="alert" hidden></div>
+
+    <div class="fn-results" id="fnResults">
+
+    <!-- ② 경고 배너 -->
+    <div class="fn-banner" id="fnWarning" role="status" hidden></div>
+
+    <!-- ③ (A)+(B) 깔때기 -->
+    <section class="fn-panel" aria-label="유입 깔때기">
+      <div class="fn-panelhd">
+        <h2>상담 → 완주 → 인계 (지금 잴 수 있는 구간) → 클릭 → 구매 (몰 데이터가 있어야 재는 구간)</h2>
+        <span class="fn-panelsub">가운데가 끊겨 있습니다 — 왜 아직 몇 건이 팔렸는지 모르는지를 그대로 보여줍니다</span>
+      </div>
+      <div class="fn-funnel" id="fnFunnel"></div>
+      <div class="fn-denom-note" id="fnDenomNote"></div>
+    </section>
+
+    <!-- ④ 3단 카드 -->
+    <div class="fn-cards">
+      <div class="fn-card">
+        <h3>인계 건의 티어 분포</h3>
+        <div id="fnTiers"></div>
+        <div id="fnAmount"></div>
+        <div class="fn-card-foot"><span id="fnHandoffLogLink"></span></div>
+      </div>
+      <div class="fn-card">
+        <h3>인계 시점 가격 재확인</h3>
+        <div class="fn-pricechips" id="fnPriceChips"></div>
+        <div class="fn-card-foot" id="fnPriceFoot"></div>
+      </div>
+      <div class="fn-card">
+        <h3>근거 클릭 · 부품 교체와의 결합</h3>
+        <div id="fnSignals"></div>
+        <div class="fn-card-foot">조인할 축은 <code class="num">user_id</code>·<code class="num">session_id</code>입니다 — 이미 있습니다.</div>
+      </div>
+    </div>
+
+    <!-- ⑤ (B) 막힌 구간 -->
+    <section class="fn-panel" aria-label="몰 데이터가 있어야 재는 구간">
+      <div class="fn-panelhd">
+        <h2>(B) 몰 데이터가 있어야 재는 구간 — [향후 사용예정]</h2>
+        <span class="fn-panelsub">화면을 잘못 지어서가 아니라 몰 쪽 데이터가 우리에게 없어서입니다</span>
+      </div>
+      <div class="fn-blocked">
+        <div class="fn-blockcard">
+          <div class="q">인계된 견적이 결제까지 갔는지</div>
+          <div class="a">몰이 회신하기 전에는 <b>우리 원장 어디에도 없습니다.</b></div>
+          <div class="dep">윈윈소프트 API 5순위(주문 결과 회신) — 회신 대기</div>
+        </div>
+        <div class="fn-blockcard">
+          <div class="q">인계 링크를 실제로 눌렀는지</div>
+          <div class="a"><b>클릭 추적 자체가 없습니다.</b> 근거 클릭 로그는 다른 사건입니다(상담 화면 전용 — 인계 링크 클릭이 아닙니다).</div>
+          <div class="dep">인계 링크 클릭 추적 경로 신설 필요</div>
+        </div>
+        <div class="fn-blockcard">
+          <div class="q">다른 상품으로 바꿔서라도 샀는지</div>
+          <div class="a">간접 전환은 <b>구조적으로 못 잽니다.</b></div>
+          <div class="dep">윈윈소프트 API(주문 결과 회신) — 간접 전환도 이 회신 없이는 못 잽니다</div>
+        </div>
+      </div>
+      <div class="fn-notice">리드타임은 <b>미정</b>입니다(회신 대기) — 지어내지 않습니다. 윈윈소프트 API 요청서는 <code>docs/design/winwin-api-request-2026-08-11.md</code>.</div>
+    </section>
+
+    <!-- 하단 고지 -->
+    <div class="fn-notice" id="fnOrphanNote" hidden></div>
+
+    <div class="fn-notice">
+      <b>이 화면이 하지 않는 일</b>
+      <ul>
+        <li>인계 개별 건 상세 — <span id="fnHandoffLogLink2">「인계 기록」</span>이 담당입니다(여기서 다시 나열하지 않습니다).</li>
+        <li>몰 가격 동기화 상세 — <span id="fnMallSyncLink2">「쇼핑몰 동기화」</span>가 담당입니다(요약치만 인용합니다).</li>
+        <li>채널별(검색·SNS·직접 유입 등) 유입 분석 — 리퍼러·UTM을 기록하는 테이블 자체가 없습니다.</li>
+        <li>회원 단위 전환 분석 — 인계 건의 <code class="num">member_id</code>가 비어 있습니다(비로그인 세션).</li>
+      </ul>
+      <div style="margin-top:8px">옛 자체 결제 원장(<code class="num">orders</code>)으로 대신할 수 없습니다 — 인계는 애초에 거기에 쓰지 않고, 최신 기록도 인계 시작(<span id="fnOrdersFeatureDate">서버 조회 중</span>) 이전에서 멈춰 있습니다.</div>
+    </div>
+
+    <div class="fn-notice">
+      <b>아직 정해지지 않은 것 — 사장님 결정 대기 4건</b>(정해지면 화면 구조를 바꾸지 않고 그대로 반영합니다)
+      <ul class="fn-decisions">
+        <li><b>결정 1.</b> 화면 ID·경로 확정 — 지금은 <code class="num">ADM-HND-030</code>·<code class="num">/admin2/funnel-performance</code> 후보로만 표시합니다(헤더 배지 점선 참조).</li>
+        <li><b>결정 2.</b> 기본 조회 기간 — 지금은 「인계 기능 존재 기간」을 기본값 후보로 열어 둡니다.</li>
+        <li><b>결정 3.</b> 열람 등급 — 미로그인 401은 확정이고, 등급(조회/운영자/관리자)은 지금 로그인만 되면 무관하게 열어 둡니다.</li>
+        <li><b>결정 4.</b> (A)만으로 지금 열지, (B)(윈윈 API)를 기다릴지 — 지금은 (A)만으로 열되 (B)는 [향후 사용예정]으로 명시합니다.</li>
+      </ul>
+    </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var S = { data: null, err: null, loading: false, period: { preset: 'feature', from: '', to: '' } };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '0' : Number(n).toLocaleString('ko-KR'); }
+  function won(n) { return (n == null) ? '알 수 없음' : fmt(n) + '원'; }
+  function pctText(n) { return (n == null) ? '—' : (String(n) + '%'); }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, 'GET /api/admin/funnel-performance') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  function query() {
+    var p = S.period;
+    var q = '?preset=' + encodeURIComponent(p.preset);
+    if (p.preset === 'custom' && p.from && p.to) {
+      q += '&date_from=' + encodeURIComponent(p.from) + '&date_to=' + encodeURIComponent(p.to);
+    }
+    return q;
+  }
+
+  function boot() {
+    S.err = null;
+    S.loading = true;
+    renderAll();
+    return apiGet('/api/admin/funnel-performance' + query())
+      .then(function (resp) { S.data = resp; S.loading = false; renderAll(); })
+      .catch(function (err) { S.err = err; S.loading = false; renderAll(); });
+  }
+
+  // ── 링크 헬퍼 — 경로 available 이면 링크, 아니면 사유 텍스트 ───────────────
+  function navLink(nav, label) {
+    if (nav && nav.available) return '<a href="' + esc(nav.path) + '">「' + esc(label) + '」</a>';
+    return '「' + esc(label) + '」' + (nav && nav.reason ? '(' + esc(nav.reason) + ')' : '');
+  }
+
+  // ── ① 기간 탭 ────────────────────────────────────────────────────
+  function renderTabs(d) {
+    var tabs = [
+      { key: 'feature', label: '인계 기능 존재 기간' },
+      { key: 'all', label: '전체 기간' },
+      { key: 'custom', label: '기간 직접 고르기' }
+    ];
+    $('fnTabs').innerHTML = tabs.map(function (t) {
+      var on = S.period.preset === t.key;
+      return '<button type="button" class="fn-tab' + (on ? ' on' : '') + '" data-preset="' + t.key + '">' + esc(t.label) + '</button>';
+    }).join('');
+    $('fnTabNote').textContent = (d && d.feature) ? ('인계 기능은 ' + d.feature.start_date + '부터') : '';
+    $('fnCustomRow').hidden = (S.period.preset !== 'custom');
+    if (d && d.period) {
+      $('fnPeriodLabel').textContent = d.period.label + ' (' + (d.period.from || '처음') + ' ~ ' + (d.period.to || '오늘') + ')';
+    }
+    if (S.period.preset === 'custom') {
+      var fi = $('fnDateFrom'), ti = $('fnDateTo');
+      if (fi && !fi.value && d && d.period) fi.value = d.period.from || '';
+      if (ti && !ti.value && d && d.period) ti.value = d.period.to || '';
+    }
+  }
+
+  // ── ② 경고 배너 ──────────────────────────────────────────────────
+  function renderWarning(d) {
+    var box = $('fnWarning');
+    if (!d.warning) { box.hidden = true; box.innerHTML = ''; return; }
+    var w = d.warning;
+    var mul = (w.multiplier == null) ? '비교할 수 없을 만큼' : (w.multiplier + '배');
+    box.hidden = false;
+    box.innerHTML = '<div class="fn-bannertxt">'
+      + '<div class="fn-bannerhd">이 기간에는 인계 기능이 없던 날이 포함돼 있습니다</div>'
+      + '<div class="fn-bannerds">' + esc(w.pre_start_from) + '~' + esc(w.pre_start_to) + ' 세션은 인계될 가능성이 애초에 없었습니다. '
+      + '그래서 이 기간의 인계율 <b>' + pctText(w.broad.pct) + '</b>(' + fmt(w.broad.num) + '/' + fmt(w.broad.den) + ')은 실제보다 '
+      + '<b>' + esc(mul) + ' 넘게 낮게</b> 보입니다 — 기능이 있던 기간(' + esc(w.narrow.from) + ' ~) 기준은 '
+      + '<b>' + pctText(w.narrow.pct) + '</b>(' + fmt(w.narrow.num) + '/' + fmt(w.narrow.den) + ')입니다.</div></div>';
+  }
+
+  // ── ③ (A)+(B) 깔때기 ─────────────────────────────────────────────
+  function renderFunnel(d) {
+    var f = d.funnel;
+    $('fnFunnel').innerHTML = ''
+      + '<div class="fn-stage"><div class="fn-stage-lbl">상담</div><div class="fn-stage-val num">' + fmt(f.sessions.n) + '</div><div class="fn-stage-sub">세션</div></div>'
+      + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(f.done.pct_of_sessions) + '</span><span class="fn-conn-arrow">→</span></div>'
+      + '<div class="fn-stage"><div class="fn-stage-lbl">완주</div><div class="fn-stage-val num">' + fmt(f.done.n) + '</div><div class="fn-stage-sub">견적 생성</div></div>'
+      + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(f.handoff.pct_of_done) + '</span><span class="fn-conn-arrow">→</span></div>'
+      + '<div class="fn-stage end"><div class="fn-stage-lbl">인계</div><div class="fn-stage-val num">세션 ' + fmt(f.handoff.sessions) + '개</div><div class="fn-stage-sub">건 ' + fmt(f.handoff.count) + '건</div></div>'
+      + '<div class="fn-break"><span class="fn-break-line"></span><span class="fn-break-label">여기서 끊깁니다</span><span class="fn-break-line"></span></div>'
+      + '<div class="fn-stage b"><div class="fn-stage-lbl">클릭</div><div class="fn-stage-val muted">[향후 사용예정]</div><div class="fn-stage-sub">추적 경로 없음</div></div>'
+      + '<div class="fn-conn b"><span class="fn-conn-arrow">→</span></div>'
+      + '<div class="fn-stage b"><div class="fn-stage-lbl">구매</div><div class="fn-stage-val muted">[향후 사용예정]</div><div class="fn-stage-sub">몰 회신 대기</div></div>';
+
+    var note = '완주 대비 인계 ' + pctText(f.handoff.pct_of_done) + '는 ' + fmt(f.handoff.sessions) + '/' + fmt(f.handoff.denominator_done) + '이고, ';
+    note += f.handoff.low_sample
+      ? ('표본이 ' + fmt(f.handoff.sessions) + '개뿐이라 이 비율 자체의 신뢰도가 낮습니다 — 기능이 켜진 지 며칠 됐다는 맥락이 비율보다 중요합니다.')
+      : ('표본은 이 비율을 신뢰할 만한 크기입니다.');
+    $('fnDenomNote').textContent = note;
+  }
+
+  // ── ④㉮ 티어 분포 ────────────────────────────────────────────────
+  function renderTiers(d) {
+    var t = d.tiers;
+    var max = Math.max(1, t.counts.highend || 0, t.counts.recommend || 0, t.counts.value || 0);
+    $('fnTiers').innerHTML = t.order.map(function (k) {
+      var n = t.counts[k] || 0, w = Math.round(n / max * 100);
+      return '<div class="fn-tierrow"><span class="fn-tierrow-lbl">' + esc(t.labels[k]) + '</span>'
+        + '<span class="fn-tierbar-track"><span class="fn-tierbar-fill ' + k + '" style="width:' + w + '%"></span></span>'
+        + '<span class="fn-tiercount num">' + fmt(n) + '건</span></div>';
+    }).join('');
+    $('fnAmount').textContent = '인계 총액(우리 견적가 기준) ' + won(d.amount.sum) + ' — ' + fmt(d.amount.n) + '건뿐이라 「평균 객단가」로 부르지 않습니다. 나누지 않고 합계와 건수를 그대로 둡니다.';
+  }
+
+  // ── ④㉯ 가격 재확인 — 비율은 서버가 계산해 보낸다(`L[key].pct`). 이 함수는
+  // 나눗셈을 하지 않는다(계약 "배수·비율은 서버가 계산한다. 화면이 나누지 않는다").
+  // ⚠ 2026-08-15 확인자 지적(경미) — 분모(라인 총계)가 카드 하단에 1회만 있어 행별로는
+  // 없었다. P-08("비율에는 표본을 병기한다")을 행 단위로도 엄격히 지키도록 각 행의
+  // 건수를 "n/전체" 형태로 바꿨다(예: "12/27") — 새 계산이 아니라 이미 응답에 있는
+  // `L.total` 을 같은 줄에 한 번 더 적는 것뿐이라 서버 변경은 필요 없었다.
+  function renderPriceCheck(d) {
+    var L = d.price_check.lines;
+    var order = [['확인됨', 'ok'], ['가격변동', 'chg'], ['확인못함', 'unk']];
+    $('fnPriceChips').innerHTML = order.map(function (pair) {
+      var key = pair[0], cls = pair[1], row = L[key] || { n: 0, pct: null };
+      return '<div class="fn-pricechip ' + cls + '"><span class="lbl">' + esc(key) + '</span>'
+        + '<span class="n num">' + fmt(row.n) + '<span class="denom">/' + fmt(L.total) + '</span></span>'
+        + '<span class="p num">' + pctText(row.pct) + '</span></div>';
+    }).join('');
+    $('fnPriceFoot').innerHTML = '라인 ' + fmt(L.total) + '건 중(인계 ' + fmt(d.price_check.handoff_n) + '건 기준) — 요약치만 인용합니다. 상세는 '
+      + navLink(d.nav.mall_sync, '쇼핑몰 동기화') + '.';
+  }
+
+  // ── ④㉰ 근거 클릭 · 부품 교체 결합 ───────────────────────────────
+  function renderSignals(d) {
+    var s = d.signals;
+    var html;
+    if (s.promo_click.matched_handoffs === 0 && s.swap.matched_handoffs === 0) {
+      html = '<p>조인할 축(<code class="num">user_id</code>·<code class="num">session_id</code>)은 이미 있지만, 지금 표본(인계 '
+        + fmt(s.promo_click.scoped_handoffs) + '건)에는 근거를 클릭하고 인계까지 간 사람도, 부품을 바꾸고 인계까지 간 사람도 <b>없습니다.</b></p>'
+        + '<p>상관을 보여줄 데이터 자체가 아직 없다는 뜻입니다 — <b>0을 성과로도 실패로도 쓰지 않습니다.</b></p>'
+        + '<p class="fn-signal-sub">근거 클릭 기록 전체 ' + fmt(s.promo_click.total_rows) + '건 · 부품 교체 기록 전체 ' + fmt(s.swap.total_rows)
+        + '건 — 표 자체가 빈 것이 아니라, 인계 건과 겹치는 사례가 없습니다.</p>';
+    } else {
+      html = '<p>근거 클릭 후 인계까지 이어진 사례 <b>' + fmt(s.promo_click.matched_handoffs) + '건</b> · 부품 교체 후 인계까지 이어진 사례 '
+        + '<b>' + fmt(s.swap.matched_handoffs) + '건</b>(전체 인계 ' + fmt(s.promo_click.scoped_handoffs) + '건 중)입니다.</p>';
+    }
+    $('fnSignals').innerHTML = html;
+  }
+
+  // ── 인라인 오류 — 탭·날짜칸을 가리지 않고 실패 사유만 알린다 ───────────────
+  function renderInlineError() {
+    var box = $('fnInlineErr');
+    if (!S.err) { box.hidden = true; box.textContent = ''; return; }
+    box.hidden = false;
+    box.textContent = S.err.message;
+  }
+
+  // ── 전체 렌더 ─────────────────────────────────────────────────────
+  // ⚠ 2026-08-15 확인자 실측 결함 수정 — 예전엔 S.err 가 있으면 #fnBody 전체를
+  // 숨겨서 기간 탭·날짜 입력칸까지 함께 사라졌다(시작일>종료일로 「적용」하면
+  // 「다시 시도」를 눌러도 같은 요청을 반복해 같은 오류만 났고, F5 가 유일한
+  // 탈출구였다). 지금은 **데이터가 이미 있으면(최초 로드든 이전 값이든) 탭과
+  // 마지막 성공 결과를 계속 보여주고, 실패는 `renderInlineError()` 로만 알린다** —
+  // 사용자가 탭을 눌러 다른 기간으로 가거나 날짜칸을 고쳐 다시 「적용」할 수 있다.
+  // 전체화면 오류(#fnErrBox)는 **한 번도 성공한 적이 없을 때만**(보여줄 것 자체가
+  // 없을 때) 쓴다.
+  function renderAll() {
+    var loading = $('fnLoading'), errBox = $('fnErrBox'), body = $('fnBody');
+
+    if (S.err && !S.data) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('fnErrMsg').textContent = S.err.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+    $('fnTabBusy').hidden = !S.loading;
+
+    var d = S.data;
+    renderTabs(d);
+    renderInlineError();
+
+    var results = $('fnResults');
+    results.classList.toggle('stale', !!S.err);
+    if (S.err) return;   // 결과 영역은 마지막 성공 데이터를 그대로 둔다(다시 그리지 않는다)
+
+    renderWarning(d);
+    renderFunnel(d);
+    renderTiers(d);
+    renderPriceCheck(d);
+    renderSignals(d);
+    $('fnHandoffLogLink').innerHTML = navLink(d.nav.handoff_log, '인계 기록');
+    $('fnHandoffLogLink2').innerHTML = navLink(d.nav.handoff_log, '인계 기록');
+    $('fnMallSyncLink2').innerHTML = navLink(d.nav.mall_sync, '쇼핑몰 동기화');
+    // ⚠ 2026-08-15 확인자 실측 결함 수정 — 이 줄만 "2026-08-11" 리터럴이었다(나머지는
+    // 전부 d.feature.start_date). handoffs 가 재구축되면 화면 상단은 새 날짜를 보여주는데
+    // 이 문장만 옛 날짜를 계속 주장해 화면이 스스로와 모순되는 사고였다.
+    $('fnOrdersFeatureDate').textContent = d.feature.start_date;
+
+    var orphanBox = $('fnOrphanNote');
+    var orphanN = (d.integrity && d.integrity.orphan_handoffs) || 0;
+    orphanBox.hidden = orphanN === 0;
+    if (orphanN > 0) {
+      orphanBox.innerHTML = '<b>세션 연결이 없는 인계 ' + fmt(orphanN) + '건이 있습니다</b> — 이 화면의 기간별 집계에는 포함되지 않습니다(세션이 없으면 어느 기간에도 속할 수 없습니다).';
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var tab = e.target.closest('[data-preset]');
+    if (tab) {
+      var next = tab.getAttribute('data-preset');
+      if (next === S.period.preset && next !== 'custom') return;
+      S.period.preset = next;
+      if (next === 'custom') { renderTabs(S.data); return; }
+      boot();
+      return;
+    }
+    var act = e.target.closest('[data-action]');
+    if (act) {
+      var a = act.getAttribute('data-action');
+      if (a === 'retry' || a === 'refresh') { boot(); return; }
+      if (a === 'apply-custom') {
+        var from = $('fnDateFrom').value, to = $('fnDateTo').value;
+        if (!from || !to) return;
+        S.period.from = from; S.period.to = to;
+        boot();
+        return;
+      }
+    }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}
