@@ -1,0 +1,962 @@
+{#
+  단가표 반영 (ADM-PRC-040) — 2026-08-15 신설
+
+  ■ 계약 — `docs/design/spec-price-import.md`(사장님 확정 **1b 안** — 좌 330px 공급처별
+    최신 파일 목록 + 우 diff). 원문(Claude Design)은 하네스만 연다 — 이 화면은 계약
+    요약 텍스트로 지었다(로컬 원안 dc-*.html 없음 · 치수 대조 대상 아님).
+
+  ■★ 이 화면이 «말해야 하는» 다섯 사실(계약 맨 앞) — 어디서 말하는지:
+      ① 「선택 반영」 클릭이 곧 승인       .pi-noticebar(상시 노출) + 버튼 문구 그 자체
+      ② 결과는 시도/실제 변경/잠겨 건너뜀 三수 resultHtml() — apply_rows() 응답 그대로
+      ③ 부분 성공 없음(문제 행 하나면 400) apply()가 400을 그대로 보여준다(errText)
+      ④ 되돌리기 겹침 409(최종 승자)      undonote 문구 + undo() 409를 그대로 보여준다
+      ⑤ 매칭 안 된 신규 모델은 반영 불가  nw 목록 + chg 미매칭 행 — 체크박스 자체가 없다
+
+  ■ 데이터 — 전부 기존 API(새로 만들지 않았다 — `undo()`의 409 메시지에 "겹친 상품
+    목록"을 주도록 고친 것(2026-08-15 1차, `api/admin_ui_price_import.py` 모듈
+    docstring §★ 참조)에 이어, 같은 날 확인자가 원장 정합성 결함을 하나 더 잡아
+    `_reprice()`도 고쳤다(2026-08-15 2차, 이 화면의 담당 파일 안): 반영이 그 상품의
+    처음이자 유일한 공급처 가격이었을 때 되돌리면 product_supplier_prices가 0행이
+    되는데, 예전엔 그 순간 `_reprice()`가 즉시 return해 products의 매입가·판매가가
+    반영 당시 값에 그대로 고정되고 이력도 안 남았다 — 응답은 `{"ok":true}`인데
+    실제로는 아무것도 안 되돌아가는 결함이었다(`api/admin_price_import.py` 함수
+    docstring 참조). ⓑ 이 화면의 「되돌리기」 버튼도 자체 결함이 있었다 — 아래 참조):
+      GET  /api/admin/price-import                  공급처별 최신 파일 + diff
+      POST /api/admin/price-import/upload            업로드(FormData, .xlsx만)
+      POST /api/admin/price-import/{file_id}/apply    선택 반영(row_ids)
+      POST /api/admin/price-import/undo/{log_id}      되돌리기
+    좌측 "프리셋 없는 공급처" 상자의 두 수(공급처 전체 · 프리셋 보유)는 서버 렌더
+    시점에 계산해 `preset_total`/`preset_with`로 받는다 — JS 없이도 바로 보인다.
+
+  ■ 판단한 것(계약이 명시하지 않아 이 제작자가 정함 — 검증 대상). 상세 근거는
+    `api/admin_ui_price_import.py` 모듈 docstring §판단한 것(⚠ 그 문서의 "간극" 서술은
+    2026-08-15 서버 수정으로 낡았다 — 그 파일은 담당 밖이라 고치지 못했다. 아래가
+    지금 동작이다):
+      · diff 표 7열은 `chg`(가격이 바뀐 행, 매칭·미매칭 함께 — `k='code'` 신규
+        모델도 포함, 아래 참조)만 담는다. `nw`는 매칭이 «안 된» 것(`k='sim'`·
+        `k='none'`)만 남는다 — 비교할 이전 매입가 자체가 없어 별도 목록에 둔다.
+      · "가격 변동 · 매칭 안 됨" 카드 = (chg 미매칭 행) + (nw 전체, 이제 k≠code뿐).
+        ⚠ 1차 구현의 `_file_diff()`는 `nw`를 매칭 종류(k)와 무관하게 전부
+        `pending`에서 제외해, 다나와코드로 이미 자동 매칭된 신규 모델(`k='code'`)
+        까지 막고 있었다 — 계약 §⑤("매칭 «안 된»" 신규 모델만 막으라는 문구)보다
+        서버가 더 좁았다(계약자·제작자 실측). **사장님이 그 간극을 닫기로 확정**
+        해 `k='code'`는 이제 `chg`+`pending`으로 들어가 위 diff 표에서 선택·반영할
+        수 있다 — 비교할 이전 매입가가 없으면 「변동」 열에 "신규"로 뜬다(매칭이
+        없다는 뜻이 아니라 비교할 값이 없다는 뜻). 실측(2026-08-15, 읽기 전용
+        스크립트로 로그인 후 조회 — 서버 재시작 없이 «지금 데이터»만 셈): nw
+        282건 중 k=code 61건(전부 파일 5·클릭나라) · k=sim 217건 · k=none 4건 —
+        61건 중 59건은 이 공급처의 첫 매입가라 반영 시 `product_supplier_prices`
+        에 새 행이 생기고(undo는 `psp_before is None` → DELETE 경로), 2건은 기존
+        행이 있어 일반 UPDATE 경로를 탄다. `apply_rows()`의 `INSERT … ON CONFLICT
+        DO UPDATE`와 `undo()`의 그 분기가 이미 두 경우를 정상 처리해 이 변경으로
+        새로 깨지는 불변식은 없다(계약자 실측). 이름 유사도(`k='sim'`)·매칭 없음
+        (`k='none'`)은 여전히 막는다 — 확정은 검수 소관.
+      · 발주 상태 전환(`stat`) 행은 체크박스가 없다 — `apply_rows()`의 `pending`은
+        가격이 바뀐 행에서만 만들어져, `stat` 행 id로 반영을 시도하면 서버가 항상
+        400(미매칭·미대기)으로 거부한다(코드 확인). 정보 표시만 한다.
+      · "매칭은 이 순서로 정해집니다" ①②줄은 전역 실적(서버 렌더, `match_stats_json`),
+        ③④줄은 지금 이 화면에 뜬 모든 파일의 `nw[]`를 클라이언트가 합산해 센다
+        (서버 재요청 없음 — 이미 받은 데이터 재사용). `k='code'`가 `nw`에서
+        빠지므로 이 두 줄은 자연히 code 매칭 건을 빼고 센다.
+      · "변동" 열(diff 표 6번째, 62px) — 원안 실측(`grid-template-columns: 24px 1fr
+        190px 100px 100px 62px 118px`, 트랙 7개)은 색·증감 신호가 「새 매입가」
+        셀의 색이 아니라 **별도 열**임을 못박는다(하네스 1차 지시가 이 열을 「새
+        매입가」 셀 색으로 흡수하라고 잘못 적었고, 2026-08-15 하네스가 원안을
+        다시 열어 자체 정정했다). 그래서 「새 매입가」 `<td>`는 중립색(`.pi-
+        difftable td`의 기본 `--on`)으로 두고, 색(내림=초록·오름=붉게)과 부호
+        있는 증감액(±숫자 / 비교 대상 없으면 "신규" / 가격은 그대로인데 상태만
+        바뀌면 "상태만")은 「변동」 열의 `<span>`에만 건다. 그 결과 예전 특이성
+        충돌(`.pi-difftable td{color:...}`가 같은 `<td>`의 `.pi-price-up` 등을
+        특이성 (0,1,1)>(0,1,0)로 이기던 것 — 확인자 실측 2026-08-15)이 구조적으로
+        사라진다: 색·부호가 `<td>`가 아니라 그 안의 `<span>`에만 걸려 있어 `.pi-
+        difftable td`의 규칙과 같은 요소를 두고 다툴 일이 없다. 색이 안 보여도
+        부호(±)·낱말(신규·상태만)로 읽힌다(U-01 "텍스트 병기" 요구 충족).
+      · 배지 색 — **2026-08-15 사장님이 「admin2는 초록 허용」으로 확정**했다
+        (계약자 판정: admin2 팔레트 `--rv-green`이 이 화면 밖 26개 화면에서 이미
+        쓰이고 있고, U-01 "관리자 화면은 통과=--primary, 초록은 고객 화면 전용"은
+        admin2가 생기기 전(2026-08-08) 결정이라 admin2 팔레트를 예상하지
+        못했다). **그래서 아래 줄은 더 이상 이 화면의 규약이 아니다** — `.pi-
+        badge-done`이 초록(oklch hue 165)을 쓰는 것은 결함이 아니다(⚠ CLAUDE.md
+        의 U-01 문구 자체는 아직 이 예외를 안 담았다 — 정본 갱신은 담당 범위
+        밖이라 보고로만 남긴다). diff 표 매입가·변동 셀의 색(내림 초록·오름
+        붉게·상태만 회색)은 계약 §③ 원안 문구를 그대로 따른다.
+      · 지난 반영 이력(우측 하단)은 참고용 — 과거 회차의 "실제 변경 · 잠김" 세부는
+        로그에 없어(코드 확인) 재계산하지 않고 "시도 {n}건 · 되돌림 여부"만 보인다.
+        이번 세션에서 방금 반영한 결과만 3수 전체를 보여준다.
+      · ⚠ 2026-08-15 결함 수정(확인자 실측) — doApply()·doUndo() 성공 뒤 무조건
+        `setTimeout(location.reload, 1500)`로 전체 페이지를 새로 불러오고 있었다.
+        그러면 클라이언트 상태 `S` 전체가 초기화되어 `S.applyResult`가 지워지는데,
+        「결과 · 되돌리기」 패널(resultHtml())의 되돌리기 버튼은 `S.applyResult.undo_id`
+        가 «유일한 진입점»이다 — 반영 버튼만 누르고 2초 기다리면 사람이 결과를 읽기도
+        전에 되돌리기 버튼 자체가 사라졌다(계약 §④가 약속한 "조용히 넘기지 않습니다"가
+        무색해짐). 자동 리로드를 없애고 `refreshFiles()`(파일 상태 · diff만 조용히
+        재요청, `S.loading`을 건드리지 않아 패널이 안 사라짐)로 바꿨다 — 대가로 「지난
+        반영 이력」(SSR 전용 — 위 §SSR 참조)은 이 새로고침으로 안 바뀌고 실제 페이지
+        새로고침이 있어야 이번 건이 그 표에 보인다.
+
+  ■ 권한 — `/api/admin/price-import*`는 `OWNER_WRITE_PREFIXES`에 없다(코드 확인) →
+    조회 viewer, 업로드·반영·되돌리기는 operator 이상(owner 전용 아님). 버튼은
+    `Admin2Shell.canWrite('operator')`로 gate.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}단가표 반영{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+
+.pi-page{flex:1;min-height:0;overflow-y:auto;padding:16px 18px 40px;display:flex;flex-direction:column;gap:14px}
+
+/* ── 상단 바 ─────────────────────────────────────────────────────── */
+.pi-topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.pi-topbar-l{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pi-topbar-r{font:400 11px/1.5 var(--font);color:var(--on-variant)}
+.pi-upload-status{font:500 11.3px/1.4 var(--font);color:var(--on-variant)}
+.pi-upload-status.busy{color:var(--on-variant)}
+.pi-upload-status.err{color:var(--rv-red)}
+.pi-upload-status.ok{color:var(--on)}
+
+/* ── 상시 경고 · 권한 안내 ──────────────────────────────────────── */
+.pi-noticebar{border:1.5px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-radius:9px;
+    padding:11px 14px;font:400 12px/1.7 var(--font);color:var(--rv-ink)}
+.pi-noticebar b{font-weight:700}
+.pi-permnote{font:400 11.3px/1.6 var(--font);color:var(--on-variant);background:var(--container-low);
+    border:1px solid var(--outline-variant);border-radius:7px;padding:8px 13px}
+.pi-permnote b{color:var(--on);font-weight:700}
+
+.pi-loading{padding:48px 20px;text-align:center;color:var(--on-variant);font:400 13px/1.6 var(--font)}
+.pi-error{padding:16px 18px;color:var(--rv-ink);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line);
+    border-radius:9px;font:500 13px/1.7 var(--font)}
+
+/* ── 레이아웃 — 좌 330px 고정 + 우 나머지(계약 골격 그대로) ───────── */
+.pi-layout{display:grid;grid-template-columns:330px 1fr;gap:16px;align-items:start;min-height:0}
+.pi-layout[hidden]{display:none}
+
+/* ── 좌측 — 파일 카드 · 경고 둘 ─────────────────────────────────── */
+.pi-left{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pi-filelist{display:flex;flex-direction:column;gap:8px}
+.pi-filecard{background:var(--card);border:1px solid var(--outline-variant);border-radius:9px;padding:11px 13px;
+    cursor:pointer;text-align:left}
+.pi-filecard:hover{background:var(--container-low)}
+.pi-filecard.on{border-color:var(--on);box-shadow:inset 0 0 0 1px var(--on)}
+.pi-filecard.nopreset{opacity:.72}
+.pi-fc-row1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pi-fc-name{font:700 12.5px/1.3 var(--font);color:var(--on)}
+.pi-fc-file{margin-top:5px;font:500 11.3px/1.4 var(--font-num);color:var(--on-variant);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+.pi-fc-meta{margin-top:4px;font:400 10.3px/1.5 var(--font);color:var(--rv-faint, var(--on-variant))}
+.pi-empty-suppliers{font:400 12px/1.6 var(--font);color:var(--on-variant);padding:8px 2px}
+
+.pi-warnbox{background:var(--card);border:1px solid var(--outline-variant);border-left:4px solid var(--rv-amber);
+    border-radius:8px;padding:12px 13px}
+.pi-warnbox.muted{border-left-color:var(--rv-dim3, var(--outline))}
+.pi-warn-t{font:700 12px/1.3 var(--font);color:var(--on);margin-bottom:6px}
+.pi-warn-d{font:400 11.3px/1.65 var(--font);color:var(--on-variant)}
+.pi-warn-d b{color:var(--on);font-weight:700}
+
+/* ── 배지 공통 ──────────────────────────────────────────────────── */
+.pi-badge{display:inline-block;font:600 9.8px/1 var(--font);padding:3px 7px;border-radius:8px;white-space:nowrap}
+.pi-badge-ok{background:var(--container-low);color:var(--primary);border:1px solid var(--outline)}
+.pi-badge-warn{background:var(--rv-amber-bg);color:oklch(0.42 0.1 62);border:1px solid var(--rv-amber-line)}
+.pi-badge-off{background:var(--container-low);color:var(--on-variant);border:1px solid var(--outline-variant)}
+.pi-badge-sim{background:var(--container-low);color:var(--rv-link);border:1px solid var(--outline-variant)}
+.pi-badge-wait{background:var(--rv-amber-bg);color:oklch(0.42 0.1 62);border:1px solid var(--rv-amber-line)}
+.pi-badge-part{background:var(--container-low);color:var(--rv-link);border:1px solid var(--outline-variant)}
+.pi-badge-done{background:oklch(0.94 0.05 165 / .55);color:oklch(0.38 0.11 165);border:1px solid oklch(0.55 0.11 165 / .4)}
+.pi-badge-live{background:var(--rv-amber-bg);color:oklch(0.42 0.1 62);border:1px solid var(--rv-amber-line)}
+
+/* ── 우측 ──────────────────────────────────────────────────────── */
+.pi-right{display:flex;flex-direction:column;gap:14px;min-width:0}
+.pi-nopreset-box{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;padding:22px 20px}
+.pi-nopreset-t{font:700 14px/1.4 var(--font-head);color:var(--on);margin-bottom:8px}
+.pi-nopreset-d{font:400 12.5px/1.7 var(--font);color:var(--on-variant)}
+
+.pi-filehead{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;padding:14px 16px}
+.pi-fh-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pi-fh-supplier{font:700 15px/1.3 var(--font-head);color:var(--on)}
+.pi-fh-file{font:500 12px/1.3 var(--font-num);color:var(--on-variant)}
+.pi-fh-meta{margin-top:7px;font:400 11.3px/1.6 var(--font);color:var(--on-variant)}
+.pi-fh-preset{margin-top:5px;font:400 11px/1.6 var(--font);color:var(--on-variant)}
+.pi-fh-preset.muted{color:var(--rv-faint, var(--on-variant));font-size:10.6px}
+
+/* ── ② 분류 카드 4장 ───────────────────────────────────────────── */
+.pi-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.pi-card{background:var(--card);border:1px solid var(--outline-variant);border-left:4px solid var(--outline);
+    border-radius:9px;padding:12px 14px}
+.pi-card.ok{border-left-color:var(--primary)}
+.pi-card.danger{border-left-color:var(--rv-red)}
+.pi-card.muted{opacity:.85}
+.pi-card-n{font:700 21px/1.2 var(--font-num);color:var(--on)}
+.pi-card-l{margin-top:4px;font:500 11px/1.4 var(--font);color:var(--on-variant)}
+
+/* ── ③ diff 표(7열) · 신규 모델 목록 · 상태 전환 목록 ─────────────── */
+.pi-section{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;padding:14px 16px}
+.pi-section-hd{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.pi-section-hd h3{margin:0;font:700 13px/1.3 var(--font);color:var(--on)}
+.pi-section-sub{font:400 10.8px/1.55 var(--font);color:var(--on-variant)}
+.pi-section-sub b{color:var(--on);font-weight:700}
+
+.pi-table-wrap{overflow-x:auto;border:1px solid var(--outline-variant);border-radius:8px}
+.pi-difftable{width:100%;min-width:760px;border-collapse:collapse}
+.pi-difftable th{text-align:left;font:600 10.3px/1.3 var(--font);color:var(--on-variant);
+    background:var(--container-low);padding:8px 9px;border-bottom:1px solid var(--outline-variant);white-space:nowrap}
+.pi-difftable td{font:400 11.6px/1.45 var(--font);color:var(--on);padding:9px 9px;
+    border-bottom:1px solid var(--outline-variant);vertical-align:top}
+.pi-difftable tr:last-child td{border-bottom:none}
+.pi-difftable td.num,.pi-difftable th.num{text-align:right;font-family:var(--font-num)}
+.pi-row.unmatched{background:var(--container-low)}
+.pi-cat{margin-top:2px;font:400 10.2px/1.3 var(--font);color:var(--on-variant)}
+/* ── 「변동」 열(원안 62px) — 색·부호를 「새 매입가」 td가 아니라 이 span에만 건다.
+   `.pi-difftable td{color:var(--on)}`(위)와 같은 요소를 두고 다툴 일이 없어(부모
+   td가 아니라 자식 span에 규칙이 걸림) 특이성 충돌이 구조적으로 생기지 않는다
+   — 예전엔 `<td class="num pi-price-up">`처럼 한 요소에 두 규칙이 걸려 (0,1,1)이
+   (0,1,0)을 이겼다(확인자 실측 2026-08-15). ── */
+.pi-delta-cell{white-space:nowrap}
+.pi-delta{display:inline-block;font:700 11.3px/1.3 var(--font-num)}
+.pi-price-down{color:var(--success-dark, oklch(0.5 0.11 165))}
+.pi-price-up{color:var(--rv-red)}
+.pi-price-flat{font:500 10.6px/1.3 var(--font);color:var(--on-variant)}
+.pi-delta-new{font:600 10.6px/1.3 var(--font);color:var(--on-variant)}
+.pi-matchstatus{max-width:130px}
+.pi-matchstatus .pi-sub{margin-top:4px}
+.pi-sub{max-width:220px;font:400 10.6px/1.5 var(--font);color:var(--on-variant);word-break:keep-all}
+
+.pi-nwlist,.pi-statlist{display:flex;flex-direction:column;gap:0}
+.pi-nwrow{display:grid;grid-template-columns:minmax(160px,2fr) minmax(90px,1fr) minmax(150px,1.6fr) minmax(140px,1.4fr);
+    gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--outline-variant)}
+.pi-nwrow:last-child{border-bottom:none}
+.pi-nw-main{display:flex;flex-direction:column;min-width:0}
+.pi-nw-name{font:500 11.6px/1.35 var(--font);color:var(--on);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pi-nw-cat{font:400 10.2px/1.3 var(--font);color:var(--on-variant)}
+.pi-nw-cost{font:500 11.3px/1.3 var(--font-num);color:var(--on)}
+.pi-nw-note{font:400 10.3px/1.5 var(--font);color:var(--rv-faint, var(--on-variant))}
+
+.pi-statrow{display:grid;grid-template-columns:minmax(160px,2fr) minmax(120px,1.1fr) minmax(160px,1.6fr);
+    gap:10px;align-items:baseline;padding:8px 4px;border-bottom:1px solid var(--outline-variant);
+    font:400 11.6px/1.4 var(--font)}
+.pi-statrow:last-child{border-bottom:none}
+.pi-stat-name{color:var(--on);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pi-stat-trans{color:var(--on-variant)}
+.pi-stat-trans b{color:var(--on)}
+.pi-stat-note{color:var(--on-variant);font-size:10.6px}
+
+.pi-empty-mini{padding:12px 4px;font:400 11.6px/1.6 var(--font);color:var(--on-variant)}
+
+/* ── 버튼 · 진행 표시 ──────────────────────────────────────────── */
+.pi-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:11px}
+.pi-btn{font:600 11.5px/1 var(--font);color:var(--on);background:var(--card);border:1px solid var(--outline);
+    border-radius:6px;padding:9px 14px;cursor:pointer}
+.pi-btn:hover{background:var(--container-low)}
+.pi-btn:disabled{color:var(--on-variant);cursor:not-allowed;opacity:.55}
+.pi-btn-primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.pi-btn-primary:disabled{background:var(--outline);color:var(--card);border-color:var(--outline)}
+.pi-btn-danger{background:var(--rv-red);color:#fff;border:none}
+.pi-btn-danger:disabled{background:var(--outline);color:var(--card)}
+.pi-btn-ghost{background:none;border:1px solid var(--outline);color:var(--on-variant)}
+.pi-busy{display:inline-flex;align-items:center;gap:7px;font:500 11.3px/1 var(--font);color:var(--on-variant)}
+.pi-busy::before{content:"";width:12px;height:12px;border:2px solid var(--outline-variant);
+    border-top-color:var(--on);border-radius:50%;display:inline-block;animation:piSpin .7s linear infinite}
+@keyframes piSpin{to{transform:rotate(360deg)}}
+
+/* ── ④ 하단 2단 ─────────────────────────────────────────────────── */
+.pi-bottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.pi-matchorder{list-style:none;margin:0;padding:0;counter-reset:pi-mo}
+.pi-matchorder li{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding:8px 2px;border-bottom:1px solid var(--outline-variant);font:400 11.6px/1.5 var(--font)}
+.pi-matchorder li:last-child{border-bottom:none}
+.pi-matchorder li::before{counter-increment:pi-mo;content:counter(pi-mo) "  ";flex:none;font-weight:700;color:var(--on-variant)}
+.pi-matchorder li .t{flex:1;color:var(--on)}
+.pi-matchorder li .v{flex:none;font-family:var(--font-num);color:var(--on-variant);text-align:right}
+.pi-matchorder li.danger .v{color:var(--rv-red);font-weight:700}
+
+.pi-undonote{font:400 11.2px/1.65 var(--font);color:var(--on-variant);margin-bottom:10px;padding-bottom:10px;
+    border-bottom:1px solid var(--outline-variant)}
+.pi-undonote b{color:var(--on);font-weight:700}
+.pi-result-head{font:700 12px/1.4 var(--font);color:var(--on);margin-bottom:8px}
+.pi-result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.pi-result-cell{background:var(--container-low);border:1px solid var(--outline-variant);border-radius:7px;
+    padding:9px 8px;text-align:center}
+.pi-result-cell .n{display:block;font:700 17px/1.2 var(--font-num);color:var(--on)}
+.pi-result-cell.ok .n{color:var(--primary)}
+.pi-result-cell.warn .n{color:oklch(0.42 0.1 62)}
+.pi-result-cell .l{display:block;margin-top:4px;font:500 9.8px/1.3 var(--font);color:var(--on-variant)}
+.pi-result-note{font:400 10.6px/1.6 var(--font);color:var(--on-variant);margin-bottom:8px}
+.pi-result-err{font:400 11.2px/1.6 var(--font);color:var(--rv-red);margin-top:6px}
+.pi-result-ok{font:500 11px/1.6 var(--font);color:var(--on);background:var(--container-low);border-radius:6px;
+    padding:8px 10px;margin-top:6px}
+.pi-recent-hd{margin-top:14px;padding-top:12px;border-top:1px solid var(--outline-variant);
+    font:700 11.5px/1.3 var(--font);color:var(--on);margin-bottom:8px}
+.pi-recent-table{width:100%;min-width:420px;border-collapse:collapse}
+.pi-recent-table th{text-align:left;font:600 10px/1.3 var(--font);color:var(--on-variant);
+    background:var(--container-low);padding:6px 8px;border-bottom:1px solid var(--outline-variant)}
+.pi-recent-table td{font:400 11px/1.4 var(--font);color:var(--on);padding:7px 8px;
+    border-bottom:1px solid var(--outline-variant);vertical-align:top}
+.pi-recent-table tr:last-child td{border-bottom:none}
+.pi-recent-table td.num{font-family:var(--font-num);text-align:right}
+.pi-muted{color:var(--on-variant);font-size:10.2px;margin-top:2px}
+
+@media (max-width:768px){
+  .pi-page{padding:12px 12px 32px}
+  .pi-layout{grid-template-columns:1fr}
+  .pi-bottom{grid-template-columns:1fr}
+  .pi-cards{grid-template-columns:repeat(2,1fr)}
+  .pi-result-grid{grid-template-columns:1fr}
+  .pi-nwrow,.pi-statrow{grid-template-columns:1fr;row-gap:3px}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pi-page" data-screen-id="ADM-PRC-040" data-domain="price-import">
+
+  <div class="pi-topbar">
+    <div class="pi-topbar-l">
+      <button type="button" class="pi-btn pi-btn-primary" id="piUploadBtn" data-action="open-upload">파일 올리기</button>
+      <input type="file" id="piFileInput" accept=".xlsx" hidden>
+      <span class="pi-upload-status" id="piUploadStatus"></span>
+    </div>
+    <div class="pi-topbar-r">매일 아침 3분 루틴 — 올리고 · 보고 · 골라서 반영합니다</div>
+  </div>
+
+  <div class="pi-noticebar">
+    ⚠⚠ <b>「선택 반영」을 누르는 그 클릭이 승인입니다.</b> 파일을 올려도 아무것도 바뀌지 않습니다 — 자동 집행이
+    아닙니다. 결과는 <b>반영 시도 · 실제로 가격이 바뀐 것 · 판매가가 잠겨 건너뛴 것</b> 셋으로 나눠 보여줍니다.
+    고른 행에 매칭 안 된 것이나 이미 반영된 것이 하나라도 섞이면 <b>전체를 400으로 거부</b>합니다(부분 성공 없음).
+    가격지도(단가 단속) 시트는 적용하지 않습니다 — 단품을 외부에 노출하지 않기 때문입니다.
+  </div>
+
+  <div class="pi-permnote">
+    조회는 로그인한 운영자 누구나 볼 수 있습니다 · <b>업로드 · 선택 반영 · 되돌리기</b>는
+    <b>운영자(operator) 이상</b>만 할 수 있습니다.
+  </div>
+
+  <div class="pi-loading" id="piLoading">불러오는 중…</div>
+  <div class="pi-error" id="piError" hidden></div>
+
+  <div class="pi-layout" id="piLayout" hidden>
+    <aside class="pi-left" data-keep="1">
+      <div class="pi-filelist" id="piFileList"></div>
+
+      {% if preset_total > preset_with %}
+      <div class="pi-warnbox">
+        <div class="pi-warn-t">프리셋 없는 공급처</div>
+        <div class="pi-warn-d">
+          공급처 <b>{{ preset_total }}곳</b> 중 <b>{{ preset_with }}곳</b>만 프리셋이 있습니다.
+          나머지({{ preset_without_names | join(' · ') }})는 파일을 <b>올릴 수조차 없습니다</b> —
+          프리셋(파일명 인식 규칙 · 열 매핑)을 만드는 화면·API가 코드 어디에도 없어 지금은 DB에 직접
+          넣어야 합니다. 공급처 화면에서 등록해도 이 화면으로 <b>바로 이어지지 않습니다.</b>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="pi-warnbox muted">
+        <div class="pi-warn-t">이 목록이 감추는 것</div>
+        <div class="pi-warn-d">
+          공급처마다 <b>최신 파일 1건</b>만 옵니다. 같은 파일명을 다시 올리면 예전 미반영 파일이 조용히
+          조회에서 사라집니다(삭제는 아님) — 이대로 둘지 미반영 이력을 다 보여줄지는 <b>결정 대기</b>입니다.
+        </div>
+      </div>
+    </aside>
+
+    <section class="pi-right" id="piRight"></section>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  'use strict';
+
+  var SUPPLIERS = {{ suppliers_json | safe }};
+  var MATCH_STATS = {{ match_stats_json | safe }};
+  var RECENT = {{ recent_json | safe }};
+
+  var API_LIST = '/api/admin/price-import';
+  var API_UPLOAD = '/api/admin/price-import/upload';
+  function API_APPLY(fileId) { return '/api/admin/price-import/' + fileId + '/apply'; }
+  function API_UNDO(logId) { return '/api/admin/price-import/undo/' + logId; }
+
+  var S = {
+    loading: true, error: null,
+    files: [], feeRate: null, marginRate: null,
+    selectedSupplierId: null,
+    checked: {},
+    uploadBusy: false, uploadErr: null, uploadOk: null,
+    applyBusy: false, applyErr: null, applyResult: null,
+    undoArmed: false, undoBusy: false, undoErr: null, undoOk: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n === null || n === undefined) ? '못 쟀음' : Number(n).toLocaleString('ko-KR'); }
+  function fmtWon(n) { return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('ko-KR') + '원'; }
+  function fmtAt(isoStr) {
+    if (!isoStr) return '—';
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' '
+      + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  function errText(body, status) {
+    if (window.popcornProgress && window.popcornProgress.errText) {
+      return window.popcornProgress.errText(body, status, '');
+    }
+    var d = body && body.detail;
+    return (typeof d === 'string' && d) ? d : ('오류 ' + status);
+  }
+  function statusClass(status) {
+    if (status === '반영 완료') return 'done';
+    if (status === '부분 반영') return 'part';
+    return 'wait';
+  }
+  function canWrite() { return window.Admin2Shell && window.Admin2Shell.canWrite('operator'); }
+
+  function supplierById(id) {
+    for (var i = 0; i < SUPPLIERS.length; i++) if (SUPPLIERS[i].supplier_id === id) return SUPPLIERS[i];
+    return null;
+  }
+  function fileFor(supplierId) {
+    for (var i = 0; i < S.files.length; i++) if (S.files[i].supplier_id === supplierId) return S.files[i];
+    return null;
+  }
+  function selectedCount() {
+    var n = 0;
+    for (var k in S.checked) if (S.checked[k]) n++;
+    return n;
+  }
+  function pickDefaultSupplier() {
+    var needsWork = S.files.filter(function (f) { return f.status !== '반영 완료'; });
+    if (needsWork.length) { S.selectedSupplierId = needsWork[0].supplier_id; return; }
+    if (S.files.length) { S.selectedSupplierId = S.files[0].supplier_id; return; }
+    S.selectedSupplierId = (SUPPLIERS[0] && SUPPLIERS[0].supplier_id) || null;
+  }
+
+  // ── 조회 ────────────────────────────────────────────────────────
+  function load() {
+    S.loading = true; S.error = null; renderAll();
+    fetch(API_LIST, { credentials: 'same-origin' }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    }).then(function (r) {
+      S.loading = false;
+      if (!r.ok) {
+        S.error = r.status === 401 ? '세션이 만료됐습니다 — 다시 로그인해 주세요.' : errText(r.body, r.status);
+        renderAll();
+        return;
+      }
+      S.files = (r.body && r.body.files) || [];
+      S.feeRate = r.body ? r.body.fee_rate : null;
+      S.marginRate = r.body ? r.body.margin_rate : null;
+      if (S.selectedSupplierId == null) pickDefaultSupplier();
+      S.checked = {};
+      renderAll();
+    }, function (err) {
+      S.loading = false;
+      S.error = '연결 실패 — ' + (err && err.message ? err.message : '네트워크');
+      renderAll();
+    });
+  }
+
+  // apply·undo 직후 diff·파일 상태만 «조용히» 다시 받는다 — S.loading을 건드리지 않아
+  // piLayout이 숨겨지지 않는다(= 「결과 · 되돌리기」 패널이 화면에서 사라지지 않는다).
+  // 2026-08-15 결함 수정(확인자 실측): 예전엔 doApply()·doUndo() 성공 뒤 무조건
+  // setTimeout(location.reload, 1500)로 전체 페이지를 새로 불러왔다 — 그러면 S 전체가
+  // 초기화되어 S.applyResult가 지워지고, 그게 되돌리기 버튼의 «유일한 진입점»이라 사람이
+  // 결과를 읽기도 전에(반영 버튼만 누르고 2초 기다리면) 되돌리기 버튼 자체가 사라졌다.
+  // 대가: 「지난 반영 이력」(RECENT, SSR 전용 — 모듈 docstring §SSR 참조)은 이 조용한
+  // 새로고침으로는 안 바뀐다. 실제 페이지 새로고침이 있어야 이번 건이 그 표에 보인다 —
+  // 그 한계보다 되돌리기 접근성을 잃는 쪽이 더 나쁘다고 판단했다(계약 §④).
+  function refreshFiles(cb) {
+    fetch(API_LIST, { credentials: 'same-origin' }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    }).then(function (r) {
+      if (r.ok) {
+        S.files = (r.body && r.body.files) || [];
+        S.feeRate = r.body ? r.body.fee_rate : S.feeRate;
+        S.marginRate = r.body ? r.body.margin_rate : S.marginRate;
+      }
+      if (cb) cb();
+    }, function () { if (cb) cb(); });
+  }
+
+  // ── 좌측 — 파일 카드 ────────────────────────────────────────────
+  function fileCardHtml(sup) {
+    var f = fileFor(sup.supplier_id);
+    var on = sup.supplier_id === S.selectedSupplierId;
+    var cls = 'pi-filecard' + (on ? ' on' : '') + (!sup.has_preset ? ' nopreset' : '');
+    var badge = !sup.has_preset
+      ? '<span class="pi-badge pi-badge-off">프리셋 없음</span>'
+      : (f ? '<span class="pi-badge pi-badge-' + statusClass(f.status) + '">' + esc(f.status) + '</span>'
+           : '<span class="pi-badge pi-badge-off">파일 없음</span>');
+    var meta = f
+      ? fmtAt(f.received_at) + ' · ' + fmt(f.row_count) + '행'
+      : (sup.has_preset ? '아직 올라온 파일이 없습니다' : '');
+    return '<div class="' + cls + '" data-action="select-supplier" data-sup="' + sup.supplier_id
+      + '" role="button" tabindex="0">'
+      + '<div class="pi-fc-row1"><span class="pi-fc-name">' + esc(sup.name) + '</span>' + badge + '</div>'
+      + '<div class="pi-fc-file">' + (f ? esc(f.label) : '—') + '</div>'
+      + '<div class="pi-fc-meta">' + esc(meta) + '</div>'
+      + '</div>';
+  }
+  function renderFileList() {
+    var box = $('piFileList');
+    if (!SUPPLIERS.length) { box.innerHTML = '<div class="pi-empty-suppliers">등록된 공급처가 없습니다.</div>'; return; }
+    box.innerHTML = SUPPLIERS.map(fileCardHtml).join('');
+  }
+
+  // ── 우측 — ③ diff 표(7열) ──────────────────────────────────────
+  function noteFor(c) {
+    var parts = [];
+    if (c.alt) parts.push(c.alt);
+    if (c.sub) parts.push(c.sub);
+    if (!parts.length && c.memo) parts.push(c.memo);
+    return parts.length ? parts.join(' · ') : '—';
+  }
+  // 「변동」 열 — 원안 §③(62px, 별도 열). 색·부호를 셀에 직접이 아니라 이 span에만
+  // 건다(위 CSS 주석 참조). `c.y`가 없으면(=`k='code'` 신규 모델 — 비교할 이전
+  // 매입가가 없다) 비교 자체가 성립하지 않으므로 "신규"로 밝힌다 — 매칭이 없다는
+  // 뜻이 아니다(그런 행은 애초에 이 표에 들어오지 않는다, 체크박스도 비활성화되지
+  // 않는다). 색이 죽어도 부호(±)·낱말로 읽힌다(U-01 "텍스트 병기").
+  function deltaHtml(c, dir) {
+    if (dir === 'new') {
+      return '<span class="pi-delta pi-delta-new" title="이 공급처의 첫 매입가입니다 — 비교할 이전 값이 없습니다">신규</span>';
+    }
+    if (dir === 'flat') {
+      return '<span class="pi-delta pi-price-flat" title="매입가는 그대로이고 다른 값만 바뀌었습니다">상태만</span>';
+    }
+    var delta = c.t - c.y;
+    var sign = delta > 0 ? '+' : '-';
+    var text = sign + Math.abs(delta).toLocaleString('ko-KR');
+    var cls = dir === 'down' ? 'pi-price-down' : 'pi-price-up';
+    var word = dir === 'down' ? '내림' : '오름';
+    return '<span class="pi-delta ' + cls + '" title="매입가 ' + word + ' ' + text + '원">' + esc(text) + '</span>';
+  }
+  function chgRowHtml(c) {
+    var matched = c.product_code != null;
+    var checked = !!S.checked[c.row_id];
+    var dir = c.y == null ? 'new' : (c.t < c.y ? 'down' : (c.t > c.y ? 'up' : 'flat'));
+    return '<tr class="pi-row' + (matched ? '' : ' unmatched') + '">'
+      + '<td><input type="checkbox" data-action="toggle-row" data-row="' + c.row_id + '"'
+      + (matched ? '' : ' disabled title="매칭 안 됨 — 신규 등록이 필요합니다. 여기서 반영할 수 없습니다"')
+      + (checked ? ' checked' : '') + '></td>'
+      + '<td>' + esc(c.name) + '<div class="pi-cat">' + esc(c.cat) + '</div></td>'
+      + '<td>' + (matched ? esc(c.sku || String(c.product_code))
+                          : '<span class="pi-badge pi-badge-off">미매칭</span>') + '</td>'
+      + '<td class="num">' + fmtWon(c.y) + '</td>'
+      + '<td class="num">' + fmtWon(c.t) + '</td>'
+      + '<td class="num pi-delta-cell">' + deltaHtml(c, dir) + '</td>'
+      + '<td class="pi-matchstatus">' + (matched ? '<span class="pi-badge pi-badge-ok">매칭됨</span>'
+                          : '<span class="pi-badge pi-badge-warn">신규 등록 필요</span>')
+      + '<div class="pi-sub">' + esc(noteFor(c)) + '</div></td>'
+      + '</tr>';
+  }
+
+  // ── 우측 — 신규 모델(nw) · 발주 상태 전환(stat) 목록 ─────────────
+  function nwKindBadge(n) {
+    // k==='code'는 2026-08-15부터 서버가 nw에 넣지 않는다(chg로 보낸다 — 위 diff
+    // 표에서 반영). 이 분기는 방어용으로 남긴다 — 없애면 서버 계약이 하나 더
+    // 생기는 셈이라, 남겨 두면 서버가 실수로 code를 다시 nw에 흘려도 화면이
+    // 조용히 죽지 않는다.
+    if (n.match.k === 'code') return '<span class="pi-badge pi-badge-ok">이미 연결된 상품 — ' + esc(n.match.sku || '') + '</span>';
+    if (n.match.k === 'sim') return '<span class="pi-badge pi-badge-sim">' + esc(n.match.text) + '</span>';
+    return '<span class="pi-badge pi-badge-warn">매칭 없음</span>';
+  }
+  function nwRowHtml(n) {
+    return '<div class="pi-nwrow">'
+      + '<div class="pi-nw-main"><span class="pi-nw-name" title="' + esc(n.name) + '">' + esc(n.name) + '</span>'
+      + '<span class="pi-nw-cat">' + esc(n.cat) + '</span></div>'
+      + '<div class="pi-nw-cost">' + fmtWon(n.cost) + '</div>'
+      + '<div>' + nwKindBadge(n) + '</div>'
+      + '<div class="pi-nw-note">여기서 반영할 수 없습니다 — 확정은 상품 사양 검수 소관</div>'
+      + '</div>';
+  }
+  function unmatchedChgRowHtml(c) {
+    return '<div class="pi-nwrow">'
+      + '<div class="pi-nw-main"><span class="pi-nw-name" title="' + esc(c.name) + '">' + esc(c.name) + '</span>'
+      + '<span class="pi-nw-cat">' + esc(c.cat) + '</span></div>'
+      + '<div class="pi-nw-cost">' + fmtWon(c.y) + ' → ' + fmtWon(c.t) + '</div>'
+      + '<div><span class="pi-badge pi-badge-warn">매칭 없음(재등장 모델)</span></div>'
+      + '<div class="pi-nw-note">여기서 반영할 수 없습니다 — 확정은 상품 사양 검수 소관</div>'
+      + '</div>';
+  }
+  function statRowHtml(s) {
+    return '<div class="pi-statrow">'
+      + '<span class="pi-stat-name" title="' + esc(s.name) + '">' + esc(s.name) + '</span>'
+      + '<span class="pi-stat-trans">' + esc(s.from) + ' → <b>' + esc(s.to) + '</b></span>'
+      + '<span class="pi-stat-note">' + esc(s.raw || '비고 없음') + '</span>'
+      + '</div>';
+  }
+
+  // ── ② 4장 · ④ 좌 매칭 순서 ────────────────────────────────────
+  function cardsHtml(f) {
+    var matchedCount = f.chg.filter(function (c) { return c.product_code != null; }).length;
+    var unmatchedChgCount = f.chg.length - matchedCount;
+    var newModelCount = unmatchedChgCount + f.nw.length;
+    var cards = [
+      { l: '가격 변동 · 매칭됨', n: matchedCount, cls: 'ok' },
+      { l: '가격 변동 · 매칭 안 됨', n: newModelCount, cls: 'danger' },
+      { l: '발주 상태 전환', n: f.stat.length, cls: '' },
+      { l: '무변동', n: f.same, cls: 'muted' }
+    ];
+    return cards.map(function (c) {
+      return '<div class="pi-card ' + c.cls + '"><div class="pi-card-n">' + fmt(c.n) + '</div>'
+        + '<div class="pi-card-l">' + esc(c.l) + '</div></div>';
+    }).join('');
+  }
+  function matchOrderHtml() {
+    var simCount = 0, noneCount = 0;
+    S.files.forEach(function (ff) {
+      (ff.nw || []).forEach(function (n) {
+        if (n.match.k === 'sim') simCount++; else if (n.match.k === 'none') noneCount++;
+      });
+    });
+    var lines = [
+      { t: '① 기억된 모델명 ↔ 상품코드 매핑', v: fmt(MATCH_STATS.remembered_map) + '건 기억됨', danger: false },
+      { t: '② danawa_code 일치 — 자동', v: '상품 ' + fmt(MATCH_STATS.danawa_products) + '건에 다나와코드 보유', danger: false },
+      { t: '③ 이름 유사도 — 후보 제시만', v: '지금 화면 후보 ' + fmt(simCount) + '건', danger: false },
+      { t: '④ 매칭 없음 — 신규 등록 필요', v: fmt(noneCount) + '건', danger: true }
+    ];
+    return '<ol class="pi-matchorder" style="counter-reset:none">' + lines.map(function (l) {
+      return '<li' + (l.danger ? ' class="danger"' : '') + ' style="list-style:none">'
+        + '<span class="t">' + esc(l.t) + '</span><span class="v">' + esc(l.v) + '</span></li>';
+    }).join('') + '</ol>';
+  }
+
+  // ── 우측 하단 — 결과 · 되돌리기 · 지난 이력 ───────────────────────
+  function resultHtml() {
+    var html = '';
+    if (S.applyResult) {
+      var r = S.applyResult;
+      html += '<div class="pi-result-head">' + esc(r.supplier || '') + ' — 이번 세션에서 방금 반영한 결과</div>';
+      html += '<div class="pi-result-grid">'
+        + '<div class="pi-result-cell"><span class="n">' + fmt(r.applied) + '</span><span class="l">반영 시도</span></div>'
+        + '<div class="pi-result-cell ok"><span class="n">' + fmt(r.price_changed) + '</span><span class="l">실제로 가격이 바뀜</span></div>'
+        + '<div class="pi-result-cell warn"><span class="n">' + fmt(r.sale_locked_skipped) + '</span><span class="l">판매가 잠겨 건너뜀</span></div>'
+        + '</div>';
+      html += '<div class="pi-result-note">「반영했다」와 「실제로 바뀌었다」는 다른 말입니다 — 이미 같은 값이던 행,'
+        + ' 타 공급처가 더 싼 행은 시도해도 실제로는 안 움직입니다.</div>';
+      if (S.undoOk) {
+        html += '<div class="pi-result-ok">' + esc(S.undoOk) + '</div>';
+      } else if (r.undo_id) {
+        if (S.undoBusy) {
+          html += '<div class="pi-busy" role="status" aria-live="polite">되돌리는 중…</div>';
+        } else if (S.undoArmed) {
+          html += '<div class="pi-actions">'
+            + '<button type="button" class="pi-btn pi-btn-danger" data-action="undo-confirm">정말 되돌립니까? 확인</button>'
+            + '<button type="button" class="pi-btn pi-btn-ghost" data-action="undo-cancel">취소</button></div>';
+        } else {
+          var can = canWrite();
+          html += '<div class="pi-actions"><button type="button" class="pi-btn" data-action="undo-arm"'
+            + (can ? '' : ' disabled title="운영자 이상만 되돌릴 수 있습니다"') + '>되돌리기</button></div>';
+        }
+        if (S.undoErr) html += '<div class="pi-result-err">' + esc(S.undoErr) + '</div>';
+      }
+    } else {
+      html += '<div class="pi-empty-mini">이번 세션에서 아직 반영한 것이 없습니다.</div>';
+      if (S.applyErr) html += '<div class="pi-result-err">반영 실패 — ' + esc(S.applyErr) + '</div>';
+    }
+    return html;
+  }
+  function recentRowHtml(r) {
+    return '<tr>'
+      + '<td>' + fmtAt(r.at) + '<div class="pi-muted">' + esc(r.operator || '—') + '</div></td>'
+      + '<td>' + esc(r.supplier || '—') + '<div class="pi-muted">' + esc(r.file_name || '') + '</div></td>'
+      + '<td class="num">' + fmt(r.attempted) + '건</td>'
+      + '<td>' + (r.undone
+        ? '<span class="pi-badge pi-badge-done">되돌려짐</span>'
+        : '<span class="pi-badge pi-badge-live">적용 중</span>') + '</td>'
+      + '</tr>';
+  }
+  function recentHtml() {
+    if (!RECENT.length) return '<div class="pi-empty-mini">지난 반영 이력이 없습니다.</div>';
+    return '<div class="pi-table-wrap"><table class="pi-recent-table"><thead><tr>'
+      + '<th>일시 · 운영자</th><th>파일</th><th class="num">시도</th><th>상태</th></tr></thead><tbody>'
+      + RECENT.map(recentRowHtml).join('') + '</tbody></table></div>';
+  }
+
+  // ── 우측 전체 조립 ────────────────────────────────────────────
+  function renderRight() {
+    var box = $('piRight');
+    var sup = supplierById(S.selectedSupplierId);
+    if (!sup) {
+      box.innerHTML = '<div class="pi-nopreset-box"><div class="pi-nopreset-t">공급처를 선택하십시오</div>'
+        + '<div class="pi-nopreset-d">왼쪽 목록에서 공급처를 고르면 그 공급처의 최신 단가표를 보여줍니다.</div></div>';
+      return;
+    }
+    if (!sup.has_preset) {
+      box.innerHTML = '<div class="pi-nopreset-box"><div class="pi-nopreset-t">「' + esc(sup.name) + '」은 프리셋이 없습니다</div>'
+        + '<div class="pi-nopreset-d">파일을 올릴 수조차 없습니다 — 프리셋(파일명 인식 규칙 · 열 매핑)을 DB에'
+        + ' 직접 등록해야 합니다. 공급처 관리 화면에서 등록해도 이 화면으로 바로 이어지지 않습니다.</div></div>';
+      return;
+    }
+    var f = fileFor(sup.supplier_id);
+    if (!f) {
+      box.innerHTML = '<div class="pi-nopreset-box"><div class="pi-nopreset-t">「' + esc(sup.name) + '」에 올라온 단가표가 없습니다</div>'
+        + '<div class="pi-nopreset-d">위 「파일 올리기」로 .xlsx 파일을 올리십시오 — 파일명으로 공급처를 자동 인식합니다.</div></div>';
+      return;
+    }
+
+    var html = '';
+
+    // ① 파일 머리줄
+    html += '<div class="pi-filehead">'
+      + '<div class="pi-fh-main"><span class="pi-fh-supplier">' + esc(f.supplier) + '</span>'
+      + '<span class="pi-fh-file">' + esc(f.label) + '</span>'
+      + '<span class="pi-badge pi-badge-' + statusClass(f.status) + '">' + esc(f.status) + '</span></div>'
+      + '<div class="pi-fh-meta">' + fmtAt(f.received_at) + ' 수신 · 총 ' + fmt(f.row_count) + '행 · 무변동 '
+      + fmt(f.same) + '건 자동 통과</div>'
+      + (f.preset ? '<div class="pi-fh-preset">' + esc(f.preset.summary || '') + '</div>'
+                    + '<div class="pi-fh-preset muted">' + esc(f.preset.map_text || '') + ' · '
+                    + esc(f.preset.note || '') + '</div>' : '')
+      + '</div>';
+
+    // ② 4장
+    html += '<div class="pi-cards">' + cardsHtml(f) + '</div>';
+
+    // ③ diff 표
+    var matchedCount = f.chg.filter(function (c) { return c.product_code != null; }).length;
+    var allChecked = matchedCount > 0 && selectedCountFor(f) === matchedCount;
+    html += '<section class="pi-section">'
+      + '<div class="pi-section-hd"><h3>가격 변동 · 매칭됨 — 반영 대상</h3>'
+      + '<span class="pi-section-sub">체크 후 아래 「선택 반영」 — <b>매칭 안 된 행은 선택할 수 없습니다</b>(신규 등록 필요)</span></div>';
+    if (!f.chg.length) {
+      html += '<div class="pi-empty-mini">가격이 바뀐 행이 없습니다.</div>';
+    } else {
+      // 원안 실측 트랙 7개(24px 1fr 190px 100px 100px 62px 118px) — colgroup은 그
+      // 비율의 힌트일 뿐(치수 대조 대상 아닌 화면, 상단 docstring 참조), table-layout
+      // 고정은 하지 않는다(긴 상품명·비고 텍스트가 잘리는 회귀를 피한다).
+      html += '<div class="pi-table-wrap"><table class="pi-difftable">'
+        + '<colgroup><col style="width:24px"><col><col style="width:190px">'
+        + '<col style="width:100px"><col style="width:100px"><col style="width:62px">'
+        + '<col style="width:118px"></colgroup>'
+        + '<thead><tr>'
+        + '<th><input type="checkbox" data-action="toggle-all"' + (matchedCount ? '' : ' disabled')
+        + (allChecked ? ' checked' : '') + '></th>'
+        + '<th>단가표 모델명</th><th>매칭된 상품</th><th class="num">이전 매입가</th>'
+        + '<th class="num">새 매입가</th><th class="num">변동</th><th>매칭 · 상태</th></tr></thead><tbody>'
+        + f.chg.map(chgRowHtml).join('') + '</tbody></table></div>';
+    }
+    var n = selectedCount();
+    var reason = !canWrite() ? '운영자 이상만 반영할 수 있습니다'
+      : (f.status === '반영 완료' ? '이미 반영 완료된 파일입니다 — 다시 반영할 대상이 없습니다'
+        : (n === 0 ? '반영할 행을 선택하십시오' : ''));
+    html += '<div class="pi-actions">'
+      + '<button type="button" class="pi-btn pi-btn-primary" data-action="do-apply"'
+      + (reason || S.applyBusy ? ' disabled' : '') + (reason ? ' title="' + esc(reason) + '"' : '') + '>'
+      + '선택 ' + n + '건 반영 = 승인</button>';
+    if (S.applyBusy) html += '<span class="pi-busy" role="status" aria-live="polite">반영하는 중…</span>';
+    html += '</div>';
+    if (S.applyErr) html += '<div class="pi-result-err">' + esc(S.applyErr) + '</div>';
+    html += '</section>';
+
+    // 신규 모델 — nw + chg 미매칭
+    var unmatchedChg = f.chg.filter(function (c) { return c.product_code == null; });
+    html += '<section class="pi-section">'
+      + '<div class="pi-section-hd"><h3>가격 변동 · 매칭 안 됨 — 신규 모델</h3>'
+      + '<span class="pi-section-sub"><b>다나와코드로 이미 연결된 모델은 위 표에서 선택해 반영합니다.</b>'
+      + ' 여기 남은 것은 이름 유사도 후보 또는 매칭 없음뿐입니다 — <b>확정은 상품 사양 검수 소관</b>,'
+      + ' 여기서 반영할 수 없습니다</span></div>';
+    if (!unmatchedChg.length && !f.nw.length) {
+      html += '<div class="pi-empty-mini">신규 모델이 없습니다.</div>';
+    } else {
+      html += '<div class="pi-nwlist">' + unmatchedChg.map(unmatchedChgRowHtml).join('')
+        + f.nw.map(nwRowHtml).join('') + '</div>';
+    }
+    html += '</section>';
+
+    // 발주 상태 전환
+    html += '<section class="pi-section">'
+      + '<div class="pi-section-hd"><h3>발주 상태 전환</h3>'
+      + '<span class="pi-section-sub">품절 ↔ 가능 ↔ 문의 — 정보 표시만, 이 화면에서 반영하지 않습니다</span></div>';
+    html += f.stat.length ? '<div class="pi-statlist">' + f.stat.map(statRowHtml).join('') + '</div>'
+                           : '<div class="pi-empty-mini">발주 상태가 바뀐 행이 없습니다.</div>';
+    html += '</section>';
+
+    // ④ 하단 2단
+    html += '<div class="pi-bottom">'
+      + '<section class="pi-section"><div class="pi-section-hd"><h3>매칭은 이 순서로 정해집니다</h3></div>'
+      + matchOrderHtml() + '</section>'
+      + '<section class="pi-section"><div class="pi-section-hd"><h3>결과 · 되돌리기</h3></div>'
+      + '<div class="pi-undonote">반영 이후 그 상품 가격이 다른 경로에서 바뀌면(매입 견적 확정 · 손으로 고침 등)'
+      + ' 되돌리기는 <b>409</b>로 막고 어느 상품인지 목록으로 보여줍니다 — 조용히 넘어가지 않습니다.</div>'
+      + resultHtml()
+      + '<div class="pi-recent-hd">지난 반영 이력(참고용, 최근 ' + fmt(RECENT.length) + '건)</div>'
+      + recentHtml()
+      + '</section></div>';
+
+    box.innerHTML = html;
+  }
+  function selectedCountFor(f) {
+    var n = 0;
+    f.chg.forEach(function (c) { if (c.product_code != null && S.checked[c.row_id]) n++; });
+    return n;
+  }
+
+  // ── 업로드 상태 표시(정적 마크업 갱신) ────────────────────────────
+  function renderUploadStatus() {
+    var btn = $('piUploadBtn'), el = $('piUploadStatus');
+    var can = canWrite();
+    btn.disabled = S.uploadBusy || !can;
+    btn.title = can ? '' : '운영자 이상만 업로드할 수 있습니다';
+    if (S.uploadBusy) { el.className = 'pi-upload-status busy'; el.textContent = '업로드하는 중…'; return; }
+    if (S.uploadErr) { el.className = 'pi-upload-status err'; el.textContent = '업로드 실패 — ' + S.uploadErr; return; }
+    if (S.uploadOk) { el.className = 'pi-upload-status ok'; el.textContent = S.uploadOk; return; }
+    el.className = 'pi-upload-status'; el.textContent = '';
+  }
+
+  function renderAll() {
+    $('piLoading').hidden = !S.loading;
+    $('piError').hidden = !S.error;
+    if (S.error) $('piError').textContent = S.error;
+    $('piLayout').hidden = S.loading || !!S.error;
+    renderUploadStatus();
+    if (S.loading || S.error) return;
+    renderFileList();
+    renderRight();
+  }
+
+  // ── 동작 ────────────────────────────────────────────────────────
+  function doApply(f) {
+    var ids = [];
+    for (var k in S.checked) if (S.checked[k]) ids.push(Number(k));
+    if (!ids.length || S.applyBusy) return;
+    S.applyBusy = true; S.applyErr = null; renderRight();
+    fetch(API_APPLY(f.file_id), {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row_ids: ids })
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    }).then(function (r) {
+      S.applyBusy = false;
+      if (!r.ok) { S.applyErr = errText(r.body, r.status); renderRight(); return; }
+      S.applyResult = r.body || {};
+      S.applyResult.supplier = f.supplier;
+      S.checked = {};
+      S.undoArmed = false; S.undoErr = null; S.undoOk = null;
+      renderRight();
+      // 파일 상태 · diff만 조용히 다시 받는다 — 전체 페이지 리로드는 하지 않는다
+      // (위 refreshFiles 주석 참조). 「결과 · 되돌리기」 패널은 그대로 남아 사람이
+      // 읽고 되돌릴 시간을 갖는다.
+      refreshFiles(renderAll);
+    }, function (err) {
+      S.applyBusy = false;
+      S.applyErr = '연결 실패 — ' + (err && err.message ? err.message : '네트워크');
+      renderRight();
+    });
+  }
+  function doUndo(undoId) {
+    if (S.undoBusy) return;
+    S.undoArmed = false; S.undoBusy = true; S.undoErr = null; renderRight();
+    fetch(API_UNDO(undoId), { method: 'POST', credentials: 'same-origin' }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    }).then(function (r) {
+      S.undoBusy = false;
+      if (!r.ok) { S.undoErr = errText(r.body, r.status); renderRight(); return; }
+      S.undoOk = (r.body && r.body.restored != null) ? ('되돌렸습니다 — ' + r.body.restored + '건 복원됐습니다.')
+                                                       : '되돌렸습니다.';
+      renderRight();
+      refreshFiles(renderAll);   // 파일 상태 · diff만 조용히 갱신 — 전체 리로드 금지(위 refreshFiles 주석)
+    }, function (err) {
+      S.undoBusy = false;
+      S.undoErr = '연결 실패 — ' + (err && err.message ? err.message : '네트워크');
+      renderRight();
+    });
+  }
+  function onFileChosen(file) {
+    if (!file) return;
+    S.uploadBusy = true; S.uploadErr = null; S.uploadOk = null; renderUploadStatus();
+    var fd = new FormData();
+    fd.append('file', file);
+    fetch(API_UPLOAD, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    }).then(function (r) {
+      S.uploadBusy = false;
+      if (!r.ok) { S.uploadErr = errText(r.body, r.status); renderUploadStatus(); return; }
+      var b = r.body || {};
+      S.uploadOk = esc(b.supplier || '') + ' · ' + esc(b.file_name || '') + ' · ' + fmt(b.row_count) + '행 업로드됐습니다';
+      if (b.supplier_id != null) S.selectedSupplierId = b.supplier_id;
+      load();
+    }, function (err) {
+      S.uploadBusy = false;
+      S.uploadErr = '연결 실패 — ' + (err && err.message ? err.message : '네트워크');
+      renderUploadStatus();
+    });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest('[data-action]');
+    if (!t) return;
+    var act = t.getAttribute('data-action');
+    if (act === 'select-supplier') {
+      S.selectedSupplierId = Number(t.getAttribute('data-sup'));
+      S.checked = {}; S.applyResult = null; S.applyErr = null;
+      S.undoArmed = false; S.undoErr = null; S.undoOk = null;
+      renderFileList(); renderRight();
+    } else if (act === 'open-upload') {
+      if (!t.disabled) $('piFileInput').click();
+    } else if (act === 'do-apply') {
+      if (!t.disabled) { var f = fileFor(S.selectedSupplierId); if (f) doApply(f); }
+    } else if (act === 'undo-arm') {
+      if (!t.disabled) { S.undoArmed = true; renderRight(); }
+    } else if (act === 'undo-cancel') {
+      S.undoArmed = false; renderRight();
+    } else if (act === 'undo-confirm') {
+      if (S.applyResult && S.applyResult.undo_id) doUndo(S.applyResult.undo_id);
+    }
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var card = ev.target.closest('.pi-filecard');
+    if (card) { ev.preventDefault(); card.click(); }
+  });
+  document.addEventListener('change', function (ev) {
+    if (ev.target && ev.target.id === 'piFileInput') {
+      var file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      onFileChosen(file);
+      return;
+    }
+    if (ev.target && ev.target.matches('[data-action="toggle-row"]')) {
+      var rid = Number(ev.target.getAttribute('data-row'));
+      if (ev.target.checked) S.checked[rid] = true; else delete S.checked[rid];
+      renderRight();
+      return;
+    }
+    if (ev.target && ev.target.matches('[data-action="toggle-all"]')) {
+      var f = fileFor(S.selectedSupplierId);
+      var on = ev.target.checked;
+      if (f) {
+        f.chg.forEach(function (c) {
+          if (c.product_code != null) { if (on) S.checked[c.row_id] = true; else delete S.checked[c.row_id]; }
+        });
+      }
+      renderRight();
+    }
+  });
+
+  function boot() {
+    renderAll();
+    load();
+    window.Admin2Shell && window.Admin2Shell.meReady.then(function () { renderAll(); });
+  }
+  boot();
+})();
+</script>
+{% endblock %}

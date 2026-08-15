@@ -97,7 +97,11 @@ def _file_diff(conn, file_row, ctx):
         cat = PART_TYPE_LABELS.get(prod["part_type"], prod["part_type"]) if prod else "—"
         p = prev.get(r["model_name"])
         if p is None:
-            # 신규 — 매칭 상태 표시만(map 등록·psp 추가는 검수 확정 소관)
+            # 신규 — 매칭 상태를 먼저 정한다. (2026-08-15: k='code'는 아래에서 chg로
+            # 보낸다 — 계약 §⑤가 막는 건 "매칭 «안 된»" 신규 모델뿐인데, 예전 코드는
+            # 매칭 종류(k)를 안 보고 여기서 전부 continue해 다나와코드로 이미 연결된
+            # 상품까지 막고 있었다(계약자·제작자 실측 — 하네스 오기, 사장님 확정으로
+            # 간극을 닫는다).
             if pc:
                 k, txt = "code", f"기억된 매핑/다나와코드 일치 — {prod['sku']} 자동 연결"
             else:
@@ -111,9 +115,30 @@ def _file_diff(conn, file_row, ctx):
                     k, txt = "sim", f"이름 유사도 {round(sim[1]*100)}% — 후보 {sim[0]}"
                 else:
                     k, txt = "none", "다나와코드·유사 이름 없음 — 신규 등록 필요"
-            nw.append({"row_id": r["row_id"], "name": r["model_name"], "cat": cat,
-                       "cost": r["cost_price"], "match": {"k": k, "text": txt,
-                       "sku": prod["sku"] if prod else None}})
+            if k != "code":
+                # 매칭 «안 된» 신규 모델(이름 유사도 후보 · 매칭 없음)만 여기서 막는다
+                # — 계약 §⑤ 그대로. 정보 표시만(기존 동작 그대로).
+                nw.append({"row_id": r["row_id"], "name": r["model_name"], "cat": cat,
+                           "cost": r["cost_price"], "match": {"k": k, "text": txt,
+                           "sku": prod["sku"] if prod else None}})
+                continue
+            # k == "code" — 기억된 매핑·다나와코드로 «이미 연결된» 상품이다. 이 파일에서
+            # 처음 보는 모델명(=이전 파일에 없던 행)이어도 상품 자체는 이미 안다. chg와
+            # 같은 경로로 보낸다 — apply_rows()의 `INSERT … ON CONFLICT DO UPDATE`와
+            # undo()의 `psp_before is None` 분기가 "이 (상품,공급처) 조합이 처음"인
+            # 경우를 이미 정상 처리한다(계약자 실측 — 이 변경으로 새로 깨지는 불변식이
+            # 없다). 비교할 «이전 파일 행»이 없으므로 old=`y`는 지금 psp 값을 쓴다
+            # (없으면 None — 화면은 이걸 "신규"로 표시한다, 매칭이 없다는 뜻이 아니다).
+            cur_psp = ctx["psp"].get(pc, {}).get(sid)
+            if cur_psp and cur_psp[0] == r["cost_price"] and cur_psp[1] == r["supply_state"]:
+                same += 1
+                continue  # DB가 이미 이 값과 같다 — 반영할 것이 없다(멱등)
+            chg.append({"row_id": r["row_id"], "product_code": pc, "sku": prod["sku"],
+                        "name": r["model_name"], "cat": cat,
+                        "y": cur_psp[0] if cur_psp else None, "t": r["cost_price"],
+                        "memo": r["memo"], "sub": None,
+                        "alt": None if cur_psp else "이 공급처의 첫 매입가입니다 — 비교할 이전 값이 없습니다"})
+            pending[r["row_id"]] = r
             continue
         if p["supply_state"] != r["supply_state"]:
             stat.append({"row_id": r["row_id"], "name": r["model_name"],
@@ -150,19 +175,33 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
 
     restore(undo 전용) = 반영 시점의 {purchase, sale} 스냅샷. 재판정 결과 purchase가 반영 전
     값으로 완전히 복귀했다면 sale도 기록된 원본으로 복원한다(공식 재도출이 아니라 — 시드처럼
-    공식과 무관한 판매가를 보존). 교차 반영으로 purchase가 다른 값이면 공식 도출 유지."""
+    공식과 무관한 판매가를 보존). 교차 반영으로 purchase가 다른 값이면 공식 도출 유지.
+
+    2026-08-15 결함 수정(확인자 실측 123327·123326 — 원장 정합성): product_supplier_prices가
+    0행이면(그 반영이 이 상품의 처음이자 유일한 공급처 가격이었을 때, undo()가 psp_before=None
+    분기에서 그 행을 DELETE한 직후가 정확히 이 상태다) 예전엔 restore가 있어도 곧바로 return해
+    products.purchase_price·sale_price가 반영 당시 값에 «영구 고정»되고 product_price_history에
+    되돌림 행도 안 남았다 — API는 {"ok":true,"restored":1}을 주는데 실제로는 아무것도 안
+    되돌아가는 결함. 0행이어도 restore가 있으면 그 스냅샷 값을 그대로 써서 복원한다(공급처가
+    하나도 없으니 "재판정"이 아니라 "복원"이다). restore가 없는 기존 호출부(admin_price_review.
+    approve의 margin_policy · admin_sourcing.confirm_quote의 sourcing — 둘 다 restore 인자를
+    안 준다)는 그대로 조기 return한다 — 동작 불변(git grep "_reprice(" 전수 확인)."""
     prod = conn.execute(text(
         "SELECT purchase_price, sale_price, locked_fields FROM products"
         " WHERE product_code=:pc FOR UPDATE"), {"pc": pc}).mappings().one()
     rows = conn.execute(text(
         "SELECT cost_price, supply_state, supplier_id FROM product_supplier_prices"
         " WHERE product_code=:pc"), {"pc": pc}).all()
-    if not rows:
-        return {"purchase_changed": False, "sale_changed": False, "sale_locked": False}
-    avail = [(c, sid) for c, s, sid in rows if s == "가능"]
-    pool = avail if avail else [(c, sid) for c, _s, sid in rows]
-    new_purchase, src_supplier = min(pool)   # 최저가 + 그 값을 만든 공급처(이력에 남긴다 — 0004)
     out = {"purchase_changed": False, "sale_changed": False, "sale_locked": False}
+    src_supplier = None
+    if rows:
+        avail = [(c, sid) for c, s, sid in rows if s == "가능"]
+        pool = avail if avail else [(c, sid) for c, _s, sid in rows]
+        new_purchase, src_supplier = min(pool)   # 최저가 + 그 값을 만든 공급처(이력에 남긴다 — 0004)
+    elif restore is not None:
+        new_purchase = restore["purchase"]   # 공급처 가격 0행 — 재판정 불가, 스냅샷으로 복원
+    else:
+        return out   # 공급처 가격도 없고 복원할 스냅샷도 없다 — 기존 동작 그대로(no-op)
     if new_purchase != prod["purchase_price"]:
         conn.execute(text(
             "UPDATE products SET purchase_price=:v, updated_at=now() WHERE product_code=:pc"),
@@ -372,14 +411,27 @@ def undo(log_id: int):
             "SELECT supplier_id FROM supplier_price_files WHERE file_id=:f FOR UPDATE"),
             {"f": file_id}).mappings().one()
         fee, margin = _settings(conn)
-        # 가드 2: 반영 이후 다른 변경이 겹쳤으면 중단(최종 승자 원칙 — 주석)
+        # 가드 2: 반영 이후 다른 변경이 겹쳤으면 중단(최종 승자 원칙). 첫 건에서 멈추지
+        # 않고 전수 스캔한다 — ADM-PRC-040 계약 §④ "어느 상품인지 목록으로 보여주고,
+        # 조용히 넘기지 않습니다"(2026-08-15, admin_ui_price_import.py 신설과 짝인 변경).
+        conflicts = []
         for it in detail["items"]:
             cur = conn.execute(text(
                 "SELECT cost_price, supply_state FROM product_supplier_prices"
                 " WHERE product_code=:pc AND supplier_id=:s FOR UPDATE"),
                 {"pc": it["product_code"], "s": f["supplier_id"]}).first()
             if cur is None or cur[0] != it["applied"]["cost"] or cur[1] != it["applied"]["state"]:
-                raise HTTPException(409, "반영 이후 다른 변경이 감지되어 되돌릴 수 없습니다")
+                conflicts.append(it["product_code"])
+        if conflicts:
+            labels = conn.execute(text(
+                "SELECT product_code, COALESCE(product_name, sku, product_code::text) AS label"
+                " FROM products WHERE product_code = ANY(:codes)"),
+                {"codes": conflicts}).mappings().all()
+            label_by_code = {r["product_code"]: r["label"] for r in labels}
+            listed = ", ".join(f"{c}({label_by_code.get(c, c)})" for c in conflicts)
+            raise HTTPException(409,
+                "반영 이후 다른 변경이 감지되어 되돌릴 수 없습니다"
+                f" — 겹친 상품 {len(conflicts)}건: {listed}")
         for it in detail["items"]:
             if it["psp_before"] is None:
                 conn.execute(text(
