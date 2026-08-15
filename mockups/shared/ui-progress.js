@@ -7,7 +7,15 @@
  * 각 화면 코드를 고치지 않는다 — fetch를 감싸는 것으로 전 화면에 동시에 걸린다.
  * 기존 화면들이 이미 하단 토스트를 쓰므로 이 표시는 **상단**에 둔다(겹치지 않게).
  *
- * 표시하지 않는 것: GET(조회는 시끄러울 뿐이다) · 인증 폴링.
+ * 표시하지 않는 것: GET(조회는 시끄러울 뿐이다) · 인증 폴링 · **미리보기**(요청 본문
+ * `preview:true` — 2026-08-15 추가). 미리보기가 저장과 같은 URL을 쓰는 화면이 있어
+ * (용도별 최소 사양 등) URL만 보는 verb()로는 못 가른다 — 그 상태로는 미리보기가
+ * "저장하는 중…" → "완료되었습니다"로 떠 아무것도 안 바뀌었는데 저장된 것처럼 보인다.
+ * 반복되면 진짜 저장 때도 무시하게 되고(알람 피로), 거꾸로 미리보기만 하고 실제 저장을
+ * 빼먹을 수도 있다. 그래서 화면이 알려주는 게 아니라 **이 파일이 요청 본문을 스스로
+ * 읽는다**(아래 `isPreviewBody`) — 화면마다 "나는 미리보기다"를 기억하게 하면 다음에
+ * 생기는 화면이 반드시 빠뜨린다. 배너가 사라진 자리는 그 화면이 자기 영역 안에서
+ * 채운다(버튼 비활성 · 인라인 진행 표시 — 예: `templates/admin/usage_floors.html.j2`).
  */
 (function () {
   if (window.__pcProgress) return;
@@ -104,15 +112,34 @@
         return (f ? f + ": " : "") + (x.msg || "");
       }).join(" · ");
     }
+    /* `detail` 이 객체인 경우 — `raise HTTPException(status, {...})` 로 사람이 읽을
+     * 문장과 기계용 코드를 함께 보내는 곳이 32곳(전수 검사, 2026-08-15). 그 문장을
+     * 담는 **키 이름이 둘로 갈린다**: `detail`(20곳 — 주문·환불·스왑·인계 등) 또는
+     * `message`(10곳 — 공급처 중복 2 · 상품 삭제/유사상품 3 · 로그인 5). `error`
+     * 는 32곳 **전부**에 기계용 코드로 함께 있다(예: `duplicate_name`).
+     *
+     * 예전 우선순위 `detail → error → message` 는 `message` 모양 10곳에서 `detail`
+     * 이 없으니 바로 `error` 를 집어 **사람이 읽는 문장이 있는데도 코드를 보여줬다**
+     * — 공급처 등록에서 중복 이름을 넣으면 상단 배너가 "! duplicate_name" 이고
+     * 화면 패널은 정상 한글 문장이라, **같은 사건에 두 자리가 다른 말을 하고
+     * 있었다**(확인자 실측, 2026-08-15). `detail` 은 그대로 최우선으로 둔다 — 20곳이
+     * 이미 이 경로로 옳게 동작 중이므로 순서를 지킨다. 대신 `message` 를 `error`
+     * 보다 앞으로 옮긴다. `detail`·`message` 어느 것도 없는 두 곳(주문 품절 ·
+     * 추천 조건 부족)은 여전히 `error` 코드를 마지막 수단으로 보여준다 — 빈
+     * 문자열이 되는 것보다는 낫다. */
     if (d && typeof d === "object") {
-      var inner = String(d.detail || d.error || d.message || "").trim();
+      var inner = String(d.detail || d.message || d.error || "").trim();
       if (inner) return inner;
     }
-    /* **본문 맨 위도 본다.** `detail` 안만 뒤지면 `{"error": ...}` 로 오는 응답이
-     * 통째로 "오류 409" 가 된다 — 422 의 `detail` 배열을 못 읽어 "오류 422" 만
-     * 뜨던 것과 **같은 병**이다(2026-08-05 사용자 신고). 화면이 서버 응답의 모양을
-     * 하나로 가정하면 다른 모양이 올 때마다 조용해진다. */
-    var top = j && String(j.error || j.message || j.note || "").trim();
+    /* **본문 맨 위도 본다.** `detail` 자체가 없는 응답(FastAPI의 HTTPException을
+     * 거치지 않은 경우)이 통째로 "오류 409" 가 된다 — 422 의 `detail` 배열을 못
+     * 읽어 "오류 422" 만 뜨던 것과 **같은 병**이다(2026-08-05 사용자 신고). 화면이
+     * 서버 응답의 모양을 하나로 가정하면 다른 모양이 올 때마다 조용해진다.
+     * (전수 검사, 2026-08-15 — 지금 이 저장소에서 이 경로에 실제로 닿는 응답은
+     * 없다: `JSONResponse`로 `detail`을 직접 보내는 네 곳이 전부 문자열이라 위
+     * 첫 분기에서 이미 걸린다. 그래도 같은 병이 다시 생기지 않게 위와 같은
+     * 순서 — 사람이 읽는 키를 코드보다 앞에 — 를 미리 맞춰 둔다.) */
+    var top = j && String(j.message || j.note || j.error || "").trim();
     if (top) return top;
     /* 그래도 읽을 문장이 없으면 **무엇이 실패했는지라도** 말한다.
      * "오류 409" 만 뜨면 운영자도 개발자도 어느 요청인지 몰라 추측만 하게 된다
@@ -132,6 +159,32 @@
     catch (e) { return String(u || "").split("?")[0]; }
   }
 
+  /* 이 요청이 "미리보기"인지 — 요청 본문을 읽어 스스로 판단한다(화면이 알려주지 않는다).
+   *
+   * `preview`는 이 저장소가 이미 쓰는 이름이다(새로 정하지 않았다 — 실측): 용도별
+   * 최소 사양(`POST .../usage-floors/{id}`) · 상품 분류 변경(`.../part-type`) ·
+   * 상품 병합(`.../merge`) 셋 다 저장과 **같은 URL**에 바디 `{..., preview: true|false}`
+   * 로만 갈린다.
+   *
+   * 이 저장소의 쓰기 호출은 전부 `fetch(url, {body: JSON.stringify(...)})` 형태다
+   * (`new Request()` 사용처 0곳 — 전수 검색으로 확인). 그래서 `init.body`는 항상
+   * **문자열**이거나 아예 없다. FormData를 쓰는 옛 업로드 화면(csv-upload·price-import)
+   * 처럼 문자열이 아닌 본문은 아래에서 그냥 `false`로 떨어진다 — **못 읽으면 기존처럼
+   * 배너를 띄운다**(실패를 "미리보기였다" 쪽으로 삼키지 않는다. 안전한 기본값은
+   * "배너를 켠다" 쪽이다 — 배너가 잘못 하나 더 뜨는 것이, 저장인데 진행 표시가 아예
+   * 사라지는 것보다 낫다).
+   */
+  function isPreviewBody(init) {
+    var b = init && init.body;
+    if (typeof b !== "string") return false;
+    try {
+      var j = JSON.parse(b);
+      return !!(j && j.preview === true);
+    } catch (e) {
+      return false;
+    }
+  }
+
   var _fetch = window.fetch;
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : (input && input.url) || "";
@@ -140,7 +193,11 @@
     var write = method !== "GET" && method !== "HEAD";
     // 로그인·세션 확인은 사용자가 누른 '저장'이 아니다 — 조용히 지나간다
     var quiet = /\/auth\/(login|logout|me)\b/.test(url);
-    if (!write || quiet) return _fetch.apply(this, arguments);
+    // 미리보기(본문 preview:true)는 저장과 같은 URL을 쓸 수 있어 URL 패턴(verb())만으로는
+    // 못 가른다 — 배너를 띄우지 않고, 화면이 자기 자리에서 진행을 보여준다(㉯ 확정,
+    // 2026-08-15). 미리보기가 아닌 요청의 동작은 이 한 줄 추가 전과 동일하다.
+    var preview = write && isPreviewBody(init);
+    if (!write || quiet || preview) return _fetch.apply(this, arguments);
 
     active++;
     show(SPIN + "<span>" + verb(url, method) + " 중…</span>");
