@@ -157,8 +157,9 @@
   href만 채웠지만(total 불변), 이번은 항목 자체를 신설해 `total` 38 -> 39,
   `new` 29 -> 30이다.
 
-  확인법: `product_price_history` 를 `log_id=7720` 으로 대조하면 이번
-  검증의 apply·undo 왕복이 되짚인다.
+  확인법: `admin_operator_activity_logs` 에서 `log_id=7720`(action='판매가
+  재산정') 행을 찾아 그 `detail`과 `product_price_history`의 해당 시각
+  변경분을 대조하면 이번 검증의 apply·undo 왕복이 되짚인다.
 
   확인법: `.venv/Scripts/python -c "from api.admin_nav import counts; print(counts())"`
   — `new`(href 있음)가 이번에 연 수만큼 늘고 `todo`가 그만큼 줄었는지 본다.
