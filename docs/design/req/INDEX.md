@@ -8,7 +8,10 @@
 > **정의서** = 요구사항만 있음 · **없음** = 아직 ·
 > **재정의** = 지어졌으나 다시 정의하기로 함 · **셸만** = 새 사이드바에 옛 본문이 붙은 상태 ·
 > **구축 중 / 신설 대기** = 승인 디자인을 받아 짓는 중 / 아직 라우트 없음 ·
-> **재구축 중 / 재구축 대기** = 이미 지어진 화면을 승인 디자인대로 다시 짓는 중 / 대기
+> **재구축 중 / 재구축 대기** = 이미 지어진 화면을 승인 디자인대로 다시 짓는 중 / 대기 ·
+> **수정 완료 · 확인자 재검증 대기** = 라우트·결함 수정은 끝났으나 확인자의 브라우저
+> 실측이 아직이라 메뉴에는 연결하지 않은 상태(2026-08-15 추가 — 용도별 최소 사양이
+> 첫 사례. 실측 없이 메뉴를 열면 운영자가 눈으로 안 본 화면에 먼저 들어간다)
 >
 > ⚠ **범례에 없는 말을 표에 쓰지 않는다** — 2026-08-14 실측 시점에 표는 「구축 중 ·
 > 재구축 대기 · 재구축 중 · 신설 대기」를 쓰는데 범례에는 넷 다 없었다. 상태 어휘가
@@ -59,8 +62,8 @@
 | 2 | **상품 분류 관리** | [req-product-category.md](req-product-category.md) | `dc-product-category.html` | **지음** (`/admin2/categories` · ADM-CAT-010) |
 | 3 | **상품 관리** | [req-products.md](req-products.md) | `dc-products-3안.html` | **재구축 대기** (ADM-PRD-010 · UX-23 → 1a) |
 | 4 | **상품 분류 매핑** | [req-product-category-map.md](req-product-category-map.md) | `dc-product-category-map.html` | **지음** (`/admin2/category-mapping`) |
-| 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **구축 중** (ADM-CSV-010 · UX-21 → 1b · 라우트·템플릿 커밋됨(`82a55a1`) · 메뉴 미연결) |
-| 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **구축 중** (ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c · 라우트·템플릿 커밋됨(`82a55a1`), 검증 전 · 메뉴 미연결) |
+| 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **지음** (`/admin2/catalog-import` · ADM-CSV-010 · UX-21 → 1b · 라우트·템플릿 커밋 `82a55a1` · ⚠⚠ owner 업로드가 영구히 잠기던 결함 수정(셸 스크립트 중복 로드로 `window.Admin2Shell` 인스턴스가 둘 생겨 권한 갱신이 안 됐다, 커밋 `08541f7`) · 확인자 재검증 통과(`script[src]` 정확히 2개 · 잠금 문구 사라짐 · 파일 입력 3개 열림 · `canWrite('owner')===true`) · 메뉴 연결 `9fdae6d`) |
+| 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **지음** (`/admin2/deleted-products` · ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c · 라우트·템플릿 커밋 `82a55a1` · 로딩 표시 CSS 결함 수정(`hidden`인데 `display:flex`였다, 커밋 `107e819`) · 확인자 재검증 통과(화면 수치 ↔ API 응답 전수 대조 일치) · 메뉴 연결 `9fdae6d`) |
 
 ## 3. 상품사양관리
 
@@ -68,15 +71,15 @@
 |---|------|----------------|--------|------|
 | 7 | **조립 호환 지도** | [req-build-map.md](req-build-map.md) | `dc-build-map-v2.html` | **재구축 대기** (`/admin2/build-map` · UX-20 → v2 클릭 고정) |
 | 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 중** (`/admin2/spec-standard` · UX-24 → **1a**) |
-| 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **구축 중** (ADM-PRD-050 · UX-27 → 1a · 라우트·템플릿 커밋됨(`82a55a1`), 검증 전 · 메뉴 미연결) |
+| 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **지음** (`/admin2/spec-field-defs` · ADM-PRD-050 · UX-27 → 1a · 라우트·템플릿 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
 | 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) · [req-compat-required.md](req-compat-required.md)(「필수 사양 안내」 탭) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`. **+2026-08-15: 「필수 사양 안내」 탭 신설**(`spec-compat-required.md` 계약 — 결정 로그 ⑤ 설계 간극을 채움) · 확인자 2차 검증 결함 0 · 커밋 `89019e2`. 메뉴는 안 바뀜 — 기존 화면 안 탭 추가) |
-| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고 · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전 · 메뉴 미연결) |
+| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **수정 완료 · 확인자 재검증 대기** (`/admin2/usage-floors` · ADM-ENG-040 · UX-29 → 두 안 참고 · 헤더·본문이 서로 다른 가로 스크롤 컨테이너였던 결함을 `.uf-tablewrap` 단일 컨테이너 + `.uf-thead` sticky 로 수정(커밋 `917baea`) · 확인자 실측(1024px, thead·tbody scrollLeft 어긋남) 근거로 고쳤으나 브라우저로 직접 보는 재검증은 아직 · 메뉴 미연결 — 「검증 통과가 조건」이라 이번 물결(7차)에서 제외) |
 | 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **지음** (`/admin2/part-grade` · ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력 · 확인자 검증 통과 · 커밋 `112c5a7` · 메뉴 연결 `7949c98`) |
 | 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **지음** (`/admin2/policy-weights` · ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명 · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
-| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **구축 중** (ADM-ENG-030 · UX-32 → 1a · 조회 전용 · 템플릿은 확인자 검증 통과·커밋 `ec4b7ba`, 라우트 파일도 커밋됨(`82a55a1`, 2026-08-15 17:46) · 검증 기록 없음 · 메뉴 미연결) |
+| 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **지음** (`/admin2/candidate-pool` · ADM-ENG-030 · UX-32 → 1a · 조회 전용 · 템플릿 커밋 `ec4b7ba` · 라우트 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 | 16 | **견적 상담 기록** | [req-consult-sessions.md](req-consult-sessions.md) | `spec-consult-sessions.md`(계약) | **지음** (`/admin2/consult-sessions` · ADM-ORD-010 · UX-33 → 1a + 우측 서랍 · 재검증 «결함 0» · 커밋 `d792434` · 메뉴 연결 `68daf6e`) |
-| 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | `spec-swap-click-logs.md`(계약 · 커밋 `c75656e` 2026-08-14 23:47 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트·템플릿 커밋됨(`82a55a1`), 검증 전 · 메뉴 미연결) |
+| 17 | 부품 교체 · 클릭 기록 | [req-swap-click-logs.md](req-swap-click-logs.md) | `spec-swap-click-logs.md`(계약 · 커밋 `c75656e` 2026-08-14 23:47 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **지음** (`/admin2/swap-click-logs` · 라우트·템플릿 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 
 ## 4. 매입 · 소싱
 
@@ -102,7 +105,7 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | `spec-sale-price.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트 커밋 `096aec2`(결함 3건 수정 포함) · 템플릿 커밋 `82a55a1` · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전 · 메뉴 미연결) |
+| 21 | 판매가 관리 | [req-sale-price.md](req-sale-price.md) | `spec-sale-price.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **지음** (`/admin2/sale-price` · 라우트 커밋 `096aec2`(결함 3건 수정 포함) · 템플릿 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 | 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · 커밋 `28c49dd`(뒤늦게 반영, 내용 변경 없음 — 이 목차 최종 편집 뒤에 커밋돼 그 사이 "미커밋"으로 남아 있었다. 조사자 목록엔 없던 여덟 번째 사례, 기록자가 같은 검사 중 발견)) |
 | 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61`) |
 | 23 | 가격 이력 | [req-price-history.md](req-price-history.md) · [spec-price-history.md](../spec-price-history.md)(2026-08-15 「(신규)」 표기 정정) | — | **지음** — 구현 `/admin2/price-history`(커밋 `140a5ba`·`77dbbef`·`bdf7e7c`) · 검증 확인자 브라우저 실측 통과 3라운드(①7행 3종 판정·ref_id null 실값·401/400/404 경계·768px ②마이그레이션 0050 「비움」 표시 — DB↔DOM 5행 대조·new_price=0 실데이터로 0과 NULL 구분 확인 ③「부품 종류」 확인 중… 고정 결함 — 10ms 폴링 프레임 단위 캡처로 재발 0·정상 로딩 노출은 유지 확인) · 계약 정정 `8e35508` · 연결 `api/admin_nav.py` `91dd3a1` |
@@ -112,8 +115,8 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | `spec-mall-sync.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트 커밋 `0eaa890` · 템플릿 커밋 `82a55a1`, 검증 전 · 메뉴 미연결) |
-| 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | `spec-handoff-log.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **구축 중** (라우트·템플릿 커밋 `82a55a1`, 검증 통과 이력 있으나 그 뒤 수정분 재검증 전 · 메뉴 미연결) |
+| 24 | 쇼핑몰 동기화 | [req-mall-sync.md](req-mall-sync.md) | `spec-mall-sync.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **지음** (`/admin2/mall-sync` · 라우트 커밋 `0eaa890` · 템플릿 커밋 `82a55a1` · 콘텐츠가 스크롤 수단 없이 잘리던 결함 수정(배너~각주까지 한 덩어리로 스크롤, 커밋 `f3cec63`) · 확인자 재검증 통과 — ⚠ 부작용 하나 남음(표 헤더 sticky 무력화, 작업 #51 · 확인자 판정 「화면 기능은 정상, 배포를 막을 사유 아님」) · 메뉴 연결 `9fdae6d`) |
+| 25 | 인계 기록 | [req-handoff-log.md](req-handoff-log.md) | `spec-handoff-log.md`(계약 · 커밋 `6f75d49` 2026-08-15 01:30 — 이 목차의 최종 편집(`08cfe9e` 16:25)보다 먼저 커밋됐는데 반영이 안 됐었다) | **지음** (`/admin2/handoff-log` · 라우트·템플릿 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 | 26 | 유입 성과 | [req-funnel-performance.md](req-funnel-performance.md) | `spec-funnel.md`(계약 · 1a 안) | **지음** (경로 `/admin2/funnel-performance` — spec-funnel.md의 「가칭」 그대로 확정 표기를 따른다. **ADM-HND-030 후보 — 화면 ID는 여전히 미배정**(spec-funnel.md 자신이 명시. ID 미정이 메뉴 연결을 막지는 않는다). 커밋 `adb6d4d` · 확인자 재검증 통과(하네스 통보 2026-08-15) · 메뉴 연결 `6b3d637`) |
 
 ## 7. AI 관리
@@ -159,10 +162,10 @@
 | 7 | 조립 호환 조감도 (3안 비교본 — v2로 대체됨) | [dc-build-map-3안.html](../dc-build-map-3안.html) | 참고용 |
 | 1 | 대시보드 **(3안 비교본)** | [dc-dashboard-3안.html](../dc-dashboard-3안.html) | 재구축 중 · UX-22 → 1b |
 | 3 | 상품 관리 **(3안 비교본)** | [dc-products-3안.html](../dc-products-3안.html) | 재구축 대기 · UX-23 → 1a |
-| 5 | 상품 일괄 등록 | [dc-product-bulk-import.html](../dc-product-bulk-import.html) | 구축 중 · UX-21 → 1b |
-| 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 구축 중 · UX-26 → 1b + 빈 상태 1c |
+| 5 | 상품 일괄 등록 | [dc-product-bulk-import.html](../dc-product-bulk-import.html) | 지음 · UX-21 → 1b · 메뉴 연결 |
+| 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 지음 · UX-26 → 1b + 빈 상태 1c · 메뉴 연결 |
 | 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 중 · UX-24 → **1a** |
-| 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 구축 중 · UX-27 → 1a |
+| 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 지음 · UX-27 → 1a · 메뉴 연결 |
 | 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 지음 |
 | 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 대기 · UX-25 |
 
@@ -175,19 +178,19 @@
 
 | # | 화면 | 계약 요약 | 구축 |
 |---|------|----------|------|
-| 12 | 용도별 최소 사양 | [spec-usage-floors.md](../spec-usage-floors.md) | 구축 중 · UX-29 → 두 안 참고 |
+| 12 | 용도별 최소 사양 | [spec-usage-floors.md](../spec-usage-floors.md) | 수정 완료 · 확인자 재검증 대기 · UX-29 → 두 안 참고 · 메뉴 미연결 |
 | 13 | 부품 등급 관리 | [spec-part-grade.md](../spec-part-grade.md) | 구축 중 · UX-30 → 1a + 1b 우측 입력 |
 | 14 | 추천 기준 보기 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
-| 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 구축 중 · UX-32 → 1a · 조회 전용 |
+| 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 지음 · UX-32 → 1a · 조회 전용 · 메뉴 연결 |
 | 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 구축 중 · UX-33 → 1a + 우측 서랍 |
-| 17 | 부품 교체 · 클릭 기록 | [spec-swap-click-logs.md](../spec-swap-click-logs.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `c75656e`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 17 | 부품 교체 · 클릭 기록 | [spec-swap-click-logs.md](../spec-swap-click-logs.md) | 지음 · 메뉴 연결 (2026-08-15 신규 등재 — 커밋 `c75656e`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다. 그 뒤 확인자 재검증 통과 · 메뉴 연결) |
 | 18 | 공급처 | [spec-suppliers.md](../spec-suppliers.md) | 지음 · 1b 안 · 메뉴 연결 |
 | 19 | 매입 견적(용산) | [spec-sourcing.md](../spec-sourcing.md) | 지음 · 1a 안 · 메뉴 연결 |
 | 20 | 단가표 반영 | [spec-price-import.md](../spec-price-import.md) | 지음 · 1b 안 · 메뉴 연결 |
-| 21 | 판매가 관리 | [spec-sale-price.md](../spec-sale-price.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 21 | 판매가 관리 | [spec-sale-price.md](../spec-sale-price.md) | 지음 · 메뉴 연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다. 그 뒤 확인자 재검증 통과 · 메뉴 연결) |
 | 23B | 판매가 재산정 | [spec-reprice.md](../spec-reprice.md) | 지음 · 1a 안 · 검증 통과 · 메뉴 연결(`c6d662e`) |
-| 24 | 쇼핑몰 동기화 | [spec-mall-sync.md](../spec-mall-sync.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
-| 25 | 인계 기록 | [spec-handoff-log.md](../spec-handoff-log.md) | 구축 중 · 메뉴 미연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다) |
+| 24 | 쇼핑몰 동기화 | [spec-mall-sync.md](../spec-mall-sync.md) | 지음 · 메뉴 연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다. 그 뒤 스크롤 결함 수정(커밋 `f3cec63`) · 확인자 재검증 통과 · 메뉴 연결) |
+| 25 | 인계 기록 | [spec-handoff-log.md](../spec-handoff-log.md) | 지음 · 메뉴 연결 (2026-08-15 신규 등재 — 커밋 `6f75d49`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다. 그 뒤 확인자 재검증 통과 · 메뉴 연결) |
 | 26 | 유입 성과 | [spec-funnel.md](../spec-funnel.md) | 지음 · 1a 안 · 화면 ID 미배정 · 메뉴 연결 |
 | 28 | 웹 사양 채움 | [spec-spec-fill.md](../spec-spec-fill.md) | 지음 · 1a 안 · 검증 통과(2026-08-15) · 메뉴 연결(기존 href) |
 
