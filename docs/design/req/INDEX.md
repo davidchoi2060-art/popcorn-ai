@@ -56,7 +56,7 @@
 | 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 중** (`/admin2/spec-standard` · UX-24 → **1a**) |
 | 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **디자인** (ADM-PRD-050 · UX-27 → 1a) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
-| 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
+| 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) · [req-compat-required.md](req-compat-required.md)(「필수 사양 안내」 탭) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`. **+2026-08-15: 「필수 사양 안내」 탭 신설**(`spec-compat-required.md` 계약 — 결정 로그 ⑤ 설계 간극을 채움) · 확인자 2차 검증 결함 0 · 커밋 `89019e2`. 메뉴는 안 바뀜 — 기존 화면 안 탭 추가) |
 | 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **구축 중** (ADM-ENG-040 · UX-29 → 두 안 참고 · 검증 통과 이력 있으나 그 뒤 수정분 재검증 전) |
 | 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **지음** (`/admin2/part-grade` · ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력 · 확인자 검증 통과 · 커밋 `112c5a7` · 메뉴 연결 `7949c98`) |
 | 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **지음** (`/admin2/policy-weights` · ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명 · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
