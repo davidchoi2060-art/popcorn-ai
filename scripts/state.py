@@ -42,6 +42,21 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+# Windows 콘솔(cp949)에서도 한글·기호가 깨지지 않게 stdout·stderr 를 UTF-8로 고정한다.
+# 이 스크립트는 첫 print() 에서 UnicodeEncodeError 로 죽고 있었다(em-dash '—' 가 cp949 밖.
+# 2026-08-16). tests/regression.py(stdout만)·tools/_console.py(ensure_utf8_console, stdout+
+# stderr)와 같은 처방 — ASCII 로 바꾸지 않고 스트림 인코딩을 맞추는 쪽을 골랐다. 이유는
+# tools/_console.py 모듈 docstring에 이미 적혀 있다: CLAUDE.md §데이터의 "로그 문자열은
+# ASCII 기호만"(슬라이스 40)은 **상시 구동 API 서버**가 요청 처리 중 내는 로그 얘기고,
+# 이 스크립트는 운영자가 터미널에서 직접 실행해 눈으로 읽는 1회성 CLI 보고문이라 범위가
+# 다르다. ⚠ tools/_console.py 와 정의가 두 벌(중복)이지만 지금은 합치지 않는다 — 그러려면
+# tools/*.py(15개, 남의 담당)의 import 문까지 함께 고쳐야 한다. 제안은 보고 참조.
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "buffer"):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace",
+                                   line_buffering=True)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # `python scripts/state.py` 로 부르면 sys.path[0] 이 scripts/ 라 `api.db` 를 못 찾는다.
 # 그러면 전부 「못 쟀음」이 되는데, 그건 **DB 가 죽은 것과 구분되지 않는다** — 여기서 막는다.
@@ -181,19 +196,43 @@ def main() -> int:
     row("주문 원장", one("SELECT COUNT(*) FROM orders"))
 
     # ── 화면 ────────────────────────────────────────────────────────
+    # 2026-08-16 개정: '관리자 목업'(mockups/admin) 하나였던 걸 셋으로 가른다 — 그 디렉터리는
+    # 2026-08-13부터 백업용 동결이라(서버가 410 Gone 반환·같은 날 실측) '지금 상태'로 세면
+    # 이 도구의 목적(«문서에서 읽지 않고 잰다»)에 어긋난다. admin2가 주(主) 숫자다.
     head("화면")
     cust = glob.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html"))
-    adm = [p for p in glob.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
-           if "data-screen-id" in io.open(p, encoding="utf-8", errors="ignore").read()]
     row("고객 목업", "%d개" % len(cust))
-    row("관리자 목업", "%d개" % len(adm))
+
+    # admin2 — CANON.md "화면 하나 = 파일 하나". data-screen-id 는 공용 셸이 매 요청마다
+    # 주입한다(`_admin2_shell.html.j2` 의 `{{ screen_id }}`) — 그래서 템플릿 정적 텍스트로는
+    # 못 잰다(39개 중 13개만 리터럴로 그 문자열을 한 번 더 갖고 있었을 뿐, 2026-08-16 실측).
+    # 대신 셸 상속 여부로 센다: admin2 화면은 전부 이 셸을 상속해야 한다는 게 CANON이 못박은
+    # 규칙이라(어기면 사이드바·헤더가 없어 바로 눈에 띈다) admin_ui_*.py 파일명 관례보다 덜 깨진다.
+    admin2 = [p for p in glob.glob(os.path.join(ROOT, "templates", "admin", "*.j2"))
+              if os.path.basename(p) not in ("_admin2_shell.html.j2", "_layout.html.j2")
+              and "_admin2_shell.html.j2" in io.open(p, encoding="utf-8", errors="ignore").read()]
+    row("관리자 화면(admin2)", "%d개" % len(admin2))
+
+    # admin1(구) — 지우면 '원래 없었다'로 읽힌다. 상태어를 붙여 남긴다.
+    frozen = [p for p in glob.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+              if "data-screen-id" in io.open(p, encoding="utf-8", errors="ignore").read()]
+    row("관리자 화면(admin1·동결)", "%d개" % len(frozen))
+
     try:
         from api.admin_nav import counts
         c = counts()
         row("LNB", "%d그룹 %d항목 — 재구축 %d · 신설예정 %d"
             % (c["groups"], c["total"], c["new"], c["todo"]))
+        # 화면(템플릿)과 메뉴 항목 수는 다를 수 있다 — LNB 로 세면 이 차이 자체가 안 보인다.
+        # 메뉴에 안 붙은 화면이 생기면 여기서 바로 드러나야 한다(과거 9개 미연결 전례).
+        if len(admin2) == c["total"]:
+            row("화면=메뉴", "일치 (%d)" % len(admin2))
+        else:
+            row("화면=메뉴", "**다르다** — 화면 %d개 / LNB %d개(메뉴에 안 붙은 화면이 있을 수 있다)"
+                % (len(admin2), c["total"]))
     except Exception as e:                                   # noqa: BLE001
         row("LNB", "%s (%s)" % (MISS, type(e).__name__))
+        row("화면=메뉴", MISS + " (LNB 를 못 읽어 대조 못함)")
 
     # ── 문서가 낡았는지 ─────────────────────────────────────────────
     head("문서 신선도 — 낡았으면 믿지 마라")

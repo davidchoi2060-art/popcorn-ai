@@ -36,6 +36,21 @@ import sys
 import urllib.error
 import urllib.request
 
+# Windows 콘솔(cp949)에서도 한글·기호가 깨지지 않게 stdout·stderr 를 UTF-8로 고정한다.
+# 이 스크립트는 첫 print() 에서 UnicodeEncodeError 로 죽고 있었다(em-dash '—' 가 cp949 밖.
+# 2026-08-16). tests/regression.py(stdout만)·tools/_console.py(ensure_utf8_console, stdout+
+# stderr)와 같은 처방 — ASCII 로 바꾸지 않고 스트림 인코딩을 맞추는 쪽을 골랐다. 이유는
+# tools/_console.py 모듈 docstring에 이미 적혀 있다: CLAUDE.md §데이터의 "로그 문자열은
+# ASCII 기호만"(슬라이스 40)은 **상시 구동 API 서버**가 요청 처리 중 내는 로그 얘기고,
+# 이 스크립트는 운영자가 터미널에서 직접 실행해 눈으로 읽는 1회성 CLI 보고문이라 범위가
+# 다르다. ⚠ tools/_console.py 와 정의가 두 벌(중복)이지만 지금은 합치지 않는다 — 그러려면
+# tools/*.py(15개, 남의 담당)의 import 문까지 함께 고쳐야 한다. 제안은 보고 참조.
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "buffer"):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace",
+                                   line_buffering=True)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCAL = "http://127.0.0.1:8000"
 SERVER = "https://admin.popcornai.co.kr"

@@ -16,13 +16,12 @@
 이 정리가 필요 없는 상태를 회귀가 지킨다("대기 검수에 이미 채워진 필드가 없다").
 """
 import argparse
-import io
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+from tools._console import ensure_utf8_console       # noqa: E402
+ensure_utf8_console()
 
 from dotenv import load_dotenv                      # noqa: E402
 from sqlalchemy import create_engine, text          # noqa: E402

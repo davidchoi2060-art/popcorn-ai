@@ -21,7 +21,6 @@
 정본 반영·검수 상태 전이·후보 진입 판정이 화면 승인과 **완전히 같은 경로**여야 한다.
 """
 import argparse
-import io
 import json
 import os
 import re
@@ -29,8 +28,8 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+from tools._console import ensure_utf8_console       # noqa: E402
+ensure_utf8_console()
 
 from dotenv import load_dotenv                      # noqa: E402
 from sqlalchemy import create_engine, text          # noqa: E402

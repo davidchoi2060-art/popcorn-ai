@@ -14,15 +14,14 @@ DB 기본값이 `false`다. respec에게는 false가 '이미 있는 값'으로 �
 "조용하게"라고 말한 이유를 배신한다. `locked_fields`로 잠긴 것은 건드리지 않는다.
 """
 import argparse
-import io
 import json
 import os
 import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+from tools._console import ensure_utf8_console       # noqa: E402
+ensure_utf8_console()
 
 from dotenv import load_dotenv                      # noqa: E402
 from sqlalchemy import create_engine, text          # noqa: E402

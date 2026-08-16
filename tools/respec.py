@@ -16,15 +16,14 @@
     4중 게이트 ②를 다시 판정한다(ai_candidate 승격 · review_required 해제).
 """
 import argparse
-import io
 import json
 import os
 import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+from tools._console import ensure_utf8_console       # noqa: E402
+ensure_utf8_console()
 
 from dotenv import load_dotenv                       # noqa: E402
 from sqlalchemy import create_engine, text           # noqa: E402

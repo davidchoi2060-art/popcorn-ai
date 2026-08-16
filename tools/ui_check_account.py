@@ -23,6 +23,8 @@ import sys
 import sqlalchemy as sa
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tools._console import ensure_utf8_console  # noqa: E402
+ensure_utf8_console()
 
 from api.db import engine                      # noqa: E402
 from api.passwords import hash_password        # noqa: E402
