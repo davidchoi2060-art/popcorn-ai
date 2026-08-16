@@ -65,7 +65,16 @@
    :has() 같은 조건 선택자 없이 body 전역에 걸어도 다른 페이지를 건드리지 않는다. */
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webkit-font-smoothing:antialiased}
-.a2-shell a{color:inherit;text-decoration:none}
+/* :where() 로 감싸 이 선택자의 특정성을 0으로 만든다(2026-08-16) — 원래 `.a2-shell a`는
+   (0,1,1)이라 화면마다 있는 단일 클래스 링크 규칙(0,1,0)을 소스 순서와 무관하게 항상 이겼다
+   (`.sc-fixbtn`·`.hl-navbtn` 등 글자가 배경과 같은 색으로 보이던 사고의 원인). `:where(.a2-shell)`는
+   매치 대상은 그대로 두고 특정성만 0으로 낮춰 (0,0,1)이 되므로, 화면의 어떤 클래스 규칙에도
+   소스 순서 없이 진다 — 화면마다 `a.클래스명`으로 이겨야 하던 재발 구조가 사라진다. 62~65행
+   주석이 이미 "body 바로 아래 .a2-shell 하나뿐이라 스코프 없이 걸어도 안전하다"고 적어 둔
+   전제를 그대로 쓰는 것이라 새 가정을 더하지 않는다. 39화면 정적 census(역방향 파손 0건 —
+   제작 보고서 참조)로 측정 후 적용. 기존 `a.클래스명` 방어 규칙은 되돌리지 않았다(중복이지만
+   무해하고, 셸이 다시 바뀌는 날의 방어선이다). */
+:where(.a2-shell) a{color:inherit;text-decoration:none}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
 
 /* ── 셸 뼈대 ── */
