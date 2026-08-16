@@ -10,3 +10,13 @@ python-dotenv~=1.0
 Jinja2~=3.1
 openpyxl~=3.1
 python-multipart~=0.0.20
+# LLM (2026-08-16, api/llm.py): google-generativeai is deprecated (PyPI marks it
+# "legacy", last release 2025-12-16). google-genai is the current official SDK
+# (last release 2026-08-13). Pinned to <3 per the SDK's own README warning.
+google-genai~=2.18
+# LLM 3-provider expansion (2026-08-16, api/llm.py): anthropic and openai are each
+# vendor's current official Python SDK (checked via PyPI release dates: anthropic
+# 0.122.0 / 2026-08-13, openai 3.1.0 / 2026-08-14 - both actively maintained, no
+# deprecated-package trap like google-generativeai).
+anthropic~=0.122
+openai~=3.1
