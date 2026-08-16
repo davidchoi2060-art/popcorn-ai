@@ -37,9 +37,12 @@
          `PATCH /api/admin/std/spec-defs/{field_key}`가 신설됐다(label·unit·note
          세 필드만 받는다 — field_key·data_type은 모델에 그 자리 자체가 없다, 코드
          확인). "수정" 모달의 편집 카드를 정직 비활성에서 실제 저장으로 바꿨다.
-      ② **정본 승격(std.spec_defs → spec_field_defs) API가 없다.** 목차(#9 "상품 사양
-         정의")도 아직 화면이 없다(`href=None`). 승격 조건(값≥1·적용 부품≥1종·관계
-         지정됨)은 **실 데이터로 계산**해 "수정" 모달에 보여주지만, 조건을 충족해도
+      ② **정본 승격(std.spec_defs → spec_field_defs) API가 없다.** ~~목차(#9 "상품 사양
+         정의")도 아직 화면이 없다(`href=None`)~~ → **2026-08-16 정정**: 목차는 이미
+         `/admin2/spec-field-defs`로 연결돼 있다(`api/admin_nav.py` 확인 — 이관 대상
+         화면이 생긴 것과 승격 API 자체가 없는 것은 별개다, 아래 사실은 그대로다). 승격
+         조건(값≥1·적용 부품≥1종·관계 지정됨)은 **실 데이터로 계산**해 "수정" 모달에
+         보여주지만, 조건을 충족해도
          버튼은 계속 잠긴 채 "이관 기능 준비 중"이라고 말한다 — 조건 미달과
          "기능 자체가 없음"을 문구로 구분한다. **1a는 이 계산 결과를 표의 "승격 후보"
          배지로도 함께 보여준다**(사장님 확정 — 서랍 안 카드 대신 표 배지 + 모달 상세).
@@ -84,6 +87,27 @@
     `/shared/ui-progress.js`(쓰기 자동 진행바)·`/shared/admin2/admin2-shell.js`
     (`Admin2Shell.canWrite`·`Admin2Shell.toast`·`Admin2Shell.meReady`)는 셸이 싣는다 —
     이 화면은 벤더 스크립트를 하나도 추가로 싣지 않는다.
+
+  ■ 2026-08-16 결함 수정 — 팝업이 LNB 옆에 붙어 나오던 레이아웃 결함(사장님 신고,
+    확인자가 브라우저 실측으로 원인 특정)
+    원인: `#ssModalOverlay`(배경·중앙정렬)와 `#ssModal`(팝업 본체)이 형제 div였다 —
+    `.ss-modal-overlay`의 `display:flex;align-items:center;justify-content:center`는
+    자식을 가운데 놓는 규칙인데 자식이 없어 빈 배경만 가운데 놓였고, `#ssModal`은 그
+    사정권 밖에서 `.ss-root`(flex column)의 평범한 흐름 아이템이 되어 좌측 정렬됐다
+    (`.ss-modal`엔 `position` 선언도 없어 `z-index:8`은 이미 죽은 선언이었다). 부수
+    증상: `position:static`이라 모달이 열리는 동안 `.ss-root`의 세로 공간을 실제로
+    차지해 `#ssBody`(표 영역)가 짓눌렸다. 고침: `#ssModal`을 `#ssModalOverlay`의
+    자식으로 중첩했다 — 모바일 미디어쿼리(위 CSS `@media (max-width:768px)`의
+    `.ss-modal-overlay{padding:0}`/`.ss-modal{width:100%;height:100%}`)가 애초에 이
+    중첩을 전제로 짜여 있었다(그래서 절반만 동작하고 있었다). CSS는 고치지 않았다 —
+    필요한 것은 flex 부모의 자식이 되는 것뿐이었다(참조 패턴 `product_deleted.html.j2`
+    의 `.dp-modal`도 `position` 선언 없이 flex 부모의 자식으로만 중앙정렬한다).
+    ⚠ 중첩만 하면 새 결함이 생긴다: 클릭 위임이 `closest('[data-action]')`라, 모달
+    내부의 data-action 없는 영역을 클릭해도 부모 오버레이(`data-action="close-modal"`)
+    까지 올라와 팝업이 즉시 닫혀 버린다 — `close-modal` 케이스에 "클릭의 실제 타깃이
+    오버레이 자신일 때만 닫는다" 가드를 추가해 막았다(아래 이벤트 코드의 주석 참조,
+    배경 클릭=닫기·팝업 안 클릭=유지를 그대로 지킨다). ✕·취소 버튼은 자기 자신에
+    `data-action="close-modal"`이 있어 이 가드의 영향을 받지 않는다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -317,8 +341,9 @@ input,select,textarea{font-family:var(--rv-font)}
     항목 추가 ≠ 엔진 반영 · 조회 실패는 401(세션 만료)과 그 밖의 오류를 구분해 안내</div>
   </div>
 
-  <div class="ss-modal-overlay" id="ssModalOverlay" hidden data-action="close-modal"></div>
-  <div class="ss-modal" id="ssModal" hidden data-keep="1" role="dialog" aria-modal="true" aria-label="사양 항목"></div>
+  <div class="ss-modal-overlay" id="ssModalOverlay" hidden data-action="close-modal">
+    <div class="ss-modal" id="ssModal" hidden data-keep="1" role="dialog" aria-modal="true" aria-label="사양 항목"></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -831,7 +856,16 @@ input,select,textarea{font-family:var(--rv-font)}
       case 'pick-filter': S.filter = t.getAttribute('data-f'); renderPills(); renderTable(); break;
       case 'open-edit': openEdit(t.getAttribute('data-key')); break;
       case 'open-add': openAdd(); break;
-      case 'close-modal': closeModal(); break;
+      case 'close-modal':
+        // #ssModal이 #ssModalOverlay의 자식으로 중첩되면서(레이아웃 결함 수정,
+        // 2026-08-16 — 전엔 형제 div라 팝업이 LNB에 붙어 나왔다) 모달 내부의
+        // data-action 없는 영역을 클릭해도 closest('[data-action]')가 부모 오버레이의
+        // data-action="close-modal"까지 올라온다 — 오버레이 자신을 "직접" 클릭했을
+        // 때만 닫는다(배경 클릭=닫기, 팝업 안 클릭=유지). ✕·취소 버튼은 자기 자신에서
+        // 먼저 매치되므로(t.id가 비어 있어 첫 조건이 거짓) 이 가드의 영향을 받지 않는다.
+        if (t.id === 'ssModalOverlay' && e.target !== t) break;
+        closeModal();
+        break;
       case 'toggle-part': doTogglePart(t.getAttribute('data-key'), t.getAttribute('data-part')); break;
       case 'toggle-add-part': toggleAddPart(t.getAttribute('data-part')); break;
       case 'toggle-add-pair': toggleAddPair(t.getAttribute('data-pair')); break;
