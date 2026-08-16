@@ -29,6 +29,14 @@
        아직 없으면(DBA가 `alembic upgrade`를 돌리기 전) 500으로 죽지 않고 "원천
        준비 중" 배너로 안내한다.
     ⑥ 토스트는 화면 자체 구현 대신 admin2 공용 셸의 `Admin2Shell.toast()`를 쓴다.
+    ⑦ **우측 "위젯 미리보기"를 실제 질문·답변 패널로 바꿨다(2026-08-17, 오늘 목표 —
+       "운영자는 연동된 AI를 통해서 대화를 할 수 있는 정도까지").** 원안(제작 시점)은
+       이 자리가 정적 미리보기였다(자동 응답이 없었으므로) — `api/llm.py`가 그 사이에
+       완성되면서 실제로 답할 수 있게 됐다. `POST /api/admin/ops-assistant/ask`를
+       불러 실제 AI 응답을 받는다. **`mockups/shared/admin-helper.js`(위젯 본체)는
+       여전히 손대지 않았다** — 이 패널은 그 위젯이 아니라 이 설정 화면 안의 새
+       기능이다. 위 ③이 밝힌 "위젯 비연동" 사실은 그대로 유효하다(아래 안내문에서
+       계속 밝힌다) — 이번에 없어진 것은 "LLM 연동 보류"였지 "위젯 연동"이 아니다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -126,10 +134,38 @@ input,textarea{font-family:var(--rv-font)}
 .chat-body{flex:1;min-height:0;overflow:auto;padding:11px;display:flex;flex-direction:column;gap:7px}
 .bubble-bot{align-self:flex-start;max-width:88%;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
           border-radius:8px 8px 8px 3px;padding:8px 10px;font:400 11px/1.6 var(--rv-font)}
-.bubble-chip{align-self:flex-end;max-width:92%;background:var(--rv-nav);color:var(--rv-nav-ink);
-           border-radius:8px 8px 3px 8px;padding:7px 10px;font:400 10.5px/1.5 var(--rv-font)}
-.bubble-dash{align-self:flex-start;max-width:88%;background:var(--rv-card);border:1px dashed rgba(0,0,0,.18);
-           border-radius:8px;padding:8px 10px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint)}
+/* ── 실제 질문·답변(2026-08-17) ── `.bubble-bot`는 원안 그대로 재사용해 AI의 실제
+   답변에 쓴다. 그 위에 "빠른 질문" 행 하나, 아래에 입력행 하나를 덧붙였다(원안엔
+   없던 요소 — 위 docstring ⑦ 참고). 원안의 `.bubble-chip`/`.bubble-dash`는 정적
+   미리보기 전용이라 실제 대화에는 쓰지 않게 돼 지웠다 — 아래 `.chat-suggest .sug`
+   (빠른 질문)·`.bubble-user`(운영자가 보낸 질문)가 그 자리를 각각 대신한다. 색은
+   전부 기존 admin2 토큰만 쓴다(새 HEX 없음). */
+.chat-suggest{flex:none;display:flex;flex-wrap:wrap;gap:6px;padding:9px 11px;border-bottom:1px solid rgba(0,0,0,.08)}
+.chat-suggest .sug{font:500 10px/1.3 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+        border:1px dashed rgba(0,0,0,.22);border-radius:12px;padding:6px 10px;cursor:pointer;max-width:100%;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-suggest .sug:hover{background:var(--rv-panel)}
+.bubble-user{align-self:flex-end;max-width:88%;background:var(--rv-nav);color:var(--rv-nav-ink);
+           border-radius:8px 8px 3px 8px;padding:8px 10px;font:400 11px/1.6 var(--rv-font);
+           white-space:pre-wrap;overflow-wrap:break-word}
+.bubble-meta{margin-top:5px;font:400 9.5px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.bubble-loading{align-self:flex-start;display:flex;align-items:center;gap:7px;max-width:88%;
+           background:var(--rv-card);border:1px dashed rgba(0,0,0,.18);border-radius:8px;
+           padding:8px 10px;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+.bubble-loading .dot-anim{width:7px;height:7px;border-radius:50%;background:var(--rv-faint);
+           animation:pcdot 1s ease-in-out infinite}
+@keyframes pcdot{0%,100%{opacity:.25}50%{opacity:1}}
+.bubble-error{align-self:flex-start;max-width:92%;background:var(--rv-amber-bg);
+           border:1px solid var(--rv-amber-line);color:oklch(0.5 0.14 55);border-radius:8px;
+           padding:8px 10px;font:400 10.5px/1.5 var(--rv-font)}
+.chat-input-row{flex:none;display:flex;gap:8px;padding:9px 10px;border-top:1px solid rgba(0,0,0,.09);background:var(--rv-card)}
+.chat-input{flex:1;min-width:0;font:400 11.5px/1.4 var(--rv-font);color:var(--rv-ink);
+           background:var(--rv-panel2);border:1px solid rgba(0,0,0,.18);border-radius:6px;
+           padding:8px 10px;outline:none}
+.chat-input:disabled{color:var(--rv-dim);cursor:not-allowed;background:var(--rv-panel)}
+.chat-send{font:600 11px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
+           border:0;border-radius:6px;padding:0 14px;cursor:pointer;flex:none}
+.chat-send:disabled{background:var(--rv-dim3);color:#f0ece2;cursor:not-allowed}
 .preview-note{font:400 10px/1.5 var(--rv-font);color:var(--rv-dim);margin-top:8px}
 
 /* ── 상세 서랍 — top:52px는 원안(dc-ops-assistant.html 153·154행)의 값을 그대로
@@ -207,8 +243,8 @@ input,textarea{font-family:var(--rv-font)}
     <div class="d">첫 릴리스 고정값이라 이 화면에 끄고 켜는 옵션 자체를 두지 않습니다. 이 화면에서 하는 편집은 <b>도우미가 답할 내용</b>을 고치는 것입니다.</div>
   </div>
   <div class="info-card warn">
-    <div class="t">자유 질문에는 아직 답하지 않습니다</div>
-    <div class="d">LLM 연동 보류(2026-07-21). 위젯은 FAQ 문자열 매칭만 하고, 매칭이 안 되면 "아직 자유 질문에는 답할 수 없습니다"라고 답합니다.</div>
+    <div class="t">이 화면에서 AI에게 직접 물어볼 수 있습니다 — 실제 위젯과는 별개입니다</div>
+    <div class="d">오른쪽 "AI 질의응답" 패널이 실제로 질문을 받아 답합니다(아래 답할 범위·FAQ를 그대로 씁니다). 다만 방문자가 보는 실제 도우미 위젯(admin-helper.js)에는 아직 연결돼 있지 않습니다 — 위젯은 여전히 FAQ 문자열 매칭만 합니다.</div>
   </div>
 </div>
 
@@ -247,15 +283,21 @@ input,textarea{font-family:var(--rv-font)}
     </div>
 
     <div class="card preview-card">
-      <div class="preview-cap">위젯 미리보기 — 참고용</div>
+      <div class="preview-cap">AI 질의응답 — 이 화면의 설정을 그대로 씁니다</div>
       <div class="chatbox">
         <div class="chat-hd">
           <span class="chat-dot"></span><span class="chat-title">운영 도우미</span><span class="grow"></span>
-          <span class="chat-tag">읽기 전용</span>
+          <span class="chat-tag" id="chatTag">질문 · 답변</span>
         </div>
+        <div class="chat-suggest" id="chatSuggest" data-keep="1" hidden></div>
         <div class="chat-body" id="chatBody"></div>
+        <div class="chat-input-row" data-keep="1">
+          <input type="text" id="chatInput" class="chat-input" maxlength="500"
+                 placeholder="운영 관련 질문을 입력하세요">
+          <button type="button" class="chat-send" id="chatSendBtn" data-action="chat-send">보내기</button>
+        </div>
       </div>
-      <div class="preview-note">이 미리보기는 지금 저장된 FAQ 순서를 보여줄 뿐입니다 — 실제 위젯(admin-helper.js)은 아직 이 목록을 읽지 않고 자체 코드 상수를 씁니다.</div>
+      <div class="preview-note" id="previewNote">지금 저장된 답할 범위·FAQ를 프롬프트에 실어 실제로 AI를 호출합니다. 다만 방문자가 보는 실제 위젯(admin-helper.js)에는 연결돼 있지 않습니다 — 그 위젯은 여전히 자체 코드 상수를 씁니다. 이 대화는 저장되지 않습니다 — 새로고침하면 사라집니다.</div>
     </div>
   </div>
 </div>
@@ -288,7 +330,11 @@ input,textarea{font-family:var(--rv-font)}
   var S = {
     ready: null, faqs: [], scopes: [], routes: [], brokenLinks: 0,
     note: '', widgetSyncNote: '', loadErr: null,
-    sel: null, drawerOpen: false, draft: null, openMenu: null
+    sel: null, drawerOpen: false, draft: null, openMenu: null,
+    // 질문·답변(2026-08-17) — 브라우저 메모리에만 둔다. 새로고침·재로드 시 사라진다
+    // (대화 이력을 저장하지 않는다는 지시 그대로 — 서버에도 이 목록을 보내지 않는다,
+    // /ask 요청 본문은 매번 그 순간의 question 하나뿐이다).
+    chat: { messages: [], asking: false }
   };
 
   function $(id) { return document.getElementById(id); }
@@ -296,6 +342,21 @@ input,textarea{font-family:var(--rv-font)}
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+  // AI 응답을 안전하게 표시한다(2026-08-17). 순서가 중요하다 — **먼저 esc()로 전부
+  // 이스케이프한 뒤**에만 <b>/<br>를 끼워 넣는다. 그러면 모델이 무엇을 답해도(설령
+  // "<script>..." 같은 내용을 텍스트로 썼더라도) 그 내용은 이미 문자 그대로 굳어 있고,
+  // 실제 태그는 이 함수가 리터럴로 넣는 것뿐이다 — innerHTML에 모델 출력을 그대로
+  // 꽂지 않는다(XSS). 마크다운은 프롬프트로도 쓰지 말라고 지시하지만(_SYSTEM_HEADER),
+  // 모델이 습관적으로 **굵게**나 "- 목록"을 쓸 수 있어(오늘 판매가 재산정 화면에서
+  // 별표가 그대로 보이던 문제와 같은 부류) 여기서 한 번 더 안전하게 정리한다.
+  function mdSafe(raw) {
+    var s = esc(raw);
+    s = s.replace(/(^|\n)[ \t]*[-*][ \t]+/g, '$1• ');   // 목록 기호 -> 가운뎃점(줄 시작만)
+    s = s.replace(/\*\*([^\n*]+)\*\*/g, '<b>$1</b>');    // **굵게** -> <b>(이미 이스케이프된 내용만 감쌈)
+    s = s.replace(/\*/g, '');                            // 남은 낱개 별표는 버린다
+    s = s.replace(/\n/g, '<br>');
+    return s;
   }
   function handle(res) {
     return res.clone().json().catch(function () { return null; }).then(function (j) {
@@ -472,13 +533,79 @@ input,textarea{font-family:var(--rv-font)}
     }).join('');
   }
 
-  // ── 위젯 미리보기 ────────────────────────────────────────────────
+  // ── AI 질의응답(2026-08-17) ──────────────────────────────────────
+  // 원안(제작 시점)은 이 자리가 정적 미리보기였다(위 docstring ⑦). 지금은
+  // `/api/admin/ops-assistant/ask`를 실제로 불러 답을 받는다.
   function renderPreview() {
+    var owner = canWrite();
+    var sug = $('chatSuggest');
+    if (!S.chat.messages.length && S.faqs.length) {
+      sug.hidden = false;
+      sug.innerHTML = S.faqs.slice(0, 5).map(function (f) {
+        return '<span class="sug" data-action="chat-fill" data-q="' + esc(f.question) + '"' +
+          ' title="눌러서 입력창에 채우기">' + esc(f.question) + '</span>';
+      }).join('');
+    } else {
+      sug.hidden = true; sug.innerHTML = '';
+    }
+
     var body = $('chatBody');
-    var html = '<div class="bubble-bot">운영 중 막히는 게 있으면 물어보세요. <b>아직 자동 답변은 준비 중</b>이라, 지금은 자주 묻는 것에 대한 바로가기를 드립니다.</div>';
-    S.faqs.slice(0, 5).forEach(function (f) { html += '<div class="bubble-chip">' + esc(f.question) + '</div>'; });
-    html += '<div class="bubble-dash">아직 자유 질문에는 답할 수 없습니다 — 답변 기능은 준비 중입니다.</div>';
+    var html = '';
+    if (!S.chat.messages.length) {
+      html += '<div class="bubble-bot">운영 중 막히는 게 있으면 물어보세요. 위 질문을 눌러' +
+        ' 입력창에 채우거나 직접 입력해 보내세요.</div>';
+    }
+    S.chat.messages.forEach(function (m) {
+      if (m.role === 'user') {
+        html += '<div class="bubble-user">' + esc(m.text) + '</div>';
+      } else if (m.role === 'bot') {
+        var meta = m.meta || {};
+        var metaLine = [meta.provider, meta.elapsed_sec != null ? meta.elapsed_sec + '초' : null,
+          meta.cost_usd != null ? '$' + meta.cost_usd.toFixed(5) : null]
+          .filter(function (x) { return x; }).join(' · ');
+        html += '<div class="bubble-bot">' + mdSafe(m.text) +
+          (metaLine ? '<div class="bubble-meta">' + esc(metaLine) + '</div>' : '') + '</div>';
+      } else {
+        html += '<div class="bubble-error">⚠ ' + esc(m.text) + '</div>';
+      }
+    });
+    if (S.chat.asking) {
+      html += '<div class="bubble-loading"><span class="dot-anim"></span>AI가 답변을 작성하는 중입니다…</div>';
+    }
     body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+
+    var inp = $('chatInput'), btn = $('chatSendBtn');
+    var blocked = S.chat.asking || !owner;
+    inp.disabled = blocked; btn.disabled = blocked;
+    inp.placeholder = owner ? '운영 관련 질문을 입력하세요'
+      : '권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '로그인 필요') + ')';
+    $('chatTag').textContent = S.chat.asking ? '응답 대기 중' : '질문 · 답변';
+  }
+
+  function askQuestion(raw) {
+    var q = (raw || '').trim();
+    if (!q) return;
+    if (S.chat.asking) { toast('이전 질문에 대한 응답을 기다리는 중입니다', 'warn'); return; }
+    if (!guard()) return;
+    S.chat.messages.push({ role: 'user', text: q });
+    S.chat.asking = true;
+    $('chatInput').value = '';
+    renderPreview();
+    apiSend('POST', '/api/admin/ops-assistant/ask', { question: q })
+      .then(function (j) {
+        S.chat.asking = false;
+        S.chat.messages.push({ role: 'bot', text: j.answer, meta: j });
+        renderPreview();
+      })
+      .catch(function (err) {
+        // 실패를 삼키지 않는다 — 캡 초과(429)·키 미설정(503)·프로바이더 실패(502) 모두
+        // 대화창 안에 그 사유 그대로(handle()이 이미 서버 detail을 뽑아 err.message로
+        // 준다) 남긴다. 위쪽 상단 진행 바(ui-progress.js)에도 같은 문장이 동시에 뜬다.
+        S.chat.asking = false;
+        S.chat.messages.push({ role: 'error', text: err.message });
+        renderPreview();
+      });
   }
 
   // ── 상세 서랍 ────────────────────────────────────────────────────
@@ -632,6 +759,13 @@ input,textarea{font-family:var(--rv-font)}
       case 'link-pick': e.stopPropagation(); pickLink(Number(t.getAttribute('data-i')), t.getAttribute('data-path')); break;
       case 'save': saveFaq(); break;
       case 'revert': revertFaq(); break;
+      case 'chat-send': askQuestion($('chatInput').value); break;
+      case 'chat-fill': {
+        var fillEl = $('chatInput');
+        fillEl.value = t.getAttribute('data-q') || '';
+        fillEl.focus();
+        break;
+      }
       default: break;
     }
   });
@@ -646,9 +780,13 @@ input,textarea{font-family:var(--rv-font)}
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && S.drawerOpen && !diffs().length) closeDrawer();
+    if (e.key === 'Enter' && e.target && e.target.id === 'chatInput' && !S.chat.asking) {
+      e.preventDefault();
+      askQuestion(e.target.value);
+    }
   });
 
-  window.Admin2Shell.meReady.then(function () { renderFaqList(); renderDrawer(); });
+  window.Admin2Shell.meReady.then(function () { renderFaqList(); renderDrawer(); renderPreview(); });
   load();
 })();
 </script>

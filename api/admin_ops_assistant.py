@@ -20,18 +20,37 @@ assistant.html`. 실측 근거: `ai-screens-datamap.md` §5.
   서버 재기동만으로 이 목록이 자동으로 늘어난다.
 
 ■ 권한 — owner 쓰기를 이 파일 스스로도 강제한다
-  `/api/admin/ops-assistant`는 아직 `api/auth.OWNER_WRITE_PREFIXES`에 등록돼 있지
-  않다(그 파일은 제작팀 공유 파일이라 이 화면 담당자가 직접 고치지 않는다 — 필요한
-  prefix를 제작 보고서에 명시해 하네스가 반영한다). 그때까지는 미들웨어가 기본값
-  (operator)만 요구하므로, 이 모듈이 `_require_owner()`로 **직접** owner를 강제한다
-  — 이중 방어이지 중복이 아니다.
+  `/api/admin/ops-assistant`는 `api/auth.OWNER_WRITE_PREFIXES`에 이미 등록돼
+  있다(실측: `auth.py:310-323`, 2026-08-17 확인 — 전에는 "아직 등록 안 됨"이라 적혀
+  있었는데 그 사이 다른 물결에서 등록됐다. CANON §5 그대로 여기서 정정한다). 그
+  접두어는 `/api/admin/ops-assistant`로 시작하는 모든 하위 경로에 적용되므로 아래
+  `POST /ops-assistant/ask`도 **새로 등록하지 않아도** GET/HEAD/OPTIONS가 아니면
+  자동으로 owner를 요구한다(`auth.required_role`). 이 모듈은 그래도 각 쓰기
+  엔드포인트에서 `_require_owner()`로 **직접** owner를 강제한다 — 미들웨어가
+  막아 주더라도 이 파일만 보고는 그 사실을 알 수 없으므로 이중 방어다(중복이 아니다).
+  **읽기(GET) 경로**도 인증은 걸린다 — `auth._is_gated`가 `/api/admin/*` 전체를
+  게이트하고, GET은 `required_role`이 "viewer"를 요구한다(무세션이면 401). 이
+  파일이 별도로 미인증 읽기를 열어 두지 않는다(실측, 2026-08-17).
+
+■ 질문·답변(`POST /ops-assistant/ask`, 2026-08-17 신설) — 운영자가 실제로 AI에게
+  묻고 답을 받는다. `api/llm.py`를 **부르기만** 한다(그 파일은 고치지 않음).
+  프롬프트에는 매 요청마다 DB에서 다시 읽은 ① `ops_assistant_scopes`(켜진 것만
+  구체적으로 답하게 하고, 잠긴 셋과 아직 안 켜진 것들은 각각 다른 이유로 금지)
+  ② `ops_assistant_faqs` 5행(질문이 근접하면 그 답을 쓰게) ③ `_real_routes()`
+  결과(화면 안내는 실제 admin2 경로만)를 싣는다 — 코드에 박으면 운영자가 화면에서
+  범위를 켜고 꺼도 반영되지 않는다는 사장님 지시를 그대로 따른 것이다. 대화 이력은
+  저장하지 않는다(이번 범위 밖 — `api_cost_logs`에는 provider·model·토큰·비용만
+  남고 질문·답변 본문은 어디에도 적재되지 않는다. 화면도 브라우저 메모리에서만
+  들고 있다가 새로고침하면 사라진다). 상세 근거는 아래 함수들의 주석 참고.
 """
 import json
+import re
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from . import llm
 from .admin_nav import NAV
 from .auth import current_operator, current_operator_id
 from .db import engine
@@ -40,10 +59,13 @@ router = APIRouter(prefix="/api/admin", tags=["ops-assistant"])
 
 MAX_LINKS = 2
 
-# 이 두 화면(AI 응답 기록·운영 도우미 설정) 자신은 `admin_nav.py`의 href가 아직
-# None("신설")이라 아래 `_nav_label_by_href()`로는 라벨을 못 찾는다 — harness가
-# admin_nav.py를 갱신하기 전까지의 임시 표시일 뿐 정본을 복제하는 것이 아니다
-# (admin_nav.py는 이 화면 담당자가 건드리지 않는 파일이다).
+# ⚠ 2026-08-17 정정(CANON §5 그대로 — 낡은 채로 두면 다음 사람이 사실로 읽는다):
+# 이 주석은 원래 "이 두 화면 자신은 admin_nav.py의 href가 아직 None(신설)이라
+# _nav_label_by_href()로는 라벨을 못 찾는다"고 적혀 있었다. 그런데 지금 admin_nav.py를
+# 실측하면 둘 다 이미 실제 href를 갖고 있다(`_nav_label_by_href()`가 스스로 두 라벨을
+# 찾아낸다 — 2026-08-17 확인). 그래서 아래 딕셔너리는 지금은 **닿지 않는 폴백**이다 —
+# 지우지는 않는다(admin_nav.py는 이 화면 담당자가 건드리지 않는 파일이라, 그쪽에서
+# 다시 href를 비우는 변경이 나중에 와도 이 화면이 라벨 없이 죽지 않게 막아 준다).
 _LOCAL_LABELS = {
     "/admin2/ai-response-log": "AI 응답 기록",
     "/admin2/ops-assistant": "운영 도우미 설정",
@@ -328,3 +350,140 @@ def set_scope(scope_key: str, body: ScopeBody):
         label, enabled = row["label"], body.enabled
     return {"ok": True, "note": label + (
         "을(를) 답변 범위에 넣었습니다" if enabled else "을(를) 답변 범위에서 뺐습니다")}
+
+
+# ============================================================================
+# 질문·답변 — 프롬프트를 만드는 함수 셋 + 엔드포인트 하나 (2026-08-17 신설)
+#
+# 셋 다 "매 요청마다" DB 값을 받아 문자열로 접는다 — 캐시하지 않는다. 답변 범위를
+# 운영자가 화면에서 막 켰는데 다음 질문이 옛 값을 쓰면 그 화면의 존재 이유가
+# 없어진다("정본을 매 요청마다 읽는다"는 지시를 코드로 옮긴 자리).
+# ============================================================================
+MAX_QUESTION_LEN = 500
+
+
+class AskBody(BaseModel):
+    question: str
+
+
+def _plain(html_ish: str) -> str:
+    """FAQ 답변의 `<b>` 등 최소 서식을 벗긴다 — 프롬프트는 순수 텍스트로 받는다."""
+    return re.sub(r"<[^>]+>", "", html_ish or "").strip()
+
+
+def _scope_prompt_block(scopes: list[dict]) -> str:
+    """켜진 것 / 잠긴 것(영구 금지) / 안 켜진 것(잠기지 않음 — 운영자가 나중에 켤 수
+    있음)을 **서로 다른 문구**로 나눠 싣는다. 셋을 한 덩어리로 섞으면 모델이 "잠금"과
+    "아직 미승인"을 구분해 답하지 못한다 — 운영자에게는 "왜 안 되는지"가 다른 정보다.
+    """
+    enabled = [s for s in scopes if s["enabled"] and not s["locked"]]
+    off = [s for s in scopes if not s["enabled"] and not s["locked"]]
+    locked = [s for s in scopes if s["locked"]]
+    lines = ["[답변 가능 범위 -- 이 주제의 질문에만 구체적으로 답한다]"]
+    lines += ([f"- {s['label']}" for s in enabled]
+              or ["- (지금 켜진 범위가 없다 -- 데이터 질문은 전부 보류한다)"])
+    lines.append("")
+    lines.append("[금지 범위 -- 절대 답하지 않는다. \"이 항목은 답변 대상이 아닙니다\"라고만"
+                  " 답하고 이유를 한 줄 덧붙인다. 예외 없음]")
+    lines += [f"- {s['label']} -- {s['lock_note'] or '잠긴 항목입니다'}" for s in locked]
+    lines.append("")
+    lines.append("[아직 켜지지 않은 범위 -- 지금은 금지 범위와 똑같이 취급해 답하지 않는다."
+                  " 다만 \"운영자가 화면에서 범위를 켜면 답할 수 있다\"고 안내한다"
+                  "(위 금지 범위와는 이유가 다르다 -- 잠금이 아니라 아직 미승인)]")
+    lines += ([f"- {s['label']}" for s in off] or ["- (없음)"])
+    return "\n".join(lines)
+
+
+def _faq_prompt_block(faqs: list[dict]) -> str:
+    lines = ["[자주 묻는 질문 -- 운영자 질문이 이것과 같거나 매우 비슷하면 이 답을 그대로 쓴다]"]
+    for f in faqs:
+        lines.append(f"Q: {f['question']}")
+        lines.append(f"A: {_plain(f['answer'])}")
+        links = f["links"] or []
+        if links:
+            lines.append("바로가기: " + ", ".join(
+                f"{ln.get('label')} {ln.get('path')}" for ln in links))
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _routes_prompt_block(routes: list[dict]) -> str:
+    lines = ["[실제 admin2 화면 경로 -- 화면을 안내할 때 이 목록에 있는 경로만 쓴다."
+             " 목록에 없는 주소를 지어내지 않는다. 안내할 화면이 없으면 경로 없이 말로만 답한다]"]
+    lines += [f"{r['path']} -- {r['label']}" for r in routes]
+    return "\n".join(lines)
+
+
+_SYSTEM_HEADER = (
+    "당신은 팝콘PC AI 관리자 화면(admin2)의 운영 도우미다. 운영자의 질문에 한국어"
+    " 평서체로 답한다. 감탄사·반문·구어체를 쓰지 않는다. 마크다운 서식(별표 굵게, #,"
+    " 코드블록, 목록 기호)을 쓰지 않고 줄글로만 답한다. 3~6문장 이내로 간결하게 답한다.\n\n"
+    "답변 원칙:\n"
+    "1. 아래 자주 묻는 질문과 같거나 매우 비슷한 질문이면 그 답을 그대로 쓴다.\n"
+    "2. 금지 범위·아직 켜지지 않은 범위에 해당하는 질문에는 데이터를 답하지 않는다.\n"
+    "3. 이 프롬프트에 없는 구체적인 수치(재고 수·가격·건수 등)는 절대 지어내지 않는다"
+    " -- 모르면 모른다고 답한다.\n"
+    "4. 화면을 안내할 때는 실제 admin2 경로 목록에 있는 경로만 쓴다.\n"
+)
+
+
+def _build_prompt(question: str, scopes: list[dict], faqs: list[dict], routes: list[dict]) -> str:
+    return "\n\n".join([
+        _SYSTEM_HEADER,
+        _scope_prompt_block(scopes),
+        _faq_prompt_block(faqs),
+        _routes_prompt_block(routes),
+        f"[운영자 질문]\n{question}",
+    ])
+
+
+_BLOCK_KIND_KO = {"cost": "비용", "rate_minute": "분당 호출 횟수", "rate_day": "일일 호출 횟수"}
+
+
+@router.post("/ops-assistant/ask")
+def ask_ops_assistant(body: AskBody, request: Request):
+    """운영자 질문에 AI가 답한다 -- `api/llm.py`를 부르기만 한다(그 파일은 고치지 않음).
+
+    캡(비용·호출 빈도)은 `llm.py`가 **프로바이더 전체 기준**으로 막는다 -- 여기서
+    한도를 다시 정의하지 않는다. 막히면 429로 사유를 그대로 올린다. 화면(JS)은 이미
+    있는 `window.popcornProgress.errText()` 경로로 `detail`을 그대로 보여준다(다른
+    쓰기 엔드포인트와 동일 -- 새로 만들지 않았다).
+    """
+    _require_owner()
+    q = (body.question or "").strip()
+    if not q:
+        raise HTTPException(400, "질문이 비었습니다")
+    if len(q) > MAX_QUESTION_LEN:
+        raise HTTPException(400, f"질문이 너무 깁니다(최대 {MAX_QUESTION_LEN}자)")
+
+    routes = _real_routes(request.app)
+    with engine.connect() as conn:
+        if not _table_ready(conn):
+            raise HTTPException(409, "FAQ·답변 범위 원천이 아직 준비되지 않았습니다(마이그레이션 미적용)")
+        faqs = [dict(r) for r in conn.execute(text(
+            "SELECT question, answer, links FROM ops_assistant_faqs"
+            " ORDER BY sort_order, faq_id")).mappings().all()]
+        scopes = [dict(r) for r in conn.execute(text(
+            "SELECT scope_key, label, enabled, locked, lock_note FROM ops_assistant_scopes"
+            " ORDER BY sort_order, scope_key")).mappings().all()]
+
+    prompt = _build_prompt(q, scopes, faqs, routes)
+
+    try:
+        result = llm.call(prompt, task_key="task.ops_assist", customer_facing=False)
+    except llm.LLMNotConfiguredError as e:
+        raise HTTPException(503, f"AI 연동이 설정되지 않았습니다 — {e}")
+    except llm.LLMBlockedError as e:
+        kind_ko = _BLOCK_KIND_KO.get(e.kind, e.kind)
+        raise HTTPException(429, f"{kind_ko} 한도에 걸렸습니다({e.provider}) — {e}")
+    except llm.LLMAllProvidersFailedError as e:
+        raise HTTPException(502, f"AI 응답을 받지 못했습니다 — 연동된 프로바이더가 모두 실패했습니다: {e}")
+    except llm.LLMProviderError as e:
+        raise HTTPException(502, f"AI 응답을 받지 못했습니다 — {e}")
+
+    return {
+        "ok": True, "answer": result.text,
+        "provider": result.provider, "model": result.model,
+        "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
+        "note": "이 질문·답변은 저장하지 않습니다 — 새로고침하면 사라집니다.",
+    }
