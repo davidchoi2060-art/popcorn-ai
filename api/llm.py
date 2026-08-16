@@ -9,10 +9,18 @@
   같은 날 두 번째 지시로 Claude·Codex(OpenAI)를 마저 등록하고 폴백을 실제로 지었다
   (아래 "다음 프로바이더를 더할 때" 문단 및 `_is_fallback_eligible`/`_resolve_fallback_order`
   참고). 사장님이 실사용 경험으로 배정을 확정했다(2026-08-16): 입력 파싱(task.s1_parse)
-  = Claude · 근거 설명(task.s2_explain) = GPT · 웹 사양 채움(task.spec_fill) = Claude ·
-  운영 도우미(task.ops_assist) = Gemini. 이 배정은 **PROVIDERS의 default_model 선택에만**
-  반영했다(각 항목 옆 주석 참고) -- task_key -> provider 자동 라우팅은 짓지 않았다(아래
-  "task_key 기반 자동 라우팅을 짓지 않은 이유" 참고).
+  = Claude(Haiku) · 근거 설명(task.s2_explain) = GPT · 웹 사양 채움(task.spec_fill) =
+  Claude(Opus) · 운영 도우미(task.ops_assist) = Gemini. 처음엔 이 배정을 **PROVIDERS의
+  default_model 선택에만**(프로바이더당 하나) 반영하고 task_key -> provider 자동
+  라우팅은 짓지 않았다 -- 그런데 s1_parse·spec_fill이 **같은 프로바이더(Claude)인데
+  등급이 다르다**는 사실이 "프로바이더당 default_model 하나" 구조로는 표현되지 않는다는
+  게 곧바로 드러났다.
+
+  그래서 같은 날 세 번째 지시로 이 층을 짓는다: `TASK_DEFAULTS`(task_key -> provider+model
+  코드 기본값, `PROVIDERS` 바로 아래) + `_resolve_task_default()`(DB `ai_task_assignments`
+  우선ㆍ코드 기본값 폴백 -- 아래 "■ task_key 기반 자동 라우팅" 참고)가 그것이다.
+  `call(prompt, task_key=...)`만 넘기면 이제 provider·model이 자동으로 정해지고,
+  `provider=`/`model=`을 명시하면 여전히 그게 이긴다(하위 호환 -- `call()` 문서 참고).
 
 ■ 지키는 결정
   - A-03 (decision-log.md): "LLM의 역할은 입력 파싱 + 근거 설명뿐. 견적을 생성하지
@@ -54,15 +62,38 @@
   `call()`ㆍ`_check_caps()`ㆍ`_call_one()`ㆍ`LLMResult`ㆍ예외 계층ㆍ폴백 로직은 프로바이더
   수와 무관하게 그대로다 -- 호출부(`llm.call(provider="claude", ...)`)도 바뀌지 않는다.
 
-  ■ task_key 기반 자동 라우팅을 짓지 않은 이유
-    사장님이 작업별 프로바이더를 확정했지만(위 문단), `call(task_key="task.s1_parse")`가
-    "그럼 자동으로 claude를 쓴다"처럼 스스로 provider를 고르게 하지는 않았다 -- 그건
-    `ai_task_assignments`(0046, ADM-AI-030)가 저장하는 값을 "누가 실제로 쓸지" 정하는
-    오케스트레이션이고, 이 파일의 책임(프로바이더+모델이 정해진 뒤 한 번 부르는 것,
-    캡ㆍ폴백)보다 한 층 위다. 그 층은 다음 단계(어디에 쓸지)의 몫으로 남겨 뒀다 -- 지금
-    호출부는 `provider=`를 직접 명시해야 한다(이번 세션의 비교 벤치마크가 실제로 그렇게
-    했다). fallback_order만 예외로 `ai_task_assignments`를 읽는다(_resolve_fallback_order)
-    -- "주 프로바이더가 막히면 다음은 뭘 쓸까"는 이미 이 파일의 책임(③) 범위 안이라서다.
+  ■ task_key 기반 자동 라우팅 (2026-08-16 세 번째 지시로 구현 -- 아래는 왜 처음엔
+    미뤘고 왜 다시 필요해졌는지의 기록이다. 지우지 않는다: 같은 판단을 "지금 안 쓸
+    추상을 미리 짓지 마세요" 원칙만 보고 다음에 또 되풀이하지 않기 위해서다)
+
+    처음엔(같은 날 두 번째 지시 시점) `call(task_key="task.s1_parse")`가 "그럼 자동으로
+    claude를 쓴다"처럼 스스로 provider를 고르게 하지 않았다 -- 그건 `ai_task_assignments`
+    (0046, ADM-AI-030)가 저장하는 값을 "누가 실제로 쓸지" 정하는 오케스트레이션이고,
+    이 파일의 책임(프로바이더+모델이 정해진 뒤 한 번 부르는 것, 캡ㆍ폴백)보다 한 층
+    위라고 판단했다. 그래서 fallback_order만 예외로 `ai_task_assignments`를 읽었다
+    (`_resolve_fallback_order`) -- "주 프로바이더가 막히면 다음은 뭘 쓸까"는 이미 이
+    파일의 책임(③) 범위 안이라서였다. 지금 호출부는 `provider=`를 직접 명시해야 했다
+    (이번 세션의 비교 벤치마크가 실제로 그렇게 했다).
+
+    그런데 s1_parse(Claude Haiku)ㆍspec_fill(Claude Opus)처럼 **같은 프로바이더인데
+    모델 등급이 다른** 배정이 나오면서 "호출부가 provider=만 골라 주면 된다"는 전제가
+    깨졌다 -- provider="claude" 하나로는 두 작업을 구분할 수 없다. 그래서 세 번째
+    지시로 "task_key 하나 -> provider+model 하나"를 정하는 층(`TASK_DEFAULTS` +
+    `_resolve_task_default`)을 이 파일 안에 새로 만들었다. **오케스트레이션이라는
+    판단 자체는 안 바뀌었다** -- `ai_task_assignments`가 여전히 정본이고 이 함수는 그
+    값을 읽어 번역할 뿐이다. 다만 그 오케스트레이션이 "프로바이더 하나를 고르는 수준"이
+    아니라 "그 프로바이더 안에서 어느 등급을 쓸지까지" 필요하다는 게 이번에 드러났고,
+    그 폭은 이 파일(프로바이더+모델을 실제로 부르는 자리, `PROVIDERS[...].pricing`의
+    키 = 유효한 모델 문자열을 이미 쥐고 있는 자리)이 가장 잘 안다고 판단했다.
+
+    ⚠ **여전히 짓지 않은 것**: `ai_task_assignments.mode='concurrent'`(여러 프로바이더를
+    동시에 불러 결과를 수렴하는 것)는 이번에도 만들지 않는다 -- `_resolve_task_default`는
+    그 작업의 `providers` 배열에서 역할이 `'주'`인 항목 하나만 골라 **단일 호출**한다
+    (concurrent로 저장된 행이 있어도 이 층은 그중 하나만 쓴다. `role='주'`가 없으면
+    배열의 첫 항목). "여러 프로바이더를 동시에 불러 비교/수렴한다"는 `call()` 한 번의
+    책임보다 위이고(이번 세션의 비교 벤치마크가 여러 번 호출해 손으로 비교한 것과 같은
+    수준 -- 그 반복을 자동화하는 것은 다음 단계다), 화면·엔드포인트를 새로 만들지
+    않는다는 이번 지시 범위 밖이기도 하다.
 
 ■ 캡(③) -- cost_thresholds/rate_limit_policies를 "읽고 실제로 막는다"
   두 표 모두 지금 0행이다(실측). "한도가 설정돼 있지 않으면 무제한"은 사고를 부른다는
@@ -514,7 +545,13 @@ PROVIDERS: dict[str, ProviderSpec] = {
     ),
     "claude": ProviderSpec(
         key="claude", vendor="Claude", env_key="ANTHROPIC_API_KEY",
-        default_model="claude-opus-5",   # 배정: 입력 파싱(s1_parse) + 웹 사양 채움(spec_fill) - "정확도"(사장님)
+        default_model="claude-opus-5",   # provider 단위 폴백(task_key로 못 갈릴 때만 씀) +
+                                          # 배정: 웹 사양 채움(spec_fill) - "정확도"(사장님).
+                                          # s1_parse는 TASK_DEFAULTS에서 claude-haiku-4-5로
+                                          # 따로 갈린다 -- 이 필드(프로바이더당 1개)로는 같은
+                                          # 프로바이더 안의 등급 차이를 못 담아 TASK_DEFAULTS를
+                                          # 새로 만들었다(모듈 docstring "task_key 기반 자동
+                                          # 라우팅" 참고).
         pricing={
             "claude-opus-5": ModelPricing(
                 price_in_per_1m=5.0, price_out_per_1m=25.0, valid_until=_CHECKED,
@@ -556,6 +593,43 @@ PROVIDERS: dict[str, ProviderSpec] = {
     # A-35의 3사가 이제 전부 등록됐다. 넷째 프로바이더가 생기면 이 딕셔너리에 항목 하나 +
     # 위에 _call_<vendor> 함수 하나만 추가한다 -- call()/_check_caps/폴백 로직은 그대로다.
 }
+
+
+# ============================================================================
+# task_key -> (provider_key, model) 코드 기본값 -- 사장님 실사용 배정(2026-08-16).
+# `ai_task_assignments`(0046)가 정본이고, 이 딕셔너리는 그 표가 비어 있거나(0행 --
+# 2026-08-16 실측) 아직 마이그레이션 미적용일 때만 쓰는 폴백이다(_resolve_task_default).
+#
+# ■ `api/admin_ai_tasks.py`의 `DEFAULT_PROVIDERS`와 두 벌이 아닌 이유 (읽기만 했음 --
+#   그 파일은 담당 밖이라 고치지 않았다)
+#   그 상수는 **작업별로 갈라지지 않는 단일 값**이다 -- `POST /ai-task-settings/tasks`가
+#   어느 task_key로 불려도 항상 같은
+#   `[{"vendor":"Claude","model":"claude-opus-5","role":"주"}]`를 새 행에 넣는다(그 파일
+#   자신의 주석: "이 상수 자체엔 task_key별 분기가 없다" · "정확한 작업별 모델은 배정
+#   직후 이 화면(PATCH)에서 운영자가 골라야 한다"). 즉 s1_parse=Haiku·spec_fill=Opus처럼
+#   **작업마다 다른 값**을 그 상수는 애초에 표현할 수 없다 -- "+ 작업 추가" 버튼을 누른
+#   직후 화면에 뭐라도 채워 두는 임시 씨앗값일 뿐, 실제 호출 라우팅의 기본값으로 쓰인
+#   적이 없다(ADM-AI-030 화면은 아직 "휴면" -- 그 파일 모듈 docstring). 그래서 이
+#   딕셔너리는 그 상수를 대체하는 게 아니라, 그 상수가 애초에 다루지 않는 "작업별" 차원을
+#   새로 채운다 -- 두 값이 같은 걸 두 번 정의하는 게 아니라 서로 다른 질문에 답한다
+#   ("새 행을 만들 때 화면에 뭘 채워 둘까" vs "실제로 어느 모델을 부를까").
+#
+#   모델 문자열의 정본은 여전히 하나다 -- 아래 값은 전부 위 `PROVIDERS[...].pricing`의
+#   기존 키를 그대로 가리킨다(새 모델을 여기서 지어내지 않는다). 모듈 로드 시
+#   assert로 이 사실을 스스로 검증한다 -- "부르기 전에 있는지 본다"(CANON §5).
+# ============================================================================
+TASK_DEFAULTS: dict[str, tuple[str, str]] = {
+    "task.s1_parse":   ("claude", "claude-haiku-4-5-20251001"),  # 입력 파싱 - 속도
+    "task.s2_explain": ("codex",  "gpt-5.6-sol"),                # 근거 설명 - 한국어 품질
+    "task.ops_assist": ("gemini", "gemini-3.7-flash"),           # 운영 도우미 - "이 정도로 충분"
+    "task.spec_fill":  ("claude", "claude-opus-5"),              # 웹 사양 채움 - 정확도
+}
+for _tk, (_pk, _md) in TASK_DEFAULTS.items():
+    assert _pk in PROVIDERS, f"TASK_DEFAULTS[{_tk}]: unknown provider {_pk!r}"
+    assert _md in PROVIDERS[_pk].pricing, (
+        f"TASK_DEFAULTS[{_tk}]: {_pk}/{_md} has no ModelPricing entry in"
+        f" PROVIDERS[{_pk!r}].pricing")
+del _tk, _pk, _md
 
 
 def _cost_usd(spec: ProviderSpec, model: str,
@@ -602,6 +676,25 @@ def _is_fallback_eligible(exc: Exception) -> bool:
     return False
 
 
+def _load_task_assignment(conn, task_key: str) -> dict | None:
+    """`ai_task_assignments`(0046)에서 task_key 행을 읽는다 -- provider/model 자동 라우팅
+    (`_resolve_task_default`)과 폴백 순서(`_resolve_fallback_order`)가 공유하는 단일 조회
+    지점이다(둘이 각자 SELECT를 따로 짜면 "같은 표를 읽는 같은 목적의 쿼리"가 두 벌 된다).
+
+    테이블이 없으면(마이그레이션 0046 미적용) `None` -- 500을 내지 않는다. 이 파일이
+    `api/admin_ai_tasks.py`의 `_ready()`(`sa_inspect(conn).has_table(...)`)와 **같은 판단을
+    같은 방식으로** 여기 다시 짠다 -- 그 함수를 import하지 않는 이유는, 그 파일이
+    admin API 라우터(상위 계층)이고 이 파일은 그 라우터가 저장한 값을 읽기만 하는 하위
+    계층이라 반대 방향 의존은 계층을 거꾸로 만들기 때문이다(그리고 그 함수 이름 자체가
+    `_`로 시작해 모듈 밖에서 부르지 말라는 신호다).
+    """
+    if not sa_inspect(conn).has_table("ai_task_assignments"):
+        return None
+    return conn.execute(text(
+        "SELECT providers, fallback_order FROM ai_task_assignments WHERE task_key = :k"),
+        {"k": task_key}).mappings().first()
+
+
 def _resolve_fallback_order(primary_key: str, task_key: str | None) -> list[str]:
     """폴백 순서를 정한다. 우선순위:
       ① task_key가 있고 `ai_task_assignments`(0046)에 그 작업의 행이 있으면 그 행의
@@ -615,16 +708,13 @@ def _resolve_fallback_order(primary_key: str, task_key: str | None) -> list[str]
     if task_key:
         try:
             with engine.connect() as conn:
-                if sa_inspect(conn).has_table("ai_task_assignments"):
-                    row = conn.execute(text(
-                        "SELECT fallback_order FROM ai_task_assignments WHERE task_key = :k"),
-                        {"k": task_key}).mappings().first()
-                    if row and row["fallback_order"]:
-                        vendor_to_key = {s.vendor: s.key for s in PROVIDERS.values()}
-                        order = [vendor_to_key[v] for v in row["fallback_order"]
-                                 if v in vendor_to_key and vendor_to_key[v] != primary_key]
-                        if order:
-                            return order
+                row = _load_task_assignment(conn, task_key)
+                if row and row["fallback_order"]:
+                    vendor_to_key = {s.vendor: s.key for s in PROVIDERS.values()}
+                    order = [vendor_to_key[v] for v in row["fallback_order"]
+                             if v in vendor_to_key and vendor_to_key[v] != primary_key]
+                    if order:
+                        return order
         except Exception:
             log.exception(
                 "[llm] failed to read ai_task_assignments.fallback_order for %s -"
@@ -632,11 +722,77 @@ def _resolve_fallback_order(primary_key: str, task_key: str | None) -> list[str]
     return [k for k in PROVIDERS if k != primary_key]
 
 
+def _resolve_task_default(task_key: str) -> tuple[str | None, str | None, str]:
+    """task_key로 (provider_key, model)을 정한다. 반환: (provider_key|None, model|None,
+    reason) -- reason은 "왜 이 값을 골랐는지"(DB 사용/코드 기본값 사용/근거 없음)를 사람이
+    읽을 수 있게 적은 문장이다(호출부가 로그로 남긴다 -- 요구사항 ①의 "왜 코드 기본값을
+    썼는지 알 수 있어야" 항목).
+
+    우선순위:
+      ① `ai_task_assignments`(0046)에 그 task_key 행이 있고 `providers`(JSONB 배열,
+         `[{"vendor":..,"model":..,"role":..}, ...]`) 안에 역할이 `'주'`인 항목이 있으면
+         그 vendor/model을 쓴다(벤더 표시명 -> PROVIDERS 키 번역) -- **이 표가 정본이다**
+         (ADM-AI-030 화면이 저장하는 바로 그 값, 운영자가 화면에서 바꾸면 그게 이긴다).
+         역할 `'주'`가 없으면 배열의 첫 항목을 쓴다(providers는 최소 1개 --
+         `admin_ai_tasks._validate_update`가 이미 그렇게 강제한다. `mode='concurrent'`로
+         여러 항목이 있어도 이 함수는 하나만 골라 단일 호출한다 -- 모듈 docstring
+         "task_key 기반 자동 라우팅" 참고).
+         테이블이 없거나(미적용)/행이 없거나(0행, 2026-08-16 실측)/벤더·모델을 PROVIDERS가
+         모르면(오타·아직 등록 안 된 모델 문자열) 조용히 ②로 내려간다 -- 500을 내지 않는다.
+      ② 코드 기본값 `TASK_DEFAULTS`(사장님 실사용 배정, 2026-08-16).
+      ③ task_key가 `TASK_DEFAULTS`에도 없으면(닫힌 4종 밖의 값) `(None, None, reason)`을
+         돌려준다 -- `call()`은 이걸 "이 task_key에는 아무 근거가 없다"로 해석해 원래
+         하드코딩 기본값("gemini")으로 떨어진다.
+    """
+    reason = ""
+    try:
+        with engine.connect() as conn:
+            row = _load_task_assignment(conn, task_key)
+            providers = (row or {}).get("providers") or []
+            if providers:
+                primary = next((p for p in providers if p.get("role") == "주"), providers[0])
+                vendor_to_key = {s.vendor: s.key for s in PROVIDERS.values()}
+                pk = vendor_to_key.get(primary.get("vendor"))
+                pm = primary.get("model")
+                if pk and pm:
+                    return (pk, pm,
+                            f"ai_task_assignments row (vendor={primary.get('vendor')!r},"
+                            f" role={primary.get('role')!r})")
+                reason = (f"ai_task_assignments row has an unrecognized vendor/model"
+                          f" ({primary.get('vendor')!r}/{primary.get('model')!r}) -"
+                          f" falling back to TASK_DEFAULTS")
+            else:
+                reason = ("ai_task_assignments has no usable row for this task_key"
+                          " (table missing, 0 rows, or empty providers) -"
+                          " falling back to TASK_DEFAULTS")
+    except Exception:
+        log.exception(
+            "[llm] failed to read ai_task_assignments.providers for %s -"
+            " falling back to TASK_DEFAULTS", task_key)
+        reason = "ai_task_assignments read failed (see server log) - falling back to TASK_DEFAULTS"
+
+    default = TASK_DEFAULTS.get(task_key)
+    if default:
+        return default[0], default[1], (reason or "TASK_DEFAULTS code default")
+    return None, None, (reason + "; task_key is also unknown to TASK_DEFAULTS" if reason
+                         else f"unknown task_key {task_key!r} - not in ai_task_assignments"
+                              f" or TASK_DEFAULTS")
+
+
 def _call_one(prompt: str, provider: str, task_key: str | None, model: str | None,
               system: str | None, customer_facing: bool, max_output_tokens: int,
-              timeout_sec: int) -> LLMResult:
+              timeout_sec: int, caller_key: int | None = None) -> LLMResult:
     """딱 한 프로바이더에게 한 번 건다 -- 캡 확인 -> 호출 -> 비용 기록. 폴백은 여기서
-    하지 않는다(call()이 이 함수를 여러 프로바이더에 대해 순서대로 부른다)."""
+    하지 않는다(call()이 이 함수를 여러 프로바이더에 대해 순서대로 부른다).
+
+    caller_key: 호출자 식별자(익명 방문자 `users.user_id` -- `api/visitor.py` 참고).
+      ⚠ **자리만 있다 -- 아직 아무것도 하지 않는다.** `_check_caps`에도 넘기지 않고
+      (사용자별 캡은 이번 범위 밖 -- 모듈 docstring ④), `api_cost_logs`에도 쓰지 않는다
+      (그 표에 호출자 컬럼 자체가 없다 -- 마이그레이션 없이는 쓸 칸이 없다). 지금은
+      디버그 로그 한 줄로만 흔적을 남긴다 -- 팝콘톡(3단계)에서 사용자별 제한을 실제로
+      구현할 때 `api_cost_logs` 스키마와 함께 이 값을 마저 배선하면 된다(그때 이 함수
+      시그니처를 또 바꾸지 않아도 되는 것이 이번에 자리를 만드는 목적).
+    """
     spec = PROVIDERS.get(provider)
     if spec is None:
         raise ValueError(f"unknown provider: {provider} (registered: {', '.join(PROVIDERS)})")
@@ -649,6 +805,8 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 
     used_model = model or spec.default_model
     has_alt_provider = len(PROVIDERS) > 1
+    log.debug("[llm] calling provider=%s model=%s task_key=%s caller_key=%s",
+              spec.key, used_model, task_key, caller_key)
 
     with engine.connect() as conn:
         _check_caps(conn, spec.key, task_key, customer_facing, has_alt_provider)
@@ -687,20 +845,32 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 # ============================================================================
 # 공개 진입점 -- 모든 호출이 지나는 단일 자리
 # ============================================================================
-def call(prompt: str, *, provider: str = "gemini", task_key: str | None = None,
+def call(prompt: str, *, provider: str | None = None, task_key: str | None = None,
          model: str | None = None, system: str | None = None,
          customer_facing: bool = False, max_output_tokens: int = 2048,
-         timeout_sec: int = 30, fallback_order: list[str] | None = None) -> LLMResult:
+         timeout_sec: int = 30, fallback_order: list[str] | None = None,
+         caller_key: int | None = None) -> LLMResult:
     """LLM을 한 번 부른다(필요하면 폴백까지). 이 함수 밖에서 프로바이더 SDK를 직접
     부르지 않는다.
 
     Args:
         prompt: 사용자/작업 프롬프트. 비어 있으면 ValueError(호출 자체를 안 하므로
             캡ㆍ비용에 영향이 없다).
-        provider: **주(primary)** 프로바이더 -- PROVIDERS의 키. 기본 "gemini".
-        task_key: A-35의 4종 작업 키(task.s1_parse 등) -- ① 작업별 부분 한도 조회
-            ② fallback_order 미지정 시 ai_task_assignments 조회에 쓰인다. 필수 아님.
-        model: 생략하면 PROVIDERS[provider].default_model.
+        provider: **주(primary)** 프로바이더 -- PROVIDERS의 키. **생략(None, 기본값)
+            하면 task_key로 자동으로 정해진다**(`_resolve_task_default` -- 아래 참고).
+            task_key도 없거나 그 작업에 아무 근거가 없으면 옛 하드코딩 기본값 "gemini"로
+            떨어진다(하위 호환 -- provider·task_key 둘 다 생략한 옛 호출부는 동작이
+            바뀌지 않는다). **명시하면 이 값이 항상 이긴다**(task_key가 있어도
+            무시하지 않는다 -- 시험ㆍ특수 호출을 위해).
+        task_key: A-35의 4종 작업 키(task.s1_parse 등). **provider=를 생략했을 때
+            provider·model을 자동으로 정하는 데 쓰인다**(① `ai_task_assignments`
+            우선 ② 없으면 `TASK_DEFAULTS` 코드 기본값). 그 밖에 ③ 작업별 부분 한도
+            조회(`_check_caps`) ④ fallback_order 미지정 시 `_resolve_fallback_order`
+            에도 쓰인다. 필수 아님 -- 생략하면 이 넷 다 그냥 건너뛴다(옛 동작 그대로).
+        model: 생략하면 provider·task_key로 정해진다 -- (명시했든 task_key로 자동
+            선택했든) 최종 provider와 task_key의 배정이 **같은 프로바이더를 가리킬
+            때만** task 기본 모델을 쓰고, 아니면 `PROVIDERS[provider].default_model`
+            (프로바이더당 1개, 옛 동작)로 떨어진다. **명시하면 이 값이 항상 이긴다.**
         system: system instruction(선택).
         customer_facing: action=batch_defer일 때만 의미가 있다 -- 고객이 기다리는
             호출이면 True로 넘겨 한도 초과여도 계속하게 한다. 기본 False(더 안전한
@@ -714,9 +884,16 @@ def call(prompt: str, *, provider: str = "gemini", task_key: str | None = None,
             순으로 정한다. **빈 리스트 `[]`를 넘기면 폴백을 아예 끈다**(주 프로바이더만
             시도) -- model= 를 명시적으로 override한 비교/시험 호출처럼 "정확히 이
             프로바이더·이 모델의 결과만 보고 싶다"는 의도를 표현하는 자리.
+        caller_key: 호출자 식별자 -- 익명 방문자 `users.user_id`(`api/visitor.py`의
+            `visitor.resolve()`가 돌려주는 바로 그 정수값, 회원 승격 후에도 같은 값이
+            이어진다). ⚠ **이번 범위에서는 받아서 로그에 남기기만 한다** -- 사용자별
+            캡ㆍ`api_cost_logs` 기록에는 아직 안 쓴다(그 표에 호출자 컬럼이 없다).
+            팝콘톡(3단계)에서 사용자별 제한을 실제로 구현할 때 이 값을 마저 배선한다
+            -- 지금 자리를 만들어 두면 그때 이 함수의 시그니처를 또 바꾸지 않아도 된다.
 
     Raises:
-        ValueError: prompt가 비어 있거나 provider가 등록되지 않음.
+        ValueError: prompt가 비어 있거나 (명시했든 task_key로 정해졌든) 최종 provider가
+            PROVIDERS에 등록되지 않음.
         LLMNotConfiguredError: **주 프로바이더**부터 키가 없거나 비어 있고(폴백 대상
             아님) 폴백 후보도 전부 같은 이유로 막히면, 마지막 시도의 이 예외가 그대로
             올라온다(아래 LLMAllProvidersFailedError와 달리 "설정 자체가 안 됨"은 굳이
@@ -730,19 +907,48 @@ def call(prompt: str, *, provider: str = "gemini", task_key: str | None = None,
     """
     if not prompt or not prompt.strip():
         raise ValueError("prompt is empty")
-    if provider not in PROVIDERS:
-        raise ValueError(f"unknown provider: {provider} (registered: {', '.join(PROVIDERS)})")
 
-    order = ([provider] if fallback_order == []
-              else [provider] + [p for p in (fallback_order or
-                                              _resolve_fallback_order(provider, task_key))
-                                  if p in PROVIDERS and p != provider])
+    # ── ① task_key -> provider/model 자동 해석 (2026-08-16 세 번째 지시) ─────────
+    # provider=·model=을 이미 둘 다 명시했으면 task_key를 몰라도 되므로 DB를 안 읽는다
+    # (기존처럼 명시 호출만 하는 호출부는 이 층이 생겨도 DB 왕복이 늘지 않는다).
+    task_provider = task_model = None
+    task_reason = ""
+    if task_key and (provider is None or model is None):
+        task_provider, task_model, task_reason = _resolve_task_default(task_key)
+
+    resolved_provider = provider if provider is not None else (task_provider or "gemini")
+    if resolved_provider not in PROVIDERS:
+        raise ValueError(
+            f"unknown provider: {resolved_provider} (registered: {', '.join(PROVIDERS)})")
+
+    # task 기본 모델은 "실제로 쓰기로 한 프로바이더"와 벤더가 같을 때만 적용한다 --
+    # 예: task_key의 배정은 claude인데 provider="gemini"를 명시로 넘기면, claude 모델
+    # 문자열을 gemini API에 보낼 수 없으므로 gemini의 default_model로 그대로 둔다.
+    resolved_model = model
+    if resolved_model is None and task_model and task_provider == resolved_provider:
+        resolved_model = task_model
+    if task_key and (provider is None or model is None):
+        # 무엇을 요청했고(requested) task_key가 무엇을 배정했고(assigned) 최종
+        # 무엇으로 정했는지(using)를 한 줄로 남긴다 -- 0행/미적용/명시 충돌 어느
+        # 경우든 이 로그 한 줄로 "왜 이 값을 썼는지"를 되짚을 수 있다(요구사항 ①).
+        log.info(
+            "[llm] task_key=%s resolution: requested(provider=%s, model=%s)"
+            " assigned(provider=%s, model=%s, %s) -> using(provider=%s, model=%s)",
+            task_key, provider, model, task_provider, task_model, task_reason,
+            resolved_provider, resolved_model or "(default_model)")
+
+    order = ([resolved_provider] if fallback_order == []
+              else [resolved_provider] + [p for p in (fallback_order or
+                                          _resolve_fallback_order(resolved_provider, task_key))
+                                  if p in PROVIDERS and p != resolved_provider])
 
     attempts: list[tuple[str, Exception]] = []
     for i, prov in enumerate(order):
         try:
-            return _call_one(prompt, prov, task_key, model if prov == provider else None,
-                              system, customer_facing, max_output_tokens, timeout_sec)
+            return _call_one(prompt, prov, task_key,
+                              resolved_model if prov == resolved_provider else None,
+                              system, customer_facing, max_output_tokens, timeout_sec,
+                              caller_key=caller_key)
         except Exception as e:
             attempts.append((prov, e))
             is_last = (i == len(order) - 1)
