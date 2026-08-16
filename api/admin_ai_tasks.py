@@ -14,12 +14,23 @@
 
 ■ 닫힌 목록 (A-35, decision-log.md 2026-08-13 사장님 확정)
   작업 종류 4종 · 프로바이더 3사(Codex·Claude·Gemini)는 여기 상수가 정본이다.
-  task_key 4종의 근거는 A-35 원문. 벤더+모델 구체 문자열(gpt-5-codex 등)은 A-35
-  원문에는 없고 화면 정본 `docs/design/dc-ai-task-settings.html`의 JS 상수가 유일한
-  구체적 소재다(조사자 실측 — "디자인 산출물이 유일한 구체적 소재"). DB화하지 않은
-  이유: 이 화면은 배정을 저장하는 화면이지 프로바이더 카탈로그를 관리하는 화면이
-  아니다(비범위) — 실제 연동 착수 시 AI 연동 설정(ADM-AI-040) 쪽에서 카탈로그를
-  다루게 되면 그때 단일 원천을 그리로 옮긴다.
+  task_key 4종의 근거는 A-35 원문. **벤더 3사·작업 4종이라는 구조**는 A-35가 정본이다.
+  화면 원안 `docs/design/dc-ai-task-settings.html`의 JS 상수는 예전엔 구체 모델
+  문자열의 유일한 소재였다(조사자 실측 — "디자인 산출물이 유일한 구체적 소재", 당시
+  기준). DB화하지 않은 이유: 이 화면은 배정을 저장하는 화면이지 프로바이더 카탈로그를
+  관리하는 화면이 아니다(비범위) — 실제 연동 착수 시 AI 연동 설정(ADM-AI-040) 쪽에서
+  카탈로그를 다루게 되면 그때 단일 원천을 그리로 옮긴다.
+
+  ⚠ **모델 세대 갱신(2026-08-16)** — 원안이 예로 든 gpt-5-codex·gpt-5-mini·
+  claude-opus-4-8·claude-sonnet-4-5·gemini-2.5-pro는 이후 세대가 갈렸다. 지금
+  `PROVIDER_CATALOG`의 문자열은 `api/llm.py`의 `PROVIDERS[...].pricing` 딕셔너리
+  키와 동일하다(그 파일이 실제 호출에 쓰는 값 — 실측 근거는 그 파일 docstring:
+  GET /v1/models·공식 단가 문서 대조, 2026-08-16 확인). **이 파일이 지금부터 구체
+  모델 문자열의 실질적 근거다** — 원안은 그 실측 이전에 쓰인 예시값이라 낡았다.
+  **단가($/1M 토큰)는 여기 중복해 적지 않는다** — 정본은 `api/llm.py`의
+  `ModelPricing`(source·valid_until 포함) 하나다, 두 벌 두면 갈라진다(이 저장소의
+  지병). claude-fable-5는 개발자 API 단가 근거를 못 찾아(구독제 전용) 카탈로그에
+  넣지 않았다 — 같은 이유가 `api/llm.py`에도 그대로 적혀 있다.
 
 ■ owner 전용 쓰기
   `api/auth.py`의 `OWNER_WRITE_PREFIXES`에 `/api/admin/ai-task-settings`가 아직
@@ -55,13 +66,16 @@ TASK_CATALOG = [
 TASK_META = {t["key"]: t for t in TASK_CATALOG}
 TASK_KEYS = set(TASK_META)
 
-# 구체적 벤더+모델 문자열의 유일한 소재 = docs/design/dc-ai-task-settings.html (위 docstring)
+# 구체적 벤더+모델 문자열의 정본 = api/llm.py의 PROVIDERS[...].pricing 딕셔너리 키
+# (2026-08-16 갱신 — 위 docstring 참조. 단가는 그 파일에만 두고 여기 반복하지 않는다).
 PROVIDER_CATALOG = [
-    {"vendor": "Codex", "model": "gpt-5-codex"},
-    {"vendor": "Codex", "model": "gpt-5-mini"},
-    {"vendor": "Claude", "model": "claude-opus-4-8"},
-    {"vendor": "Claude", "model": "claude-sonnet-4-5"},
-    {"vendor": "Gemini", "model": "gemini-2.5-pro"},
+    {"vendor": "Codex", "model": "gpt-5.6-sol"},
+    {"vendor": "Codex", "model": "gpt-5.6-terra"},
+    {"vendor": "Codex", "model": "gpt-5.6-luna"},
+    {"vendor": "Claude", "model": "claude-opus-5"},
+    {"vendor": "Claude", "model": "claude-sonnet-5"},
+    {"vendor": "Claude", "model": "claude-haiku-4-5-20251001"},
+    {"vendor": "Gemini", "model": "gemini-3.7-flash"},
 ]
 PROVIDER_PAIRS = {(p["vendor"], p["model"]) for p in PROVIDER_CATALOG}
 
@@ -78,7 +92,19 @@ CONFLICTS = [
      "adopted": True},
 ]
 
-DEFAULT_PROVIDERS = [{"vendor": "Claude", "model": "claude-opus-4-8", "role": "주"}]
+# "+ 작업 추가"(POST /tasks)가 새로 배정하는 작업 4종 전부에 그대로 삽입되는 **단일**
+# 기본값이다 — 이 상수 자체엔 task_key별 분기가 없다(create_task()가 body.task_key와
+# 무관하게 이 리스트를 그대로 쓴다). 2026-08-16 갱신: claude-opus-4-8 -> claude-opus-5
+# (api/llm.py의 claude default_model과 동일 — PROVIDER_CATALOG에도 존재해야 이후
+# PATCH 저장 시 PROVIDER_PAIRS 검증을 통과한다, 아래 _validate_update 참고).
+# ⚠ 하네스가 전달한 사장님 배정표(2026-08-16)는 입력 파싱(task.s1_parse)을
+# claude-haiku-4-5로 특정하는데, 이 상수는 작업별로 갈라지지 않아 4종 전부 같은 값이
+# 들어간다 — 정확한 작업별 모델은 배정 직후 이 화면(PATCH)에서 운영자가 골라야 한다.
+# api/llm.py의 PROVIDERS["claude"].default_model도 같은 구조적 한계로 s1_parse·
+# spec_fill 둘 다에 claude-opus-5 하나를 쓴다(그 파일 주석 — "정확도" 근거) — 두 소스가
+# 입력 파싱의 모델(haiku vs opus)에서 서로 다른 말을 하고 있다. 이 파일에서 판단하지
+# 않고 보고서에만 남긴다.
+DEFAULT_PROVIDERS = [{"vendor": "Claude", "model": "claude-opus-5", "role": "주"}]
 
 NOT_READY_MSG = ("설정 테이블이 아직 준비되지 않았습니다 — 마이그레이션 0046이 적용된 뒤"
                   " 다시 시도하세요(DBA 적용 대기).")

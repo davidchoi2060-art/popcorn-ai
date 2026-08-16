@@ -19,7 +19,20 @@
 ■ 프로바이더·작업·동작 카탈로그 — DB 테이블이 없다(조사자 datamap 실측: "코드화 안 됨").
   정본은 `docs/decisions/decision-log.md` A-35(프로바이더 3사·작업 4종 확정)와
   `docs/design/dc-ai-integration.html`(모델명·envKey·동작 4종 제안값)이다. 이 두 파일이
-  이 모듈의 유일한 근거이므로, 값을 바꾸려면 그 결정이 먼저 바뀌어야 한다.
+  이 모듈의 **구조**(벤더 3사·작업 4종·동작 4종)의 근거이므로, 그 구조를 바꾸려면
+  그 결정이 먼저 바뀌어야 한다.
+
+  ⚠ **구체적 모델 ID 문자열은 예외다(2026-08-16 갱신)** — dc-ai-integration.html이
+  제안값을 적던 시점엔 세 모델 다 최신이었지만 이후 세대가 갈렸다(gpt-5-codex →
+  gpt-5.6-sol · claude-opus-4-8 → claude-opus-5 · gemini-2.5-pro → gemini-3.7-flash).
+  모델 세대는 A-35의 결정 대상이 아니라 각 회사가 바꾸는 사실이라 낡으면 그 자체가
+  결함이다. 지금 값은 `api/llm.py`의 `PROVIDERS[...].default_model`과 같다(그 파일이
+  실제 호출에 쓰는 값 — 실측 근거는 그 파일 docstring, 2026-08-16 확인:
+  GET /v1/models·공식 단가 문서 대조). 이 필드는 프로바이더당 **대표 모델 하나**만
+  담는다 — 작업별로 다른 모델을 쓰는 세부 배정은 `api/admin_ai_tasks.py`의
+  `PROVIDER_CATALOG`/작업별 배정 소관이다(그 파일에서 카탈로그 전체를 고를 수 있다).
+  단가($/1M 토큰)는 여기 두지 않는다 — 정본은 `api/llm.py`의 `ModelPricing`
+  하나다(중복하면 갈라진다, `api/admin_ai_tasks.py` docstring도 같은 근거).
 
 ■ 한도 저장 — `cost_thresholds`·`rate_limit_policies`는 이미 있는 테이블이다(0행,
   컬럼 충분 — 마이그레이션 불필요, 실측 `db/migrations/versions/0001_initial_schema.py`).
@@ -53,13 +66,15 @@ from .timeutil import iso, now_iso
 router = APIRouter(prefix="/api/admin/ai-integration")
 
 # ── 카탈로그(코드 상수 — 위 모듈 docstring 참조: DB 테이블 없음, A-35 + 디자인 원안이 근거) ──
+# 모델 ID는 2026-08-16 갱신 — api/llm.py의 PROVIDERS[...].default_model과 동일 문자열
+# (그 파일이 실제 호출에 쓰는 값, GET /v1/models·공식 단가 문서로 실측 확인됨).
 PROVIDERS = [
     {"key": "codex", "vendor": "Codex", "company": "OpenAI",
-     "env_key": "OPENAI_API_KEY", "model": "gpt-5-codex"},
+     "env_key": "OPENAI_API_KEY", "model": "gpt-5.6-sol"},
     {"key": "claude", "vendor": "Claude", "company": "Anthropic",
-     "env_key": "ANTHROPIC_API_KEY", "model": "claude-opus-4-8"},
+     "env_key": "ANTHROPIC_API_KEY", "model": "claude-opus-5"},
     {"key": "gemini", "vendor": "Gemini", "company": "Google",
-     "env_key": "GEMINI_API_KEY", "model": "gemini-2.5-pro"},
+     "env_key": "GEMINI_API_KEY", "model": "gemini-3.7-flash"},
 ]
 PROVIDER_MAP = {p["key"]: p for p in PROVIDERS}
 
