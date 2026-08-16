@@ -1047,6 +1047,8 @@ class PartTypeBody(BaseModel):
 @router.post("/products/{product_code}/part-type")
 def change_part_type(product_code: int, body: PartTypeBody):
     """분류 변경 — preview로 영향을 먼저 보고, 확인 후 적용한다."""
+    import json as _json
+
     from .admin_orders import _log
 
     new_pt = (body.part_type or "").strip()
@@ -1056,7 +1058,8 @@ def change_part_type(product_code: int, body: PartTypeBody):
     with engine.begin() as conn:
         r = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, category_group,"
-            " ai_candidate_yn, review_required_yn, sale_price, stock_qty, status"
+            " ai_candidate_yn, review_required_yn, sale_price, stock_qty, status,"
+            " locked_fields"
             " FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": product_code}).mappings().first()
         if r is None:
@@ -1100,12 +1103,28 @@ def change_part_type(product_code: int, body: PartTypeBody):
         if body.preview:
             return {"preview": True, "impact": impact}
 
+        # 분류·게이트 결과를 잠근다(2026-08-16 — 사장님 지시: 잠금을 사양·분류·검수
+        # 플래그까지 넓힌다). 안 그러면 다음 재적재가 그대로 되돌린다 — 실사고 둘:
+        # ① 0031이 완제품·베어본을 ETC에서 올려놓은 뒤 08-15 몰 적재가 340건을 다시
+        # ETC로 되돌렸다 ② 123034는 검수로 회부된 채(review_id=8193, 대기)인데
+        # 적재가 review_required_yn을 재계산해 후보로 되돌렸다. 이 UPDATE가 실제로
+        # 쓰는 네 컬럼을 그대로 잠근다 — part_type·category_group은 이 결정 자체이고,
+        # ai_candidate_yn·review_required_yn은 그 결정을 근거로 지금 계산한 게이트
+        # 결과다. 사양을 나중에 채우면(patch_product_specs) 그 경로가 잠금과 무관하게
+        # 직접 재승격하므로 이후 교정 경로는 막히지 않는다 — apply_plan(catalog_ingest)의
+        # UPSERT만 이 잠금을 존중한다.
+        locked = list(r["locked_fields"] or [])
+        for col in ("part_type", "category_group", "ai_candidate_yn", "review_required_yn"):
+            if col not in locked:
+                locked.append(col)
         conn.execute(text(
             "UPDATE products SET part_type=:pt, category_group=:g,"
             " ai_candidate_yn = CASE WHEN :ok THEN true ELSE false END,"
             " review_required_yn = CASE WHEN :ok THEN false ELSE true END,"
+            " locked_fields = CAST(:lf AS JSONB),"
             " updated_at=now() WHERE product_code=:pc"),
-            {"pt": new_pt, "g": new_group, "ok": will_pool, "pc": product_code})
+            {"pt": new_pt, "g": new_group, "ok": will_pool, "pc": product_code,
+             "lf": _json.dumps(locked, ensure_ascii=False)})
         # 사양 행의 분류도 함께 옮긴다 — 어긋나면 적재·검수가 서로 다른 종류로 본다
         conn.execute(text(
             "UPDATE product_specs SET part_type=:pt, updated_at=now()"
@@ -1153,7 +1172,8 @@ def change_part_type(product_code: int, body: PartTypeBody):
                        "from": old_pt, "to": new_pt,
                        "before": {"category_group": r["category_group"],
                                   "ai_candidate_yn": r["ai_candidate_yn"],
-                                  "review_required_yn": r["review_required_yn"]},
+                                  "review_required_yn": r["review_required_yn"],
+                                  "locked_fields": list(r["locked_fields"] or [])},
                        "closed": closed, "opened": opened}, kind="product")
         now_pool = conn.execute(text(
             "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
@@ -1161,15 +1181,19 @@ def change_part_type(product_code: int, body: PartTypeBody):
 
     return {"ok": True, "impact": impact, "reviews_closed": closed,
             "reviews_opened": opened, "in_pool": now_pool, "undo_id": log_id,
+            "locked_fields": locked,
             "note": ("분류를 " + impact["to"]["label"] + "로 바꿨습니다."
                      + (" 검수 " + str(closed) + "건이 해소되고" if closed else "")
                      + (" " + str(opened) + "건이 새로 올라왔습니다." if opened else
-                        (" 추천 후보에 올랐습니다." if now_pool else "")))}
+                        (" 추천 후보에 올랐습니다." if now_pool else ""))
+                     + " 분류·게이트는 잠겼습니다 — 다음 적재가 덮지 않습니다.")}
 
 
 @router.post("/products/part-type/undo/{log_id}")
 def undo_part_type(log_id: int):
-    """분류 변경 되돌리기 — 분류·그룹·게이트 상태를 함께 되돌린다."""
+    """분류 변경 되돌리기 — 분류·그룹·게이트·잠금 상태를 함께 되돌린다."""
+    import json as _json
+
     from .admin_orders import _log
 
     with engine.begin() as conn:
@@ -1186,13 +1210,17 @@ def undo_part_type(log_id: int):
             raise HTTPException(409, "이미 되돌린 변경입니다")
         d = row["detail"] or {}
         pc, b = d.get("product_code"), d.get("before") or {}
+        # 잠금도 변경 전 상태로 되돌린다 — 값만 원복하고 잠금이 남으면 적재가 영영
+        # 못 채운다(CLAUDE.md §관리자 화면 규약: "되돌릴 때 잠금도 함께 되돌린다").
         conn.execute(text(
             "UPDATE products SET part_type=:pt, category_group=:g,"
-            " ai_candidate_yn=:ac, review_required_yn=:rr, updated_at=now()"
+            " ai_candidate_yn=:ac, review_required_yn=:rr,"
+            " locked_fields = CAST(:lf AS JSONB), updated_at=now()"
             " WHERE product_code=:pc"),
             {"pt": d.get("from"), "g": b.get("category_group"),
              "ac": b.get("ai_candidate_yn", False),
-             "rr": b.get("review_required_yn", True), "pc": pc})
+             "rr": b.get("review_required_yn", True),
+             "lf": _json.dumps(b.get("locked_fields") or [], ensure_ascii=False), "pc": pc})
         conn.execute(text(
             "UPDATE product_specs SET part_type=:pt, updated_at=now()"
             " WHERE product_code=:pc"), {"pt": d.get("from"), "pc": pc})

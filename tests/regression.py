@@ -4153,6 +4153,7 @@ def test_part_type_change():
         return
     _selftest_remember("last_target_part_type_change", pc)
     was = db_one("SELECT part_type FROM products WHERE product_code=:p", p=pc)
+    locked_before = db_one("SELECT locked_fields FROM products WHERE product_code=:p", p=pc)
     pool0 = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty>0")
 
     st, prev = post(f"/api/admin/products/{pc}/part-type",
@@ -4188,6 +4189,20 @@ def test_part_type_change():
             check("없는 분류는 400",
                   post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0] == 400,
                   400, post(f"/api/admin/products/{pc}/part-type", {"part_type": "ZZZ"})[0])
+            # ── 잠금 확대(2026-08-16) — ㉢ change_part_type이 잠금을 걸어야 다음
+            # 재적재가 이 분류·게이트 판정을 되돌리지 못한다(0031/123034 실사고와 같은
+            # 모양). 응답과 DB를 둘 다 본다 — 응답만 보면 "말은 그런데 실제로는 안
+            # 걸림"을 놓친다.
+            want_locked = {"part_type", "category_group", "ai_candidate_yn",
+                           "review_required_yn"}
+            check("분류 변경이 응답에서 4개 필드를 잠갔다고 밝힌다",
+                  want_locked <= set((ap or {}).get("locked_fields") or []),
+                  sorted(want_locked), (ap or {}).get("locked_fields"))
+            locked_after_apply = db_one(
+                "SELECT locked_fields FROM products WHERE product_code=:p", p=pc)
+            check("분류 변경이 DB에 실제로 4개 필드를 잠갔다(DB 직접 재확인)",
+                  want_locked <= set(locked_after_apply or []),
+                  sorted(want_locked), locked_after_apply)
     finally:
         if uid is not None:
             try:
@@ -4204,6 +4219,12 @@ def test_part_type_change():
             now_pool = db_one("SELECT count(*) FROM v_recommendation_candidates"
                               " WHERE stock_qty>0")
             check("되돌린 뒤 추천 풀이 제자리(DB 직접 재확인)", now_pool == pool0, pool0, now_pool)
+            # 잠금도 원복돼야 한다 — 값만 되돌리고 잠금이 남으면 적재가 영영 못 채운다
+            # (CLAUDE.md §관리자 화면 규약, 슬라이스 53의 되돌리기 원칙과 동일).
+            now_locked = db_one(
+                "SELECT locked_fields FROM products WHERE product_code=:p", p=pc)
+            check("분류 변경 되돌리기가 잠금도 원복한다(DB 직접 재확인)",
+                  now_locked == locked_before, locked_before, now_locked)
             if st3 == 200:
                 st4, _ = post(f"/api/admin/products/part-type/undo/{uid}")
                 check("이중 되돌리기는 409", st4 == 409, 409, st4)
@@ -5355,19 +5376,59 @@ def test_display_name():
         leaked = [n for n in rows if "회원가입" in display_name(n) and display_name(n) != n]
         check(f"[42] 원천 {len(rows)}건 파생 후 꼬리 잔존 없음", not leaked, 0, len(leaked))
         exempt = [n for n in rows if display_name(n) == n]
+        # 2026-08-16: 오늘부터 꼬리가 대괄호로 감싸이며(`[회원가입 …]`) 예외 판정이 뚫렸다.
+        # "원천이 통째로 광고"인 예외는 이제 "회원가입"으로 시작하거나 "[회원가입"으로
+        # 시작하거나 둘 다다 — 문자열 시작 형태가 아니라 **판정 근거(못 잘랐다는 사실)**가
+        # 예외인지를 정하므로, 여기서는 두 형태 모두 정당한 예외로 받는다.
         check(f"[42] 자를 수 없는 예외 {len(exempt)}건 — 전부 원천이 통째로 광고",
-              all(n.startswith("회원가입") for n in exempt), "전부",
-              [n[:20] for n in exempt if not n.startswith("회원가입")])
+              all(n.startswith(("회원가입", "[회원가입")) for n in exempt), "전부",
+              [n[:20] for n in exempt if not n.startswith(("회원가입", "[회원가입"))])
 
     # ④ 파생이 못 푸는 결함은 **게이트가 막는다** — 이름 없는 부품이 견적에 들어가면
     #    고객은 무엇을 사는지 알 수 없다. 123034(원천이 통째로 광고)를 검수 회부해 뺐고,
     #    같은 것이 다음 적재로 또 들어오면 여기서 잡힌다. 고정 건수가 아니라 관계다.
-    bad = db_one("SELECT COUNT(*) FROM v_recommendation_candidates"
-                 " WHERE product_name LIKE '회원가입%'")
-    if bad is None:
+    #
+    #    2026-08-16: 게이트가 `LIKE '회원가입%'`(문자열이 그 낱말로 **시작**해야 매치)였는데,
+    #    오늘부터 새 형태는 `[회원가입…]`(대괄호로 시작)이라 이 게이트가 841건을 전부
+    #    놓쳤다. `%회원가입%`로 넓히되, "문자열 시작"이라는 형태 판정 대신
+    #    **display_name() 이 실제로 못 자르는지**(원본과 동일하게 돌아오는지)를 직접
+    #    본다 — 정상적으로 잘리는 후보(대부분)까지 걸리면 안 되기 때문이다.
+    cand_ad = db_all("SELECT product_code, product_name FROM v_recommendation_candidates"
+                      " WHERE product_name LIKE '%회원가입%'")
+    if _engine is None:
         check("[42] 이름 없는 후보 검사", True, "DB 미접속 — 건너뜀", "건너뜀", kind="SKIP")
     else:
-        check("[42] 이름이 통째로 판매조건인 추천 후보 없음", bad == 0, 0, bad)
+        uncuttable = [r["product_code"] for r in cand_ad
+                      if display_name(r["product_name"]) == r["product_name"]]
+        check(f"[42] 이름이 통째로 판매조건인 추천 후보 없음 (원천에 꼬리 있는 후보 {len(cand_ad)}건 대조)",
+              not uncuttable, 0, uncuttable)
+
+    # ④' (신설, 2026-08-16) — 「지웠는데 껍데기가 남았다」를 직접 본다.
+    #    이번 사고의 본질은 완전 실패(③·④가 본다)가 아니라 **부분 실패**였다: 여는
+    #    대괄호가 "회원가입" 앞에 있어 매치 밖으로 새고, 잘린 결과가 `…파워 [` 처럼
+    #    대괄호 하나만 매달린 채 나갔다. 그런 잔해를 보는 검사가 기존에 하나도 없었다
+    #    (③은 "회원가입"이 남았는지만 보고, ④는 완전 미절단만 본다). 후보 뷰
+    #    **전체**(추천 + 주변기기)를 대상으로, 파생 후 대괄호가 홀로 남거나 개수가
+    #    어긋나는지를 관계로 본다 — 고정 건수가 아니다.
+    residue_rows = db_all(
+        "SELECT product_code, product_name FROM v_recommendation_candidates"
+        " WHERE product_name LIKE '%회원가입%'"
+        " UNION"
+        " SELECT product_code, product_name FROM v_companion_candidates"
+        " WHERE product_name LIKE '%회원가입%'")
+    if _engine is None:
+        check("[42] 후보 뷰 파생 잔해 검사", True, "DB 미접속 — 건너뜀", "건너뜀", kind="SKIP")
+    else:
+        def _has_residue(n):
+            d = display_name(n)
+            # 홀로 남은 여는 대괄호(오늘의 실제 증상) + 일반적인 대괄호 개수 불일치(안전망).
+            # 닫는 대괄호로 끝나는 것은 걸지 않는다 — `[32G x 4]`처럼 정당한 대괄호도
+            # 흔히 그렇게 끝난다(개수가 맞으면 정당한 것으로 본다).
+            return ("회원가입" in d) or d.rstrip().endswith("[") \
+                or (d.count("[") != d.count("]"))
+        residue = [r["product_code"] for r in residue_rows if _has_residue(r["product_name"])]
+        check(f"[42] 추천·주변기기 후보 {len(residue_rows)}건, 파생 후 대괄호·꼬리 잔해 없음",
+              not residue, 0, residue)
 
     # ⑤ 관통 — 고객 응답(견적·대안·연쇄)에 꼬리가 없다
     TAILS = ("회원가입", "맞춤할인", "현금할인", "할인쿠폰")
@@ -5385,8 +5446,11 @@ def test_display_name():
                 names.append((slot, ch["from"]["name"]))
     # 이름이 통째로 광고인 상품은 여기서 세지 않는다 — 그건 ④가 게이트로 잡는 다른 결함이다.
     # 둘을 섞으면 실패 메시지가 "파생이 샜다"인지 "게이트가 뚫렸다"인지 구분되지 않는다.
+    # 2026-08-16: 그 예외 형태가 "회원가입"으로 시작하는 것 말고 "[회원가입"으로 시작하는
+    # 것도 생겼다(위 ③·④와 같은 이유) — 여기서도 같이 받아야 같은 상품이 두 검사에서
+    # 서로 다른 이름(파생 실패/게이트 뚫림)으로 중복 보고되지 않는다.
     leak = [(s, n) for s, n in names
-            if any(t in n for t in TAILS) and not n.startswith("회원가입")]
+            if any(t in n for t in TAILS) and not n.startswith(("회원가입", "[회원가입"))]
     check(f"[42] 고객 응답 이름 {len(names)}건에 판매조건 꼬리 없음",
           not leak, 0, leak[:3])
     check("[42] 응답 표본이 비어 있지 않다(검사가 헛돌지 않는다)",
@@ -5513,6 +5577,219 @@ def test_rebuild_screens():
           c["total"], c["new"] + c["todo"])
 
 
+def test_lock_scope():
+    """[44] 잠금 범위 확대 — 사양·분류·검수 플래그까지 (2026-08-16 사장님 지시)
+
+    **왜 새 함수인가.** 이전에는 잠금(`locked_fields`)이 지키는 것이 매입가·판매가
+    둘뿐이었다 — 같은 UPSERT의 나머지 14개 컬럼은 무조건 EXCLUDED였다. 실사고 둘:
+    `0031_built_pc_axis.py`가 완제품·베어본을 ETC에서 올려놓은 뒤 2026-08-15 몰
+    적재(job 25, 24,721행)가 340건을 다시 ETC로 되돌렸고, 상품 123034는 검수로
+    회부된 채(review_id=8193, 대기)인데 적재가 review_required_yn을 재계산해
+    후보로 되돌렸다.
+
+    **왜 이 방식인가 — apply_plan()을 실행하지 않는다.** "회귀는 정본을 쓰지
+    않는다"(슬라이스 50 — 업로드 dryrun 검사가 apply까지 돌려 시드 상품 하나를
+    테스트 값으로 덮은 전례)는 폐기할 수 없는 규약이다. 그래서 세 갈래로 나눠
+    **쓰기 없이** 검증한다:
+      ① 정적 SQL 검사 — UPSERT 문자열 자체에 잠금 가드가 있는지(문자열만 본다.
+         DB에도 닿지 않는다)
+      ② EXPLAIN — 고친 SQL이 실제 스키마에 문법적으로 맞는지. `EXPLAIN`(ANALYZE
+         아님)은 계획만 세우고 **실행하지 않는다** — Postgres 문서 그대로, 데이터를
+         전혀 건드리지 않는다. 그래도 트랜잭션을 열고 명시적으로 rollback한다(안전벨트).
+      ③ `build_plan()` 순수 함수 검사 — 이 함수는 **DB를 건드리지 않는다**
+         (모듈 docstring이 이미 그렇게 선언하고 있다). 합성 입력을 직접 만들어 호출하고
+         반환된 계획(딕셔너리)만 본다 — 실제 DB에 쓰는 건 apply_plan()이고 여기서는
+         한 번도 부르지 않는다.
+      ③-b 실제 DB의 잠금 데이터(388개 상품 · 562건, 실측)를 **읽기만** 해서
+         (`read_refs()`는 SELECT뿐이다) 진짜 사양명·part_type으로 합성 CSV 행을
+         만들고, 거기에 "현재 값과 확실히 다른" 더미 EAV 값을 주입해 build_plan을
+         두 번(잠금 있음/없음) 돌려 비교한다. **DB에는 여전히 아무것도 쓰지 않는다**
+         — build_plan은 순수 함수이고 이 검사는 apply_plan을 부르지 않는다.
+    """
+    print("\n[44] 잠금 범위 확대 — 사양·분류·검수 플래그까지 (2026-08-16)")
+    import re as _re44
+
+    try:
+        if ROOT not in sys.path:
+            sys.path.insert(0, ROOT)
+        from api import catalog_ingest as ci
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] (I) 잠금 범위 — api.catalog_ingest import 실패: {e}")
+        return
+
+    # ── ① 정적 SQL 검사 — 문자열만 본다, DB 미접속이어도 항상 돈다 ──────────────
+    sql = ci.UPSERT_PRODUCTS_SQL
+    for col in ci.LOCK_AWARE_PRODUCT_COLS:
+        guarded = _re44.search(
+            r"\b" + _re44.escape(col) + r"\s*=\s*CASE WHEN products\.locked_fields \? '"
+            + _re44.escape(col) + "'", sql) is not None
+        check(f"[44] products UPSERT가 {col} 잠금을 확인한다(정적 SQL 검사)", guarded,
+              "CASE WHEN 가드 있음", "없음 — 이 컬럼은 잠겨도 재적재가 덮는다")
+    n_guards = len(_re44.findall(r"CASE WHEN products\.locked_fields \?", sql))
+    check("[44] 잠금 가드 수 = LOCK_AWARE_PRODUCT_COLS 수"
+          "(어긋나면 목록에 없는 컬럼이 가드를 갖고 있거나 그 반대다)",
+          n_guards == len(ci.LOCK_AWARE_PRODUCT_COLS),
+          len(ci.LOCK_AWARE_PRODUCT_COLS), n_guards)
+    # stock_qty·status는 **의도적으로** 잠금 밖이다(재고·판매상태는 몰의 실시간 값을
+    # 옮겨 적은 것이라 영구히 얼리면 없는 물건을 팔거나 재입고를 계속 감춘다 — 근거는
+    # UPSERT_PRODUCTS_SQL 모듈 상수 주석). 그 결정이 조용히 뒤집히는지(가드가 생겼다
+    # 없어졌다 하는지) 이 검사가 지킨다 — 실패하면 코드가 결정과 달라졌다는 뜻이다.
+    check("[44] stock_qty는 의도적으로 잠금 대상 밖이다(무조건 EXCLUDED — 재고는 원장 소관)",
+          "stock_qty = EXCLUDED.stock_qty" in sql, "무조건 갱신", "가드가 생겼다")
+    check("[44] status는 의도적으로 잠금 대상 밖이다(무조건 EXCLUDED — 몰의 실시간 판매상태)",
+          _re44.search(r"\bstatus = EXCLUDED\.status\b", sql) is not None,
+          "무조건 갱신", "가드가 생겼다")
+
+    # ── ② EXPLAIN — SQL이 실제 스키마에 문법적으로 맞는가 (쓰기 없음) ───────────
+    if _engine is None:
+        print("  [SKIP] (I) [44] UPSERT SQL 파싱(EXPLAIN) — DB 미연결: " + _db_why)
+    else:
+        prod_params = {"pc": -1, "sku": "회귀", "name": "회귀", "maker": None, "model": None,
+                       "pt": "ETC", "grp": "etc", "status": "판매중", "ai": False, "rev": True,
+                       "pp": None, "sp2": None, "mp": None, "sup": None, "dan": None,
+                       "stock": 0, "spec_text": None, "origin": "real"}
+        spec_params = {"pc": -1, "pt": "CPU", "sources": "{}"}
+        spec_params.update({c: None for c in ci.SPEC_COLS})
+        with _engine.connect() as c:
+            err1 = err2 = None
+            tx = c.begin()
+            try:
+                c.execute(text("EXPLAIN " + ci.UPSERT_PRODUCTS_SQL), prod_params)
+            except Exception as e:                       # noqa: BLE001
+                err1 = repr(e)
+            finally:
+                tx.rollback()          # EXPLAIN은 쓰지 않지만 안전벨트로 명시 롤백
+            check("[44] products UPSERT가 실제 스키마에 문법적으로 맞는다(EXPLAIN, 쓰기 없음)",
+                  err1 is None, "EXPLAIN 성공", err1 or "—")
+
+            tx2 = c.begin()
+            try:
+                c.execute(text("EXPLAIN " + ci.UPSERT_SPECS_SQL), spec_params)
+            except Exception as e:                       # noqa: BLE001
+                err2 = repr(e)
+            finally:
+                tx2.rollback()
+            check("[44] product_specs UPSERT가 실제 스키마에 문법적으로 맞는다(EXPLAIN, 쓰기 없음)",
+                  err2 is None, "EXPLAIN 성공", err2 or "—")
+
+    # ── ③ build_plan 순수 함수 검사 — DB에 한 번도 쓰지 않는다 ──────────────────
+    def _row(code, name, l2):
+        return {"자체상품코드": str(code), "상품명": name, "카테고리1": "PC/주요부품",
+                "카테고리2": l2, "카테고리3": "인텔", "상태값": "판매중", "매입가": "10000",
+                "일반회원": "20000", "시중가": "30000", "공급처": "회귀", "스펙": "",
+                "제조사": "테스트", "모델명": "회귀모델", "다나와No": ""}
+
+    # 회귀 전용 가짜 코드 — DB에 없는 값이라 실제 상품과 절대 겹치지 않는다
+    A, B, C = 919990001, 919990002, 919990003
+    rows = [_row(A, "회귀 잠금 A", "프로세서(CPU)"), _row(B, "회귀 잠금 B", "프로세서(CPU)"),
+            _row(C, "회귀 잠금 C", "프로세서(CPU)")]
+    kvs = {str(A): {"소켓 형태": "AM5"}, str(B): {"소켓 형태": "AM5"},
+           str(C): {"소켓 형태": "AM5"}}
+    # A=검수 승인 경로 표기('specs.'접두어) · B=사양 PATCH 경로 표기(맨 이름) · C=잠금 없음(대조군)
+    refs = {"gpu_ref": {}, "dan_owner": {}, "existing": {},
+            "locked": {A: ["specs.socket"], B: ["socket"]}}
+    plan = ci.build_plan(rows, kvs, {}, refs, "real")
+    sp = {s["pc"]: s for s in plan["specs"]}
+    check("[44] build_plan — CSV에 값이 있어도 'specs.'접두어로 잠긴 사양은 계획에 안 오른다"
+          "(검수 승인 경로 표기)",
+          sp.get(A, {}).get("socket") is None, None, sp.get(A, {}).get("socket"))
+    check("[44] build_plan — CSV에 값이 있어도 맨 이름으로 잠긴 사양은 계획에 안 오른다"
+          "(사양 PATCH 경로 표기)",
+          sp.get(B, {}).get("socket") is None, None, sp.get(B, {}).get("socket"))
+    check("[44] build_plan — 대조군: 잠기지 않았으면 그대로 뽑힌다"
+          "(위 두 결과가 억지로 None인 게 아님을 증명)",
+          sp.get(C, {}).get("socket") == "AM5", "AM5", sp.get(C, {}).get("socket"))
+
+    # ── ③-b 실제 DB의 잠금 388건을 대상으로 대규모 대조 — 읽기만 한다 ───────────
+    # docs/상품다운_2026-08-15_병합_24721.csv 자체는 EAV가 없어(파일 실측) 대부분
+    # 필드가 애초에 안 뽑힌다(위험이 우연히 0으로 나와 "보호됐다"는 착시를 준다).
+    # 그래서 실제 잠긴 상품의 진짜 part_type·상품명을 그대로 쓰되, 그 종류가 실제로
+    # 읽는 EAV 키에 "지금 값과 다른 게 확실한" 더미 값을 주입해 진짜 충돌을 강제로
+    # 만든다. 이러면 "잠금이 없었다면 정말 덮였을 것"만 골라 그 보호 여부를 잰다.
+    if _engine is None:
+        print("  [SKIP] (I) [44] 실제 잠금 데이터 대조 — DB 미연결: " + _db_why)
+        return
+    KV_KEY = {
+        ("CPU", "tdp_watt"): ("열 설계 전력(TDP)", "999"),
+        ("CPU", "socket"): ("소켓 형태", "ZZ9999"),
+        ("RAM", "capacity_gb"): ("메모리 용량", "999(GB)"),
+        ("RAM", "clock_mhz"): ("동작 클럭", "9999"),
+        ("GPU", "length_mm"): ("길이", "999"),
+        ("GPU", "required_power_watt"): ("권장파워", "9999"),
+        ("POWER", "rated_watt"): ("정격출력", "9999"),
+        ("CASE", "gpu_max_mm"): ("VGA장착길이", "999"),
+        ("CASE", "cooler_height_mm"): ("CPU쿨러장착높이", "999"),
+        ("COOLER_CPU_AIR", "cooler_height_mm"): ("높이", "999"),
+        ("COOLER_CPU_AIR", "cooler_tdp"): ("TDP", "9999"),
+        ("COOLER_CPU_AIO", "cooler_tdp"): ("TDP", "9999"),
+        ("SSD", "capacity_gb"): ("용량", "9999(GB)"),
+        ("HDD", "capacity_gb"): ("용량", "9999(GB)"),
+        ("MONITOR", "refresh_hz"): ("주사율", "999"),
+        ("MONITOR", "resolution"): ("해상도", "ZZZ해상도"),
+        ("MONITOR", "panel"): ("패널", "ZZZ패널"),
+    }
+    PT_TO_L2 = {"CPU": "프로세서(CPU)", "MB": "메인보드(M\\B)", "RAM": "메모리(RAM)",
+                "GPU": "그래픽카드(VGA)", "POWER": "파워(POWER)", "CASE": "케이스(CASE)",
+                "SSD": "고속저장(SSD)", "HDD": "저장장치(HDD)"}
+
+    with _engine.connect() as conn:
+        refs_real = ci.read_refs(conn)
+        locked_rows = conn.execute(text(
+            "SELECT product_code, part_type, product_name FROM products"
+            " WHERE jsonb_array_length(locked_fields) > 0")).mappings().all()
+
+    spec_col_set = set(ci.SPEC_COLS)
+    targets = []
+    for r in locked_rows:
+        pc, pt, name = r["product_code"], r["part_type"], r["product_name"]
+        for f in (refs_real["locked"].get(pc) or []):
+            bare = f[len("specs."):] if f.startswith("specs.") else f
+            if bare in spec_col_set and (pt, bare) in KV_KEY:
+                targets.append((pc, pt, name, bare))
+
+    if not targets:
+        print("  [SKIP] (I) [44] 실제 잠금 데이터 대조 — 강제 충돌시킬 대상 없음"
+              "(잠긴 사양이 없거나 전부 KV_KEY 밖의 필드)")
+        return
+
+    rows2, kvs2 = [], {}
+    for pc, pt, name, field in targets:
+        skey = str(pc)
+        l2 = PT_TO_L2.get(pt, "")
+        rows2.append({"자체상품코드": skey, "상품명": name or f"상품{pc}",
+                      "카테고리1": "PC/주요부품" if l2 else "기타", "카테고리2": l2,
+                      "카테고리3": "", "상태값": "판매중", "매입가": "1000",
+                      "일반회원": "2000", "시중가": "3000", "공급처": "회귀검증",
+                      "스펙": "", "제조사": "", "모델명": "", "다나와No": ""})
+        key, dummy = KV_KEY[(pt, field)]
+        kvs2.setdefault(skey, {})[key] = dummy
+
+    plan_prot = ci.build_plan(rows2, kvs2, {}, refs_real, "real")
+    refs_unlocked = dict(refs_real)
+    refs_unlocked["locked"] = {}
+    plan_unprot = ci.build_plan(rows2, kvs2, {}, refs_unlocked, "real")
+    sp_prot = {s["pc"]: s for s in plan_prot["specs"]}
+    sp_unprot = {s["pc"]: s for s in plan_unprot["specs"]}
+
+    would_overwrite, protected_ok, leaked = 0, 0, []
+    for pc, pt, name, field in targets:
+        unprot_val = (sp_unprot.get(pc) or {}).get(field)
+        if unprot_val is None:
+            continue                    # 이 상품은 이번 합성 CSV로 분류가 안 살았거나 추출 실패 — 대상 밖
+        would_overwrite += 1
+        prot_val = (sp_prot.get(pc) or {}).get(field)
+        if prot_val is None:
+            protected_ok += 1
+        else:
+            leaked.append({"product_code": pc, "field": field, "part_type": pt,
+                          "protected_value": prot_val})
+    check(f"[44] 실제 잠금 상품 중 강제 충돌시킨 {would_overwrite}건이 전부 보호된다"
+          "(잠금 없었으면 실제로 덮였을 값을 만들어 확인 — DB에는 안 씀)",
+          would_overwrite > 0 and leaked == [], "0건 누락", leaked[:5] or f"충돌 대상 {would_overwrite}건")
+    check("[44] 이 검사가 실제로 뭔가를 시험했다(충돌 0건이면 위 결과가 무의미하다)",
+          would_overwrite > 0, "> 0", would_overwrite)
+
+
 def main():
     print("=" * 74)
     print("팝콘PC AI 통합 회귀 세트 — 전량 불변식(I). 절대값 대신 관계·원천 대조 (A-13)")
@@ -5570,7 +5847,8 @@ def main():
                test_guards,
                test_rebuild_screens,
                test_display_name,
-               test_std_schema):
+               test_std_schema,
+               test_lock_scope):
         try:
             fn()
         except Exception as e:

@@ -44,8 +44,73 @@ SKIP_L1 = {"삭제대기", "내부관리용", "고객님 개인결제"}
 # 판단 근거는 **스펙 원문의 분류 토큰**뿐이다 — 상품명으로 보면 모듈러 파워의 '케이블',
 # SSD의 '연장가이드'까지 걸려 진짜 부품을 추천에서 떨어뜨린다(위험 방향이 반대다).
 # 완성품 중 **베어본·미니PC만** 분류 토큰으로 잴 수 있다(아래 NOT_PART 에 이미 있는 말이다).
-# 완제품 PC 는 근거가 없어 여기서 판정하지 않는다 — `map_part_type` 주석 참조.
+# 완제품 PC 판정은 `map_part_type` 주석 참조(2026-08-16 부로 분기가 생겼다).
 BAREBONE_CLS = re.compile(r"베어본|미니\s*PC", re.I)
+
+# 완제품 PC — 카테고리1 축(2026-08-16, `docs/상품다운_2026-08-15_병합_24721.csv` 24,721행
+# 전수 실측). 이 CSV 안에서 완제 PC 를 담는 카테고리1 은 이 값 **하나뿐**이다(다른
+# 카테고리1 17종 어디에도 '완제'·'조립PC'·'바로쓰는' 류 표기가 없다 — 전수 검색 결과).
+PREMIUM_PC_L1 = "프리미엄 피씨"
+# 그런데 이 카테고리1 아래에 완제품이 아닌 것이 섞여 있다(실측 359건 중 19건):
+#   '생활가전'(15+1건) — 표본 전수가 에어컨·냉풍기·제빙기·건조기다. 몰이 교차판매용으로
+#     같은 카테고리1 에 끼워 넣은 것으로 보인다 — PC가 아니다.
+#   '소중한고객님※개인결제※'(3건) — 상품명이 '테스트용PC'·개인 이름(예: 최명국_서버)인
+#     개인결제 안내 페이지다. `SKIP_L1` 의 '고객님 개인결제'와 같은 성격이라 제외한다.
+# 상품명이 아니라 **카테고리2 값 자체**로 거른다(슬라이스 51 — 상품명 유추는 오탐을 만든다).
+PREMIUM_PC_EXCLUDE_L2 = {"생활가전", "소중한고객님※개인결제※"}
+
+# ─── 중고 부품(2026-08-16, 사장님 지시 "중고 부품은 견적에서 빼둔다. 다만 분류는
+# 제대로 잡아라") — 24,721행 전수 실측 근거는 map_part_type 하단 `map_part_type`
+# 독스트링과 `has_used_mark` 주석 참조. ───
+#
+# 중고 그래픽카드 — 카테고리2 자체가 표준 '그래픽카드(VGA)'와 다른, 몰이 아예 분리해
+# 둔 값이다. 카테고리 그 자체가 이미 "중고"라는 판매조건을 담고 있으므로 **상품명 표시
+# 여부와 무관하게** 여기서 category_group을 core_part 밖(etc)으로 정한다 — 상품명에
+# 오탈자가 있어도(실측 24건 중 1건 "[중괴]") 카테고리가 더 믿을 수 있는 근거다(슬라이스
+# 51과 같은 원칙 — 카테고리로 거른다). `l1`을 함께 본다 — 아래 '중고그래픽카드'(공백
+# 없음, 컴퓨터주변기기 축)는 전혀 다른 것이다: 그래픽카드가 아니라 **중고 조립PC 번들**
+# (CPU+RAM+SSD+GPU 전체 구성)을 검색 노출 목적으로 그래픽카드 카테고리에 끼워 넣은
+# 것으로 보인다(실측 12건 전수가 상품명에 "중고조립컴퓨터"·"중고게이밍컴퓨터"를 명시하고
+# 스펙 필드도 부품 사양이 아니라 "[12400F/16G/250G/GTX1660SU]"식 완제품 구성이다 —
+# 카테고리3 값도 "그래픽카드중고pc"로 몰 스스로 'pc'를 붙여 구분해 뒀다). part_type=GPU로
+# 넣으면 그래픽카드가 아닌 것을 그래픽카드라 부르는 거짓 분류가 된다 — 여기서는 판정하지
+# 않는다(기존과 같이 미분류로 남는다). 완제품 축(PC_COMPLETE)으로 볼지는 `PREMIUM_PC_L1`
+# 축 밖의 별도 사례라 이번 수정에 포함하지 않았다(보고 참조).
+USED_GPU_L1 = "알레오코인 채굴기/ 부품"
+USED_GPU_L2 = "중고 그래픽카드"
+
+# 알레오코인(채굴) 카테고리 아래 부품 — 우리 표준 라벨과 표기만 다르다(괄호 약어 없음).
+# 이 카테고리 자체는 "채굴용"이라는 뜻이지 "중고"라는 뜻이 아니다(실측: 이 별칭 5건 중
+# 1건 "COLORFUL H81A-BTC"는 상품명·스펙 어디에도 중고 표시가 없다 — 카테고리만으로
+# 중고 단정은 오판이다). 중고 여부는 `has_used_mark`가 상품명+스펙 원문에서 따로
+# 판정한다 — 아래 CORE_L2로 들어가는 정상 표기 상품도 **같은 판정**을 받는다(이 별칭에
+# 국한된 로직이 아니다).
+MINING_L1 = "알레오코인 채굴기/ 부품"
+MINING_L2_ALIAS = {"메인보드": "MB", "파워서플라이": "POWER", "저장장치(SSD)": "SSD"}
+
+# 프로모션 진열 카테고리("베스트7주력부품") 아래 CPU·SSD — 표기만 다르다(괄호 없음).
+# "중고"와 무관하다(실측 3건 전부 상품명·스펙에 중고 표시 없음 — CPU 1건은 "(정품박스)"로
+# 신품임을 스스로 밝힌다).
+PROMO_L1 = "베스트7주력부품"
+PROMO_L2_ALIAS = {"CPU": "CPU", "SSD": "SSD"}
+
+# 상품명·스펙 원문에 몰이 명시한 중고·리퍼 표시 — **표준 카테고리로 이미 core_part가
+# 되는 상품 안에도 이 표시가 섞여 있다**(실측 67건: '그래픽카드(VGA)'·'메모리(RAM)'·
+# '메인보드(M/B)' 같은 정상 카테고리인데 상품명이나 스펙 원문(형식 B의 "분류 : 중고",
+# 부품 계열 접두어 "중고/리퍼 컴퓨터부품 / ...")이 스스로 중고·리퍼임을 밝힌다).
+# '벌크'(정품박스 없는 유통 형태)·'미사용'(신품이라는 뜻)은 중고가 아니므로 넣지 않는다
+# — 실측에서 '(정품)'·'[미사용]'이 함께 걸리는 상품도 있었고, 그런 것은 신품 판정을
+# 그대로 둔다(예: "AMD 라이젠 스레드리퍼 PRO 3975WX (캐슬 픽-W)(정품)"). '리퍼' 단독은
+# '쓰레드리퍼'(Threadripper)·'스레드리퍼' 일부와 겹쳐 오탐이 난다(실측 47건 오탐) —
+# 대괄호로 감싼 표시이거나 '리퍼비시' 전체 단어일 때만 인정한다(extract_tags와 같은
+# "명시 표현만" 원칙 — 태그 소스와 똑같이 name+raw를 합쳐서 본다).
+USED_MARK = re.compile(r"중고|리퍼비시|\[\s*리퍼\s*\]")
+
+
+def has_used_mark(name: str, raw: str = "") -> bool:
+    """상품명 또는 스펙 원문이 스스로 중고·리퍼임을 밝히는가(명시 표현만 신뢰)."""
+    return bool(USED_MARK.search((name or "") + " " + (raw or "")))
+
 
 NOT_PART = re.compile(
     r"액세서리|베어본|미니PC|\bUPS\b|허브\.컨버터"
@@ -122,19 +187,44 @@ def is_sodimm(raw: str) -> bool:
 
 
 def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):
+    """(part_type, category_group, skip_reason) — 분류 판정 + 중고 표시로 후보 제외.
+
+    실제 분류는 `_classify`가 한다. 여기서는 그 결과에 **상품명·스펙 원문의 중고 표시**
+    (`has_used_mark`)를 얹어 `category_group`만 내린다 — `part_type`은 그대로 둔다
+    (2026-08-16, 사장님 지시 "중고 부품은 견적에서 빼둔다. 다만 분류는 제대로 잡아라").
+    그래서 중고 그래픽카드는 상품 목록·필터·통계에서는 여전히 GPU로 보이지만
+    (part_type 유지) 두 후보 뷰(core_part/peripheral만 보는 v_recommendation_candidates·
+    v_companion_candidates)에는 들어가지 않는다(category_group='etc').
+
+    `_classify`가 이미 'etc'로 내린 것(완제품 PC·베어본·미분류·액세서리)은 건드리지
+    않는다 — 이 판정은 core_part/peripheral로 **올라간 뒤에만** 적용한다. 그래서
+    "기존 판정이 하나도 바뀌면 안 된다"는 요구를 어기지 않는다: 정상 부품(중고 표시가
+    없는 상품)은 이 판정에서 전혀 걸리지 않고 `_classify`의 결과를 그대로 돌려준다.
+    """
+    pt, grp, reason = _classify(l1, l2, l3, name, raw)
+    if pt and grp in ("core_part", "peripheral") and has_used_mark(name, raw):
+        return pt, "etc", None
+    return pt, grp, reason
+
+
+def _classify(l1: str, l2: str, l3: str, name: str, raw: str = ""):
     """(part_type, category_group, skip_reason) — 매핑 못 해도 카탈로그에는 넣는다.
 
     part_type을 못 정한 상품은 `category_group='etc'`로 적재된다: 추천 대상이 아니지만
     재고·가격 관리 대상이기 때문이다(시스템 쿨러·튜닝용품·완제품PC·케이블 등).
 
     `raw`(스펙 원문)를 주면 원천이 액세서리로 분류한 상품을 core_part로 올리지 않는다.
+
+    중고 표시(has_used_mark)는 여기서 보지 않는다 — 공개 함수 `map_part_type`이 이
+    결과 위에 얹어서 판정한다(위 독스트링 참조). 이 함수 자체는 "이 상품이 무슨
+    부품인가"만 답한다.
     """
     l1, l2, l3 = (l1 or "").strip(), (l2 or "").strip(), (l3 or "").strip()
     if l1 in SKIP_L1:
         return None, None, f"{l1} 분류"
     # 완성품 축(2026-08-05) — **액세서리 판정보다 먼저** 본다.
     #
-    # 베어본·미니PC 는 `NOT_PART` 에 이미 들어 있어(46~51행) 아래 `is_accessory` 가 잡아
+    # 베어본·미니PC 는 위 `NOT_PART` 에 이미 들어 있어 아래 `is_accessory` 가 잡아
     # `etc` 로 떨어뜨렸다. 이제는 "부품이 아님"에서 멈추지 않고 **무엇인지**까지 말한다.
     # 이 분기가 필요한 이유: `part_type` 은 저장된 판정이 아니라 **적재마다 다시 계산되는
     # 파생값**이고, 적재 UPSERT 는 운영자가 갈라 놓은 `category_id` 를 읽지도 쓰지도 않는다.
@@ -145,14 +235,13 @@ def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):
     if BAREBONE_CLS.search(f"{l1} {l2} {l3}") or (raw and BAREBONE_CLS.search(raw)):
         return "BAREBONE", "etc", None
 
-    # **완제품 PC 는 여기서 판정하지 않는다.** 원천 분류 토큰을 확인할 길이 없기 때문이다:
-    # 리포에 원천 CSV 가 없고 `product_imports`(원문 보관)도 0행이라 318건이 어떤
-    # `카테고리1/2/3` 으로 들어왔는지 **잴 수가 없다**. 상품명으로 판정하면 슬라이스 51에서
-    # 겪은 오탐이 난다("어휘를 넓힐 때 오검출을 먼저 센다").
-    # 그래서 초기 배정은 **운영자가 이미 갈라 놓은 판매 분류**를 근거로 마이그레이션이 하고
-    # (0031), 다음 적재가 되돌리면 회귀 `[32]`가 그 자리에서 잡는다
-    # ("판매 분류가 완제품인데 part_type 이 ETC 인 상품이 없다").
-    # 원천 CSV 를 다시 확보하면 그때 토큰을 실측해 이 자리에 분기를 넣는다.
+    # **완제품 PC**(2026-08-16 — 위 `PREMIUM_PC_L1`/`PREMIUM_PC_EXCLUDE_L2` 주석 참조).
+    # `BAREBONE_CLS` **다음에** 둔다 — 이 카테고리1 에서 베어본이 나올 근거는 실측 0건이지만,
+    # 원문이 '베어본'·'미니PC'를 스스로 명시하면 그쪽이 더 구체적인 사실이라 우선한다.
+    # `category_group='etc'` 는 그대로 둔다(0031 — 두 후보 뷰가 core_part/peripheral 만
+    # 본다. part_type 축만 옮기고 후보 노출 축은 같은 슬라이스에서 움직이지 않는다).
+    if l1 == PREMIUM_PC_L1 and l2 not in PREMIUM_PC_EXCLUDE_L2:
+        return "PC_COMPLETE", "etc", None
 
     if raw and is_accessory(raw):
         return None, "etc", "원천 분류가 액세서리·베어본 — 부품 아님"
@@ -161,6 +250,26 @@ def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):
         if bad:
             return None, "etc", bad
         return CORE_L2[l2], "core_part", None
+    # 중고 그래픽카드 — 카테고리 자체가 이미 "중고"를 담고 있어 여기서 바로 etc로
+    # 내린다(위 `USED_GPU_L1`/`USED_GPU_L2` 주석 참조 — 상품명 오탈자와 무관하게 판정).
+    if l1 == USED_GPU_L1 and l2 == USED_GPU_L2:
+        return "GPU", "etc", None
+    # 알레오코인 채굴기 카테고리의 표기 별칭(위 `MINING_L2_ALIAS` 주석 참조). 중고 여부는
+    # 아래 공개 함수 `map_part_type`이 `has_used_mark`로 별도 판정하므로 여기서는
+    # core_part로 둔다 — CORE_L2 정상 경로와 동일하게 취급한다.
+    if l1 == MINING_L1 and l2 in MINING_L2_ALIAS:
+        pt2 = MINING_L2_ALIAS[l2]
+        bad = wrong_slot(pt2, raw) if raw else None
+        if bad:
+            return None, "etc", bad
+        return pt2, "core_part", None
+    # 프로모션 진열 카테고리의 표기 별칭(위 `PROMO_L2_ALIAS` 주석 참조).
+    if l1 == PROMO_L1 and l2 in PROMO_L2_ALIAS:
+        pt2 = PROMO_L2_ALIAS[l2]
+        bad = wrong_slot(pt2, raw) if raw else None
+        if bad:
+            return None, "etc", bad
+        return pt2, "core_part", None
     if l2 == "CPU쿨러":
         # 실측: l3가 공랭쿨러 314 / 수냉쿨러 239로 갈린다(빈값 2건은 검수)
         if "수냉" in l3 or "수랭" in l3:

@@ -10,6 +10,13 @@
   · apply_plan은 한 트랜잭션이다 — 중간에 실패하면 통째로 없던 일이 된다.
   · 적재는 product_code 기준 upsert이고 **삭제가 없다**. 올린다고 기존 상품이 사라지지 않는다.
   · `locked_fields`로 잠근 값은 덮지 않는다(운영자가 손으로 고친 값 보호 — ERD §4.3).
+    **2026-08-16까지는 매입가·판매가 둘만 지켰다** — 같은 UPSERT의 나머지 14개 컬럼은
+    무조건 EXCLUDED였다(실사고: 0031이 올려놓은 완제품·베어본 분류를 08-15 적재가
+    340건 되돌림, 검수 회부(123034)가 적재마다 지워짐). 지금은 part_type·category_group
+    (분류) · ai_candidate_yn·review_required_yn(검수 게이트) · product_specs의
+    SPEC_COLS 전부(사양)까지 넓혔다 — 근거·제외 이유(stock_qty·status는 의도적으로
+    제외)는 `UPSERT_PRODUCTS_SQL` 상수 주석에 있다. 표기(잠금 문자열)는 두 갈래가
+    공존한다(`col` 맨 이름 / `specs.col` 접두어) — `_spec_locked()`가 둘 다 인식한다.
   · 가격(purchase_price·sale_price)이 바뀌면 product_price_history에 reason='csv'로 남긴다
     (ERD §6 3원칙 3항 · §189 reason 열거값). 값이 같거나 잠긴 필드면 남기지 않고, 신규
     상품의 최초 가격은 비교할 이전 값이 없어 이력 대상이 아니다(등록 화면과 같은 규약).
@@ -136,6 +143,11 @@ def read_refs(conn) -> dict:
     """계획 수립에 필요한 현재 DB 상태(잠금·다나와 점유·GPU 참조표·기존 사양)."""
     gpu_ref = dict(conn.execute(text(
         "SELECT chipset_key, recommended_watt FROM gpu_power_reference")).all())
+    # build_plan()이 이 값으로 잠긴 사양을 계획에서 뺀다(_locked_for) — 예전엔 여기서
+    # 만들기만 하고 아무도 안 읽었다(2026-08-15까지의 실사고: 소비처가
+    # tools/catalog_import.py의 화면 출력뿐이었다). product 컬럼 잠금(part_type 등)은
+    # apply_plan의 UPSERT SQL이 이 딕셔너리가 아니라 DB의 products.locked_fields를
+    # 직접(SQL 안에서) 다시 읽는다 — 여기서 만든 스냅샷은 사양 쪽에만 쓰인다.
     locked = {r[0]: (r[1] or []) for r in conn.execute(text(
         "SELECT product_code, locked_fields FROM products"
         " WHERE jsonb_array_length(locked_fields) > 0")).all()}
@@ -150,6 +162,18 @@ def read_refs(conn) -> dict:
                     f"SELECT product_code, {', '.join(gf)} FROM product_specs")).all()}
     return {"gpu_ref": gpu_ref, "locked": locked, "dan_owner": dan_owner,
             "existing": existing}
+
+
+def _locked_for(refs: dict, code: int) -> set:
+    """이 상품의 잠긴 필드 이름 집합. 표기가 두 갈래다 — 검수 승인(admin_reviews._approve)은
+    `specs.<field>` 접두어를, 사양 PATCH(admin_products.patch_product_specs)는 맨
+    필드명을 쓴다(DB 실측: 기존 559건 전부 접두어 · 3건 맨 이름). 정본을 하나로 통일하지
+    않고(§보고 참조) 여기서 둘 다 인식한다 — `tools/respec.py:89`와 같은 이중 검사다."""
+    return set((refs.get("locked") or {}).get(code) or [])
+
+
+def _spec_locked(locked: set, col: str) -> bool:
+    return col in locked or f"specs.{col}" in locked
 
 
 def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str) -> dict:
@@ -223,8 +247,19 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
             "origin": origin,
         })
         if pt:
+            locked = _locked_for(refs, code)
             row = {"pc": code, "pt": pt, "sources": json.dumps(src, ensure_ascii=False)}
             for col in SPEC_COLS:
+                if _spec_locked(locked, col):
+                    # 잠긴 사양은 계획에 새 값을 올리지 않는다(2026-08-16 — 사장님 지시:
+                    # 잠금을 사양까지 넓힌다). None으로 두면 apply_plan의
+                    # COALESCE(EXCLUDED.col, product_specs.col)가 기존 값을 그대로
+                    # 지킨다 — '적재는 채우기만 하고 지우지 않는다'는 이미 있던 장치를
+                    # 그대로 재사용한다(SQL을 따로 고칠 필요가 없다). CSV 원문에 값이
+                    # 있어 재추출되면 덮이던 위험 사례(예: socket=AM5 ↔ CSV
+                    # "AMD(소켓AM5)")가 바로 이 분기로 막힌다.
+                    row[col] = None
+                    continue
                 v = sp.get(col)
                 if col in JSON_COLS and v is not None:
                     v = json.dumps(v)
@@ -306,6 +341,100 @@ def plan_summary(plan: dict) -> dict:
     }
 
 
+# ── 상품 UPSERT (CLI·API 공통) ────────────────────────────────────────────────
+# 모듈 상수로 뺀다(2026-08-16) — 회귀가 이 SQL 문자열을 직접 import해 ①EXPLAIN으로
+# 문법을 파싱하고 ②어떤 컬럼이 잠금 가드를 갖는지 정적으로 검사할 수 있어야 한다.
+# apply_plan() 안 지역 변수로 있으면 함수를 실행(=DB에 쓰기)하지 않고는 손댈 수 없다
+# — '회귀는 정본을 쓰지 않는다'(슬라이스 50)를 지키면서 SQL 자체를 검증하는 유일한 길.
+#
+# **잠금 범위(2026-08-16 — 사장님 지시: "잠금을 사양·분류·검수 플래그까지 전부 넓혀라")**
+#   잠금 적용    purchase_price · sale_price(기존) + part_type · category_group(분류)
+#               + ai_candidate_yn · review_required_yn(검수 게이트)
+#   잠금 제외    stock_qty · status — **의도적 판단**이다. 이 둘은 몰의 실시간 재고·
+#               판매상태를 옮겨 적은 값이라(CSV `상태값`이 그대로 stock_qty=1/0을
+#               결정한다 — build_plan 참조) 영구히 얼리면 몰이 품절로 바꿔도 우리는
+#               계속 판매중이라 말해 없는 물건을 팔거나, 반대로 재입고를 계속
+#               감춘다. 가격·분류·검수 플래그는 "우리가 소싱/판정해 안다"는 값이라
+#               잠그는 것이 맞지만, 재고·판매상태는 "몰이 지금 뭐라고 하는가"이지
+#               우리가 확정할 사실이 아니다 — CLAUDE.md "가격 원천은 몰. 소싱한
+#               경우만 우리가 덮어쓰고 잠근다"와 같은 구분선. 이 UPSERT의 갱신 컬럼은
+#               16개(product_code·sku 제외) — 잠금 인식 6개 + stock_qty·status(의도적
+#               제외) + 나머지 8개(product_name·maker·model_name·market_price·
+#               supplier·danawa_code·spec_source_text·data_origin)는 이번 지시
+#               (사양·분류·검수)의 대상이 아니라 손대지 않았다 — patch_product가 이미
+#               이 중 일부(product_name·maker·stock_qty·status)를 잠글 수 있는데
+#               이 UPSERT가 그 잠금을 못 보는 것은 **이번에 고치지 않은 기존
+#               결함**이다(보고 참조).
+UPSERT_PRODUCTS_SQL = """
+    INSERT INTO products (product_code, sku, product_name, maker, model_name, part_type,
+      category_group, status, ai_candidate_yn, review_required_yn, purchase_price,
+      sale_price, market_price, supplier, danawa_code, stock_qty, spec_source_text,
+      data_origin)
+    VALUES (:pc, :sku, :name, :maker, :model, :pt, :grp, :status, :ai, :rev, :pp, :sp2,
+      :mp, :sup, :dan, :stock, :spec_text, :origin)
+    ON CONFLICT (product_code) DO UPDATE SET
+      product_name = EXCLUDED.product_name, maker = EXCLUDED.maker,
+      model_name = EXCLUDED.model_name, status = EXCLUDED.status,
+      -- locked_fields는 JSONB 배열이다 — 요소 존재는 `?` 연산자로 본다.
+      -- 운영자가 손으로 고친 값을 적재가 덮으면 검수 노동이 무효가 된다(ERD §4.3).
+      -- 잠기지 않았어도 COALESCE로 기존 값을 지킨다 — 원천 CSV가 이 행에 매입가·판매가를
+      -- 안 실었을 뿐인데(_int()가 None) 그걸 그대로 넣으면 멀쩡한 가격이 NULL로 지워진다.
+      -- '적재는 채우기만 하고 지우지 않는다'는 아래 product_specs와 이미 같은 원칙이었는데
+      -- 가격 두 컬럼만 빠져 있었다. market_price·다른 컬럼은 이번 범위가 아니다(가격 둘만).
+      purchase_price = CASE WHEN products.locked_fields ? 'purchase_price'
+                            THEN products.purchase_price
+                            ELSE COALESCE(EXCLUDED.purchase_price, products.purchase_price) END,
+      sale_price = CASE WHEN products.locked_fields ? 'sale_price'
+                        THEN products.sale_price
+                        ELSE COALESCE(EXCLUDED.sale_price, products.sale_price) END,
+      -- 분류·검수 게이트도 같은 이유로 잠근다. 실사고 둘: ① 0031이 완제품·베어본을
+      -- ETC에서 올려놓은 뒤 08-15 몰 적재가 340건을 다시 ETC로 되돌렸다 ② 123034는
+      -- 검수로 회부된 채(review_id=8193, 대기)인데 적재가 review_required_yn을
+      -- 재계산해 후보로 되돌렸다. 이 넷을 잠그는 쪽은 admin_products.change_part_type
+      -- 이다 — 여기서 그 잠금을 존중하지 않으면 다음 재적재가 그대로 되돌린다.
+      part_type = CASE WHEN products.locked_fields ? 'part_type'
+                       THEN products.part_type
+                       ELSE COALESCE(EXCLUDED.part_type, products.part_type) END,
+      category_group = CASE WHEN products.locked_fields ? 'category_group'
+                            THEN products.category_group
+                            ELSE COALESCE(EXCLUDED.category_group, products.category_group) END,
+      ai_candidate_yn = CASE WHEN products.locked_fields ? 'ai_candidate_yn'
+                             THEN products.ai_candidate_yn
+                             ELSE COALESCE(EXCLUDED.ai_candidate_yn, products.ai_candidate_yn) END,
+      review_required_yn = CASE WHEN products.locked_fields ? 'review_required_yn'
+                                THEN products.review_required_yn
+                                ELSE COALESCE(EXCLUDED.review_required_yn,
+                                              products.review_required_yn) END,
+      -- stock_qty·status는 위 모듈 주석대로 의도적으로 잠금 대상 밖이다.
+      market_price = EXCLUDED.market_price, supplier = EXCLUDED.supplier,
+      danawa_code = EXCLUDED.danawa_code, stock_qty = EXCLUDED.stock_qty,
+      spec_source_text = EXCLUDED.spec_source_text, data_origin = EXCLUDED.data_origin,
+      updated_at = now()
+"""
+# 잠금 가드가 있어야 하는 컬럼 — 회귀[44]가 이 목록과 SQL 본문을 대조한다(정적 검사).
+LOCK_AWARE_PRODUCT_COLS = ("purchase_price", "sale_price", "part_type", "category_group",
+                           "ai_candidate_yn", "review_required_yn")
+
+# ── 사양 UPSERT ────────────────────────────────────────────────────────────
+# 잠긴 사양은 이 SQL이 몰라도 된다 — build_plan()이 잠긴 필드를 이미 None으로 비워
+# 보낸다(두 표기 다 인식, 위 _spec_locked 참조). COALESCE(EXCLUDED.col, 기존)는
+# EXCLUDED.col이 NULL이면 항상 기존 값을 지키므로, '적재는 채우기만 하고 지우지
+# 않는다'는 기존 장치 그대로 잠금까지 함께 지켜진다 — SQL을 따로 고칠 필요가 없었다.
+_SPEC_SET_COLS = ", ".join(f"{c} = COALESCE(EXCLUDED.{c}, product_specs.{c})" for c in SPEC_COLS)
+UPSERT_SPECS_SQL = f"""
+    INSERT INTO product_specs (product_code, part_type, {', '.join(SPEC_COLS)},
+      spec_sources, extract_source, confidence)
+    VALUES (:pc, :pt, {', '.join(':' + c for c in SPEC_COLS)},
+      CAST(:sources AS JSONB), 'csv', 0.8)
+    ON CONFLICT (product_code) DO UPDATE SET
+      part_type = EXCLUDED.part_type, {_SPEC_SET_COLS},
+      -- 출처도 덮지 않고 합친다(새 출처가 우선) — 어디서 온 값인지 잃지 않는다
+      spec_sources = COALESCE(product_specs.spec_sources, '{{}}'::jsonb)
+                     || COALESCE(EXCLUDED.spec_sources, '{{}}'::jsonb),
+      extract_source = 'csv', updated_at = now()
+"""
+
+
 def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) -> int:
     """계획을 한 트랜잭션으로 반영하고 배치 번호를 돌려준다. 호출자가 트랜잭션을 연다."""
     prods, specs, reviews, errors = (plan["prods"], plan["specs"],
@@ -317,36 +446,7 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
         {"f": file_name[:200], "t": plan["row_total"], "ok": len(prods),
          "er": len(errors), "rv": len(reviews), "o": origin, "by": operator_id}).scalar()
 
-    ins_p = text("""
-        INSERT INTO products (product_code, sku, product_name, maker, model_name, part_type,
-          category_group, status, ai_candidate_yn, review_required_yn, purchase_price,
-          sale_price, market_price, supplier, danawa_code, stock_qty, spec_source_text,
-          data_origin)
-        VALUES (:pc, :sku, :name, :maker, :model, :pt, :grp, :status, :ai, :rev, :pp, :sp2,
-          :mp, :sup, :dan, :stock, :spec_text, :origin)
-        ON CONFLICT (product_code) DO UPDATE SET
-          product_name = EXCLUDED.product_name, maker = EXCLUDED.maker,
-          model_name = EXCLUDED.model_name, part_type = EXCLUDED.part_type,
-          category_group = EXCLUDED.category_group, status = EXCLUDED.status,
-          ai_candidate_yn = EXCLUDED.ai_candidate_yn,
-          review_required_yn = EXCLUDED.review_required_yn,
-          -- locked_fields는 JSONB 배열이다 — 요소 존재는 `?` 연산자로 본다.
-          -- 운영자가 손으로 고친 값을 적재가 덮으면 검수 노동이 무효가 된다(ERD §4.3).
-          -- 잠기지 않았어도 COALESCE로 기존 값을 지킨다 — 원천 CSV가 이 행에 매입가·판매가를
-          -- 안 실었을 뿐인데(_int()가 None) 그걸 그대로 넣으면 멀쩡한 가격이 NULL로 지워진다.
-          -- '적재는 채우기만 하고 지우지 않는다'는 아래 product_specs와 이미 같은 원칙이었는데
-          -- 가격 두 컬럼만 빠져 있었다. market_price·다른 컬럼은 이번 범위가 아니다(가격 둘만).
-          purchase_price = CASE WHEN products.locked_fields ? 'purchase_price'
-                                THEN products.purchase_price
-                                ELSE COALESCE(EXCLUDED.purchase_price, products.purchase_price) END,
-          sale_price = CASE WHEN products.locked_fields ? 'sale_price'
-                            THEN products.sale_price
-                            ELSE COALESCE(EXCLUDED.sale_price, products.sale_price) END,
-          market_price = EXCLUDED.market_price, supplier = EXCLUDED.supplier,
-          danawa_code = EXCLUDED.danawa_code, stock_qty = EXCLUDED.stock_qty,
-          spec_source_text = EXCLUDED.spec_source_text, data_origin = EXCLUDED.data_origin,
-          updated_at = now()
-    """)
+    ins_p = text(UPSERT_PRODUCTS_SQL)
     # ── 재고 델타·가격 변경 전 값을 함께 읽는다 (슬라이스 98 + 가격 이력 결손 보완) ──
     # 적재는 `stock_qty = EXCLUDED.stock_qty`로 **덮어쓴다**. 그런데 원장에는 아무것도
     # 남지 않아, 재고>0인데 원장이 없는 상품이 7,547건 쌓여 있었다. `stock_movements`
@@ -435,19 +535,9 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     # **적재는 채우기만 하고 지우지 않는다.** 새 파일에서 못 뽑은 필드가 기존 값을 NULL로
     # 덮으면, EAV를 빼고 마스터만 올린 한 번의 적재가 추천 후보를 통째로 무너뜨린다
     # (슬라이스 50에서 실제로 겪었다). 잘못된 사양을 비우는 일은 검수 화면 소관이다.
-    set_cols = ", ".join(f"{c} = COALESCE(EXCLUDED.{c}, product_specs.{c})" for c in SPEC_COLS)
-    ins_s = text(f"""
-        INSERT INTO product_specs (product_code, part_type, {', '.join(SPEC_COLS)},
-          spec_sources, extract_source, confidence)
-        VALUES (:pc, :pt, {', '.join(':' + c for c in SPEC_COLS)},
-          CAST(:sources AS JSONB), 'csv', 0.8)
-        ON CONFLICT (product_code) DO UPDATE SET
-          part_type = EXCLUDED.part_type, {set_cols},
-          -- 출처도 덮지 않고 합친다(새 출처가 우선) — 어디서 온 값인지 잃지 않는다
-          spec_sources = COALESCE(product_specs.spec_sources, '{{}}'::jsonb)
-                         || COALESCE(EXCLUDED.spec_sources, '{{}}'::jsonb),
-          extract_source = 'csv', updated_at = now()
-    """)
+    # 잠긴 사양도 같은 장치로 지켜진다 — build_plan()이 이미 None으로 비워 보냈다
+    # (모듈 상수 UPSERT_SPECS_SQL 주석 참조).
+    ins_s = text(UPSERT_SPECS_SQL)
     for i in range(0, len(specs), BATCH):
         conn.execute(ins_s, specs[i:i + BATCH])
 
