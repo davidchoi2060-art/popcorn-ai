@@ -11,7 +11,9 @@
 > **재구축 중 / 재구축 대기** = 이미 지어진 화면을 승인 디자인대로 다시 짓는 중 / 대기 ·
 > **수정 완료 · 확인자 재검증 대기** = 라우트·결함 수정은 끝났으나 확인자의 브라우저
 > 실측이 아직이라 메뉴에는 연결하지 않은 상태(2026-08-15 추가 — 용도별 최소 사양이
-> 첫 사례. 실측 없이 메뉴를 열면 운영자가 눈으로 안 본 화면에 먼저 들어간다)
+> 첫 사례. 실측 없이 메뉴를 열면 운영자가 눈으로 안 본 화면에 먼저 들어간다).
+> **그 첫 사례는 2026-08-16 확인자 재검증 통과 + 메뉴 연결로 「지음」이 됐다** —
+> 이 상태어 자체는 폐기가 아니라 다음에 같은 상황이 오면 또 쓴다(CANON §5).
 >
 > ⚠ **범례에 없는 말을 표에 쓰지 않는다** — 2026-08-14 실측 시점에 표는 「구축 중 ·
 > 재구축 대기 · 재구축 중 · 신설 대기」를 쓰는데 범례에는 넷 다 없었다. 상태 어휘가
@@ -74,7 +76,7 @@
 | 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **지음** (`/admin2/spec-field-defs` · ADM-PRD-050 · UX-27 → 1a · 라우트·템플릿 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
 | 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) · [req-compat-required.md](req-compat-required.md)(「필수 사양 안내」 탭) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`. **+2026-08-15: 「필수 사양 안내」 탭 신설**(`spec-compat-required.md` 계약 — 결정 로그 ⑤ 설계 간극을 채움) · 확인자 2차 검증 결함 0 · 커밋 `89019e2`. 메뉴는 안 바뀜 — 기존 화면 안 탭 추가) |
-| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **수정 완료 · 확인자 재검증 대기** (`/admin2/usage-floors` · ADM-ENG-040 · UX-29 → 두 안 참고 · 헤더·본문이 서로 다른 가로 스크롤 컨테이너였던 결함을 `.uf-tablewrap` 단일 컨테이너 + `.uf-thead` sticky 로 수정(커밋 `917baea`) · 확인자 실측(1024px, thead·tbody scrollLeft 어긋남) 근거로 고쳤으나 브라우저로 직접 보는 재검증은 아직 · 메뉴 미연결 — 「검증 통과가 조건」이라 이번 물결(7차)에서 제외) |
+| 12 | **용도별 최소 사양** | [req-usage-floors.md](req-usage-floors.md) | `spec-usage-floors.md`(계약) | **지음** (`/admin2/usage-floors` · ADM-ENG-040 · UX-29 → 두 안 참고 · 헤더·본문이 서로 다른 가로 스크롤 컨테이너였던 결함을 `.uf-tablewrap` 단일 컨테이너 + `.uf-thead` sticky 로 수정(커밋 `917baea`) · **확인자 재검증 통과(2026-08-16)** — 스크롤 전·후 헤더 위치 459.02px 고정·헤더-본문 가로 거리 220px 어긋남 없음 실측 · **메뉴 연결(기록자, 2026-08-16)** — 마지막 미연결이었다. `api/admin_nav.py` `counts()` 로 `todo` 0 확인) |
 | 13 | **부품 등급 관리** | [req-part-grade.md](req-part-grade.md) | `spec-part-grade.md`(계약) | **지음** (`/admin2/part-grade` · ADM-ENG-050 · UX-30 → 1a + 1b 우측 입력 · 확인자 검증 통과 · 커밋 `112c5a7` · 메뉴 연결 `7949c98`) |
 | 14 | **추천 기준 보기** (구 「추천 기준 설정」) | [req-policy-weights.md](req-policy-weights.md) | `spec-policy-weights.md`(계약) | **지음** (`/admin2/policy-weights` · ADM-ENG-020 · UX-31 → 1a · 조회 전용 · 개명 · 확인자 검증 통과 · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`) |
 | 15 | **추천 가능 재고 현황** | [req-candidate-pool.md](req-candidate-pool.md) | `spec-candidate-pool.md`(계약) | **지음** (`/admin2/candidate-pool` · ADM-ENG-030 · UX-32 → 1a · 조회 전용 · 템플릿 커밋 `ec4b7ba` · 라우트 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
@@ -167,7 +169,7 @@
 | 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 중 · UX-24 → **1a** |
 | 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 지음 · UX-27 → 1a · 메뉴 연결 |
 | 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 지음 |
-| 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 대기 · UX-25 |
+| 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 중 · UX-25 (2026-08-16 기록자 정정 — 위 §7 목차가 2026-08-15에 이미 「대기 아니라 작업 중」으로 스스로 고쳤는데 이 표만 옛 값 「재구축 대기」를 그대로 들고 있었다. 재확인: `/admin2/dash` curl 200 · `data-screen-id="ADM-AI-010"` 실재 — 라우트가 이미 있으므로 「대기」(라우트 없음)는 아니다) |
 
 ### 계약 요약으로 전달된 승인 디자인
 
@@ -178,11 +180,11 @@
 
 | # | 화면 | 계약 요약 | 구축 |
 |---|------|----------|------|
-| 12 | 용도별 최소 사양 | [spec-usage-floors.md](../spec-usage-floors.md) | 수정 완료 · 확인자 재검증 대기 · UX-29 → 두 안 참고 · 메뉴 미연결 |
-| 13 | 부품 등급 관리 | [spec-part-grade.md](../spec-part-grade.md) | 구축 중 · UX-30 → 1a + 1b 우측 입력 |
-| 14 | 추천 기준 보기 | [spec-policy-weights.md](../spec-policy-weights.md) | 구축 중 · UX-31 → 1a · 조회 전용 |
+| 12 | 용도별 최소 사양 | [spec-usage-floors.md](../spec-usage-floors.md) | 지음 · UX-29 → 두 안 참고 · 메뉴 연결(2026-08-16) |
+| 13 | 부품 등급 관리 | [spec-part-grade.md](../spec-part-grade.md) | 지음 · UX-30 → 1a + 1b 우측 입력 · 메뉴 연결 (2026-08-16 기록자 정정 — 위 §2 목차·`api/admin_nav.py`는 이미 「지음」인데 이 표만 「구축 중」이었다. 재확인: `/admin2/part-grade` dev-login curl 200 · 응답 본문에 `data-screen-id="ADM-ENG-050"` 실재) |
+| 14 | 추천 기준 보기 | [spec-policy-weights.md](../spec-policy-weights.md) | 지음 · UX-31 → 1a · 조회 전용 · 메뉴 연결 (2026-08-16 기록자 정정 — 위와 같은 자기모순. 재확인: `/admin2/policy-weights` curl 200 · `data-screen-id="ADM-ENG-020"` 실재) |
 | 15 | 추천 가능 재고 현황 | [spec-candidate-pool.md](../spec-candidate-pool.md) | 지음 · UX-32 → 1a · 조회 전용 · 메뉴 연결 |
-| 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 구축 중 · UX-33 → 1a + 우측 서랍 |
+| 16 | 견적 상담 기록 | [spec-consult-sessions.md](../spec-consult-sessions.md) | 지음 · UX-33 → 1a + 우측 서랍 · 메뉴 연결 (2026-08-16 기록자 정정 — 위와 같은 자기모순. 재확인: `/admin2/consult-sessions` curl 200 · `data-screen-id="ADM-ORD-010"` 실재) |
 | 17 | 부품 교체 · 클릭 기록 | [spec-swap-click-logs.md](../spec-swap-click-logs.md) | 지음 · 메뉴 연결 (2026-08-15 신규 등재 — 커밋 `c75656e`이 이 목차 최종 편집보다 먼저였는데 빠져 있었다. 그 뒤 확인자 재검증 통과 · 메뉴 연결) |
 | 18 | 공급처 | [spec-suppliers.md](../spec-suppliers.md) | 지음 · 1b 안 · 메뉴 연결 |
 | 19 | 매입 견적(용산) | [spec-sourcing.md](../spec-sourcing.md) | 지음 · 1a 안 · 메뉴 연결 |
