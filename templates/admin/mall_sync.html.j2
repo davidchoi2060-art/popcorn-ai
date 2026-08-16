@@ -109,6 +109,10 @@
   .ms-pager-btns{display:flex;gap:8px}
   .ms-pgbtn{padding:6px 14px;border-radius:6px;border:1px solid var(--outline-variant);background:var(--card);
     color:var(--on);font:500 12px/1 var(--font);cursor:pointer}
+  /* .a2-shell a{color:inherit}(0,1,1)가 위 .ms-pgbtn(0,1,0)의 color를 이긴다 — 지금은
+     상속값(--on)이 우연히 같은 토큰이라 무증상이지만, 죽은 규칙이라 토큰이 갈라지면
+     터진다. a에만 걸리는 (0,1,1) 규칙으로 되돌린다 */
+  a.ms-pgbtn{color:var(--on)}
   .ms-pgbtn:hover{border-color:var(--outline)}
   .ms-pgbtn.disabled{color:var(--on-variant);opacity:.45;cursor:not-allowed}
 
@@ -153,7 +157,15 @@
   .ms-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;
     border-radius:7px;border:1px solid var(--outline);font:600 12.5px/1 var(--font);cursor:pointer;
     background:var(--card);color:var(--on)}
+  /* .a2-shell a{color:inherit}(0,1,1)가 위 .ms-btn(0,1,0)의 color를 이긴다 — 무증상
+     방어(아래 .ms-btn-primary 보다 앞에 둬 결합 시 특정성 동률 소스 순서가 유지되게 한다) */
+  a.ms-btn{color:var(--on)}
   .ms-btn-primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+  /* ⚠ 지금 실제로 안 보이는 버튼 — 「판매가 관리에서 열기 →」(311행, sale_price_link.available
+     일 때 <a class="ms-btn ms-btn-primary">). background:var(--primary)=--rv-ink(어두움)인데
+     color는 .a2-shell a{color:inherit}에 밀려 상속된 --on(=--rv-ink, 어두움)이 돼 대비 1:1이었다.
+     사장님이 신고하신 것과 같은 증상 */
+  a.ms-btn-primary{color:var(--on-primary)}
   .ms-btn-locked{cursor:not-allowed;color:var(--on-variant);background:var(--container)}
   .ms-btn-locked:disabled{opacity:.7}
   .ms-lock-note{margin:8px 0 0;font:400 11px/1.6 var(--font);color:var(--on-variant)}

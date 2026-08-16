@@ -199,6 +199,11 @@
 .pp-btn-line{font:500 11.5px/1 var(--font);color:var(--on);background:var(--card);
          border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:9px 13px;cursor:pointer;
          text-decoration:none;display:inline-block}
+/* .a2-shell a{color:inherit}(0,1,1)가 위 .pp-btn-line(0,1,0)의 color를 이긴다 — 검수 큐로
+   이동하는 <a class="pp-btn-line">(967행, status_key==="review"일 때만 렌더)에서 지금은
+   상속된 값(--on)이 우연히 같은 토큰이라 무증상이지만, 죽은 규칙이라 토큰이 갈라지면
+   터진다. a에만 걸리는 (0,1,1) 규칙으로 되돌린다 */
+a.pp-btn-line{color:var(--on)}
 .pp-btn-line:hover{background:var(--container-low)}
 .pp-btn-primary:disabled,.pp-btn-line:disabled{cursor:not-allowed;opacity:.55;pointer-events:none}
 /* 공용 진행 배너는 preview:true 요청엔 뜨지 않는다(ui-progress.js가 스스로 제외 — ㉯

@@ -286,6 +286,10 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
 .ph-evt.noprior{color:var(--rv-faint);background:var(--rv-panel2);border:1px dashed rgba(0,0,0,.14)}
 .ph-move{display:inline-flex;align-items:center;font:600 10.5px/1 var(--rv-font);color:var(--rv-ink);
   background:var(--rv-panel2);border-radius:5px;padding:5px 8px;cursor:pointer}
+/* .a2-shell a{color:inherit}(0,1,1)가 위 .ph-move(0,1,0)의 color를 이긴다 — 지금은
+   상속된 값(--on=--rv-ink)이 우연히 같은 토큰이라 무증상이지만, 죽은 규칙이라
+   토큰이 갈라지면 터진다. a에만 걸리는 (0,1,1) 규칙으로 되돌린다 */
+a.ph-move{color:var(--rv-ink)}
 .ph-move.off{color:var(--rv-muted);cursor:default}
 .ph-move .tag{font:500 9px/1 var(--rv-font);background:rgba(0,0,0,.08);border-radius:3px;padding:2px 4px;margin-left:4px}
 .ph-empty{padding:18px 6px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-faint)}

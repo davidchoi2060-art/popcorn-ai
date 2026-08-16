@@ -211,6 +211,9 @@
 
 /* ── 링크 · 비활성 링크 ─────────────────────────────────────────── */
 .mp-link{color:var(--rv-link);font-weight:600;cursor:pointer}
+/* .a2-shell a{color:inherit}(0,1,1)가 위 .mp-link(0,1,0)를 이겨 경고박스(.warn) 안에서는
+   빨강을, 그 밖에서는 본문색을 상속하던 결함 — a에만 걸리는 (0,1,1) 규칙으로 되돌린다 */
+a.mp-link{color:var(--rv-link)}
 .mp-link:hover{text-decoration:underline}
 .mp-link-off{color:var(--rv-dim2);font-weight:500;cursor:not-allowed;border-bottom:1px dashed var(--rv-dim3)}
 

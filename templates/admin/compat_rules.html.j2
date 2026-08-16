@@ -144,6 +144,10 @@
   .cr-drawer-foot-note{flex:1;font:400 10.5px/1.4 var(--font);color:var(--on-variant)}
   .cr-btn{font:500 11.5px/1 var(--font);border-radius:5px;padding:9px 13px;cursor:pointer}
   .cr-btn--ghost{color:var(--on);background:var(--card);border:1px solid rgba(0,0,0,.24)}
+  /* .a2-shell a{color:inherit}(0,1,1)가 위 .cr-btn--ghost(0,1,0)의 color를 이긴다 — 지금은
+     상속값(--on)이 우연히 같은 토큰이라 무증상이지만, 죽은 규칙이라 토큰이 갈라지면
+     터진다. a에만 걸리는 (0,1,1) 규칙으로 되돌린다(471행 <a class="cr-btn cr-btn--ghost">) */
+  a.cr-btn--ghost{color:var(--on)}
   .cr-btn--locked{color:var(--bg);background:var(--outline);border:none;cursor:not-allowed}
 
   @media (max-width:768px){

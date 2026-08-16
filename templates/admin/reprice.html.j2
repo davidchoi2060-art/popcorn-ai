@@ -205,6 +205,9 @@
 
 /* ── 링크 · 비활성 링크 ─────────────────────────────────────────── */
 .rp-link{color:var(--rv-link);font-weight:600;cursor:pointer}
+/* .a2-shell a{color:inherit}(0,1,1)가 위 .rp-link(0,1,0)를 이겨 링크 색이 본문색으로
+   보이던 결함 — a에만 걸리는 (0,1,1) 규칙으로 되돌린다 */
+a.rp-link{color:var(--rv-link)}
 .rp-link:hover{text-decoration:underline}
 .rp-link-off{color:var(--rv-dim2);font-weight:500;cursor:not-allowed;border-bottom:1px dashed var(--rv-dim3)}
 
