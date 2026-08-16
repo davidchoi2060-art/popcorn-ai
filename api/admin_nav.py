@@ -203,6 +203,20 @@
   확인법: `.venv/Scripts/python -c "from api.admin_nav import counts; print(counts())"`
   — `new`(href 있음) 30 -> 38 · `todo` 9 -> 1(남는 하나 = 용도별 최소 사양) ·
   `total` 39 불변(여덟 다 라벨이 이미 있어 href만 채웠다).
+
+■ href 연결 — 용도별 최소 사양, 마지막 미연결 해소 (2026-08-16, 기록자 · 8차)
+  7차 노트가 「연결하지 않는다」고 적었던 화면이 이번에 조건을 채웠다 — 지우지
+  않고 여기서 정정한다(CANON §5). 확인자가 실측으로 재검증을 통과시켰다(커밋
+  917baea 의 결함 "헤더·본문이 서로 다른 가로 스크롤 컨테이너"가 실제로 해소됐는지
+  스크롤 전·후 헤더 위치(459.02px 고정)·헤더-본문 가로 거리(220px, 어긋남 없음)를
+  대조). 라우트 `/admin2/usage-floors` 는 `api/admin_ui_usage_floors.py`
+  (`APIRouter(prefix="/admin2")` + `@router.get("/usage-floors")`)를 직접 읽어
+  확인했다 — dev-login 세션 curl 200 · 템플릿이 공용 셸을 상속하는 것도 함께
+  확인됨. 형식은 같은 그룹의 다른 「지음」 항목과 동일하게 맞췄다(href만 채우고
+  비고는 `None` 그대로 — 상품 사양 정의·조립 호환 규칙 등과 같은 모양).
+
+  확인법: `.venv/Scripts/python -c "from api.admin_nav import counts; print(counts())"`
+  — `todo` 가 1 -> 0, `new` 가 38 -> 39, `total` 39 불변(라벨은 이미 있었다).
 """
 
 # 그룹: (제목, 아이콘, [항목])
@@ -227,7 +241,7 @@ NAV = [
         ("상품 사양 정의", "/admin2/spec-field-defs", None),
         ("상품 사양 검수", "/admin2/reviews", "신설 · 사장님 확정 화면(2026-08-13)"),
         ("조립 호환 규칙", "/admin2/compat-rules", None),
-        ("용도별 최소 사양", None, None),
+        ("용도별 최소 사양", "/admin2/usage-floors", None),
         ("부품 등급 관리", "/admin2/part-grade", None),
         ("추천 기준 보기", "/admin2/policy-weights", None),
         ("추천 가능 재고 현황", "/admin2/candidate-pool", None),
