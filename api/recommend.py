@@ -21,6 +21,7 @@ from sqlalchemy import text
 
 from . import visitor
 
+from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
 from . import usage_floors as UF
 from .timeutil import iso, now_iso
 from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap
@@ -57,12 +58,21 @@ class RecommendBody(BaseModel):
 def _load_pool(conn):
     # 규칙이 참조하는 필드는 전부 여기서 실려야 한다 — 규칙을 추가하면 이 목록도 함께 늘린다
     # (슬라이스 39에서 socket_list를 빼먹어 KeyError로 견적이 500이 됐다).
+    #
+    # maker·chipset·clock_mhz·pcie_gen·interface·tag_rgb(아래 6개)는 호환 판정에는 안
+    # 쓴다 — 견적 응답의 부품 항목이 가격·이름뿐이라 "왜 이 부품인가"를 설명할 재료가
+    # 없던 것을 메우려고 추가했다(재료 늘리기 단계 · AI는 안 붙임). 전부 이미 조인된
+    # v_recommendation_candidates 컬럼이라 추가 조회가 아니라 SELECT 목록만 늘어난다.
+    # `brand`·`warranty_months`는 뺐다 — 후보 풀 3,059건 전수 확인 결과 **둘 다 0%
+    # 채움**(products.brand·warranty_months가 전부 NULL)이라 실어도 null만 나간다.
+    # "제조사"가 필요한 자리는 100% 채워진 `maker`로 대신한다(brand가 아니라 maker다).
     return [dict(r) for r in conn.execute(text(
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"
-        " socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
+        " maker, chipset, socket, socket_list, mem_type, clock_mhz, tdp_watt, rated_watt,"
+        " required_power_watt, pcie_gen, interface,"
         " form_factor, form_factor_list, capacity_gb,"
         " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
-        " radiator_rows, radiator_max_rows, tag_white, tag_silent,"
+        " radiator_rows, radiator_max_rows, tag_white, tag_silent, tag_rgb,"
         " spec_sources, data_origin"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
@@ -351,6 +361,48 @@ def build_compat(chosen: dict, rules: dict) -> dict:
     return {"power_headroom_pct": headroom, "checks": checks}
 
 
+# ---- 견적 이유의 재료 (재료 늘리기 단계 — AI는 붙이지 않는다) ----
+# A-03: LLM은 "왜 이 부품인가"를 설명만 한다, 견적을 만들지 않는다. 설명하려면 설명할
+# 사실이 있어야 하는데 지금까지 items[]는 이름·가격뿐이었다. 아래 둘은 그 재료를
+# `_load_pool()`이 이미 읽어 둔 값에서 뽑아 실을 뿐, 판정·정렬 로직은 건드리지 않는다.
+
+_TAG_FIELDS = ("tag_silent", "tag_white", "tag_rgb")
+
+
+def _pref_tags(p: dict) -> list:
+    """확정된 선호 태그만 — **참인 것만** 이름으로 올린다.
+
+    CLAUDE.md §데이터: 태그 백필은 "명시 표현만 인정, 추론 금지 — false는 아직 판정
+    안 함"이다. `tag_silent: false`를 그대로 실으면 "판정 안 함"이 "조용하지 않음"으로
+    오독되고, 다음 단계(LLM)가 근거 없는 부정 서술을 쓸 재료가 된다. 그래서 false는
+    아예 적지 않는다.
+    """
+    return [name for name, field in
+            (("silent", "tag_silent"), ("white", "tag_white"), ("rgb", "tag_rgb"))
+            if p.get(field)]
+
+
+def _explain_spec(p: dict) -> dict:
+    """부품 설명에 쓸 사양만 종류별로 고른다 — 전부 싣지 않는다.
+
+    "어떤 사양이 어떤 부품 종류에 뜻이 있는가"는 이미 `spec_field_defs`가 정의한다
+    (→ `api.spec_fields.fields_for`, 프로세스 캐시라 요청마다 DB를 새로 안 읽는다).
+    여기서 두 번째 매핑을 만들지 않는다(CANON §1 — 정본 복제 금지) — 그래서 CPU엔
+    socket·tdp_watt만, SSD엔 capacity_gb·form_factor·interface만 남고 CPU에
+    capacity_gb, SSD에 socket 같은 무의미한 None이 섞이지 않는다. 값이 없는 필드는
+    설명 재료가 못 되므로 뺀다(모르는 것을 지어내지 않는다).
+    """
+    out = {}
+    for f in spec_fields.fields_for(p.get("part_type")):
+        k = f["field_key"]
+        if k in _TAG_FIELDS:
+            continue   # 태그는 _pref_tags()가 참인 것만 따로 싣는다
+        v = p.get(k)
+        if v is not None:
+            out[k] = v
+    return out
+
+
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None):
     slot_pools = {}
     for s in SLOTS:
@@ -383,7 +435,9 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         "label": TIER_LABELS[tier],
         "items": [{"part_type": s, "product_code": chosen[s]["product_code"],
                    "sku": chosen[s]["sku"], "name": display_name(chosen[s]["product_name"]),
-                   "price": chosen[s]["sale_price"]} for s in SLOTS],
+                   "price": chosen[s]["sale_price"], "maker": chosen[s].get("maker"),
+                   "spec": _explain_spec(chosen[s]), "tags": _pref_tags(chosen[s])}
+                  for s in SLOTS],
         "total": total,
         "compat": build_compat(chosen, rules),
         "budget": {"cap": cap, "verdict": verdict,
