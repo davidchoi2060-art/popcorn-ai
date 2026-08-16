@@ -24,10 +24,10 @@
 | admin2 셸 동작(JS) | `mockups/shared/admin2/admin2-shell.js` | 사이드바 접기·그룹 아코디언·권한 표시. 화면이 다시 구현하지 않는다 |
 | admin2 페이지 라우트 | `api/admin_ui_<screen>.py` (`api/admin_ui_common.py`=렌더 헬퍼) | 화면 하나 = 파일 하나. `api/main.py`가 `router`(APIRouter) 있는 모듈을 자동으로 훑어 싣는다(주석 참조) — `main.py`를 고치지 않는다. API 모듈(`api/*.py`)도 같은 방식 |
 | 디자인 브리프 서식 | `.claude/BRIEF.md` | 화면을 클로드 디자인에 맡길 때 · 받은 뒤 배선 규약 |
-| Phoenix 원본 좌표 | `docs/design/phoenix-template-map.md` | 옆 화면을 베끼지 말고 여기서 찾는다 |
+| ~~Phoenix 원본 좌표~~ | ~~`docs/design/phoenix-template-map.md`~~ | ⚠ **폐기 — 2026-08-14 사장님 지시**(「앞으로는 피닉스 디자인은 참고하지 말고, 내가 주는 화면 UI 대로 해줘」). 화면의 유일한 원천은 **사장님이 주시는 승인 디자인**이다. 이 줄은 지우지 않고 역사로 남긴다 — 지우면 다음 사람이 「원래 없었다」로 읽는다. 근거는 `CLAUDE.md` §디자인 계약 |
 | 화면 흐름 | `docs/design/screen-flow.md` | 흐름도. 화면·이동을 바꾸면 **여기부터** 고친다 |
 | 결정 이력 | `docs/decisions/decision-log.md` | 확정/미정의 단일 원천 |
-| 회귀 | `tests/regression.py` | 861건. 값이 아니라 **관계**를 검사한다 |
+| 회귀 | `tests/regression.py` | 값이 아니라 **관계**를 검사한다. ⚠ **건수는 여기 적지 않는다** — 돌리면 마지막 줄이 말해 준다. 2026-08-16 에 이 표(861)와 `CLAUDE.md` 두 곳(334·862)이 **서로 다른 세 수**를 정본처럼 들고 있었다 |
 
 **DB 쪽 정본**
 
