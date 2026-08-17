@@ -59,7 +59,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <span style="display:flex;align-items:center;gap:5px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
 <span style="font-family:'Material Symbols Outlined';font-size:16px;">inventory_2</span>실시간 재고 검증</span>
 <span style="display:flex;align-items:center;gap:5px;background:#eaf1fd;color:#2149b0;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
-<span style="font-family:'Material Symbols Outlined';font-size:16px;">verified</span>호환성 5종 통과</span>
+<span style="font-family:'Material Symbols Outlined';font-size:16px;">verified</span>호환성 <span data-bind="showcase_rules">—</span>종 통과</span>
 <span style="display:flex;align-items:center;gap:5px;background:#f2edfb;color:#4a2a94;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
 <span style="font-family:'Material Symbols Outlined';font-size:16px;">description</span>선정 근거 리포트</span>
 </div>
@@ -126,7 +126,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 <div style="display:flex;align-items:center;gap:16px;">
 <div style="flex:1;min-width:0;position:relative;">
-<img src="assets/verify-2-compat.png" alt="호환성 5종 통과" style="width:100%;height:auto;display:block;border-radius:10px;" onerror="this.style.display='none';this.parentNode.querySelector('.imgph').style.display='flex';">
+<img src="assets/verify-2-compat.png" alt="호환성 통과 검증" style="width:100%;height:auto;display:block;border-radius:10px;" onerror="this.style.display='none';this.parentNode.querySelector('.imgph').style.display='flex';">
 <div class="imgph" style="display:none;height:92px;align-items:center;justify-content:center;text-align:center;background:repeating-linear-gradient(45deg,#232320,#232320 8px,#2b2b28 8px,#2b2b28 16px);border:1.5px dashed #3a3a35;border-radius:10px;color:#9a968d;font-family:var(--font-num);font-size:11.5px;padding:12px;">assets/verify-2-compat.png</div>
 </div>
 </div>
@@ -158,8 +158,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <span style="width:46px;height:46px;border-radius:13px;background:#2b5fd9;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">verified</span>
 <span style="font-size:12px;font-weight:800;color:#4a6ab0;">STEP 2 · 호환성 검증</span>
 </div>
-<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:#1c3f8f;">소켓·전력·치수 — 호환성 5종 통과만 남김</h3>
-<p style="margin:0;font-size:14px;line-height:1.65;color:#4a6ab0;">소켓, 전력, 케이스 치수 등 호환성 5종을 통과한 구성만 후보에 남깁니다.</p>
+<h3 style="margin:0 0 8px;font-size:19px;font-weight:900;color:#1c3f8f;">소켓·전력·치수 — 호환성 <span data-bind="showcase_rules">—</span>종 통과만 남김</h3>
+<p style="margin:0;font-size:14px;line-height:1.65;color:#4a6ab0;">소켓, 전력, 케이스 치수 등 호환성 <span data-bind="showcase_rules">—</span>종을 통과한 구성만 후보에 남깁니다.</p>
 </div>
 <div style="background:#f2edfb;border-radius:20px;padding:26px;">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -445,7 +445,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 <div class="s0rev-card">
 <div style="font-family:'Material Symbols Outlined';font-size:28px;color:#ffcb4a;">format_quote</div>
-<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">호환성이 늘 걱정이라 커뮤니티에 물어봤는데, 여기선 5종 검증 통과가 딱 떠서 마음이 편했어요.</p>
+<p style="margin:6px 0 16px;font-size:15px;line-height:1.7;color:#2c2c32;font-weight:600;">호환성이 늘 걱정이라 커뮤니티에 물어봤는데, 여기선 호환성 검증 통과가 딱 떠서 마음이 편했어요.</p>
 <div style="display:flex;align-items:center;gap:10px;">
 <span style="width:34px;height:34px;border-radius:50%;background:var(--success-container, #e9f6ef);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">person</span>
 <span style="font-size:13.5px;font-weight:800;color:#55555c;">스팀덕후 님</span>
@@ -564,12 +564,13 @@ document.addEventListener('click',function(e){
   /* 호환 규칙 수는 서버가 정한다. **'통과'와 함께 말하는 숫자는 `rules_applied`** 다 —
      등록은 9종이지만 쿨러 높이(공랭)·라디에이터(수랭)가 배타적이라 한 구성엔 8종만 걸린다.
      `rules`(9)를 쓰면 S2·S3 가 같은 견적을 '8종'이라 말해 두 화면이 어긋난다
-     (사용자 결정 2026-08-08 · A안). */
-  var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n,hit=[];
-  while((n=tw.nextNode()))if(/호환성\s*\d+종/.test(n.nodeValue))hit.push(n);
-  hit.forEach(function(t){t.nodeValue=t.nodeValue.replace(/호환성\s*\d+종/,'호환성 '+(d.rules_applied||d.rules)+'종');});
-  Array.prototype.forEach.call(document.querySelectorAll('img[alt*="호환성"]'),function(im){
-   im.alt=im.alt.replace(/호환성\s*\d+종/,'호환성 '+(d.rules_applied||d.rules)+'종');});
+     (사용자 결정 2026-08-08 · A안).
+     ⚠ 예전엔 마크업에 '5종'을 박아 두고 이 자리에서 TreeWalker 로 덮어썼다. 그러면
+     ① 서버가 못 주는 순간 지어낸 수가 그대로 보이고 ② 정규식이 못 잡는 문장은
+     조용히 낡은 채로 남는다(후기 문구의 '5종 검증 통과'가 실제로 그랬다).
+     그래서 수는 마크업에서 걷어내고 `data-bind="showcase_rules"` 자리에만 채운다 —
+     서버가 없으면 '—' 로 남는다. 이미지·alt 에도 수를 넣지 않는다(그림은 갱신되지 않는다). */
+  put('showcase_rules',(d.rules_applied!=null?d.rules_applied:d.rules));
  }).catch(function(){});
 })();
 </script>
