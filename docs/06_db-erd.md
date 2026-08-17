@@ -1261,3 +1261,63 @@ CREATE INDEX idx_sourcing_quotes_confirmed_at
 `information_schema.columns`의 `product_sourcing_quotes.confirmed_at`이
 생겼는지를 직접 조회한다(§15 확인법과 같은 방식). 셋 중 하나라도 없으면 이
 절은 여전히 "파일만 있음" 상태다.
+
+---
+
+## 17. [13차 개정] stock_inbound_holds — 재고 입고 보류 (2026-08-17, ADM-SRC-020, **적용됨**)
+
+```sql
+-- 0056 (db/migrations/versions/0056_stock_inbound_holds.py, DBA 적용 완료 — 아래 확인법 참조)
+CREATE TABLE stock_inbound_holds (
+  hold_id      BIGSERIAL   PRIMARY KEY,
+  product_code BIGINT      NOT NULL REFERENCES products (product_code),
+  reason       TEXT        NOT NULL,
+  held_by      BIGINT      NOT NULL REFERENCES admin_operators (operator_id),
+  held_at      TIMESTAMP   NOT NULL DEFAULT now(),
+  released_at  TIMESTAMP,
+  released_by  BIGINT      REFERENCES admin_operators (operator_id)
+);
+CREATE UNIQUE INDEX ux_stock_inbound_holds_active
+  ON stock_inbound_holds (product_code) WHERE released_at IS NULL;
+CREATE INDEX ix_stock_inbound_holds_product
+  ON stock_inbound_holds (product_code, held_at DESC);
+```
+
+**왜 필요한가 — 대기 목록은 «저장»이 아니라 «파생»이다.** 재고 입고
+대기 목록(§10.6 `stock_movements` + `products.stock_qty`/`safety_stock`에서
+매 조회마다 계산)에는 "보류" 상태를 담을 컬럼이 없었다. 구 화면
+(`mockups/admin/stock-inbound.html`)은 보류를 **브라우저 배열에서만** 지우고
+「보류 — 재고 미반영」을 띄웠는데, 목록이 파생이라 **다음 조회에 그대로 다시
+나왔다** — 운영자는 처리됐다고 읽는데 서버는 몰랐다. 사장님 확정(2026-08-17,
+승인 디자인 계약 `docs/design/spec-stock-inbound.md`): 보류는 **서버 상태로
+남긴다**(㉡안). 검토했던 대안 셋(`products` 컬럼 추가·`stock_movements` 재활용·
+활동 로그만으로 파생)을 기각한 근거는 마이그레이션 파일 docstring에 남아 있다
+— 요지는 `products`가 카탈로그 적재 UPSERT 대상이라 사람이 넣은 값이 다음
+적재에 지워지는 사고(§4.3 `locked_fields`가 매입가·판매가 둘만 지키는 문제,
+상품 123034 전례)가 정확히 그 표에서 났다는 것.
+
+**계약**: ① **활성 = `released_at IS NULL`** — 코드가 새로 정의하지 않고
+부분 유니크 인덱스(`ux_stock_inbound_holds_active`)가 "상품당 활성 보류
+1건"을 DB 레벨에서 강제한다. ② 해제는 **행 삭제가 아니라 `released_at`
+기록** — 되돌림이 삭제가 아닌 것과 같은 원장 규약. 회차마다 한 행이라
+보류 이력이 남는다("왜 이 상품을 계속 보류하나"에 답할 수 있다). ③ 기존
+표(`products` 포함)는 **ALTER 0건** — NOT NULL 백필도 기본값 채우기도
+없다(0055의 판단과 같은 이유: 적용 시점부터 그 컬럼을 안 넣는 옛 코드의
+INSERT가 전부 죽는다).
+
+⚠ **적용 순서가 규약이다** — ① 이 마이그레이션(완료) → ② 보류 쓰기·해제
+API + 대기 목록의 "보류분 제외" 조건 → ③ 화면의 「보류」 단추. **2026-08-17
+시점에 ②·③은 아직 없다**(`api/admin_stock.py`에 `stock_inbound_holds`를
+참조하는 SQL 0건 — 확인법 참조). 표가 없는 DB에서 ②를 먼저 배포하면 대기
+목록 조회 자체가 죽는다(0052 계열이 겪은 순서 문제와 같다).
+
+**§10.6 `stock_movements`와의 관계**: 보류는 **수량 변동이 아니다** —
+`stock_movements`에 `qty_delta=0` 행을 넣는 안은 기각됐다(검토 대안 참조).
+재고 원장에 재고가 안 변한 행이 섞이면 "이 재고의 출처"를 못 읽는다.
+
+**확인법**: `SELECT version_num FROM alembic_version` → `0056`(기록자
+2026-08-17 확인, 이 절의 다른 §16과 달리 **이미 적용 완료**) ·
+`SELECT to_regclass('stock_inbound_holds')` → NULL 아님 ·
+`\d stock_inbound_holds`로 부분 유니크 인덱스 실재 확인 ·
+`grep -n "stock_inbound_holds" api/admin_stock.py` → 0건이면 ②·③ 단계
+그대로(위 §순서 참조, 2026-08-17 시점).
