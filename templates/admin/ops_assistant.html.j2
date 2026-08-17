@@ -325,7 +325,10 @@ input,textarea{font-family:var(--rv-font)}
   'use strict';
 
   var AMBER = 'var(--rv-amber)', GREEN = 'var(--rv-green)';
-  var MAX_LINKS = 2;
+  // 서버 `api/admin_ops_assistant.MAX_LINKS`와 같은 값이어야 한다 — 작으면 화면이
+  // 저장할 수 있는 것을 미리 막고, 크면 서버가 400으로 되던진다. 2 -> 3 정정 근거는
+  // 그 상수의 주석에 있다(시드 FAQ 하나가 실제로 링크 3개다).
+  var MAX_LINKS = 3;
 
   var S = {
     ready: null, faqs: [], scopes: [], routes: [], brokenLinks: 0,
@@ -404,9 +407,11 @@ input,textarea{font-family:var(--rv-font)}
     return out;
   }
   // ── 로드 ─────────────────────────────────────────────────────────
+  // ⚠ 프라미스를 «돌려준다» — 저장 성공 후 기준선을 다시 잡으려면(saveFaq) 다시
+  // 읽기가 «끝난 시점»을 알아야 한다. 반환을 빼면 저장 직후 옛 목록에 기준선을 맞춘다.
   function load() {
     $('faqList').innerHTML = '<div class="faq-empty">불러오는 중…</div>';
-    apiGet('/api/admin/ops-assistant').then(function (j) {
+    return apiGet('/api/admin/ops-assistant').then(function (j) {
       S.ready = j.ready; S.faqs = j.faqs || []; S.scopes = j.scopes || [];
       S.routes = j.routes || []; S.brokenLinks = j.broken_links || 0;
       S.note = j.note || ''; S.widgetSyncNote = j.widget_sync_note || '';
@@ -496,8 +501,16 @@ input,textarea{font-family:var(--rv-font)}
     apiSend('POST', '/api/admin/ops-assistant/faqs', { question: '새 질문', answer: '답변을 입력하세요.', links: [] })
       .then(function (j) {
         toast('FAQ를 추가했습니다 — 질문·답변을 채우고 저장하세요.', 'ok');
-        load();
-        setTimeout(function () { openFaq(j.faq_id); }, 0);
+        // ⚠ `setTimeout(..., 0)`이었다 — `load()`가 비동기인데 동기처럼 다뤘다.
+        // 목록이 도착하기 «전»에 열려 하니 `openFaq`의 `findFaq(id)`가 undefined라
+        // 조용히 return 했고, **행은 늘었는데 편집 서랍이 안 열렸다**(실측 2026-08-17:
+        // FAQ 6행 생성 · drawerOpen=false). 안내 문구는 "질문·답변을 채우고
+        // 저장하세요"인데 채울 자리가 안 나오는 상태였다. 저장 후 기준선 문제와
+        // 뿌리가 같다 — 다시 읽기가 «끝난 뒤»에 해야 할 일을 기다리지 않은 것.
+        return load().then(function () {
+          if (S.loadErr) return;    // 목록을 못 읽었으면 열 근거가 없다(토스트는 load가 띄운다)
+          openFaq(j.faq_id);
+        });
       }).catch(function (err) { toast(err.message, 'err'); });
   }
 
@@ -716,7 +729,34 @@ input,textarea{font-family:var(--rv-font)}
     var broken = S.draft.links.filter(function (l) { return !routeOf(l.path); });
     if (broken.length) { toast('존재하지 않는 admin2 경로입니다: ' + broken.map(function (l) { return l.path; }).join(', ') + ' (400)', 'err'); return; }
     apiSend('PATCH', '/api/admin/ops-assistant/faqs/' + S.sel, S.draft)
-      .then(function (j) { toast(j.note, 'ok'); load(); }).catch(function (err) { toast(err.message, 'err'); });
+      .then(function (j) { toast(j.note, 'ok'); return load(); })
+      .then(rebaseDraftToServer)
+      .catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  // 저장이 «성공한 뒤에만» 기준선을 서버 값으로 다시 잡는다.
+  //
+  // 왜 필요한가(2026-08-17 확인자 결함 · 실측): 서버는 받은 값을 **그대로 저장하지
+  // 않는다** — `_validate_faq`가 질문·답변을 `strip()` 하고 질문은 200자, 바로가기
+  // 라벨은 60자로 자르며 라벨이 비면 경로로 대체한다. 그래서 답변 끝에 공백 하나만
+  // 남겨도 화면 초안 75자 · 서버 저장본 74자가 되고, `diffs()`가 초안과 서버 목록을
+  // 대조하는 이상 **저장에 성공해도 「변경됨 · 저장 필요」가 영원히 남는다.**
+  // 실제로 그 상태에서 X를 누르면 "저장하지 않은 변경이 있습니다"로 닫히지 않았고,
+  // 운영자가 되돌리기를 누르면 **방금 저장한 편집이 화면에서 사라진 것처럼 보인다.**
+  //
+  // 고치는 자리를 «클라이언트 정규화»로 잡지 않은 이유: 서버가 어떻게 다듬는지를
+  // 화면이 흉내 내면 규칙이 두 벌이 되고(이 저장소의 지병) 다음에 서버 규칙이 늘면
+  // 또 어긋난다. **저장된 실제 값을 다시 읽어 그것을 기준선으로 삼는 것**이 언제나 맞다.
+  //
+  // ⚠ 성공을 «가정»하지 않는다: PATCH가 400/409로 떨어지면 위 체인이 catch로 빠져
+  // 여기 오지 않으므로 초안·dirty가 그대로 남는다. 다시 읽기(load)가 실패한 경우도
+  // `S.loadErr`로 걸러 낸다 — 서버 상태를 못 읽었으면 기준선을 옮길 근거가 없다.
+  function rebaseDraftToServer() {
+    if (S.loadErr || S.sel == null || !S.draft) return;
+    var saved = findFaq(S.sel);
+    if (!saved) return;             // 그 사이 삭제됨 — load()가 이미 서랍을 정리한다
+    S.draft = cloneDraft(saved);
+    renderDrawer();
   }
   function revertFaq() {
     var orig = findFaq(S.sel);
