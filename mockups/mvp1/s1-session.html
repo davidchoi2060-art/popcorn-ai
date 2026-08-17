@@ -477,7 +477,17 @@ function inspectBlock(){var cpu=cur('cpu'),gpu=cur('gpu'),psu=cur('psu');functio
 function validate(){var cn=compatNotes();var notes=cn.notes;var warns=0;notes.forEach(function(x){if(x.level==='warn')warns++;});var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='<div style="display:flex;align-items:center;gap:11px;padding:14px 16px;border-radius:12px;background:'+(warns?'#fbecec':'var(--success-container, #e9f6ef)')+';"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:'+(warns?'#b31b25':'var(--success, #2f9e6d)')+';">'+(warns?'error':'verified')+'</span><div><div style="font-size:15px;font-weight:900;color:'+(warns?'#8a1f22':'var(--success-deep, #0f5132)')+';">'+(warns?(warns+'건의 경고가 있어요'):'전부 통과했습니다')+'</div><div style="font-size:12.5px;font-weight:600;color:'+(warns?'#a15055':'var(--success-muted, #3d7a5c)')+';">'+(warns?'경고를 해결하면 진행할 수 있어요.':'조립·호환에 문제가 없습니다.')+'</div></div></div>';var cp=document.getElementById('s1-compat');if(cp){cp.innerHTML=compatSection(notes);Array.prototype.forEach.call(cp.querySelectorAll('[data-fix]'),function(b){b.addEventListener('click',function(){applyFix(b.getAttribute('data-fix'));});});}var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=inspectBlock();if(warns===0)enableConfirm('호환성·검수 모두 통과 — 이 구성으로 진행할 수 있어요.');else lockConfirm(warns+'건의 경고를 해결해야 진행할 수 있어요.');}
 // ---- talk 팝콘톡: 자유 문답 (LLM 지식 상담 — 파싱은 동일 제약객체, 견적 생성은 여전히 엔진) ----
 var TALK_SUGGEST=['게임용으로 100만원이면 어때요?','RTX 4060이면 배그 잘 돌아가요?','모니터도 같이 맞추는 게 좋을까요?','쓰던 PC 업그레이드 되나요?'];
-var PCWORDS=['pc','컴퓨터','컴퓨','부품','견적','게임','롤','배그','발로란트','오버워치','로아','그래픽','지포스','rtx','gtx','라데온','cpu','라이젠','인텔','gpu','램','메모리','ddr','ssd','nvme','하드','hdd','파워','psu','케이스','쿨러','메인보드','보드','am5','am4','소켓','모니터','조립','업그레이드','영상','편집','방송','스트리밍','사무','개발','예산','만원','성능','호환','재고','가격','시세','발열','소음','와트','업글','풀옵','프레임','fps','화이트','디자인','감성','인치','듀얼','해상도'];
+/* ── 「PC 상담인지」는 AI 가 판정한다 (2026-08-17 사장님 확정 「관문을 걷는다」) ──
+   여기 있던 `PCWORDS` 리터럴 목록(66개 어휘)을 **지웠다.** 그 목록이 `isPC` 를 만들고,
+   그 값이 팝콘톡 문장을 AI 에 보내기 «전에» 반송했다. 확인자 실측 피해(2026-08-17):
+
+       「겜만 할래요」           '겜' 이 목록에 없다 -> AI 호출 0건 · 반송
+       「본체 하나 맞춰주세요」   '본체' 없음 · '맞춰' 가 원형 '맞추' 와 문자열 불일치 -> 반송
+
+   둘 다 정상적인 PC 문의인데 상담 자체가 막혔다. 원형만 담은 리터럴 목록은 **활용형을
+   영영 못 잡는다** — 같은 날 이 파일이 없앤 병(리터럴 어휘로 조건을 판정)과 같은 원인이다.
+   판정은 `api/talk.py` 의 프롬프트(`pc_related`)로 옮겼고, 반송 규칙은 `talkParse` 가 갖는다.
+   ⚠ 어휘 목록을 여기 다시 만들지 마라 — 그러면 같은 병이 돌아온다. */
 var TALKS=[
  {k:['모르겠','몰라','글쎄'],a:'괜찮아요, 다들 그렇게 시작하세요. 거꾸로 가볼게요 — <b>예산 느낌</b>만 알려주시면 그 돈으로 뭘 할 수 있는지 보여드릴게요.',chips:['60만 안팎이요','100만 안팎이요','150만 이상도 괜찮아요']},
  {k:['사려','사고 싶','추천','바꾸','맞추','장만','필요해'],a:'좋아요, 딱 맞는 걸 찾아드릴게요. <b>주로 뭘 하실 PC</b>인가요?',chips:['게임 위주예요','사무·인강용이에요','영상편집 같은 작업용이에요','아직 잘 모르겠어요']},
@@ -564,6 +574,12 @@ function talkFlow(){
    more.addEventListener('click',function(){more.style.opacity='.45';more.style.pointerEvents='none';addUser('조금 더 다듬을래요');setTimeout(function(){addAI('좋아요. 이런 것들을 더 반영할 수 있어요 — 자유롭게 말씀하셔도 돼요.');talkRow(['조용한 게 좋아요','화이트 디자인이면 좋겠어요','쓰던 부품도 재활용하고 싶어요']);},350);});
    row.appendChild(go);row.appendChild(more);
    msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;
+   /* 이 말풍선·버튼은 조건 적용 900ms 뒤에 뜬다 — 서버 응답(디바운스 300 + 왕복)이 «이미 지나간»
+      경우가 흔해, 채울 주체(applyCount)가 없어 판정이 「세는 중…」으로 굳고 [견적 받기]가
+      풀린 것처럼 보였다(실측 2026-08-17 talk 모드: 7초 뒤에도 「세는 중」 · 버튼 커서 pointer).
+      addProposal·guidedAsk 이 쓰는 같은 가드를 «행을 붙인 뒤»에 둔다 — 앞에 두면 아직 없는
+      버튼을 못 잡는다(그 상태를 실측해서 이 자리로 옮겼다). */
+   if(LIVE&&!_pending&&lastCount)fillVerdicts(lastCount,null,lastSnap);
   },900);
   return;
  }
@@ -592,37 +608,69 @@ function talkApply(p){addSpec(p.l,p.v,p.i);// LIVE에서는 배수 연출(p.f)�
  // addConstraint를 타고 서버 재계산이 걸리므로, 그 응답만이 화면 숫자의 출처다.
  /* 비-LIVE 도 마찬가지다(2026-08-17) — 배수 연출은 서버가 모르는 수다. 사유만 적고 수는 비운다. */
  if(!LIVE){logFilter(p.l,null,p.why);poolUnknown(SRC_NOTE.off);}var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
+/* 반송 문구 — 진짜 잡담에만 나간다. 문구는 그대로 살렸고 **판정 주체만** 어휘 목록에서
+   AI 로 바뀌었다(2026-08-17 사장님 확정). */
+var TALK_BOUNCE='그 주제는 제가 정확히 답하기 어렵습니다.<br><b>팝콘PC의 실재고·조립 데이터</b>'
+ +'로 답하는 PC 상담 전용이라서요.<br>대신 이런 질문에는 잘 답합니다:';
+/* talkParse(문장, 정규식이 뽑은 조건, 아직 말하지 않은 답변 문구들, 답변에 붙일 칩)
+   — 팝콘톡의 «조건 + 반송» 담당.
+   문장은 항상 AI 를 탄다 — 옛 코드는 TALKS 가 한 마디라도 걸리면 AI 를 부르지 않아
+   「겜하려고요ㅋㅋ 백오십만언쯤 조용한걸루요」에서 예산·용도가 통째로 사라졌다.
+   합치는 규칙은 chat 과 같다: 정규식 먼저 · AI 나중(라벨 겹치면 AI 가 남는다) · 선호는 합집합.
+
+   ⚠ **답변 문구를 여기까지 들고 온다**(옛 코드는 talkSend 가 즉시 말했다). AI 판정이
+   「PC 아님」이면 PC 답변(TALKS·예산·모니터) 대신 반송 문구가 나가야 하는데, 먼저 말해
+   버리면 「배그 얘기」와 「반송」이 같은 화면에 나란히 남는다. 기다리는 동안 보이는 것은
+   srvWait() 의 「말씀을 조건으로 읽는 중이에요…」다.
+
+   ■ 반송 규칙 (셋을 갈라야 한다 — 뭉개면 정상 문의가 끊긴다)
+       pc===false 이고 조건이 하나도 없다   -> 반송 (모델이 「PC 아님」이라 답한 것만)
+       pc===true  이고 조건이 하나도 없다   -> vague (PC 얘기지만 조건이 없다)
+       pc===null (모름 · AI 실패 · 비-LIVE) -> **반송하지 않는다.** 실패는 판정이 아니다.
+     ⚠ pc===false 인데 조건이 잡혔으면 모델이 자기 말과 어긋난 것이다 — 그때는 읽어낸
+       조건을 버리지 않는 쪽(반송 안 함)을 택한다. 반송하면 방금 읽은 조건이 사라진다. */
+function talkParse(t,packs,say,chips){
+ var vague='네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>'
+  +'예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), '
+  +'<b>예산</b>을 함께 말씀해 주세요.';
+ function apply(list,err,pc){
+  if(pc===false&&!list.length){addAI(TALK_BOUNCE);talkChips();return;}
+  say.forEach(function(a){addAI(a);});
+  if(chips)talkRow(chips);
+  list.forEach(talkApply);
+  if(err)addAI('말씀을 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
+    +(list.length?'문장에서 바로 읽어낸 조건만 반영했어요.':SRV_HINT));
+  else if(!say.length)addAI(list.length?'말씀하신 내용을 <b>조건으로 잡았어요.</b>':vague);
+  if(list.length)talkFlow();
+ }
+ /* 비-LIVE(file:// · API 없음)는 판정 주체가 아예 없다 -> pc=null, 반송 없음.
+    옛 PCWORDS 가 여기서도 반송을 만들었지만, 어휘 판정을 «데모에서만» 남기면 그 목록이
+    다시 자라 LIVE 로 새어 들어간다. 데모는 반송 대신 vague 로 안내한다(거짓말이 아니다). */
+ if(!LIVE){apply(packs,null,null);return;}
+ srvOrdered(t,function(sc,err,pc){       /* 순서 보장 — srvOrdered 주석 참고 */
+  if(err){apply(packs,err,null);return;}
+  apply(packs.concat((sc||[]).map(function(c){
+   return {i:srvIcon(c.l,c.v),l:c.l,v:c.v,f:1,why:[]};})),null,pc);});}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
- // LIVE 보충(슬라이스 48): 팝콘톡 파서는 예산·모니터·시나리오만 읽는다. 서버가 실제로
- // 후보 수에 반영하는 선호(저소음·화이트)를 놓치면 고객이 말한 조건이 사라진다 —
- // chat 모드와 같은 기준으로 맞춘다(예산은 talkBudget이 담당하므로 선호만 보충).
- if(LIVE){liveParse(t).forEach(function(c){if(c[1]==='선호')addConstraint(c[0],c[1],c[2]);});}
  var bud=talkBudget(t);
  var hit=null,score=0;
  TALKS.forEach(function(x){var n=0;x.k.forEach(function(k){if(low.indexOf(k)>-1)n++;});var need=x.min||1;if(n>=need&&n>score){hit=x;score=n;}});
- var isPC=PCWORDS.some(function(w){return low.indexOf(w)>-1;});
  setTimeout(function(){
+  /* 인사·감사는 조건도 반송도 아닌 «대화 예절»이라 AI 를 태우지 않는다(비용 0).
+     PC 상담 여부를 판정하는 자리가 아니다 — 반송하지 않고 바로 되묻는다. */
   if(/^(안녕|하이|hi|헬로|ㅎㅇ|반갑)/.test(low)){addAI('안녕하세요! 팝콘톡입니다. 부품·가격·용도, PC에 관한 건 뭐든 물어보세요.');talkRow(TALK_SUGGEST);return;}
   if(/(감사|고마워|땡큐|thank)/.test(low)&&low.length<20){addAI('별말씀을요. 더 궁금한 게 생기면 언제든 물어보세요!');return;}
   var mon=talkMon(t);
-  if(bud&&!hit){addAI(bud.a);talkApply(bud);if(mon){addAI(mon.a);talkApply(mon);}talkFlow();return;}
-  if(hit){addAI(hit.a);if(hit.p)talkApply(hit.p);if(bud)talkApply(bud);if(mon){addAI(mon.a);talkApply(mon);}if(hit.chips)talkRow(hit.chips);talkFlow();return;}
-  if(mon){addAI(mon.a);talkApply(mon);if(bud)talkApply(bud);talkFlow();return;}
-  if(!isPC){addAI('그 주제는 제가 정확히 답하기 어렵습니다.<br><b>팝콘PC의 실재고·조립 데이터</b>로 답하는 PC 상담 전용이라서요.<br>대신 이런 질문에는 잘 답합니다:');talkChips();return;}
-  var vague='네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), <b>예산</b>을 함께 말씀해 주세요.';
-  /* 여기까지 왔다는 것은 팝콘톡 정규식(TALKS·talkBudget·talkMon·liveParse 선호)이
-     **아무것도** 못 뽑았다는 뜻이다 — 그때만 서버를 부른다(위 srvParse 주석 참고). */
-  if(LIVE){
-   srvParse(t,function(sc,err){
-    if(err){addAI('말씀을 <b>조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'+SRV_HINT);return;}
-    if(sc&&sc.length){
-     sc.forEach(function(c){talkApply({i:srvIcon(c.l,c.v),l:c.l,v:c.v,f:1,why:[]});});
-     addAI('말씀하신 내용을 <b>조건으로 잡았어요.</b>');talkFlow();
-    }else{addAI(vague);}
-   });
-   return;
-  }
-  addAI(vague);
+  /* packs = 정규식이 뽑은 조건(«보조») · say = 고른 답변 문구(**아직 말하지 않는다**).
+     둘 다 talkParse 가 AI 판정을 받은 뒤에 한 번에 낸다 — 반송이면 say 를 버린다. */
+  var packs=[],say=[],chips=null;
+  if(bud&&!hit){say.push(bud.a);packs.push(bud);if(mon){say.push(mon.a);packs.push(mon);}}
+  else if(hit){say.push(hit.a);if(hit.p)packs.push(hit.p);if(bud)packs.push(bud);
+   if(mon){say.push(mon.a);packs.push(mon);}if(hit.chips)chips=hit.chips;}
+  else if(mon){say.push(mon.a);packs.push(mon);if(bud)packs.push(bud);}
+  /* 팝콘톡 정규식이 못 보는 선호(저소음·화이트)를 chat 과 같은 기준으로 보충한다(슬라이스 48). */
+  liveParse(t).forEach(function(c){if(c[1]==='선호')packs.push({i:c[0],l:c[1],v:c[2],f:1,why:[]});});
+  talkParse(t,packs,say,chips);
  },400);}
 function talkStart(){
  if(inp){inp.placeholder='무엇이 궁금하신가요?';setTimeout(function(){inp.focus();},300);}
@@ -1015,9 +1063,26 @@ function liveParse(s){
                             '선호',prefs.join(' · ')]);
   return out;
 }
-/* ---- 서버 파싱 보조(POST /api/talk/parse) — 2026-08-17 사장님 확정 「정규식 먼저, 못 읽은 문장만 AI」
-   위 liveParse(그리고 팝콘톡의 TALKS·talkBudget·talkMon)가 **아무것도 못 뽑았을 때만** 부른다.
-   하나라도 뽑았으면 부르지 않는다 — 비용 0 · 기존 동작 보존.
+/* ---- 문장 파싱(POST /api/talk/parse) — **문장은 항상 AI 가 본다** (2026-08-17 사장님 결정)
+   ⚠ 같은 날 아침 결정(「정규식 먼저, 못 읽은 문장만 AI」)을 **뒤집은 것**이다. 폐기 근거는 실측:
+       입력   「겜하려고요ㅋㅋ 백오십만언쯤 조용한걸루요」
+       옛 코드 liveParse 가 「조용한」 하나만 잡아 cons.length>0 -> srvParse 호출 **0건**.
+              「백오십만언」(한글 금액 표기) · 「겜」(USE_PAT 은 '게임' 리터럴만)이 그대로 버려져
+              **예산 150만원과 용도 게임이 통째로 사라지고** 조건이 「저소음」 하나만 남았다.
+       즉 「못 읽은 문장만」이 문장 단위가 아니라 «우연히 걸린 토큰 하나»로 판정되고 있었다.
+   같은 문장을 서버에 넣으면 AI 는 예산·용도·선호 셋을 다 읽는다(실측 2026-08-17, 2.4초).
+
+   합치는 방식 = **합집합 · 라벨이 겹치면 AI 가 이긴다**. 정규식은 지우지 않고 «보조»로 남는다.
+     ① 왜 덮어쓰지 않고 더하나 — AI 가 만들 수 있는 라벨은 셋뿐이다
+        (`api/talk.py` LABELS = 예산·용도·선호). 팝콘톡 정규식은 그 밖에 **상황·모니터·관심 부품**
+        까지 만든다(TALKS 의 p). AI 결과로 갈아끼우면 그 셋이 조용히 사라진다.
+     ② 왜 겹치는 라벨은 AI 인가 — 위 실측에서 더 많이 읽은 쪽이 AI 다(3 대 1).
+        addConstraint 는 라벨 교체라 **나중에 부른 쪽이 남는다** -> 정규식을 먼저, AI 를 나중에 건다.
+        선호만은 normCons 가 토큰 합집합이라 어느 쪽도 지워지지 않는다.
+     ③ AI 가 실패하면(502·429·키 없음) **정규식 결과를 그대로 살리고 실패를 말한다** — 삼키지 않는다.
+   ⚠ AI 응답 전에는 조건을 **하나도** 붙이지 않는다. 붙이면 그 순간의 후보 수가 화면에 떴다가
+      AI 응답 뒤 다시 바뀐다 — 「AI 가 답하기 전에 화면이 수를 말하지 않는다」(사장님 지시).
+      기다리는 동안 보이는 것은 srvWait() 의 「말씀을 조건으로 읽는 중이에요…」뿐이다.
    서버는 조건({l,v})만 돌려준다. 후보 수·부품·가격은 여전히 /api/candidates/count 몫이고
    (A-01·A-02), 이 경로가 화면 숫자를 만들지 않는다 — addConstraint가 scheduleCount를 태운다. */
 var SRV_ICON={'예산':'savings','용도':'interests','선호':'tune'};
@@ -1072,10 +1137,17 @@ function srvWait(){
  var d=document.createElement('div');d.style.cssText='display:flex;gap:12px;align-items:center;max-width:92%;';
  d.innerHTML='<span style="flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">auto_awesome</span><span style="font-size:13.5px;color:#8a8578;font-weight:700;">말씀을 조건으로 읽는 중이에요…</span>';
  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d;}
-/* done(constraints, errorText) — 실패를 삼키지 않는다. 서버가 준 사유를 그대로 넘긴다. */
+/* done(constraints, errorText, pcRelated) — 실패를 삼키지 않는다. 서버가 준 사유를 그대로 넘긴다.
+   pcRelated = 「이 문장이 PC 상담인가」의 **AI 판정**(api/talk.py `pc_related`):
+     true   PC 상담이다
+     false  PC 상담이 아니다 — **이때만** 반송한다
+     null   모름 — 판정을 못 얻었다(모델이 필드를 빼먹음) **또는 호출 자체가 실패**(err).
+            null 을 false 로 읽으면 AI 실패가 「PC 아님」으로 위장해 정상 문의가 반송된다.
+   ⚠ 화면은 어휘 목록으로 이 판정을 다시 하지 않는다 — 그것이 오늘 없앤 병이다. */
 function srvParse(t,done){
  var wait=srvWait();
- function fin(cons,err){if(wait&&wait.parentNode)wait.parentNode.removeChild(wait);done(cons,err);}
+ function fin(cons,err,pc){if(wait&&wait.parentNode)wait.parentNode.removeChild(wait);
+  done(cons,err,(pc===true||pc===false)?pc:null);}
  fetch('/api/talk/parse',{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({text:t})})
   .then(function(r){return r.text().then(function(b){
@@ -1086,29 +1158,52 @@ function srvParse(t,done){
     var det=x.d&&x.d.detail;
     if(det&&window.popcornProgress&&window.popcornProgress.errText)
       det=window.popcornProgress.errText({detail:det})||det;
-    fin(null,(typeof det==='string'&&det)||('서버 오류 '+x.status));return;}
-   fin(x.d.constraints||[],null);})
-  .catch(function(e){fin(null,'서버에 연결하지 못했습니다 — '+(e&&e.message||e));});}
+    /* 실패에는 판정이 없다(null). 429·502·키 없음이 반송 사유가 되어선 안 된다. */
+    fin(null,(typeof det==='string'&&det)||('서버 오류 '+x.status),null);return;}
+   fin(x.d.constraints||[],null,x.d.pc_related);})
+  .catch(function(e){fin(null,'서버에 연결하지 못했습니다 — '+(e&&e.message||e),null);});}
 var SRV_HINT='예산(예: 100만), 용도(게임·사무·영상편집), 조용하게·화이트처럼 말해주시면 그 자리에서 다시 세어드려요.';
+/* parseAll(t, done) — 문장 하나를 조건 목록으로 바꾸는 **단일 경로**(chat·guided 자유입력).
+   done(list, err, pc):
+     list = [{i,l,v}] · **적용 순서가 규약이다**(정규식 먼저 · AI 나중 = 라벨 겹치면 AI 가 남는다)
+     err  = AI 실패 사유. err 가 있어도 list(정규식 몫)는 살아 있다 — 부르는 쪽이 둘 다 말한다.
+     pc   = 「PC 상담인가」 AI 판정(srvParse 주석). 비-LIVE·실패는 null(모름)이다. */
+function parseAll(t,done){
+ var reg=liveParse(t).map(function(c){return {i:c[0],l:c[1],v:c[2]};});
+ if(!LIVE){done(reg,null,null);return;}
+ srvOrdered(t,function(sc,err,pc){
+  if(err){done(reg,err,null);return;}
+  done(reg.concat((sc||[]).map(function(c){return {i:srvIcon(c.l,c.v),l:c.l,v:c.v};})),null,pc);});}
+/* srvOrdered — srvParse 를 «부른 순서»로 돌려준다(요청 자체는 그대로 곧바로 나간다).
+   ⚠ 이 줄이 필요해진 것은 «모든 문장이 AI 를 타게» 되면서다. 정규식은 동기라
+   「말한 순서 = 반영 순서」가 공짜로 성립했는데, 문장마다 비동기 호출이 붙자 응답이 뒤바뀌면
+   **나중에 말한 값이 먼저 말한 값에 덮인다.** 실측(2026-08-17 브라우저): 0.12초 간격으로
+   「90만원」->「110만원」->「120만원」을 넣자 최종 조건이 **예산 90만원**으로 굳었다.
+   라벨 교체(addConstraint)가 «마지막에 적용된 것»을 남기므로, 줄을 세우는 자리는 «적용»이다. */
+var _parseQ=Promise.resolve();
+function srvOrdered(t,cb){
+ var got=new Promise(function(res){srvParse(t,function(sc,err,pc){res([sc,err,pc]);});});
+ _parseQ=_parseQ.then(function(){return got;}).then(function(r){cb(r[0],r[1],r[2]);})
+  /* 줄 세우기 자체가 깨진 것도 판정이 아니다 — pc=null 로 넘겨 반송을 막는다. */
+  .catch(function(e){cb(null,'조건을 반영하지 못했습니다 — '+((e&&e.message)||e),null);});}
 function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}
  addUser(t);inp.value='';addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');
  if(LIVE){
-  var cons=liveParse(t);
-  if(cons.length){
-   cons.forEach(function(c){addConstraint(c[0],c[1],c[2]);});   // → scheduleCount() → 서버 재계산
-   setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},700);
-  }else{
-   /* 정규식 0건 — 여기서만 서버를 부른다. 서버도 못 읽으면 조건을 지어내지 않고 밝힌다. */
-   srvParse(t,function(sc,err){
-    if(err){addAI('말씀은 기록했어요. 다만 <b>조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'+SRV_HINT);return;}
-    if(sc&&sc.length){
-     sc.forEach(function(c){addConstraint(srvIcon(c.l,c.v),c.l,c.v);});
-     setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},700);
-    }else{
-     addAI('말씀은 기록했어요. 다만 <b>후보 수를 바꾸는 조건</b>으로는 아직 못 읽었어요 — '+SRV_HINT);
-    }
-   });
-  }
+  /* 문장은 «전부» AI 를 탄다(위 parseAll 주석). 정규식은 AI 가 실패했을 때의 몫으로 남는다.
+     ⚠ chat·guided 는 «반송»하지 않는다(pc 판정을 쓰지 않는다) — 반송 문구는 팝콘톡(talk)의
+     장치이고, 여기서는 잡담도 「조건으로는 못 읽었다」로만 답한다(거짓을 말하지 않는다).
+     반송을 여기로 넓히는 것은 별건이다 — 넓힌다면 talkParse 와 «같은 규칙»(false 만, 조건이
+     하나도 없을 때만)을 써야 한다. */
+  parseAll(t,function(cons,err){
+   if(err)addAI('말씀은 기록했어요. 다만 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
+     +(cons.length?'아래 조건은 문장에서 바로 읽어낸 것만 반영했어요.':SRV_HINT));
+   if(cons.length){
+    cons.forEach(function(c){addConstraint(c.i,c.l,c.v);});   // → scheduleCount() → 서버 재계산
+    setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},700);
+   }else if(!err){
+    addAI('말씀은 기록했어요. 다만 <b>후보 수를 바꾸는 조건</b>으로는 아직 못 읽었어요 — '+SRV_HINT);
+   }
+  });
   return;
  }
  poolUnknown(SRC_NOTE.off);

@@ -1,20 +1,50 @@
-"""S1 자유입력 파싱(POST /api/talk/parse) — 문장을 «조건»으로만 바꾼다.
+"""S1 자유입력 파싱(POST /api/talk/parse) — 문장을 «조건»으로 바꾸고, «PC 상담인지»를 판정한다.
 
 `api/main.py`가 자동으로 싣는다(pkgutil 1단계 스캔 — 등록 코드 없음).
 
 ■ 무엇을 하는 자리인가
   고객이 S1에서 자연어로 말한 문장을 화면이 이미 쓰는 제약 형태(`{l, v}` —
-  정본은 `api/candidates.Constraint`)로 바꾼다. **그것 하나만 한다.**
+  정본은 `api/candidates.Constraint`)로 바꾼다. **그리고 그 문장이 PC 상담인지도
+  여기서 판정한다**(`pc_related`) — 같은 한 번의 호출로.
+
+■ 「PC 상담이 아니다」도 AI 가 판정한다 (2026-08-17 사장님 확정 — 「관문을 걷는다」)
+  아침 결정은 「관문(어휘 목록)을 그대로 둔다」였다. 그때 그 문이 막던 것은 «보조
+  파서»였다. 같은 날 「문장은 항상 AI 가 본다」로 바뀌면서 **그 문이 본 파서를 막게
+  됐다** — 전제가 무너져 결정이 바뀌었다. 실측된 피해(확인자, 2026-08-17):
+
+      「겜만 할래요」           '겜' 이 화면 어휘 목록(PCWORDS)에 없다   -> AI 호출 0건 · 반송
+      「본체 하나 맞춰주세요」   '본체' 없음 · '맞춰' 는 원형 '맞추' 와 문자열 불일치 -> 반송
+
+  둘 다 정상적인 PC 문의인데 상담 자체가 차단됐다. 원형만 담은 리터럴 목록은
+  **활용형을 영영 못 잡는다** — 오늘 이 파일이 없앤 병(리터럴 어휘로 판정)과
+  같은 원인이다. 그래서 그 목록을 지우고, 판정을 이 프롬프트로 옮겼다.
+
+  ⚠ **`pc_related` 는 bool 이 아니면 `None`(모름)이다.** 모델이 필드를 빼먹거나
+  형식을 어긴 것을 `false` 로 접으면 **정상 문의가 반송된다** — 실패를 「PC 아님」
+  으로 오해시키지 않는다(아래 §실패를 삼키지 않는다와 같은 원칙). LLM 이 아예
+  실패하면 502 라 `pc_related` 자체가 없고, 화면은 그때 반송하지 않는다.
+
+  ⚠ **판정은 여기서만 한다.** 화면이 어휘로 다시 거르면 같은 병이 돌아온다
+  (`mockups/mvp1/s1-session.html` 의 `talkParse` 주석이 그 규약을 들고 있다).
 
 ■ 지키는 결정
   - A-01·A-02·A-03: **LLM은 견적을 만들지 않는다.** 이 모듈은 부품·가격·후보 수를
     한 글자도 말하지 않는다. 구조적으로도 못 한다 — 응답 스키마가 라벨 3종
     (예산·용도·선호)과 **미리 정해진 값 집합**뿐이라 부품명이 들어올 칸이 없다.
     후보 수는 여전히 `/api/candidates/count`만이 답한다.
-  - **정규식 먼저, 못 읽은 문장만 AI**(2026-08-17 사장님 확정). 이 엔드포인트는
-    화면의 `liveParse`가 **아무것도 못 뽑았을 때만** 불린다 — 하나라도 뽑았으면
-    부르지 않는다(비용 0 · 기존 동작 보존). 그 판단은 화면이 한다
-    (`mockups/mvp1/s1-session.html`의 `srvParse` 호출 지점 주석 참고).
+  - **문장은 항상 AI가 본다**(2026-08-17 사장님 확정 — 같은 날 아침의 「정규식 먼저,
+    못 읽은 문장만 AI」를 뒤집은 결정). 옛 규칙은 「못 읽은 문장」을 문장 단위가 아니라
+    «우연히 걸린 토큰 하나»로 판정하고 있었다 — 실측 「겜하려고요ㅋㅋ 백오십만언쯤
+    조용한걸루요」에서 화면 정규식이 '조용한' 하나만 잡아 이 엔드포인트를 **한 번도
+    부르지 않았고**, 예산 150만원과 용도 게임이 통째로 사라졌다. 같은 문장을 이 경로에
+    넣으면 셋을 다 읽는다(2026-08-17 실측 2.4초 · claude-haiku).
+    이제 화면은 **모든 문장**을 여기로 보내고, 정규식 결과는 **AI가 실패했을 때의 몫**과
+    **AI가 만들지 못하는 라벨**(상황·모니터·관심 부품 — 아래 LABELS 밖)로만 남는다.
+    합치는 규칙은 화면이 갖는다(`mockups/mvp1/s1-session.html`의 `parseAll` 주석):
+    합집합 · 라벨이 겹치면 AI 우선 · 선호는 토큰 합집합.
+    ⚠ 그래서 **한 사람이 태우는 호출 수가 대화 길이만큼 늘었다** — 방문자 한도
+    (`api/access_gate.DEFAULT_PER_MINUTE`·`DEFAULT_PER_DAY`)의 근거였던 「한 사이클
+    최대 4회」는 더 이상 성립하지 않는다. 조절 자리는 `rate_limit_policies` 행이다.
 
 ■ 어휘를 여기서 새로 정의하지 않는다 (CANON §1 — 정본을 복제하지 않는다)
   ① 용도 값 = `api/usage_floors`의 `usage_label` 집합. **요청마다 읽는다** —
@@ -103,7 +133,8 @@ def _build_prompt(text: str, usages: list) -> str:
     """매 요청마다 접는다 -- 용도 어휘가 DB에서 바뀌면 다음 요청부터 반영된다."""
     usage_line = " / ".join(usages) if usages else "(지금 정의된 용도가 없다)"
     return "\n".join([
-        "당신은 PC 견적 상담의 «입력 파서»다. 고객 문장을 구조화 조건으로 바꾸는 일만 한다.",
+        "당신은 PC 견적 상담의 «입력 파서»다. 고객 문장을 두 가지로만 바꾼다 --",
+        "① 이 문장이 PC 상담인가(pc) ② 문장에서 읽히는 구조화 조건(constraints).",
         "",
         "[절대 금지]",
         "- 부품 이름·가격·후보 수·견적을 말하지 않는다. 그것은 다른 시스템이 한다.",
@@ -113,8 +144,20 @@ def _build_prompt(text: str, usages: list) -> str:
         "- 추측·보완·친절한 해석을 하지 않는다. 적힌 것만 옮긴다.",
         "",
         "[출력 형식] JSON 하나만 출력한다. 설명·코드블록·앞뒤 문장을 붙이지 않는다.",
-        '{"constraints":[{"l":"라벨","v":"값"}]}',
-        "읽을 것이 하나도 없으면 정확히 이렇게 출력한다: {\"constraints\":[]}",
+        '{"pc":true,"constraints":[{"l":"라벨","v":"값"}]}',
+        "두 항목은 **언제나 함께** 넣는다. pc 는 true/false 중 하나이며 문자열이 아니다.",
+        "조건으로 읽을 것이 없으면 constraints 를 빈 목록으로 두되 pc 는 그대로 판정한다.",
+        "",
+        "[pc -- 이 문장이 PC 상담인가]",
+        "여기는 PC(컴퓨터) 견적 상담 창구다. 고객은 컴퓨터를 사거나 고치러 온 사람이다.",
+        "- true: 컴퓨터·부품·게임·용도·예산·구매·조립·업그레이드·호환·재고·배송·가격·A/S 중"
+        " 하나라도 걸리는 문장.",
+        "  **무엇을 살지 밝히지 않은 막연한 요청도 true 다** -- 예: \"그냥 좋은 거"
+        " 추천해주세요\", \"본체 하나 맞춰주세요\", \"겜만 할래요\", \"모르겠어요\".",
+        "  구어·줄임말·오타여도 뜻이 PC 상담이면 true 다(겜 = 게임, 컴 = 컴퓨터, 본체 = PC).",
+        "- false: PC 와 **분명히** 무관한 주제일 때만이다 -- 날씨·요리·연애·정치·건강·"
+        "여행·번역·일반 지식 질문 등.",
+        "- 애매하면 true 다. false 는 상담을 그 자리에서 끊는 판정이라 확실할 때만 쓴다.",
         "",
         "[쓸 수 있는 라벨과 값 -- 이 목록 밖의 값은 쓰지 않는다]",
         '1. l="예산"  v: "숫자만원" 형식. 예 "150만원".',
@@ -174,6 +217,26 @@ def _extract_json(raw: str) -> dict:
     return obj
 
 
+def _pc_verdict(obj: dict):
+    """모델이 말한 「PC 상담인가」 -> True · False · **None(모름)**.
+
+    ⚠ **bool 이 아니면 None 이다.** 필드가 없거나 형식이 틀린 것을 `False` 로 접으면
+    정상 문의가 반송된다 -- 「모델이 «PC 아님»이라 답한 것만 반송한다」(사장님 지시
+    2026-08-17)를 코드로 지키는 자리가 여기다. 문자열 "true"/"false" 는 모델이 흔히
+    내는 형태라 받아 주되, 그 밖은 전부 모름이다.
+    """
+    v = obj.get("pc")
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        s = v.strip().strip('"').lower()
+        if s in ("true", "yes", "y", "1"):
+            return True
+        if s in ("false", "no", "n", "0"):
+            return False
+    return None
+
+
 def _validate(raw_items, usages: list) -> tuple:
     """모델이 준 목록 -> (반영할 제약, 버린 것 + 사유).
 
@@ -219,10 +282,18 @@ def _validate(raw_items, usages: list) -> tuple:
 
 @router.post("/parse")
 def parse_talk(body: ParseBody, request: Request):
-    """고객 문장 -> 조건 목록. 부품·가격·후보 수는 말하지 않는다(A-01·A-02).
+    """고객 문장 -> (PC 상담인가) + 조건 목록. 부품·가격·후보 수는 말하지 않는다(A-01·A-02).
 
-    화면은 정규식 파서가 0건일 때만 이 경로를 부른다. 실패는 502로 올라가고
-    화면은 "조건으로 못 읽었다"고 밝힌다 -- 조건을 지어내지 않는다.
+    화면은 **모든 문장**을 이 경로로 보낸다(2026-08-17 결정 뒤집기 -- 모듈 docstring).
+    실패는 502로 올라가고 화면은 "AI가 조건으로 못 읽었다"고 밝히며 정규식 결과만
+    반영한다 -- 조건을 지어내지 않는다.
+
+    ■ 응답이 «반송해야 하는 문장»과 «조건이 없는 문장»을 가른다
+      `pc_related` 가 **`false` 일 때만** 화면이 「PC 상담 전용」 안내로 반송한다.
+      `true` 이고 `constraints` 가 비었으면 그것은 「PC 얘기지만 조건이 없다」이고
+      (예: "그냥 좋은 거 추천해주세요") 화면은 무엇을 말해 주면 되는지 안내한다.
+      `null` 은 **모름**이다 -- 반송하지 않는다. 502(전 프로바이더 실패·한도·키 없음)
+      도 마찬가지로 판정이 아니다. 이 셋을 한 응답으로 뭉개면 정상 문의가 끊긴다.
 
     ■ 방문자별 호출 횟수 제한 (2026-08-17 사장님 확정 -- 세 구멍 중 ②)
       이 경로는 인증 요구가 0 이라 **한 사람이 프로바이더 하루치(기본 일 500 · $2)를
@@ -231,6 +302,7 @@ def parse_talk(body: ParseBody, request: Request):
       소유자 개념이 없는 자리라 403 은 없고 **429 만** 난다.
 
     응답 규약(추가분)
+      200 {ok, constraints[], dropped[], pc_related: true|false|null, note, ...}
       429 {error:"rate_limited", scope:"visitor", window:"minute"|"day",
            used, limit, retry_after_sec, detail}  + `Retry-After` 헤더
     """
@@ -272,14 +344,32 @@ def parse_talk(body: ParseBody, request: Request):
         raise HTTPException(502, f"AI 응답을 조건으로 읽지 못했습니다 - {e}")
 
     kept, dropped = _validate(obj.get("constraints"), usages)
-    log.info("[talk] parse done: provider=%s kept=%d dropped=%d elapsed=%.2fs",
-             result.provider, len(kept), len(dropped), result.elapsed_sec)
+    pc = _pc_verdict(obj)
+    log.info("[talk] parse done: provider=%s pc=%s kept=%d dropped=%d elapsed=%.2fs",
+             result.provider, "none" if pc is None else ("yes" if pc else "no"),
+             len(kept), len(dropped), result.elapsed_sec)
+    if pc is None:
+        # 삼키지 않는다 -- 판정을 못 얻은 것도 사실이므로 로그에 남긴다. 화면은 이때
+        # 반송하지 않고 「조건이 없다」쪽으로만 안내한다(정상 문의를 끊지 않는다).
+        log.warning("[talk] no pc verdict in response from %s/%s - treated as unknown",
+                    result.provider, result.model)
+
+    # 「PC 아님」과 「PC 얘기지만 조건이 없다」는 **다른 사실**이라 다른 문장을 준다.
+    # 이 note 는 화면 상단 진행 바가 그대로 읽어 쓴다(shared/ui-progress.js okText).
+    if pc is False and not kept:
+        note = "PC 상담 문장이 아니라고 판정했습니다."
+    elif not kept:
+        note = "조건으로 읽을 수 있는 내용이 없습니다."
+    else:
+        note = None
 
     return {
         "ok": True,
         "constraints": kept,
         "dropped": dropped,
-        "note": ("조건으로 읽을 수 있는 내용이 없습니다." if not kept else None),
+        # true | false | null(모름). null 을 false 로 읽지 않는 것이 규약이다.
+        "pc_related": pc,
+        "note": note,
         "provider": result.provider, "model": result.model,
         "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
         "stored": False,   # 대화 원문은 어디에도 저장하지 않는다
