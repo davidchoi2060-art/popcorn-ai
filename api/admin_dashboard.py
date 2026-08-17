@@ -2,7 +2,8 @@
 
 각 타일은 해당 화면의 실집계와 같은 기준을 쓴다(중복 정의 금지 — 기준이 갈리면 숫자가 갈린다):
   검수 대기 = product_reviews 대기 / 가격 검토 = 가격 검토 파생 조건(admin_price_review PENDING)
-  입고 대기 = 재고 0(admin_stock 파생) / 환불 처리 = 활성 환불(admin_orders.ACTIVE_REFUND)
+  입고 대기 = admin_stock.pending_where() **를 부른다**(조건을 여기 다시 적지 않는다 —
+             재고 0 ∨ 안전재고 미달, 보류분 제외) / 환불 처리 = 활성 환불(admin_orders.ACTIVE_REFUND)
 정직 표기(원천 부재 — 값 대신 '—'):
   ① 오늘 적재 = csv_import_jobs 0행(CSV 파이프라인 미구현 T0)
   ② AI 사용량 = api_cost_logs 0행(LLM 연동 보류 — 착수 시 실값)
@@ -15,6 +16,12 @@ from sqlalchemy import text
 
 from .timeutil import iso
 from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
+# 입고 대기 조건은 **admin_stock 이 정본**이다(그 파일 §입고 대기 조건). 여기서 SQL 을 다시
+# 적으면 보류(0056) 같은 조건 변경이 한쪽에만 들어가 세 화면이 다른 수를 말한다 —
+# 실제로 2026-08-17 보류 도입 때 stock-inbound 만 15,724, 여기와 매입 견적은 15,725 였다.
+# 순환 없음: admin_stock 은 admin_orders·admin_products·auth·db·timeutil 만 가져오고
+# 그 어느 것도 이 모듈(또는 admin_sourcing)을 가져오지 않는다.
+from .admin_stock import pending_where
 from .db import engine
 from .taxonomy import CORE_TYPES, PART_LABELS
 
@@ -33,11 +40,10 @@ def pending_counts(conn) -> dict:
     return {
         "review": one("SELECT COUNT(*) FROM product_reviews WHERE review_status='대기'"),
         "price": one(f"SELECT COUNT(*) FROM products p WHERE {_PRICE_PENDING}"),
-        # admin_stock._PENDING과 동일 조건 — 재고 0 ∨ 안전재고 미달(0004 safety_stock)
-        "inbound": one("SELECT COUNT(*) FROM products"
-                       " WHERE status NOT IN ('단종','삭제대기')"
-                       " AND (stock_qty=0"
-                       "      OR (safety_stock IS NOT NULL AND stock_qty < safety_stock))"),
+        # 입고 대기 = admin_stock.pending_where() **그 자체**(조건을 여기 다시 적지 않는다).
+        # 기본값 exclude — 보류(「지금 안 한다」)는 운영자의 할 일이 아니므로 빠진다.
+        # ⚠ 별칭 `p` 고정이라 FROM 절에 별칭이 필요하다(예전엔 무별칭 FROM products 였다).
+        "inbound": one(f"SELECT COUNT(*) FROM products p WHERE {pending_where()}"),
         "refund": one("SELECT COUNT(*) FROM refunds"
                       " WHERE status IN ('접수','검토','수거·처리')"),
         # 카테고리 매핑(슬라이스 C) — 기존 임대 관리자는 미매핑 1,458건을 별도 화면에
@@ -261,7 +267,8 @@ def worklist():
          "href": "price-review.html", "hint": "판매가가 없어 팔 수 없는 상품"},
         {"key": "inbound", "label": "재고 입고", "count": p["inbound"],
          "focus": None, "focus_label": None,
-         "href": "stock-inbound.html", "hint": "재고 0 또는 안전재고 미달"},
+         "href": "stock-inbound.html",
+         "hint": "재고 0 또는 안전재고 미달 (보류 제외)"},
         {"key": "refund", "label": "환불 처리", "count": p["refund"],
          "focus": None, "focus_label": None,
          "href": "refunds.html", "hint": "접수·검토·수거 중"},

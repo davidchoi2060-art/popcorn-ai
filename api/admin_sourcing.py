@@ -20,6 +20,9 @@ from .admin_orders import _log
 from .auth import current_operator_id
 from .admin_price_import import _reprice, _settings
 from .admin_products import PART_TYPE_LABELS
+# 대기 조건 정본 = admin_stock.pending_where() — 아래 _WHERE 주석 참조.
+# 순환 없음: admin_stock 은 admin_orders·admin_products·auth·db·timeutil 만 가져온다.
+from .admin_stock import pending_where
 from .db import engine
 
 router = APIRouter(prefix="/api/admin")
@@ -30,10 +33,16 @@ router = APIRouter(prefix="/api/admin")
 # 실측 15,261건 · 3.6MB였다 — 화면이 열리는 데 몇 초가 걸렸고 그 뒤로도 브라우저가
 # 그 표를 통째로 그려야 했다. 목록은 전부 서버 페이지네이션이라는 규약(슬라이스 54)에서
 # 이 화면만 빠져 있었다.
-_WHERE = """
+# 대기 조건(앞 두 줄)은 **admin_stock.pending_where() 가 정본**이다 — 여기 SQL 을 다시
+# 적으면 갈라진다(2026-08-17 보류 도입 때 실제로 stock-inbound 만 1건 줄었다).
+# 기본값 exclude: 매입 견적은 「이 상품을 사 오려면 얼마인가」를 공급처에 묻는 자리인데,
+# 입고를 보류한 상품은 지금 들여오지 않기로 한 것이라 견적을 물을 대상이 아니다.
+# (확정해도 재고는 늘지 않고 곧장 입고 대기로 넘어가는데 — 이 파일 머리말 §③ —
+#  그 입고가 보류돼 있으면 견적 요청이 갈 곳 없는 일이 된다.)
+# 검색·분류 조건은 이 파일 소관이므로 그대로 둔다.
+_WHERE = f"""
     FROM products p
-    WHERE p.status NOT IN ('단종','삭제대기')
-      AND (p.stock_qty = 0 OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+    WHERE {pending_where()}
       AND (:q = '' OR p.product_name ILIKE :like OR p.sku ILIKE :like
            OR CAST(p.product_code AS TEXT) = :q)
       AND (:part_type = '' OR p.part_type = :part_type)

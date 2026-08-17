@@ -28,10 +28,11 @@ docstring이 「기준 컬럼이 없어 LIVE 제외」라고 반대로 적고 �
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from .admin_orders import _log
 from .admin_products import PART_TYPE_LABELS
-from .auth import current_operator
+from .auth import current_operator, current_operator_id
 from .db import engine
 from .timeutil import iso
 
@@ -41,20 +42,64 @@ WHY = ("inbound", "adjust")
 NOTE = ("입고 대기 = 재고 0 또는 **안전재고 미달** 상품입니다(기준은 상품별 safety_stock)"
         " · 매입가 변경은 단가표·매입 견적 소관(입고 원장에는 단가를 남기지 않습니다).")
 
+# ───────────────────────── 입고 대기 조건 — **정본은 여기 하나다** ─────────────────────────
+# 이 조건은 2026-08-17 까지 **세 파일에 SQL 문자열로 복제**돼 있었다(정의서 §④-다):
+#     api/admin_stock.py(여기) · api/admin_sourcing.py `_WHERE` · api/admin_dashboard.py `pending_counts`
+# 셋이 같아야 한다는 것은 «규약이 아니라 검사»로 이미 못박혀 있다 —
+#     tests/regression.py  「입고 대기 = 대시보드 집계」 · 「매입 대기 = 입고 대기(같은 파생 조건)」
+# 보류(0056)를 여기서만 제외하면 **그 두 검사가 실패한다.** 그래서 조건을 함수 하나로 내보내고
+# 나머지 두 파일이 이것을 부르게 한다(그 두 파일은 이 작업의 담당 밖 — 보고로 넘긴다).
+# ⚠ 별칭은 **`p` 고정**이다. 부르는 쪽이 `FROM products p` 로 써야 한다.
+HOLD_ACTIVE = ("EXISTS (SELECT 1 FROM stock_inbound_holds h"
+               " WHERE h.product_code = p.product_code AND h.released_at IS NULL)")
+
+_PENDING_BASE = """p.status NOT IN ('단종','삭제대기')
+      AND (p.stock_qty = 0
+           OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))"""
+
+HOLD_MODES = ("exclude", "only", "all")
+
+HOLD_SCOPE = (" 보류분은 기본 조회에서 빠집니다(hold=only 로 보류분만 조회)."
+              " 보류는 서버 상태이며 해제는 행 삭제가 아니라 해제 시각 기록입니다."
+              " 보류 중인 상품에는 입고를 확정할 수 없습니다 — 보류를 먼저 해제하십시오"
+              "(되돌리기는 보류 중에도 할 수 있습니다).")
+
+
+def pending_where(hold: str = "exclude") -> str:
+    """입고 대기 조건 — **단일 원천.** 다른 모듈은 이 함수를 부른다(문자열을 다시 적지 않는다).
+
+        exclude  기본 — 보류분을 «뺀다»(승인 디자인: 「보류분은 기본 조회에서 빠진다」)
+        only     보류분만 — 「별도 조건으로 다시 본다」
+        all      보류 여부를 따지지 않는다(보류 도입 이전과 같은 모집단)
+
+    ⚠ 대시보드·매입 견적은 **`exclude`(기본)** 를 써야 한다 — 「입고 대기」라는 같은 말을
+      세 화면이 다른 수로 말하면 안 된다(회귀가 그 일치를 검사한다).
+    """
+    if hold == "only":
+        return f"{_PENDING_BASE}\n      AND {HOLD_ACTIVE}"
+    if hold == "all":
+        return _PENDING_BASE
+    return f"{_PENDING_BASE}\n      AND NOT {HOLD_ACTIVE}"
+
+
 _PENDING = """
     SELECT p.product_code, p.sku, p.product_name, p.part_type, p.status, p.stock_qty,
            p.safety_stock, p.purchase_price, p.sale_price,
            p.review_required_yn, p.ai_candidate_yn,
            psp.cost_price, s.name AS supplier,
-           EXISTS(SELECT 1 FROM product_specs sp WHERE sp.product_code = p.product_code) AS has_specs
+           EXISTS(SELECT 1 FROM product_specs sp WHERE sp.product_code = p.product_code) AS has_specs,
+           h.hold_id, h.reason AS hold_reason, h.held_at, COALESCE(ho.name, '—') AS hold_by
     FROM products p
     LEFT JOIN (SELECT DISTINCT ON (product_code) product_code, supplier_id, cost_price
                FROM product_supplier_prices ORDER BY product_code, cost_price) psp
            USING (product_code)
     LEFT JOIN suppliers s USING (supplier_id)
-    WHERE p.status NOT IN ('단종','삭제대기')
-      AND (p.stock_qty = 0
-           OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+    -- 활성 보류는 상품당 최대 1건이다(0056 부분 유니크 인덱스) — 그래서 이 LEFT JOIN 이
+    -- 행을 늘리지 않는다. 인덱스가 없었다면 목록 건수가 조용히 부풀었을 자리다.
+    LEFT JOIN stock_inbound_holds h
+           ON h.product_code = p.product_code AND h.released_at IS NULL
+    LEFT JOIN admin_operators ho ON ho.operator_id = h.held_by
+    WHERE {where}
       AND (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%')
       AND (:part_type = '' OR p.part_type = :part_type)
     ORDER BY (p.stock_qty > 0), p.product_code
@@ -64,9 +109,7 @@ _PENDING = """
 # 목록과 같은 조건의 총계 — 화면이 '전체 N건 중 이 페이지'를 정직하게 말하려면 필요하다
 _PENDING_COUNT = """
     SELECT count(*) FROM products p
-    WHERE p.status NOT IN ('단종','삭제대기')
-      AND (p.stock_qty = 0
-           OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))
+    WHERE {where}
       AND (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%')
       AND (:part_type = '' OR p.part_type = :part_type)
 """
@@ -118,21 +161,32 @@ def _note_of(r) -> str:
 
 @router.get("/stock-inbound")
 def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "",
-                  catalog_q: str = ""):
+                  catalog_q: str = "", hold: str = "exclude"):
     """입고 대상 — **서버 페이지네이션**(슬라이스 54).
 
     전량 전송이던 것을 나눠 보낸다: 입고 대상 15,259건 · 카탈로그 22,838건을 매 요청마다
     보내면 화면이 느려지고 브라우저가 버티지 못한다(상품 관리는 이미 페이지네이션이다).
     직접 등록용 `catalog`은 **검색어가 있을 때만** 최대 50건 — 셀렉트 하나 때문에 전량을
     보낼 이유가 없다.
+
+    `hold` — **보류분은 기본 조회에서 빠진다**(`exclude`). `only` 로 보류분만 다시 보고,
+    `all` 은 보류 여부를 따지지 않는다. 구 화면은 보류를 «브라우저 배열»에서만 지워
+    다음 조회에 그대로 되살아났다 — 이제 서버 상태다(마이그레이션 0056).
     """
+    if hold not in HOLD_MODES:
+        raise HTTPException(400, f"알 수 없는 보류 조건: {hold}"
+                                 f" (허용값 {' · '.join(HOLD_MODES)})")
     size = max(1, min(size, 200))
     page = max(1, page)
     p = {"q": q.strip(), "part_type": part_type.strip(),
          "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
-        rows = conn.execute(text(_PENDING), p).mappings().all()
-        total = conn.execute(text(_PENDING_COUNT), p).scalar_one()
+        rows = conn.execute(text(_PENDING.format(where=pending_where(hold))), p).mappings().all()
+        total = conn.execute(text(
+            _PENDING_COUNT.format(where=pending_where(hold))), p).scalar_one()
+        # 「보류 N건 제외」를 화면이 세지 않게 서버가 준다 — 같은 조회 조건(q·분류)에서 센다.
+        held_total = conn.execute(text(
+            _PENDING_COUNT.format(where=pending_where("only"))), p).scalar_one()
         cq = catalog_q.strip()
         catalog = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, purchase_price, stock_qty,"
@@ -144,6 +198,9 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
         "page": page, "size": size, "total": total,
         "pages": (total + size - 1) // size,
         "catalog_q": catalog_q.strip(),
+        # 「전체 N건 중 이 페이지」와 별개로 **보류가 몇 건 빠졌는지**를 함께 말한다 —
+        # 안 그러면 어제와 오늘의 total 이 왜 다른지 화면이 설명하지 못한다.
+        "hold": hold, "held_total": held_total,
         "items": [{
             "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
             "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
@@ -155,6 +212,11 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
             "reviewed": not r["review_required_yn"],
             "has_specs": r["has_specs"],
             "status": r["status"], "note": _note_of(r),
+            # 보류는 «서버 상태»다 — 화면 배열이 아니다(구 화면 결함 2).
+            # exclude 조회에서는 언제나 null 이고, only·all 에서만 값이 선다.
+            "hold": None if r["hold_id"] is None else {
+                "hold_id": r["hold_id"], "reason": r["hold_reason"],
+                "held_at": iso(r["held_at"]), "held_by": r["hold_by"]},
         } for r in rows],
         "catalog": [{
             "product_code": c["product_code"], "sku": c["sku"], "name": c["product_name"],
@@ -164,7 +226,7 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
         } for c in catalog],
         "note": NOTE + (" 목록은 서버에서 나눠 보냅니다 — 화면은 '전체 N건 중 이 페이지'를"
                         " 표시합니다. 직접 등록 후보는 검색어를 입력해야 조회됩니다"
-                        "(22,838건 전량 전송을 없앴습니다)."),
+                        "(22,838건 전량 전송을 없앴습니다).") + HOLD_SCOPE,
     }
 
 
@@ -365,6 +427,22 @@ def inbound(product_code: int, body: InboundBody):
             raise HTTPException(404, "상품이 없습니다")
         if p["status"] in ("단종", "삭제대기"):
             raise HTTPException(400, f"'{p['status']}' 상품에는 입고할 수 없습니다")
+        # ★ 보류 중이면 입고를 «막는다» (2026-08-17 판정 — 근거를 남긴다).
+        #   보류는 「지금 이 상품에 손대지 않는다」는 뜻이다. 막지 않으면 보류가
+        #   «목록에서만 안 보이는 화면 편의»가 되고, 그것이 정확히 구 화면의 결함
+        #   (서버가 모르는 보류)과 같은 결과다 — 상태로 남긴 이유가 사라진다.
+        #   ⚠ 실제 입고를 막는 것이 아니다: 해제가 한 번의 호출이고 그 해제가 기록으로
+        #     남는다. 즉 「물건이 들어왔으니 보류를 푼다」가 원장에 남는 편이 낫다.
+        #   ⚠ **되돌리기(undo)는 막지 않는다** — 되돌리기는 새 입고가 아니라 «교정»이다.
+        #     보류가 교정을 막으면 잘못 넣은 수량이 보류 때문에 굳는다.
+        held = conn.execute(text(
+            "SELECT hold_id, reason FROM stock_inbound_holds"
+            " WHERE product_code=:pc AND released_at IS NULL"),
+            {"pc": product_code}).mappings().first()
+        if held:
+            raise HTTPException(409, f"보류 중인 상품입니다 (보류 #{held['hold_id']}"
+                                     f" · 사유 {held['reason']})"
+                                     " — 보류를 먼저 해제한 뒤 입고를 확정하십시오")
         before, status_changed = p["stock_qty"], False
         log_id = _log(conn, "stock_inbound", p["sku"],
                       {"product_code": product_code, "sku": p["sku"], "qty": body.qty,
@@ -387,8 +465,110 @@ def inbound(product_code: int, body: InboundBody):
                 "pool_entered": _in_pool(conn, product_code)}
 
 
+class HoldBody(BaseModel):
+    reason: str = ""
+
+
+@router.post("/stock-inbound/hold/{product_code}")
+def hold_product(product_code: int, body: HoldBody):
+    """입고 보류 — **서버 상태로 남긴다**(사장님 확정 ㉡ · 마이그레이션 0056).
+
+    구 화면은 `R.splice(i,1)` 로 브라우저 배열에서만 지우고 「보류 — 재고 미반영」을
+    띄웠다. 대기 목록은 파생이라 **다음 조회에 그대로 되살아났다** — 운영자는 처리됐다고
+    읽는데 서버는 몰랐다. 이제 보류는 행이고, 조회에서 실제로 빠진다.
+    """
+    reason = (body.reason or "").strip()
+    if not reason:
+        # `reason` 은 NOT NULL 이다(0056). 빈 값을 넣어 DB 오류(500)로 만들지 않고
+        # **왜 안 되는지를 사람 말로** 돌려준다.
+        raise HTTPException(400, "보류 사유를 입력하십시오")
+    with engine.begin() as conn:
+        p = conn.execute(text(
+            "SELECT product_code, sku, status, stock_qty FROM products"
+            " WHERE product_code=:pc FOR UPDATE"), {"pc": product_code}).mappings().first()
+        if p is None:
+            raise HTTPException(404, "상품이 없습니다")
+        if p["status"] in ("단종", "삭제대기"):
+            # 대기 목록에 애초에 없는 상품이다 — 보류할 것이 없다.
+            raise HTTPException(400, f"'{p['status']}' 상품은 입고 대기 대상이 아니므로"
+                                     " 보류할 수 없습니다")
+        cur = conn.execute(text(
+            "SELECT hold_id, reason, held_at FROM stock_inbound_holds"
+            " WHERE product_code=:pc AND released_at IS NULL"),
+            {"pc": product_code}).mappings().first()
+        if cur:
+            # 부분 유니크 인덱스(ux_stock_inbound_holds_active)가 DB 에서 막는 것을
+            # **사람 말로 옮긴다.** 인덱스는 최후의 보루로 남는다(아래 IntegrityError).
+            raise HTTPException(409, f"이미 보류 중입니다 (보류 #{cur['hold_id']}"
+                                     f" · 사유 {cur['reason']}"
+                                     f" · 보류 시각 {iso(cur['held_at'])})")
+        try:
+            hold_id = conn.execute(text(
+                "INSERT INTO stock_inbound_holds (product_code, reason, held_by)"
+                " VALUES (:pc, :r, :op) RETURNING hold_id"),
+                {"pc": product_code, "r": reason, "op": current_operator_id()}).scalar()
+        except IntegrityError:
+            # 위 조회와 INSERT 사이에 다른 작업자가 먼저 넣은 경우. 상품 행을 FOR UPDATE 로
+            # 잡고 있어 실제로는 거의 나지 않지만, **DB 가 막은 것을 500 으로 흘리지 않는다.**
+            raise HTTPException(409, "이미 보류 중입니다 — 다른 작업자가 방금 보류했습니다")
+        log_id = _log(conn, "stock_hold", p["sku"],
+                      {"hold_id": hold_id, "product_code": product_code,
+                       "sku": p["sku"], "reason": reason,
+                       "before": {"stock_qty": p["stock_qty"], "status": p["status"]}},
+                      kind="stock")
+        return {"ok": True, "hold_id": hold_id, "log_id": log_id, "sku": p["sku"],
+                "product_code": product_code, "reason": reason,
+                "note": "보류 중에는 입고를 확정할 수 없습니다."
+                        " 목록 기본 조회에서 빠지며 hold=only 로 다시 조회합니다."}
+
+
+@router.post("/stock-inbound/hold/{product_code}/release")
+def release_hold(product_code: int):
+    """보류 해제 — **행을 지우지 않는다.** `released_at` 을 기록한다(원장·되돌림 규약).
+
+    DELETE 가 아니라 POST `/release` 인 것이 계약이다 — 삭제로 부르면 언젠가 삭제로 짓는다.
+    """
+    with engine.begin() as conn:
+        p = conn.execute(text(
+            "SELECT product_code, sku FROM products WHERE product_code=:pc FOR UPDATE"),
+            {"pc": product_code}).mappings().first()
+        if p is None:
+            raise HTTPException(404, "상품이 없습니다")
+        cur = conn.execute(text(
+            "SELECT hold_id FROM stock_inbound_holds"
+            " WHERE product_code=:pc AND released_at IS NULL"),
+            {"pc": product_code}).mappings().first()
+        if cur is None:
+            # **사유를 갈라 말한다** — 되돌리기가 404(기록 없음) / 409(이미 되돌림)를
+            # 가르는 것과 같은 형태다. 「해제할 게 없다」와 「이미 해제됐다」는 다른 사실이고,
+            # 운영자가 다음에 할 일도 다르다.
+            last = conn.execute(text(
+                "SELECT hold_id, released_at FROM stock_inbound_holds"
+                " WHERE product_code=:pc ORDER BY hold_id DESC LIMIT 1"),
+                {"pc": product_code}).mappings().first()
+            if last:
+                raise HTTPException(409, f"이미 해제된 보류입니다 (보류 #{last['hold_id']}"
+                                         f" · 해제 시각 {iso(last['released_at'])})")
+            raise HTTPException(404, "보류 기록이 없습니다")
+        conn.execute(text(
+            "UPDATE stock_inbound_holds SET released_at = now(), released_by = :op"
+            " WHERE hold_id = :h"), {"op": current_operator_id(), "h": cur["hold_id"]})
+        # ⚠ 역참조 키로 `ref_log_id` 를 «쓰지 않는다». 그 키는 «되돌림»의 표식이고,
+        #   활동 기록 화면이 그것으로 원 기록에 「되돌려짐」 배지를 붙인다. 해제는
+        #   되돌림이 아니다 — 보류가 틀렸다는 뜻이 아니라 끝났다는 뜻이다. 대신
+        #   `hold_id`(표의 행)로 잇는다. 그 편이 로그 id 보다 오래 남는 연결이다.
+        log_id = _log(conn, "stock_hold_release", p["sku"],
+                      {"hold_id": cur["hold_id"], "product_code": product_code,
+                       "sku": p["sku"]}, kind="stock")
+        return {"ok": True, "hold_id": cur["hold_id"], "log_id": log_id, "sku": p["sku"],
+                "product_code": product_code,
+                "note": "보류를 해제했습니다. 입고 대기 목록에 다시 나타납니다"
+                        "(보류 행은 지우지 않고 해제 시각을 기록했습니다)."}
+
+
 @router.post("/stock-inbound/undo/{log_id}")
 def undo_inbound(log_id: int):
+    # ⚠ 보류 중이어도 되돌리기는 «막지 않는다» — 근거는 inbound() 의 보류 가드 주석.
     with engine.begin() as conn:
         log = conn.execute(text(
             "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
