@@ -531,6 +531,10 @@ AI 는 **입력 파싱과 근거 설명만** 하고 견적을 만들지 않는�
 | U-07 | **히어로 배경 톤(S0)** | 단색 틴트 vs 은은한 그라디언트/일러스트. 라이브 재고 신호 노출 강도. 프리미엄 톤 vs 정보 위주. | S0 적용노트 |
 | U-11 | **몰 분류를 담을 자리**(2026-08-16 신규) | 우리 축은 이미 둘이다 — `part_type`(엔진용, 닫힌 집합) · `categories`(판매 탐색용, 34행, 운영자가 만든다). `0027_categories.py`가 "카테고리를 옮겨도 견적 결과가 변하면 안 된다"(A-02 재현성)고 설계로 못박았고, 회귀 `test_categories`·`test_category_isolation`이 그 계약을 지킨다. **빠진 것은 몰 원문 축 하나뿐** — 카테고리1~4는 적재 때 읽고 버려지고(카테고리4는 아무 데서도 안 읽힘), `product_imports` 표가 있는데 0행이다(`api/admin_imports.py`가 "성공 행의 원본은 저장하지 않는다"고 명시). 배경(사장님 설명): *"우리 내부에서 잡는 분류는 조립AI를 돌리기 위한 용도이고, 팝콘PC는 원천 소스를 제공하는 곳이라서."* 사장님 지시 — 스키마 신설 포함해 선택지를 만들어 보고할 것. ⚠ **여기서 선택지를 임의로 채우지 않는다** — 그건 보고를 받는 사장님의 몫이다. | A-49(중고 분류와 연동될 수 있음) |
 | U-12 | **AI 비용 합산 한도(`kind="cost_global"`) — 만들지 여부·언제·얼마**(2026-08-16 신규) | `cost_thresholds`는 프로바이더 전체(`key=provider`)·작업별 부분(`key=f"{provider}:{task_key}"`) 두 키만 있다 — **여러 프로바이더를 합친 하루 전체 지출**을 막는 키가 없다. `LLMBlockedError.kind="cost_global"`이 자리는 예약해 뒀지만(2026-08-16 사장님 지시: "전체 비용 한도 초과는 폴백하면 안 된다" — 프로바이더를 바꿔도 같은 지갑이라 우회가 안 되므로) 실제로 던지는 코드는 0곳이다(`api/llm.py`). 지금은 프로바이더 셋을 동시에 최대로 쓰면 세 한도의 합만큼 쓸 수 있다. ⚠ 여기서 한도액을 임의로 채우지 않는다 — 그건 사장님의 몫이다. | A-54 |
+| U-13 | **FAQ 「재고는 어디서 넣나요?」 답변 내용**(2026-08-17 신규) | `0048_ops_assistant_faq.py` 시드가 "재고 입고 화면에서 넣습니다"라며 옛 `stock-inbound.html`을 안내하는데, **admin2 에는 재고 입고 화면이 없다**(`api/admin_nav.py`에 관련 항목 0건 · `admin_ui_*stock*` 모듈 0개 — 기록자 실측, 의도적 축소로 보인다). 경로 오타가 아니라 **답변 내용 자체가 낡았다.** 무엇으로 바꿀지(재고 입고 축이 admin2에 아예 안 생길지, 다른 화면으로 안내할지) 사장님 결정 대기. | A-55 |
+| U-14 | **`api/handoff.py:174` `get_handoff()` 를 다시 쓸지**(2026-08-17 신규) | docstring은 "완료 화면과 관리자 「인계 기록」이 함께 쓴다"고 적지만 **둘 다 이 GET 을 한 번도 부르지 않는다**(기록자 전수 검색). 인계 기록을 링크로 다시 열 수 있게 배선할지, docstring 만 정정할지는 사장님 결정 대기. 코드 파일이라 기록자는 고치지 않는다. | 위 A-56 부기 |
+| U-15 | **S1 `fillVerdicts` 의 판정·조건 태그 시차**(2026-08-17 신규) | `mockups/mvp1/s1-session.html`의 `fillVerdicts`가 과거 말풍선을 최신 판정으로 갱신하는데, 그러면 그 말풍선에 남은 «조건 태그»는 그때 것이고 «판정»은 지금 것이라 하나의 말풍선 안에서 앞뒤가 어긋난다(확인자 관측). 태그도 함께 갱신할지, 판정 갱신 자체를 멈출지 사장님 결정 대기. | S1 |
+| U-16 | **s4/s5 근거 없는 약속 문구**(2026-08-17 신규) | `mockups/mvp1/s4-cart.html`의 "당일 출고", `s5-complete.html`의 "24시간 안정성 테스트"·"왕복 택배비는 A/S 기간 내 당사 부담"에는 근거·정책 확정 표시가 없다(같은 화면의 "무상 보증 2년"에는 "(*정책 확정 전 예시)"가 붙어 있어 표기 기준이 갈린다). 정책이 실제로 확정됐는지, 안 됐다면 같은 예시 표기를 붙일지 사장님 결정 대기. | s4-cart.html · s5-complete.html |
 
 ---
 
@@ -2738,6 +2742,140 @@ $7.50로 2배(`api/llm.py` `ModelPricing.valid_until`, Google 공식 가격 문�
 으로만 나온다) · `grep -rn "task_key" db/migrations/versions/`(0046 하나뿐인지)
 · `db/migrations/versions/0054_api_cost_logs_status.py`를 열어 `status`/
 `error_message`인지 확인(`task_key`가 아니다).
+
+---
+
+## 운영 도우미 잠금 뒤집힘 + LLM 실연동 확장·배포 범위 (2026-08-17)
+
+### A-55 ★ 운영 도우미 잠금 뒤집힘 — 잠긴 셋을 사장님이 직접 연다 (✅ 2026-08-17 사장님 확정)
+
+**사장님 원문**: 「운영 도우미의 경우 판매가, 매입가, 마진, 회원개인정보 등에
+모두 접근이 가능해야 합니다. 운영인원이 모두 사장님, 전산실장 등 모든 권한을
+가진 일부입니다.」
+
+**무엇이 뒤집혔나 — 잠금의 원래 근거는 사장님 결재를 거친 적이 없었다.**
+`db/migrations/versions/0048_ops_assistant_faq.py` 시드 주석 원문(코드 확인):
+「잠긴 셋(회원 개인정보·매입가·마진·관리자 계정)은 enabled=false 로 고정
+시드한다 — 화면에서 켤 수 없다(요구사항 문서 ⑦, 개인정보·원가·권한 노출
+위험).」 근거로 인용된 `docs/design/req/req-ops-assistant.md` §⑦은 "정책 편집은
+owner"라고만 적었을 뿐 잠금 자체를 사장님이 결정했다는 기록이 아니다 — **이
+decision-log 에 이 잠금을 다루는 항목이 지금까지 하나도 없었다**(기록자가
+"잠금"·"ops_assistant"로 전수 검색해 이번이 첫 항목). 즉 잠금은 **제작팀이
+스스로 내린 위험 판단**이었지 사장님이 직접 정한 것이 아니었다.
+
+**오늘 DBA 가 적용 — 기록자 재확인(`ops_assistant_scopes` 9행 전체 SELECT,
+2026-08-17)**:
+
+    order_status · sell_price                 enabled false -> true (locked 원래 false)
+    member_pii · cost_margin · admin_accounts  locked true -> false + enabled false -> true
+    product_specs·stock_qty·review_status·compat_check  원래부터 enabled=true·
+                                                          locked=false — 이번에 안 바뀜
+
+    지금 9행 전부 enabled=true · locked=false (2026-08-17 기록자 실측)
+
+되돌림 원장 — `admin_operator_activity_logs` log_id 8204~8208
+(action=`ops_assistant_scope_open_dba`), 다섯 행 전부 같은 사유를 `detail.note`
+에 남겼다: 「DBA 2026-08-17: 사장님 지시 -- 운영 도우미가 판매가, 매입가,
+마진, 회원개인정보 등에 모두 접근 가능해야 한다(운영인원 전원 owner급
+전권). locked=false 로 해제(장치는 유지, 재잠금 가능) + enabled=true.」
+각 행의 `before`/`after`가 위 표와 한 글자도 다르지 않게 일치한다(기록자가
+직접 SELECT로 대조).
+
+답변 가능 범위는 4종(product_specs·stock_qty·review_status·compat_check)에서
+9종(전부)으로 늘었다.
+
+⚠ **잠금 «장치» 는 폐기하지 않았다.** `api/admin_ops_assistant.py`의
+`set_scope()`는 지금도 `row["locked"]`가 참이면 400 으로 거부한다(코드 확인,
+L385-387: `if row["locked"]: raise HTTPException(400, ...)`). 다시
+`locked=true` 로 되돌리면 그 즉시 다시 잠긴다 — 이번 변경은 **데이터 값만**
+바꿨을 뿐 게이트 로직은 그대로다.
+
+⚠ **개인정보는 외부로 나가지 않는다**(제작자가 이미 모듈 docstring 에
+2026-08-17 자체 문서화해 둔 것을 기록자가 코드로 재확인). `ask_ops_assistant()`
+가 프롬프트를 만들며 읽는 표는 `ops_assistant_faqs`·`ops_assistant_scopes`
+둘뿐이고(`engine.connect()` 블록, `api/admin_ops_assistant.py`), 나머지 한 축
+`_real_routes()`는 DB 가 아니라 `request.app.routes`(메모리 라우트 표)를
+훑는다. `member_pii`를 켜도 회원 테이블을 읽지 않는다 — 모델이 일반 지식 +
+FAQ 문구로 답할 뿐, 실제 회원·주문·매입가 행은 한 줄도 프롬프트에 실리지
+않는다. 외부 LLM 으로 나가는 것은 운영자가 타이핑한 질문과 owner 가 쓴 FAQ
+문구뿐이다.
+
+**넘지 말아야 할 선**: `ask_ops_assistant` 의 `engine.connect()` 블록에 업무
+표(members·products·orders 등) 조회를 더하고 그 결과를 `_build_prompt` 로
+넘기는 순간부터 개인정보가 실제로 전송되기 시작한다. 그건 코드 문제가 아니라
+개인정보 반출 문제이므로 그때는 사장님 판단이 먼저다.
+
+⚠ **이 DB 는 로컬·배포 서버 공유다**(`CLAUDE.md` §작업 흐름). DBA 변경은
+코드 배포 없이 **배포 서버에도 즉시** 반영됐다.
+
+**확인법**:
+`SELECT scope_key, enabled, locked FROM ops_assistant_scopes ORDER BY sort_order`
+(9행 전부 enabled=true·locked=false 인지) ·
+`SELECT log_id, action, target_id, detail FROM admin_operator_activity_logs
+WHERE log_id BETWEEN 8204 AND 8208`(다섯 행의 before/after) ·
+`grep -n 'row\["locked"\]' api/admin_ops_assistant.py`(400 게이트가 아직
+있는지) · `grep -n "engine.connect" api/admin_ops_assistant.py`(프롬프트가
+읽는 표가 여전히 둘뿐인지 그 블록 안 SELECT 문 확인).
+
+---
+
+### A-56 LLM 실연동 확장 + 배포 범위 — 오늘 확정 9건 (✅ 2026-08-17 사장님 확정)
+
+**① 범위 확장**: A-52 로 착수 승인된 LLM 실연동(원래 팝콘톡 한정)을 **고객
+견적 화면까지 넓힌다** — 입력 파싱(S1)과 근거 설명(S2) 둘에 붙인다.
+
+**② S1 파싱 방식 = 정규식 먼저, 못 읽은 문장만 AI.** 정규식이 문장에서
+하나라도 뽑으면 AI 는 호출하지 않는다(그 요청의 AI 호출은 0).
+
+**③ S2 근거 자리 — 새로 만들지 않는다.** 부품별 근거를 담을 새 자리를 만드는
+대신, **이미 있는 「이 구성을 고른 이유」 자리부터** AI 로 채운다.
+
+**④ 팝콘톡 `isPC` 어휘 관문은 그대로 둔다.** 진짜 잡담에 LLM 비용을 0 으로
+유지하는 대가로, 구어체로 쓴 진짜 PC 질문이 돌려보내지는 손실은 감수한다.
+
+**⑤ 랜딩 배너 「호환성 5종」 — 이미지 안의 수를 걷어낸다.** 배너 이미지
+파일 자체에 박힌 숫자는 빼고, 수는 **서버가 주는 텍스트 배지로만** 낸다
+(§화면 정직성 "화면이 숫자를 지어내지 않는다"의 연장 — 지금까지 그 규칙이
+안 미치던 자리가 이미지 자체였다는 뜻).
+
+**⑥ 마크업에 박힌 목업 숫자 정리 — 고객 화면만 먼저.** MY 4화면은 범위
+축소로 제거될 화면이라 제외, 구 admin 화면(백업용 동결, P-09)도 제외.
+
+**⑦ 배포 순서 — 관리자 수정만 먼저.** 고객 화면 AI 는 접근 게이트가 설
+때까지 로컬에 둔다. A-52 가 남겨 둔 공백 ㉲(접근 게이트 없음)이 아직 안
+풀렸다는 뜻 — 그 공백이 메워지기 전엔 고객에게 노출하지 않는다.
+
+**⑧ 로그인 화면(ADM-SYS-021) 재구축 — AI 연동 물결이 끝난 뒤 착수한다.**
+승인 디자인은 이미 있다(`docs/design/spec-login.md`, 1b 안, 2026-08-15
+사장님 확정) — **미룬 것은 구현 착수 시점뿐**이다. 아래 「문서 정정 ⓐ」 참조.
+
+**⑨ 배포 서버 AI 키 — 사장님이 직접 넣었다(3사 전부).**
+
+    근거   `api_cost_logs`, 2026-08-17(기록자 SELECT, 위 A-55 확인 과정과
+           같은 접속으로 재실측): codex 14건 $0.227 · claude 20건 $0.058 ·
+           gemini 10건 $0.031 — 3사 모두 실비용이 찍혀 있다
+
+    ⚠ 처음 보고된 수치("Codex $0.23 · Claude $0.25 · Gemini $0.03")와
+    Claude 쪽이 어긋난다. 기록자가 재보니 **claude $0.25 는 2026-08-16(전날)
+    누적 합계 $0.27177 에 더 가깝다** — 날짜가 섞였을 가능성이 있다. 「3사
+    전부 실비용이 찍혀 있다 = 사장님이 직접 키를 넣었다」는 결론은 두 수치
+    어느 쪽으로도 참이라 바뀌지 않지만, **숫자는 문서에 박지 않는다는
+    CLAUDE.md 규칙대로 이 문서도 확정 숫자를 못박지 않는다** — 필요하면
+    아래 확인법으로 다시 잰다.
+
+**확인법(⑨)**: `SELECT provider, count(*), sum(cost_usd) FROM api_cost_logs
+WHERE created_at::date = current_date GROUP BY provider`.
+
+⚠ **미해결로 남긴 것 — `api/handoff.py:174`**: `get_handoff()`의 docstring이
+"완료 화면과 관리자 「인계 기록」이 함께 쓴다"고 적는데, **둘 다 이 GET 을
+부르지 않는다**(기록자 전수 검색, 2026-08-17). `mockups/mvp1/s5-complete.html`
+안에 `handoff/`·`get_handoff` 문자열 0건. 관리자 「인계 기록」
+(`api/admin_ui_handoff_log.py`)도 이 엔드포인트를 부르지 않고
+`handoffs`·`handoff_items`를 **직접** SELECT 한다(같은 파일 주석이 자인:
+"POST 를 부르는 곳은 없고" 등 이미 자체 실측이 남아 있음). **이 항목은
+코드 파일이라 기록자가 고치지 않는다** — 무엇을 할지는 사장님 결정 대기다
+(인계 기록을 이 GET 으로 다시 열 수 있게 배선할지, 아니면 docstring 만
+정정할지).
 
 ---
 
