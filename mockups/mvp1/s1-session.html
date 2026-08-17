@@ -287,7 +287,13 @@ function addConstraint(icon,label,value){var e=document.getElementById('s1-cons-
 function addCond(text,icon,label,value,factor){addUser(text);addConstraint(icon,label,value);setTimeout(function(){if(!LIVE)poolUnknown(SRC_NOTE.off);addAI('네, <b>'+value+'</b> 조건을 반영했어요.'+(LIVE?'':' 통과 후보 수는 <b>서버에 연결되면 표시됩니다</b>.'));},350);}
 /* 조건을 좁히는 시나리오 칩. «재고에 0개»는 서버만 할 수 있는 말이라 하지 않는다 —
    LIVE 면 applyCount()의 verdict·empty_slots 가 실제 사유까지 말해 준다. */
-function overConstrain(text){addUser(text);addConstraint('savings','예산','80만원 이하');addConstraint('sports_esports','용도','고사양 게임');setTimeout(function(){if(LIVE)return;poolUnknown(SRC_NOTE.off);addAI('<b>예산 80만 · 고사양 게임</b>을 조건으로 잡았어요. 이 조합을 통과하는 부품이 몇 개인지는 <b>서버에 연결되면 표시됩니다</b>.');},350);}
+/* 용도 값을 여기 박아 두지 않는다 — 칩 문장을 matchUsage 로 접는다(아래 USAGES 블록).
+   서버가 목록을 못 주면 용도는 붙지 않고, 말풍선도 그 사실대로만 말한다. */
+function overConstrain(text){addUser(text);addConstraint('savings','예산','80만원 이하');
+ USAGES_READY.then(function(){
+  var u=matchUsage(text);if(u)addConstraint('interests','용도',u);
+  setTimeout(function(){if(LIVE)return;poolUnknown(SRC_NOTE.off);
+   addAI('<b>예산 80만'+(u?' · '+esc(u):'')+'</b>을 조건으로 잡았어요. 이 조합을 통과하는 부품이 몇 개인지는 <b>서버에 연결되면 표시됩니다</b>.');},350);});}
 document.querySelectorAll('button').forEach(function(b){var x=b.textContent;if(x.indexOf('GPU 한 단계 낮추기')>-1)b.addEventListener('click',function(){relax();});else if(x.indexOf('예산 20만원 올리기')>-1)b.addEventListener('click',function(){relax();});});
 cb.addEventListener('click',function(){if(!cb.disabled)window.location.href='s2-result.html';});
 function setGear(k){document.querySelectorAll('[data-gear]').forEach(function(x){var on=x.getAttribute('data-gear')===k;x.style.background=on?'#17171b':'transparent';x.style.color=on?'#fff':'#6b6b73';x.style.fontWeight=on?'800':'700';});var man=document.getElementById('s1-manual');if(man){if(k==='manual'){msgs.style.display='none';man.hidden=false;}else{man.hidden=true;msgs.style.display='flex';}}}
@@ -308,10 +314,48 @@ var Q_PURPOSE={id:'purpose',q:'누가 쓰실 PC인가요?',cl:'대상',ci:'perso
 var Q_QTY={id:'qty',q:'직원용이면, 몇 대 필요하세요?',cl:'수량',ci:'inventory_2',f:0.92,opts:[{t:'1~5대',v:'1~5대',why:['대량 동일사양 재고로 압축']},{t:'6~20대',v:'6~20대',why:['대량 동일사양 재고로 압축']},{t:'20대+',v:'20대 이상',why:['대량 동일사양 재고로 압축']}]};
 var Q_EXISTING={id:'existing',q:'이번 구매는 어떤 경우세요?',cl:'구매 형태',ci:'sync',f:0.85,opts:[{t:'처음 장만 (다 새로)',v:'신규 일체',why:[]},{t:'PC만 교체 (모니터는 쓰던 거)',v:'모니터 기존',why:['모니터 견적 제외']},{t:'업그레이드 (일부 재사용)',v:'업그레이드',why:['재사용 예정 부품 후보 제외']}]};
 var Q_REUSE={id:'reuse',q:'그대로 쓰실 부품을 골라 주세요.',cl:'재사용',ci:'recycling',multi:true,skip:true,f:0.9,opts:[{t:'모니터',v:'모니터',why:['모니터 견적 제외']},{t:'케이스',v:'케이스',why:['케이스 견적 제외']},{t:'저장장치',v:'저장장치',why:['저장장치 견적 제외']},{t:'파워',v:'파워',why:['파워 견적 제외']},{t:'그래픽카드',v:'그래픽카드',why:['그래픽카드 견적 제외']},{t:'잘 모름-봐주세요',v:'점검 요청',why:['현 부품 호환 점검 대상']}]};
-var Q_USE={id:'use',q:'주로 무엇에 쓰실 거예요?',cl:'용도',ci:'interests',multi:true,f:0.5,opts:[{t:'🎮 게임(오버워치·발로란트·롤)',v:'게임',hint:'화면 끊김 없이 부드럽게 맞출게요',why:['저사양 GPU 제외(프레임 미달)','고주사율 대응 GPU 우선']},{t:'🎮 고사양 게임(배그·대작)',v:'고사양 게임',hint:'높은 그래픽도 여유롭게',why:['중급 이하 GPU 제외']},{t:'🎬 영상 편집(쇼츠·유튜브)',v:'영상 편집',hint:'빠른 편집·렌더링 위주로',why:['저코어 CPU 제외','대용량 램 우선']},{t:'📈 주식·트레이딩',v:'주식·트레이딩',hint:'모니터 여러 대 연결되게',why:['멀티 모니터 출력 보드 우선']},{t:'🤖 AI 사용(이미지·챗봇)',v:'AI 작업',hint:'AI에 강한 그래픽카드로',why:['저용량 VRAM GPU 제외']},{t:'📄 사무(엑셀·문서·PPT)',v:'사무',hint:'조용하고 가볍게',why:['고성능 GPU 제외','온보드 GPU 메인보드 우선']},{t:'🎓 인강·인터넷·영상 시청',v:'인터넷·시청',hint:'부담 없는 가성비로',why:['고가 부품 제외']},{t:'🎥 영화·미디어(프로젝터)',v:'영화·미디어',hint:'조용하고 큰 화면 연결되게',why:['고소음 부품 제외']}]};
+/* 용도 선택지는 «서버가 준다» — 어휘를 여기 박지 않는다(2026-08-17, 아래 USAGES 블록).
+   ⚠ multi 를 뗐다: 서버 `usage_floors.match()` 는 **먼저 맞는 하나만** 쓴다. 여러 개를 고르게
+   두면 화면엔 「게임 · 영상편집」 두 칩이 뜨는데 하한은 한 벌만 걸려 화면이 거짓말한다. */
+var Q_USE={id:'use',q:'주로 무엇에 쓰실 거예요?',cl:'용도',ci:'interests',f:0.5,opts:[]};
 var Q_ENV={id:'env',q:'인터넷 연결은 어떻게 쓰세요?',cl:'연결',ci:'wifi',f:0.82,opts:[{t:'무선(WiFi)',v:'무선',why:['WiFi 미탑재 보드 제외']},{t:'유선(랜선)',v:'유선',why:[]},{t:'잘 모름',v:'무선 기본',why:['WiFi 기본 포함 보드 우선']}]};
 var Q_BUDGET={id:'budget',q:'예산은 어느 정도 생각하세요?',cl:'예산',ci:'savings',f:0.5,opts:[{t:'~70만',v:'70만원 이하',why:['70만 초과 부품 제외']},{t:'~100만',v:'100만원 이하',why:['100만 초과 부품 제외']},{t:'~150만',v:'150만원 이하',why:['150만 초과 부품 제외']},{t:'200만+',v:'200만원 이상',why:['상한 없이 최고 사양까지']},{t:'잘 모르겠어요(추천 받을래요)',v:'AI 추천 예산',why:['가성비 최적 구간으로 압축']}]};
 var Q_PRIORITY={id:'priority',q:'특별히 중요한 게 있을까요?',cl:'선호',ci:'star',multi:true,skip:true,f:0.62,opts:[{t:'조용함',v:'저소음',why:['고소음 쿨러·GPU 제외']},{t:'화이트·디자인',v:'화이트',why:['화이트 외 케이스 제외']},{t:'최대 성능',v:'성능 우선',why:['저성능 후보 제외']},{t:'확장성 여유',v:'확장성',why:['확장 슬롯 부족 보드 제외']},{t:'A/S 넉넉히',v:'A/S 중시',why:['보증 짧은 부품 후순위']},{t:'가성비',v:'가성비',why:['가격효율 낮은 후보 후순위']},{t:'특별히 없음',v:'없음',skipAll:true,why:[]}]};
+/* ── 용도 목록은 «화면이 갖지 않는다» — 서버 `usage_floors` 표가 단일 원천 (2026-08-17) ──
+   병: 화면이 용도 어휘를 **세 벌** 들고 있었다(USE_PAT · guided Q_USE · 팝콘톡 TALKS · SCEN).
+     · 화면에만 있던 셋(인터넷·시청 / 주식·트레이딩 / 영화·미디어)은 DB 에 없어 `applied:false` —
+       **후보 수는 그대로인데 화면은 「저사양 GPU 제외」 같은 이유를 보여줬다**(§화면 정직성 위반).
+     · DB 에만 있던 셋(방송·스트리밍 / 디자인 / 개발)은 **화면에 진입로가 아예 없었다.**
+     · 같은 말이 입구마다 다른 용도가 됐다 — 「배그」가 정규식·guided 에선 고사양 게임,
+       팝콘톡 키워드에선 게임. 즉 «어느 입구로 들어왔느냐»로 견적이 갈렸다.
+   고친 방식: 어휘·순서·이유를 `GET /api/usages` 로 받는다. 화면은 «규칙만» 실행한다.
+   ⚠ 못 받으면 «용도 선택지를 내지 않는다». 어휘를 여기 폴백으로 박으면 세 벌이 네 벌이 된다.
+     대신 실패를 말하고 자유 입력으로 보낸다 — `/api/talk/parse` 가 **같은 표**를 읽으므로
+     그 경로는 화면 목록 없이도 용도를 잡는다(어휘가 화면에 없어도 길이 남는다). */
+var USAGES=[],USAGES_ERR=null,USAGES_DONE=false;
+/* matchUsage — `api/usage_floors.py:40-51 match()` 와 **같은 규칙**이다:
+     부분일치 · 배열 순서(sort_order)가 우선순위 · **첫 hit 하나만**.
+   어휘도 순서도 서버가 준 것을 그대로 쓴다. 규칙이 갈라지면 같은 문장이 화면과 서버에서
+   다른 용도가 된다 — '고사양 게임'이 '게임'보다 앞이라 이기는 것도 이 순서가 지킨다. */
+function matchUsage(s){
+ if(!s)return null;var t=String(s);
+ for(var i=0;i<USAGES.length;i++){var ts=USAGES[i].terms||[];
+  for(var j=0;j<ts.length;j++)if(ts[j]&&t.indexOf(ts[j])>-1)return USAGES[i].label;}
+ return null;}
+/* 용도의 «이유»도 서버가 준 것(floor_note = 실제로 거는 하한, 숫자 포함)만 쓴다.
+   예전의 「저사양 GPU 제외(프레임 미달)」는 화면이 지어낸 문구였다(§화면 정직성). */
+function usageNote(label){
+ for(var i=0;i<USAGES.length;i++)if(USAGES[i].label===label)return USAGES[i].floor_note||null;
+ return null;}
+/* why 는 필터 로그(우측 패널)로 간다. hint(칩 아래 초록 한 줄)는 multi 단계 전용이라
+   여기서는 쓰지 않는다 — 안 쓰는 칸을 채워 두면 다음 사람이 «보이는 줄»로 읽는다. */
+function usageOpts(){return USAGES.map(function(u){
+ return {t:u.label,v:u.label,why:u.floor_note?[u.floor_note]:[]};});}
+var USAGES_READY=fetch('/api/usages')
+ .then(function(r){if(!r.ok)throw new Error('서버 응답 '+r.status);return r.json();})
+ .then(function(d){USAGES=(d&&d.usages)||[];})
+ .catch(function(e){USAGES=[];USAGES_ERR=(e&&e.message)||String(e);})
+ .then(function(){USAGES_DONE=true;Q_USE.opts=usageOpts();});
 var QUEUE=[Q_PURPOSE,Q_EXISTING,Q_USE,Q_ENV,Q_BUDGET,Q_PRIORITY];
 var qidx=0;
 function selChip(c,on){if(on){c.style.background='#e8effc';c.style.borderColor='#2b5fd9';c.style.color='#2149b0';}else{c.style.background='#fff';c.style.borderColor='#e2ded5';c.style.color='#3a3a40';}}
@@ -325,6 +369,8 @@ function logFilter(label,delta,reasons){var wrap=document.getElementById('s1-fil
 function gAnswer(st,opts){if(opts.length){addUser(opts.map(function(o){return o.t;}).join(' · '));addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));var rs=[];opts.forEach(function(o){if(o.why)o.why.forEach(function(w){if(rs.indexOf(w)<0)rs.push(w);});});logFilter(st.cl,null,rs);if(!LIVE)poolUnknown(SRC_NOTE.off);}else{addUser('건너뛸게요');}applyBranch(st,opts);qidx++;setTimeout(guidedAsk,500);}
 function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots.innerHTML='';for(var i=0;i<QUEUE.length;i++){var d=document.createElement('span');d.style.cssText='width:22px;height:6px;border-radius:3px;transition:.3s;background:'+(i<qidx?'#2b5fd9':(i===qidx?'#7fa8ff':'#e6e2da'))+';';dots.appendChild(d);}}var num=document.getElementById('s1-progress-num');if(num)num.textContent=qidx>=QUEUE.length?'완료':((qidx+1)+' / '+QUEUE.length);}
 function guidedAsk(){
+ /* 용도 단계는 «서버 목록이 도착한 뒤»에 그린다 — 없는 채로 그리면 선택지가 빈 채 지나간다. */
+ if(qidx<QUEUE.length&&QUEUE[qidx].id==='use'&&!USAGES_DONE){USAGES_READY.then(guidedAsk);return;}
  setProgress();
  if(qidx>=QUEUE.length){setTimeout(function(){
    addAI('다 여쭤봤습니다. <b>추천 구성</b>을 준비했어요.<br>'+tagsBlock()+'<br>'+verdictSlot());
@@ -334,6 +380,12 @@ function guidedAsk(){
    if(LIVE&&!_pending&&lastCount)fillVerdicts(lastCount,null,lastSnap);
   },300);return;}
  var st=QUEUE[qidx];
+ /* 서버가 용도 목록을 못 줬다 — **임의 목록을 대신 내지 않는다**(위 USAGES 주석).
+    빈 선택지를 그리면 「고를 게 없는 질문」이 남으므로, 사유를 말하고 자유 입력으로 보낸다. */
+ if(st.id==='use'&&!st.opts.length){
+  addAI('<b>용도 선택지를 서버에서 받지 못했습니다</b>'+(USAGES_ERR?' — '+esc(USAGES_ERR):'')+'.<br>'
+   +'서버가 아는 용도만 보여드릴 수 있어 임의 목록을 대신 내지 않습니다. 아래 입력창에 직접 말씀해 주세요.');
+  focusInput();qidx++;setTimeout(guidedAsk,700);return;}
  addAI((qidx===0?'몇 가지만 여쭤볼게요.<br>':'')+'<b>'+st.q+'</b>'+(st.multi?' <span style="font-weight:600;color:#8a8578;font-size:13px;">(여러 개 가능)</span>':''));
  var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;align-items:center;';
  if(st.multi){
@@ -358,10 +410,20 @@ function guidedAsk(){
  }
  msgs.scrollTop=msgs.scrollHeight;
 }
+/* 시나리오 칩의 «용도»도 화면이 정하지 않는다 — 칩 문장을 matchUsage 로 접는다(위 USAGES).
+   예전엔 '게임(롤·발로란트)'·'영상편집+게임' 처럼 **서버에 없는 문자열**을 조건으로 넣었고,
+   붙은 사유('저사양 GPU 제외')도 화면이 지어낸 것이었다. 이제 사유는 서버 하한만 말한다.
+   ⚠ **여기의 matchUsage 는 폴백이 아니라 «칩 문장 -> 서버 어휘» 조회다** — 이 경로는 AI 를
+     타지 않으므로 AI 결과를 덮을 일이 없다(그래서 2026-08-17 정리에서 남겼다).
+   ⚠ 다만 부분일치가 문맥을 못 읽는 한계는 그대로다. 실측: 둘째 칩
+     「4K 영상편집 주로, 가끔 고사양 게임」이 «고사양 게임»으로 접힌다(gaming_high 가
+     sort_order 앞이라 '고사양 게임'이 먼저 걸린다) — 문장이 말한 «주로»는 영상편집이다.
+     칩 문장을 고치는 것도, 이 경로를 parseAll(AI)로 돌리는 것도 화면 설계·비용 판단이라
+     제작자가 임의로 정하지 않는다 — 결함으로 보고했다. */
 var SCEN=[
- {t:'롤·발로란트 고주사율로 부드럽게 (100만)',cons:[['sports_esports','용도','게임(롤·발로란트)'],['savings','예산','100만원 이하']],f:0.22,why:['저사양 GPU 제외','100만 초과 부품 제외','고주사율 대응 GPU 우선']},
- {t:'4K 영상편집 주로, 가끔 고사양 게임',cons:[['movie','용도','영상편집+게임'],['memory','메모리','대용량 램']],f:0.28,why:['저코어 CPU 제외','대용량 램 우선']},
- {t:'사무·인강용 조용하고 저렴하게',cons:[['description','용도','사무·인강'],['volume_off','선호','저소음']],f:0.34,why:['고성능 GPU 제외','고소음 부품 제외']}
+ {t:'롤·발로란트 고주사율로 부드럽게 (100만)',useFrom:true,cons:[['savings','예산','100만원 이하']],f:0.22,why:['100만 초과 부품 제외']},
+ {t:'4K 영상편집 주로, 가끔 고사양 게임',useFrom:true,cons:[['memory','메모리','대용량 램']],f:0.28,why:[]},
+ {t:'사무·인강용 조용하고 저렴하게',useFrom:true,cons:[['volume_off','선호','저소음']],f:0.34,why:['고소음 부품 제외']}
 ];
 var NUDGES=[
  {t:'더 조용하게',icon:'volume_off',cl:'선호',v:'저소음',f:0.82,why:['고소음 부품 추가 제외']},
@@ -429,7 +491,14 @@ function addProposal(lead){var d=document.createElement('div');d.style.cssText='
  if(LIVE&&!_pending&&lastCount)fillVerdicts(lastCount,null,lastSnap);}
 function nudgeRow(){var avail=NUDGES.filter(function(n){return !usedNudges[n.t];});if(!avail.length)return;var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';avail.forEach(function(n){var c=document.createElement('span');c.style.cssText='background:#fff;border:1.5px solid #e2ded5;color:#3a3a40;padding:9px 13px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;';c.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">'+n.icon+'</span>'+n.t;c.addEventListener('click',function(){chatNudge(n,row);});row.appendChild(c);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function chatNudge(n,row){usedNudges[n.t]=true;if(row){Array.prototype.forEach.call(row.children,function(x){x.style.pointerEvents='none';});row.style.opacity='.45';}addUser(n.t);addSpec(n.cl,n.v,n.icon);logFilter(n.cl,null,n.why);if(!LIVE)poolUnknown(SRC_NOTE.off);setTimeout(function(){addProposal('네, <b>'+n.t+'</b> 반영해 다시 잡았어요.');nudgeRow();},400);}
-function chatScenario(s,chipEl){if(chipEl)chipEl.style.display='none';addUser(s.t);s.cons.forEach(function(k){addSpec(k[1],k[2],k[0]);});logFilter('입력 이해',null,s.why);if(!LIVE)poolUnknown(SRC_NOTE.off);setTimeout(function(){addProposal('말씀 이해했어요. 이 방향으로 잡아봤어요.');nudgeRow();},400);}
+function chatScenario(s,chipEl){if(chipEl)chipEl.style.display='none';addUser(s.t);
+ USAGES_READY.then(function(){                     /* 용도 목록이 도착한 뒤에 조건을 접는다 */
+  var cons=s.cons.slice(),why=(s.why||[]).slice();
+  if(s.useFrom){var u=matchUsage(s.t);
+   if(u){cons.unshift(['interests','용도',u]);var n=usageNote(u);if(n)why.unshift(n);}}
+  cons.forEach(function(k){addSpec(k[1],k[2],k[0]);});logFilter('입력 이해',null,why);
+  if(!LIVE)poolUnknown(SRC_NOTE.off);
+  setTimeout(function(){addProposal('말씀 이해했어요. 이 방향으로 잡아봤어요.');nudgeRow();},400);});}
 function chatStart(){
  var wrap=document.createElement('div');wrap.style.cssText='padding-left:48px;';
  wrap.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;color:#8a8578;margin-bottom:9px;"><span style="font-family:\'Material Symbols Outlined\';font-size:17px;color:#2b5fd9;">touch_app</span>이렇게 말해보세요 (또는 아래에 직접 입력)</div>';
@@ -487,11 +556,20 @@ var TALK_SUGGEST=['게임용으로 100만원이면 어때요?','RTX 4060이면 �
    둘 다 정상적인 PC 문의인데 상담 자체가 막혔다. 원형만 담은 리터럴 목록은 **활용형을
    영영 못 잡는다** — 같은 날 이 파일이 없앤 병(리터럴 어휘로 조건을 판정)과 같은 원인이다.
    판정은 `api/talk.py` 의 프롬프트(`pc_related`)로 옮겼고, 반송 규칙은 `talkParse` 가 갖는다.
-   ⚠ 어휘 목록을 여기 다시 만들지 마라 — 그러면 같은 병이 돌아온다. */
+   ⚠ 어휘 목록을 여기 다시 만들지 마라 — 그러면 같은 병이 돌아온다.
+
+   ── 용도 값도 여기서 정하지 않는다 (2026-08-17) ──
+   예전엔 세 항목이 `p:{l:'용도',v:'게임'|'영상편집'|'사무·인강'}` 으로 **자기 용도 값**을
+   갖고 있었다. 그래서 「배그」가 여기서는 '게임'(GPU 450W), 화면 정규식·guided 에서는
+   '고사양 게임'(GPU 550W)이 됐다 — DB 정본은 고사양 게임인데, **어느 입구로 들어왔느냐로
+   견적이 갈렸다.** 이제 그 자리는 **비어 있고**, 용도는 talkSend 가 «한 자리에서»
+   matchUsage(문장)로 서버 목록에서 접는다(chat 의 liveParse 와 같은 기준). 못 접으면
+   용도를 붙이지 않는다 — 서버에 없는 용도를 만들지 않는다.
+   ⚠ 여기가 내는 것은 용도만이 아니다 — 상황·모니터·관심 부품·선호는 그대로 `p` 로 남는다. */
 var TALKS=[
  {k:['모르겠','몰라','글쎄'],a:'괜찮아요, 다들 그렇게 시작하세요. 거꾸로 가볼게요 — <b>예산 느낌</b>만 알려주시면 그 돈으로 뭘 할 수 있는지 보여드릴게요.',chips:['60만 안팎이요','100만 안팎이요','150만 이상도 괜찮아요']},
- {k:['사려','사고 싶','추천','바꾸','맞추','장만','필요해'],a:'좋아요, 딱 맞는 걸 찾아드릴게요. <b>주로 뭘 하실 PC</b>인가요?',chips:['게임 위주예요','사무·인강용이에요','영상편집 같은 작업용이에요','아직 잘 모르겠어요']},
- {k:['사무','인강','문서','엑셀','주식','웹서핑'],a:'사무·인강용은 <b>40~80만이면 충분히 쾌적</b>해요. 내장그래픽으로 조용하게, 부팅 빠른 NVMe SSD는 기본으로 잡습니다. 모니터 개수나 다루는 파일 크기에 따라 램 용량만 조금 달라져요.',p:{i:'description',l:'용도',v:'사무·인강',f:0.55,why:['사무·인강: 저소음·안정 우선, 고성능 GPU 제외']}},
+ {k:['사려','사고 싶','추천','바꾸','맞추','장만','필요해'],a:'좋아요, 딱 맞는 걸 찾아드릴게요. <b>주로 뭘 하실 PC</b>인가요?',chipsUse:1},
+ {k:['사무','인강','문서','엑셀','주식','웹서핑'],a:'사무·인강용은 <b>40~80만이면 충분히 쾌적</b>해요. 내장그래픽으로 조용하게, 부팅 빠른 NVMe SSD는 기본으로 잡습니다. 모니터 개수나 다루는 파일 크기에 따라 램 용량만 조금 달라져요.'},
  {k:['조립비','공임','조립 비용','조립료'],a:'조립·검수 공임은 <b>3만원</b>입니다. 선정리·3시간 안정성 테스트·기본 세팅까지 포함이고, 견적서에 <b>별도 행으로 투명하게</b> 표기돼요 — 총액에 숨기지 않습니다.'},
  {k:['에이에스','a/s','as','보증','수리','고장','애프터'],a:'무상 보증 <b>2년</b>, 왕복 택배비는 저희 부담입니다. 초기 불량은 수령 7일 내 교환, 지원은 전화·원격·용산 방문 세 가지예요. <span style="font-size:11.5px;color:#a29d92;">(*정책 확정 전 예시)</span>'},
  {k:['다나와','최저가','타사','다른 데','견적 봐','견적서 봐'],a:'좋은 비교예요. 부품값 자체는 최저가 조합과 거의 같고, 차이는 <b>조립·선정리·3시간 검사·2년 A/S 포함 여부</b>입니다.<br>다른 곳 견적이 있으면 <b>그대로 붙여넣어 주세요</b> — 부품·가격·호환성을 그 자리에서 진단해 드릴게요.'},
@@ -500,8 +578,8 @@ var TALKS=[
  {k:['화이트','디자인','예쁘','이쁘','감성'],a:'보기 좋은 PC, 중요하죠. <b>화이트·디자인 우선</b>으로 잡아둘게요 — 케이스·쿨러 색을 맞추고 선정리까지 신경 씁니다. 디자인 부품은 동급 성능 대비 1~3만원 정도 더 붙는 점만 참고하세요.',p:{i:'palette',l:'선호',v:'화이트',f:0.85,why:['화이트·디자인: 색상 불일치 부품 제외']}},
  {k:['4060','ti','비교','차이'],min:2,a:'좋은 질문이에요. 자체 판매 데이터 기준으로 <b>RTX 4060 Ti는 4060보다 1440p 게임에서 평균 +18%</b> 빠르고, 지금 저희 재고가는 <b>약 11만원 차이</b>예요.<br>· FHD(1080p) 위주면 4060으로 충분 — 차액으로 SSD를 올리는 게 체감이 커요.<br>· QHD(1440p)·고주사율 모니터면 Ti가 값을 해요.',p:{i:'memory',l:'관심 부품',v:'RTX 4060급 GPU',f:0.72,why:['GPU 관심 대역 반영: 미들급 게이밍']}},
  {k:['가격','시세','동향','얼마','비싸','내려','올라'],a:'저희 <b>실제 매입가 기준</b>(외부 크롤링이 아니라 자체 데이터예요) 최근 4주 동향이에요.<br>· 그래픽카드: <b>-3.2%</b> 완만한 하락 — 급하지 않으면 나쁘지 않은 시점<br>· DDR5 메모리: <b>+5.1%</b> 상승 — 필요하면 미루지 않는 걸 권해요<br>· SSD(NVMe): 보합<br>특정 부품이 궁금하면 이름을 알려주세요. 재고가로 바로 답해드릴게요.'},
- {k:['영상','편집','프리미어','다빈치','인코딩'],a:'영상편집은 게임과 우선순위가 달라요.<br>① <b>CPU 코어 수</b>(인코딩 속도) ② <b>램 32GB↑</b>(4K 타임라인) ③ <b>NVMe SSD</b>(소스 스크럽) 순이고, GPU는 그다음이에요.<br>어떤 툴로 어떤 영상(FHD/4K)을 만드실지 알려주시면 더 정확해져요.',p:{i:'movie',l:'용도',v:'영상편집',f:0.55,why:['영상편집: 다코어 CPU·램 32GB↑ 우선']}},
- {k:['게임','롤','배그','발로란트','오버워치','로아','풀옵','프레임','fps'],a:'게임이 목적이면 <b>어떤 게임을 어느 화질로</b>가 핵심이에요.<br>· 롤·발로란트급은 엔트리 GPU로도 144fps<br>· 배그·오버워치는 미들급 GPU 권장<br>· 로아 같은 MMO는 CPU도 함께 중요해요.<br>주로 하시는 게임을 알려주시면 조건에 반영할게요.',p:{i:'sports_esports',l:'용도',v:'게임',f:0.6,why:['게임 용도: GPU 성능 우선 정렬']}},
+ {k:['영상','편집','프리미어','다빈치','인코딩'],a:'영상편집은 게임과 우선순위가 달라요.<br>① <b>CPU 코어 수</b>(인코딩 속도) ② <b>램 32GB↑</b>(4K 타임라인) ③ <b>NVMe SSD</b>(소스 스크럽) 순이고, GPU는 그다음이에요.<br>어떤 툴로 어떤 영상(FHD/4K)을 만드실지 알려주시면 더 정확해져요.'},
+ {k:['게임','롤','배그','발로란트','오버워치','로아','풀옵','프레임','fps'],a:'게임이 목적이면 <b>어떤 게임을 어느 화질로</b>가 핵심이에요.<br>· 롤·발로란트급은 엔트리 GPU로도 144fps<br>· 배그·오버워치는 미들급 GPU 권장<br>· 로아 같은 MMO는 CPU도 함께 중요해요.<br>주로 하시는 게임을 알려주시면 조건에 반영할게요.'},
  {k:['ddr','램','메모리'],a:'지금 새로 맞추신다면 <b>DDR5를 권해요</b>. AM5 등 최신 플랫폼이 DDR5 전용이라 업그레이드 수명이 길어요.<br>다만 <b>기존 DDR4 보드에서 램만 올리는 건</b> 규격이 달라 불가능해요 — 보드·CPU까지 함께 바꾸는 그림이 됩니다. 기존 PC 사양을 알려주시면 갈아탈 가치가 있는지 계산해드릴게요.',p:{i:'memory',l:'관심 부품',v:'DDR5 메모리',f:0.85,why:['DDR5 플랫폼 관심 반영']}},
  {k:['파워','와트','psu','전력'],a:'파워는 <b>부품 소비전력 합에 여유율 30%</b>를 두는 게 저희 조립 기준이에요(정격 기준). 예: RTX 4060 구성이면 500~550W면 충분하고, 4070 Ti 이상이면 750W를 권해요.<br>구성이 정해지면 엔진이 자동으로 검증합니다.'},
  {k:['호환','소켓','am5','am4','맞아','장착','들어가','병목'],a:'호환은 소켓 일치·GPU 길이·쿨러 높이·전력 여유·램 규격을 <b>결정론 엔진이 전부 검사</b>합니다 — 조립 불가능한 조합은 견적에 아예 나오지 않아요.<br>확인하고 싶은 조합이 있으면 부품명을 알려주세요 — 바로 검증해드릴게요.'},
@@ -629,11 +707,11 @@ var TALK_BOUNCE='그 주제는 제가 정확히 답하기 어렵습니다.<br><b
        pc===null (모름 · AI 실패 · 비-LIVE) -> **반송하지 않는다.** 실패는 판정이 아니다.
      ⚠ pc===false 인데 조건이 잡혔으면 모델이 자기 말과 어긋난 것이다 — 그때는 읽어낸
        조건을 버리지 않는 쪽(반송 안 함)을 택한다. 반송하면 방금 읽은 조건이 사라진다. */
-function talkParse(t,packs,say,chips){
+function talkParse(t,packs,useFb,say,chips){
  var vague='네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>'
   +'예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), '
   +'<b>예산</b>을 함께 말씀해 주세요.';
- function apply(list,err,pc){
+ function apply(list,err,pc,fb){
   if(pc===false&&!list.length){addAI(TALK_BOUNCE);talkChips();return;}
   say.forEach(function(a){addAI(a);});
   if(chips)talkRow(chips);
@@ -641,86 +719,159 @@ function talkParse(t,packs,say,chips){
   if(err)addAI('말씀을 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
     +(list.length?'문장에서 바로 읽어낸 조건만 반영했어요.':SRV_HINT));
   else if(!say.length)addAI(list.length?'말씀하신 내용을 <b>조건으로 잡았어요.</b>':vague);
+  if(fb)addAI(USE_FALLBACK_NOTE);   /* 폴백으로 잡은 용도는 그 사실을 밝힌다 */
   if(list.length)talkFlow();
  }
+ /* 정규식 용도(useFb)는 **AI 가 답하지 못한 경로에만** 붙는다 — splitUse·aiCons 주석.
+    붙이면 AI 의 옳은 용도(「배그는 안 하고 롤만 해요」-> 게임)를 덮는다. */
+ var withFb=useFb?packs.concat([useFb]):packs;
  /* 비-LIVE(file:// · API 없음)는 판정 주체가 아예 없다 -> pc=null, 반송 없음.
     옛 PCWORDS 가 여기서도 반송을 만들었지만, 어휘 판정을 «데모에서만» 남기면 그 목록이
     다시 자라 LIVE 로 새어 들어간다. 데모는 반송 대신 vague 로 안내한다(거짓말이 아니다). */
- if(!LIVE){apply(packs,null,null);return;}
+ if(!LIVE){apply(withFb,null,null,!!useFb);return;}
  srvOrdered(t,function(sc,err,pc){       /* 순서 보장 — srvOrdered 주석 참고 */
-  if(err){apply(packs,err,null);return;}
-  apply(packs.concat((sc||[]).map(function(c){
-   return {i:srvIcon(c.l,c.v),l:c.l,v:c.v,f:1,why:[]};})),null,pc);});}
+  if(err){apply(withFb,err,null,!!useFb);return;}
+  /* aiCons: 라벨이 겹치면 AI 가 남는다 — 용도도 예외가 아니다(aiCons 주석). */
+  apply(packs.concat(aiCons(sc).map(function(c){
+   return {i:c.i,l:c.l,v:c.v,f:1,why:[]};})),null,pc,false);});}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
  var bud=talkBudget(t);
  var hit=null,score=0;
  TALKS.forEach(function(x){var n=0;x.k.forEach(function(k){if(low.indexOf(k)>-1)n++;});var need=x.min||1;if(n>=need&&n>score){hit=x;score=n;}});
- setTimeout(function(){
+ setTimeout(function(){USAGES_READY.then(function(){   /* 용도 목록이 도착한 뒤에 문장을 접는다 */
   /* 인사·감사는 조건도 반송도 아닌 «대화 예절»이라 AI 를 태우지 않는다(비용 0).
      PC 상담 여부를 판정하는 자리가 아니다 — 반송하지 않고 바로 되묻는다. */
   if(/^(안녕|하이|hi|헬로|ㅎㅇ|반갑)/.test(low)){addAI('안녕하세요! 팝콘톡입니다. 부품·가격·용도, PC에 관한 건 뭐든 물어보세요.');talkRow(TALK_SUGGEST);return;}
   if(/(감사|고마워|땡큐|thank)/.test(low)&&low.length<20){addAI('별말씀을요. 더 궁금한 게 생기면 언제든 물어보세요!');return;}
   var mon=talkMon(t);
+  /* 용도는 «서버 목록 + 서버 규칙»으로만 잡는다(위 TALKS 주석 · USAGES 블록).
+     사유도 서버 하한(floor_note)만 말한다 — 화면이 이유를 지어내지 않는다.
+     ⚠ 이건 **폴백 생산자**다 — 쓰는 자리는 talkParse 의 AI 실패 경로뿐이다(splitUse 주석). */
+  function usePack(){var u=matchUsage(t);if(!u)return null;
+   var n=usageNote(u);return {i:'interests',l:'용도',v:u,f:1,why:n?[n]:[]};}
   /* packs = 정규식이 뽑은 조건(«보조») · say = 고른 답변 문구(**아직 말하지 않는다**).
      둘 다 talkParse 가 AI 판정을 받은 뒤에 한 번에 낸다 — 반송이면 say 를 버린다. */
-  var packs=[],say=[],chips=null;
+  var packs=[],say=[],chips=null,up=null;
   if(bud&&!hit){say.push(bud.a);packs.push(bud);if(mon){say.push(mon.a);packs.push(mon);}}
-  else if(hit){say.push(hit.a);if(hit.p)packs.push(hit.p);if(bud)packs.push(bud);
-   if(mon){say.push(mon.a);packs.push(mon);}if(hit.chips)chips=hit.chips;}
+  else if(hit){say.push(hit.a);if(hit.p)packs.push(hit.p);
+   if(bud)packs.push(bud);
+   if(mon){say.push(mon.a);packs.push(mon);}
+   if(hit.chips)chips=hit.chips;
+   /* 용도 되묻기 칩도 서버 목록 그대로다. 못 받았으면 칩 대신 사유를 말한다. */
+   if(hit.chipsUse){
+    if(USAGES.length){chips=USAGES.map(function(u){return u.label;});chips.push('아직 잘 모르겠어요');}
+    else say.push('용도 선택지는 <b>서버에서 받지 못했습니다</b>'+(USAGES_ERR?' — '+esc(USAGES_ERR):'')
+      +'. 하시려는 일을 그대로 말씀해 주시면 그대로 읽어 볼게요.');}}
   else if(mon){say.push(mon.a);packs.push(mon);if(bud)packs.push(bud);}
+  /* 용도는 **어느 갈래로 오든 한 자리**에서만 붙인다 — chat 의 liveParse 와 같은 기준이다.
+     TALKS 항목마다 자기 용도 값을 갖고 있던 것이 「배그 = 게임 / 고사양 게임」 분기의 원인이었다.
+     ⚠ packs 에 넣지 않는다 — 이건 **AI 가 실패했을 때의 폴백**이라 따로 넘긴다(splitUse 주석). */
+  up=usePack();
   /* 팝콘톡 정규식이 못 보는 선호(저소음·화이트)를 chat 과 같은 기준으로 보충한다(슬라이스 48). */
   liveParse(t).forEach(function(c){if(c[1]==='선호')packs.push({i:c[0],l:c[1],v:c[2],f:1,why:[]});});
-  talkParse(t,packs,say,chips);
- },400);}
+  talkParse(t,packs,up,say,chips);
+ });},400);}
 function talkStart(){
  if(inp){inp.placeholder='무엇이 궁금하신가요?';setTimeout(function(){inp.focus();},300);}
 }
 // ---- 예상 예산 범위 (2026-07 시장가 조사 기준: 견적왕·다나와·퀘이사존) ----
+/* ⚠⚠ **이 수(lo·hi)는 서버가 모르는 수다.** §화면 정직성은 「후보 수·가격·건수·규칙 수는
+   서버 응답만 쓴다」인데 이 표는 외부 조사(견적왕·다나와·퀘이사존)를 화면에 박아 둔 것이고,
+   `usage_floors` 에는 예산대라는 개념 자체가 없다. **정본 자리가 없어 화면이 들고 있을 뿐**이라
+   담당 밖으로 보고했다(보고 §담당 밖) — 여기서 표를 늘리거나 새 수를 지어내지 않는다.
+   ⚠ 그래서 예산대가 «정의되지 않은» 용도는 비워 둔다 — 기본 범위(전체 구성 기준)로 떨어지고
+     화면이 「용도·대상을 알려주시면 범위가 좁혀집니다」라고 사실대로 말한다. */
 var BUDGET_TIERS={
  parents:{lo:30,hi:60,label:'부모님 · 인터넷용',note:'인터넷·영상 시청 중심이면 이 정도로 충분합니다.'},
  office:{lo:40,hi:80,label:'사무 · 문서용',note:'문서·웹·화상회의 중심, 부품 전체 합계 기준입니다.'},
  lightgame:{lo:70,hi:110,label:'라이트 게임',note:'롤·발로란트·피파급은 FHD에서 이 범위면 충분해요.'},
- dev:{lo:80,hi:130,label:'개발 · 전문 사무',note:'멀티태스킹·컴파일 여유를 두면 이 정도가 듭니다.'},
+ dev:{lo:80,hi:130,label:null,note:'멀티태스킹·컴파일 여유를 두면 이 정도가 듭니다.'},
  midgame:{lo:100,hi:140,label:'보급 게이밍',note:'배그·오버워치·로아급을 FHD로 돌리는 범위예요.'},
  highgame:{lo:130,hi:180,label:'고사양 게이밍(QHD)',note:'풀옵션·QHD 고주사율이면 이 범위를 봅니다.'},
- stream:{lo:150,hi:230,label:'방송 · 스트리밍',note:'게임과 송출을 동시에 돌리는 구성입니다.'},
- edit:{lo:150,hi:250,label:'영상편집 · 크리에이터',note:'FHD 편집은 150부터, 4K 작업은 200 이상을 봐야 해요.'},
+ /* label:null = **용도로만 닿는 예산대**라 이름을 서버 용도 라벨로 쓴다.
+    여기 이름을 적으면 DB 와 갈라진다 — 실제로 '방송 · 스트리밍'(화면)과 「방송·스트리밍」(DB)이
+    가운뎃점 띄어쓰기까지 달랐고, 마이그레이션 0058 이 그것을 「방송 송출」로 바꿨다. */
+ stream:{lo:150,hi:230,label:null,note:'게임과 송출을 동시에 돌리는 구성입니다.'},
+ edit:{lo:150,hi:250,label:null,note:'FHD 편집은 150부터, 4K 작업은 200 이상을 봐야 해요.'},
  latest:{lo:160,hi:200,label:'최신 사양 게이밍',note:'최신 세대 CPU·GPU로 맞출 때의 범위입니다.'},
  extreme:{lo:200,hi:300,label:'하이엔드 · 4K',note:'4K·최상위 부품으로 채우는 구성입니다.'}
 };
+/* ── 용도 -> 예산대는 «서버 usage_key» 로만 잇는다 (2026-08-17 후반) ──
+   있던 것: `pickTier` 가 `/방송|스트리밍/` · `/고사양|풀옵|QHD/` · `/배그|오버워치|로아/` ·
+   `/영상|편집|크리에이터/` 처럼 **DB `match_terms` 를 화면에 베낀 낱말**로 예산대를 정했다.
+   그 결과 두 가지가 났다:
+     ① 표가 이름을 바꾸면 조용히 어긋난다. 0058(방송·스트리밍 -> 「방송 송출」 / 영화·미디어 ->
+        「영화·시청」)은 실제로 이 정규식을 **피해 가려고 이름을 골라야 했다** — 마이그레이션이
+        화면 정규식에 맞춰 정본 이름을 고르는 것은 순서가 뒤집힌 것이다.
+     ② 판정 대상 문자열에 «요청» 라벨(고객 원문 16자)이 섞여 있어, 부분일치가 여기서도
+        부정문을 못 읽었다 — 「배그는 안 하고 롤만 해요」의 원문에 걸린 '배그'가 예산대를
+        보급 게이밍으로 끌어올렸다. 오늘 걷어낸 병과 **같은 병**이다.
+   고친 방식: 용도는 `key` 로 잇는다. **0058 은 `usage_label`·`match_terms` 만 UPDATE 하고
+   `usage_key` 는 한 줄도 건드리지 않으므로**, 이름이 또 바뀌어도 이 표는 그대로 맞다.
+   ⚠ 여기 없는 용도(AI 작업·디자인·주식·트레이딩·영화·시청·인터넷·시청)는 **비워 둔다** —
+     예산대를 새로 지어내지 않는다. 기본 범위로 떨어지고 화면이 그 사실대로 말한다. */
+var USAGE_TIER={gaming_high:'highgame',game:'midgame',video:'edit',
+                stream:'stream',office:'office',dev:'dev'};
 var consPairs=[];
+/* 지금 잡힌 용도 -> {k:예산대 키, from:서버 용도 라벨}. 못 고르면 null.
+   ⚠ 라벨 우선순위는 matchUsage 와 같은 규칙이다(USAGES 배열 순 = sort_order) —
+     '게임'이 '고사양 게임'의 부분문자열이라, 순서를 안 지키면 넓은 쪽이 먼저 걸린다. */
+function usageTier(){
+ for(var i=0;i<consPairs.length;i++){
+  if(consPairs[i].l!=='용도')continue;
+  var v=String(consPairs[i].v||'');
+  for(var j=0;j<USAGES.length;j++){
+   var u=USAGES[j];
+   if(u.label&&v.indexOf(u.label)>-1)return {k:USAGE_TIER[u.key]||null,from:u.label};}
+  return {k:null,from:v};   /* 서버 목록에 없는 용도 값 — 이름은 그대로 보여주되 범위는 안 좁힌다 */
+ }
+ return null;
+}
 function pickTier(){
+ /* ① 용도가 있으면 용도가 정한다 — 서버가 준 값이라 화면이 만든 라벨보다 근거가 세다. */
+ var ut=usageTier();
+ if(ut)return ut;
+ /* ② 용도가 없을 때만 화면이 소유한 낱말로 고른다(대상·관심 부품·원문).
+    ⚠ DB 어휘(게임·롤·배그·영상편집·방송·사무·개발)를 여기 되박지 마라 — 위 주석의 병이 돌아온다. */
  var t=consPairs.map(function(p){return p.l+':'+p.v;}).join(' ');
- if(/영상|편집|크리에이터|프리미어|다빈치/.test(t))return'edit';
- if(/방송|스트리밍/.test(t))return'stream';
- if(/4K|하이엔드|최상위|익스트림/.test(t))return'extreme';
- if(/자녀/.test(t))return'latest';
- if(/최신/.test(t))return'latest';
- if(/고사양|풀옵|QHD/.test(t))return'highgame';
- if(/배그|오버워치|로아|4060/.test(t))return'midgame';
- if(/롤|발로|피파|라이트|가볍/.test(t))return'lightgame';
- if(/게임/.test(t))return'midgame';
- if(/개발/.test(t))return'dev';
- if(/부모님/.test(t))return'parents';
- if(/사무|문서|직원/.test(t))return'office';
+ if(/4K|하이엔드|최상위|익스트림/.test(t))return{k:'extreme',from:null};
+ if(/자녀|최신/.test(t))return{k:'latest',from:null};
+ if(/풀옵|QHD/.test(t))return{k:'highgame',from:null};
+ if(/4060/.test(t))return{k:'midgame',from:null};     /* TALKS 의 관심 부품 값 — 화면 소유 */
+ if(/라이트|가볍/.test(t))return{k:'lightgame',from:null};
+ if(/부모님/.test(t))return{k:'parents',from:null};
+ if(/직원/.test(t))return{k:'office',from:null};
  return null;
 }
 function budgetSaid(){
  for(var i=0;i<consPairs.length;i++){if(consPairs[i].l==='예산'){var m=String(consPairs[i].v).match(/(\d{2,3})/);if(m)return +m[1];}}
  return null;
 }
+var BUDGET_ANY={lo:40,hi:300,label:'전체 구성 기준',
+ note:'부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.'};
 function budgetUpdate(){
- var k=pickTier(),T=k?BUDGET_TIERS[k]:{lo:40,hi:300,label:'전체 구성 기준',note:'부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.'};
+ /* 예산대가 정의되지 않은 용도(AI 작업·디자인·주식·트레이딩 …)는 **범위를 좁히지 않는다** —
+    수를 지어내지 않고 기본 범위로 두되, 배지 이름은 서버가 준 용도 라벨을 그대로 보여준다. */
+ var k=pickTier(),T=(k&&k.k&&BUDGET_TIERS[k.k])||BUDGET_ANY;
  var el=document.getElementById('s1-budget-range');
  if(el)el.innerHTML=T.lo+'<span style="font-size:16px;color:#9a968d;"> ~ </span>'+T.hi+'<span style="font-size:14px;color:#9a968d;"> 만원</span>';
- var bs=document.getElementById('s1-budget-basis');if(bs)bs.textContent=T.label;
+ /* 이름은 «서버 용도 라벨 > 화면 예산대 이름» 순 — 화면이 DB 이름을 베껴 두지 않는다. */
+ var bs=document.getElementById('s1-budget-basis');
+ if(bs)bs.textContent=(k&&k.from)||T.label||BUDGET_ANY.label;
  var band=document.getElementById('s1-budget-band');
  if(band){band.style.left=Math.min(100,T.lo/300*100)+'%';band.style.width=Math.max(4,Math.min(100,(T.hi-T.lo)/300*100))+'%';}
+ /* 범위를 «좁혔는가»를 갈라 둔다 — 안 좁혔는데 「이 용도 범위」라고 말하면 거짓이다.
+    (용도는 잡혔는데 그 용도의 예산대 기준이 없는 경우가 실제로 있다 — USAGE_TIER 주석.) */
+ var narrowed=(T!==BUDGET_ANY);
  var note=T.note,said=budgetSaid();
+ if(!narrowed&&k&&k.from)
+  note='<b>'+esc(k.from)+'</b>의 예산 범위 기준은 아직 없어 전체 범위로 둡니다.';
  var mk=document.getElementById('s1-budget-marker');
  if(said!==null){
   if(mk){mk.style.display='block';mk.style.left=Math.min(99,said/300*100)+'%';}
-  if(said<T.lo)note='말씀하신 <b>'+said+'만원</b>은 이 용도 범위('+T.lo+'~'+T.hi+'만)보다 빠듯해요 — 사양을 조금 낮추거나 예산을 조정해 보세요.';
+  if(!narrowed)note='말씀하신 <b>'+said+'만원</b>을 표시했어요. '
+   +(k&&k.from?'<b>'+esc(k.from)+'</b>의 ':'')+'예산 범위 기준은 아직 없어 전체 범위로 둡니다.';
+  else if(said<T.lo)note='말씀하신 <b>'+said+'만원</b>은 이 용도 범위('+T.lo+'~'+T.hi+'만)보다 빠듯해요 — 사양을 조금 낮추거나 예산을 조정해 보세요.';
   else if(said>T.hi)note='말씀하신 <b>'+said+'만원</b>이면 이 용도 범위('+T.lo+'~'+T.hi+'만)보다 여유가 있어요 — 상위 구성도 가능해요.';
   else note='말씀하신 <b>'+said+'만원</b>은 이 용도의 적정 범위 안이에요. (범위 '+T.lo+'~'+T.hi+'만)';
  }else if(mk){mk.style.display='none';}
@@ -893,10 +1044,14 @@ var relaxSeq=0;
 var _anim=animate;animate=function(el,to){if(LIVE&&el===pool&&!_srv)return;_anim(el,to);};
 var _logF=logFilter;logFilter=function(l,d,r){if(LIVE)return;_logF(l,d,r);};
 var _cand=candidates;candidates=function(n){if(LIVE&&!_srv){scheduleCount();return;}_cand(n);};
+/* ⚠ LIVE 경로는 위 overConstrain 을 통째로 갈아끼운다 — 용도 값을 여기에도 박아 두면
+   «비-LIVE 만 고쳐진» 상태가 된다(실제로 첫 수정에서 이 줄을 놓칠 뻔했다). 같은 규칙을 쓴다. */
 var _overC=overConstrain;overConstrain=function(text){
  if(!LIVE){_overC(text);return;}
- addUser(text);addConstraint('savings','예산','80만원 이하');addConstraint('sports_esports','용도','고사양 게임');
- setTimeout(function(){addAI('조건을 모두 반영했어요 — 통과한 후보 수는 옆 패널에서 실시간으로 확인돼요.');},350);};
+ addUser(text);addConstraint('savings','예산','80만원 이하');
+ USAGES_READY.then(function(){
+  var u=matchUsage(text);if(u)addConstraint('interests','용도',u);
+  setTimeout(function(){addAI('조건을 모두 반영했어요 — 통과한 후보 수는 옆 패널에서 실시간으로 확인돼요.');},350);});};
 var _liveBase=addConstraint;addConstraint=function(icon,label,value){_liveBase(icon,label,value);scheduleCount();};
 // LIVE 전용 버튼 가로채기(capture) — 완화 칩·직접 입력의 하드코딩 숫자 제거
 document.querySelectorAll('button').forEach(function(b){var x=b.textContent||'';
@@ -1027,18 +1182,15 @@ if(mode==='guided'){
 // 3,087이었다. 서버가 모르는 숫자를 고객에게 보여주는 것은 "모든 견적에는 이유가
 // 있습니다"와 정면으로 어긋난다. 이제 LIVE에서는 입력을 **서버가 실제로 반영하는
 // 조건**(예산·저소음·화이트)으로 승격해 다시 세고, 못 읽은 말은 세었다고 하지 않는다.
-/* 용도 어휘 = guided 옵션 값과 동일. 순서가 우선순위다 — '고사양 게임'이 '게임'보다 먼저.
-   서버 recommend는 (용도|상황) + 예산을 요구하므로 용도를 못 읽으면 견적 자체가 불가하다. */
-var USE_PAT=[
- [/고사양\s*게임|배그|배틀그라운드|대작|AAA/i,'고사양 게임'],
- [/게임|롤\b|리그\s*오브|발로란트|오버워치|피파|로스트아크|스타크래프트/i,'게임'],
- [/영상\s*편집|프리미어|다빈치|애프터\s*이펙트|렌더링|쇼츠|유튜브\s*제작/i,'영상 편집'],
- [/주식|트레이딩|증권|차트\s*여러|HTS|MTS/i,'주식·트레이딩'],
- [/\bAI\b|인공지능|스테이블\s*디퓨전|이미지\s*생성|챗봇|LLM/i,'AI 작업'],
- [/사무|엑셀|문서|한글\s*작업|파워포인트|\bPPT\b|워드/i,'사무'],
- [/인강|강의\s*시청|인터넷\s*위주|웹서핑/i,'인터넷·시청'],
- [/영화|넷플릭스|미디어\s*감상|영상\s*시청/i,'영화·미디어']
-];
+/* ── 용도 정규식(옛 USE_PAT 8종)을 **지웠다** (2026-08-17) ──
+   여기 있던 목록은 서버 `usage_floors` 표와 갈라진 «두 번째 어휘»였다. 실측 피해:
+     · 화면에만 있던 셋(인터넷·시청 / 주식·트레이딩 / 영화·미디어)을 조건으로 잡았는데
+       DB 에 없어 `applied:false` — 후보 수는 3,059 그대로인데 화면은 이유를 보여줬다.
+     · DB 에만 있던 셋(방송·스트리밍 / 디자인 / 개발)은 여기서 **영영 못 잡혔다.**
+     · '영상 편집'(띄어쓰기) 처럼 라벨과 다른 문자열을 조건으로 보내고 있었다.
+   지금은 어휘·순서·이유를 서버가 주고(GET /api/usages), 화면은 matchUsage 로 «같은 규칙»만
+   실행한다. 목록을 못 받으면 용도를 잡지 않는다 — 여기 어휘를 되박지 않는다.
+   ⚠ 선호(PREF_PAT)는 남는다: 짝이 `api/talk.py PREF_VALUES` 이고 표가 아니라 코드 상수다. */
 /* 선호 어휘. 여러 개를 말하면 한 값으로 합친다 — 라벨 기준 교체라 따로 넣으면 덮인다.
    서버 `_apply_one`이 한 값의 복수 태그를 순차 결합한다. */
 var PREF_PAT=[
@@ -1049,20 +1201,33 @@ function liveParse(s){
   var out=[];
   var m=s.match(/(\d{2,4})\s*만/);
   if(m)out.push(['savings','예산',m[1]+'만원']);
-  var uses=[];
-  for(var i=0;i<USE_PAT.length;i++){
-   if(!USE_PAT[i][0].test(s))continue;
-   /* '고사양 게임'이 이미 잡혔으면 '게임'은 중복이므로 건너뛴다 */
-   if(USE_PAT[i][1]==='게임'&&uses.indexOf('고사양 게임')>-1)continue;
-   uses.push(USE_PAT[i][1]);
-  }
-  if(uses.length)out.push(['interests','용도',uses.join(' · ')]);
+  /* 용도는 서버 목록 + 서버 규칙으로만 잡는다(matchUsage). **하나만** 나온다 —
+     서버 match() 도 먼저 맞는 usage_key 하나만 쓰므로 여기서 둘을 이으면 화면이 거짓말한다. */
+  var u=matchUsage(s);
+  if(u)out.push(['interests','용도',u]);
   var prefs=[];
   PREF_PAT.forEach(function(p){if(p[0].test(s))prefs.push(p[1]);});
   if(prefs.length)out.push([prefs.length>1?'tune':(prefs[0]==='저소음'?'volume_off':'palette'),
                             '선호',prefs.join(' · ')]);
   return out;
 }
+/* ── 정규식 용도는 «AI 가 실패했을 때만» 쓰는 폴백이다 (2026-08-17 후반 · aiCons 주석의 짝) ──
+   AI 가 답하면 용도는 **AI 것만** 쓴다. 「배그는 안 하고 롤만 해요」를 부분일치는
+   «고사양 게임»으로, AI 는 «게임»으로 읽는다 — 문맥을 읽는 쪽이 맞다(서버 실측).
+
+   ⚠ 그래도 지우지 않은 이유(둘 다 실패 경로다):
+     ① AI 가 막히면(429 방문자 한도 · 502 · 키 없음) 용도를 아예 못 잡는다. 그런데 용도는
+        **예산과 함께 견적 확정의 조건**이라(`enable`) 자유입력 경로가 통째로 막힌다.
+        분당 8회 한도라 429 는 흔한 일이지 예외가 아니다.
+     ② 비-LIVE(file://)에는 판정 주체 자체가 없다.
+   ⚠ 대신 둘을 지킨다: **폴백은 AI 결과를 덮지 못한다**(성공 경로에서는 아예 빠진다) ·
+     **폴백으로 잡았다는 사실을 화면이 말한다**(USE_FALLBACK_NOTE). 부분일치가 부정문을
+     못 읽는 사실은 폴백이어도 변하지 않으므로, 조용히 쓰면 그것이 다시 거짓 근거가 된다. */
+function splitUse(list){var use=null,rest=[];
+ list.forEach(function(c){if(c.l==='용도'){if(!use)use=c;}else rest.push(c);});
+ return {use:use,rest:rest};}
+var USE_FALLBACK_NOTE='<b>용도</b>는 AI 없이 <b>문장에 있는 말만 맞춰</b> 잡았어요 — '
+ +'「~는 안 하고」처럼 뒤집는 말은 읽지 못합니다. 다르면 용도를 다시 말씀해 주세요.';
 /* ---- 문장 파싱(POST /api/talk/parse) — **문장은 항상 AI 가 본다** (2026-08-17 사장님 결정)
    ⚠ 같은 날 아침 결정(「정규식 먼저, 못 읽은 문장만 AI」)을 **뒤집은 것**이다. 폐기 근거는 실측:
        입력   「겜하려고요ㅋㅋ 백오십만언쯤 조용한걸루요」
@@ -1089,6 +1254,30 @@ var SRV_ICON={'예산':'savings','용도':'interests','선호':'tune'};
 function srvIcon(l,v){
  if(l!=='선호')return SRV_ICON[l]||'tune';
  return (String(v).indexOf(' · ')>-1)?'tune':(String(v).indexOf('저소음')>-1?'volume_off':'palette');}
+/* ── 용도도 AI 가 이긴다 — «화면이 DB 어휘로 되접던» 임시 조치를 걷었다 (2026-08-17 후반) ──
+   있던 것: 합치는 기본 규칙은 「라벨이 겹치면 AI 가 남는다」인데 **용도만 예외**로,
+   화면이 matchUsage(부분일치)로 접은 값을 AI 결과보다 «우선»했다. 그때의 사정:
+
+       「배그 하고 싶어요」  POST /api/talk/parse -> 용도 «게임»   (GPU 450W)
+                             usage_floors 정본     -> «고사양 게임» (GPU 550W)
+     원인은 `api/talk.py` 가 모델에게 `usage_label` 목록만 주고 `match_terms` 를 안 준 것.
+     사장님 확정(배그 = 고사양 게임)이 깨지므로 화면이 임시로 메웠고, 그 주석은
+     **「프롬프트에 match_terms 를 실으면 이 분기는 필요 없어진다」**고 해소 조건을 적어 뒀다.
+
+   ⚠ **그 뿌리가 고쳐지자 임시 조치 자체가 병이 됐다.** 프롬프트가 정본 어휘와
+   부정·제외 규칙을 함께 실으므로 서버는 이제 «문맥»을 읽는다. 반대로 화면의 부분일치는
+   문맥을 못 읽어 옳은 답을 덮었다(서버 실측 2026-08-17):
+
+       「배그 하고 싶어요」         서버 «고사양 게임» ✔    화면 matchUsage 고사양 게임 (같다)
+       「배그는 안 하고 롤만 해요」  서버 «게임»       ✔    화면 matchUsage **고사양 게임** ✘
+
+   즉 남겨 두면 **서버는 맞는데 화면이 틀린다.** 그래서 예외를 없앤다 — 이 함수는 이제
+   «서버가 준 조건을 화면 형태(아이콘)로 옮기는 자리»일 뿐이다.
+   ⚠ 정규식 몫의 용도는 지우지 않고 **AI 가 실패했을 때만 쓰는 폴백**으로 내렸다
+     (아래 `splitUse` · `parseAll` · `talkParse`). 부분일치가 부정문을 못 읽는 사실은
+     변하지 않으므로, 폴백으로 잡은 용도는 화면이 «그렇게 잡았다»고 밝힌다. */
+function aiCons(sc){
+ return (sc||[]).map(function(c){return {i:srvIcon(c.l,c.v),l:c.l,v:c.v};});}
 /* ── 같은 말을 두 이름으로 잡지 않는다 (2026-08-17 사장님 확정 「하나로 합친다」) ──
    병: 「조용한 게 좋아요」 한 마디에 liveParse 가 선호='저소음' 을, TALKS 키워드가
    우선순위='저소음' 을 넣어 **제약이 둘**이 됐다. addConstraint 는 라벨이 다르면 별개로
@@ -1164,16 +1353,23 @@ function srvParse(t,done){
   .catch(function(e){fin(null,'서버에 연결하지 못했습니다 — '+(e&&e.message||e),null);});}
 var SRV_HINT='예산(예: 100만), 용도(게임·사무·영상편집), 조용하게·화이트처럼 말해주시면 그 자리에서 다시 세어드려요.';
 /* parseAll(t, done) — 문장 하나를 조건 목록으로 바꾸는 **단일 경로**(chat·guided 자유입력).
-   done(list, err, pc):
-     list = [{i,l,v}] · **적용 순서가 규약이다**(정규식 먼저 · AI 나중 = 라벨 겹치면 AI 가 남는다)
-     err  = AI 실패 사유. err 가 있어도 list(정규식 몫)는 살아 있다 — 부르는 쪽이 둘 다 말한다.
-     pc   = 「PC 상담인가」 AI 판정(srvParse 주석). 비-LIVE·실패는 null(모름)이다. */
+   done(list, err, pc, useFb):
+     list  = [{i,l,v}] · **적용 순서가 규약이다**(정규식 먼저 · AI 나중 = 라벨 겹치면 AI 가 남는다)
+     err   = AI 실패 사유. err 가 있어도 list(정규식 몫)는 살아 있다 — 부르는 쪽이 둘 다 말한다.
+     pc    = 「PC 상담인가」 AI 판정(srvParse 주석). 비-LIVE·실패는 null(모름)이다.
+     useFb = **용도를 정규식 폴백으로 잡았다**(splitUse 주석). 부르는 쪽이 그 사실을 말한다.
+   ⚠ AI 가 답한 경로에서는 정규식 용도를 **아예 넣지 않는다.** 라벨 교체(뒤가 이김)에
+     맡기면 «AI 가 용도를 하나도 안 준 문장»에서 정규식 용도가 그대로 남는다 —
+     「배그 안 해요」가 그런 문장이고, 그때 붙는 «고사양 게임»은 정확히 우리가 없앤 병이다. */
 function parseAll(t,done){
- var reg=liveParse(t).map(function(c){return {i:c[0],l:c[1],v:c[2]};});
- if(!LIVE){done(reg,null,null);return;}
- srvOrdered(t,function(sc,err,pc){
-  if(err){done(reg,err,null);return;}
-  done(reg.concat((sc||[]).map(function(c){return {i:srvIcon(c.l,c.v),l:c.l,v:c.v};})),null,pc);});}
+ /* 용도 목록이 도착한 뒤에 정규식 몫을 뽑는다 — liveParse 의 용도가 그 목록을 읽는다. */
+ USAGES_READY.then(function(){
+  var sp=splitUse(liveParse(t).map(function(c){return {i:c[0],l:c[1],v:c[2]};}));
+  var fb=sp.use?sp.rest.concat([sp.use]):sp.rest;   /* 폴백 경로: 정규식 용도를 살린다 */
+  if(!LIVE){done(fb,null,null,!!sp.use);return;}
+  srvOrdered(t,function(sc,err,pc){
+   if(err){done(fb,err,null,!!sp.use);return;}
+   done(sp.rest.concat(aiCons(sc)),null,pc,false);});});}
 /* srvOrdered — srvParse 를 «부른 순서»로 돌려준다(요청 자체는 그대로 곧바로 나간다).
    ⚠ 이 줄이 필요해진 것은 «모든 문장이 AI 를 타게» 되면서다. 정규식은 동기라
    「말한 순서 = 반영 순서」가 공짜로 성립했는데, 문장마다 비동기 호출이 붙자 응답이 뒤바뀌면
@@ -1194,9 +1390,10 @@ function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value=
      장치이고, 여기서는 잡담도 「조건으로는 못 읽었다」로만 답한다(거짓을 말하지 않는다).
      반송을 여기로 넓히는 것은 별건이다 — 넓힌다면 talkParse 와 «같은 규칙»(false 만, 조건이
      하나도 없을 때만)을 써야 한다. */
-  parseAll(t,function(cons,err){
+  parseAll(t,function(cons,err,pc,useFb){
    if(err)addAI('말씀은 기록했어요. 다만 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
      +(cons.length?'아래 조건은 문장에서 바로 읽어낸 것만 반영했어요.':SRV_HINT));
+   if(useFb)addAI(USE_FALLBACK_NOTE);   /* 폴백으로 잡은 용도는 그 사실을 밝힌다 */
    if(cons.length){
     cons.forEach(function(c){addConstraint(c.i,c.l,c.v);});   // → scheduleCount() → 서버 재계산
     setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},700);
