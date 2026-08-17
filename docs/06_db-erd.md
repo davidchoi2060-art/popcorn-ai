@@ -37,6 +37,7 @@ erDiagram
   recommendations ||--o{ recommendation_items : "포함"
   users ||--o{ recommendations : "요청"
   admin_operators ||--o{ admin_operator_activity_logs : "활동"
+  admin_operators ||--o| admin_operator_photos : "프로필 사진 1:1 (§18)"
 
   %% Ver 4.0 증분
   users |o--o| members : "가입 승격 (익명→회원)"
@@ -298,9 +299,22 @@ CREATE TABLE compat_rules (
 
 ### 3.9 [5차 개정] 관리자 인증 — admin_operators 확장 / admin_sessions (사용자 확정 2026-07-26)
 
-**설계 원칙: 비밀번호를 저장하지 않는다.** 신원은 소셜 제공자(구글)가 확인하고, 우리는 **승인 여부와
-권한만** 관리한다. 우리가 갖지 않은 정보는 유출될 수 없다 — 커머스 개인정보를 다루는 시스템의
-공격면을 줄이는 선택이다. 자체 비밀번호를 추가하면 이 이득이 사라지므로 **추가하지 않는다**.
+> ⚠ **아래 「비밀번호를 저장하지 않는다」는 2026-07-26 당시 원칙이고, 2026-08-17
+> 기록자 재확인 결과 더는 사실이 아니다.** 마이그레이션 `0018_operator_password.py`
+> (슬라이스 70)가 `admin_operators.password_hash`를 추가했고, 지금 로그인은 그 값을
+> 검증한다(2026-08-17 실측: `password_hash IS NOT NULL` 12건/18행). **뒤집힌 이유**는
+> 0018 docstring에 적혀 있다 — nginx Basic Auth 팝업이 모바일에서 이메일을 다시
+> 입력하게 만들어 혼동을 반복시켰고("kck@popcornpc.co.kr was not found in
+> .htpasswd-popcorn" 오류), 그걸 걷어내려면 **앱이 직접 비밀번호를 검증**해야
+> 했다(그 전엔 이메일만 신뢰하는 dev 어댑터였다). **원문은 여전히 저장하지
+> 않는다** — scrypt 해시만 두므로(표준 라이브러리, 새 의존성 없음) DB가 새도
+> 비밀번호 원문은 새지 않는다는 이 절의 취지 자체는 지켜졌다. 이 문단은 지우지
+> 않고 역사로 남긴다(CANON §2-4) — 아래 원문은 그 당시의 설계 판단이다.
+
+**설계 원칙(2026-07-26 당시 · 이후 뒤집힘): 비밀번호를 저장하지 않는다.** 신원은 소셜 제공자(구글)가
+확인하고, 우리는 **승인 여부와 권한만** 관리한다. 우리가 갖지 않은 정보는 유출될 수 없다 — 커머스
+개인정보를 다루는 시스템의 공격면을 줄이는 선택이다. 자체 비밀번호를 추가하면 이 이득이 사라지므로
+**추가하지 않는다.**
 
 **흐름**: 소셜 로그인 → 계정 없으면 `status='대기'`로 신청 생성(프로필) → **승인 전에는 어떤 데이터도
 보이지 않는다** → owner가 승인 + 권한 부여 → 세션 발급. 퇴사·사고 시 `status='정지'`(세션 즉시 무효).
@@ -1321,3 +1335,109 @@ API + 대기 목록의 "보류분 제외" 조건 → ③ 화면의 「보류」 
 `\d stock_inbound_holds`로 부분 유니크 인덱스 실재 확인 ·
 `grep -n "stock_inbound_holds" api/admin_stock.py` → 0건이면 ②·③ 단계
 그대로(위 §순서 참조, 2026-08-17 시점).
+
+---
+
+## 18. [14차 개정] admin_operator_photos — 운영자 프로필 사진 (2026-08-17, ADM-SYS-022, **미적용**)
+
+```sql
+-- 0060 (db/migrations/versions/0060_admin_operator_photos.py, 파일만 — DB 미적용)
+CREATE TABLE admin_operator_photos (
+  operator_id  BIGINT      PRIMARY KEY
+               REFERENCES admin_operators (operator_id) ON DELETE CASCADE,
+  content_type VARCHAR(32) NOT NULL,
+  bytes        BYTEA       NOT NULL,
+  byte_size    INTEGER     NOT NULL,
+  uploaded_at  TIMESTAMP   NOT NULL DEFAULT now(),
+  uploaded_by  BIGINT      REFERENCES admin_operators (operator_id) ON DELETE SET NULL,
+  CONSTRAINT ck_admin_operator_photos_size
+    CHECK (byte_size > 0 AND byte_size = octet_length(bytes))
+);
+```
+
+**관계**: `admin_operators ||--o| admin_operator_photos` — **1:0..1**. PK 가 곧 FK 라
+「한 사람 한 장」이 스키마로 강제된다(사장님 확정 2026-08-17 ①). 교체는 UPDATE 이고
+과거 사진을 쌓지 않는다.
+
+**왜 `admin_operators` 에 컬럼을 붙이지 않는가 — 인증 경로가 그 표를 지난다.**
+`api/auth.py` `resolve_session()` 은 **모든 `/api/admin/*`·`/admin2/*` 요청**이 지나는
+자리이고 매 요청 `admin_operators` 를 조인한다. 같은 표에 이미지 바이트를 두면 언젠가
+`SELECT *` 한 줄이 **인증 경로에서 이미지까지 함께 읽는다** — 요청마다, 전 화면에서.
+표를 나누는 이유는 성능이 아니라 **그 실수를 못 하게** 하는 것이다(컬럼이 없으면 실수할
+수 없다). 사장님 확정 원문: 「admin_operators 에 컬럼 추가 «아님»」.
+
+**왜 파일이 아니라 DB 인가**(정의서 `docs/design/req/req-my-profile.md` §④-2 세 후보 실측
+비교): ① 배포 서버는 `deploy/popcorn-api.service` 가 `ProtectSystem=strict` +
+`ReadWritePaths=/srv/popcorn-ai/.cache` **한 곳** + `PrivateTmp=true` 라 새 경로를 쓰려면
+systemd 유닛을 고쳐야 하고 `/tmp` 는 재시작마다 비워진다. ② **백업 대상이 DB 뿐이다**
+(`deploy/RESTORE.md` 전문에 파일·업로드 언급 0건) — 파일로 두면 사진만 자동 백업 7건 +
+PITR 7일 밖에 남는다. ③ 크기는 운영자 18명 × 1MB = **최대 18MB** 로 상품 22,000행대를
+담은 이 DB 에서 무시할 수 있다.
+
+**계약**:
+① **`content_type` 은 서버가 파일 앞머리(magic bytes)로 판정한 값**이다 — 클라이언트가
+   보낸 `Content-Type` 도 확장자도 넣지 않는다. 허용은 JPEG·PNG·WebP 셋이고 **SVG 는
+   명시적으로 거절**된다(SVG 는 스크립트를 품을 수 있고, 같은 출처에서 서빙되면 그
+   스크립트가 관리자 세션 문맥에서 돈다).
+② **1MB 상한과 허용 형식 목록은 스키마에 «박지 않았다».** 둘 다 정책이라 바뀔 수 있고,
+   같은 값이 코드와 DB 두 곳에 살면 언젠가 어긋난다(이 문서가 「수를 박아」 여러 번 당한
+   병). 단일 원천은 `api/admin_profile_photo.MAX_PHOTO_BYTES` · `_sniff()` 다. **CHECK 는
+   불변식만** 건다 — `byte_size = octet_length(bytes)`(크기가 거짓말을 못 하게).
+③ **사진은 원장이 아니다 — 삭제하면 실제로 지운다.** `revoked_at`·`deleted_at` 컬럼이
+   «없다». 원장 규약(CANON §2-2·2-4)이 지키는 것은 「사실의 이력」이고 사진은 **본인의
+   개인 자료**다. 지운 사진을 계속 보관하는 것은 §3.9 「우리가 갖지 않은 정보는 유출될
+   수 없다」에 어긋난다. **다만 행위는 남긴다** — `admin_operator_activity_logs` 에
+   `operator_photo_set`·`operator_photo_delete`. **비밀번호와 같은 결**(원문은 안 남기고
+   `password_set_at`·활동 로그는 남는다): **자료는 지우고 사실은 남긴다.**
+④ **`ON DELETE CASCADE`(0051 `admin_operator_devices` 와 다르다)** — 계정을 지웠는데
+   사진이 남으면 필요 없어진 개인정보를 계속 보관하는 것이고, CASCADE 가 없으면 사진이
+   있는 계정은 **삭제 자체가 FK 로 막힌다**(슬라이스 78 에 실제로 운영자 계정을 지운
+   전례가 있다). `uploaded_by` 는 반대로 `SET NULL` — 올려 준 사람 계정이 지워졌다고
+   **사진이 사라지면 안 된다**.
+⑤ **사진은 API 로 내보낸다 — 정적 마운트에 두지 않는다.** 정적 마운트는 둘뿐이고
+   (`/design-system` · 캐치올 `/` → `mockups/`) `mockups/` 는 **커밋된 저장소 폴더**다.
+   거기에 업로드 파일을 쓰면 커밋되지 않은 파일이 배포 서버에 생기고, 그 폴더는
+   `ProtectSystem=strict` 아래 쓰기가 막혀 있다.
+
+**권한 경계**(사장님 확정 2026-08-17 ③ 「전 운영자가 서로 본다」): 등록·교체·삭제는
+**본인만**(`POST|DELETE /api/admin/my-profile/photo` — 남의 id 를 받는 자리가 없다),
+열람은 **로그인한 운영자 전체**(`GET /api/admin/operators/{id}/photo`). `/api/admin/operators`
+는 `required_role()` 에서 **조회조차 owner** 이므로 이 한 경로·GET 만 예외로 열었다
+(`api/auth.py` `_is_operator_photo_path()` — 접두어가 아니라 조각 판정이라
+`/operators/1/photo-and-role` 같은 경로가 딸려 열리지 않는다).
+⚠ **owner 가 남의 사진을 대신 등록·삭제하는 경로는 «짓지 않았다» — 미정이다**
+(정의서 결정대기 ⑤. 사장님은 「전 운영자 열람」만 답하셨다).
+
+**⚠ 적용 순서가 규약이다** — ① 이 마이그레이션 → ② API(**이미 있다**,
+`api/admin_profile_photo.py`) → ③ 화면·상단바 아바타(다음 물결). ②를 먼저 배포해도
+**죽지 않는다**: `_photo_table_ready()` 가 `to_regclass` 로 표 존재를 캐싱해 확인하고,
+표가 없으면 네 경로 모두 **503 `photo_schema_missing`** 을 준다 — **404 `no_photo`
+(사진 없음)와 구분한다.** 0051(기기 기억)이 `ready:false` 로 같은 구분을 한 것과 같은
+판단이다. 적용 안 된 것을 「사진 없음」이라 말하면 그게 지어낸 사실이다.
+
+**사진이 없는 운영자 → 404 `no_photo`**(빈 200 이 아니다 — 이 경로는 바이너리를 주는
+자리라 「빈 이미지」가 없고, 0바이트 200 은 `<img>` 가 깨진 이미지를 그리면서 `onerror`
+조차 안 떠 화면이 이니셜 대체를 못 한다). ⚠ **계정이 없는 것과 사진이 없는 것을
+구분하지 않는다** — viewer 는 운영자 목록을 볼 수 없는데(owner 전용) 답을 갈라 주면
+id 를 세어 계정 존재 여부를 알아낼 수 있다.
+
+**캐시**: 응답은 `ETag`(= `operator_id`-`uploaded_at`(마이크로초)-`byte_size`) +
+`Cache-Control: private, no-cache, must-revalidate`. 교체는 언제나 `uploaded_at` 을 새로
+찍으므로 **바뀐 사진이 옛 사진으로 보이지 않는다**. ETag 를 메타 세 컬럼으로 만든 덕에
+조건부 GET 은 **BYTEA 를 읽지 않고** 304 로 끝난다 — 해시 컬럼을 따로 두지 않은 이유다.
+
+**⚠ 서버 재인코딩(EXIF 제거·크기 정규화)은 하지 않는다.** 저장소에 이미지 라이브러리가
+**없고**(실측 2026-08-17: `requirements.txt` 전수 · `.venv` 에 PIL 미설치) 사장님이 새
+의존성을 늘리지 말라 정하셨다(정의서 결정대기 ③의 ㉡안). 대가는 ㉠ EXIF 가 원본에 남는다
+㉡ 폴리글롯 파일을 앞머리 검사만으로 완전히는 못 막는다 — ㉡ 는 응답 헤더
+(`X-Content-Type-Options: nosniff` · `Content-Disposition: inline` · CSP `sandbox`)로
+브라우저의 재해석을 막아 실효 위험을 줄인다.
+
+**확인법**:
+```
+SELECT version_num FROM alembic_version;                      -- 0060 이면 적용됨(2026-08-17 현재 아님)
+SELECT to_regclass('admin_operator_photos');                  -- NULL 이면 미적용
+grep -n "MAX_PHOTO_BYTES\|_MAGIC\|_no_photo" api/admin_profile_photo.py
+grep -n "_is_operator_photo_path" api/auth.py                 -- 정의 1 + 사용 1 = 2건
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/admin/operators/1/photo   -- 미로그인이면 401
+```
