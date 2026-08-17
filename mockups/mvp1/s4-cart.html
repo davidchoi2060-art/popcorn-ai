@@ -26,7 +26,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <span style="width:1px;height:16px;background:#d8d4cc;"></span>
         <div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">receipt_long</span>주문 확인</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>조립 가능 검증됨</div>
+      <div id="s4-hdr-verified" style="display:none;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>조립 가능 검증됨</div>
     </div>
   </header>
 
@@ -49,22 +49,32 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
       <!-- LEFT -->
       <section style="display:flex;flex-direction:column;gap:18px;">
 
-        <!-- verified banner -->
-        <div style="background:var(--success-container, #e9f6ef);border-radius:20px;padding:22px 24px;">
+        <!-- 견적 세션 없음 / 서버 미연결 — 이 자리에서만 사유와 돌아갈 길을 말한다 -->
+        <div id="s4-nosession" style="display:none;background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:22px 24px;">
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">
+            <span style="width:42px;height:42px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#8a8578;">link_off</span>
+            <h2 id="s4-nosession-title" style="margin:0;font-size:19px;font-weight:900;color:#17171b;">견적 세션 없음</h2>
+            <span id="s4-nosession-badge" style="display:none;margin-left:auto;align-items:center;background:#f4f2ec;color:#6b6b73;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;">연결 안 됨</span>
+          </div>
+          <p id="s4-nosession-why" style="margin:0 0 14px;font-size:13.5px;line-height:1.7;color:#6b6b73;">상담에서 만든 견적을 인계하는 화면입니다. 견적 세션이 없어 구성과 금액을 표시하지 않습니다. 상담을 다시 시작하면 서버에 연결되어 표시됩니다.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <a href="s1-session.html" style="display:inline-flex;align-items:center;gap:6px;padding:11px 18px;background:#2b5fd9;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;text-decoration:none;">상담 다시 시작</a>
+            <a href="s0-landing.html" style="display:inline-flex;align-items:center;gap:6px;padding:11px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:11px;font-size:13.5px;font-weight:800;color:#3a3a40;text-decoration:none;">처음으로</a>
+          </div>
+        </div>
+
+        <!-- verified banner — 서버 판정(compat.checks)이 도착한 뒤에만 표시한다 -->
+        <div id="s4-verified" style="display:none;background:var(--success-container, #e9f6ef);border-radius:20px;padding:22px 24px;">
           <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">
             <span style="width:42px;height:42px;border-radius:12px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#fff;">verified</span>
-            <h2 style="margin:0;font-size:19px;font-weight:900;color:var(--success-deep, #0f5132);">이 구성은 조립 가능함이 검증됐습니다</h2>
+            <h2 id="s4-verified-title" style="margin:0;font-size:19px;font-weight:900;color:var(--success-deep, #0f5132);">이 구성은 조립 가능함이 검증됐습니다</h2>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>소켓 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>메모리 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>전력 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>쿨러 통과</span>
-            <span style="display:flex;align-items:center;gap:5px;background:#fff;color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">check_circle</span>케이스 통과</span>
-          </div>
+          <!-- 검증 칩은 서버 판정(compat.checks)으로만 그린다. 목업 5종(소켓·메모리·전력·
+               쿨러·케이스)을 박아두면 서버가 8종을 검사하는 사실을 화면이 숨긴다. -->
+          <div id="s4-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
           <div style="display:flex;gap:18px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--success-container-line, #d4e9dd);">
             <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">build</span>전문가 조립 · 검수</span>
-            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">bolt</span>당일 출고</span>
+            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">bolt</span>당일에서 최대 3일 이내 출고</span>
             <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">shield</span>A/S 보증</span>
           </div>
         </div>
@@ -73,26 +83,22 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;overflow:hidden;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #f0eee9;">
             <h3 style="margin:0;font-size:16px;font-weight:900;color:#17171b;">구성 상세</h3>
-            <a href="s3-detail.html" style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:800;color:#2b5fd9;text-decoration:none;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">tune</span>부품 변경하기</a>
+            <a id="s4-edit-parts" href="s3-detail.html" style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:800;color:#2b5fd9;text-decoration:none;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">tune</span>부품 변경하기</a>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/cpu.png" alt="CPU" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">CPU</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">Intel Core i7-14700K</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">580,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/gpu.png" alt="GPU" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">GPU</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">NVIDIA RTX 4070 Ti SUPER</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">420,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/mb.png" alt="메인보드" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">메인보드</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">MSI MAG Z790 Tomahawk WiFi</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">250,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/ram.png" alt="메모리" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">메모리</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">삼성 DDR5-5600 32GB (16×2)</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">120,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/ssd.png" alt="SSD" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">SSD</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">삼성 990 PRO 1TB NVMe</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">135,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;"><img src="assets/parts/psu.png" alt="파워" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">파워</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">시소닉 FOCUS GX-750 750W</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">110,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;"><img src="assets/parts/case.png" alt="케이스" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;"><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">케이스</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">NZXT H5 Flow</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">90,000원</div></div>
-          <div style="display:flex;align-items:center;gap:14px;padding:14px 22px;background:#f7f9fc;"><span style="flex:0 0 44px;"><span style="font-family:'Material Symbols Outlined';font-size:22px;color:#2b5fd9;">build</span></span><div style="flex:1;"><div style="font-size:14.5px;font-weight:700;color:#17171b;">전문가 조립 · 검수 공임</div><div style="font-size:12px;color:#8a8578;">별도 청구 · ASSEMBLY_SERVICE</div></div><div style="font-size:14.5px;font-weight:800;color:#17171b;">30,000원</div></div>
+          <!-- 부품 행은 견적 스냅샷에서 그린다. 마크업에 부품명·가격을 적지 않는다. -->
+          <div id="s4-parts"></div>
+          <div id="s4-parts-empty" style="padding:24px 22px;font-size:13.5px;font-weight:600;color:#8a8578;">구성 정보를 불러오지 못했습니다 — 서버에 연결되면 표시됩니다.</div>
+          <div id="s4-assembly" style="display:none;align-items:center;gap:14px;padding:14px 22px;background:#f7f9fc;"><span style="flex:0 0 44px;"><span style="font-family:'Material Symbols Outlined';font-size:22px;color:#2b5fd9;">build</span></span><div style="flex:1;"><div style="font-size:14.5px;font-weight:700;color:#17171b;">전문가 조립 · 검수 공임</div><div style="font-size:12px;color:#8a8578;">별도 청구 · ASSEMBLY_SERVICE</div></div><div id="s4-assembly-price" style="font-size:14.5px;font-weight:800;color:#17171b;">—원</div></div>
           <div id="s4-periph"></div>
         </div>
 
         <!-- restock check -->
-        <div style="background:#eaf1fd;border-radius:20px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+        <div id="s4-restock" style="display:none;background:#eaf1fd;border-radius:20px;padding:20px 24px;align-items:center;justify-content:space-between;gap:16px;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="width:42px;height:42px;border-radius:12px;background:#2b5fd9;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#fff;">inventory</span>
             <div>
               <div style="font-size:15px;font-weight:900;color:#1c3f8f;">결제 직전 재고 재확인</div>
-              <div style="font-size:13.5px;color:#4a6ab0;font-weight:600;">전 품목 재고 확보 — 바로 출고 가능</div>
+              <div style="font-size:13.5px;color:#4a6ab0;font-weight:600;">결제 시점에 서버가 전 품목 재고를 확정 검증합니다</div>
             </div>
           </div>
           <button style="flex:0 0 auto;padding:10px 16px;border:1.5px solid #b9cdf5;background:#fff;border-radius:10px;font-size:13px;font-weight:800;color:#2149b0;cursor:pointer;font-family:inherit;" id="s4-soldout">안전 대안으로 교체</button>
@@ -105,9 +111,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
         <!-- summary -->
         <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:22px;box-shadow:0 14px 40px -28px rgba(30,25,15,.28);">
-          <div style="display:flex;flex-direction:column;gap:11px;padding-bottom:16px;border-bottom:1px solid #f0eee9;">
-            <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">부품 합계 (7종)</span><b style="color:#17171b;">1,705,000원</b></div>
-            <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">조립비</span><b style="color:#17171b;">30,000원</b></div>
+          <div id="s4-sum" style="display:none;flex-direction:column;gap:11px;padding-bottom:16px;border-bottom:1px solid #f0eee9;">
+            <div style="display:flex;justify-content:space-between;font-size:14px;"><span id="s4-sum-label" style="color:#6b6b73;">부품 합계</span><b id="s4-sum-val" style="color:#17171b;">—원</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">조립비</span><b id="s4-fee-val" style="color:#17171b;">—원</b></div>
             <div id="s4-periph-line" style="display:none;justify-content:space-between;font-size:14px;"></div>
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">배송비</span><b style="color:var(--success, #2f9e6d);">무료</b></div>
           </div>
@@ -117,7 +123,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           </div>
           <div style="background:#17171b;border-radius:14px;padding:18px 20px;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <div><div style="font-size:13px;font-weight:700;color:#9a968d;">총 결제금액</div><div style="font-size:11px;color:#7a766d;">3시간 전 기준 · VAT 포함</div></div>
+              <div><div style="font-size:13px;font-weight:700;color:#9a968d;">총 결제금액</div><div id="s4-total-cap" style="font-size:11px;color:#7a766d;"></div></div>
               <div id="s4-total" style="font-size:26px;font-weight:900;color:#fff;">—<span style="font-size:14px;color:#9a968d;">원</span></div>
             </div>
           </div>
@@ -172,7 +178,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <div id="s4-done" style="display:none;background:#eaf1fd;border-radius:20px;padding:22px;text-align:center;">
           <span style="width:44px;height:44px;border-radius:50%;background:#2b5fd9;display:inline-flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:24px;color:#fff;">check_circle</span>
           <h3 style="margin:10px 0 4px;font-size:17px;font-weight:900;color:#17171b;">주문이 완료됐습니다</h3>
-          <p style="margin:0 0 4px;font-size:13px;color:#4a6ab0;font-weight:700;">주문번호 <b>ORD-84216</b> · 스냅샷 SNAP-0716-1030</p>
+          <!-- 주문번호는 서버 응답(order_no)만 쓴다. 스냅샷 번호는 `api/orders` 가
+               응답에 싣지 않는다 — 모르는 것은 자리째 두지 않는다(예전엔 SNAP-0716-1030 박제). -->
+          <p style="margin:0 0 4px;font-size:13px;color:#4a6ab0;font-weight:700;">주문번호 <b id="s4-done-no">—</b></p>
           <p style="margin:0 0 14px;font-size:12px;color:#8a8578;">조립·검수 후 출고됩니다. 진행 상황은 마이페이지에서 확인하세요.</p>
           <a href="my-page.html" style="display:inline-flex;align-items:center;gap:6px;padding:11px 18px;border:none;background:#2b5fd9;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;text-decoration:none;">마이페이지에서 추적</a>
         </div>
@@ -181,7 +189,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;padding:18px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <span style="font-size:13px;font-weight:700;color:#8a8578;">총 결제금액</span>
-            <span id="s4-total2" style="font-size:20px;font-weight:900;color:#17171b;">1,735,000원</span>
+            <span id="s4-total2" style="font-size:20px;font-weight:900;color:#17171b;">—원</span>
           </div>
           <div style="display:flex;gap:10px;">
             <a href="s3-detail.html" style="flex:0 0 auto;padding:14px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:12px;font-size:14px;font-weight:800;color:#3a3a40;text-decoration:none;">부품 변경</a>
@@ -201,6 +209,84 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
 <div id="s4-toast" style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:#17171b;color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:12px;opacity:0;pointer-events:none;transition:.25s;z-index:60;"></div>
 <script>
+/* ---- S4 표시 게이트 (2026-08-17) ---------------------------------------
+   이 화면은 인계 화면이다. 견적 세션이 없거나 서버에 닿지 못하면
+   **구성도 금액도 말하지 않는다** (CLAUDE.md 화면 정직성 - 가격·건수는 서버 응답만).
+   전에는 목업 부품 7행과 1,735,000원이 마크업에 박혀 있어, 세션 없이 URL 로
+   들어와도 «맞는 것처럼» 보였다. 지금은 마크업에 금액이 없다.
+
+   금액을 보이는 자리는 둘(검은 박스 · CTA)이지만 **쓰는 코드는 s4SetTotal 하나다.**
+   두 곳을 각자 갱신하면 한쪽만 고치는 사고가 난다. */
+(function(){
+ var W = window;
+ function el(id){return document.getElementById(id);}
+
+ /* 견적 스냅샷이 실제로 쓸 수 있는 상태인지 - LIVE 스크립트와 같은 판정을 쓴다 */
+ W.s4HasQuote = function(){
+  var raw; try{raw = localStorage.getItem('popcorn-quote');}catch(e){return false;}
+  if(!raw) return false;
+  var Q; try{Q = JSON.parse(raw).data;}catch(e){return false;}
+  if(!Q || !Q.sets) return false;
+  var t = null; try{t = localStorage.getItem('popcorn-quote-tier');}catch(e){}
+  if(!t || !Q.sets[t]) t = Q.sets.recommend ? 'recommend'
+                          : (Q.sets.value ? 'value' : (Q.sets.highend ? 'highend' : null));
+  return !!(t && Q.sets[t]);
+ };
+
+ /* 총액 단일 원천 - null 이면 «-» 로 둔다(0 원이 아니다) */
+ W.s4SetTotal = function(n){
+  var s = (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString();
+  var t1 = el('s4-total'), t2 = el('s4-total2');
+  if(t1) t1.innerHTML = s + '<span style="font-size:14px;color:#9a968d;">원</span>';
+  if(t2) t2.textContent = s + '원';
+ };
+
+ W.s4Live = false;
+ W.s4Msg = '';
+
+ /* 표시할 것이 없는 상태 - 사유와 돌아갈 길을 말하고, 인계 버튼을 잠근다 */
+ W.s4Offline = function(reason, disconnected){
+  W.s4Live = false;
+  /* 버튼 아래 문구는 짧게 - 사유 전문은 위 안내 블록이 말한다 */
+  W.s4Msg  = disconnected ? '구성 정보를 확인하지 못해 인계할 수 없습니다.'
+                          : '견적 세션이 없어 인계할 수 없습니다.';
+  var box = el('s4-nosession');
+  if(box){
+   box.style.display = '';
+   var why = el('s4-nosession-why'); if(why) why.textContent = reason;
+   var ttl = el('s4-nosession-title');
+   if(ttl) ttl.textContent = disconnected ? '구성 정보 표시 불가' : '견적 세션 없음';
+   var bg = el('s4-nosession-badge');
+   if(bg) bg.style.display = disconnected ? 'inline-flex' : 'none';
+  }
+  ['s4-hdr-verified','s4-verified','s4-restock','s4-sum','s4-assembly','s4-authgate','s4-own','s4-done','s4-edit-parts']
+   .forEach(function(id){var d = el(id); if(d) d.style.display = 'none';});
+  var pe = el('s4-parts');       if(pe) pe.innerHTML = '';
+  var pp = el('s4-periph');      if(pp) pp.innerHTML = '';
+  var pl = el('s4-periph-line'); if(pl) pl.style.display = 'none';
+  var pm = el('s4-parts-empty'); if(pm) pm.textContent = '표시할 구성이 없습니다.';
+  W.s4SetTotal(null);
+  var cap2 = el('s4-total-cap'); if(cap2) cap2.textContent = '표시할 견적 없음';
+  /* 없는 구성이 몰로 넘어가면 안 된다 - 버튼을 눌리지 않게 한다 */
+  var pay = el('s4-pay');
+  if(pay){pay.disabled = true; pay.style.background = '#c9c5bd'; pay.style.cursor = 'not-allowed';}
+  var cap = el('s4-pay-cap'); if(cap) cap.textContent = W.s4Msg;
+  ['s4-coupon','s4-mode-demo','s4-soldout'].forEach(function(id){
+   var b = el(id);
+   if(b){b.disabled = true; b.style.opacity = '.45'; b.style.cursor = 'not-allowed';}
+  });
+ };
+
+ if(!W.s4HasQuote()){
+  W.s4Offline('상담에서 만든 견적을 인계하는 화면입니다. 견적 세션이 없어 구성과 금액을 표시하지 않습니다. 상담을 다시 시작하면 서버에 연결되어 표시됩니다.', false);
+ }else{
+  var pm0 = el('s4-parts-empty');
+  if(pm0) pm0.textContent = '구성 정보를 불러오는 중입니다.';
+  W.s4Msg = '구성 정보를 불러오는 중입니다.';
+ }
+})();
+</script>
+<script>
 (function(){
 function tmsg(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
 var login=document.getElementById('s4-login'),pay=document.getElementById('s4-pay'),cap=document.getElementById('s4-pay-cap'),gate=document.getElementById('s4-authgate');
@@ -219,6 +305,13 @@ function renderMember(){
 function check(){
  var mode=opsPay();
  var ok=false, msg='';
+ /* 서버 값으로 구성이 그려지기 전에는 어떤 경로로도 인계 버튼이 열리지 않는다.
+    (쇼핑몰 로그인 단추만 눌러도 열리던 자리다 - 견적 없이 몰로 넘어갔다) */
+ if(!window.s4Live){
+  if(pay){pay.disabled=true;pay.style.background='#c9c5bd';pay.style.cursor='not-allowed';}
+  if(cap)cap.textContent=window.s4Msg||'견적 세션이 없어 인계할 수 없습니다.';
+  return;
+ }
  /* 인계 모드에서 우리는 결제를 받지 않는다 — 문구가 그렇게 말해야 한다(범위 확정 2026-08-11) */
  if(mode==='mall'){ok=mallLogged;msg=ok?'견적을 쇼핑몰 장바구니로 넘깁니다. 결제·배송은 쇼핑몰에서 진행됩니다.':'쇼핑몰 로그인 후 넘길 수 있어요.';}
  else{
@@ -233,16 +326,20 @@ function check(){
 }
 function applyMode(){
  var mode=opsPay();
+ /* 표시할 견적이 없으면 결제·인계 입력 자리 자체를 열지 않는다 */
+ var live=!!window.s4Live;
  if(badge){badge.textContent=mode==='own'?'자체 결제':'쇼핑몰 인계';badge.style.background=mode==='own'?'#eaf1fd':'#f2edfb';badge.style.color=mode==='own'?'#2149b0':'#4a2a94';}
- if(gate)gate.style.display=mode==='mall'?'':'none';
- if(own)own.style.display=mode==='own'?'flex':'none';
+ if(gate)gate.style.display=(live&&mode==='mall')?'':'none';
+ if(own)own.style.display=(live&&mode==='own')?'flex':'none';
  if(done)done.style.display='none';
  /* 버튼이 하는 일을 버튼이 말한다. 인계 모드인데 「결제하기」라 적혀 있으면
     누르는 사람은 우리에게 결제한다고 믿는다 — 실제로는 몰로 넘어간다. */
  if(pay)pay.textContent=mode==='mall'?'쇼핑몰로 넘기기':'결제하기';
- if(mode==='own')renderMember();
+ if(live&&mode==='own')renderMember();
  check();
 }
+/* LIVE 렌더가 끝난 뒤 다시 돌린다(applyMode·check 는 폐쇄 변수라 밖에서 못 부른다) */
+window.s4Recheck=applyMode;
 var demo=document.getElementById('s4-mode-demo');
 if(demo)demo.addEventListener('click',function(){
  var ops={};try{ops=JSON.parse(localStorage.getItem('popcorn-ops')||'{}');}catch(e){}
@@ -261,9 +358,11 @@ if(pay)pay.addEventListener('click',function(){
  /* 여기까지 오면 LIVE 스크립트(아래 IIFE)가 뜨지 못한 것이다 — 평소엔 그쪽이 가로챈다.
     예전엔 «인계 모드 (목업)» 토스트를 띄웠는데, 그러면 안 된 것을 된 것처럼 말한다. */
  if(opsPay()==='mall'){tmsg('인계를 준비하지 못했습니다 — 새로고침 후 다시 시도해 주세요.');return;}
- tmsg('재고 예약(hold) 완료 — 7개 부품 점유');
+ /* 점유 부품 수도 서버가 준 값이 아니다 — 수를 말하지 않는다(예전엔 «7개» 박제) */
+ tmsg('재고 예약(hold) 완료');
  setTimeout(function(){tmsg(pm+' 결제 승인 (목업 PG)');},1200);
- setTimeout(function(){tmsg('주문 ORD-84216 생성 — 원장은 본 시스템에 저장됐어요');},2400);
+ /* 주문번호를 지어내지 않는다 — 이 경로는 서버를 부르지 못한 폴백이라 번호가 없다 */
+ setTimeout(function(){tmsg('주문번호는 서버 응답으로 표시됩니다.');},2400);
  setTimeout(function(){window.location.href='s5-complete.html';},3400);
 });
 applyMode();
@@ -316,6 +415,8 @@ window.addEventListener('scroll',closeTip,{passive:true});
 // 주변기기 ③: S2 '함께 구성' 선택이 장바구니로 이어짐 (localStorage popcorn-periph)
 (function(){
  var box=document.getElementById('s4-periph');if(!box)return;
+ /* 견적 세션이 없으면 주변기기 금액도 말하지 않는다 - 지난 세션의 값이다 */
+ if(!(window.s4HasQuote&&window.s4HasQuote()))return;
  var arr=[];try{arr=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
  if(!arr.length)return;
  var icons={'모니터':'desktop_windows','키보드':'keyboard','마우스':'mouse','헤드셋':'headphones'};
@@ -324,9 +425,8 @@ window.addEventListener('scroll',closeTip,{passive:true});
  box.innerHTML=h;
  var line=document.getElementById('s4-periph-line');
  if(line){line.style.display='flex';line.innerHTML='<span style="color:#6b6b73;">함께 구성 ('+arr.length+'종)</span><b style="color:#17171b;">'+sum.toLocaleString()+'원</b>';}
- var total=1735000+sum;
- var t1=document.getElementById('s4-total');if(t1)t1.innerHTML=total.toLocaleString()+'<span style="font-size:14px;color:#9a968d;">원</span>';
- var t2=document.getElementById('s4-total2');if(t2)t2.textContent=total.toLocaleString()+'원';
+ /* 총액은 여기서 쓰지 않는다 - 부품 합계를 아는 것은 견적 스냅샷뿐이고,
+    총액을 쓰는 자리는 s4SetTotal 하나다(예전엔 여기서 1,735,000 을 더했다). */
 })();
 </script>
 <script>
@@ -345,11 +445,14 @@ window.addEventListener('scroll',closeTip,{passive:true});
  function toast(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
  var PIMG={CPU:'cpu',GPU:'gpu',MB:'mb',RAM:'ram',SSD:'ssd',POWER:'psu',CASE:'case'};
  var PKO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'GPU',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'SSD'};
+ /* 조립비는 견적 스냅샷에 실려 오지 않는다(api/handoff 는 몰 값을 쓴다).
+    화면이 쓰는 이 상수는 자체 결제 경로(api/orders.ASSEMBLY_FEE)와 같은 값이다 -
+    인계 경로의 표시 근거는 아직 서버가 주지 않는다(보고 대상). */
+ var ASSEMBLY_FEE=30000;
  fetch('/api/ops').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(ops){
-  // 1) 본체 하드코딩 → 견적 스냅샷 부품으로 재렌더
-  var card=document.getElementById('s4-periph').parentNode;
-  var partRows=[].filter.call(card.children,function(d){return d.querySelector&&d.querySelector('img[src*="assets/parts/"]');});
-  var anchor=partRows.length?partRows[0]:null;
+  // 1) 견적 스냅샷 부품으로 구성 상세를 그린다(마크업에는 부품이 없다)
+  var slot=document.getElementById('s4-parts');
+  slot.innerHTML='';
   S.items.forEach(function(it){
    var d=document.createElement('div');
    d.style.cssText='display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;';
@@ -359,16 +462,23 @@ window.addEventListener('scroll',closeTip,{passive:true});
        글자로 그대로 노출됐다 — 이미지가 없으면 라벨로 대신한다(슬라이스 48). */
     :'<span style="flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #ece9e3;background:#faf9f6;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span>';
    d.innerHTML=img+'<span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.name+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.price.toLocaleString()+'원</div>';
-   card.insertBefore(d,anchor);
+   slot.appendChild(d);
   });
-  partRows.forEach(function(d){d.remove();});
-  // 2) 합계 재계산 — 부품 합계 행·총액 2곳
-  var sumRow=null;
-  document.querySelectorAll('span').forEach(function(s){if(s.childElementCount===0&&s.textContent.indexOf('부품 합계')===0)sumRow=s;});
-  if(sumRow){sumRow.textContent='부품 합계 ('+S.items.length+'종)';var b=sumRow.parentNode.querySelector('b');if(b)b.textContent=S.total.toLocaleString()+'원';}
-  var total=S.total+30000+periphSum;
-  var t1=document.getElementById('s4-total');if(t1)t1.innerHTML=total.toLocaleString()+'<span style="font-size:14px;color:#9a968d;">원</span>';
-  var t2=document.getElementById('s4-total2');if(t2)t2.textContent=total.toLocaleString()+'원';
+  var pe=document.getElementById('s4-parts-empty');if(pe)pe.style.display='none';
+  var asm=document.getElementById('s4-assembly');if(asm)asm.style.display='flex';
+  var asmP=document.getElementById('s4-assembly-price');
+  if(asmP)asmP.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
+  // 2) 합계 — 부품 합계 행 · 총액(단일 원천 s4SetTotal)
+  var sumBox=document.getElementById('s4-sum');if(sumBox)sumBox.style.display='flex';
+  var sumLb=document.getElementById('s4-sum-label');
+  if(sumLb)sumLb.textContent='부품 합계 ('+S.items.length+'종)';
+  var sumVal=document.getElementById('s4-sum-val');
+  if(sumVal)sumVal.textContent=S.total.toLocaleString()+'원';
+  var feeVal=document.getElementById('s4-fee-val');
+  if(feeVal)feeVal.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
+  window.s4SetTotal(S.total+ASSEMBLY_FEE+periphSum);
+  var tcap=document.getElementById('s4-total-cap');if(tcap)tcap.textContent='VAT 포함';
+  var rst=document.getElementById('s4-restock');if(rst)rst.style.display='flex';
   if(periphArr.length!==periphValid.length)toast('이전 세션의 주변기기 일부는 실주문에서 제외됩니다 — 견적서에서 다시 담아주세요.');
   // 3) 운영 모드 = 서버 동기화 (데모 전환 비활성)
   try{var lo=JSON.parse(localStorage.getItem('popcorn-ops')||'{}');
@@ -377,16 +487,18 @@ window.addEventListener('scroll',closeTip,{passive:true});
   }catch(e){}
   var demo=document.getElementById('s4-mode-demo');
   if(demo){demo.disabled=true;demo.style.opacity='.45';demo.style.cursor='not-allowed';demo.textContent='관리자 설정';demo.title='운영 전환은 관리자 운영 전환 설정에서';}
-  // 재고 카피 정직화
-  document.querySelectorAll('div').forEach(function(d){if(d.childElementCount===0&&d.textContent.indexOf('전 품목 재고 확보')===0)d.textContent='결제 시점에 서버가 전 품목 재고를 확정 검증합니다';});
+  /* 여기까지 와야 화면이 금액을 말할 자격이 있다 — 인계 버튼도 이때 열린다.
+     applyMode 가 운영 모드에 맞는 입력 자리를 다시 편다. */
+  window.s4Live=true;window.s4Msg='';
+  if(window.s4Recheck)window.s4Recheck();
   // 검증 칩 = 서버가 판정한 규칙 1:1 (슬라이스 48)
   // 목업은 소켓·메모리·전력·쿨러·케이스 5개로 고정이었다. 서버는 8종을 검사하므로
   // 3종을 숨기고 있었고, 불통과가 나와도 전부 '통과'로 보일 구조였다.
   var chips=(S.compat&&S.compat.checks)||[];
   if(chips.length){
-   var chipBox=null;
-   document.querySelectorAll('div').forEach(function(d){
-    if(!chipBox&&d.children.length>=5&&/소켓 통과/.test(d.textContent||''))chipBox=d;});
+   /* id 바인딩이다 — 예전엔 «소켓 통과»라는 글자로 이 상자를 찾았다.
+      그 글자를 지우는 날 찾기가 조용히 실패하고 칩이 갱신되지 않는다. */
+   var chipBox=document.getElementById('s4-chips');
    if(chipBox){
     var nF=0;chips.forEach(function(c){if(c.pass===false)nF++;});
     chipBox.innerHTML=chips.map(function(c){
@@ -400,11 +512,13 @@ window.addEventListener('scroll',closeTip,{passive:true});
       +c.label.replace(/\s*통과$/,'')+' '+(ok?'통과':'불통과')+'</span>';
     }).join('');
     if(nF){
-     var hh=document.querySelector('h2');
-     document.querySelectorAll('h2').forEach(function(h){
-      if((h.textContent||'').indexOf('조립 가능함이 검증')>-1)
-       h.textContent='조립할 수 없는 구성입니다 — 호환 '+chips.length+'종 중 '+nF+'종 불통과';});
+     var vt=document.getElementById('s4-verified-title');
+     if(vt)vt.textContent='조립할 수 없는 구성입니다 — 호환 '+chips.length+'종 중 '+nF+'종 불통과';
     }
+    /* 서버 판정이 온 뒤에만 검증 배너를 편다 — 판정 없이 «검증됨»이라 말하지 않는다 */
+    var vb=document.getElementById('s4-verified');if(vb)vb.style.display='';
+    var hv=document.getElementById('s4-hdr-verified');
+    if(hv&&!nF)hv.style.display='flex';
    }
   }
   // 배지
@@ -429,18 +543,27 @@ window.addEventListener('scroll',closeTip,{passive:true});
    if(mode==='mall'){
     ev.stopImmediatePropagation();ev.preventDefault();
     var o0=payBtn.textContent;payBtn.disabled=true;payBtn.textContent='넘기는 중…';
+    /* 열쇠(access_key)는 견적 응답이 준 값이다 - 「이 상담의 주인인가」를 서버가 그것으로
+       판정한다. 화면에는 «보여주지» 않는다: 링크·본문에 싣지 않고 localStorage 에 이미
+       있는 것을 꺼내 실어 보내기만 한다. 0055 미적용이면 null 이고, 그때는 서버가
+       503(gate_unavailable)으로 그 사실을 그대로 말한다. */
     fetch('/api/handoff',{method:'POST',credentials:'same-origin',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({session_id:Q.session_id,tier:tier,
+      body:JSON.stringify({session_id:Q.session_id,tier:tier,access_key:Q.access_key||null,
         periph:periphValid.map(function(it){return {code:it.code,qty:1};})})})
      .then(function(r){return r.json().then(function(j){return {ok:r.ok,st:r.status,j:j};});})
      .then(function(res){
       if(!res.ok){
        var d=(res.j&&res.j.detail)||{};
        /* 「실패했어요」로 뭉뚱그리지 않는다 — 사람이 다음에 무엇을 할지 알아야 한다 */
+       /* 403·429·503 은 «서로 다른 사건»이다 — 한 문장으로 뭉뚱그리면 사람이 다음에
+          무엇을 할지 모른다(s2·s3 와 같은 어휘를 쓴다). */
        var m=d.error==='pay_mode_own' ? '지금은 자체 결제 모드입니다 — 관리자 운영 전환 설정을 확인해 주세요.'
            : d.error==='quote_not_found' ? '견적을 찾지 못했어요 — 견적서에서 다시 담아주세요.'
            : d.error==='periph_not_offered' ? '제안 목록에 없는 주변기기가 있어요 — 견적서에서 다시 담아주세요.'
+           : res.st===403 ? '이 견적을 넘길 권한이 확인되지 않습니다 — 다른 브라우저에서 받은 견적이거나 오래된 링크입니다. 상담에서 견적을 다시 받아주세요.'
+           : res.st===429 ? ('요청이 한도를 넘었습니다 — '+(d.retry_after_sec?(d.retry_after_sec+'초 뒤에'):'잠시 뒤')+' 다시 시도해 주세요.')
+           : res.st===503 ? '인계 기능이 아직 준비되지 않았습니다 — 준비되면 표시됩니다.'
            : (d.detail||d.error||('넘기지 못했어요 (오류 '+res.st+')'));
        toast(m);payBtn.disabled=false;payBtn.textContent=o0;return;
       }
@@ -470,7 +593,10 @@ window.addEventListener('scroll',closeTip,{passive:true});
    var m=(window.popcornAuth&&window.popcornAuth.member())||null;
    if(!m)return;
    var orig=payBtn.textContent;payBtn.disabled=true;payBtn.textContent='결제 진행 중…';
-   var body={session_id:Q.session_id,tier:tier,
+   /* 열쇠(access_key)는 견적 응답이 준 값이다 - 서버가 「이 상담의 주인인가」를 그것으로
+      확인한다(위 /api/handoff 와 같은 장치). 안 실으면 403 access_key_missing 이라
+      주문이 생성되지 않는다. 실패는 아래 !res.ok 분기가 사유 그대로 말한다. */
+   var body={session_id:Q.session_id,tier:tier,access_key:Q.access_key||null,
     periph:periphValid.map(function(it){return {code:it.code,qty:1};}),
     member:{nick:m.nick||'회원',email:m.email||'guest@popcornpc.local',via:m.via||'email'},
     shipping:{name:(document.getElementById('s4-name')||{}).value||'',phone:(document.getElementById('s4-phone')||{}).value||'',addr:(document.getElementById('s4-addr')||{}).value||''},
@@ -485,6 +611,8 @@ window.addEventListener('scroll',closeTip,{passive:true});
       payBtn.disabled=false;payBtn.textContent=orig;return;
      }
      var od=res.j;
+     /* 주문번호는 서버가 준 값만 쓴다(마크업에는 «—»만 있다) */
+     var dn=document.getElementById('s4-done-no');if(dn)dn.textContent=od.order_no;
      toast('재고 예약(hold) 완료 — '+od.held+'개 부품 점유');
      setTimeout(function(){toast(od.payment.method+' 결제 승인 (목업 PG) · '+od.payment.pg_ref);},1200);
      setTimeout(function(){toast('주문 '+od.order_no+' 생성 — 원장은 본 시스템에 저장됐어요');},2400);
@@ -498,7 +626,11 @@ window.addEventListener('scroll',closeTip,{passive:true});
     })
     .catch(function(){toast('주문 처리에 실패했어요 — 잠시 후 다시 시도해 주세요.');payBtn.disabled=false;payBtn.textContent=orig;});
   },true);
- }).catch(function(){});
+ }).catch(function(){
+  /* 실패를 삼키지 않는다 — 예전엔 빈 catch 라, 서버에 못 닿으면 목업 금액이
+     그대로 «맞는 값»처럼 남아 있었다. 지금은 사유를 말하고 인계를 막는다. */
+  window.s4Offline('구성 정보를 서버에서 확인하지 못했습니다. 서버에 연결되면 표시됩니다.', true);
+ });
 })();
 </script>
 <script src="../shared/auth.js"></script>

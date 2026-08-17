@@ -1,6 +1,9 @@
 """견적 생성 엔진 v1 — POST /api/recommend.
 
-A-02: 같은 입력 + 같은 재고 = 같은 구성. A-03: LLM 없음(reasons는 고정 템플릿).
+A-02: 같은 입력 + 같은 재고 = 같은 구성. **구성 선택에는 LLM이 없다** — 이 파일의 탐색·
+정렬·판정은 전부 결정론이고 `reasons`도 엔진이 적는 고정 문구다. LLM은 A-03이 허용한
+「설명」에만 쓰이고, 그 자리는 견적 경로 밖의 `POST /api/recommend/explain` 하나다
+(파일 맨 아래 — 확정 저장된 견적을 읽어 설명 문구만 만든다. 구성은 건드리지 않는다).
 고정 슬롯 순서 DFS(백트래킹) — 호환성 5종은 제약, 티어는 슬롯 내 정렬 순서로만 구분:
   가성비 = 예산 캡 풀 + 가격 오름차순
   추천   = 예산 캡 풀 + 가격 내림차순 + 예산 총액 가지치기(현재 합+남은 슬롯 최저가 합>예산이면 prune)
@@ -13,12 +16,16 @@ v1 정직 한계(문서·응답에 명기): 성능 지표(벤치·FPS) 미보유
 NULL 스펙 필드는 해당 호환 검사 불통과로 간주(검증 불가 부품은 조립 보증 불가 → 제외).
 """
 import json
+import logging
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from . import access_gate   # 접근 게이트의 단일 원천 — 열쇠 생성·소유자 확인·횟수 제한
+from . import llm       # LLM 호출의 단일 원천 — 이 파일에서 프로바이더를 직접 부르지 않는다
 from . import visitor
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
@@ -29,6 +36,7 @@ from .db import engine
 from .product_name import display_name   # 견적은 파는 이름이 아니라 설명하는 이름을 쓴다
 
 router = APIRouter(prefix="/api")
+log = logging.getLogger("recommend")
 
 from .taxonomy import SLOTS, QUOTE_SLOTS as SLOT_TYPES   # 단일 원천(슬라이스 A)
 # 안전망 — 병리적 조합 폭발을 막는 상한. 실규모 실측(슬라이스 40)에 맞춰 상향했다.
@@ -693,11 +701,21 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                                              hi_note or relaxed, hi_limit)
 
         uid = visitor.resolve(conn, request, response)
+        # 이 견적의 「추측 못 할 열쇠」 — session_id 가 연속 정수라(최근 10건 5872~5881)
+        # 번호만으로는 남의 견적을 막을 수 없다. 열쇠는 **이 응답을 받은 쪽에만** 간다.
+        # 스키마(0055)가 아직 없으면 열쇠 없이 그대로 만든다 — 그 행은 나중에 설명을
+        # 부를 수 없고(403), 게이트가 왜 못 서는지는 서버 로그가 말한다.
+        gate_on = access_gate.column_ready(conn, "consult_sessions")
+        access_key = access_gate.new_key() if gate_on else None
+        params = {"m": body.mode, "u": uid,
+                  "c": json.dumps([{"l": c.l, "v": c.v} for c in body.constraints])}
+        cols, vals = "member_id, mode, constraints, user_id", "NULL, :m, CAST(:c AS JSONB), :u"
+        if gate_on:
+            cols, vals = cols + ", access_key", vals + ", :ak"
+            params["ak"] = access_key
         session_id = conn.execute(text(
-            "INSERT INTO consult_sessions (member_id, mode, constraints, user_id) VALUES"
-            " (NULL, :m, CAST(:c AS JSONB), :u) RETURNING session_id"),
-            {"m": body.mode, "u": uid,
-             "c": json.dumps([{"l": c.l, "v": c.v} for c in body.constraints])}).scalar()
+            f"INSERT INTO consult_sessions ({cols}) VALUES ({vals}) RETURNING session_id"),
+            params).scalar()
         comp = _companion(conn)
         for qt, s in sets.items():
             if s is None:
@@ -711,8 +729,233 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                  "ta": s["total"]})
 
     return {"session_id": session_id, "generated_at": now_iso(),
+            # 이 견적의 열쇠. 화면은 이걸 들고 `POST /api/recommend/explain` 을 부른다.
+            # null 이면 게이트 스키마 미적용 상태다 — 그 경우 explain 은 503 을 준다.
+            "access_key": access_key,
             "funnel": {"total": total_n, "passed": len(passed)},
             # 서버가 실제로 건 하한 — 화면이 지어내지 않고 이것만 말한다
             "usage_floors": {"usage": UF.label_of(usage_v), "items": floors},
             "highend_cap_x": HIGHEND_CAP_X,
             "sets": sets, "companion": comp}
+
+
+# ============================================================================
+# S2 「이 구성을 고른 이유」 — 이미 결정된 구성을 **설명만** 한다 (A-01·A-02·A-03)
+#
+# ■ 왜 견적 응답(POST /api/recommend)에 싣지 않았나
+#   그 경로는 고객이 기다리는 자리다. LLM 호출 한 번은 견적 생성보다 몇 배 느리고,
+#   근거 문구 하나 때문에 견적 전체가 늦어지면 안 된다. 그래서 **화면이 견적을 받은 뒤
+#   따로 부르는** 별도 경로로 둔다 — 견적 응답 시간은 이 변경으로 바뀌지 않는다.
+#   문구가 도착하기 전까지 화면에는 엔진이 적어 보낸 고정 문구가 그대로 보인다.
+#
+# ■ 왜 화면이 부품을 실어 보내지 않고 session_id·tier만 보내나
+#   프롬프트의 재료를 화면이 실어 보내면 그 순간 재료를 클라이언트가 지어낼 수 있게 된다
+#   (§화면 정직성 — 화면이 숫자를 지어내지 않는다는 규칙의 서버 쪽 짝). 재료는 전부
+#   서버가 원장(consult_sessions · quote_snapshots)에서 다시 읽는다. 즉 이 엔드포인트는
+#   **엔진을 다시 돌리지 않고**, 그때 확정돼 저장된 구성을 그대로 읽어 설명한다.
+#
+# ■ 지키는 계약
+#   A-01·A-02  LLM은 구성을 바꾸지 않는다 — 프롬프트로 금지하고, 결과에 **사실에 없는
+#              숫자**가 섞이면 그 답을 버린다(_unbacked_numbers). 지어낸 수치를 고객
+#              화면에 올리느니 고정 문구가 낫다.
+#   실패 은폐 금지  키 미설정·한도 초과·프로바이더 오류·검증 탈락은 전부 `ok:false`와
+#              사유로 돌려주고 서버 로그에 남긴다(로그는 ASCII 기호만 — stdout이 cp949다).
+# ============================================================================
+EXPLAIN_TASK_KEY = "task.s2_explain"
+EXPLAIN_MAX_CHARS = 400          # 프롬프트는 200자를 요구한다. 넘치면 설명이 아니라 작문이다
+EXPLAIN_TIMEOUT_SEC = 25
+EXPLAIN_MAX_TOKENS = 400
+
+# 같은 (상담, 티어)를 다시 물으면 다시 사지 않는다 — 탭을 오갈 때마다 과금되면 안 된다.
+# 견적이 확정 저장본이라 같은 입력에는 같은 재료가 나온다(캐시가 다른 답을 감추지 않는다).
+_EXPLAIN_CACHE: dict = {}
+_EXPLAIN_CACHE_MAX = 300
+
+_NUM_RE = re.compile(r"\d+")
+
+_EXPLAIN_SYSTEM = (
+    "너는 PC 견적의 근거를 설명하는 사람이다. 구성은 이미 확정됐고, 너는 그 구성을"
+    " 고객에게 설명만 한다.\n"
+    "1. 부품을 바꾸거나 더하거나 빼자고 말하지 않는다. 다른 제품을 권하지 않는다.\n"
+    "2. 주어진 사실에 없는 수치는 한 개도 쓰지 않는다 — 가격·후보 수·순위·점수·FPS·"
+    "성능 배수를 지어내지 않는다. 숫자를 쓸 때는 주어진 값을 그대로 옮긴다.\n"
+    "3. 성능 벤치마크 자료는 없다. '가장 빠르다'·'최고 성능' 같은 단정을 하지 않는다.\n"
+    "4. 한국어 존댓말 평서체(~합니다)로 2~3문장, 200자 이내. 한 문단으로 쓰고 목록·"
+    "머리기호·마크다운·따옴표를 쓰지 않는다.\n"
+    "5. 고객이 말한 조건(용도·예산)과 실제로 선택된 부품을 연결해 왜 이 구성인지를 말한다."
+)
+
+
+def _spec_ko(spec: dict) -> dict:
+    """사양 키를 표시 라벨로 바꾼다 — 라벨의 정본은 `spec_field_defs`다(CANON §1).
+
+    여기서 두 번째 어휘표를 만들지 않는다. 정의를 못 찾으면 원래 키를 그대로 쓴다.
+    """
+    out = {}
+    for k, v in (spec or {}).items():
+        d = spec_fields.by_key(k)
+        name = (d or {}).get("label") or k
+        unit = (d or {}).get("unit")
+        out[name] = f"{v}{unit}" if unit else v
+    return out
+
+
+def _explain_facts(conn, session_id: int, tier: str) -> dict | None:
+    """설명의 재료 — **원장에 저장된 그 견적**에서만 모은다. 없으면 None.
+
+    엔진을 다시 돌리지 않는다: 지금 재고·가격이 그때와 달라도 고객이 보고 있는 것은
+    그때 만들어진 견적이므로, 설명도 그 견적을 설명해야 한다.
+    """
+    sess = conn.execute(text(
+        "SELECT constraints FROM consult_sessions WHERE session_id = :s"),
+        {"s": session_id}).mappings().first()
+    if sess is None:
+        return None
+    snap = conn.execute(text(
+        "SELECT items, total_amount FROM quote_snapshots"
+        " WHERE session_id = :s AND quote_type = :t"
+        " ORDER BY snapshot_id DESC LIMIT 1"), {"s": session_id, "t": tier}).mappings().first()
+    if snap is None:
+        return None
+
+    items = snap["items"] or {}
+    parts = items.get("parts") or []
+    compat = items.get("compat") or {}
+    checks = compat.get("checks") or []
+    cons = sess["constraints"] or []
+    budget_v = next((c.get("v") for c in cons if c.get("l") == "예산"), "")
+    cap = _budget_cap(budget_v)
+    total = int(snap["total_amount"] or 0)
+
+    # 금액은 **표시 표기 그대로** 넘긴다. 정수로 주면 답에 "1499800원"이 그대로 실린다 —
+    # 화면에 올릴 문장이라 자릿수 구분이 있는 쪽이 맞고, 검증(_unbacked_numbers)은 쉼표를
+    # 지우고 비교하므로 어느 표기로 인용하든 통과한다.
+    def won(v):
+        return f"{int(v):,}원"
+
+    return {
+        "견적_종류": TIER_LABELS.get(tier, tier),
+        "고객_조건": [{"항목": c.get("l"), "값": c.get("v")} for c in cons],
+        # None이면 숫자 상한이 없는 표현('AI 추천 예산'·'200만원 이상')이다
+        "예산_상한": won(cap) if cap is not None else None,
+        "예산_판정": ("상한 없음" if cap is None
+                     else ("예산 이내" if total <= cap else "예산 초과")),
+        "총액": won(total),
+        "부품_수": len(parts),
+        "부품": [{"종류": SLOT_KO.get(p.get("part_type"), p.get("part_type")),
+                  "이름": p.get("name"), "제조사": p.get("maker"),
+                  "가격": won(p.get("price") or 0), "사양": _spec_ko(p.get("spec") or {}),
+                  "선호_태그": p.get("tags") or []}
+                 for p in parts],
+        "호환_검사_수": len(checks),
+        "호환_검사": [{"항목": c.get("label"), "통과": c.get("pass"), "값": c.get("detail")}
+                     for c in checks],
+        "파워_여유율_퍼센트": compat.get("power_headroom_pct"),
+        "엔진이_적은_근거": items.get("reasons") or [],
+    }
+
+
+def _unbacked_numbers(out_text: str, facts_json: str) -> list:
+    """문장에 있는데 **사실에는 없는** 숫자를 찾는다 — 있으면 그 답은 버린다.
+
+    A-01의 "응답에 없는 수치를 쓰지 않는다"를 프롬프트만으로 믿지 않는 장치다. 자릿수
+    구분 쉼표는 지우고 비교한다(사실의 428000과 문장의 428,000이 같은 값이다).
+    """
+    allowed = set(_NUM_RE.findall(facts_json.replace(",", "")))
+    return sorted({n for n in _NUM_RE.findall(out_text.replace(",", "")) if n not in allowed})
+
+
+def _explain_clean(s: str) -> str:
+    """한 문단으로 편다 — 줄바꿈·머리기호·감싼 따옴표를 없앤다(화면은 한 문단 자리다)."""
+    s = re.sub(r"\s+", " ", (s or "").replace("*", "").replace("- ", " ")).strip()
+    if len(s) >= 2 and s[0] in "\"'“‘" and s[-1] in "\"'”’":
+        s = s[1:-1].strip()
+    return s
+
+
+class ExplainBody(BaseModel):
+    session_id: int
+    tier: str
+    # 견적 응답(`POST /api/recommend`)이 준 열쇠. 쿼리 `?k=`·헤더 `X-Access-Key` 로도 받는다.
+    access_key: str | None = None
+
+
+@router.post("/recommend/explain")
+def recommend_explain(body: ExplainBody, request: Request, k: str | None = None):
+    """확정된 견적 하나에 대한 「이 구성을 고른 이유」 문구를 만든다.
+
+    ■ 접근 게이트 (2026-08-17 사장님 확정 — 세 구멍 중 ①·②)
+      이 경로는 **남의 session_id 를 넣으면 남의 견적 구성·가격이 그대로 나오던 자리**다.
+      session_id 는 연속 정수라 세면 맞힐 수 있다. 그래서 열쇠를 요구한다.
+      횟수 제한은 **캐시에 없는 요청**, 즉 실제로 LLM 비용이 나가는 자리 직전에만 센다.
+
+    응답 규약
+      200 {ok:true, text}   설명 생성 성공
+      200 {ok:false, reason} LLM 미설정·한도 초과·프로바이더 오류·검증 탈락 —
+          **문구를 만들지 못했을 뿐 요청은 정상**이라 200이다. 화면은 기존 고정 문구를
+          지키고, 왜 못 만들었는지는 사유와 서버 로그가 말한다(조용한 실패가 아니다).
+      400 / 404             알 수 없는 견적 종류 / 그런 상담·견적이 없음 — 요청 자체가
+          틀린 경우다. 이걸 200으로 덮으면 잘못된 호출이 "AI가 답을 못 했다"로 보인다.
+      403 {error:"forbidden", reason, detail}
+          `access_key_missing`  열쇠를 안 보냈다
+          `access_key_mismatch` 남의 견적이다(또는 열쇠가 틀렸다)
+          `no_access_key`       게이트 도입 이전 상담이라 열쇠 자체가 없다(NULL)
+      429 {error:"rate_limited", scope:"visitor", window, used, limit, retry_after_sec, detail}
+          방문자별 호출 한도 초과. `Retry-After` 헤더를 함께 준다.
+      503 {error:"gate_unavailable"}  마이그레이션 0055 미적용 — 게이트를 세울 수 없다.
+          **열어 두지 않는다.** 열어 두면 "막았다"는 보고가 거짓이 된다.
+
+      ⚠ 403 과 429 는 **다른 응답**이다 — 화면이 "본인 링크로 다시 여십시오"와
+        "잠시 뒤 다시"를 구분해 말할 수 있어야 한다(§실패를 삼키지 않는다).
+    """
+    if body.tier not in TIER_LABELS:
+        raise HTTPException(400, f"알 수 없는 견적 종류: {body.tier}")
+
+    provided = body.access_key or access_gate.key_from_request(request, k)
+    cache_key = (body.session_id, body.tier)
+
+    with engine.connect() as conn:
+        # 소유자 확인은 `api/access_gate` 하나가 한다 — swap.apply 도 같은 함수를 부른다.
+        # 게이트 도입 이전 행(열쇠 NULL)은 아무도 못 연다: 열쇠를 지어내 채우지 않았다
+        # (0055 docstring). 화면은 그때 엔진 고정 문구를 그대로 쓴다.
+        access_gate.require_session_owner(
+            conn, body.session_id, provided,
+            what="recommend.explain", not_found_detail="그 상담의 해당 견적이 없습니다")
+
+        # 소유자가 맞다. 캐시에 있으면 비용이 0 이라 횟수로 세지 않는다.
+        if cache_key in _EXPLAIN_CACHE:
+            return {"ok": True, "tier": body.tier, "cached": True} | _EXPLAIN_CACHE[cache_key]
+
+        access_gate.check_rate(conn, request, what="recommend.explain")
+        facts = _explain_facts(conn, body.session_id, body.tier)
+    if facts is None:
+        raise HTTPException(404, "그 상담의 해당 견적이 없습니다")
+
+    facts_json = json.dumps(facts, ensure_ascii=False)
+    prompt = ("아래는 우리 엔진이 이미 확정한 견적이다. 이 구성을 고른 이유를 고객에게"
+              " 설명하는 문단 하나를 써라. 사실(JSON):\n" + facts_json)
+
+    try:
+        res = llm.call(prompt, task_key=EXPLAIN_TASK_KEY, system=_EXPLAIN_SYSTEM,
+                       customer_facing=True, max_output_tokens=EXPLAIN_MAX_TOKENS,
+                       timeout_sec=EXPLAIN_TIMEOUT_SEC)
+    except Exception as e:                                   # noqa: BLE001
+        # 삼키지 않는다: 무엇이 왜 실패했는지 서버 로그에 남긴다(ASCII 기호만).
+        log.warning("[s2_explain] LLM call failed session=%s tier=%s: %s: %s",
+                    body.session_id, body.tier, type(e).__name__, e)
+        return {"ok": False, "tier": body.tier,
+                "reason": f"{type(e).__name__}: {e}"}
+
+    out = _explain_clean(res.text)
+    bad = _unbacked_numbers(out, facts_json)
+    if bad or not out or len(out) > EXPLAIN_MAX_CHARS:
+        why = ("unbacked numbers " + ",".join(bad) if bad
+               else ("empty text" if not out else f"too long ({len(out)} chars)"))
+        log.warning("[s2_explain] rejected answer session=%s tier=%s provider=%s model=%s: %s",
+                    body.session_id, body.tier, res.provider, res.model, why)
+        return {"ok": False, "tier": body.tier, "reason": f"answer rejected - {why}"}
+
+    if len(_EXPLAIN_CACHE) >= _EXPLAIN_CACHE_MAX:
+        _EXPLAIN_CACHE.clear()
+    _EXPLAIN_CACHE[cache_key] = {"text": out, "provider": res.provider, "model": res.model}
+    return {"ok": True, "tier": body.tier, "cached": False} | _EXPLAIN_CACHE[cache_key]

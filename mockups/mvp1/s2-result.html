@@ -41,7 +41,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 <div style="display:flex;align-items:center;gap:14px;">
 <div style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">
-<span style="font-family:'Material Symbols Outlined';font-size:18px;">verified</span>호환성 5종 전부 통과</div>
+<span style="font-family:'Material Symbols Outlined';font-size:18px;">verified</span><span id="s2-fit-badge">호환성 검사 결과</span></div>
 <button style="padding:10px 18px;border:none;background:#2b5fd9;border-radius:10px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">장바구니 담기</button>
 </div>
 </div>
@@ -94,50 +94,50 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 <!-- price card (dark) -->
 <div style="background:#17171b;color:#fff;border-radius:22px;padding:32px 30px;display:flex;flex-direction:column;box-shadow:0 14px 40px -22px rgba(30,25,15,.4);">
-<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#9a968d;letter-spacing:.02em;"><span id="s2-setlabel">추천형 견적</span> <span style="width:4px;height:4px;border-radius:50%;background:#4a4740;">
-</span> 3시간 전 기준</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#9a968d;letter-spacing:.02em;"><span id="s2-setlabel">견적</span> <span style="width:4px;height:4px;border-radius:50%;background:#4a4740;">
+</span> —</div>
 <div style="font-size:13px;font-weight:700;color:#9a968d;margin-top:18px;">최종 견적가</div>
 <div style="font-size:56px;font-weight:900;line-height:1.02;letter-spacing:-.02em;"><span id="s2-price">—</span><span style="font-size:30px;">원</span>
 </div>
 <div style="display:flex;gap:26px;margin-top:22px;padding-bottom:24px;border-bottom:1px solid #2e2e29;">
 <div>
-<div style="font-size:30px;font-weight:900;color:#7fa8ff;"><span id="s2-fps">96</span><span style="font-size:16px;color:#c9c5bd;"> FPS</span>
+<div style="font-size:30px;font-weight:900;color:#7fa8ff;"><span id="s2-fps">—</span><span style="font-size:16px;color:#c9c5bd;"> FPS</span>
 </div>
 <div style="font-size:12px;color:#9a968d;font-weight:700;">QHD · 1% Low</div>
 </div>
 <div>
-<div style="font-size:30px;font-weight:900;color:var(--success-bright, #5fd6a0);"><span id="s2-score">S+</span></div>
+<div style="font-size:30px;font-weight:900;color:var(--success-bright, #5fd6a0);"><span id="s2-score">—</span></div>
 <div style="font-size:12px;color:#9a968d;font-weight:700;">가격효율</div>
 </div>
 <div>
 <div style="font-size:30px;font-weight:900;color:#ffcb4a;display:flex;align-items:center;gap:3px;">
-<span style="font-family:'Material Symbols Outlined';font-size:28px;">bolt</span>당일</div>
-<div style="font-size:12px;color:#9a968d;font-weight:700;">출고</div>
+<span style="font-family:'Material Symbols Outlined';font-size:28px;">bolt</span>당일~3일</div>
+<div style="font-size:12px;color:#9a968d;font-weight:700;">이내 출고</div>
 </div>
 </div>
-<div style="margin-top:20px;font-size:13px;font-weight:800;color:#c9c5bd;">부품 상세 · 7종</div>
+<div id="s2-listhead" style="margin-top:20px;font-size:13px;font-weight:800;color:#c9c5bd;">부품 상세</div>
 <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;flex:1;">
 <div style="display:flex;justify-content:space-between;font-size:13.5px;">
 <span style="color:#9a968d;">CPU</span>
-<span id="s2-cpu" style="font-weight:700;">Ryzen 5 7500F</span>
+<span id="s2-cpu" style="font-weight:700;">—</span>
 </div>
 <div style="display:flex;justify-content:space-between;font-size:13.5px;">
 <span style="color:#9a968d;">GPU</span>
-<span id="s2-gpu" style="font-weight:700;">RTX 4060 8GB</span>
+<span id="s2-gpu" style="font-weight:700;">—</span>
 </div>
 <div style="display:flex;justify-content:space-between;font-size:13.5px;">
 <span style="color:#9a968d;">메모리</span>
-<span id="s2-ram" style="font-weight:700;">DDR5 32GB (16×2)</span>
+<span id="s2-ram" style="font-weight:700;">—</span>
 </div>
 <div style="display:flex;justify-content:space-between;font-size:13.5px;">
 <span style="color:#9a968d;">저장장치</span>
-<span id="s2-ssd" style="font-weight:700;">NVMe SSD 1TB</span>
+<span id="s2-ssd" style="font-weight:700;">—</span>
 </div>
 <div style="display:flex;justify-content:space-between;font-size:13.5px;">
 <span style="color:#9a968d;">파워</span>
-<span id="s2-psu" style="font-weight:700;">650W 80+ 브론즈</span>
+<span id="s2-psu" style="font-weight:700;">—</span>
 </div>
-<a href="s3-detail.html" style="font-size:12.5px;color:#7fa8ff;font-weight:700;text-decoration:none;margin-top:2px;">전체 부품 7종 보기 →</a>
+<a href="s3-detail.html" style="font-size:12.5px;color:#7fa8ff;font-weight:700;text-decoration:none;margin-top:2px;">전체 부품 보기 →</a>
 <a href="#sec-periph" style="font-size:12.5px;color:#e8b563;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;"><span style="font-family:'Material Symbols Outlined';font-size:15px;">devices</span>모니터·키보드는 아래 &quot;함께 쓰면 좋은 구성&quot;에서 ↓</a>
 <style>html{scroll-behavior:smooth}</style>
 </div>
@@ -153,15 +153,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="display:flex;align-items:center;gap:13px;">
 <span style="width:46px;height:46px;border-radius:13px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:26px;color:#fff;">shield</span>
 <div>
-<h2 style="margin:0;font-size:24px;font-weight:900;color:var(--success-deep, #0f5132);">호환성 5종, 전부 통과했습니다</h2>
-<p style="margin:4px 0 0;font-size:14px;color:var(--success-muted, #3d7a5c);">조립이 되는 조합인지, 규칙(엔진)이 실제 재고에서 5가지를 모두 확인했어요.</p>
+<h2 id="s2-fit-title" style="margin:0;font-size:24px;font-weight:900;color:var(--success-deep, #0f5132);">호환성 검사 결과</h2>
+<p id="s2-fit-sub" style="margin:4px 0 0;font-size:14px;color:var(--success-muted, #3d7a5c);">조립이 되는 조합인지, 규칙(엔진)이 실제 재고에서 확인합니다.</p>
 </div>
 </div>
 <span style="background:var(--success, #2f9e6d);color:#fff;font-size:13px;font-weight:800;padding:7px 15px;border-radius:999px;">핵심 1</span>
 </div>
 <div style="display:grid;grid-template-columns:1fr 3fr;gap:14px;align-items:stretch;">
 <div style="background:#fff;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 0;">
-<div style="font-size:52px;font-weight:900;color:var(--success, #2f9e6d);line-height:1;">132%</div>
+<div style="font-size:52px;font-weight:900;color:var(--success, #2f9e6d);line-height:1;">—</div>
 <div style="font-size:13px;font-weight:800;color:var(--success-muted, #3d7a5c);margin-top:6px;">파워 전원 여유</div>
 <div style="font-size:12px;color:var(--success-sage, #7aa891);margin-top:2px;">넉넉합니다</div>
 </div>
@@ -184,7 +184,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 </div>
 </div>
-<p style="margin:16px 0 0;font-size:14.5px;color:var(--success-deep, #0f5132);font-weight:800;">조립이 안 되는 구성은 처음부터 후보에서 빠집니다.</p>
+<p id="s2-fit-note" style="margin:16px 0 0;font-size:14.5px;color:var(--success-deep, #0f5132);font-weight:800;">조립이 안 되는 구성은 처음부터 후보에서 빠집니다.</p>
 </section>
 <!-- reason row -->
 <section style="display:grid;grid-template-columns:1.5fr 1fr;gap:24px;margin-bottom:24px;">
@@ -192,29 +192,28 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <h2 style="margin:0 0 16px;font-size:19px;font-weight:900;color:#17171b;">이 구성을 고른 이유</h2>
 <div style="display:flex;align-items:center;gap:16px;">
 <div style="flex:1;text-align:center;background:#f4f2ec;border-radius:14px;padding:22px 0;">
-<div style="font-size:34px;font-weight:900;color:#17171b;">2,480대</div>
-<div style="font-size:13px;color:#8a8578;font-weight:700;margin-top:2px;">전체 재고</div>
+<div id="s2-funnel-total" style="font-size:34px;font-weight:900;color:#17171b;">—</div>
+<div id="s2-funnel-total-cap" style="font-size:13px;color:#8a8578;font-weight:700;margin-top:2px;">전체 후보</div>
 </div>
 <span style="font-family:'Material Symbols Outlined';font-size:28px;color:#c9c5bd;">arrow_forward</span>
 <div style="flex:1;text-align:center;background:#e8effc;border-radius:14px;padding:22px 0;">
-<div style="font-size:34px;font-weight:900;color:#2b5fd9;">42대</div>
+<div id="s2-funnel-pass" style="font-size:34px;font-weight:900;color:#2b5fd9;">—</div>
 <div style="font-size:13px;color:#5a7bc0;font-weight:700;margin-top:2px;">조건·호환·예산 통과</div>
 </div>
 <span style="font-family:'Material Symbols Outlined';font-size:28px;color:#c9c5bd;">arrow_forward</span>
 <div style="flex:0 0 auto;text-align:center;background:#17171b;border-radius:14px;padding:22px 20px;">
-<div style="font-size:20px;font-weight:900;color:#ffcb4a;">1등</div>
-<div style="font-size:12px;color:#9a968d;font-weight:700;margin-top:2px;">점수 최고</div>
+<div id="s2-funnel-rank" style="font-size:20px;font-weight:900;color:#ffcb4a;">—</div>
+<div id="s2-funnel-rank-cap" style="font-size:12px;color:#9a968d;font-weight:700;margin-top:2px;">선택 구성</div>
 </div>
 </div>
-<p style="margin:16px 0 0;font-size:14px;line-height:1.7;color:#55555c;">이 예산대에서 점수가 가장 높은 구성입니다. 이 순위는 엔진이 계산한 결과를 그대로 옮긴 것입니다.</p>
+<p id="s2-why" style="margin:16px 0 0;font-size:14px;line-height:1.7;color:#55555c;">이 예산대에서 점수가 가장 높은 구성입니다. 이 순위는 엔진이 계산한 결과를 그대로 옮긴 것입니다.</p>
 </div>
 <div style="background:#fbf6ea;border-radius:22px;border:1px solid #f0e6cd;padding:28px 30px;display:flex;flex-direction:column;">
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
 <span style="font-family:'Material Symbols Outlined';font-size:26px;color:#c77b1f;">savings</span>
 <h3 style="margin:0;font-size:17px;font-weight:900;color:#8a561a;">예산 트레이드오프</h3>
 </div>
-<p style="margin:0;font-size:14.5px;line-height:1.7;color:#5a5344;flex:1;">
-<b style="color:#a8611a;">+100,000원</b>이면 그래픽카드를 한 등급(RTX 4060 Ti) 위로 올릴 수 있지만, 설정하신 예산 상한을 넘습니다. 지금 구성이 예산 안에서 점수가 가장 높습니다.</p>
+<p id="s2-tradeoff" style="margin:0;font-size:14.5px;line-height:1.7;color:#5a5344;flex:1;">예산을 올렸을 때 어느 부품이 어떻게 바뀌는지는 서버 근거가 준비되면 표시됩니다.</p>
 <button style="margin-top:16px;padding:12px 16px;border:1.5px solid #e0cfa5;background:#fff;border-radius:11px;font-size:14px;font-weight:800;color:#8a561a;cursor:pointer;font-family:inherit;">예산 올려서 다시 보기</button>
 </div>
 </section>
@@ -224,37 +223,19 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="display:flex;align-items:center;gap:13px;">
 <span style="width:46px;height:46px;border-radius:13px;background:#2b5fd9;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:26px;color:#fff;">science</span>
 <div>
-<h2 style="margin:0;font-size:24px;font-weight:900;color:#1c3f8f;">이 PC가 거친 검사, 숫자로 공개합니다</h2>
+<h2 style="margin:0;font-size:24px;font-weight:900;color:#1c3f8f;">이 PC가 거치는 검사</h2>
 <p style="margin:4px 0 0;font-size:14px;color:#4a6ab0;">"조립 잘 됐겠지" — 짐작 대신, 출고 전 검사·테스트 결과를 그대로 공개합니다.</p>
 </div>
 </div>
 <span style="background:#2b5fd9;color:#fff;font-size:13px;font-weight:800;padding:7px 15px;border-radius:999px;">핵심 2</span>
 </div>
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px;">
-<div style="text-align:center;background:#fff;border-radius:12px;padding:18px 0;">
-<div style="font-size:26px;font-weight:900;color:var(--success, #2f9e6d);">불량 0</div>
-<div style="font-size:12px;color:#5a7bc0;font-weight:700;margin-top:3px;">새 제품 검사</div>
-</div>
-<div style="text-align:center;background:#fff;border-radius:12px;padding:18px 0;">
-<div style="font-size:26px;font-weight:900;color:#17171b;">67·71°C</div>
-<div style="font-size:12px;color:#5a7bc0;font-weight:700;margin-top:3px;">CPU·GPU 발열</div>
-</div>
-<div style="text-align:center;background:#fff;border-radius:12px;padding:18px 0;">
-<div style="font-size:26px;font-weight:900;color:#17171b;">412 W</div>
-<div style="font-size:12px;color:#5a7bc0;font-weight:700;margin-top:3px;">최대 소비전력</div>
-</div>
-<div style="text-align:center;background:#fff;border-radius:12px;padding:18px 0;">
-<div style="font-size:26px;font-weight:900;color:#17171b;">34 dB</div>
-<div style="font-size:12px;color:#5a7bc0;font-weight:700;margin-top:3px;">풀가동 소음</div>
-</div>
-<div style="text-align:center;background:#fff;border-radius:12px;padding:18px 0;">
-<div style="font-size:26px;font-weight:900;color:var(--success, #2f9e6d);">통과</div>
-<div style="font-size:12px;color:#5a7bc0;font-weight:700;margin-top:3px;">포트·부팅 확인</div>
-</div>
-</div>
+<!-- 발열·소음·소비전력은 **이 PC를 만들어 봐야 아는 값**이다. 목업 시절 예시값
+     (67·71°C · 412W · 34dB · 불량 0)이 견적 화면에 사실처럼 박혀 있었다 — 걷어내고
+     언제 무엇이 제공되는지만 말한다(§화면 정직성). -->
+<div style="background:#fff;border-radius:12px;padding:18px 20px;margin-bottom:14px;font-size:14.5px;line-height:1.7;color:#1c3f8f;"><b>발열·소음·소비전력 수치는 출고 시 이 PC의 실측 리포트로 제공됩니다.</b><br>새 제품 검사 · 포트/부팅 확인 · 조립·선정리 검수를 전부 통과해야 출고합니다.</div>
 <div style="display:flex;align-items:center;gap:9px;background:#2b5fd9;color:#fff;padding:14px 18px;border-radius:12px;font-size:15px;font-weight:800;">
-<span style="font-family:'Material Symbols Outlined';font-size:21px;">timer</span>24시간 안정성 테스트 통과 — 온도·부하가 안전 범위를 계속 유지했습니다</div>
-<p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1c3f8f;font-weight:800;">조립·선정리·24시간 테스트·A/S 준비까지 마친 뒤에 보냅니다.</p>
+<span style="font-family:'Material Symbols Outlined';font-size:21px;">timer</span>3시간 안정성 테스트 후 출고 — 온도·부하가 안전 범위를 유지해야 출고합니다</div>
+<p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1c3f8f;font-weight:800;">조립·선정리·3시간 테스트·A/S 준비까지 마친 뒤에 보냅니다.</p>
 </section>
 <!-- 3 + 4 row: A/S (purple) + Compare (amber) -->
 <section style="display:grid;grid-template-columns:1fr 1.25fr;gap:24px;margin-bottom:24px;">
@@ -292,7 +273,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
 <div style="display:flex;align-items:center;gap:12px;">
 <span style="width:44px;height:44px;border-radius:13px;background:#c77b1f;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">balance</span>
-<h2 style="margin:0;font-size:21px;font-weight:900;color:#8a561a;">최저가보다 <span id="s2-gap-title">3만원</span> 비싼 이유</h2>
+<h2 style="margin:0;font-size:21px;font-weight:900;color:#8a561a;">최저가보다 <span id="s2-gap-title">—</span> 비싼 이유</h2>
 </div>
 <span style="background:#c77b1f;color:#fff;font-size:13px;font-weight:800;padding:7px 14px;border-radius:999px;">핵심 4</span>
 </div>
@@ -313,7 +294,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="padding:12px 16px;text-align:center;font-weight:800;color:var(--success, #2f9e6d);">포함</div>
 </div>
 <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;font-size:14px;border-top:1px solid #f5eddd;">
-<div style="padding:12px 16px;color:#55555c;">24시간 안정성 검사</div>
+<div style="padding:12px 16px;color:#55555c;">3시간 안정성 검사</div>
 <div style="padding:12px 16px;text-align:center;color:#b04a3a;font-weight:700;">불가</div>
 <div style="padding:12px 16px;text-align:center;font-weight:800;color:var(--success, #2f9e6d);">포함</div>
 </div>
@@ -323,7 +304,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="padding:12px 16px;text-align:center;font-weight:800;color:var(--success, #2f9e6d);">포함</div>
 </div>
 </div>
-<p style="margin:14px 0 0;font-size:14.5px;line-height:1.6;color:#8a561a;font-weight:800;">시장 최저가 조합은 <span id="s2-market">1,220,000원</span>(<span id="s2-gap">+30,000원</span> 차이). 부품값은 똑같습니다 — 차이는 직접 하면 드는 시간·부담을 저희가 대신 진다는 점입니다.</p>
+<p style="margin:14px 0 0;font-size:14.5px;line-height:1.6;color:#8a561a;font-weight:800;">시장 최저가 조합은 <span id="s2-market">—</span>(<span id="s2-gap">—</span> 차이). 부품값은 똑같습니다 — 차이는 직접 하면 드는 시간·부담을 저희가 대신 진다는 점입니다.</p>
 </div>
 </section>
 <!-- external quote diagnose -->
@@ -345,30 +326,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 <p style="margin:0 0 18px;font-size:14px;color:#6b6b73;">본체 견적과는 별개입니다 — 이미 갖고 계시면 그대로 두세요. 담을 때도 근거를 보고 정하시면 됩니다.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
-<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
-<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:20px;color:#2b5fd9;">desktop_windows</span><span style="font-size:12px;font-weight:800;color:#8a8578;">모니터</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 9대</span></div>
-<div><b style="font-size:15.5px;color:#17171b;">LG 울트라기어 27GS75Q</b><span style="font-size:12.5px;color:#8a8578;font-weight:600;"> · 27형 QHD 180Hz</span></div>
-<p style="margin:0;font-size:13px;line-height:1.6;color:#55555c;background:#f7f6f2;border-radius:10px;padding:10px 12px;flex:1;"><b style="color:#853d97;">이 견적 기준:</b> RTX 4060이면 롤·발로란트는 180fps를 채우고, 배그급은 DLSS로 QHD 100fps대 — 180Hz가 아깝지 않습니다. DP 1.4 연결, 이 견적과 포트 호환 확인.</p>
-<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">329,000원</b><button class="s2p-add" data-p="mon" data-price="329000" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div>
-</div>
-<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
-<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:20px;color:#2b5fd9;">keyboard</span><span style="font-size:12px;font-weight:800;color:#8a8578;">키보드</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 44대</span></div>
-<div><b style="font-size:15.5px;color:#17171b;">앱코 K660 축교환 기계식</b></div>
-<p style="margin:0;font-size:13px;line-height:1.6;color:#55555c;background:#f7f6f2;border-radius:10px;padding:10px 12px;flex:1;"><b style="color:#853d97;">이 견적 기준:</b> 게임 용도의 기본기 — 무한 동시입력. 축 교환형이라 타건감 취향이 바뀌어도 스위치만 갈면 됩니다.</p>
-<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">39,000원</b><button class="s2p-add" data-p="kbd" data-price="39000" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div>
-</div>
-<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
-<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:20px;color:#2b5fd9;">mouse</span><span style="font-size:12px;font-weight:800;color:#8a8578;">마우스</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 120대</span></div>
-<div><b style="font-size:15.5px;color:#17171b;">로지텍 G102 LIGHTSYNC</b></div>
-<p style="margin:0;font-size:13px;line-height:1.6;color:#55555c;background:#f7f6f2;border-radius:10px;padding:10px 12px;flex:1;"><b style="color:#853d97;">이 견적 기준:</b> 85g 경량 — FPS(오버워치·발로란트) 입문 표준. 말씀하신 게임 용도 조건과 맞습니다.</p>
-<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">23,000원</b><button class="s2p-add" data-p="mou" data-price="23000" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div>
-</div>
-<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
-<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Material Symbols Outlined';font-size:20px;color:#2b5fd9;">headphones</span><span style="font-size:12px;font-weight:800;color:#8a8578;">헤드셋</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 17대</span></div>
-<div><b style="font-size:15.5px;color:#17171b;">하이퍼엑스 Cloud III</b></div>
-<p style="margin:0;font-size:13px;line-height:1.6;color:#55555c;background:#f7f6f2;border-radius:10px;padding:10px 12px;flex:1;"><b style="color:#853d97;">이 견적 기준:</b> 팀 보이스가 필요한 게임이면 — 노이즈캔슬 마이크. 스피커를 쓰신다면 생략하셔도 됩니다.</p>
-<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">119,000원</b><button class="s2p-add" data-p="hset" data-price="119000" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div>
-</div>
+<!-- 주변기기 후보는 서버(GET /api/recommend 의 companion)가 준다. 목업 시절 예시 4종
+     (LG 27GS75Q 329,000원 · 앱코 K660 · 로지텍 G102 · 하이퍼엑스 Cloud III,
+     실재고 9/44/120/17대)가 마크업에 박혀 있어 서버가 못 주면 사실처럼 보였다. -->
+<div style="grid-column:1 / -1;border:1px dashed #ddd8ce;border-radius:16px;padding:18px 20px;font-size:13.5px;line-height:1.7;color:#8a8578;">함께 쓰는 구성은 실재고에서 골라 표시됩니다. 견적을 받으면 모니터 · 키보드 · 마우스 · 헤드셋 후보가 이 자리에 표시됩니다.</div>
 </div>
 <p id="s2p-sum" style="margin:16px 0 0;font-size:13.5px;color:#8a8578;font-weight:600;">아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.</p>
 </section>
@@ -384,18 +345,18 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 
 <script>
-var S2SETS={
- value:{label:'가성비형 견적',price:'890,000',fps:'72',score:'A+',cpu:'Ryzen 5 5600',gpu:'RTX 3060 12GB',ram:'DDR4 16GB (8×2)',ssd:'NVMe SSD 500GB',psu:'600W 80+ 브론즈',market:'875,000원',gap:'+15,000원'},
- recommend:{label:'추천형 견적',price:'1,250,000',fps:'96',score:'S+',cpu:'Ryzen 5 7500F',gpu:'RTX 4060 8GB',ram:'DDR5 32GB (16×2)',ssd:'NVMe SSD 1TB',psu:'650W 80+ 브론즈',market:'1,220,000원',gap:'+30,000원'},
- highend:{label:'고성능형 견적',price:'1,780,000',fps:'138',score:'S',cpu:'Ryzen 7 7700',gpu:'RTX 4070 SUPER',ram:'DDR5 32GB (16×2) 6000',ssd:'NVMe SSD 2TB',psu:'750W 80+ 골드',market:'1,760,000원',gap:'+20,000원'}
-};
-function s2set(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
-function s2apply(k){var d=S2SETS[k];if(!d)return;['setlabel','price','fps','score','cpu','gpu','ram','ssd','psu'].forEach(function(f){s2set('s2-'+f,d[f]);});s2set('s2-cmp-parts',d.price);s2set('s2-cmp-parts2',d.price);s2set('s2-market',d.market);s2set('s2-gap',d.gap);var _g=parseInt((d.gap||'').replace(/[^0-9]/g,''),10);var _gt=document.getElementById('s2-gap-title');if(_gt&&_g)_gt.textContent=(_g/10000)+'만원';}
+/* 티어 전환의 기본 동작. **예시 구성(S2SETS)은 폐기했다** — 세 티어의 가격·부품명·
+   시장가를 여기에 들고 있다가 탭을 누르면 화면에 채웠고, 견적 세션이 없어도 그
+   값이 «진짜 견적»처럼 보였다(1,250,000원 · Ryzen 5 7500F · RTX 4060).
+   실데이터 렌더는 아래 LIVE 스크립트가 이 함수를 덮어써서 한다 — 견적이 없으면
+   덮어쓰지 않고 탭 자체를 막는다(s2NoQuote). */
+function s2apply(k){}
 document.querySelectorAll('.s2tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.s2tab').forEach(function(x){x.classList.remove('is-active');x.setAttribute('aria-selected','false');});t.classList.add('is-active');t.setAttribute('aria-selected','true');s2apply(t.getAttribute('data-set'));});});
 document.querySelectorAll('button').forEach(function(b){var x=(b.textContent||'').trim();if(x.indexOf('부품 변경')===0){b.addEventListener('click',function(){window.location.href='s3-detail.html';});}else if(x.indexOf('장바구니 담기')===0){b.addEventListener('click',function(){window.location.href='s4-cart.html';});}});
 // 함께 구성(주변기기) 담기 토글 — 본체 견적과 분리, 근거 기반 제안 (A-02 유지)
 var s2pSel={};
-var S2P_META={mon:['모니터','LG 울트라기어 27GS75Q'],kbd:['키보드','앱코 K660 축교환 기계식'],mou:['마우스','로지텍 G102 LIGHTSYNC'],hset:['헤드셋','하이퍼엑스 Cloud III']};
+// 카드와 이름은 서버 companion 이 준다(LIVE 렌더가 채운다) — 예시 4종은 폐기했다
+var S2P_META={};
 document.querySelectorAll('.s2p-add').forEach(function(b){
  b.addEventListener('click',function(){
   var id=b.getAttribute('data-p'),price=parseInt(b.getAttribute('data-price'),10);
@@ -410,12 +371,78 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
 });
 </script>
 <script>
-// ---- 엔진 v1 LIVE 렌더 (슬라이스 5) — localStorage popcorn-quote 있을 때만. 없으면 더미 원형 ----
+// ---- 엔진 v1 LIVE 렌더 (슬라이스 5) — localStorage popcorn-quote 가 있을 때만 견적을 그린다.
+//      없으면 «더미 원형»이 아니라 빈 상태다(s2NoQuote — 2026-08-17). ----
 (function(){
- var raw;try{raw=localStorage.getItem('popcorn-quote');}catch(e){return;}
- if(!raw)return;
- var Q;try{Q=JSON.parse(raw).data;}catch(e){return;}
- if(!Q||!Q.sets)return;
+ /* ★ 견적 데이터가 없으면 «견적을 보여주지 않는다».
+    예전에는 여기서 그냥 return 했고, 그러면 목업 시절 예시값(Ryzen 5 7500F · RTX 4060 ·
+    「호환성 5종 전부 통과」 · 검사 수치 5칸)이 **진짜 견적처럼** 남았다. 세션 없이 URL로
+    바로 들어온 사람은 지어낸 구성을 보고 [장바구니 담기]까지 누를 수 있었다.
+    값을 8종으로 «고치는» 것은 답이 아니다 — 검사한 적 없는 구성이므로 본문을 닫고,
+    왜 비었는지와 어디로 가면 되는지를 말한다(§화면 정직성). */
+ function s2NoQuote(why,msg,label){
+  label=label||'견적 세션 없음';
+  var esc=function(x){return String(x).replace(/[<>&]/g,function(c){
+   return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});};
+  var main=document.querySelector('main');
+  if(main){
+   // ① 예시 구성·금액·검사 수치를 전부 닫는다 — 하나라도 남으면 사실로 읽힌다
+   Array.prototype.forEach.call(main.children,function(el){el.style.display='none';});
+   // ② 왜 비었는지 + 어디로 가면 되는지
+   var box=document.createElement('section');
+   box.id='s2-noquote';
+   box.style.cssText='background:#fff;border-radius:22px;border:1px solid #ece9e3;padding:36px 40px;';
+   box.innerHTML='<div style="display:inline-flex;align-items:center;gap:6px;background:#f4f2ec;'
+    +'color:#8a8578;font-size:12.5px;font-weight:800;padding:5px 12px;border-radius:999px;">'+esc(label)+'</div>'
+    +'<h2 style="margin:14px 0 8px;font-size:22px;font-weight:900;color:#17171b;">표시할 견적이 없습니다</h2>'
+    +'<p style="margin:0;font-size:14.5px;line-height:1.7;color:#55555c;">'
+    +esc(msg||'이 화면은 상담에서 만든 견적을 표시합니다. 이 브라우저에 견적 데이터가 없어'
+              +' 구성·금액·호환 결과를 표시하지 않습니다.')
+    +'<br>화면에 남아 있던 예시 값을 견적으로 오인하지 않도록 본문을 닫았습니다.</p>'
+    +'<p style="margin:10px 0 0;font-size:12.5px;color:#9a968d;">사유: '+esc(why)+'</p>'
+    +'<div style="display:flex;gap:10px;margin-top:20px;">'
+    +'<a href="s1-session.html" style="padding:13px 22px;background:#2b5fd9;color:#fff;border-radius:11px;'
+    +'font-size:14.5px;font-weight:800;text-decoration:none;">상담 시작</a>'
+    +'<a href="s0-landing.html" style="padding:13px 22px;border:1.5px solid #ddd8ce;color:#3a3a40;'
+    +'border-radius:11px;font-size:14.5px;font-weight:800;text-decoration:none;">처음 화면</a></div>';
+   main.insertBefore(box,main.firstChild);
+  }
+  // ③ 담을 견적이 없다 — 진행 버튼을 막는다(누르면 s4로 넘어간다)
+  Array.prototype.forEach.call(document.querySelectorAll('button'),function(b){
+   var t=(b.textContent||'').trim();
+   if(t.indexOf('장바구니 담기')!==0&&t.indexOf('부품 변경')!==0&&t.indexOf('진단하기')!==0)return;
+   b.disabled=true;b.style.opacity='.4';b.style.cursor='not-allowed';
+   b.title=label+' — 상담을 먼저 시작하세요';
+  });
+  // ④ 티어 탭·구성 수정 요청도 막는다 — 채울 구성이 없다
+  Array.prototype.forEach.call(document.querySelectorAll('.s2tab'),function(t){
+   t.disabled=true;t.style.opacity='.38';t.style.cursor='not-allowed';t.title=label;
+  });
+  var cf=document.querySelector('.s2composer');
+  if(cf)Array.prototype.forEach.call(cf.querySelectorAll('input,button'),function(el){
+   el.disabled=true;el.style.opacity='.5';el.title=label;});
+  // ⑤ 헤더 배지 — 검사한 적 없는 구성이므로 「검사 결과」라고 말하지 않는다
+  var bdg0=document.getElementById('s2-fit-badge');
+  if(bdg0){
+   bdg0.textContent=label;
+   var pill=bdg0.parentNode;
+   if(pill&&pill.style){pill.style.background='#f4f2ec';pill.style.color='#8a8578';}
+  }
+  // ⑥ 조용히 넘어가지 않는다 — 왜 빈 화면인지 콘솔에도 남긴다
+  console.warn('[s2] '+label+' —',why);
+ }
+ var raw=null;try{raw=localStorage.getItem('popcorn-quote');}catch(e){}
+ if(!raw){s2NoQuote('브라우저에 저장된 견적이 없습니다');return;}
+ var Q=null;try{Q=JSON.parse(raw).data;}catch(e){}
+ if(!Q||!Q.sets){s2NoQuote('저장된 견적을 읽지 못했습니다');return;}
+ /* 세 티어가 전부 없는 경우(조건 불성립 — 예: 게임 40만원)도 빈 상태다. 예전에는 여기서
+    LIVE가 계속 돌아 목업 값만 남은 화면이 됐다. 견적이 없다는 사실을 말하는 게 맞다. */
+ if(!(Q.sets.value||Q.sets.recommend||Q.sets.highend)){
+  s2NoQuote('이 조건으로는 구성이 없습니다',
+   '상담에서 받은 조건으로는 조립할 수 있는 구성이 없습니다. 예산 또는 용도 조건을 바꿔 다시 상담하세요.',
+   '구성 없음');
+  return;
+ }
  function relTime(iso){var s=(Date.now()-new Date(iso).getTime())/1e3;if(s<60)return'방금 전 기준';var m=Math.floor(s/60);if(m<60)return m+'분 전 기준';return Math.floor(m/60)+'시간 전 기준';}
  function byText(txt){var all=document.querySelectorAll('div,span,p,h2,h3');for(var i=0;i<all.length;i++){if(all[i].childElementCount===0&&all[i].textContent.trim()===txt)return all[i];}return null;}
  var PART_KO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'그래픽카드',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'저장장치'};
@@ -429,24 +456,26 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  // 생성 시각 정직 표기
  var sl=document.getElementById('s2-setlabel');
  if(sl&&sl.parentNode.lastChild)sl.parentNode.lastChild.textContent=' '+relTime(Q.generated_at);
- // 깔때기 실수치
- var f1=byText('2,480대'),f2=byText('42대'),f3=byText('1등'),f4=byText('점수 최고'),fcap=byText('전체 재고');
+ /* 깔때기 실수치. 예전에는 목업 값('2,480대'·'42대'·'1등')을 **글자로 찾아** 덮어썼다 —
+    그래서 그 값이 마크업에 남아 있어야만 동작했고, 서버가 없으면 지어낸 수가 그대로 보였다.
+    지금은 자리에 id를 달고 마크업은 '—'로 시작한다(값은 서버만 넣는다). */
+ var f1=document.getElementById('s2-funnel-total'),f2=document.getElementById('s2-funnel-pass'),
+     f3=document.getElementById('s2-funnel-rank'),f4=document.getElementById('s2-funnel-rank-cap'),
+     fcap=document.getElementById('s2-funnel-total-cap');
  if(f1)f1.textContent=Q.funnel.total+'개';if(fcap)fcap.textContent='전체 후보(실재고)';
  if(f2)f2.textContent=Q.funnel.passed+'개';
  if(f3)f3.textContent='규칙 선택';if(f4)f4.textContent='추천 구성';
- var fp=byText('이 예산대에서 점수가 가장 높은 구성입니다. 이 순위는 엔진이 계산한 결과를 그대로 옮긴 것입니다.');
- if(fp)fp.textContent='조건·호환·예산을 통과한 부품에서 규칙으로 뽑은 구성입니다. 성능 점수는 준비 중이라, 지금은 가격을 사양 근사로 씁니다 — 이 순위는 엔진 계산 결과 그대로입니다.';
+ /* 「이 구성을 고른 이유」 문단. 서버가 근거 문구를 보내오기 전까지 보이는 기본 문구이고,
+    실패하면 이 문구가 그대로 남는다(s2why 참고). */
+ var fp=document.getElementById('s2-why');
+ var WHY_FALLBACK='조건·호환·예산을 통과한 부품에서 규칙으로 뽑은 구성입니다. 성능 점수는 준비 중이라, 지금은 가격을 사양 근사로 씁니다 — 이 순위는 엔진 계산 결과 그대로입니다.';
+ if(fp)fp.textContent=WHY_FALLBACK;
  // 트레이드오프 카드 숨김
  var tt=byText('예산 트레이드오프');
  if(tt){var card=tt.closest('div[style*="fbf6ea"]')||tt.parentNode.parentNode;card.style.display='none';if(card.parentNode)card.parentNode.style.gridTemplateColumns='1fr';}
- // §2 검수 수치 → 정직 표기
- var chk=document.getElementById('sec-check');
- if(chk){
-  var grid=chk.querySelector('div[style*="repeat(5,1fr)"]');
-  if(grid){grid.outerHTML='<div style="background:#fff;border-radius:12px;padding:18px 20px;margin-bottom:14px;font-size:14.5px;line-height:1.7;color:#1c3f8f;"><b>발열·소음·소비전력 수치는 출고 시 이 PC의 실측 리포트로 제공됩니다.</b><br>새 제품 검사 · 포트/부팅 확인 · 조립·선정리 검수를 전부 통과해야 출고합니다.</div>';}
-  var banner=chk.querySelector('div[style*="background:#2b5fd9"]');
-  if(banner)banner.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:21px;">timer</span>24시간 안정성 테스트 후 출고 — 온도·부하가 안전 범위를 유지해야 출고합니다';
- }
+ /* §2 검수 수치는 **마크업에서 걷어냈다** — 예전에는 목업 값(67·71°C · 412W · 34dB ·
+    불량 0)이 마크업에 있고 이 자리에서 정직 문구로 «덮어썼다». 서버 없이 열면 그 값이
+    그대로 남았으므로, 지금은 마크업 자체가 정직 문구를 들고 있다(여기서 할 일이 없다). */
  // §4 비교 — 최저가 데이터 없음(U-06 미정): 정직 헤더 + 시장가 문단 숨김
  var gt=document.getElementById('s2-gap-title');
  if(gt)gt.parentNode.textContent='직접 조립과 비교하면';
@@ -484,7 +513,62 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  }
  // 부품 리스트 컨테이너
  var listWrap=document.getElementById('s2-cpu')?document.getElementById('s2-cpu').closest('div[style*="flex-direction:column"]'):null;
- var listHead=byText('부품 상세 · 7종');
+ var listHead=document.getElementById('s2-listhead');   // 종 수는 서버가 정한다(마크업엔 없다)
+ /* 「이 구성을 고른 이유」 — 서버가 **확정 저장된 견적**을 읽어 만든 근거 문구로 바꾼다.
+    견적 응답(POST /api/recommend)에 싣지 않은 이유는 서버 쪽 주석 그대로다: 그 경로는
+    고객이 기다리는 자리라 LLM 호출을 동기로 끼우면 견적 전체가 느려진다. 그래서 견적을
+    받은 뒤 따로 부르고, 도착 전에는 위 기본 문구가 그대로 보인다.
+    보내는 것은 session_id·티어 둘뿐이다 — 부품·가격·수치를 화면이 실어 보내면 그 순간
+    설명의 재료를 화면이 지어낼 수 있게 된다(§화면 정직성). */
+ var WHY={};                       // 티어별 캐시 — 탭을 오갈 때마다 다시 부르지 않는다
+ function s2why(k){
+  if(!fp||!Q.session_id)return;
+  if(WHY[k]){fp.textContent=WHY[k];fp.setAttribute('data-why-source','server');return;}
+  fp.textContent=WHY_FALLBACK;fp.setAttribute('data-why-source','fallback');
+  /* 열쇠(access_key)는 견적 응답이 준 값을 그대로 되돌려 보낸다 - 서버가 「이 상담의
+     주인인가」를 그것으로 판정한다. 화면에는 «보여주지» 않는다(링크·본문에 싣지 않는다).
+     0055 미적용이면 이 값이 null 이고 서버는 503 으로 그 사실을 말한다. */
+  fetch('/api/recommend/explain',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session_id:Q.session_id,tier:k,access_key:Q.access_key||null})})
+   .then(function(r){return r.json().catch(function(){return null;})
+     .then(function(j){return {st:r.status,ok:r.ok,j:j};});})
+   .then(function(res){
+    var j=res.j;
+    /* 실패를 조용히 넘기지 않는다 — 사유는 서버 로그가 남기고 여기서도 콘솔에 적는다.
+       고객 화면에는 기본 문구를 그대로 두되, 403·429·503 은 «서로 다른 사건»이라
+       한 줄로 갈라서 덧붙인다(지어낸 문장을 대신 내밀지 않는다). */
+    if(!res.ok||!j||!j.ok||!j.text){
+     var d=(j&&j.detail&&typeof j.detail==='object')?j.detail:(j||{});
+     console.warn('[s2] why text unavailable - status='+res.st,(d.reason||d.error||d.detail||''));
+     var at0=document.querySelector('.s2tab.is-active');
+     if(at0&&at0.getAttribute('data-set')!==k)return;
+     var note=s2GateNote(res.st,d);
+     if(note){fp.textContent=WHY_FALLBACK+' '+note;fp.setAttribute('data-why-source','fallback');}
+     return;
+    }
+    WHY[k]=j.text;
+    var at=document.querySelector('.s2tab.is-active');
+    if(at&&at.getAttribute('data-set')!==k)return;   /* 늦게 온 답이 다른 티어를 덮지 않는다 */
+    fp.textContent=j.text;fp.setAttribute('data-why-source','server');
+   })
+   .catch(function(e){
+    console.warn('[s2] why text request failed -',e);
+    var at1=document.querySelector('.s2tab.is-active');
+    if(at1&&at1.getAttribute('data-set')!==k)return;
+    fp.textContent=WHY_FALLBACK+' 상세 근거 문구는 서버에 연결되면 표시됩니다.';
+    fp.setAttribute('data-why-source','fallback');
+   });
+ }
+ /* 접근 게이트의 세 사건을 사람 말로 가른다 — s3 와 같은 어휘를 쓴다.
+    403 = 이 견적을 볼 권한이 없다 · 429 = 잠시 뒤 다시 · 503 = 아직 준비되지 않았다. */
+ function s2GateNote(st,d){
+  d=d||{};
+  if(st===403)return '상세 근거 문구는 이 견적의 권한이 확인되지 않아 표시하지 않습니다 — 다른 브라우저에서 받은 견적이거나 오래된 링크입니다.';
+  if(st===429){var s=d.retry_after_sec;
+   return '상세 근거 문구 요청이 한도를 넘었습니다 — '+(s?(s+'초 뒤에'):'잠시 뒤')+' 다시 시도하면 표시됩니다.';}
+  if(st===503)return '상세 근거 문구는 아직 준비되지 않았습니다 — 준비되면 표시됩니다.';
+  return '상세 근거 문구는 서버에 연결되면 표시됩니다.';
+ }
  // 탭 → 실데이터 apply
  s2apply=function(k){
   var s=Q.sets[k];if(!s)return;
@@ -532,23 +616,20 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    var okCol=c.pass!==false;
    checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:'+(okCol?'var(--success, #2f9e6d)':'#b31b25')+';">'+(okCol?'check_circle':'error')+'</span><span style="font-size:14.5px;font-weight:700;color:var(--success-ink, #2c4c3c);">'+c.label+'</span><span style="font-size:12px;color:var(--success-sage, #7aa891);">'+c.detail+'</span>';
   }
-  /* 제목·배지의 '5종'은 목업 시절 하드코딩이다 — 규칙 수는 서버가 정한다(현재 8종).
-     실제로 더 많이 검사하는데 적게 말하면 손해이고, 무엇보다 거짓이다(슬라이스 48).
-     실패가 하나라도 있으면 '전부 통과'라고 말하지 않는다. */
+  /* 검사 «종 수»는 서버가 정한다 — 마크업에는 수를 두지 않는다.
+     예전에는 마크업의 '5종'(목업 하드코딩, 실제 8종)을 글자로 찾아 덮어썼다. 그래서
+     ① 서버 없이 열면 5종이 그대로 남았고 ② 그 문구를 지우면 갱신도 함께 죽었다.
+     지금은 제목·부제·헤더 배지에 id를 달고 여기서 문장을 만든다.
+     실패가 하나라도 있으면 '전부 통과'라고 말하지 않는다(슬라이스 48). */
   var nC=s.compat.checks.length,nF=0;
   s.compat.checks.forEach(function(c){if(c.pass===false)nF++;});
   var okAll=nF===0;
-  var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),tn,hits=[];
-  while((tn=tw.nextNode()))if(/호환성\s*\d+종|\d+가지를 모두 확인/.test(tn.nodeValue))hits.push(tn);
-  hits.forEach(function(n){
-   n.nodeValue=n.nodeValue
-    .replace(/호환성\s*\d+종,\s*전부\s*통과했습니다/,
-      okAll?('호환성 '+nC+'종, 전부 통과했습니다')
-           :('호환성 '+nC+'종 중 '+nF+'종이 통과하지 못했습니다'))
-    .replace(/호환성\s*\d+종\s*전부\s*통과/,
-      okAll?('호환성 '+nC+'종 전부 통과'):('호환성 '+nC+'종 중 '+nF+'종 불통과'))
-    .replace(/\d+가지를 모두 확인/,nC+'가지를 모두 확인');
-  });
+  var ttl=document.getElementById('s2-fit-title'),sub=document.getElementById('s2-fit-sub'),
+      bdg=document.getElementById('s2-fit-badge');
+  if(ttl)ttl.textContent=okAll?('호환성 '+nC+'종, 전부 통과했습니다')
+                              :('호환성 '+nC+'종 중 '+nF+'종이 통과하지 못했습니다');
+  if(sub)sub.textContent='조립이 되는 조합인지, 규칙(엔진)이 실제 재고에서 '+nC+'가지를 모두 확인했습니다.';
+  if(bdg)bdg.textContent=okAll?('호환성 '+nC+'종 전부 통과'):('호환성 '+nC+'종 중 '+nF+'종 불통과');
   /* 예산 판정은 서버가 내려준다(cap·verdict·over_by). 화면이 이걸 안 쓰면 120만원 예산에
      3,025만원 구성을 내밀면서 초과 사실을 감춘다 — 실제로 그랬다(슬라이스 48).
      초록 토큰이 없으므로 통과=primary·초과=error로 쓰고 **항상 텍스트를 병기**한다. */
@@ -594,6 +675,7 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   }
   var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
   if(cp)cp.textContent=s.total.toLocaleString();if(cp2)cp2.textContent=s.total.toLocaleString();
+  s2why(k);        // 근거 문구는 이 티어의 확정 구성으로 따로 받아 온다(위 s2why 주석)
  };
  // null 티어 탭 비활성
  document.querySelectorAll('.s2tab').forEach(function(t){

@@ -15,6 +15,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from . import access_gate   # 소유자 확인의 단일 원천 — 여기서 다시 만들지 않는다
 from . import visitor
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -26,7 +27,13 @@ from .product_name import display_name   # 품절 알림도 고객이 읽는다
 router = APIRouter(prefix="/api")
 
 ASSEMBLY_FEE = 30000
-ASSEMBLY_NAME = "전문가 조립 · 선정리 · 24시간 검사"
+# 2026-08-17 사장님 확정: 안정성 테스트는 24시간이 아니라 **3시간**이다(고객 화면 12곳과 같은 문구).
+# ⚠ **앞으로만 바뀐다** — 이 상수는 주문을 «만들 때» `order_items.name_snap` 에 «복사»되고
+#   (아래 `add_item`), 과거 주문을 읽는 자리는 전부 그 스냅샷 컬럼을 읽는다
+#   (`api/my_orders.py` L39-42 · `api/admin_orders.py` L98-101 · `api/admin_member_reviews.py` L45).
+#   그래서 상수를 바꿔도 **이미 있는 17건은 옛 이름을 그대로 들고 있다** — 원장이 당시와
+#   다른 말을 하지 않는다(`api/product_name.py` L34 「스냅샷·원장은 기록된 대로 보여준다」).
+ASSEMBLY_NAME = "전문가 조립 · 선정리 · 3시간 검사"
 VIA_MAP = {"카카오": "kakao", "네이버": "naver", "이메일": "email",
            "kakao": "kakao", "naver": "naver", "email": "email"}
 
@@ -55,6 +62,10 @@ class OrderBody(BaseModel):
     member: MemberIn
     shipping: ShippingIn
     method: str = "카드"
+    # 견적 응답(`POST /api/recommend`)이 준 열쇠. 쿼리 `?k=`·헤더 `X-Access-Key` 로도 받는다.
+    # ⚠ 이 줄이 «없으면» 화면이 보내도 Pydantic 이 조용히 버린다(extra='ignore') —
+    #   `HandoffBody`·`SwapQuery` 가 실제로 그 상태였다(서버는 200 을 주고 화면은 막힌 줄 안다).
+    access_key: str | None = None
 
 
 @router.get("/ops")
@@ -64,14 +75,47 @@ def get_ops():
 
 
 @router.post("/orders")
-def create_order(body: OrderBody, request: Request, response: Response):
+def create_order(body: OrderBody, request: Request, response: Response,
+                 k: str | None = None):
+    """자체 결제 주문 생성.
+
+    ■ 접근 게이트 (2026-08-17 사장님 확정 — 커머스 원장을 여는 마지막 자리)
+      `session_id` 는 연속 정수라, 막기 전에는 남의 번호로 **남의 견적을 주문할 수** 있었다.
+      실측(전부 ROLLBACK): `pay=own` 으로 켠 상태에서 제3자가 피해자의 session_id 로 부르면
+      **주문이 실제로 생겼다** — `orders` +1 · `order_items` +9 · `stock_reservations` +8 ·
+      `stock_movements` +8 · `payments` +1, 재고까지 실제로 깎였고 응답에 피해자의 부품
+      구성 9줄이 그대로 실렸다. 오늘 이 경로가 닫혀 있던 이유는 소유자 확인이 아니라
+      **운영 스위치 하나**였다(`ops_settings.pay`). 스위치를 켜는 날 뚫려 있으면 그때는
+      원장에 실주문이 남는다.
+
+      확인은 `access_gate.require_session_owner()` 하나가 한다 — `recommend/explain`·
+      `swap/candidates`·`swap/apply`·`handoff.create` 와 **같은 함수·같은 열쇠**다.
+
+    ■ ⚠ 검사 자리 — 「운영 스위치 «다음», 쓰기 «전»」
+      **`pay_mode_mall`(409)보다 앞에 두지 않는다.** 앞에 두면 지금처럼 몰 인계 모드일 때
+      「자체 결제가 꺼져 있다」가 아니라 403 이 나가 **오늘 동작이 바뀐다** — 화면은 결제
+      모드 안내를 못 하고 열쇠 탓으로 오해한다.
+      **재고 예약·원장·주문/결제 INSERT 보다는 앞이다.** 뒤에 두면 막아도 흔적이 남는다.
+
+    응답 규약(추가분)
+      403 {detail:{error:"forbidden", reason:"access_key_missing|access_key_mismatch|
+                    no_access_key", detail}}
+      503 {detail:{error:"gate_unavailable", table:"consult_sessions"}}  0055 미적용
+      ⚠ 기존 400·404·409(티어·견적 없음·결제 모드·품절·주변기기)는 그대로다.
+    """
     if body.tier not in ("value", "recommend", "highend"):
         raise HTTPException(400, f"알 수 없는 티어: {body.tier}")
+    provided = body.access_key or access_gate.key_from_request(request, k)
     with engine.begin() as conn:
         ops = dict(conn.execute(text("SELECT key, mode FROM ops_settings")).all())
         if ops.get("pay") != "own":
             raise HTTPException(409, {"error": "pay_mode_mall",
                                       "detail": "결제가 쇼핑몰 인계 모드입니다 — 자체 결제 불가(운영 전환은 관리자 설정)"})
+
+        # 운영 스위치 «다음» · 재고 예약과 원장 «전».
+        access_gate.require_session_owner(
+            conn, body.session_id, provided,
+            what="orders.create", not_found_detail="그 상담을 찾을 수 없습니다")
 
         snap = conn.execute(text(
             "SELECT items, companion, total_amount FROM quote_snapshots"

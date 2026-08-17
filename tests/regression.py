@@ -2549,30 +2549,121 @@ def test_no_fabricated_data():
     # ④ 화면이 스스로 세는 큰 수를 마크업에 박아두지 않는다.
     #    콤마가 들어간 4자리 이상 숫자는 서버가 주는 값이지 화면이 아는 값이 아니다.
     #    (버전·연도·전화번호 오탐을 피하려 콤마 형식만 본다)
-    baked = []
-    for n, s_ in screens():
-        body = _re13.sub(r"<script[\s\S]*?</script>", "", s_)
-        body = _re13.sub(r"<!--[\s\S]*?-->", "", body)          # 주석 속 설명은 봐준다
-        for m in _re13.finditer(r">\s*([0-9]{1,3}(?:,[0-9]{3})+)\s*<", body):
-            baked.append(n + ":" + m.group(1))
-    check("마크업에 콤마 숫자를 박아두지 않는다", baked == [], [], baked[:8])
+    #
+    # ⚠ **이 검사는 2026-08-17까지 한 건도 못 잡았다** — 무엇을 세는지와 무엇을 증명하는지가
+    #    달랐던 `[26]`·`[42]`와 같은 계열이다(§회귀 세트). 정규식이 `>\s*1,705,000\s*<`,
+    #    즉 **숫자가 태그 사이의 «전부»일 때만** 봤다. 실제 마크업은 거의 언제나
+    #    `>1,705,000원<`·`>2,480대<`처럼 단위가 붙어 있어 **「원·대·개·종」 한 글자만 붙으면
+    #    그대로 통과**했다. 증명해야 하는 것은 "숫자만 든 텍스트 노드가 없다"가 아니라
+    #    **"화면이 말하는 글에 서버만 알 수 있는 수가 없다"**이므로, 태그를 걷어낸
+    #    **본문 텍스트 전체**에서 찾는다(속성값은 사람에게 안 보이므로 대상이 아니다 —
+    #    태그를 지우면 함께 빠진다).
+    def baked_numbers(src):
+        body = _re13.sub(r"<script[\s\S]*?</script>", " ", src)
+        body = _re13.sub(r"<style[\s\S]*?</style>", " ", body)
+        body = _re13.sub(r"<!--[\s\S]*?-->", " ", body)         # 주석 속 설명은 봐준다
+        body = _re13.sub(r"<[^>]+>", " ", body)                 # 사람이 읽는 글만 남긴다
+        return _re13.findall(r"[0-9]{1,3}(?:,[0-9]{3})+", body)
+
+    # ── 유예를 다루는 법 (2026-08-17 사장님 결정 「고객 화면만 먼저 고친다」) ────────
+    #
+    # 넓힌 검사가 «지금 고치지 않기로 한 것»까지 잡는다. 그렇다고 검사를 **좁히지 않는다**
+    # — 좁히는 순간 이 검사는 다시 거짓 안심이 된다(바로 위 ⚠ 가 그 이야기다).
+    # 대신 유예분을 전부 찾아낸 채로 아래 **세 장치**에 묶어 둔다. 근거 없는 화이트리스트가
+    # 아니라, 스스로 낡으면 실패하는 목록이다.
+    #
+    #   ① 값까지 고정한다   지금 박혀 있는 수를 한 자리까지 적는다. 유예 파일에 **새 수가
+    #                       늘면 실패**한다 — 예외가 조용히 자라지 못한다.
+    #   ② 낡으면 실패한다   고정한 수가 사라졌는데 목록에 남아 있으면 실패한다
+    #                       ("고쳤으면 예외도 지워라"). 예외가 원인보다 오래 살지 못한다.
+    #   ③ 기한이 있다       기한을 넘기면 유예가 통째로 **실패로 바뀐다.** 이 저장소는
+    #                       「나중에」가 낡아 사고가 된 전례가 많다(CLAUDE.md 곳곳) —
+    #                       날짜가 지나면 사람이 다시 판단하게 만든다.
+    #
+    # 기한을 미루려면 «왜 아직 유예인가»를 여기 적고 날짜를 옮긴다(그 자체가 기록이다).
+    import datetime as _dt13
+    BAKED_EXPIRES = "2026-09-30"
+    _baked_expired = _dt13.date.today().isoformat() > BAKED_EXPIRES
+
+    def baked_split(found_by_file, defer, label):
+        """유예 목록을 적용하되 «숨기지 않는다» — 막을 것 · 자란 것 · 낡은 것으로 가른다."""
+        blocking, grew, stale = [], [], []
+        for fn, vals in found_by_file.items():
+            if fn not in defer or _baked_expired:
+                blocking += [fn + ":" + v for v in vals]
+                continue
+            pinned = set(defer[fn][0])
+            grew += [fn + ":" + v for v in vals if v not in pinned]     # ①
+        for fn, (pinned, _why) in defer.items():                        # ②
+            gone = [v for v in pinned if v not in found_by_file.get(fn, [])]
+            if gone:
+                stale.append(fn + ": " + ",".join(gone))
+        check(label + " 유예 목록이 자라지 않는다", grew == [], [], sorted(set(grew))[:8])
+        check(label + " 유예 목록에 낡은 항목이 없다 (고쳤으면 예외도 지운다)",
+              stale == [], [], stale)
+        # 유예분은 «조용히» 넘어가지 않는다 — 돌릴 때마다 눈에 보이게 적는다
+        if defer and not _baked_expired:
+            for fn, (pinned, why) in sorted(defer.items()):
+                print("         [유예 ~%s] %s: %s — %s"
+                      % (BAKED_EXPIRES, fn, ",".join(pinned), why))
+        return blocking
+
+    def baked_by_file(pairs):
+        out = {}
+        for fn, src in pairs:
+            found = sorted(set(baked_numbers(src)))
+            if found:
+                out[fn] = found
+        return out
+
+    check("유예 기한이 남아 있다 (넘기면 유예가 전부 실패가 된다)",
+          not _baked_expired, "오늘 <= " + BAKED_EXPIRES, _dt13.date.today().isoformat())
+
+    # 구 `/admin/*.html` 은 **백업용 동결**이다(P-09 · CLAUDE.md §관리자 화면 규약):
+    # 수정 금지 · 링크 금지 · 사용자 안내 금지. 고객이 보는 화면이 아니고, 필요한 기능은
+    # admin2 에 «새로 짓는» 것이지 여기를 고치는 것이 아니다. 그래서 유예한다 —
+    # 다만 동결이 곧 면제는 아니므로, 파일이 지워지거나 admin2 로 옮겨지면 ②가 알린다.
+    BAKED_ADMIN_DEFER = {
+        "candidate-pool.html": (
+            ["2,457"],
+            "구 /admin/*.html 백업용 동결(P-09) — 고치는 대신 admin2 에 새로 짓는다. "
+            "이 파일이 사라지거나 admin2 로 옮겨지면 이 항목도 지운다."),
+    }
+    baked = baked_split(baked_by_file(screens()), BAKED_ADMIN_DEFER, "관리자 화면")
+    check("마크업에 콤마 숫자를 박아두지 않는다", baked == [], [], sorted(set(baked))[:8])
 
     # **고객 화면도 같은 규칙이다.** `[39]` 가 오래 `mockups/admin` 만 봤고, 그 사이
     # 고객 화면에 20곳이 남아 있었다(감사 2026-08-06). 지금은 대부분 런타임에 덮이지만
     # **서버가 실패하면 그 수들이 사실처럼 남는다** — 첫 화면일수록 위험하다.
     # `vslot-demo` 는 규약 데모라 화면이 아니다(제외).
-    baked_cx = []
+    #
+    # **MY 화면 둘은 유예다** (2026-08-17 사장님 결정 「고객 화면만 먼저 고친다」).
+    # 범위 축소로 «제거될» 화면이라 지금 고치는 것은 지워질 코드를 다듬는 일이다
+    # (HANDOFF §2 — 회원 원장은 쇼핑몰이 갖는다). 유예 장치 셋은 위 `baked_split` 에 있다.
+    BAKED_CX_DEFER = {
+        # 파일: (지금 박혀 있는 수, 왜 지금 고치지 않는가 · 무엇이 해소인가)
+        "my-page.html": (
+            ["812,000"],
+            "범위 축소로 제거될 화면 — 회원 원장은 쇼핑몰이 갖는다(HANDOFF §2). "
+            "화면이 지워지면 이 항목도 함께 지운다."),
+        "my-payments.html": (
+            ["1,735,000", "3,831,000"],
+            "범위 축소로 제거될 화면 — 회원 원장은 쇼핑몰이 갖는다(HANDOFF §2). "
+            "화면이 지워지면 이 항목도 함께 지운다."),
+    }
+    cx_pairs = []
     for _p3 in sorted(_g9.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html"))):
         _n3 = os.path.basename(_p3)
         if _n3 == "vslot-demo.html":
             continue
-        _s3 = io.open(_p3, encoding="utf-8").read()
-        _b3 = _re13.sub(r"<script[\s\S]*?</script>", "", _s3)
-        _b3 = _re13.sub(r"<!--[\s\S]*?-->", "", _b3)
-        for _m3 in _re13.finditer(r">\s*([0-9]{1,3}(?:,[0-9]{3})+)\s*<", _b3):
-            baked_cx.append(_n3 + ":" + _m3.group(1))
+        cx_pairs.append((_n3, io.open(_p3, encoding="utf-8").read()))
+
+    baked_cx = baked_split(baked_by_file(cx_pairs), BAKED_CX_DEFER, "고객 화면")
     check("고객 화면 마크업에도 콤마 숫자를 박아두지 않는다",
           baked_cx == [], [], sorted(set(baked_cx))[:8])
+    drift("baked_numbers_deferred",
+          sum(len(v[0]) for v in BAKED_CX_DEFER.values())
+          + sum(len(v[0]) for v in BAKED_ADMIN_DEFER.values()))
 
     # ⑤ 서버가 준 값만 쓴다는 계약이 살아 있는가 — 실패 시 이유를 말하는 화면 수
     honest = [n for n, s_ in screens()
@@ -5066,8 +5157,14 @@ def test_swap():
                   "constraints": [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "150만원"}]})
     sess = rec["session_id"]
 
+    # 접근 게이트(0055) — `candidates`도 그 상담의 주인인지 검사한다. 열쇠는 바로 위
+    # `POST /api/recommend` 응답이 준 것 하나뿐이다. 아래 `apply`와 같은 이유이고
+    # 같은 열쇠다 — **회귀를 통과시키려고 맞추는 값이 아니라, 열쇠를 실어 보내는 것이
+    # 「옳은 호출」이라서 고친다.** 안 실으면 403(access_key_missing)이라 이 검사는
+    # 「대안이 0건이다」가 아니라 「호출이 틀렸다」를 보고하는 셈이 된다.
     st, cand = post("/api/swap/candidates",
-                    {"session_id": sess, "tier": "recommend", "slot": "GPU"})
+                    {"session_id": sess, "tier": "recommend", "slot": "GPU",
+                     "access_key": rec.get("access_key")})
     slots = cand.get("slots", {})
     total_alts = sum(len(v.get("alternatives") or []) for v in slots.values())
     check("스왑 대안이 존재한다(슬롯 합)", total_alts > 0, "> 0", total_alts)
@@ -5082,9 +5179,19 @@ def test_swap():
     pick = next((a for a in gpu if not a.get("chain")), gpu[0])
 
     before = get("/api/admin/swap-logs")["total"]
+    # 접근 게이트(0055) — 이 경로는 원장에 쓰는 자리라 「그 상담의 주인인가」를 서버가
+    # 검사한다. 열쇠는 위 `POST /api/recommend` 응답이 준 것 하나뿐이다. 넣지 않으면
+    # 403(access_key_missing)이라 «옳은 호출»이 되지 않는다 — 값을 맞추는 게 아니라
+    # 호출을 맞추는 것이다. 0055 미적용 DB 에서는 서버가 열쇠를 null 로 주고 503 을 낸다.
+    ak = rec.get("access_key")
     st, ap = post("/api/swap/apply", {"session_id": sess, "tier": "recommend",
+                                      "access_key": ak,
                                       "changes": [{"slot": "GPU",
                                                    "product_code": pick["product_code"]}]})
+    if st == 503:
+        check("스왑 적용 성공", False, 200,
+              "503 gate_unavailable - 마이그레이션 0055 미적용(access_key 컬럼 없음)")
+        return
     check("스왑 적용 성공", st == 200, 200, st)
     if st != 200:
         return
@@ -5436,8 +5543,12 @@ def test_display_name():
                   "constraints": [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "150만원"}]})
     names = [(t, it["name"]) for t, s in (rec.get("sets") or {}).items()
              for it in (s or {}).get("items") or []]
+    # 접근 게이트(0055) — 열쇠를 실어야 대안이 내려온다. 안 실으면 403이라 아래
+    # 표본이 견적 24건만 남아, 「이름에 꼬리가 없다」 검사가 **거의 헛돌게 된다**
+    # (실측: 열쇠 없이 24건 vs 열쇠 있으면 2,587건). 바로 다음 검사가 그 헛돎을 잡는다.
     st, cand = post("/api/swap/candidates",
-                    {"session_id": rec["session_id"], "tier": "recommend"})
+                    {"session_id": rec["session_id"], "tier": "recommend",
+                     "access_key": rec.get("access_key")})
     for slot, v in (cand.get("slots") or {}).items():
         for a in v.get("alternatives") or []:
             names.append((slot, a["name"]))

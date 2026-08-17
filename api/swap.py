@@ -21,6 +21,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from . import access_gate   # 소유자 확인의 단일 원천 — 여기서 다시 만들지 않는다
 from . import visitor
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -47,6 +48,10 @@ SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_powe
 class SwapQuery(BaseModel):
     session_id: int
     tier: str
+    # ⚠ **기반 클래스에 둔다** — `ApplyBody` 가 이걸 상속한다. 파생에만 두면 이 클래스를
+    #   쓰는 `candidates` 가 열쇠를 조용히 버린다(Pydantic extra='ignore'). 실제로
+    #   `HandoffBody` 가 그 상태였다: 화면은 보냈는데 서버가 버리고 200 을 줬다.
+    access_key: str | None = None
 
 
 class Change(BaseModel):
@@ -56,6 +61,7 @@ class Change(BaseModel):
 
 class ApplyBody(SwapQuery):
     changes: list[Change]
+    # `access_key` 는 SwapQuery 에서 상속한다 — 여기서 다시 선언하지 않는다.
 
 
 def _load_snapshot(conn, session_id: int, tier: str):
@@ -140,8 +146,26 @@ def _pool_ctx(conn):
 
 
 @router.post("/candidates")
-def candidates(body: SwapQuery):
+def candidates(body: SwapQuery, request: Request, k: str | None = None):
+    """부품별 대안 목록 — **남의 견적 구성이 통째로 나오던 자리**(2026-08-17 사장님 확정).
+
+    읽기지만 새는 것이 견적 전체다: `current`(부품명·가격·품절 여부) · `total` ·
+    `compat`(호환 판정) · 슬롯별 대안과 연쇄 교체 근거. `explain` 이 막는 것과 같은 내용을
+    이 경로가 열어 두고 있었다.
+
+    ■ 이제 막을 수 있게 된 이유
+      직전까지는 막으면 S3 가 **조용히 거짓 화면**이 됐다 — `s3-detail.html` 의 빈
+      `catch` 가 실패를 삼켜 정적 목업 부품이 그대로 남았다. 화면이 열쇠를 싣고 빈
+      `catch` 를 걷어내 사건별로 사유를 말하게 되면서 그 제약이 사라졌다.
+
+    응답 규약(추가분) — `swap/apply` 와 같다
+      403 {detail:{error:"forbidden", reason, detail}} · 503 {detail:{error:"gate_unavailable"}}
+    """
+    provided = body.access_key or access_gate.key_from_request(request, k)
     with engine.connect() as conn:
+        access_gate.require_session_owner(
+            conn, body.session_id, provided,
+            what="swap.candidates", not_found_detail="그 상담을 찾을 수 없습니다")
         snap = _load_snapshot(conn, body.session_id, body.tier)
         parts = snap["items"]["parts"]
         specs = _specs_by_code(conn, [it["product_code"] for it in parts])
@@ -193,7 +217,26 @@ def candidates(body: SwapQuery):
 
 
 @router.post("/apply")
-def apply(body: ApplyBody, request: Request, response: Response):
+def apply(body: ApplyBody, request: Request, response: Response, k: str | None = None):
+    """부품 교체를 적용한다 — **남의 견적을 «바꿀» 수 있던 자리**(2026-08-17 사장님 확정).
+
+    ■ 왜 이 경로가 제일 급했나
+      `_load_snapshot` 은 `session_id`·`tier` 만 보고, `session_id` 는 연속 정수다
+      (최근 10건 5872~5881). 즉 남의 번호를 세어 맞히면 **읽는 데서 그치지 않았다** —
+      이 함수가 `swap_event_logs` 를 남기고 **새 `quote_snapshots` 행을 INSERT** 한다.
+      다음 견적 조회·인계는 «최신 스냅샷»을 읽으므로, 진짜 주인이 자기가 고르지 않은
+      구성을 보고 그대로 결제까지 갈 수 있었다. 읽기 유출보다 위험한 쓰기 유출이다.
+
+    ■ 새 장치를 만들지 않았다
+      `POST /api/recommend/explain` 과 **같은 함수**(`access_gate.require_session_owner`)를
+      부른다. 열쇠도 같은 것 — 견적 응답이 준 `access_key` 하나다.
+
+    응답 규약(추가분)
+      403 {detail:{error:"forbidden", reason:"access_key_missing|access_key_mismatch|
+                    no_access_key", detail}}
+      503 {detail:{error:"gate_unavailable", table:"consult_sessions"}}  0055 미적용
+      ⚠ 기존 400·404·409(잘못된 슬롯·견적 없음·품절·호환 불가)는 그대로다.
+    """
     if not body.changes:
         raise HTTPException(400, "변경할 부품이 없습니다")
     ch_by_slot = {}
@@ -201,7 +244,12 @@ def apply(body: ApplyBody, request: Request, response: Response):
         if c.slot not in SLOTS or c.slot in ch_by_slot:
             raise HTTPException(400, f"잘못된 변경 슬롯: {c.slot}")
         ch_by_slot[c.slot] = c.product_code
+    provided = body.access_key or access_gate.key_from_request(request, k)
     with engine.begin() as conn:
+        # ⚠ 원장에 손대기 «전에» 막는다 — 검사가 INSERT 뒤에 오면 막아도 이미 남는다.
+        access_gate.require_session_owner(
+            conn, body.session_id, provided,
+            what="swap.apply", not_found_detail="그 상담을 찾을 수 없습니다")
         uid = visitor.resolve(conn, request, response)   # 교체 이벤트를 사람에 잇는다
         snap = _load_snapshot(conn, body.session_id, body.tier)
         parts = snap["items"]["parts"]
