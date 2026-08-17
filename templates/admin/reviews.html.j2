@@ -225,16 +225,19 @@ input{font-family:var(--rv-mono)}
 .row .live{font:600 11px/1 var(--rv-mono);color:var(--rv-red)}
 .row .fld{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .ov{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .ov.empty{color:var(--rv-dim2)}
+.row .ov.noval{color:var(--rv-dim2)}
 .row .sv{font:600 10.5px/1.3 var(--rv-mono);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .sv.empty{font-weight:400;color:var(--rv-dim2)}
+.row .sv.noval{font-weight:400;color:var(--rv-dim2)}
 .row .cf{font:600 10.5px/1.3 var(--rv-mono)}
 .row .st{font:400 10px/1.3 var(--rv-font);color:var(--rv-dim)}
 
-.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
-.empty .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
-.empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:340px}
-.empty .bt{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+/* emptystate = list-level banner (0 rows). Row cells with no value use .noval --
+   one bare .empty token used to serve both, and the banner layout (padding:40px,
+   display:flex) leaked into row cells, inflating row height 34px -> 112px. */
+.emptystate{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.emptystate .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.emptystate .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:340px}
+.emptystate .bt{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
           border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:8px 13px;cursor:pointer}
 .loading,.errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
 .errbox .ti{font:600 14px/1.4 var(--rv-font)}
@@ -294,7 +297,7 @@ input{font-family:var(--rv-mono)}
 .cbox.suggest.low{border-color:var(--rv-amber);background:var(--rv-amber-bg)}
 .cbox .lb{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint);margin-bottom:5px}
 .cbox .vv{font:600 21px/1.15 var(--rv-mono)}
-.cbox .vv.empty{font:400 14px/1.3 var(--rv-font);color:var(--rv-dim)}
+.cbox .vv.noval{font:400 14px/1.3 var(--rv-font);color:var(--rv-dim)}
 .sig-box{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0}
 .sig-box.low{border-color:var(--rv-amber);background:oklch(0.96 0.035 70)}
 .sig-row1{display:flex;align-items:center;gap:8px}
@@ -897,7 +900,7 @@ input{font-family:var(--rv-mono)}
         : (S.f.keyword
           ? '상품명·product_code·사양 필드명으로만 찾습니다. 검색어를 지우면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.'
           : '필터 범위를 넓히면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.');
-      tbody.innerHTML = '<div class="empty"><div class="ti">' + esc(title) + '</div>' +
+      tbody.innerHTML = '<div class="emptystate"><div class="ti">' + esc(title) + '</div>' +
         '<div class="ds">' + esc(desc) + '</div>' +
         '<div class="bt" data-action="reset-filters">필터 초기화</div></div>';
       return;
@@ -913,8 +916,8 @@ input{font-family:var(--rv-mono)}
         '<span class="rname"><span class="nm">' + esc(r.name) + '</span>' +
         (r.live ? '<span class="live">●</span>' : '') + '</span>' +
         '<span class="fld">' + esc(r.field || '—') + '</span>' +
-        '<span class="ov' + (ov ? '' : ' empty') + '">' + esc(ov || '없음') + '</span>' +
-        '<span class="sv' + (sv ? '' : ' empty') + '">' + esc(sv || '—') + '</span>' +
+        '<span class="ov' + (ov ? '' : ' noval') + '">' + esc(ov || '없음') + '</span>' +
+        '<span class="sv' + (sv ? '' : ' noval') + '">' + esc(sv || '—') + '</span>' +
         '<span class="cf" style="color:' + cd.c + '">' + esc(cd.label) + '</span>' +
         '<span class="st">' + esc(stateText(r)) + '</span></div>';
     }).join('');
@@ -976,7 +979,7 @@ input{font-family:var(--rv-mono)}
     }
     var rows = S.sourcing.rows || [];
     if (!rows.length) {
-      $('srcBody').innerHTML = '<div class="empty"><div class="ti">단가표 편입 대기가 없습니다</div></div>';
+      $('srcBody').innerHTML = '<div class="emptystate"><div class="ti">단가표 편입 대기가 없습니다</div></div>';
       return;
     }
     $('srcBody').innerHTML = rows.map(function (r) {
@@ -1064,10 +1067,10 @@ input{font-family:var(--rv-mono)}
       '<span class="risk-badge" style="color:' + riskColor + ';background:' + riskColor + '1a;border:1px solid ' + riskColor + '55">' +
       esc(row.risk || '') + '</span></div>' +
       '<div class="compare-grid">' +
-      '<div class="cbox"><div class="lb">원문 추출값</div><div class="vv' + (ov ? '' : ' empty') + '">' + esc(ov || '없음') + '</div></div>' +
+      '<div class="cbox"><div class="lb">원문 추출값</div><div class="vv' + (ov ? '' : ' noval') + '">' + esc(ov || '없음') + '</div></div>' +
       '<div class="cbox suggest' + (cd.tier === 'low' ? ' low' : '') + '"><div class="lb">' +
       (row.suggested_value ? '제안값 · ' + esc(labelForSource(row.suggest_source)) : '제안 없음 — 사람이 찾아 입력') + '</div>' +
-      '<div class="vv' + (sv ? '' : ' empty') + '">' + esc(sv || '값 없음') + '</div></div></div></div>';
+      '<div class="vv' + (sv ? '' : ' noval') + '">' + esc(sv || '값 없음') + '</div></div></div></div>';
 
     if (row.suggested_value) {
       var sig = row.signal;
