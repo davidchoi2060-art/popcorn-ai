@@ -375,6 +375,19 @@ OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
                         "/api/admin/ops-assistant")
 
 
+def _is_operator_photo_path(path: str) -> bool:
+    """`/api/admin/operators/{정수}/photo` 정확히 그것인가.
+
+    접두어(`startswith`)로 판정하지 «않는다» — `/operators/1/photo-and-role` 같은
+    경로가 생기면 함께 열려 버린다. 정규식 대신 조각을 세는 이유는 이 파일이 `re`를
+    쓰지 않기 때문이고(의존 하나를 늘리지 않는다), 조각 판정이 눈으로 읽기 쉽다.
+    """
+    parts = path.split("/")
+    #      ['', 'api', 'admin', 'operators', '<id>', 'photo']
+    return (len(parts) == 6 and parts[1] == "api" and parts[2] == "admin"
+            and parts[3] == "operators" and parts[4].isdigit() and parts[5] == "photo")
+
+
 def required_role(method: str, path: str) -> str:
     """경로·메서드별 최소 권한 — 읽기 viewer / 쓰기 operator / 운영자·정책 owner."""
     # 내 정보(ADM-SYS-030)는 **자기 것만** 다루므로 쓰기도 viewer로 연다(슬라이스 92).
@@ -382,6 +395,13 @@ def required_role(method: str, path: str) -> str:
     # `admin_profile.EDITABLE` 화이트리스트가 막는다 — role·status·email은 아예 못 보낸다.
     # `/operators`보다 **먼저** 검사한다: 아래 owner 규칙이 접두어로 걸리지 않게.
     if path.startswith("/api/admin/my-profile"):
+        return "viewer"
+    # 남의 «프로필 사진»만 예외로 연다 — 사장님 확정 2026-08-17 ③「전 운영자가 서로 본다」.
+    # 아래 `/operators` owner 규칙보다 **먼저** 봐야 접두어로 걸리지 않는다(위 my-profile과
+    # 같은 이유). 예외는 이 «한 경로 · GET» 뿐이다 — 계정 목록·역할·정지는 그대로 owner다.
+    # 판정을 여기 한 곳에서만 한다(`api/admin_profile_photo.py`는 다시 판정하지 않는다 —
+    # 두 곳이 갈리면 한쪽만 고치는 사고가 난다).
+    if method in ("GET", "HEAD") and _is_operator_photo_path(path):
         return "viewer"
     if path.startswith("/api/admin/operators"):
         return "owner"                      # 조회조차 owner(계정 목록은 민감)
