@@ -9,9 +9,11 @@ GT710 2GB가 나왔다 — 저소음 + 최저가를 정확히 만족한 결과�
 
 `spec_fields`와 같은 캐시 방식이다 — 요청마다 읽지 않고, 관리자가 고치면 `reload()`.
 """
+from fastapi import APIRouter
 from sqlalchemy import text
 
 from .db import engine
+from .taxonomy import SLOT_LABELS as SLOT_KO   # 슬롯 한글 이름의 단일 원천(슬라이스 A)
 
 _CACHE: list | None = None
 
@@ -86,3 +88,63 @@ def summary(value: str) -> list:
     """화면·근거용 한 줄 목록 — 서버가 실제로 건 하한만 말한다."""
     return [{"slot": r["slot"], "label": r["label"], "field": r["field"],
              "op": r["op"], "value": r["value"]} for r in match(value)]
+
+
+# ── 근거 한 줄 문구 ────────────────────────────────────────────────────────
+# "고사양 게임 GPU 등급"만으로는 무엇을 걸렀는지 알 수 없다 — **얼마 이상인지가
+# 근거다**(슬라이스 58). 같은 조립이 `candidates._apply_one`(118-120행)과
+# `recommend.py`(652-654행)에도 인라인으로 있다. 정본은 여기이고 저 둘은 각자
+# 담당자가 이 함수를 부르도록 정리할 자리다 — 지금 고치면 담당 밖이라 남겨 둔다.
+_UNIT = {"required_power_watt": "W", "capacity_gb": "GB"}
+
+
+def floor_text(rows: list) -> str:
+    """하한 규칙 행들 -> "그래픽카드 550W 이상 · 메모리 16GB 이상" 한 줄."""
+    return " · ".join(f"{SLOT_KO.get(r['slot'], r['slot'])} {r['value']:,}"
+                      f"{_UNIT.get(r['field'], '')} 이상" for r in rows)
+
+
+router = APIRouter(prefix="/api", tags=["usages"])
+
+
+@router.get("/usages")
+def list_usages():
+    """지금 서버가 하한을 갖고 있는 **용도 목록** — 읽기 전용·인증 없음.
+
+    ■ 왜 있는가 (2026-08-17)
+      S1 화면이 용도 어휘를 **자기 안에** 세 벌 들고 있었다(`USE_PAT` · guided
+      `Q_USE` · 팝콘톡 `TALKS`). 그래서
+        · 화면에만 있는 용도(인터넷·시청 / 주식·트레이딩 / 영화·미디어)가
+          선택지로 떴는데 DB에 없어 `applied:false` — **후보 수가 그대로인데
+          화면은 「저사양 GPU 제외」 같은 이유를 보여줬다**(§화면 정직성 위반).
+        · DB에만 있는 용도(방송·스트리밍 / 디자인 / 개발)는 **진입로가 없었다.**
+        · 같은 말이 입구마다 다른 용도로 잡혔다(「배그」= 고사양 게임 / 게임).
+      화면이 목록을 갖는 한 표가 바뀌는 날 반드시 갈라진다. 그래서 **받아 쓰게** 한다.
+
+    ■ 순서가 곧 우선순위다
+      `_rows()`는 `sort_order, floor_id` 순이고 `match()`가 **먼저 맞는 하나만**
+      쓴다('고사양 게임'이 '게임'보다 앞이라 이긴다). 이 응답의 배열 순서가 그
+      우선순위 그대로다 — 화면이 같은 규칙으로 고르려면 **순서를 바꾸지 않아야** 한다.
+
+    ■ 화면이 못 받으면
+      빈 목록이 아니라 **요청 실패**로 돌아간다(DB를 못 읽으면 `_rows()`가 []를
+      주므로 `usages`가 빈 배열일 수도 있다). 어느 쪽이든 화면은 **용도 선택지를
+      내지 않는다** — 임의 어휘를 폴백으로 박으면 목록이 다시 갈라진다.
+
+    응답 {ok, usages:[{key, label, terms[], floor_note}]}
+      terms      `match_terms` 원본 — 부분일치 대상
+      floor_note 서버가 실제로 거는 하한 한 줄(숫자 포함). 화면의 「이유」 자리는
+                 이 값을 그대로 쓴다 — 화면이 이유를 지어내지 않는다.
+    """
+    out: list = []
+    idx: dict = {}
+    for r in _rows():
+        k = r["usage_key"]
+        if k not in idx:
+            idx[k] = len(out)
+            out.append({"key": k, "label": r["usage_label"],
+                        "terms": list(r["match_terms"] or []), "_r": []})
+        out[idx[k]]["_r"].append(r)
+    for u in out:
+        u["floor_note"] = floor_text(u.pop("_r"))
+    return {"ok": True, "usages": out}

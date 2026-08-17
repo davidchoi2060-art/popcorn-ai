@@ -47,9 +47,40 @@
     최대 4회」는 더 이상 성립하지 않는다. 조절 자리는 `rate_limit_policies` 행이다.
 
 ■ 어휘를 여기서 새로 정의하지 않는다 (CANON §1 — 정본을 복제하지 않는다)
-  ① 용도 값 = `api/usage_floors`의 `usage_label` 집합. **요청마다 읽는다** —
-     운영자가 `usage_floors`를 고치면 다음 요청부터 반영된다. 여기에 목록을 박아
-     두면 표가 늘어난 날 화면만 옛 어휘로 말한다.
+  ① 용도 값 = `api/usage_floors`의 `usage_label` **과 `match_terms`**. 둘 다
+     **요청마다 읽는다** — 운영자가 `usage_floors`를 고치면 다음 요청부터 반영된다.
+     여기에 목록을 박아 두면 표가 늘어난 날 화면만 옛 어휘로 말한다.
+
+     ⚠ **라벨만 주면 모델이 추론한다**(2026-08-17 실측으로 신설). 이 프롬프트는
+     오래 «용도 이름 8개»만 줬고 「어떤 말이 그 용도인가」는 주지 않았다. 그래서
+     정본이 답을 갖고 있는데도(`gaming_high.match_terms` = 고사양 게임 · 고사양게임 ·
+     **배그** · AAA) 모델이 스스로 넓은 쪽을 골랐다:
+
+         「배그 하고 싶어요」  이 경로 -> 용도 «게임»       (GPU 하한 450W)
+                               정본     -> «고사양 게임»    (GPU 하한 550W)
+
+     사장님 확정(2026-08-17)은 「배그 = 고사양 게임」이라 **이 경로가 정본을 배신하고
+     있었다.** 화면이 그동안 «용도만 DB 어휘로 접어 AI 결과보다 우선»하는 임시 분기로
+     메우고 있었다(`mockups/mvp1/s1-session.html` 의 `aiCons`). 그 임시 조치의 해소가
+     여기다 — **정본 어휘를 프롬프트에 함께 싣는다.**
+
+  ①-1 충돌 판정 — **모델이 이긴다. 서버가 원문을 다시 접지 않는다.**
+     「모델이 고른 용도」와 「원문을 `UF.match()` 로 접은 용도」가 다를 때 무엇을 쓰는가는
+     정하고 넘어가야 하는 문제다. 여기서는 **서버가 원문을 다시 접는 층을 두지 않는다.**
+
+         근거 ① `UF.match()` 는 **부분일치**라 문맥을 못 본다. 「배그는 안 하고 롤만
+                해요」에도 '배그'가 걸려 «고사양 게임»을 준다 — 고객이 안 한다고 말한
+                것을 용도로 잡는 것이라, 그 값으로 건 하한(GPU 550W)은 근거가 거짓이 된다.
+         근거 ② 정본을 프롬프트에 실은 뒤로 **어휘 때문에 갈리는 일은 사라진다.**
+                남는 차이는 부정·제외·비교 같은 **문맥**뿐이고, 그건 모델만 읽을 수 있다.
+                실측(2026-08-17, claude-haiku): 「배그 하고 싶어요」 -> 고사양 게임 ·
+                「배그는 안 하고 롤만 해요」 -> 게임. 둘 다 정본과 문맥을 함께 지켰다.
+         근거 ③ **정본은 여전히 강제된다.** 값은 `_norm_from_set` 이 `usage_label`
+                집합 밖이면 버리고, 어휘 자체가 매 요청 DB에서 온다. 모델이 이기는 것은
+                「어느 용도인가」의 판단뿐이고 「어떤 용도가 있는가」는 계속 표가 정한다.
+
+     ⚠ 뒤집는다면(=서버가 원문 판정으로 덮어쓴다면) **부정문을 먼저 재라.** 그 층은
+     「배그는 안 하고」를 «고사양 게임»으로 만든다.
   ② 선호 값 = 저소음 · 화이트 둘뿐. 근거는 `api/candidates._apply_one`이 **실제로
      거르는 태그가 그 둘뿐**이라는 것이다(`SILENT_SCOPE`·`WHITE_SCOPE`). 셋째를
      지어내면 화면이 "조건으로 잡았다"고 말하는데 후보 수는 안 변한다 —
@@ -119,20 +150,44 @@ class ParseBody(BaseModel):
     text: str
 
 
-def _usage_values() -> list:
-    """지금 서버가 실제로 하한을 갖고 있는 용도 라벨(중복 제거, 정렬 순서 유지)."""
-    out = []
+def _usage_rows() -> list:
+    """용도 정본 -> [(라벨, 그 용도를 가리키는 말들)]. 중복 제거 · 정렬 순서 유지.
+
+    ⚠ **여기서 어휘를 만들지 않는다.** 라벨도 어휘도 전부 `usage_floors` 행에서 온다
+    (`usage_label` · `match_terms`). 한 usage_key 에 하한 행이 여럿이라 같은 라벨이
+    여러 번 나오는데, 어휘는 행마다 같으므로 **처음 만난 행의 것만** 쓴다.
+    순서는 `UF._rows()`(sort_order, floor_id) 그대로다 -- 그 순서가 곧 우선순위이고
+    ('고사양 게임'이 '게임'보다 앞), 프롬프트도 같은 순서로 보여야 모델이 좁은 쪽을
+    먼저 본다(`api/usage_floors.list_usages` 의 §순서가 곧 우선순위와 같은 규약).
+    """
+    out: list = []
+    seen: set = set()
     for r in UF._rows():
         lab = r.get("usage_label")
-        if lab and lab not in out:
-            out.append(lab)
+        if lab and lab not in seen:
+            seen.add(lab)
+            out.append((lab, [t for t in (r.get("match_terms") or []) if t]))
     return out
 
 
-def _build_prompt(text: str, usages: list) -> str:
+def _build_prompt(text: str, usage_rows: list) -> str:
     """매 요청마다 접는다 -- 용도 어휘가 DB에서 바뀌면 다음 요청부터 반영된다."""
-    usage_line = " / ".join(usages) if usages else "(지금 정의된 용도가 없다)"
-    return "\n".join([
+    # 라벨만 주면 모델은 '배그'가 어느 용도인지 알 방법이 없어 **추론한다**(실측:
+    # 「배그 하고 싶어요」 -> 용도 «게임», 정본은 «고사양 게임»). 정본이 이미 그 답을
+    # 갖고 있으므로(`match_terms`) 라벨과 함께 넘긴다 -- 여기 목록을 박지 않는다.
+    usage_line = " / ".join(
+        "%s(%s)" % (lab, ", ".join(terms)) if terms else lab for lab, terms in usage_rows
+    ) if usage_rows else "(지금 정의된 용도가 없다)"
+    # 예시도 표에서 뽑는다 -- '배그 -> 고사양 게임' 을 문자열로 박으면 표에서 그 말이
+    # 빠진 날 프롬프트만 옛 어휘로 가르친다(이 파일이 오늘 고친 병과 같은 모양이다).
+    # 고를 때는 «이름과 안 닮은» 말을 먼저 본다(글자가 하나도 안 겹치는 것) --
+    # '고사양게임 -> 고사양 게임' 처럼 띄어쓰기만 다른 예시는 아무것도 안 가르친다.
+    pairs = [(lab, t) for lab, terms in usage_rows for t in terms if t != lab]
+    ex = next((p for p in pairs if not (set(p[1]) & set(p[0]))), None) or (
+        pairs[0] if pairs else None)
+    ex_line = ('   예: 문장에 "%s" 가 있으면 값은 "%s" 로 적는다.' % (ex[1], ex[0])) if ex else None
+    # 표에 어휘가 하나도 없으면 예시가 없다 -- 그 줄만 빠진다(문단 사이 빈 줄 ""은 남긴다).
+    return "\n".join(ln for ln in [
         "당신은 PC 견적 상담의 «입력 파서»다. 고객 문장을 두 가지로만 바꾼다 --",
         "① 이 문장이 PC 상담인가(pc) ② 문장에서 읽히는 구조화 조건(constraints).",
         "",
@@ -166,13 +221,18 @@ def _build_prompt(text: str, usages: list) -> str:
         '   "쯤"·"정도"·"안팎"처럼 대략을 뜻하는 말은 경계가 아니다 -- 그냥 "150만원"으로 적는다.',
         "   금액이 문장에 없으면 이 항목을 넣지 않는다.",
         f'2. l="용도"  v: 다음 중에서만 고른다 -- {usage_line}',
+        "   **괄호 안은 그 용도를 가리키는 말이다**(서버 정본). 문장에 그 말이 있으면"
+        " 괄호가 아니라 **앞의 이름**을 값으로 적는다.",
+        ex_line,
+        "   여러 이름의 말이 함께 있으면 **문장이 실제로 하겠다는 쪽**을 적는다 --"
+        " 부정·제외된 말(\"~는 안 하고\" · \"~ 말고\")은 그 용도로 세지 않는다.",
         "   둘 이상이면 \" · \" 로 잇는다. 목록에 없는 용도는 넣지 않는다.",
         f'3. l="선호"  v: 다음 중에서만 고른다 -- {" / ".join(PREF_VALUES)}',
         "   둘 다면 \"저소음 · 화이트\". 그 밖의 선호(성능·크기·브랜드 등)는 넣지 않는다.",
         "",
         "[고객 문장]",
         text,
-    ])
+    ] if ln is not None)
 
 
 def _norm_budget(v: str):
@@ -316,10 +376,14 @@ def parse_talk(body: ParseBody, request: Request):
     with engine.connect() as conn:
         access_gate.check_rate(conn, request, what="talk.parse")
 
-    usages = _usage_values()
-    prompt = _build_prompt(text, usages)
+    usage_rows = _usage_rows()
+    usages = [lab for lab, _terms in usage_rows]
+    prompt = _build_prompt(text, usage_rows)
     # 문장 자체는 로그에 남기지 않는다(원문 비적재 규약) -- 길이만 남긴다.
-    log.info("[talk] parse request: chars=%d usages=%d", len(text), len(usages))
+    # terms 는 프롬프트에 실린 정본 어휘 수다 -- 표가 늘면 프롬프트도 길어지므로
+    # (비용) 여기서 세어 둔다. 어휘 자체는 찍지 않는다(로그는 ASCII 기호만).
+    log.info("[talk] parse request: chars=%d usages=%d terms=%d", len(text), len(usages),
+             sum(len(t) for _lab, t in usage_rows))
 
     try:
         result = llm.call(prompt, task_key="task.s1_parse", customer_facing=True,
