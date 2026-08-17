@@ -1,0 +1,469 @@
+{#
+  로그인 — ADM-SYS-021 · /admin2/login (신설 2026-08-17)
+
+  ■ 원천
+    승인 디자인 계약  docs/design/spec-login.md   (1b 안 · 사장님 확정 2026-08-15)
+    요구사항 정의서   docs/design/req/req-login.md
+    Phoenix 는 참조하지 않는다(2026-08-14 사장님 지시). 팔레트·서체·헤더는 우리 것
+    (/shared/admin2/admin2.css)만 쓴다.
+
+  ■ 셸을 상속하지 않는 이유
+    계약이 「상단바(최소 셸)」 + 「사이드바를 그리지 않는다」로 못박았다 — 이 화면에는
+    그릴 운영자가 없다. 근거·판단은 api/admin_ui_login.py 모듈 docstring 참조.
+    팔레트를 여기서 다시 정의하지 않는다(:root 재정의 0) — admin2.css 하나만 읽는다.
+
+  ■ ★ 「갈라 보이지만 갈라지지 않는다」
+    좌우로 나눈 것은 «쓰는 사람이 이해하기 쉬우라고»이지 서버가 갈라졌다는 뜻이 아니다.
+    제출은 둘 다 POST /api/admin/auth/login 이다. 계약이 스스로 밝힌 그 문장을
+    화면에서 «빼지 않는다» — 빼면 화면이 거짓이 된다(.lg-same 참조).
+
+  ■ 숫자를 지어내지 않는다
+    세션 규칙(시간·회·분·일)은 마크업에 박지 않고 라우트가 api/auth.py 상수에서 읽어
+    넘긴 값(session_hours·max_fails·lock_minutes·remember_days)만 쓴다.
+    이메일·이름·연락처 예시 값은 두지 않는다(placeholder 포함) — 등록 폼에 남은 예시가
+    기본값으로 저장될 뻔한 전례가 있다.
+
+  ■ 실패를 삼키지 않는다
+    로그인 실패 · 승인 대기 · 비밀번호 미설정 · 잠금 · 정지는 서로 다른 사건이다.
+    서버가 준 message 를 그대로 보이고, 코드(HTTP + error)를 함께 적는다 —
+    색만으로 말하지 않는다. 모르는 응답 모양도 조용히 넘기지 않고 원문을 보인다.
+#}<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팝콘PC 관리자 · 로그인</title>
+<link rel="stylesheet" href="/shared/fonts/fonts.css">
+<link rel="stylesheet" href="/shared/admin2/admin2.css">
+<style>
+/* 이 화면 본문 스타일 — 색은 전부 admin2.css 별칭(토큰)으로만 쓴다. 임의 HEX 0건.
+   box-sizing 은 공통 셸이 `.a2-shell *` 로 주던 것과 같은 값을 여기서 준다
+   (이 화면은 `.a2-shell` 을 두지 않으므로 — .a2-hd 의 min-height 계산이 다른
+   admin2 화면과 어긋나지 않게 하는 것이 목적이다). */
+*{box-sizing:border-box}
+
+.lg-page{min-height:100vh;display:flex;flex-direction:column}
+
+/* ── 상단바(최소 셸) — 공통 셸의 `.a2-hd` 를 그대로 쓴다(사본을 만들지 않는다) ── */
+.lg-brand{font:600 14px/1 var(--font);color:var(--on);letter-spacing:-.01em}
+.lg-hd-note{font:400 11.5px/1.4 var(--font);color:var(--rv-faint)}
+
+/* ── 본문 ── */
+.lg-body{flex:1;display:flex;justify-content:center;padding:36px 20px 44px}
+.lg-wrap{display:flex;flex-direction:column;gap:20px;max-width:1005px}
+.lg-cols{display:flex;align-items:stretch}
+/* 계약 치수: 좌 470px · 세로 구분선 · 우 470px */
+.lg-col{width:470px;flex:none;padding:26px 28px;border-radius:10px}
+.lg-col-login{background:var(--card);border:1px solid var(--outline)}
+/* 「아직 계정이 없는 쪽」을 시각으로 가른다 — 점선 테두리 · 다른 배경(계약) */
+.lg-col-apply{background:var(--container-low);border:1px dashed var(--rv-dim)}
+.lg-div{width:1px;flex:none;background:var(--outline);margin:0 32px}
+
+.lg-h{margin:0;font:600 17px/1.3 var(--font-head);color:var(--on)}
+.lg-sub{margin:5px 0 20px;font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.lg-f{display:flex;flex-direction:column;gap:13px}
+.lg-lb{display:flex;flex-direction:column;gap:5px;font:500 11.5px/1 var(--font);color:var(--on-variant)}
+.lg-in{width:100%;padding:9px 11px;border:1px solid var(--outline);border-radius:6px;
+       background:var(--card);color:var(--on);font:400 13px/1.4 var(--font)}
+.lg-in:focus{outline:2px solid var(--rv-link);outline-offset:-1px}
+.lg-check{display:flex;align-items:flex-start;gap:8px;font:500 12px/1.4 var(--font);color:var(--on)}
+.lg-check input{margin:1px 0 0;flex:none}
+.lg-btn{width:100%;padding:11px 14px;border:1px solid var(--primary);border-radius:6px;
+        background:var(--primary);color:var(--on-primary);font:600 13px/1 var(--font);cursor:pointer}
+.lg-btn:hover{background:var(--rv-ink-soft);border-color:var(--rv-ink-soft)}
+.lg-btn-2{background:var(--card);color:var(--on);border-color:var(--outline);font-weight:500}
+.lg-btn-2:hover{background:var(--container-low);border-color:var(--rv-dim);color:var(--on)}
+.lg-note{margin:0;font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+.lg-note-faint{color:var(--rv-faint)}
+.lg-hr{height:1px;background:var(--outline);margin:18px 0}
+.lg-social{display:flex;gap:10px}
+.lg-social .lg-btn{width:auto;flex:1}
+.lg-foot{margin:20px 0 0;padding-top:14px;border-top:1px solid var(--outline);
+         font:400 11px/1.7 var(--font);color:var(--rv-faint)}
+.lg-code{font-family:var(--font-num);font-size:11px}
+
+/* ── ★ 계약이 스스로 밝힌 문장 — 좌우가 갈라 보이지만 제출은 한 곳으로 간다 ── */
+.lg-same{margin:0;padding:13px 16px;border:1px solid var(--outline);border-left:3px solid var(--rv-link);
+         border-radius:7px;background:var(--container);font:400 12px/1.7 var(--font);color:var(--on-variant)}
+.lg-same b{color:var(--on)}
+.lg-same code{font-family:var(--font-num);font-size:11.5px;color:var(--on)}
+
+/* ── 결과 상자 — 색조 넷(성공 초록 · 주의 노랑 · 대기 회색 · 오류 붉게).
+   ⚠ 색만으로 말하지 않는다: 코드(HTTP + error)와 문구를 함께 적는다. ── */
+.lg-result{margin:16px 0 0;padding:11px 13px;border:1px solid var(--outline);border-left:3px solid var(--state-wait);
+           border-radius:7px;background:var(--container-low);display:flex;flex-direction:column;gap:5px}
+.lg-result[hidden]{display:none}
+.lg-result-code{font:600 10.5px/1 var(--font-num);color:var(--rv-faint);letter-spacing:.03em}
+.lg-result-msg{font:500 12.5px/1.6 var(--font);color:var(--on);white-space:pre-wrap}
+.lg-result-act{align-self:flex-start;margin-top:3px;padding:7px 11px;border:1px solid var(--outline);
+               border-radius:6px;background:var(--card);color:var(--on);font:600 11.5px/1 var(--font);cursor:pointer}
+.lg-result.is-ok{border-left-color:var(--state-done)}
+.lg-result.is-ok .lg-result-code{color:var(--state-done)}
+.lg-result.is-warn{border-left-color:var(--state-run);background:var(--rv-amber-bg)}
+.lg-result.is-warn .lg-result-code{color:var(--state-run)}
+.lg-result.is-wait{border-left-color:var(--state-wait)}
+.lg-result.is-err{border-left-color:var(--state-fail)}
+.lg-result.is-err .lg-result-code{color:var(--state-fail)}
+
+/* ── 768px 세로 스택 ── */
+@media (max-width:768px){
+  .lg-body{padding:22px 14px 32px}
+  .lg-cols{flex-direction:column}
+  .lg-col{width:100%;padding:20px 18px}
+  .lg-div{width:100%;height:1px;margin:20px 0}
+  .lg-social{flex-direction:column}
+}
+</style>
+</head>
+<body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}">
+<div class="lg-page">
+
+  {# 상단바 — 계약: 「admin2」 · 「관리자 로그인」 · 우측 안내. 사이드바는 그리지 않는다. #}
+  <header class="a2-hd">
+    <span class="lg-brand">admin2</span>
+    <span class="a2-sep">/</span>
+    <span class="a2-now">{{ crumb_now }}</span>
+    <span class="a2-badge">{{ screen_id }}</span>
+    <span class="a2-grow"></span>
+    <span class="lg-hd-note">사이드바·권한 표시는 로그인 뒤에 그립니다</span>
+  </header>
+
+  <main class="lg-body">
+    <div class="lg-wrap">
+
+      <div class="lg-cols">
+
+        {# ── 좌 470px — 로그인 ─────────────────────────────────── #}
+        <section class="lg-col lg-col-login" aria-labelledby="lgLoginH">
+          <h1 class="lg-h" id="lgLoginH">로그인</h1>
+          <p class="lg-sub">계정이 이미 승인된 분</p>
+
+          <form class="lg-f" id="lgLoginForm" novalidate>
+            <label class="lg-lb">회사 이메일
+              <input class="lg-in" type="email" id="lgEmail" name="email"
+                     autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            </label>
+            <label class="lg-lb">비밀번호
+              <input class="lg-in" type="password" id="lgPw" name="password"
+                     autocomplete="current-password">
+            </label>
+
+            {# 기기 기억 — 계약의 「결정 5」로 «넣는다». 서버가 실제로 받는 필드
+               (LoginBody.remember_device) 이고, 비밀번호를 확인한 로그인에서만 등록된다. #}
+            <label class="lg-check">
+              <input type="checkbox" id="lgRemember" name="remember_device">
+              <span>이 기기에서 로그인 유지 ({{ remember_days }}일)</span>
+            </label>
+            <p class="lg-note">민감한 변경에는 비밀번호를 다시 확인합니다 · 철회는 「내 정보」</p>
+            <p class="lg-note lg-note-faint">비밀번호로 로그인할 때만 등록됩니다 — 계정 사용 신청 · 소셜 계정 · 부트스트랩 경로에서는 등록되지 않습니다.</p>
+
+            <button class="lg-btn" type="submit" id="lgLoginBtn">로그인</button>
+          </form>
+
+          <div class="lg-hr"></div>
+
+          <div class="lg-social">
+            <button class="lg-btn lg-btn-2" type="button" id="lgGoogle">구글 계정</button>
+            <button class="lg-btn lg-btn-2" type="button" id="lgKakao">카카오 계정</button>
+          </div>
+          <p class="lg-note lg-note-faint" style="margin-top:9px">지금은 실제 검증을 하지 않습니다 — 입력한 이메일을 그대로 신뢰합니다</p>
+
+          <div class="lg-result" id="lgBoxLeft" role="status" aria-live="polite" hidden></div>
+
+          <p class="lg-foot">비밀번호는 <b>복호화할 수 없는 해시</b>로 저장됩니다 ·
+            세션은 <span class="lg-code">{{ session_hours }}</span>시간 뒤 만료 ·
+            <span class="lg-code">{{ max_fails }}</span>회 틀리면
+            <span class="lg-code">{{ lock_minutes }}</span>분 잠깁니다.</p>
+        </section>
+
+        {# ── 가운데 — 세로 구분선 ──────────────────────────────── #}
+        <div class="lg-div" aria-hidden="true"></div>
+
+        {# ── 우 470px — 계정 사용 신청 (점선 테두리 · 다른 배경) ── #}
+        <section class="lg-col lg-col-apply" aria-labelledby="lgApplyH">
+          <h2 class="lg-h" id="lgApplyH">계정 사용 신청</h2>
+          <p class="lg-sub">아직 계정이 없는 분</p>
+
+          <form class="lg-f" id="lgApplyForm" novalidate>
+            <label class="lg-lb">회사 이메일
+              <input class="lg-in" type="email" id="lgApEmail" name="email"
+                     autocomplete="email" autocapitalize="none" spellcheck="false" required>
+            </label>
+            <label class="lg-lb">이름
+              <input class="lg-in" type="text" id="lgApName" name="name" autocomplete="name">
+            </label>
+            <label class="lg-lb">연락처
+              <input class="lg-in" type="tel" id="lgApPhone" name="phone" autocomplete="tel">
+            </label>
+            <label class="lg-lb">담당 업무
+              <input class="lg-in" type="text" id="lgApDuty" name="duty">
+            </label>
+            <button class="lg-btn" type="submit" id="lgApplyBtn">계정 사용 신청</button>
+          </form>
+
+          <p class="lg-note" style="margin-top:14px">이름 · 연락처 · 담당 업무는 <b>승인 판단 자료</b>로 함께 저장됩니다.</p>
+          <p class="lg-note lg-note-faint" style="margin-top:8px">신청에는 비밀번호를 입력하지 않습니다 — 승인 뒤 관리자가 임시 비밀번호를 발급합니다.</p>
+
+          <div class="lg-result" id="lgBoxRight" role="status" aria-live="polite" hidden></div>
+        </section>
+
+      </div>
+
+      {# ★ 이 문장을 빼면 화면이 거짓이 된다 — 계약 §「갈라 보이지만 갈라지지 않는다」 #}
+      <p class="lg-same"><b>같은 엔드포인트를 씁니다</b> — 갈라 보이지만 제출은 둘 다
+        <code>POST /api/admin/auth/login</code> 이고, 무엇이 일어날지는 서버가 판정합니다.
+        <b>잘못된 쪽에 넣어도 결과는 같습니다.</b></p>
+
+    </div>
+  </main>
+
+</div>
+
+<script src="/shared/ui-progress.js"></script>
+<script>
+/* 로그인 화면 런타임 (ADM-SYS-021)
+ *
+ * ■ 제출은 «한 번»이고 «한 곳»으로 간다 — POST /api/admin/auth/login
+ *   계정 존재 여부를 미리 조회하지 않는다. 사전 조회를 만들면 bad_credentials 의
+ *   「어느 쪽이 틀렸는지 밝히지 않는다」(존재 은닉)가 깨진다.
+ *
+ * ■ 결과를 «어느 쪽에» 띄우나 — 제출한 폼이 아니라 «서버 판정»이 정한다.
+ *   pending(신규 신청 · 대기 재제출) -> 우측 신청 상자 · 그 밖 전부 -> 좌측 로그인 상자.
+ *
+ * ■ 문구는 서버가 준 message 를 그대로 쓴다. 화면이 다시 쓰지 않는다.
+ *   예외 둘 — 서버가 message 를 «주지 않는» 자리다(실측 api/auth.py login():
+ *   성공 응답은 state/operator/must_change_password/device_remembered 만 준다).
+ *   그 둘만 계약 표(spec-login.md §결과 표시)의 문장을 쓰고, 어디서 온 문장인지
+ *   아래 SCREEN_MSG 에 적어 둔다.
+ */
+(function () {
+  "use strict";
+
+  var DASH = "/admin2/";
+
+  /* 서버가 message 를 주지 않는 두 자리 — 계약 표의 문장이다(위 주석 참조) */
+  var SCREEN_MSG = {
+    active: "로그인됐습니다",
+    must_change: "임시 비밀번호로 로그인했습니다 — 비밀번호를 변경하세요",
+    net: "API 서버에 연결할 수 없습니다 — 관리자에게 문의하세요",
+    no_email: "이메일을 먼저 입력하세요",
+    already: "이미 로그인돼 있습니다",
+    expired: "세션이 만료됐습니다 — 다시 로그인하세요"
+  };
+
+  function $(id) { return document.getElementById(id); }
+
+  var boxes = { left: $("lgBoxLeft"), right: $("lgBoxRight") };
+
+  function clearBoxes() {
+    ["left", "right"].forEach(function (k) {
+      boxes[k].hidden = true;
+      boxes[k].textContent = "";
+      boxes[k].className = "lg-result";
+    });
+  }
+
+  /* 결과 상자 — 색조 + 코드 + 문구. 색만으로 말하지 않는다.
+   * tone: ok | warn | wait | err   code: 사람이 읽는 코드 문자열   msg: 서버 문구
+   * goto: 있으면 「대시보드로 이동」 단추를 함께 둔다 */
+  function box(side, tone, code, msg, goHref) {
+    clearBoxes();
+    var b = boxes[side];
+    b.className = "lg-result is-" + tone;
+    var c = document.createElement("span");
+    c.className = "lg-result-code";
+    c.textContent = code;
+    var m = document.createElement("span");
+    m.className = "lg-result-msg";
+    m.textContent = msg;
+    b.appendChild(c);
+    b.appendChild(m);
+    if (goHref) {
+      var a = document.createElement("button");
+      a.type = "button";
+      a.className = "lg-result-act";
+      a.textContent = "대시보드로 이동";
+      a.onclick = function () { window.location.assign(goHref); };
+      b.appendChild(a);
+    }
+    b.hidden = false;
+  }
+
+  function go(ms) { window.setTimeout(function () { window.location.assign(DASH); }, ms); }
+
+  function busy(on) {
+    ["lgLoginBtn", "lgApplyBtn", "lgGoogle", "lgKakao"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.disabled = on;
+    });
+  }
+
+  /* 응답 본문을 «있는 그대로» 들고 온다 — JSON 이 아니어도 원문을 버리지 않는다.
+   * (파싱 실패를 조용히 null 로 뭉개면 실패 사유가 지워진다) */
+  function call(url, payload) {
+    var opt = { method: "POST", credentials: "same-origin" };
+    if (payload) {
+      opt.headers = { "Content-Type": "application/json" };
+      opt.body = JSON.stringify(payload);
+    }
+    return window.fetch(url, opt).then(function (res) {
+      return res.text().then(function (t) {
+        var j = null;
+        try { j = JSON.parse(t); } catch (e) { j = null; }
+        return { status: res.status, ok: res.ok, j: j, raw: t };
+      });
+    });
+  }
+
+  /* 실패 응답에서 코드·문구를 뽑는다.
+   * api/auth.py 는 두 모양을 쓴다(실측):
+   *   HTTPException(400, "문자열")        -> detail: "문자열"
+   *   HTTPException(401, 오브젝트)        -> detail: 오브젝트(error, message)
+   * 어느 쪽도 아니면 공용 헬퍼(ui-progress.errText)로 넘긴다 — 삼키지 않는다. */
+  function failure(r) {
+    var d = r.j && r.j.detail;
+    var err = "";
+    var msg = "";
+    if (d && typeof d === "object") {
+      err = d.error || "";
+      msg = d.message || "";
+    } else if (typeof d === "string") {
+      msg = d;
+    }
+    if (!msg) {
+      if (r.status === 401) {
+        msg = SCREEN_MSG.expired;
+      } else if (window.popcornProgress && window.popcornProgress.errText) {
+        msg = window.popcornProgress.errText(r.j, r.status, "POST /api/admin/auth/login");
+      } else {
+        msg = "오류 " + r.status + (r.raw ? " · " + r.raw : "");
+      }
+    }
+    return { code: "HTTP " + r.status + (err ? " · " + err : ""), msg: msg };
+  }
+
+  /* 서버 판정 -> 화면 */
+  function render(r) {
+    if (r.ok) {
+      var j = r.j || {};
+      if (j.state === "pending") {
+        /* 신규 신청 · 대기 재제출 — 우측(신청) 상자. 화면에 남는다(이동하지 않는다) */
+        box("right", "wait", "HTTP 200 · state=pending", j.message || "");
+        return;
+      }
+      if (j.state === "active") {
+        if (j.bootstrap) {
+          box("left", "ok", "HTTP 200 · bootstrap", j.message || "");
+          go(900);
+          return;
+        }
+        if (j.must_change_password) {
+          /* 계약 표에 「-> 대시보드」가 적혀 있지 않은 자리다. 그래도 이동한다 —
+           * 세션은 이미 발급됐고 「내 정보」(ADM-SYS-022)는 admin2 에 아직 없어서
+           * 여기 머물게 하면 막다른 길이 된다(구화면으로 보내는 것은 P-09 금지).
+           * 문구를 읽을 시간을 두려고 성공(0.9초)보다 길게 잡는다. */
+          box("left", "warn", "HTTP 200 · must_change_password", SCREEN_MSG.must_change);
+          go(1600);
+          return;
+        }
+        var msg = SCREEN_MSG.active;
+        if (j.device_remembered) msg += " · 이 기기를 기억합니다";
+        box("left", "ok", "HTTP 200 · state=active", msg);
+        go(900);
+        return;
+      }
+      /* 모르는 성공 응답 — 조용히 넘기지 않고 원문을 보인다 */
+      box("left", "wait", "HTTP " + r.status, r.raw);
+      return;
+    }
+    var f = failure(r);
+    /* 실패는 전부 좌측(로그인) 상자 — 계약 §결과를 어느 쪽에 띄우나 */
+    box("left", "err", f.code, f.msg);
+  }
+
+  function submit(payload) {
+    busy(true);
+    return call("/api/admin/auth/login", payload).then(function (r) {
+      busy(false);
+      render(r);
+    }, function () {
+      busy(false);
+      box("left", "err", "네트워크", SCREEN_MSG.net);
+    });
+  }
+
+  /* ── 좌: 비밀번호 로그인 ── */
+  $("lgLoginForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    submit({
+      email: $("lgEmail").value.trim(),
+      password: $("lgPw").value,
+      provider: "dev",
+      remember_device: $("lgRemember").checked
+    });
+  });
+
+  /* ── 좌: 소셜 계정 — 같은 엔드포인트에 provider 만 바꿔 보낸다(dev 어댑터) ── */
+  function social(provider) {
+    var email = $("lgEmail").value.trim();
+    if (!email) {
+      box("left", "warn", "제출 안 함", SCREEN_MSG.no_email);
+      $("lgEmail").focus();
+      return;
+    }
+    submit({ email: email, provider: provider, remember_device: false });
+  }
+  $("lgGoogle").addEventListener("click", function () { social("google"); });
+  $("lgKakao").addEventListener("click", function () { social("kakao"); });
+
+  /* ── 우: 계정 사용 신청 — 비밀번호를 보내지 않는다 ── */
+  $("lgApplyForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    submit({
+      email: $("lgApEmail").value.trim(),
+      name: $("lgApName").value.trim(),
+      phone: $("lgApPhone").value.trim(),
+      duty: $("lgApDuty").value.trim(),
+      provider: "dev"
+    });
+  });
+
+  /* ── 로드: 이미 로그인 상태인가 -> 기기 기억으로 들어갈 수 있나 ──
+   * device-login 은 실패를 전부 같은 모양(state:"no_device")으로 돌려준다 —
+   * 「이 브라우저는 기억된 기기가 아니다」는 흔한 정상 상황이라 아무것도 표시하지 않는다.
+   * httponly 쿠키는 JS 가 읽을 수 없어 «있는지»를 미리 알 방법이 없다(그래서 매번 물어본다,
+   * api/auth.py device_login() docstring 참조). */
+  function deviceLogin() {
+    return call("/api/admin/auth/device-login", null).then(function (r) {
+      if (r.ok && r.j && r.j.state === "active") {
+        box("left", "ok", "HTTP 200 · device-login", r.j.note || "");
+        go(900);
+      }
+    }, function () { /* 로드 시점 실패는 화면을 막지 않는다 — 아래 /me 가 이미 알린다 */ });
+  }
+
+  window.fetch("/api/admin/auth/me", { credentials: "same-origin" })
+    .then(function (res) {
+      return res.text().then(function (t) {
+        var j = null;
+        try { j = JSON.parse(t); } catch (e) { j = null; }
+        return { status: res.status, ok: res.ok, j: j, raw: t };
+      });
+    })
+    .then(function (r) {
+      if (r.ok && r.j && r.j.authenticated) {
+        box("left", "wait", "GET /auth/me · authenticated", SCREEN_MSG.already, DASH);
+        return null;
+      }
+      if (!r.ok) {
+        box("left", "err", failure(r).code, failure(r).msg);
+        return null;
+      }
+      return deviceLogin();
+    }, function () {
+      box("left", "err", "네트워크", SCREEN_MSG.net);
+    });
+})();
+</script>
+</body>
+</html>

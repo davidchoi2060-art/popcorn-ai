@@ -92,6 +92,48 @@ ADMIN2_PREFIX = "/admin2"
 # 필요가 없다), 불가피하면 여기 추가한다.
 ADMIN2_JSON_DATA_PATHS = ("/admin2/handoff-log/data",)
 
+# `/admin2/*` 안에서 게이트를 **면제**하는 경로 — 2026-08-17 신설(사장님 확정, A-44).
+#
+# ■ 왜 필요한가 — 순환
+#   `_is_gated()`가 `/admin2` 전체를 게이트 대상으로 보므로, 로그인 화면(ADM-SYS-021 ·
+#   `/admin2/login` · `api/admin_ui_login.py`)도 무세션이면 401을 받는다. **로그인하려는
+#   사람이 로그인 화면에 못 들어오는 순환**이라 이 한 경로만 예외로 연다.
+#
+# ■ 왜 «접두어»가 아니라 «완전 일치 집합»인가
+#   `path.startswith("/admin2/login")`으로 열면 `/admin2/login-xxx`·`/admin2/loginsecret`
+#   처럼 **뒤에 무엇이든 붙은 경로가 함께 열린다**. 지금은 그런 라우트가 없지만, 여는 쪽의
+#   실수는 «없는 화면이 404가 되는» 것으로 끝나지 않는다 — 나중에 누가 `/admin2/login-audit`
+#   같은 화면을 만들면 그 화면이 **아무 표시 없이 무세션으로 열린다**(짓는 사람은 이 파일을
+#   읽을 이유가 없다). `in` 판정이라 그 위험이 구조적으로 사라진다.
+#   ⚠ 2026-08-15에 정확히 반대 방향의 사고가 있었다(서버 렌더 화면 3종이 자체 게이트 없이
+#   실데이터를 흘렸다, 커밋 `7ccb68d`) — 이번은 그 반대다: **예외가 넓으면 다른 화면이
+#   무세션으로 열린다.** 그래서 이 집합은 «늘리기 어렵게» 두는 것이 목적이다.
+#
+# ■ 끝 슬래시(`/admin2/login/`)는 **넣지 않는다**
+#   실제 라우트는 `/admin2/login` 하나다(`api/admin_ui_login.py` — `prefix="/admin2"` +
+#   `@router.get("/login")`). `/admin2/login/`은 우리 라우트가 아니라 Starlette의
+#   `redirect_slashes` 편의가 307로 되돌려 줄 뿐인 **다른 문자열**이고, 미들웨어는 라우팅보다
+#   먼저 돌기 때문에 그 리다이렉트를 기다려 주지도 않는다. 즉 넣지 않으면 그 경로는 401이고,
+#   넣으면 **같은 화면을 여는 문자열이 둘**이 된다(면제 대상이 하나라는 사실을 다음 사람이
+#   두 번 확인해야 한다). 게이트에 걸린 사람을 보내는 목적지(`admin_ui_common._LOGIN_PAGE`,
+#   전환 예정)도 슬래시 없는 형태를 쓰므로 **열어야 할 문자열은 하나로 족하다.**
+#
+# ■ 메서드를 가리지 않는다
+#   `GET`만 열지 않고 경로 단위로 면제한다 — `/admin2/login`에 등록된 라우트는 GET 하나뿐이라
+#   다른 메서드는 라우터가 405로 거절한다. 여기서 메서드까지 따지면 «게이트 대상인가»만
+#   답하던 `_is_gated()`의 계약이 넓어진다(그 함수는 경로만 받는다).
+#
+# ⚠ **이 집합에 무엇을 더하는 것은 인증 경계를 넓히는 일이다.** 화면이 서버 렌더로 데이터를
+#   싣지 않는지, 그 화면이 부르는 API가 `/api/admin/*`(여전히 게이트된다)인지 먼저 확인한다.
+#
+# ■ 항목을 더할 때 «반드시» 함께 할 것 — 감사 호출 (이 파일 맨 아래)
+#   `_audit_admin2_open_paths()`가 항목의 «모양»을 이 파일 가져오기 시점에 검사하고,
+#   `_audit_admin2_open_routes(router)`가 그 경로의 «메서드»를 검사한다. 후자는 라우트를
+#   봐야 하므로 **경로를 소유한 모듈이 자기 맨 아래에서 부른다**(지금은
+#   `api/admin_ui_login.py`). 새 면제 경로를 만들면 그 모듈에도 같은 한 줄을 넣어라 —
+#   빠뜨리면 그 모듈은 검사되지 않는다(두 함수의 docstring 참조).
+ADMIN2_OPEN_PATHS = frozenset({"/admin2/login"})
+
 
 def _is_admin2_path(path: str) -> bool:
     """이 요청이 `/admin2/*` 아래(화면이든 `ADMIN2_JSON_DATA_PATHS`의 데이터 엔드포인트든
@@ -142,7 +184,17 @@ def _is_gated(path: str) -> bool:
 
     **`_is_admin2_page()`가 아니라 `_is_admin2_path()`를 쓴다** — `/admin2/handoff-log/data`
     처럼 거절 형식만 JSON으로 다른 경로도 게이트 대상에서 빠지면 안 되기 때문이다.
+
+    **면제는 `ADMIN2_OPEN_PATHS`(완전 일치) 하나뿐이다** — 지금은 로그인 화면
+    `/admin2/login` 이고, 근거·범위·왜 접두어가 아닌지는 그 상수 위 주석에 있다
+    (2026-08-17 신설). 판정을 **여기 한 곳**에서 하는 이유는 위와 같다: 미들웨어가
+    아니라 이 함수가 「게이트 대상인가」의 단일 원천이라, 나중에 다른 곳에서
+    `_is_gated()`를 부르게 되어도 면제가 함께 따라간다.
+    ⚠ 이 면제가 `/api/admin/*`에는 닿지 않는다 — `ADMIN2_OPEN_PATHS`의 문자열이
+    `/admin2/`로 시작하므로 `/api/admin/...`과는 어떤 경우에도 같아질 수 없다.
     """
+    if path in ADMIN2_OPEN_PATHS:
+        return False
     return path.startswith("/api/admin/") or _is_admin2_path(path)
 
 
@@ -1096,3 +1148,98 @@ def _audit_open_auth_routes() -> None:
 
 
 _audit_open_auth_routes()
+
+
+# ── 감사: ADMIN2_OPEN_PATHS 가 넓어지거나 쓰기 경로를 품지 않는가 (2026-08-17 신설) ──
+#
+# 위 `_audit_open_auth_routes()`와 **같은 방식**이다: 사람이 "다음에도 기억하기"에
+# 기대지 않고 **기동 시점에 기계로 확인**하고, 어긋나면 `RuntimeError`로 **앱이 뜨지
+# 않게** 한다. 새 장치를 만들지 않고 그 함수의 결을 그대로 따랐다(안전 메서드
+# 판정까지 같은 `("GET", "HEAD", "OPTIONS")` 목록을 쓴다).
+#
+# ■ 왜 필요한가 — `ADMIN2_OPEN_PATHS`(위)는 인증 게이트를 «면제»하는 집합이다.
+#   `OPEN_PREFIXES` 아래에서 `issue_password`가 조용히 뚫려 있던 것과 **같은 클래스의
+#   구멍**이 여기서도 생길 수 있다: 이 집합에 쓰기 경로가 들어오면 그 경로는 세션도
+#   권한도 없이 실행된다. 정상 동작 테스트로는 절대 드러나지 않는다.
+#
+# ■ 두 겹으로 나눈 이유 — 검사 시점이 다르다
+#   ① 집합 «모양» 검사는 이 파일 가져오기 시점에 할 수 있다(라우트가 필요 없다).
+#   ② 집합에 걸린 경로의 «메서드» 검사는 라우트를 봐야 하는데, `/admin2/*` 라우트는
+#      다른 모듈(`api/admin_ui_login.py` 등)에 있고 그 모듈들은 `api/main.py`의
+#      라우터 탐색이 **이 파일보다 뒤에** 가져온다(실측: `main.py`가 16행에서
+#      `from .auth import auth_middleware`, 74행에서 `_discover_routers()`). 그래서
+#      ②는 여기서 실행하지 못하고, **경로를 소유한 모듈이 자기 가져오기 시점에**
+#      `_audit_admin2_open_routes(router)`를 부른다 — 그것도 결국 기동 시점이다.
+#      (`auth.py`가 그 모듈을 직접 가져오면 순환이다 — 그 모듈이 이미 auth를 읽는다.)
+#
+# ⚠ ①이 막는 것이 무엇인지 분명히 해 둔다 — `"/admin2"`나 `"/admin2/"`를 이 집합에
+#   넣으면 `_is_gated()`가 그 **정확한 문자열**에만 False를 주므로 `/admin2/dash`가
+#   함께 열리지는 않지만, `/admin2/`(admin2 홈, `admin_ui_home.py`가 서버 렌더로
+#   실데이터를 싣는 화면)가 **무세션으로 열린다.** 2026-08-15에 새어 나간 것과 같은
+#   종류다. 그래서 그 두 문자열을 기동 시점에 거절한다.
+
+
+def _audit_admin2_open_paths() -> None:
+    """`ADMIN2_OPEN_PATHS`의 «모양»을 기동 시점에 확인한다 — 위 주석 참조.
+
+    검사하는 것: `/admin2/` 아래인가 · 그 아래 실제 이름이 있는가(`/admin2`·
+    `/admin2/` 자체가 아닌가) · 끝 슬래시가 없는가(면제 문자열이 둘이 되지 않게 —
+    `ADMIN2_OPEN_PATHS` 위 주석 §끝 슬래시) · 한 항목이 여러 경로를 뜻하게 만드는
+    글자(`?`·`#`·`*`·`{`·공백)가 없는가. `_is_gated()`는 `in` 판정이므로 그런 글자가
+    섞이면 «맞을 리 없는 문자열»이 되어 조용히 아무것도 면제하지 않거나(오탐 없음
+    쪽이라 그나마 안전하다), 사람이 접두어처럼 읽고 잘못 늘리게 된다.
+    """
+    problems = []
+    for path in sorted(ADMIN2_OPEN_PATHS):
+        if not path.startswith(ADMIN2_PREFIX + "/") or len(path) <= len(ADMIN2_PREFIX) + 1:
+            problems.append((path, "'/admin2/<name>' 형태가 아니다"))
+            continue
+        if path.endswith("/"):
+            problems.append((path, "끝 슬래시는 넣지 않는다"))
+        if any(ch in path for ch in "?#*{} \t"):
+            problems.append((path, "한 항목이 여러 경로를 뜻하게 만드는 글자가 있다"))
+    if problems:
+        raise RuntimeError(
+            "보안 감사 실패(api/auth.py _audit_admin2_open_paths): ADMIN2_OPEN_PATHS "
+            "항목이 게이트 면제 규칙에 맞지 않습니다 -> "
+            f"{problems}. 이 집합은 '/admin2/<name>' 완전 일치만 받습니다 "
+            "(상수 위 주석 참조).")
+
+
+def _audit_admin2_open_routes(open_router) -> None:
+    """`ADMIN2_OPEN_PATHS`에 걸린 경로가 «안전 메서드»만 노출하는지 확인한다.
+
+    **게이트 면제 경로를 가진 모듈이 자기 가져오기 시점에 부른다** — 예:
+
+        from .auth import _audit_admin2_open_routes
+        _audit_admin2_open_routes(router)      # 모듈 맨 아래
+
+    `api/main.py`의 라우터 탐색이 그 모듈을 가져올 때 함께 돌아 **기동 시점에**
+    드러난다(위 주석 ② 참조 — 이 파일에서 직접 돌리지 못하는 이유가 거기 있다).
+    쓰기 경로가 이 집합에 걸려 있으면 `RuntimeError`로 **앱이 뜨지 않는다**:
+    그 경로는 세션도 권한도 없이 실행되므로, 요청이 조용히 성공하는 것보다
+    서버가 그 자리에서 실패하는 쪽이 낫다(`_audit_open_auth_routes()`와 같은 판단).
+
+    ⚠ **이 함수는 넘겨받은 라우터만 훑는다** — 위 `_audit_open_auth_routes()`가
+    자기 docstring에 적어 둔 것과 같은 한계다. 면제 경로를 새로 만드는 모듈이 이
+    호출을 빠뜨리면 그 모듈은 검사되지 않는다. 그래서 `ADMIN2_OPEN_PATHS`에
+    항목을 더하는 사람이 읽도록 **상수 위 주석에 이 호출을 함께 적어 둔다.**
+    """
+    problems = []
+    for route in getattr(open_router, "routes", []):
+        if getattr(route, "path", None) not in ADMIN2_OPEN_PATHS:
+            continue
+        for method in (getattr(route, "methods", None) or set()):
+            if method in ("GET", "HEAD", "OPTIONS"):
+                continue                      # 안전 메서드는 이 감사 대상이 아니다
+            problems.append((method, route.path))
+    if problems:
+        raise RuntimeError(
+            "보안 감사 실패(api/auth.py _audit_admin2_open_routes): 다음 경로가 "
+            "ADMIN2_OPEN_PATHS 로 인증 게이트를 면제받는데 안전 메서드가 아닙니다 -> "
+            f"{sorted(problems)}. 면제 경로는 세션도 권한도 없이 실행되므로 쓰기를 "
+            "둘 수 없습니다. 쓰기가 필요하면 그 엔드포인트를 '/api/admin/*' 아래로 "
+            "옮기십시오(그쪽은 게이트가 그대로 걸립니다).")
+
+
+_audit_admin2_open_paths()

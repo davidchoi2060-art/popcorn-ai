@@ -49,7 +49,7 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 0 | 로그인 | [req-login.md](req-login.md) | [spec-login.md](../spec-login.md) | **승인 디자인 완료 · 구현 대기**(2026-08-17 정정 — 전에는 "승인 디자인 대기"였는데 `spec-login.md`가 2026-08-15 이미 사장님 확정을 받아 있었다. **구현은 아직 없다**: `templates/admin`에 login 계열 템플릿 0건. 착수 시점은 A-56 ⑧로 "AI 실연동 물결이 끝난 뒤"로 미뤄져 있다. ID `ADM-SYS-021`(기존 재사용) · 경로 `/admin2/login` — 인증 게이트 예외 신설 필요, 정의서 §⑦ ㉮ 참조) |
+| 0 | 로그인 | [req-login.md](req-login.md) | [spec-login.md](../spec-login.md) | **지음**(2026-08-17 정정 — A-56 ⑧이 미뤄 둔 착수를 같은 날 앞당겨 구현했다. `/admin2/login` · **ADM-SYS-021** · `api/admin_ui_login.py` + `templates/admin/login.html.j2`. 게이트 면제는 `api/auth.py` `ADMIN2_OPEN_PATHS`의 **완전 일치 집합**(A-44) — 접두어가 아니다. 기동 시 감사 두 겹(`_audit_admin2_open_paths`·`_audit_admin2_open_routes`)이 이 집합이 넓어지거나 쓰기 경로를 품으면 앱을 세운다. **전환은 같은 커밋**: `admin_ui_common._LOGIN_PAGE`를 `/admin2/login`으로 · `api/main.py`의 `_ADMIN_AUTH_DOOR_SCREENS`에서 `login` 제거(`my-profile`·`operators`는 대체 화면이 없어 남김 — 한 번에 셋을 닫지 않는다). 확인자 검증: 게이트 무회귀 14/14 401 · 승인 디자인 치수 8항목 일치 · 기기 기억 전 흐름(등록→로그인→철회→`no_device`) 실완주 · 숫자 리터럴 0건(세션 규칙은 서버 상수를 렌더에 실어 보냄) · 무세션 `/admin2/reviews` → 401 → 로그인 → 대시보드 → 좌측 메뉴 → 도착. 확인법: `grep -n "ADMIN2_OPEN_PATHS" api/auth.py`) |
 
 ## 1. 대시보드
 

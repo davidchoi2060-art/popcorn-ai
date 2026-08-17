@@ -60,7 +60,18 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
 # 참조하지 않으므로(실측 — 이 파일과 `admin_nav.py` 양쪽 다 `auth` import 0건),
 # `auth.py`와 `admin_ui_home.py` 둘 다 여기서 가져오면 순환이 생기지 않는다.
 # 같은 것을 두 벌 두지 않는다(CANON.md §1) — 문구를 바꿀 일이 생기면 여기 한 곳만 고친다.
-_LOGIN_PAGE = "/admin/login.html"
+#
+# ■ 2026-08-17 전환 — 목적지를 admin2 로 옮겼다 (`/admin/login.html` -> `/admin2/login`)
+#   `req-login.md` §④가 「이 상수가 함께 옮겨지지 않으면 게이트에 걸린 사람은 계속
+#   구화면으로 안내된다 — 새 화면은 주소를 직접 아는 사람만 쓰게 된다」고 예고했고,
+#   실제로 그 상태였다(확인자 실측: 무세션 `/admin2/dash` 응답 본문이
+#   `url=/admin/login.html`을 가리켰다). 옮기는 조건이던 **확인자 검증을 통과한 뒤**
+#   바꾼 것이다 — 검증 전에 바꾸면 덜 된 화면으로 모든 운영자가 떨어진다.
+#
+#   ⚠ **`api/main.py`의 `_ADMIN_AUTH_DOOR_SCREENS`에서 `login`을 빼는 것과 «같은
+#   커밋»이어야 한다.** 이쪽만 옮기면 구화면 `/admin/login.html`이 계속 열려 있어
+#   **로그인 화면이 둘 공존**한다(어느 쪽이 정본인지 아무도 모르게 된다).
+_LOGIN_PAGE = "/admin2/login"
 
 
 def login_required_html() -> str:
