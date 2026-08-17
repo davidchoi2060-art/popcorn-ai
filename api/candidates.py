@@ -6,9 +6,11 @@ base = v_recommendation_candidates ∧ stock_qty > 0 (UX-08 "조건 통과 부�
 v0 하드필터(정직한 최소 룰 — 그 외 제약은 applied=false로 정직 표기):
 - 예산: 부품별 상한 배분율(아래 BUDGET_ALLOC — 휴리스틱, S2 엔진 배분 로직으로 대체 예정).
   '이상'·숫자 없음('AI 추천 예산' 등)은 미적용.
-- 태그: 값에 '저소음' → tag_silent (스코프: GPU·POWER·CASE·COOLER — 스코프 밖 부품은
-  무조건 통과. tag false의 이중 의미(미태깅) 때문에 전 부품 적용 시 전멸 위험),
+- 태그: **「선호」 라벨에 한해** 값에 '저소음' → tag_silent (스코프: GPU·POWER·CASE·COOLER —
+  스코프 밖 부품은 무조건 통과. tag false의 이중 의미(미태깅) 때문에 전 부품 적용 시 전멸 위험),
   '화이트' → tag_white (스코프: CASE).
+  ⚠ 라벨을 안 보고 값만 보던 시절엔 「요청」(고객 원문 요약)까지 걸러 같은 필터가 두 번
+  걸렸다(2026-08-17 수정). 어느 라벨이 무엇을 거르는지는 아래 처분표가 정본이다.
 
 effects = 제약 배열 순서대로 누적 적용한 델타. 순서를 바꾸면 최종 count는 같고
 델타 배분만 달라진다 — 이것이 이 계약의 정의된 결정론이다.
@@ -40,6 +42,42 @@ BUDGET_ALLOC = {
 SILENT_SCOPE = {"GPU", "POWER", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
 WHITE_SCOPE = {"CASE"}
 
+# ── 라벨이 「거를 자격」을 정한다 — 값 문자열이 아니다 (2026-08-17) ────────────────
+# 아래 넷이 **들어오는 라벨 전부에 대한 처분표**다. 여기 없는 라벨은 거르지 않는다.
+#
+# 병(실측 2026-08-17): 태그 필터가 라벨을 보지 않고 값에 '저소음'·'화이트'가 「들어 있는지」만
+#   봤다. 그래서 「요청」(고객 원문 요약)까지 필터를 받아 **같은 필터가 두 번** 걸렸다.
+#     chat 「화이트로」 -> 요청 delta 469 · 선호 delta 0 (선호가 걸 것이 이미 없다)
+#   결과: 완화 칩이 둘 뜨고, 「선호 조건 풀기」를 눌러도 3,059 가 아니라 2,590 까지만 돌아왔다.
+#   같은 날 「우선순위 -> 선호」 통합으로 막은 「풀었는데 안 풀린다」 함정의 재발 경로였다.
+#
+# 왜 「값만 보는 것」이 구조적으로 틀렸나 — 셋이 동시에 성립했다:
+#   ① 필터를 받을 자격은 라벨의 「뜻」이 정한다. 「요청」은 원문 요약이라 그 안에 어떤 낱말이
+#      있든 조건이 아니다 — **그 라벨 자신의 reason 이 이미 그렇게 선언하고 있었다.**
+#      코드가 자기 계약을 안 지키는 상태였고, 계약은 주석이 아니라 표로 지켜야 한다.
+#   ② 판정이 낱말 운에 좌우됐다. 실측: 요청 '화이트로' -> applied=true(469 제외) ·
+#      요청 '조용하게 해주세요' -> applied=false. **뜻이 같은데 결과가 다르다.**
+#      고객이 우연히 태그 낱말을 그대로 쳤을 때만 걸리는 것은 규칙이 아니라 사고다.
+#   ③ 그래서 「몇 개를 걸렀나」를 세는 검사는 이걸 못 잡는다 — 둘 다 「걸렀다」이므로 통과한다.
+#      증명해야 하는 것은 **「이 라벨이 거를 자격이 있는가」**이고, 그건 세어서 알 수 없다.
+#      표로 선언해야만 「자격 없는 라벨이 걸렀다」가 관측 가능한 사실이 된다.
+#      (회귀 [26]·[42] 가 「문자열 모양」으로 동작을 추정하다 조용히 빠져나간 것과 같은 계열.)
+#
+# ⚠ 라벨을 여기 «빠뜨리면» 안 거르고 applied=false 로 정직하게 표기된다 — 화면은 그 제약을
+#   완화 칩으로 내밀지 않으므로 조용한 오작동이 아니라 **눈에 보이는 미적용**이 된다.
+#   반대 방향(자격 없는 라벨을 넣는 것)이 위험한 쪽이라, 넓히려면 근거를 여기 적는다.
+BUDGET_LABELS = frozenset({"예산"})
+USAGE_LABELS = frozenset({"용도", "상황"})
+# 태그 필터를 받는 유일한 라벨. 화면(`s1-session.html` CONS_ALIAS)이 우선순위·소음·외관을
+# 「선호」로 접어서 보내고, 서버 파서(`api/talk.py` LABELS)도 「선호」만 낸다 — 어휘의 정본은
+# 그 둘이다. 여기서 별칭을 다시 정의하면 같은 어휘가 두 벌이 된다(CANON §1).
+TAG_LABELS = frozenset({"선호"})
+# 원문 보관 라벨 — 「거르지 않는다」가 계약이다. 고객이 친 말을 그대로 담는 자리라
+# 조건이 아니고, 후보 수에 영향을 주지 않는다. 다만 **무시하지는 않는다**:
+# `/api/recommend` 가 consult_sessions.constraints 에 저장하고, 근거 설명 경로
+# (`recommend._explain_facts` 의 `고객_조건`)가 이 값을 그대로 재료로 쓴다.
+VERBATIM_LABELS = frozenset({"요청"})
+
 
 class Constraint(BaseModel):
     l: str
@@ -62,14 +100,14 @@ def _budget_cap(value: str):
 
 def _apply_one(parts: list[dict], label: str, value: str):
     """제약 1건 적용 — (남은 parts, applied, reason). 한 제약에 복수 태그면 순차 결합."""
-    if label == "예산":
+    if label in BUDGET_LABELS:
         cap = _budget_cap(value)
         if cap is None:
             return parts, False, "상한 없는 예산 표현 — 후보 수에는 영향 없음"
         kept = [p for p in parts
                 if p["sale_price"] <= int(cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
         return kept, True, "부품별 예산 상한(CPU 25%·GPU 40% 등 배분율) 초과 부품 제외"
-    if label in ("용도", "상황"):
+    if label in USAGE_LABELS:
         # 슬라이스 58: 용도가 실제로 부품을 거른다. 이전에는 "구성 단계(스코어)에서 반영"이라고
         # 답하고 아무것도 하지 않아, 고사양 게임에 GT710 2GB가 나왔다.
         floors = UF.slot_floors(value)
@@ -81,19 +119,24 @@ def _apply_one(parts: list[dict], label: str, value: str):
         why = " · ".join(f"{SLOT_KO.get(s, s)} {f[2]:,}{unit.get(f[0], '')} 이상"
                          for s, fl in floors.items() for f in fl[:1])
         return kept, True, f"용도 하한 미달 부품 제외 — {why}"
-    applied, reasons = False, []
-    if "저소음" in value:
-        parts = [p for p in parts
-                 if p["part_type"] not in SILENT_SCOPE or p["tag_silent"]]
-        applied = True
-        reasons.append("소음원 부품(GPU·파워·케이스·쿨러) 중 저소음 태그 없는 부품 제외")
-    if "화이트" in value:
-        parts = [p for p in parts
-                 if p["part_type"] not in WHITE_SCOPE or p["tag_white"]]
-        applied = True
-        reasons.append("케이스 중 화이트 태그 없는 부품 제외")
-    if applied:
-        return parts, True, " · ".join(reasons)
+    if label in VERBATIM_LABELS:
+        # 원문 요약이라 조건이 아니다. 값 안에 '화이트'·'저소음'이 들어 있어도 거르지 않는다 —
+        # 거르면 화면의 선호 경로와 **같은 필터가 두 번** 걸린다(위 처분표 ①·②).
+        return parts, False, "고객 원문 요약 — 조건이 아니므로 후보 수에는 영향 없음"
+    if label in TAG_LABELS:
+        applied, reasons = False, []
+        if "저소음" in value:
+            parts = [p for p in parts
+                     if p["part_type"] not in SILENT_SCOPE or p["tag_silent"]]
+            applied = True
+            reasons.append("소음원 부품(GPU·파워·케이스·쿨러) 중 저소음 태그 없는 부품 제외")
+        if "화이트" in value:
+            parts = [p for p in parts
+                     if p["part_type"] not in WHITE_SCOPE or p["tag_white"]]
+            applied = True
+            reasons.append("케이스 중 화이트 태그 없는 부품 제외")
+        if applied:
+            return parts, True, " · ".join(reasons)
     return parts, False, "구성 단계(스코어)에서 반영 — 후보 수에는 영향 없음"
 
 
