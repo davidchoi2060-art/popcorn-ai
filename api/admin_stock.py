@@ -9,6 +9,9 @@ ADM-PRC-040·매입 견적 ADM-SRC-010 소관). 화면 매입가는 참조 표�
 undo = **역방향 원장 행**(adjust, -qty) — 원장은 삭제하지 않는다(order_events 전례).
 pool_entered는 추측하지 않고 v_recommendation_candidates 실측으로 판정 — 재고만 열려도
 검수·가격이 미완이면 false(3중 게이트).
+목록 행의 후보 진입 판정(`pool_state`·`pool_label`·`pool_note`)도 **같은 뷰를 실조회한다**
+(2026-08-18 신설 — 그전에는 화면이 reviewed·priced·has_specs 셋을 조합했다. 근거·실측은
+§_pool_of 주석).
 목록 = 파생(stock_qty=0 ∨ 안전재고 미달, status NOT IN 단종·삭제대기) — **저장하는 컬럼이 없다.**
 안전재고 미달도 LIVE 판정이다: `products.safety_stock` 컬럼이 실재하고(마이그레이션 0004)
 `_PENDING`·`_PENDING_COUNT`·`_note_of` 셋이 실제로 그 컬럼을 읽는다. 2026-08-17까지 이
@@ -143,20 +146,107 @@ def _in_pool(conn, pc: int) -> bool:
         {"pc": pc}).first() is not None
 
 
-def _note_of(r) -> str:
-    if r["stock_qty"] > 0 and r["safety_stock"] and r["stock_qty"] < r["safety_stock"]:
-        return (f"안전재고 미달 — 현재 {r['stock_qty']} / 기준 {r['safety_stock']}"
-                " (판매는 계속되지만 소진 위험)")
+# ───────────── 목록 행의 후보 진입 판정 — **서버가 뷰를 실조회한다** ─────────────
+# 계약 §3중 게이트: 「서버가 v_recommendation_candidates 를 실조회한다 — 화면이 판정하지
+# 않는다」. 2026-08-18 까지 이 판정을 **화면이** 했다(`verdictOf()` 가 reviewed·priced·
+# has_specs 셋을 조합). 그 조합은 뷰가 함께 거르는 나머지를 못 본다 —
+#     ai_candidate_yn · category_group='core_part' · part_type(핵심 10종) ·
+#     data_origin <> 'demo' · status='판매중'
+# 실측(2026-08-18 · 입고 대기 15,725행): 셋을 다 통과한 행 10,540건 중 **3,876건은
+# 그 밖의 조건 때문에 뷰에 영영 들어가지 않는다.** 재고>0 인 2건(P-4101·P-4103)도
+# 셋을 다 통과하지만 `data_origin='demo'` 라 후보가 아닌데, 화면은 「후보 진입 가능」
+# 이라 말하고 있었다 — **미래형인 것도 틀렸고 판정 자체도 틀렸다.**
+#
+# 그래서 판정을 뷰 실조회로 옮긴다. 확정 응답 `pool_entered` 가 부르는 그 뷰이므로
+# **확정 전 라벨과 확정 후 값이 같은 원천**을 쓴다(갈라지면 확정하는 순간 말이 바뀐다).
+#
+# ⚠ 뷰는 재고를 거르지 않지만 **status='판매중' 은 거른다.** 그런데 입고 확정이 하는
+#   일 중 하나가 「품절 -> 판매중」이다. 즉 **품절 행은 뷰가 false 를 주는 이유가
+#   「입고가 없앨 그 조건」 자체**라, 그 false 로는 나머지 게이트를 알 수 없다.
+#   그런 행에 「진입 불가」를 붙이면 지어내는 것이고, 「진입 가능」을 붙여도 지어내는
+#   것이다 — 그래서 **판정하지 않고**(`unknown`) 사유(note)만 보인다.
+#   품절 행까지 정확히 판정하려면 「재고·상태를 뺀 후보 자격」이 뷰나 함수로 하나
+#   있어야 한다(여기서 술어를 다시 적으면 admin_pool.py 가 이미 겪은 갈라짐이다 —
+#   그 파일 주석의 3,219 대 3,242 가 그 사고다). **신설은 마이그레이션 소관이라 이
+#   작업의 범위 밖이다** — 보고로 넘긴다.
+POOL_LABELS = {
+    "in": "추천 후보 포함",
+    "enters": "입고 확정 시 후보 진입",
+    "out": "추천 후보 제외",
+    "blocked": "입고 확정 후에도 진입 불가",
+    "unknown": "입고 확정 후 판정",
+}
+
+
+def _pool_gaps(r) -> list:
+    """뷰 조건 중 **이 응답이 직접 읽는 셋**의 미충족 목록 — 예측이 아니라 사실이다.
+
+    ⚠ 방향이 하나뿐이다. 뷰의 WHERE 는 여덟 조각의 **AND** 이므로
+        · 셋 중 하나라도 거짓 -> 전체가 거짓 -> 「진입 불가」는 **참**이다(읽은 것만으로 증명된다)
+        · 셋이 다 참 -> 나머지 다섯을 모르므로 **아무 말도 못 한다**(이게 3,876행을 만든 방향이다)
+    `blocked` 는 앞의 방향만 쓴다. 뒤의 방향은 오직 뷰 실조회(`in_view`)가 답한다.
+    """
+    gaps = []
     if r["review_required_yn"]:
-        return "검수 미통과 — 입고해도 추천에 쓰이지 않습니다"
+        gaps.append("검수 미통과")
     if r["sale_price"] is None:
-        return "판매가 미산정 — 가격 검토 후 추천 진입"
+        gaps.append("판매가 미산정")
     if not r["has_specs"]:
-        # 추천 뷰는 product_specs를 조인한다 — 사양 행이 없으면 재고·가격이 다 채워져도 미진입
-        return "사양 미등록(specs 행 없음) — 재고만으로는 추천 진입 불가"
+        # 추천 뷰는 product_specs 를 조인한다 — 사양 행이 없으면 재고·가격이 다 차도 미진입
+        gaps.append("사양 행 없음")
+    return gaps
+
+
+def _pool_of(r, in_view: bool) -> dict:
+    """행 하나의 후보 진입 «판정 + 사유» — **한 원천에서 둘 다 나온다.**
+
+    2026-08-18 후속 개정. 처음에는 판정(`pool_label`)만 여기서 만들고 사유는 `note`
+    (구 `_note_of`)를 그대로 썼는데, 화면이 둘을 한 행에 나란히 그리면서
+    **「추천 후보 제외」 옆에 「입고 시 추천 가능 재고 진입」**이 동시에 떴다(확인자 재현
+    P-9103). 라벨만 새 원천으로 바꾸고 사유를 옛 원천에 두면 결함이 형태만 바꿔 재발한다.
+    그래서 **사유는 판정과 같은 자리에서 만든다** — 화면은 이 둘만 붙여 쓴다.
+    """
+    stock = r["stock_qty"] or 0
+    gaps = _pool_gaps(r)
+    if in_view:
+        st = "in" if stock > 0 else "enters"
+        note = ("추천 후보 뷰 조회됨 · 재고 있음" if stock > 0
+                else "추천 후보 뷰 조회됨 · 재고만 미충족")
+    elif r["status"] != "품절":
+        # 판매중인데 뷰에 없다 = **지금 상태가 곧 답이다**(미래형으로 말할 것이 없다)
+        st = "out"
+        note = "추천 후보 뷰 미조회 — " + (" · ".join(gaps) if gaps
+                                          else "재고 외 조건 미충족")
+    elif gaps:
+        st = "blocked"
+        note = "뷰 조건 미충족 — " + " · ".join(gaps) + " (입고로 해소되지 않음)"
+    else:
+        st = "unknown"
+        note = ("검수·판매가·사양 행 충족 · 품절 상태가 후보 뷰 조건이라 확정 전 판정 없음"
+                " (확정 응답 pool_entered 로 확인)")
+    return {"pool_state": st, "pool_label": POOL_LABELS[st], "pool_note": note}
+
+
+def _note_of(r) -> str:
+    """이 행이 **왜 입고 대기인가** — 대기 유형(사실)만 말한다.
+
+    2026-08-18 개정. 그전에는 이 문장이 「입고 시 추천 가능 재고 진입」처럼 **후보 진입을
+    약속**했다. 그 약속은 뷰 여덟 조건 중 셋만 보고 한 것이라 실측 3,876행에서 거짓이었고,
+    판정을 뷰 실조회로 옮긴 뒤에는 **같은 행에서 라벨과 정반대 문장**이 됐다.
+    **후보 진입은 `pool_*` 셋이 전담한다 — 여기서는 말하지 않는다.**
+    (대기 조건 정본은 §입고 대기 조건: 재고 0 ∨ 안전재고 미달. 이 함수는 그 둘 중
+     어느 쪽인지를 값과 함께 말하는 자리다.)
+    """
+    stock = r["stock_qty"] or 0
+    if stock > 0:
+        if r["safety_stock"] and stock < r["safety_stock"]:
+            return (f"안전재고 미달 — 현재 {stock} / 기준 {r['safety_stock']}"
+                    " (판매는 계속되지만 소진 위험)")
+        # 대기 조건 밖 — 조회와 표시 사이에 재고가 들어온 행이다. 지어내지 않고 값만 말한다.
+        return f"재고 {stock} — 대기 조건 밖(조회 이후 변동)"
     if r["status"] == "품절":
-        return "품절 표시 상태 — 입고 시 판매중으로 복귀하며 추천 진입"
-    return "검수·가격 완료 — 입고 시 추천 가능 재고 진입"
+        return "재고 0 · 품절 표시 — 입고 확정 시 판매중 복귀"
+    return "재고 0"
 
 
 @router.get("/stock-inbound")
@@ -190,10 +280,21 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
         cq = catalog_q.strip()
         catalog = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, purchase_price, stock_qty,"
-            " sale_price, review_required_yn"
+            " sale_price, review_required_yn, status,"
+            # `_pool_gaps()` 가 셋을 다 읽어야 「진입 불가」를 증명할 수 있다 — 사양 행만
+            # 빠지면 카탈로그 행에서 그 판정을 못 한다(최대 50행이라 EXISTS 비용은 작다).
+            " EXISTS(SELECT 1 FROM product_specs sp"
+            "        WHERE sp.product_code = products.product_code) AS has_specs"
             " FROM products WHERE status NOT IN ('단종','삭제대기')"
             "   AND (product_name ILIKE '%%' || :cq || '%%' OR sku ILIKE '%%' || :cq || '%%')"
             " ORDER BY sku LIMIT 50"), {"cq": cq}).mappings().all() if cq else []
+        # ★ 후보 진입 판정 — 이 페이지에 실제로 나가는 코드만 뷰에 물어본다(최대 100건).
+        #   목록 SQL 안의 상관 서브쿼리로 넣지 않는다: ORDER BY + LIMIT 앞에서 15,725행
+        #   전부에 대해 평가될 수 있다(statement_timeout 15초를 쓰는 엔진이다 — db.py).
+        codes = [r["product_code"] for r in rows] + [c["product_code"] for c in catalog]
+        in_view = set(conn.execute(text(
+            "SELECT product_code FROM v_recommendation_candidates"
+            " WHERE product_code = ANY(:codes)"), {"codes": codes}).scalars()) if codes else set()
     return {
         "page": page, "size": size, "total": total,
         "pages": (total + size - 1) // size,
@@ -212,6 +313,8 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
             "reviewed": not r["review_required_yn"],
             "has_specs": r["has_specs"],
             "status": r["status"], "note": _note_of(r),
+            # ★ 화면이 판정하지 않는다 — 뷰 실조회 결과를 서버가 문구까지 실어 보낸다
+            **_pool_of(r, r["product_code"] in in_view),
             # 보류는 «서버 상태»다 — 화면 배열이 아니다(구 화면 결함 2).
             # exclude 조회에서는 언제나 null 이고, only·all 에서만 값이 선다.
             "hold": None if r["hold_id"] is None else {
@@ -223,6 +326,10 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
             "cat": PART_TYPE_LABELS.get(c["part_type"], c["part_type"]),
             "purchase": c["purchase_price"], "stock": c["stock_qty"],
             "priced": c["sale_price"] is not None, "reviewed": not c["review_required_yn"],
+            "status": c["status"], "has_specs": c["has_specs"],
+            # 직접 등록 후보도 같은 판정을 받는다 — 이 응답에는 사양 행 정보가 없어
+            # 화면이 조합할 수 없던 자리다(그래서 「판정 없음」이 떴다).
+            **_pool_of(c, c["product_code"] in in_view),
         } for c in catalog],
         "note": NOTE + (" 목록은 서버에서 나눠 보냅니다 — 화면은 '전체 N건 중 이 페이지'를"
                         " 표시합니다. 직접 등록 후보는 검색어를 입력해야 조회됩니다"
@@ -346,7 +453,7 @@ def _hist_row(r) -> dict:
         note = " · ".join(bits) or "이전 재고 기록 없음"
     state, undo_note, undoable = _undo_state(r["action"], d, r["stock_qty"], r["undone_by"])
     if not r["ledger_rows"]:
-        note += " · 원장 행 없음 — 이 기록에 대응하는 재고 원장 행이 조회되지 않습니다"
+        note += " · 원장 행 없음 — 대응 원장 행 미조회"
     return {
         "log_id": r["log_id"],
         "at": iso(r["created_at"]),
@@ -402,8 +509,11 @@ def stock_inbound_history(page: int = 1, size: int = 20, product_code: int | Non
         "items": [_hist_row(r) for r in rows],
         # 권한도 화면이 추정하지 않는다 — 403 은 단추를 감추지 않고 «비활성 + 사유 병기»다.
         "can_write": role in ("operator", "owner"),
+        # 문구는 계약 §서버 응답 표 원문 그대로다. 화면이 이 값으로 단추 title 을 덮으므로
+        # 화면 폴백과 다르게 적으면 **응답 전후로 같은 자리의 문구가 바뀐다**
+        # (화면 폴백은 처음부터 계약 원문이었고 여기만 등급 이름을 달리 불렀다).
         "can_write_note": ("" if role in ("operator", "owner")
-                           else "조회 등급은 입고 확정·되돌리기를 할 수 없습니다"),
+                           else "viewer 등급은 입고 확정·되돌리기를 할 수 없습니다"),
         "scope_note": HISTORY_SCOPE,
     }
 
@@ -416,7 +526,8 @@ class InboundBody(BaseModel):
 @router.post("/stock-inbound/{product_code}")
 def inbound(product_code: int, body: InboundBody):
     if body.why not in WHY:
-        raise HTTPException(400, f"알 수 없는 사유: {body.why}")
+        # 계약 §서버 응답 표 원문. 화면의 사전검증도 같은 문구를 쓴다 — 서버만 달랐다.
+        raise HTTPException(400, "알 수 없는 사유입니다 (허용값 inbound·adjust 둘뿐)")
     if body.qty <= 0:
         raise HTTPException(400, "입고 수량은 1 이상이어야 합니다")
     with engine.begin() as conn:
@@ -424,7 +535,11 @@ def inbound(product_code: int, body: InboundBody):
             "SELECT product_code, sku, stock_qty, status FROM products"
             " WHERE product_code=:pc FOR UPDATE"), {"pc": product_code}).mappings().first()
         if p is None:
-            raise HTTPException(404, "상품이 없습니다")
+            # 계약 §서버 응답 표 「상품 없음」 원문. `_undo_state()` 의 product_missing 분기가
+            # 처음부터 이 문장을 썼는데 **같은 사실을 가리키는 이 파일의 404 넷은 더 짧은
+            # 다른 문장**이었다 — 목록이 사유를 한 문장으로 말해 놓고 실제로 누르면 다른
+            # 문장이 떴다. 넷을 이 문장으로 모았다(2026-08-18).
+            raise HTTPException(404, "상품을 찾을 수 없습니다 — 조회 이후 삭제됐습니다")
         if p["status"] in ("단종", "삭제대기"):
             raise HTTPException(400, f"'{p['status']}' 상품에는 입고할 수 없습니다")
         # ★ 보류 중이면 입고를 «막는다» (2026-08-17 판정 — 근거를 남긴다).
@@ -487,7 +602,7 @@ def hold_product(product_code: int, body: HoldBody):
             "SELECT product_code, sku, status, stock_qty FROM products"
             " WHERE product_code=:pc FOR UPDATE"), {"pc": product_code}).mappings().first()
         if p is None:
-            raise HTTPException(404, "상품이 없습니다")
+            raise HTTPException(404, "상품을 찾을 수 없습니다 — 조회 이후 삭제됐습니다")
         if p["status"] in ("단종", "삭제대기"):
             # 대기 목록에 애초에 없는 상품이다 — 보류할 것이 없다.
             raise HTTPException(400, f"'{p['status']}' 상품은 입고 대기 대상이 아니므로"
@@ -533,7 +648,7 @@ def release_hold(product_code: int):
             "SELECT product_code, sku FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": product_code}).mappings().first()
         if p is None:
-            raise HTTPException(404, "상품이 없습니다")
+            raise HTTPException(404, "상품을 찾을 수 없습니다 — 조회 이후 삭제됐습니다")
         cur = conn.execute(text(
             "SELECT hold_id FROM stock_inbound_holds"
             " WHERE product_code=:pc AND released_at IS NULL"),
@@ -585,7 +700,7 @@ def undo_inbound(log_id: int):
             "SELECT stock_qty, status FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": d["product_code"]}).mappings().first()
         if p is None:
-            raise HTTPException(404, "상품이 없습니다")
+            raise HTTPException(404, "상품을 찾을 수 없습니다 — 조회 이후 삭제됐습니다")
         if p["stock_qty"] < d["qty"]:
             raise HTTPException(409, "입고분보다 재고가 적습니다 — 이후 판매·조정이 있어 되돌릴 수 없습니다")
         # 원장은 삭제하지 않는다 — 역방향 행으로 상쇄(order_events 전례)

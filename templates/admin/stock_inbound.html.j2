@@ -1,0 +1,1050 @@
+{#
+  재고 입고 (ADM-SRC-020) — admin2 신규 구축 · 2026-08-18
+
+  ■ 계약 — `docs/design/spec-stock-inbound.md`. 사장님 확정(2026-08-17): **1b 골격
+    (좌 566px 목록 + 우 작업 패널) + 1a 「목록에서 바로 확정」** 혼합.
+    원안 `docs/design/dc-stock-inbound.html` 에서 가져온 것은 «치수·배치»뿐이다 —
+    좌 566px · 필터 줄 31px · 칩 27px · 행 padding 10px 14px · 카드 radius 8px ·
+    수량칸 110×38 · 게이트 칩 4 · 이력 열 폭(104/62/52). 색·서체는 원안(IBM Plex ·
+    #e8e4dc 등)을 쓰지 않고 `/shared/admin2/admin2.css` 토큰만 쓴다.
+    원안 안의 상품명·수량·건수는 전부 모형이라 코드에 박지 않았다.
+
+  ■ 서버 — `api/admin_stock.py` 만 부른다(새 API 없음). 화면이 재고·판정을 다시 계산하지
+    않는다: 목록 행의 후보 진입 판정(pool_state·pool_label·pool_note)·게이트 플래그
+    (reviewed·priced·has_specs)·사유(note) · 확정 응답의 stock_before·stock_after·
+    status_changed·pool_entered·undo_id·sku · 이력 응답의 undoable·undo_state·undo_note·
+    can_write 를 «그대로» 표시한다.
+    ⚠ 목록 행 판정은 2026-08-18 까지 화면이 조합했다(reviewed && priced && has_specs).
+      그 조합은 뷰가 함께 거르는 ai_candidate_yn·category_group·part_type·data_origin 을
+      못 봐서 실측 3,876행을 「후보 진입 가능」이라 잘못 말했다 — 서버로 옮겼다.
+    ⚠⚠ **한 행은 한 원천으로만 말한다.** 위를 고칠 때 라벨만 새 판정으로 바꾸고 사유는
+      옛 `note` 를 그대로 뒀더니 P-9103 행에서 「추천 후보 제외」(새 판정) 옆에
+      「검수·가격 완료 — 입고 시 추천 가능 재고 진입」(옛 note)이 **동시에** 떴다.
+      지금은 **판정·사유 둘 다 `pool_label`·`pool_note`** 에서 오고, `note` 는
+      «대기 유형 사실»만 말해 유형 태그의 title 로만 쓴다(후보 진입을 말하지 않는다).
+
+  ■ 두 확정 경로(목록 행 「바로 확정」 · 패널 「확정」)는 같은 함수 confirmInbound() →
+    같은 엔드포인트 → 같은 결과 표시 showResult() 를 쓴다 — 갈라 구현하지 않는다.
+
+  ■ 서버에 없는 것은 짓지 않았다(보고에 적음):
+    · 대기 유형(재고 0 / 안전재고 미달) «필터»와 «유형별 건수» — 목록 API 에 유형 파라미터·
+      집계가 없다. 칩은 「향후 사용예정」으로 비활성(수 없음).
+    · 「오늘 입고」 — 서버 집계 없음, 표시하지 않는다(공통 전제 ⑥).
+    · 매입가 입력칸 없음(⑤) · 일괄 선택 없음(④) · 「매입 확정분」 라벨 없음(⑦).
+
+  ■ 문구 — 「서버 응답」 표의 문구는 계약이 «그대로 옮긴다»고 못박아 원문대로 썼다
+    (~습니다 서술문 포함). 그 밖의 항목명·단추·상태는 관리도구 용어(명사형).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}재고 입고{% endblock %}
+
+{% block head_extra %}
+<style>
+.si-wrap,.si-wrap *{box-sizing:border-box}
+.si-wrap{flex:1;min-height:0;display:flex;background:var(--rv-canvas)}
+
+/* ── 헤더 위젯 ── */
+.si-hdcount{font:400 10px/1 var(--rv-font);color:var(--rv-muted);margin-left:4px}
+.si-hdcount b{font-family:var(--rv-mono);font-weight:600;color:var(--rv-ink)}
+
+/* ── 좌 566px 목록 ── */
+.si-list{width:566px;flex:none;border-right:1px solid rgba(0,0,0,.12);display:flex;flex-direction:column;min-height:0;background:var(--rv-canvas)}
+.si-filters{flex:none;padding:11px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid rgba(0,0,0,.1)}
+.si-frow{display:flex;gap:7px;align-items:center}
+.si-search{flex:1;min-width:0;height:31px;border:1px solid rgba(0,0,0,.2);border-radius:6px;background:var(--rv-card);
+  padding:0 10px;font:400 11px/1 var(--rv-font);color:var(--rv-ink)}
+.si-search::placeholder{color:var(--rv-dim)}
+.si-select{height:31px;border:1px solid rgba(0,0,0,.2);border-radius:6px;background:var(--rv-card);padding:0 8px;
+  font:400 11px/1 var(--rv-font);color:var(--rv-ink);max-width:150px}
+.si-btn-ink{height:31px;border:0;border-radius:6px;background:var(--rv-ink);color:var(--rv-canvas);padding:0 12px;
+  font:600 11px/1 var(--rv-font);cursor:pointer;white-space:nowrap}
+.si-btn-ink[aria-pressed="true"]{background:var(--rv-green)}
+.si-btn-ink:disabled{background:var(--rv-dim4);color:var(--rv-canvas);cursor:not-allowed}
+.si-chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.si-chip{height:27px;border:1px solid rgba(0,0,0,.2);border-radius:6px;background:var(--rv-card);color:var(--rv-ink-soft);
+  padding:0 9px;font:400 10.5px/1 var(--rv-font);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.si-chip .n{font-family:var(--rv-mono);font-weight:600}
+.si-chip[aria-pressed="true"]{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink);font-weight:600}
+.si-chip:disabled{color:var(--rv-dim2);cursor:not-allowed;background:var(--rv-panel2);border-style:dashed}
+.si-fnote{font:400 9.5px/1.5 var(--rv-font);color:var(--rv-faint)}
+.si-fnote[hidden]{display:none}
+
+.si-rows{flex:1;min-height:0;overflow:auto;position:relative}
+.si-state{padding:30px 16px;text-align:center;font:400 11.5px/1.7 var(--rv-font);color:var(--rv-muted)}
+.si-state.err{color:var(--rv-red)}
+.si-state a,.si-state button{display:inline-block;margin-top:8px;font:600 11px/1 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.22);border-radius:6px;padding:8px 14px;cursor:pointer;text-decoration:none}
+.si-state[hidden]{display:none}
+
+.si-row{display:flex;flex-direction:column;gap:5px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.07);cursor:pointer;background:transparent}
+.si-row:hover{background:rgba(0,0,0,.02)}
+.si-row.on{background:var(--rv-panel2);box-shadow:inset 3px 0 0 var(--rv-ink)}
+.si-row .l1{display:flex;align-items:center;gap:8px}
+.si-row .nm{flex:1;min-width:0;font:500 11.5px/1.35 var(--rv-font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-tag{flex:none;font:500 9.5px/1 var(--rv-font);border-radius:3px;padding:4px 6px;border:1px solid rgba(0,0,0,.14);color:var(--rv-muted);white-space:nowrap}
+.si-tag.low{color:var(--rv-amber);border-color:var(--rv-amber-line)}
+.si-tag.hold{color:var(--rv-purple);border-color:oklch(0.5 0.11 285 / .35)}
+.si-row .st{flex:none;width:52px;text-align:right;font:600 12px/1 var(--rv-mono)}
+.si-row .meta{font:400 9.5px/1.4 var(--rv-mono);color:var(--rv-faint)}
+.si-row .pool{display:flex;gap:6px;align-items:baseline;min-width:0}
+.si-row .pool .v{flex:none;font:600 10px/1.3 var(--rv-font)}
+.si-row .pool .v.ok{color:var(--rv-green)}
+.si-row .pool .v.no{color:var(--rv-red)}
+.si-row .pool .w{flex:1;min-width:0;font:400 9.5px/1.5 var(--rv-font);color:var(--rv-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-row .act{display:flex;gap:5px;align-items:center;justify-content:flex-end}
+.si-row .act .hd{flex:1;min-width:0;font:400 9.5px/1.4 var(--rv-font);color:var(--rv-purple);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-qty{width:56px;height:28px;border:1px solid rgba(0,0,0,.18);border-radius:5px;background:var(--rv-card);padding:0 8px;
+  text-align:right;font:500 11.5px/1 var(--rv-mono);color:var(--rv-ink)}
+.si-qty::placeholder{color:var(--rv-dim3);font-weight:400}
+.si-why{height:28px;border:1px solid rgba(0,0,0,.18);border-radius:5px;background:var(--rv-card);padding:0 5px;font:400 10px/1 var(--rv-font);color:var(--rv-ink-soft)}
+.si-b{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;border-radius:5px;
+  font:600 10.5px/1 var(--rv-font);white-space:nowrap;cursor:pointer;border:1px solid rgba(0,0,0,.2);background:var(--rv-card);color:var(--rv-ink-soft)}
+.si-b.pri{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink)}
+.si-b:disabled{background:var(--rv-panel);color:var(--rv-dim);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+
+.si-pager{flex:none;display:flex;align-items:center;gap:10px;padding:9px 13px;border-top:1px solid rgba(0,0,0,.13);background:var(--rv-panel)}
+.si-pager .txt{font:400 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+.si-pager .txt b{font-family:var(--rv-mono);font-weight:600;color:var(--rv-ink)}
+.si-pager .grow{flex:1}
+.si-pg{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:4px;
+  font:400 10.5px/1 var(--rv-mono);background:var(--rv-card);color:var(--rv-ink-soft);border:1px solid rgba(0,0,0,.14);cursor:pointer;margin-left:3px}
+.si-pg.on{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink);font-weight:600}
+.si-pg:disabled{color:var(--rv-dim3);cursor:not-allowed}
+.si-pg.gap{border:0;background:transparent;cursor:default}
+
+/* ── 우 작업 패널 ── */
+.si-panel{flex:1;min-width:0;overflow:auto;padding:13px 16px;display:flex;flex-direction:column;gap:10px;background:var(--rv-panel2)}
+.si-panel[hidden]{display:none}
+.si-card{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.si-card[hidden]{display:none}
+.si-empty{flex:none;padding:14px 2px 2px;font:400 11.5px/1.7 var(--rv-font);color:var(--rv-muted)}
+.si-empty[hidden]{display:none}
+.si-empty b{color:var(--rv-ink)}
+.si-phead{flex:none;display:flex;flex-direction:column;gap:3px}
+.si-phead .t{font:600 16px/1.3 var(--rv-font)}
+.si-phead .m{font:400 10.5px/1.5 var(--rv-mono);color:var(--rv-muted)}
+.si-phead[hidden]{display:none}
+
+.si-form{display:flex;gap:12px;align-items:flex-end}
+.si-fld{display:flex;flex-direction:column;gap:5px}
+.si-fld .lb{font:600 10px/1 var(--rv-font);color:var(--rv-muted)}
+.si-qty-big{width:110px;height:38px;border:1px solid rgba(0,0,0,.26);border-radius:6px;background:var(--rv-card);padding:0 11px;
+  font:600 15px/1 var(--rv-mono);color:var(--rv-ink)}
+.si-qty-big::placeholder{color:var(--rv-dim3);font-weight:400}
+.si-whys{display:flex;gap:7px;flex:1}
+.si-whyb{flex:1;height:38px;border:1px solid rgba(0,0,0,.2);border-radius:6px;background:var(--rv-card);display:flex;flex-direction:column;
+  justify-content:center;align-items:flex-start;padding:0 11px;cursor:pointer;text-align:left}
+.si-whyb .k{font:500 11.5px/1.3 var(--rv-font);color:var(--rv-ink-soft)}
+.si-whyb .c{font:400 9px/1.3 var(--rv-mono);color:var(--rv-faint)}
+.si-whyb[aria-pressed="true"]{border:1.5px solid var(--rv-ink);background:var(--rv-panel)}
+.si-whyb[aria-pressed="true"] .k{font-weight:600;color:var(--rv-ink)}
+.si-confirm{flex:none;height:38px;padding:0 18px;border-radius:6px;border:0;background:var(--rv-ink);color:var(--rv-canvas);
+  font:600 12.5px/1 var(--rv-font);cursor:pointer;white-space:nowrap}
+.si-confirm:disabled{background:var(--rv-panel);color:var(--rv-dim);border:1px solid rgba(0,0,0,.1);cursor:not-allowed}
+.si-preview{display:flex;gap:10px;align-items:center;padding:9px 11px;background:var(--rv-panel);border-radius:6px}
+.si-preview .tx{flex:1;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.si-preview .tx b{font-family:var(--rv-mono);font-weight:600;color:var(--rv-ink)}
+.si-badge-warn{flex:none;font:600 9.5px/1 var(--rv-font);color:var(--rv-red);border:1px solid var(--rv-amber-line);border-radius:3px;padding:4px 7px;white-space:nowrap}
+.si-note{font:400 10px/1.6 var(--rv-font);color:var(--rv-muted)}
+.si-note b{color:var(--rv-ink-soft)}
+.si-note code{font-family:var(--rv-mono);font-size:9.5px}
+
+.si-ctitle{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.si-ctitle .t{font:600 11.5px/1 var(--rv-font)}
+.si-ctitle .s{font:400 9.5px/1.4 var(--rv-font);color:var(--rv-faint)}
+.si-ctitle .s code{font-family:var(--rv-mono)}
+.si-ctitle .grow{flex:1}
+.si-gates{display:flex;gap:8px}
+.si-gate{flex:1;min-width:0;display:flex;gap:7px;align-items:center;padding:8px 9px;border-radius:6px;border:1px solid rgba(0,0,0,.1);background:var(--rv-panel2)}
+.si-gate.no{border-color:oklch(0.75 0.11 33 / .5);background:color-mix(in oklch,var(--rv-red) 6%,var(--rv-card))}
+.si-gate.na{border-style:dashed}
+.si-gate .mk{flex:none;width:17px;height:17px;border-radius:4px;display:flex;align-items:center;justify-content:center;font:600 10px/1 var(--rv-mono);color:var(--rv-card);background:var(--rv-green)}
+.si-gate.no .mk{background:var(--rv-red)}
+.si-gate.na .mk{background:var(--rv-dim3)}
+.si-gate .lb{font:600 10.5px/1.3 var(--rv-font)}
+.si-gate .nt{font:400 9.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.si-gate .tx{display:flex;flex-direction:column;gap:1px;min-width:0}
+
+/* ── 결과 행 — 서버 응답이 온 뒤에만 채운다 ── */
+.si-result{flex:none;display:flex;gap:12px;align-items:center;padding:11px 14px;border-radius:8px;border:1px solid rgba(0,0,0,.13);background:var(--rv-panel)}
+.si-result[hidden]{display:none}
+.si-result .body{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.si-result .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.si-result .code{flex:none;font:600 9.5px/1 var(--rv-mono);border:1px solid rgba(0,0,0,.13);border-radius:3px;padding:4px 6px;color:var(--rv-muted)}
+.si-result .msg{font:600 12px/1.4 var(--rv-font);color:var(--rv-muted)}
+.si-result .nt{font:400 10px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.si-result .nt code{font-family:var(--rv-mono)}
+.si-result .act{flex:none;display:flex;gap:6px}
+.si-result.ok{border-color:oklch(0.74 0.09 165 / .55);background:color-mix(in oklch,var(--rv-green) 7%,var(--rv-card))}
+.si-result.ok .code,.si-result.ok .msg{color:var(--rv-green);border-color:oklch(0.74 0.09 165 / .55)}
+.si-result.warn{border-color:var(--rv-amber-line);background:var(--rv-amber-bg)}
+.si-result.warn .code,.si-result.warn .msg{color:var(--rv-amber);border-color:var(--rv-amber-line)}
+.si-result.err{border-color:oklch(0.75 0.11 33 / .55);background:color-mix(in oklch,var(--rv-red) 6%,var(--rv-card))}
+.si-result.err .code,.si-result.err .msg{color:var(--rv-red);border-color:oklch(0.75 0.11 33 / .55)}
+.si-result a.si-b{text-decoration:none}
+
+/* ── 이력 ── */
+.si-hist{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:0;gap:0}
+.si-hist .hd{flex:none;display:flex;align-items:baseline;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.1);flex-wrap:wrap}
+.si-hist .rows{flex:1;min-height:0;overflow:auto}
+.si-hrow{display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.si-hrow.undone{background:var(--rv-panel2)}
+.si-hrow .when{flex:none;width:104px;font:400 10px/1.4 var(--rv-mono);color:var(--rv-muted)}
+.si-hrow .kind{flex:none;width:62px;font:600 10px/1 var(--rv-font);color:var(--rv-ink)}
+.si-hrow .kind.u{color:var(--rv-faint)}
+.si-hrow .d{flex:none;width:52px;text-align:right;font:600 11.5px/1 var(--rv-mono)}
+.si-hrow .nt{flex:1;min-width:0;font:400 10px/1.5 var(--rv-font);color:var(--rv-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-hrow .nt b{color:var(--rv-ink-soft);font-weight:500}
+.si-hb{flex:none;display:inline-flex;align-items:center;justify-content:center;height:25px;padding:0 9px;border-radius:5px;font:600 10.5px/1 var(--rv-font);
+  white-space:nowrap;cursor:pointer;background:var(--rv-card);color:var(--rv-ink-soft);border:1px solid rgba(0,0,0,.22)}
+.si-hb:disabled{background:transparent;color:var(--rv-dim);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+.si-hb.blocked:disabled{color:var(--rv-red);border-color:oklch(0.75 0.11 33 / .5)}
+.si-hist .ft{flex:none;padding:9px 14px;font:400 9.5px/1.6 var(--rv-font);color:var(--rv-faint);border-top:1px solid rgba(0,0,0,.08);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.si-hist .ft .sc{flex:1;min-width:200px}
+.si-hist .ft .pg{display:flex;align-items:center;gap:0}
+.si-hist .ft .txt{font:400 10px/1 var(--rv-font);color:var(--rv-muted);margin-right:6px}
+.si-hist .ft .txt b{font-family:var(--rv-mono);font-weight:600;color:var(--rv-ink)}
+.si-hist .empty{padding:16px 14px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+
+/* ── 보류 상자 ── */
+.si-holdbox{flex:none;display:flex;gap:9px;align-items:center;padding:9px 12px;border-radius:7px;border:1px solid rgba(0,0,0,.13);background:var(--rv-panel)}
+.si-holdbox[hidden]{display:none}
+.si-holdbox.held{border-color:oklch(0.5 0.11 285 / .35);background:color-mix(in oklch,var(--rv-purple) 6%,var(--rv-card))}
+.si-holdbox .bd{flex:none;font:600 9.5px/1 var(--rv-font);color:var(--rv-purple);border:1px solid oklch(0.5 0.11 285 / .35);border-radius:3px;padding:5px 7px;background:var(--rv-card);white-space:nowrap}
+.si-holdbox .tx{flex:1;min-width:0;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.si-holdbox .tx b{font-family:var(--rv-mono);font-weight:600}
+.si-holdin{flex:1;min-width:0;height:28px;border:1px solid rgba(0,0,0,.2);border-radius:5px;background:var(--rv-card);padding:0 9px;font:400 10.5px/1 var(--rv-font);color:var(--rv-ink)}
+.si-holdin::placeholder{color:var(--rv-dim)}
+
+.si-foot{flex:none;font:400 10px/1.7 var(--rv-font);color:var(--rv-muted)}
+.si-foot b{color:var(--rv-ink-soft)}
+
+@media (max-width:768px){
+  .si-wrap{flex-direction:column;overflow:auto}
+  .si-list{width:100%;border-right:0;border-bottom:1px solid rgba(0,0,0,.12);max-height:60vh}
+  .si-panel{overflow:visible}
+  .si-form{flex-direction:column;align-items:stretch}
+  .si-gates{flex-wrap:wrap}
+  .si-gate{flex:1 1 45%}
+  .si-hist{flex:none;max-height:360px}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="si-hdcount" id="siHdCount" data-bind="header-count">입고 대기 <b>—</b>건</span>
+{% endblock %}
+
+{% block content %}
+<div class="si-wrap">
+
+  <section class="si-list" data-keep="1" aria-label="입고 대기 목록">
+    <div class="si-filters" data-keep="1">
+      <div class="si-frow">
+        <input type="search" class="si-search" id="siSearch" placeholder="상품명 · SKU 검색" autocomplete="off" data-bind="q">
+        <select class="si-select" id="siPart" data-bind="part_type" aria-label="분류">
+          <option value="">분류 · 전체</option>
+        </select>
+        <button type="button" class="si-btn-ink" id="siDirectBtn" data-action="toggle-direct" aria-pressed="false"
+                title="대기 목록에 없는 상품을 검색해 입고한다 — 후보는 검색어가 있을 때만 서버가 조회한다(최대 50건)">직접 등록</button>
+      </div>
+      <div class="si-chips" id="siChips" role="group" aria-label="조회 조건">
+        <button type="button" class="si-chip" data-action="hold-mode" data-hold="exclude" aria-pressed="true">입고 대기 <span class="n" id="siCntWait">—</span></button>
+        <button type="button" class="si-chip" disabled title="향후 사용예정 — 서버 목록 조회에 대기 유형 조건이 없다(재고 0 / 안전재고 미달 구분은 행마다 표시)">재고 0</button>
+        <button type="button" class="si-chip" disabled title="향후 사용예정 — 서버 목록 조회에 대기 유형 조건이 없다(재고 0 / 안전재고 미달 구분은 행마다 표시)">안전재고 미달</button>
+        <button type="button" class="si-chip" data-action="hold-mode" data-hold="only" aria-pressed="false" title="보류분만 조회(서버 상태 hold=only)">보류 <span class="n" id="siCntHold">—</span></button>
+      </div>
+      <div class="si-fnote" id="siDirectNote" hidden>직접 등록 — 대기 목록 밖 상품 검색. 검색어 입력 후 조회(최대 50건). 매입가 입력칸 없음(원장에 단가 컬럼 없음).</div>
+    </div>
+
+    <div class="si-rows" id="siRows" data-repeat="inbound-row">
+      <div class="si-state" id="siLoading">불러오는 중</div>
+      <div class="si-state err" id="siErr" hidden></div>
+      <div class="si-state" id="siEmpty" hidden></div>
+      <div id="siRowsBody"></div>
+    </div>
+
+    <div class="si-pager" id="siPager" data-keep="1">
+      <span class="txt" id="siPagerTxt">전체 <b>—</b>건</span>
+      <span class="grow"></span>
+      <span id="siPagerBtns"></span>
+    </div>
+  </section>
+
+  <section class="si-panel" id="siPanel" data-keep="1" aria-label="작업 패널">
+    <div class="si-empty" id="siPanelEmpty">
+      <b>대상 선택 대기</b> — 좌측 목록에서 상품을 선택하면 게이트 판정 · 확정 · 그 상품의 입고 이력이 여기 선다.
+      목록 행의 「바로 확정」도 같은 서버 동작이며 결과는 여기에 표시된다.
+    </div>
+
+    <div class="si-phead" id="siPhead" hidden data-bind="product-head">
+      <div class="t" id="siPName"></div>
+      <div class="m" id="siPMeta"></div>
+    </div>
+
+    <div class="si-card" id="siConfirmCard" hidden>
+      <div class="si-form">
+        <div class="si-fld">
+          <span class="lb">입고 수량</span>
+          <input type="number" class="si-qty-big" id="siQty" min="1" step="1" inputmode="numeric" placeholder="수량" data-bind="qty">
+        </div>
+        <div class="si-fld" style="flex:1">
+          <span class="lb">사유</span>
+          <div class="si-whys" role="group" aria-label="사유">
+            <button type="button" class="si-whyb" data-action="why" data-why="inbound" aria-pressed="true"><span class="k">입고</span><span class="c">inbound</span></button>
+            <button type="button" class="si-whyb" data-action="why" data-why="adjust" aria-pressed="false"><span class="k">실사 조정</span><span class="c">adjust</span></button>
+          </div>
+        </div>
+        <button type="button" class="si-confirm" id="siConfirmBtn" data-action="confirm-panel">입고 확정</button>
+      </div>
+      <div class="si-preview">
+        <span class="tx" id="siPreview"></span>
+        <span class="si-badge-warn">저장 전 — 확정 시 원장 반영</span>
+      </div>
+      <div class="si-note"><b>매입가 입력칸 없음</b> — 원장에 단가 컬럼이 없어 입력해도 저장되지 않는다. 매입가 변경은 단가표 반영 · 매입 견적 소관. <b>수량 상한 없음</b> — 자릿수가 큰 값은 확정 전 되읽어 확인한다.</div>
+    </div>
+
+    <div class="si-holdbox" id="siHoldBox" hidden data-bind="hold"></div>
+
+    <div class="si-card" id="siGateCard" hidden>
+      <div class="si-ctitle"><span class="t">추천 후보 진입 판정</span><span class="s">서버가 <code>v_recommendation_candidates</code>를 실조회한다 — 화면이 판정하지 않는다</span></div>
+      <div class="si-gates" id="siGates" data-repeat="gate"></div>
+      <div class="si-note" id="siGateNote"></div>
+    </div>
+
+    <div class="si-result" id="siResult" data-bind="result">
+      <div class="body">
+        <div class="top"><span class="code" id="siResCode">—</span><span class="msg" id="siResMsg">확정하면 여기에 서버 응답이 그대로 섭니다</span></div>
+        <div class="nt" id="siResNote">화면이 재고를 다시 계산하지 않습니다 — <code>stock_before · stock_after · status_changed · pool_entered · undo_id · sku</code> 를 그대로 표시합니다.</div>
+      </div>
+      <div class="act" id="siResAct"></div>
+    </div>
+
+    <div class="si-card si-hist" id="siHistCard">
+      <div class="hd">
+        <span class="si-ctitle" style="gap:8px"><span class="t" id="siHistTitle">입고 이력</span><span class="s">서버 조회 · 되돌릴 건을 여기서 고른다(과거 회차 포함)</span></span>
+      </div>
+      <div class="rows" id="siHistRows" data-repeat="history-row"><div class="empty">불러오는 중</div></div>
+      <div class="ft">
+        <span class="sc" id="siHistScope"></span>
+        <span class="pg"><span class="txt" id="siHistTxt"></span><span id="siHistBtns"></span></span>
+      </div>
+    </div>
+
+    <div class="si-foot">
+      <b>입고 확정 즉시 견적 반영</b> — 되돌릴 수 있지만 그 사이 나간 견적은 그 재고로 나갔다. 되돌리기는 「없던 일」이 아니다 ·
+      <b>인계 — 재고 차감 없음</b> — 재고를 줄이는 경로는 자체 주문과 실사 조정뿐 ·
+      <b>안전재고 기준은 읽기 전용</b> — 변경은 상품 관리(ADM-PRD-010) · 「오늘 입고」는 서버 집계가 없어 표시하지 않는다.
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var LOGIN = '/admin2/login';
+  var PAGE_SIZE = 50;       // 서버 상한 200 — 그보다 큰 값을 요청하지 않는다
+  var HIST_SIZE = 20;
+
+  var S = {
+    mode: 'pending',        // pending | catalog(직접 등록)
+    hold: 'exclude',        // exclude | only
+    q: '', part: '', page: 1,
+    list: null,             // 마지막 목록 응답
+    heldTotal: null, waitTotal: null,
+    sel: null,              // 패널에 올린 상품(서버 행 그대로 + source)
+    why: 'inbound',
+    hist: { page: 1, data: null, pc: null },
+    canWrite: null,         // 서버(history.can_write)가 말해 준 값 — 그 전엔 셸 판정
+    canWriteNote: '',
+    busy: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function fmtDT(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function writable() {
+    if (S.canWrite !== null) return S.canWrite;
+    return !!(window.Admin2Shell && window.Admin2Shell.canWrite('operator'));
+  }
+  function writeNote() {
+    return S.canWriteNote || 'viewer 등급은 입고 확정·되돌리기를 할 수 없습니다';
+  }
+
+  // ── API — 실패를 삼키지 않는다. 401 은 status 로 갈라 세션 만료 안내로 간다 ──
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(url) { return fetch(url, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(url, body) {
+    return fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+    }).then(handle);
+  }
+  function errHtml(err, retryAction) {
+    var un = err && err.status === 401;
+    if (un) {
+      return '세션이 만료됐습니다 — 다시 로그인 후 조회하십시오.<br>'
+        + '<a href="' + LOGIN + '">로그인 화면으로 이동</a> '
+        + '<button type="button" data-action="' + retryAction + '">다시 시도</button>';
+    }
+    if (err && err.status === undefined) {
+      return '연결 실패 — ' + esc(err.message || '네트워크') + '<br><button type="button" data-action="' + retryAction + '">다시 시도</button>';
+    }
+    return '조회 실패 — ' + esc((err && err.message) || '알 수 없는 오류')
+      + '<br><button type="button" data-action="' + retryAction + '">다시 시도</button>';
+  }
+
+  // ── 분류 선택지 — 서버(product-meta.used_parts)가 준다. 화면이 페이지에서 뽑지 않는다 ──
+  function loadMeta() {
+    apiGet('/api/admin/product-meta').then(function (j) {
+      var sel = $('siPart');
+      var cur = sel.value;
+      var opts = ['<option value="">분류 · 전체</option>'];
+      (j.used_parts || []).forEach(function (p) {
+        opts.push('<option value="' + esc(p.part_type) + '">' + esc(p.label) + '</option>');
+      });
+      sel.innerHTML = opts.join('');
+      sel.value = cur;
+    }).catch(function (e) {
+      // 분류 선택지가 없어도 목록은 돈다 — 다만 사실을 감추지 않는다
+      var sel = $('siPart');
+      sel.innerHTML = '<option value="">분류 · 선택지 조회 실패</option>';
+      sel.title = e.message || '';
+    });
+  }
+
+  // ── 목록 ──────────────────────────────────────────────────────────────
+  function listUrl() {
+    var u = '/api/admin/stock-inbound?page=' + S.page + '&size=' + PAGE_SIZE + '&hold=' + encodeURIComponent(S.hold);
+    if (S.mode === 'catalog') {
+      u += '&catalog_q=' + encodeURIComponent(S.q);
+    } else {
+      u += '&q=' + encodeURIComponent(S.q) + '&part_type=' + encodeURIComponent(S.part);
+    }
+    return u;
+  }
+  function loadList() {
+    $('siLoading').hidden = false; $('siErr').hidden = true; $('siEmpty').hidden = true;
+    $('siRowsBody').innerHTML = '';
+    if (S.mode === 'catalog' && !S.q.trim()) {
+      // 검색 전 — 「검색 전인지 · 결과가 없는지 · 못 불러왔는지」를 가른다
+      $('siLoading').hidden = true;
+      $('siEmpty').hidden = false;
+      $('siEmpty').textContent = '검색 전 — 상품명 또는 SKU 를 입력하면 서버가 후보를 조회한다(최대 50건).';
+      S.list = null; renderPager(); renderHeader();
+      return;
+    }
+    var url = listUrl();
+    apiGet(url).then(function (j) {
+      if (url !== listUrl()) return;   // 그 사이 조건이 바뀌었으면 버린다
+      S.list = j;
+      if (S.mode === 'pending') {
+        S.heldTotal = j.held_total;
+        if (S.hold === 'exclude') S.waitTotal = j.total;
+      }
+      $('siLoading').hidden = true;
+      renderRows(); renderPager(); renderChips(); renderHeader();
+    }).catch(function (e) {
+      $('siLoading').hidden = true;
+      $('siErr').hidden = false;
+      $('siErr').innerHTML = errHtml(e, 'retry-list');
+      S.list = null; renderPager();
+    });
+  }
+
+  // 후보 진입 판정은 «서버가» 한다(계약 §3중 게이트) — 화면은 색만 고른다.
+  // 화면이 셋(reviewed·priced·has_specs)을 조합하던 것을 2026-08-18 서버로 옮겼다:
+  // 그 조합은 뷰의 나머지 조건(ai_candidate_yn·category_group·part_type·data_origin)을
+  // 못 봐서 실측 3,876행을 「후보 진입 가능」이라 잘못 말했다.
+  // ⚠ 판정과 «사유»는 반드시 같은 원천(pool_label · pool_note)에서 온다. 처음 고칠 때
+  //    라벨만 서버 판정으로 바꾸고 사유는 옛 note 를 그대로 뒀더니 한 행에서
+  //    「추천 후보 제외」 옆에 「입고 시 추천 가능 재고 진입」이 함께 떴다(P-9103).
+  //    note 는 이제 «대기 유형 사실»만 말하며 유형 태그의 title 로만 쓴다.
+  var POOL_TONE = { 'in': 'ok', 'enters': 'ok', 'out': 'no', 'blocked': 'no', 'unknown': '' };
+  function tagOf(it) {
+    if (it.hold) return { cls: 'hold', txt: '보류' };
+    if (it.stock === 0) return { cls: '', txt: '재고 0' };
+    if (it.safety_stock != null && it.stock < it.safety_stock) return { cls: 'low', txt: '안전재고 미달' };
+    return { cls: '', txt: '대기 목록 밖' };
+  }
+  function rowHtml(it, src) {
+    var on = S.sel && S.sel.product_code === it.product_code;
+    var tag = tagOf(it);
+    var held = !!it.hold;
+    var w = writable();
+    var poolHtml = !it.pool_state
+      ? '<span class="v">판정 없음</span><span class="w">서버 응답에 후보 진입 판정(pool_state)이 없다 — 확정 후 pool_entered 로 확인</span>'
+      : '<span class="v ' + (POOL_TONE[it.pool_state] || '') + '">' + esc(it.pool_label || '') + '</span>'
+        + '<span class="w" title="' + esc(it.pool_note || '') + '">' + esc(it.pool_note || '') + '</span>';
+    var actHtml;
+    if (held) {
+      actHtml = '<span class="hd" title="' + esc(it.hold.reason) + '">보류 · ' + esc(it.hold.reason) + ' · ' + esc(fmtDT(it.hold.held_at)) + ' · ' + esc(it.hold.held_by) + '</span>'
+        + '<button type="button" class="si-b" data-action="release" data-code="' + it.product_code + '"' + (w ? '' : ' disabled title="' + esc(writeNote()) + '"') + '>보류 해제</button>';
+    } else {
+      var defWhy = it.why === 'adjust' ? 'adjust' : 'inbound';
+      actHtml = '<input type="number" class="si-qty" min="1" step="1" inputmode="numeric" placeholder="수량" data-row-qty="' + it.product_code + '" aria-label="입고 수량">'
+        + '<select class="si-why" data-row-why="' + it.product_code + '" aria-label="사유">'
+        + '<option value="inbound"' + (defWhy === 'inbound' ? ' selected' : '') + '>입고</option>'
+        + '<option value="adjust"' + (defWhy === 'adjust' ? ' selected' : '') + '>실사 조정</option></select>'
+        + '<button type="button" class="si-b pri" data-action="confirm-row" data-code="' + it.product_code + '"' + (w ? '' : ' disabled title="' + esc(writeNote()) + '"') + '>바로 확정</button>'
+        + (src === 'pending'
+            ? '<button type="button" class="si-b" data-action="hold" data-code="' + it.product_code + '"' + (w ? '' : ' disabled title="' + esc(writeNote()) + '"') + '>보류</button>'
+            : '');
+    }
+    return '<div class="si-row' + (on ? ' on' : '') + '" data-action="select" data-code="' + it.product_code + '" data-src="' + src + '" data-keep="1">'
+      + '<div class="l1"><span class="nm" title="' + esc(it.name) + '">' + esc(it.name) + '</span>'
+      + '<span class="si-tag ' + tag.cls + '" title="' + esc(it.note || '') + '">' + esc(tag.txt) + '</span>'
+      + '<span class="st num">' + fmt(it.stock) + '</span></div>'
+      + '<div class="meta">' + esc(it.sku) + ' · ' + esc(it.cat) + (it.status ? ' · ' + esc(it.status) : '') + '</div>'
+      + '<div class="pool">' + poolHtml + '</div>'
+      + '<div class="act">' + actHtml + '</div>'
+      + '</div>';
+  }
+  function renderRows() {
+    var j = S.list;
+    if (!j) return;
+    var body = $('siRowsBody');
+    var items = S.mode === 'catalog' ? (j.catalog || []) : (j.items || []);
+    var src = S.mode === 'catalog' ? 'catalog' : 'pending';
+    if (!items.length) {
+      $('siEmpty').hidden = false;
+      if (S.mode === 'catalog') {
+        $('siEmpty').textContent = '검색 결과 없음 — 「' + S.q + '」 에 맞는 상품이 없다(단종·삭제대기 제외).';
+      } else if (S.hold === 'only') {
+        $('siEmpty').textContent = '보류 중인 상품 없음' + (S.q || S.part ? ' — 조회 조건 안에서' : '') + '.';
+      } else if (S.q || S.part) {
+        $('siEmpty').innerHTML = '조회 결과 없음 — 조건을 좁힌 결과다.<br><button type="button" data-action="reset-filter">조건 초기화</button>';
+      } else {
+        $('siEmpty').textContent = '입고 대기 0건 — 입고할 것이 없다(오류가 아니다).';
+      }
+      body.innerHTML = '';
+      return;
+    }
+    $('siEmpty').hidden = true;
+    body.innerHTML = items.map(function (it) { return rowHtml(it, src); }).join('');
+  }
+  function pagerBtns(page, pages, action) {
+    if (!pages || pages < 1) return '';
+    var out = [];
+    function b(n, label, on, dis, gap) {
+      return '<button type="button" class="si-pg' + (on ? ' on' : '') + (gap ? ' gap' : '') + '" data-action="' + action + '" data-page="' + n + '"'
+        + (dis || gap ? ' disabled' : '') + '>' + label + '</button>';
+    }
+    out.push(b(page - 1, '‹', false, page <= 1));
+    var nums = [];
+    var i;
+    if (pages <= 7) { for (i = 1; i <= pages; i++) nums.push(i); }
+    else {
+      nums.push(1);
+      var lo = Math.max(2, page - 1), hi = Math.min(pages - 1, page + 1);
+      if (lo > 2) nums.push('…');
+      for (i = lo; i <= hi; i++) nums.push(i);
+      if (hi < pages - 1) nums.push('…');
+      nums.push(pages);
+    }
+    nums.forEach(function (n) {
+      if (n === '…') out.push(b(0, '…', false, true, true));
+      else out.push(b(n, String(n), n === page, false));
+    });
+    out.push(b(page + 1, '›', false, page >= pages));
+    return out.join('');
+  }
+  function renderPager() {
+    var j = S.list;
+    if (!j) { $('siPagerTxt').innerHTML = '전체 <b>—</b>건'; $('siPagerBtns').innerHTML = ''; return; }
+    if (S.mode === 'catalog') {
+      var n = (j.catalog || []).length;
+      $('siPagerTxt').innerHTML = '검색 결과 <b>' + n + '</b>건' + (n >= 50 ? ' · 상한 50 — 검색어를 좁힌다' : '');
+      $('siPagerBtns').innerHTML = '';
+      return;
+    }
+    var cnt = (j.items || []).length;
+    var a = cnt ? (j.page - 1) * j.size + 1 : 0;
+    var z = cnt ? a + cnt - 1 : 0;
+    $('siPagerTxt').innerHTML = '전체 <b>' + fmt(j.total) + '</b>건 중 <b>' + fmt(a) + '–' + fmt(z) + '</b>'
+      + (S.hold === 'exclude' && j.held_total ? ' · 보류 ' + fmt(j.held_total) + '건 제외' : '');
+    $('siPagerBtns').innerHTML = pagerBtns(j.page, j.pages, 'page');
+  }
+  function renderChips() {
+    $('siCntWait').textContent = S.waitTotal == null ? '—' : fmt(S.waitTotal);
+    $('siCntHold').textContent = S.heldTotal == null ? '—' : fmt(S.heldTotal);
+    document.querySelectorAll('[data-action="hold-mode"]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-hold') === S.hold && S.mode === 'pending'));
+    });
+  }
+  function renderHeader() {
+    var j = S.list;
+    var box = $('siHdCount');
+    if (S.mode !== 'pending' || !j) { box.innerHTML = '입고 대기 <b>' + (S.waitTotal == null ? '—' : fmt(S.waitTotal)) + '</b>건'; return; }
+    box.innerHTML = (S.hold === 'only' ? '보류 ' : '입고 대기 ') + '<b>' + fmt(j.total) + '</b>건 · 이 페이지 ' + (j.items || []).length + '건';
+  }
+
+  // ── 패널 ──────────────────────────────────────────────────────────────
+  function select(code, src) {
+    var j = S.list; if (!j) return;
+    var pool = src === 'catalog' ? (j.catalog || []) : (j.items || []);
+    var it = null;
+    pool.forEach(function (x) { if (x.product_code === code) it = x; });
+    if (!it) return;
+    S.sel = Object.assign({ source: src }, it);
+    S.why = it.why === 'adjust' ? 'adjust' : 'inbound';
+    $('siQty').value = '';
+    clearResult();
+    renderPanel();
+    renderRows();
+    loadHistory(code);
+  }
+  function renderPanel() {
+    var p = S.sel;
+    var has = !!p;
+    $('siPanelEmpty').hidden = has;
+    $('siPhead').hidden = !has;
+    $('siConfirmCard').hidden = !has;
+    $('siGateCard').hidden = !has;
+    if (!has) { $('siHoldBox').hidden = true; return; }
+    $('siPName').textContent = p.name;
+    $('siPMeta').textContent = p.sku + ' · ' + p.cat
+      + ' · 상태 ' + (p.status || '조회 안 됨') + ' · 현재고 ' + fmt(p.stock)
+      + (p.safety_stock != null ? ' · 안전재고 ' + fmt(p.safety_stock) + '(읽기 전용)' : '')
+      + ' · 매입가 ' + (p.purchase == null ? '미등록' : fmt(p.purchase) + '원')
+      + (p.supplier && p.supplier !== '—' ? ' · 공급처 ' + p.supplier : '');
+    document.querySelectorAll('[data-action="why"]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-why') === S.why));
+    });
+    renderPreview();
+    renderGates();
+    renderHold();
+    renderConfirmBtn();
+  }
+  function renderPreview() {
+    var p = S.sel; if (!p) return;
+    var q = parseInt($('siQty').value, 10);
+    var box = $('siPreview');
+    if (!(q > 0)) {
+      box.innerHTML = '수량을 입력하면 확정 전 되읽기가 여기 선다 — 현재고 <b>' + fmt(p.stock) + '</b>.';
+      return;
+    }
+    // 이것은 «입력값 되읽기»다(자릿수 큰 값 확인용). 확정 뒤 재고는 서버 stock_before·stock_after 만 쓴다.
+    var after = p.stock == null ? null : p.stock + q;
+    box.innerHTML = '확정하면 재고 <b>' + fmt(p.stock) + ' → ' + (after == null ? '?' : fmt(after)) + '</b>'
+      + (p.status === '품절' ? ' · 상태 <b>품절 → 판매중</b>' : '')
+      + ' · 원장에 <b>' + esc(S.why) + ' / manual</b> 행. 입력 <b>' + fmt(q) + '</b> 되읽음.';
+  }
+  function gate(label, ok, note) {
+    var cls = ok === null ? 'na' : (ok ? '' : 'no');
+    var mk = ok === null ? '?' : (ok ? '✓' : '✕');
+    return '<div class="si-gate ' + cls + '"><span class="mk">' + mk + '</span><span class="tx"><span class="lb">' + label + '</span><span class="nt">' + esc(note) + '</span></span></div>';
+  }
+  function renderGates() {
+    var p = S.sel; if (!p) return;
+    var q = parseInt($('siQty').value, 10);
+    var g = [];
+    g.push(gate('검수', p.reviewed === undefined ? null : !!p.reviewed, p.reviewed === undefined ? '조회 안 됨' : (p.reviewed ? '통과' : '미통과')));
+    g.push(gate('판매가', p.priced === undefined ? null : !!p.priced, p.priced === undefined ? '조회 안 됨' : (p.priced ? '산정 완료' : '미산정')));
+    g.push(gate('사양 행', p.has_specs === undefined ? null : !!p.has_specs,
+      p.has_specs === undefined ? '카탈로그 검색 응답에 없음' : (p.has_specs ? 'product_specs 행 있음' : 'product_specs 행 없음')));
+    g.push(gate('재고', p.stock > 0 ? true : (q > 0 ? true : false),
+      p.stock > 0 ? '현재고 ' + fmt(p.stock) : (q > 0 ? '확정하면 0 → ' + fmt(q) : '0 — 수량 입력 전')));
+    $('siGates').innerHTML = g.join('');
+    // 판정(서버 뷰 실조회)과 사실(대기 유형)을 **이름을 붙여 갈라** 적는다 — 두 문장이
+    // 붙어 있으면 어느 쪽이 판정인지 알 수 없고, 그때 한 행이 두 말을 한 것으로 읽힌다.
+    $('siGateNote').innerHTML = (p.pool_state
+        ? '서버 판정: <b>' + esc(p.pool_label || '') + '</b> — ' + esc(p.pool_note || '')
+        : '서버 판정 없음 — 응답에 <code>pool_state</code> 가 없다')
+      + (p.note ? ' · 대기 유형: ' + esc(p.note) : '')
+      + ' · <b>입고만으로 추천에 들어가지 않는다</b> — 확정 뒤 <code>pool_entered</code> 를 실측으로 표시한다.';
+  }
+  function renderHold() {
+    var p = S.sel;
+    var box = $('siHoldBox');
+    if (!p || p.source !== 'pending') { box.hidden = true; return; }
+    box.hidden = false;
+    var w = writable();
+    if (p.hold) {
+      box.className = 'si-holdbox held';
+      box.innerHTML = '<span class="bd">보류 중</span>'
+        + '<span class="tx">사유 <b>' + esc(p.hold.reason) + '</b> · ' + esc(fmtDT(p.hold.held_at)) + ' · ' + esc(p.hold.held_by)
+        + ' — 보류 중에는 입고를 확정할 수 없다(되돌리기는 가능). 해제는 행 삭제가 아니라 해제 시각 기록.</span>'
+        + '<button type="button" class="si-b" data-action="release" data-code="' + p.product_code + '"' + (w ? '' : ' disabled title="' + esc(writeNote()) + '"') + '>보류 해제</button>';
+    } else {
+      box.className = 'si-holdbox';
+      box.innerHTML = '<span class="bd">보류</span>'
+        + '<input type="text" class="si-holdin" id="siHoldReason" maxlength="200" placeholder="보류 사유(필수) — 서버 상태로 남는다 · 기본 조회에서 빠진다" data-bind="hold-reason">'
+        + '<button type="button" class="si-b" data-action="hold-panel" data-code="' + p.product_code + '"' + (w ? '' : ' disabled title="' + esc(writeNote()) + '"') + '>보류</button>';
+    }
+  }
+  function renderConfirmBtn() {
+    var p = S.sel; var b = $('siConfirmBtn');
+    if (!p) return;
+    var w = writable();
+    if (!w) { b.disabled = true; b.title = writeNote(); b.textContent = '확정 불가 — ' + writeNote(); return; }
+    if (p.hold) { b.disabled = true; b.title = '보류 중 — 보류를 먼저 해제한 뒤 확정한다'; b.textContent = '확정 불가 — 보류 중'; return; }
+    b.disabled = false; b.title = ''; b.textContent = '입고 확정';
+  }
+
+  // ── 결과 행 — 서버 응답이 온 뒤에만 채운다(공통 전제 ①) ─────────────────
+  var RESULT_IDLE = {
+    tone: 'none', code: '—', msg: '확정하면 여기에 서버 응답이 그대로 섭니다',
+    note: '화면이 재고를 다시 계산하지 않습니다 — <code>stock_before · stock_after · status_changed · pool_entered · undo_id · sku</code> 를 그대로 표시합니다.',
+    act: ''
+  };
+  function showResult(r) {
+    var box = $('siResult');
+    box.className = 'si-result ' + (r.tone || 'none');
+    $('siResCode').textContent = r.code || '—';
+    $('siResMsg').textContent = r.msg || '';
+    $('siResNote').innerHTML = r.note || '';
+    $('siResAct').innerHTML = r.act || '';
+  }
+  function clearResult() { showResult(RESULT_IDLE); }
+
+  function resultFromError(e, kind, ctx) {
+    // kind: 'inbound' | 'undo' | 'hold' | 'release'  — 사유를 갈라 말한다(계약 §서버 응답)
+    var st = e && e.status;
+    var detail = (e && e.message) || '';
+    if (st === 401) {
+      return { tone: 'err', code: '401', msg: '세션이 만료됐습니다 — 다시 로그인 후 확정하십시오',
+        note: '입력값은 서버에 닿지 않았다 — 저장되지 않았다.',
+        act: '<a class="si-b" href="' + LOGIN + '">로그인 화면으로 이동</a>' + retryBtn(ctx) };
+    }
+    if (st === 403) {
+      return { tone: 'err', code: '403', msg: 'viewer 등급은 입고 확정·되돌리기를 할 수 없습니다',
+        note: '서버 사유: ' + esc(detail) + ' — 조회는 viewer · 쓰기는 operator 이상(owner 전용 아님). 단추는 감추지 않고 비활성 + 사유 병기.', act: '' };
+    }
+    if (st === 400) {
+      return { tone: 'err', code: '400', msg: detail,
+        note: kind === 'hold' ? '보류 사유는 필수다.' : '허용 사유는 <code>inbound · adjust</code> 둘뿐 · 수량은 1 이상(상한은 서버에 없다) · 「단종」·「삭제대기」 상품에는 입고할 수 없다 — 조회 시점과 확정 시점 사이에 상태가 바뀐 경우 목록을 다시 조회한다.', act: '' };
+    }
+    if (st === 404) {
+      return { tone: 'err', code: '404', msg: detail,
+        note: kind === 'undo' ? 'log_id 가 유효하지 않거나 이 화면 계열의 기록이 아니다.' : '조회 이후 삭제됐습니다 — 목록은 파생이라 다음 조회에서 사라진다.', act: '' };
+    }
+    if (st === 409) {
+      return { tone: 'err', code: '409', msg: detail,
+        note: kind === 'undo'
+          ? '이미 되돌린 입고는 <code>detail->>ref_log_id</code> 로 막는다 · 입고분보다 재고가 적으면 이후 판매·조정이 있어 되돌릴 수 없다(재고를 음수로 만들지 않는다).'
+          : '보류 중인 상품은 보류를 먼저 해제한 뒤 확정한다 · 이미 보류/해제된 건은 그 사실을 그대로 표시한다.', act: '' };
+    }
+    if (st >= 500) {
+      return { tone: 'err', code: String(st), msg: '서버 오류로 입고를 기록하지 못했습니다',
+        note: '사유: ' + esc(detail) + ' — 원장 행과 재고 갱신은 한 트랜잭션이라 부분 반영은 없다.', act: retryBtn(ctx) };
+    }
+    if (st === undefined) {
+      return { tone: 'err', code: '연결 실패', msg: '서버에 닿지 못했다 — ' + (detail || '네트워크'),
+        note: '입력값은 저장되지 않았다.', act: retryBtn(ctx) };
+    }
+    return { tone: 'err', code: String(st), msg: detail || ('오류 ' + st), note: '', act: retryBtn(ctx) };
+  }
+  function retryBtn(ctx) {
+    if (!ctx) return '';
+    return '<button type="button" class="si-b" data-action="retry-write" data-ctx="' + esc(JSON.stringify(ctx)) + '">다시 시도</button>';
+  }
+
+  // ── 확정 — 두 경로(목록 행 · 패널)가 «이 함수 하나»를 쓴다 ─────────────
+  function confirmInbound(code, qty, why, src) {
+    if (S.busy) return;
+    if (!(qty > 0)) {
+      showResult({ tone: 'err', code: '입력', msg: '입고 수량은 1 이상이어야 합니다', note: '서버에 보내지 않았다 — 저장되지 않았다.', act: '' });
+      return;
+    }
+    if (why !== 'inbound' && why !== 'adjust') {
+      showResult({ tone: 'err', code: '입력', msg: '알 수 없는 사유입니다', note: '허용값 <code>inbound · adjust</code> 둘뿐.', act: '' });
+      return;
+    }
+    // 결과는 패널에 선다 — 목록에서 확정해도 그 상품을 패널에 올린다(같은 결과 표시 함수)
+    if (!S.sel || S.sel.product_code !== code) select(code, src || 'pending');
+    // 확정 «전» 사유도 판정과 같은 원천(pool_note)에서 가져온다 — 옛 note 를 쓰면
+    // pool_entered=false 결과 바로 옆에 「입고 시 추천 가능 재고 진입」이 붙는다.
+    var selNote = S.sel && S.sel.product_code === code ? (S.sel.pool_note || '') : '';
+    S.busy = true;
+    var ctx = { kind: 'inbound', code: code, qty: qty, why: why, src: src || 'pending' };
+    apiPost('/api/admin/stock-inbound/' + code, { qty: qty, why: why }).then(function (r) {
+      S.busy = false;
+      var pool = r.pool_entered === true;
+      var msg = pool
+        ? '입고 완료 — 재고 ' + fmt(r.stock_before) + ' → ' + fmt(r.stock_after) + (r.status_changed ? ' · 품절 해제' : '') + ' · 추천 후보 진입'
+        : '입고 완료 — 재고 ' + fmt(r.stock_before) + ' → ' + fmt(r.stock_after) + (r.status_changed ? ' · 품절 해제' : '') + ' · 다만 추천 후보에는 들어가지 않았습니다';
+      var note = pool
+        ? '<code>status_changed=' + String(!!r.status_changed) + ' · pool_entered=true</code> · SKU ' + esc(r.sku) + ' · 기록 #' + r.undo_id + '. 이 순간부터 견적에 쓰인다 — 되돌려도 그 사이 나간 견적은 이 재고로 나갔다.'
+        : '<code>pool_entered=false</code> · SKU ' + esc(r.sku) + ' · 기록 #' + r.undo_id + '. 확정 전 서버 판정 사유' + (selNote ? ': ' + esc(selNote) : ' 없음') + '. 화면이 사유를 새로 판정하지 않는다.';
+      showResult({ tone: pool ? 'ok' : 'warn', code: pool ? '200' : '200 · pool_entered=false', msg: msg, note: note,
+        act: writable() ? '<button type="button" class="si-b" data-action="undo" data-log="' + r.undo_id + '">되돌리기</button>' : '' });
+      if (S.sel && S.sel.product_code === code) {
+        S.sel.stock = r.stock_after;
+        if (r.status_changed) S.sel.status = '판매중';
+        $('siQty').value = '';
+        renderPanel();
+      }
+      loadList();
+      loadHistory(code);
+    }).catch(function (e) {
+      S.busy = false;
+      showResult(resultFromError(e, 'inbound', ctx));
+    });
+  }
+
+  // ── 되돌리기 — 서버 이력에서 고른다. 판정도 서버(undoable·undo_note) ────────
+  function undo(logId) {
+    if (S.busy) return;
+    S.busy = true;
+    var ctx = { kind: 'undo', log: logId };
+    apiPost('/api/admin/stock-inbound/undo/' + logId).then(function (r) {
+      S.busy = false;
+      showResult({ tone: 'ok', code: '200', msg: '되돌림 완료 — 재고 ' + fmt(r.stock_after) + ' · 역방향 원장 행 기록',
+        note: 'SKU ' + esc(r.sku || '—') + ' · 원 기록 #' + logId + '. 원장 행은 삭제하지 않는다 — <code>adjust · -qty</code> 행이 추가됐다. 입고 전 상태가 품절이었으면 품절로 되돌아간다.', act: '' });
+      if (S.sel) { S.sel.stock = r.stock_after; renderPanel(); }
+      loadList();
+      loadHistory(S.hist.pc);
+    }).catch(function (e) {
+      S.busy = false;
+      showResult(resultFromError(e, 'undo', ctx));
+    });
+  }
+
+  // ── 보류 · 해제 — 서버 상태 ─────────────────────────────────────────────
+  function hold(code, reason) {
+    if (S.busy) return;
+    if (!(reason || '').trim()) {
+      showResult({ tone: 'err', code: '입력', msg: '보류 사유를 입력하십시오', note: '서버에 보내지 않았다 — 보류 사유는 필수다.', act: '' });
+      var inp = $('siHoldReason'); if (inp) inp.focus();
+      return;
+    }
+    S.busy = true;
+    apiPost('/api/admin/stock-inbound/hold/' + code, { reason: reason.trim() }).then(function (r) {
+      S.busy = false;
+      showResult({ tone: 'warn', code: '200 · 보류', msg: '보류 등록 — 보류 #' + r.hold_id + ' · SKU ' + esc(r.sku),
+        note: esc(r.note || '') + ' 기록 #' + r.log_id + '.', act: '' });
+      if (window.Admin2Shell && window.Admin2Shell.toast) window.Admin2Shell.toast('보류 등록 #' + r.hold_id + ' — 기본 조회에서 빠진다', 'warn');
+      if (S.sel && S.sel.product_code === code) {
+        S.sel.hold = { hold_id: r.hold_id, reason: r.reason, held_at: new Date().toISOString(), held_by: (window.Admin2Shell && window.Admin2Shell.getMe() || {}).name || '—' };
+        renderPanel();
+      }
+      loadList();
+    }).catch(function (e) {
+      S.busy = false;
+      showResult(resultFromError(e, 'hold', null));
+    });
+  }
+  function release(code) {
+    if (S.busy) return;
+    S.busy = true;
+    apiPost('/api/admin/stock-inbound/hold/' + code + '/release').then(function (r) {
+      S.busy = false;
+      showResult({ tone: 'ok', code: '200 · 해제', msg: '보류 해제 — 보류 #' + r.hold_id + ' · SKU ' + esc(r.sku),
+        note: esc(r.note || '') + ' 기록 #' + r.log_id + '.', act: '' });
+      if (window.Admin2Shell && window.Admin2Shell.toast) window.Admin2Shell.toast('보류 해제 #' + r.hold_id + ' — 입고 대기 목록에 다시 나타난다', 'ok');
+      if (S.sel && S.sel.product_code === code) { S.sel.hold = null; renderPanel(); }
+      loadList();
+    }).catch(function (e) {
+      S.busy = false;
+      showResult(resultFromError(e, 'release', null));
+    });
+  }
+
+  // ── 이력 — 같은 엔드포인트·같은 렌더러. 상품 선택 시 그 상품만, 아니면 전체(이 화면 처리분) ──
+  function loadHistory(pc) {
+    if (S.hist.pc !== pc) S.hist.page = 1;
+    S.hist.pc = pc == null ? null : pc;
+    var url = '/api/admin/stock-inbound/history?page=' + S.hist.page + '&size=' + HIST_SIZE
+      + (S.hist.pc == null ? '' : '&product_code=' + S.hist.pc);
+    $('siHistTitle').textContent = S.hist.pc == null ? '입고 이력 — 전체(이 화면 처리분)' : '이 상품의 입고 이력';
+    $('siHistRows').innerHTML = '<div class="empty">불러오는 중</div>';
+    apiGet(url).then(function (j) {
+      if (S.hist.pc !== (j.product_code == null ? null : j.product_code)) return;
+      S.hist.data = j;
+      S.canWrite = j.can_write === true;
+      S.canWriteNote = j.can_write_note || '';
+      renderHistory();
+      // 권한을 서버가 말해 줬으니 단추들도 그 값으로 다시 그린다
+      renderRows(); if (S.sel) { renderHold(); renderConfirmBtn(); }
+    }).catch(function (e) {
+      $('siHistRows').innerHTML = '<div class="empty si-state err" style="padding:16px 14px;text-align:left">' + errHtml(e, 'retry-hist') + '</div>';
+      $('siHistTxt').innerHTML = ''; $('siHistBtns').innerHTML = '';
+    });
+  }
+  function histRow(h) {
+    var w = writable();
+    var d = h.qty_delta == null ? '—' : (h.qty_delta > 0 ? '+' : '') + fmt(h.qty_delta);
+    var act;
+    if (h.kind === 'undo') {
+      act = '<button type="button" class="si-hb" disabled title="' + esc(h.undo_note || '') + '">되돌림 완료</button>';
+    } else if (h.undone_by != null) {
+      act = '<button type="button" class="si-hb" disabled title="' + esc(h.undo_note || '') + '">이미 되돌림</button>';
+    } else if (!w) {
+      act = '<button type="button" class="si-hb blocked" disabled title="' + esc(writeNote()) + '">되돌리기 불가</button>';
+    } else if (h.undoable) {
+      act = '<button type="button" class="si-hb" data-action="undo" data-log="' + h.log_id + '" title="' + esc(h.undo_note || '') + '">되돌리기</button>';
+    } else {
+      var lab = h.undo_state === 'stock_short' ? '재고 부족 · 409' : (h.undo_state === 'product_missing' ? '상품 없음' : '되돌리기 불가');
+      act = '<button type="button" class="si-hb blocked" disabled title="' + esc(h.undo_note || '') + '">' + lab + '</button>';
+    }
+    var nt = '';
+    if (S.hist.pc == null) nt += '<b>' + esc(h.name || h.sku || ('상품 ' + h.product_code)) + '</b> · ';
+    nt += esc(h.operator || '—') + (h.why ? ' · why=' + esc(h.why) : '') + ' · ' + esc(h.note || '');
+    return '<div class="si-hrow' + (h.undone_by != null || h.kind === 'undo' ? ' undone' : '') + '" data-log="' + h.log_id + '">'
+      + '<span class="when">' + esc(fmtDT(h.at)) + '</span>'
+      + '<span class="kind' + (h.kind === 'undo' ? ' u' : '') + '">' + esc(h.kind_label) + '</span>'
+      + '<span class="d num">' + d + '</span>'
+      + '<span class="nt" title="' + esc(nt.replace(/<[^>]+>/g, '')) + '">' + nt + '</span>'
+      + act + '</div>';
+  }
+  function renderHistory() {
+    var j = S.hist.data;
+    var box = $('siHistRows');
+    if (!j.items.length) {
+      box.innerHTML = '<div class="empty">' + (S.hist.pc == null ? '이 화면으로 처리한 입고가 없습니다' : '이 상품에 대해 이 화면으로 처리한 입고가 없습니다') + '</div>';
+    } else {
+      box.innerHTML = j.items.map(histRow).join('');
+    }
+    $('siHistScope').textContent = j.scope_note || '';
+    var cnt = j.items.length;
+    var a = cnt ? (j.page - 1) * j.size + 1 : 0, z = cnt ? a + cnt - 1 : 0;
+    $('siHistTxt').innerHTML = cnt
+      ? '전체 <b>' + fmt(j.total) + '</b>건 중 <b>' + fmt(a) + '–' + fmt(z) + '</b>'
+      : '전체 <b>' + fmt(j.total) + '</b>건';
+    $('siHistBtns').innerHTML = j.pages > 1 ? pagerBtns(j.page, j.pages, 'hist-page') : '';
+  }
+
+  // ── 이벤트 ─────────────────────────────────────────────────────────────
+  var qTimer = null;
+  $('siSearch').addEventListener('input', function () {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function () { S.q = $('siSearch').value.trim(); S.page = 1; loadList(); }, 300);
+  });
+  $('siSearch').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { clearTimeout(qTimer); S.q = $('siSearch').value.trim(); S.page = 1; loadList(); }
+  });
+  $('siPart').addEventListener('change', function () { S.part = $('siPart').value; S.page = 1; loadList(); });
+  $('siQty').addEventListener('input', function () { renderPreview(); renderGates(); });
+  $('siQty').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && S.sel && !$('siConfirmBtn').disabled) confirmInbound(S.sel.product_code, parseInt($('siQty').value, 10), S.why, S.sel.source);
+  });
+
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    var el;
+    if ((el = t.closest('[data-action="retry-list"]'))) { loadList(); return; }
+    if ((el = t.closest('[data-action="retry-hist"]'))) { loadHistory(S.hist.pc); return; }
+    if ((el = t.closest('[data-action="reset-filter"]'))) {
+      S.q = ''; S.part = ''; S.page = 1; $('siSearch').value = ''; $('siPart').value = ''; loadList(); return;
+    }
+    if ((el = t.closest('[data-action="toggle-direct"]'))) {
+      S.mode = S.mode === 'catalog' ? 'pending' : 'catalog';
+      el.setAttribute('aria-pressed', String(S.mode === 'catalog'));
+      $('siDirectNote').hidden = S.mode !== 'catalog';
+      $('siSearch').placeholder = S.mode === 'catalog' ? '직접 등록 — 상품명 · SKU 검색(필수)' : '상품명 · SKU 검색';
+      $('siPart').disabled = S.mode === 'catalog';
+      S.page = 1; renderChips(); loadList();
+      if (S.mode === 'catalog') $('siSearch').focus();
+      return;
+    }
+    if ((el = t.closest('[data-action="hold-mode"]'))) {
+      if (el.disabled) return;
+      S.hold = el.getAttribute('data-hold');
+      if (S.mode === 'catalog') { S.mode = 'pending'; $('siDirectBtn').setAttribute('aria-pressed', 'false'); $('siDirectNote').hidden = true; $('siPart').disabled = false; $('siSearch').placeholder = '상품명 · SKU 검색'; }
+      S.page = 1; renderChips(); loadList(); return;
+    }
+    if ((el = t.closest('[data-action="page"]'))) {
+      if (el.disabled) return;
+      S.page = Number(el.getAttribute('data-page')) || 1; loadList(); return;
+    }
+    if ((el = t.closest('[data-action="hist-page"]'))) {
+      if (el.disabled) return;
+      S.hist.page = Number(el.getAttribute('data-page')) || 1; loadHistory(S.hist.pc); return;
+    }
+    if ((el = t.closest('[data-action="why"]'))) {
+      S.why = el.getAttribute('data-why');
+      document.querySelectorAll('[data-action="why"]').forEach(function (b) { b.setAttribute('aria-pressed', String(b === el)); });
+      renderPreview(); return;
+    }
+    if ((el = t.closest('[data-action="confirm-panel"]'))) {
+      if (el.disabled || !S.sel) return;
+      confirmInbound(S.sel.product_code, parseInt($('siQty').value, 10), S.why, S.sel.source); return;
+    }
+    if ((el = t.closest('[data-action="confirm-row"]'))) {
+      if (el.disabled) return;
+      var code = Number(el.getAttribute('data-code'));
+      var qi = document.querySelector('[data-row-qty="' + code + '"]');
+      var wi = document.querySelector('[data-row-why="' + code + '"]');
+      var row = el.closest('.si-row');
+      confirmInbound(code, qi ? parseInt(qi.value, 10) : NaN, wi ? wi.value : 'inbound', row ? row.getAttribute('data-src') : 'pending');
+      return;
+    }
+    if ((el = t.closest('[data-action="hold"]'))) {
+      if (el.disabled) return;
+      var hc = Number(el.getAttribute('data-code'));
+      if (!S.sel || S.sel.product_code !== hc) select(hc, 'pending');
+      var inp = $('siHoldReason'); if (inp) inp.focus();
+      return;
+    }
+    if ((el = t.closest('[data-action="hold-panel"]'))) {
+      if (el.disabled) return;
+      var inp2 = $('siHoldReason');
+      hold(Number(el.getAttribute('data-code')), inp2 ? inp2.value : ''); return;
+    }
+    if ((el = t.closest('[data-action="release"]'))) {
+      if (el.disabled) return;
+      release(Number(el.getAttribute('data-code'))); return;
+    }
+    if ((el = t.closest('[data-action="undo"]'))) {
+      if (el.disabled) return;
+      undo(Number(el.getAttribute('data-log'))); return;
+    }
+    if ((el = t.closest('[data-action="retry-write"]'))) {
+      var ctx = null;
+      try { ctx = JSON.parse(el.getAttribute('data-ctx')); } catch (x) { ctx = null; }
+      if (!ctx) return;
+      if (ctx.kind === 'inbound') confirmInbound(ctx.code, ctx.qty, ctx.why, ctx.src);
+      else if (ctx.kind === 'undo') undo(ctx.log);
+      return;
+    }
+    if ((el = t.closest('[data-action="select"]'))) {
+      // 행 안의 입력·단추 클릭은 선택으로 치지 않는다
+      if (t.closest('input,select,button')) return;
+      select(Number(el.getAttribute('data-code')), el.getAttribute('data-src') || 'pending'); return;
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target && e.target.id === 'siHoldReason' && S.sel) {
+      hold(S.sel.product_code, e.target.value);
+    }
+  });
+
+  // ── 시작 ───────────────────────────────────────────────────────────────
+  clearResult();
+  loadMeta();
+  loadList();
+  loadHistory(null);
+  if (window.Admin2Shell && window.Admin2Shell.meReady) {
+    window.Admin2Shell.meReady.then(function () { renderRows(); if (S.sel) { renderHold(); renderConfirmBtn(); } if (S.hist.data) renderHistory(); });
+  }
+})();
+</script>
+{% endraw %}
+{% endblock %}
