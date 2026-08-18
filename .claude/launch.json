@@ -4,13 +4,28 @@
     {
       "name": "api",
       "runtimeExecutable": ".venv/Scripts/python",
-      "runtimeArgs": ["-m", "uvicorn", "api.main:app", "--port", "8000"],
-      "port": 8000
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "api.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "port": 8000,
+      "autoPort": false
     },
     {
       "name": "admin-static",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8777", "--directory", "mockups/admin"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8777",
+        "--directory",
+        "mockups/admin"
+      ],
       "port": 8777
     }
   ]
