@@ -3187,6 +3187,64 @@ req 문서 §사장님 결정 5는 세 가지를 함께 물었다 — ① 등록
 **확인법**: `req-my-profile.md` §④-2 「누가 바꿀 수 있는가 · 누가 볼 수 있는가」
 표 · §사장님 결정 5(둘 다 「확정」으로 닫혀 있어야 한다).
 
+### A-66 구 관리자(`mockups/admin/*.html`) 처분 ㉮ — 대체 없는 8개만 잔류, 29개 + 잔재 1개는 `_legacy/admin-phoenix/`로 이관 (✅ 2026-08-17 사장님 확정)
+
+**사장님 원문**: 「가를 권장」. 조사자가 올린 선택지 중 **㉮**(admin2 대체가 이미 선
+화면은 옮기고, 대체가 없는 화면만 원 위치에 동결로 남긴다)를 택했다.
+
+**근거 — 조사자 실측**: `api/admin_nav.py`(IA 정본)와 `api/admin_ui_*.py`(41개,
+2026-08-17 기준) 대조 결과 `mockups/admin/*.html` 37개(+`_demo-products.html`
+템플릿 잔재 1개) 중 **admin2 대체가 없는 것은 8개뿐이었다** — `customers` ·
+`my-profile` · `orders` · `payments` · `refunds` · `reviews` · `shipping` ·
+`stock-inbound`. 그 8개는 **A-10 커머스 도메인**(회원·주문·결제·배송·환불 —
+본 시스템이 직접 처리하기로 확정한 도메인, `CLAUDE.md` A-10)과 그대로 겹친다 —
+admin2 재구축이 아직 이 도메인에 닿지 않았다는 뜻이지, 화면 자체가 불필요해진
+것이 아니다.
+
+**한 것**:
+
+    이동    mockups/admin/*.html 29개 + _demo-products.html → _legacy/admin-phoenix/
+            git mv(파일을 지우지 않는다 — P-09, 이력 보존)
+    잔류    위 8개만 mockups/admin/ 에 남는다(door 화면 my-profile 포함)
+    라우트  api/main.py `_ADMIN_AUTH_DOOR_SCREENS` 에서 `operators` 제거(둘 -> 하나,
+            /admin2/operators 가 대체 화면으로 이미 서 있어 예외 전제가 사라졌다)
+            — /admin/operators.html 은 이제 410, my-profile 만 door 로 남는다
+            (admin2 대체가 아직 없다 — ADM-SYS-022, A-62~A-65 참조)
+    검사    tests/regression.py 에 admin_html()/admin_htmls() 헬퍼 신설 —
+            파일이 두 거처(mockups/admin/ 또는 _legacy/) 중 어디 있든 검사가
+            따라간다. 파일이 없어져 [SKIP]/실패로 조용히 빠지는 것을 막는다
+            (~45곳 경로 해소, 검사 수 그대로 — 회귀 전량 통과(2026-08-17 실행 ·
+            2026-08-18 재실행 모두 실패 0 — 검사 수가 조용히 준 것이 아님은 헬퍼
+            도입 전후 같은 수로 확인))
+    실결함  회귀가 잡은 것 1건 동봉 — `templates/admin/build_map.html.j2` 의 401
+            안내가 죽은 링크 `/admin/login.html`(410)을 가리키고 있었다.
+            `/admin2/login`으로 정정
+
+**실측(2026-08-17)**: `/admin/operators.html` → 410(실측), `/admin2/operators`
+살아 있음(실측) · `/_legacy/*` 는 서빙 안 됨 — 404(캐치올 마운트가 `mockups/`만
+잡고 `_legacy/`는 리포 루트라 밖이다, 실측) · `/admin/assets/*`·`/admin/vendors/*`
+는 잔류 8개가 상대경로로 참조하므로 **유지**(admin2 템플릿의 그 경로 참조는
+2026-08-17 재실측 0건 — `api/main.py` 주석 정정, §데이터 어긋남 아님).
+
+**남은 일 — 별도 물결 다섯(다음 세션이 잇는다, 임의로 메우지 않는다)**:
+
+    1. admin2 템플릿 12곳의 낙오 링크 — build_map 1곳만 이번에 잡았다.
+       나머지 11곳은 아직 실측·정정 전이다(전수 검사 필요)
+    2. `GET /api/admin/setup-status`·`worklist` 가 여전히 구 파일명(`mockups/admin/*.html`
+       경로)을 응답에 담아 반환한다 — 이번 이동으로 그 응답이 가리키는 실제 위치와
+       어긋날 수 있다(대체 화면이 없는 8개는 안 어긋나지만 나머지는 `_legacy/` 로
+       옮겨졌으므로 응답의 경로 문자열 자체를 재검토해야 한다)
+    3. 검사 재설계 — `admin_html()`/`admin_htmls()`는 **임시 다리**다. 8개가 admin2로
+       전부 재구축되면 이 헬퍼와 `_legacy/` 참조 검사 자체가 필요 없어진다
+    4. `faq_id=4` — 이번 물결 조사 중 드러난 별건(상세 미기록, 다음 세션이 재확인)
+    5. `assets`·`vendors`(`/admin/assets/*`·`/admin/vendors/*`) — 잔류 8개가 이관되면
+       그때 함께 치운다. 지금 치우면 그 8개가 스타일 없이 뜬다(슬라이스 101 재현)
+
+**확인법**: `ls _legacy/admin-phoenix/*.html | wc -l`(30) · `ls mockups/admin/*.html`
+(8개만 나와야 한다) · `grep -n "_ADMIN_AUTH_DOOR_SCREENS" api/main.py`(`{"my-profile"}`) ·
+`grep -n "admin_html\b" tests/regression.py | wc -l`(다수) ·
+`grep -n "/admin2/login" templates/admin/build_map.html.j2`.
+
 ---
 
 ## 팝콘PC 쇼핑몰 인계 — 실측 (2026-08-11)
