@@ -143,7 +143,17 @@ if TOKENS_DIR.is_dir():
 #   보다 앞에 있기만 하면 된다 — admin2 페이지 라우터를 마운트보다 먼저 건
 #   §라우터 자동 등록과 같은 원리).
 #
-# ■ 왜 `/admin/` 전체가 아니라 `<이름>.html` 만인가 — 실측(2026-08-13) 결과 admin2의
+# ■ 왜 `/admin/` 전체가 아니라 `<이름>.html` 만인가
+#
+#   ⚠ 아래 「admin2 넷이 읽는다」는 2026-08-13 시점의 실측 기록이다 — 역사로 남긴다.
+#   **2026-08-17 재실측: admin2 템플릿의 `/admin/assets/*`·`/admin/vendors/*` 참조는
+#   0건이다**(전부 `_admin2_shell.html.j2` 상속 · 유일한 절대경로 참조는 폐기된
+#   `_layout.html.j2` 뿐인데 아무 코드도 렌더하지 않는다). 지금 이 자산을 열어 두는
+#   이유는 admin2가 아니라 **`mockups/admin/` 에 남은 구 화면 8개**(door인 my-profile
+#   포함)가 상대경로 `assets/`·`vendors/` 로 각 36건씩 읽기 때문이다 — 그 8개가
+#   admin2로 옮겨간 뒤에야 자산을 치울 수 있다.
+#
+#   (이하 2026-08-13 기록) — 실측(2026-08-13) 결과 admin2의
 #   `templates/admin/{home,products,spec_fill,spec_standard}.html.j2` 넷은 **지금도
 #   Phoenix 벤더 스택(Bootstrap·simplebar·feather-icons 등)과 파비콘을
 #   `/admin/assets/*`·`/admin/vendors/*` 에서 그대로 읽는다**(폐기된 `_layout.html.j2`
@@ -224,7 +234,21 @@ _ADMIN_LEGACY_GONE_HTML = (
 #   ⚠ **옛 북마크는 이제 410을 받는다**(`/admin/login.html`). 막다른 길은 아니다 —
 #   `/admin2/*` 어디를 열어도 401 안내가 새 화면으로 보내고, 410 본문도 admin2 로
 #   안내한다. 캐시된 410 문제는 아래 함수의 no-cache 정책이 그대로 처리한다.
-_ADMIN_AUTH_DOOR_SCREENS = {"my-profile", "operators"}
+#
+# ■ 2026-08-17 전환 — `operators`를 뺐다 (둘 -> 하나, 사장님 확정 ㉮)
+#
+#   위 「하나씩 뺀다」의 두 번째 적용이다. `/admin2/operators`(admin_ui_operators_roles.py)
+#   가 대체 화면으로 서 있어 예외의 전제(「이 화면이 없으면 재진입 방법이 없는가」)가
+#   사라졌다. `/admin/operators.html`도 이제 410을 받는다. `my-profile`만 남는다 —
+#   여전히 admin2 대체가 없다(api/admin_ui_my_profile.py 없음, 2026-08-17 재확인).
+#
+#   같은 날 구 화면 파일도 옮겼다: admin2 대체가 없는 8화면(customers·my-profile·
+#   orders·payments·refunds·reviews·shipping·stock-inbound)만 `mockups/admin/` 에
+#   남기고, 나머지 29화면 + `_demo-products.html` 은 `_legacy/admin-phoenix/` 로
+#   git mv(P-09 「파일은 지우지 않는다」 — 위치만 바꿈, 이력 보존). `_legacy/` 는
+#   리포 루트라 아래 캐치올 마운트(MOCKUPS_DIR) 밖이다 — 서빙되지 않는다(실측).
+#   이 라우트의 410은 파일 존재와 무관하므로 옮긴 뒤에도 그대로다.
+_ADMIN_AUTH_DOOR_SCREENS = {"my-profile"}
 
 
 @app.get("/admin", include_in_schema=False)
@@ -234,9 +258,10 @@ def _legacy_admin_page_gone(page_name: str = ""):
     """구 관리자 화면(`mockups/admin/*.html`) 접근 차단 — 위 블록 주석 참조.
 
     `/admin/assets/*`·`/admin/vendors/*` 는 이 경로 패턴에 걸리지 않아 캐치올
-    마운트가 그대로 서빙한다 — admin2 4화면이 아직 그 자산에 기대고 있어서다.
+    마운트가 그대로 서빙한다 — `mockups/admin/` 에 남은 구 화면 8개가 상대경로로
+    읽기 때문이다(admin2 참조는 0건 — 2026-08-17 재실측, 위 블록 주석 참조).
 
-    `_ADMIN_AUTH_DOOR_SCREENS`(로그인·내 정보·운영자 관리)는 차단하지 않고 실제
+    `_ADMIN_AUTH_DOOR_SCREENS`(내 정보)는 차단하지 않고 실제
     파일을 그대로 서빙한다 — 위 "인증·세션 화면" 블록 참조. `NoCacheStatic`이 이
     캐치올 대신 여기서 먼저 잡히므로, 캐시 미적용 정책(no-cache)도 동일하게 직접
     건다 — 옛 로그인 화면이 브라우저에 캐시돼 새 배포가 안 보이는 사고(슬라이스 71)를

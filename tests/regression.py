@@ -45,6 +45,30 @@ QUIET = "--quiet" in sys.argv
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SNAP_PATH = os.path.join(ROOT, "tests", ".regression-snapshot.json")
 
+# ── 구 관리자 화면의 두 거처 (2026-08-17 동결 이동) ─────────────────────────────
+# admin2 대체가 없는 8화면(customers·my-profile·orders·payments·refunds·reviews·
+# shipping·stock-inbound)만 `mockups/admin/` 에 남고, 나머지 29화면 + `_demo-products.html`
+# 은 `_legacy/admin-phoenix/` 로 옮겨졌다(git mv — P-09 「파일은 지우지 않는다」 유지).
+#
+#   admin_html(name)   옛 마크업의 «성질»을 재는 단건 검사가 파일을 따라가는 경로.
+#                      파일이 어디 있든 검사 수가 줄지 않는다 — 파일이 없어져
+#                      [SKIP]/실패로 조용히 빠지는 것이 가장 위험하다(§회귀 세트).
+#   admin_htmls()      동결 구 화면 «전체»(남은 8 + _legacy). 전수 마크업 감사용.
+#
+# ⚠ 서빙·화면 수를 재는 검사([30] 자산 실재 · [31] 화면 수)는 이 둘을 쓰면 안 된다 —
+#   그 검사들의 모집단은 「지금 mockups/ 아래 있는 것」이다.
+LEGACY_ADMIN = os.path.join(ROOT, "_legacy", "admin-phoenix")
+
+
+def admin_html(name):
+    p = os.path.join(ROOT, "mockups", "admin", name)
+    return p if os.path.exists(p) else os.path.join(LEGACY_ADMIN, name)
+
+
+def admin_htmls():
+    return (sorted(glob.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+            + sorted(glob.glob(os.path.join(LEGACY_ADMIN, "*.html"))))
+
 # 슬라이스 39의 '알려진 한계'는 슬라이스 40에서 해소됐다: 예산 100만원 추천이 안 나온 원인은
 # 탐색 전략이 아니라 **노드 상한값**이었다(100,000 → 682,419노드면 답이 있다. 탐색은 싸다 —
 # 100,007노드가 0.02초). 상한을 2,000,000으로 올려 1,000,000원 구성이 나온다.
@@ -671,7 +695,7 @@ def test_compat():
     # {slot_width}·{efficiency}·{speed_mts}), 'v5 → v6 발행' 버전 체계,
     # '예상 24,912 → 약 24,7xx'를 사실처럼 보여주고 있었다. 슬라이스 76에서 마진 정책·
     # 가중치에 한 정리를 이 화면만 빠뜨렸다 — 되돌아오지 않게 마크업으로 고정한다.
-    _p = os.path.join(ROOT, "mockups", "admin", "compat-rules.html")
+    _p = admin_html("compat-rules.html")
     _t = io.open(_p, encoding="utf-8").read()
     for bad in ('"R-01"', "{igpu}", "{m2_slots}", "{pcie_power}", "{slot_width}",
                 "{speed_mts}", "v6 발행", "24,912"):
@@ -733,7 +757,7 @@ def test_compat():
             self.stray.append(tag)
 
     _bad = []
-    for _p in sorted(_g2.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -875,7 +899,7 @@ def test_product_edit():
     # 마크업에 예시 값이 박혀 있지 않은지 회귀가 지킨다.
     try:
         import re as _re
-        html = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+        html = io.open(admin_html("product-edit.html"),
                        encoding="utf-8").read()
         vals = _re.findall(r'<label class="form-label[^>]*>(상품명|재고 수량|판매가\(원\))</label>'
                            r'<input[^>]*value="([^"]*)"', html)
@@ -890,7 +914,7 @@ def test_product_edit():
               "if(!EDIT){ EDIT = true; paint(); return; }" in html, "전환 분기 존재", False)
         check("저장하면 읽기 모드로 돌아간다(연속 오조작 방지)",
               "EDIT=false;               // 저장했으면 읽기로" in html, "복귀 분기 존재", False)
-        lst = io.open(os.path.join(ROOT, "mockups", "admin", "products.html"),
+        lst = io.open(admin_html("products.html"),
                       encoding="utf-8").read()
         check("목록의 행 버튼은 [수정]이고 편집 모드로 간다",
               "&edit=1\">수정</a>" in lst, "[수정] + edit=1",
@@ -1184,7 +1208,7 @@ def test_password_auth():
 
     # 화면이 비밀번호를 받는가
     try:
-        lg = io.open(os.path.join(ROOT, "mockups", "admin", "login.html"),
+        lg = io.open(admin_html("login.html"),
                      encoding="utf-8").read()
         check("로그인 화면에 비밀번호 칸이 있다",
               'id="password"' in lg and "password: document" in lg.replace('"', '"'),
@@ -1413,7 +1437,7 @@ def test_taxonomy_single_source():
     # 화면은 세 자리에서 셀렉트를 채운다(단가표發 등록 · 수정 · 단건 등록).
     # 셋 다 **같은 원천**(part_choices/all_choices)을 써야 한다 — 하나라도 옛 라벨 경로로
     # 남으면 그 자리에서만 쿨러가 갈라진다(단일 원천 규율).
-    _pe = pathlib.Path(ROOT, "mockups", "admin", "product-edit.html").read_text(encoding="utf-8")
+    _pe = pathlib.Path(admin_html("product-edit.html")).read_text(encoding="utf-8")
     check("상품 등록·수정 화면에 옛 라벨 선택지 경로가 남지 않았다",
           "part_labels" not in _pe, "없음", "part_labels 사용처가 남아 있음")
     check("분류 셀렉트를 채우는 자리가 전부 choices 원천",
@@ -1495,7 +1519,7 @@ def test_taxonomy_single_source():
             check("조립 부품 아닌 것에 등급이 없다", _bad == 0, 0, _bad)
 
             # 등급판 화면 계약 — 브라우저 없이 마크업으로 본다
-            _gb = pathlib.Path(ROOT, "mockups", "admin", "grade-board.html").read_text(encoding="utf-8")
+            _gb = pathlib.Path(admin_html("grade-board.html")).read_text(encoding="utf-8")
             # **엔진이 안 읽는다는 사실을 화면이 먼저 말한다.** 안 그러면 운영자는
             # "저장했는데 견적이 안 바뀐다"를 결함으로 신고한다(화면 정직성).
             check("등급판이 '엔진이 아직 안 읽는다'를 화면에 적는다",
@@ -1540,7 +1564,7 @@ def test_taxonomy_single_source():
                   and "grade-board.html" in _api_sw, True,
                   [x for x in ("usage-floors.html", "policy-weights.html", "grade-board.html")
                    if x not in _api_sw])
-            _sw = pathlib.Path(ROOT, "mockups", "admin", "swap-logs.html").read_text(encoding="utf-8")
+            _sw = pathlib.Path(admin_html("swap-logs.html")).read_text(encoding="utf-8")
             check("교체 화면이 판정 문구를 서버에서 받는다",
                   "r.reading" in _sw and "r.fix" in _sw, True,
                   "r.reading" in _sw and "r.fix" in _sw)
@@ -1677,7 +1701,7 @@ def test_categories():
     check("없는 카테고리 수정은 404", st == 404, 404, st)
 
     # 6) 화면 계약 — 마크업이 서버 값을 쓰는가(브라우저 없이)
-    _p = os.path.join(ROOT, "mockups", "admin", "categories.html")
+    _p = admin_html("categories.html")
     if os.path.exists(_p):
         _h = io.open(_p, encoding="utf-8").read()
         check("화면이 ADM-CAT-010이다", 'data-screen-id="ADM-CAT-010"' in _h, True,
@@ -1826,7 +1850,7 @@ def test_category_mapping():
         check("알 수 없는 범위는 400", e.code == 400, 400, e.code)
 
     # 화면 계약
-    _p = os.path.join(ROOT, "mockups", "admin", "category-mapping.html")
+    _p = admin_html("category-mapping.html")
     if os.path.exists(_p):
         _h = io.open(_p, encoding="utf-8").read()
         check("화면이 ADM-CAT-020이다", 'data-screen-id="ADM-CAT-020"' in _h, True,
@@ -2064,7 +2088,7 @@ def test_reprice():
     check("없는 재산정 기록 되돌리기는 404", st == 404, 404, st)
 
     # 화면 계약
-    _p = os.path.join(ROOT, "mockups", "admin", "reprice.html")
+    _p = admin_html("reprice.html")
     if os.path.exists(_p):
         _h = io.open(_p, encoding="utf-8").read()
         check("화면이 ADM-PRC-050이다", 'data-screen-id="ADM-PRC-050"' in _h, True,
@@ -2113,7 +2137,8 @@ def test_category_margin():
     # 2) 상속을 **한 곳에서만** 계산하는가. 화면이나 다른 모듈이 다시 구현하면 갈라진다.
     _dupes = []
     for _dir, _ext in ((os.path.join(ROOT, "api"), ".py"),
-                       (os.path.join(ROOT, "mockups", "admin"), ".html")):
+                       (os.path.join(ROOT, "mockups", "admin"), ".html"),
+                       (LEGACY_ADMIN, ".html")):
         for _fn in sorted(os.listdir(_dir)):
             if not _fn.endswith(_ext) or _fn == "pricing.py":
                 continue
@@ -2192,7 +2217,7 @@ def test_category_margin():
           p.get("margin_varies") == (len(_used) > 1), len(_used) > 1, p.get("margin_varies"))
 
     # 6) 화면이 서버 값을 그대로 쓰는가(상속을 다시 계산하지 않는다)
-    _h = io.open(os.path.join(ROOT, "mockups", "admin", "categories.html"),
+    _h = io.open(admin_html("categories.html"),
                  encoding="utf-8").read()
     check("화면이 적용 마진을 서버에서 받는다", "margin_effective" in _h, True,
           "margin_effective" in _h)
@@ -2221,7 +2246,7 @@ def test_template_usage():
 
     admin = os.path.join(ROOT, "mockups", "admin")
     def read(name):
-        p = os.path.join(admin, name)
+        p = admin_html(name)
         return io.open(p, encoding="utf-8").read() if os.path.exists(p) else ""
 
     cat = read("categories.html")
@@ -2257,7 +2282,7 @@ def test_template_usage():
             "data-nouislider": "nouislider", "data-rater": "rater-js",
             "data-sortable": "sortablejs", "data-calendar": "fullcalendar"}
     missing = []
-    for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
+    for _p in admin_htmls():
         if os.path.basename(_p).startswith("_"):
             continue
         _s = io.open(_p, encoding="utf-8").read()
@@ -2290,7 +2315,7 @@ def test_template_usage():
             check("헬퍼가 %s 를 담당한다" % why, need in h, need, need in h)
 
     direct, own_sort, no_helper = [], [], []
-    for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -2315,13 +2340,13 @@ def test_template_usage():
     check("화면이 List를 직접 만들지 않는다", direct == [], [], direct)
     check("비교 함수를 헬퍼를 우회해 쓰지 않는다", own_sort == [], [], own_sort)
     # 특례가 몇 개인지 눈에 보이게 둔다 — 늘면 헬퍼 기본값을 고칠 때가 된 것이다.
-    special = [os.path.basename(_p) for _p in sorted(_g7.glob(os.path.join(admin, "*.html")))
+    special = [os.path.basename(_p) for _p in admin_htmls()
                if "sortFunction" in io.open(_p, encoding="utf-8").read()]
     drift("custom_sortfn_screens", len(special))
 
     # 손으로 만든 전체선택이 남아 있지 않은가 — 있으면 컴포넌트를 또 베낀 것이다
     handrolled = []
-    for _p in sorted(_g7.glob(os.path.join(admin, "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -2331,7 +2356,7 @@ def test_template_usage():
     check("전체선택을 손으로 만든 화면이 없다", handrolled == [], [], handrolled)
 
     # 몇 개 화면이 실제로 템플릿 표를 쓰는가 — 늘어나는 것이 정상이다(줄면 되돌린 것이다)
-    using = [os.path.basename(_p) for _p in sorted(_g7.glob(os.path.join(admin, "*.html")))
+    using = [os.path.basename(_p) for _p in admin_htmls()
              if not os.path.basename(_p).startswith("_")
              and "popcornList.wire" in io.open(_p, encoding="utf-8").read()]
     check("템플릿 표를 쓰는 화면 수", len(using) >= 12, ">= 12", len(using))
@@ -2363,7 +2388,7 @@ def test_charts_and_choices():
     for v in ("echarts", "choices"):
         check("vendor %s 가 실제로 있다" % v, v in have, v, sorted(have))
 
-    idx = io.open(os.path.join(admin, "index.html"), encoding="utf-8").read()
+    idx = io.open(admin_html("index.html"), encoding="utf-8").read()
     check("대시보드가 echarts vendor를 싣는다", "vendors/echarts/echarts.min.js" in idx, True,
           "vendors/echarts" in idx)
     for cid in ("chPool", "chOrders", "chPending"):
@@ -2453,7 +2478,7 @@ def test_charts_and_choices():
 
     # 화면이 Choices 를 직접 new 하지 않는다(헬퍼를 우회하면 다시 갈라진다)
     direct = []
-    for _p in sorted(_g8.glob(os.path.join(admin, "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -2464,7 +2489,7 @@ def test_charts_and_choices():
 
     # 검색을 붙인 화면은 vendor·헬퍼를 함께 실어야 한다(하나만 빠지면 조용히 평범한 셀렉트가 된다)
     broken = []
-    for _p in sorted(_g8.glob(os.path.join(admin, "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -2478,7 +2503,7 @@ def test_charts_and_choices():
             broken.append(_n + ":" + ",".join(miss))
     check("검색 셀렉트 화면이 vendor·CSS·헬퍼를 다 싣는다", broken == [], [], broken)
 
-    using = [os.path.basename(_p) for _p in sorted(_g8.glob(os.path.join(admin, "*.html")))
+    using = [os.path.basename(_p) for _p in admin_htmls()
              if "popcornChoices" in io.open(_p, encoding="utf-8").read()]
     check("검색 셀렉트를 쓰는 화면이 있다", len(using) >= 3, ">= 3", len(using))
     drift("choices_screens", len(using))
@@ -2505,7 +2530,7 @@ def test_no_fabricated_data():
     admin = os.path.join(ROOT, "mockups", "admin")
 
     def screens():
-        for _p in sorted(_g9.glob(os.path.join(admin, "*.html"))):
+        for _p in admin_htmls():
             _n = os.path.basename(_p)
             if _n.startswith("_") or _n == "login.html":
                 continue
@@ -2707,7 +2732,7 @@ def test_screen_assets():
 
     # ── 브라우저에서 실제로 열어 잡은 것들 (2026-08-05) ────────────────
     _screens = [(_p, io.open(_p, encoding="utf-8").read())
-                for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+                for _p in admin_htmls()
                 if not os.path.basename(_p).startswith("_")]
 
     # ① RTL 잔재가 돌아오지 않는가. 링크만 지우면 인라인 스크립트가 null 에
@@ -2821,9 +2846,9 @@ def test_screen_assets():
     _hrefs = _re7.findall(r"href:\s*'([^']+)'", _md)
     check("메뉴 항목이 34개다", len(_hrefs) == 34, 34, len(_hrefs))
     check("메뉴가 가리키는 화면이 실제로 있다",
-          all(os.path.exists(os.path.join(ROOT, "mockups", "admin", h)) for h in _hrefs),
+          all(os.path.exists(admin_html(h)) for h in _hrefs),
           "전부 존재",
-          [h for h in _hrefs if not os.path.exists(os.path.join(ROOT, "mockups", "admin", h))][:3])
+          [h for h in _hrefs if not os.path.exists(admin_html(h))][:3])
     # 숫자 배지를 정본에 담지 않는다 — 담으면 거짓을 원천에 새긴다(실제 대기는 5,162였다)
     _numbadge = _re7.findall(r"badge:\s*'(\d+)'", _md)
     check("메뉴 정본에 지어낸 숫자 배지가 없다", _numbadge == [], [], _numbadge)
@@ -2845,7 +2870,7 @@ def test_screen_assets():
     #    체크박스 열을 넣으면서 colgroup·thead·행·빈 상태 colspan 이 어긋나기 쉽다.
     #    어긋나면 표가 조용히 뒤틀린다 — 브라우저는 오류를 내지 않는다.
     for _n in ("products.html", "orders.html", "category-mapping.html"):
-        _s = io.open(os.path.join(ROOT, "mockups", "admin", _n), encoding="utf-8").read()
+        _s = io.open(admin_html(_n), encoding="utf-8").read()
         _cg = _re7.search(r"<colgroup>(.*?)</colgroup>", _s, _re7.S)
         if not _cg:
             continue
@@ -2871,7 +2896,7 @@ def test_screen_assets():
                   _ntd == _nth, _nth, _ntd)
 
     # ⑫ 일괄 선택은 **아무 일도 못 하는 체크박스가 아니다** — 실제 동작이 붙어 있어야 한다.
-    _pl = io.open(os.path.join(ROOT, "mockups", "admin", "products.html"),
+    _pl = io.open(admin_html("products.html"),
                   encoding="utf-8").read()
     check("상품 목록에 일괄 선택이 있다", "data-bulk-select=" in _pl, True,
           "data-bulk-select=" in _pl)
@@ -3101,7 +3126,7 @@ def test_screen_assets():
 
     # 스타일이 안 먹으면 화면은 뜨지만 읽을 수 없는 상태가 된다 — 테마를 싣는지 본다
     noTheme = []
-    for _p in sorted(_g7.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -3275,7 +3300,7 @@ def test_time_display():
     FMT = _re6.compile(r"(PT\.|fmtT\s*\(|fmt\w*\s*\(|relTime\s*\(|new Date\s*\(|toLocale)")
 
     raw = []
-    for _p in (sorted(_g6.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+    for _p in (admin_htmls()
                + sorted(_g6.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
         _n = os.path.basename(_p)
         if _n.startswith("_"):
@@ -3307,7 +3332,7 @@ def test_time_display():
     # 하드코딩된 날짜를 기본값으로 쓰지 않는다 —
     # my-page가 `m.joined || '2026-07-16'`으로 없는 가입일을 지어내고 있었다
     hard = []
-    for _p in (sorted(_g6.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+    for _p in (admin_htmls()
                + sorted(_g6.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
         _n = os.path.basename(_p)
         if _n.startswith("_"):
@@ -3319,7 +3344,7 @@ def test_time_display():
 
     # 화면이 그 모듈을 실제로 싣는가 — 안 실으면 PT가 undefined라 렌더가 죽는다
     missing = []
-    for _p in (sorted(_g6.glob(os.path.join(ROOT, "mockups", "admin", "*.html")))
+    for _p in (admin_htmls()
                + sorted(_g6.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html")))):
         _n = os.path.basename(_p)
         if _n.startswith("_"):
@@ -3472,7 +3497,7 @@ def test_stock_ledger():
     # ── 화면 계약 ── 연속 등록 (슬라이스 97)
     # 빈 상태에서 견적 한 벌 = 8개 슬롯. 슬롯 하나가 0이면 견적이 0건이라 최소 8번 등록한다.
     try:
-        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+        pe = io.open(admin_html("product-edit.html"),
                      encoding="utf-8").read()
         check("저장하고 다음 상품 버튼이 있다",
               'id="saveNext"' in pe or '.id = "saveNext"' in pe, "있음", "없음")
@@ -3534,7 +3559,7 @@ def test_review_flow():
 
     # ── 화면 계약 ──
     try:
-        rq = io.open(os.path.join(ROOT, "mockups", "admin", "review-queue.html"),
+        rq = io.open(admin_html("review-queue.html"),
                      encoding="utf-8").read()
         # 830건을 손으로 넣는데 저장하면 모달이 닫히고 끝이었다 — 왕복이 830번이다
         check("저장하고 다음 버튼이 있다", 'id="fixNext"' in rq, "있음", "없음")
@@ -3593,7 +3618,7 @@ def test_product_gate():
 
     # ── 화면 계약 ──
     try:
-        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+        pe = io.open(admin_html("product-edit.html"),
                      encoding="utf-8").read()
         check("상세가 게이트 체크리스트를 그린다", "P.gate" in pe, "사용", "없음")
         check("상세가 먼저 할 일을 지목한다", "gate_first" in pe, "사용", "없음")
@@ -3604,12 +3629,12 @@ def test_product_gate():
     # '상품 스펙 관리'는 개별 상품 스펙이 아니라 사양 항목(DB 컬럼)을 만드는 화면이었다.
     # 그 이름 때문에 개별 상품 사양을 고치러 온 운영자가 스키마 편집기를 열게 됐다.
     import glob as _g5
-    stale = [os.path.basename(x) for x in _g5.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+    stale = [os.path.basename(x) for x in admin_htmls()
              if not os.path.basename(x).startswith("_")
              and "상품 스펙 관리" in io.open(x, encoding="utf-8").read()]
     check("옛 이름('상품 스펙 관리')이 남지 않았다", not stale, "없음", stale[:4])
     try:
-        sf = io.open(os.path.join(ROOT, "mockups", "admin", "spec-fields.html"),
+        sf = io.open(admin_html("spec-fields.html"),
                      encoding="utf-8").read()
         check("사양 항목 정의로 이름이 바뀌었다", "사양 항목 정의" in sf, "있음", "없음")
         # 이름을 바꿔도 잘못 오는 사람이 있다 — 갈 곳을 알려준다
@@ -3653,7 +3678,7 @@ def test_setup_status():
     # 각 단계가 실제로 갈 수 있는 화면을 가리키는가 —
     # 슬라이스 93의 공급처처럼 '문서에는 있는데 화면이 없는' 단계를 막는다
     missing = [s["screen"] for s in steps
-               if not os.path.exists(os.path.join(ROOT, "mockups", "admin", s["screen"]))]
+               if not os.path.exists(admin_html(s["screen"]))]
     check("모든 단계가 실제 있는 화면을 가리킨다", not missing, "전부 존재", missing)
 
     # ── 슬롯은 엔진과 같은 정의로 센다 ──
@@ -3677,7 +3702,7 @@ def test_setup_status():
 
     # ── 화면 계약 ──
     try:
-        idx = io.open(os.path.join(ROOT, "mockups", "admin", "index.html"),
+        idx = io.open(admin_html("index.html"),
                       encoding="utf-8").read()
         check("대시보드에 체크리스트 자리가 있다", 'id="setupHost"' in idx, "있음", "없음")
         check("대시보드가 setup-status를 부른다",
@@ -3729,7 +3754,7 @@ def test_suppliers():
     if d["items"]:
         check("공급처 목록 항목이 id 를 준다", "id" in d["items"][0],
               "id", sorted(d["items"][0]))
-    _pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+    _pe = io.open(admin_html("product-edit.html"),
                   encoding="utf-8").read()
     # 화면이 목록에서 **서버가 주는 키**를 읽는가
     check("상품 상세가 공급처 id 로 셀렉트를 만든다", "s.id != null" in _pe, True,
@@ -3826,7 +3851,7 @@ def test_suppliers():
           "없음")
     # 화면이 메뉴를 다시 박아 두지 않는가 — 두 벌이 되면 또 갈라진다
     _inline = []
-    for _p in sorted(_g4.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -3838,7 +3863,7 @@ def test_suppliers():
             _inline.append(_n)
     check("화면이 메뉴 마크업을 다시 품지 않는다", _inline == [], [], _inline[:4])
     check("공급처 화면 파일이 있다",
-          os.path.exists(os.path.join(ROOT, "mockups", "admin", "suppliers.html")),
+          os.path.exists(admin_html("suppliers.html")),
           "있음", "없음")
 
 
@@ -4019,7 +4044,7 @@ def test_my_profile():
     # ── 화면 계약 ── 프로필 메뉴가 없는 곳을 가리키지 않는다
     import glob as _g3
     dead = []
-    for _p in sorted(_g3.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))):
+    for _p in admin_htmls():
         _n = os.path.basename(_p)
         if _n.startswith("_"):
             continue
@@ -4086,7 +4111,7 @@ def test_usage_floor_admin():
                   was, db_one("SELECT value FROM usage_floors WHERE floor_id=:i", i=fid))
 
     try:
-        uf = io.open(os.path.join(ROOT, "mockups", "admin", "usage-floors.html"),
+        uf = io.open(admin_html("usage-floors.html"),
                      encoding="utf-8").read()
         check("하한 화면이 미리보기를 거친다", "preview: true" in uf.replace('"', "'")
               or "preview:true" in uf.replace(" ", ""), "preview 호출", "없음")
@@ -4104,7 +4129,7 @@ def test_screen_identity():
     # 화면 ID는 이미 배지로 보이므로 그 값을 body로 옮겼다.
     import glob as _g
     import re as _re
-    pages = [p for p in _g.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+    pages = [p for p in admin_htmls()
              if not os.path.basename(p).startswith("_")]
     miss_sid, miss_dom, seen = [], [], {}
     for p in pages:
@@ -4204,7 +4229,7 @@ def test_margin_policy():
                     " WHERE action='pricing_settings' AND log_id > :lg", lg=log0 or 0))
 
     try:
-        mp = io.open(os.path.join(ROOT, "mockups", "admin", "margin-policy.html"),
+        mp = io.open(admin_html("margin-policy.html"),
                      encoding="utf-8").read()
         check("마진 화면에 margin 분기가 있다", 'SCREEN === "margin"' in mp,
               "분기 있음", "없음")
@@ -4407,7 +4432,7 @@ def test_part_type_change():
     check("공급처 선택지를 서버가 준다", bool(sup.get("items")), "1개 이상",
           len(sup.get("items") or []))
     try:
-        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+        pe = io.open(admin_html("product-edit.html"),
                      encoding="utf-8").read()
         # 공급처 표(tbody#supRows)만 본다 — 상단 알림 더미와 코드 주석까지 잡으면 오탐이다
         i = pe.find('id="supRows"')
@@ -4611,7 +4636,7 @@ def test_usage_floors():
           dash["flow"]["pool_ok"], wl["pool"])
     # 링크가 실제 화면을 가리키는가 — 깨진 바로가기는 없느니만 못하다
     dead = [i["href"] for i in wl["items"]
-            if not os.path.exists(os.path.join(ROOT, "mockups", "admin", i["href"]))]
+            if not os.path.exists(admin_html(i["href"]))]
     check("작업 패널 바로가기가 실재한다", not dead, "전 경로 존재", dead)
     # 검수는 '판매중·재고 있는 것'이 실제 작업 목록이다(전체를 다 훑을 수는 없다)
     rv = next((i for i in wl["items"] if i["key"] == "review"), None)
@@ -4623,14 +4648,14 @@ def test_usage_floors():
         js = io.open(os.path.join(ROOT, "mockups", "shared", "admin-panel.js"),
                      encoding="utf-8").read()
         check("패널이 서버 값만 쓴다", "/api/admin/worklist" in js, "worklist fetch", "없음")
-        pages = glob.glob(os.path.join(ROOT, "mockups", "admin", "*.html"))
+        pages = admin_htmls()
         miss = [os.path.basename(p) for p in pages
                 if "settings-offcanvas" in io.open(p, encoding="utf-8").read()
                 and "admin-panel.js" not in io.open(p, encoding="utf-8").read()]
         check("패널 있는 화면에 모두 주입됐다", not miss, "누락 없음", miss)
         # 상품 상세 제목에 예시 상품명이 남아 있으면 '최근 본 상품'에 엉뚱한 이름이
         # 박힌다 — 실제로 다른 상품 이름이 저장됐다(슬라이스 61).
-        pe = io.open(os.path.join(ROOT, "mockups", "admin", "product-edit.html"),
+        pe = io.open(admin_html("product-edit.html"),
                      encoding="utf-8").read()
         head = pe[pe.find('id="ptitle"'):pe.find('id="ptitle"') + 200]
         check("상품 상세 제목에 예시 상품명이 없다", "이엠텍" not in head, "비어 있음", head[:60])
@@ -4642,7 +4667,7 @@ def test_usage_floors():
         # 메뉴 배지가 가리키는 화면은 worklist가 다 덮어야 한다 — 안 덮이면 그 배지는
         # 지어낸 수로 남는다
         hrefs = {i["href"] for i in wl["items"]}
-        idx = io.open(os.path.join(ROOT, "mockups", "admin", "index.html"),
+        idx = io.open(admin_html("index.html"),
                       encoding="utf-8").read()
         import re as _re
         badged = set(_re.findall(r'href="([a-z-]+\.html)"[^>]*>(?:(?!</a>).)*?class="badge',
@@ -4670,7 +4695,7 @@ def test_usage_floors():
         # 검수 [직접 수정]은 브라우저 기본 prompt()였다 — 값 하나만 묻는 회색 상자에
         # 상품이 무엇인지도 다른 사양이 어떤지도 없었다(사용자 지적). 맥락 없는 판단은
         # 오판을 부른다. 모달로 바꾸되 **새 API를 만들지 않는다**(기존 process 재사용).
-        rq = io.open(os.path.join(ROOT, "mockups", "admin", "review-queue.html"),
+        rq = io.open(admin_html("review-queue.html"),
                      encoding="utf-8").read()
         check("검수 직접 수정이 prompt()를 쓰지 않는다",
               "prompt(`${q.name}\\n${FIELD_KO" not in rq, "모달 사용", "prompt 잔존")
@@ -5030,7 +5055,7 @@ def test_auth():
           "_regress_verified" not in _PK, "없음", sorted(_PK))
 
     # ── 화면 계약 ── 되돌아오면 안 되는 문구들
-    _op = io.open(os.path.join(ROOT, "mockups", "admin", "operators.html"),
+    _op = io.open(admin_html("operators.html"),
                   encoding="utf-8").read()
     check("화면이 '있지도 않은 인증'을 단언하지 않는다",
           "esc(o.provider) + ' 인증'" not in _op, "제거됨", "잔존")
@@ -5406,7 +5431,10 @@ def test_std_schema():
     #    2026-08-11 이 화면은 세션이 끊긴 채 사용자에게 갔고, 머리말에 «HTTP 401» 만
     #    찍혀 운영자가 할 수 있는 것이 없었다. 오류를 표시하는 것과 조치를 주는 것은 다르다.
     _, bm = get_html("/admin2/build-map")
-    for token, why in (("/admin/login.html", "로그인 경로"),
+    # 로그인 경로는 `/admin2/login` 이다(2026-08-17 전환 — admin_ui_common._LOGIN_PAGE 와
+    # 같은 목적지). 옛 `/admin/login.html` 은 이제 410 이라, 그리로 보내는 안내는
+    # «돌아갈 길»이 아니다 — 구화면 이동(2026-08-17)이 이 화면의 낙오 링크를 함께 고쳤다.
+    for token, why in (("/admin2/login", "로그인 경로"),
                        ("세션 만료", "401 안내 문구"),
                        ("data-action=\"retry\"", "재시도 버튼")):
         check(f"[43] 조감도 조회 실패 안내 — {why}", token in bm, "있음", "없음")
