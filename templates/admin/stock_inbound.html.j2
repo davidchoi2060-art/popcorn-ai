@@ -26,9 +26,15 @@
   ■ 두 확정 경로(목록 행 「바로 확정」 · 패널 「확정」)는 같은 함수 confirmInbound() →
     같은 엔드포인트 → 같은 결과 표시 showResult() 를 쓴다 — 갈라 구현하지 않는다.
 
+  ■ 대기 유형 필터(U-17 · 2026-08-18 사장님 확정 ㉮ 「서버에 만든다」) — 칩 둘이 살아 있다.
+    · 조회 조건 `kind=zero|low|all`, 유형별 건수 `kind_counts`, 기준 문장 `kind_scope` 를
+      **서버가** 준다. 화면은 세지 않는다.
+    · 칩의 수는 «현재 조회 조건(검색어·분류·보류) 안에서» 센 수다 — 「누르면 이만큼 남는다」.
+      그 기준을 칩 아래 한 줄(`siKindNote`)에 **서버 문장 그대로** 표시한다.
+    · 행의 유형 태그도 서버 `wait_kind` 를 읽는다(화면이 stock·safety_stock 을 다시
+      비교하지 않는다 — 그러면 칩의 수와 행의 태그가 갈린다).
+
   ■ 서버에 없는 것은 짓지 않았다(보고에 적음):
-    · 대기 유형(재고 0 / 안전재고 미달) «필터»와 «유형별 건수» — 목록 API 에 유형 파라미터·
-      집계가 없다. 칩은 「향후 사용예정」으로 비활성(수 없음).
     · 「오늘 입고」 — 서버 집계 없음, 표시하지 않는다(공통 전제 ⑥).
     · 매입가 입력칸 없음(⑤) · 일괄 선택 없음(④) · 「매입 확정분」 라벨 없음(⑦).
 
@@ -251,10 +257,11 @@
       </div>
       <div class="si-chips" id="siChips" role="group" aria-label="조회 조건">
         <button type="button" class="si-chip" data-action="hold-mode" data-hold="exclude" aria-pressed="true">입고 대기 <span class="n" id="siCntWait">—</span></button>
-        <button type="button" class="si-chip" disabled title="향후 사용예정 — 서버 목록 조회에 대기 유형 조건이 없다(재고 0 / 안전재고 미달 구분은 행마다 표시)">재고 0</button>
-        <button type="button" class="si-chip" disabled title="향후 사용예정 — 서버 목록 조회에 대기 유형 조건이 없다(재고 0 / 안전재고 미달 구분은 행마다 표시)">안전재고 미달</button>
+        <button type="button" class="si-chip" data-action="kind" data-kind="zero" aria-pressed="false">재고 0 <span class="n" id="siCntZero">—</span></button>
+        <button type="button" class="si-chip" data-action="kind" data-kind="low" aria-pressed="false">안전재고 미달 <span class="n" id="siCntLow">—</span></button>
         <button type="button" class="si-chip" data-action="hold-mode" data-hold="only" aria-pressed="false" title="보류분만 조회(서버 상태 hold=only)">보류 <span class="n" id="siCntHold">—</span></button>
       </div>
+      <div class="si-fnote" id="siKindNote"></div>
       <div class="si-fnote" id="siDirectNote" hidden>직접 등록 — 대기 목록 밖 상품 검색. 검색어 입력 후 조회(최대 50건). 매입가 입력칸 없음(원장에 단가 컬럼 없음).</div>
     </div>
 
@@ -355,9 +362,10 @@
   var S = {
     mode: 'pending',        // pending | catalog(직접 등록)
     hold: 'exclude',        // exclude | only
+    kind: 'all',            // all | zero | low  — 대기 유형(서버 파라미터 U-17)
     q: '', part: '', page: 1,
     list: null,             // 마지막 목록 응답
-    heldTotal: null, waitTotal: null,
+    heldTotal: null, waitTotal: null, kindCounts: null,
     sel: null,              // 패널에 올린 상품(서버 행 그대로 + source)
     why: 'inbound',
     hist: { page: 1, data: null, pc: null },
@@ -441,7 +449,8 @@
 
   // ── 목록 ──────────────────────────────────────────────────────────────
   function listUrl() {
-    var u = '/api/admin/stock-inbound?page=' + S.page + '&size=' + PAGE_SIZE + '&hold=' + encodeURIComponent(S.hold);
+    var u = '/api/admin/stock-inbound?page=' + S.page + '&size=' + PAGE_SIZE
+      + '&hold=' + encodeURIComponent(S.hold) + '&kind=' + encodeURIComponent(S.kind);
     if (S.mode === 'catalog') {
       u += '&catalog_q=' + encodeURIComponent(S.q);
     } else {
@@ -466,7 +475,10 @@
       S.list = j;
       if (S.mode === 'pending') {
         S.heldTotal = j.held_total;
-        if (S.hold === 'exclude') S.waitTotal = j.total;
+        S.kindCounts = j.kind_counts || null;
+        // 「입고 대기」 칩은 **유형을 안 고른 상태의 전체**를 말한다 — j.total 을 쓰면
+        // 유형 칩을 누른 순간 그 칩의 수까지 같이 줄어 「누르면 이만큼」이 깨진다.
+        if (S.hold === 'exclude') S.waitTotal = j.kind_counts ? j.kind_counts.all : j.total;
       }
       $('siLoading').hidden = true;
       renderRows(); renderPager(); renderChips(); renderHeader();
@@ -487,10 +499,13 @@
   //    「추천 후보 제외」 옆에 「입고 시 추천 가능 재고 진입」이 함께 떴다(P-9103).
   //    note 는 이제 «대기 유형 사실»만 말하며 유형 태그의 title 로만 쓴다.
   var POOL_TONE = { 'in': 'ok', 'enters': 'ok', 'out': 'no', 'blocked': 'no', 'unknown': '' };
+  // 대기 유형 태그 — **서버가 판정한 `wait_kind`** 를 읽는다(U-17). 화면이 stock 과
+  // safety_stock 을 다시 비교하면 칩의 수(서버 집계)와 행의 태그가 갈린다.
+  // 카탈로그 행은 대기 목록이 아니라 `wait_kind` 가 없다 — 그 사실을 그대로 말한다.
   function tagOf(it) {
     if (it.hold) return { cls: 'hold', txt: '보류' };
-    if (it.stock === 0) return { cls: '', txt: '재고 0' };
-    if (it.safety_stock != null && it.stock < it.safety_stock) return { cls: 'low', txt: '안전재고 미달' };
+    if (it.wait_kind === 'zero') return { cls: '', txt: '재고 0' };
+    if (it.wait_kind === 'low') return { cls: 'low', txt: '안전재고 미달' };
     return { cls: '', txt: '대기 목록 밖' };
   }
   function rowHtml(it, src) {
@@ -538,7 +553,7 @@
         $('siEmpty').textContent = '검색 결과 없음 — 「' + S.q + '」 에 맞는 상품이 없다(단종·삭제대기 제외).';
       } else if (S.hold === 'only') {
         $('siEmpty').textContent = '보류 중인 상품 없음' + (S.q || S.part ? ' — 조회 조건 안에서' : '') + '.';
-      } else if (S.q || S.part) {
+      } else if (S.q || S.part || S.kind !== 'all') {
         $('siEmpty').innerHTML = '조회 결과 없음 — 조건을 좁힌 결과다.<br><button type="button" data-action="reset-filter">조건 초기화</button>';
       } else {
         $('siEmpty').textContent = '입고 대기 0건 — 입고할 것이 없다(오류가 아니다).';
@@ -587,16 +602,35 @@
     var cnt = (j.items || []).length;
     var a = cnt ? (j.page - 1) * j.size + 1 : 0;
     var z = cnt ? a + cnt - 1 : 0;
+    // 「전체 N건」은 **필터 적용 후 서버 total** 이다 — 무엇이 걸려 있는지 함께 밝힌다
+    // (어느 조건의 전체인지 모르면 그 수는 거짓말할 수 있다).
     $('siPagerTxt').innerHTML = '전체 <b>' + fmt(j.total) + '</b>건 중 <b>' + fmt(a) + '–' + fmt(z) + '</b>'
+      + (j.kind && j.kind !== 'all' ? ' · 대기 유형 조건 적용' : '')
       + (S.hold === 'exclude' && j.held_total ? ' · 보류 ' + fmt(j.held_total) + '건 제외' : '');
     $('siPagerBtns').innerHTML = pagerBtns(j.page, j.pages, 'page');
   }
   function renderChips() {
+    var kc = S.kindCounts;
     $('siCntWait').textContent = S.waitTotal == null ? '—' : fmt(S.waitTotal);
     $('siCntHold').textContent = S.heldTotal == null ? '—' : fmt(S.heldTotal);
+    $('siCntZero').textContent = kc ? fmt(kc.zero) : '—';
+    $('siCntLow').textContent = kc ? fmt(kc.low) : '—';
     document.querySelectorAll('[data-action="hold-mode"]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-hold') === S.hold && S.mode === 'pending'));
     });
+    // 유형 칩은 «직접 등록(카탈로그)» 조회에는 걸리지 않는다 — 카탈로그는 대기 목록이
+    // 아니라 유형 자체가 없다. 감추지 않고 비활성 + 사유 병기(403 단추와 같은 규약).
+    var off = S.mode === 'catalog';
+    document.querySelectorAll('[data-action="kind"]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(!off && b.getAttribute('data-kind') === S.kind));
+      b.disabled = off;
+      b.title = off ? '직접 등록 조회에는 대기 유형이 없다 — 대기 목록 조회에서 사용한다'
+        : (S.list && S.list.kind_scope ? S.list.kind_scope : '');
+    });
+    // 「이 수가 무엇의 수인가」는 서버 문장을 그대로 쓴다(화면이 기준을 지어내지 않는다).
+    var note = $('siKindNote');
+    note.textContent = (!off && S.list && S.list.kind_scope) ? S.list.kind_scope : '';
+    note.hidden = !note.textContent;
   }
   function renderHeader() {
     var j = S.list;
@@ -952,7 +986,8 @@
     if ((el = t.closest('[data-action="retry-list"]'))) { loadList(); return; }
     if ((el = t.closest('[data-action="retry-hist"]'))) { loadHistory(S.hist.pc); return; }
     if ((el = t.closest('[data-action="reset-filter"]'))) {
-      S.q = ''; S.part = ''; S.page = 1; $('siSearch').value = ''; $('siPart').value = ''; loadList(); return;
+      S.q = ''; S.part = ''; S.kind = 'all'; S.page = 1;
+      $('siSearch').value = ''; $('siPart').value = ''; renderChips(); loadList(); return;
     }
     if ((el = t.closest('[data-action="toggle-direct"]'))) {
       S.mode = S.mode === 'catalog' ? 'pending' : 'catalog';
@@ -963,6 +998,12 @@
       S.page = 1; renderChips(); loadList();
       if (S.mode === 'catalog') $('siSearch').focus();
       return;
+    }
+    if ((el = t.closest('[data-action="kind"]'))) {
+      if (el.disabled) return;
+      var k = el.getAttribute('data-kind');
+      S.kind = (S.kind === k) ? 'all' : k;   // 누른 칩을 다시 누르면 해제(= 유형 전체)
+      S.page = 1; renderChips(); loadList(); return;
     }
     if ((el = t.closest('[data-action="hold-mode"]'))) {
       if (el.disabled) return;

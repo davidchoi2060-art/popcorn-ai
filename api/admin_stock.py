@@ -56,11 +56,34 @@ NOTE = ("입고 대기 = 재고 0 또는 **안전재고 미달** 상품입니다
 HOLD_ACTIVE = ("EXISTS (SELECT 1 FROM stock_inbound_holds h"
                " WHERE h.product_code = p.product_code AND h.released_at IS NULL)")
 
-_PENDING_BASE = """p.status NOT IN ('단종','삭제대기')
-      AND (p.stock_qty = 0
-           OR (p.safety_stock IS NOT NULL AND p.stock_qty < p.safety_stock))"""
+# ── 대기 유형 — **재고 0 과 안전재고 미달을 «배타»로 가른다**(U-17 · 2026-08-18 사장님 확정 ㉮)
+# 이 두 문자열이 유형의 **유일한 정의**다. 셋이 전부 여기서 나온다:
+#     ① 목록 조회 조건(`kind=zero|low`)  ② 유형별 건수(칩의 수)  ③ 행의 `wait_kind`(태그·note)
+# 화면이나 다른 함수가 `stock_qty`·`safety_stock` 을 **다시 비교하면 칩의 수와 행의 태그가
+# 갈린다** — 같은 날 겪은 「3,876행」 사고(판정을 두 곳에서 만든 것)와 정확히 같은 병이다.
+# ⚠ 배타로 가르는 순서는 **재고 0 이 먼저**다. 재고 0 이면서 safety_stock 이 있는 행은
+#   둘 다 만족하는데, 화면 태그도 `_note_of` 도 처음부터 「재고 0」을 먼저 불렀다.
+#   그래서 LOW 에 `stock_qty > 0` 을 붙여 **겹치지 않게** 만든다.
+# ⚠ 이 개정으로 **모집단이 바뀌면 안 된다**(회귀 「입고 대기 = 대시보드 집계」).
+#   실측 2026-08-18: 옛 조건 15,725 · 새 조건 15,725 · 차집합 0 · 재고 음수 상품 0 ·
+#   두 유형 동시 만족 0 · zero 15,723 + low 2 = 15,725.
+_KIND_ZERO = "p.stock_qty = 0"
+_KIND_LOW = ("p.stock_qty > 0 AND p.safety_stock IS NOT NULL"
+             " AND p.stock_qty < p.safety_stock")
+_KIND_CASE = (f"CASE WHEN ({_KIND_ZERO}) THEN 'zero'"
+              f" WHEN ({_KIND_LOW}) THEN 'low' END")
+
+_PENDING_BASE = f"""p.status NOT IN ('단종','삭제대기')
+      AND (({_KIND_ZERO}) OR ({_KIND_LOW}))"""
 
 HOLD_MODES = ("exclude", "only", "all")
+PENDING_KINDS = ("all", "zero", "low")
+
+# 칩의 수가 «무엇의 수인가»를 서버가 말한다 — 화면 각주로 두면 다음 화면이 같은 오해를
+# 반복한다(HISTORY_SCOPE·HOLD_SCOPE 와 같은 형태). ㉮ 를 택한 근거는 stock_inbound() 참조.
+KIND_SCOPE = ("유형별 건수는 현재 조회 조건(검색어·분류·보류) 안에서 센 수입니다"
+              " — 칩을 누르면 그 수만 남습니다. 두 유형은 배타이며(재고 0 우선)"
+              " 합이 조건 안 전체와 같습니다.")
 
 HOLD_SCOPE = (" 보류분은 기본 조회에서 빠집니다(hold=only 로 보류분만 조회)."
               " 보류는 서버 상태이며 해제는 행 삭제가 아니라 해제 시각 기록입니다."
@@ -68,21 +91,31 @@ HOLD_SCOPE = (" 보류분은 기본 조회에서 빠집니다(hold=only 로 보�
               "(되돌리기는 보류 중에도 할 수 있습니다).")
 
 
-def pending_where(hold: str = "exclude") -> str:
+def pending_where(hold: str = "exclude", kind: str = "all") -> str:
     """입고 대기 조건 — **단일 원천.** 다른 모듈은 이 함수를 부른다(문자열을 다시 적지 않는다).
 
-        exclude  기본 — 보류분을 «뺀다»(승인 디자인: 「보류분은 기본 조회에서 빠진다」)
-        only     보류분만 — 「별도 조건으로 다시 본다」
-        all      보류 여부를 따지지 않는다(보류 도입 이전과 같은 모집단)
+        hold  exclude  기본 — 보류분을 «뺀다»(승인 디자인: 「보류분은 기본 조회에서 빠진다」)
+              only     보류분만 — 「별도 조건으로 다시 본다」
+              all      보류 여부를 따지지 않는다(보류 도입 이전과 같은 모집단)
 
-    ⚠ 대시보드·매입 견적은 **`exclude`(기본)** 를 써야 한다 — 「입고 대기」라는 같은 말을
-      세 화면이 다른 수로 말하면 안 된다(회귀가 그 일치를 검사한다).
+        kind  all      기본 — 유형을 따지지 않는다(**유형 필터 도입 이전과 같은 모집단**)
+              zero     재고 0 만
+              low      안전재고 미달 만(재고 > 0)
+
+    ⚠ 대시보드·매입 견적은 **`exclude` + `all`(기본)** 을 써야 한다 — 「입고 대기」라는 같은
+      말을 세 화면이 다른 수로 말하면 안 된다(회귀가 그 일치를 검사한다). 두 인자 모두
+      기본값이 «전과 같은 모집단»이라 그 두 파일은 고치지 않아도 된다.
     """
+    where = _PENDING_BASE
+    if kind == "zero":
+        where = f"{where}\n      AND {_KIND_ZERO}"
+    elif kind == "low":
+        where = f"{where}\n      AND ({_KIND_LOW})"
     if hold == "only":
-        return f"{_PENDING_BASE}\n      AND {HOLD_ACTIVE}"
+        return f"{where}\n      AND {HOLD_ACTIVE}"
     if hold == "all":
-        return _PENDING_BASE
-    return f"{_PENDING_BASE}\n      AND NOT {HOLD_ACTIVE}"
+        return where
+    return f"{where}\n      AND NOT {HOLD_ACTIVE}"
 
 
 _PENDING = """
@@ -91,6 +124,7 @@ _PENDING = """
            p.review_required_yn, p.ai_candidate_yn,
            psp.cost_price, s.name AS supplier,
            EXISTS(SELECT 1 FROM product_specs sp WHERE sp.product_code = p.product_code) AS has_specs,
+           {kind_case} AS wait_kind,
            h.hold_id, h.reason AS hold_reason, h.held_at, COALESCE(ho.name, '—') AS hold_by
     FROM products p
     LEFT JOIN (SELECT DISTINCT ON (product_code) product_code, supplier_id, cost_price
@@ -107,6 +141,19 @@ _PENDING = """
       AND (:part_type = '' OR p.part_type = :part_type)
     ORDER BY (p.stock_qty > 0), p.product_code
     LIMIT :size OFFSET :offset
+"""
+
+# 유형별 건수 — **한 번 훑어 두 유형을 동시에 센다**(count(*) FILTER).
+# 두 번 세면 두 조회 사이에 재고가 바뀌어 합이 전체와 안 맞을 수 있고, 스캔도 두 번이다.
+# 여기 `{where}` 에는 **유형을 뺀** 조건(kind='all')이 들어간다 — 그래야 각 칩이
+# 「누르면 이만큼 남는다」를 말한다.
+_PENDING_KIND_COUNT = """
+    SELECT count(*) FILTER (WHERE {zero}) AS zero,
+           count(*) FILTER (WHERE {low})  AS low
+    FROM products p
+    WHERE {where}
+      AND (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%')
+      AND (:part_type = '' OR p.part_type = :part_type)
 """
 
 # 목록과 같은 조건의 총계 — 화면이 '전체 N건 중 이 페이지'를 정직하게 말하려면 필요하다
@@ -237,21 +284,24 @@ def _note_of(r) -> str:
     (대기 조건 정본은 §입고 대기 조건: 재고 0 ∨ 안전재고 미달. 이 함수는 그 둘 중
      어느 쪽인지를 값과 함께 말하는 자리다.)
     """
+    # ⚠ 유형 판정을 여기서 «다시» 하지 않는다 — SQL 이 `_KIND_CASE` 로 판정한 `wait_kind` 를
+    #   읽는다(U-17). 칩의 수·조회 조건·이 문장이 전부 같은 한 표현에서 나온다.
     stock = r["stock_qty"] or 0
-    if stock > 0:
-        if r["safety_stock"] and stock < r["safety_stock"]:
-            return (f"안전재고 미달 — 현재 {stock} / 기준 {r['safety_stock']}"
-                    " (판매는 계속되지만 소진 위험)")
-        # 대기 조건 밖 — 조회와 표시 사이에 재고가 들어온 행이다. 지어내지 않고 값만 말한다.
-        return f"재고 {stock} — 대기 조건 밖(조회 이후 변동)"
-    if r["status"] == "품절":
-        return "재고 0 · 품절 표시 — 입고 확정 시 판매중 복귀"
-    return "재고 0"
+    if r["wait_kind"] == "low":
+        return (f"안전재고 미달 — 현재 {stock} / 기준 {r['safety_stock']}"
+                " (판매는 계속되지만 소진 위험)")
+    if r["wait_kind"] == "zero":
+        if r["status"] == "품절":
+            return "재고 0 · 품절 표시 — 입고 확정 시 판매중 복귀"
+        return "재고 0"
+    # 둘 중 어느 유형도 아닌 행은 조회 조건상 나올 수 없다. 나왔다면 조건과 판정이
+    # 갈린 것이므로 **감추지 않고 그대로 말한다**(지어낸 유형을 붙이지 않는다).
+    return f"대기 유형 미판정 — 현재 재고 {stock}"
 
 
 @router.get("/stock-inbound")
 def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "",
-                  catalog_q: str = "", hold: str = "exclude"):
+                  catalog_q: str = "", hold: str = "exclude", kind: str = "all"):
     """입고 대상 — **서버 페이지네이션**(슬라이스 54).
 
     전량 전송이던 것을 나눠 보낸다: 입고 대상 15,259건 · 카탈로그 22,838건을 매 요청마다
@@ -262,21 +312,43 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
     `hold` — **보류분은 기본 조회에서 빠진다**(`exclude`). `only` 로 보류분만 다시 보고,
     `all` 은 보류 여부를 따지지 않는다. 구 화면은 보류를 «브라우저 배열»에서만 지워
     다음 조회에 그대로 되살아났다 — 이제 서버 상태다(마이그레이션 0056).
+
+    `kind` — **대기 유형**(U-17 · 사장님 확정 ㉮ 「서버에 만든다」). `zero`(재고 0) ·
+    `low`(안전재고 미달) · `all`(기본). 정의서 §⑤ 2번이 요구했는데 계약이 서버 자리를
+    빠뜨려 화면이 칩 둘을 «비활성»으로 두고 있었다.
+
+    **유형별 건수는 `kind` 를 «뺀» 모집단에서 센다**(㉮ 선택 — 아래 근거).
+    `kind_counts` 는 지금의 `q`·`part_type`·`hold` 를 그대로 적용하고 유형만 풀어 센 수라
+    **「그 칩을 누르면 남는 수」와 정확히 같다.** 조건과 무관한 전체(㉯)를 실으면
+    검색어를 넣은 순간 칩의 수와 실제 결과가 어긋나고, 운영자는 어느 쪽이 맞는지 알 수
+    없다 — 이 화면은 이미 「보류 N건 제외」를 같은 방식(조건 안에서 센 수)으로 말하고
+    있어 ㉯ 를 택하면 **한 줄 안에서 기준이 둘**이 된다. 무엇의 수인지는 `kind_scope` 가
+    응답으로 말한다(화면 각주가 아니라 서버 문장이어야 다음 화면이 오해를 반복하지 않는다).
     """
     if hold not in HOLD_MODES:
         raise HTTPException(400, f"알 수 없는 보류 조건: {hold}"
                                  f" (허용값 {' · '.join(HOLD_MODES)})")
+    if kind not in PENDING_KINDS:
+        # 계약 §서버 응답 「사유 오류」와 같은 결 — 값을 되풀이하지 않고 허용값을 밝힌다.
+        raise HTTPException(400, "알 수 없는 대기 유형입니다"
+                                 f" (허용값 {'·'.join(PENDING_KINDS)} 셋뿐)")
     size = max(1, min(size, 200))
     page = max(1, page)
     p = {"q": q.strip(), "part_type": part_type.strip(),
          "size": size, "offset": (page - 1) * size}
     with engine.connect() as conn:
-        rows = conn.execute(text(_PENDING.format(where=pending_where(hold))), p).mappings().all()
+        rows = conn.execute(text(_PENDING.format(
+            where=pending_where(hold, kind), kind_case=_KIND_CASE)), p).mappings().all()
         total = conn.execute(text(
-            _PENDING_COUNT.format(where=pending_where(hold))), p).scalar_one()
-        # 「보류 N건 제외」를 화면이 세지 않게 서버가 준다 — 같은 조회 조건(q·분류)에서 센다.
+            _PENDING_COUNT.format(where=pending_where(hold, kind))), p).scalar_one()
+        # 「보류 N건 제외」를 화면이 세지 않게 서버가 준다 — 같은 조회 조건(q·분류·**유형**)
+        # 에서 센다. 유형을 빼고 세면 「재고 0」을 고른 상태에서 「보류 3건 제외」라 말해
+        # 놓고 보류 칩을 누르면 1건만 나오는 어긋남이 생긴다.
         held_total = conn.execute(text(
-            _PENDING_COUNT.format(where=pending_where("only"))), p).scalar_one()
+            _PENDING_COUNT.format(where=pending_where("only", kind))), p).scalar_one()
+        # 유형별 건수 — **유형만 풀고** 나머지 조건(q·분류·보류)은 그대로 둔 채 한 번에 센다.
+        kc = conn.execute(text(_PENDING_KIND_COUNT.format(
+            zero=_KIND_ZERO, low=_KIND_LOW, where=pending_where(hold, "all"))), p).mappings().first()
         cq = catalog_q.strip()
         catalog = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, purchase_price, stock_qty,"
@@ -302,6 +374,12 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
         # 「전체 N건 중 이 페이지」와 별개로 **보류가 몇 건 빠졌는지**를 함께 말한다 —
         # 안 그러면 어제와 오늘의 total 이 왜 다른지 화면이 설명하지 못한다.
         "hold": hold, "held_total": held_total,
+        # 대기 유형 — 화면은 이 수를 그대로 칩에 단다(세지 않는다).
+        # `all` 은 «유형을 안 고른 상태의 전체»다 = zero + low (배타이므로 합이 곧 전체).
+        "kind": kind,
+        "kind_counts": {"zero": kc["zero"], "low": kc["low"],
+                        "all": kc["zero"] + kc["low"]},
+        "kind_scope": KIND_SCOPE,
         "items": [{
             "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
             "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
@@ -309,6 +387,9 @@ def stock_inbound(page: int = 1, size: int = 50, q: str = "", part_type: str = "
             "supplier": r["supplier"] or "—", "stock": r["stock_qty"],
             "safety_stock": r["safety_stock"],
             "why": "adjust" if r["stock_qty"] > 0 else "inbound",  # 미달 보충 = 실사 조정 성격
+            # 대기 유형 — **SQL 이 판정한 값**(화면이 stock/safety 를 다시 비교하지 않는다).
+            # 칩의 수·조회 조건·행 태그가 이 한 값으로 묶인다.
+            "wait_kind": r["wait_kind"],
             "priced": r["sale_price"] is not None,
             "reviewed": not r["review_required_yn"],
             "has_specs": r["has_specs"],
