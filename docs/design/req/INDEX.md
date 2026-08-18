@@ -90,6 +90,7 @@
 | 18 | 공급처 | [req-suppliers.md](req-suppliers.md) | `spec-suppliers.md`(계약 · 1b 안) | **지음** (`/admin2/suppliers` · **ADM-SRC-030** · 커밋 `e5572eb` · 확인자 재검증 통과(하네스 통보 2026-08-15 — 커밋 자신은 "제작 완료·검증 중"이라 적었으나 그 뒤 통과) · 메뉴 연결 `6b3d637`) |
 | 19 | 매입 견적(용산) | [req-sourcing-quote.md](req-sourcing-quote.md) | `spec-sourcing.md`(계약 · 1a 안) | **지음** (`/admin2/sourcing` · **ADM-SRC-010** · 커밋 `d53732c` · 확인자 재검증 통과(하네스 통보 2026-08-15 — 위와 같은 경위) · 메뉴 연결 `6b3d637` · ⚠ 마이그레이션 `0053_sourcing_confirmed_at`은 스키마만이고 DB 미적용 — 적용 전까지 「오늘 확정 N건」은 `null`+사유 문구로 대신 응답한다) |
 | 20 | 단가표 반영 | [req-price-sheet-apply.md](req-price-sheet-apply.md) | `spec-price-import.md`(계약 · 1b 안) | **지음** (`/admin2/price-import` · **ADM-PRC-040** · 커밋 `4b23e78`(라우트·템플릿 함께) — 그 커밋 메시지 자신은 "재검증 진행 중"이라 적었다. **decision-log `T-11`**: 같은 시각 다른 제작자가 배포를 막던 결함 둘(0행 복원 no-op·되돌리기 버튼 소실)을 같은 두 파일에서 고치다 working tree가 겹쳐 이 커밋에 조용히 함께 들어갔다 — A-46이 그 결함을 처음 실행 가능하게 만들어서야 드러난 잠복 결함이었다. 그 뒤 확인자 재검증 통과(하네스 통보 2026-08-15) · 메뉴 연결 `6b3d637`) |
+| 20B | 재고 입고 | [req-stock-inbound.md](req-stock-inbound.md) | [spec-stock-inbound.md](../spec-stock-inbound.md)(계약 · 1b 골격 + 1a 「목록에서 바로 확정」 혼합) · [dc-stock-inbound.html](../dc-stock-inbound.html)(원안 · [README](../dc-stock-inbound-README.md)) | **지음** (`/admin2/stock-inbound` · **ADM-SRC-020**(구 화면 ID 유지 — 새 ID 를 주면 한 화면이 두 신원을 갖는다) · **A-58**로 IA 재등재(2026-08-11 제외 근거였던 「재고 원장은 쇼핑몰이 갖는다」가 사실과 달랐다 — 원장은 우리 것이고 추천 후보 조회가 `WHERE stock_qty > 0` 을 붙인다). **확인자 3차 검증 결함 0**: P-9103 라벨·사유 두 문장만 · `blocked` 행(SKU 39948) 정확 · **세 번째 누출 지점**(확정 결과 옆 사유) 해소 — 「한 행이 두 원천으로 말하지 않는다」가 실측으로 지켜짐 · 게이트 카드 이름표 둘 · 안전재고 사실 `title` 보존 · 카탈로그 `has_specs` 실값 · API↔DOM 문자 대조 9건 일치 · 성능 104~104ms · 치수 전 항목 불변 · 쓰기 왕복 1건(상품 20489103 · log_id 9080) 되돌려 원복, 재고 불변식 일치. **회귀 전건 통과(실패 0)** — `REGRESSION_KEEP_SESSIONS` 없이 돌려 평소 건너뛰던 세션 왕복 항목까지 포함. **메뉴 연결(기록자, 2026-08-18)** — 「매입 · 소싱」 그룹 끝. ⚠ 승인 원안의 사이드바는 매입 견적과 단가표 반영 «사이»를 그렸으나 IA 정본(`docs/design/admin-ia-draft-2026-08-09.md` 58줄) 순서를 따랐다 — 근거·되짚는 법은 `api/admin_nav.py` 9차 노트. **화면 커밋 `dbfc5f9`**(라우트·템플릿·`api/admin_stock.py`·원안·계약이 한 커밋). ⚠ **메뉴 연결 커밋의 해시는 적지 않는다** — 이 행을 세운 커밋 자신이라 쓰는 시점에 존재하지 않는다(지어내지 않는다). 찾는 법: `git log --oneline -1 -- docs/design/req/INDEX.md api/admin_nav.py`) |
 
 ## 5. 판매가
 
@@ -169,6 +170,7 @@
 | 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 중 · UX-24 → **1a** |
 | 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 지음 · UX-27 → 1a · 메뉴 연결 |
 | 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 지음 |
+| 20B | 재고 입고 | [dc-stock-inbound.html](../dc-stock-inbound.html) · [핸드오프 README](../dc-stock-inbound-README.md) | 지음 · 1b 골격 + 1a 목록 확정 혼합 · 확인자 3차 결함 0 · 메뉴 연결(2026-08-18) — ⚠ **이 표에서 원안 파일이 서브에이전트 손으로 받아진 첫 사례**(아래 「계약 요약」 절 정정 참조) |
 | 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 중 · UX-25 (2026-08-16 기록자 정정 — 위 §7 목차가 2026-08-15에 이미 「대기 아니라 작업 중」으로 스스로 고쳤는데 이 표만 옛 값 「재구축 대기」를 그대로 들고 있었다. 재확인: `/admin2/dash` curl 200 · `data-screen-id="ADM-AI-010"` 실재 — 라우트가 이미 있으므로 「대기」(라우트 없음)는 아니다) |
 
 ### 계약 요약으로 전달된 승인 디자인
@@ -177,6 +179,18 @@
 `DesignSync` 가 서브에이전트에서 막혀 있어(2026-08-14 확인) 제작자가 원안을 직접 못 받기
 때문이다 — **위 `dc-*.html` 과 성격이 다른 것이 아니라 전달 경로만 다르다.** 그 제약이
 풀리면 이 표는 위 표로 합쳐진다.
+
+> ⚠ **위 문단의 「막혀 있어」는 2026-08-18 로 낡았다 — 지우지 않고 정정한다(CANON §5).**
+> 그날 general-purpose 서브에이전트가 `DesignSync get_file` 로 `재고 입고.dc.html` 을 받아
+> `docs/design/dc-stock-inbound.html` 로 저장했다(`truncated:false` · 하네스 확정).
+> **새 권한이 아니라, 이미 사장님 확정이던 「제작자·계약자가 원안을 직접 가져온다」가
+> 도구 제약으로 성립하지 못하던 것이 성립하게 됐다는 사실 기록**이다(`CLAUDE.md`
+> §팀 운용 「못 넘기는 것 — 둘 → 하나」 · 절차는 `docs/design/MAKER-CHECKLIST.md` §1).
+> **두 표를 합치는 것은 아직 하지 않았다** — 아래 표의 화면 대부분은 여전히 계약 요약만
+> 받은 상태이고, 합치려면 화면마다 원안 파일이 실제로 있는지 재야 한다. **재고 입고가
+> 「원안 파일이 저장소에 있는」 첫 사례**라 그 행만 위 표에 세웠다.
+> **확인법**: `ls docs/design/dc-*.html` 로 원안 파일이 실재하는 화면을 세고, 위 표와
+> 대조한다. 어느 세션에서 `DesignSync` 가 다시 막히면 그때만 하네스 경유로 돌아간다.
 
 | # | 화면 | 계약 요약 | 구축 |
 |---|------|----------|------|
