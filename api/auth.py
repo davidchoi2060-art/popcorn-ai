@@ -424,6 +424,18 @@ async def auth_middleware(request: Request, call_next):
     하나 있다(`ADMIN2_JSON_DATA_PATHS` — 지금은 `/admin2/handoff-log/data`뿐).
     그 경로는 **게이트는 그대로 받되**(무세션이면 여전히 401) 거절 문서만 JSON이다 —
     `is_page`(아래) 판정을 `_is_admin2_page()`가 홀로 진다.
+
+    ■ 아래 JSON 401 문구는 「~다」체다(2026-08-19 결함① 수정). 예전 「로그인이
+    필요합니다」는 이 게이트가 `/api/admin/*` 전체(관리자 화면 41개)를 지나므로
+    **바꾸면 그 41개가 전부 같이 바뀐다** — 그래서 바꾸기 전 전수 grep 했다(결과는
+    이 세션 보고 참조, 이 파일엔 옮기지 않는다 — 코드가 아니라 보고 소관).
+    ⚠ **이 함수의 HTML 분기(`login_required_html()`, `api/admin_ui_common.py`)는
+    같이 고치지 않았다** — 다른 파일이고(19+ 화면이 공유하는 정본 파일이라 "동시에
+    한 명"만 만진다는 CANON 규칙 대상), 이번 지시 범위(`api/auth.py`·
+    `templates/admin/my_profile.html.j2` 둘)도 아니다. 그래서 지금은 `/admin2/*`
+    **페이지**를 세션 없이 직접 열면(HTML 분기) 옛 문체가, `/api/admin/*` **API**
+    호출이 401을 받으면(아래 JSON 분기) 새 문체가 뜬다 — 같은 게이트인데 분기별로
+    문체가 다른 상태다. 다음에 그 파일을 만지는 사람이 맞춘다.
     """
     path = request.url.path
     token = _current.set(None)
@@ -441,7 +453,7 @@ async def auth_middleware(request: Request, call_next):
                     from .admin_ui_common import login_required_html
                     return HTMLResponse(login_required_html(), status_code=401)
                 from fastapi.responses import JSONResponse
-                return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
+                return JSONResponse({"detail": "로그인이 필요하다"}, status_code=401)
             need = required_role(request.method, path)
             if ROLE_RANK.get(op["role"], 0) < ROLE_RANK[need]:
                 if is_page:
@@ -878,22 +890,51 @@ def password_policy():
 
 @router.post("/password")
 def change_my_password(body: SetPasswordBody, request: Request):
-    """본인 비밀번호 변경. 현재 비밀번호를 확인한다."""
+    """본인 비밀번호 변경. 현재 비밀번호를 확인한다.
+
+    ■ 401 이 «둘»이고 원인이 다르다(2026-08-19 결함② 수정 — 확인자 실측).
+    아래 첫 401(세션 없음)과 둘째 401(현재 비밀번호 불일치)은 **같은 상태코드**를
+    쓴다. 화면(`templates/admin/my_profile.html.j2`)이 옛날엔 401을 전부 "세션
+    만료"로 보고 전면 오버레이(z-index 30)를 띄웠다 — 그래서 오타를 낸 운영자에게
+    「세션이 만료됐다 — 다시 로그인하면…」이 뜨고, 결과상자(`#mpResPw`)에 이미
+    적힌 정확한 사유는 그 오버레이에 완전히 가려 안 보였다.
+
+    상태코드(401)는 계약이라 바꾸지 않는다(사장님 결정 사안 · 다른 화면·회귀가 그
+    코드를 보고 있을 수 있다) — 대신 `detail`을 **이 파일에 이미 있는 관례**로
+    구조화해 화면이 자연어 문장이 아니라 안정적인 코드로 가르게 한다. 그 관례는
+    `_require_owner_reauth`(이 파일 아래)의
+    `{"error": "reauth_required", "message": "..."}`다 — `ui-progress.js`의
+    `errText()`가 "32곳 전수 검사"(2026-08-15)로 이미 `detail`이 객체면
+    `.message`(또는 `.error`)를 읽도록 돼 있고, **레거시 화면
+    `mockups/admin/my-profile.html`도 이미 그 모양을 대비하고 있었다**
+    (`dt.message || dt.error`, 580-583행) — 그래서 이 변경은 새 계약이 아니라
+    저장소가 이미 반쯤 전제하던 모양을 실제로 채운 것에 가깝다.
+
+    **문구(자연어 메시지) 문자열로 가르지 않는다.** 이 저장소는 "문자열 모양"으로
+    동작을 추정하는 검사가 원문 표기가 바뀌는 날 조용히 못 잡은 사고를 이미 둘
+    겪었다(`CLAUDE.md` §회귀 세트 `[26]` 재고 원장 · `[42]` 상품명) — 문구를 다듬을
+    때마다(이번 물결처럼) 매칭이 조용히 깨지는 것과 같은 모양의 함정이다. `message`는
+    여전히 사람이 읽는 문장이라 화면 표시엔 그대로 쓰되, **분기 판단에는 쓰지
+    않는다** — 화면은 `error` 코드만 본다(`templates/admin/my_profile.html.j2`의
+    `resFail()` 참조).
+    """
     op = resolve_session(request.cookies.get(COOKIE, ""))
     if op is None:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, {"error": "not_authenticated",
+                                   "message": "로그인이 필요하다"})
     with engine.begin() as conn:
         cur = conn.execute(text(
             "SELECT email, password_hash FROM admin_operators WHERE operator_id=:i"
             " FOR UPDATE"), {"i": op["operator_id"]}).mappings().first()
         if cur["password_hash"] and not verify_password(body.current or "",
                                                         cur["password_hash"]):
-            raise HTTPException(401, "현재 비밀번호가 올바르지 않습니다")
+            raise HTTPException(401, {"error": "bad_current_password",
+                                       "message": "현재 비밀번호가 올바르지 않다"})
         bad = strength_problem(body.new, cur["email"])
         if bad:
             raise HTTPException(400, bad)
         if cur["password_hash"] and verify_password(body.new, cur["password_hash"]):
-            raise HTTPException(400, "이전과 다른 비밀번호를 쓰세요")
+            raise HTTPException(400, "이전과 다른 비밀번호를 써야 한다")
         conn.execute(text(
             "UPDATE admin_operators SET password_hash=:h, password_set_at=now(),"
             " must_change_password=false, login_fail_count=0, locked_until=NULL"
@@ -908,7 +949,7 @@ def change_my_password(body: SetPasswordBody, request: Request):
         # 기기 기억도 함께 철회한다 — 안 그러면 훔친 device 쿠키가 새 비밀번호를
         # 몰라도 계속 로그인을 만들어낼 수 있다(위 _revoke_devices 참조).
         _revoke_devices(conn, op["operator_id"])
-    return {"ok": True, "note": "비밀번호를 바꿨습니다. 다른 기기의 로그인과 기기 기억이 해제됐습니다."}
+    return {"ok": True, "note": "비밀번호를 바꿨다. 다른 기기의 로그인과 기기 기억이 해제됐다."}
 
 
 # ── /api/admin/auth/* 안의 "정책 발행급 쓰기" 전용 방벽 (2026-08-15 결함 수정) ──
