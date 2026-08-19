@@ -288,3 +288,29 @@ sudo grep -c UI_CHECK_DEV_LOGIN /etc/popcorn-ai.env    # 0 이어야 한다
 
 같은 이유로 `UI_CHECK_EMAIL`·`UI_CHECK_PW` 도 운영에 두지 않는다
 (CLAUDE.md 「브라우저 점검 계정」 — 개발 서버 전용).
+
+`POPCORN_TEST_HEADER_ENABLED` — **회귀(`tests/regression.py`)가 만든 요청을
+`consult_sessions.data_origin='test'`로 표시하게 여는 스위치다.** 로컬 API가
+배포 서버와 같은 Cloud SQL을 보므로, 이 스위치가 꺼져 있으면(운영 기본값)
+회귀성 요청도 전부 `'real'`로 남는다 — 반대로 개발 PC에서 이 값을 켜지 않은
+채 회귀를 돌리면 실제 상담 원장이 오염된다(2026-08-20 발견 당시
+`consult_sessions` 6,893건 중 6,732건(97.7%)이 이렇게 섞여 있었다 — 경위·
+처방은 `docs/decisions/decision-log.md` **A-75**).
+
+두 겹으로 막혀 있다:
+
+  ① 이 환경변수가 켜져 있을 때만 헤더를 신뢰한다 (기본 꺼짐)
+  ② `X-Popcorn-Test` 헤더 + **localhost 요청만** — 인터넷의 실고객 요청은
+     nginx 뒤에서 이미 실제 클라이언트 IP로 바뀌므로 "localhost"로 보일 수 없다
+     (`api/recommend.py`의 `_resolve_data_origin` 참조)
+
+**운영에 켜면 안 되는 이유는 `UI_CHECK_DEV_LOGIN`과 다르다** — 이 스위치
+자체는 관리자 권한을 열지 않는다. 대신 **운영 박스 안에서 loopback으로 API를
+두드리는 내부 프로세스**(헬스체크·크론 등)가 실고객 세션을 `'test'`로 표시해,
+그 세션이 대시보드·퍼널·인계 원장에서 조용히 빠지는 경로를 연다 — 지금 겪은
+사고와 반대 방향(진짜인데 가짜로 표시됨)이다. `/etc/popcorn-ai.env`에 이
+이름이 나타나면 즉시 지우고 서비스를 재시작한다. 확인:
+
+```bash
+sudo grep -c POPCORN_TEST_HEADER_ENABLED /etc/popcorn-ai.env    # 0 이어야 한다
+```
