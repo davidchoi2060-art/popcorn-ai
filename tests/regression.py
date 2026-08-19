@@ -225,8 +225,29 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@popcornpc.local")
 ADMIN_PW = os.environ.get("ADMIN_PW", "")
 
 
+# 회귀가 만드는 상담·견적은 실제 원장이 아니라 **테스트 표식**을 달고 들어가야 한다
+# (2026-08-20 사장님 확정) — 이 스크립트가 두드리는 BASE(기본 localhost:8000)의 로컬
+# API는 배포 서버와 **같은 Cloud SQL**을 본다(`.env`의 DATABASE_URL 공유). 표식이
+# 없던 시절 조사자 실측: consult_sessions 6,893건 중 6,732건(97.7%)이 회귀였다.
+#
+# 헤더 이름은 `api/recommend.py`의 `TEST_HEADER`(값 "X-Popcorn-Test")와 반드시
+# 같아야 한다 — 이 스크립트는 stdlib만 쓰는 원칙이라(아래 `_mp()` 주석 참조) 그
+# 모듈을 import하지 않고 문자열을 그대로 맞춘다. 서버는 이 헤더 + `.env`의
+# `POPCORN_TEST_HEADER_ENABLED` + **localhost 요청**이 전부 맞을 때만
+# `consult_sessions.data_origin='test'`로 찍는다(`api/recommend._resolve_data_origin`
+# · `api/expert.py`가 그대로 재사용). 이 스크립트는 항상 로컬 API를 두드리므로
+# (BASE 기본값이 localhost) 스위치만 켜져 있으면 게이트를 통과한다.
+#
+# 세션을 만들지 않는 엔드포인트(로그인·목록 조회 등)에도 똑같이 싣는다 — 굳이
+# 가려서 붙이면 "이 호출부는 깜빡했다"가 반복된다(§상단 원칙). 서버는 이 헤더를
+# `/api/recommend`·`/api/expert/build`의 세션 INSERT 자리에서만 해석하고 나머지
+# 엔드포인트는 무시하므로 부작용이 없다.
+TEST_HEADER = "X-Popcorn-Test"
+
+
 def _headers(json_body=False):
     h = {"Content-Type": "application/json"} if json_body else {}
+    h[TEST_HEADER] = "1"
     if SESSION:
         h["Cookie"] = "; ".join(SESSION.values())
     return h
@@ -466,6 +487,7 @@ def _mp(fields: dict, files: dict) -> tuple[bytes, dict]:
 
 def post_raw(path, data, headers, method="POST"):
     h = dict(headers)
+    h[TEST_HEADER] = "1"          # _headers()와 같은 표식 — 정의·근거는 그 위 주석
     if SESSION:
         h["Cookie"] = "; ".join(SESSION.values())
     req = urllib.request.Request(BASE + path, data=data, method=method, headers=h)

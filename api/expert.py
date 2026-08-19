@@ -82,6 +82,7 @@ from .product_name import display_name
 from .recommend import (
     SLOTS, SLOT_TYPES, load_compat_rules, check_rule_fields, build_compat, _build_set,
     _cmp, _rule_applies, _explain_spec, _pref_tags, _companion, HIGHEND_CAP_X,
+    _resolve_data_origin,   # 회귀 표식 판정 — recommend.py 정본, 새로 만들지 않는다
 )
 from .swap import _pool_ctx, _valid
 from .taxonomy import SLOT_LABELS as SLOT_KO
@@ -366,8 +367,9 @@ def expert_build(body: ExpertBuildBody, request: Request, response: Response):
         # 후보 수·필터에 영향 없음) 라벨로 사실만 짧게 남긴다. 지어낸 제약을 넣지 않는다.
         cons_json = json.dumps([{"l": "요청",
                                   "v": f"부품 직접 선택 - {len(SLOTS) - len(empty_slots)}/{len(SLOTS)}슬롯"}])
-        params = {"u": uid, "c": cons_json}
-        cols, vals = "member_id, mode, constraints, user_id", "NULL, 'expert', CAST(:c AS JSONB), :u"
+        params = {"u": uid, "c": cons_json, "do": _resolve_data_origin(request)}
+        cols = "member_id, mode, constraints, user_id, data_origin"
+        vals = "NULL, 'expert', CAST(:c AS JSONB), :u, :do"
         if gate_on:
             cols, vals = cols + ", access_key", vals + ", :ak"
             params["ak"] = access_key

@@ -17,6 +17,7 @@ NULL 스펙 필드는 해당 호환 검사 불통과로 간주(검증 불가 부
 """
 import json
 import logging
+import os
 import re
 from datetime import datetime
 
@@ -27,6 +28,7 @@ from sqlalchemy import text
 from . import access_gate   # 접근 게이트의 단일 원천 — 열쇠 생성·소유자 확인·횟수 제한
 from . import llm       # LLM 호출의 단일 원천 — 이 파일에서 프로바이더를 직접 부르지 않는다
 from . import visitor
+from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정의를 그대로 쓴다(새로 만들지 않는다)
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
 from . import usage_floors as UF
@@ -358,10 +360,19 @@ def build_compat(chosen: dict, rules: dict) -> dict:
             v = chosen[slot].get(rule["field"])
             r = chosen[rule["ref_slot"]].get(rule["ref_field"])
             fmt = rule["detail_fmt"] or "{v} / {r}"
+            # 결측 참조 필드(None)를 str()에 그대로 넣으면 문구에 "None"이 샌다
+            # (재현: "라디에이터 장착 불통과 · 3열 ≤ 케이스 None열" — 판정(_cmp)은
+            # 이미 NULL 불통과로 맞고 문구만 오염됐다). 화면(S1 inspectBlock 등)이
+            # 이미 쓰는 관례인 "—"로 바꾼다 — 값이 있는데 "—"로 지워지는 방향이
+            # 아니라 없는 값만 대체하므로 판정과는 무관하다.
+            # guided·chat·talk 는 DFS가 결측 참조 필드를 남기는 조합 자체를 탐색에서
+            # 제외해 이 코드가 실사용자에게 노출된 적이 없었다 — expert 모드가 엔진이
+            # 절대 만들지 않던 조합을 사람이 직접 만들 수 있게 열면서 드러났다.
             checks.append({
                 "key": rule["rule_key"], "label": rule["label"],
                 "pass": _cmp(rule["op"], v, r),
-                "detail": fmt.replace("{v}", str(v)).replace("{r}", str(r)),
+                "detail": fmt.replace("{v}", "—" if v is None else str(v))
+                             .replace("{r}", "—" if r is None else str(r)),
             })
     gpu, power = chosen["GPU"], chosen["POWER"]
     headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
@@ -605,6 +616,70 @@ def _companion(conn):
     return sorted(out, key=lambda c: order.index(c["part_type"]))
 
 
+# ============================================================================
+# 회귀 트래픽 표시 — consult_sessions.data_origin 분기 (2026-08-20 사장님 확정)
+# ============================================================================
+# ■ 무엇을 막나
+#   tests/regression.py 는 BASE=localhost:8000(로컬 API)을 두드리는데, 로컬 API는
+#   배포 서버와 **같은 Cloud SQL**을 본다(`.env`의 DATABASE_URL 공유). 그래서 회귀를
+#   돌릴 때마다 아래 세션 INSERT가 실제 상담 원장에 쌓였다 — 조사자 실측:
+#   consult_sessions 6,893건 중 6,732건(97.7%)이 회귀가 만든 행이었다.
+#
+# ■ 헤더 이름 — "X-Popcorn-Test"
+#   이 저장소의 커스텀 헤더 선례는 `access_gate.HEADER`("X-Access-Key") 하나뿐이고
+#   `X-` 접두어만 관례다. "Popcorn"을 더 붙인 이유는 이게 우리 앱 전용 자기 신고
+#   표식임을 분명히 하기 위해서다 — 표준 헤더나 nginx/프록시가 붙이는 헤더와 이름이
+#   겹칠 일이 없다. 값은 내용이 아니라 존재 자체가 신호라 "1"이면 충분하다.
+#
+# ■ 왜 헤더를 그대로 믿지 않는가 — 자기 신고라 아무나 실을 수 있다
+#   그대로 믿으면 외부에서 이 헤더를 실어 **실고객 세션을 'test'로 감출 수 있다**
+#   (지금 겪는 오염과 반대 방향의 오염). 그래서 `UI_CHECK_DEV_LOGIN`
+#   (`api/auth.py` `dev_login` · CLAUDE.md §브라우저 점검 계정)과 같은 이중 게이트를
+#   그대로 따른다:
+#     ① `.env`의 `POPCORN_TEST_HEADER_ENABLED=1` (기본 꺼짐)
+#     ② **localhost 요청만** — 판정은 `api/auth.py`의 기존 관례를 그대로 따른다:
+#        `request.client.host`를 직접 신뢰한다(`_client_ip`, api/auth.py:227-254 —
+#        운영 배포는 uvicorn ProxyHeadersMiddleware가 nginx 뒤에서 이미 실제
+#        클라이언트 IP로 바꿔 두므로, 인터넷의 실고객 요청은 여기서 "localhost"로
+#        보일 수 없다). 새 판정 로직을 만들지 않고 `LOCAL_HOSTS`(위 import)를
+#        그대로 가져다 쓴다.
+#   ①을 추가로 요구하는 이유: ②만으로는 "운영 박스 안에서 loopback으로 이 API를
+#   두드리는 내부 프로세스"(헬스체크·크론 등)까지는 못 막는다. 스위치를 기본
+#   꺼짐으로 두고 **운영 서버 `.env`에는 아예 넣지 않으면**(배포 절차
+#   `deploy/README.md`) 그 경로 자체가 운영에서 항상 닫힌다 — `UI_CHECK_DEV_LOGIN`과
+#   같은 방어선이다. 이 값은 로컬 개발 `.env`에만 켠다.
+#
+# ■ data_origin 값 = 'test' — products 축의 'demo'와 다른 뜻
+#   컬럼은 이미 있다(마이그레이션 0033_demo_data_axis · consult_sessions.data_origin
+#   VARCHAR(10) NOT NULL DEFAULT 'real'). `'demo'`는 products·orders·members·
+#   csv_import_jobs가 쓰는 "시연용 가짜 상품/주문" 축이고, 이건 "테스트 스위트가
+#   만든 상담"이라 뜻이 다르다 — 같은 값을 쓰면 나중에 "이 데모 세션이 회귀가 만든
+#   것인지 실제 시연인지" 구분할 길이 없어진다. 0033 자신의 존재 이유가 "무엇을
+#   비울지 구분 못 하면 못 비운다"였다 — 그 원칙을 그대로 지킨다.
+TEST_HEADER = "X-Popcorn-Test"
+
+
+def _test_header_enabled() -> bool:
+    return os.environ.get("POPCORN_TEST_HEADER_ENABLED", "").strip() in ("1", "true", "True", "yes")
+
+
+def _resolve_data_origin(request: Request) -> str:
+    """이 요청이 회귀 표식을 달고, 그 표식을 신뢰할 수 있는 경로로 왔으면 'test'.
+
+    `api/expert.py`도 이 함수를 그대로 가져다 쓴다 — 이 파일의 언더스코어 함수를
+    다른 모듈이 import하는 것은 이 저장소의 기존 관례다(`swap.py`가 이 파일의
+    `_build_set` 등을 그대로 쓰는 것과 같다. api/expert.py 상단 주석 참조).
+    """
+    if not _test_header_enabled():
+        return "real"
+    if not (request.headers.get(TEST_HEADER) or "").strip():
+        return "real"
+    host = (request.client.host if request.client else "") or ""
+    if host not in LOCAL_HOSTS:
+        return "real"
+    return "test"
+
+
 @router.post("/recommend")
 def recommend(body: RecommendBody, request: Request, response: Response):
     # 방문자 키 — 이 상담을 나중에 클릭·교체·주문과 잇는 실이다(슬라이스 2026-08-09).
@@ -708,8 +783,10 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         gate_on = access_gate.column_ready(conn, "consult_sessions")
         access_key = access_gate.new_key() if gate_on else None
         params = {"m": body.mode, "u": uid,
-                  "c": json.dumps([{"l": c.l, "v": c.v} for c in body.constraints])}
-        cols, vals = "member_id, mode, constraints, user_id", "NULL, :m, CAST(:c AS JSONB), :u"
+                  "c": json.dumps([{"l": c.l, "v": c.v} for c in body.constraints]),
+                  "do": _resolve_data_origin(request)}
+        cols = "member_id, mode, constraints, user_id, data_origin"
+        vals = "NULL, :m, CAST(:c AS JSONB), :u, :do"
         if gate_on:
             cols, vals = cols + ", access_key", vals + ", :ak"
             params["ak"] = access_key
