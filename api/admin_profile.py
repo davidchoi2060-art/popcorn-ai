@@ -57,15 +57,15 @@ class ProfileBody(BaseModel):
 # 그래서 'google'을 "Google 계정"이라 적으면 **하지 않은 검증을 주장**하는 것이다.
 # 실 OAuth를 붙이는 날 여기의 `verified`와 문구를 함께 고친다 — 이 자리가 그 신호다.
 PROVIDER_NONE = ("기록 없음", False,
-                 "신청 절차를 거치지 않고 만들어진 계정입니다(시드·부트스트랩)."
-                 " 로그인은 이메일과 비밀번호로 합니다.")
+                 "신청 절차를 거치지 않고 만들어진 계정이다(시드·부트스트랩)."
+                 " 로그인은 이메일과 비밀번호로 한다.")
 PROVIDER_KO = {
     "dev": ("개발용 임시 인증", False,
-            "dev 어댑터입니다 — 이메일 입력만으로 통과하며 신원을 검증하지 않습니다."
-            " 실 OAuth 전환 전까지 내부 전용입니다."),
+            "dev 어댑터다 — 이메일 입력만으로 통과하며 신원을 검증하지 않는다."
+            " 실 OAuth 전환 전까지 내부 전용이다."),
     "google": ("Google(신고된 값)", False,
-               "클라이언트가 보낸 제공자 이름을 그대로 기록한 값입니다."
-               " id_token 검증은 아직 하지 않습니다."),
+               "클라이언트가 보낸 제공자 이름을 그대로 기록한 값이다."
+               " id_token 검증은 아직 하지 않는다."),
 }
 
 
@@ -85,7 +85,7 @@ def identity_reasons(r) -> dict:
         # 모르는 값에 PROVIDER_NONE 문구를 붙이면 거짓말이 된다(신청은 거쳤으므로).
         label, verified, note = (
             f"{p}(신고된 값)", False,
-            "우리가 아는 제공자 목록에 없는 값입니다 — 검증하지 않았습니다.")
+            "알려진 제공자 목록에 없는 값이다 — 검증하지 않았다.")
 
     if r["approved_at"]:
         none_reason = None
@@ -95,10 +95,10 @@ def identity_reasons(r) -> dict:
         elif r["approved_by"]:
             # 승인은 사람이 했는데 그 계정이 지워졌다(슬라이스 78에서 실제로 지웠다).
             approved_note = (f"승인자 계정(#{r['approved_by']})이 남아 있지 않아"
-                             " 이름을 찾을 수 없습니다")
+                             " 이름을 찾을 수 없다")
             approved_short = "계정 삭제됨"
         else:
-            approved_note = ("부트스트랩 자동 승인 — 사람이 승인한 것이 아닙니다"
+            approved_note = ("부트스트랩 자동 승인 — 사람이 승인한 것이 아니다"
                              " (ADMIN_BOOTSTRAP_EMAILS의 첫 관리자)")
             approved_short = "부트스트랩(자동)"
     else:
@@ -107,17 +107,17 @@ def identity_reasons(r) -> dict:
         # 만들면 그건 화면이 지어내는 것이고, 문구를 고칠 때 두 곳이 어긋난다(ADM-SYS-020).
         approved_short = "승인 안 됨"
         if r["status"] == "대기":
-            none_reason = "승인 대기 중입니다 — 승인되면 그때 시각이 기록됩니다"
+            none_reason = "승인 대기 중이다 — 승인되면 그때 시각이 기록된다"
         elif r["status"] == "활성":
             # 승인 경로는 항상 approved_at을 넣는다(admin_operators.py). 활성인데 비었다면
             # 신청·승인을 거치지 않고 만들어진 계정이라는 뜻이다.
-            none_reason = ("승인 기록 없이 활성입니다"
-                           " — 신청·승인을 거치지 않고 만들어진 계정입니다(시드)")
+            none_reason = ("승인 기록 없이 활성이다"
+                           " — 신청·승인을 거치지 않고 만들어진 계정이다(시드)")
         elif r["status"] == "정지":
             # 승인되기 전에 정지된 계정 — 반려된 신청이 이 모양으로 남는다.
-            none_reason = "승인된 적이 없습니다 — 승인 전에 정지된 계정입니다"
+            none_reason = "승인된 적이 없다 — 승인 전에 정지된 계정이다"
         else:
-            none_reason = "승인 기록이 없습니다"
+            none_reason = "승인 기록이 없다"
 
     return {"provider_label": label, "provider_verified": verified,
             "provider_note": note, "approved_note": approved_note,
@@ -171,16 +171,16 @@ def _shape(r) -> dict:
 def get_my_profile():
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
     with engine.connect() as conn:
         r = _row(conn, me["operator_id"])
     if r is None:                     # 세션은 살아 있는데 계정 행이 없다(삭제된 경우)
-        raise HTTPException(404, "계정을 찾을 수 없습니다")
+        raise HTTPException(404, "계정을 찾을 수 없다")
     d = _shape(r)
-    d["note"] = ("이름·연락처·직무만 본인이 고칠 수 있습니다"
-                 " · 이메일은 로그인 신원이라 관리자만 정정합니다"
-                 " · 권한 등급은 여기서 바꿀 수 없습니다"
-                 " · 비밀번호는 해시로만 보관합니다(원문은 저장하지 않습니다)")
+    d["note"] = ("이름·연락처·직무만 본인이 고칠 수 있다"
+                 " · 이메일은 로그인 신원이라 관리자만 정정한다"
+                 " · 권한 등급은 여기서 바꿀 수 없다"
+                 " · 비밀번호는 해시로만 보관한다(원문은 저장하지 않는다)")
     return d
 
 
@@ -188,24 +188,24 @@ def get_my_profile():
 def update_my_profile(body: ProfileBody):
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
 
     name = (body.name or "").strip()
     if not name:
-        raise HTTPException(400, "이름을 입력하세요")
+        raise HTTPException(400, "이름을 입력해야 한다")
     if len(name) > 100:
-        raise HTTPException(400, "이름은 100자 이하로 입력하세요")
+        raise HTTPException(400, "이름은 100자 이하로 입력해야 한다")
     phone = (body.phone or "").strip() or None
     if phone and len(phone) > 30:
-        raise HTTPException(400, "연락처는 30자 이하로 입력하세요")
+        raise HTTPException(400, "연락처는 30자 이하로 입력해야 한다")
     duty = (body.duty or "").strip() or None
     if duty and len(duty) > 100:
-        raise HTTPException(400, "직무는 100자 이하로 입력하세요")
+        raise HTTPException(400, "직무는 100자 이하로 입력해야 한다")
 
     with engine.begin() as conn:
         before = _row(conn, me["operator_id"])
         if before is None:
-            raise HTTPException(404, "계정을 찾을 수 없습니다")
+            raise HTTPException(404, "계정을 찾을 수 없다")
 
         changed = {}
         for key, new in (("name", name), ("phone", phone), ("duty", duty)):
@@ -214,7 +214,7 @@ def update_my_profile(body: ProfileBody):
         if not changed:
             # 바뀐 게 없으면 원장에 남기지 않는다 — '고쳤다'는 기록이 거짓이 된다.
             out = _shape(before)
-            out["note"] = "바뀐 값이 없습니다"
+            out["note"] = "바뀐 값이 없다"
             out["changed"] = {}
             return out
 
@@ -234,9 +234,9 @@ def update_my_profile(body: ProfileBody):
     # 이름을 바꾸면 **과거 작업 기록의 표시 이름도 함께 바뀐다**(로그는 operator_id를
     # 참조하고 이름은 조인으로 나온다). 같은 사람이므로 의도된 동작이지만, 화면이
     # 그 사실을 미리 말해야 "예전 기록이 왜 바뀌었지"를 묻지 않는다.
-    out["note"] = ("저장했습니다 — " + " · ".join(
+    out["note"] = ("저장했다 — " + " · ".join(
         {"name": "이름", "phone": "연락처", "duty": "직무"}[k] for k in changed)
-        + (" (이름은 지난 작업 기록의 표시에도 함께 반영됩니다)" if "name" in changed else ""))
+        + (" (이름은 지난 작업 기록의 표시에도 함께 반영된다)" if "name" in changed else ""))
     return out
 
 
@@ -262,7 +262,7 @@ def my_sessions(request: Request):
     """내 세션 목록 — 누르기 전에 무엇이 끊기는지 보여주기 위한 것."""
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
     cur = request.cookies.get(COOKIE, "")
     with engine.connect() as conn:
         rows = conn.execute(text(
@@ -285,22 +285,22 @@ def my_sessions(request: Request):
     } for r in rows]
     others = [i for i in items if not i["current"]]
     return {"items": items, "total": len(items), "others": len(others),
-            "note": (f"지금 기기를 포함해 {len(items)}개가 열려 있습니다."
+            "note": (f"지금 기기를 포함해 {len(items)}개가 열려 있다."
                      + (f" [다른 기기에서 로그아웃]을 누르면 {len(others)}개가 끊기고"
-                        " 지금 기기는 유지됩니다." if others else " 다른 기기는 없습니다."))}
+                        " 지금 기기는 유지된다." if others else " 다른 기기는 없다."))}
 
 
 @router.post("/my-profile/sessions/revoke-others")
 def revoke_other_sessions(request: Request):
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
     cur = request.cookies.get(COOKIE, "")
     with engine.begin() as conn:
         # 현재 세션을 뺀 나머지만. `cur`가 빈 값이면 전부가 대상이 되므로 막는다 —
         # 쿠키 없이 이 경로에 닿는 일은 없어야 하지만, 있으면 자기 세션까지 끊긴다.
         if not cur:
-            raise HTTPException(400, "현재 세션을 확인할 수 없습니다")
+            raise HTTPException(400, "현재 세션을 확인할 수 없다")
         n = conn.execute(text(
             "UPDATE admin_sessions SET revoked_at = now()"
             " WHERE operator_id = :op AND session_id <> :cur"
@@ -314,8 +314,8 @@ def revoke_other_sessions(request: Request):
             " WHERE operator_id = :op AND revoked_at IS NULL AND expires_at > now()"),
             {"op": me["operator_id"]}).scalar_one()
     return {"ok": True, "revoked": n, "remaining": left,
-            "note": (f"{n}개를 끊었습니다 — 지금 기기는 그대로 쓸 수 있습니다."
-                     if n else "끊을 다른 세션이 없습니다.")}
+            "note": (f"{n}개를 끊었다 — 지금 기기는 그대로 쓸 수 있다."
+                     if n else "끊을 다른 세션이 없다.")}
 
 
 # ---- 2026-08-15: 기기 기억(비밀번호 생략) 목록·철회 ----
@@ -333,13 +333,13 @@ def my_devices(request: Request):
     """
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
     if not _schema_ready():
         # 마이그레이션 0051 미적용 — api/auth.py _schema_ready 참조. 화면은
         # "아직 없다"고 정직하게 말한다(0건을 지어내는 것과는 다르다 — 이유가
         # 있는 빈 상태다).
         return {"items": [], "total": 0, "ready": False,
-                "note": "기기 기억 기능이 아직 이 서버에 적용되지 않았습니다."}
+                "note": "기기 기억 기능이 아직 이 서버에 적용되지 않았다."}
     cur_device_id = request.cookies.get(DEVICE_COOKIE, "").partition(":")[0]
     with engine.connect() as conn:
         rows = conn.execute(text(
@@ -356,8 +356,8 @@ def my_devices(request: Request):
         "agent": (r["user_agent"] or "")[:120] or None,
     } for r in rows]
     return {"items": items, "total": len(items), "ready": True,
-            "note": (f"비밀번호 없이 로그인할 수 있는 기기 {len(items)}개가 등록돼 있습니다."
-                     if items else "등록된 기기가 없습니다.")}
+            "note": (f"비밀번호 없이 로그인할 수 있는 기기 {len(items)}개가 등록돼 있다."
+                     if items else "등록된 기기가 없다.")}
 
 
 @router.post("/my-profile/devices/{device_id}/revoke")
@@ -369,9 +369,9 @@ def revoke_device(device_id: str, request: Request):
     """
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
     if not _schema_ready():
-        raise HTTPException(404, "기기 기억 기능이 아직 이 서버에 적용되지 않았습니다")
+        raise HTTPException(404, "기기 기억 기능이 아직 이 서버에 적용되지 않았다")
     with engine.begin() as conn:
         n = conn.execute(text(
             "UPDATE admin_operator_devices SET revoked_at = now()"
@@ -381,5 +381,5 @@ def revoke_device(device_id: str, request: Request):
             _log(conn, "device_forget", me.get("email") or str(me["operator_id"]),
                  {"device_id": device_id}, kind="operator")
     if not n:
-        raise HTTPException(404, "기기를 찾을 수 없습니다")
-    return {"ok": True, "note": "이 기기는 다음부터 로그인할 때 비밀번호를 다시 물어봅니다."}
+        raise HTTPException(404, "기기를 찾을 수 없다")
+    return {"ok": True, "note": "이 기기는 다음부터 로그인할 때 비밀번호를 다시 묻는다."}

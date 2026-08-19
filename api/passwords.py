@@ -58,21 +58,21 @@ def verify_password(raw: str, stored: str | None) -> bool:
 def strength_problem(raw: str, email: str | None = None) -> str | None:
     """약한 비밀번호면 이유를, 괜찮으면 None. **원문을 되돌려 주지 않는다.**"""
     if not raw or len(raw) < MIN_LENGTH:
-        return f"비밀번호는 {MIN_LENGTH}자 이상이어야 합니다"
+        return f"비밀번호는 {MIN_LENGTH}자 이상이어야 한다"
     kinds = sum(bool(re.search(p, raw)) for p in
                 (r"[a-z]", r"[A-Z]", r"\d", r"[^\w\s]"))
     if kinds < 3:
-        return "영문 대문자·소문자·숫자·기호 중 3가지 이상을 섞어 주세요"
+        return "영문 대문자 · 소문자 · 숫자 · 기호 중 3가지 이상 섞기"
     if re.search(r"(.)\1{3,}", raw):
-        return "같은 문자를 4번 이상 반복하지 마세요"
+        return "같은 문자를 4번 이상 반복하지 않기"
     if email:
         local = email.split("@")[0].lower()
         if len(local) >= 4 and local in raw.lower():
-            return "이메일과 같은 문자열은 쓸 수 없습니다"
+            return "이메일과 같은 문자열은 쓸 수 없다"
     low = raw.lower()
     for bad in ("password", "popcorn", "admin", "qwerty", "12345678"):
         if bad in low:
-            return "흔한 단어가 들어 있습니다"
+            return "흔한 단어가 들어 있다"
     return None
 
 
@@ -92,6 +92,6 @@ def password_rules() -> dict:
             "같은 문자를 4번 이상 반복하지 않기",
             "이메일 앞부분과 같은 문자열 쓰지 않기",
             "흔한 단어(password · admin · qwerty 등) 쓰지 않기",
-            "이전 비밀번호와 다르게",
+            "이전 비밀번호와 다르게 하기",
         ],
     }
