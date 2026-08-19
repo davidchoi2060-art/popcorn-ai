@@ -51,6 +51,20 @@
 |---|------|----------------|--------|------|
 | 0 | 로그인 | [req-login.md](req-login.md) | [spec-login.md](../spec-login.md) | **지음**(2026-08-17 정정 — A-56 ⑧이 미뤄 둔 착수를 같은 날 앞당겨 구현했다. `/admin2/login` · **ADM-SYS-021** · `api/admin_ui_login.py` + `templates/admin/login.html.j2`. 게이트 면제는 `api/auth.py` `ADMIN2_OPEN_PATHS`의 **완전 일치 집합**(A-44) — 접두어가 아니다. 기동 시 감사 두 겹(`_audit_admin2_open_paths`·`_audit_admin2_open_routes`)이 이 집합이 넓어지거나 쓰기 경로를 품으면 앱을 세운다. **전환은 같은 커밋**: `admin_ui_common._LOGIN_PAGE`를 `/admin2/login`으로 · `api/main.py`의 `_ADMIN_AUTH_DOOR_SCREENS`에서 `login` 제거(`my-profile`·`operators`는 대체 화면이 없어 남김 — 한 번에 셋을 닫지 않는다). 확인자 검증: 게이트 무회귀 14/14 401 · 승인 디자인 치수 8항목 일치 · 기기 기억 전 흐름(등록→로그인→철회→`no_device`) 실완주 · 숫자 리터럴 0건(세션 규칙은 서버 상수를 렌더에 실어 보냄) · 무세션 `/admin2/reviews` → 401 → 로그인 → 대시보드 → 좌측 메뉴 → 도착. 확인법: `grep -n "ADMIN2_OPEN_PATHS" api/auth.py`) |
 
+## 0B. 내 정보 — LNB 밖
+
+> 이 화면도 좌측 메뉴에 없다(실측: `api/admin_nav.py` 전수 검색 "my-profile"·"내 정보" 0건
+> — 자기 계정을 조회·수정하는 화면이라 메뉴 대상이 아니다. 근거는 계약
+> `spec-my-profile.md`의 `LNB **없음**` 항목 · 같은 근거로 확인). 번호 `0B`는 로그인(0)과
+> 같은 「LNB 밖」 성격이라 그 옆에 붙인 표기이지 LNB 순번이 아니다(22B 등 다른 「B」 표기와
+> 같은 관례). **진입점은 상단바 아바타 링크다**(승인 원안·계약 §진입점) — **화면 검증을
+> 통과한 뒤에 링크를 단다**는 순서 규약(T-02 ②)이 여전히 걸려 있어, 아래 상태가 「검증 전」인
+> 동안은 링크도 없다.
+
+| # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
+|---|------|----------------|--------|------|
+| 0B | 내 정보 | [req-my-profile.md](req-my-profile.md) | [spec-my-profile.md](../spec-my-profile.md) | **지어졌으나 미커밋 · 검증 전 · 교정 물결 진행 중**(2026-08-19 실측 — **ADM-SYS-022** · 경로 `/admin2/my-profile` · `api/admin_ui_my_profile.py` + `templates/admin/my_profile.html.j2` + `api/admin_profile_photo.py`. 2026-08-19 계약자 재점검 결함 셋 중 하나(사진 정책 API 임의 신설)는 같은 날 **A-70**으로 추인 해소, 나머지는 미정 **U-19~U-23** 및 문구·동작 결함으로 교정 물결이 제작자에게 가 있다 — 상세는 `HANDOFF.md` 「지금 하던 일(2026-08-19)」. **회귀 스위트는 이 화면(사진 API)을 다루지 않는다**(coverage gap). 검증 통과 전이라 메뉴·상단바 링크 어디에도 연결하지 않았다(§2 규약 그대로)) |
+
 ## 1. 대시보드
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |

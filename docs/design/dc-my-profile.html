@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+</style>
+</helmet>
+
+<section style="padding:34px 40px 60px;display:flex;flex-direction:column;gap:22px">
+  <div style="max-width:1340px">
+    <div style="font:600 20px/1.3 'IBM Plex Sans KR',sans-serif">내 정보 (ADM-SYS-022) — admin2 신규 구축 2안</div>
+    <div style="font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px">두 안이 가른 축은 <b>「위에서 아래로 읽는 한 열」 vs 「신원(읽기)과 보안(쓰기)을 좌우로 가른 두 열」</b>입니다. 공통 전제: <b>결과 문구는 서버가 준 것을 그대로</b>(화면이 지어내지 않고, 긴 <span style="font-family:'IBM Plex Mono',monospace">note</span>도 잘라내지 않습니다) · <b>고칠 수 있는 필드는 서버 <span style="font-family:'IBM Plex Mono',monospace">editable</span>이 정한다</b>(이름·연락처·직무 셋) · <b>빈 값의 이유는 <span style="font-family:'IBM Plex Mono',monospace">identity_reasons()</span> 문장을 그대로</b>(화면이 추측하지 않고 <span style="font-family:'IBM Plex Mono',monospace">—</span> 하나로 덮지 않습니다) · <b>비밀번호 규칙은 서버 조회</b>(화면이 베끼지 않습니다 — 「8자」로 적어 두고 서버가 10자를 요구한 전례) · <b>비밀번호는 <span style="font-family:'IBM Plex Mono',monospace">type=password</span> 3칸</b>(<span style="font-family:'IBM Plex Mono',monospace">prompt()</span> 미사용) · <b>세션 철회 ≠ 기기 철회</b>(같아 보이게 두지 않습니다) · <b>세션 식별자는 화면에 나오지 않습니다</b> · <b>모든 시각은 서울 표시</b>.</div>
+    <div style="font:400 11.5px/1.7 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30);margin-top:7px;border-left:3px solid oklch(0.52 0.16 30);padding-left:10px">표 안의 이름·이메일·연락처·기기·IP·시각은 <b>자리 확인용 모형</b>이고 실제 화면은 서버 응답만 씁니다. 트윅 여섯: <b>서버 응답 18가지</b>(수정·비밀번호·세션·기기·사진·전면 실패로 갈라 표시) · <b>계정 상태 5가지</b>(비밀번호 미설정 6건 · 임시 비밀번호 · 승인 안 됨 · dev 어댑터 · google 신고값) · <b>세션 수</b> · <b>기기 상태 3가지</b>(<span style="font-family:'IBM Plex Mono',monospace">ready:false</span> 포함) · <b>사진 유무</b> · <b>결정 3(이미지 라이브러리 신설 여부 — 🟥 미정)</b>.</div>
+  </div>
+
+  <div style="display:flex;gap:44px;align-items:flex-start">
+
+    <div id="1a" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1a</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">한 열 · 위에서 아래로 읽는 순서</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">신원 → 정보 수정 → 비밀번호 → 세션 → 기기. <b>폭이 넓어 서버 문장을 자르지 않는다</b> · 대신 <b>세션·기기가 접힌 아래</b>에 있다</span>
+      </div>
+      <div data-screen-label="1a 한 열 순서" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;position:relative;display:flex;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="39">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+          <div style="margin-top:9px;padding:8px 16px 0;border-top:1px solid rgba(255,255,255,.09);font:400 9px/1.6 'IBM Plex Sans KR',sans-serif;color:#8b8477">이 화면은 <b style="color:#cfc9bd">메뉴에 없습니다</b> — 진입점은 상단바 프로필입니다</div>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">내 계정</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">내 정보</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-SYS-022</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/my-profile · 제안</span>
+            <span style="flex:1"></span>
+            <span style="{{ roleBadgeStyle }}">{{ roleBadge }}</span>
+            <span style="display:flex;align-items:center;gap:7px;padding:4px 5px 4px 9px;border:1px dashed oklch(0.7 0.13 165 / .7);border-radius:16px">
+              <span style="font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 165)">여기서 들어온다 · 사진이 서는 자리</span>
+              <span style="{{ avatarStyle }}">{{ avatarInitial }}</span>
+            </span>
+          </header>
+
+          <div style="flex:1;min-height:0;overflow:hidden;padding:13px 18px 0;display:flex;justify-content:center">
+            <div style="width:1192px;display:flex;flex-direction:column;gap:8px">
+
+              <sc-if value="{{ mustChange }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:7px;background:oklch(0.96 0.04 85);border:1px solid oklch(0.78 0.1 80 / .6)">
+                  <span style="flex:none;font:600 9.5px/1 'IBM Plex Mono',monospace;color:oklch(0.42 0.11 70);border:1px solid oklch(0.78 0.1 80 / .7);border-radius:3px;padding:5px 7px;background:#fffdf9">must_change_password</span>
+                  <span style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font:600 12.5px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 70)">임시 비밀번호로 로그인했습니다 — 비밀번호를 바꾸세요</span>
+                    <span style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">로그인 화면(ADM-SYS-021)이 이 자리로 보낼 수 있게 되는 지점입니다 — 지금은 문구로만 알리고 대시보드로 보냅니다(막다른 길).</span>
+                  </span>
+                </div>
+              </sc-if>
+
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;gap:14px">
+                <div style="flex:none;width:88px;display:flex;flex-direction:column;gap:6px;align-items:center">
+                  <span style="{{ photoBigStyle }}">{{ photoBigLabel }}</span>
+                  <div style="display:flex;gap:5px;width:100%">
+                    <span style="flex:1;height:27px;border-radius:5px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif">{{ photoMainBtn }}</span>
+                    <sc-if value="{{ photoOn }}" hint-placeholder-val="{{ true }}">
+                      <span style="flex:none;height:27px;padding:0 8px;border-radius:5px;border:1px solid oklch(0.72 0.12 33 / .55);color:oklch(0.45 0.15 30);display:flex;align-items:center;font:500 10px/1 'IBM Plex Sans KR',sans-serif">삭제</span>
+                    </sc-if>
+                  </div>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+                    <span style="font:600 19px/1.2 'IBM Plex Sans KR',sans-serif">김소희</span>
+                    <span style="font:400 12px/1 'IBM Plex Mono',monospace;color:#5b564d">sohee.kim@popcornai.co.kr</span>
+                    <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#4a463e;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 6px">{{ roleWord }}</span>
+                    <span style="{{ statusChipStyle }}">{{ statusWord }}</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px 14px">
+                    <sc-for list="{{ idRowsShort }}" as="r" hint-placeholder-count="5">
+                      <div style="display:flex;flex-direction:column;gap:3px;padding-top:7px;border-top:1px solid rgba(0,0,0,.08)">
+                        <span style="font:500 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ r.k }}</span>
+                        <span style="{{ r.vStyle }}">{{ r.v }}</span>
+                        <span style="{{ r.noteStyle }}">{{ r.note }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;gap:9px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed rgba(0,0,0,.16)">
+                    <span style="flex:none;font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-top:2px">여기서 못 고치는 것</span>
+                    <sc-for list="{{ locked }}" as="l" hint-placeholder-count="3">
+                      <span style="flex:1;min-width:190px;display:flex;flex-direction:column;gap:2px;border-left:2px solid rgba(0,0,0,.14);padding-left:8px">
+                        <span style="font:600 10.5px/1.3 'IBM Plex Sans KR',sans-serif">{{ l.f }}</span>
+                        <span style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ l.why }}</span>
+                      </span>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:baseline;gap:9px">
+                  <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">정보 수정</span>
+                  <span style="font:400 10.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">서버 <span style="font-family:'IBM Plex Mono',monospace">editable</span>이 준 셋 — 화면이 목록을 정하지 않습니다</span>
+                  <span style="flex:1"></span>
+                  <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">PATCH /api/admin/my-profile</span>
+                </div>
+                <div style="display:flex;gap:11px;align-items:flex-end">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                    <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">이름 <span style="color:oklch(0.5 0.15 30)">필수</span> <span style="font-weight:400;color:#a09889">· 100자</span></span>
+                    <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 11px;font:400 12.5px/1 'IBM Plex Sans KR',sans-serif">김소희</div>
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                    <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">연락처 <span style="font-weight:400;color:#a09889">· 선택 · 30자 · 비우면 저장 안 함(NULL)</span></span>
+                    <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 11px;font:400 12px/1 'IBM Plex Mono',monospace">010-2848-1195</div>
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                    <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">직무 <span style="font-weight:400;color:#a09889">· 선택 · 100자</span></span>
+                    <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 11px;font:400 12px/1 'IBM Plex Sans KR',sans-serif">용산 매입 · 단가표 관리</div>
+                  </div>
+                  <span style="flex:none;height:32px;padding:0 18px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">저장</span>
+                  <span style="flex:none;height:32px;padding:0 14px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 12px/1 'IBM Plex Sans KR',sans-serif">되돌리기</span>
+                </div>
+                <div style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">「되돌리기」는 <b>서버 값 재적용</b>(저장 전 입력 취소)입니다 — <b>원장 되돌림이 아닙니다</b>. 이름을 바꾸면 <b>지난 작업 기록의 표시 이름도 함께 바뀝니다</b>.</div>
+                <sc-if value="{{ resInfo }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ resBoxStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                    <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                    <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;gap:14px">
+                <div style="flex:none;width:344px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">비밀번호 규칙</span>
+                    <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">GET /auth/password-policy</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <sc-for list="{{ pwRules }}" as="p" hint-placeholder-count="6">
+                      <span style="display:flex;gap:7px;font:400 10.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#4a463e"><span style="flex:none;color:#a09889">·</span><span>{{ p }}</span></span>
+                    </sc-for>
+                  </div>
+                  <div style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-top:6px;border-top:1px solid rgba(0,0,0,.08)">규칙 문구를 화면에 박지 않습니다 — 서버 응답을 그대로 나열합니다. 거절당하기 전에 보여 줍니다.</div>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:9px">
+                  <sc-if value="{{ hasPassword }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;flex-direction:column;gap:9px">
+                      <div style="display:flex;gap:10px">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                          <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">현재 비밀번호</span>
+                          <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 11px;font:400 13px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4a463e">••••••••••</div>
+                        </div>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                          <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">새 비밀번호</span>
+                          <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 11px;font:400 13px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4a463e">••••••••••••</div>
+                        </div>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                          <span style="font:600 10px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">새 비밀번호 확인</span>
+                          <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 11px;font:400 13px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4a463e">••••••••••••</div>
+                        </div>
+                      </div>
+                      <div style="display:flex;gap:10px;align-items:center">
+                        <span style="flex:1;padding:7px 10px;border-radius:6px;background:oklch(0.96 0.04 85);border:1px solid oklch(0.78 0.1 80 / .55);font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>바꾸면 이 기기를 뺀 모든 세션과 기억된 기기 전부가 철회됩니다</b> — 다른 기기에서는 다시 로그인해야 합니다. <b>되돌릴 수 없습니다.</b> 누른 뒤가 아니라 <b>지금</b> 밝힙니다. 비밀번호 원문은 어디에도 저장하지 않습니다.</span>
+                        <span style="flex:none;height:32px;padding:0 18px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 12.5px/1 'IBM Plex Sans KR',sans-serif">비밀번호 변경</span>
+                      </div>
+                      <div style="font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">세 칸 모두 <span style="font-family:'IBM Plex Mono',monospace">type="password"</span> — 화면에 보이지 않습니다. 구화면은 <span style="font-family:'IBM Plex Mono',monospace">prompt()</span>로 받아 <b>어깨너머로 보였습니다</b>.</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ noPassword }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:8px;padding:12px 13px;border-radius:7px;background:oklch(0.96 0.03 30);border:1px solid oklch(0.75 0.11 33 / .5)">
+                      <span style="font:600 12.5px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30)">이 계정에는 비밀번호가 설정돼 있지 않습니다</span>
+                      <span style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">판정 근거는 서버가 계산한 <span style="font-family:'IBM Plex Mono',monospace">has_password</span>입니다(<span style="font-family:'IBM Plex Mono',monospace">password_set_at</span>은 표시용 시각일 뿐입니다 — 두 값은 실제로 1건 어긋나 있습니다). 로그인은 <span style="font-family:'IBM Plex Mono',monospace">403 password_not_set</span>으로 막힙니다.</span>
+                      <span style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>이 화면에는 발급 수단이 없습니다.</b> 임시 비밀번호는 owner가 「운영자·권한」(ADM-SYS-020)에서 발급하고 직접 전달합니다 — 응답에 비밀번호를 돌려주지 않습니다. <b>스스로 푸는 「비밀번호 찾기」는 저장소에 없습니다</b> — 잊으면 owner 재발급이 유일한 복구 경로입니다.</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ resPw }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ resBoxStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                      <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                      <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:baseline;gap:9px">
+                  <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">열려 있는 세션</span>
+                  <span style="{{ sessCountStyle }}">{{ sessCountLabel }}</span>
+                  <span style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">세션 식별자는 표시하지 않습니다 — 그 값이 곧 로그인 자격입니다. 서버는 <span style="font-family:'IBM Plex Mono',monospace">current</span> 불리언만 줍니다.</span>
+                  <span style="flex:1"></span>
+                  <span style="{{ revokeBtnStyle }}">{{ revokeBtnLabel }}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1.5fr 1fr .9fr .9fr .9fr;gap:0 12px;font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-bottom:6px;border-bottom:1px solid rgba(0,0,0,.13)">
+                  <span>기기 · 브라우저</span><span>접속 IP</span><span>로그인</span><span>최근 사용</span><span>만료</span>
+                </div>
+                <sc-for list="{{ sessRows }}" as="s" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:1.5fr 1fr .9fr .9fr .9fr;gap:0 12px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+                    <span style="display:flex;align-items:center;gap:7px;font:400 11.5px/1.4 'IBM Plex Sans KR',sans-serif"><span>{{ s.ua }}</span><span style="{{ s.curStyle }}">{{ s.cur }}</span></span>
+                    <span style="{{ s.ipStyle }}">{{ s.ip }}</span>
+                    <span style="font:400 11px/1.4 'IBM Plex Mono',monospace;color:#4a463e">{{ s.created }}</span>
+                    <span style="font:400 11px/1.4 'IBM Plex Mono',monospace;color:#4a463e">{{ s.seen }}</span>
+                    <span style="font:400 11px/1.4 'IBM Plex Mono',monospace;color:#4a463e">{{ s.expires }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ sessConfirm }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:12px;align-items:center;padding:8px 11px;border-radius:7px;background:#f4f0e7;border:1px solid rgba(0,0,0,.18)">
+                    <span style="flex:1;font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>다른 기기 2곳의 세션을 끊습니다</b> — 누르기 전에 목록을 다시 조회해 <b>몇 개가 끊기는지</b> 세었습니다. 이 기기는 유지됩니다. <b>되돌릴 수 없습니다</b> — 끊긴 세션을 되살리지 않습니다(세션 행은 삭제하지 않고 철회 시각만 남습니다). 기억된 기기는 <b>이 동작으로 지워지지 않습니다</b>.</span>
+                    <span style="flex:none;height:33px;padding:0 15px;border-radius:6px;background:oklch(0.45 0.15 30);color:#fff;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif">2곳 로그아웃</span>
+                    <span style="flex:none;height:33px;padding:0 13px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11.5px/1 'IBM Plex Sans KR',sans-serif">취소</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ sessAlone }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:10px 12px;border-radius:7px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.2);font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>다른 기기는 없습니다</b> — 지금 이 기기 하나만 열려 있어 <b>철회 단추를 내지 않습니다</b>. 눌러도 끊을 것이 없는 단추를 두면 「눌렀는데 아무 일도 없다」가 됩니다.</div>
+                </sc-if>
+                <sc-if value="{{ resSess }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ resBoxStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                    <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                    <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:baseline;gap:9px">
+                  <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">기억된 기기</span>
+                  <span style="font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61"><b>비밀번호 없이 로그인할 수 있는 기기</b>입니다(30일 슬라이딩) · 등록은 로그인 화면의 체크박스가 합니다 — 이 화면은 <b>목록과 개별 철회</b>만 합니다</span>
+                  <span style="flex:1"></span>
+                  <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">GET /my-profile/devices</span>
+                </div>
+                <sc-for list="{{ devRows }}" as="d" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:12px;padding:5px 0;border-top:1px solid rgba(0,0,0,.07)">
+                    <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font:500 11.5px/1.4 'IBM Plex Sans KR',sans-serif">{{ d.ua }}</span>
+                      <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">device_id {{ d.id }}</span>
+                    </span>
+                    <span style="flex:none;font:400 10px/1.4 'IBM Plex Mono',monospace;color:#4a463e">등록 {{ d.created }} · 최근 사용 {{ d.seen }} · 만료 {{ d.expires }}</span>
+                    <span style="flex:none;height:30px;padding:0 13px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif">이 기기 잊기</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ devEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:10px 12px;border-radius:7px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.2);font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>등록된 기기가 없습니다</b> — 로그인할 때 「이 기기에서 로그인 유지」를 켜면 여기에 섭니다. <b>실측 현재 DB가 이 상태입니다</b>(살아 있는 기기 0건).</div>
+                </sc-if>
+                <sc-if value="{{ devNotReady }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:10px 12px;border-radius:7px;background:oklch(0.96 0.04 85);border:1px solid oklch(0.78 0.1 80 / .55);display:flex;flex-direction:column;gap:4px">
+                    <span style="font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 70)">기기 기억 기능이 아직 이 서버에 적용되지 않았습니다</span>
+                    <span style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e"><span style="font-family:'IBM Plex Mono',monospace">ready:false</span> — 마이그레이션 0051 미적용. <b>0건과 다른, 이유 있는 빈 상태입니다</b>. 「등록된 기기가 없습니다」로 덮으면 없는 사실을 지어냅니다.</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ resDev }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ resBoxStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                    <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                    <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                  </div>
+                </sc-if>
+              </div>
+
+            </div>
+          </div>
+
+          <div style="flex:none;height:34px;border-top:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;gap:14px;padding:0 18px">
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">모든 시각은 <b>서울 표시</b>입니다 — 서버는 절대시각(<span style="font-family:'IBM Plex Mono',monospace">+00:00</span>)만 주고, ISO 원문을 그대로 내보내지 않습니다.</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">세션 절대 8시간 · 유휴 480분 · 로그인 5회 실패 시 <b>15분 잠금</b>(계정 단위) · 내가 남긴 작업 기록 <b>1,284</b>건 — 열람은 「작업 기록」</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">화면 스크립트가 5초 안에 살아나지 않으면 <b>그 사실을 표시합니다</b>(구화면은 「불러오는 중」에서 영원히 멈췄습니다)</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ overlayOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#f7f4ee;display:flex;align-items:center;justify-content:center;padding:70px">
+            <div style="width:660px;display:flex;flex-direction:column;gap:13px">
+              <span style="{{ overlayChipStyle }}">{{ overlayCode }}</span>
+              <div style="font:600 22px/1.35 'IBM Plex Sans KR',sans-serif">{{ overlayMsg }}</div>
+              <div style="font:400 12.5px/1.8 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ overlayNote }}</div>
+              <div style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#8a8377">세션 만료 · 네트워크 실패 · 서버 오류 · 화면 스크립트 미실행을 <b>갈라 말합니다</b>. <span style="font-family:'IBM Plex Mono',monospace">if(!res.ok) return;</span> 은 쓰지 않습니다 — 저장을 눌러도 아무 일도 안 일어나는 화면이 됩니다.</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div id="1b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">두 열 · 신원(읽기)과 보안(쓰기)을 나란히</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">왼쪽 = 내가 누구인가 · 오른쪽 = 내 로그인을 정리한다. <b>세션·기기가 첫 화면에 있다</b> · 대신 <b>열이 좁아 서버 문장이 여러 줄로 접힌다</b></span>
+      </div>
+      <div data-screen-label="1b 두 열 신원·보안" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;position:relative;display:flex;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="39">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+          <div style="margin-top:9px;padding:8px 16px 0;border-top:1px solid rgba(255,255,255,.09);font:400 9px/1.6 'IBM Plex Sans KR',sans-serif;color:#8b8477">이 화면은 <b style="color:#cfc9bd">메뉴에 없습니다</b> — 진입점은 상단바 프로필입니다</div>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">내 계정</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif">내 정보</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">ADM-SYS-022</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px">/admin2/my-profile · 제안</span>
+            <span style="flex:1"></span>
+            <span style="{{ roleBadgeStyle }}">{{ roleBadge }}</span>
+            <span style="display:flex;align-items:center;gap:7px;padding:4px 5px 4px 9px;border:1px dashed oklch(0.7 0.13 165 / .7);border-radius:16px">
+              <span style="font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 165)">여기서 들어온다 · 사진이 서는 자리</span>
+              <span style="{{ avatarStyle }}">{{ avatarInitial }}</span>
+            </span>
+          </header>
+
+          <div style="flex:1;min-height:0;overflow:hidden;padding:12px 18px 0;display:flex;flex-direction:column;gap:10px">
+            <sc-if value="{{ mustChange }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:none;display:flex;gap:10px;align-items:flex-start;padding:10px 13px;border-radius:7px;background:oklch(0.96 0.04 85);border:1px solid oklch(0.78 0.1 80 / .6)">
+                <span style="flex:none;font:600 9.5px/1 'IBM Plex Mono',monospace;color:oklch(0.42 0.11 70);border:1px solid oklch(0.78 0.1 80 / .7);border-radius:3px;padding:5px 7px;background:#fffdf9">must_change_password</span>
+                <span style="font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b style="font-size:12px">임시 비밀번호로 로그인했습니다 — 비밀번호를 바꾸세요.</b> 오른쪽 열 첫 카드가 그 자리입니다. 로그인 화면(ADM-SYS-021)이 여기로 보낼 수 있게 되는 지점입니다.</span>
+              </div>
+            </sc-if>
+
+            <div style="flex:1;min-height:0;display:flex;gap:14px;align-items:stretch">
+
+              <div style="flex:none;width:474px;display:flex;flex-direction:column;gap:9px">
+                <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:14px 15px;display:flex;flex-direction:column;gap:11px">
+                  <div style="display:flex;gap:13px;align-items:flex-start">
+                    <span style="{{ photoBigStyle }}">{{ photoBigLabel }}</span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                      <span style="font:600 18px/1.2 'IBM Plex Sans KR',sans-serif">김소희</span>
+                      <span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#5b564d">sohee.kim@popcornai.co.kr</span>
+                      <span style="display:flex;gap:6px;margin-top:2px">
+                        <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#4a463e;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 6px">{{ roleWord }}</span>
+                        <span style="{{ statusChipStyle }}">{{ statusWord }}</span>
+                      </span>
+                      <span style="display:flex;gap:6px;margin-top:4px">
+                        <span style="height:27px;padding:0 11px;border-radius:5px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 10.5px/1 'IBM Plex Sans KR',sans-serif">{{ photoMainBtn }}</span>
+                        <sc-if value="{{ photoOn }}" hint-placeholder-val="{{ true }}">
+                          <span style="height:27px;padding:0 10px;border-radius:5px;border:1px solid oklch(0.72 0.12 33 / .55);color:oklch(0.45 0.15 30);display:flex;align-items:center;font:500 10px/1 'IBM Plex Sans KR',sans-serif">사진 삭제</span>
+                        </sc-if>
+                      </span>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px;padding-top:9px;border-top:1px solid rgba(0,0,0,.08)">
+                    <sc-for list="{{ photoPolicy }}" as="p" hint-placeholder-count="4">
+                      <span style="display:flex;gap:7px;font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#5b564d"><span style="flex:none;color:#a09889">·</span><span>{{ p }}</span></span>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ resPhoto }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ resBoxStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                      <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                      <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:14px 15px;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">신원 · 이력</span>
+                    <span style="font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">빈 값의 이유는 서버 <span style="font-family:'IBM Plex Mono',monospace">identity_reasons()</span> 문장 그대로</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 13px">
+                    <sc-for list="{{ idRowsShort }}" as="r" hint-placeholder-count="5">
+                      <div style="display:flex;flex-direction:column;gap:3px;padding-top:7px;border-top:1px solid rgba(0,0,0,.08)">
+                        <span style="font:500 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ r.k }}</span>
+                        <span style="{{ r.vStyle }}">{{ r.v }}</span>
+                        <span style="{{ r.noteStyle }}">{{ r.note }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding-top:9px;border-top:1px dashed rgba(0,0,0,.16)">
+                    <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">여기서 못 고치는 것</span>
+                    <sc-for list="{{ locked }}" as="l" hint-placeholder-count="3">
+                      <span style="display:flex;gap:8px;align-items:baseline">
+                        <span style="flex:none;width:46px;font:600 10.5px/1.4 'IBM Plex Sans KR',sans-serif">{{ l.f }}</span>
+                        <span style="flex:1;font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ l.why }}</span>
+                      </span>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:13px 15px;display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">정보 수정</span>
+                    <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">editable: name · phone · duty</span>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                      <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">이름 <span style="color:oklch(0.5 0.15 30)">필수</span></span>
+                      <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 11.5px/1 'IBM Plex Sans KR',sans-serif">김소희</div>
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                      <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">연락처</span>
+                      <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 11px/1 'IBM Plex Mono',monospace">010-2848-1195</div>
+                    </div>
+                    <div style="flex:1.15;display:flex;flex-direction:column;gap:4px">
+                      <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">직무</span>
+                      <div style="height:32px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 11px/1 'IBM Plex Sans KR',sans-serif">용산 매입 · 단가표 관리</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="height:34px;padding:0 16px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 12px/1 'IBM Plex Sans KR',sans-serif">저장</span>
+                    <span style="height:34px;padding:0 12px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11.5px/1 'IBM Plex Sans KR',sans-serif">되돌리기</span>
+                    <span style="flex:1;font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">「되돌리기」는 <b>서버 값 재적용</b>이지 원장 되돌림이 아닙니다</span>
+                  </div>
+                  <sc-if value="{{ resInfo }}" hint-placeholder-val="{{ true }}">
+                    <div style="{{ resBoxStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버 문구 그대로</span></div>
+                      <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                      <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+                <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:14px 16px;display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">비밀번호</span>
+                    <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">POST /api/admin/auth/password</span>
+                    <span style="flex:1"></span>
+                    <span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">규칙은 서버가 줍니다 — 화면이 베끼지 않습니다</span>
+                  </div>
+                  <sc-if value="{{ hasPassword }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;flex-direction:column;gap:9px">
+                      <div style="display:flex;gap:9px">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                          <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">현재 비밀번호</span>
+                          <div style="height:34px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 10px;font:400 13px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4a463e">••••••••••</div>
+                        </div>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                          <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">새 비밀번호</span>
+                          <div style="height:34px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 10px;font:400 13px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4a463e">••••••••••••</div>
+                        </div>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                          <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">새 비밀번호 확인</span>
+                          <div style="height:34px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 10px;font:400 13px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4a463e">••••••••••••</div>
+                        </div>
+                      </div>
+                      <div style="display:flex;gap:13px;align-items:flex-start">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                          <sc-for list="{{ pwRules }}" as="p" hint-placeholder-count="6">
+                            <span style="display:flex;gap:6px;font:400 10px/1.5 'IBM Plex Sans KR',sans-serif;color:#4a463e"><span style="flex:none;color:#a09889">·</span><span>{{ p }}</span></span>
+                          </sc-for>
+                        </div>
+                        <div style="flex:none;width:250px;display:flex;flex-direction:column;gap:7px">
+                          <span style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 70);border-left:2px solid oklch(0.78 0.1 80);padding-left:8px"><b>바꾸면 다른 세션과 기억된 기기가 전부 철회됩니다.</b> 되돌릴 수 없습니다 — 누르기 전에 밝힙니다.</span>
+                          <span style="height:34px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;justify-content:center;font:600 12px/1 'IBM Plex Sans KR',sans-serif">비밀번호 변경</span>
+                          <span style="font:400 9px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377">세 칸 모두 <span style="font-family:'IBM Plex Mono',monospace">type="password"</span> · <span style="font-family:'IBM Plex Mono',monospace">prompt()</span> 미사용</span>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ noPassword }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-radius:7px;background:oklch(0.96 0.03 30);border:1px solid oklch(0.75 0.11 33 / .5)">
+                      <span style="font:600 12px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30)">이 계정에는 비밀번호가 설정돼 있지 않습니다 — 로그인은 <span style="font-family:'IBM Plex Mono',monospace">403 password_not_set</span>으로 막힙니다</span>
+                      <span style="font:400 10px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e">판정 근거는 서버가 계산한 <span style="font-family:'IBM Plex Mono',monospace">has_password</span>입니다. <b>이 화면에는 발급 수단이 없습니다</b> — owner가 「운영자·권한」에서 임시 비밀번호를 발급해 직접 전달합니다(응답에 비밀번호를 돌려주지 않습니다). <b>스스로 푸는 「비밀번호 찾기」는 없습니다.</b></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ resPw }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ resBoxStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버 문구 그대로</span></div>
+                      <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                      <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:14px 16px;display:flex;flex-direction:column;gap:9px;overflow:hidden">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">열려 있는 세션</span>
+                    <span style="{{ sessCountStyle }}">{{ sessCountLabel }}</span>
+                    <span style="flex:1"></span>
+                    <span style="{{ revokeBtnStyle }}">{{ revokeBtnLabel }}</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1.4fr .9fr .8fr .8fr;gap:0 10px;font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-bottom:5px;border-bottom:1px solid rgba(0,0,0,.13)">
+                    <span>기기 · 브라우저</span><span>접속 IP</span><span>최근 사용</span><span>만료</span>
+                  </div>
+                  <sc-for list="{{ sessRows }}" as="s" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:1.4fr .9fr .8fr .8fr;gap:0 10px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+                      <span style="display:flex;align-items:center;gap:6px;font:400 11px/1.4 'IBM Plex Sans KR',sans-serif"><span>{{ s.ua }}</span><span style="{{ s.curStyle }}">{{ s.cur }}</span></span>
+                      <span style="{{ s.ipStyle }}">{{ s.ip }}</span>
+                      <span style="font:400 10.5px/1.4 'IBM Plex Mono',monospace;color:#4a463e">{{ s.seen }}</span>
+                      <span style="font:400 10.5px/1.4 'IBM Plex Mono',monospace;color:#4a463e">{{ s.expires }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377">세션 식별자는 표시하지 않습니다(그 값이 곧 로그인 자격입니다) · 접속 IP가 비면 <b>이유를 지어내지 않고</b> 그대로 둡니다 · 세션은 절대 8시간 · 유휴 480분 · 5회 실패 시 15분 잠금(계정 단위)</div>
+                  <sc-if value="{{ sessConfirm }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:7px;background:#f4f0e7;border:1px solid rgba(0,0,0,.18)">
+                      <span style="font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>다른 기기 2곳의 세션을 끊습니다</b> — 목록을 다시 조회해 센 수입니다. 이 기기는 유지됩니다. <b>되돌릴 수 없습니다.</b> 기억된 기기는 이 동작으로 지워지지 않습니다.</span>
+                      <span style="display:flex;gap:8px">
+                        <span style="flex:none;height:31px;padding:0 14px;border-radius:6px;background:oklch(0.45 0.15 30);color:#fff;display:flex;align-items:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif">2곳 로그아웃</span>
+                        <span style="flex:none;height:31px;padding:0 12px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif">취소</span>
+                      </span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ sessAlone }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:9px 11px;border-radius:7px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.2);font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>다른 기기는 없습니다</b> — 이 기기 하나만 열려 있어 <b>철회 단추를 내지 않습니다</b>.</div>
+                  </sc-if>
+                  <sc-if value="{{ resSess }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ resBoxStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버 문구 그대로</span></div>
+                      <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                      <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:13px 16px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">기억된 기기</span>
+                    <span style="font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61"><b>비밀번호 없이 로그인할 수 있는 기기</b> · 30일 슬라이딩 · 등록은 로그인 화면 소관</span>
+                  </div>
+                  <sc-for list="{{ devRows }}" as="d" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:11px;padding:7px 0;border-top:1px solid rgba(0,0,0,.07)">
+                      <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+                        <span style="font:500 11px/1.4 'IBM Plex Sans KR',sans-serif">{{ d.ua }}</span>
+                        <span style="font:400 9px/1 'IBM Plex Mono',monospace;color:#8a8377">device_id {{ d.id }} · 등록 {{ d.created }} · 최근 {{ d.seen }} · 만료 {{ d.expires }}</span>
+                      </span>
+                      <span style="flex:none;height:29px;padding:0 12px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 10.5px/1 'IBM Plex Sans KR',sans-serif">이 기기 잊기</span>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ devEmpty }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:9px 11px;border-radius:7px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.2);font:400 10.5px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>등록된 기기가 없습니다</b> — 로그인할 때 「이 기기에서 로그인 유지」를 켜면 여기에 섭니다. <b>실측 현재 DB가 이 상태입니다</b>.</div>
+                  </sc-if>
+                  <sc-if value="{{ devNotReady }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:9px 11px;border-radius:7px;background:oklch(0.96 0.04 85);border:1px solid oklch(0.78 0.1 80 / .55);display:flex;flex-direction:column;gap:3px">
+                      <span style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 70)">기기 기억 기능이 아직 이 서버에 적용되지 않았습니다</span>
+                      <span style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:#4a463e"><span style="font-family:'IBM Plex Mono',monospace">ready:false</span> — <b>0건과 다른, 이유 있는 빈 상태</b>입니다.</span>
+                    </div>
+                  </sc-if>
+                  <div style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-top:4px;border-top:1px solid rgba(0,0,0,.07)">기기를 잊어도 <b>지금 열려 있는 세션은 끊기지 않습니다</b> — 다음 로그인부터 비밀번호를 다시 묻는다는 뜻입니다. 위 세션 철회와 <b>다른 일</b>입니다.</div>
+                  <sc-if value="{{ resDev }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ resBoxStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버 문구 그대로</span></div>
+                      <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                      <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;height:34px;border-top:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;gap:14px;padding:0 18px">
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">모든 시각은 <b>서울 표시</b> — 서버는 절대시각만 줍니다</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">내가 남긴 작업 기록 <b>1,284</b>건 — 건수만 표시하고 열람은 「작업 기록」(ADM-SYS-030)</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">스크립트가 5초 안에 살아나지 않으면 <b>그 사실을 표시합니다</b></span>
+          </div>
+        </div>
+
+        <sc-if value="{{ overlayOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#f7f4ee;display:flex;align-items:center;justify-content:center;padding:70px">
+            <div style="width:660px;display:flex;flex-direction:column;gap:13px">
+              <span style="{{ overlayChipStyle }}">{{ overlayCode }}</span>
+              <div style="font:600 22px/1.35 'IBM Plex Sans KR',sans-serif">{{ overlayMsg }}</div>
+              <div style="font:400 12.5px/1.8 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ overlayNote }}</div>
+              <div style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#8a8377">세션 만료 · 네트워크 실패 · 서버 오류 · 화면 스크립트 미실행을 <b>갈라 말합니다</b>.</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="max-width:1340px;display:flex;gap:18px;flex-wrap:wrap">
+    <div style="flex:1;min-width:430px;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">사진은 전부 신설이다 — 두 안이 공통으로 전제한 것</div>
+      <div style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">저장 컬럼 · 업로드 API · 업로드 UI가 <b>지금 저장소에 하나도 없습니다</b>. 아래는 확정분(A-62~A-65)과 <b>미정 하나</b>입니다.</div>
+      <sc-for list="{{ photoFacts }}" as="p" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:96px 1fr;gap:11px;padding:7px 0;border-top:1px solid rgba(0,0,0,.08)">
+          <span style="{{ p.tagStyle }}">{{ p.tag }}</span>
+          <span style="display:flex;flex-direction:column;gap:2px">
+            <span style="font:500 11px/1.6 'IBM Plex Sans KR',sans-serif">{{ p.what }}</span>
+            <span style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ p.why }}</span>
+          </span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;width:400px;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">이 화면이 서면 함께 정리되는 것</div>
+      <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">셋 다 이 화면의 담당 파일 밖입니다 — 사실만 밝힙니다.</div>
+      <sc-for list="{{ cleanups }}" as="c" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:2px;padding:7px 0;border-top:1px solid rgba(0,0,0,.08)">
+          <span style="font:600 10.5px/1.5 'IBM Plex Mono',monospace">{{ c.what }}</span>
+          <span style="font:400 10px/1.65 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ c.why }}</span>
+        </div>
+      </sc-for>
+      <div style="font:600 12.5px/1.3 'IBM Plex Sans KR',sans-serif;padding-top:9px;border-top:1px solid rgba(0,0,0,.12)">이 화면이 <b>하지 않는</b> 일</div>
+      <sc-for list="{{ outOfScope }}" as="o" hint-placeholder-count="6">
+        <div style="display:flex;gap:9px;padding:5px 0;border-top:1px solid rgba(0,0,0,.07)">
+          <span style="flex:1;font:500 10.5px/1.6 'IBM Plex Sans KR',sans-serif">{{ o.what }}</span>
+          <span style="flex:none;width:142px;font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61;text-align:right">{{ o.where }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;serverState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;응답 없음&quot;,&quot;수정 성공 · 이름 변경&quot;,&quot;바뀐 값 없음&quot;,&quot;422 못 고치는 필드 동봉&quot;,&quot;400 이름 미입력&quot;,&quot;비밀번호 변경 성공&quot;,&quot;401 현재 비밀번호 불일치&quot;,&quot;400 강도 미달&quot;,&quot;400 이전과 같은 비밀번호&quot;,&quot;세션 철회 성공&quot;,&quot;400 세션 쿠키 없음&quot;,&quot;기기 철회 성공&quot;,&quot;404 기기 없음&quot;,&quot;사진 등록 성공&quot;,&quot;사진 형식 거절 · SVG&quot;,&quot;사진 1MB 초과&quot;,&quot;401 미로그인&quot;,&quot;404 계정 없음&quot;,&quot;서버 연결 실패&quot;,&quot;화면 스크립트 미실행 · 5초 감시자&quot;],&quot;default&quot;:&quot;수정 성공 · 이름 변경&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;서버 응답 (실측 문구 기준)&quot;},&quot;account&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;google(신고된 값) · 부트스트랩 승인&quot;,&quot;개발용 임시 인증(dev)&quot;,&quot;비밀번호 미설정(현재 6건)&quot;,&quot;임시 비밀번호 · 교체 필요&quot;,&quot;승인 안 됨(approved_at NULL)&quot;],&quot;default&quot;:&quot;google(신고된 값) · 부트스트랩 승인&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;계정 상태 — 빈 값의 이유는 서버가 문장으로 준다&quot;},&quot;sessions&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;3개 · 다른 기기 2&quot;,&quot;1개 · 이 기기뿐&quot;],&quot;default&quot;:&quot;3개 · 다른 기기 2&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;세션&quot;},&quot;devices&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;2건&quot;,&quot;0건 · 실측 현재 상태&quot;,&quot;스키마 미적용 · ready:false&quot;],&quot;default&quot;:&quot;2건&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;기억된 기기&quot;},&quot;hasPhoto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;프로필 사진 (전부 신설)&quot;},&quot;reencodeServer&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;결정 3 — 이미지 라이브러리를 새로 넣을까 (미정)&quot;}}">
+const GREEN = 'oklch(0.72 0.12 165)';
+const NAVL=[['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['삭제 상품 조회','삭'],['조립 호환 지도','지'],['조립 사양 표준','표'],['상품 사양 정의','정'],['상품 사양 검수','검'],['조립 호환 규칙','규'],['용도별 최소 사양','용'],['부품 등급 관리','등'],['추천 기준 보기','추'],['추천 가능 재고 현황','풀'],['견적 상담 기록','상'],['부품 교체 · 클릭','교'],['판매가 관리','판'],['가격 검토 대기','검'],['마진 정책','마'],['판매가 재산정','재'],['가격 이력','이'],['공급처','공'],['매입 견적(용산)','견'],['재고 입고','입'],['단가표 반영','단'],['쇼핑몰 동기화','동'],['인계 기록','인'],['유입 성과','성'],['작업 현황판','판'],['웹 사양 채움','채'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+
+const TONES = {
+  ok:   {bg:'oklch(0.96 0.03 165)', bd:'oklch(0.74 0.09 165 / .55)', fg:'oklch(0.37 0.1 165)'},
+  warn: {bg:'oklch(0.96 0.04 85)',  bd:'oklch(0.78 0.1 80 / .6)',    fg:'oklch(0.42 0.11 70)'},
+  err:  {bg:'oklch(0.96 0.03 30)',  bd:'oklch(0.75 0.11 33 / .55)',  fg:'oklch(0.45 0.15 30)'},
+  none: {bg:'#f4f0e7',              bd:'rgba(0,0,0,.13)',            fg:'#6f6a61'}
+};
+
+const RESULTS = {
+  '응답 없음': {zone:'', tone:'none', code:'—', msg:'', note:''},
+  '수정 성공 · 이름 변경': {zone:'info', tone:'ok', code:'200', msg:'저장했습니다 — 이름을 「김소희」에서 「김소희(정정)」으로 바꿨습니다. 지난 작업 기록에 표시되는 이름도 함께 바뀝니다.',
+    note:'서버 note를 통째로 옮깁니다 — 로그는 operator_id를 참조하고 이름은 조인으로 나오기 때문입니다. 이 문장을 잘라내면 「예전 기록이 왜 바뀌었나」를 나중에 묻게 됩니다. 원장에는 operator_self_update 와 바뀐 필드의 before/after 원문이 남습니다.'},
+  '바뀐 값 없음': {zone:'info', tone:'none', code:'200', msg:'바뀐 값이 없습니다', note:'원장에 남기지 않습니다 — 「고쳤다」는 기록이 거짓이 되기 때문입니다. 성공 문구도 내지 않습니다.'},
+  '422 못 고치는 필드 동봉': {zone:'info', tone:'err', code:'422 · extra=forbid', msg:'여기서는 이름 · 연락처 · 직무만 고칠 수 있습니다',
+    note:'요청 본문에 role 이 섞여 들어와 거절됐습니다. 모르는 필드를 조용히 무시하지 않습니다 — 무시하면 「바꿨는데 안 바뀌었다」가 됩니다. 고칠 수 있는 목록은 화면이 아니라 서버 editable 배열이 정합니다.'},
+  '400 이름 미입력': {zone:'info', tone:'err', code:'400', msg:'이름을 입력하세요', note:'공백만 입력한 경우도 같습니다. 연락처·직무는 빈 문자열이면 NULL 로 저장됩니다(지우는 것이 허용됩니다).'},
+  '비밀번호 변경 성공': {zone:'pw', tone:'ok', code:'200', msg:'비밀번호를 변경했습니다 — 다른 기기의 세션과 기억된 기기가 모두 철회됐습니다',
+    note:'서버 note 그대로. must_change_password 해제 · 로그인 실패 횟수와 잠금 해제 · password_set_at 갱신. 비밀번호 원문은 어디에도 저장하지 않습니다. 이 사실은 누르기 전에도 밝혔습니다.'},
+  '401 현재 비밀번호 불일치': {zone:'pw', tone:'err', code:'401', msg:'현재 비밀번호가 올바르지 않습니다',
+    note:'이 화면의 쓰기는 재확인(reauth) 대상이 아니지만, 비밀번호 변경은 현재 비밀번호를 요구하는 것으로 자체 방어됩니다(코드 주석: reauth 와 동등하거나 더 강함).'},
+  '400 강도 미달': {zone:'pw', tone:'err', code:'400', msg:'비밀번호는 10자 이상이어야 합니다',
+    note:'문구와 최소 길이는 서버가 준 것입니다. 구화면은 「8자 이상」이라 적어 두고 서버는 10자를 요구했습니다 — 화면이 규칙을 베끼면 그 자리에서 어긋납니다.'},
+  '400 이전과 같은 비밀번호': {zone:'pw', tone:'err', code:'400', msg:'이전과 다른 비밀번호를 쓰세요', note:'서버가 해시를 비교해 판정합니다 — 화면은 판정하지 않습니다.'},
+  '세션 철회 성공': {zone:'sess', tone:'ok', code:'200 · {"revoked":2}', msg:'다른 기기 2곳에서 로그아웃했습니다 — 이 기기는 유지됩니다',
+    note:'세션 행은 삭제하지 않고 revoked_at 을 남깁니다(「언제 어디서 열려 있었나」를 잃지 않습니다). 활동 로그에 session_revoke_others 가 남습니다. 되돌릴 수 없습니다 — 끊은 세션을 되살리지 않습니다. 기억된 기기는 그대로입니다.'},
+  '400 세션 쿠키 없음': {zone:'sess', tone:'err', code:'400', msg:'현재 세션을 확인할 수 없습니다',
+    note:'서버가 막습니다 — 현재 세션을 특정할 수 없으면 자기 세션까지 끊기기 때문입니다. 화면이 대신 판단하지 않습니다.'},
+  '기기 철회 성공': {zone:'dev', tone:'ok', code:'200', msg:'이 기기를 잊었습니다 — 다음 로그인부터 비밀번호를 다시 묻습니다',
+    note:'지금 열려 있는 세션은 끊기지 않습니다. 세션 철회와는 다른 일입니다. 행은 삭제하지 않고 revoked_at 을 남기며 활동 로그에 device_forget 이 남습니다. 되돌릴 수 없습니다.'},
+  '404 기기 없음': {zone:'dev', tone:'err', code:'404', msg:'기기를 찾을 수 없습니다', note:'이미 철회됐거나 남의 기기입니다 — 목록을 다시 조회합니다. device_id 자체는 노출해도 안전합니다(시크릿은 해시만 저장).'},
+  '사진 등록 성공': {zone:'photo', tone:'ok', code:'200', msg:'사진을 등록했습니다',
+    note:'상단바 아바타도 함께 갱신됩니다(A-64) — 정본 셸 수정 또는 /auth/me 확장이 따라옵니다(39개 화면 동시 영향). 「누가 언제 등록했다」는 활동 로그에 남습니다.'},
+  '사진 형식 거절 · SVG': {zone:'photo', tone:'err', code:'400', msg:'JPEG · PNG · WebP 만 올릴 수 있습니다',
+    note:'SVG 는 거절합니다 — 스크립트를 품을 수 있고, 같은 출처에서 서빙되면 그 스크립트가 관리자 세션 문맥에서 돕니다. 확장자와 클라이언트가 보낸 MIME 을 믿지 않고 바이트 앞머리(매직 넘버)로 판정합니다.'},
+  '사진 1MB 초과': {zone:'photo', tone:'err', code:'400', msg:'사진은 1MB 까지 올릴 수 있습니다 (선택한 파일 3.4MB)',
+    note:'상한 1MB 는 표시 크기(최대 64px · 고해상도 2배 128px)에서 역산한 값입니다(A-63). 저장소의 기존 상한 64MB 는 28MB 카탈로그 CSV 용이라 근거가 되지 않습니다.'},
+  '401 미로그인': {zone:'over', tone:'err', code:'401', msg:'로그인이 필요합니다', note:'세션이 없거나 만료됐습니다(절대 8시간 · 유휴 480분). /admin2/login 으로 안내합니다 — 여기서 다시 시도하게 두지 않습니다.'},
+  '404 계정 없음': {zone:'over', tone:'err', code:'404', msg:'계정을 찾을 수 없습니다', note:'세션은 살아 있으나 계정 행이 없습니다(삭제된 경우). 사유를 그대로 보여 주고 화면을 그리지 않습니다 — 빈 칸으로 채운 화면이 더 나쁩니다.'},
+  '서버 연결 실패': {zone:'over', tone:'err', code:'네트워크 실패', msg:'서버에 연결할 수 없습니다', note:'세션 만료(401)와 네트워크 실패, 서버 오류를 갈라 말합니다. 포트 번호나 내부 사정은 사용자 문구에 박지 않습니다.'},
+  '화면 스크립트 미실행 · 5초 감시자': {zone:'over', tone:'warn', code:'감시자 발동', msg:'화면 스크립트가 실행되지 않았습니다', note:'별도 감시자 스크립트가 5초 뒤에도 본 스크립트가 살아나지 않았음을 확인했습니다. 구화면은 파싱 오류로 통째로 죽어 「불러오는 중」에서 영원히 멈췄고 사용자에게 아무 신호도 없었습니다 — 같은 보호를 둡니다. 새로고침 · 관리자 문의를 함께 안내합니다.'}
+};
+
+const ACCOUNTS = {
+  'google(신고된 값) · 부트스트랩 승인': {role:'owner', status:'활성', hasPw:true, mustChange:false,
+    provider:'Google(신고된 값)', pnote:'구글이 확인한 값이 아닙니다 — 요청 본문의 값을 그대로 저장했고, 실제 검증 경로는 아직 없습니다.',
+    approved:'부트스트랩(자동)', anote:'설치 시 자동 승인된 계정입니다 — 사람이 승인한 것이 아닙니다.', pwSet:'2026-08-14 11:07'},
+  '개발용 임시 인증(dev)': {role:'operator', status:'활성', hasPw:true, mustChange:false,
+    provider:'개발용 임시 인증', pnote:'입력한 이메일을 그대로 신뢰하는 어댑터입니다 — 신원이 검증되지 않았습니다.',
+    approved:'2026-08-12 15:40 · 박정우', anote:'', pwSet:'2026-08-14 11:07'},
+  '비밀번호 미설정(현재 6건)': {role:'viewer', status:'활성', hasPw:false, mustChange:false,
+    provider:'기록 없음', pnote:'로그인 기록이 없어 제공자를 알 수 없습니다.',
+    approved:'2026-08-13 10:02 · 박정우', anote:'', pwSet:''},
+  '임시 비밀번호 · 교체 필요': {role:'operator', status:'활성', hasPw:true, mustChange:true,
+    provider:'개발용 임시 인증', pnote:'입력한 이메일을 그대로 신뢰하는 어댑터입니다 — 신원이 검증되지 않았습니다.',
+    approved:'2026-08-16 09:11 · 박정우', anote:'', pwSet:'2026-08-17 20:55'},
+  '승인 안 됨(approved_at NULL)': {role:'viewer', status:'정지', hasPw:true, mustChange:false,
+    provider:'Google(신고된 값)', pnote:'구글이 확인한 값이 아닙니다 — 실제 검증 경로가 아직 없습니다.',
+    approved:'승인 안 됨', anote:'승인 대기 상태입니다 — 승인한 사람도, 승인 시각도 없습니다.', pwSet:'2026-08-15 14:20'}
+};
+
+const SESSIONS = [
+  {ua:'Chrome 141 · macOS 15', ip:'192.168.0.14', created:'08-17 22:03', seen:'08-17 22:04', expires:'08-18 06:03', cur:true},
+  {ua:'Chrome 140 · Windows 11', ip:'', created:'08-17 14:31', seen:'08-17 19:58', expires:'08-17 22:31', cur:false},
+  {ua:'Safari · iPhone iOS 19', ip:'172.30.1.42', created:'08-17 09:12', seen:'08-17 21:40', expires:'08-17 17:12', cur:false}
+];
+
+const DEVICES = [
+  {ua:'Chrome 141 · macOS 15 — 지금 쓰는 기기', id:'d1f4…9ab2', created:'08-17 21:41', seen:'08-17 22:03', expires:'09-16 21:41'},
+  {ua:'Safari · iPhone iOS 19', id:'7c02…4e18', created:'08-17 11:05', seen:'08-17 21:40', expires:'09-16 11:05'}
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.serverState ?? '수정 성공 · 이름 변경';
+    const r = RESULTS[st] || RESULTS['응답 없음'];
+    const t = TONES[r.tone];
+    const acc = ACCOUNTS[this.props.account ?? 'google(신고된 값) · 부트스트랩 승인'];
+    const sessMode = this.props.sessions ?? '3개 · 다른 기기 2';
+    const devMode = this.props.devices ?? '2건';
+    const photoOn = this.props.hasPhoto ?? true;
+    const reencode = this.props.reencodeServer ?? false;
+
+    const nav = NAVL.map(([label, icon]) => ({ label, icon,
+      style:"display:flex;align-items:center;gap:8px;padding:1px 16px;font:500 10px/1.25 'IBM Plex Sans KR',sans-serif;color:#a29b8d;background:transparent",
+      iconStyle:"flex:none;width:17px;height:17px;border-radius:4px;display:flex;align-items:center;justify-content:center;font:600 8px/1 'IBM Plex Sans KR',sans-serif;color:#cfc9bd;background:rgba(255,255,255,.07)" }));
+
+    const dim = "font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61";
+    const red = "font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30)";
+    const val = "font:500 11.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#26231e";
+    const mono = "font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#26231e";
+
+    const idRows = [
+      {k:'로그인 방식', v:acc.provider, vStyle:val, note:'검증되지 않았습니다 — ' + acc.pnote, noteStyle:red},
+      {k:'가입', v:'2026-08-11 18:22', vStyle:mono, note:'서울 표시', noteStyle:dim},
+      {k:'승인', v:acc.approved, vStyle:val, note:acc.anote || '승인한 사람과 시각이 그대로 있습니다', noteStyle:acc.anote ? red : dim},
+      {k:'마지막 로그인', v:'2026-08-17 22:03', vStyle:mono, note:'이 기기에서', noteStyle:dim},
+      {k:'비밀번호 설정', v:acc.hasPw ? acc.pwSet : '설정되지 않음', vStyle:acc.hasPw ? mono : val,
+       note:acc.hasPw ? '표시용 시각입니다 — 판정 근거는 has_password 입니다' : 'has_password=false — 이 값으로 판정합니다', noteStyle:acc.hasPw ? dim : red},
+      {k:'세션 규칙', v:'절대 8시간 · 유휴 480분', vStyle:val, note:'서버 상수 — 화면이 정하지 않습니다', noteStyle:dim},
+      {k:'로그인 잠금', v:'5회 실패 · 15분', vStyle:val, note:'계정 단위입니다(같은 IP의 다른 사람은 막지 않습니다)', noteStyle:dim},
+      {k:'내가 남긴 작업 기록', v:'1,284건', vStyle:val, note:'건수만 표시 · 열람은 「작업 기록」(ADM-SYS-030)', noteStyle:dim}
+    ];
+
+    const locked = [
+      {f:'이메일', why:'로그인 신원 그 자체입니다 — 본인이 바꾸면 계정이 통째로 다른 사람에게 옮겨갑니다. 정정은 owner 경로로만 합니다.'},
+      {f:'권한', why:'자기 권한 상승을 막습니다 — 승인 게이트의 의미가 사라집니다. 부여는 「운영자·권한」 소관입니다.'},
+      {f:'상태', why:'자기 정지 해제를 막습니다. 같은 이유로 조용히 무시하는 대신 422 로 거절합니다.'}
+    ];
+
+    const others = sessMode === '1개 · 이 기기뿐' ? 0 : 2;
+    const sessRows = (others === 0 ? SESSIONS.slice(0,1) : SESSIONS).map(s => ({
+      ua:s.ua, created:s.created, seen:s.seen, expires:s.expires,
+      cur:s.cur ? '지금 이 기기' : '',
+      curStyle:s.cur ? "flex:none;font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.37 0.1 165);background:oklch(0.95 0.04 165);border:1px solid oklch(0.74 0.09 165 / .5);border-radius:3px;padding:4px 5px" : 'display:none',
+      ip:s.ip || '기록 없음',
+      ipStyle:s.ip ? "font:400 11px/1.4 'IBM Plex Mono',monospace;color:#4a463e" : "font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#a09889"
+    }));
+
+    const devReady = devMode !== '스키마 미적용 · ready:false';
+    const devRows = (devReady && devMode === '2건') ? DEVICES : [];
+
+    const chip = (txt, tone) => ({txt, style:"font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:"+TONES[tone].fg+';background:'+TONES[tone].bg+';border:1px solid '+TONES[tone].bd+';border-radius:3px;padding:4px 6px'});
+    const statusOk = acc.status === '활성';
+
+    const photoPolicy = [
+      'JPEG · PNG · WebP · 최대 1MB — SVG는 거절합니다(스크립트를 품을 수 있고, 같은 출처에서 관리자 세션 문맥으로 실행됩니다).',
+      '확장자와 클라이언트 MIME을 믿지 않고 바이트 앞머리로 판정합니다(A-63).',
+      reencode ? '서버가 다시 인코딩합니다 — EXIF 제거 · 크기 정규화. 이미지 라이브러리 신설이 따라옵니다(결정 3 · 미정).'
+               : '원본 바이트를 그대로 보관합니다 — EXIF(촬영 위치 등)가 남습니다. 지금 이미지 라이브러리가 없습니다(결정 3 · 미정).',
+      '삭제하면 실제로 지웁니다 — 되돌리기 없음. 「누가 언제 등록·교체·삭제했다」만 활동 로그에 남습니다.',
+      'owner도 남의 사진은 못 바꾸고, 열람은 전 운영자입니다(A-65). 고객 화면에는 나가지 않습니다.'
+    ];
+
+    const photoFacts = [
+      {tag:'A-62 확정', tone:'ok', what:'별도 표를 신설한다 — admin_operators 에 바이너리 컬럼을 두지 않는다',
+       why:'resolve_session() 이 모든 /api/admin/* 요청에서 admin_operators 를 조인합니다 — 같은 표에 이미지 바이트를 두면 언젠가 인증 경로가 그 바이트까지 읽습니다. 표 이름·컬럼(제안 admin_operator_photos)은 마이그레이션 + ERD 개정 몫입니다.'},
+      {tag:'A-62 확정', tone:'ok', what:'DB 에 담는다 — 파일시스템·외부 저장소가 아니다',
+       why:'백업이 자동으로 따라옵니다(파일은 백업 대상 밖입니다) · systemd 는 ProtectSystem=strict 로 쓰기 경로가 한 곳뿐이고 /tmp 는 재시작마다 비워집니다 · 18명 × 1MB = 18MB 규모라 상품 22,000행대 DB 에서 무시할 수 있습니다.'},
+      {tag:'A-62 확정', tone:'ok', what:'API 로 내보낸다 — 정적 마운트에 두지 않는다',
+       why:'정적 마운트는 커밋된 저장소 폴더(mockups/)를 가리키고, 그 폴더는 배포 서버에서 쓰기가 막혀 있습니다. GET /api/admin/my-profile/photo · /operators/{id}/photo 신설이 필요합니다.'},
+      {tag:'A-64 확정', tone:'ok', what:'상단바 아바타에 사진을 띄운다 — 39개 화면 동시 영향',
+       why:'공용 셸은 화면당 GET /auth/me 를 한 번 부르는데 그 응답에 사진이 없습니다. /auth/me 확장 또는 셸 호출 추가 중 하나가 따라옵니다 — 정본 셸 수정이라 이 화면의 범위 밖입니다.'},
+      {tag:'A-65 확정', tone:'ok', what:'본인만 등록·교체·삭제 · 열람은 전 운영자',
+       why:'owner 대행 경로는 만들지 않습니다. 사진은 role·status·email 과 달리 권한·신원에 영향을 주지 않고, 지운 개인 자료를 시스템이 계속 보관하지 않습니다.'},
+      {tag:'결정 3 미정', tone:'err', what:'이미지 라이브러리를 새로 넣을지 — 트윅으로 두 모습을 갈라 뒀습니다',
+       why:'넣으면 서버가 재인코딩해 EXIF 를 제거하고 폴리글롯 파일 방어가 확실해집니다. 안 넣으면 매직 넘버 검사와 1MB 상한만으로 막고 원본 바이트를 보관합니다 — 화면 문구가 그만큼 달라집니다.'}
+    ];
+
+    const overlayOn = r.zone === 'over';
+
+    return {
+      nav, idRows, idRowsShort: idRows.slice(0, 5), locked, sessRows, devRows, photoPolicy,
+      photoFacts: photoFacts.map(p => Object.assign({}, p, {
+        tagStyle:"align-self:flex-start;font:600 9.5px/1 'IBM Plex Mono',monospace;color:"+TONES[p.tone].fg+';background:'+TONES[p.tone].bg+';border:1px solid '+TONES[p.tone].bd+';border-radius:3px;padding:5px 6px'})),
+      cleanups: [
+        {what:'api/main.py:227 _ADMIN_AUTH_DOOR_SCREENS', why:'구 /admin/*.html 은 전부 410 인데 my-profile · operators 만 예외로 살아 있습니다. 이 화면이 서면 my-profile 을 뺄 수 있습니다 — 한 번에 둘을 닫지는 않습니다.'},
+        {what:'templates/admin/login.html.j2:360-366', why:'must_change_password 를 문구로만 알리고 대시보드로 보냅니다(비밀번호를 바꿀 화면이 없어 링크를 못 달았습니다). 이 화면으로 안내할 수 있게 됩니다.'},
+        {what:'tests/regression.py [17]·[21]·[27]', why:'구 mockups/admin/my-profile.html 파일을 직접 읽어 검사합니다. 새 화면을 보게 옮기지 않으면 구화면이 사라지는 날 조용히 SKIP 되거나 낡은 파일을 계속 검사합니다.'}
+      ],
+      outOfScope: [
+        {what:'타인 계정 승인 · 등급 · 정지 · 이메일 정정', where:'운영자·권한 ADM-SYS-020'},
+        {what:'임시 비밀번호 발급(owner + reauth)', where:'운영자·권한'},
+        {what:'비밀번호 찾기 · 재설정 메일', where:'저장소에 경로 없음'},
+        {what:'실 OAuth 검증 구현', where:'신설 대상(빈 함수 아님)'},
+        {what:'기기 기억 등록', where:'로그인 ADM-SYS-021'},
+        {what:'작업 기록 열람', where:'작업 기록 ADM-SYS-030'},
+        {what:'공용 셸 수정', where:'_admin2_shell.html.j2'}
+      ],
+      mustChange: acc.mustChange,
+      hasPassword: acc.hasPw,
+      noPassword: !acc.hasPw,
+      roleWord: acc.role,
+      statusWord: acc.status,
+      statusChipStyle: chip('', statusOk ? 'ok' : 'err').style + ';white-space:nowrap',
+      roleBadge: acc.role + ' — 세 등급 전부가 쓰는 화면입니다',
+      roleBadgeStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;border-radius:4px;padding:5px 8px;color:#4a463e;border:1px solid rgba(0,0,0,.18);white-space:nowrap",
+      avatarInitial: photoOn ? '' : '김',
+      avatarStyle: photoOn
+        ? "flex:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.14);background:repeating-linear-gradient(135deg,#ddd7c9 0 5px,#cfc7b6 5px 10px)"
+        : "flex:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.14);background:#ddd7c9;display:flex;align-items:center;justify-content:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d",
+      photoOn,
+      photoMainBtn: photoOn ? '사진 교체' : '사진 올리기',
+      photoBigLabel: photoOn ? '운영자 사진' : '김',
+      photoBigStyle: photoOn
+        ? "flex:none;width:84px;height:84px;border-radius:50%;border:1px solid rgba(0,0,0,.16);background:repeating-linear-gradient(135deg,#ddd7c9 0 7px,#cfc7b6 7px 14px);display:flex;align-items:center;justify-content:center;text-align:center;font:500 9px/1.3 'IBM Plex Mono',monospace;color:#5b564d"
+        : "flex:none;width:84px;height:84px;border-radius:50%;border:1px dashed rgba(0,0,0,.28);background:#f4f0e7;display:flex;align-items:center;justify-content:center;font:600 30px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377",
+      pwRules: [
+        '10자 이상 (서버 min_length = 10)',
+        '영문 대문자 · 소문자를 각각 하나 이상',
+        '숫자를 하나 이상',
+        '기호를 하나 이상',
+        '이메일 · 이름과 같은 문자열을 쓰지 않습니다',
+        '이전 비밀번호와 달라야 합니다'
+      ],
+      sessCountLabel: others === 0 ? '1개 — 이 기기뿐' : '3개 — 다른 기기 2곳',
+      sessCountStyle: "flex:none;font:600 10px/1 'IBM Plex Mono',monospace;color:#4a463e;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 6px;white-space:nowrap",
+      revokeBtnLabel: others === 0 ? '' : '다른 기기에서 로그아웃',
+      revokeBtnStyle: others === 0 ? 'display:none' : "flex:none;height:32px;padding:0 14px;border-radius:6px;border:1px solid rgba(0,0,0,.24);color:#4a463e;background:#fffdf9;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      sessConfirm: others > 0,
+      sessAlone: others === 0,
+      devEmpty: devReady && devMode === '0건 · 실측 현재 상태',
+      devNotReady: !devReady,
+      resInfo: r.zone === 'info',
+      resPw: r.zone === 'pw',
+      resSess: r.zone === 'sess',
+      resDev: r.zone === 'dev',
+      resPhoto: r.zone === 'photo',
+      resCode: r.code,
+      resMsg: r.msg,
+      resNote: r.note,
+      resBoxStyle: 'background:'+t.bg+';border:1px solid '+t.bd+';border-radius:7px;padding:10px 12px;display:flex;flex-direction:column;gap:5px',
+      resCodeStyle: "font:600 9.5px/1 'IBM Plex Mono',monospace;color:"+t.fg+';border:1px solid '+t.bd+';border-radius:3px;padding:4px 6px;background:#fffdf9',
+      resMsgStyle: "font:600 12px/1.5 'IBM Plex Sans KR',sans-serif;color:"+t.fg,
+      resNoteStyle: "font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#4a463e",
+      overlayOn,
+      overlayCode: r.code,
+      overlayMsg: r.msg,
+      overlayNote: r.note,
+      overlayChipStyle: "align-self:flex-start;font:600 10px/1 'IBM Plex Mono',monospace;color:"+t.fg+';border:1px solid '+t.bd+';border-radius:4px;padding:5px 8px;background:'+t.bg
+    };
+  }
+}
+</script>
+</body>
+</html>

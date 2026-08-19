@@ -110,13 +110,13 @@ def _need_table() -> None:
     if not _photo_table_ready():
         # 404(사진 없음)와 «다른 사실»이다 — 적용 안 된 것을 「없다」고 말하면 지어낸 것이다.
         raise HTTPException(503, {"error": "photo_schema_missing",
-                                  "message": "프로필 사진 기능이 아직 이 서버에 적용되지 않았습니다"})
+                                  "message": "프로필 사진 기능이 아직 이 서버에 적용되지 않았다"})
 
 
 def _me():
     me = current_operator()
     if not me:
-        raise HTTPException(401, "로그인이 필요합니다")
+        raise HTTPException(401, "로그인이 필요하다")
     return me
 
 
@@ -160,7 +160,7 @@ def _no_photo() -> HTTPException:
     ⚠ 화면은 **세 가지를 구분해야 한다**: 404 `no_photo`(없다) · 503
     `photo_schema_missing`(아직 기능이 없다) · 401(로그인이 끊겼다).
     """
-    return HTTPException(404, {"error": "no_photo", "message": "등록된 사진이 없습니다"})
+    return HTTPException(404, {"error": "no_photo", "message": "등록된 사진이 없다"})
 
 
 def _photo_response(request: Request, r_meta, raw: bytes | None) -> Response:
@@ -186,7 +186,7 @@ def _photo_response(request: Request, r_meta, raw: bytes | None) -> Response:
         # 조건부 요청 — 여기까지 오는 동안 `bytes` 는 한 번도 읽지 않았다.
         return Response(status_code=304, headers=headers)
     if raw is None:                       # 호출자가 메타만 들고 온 경우(조건부 아님)
-        raise HTTPException(500, "사진 본문을 읽지 못했습니다")
+        raise HTTPException(500, "사진 본문을 읽지 못했다")
     return Response(content=bytes(raw), media_type=r_meta["content_type"], headers=headers)
 
 
@@ -203,7 +203,7 @@ async def _read_capped(request: Request) -> bytes:
         n += len(chunk)
         if n > MAX_PHOTO_BYTES:
             # **여기서 끊는다** — 남은 바이트를 더 받지 않는다.
-            raise HTTPException(413, f"사진은 {MAX_PHOTO_BYTES // 1024}KB 이하만 등록할 수 있습니다")
+            raise HTTPException(413, f"사진은 {MAX_PHOTO_BYTES // 1024}KB 이하만 등록할 수 있다")
         chunks.append(chunk)
     return b"".join(chunks)
 
@@ -225,19 +225,19 @@ async def upload_my_photo(request: Request):
     # ㉠ 한 바이트도 읽기 전에 — 헤더가 이미 넘는다고 «말하면» 거기서 끝낸다.
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_PHOTO_BYTES:
-        raise HTTPException(413, f"사진은 {MAX_PHOTO_BYTES // 1024}KB 이하만 등록할 수 있습니다"
+        raise HTTPException(413, f"사진은 {MAX_PHOTO_BYTES // 1024}KB 이하만 등록할 수 있다"
                                  f" (보낸 크기 {int(declared) / 1024:.0f}KB)")
 
     # ㉡ 헤더는 거짓말할 수 있고 chunked 면 없다 — 세면서 읽는다.
     raw = await _read_capped(request)
 
     if len(raw) < _MIN_HEAD:
-        raise HTTPException(400, "파일이 비어 있거나 너무 작습니다")
+        raise HTTPException(400, "파일이 비어 있거나 너무 작다")
     ctype = _sniff(raw[:_MIN_HEAD])
     if ctype is None:
         # 확장자·Content-Type 을 믿지 않는다 — 앞머리가 답이다(SVG 도 여기서 걸린다).
-        raise HTTPException(400, f"{ALLOWED_LABEL} 파일만 등록할 수 있습니다"
-                                 " (파일 앞머리로 판정했습니다)")
+        raise HTTPException(400, f"{ALLOWED_LABEL} 파일만 등록할 수 있다"
+                                 " (파일 앞머리로 판정했다)")
 
     with engine.begin() as conn:
         before = _meta(conn, me["operator_id"])
@@ -262,8 +262,8 @@ async def upload_my_photo(request: Request):
     return {"ok": True, "content_type": ctype, "byte_size": len(raw),
             "uploaded_at": iso(after["uploaded_at"]),
             "replaced": before is not None,
-            "note": ("사진을 교체했습니다." if before else "사진을 등록했습니다.")
-                    + " 삭제하면 되돌릴 수 없습니다."}
+            "note": ("사진을 교체했다." if before else "사진을 등록했다.")
+                    + " 삭제하면 되돌릴 수 없다."}
 
 
 # ───────────────────────────── 삭제 ─────────────────────────────
@@ -282,7 +282,7 @@ def delete_my_photo():
         _log(conn, "operator_photo_delete", me.get("email") or str(me["operator_id"]),
              {"content_type": before["content_type"], "byte_size": before["byte_size"],
               "uploaded_at": iso(before["uploaded_at"])}, kind="operator")
-    return {"ok": True, "note": "사진을 삭제했습니다 — 되돌릴 수 없습니다."}
+    return {"ok": True, "note": "사진을 삭제했다 — 되돌릴 수 없다."}
 
 
 # ───────────────────────────── 열람 ─────────────────────────────
@@ -331,3 +331,59 @@ def get_operator_photo(operator_id: int, request: Request):
             "SELECT bytes FROM admin_operator_photos WHERE operator_id = :id"),
             {"id": operator_id}).scalar()
     return _photo_response(request, m, raw)
+
+
+# ─────────────────── 정책 조회 (2026-08-18 신설) ───────────────────
+#
+# ■ 왜 생겼나 — 화면이 「무엇을 올릴 수 있는지」를 «거절당한 뒤에야» 알 수 있었다.
+#   위 상수(`MAX_PHOTO_BYTES` · `ALLOWED_LABEL`)가 이 모듈 밖으로 나가는 유일한 경로가
+#   **400 · 413 오류 문구뿐**이었다. 「내 정보」(ADM-SYS-022)가 사진 단추 옆에 사전
+#   안내를 두기로 확정되면서(사장님 확정 2026-08-18 · `docs/design/spec-my-profile.md`
+#   §사진 §사전 안내) 그 값의 출처가 필요해졌다.
+#
+# ■ 선례를 그대로 따른다 — `GET /api/admin/auth/password-policy`
+#   (`api/auth.py` `password_policy()` -> `api/passwords.py` `password_rules()`).
+#   그쪽이 이미 같은 사고를 막았다: 구화면이 「8자 이상」이라 적어 두고 서버는 10자를
+#   요구했다. **판정과 설명이 같은 파일에 있어야 어긋나지 않는다** — 그래서 이 함수는
+#   `MAX_PHOTO_BYTES` · `ALLOWED_LABEL` · `_sniff()` 와 같은 파일에 산다.
+#
+# ■ 새 상수를 만들지 않는다. 위 상수를 그대로 내보낸다 — 같은 수가 두 곳에 살면
+#   언젠가 갈라진다(모듈 상단 `MAX_PHOTO_BYTES` 주석과 같은 판단).
+#
+# ■ 읽기 전용 · 부작용 0 · DB 를 보지 않는다
+#   `_need_table()` 을 부르지 **않는다**: 정책은 표가 있든 없든 같은 값이고, 여기서
+#   503 을 내면 화면은 「무엇을 올릴 수 있는지」조차 못 적는다(표가 없을 때야말로
+#   사전 안내가 필요하다 — 등록 단추를 왜 못 쓰는지는 등록 경로의 503 이 말한다).
+#   권한은 이 모듈의 다른 GET 과 같다 — `_me()`(로그인한 운영자). 전역 규칙
+#   (`api/auth.py` `required_role`)이 `/api/admin/my-profile*` 을 viewer 로 열므로
+#   등급 제한은 없다(A-65 「열람은 전 운영자」와 같은 결).
+def photo_rules() -> dict:
+    """화면이 그대로 보여줄 사진 정책. 값의 원천은 위 상수 둘뿐이다.
+
+    화면이 「JPEG · PNG · WebP」·「1024KB」를 스스로 적으면 그 순간 원천이 둘이 된다.
+    그래서 문장까지 여기서 만들어 내려보낸다 — 화면은 이어 붙이지도 않는다.
+    """
+    max_kb = MAX_PHOTO_BYTES // 1024
+    return {
+        "max_bytes": MAX_PHOTO_BYTES,
+        "max_kb": max_kb,
+        "allowed_label": ALLOWED_LABEL,
+        # 단추 옆 한 줄 — 화면이 값을 이어 붙여 문장을 만들지 않게 서버가 완성해 준다.
+        "short": f"{ALLOWED_LABEL} · {max_kb}KB 이하",
+        "rules": [
+            f"{ALLOWED_LABEL} 파일만 등록",
+            f"{max_kb}KB 이하",
+            "형식은 파일 앞머리로 판정 — 확장자 · Content-Type 은 보지 않는다",
+            "SVG 등록 불가",
+        ],
+    }
+
+
+@router.get("/my-profile/photo-policy")
+def my_photo_policy():
+    """사진 정책 — **거절당하기 전에** 보여주기 위한 것(password-policy 와 같은 결).
+
+    쓰기 없음 · 원장 없음 · DB 접근 없음. 위 `photo_rules()` 를 그대로 돌려준다.
+    """
+    _me()
+    return photo_rules()

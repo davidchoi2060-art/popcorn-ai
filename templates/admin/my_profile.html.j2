@@ -1,0 +1,1063 @@
+{#
+  내 정보 (ADM-SYS-022) — admin2 신규 구축 · 2026-08-18
+
+  ■ 계약 — `docs/design/spec-my-profile.md`. 사장님 확정(2026-08-18): **1a 안**
+    (한 열 · 신원 -> 정보 수정 -> 비밀번호 -> 세션 -> 기기). 원안
+    `docs/design/dc-my-profile.html` 의 `id="1a"` 구획에서 가져온 것은 «치수·배치»뿐이다 —
+    카드 radius 9px · padding 10px 14px · 카드 사이 gap 8px · 사진 84x84 · 이름 19px ·
+    신원 격자 5열 · 입력칸 32px/radius 6px · 비밀번호 좌열 344px · 세션 격자
+    1.5/1/.9/.9/.9 · 기기 행 padding 5px · 하단 띠 34px · 오버레이 안쪽 660px.
+    **색·서체는 원안(IBM Plex · HEX)을 쓰지 않고** `/shared/admin2/admin2.css` 토큰만 쓴다.
+    ⚠ 같은 원안 파일의 `1b` 는 정본이 아니다 — 참조하지 않았다.
+
+  ■ 원안의 이름·이메일·연락처·기기·IP·시각·건수는 **전부 모형**이라 한 글자도 옮기지
+    않았다. 마크업에 `value=` 기본값이 없다(등록 폼에 남의 값이 남아 저장될 뻔한 전례).
+
+  ■ 서버가 문장으로 준 것은 **그대로** 싣는다 — `note` · `provider_label` ·
+    `provider_note` · `approved_note` · `approved_none_reason` · `approved_short` ·
+    `editable` · 사진 400/413/404/503 문구 · 비밀번호 `rules`. 화면이 다시 판정하지 않는다
+    (`identity_reasons()` 가 그 판정의 단일 원천이고 ADM-SYS-020 도 그것을 쓴다).
+
+  ■ 화면이 «값»을 지어내지 않는다
+    · 비밀번호 규칙 줄은 `GET /auth/password-policy` 의 `rules` 를 그대로 나열한다 —
+      **줄 수도 서버가 정한다.** 원안의 예시 6줄은 서버보다 엄격해서 베끼면 화면이
+      규칙을 틀리게 말한다(구화면 「8자」 대 서버 10자와 같은 사고).
+    · 사진 허용 형식·상한은 `GET /my-profile/photo-policy`(2026-08-18 신설) 의
+      `short` 를 그대로 쓴다 — 이 파일에 형식 이름도 상한 수도 없다.
+    · 세션·잠금·기기 기억 상수는 라우트가 `api/auth.py` 상수를 넘겨준다.
+    · 작업 기록 건수는 `GET /my-profile` 의 `acts` 다 — 받기 전에는 「집계 전」이다.
+
+  ■ 사진
+    · 업로드는 **multipart 가 아니다** — `fetch(url,{method:'POST',body:file})`.
+      `FormData` 로 감싸면 서버의 「읽기 전에 막는다」(Content-Length 선검사 + 스트림
+      중 차단)가 무력해진다.
+    · 결과는 **공용 토스트**(`window.Admin2Shell.toast`)로 낸다 — 사진 전용 결과
+      영역을 신설하지 않는다(사장님 확정 2026-08-18 ㉮). 실패는 서버 문장 그대로.
+    · 404(없다) · 503(기능 미적용) · 401(로그인 끊김) 을 **갈라 말한다** — 같은 빈
+      원으로 덮으면 화면이 거짓말을 한다.
+    · 삭제는 되돌릴 수 없어 **누르기 전에** 확인 단계에서 밝힌다(세션 철회와 같은 결).
+
+  ■ 403 을 만들지 않았다 — `required_role()` 이 `/my-profile*` 을 쓰기까지 viewer 로
+    열어 **권한 부족이 성립하지 않는다**(`api/admin_profile_photo.py` 403 실측 0건).
+    나지 않는 오류의 문구를 짓지 않는다.
+
+  ■ 상단바 아바타(26px · A-64) — 이 화면에서 사진을 바꾸면 **이 페이지의** 상단바
+    아바타도 함께 바뀐다(런타임 스타일만 건다 · 셸 파일은 건드리지 않는다).
+    ⚠ 셸이 스스로 사진을 읽게 하는 것(41개 화면 공통)은 **정본 파일 소관이라 범위 밖**이다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}내 정보{% endblock %}
+
+{% block head_extra %}
+<style>
+.mp-wrap,.mp-wrap *{box-sizing:border-box}
+/* [hidden] 되찾기 — 저작 `display:flex`·`display:block` 은 UA 의 `[hidden]{display:none}`
+   을 이긴다. 숨겼는데 그대로 보이는 사고를 막는 규칙이다(MAKER-CHECKLIST §3).
+   ⚠ 오버레이 «안쪽»도 함께 건다 — `#mpOvLogin` 이 인라인 `display:inline-flex` 라
+   이 줄이 없으면 401 이 아닐 때도 「로그인 화면으로 이동」이 계속 서 있다. */
+.mp-wrap [hidden],.mp-ov[hidden],.mp-ov [hidden]{display:none !important}
+.mp-wrap{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--rv-canvas)}
+
+/* 본문 — 원안 padding 13px 18px 0. 캔버스는 overflow:hidden 이라 기기 카드가 잘렸다.
+   구현은 세로 스크롤로 둔다(계약 §세로 넘침) — 그래서 아래쪽 여백을 함께 준다. */
+.mp-scroll{flex:1;min-height:0;overflow-y:auto;padding:13px 18px;display:flex;justify-content:center}
+.mp-col{width:100%;display:flex;flex-direction:column;gap:8px}
+.mp-card{border:1px solid var(--outline-variant);border-radius:9px;padding:10px 14px;background:var(--card)}
+
+/* 공통 조각 */
+.mp-sec{display:flex;flex-direction:column;gap:7px}
+.mp-hd{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.mp-hd-t{font:600 13px/1.3 var(--rv-font);color:var(--rv-ink)}
+.mp-hd-d{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.mp-api{font:500 9.5px/1 var(--rv-mono);color:var(--rv-faint)}
+.mp-hd .mp-btn3,.mp-hd .mp-cnt{align-self:center}
+.mp-note{font:400 10px/1.5 var(--rv-font);color:var(--rv-muted)}
+.mp-none{font:400 10px/1.4 var(--rv-font);color:var(--rv-dim)}
+.mp-badge{font:600 9.5px/1 var(--rv-font);padding:4px 6px;border:1px solid var(--rv-dim3);border-radius:3px;color:var(--rv-ink-soft);white-space:nowrap}
+.mp-badge.warn{border-color:var(--rv-amber-line);color:var(--rv-amber)}
+.mp-badge.bad{border-color:var(--rv-red);color:var(--rv-red)}
+.mp-badge.ok{border-color:var(--rv-green);color:var(--rv-green)}
+
+/* 단추 */
+.mp-btn{flex:none;height:32px;padding:0 18px;border:1px solid var(--rv-ink);border-radius:6px;background:var(--rv-ink);color:var(--on-primary);font:600 12.5px/1 var(--rv-font);cursor:pointer}
+.mp-btn2{flex:none;height:32px;padding:0 14px;border:1px solid var(--rv-dim3);border-radius:6px;background:var(--rv-card);color:var(--rv-ink);font:500 12px/1 var(--rv-font);cursor:pointer}
+.mp-btn3{flex:none;height:32px;padding:0 14px;border:1px solid var(--rv-dim3);border-radius:6px;background:var(--rv-card);color:var(--rv-ink);font:500 11.5px/1 var(--rv-font);cursor:pointer}
+.mp-btn:disabled,.mp-btn2:disabled,.mp-btn3:disabled{opacity:.5;cursor:not-allowed}
+.mp-btn:enabled:hover{background:var(--rv-ink-soft);border-color:var(--rv-ink-soft)}
+.mp-btn2:enabled:hover,.mp-btn3:enabled:hover{border-color:var(--rv-dim)}
+
+/* ㉠ 임시 비밀번호 배너 */
+.mp-banner{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid var(--rv-amber-line);border-radius:7px;background:var(--rv-amber-bg)}
+.mp-banner-b{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mp-code{flex:none;font:600 9.5px/1 var(--rv-mono);padding:5px 7px;border:1px solid var(--rv-amber-line);border-radius:3px;color:var(--rv-amber)}
+.mp-banner-t{font:600 12.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.mp-banner-x{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-muted)}
+
+/* ㉡ 신원 카드 */
+.mp-id{display:flex;gap:14px;align-items:flex-start}
+.mp-photo{width:88px;flex:none;display:flex;flex-direction:column;gap:6px;align-items:center}
+.mp-ph{width:84px;height:84px;border-radius:50%;border:1px solid var(--rv-dim3);background:var(--rv-panel2);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mp-ph.empty{border-style:dashed}
+.mp-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.mp-ph-ini{font:600 30px/1 var(--rv-font);color:var(--rv-dim)}
+.mp-ph-lb{font:400 9px/1.3 var(--rv-font);color:var(--rv-faint);text-align:center}
+.mp-ph-btns{display:flex;gap:5px;width:100%}
+.mp-btn-photo{flex:1;min-width:0;height:27px;border:1px solid var(--rv-ink);border-radius:5px;background:var(--rv-ink);color:var(--on-primary);font:600 10.5px/1 var(--rv-font);cursor:pointer}
+.mp-btn-phdel{flex:none;height:27px;padding:0 8px;border:1px solid var(--rv-dim3);border-radius:5px;background:var(--rv-card);color:var(--rv-red);font:500 10px/1 var(--rv-font);cursor:pointer}
+.mp-btn-photo:disabled,.mp-btn-phdel:disabled{opacity:.5;cursor:not-allowed}
+.mp-ph-policy{font:400 9px/1.45 var(--rv-font);color:var(--rv-faint);text-align:center}
+.mp-idr{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+.mp-name{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.mp-name-t{font:600 19px/1.2 var(--rv-font);color:var(--rv-ink);word-break:break-all}
+.mp-mail{font:400 12px/1 var(--rv-font);color:var(--rv-muted);word-break:break-all}
+.mp-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px 14px}
+.mp-cell{display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--outline-variant);padding-top:7px;min-width:0}
+.mp-k{font:500 9.5px/1 var(--rv-font);color:var(--rv-faint)}
+.mp-v{font:500 11.5px/1.4 var(--rv-font);color:var(--rv-ink);word-break:break-word}
+.mp-n{font:400 9.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+.mp-n.bad{color:var(--rv-red)}
+.mp-lock{display:flex;gap:9px;padding-top:8px;border-top:1px dashed var(--rv-dim3);flex-wrap:wrap}
+.mp-lock-lb{flex:none;font:500 9.5px/1 var(--rv-font);color:var(--rv-faint);padding-top:2px}
+.mp-lock-i{flex:1;min-width:190px;border-left:2px solid var(--rv-dim4);padding-left:8px;display:flex;flex-direction:column;gap:2px}
+.mp-lock-f{font:600 10.5px/1.3 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-lock-w{font:400 9.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+
+/* ㉢ 정보 수정 */
+.mp-frow{display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap}
+.mp-f{flex:1;min-width:150px;display:flex;flex-direction:column;gap:5px}
+.mp-lb{font:500 10px/1 var(--rv-font);color:var(--rv-faint)}
+.mp-in{height:32px;width:100%;border:1px solid var(--rv-dim3);border-radius:6px;padding:0 11px;background:var(--rv-card);color:var(--rv-ink);font:400 12.5px/1 var(--rv-font)}
+.mp-in:disabled{background:var(--rv-panel2);color:var(--rv-dim)}
+.mp-in:focus{outline:2px solid var(--rv-link);outline-offset:1px}
+
+/* 결과 상자 — 원안 1a 가 카드마다 갖고 있는 자리(사진만 토스트로 낸다) */
+.mp-res{display:flex;flex-direction:column;gap:5px;border:1px solid var(--outline-variant);border-radius:7px;padding:10px 12px;background:var(--rv-panel2)}
+.mp-res.bad{border-color:var(--rv-red)}
+.mp-res.warn{border-color:var(--rv-amber-line)}
+.mp-res-h{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.mp-res-c{font:600 9.5px/1 var(--rv-mono);padding:4px 6px;border:1px solid var(--rv-dim3);border-radius:3px;color:var(--rv-ink-soft)}
+.mp-res-s{font:400 9.5px/1.4 var(--rv-font);color:var(--rv-faint)}
+.mp-res-m{font:400 12px/1.5 var(--rv-font);color:var(--rv-ink)}
+.mp-res-n{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-muted)}
+
+/* ㉣ 비밀번호 */
+.mp-pw{display:flex;gap:14px;align-items:flex-start}
+.mp-pw-l{width:344px;flex:none;display:flex;flex-direction:column;gap:8px}
+.mp-pw-hd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.mp-rules{display:flex;flex-direction:column;gap:2px}
+.mp-rule{display:flex;gap:7px;font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-rule i{flex:none;font-style:normal;color:var(--rv-dim)}
+.mp-fn{font:400 9.5px/1.6 var(--rv-font);color:var(--rv-muted);padding-top:6px;border-top:1px solid var(--outline-variant)}
+.mp-pw-r{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+.mp-pw3{display:flex;gap:10px;flex-wrap:wrap}
+.mp-in-pw{height:32px;width:100%;border:1px solid var(--rv-dim3);border-radius:6px;padding:0 11px;background:var(--rv-card);color:var(--rv-ink);font:400 13px/1 var(--rv-font);letter-spacing:.16em}
+.mp-in-pw:focus{outline:2px solid var(--rv-link);outline-offset:1px}
+.mp-warnrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mp-warn{flex:1;min-width:220px;padding:7px 10px;border:1px solid var(--rv-amber-line);border-radius:6px;background:var(--rv-amber-bg);font:400 10px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-fn2{font:400 9.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.mp-nopw{display:flex;flex-direction:column;gap:8px;padding:12px 13px;border:1px solid var(--rv-amber-line);border-radius:7px;background:var(--rv-amber-bg)}
+.mp-nopw-t{font:600 12.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.mp-nopw-x{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-muted)}
+
+/* ㉤ 세션 */
+.mp-cnt{font:600 10px/1 var(--rv-mono);padding:4px 6px;border:1px solid var(--rv-dim3);border-radius:3px;color:var(--rv-ink-soft)}
+.mp-tbl{overflow-x:auto}
+.mp-tin{min-width:660px}
+.mp-tr{display:grid;grid-template-columns:minmax(150px,1.5fr) minmax(100px,1fr) minmax(92px,.9fr) minmax(92px,.9fr) minmax(92px,.9fr);gap:0 12px}
+.mp-th{font:500 9.5px/1 var(--rv-font);color:var(--rv-faint);padding-bottom:6px;border-bottom:1px solid var(--outline-variant)}
+.mp-td{padding:4px 0;border-bottom:1px solid var(--outline-variant);align-items:center}
+.mp-ua{display:flex;gap:7px;align-items:center;min-width:0}
+.mp-ua-t{font:400 11.5px/1.4 var(--rv-font);color:var(--rv-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-cur{flex:none;font:600 9px/1 var(--rv-font);padding:4px 5px;border:1px solid var(--rv-green);border-radius:3px;color:var(--rv-green);white-space:nowrap}
+.mp-ip{font:400 11px/1.4 var(--rv-mono);color:var(--rv-ink-soft);word-break:break-all}
+.mp-ts{font:400 11px/1.4 var(--rv-mono);color:var(--rv-ink-soft)}
+.mp-confirm{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 11px;border:1px solid var(--rv-amber-line);border-radius:7px;background:var(--rv-amber-bg)}
+.mp-confirm-t{flex:1;min-width:220px;font:400 11px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
+.mp-btn-do{flex:none;height:33px;padding:0 15px;border:1px solid var(--rv-red);border-radius:6px;background:var(--rv-red);color:var(--rv-nav-ink);font:600 11.5px/1 var(--rv-font);cursor:pointer}
+.mp-btn-no{flex:none;height:33px;padding:0 13px;border:1px solid var(--rv-dim3);border-radius:6px;background:var(--rv-card);color:var(--rv-ink);font:500 11.5px/1 var(--rv-font);cursor:pointer}
+.mp-btn-do:disabled,.mp-btn-no:disabled,.mp-btn-forget:disabled{opacity:.5;cursor:not-allowed}
+.mp-empty{padding:10px 12px;border:1px dashed var(--rv-dim3);border-radius:7px;font:400 11px/1.7 var(--rv-font);color:var(--rv-muted)}
+.mp-empty2{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid var(--rv-dim3);border-radius:7px}
+.mp-empty2-t{font:600 11.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.mp-empty2-x{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-muted)}
+
+/* ㉥ 기기 */
+.mp-dev{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--outline-variant)}
+.mp-dev-l{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px}
+.mp-dev-ua{font:400 11.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.mp-dev-id{font:400 9.5px/1 var(--rv-mono);color:var(--rv-faint);word-break:break-all}
+.mp-dev-t{font:400 10px/1.4 var(--rv-font);color:var(--rv-muted)}
+.mp-btn-forget{flex:none;height:30px;padding:0 13px;border:1px solid var(--rv-dim3);border-radius:6px;background:var(--rv-card);color:var(--rv-ink);font:500 11px/1 var(--rv-font);cursor:pointer}
+
+/* ㉦ 하단 띠 */
+.mp-foot{flex:none;height:34px;border-top:1px solid var(--outline-variant);background:var(--card);padding:0 18px;display:flex;align-items:center;gap:14px;overflow:hidden}
+.mp-foot-t{font:400 10px/1.4 var(--rv-font);color:var(--rv-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-grow{flex:1}
+
+/* ㉧ 전면 오버레이 — 401 · 404 · 네트워크 실패 · 스크립트 미실행 */
+.mp-ov{position:absolute;inset:0;z-index:30;background:var(--rv-canvas);display:flex;align-items:center;justify-content:center;padding:70px;text-align:center}
+.mp-ov-in{width:660px;max-width:100%;display:flex;flex-direction:column;gap:13px;align-items:center}
+.mp-ov-c{font:600 10px/1 var(--rv-mono);padding:5px 8px;border:1px solid var(--rv-dim3);border-radius:4px;color:var(--rv-ink-soft)}
+.mp-ov-t{font:600 22px/1.35 var(--rv-font);color:var(--rv-ink)}
+.mp-ov-m{font:400 12.5px/1.8 var(--rv-font);color:var(--rv-muted)}
+.mp-ov-n{font:400 11px/1.7 var(--rv-font);color:var(--rv-faint)}
+.mp-ov-a{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+
+/* 768px 이하 세로 스택 — 세션 표는 헤더·행을 «한» 가로 스크롤 컨테이너에 함께 두어
+   거터가 어긋나지 않는다. 헤더와 행이 서로 다른 열을 숨기지 않는다.
+   ⚠ 셸(`.a2-hd` 열간격 · 허브 padding)은 여기서 다시 선언하지 않는다 — 정본은 admin2.css. */
+@media (max-width:768px){
+  .mp-scroll{padding:11px 12px}
+  .mp-id{flex-direction:column}
+  .mp-photo{width:100%;align-items:flex-start}
+  .mp-ph-btns{max-width:220px}
+  .mp-ph-lb,.mp-ph-policy{text-align:left}
+  .mp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mp-frow{flex-direction:column;align-items:stretch}
+  .mp-pw{flex-direction:column}
+  .mp-pw-l{width:100%}
+  .mp-pw3{flex-direction:column}
+  .mp-ov{padding:24px}
+  .mp-foot{height:auto;padding:6px 12px;flex-direction:column;align-items:flex-start;gap:2px}
+  .mp-foot-t{white-space:normal}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mp-wrap">
+  <div class="mp-scroll" id="mpScroll">
+    <div class="mp-col">
+
+      {# ㉠ 임시 비밀번호 배너 — `must_change_password` 일 때만 #}
+      <div class="mp-banner" id="mpPwBanner" data-domain="account" hidden>
+        <span class="mp-code">must_change_password</span>
+        <div class="mp-banner-b">
+          <div class="mp-banner-t">임시 비밀번호 상태</div>
+          <div class="mp-banner-x">아래 「비밀번호 변경」에서 새 비밀번호를 설정한다.</div>
+        </div>
+      </div>
+
+      {# ㉡ 신원 #}
+      <section class="mp-card mp-sec" data-domain="identity">
+        <div class="mp-id">
+          <div class="mp-photo">
+            <div class="mp-ph empty" id="mpPh">
+              <span class="mp-ph-ini" id="mpPhIni" data-bind="initial">·</span>
+              <img id="mpPhImg" alt="프로필 사진" hidden>
+            </div>
+            <div class="mp-ph-lb" id="mpPhLabel" data-bind="photo_state">조회 중</div>
+            <div class="mp-ph-btns">
+              <button type="button" class="mp-btn-photo" id="mpPhBtn" data-action="photo-pick" disabled>사진</button>
+              <button type="button" class="mp-btn-phdel" id="mpPhDel" data-action="photo-delete-ask" hidden>삭제</button>
+            </div>
+            {# 사전 안내 — 값은 `GET /my-profile/photo-policy` 의 `short` 그대로 #}
+            <div class="mp-ph-policy" id="mpPhPolicy" data-bind="photo_policy">사진 정책 조회 중</div>
+            <input type="file" id="mpPhFile" accept="image/*" hidden>
+          </div>
+
+          <div class="mp-idr">
+            <div class="mp-name">
+              <span class="mp-name-t" id="mpName" data-bind="name">조회 중</span>
+              <span class="mp-mail" id="mpEmail" data-bind="email"></span>
+              <span class="mp-badge" id="mpRole" data-bind="role_label" hidden></span>
+              <span class="mp-badge" id="mpStatus" data-bind="status" hidden></span>
+              <span class="mp-badge bad" id="mpLocked" hidden>로그인 잠금</span>
+            </div>
+            <div class="mp-grid" id="mpGrid" data-repeat="identity"></div>
+            <div class="mp-lock">
+              <span class="mp-lock-lb">여기서 못 고치는 것</span>
+              <div class="mp-lock-i">
+                <div class="mp-lock-f">이메일</div>
+                <div class="mp-lock-w">로그인 신원 그 자체다 — 본인이 바꾸면 계정이 다른 사람에게 옮겨간다. 정정은 관리자 경로 소관.</div>
+              </div>
+              <div class="mp-lock-i">
+                <div class="mp-lock-f">권한 등급</div>
+                <div class="mp-lock-w">자기 권한 상승을 막는다 — 승인 게이트의 의미가 사라진다. 부여는 「운영자·권한」 소관.</div>
+              </div>
+              <div class="mp-lock-i">
+                <div class="mp-lock-f">상태</div>
+                <div class="mp-lock-w">자기 정지 해제를 막는다. 동봉해 보내면 조용히 무시하지 않고 422 로 거절한다.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# 사진 삭제 확인 — 누르기 «전에» 되돌릴 수 없음을 밝힌다 #}
+        <div class="mp-confirm" id="mpPhConfirm" hidden>
+          <span class="mp-confirm-t">사진을 삭제한다. 되돌리기는 없다 — 서버에서 실제로 지운다. 다시 쓰려면 파일을 새로 등록한다.</span>
+          <button type="button" class="mp-btn-do" data-action="photo-delete">삭제 실행</button>
+          <button type="button" class="mp-btn-no" data-action="photo-delete-cancel">취소</button>
+        </div>
+      </section>
+
+      {# ㉢ 정보 수정 #}
+      <section class="mp-card mp-sec" data-domain="profile-edit">
+        <div class="mp-hd">
+          <span class="mp-hd-t">정보 수정</span>
+          <span class="mp-hd-d" id="mpEditableNote">수정 가능 항목은 서버 <code>editable</code> 이 정한다</span>
+          <span class="mp-api">PATCH /api/admin/my-profile</span>
+        </div>
+        <div class="mp-frow">
+          <div class="mp-f">
+            <label class="mp-lb" for="mpFName">이름 · 필수 · 100자</label>
+            <input class="mp-in" id="mpFName" type="text" maxlength="100" autocomplete="off" disabled>
+          </div>
+          <div class="mp-f">
+            <label class="mp-lb" for="mpFPhone">연락처 · 선택 · 30자</label>
+            <input class="mp-in" id="mpFPhone" type="text" maxlength="30" autocomplete="off" disabled>
+          </div>
+          <div class="mp-f">
+            <label class="mp-lb" for="mpFDuty">직무 · 선택 · 100자</label>
+            <input class="mp-in" id="mpFDuty" type="text" maxlength="100" autocomplete="off" disabled>
+          </div>
+          <button type="button" class="mp-btn" id="mpSave" data-action="profile-save" disabled>저장</button>
+          <button type="button" class="mp-btn2" id="mpRevert" data-action="profile-revert" disabled>되돌리기</button>
+        </div>
+        <div class="mp-note">「되돌리기」는 서버 값 재적용이다 — 저장 전 입력 취소이지 원장 되돌림이 아니다. 연락처·직무를 비우면 NULL 로 저장한다. 이름을 바꾸면 지난 작업 기록의 표시 이름도 함께 바뀐다.</div>
+        <div class="mp-res" id="mpResEdit" hidden>
+          <div class="mp-res-h"><span class="mp-res-c" data-bind="code"></span><span class="mp-res-s">서버가 준 문구를 그대로</span></div>
+          <div class="mp-res-m" data-bind="message"></div>
+          <div class="mp-res-n" data-bind="note"></div>
+        </div>
+      </section>
+
+      {# ㉣ 비밀번호 #}
+      <section class="mp-card" data-domain="password">
+        <div class="mp-pw">
+          <div class="mp-pw-l">
+            <div class="mp-pw-hd">
+              <span class="mp-hd-t">비밀번호 규칙</span>
+              <span class="mp-api">GET /api/admin/auth/password-policy</span>
+            </div>
+            <div class="mp-rules" id="mpRules" data-repeat="password-rules">
+              <div class="mp-rule"><i>·</i><span>규칙 조회 중</span></div>
+            </div>
+            <div class="mp-fn">규칙 문구를 화면에 박지 않는다 — 서버 응답을 그대로 나열한다. 줄 수도 서버가 정한다.</div>
+          </div>
+          <div class="mp-pw-r">
+            <div id="mpPwForm" hidden>
+              <div class="mp-pw3">
+                <div class="mp-f">
+                  <label class="mp-lb" for="mpPwCur">현재 비밀번호</label>
+                  <input class="mp-in-pw" id="mpPwCur" type="password" autocomplete="current-password">
+                </div>
+                <div class="mp-f">
+                  <label class="mp-lb" for="mpPwNew">새 비밀번호</label>
+                  <input class="mp-in-pw" id="mpPwNew" type="password" autocomplete="new-password">
+                </div>
+                <div class="mp-f">
+                  <label class="mp-lb" for="mpPwNew2">새 비밀번호 확인</label>
+                  <input class="mp-in-pw" id="mpPwNew2" type="password" autocomplete="new-password">
+                </div>
+              </div>
+              <div class="mp-warnrow" style="margin-top:9px">
+                <div class="mp-warn">변경하면 이 기기를 뺀 모든 세션과 기억된 기기 전부가 철회된다 — 다른 기기에서는 다시 로그인한다. 되돌리기는 없다. 비밀번호 원문은 어디에도 저장하지 않는다.</div>
+                <button type="button" class="mp-btn" id="mpPwBtn" data-action="password-change">비밀번호 변경</button>
+              </div>
+              <div class="mp-fn2" style="margin-top:9px">세 칸 모두 <code>type="password"</code> — 화면에 보이지 않는다.</div>
+            </div>
+            <div class="mp-nopw" id="mpNoPw" hidden>
+              <div class="mp-nopw-t">이 계정에는 비밀번호가 설정돼 있지 않다</div>
+              <div class="mp-nopw-x">판정 근거는 서버 <code>has_password</code>다. 이 화면에는 발급 수단이 없다 — 임시 비밀번호는 관리자가 「운영자·권한」(ADM-SYS-020)에서 발급해 직접 전달한다. 스스로 푸는 「비밀번호 찾기」 경로는 없다.</div>
+            </div>
+            <div class="mp-res" id="mpResPw" hidden style="margin-top:9px">
+              <div class="mp-res-h"><span class="mp-res-c" data-bind="code"></span><span class="mp-res-s">서버가 준 문구를 그대로</span></div>
+              <div class="mp-res-m" data-bind="message"></div>
+              <div class="mp-res-n" data-bind="note"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ㉤ 세션 #}
+      <section class="mp-card mp-sec" data-domain="sessions">
+        <div class="mp-hd">
+          <span class="mp-hd-t">열려 있는 세션</span>
+          <span class="mp-cnt" id="mpSessCnt" data-bind="sessions_total" hidden></span>
+          <span class="mp-hd-d">세션 식별자는 표시하지 않는다 — 그 값이 곧 로그인 자격이다.</span>
+          <span class="mp-grow"></span>
+          <button type="button" class="mp-btn3" id="mpRevokeBtn" data-action="revoke-ask" hidden>다른 기기에서 로그아웃</button>
+        </div>
+        <div class="mp-tbl">
+          <div class="mp-tin">
+            <div class="mp-tr mp-th">
+              <span>기기 · 브라우저</span><span>접속 IP</span><span>로그인</span><span>최근 사용</span><span>만료</span>
+            </div>
+            <div id="mpSessRows" data-repeat="sessions"></div>
+          </div>
+        </div>
+        <div class="mp-note" id="mpSessNote" data-bind="sessions_note">세션 조회 중</div>
+        <div class="mp-empty" id="mpSessAlone" hidden>다른 기기는 없다 — 지금 이 기기 하나만 열려 있어 철회 단추를 내지 않는다.</div>
+        <div class="mp-confirm" id="mpRevokeConfirm" hidden>
+          <span class="mp-confirm-t" id="mpRevokeText"></span>
+          <button type="button" class="mp-btn-do" id="mpRevokeDo" data-action="revoke-do">실행</button>
+          <button type="button" class="mp-btn-no" data-action="revoke-cancel">취소</button>
+        </div>
+        <div class="mp-res" id="mpResSess" hidden>
+          <div class="mp-res-h"><span class="mp-res-c" data-bind="code"></span><span class="mp-res-s">서버가 준 문구를 그대로</span></div>
+          <div class="mp-res-m" data-bind="message"></div>
+          <div class="mp-res-n" data-bind="note"></div>
+        </div>
+      </section>
+
+      {# ㉥ 기기 #}
+      <section class="mp-card mp-sec" data-domain="devices">
+        <div class="mp-hd">
+          <span class="mp-hd-t">기억된 기기</span>
+          <span class="mp-hd-d">비밀번호 없이 로그인할 수 있는 기기다({{ remember_days }}일) · 등록은 로그인 화면의 체크박스 소관이고 이 화면은 목록 조회와 개별 철회만 한다</span>
+          <span class="mp-api">GET /api/admin/my-profile/devices</span>
+        </div>
+        <div id="mpDevRows" data-repeat="devices"></div>
+        <div class="mp-note" id="mpDevNote" data-bind="devices_note">기기 조회 중</div>
+        <div class="mp-note">기기 철회는 열려 있는 세션을 끊지 않는다 — 그 기기의 다음 로그인부터 비밀번호를 다시 묻는다. 세션 철회와 다른 동작이다.</div>
+        <div class="mp-empty" id="mpDevEmpty" hidden></div>
+        <div class="mp-empty2" id="mpDevNotReady" hidden>
+          <span class="mp-empty2-t">기기 기억 기능 미적용</span>
+          <span class="mp-empty2-x" data-bind="ready_note"></span>
+        </div>
+        <div class="mp-res" id="mpResDev" hidden>
+          <div class="mp-res-h"><span class="mp-res-c" data-bind="code"></span><span class="mp-res-s">서버가 준 문구를 그대로</span></div>
+          <div class="mp-res-m" data-bind="message"></div>
+          <div class="mp-res-n" data-bind="note"></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  {# ㉦ 하단 띠 — 상수는 라우트가 `api/auth.py` 에서 읽어 넘긴 값, 건수는 서버 `acts` #}
+  <div class="mp-foot">
+    <span class="mp-foot-t">모든 시각은 서울 표시</span>
+    <span class="mp-grow"></span>
+    <span class="mp-foot-t">세션 절대 {{ session_hours }}시간 · 유휴 {{ idle_minutes }}분 · 로그인 {{ max_fails }}회 실패 시 {{ lock_minutes }}분 잠금 · 작업 기록 <b id="mpActs" data-bind="acts">집계 전</b> · 열람은 「작업 기록」</span>
+    <span class="mp-grow"></span>
+    <span class="mp-foot-t">화면 스크립트가 5초 안에 살아나지 않으면 그 사실을 표시한다</span>
+  </div>
+</div>
+
+{# ㉧ 전면 오버레이 — 카드 안 결과 상자가 아니라 화면 전체를 덮는다 #}
+<div class="mp-ov" id="mpOv" hidden>
+  <div class="mp-ov-in">
+    <span class="mp-ov-c" id="mpOvCode"></span>
+    <div class="mp-ov-t" id="mpOvTitle"></div>
+    <div class="mp-ov-m" id="mpOvMsg"></div>
+    <div class="mp-ov-n" id="mpOvNote"></div>
+    <div class="mp-ov-a">
+      <a class="mp-btn2" id="mpOvLogin" href="/admin2/login" style="display:inline-flex;align-items:center" hidden>로그인 화면으로 이동</a>
+      <button type="button" class="mp-btn2" id="mpOvRetry" data-action="overlay-retry" hidden>다시 시도</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+/* 감시자 — **별도 <script> 여야 한다.** 아래 본 스크립트가 파싱 실패로 통째로 죽으면
+   화면은 「조회 중」에서 영원히 멈추고 사용자에게는 아무 신호도 없다(슬라이스 92 실사고).
+   같은 <script> 에 넣으면 함께 죽으므로 의미가 없다. 콘솔 에러는 사용자가 보지 않는다. */
+window.__mpAlive = false;
+setTimeout(function () {
+  if (window.__mpAlive) return;
+  var ov = document.getElementById('mpOv');
+  if (!ov) return;
+  document.getElementById('mpOvCode').textContent = 'script_dead';
+  document.getElementById('mpOvTitle').textContent = '화면 스크립트가 실행되지 않았다';
+  document.getElementById('mpOvMsg').textContent =
+    '이 화면의 스크립트가 5초 안에 시작하지 않았다. 새로고침해도 같으면 관리자에게 알린다.';
+  document.getElementById('mpOvNote').textContent =
+    '표시된 값이 없는 것이 아니라 «불러오지 못한» 상태다 — 화면에 남은 항목을 사실로 읽지 않는다.';
+  ov.hidden = false;
+}, 5000);
+</script>
+<script>
+(function () {
+  'use strict';
+  window.__mpAlive = true;          // 감시자에게 "나는 살아 있다"
+
+  var LOGIN = '/admin2/login';
+  var API = '/api/admin/my-profile';
+  var PHOTO = API + '/photo';
+  var S = {
+    me: null, pol: null, phPol: null, sess: null, dev: null,
+    photo: 'unknown', photoMsg: '', photoV: 0, busy: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function show(el, on) { if (el) el.hidden = !on; }
+  function toast(msg, kind, action, onAction) {
+    if (window.Admin2Shell && window.Admin2Shell.toast) {
+      window.Admin2Shell.toast(msg, kind, action, onAction);
+    }
+  }
+
+  /* ── 시각 — 서버는 절대시각(UTC)만 준다. 표시는 화면이 «서울로 못박아» 한다.
+     타임존 없는 해석에 맡기면 UTC 04:57 이 04:57 로 찍혀 9시간 어긋난다(슬라이스 62·100). */
+  var _dtf = null;
+  function dtf() {
+    if (_dtf !== null) return _dtf;
+    try {
+      _dtf = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      });
+    } catch (e) { _dtf = false; }
+    return _dtf;
+  }
+  function fmtDT(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    var f = dtf();
+    if (!f) return null;
+    return f.format(d).replace('T', ' ');
+  }
+  /* 「값이 없다」와 「형식을 못 읽었다」를 구분한다 — 같은 대시로 덮지 않는다. */
+  function tv(iso) {
+    if (iso === null || iso === undefined || iso === '') {
+      return '<span class="mp-none">기록 없음</span>';
+    }
+    var s = fmtDT(iso);
+    return s ? esc(s) : '<span class="mp-none">시각 형식 오류</span>';
+  }
+
+  /* ── API — 실패를 삼키지 않는다. 서버가 준 사유를 그대로 들고 올라간다 ── */
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(url) { return fetch(url, { credentials: 'same-origin' }).then(handle); }
+  function apiSend(method, url, body) {
+    var opt = { method: method, credentials: 'same-origin' };
+    if (body !== undefined) {
+      opt.headers = { 'Content-Type': 'application/json' };
+      opt.body = JSON.stringify(body);
+    }
+    return fetch(url, opt).then(handle);
+  }
+  function netMsg(e) {
+    if (e && e.status === undefined) {
+      return '서버에 연결할 수 없다 — ' + (e.message || '네트워크');
+    }
+    return (e && e.message) || '알 수 없는 오류';
+  }
+
+  /* ── 전면 오버레이 — 401 · 404 · 네트워크 실패를 갈라 말한다 ── */
+  function overlay(code, title, msg, note, opt) {
+    $('mpOvCode').textContent = code;
+    $('mpOvTitle').textContent = title;
+    $('mpOvMsg').textContent = msg;
+    $('mpOvNote').textContent = note || '';
+    show($('mpOvLogin'), !!(opt && opt.login));
+    show($('mpOvRetry'), !!(opt && opt.retry));
+    show($('mpOv'), true);
+  }
+  function overlayFor(e) {
+    if (e && e.status === 401) {
+      overlay('401', '로그인이 필요하다', netMsg(e),
+        '세션이 만료됐다 — 다시 로그인하면 이 화면으로 돌아올 수 있다.', { login: true });
+      return true;
+    }
+    if (e && e.status === 404) {
+      overlay('404', '계정을 찾을 수 없다', netMsg(e),
+        '세션은 살아 있으나 계정 행이 없다 — 관리자에게 알린다.', { login: true });
+      return true;
+    }
+    if (e && e.status === undefined) {
+      overlay('network', '서버에 연결할 수 없다', netMsg(e),
+        '망 또는 서버가 응답하지 않는다. 표시된 값이 없는 것이 아니라 «불러오지 못한» 상태다.',
+        { retry: true });
+      return true;
+    }
+    overlay(String((e && e.status) || 'error'), '조회에 실패했다', netMsg(e),
+      '서버가 준 사유를 그대로 표시한다.', { retry: true });
+    return true;
+  }
+
+  /* ── 결과 상자 — 원안 1a 가 카드마다 갖고 있는 자리(사진만 토스트) ── */
+  function setRes(id, code, msg, note, tone) {
+    var box = $(id);
+    if (!box) return;
+    box.className = 'mp-res' + (tone ? ' ' + tone : '');
+    box.querySelector('[data-bind="code"]').textContent = code;
+    box.querySelector('[data-bind="message"]').textContent = msg || '';
+    box.querySelector('[data-bind="note"]').textContent = note || '';
+    box.hidden = false;
+  }
+  /* 401 실패 처리 — 결과상자에 사유를 적고, 대부분은 «세션이 없다»는 뜻이라 전면
+     오버레이(§㉧)도 함께 띄운다. 예외는 비밀번호 변경(#mpResPw) 하나뿐이다 —
+     같은 401 상태코드로 "현재 비밀번호가 틀렸다"도 온다(서버 계약은 바꾸지 않는다
+     — `api/auth.py`의 `change_my_password` 결함② 주석 참조). 그 경우까지 오버레이를
+     덮어씌우면 결과상자에 이미 적힌 정확한 사유가 안 보인다(2026-08-19 확인자 실측
+     — 오타 낸 운영자가 "세션이 만료됐다"로 오안내받았다). `skipOverlayCode`를 넘긴
+     호출만, 서버가 그 코드(`detail.error`)로 401을 설명할 때 오버레이를 건너뛴다 —
+     결과상자 사유는 그 경우에도 항상 그대로 뜬다. 세션이 «진짜로» 없어졌을 때는
+     (`error`가 다른 값이거나 없음) 이 함수를 그대로 통과해 오버레이가 뜬다 — 그
+     경로는 죽이지 않는다.
+     가르는 신호로 **서버 메시지 문자열이 아니라 error 코드**를 쓴다 — 이 저장소는
+     문구 "모양"으로 동작을 추정하는 검사가 원문 표기가 바뀐 날 조용히 못 잡은
+     전례가 둘 있다(`CLAUDE.md` §회귀 세트 `[26]` 재고 원장 · `[42]` 상품명). "현재
+     비밀번호가 올바르지 않다" 문장 자체를 매칭했다면, 이번 물결처럼 문구를 다듬을
+     때마다 이 분기가 조용히 깨졌을 것이다. */
+  function resFail(id, e, skipOverlayCode) {
+    var d = e && e.body && e.body.detail;
+    var code = (d && typeof d === 'object') ? d.error : null;
+    var overlayNeeded = !!(e && e.status === 401
+      && !(skipOverlayCode && code === skipOverlayCode));
+    setRes(id, e && e.status !== undefined ? String(e.status) : 'network', netMsg(e),
+      overlayNeeded ? '다시 로그인한 뒤 같은 작업을 반복한다.' : '', 'bad');
+    if (overlayNeeded) overlayFor(e);
+  }
+
+  /* ── ㉡ 신원 ─────────────────────────────────────────────────────── */
+  function cell(k, vHtml, note, bad) {
+    return '<div class="mp-cell"><span class="mp-k">' + esc(k) + '</span>'
+      + '<span class="mp-v">' + vHtml + '</span>'
+      + (note ? '<span class="mp-n' + (bad ? ' bad' : '') + '">' + esc(note) + '</span>' : '')
+      + '</div>';
+  }
+  function renderIdentity() {
+    var d = S.me;
+    if (!d) return;
+    $('mpName').textContent = d.name || '이름 없음';
+    $('mpEmail').textContent = d.email || '';
+    var role = $('mpRole');
+    role.textContent = d.role_label || d.role || '';
+    show(role, !!(d.role_label || d.role));
+    var st = $('mpStatus');
+    st.textContent = d.status || '';
+    show(st, !!d.status);
+    show($('mpLocked'), !!d.is_locked);
+    show($('mpPwBanner'), !!d.must_change_password);
+
+    /* 로그인 방식 — `provider_verified` 가 false 면 「미검증」을 «텍스트로» 병기한다.
+       색만으로 말하지 않는다. 값에 따라 배지를 빼지 않는다('google' 도 신고된 값이다). */
+    var prov = esc(d.provider_label || '기록 없음');
+    if (d.provider_verified !== true) {
+      prov += ' <span class="mp-badge bad">미검증</span>';
+    }
+
+    /* 승인 — `approved_note` 와 `approved_none_reason` 은 둘 중 하나만 채워진다. */
+    var apprNote = d.approved_note || d.approved_none_reason || '';
+    var apprBad = !d.approved_at;
+    var apprVal = d.approved_at ? tv(d.approved_at) : esc(d.approved_short || '승인 안 됨');
+
+    /* 비밀번호 설정 — 판정 근거는 `has_password` 이고 `password_set_at` 은 표시용 시각이다.
+       둘이 어긋날 수 있다(실제로 어긋난 계정이 있다) — 시각이 없다고 「미설정」이라 하지 않는다. */
+    var pwVal, pwNote;
+    if (!d.has_password) {
+      pwVal = '설정 안 됨';
+      pwNote = 'has_password=false — 이 값으로 판정한다';
+    } else if (d.password_set_at) {
+      pwVal = null;
+      pwNote = '표시용 시각이다 — 판정 근거는 has_password다';
+    } else {
+      pwVal = null;
+      pwNote = '설정돼 있으나 시각 기록이 없다 — 판정 근거는 has_password다';
+    }
+
+    $('mpGrid').innerHTML =
+      cell('로그인 방식', prov, d.provider_note || '', d.provider_verified !== true)
+      + cell('가입', tv(d.joined), '서울 표시')
+      + cell('승인', apprVal, apprNote, apprBad)
+      + cell('마지막 로그인', tv(d.last_login), '')
+      + cell('비밀번호 설정',
+        pwVal === null ? tv(d.password_set_at) : esc(pwVal), pwNote, !d.has_password);
+
+    $('mpActs').textContent = (d.acts === null || d.acts === undefined)
+      ? '집계 전' : Number(d.acts).toLocaleString('ko-KR') + '건';
+  }
+
+  /* ── ㉢ 정보 수정 — 무엇을 잠글지는 서버 `editable` 이 정한다 ── */
+  var FIELDS = [['name', 'mpFName'], ['phone', 'mpFPhone'], ['duty', 'mpFDuty']];
+  /* 서버 필드 키 -> 한글 라벨. 매핑에 없는 키가 오면 raw 그대로 보이되 「라벨 미정의」를
+     붙여 그 사실을 드러낸다 — 모르는 키를 조용히 숨기면 editable 이 늘 때 화면이
+     거짓말한다(서버가 새 필드를 열어도 이 화면은 말 없이 못 보여준 것처럼 보인다). */
+  var FIELD_LABELS = { name: '이름', phone: '연락처', duty: '직무' };
+  function editableLabel(key) {
+    return FIELD_LABELS[key] || (key + '(라벨 미정의)');
+  }
+  function fillForm() {
+    var d = S.me;
+    if (!d) return;
+    var ed = d.editable || [];
+    FIELDS.forEach(function (f) {
+      var el = $(f[1]);
+      el.value = d[f[0]] == null ? '' : d[f[0]];
+      var can = ed.indexOf(f[0]) >= 0;
+      el.disabled = !can;
+      el.title = can ? '' : '서버 editable 목록에 없어 이 화면에서 고칠 수 없다';
+    });
+    $('mpSave').disabled = ed.length === 0;
+    $('mpRevert').disabled = ed.length === 0;
+    $('mpEditableNote').textContent = ed.length
+      ? ('수정 가능 항목: ' + ed.map(editableLabel).join(' · ') + ' — 서버 editable 이 정한다')
+      : '수정 가능 항목이 없다 — 서버 editable 이 비어 있다';
+  }
+  function saveProfile() {
+    if (S.busy) return;
+    S.busy = true;
+    $('mpSave').disabled = true;
+    apiSend('PATCH', API, {
+      name: $('mpFName').value, phone: $('mpFPhone').value, duty: $('mpFDuty').value
+    }).then(function (j) {
+      S.me = j;
+      renderIdentity(); fillForm();
+      var changed = j.changed && Object.keys(j.changed).length;
+      setRes('mpResEdit', changed ? '200' : '200', j.note || '',
+        changed ? ('바뀐 항목 ' + Object.keys(j.changed).join(' · ')) : '', changed ? '' : 'warn');
+    }).catch(function (e) {
+      resFail('mpResEdit', e);
+    }).then(function () {
+      S.busy = false; $('mpSave').disabled = false;
+    });
+  }
+
+  /* ── ㉣ 비밀번호 ─────────────────────────────────────────────────── */
+  function renderRules() {
+    var rules = (S.pol && S.pol.rules) || [];
+    if (!rules.length) {
+      $('mpRules').innerHTML = '<div class="mp-rule"><i>·</i><span class="mp-none">서버가 규칙을 주지 않았다</span></div>';
+      return;
+    }
+    $('mpRules').innerHTML = rules.map(function (r) {
+      return '<div class="mp-rule"><i>·</i><span>' + esc(r) + '</span></div>';
+    }).join('');
+  }
+  function renderPwSection() {
+    var has = !!(S.me && S.me.has_password);
+    show($('mpPwForm'), has);
+    show($('mpNoPw'), !has);
+  }
+  function changePassword() {
+    if (S.busy) return;
+    var cur = $('mpPwCur').value, nw = $('mpPwNew').value, nw2 = $('mpPwNew2').value;
+    if (!nw || !nw2) {
+      setRes('mpResPw', '입력', '새 비밀번호 미입력', '새 비밀번호와 확인 두 칸을 채운다.', 'bad');
+      return;
+    }
+    if (nw !== nw2) {
+      /* 서버는 확인칸을 받지 않는다 — 오타를 잡는 것이 이 칸의 목적이다(구화면엔 없었다). */
+      setRes('mpResPw', '입력', '새 비밀번호 확인 불일치', '두 칸에 같은 값을 입력한다.', 'bad');
+      return;
+    }
+    S.busy = true; $('mpPwBtn').disabled = true;
+    apiSend('POST', '/api/admin/auth/password', { current: cur, new: nw })
+      .then(function (j) {
+        $('mpPwCur').value = ''; $('mpPwNew').value = ''; $('mpPwNew2').value = '';
+        setRes('mpResPw', '200', j.note || '', '', '');
+        return loadProfile();
+      })
+      .catch(function (e) { resFail('mpResPw', e, 'bad_current_password'); })
+      .then(function () { S.busy = false; $('mpPwBtn').disabled = false; });
+  }
+
+  /* ── ㉤ 세션 ─────────────────────────────────────────────────────── */
+  function sessRow(s) {
+    return '<div class="mp-tr mp-td">'
+      + '<span class="mp-ua"><span class="mp-ua-t" title="' + esc(s.agent || '') + '">'
+      + (s.agent ? esc(s.agent) : '<span class="mp-none">기록 없음</span>') + '</span>'
+      + (s.current ? '<span class="mp-cur">지금 이 기기</span>' : '') + '</span>'
+      + '<span class="mp-ip">' + (s.ip ? esc(s.ip) : '<span class="mp-none">기록 없음</span>') + '</span>'
+      + '<span class="mp-ts">' + tv(s.created) + '</span>'
+      + '<span class="mp-ts">' + tv(s.last_seen) + '</span>'
+      + '<span class="mp-ts">' + tv(s.expires) + '</span>'
+      + '</div>';
+  }
+  function renderSessions() {
+    var j = S.sess;
+    if (!j) return;
+    var items = j.items || [];
+    $('mpSessRows').innerHTML = items.length
+      ? items.map(sessRow).join('')
+      : '<div class="mp-empty" style="margin-top:6px">열려 있는 세션이 없다 — 서버가 0건으로 답했다.</div>';
+    var cnt = $('mpSessCnt');
+    cnt.textContent = j.total + '개';
+    show(cnt, true);
+    $('mpSessNote').textContent = j.note || '';
+    /* 「다른 기기가 없으면 단추를 내지 않는다」 — 눌러도 끊을 것이 없는 단추를 두지 않는다. */
+    show($('mpRevokeBtn'), (j.others || 0) > 0);
+    show($('mpSessAlone'), (j.others || 0) === 0);
+  }
+  function askRevoke() {
+    /* 누르기 «전에» 다시 조회해 몇 개가 끊기는지 서버에게 묻는다. 세는 것은 서버다. */
+    apiGet(API + '/sessions').then(function (j) {
+      S.sess = j; renderSessions();
+      if (!j.others) {
+        show($('mpRevokeConfirm'), false);
+        setRes('mpResSess', '조회', j.note || '', '끊을 다른 세션이 없다.', 'warn');
+        return;
+      }
+      $('mpRevokeText').textContent = j.note
+        + ' 되돌리기는 없다 — 끊긴 세션을 되살리지 않는다. 기억된 기기는 이 동작으로 지워지지 않는다.';
+      $('mpRevokeDo').textContent = j.others + '곳 로그아웃';
+      show($('mpRevokeConfirm'), true);
+    }).catch(function (e) { resFail('mpResSess', e); });
+  }
+  function doRevoke() {
+    if (S.busy) return;
+    S.busy = true; $('mpRevokeDo').disabled = true;
+    apiSend('POST', API + '/sessions/revoke-others')
+      .then(function (j) {
+        setRes('mpResSess', '200', j.note || '',
+          '남은 세션 ' + j.remaining + '개 · 철회 ' + j.revoked + '개', '');
+        show($('mpRevokeConfirm'), false);
+        return loadSessions();
+      })
+      .catch(function (e) { resFail('mpResSess', e); })
+      .then(function () { S.busy = false; $('mpRevokeDo').disabled = false; });
+  }
+
+  /* ── ㉥ 기기 ─────────────────────────────────────────────────────── */
+  function devRow(d) {
+    return '<div class="mp-dev">'
+      + '<span class="mp-dev-l"><span class="mp-dev-ua">'
+      + (d.agent ? esc(d.agent) : '<span class="mp-none">기록 없음</span>') + '</span>'
+      + '<span class="mp-dev-id">device_id ' + esc(d.device_id) + '</span></span>'
+      + '<span class="mp-dev-t">등록 ' + tv(d.created) + ' · 최근 사용 ' + tv(d.last_used)
+      + ' · 만료 ' + tv(d.expires) + '</span>'
+      + '<button type="button" class="mp-btn-forget" data-action="device-forget"'
+      + ' data-device="' + esc(d.device_id) + '"'
+      + ' title="열려 있는 세션은 끊지 않는다 — 다음 로그인부터 비밀번호를 다시 묻는다">이 기기 잊기</button>'
+      + '</div>';
+  }
+  function renderDevices() {
+    var j = S.dev;
+    if (!j) return;
+    var ready = j.ready !== false;
+    var items = j.items || [];
+    $('mpDevRows').innerHTML = ready ? items.map(devRow).join('') : '';
+    $('mpDevNote').textContent = ready ? (j.note || '') : '';
+    /* 빈 상태 둘은 «다른 사실»이다 — 0건(점선)과 스키마 미적용(실선 + 제목 2줄). */
+    var empty = $('mpDevEmpty');
+    empty.textContent = j.note || '등록된 기기가 없다.';
+    show(empty, ready && items.length === 0);
+    var nr = $('mpDevNotReady');
+    nr.querySelector('[data-bind="ready_note"]').textContent = j.note || '';
+    show(nr, !ready);
+  }
+  function forgetDevice(id, btn) {
+    if (S.busy) return;
+    S.busy = true; if (btn) btn.disabled = true;
+    apiSend('POST', API + '/devices/' + encodeURIComponent(id) + '/revoke')
+      .then(function (j) {
+        setRes('mpResDev', '200', j.note || '', 'device_id ' + id, '');
+        return loadDevices();
+      })
+      .catch(function (e) { resFail('mpResDev', e); if (btn) btn.disabled = false; })
+      .then(function () { S.busy = false; });
+  }
+
+  /* ── 사진 ────────────────────────────────────────────────────────── */
+  function initialOf() {
+    var n = (S.me && (S.me.name || S.me.email)) || '';
+    return n ? n.trim().charAt(0) : '?';
+  }
+  /* A-64 — 「같은 사람의 사진」이므로 상단바 아바타(26px)도 함께 바뀌어야 한다.
+     ⚠ 셸(`_admin2_shell.html.j2` · `admin2.css`)은 이 화면의 담당이 아니다. 그래서
+     파일을 고치지 않고 **이 페이지에서만** 런타임 스타일을 건다. 셸이 스스로 사진을
+     읽게 하는 것(상속 화면 41개 공통)은 정본 파일 소관이라 범위 밖이다. */
+  function paintShellAvatar(url) {
+    var av = document.querySelector('.a2-avatar');
+    if (!av) return;
+    if (url) {
+      av.style.backgroundImage = 'url("' + url + '")';
+      av.style.backgroundSize = 'cover';
+      av.style.backgroundPosition = 'center';
+    } else {
+      av.style.backgroundImage = '';
+    }
+  }
+  function photoUrl() { return PHOTO + (S.photoV ? ('?v=' + S.photoV) : ''); }
+  function renderPhoto() {
+    var box = $('mpPh'), img = $('mpPhImg'), ini = $('mpPhIni');
+    var btn = $('mpPhBtn'), del = $('mpPhDel'), lb = $('mpPhLabel');
+    var has = S.photo === 'has';
+    if (has) {
+      img.src = photoUrl();
+      show(img, true); show(ini, false);
+      box.className = 'mp-ph';
+      paintShellAvatar(photoUrl());
+    } else {
+      show(img, false); show(ini, true);
+      ini.textContent = initialOf();
+      box.className = 'mp-ph empty';
+      paintShellAvatar(null);
+    }
+    btn.textContent = has ? '사진 교체' : '사진 올리기';
+    show(del, has);
+    var blocked = (S.photo === 'schema');
+    var unknown = (S.photo === 'unknown');
+    if (unknown) btn.textContent = '사진 조회 중';
+    btn.disabled = blocked || unknown;
+    del.disabled = blocked;
+    btn.title = blocked ? S.photoMsg : '';
+    if (S.photo === 'has') lb.textContent = '등록됨';
+    else if (S.photo === 'none') lb.textContent = '사진 없음';
+    else if (S.photo === 'schema') lb.textContent = S.photoMsg;
+    else if (S.photo === 'unknown') lb.textContent = '조회 중';
+    else lb.textContent = S.photoMsg || '조회 실패';
+  }
+  function setPhoto(state, msg) { S.photo = state; S.photoMsg = msg || ''; renderPhoto(); }
+  /* 404(없다) · 503(기능 미적용) · 401(로그인 끊김) 을 갈라 말해야 하므로 상태를 먼저
+     본다. GET 한 번으로 판정한다 — HEAD 는 쓰지 않는다.
+     ⚠ HEAD 를 걷어낸 이유: 이 서버(FastAPI 0.139.2)는 GET 라우트에 HEAD 를 자동으로
+     얹지 않는다(프레임워크 레벨 현상 · 이 앱 전체에 공통 · 확인자 실증 2026-08-19 ·
+     별도 조사 진행 중) — 그래서 HEAD 요청이 라우트에 닿기도 전에 404 가 났다. 예전
+     코드는 그 404 를 「HEAD 미지원」으로 오인해 GET 으로 재시도했고, 이어서 <img> 가
+     다시 받아 3중 요청이 됐다 — 사진이 있으면 매 로드마다 최대 1MB 를 두 번 받았다.
+     ⚠ blob 으로 받아 다른 타입으로 다시 만들지 않는다 — 서버가 건 응답 헤더
+     (nosniff · inline · CSP sandbox)를 우회하는 방식이다. */
+  function probePhoto() {
+    return fetch(PHOTO, { credentials: 'same-origin' }).then(function (res) {
+      if (res.status === 200) { setPhoto('has', ''); return; }
+      return res.json().catch(function () { return null; }).then(function (j) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        if (res.status === 404) setPhoto('none', msg);
+        else if (res.status === 503) setPhoto('schema', msg);
+        else if (res.status === 401) {
+          setPhoto('err', msg);
+          overlayFor({ status: 401, message: msg });
+        } else setPhoto('err', msg);
+      });
+    }).catch(function (e) {
+      setPhoto('err', '서버에 연결할 수 없다 — ' + ((e && e.message) || '네트워크'));
+    });
+  }
+  function photoFail(e) {
+    var msg = netMsg(e);
+    if (e && e.status === 401) {
+      toast(msg, 'err', '로그인 화면', function () { location.href = LOGIN; });
+      overlayFor(e);
+      return;
+    }
+    if (e && (e.status === 413 || e.status === 400)) {
+      /* 다시 시도해야 하는 실패다 — 토스트가 7초 뒤 사라지므로 동작 단추를 함께 낸다. */
+      toast(msg, 'err', '다시 선택', function () { $('mpPhFile').click(); });
+      return;
+    }
+    toast(msg, e && e.status === 503 ? 'warn' : 'err');
+  }
+  function uploadPhoto(file) {
+    if (S.busy) return;
+    S.busy = true; $('mpPhBtn').disabled = true;
+    /* ★ multipart 가 아니다 — 본문이 이미지 바이트 그대로다.
+       FormData 로 감싸면 서버의 「읽기 전에 막는다」가 무력해진다. */
+    fetch(PHOTO, { method: 'POST', credentials: 'same-origin', body: file })
+      .then(handle)
+      .then(function (j) {
+        toast(j.note || '', 'ok');
+        S.photoV = Date.now();        // ETag 는 바뀌지만 <img> 를 다시 부르게 만든다
+        setPhoto('has', '');
+      })
+      .catch(photoFail)
+      .then(function () { S.busy = false; renderPhoto(); });
+  }
+  function deletePhoto() {
+    if (S.busy) return;
+    S.busy = true;
+    fetch(PHOTO, { method: 'DELETE', credentials: 'same-origin' })
+      .then(handle)
+      .then(function (j) {
+        toast(j.note || '', 'ok');
+        S.photoV = 0;
+        setPhoto('none', '');
+        show($('mpPhConfirm'), false);
+      })
+      .catch(photoFail)
+      .then(function () { S.busy = false; renderPhoto(); });
+  }
+
+  /* ── 적재 ────────────────────────────────────────────────────────── */
+  function loadProfile() {
+    return apiGet(API).then(function (j) {
+      S.me = j; renderIdentity(); fillForm(); renderPwSection(); renderPhoto();
+      show($('mpOv'), false);
+    }).catch(function (e) { overlayFor(e); throw e; });
+  }
+  function loadPolicy() {
+    return apiGet('/api/admin/auth/password-policy').then(function (j) {
+      S.pol = j; renderRules();
+    }).catch(function (e) {
+      $('mpRules').innerHTML = '<div class="mp-rule"><i>·</i><span class="mp-none">'
+        + esc('규칙을 불러오지 못했다 — ' + netMsg(e)) + '</span></div>';
+    });
+  }
+  function loadPhotoPolicy() {
+    return apiGet(PHOTO + '-policy').then(function (j) {
+      S.phPol = j;
+      $('mpPhPolicy').textContent = j.short || '';
+    }).catch(function (e) {
+      /* 값을 지어내지 않는다 — 못 받았다는 사실을 적는다. */
+      $('mpPhPolicy').textContent = '사진 정책을 불러오지 못했다';
+      $('mpPhPolicy').title = netMsg(e);
+    });
+  }
+  function loadSessions() {
+    return apiGet(API + '/sessions').then(function (j) {
+      S.sess = j; renderSessions();
+    }).catch(function (e) {
+      $('mpSessNote').textContent = '세션 조회 실패 — ' + netMsg(e);
+      if (e && e.status === 401) overlayFor(e);
+    });
+  }
+  function loadDevices() {
+    return apiGet(API + '/devices').then(function (j) {
+      S.dev = j; renderDevices();
+    }).catch(function (e) {
+      $('mpDevNote').textContent = '기기 조회 실패 — ' + netMsg(e);
+      if (e && e.status === 401) overlayFor(e);
+    });
+  }
+  function loadAll() {
+    loadProfile().then(function () { return probePhoto(); }).catch(function () { });
+    loadPolicy(); loadPhotoPolicy(); loadSessions(); loadDevices();
+  }
+
+  /* ── 배선 ────────────────────────────────────────────────────────── */
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest ? ev.target.closest('[data-action]') : null;
+    if (!t) return;
+    var a = t.getAttribute('data-action');
+    if (a === 'profile-save') { saveProfile(); }
+    else if (a === 'profile-revert') { fillForm(); show($('mpResEdit'), false); }
+    else if (a === 'password-change') { changePassword(); }
+    else if (a === 'revoke-ask') { askRevoke(); }
+    else if (a === 'revoke-do') { doRevoke(); }
+    else if (a === 'revoke-cancel') { show($('mpRevokeConfirm'), false); }
+    else if (a === 'device-forget') { forgetDevice(t.getAttribute('data-device'), t); }
+    else if (a === 'photo-pick') { $('mpPhFile').click(); }
+    else if (a === 'photo-delete-ask') { show($('mpPhConfirm'), true); }
+    else if (a === 'photo-delete-cancel') { show($('mpPhConfirm'), false); }
+    else if (a === 'photo-delete') { deletePhoto(); }
+    else if (a === 'overlay-retry') { show($('mpOv'), false); loadAll(); }
+  });
+  $('mpPhFile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (f) uploadPhoto(f);
+  });
+  /* 사진 경로가 200 을 줬는데 <img> 가 그리지 못한 경우 — 조용히 빈 원으로 두지 않는다. */
+  $('mpPhImg').addEventListener('error', function () {
+    if (S.photo !== 'has') return;
+    setPhoto('err', '사진을 표시하지 못했다 — 파일이 손상됐을 수 있다');
+  });
+
+  loadAll();
+})();
+</script>
+{% endraw %}
+{% endblock %}
