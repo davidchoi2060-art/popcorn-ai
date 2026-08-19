@@ -33,37 +33,40 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           <span style="padding:6px 13px;border-radius:7px;color:#6b6b73;font-size:12.5px;font-weight:700;cursor:pointer;" data-role="operator">운영자</span>
           <span style="padding:6px 13px;border-radius:7px;color:#6b6b73;font-size:12.5px;font-weight:700;cursor:pointer;" data-role="dev">개발자</span>
         </div>
-        <div style="display:flex;align-items:center;gap:7px;"><span style="width:30px;height:30px;border-radius:50%;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">person</span><span style="font-size:13.5px;font-weight:800;color:#3a3a40;">davidchoi2060</span></div>
+        <!-- 계정 표시는 두지 않는다 — 이 화면은 로그인 없이 열리므로 표시할 신원이 없다.
+             특정 계정명이 접속자와 무관하게 박혀 있었다(2026-08-18 제거). -->
       </div>
     </div>
   </header>
 
   <main style="max-width:1360px;margin:0 auto;padding:32px 40px 64px;">
 
-    <!-- status strip -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;">
+    <!-- status strip
+         이 화면은 서버를 부르지 않는다(fetch 0건). 그래서 값·판정을 박아두지 않는다 —
+         「서버 정상」·「Cloud SQL 연결됨」·「오늘 AI 비용 금액」은 측정 없이 적혀 있던 것이라
+         2026-08-18 에 걷어냈다. 통과색(초록)도 함께 걷었다 — 색만으로 판정을 말하지 않는다.
+         「API 모드」 칸은 원천이 아예 없어(서버에 그런 상태가 없다) 칸째 제거했다. -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;">
       <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
-        <span style="width:40px;height:40px;border-radius:11px;background:var(--success-container, #e9f6ef);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:var(--success, #2f9e6d);">dns</span>
-        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">서버</div><b style="font-size:15px;color:var(--success-deep, #0f5132);">정상</b></div>
+        <span style="width:40px;height:40px;border-radius:11px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#8a8578;">dns</span>
+        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">서버 상태</div><b style="font-size:14px;color:#a29d92;font-weight:700;">향후 사용예정</b></div>
       </div>
       <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
-        <span style="width:40px;height:40px;border-radius:11px;background:var(--success-container, #e9f6ef);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:var(--success, #2f9e6d);">database</span>
-        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">DB 연결</div><b style="font-size:14px;color:#17171b;">Cloud SQL 연결됨</b></div>
+        <span style="width:40px;height:40px;border-radius:11px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#8a8578;">database</span>
+        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">DB 연결</div><b style="font-size:14px;color:#a29d92;font-weight:700;">향후 사용예정</b></div>
       </div>
       <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
-        <span style="width:40px;height:40px;border-radius:11px;background:#fbf3e2;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#c77b1f;">payments</span>
-        <div style="flex:1;"><div style="font-size:12px;color:#8a8578;font-weight:700;">오늘 AI 비용</div><b style="font-size:15px;color:#17171b;">$0.00 <span style="font-size:12px;color:#8a8578;font-weight:600;">/ $50.00</span></b></div>
-      </div>
-      <div style="background:#fff;border:1px solid #ece9e3;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:12px;">
-        <span style="width:40px;height:40px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#2b5fd9;">api</span>
-        <div><div style="font-size:12px;color:#8a8578;font-weight:700;">API 모드</div><b style="font-size:15px;color:#17171b;">Mock</b></div>
+        <span style="width:40px;height:40px;border-radius:11px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#8a8578;">payments</span>
+        <div style="flex:1;"><div style="font-size:12px;color:#8a8578;font-weight:700;">오늘 AI 비용</div><b style="font-size:14px;color:#a29d92;font-weight:700;">향후 사용예정</b></div>
       </div>
     </div>
 
     <!-- title -->
     <div style="margin-bottom:24px;">
-      <h1 style="margin:0 0 8px;font-size:34px;font-weight:900;color:#17171b;letter-spacing:-.01em;">어디로 가시겠어요?</h1>
-      <p style="margin:0;font-size:15.5px;color:#6b6b73;max-width:720px;line-height:1.6;">세 서비스의 메인·랜딩·운영자 화면으로 바로 이동합니다. 역할에 따라 열리는 버튼이 달라집니다.</p>
+      <h1 style="margin:0 0 8px;font-size:34px;font-weight:900;color:#17171b;letter-spacing:-.01em;">내부 화면 바로가기</h1>
+      <!-- 「역할에 따라 열리는 버튼이 달라집니다」는 사실이 아니었다 — 역할 칩은 선택 표시와
+           토스트만 바꾸고 바로가기 구성은 그대로다(2026-08-18 문구 교정). -->
+      <p style="margin:0;font-size:15.5px;color:#6b6b73;max-width:720px;line-height:1.6;">MVP 1~3 의 메인·랜딩·운영자 화면으로 이동한다. 역할 선택은 표시용이며 열리는 화면은 달라지지 않는다.</p>
     </div>
 
     <!-- MVP cards -->
@@ -74,15 +77,16 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <div style="background:#17171b;color:#fff;padding:22px 24px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#7fa8ff;">MVP 1</span>
-            <span style="display:flex;align-items:center;gap:5px;background:var(--success-dark, #1c7a4d);color:#fff;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--success-bright, #5fd6a0);"></span>개발중</span>
+            <span style="display:flex;align-items:center;gap:5px;background:var(--success-dark, #1c7a4d);color:#fff;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:999px;background:var(--success-bright, #5fd6a0);"></span>개발중</span>
           </div>
           <h2 style="margin:0 0 6px;font-size:20px;font-weight:900;">팝콘PC 단독 AI 견적</h2>
           <p style="margin:0;font-size:13px;line-height:1.55;color:#9a968d;">자체 실시간 재고 기반 AI 견적. 가장 먼저 오픈하는 코어 서비스.</p>
         </div>
         <div style="padding:20px 24px;flex:1;display:flex;flex-direction:column;">
+          <!-- 진척 수치·막대는 서버가 주지 않는다. 「5 중 5」 표기와 가득 찬 막대는 목업 시절에
+               박아 둔 값이라 2026-08-18 에 걷어냈다 — 칸은 남기고 수·차트는 남기지 않는다. -->
           <div style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:800;color:#8a8578;margin-bottom:6px;"><span>화면 진척 S0~S4</span><span style="color:var(--success, #2f9e6d);">5 / 5</span></div>
-            <div style="height:8px;background:#f0eee9;border-radius:999px;overflow:hidden;"><div style="width:100%;height:100%;background:var(--success, #2f9e6d);border-radius:999px;"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:800;color:#8a8578;"><span>화면 진척</span><span style="color:#a29d92;">향후 사용예정</span></div>
           </div>
           <div style="font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;">바로가기</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
@@ -94,20 +98,21 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
             <!-- 운영자 재구축(2026-08-09 착수) — 기존 37화면과 **병행 신축**이다.
                  서버 렌더(Jinja2)라 절대경로를 쓴다. Firebase 정적 호스팅에는
                  렌더할 서버가 없어 열리지 않는다 — 개발 서버에서만 동작한다. -->
-            <a href="/admin2/" style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px dashed #7fa8ff;border-radius:11px;text-decoration:none;background:#f5f8ff;"><span style="font-size:13px;font-weight:800;color:#2b5fd9;">운영자 재구축</span><span style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:900;letter-spacing:.06em;color:#fff;background:#2b5fd9;padding:2px 6px;border-radius:999px;">NEW</span><span style="font-family:'Material Symbols Outlined';font-size:15px;color:#2b5fd9;">build</span></span></a>
+            <a href="/admin2/" style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1.5px dashed #7fa8ff;border-radius:11px;text-decoration:none;background:#f5f8ff;"><span style="font-size:13px;font-weight:800;color:#2b5fd9;">운영자 재구축</span><span style="font-family:'Material Symbols Outlined';font-size:15px;color:#2b5fd9;">build</span></a>
           </div>
           <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
-            <div style="font-size:11.5px;font-weight:900;color:#8a8578;margin-bottom:10px;">화면 목록 (S0~S4)</div>
+            <!-- 「(S0~S4)」는 실제 목록(S0~S5 + MY 3)과 어긋나 있었다 — 범위 표기를 걷는다. -->
+            <div style="font-size:11.5px;font-weight:900;color:#8a8578;margin-bottom:10px;">화면 목록</div>
             <div style="display:flex;flex-direction:column;gap:7px;">
               <a href="s0-landing.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S0</span>랜딩 / 입력 게이트</a>
               <a href="s1-session.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S1</span>대화형 견적 세션</a>
               <a href="s2-result.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S2</span>견적 제안서</a>
               <a href="s3-detail.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S3</span>부품 변경</a>
               <a href="s4-cart.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S4</span>주문 확인 · 결제 인계</a>
-              <a href="s5-complete.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S5</span>주문 완료 <span style="background:#fbf3e2;color:#8a561a;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;">NEW</span></a>
+              <a href="s5-complete.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#2b5fd9;background:#eaf1fd;padding:2px 7px;border-radius:5px;">S5</span>주문 완료</a>
               <a href="my-page.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#8a561a;background:#fbf3e2;padding:2px 7px;border-radius:5px;">MY</span>마이페이지 (회원)</a>
-              <a href="my-orders.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#8a561a;background:#fbf3e2;padding:2px 7px;border-radius:5px;">MY</span>주문 내역 · 환불 접수 <span style="background:#fbf3e2;color:#8a561a;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;">NEW</span></a>
-              <a href="my-payments.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#8a561a;background:#fbf3e2;padding:2px 7px;border-radius:5px;">MY</span>결제 내역 <span style="background:#fbf3e2;color:#8a561a;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;">NEW</span></a>
+              <a href="my-orders.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#8a561a;background:#fbf3e2;padding:2px 7px;border-radius:5px;">MY</span>주문 내역 · 환불 접수</a>
+              <a href="my-payments.html" style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3a3a40;text-decoration:none;"><span style="font-size:10px;font-weight:900;color:#8a561a;background:#fbf3e2;padding:2px 7px;border-radius:5px;">MY</span>결제 내역</a>
             </div>
           </div>
         </div>
@@ -125,12 +130,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         </div>
         <div style="padding:20px 24px;flex:1;display:flex;flex-direction:column;">
           <span style="display:inline-flex;align-items:center;gap:5px;background:#f2edfb;color:#4a2a94;font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;align-self:flex-start;margin-bottom:16px;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">share</span>엔진 ① 공유</span>
-          <div style="font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;">바로가기</div>
+          <!-- 세 항목은 링크가 아니다(2026-08-18). 빈 앵커라 눌러도 아무 데도 가지 않는데
+               링크처럼 보였다 — MVP2 에는 아직 대상 화면이 없다. 항목은 남기고 «갈 수 있는 것처럼
+               보이는 것»만 없앤다: a -> div, 커서·밑줄 없음, 키보드 초점도 받지 않는다. -->
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;"><span>바로가기</span><span style="font-size:11.5px;font-weight:700;color:#a29d92;">향후 사용예정</span></div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
-            <a href="#" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13.5px;font-weight:800;color:#3a3a40;">메인 · 서비스 진입</span><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#c9c5bd;">arrow_forward</span></a>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid #ece9e3;border-radius:11px;background:#faf9f6;cursor:default;"><span style="font-size:13.5px;font-weight:800;color:#a29d92;">메인 · 서비스 진입</span></div>
             <div style="display:flex;gap:8px;">
-              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">랜딩</a>
-              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">운영자 · 마진</a>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #ece9e3;border-radius:11px;background:#faf9f6;font-size:13px;font-weight:800;color:#a29d92;cursor:default;">랜딩</div>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #ece9e3;border-radius:11px;background:#faf9f6;font-size:13px;font-weight:800;color:#a29d92;cursor:default;">운영자 · 마진</div>
             </div>
           </div>
           <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
@@ -152,12 +160,13 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         </div>
         <div style="padding:20px 24px;flex:1;display:flex;flex-direction:column;">
           <span style="display:inline-flex;align-items:center;gap:5px;background:#fbf3e2;color:#8a561a;font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;align-self:flex-start;margin-bottom:16px;"><span style="font-family:'Material Symbols Outlined';font-size:16px;">share</span>엔진 ① 공유</span>
-          <div style="font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;">바로가기</div>
+          <!-- MVP2 와 같은 이유로 링크가 아니다(2026-08-18) — MVP3 은 기획 단계라 대상 화면이 없다. -->
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:900;color:#17171b;margin-bottom:10px;"><span>바로가기</span><span style="font-size:11.5px;font-weight:700;color:#a29d92;">향후 사용예정</span></div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
-            <a href="#" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;"><span style="font-size:13.5px;font-weight:800;color:#3a3a40;">메인 · 서비스 진입</span><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#c9c5bd;">arrow_forward</span></a>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid #ece9e3;border-radius:11px;background:#faf9f6;cursor:default;"><span style="font-size:13.5px;font-weight:800;color:#a29d92;">메인 · 서비스 진입</span></div>
             <div style="display:flex;gap:8px;">
-              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">랜딩</a>
-              <a href="#" style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #e2ded5;border-radius:11px;text-decoration:none;font-size:13px;font-weight:800;color:#3a3a40;">운영자 · 입점가</a>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #ece9e3;border-radius:11px;background:#faf9f6;font-size:13px;font-weight:800;color:#a29d92;cursor:default;">랜딩</div>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 13px;border:1.5px solid #ece9e3;border-radius:11px;background:#faf9f6;font-size:13px;font-weight:800;color:#a29d92;cursor:default;">운영자 · 입점가</div>
             </div>
           </div>
           <div style="border-top:1px solid #f0eee9;padding-top:14px;margin-top:auto;">
@@ -175,12 +184,16 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <span style="width:46px;height:46px;border-radius:13px;background:#232320;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:24px;color:#7fa8ff;">code</span>
         <div>
           <h3 style="margin:0 0 3px;font-size:18px;font-weight:900;">개발자 도구</h3>
-          <p style="margin:0;font-size:13px;color:#9a968d;">화면 진척 매트릭스 · DEV 허브 · API 모드 전환</p>
+          <!-- 「화면 진척 매트릭스 · DEV 허브 · API 모드 전환」은 셋 다 없는 기능이었다.
+               실제로 있는 것만 적는다(2026-08-18). -->
+          <p style="margin:0;font-size:13px;color:#9a968d;">관리자 허브 이동</p>
         </div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <a href="/admin2/" style="padding:11px 18px;border:1.5px solid #3a3a35;background:transparent;border-radius:11px;font-size:13.5px;font-weight:800;color:#e6e2da;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">admin_panel_settings</span>관리자 허브</a>
-        <button style="padding:11px 18px;border:none;background:#2b5fd9;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;" id="hub-api"><span style="font-family:'Material Symbols Outlined';font-size:17px;">swap_horiz</span>API 모드 Mock ⇄ Real</button>
+        <!-- 「API 모드 전환」 단추 제거(2026-08-18). 누르면 화면 안의 변수 하나만 바뀌고
+             토스트가 떴을 뿐 서버로는 아무것도 보내지 않았다 — 새로고침하면 되돌아갔다.
+             서버에 그런 스위치가 없으므로 다시 만들지 않는다. -->
       </div>
     </section>
 
@@ -192,12 +205,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
 
 
-<div id="hub-toast" style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:#17171b;color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:12px;opacity:0;pointer-events:none;transition:.25s;z-index:60;"></div>
+<!-- 가운데 정렬을 백분율 offset + translateX 방식에서 margin:0 auto 로 바꿨다(2026-08-18).
+     걷어낸 진척 백분율과 CSS 백분율이 같은 글자라 잔존 검사에서 섞였다 —
+     보이는 결과는 같고 transform 은 등장·퇴장 이동만 맡는다. -->
+<div id="hub-toast" style="position:fixed;bottom:26px;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100vw - 48px);transform:translateY(20px);background:#17171b;color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:12px;opacity:0;pointer-events:none;transition:.25s;z-index:60;"></div>
 <script>
 (function(){
-function tmsg(m){var t=document.getElementById('hub-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2200);}
+function tmsg(m){var t=document.getElementById('hub-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateY(20px)';},2200);}
 document.querySelectorAll('[data-role]').forEach(function(r){r.addEventListener('click',function(){document.querySelectorAll('[data-role]').forEach(function(x){x.style.background='transparent';x.style.color='#6b6b73';x.style.fontWeight='700';});r.style.background='#17171b';r.style.color='#fff';r.style.fontWeight='800';tmsg('역할: '+r.textContent);});});
-var api=document.getElementById('hub-api'),mode='Mock';if(api)api.addEventListener('click',function(){mode=(mode==='Mock'?'Real':'Mock');tmsg('API 모드: '+mode);});
+// API 모드 전환 핸들러 제거(2026-08-18) — 서버에 보내는 것이 없어 화면만 바뀌는 단추였다.
 })();
 </script>
 <script src="../shared/ui-progress.js"></script>
