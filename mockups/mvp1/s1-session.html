@@ -281,7 +281,12 @@ function candidates(n){if(n==null){poolUnknown(SRC_NOTE.off);return;}poolN=n;ani
 /* 완화 효과는 «서버에 물어야 아는 수»다. LIVE 에서는 relaxChips()가 실측으로 다시 그리고,
    서버가 없으면 몇 개가 되는지 말하지 않는다 — 목업의 '+1,240개'가 그렇게 생겼다. */
 function relax(){poolUnknown(SRC_NOTE.off);addAI('조건을 완화했어요. 다만 <b>몇 개가 되는지는 서버에 연결되면 표시됩니다</b> — 지금은 후보 수를 셀 수 없어요.');}
-function addConstraint(icon,label,value){var e=document.getElementById('s1-cons-empty');if(e)e.style.display='none';var box=document.getElementById('s1-cons');if(!box)return;var d=document.createElement('div');d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f6f2;border-radius:11px;';d.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+icon+'</span><div style="flex:1;"><div style="font-size:11.5px;color:#8a8578;font-weight:700;">'+label+'</div><b style="font-size:13.5px;color:#17171b;">'+value+'</b></div>';box.appendChild(d);consCount++;var c=document.getElementById('s1-cons-count');if(c)c.textContent='조건 '+consCount+'개';}
+function addConstraint(icon,label,value){var e=document.getElementById('s1-cons-empty');if(e)e.style.display='none';var box=document.getElementById('s1-cons');if(!box)return;var d=document.createElement('div');d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f6f2;border-radius:11px;';d.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+icon+'</span><div style="flex:1;"><div style="font-size:11.5px;color:#8a8578;font-weight:700;">'+label+'</div><b style="font-size:13.5px;color:#17171b;">'+value+'</b></div>';box.appendChild(d);}
+/* 조건 배지("조건 N개")는 여기서 세지 않는다 — 아래 recountCons() 가 단일 원천이다
+   (2026-08-19 사장님 확정 ②: 배지는 실제 적용된 것만 센다). 이 함수는 아래에서 여러 번
+   `addConstraint=function...` 로 재정의돼(선호 별칭 정리 · LIVE scheduleCount · 판정 wrapper)
+   consPairs 를 쥔 형태로 바뀐다 — 그중 판정 wrapper가 매 호출 끝에 recountCons() 를 부른다.
+   (몇 겹인지는 여기 적지 않는다 — `grep 'addConstraint=function' 로 직접 센다`, CANON 원칙.) */
 /* 조건은 반영하되 «몇 개로 좁혀졌는지»는 말하지 않는다 — LIVE 면 addConstraint 가 태우는
    scheduleCount() 의 서버 응답이 카운터를 채우고, 아니면 «—» 로 남는다. */
 function addCond(text,icon,label,value,factor){addUser(text);addConstraint(icon,label,value);setTimeout(function(){if(!LIVE)poolUnknown(SRC_NOTE.off);addAI('네, <b>'+value+'</b> 조건을 반영했어요.'+(LIVE?'':' 통과 후보 수는 <b>서버에 연결되면 표시됩니다</b>.'));},350);}
@@ -310,15 +315,36 @@ var mg=document.getElementById('s1-manual-go'),mi=document.getElementById('s1-ma
 if(mg)mg.addEventListener('click',function(){var t=(mi.value||'').trim()||'인기게임, 예산 120만, 조용하게';setGear('ask');addUser(t);setTimeout(function(){poolUnknown(SRC_NOTE.off);addAI('입력을 기록했어요. 다만 <b>통과 후보 수는 서버에 연결되면 표시됩니다</b> — 지금은 셀 수 없어요.');},350);});
 function mkChip(label,warm){var s=document.createElement('span');s.textContent=label;s.style.cssText='background:'+(warm?'#fdf9f0':'#fff')+';border:1.5px solid '+(warm?'#e6c98f':'#e2ded5')+';color:'+(warm?'#8a561a':'#3a3a40')+';padding:9px 14px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;';return s;}
 // ---- guided 인터뷰 스텝 ----
-var Q_PURPOSE={id:'purpose',q:'누가 쓰실 PC인가요?',cl:'대상',ci:'person',f:0.72,opts:[{t:'내가 집에서',v:'개인·가정',why:['가정 환경 안정성 우선']},{t:'내 사무실용',v:'개인 사무',why:['고성능 게임 부품 제외','저소음·안정 우선']},{t:'직원용(여러 대)',v:'직원용',why:['고사양 부품 제외','동일사양 대량 재고 우선']},{t:'부모님',v:'부모님',why:['복잡한 고성능 부품 제외','저소음·간단 구성']},{t:'자녀',v:'자녀',why:['예산 안전 범위 우선']},{t:'지인 대신 부탁',v:'지인 대신',why:[]}]};
-var Q_QTY={id:'qty',q:'직원용이면, 몇 대 필요하세요?',cl:'수량',ci:'inventory_2',f:0.92,opts:[{t:'1~5대',v:'1~5대',why:['대량 동일사양 재고로 압축']},{t:'6~20대',v:'6~20대',why:['대량 동일사양 재고로 압축']},{t:'20대+',v:'20대 이상',why:['대량 동일사양 재고로 압축']}]};
-var Q_EXISTING={id:'existing',q:'이번 구매는 어떤 경우세요?',cl:'구매 형태',ci:'sync',f:0.85,opts:[{t:'처음 장만 (다 새로)',v:'신규 일체',why:[]},{t:'PC만 교체 (모니터는 쓰던 거)',v:'모니터 기존',why:['모니터 견적 제외']},{t:'업그레이드 (일부 재사용)',v:'업그레이드',why:['재사용 예정 부품 후보 제외']}]};
-var Q_REUSE={id:'reuse',q:'그대로 쓰실 부품을 골라 주세요.',cl:'재사용',ci:'recycling',multi:true,skip:true,f:0.9,opts:[{t:'모니터',v:'모니터',why:['모니터 견적 제외']},{t:'케이스',v:'케이스',why:['케이스 견적 제외']},{t:'저장장치',v:'저장장치',why:['저장장치 견적 제외']},{t:'파워',v:'파워',why:['파워 견적 제외']},{t:'그래픽카드',v:'그래픽카드',why:['그래픽카드 견적 제외']},{t:'잘 모름-봐주세요',v:'점검 요청',why:['현 부품 호환 점검 대상']}]};
+/* ── noFilter — 서버 처분표(api/candidates.py)에 없는 라벨은 «묻되» 조건으로 보내지 않는다
+   (2026-08-19 사장님 확정 ① — 후속: guided 완주 시 조건 태그 5개 중 4개가 회색·「참고」로
+   뜨는 게 실측됐다). 처분표(BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·VERBATIM_LABELS)를
+   QUEUE 의 cl(라벨)과 한 줄씩 대조한 결과 — api/recommend.py 도 같은 _apply_one 을 그대로
+   쓰므로 이 표는 후보 수 미리보기뿐 아니라 최종 견적에도 그대로 적용된다:
+     값에 따라 거른다(그대로 둔다)   용도(Q_USE, USAGE_LABELS) · 예산(Q_BUDGET, BUDGET_LABELS)
+                                    · 선호(Q_PRIORITY, TAG_LABELS — 저소음·화이트일 때만)
+     라벨 자체가 없어 항상 안 거른다(noFilter)
+                                    대상 · 수량 · 구매 형태 · 재사용 · 연결
+                                    — 값과 무관하게 **항상** applied=false 다. 조사자가 실측한
+                                    셋(대상·구매 형태·연결)에 QUEUE 전체를 마저 대조해 수량·
+                                    재사용 둘을 더 찾았다(직원용·업그레이드를 고를 때만 분기로
+                                    나온다).
+   noFilter 질문은 **묻는 것 자체는 남긴다** — 대상/구매형태는 Q_QTY·Q_REUSE 분기 조건이고
+   대화 맥락(인사·서비스 안내)으로 쓸모가 있다. 다만 gAnswer()가 이 표식을 보면
+   addConstraint(→consPairs→서버 전송)·logFilter(가짜 필터 사유)를 부르지 않는다 — 답은
+   말풍선에만 남고 사이드바 칩·조건 배지·필터 로그·consult_sessions.constraints 어디에도
+   안 쌓인다(안 쓰는 값을 원장에 쌓지 않는다 — 사장님 지시 원문). opts 의 why 는 이제 아무도
+   읽지 않는다 — 이 옵션이 «원래 걸렀어야 했던 것»의 기록으로 지우지 않고 남겨 둔다.
+   ⚠ 선호(Q_PRIORITY)는 여기 넣지 않는다 — 저소음·화이트 값일 때는 실제로 거른다. 문항이
+     무효인 게 아니라 값에 따라 갈리는 것이다(사장님 지시로 명시 제외). */
+var Q_PURPOSE={id:'purpose',q:'누가 쓰실 PC인가요?',cl:'대상',ci:'person',f:0.72,noFilter:true,opts:[{t:'내가 집에서',v:'개인·가정',why:['가정 환경 안정성 우선']},{t:'내 사무실용',v:'개인 사무',why:['고성능 게임 부품 제외','저소음·안정 우선']},{t:'직원용(여러 대)',v:'직원용',why:['고사양 부품 제외','동일사양 대량 재고 우선']},{t:'부모님',v:'부모님',why:['복잡한 고성능 부품 제외','저소음·간단 구성']},{t:'자녀',v:'자녀',why:['예산 안전 범위 우선']},{t:'지인 대신 부탁',v:'지인 대신',why:[]}]};
+var Q_QTY={id:'qty',q:'직원용이면, 몇 대 필요하세요?',cl:'수량',ci:'inventory_2',f:0.92,noFilter:true,opts:[{t:'1~5대',v:'1~5대',why:['대량 동일사양 재고로 압축']},{t:'6~20대',v:'6~20대',why:['대량 동일사양 재고로 압축']},{t:'20대+',v:'20대 이상',why:['대량 동일사양 재고로 압축']}]};
+var Q_EXISTING={id:'existing',q:'이번 구매는 어떤 경우세요?',cl:'구매 형태',ci:'sync',f:0.85,noFilter:true,opts:[{t:'처음 장만 (다 새로)',v:'신규 일체',why:[]},{t:'PC만 교체 (모니터는 쓰던 거)',v:'모니터 기존',why:['모니터 견적 제외']},{t:'업그레이드 (일부 재사용)',v:'업그레이드',why:['재사용 예정 부품 후보 제외']}]};
+var Q_REUSE={id:'reuse',q:'그대로 쓰실 부품을 골라 주세요.',cl:'재사용',ci:'recycling',multi:true,skip:true,f:0.9,noFilter:true,opts:[{t:'모니터',v:'모니터',why:['모니터 견적 제외']},{t:'케이스',v:'케이스',why:['케이스 견적 제외']},{t:'저장장치',v:'저장장치',why:['저장장치 견적 제외']},{t:'파워',v:'파워',why:['파워 견적 제외']},{t:'그래픽카드',v:'그래픽카드',why:['그래픽카드 견적 제외']},{t:'잘 모름-봐주세요',v:'점검 요청',why:['현 부품 호환 점검 대상']}]};
 /* 용도 선택지는 «서버가 준다» — 어휘를 여기 박지 않는다(2026-08-17, 아래 USAGES 블록).
    ⚠ multi 를 뗐다: 서버 `usage_floors.match()` 는 **먼저 맞는 하나만** 쓴다. 여러 개를 고르게
    두면 화면엔 「게임 · 영상편집」 두 칩이 뜨는데 하한은 한 벌만 걸려 화면이 거짓말한다. */
 var Q_USE={id:'use',q:'주로 무엇에 쓰실 거예요?',cl:'용도',ci:'interests',f:0.5,opts:[]};
-var Q_ENV={id:'env',q:'인터넷 연결은 어떻게 쓰세요?',cl:'연결',ci:'wifi',f:0.82,opts:[{t:'무선(WiFi)',v:'무선',why:['WiFi 미탑재 보드 제외']},{t:'유선(랜선)',v:'유선',why:[]},{t:'잘 모름',v:'무선 기본',why:['WiFi 기본 포함 보드 우선']}]};
+var Q_ENV={id:'env',q:'인터넷 연결은 어떻게 쓰세요?',cl:'연결',ci:'wifi',f:0.82,noFilter:true,opts:[{t:'무선(WiFi)',v:'무선',why:['WiFi 미탑재 보드 제외']},{t:'유선(랜선)',v:'유선',why:[]},{t:'잘 모름',v:'무선 기본',why:['WiFi 기본 포함 보드 우선']}]};
 var Q_BUDGET={id:'budget',q:'예산은 어느 정도 생각하세요?',cl:'예산',ci:'savings',f:0.5,opts:[{t:'~70만',v:'70만원 이하',why:['70만 초과 부품 제외']},{t:'~100만',v:'100만원 이하',why:['100만 초과 부품 제외']},{t:'~150만',v:'150만원 이하',why:['150만 초과 부품 제외']},{t:'200만+',v:'200만원 이상',why:['상한 없이 최고 사양까지']},{t:'잘 모르겠어요(추천 받을래요)',v:'AI 추천 예산',why:['가성비 최적 구간으로 압축']}]};
 var Q_PRIORITY={id:'priority',q:'특별히 중요한 게 있을까요?',cl:'선호',ci:'star',multi:true,skip:true,f:0.62,opts:[{t:'조용함',v:'저소음',why:['고소음 쿨러·GPU 제외']},{t:'화이트·디자인',v:'화이트',why:['화이트 외 케이스 제외']},{t:'최대 성능',v:'성능 우선',why:['저성능 후보 제외']},{t:'확장성 여유',v:'확장성',why:['확장 슬롯 부족 보드 제외']},{t:'A/S 넉넉히',v:'A/S 중시',why:['보증 짧은 부품 후순위']},{t:'가성비',v:'가성비',why:['가격효율 낮은 후보 후순위']},{t:'특별히 없음',v:'없음',skipAll:true,why:[]}]};
 /* ── 용도 목록은 «화면이 갖지 않는다» — 서버 `usage_floors` 표가 단일 원천 (2026-08-17) ──
@@ -362,11 +388,17 @@ function selChip(c,on){if(on){c.style.background='#e8effc';c.style.borderColor='
 function lockRow(row){Array.prototype.forEach.call(row.children,function(x){x.style.pointerEvents='none';});row.style.opacity='.7';}
 function renderHints(box,sel){box.innerHTML='';sel.forEach(function(o){if(!o.hint)return;var h=document.createElement('div');h.style.cssText='display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--success, #2f9e6d);font-weight:700;';h.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">subdirectory_arrow_right</span>'+o.hint;box.appendChild(h);});}
 function applyBranch(st,opts){var vals=opts.map(function(o){return o.v;});if(st.id==='purpose'&&vals.indexOf('직원용')>-1)QUEUE.splice(qidx+1,0,Q_QTY);if(st.id==='existing'&&vals.indexOf('업그레이드')>-1)QUEUE.splice(qidx+1,0,Q_REUSE);
- if(st.id==='existing'&&vals.indexOf('신규 일체')>-1){addConstraint('devices','주변기기','함께 구성 검토');setTimeout(function(){addAI('처음 장만이시면 <b>모니터·키보드 같은 주변기기</b>도 필요하실 수 있어요 — 견적서의 <b>&quot;함께 쓰면 좋은 구성&quot;</b>에서 챙겨드릴게요.');},250);}}
+ /* '주변기기' 안내도 조건이 아니다 — 처분표에 없는 라벨이라 대상·구매 형태와 같은 이유로
+    항상 안 걸린다(2026-08-19). addConstraint 를 부르지 않아 consPairs·사이드바 칩에
+    남기지 않고, 안내 말풍선만 띄운다(견적서 "함께 쓰면 좋은 구성"은 S2 소관 그대로). */
+ if(st.id==='existing'&&vals.indexOf('신규 일체')>-1){setTimeout(function(){addAI('처음 장만이시면 <b>모니터·키보드 같은 주변기기</b>도 필요하실 수 있어요 — 견적서의 <b>&quot;함께 쓰면 좋은 구성&quot;</b>에서 챙겨드릴게요.');},250);}}
 function logFilter(label,delta,reasons){var wrap=document.getElementById('s1-filterwrap');if(wrap)wrap.style.display='block';if(s3)s3.style.opacity='1';if(s3i){s3i.textContent='sync';s3i.style.color='#7fa8ff';}if(s3s){s3s.textContent='반영 중';s3s.style.color='#7fa8ff';}var box=document.getElementById('s1-filterlog');if(!box)return;var d=document.createElement('div');d.style.cssText='background:#232320;border-radius:10px;padding:10px 12px;';var rs='';(reasons||[]).forEach(function(w){rs+='<div style="font-size:11.5px;color:#9a968d;display:flex;gap:5px;align-items:flex-start;line-height:1.45;margin-top:3px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#6b675e;flex:0 0 auto;">chevron_right</span>'+w+'</div>';});d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:800;color:#e6e2da;">'+label+'</span>'+(delta>0?'<b style="font-size:12.5px;color:#ff9d7a;font-variant-numeric:tabular-nums;flex:0 0 auto;">−'+delta.toLocaleString()+'</b>':'')+'</div>'+rs;box.appendChild(d);box.scrollTop=box.scrollHeight;}
 /* 필터 사유(rs)는 우리가 건 조건이라 말할 수 있지만, «몇 개 줄었는지»(delta)는 서버만 안다.
    예전엔 poolN*st.f 로 지어냈다 — LIVE 에서는 300ms 뒤 서버 값에 덮이는 «거짓 중간값»이었다. */
-function gAnswer(st,opts){if(opts.length){addUser(opts.map(function(o){return o.t;}).join(' · '));addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));var rs=[];opts.forEach(function(o){if(o.why)o.why.forEach(function(w){if(rs.indexOf(w)<0)rs.push(w);});});logFilter(st.cl,null,rs);if(!LIVE)poolUnknown(SRC_NOTE.off);}else{addUser('건너뛸게요');}applyBranch(st,opts);qidx++;setTimeout(guidedAsk,500);}
+/* noFilter 문항(대상·수량·구매 형태·재사용·연결)은 addConstraint·logFilter 를 부르지 않는다 —
+   위 Q_PURPOSE 주석의 처분표 대조 결과. 답은 addUser 말풍선에만 남고 서버로 가지 않는다
+   (2026-08-19 사장님 확정 ①). */
+function gAnswer(st,opts){if(opts.length){addUser(opts.map(function(o){return o.t;}).join(' · '));if(!st.noFilter){addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));var rs=[];opts.forEach(function(o){if(o.why)o.why.forEach(function(w){if(rs.indexOf(w)<0)rs.push(w);});});logFilter(st.cl,null,rs);}if(!LIVE)poolUnknown(SRC_NOTE.off);}else{addUser('건너뛸게요');}applyBranch(st,opts);qidx++;setTimeout(guidedAsk,500);}
 function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots.innerHTML='';for(var i=0;i<QUEUE.length;i++){var d=document.createElement('span');d.style.cssText='width:22px;height:6px;border-radius:3px;transition:.3s;background:'+(i<qidx?'#2b5fd9':(i===qidx?'#7fa8ff':'#e6e2da'))+';';dots.appendChild(d);}}var num=document.getElementById('s1-progress-num');if(num)num.textContent=qidx>=QUEUE.length?'완료':((qidx+1)+' / '+QUEUE.length);}
 function guidedAsk(){
  /* 용도 단계는 «서버 목록이 도착한 뒤»에 그린다 — 없는 채로 그리면 선택지가 빈 채 지나간다. */
@@ -403,8 +435,9 @@ function guidedAsk(){
    if(c===selc)return;
    if(selc)selChip(selc,false);selc=c;selChip(c,true);
    addUser('아, <b>'+o.t+'</b>(으)로 바꿀게요');
-   addConstraint(st.ci,st.cl,o.v);
-   addAI('네, <b>'+st.cl+'</b>을(를) <b>'+o.v+'</b>(으)로 바꿔 반영했어요.');
+   /* noFilter 문항은 «반영했다»고 말하지 않는다 — 서버로 보내지도 않은 값이다(위 gAnswer 참고). */
+   if(st.noFilter){addAI('네, <b>'+o.t+'</b>(으)로 알아둘게요.');}
+   else{addConstraint(st.ci,st.cl,o.v);addAI('네, <b>'+st.cl+'</b>을(를) <b>'+o.v+'</b>(으)로 바꿔 반영했어요.');}
   });row.appendChild(c);});
   msgs.appendChild(row);
  }
@@ -442,7 +475,12 @@ function addSpec(label,value,icon){addConstraint(icon,label,value);}
    그 결과 「게임용으로 200만원」 태그 하나만 든 말풍선에 나중 판정이 붙었다.
    (§상태 관리 원칙: 제약은 객체 하나가 단일 원천.)
    pairs 를 주면 «그 시점의 스냅샷»을 그린다 — 판정과 같은 시점을 가리키게 하는 장치다. */
-function specTags(pairs){var s='';(pairs||consPairs).forEach(function(x){s+='<span style="display:inline-flex;align-items:center;background:#eef2fb;color:#2149b0;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;margin:0 4px 4px 0;">'+esc(x.v)+'</span>';});return s;}
+/* ref(참고용) 칩 — chipMeta(=서버 effects[].applied) 가 false 인 라벨만 다르게 그린다.
+   아직 모르면(chipMeta null) 기본(파랑) 그대로 둔다 — «모른다»를 «조건 아님»으로 단정하지 않는다. */
+function specTags(pairs){var s='';(pairs||consPairs).forEach(function(x){
+ var meta=chipMeta(x.l),ref=!!(meta&&meta.applied===false);
+ s+='<span style="display:inline-flex;align-items:center;background:'+(ref?'#f4f2ec':'#eef2fb')+';color:'+(ref?'#8a8578':'#2149b0')+';border:1px '+(ref?'dashed #ddd8ce':'solid transparent')+';padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;margin:0 4px 4px 0;"'+(ref?' title="'+esc(meta.reason||'')+'"':'')+'>'+esc(x.v)+(ref?'<span style="font-weight:600;opacity:.75;margin-left:5px;">· 참고</span>':'')+'</span>';
+});return s;}
 /* 태그 자리에 표식을 단다 — 갱신 주체는 fillVerdicts 하나뿐이다(판정과 «함께» 갈아끼운다).
    <p> 안에도 들어가므로 div 가 아니라 span 이어야 한다(브라우저가 p 를 끊는다). */
 function tagsBlock(pairs){return '<span data-constags="1">'+specTags(pairs)+'</span>';}
@@ -507,43 +545,112 @@ function chatStart(){
  var ec=mkChip('예산 80만에 고사양 게임까지',true);ec.addEventListener('click',function(){ec.style.display='none';overConstrain(ec.textContent.trim());});row.appendChild(ec);
  wrap.appendChild(row);msgs.appendChild(wrap);msgs.scrollTop=msgs.scrollHeight;
 }
-var SLOTS=[
- {key:'cpu',label:'CPU',ci:'developer_board',opts:[{t:'Ryzen 5 7600',socket:'AM5',tdp:65,tier:3,spec:'6코어 12스레드 · 3.8~5.1GHz · AM5',reason:'6코어 12스레드로 이 가격대 게임·사무 균형이 가장 좋은 보급형 강자입니다.',src:'AMD 공식 · PC 벤치 그룹 (예시)'},{t:'Intel i5-14400F',socket:'LGA1700',tdp:65,tier:3,spec:'10코어 16스레드 · 최대 4.7GHz · LGA1700',reason:'10코어로 멀티작업에 강하고, 내장그래픽 없는 가성비 게이밍 CPU입니다.',src:'Intel 공식 · 벤치 리뷰 (예시)'},{t:'Ryzen 7 7700',socket:'AM5',tdp:65,tier:4,spec:'8코어 16스레드 · 3.8~5.3GHz · AM5',reason:'8코어 16스레드로 현재 AM5 라인업 상위 성능 — 고사양 게임까지 여유롭습니다.',src:'AMD 공식 · PC 벤치 그룹 (예시)'}]},
- {key:'gpu',label:'GPU',ci:'memory',opts:[{t:'RTX 4060 8GB',tdp:115,tier:3,len:'표준',spec:'GDDR6 8GB · DLSS3 · 115W',reason:'DLSS3로 이 예산대 프레임 방어율 최상위, QHD 게임에 적정합니다.',src:'NVIDIA · 게임 벤치 (예시)'},{t:'RTX 4070 SUPER',tdp:220,tier:5,len:'긴',spec:'GDDR6X 12GB · DLSS3 · 220W',reason:'12GB 메모리로 QHD 고옵션·4K까지 커버하는 상위 성능입니다.',src:'NVIDIA · 게임 벤치 (예시)'},{t:'RX 7600 8GB',tdp:165,tier:3,len:'표준',spec:'GDDR6 8GB · FSR · 165W',reason:'FSR 지원 가성비 카드로 FHD 고주사율에 적합합니다.',src:'AMD · 게임 벤치 (예시)'}]},
- {key:'board',label:'메인보드',ci:'dashboard',opts:[{t:'B650M (AM5·DDR5)',socket:'AM5',mem:'DDR5',spec:'AM5 · DDR5 · M.2 2개 · WiFi',reason:'AM5 최신 소켓 + DDR5 지원, WiFi 내장으로 확장·편의 균형이 좋습니다.',src:'제조사 스펙 (예시)'},{t:'B760M (LGA1700·DDR5)',socket:'LGA1700',mem:'DDR5',spec:'LGA1700 · DDR5 · M.2 2개',reason:'인텔 13/14세대 대응 DDR5 보드, 안정적인 전원부를 갖췄습니다.',src:'제조사 스펙 (예시)'},{t:'A620M (AM5·DDR5)',socket:'AM5',mem:'DDR5',spec:'AM5 · DDR5 · 보급형',reason:'AM5 보급형으로 필수 기능 위주의 최저가 구성입니다.',src:'제조사 스펙 (예시)'}]},
- {key:'ram',label:'메모리',ci:'memory_alt',opts:[{t:'DDR5 32GB (16×2)',mem:'DDR5',spec:'32GB(16×2) · 5600MHz · 듀얼채널',reason:'32GB 듀얼채널로 게임·편집·멀티작업 모두 넉넉합니다.',src:'JEDEC 규격 (예시)'},{t:'DDR5 16GB (8×2)',mem:'DDR5',spec:'16GB(8×2) · 5600MHz · 듀얼채널',reason:'16GB 듀얼채널로 일반 게임·사무에 충분합니다.',src:'JEDEC 규격 (예시)'},{t:'DDR4 16GB (8×2)',mem:'DDR4',spec:'16GB(8×2) · 3200MHz · DDR4',reason:'구형 DDR4 규격으로, 신형 DDR5 보드와는 호환되지 않습니다.',src:'JEDEC 규격 (예시)'}]},
- {key:'ssd',label:'저장장치',ci:'hard_drive',opts:[{t:'NVMe 1TB Gen4',spec:'1TB · Gen4 · 최대 7000MB/s',reason:'Gen4 초고속으로 OS·게임 로딩이 쾌적한 표준 용량입니다.',src:'제조사 스펙 (예시)'},{t:'NVMe 2TB Gen4',spec:'2TB · Gen4 · 최대 7000MB/s',reason:'대용량 Gen4로 영상·다수 게임 저장에 여유가 있습니다.',src:'제조사 스펙 (예시)'},{t:'SATA SSD 512GB',spec:'512GB · SATA · 최대 550MB/s',reason:'저가 SATA로 속도·용량이 제한적이라 보조용으로 권장합니다.',src:'제조사 스펙 (예시)'}]},
- {key:'psu',label:'파워',ci:'bolt',opts:[{t:'650W 80+ 골드',watt:650,spec:'650W · 80+ 골드 · 표준 ATX',reason:'80+ 골드 효율로 이 구성에 안전 마진을 확보한 표준 용량입니다.',src:'80PLUS 인증 (예시)'},{t:'750W 80+ 골드',watt:750,spec:'750W · 80+ 골드 · 여유 전력',reason:'상위 그래픽카드까지 여유 있는 넉넉한 전력입니다.',src:'80PLUS 인증 (예시)'},{t:'400W 80+ 브론즈',watt:400,spec:'400W · 80+ 브론즈 · 저용량',reason:'저용량 브론즈로, 그래픽카드 포함 구성엔 전력이 부족할 위험이 있습니다.',src:'80PLUS 인증 (예시)'}]},
- {key:'case',label:'케이스',ci:'dns',opts:[{t:'미들타워',size:'표준',spec:'미들타워 · 최대 330mm GPU · 쿨링 양호',reason:'대부분의 그래픽카드·쿨러를 수용하는 무난한 표준 크기입니다.',src:'제조사 스펙 (예시)'},{t:'미니타워(ITX)',size:'소형',spec:'미니 ITX · 소형 · 긴 GPU 제한',reason:'공간 절약형으로, 긴 그래픽카드·대형 쿨러는 제한됩니다.',src:'제조사 스펙 (예시)'},{t:'빅타워',size:'대형',spec:'빅타워 · 대형 · 확장 여유',reason:'확장·쿨링 여유가 큰 대형으로 고성능 빌드에 적합합니다.',src:'제조사 스펙 (예시)'}]}
-];
-SLOTS.forEach(function(s){s.opts.push({t:'(선택 안 함)',none:true,spec:'미선택 · 기존 부품/별도 준비',reason:'이 부품은 선택하지 않았습니다. 기존 부품을 재사용하거나 별도로 준비하는 것으로 간주합니다.',src:'—'});});
-var pick={cpu:0,gpu:0,board:0,ram:0,ssd:0,psu:0,case:0};
+// ---- expert(직접 고르기) 부품 표본 — GET /api/expert/slots 로 대체(A-71/A-72) ----
+// 예전엔 여기 7슬롯×3안=21개가 리터럴로 박혀 있었고 spec·reason·src 전부 「(예시)」였다
+// (이름·사양·가격·추천사유·출처가 화면이 지어낸 값). 이제 서버가 실재고 표본을 준다 —
+// 슬롯도 7 -> 8개(A-72 쿨러 신설: COOLER, 공랭·수랭 통합 자리). SLOTS/pick 은 그 응답이
+// 오기 전엔 비어 있다가 loadExpertSlots()(아래, renderParts 옆)가 채운다.
+var SLOTS=[];
+var pick={};
+var lastBuild=null;   // 마지막 성공한 POST /api/expert/build 응답 — 「이 구성으로 진행」이 재사용한다
 function slotOf(k){for(var i=0;i<SLOTS.length;i++)if(SLOTS[i].key===k)return SLOTS[i];return null;}
-function cur(k){return slotOf(k).opts[pick[k]];}
+function cur(k){var s=slotOf(k);return s?s.opts[pick[k]]:null;}
 function enableConfirm(m){var b=document.getElementById('s1-xconfirm'),c=document.getElementById('s1-xconfirm-cap');if(b){b.disabled=false;b.style.background='#2b5fd9';b.style.cursor='pointer';}if(c)c.textContent=m;}
 function lockConfirm(m){var b=document.getElementById('s1-xconfirm'),c=document.getElementById('s1-xconfirm-cap');if(b){b.disabled=true;b.style.background='#c9c5bd';b.style.cursor='not-allowed';}if(c)c.textContent=m;}
-function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:5px 14px 5px 5px;';var oh='';s.opts.forEach(function(o,i){oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+o.t+'</option>';});row.innerHTML='<img src="assets/parts/'+(s.key==='board'?'mb':s.key)+'.png" alt="'+s.label+'" style="flex:0 0 auto;width:80px;height:80px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 52px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:62px;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+(s.opts[pick[s.key]].spec||'')+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=s.opts[pick[s.key]].spec||'';renderReason();resetValidation();});});renderReason();}
-function resetValidation(){var ph='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:150px;color:#a29d92;border:1.5px dashed #ddd8ce;border-radius:14px;padding:22px;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#d8d2c6;">rule</span><span style="font-size:12.5px;line-height:1.5;font-weight:600;">AI 검증하기를 누르면<br>여기에 결과가 나옵니다.</span></div>';var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='';var cp=document.getElementById('s1-compat');if(cp)cp.innerHTML=ph;var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=ph;lockConfirm('부품을 검증해야 진행할 수 있어요.');}
-function applyFix(k){if(k==='board'){var soc=cur('cpu').socket,bi=pick.board;slotOf('board').opts.forEach(function(o,i){if(o.socket===soc)bi=i;});pick.board=bi;}else if(k==='ram'||k==='ram32')pick.ram=0;else if(k==='psu')pick.psu=0;else if(k==='case')pick.case=0;renderParts();validate();}
-function renderReason(){var box=document.getElementById('s1-reason');if(!box)return;var html='';SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];html+='<div style="border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;overflow:hidden;"><div class="acc-h" style="display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;"><span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+s.ci+'</span><div style="flex:1;min-width:0;"><div style="font-size:11px;color:#8a8578;font-weight:700;">'+s.label+'</div><b style="font-size:13.5px;color:#17171b;">'+o.t+'</b></div><span class="acc-i" style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#c9c5bd;">expand_more</span></div><div class="acc-b" style="display:none;padding:2px 13px 13px 42px;"><p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:#55555c;">'+(o.reason||'')+'</p><div style="font-size:11.5px;color:#8a8578;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;">link</span>출처: '+(o.src||'—')+'</div></div></div>';});box.innerHTML=html;Array.prototype.forEach.call(box.querySelectorAll('.acc-h'),function(h){h.addEventListener('click',function(){var b=h.parentNode.querySelector('.acc-b');var ic=h.querySelector('.acc-i');if(b.style.display==='block'){b.style.display='none';if(ic)ic.textContent='expand_more';}else{b.style.display='block';if(ic)ic.textContent='expand_less';}});});}
-function compatNotes(){var cpu=cur('cpu'),gpu=cur('gpu'),board=cur('board'),ram=cur('ram'),psu=cur('psu'),cs=cur('case');function h(o){return !o.none;}var ctdp=h(cpu)?cpu.tdp:0,gtdp=h(gpu)?gpu.tdp:0;var need=Math.round((ctdp+gtdp+100)*1.6);var margin=h(psu)?Math.round((psu.watt-need)/psu.watt*100):0;var n=[];
- if(!h(cpu)||!h(board))n.push({level:'advice',pair:'CPU 소켓 규격',detail:(!h(cpu)?'CPU':'메인보드')+' 미선택 — 부품을 정하면 소켓 호환을 검증합니다.'});
- else n.push(cpu.socket===board.socket?{level:'ok',pair:'CPU 소켓 규격',detail:board.t.split(' ')[0]+'('+board.socket+')는 '+cpu.t+'('+cpu.socket+')와 소켓이 일치합니다.'}:{level:'warn',pair:'CPU 소켓 규격',detail:'소켓 불일치 — '+cpu.socket+' CPU는 '+board.socket+' 보드에 장착되지 않습니다.',fix:'board',fixlabel:'맞는 보드로'});
- if(!h(ram)||!h(board))n.push({level:'advice',pair:'메모리 규격',detail:(!h(ram)?'메모리':'메인보드')+' 미선택 — 규격 검증 보류.'});
- else n.push(ram.mem===board.mem?{level:'ok',pair:'메모리 규격',detail:'보드 '+board.mem+' ↔ 메모리 '+ram.mem+' 규격이 일치합니다.'}:{level:'warn',pair:'메모리 규격',detail:board.mem+' 보드에 '+ram.mem+' 메모리는 장착 불가 — 규격이 다릅니다.',fix:'ram',fixlabel:'DDR5로 변경'});
- if(!h(cpu))n.push({level:'advice',pair:'쿨러 발열(TDP)',detail:'CPU 미선택 — 발열 검증 보류.'});
- else n.push({level:'ok',pair:'쿨러 발열(TDP)',detail:'기본 쿨러가 '+cpu.t+'('+cpu.tdp+'W)의 발열을 안정적으로 감당합니다.'});
- if(!h(cs)||!h(gpu))n.push({level:'advice',pair:'케이스 장착 공간',detail:(!h(cs)?'케이스':'GPU')+' 미선택 — 장착 공간 검증 보류.'});
- else n.push(!(cs.size==='소형'&&gpu.len==='긴')?{level:'ok',pair:'케이스 장착 공간',detail:'선택한 케이스가 '+gpu.t+' 길이를 수용합니다.'}:{level:'warn',pair:'케이스 장착 공간',detail:'긴 그래픽카드가 소형 케이스에 들어가지 않습니다.',fix:'case',fixlabel:'미들타워로'});
- if(!h(psu))n.push({level:'advice',pair:'파워 전원 여유',detail:'파워 미선택 — 기존 파워가 권장 '+need+'W 이상인지 확인하세요.'});
- else n.push(psu.watt>=need?{level:'ok',pair:'파워 전원 여유',detail:psu.watt+'W · 권장 '+need+'W 대비 여유 '+margin+'%로 안전합니다.'}:{level:'warn',pair:'파워 전원 여유',detail:'권장 '+need+'W 이상인데 현재 '+psu.watt+'W — 전원이 부족합니다.',fix:'psu',fixlabel:'650W로 변경'});
- if(!h(cpu)||!h(gpu))n.push({level:'advice',pair:'CPU ↔ GPU 병목',detail:'CPU/GPU 중 미선택이 있어 병목 검증 보류.'});
- else n.push(Math.abs(cpu.tier-gpu.tier)<=1?{level:'ok',pair:'CPU ↔ GPU 병목',detail:'두 부품 등급이 맞아 병목 없이 성능을 냅니다.'}:{level:'warn',pair:'CPU ↔ GPU 병목',detail:'등급 차이가 커 한쪽이 성능을 제한(병목)합니다.'});
- if(h(ram)&&h(board)&&ram.mem===board.mem&&ram.t.indexOf('16GB')>-1)n.push({level:'advice',pair:'메모리 확장성',detail:'16GB(8×2)는 슬롯 2개를 모두 사용합니다. 향후 증설이 어려우니 여유가 필요하면 32GB 구성을 권장합니다.',fix:'ram32',fixlabel:'32GB로 변경'});
- return {notes:n,margin:margin};}
-function compatSection(notes){var html='';notes.forEach(function(x){var col=x.level==='ok'?'var(--success, #2f9e6d)':(x.level==='advice'?'#c77b1f':'#b31b25');var ic=x.level==='ok'?'check_circle':(x.level==='advice'?'lightbulb':'warning');var bd=x.level==='ok'?'정상':(x.level==='advice'?'권장':'경고');html+='<div style="display:flex;gap:10px;padding:11px 13px;border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;"><span style="font-family:\'Material Symbols Outlined\';font-size:20px;color:'+col+';flex:0 0 auto;">'+ic+'</span><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:13px;color:#17171b;">'+x.pair+'</b><span style="font-size:10.5px;font-weight:800;color:'+col+';background:'+col+'1f;padding:2px 7px;border-radius:6px;">'+bd+'</span></div><p style="margin:4px 0 0;font-size:12.5px;line-height:1.6;color:#55555c;">'+x.detail+'</p>'+(x.fix?'<button data-fix="'+x.fix+'" style="margin-top:8px;padding:6px 11px;border:1.5px solid #e0cfa5;background:#fff;border-radius:8px;font-size:12px;font-weight:800;color:#8a561a;cursor:pointer;font-family:inherit;">'+(x.fixlabel||'안전 대안')+'</button>':'')+'</div></div>';});return html;}
-function inspectBlock(){var cpu=cur('cpu'),gpu=cur('gpu'),psu=cur('psu');function h(o){return !o.none;}var ctdp=h(cpu)?cpu.tdp:0,gtdp=h(gpu)?gpu.tdp:0;var need=Math.round((ctdp+gtdp+100)*1.6);var margin=h(psu)?Math.round((psu.watt-need)/psu.watt*100):0;var draw=Math.round((ctdp+gtdp)*1.35+85);var cpuT=h(cpu)?(63+Math.round(cpu.tdp/12)):'–';var gpuT=h(gpu)?(60+Math.round(gpu.tdp/12)):'–';var noise=30+Math.round(gtdp/40);function card(l,v,c){return '<div style="background:#17171b;border-radius:13px;padding:13px 15px;"><div style="font-size:11px;color:#9a968d;font-weight:700;">'+l+'</div><div style="font-size:23px;font-weight:900;line-height:1.15;color:'+(c||'#fff')+';">'+v+'</div></div>';}var grid='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+card('최대 소비전력',draw+'W')+card('전력 마진',h(psu)?margin+'%':'–',h(psu)?(margin<15?'#ff9d7a':'var(--success-bright, #5fd6a0)'):'#9a968d')+card('CPU·GPU 발열',cpuT+'·'+gpuT+'°C')+card('풀가동 소음',noise+'dB')+'</div>';var chips=['불량 0','포트·부팅 통과','3시간 안정성 통과'].map(function(t){return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11.5px;font-weight:800;padding:5px 10px;border-radius:8px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;">check_circle</span>'+t+'</span>';}).join('');return grid+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+chips+'</div>';}
-function validate(){var cn=compatNotes();var notes=cn.notes;var warns=0;notes.forEach(function(x){if(x.level==='warn')warns++;});var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='<div style="display:flex;align-items:center;gap:11px;padding:14px 16px;border-radius:12px;background:'+(warns?'#fbecec':'var(--success-container, #e9f6ef)')+';"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:'+(warns?'#b31b25':'var(--success, #2f9e6d)')+';">'+(warns?'error':'verified')+'</span><div><div style="font-size:15px;font-weight:900;color:'+(warns?'#8a1f22':'var(--success-deep, #0f5132)')+';">'+(warns?(warns+'건의 경고가 있어요'):'전부 통과했습니다')+'</div><div style="font-size:12.5px;font-weight:600;color:'+(warns?'#a15055':'var(--success-muted, #3d7a5c)')+';">'+(warns?'경고를 해결하면 진행할 수 있어요.':'조립·호환에 문제가 없습니다.')+'</div></div></div>';var cp=document.getElementById('s1-compat');if(cp){cp.innerHTML=compatSection(notes);Array.prototype.forEach.call(cp.querySelectorAll('[data-fix]'),function(b){b.addEventListener('click',function(){applyFix(b.getAttribute('data-fix'));});});}var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=inspectBlock();if(warns===0)enableConfirm('호환성·검수 모두 통과 — 이 구성으로 진행할 수 있어요.');else lockConfirm(warns+'건의 경고를 해결해야 진행할 수 있어요.');}
+// 부품 종류별 아이콘 — 서버는 라벨(문자)만 준다. 아이콘은 순수 장식이라 어휘 정본
+// (api/taxonomy.py)을 복제하는 게 아니다 — 슬롯 키(대문자, 서버와 동일)에 매핑만 한다.
+var SLOT_ICON={CPU:'developer_board',MB:'dashboard',RAM:'memory_alt',GPU:'memory',CASE:'dns',COOLER:'ac_unit',POWER:'bolt',SSD:'hard_drive'};
+// 부품 썸네일 자산 — 있는 파일만 매핑한다(mockups/mvp1/assets/parts/*.png 실측).
+// COOLER 는 자산이 없다(A-72 신설 슬롯) — 없는 파일을 요청해 404를 내는 대신 아이콘
+// 배지로 대체한다(위 SLOT_ICON). 이 이름들은 1600행 근처 「부품 설명 보기」 툴팁이
+// img[src*="assets/parts/"] 를 그대로 찾으므로, 그 기존 기능도 그대로 살아난다.
+var SLOT_ASSET={CPU:'cpu',MB:'mb',RAM:'ram',GPU:'gpu',CASE:'case',POWER:'psu',SSD:'ssd'};
+// 사양 필드 라벨 — spec_field_defs(DB, 마이그레이션 0014·0022 실측)의 label·unit 그대로
+// 옮겼다. 고객용 GET /api/expert/slots 는 {field_key:value}만 주고 라벨을 안 준다(그
+// 라벨을 붙이려면 서버 파일을 고쳐야 하는데 이 작업은 읽기만 하라는 지시다). 모르는
+// 키가 오면 라벨 없이 원문 그대로 보여준다 — 추측한 한글 라벨을 지어내지 않는다.
+var SPEC_META={socket:['소켓',''],socket_list:['지원 소켓',''],chipset:['칩셋',''],
+ mem_type:['메모리 규격',''],capacity_gb:['용량','GB'],clock_mhz:['클럭','MHz'],
+ tdp_watt:['발열(TDP)','W'],rated_watt:['정격 출력','W'],required_power_watt:['권장 전원','W'],
+ length_mm:['길이','mm'],gpu_max_mm:['GPU 장착 길이','mm'],cooler_height_mm:['쿨러 높이','mm'],
+ cooler_tdp:['쿨러 발열 한도','W'],pcie_gen:['PCIe 세대',''],form_factor:['규격',''],
+ form_factor_list:['수용 보드 규격',''],interface:['인터페이스',''],
+ radiator_rows:['라디에이터 열','열'],radiator_max_rows:['수랭 최대 열','열']};
+var TAG_KO={silent:'저소음',white:'화이트',rgb:'RGB'};
+function fmtSpec(spec){if(!spec)return '';var out=[];Object.keys(spec).forEach(function(k){var v=spec[k];if(v==null||v==='')return;var m=SPEC_META[k];var label=m?m[0]:k.replace(/_/g,' ');var unit=m?m[1]:'';var vs=Array.isArray(v)?v.join('/'):String(v);out.push(label+' '+vs+unit);});return out.join(' · ');}
+function tagLine(tags){return (tags||[]).map(function(t){return TAG_KO[t]||t;}).join('/');}
+function specLine(o){if(!o)return '';if(o.none)return o.spec||'';var bits=[];var sp=fmtSpec(o.spec);if(sp)bits.push(sp);var tg=tagLine(o.tags);if(tg)bits.push(tg);return bits.join(' · ')||'등록된 사양 정보가 없습니다.';}
+function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:12px 14px;';var oh='';s.opts.forEach(function(o,i){var lb=o.none?o.t:(esc(o.name)+' · '+o.price.toLocaleString()+'원');oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+lb+'</option>';});var ak=SLOT_ASSET[s.key];var thumb=ak?('<img src="assets/parts/'+ak+'.png" alt="'+esc(s.label)+'" title="부품 설명 보기" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'):('<span style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;background:#eee8fa;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:23px;color:#6a3fbf;">'+s.ci+'</span>');row.innerHTML=thumb+'<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 62px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:72px;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+esc(specLine(s.opts[pick[s.key]]))+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=specLine(s.opts[pick[s.key]]);renderReason();resetValidation();});});renderReason();}
+// 서버 표본 로드 — 실패해도 예전 21개 리터럴로 되돌아가지 않는다. 지어낸 부품을
+// 보여주느니 실패를 그대로 보여준다(§실패를 삼키지 않는다).
+function loadExpertSlots(){var box=document.getElementById('s1-parts');if(box)box.innerHTML='<div style="display:flex;align-items:center;gap:8px;color:#8a8578;font-size:13px;padding:14px 4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;">hourglass_top</span>실재고에서 부품 후보를 불러오는 중입니다…</div>';
+ fetch('/api/expert/slots').then(function(r){if(!r.ok)throw new Error('서버 응답 '+r.status);return r.json();}).then(function(d){
+  SLOTS=Object.keys(d.slots||{}).map(function(k){var s=d.slots[k]||{};var opts=(s.items||[]).slice();
+   opts.push({t:'(선택 안 함)',none:true,product_code:null,spec:'미선택 · 기존 부품/별도 준비',
+    reason:'이 부품은 선택하지 않았습니다. 기존 부품을 재사용하거나 별도로 준비하는 것으로 간주합니다.'});
+   pick[k]=0;
+   return {key:k,label:s.label||k,ci:SLOT_ICON[k]||'category',total:s.total_candidates||0,opts:opts};});
+  renderParts();resetValidation();
+ }).catch(function(e){
+  if(box)box.innerHTML='<div style="padding:16px;border:1.5px dashed #e2b2a8;border-radius:12px;color:#b04a3a;font-size:13px;line-height:1.6;">부품 후보를 불러오지 못했습니다 — '+esc((e&&e.message)||String(e))+'<br>새로고침 후 다시 시도해 주세요.</div>';
+  lockConfirm('부품 후보를 불러오지 못해 진행할 수 없어요.');
+  var evb=document.getElementById('s1-validate');if(evb)evb.disabled=true;
+ });}
+function resetValidation(){var ph='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:150px;color:#a29d92;border:1.5px dashed #ddd8ce;border-radius:14px;padding:22px;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#d8d2c6;">rule</span><span style="font-size:12.5px;line-height:1.5;font-weight:600;">AI 검증하기를 누르면<br>여기에 결과가 나옵니다.</span></div>';var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='';var cp=document.getElementById('s1-compat');if(cp)cp.innerHTML=ph;var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=ph;lastBuild=null;lockConfirm('부품을 검증해야 진행할 수 있어요.');}
+function renderReason(){var box=document.getElementById('s1-reason');if(!box)return;var html='';SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];var title=o.none?o.t:o.name;var price=o.none?'':(o.price.toLocaleString()+'원');html+='<div style="border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;overflow:hidden;"><div class="acc-h" style="display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;"><span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+s.ci+'</span><div style="flex:1;min-width:0;"><div style="font-size:11px;color:#8a8578;font-weight:700;">'+s.label+'</div><b style="font-size:13.5px;color:#17171b;">'+esc(title)+'</b></div>'+(price?'<span style="font-size:12.5px;font-weight:800;color:#3a3a40;flex:0 0 auto;">'+price+'</span>':'')+'<span class="acc-i" style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#c9c5bd;">expand_more</span></div><div class="acc-b" style="display:none;padding:2px 13px 13px 42px;"><p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:#55555c;">'+(o.none?esc(o.reason||''):('실재고 상품입니다 — '+esc(fmtSpec(o.spec)||'등록된 사양 정보가 없습니다.')))+'</p>'+(o.none?'':'<div style="font-size:11.5px;color:#8a8578;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;">inventory_2</span>'+(o.maker?esc(o.maker)+' · ':'')+'상품코드 '+o.product_code+(tagLine(o.tags)?' · '+esc(tagLine(o.tags)):'')+'</div>')+'</div></div>';});box.innerHTML=html;Array.prototype.forEach.call(box.querySelectorAll('.acc-h'),function(h){h.addEventListener('click',function(){var b=h.parentNode.querySelector('.acc-b');var ic=h.querySelector('.acc-i');if(b.style.display==='block'){b.style.display='none';if(ic)ic.textContent='expand_more';}else{b.style.display='block';if(ic)ic.textContent='expand_less';}});});}
+// ---- compatNotes()/compatSection()/applyFix()/inspectBlock() 를 지웠다(A-72) ----
+// 예전 compatNotes()는 서버 호환 규칙 9행 중 소켓·메모리 2행만 개념이 비슷했다(그나마
+// 자체 문자열 비교). 전력 여유는 서버 규칙이 아니라 자체 공식(need=(TDP합+100)*1.6)이었고,
+// 쿨러 발열(TDP)은 조건 분기 없이 항상 '통과'였고, 나머지 쿨러 관련 규칙 3행(지원 소켓·
+// 쿨러 높이·라디에이터 장착)은 화면에 COOLER 슬롯 자체가 없어 검사할 방법이 없었다
+// (지시문 그대로 — A-71 조사 근거). inspectBlock()의 소비전력·발열·소음 수치도 같은
+// 자체 공식으로 지어낸 값이었다 — 실제로 만들어 본 적 없는 PC의 온도·소음을 화면이
+// 계산해 사실처럼 보여줬다(§화면 정직성 「숫자를 지어내지 않는다」 위반. S2 검수 섹션이
+// 이미 같은 이유로 이 수치들을 걷어냈다 — 여기서도 같은 방향으로 맞춘다). applyFix()는
+// 그 지어낸 판정을 되돌리는 기능이라 함께 지운다(서버는 "어느 슬롯을 어떻게 고치면
+// 되는지"를 답으로 주지 않는다 — 그걸 화면이 추측하면 또 판정을 지어내는 것이다).
+// 지금은 POST /api/expert/build 가 규칙 9행 전부로 판정하고, 화면은 그 결과만 그린다
+// (아래 renderChecks/validate).
+function checkVisual(p){
+ if(p===true)return{col:'var(--success, #2f9e6d)',bg:'var(--success-container, #e9f6ef)',ic:'check_circle',badge:'통과'};
+ if(p===false)return{col:'#b31b25',bg:'#fbecec',ic:'error',badge:'불통과'};
+ // pass===null — 「모른다」다. 색만 바꾸지 않고 글자도 병기한다(CANON — 색만으로
+ // 통과/실패를 말하지 않는다). S2 의 같은 판정과 같은 팔레트를 쓴다(③).
+ return{col:'#8a561a',bg:'#fdf3e2',ic:'help',badge:'확인 보류'};
+}
+function renderChecks(checks){return checks.map(function(c){var v=checkVisual(c.pass);return '<div style="display:flex;gap:10px;padding:11px 13px;border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;"><span style="font-family:\'Material Symbols Outlined\';font-size:20px;color:'+v.col+';flex:0 0 auto;">'+v.ic+'</span><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:13px;color:#17171b;">'+esc(c.label)+'</b><span style="font-size:10.5px;font-weight:800;color:'+v.col+';background:'+v.bg+';padding:2px 7px;border-radius:6px;">'+v.badge+'</span></div><p style="margin:4px 0 0;font-size:12.5px;line-height:1.6;color:#55555c;">'+esc(c.detail||'')+'</p></div></div>';}).join('');}
+function bannerHtml(kind,title,sub){var C={ok:['var(--success-container, #e9f6ef)','var(--success, #2f9e6d)','var(--success-deep, #0f5132)','var(--success-muted, #3d7a5c)','verified'],warn:['#fbecec','#b31b25','#8a1f22','#a15055','error'],pending:['#fdf3e2','#c77b1f','#8a561a','#a1783f','rule']}[kind]||['#fbecec','#b31b25','#8a1f22','#a15055','error'];return '<div style="display:flex;align-items:center;gap:11px;padding:14px 16px;border-radius:12px;background:'+C[0]+';"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:'+C[1]+';">'+C[4]+'</span><div><div style="font-size:15px;font-weight:900;color:'+C[2]+';">'+esc(title)+'</div><div style="font-size:12.5px;font-weight:600;color:'+C[3]+';">'+esc(sub||'')+'</div></div></div>';}
+// 발열·소음·소비전력은 실측 없이는 모르는 값이다(위 삭제 사유 참조) — S2 §2 검수
+// 섹션과 같은 문장을 쓴다. 전력 마진만 서버 실측(power_headroom_pct)이라 그대로 쓴다.
+function inspectBlock(s){var hp=s.compat&&s.compat.power_headroom_pct;var hpTxt=(hp==null)?'—':(hp+'%');var hpCol=(hp==null)?'#9a968d':(hp<15?'#ff9d7a':'var(--success-bright, #5fd6a0)');function card(l,v,c){return '<div style="background:#17171b;border-radius:13px;padding:13px 15px;"><div style="font-size:11px;color:#9a968d;font-weight:700;">'+l+'</div><div style="font-size:23px;font-weight:900;line-height:1.15;color:'+(c||'#fff')+';">'+v+'</div></div>';}var grid='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+card('전력 마진',hpTxt,hpCol)+card('부품 합계',s.total?s.total.toLocaleString()+'원':'—')+'</div>';var note='<p style="margin:10px 0 0;font-size:12.5px;line-height:1.6;color:#6b6b73;">발열·소음 실측치는 출고 시 이 PC의 실측 리포트로 제공됩니다. 새 제품 검사·포트/부팅 확인·3시간 안정성 테스트를 전부 통과해야 출고합니다.</p>';return grid+note;}
+function currentPicks(){var picks={};SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];picks[s.key]=(o&&!o.none)?o.product_code:null;});return picks;}
+function renderValidated(s){var bn=document.getElementById('s1-vbanner'),cp=document.getElementById('s1-compat'),ins=document.getElementById('s1-inspect');var checks=(s.compat&&s.compat.checks)||[];var nFail=0;checks.forEach(function(c){if(c.pass===false)nFail++;});var lead=(s.reasons&&s.reasons[0])||'';
+ if(bn)bn.innerHTML=nFail?bannerHtml('warn',nFail+'건의 호환 문제가 있어요',lead)
+  :(!s.complete?bannerHtml('pending','아직 다 고르지 않았어요',lead):bannerHtml('ok','전부 통과했습니다',lead));
+ if(cp)cp.innerHTML=checks.length?renderChecks(checks):'<p style="margin:0;font-size:13px;color:#8a8578;">이 조합에서 확인할 호환 규칙이 없습니다.</p>';
+ if(ins)ins.innerHTML=inspectBlock(s);
+ /* 진행 잠금은 «확인된 불통과»(pass===false)에만 건다 — «아직 안 골랐다»(pass===null·
+    !complete)는 막지 않는다. 「선택 안 함」은 유효한 선택이다(지시문 그대로 — 서버가
+    빈 슬롯을 pass:null 로 받아 정직하게 답하는 게 이 작업의 요지이지, 다 채워야만
+    진행하게 만드는 게 아니다). 완결 여부와 무관하게 실패 0건이면 진행할 수 있다. */
+ if(!nFail)enableConfirm(s.complete?'AI 검증을 통과했어요 — 이 구성으로 진행할 수 있어요.'
+                                    :'비워 둔 자리가 있어요 — 그래도 이 구성으로 진행할 수 있어요.');
+ else lockConfirm(lead||'경고를 해결해야 진행할 수 있어요.');}
+function validate(){var btn=document.getElementById('s1-validate'),bn=document.getElementById('s1-vbanner'),cp=document.getElementById('s1-compat'),ins=document.getElementById('s1-inspect');
+ lastBuild=null;lockConfirm('검증 중입니다…');if(btn)btn.disabled=true;
+ if(bn)bn.innerHTML=bannerHtml('pending','서버에서 검증하는 중…','호환 규칙 전체를 실재고 기준으로 대조하고 있어요.');
+ if(cp)cp.innerHTML='';if(ins)ins.innerHTML='';
+ fetch('/api/expert/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({picks:currentPicks()})})
+  .then(function(r){return r.json().catch(function(){return null;}).then(function(j){return{ok:r.ok,st:r.status,j:j};});})
+  .then(function(res){if(btn)btn.disabled=false;
+   if(!res.ok||!res.j||!res.j.sets||!res.j.sets.recommend){
+    var msg=(window.popcornProgress&&window.popcornProgress.errText)?window.popcornProgress.errText(res.j||{},res.st):('검증 요청이 실패했습니다(오류 '+res.st+')');
+    if(bn)bn.innerHTML=bannerHtml('warn','검증하지 못했어요',msg);
+    lockConfirm('검증에 실패했어요 — 위 안내를 확인하고 다시 시도해 주세요.');return;}
+   lastBuild=res.j;renderValidated(res.j.sets.recommend);})
+  .catch(function(e){if(btn)btn.disabled=false;
+   if(bn)bn.innerHTML=bannerHtml('warn','검증하지 못했어요','네트워크 오류로 서버에 닿지 못했습니다 — 다시 시도해 주세요.');
+   lockConfirm('검증에 실패했어요 — 다시 시도해 주세요.');});}
 // ---- talk 팝콘톡: 자유 문답 (LLM 지식 상담 — 파싱은 동일 제약객체, 견적 생성은 여전히 엔진) ----
 var TALK_SUGGEST=['게임용으로 100만원이면 어때요?','RTX 4060이면 배그 잘 돌아가요?','모니터도 같이 맞추는 게 좋을까요?','쓰던 PC 업그레이드 되나요?'];
 /* ── 「PC 상담인지」는 AI 가 판정한다 (2026-08-17 사장님 확정 「관문을 걷는다」) ──
@@ -832,7 +939,11 @@ function pickTier(){
  var ut=usageTier();
  if(ut)return ut;
  /* ② 용도가 없을 때만 화면이 소유한 낱말로 고른다(대상·관심 부품·원문).
-    ⚠ DB 어휘(게임·롤·배그·영상편집·방송·사무·개발)를 여기 되박지 마라 — 위 주석의 병이 돌아온다. */
+    ⚠ DB 어휘(게임·롤·배그·영상편집·방송·사무·개발)를 여기 되박지 마라 — 위 주석의 병이 돌아온다.
+    ⚠ 2026-08-19: guided 「대상」은 noFilter 라 consPairs 에 안 들어간다 — 아래 부모님·자녀·직원
+      패턴은 이제 guided 대상 답변만으로는 안 걸리고, 자유 입력(「요청」 등)에 같은 낱말이 있을
+      때만 걸린다. 예산대 추정이 조금 늦게(용도 답변 시점에 usageTier() 로) 좁혀질 뿐, 잘못된
+      값을 보여주지는 않는다 — BUDGET_ANY(전체 구성 기준)로 남아 있다가 좁혀진다. */
  var t=consPairs.map(function(p){return p.l+':'+p.v;}).join(' ');
  if(/4K|하이엔드|최상위|익스트림/.test(t))return{k:'extreme',from:null};
  if(/자녀|최신/.test(t))return{k:'latest',from:null};
@@ -879,6 +990,60 @@ function budgetUpdate(){
 }
 // 단일 제약객체 원칙: 같은 라벨은 누적이 아니라 교체 — 요약 카드도 제자리 갱신
 var consMap={};
+/* ── 「참고용」 칩 판정은 서버가 준다 — 화면이 라벨 이름으로 판정하지 않는다 (2026-08-19) ──
+   병: 예산·용도·선호는 실제로 후보를 거르는데 「요청」(자유 입력 원문 요약)은 걸러지지
+   않는다(`api/candidates.py` VERBATIM_LABELS — applied 이 늘 false). 그런데 사이드바
+   「현재 제약 요약」과 말풍선 조건 태그는 둘을 같은 모양의 칩으로 그려 왔다 — "RTX 4070
+   SUPER 꼭 넣어주세요"가 실제로 반영된 조건처럼 보였다(실제 추천엔 반영되지 않았는데도).
+   고친 방식: 화면이 "이건 부품명이라 조건이 아니다"를 스스로 판정하지 않는다(그건 이번
+   작업에서 하지 않기로 한 일이고, 하더라도 결국 또 다른 지어낸 판정이 된다). 대신 매
+   /api/candidates/count 응답이 이미 들고 있는 `effects[].applied`·`reason`을 그대로
+   옮긴다 — 이 규칙은 「요청」에만 매인 것이 아니라 서버가 "후보 수에 영향 없음"이라 답한
+   모든 라벨에 똑같이 적용된다(상한 없는 예산 표현·하한 없는 용도도 같은 처지).
+   effectMap 은 아직 응답이 없는 라벨에는 아무 말도 하지 않는다(null) — 모르는 것을
+   "조건 아님"으로 단정하는 것도 지어낸 판정이라 그렇게 하지 않는다. */
+var effectMap={};
+function markEffects(effects){
+ effectMap={};
+ (effects||[]).forEach(function(e){effectMap[e.label]={applied:e.applied,reason:e.reason};});
+}
+function chipMeta(label){return effectMap[label]||null;}
+/* 조건 배지("조건 N개" 사이드바 · 모바일 하단 바)는 consPairs.length 가 아니라
+   «서버가 실제로 적용한 것»만 센다(2026-08-19 사장님 확정 ② — 확인자 실측: 배지 5개인데
+   실제 적용은 1개뿐이었다). consPairs 자체는 손대지 않는다 — 서버로 보내는 단일 원천이고
+   참고용 값도 「요청」 원문처럼 근거로 남아야 한다(사장님 지시). 세는 방식만 여기서 바꾼다.
+   ⚠ 응답 전(chipMeta 없음 = null)은 «모름»이지 «미적용»이 아니다 — null 을 빼고 세면 응답이
+   오기 전 잠깐 배지가 낮았다가 응답 도착 후 다시 튀어 오른다(깜빡임). §화면 정직성
+   "모름을 조건 아님으로 단정하지 않는다"와 같은 원칙으로, 확정된 applied===false 만 빼고
+   null·true 는 둘 다 센다. */
+function recountCons(){
+ var n=0;
+ for(var i=0;i<consPairs.length;i++){
+  var meta=chipMeta(consPairs[i].l);
+  if(!meta||meta.applied!==false)n++;
+ }
+ consCount=n;
+ var c=document.getElementById('s1-cons-count');if(c)c.textContent='조건 '+consCount+'개';
+ mbarUpdate();
+}
+/* 사이드바 칩 하나를 서버 판정에 맞게 다시 칠한다. background는 건드리지 않는다 — 값이
+   바뀔 때 나는 호박색 플래시(아래 ex 분기)와 같은 속성을 다투면 플래시가 먹히기 전에
+   지워진다. border·아이콘 색·설명 문구만 쓴다. */
+function styleConsChip(label){
+ var el=consMap[label];if(!el||!el.children||el.children.length<2)return;
+ var ic=el.children[0],body=el.children[1];
+ var meta=chipMeta(label),ref=!!(meta&&meta.applied===false);
+ el.style.border=ref?'1.5px dashed #ddd8ce':'1.5px solid transparent';
+ if(ic)ic.style.color=ref?'#c9c5bd':'#2b5fd9';
+ var note=body.querySelector('[data-reftag]');
+ if(ref){
+  if(!note){note=document.createElement('div');note.setAttribute('data-reftag','1');
+   note.style.cssText='font-size:10.5px;color:#8a8578;font-weight:700;margin-top:4px;line-height:1.4;';
+   body.appendChild(note);}
+  note.textContent=(meta.reason||'후보 수에는 영향 없음')+' · 참고용';
+ }else if(note){note.remove();}
+}
+function styleAllCons(){for(var k in consMap)styleConsChip(k);}
 var _bgAddConstraint=addConstraint;
 addConstraint=function(icon,label,value){
  panelReveal();
@@ -897,7 +1062,8 @@ addConstraint=function(icon,label,value){
  for(var i=0;i<consPairs.length;i++){if(consPairs[i].l===label){consPairs[i].v=value;found=true;break;}}
  if(!found)consPairs.push({l:label,v:value});
  budgetUpdate();
- mbarUpdate();
+ recountCons();   /* mbarUpdate() 포함 — 배지도 이 시점 기준(응답 전이면 낙관적으로)으로 다시 센다 */
+ styleConsChip(label);   /* 새 값도 즉시 판정 상태로 칠한다(응답 전이면 기본 모양) */
 };
 // ---- 엔진 v0 LIVE 연동 (슬라이스 4) — 성공 시 카운터·필터 로그를 실측으로, 실패(file://·정적)면 26,480 연출 원형 ----
 var LIVE=false,_srv=false,_seq=0,_ct=null;
@@ -931,8 +1097,11 @@ function applyCount(d,snap){
     **먼저** 최신 응답을 꽂아 둔다. 뒤에 두면 enable() 이 낡은(또는 없는) 판정을 보고
     「세는 중」으로 막아 **견적 가능한데도 확정 버튼이 영영 안 열린다**(자체 검증에서 잡음). */
  lastCount=d;if(snap)lastSnap=snap;
+ markEffects(d.effects);   /* 조건 칩 색·설명이 이 응답 기준으로 서게 한다(specTags·styleAllCons 공용) */
  _srv=true;candidates(d.count);_srv=false;
- poolN=d.count;if(typeof mbarUpdate==='function')mbarUpdate();
+ poolN=d.count;
+ /* 조건 배지도 이 응답 기준으로 다시 센다 — 새로 확정된 applied 가 반영된다(recountCons()). */
+ recountCons();
  /* 이미 뿌려진 제안 말풍선의 숫자도 서버 값으로 맞춘다 — 낡은 수를 남기지 않는다.
     ⚠ 2026-08-17 수정: 옛 코드는 `#s1-msgs b` 를 훑어 정규식 `/^[\\d,]+개$/` 로 걸렀는데,
     그 문자 클래스는 «숫자»가 아니라 { \ , d , 쉼표 } 라 **한 건도 잡지 못했다**(브라우저
@@ -947,6 +1116,7 @@ function applyCount(d,snap){
     「게임용으로 200만원」 태그에 「547개·불가」가 붙는다(U-15). */
  fillVerdicts(d,null,snap);
  renderEffects(d.effects);
+ styleAllCons();   /* 사이드바 "현재 제약 요약" 칩도 같은 판정으로 다시 칠한다 */
  /* 후보 수가 0이 아니어도 슬롯 하나가 비면 견적을 만들 수 없다(슬라이스 48).
     판단은 서버의 buildable/verdict만 쓴다 — 화면이 '3구성 가능'을 추측하지 않는다. */
  var nb=(d.buildable===false),zero=(d.count===0);
@@ -983,10 +1153,10 @@ function dropCons(label){
  var box=document.getElementById('s1-cons'),eb=document.getElementById('s1-cons-empty');
  if(box&&eb&&!Object.keys(consMap).length)eb.style.display='';
  /* 조건 수도 함께 줄인다 — 칩은 사라지는데 배지·하단 바가 「조건 3개」로 남아 있었다.
-    수는 세지 말고 제약 객체의 길이를 그대로 쓴다(단일 원천). */
- consCount=consPairs.length;
- var cc=document.getElementById('s1-cons-count');if(cc)cc.textContent='조건 '+consCount+'개';
- budgetUpdate();mbarUpdate();scheduleCount();
+    2026-08-19: consPairs.length 를 그대로 쓰지 않는다 — recountCons() 가 applied===true
+    (+응답 전 모름)만 센다(사장님 확정 ②). */
+ recountCons();
+ budgetUpdate();scheduleCount();
 }
 /* 완화 칩을 실측으로 다시 그린다 — '이걸 풀면 몇 개가 되고, 견적이 되는가'를 서버에 묻는다.
    목업의 '+1,240개'는 서버가 모르는 수였다(슬라이스 48). */
@@ -1148,7 +1318,7 @@ document.addEventListener('click',function(ev){
  if(!LIVE)return;
  var t=ev.target&&ev.target.closest?ev.target.closest('button'):null;
  if(!t)return;
- if(t.id==='s1-xconfirm')return;/* expert는 부품 직접 지정 — v1 제외, 더미 이동 유지 */
+ if(t.id==='s1-xconfirm')return;/* expert 전용 리스너(아래 mode==='expert' 초기화)가 처리한다 — 여기서는 가로채지 않는다 */
  if(t.id==='s1-confirm'&&!t.disabled){ev.stopImmediatePropagation();ev.preventDefault();goRecommend(t);return;}
  if((t.textContent||'').indexOf('이 조건으로 견적 받기')>-1){ev.stopImmediatePropagation();ev.preventDefault();if(!t.disabled)goRecommend(t);}
 },true);
@@ -1166,9 +1336,20 @@ if(mode==='guided'){
  var _eib=document.getElementById('s1-inputbar');if(_eib)_eib.style.display='none';
  var _gr=document.getElementById('s1-grid');if(_gr)_gr.style.gridTemplateColumns='1fr';
  var _as=document.getElementById('s1-aside');if(_as)_as.style.display='none';
- renderParts();resetValidation();
+ loadExpertSlots();
  var _evb=document.getElementById('s1-validate');if(_evb)_evb.addEventListener('click',validate);
- var _xc=document.getElementById('s1-xconfirm');if(_xc)_xc.addEventListener('click',function(){if(!_xc.disabled)window.location.href='s2-result.html';});
+ var _xc=document.getElementById('s1-xconfirm');if(_xc)_xc.addEventListener('click',function(){
+  if(_xc.disabled||!lastBuild)return;
+  /* S2 로 넘기는 방법은 다른 모드(goRecommend, 위 참조)와 같다 — localStorage 에 서버
+     응답을 그대로 담는다. session_id·access_key 는 응답 최상위에 이미 있어 함께
+     저장된다(S3 부품 변경이 이어지려면 이 값이 필요하다 — 지시문 그대로).
+     다시 fetch 하지 않는다: 부품을 하나라도 바꾸면 resetValidation() 이 즉시 이 버튼을
+     잠그므로(lockConfirm), 버튼이 눌리는 시점의 lastBuild 는 항상 지금 고른 구성과
+     일치하는 검증 결과다 — AI 검증하기가 이미 서버에 남긴 세션을 또 만들 이유가 없다. */
+  localStorage.setItem('popcorn-quote',JSON.stringify({at:Date.now(),data:lastBuild}));
+  try{localStorage.removeItem('popcorn-quote-tier');}catch(e){}
+  window.location.href='s2-result.html';
+ });
 }else if(mode==='talk'){var _tgb=document.getElementById('s1-gearbar');if(_tgb)_tgb.style.display='none';
  panelLatent();
  if(cap)cap.textContent='용도와 예산을 알려주시면 견적을 만들 수 있어요.';
@@ -1396,7 +1577,12 @@ function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value=
    if(useFb)addAI(USE_FALLBACK_NOTE);   /* 폴백으로 잡은 용도는 그 사실을 밝힌다 */
    if(cons.length){
     cons.forEach(function(c){addConstraint(c.i,c.l,c.v);});   // → scheduleCount() → 서버 재계산
-    setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},700);
+    /* ⚠ 예전 문구 「말씀 반영해 이렇게 잡았어요」는 사실이 아니었다 — cons 는 AI 가 실제로
+       조건으로 옮긴 부분일 뿐, 고객이 보낸 문장 전체("말씀")가 아니다. 부품명 요청처럼
+       조건이 되지 못한 부분도 있을 수 있다 — 그 원문은 아래 「요청」 칩에 참고용으로
+       남는다(specTags 의 ref 스타일 · chipMeta). 여기서 그 구분을 다시 판정하지 않는다 —
+       "어디까지 조건으로 읽었는지"만 정직하게 말한다. */
+    setTimeout(function(){addProposal('말씀 중 조건으로 읽어낸 부분만 반영했어요.');nudgeRow();},700);
    }else if(!err){
     addAI('말씀은 기록했어요. 다만 <b>후보 수를 바꾸는 조건</b>으로는 아직 못 읽었어요 — '+SRV_HINT);
    }
@@ -1405,7 +1591,9 @@ function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value=
  }
  poolUnknown(SRC_NOTE.off);
  logFilter('입력 이해',null,['입력하신 조건 반영']);
- setTimeout(function(){addProposal('말씀 반영해 이렇게 잡았어요.');nudgeRow();},400);}
+ /* 비-LIVE 는 서버가 없어 무엇이 실제 조건이 됐는지조차 모른다 — "반영했다"고 말할
+    근거가 없다. 다른 비-LIVE 자리(위 mg 리스너·overConstrain)와 같은 문구로 맞춘다. */
+ setTimeout(function(){addProposal('입력을 기록했어요.');nudgeRow();},400);}
 if(snd)snd.addEventListener('click',send);
 if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();send();}});
 function focusInput(){var ib=document.getElementById('s1-inputbar');if(ib&&ib.style.display==='none')ib.style.display='';var gf=document.getElementById('s1-guided-foot');if(gf)gf.style.display='none';if(!inp)return;inp.scrollIntoView({behavior:'smooth',block:'nearest'});inp.focus();inp.classList.remove('s1-flash');void inp.offsetWidth;inp.classList.add('s1-flash');setTimeout(function(){inp.classList.remove('s1-flash');},2100);}
