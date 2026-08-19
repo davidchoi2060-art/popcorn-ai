@@ -132,6 +132,31 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
 .a2-hd .a2-now{font:600 13px/1 var(--font)}
 .a2-hd .a2-badge{font:500 10px/1 var(--font-num);color:var(--rv-faint);padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px}
 .a2-hd .a2-grow{flex:1}
+/* ── 「허브」 단추 — 내부 접근 허브(INT-GATE-010, `/mvp1/index.html`)로 가는 링크.
+   자리는 `a2-grow` 뒤 · 권한 표시(`a2-roles`) 앞(2026-08-18 사장님 지시).
+
+   ■ 왜 `.a2-hd .a2-hub` 로 «좁게» 거는가
+     69~76행이 적어 둔 사고(`:where(.a2-shell) a{color:inherit}` 를 특정성 0으로 낮춘 건)의
+     반대 방향 실수를 피하기 위해서다. 여기서 `.a2-shell a.a2-hub` 같은 넓은 선택자를 쓰면
+     또다시 화면 규칙을 이기는 자리가 생긴다. `.a2-hd` 안으로 한정하면 영향 범위가 헤더뿐이고,
+     특정성 (0,2,0) 은 `:where(...) a` (0,0,1) 을 소스 순서와 무관하게 이겨 색이 확정된다.
+     ⚠ 색을 명시하지 않으면 `color:inherit` 를 타고 헤더 글자색이 되어 링크로 안 보인다.
+
+   ■ 왜 `.a2-roles` 와 «닮았으되 같지 않은가»
+     높이·모서리·테두리 두께·좌우 padding 을 `.a2-roles` 와 맞춰 상단바 한 줄이 흐트러지지
+     않게 한다(둘 다 border 1px + padding 6px 10px + line-height 1 · 10.5px → 24.5px).
+     구별은 «역할»로 준다 — 허브는 **이동**이라 팔레트의 링크색(`--rv-link`)에 굵기 600,
+     권한 표시는 **정보**라 본문색에 굵기 500. 색만으로 구분하지 않도록 글자(「허브」)가 있다.
+
+   ■ 헤더 높이 52px 불변: `.a2-hd` 는 `min-height:52px` + `padding:8px` 이라 내용 높이가
+     36px 를 넘지 않는 한 52px 로 유지된다. 이 단추는 24.5px 로 기존 `.a2-avatar`(26px)보다
+     낮아 헤더를 밀지 않는다. 768px 이하에서는 `.a2-hd` 의 `flex-wrap:wrap` 이 이미 처리하고,
+     `flex:none` + `white-space:nowrap` 이라 줄 안에서 찌그러지거나 넘치지 않는다. ── */
+.a2-hd .a2-hub{display:inline-flex;align-items:center;flex:none;white-space:nowrap;
+       border:1px solid var(--rv-dim3);border-radius:5px;padding:6px 10px;background:var(--rv-card);
+       font:600 10.5px/1 var(--font);color:var(--rv-link);text-decoration:none}
+.a2-hd .a2-hub:hover{border-color:var(--rv-dim);background:var(--rv-panel2)}
+.a2-hd .a2-hub:focus-visible{outline:2px solid var(--rv-link);outline-offset:1px}
 .a2-roles{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden;padding:6px 10px;
        font:500 10.5px/1 var(--font);color:var(--on)}
 .a2-avatar{width:26px;height:26px;border-radius:50%;background:var(--rv-dim4);border:1px solid rgba(0,0,0,.12);flex:none}
@@ -177,4 +202,65 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
      .a2-lnb.collapsed 하위 규칙이 그대로 처리 — 그 규칙들은 건드리지 않았다). 769px
      이상·64px 값 자체·클래스 이름은 이 블록 밖이라 영향 없음. */
   .a2-lnb.collapsed{width:100%}
+
+  /* 좁은 폭 상단바 — 허브 단추를 숨긴다 (㉯ 확정, 2026-08-19). 전날(2026-08-18) 넣은 ㉮ 안
+     (허브를 남기고 padding 만 줄이는 것)을 대체한다 — 마크업(`_admin2_shell.html.j2`)은
+     그대로이고 이 CSS 만으로 숨긴다.
+
+     ⚠⚠ 수를 적을 때는 «조건»을 반드시 함께 적을 것. 이 주석은 하루에 세 번 고쳐졌고
+        세 번 다 원인이 같았다 — 조건을 안 적은 수를 사실로 읽은 것이다. ㉮ -> ㉯ 로
+        바뀌어도 이 규약과 아래 세 사고는 낡지 않아 그대로 남긴다.
+          (1) 고정 1.0초 대기로 재서, 아직 안 채워진 header_extra 를 「좋아졌다」로 읽음
+          (2) 시험 계정 이름으로만 재서, 실계정에서만 깨지는 것을 못 봄
+          (3) 스크롤바를 끄고 재서, 모든 화면을 15px 낙관 쪽으로 봄
+        그래서 수치를 적을 때는 **폭 · 이름 길이 · 스크롤바 유무**를 항상 함께 적는다.
+          이름   시험 `UI점검 · 관리자` = `.a2-roles` 85.3px   실계정 `davidchoi2060 · 관리자` = 129.2px
+          스크롤바  ≤768px 은 세로 스크롤이 생겨 실제로는 거의 «있음» — 안쪽 폭이 732 -> 717px
+
+     ■ 이 규칙이 하는 일 — 768px 이하에서 허브를 지우고, 열간격 회수는 그대로 둔다
+         .a2-hd .a2-hub{display:none}     허브의 폭·높이 기여가 0이 된다(마크업은 그대로 —
+                                          `_admin2_shell.html.j2` 미변경, CSS만으로 숨김)
+         column-gap 10px -> 7px           9칸 x 3px = 27px 회수 (사장님 재확정 · 값 불변)
+       ㉮ 안은 허브를 «줄여서 유지»해 순비용을 낮추려 했다(허브 padding 6px 10px -> 4px 6px,
+       순비용 약 +15.2px). ㉯ 는 허브를 아예 지워 그 비용을 0으로 만든다 — 줄이는 것이 아니라
+       없애는 것이라 회수한 27px 이 상쇄 없이 그대로 여유가 된다. **좁은 폭 상단바는 허브
+       도입 «전»보다 27px 여유가 생긴다** — 결함이 아니라 사장님이 의도한 개선이다.
+       허브 전용 padding 규칙(㉮ 안)은 걷어냈다 — `display:none` 인 요소의 padding 은 아무
+       효과가 없고, 남겨두면 「왜 안 보이는 것에 padding 이 있나」를 다음 사람이 다시
+       조사해야 한다.
+
+     ⚠ `/admin2/category-mapping` 은 이 폭에서 가장 얇은 화면이다 — 경과를 남긴다(지우지 않음).
+         ㉮ 시절(허브를 남기고 줄이기만 함)   여유 15.8px, **0.7px 차이로** 살아남았었다
+         ㉯ 지금(허브 숨김 · 확인자 실측)     여유 **39.8px** = 15.8 + **24.0**
+             (보이는 자식 9개 중 허브를 뺀 8칸 × 열간격 회수분 3px = 24.0px — 계산과 실측 일치)
+       살얼음은 풀렸다. 그래도 **「헤더에 무엇을 더하려면 먼저 이 화면부터 계측을 돌릴 것」
+       규칙 자체는 남긴다** — 여유가 커져도 «이 폭에서 가장 얇은 화면»이라는 자리는 바뀌지
+       않는다. 1줄 높이(52px)는 그대로다.
+
+     ■ 확인자 실측 (768px · 실계정 이름 `davidchoi2060 · 관리자` 129.2px · 스크롤바 있음
+       (`show`) · `cdp_sweep.py`):
+         categories        52.0px (1줄)  완전 회복 — 허브 도입 전과 동일
+         products          52.0px (1줄)  완전 회복 — 허브 도입 전과 동일
+         category-mapping  여유 39.8px, 1줄 h=52 (위 참조)
+         ai-response-log   73.0 -> 52.0px   열간격 회수로 문턱을 넘어 개선
+         compat-rules      71.5 -> 52.0px   열간격 회수로 문턱을 넘어 개선
+       40화면 전수: **`cur_long > pre_long`(허브 도입 전보다 나빠진 화면) 0건.**
+       폭 경계: 1450px 40/40 화면 `.a2-hub` 표시 유지 · 769px(브레이크포인트 바로 위 1px)
+       `display:flex`·`column-gap:10px`로 미디어쿼리 누출 없음 · 768px 40/40 화면
+       `.a2-hub` `display:none` 확인. 결함 0 · 회귀 896건 전건 통과.
+
+     ⚠ **아직 2줄인 화면이 있다 — 그런데 원인이 이 CSS 가 아니다. 이 구분을 지우지 말 것**
+       (안 지우면 다음 사람이 이 두 화면을 보고 이 CSS 를 다시 의심한다):
+         mall-sync      66.0px (2줄)   잔존 원인 header_extra `.ms-hd-node` 282.6px
+         ops-settings   67.0px (2줄)   잔존 원인 header_extra `.os-stagechip`+`.os-verdictnote`
+       확인자가 실브라우저로 확인했다 — 두 화면 다 `.a2-hub` 는 이미 `display:none` 인데도
+       2줄이고, **`cur_long == pre_long`**(허브 도입 «전»과 정확히 같은 높이)다. 즉 이 CSS 가
+       새로 깨뜨린 것이 아니라 **허브가 있던 적도 없는 것과 같은 기준선**이다. 원인은 각 화면
+       자체의 header_extra 폭이고, 여기서 고치지 않는다 — 셸이 화면 사정을 떠안기 시작하면
+       그게 다음 복제가 된다.
+     ■ 계측기: scratchpad `cdp_sweep.py` (인자: routes 파일 · 폭들 · 세션쿠키 · show|hide).
+       고정 대기를 쓰지 않는다(로드 + 네트워크 정적 + 헤더 지문 안정). `/admin2/dash` 는
+       헤더에 시각·상태 문자열이 살아 움직여 지문이 «영영 안 굳는다» — settled=False 가 정상이다. */
+  .a2-hd{column-gap:7px}
+  .a2-hd .a2-hub{display:none}
 }

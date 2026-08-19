@@ -29,7 +29,10 @@
     head_extra        <head> 안 추가 자산 — Phoenix/Bootstrap 벤더 CSS(구 화면 이관용)
                        또는 화면 전용 <style>(본문 색은 admin2.css 별칭을, 레이아웃만 이걸로)
     body_attrs_extra   <body> 추가 속성(예: data-dummy-fallback)
-    header_extra       헤더의 권한 표시 뒤 · 아바타 앞 — 화면별 위젯(탭·상태 표시 등)
+    header_extra       헤더의 화면ID 배지 뒤 · 여백(`a2-grow`) 앞 — 화면별 위젯(탭·상태 표시 등)
+                       ⚠ 이 줄은 오래 「권한 표시 뒤 · 아바타 앞」이라 적혀 있었으나 마크업과
+                         어긋난 설명이었다(2026-08-18 정정). 실제 순서는 아래 <header> 그대로:
+                         crumb/now -> 배지 -> **header_extra** -> a2-grow -> 허브 -> 권한 -> 아바타
     content            본문. 헤더 바로 아래, `.a2-main` 안에 그대로 들어간다
     foot_extra         </body> 직전 — Phoenix/Bootstrap 벤더 JS 또는 화면 자체 <script>
 
@@ -86,6 +89,27 @@
       <span class="a2-badge">{{ screen_id }}</span>
       {% block header_extra %}{% endblock %}
       <span class="a2-grow"></span>
+      {#  「허브」 — 내부 접근 허브(INT-GATE-010 · `/mvp1/index.html`)로 가는 단추.
+          · 경로는 «루트 상대»다. 도메인을 박으면 로컬(127.0.0.1:8000)과 배포
+            (admin.popcornai.co.kr) 중 한쪽에서 깨진다 — 같은 마크업이 양쪽에서 돈다.
+          · `target="_blank"` = 사장님 지시(별도 탭). `rel="noopener"` 는 새 탭이
+            `window.opener` 로 이 창을 조작하지 못하게 막는 짝이라 함께 단다.
+          · 클릭 핸들러를 두지 않는다. 순수 링크다 — `data-action` 은 마크업 규약에
+            따른 표식일 뿐이고, 화면들의 `closest('[data-action]')` 위임은 전부
+            이름을 switch 로 가려 무조건 preventDefault 하는 곳이 없다(실측 27곳).
+          · `data-keep="1"` — **새 탭으로 열기 때문에** 원래 탭은 그 자리에 남는다.
+            이 표식이 없으면 화면들의 「바깥 클릭 = 선택/서랍 해제」 위임(실측 8곳:
+            ai_task_settings·ai_usage_cost·build_map·handoff_log·price_review·
+            product_deleted·reviews·sale_price)이 허브 클릭을 바깥 클릭으로 읽어,
+            돌아왔을 때 서랍이 이유 없이 닫혀 있다 — 얻는 것 없이 잃기만 한다.
+            같은 탭 이동이었다면 붙이지 않았을 표식이다.
+            그 8곳은 `data-keep` 이 맞으면 **`return` 할 뿐 preventDefault 를 부르지
+            않는다**(실측 0건). 즉 「아무것도 안 함」이 링크 기본 동작을 막지 않는다.
+          · 라벨은 고객 화면 FAB(`mockups/shared/hub-fab.js`)와 같은 「허브」,
+            title·aria-label 은 그 화면의 정본 명칭 「내부 접근 허브」. #}
+      <a class="a2-hub" href="/mvp1/index.html" target="_blank" rel="noopener"
+         data-action="open-hub" data-keep="1"
+         title="내부 접근 허브" aria-label="내부 접근 허브">허브</a>
       <span class="a2-roles" id="roleBox">확인 중…</span>
       <span class="a2-avatar"></span>
     </header>
