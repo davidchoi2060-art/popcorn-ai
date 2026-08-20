@@ -13,6 +13,10 @@
   관리자 화면(ADM-CUS-020)의 숨김·신고 처리 대상이 된다.
 인증(슬라이스 38): **회원 경계는 세션이 정한다** — 요청 본문의 이메일은 더 이상 받지 않는다.
 수정·삭제는 범위 밖(관리자 숨김만 — 목업에도 없음).
+
+고객 쓰기 잠금(2026-08-20, 지인·테스터 오픈 준비): 후기 작성은 `customer_write_lock`
+스위치가 켜져 있으면 403으로 거부된다 — 근거·켜는 법은 그 모듈 docstring 참조.
+기본은 꺼짐(지금 동작 그대로).
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -20,6 +24,7 @@ from sqlalchemy import text
 
 from .timeutil import iso
 from .customer_auth import require_member
+from .customer_write_lock import write_locked, REASON as WRITE_LOCK_REASON
 from .db import engine
 
 router = APIRouter(prefix="/api/my")
@@ -111,6 +116,10 @@ class ReviewBody(BaseModel):
 @router.post("/reviews")
 def write_review(body: ReviewBody):
     me = require_member()
+    if write_locked():
+        # my-review-write.html 은 res.j.detail 을 문자열로 그대로 이어붙인다 —
+        # 객체를 주면 "[object Object]"가 뜬다. 이 엔드포인트는 문자열로 둔다.
+        raise HTTPException(403, WRITE_LOCK_REASON)
     if not 1 <= body.rating <= 5:
         raise HTTPException(400, "별점은 1~5 사이여야 합니다")
     text_body = (body.body or "").strip()

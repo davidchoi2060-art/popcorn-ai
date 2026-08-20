@@ -7,6 +7,12 @@
 고객 접수 즉시 관리자 주문·배송 화면의 상태 전이가 잠긴다(admin_orders._guard_refund 409).
 접수 가능 상태: 결제완료(주문 취소)·조립중(주문 취소)·배송중(환불)·완료(반품·교환, 활성 환불 없을 때).
 이관(ADM-CLM-010): reason_detail 저장 컬럼·부분 환불·접수 철회(현재 불가 — 접수 주문은 활성 잠금).
+
+고객 쓰기 잠금(2026-08-20, 지인·테스터 오픈 준비): 환불 접수는 `customer_write_lock`
+스위치가 켜져 있으면 403으로 거부된다 — 근거·켜는 법은 그 모듈 docstring 참조.
+기본은 꺼짐(지금 동작 그대로). ⚠ `ops_snapshot`의 `refund`(own/mall)와는 다른 축이다 —
+그건 접수된 건을 누가 처리하는지를 정할 뿐 접수 자체를 막지 않는다(아래 create_refund
+실측 그대로).
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -15,6 +21,7 @@ from sqlalchemy import text
 from .timeutil import iso
 from .admin_orders import STEP, _item_label, refund_label
 from .customer_auth import require_member
+from .customer_write_lock import write_locked, REASON as WRITE_LOCK_REASON
 from .db import engine
 
 router = APIRouter(prefix="/api/my")
@@ -85,6 +92,11 @@ class RefundBody(BaseModel):
 @router.post("/refunds")
 def create_refund(body: RefundBody):
     me = require_member()
+    if write_locked():
+        # my-orders.html 은 res.j.detail 을 객체로 보고 .detail/.error 를 꺼낸다
+        # (409 invalid_state·refund_active 와 같은 모양) — 문자열만 주면
+        # "잠시 후 다시 시도해 주세요"로 뭉개져 사유가 안 보인다.
+        raise HTTPException(403, {"error": "write_locked", "detail": WRITE_LOCK_REASON})
     if body.reason_type not in REASONS:
         raise HTTPException(400, f"알 수 없는 사유: {body.reason_type}")
     with engine.begin() as conn:
