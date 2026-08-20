@@ -453,18 +453,33 @@ function guidedAsk(){
      sort_order 앞이라 '고사양 게임'이 먼저 걸린다) — 문장이 말한 «주로»는 영상편집이다.
      칩 문장을 고치는 것도, 이 경로를 parseAll(AI)로 돌리는 것도 화면 설계·비용 판단이라
      제작자가 임의로 정하지 않는다 — 결함으로 보고했다. */
+/* ── chat 시나리오·넛지 칩도 guided 와 같은 처분표를 쓴다 (2026-08-20) ──
+   guided 의 noFilter(위 318행 주석)와 같은 이유: api/candidates.py 처분표
+   (BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·VERBATIM_LABELS)에 없는 라벨은
+   `_apply_one`의 마지막 catch-all("구성 단계(스코어)에서 반영")로 떨어져
+   **항상 applied=false**다 — 재고에 그런 스코어링 단계가 없으므로 사실은 「후보
+   수에 영향 없음」인데, specTags()·styleConsChip()이 그걸 회색·점선·「참고」로
+   그려 마치 뭔가 접수는 된 것처럼 보인다(확인자 실측: 「성능」칩). 값 대조 결과 —
+     그대로 둔다(값에 달렸다)   예산(cap 있을 때) · 용도(하한 있을 때) · 선호(저소음·화이트)
+     noFilter(항상 무자격)     성능 · 저장 · 그래픽 · 메모리 — 처분표 어디에도 없는 라벨
+   guided 는 버튼(Q_*.opts)이라 gAnswer()가 st.noFilter 하나로 걸렀지만, 여기 SCEN 은
+   튜플(cons:[[icon,label,value]]) 구조라 **4번째 자리**를 noFilter 표식으로 쓴다
+   (아래 chatScenario 에서 검사). NUDGES 는 guided 와 같은 객체형이라 noFilter:true 그대로.
+   ('예산 절감' 넛지는 이미 아래 LIVE 부트스트랩(`NUDGES=NUDGES.filter(...)`)에서 배열째 제외된다 —
+   상한 없는 값이라 이것도 결국 무자격이지만, 제거 사유(예산 역설 방지)가 달라 그 줄은
+   그대로 둔다.) */
 var SCEN=[
  {t:'롤·발로란트 고주사율로 부드럽게 (100만)',useFrom:true,cons:[['savings','예산','100만원 이하']],f:0.22,why:['100만 초과 부품 제외']},
- {t:'4K 영상편집 주로, 가끔 고사양 게임',useFrom:true,cons:[['memory','메모리','대용량 램']],f:0.28,why:[]},
+ {t:'4K 영상편집 주로, 가끔 고사양 게임',useFrom:true,cons:[['memory','메모리','대용량 램',true]],f:0.28,why:[]},
  {t:'사무·인강용 조용하고 저렴하게',useFrom:true,cons:[['volume_off','선호','저소음']],f:0.34,why:['고소음 부품 제외']}
 ];
 var NUDGES=[
  {t:'더 조용하게',icon:'volume_off',cl:'선호',v:'저소음',f:0.82,why:['고소음 부품 추가 제외']},
- {t:'성능 더 올려',icon:'bolt',cl:'성능',v:'성능 상향',f:0.7,why:['한 단계 낮은 부품 제외']},
+ {t:'성능 더 올려',icon:'bolt',cl:'성능',v:'성능 상향',f:0.7,noFilter:true,why:['한 단계 낮은 부품 제외']},
  {t:'예산 아껴',icon:'savings',cl:'예산',v:'예산 절감',f:0.75,why:['상위가 부품 제외']},
  {t:'화이트로',icon:'palette',cl:'선호',v:'화이트',f:0.85,why:['화이트 외 케이스 제외']},
- {t:'저장공간 크게',icon:'hard_drive',cl:'저장',v:'대용량 저장',f:0.88,why:['소용량 저장장치 제외']},
- {t:'그래픽 한 단계 위',icon:'monitor',cl:'그래픽',v:'GPU 상향',f:0.72,why:['하위 GPU 제외']}
+ {t:'저장공간 크게',icon:'hard_drive',cl:'저장',v:'대용량 저장',f:0.88,noFilter:true,why:['소용량 저장장치 제외']},
+ {t:'그래픽 한 단계 위',icon:'monitor',cl:'그래픽',v:'GPU 상향',f:0.72,noFilter:true,why:['하위 GPU 제외']}
 ];
 var usedNudges={};
 function addSpec(label,value,icon){addConstraint(icon,label,value);}
@@ -528,13 +543,18 @@ function addProposal(lead){var d=document.createElement('div');d.style.cssText='
  /* 이미 최신 서버 값이 있고 재계산 대기도 없으면 즉시 채운다 — 태그도 그 응답의 스냅샷으로. */
  if(LIVE&&!_pending&&lastCount)fillVerdicts(lastCount,null,lastSnap);}
 function nudgeRow(){var avail=NUDGES.filter(function(n){return !usedNudges[n.t];});if(!avail.length)return;var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';avail.forEach(function(n){var c=document.createElement('span');c.style.cssText='background:#fff;border:1.5px solid #e2ded5;color:#3a3a40;padding:9px 13px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;';c.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">'+n.icon+'</span>'+n.t;c.addEventListener('click',function(){chatNudge(n,row);});row.appendChild(c);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
-function chatNudge(n,row){usedNudges[n.t]=true;if(row){Array.prototype.forEach.call(row.children,function(x){x.style.pointerEvents='none';});row.style.opacity='.45';}addUser(n.t);addSpec(n.cl,n.v,n.icon);logFilter(n.cl,null,n.why);if(!LIVE)poolUnknown(SRC_NOTE.off);setTimeout(function(){addProposal('네, <b>'+n.t+'</b> 반영해 다시 잡았어요.');nudgeRow();},400);}
+/* noFilter 넛지·시나리오 조건은 addSpec(→addConstraint→consPairs→서버 전송)·logFilter(가짜
+   필터 사유)를 건너뛴다 — guided gAnswer() 의 noFilter 분기와 같은 처리다. 「반영했다」고
+   말하지 않는 안내만 남긴다(위 SCEN/NUDGES 주석). */
+function chatNudge(n,row){usedNudges[n.t]=true;if(row){Array.prototype.forEach.call(row.children,function(x){x.style.pointerEvents='none';});row.style.opacity='.45';}addUser(n.t);
+ if(n.noFilter){setTimeout(function(){addAI('네, <b>'+n.t+'</b> 말씀은 알아뒀어요 — 지금 조건 검색에는 반영되지 않아요.');nudgeRow();},400);return;}
+ addSpec(n.cl,n.v,n.icon);logFilter(n.cl,null,n.why);if(!LIVE)poolUnknown(SRC_NOTE.off);setTimeout(function(){addProposal('네, <b>'+n.t+'</b> 반영해 다시 잡았어요.');nudgeRow();},400);}
 function chatScenario(s,chipEl){if(chipEl)chipEl.style.display='none';addUser(s.t);
  USAGES_READY.then(function(){                     /* 용도 목록이 도착한 뒤에 조건을 접는다 */
   var cons=s.cons.slice(),why=(s.why||[]).slice();
   if(s.useFrom){var u=matchUsage(s.t);
    if(u){cons.unshift(['interests','용도',u]);var n=usageNote(u);if(n)why.unshift(n);}}
-  cons.forEach(function(k){addSpec(k[1],k[2],k[0]);});logFilter('입력 이해',null,why);
+  cons.forEach(function(k){if(!k[3])addSpec(k[1],k[2],k[0]);});logFilter('입력 이해',null,why);   /* k[3]=noFilter — 처분표에 없는 라벨은 보내지 않는다 */
   if(!LIVE)poolUnknown(SRC_NOTE.off);
   setTimeout(function(){addProposal('말씀 이해했어요. 이 방향으로 잡아봤어요.');nudgeRow();},400);});}
 function chatStart(){
@@ -672,7 +692,16 @@ var TALK_SUGGEST=['게임용으로 100만원이면 어때요?','RTX 4060이면 �
    견적이 갈렸다.** 이제 그 자리는 **비어 있고**, 용도는 talkSend 가 «한 자리에서»
    matchUsage(문장)로 서버 목록에서 접는다(chat 의 liveParse 와 같은 기준). 못 접으면
    용도를 붙이지 않는다 — 서버에 없는 용도를 만들지 않는다.
-   ⚠ 여기가 내는 것은 용도만이 아니다 — 상황·모니터·관심 부품·선호는 그대로 `p` 로 남는다. */
+   ⚠ 여기가 내는 것은 용도만이 아니다 — 상황·모니터·관심 부품·선호는 그대로 `p` 로 남는다.
+
+   ── 상황·관심 부품은 «처분표에 없는 라벨»이다 (2026-08-20 추가) ──
+   `p`(예:「업그레이드」의 상황·「4060」·「ddr」의 관심 부품)는 계속 만들지만, `api/candidates.py`
+   처분표(BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·VERBATIM_LABELS)에 없는 라벨이라 서버에
+   보내도 항상 applied=false — 회색·점선·「참고」 칩만 남기고 실제로는 아무것도 거르지 않는다
+   (모니터도 같은 문제였다 — 아래 talkMon·talkApply). `p.noFilter:true` 로 표시해 두면
+   talkApply()가 addSpec(→addConstraint→서버 전송) 자체를 건너뛴다 — 답변 문구(a)는 그대로
+   나가되 「조건에 반영했다」고 말하지 않는다. 선호·용도·예산(값에 캡·하한·저소음/화이트
+   토큰이 있을 때)은 실제로 거르므로 noFilter 를 달지 않는다. */
 var TALKS=[
  {k:['모르겠','몰라','글쎄'],a:'괜찮아요, 다들 그렇게 시작하세요. 거꾸로 가볼게요 — <b>예산 느낌</b>만 알려주시면 그 돈으로 뭘 할 수 있는지 보여드릴게요.',chips:['60만 안팎이요','100만 안팎이요','150만 이상도 괜찮아요']},
  {k:['사려','사고 싶','추천','바꾸','맞추','장만','필요해'],a:'좋아요, 딱 맞는 걸 찾아드릴게요. <b>주로 뭘 하실 PC</b>인가요?',chipsUse:1},
@@ -683,17 +712,17 @@ var TALKS=[
  {k:['싸게','비싸','할인','깎','흥정'],a:'솔직히 말씀드리면 저희 견적은 최저가 조합보다 보통 <b>2~3만원</b> 높습니다. 그 차이가 조립·선정리·3시간 검사·2년 A/S 값이에요.<br>부품값은 똑같고, 견적서에서 <b>&quot;최저가보다 N만원 비싼 이유&quot;</b>로 그대로 보여드립니다.'},
  {k:['매장','방문','오프라인','직접 가'],a:'서울 <b>용산</b>에 매장이 있습니다. 조립 과정을 직접 보실 수도 있고, 온라인 견적을 매장에서 그대로 이어받아 상담할 수도 있어요.'},
  {k:['화이트','디자인','예쁘','이쁘','감성'],a:'보기 좋은 PC, 중요하죠. <b>화이트·디자인 우선</b>으로 잡아둘게요 — 케이스·쿨러 색을 맞추고 선정리까지 신경 씁니다. 디자인 부품은 동급 성능 대비 1~3만원 정도 더 붙는 점만 참고하세요.',p:{i:'palette',l:'선호',v:'화이트',f:0.85,why:['화이트·디자인: 색상 불일치 부품 제외']}},
- {k:['4060','ti','비교','차이'],min:2,a:'좋은 질문이에요. 자체 판매 데이터 기준으로 <b>RTX 4060 Ti는 4060보다 1440p 게임에서 평균 +18%</b> 빠르고, 지금 저희 재고가는 <b>약 11만원 차이</b>예요.<br>· FHD(1080p) 위주면 4060으로 충분 — 차액으로 SSD를 올리는 게 체감이 커요.<br>· QHD(1440p)·고주사율 모니터면 Ti가 값을 해요.',p:{i:'memory',l:'관심 부품',v:'RTX 4060급 GPU',f:0.72,why:['GPU 관심 대역 반영: 미들급 게이밍']}},
+ {k:['4060','ti','비교','차이'],min:2,a:'좋은 질문이에요. 자체 판매 데이터 기준으로 <b>RTX 4060 Ti는 4060보다 1440p 게임에서 평균 +18%</b> 빠르고, 지금 저희 재고가는 <b>약 11만원 차이</b>예요.<br>· FHD(1080p) 위주면 4060으로 충분 — 차액으로 SSD를 올리는 게 체감이 커요.<br>· QHD(1440p)·고주사율 모니터면 Ti가 값을 해요.',p:{i:'memory',l:'관심 부품',v:'RTX 4060급 GPU',f:0.72,noFilter:true,why:['GPU 관심 대역 반영: 미들급 게이밍']}},
  {k:['가격','시세','동향','얼마','비싸','내려','올라'],a:'저희 <b>실제 매입가 기준</b>(외부 크롤링이 아니라 자체 데이터예요) 최근 4주 동향이에요.<br>· 그래픽카드: <b>-3.2%</b> 완만한 하락 — 급하지 않으면 나쁘지 않은 시점<br>· DDR5 메모리: <b>+5.1%</b> 상승 — 필요하면 미루지 않는 걸 권해요<br>· SSD(NVMe): 보합<br>특정 부품이 궁금하면 이름을 알려주세요. 재고가로 바로 답해드릴게요.'},
  {k:['영상','편집','프리미어','다빈치','인코딩'],a:'영상편집은 게임과 우선순위가 달라요.<br>① <b>CPU 코어 수</b>(인코딩 속도) ② <b>램 32GB↑</b>(4K 타임라인) ③ <b>NVMe SSD</b>(소스 스크럽) 순이고, GPU는 그다음이에요.<br>어떤 툴로 어떤 영상(FHD/4K)을 만드실지 알려주시면 더 정확해져요.'},
  {k:['게임','롤','배그','발로란트','오버워치','로아','풀옵','프레임','fps'],a:'게임이 목적이면 <b>어떤 게임을 어느 화질로</b>가 핵심이에요.<br>· 롤·발로란트급은 엔트리 GPU로도 144fps<br>· 배그·오버워치는 미들급 GPU 권장<br>· 로아 같은 MMO는 CPU도 함께 중요해요.<br>주로 하시는 게임을 알려주시면 조건에 반영할게요.'},
- {k:['ddr','램','메모리'],a:'지금 새로 맞추신다면 <b>DDR5를 권해요</b>. AM5 등 최신 플랫폼이 DDR5 전용이라 업그레이드 수명이 길어요.<br>다만 <b>기존 DDR4 보드에서 램만 올리는 건</b> 규격이 달라 불가능해요 — 보드·CPU까지 함께 바꾸는 그림이 됩니다. 기존 PC 사양을 알려주시면 갈아탈 가치가 있는지 계산해드릴게요.',p:{i:'memory',l:'관심 부품',v:'DDR5 메모리',f:0.85,why:['DDR5 플랫폼 관심 반영']}},
+ {k:['ddr','램','메모리'],a:'지금 새로 맞추신다면 <b>DDR5를 권해요</b>. AM5 등 최신 플랫폼이 DDR5 전용이라 업그레이드 수명이 길어요.<br>다만 <b>기존 DDR4 보드에서 램만 올리는 건</b> 규격이 달라 불가능해요 — 보드·CPU까지 함께 바꾸는 그림이 됩니다. 기존 PC 사양을 알려주시면 갈아탈 가치가 있는지 계산해드릴게요.',p:{i:'memory',l:'관심 부품',v:'DDR5 메모리',f:0.85,noFilter:true,why:['DDR5 플랫폼 관심 반영']}},
  {k:['파워','와트','psu','전력'],a:'파워는 <b>부품 소비전력 합에 여유율 30%</b>를 두는 게 저희 조립 기준이에요(정격 기준). 예: RTX 4060 구성이면 500~550W면 충분하고, 4070 Ti 이상이면 750W를 권해요.<br>구성이 정해지면 엔진이 자동으로 검증합니다.'},
  {k:['호환','소켓','am5','am4','맞아','장착','들어가','병목'],a:'호환은 소켓 일치·GPU 길이·쿨러 높이·전력 여유·램 규격을 <b>결정론 엔진이 전부 검사</b>합니다 — 조립 불가능한 조합은 견적에 아예 나오지 않아요.<br>확인하고 싶은 조합이 있으면 부품명을 알려주세요 — 바로 검증해드릴게요.'},
  {k:['ssd','nvme','하드','hdd','저장'],a:'요즘은 <b>NVMe SSD가 기본</b>이에요. 부팅·로딩 체감이 SATA와 확실히 다릅니다.<br>· 일반 사무·게임: 1TB NVMe<br>· 영상편집·대용량: 2TB NVMe + 창고용 HDD 조합이 가성비<br>지금 990 PRO 2TB가 재고 기준 좋은 가격대에 있어요.'},
  {k:['소음','조용','저소음','팬소리'],a:'저소음은 조합의 문제라 좋은 질문이에요. <b>큰 팬 쿨러(저RPM) + 80PLUS 파워 + 통풍 좋은 케이스</b>가 핵심이고, GPU는 팬 2개 이상 모델이 유리해요.<br>조건에 넣어두면 시끄러운 부품은 후보에서 빠져요.',p:{i:'volume_off',l:'선호',v:'저소음',f:0.7,why:['저소음: 고RPM 쿨러·고발열 부품 제외']}},
  {k:['재고','당일','출고','배송','언제'],a:'저희는 <b>용산 자체 실재고</b>로만 견적해요 — 견적에 뜨는 부품은 전부 지금 매장에 있는 것들이고, 오후 3시 전 결제면 보통 당일에서 최대 3일 이내에 조립 출고돼요.<br>특정 부품 재고가 궁금하면 이름을 알려주세요.'},
- {k:['업그레이드','업글','기존','쓰던','중고'],a:'기존 PC 업그레이드도 도와드려요. <b>지금 쓰시는 CPU(또는 보드)와 목적</b>을 알려주시면, 재사용 가능한 부품은 빼고 바꿀 것만 견적에 잡아드릴게요.',p:{i:'build',l:'상황',v:'기존 PC 업그레이드',f:0.8,why:['보유 부품 재사용 전제 반영']}}
+ {k:['업그레이드','업글','기존','쓰던','중고'],a:'기존 PC 업그레이드도 도와드려요. <b>지금 쓰시는 CPU(또는 보드)와 목적</b>을 알려주시면, 재사용 가능한 부품은 빼고 바꿀 것만 견적에 잡아드릴게요.',p:{i:'build',l:'상황',v:'기존 PC 업그레이드',f:0.8,noFilter:true,why:['보유 부품 재사용 전제 반영']}}
 ];
 function talkRow(list){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';list.forEach(function(q){var ch=mkChip(q,true);ch.addEventListener('click',function(){row.style.opacity='.45';row.style.pointerEvents='none';talkSend(q);});row.appendChild(ch);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function talkChips(){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';TALK_SUGGEST.forEach(function(q){var c=mkChip(q,true);c.addEventListener('click',function(){talkSend(q);});row.appendChild(c);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
@@ -775,7 +804,11 @@ function talkFlow(){
   },1100);
  }
 }
-// 주변기기 ③: 모니터 언급 인지 — 보유(재사용)와 구매 의향을 구분해 조건화
+// 주변기기 ③: 모니터 언급 인지 — 보유(재사용)와 구매 의향을 구분해 구조화(noFilter, 아래 참고)
+/* '모니터'도 처분표에 없는 라벨이다(위 TALKS 주석) — noFilter:true 로 표시해 addSpec 을
+   건너뛴다(아래 talkApply). guided 의 '주변기기' 안내(394행 근처)와 같은 성격이라 문구도
+   그것을 따른다 — 예전 "조건에 잡아뒀어요"는 필터링을 함축해 거짓이었다. 이 값은 후보를
+   거르지 않고, 본체 확정 뒤 S2 "함께 쓰면 좋은 구성"에서만 참고한다. */
 function talkMon(t){
  if(t.indexOf('모니터')<0)return null;
  var m=t.match(/(\d{2})\s*(인치|형)/);var inch=m?m[1]:null;
@@ -783,13 +816,20 @@ function talkMon(t){
  var own=/(쓰고|쓰는|사용 중|사용중|있어|있는|보유|쓰던)/.test(t);
  if(own){
   var v=((inch?inch+'형':'')+(dual?' 듀얼':'')+' 보유').trim();if(v==='보유')v='보유 모니터';
-  return {i:'desktop_windows',l:'모니터',v:v,f:1,why:['보유 모니터 기준: 출력 포트·권장 GPU 매칭'],
-   a:'모니터는 '+(inch?'<b>'+inch+'형'+(dual?' 듀얼':'')+'</b>을':'갖고 계신 걸')+' 쓰시는군요 — 조건에 잡아뒀어요.'+(dual?' 듀얼이면 <b>출력 포트 2개 이상</b>은 기본으로 확인합니다.':'')+' 해상도(FHD/QHD/4K)까지 알려주시면 GPU 권장이 더 정확해져요.'};
+  return {i:'desktop_windows',l:'모니터',v:v,f:1,noFilter:true,why:['보유 모니터 기준: 출력 포트·권장 GPU 매칭'],
+   a:'모니터는 '+(inch?'<b>'+inch+'형'+(dual?' 듀얼':'')+'</b>을':'갖고 계신 걸')+' 쓰시는군요 — 참고로 남겨둘게요.'+(dual?' 듀얼이면 <b>출력 포트 2개 이상</b>은 기본으로 확인합니다.':'')+' 해상도(FHD/QHD/4K)까지 알려주시면 GPU 권장이 더 정확해져요.'};
  }
- return {i:'desktop_windows',l:'모니터',v:'구매 예정',f:1,why:['모니터: 함께 구성 제안 대상'],
-  a:'모니터도 새로 보시는군요 — 조건에 잡아뒀어요. 본체가 정해지면 <b>견적서의 &quot;함께 쓰면 좋은 구성&quot;</b>에서 GPU 성능에 맞는 주사율로 골라 드릴게요.'};
+ return {i:'desktop_windows',l:'모니터',v:'구매 예정',f:1,noFilter:true,why:['모니터: 함께 구성 제안 대상'],
+  a:'모니터도 새로 보시는군요 — 참고로 남겨둘게요. 본체가 정해지면 <b>견적서의 &quot;함께 쓰면 좋은 구성&quot;</b>에서 GPU 성능에 맞는 주사율로 골라 드릴게요.'};
 }
-function talkApply(p){addSpec(p.l,p.v,p.i);// LIVE에서는 배수 연출(p.f)로 후보 수를 만들지 않는다(슬라이스 48) — addSpec이
+/* noFilter p(관심 부품·상황:기존 PC 업그레이드·모니터)는 addSpec 을 아예 부르지 않는다 —
+   처분표에 없는 라벨이라 항상 applied=false(회색·점선·「참고」)로만 뜨고, consPairs·
+   사이드바 칩·필터 로그·consult_sessions.constraints 어디에도 안 쌓인다(2026-08-20,
+   guided noFilter·위 TALKS·talkMon 주석과 같은 이유). 답변 문구(a)는 그대로 나간다 —
+   정보 제공 자체는 유효하다, 다만 조건으로 반영됐다고 말하지 않을 뿐이다. */
+function talkApply(p){
+ if(p.noFilter)return;
+ addSpec(p.l,p.v,p.i);// LIVE에서는 배수 연출(p.f)로 후보 수를 만들지 않는다(슬라이스 48) — addSpec이
  // addConstraint를 타고 서버 재계산이 걸리므로, 그 응답만이 화면 숫자의 출처다.
  /* 비-LIVE 도 마찬가지다(2026-08-17) — 배수 연출은 서버가 모르는 수다. 사유만 적고 수는 비운다. */
  if(!LIVE){logFilter(p.l,null,p.why);poolUnknown(SRC_NOTE.off);}var _ch=consMap[p.l];if(_ch){_ch.style.transition='background .4s';_ch.style.background='#fbf3e2';setTimeout(function(){_ch.style.background='#f7f6f2';},1800);}}
@@ -948,7 +988,12 @@ function pickTier(){
  if(/4K|하이엔드|최상위|익스트림/.test(t))return{k:'extreme',from:null};
  if(/자녀|최신/.test(t))return{k:'latest',from:null};
  if(/풀옵|QHD/.test(t))return{k:'highgame',from:null};
- if(/4060/.test(t))return{k:'midgame',from:null};     /* TALKS 의 관심 부품 값 — 화면 소유 */
+ if(/4060/.test(t))return{k:'midgame',from:null};     /* TALKS 의 관심 부품 값 — 화면 소유.
+    ⚠ 2026-08-20: '관심 부품' 라벨이 noFilter 로 바뀌어 consPairs 에 더는 안 들어간다(talkApply) —
+    이 분기는 이제 다른 라벨(예: 선호·요청)의 값에 우연히 '4060'이 들어 있을 때만 걸린다.
+    talk 모드는 '요청' 에코가 없어(send()는 chat 전용) 사실상 항상 걸리지 않는다. 예산대
+    표(BUDGET_TIERS)는 정본이 없는 화면 소유 값이라(위 §BUDGET_TIERS 주석) 고치지 않는다 —
+    걸리지 않으면 BUDGET_ANY(전체 범위)로 떨어질 뿐 거짓 수를 보여주지 않는다. */
  if(/라이트|가볍/.test(t))return{k:'lightgame',from:null};
  if(/부모님/.test(t))return{k:'parents',from:null};
  if(/직원/.test(t))return{k:'office',from:null};
