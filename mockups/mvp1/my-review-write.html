@@ -76,7 +76,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     <button id="submit" class="btnp" disabled><span class="msym" style="font-size:17px;">send</span>후기 등록</button>
   </div>
 
-  <p style="margin:16px 4px 0;font-size:11.5px;color:#a29d92;font-weight:600;">이 화면은 설계 시안입니다 — 등록·수정 저장은 다음 단계에서 연결됩니다.</p>
+  <p style="margin:16px 4px 0;font-size:11.5px;color:#a29d92;font-weight:600;">등록한 후기는 실제 주문 이력에 저장됩니다 — 이 화면에서 수정은 지원하지 않습니다.</p>
 </main>
 
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" hidden style="position:fixed;left:18px;bottom:18px;z-index:80;display:none;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:rgba(23,23,27,.82);color:#fff;font-size:12px;font-weight:800;text-decoration:none;backdrop-filter:blur(4px);"><span class="msym" style="font-size:15px;">grid_view</span>허브</a>
@@ -84,7 +84,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <script src="../shared/auth.js"></script>
 <script>
 (function(){
-  // MY-040 후기 쓰기 — 설계 시안(슬라이스 29). 저장 API는 다음 슬라이스에서 연결.
+  // MY-040 후기 쓰기 — 등록은 LIVE(슬라이스 30, 아래 "---- LIVE (슬라이스 30)" 블록).
+  // 수정·삭제는 범위 밖(api/my_account.py 상단 docstring: "수정·삭제는 범위 밖(관리자 숨김만 — 목업에도 없음)").
   // 구매 인증 계약: 후기는 order_items 라인에 매달린다(member_reviews.order_item_id NOT NULL).
   var ORDERS=[
     {no:"ORD-83907",at:"06-28",item:"라이젠5 5600 · RTX 3060 구성 (7종)",total:1284000,written:true,
@@ -112,7 +113,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     document.querySelectorAll("[data-o]").forEach(function(el){
       el.onclick=function(){
         var i=+el.dataset.o;
-        if(ORDERS[i].written){window.popcornAuth.toast("이 주문에는 이미 후기를 남기셨어요 — 수정은 마이페이지에서 가능합니다(준비 중)");return;}
+        if(ORDERS[i].written){window.popcornAuth.toast("이 주문에는 이미 후기를 남기셨어요 — 이 화면에서 수정은 지원하지 않습니다");return;}
         pick=i;renderOrders();renderSnap();
       };
     });
