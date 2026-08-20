@@ -481,6 +481,28 @@
   다른 결이라 커밋을 갈랐다. `docs/design/screen-flow.md` §⑥ 항목 ③도 이 사실에
   맞게 고쳐야 하는데 그 문서는 기록자 담당 밖이다 — 다음에 손대는 사람이 갱신한다.
 
+- **지금 하던 일(2026-08-21, 기록자 갱신) — 밤사이 셋 커밋·푸시(사장님 취침 중,
+  배포는 하네스 몫으로 남김).** ① `GET /` 신설 — 404였던 것을 `/mvp1/main-landing.html`
+  307 리다이렉트로 고쳤다(지인 오픈 도메인 `www.popcornai.co.kr`의 첫 화면). ②
+  「오늘」 KST 기준 교정 — `scripts/status.py`·`api/admin_dashboard.py`·
+  `api/admin_sessions.py`·`api/admin_sourcing.py` 넷이 UTC `CURRENT_DATE`를
+  써 KST 09:00 이전엔 「오늘」이 어제 구간과 섞이고 있었다(실측: 상담
+  `CURRENT_DATE` 술어 4건 vs KST 반개구간 0건). `api/timeutil.kst_day_range()`로
+  통일했다 — 회귀 `[4834]`가 왜 이 결함을 못 잡았는지(동등성 검사가 「같은
+  잘못을 공유하는 두 값」을 구분 못함)를 `CLAUDE.md` §회귀 세트 네 번째 사례로
+  남겼다(기록자 초안 — **하네스 확정 필요**, T-02 ③). ③ 텔레그램 일일 현황은
+  서버가 아니라 로컬 PC 작업 스케줄러로 방향이 바뀌었다(사장님: "토큰을 서버에
+  안 넣습니다") — 준비 문서 `deploy/telegram-daily-status.md` 신규, 등록은
+  하네스가 이미 함(`PopcornAI-DailyStatus`, 매일 09:30 KST).
+
+  **결정 아님, 다음 세션 참고할 것 둘**(2026-08-21 밤사이 조사에서 함께 드러남):
+  `api/admin_sourcing.py`의 `_confirmed_at_ready()` 독스트링이 "마이그레이션
+  0053이 DB에 미적용"이라 적고 있는데, 제작자가 `information_schema`로 확인한
+  결과 `confirmed_at` 컬럼이 **이미 있다** — 문서만 낡았다(코드는 이번 물결에서
+  안 고쳤다, 이 작업과는 다른 결함이다). `api/admin_funnel.py`의 응답 필드
+  `history_bounds.sessions_min`은 여전히 죽은 필드다(2026-08-20 A-81 항목에
+  이미 기록 — 오늘 재확인만 됐다, 새 사실 아님).
+
 - **오늘 수치는 여기 적지 않는다** — 위 머리말의 「어디서 보나」 표를 쓴다.
 
 ---
