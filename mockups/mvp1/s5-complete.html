@@ -184,13 +184,30 @@ a[aria-disabled="true"]{pointer-events:none;opacity:.5;cursor:default}
   if(hero){
    var box=document.createElement('div');
    box.className='card';box.style.marginBottom='18px';
+   // 담을 목록 행에 품절 표시를 남기려면 어느 pd_no 가 품절인지 먼저 알아야 한다
+   var soldoutMap={};(H.soldout||[]).forEach(function(c){soldoutMap[c.code]=1;});
    var rows=(H.cart||[]).map(function(c){
+    var rowSoldout=!!soldoutMap[c.pd_no];
+    // 품절 행에만 태그를 단다 — 가격변동(chg)은 아래 요약에만 있고 행 자체는 안 건드린다.
+    // 품절은 「담을 수 없다」는 사실이 목록 자체에서 보여야 가격변동보다 무겁게 읽힌다.
     return '<div style="display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #f2efe9;">'
       +'<span style="flex:0 0 74px;font-size:11.5px;font-weight:800;color:#8a8578;">'+esc(c.pd_no)+'</span>'
-      +'<span style="flex:1;font-size:13.5px;color:#17171b;">'+esc(c.name)+'</span>'
+      +'<span style="flex:1;font-size:13.5px;color:#17171b;">'+esc(c.name)
+      +(rowSoldout?' <b style="font-size:11px;font-weight:800;color:#b31b25;background:#fdf3f3;border:1px solid #f3dede;border-radius:999px;padding:1px 8px;margin-left:2px;">품절</b>':'')
+      +'</span>'
       +(c.amount>1?'<span style="font-size:12px;color:#8a8578;">×'+c.amount+'</span>':'')
       +'<b style="font-size:13.5px;color:#17171b;">'+won(c.price)+'</b></div>';
    }).join('');
+   // 품절은 가격변동보다 무겁다 — 가격변동은 금액만 바뀌지만 품절은 «담을 수 없다».
+   // 그래서 ① 요약 카드를 changed 보다 먼저 두고 ② 문구도 「담을 수 없다」로 명확히 한다.
+   // 재고(stock_qty)는 4일 전 일괄 갱신 스냅샷이라 여기 쓰지 않는다 — 이 판정은 인계
+   // 시점에 몰 상품 페이지를 직접 읽은 값이라 그보다 최신이다(2026-08-20).
+   var sold=(H.soldout||[]).length?'<div style="margin-top:12px;background:#fdf3f3;border:1.5px solid #f3dede;'
+     +'border-radius:11px;padding:11px 13px;"><b style="font-size:13px;color:#b31b25;">품절 '
+     +H.soldout.length+'개 — 쇼핑몰 장바구니에 담을 수 없습니다</b>'
+     +'<p style="margin:4px 0 6px;font-size:12px;color:#55555c;font-weight:600;">방금 쇼핑몰 상품 페이지에서 확인한 결과입니다. 다른 상품으로 바꿔 담아주세요.</p>'
+     +H.soldout.map(function(c){return '<div style="margin-top:3px;font-size:12.5px;color:#55555c;">'+esc(c.name)+'</div>';}).join('')
+     +'</div>':'';
    // 가격이 달라진 것은 **숫자로** 말한다. 「변동 있음」만으로는 사람이 판단할 수 없다
    var chg=(H.changed||[]).length?'<div style="margin-top:12px;background:#fdf3f3;border:1px solid #f3dede;'
      +'border-radius:11px;padding:11px 13px;"><b style="font-size:13px;color:#b31b25;">쇼핑몰 가격이 달라진 부품 '
@@ -207,9 +224,9 @@ a[aria-disabled="true"]{pointer-events:none;opacity:.5;cursor:default}
      +'장바구니는 쇼핑몰에서 직접 담습니다. 아래 목록과 같은 상품인지 확인해 주세요.</p>'
      +rows
      +'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0 0;">'
-     +'<span style="font-size:13px;font-weight:800;color:#8a8578;">예상 합계</span>'
+     +'<span style="font-size:13px;font-weight:800;color:#8a8578;">예상 합계'+((H.soldout||[]).length?' <span style="font-weight:700;color:#b31b25;">(품절 포함)</span>':'')+'</span>'
      +'<b style="font-size:17px;color:#17171b;">'+won(H.total_mall)+'</b></div>'
-     +chg+unk;
+     +sold+chg+unk;
    hero.parentNode.insertBefore(box,hero.nextSibling);
   }
 

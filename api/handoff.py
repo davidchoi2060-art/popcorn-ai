@@ -15,6 +15,16 @@
 
   못 읽은 건은 «확인 못 함»으로 남긴다. 견적 시점 가격을 사실인 양 넘기지 않는다.
 
+■ 품절도 같은 자리에서 함께 본다 (2026-08-20 검증자 실측 · 오픈 전 교정)
+  검증자 실측 125건 표본 중 2건(127897·129334)이 «판매중»이라 든 채 실제로는 몰에서
+  품절이었다. 원인은 두 겹이었다 — ① `mall.fetch_prices()`가 같은 상세 페이지를
+  읽으면서도 품절 표시를 아예 안 읽었다(가격만 봤다) ② `soldout_cnt` 컬럼이 있는데
+  INSERT 가 항상 리터럴 `0`을 넣어 세는 코드 자체가 없었다. `mall.fetch_prices()`가
+  `soldout` 필드를 더 돌려주고(기존 `ok`/`price` 계약은 그대로), 여기서 그 값으로
+  `soldout_cnt`를 실제로 계산해 넣고 응답의 `soldout` 배열에도 싣는다.
+  **이 교정은 «보이게 하는 것»까지다 — 품절이어도 인계 자체는 막지 않는다.**
+  막을지 말지는 정책 결정이라 이 코드가 정하지 않는다.
+
 ■ 조립비는 몰 상품이다
   `pd_no=92983` 「제작 공임1」 30,000 원(2026-08-11 실측). 우리가 금액을 지어내지 않고
   몰의 상품 한 줄로 담는다 — 그래야 견적 합계와 몰 결제 금액이 맞는다.
@@ -141,7 +151,7 @@ def create_handoff(body: HandoffBody, request: Request, response: Response,
         # ── 몰 가격 재확인 ────────────────────────────────────────────
         got = mall.fetch_prices([l["code"] for l in lines])
         checked_all = bool(got) and all(v["ok"] for v in got.values())
-        changed, unknown = [], []
+        changed, unknown, soldout = [], [], []
         total_quoted = total_mall = 0
         for l in lines:
             g = got.get(l["code"]) or {}
@@ -149,9 +159,18 @@ def create_handoff(body: HandoffBody, request: Request, response: Response,
             # 조립비는 견적에 우리가 금액을 안 실었다 — 몰 값을 그대로 쓴다
             if l["quoted"] is None:
                 l["quoted"] = l["mall"]
+            # ⚠ 2026-08-20 검증자 실측: 몰이 품절이어도 price 는 살아 있다(127897·129334
+            #   둘 다 ok=True·price=원래값). 그래서 가격 비교만 하면 「확인됨」으로 조용히
+            #   넘어갔고, handoffs.soldout_cnt 는 항상 리터럴 0으로 INSERT 됐다(세려던
+            #   것인데 세는 코드가 없었다). soldout 은 가격 일치 여부보다 먼저 본다 —
+            #   값이 맞아도 살 수 없으면 「확인됨」이 아니다. **인계 자체는 막지 않는다**
+            #   (그 정책 결정은 이 작업 범위 밖).
             if l["mall"] is None:
                 l["status"] = "확인못함"
                 unknown.append(l)
+            elif g.get("soldout"):
+                l["status"] = "품절"
+                soldout.append(l)
             elif l["quoted"] is not None and l["mall"] != l["quoted"]:
                 l["status"] = "가격변동"
                 changed.append(l)
@@ -175,13 +194,14 @@ def create_handoff(body: HandoffBody, request: Request, response: Response,
         access_key = access_gate.new_key() if gate_on else None
         params = {"no": no, "s": body.session_id, "snap": snap["snapshot_id"], "t": body.tier,
                   "m": member_id, "u": uid, "tq": total_quoted, "tm": total_mall,
-                  "chk": checked_all, "ch": len(changed),
+                  "chk": checked_all, "ch": len(changed), "so": len(soldout),
                   "note": json.dumps({"unknown": [l["code"] for l in unknown]},
                                      ensure_ascii=False) if unknown else None}
         cols = ("handoff_no, session_id, snapshot_id, quote_type, member_id, user_id,"
                 " total_quoted, total_mall, price_checked, changed_cnt, soldout_cnt,"
                 " status, note")
-        vals = ":no, :s, :snap, :t, :m, :u, :tq, :tm, :chk, :ch, 0, '인계', :note"
+        # soldout_cnt 는 이제 실제로 센다(len(soldout)) — 예전엔 여기 리터럴 0이었다.
+        vals = ":no, :s, :snap, :t, :m, :u, :tq, :tm, :chk, :ch, :so, '인계', :note"
         if gate_on:
             cols, vals = cols + ", access_key", vals + ", :ak"
             params["ak"] = access_key
@@ -212,6 +232,10 @@ def create_handoff(body: HandoffBody, request: Request, response: Response,
                      "quoted": l["quoted"], "mall": l["mall"],
                      "diff": (l["mall"] or 0) - (l["quoted"] or 0)} for l in changed],
         "unknown": [{"code": l["code"], "name": l["name"]} for l in unknown],
+        # 품절 — 가격은 확인됐지만(ok=True) 몰이 「구매 불가」로 표시한 줄.
+        # ⚠ 이 배열이 있다고 인계를 막지 않는다 — 「보이게 하는 것」까지가 이번 범위다.
+        #   막을지 말지는 정책 결정이라 이 코드가 정하지 않는다(사장님 결정 사안).
+        "soldout": [{"code": l["code"], "name": l["name"], "mall": l["mall"]} for l in soldout],
         # 쇼핑몰 장바구니에 담을 목록. API 가 나오면 서버가 직접 담고 이 배열은 근거로만 쓴다
         "cart": [{"pd_no": l["code"], "amount": l["qty"],
                   "name": l["name"], "price": l["mall"] if l["mall"] is not None else l["quoted"]}

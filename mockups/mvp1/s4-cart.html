@@ -97,8 +97,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="width:42px;height:42px;border-radius:12px;background:#2b5fd9;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:22px;color:#fff;">inventory</span>
             <div>
-              <div style="font-size:15px;font-weight:900;color:#1c3f8f;">결제 직전 재고 재확인</div>
-              <div style="font-size:13.5px;color:#4a6ab0;font-weight:600;">결제 시점에 서버가 전 품목 재고를 확정 검증합니다</div>
+              <!-- 2026-08-20 문안 교정: 「재고 재확인」은 코드로 반증됐었다(당시 api/handoff.py 전체
+                   확인 — 재고 검증 코드 없음. 실제로 하는 일은 몰 가격 재확인뿐이었다).
+                   ⚠ 그 뒤 다른 제작자가 api/mall.py·api/handoff.py 에 품절 검사를 붙였다
+                   (응답 soldout 배열 · soldout_cnt 실카운트) — 아래 문구를 그 자리로 확장했다
+                   (2026-08-20). 재고 수량(stock_qty) 은 여전히 안 본다 — 4일 전 일괄 갱신
+                   스냅샷이라 이 판정과는 다르다. 여기 말하는 것은 «지금 몰 상품 페이지의
+                   판매 가능 여부»다(구매버튼 자리 class 로 판정 · mall.fetch_prices). -->
+              <div style="font-size:15px;font-weight:900;color:#1c3f8f;">인계 직전 쇼핑몰 가격·품절 재확인</div>
+              <div style="font-size:13.5px;color:#4a6ab0;font-weight:600;">쇼핑몰로 넘기기 직전 서버가 전 품목의 쇼핑몰 가격과 판매 가능 여부를 다시 확인합니다 — 달라지거나 품절된 항목은 다음 화면에서 알려드립니다</div>
             </div>
           </div>
           <button style="flex:0 0 auto;padding:10px 16px;border:1.5px solid #b9cdf5;background:#fff;border-radius:10px;font-size:13px;font-weight:800;color:#2149b0;cursor:pointer;font-family:inherit;" id="s4-soldout">안전 대안으로 교체</button>
@@ -288,7 +295,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </script>
 <script>
 (function(){
-function tmsg(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
+function tmsg(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.background='#17171b';/* LIVE toast()가 남긴 오류색을 되돌린다 */t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
 var login=document.getElementById('s4-login'),pay=document.getElementById('s4-pay'),cap=document.getElementById('s4-pay-cap'),gate=document.getElementById('s4-authgate');
 var own=document.getElementById('s4-own'),done=document.getElementById('s4-done'),badge=document.getElementById('s4-mode-badge');
 function opsPay(){try{return (JSON.parse(localStorage.getItem('popcorn-ops')||'{}').pay)||'mall';}catch(e){return 'mall';}}
@@ -442,7 +449,11 @@ window.addEventListener('scroll',closeTip,{passive:true});
  var periphArr=[];try{periphArr=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
  var periphValid=periphArr.filter(function(it){return it.code;});
  var periphSum=0;periphArr.forEach(function(it){periphSum+=it.p;});
- function toast(m){var t=document.getElementById('s4-toast');t.textContent=m;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
+ function toast(m,warn){var t=document.getElementById('s4-toast');t.textContent=m;
+  /* 품절은 가격변동보다 무겁다(담기지 않음) — 이 파일이 검증 불통과·가격 인상에
+     이미 쓰는 오류색(#b31b25)을 토스트 배경에도 그대로 쓴다. 새 색을 만들지 않는다. */
+  t.style.background=warn?'#b31b25':'#17171b';
+  t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
  var PIMG={CPU:'cpu',GPU:'gpu',MB:'mb',RAM:'ram',SSD:'ssd',POWER:'psu',CASE:'case'};
  var PKO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'GPU',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'SSD'};
  /* 조립비는 견적 스냅샷에 실려 오지 않는다(api/handoff 는 몰 값을 쓴다).
@@ -574,14 +585,26 @@ window.addEventListener('scroll',closeTip,{passive:true});
        localStorage.removeItem('popcorn-periph');localStorage.removeItem('popcorn-quote-tier');
       }catch(e){}
       toast('인계 '+h.handoff_no+' 기록 — 담을 목록 '+h.cart.length+'개');
-      /* 가격이 달라졌으면 넘어가기 전에 말한다. 몰에서 다른 값을 보고 놀라면
-         「모든 견적에는 이유가 있습니다」가 그 자리에서 무너진다. */
-      if(h.changed&&h.changed.length)
-       setTimeout(function(){toast('쇼핑몰 가격이 달라진 부품 '+h.changed.length+'개 — 다음 화면에서 확인하세요');},1300);
-      if(!h.price_checked)
-       setTimeout(function(){toast('일부 부품은 쇼핑몰 가격을 확인하지 못했습니다');},2100);
-      setTimeout(function(){window.location.href='s5-complete.html';},
-                 (h.changed&&h.changed.length)||!h.price_checked?2900:1500);
+      /* 순서는 무게 순 — 품절(담기지 않음) > 가격변동(금액만 바뀜) > 가격 미확인.
+         가격이 달라졌으면 넘어가기 전에 말한다. 몰에서 다른 값을 보고 놀라면
+         「모든 견적에는 이유가 있습니다」가 그 자리에서 무너진다.
+         2026-08-20: 품절은 changed 보다 뒤로 밀리면 안 된다 — 더 무거운 사실이 늦게
+         뜨면 먼저 뜬 changed 토스트만 보고 그대로 넘어갈 수 있다. warn=true 로 배경을
+         이 파일이 이미 쓰는 오류색(#b31b25)으로 바꾼다(검증 불통과·가격 인상과 같은 색). */
+      var toastAt=1300;
+      if(h.soldout&&h.soldout.length){
+       setTimeout(function(){toast('쇼핑몰에서 품절된 부품 '+h.soldout.length+'개 — 장바구니에 담을 수 없어요. 다음 화면에서 확인하세요',true);},toastAt);
+       toastAt+=1400;
+      }
+      if(h.changed&&h.changed.length){
+       setTimeout(function(){toast('쇼핑몰 가격이 달라진 부품 '+h.changed.length+'개 — 다음 화면에서 확인하세요');},toastAt);
+       toastAt+=900;
+      }
+      if(!h.price_checked){
+       setTimeout(function(){toast('일부 부품은 쇼핑몰 가격을 확인하지 못했습니다');},toastAt);
+       toastAt+=900;
+      }
+      setTimeout(function(){window.location.href='s5-complete.html';},toastAt>1300?toastAt+300:1500);
      })
      .catch(function(){toast('넘기지 못했어요 — 잠시 후 다시 시도해 주세요.');
                        payBtn.disabled=false;payBtn.textContent=o0;});
