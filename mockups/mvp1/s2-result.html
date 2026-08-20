@@ -15,9 +15,128 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 .s2tab{border:0;background:transparent;font-family:inherit;font-size:14px;font-weight:800;color:#7a756b;padding:8px 18px;border-radius:9px;cursor:pointer}
 .s2tab.is-active{background:#fff;color:#17171b;box-shadow:0 2px 6px rgba(30,25,15,.10)}
 .s2composer{flex:1;display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e6e2da;border-radius:12px;padding:0 8px 0 14px;height:44px}
-.s2composer input{flex:1;border:0;outline:none;font-family:inherit;font-size:14px;background:transparent;color:#17171b}
+.s2composer input{flex:1;min-width:0;border:0;outline:none;font-family:inherit;font-size:14px;background:transparent;color:#17171b}
 .s2composer button{flex:0 0 auto;width:34px;height:34px;border:0;border-radius:9px;background:#2b5fd9;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
-@media(max-width:820px){.s2bar__inner{flex-direction:column;min-height:auto;padding:10px 0;align-items:stretch;gap:10px}.s2bar{top:0}}
+@media(max-width:820px){
+.s2bar__inner{flex-direction:column;min-height:auto;padding:10px 0;align-items:stretch;gap:10px}
+/* 확인자 실측 결함 2건(2026-08-19~20). 앞선 지시가 "481px 이상은 건드리지 마라"였던 탓에
+   아래 규칙들을 ≤480px 전용으로만 고쳐 놓아, 481~820px 구간에 같은 결함이 그대로 남아 있었다.
+   ① scrollWidth 554 > clientWidth 375(375px) 및 481px에서 47px 가로 넘침. 원인은
+   #sec-compare(최저가 비교표)의 grid-template-columns:1.5fr 1fr 1fr 고정이 이 폭에서 더 넓은
+   폭을 요구하는 것 — grid item은 min-width:auto가 기본이라 내용이 요구하는 만큼 트랙이
+   커지고, 그 뒤에 있는 overflow:hidden은 "이미 커진 자기 크기" 안에서는 아무것도 자르지
+   못한다. 문서가 넘치면 shared/auth.js가 넣는 #pa-fab(로그인 버튼)도 넓어진 레이아웃
+   뷰포트를 따라가 화면 밖으로 밀린다 — 그래서 이 표 하나가 로그인 버튼을 통째로 가린다.
+   고침: (a) 표를 담은 2단 섹션(.s2-row-2, A/S+비교표)을 1단으로 접어 비교표에 폭을 더 준다
+   (b) #sec-compare에 min-width:0을 줘 그리드 트랙이 내용 크기만큼 커지는 것을 멈춘다
+   (c) 그래도 남는 폭은 표 구조(1.5fr 1fr 1fr)를 그대로 둔 채 카드 안에서만 가로 스크롤되게
+   가둔다(overflow-x:auto) — 문서 자체는 넘치지 않는다.
+   ② .s2bar(아래에서 position:static으로 바뀌기 전까지는 top:0)와 .s2header(인라인
+   position:sticky;top:0)가 스크롤 중 같은 자리를 다퉈, 600px에서 스크롤 50이면 티어 탭
+   3개가 헤더 밑에 완전히 가려지고 스크롤 150부터는 탭바 자체가 화면 위로 밀려나 접근이
+   아예 불가능해진다. 헤더 높이가 폭마다 가변이라 .s2bar의 top에 고정 px를 박으면 헤더
+   문구가 길어지는 날 다시 어긋난다 — 그래서 오프셋을 계산해 박지 않는다. 대신 헤더+탭바를
+   .s2stickygroup 하나로 묶어 그 묶음만 sticky로 두고, 안에서는 보통 문서 흐름(위:헤더,
+   아래:탭바)으로 쌓는다. 헤더가 몇 줄이 되든 탭바는 항상 헤더 바로 다음이라 겹칠 수 없다.
+   ①②의 규칙 값 자체는 이전 ≤480px 전용 버전과 완전히 같다(1fr·min-width:0·overflow-x:auto·
+   position:static) — 임계값만 480→820으로 넓혔을 뿐이라 480px 이하 동작은 바뀌지 않는다.
+   821px 이상은 이 미디어쿼리 자체가 매치하지 않으므로 헤더 top:0·.s2bar top:64px·.s2-row-2
+   2열은 그대로다. */
+.s2-row-2{grid-template-columns:1fr !important}
+#sec-compare{min-width:0}
+#sec-compare>div[style*="overflow:hidden"]{overflow-x:auto !important;-webkit-overflow-scrolling:touch}
+.s2stickygroup{position:sticky;top:0;z-index:20}
+.s2header{position:static !important}
+.s2bar{position:static !important;top:auto !important}
+/* 375px 전수 점검(이번 지시)에서 새로 찾은 넘침 자리. 전부 "2단→1단" 또는 "flex-wrap
+   허용"뿐이라 시각 변화가 작고, ≤820px 밖(데스크톱)은 매치하지 않아 그대로다.
+   .s2hero        HERO(본체 이미지+가격 카드) grid 1.15fr/0.85fr → 1단.
+   .s2fit-grid    "호환성 검사 결과" 안 1fr/3fr(전원여유 박스 + 4항목 그리드) → 1단.
+   .s2fit-checks  위 4항목 카드 repeat(4,1fr) → repeat(2,1fr) — 카드 4장의 padding만으로도
+                  16px×2×4장=128px가 375px에서 줄지 않는 하한이 되어(grid item 자동 최소
+                  크기) 좁은 폭에서 그리드를 밀어낼 수 있다. 2열로 줄여 하한을 절반으로.
+   .s2quote 계열  "다른 곳에서 받은 견적" 섹션 — 확인자가 지목한 375px 130px 넘침의 실제
+                  원인(input width:280px 고정 + 부모 flex:0 0 auto + 섹션에 flex-wrap
+                  없음, 오늘 고친 헤더와 같은 메커니즘). flex-wrap을 허용하고 input을
+                  flex:1;min-width:0(width는 이 미디어쿼리 안에서만 auto로 override)으로
+                  바꿔, 안 들어가면 다음 줄로 내려가고 그래도 남는 폭은 input이 줄며 흡수한다.
+   .s2closing 계열 맨 아래 마감 배너 — 문구+flex:0 0 auto 버튼열, flex-wrap 없음(같은 패턴).
+                  실측 넘침은 안 잡혔지만 같은 구조라 예방적으로 동일 처방.
+   ⚠ 위 다섯 곳을 고치고 재실측해도 375px 넘침이 80px 남아 있었다(scrollWidth 455 >
+     clientWidth 375). 원인은 한 겹 더 안쪽 — "이 구성을 고른 이유" 섹션(268행) 안의
+     깔때기 줄(.s2reason, 271행: 전체 후보 박스+화살표+통과 박스+화살표+선택 구성 박스).
+     이 줄을 감싸는 바깥 그리드(1.5fr 1fr, 268행)는 스크립트(약 557행 card.parentNode.
+     style.gridTemplateColumns='1fr')가 폭과 무관하게 항상 1열로 되돌려 놓아 이미 안전한데,
+     그 겉모습만 보고 «그 안»의 flex 줄은 못 봤다 — flex-wrap이 없고 마지막 박스가
+     flex:0 0 auto·padding:22px 20px라 줄지 않는 것은 위 s2quote·s2closing과 같은 패턴이
+     한 단 더 안쪽에서 반복된 것이다(§sec-compare→외부 견적→이 깔때기, 세 번째).
+   .s2reason      고침은 flex-direction:column 한 줄. flex-wrap 대신 완전한 세로 스택을
+                  택한 이유 — 자식이 5개(박스·화살표·박스·화살표·박스)라 일부만 줄바꿈되면
+                  나머지가 몇 개씩 뭉쳐 다시 넘칠 위험을 브라우저 실측 없이는 계산만으로
+                  배제할 수 없다. 세로 스택이면 항목마다 자기 줄을 혼자 쓰므로 각 항목의
+                  fit-content 폭(가장 넓어야 "22,840개"류 숫자 한 덩어리, ~140px 안팎)이
+                  375px 카드 안쪽 실폭(375-main패딩80-카드패딩60=235px)을 넘을 일이 없다.
+     align-items는 그대로 뒀다(인라인 center) — flex-direction만 세로로 바꾸면 그 center가
+     교차축(가로)에 그대로 적용되어 각 박스·화살표가 자기 폭만큼 가운데 정렬된다. 481~820px
+     에서도 이 규칙이 함께 적용되지만(이 규칙이 속한 미디어쿼리 자체가 ≤820px), 세로 스택은
+     폭 요구량을 줄이기만 하므로 그 폭에서 이미 통과하던 상태(넘침 0)를 절대 깨지 않는다. */
+.s2hero{grid-template-columns:1fr !important}
+.s2fit-grid{grid-template-columns:1fr !important}
+.s2fit-checks{grid-template-columns:repeat(2,1fr) !important}
+.s2quote{flex-wrap:wrap}
+.s2quote__row{flex:1 1 100% !important}
+.s2quote__input{width:auto !important;flex:1;min-width:0}
+.s2closing{flex-wrap:wrap}
+.s2closing__actions{flex:1 1 100% !important}
+.s2reason{flex-direction:column}
+}
+/* 헤더 글자 단위 붕괴 — 375px에서 먼저 잡았는데(확인자 실측 — scrollWidth 600 >
+   clientWidth 375, #s2-fit-badge 폭 12px로 짜부라져 세로로 늘어지고 「장바구니 담기」와
+   겹침) 481~650px대에 같은 결함이 그대로 남아 있었다(확인자 재실측 2026-08-20 —
+   481px 「호환성」이 「호/환/성」 3줄 폭13px×높이60px, 600px 2줄 폭30px×높이40px,
+   650px도 붕괴, 700px부터 정상 1줄 높이20px. 경계는 650~700 사이). 대상은 nav(호환성·
+   검수·비교)·배지(#s2-fit-badge)·버튼(장바구니 담기) 전부.
+   원인: <header>가 justify-content:space-between 고정 1행 플렉스인데 좁은 폭에서
+   로고+메뉴+배지+버튼이 한 줄에 다 안 들어가면, flex-shrink 기본값 1 때문에 브라우저가
+   내용물을 min-content 밑으로 줄이려 든다. 한글은 공백이 없어도 글자와 글자 사이마다
+   줄바꿈 기회가 있어(라틴 단어처럼 통째로 넘치는 대신) 텍스트 상자가 글자 단위로 극단
+   찌부러진다.
+   ⚠ 이 결함은 scrollWidth===clientWidth(가로 넘침 0) 검사로는 «통과»로 나온다 — 글자
+   단위로 줄바꿈되니 문서가 가로로 넘치지 않는다(브라우저 입장에서는 "성공적으로 욱여넣은"
+   상태다). 오늘 이 파일 전체에서 통과선으로 쓴 검사가 정확히 이것이었고, 그래서 이 결함만
+   구조적으로 빠져나갔다. 다음에도 「가로 넘침 0이니 괜찮다」로 넘기지 말 것 — 이런 종류는
+   높이 급증(세로로 여러 줄)을 따로 봐야 잡힌다.
+   고침: flex-shrink:0으로 찌부러짐 자체를 막는 방식은 쓰지 않았다 — 그러면 줄어들 곳을
+   잃은 내용이 이번엔 «가로»로 넘쳐 문서가 스크롤되므로, 오늘 이 파일에서 고친 다른 결함들과
+   같은 종류의 사고를 새로 만든다. 대신 좁은 폭에서 로고그룹(.s2header__left)과
+   배지+버튼그룹(.s2header__right)이 한 줄을 나눠 쓰지 않고 각자 줄 전체를 혼자 쓰게
+   쌓는다(.s2header__inner를 flex-direction:column). 두 그룹이 폭을 다툴 일이 없어지면
+   각 그룹 안의 flex-wrap이 "넘칠 때만 다음 줄로"를 정상적으로 수행한다 — 이 조합은
+   375px(더 좁은 폭)에서 이미 결함 없이 동작 중이므로 481~820px(더 넉넉한 폭)에서도
+   같은 값 그대로 안전하다. 고정 height도 없애 겹침의 원인이던 "64px 안에 세로로 넘치는
+   내용"을 없앤다.
+   ⚠ 이전 주석(여기 있었다: "481~820px에서는 헤더가 1행으로 이미 들어맞아(확인자가 이
+   폭에서 헤더 관련 결함을 보고하지 않았다) 이 블록은 ≤480px로 그대로 둔다")은 실측과
+   어긋났다 — 확인자가 «결함 없다»고 말한 적이 없고, 단지 «그 폭의 헤더를 아직 보지
+   않았을» 뿐인데 그 침묵을 "통과"로 잘못 옮겨 적은 것이었다. 그래서 임계값을 480→820으로
+   넓힌다(위 블록의 .s2-row-2·#sec-compare·.s2stickygroup 등과 같은 값). 650~700 사이의
+   실측 경계보다 더 좁혀 잡지 않는 이유: 700~820 구간을 데스크톱의 고정 height:64px·
+   overflow:visible 헤더(확인자 관측 — 라벨이 조금만 길어도 탭바와 겹칠 여지가 있는
+   아슬아슬한 상태)에 맡겨 두면, 배지 문구가 런타임에 "호환성 8종, 전부 통과했습니다"류로
+   길어질 때 그 위험을 넓은 폭까지 그대로 끌고 간다. 이 파일이 이미 820 하나로 통일돼
+   있어(위 블록·.s2stickygroup 주석) 헤더만 다른 경계를 쓰면 그 자체가 다음 사고 자리다.
+   ≤480px 규칙 값은 한 글자도 바꾸지 않았다 — 적용 범위만 넓혔다. 821px 이상은 이
+   미디어쿼리가 매치하지 않으므로 기존 인라인 스타일(justify-content:space-between
+   1행·height:64px) 그대로 렌더된다 — 마크업 인라인 스타일은 손대지 않고 클래스만
+   추가했다. */
+@media(max-width:820px){
+.s2header__inner{flex-direction:column;height:auto !important;gap:8px;padding:12px 0}
+.s2header__left{flex-wrap:wrap;justify-content:center;gap:8px !important}
+.s2header__nav{flex-wrap:wrap;justify-content:center}
+.s2header__right{flex-wrap:wrap;justify-content:center}
+.s2header__badge{flex-shrink:0}
+#s2-fit-badge{white-space:nowrap}
+}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -27,20 +146,25 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
 <div style="min-height:100vh;background:#f1eee8;">
 <!-- top nav -->
-<header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;padding:0 40px;">
-<div style="max-width:1360px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;">
-<div style="display:flex;align-items:center;gap:28px;">
+<!-- .s2stickygroup: ≤820px 전용 sticky 그룹(위 미디어쿼리 ② 참조 — 2026-08-20까지는 ≤480px
+     뿐이었으나 481~820px에서 헤더·탭바가 top:0을 다투는 같은 결함이 재현돼 넓혔다). 821px
+     이상에서는 이 div가 position:static(기본값) 그대로라 레이아웃에 아무 영향이 없고,
+     header·.s2bar는 각자의 기존 sticky 규칙(top:0 / top:64px)을 그대로 쓴다. -->
+<div class="s2stickygroup">
+<header class="s2header" style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;padding:0 40px;">
+<div class="s2header__inner" style="max-width:1360px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;">
+<div class="s2header__left" style="display:flex;align-items:center;gap:28px;">
 <div style="font-size:17px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span>
 </div>
-<nav style="display:flex;gap:22px;">
+<nav class="s2header__nav" style="display:flex;gap:22px;">
 <a href="#sec-fit" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">호환성</a>
 <a href="#sec-check" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">검수</a>
 <a href="#sec-as" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">A/S</a>
 <a href="#sec-compare" style="font-size:14px;font-weight:700;color:#55555c;text-decoration:none;">비교</a>
 </nav>
 </div>
-<div style="display:flex;align-items:center;gap:14px;">
-<div style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">
+<div class="s2header__right" style="display:flex;align-items:center;gap:14px;">
+<div class="s2header__badge" style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">
 <span style="font-family:'Material Symbols Outlined';font-size:18px;">verified</span><span id="s2-fit-badge">호환성 검사 결과</span></div>
 <button style="padding:10px 18px;border:none;background:#2b5fd9;border-radius:10px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">장바구니 담기</button>
 </div>
@@ -60,9 +184,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </form>
 </div>
 </div>
+</div>
 <main style="max-width:1360px;margin:0 auto;padding:36px 40px 72px;">
 <!-- HERO -->
-<section style="display:grid;grid-template-columns:1.15fr 0.85fr;gap:28px;margin-bottom:28px;">
+<section class="s2hero" style="display:grid;grid-template-columns:1.15fr 0.85fr;gap:28px;margin-bottom:28px;">
 <!-- product image -->
 <div style="background:#fff;border-radius:22px;border:1px solid #ece9e3;box-shadow:0 14px 40px -22px rgba(30,25,15,.25);overflow:hidden;display:flex;flex-direction:column;">
 <div style="flex:1;min-height:420px;border-bottom:1px solid #f0eee9;position:relative;overflow:hidden;">
@@ -159,13 +284,13 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 <span style="background:var(--success, #2f9e6d);color:#fff;font-size:13px;font-weight:800;padding:7px 15px;border-radius:999px;">핵심 1</span>
 </div>
-<div style="display:grid;grid-template-columns:1fr 3fr;gap:14px;align-items:stretch;">
+<div class="s2fit-grid" style="display:grid;grid-template-columns:1fr 3fr;gap:14px;align-items:stretch;">
 <div style="background:#fff;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 0;">
 <div style="font-size:52px;font-weight:900;color:var(--success, #2f9e6d);line-height:1;">—</div>
 <div style="font-size:13px;font-weight:800;color:var(--success-muted, #3d7a5c);margin-top:6px;">파워 전원 여유</div>
-<div style="font-size:12px;color:var(--success-sage, #7aa891);margin-top:2px;">넉넉합니다</div>
+<div style="font-size:12px;color:var(--success-sage, #7aa891);margin-top:2px;">—</div>
 </div>
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+<div class="s2fit-checks" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
 <div style="background:#fff;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
 <span style="font-family:'Material Symbols Outlined';font-size:24px;color:var(--success, #2f9e6d);">check_circle</span>
 <span style="font-size:14.5px;font-weight:700;color:var(--success-ink, #2c4c3c);">CPU 소켓 규격 일치</span>
@@ -190,7 +315,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <section style="display:grid;grid-template-columns:1.5fr 1fr;gap:24px;margin-bottom:24px;">
 <div style="background:#fff;border-radius:22px;border:1px solid #ece9e3;padding:28px 30px;">
 <h2 style="margin:0 0 16px;font-size:19px;font-weight:900;color:#17171b;">이 구성을 고른 이유</h2>
-<div style="display:flex;align-items:center;gap:16px;">
+<div class="s2reason" style="display:flex;align-items:center;gap:16px;">
 <div style="flex:1;text-align:center;background:#f4f2ec;border-radius:14px;padding:22px 0;">
 <div id="s2-funnel-total" style="font-size:34px;font-weight:900;color:#17171b;">—</div>
 <div id="s2-funnel-total-cap" style="font-size:13px;color:#8a8578;font-weight:700;margin-top:2px;">전체 후보</div>
@@ -238,7 +363,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1c3f8f;font-weight:800;">조립·선정리·3시간 테스트·A/S 준비까지 마친 뒤에 보냅니다.</p>
 </section>
 <!-- 3 + 4 row: A/S (purple) + Compare (amber) -->
-<section style="display:grid;grid-template-columns:1fr 1.25fr;gap:24px;margin-bottom:24px;">
+<section class="s2-row-2" style="display:grid;grid-template-columns:1fr 1.25fr;gap:24px;margin-bottom:24px;">
 <!-- A/S -->
 <div id="sec-as" style="background:#f2edfb;border-radius:22px;padding:30px 30px;">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
@@ -308,13 +433,13 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 </section>
 <!-- external quote diagnose -->
-<section style="background:#fff;border-radius:22px;border:1px solid #ece9e3;padding:26px 30px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
+<section class="s2quote" style="background:#fff;border-radius:22px;border:1px solid #ece9e3;padding:26px 30px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
 <div>
 <h3 style="margin:0 0 5px;font-size:17px;font-weight:900;color:#17171b;">다른 곳에서 받은 견적, 여기 붙여넣어 보세요</h3>
 <p style="margin:0;font-size:14px;color:#6b6b73;">부품·가격·호환성을 그 자리에서 진단합니다.</p>
 </div>
-<div style="display:flex;gap:10px;flex:0 0 auto;">
-<input placeholder="외부 견적 입력" style="width:280px;padding:13px 16px;border:1.5px solid #ddd8ce;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">
+<div class="s2quote__row" style="display:flex;gap:10px;flex:0 0 auto;">
+<input class="s2quote__input" placeholder="외부 견적 입력" style="width:280px;padding:13px 16px;border:1.5px solid #ddd8ce;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">
 <button style="padding:13px 22px;border:none;background:#17171b;border-radius:11px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">진단하기</button>
 </div>
 </section>
@@ -325,7 +450,11 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <h2 style="margin:0;font-size:21px;font-weight:900;color:#17171b;">함께 쓰면 좋은 구성</h2>
 </div>
 <p style="margin:0 0 18px;font-size:14px;color:#6b6b73;">본체 견적과는 별개입니다 — 이미 갖고 계시면 그대로 두세요. 담을 때도 근거를 보고 정하시면 됩니다.</p>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+<!-- minmax(320px,...) 하한이 320px보다 좁은 컨테이너(375px 뷰포트 - 좌우 padding = 227px)에서도
+     그대로 유지돼 그리드가 부모 폭을 무시하고 넓어지는 문제(grid blowout, 375px 전수 점검에서
+     발견). min(320px,100%)로 하한을 컨테이너 폭 이내로 묶는다 — 320px 이상 여유가 있는
+     폭(481px+)에서는 min()이 그대로 320px로 평가되어 기존 카드 폭이 전혀 바뀌지 않는다. -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;">
 <!-- 주변기기 후보는 서버(GET /api/recommend 의 companion)가 준다. 목업 시절 예시 4종
      (LG 27GS75Q 329,000원 · 앱코 K660 · 로지텍 G102 · 하이퍼엑스 Cloud III,
      실재고 9/44/120/17대)가 마크업에 박혀 있어 서버가 못 주면 사실처럼 보였다. -->
@@ -334,9 +463,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <p id="s2p-sum" style="margin:16px 0 0;font-size:13.5px;color:#8a8578;font-weight:600;">아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.</p>
 </section>
 <!-- closing banner -->
-<section style="background:#17171b;color:#fff;border-radius:22px;padding:36px 40px;display:flex;align-items:center;justify-content:space-between;gap:32px;">
+<section class="s2closing" style="background:#17171b;color:#fff;border-radius:22px;padding:36px 40px;display:flex;align-items:center;justify-content:space-between;gap:32px;">
 <p style="margin:0;font-size:20px;line-height:1.55;font-weight:700;max-width:820px;">저희가 파는 것은 <span style="color:#ffcb4a;">용도에 맞고, 값이 정당하고, 문제가 생겨도 해결된다는 확신</span>입니다.</p>
-<div style="display:flex;gap:12px;flex:0 0 auto;">
+<div class="s2closing__actions" style="display:flex;gap:12px;flex:0 0 auto;">
 <button style="padding:16px 22px;border:1.5px solid #3a3a35;background:transparent;border-radius:12px;font-size:15px;font-weight:700;color:#e6e2da;cursor:pointer;font-family:inherit;">부품 변경</button>
 <button style="padding:16px 28px;border:none;background:#2b5fd9;border-radius:12px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">장바구니 담기</button>
 </div>
@@ -464,6 +593,10 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
      fcap=document.getElementById('s2-funnel-total-cap');
  if(f1)f1.textContent=Q.funnel.total+'개';if(fcap)fcap.textContent='전체 후보(실재고)';
  if(f2)f2.textContent=Q.funnel.passed+'개';
+ /* f3·f4("규칙 선택"·"추천 구성")는 바로 위 f1·f2(Q.funnel.total/passed, 서버 값)와
+    다르다 — Q.funnel에 이 두 라벨에 대응하는 필드가 없어 이 줄에 문구를 그대로 박아
+    두었다. 어떤 견적을 넣어도 항상 같은 두 단어만 나온다는 뜻. 2026-08-20 375px 깔때기
+    넘침(.s2reason) 수정 중 발견 — 이번 작업 범위 밖이라 고치지 않고 남긴다. */
  if(f3)f3.textContent='규칙 선택';if(f4)f4.textContent='추천 구성';
  /* 「이 구성을 고른 이유」 문단. 서버가 근거 문구를 보내오기 전까지 보이는 기본 문구이고,
     실패하면 이 문구가 그대로 남는다(s2why 참고). */

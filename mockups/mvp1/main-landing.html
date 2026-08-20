@@ -14,6 +14,96 @@
   @keyframes eqbar { 0%,100%{height:7px} 50%{height:20px} }
   @keyframes tagIn { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
   .intent-tag { background:rgba(101,161,212,.12); color:#2A5C86; border:1px solid rgba(101,161,212,.3); border-radius:8px; padding:5px 11px; font-size:12.5px; font-weight:700; font-family:var(--font-num); opacity:0; animation:tagIn .5s ease-out both; }
+
+  /* ============================================================
+     좁은 폭 대응 (2026-08-20 제작 — 지인·테스터 오픈 전 필수 교정).
+     실측 결함(지시서 근거): 375px에서 header nav 글자가 세로로 한 글자씩
+     끊김(nav a 실측 폭 13px) · document.documentElement.scrollWidth 596
+     > innerWidth 375(약 1.59배 초과). 이 파일은 @media 규칙이 0건이었다
+     (전수 grep). 원인은 헤더·히어로·그리드가 전부 고정 px 패딩이거나
+     고정 grid-template-columns, 또는 flex-wrap 없이 여러 텍스트 항목을
+     한 줄에 우겨넣는 flex 행이었다는 점 — 좁은 폭에서 flex-shrink가
+     텍스트를 최소폭(글자 1개 단위)까지 눌렀다.
+     방식: 마크업 구조·색·컴포넌트는 그대로 두고(디자인 변경 없음),
+     아래 클래스 훅만 추가해 ≤768px에서만 레이아웃을 접는다. 769px
+     이상은 이 블록 밖이라 무영향(데스크톱 셀렉터는 건드리지 않았다).
+     인라인 style 속성이 특정성 최상위라 값을 덮으려면 !important가
+     필요하다 — 이 블록 선언이 전부 !important인 것은 그 때문이지
+     우선순위 남용이 아니다(블록 자체가 미디어쿼리로 좁은 폭에만 갇혀
+     있다). ============================================================ */
+  @media (max-width:768px){
+    /* 헤더 — 결함의 진원지. 원래 padding:26px 56px 안에 로고 + [nav
+       3링크(gap34) + 버튼](gap40)을 한 줄로 강제했다. 375px 폭(패딩
+       차감 후 콘텐츠 263px)에서 로고(~150px)+nav+버튼(~380px+) 총
+       요구폭이 available를 크게 넘어 nav가 최소폭까지 짓눌렸다(실측
+       nav a 13px). 해법: nav를 숨겨 압축 요인 자체를 없앤다(모델·성능·
+       작동 방식 3링크는 전부 같은 페이지 내부 앵커라 스크롤로도 도달
+       가능 — 콘텐츠 손실 없음, 1차 전환 버튼 "견적 시작"은 유지).
+       패딩도 줄여 로고+버튼 여유폭을 넉넉히 확보(150+115=265px vs
+       원래 263px는 아슬아슬했다 → 339px로 여유 74px). */
+    .mm-header{padding:16px 20px!important;flex-wrap:wrap!important;row-gap:8px!important}
+    .mm-header nav{display:none!important}
+
+    /* 히어로 — 좌우 56px(폭의 30%) 축소. 헤더가 짧아졌으니 상단 120px도
+       줄인다(원래 값은 로고+3줄 nav 헤더를 피하기 위한 여유였다). h1
+       56px는 263px 폭에서 한글 6자/줄이라 3~4줄로 지나치게 길어져(한글은
+       글자 단위 줄바꿈이 기본이라 "끊김"은 아니지만 가독성이 떨어진다)
+       30px로 낮춘다 — 서체·색·굵기는 그대로, 크기만 좁은 폭 전용. */
+    .mm-hero{padding:80px 20px 0!important}
+    .mm-hero h1{font-size:30px!important;line-height:1.22!important}
+
+    /* 상태 배지 4개(실시간 재고 검증·호환성 N종·근거 리포트·본체부터
+       모니터·주변기기까지) — flex-wrap이 없어 gap22px로 4개를 한 줄에
+       강제했다(각 항목 120~160px, 합계 600px대 vs 가용 263~339px).
+       접으면 2개씩 줄바꿈되어 항목 폭이 확보돼 문장 단위로 줄바꿈된다. */
+    .mm-hero-badges{flex-wrap:wrap!important;gap:10px 14px!important;margin:22px 0 26px!important}
+
+    /* 1·2차 CTA 두 버튼 — gap16 나란히 배치는 두 버튼 패딩만 합쳐도
+       263~339px를 넘는다(19px×2 패딩 두 개). 세로로 쌓고 폭 100%,
+       패딩 16px(터치 목표 ≥44px: 16px×2 + 16px 폰트 줄높이 ≈ 51px). */
+    .mm-hero-ctas{flex-direction:column!important;align-items:stretch!important;gap:12px!important}
+    .mm-hero-ctas button{width:100%!important;justify-content:center!important;padding:16px 20px!important;font-size:16px!important}
+
+    /* 음소거 토글 — 56px 원형 버튼이 우측 48px 고정이라 좁은 화면에서
+       콘텐츠와 가까워진다. 44px(터치 최소 권장값)로 줄이고 모서리로
+       당긴다. 섹션이 overflow:hidden이라 위치 조정이 가로 스크롤을
+       만들지 않는다(원래도 안 만들었다 — 가독성·여백 정리 목적). */
+    .mm-sound-btn{width:44px!important;height:44px!important;right:14px!important;bottom:14px!important}
+    .mm-sound-btn .msym{font-size:20px!important}
+
+    /* 시트 콘텐츠 좌우 여백 — 56px×2는 263~339px 폭에서 과하다. 내부
+       그리드(auto-fit,minmax 계열)는 이미 자체 반응형이라 컨테이너
+       폭만 넓혀주면 된다(별도 그리드 규칙 불필요). */
+    .mm-container{padding:0 20px!important}
+
+    /* LIVE QUOTE EXAMPLE — 7fr:5fr 고정 2열. 좁은 폭에서 각 열이
+       150px·110px대로 눌려 내부 버튼·배지·칩이 전부 압축된다. 1열로
+       쌓는다. */
+    .mm-live-grid{grid-template-columns:1fr!important}
+    /* 재고 필터·호환성·근거 스코어 3열 고정 — 카드 하나당 최소 90px대
+       내용(아이콘+라벨+배지)이라 3등분하면 압축 위험이 있어 1열로
+       쌓는다(2열도 가능하나 배지 텍스트가 길어질 여지가 있어 안전한
+       쪽을 택함 — 확인자 재검토 대상). */
+    .mm-live-status{grid-template-columns:1fr!important}
+
+    /* 후기 카드 3열 고정 — 카드 하나 폭이 데스크톱 기준 340px대라
+       263~339px 폭에 셋은 애초에 불가능. 1열로 쌓는다. */
+    .mm-testi-grid{grid-template-columns:1fr!important}
+
+    /* FINAL CTA — margin:0 56px + 내부 padding:72px 64px는 263~339px
+       폭에서 콘텐츠 영역을 더 깎아 46px 헤드라인이 극단적으로 눌린다.
+       섹션 자체가 overflow:hidden이라 가로 스크롤을 만들지는 않지만
+       (줄바꿈으로 흡수) 지나치게 길어져 가독성이 떨어진다. */
+    .mm-final-cta{margin:0 14px!important}
+    .mm-final-cta > div:last-child{padding:40px 22px!important}
+    .mm-final-cta h2{font-size:27px!important}
+    .mm-final-cta button{padding:15px 20px!important;font-size:16px!important;width:100%!important;justify-content:center!important}
+
+    /* 푸터 — 3열(auto) 고정 링크 그리드, gap64px. 3열×64px만으로
+       192px라 263~339px 폭에서 성립 불가. 2열로 접는다(브랜드 블록은
+       상위 flex-wrap이 이미 처리하고 있어 그대로 둔다). */
+    .mm-footer-links{grid-template-columns:repeat(2,1fr)!important;gap:20px 16px!important}
+  }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -30,7 +120,7 @@
     <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(8,14,26,.85) 0%, rgba(8,14,26,0) 34%);"></div>
 
     <!-- header -->
-    <div style="position:absolute; top:0; left:0; right:0; z-index:30; display:flex; align-items:center; justify-content:space-between; padding:26px 56px; max-width:1440px; margin:0 auto;">
+    <div class="mm-header" style="position:absolute; top:0; left:0; right:0; z-index:30; display:flex; align-items:center; justify-content:space-between; padding:26px 56px; max-width:1440px; margin:0 auto;">
       <div style="font-family:var(--font); font-weight:800; font-size:26px; color:#fff; letter-spacing:-0.02em;">팝콘PC <span style="color:#8FC0E8;">AI</span></div>
       <div style="display:flex; align-items:center; gap:40px;">
         <nav style="display:flex; gap:34px;">
@@ -43,7 +133,7 @@
     </div>
 
     <!-- hero content -->
-    <div style="position:relative; z-index:20; height:100%; display:flex; flex-direction:column; justify-content:center; padding:120px 56px 0; max-width:1080px; margin:0 auto; width:100%;">
+    <div class="mm-hero" style="position:relative; z-index:20; height:100%; display:flex; flex-direction:column; justify-content:center; padding:120px 56px 0; max-width:1080px; margin:0 auto; width:100%;">
       <div style="display:inline-flex; align-self:flex-start; align-items:center; gap:9px; padding:8px 16px; border-radius:999px; background:rgba(101,161,212,.16); border:1px solid rgba(101,161,212,.4); color:#A9D0EE; font-family:var(--font-num); font-size:12px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; margin-bottom:26px;">
         <span class="msym" style="font-size:15px; font-variation-settings:'FILL' 1;">bolt</span> 의도는 AI가 교차 해석 · 재고·호환성은 검증 엔진
       </div>
@@ -54,26 +144,26 @@
       </div>
       <h1 style="margin:0; font-family:var(--font); font-weight:800; font-size:56px; line-height:1.14; letter-spacing:-0.03em; color:#fff;">모든 견적에는 <span style="color:#8FC0E8;">이유가 있습니다.</span></h1>
       <p style="margin:26px 0 0; font-size:19px; line-height:1.7; color:rgba(255,255,255,.78); max-width:640px;">말씀하신 그대로 이해하고, 엔진이 검증한 구성으로 답합니다. 조립 불가능한 조합은 후보에서 제외됩니다.</p>
-      <div style="display:flex; gap:22px; margin:30px 0 34px; align-items:center;">
+      <div class="mm-hero-badges" style="display:flex; gap:22px; margin:30px 0 34px; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f); box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>실시간 재고 검증</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757; box-shadow:0 0 0 4px rgba(217,119,87,.2);"></span>호환성 <span data-bind="showcase_rules">—</span>종</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#4285F4; box-shadow:0 0 0 4px rgba(66,133,244,.2);"></span>근거 리포트</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#E8B563; box-shadow:0 0 0 4px rgba(232,181,99,.2);"></span>본체부터 모니터·주변기기까지</div>
       </div>
-      <div style="display:flex; gap:16px; align-items:center;">
+      <div class="mm-hero-ctas" style="display:flex; gap:16px; align-items:center;">
         <button style="background:#65A1D4; color:#fff; border:none; padding:19px 34px; border-radius:16px; font-family:var(--font); font-weight:800; font-size:19px; cursor:pointer; box-shadow:0 20px 44px rgba(101,161,212,.4); display:flex; align-items:center; gap:10px;" data-cta="start">내 맞춤 견적 받기 <span class="msym" style="font-size:22px;">arrow_forward</span></button>
         <button style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.28); backdrop-filter:blur(8px); padding:19px 28px; border-radius:16px; font-weight:600; font-size:17px; cursor:pointer; display:flex; align-items:center; gap:9px;" data-cta="how">작동 방식 보기</button>
       </div>
     </div>
 
-    <button data-sound-toggle="heroVidA" style="position:absolute; bottom:120px; right:48px; z-index:30; width:56px; height:56px; border-radius:50%; background:rgba(0,0,0,.4); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.22); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+    <button class="mm-sound-btn" data-sound-toggle="heroVidA" style="position:absolute; bottom:120px; right:48px; z-index:30; width:56px; height:56px; border-radius:50%; background:rgba(0,0,0,.4); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.22); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;">
       <span class="msym" data-sound-icon style="font-size:24px;">volume_off</span>
     </button>
   </section>
 
   <!-- SHEET -->
   <main style="position:relative; z-index:20; margin-top:-52px; background:#F0F5F9; border-radius:40px 40px 0 0; box-shadow:0 -24px 50px rgba(15,23,42,.12);">
-    <div style="max-width:1240px; margin:0 auto; padding:0 56px;">
+    <div class="mm-container" style="max-width:1240px; margin:0 auto; padding:0 56px;">
 
       <!-- trust strip -->
       <section style="display:flex; align-items:center; justify-content:space-between; gap:32px; padding:34px 0; border-bottom:1px solid rgba(148,163,184,.28); flex-wrap:wrap;">
@@ -169,7 +259,7 @@
           <div><h2 style="margin:0 0 8px; font-family:var(--font); font-weight:800; font-size:32px; color:#111827;">검증 엔진</h2><p style="margin:0; font-size:15px; color:#64748B;">자체 재고 DB와 결정론 엔진의 결합</p></div>
           <span style="font-family:var(--font-num); font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:700; color:#65A1D4; background:rgba(101,161,212,.12); padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:50%; background:#65A1D4; animation:pulseDot 1.4s infinite;"></span>Live Analysis</span>
         </div>
-        <div style="display:grid; grid-template-columns:7fr 5fr; gap:26px;">
+        <div class="mm-live-grid" style="display:grid; grid-template-columns:7fr 5fr; gap:26px;">
           <div style="display:flex; flex-direction:column; gap:20px;">
             <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:28px; padding:34px;">
               <div style="font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#64748B; margin-bottom:16px;">입력 프롬프트</div>
@@ -195,7 +285,7 @@
               <div style="margin-top:26px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;"><span style="font-size:14px; font-weight:600; color:#475569;">부품 정합성 및 성능 분석률</span><span style="font-family:var(--font-num); font-size:14px; font-weight:700; color:#65A1D4;">98%</span></div>
               <div style="height:9px; background:#E2EAF2; border-radius:999px; overflow:hidden;"><div style="height:100%; width:98%; background:linear-gradient(90deg,#65A1D4,#4A90E2); border-radius:999px; transform-origin:left; animation:growX 1.6s cubic-bezier(.22,1,.36,1) both; box-shadow:0 0 14px rgba(101,161,212,.55);"></div></div>
             </div>
-            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+            <div class="mm-live-status" style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
               <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f);"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">재고 필터</span><span style="margin-left:auto; font-size:11px; font-weight:700; color:var(--success-teal, #10a37f); background:rgba(16,163,127,.1); padding:3px 8px; border-radius:6px;">완료</span></div>
               <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757;"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">호환성</span><span style="margin-left:auto; font-size:11px; font-weight:700; color:#D97757; background:rgba(217,119,87,.1); padding:3px 8px; border-radius:6px;">완료</span></div>
               <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; padding:16px; display:flex; align-items:center; gap:11px;"><span style="width:9px; height:9px; border-radius:50%; background:#4285F4;"></span><span style="font-size:14px; font-weight:700; color:#1A202C;">근거 스코어</span><span style="margin-left:auto; display:flex; gap:3px; align-items:flex-end;"><span style="width:3px; background:#4285F4; border-radius:2px; animation:eqbar .9s infinite;"></span><span style="width:3px; background:#4285F4; border-radius:2px; animation:eqbar .9s infinite .15s;"></span><span style="width:3px; background:#4285F4; border-radius:2px; animation:eqbar .9s infinite .3s;"></span></span></div>
@@ -218,7 +308,7 @@
       <!-- TESTIMONIALS -->
       <section id="reviews" data-reveal style="padding:20px 0 88px;">
         <div style="text-align:center; margin-bottom:48px;"><div style="font-family:var(--font-num); font-size:13px; letter-spacing:.24em; color:#65A1D4; font-weight:600; text-transform:uppercase; margin-bottom:12px;">REVIEWS</div><h2 style="margin:0; font-family:var(--font); font-weight:800; font-size:40px; letter-spacing:-0.025em; color:#111827;">먼저 받아본 사람들<br><span style="font-size:13px;font-weight:600;color:#9a968d;">오픈 전 시연 참가자 후기 — 정식 오픈 후 실제 구매 후기로 교체됩니다</span></h2></div>
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
+        <div class="mm-testi-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
           <div style="background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:26px; padding:32px;">
             <div style="display:flex; gap:3px; color:#F5B301; margin-bottom:18px;"><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span><span class="msym" style="font-size:20px; font-variation-settings:'FILL' 1;">star</span></div>
             <p style="margin:0 0 24px; font-size:16px; line-height:1.65; color:#334155;">"부품 이름을 하나도 모르는데 '영상편집용'이라고만 썼어요. 왜 이 부품인지 설명이 다 붙어 나오는 게 신기했습니다."</p>
@@ -239,7 +329,7 @@
     </div>
 
     <!-- FINAL CTA -->
-    <section data-reveal style="margin:0 56px; border-radius:34px; overflow:hidden; background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#2A5C86 100%); position:relative;">
+    <section class="mm-final-cta" data-reveal style="margin:0 56px; border-radius:34px; overflow:hidden; background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#2A5C86 100%); position:relative;">
       <div style="position:absolute; top:-40px; right:60px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(101,161,212,.5),transparent 70%);"></div>
       <div style="position:relative; padding:72px 64px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap;">
         <div>
@@ -258,7 +348,7 @@
         <p style="margin:18px 0 24px; font-size:14px; line-height:1.8; color:#64748B;">© 2026 팝콘PC AI. 실시간 재고로 견적하는 용산 팝콘PC. 모든 견적에는 이유가 있습니다.</p>
         <div style="display:flex; gap:12px;"><div style="width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,.05); display:flex; align-items:center; justify-content:center; color:#475569;"><span class="msym" style="font-size:20px;">share</span></div><div style="width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,.05); display:flex; align-items:center; justify-content:center; color:#475569;"><span class="msym" style="font-size:20px;">alternate_email</span></div></div>
       </div>
-      <div style="display:grid; grid-template-columns:repeat(3,auto); gap:64px;">
+      <div class="mm-footer-links" style="display:grid; grid-template-columns:repeat(3,auto); gap:64px;">
         <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">제품</span><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">견적 내기</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">부품 DB</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">벤치마크</a></div>
         <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">정책</span><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">이용약관</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">개인정보 처리방침</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">환불 규정</a></div>
         <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">고객 지원</span><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">자주 묻는 질문</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">1:1 문의</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">커뮤니티</a></div>

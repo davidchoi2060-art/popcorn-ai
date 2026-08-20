@@ -24,6 +24,84 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 .s0rev-card{flex:0 0 340px;margin-right:20px;background:#fff;border:1px solid #ece9e3;border-radius:18px;padding:24px}
 @media(max-width:768px){.s0rev-card{flex-basis:278px}}
 @media(prefers-reduced-motion:reduce){.s0rev-track{animation:none}}
+
+/* ============================================================
+   좁은 폭 대응 (2026-08-20 제작 — 지인·테스터 오픈 전 필수 교정).
+   main-landing.html 과 같은 결함 패턴: header 가 padding:0 40px 고정
+   height:64px 안에 로고 + nav 4링크(gap22) + 로그인링크 + 견적받기
+   버튼을 한 줄로 강제한다. 375px 폭(패딩 차감 후 295px)에서 요구폭
+   총합이 600px대라 nav a 가 최소폭(글자 1개 단위)까지 눌린다 —
+   main-landing 의 「nav a 실측 폭 13px」과 동일한 원인(다중 텍스트
+   flex 항목 + wrap 없음).
+   방식은 동일하다: 마크업 구조·색·컴포넌트는 그대로 두고 ≤768px 에서만
+   접는다. 769px 이상은 이 블록 밖이라 무영향. 인라인 style 이 특정성
+   최상위라 !important 로 덮는다(전부 미디어쿼리 안에 갇혀 있다).
+   ============================================================ */
+@media (max-width:768px){
+  /* 헤더 — 보조 nav(작동 방식·근거·추천 구성·후기)와 "로그인 / 회원가입"
+     텍스트 링크를 숨기고 로고 + 주 CTA(견적 받기)만 남긴다. 4개 링크는
+     전부 같은 페이지 내부 앵커라 스크롤로도 도달 가능 — 콘텐츠 손실
+     없음. 클래스 없이 태그·구조 선택자만 사용(마크업 변경 없음):
+     header는 파일에 하나뿐이라 태그 선택자로 유일하게 지정되고,
+     로그인 링크는 header > div > div:last-child(로그인+버튼 묶음)의
+     첫 자식이라 구조 선택자로 유일하게 지정된다. */
+  header{padding:0 16px!important}
+  header nav{display:none!important}
+  header > div > div:last-child > a:first-child{display:none!important}
+
+  /* 본문 좌우 40px(295px 폭의 21%)는 375px 폰에서 과하다. 16px로
+     줄여 이후 모든 그리드·행 계산에 여유를 더한다(343px 확보). */
+  main{padding:22px 16px 48px!important}
+
+  /* 히어로 — section 자체가 1fr 1fr 고정 2열. 343px 폭에서 각 열
+     170px대로 붕괴해 배지·버튼·이미지가 전부 압축된다. 1열로 쌓는다.
+     h1 52px는 <br> 로 이미 2줄인데 343px 폭에서도 각 줄이 다시
+     줄바꿈돼(예: "이유가"/"있습니다.") 4줄로 늘어나 30px로 낮춘다. */
+  .s0-hero-grid{grid-template-columns:1fr!important}
+  .s0-hero-grid h1{font-size:30px!important}
+  /* 지금 검증 중인 재고 수 — 60px 폰트는 6~7자리 수(예: "126,480")가
+     되면 카드 인테리어(279px)를 넘길 수 있다(6자리도 264px로 15px
+     여유뿐). 38px로 낮춰 안전 여유를 둔다. */
+  .s0-stock-num{font-size:38px!important}
+
+  /* STEP 1~3(#how) · 근거 태그 3장(#reason) — 각 section 안의 유일한
+     div가 3열(repeat(3,1fr)) 고정이다. 카드 최소 내용(아이콘46px+
+     라벨)만으로도 3등분한 폭을 넘어 1열로 쌓는다. */
+  #how > div{grid-template-columns:1fr!important}
+  #reason > div{grid-template-columns:1fr!important}
+
+  /* 추천 구성 미리보기 — section#build 자체가 1fr 1fr 고정 2열. */
+  #build{grid-template-columns:1fr!important}
+  /* 부품 스펙 행(CPU·GPU·RAM·SSD·보드·파워 — 6곳 동일 구조라
+     class="s0-spec-row" 를 함께 부여) — 이름과 설명 두 텍스트가
+     justify-content:space-between 으로 맞서는데, 아이콘(46px) 제외
+     ~219px 안에 이름(~160px)+설명(~180~200px) 합계 340px+ 를
+     욱여넣고 있었다 — header nav 와 같은 압축 위험. flex-wrap 으로
+     세로 두 줄로 접고, 설명의 인라인 text-align:right 는 줄바꿈 뒤
+     오른쪽에 붙어 어색해지므로 왼쪽 정렬로 되돌린다. */
+  .s0-spec-row{flex-wrap:wrap!important;row-gap:4px!important}
+  .s0-spec-row > div:last-child{text-align:left!important}
+  /* 예상 견적가 바 — 캡션과 총액 두 텍스트가 같은 위험 패턴(wrap
+     없음). 총액이 실제 데이터로 채워지면(예: "1,250,000원") 캡션과
+     합쳐 247px 안에 못 들어간다. */
+  .s0-price-bar{flex-wrap:wrap!important;row-gap:6px!important}
+
+  /* 이번 주 특가 — 아이콘+헤드라인 묶음과 버튼이 gap24 로 나란히,
+     wrap 없음. 헤드라인 한 줄이 22자라 아이콘(46px) 제외 217px 안에
+     못 들어가고 버튼과 다투며 압축된다. 버튼을 다음 줄로 접고 폭
+     100%로 넓혀 누르기 쉽게 한다. */
+  .s0-deal{flex-wrap:wrap!important;row-gap:14px!important}
+  .s0-deal button{width:100%!important}
+
+  /* 푸터 — 1.6fr 1fr 1fr 1fr 고정 4열은 343px 폭에서 성립 불가.
+     브랜드 소개문과 링크 3묶음을 전부 1열로 쌓는다(내용 성격이
+     서로 달라 2열 혼합은 어색해질 위험이 있어 가장 안전한 1열을
+     택함). 약관·저작권 하단 줄도 wrap 없이 space-between 이라 둘 다
+     유의미한 길이(합계 약 330px > 가용 343px 이지만 폰트에 따라
+     역전될 수 있는 근소한 차이)라 같은 위험군 — 접는다. */
+  footer{grid-template-columns:1fr!important}
+  main > div{flex-wrap:wrap!important;row-gap:10px!important}
+}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -53,7 +131,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </header>
 <main style="max-width:1360px;margin:0 auto;padding:44px 40px 72px;">
 <!-- HERO -->
-<section style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:stretch;margin-bottom:32px;">
+<section class="s0-hero-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:stretch;margin-bottom:32px;">
 <div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;">
 <span style="display:flex;align-items:center;gap:5px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;">
@@ -112,7 +190,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--success-bright, #5fd6a0);">
 <span style="width:8px;height:8px;border-radius:50%;background:var(--success-bright, #5fd6a0);">
 </span>지금 검증 중인 실시간 재고</div>
-<div style="font-size:60px;font-weight:900;line-height:1.02;letter-spacing:-.02em;margin-top:6px;"><span data-bind="live_stock_count">—</span><span style="font-size:26px;color:#9a968d;"> 개</span>
+<div class="s0-stock-num" style="font-size:60px;font-weight:900;line-height:1.02;letter-spacing:-.02em;margin-top:6px;"><span data-bind="live_stock_count">—</span><span style="font-size:26px;color:#9a968d;"> 개</span>
 </div>
 <div style="font-size:13px;color:#9a968d;margin-top:4px;">재고 정보를 실시간으로 갱신하는 중입니다</div>
 <div style="height:1px;background:#2e2e29;margin:24px 0;">
@@ -216,48 +294,48 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="display:flex;flex-direction:column;">
 <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
 <span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="7.5" width="11" height="11" rx="1.5"/><rect x="10.5" y="10.5" width="5" height="5" rx="1"/><path d="M10 7.5V4.5M16 7.5V4.5M10 21.5v-3M16 21.5v-3M7.5 10H4.5M7.5 16H4.5M21.5 10h-3M21.5 16h-3"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">CPU</span></span>
-<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
 <div style="font-size:14.5px;font-weight:800;color:#17171b;">Intel Core i5-13400F</div>
 <div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">10코어 하이브리드, 게임·작업 밸런스</div>
 </div>
 </div>
 <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
 <span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="19" height="10.5" rx="1.5"/><circle cx="9" cy="13.2" r="2.4"/><circle cx="16" cy="13.2" r="2.4"/><path d="M6 18.5v3"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">GPU</span></span>
-<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
 <div style="font-size:14.5px;font-weight:800;color:#17171b;">GeForce RTX 4060</div>
 <div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">DLSS 3 지원, 이 예산대 프레임 방어</div>
 </div>
 </div>
 <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
 <span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1"/><path d="M8 11.5h10"/><path d="M7 18.5v2M10 18.5v2M13.5 18.5v2M17 18.5v2M20 18.5v2"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">RAM</span></span>
-<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
 <div style="font-size:14.5px;font-weight:800;color:#17171b;">DDR5 32GB (16GB×2)</div>
 <div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">듀얼채널, QVL 통과 구성</div>
 </div>
 </div>
 <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
 <span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9.5" width="19" height="7.5" rx="1"/><rect x="6" y="11.5" width="6.5" height="3.5" rx="0.6"/><circle cx="19.5" cy="13.2" r="1.1"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">SSD</span></span>
-<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
 <div style="font-size:14.5px;font-weight:800;color:#17171b;">NVMe 1TB Gen4</div>
 <div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">고속 로딩, 넉넉한 게임 저장</div>
 </div>
 </div>
 <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
 <span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="18" height="18" rx="1.6"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 7v9M18.5 7v9"/><path d="M7 17.5h6"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">보드</span></span>
-<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
 <div style="font-size:14.5px;font-weight:800;color:#17171b;">B760M DDR5</div>
 <div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">안정 전원부, 확장 슬롯 여유</div>
 </div>
 </div>
 <div style="display:flex;align-items:center;gap:14px;padding:13px 0;">
 <span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1.6"/><circle cx="11" cy="13" r="3.3"/><circle cx="11" cy="13" r="0.6"/><rect x="16.5" y="10.5" width="3.2" height="2.4" rx="0.5"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">파워</span></span>
-<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
 <div style="font-size:14.5px;font-weight:800;color:#17171b;">정격 650W 80PLUS</div>
 <div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">전력 마진 30% 확보</div>
 </div>
 </div>
 </div>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:18px 22px;background:#17171b;border-radius:14px;">
+<div class="s0-price-bar" style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:18px 22px;background:#17171b;border-radius:14px;">
 <span style="font-size:13.5px;font-weight:700;color:#9a968d;" data-bind="showcase_caption">실시간 재고 기준 예상 견적가</span>
 <span style="font-size:26px;font-weight:900;color:#fff;"><span data-bind="showcase_total">—</span><span style="font-size:15px;color:#9a968d;">원</span>
 </span>
@@ -463,7 +541,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 </section>
 <!-- weekly deal -->
-<section style="background:#fbf3e2;border-radius:22px;padding:26px 32px;margin-bottom:32px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
+<section class="s0-deal" style="background:#fbf3e2;border-radius:22px;padding:26px 32px;margin-bottom:32px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
 <div style="display:flex;align-items:center;gap:16px;">
 <span style="width:46px;height:46px;border-radius:13px;background:#c77b1f;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:25px;color:#fff;">local_fire_department</span>
 <div>
