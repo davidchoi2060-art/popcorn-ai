@@ -8,7 +8,7 @@ import pkgutil
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -281,6 +281,55 @@ def _legacy_admin_page_gone(page_name: str = ""):
         resp.headers["Pragma"] = "no-cache"
         return resp
     resp = HTMLResponse(content=_ADMIN_LEGACY_GONE_HTML, status_code=410)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 루트(`/`) → 고객 랜딩 리다이렉트 (2026-08-19 지인·내부자 오픈 대비)
+#
+# ■ 왜 필요한가 — `/`에 라우트가 없어 정적 캐치올(html=True)이 `mockups/index.html`을
+#   찾다 404를 낸다(실측: `mockups/` 바로 아래엔 index.html이 없다 — `ls mockups/index.html`
+#   → No such file). 도메인이 연결되는 순간 첫 화면이 빈 채로 열린다는 뜻이다.
+#
+# ■ 무엇이 진짜 고객 랜딩인가 — 하네스 전언(main-landing.html)을 실측으로 재확인했다.
+#   `docs/design/screen-flow.md` §①·§②(2026-08-12 실측, href·fetch를 뽑아 그린 그림)
+#   둘 다 `게이트웨이(내부자 전용) → 랜딩(main-landing) → S0 → S1 → …` 순서다. 화면 ID로도
+#   갈린다: `mockups/mvp1/main-landing.html`은 `data-screen-id="FR-LND-030"
+#   data-domain="landing"`(고객용)인데, `mockups/mvp1/index.html`은
+#   `data-screen-id="INT-GATE-010" data-domain="internal"` +
+#   `<meta name="robots" content="noindex,nofollow">` + 제목 "내부 접근 허브"다(관리자·
+#   MVP2·MVP3 바로가기 모음 — 고객에게 보일 화면이 아니다). 그래서 `/`는
+#   main-landing.html로 보낸다. `/admin2/*`는 이 라우트의 대상이 아니다(건드리지 않았다).
+#
+# ■ 왜 직접 서빙이 아니라 리다이렉트인가 — main-landing.html은 자기 위치
+#   (`mockups/mvp1/`)를 기준으로 한 **상대 경로**만 쓴다(`../shared/fonts/fonts.css`·
+#   `../../design-system/tokens.css`·`assets/hero.mp4`·다음 화면 이동
+#   `location.href='s0-landing.html'` 등 — 이 파일은 담당 밖이라 고치지 않았다).
+#   `/`에서 이 파일을 그대로 반환(FileResponse)하면 브라우저 주소는 `/`에 머물고
+#   상대 경로가 **그 주소를 기준으로** 다시 풀린다 — 디렉터리 세그먼트가 없는 base
+#   경로(`/`)에서는 `s0-landing.html`이 `/mvp1/s0-landing.html`이 아니라 `/s0-landing.html`
+#   로, `assets/hero.mp4`가 `/mvp1/assets/hero.mp4`가 아니라 `/assets/hero.mp4`로 풀려
+#   **다음 화면 버튼과 히어로 영상이 깨진다**(RFC 3986 병합 규칙 — base path가 정확히
+#   `/`면 파일명 세그먼트만 있는 상대참조는 마지막 `/` 앞의 `mvp1/`을 잃는다). 리다이렉트로
+#   주소 자체를 `/mvp1/main-landing.html`로 옮기면 지금 그대로 동작하는 상대 경로를
+#   하나도 건드리지 않는다(실측: `/shared/fonts/fonts.css`·`/design-system/tokens.css`·
+#   `/mvp1/assets/hero.mp4` 전부 현재 마운트로 200을 받는다).
+#
+# ■ 상대(도메인 없는) Location — 절대 URL(`https://www.popcornai.co.kr/...`)을 박으면
+#   `admin.popcornai.co.kr`·`dev.popcornai.co.kr`·로컬(`localhost:8000`) 등 이 앱이 얹히는
+#   다른 오리진에서 매번 깨진다. 스킴·호스트 없는 경로만 돌려주면 요청받은 오리진
+#   그대로 리다이렉트된다.
+#
+# ■ 307 + no-cache — 이 저장소는 캐시가 배포 확인을 막은 전례가 있다(`NoCacheStatic`
+#   주석 — 옛 로그인 화면이 브라우저에 캐시돼 재로그인이 막혔던 슬라이스 71 사고).
+#   301은 브라우저가 자체 판단으로 영구 캐시하기도 해 같은 사고를 반복할 수 있다 —
+#   307(임시 · 메서드 보존) + no-cache 헤더로 막는다.
+@app.get("/", include_in_schema=False)
+def _root_to_customer_landing():
+    """`/` = 고객 랜딩 진입점. 위 블록 주석 참조 — `/admin2/*`는 건드리지 않는다."""
+    resp = RedirectResponse(url="/mvp1/main-landing.html", status_code=307)
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     return resp
