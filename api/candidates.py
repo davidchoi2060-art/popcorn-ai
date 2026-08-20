@@ -169,6 +169,7 @@ def count_candidates(body: CountBody):
             + ", ".join(FLOOR_COLS)
             + " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
     total = len(parts)
+    pool = parts   # 원본(무필터) — 아래 재시도가 배분율만 뺀 풀을 다시 만드는 데 쓴다
     effects = []
     for c in body.constraints:
         before = len(parts)
@@ -178,6 +179,42 @@ def count_candidates(body: CountBody):
             "delta": before - len(parts), "count_after": len(parts), "reason": reason,
         })
     slot_counts, empty = _slot_view(parts)
+
+    # ── 재시도 — 엔진과 같은 규칙(recommend.py:757-761 「recommend」 티어와 동일 패턴) ──
+    # 배분율 필터(BUDGET_ALLOC)로 후보가 0이 된 슬롯이 있으면, 예산만 뺀 풀(엔진의
+    # `common` — 용도 하한·태그는 그대로 두고 배분율만 제거)로 **그 슬롯만** 다시 센다.
+    # 새 방식이 아니다: recommend.py는 capped 로 실패하면 common 으로 다시 짓는다
+    # (752-756행 근거: 배분율은 "한 부품에 몰빵하지 마라"는 균형 장치일 뿐 조립 조건이
+    # 아니다) — 그 규칙을 이 파일의 슬롯 단위 카운터에 그대로 옮겼다. 용도 하한·태그
+    # 필터는 조립 조건이라 재시도에서도 그대로 유지한다(예산만 뺀다).
+    retried_slots: list[str] = []
+    if empty:
+        common = pool
+        for c in body.constraints:
+            if c.l not in BUDGET_LABELS:
+                common, _, _ = _apply_one(common, c.l, c.v)
+        common_counts, _ = _slot_view(common)
+        still_empty = []
+        for s in empty:
+            n = common_counts.get(s, 0)
+            if n > 0:
+                slot_counts[s] = n
+                retried_slots.append(s)
+            else:
+                still_empty.append(s)
+        empty = still_empty
+
+    # 재시도로 살아난 슬롯이 있으면 예산 효과의 사유가 더는 사실 전부를 말하지 않는다 —
+    # "초과 부품 제외"만 남겨두면, 그 슬롯에 한해 배분 상한을 걷어냈다는 사실이 빠져
+    # 화면이 그대로 싣는 문구가 실제와 어긋난다(화면이 이 reason을 그대로 싣는다).
+    if retried_slots:
+        labels = " · ".join(SLOT_KO.get(s, s) for s in retried_slots)
+        note = (f" — {labels}는 배분 상한 적용 시 후보가 없어 그 부품에 한해"
+                " 배분 상한 없이 다시 포함(총액 예산은 별도 적용)")
+        for e in effects:
+            if e["label"] in BUDGET_LABELS and e["applied"]:
+                e["reason"] = e["reason"] + note
+
     return {
         "total": total, "count": len(parts), "effects": effects,
         "slots": slot_counts,
