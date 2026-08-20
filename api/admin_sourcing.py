@@ -15,7 +15,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from .timeutil import iso
+from datetime import datetime
+
+from .timeutil import iso, KST, kst_day_range
 from .admin_orders import _log
 from .auth import current_operator_id
 from .admin_price_import import _reprice, _settings
@@ -139,9 +141,15 @@ def sourcing(page: int = 1, size: int = 100, q: str = "", part_type: str = ""):
         # done_today — _confirmed_at_ready() 참조. 컬럼이 없는 동안은 "0건"을 지어내지
         # 않고 왜 못 세는지를 함께 돌려준다(done_today_reason).
         if _confirmed_at_ready():
+            # 「오늘」= KST 달력일(timeutil.py 규약) — admin_dashboard.sessions_today와 같은
+            # 병(confirmed_at도 naive UTC라 CURRENT_DATE를 그대로 쓰면 09:00 KST 이전에
+            # KST 어제분과 섞인다), 같은 처방(2026-08-21).
+            _today_kst = datetime.now(KST).date()
+            _d_lo, _d_hi = kst_day_range(iso(_today_kst), iso(_today_kst))
             done = conn.execute(text(
                 "SELECT COUNT(*) FROM product_sourcing_quotes"
-                " WHERE status='확정' AND confirmed_at::date = CURRENT_DATE")).scalar_one()
+                " WHERE status='확정' AND confirmed_at >= :lo AND confirmed_at < :hi"),
+                {"lo": _d_lo, "hi": _d_hi}).scalar_one()
             done_today_reason = None
         else:
             done = None

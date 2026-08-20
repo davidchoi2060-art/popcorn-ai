@@ -14,10 +14,12 @@
 `consult_sessions` 를 세는 자리는 전부 `session_scope_where()`(`api/session_scope.py`)를
 거친다 — U-34(data_origin 필터 정책 미확정) 대응, 지금은 아무것도 거르지 않는다.
 """
+from datetime import datetime
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from .timeutil import iso
+from .timeutil import iso, KST, kst_day_range
 from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
 # 입고 대기 조건은 **admin_stock 이 정본**이다(그 파일 §입고 대기 조건). 여기서 SQL 을 다시
 # 적으면 보류(0056) 같은 조건 변경이 한쪽에만 들어가 세 화면이 다른 수를 말한다 —
@@ -71,11 +73,21 @@ def dashboard():
             "SELECT COUNT(*) FROM products WHERE category_group='core_part'"
             " AND part_type = ANY(:core)"), {"core": list(CORE_TYPES)}).scalar_one()
         scope = session_scope_where()
-        sess_today = one(f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
-                         " AND created_at::date=CURRENT_DATE")
-        sess_done = one(f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
-                        " AND created_at::date=CURRENT_DATE"
-                        " AND EXISTS (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)")
+        # 「오늘」= KST 달력일(timeutil.py 규약). created_at은 naive UTC라 CURRENT_DATE(UTC)를
+        # 그대로 쓰면 09:00 KST 이전엔 KST 어제 낮~밤 상담까지 「오늘」로 세거나 빠뜨린다
+        # (2026-08-21 조사자 실측 — 발견 경위·값은 tests/regression.py 근접 커밋 참조).
+        # 새로 만들지 않고 scripts/status.py·admin_ai_usage._period_bounds와 같은 패턴을 쓴다.
+        today_kst = datetime.now(KST).date()
+        _t_lo, _t_hi = kst_day_range(iso(today_kst), iso(today_kst))
+        _t_params = {"lo": _t_lo, "hi": _t_hi}
+        sess_today = conn.execute(text(
+            f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
+            " AND created_at >= :lo AND created_at < :hi"), _t_params).scalar_one()
+        sess_done = conn.execute(text(
+            f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
+            " AND created_at >= :lo AND created_at < :hi"
+            " AND EXISTS (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)"),
+            _t_params).scalar_one()
         orders = conn.execute(text(
             "SELECT status, COUNT(*) FROM orders GROUP BY status")).all()
         import_rows = one("SELECT COUNT(*) FROM csv_import_jobs")

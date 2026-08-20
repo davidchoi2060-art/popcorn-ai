@@ -20,10 +20,12 @@
 total·done_total·drop_total은 consult_sessions 전체 기준(창 밖 포함) — 완주율 분모를
 200건 창이 아니라 전체로 잡을 수 있게 별도로 낸다.
 """
+from datetime import datetime
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from .timeutil import iso
+from .timeutil import iso, KST, kst_day_range
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 # 세션 조회 술어(「어느 세션을 포함하는가」) 단일 원천 — U-34 대응, 그 파일 docstring 참조.
@@ -90,9 +92,15 @@ def list_sessions(offset: int = 0):
             "SELECT snapshot_id, session_id, quote_type, total_amount, items, companion, created_at"
             " FROM quote_snapshots WHERE session_id = ANY(:ids) ORDER BY snapshot_id"),
             {"ids": [r["session_id"] for r in rows] or [0]}).mappings().all()
+        # 「오늘」= KST 달력일(timeutil.py 규약) — admin_dashboard.sessions_today와 같은 병,
+        # 같은 처방(2026-08-21). 회귀 [4834]가 이 값과 dashboard.flow.sessions_today의
+        # 일치를 검사하므로 **반드시 같은 kst_day_range 반개구간**으로 맞춘다.
+        today_kst = datetime.now(KST).date()
+        _t_lo, _t_hi = kst_day_range(iso(today_kst), iso(today_kst))
         today = conn.execute(text(
             f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
-            " AND created_at::date = CURRENT_DATE")).scalar_one()
+            " AND created_at >= :lo AND created_at < :hi"),
+            {"lo": _t_lo, "hi": _t_hi}).scalar_one()
         # 전체 기준(창 밖 포함) — 완주율 분모가 200건 창이 아니라 전체가 되도록 별도로 낸다.
         # done_total은 quote_snapshots에 세션이 하나라도 있으면 완주로 센다(창 안 done과 같은 정의).
         # ⚠ 2026-08-20 정정 — done_total 을 quote_snapshots 단독으로 세면 total(scope 적용)만
