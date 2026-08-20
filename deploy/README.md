@@ -1,8 +1,10 @@
 # 내부 직원 베타 배포 절차 (GCP VM · 외부 IP · HTTP)
 
-> **현행(2026-07-30)**: `popcorn-app`(asia-northeast3-b) · 고정 IP `34.47.124.184`
-> · Cloud SQL `popcorn-db`. 접속 **https://admin.popcornai.co.kr/admin/login.html**
-> 접근 정책은 **관리자 열림 · 고객 404 차단**(§7). 재검증은 `sudo bash deploy/verify.sh`.
+> **현행(2026-07-30, 접속 주소·접근 정책은 2026-08-17·08-09 갱신 반영 — 아래)**:
+> `popcorn-app`(asia-northeast3-b) · 고정 IP `34.47.124.184` · Cloud SQL `popcorn-db`.
+> 접속 **https://admin.popcornai.co.kr/admin2/login**(구 `/admin/login.html`은
+> 2026-08-14~17 admin2 이전으로 410 Gone — §검증 참조). 접근 정책은 **관리자·고객
+> 모두 열어 둔다**(2026-08-09 개정 — §7). 재검증은 `sudo bash deploy/verify.sh`.
 >
 > ⚠️ 아래 §0~§6은 **최초 구축 절차**다(2026-07-26 기준, HTTP·Basic Auth 전제).
 > 지금 서버는 그 상태가 아니다 — 현행 접근 정책은 **§7이 정본**이다.
@@ -135,7 +137,11 @@ sudo -u popcorn bash -c 'set -a; . /etc/popcorn-ai.env; set +a; cd /srv/popcorn-
 | HTTP(80) | ACME 통로만 남기고 301 → HTTPS |
 | 설정 정본 | `deploy/nginx-popcorn.conf` — **서버 실제와 일치한다** |
 
-### 접근 정책 — 관리자는 열고 고객은 막는다 (사용자 결정 2026-07-30)
+### 접근 정책 — 관리자·고객 모두 연다 (2026-07-30 결정 · 2026-08-09 고객 축 개정)
+
+> ⚠️ 이 절 제목은 원래 "관리자는 열고 고객은 막는다"였다 — **2026-08-09에 고객 경로도
+> 열렸는데(바로 아래 표) 제목이 그 갱신을 안 따라가 11일 넘게 자기모순 상태였다**
+> (기록자 2026-08-20 발견·정정). 아래 본문·표는 그때도 맞았다 — 제목만 낡아 있었다.
 
 예전에는 Basic Auth가 사이트 전체를 봉쇄했다. 그런데 `certbot --nginx`가 설정을 고치는
 과정에서 **`auth_basic` 지시어가 사라져** 사이트가 공개된 상태로 이틀을 보냈다.
@@ -191,15 +197,36 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ### 검증 (외부에서)
 
+> ⚠️ **이 다섯 줄을 문자 그대로 반복 돌리면 매번 3/5가 "실패"로 보인다** — 그런데
+> 그 3줄은 오늘 배포가 깬 것이 아니라 **원래 그렇게 응답하는 것이 정상**이다(2026-08-20
+> 확인자 실측 — 배포와 무관하게 로컬 개발 서버에서도 똑같이 재현된다). 아래 개별
+> 설명대로 기대값을 맞춰 읽지 않으면 ① 진짜 회귀가 나도 "원래 이렇다"고 넘기거나
+> ② 반대로 정상 상태를 배포 사고로 오인하게 된다.
+
 ```bash
 B=https://admin.popcornai.co.kr
-curl -sI $B/admin/login.html     | head -1    # 200  관리자 화면은 열려 있다
+curl -sI $B/admin/login.html     | head -1    # 410  구 화면 — 아래 설명, 200 이면 오히려 의심
 curl -sI $B/api/admin/products   | head -1    # 401  미들웨어 게이트
-curl -sI $B/mvp1/s1-session.html | head -1    # 200  고객 화면 (2026-08-09 개방)
-curl -sI $B/api/showcase         | head -1    # 200  고객 API  (2026-08-09 개방)
-curl -sI $B/api/health           | head -1    # 200  감시용
+curl -sI $B/mvp1/s1-session.html | head -1    # 200  고객 화면(2026-08-09 개방) — StaticFiles
+                                               #      마운트라 HEAD 도 정상 지원된다(아래 설명)
+curl -s -o /dev/null -w '%{http_code}\n' $B/api/showcase   # 200  고객 API(2026-08-09 개방) — HEAD 아닌 GET 으로 잰다(아래 설명)
+curl -s -o /dev/null -w '%{http_code}\n' $B/api/health     # 200  감시용 — 위와 같은 이유로 GET
 sudo certbot renew --dry-run                  # 90일 뒤 조용한 만료를 막는 유일한 검사
 ```
+
+**`/admin/login.html`은 410이 정상이다.** 2026-08-14~17 커밋으로 구 관리자 로그인
+화면을 admin2로 옮기며 의도적으로 치웠다(`api/main.py`의 `_ADMIN_LEGACY_GONE_HTML`·
+`_legacy_admin_page_gone` — 본문이 "이 화면은 admin2로 이전되었습니다"라고 스스로
+말한다). 지금 관리자 화면은 `$B/admin2/login`에서 연다(위 §「현행」 배너도 이 주소로
+고쳤다). **이 줄이 200을 돌려주면 좋은 신호가 아니라 이 라우트가 되살아났거나 뭔가
+바뀐 것**이니 그때 의심한다.
+
+**`/api/showcase`·`/api/health`는 `curl -sI`(HEAD)를 쓰면 안 된다.** 이 둘은
+`@app.get(...)`로만 등록됐고, FastAPI/Starlette는 그렇게 등록한 라우트에 HEAD를
+자동으로 얹지 않는다 — HEAD가 자동으로 되는 것은 `StaticFiles` 마운트뿐이다(바로 위
+`/mvp1/s1-session.html`이 HEAD에도 200인 이유가 그것이다 — 정적 파일 마운트를 거친다).
+**이 문제는 오늘 배포와 무관한 프레임워크 특성이라 로컬 개발 서버에서도 똑같이
+재현된다.** GET으로 상태코드만 받으면(`-o /dev/null -w '%{http_code}'`) 정상 200이다.
 
 > **관리자 로그인을 비밀번호 없이 두 번 이상 시도하면 계정이 15분 잠긴다**(슬라이스 70).
 > 검증하다 시드 owner를 잠근 적이 있다 — 잠겼으면 `login_fail_count=0, locked_until=NULL`로
@@ -263,10 +290,11 @@ sudo journalctl -u popcorn-api -n 30 --no-pager
 | 위험 | 지금 상태 | 해소 조건 |
 |---|---|---|
 ~~평문 통신~~ | **해소(2026-07-28)** — HTTPS 전환 완료 | — |
-| 고객 인증 dev 어댑터 | `"@" in email`이 전부 — nginx가 고객 경로를 404로 막고 있다(§7) | 실 OAuth |
-신원 확인 | dev 어댑터(입력 이메일을 신뢰) — Basic Auth가 유일한 실질 방벽 | 실 OAuth 연동 |
+~~nginx가 고객 경로를 막는다~~ | **낡음(2026-08-09 개정으로 무효)** — 고객 경로는 이제 열려 있다(§7). 그래서 아래 두 항목은 더는 "막혀 있어 괜찮은" 위험이 아니라 **지금 그대로 노출된 위험**이다 | — |
+| 고객 인증 dev 어댑터 | `"@" in email`이 전부 — **막는 nginx 차단이 없어 그대로 노출된다**(§7 「열면서 감수한 구멍」 참조) | 실 OAuth |
+신원 확인 | dev 어댑터(입력 이메일을 신뢰) — ~~Basic Auth가 유일한 실질 방벽~~(2026-07-30 폐기, 상단 「최초 결정과 그 뒤 바뀐 것」 참조). **지금 방벽은 없다** — 관리자 쪽만 비밀번호 인증 + `/api/admin/*` 미들웨어가 막고, 고객 쪽은 이메일 형식 검사뿐이다 | 실 OAuth 연동 |
 로그인 시도 제한 | 없음 | fail2ban 또는 앱 레벨 제한 |
-고객 축 | 코드는 있지만 베타에서 쓰지 않는다 | 고객 오픈은 별도 결정 |
+고객 축 | ~~코드는 있지만 베타에서 쓰지 않는다~~ **2026-08-09부터 열려 실제로 쓰인다**(§7) | 위 dev 어댑터가 실 OAuth 로 바뀌는 것 — 「고객 오픈」 자체는 이미 결정·실행됐다 |
 
 ## ⚠ 운영 서버에 절대 넣지 않는 환경변수
 
