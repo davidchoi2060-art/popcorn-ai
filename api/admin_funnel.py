@@ -61,8 +61,9 @@
      확인, 아래 참조).
   ③ **"완주"의 정의** — `api/admin_sessions.py`(담당 밖, 읽기만)가 이미 "세션에
      `quote_snapshots`가 하나라도 있으면 완주"로 판정하고 있다(`done_total =
-     COUNT(DISTINCT session_id) FROM quote_snapshots`). 이 화면도 **같은 정의**를
-     그대로 쓴다 — 화면마다 "완주"가 다른 뜻이면 안 된다(단일 원천).
+     COUNT(DISTINCT session_id) FROM quote_snapshots JOIN consult_sessions ...` —
+     2026-08-20 세션 조회 술어 통합으로 JOIN 형태로 바뀌었다, 정의 자체는 그대로다).
+     이 화면도 **같은 정의**를 그대로 쓴다 — 화면마다 "완주"가 다른 뜻이면 안 된다(단일 원천).
   ④ **인계 건의 티어·가격 재확인 결과가 어디 있나** — 티어는 `handoffs.quote_type`
      (값 셋: value/recommend/highend, `api/handoff.py` L61-62 검증 그대로). 가격
      재확인은 **라인 단위**로 `handoff_items.mall_status`에 있다(값 셋: 확인됨/
@@ -120,6 +121,9 @@ from sqlalchemy import text
 
 from .admin_nav import NAV
 from .db import engine
+# 세션 조회 술어(「어느 세션을 포함하는가」) 단일 원천 — U-34 대응, 그 파일 docstring 참조.
+# A-81 확정 이후: SCOPE_BASELINE_ISO·SCOPE_LABEL = 응답의 "scope" 블록(아래 feature와 같은 모양)
+from .session_scope import session_scope_where, SCOPE_BASELINE_ISO, SCOPE_LABEL
 from .timeutil import KST, iso, kst_day_range, range_sql
 
 router = APIRouter(prefix="/api/admin")
@@ -190,15 +194,16 @@ def _stage_counts(conn, lo, hi) -> dict:
     if hi is not None:
         params["_dt_hi"] = hi
     rs = range_sql("s.created_at", lo, hi)
+    scope = session_scope_where()
     sessions = conn.execute(text(
-        "SELECT COUNT(*) FROM consult_sessions s WHERE 1=1" + rs), params).scalar_one()
+        f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}" + rs), params).scalar_one()
     done = conn.execute(text(
         "SELECT COUNT(DISTINCT s.session_id) FROM consult_sessions s"
-        " JOIN quote_snapshots q ON q.session_id = s.session_id WHERE 1=1" + rs),
+        f" JOIN quote_snapshots q ON q.session_id = s.session_id WHERE {scope}" + rs),
         params).scalar_one()
     ho = conn.execute(text(
         "SELECT COUNT(DISTINCT h.session_id), COUNT(*) FROM consult_sessions s"
-        " JOIN handoffs h ON h.session_id = s.session_id WHERE 1=1" + rs),
+        f" JOIN handoffs h ON h.session_id = s.session_id WHERE {scope}" + rs),
         params).first()
     return {"sessions": sessions, "done": done,
             "handoff_sessions": ho[0], "handoff_count": ho[1]}
@@ -229,7 +234,8 @@ def _scoped_handoffs(conn, lo, hi) -> list:
     rows = conn.execute(text(
         "SELECT h.handoff_id, h.handoff_no, h.session_id, h.user_id, h.quote_type,"
         " h.total_quoted FROM consult_sessions s"
-        " JOIN handoffs h ON h.session_id = s.session_id WHERE 1=1" + rs + " ORDER BY h.handoff_id"),
+        f" JOIN handoffs h ON h.session_id = s.session_id WHERE {session_scope_where()}"
+        + rs + " ORDER BY h.handoff_id"),
         params).mappings().all()
     return list(rows)
 
@@ -258,7 +264,8 @@ def funnel_performance(preset: str = "feature", date_from: str | None = None,
         # 낮지만(확인자 판정), 검사를 통과하려면 예외 없이 `iso()`로 통일해야 한다.
         feature_lo, _ = kst_day_range(iso(feature_start), None)
 
-        sessions_min_raw = conn.execute(text("SELECT MIN(created_at) FROM consult_sessions")).scalar()
+        sessions_min_raw = conn.execute(text(
+            f"SELECT MIN(created_at) FROM consult_sessions s WHERE {session_scope_where()}")).scalar()
         sessions_min_date = _kst_date_of(sessions_min_raw)
         today_kst = datetime.now(KST).date()
 
@@ -284,26 +291,38 @@ def funnel_performance(preset: str = "feature", date_from: str | None = None,
 
         primary = _stage_counts(conn, lo, hi)
 
-        # ── 경고 배너 — 선택 기간이 인계 기능 시작일 이전을 포함하면 ────────────────
+        # ── 경고 배너 — 선택 기간에 "기능이 없던 날의 세션"이 실제로 섞여 있으면 ──────
+        # `crosses`는 날짜 범위만 본다("기간 시작이 기능 시작일보다 이른가") — 기간을
+        # 넓게 고를 수 있다는 사실만 확인할 뿐, **그 넓힌 구간에 실제로 세션이 있는지는
+        # 모른다.** A-81(2026-08-20) 이전에는 실 세션 이력이 항상 기능 시작일(2026-08-11)
+        # 보다 훨씬 일렀어서 이 구분이 드러나지 않았다. A-81 이후 실 세션 최초일이 기능
+        # 시작일보다 «늦을» 수 있다(실측: 2026-08-20 > 2026-08-11) — 그러면 아무리 기간을
+        # 넓혀도 "기능 없던 날" 구간엔 실 세션이 0건이라 broad·narrow 가 같은 세션을 세고,
+        # ⚠ 예전엔 이 상태가 나올 수 없어서 없었던 자기모순(두 비율이 같은데 "비교할 수
+        # 없을 만큼 낮다"고 말하는 것)이 생긴다. **문구를 다듬지 않고 조건에서 걸러낸다.**
         crosses = (lo is None) or (lo < feature_lo)
         warning = None
         if crosses:
             narrow_lo = feature_lo if lo is None else max(lo, feature_lo)
             narrow = _stage_counts(conn, narrow_lo, hi)
-            broad_r = _ratio_block(primary)
-            narrow_r = _ratio_block(narrow)
-            broad_raw, narrow_raw = _raw_ratio(primary), _raw_ratio(narrow)
-            multiplier = None
-            if broad_raw not in (None, 0) and narrow_raw is not None:
-                multiplier = round(narrow_raw / broad_raw, 1)
-            pre_start_to = date.fromordinal(feature_start.toordinal() - 1)
-            warning = {
-                "pre_start_from": period_from_label,
-                "pre_start_to": iso(pre_start_to),
-                "broad": {**broad_r, "sessions": primary["sessions"], "from": period_from_label},
-                "narrow": {**narrow_r, "sessions": narrow["sessions"], "from": iso(feature_start)},
-                "multiplier": multiplier,
-            }
+            # narrow는 [narrow_lo, hi) ⊆ [lo, hi) = primary의 부분집합이라 sessions는
+            # 항상 narrow <= primary다 — 그 차이가 있을 때만 "기능 없던 날의 세션"이
+            # 실재해 배너가 말하는 왜곡이 실제로 일어난다.
+            if primary["sessions"] > narrow["sessions"]:
+                broad_r = _ratio_block(primary)
+                narrow_r = _ratio_block(narrow)
+                broad_raw, narrow_raw = _raw_ratio(primary), _raw_ratio(narrow)
+                multiplier = None
+                if broad_raw not in (None, 0) and narrow_raw is not None:
+                    multiplier = round(narrow_raw / broad_raw, 1)
+                pre_start_to = date.fromordinal(feature_start.toordinal() - 1)
+                warning = {
+                    "pre_start_from": period_from_label,
+                    "pre_start_to": iso(pre_start_to),
+                    "broad": {**broad_r, "sessions": primary["sessions"], "from": period_from_label},
+                    "narrow": {**narrow_r, "sessions": narrow["sessions"], "from": iso(feature_start)},
+                    "multiplier": multiplier,
+                }
 
         # ── (A) 3단계 표기 ──────────────────────────────────────────────
         sess_to_done_pct = _pct(primary["done"], primary["sessions"], 1)
@@ -380,6 +399,11 @@ def funnel_performance(preset: str = "feature", date_from: str | None = None,
         "generated_at": iso(datetime.now(_tz.utc)),
         "feature": {"start_date": iso(feature_start), "source": feature_source,
                     "migration_file": HANDOFF_MIGRATION_FILE},
+        # A-81 — 이 화면의 sessions·done·handoff 는 전부 session_scope_where() 를 거친
+        # 「시험 운영 기간」 제외분이다. feature 와 같은 모양(날짜+어휘)으로 병기한다 —
+        # 서로 다른 두 경계(인계 기능 시작일 / 시험 운영 기간 경계)를 헷갈리지 않게
+        # 필드를 나눈다(하나로 합치면 "그래서 어느 날짜가 뭘 뜻하는지" 를 다시 물어야 한다).
+        "scope": {"start_date": SCOPE_BASELINE_ISO, "label": SCOPE_LABEL},
         "period": {"preset": preset, "from": period_from_label, "to": period_to_label,
                    "label": period_label},
         "history_bounds": {"sessions_min": iso(sessions_min_date),

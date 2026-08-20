@@ -19,6 +19,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv                                    # noqa: E402
 from sqlalchemy import create_engine, text                        # noqa: E402
 
+# 세션 조회 술어(「어느 세션을 포함하는가」) 단일 원천 — U-34 대응, api/session_scope.py 참조.
+from api.session_scope import session_scope_where                 # noqa: E402
+
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 
@@ -33,7 +36,8 @@ def main() -> None:
         pool = q("SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")
         review = q("SELECT COUNT(*) FROM product_reviews WHERE review_status='대기'")
         today = q("SELECT COUNT(*) FROM orders WHERE created_at::date = CURRENT_DATE")
-        sess = q("SELECT COUNT(*) FROM consult_sessions WHERE created_at::date = CURRENT_DATE")
+        sess = q(f"SELECT COUNT(*) FROM consult_sessions s WHERE {session_scope_where()}"
+                 " AND created_at::date = CURRENT_DATE")
         std = q("SELECT COUNT(*) FROM std.part_specs")
         ven = q("SELECT COUNT(*) FROM std.part_specs WHERE source='vendor'")
         hum = q("SELECT COUNT(*) FROM std.part_specs WHERE source='human'")

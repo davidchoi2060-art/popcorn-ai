@@ -409,7 +409,11 @@ body[data-screen-id="ADM-HND-030"] .a2-badge{border-style:dashed}
       var on = S.period.preset === t.key;
       return '<button type="button" class="fn-tab' + (on ? ' on' : '') + '" data-preset="' + t.key + '">' + esc(t.label) + '</button>';
     }).join('');
-    $('fnTabNote').textContent = (d && d.feature) ? ('인계 기능은 ' + d.feature.start_date + '부터') : '';
+    // A-81 — 기존 fnTabNote 자리(인계 기능 시작일 안내)에 시험 운영 기간 경계를 이어 붙인다.
+    // 두 경계는 서로 다른 개념이라(위 renderTabs 상단 주석) 문장을 나눈다.
+    $('fnTabNote').textContent =
+      ((d && d.feature) ? ('인계 기능은 ' + d.feature.start_date + '부터') : '') +
+      ((d && d.scope) ? ' · ' + d.scope.start_date + ' 이후만 집계(그 이전은 「' + d.scope.label + '」)' : '');
     $('fnCustomRow').hidden = (S.period.preset !== 'custom');
     if (d && d.period) {
       $('fnPeriodLabel').textContent = d.period.label + ' (' + (d.period.from || '처음') + ' ~ ' + (d.period.to || '오늘') + ')';

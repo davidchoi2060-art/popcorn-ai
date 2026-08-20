@@ -476,9 +476,12 @@ button{font-family:inherit}
     // 이 페이지(LIMIT 창) 기준은 note 줄에 병기한다 — 두 분모를 섞지 않는다.
     var pctTotal = total ? (doneTotal / total * 100).toFixed(1) : '—';
     var pctWindow = N ? (doneN / N * 100).toFixed(1) : '—';
+    // A-81 — total·doneTotal·dropTotal 은 이미 서버에서 「시험 운영 기간」을 제외한 값이다.
+    // 새 컴포넌트를 만들지 않고 기존 note 줄(전체 세션 카드)에 이어 붙인다.
+    var scopeNote = S.data.scope_note ? (' · ' + S.data.scope_note) : '';
     $('kpis').innerHTML =
       kpiCard('전체 세션', '<span class="val real">' + fmtInt(total) + '</span><span class="unit">건</span>',
-        '', '이 페이지 ' + fmtInt(N) + '건 표시 중(페이지당 상한 ' + fmtInt(S.data.limit) + '건)') +
+        '', '이 페이지 ' + fmtInt(N) + '건 표시 중(페이지당 상한 ' + fmtInt(S.data.limit) + '건)' + scopeNote) +
       kpiCard('오늘', '<span class="val real">' + fmtInt(todayN) + '</span><span class="unit">건</span>', '', '') +
       kpiCard('완주율', '<span class="val real">' + pctTotal + '%</span>',
         '<span class="kpichip sample">전체 ' + fmtInt(total) + '건 기준</span>',

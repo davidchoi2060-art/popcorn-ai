@@ -10,6 +10,9 @@
   ③ 적용 중인 버전(마진·호환 규칙·추천 기준) = 버전 관리 미모델링
 목업의 '매입 대기'(sourcing 원천 0행)는 **입고 대기**로, '주문 재전달 필요'(전달 상태 컬럼 없음)는
 **환불 처리 대기**로 교체 — 실제로 운영자 판단이 필요한 것을 가리키게 한다.
+
+`consult_sessions` 를 세는 자리는 전부 `session_scope_where()`(`api/session_scope.py`)를
+거친다 — U-34(data_origin 필터 정책 미확정) 대응, 지금은 아무것도 거르지 않는다.
 """
 from fastapi import APIRouter
 from sqlalchemy import text
@@ -22,6 +25,9 @@ from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
 # 순환 없음: admin_stock 은 admin_orders·admin_products·auth·db·timeutil 만 가져오고
 # 그 어느 것도 이 모듈(또는 admin_sourcing)을 가져오지 않는다.
 from .admin_stock import pending_where
+# 세션 조회 술어(「어느 세션을 포함하는가」)도 같은 이유로 한 곳에 모았다 — 그 파일 참조.
+# A-81 확정 이후: scope_note() = 「왜 세션 수가 줄었나」를 화면이 말할 문장(그 함수 참조).
+from .session_scope import session_scope_where, scope_note
 from .db import engine
 from .taxonomy import CORE_TYPES, PART_LABELS
 
@@ -64,8 +70,11 @@ def dashboard():
         core = conn.execute(text(
             "SELECT COUNT(*) FROM products WHERE category_group='core_part'"
             " AND part_type = ANY(:core)"), {"core": list(CORE_TYPES)}).scalar_one()
-        sess_today = one("SELECT COUNT(*) FROM consult_sessions WHERE created_at::date=CURRENT_DATE")
-        sess_done = one("SELECT COUNT(*) FROM consult_sessions s WHERE created_at::date=CURRENT_DATE"
+        scope = session_scope_where()
+        sess_today = one(f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
+                         " AND created_at::date=CURRENT_DATE")
+        sess_done = one(f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
+                        " AND created_at::date=CURRENT_DATE"
                         " AND EXISTS (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)")
         orders = conn.execute(text(
             "SELECT status, COUNT(*) FROM orders GROUP BY status")).all()
@@ -87,6 +96,7 @@ def dashboard():
             "pool_rate": round(pool_ok / core * 100, 1) if core else 0.0,
             "sessions_today": sess_today, "sessions_done": sess_done,
             "sessions_drop": sess_today - sess_done,
+            "sessions_scope_note": scope_note(),   # A-81 — 왜 세션 수가 줄었는지(시험 운영 기간 제외)
             "orders_total": sum(order_map.values()), "orders_active": active,
             "orders_by_status": [{"status": s, "count": n} for s, n in
                                  sorted(orders, key=lambda x: -x[1])],
@@ -127,10 +137,18 @@ def quote_quality():
     """
     with engine.connect() as conn:
         one = lambda sql: conn.execute(text(sql)).scalar_one()
-        sess = one("SELECT COUNT(*) FROM consult_sessions")
-        done = one("SELECT COUNT(DISTINCT session_id) FROM quote_snapshots")
+        scope = session_scope_where()
+        sess = one(f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}")
+        # ⚠ 2026-08-20 정정 — quote_snapshots 만 단독으로 세면(scope 미적용) sess(scope 적용)
+        # 만 줄어 정책이 켜지는 순간 rate>100%·unquoted<0 이 난다(admin_sessions.py
+        # done_total 과 같은 병 — 제작 중 조사자 발견). session_id 는 NOT NULL·FK라 JOIN해도
+        # 지금(scope=TRUE) 값은 그대로다(2026-08-20 직접 확인: 고아 행 0).
+        done = one(
+            "SELECT COUNT(DISTINCT q.session_id) FROM quote_snapshots q"
+            f" JOIN consult_sessions s ON s.session_id = q.session_id WHERE {scope}")
         modes = conn.execute(text(
-            "SELECT mode, COUNT(*) FROM consult_sessions GROUP BY 1 ORDER BY 2 DESC")).all()
+            f"SELECT mode, COUNT(*) FROM consult_sessions s WHERE {scope}"
+            " GROUP BY 1 ORDER BY 2 DESC")).all()
         tiers = conn.execute(text(
             "SELECT quote_type, COUNT(*) FROM quote_snapshots GROUP BY 1 ORDER BY 2 DESC")).all()
         # 상관 서브쿼리(상품 22,840건 × 매 행마다 stock_movements 전량 스캔)가
@@ -162,6 +180,7 @@ def quote_quality():
         "note": ("불성립은 별도로 기록되지 않아 **세션은 있는데 견적 스냅샷이 없는 것**으로"
                  " 셉니다. 그래서 왜 못 냈는지(빈 슬롯·걸린 조건)는 아직 알 수 없습니다 —"
                  " consult_sessions 에 결과 컬럼이 붙어야 답할 수 있습니다."),
+        "scope_note": scope_note(),   # A-81 — sessions·quoted·rate 전부 이 기준을 적용한 값
     }
 
 
@@ -191,10 +210,11 @@ def funnel():
     with engine.connect() as conn:
         one = lambda sql: conn.execute(text(sql)).scalar_one()
         visitors = one("SELECT COUNT(*) FROM users WHERE anon_key NOT LIKE 'seed-%'")
-        consulted = one("SELECT COUNT(DISTINCT user_id) FROM consult_sessions"
-                        " WHERE user_id IS NOT NULL")
-        quoted = one("SELECT COUNT(DISTINCT s.user_id) FROM consult_sessions s"
-                     " WHERE s.user_id IS NOT NULL AND EXISTS"
+        scope = session_scope_where()
+        consulted = one(f"SELECT COUNT(DISTINCT user_id) FROM consult_sessions s WHERE {scope}"
+                        " AND user_id IS NOT NULL")
+        quoted = one(f"SELECT COUNT(DISTINCT s.user_id) FROM consult_sessions s WHERE {scope}"
+                     " AND s.user_id IS NOT NULL AND EXISTS"
                      " (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)")
         # ④ S2 도달 = 견적 스냅샷이 생긴 상담을 가진 방문자 (=③과 같은 집합).
         #    지금은 ③과 구분되지 않는다 — S2 페이지뷰 기록이 없기 때문이다.
@@ -206,11 +226,15 @@ def funnel():
     def step(key, label, value, note=None):
         return {"key": key, "label": label, "value": value, "note": note}
 
+    # A-81 — consult·quote(→s2)는 consult_sessions 파생값이라 이 기준이 적용된다.
+    # visit(users)·order(orders)는 consult_sessions 를 안 거치므로 대상이 아니다 — 그래서
+    # 단계 전체가 아니라 **이 두 단계에만** 안내를 단다(잘못 읽으면 전 단계가 준 것처럼 보인다).
+    _scope_step_note = scope_note()
     return {
         "steps": [
             step("visit", "접속(방문자)", visitors),
-            step("consult", "AI 부품 문의", consulted),
-            step("quote", "견적 성공", quoted),
+            step("consult", "AI 부품 문의", consulted, _scope_step_note),
+            step("quote", "견적 성공", quoted, _scope_step_note),
             step("s2", "제안서(S2) 도달", reached_s2,
                  "지금은 「견적 성공」과 같은 집합입니다 — S2 화면 도달 기록이 따로 없습니다"),
             step("cart", "장바구니", None, "장바구니 테이블이 없습니다 — 원천 부재"),

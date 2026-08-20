@@ -200,7 +200,7 @@
 
     <div class="dash-row3">
       <div class="dash-panel">
-        <div class="hd">
+        <div class="hd" title="{{ quality.scope_note or '' }}">
           <span>견적 품질 — 누적</span>
           {% if quality.status == 'ok' %}<span class="sample">{{ quality.quoted_fmt }} / {{ quality.sessions_fmt }}</span>{% endif %}
         </div>

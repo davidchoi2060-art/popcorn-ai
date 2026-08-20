@@ -26,6 +26,9 @@ from sqlalchemy import text
 from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
+# 세션 조회 술어(「어느 세션을 포함하는가」) 단일 원천 — U-34 대응, 그 파일 docstring 참조.
+# A-81 확정 이후: scope_note() = 「왜 세션 수가 줄었나」를 화면이 말할 문장(그 함수 참조).
+from .session_scope import session_scope_where, scope_note
 
 router = APIRouter(prefix="/api/admin")
 
@@ -63,6 +66,7 @@ def list_sessions(offset: int = 0):
     # 되돌린다(engine/characteristics.py IsolationLevelCharacteristic·pool/base.py
     # checkin의 finalize_callback) — 다른 요청·다른 화면에 새지 않는다.
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
+        scope = session_scope_where()
         rows = conn.execute(text(
             "SELECT s.session_id, s.member_id, s.user_id, s.mode, s.constraints, s.created_at,"
             " m.nickname, o.order_no, o.status AS order_status,"
@@ -79,6 +83,7 @@ def list_sessions(offset: int = 0):
             "                   total_quoted, total_mall, price_checked, created_at"
             "            FROM handoffs WHERE session_id IS NOT NULL"
             "            ORDER BY session_id, handoff_id DESC) h USING (session_id)"
+            f" WHERE {scope}"
             " ORDER BY s.session_id DESC LIMIT :lim OFFSET :off"),
             {"lim": LIMIT, "off": offset}).mappings().all()
         snaps = conn.execute(text(
@@ -86,12 +91,22 @@ def list_sessions(offset: int = 0):
             " FROM quote_snapshots WHERE session_id = ANY(:ids) ORDER BY snapshot_id"),
             {"ids": [r["session_id"] for r in rows] or [0]}).mappings().all()
         today = conn.execute(text(
-            "SELECT COUNT(*) FROM consult_sessions WHERE created_at::date = CURRENT_DATE")).scalar_one()
+            f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}"
+            " AND created_at::date = CURRENT_DATE")).scalar_one()
         # 전체 기준(창 밖 포함) — 완주율 분모가 200건 창이 아니라 전체가 되도록 별도로 낸다.
         # done_total은 quote_snapshots에 세션이 하나라도 있으면 완주로 센다(창 안 done과 같은 정의).
-        total = conn.execute(text("SELECT COUNT(*) FROM consult_sessions")).scalar_one()
+        # ⚠ 2026-08-20 정정 — done_total 을 quote_snapshots 단독으로 세면 total(scope 적용)만
+        # 줄고 done_total(scope 미적용)은 그대로라 **정책이 켜지는 순간 완주율이 100%를
+        # 넘는다**(제작 중 조사자 발견). quote_snapshots.session_id 는 NOT NULL + FK라
+        # consult_sessions 에 없는 행이 없다(2026-08-20 직접 확인: 고아 행 0 · distinct
+        # session_id 6,630 = JOIN 결과 6,630, 일치) — 그래서 JOIN 으로 같은 scope 를
+        # 적용해도 **지금(scope=TRUE) 값은 그대로**다. total 과 done_total 이 항상 같은
+        # 모집단(같은 scope)에서 나오게 한다.
+        total = conn.execute(text(
+            f"SELECT COUNT(*) FROM consult_sessions s WHERE {scope}")).scalar_one()
         done_total = conn.execute(text(
-            "SELECT COUNT(DISTINCT session_id) FROM quote_snapshots")).scalar_one()
+            "SELECT COUNT(DISTINCT q.session_id) FROM quote_snapshots q"
+            f" JOIN consult_sessions s ON s.session_id = q.session_id WHERE {scope}")).scalar_one()
         drop_total = total - done_total
 
     by_session: dict = {}
@@ -144,9 +159,11 @@ def list_sessions(offset: int = 0):
     return {"items": items, "today": today, "done": done, "drop": drop, "limit": LIMIT,
             "offset": offset, "total": total,
             "done_total": done_total, "drop_total": drop_total,
+            "scope_note": scope_note(),   # A-81 — 아래 kpiCard(「전체 세션」)의 note 자리로 간다
             "note": ("상담은 로그인 전 세션이라 회원 귀속이 비어 있습니다(실 인증 슬라이스 몫) ·"
                      " 이탈은 스냅샷 유무로만 판정합니다(단계별 이탈 이벤트는 준비 중) ·"
                      " 재현은 당시 스냅샷 기준이며 현재 재고로 재실행한 대조는 준비 중입니다 ·"
                      " user_id는 회원이 아니라 익명 방문자 키입니다(FK users, 익명 발급 — 회원과 혼동 금지) ·"
                      " done/drop은 최신 %d건 창 기준이고, done_total/drop_total·total은"
-                     " consult_sessions 전체 %d건 기준입니다." % (LIMIT, total))}
+                     # ⚠ 2026-08-20 정정 — A-81 로 「전체」가 아니게 됐다(시험 운영 기간 제외).
+                     " consult_sessions 중 「시험 운영 기간」 제외 %d건 기준입니다." % (LIMIT, total))}

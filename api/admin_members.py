@@ -19,6 +19,8 @@ from .timeutil import iso
 from .admin_orders import _log
 from .auth import current_operator_id
 from .db import engine
+# 세션 조회 술어(「어느 세션을 포함하는가」) 단일 원천 — U-34 대응, 그 파일 docstring 참조.
+from .session_scope import session_scope_where
 
 router = APIRouter(prefix="/api/admin")
 
@@ -45,7 +47,10 @@ def _note(r) -> str:
 
 @router.get("/members")
 def list_members():
-    q = text("""
+    # 세션 집계(c 서브쿼리)만 session_scope_where() 를 거친다 — consult_sessions 를
+    # 직접 읽는 유일한 자리다(다른 서브쿼리는 orders·member_reviews·member_favorites).
+    scope = session_scope_where()
+    q = text(f"""
         SELECT m.member_id, m.nickname, m.email, m.joined_via, m.created_at,
                m.mall_member_id, m.mall_map_requested_at AS requested_at,
                COALESCE(o.cnt,0) AS orders, o.last_at AS o_last,
@@ -56,7 +61,8 @@ def list_members():
         LEFT JOIN (SELECT member_id, COUNT(*) cnt, MAX(created_at) last_at
                    FROM orders GROUP BY member_id) o USING (member_id)
         LEFT JOIN (SELECT member_id, COUNT(*) cnt, MAX(created_at) last_at
-                   FROM consult_sessions WHERE member_id IS NOT NULL GROUP BY member_id) c USING (member_id)
+                   FROM consult_sessions s WHERE {scope} AND s.member_id IS NOT NULL
+                   GROUP BY member_id) c USING (member_id)
         LEFT JOIN (SELECT member_id, COUNT(*) cnt, MAX(created_at) last_at
                    FROM member_reviews GROUP BY member_id) r USING (member_id)
         LEFT JOIN (SELECT member_id, COUNT(*) cnt,

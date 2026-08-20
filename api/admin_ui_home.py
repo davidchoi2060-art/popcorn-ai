@@ -212,8 +212,11 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
     drop_fmt = "—"
     if dash is not None:
         f = dash["flow"]
-        consult = {"value_fmt": f'{f["sessions_today"]:,}', "status": "ok", "reason": None}
-        quoted = {"value_fmt": f'{f["sessions_done"]:,}', "status": "ok", "reason": None}
+        # A-81 — 세션 수는 「시험 운영 기간」 제외분이다. 기존 title 툴팁 자리(에러 사유가
+        # 쓰던 자리)를 성공 상태에서도 재사용한다 — 새 자리를 만들지 않는다.
+        note = f.get("sessions_scope_note")
+        consult = {"value_fmt": f'{f["sessions_today"]:,}', "status": "ok", "reason": note}
+        quoted = {"value_fmt": f'{f["sessions_done"]:,}', "status": "ok", "reason": note}
         drop_fmt = f'{f["sessions_drop"]:,}'
     stock = {"status": "error", "label": "— 조회 실패", "reason": err_quality}
     if quality is not None:
@@ -238,6 +241,9 @@ def _quality_view(quality: dict | None, err) -> dict:
         "rate_fmt": f'{quality["rate"]:.1f}%',
         "quoted_fmt": f'{quality["quoted"]:,}', "sessions_fmt": f'{sess:,}',
         "modes": modes,
+        # A-81 — sessions/quoted/rate 전부 「시험 운영 기간」 제외분. 패널 헤드의 title
+        # 툴팁 자리에 얹는다(새 자리를 만들지 않는다).
+        "scope_note": quality.get("scope_note"),
     }
 
 
@@ -253,8 +259,11 @@ def _funnel_view(fn: dict | None, err) -> list:
         for key, label in (("visit", "접속"), ("consult", "AI 문의"), ("quote", "견적 성공")):
             v = steps[key]["value"] or 0
             pct = round(v / visit * 100, 1) if visit else 0.0
+            # A-81 — consult·quote 단계는 funnel()이 이미 단계별 note(steps[key]["note"])로
+            # 시험 운영 기간 제외 사실을 실어 보낸다. visit 은 users 테이블이라 대상이 아니다
+            # (funnel() 쪽에서도 그 단계에는 note를 안 실었다 — steps[key].get()이 None을 돌려준다).
             rows.append({"label": label, "status": "ok", "value_fmt": f"{v:,}", "pct": pct,
-                        "reason": None})
+                        "reason": steps[key].get("note")})
     # 장바구니·몰 인계는 API 응답의 일부가 아니다 — decision-log UX-22가 명시한 빈 값
     # 두 종류를 그대로 옮긴다(장바구니 = 원천 없음, 몰 인계 = 향후 사용예정). 0을 넣지 않는다.
     rows.append({"label": "장바구니", "status": "empty", "value_fmt": "원천 없음", "pct": 0,
