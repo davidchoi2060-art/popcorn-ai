@@ -47,17 +47,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
 <script>
 (function(){
-var periph=[];try{periph=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
-var psum=0;periph.forEach(function(x){psum+=x.p;});
-var PAYS=[
- {at:'오늘 14:22',order:'ORD-84216',method:'신용카드',mode:'own',amount:1735000+psum,state:'승인'},
- {at:'07-14 11:05',order:'ORD-84213',method:'신용카드',mode:'own',amount:812000,state:'승인'},
- {at:'06-28 16:40',order:'ORD-83907',method:'쇼핑몰 결제',mode:'mall',amount:1284000,state:'승인'}
-];
 var won=function(n){return n.toLocaleString()+'원';};
 var stCol={'승인':['#eaf1fd','#2149b0'],'취소':['#f4f2ec','#6b6b73'],'환불':['#fbecec','#8a1f22']};
 function render(rows){
- if(!rows.length){document.getElementById('plist').innerHTML='<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">결제 내역이 없습니다.</div>';return;}
+ if(!rows.length){document.getElementById('plist').innerHTML='<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">아직 결제 내역이 없습니다.</div>';return;}
  document.getElementById('plist').innerHTML=rows.map(function(p){
   var c=stCol[p.state]||['#f4f2ec','#6b6b73'];
   return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #f0eee9;">'
@@ -68,13 +61,31 @@ function render(rows){
    +'<b style="font-size:15px;color:#17171b;font-variant-numeric:tabular-nums;">'+won(p.amount)+'</b></div>';
  }).join('');
 }
-render(PAYS);
-var total=0;PAYS.forEach(function(p){total+=p.amount;});
-document.getElementById('mp-total').textContent=won(total);
-document.getElementById('mp-month').textContent=won(PAYS[0].amount);
+// 미로그인 상태에서도 결제 3건(1,735,000원 등)이 그대로 보이는 문제가 있었다(2026-08-20
+// 확인자 실측 — anyLoginPrompt=false·anyErrorText=false로 100% 재현). 원인은 이 자리에
+// 있던 하드코딩 더미 PAYS를 로그인 확인 없이 먼저 그리고, 아래 LIVE 블록의
+// `.catch(function(){})`가 빈 함수라 요청 실패·미로그인 시에도 그대로 남겨 둔 것이었다.
+// my-page.html이 오늘 같은 문제를 푼 방식(로그아웃/0건/실패 세 상태 + 401은
+// popcornAuth.expired())을 따라 더미 배열을 지운다.
+//
+// ⚠ 위 KPI 카드(#mp-month·#mp-total)의 정적 마크업 "1,735,000원"·"3,831,000원"은 지우지
+// 않는다 — tests/regression.py의 BAKED_CX_DEFER가 my-payments.html에서 이 두 값이 계속
+// 보이는 것을 전제로 유예해 두었다(HANDOFF §2 · 만료 2026-09-30, 그때까지 지우면 "유예
+// 목록에 낡은 항목" 검사가 실패한다). 대신 로그인 상태를 알기 전에 즉시(동기) 표시만
+// 비운다 — 소스의 정적 문자열은 남기고 실제 사용자 화면에는 노출하지 않는다.
+document.getElementById('mp-month').textContent='—';
+document.getElementById('mp-total').textContent='—';
+document.getElementById('mp-total-label').textContent='누적 결제';
 
-// ---- LIVE (슬라이스 12) — popcorn-member 있고 API 성공 시 결제 원장 전 행으로 교체, 아니면 더미 원형 ----
-// 더미 첫 행의 psum 가산은 리터럴 전용 — 실데이터 amount는 결제 실액(주변기기 포함)이라 재적용 금지(이중 계상).
+function noteBox(msg){return '<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">'+msg+'</div>';}
+function renderState(msg){
+ document.getElementById('plist').innerHTML=noteBox(msg);
+ document.getElementById('mp-month').textContent='—';
+ document.getElementById('mp-total').textContent='—';
+ document.getElementById('mp-total-label').textContent='누적 결제';
+}
+
+// ---- LIVE — popcorn-member 있고 API 성공 시에만 결제 원장을 그린다 ----
 function fmtT(iso){
  var d=new Date(iso),now=new Date();
  var hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -99,7 +110,9 @@ if(mem&&mem.email){
    document.getElementById('mp-month').textContent=won(month);
    document.getElementById('mp-total').textContent=won(sum);
    document.getElementById('mp-total-label').textContent='누적 결제 ('+d.items.length+'건)';
-  }).catch(function(){});
+  }).catch(function(){renderState('결제 내역을 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.');});
+}else{
+ renderState('로그인하면 결제 내역을 볼 수 있어요.');
 }
 })();
 </script>

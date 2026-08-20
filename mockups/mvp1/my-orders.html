@@ -52,20 +52,14 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
 <script>
 (function(){
-// ---- 데이터 (목업 — 주문 시점 스냅샷 원칙) ----
-var periph=[];try{periph=JSON.parse(localStorage.getItem('popcorn-periph')||'[]');}catch(e){}
-var psum=0;periph.forEach(function(x){psum+=x.p;});
-var ORDERS=[
- {no:'ORD-84216',date:'오늘 14:22',channel:'own',status:'조립중',step:2,
-  items:[['CPU','Intel Core i7-14700K',580000],['GPU','NVIDIA RTX 4070 Ti SUPER',420000],['메인보드','MSI MAG Z790 Tomahawk WiFi',250000],['메모리','삼성 DDR5-5600 32GB (16×2)',120000],['SSD','삼성 990 PRO 1TB NVMe',135000],['파워','시소닉 FOCUS GX-750 750W',110000],['케이스','NZXT H5 Flow',90000],['조립·검수','전문가 조립 · 선정리 · 24시간 검사',30000]].concat(periph.map(function(x){return [x.c+' (함께 구성)',x.n,x.p];})),
-  total:1735000+psum,pay:{method:'신용카드 (자체 결제)',state:'승인',at:'오늘 14:22'},ship:null,refund:null},
- {no:'ORD-84213',date:'07-14 11:05',channel:'own',status:'배송중',step:3,
-  items:[['구성 요약','라이젠5 7600 · RTX 4060 구성 (7종) + 조립·검수',812000]],
-  total:812000,pay:{method:'신용카드 (자체 결제)',state:'승인',at:'07-14 11:05'},ship:{carrier:'CJ대한통운',no:'6482-1234-5678'},refund:null},
- {no:'ORD-83907',date:'06-28 16:40',channel:'mall',status:'완료',step:4,
-  items:[['구성 요약','라이젠5 5600 · RTX 3060 구성 (7종) + 조립·검수',1284000]],
-  total:1284000,pay:{method:'쇼핑몰 결제 (인계)',state:'승인',at:'06-28 16:40'},ship:{carrier:'CJ대한통운',no:'6480-8821-3341'},refund:null}
-];
+// ---- 데이터 ----
+// 미로그인 상태에서도 하드코딩 더미 3건(ORD-84216 등, 최대 1,735,000원)이 그대로 보이는
+// 문제가 있었다(2026-08-20 확인자 실측 — anyLoginPrompt=false·anyErrorText=false로 100%
+// 재현). 원인은 이 자리에 있던 더미 배열과, 아래 LIVE 블록의 `.catch(function(){})`가
+// 빈 함수라 로그인 확인·요청 실패 시에도 더미가 그대로 남는 것이었다. my-page.html이
+// 오늘 같은 문제를 푼 방식(로그아웃/0건/실패 세 상태 + 401은 popcornAuth.expired())을
+// 따라 더미 배열을 지우고, 로그인 확인 전에는 아무것도 그리지 않는다.
+var ORDERS=[];
 var STEPS=['결제 완료','조립·검사','출고·배송','배송 완료'];
 var cur='all', sel=null, LIVE=false;
 function kindOf(st){return (st==='조립중'||st==='결제완료'||st==='취소')?'주문 취소':(st==='완료'?'반품·교환':'환불');}
@@ -98,7 +92,7 @@ function renderList(){
    +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+' · '+o.items[0][1].slice(0,34)+(o.items.length>1?' 외':'')+'</div></div>'
    +'<b style="font-size:16px;color:#17171b;">'+won(o.total)+'</b>'
    +'<span class="msym" style="font-size:20px;color:#c9c5bd;">chevron_right</span></div>';
- }).join(''):'<div class="card" style="text-align:center;color:#a29d92;padding:40px;">이 분류의 주문이 없습니다.</div>';
+ }).join(''):'<div class="card" style="text-align:center;color:#a29d92;padding:40px;">'+(cur==='all'?'아직 주문 내역이 없습니다.':'이 분류의 주문이 없습니다.')+'</div>';
  document.querySelectorAll('#olist [data-o]').forEach(function(el){el.onclick=function(){sel=el.dataset.o;renderDetail();show('v-detail');};});
 }
 // ---- 상세 ----
@@ -153,7 +147,7 @@ function renderRefund(){
   +'<div class="card" style="margin-bottom:14px;"><h2 style="margin:0 0 4px;font-size:19px;font-weight:900;color:#17171b;">'+kind+' 접수</h2><p style="margin:0;font-size:13px;color:#8a8578;font-weight:600;">'+o.no+' · '+won(o.total)+' · '+o.date+'</p></div>'
   +'<div class="card" style="margin-bottom:14px;"><h3 style="margin:0 0 12px;font-size:14.5px;font-weight:900;color:#17171b;">사유를 선택해 주세요</h3><div id="r-reasons" style="display:flex;gap:8px;flex-wrap:wrap;">'+REASONS.map(function(r){return '<span class="chip" data-r="'+r+'">'+r+'</span>';}).join('')+'</div>'
   +'<textarea id="r-note" placeholder="상세 내용 (선택)" style="width:100%;margin-top:12px;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:11px;font-size:13.5px;font-family:inherit;outline:none;min-height:70px;resize:vertical;"></textarea></div>'
-  +'<div class="card" style="background:#fbf3e2;border-color:#e6c98f;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;"><span class="msym" style="font-size:19px;color:#8a561a;flex:none;">info</span><p style="margin:0;font-size:12.5px;color:#8a561a;line-height:1.65;font-weight:600;">'+modeNote+'<br><span style="color:#a58044;">'+(kind==='주문 취소'?'조립 착수 전 취소는 전액 환불됩니다. 예약된 재고(hold)는 즉시 해제됩니다.':'초기 불량은 수령 7일 내 교환 우선, 왕복 택배비는 당사 부담입니다.')+'</span></p></div>'
+  +'<div class="card" style="background:#fbf3e2;border-color:#e6c98f;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;"><span class="msym" style="font-size:19px;color:#8a561a;flex:none;">info</span><p style="margin:0;font-size:12.5px;color:#8a561a;line-height:1.65;font-weight:600;">'+modeNote+'<br><span style="color:#a58044;">'+(kind==='주문 취소'?'조립 착수 전 취소는 전액 환불됩니다. 예약된 재고(hold)는 즉시 해제됩니다.':'초기 불량은 수령 7일 내 교환 우선, 왕복 택배비는 당사 부담입니다. <span style="color:#a29d92;">(*정책 확정 전 예시)</span>')+'</span></p></div>'
   +'<div style="display:flex;gap:10px;"><button class="btnp" id="r-submit" disabled style="background:#c9c5bd;cursor:not-allowed;">접수하기</button><button class="btn2" id="r-cancel">돌아가기</button></div>';
  var reason=null;
  document.querySelectorAll('#r-reasons .chip').forEach(function(c){c.onclick=function(){reason=c.dataset.r;document.querySelectorAll('#r-reasons .chip').forEach(function(x){x.classList.toggle('on',x===c);});var b=document.getElementById('r-submit');b.disabled=false;b.style.background='#2b5fd9';b.style.cursor='pointer';};});
@@ -179,12 +173,14 @@ function renderRefund(){
   renderDetail();show('v-detail');
  };
 }
-// ---- 초기화: ?id= 딥링크 ----
-renderList();
-var qid=new URLSearchParams(location.search).get('id');
-if(qid&&ORDERS.some(function(o){return o.no===qid;})){sel=qid;renderDetail();show('v-detail');}
-// ---- LIVE (슬라이스 10) — popcorn-member 있고 API 성공 시 회원 주문으로 교체(회원 경계), 아니면 더미 원형 ----
-// 주변기기 concat은 더미 리터럴 전용 — LIVE는 order_items에 이미 포함되어 자연 우회.
+// ---- 로그아웃·요청 실패 상태 안내 (my-page.html의 노트박스 방식) ----
+function noteBox(msg){return '<div class="card" style="text-align:center;color:#a29d92;padding:40px;">'+msg+'</div>';}
+function renderState(msg){
+ document.getElementById('filters').innerHTML='';
+ document.getElementById('olist').innerHTML=noteBox(msg);
+}
+
+// ---- LIVE — popcorn-member 있고 API 성공 시에만 주문을 그린다 (?id= 딥링크 포함) ----
 function fmtT(iso){
  var d=new Date(iso),now=new Date();
  var hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -197,6 +193,7 @@ var fromApi=function(o){return {no:o.no,date:fmtT(o.created_at),channel:o.channe
  pay:o.pay?{method:o.pay.method,state:o.pay.state,at:o.pay.at?fmtT(o.pay.at):''}:{method:'결제 대기',state:'—',at:''},
  ship:o.ship,refund_mode:o.refund_mode,
  refund:o.refund?{kind:kindOf(o.status),no:o.refund.no,reason:o.refund.reason,status:o.refund.status,modeNote:noteOfMode(o.refund.mode)}:null};};
+var qid=new URLSearchParams(location.search).get('id');
 var mem=null;try{mem=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
 if(mem&&mem.email){
  fetch('/api/my/orders')
@@ -211,7 +208,9 @@ if(mem&&mem.email){
     else{sel=null;show('v-list');}
    }
   })
-  .catch(function(){});
+  .catch(function(){renderState('주문 내역을 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.');});
+}else{
+ renderState('로그인하면 주문 내역을 볼 수 있어요.');
 }
 })();
 </script>

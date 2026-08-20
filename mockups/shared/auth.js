@@ -5,8 +5,10 @@
 // **서버가 "세션 없다"고 하면 캐시를 지운다**(로그인처럼 보이는데 API는 401인 상태를 만들지 않는다).
 // API가 아예 없으면(목업 단독 열람) 기존 로컬 mock 동작을 유지한다.
 //
-// **비밀번호를 저장하지 않는다** — 신원은 소셜 제공자가 확인한다(관리자 인증과 같은 원칙).
-// 지금은 dev 어댑터라 입력한 이메일을 신원으로 신뢰한다 — **로컬 전용·공개 배포 차단 사유.**
+// **비밀번호를 저장하지 않는다.** 카카오·네이버 로그인은 앱 등록 전이라 실제로 동작하지
+// 않고, 눌러도 화면이 "준비 중"이라고 알릴 뿐 로그인을 완료시키지 않는다(2026-08-20).
+// 실제로 열려 있는 유일한 경로는 이메일이고, 그 검증도 형식(@ 포함 여부)만 본다 —
+// 본인 확인(실명·소유 인증)은 아직 없다. **로컬 전용·공개 배포 차단 사유.**
 (function(){
 var KEY='popcorn-member';
 function member(){try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;}}
@@ -27,23 +29,27 @@ function open(mode,after){
  close();mode=mode||'login';
  var ov=document.createElement('div');ov.id='pa-ov';
  ov.style.cssText='position:fixed;inset:0;z-index:99990;background:rgba(23,23,27,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font-family:var(--font);padding:16px;';
+ // "가입하면 ~" 문구는 실제로 저장·재조회되는 것만 말한다(2026-08-20). 상담·관심 부품은
+ // 아직 회원 계정에 연결되지 않는다 — api/recommend.py가 member_id를 로그인 여부와 무관하게
+ // 항상 NULL로 넣고, /api/my/*에 상담·찜을 돌려주는 엔드포인트가 없다(member_favorites는
+ // ERD에만 있다). 실제로 저장·재조회되는 것은 주문 내역·결제 내역·후기뿐이라 그 셋만 적는다.
  ov.innerHTML=''
  +'<div style="width:min(400px,94vw);background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 24px 70px rgba(0,0,0,.35);box-sizing:border-box;">'
  +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
  +'<div style="font-size:17px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span></div>'
  +'<button id="pa-x" style="border:none;background:#f4f2ec;width:30px;height:30px;border-radius:9px;cursor:pointer;font-weight:800;color:#6b6b73;">✕</button></div>'
- +'<p style="margin:0 0 16px;font-size:12.5px;color:#8a8578;font-weight:600;line-height:1.5;">가입하면 <b style="color:#3a3a40;">상담 내역·관심 부품·견적</b>이 저장되고, 그때 가격 그대로 다시 볼 수 있어요.</p>'
+ +'<p style="margin:0 0 16px;font-size:12.5px;color:#8a8578;font-weight:600;line-height:1.5;">가입하면 <b style="color:#3a3a40;">주문 내역·결제 내역·후기</b>가 저장되고, 주문할 때 가격도 그대로 남아요.</p>'
  +'<div style="display:flex;background:#f4f2ec;border-radius:11px;padding:3px;margin-bottom:16px;">'
  +'<button data-tab="login" style="flex:1;padding:9px;border:none;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;">로그인</button>'
  +'<button data-tab="join" style="flex:1;padding:9px;border:none;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;">회원가입</button></div>'
  +'<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">'
- +'<button data-social="카카오" style="width:100%;padding:12px;border:none;background:#FEE500;border-radius:11px;font-size:13.5px;font-weight:800;color:#191919;cursor:pointer;font-family:inherit;">카카오로 3초 만에 시작</button>'
- +'<button data-social="네이버" style="width:100%;padding:12px;border:none;background:#03C75A;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">네이버로 시작</button></div>'
+ +'<button data-social="카카오" style="width:100%;padding:12px;border:none;background:#FEE500;border-radius:11px;font-size:13.5px;font-weight:800;color:#191919;cursor:pointer;font-family:inherit;">카카오 로그인 (준비 중)</button>'
+ +'<button data-social="네이버" style="width:100%;padding:12px;border:none;background:#03C75A;border-radius:11px;font-size:13.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">네이버 로그인 (준비 중)</button></div>'
  +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#c9c5bd;font-size:11.5px;font-weight:700;"><span style="flex:1;height:1px;background:#ece9e3;"></span>또는 이메일로<span style="flex:1;height:1px;background:#ece9e3;"></span></div>'
  +'<div id="pa-form" style="display:flex;flex-direction:column;gap:9px;">'
  +'<input id="pa-nick" placeholder="닉네임" style="display:none;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">'
  +'<input id="pa-email" type="email" placeholder="이메일" style="padding:12px 14px;border:1.5px solid #e6e2da;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">'
- +'<p style="margin:0;font-size:11.5px;color:#a29d92;font-weight:700;line-height:1.5;">비밀번호를 만들지 않습니다 — 본인 확인은 <b style="color:#8a8578;">카카오·네이버 계정</b>이 합니다.</p>'
+ +'<p style="margin:0;font-size:11.5px;color:#a29d92;font-weight:700;line-height:1.5;">비밀번호를 만들지 않습니다 — 지금은 <b style="color:#8a8578;">이메일 주소만</b> 확인합니다. 카카오·네이버를 통한 본인 확인은 아직 준비 중입니다.</p>'
  +'<p id="pa-err" style="margin:0;font-size:12px;color:#b31b25;font-weight:700;min-height:14px;"></p>'
  +'<button id="pa-go" style="width:100%;padding:13px;border:none;background:#2b5fd9;border-radius:11px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">로그인</button>'
  +'<p id="pa-terms" style="display:none;margin:2px 0 0;font-size:11px;color:#a29d92;line-height:1.5;">가입 시 <a href="#!" style="color:#8a8578;">이용약관</a>·<a href="#!" style="color:#8a8578;">개인정보 처리방침</a>에 동의합니다. 결제·배송 정보는 주문 시점에만 수집합니다.</p>'
@@ -58,15 +64,16 @@ function open(mode,after){
  }
  ov.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){cur=b.dataset.tab;paint();};});
 
- // 소셜 — 앱 등록 전이라 신원 확인을 이메일로 대체한다(같은 흐름을 검증하기 위해).
+ // 소셜 — 카카오·네이버 앱 등록 전이라 실제 로그인으로 이어지지 않는다(2026-08-20 사장님 지시).
+ // 이전에는 이메일 칸이 채워져 있으면 그 값으로 로그인을 완료시켰다 — 카카오·네이버가
+ // 본인 확인을 한 것처럼 보이는데 실제로는 이메일 형식만 확인한 것이라 거짓이었다.
+ // 지금은 이메일 입력 여부와 관계없이 항상 "준비 중"만 알리고, 로그인은 아래 이메일
+ // 경로로만 완료된다.
  ov.querySelectorAll('[data-social]').forEach(function(b){b.onclick=function(){
-  var via=b.dataset.social, em=ov.querySelector('#pa-email').value.trim();
+  var via=b.dataset.social;
   var err=ov.querySelector('#pa-err');
-  if(!em||em.indexOf('@')<0){
-   err.textContent=via+' 로그인은 앱 등록 후 동작합니다 — 지금은 이메일로 같은 흐름을 확인합니다.';
-   ov.querySelector('#pa-email').focus();return;
-  }
-  finish(em, ov.querySelector('#pa-nick').value.trim()||(via+' 사용자'), via, err);
+  err.textContent=via+' 로그인은 지금 준비 중입니다 — 아래 이메일로 계속해 주세요.';
+  ov.querySelector('#pa-email').focus();
  };});
 
  ov.querySelector('#pa-go').onclick=function(){
