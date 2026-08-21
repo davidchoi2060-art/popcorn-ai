@@ -43,6 +43,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     <div id="orderPick"></div>
   </div>
 
+  <!-- 대상 주문이 확인된 뒤에만 보인다(초기 display:none — 2026-08-21 빈 상태 정정) -->
+  <div id="writeArea" style="display:none;">
+
   <!-- 작성 -->
   <div class="card" style="margin-bottom:16px;">
     <h3 class="h6"><span class="msym" style="font-size:19px;color:#c77b1f;">rate_review</span>평가</h3>
@@ -77,6 +80,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   </div>
 
   <p style="margin:16px 4px 0;font-size:11.5px;color:#a29d92;font-weight:600;">등록한 후기는 실제 주문 이력에 저장됩니다 — 이 화면에서 수정은 지원하지 않습니다.</p>
+
+  </div>
 </main>
 
 <a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" hidden style="position:fixed;left:18px;bottom:18px;z-index:80;display:none;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:rgba(23,23,27,.82);color:#fff;font-size:12px;font-weight:800;text-decoration:none;backdrop-filter:blur(4px);"><span class="msym" style="font-size:15px;">grid_view</span>허브</a>
@@ -84,21 +89,36 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <script src="../shared/auth.js"></script>
 <script>
 (function(){
-  // MY-040 후기 쓰기 — 등록은 LIVE(슬라이스 30, 아래 "---- LIVE (슬라이스 30)" 블록).
-  // 수정·삭제는 범위 밖(api/my_account.py 상단 docstring: "수정·삭제는 범위 밖(관리자 숨김만 — 목업에도 없음)").
+  // MY-040 후기 쓰기 — 대상은 항상 서버가 준다(GET /api/my/account 의 reviewable[]).
   // 구매 인증 계약: 후기는 order_items 라인에 매달린다(member_reviews.order_item_id NOT NULL).
-  var ORDERS=[
-    {no:"ORD-83907",at:"06-28",item:"라이젠5 5600 · RTX 3060 구성 (7종)",total:1284000,written:true,
-     parts:[["CPU","AMD 라이젠5 5600"],["그래픽카드","RTX 3060 12GB"],["메인보드","ASUS PRIME B550M"],["메모리","DDR4-3200 16GB"]]},
-    {no:"ORD-84213",at:"07-14",item:"라이젠5 7600 · RTX 4060 구성 (7종)",total:812000,written:false,
-     parts:[["CPU","AMD 라이젠5 7600"],["그래픽카드","이엠텍 RTX 4060 STORM X2"],["메인보드","ASUS PRIME B650M-A II"],["메모리","삼성 DDR5-5600 16GB"],["SSD","삼성 990 PRO 1TB"]]}
-  ];
+  // 수정·삭제는 범위 밖(api/my_account.py 상단 docstring: "수정·삭제는 범위 밖(관리자 숨김만 — 목업에도 없음)").
+  //
+  // 2026-08-21 빈 상태 정정(길잡이 실측 — 구매 이력 0건 신규 회원에게 시안 주문 2건
+  // ORD-83907·ORD-84213이 "구매 인증된 주문"이라며 그대로 보였다): 이 자리에 있던
+  // 하드코딩 시안 배열을 지웠다. my-orders.html·my-page.html이 같은 문제(더미가 실데이터
+  // 처럼 남는 것)를 푼 방식을 그대로 따른다 — ORDERS는 항상 빈 배열로 시작하고, 서버
+  // 응답이 오기 전에는 #orderPick에 아무것도 그리지 않는다(writeArea는 초기 display:none).
+  // 갈리는 상태 넷:
+  //   ① 로그인 캐시(popcorn-member) 없음               → renderState("로그인하면…")
+  //   ② 서버 401(세션 만료·무효)                        → 기존 관례대로 popcornAuth.expired()
+  //   ③ d.member===null — 세션은 있는데 회원 행이 없음   → renderState(오류 문구)
+  //      my-page.html:208과 같은 판단("세션은 있는데 회원 행이 없음 — 확인 불가로 정직하게")을
+  //      그대로 따른다. require_member()가 이미 401로 걸러 "미가입"은 여기 도달하지 않고,
+  //      여기 도달하는 것은 세션은 유효한데 회원 행을 못 찾는 예외 상태라 "다시 시도"가 맞다.
+  //   ④ 회원은 확인됐는데 reviewable이 빈 배열(구매 이력 없음) → renderState("배송이 완료된…")
+  // 제출(POST /api/my/reviews)은 이제 항상 서버를 부른다 — writeArea가 보이는 시점엔
+  // ORDERS 전 항목이 서버가 준 실제 item_id를 갖고 있으므로(위 ①~④를 통과해야만 여기 온다),
+  // "시늉"·"개발 서버" 폴백 문구가 더 이상 필요하지 않다(submit 핸들러 참조).
+  var ORDERS=[];
   var TAGS=["게임 성능 만족","조용해요","조립 상태 좋음","배송 빨랐어요","근거 설명이 좋았어요","사무용으로 충분"];
-  var pick=ORDERS.findIndex(function(o){return !o.written;});
-  if(pick<0)pick=0;
-  var rating=0, picked=[];
+  var pick=0, rating=0, picked=[], LIVE=false;
 
   function money(n){return n.toLocaleString()+"원";}
+  function noteBox(msg){return '<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">'+msg+'</div>';}
+  function renderState(msg){
+    document.getElementById("orderPick").innerHTML=noteBox(msg);
+    document.getElementById("writeArea").style.display="none";
+  }
   function renderOrders(){
     document.getElementById("orderPick").innerHTML=ORDERS.map(function(o,i){
       var on=i===pick;
@@ -157,16 +177,13 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     validate();
   }
   function validate(){
-    var ok=rating>0 && document.getElementById("body").value.trim().length>=10;
+    var ok=ORDERS.length>0 && rating>0 && document.getElementById("body").value.trim().length>=10;
     document.getElementById("submit").disabled=!ok;
   }
   document.getElementById("body").addEventListener("input",onInput);
   document.getElementById("submit").onclick=function(){
     var o=ORDERS[pick], btn=document.getElementById("submit");
-    if(!LIVE||!o.item_id){
-      window.popcornAuth.toast(o.no+" 후기 등록 시늉 — ★"+rating+" · 구매 인증 배지와 함께 노출됩니다 (저장은 개발 서버에서)");
-      return;
-    }
+    if(!o||!o.item_id){window.popcornAuth.toast("등록할 주문을 찾을 수 없습니다 — 새로고침 후 다시 시도해 주세요");return;}
     btn.disabled=true;
     fetch("/api/my/reviews",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({item_id:o.item_id,rating:rating,body:document.getElementById("body").value})})
@@ -178,28 +195,32 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
        setTimeout(function(){location.href="my-page.html";},1600);
      }).catch(function(){window.popcornAuth.toast("등록 실패 — 네트워크 오류");btn.disabled=false;});
   };
-  renderOrders();renderSnap();renderStars();renderTags();onInput();
+  renderStars();renderTags();onInput();
 
-  // ---- LIVE (슬라이스 30) — 구매 인증 대상은 서버가 준다(완료 주문 라인 ∧ 미작성) ----
-  var MEMBER=null, LIVE=false;
+  // ---- 대상 조회(슬라이스 30 LIVE, 2026-08-21 빈 상태 정정) — 위 주석 ①~④ 그대로 ----
+  var MEMBER=null;
   try{MEMBER=JSON.parse(localStorage.getItem("popcorn-member")||"null");}catch(e){}
   if(MEMBER&&MEMBER.email){
     fetch("/api/my/account")
      .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
                      if(!r.ok)throw new Error(r.status);return r.json();})
      .then(function(d){
-       if(!d.member||!d.reviewable.length)return;   // 미가입·대상 없음 — 시안 유지
-       LIVE=true;
+       if(!d.member){renderState("후기 정보를 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.");return;}
        ORDERS=d.reviewable.map(function(x){
          return {no:x.order_no,at:x.at.slice(5,10),item:x.item,total:x.total,written:x.written,
                  item_id:x.item_id,parts:[["구성",x.item]]};
        });
+       if(!ORDERS.length){renderState("배송이 완료된 주문이 있으면 후기를 남길 수 있어요.");return;}
+       LIVE=true;
        var q=new URLSearchParams(location.search).get("order");
        pick=ORDERS.findIndex(function(o){return (q&&o.no===q&&!o.written);});
        if(pick<0)pick=ORDERS.findIndex(function(o){return !o.written;});
        if(pick<0)pick=0;
-       renderOrders();renderSnap();
-     }).catch(function(){});
+       document.getElementById("writeArea").style.display="";
+       renderOrders();renderSnap();validate();
+     }).catch(function(){renderState("후기 정보를 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.");});
+  }else{
+    renderState("로그인하면 후기를 남길 수 있어요.");
   }
 })();
 </script>
