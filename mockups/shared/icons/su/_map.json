@@ -120,5 +120,7 @@
 "ft-sliders": "settings-slider-desktop-horizontal",
 "ft-repeat": "data-transfer-circle",
 "ft-clock": "stopwatch",
-"ms-hourglass_top": "loading"
+"ms-hourglass_top": "loading",
+"ms-volume_up": "volume-control-up-3",
+"ms-speaker": "speaker-1"
 }
