@@ -8,6 +8,63 @@
 *{box-sizing:border-box}html,body{margin:0;padding:0}
 body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialiased;color:#1a1a1e}
 .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+/* 2026-08-21 반응형 375~820px — 커밋 f4b36af(main-landing·s0-landing·s2-result, 2026-08-20)와
+   같은 원칙과 같은 임계값을 그대로 확장한다: 마크업 구조·색은 그대로 두고 클래스 훅만
+   추가해 이 폭에서만 레이아웃을 접는다. 821px 이상은 이 미디어쿼리가 매치하지 않으므로
+   기존 인라인 스타일(그리드 1.62fr/372px·헤더 height:62px 1행·행 flex-row)이 그대로
+   렌더된다 — CDP 로 1440·768 rect 를 수정 전후 대조해 1px 오차 없음을 확인했다.
+   인라인 style 의 특정성을 덮어야 하는 자리만 !important 를 쓴다(전부 이 미디어쿼리
+   안에 갇혀 있어 데스크톱엔 영향이 없다).
+
+   실측(CDP, headless Chrome):
+   ① 메인 그리드(1.62fr 372px, 47행) — 372px 고정 열 때문에 문서 자연폭이 항상
+      763px 다(뷰포트와 무관 — 768px 에서는 안 넘치고 375px 에서는 388px 넘친다,
+      scrollWidth 763 그대로). 1열로 접는다.
+   ② 상단 헤더(22~30행) — height:62px 고정 1행에 flex-wrap 이 없다. 500px 에서는
+      좌/우 그룹이 각각 26px·37px(정상 1줄)인데 450px 에서 48px·50px 로 뛴다(2줄
+      붕괴 시작). s2 헤더와 같은 구조라 같은 처방: 좌우 그룹을 세로로 쌓고 각자
+      flex-wrap 을 허용한다.
+   ③ 부품 행(6곳, 62~120행 정적 마크업 + renderParts() 의 동일 템플릿) — img+상품명
+      +가격+버튼 4개가 한 줄, wrap 없음. ⚠ **가로 넘침(scrollWidth) 검사로는 안
+      잡힌다** — 행 자체는 뷰포트 안쪽에 머문 채(row.right < innerWidth 항상),
+      상품명 칸만 안으로 짜부라진다: 700px 46px(정상 2줄: 배지줄+상품명줄) →
+      500px 부터 102px → 450px 이하 198px(라틴 단어 단위로 5~10줄까지 세로 붕괴,
+      "Intel Core i9-14900K" 같은 상품명이 세로로 길게 늘어진다). s2 커밋이 이미
+      경고한 함정 그대로("가로 넘침 0만으로 안심하지 않는다"). 처방은 s2 의
+      `.s2reason`(깔때기 줄, 자식 5개)과 같다 — 부분 wrap 은 나머지가 뭉쳐 다시
+      넘칠 위험을 계산만으로 배제 못해 완전 세로 스택을 쓴다: 이 행도 자식이
+      4개(이미지·상품명·가격·버튼)라 같은 이유로 같은 처방을 쓴다.
+   ④ 사이드바(125행, position:sticky) — 1열로 접히면 사이드바가 부품 목록 «아래»로
+      내려가는데 sticky 를 그대로 두면 좁은 폭에서 겹침 여지가 생긴다(s2 의
+      헤더/탭바 sticky 다툼과 같은 부류). position:static 으로 끈다.
+   ⑤ 2026-08-21 후속 — ①~④ 적용 후에도 375px 에서 scrollWidth 가 정확히 367px 로
+      바닥을 찍고 있었다(뷰포트를 200px 까지 좁혀도 367 그대로 — 즉 «남는 공간이
+      없어서»가 아니라 «content 기반 최소폭이 367 이하로 못 내려가서»). 후보를
+      한 요소씩 display:none 으로 지워보는 소거법(Playwright)으로 특정: 부품 목록도
+      사이드바도 아니고 **「자연어 교체 요청」입력행**(92~95행, `flex:1;min-width:0`
+      input + 고정폭 button) 하나가 이 367px 전부를 만들고 있었다(이 요소만 숨기면
+      바로 0으로 떨어짐). input 은 이미 `min-width:0` 이 붙어 있는데도 안 줄어든
+      이유 — `flex:1` 은 `flex-basis:0%`(퍼센트)로 풀리는데, CSS Flexbox 스펙상
+      **퍼센트 flex-basis 는 컨테이너의 main-size 가 미확정(indefinite)이면 `content`
+      로 대체**된다. `.s3-main-grid > section`·`.s3-aside` 가 grid 아이템인데 여전히
+      `min-width:auto`(기본값)라 자기 min-content 로 자기 자신의 폭을 정하려 하고,
+      그 계산 자체가 「미확정 폭에서 후손을 재는」 과정이라 input 의 flex-basis 가
+      `content`(= size=20 기본 폭 ≈179px)로 대체돼 min-width:0 을 무력화했다. section·
+      aside 에 min-width:0 을 주면 grid 트랙이 «내용이 아니라 뷰포트가 준 실제 폭»으로
+      확정되고, 그 확정된 폭이 후손까지 내려가면서 flex-basis:0% 가 정상적으로 0 으로
+      풀려 input 의 min-width:0 이 비로소 작동한다(실측: 200~1440px 전 구간 scrollWidth
+      === innerWidth). 372px 고정 열 문제와 뿌리는 같다(그리드 아이템 자동 최소폭) —
+      다만 이번엔 «고정 폭 컬럼»이 아니라 «후손의 % flex-basis»가 새는 경로였다. */
+@media(max-width:820px){
+.s3-header-inner{flex-direction:column;height:auto !important;gap:8px;padding:12px 0}
+.s3-header-left{flex-wrap:wrap;justify-content:center}
+.s3-header-right{flex-wrap:wrap;justify-content:center}
+.s3-main-grid{grid-template-columns:1fr !important}
+.s3-main-grid>section{min-width:0}
+.s3-aside{position:static !important;top:auto !important;min-width:0}
+.s3-row{flex-direction:column !important;align-items:stretch !important}
+.s3-row-price{margin-right:0 !important}
+}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -20,13 +77,13 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
   <!-- nav -->
   <header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;padding:0 40px;">
-    <div style="max-width:1360px;margin:0 auto;height:62px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:14px;">
+    <div class="s3-header-inner" style="max-width:1360px;margin:0 auto;height:62px;display:flex;align-items:center;justify-content:space-between;">
+      <div class="s3-header-left" style="display:flex;align-items:center;gap:14px;">
         <div style="font-size:16px;font-weight:900;color:#17171b;">팝콘PC <span style="color:#2b5fd9;">AI</span></div>
         <span style="width:1px;height:16px;background:#d8d4cc;"></span>
         <div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">tune</span>부품 상세 및 교체</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>호환 5종 통과</div>
+      <div class="s3-header-right" style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>호환 5종 통과</div>
     </div>
   </header>
 
@@ -44,7 +101,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1.62fr 372px;gap:24px;align-items:start;">
+    <div class="s3-main-grid" style="display:grid;grid-template-columns:1.62fr 372px;gap:24px;align-items:start;">
 
       <!-- LEFT: parts -->
       <section>
@@ -52,77 +109,77 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <div style="background:#fff;border:1px solid #ece9e3;border-radius:18px;padding:18px 20px;margin-bottom:18px;box-shadow:0 12px 34px -26px rgba(30,25,15,.25);">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="font-family:'Material Symbols Outlined';font-size:20px;color:#2b5fd9;">chat</span><span style="font-size:14px;font-weight:900;color:#17171b;">자연어 교체 요청</span></div>
           <div style="display:flex;gap:10px;">
-            <input id="s3-refine-input" placeholder="예) 그래픽카드 한 단계 낮춰줘 · 조용한 케이스로 · 램 64GB로" style="flex:1;padding:13px 16px;border:1.5px solid #ddd8ce;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">
+            <input id="s3-refine-input" placeholder="예) 그래픽카드 한 단계 낮춰줘 · 조용한 케이스로 · 램 64GB로" style="flex:1;min-width:0;padding:13px 16px;border:1.5px solid #ddd8ce;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">
             <button style="flex:0 0 auto;padding:13px 20px;border:none;background:#17171b;border-radius:11px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;" id="s3-refine">교체 요청</button>
           </div>
         </div>
 
         <!-- parts list -->
         <div style="background:#fff;border:1px solid #ece9e3;border-radius:20px;overflow:hidden;">
-          <div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
+          <div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
             <img src="assets/parts/cpu.png" alt="CPU" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기">
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">CPU</span><span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 12개</span></div>
               <div style="font-size:16px;font-weight:800;color:#17171b;">Intel Core i9-14900K</div>
             </div>
-            <div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
+            <div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
             <button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-swap="1">변경</button>
           </div>
 
-          <div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
+          <div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
             <img src="assets/parts/gpu.png" alt="GPU" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기">
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">GPU</span><span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 8개</span></div>
               <div style="font-size:16px;font-weight:800;color:#17171b;">NVIDIA RTX 4070 Ti</div>
             </div>
-            <div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
+            <div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
             <button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-swap="1">변경</button>
           </div>
 
-          <div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
+          <div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
             <img src="assets/parts/ram.png" alt="메모리" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기">
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">RAM</span><span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 24개</span></div>
               <div style="font-size:16px;font-weight:800;color:#17171b;">DDR5 32GB (16GB×2)</div>
             </div>
-            <div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
+            <div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
             <button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-swap="1">변경</button>
           </div>
 
-          <div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
+          <div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
             <img src="assets/parts/mb.png" alt="메인보드" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기">
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">메인보드</span><span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 5개</span></div>
               <div style="font-size:16px;font-weight:800;color:#17171b;">ASUS ROG Z790-F</div>
             </div>
-            <div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
+            <div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
             <button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-swap="1">변경</button>
           </div>
 
-          <div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
+          <div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">
             <img src="assets/parts/psu.png" alt="파워" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기">
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">파워</span><span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 14개</span></div>
               <div style="font-size:16px;font-weight:800;color:#17171b;">시소닉 FOCUS 750W 골드</div>
             </div>
-            <div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
+            <div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
             <button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-swap="1">변경</button>
           </div>
 
-          <div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;">
+          <div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;">
             <img src="assets/parts/case.png" alt="케이스" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;" title="부품 설명 보기">
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">케이스</span><span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 19개</span></div>
               <div style="font-size:16px;font-weight:800;color:#17171b;">NZXT H5 Flow</div>
             </div>
-            <div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
+            <div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">—<span style="font-size:12px;color:#8a8578;">원</span></div></div>
             <button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-swap="1">변경</button>
           </div>
         </div>
       </section>
 
       <!-- RIGHT: sidebar -->
-      <aside style="display:flex;flex-direction:column;gap:16px;position:sticky;top:86px;">
+      <aside class="s3-aside" style="display:flex;flex-direction:column;gap:16px;position:sticky;top:86px;">
 
         <!-- realtime revalidation -->
         <div style="background:#17171b;color:#fff;border-radius:20px;padding:22px;">
@@ -327,10 +384,10 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
    var img=PIMG[slot]
     ?'<img src="assets/parts/'+PIMG[slot]+'.png" alt="'+PKO[slot]+'" style="flex:0 0 auto;width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;">'
     :'<span style="flex:0 0 72px;height:72px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid #ece9e3;background:#fff;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#8a8578;">mode_fan</span></span>';
-   h+='<div style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">'+img
+   h+='<div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">'+img
     +'<div style="flex:1;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">'+PKO[slot]+'</span>'+badge+'</div>'
     +'<div style="font-size:16px;font-weight:800;color:#17171b;">'+p.name+'</div></div>'
-    +'<div style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">'+p.price.toLocaleString()+'<span style="font-size:12px;color:#8a8578;">원</span></div></div>'
+    +'<div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">'+p.price.toLocaleString()+'<span style="font-size:12px;color:#8a8578;">원</span></div></div>'
     +'<button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-live-swap="'+slot+'">변경</button></div>';
   });
   partsBox.innerHTML=h;
