@@ -58,6 +58,13 @@
 `login`은 `/admin2/login`이 서면서 2026-08-17에 예외에서 빠졌다. **`my-profile`은
 admin2 대체 화면이 없어 남아 있다.** `operators`는 `/admin2/operators`가 이미 있다.
 
+⚠ **갱신(2026-08-21)** — 위 값은 **작성일(2026-08-17) 당시엔 정확했다.** 바로 다음
+날 **2026-08-18 커밋 `1e27d3d`**에서 `operators`도 예외에서 빠졌다(이 절이 이미
+"`/admin2/operators`가 이미 있다"고 짚어 둔 그대로 됐다) — 실제 값은
+`_ADMIN_AUTH_DOOR_SCREENS = {"my-profile"}` 하나뿐이다(`api/main.py:251`, 실측
+2026-08-21). 이 절의 논지(「`my-profile`만 admin2 대체가 없어 남는다」)는 그대로
+유효하다 — 바뀐 것은 `operators`가 실제로 빠졌다는 사실뿐이다.
+
 **㉢ API는 다 있는데 화면이 없다.**
 `api/admin_profile.py`가 엔드포인트 6본, `api/auth.py`가 본인 비밀번호 관련 2본을 이미
 제공한다(§④). **이 여덟 중 넷은 admin2 어디에서도 호출되지 않는다** — 뒷단만 서 있고
@@ -500,7 +507,7 @@ ISO 원문을 그대로 내보내지 않는다.** 회귀 [27]이 이 규약을 �
 
 | 대상 | 지금 상태 | 이 화면이 서면 |
 |---|---|---|
-| `api/main.py:227` `_ADMIN_AUTH_DOOR_SCREENS` | `{"my-profile", "operators"}` | `my-profile`을 뺄 수 있다 — **한 번에 둘을 닫지 않는다**(로그인 전환 때의 원칙 그대로) |
+| `api/main.py:227` `_ADMIN_AUTH_DOOR_SCREENS` | `{"my-profile"}` 하나뿐(2026-08-21 실측, `api/main.py:251`) — 작성일(2026-08-17)엔 `{"my-profile", "operators"}`였으나 다음 날 커밋 `1e27d3d`에서 `operators`가 빠졌다(§㉡ 갱신 메모 참조) | `my-profile`을 뺄 수 있다 — **한 번에 둘을 닫지 않는다**(로그인 전환 때의 원칙 그대로) |
 | `templates/admin/login.html.j2:360-366` | `must_change_password`를 문구로만 알리고 대시보드로 보낸다 | 이 화면으로 안내할 수 있다 |
 | `tests/regression.py` [17]·[21]·[27] | **구 `mockups/admin/my-profile.html` 파일을 직접 읽어** 검사한다(파일 존재 · `revokeOthers` · `live_sessions > 1` · `confirm(` · `되돌릴 수 없습니다` · `prompt(` 미사용 · `type="password"` 3칸 · `provider_label`·`approved_none_reason` 사용 · `dash(d.provider)` 미사용) | **그 검사들이 새 화면을 보게 옮겨야 한다.** 옮기지 않으면 구화면이 사라지는 날 회귀가 조용히 SKIP되거나 낡은 파일을 계속 검사한다 |
 
