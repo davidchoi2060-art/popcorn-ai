@@ -30,7 +30,7 @@ from .timeutil import iso, now_iso
 from .db import engine
 from .product_name import display_name   # 대안 제시도 고객이 보는 자리다
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
-                        load_compat_rules)
+                        load_compat_rules, _cmp, _rule_applies)
 from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천 — SSD를 여기만 "저장장치"로 쓰고 있었다
 
 router = APIRouter(prefix="/api/swap")
@@ -85,8 +85,17 @@ def _specs_by_code(conn, codes):
 
 
 def _chosen_from_parts(parts, specs):
-    """스냅샷 parts → 슬롯별 스펙 dict(_slot_ok·build_compat 입력). 스냅샷 가격 유지."""
-    chosen = {}
+    """스냅샷 parts → 슬롯별 스펙 dict(_slot_ok·build_compat 입력). 스냅샷 가격 유지.
+
+    ⚠ **SLOTS 8개 키를 전부 채운다** — 없는 슬롯은 None(미선택, `api/expert.py`의
+    `chosen[slot] = None`과 같은 관례). 예전엔 parts에 있는 슬롯만 키로 넣었는데,
+    S1 기본값이 '(선택 안 함)'으로 바뀐 뒤(2026-08-21) 빈 슬롯이 낀 스냅샷이 흔해졌고
+    `_valid`·`_find_chain`·`candidates()`가 `for s in SLOTS: ... chosen[s]`로 8자리
+    전부를 전제하고 있어 없는 키를 그대로 두면 KeyError로 500이 났다(실사고 재현·확인
+    — session 7360 KeyError:'CPU' swap.py:186, session 7361 KeyError:'COOLER'
+    swap.py:101). None으로라도 채워야 아래 `_valid`가 "미선택"과 "위반"을 구분한다.
+    """
+    chosen = {s: None for s in SLOTS}
     for it in parts:
         sp = specs.get(it["product_code"])
         if sp is None:
@@ -97,7 +106,50 @@ def _chosen_from_parts(parts, specs):
     return chosen
 
 
+def _partial_compat(chosen: dict, rules: dict) -> dict:
+    """빈 슬롯(None)이 하나라도 있을 때의 판정 — `api/expert.py`의 `_partial_compat`과
+    **같은 원칙**: 대상·참조 슬롯 중 하나라도 미선택이면 그 규칙은 pass=None(검증
+    보류)이지 불통과가 아니다(CLAUDE.md "원천이 아직 답할 수 없는 것은 판정하지
+    않는다"). `recommend.py`의 `_slot_ok`·`build_compat`은 8슬롯이 전부 dict라고
+    전제해 None에서 AttributeError로 죽으므로 그대로 못 쓴다. `recommend.py`는
+    고치지 않는다(담당 파일 밖) — expert.py가 이미 같은 이유로 이 판정 루프를 자기
+    파일에 따로 둔 전례를 그대로 따른다(그 함수 주석: "엔진 정본에 새 공용 함수를
+    늘리지 않고 각자 고친다" — 규칙 비교 `_cmp`·`_rule_applies`만 recommend.py 것을
+    그대로 부른다).
+    """
+    checks, violations = [], []
+    for slot in SLOTS:
+        p = chosen[slot]
+        for rule in rules.get(slot, ()):
+            ref = chosen[rule["ref_slot"]]
+            if p is None or ref is None:
+                checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": None,
+                               "detail": "미선택 부품이 있어 이 항목은 검증을 보류합니다"})
+                continue
+            if not _rule_applies(rule, p):
+                continue   # 겨냥하지 않은 부품(예: 라디에이터 규칙 vs 공랭) — build_compat과 동일
+            v, r = p.get(rule["field"]), ref.get(rule["ref_field"])
+            ok = _cmp(rule["op"], v, r)
+            fmt = rule["detail_fmt"] or "{v} / {r}"
+            checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": ok,
+                           "detail": fmt.replace("{v}", "—" if v is None else str(v))
+                                         .replace("{r}", "—" if r is None else str(r))})
+            if not ok:
+                violations.append(slot)
+    gpu, power = chosen.get("GPU"), chosen.get("POWER")
+    headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
+                if gpu and power and power.get("rated_watt") and gpu.get("required_power_watt")
+                else None)
+    return {"power_headroom_pct": headroom, "checks": checks,
+            "violations": sorted(set(violations))}
+
+
 def _valid(chosen, rules) -> list:
+    """위반 슬롯 목록. 빈 슬롯이 하나라도 있으면 `_partial_compat`(null-안전 경로)을
+    쓴다 — 8슬롯이 전부 찬 기존 경로(대다수 · 7362 같은 정상 케이스)는 원래 코드를
+    한 글자도 바꾸지 않는다(회귀 위험 최소화)."""
+    if any(chosen[s] is None for s in SLOTS):
+        return _partial_compat(chosen, rules)["violations"]
     return [s for s in SLOTS if not _slot_ok(s, chosen[s], chosen, rules)]
 
 
@@ -174,13 +226,26 @@ def candidates(body: SwapQuery, request: Request, k: str | None = None):
         rules = load_compat_rules(conn)   # 엔진과 같은 규칙 원천(슬라이스 34)
     # 규칙이 참조하는 필드가 chosen(스냅샷 조인)에 실렸는지 확인 — 누락은 '대안 0건'이라는
     # 조용한 고장으로 나타난다. 경고로 드러낸다(슬라이스 46 전례).
-    check_rule_fields(list(chosen.values()), rules)
+    # None(미선택 슬롯)은 대표 샘플에서 뺀다 — check_rule_fields가 pool[0].keys()로
+    # 필드 목록을 뽑으므로 None이 섞이면 AttributeError로 새 500이 생긴다.
+    check_rule_fields([v for v in chosen.values() if v is not None], rules)
 
     current = [{"slot": it["part_type"], "product_code": it["product_code"],
                 "sku": it["sku"], "name": it["name"], "price": it["price"],
                 "unavailable": it["product_code"] not in pool_codes} for it in parts]
     slots = {}
     for s in SLOTS:
+        if chosen[s] is None:
+            # 아직 고르지 않은 자리 — 임의 부품으로 채우지 않는다(CLAUDE.md "모르는
+            # 것을 지어내지 않는다"). "후보를 찾아봤는데 없다"(empty_reason 기존 문구)
+            # 와는 사유가 달라 selected로 구분한다. 이 자리를 "채울" 후보 추천은
+            # 스왑(교체)이 아니라 추가라 이번 회귀 수정 범위 밖으로 남긴다 — 지금
+            # s3-detail.html도 C.current(채워진 슬롯)만 순회해 이 슬롯의 alternatives를
+            # 아직 아무 데서도 읽지 않는다(2026-08-21 확인, mockups/mvp1/s3-detail.html
+            # renderParts()).
+            slots[s] = {"alternatives": [], "empty": True, "selected": False,
+                        "empty_reason": "아직 선택하지 않은 부품이에요 — 먼저 골라야 대안을 보여드릴 수 있어요"}
+            continue
         alts = []
         for alt in by_slot.get(s, []):
             if alt["product_code"] == chosen[s]["product_code"]:
@@ -208,7 +273,7 @@ def candidates(body: SwapQuery, request: Request, k: str | None = None):
                 } for c in chain]
                 entry["chain_reason"] = _chain_reason(s, chain, chosen, alt)
             alts.append(entry)
-        slots[s] = {"alternatives": alts, "empty": not alts,
+        slots[s] = {"alternatives": alts, "empty": not alts, "selected": True,
                     "empty_reason": "지금 판매 중인 재고에 이 부품의 대안이 없어요" if not alts else None}
     return {"session_id": body.session_id, "tier": body.tier,
             "snapshot_id": snap["snapshot_id"], "total": snap["total_amount"],
@@ -285,7 +350,16 @@ def apply(body: ApplyBody, request: Request, response: Response, k: str | None =
             else:
                 new_parts.append(it)
         total = sum(it["price"] for it in new_parts)
-        compat = build_compat(chosen, rules)
+        # 바꾸지 않은 슬롯이 여전히 미선택(None)일 수 있다 — build_compat은 8슬롯 전부
+        # dict라고 전제해 None에서 AttributeError로 500이 난다(코드 확인으로 발견 —
+        # apply는 원장에 쓰는 경로라 실호출로 재현하지 않았다). candidates()가 쓰는
+        # 것과 같은 null-안전 경로(_partial_compat)로 넘긴다. 8슬롯이 전부 찬 기존
+        # 경로는 그대로 build_compat을 쓴다(원래 코드 그대로 — 회귀 위험 없음).
+        if any(chosen[s] is None for s in SLOTS):
+            pc = _partial_compat(chosen, rules)
+            compat = {"power_headroom_pct": pc["power_headroom_pct"], "checks": pc["checks"]}
+        else:
+            compat = build_compat(chosen, rules)
 
         # 교체 사실을 원장에 남긴다(슬라이스 46) — 그동안 swap_event_logs는 0행이었다.
         # 이 기록이 "고객이 어떤 추천을 어떤 부품으로 바꿨나"의 유일한 원천이고,
