@@ -10,6 +10,18 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
 @keyframes s1flash{0%{box-shadow:0 0 0 0 rgba(43,95,217,.4)}70%{box-shadow:0 0 0 9px rgba(43,95,217,0)}100%{box-shadow:0 0 0 0 rgba(43,95,217,0)}}
 .s1-flash{animation:s1flash 1s ease-out 2;border-color:#2b5fd9 !important}
+/* CPU쿨러 설명이 회색 카드 밖으로 넘치던 결함(2026-08-21 사장님 지적) — 실측(Playwright
+   getBoundingClientRect, 768px에서 +103px·375px에서 +141px 초과 확인) 원인: renderParts()의
+   .spectxt 는 fmtSpec()이 socket_list 를 '/'로 붙여 만든 한 토큰(공백 없음, 예:
+   AM4/AM5/LGA115(X)/LGA1200/LGA1700/LGA1851)을 담는데, 이 토큰엔 줄바꿈 지점이 없어
+   flex 아이템의 min-content 폭이 그 토큰 전체 폭(약 271px)으로 고정되고, 카드 폭이 그보다
+   좁으면(768px·375px 레이아웃) 줄바꿈 대신 카드 밖으로 흘러넘쳤다(1360px은 폭이 넉넉해
+   증상이 없었다 — 그래서 «다른 부품은 한 줄에 들어간다»로 보였다). 소켓 목록 문자열
+   자체(정보)는 그대로 두고 담는 방식만 고친다: overflow-wrap:anywhere 로 그 토큰도 필요하면
+   내부에서 줄바꿈되게 하고, min-width:0 으로 flex 아이템이 카드 폭까지 실제로 줄어들게
+   한다. 짧은 설명(다른 7부품)은 이미 한 줄에 다 들어가 이 규칙이 붙어도 그대로 한 줄이다 —
+   실측으로 확인(아래 CPU/MB/RAM/GPU/CASE/POWER/SSD 는 수정 전후 폭 변화 0). */
+.spectxt{min-width:0;overflow-wrap:anywhere;}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -71,7 +83,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="display:flex;gap:24px;flex-wrap:wrap;">
 <div style="flex:1 1 320px;min-width:0;">
 <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:900;color:#17171b;margin-bottom:4px;"><span style="font-family:'Material Symbols Outlined';font-size:21px;color:#6a3fbf;">tune</span>부품을 직접 선택하세요</div>
-<p style="margin:0 0 16px;font-size:13px;color:#6b6b73;line-height:1.6;">고르시면 AI가 <b>추천이 아니라 검증</b>만 합니다. 기본 구성이 선택돼 있어요.</p>
+<p style="margin:0 0 16px;font-size:13px;color:#6b6b73;line-height:1.6;">고르시면 AI가 <b>추천이 아니라 검증</b>만 합니다. 모든 자리는 <b>(선택 안 함)</b>에서 시작해요 — 직접 골라주세요.</p>
 <div id="s1-parts" style="display:flex;flex-direction:column;gap:10px;"></div>
 <button id="s1-validate" style="margin-top:16px;width:100%;padding:14px;border:none;background:#2b5fd9;border-radius:12px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;"><span style="font-family:'Material Symbols Outlined';font-size:20px;">verified_user</span>AI 검증하기</button>
 </div>
@@ -382,7 +394,13 @@ var USAGES_READY=fetch('/api/usages')
  .then(function(d){USAGES=(d&&d.usages)||[];})
  .catch(function(e){USAGES=[];USAGES_ERR=(e&&e.message)||String(e);})
  .then(function(){USAGES_DONE=true;Q_USE.opts=usageOpts();});
-var QUEUE=[Q_PURPOSE,Q_EXISTING,Q_USE,Q_ENV,Q_BUDGET,Q_PRIORITY];
+/* 순서 2026-08-21 사장님 지시: 용도 -> 예산 -> 나머지. 「누가 쓰실 PC인가요?」(Q_PURPOSE)는
+   뺀다 — noFilter 라 원래도 consPairs·서버 전송에 안 들어갔으므로(위 Q_PURPOSE 주석)
+   빼도 서버로 가는 조건엔 변화가 없다. 다만 Q_PURPOSE 의 '직원용' 답만이 Q_QTY(몇 대
+   필요)를 끼워 넣는 유일한 경로였다 — 그 경로가 사라져 Q_QTY 는 이제 트리거되지 않는다
+   (변수 정의는 남겨 둔다 — 지우면 이 이력이 사라진다). QUEUE.length 로 진행 표시가 자동
+   갱신되므로(아래 setProgress) 문항 수를 따로 맞출 필요는 없다. */
+var QUEUE=[Q_USE,Q_BUDGET,Q_EXISTING,Q_ENV,Q_PRIORITY];
 var qidx=0;
 function selChip(c,on){if(on){c.style.background='#e8effc';c.style.borderColor='#2b5fd9';c.style.color='#2149b0';}else{c.style.background='#fff';c.style.borderColor='#e2ded5';c.style.color='#3a3a40';}}
 function lockRow(row){Array.prototype.forEach.call(row.children,function(x){x.style.pointerEvents='none';});row.style.opacity='.7';}
@@ -600,7 +618,7 @@ var TAG_KO={silent:'저소음',white:'화이트',rgb:'RGB'};
 function fmtSpec(spec){if(!spec)return '';var out=[];Object.keys(spec).forEach(function(k){var v=spec[k];if(v==null||v==='')return;var m=SPEC_META[k];var label=m?m[0]:k.replace(/_/g,' ');var unit=m?m[1]:'';var vs=Array.isArray(v)?v.join('/'):String(v);out.push(label+' '+vs+unit);});return out.join(' · ');}
 function tagLine(tags){return (tags||[]).map(function(t){return TAG_KO[t]||t;}).join('/');}
 function specLine(o){if(!o)return '';if(o.none)return o.spec||'';var bits=[];var sp=fmtSpec(o.spec);if(sp)bits.push(sp);var tg=tagLine(o.tags);if(tg)bits.push(tg);return bits.join(' · ')||'등록된 사양 정보가 없습니다.';}
-function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:12px 14px;';var oh='';s.opts.forEach(function(o,i){var lb=o.none?o.t:(esc(o.name)+' · '+o.price.toLocaleString()+'원');oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+lb+'</option>';});var ak=SLOT_ASSET[s.key];var thumb=ak?('<img src="assets/parts/'+ak+'.png" alt="'+esc(s.label)+'" title="부품 설명 보기" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'):('<span style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;background:#eee8fa;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:23px;color:#6a3fbf;">'+s.ci+'</span>');row.innerHTML=thumb+'<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 62px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:72px;display:flex;align-items:center;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+esc(specLine(s.opts[pick[s.key]]))+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=specLine(s.opts[pick[s.key]]);renderReason();resetValidation();});});renderReason();}
+function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:12px 14px;';var oh='';s.opts.forEach(function(o,i){var lb=o.none?o.t:(esc(o.name)+' · '+o.price.toLocaleString()+'원');oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+lb+'</option>';});var ak=SLOT_ASSET[s.key];var thumb=ak?('<img src="assets/parts/'+ak+'.png" alt="'+esc(s.label)+'" title="부품 설명 보기" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'):('<span style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;background:#eee8fa;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:23px;color:#6a3fbf;">'+s.ci+'</span>');row.innerHTML=thumb+'<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 62px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:72px;display:flex;align-items:flex-start;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+esc(specLine(s.opts[pick[s.key]]))+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=specLine(s.opts[pick[s.key]]);renderReason();resetValidation();});});renderReason();}
 // 서버 표본 로드 — 실패해도 예전 21개 리터럴로 되돌아가지 않는다. 지어낸 부품을
 // 보여주느니 실패를 그대로 보여준다(§실패를 삼키지 않는다).
 function loadExpertSlots(){var box=document.getElementById('s1-parts');if(box)box.innerHTML='<div style="display:flex;align-items:center;gap:8px;color:#8a8578;font-size:13px;padding:14px 4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;">hourglass_top</span>실재고에서 부품 후보를 불러오는 중입니다…</div>';
@@ -608,7 +626,11 @@ function loadExpertSlots(){var box=document.getElementById('s1-parts');if(box)bo
   SLOTS=Object.keys(d.slots||{}).map(function(k){var s=d.slots[k]||{};var opts=(s.items||[]).slice();
    opts.push({t:'(선택 안 함)',none:true,product_code:null,spec:'미선택 · 기존 부품/별도 준비',
     reason:'이 부품은 선택하지 않았습니다. 기존 부품을 재사용하거나 별도로 준비하는 것으로 간주합니다.'});
-   pick[k]=0;
+   /* 전 슬롯 기본값 = «선택 안 함»(2026-08-21 사장님 지시 — 예전엔 CPU만 그랬고 나머지
+      7슬롯은 첫 실재고 후보(index 0)가 미리 골라져 있었다). opts 의 마지막 자리가 항상
+      방금 push 한 «선택 안 함»이므로 그 인덱스를 쓴다 — 서버가 준 후보 개수가 슬롯마다
+      달라도 항상 마지막을 가리킨다. */
+   pick[k]=opts.length-1;
    return {key:k,label:s.label||k,ci:SLOT_ICON[k]||'category',total:s.total_candidates||0,opts:opts};});
   renderParts();resetValidation();
  }).catch(function(e){
@@ -1370,9 +1392,17 @@ document.addEventListener('click',function(ev){
 budgetUpdate();
 if(mode==='guided'){
  var _gb=document.getElementById('s1-gearbar');if(_gb)_gb.style.display='none';
- var _ib=document.getElementById('s1-inputbar');if(_ib)_ib.style.display='none';
+ /* 채팅 입력창은 처음부터 열어 둔다(2026-08-21 사장님 지시 — "채팅창은 항상열어둡시다").
+    예전엔 여기서 s1-inputbar 를 display:none 으로 접고, s1-guided-foot(「답만 고르시면
+    됩니다. 추가로 입력할래요 →」)를 대신 보여준 뒤 그 링크를 눌러야 열었다 — 접어 둔
+    근거를 이 파일·decision-log 어디에서도 찾지 못했다(§UX-17 은 팝콘톡 첫 화면 얘기라
+    다른 대상). s1-inputbar 는 정적 마크업 기본값이 이미 «보임»이라 따로 열 것이 없다.
+    s1-guided-foot 은 그 자체가 "입력창이 접혀 있다"는 전제로 만든 안내라 이제 띄우지
+    않는다(안 띄우면 정적 기본값 display:none 이 그대로 유지된다) — 그 안내를 계속 보여주면
+    입력창이 이미 열려 있는데 "추가로 입력할래요 →"가 남아 사실과 어긋난다. s1-guided-esc
+    리스너는 지우지 않는다(해가 없고, 이 화면의 다른 자리에서 s1-guided-foot 을 다시 켜는
+    경로가 생겨도 바로 작동한다). */
  var _pg=document.getElementById('s1-progress');if(_pg)_pg.style.display='flex';
- var _gf=document.getElementById('s1-guided-foot');if(_gf)_gf.style.display='flex';
  var _esc=document.getElementById('s1-guided-esc');if(_esc)_esc.addEventListener('click',function(){var a=document.getElementById('s1-inputbar');if(a)a.style.display='';var f=document.getElementById('s1-guided-foot');if(f)f.style.display='none';});
  panelLatent();
  guidedAsk();
