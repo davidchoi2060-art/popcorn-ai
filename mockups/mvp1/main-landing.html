@@ -356,6 +356,130 @@
     </footer>
   </main>
 </div>
+
+<!-- NOTICE POPUP (2026-08-21 제작 — 사장님 지시: "랜딩 페이지 메인에 공지사항
+     팝업창으로 현재 오픈 베타 점검중이라고 띄우는 페이지 [ ]오늘 하루 보지 않기
+     x 닫기"). 요소 셋은 사장님 확정: 공지 문구 · "오늘 하루 보지 않기" 체크박스 ·
+     닫기(x). 문구는 원문을 최소로만 옮겼다 — "곧 정식 오픈합니다"·"일부 기능이
+     제한됩니다" 류는 사장님이 말씀하지 않아 넣지 않았다. 후기·환불 쓰기 잠금
+     (api/customer_write_lock.py REASON)도 검토했으나 넣지 않았다: ① 랜딩 첫
+     방문객은 아직 후기·환불 단계 전이라 이 시점엔 무관한 정보이고 ② 그 잠금은
+     .env 스위치(POPCORN_CUSTOMER_WRITE_LOCK)로 배포 서버에서만 켜져 있어, 이
+     화면이 정적 문구로 단정하면 스위치가 꺼진 뒤에도 낡은 말이 남는다.
+     색·라운딩·그림자는 이 파일이 이미 쓰는 값만 그대로 재사용했다(새 토큰 없음):
+     카드 border-radius는 후기 카드(위 REVIEWS 섹션 312·317·322행, 26px)와
+     동일값이고 box-shadow는 TOP PICK 카드(위 LIVE QUOTE 섹션 294행)와 동일값이다
+     — 이 줄이 애초 "TOP PICK 카드와 동일값"이라 뭉뚱그린 것은 border-radius
+     쪽이 틀렸다(TOP PICK은 28px, 26px로 일치하는 쪽은 후기 카드다 — 2026-08-21
+     확인자 실측으로 정정). 테두리는 피처 카드와 동일한 rgba(148,163,184,.24),
+     스크림 색은 이 파일의 body/hero 배경 #0B1220 을 그대로 썼다.
+     닫기 아이콘(2026-08-21 정정): 애초 이 파일이 이미 쓰는 .msym 관례
+     (su-icons.js 매핑 "close" -> ms-close.svg)를 그대로 썼는데, 그 SVG
+     (Streamline Ultimate **Color**)가 fill을 #ff808c/#ffbfc5로 하드코딩해서
+     (currentColor 미사용) su-icons.js가 img 태그로 치환한 뒤에는 버튼의
+     color:#64748B가 전혀 먹지 않아 회색 대신 코랄핑크로 렌더됐다(확인자 실측).
+     su-icons.js·SVG 자산은 공용이라 건드리지 않았다. s3-detail.html:208의
+     전례(font-family를 span이 아니라 버튼에 직접 걸어 su-icons.js의 span·i
+     전용 스캔을 비켜간다)를 검토했으나 그대로 옮기지 않았다 — 이 저장소
+     어디에도 'Material Symbols Outlined' 폰트를 로드하는 곳이 없어(전수
+     grep + Playwright canvas measureText 대조로 확인) 그 전례를 그대로
+     쓰면 아이콘이 아니라 폴백 글꼴의 글자 그대로 "close"가 32px 버튼 박스
+     보다 넓게(약 46px) 튀어나와 보인다(s3-detail.html도 같은 상태로 추정 —
+     이 파일 담당 밖이라 손대지 않았다). 대신 su-icons.js를 여전히 피하면서
+     실제로 X 모양이 나오는, 이미 이 폴더에 있는 관례를 썼다 — s2-result.html의
+     #s2lb-x와 같은 방식으로 폰트 의존 없는 문자 "✕"(U+2715)를 span 없이
+     버튼에 직접 넣는다. -->
+<style>
+/* 좁은 폭에서 팝업을 아래로 (2026-08-21 정정 — 하네스 지시, 근거는 아래 실측).
+   결함: 가운데 정렬(align-items:center)에서 팝업이 히어로 H1("모든 견적에는
+   이유가 있습니다")과 겹친다. Playwright로 H1 rect와 팝업 rect의 겹침 비율을
+   재면(H1 면적 대비) 375px 100%(완전히 가림) · 768px 57.7% · 1440px 43.4%다.
+   임계값은 이 파일 상단(24~106행)에 이미 있는 @media(max-width:768px) 모바일
+   기준선을 그대로 재사용한다 — 그 블록에 합치지 않고 팝업 곁에 따로 둔 이유는
+   팝업이 히어로·헤더·푸터와 무관한 독립 기능이라 팝업 코드를 한 덩어리로
+   유지하기 위해서다(같은 숫자 768을 두 곳에 쓰는 것은 "모바일 레이아웃 폭"이라는
+   같은 개념의 동일한 상수이지 정본을 두 벌 두는 것이 아니다). 1440px(데스크톱)은
+   이 규칙 밖에 그대로 뒀다 — 좌우로 글자 일부가 보여 375px처럼 완전히 가리지는
+   않고, 하네스 결정 범위("좁은 폭에서만")도 아니다. 아래로 내리면
+   (align-items:flex-end) 375·768px 모두 겹침이 0%가 됨을 같은 방법으로 확인
+   했다. 아래쪽 여백은 기존 #mm-notice의 padding:20px보다 살짝 넉넉하게 24px로
+   뒀다(딱 붙으면 답답하다는 지시 반영). 팝업 박스 자체의
+   max-height:calc(100vh - 40px)+overflow-y:auto는 그대로 둬서, 낮은 세로
+   (375×667 실측)에서도 하단 여백 24px를 지키며 전체가 뷰포트 안에 들어오고
+   잘리지 않는다(실측 확인). ×·바깥·Escape 닫기와 체크박스 저장 로직은 CSS
+   위치만 바꿨을 뿐 아래 script의 이벤트 리스너를 손대지 않아 그대로
+   동작한다. !important가 필요한 이유는 #mm-notice의 align-items·padding이
+   인라인 style이라 외부 스타일시트는 !important 없이는 못 이기기 때문 —
+   이 파일 상단 미디어쿼리 블록과 같은 이유·같은 관례다. */
+@media(max-width:768px){
+  #mm-notice{align-items:flex-end!important;padding-bottom:24px!important;}
+}
+</style>
+<div id="mm-notice" style="display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;padding:20px;">
+  <div id="mm-notice-scrim" style="position:absolute;inset:0;background:rgba(11,18,32,.6);"></div>
+  <div role="dialog" aria-modal="true" aria-labelledby="mm-notice-title" style="position:relative;background:#fff;border-radius:26px;max-width:420px;width:100%;padding:34px 24px 22px;box-shadow:0 30px 60px -30px rgba(15,23,42,.7);border:1px solid rgba(148,163,184,.24);max-height:calc(100vh - 40px);overflow-y:auto;overscroll-behavior:contain;">
+    <button id="mm-notice-x" aria-label="닫기" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border:none;background:none;cursor:pointer;font-size:18px;font-weight:700;line-height:1;color:#64748B;display:flex;align-items:center;justify-content:center;border-radius:50%;">✕</button>
+    <h2 id="mm-notice-title" style="margin:0 0 10px;font-family:var(--font);font-weight:800;font-size:19px;color:#111827;letter-spacing:-0.02em;">오픈 베타 점검 안내</h2>
+    <p style="margin:0;font-size:14.5px;line-height:1.65;color:#475569;">현재 오픈 베타 점검 중입니다.</p>
+    <div style="display:flex;align-items:center;margin-top:22px;padding-top:16px;border-top:1px solid rgba(148,163,184,.24);">
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#64748B;font-weight:600;cursor:pointer;">
+        <input type="checkbox" id="mm-notice-hide" style="cursor:pointer;">오늘 하루 보지 않기
+      </label>
+    </div>
+  </div>
+</div>
+<script>
+/* 저장: localStorage `popcorn-` 접두어 관례(popcorn-quote·popcorn-member 등, grep 확인
+   완료) 그대로 `popcorn-notice-beta` 키를 쓴다. 값은 KST(브라우저 로컬) 기준
+   'YYYY-MM-DD' 문자열 — toISOString()은 쓰지 않는다(UTC 변환이라 KST 00:00~08:59
+   구간에 날짜가 하루 밀린다 — CLAUDE.md 가 이 저장소에서 넷 고쳤다고 적은 것과 같은
+   결함 패턴). getFullYear/getMonth/getDate는 브라우저 로컬 값을 준다 — 한국 브라우저
+   환경(OS 시간대 설정이 KST)에서는 이것이 KST 자정에 정확히 갱신된다.
+   체크 후 어느 방식으로 닫든(×·바깥·Escape) '오늘' 키를 남기고, 체크 안 하고 닫으면
+   아무것도 안 남겨 다음 새로고침에도 다시 뜬다(사장님 지정 동작 그대로). */
+(function(){
+ var KEY='popcorn-notice-beta';
+ function pad2(n){return n<10?('0'+n):(''+n);}
+ function todayKey(){
+  var d=new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+ }
+ function seenToday(){
+  var v=null;try{v=localStorage.getItem(KEY);}catch(e){}
+  return v===todayKey();
+ }
+ var box=document.getElementById('mm-notice');
+ if(!box)return;
+ var scrim=document.getElementById('mm-notice-scrim');
+ var xbtn=document.getElementById('mm-notice-x');
+ var hide=document.getElementById('mm-notice-hide');
+ var prevHtmlOverflow='',prevBodyOverflow='';
+ function openNotice(){
+  prevHtmlOverflow=document.documentElement.style.overflow;
+  prevBodyOverflow=document.body.style.overflow;
+  document.documentElement.style.overflow='hidden';
+  document.body.style.overflow='hidden';
+  box.style.display='flex';
+ }
+ function closeNotice(){
+  if(hide&&hide.checked){try{localStorage.setItem(KEY,todayKey());}catch(e){}}
+  box.style.display='none';
+  document.documentElement.style.overflow=prevHtmlOverflow;
+  document.body.style.overflow=prevBodyOverflow;
+ }
+ if(xbtn)xbtn.addEventListener('click',closeNotice);
+ if(scrim)scrim.addEventListener('click',closeNotice);
+ document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&box.style.display!=='none')closeNotice();
+ });
+ if(!seenToday()){
+  /* 히어로 영상이 먼저 눈에 들어오도록 짧게 늦춘다 — 첫인상을 로드 즉시 가리지
+     않는다(지시서 "히어로 영상을 가리는 위치·시점을 조심하라"). */
+  setTimeout(openNotice,500);
+ }
+})();
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   // CTA 라우팅 (목업): 견적 시작 계열 → S0 입력 게이트(→ 이후 S1), 작동 방식 보기 → HOW 섹션
