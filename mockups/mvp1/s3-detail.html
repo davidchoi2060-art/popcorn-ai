@@ -223,8 +223,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
 <div id="s3-modal" style="position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:24px;">
 <div id="s3-scrim" style="position:absolute;inset:0;background:rgba(23,23,27,.45);backdrop-filter:blur(3px);"></div>
-<div style="position:relative;background:#fff;border-radius:20px;max-width:520px;width:100%;padding:26px;box-shadow:0 30px 70px -20px rgba(30,25,15,.5);">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h3 style="margin:0;font-size:19px;font-weight:900;color:#17171b;">호환 가능한 대안 — <span id="s3-part">GPU</span></h3><button id="s3-close" style="border:none;background:none;cursor:pointer;font-family:'Material Symbols Outlined';font-size:24px;color:#8a8578;">close</button></div>
+<div style="position:relative;background:#fff;border-radius:20px;max-width:520px;width:100%;padding:26px;box-shadow:0 30px 70px -20px rgba(30,25,15,.5);max-height:calc(100vh - 48px);overflow-y:auto;overscroll-behavior:contain;">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;"><h3 style="margin:0;font-size:19px;font-weight:900;color:#17171b;">호환 가능한 대안 — <span id="s3-part">GPU</span></h3><button id="s3-close" style="flex:0 0 auto;align-self:flex-start;border:none;background:none;cursor:pointer;font-family:'Material Symbols Outlined';font-size:24px;color:#8a8578;">close</button></div>
 <p style="margin:0 0 16px;font-size:13.5px;color:#6b6b73;">현 구성과 <b style="color:var(--success-dark, #1c7a4d);">호환 5종을 전부 통과한</b> 제품만 표시합니다.</p>
 <div id="s3-alts" style="display:flex;flex-direction:column;gap:10px;"></div>
 </div></div>
