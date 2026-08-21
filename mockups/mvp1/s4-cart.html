@@ -87,7 +87,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <!-- verified banner — 서버 판정(compat.checks)이 도착한 뒤에만 표시한다 -->
         <div id="s4-verified" style="display:none;background:var(--success-container, #e9f6ef);border-radius:20px;padding:22px 24px;">
           <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">
-            <span style="width:42px;height:42px;border-radius:12px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#fff;">verified</span>
+            <span id="s4-verified-icon" style="width:42px;height:42px;border-radius:12px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:23px;color:#fff;">verified</span>
             <h2 id="s4-verified-title" style="margin:0;font-size:19px;font-weight:900;color:var(--success-deep, #0f5132);">이 구성은 조립 가능함이 검증됐습니다</h2>
           </div>
           <!-- 검증 칩은 서버 판정(compat.checks)으로만 그린다. 목업 5종(소켓·메모리·전력·
@@ -504,21 +504,51 @@ window.addEventListener('scroll',closeTip,{passive:true});
    d.innerHTML=img+'<span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.name+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.price.toLocaleString()+'원</div>';
    slot.appendChild(d);
   });
-  var pe=document.getElementById('s4-parts-empty');if(pe)pe.style.display='none';
-  var asm=document.getElementById('s4-assembly');if(asm)asm.style.display='flex';
+  /* 부품 0개는 "불러오지 못함"이 아니라 "선택 안 함"이다 (하네스 지시 2026-08-21).
+     #s4-parts-empty 는 원래 통신 실패·로딩 중 문구용이었다(top IIFE 의 s4Offline·
+     '구성 정보를 불러오는 중입니다.' — 위 240행대 주석). 그대로 두면 서버가 이미
+     응답했고 답이 "0개"인데도 "서버에 연결되면 표시됩니다"라고 말해 사실과 다르다.
+     조립비도 조립할 부품이 없으면 청구하지 않는다 — 0개에 조립비 30,000원만
+     "총 결제금액"으로 내미는 것은 이 화면(주문 확인)의 정직성을 배신한다. 총액은
+     0원으로 지어내지 않고 s4SetTotal(null) 의 기존 규약을 따른다("null=—, 0원과
+     다르다" — 위 264행 s4SetTotal 주석). s4Live 를 true 로 올리지 않아 기존
+     !s4Live 게이트(check() 의 조기 반환)가 그대로 결제·인계를 막는다 — 새 분기를
+     추가하지 않고 이미 검증된 경로를 재사용한다. */
+  var hasParts=S.items.length>0;
+  var pe=document.getElementById('s4-parts-empty');
+  if(pe){
+   if(hasParts){
+    pe.style.display='none';
+   }else{
+    pe.textContent='선택된 부품이 없습니다 — 부품 변경하기에서 구성을 담아주세요.';
+    pe.style.display='';
+   }
+  }
+  var asm=document.getElementById('s4-assembly');
   var asmP=document.getElementById('s4-assembly-price');
-  if(asmP)asmP.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
-  // 2) 합계 — 부품 합계 행 · 총액(단일 원천 s4SetTotal)
-  var sumBox=document.getElementById('s4-sum');if(sumBox)sumBox.style.display='flex';
-  var sumLb=document.getElementById('s4-sum-label');
-  if(sumLb)sumLb.textContent='부품 합계 ('+S.items.length+'종)';
-  var sumVal=document.getElementById('s4-sum-val');
-  if(sumVal)sumVal.textContent=S.total.toLocaleString()+'원';
-  var feeVal=document.getElementById('s4-fee-val');
-  if(feeVal)feeVal.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
-  window.s4SetTotal(S.total+ASSEMBLY_FEE+periphSum);
-  var tcap=document.getElementById('s4-total-cap');if(tcap)tcap.textContent='VAT 포함';
-  var rst=document.getElementById('s4-restock');if(rst)rst.style.display='flex';
+  if(hasParts){
+   if(asm)asm.style.display='flex';
+   if(asmP)asmP.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
+  }
+  // 2) 합계 — 부품 합계 행 · 총액(단일 원천 s4SetTotal). 부품이 없으면 합계 상자
+  //    자체를 열지 않는다(마크업 기본값 display:none 유지) — "부품 합계 0종·0원"을
+  //    보여줘도 확인할 구성이 없다는 사실은 달라지지 않는다.
+  if(hasParts){
+   var sumBox=document.getElementById('s4-sum');if(sumBox)sumBox.style.display='flex';
+   var sumLb=document.getElementById('s4-sum-label');
+   if(sumLb)sumLb.textContent='부품 합계 ('+S.items.length+'종)';
+   var sumVal=document.getElementById('s4-sum-val');
+   if(sumVal)sumVal.textContent=S.total.toLocaleString()+'원';
+   var feeVal=document.getElementById('s4-fee-val');
+   if(feeVal)feeVal.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
+   window.s4SetTotal(S.total+ASSEMBLY_FEE+periphSum);
+   var tcap=document.getElementById('s4-total-cap');if(tcap)tcap.textContent='VAT 포함';
+   var rst=document.getElementById('s4-restock');if(rst)rst.style.display='flex';
+  }else{
+   window.s4SetTotal(null);
+   var tcap0=document.getElementById('s4-total-cap');if(tcap0)tcap0.textContent='선택된 부품 없음';
+   window.s4Msg='선택된 부품이 없어 결제할 수 없습니다.';
+  }
   if(periphArr.length!==periphValid.length)toast('이전 세션의 주변기기 일부는 실주문에서 제외됩니다 — 견적서에서 다시 담아주세요.');
   // 3) 운영 모드 = 서버 동기화 (데모 전환 비활성)
   try{var lo=JSON.parse(localStorage.getItem('popcorn-ops')||'{}');
@@ -528,8 +558,10 @@ window.addEventListener('scroll',closeTip,{passive:true});
   var demo=document.getElementById('s4-mode-demo');
   if(demo){demo.disabled=true;demo.style.opacity='.45';demo.style.cursor='not-allowed';demo.textContent='관리자 설정';demo.title='운영 전환은 관리자 운영 전환 설정에서';}
   /* 여기까지 와야 화면이 금액을 말할 자격이 있다 — 인계 버튼도 이때 열린다.
+     부품이 0개면 말할 금액이 없으므로 live 로 올리지 않는다(바로 위에서 이미
+     s4Msg 를 "선택된 부품이 없어…"로 정해 뒀다 — 여기서 빈 문자열로 덮지 않는다).
      applyMode 가 운영 모드에 맞는 입력 자리를 다시 편다. */
-  window.s4Live=true;window.s4Msg='';
+  if(hasParts){window.s4Live=true;window.s4Msg='';}
   if(window.s4Recheck)window.s4Recheck();
   // 검증 칩 = 서버가 판정한 규칙 1:1 (슬라이스 48)
   // 목업은 소켓·메모리·전력·쿨러·케이스 5개로 고정이었다. 서버는 8종을 검사하므로
@@ -540,25 +572,74 @@ window.addEventListener('scroll',closeTip,{passive:true});
       그 글자를 지우는 날 찾기가 조용히 실패하고 칩이 갱신되지 않는다. */
    var chipBox=document.getElementById('s4-chips');
    if(chipBox){
-    var nF=0;chips.forEach(function(c){if(c.pass===false)nF++;});
+    /* ⚠ pass 는 3값이다(2026-08-21) — true=통과 · false=불통과 · null=확인 보류
+       (부품을 다 고르지 않아 서버가 이 규칙을 아직 판정하지 못한 것, api/expert.py
+       _partial_compat). 오늘부터 부품 선택란 기본값이 '(선택 안 함)'이라 null 이
+       드물지 않은 상태다. s1-session.html checkVisual()(656행)·s3-detail.html
+       passVisual()과 같은 3색 규칙을 쓴다 — 그 주석이 "모른다를 된다로 바꿔
+       말하지 않는다"는 원칙을 이미 적어 뒀다. mockups/shared/*.js 로 빼지 않고
+       (다른 제작자가 지금 그 폴더를 만지고 있어 새 공용 파일을 못 만든다) 이
+       파일 안에서 같은 규칙을 다시 구현한다 — s2-result.html:794-798 에도 같은
+       3값 판정이 독립 구현돼 있다. 전에는 c.pass!==false 로 true/false 둘로만
+       나눠 null(서버가 "모른다"고 답한 것)을 통과색(초록)으로 칠했다 —
+       §화면 정직성 위반. */
+    function chipVisual(p){
+     if(p===true)return{col:'var(--success-dark, #1c7a4d)',ic:'check_circle',val:'통과'};
+     if(p===false)return{col:'#b31b25',ic:'error',val:'불통과'};
+     return{col:'#8a561a',ic:'help',val:'확인 보류'};
+    }
+    var nF=0,nP=0;chips.forEach(function(c){if(c.pass===false)nF++;else if(c.pass===null)nP++;});
     chipBox.innerHTML=chips.map(function(c){
-     var ok=c.pass!==false;
+     var pv=chipVisual(c.pass);
      return '<span title="'+(c.detail||'').replace(/"/g,'')+'" style="display:flex;'
-      +'align-items:center;gap:5px;background:#fff;color:'+(ok?'var(--success-dark, #1c7a4d)':'#b31b25')
+      +'align-items:center;gap:5px;background:#fff;color:'+pv.col
       +';padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">'
       +'<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">'
-      +(ok?'check_circle':'error')+'</span>'
+      +pv.ic+'</span>'
       /* 서버 라벨이 이미 '통과'로 끝나는 규칙이 있다(쿨러 발열(TDP) 통과) — 중복을 지운다 */
-      +c.label.replace(/\s*통과$/,'')+' '+(ok?'통과':'불통과')+'</span>';
+      +c.label.replace(/\s*통과$/,'')+' '+pv.val+'</span>';
     }).join('');
     if(nF){
      var vt=document.getElementById('s4-verified-title');
      if(vt)vt.textContent='조립할 수 없는 구성입니다 — 호환 '+chips.length+'종 중 '+nF+'종 불통과';
+    }else if(nP){
+     /* nF===0 이지만 아직 다 확인되지 않은 규칙이 있다 — 정적 마크업 기본 문구
+        "이 구성은 조립 가능함이 검증됐습니다"를 그대로 두면 확인 보류를 검증
+        완료로 잘못 말하는 것이라 이 경우에도 제목을 바꾼다(nF 문구와 같은 원칙). */
+     var vt2=document.getElementById('s4-verified-title');
+     if(vt2)vt2.textContent='구성 확인이 끝나지 않았습니다 — 호환 '+chips.length+'종 중 '+nP+'종 확인 보류';
     }
+    /* 카드 색·아이콘도 상태를 따라간다(하네스 지시 2026-08-21) — 전에는 nF>0 이어도
+       배경·아이콘 박스·제목 글자색이 항상 초록이라 "조립할 수 없는 구성입니다"라는
+       글자가 통과색(초록) 카드 안에 그대로 앉아 있었다. 글자(제목 문구)는 위에서
+       이미 정확하다 — 손대지 않는다. 새 색은 만들지 않는다: 이 파일이 이미 칩에
+       쓰는 색(위 chipVisual, false=#b31b25·null=#8a561a)의 "연한 배경/짙은 박스"
+       짝을 다른 화면에서 그대로 옮긴다 — 빨강 배경 #fbecec 는 s1-session.html:658·
+       s2-result.html:796 의 불통과 칩 배경(bg:'#fbecec')과 같은 값이고, 주황 배경
+       #fbf3e2 는 이 파일 459행("함께 구성" 배지)·s0-landing.html 등 여러 화면이
+       이미 쓰는 값이다. 아이콘 박스는 그 문구색을 그대로 짙은 배경으로 쓴다(초록이
+       --success-container 연한 배경 + --success 짙은 박스 두 톤인 것과 같은 구조).
+       아이콘은 su-icons.js MS 맵에 이미 있는 키만 쓴다 — warning(ms-warning.svg)·
+       help(ms-pending.svg) 둘 다 파일 존재 확인됨(새 SVG 를 받지 않는다). */
+    var vv = nF ? {bg:'#fbecec',box:'#b31b25',title:'#b31b25',ic:'warning'}
+      : nP ? {bg:'#fbf3e2',box:'#8a561a',title:'#8a561a',ic:'help'}
+      : {bg:'var(--success-container, #e9f6ef)',box:'var(--success, #2f9e6d)',title:'var(--success-deep, #0f5132)',ic:'verified'};
+    var vCard=document.getElementById('s4-verified');
+    if(vCard)vCard.style.background=vv.bg;
+    var vIcon=document.getElementById('s4-verified-icon');
+    /* textContent 대입이 이전 스와퍼 결과(<img>)를 지운다 — su-icons.js 의 스와퍼는
+       "data-su-done 이면서 img 가 남아 있을 때"만 건너뛴다(swapMS, 그 파일 74행).
+       img 가 사라졌으니 다음 sweep(MutationObserver·최대 1.2초 타이머)이 새 이름으로
+       다시 swap 한다 — data-su-done 을 직접 지울 필요는 없지만 방어적으로 함께 지운다. */
+    if(vIcon){vIcon.style.background=vv.box;vIcon.textContent=vv.ic;vIcon.removeAttribute('data-su-done');}
+    var vTitleEl=document.getElementById('s4-verified-title');
+    if(vTitleEl)vTitleEl.style.color=vv.title;
     /* 서버 판정이 온 뒤에만 검증 배너를 편다 — 판정 없이 «검증됨»이라 말하지 않는다 */
     var vb=document.getElementById('s4-verified');if(vb)vb.style.display='';
     var hv=document.getElementById('s4-hdr-verified');
-    if(hv&&!nF)hv.style.display='flex';
+    /* 헤더의 "조립 가능 검증됨" 배지도 nP 를 함께 본다 — 예전엔 !nF 만 봐서
+       확인 보류가 섞여도 배지가 "검증됨"으로 떴다. */
+    if(hv&&!nF&&!nP)hv.style.display='flex';
    }
   }
   // 배지

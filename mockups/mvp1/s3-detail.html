@@ -83,7 +83,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <span style="width:1px;height:16px;background:#d8d4cc;"></span>
         <div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:#2b5fd9;">tune</span>부품 상세 및 교체</div>
       </div>
-      <div class="s3-header-right" style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>호환 5종 통과</div>
+      <div id="s3-hdr-badge" class="s3-header-right" style="display:flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:17px;">verified</span>호환 5종 통과</div>
     </div>
   </header>
 
@@ -93,7 +93,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:16px;">
       <div>
         <h1 style="margin:0 0 8px;font-size:32px;font-weight:900;color:#17171b;letter-spacing:-.01em;">부품 상세 및 교체</h1>
-        <span style="display:inline-flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:7px 14px;border-radius:999px;font-size:13.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:18px;">check_circle</span>조립 가능 — 호환 5종 통과</span>
+        <span id="s3-title-badge" style="display:inline-flex;align-items:center;gap:6px;background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);padding:7px 14px;border-radius:999px;font-size:13.5px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:18px;">check_circle</span>조립 가능 — 호환 5종 통과</span>
       </div>
       <div style="text-align:right;">
         <div style="font-size:13px;font-weight:700;color:#8a8578;">현재 구성 총액 · 3시간 전 재고가 기준</div>
@@ -191,7 +191,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
             <div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:var(--success-bright, #5fd6a0);">check_circle</span>쿨러 TDP</span><b style="font-size:12.5px;color:var(--success-bright, #5fd6a0);">정상</b></div>
             <div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:'Material Symbols Outlined';font-size:18px;color:var(--success-bright, #5fd6a0);">check_circle</span>케이스 실장</span><b style="font-size:12.5px;color:var(--success-bright, #5fd6a0);">정상</b></div>
           </div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:7px;background:var(--success-dark, #1c7a4d);border-radius:11px;padding:12px;margin-top:14px;font-size:14px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:19px;">verified</span>조립 가능 — 호환 5종 통과</div>
+          <div id="s3-compat-banner" style="display:flex;align-items:center;justify-content:center;gap:7px;background:var(--success-dark, #1c7a4d);border-radius:11px;padding:12px;margin-top:14px;font-size:14px;font-weight:800;"><span style="font-family:'Material Symbols Outlined';font-size:19px;">verified</span>조립 가능 — 호환 5종 통과</div>
         </div>
 
         <!-- reassurance -->
@@ -314,10 +314,21 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
    var el=n.parentElement;
    if(!el||!el.style)return;
    var bg=el.style.background||'';
-   if(bg.indexOf('success')>-1||bg.indexOf('#e9f6ef')>-1||bg.indexOf('#1c7a4d')>-1){
+   /* 2026-08-21 상태색 배너(86·96·194행, id=s3-hdr-badge/s3-title-badge/
+      s3-compat-banner) 추가로 id 조건을 더한다 — 그 셋은 nF·nP 에 따라
+      배경이 --error/#995c00(빨강·주황)로도 바뀌므로, 문자열 'success'·
+      '#e9f6ef'·'#1c7a4d' 매치만으로는 오프라인 전환 때 색이 안 지워진다
+      (남의 것 같은 판정을 계속 보여주게 된다 — 위 "없는 구성을 그리지
+      않는다" 원칙과 같은 이유). */
+   var isBanner=el.id==='s3-hdr-badge'||el.id==='s3-title-badge'||el.id==='s3-compat-banner';
+   if(bg.indexOf('success')>-1||bg.indexOf('#e9f6ef')>-1||bg.indexOf('#1c7a4d')>-1||isBanner){
     el.style.background='#f0eee9';el.style.color='#6b6b73';
     el.querySelectorAll('span[style*="Material Symbols"]').forEach(function(g){
      g.textContent='help';g.style.color='#8a8578';});
+    /* 다음에 LIVE 가 다시 성립하면(예: 실패 뒤 재연결) renderCompat() 이
+       nF·nP 로 다시 배색해야 한다 — 표식을 지워 "이전과 같은 상태라 다시
+       안 칠한다" 가드(paintBanner 의 dataset.compatState 비교)를 무력화한다. */
+    if(isBanner)el.dataset.compatState='';
    }
   });
  }
@@ -412,26 +423,121 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
   /* 서버가 판정한 규칙을 1:1로 전부 그린다. 라벨·근거·통과 여부 모두 서버 값이다.
      초록 토큰이 없으므로 통과/불통과는 색만이 아니라 텍스트로도 구분한다.
      이전에는 목업 5행 틀에 맞춰 4종만 골라 쓰고 pass=false도 '정상'으로 찍었다 —
-     불통과를 통과로 보이게 하는 가장 위험한 거짓이었다. find('fit')은 없는 키였다. */
-  var row=function(lab,val,sub,ok){var col=ok?'var(--success-bright, #5fd6a0)':'#ff8f84';
-   return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:'+col+';">'+(ok?'check_circle':'error')+'</span>'+lab+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+sub+'</span>':'')+'</span><b style="font-size:12.5px;color:'+col+';">'+val+'</b></div>';};
+     불통과를 통과로 보이게 하는 가장 위험한 거짓이었다. find('fit')은 없는 키였다.
+     ⚠ pass 는 3값이다(2026-08-21) — true=통과 · false=불통과 · null=확인 보류(부품을
+     다 고르지 않아 서버가 이 규칙을 아직 판정하지 못한 것, api/expert.py
+     _partial_compat). 오늘부터 부품 선택란 기본값이 '(선택 안 함)'이라 null 이
+     드물지 않은 상태다. s1-session.html checkVisual()(656행)과 같은 3색 규칙을
+     쓴다 — 그 파일 주석이 "모른다를 된다로 바꿔 말하지 않는다"는 원칙을 이미 적어
+     뒀다. mockups/shared/*.js 로 빼지 않고(다른 제작자가 그 폴더를 만지고 있어
+     새 공용 파일을 못 만든다) 이 파일 안에서 같은 규칙을 다시 구현한다 — 배색만
+     이 카드의 어두운 배경(#232320)에 맞게 조정했다(s1·s2는 밝은 카드라 배색이
+     다르다). s2-result.html:794-798 에도 같은 3값 판정이 독립 구현돼 있다 —
+     정의를 한 파일로 합치는 대신 세 파일이 같은 규칙(참/거짓/null → 색+글자)을
+     각자 유지하는 쪽을 택했다(공용 파일 편집이 막혀 있는 지금 유일한 선택지).
+     이전 col/ok 2색 row() 는 pv.col/pv.ic/pv.val 을 받는 rowRaw() 로 남기고,
+     pass→시각을 고르는 판단은 passVisual() 하나로 모았다 — 파워 정격 여유(수치,
+     null 없음)는 그대로 rowRaw() 를 직접 부른다. */
+  var rowRaw=function(lab,val,sub,col,ic){
+   return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:'+col+';">'+ic+'</span>'+lab+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+sub+'</span>':'')+'</span><b style="font-size:12.5px;color:'+col+';">'+val+'</b></div>';};
+  function passVisual(p){
+   if(p===true)return{col:'var(--success-bright, #5fd6a0)',ic:'check_circle',val:'정상'};
+   if(p===false)return{col:'#ff8f84',ic:'error',val:'불통과'};
+   return{col:'#ffb74d',ic:'help',val:'확인 보류'};
+  }
   var html='';
-  cm.checks.forEach(function(c){var ok=c.pass!==false;
-   html+=row(c.label,ok?'정상':'불통과',c.detail||'',ok);});
-  /* 여유율은 규칙 판정이 아니라 수치다 — 규칙 목록과 섞지 않고 뒤에 붙인다 */
-  if(typeof cm.power_headroom_pct==='number')
-   html+=row('파워 정격 여유',cm.power_headroom_pct+'%','권장 대비',cm.power_headroom_pct>=100);
+  cm.checks.forEach(function(c){var pv=passVisual(c.pass);
+   html+=rowRaw(c.label,pv.val,c.detail||'',pv.col,pv.ic);});
+  /* 여유율은 규칙 판정이 아니라 수치다 — 규칙 목록과 섞지 않고 뒤에 붙인다.
+     null 이 없는 2값(가결/미달)이라 passVisual() 을 쓰지 않고 그대로 둔다. */
+  if(typeof cm.power_headroom_pct==='number'){
+   var hok=cm.power_headroom_pct>=100;
+   html+=rowRaw('파워 정격 여유',cm.power_headroom_pct+'%','권장 대비',
+    hok?'var(--success-bright, #5fd6a0)':'#ff8f84',hok?'check_circle':'error');
+  }
   box.innerHTML=html;
-  /* '5종'은 목업 시절 하드코딩이다 — 규칙 수는 서버가 정한다(현재 8종).
-     불통과가 있으면 '통과'라고 말하지 않는다. */
-  var nC=cm.checks.length,nF=0;
-  cm.checks.forEach(function(c){if(c.pass===false)nF++;});
+  /* '5종'은 목업 시절 하드코딩이다 — 규칙 수는 서버가 정한다(현재 9종).
+     불통과가 있으면 '통과'라고 말하지 않는다 — nP(확인 보류)도 같은 이유로
+     '통과'가 아니다(위 passVisual() 과 같은 원칙, 2026-08-21 추가). */
+  var nC=cm.checks.length,nF=0,nP=0;
+  cm.checks.forEach(function(c){if(c.pass===false)nF++;else if(c.pass===null)nP++;});
   var tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),tn,hits=[];
   while((tn=tw.nextNode()))if(/호환(성)?\s*\d+종/.test(tn.nodeValue))hits.push(tn);
   hits.forEach(function(n){
    n.nodeValue=n.nodeValue.replace(/호환(성?)\s*\d+종/g,function(_,g){return '호환'+g+' '+nC+'종';});
-   if(nF)n.nodeValue=n.nodeValue.replace(/조립 가능 — (호환\s*\d+종)\s*통과/,'조립 불가 — $1 중 '+nF+'종 불통과');
+   /* 예전엔 "조립 가능 — 호환N종 통과" 접두 문구만 고쳤다(96·194행). 접두가 없는
+      맨몸 "호환N종 통과"(86행 헤더 배지)는 nF>0 이어도 '통과'로 남아 있었다 —
+      이것도 같은 «화면이 숫자를 지어낸다» 결함이라 함께 고친다. 228행("현 구성과
+      호환N종을 전부 통과한 제품만 표시합니다")은 손대지 않는다 — 그건 현재 구성의
+      통과 여부가 아니라 "대안 목록에 실린 항목만 이미 검증됐다"는 대안 필터 자체의
+      보증(api/swap.py _find_chain, 항상 유효)을 말하는 별개 문장이고, "종을 전부
+      통과한"처럼 "종" 뒤에 "을 전부" 같은 말이 끼어 있어 아래 정규식(종 바로 뒤
+      공백만 두고 통과)과도 매치하지 않는다(실측 확인). */
+   if(nF){
+    n.nodeValue=n.nodeValue.replace(/조립 가능 — (호환\s*\d+종)\s*통과/,'조립 불가 — $1 중 '+nF+'종 불통과');
+    n.nodeValue=n.nodeValue.replace(/(호환(성?)\s*\d+종)\s*통과$/,'$1 중 '+nF+'종 불통과');
+   }else if(nP){
+    n.nodeValue=n.nodeValue.replace(/조립 가능 — (호환\s*\d+종)\s*통과/,'조립 가능 — $1 중 '+nP+'종 확인 보류');
+    n.nodeValue=n.nodeValue.replace(/(호환(성?)\s*\d+종)\s*통과$/,'$1 중 '+nP+'종 확인 보류');
+   }
   });
+  /* ── 배너·배지 배경색 — 2026-08-21 사장님 확정: "상태대로 색을 바꾼다. 글자는
+     지금 그대로 둔다." 위 hits.forEach() 는 글자만 고치고 배경은 그대로 두고
+     있었다(세션 7361 실측 — "조립 불가 … 불통과" 문구인데 배경은 초록 그대로).
+     nF·nP 산출·글자 치환(바로 위 블록)은 그대로 두고, 여기서는 그 값만 읽어
+     배경·아이콘을 고른다. 대상은 바로 위 주석이 이미 특정해 둔 세 곳뿐이다 —
+     86행(헤더 배지, id=s3-hdr-badge) · 96행(부제 배지, id=s3-title-badge) ·
+     194행(사이드바 배너, id=s3-compat-banner). 186행(재검증 표제)·200행(안심
+     안내)·228행(대안 필터 보증)·513행(대안 버튼 배지)은 다른 의미라 위 주석이
+     이미 제외해 뒀고 여기서도 건드리지 않는다.
+     색 출처 — 새 색을 만들기 전에 찾았다(우선순위: 토큰 → 이 파일 안의 기존 색):
+       불통과(빨강)  var(--error, #C0392B) — design-system/tokens.css 기존
+         토큰(`--state-fail:var(--error)`로 이미 쓰인다). 상대휘도(WCAG) 0.143 —
+         --success-dark(0.147, #1c7a4d)와 사실상 같은 "진하기"(흰 글자 대비
+         5.44:1 대 5.33:1, node 로 실측 — design-system/tokens.css 에
+         --warn·--warning 류는 없음, grep 확인).
+       확인 보류(주황)  #995c00 — tokens.css 에 대응 토큰 없음. 이 카드가 이미
+         쓰는 확인 보류 색(passVisual() null, #ffb74d, 색상각 약 36°)과 같은
+         색상에서 명도만 낮춰 상대휘도 0.144(흰 글자 대비 5.40:1)로
+         --success-dark 에 맞춰 도출했다(근거를 여기 남긴다 — 토큰에는 없다).
+     옅은 칩(86·96행)은 배너(194행)와 배색 방식이 달라(옅은 배경 + 진한 글자) 그
+     짝도 새로 만들지 않고 이 파일이 이미 쓰는 옅은 배경 쌍을 그대로 가져다
+     썼다 — 불통과는 276·381행의 "문제/품절" 칩(#fbe9e7/#b04a3a, 대비 4.61:1) ·
+     확인 보류는 507행의 연쇄 변경 안내 칩(#fbf3e2/#8a561a, 대비 5.55:1).
+     아이콘은 이 카드 바로 위 passVisual()(432행 부근)과 같은 어휘를 쓴다 —
+     불통과→error · 확인 보류→help(su-icons.js 의 MS 맵에 이미 있는 키만 사용,
+     "물음표 계열은 help" 그대로). MS 맵에는 "warning"(ms-warning)도 있었지만
+     쓰지 않았다 — 같은 카드 안에서 개별 판정 행(위 rowRaw, 5~9행 렌더)과 요약
+     배너가 서로 다른 아이콘을 쓰면 "이게 같은 뜻인가"를 사람이 다시 판단해야
+     한다. 정상(초록)은 손대지 않는다 — 원래 아이콘(verified/check_circle)
+     그대로 유지. */
+  var BANNER_V={
+   fail:{bg:'var(--error, #C0392B)',chipBg:'#fbe9e7',chipFg:'#b04a3a',icon:'error'},
+   pending:{bg:'#995c00',chipBg:'#fbf3e2',chipFg:'#8a561a',icon:'help'},
+   pass:{bg:'var(--success-dark, #1c7a4d)',chipBg:'var(--success-container, #e9f6ef)',chipFg:'var(--success-dark, #1c7a4d)',icon:null}
+  };
+  var bState=nF?'fail':(nP?'pending':'pass');
+  var bv=BANNER_V[bState];
+  function paintIcon(container,iconName){
+   var ic=container&&container.querySelector('span[style*="Material Symbols"]');
+   /* textContent 를 바꾸면 su-icons.js 가 이미 그려 넣은 <img>(있다면)가 함께
+      지워진다 — container.querySelector('img') 가 비게 돼 스와퍼의 "이미
+      처리됨" 가드(data-su-done && querySelector('img'))를 다시 통과해 새
+      이름으로 재교체한다. clearCompatClaims()(위 326행)가 이미 같은 방식으로
+      아이콘을 바꾸고 있어 — data-su-done 속성을 따로 지우지 않아도 된다. */
+   if(ic)ic.textContent=iconName;
+  }
+  function paintBanner(id,bg,fg,iconName){
+   var el=document.getElementById(id);
+   if(!el||el.dataset.compatState===bState)return; /* 같은 상태면 다시 안 칠한다(아이콘 깜빡임 방지) */
+   el.style.background=bg;
+   if(fg)el.style.color=fg;
+   paintIcon(el,iconName);
+   el.dataset.compatState=bState;
+  }
+  paintBanner('s3-compat-banner',bv.bg,null,bv.icon||'verified');
+  paintBanner('s3-hdr-badge',bv.chipBg,bv.chipFg,bv.icon||'verified');
+  paintBanner('s3-title-badge',bv.chipBg,bv.chipFg,bv.icon||'check_circle');
  }
  function openLive(slot){
   var s=C.slots[slot];
@@ -439,21 +545,44 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
   var alts=document.getElementById('s3-alts');alts.innerHTML='';
   if(s.empty){
    alts.innerHTML='<div style="padding:20px;text-align:center;color:#8a8578;font-size:13.5px;font-weight:700;">'+s.empty_reason+'</div>';
-  }else s.alternatives.forEach(function(a){
-   var diff=(a.price_diff>=0?'+':'')+a.price_diff.toLocaleString()+'원';
-   var chainHtml='';
-   if(a.chain){
-    var c=a.chain[0];
-    chainHtml='<div style="margin-top:9px;background:#fbf3e2;border-radius:9px;padding:9px 11px;font-size:12px;color:#8a561a;font-weight:700;line-height:1.5;">'+a.chain_reason
-     +'<br>→ '+PKO[c.slot]+'를 <b>'+c.to.name+'</b>(으)로 함께 바꿉니다 ('+(c.to.price_diff>=0?'+':'')+c.to.price_diff.toLocaleString()+'원)</div>'
-     +'<div style="margin-top:8px;font-size:12.5px;font-weight:800;color:#2b5fd9;">연쇄 변경하고 계속하기 →</div>';
-   }
-   var b=document.createElement('button');
-   b.style.cssText='display:block;width:100%;padding:14px 16px;border:1.5px solid #e2ded5;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;';
-   b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+a.name+'</span><span style="font-size:12.5px;color:var(--success-dark, #1c7a4d);font-weight:700;">✓ 호환 '+((C.compat&&C.compat.checks||[]).length)+'종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
-   b.addEventListener('click',function(){applySwap(slot,a,b);});
-   alts.appendChild(b);
-  });
+  }else{
+   /* ⚠ 대안 버튼의 "✓ 호환 N종 통과" 배지는 손대지 않는다(2026-08-21 검토 후 유지로
+      확정 — 아래 row()/nF·nP 수정과 겉모양은 같은 문제처럼 보였지만 다른 사안이다).
+      이 배지는 C.compat.checks(«지금 견적»의 원 판정, null 이 있을 수 있는 값)를
+      세지 않는다 — 여기 실리는 항목은 api/swap.py _find_chain 이 "스왑(+필요하면
+      연쇄 교체까지) 적용 뒤 위반이 0건"임을 **이미 최종 확인한 것만**(136행
+      `return chain if not _valid(trial, rules) else None`) 걸러 보여준다. 즉
+      "통과"는 지금 상태가 아니라 이 대안을 골랐을 때의 결과를 말하는 것이라 서버가
+      이미 보장한 사실이고, C.compat.checks 로 다시 계산하면 그 배지가 오히려
+      틀린다 — 관계없는 슬롯의 기존 불통과(예: CPU·MB 소켓 불일치) 때문에 실제로는
+      연쇄 교체까지 포함해 안전하게 걸러진 GPU 대안이 "불통과"로 잘못 뜬다. (참고로
+      이 문장이 기대던 전제 — "빈 슬롯이면 이 모달에 못 온다" — 는 당시 실제로 있던
+      별도 결함에 기댄 것이었다: 빈 슬롯이 하나라도 있으면 chosen 에 그 슬롯 키가
+      없어 KeyError 가 났고(실사고 — api/swap.py _chosen_from_parts 문서화 참고),
+      그래서 /api/swap/candidates 가 500 이라 load() 가 이미 오프라인으로 빠져 이
+      모달을 열 수조차 없었다. **그 KeyError 는 같은 커밋이 고쳤다** —
+      _chosen_from_parts(98행)가 `chosen = {s: None for s in SLOTS}` 로 8슬롯을
+      선채움해 빈 슬롯이 있어도 예외를 던지지 않는다(확인자가 빈 슬롯 시나리오를
+      순수함수로 재현 → 예외 없이 정상 처리됨을 오프라인으로 확인 — ⚠ 실서버·브라우저
+      fetch 경로 검증은 아직 못 했다). **그래서 이 전제를 더 이상 근거로 쓰지 않는다**
+      — 지금 이 모달이 null 포함 상태에 실제로 도달하는지는 이 주석이 보장하지 않고,
+      별도 확인이 필요하다.) */
+   s.alternatives.forEach(function(a){
+    var diff=(a.price_diff>=0?'+':'')+a.price_diff.toLocaleString()+'원';
+    var chainHtml='';
+    if(a.chain){
+     var c=a.chain[0];
+     chainHtml='<div style="margin-top:9px;background:#fbf3e2;border-radius:9px;padding:9px 11px;font-size:12px;color:#8a561a;font-weight:700;line-height:1.5;">'+a.chain_reason
+      +'<br>→ '+PKO[c.slot]+'를 <b>'+c.to.name+'</b>(으)로 함께 바꿉니다 ('+(c.to.price_diff>=0?'+':'')+c.to.price_diff.toLocaleString()+'원)</div>'
+      +'<div style="margin-top:8px;font-size:12.5px;font-weight:800;color:#2b5fd9;">연쇄 변경하고 계속하기 →</div>';
+    }
+    var b=document.createElement('button');
+    b.style.cssText='display:block;width:100%;padding:14px 16px;border:1.5px solid #e2ded5;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;';
+    b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+a.name+'</span><span style="font-size:12.5px;color:var(--success-dark, #1c7a4d);font-weight:700;">✓ 호환 '+((C.compat&&C.compat.checks||[]).length)+'종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
+    b.addEventListener('click',function(){applySwap(slot,a,b);});
+    alts.appendChild(b);
+   });
+  }
   document.getElementById('s3-modal').style.display='flex';
  }
  function applySwap(slot,a,btn){
@@ -480,11 +609,20 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
     }
     Q.sets[tier].items=res.j.items;Q.sets[tier].total=res.j.total;Q.sets[tier].compat=res.j.compat;
     try{localStorage.setItem('popcorn-quote',JSON.stringify({at:Date.now(),data:Q}));}catch(e){}
-    /* 재검증 결과는 이 응답이 말한다 — 개수도 통과 여부도 추측하지 않는다(슬라이스 48) */
-    var rc=(res.j.compat&&res.j.compat.checks)||[],rf=0;
-    rc.forEach(function(c){if(c.pass===false)rf++;});
+    /* 재검증 결과는 이 응답이 말한다 — 개수도 통과 여부도 추측하지 않는다(슬라이스 48).
+       ⚠ rf·rp 는 이 자리에서는 사실 항상 0 이다(2026-08-21 확인) — api/swap.py
+       apply() 가 위반이 하나라도 있으면 이 응답을 만들기 «전에» 409 로 막는다
+       (`violations = _valid(chosen, rules); if violations: raise 409`, chosen 이
+       불완전하면 그 전에 KeyError 로 죽는다). 즉 여기 도달했다면 이미 전부 통과다.
+       그래도 rf·rp 분기를 지운 2값 코드로 되돌리지 않고 남겨 둔다 — 위 openLive()
+       배지와 달리 이 판단은 「지금 이 응답(res.j.compat)」 자체를 그대로 세므로
+       나중에 apply() 의 409 가드가 느슨해져도(예: 경고만 하고 통과시키는 정책으로
+       바뀌면) 여기는 안 고쳐도 계속 맞는다 — 문구 하나를 두 곳(row()/nF·nP·이 자리)
+       이 각자 다시 판단하게 두지 않는 것이 목적이다. */
+    var rc=(res.j.compat&&res.j.compat.checks)||[],rf=0,rp=0;
+    rc.forEach(function(c){if(c.pass===false)rf++;else if(c.pass===null)rp++;});
     tmsg((a.chain?'연쇄 변경 적용 — ':'')+PKO[slot]+' 교체 완료 · 호환 '+rc.length
-     +(rf?('종 중 '+rf+'종 불통과'):'종 재검증 통과')
+     +(rf?('종 중 '+rf+'종 불통과'):rp?('종 중 '+rp+'종 확인 보류'):'종 재검증 통과')
      +' · 총 '+res.j.total.toLocaleString()+'원');
     load().catch(function(e2){
      /* 교체는 됐는데 다시 읽지 못한 상태 — 옛 구성이 남으면 «바뀐 것을 안 바뀐 것처럼»
@@ -495,7 +633,11 @@ if(rf)rf.addEventListener('click',function(){var t=(ri.value||'').trim();if(!t){
     });
    })
    .catch(function(e){console.warn('[s3] swap apply failed -',e);
-    tmsg('⚠ 적용에 실패했어요 — 다시 시도해 주세요.');btn.disabled=false;});
+    tmsg('⚠ 적용에 실패했습니다 — 다시 시도해 주세요.');btn.disabled=false;
+    /* fetch 자체가 거부된 경우(네트워크 단절) — 서버가 응답조차 못 했으므로 적용 여부를
+       알 수 없다. 지어낸 배너·총액을 그대로 두지 않는다 — 606-607·627-633 과 같은 방식
+       (s3Offline → clearCompatClaims) 으로 지운다. */
+    var st=e&&e.st;s3Offline(gateKind(st),'구성 정보 표시 불가',gateMsg(st,(e&&e.gate)||{}));});
  }
  function load(){
   /* 이 경로에도 열쇠를 싣는다 — 지금 서버는 후보 조회를 막지 않지만, 막는 날
