@@ -82,8 +82,9 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
 
 /* ── 좌측 메뉴(LNB) — 동작 규격(2026-08-13 사장님 확정, admin2 전 화면 공통):
    펼침 212px ↔ 접힘 64px · `width .16s ease` · 최하단 「메뉴창 접기」 · 아이콘 «/» ·
-   접히면 라벨 숨김+`title` 툴팁 · 브랜드 admin2↔a2. IA(항목 구성)는 이 파일 소관이
-   아니다 — 정본은 `api/admin_nav.py`(`nav_for`). ── */
+   접히면 라벨 숨김+`title` 툴팁 · 브랜드 「팝콘 AI」↔「팝콘」(2026-08-21 개정 — 이전엔
+   admin2↔a2였다. 경위는 CLAUDE.md §관리자 화면 규약·decision-log A-82). IA(항목
+   구성)는 이 파일 소관이 아니다 — 정본은 `api/admin_nav.py`(`nav_for`). ── */
 .a2-lnb{width:212px;flex:none;background:var(--nav);color:var(--on-nav-muted);padding:16px 0 10px;
      display:flex;flex-direction:column;gap:1px;transition:width .16s ease;overflow:hidden}
 .a2-lnb.collapsed{width:64px}

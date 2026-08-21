@@ -27,7 +27,7 @@
     if (!lnb) return;
     lnb.classList.toggle('collapsed', collapsed);
     var brand = document.getElementById('lnbBrand');
-    if (brand) brand.textContent = collapsed ? 'a2' : 'admin2';
+    if (brand) brand.textContent = collapsed ? '팝콘' : '팝콘 AI';
     var icon = document.getElementById('lnbToggleIcon');
     if (icon) icon.textContent = collapsed ? '»' : '«';
   }
