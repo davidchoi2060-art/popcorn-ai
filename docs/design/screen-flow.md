@@ -146,7 +146,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  LOGIN["로그인<br/>admin/login.html"] --> HOME["대시보드<br/>/admin2/"]
+  LOGIN["로그인<br/>/admin2/login"] --> HOME["대시보드<br/>/admin2/"]
 
   HOME --> G1["상품관리 5"]
   HOME --> G2["상품사양관리 11"]
