@@ -89,13 +89,20 @@ class CountBody(BaseModel):
 
 
 def _budget_cap(value: str):
-    """예산 라벨 → 상한(원) 또는 None(미적용). '200만원 이상'은 상한이 아니다."""
+    """예산 라벨 → 상한(원) 또는 None(미적용). '200만원 이상'은 상한이 아니다.
+
+    ⚠ 2026-08-22 수정: 옛 정규식 `\\d{2,3}`은 자릿수를 2~3자리로 못박아 "1500만원"에서
+    뒤 세 자리 "500"만 집었다 — 예산 1,500만원 고객과 500만원 고객이 같은 상한(500만원)을
+    받는 결함(조사자 실측). 자릿수 제한을 없애고 "1,500만원" 같은 콤마 구분 표기도 받는다.
+    '만'이 없는 순수 숫자("150")·한글 수사("백오십만원")는 여전히 못 받는다 — 단위를
+    지어내 해석하지 않는다.
+    """
     if "이상" in value:
         return None
-    m = re.search(r"(\d{2,3})\s*만", value)
+    m = re.search(r"(\d{1,3}(?:,\d{3})+|\d+)\s*만", value)
     if not m:
         return None
-    return int(m.group(1)) * 10000
+    return int(m.group(1).replace(",", "")) * 10000
 
 
 def _apply_one(parts: list[dict], label: str, value: str):
