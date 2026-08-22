@@ -149,8 +149,11 @@ RULES = {
     },
     "COOLER_CPU_AIR": {
         "cooler_height_mm": (("높이", "쿨러 높이"), _num),
+        "cooler_tdp": (("TDP",), _num),
     },
-    "COOLER_CPU_AIO": {},
+    "COOLER_CPU_AIO": {
+        "cooler_tdp": (("TDP",), _num),
+    },
 }
 
 
