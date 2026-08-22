@@ -140,7 +140,14 @@ LLM_MAX_OUTPUT_TOKENS = 256   # JSON 한 덩어리면 충분하다(최악 비용
 PREF_VALUES = ("저소음", "화이트")
 
 # 예산 표기 -- `api/candidates._budget_cap`이 읽는 모양.
-_BUDGET_NUM = re.compile(r"(\d{2,4})\s*만")
+# ⚠ 2026-08-22 수정: 옛 정규식 `\d{2,4}`는 자릿수를 2~4자리로 못박아 다섯 자리 이상
+# 예산을 서버에서 잘랐다(`api/candidates.py` `_budget_cap`이 같은 날 고친 것과 같은
+# 결함 — 그 커밋이 이 파일을 「남은 구멍」으로 명시했다). 이 값은 LLM이 프롬프트
+# 규격("숫자만원", `_build_prompt`의 라벨 1)대로 뽑아낸 **이미 라벨링된** 단일 값이라
+# `mockups/mvp1/s1-session.html`의 `budgetSaid`·`talkBudget`과 같은 처지다(자유 문장을
+# 통째로 훑는 `liveParse`가 아니다) — 그래서 그 둘과 같게 자릿수 하한도 두지 않는다.
+# `api/candidates.py`와 같은 패턴으로 자릿수 상한을 없애고 콤마 구분 표기도 받는다.
+_BUDGET_NUM = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+)\s*만")
 _BUDGET_BOUND = re.compile(r"(이상|이하)")
 
 LABELS = ("예산", "용도", "선호")
@@ -241,7 +248,15 @@ def _norm_budget(v: str):
     if not m:
         return None, "금액을 읽을 수 없는 예산 표기입니다"
     b = _BUDGET_BOUND.search(v)
-    return m.group(1) + "만원" + (" " + b.group(1) if b else ""), None
+    # 천단위 콤마로 «표시»한다(2026-08-22 사장님 지시) -- "1500만원"이 아니라 "1,500만원".
+    # 이 값은 조건 칩으로 고객에게 그대로 보이면서 동시에 파서 입력이기도 한데, 소비처
+    # 둘 다 콤마를 이미 받는다(실측): api/candidates._budget_cap 은 `\d{1,3}(?:,\d{3})+|\d+`
+    # 로 읽고 int 변환 전에 콤마를 지우고, 화면 budgetSaid()(s1-session.html)도 같은 패턴에
+    # `replace(/,/g,'')` 다. 그래서 표시를 바꿔도 상한 계산·범위 마커가 깨지지 않는다.
+    # 일단 콤마를 지워 int 로 만든 뒤 다시 넣는다 -- 입력이 "1,500"이든 "1500"이든 같은 표기가
+    # 나와야 한다(입력 표기가 화면에 새어 나가면 같은 예산이 두 모양으로 보인다).
+    n = int(m.group(1).replace(",", ""))
+    return format(n, ",") + "만원" + (" " + b.group(1) if b else ""), None
 
 
 def _norm_from_set(v: str, allowed: list, kind: str):
