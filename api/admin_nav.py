@@ -349,6 +349,8 @@ NAV = [
     ("AI 관리", "cpu", [
         ("작업 현황판", "/admin2/dash", "신설 · 진행 보기 + 말 걸기"),
         ("웹 사양 채움", "/admin2/spec-fill", "신설(ADM-AI-020) · B안 확정 2026-08-13"),
+        ("팝콘톡 응답 패턴", "/admin2/talk-patterns",
+         "신설(ADM-TLK-010 · 가칭) · 1b 확정 2026-08-22 — 질문을 쌓아 답변 패턴으로"),
         ("AI 작업 설정", "/admin2/ai-task-settings", "신설 — 작업↔모델 · 폴백"),
         ("AI 연동 설정", "/admin2/ai-integration", "신설 — 키는 서버 env"),
         ("AI 사용량 · 비용", "/admin2/ai-usage-cost", None),

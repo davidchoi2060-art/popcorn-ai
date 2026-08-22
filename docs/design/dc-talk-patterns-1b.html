@@ -1,0 +1,481 @@
+id="1b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">목록 전면 · 큐는 위에서 자라는 띠</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61"><b>오늘 바로 쓸모가 있다</b>(패턴 20종이 화면을 채운다) · 큐가 차면 띠가 열려 목록 위를 차지한다</span>
+      </div>
+      <div data-screen-label="1b 목록 전면" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;position:relative;display:flex;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="40">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">팝콘톡</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">응답 패턴</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap">ADM-TLK-010 · 가칭</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap">/admin2/talk-patterns</span>
+            <span style="flex:1"></span>
+            <span style="{{ gradeBadgeStyle }}">{{ gradeBadge }}</span>
+            <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.14);background:#ddd7c9"></span>
+          </header>
+
+          <div style="flex:1;min-height:0;overflow:hidden;padding:9px 16px;display:flex;flex-direction:column;gap:8px">
+
+            <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                <span style="font:600 13.5px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">안 걸린 질문</span>
+                <span style="{{ queueCountStyle }}">{{ queueCountLabel }}</span>
+                <span style="font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">우리가 아직 답을 못 만든 질문 — 새 의도의 후보입니다 · <b>서로 다른 방문자 5명</b>이 자동 승격 임계입니다</span>
+                <span style="flex:1"></span>
+                <span style="{{ regressChipStyle }}">{{ regressChip }}</span>
+                <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">intent_key IS NULL</span>
+              </div>
+              <sc-if value="{{ queueHasRows }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;gap:8px">
+                  <sc-for list="{{ queueRows }}" as="q" hint-placeholder-count="4">
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;padding:8px 10px;border-radius:7px;background:#f4f0e7;border:1px solid rgba(0,0,0,.13)">
+                      <span style="font:500 11px/1.35 'IBM Plex Sans KR',sans-serif">{{ q.terms }}</span>
+                      <span style="display:flex;align-items:baseline;gap:8px">
+                        <span style="font:600 15px/1 'IBM Plex Mono',monospace">{{ q.visitors }}</span>
+                        <span style="font:400 9px/1.3 'IBM Plex Sans KR',sans-serif;color:#6f6a61">서로 다른 방문자 · {{ q.hits }}건 · 최근 {{ q.last }}</span>
+                      </span>
+                      <span style="{{ q.noteStyle }}">{{ q.note }}</span>
+                      <span style="height:25px;border-radius:5px;border:1px solid rgba(0,0,0,.24);background:#fffdf9;display:flex;align-items:center;justify-content:center;font:600 10px/1 'IBM Plex Sans KR',sans-serif">의도로 만들기</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:9px 12px;border-radius:7px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.22);display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+                  <span style="font:600 12px/1.4 'IBM Plex Sans KR',sans-serif;white-space:nowrap">아직 쌓인 질문이 없습니다</span>
+                  <span style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>지금이 이 상태입니다</b> — 최근 3,000세션 중 <span style="font-family:'IBM Plex Mono',monospace">talk</span> <b>4건</b>(<span style="font-family:'IBM Plex Mono',monospace">guided 2,319 · chat 631 · expert 46</span>). 회귀분을 뺀 수입니다. <b>0건을 지어내지 않고 없는 이유를 말합니다</b> — 장치를 먼저 세우고 트래픽을 기다립니다.</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="flex:1;min-height:0;display:flex;gap:10px">
+              <div style="flex:1;min-width:0;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:11px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+                <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                  <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">답변 패턴</span>
+                  <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#4a463e;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 6px;white-space:nowrap">20종</span>
+                  <span style="font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">조건팩이 붙은 것 7종 · 팝콘톡이 이 표를 읽어 이미 쓰고 있습니다</span>
+                  <span style="flex:1"></span>
+                  <span style="flex:none;height:29px;padding:0 13px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">새 패턴</span>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  <sc-for list="{{ filters }}" as="f" hint-placeholder-count="7">
+                    <span style="{{ f.style }}">{{ f.label }}</span>
+                  </sc-for>
+                  <span style="flex:1;min-width:120px;height:27px;border:1px solid rgba(0,0,0,.2);border-radius:5px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 10.5px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">의도명 · 어휘로 검색</span>
+                </div>
+                <div style="display:grid;grid-template-columns:150px 1fr 108px 66px 62px 74px;gap:0 9px;font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-bottom:5px;border-bottom:1px solid rgba(0,0,0,.13)">
+                  <span>의도명</span><span>어휘 (match_terms)</span><span>답변 종류</span><span style="text-align:right">걸린 횟수</span><span style="text-align:center">상태</span><span style="text-align:right">마지막 사용</span>
+                </div>
+                <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden">
+                  <sc-for list="{{ intentRows }}" as="i" hint-placeholder-count="10">
+                    <div style="{{ i.rowStyle }}">
+                      <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                        <span style="font:600 11.5px/1.3 'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ i.key }}</span>
+                        <span style="font:400 9px/1.2 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ i.name }}</span>
+                      </span>
+                      <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                        <span style="font:400 10.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#4a463e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ i.terms }}</span>
+                        <span style="{{ i.warnStyle }}">{{ i.warn }}</span>
+                      </span>
+                      <span style="{{ i.kindStyle }}">{{ i.kind }}</span>
+                      <span style="font:500 11.5px/1 'IBM Plex Mono',monospace;text-align:right">{{ i.hits }}</span>
+                      <span style="display:flex;justify-content:center"><span style="{{ i.statusStyle }}">{{ i.status }}</span></span>
+                      <span style="{{ i.lastStyle }}">{{ i.last }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ resList }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ resBoxStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                    <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                    <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="flex:none;width:392px;display:flex;flex-direction:column;gap:8px">
+                <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:11px 13px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">패턴 등록</span>
+                    <span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">저장하면 <b>대기</b> — 아직 고객에게 안 나갑니다</span>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                      <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">의도명</span>
+                      <div style="height:30px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 11px/1 'IBM Plex Mono',monospace">psu_wattage</div>
+                    </div>
+                    <div style="flex:none;width:96px;display:flex;flex-direction:column;gap:4px">
+                      <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">최소 매치 수</span>
+                      <div style="height:30px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 11px/1 'IBM Plex Mono',monospace">2</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">어휘 <span style="font-weight:400;color:#a09889">· 큐에서 넘어온 값이 채워집니다</span></span>
+                    <div style="min-height:30px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;gap:5px;padding:5px 7px;flex-wrap:wrap">
+                      <sc-for list="{{ termChips }}" as="c" hint-placeholder-count="4">
+                        <span style="font:500 10px/1 'IBM Plex Sans KR',sans-serif;color:#4a463e;background:#f4f0e7;border:1px solid rgba(0,0,0,.14);border-radius:3px;padding:5px 6px">{{ c }}</span>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">답변 종류</span>
+                    <div style="display:flex;gap:5px">
+                      <sc-for list="{{ kindChoices }}" as="k" hint-placeholder-count="4">
+                        <span style="{{ k.style }}">{{ k.label }}</span>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#5b564d">{{ answerFieldLabel }}</span>
+                    <div style="height:30px;border:1px solid rgba(0,0,0,.24);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 9px;font:400 11px/1 'IBM Plex Mono',monospace;color:#4a463e">{{ answerFieldValue }}</div>
+                    <span style="font:400 9px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">답변 종류가 <span style="font-family:'IBM Plex Mono',monospace">text</span>가 아니면 문구 칸 대신 <b>API 경로 칸</b>을 씁니다 — <b>수가 필요한 답은 서버가 셉니다</b>. 답 없는 「사용」은 DB가 거부합니다(<span style="font-family:'IBM Plex Mono',monospace">ck_talk_intents_answer</span>) — 화면이 그 전에 막습니다.</span>
+                  </div>
+                  <div style="display:flex;gap:7px;align-items:center">
+                    <span style="{{ saveBtnStyle }}">저장 → 대기</span>
+                    <span style="{{ approveBtnStyle }}">{{ approveBtnLabel }}</span>
+                    <span style="flex:1"></span>
+                    <span style="{{ gradeNoteStyle }}">{{ gradeNote }}</span>
+                  </div>
+                </div>
+
+                <div style="{{ rawCardStyle }}">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">원문 보관</span>
+                    <span style="font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:oklch(0.42 0.11 70);background:oklch(0.96 0.04 85);border:1px solid oklch(0.78 0.1 80 / .6);border-radius:3px;padding:4px 6px;white-space:nowrap">owner 전용</span>
+                    <span style="flex:1"></span>
+                    <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">raw_text · 90일</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                    <sc-for list="{{ rawStats }}" as="s" hint-placeholder-count="3">
+                      <div style="display:flex;flex-direction:column;gap:2px;padding-top:6px;border-top:1px solid rgba(0,0,0,.1)">
+                        <span style="font:500 9px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ s.k }}</span>
+                        <span style="font:600 13px/1.15 'IBM Plex Mono',monospace">{{ s.v }}</span>
+                        <span style="font:400 8.5px/1.35 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ s.note }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="font:400 9px/1.55 'IBM Plex Sans KR',sans-serif;color:#4a463e"><b>원문 내용은 목록에 펼치지 않습니다</b> — 대량으로 읽히면 마스킹이 있어도 사실상 대화 열람입니다. 저장 <b>전</b> 마스킹 · 90일 뒤 <span style="font-family:'IBM Plex Mono',monospace">raw_text</span>만 NULL(행은 남습니다) · 고객 경로에서는 반환하지 않습니다.</div>
+                  <div style="{{ rawOpenStyle }}">{{ rawOpenText }}</div>
+                </div>
+
+                <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:11px 13px;display:flex;flex-direction:column;gap:6px;overflow:hidden">
+                  <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">자동 승격은 무엇을 올리고 무엇을 안 올리나</span>
+                  <sc-for list="{{ autoRules }}" as="a" hint-placeholder-count="4">
+                    <span style="display:flex;gap:7px;font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#4a463e"><span style="flex:none;color:#a09889">·</span><span>{{ a }}</span></span>
+                  </sc-for>
+                  <span style="font:600 12px/1.3 'IBM Plex Sans KR',sans-serif;padding-top:5px;border-top:1px solid rgba(0,0,0,.1)">상태는 전이지 삭제가 아니다</span>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px">
+                    <sc-for list="{{ transitions }}" as="t" hint-placeholder-count="4">
+                      <span style="display:flex;align-items:baseline;gap:6px">
+                        <span style="flex:none;width:36px;font:600 9.5px/1.35 'IBM Plex Sans KR',sans-serif">{{ t.act }}</span>
+                        <span style="flex:1;font:400 9px/1.35 'IBM Plex Mono',monospace;color:#6f6a61">{{ t.flow }}</span>
+                      </span>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;height:30px;border-top:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;gap:14px;padding:0 18px">
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">고객 팝콘톡 화면에 <b>「대화 내용은 상담 품질 개선에 사용됩니다.」</b> 상시 표시 — <b>말 없이 쌓지 않습니다</b></span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">내리기는 상태 전이입니다 — <b>행을 지우지 않습니다</b></span>
+          </div>
+        </div>
+
+        <sc-if value="{{ overlayOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#f7f4ee;display:flex;align-items:center;justify-content:center;padding:70px">
+            <div style="width:660px;display:flex;flex-direction:column;gap:13px">
+              <span style="{{ overlayChipStyle }}">{{ overlayCode }}</span>
+              <div style="font:600 22px/1.35 'IBM Plex Sans KR',sans-serif">{{ overlayMsg }}</div>
+              <div style="font:400 12.5px/1.8 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ overlayNote }}</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="max-width:1340px;display:flex;gap:18px;flex-wrap:wrap">
+    <div style="flex:1;min-width:430px;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">뒤집힌 결정 둘 — 화면이 그 위험을 어떻게 떠안았나</div>
+      <div style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">사장님이 ① 원문 저장 ② 자동 승격을 확정했고, 반대 근거는 <b>지우지 않고 보존</b>됐습니다. 화면은 그 확정을 <b>안전하게 이행하는 장치</b>를 눈에 보이게 답니다.</div>
+      <sc-for list="{{ safeguards }}" as="s" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:104px 1fr;gap:11px;padding:7px 0;border-top:1px solid rgba(0,0,0,.08)">
+          <span style="{{ s.tagStyle }}">{{ s.tag }}</span>
+          <span style="display:flex;flex-direction:column;gap:2px">
+            <span style="font:500 11px/1.55 'IBM Plex Sans KR',sans-serif">{{ s.what }}</span>
+            <span style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ s.why }}</span>
+          </span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;width:400px;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">오늘 이 화면이 푸는 것</div>
+      <sc-for list="{{ unblocks }}" as="u" hint-placeholder-count="4">
+        <div style="display:flex;gap:9px;padding:6px 0;border-top:1px solid rgba(0,0,0,.08)">
+          <span style="{{ u.numStyle }}">{{ u.n }}</span>
+          <span style="display:flex;flex-direction:column;gap:2px">
+            <span style="font:500 10.5px/1.5 'IBM Plex Sans KR',sans-serif">{{ u.what }}</span>
+            <span style="font:400 9.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ u.now }}</span>
+          </span>
+        </div>
+      </sc-for>
+      <div style="font:600 12.5px/1.3 'IBM Plex Sans KR',sans-serif;padding-top:9px;border-top:1px solid rgba(0,0,0,.12)">남은 확정 — 사장님 몫</div>
+      <sc-for list="{{ pending }}" as="p" hint-placeholder-count="4">
+        <div style="display:flex;gap:9px;padding:5px 0;border-top:1px solid rgba(0,0,0,.07)">
+          <span style="flex:1;font:500 10.5px/1.55 'IBM Plex Sans KR',sans-serif">{{ p.what }}</span>
+          <span style="flex:none;width:132px;font:400 9.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#6f6a61;text-align:right">{{ p.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;serverState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;응답 없음&quot;,&quot;등록 성공 → 대기&quot;,&quot;승인 → 사용&quot;,&quot;반려 → 미사용&quot;,&quot;내리기 → 미사용&quot;,&quot;어휘 충돌 경고 (막지 않음)&quot;,&quot;답 없는 사용 거부&quot;,&quot;text 자동 승격 거부&quot;,&quot;자동 승격 발생&quot;,&quot;회귀분이 섞였을 뻔함&quot;,&quot;원문 열람 기록됨&quot;,&quot;403 원문 · 등급 부족&quot;,&quot;401 미로그인&quot;,&quot;서버 연결 실패&quot;],&quot;default&quot;:&quot;등록 성공 → 대기&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;서버 응답&quot;},&quot;queue&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;0건 · 오늘의 실측 상태&quot;,&quot;2묶음 · 임계 아래&quot;,&quot;4묶음 · 둘이 임계 도달&quot;],&quot;default&quot;:&quot;4묶음 · 둘이 임계 도달&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;안 걸린 질문 큐&quot;},&quot;autoPromoted&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;자동 승격분이 목록에 있는가&quot;},&quot;grade&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;owner&quot;,&quot;운영자&quot;],&quot;default&quot;:&quot;owner&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;보는 사람의 등급&quot;},&quot;includeRegression&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;회귀 트래픽을 집계에 넣으면 (경고를 보려면 켜기)&quot;},&quot;rawSingleOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;결정 ㉢ — 원문 단건 열람을 허용할까 (미정)&quot;}}">
+const NAVL=[['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['삭제 상품 조회','삭'],['조립 호환 지도','지'],['조립 사양 표준','표'],['상품 사양 정의','정'],['상품 사양 검수','검'],['조립 호환 규칙','규'],['용도별 최소 사양','용'],['부품 등급 관리','등'],['추천 기준 보기','추'],['추천 가능 재고 현황','풀'],['견적 상담 기록','상'],['부품 교체 · 클릭','교'],['판매가 관리','판'],['가격 검토 대기','검'],['마진 정책','마'],['판매가 재산정','재'],['가격 이력','이'],['공급처','공'],['매입 견적(용산)','견'],['재고 입고','입'],['단가표 반영','단'],['쇼핑몰 동기화','동'],['인계 기록','인'],['유입 성과','성'],['작업 현황판','판'],['웹 사양 채움','채'],['팝콘톡 응답 패턴','톡'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+
+const TONES = {
+  ok:   {bg:'oklch(0.96 0.03 165)', bd:'oklch(0.74 0.09 165 / .55)', fg:'oklch(0.37 0.1 165)'},
+  warn: {bg:'oklch(0.96 0.04 85)',  bd:'oklch(0.78 0.1 80 / .6)',    fg:'oklch(0.42 0.11 70)'},
+  err:  {bg:'oklch(0.96 0.03 30)',  bd:'oklch(0.75 0.11 33 / .55)',  fg:'oklch(0.45 0.15 30)'},
+  none: {bg:'#f4f0e7',              bd:'rgba(0,0,0,.13)',            fg:'#6f6a61'}
+};
+
+const RESULTS = {
+  '응답 없음': {zone:'', tone:'none', code:'—', msg:'', note:''},
+  '등록 성공 → 대기': {zone:'list', tone:'ok', code:'201', msg:'패턴을 등록했습니다 — 상태는 「대기」입니다',
+    note:'아직 고객에게 나가지 않습니다. 승인해야 팝콘톡이 그 답을 씁니다. 어휘는 큐에서 고른 묶음이 그대로 채워졌습니다.'},
+  '승인 → 사용': {zone:'list', tone:'ok', code:'200', msg:'「사용」으로 올렸습니다 — 다음 요청부터 팝콘톡이 이 답을 씁니다',
+    note:'사람이 승인한 것이므로 「자동」과 구분해 표시됩니다. 되돌리려면 「내리기」로 상태를 전이합니다 — 행을 지우지 않습니다.'},
+  '반려 → 미사용': {zone:'list', tone:'none', code:'200', msg:'「미사용」으로 내렸습니다', note:'행은 남습니다(원장 원칙). 어휘와 답변은 그대로 보관되고 팝콘톡이 읽지 않을 뿐입니다.'},
+  '내리기 → 미사용': {zone:'list', tone:'none', code:'200', msg:'「미사용」으로 내렸습니다 — 팝콘톡이 더는 이 답을 쓰지 않습니다', note:'자동 승격분도 같은 방법으로 내립니다. 「어느 것이 자동인지」가 목록에 늘 보이는 이유가 이것입니다 — 운영자가 내릴지 판단할 수 있어야 합니다.'},
+  '어휘 충돌 경고 (막지 않음)': {zone:'list', tone:'warn', code:'200 · 경고', msg:'「전력 · 파워 · 몇 W」는 이미 psu_recommend가 물고 있습니다 — 그래도 저장했습니다',
+    note:'경고하되 막지 않습니다. 같은 말을 두 의도가 물고 min_hits 로 갈리는 설계가 실재합니다(gpu_compare 가 그렇습니다). 다만 어느 쪽이 걸리는지 확인하십시오.'},
+  '답 없는 사용 거부': {zone:'list', tone:'err', code:'400', msg:'답변이 비어 있어 「사용」으로 올릴 수 없습니다',
+    note:'DB 제약(ck_talk_intents_answer)이 거부하는 조건이라 화면이 그 전에 막습니다. 답변 종류가 text 가 아니면 문구 대신 API 경로를 채워야 합니다.'},
+  'text 자동 승격 거부': {zone:'list', tone:'warn', code:'차단', msg:'자유 문구(text)는 자동으로 올리지 않습니다 — 사람이 씁니다',
+    note:'검증 없는 문장이 고객에게 나가는 유일한 경로가 그것입니다. 자동 승격되는 기본 답변 종류는 constraint_parse 또는 band_cards 입니다.'},
+  '자동 승격 발생': {zone:'list', tone:'warn', code:'자동', msg:'「예산 · 얼마 · 가격대」 묶음이 서로 다른 방문자 5명에 닿아 자동으로 올라갔습니다',
+    note:'status=자동 으로 들어갔습니다 — 사람이 승인한 「사용」과 구분해 표시됩니다. 한 사람이 5번 물은 것은 1로 셉니다. 회귀 트래픽(data_origin=test)은 세지 않았습니다.'},
+  '회귀분이 섞였을 뻔함': {zone:'list', tone:'warn', code:'제외 2,931', msg:'회귀가 만든 세션 2,931건을 집계에서 뺐습니다',
+    note:'실측상 세션의 97.7%가 회귀였습니다 — 빼지 않으면 회귀가 만든 질문이 답변 패턴이 됩니다. 뺐다는 사실을 숨기지 않고 화면이 말합니다.'},
+  '원문 열람 기록됨': {zone:'list', tone:'warn', code:'200 · 기록', msg:'원문 1건을 열었습니다 — 누가 언제 열었는지 기록됐습니다',
+    note:'단건으로만 열립니다. 목록에서 펼치는 경로는 없습니다 — 한 화면에서 대량으로 읽히면 마스킹이 있어도 사실상 대화 열람이 됩니다.'},
+  '403 원문 · 등급 부족': {zone:'list', tone:'err', code:'403', msg:'원문은 owner만 볼 수 있습니다',
+    note:'고객 인증이 아직 dev 어댑터라 아무나 남의 이메일로 그 사람 세션을 받습니다 — owner 전용이 그 구멍을 막는 유일한 장치입니다. raw_text 는 고객 경로(/api/my/*)에서 절대 반환하지 않습니다.'},
+  '401 미로그인': {zone:'over', tone:'err', code:'401', msg:'로그인이 필요합니다', note:'/admin2/login 으로 안내합니다.'},
+  '서버 연결 실패': {zone:'over', tone:'err', code:'네트워크 실패', msg:'서버에 연결할 수 없습니다', note:'세션 만료(401) · 네트워크 실패 · 서버 오류를 갈라 말합니다. if(!res.ok) return; 은 쓰지 않습니다.'}
+};
+
+const INTENTS = [
+  {key:'budget_range', name:'예산 범위 문의', terms:'예산 · 얼마 · 가격대 · 저렴', kind:'constraint_parse', hits:'—', last:'—', status:'사용'},
+  {key:'gpu_compare', name:'그래픽카드 비교', terms:'그래픽카드 · 비교 · 차이 · 뭐가 나아', kind:'band_cards', hits:'—', last:'—', status:'사용', warn:'monitor_band와 어휘 일부 공유 — min_hits로 갈립니다'},
+  {key:'monitor_band', name:'모니터 대역 안내', terms:'모니터 · 주사율 · 해상도 · 인치', kind:'api', kindLabel:'/api/talk/monitor-bands', hits:'—', last:'—', status:'사용'},
+  {key:'delivery_time', name:'배송 기간', terms:'배송 · 언제 · 며칠 · 도착', kind:'text', hits:'—', last:'—', status:'사용'},
+  {key:'assembly_diff', name:'조립 난이도', terms:'조립 · 어려운 · 직접 · 초보', kind:'text', hits:'—', last:'—', status:'사용'},
+  {key:'noise_level', name:'소음 문의', terms:'소음 · 시끄러 · 조용 · 팬', kind:'band_cards', hits:'—', last:'—', status:'사용'},
+  {key:'psu_recommend', name:'파워 용량 추천', terms:'전력 · 파워 · 몇 W · 정격', kind:'constraint_parse', hits:'—', last:'—', status:'사용'},
+  {key:'ram_upgrade', name:'램 증설 가능 여부', terms:'램 · 증설 · 슬롯 · 나중에', kind:'text', hits:'—', last:'—', status:'사용'},
+  {key:'warranty_span', name:'보증 기간', terms:'보증 · AS · 무상 · 기간', kind:'text', hits:'—', last:'—', status:'사용'},
+  {key:'thermal_worry', name:'발열 문의', terms:'발열 · 뜨거 · 쿨러 · 온도', kind:'band_cards', hits:'—', last:'—', status:'사용'}
+];
+
+const AUTO_ROWS = [
+  {key:'budget_range_v2', name:'예산 범위 문의 (자동)', terms:'예산 · 얼마 · 가격대 · 맞춰', kind:'constraint_parse', hits:'7', last:'08-21', status:'자동'},
+  {key:'size_fit', name:'케이스 크기 문의 (자동)', terms:'케이스 · 크기 · 들어가 · 미들', kind:'band_cards', hits:'5', last:'08-22', status:'자동'}
+];
+
+const QUEUE = [
+  {terms:'중고 · 보상판매 · 팔 수 있나', hits:'11', v:6, last:'08-22', note:'임계 5명을 넘었습니다 — text 답변이면 자동으로 올라가지 않습니다(사람이 씁니다)'},
+  {terms:'분할결제 · 카드 · 무이자', hits:'8', v:5, last:'08-22', note:'임계에 닿았습니다 — 다음 집계에서 자동 승격 대상입니다'},
+  {terms:'윈도우 · 정품 · 설치해주나', hits:'9', v:3, last:'08-21', note:'같은 사람이 여러 번 물은 것은 1로 셉니다 — 아직 임계 아래입니다'},
+  {terms:'매장 · 방문 · 직접 볼 수', hits:'4', v:2, last:'08-20', note:'묶음은 작지만 회귀분을 뺀 실사용입니다'}
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.serverState ?? '등록 성공 → 대기';
+    const r = RESULTS[st] || RESULTS['응답 없음'];
+    const t = TONES[r.tone];
+    const queueMode = this.props.queue ?? '4묶음 · 둘이 임계 도달';
+    const showAuto = this.props.autoPromoted ?? true;
+    const grade = this.props.grade ?? 'owner';
+    const includeTest = this.props.includeRegression ?? false;
+    const rawSingleOpen = this.props.rawSingleOpen ?? true;
+    const isOwner = grade === 'owner';
+
+    const nav = NAVL.map(([label, icon]) => {
+      const on = label === '팝콘톡 응답 패턴';
+      return { label, icon,
+        style:"display:flex;align-items:center;gap:8px;padding:1px 16px;font:500 10px/1.25 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') + ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent'),
+        iconStyle:"flex:none;width:17px;height:17px;border-radius:4px;display:flex;align-items:center;justify-content:center;font:600 8px/1 'IBM Plex Sans KR',sans-serif;color:#cfc9bd;background:rgba(255,255,255,.07)" };
+    });
+
+    const kindTone = k => k === 'text' ? 'warn' : (k === 'api' ? 'none' : 'ok');
+    const kindText = i => i.kind === 'api' ? i.kindLabel : i.kind;
+    const statusTone = s => s === '사용' ? 'ok' : (s === '자동' ? 'warn' : (s === '대기' ? 'none' : 'none'));
+
+    const rows = (showAuto ? AUTO_ROWS.concat(INTENTS.slice(0, 8)) : INTENTS).map(i => {
+      const kt = TONES[kindTone(i.kind)];
+      const stt = TONES[statusTone(i.status)];
+      const auto = i.status === '자동';
+      return {
+        key:i.key, name:i.name, terms:i.terms, hits:i.hits, last:i.last, status:i.status,
+        kind: kindText(i),
+        rowStyle:'display:grid;grid-template-columns:150px 1fr 108px 66px 62px 74px;gap:0 9px;align-items:center;padding:6px 8px;margin:0 -8px;border-bottom:1px solid rgba(0,0,0,.06)' + (auto ? ';background:oklch(0.97 0.025 85)' : ''),
+        kindStyle:"font:500 9.5px/1.2 'IBM Plex Mono',monospace;color:" + kt.fg + ';background:' + kt.bg + ';border:1px solid ' + kt.bd + ';border-radius:3px;padding:4px 5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
+        statusStyle:"font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;color:" + stt.fg + ';background:' + stt.bg + ';border:1px solid ' + stt.bd + ';border-radius:3px;padding:4px 6px;white-space:nowrap',
+        lastStyle:"font:400 10px/1 'IBM Plex Mono',monospace;color:" + (i.last === '—' ? '#a09889' : '#4a463e') + ';text-align:right',
+        warn: i.warn || '',
+        warnStyle: i.warn ? "font:400 8.5px/1.3 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30)" : 'display:none'
+      };
+    });
+
+    const queueEmpty = queueMode === '0건 · 오늘의 실측 상태';
+    const queueRows = (queueMode === '2묶음 · 임계 아래' ? QUEUE.slice(2) : QUEUE).map(q => {
+      const hot = q.v >= 5;
+      return {
+        terms:q.terms, hits:q.hits, last:q.last,
+        visitors: q.v + '명',
+        visitorStyle:"font:600 11.5px/1 'IBM Plex Mono',monospace;text-align:right;color:" + (hot ? TONES.warn.fg : '#26231e'),
+        note:q.note,
+        noteStyle:"font:400 9px/1.4 'IBM Plex Sans KR',sans-serif;color:" + (hot ? TONES.warn.fg : '#6f6a61')
+      };
+    });
+
+    const filterSet = ['전체', '대기', '사용', '자동만', '미사용', 'text 답변', '조건팩 있음'];
+    const filters = filterSet.map((label, n) => ({
+      label,
+      style:"height:27px;padding:0 10px;border-radius:5px;display:flex;align-items:center;font:600 10px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap;" +
+        (n === 0 ? 'background:#26231e;color:#f4f1ea;border:1px solid #26231e'
+         : (label === '자동만' ? 'color:' + TONES.warn.fg + ';background:' + TONES.warn.bg + ';border:1px solid ' + TONES.warn.bd
+            : 'color:#4a463e;background:#fffdf9;border:1px solid rgba(0,0,0,.2)'))
+    }));
+
+    const kindChoices = [
+      {label:'constraint_parse', on:true}, {label:'band_cards', on:false}, {label:'API 경로', on:false}, {label:'text', on:false}
+    ].map(k => ({ label:k.label,
+      style:"flex:1;height:27px;border-radius:5px;display:flex;align-items:center;justify-content:center;font:600 9px/1 'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;" +
+        (k.on ? 'background:#26231e;color:#f4f1ea;border:1px solid #26231e' : 'color:#6f6a61;background:#fffdf9;border:1px solid rgba(0,0,0,.2)') }));
+
+    const overlayOn = r.zone === 'over';
+
+    return {
+      nav, filters, kindChoices, queueRows,
+      intentRows: rows,
+      queueEmpty,
+      queueHasRows: !queueEmpty,
+      queueCountLabel: queueEmpty ? '0건' : (queueMode === '2묶음 · 임계 아래' ? '2묶음' : '4묶음 · 둘이 임계 도달'),
+      queueCountStyle: "flex:none;font:600 10px/1 'IBM Plex Mono',monospace;white-space:nowrap;border-radius:3px;padding:4px 6px;" +
+        (queueEmpty ? 'color:#6f6a61;border:1px solid rgba(0,0,0,.16)' : 'color:' + TONES.warn.fg + ';background:' + TONES.warn.bg + ';border:1px solid ' + TONES.warn.bd),
+      regressNote: includeTest
+        ? '⚠ 지금 회귀 트래픽(data_origin=test)이 집계에 섞여 있습니다 — 실측상 세션의 97.7%가 회귀였습니다. 이대로면 회귀가 만든 질문이 답변 패턴이 됩니다.'
+        : '회귀 트래픽(data_origin=test) 2,931건을 뺀 수입니다 — 조용히 감추지 않고 뺐다는 사실을 말합니다.',
+      regressNoteStyle: includeTest
+        ? "font:500 9.5px/1.55 'IBM Plex Sans KR',sans-serif;color:" + TONES.err.fg + ';background:' + TONES.err.bg + ';border:1px solid ' + TONES.err.bd + ';border-radius:6px;padding:6px 9px'
+        : "font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377;border-left:2px solid rgba(0,0,0,.14);padding-left:8px",
+      regressChip: includeTest ? '회귀 포함 중 — 위험' : '회귀 2,931건 제외됨',
+      regressChipStyle: "flex:none;font:600 9px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap;border-radius:3px;padding:4px 6px;" +
+        (includeTest ? 'color:' + TONES.err.fg + ';background:' + TONES.err.bg + ';border:1px solid ' + TONES.err.bd
+                     : 'color:#6f6a61;background:#f4f0e7;border:1px solid rgba(0,0,0,.14)'),
+      gradeBadge: isOwner ? 'owner — 원문 · 등록 · 승인 가능' : '운영자 — 조회까지',
+      gradeBadgeStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;border-radius:4px;padding:5px 8px;white-space:nowrap;" +
+        (isOwner ? 'color:#4a463e;border:1px solid rgba(0,0,0,.18)' : 'color:' + TONES.warn.fg + ';background:' + TONES.warn.bg + ';border:1px solid ' + TONES.warn.bd),
+      rawCardStyle: isOwner
+        ? 'flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:11px 14px;display:flex;flex-direction:column;gap:7px'
+        : 'display:none',
+      rawStats: [
+        {k:'원문이 남은 건수', v:'0건', note:'질문 이력이 아직 0건입니다(검증분은 지웠습니다)'},
+        {k:'가장 오래된 것', v:'—', note:'쌓이면 여기에 섭니다'},
+        {k:'다음 삭제 예정', v:'—', note:'저장 90일 뒤 raw_text만 NULL'}
+      ],
+      rawOpenText: rawSingleOpen
+        ? '결정 ㉢ — owner가 원문을 한 건씩 여는 것을 허용한 모습입니다. 열면 「누가 언제 열었다」가 기록되고, 목록에서 펼치는 경로는 만들지 않습니다.'
+        : '결정 ㉢ — 단건 열람도 막은 모습입니다. owner는 건수·기간만 보고 원문 내용에는 화면으로 닿지 못합니다.',
+      rawOpenStyle: "font:400 9.5px/1.55 'IBM Plex Sans KR',sans-serif;color:" + TONES.err.fg + ';background:' + TONES.err.bg + ';border:1px solid ' + TONES.err.bd + ';border-radius:6px;padding:6px 9px',
+      autoRules: [
+        '같은 어휘 묶음이 서로 다른 방문자 5명에게서 나와야 올라갑니다 — 한 사람이 5번 물은 것은 1로 셉니다(한 명이 패턴을 만들지 못하게).',
+        '회귀 트래픽(data_origin=test)은 세지 않습니다 — 실측상 세션의 97.7%가 회귀였습니다.',
+        '자동 승격분은 status=자동 으로 들어가고 목록에서 배경으로 갈라 보입니다 — 사람이 승인한 「사용」과 신뢰도가 다릅니다.',
+        'text(자유 문구)로는 자동 승격하지 않습니다 — 검증 없는 문장이 고객에게 나가는 유일한 경로라서, 문구 답변은 여전히 사람이 씁니다.'
+      ],
+      transitions: [
+        {act:'승인', flow:'대기 → 사용'},
+        {act:'반려', flow:'대기 → 미사용'},
+        {act:'내리기', flow:'사용 / 자동 → 미사용'},
+        {act:'삭제', flow:'없음 — 행을 지우지 않습니다'}
+      ],
+      termChips: ['중고', '보상판매', '팔 수 있나', '매입'],
+      answerFieldLabel: '답변 문구 또는 API 경로',
+      answerFieldValue: '/api/talk/monitor-bands',
+      saveBtnStyle: isOwner
+        ? "flex:none;height:30px;padding:0 14px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap"
+        : "flex:none;height:30px;padding:0 14px;border-radius:6px;background:#e2ddd2;color:#a09889;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap",
+      approveBtnLabel: isOwner ? '승인 → 사용' : '승인 불가',
+      approveBtnStyle: isOwner
+        ? "flex:none;height:30px;padding:0 12px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap"
+        : 'display:none',
+      gradeNote: isOwner ? '' : '등록 · 승인은 owner 몫입니다 — 운영자는 조회까지',
+      gradeNoteStyle: isOwner ? 'display:none' : "flex:none;font:400 9px/1.4 'IBM Plex Sans KR',sans-serif;color:" + TONES.warn.fg + ';text-align:right',
+      safeguards: [
+        {tag:'확정 ① 원문', tone:'ok', what:'고객 문장 원문도 저장한다 — 원문 비적재 규약을 뒤집었다',
+         why:'하네스는 ①재사용에 필요한 건 의도이지 문장이 아니다 ②고객 인증이 dev 어댑터라 원문이 곧 유출 경로다 ③무효화된 근거가 없다는 이유로 반대했습니다. 사장님이 뒤집은 것은 「근거가 틀렸다」가 아니라 「그럼에도 그렇게 한다」이고, 그 근거는 지우지 않고 보존됩니다.'},
+        {tag:'장치 ㉮', tone:'ok', what:'저장 전 마스킹 — 전화번호 · 이메일 · 계좌 · 주민번호를 치환해 넣는다',
+         why:'지어내는 것이 아니라 지우는 것이라 A-02와 무관합니다. 마스킹 결과가 원문 컬럼에 그대로 들어가고 별도 사본은 없습니다.'},
+        {tag:'장치 ㉯㉰', tone:'ok', what:'90일 뒤 raw_text만 NULL · 읽는 경로는 owner 전용',
+         why:'행은 남습니다(원장 원칙). 고객 인증이 dev 어댑터인 지금 owner 전용이 남의 대화를 막는 유일한 장치라, raw_text 는 고객 경로에서 절대 반환하지 않습니다.'},
+        {tag:'장치 ㉱', tone:'ok', what:'고객에게 상시 고지 — 「대화 내용은 상담 품질 개선에 사용됩니다.」',
+         why:'말 없이 쌓지 않습니다. 문구는 확정됐고, 팝콘톡 화면 어디에 둘지는 미정입니다(결정 ㉣).'},
+        {tag:'확정 ② 자동', tone:'ok', what:'자주 나온 질문은 자동으로 답변 패턴이 된다 — 사람 승인만 하자는 권고를 뒤집었다',
+         why:'하네스는 ①빈도의 전제가 지금 없다(talk 4건) ②틀린 답은 굳으면 되돌리기 어렵다 ③승인 큐 모양이 이미 있다는 이유로 반대했습니다. 반대 근거는 보존하고, 대신 아래 넷으로 위험을 줄입니다.'},
+        {tag:'장치 ㉮㉯', tone:'ok', what:'회귀분 제외 · 서로 다른 방문자 5명 임계',
+         why:'회귀를 빼지 않으면 회귀가 만든 질문이 답변 패턴이 됩니다(세션의 97.7%). 방문자 기준이 아니면 한 사람이 패턴을 만듭니다.'},
+        {tag:'장치 ㉰㉱', tone:'ok', what:'자동은 「사용」과 섞지 않는다 · text는 자동 승격하지 않는다',
+         why:'신뢰도가 다르므로 운영자가 내릴지 판단할 수 있어야 합니다. 검증 없는 문장이 고객에게 나가는 경로는 열지 않습니다.'},
+        {tag:'지금 상태', tone:'err', what:'오늘은 아무것도 자동 승격되지 않는다 — 장치를 먼저 세우고 트래픽을 기다린다',
+         why:'최근 3,000세션에서 talk 는 4건입니다(guided 2,319 · chat 631 · expert 46). 임계 5명에 닿는 어휘 묶음이 없습니다.'}
+      ].map(s => Object.assign({}, s, {
+        tagStyle:"align-self:flex-start;font:600 9px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap;color:" + TONES[s.tone].fg + ';background:' + TONES[s.tone].bg + ';border:1px solid ' + TONES[s.tone].bd + ';border-radius:3px;padding:5px 6px'})),
+      unblocks: [
+        {n:'①', what:'답변을 고치려면 SQL을 직접 쳐야 했다', now:'운영자가 못 하던 일입니다 — 목록·수정으로 오늘 풀립니다.'},
+        {n:'②', what:'「안 걸린 질문」이 쌓여도 아무도 몰랐다', now:'큐를 볼 창이 생깁니다. 다만 오늘은 0건이라 트래픽이 쌓이는 만큼 자랍니다.'},
+        {n:'③', what:'어느 답이 실제로 쓰였는지 몰랐다', now:'걸린 횟수·마지막 사용으로 죽은 의도를 찾습니다 — 오늘 풀립니다.'},
+        {n:'④', what:'원문이 쌓이는데 얼마나 들고 있는지 안 보였다', now:'보관 현황이 서면서 「말 없이 쌓지 않는다」가 온전해집니다 — 오늘 풀립니다.'}
+      ].map(u => Object.assign({}, u, {
+        numStyle:"flex:none;font:600 11px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377;padding-top:2px"})),
+      pending: [
+        {what:'화면 ID 카탈로그 등재', note:'지금 가칭 ADM-TLK-010'},
+        {what:'원문 단건 열람을 허용할지 · 아예 막을지', note:'결정 ㉢ — 트윅으로 갈라 뒀습니다'},
+        {what:'고객 고지를 팝콘톡 어디에 둘지', note:'결정 ㉣ — 문구는 확정'},
+        {what:'승인 디자인(배치 · 색)', note:'§화면 작업의 경계'}
+      ],
+      resList: r.zone === 'list',
+      resCode: r.code,
+      resMsg: r.msg,
+      resNote: r.note,
+      resBoxStyle: 'flex:none;background:' + t.bg + ';border:1px solid ' + t.bd + ';border-radius:7px;padding:9px 11px;display:flex;flex-direction:column;gap:4px',
+      resCodeStyle: "font:600 9.5px/1 'IBM Plex Mono',monospace;color:" + t.fg + ';border:1px solid ' + t.bd + ';border-radius:3px;padding:4px 6px;background:#fffdf9',
+      resMsgStyle: "font:600 11.5px/1.45 'IBM Plex Sans KR',sans-serif;color:" + t.fg,
+      resNoteStyle: "font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e",
+      overlayOn,
+      overlayCode: r.code,
+      overlayMsg: r.msg,
+      overlayNote: r.note,
+      overlayChipStyle: "align-self:flex-start;font:600 10px/1 'IBM Plex Mono',monospace;color:" + t.fg + ';border:1px solid ' + t.bd + ';border-radius:4px;padding:5px 8px;background:' + t.bg
+    };
+  }
+}
+</script>
+</body>
+</html>

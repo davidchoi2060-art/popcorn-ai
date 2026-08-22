@@ -1,0 +1,378 @@
+{#
+  팝콘톡 응답 패턴 (ADM-TLK-010 · 가칭) — 2026-08-22 신설.
+
+  ■ 출처 — 승인 디자인 1b「목록 전면」
+    원안 `docs/design/dc-talk-patterns.html`(사장님 확정 **1b**, 2026-08-22) ·
+    README 그대로 받아 `docs/design/dc-talk-patterns-1b.html` 로 분리해 뒀다.
+    정의서 `docs/design/req/req-talk-patterns.md` · 결정 **A-95**(원문 저장)·**A-96**(자동 승격).
+
+  ■ 왜 1b 인가 (README 의 근거를 그대로 옮긴다)
+    「안 걸린 질문 큐」가 이 화면의 핵심인데 **오늘 0건**이고(팝콘톡 세션 4건), 답변 패턴은
+    **이미 20종**이 차 있다. 오늘 이 화면을 세우는 이유의 3/4(답변 수정·죽은 의도 찾기·
+    원문 현황)이 목록 쪽에 있어 목록을 전면에 둔다. 큐는 위에서 자라는 띠다.
+
+  ■ 색은 admin2 토큰 그대로다
+    승인 디자인이 이미 `--rv-*` 팔레트로 그려져 있다(canvas #f7f4ee · card #fffdf9 ·
+    ink #26231e — `mockups/shared/admin2/admin2.css` 와 한 값씩 같다). **HEX 를 새로
+    박지 않는다**(§디자인 계약).
+
+  ■ 화면이 «계속» 말해야 하는 것 여덟 (승인 디자인 README)
+    ① 「자동」은 「사용」과 섞지 않는다 — 배경색으로 가르고 `자동만` 필터를 따로 둔다
+    ② 회귀 트래픽은 빼고, **뺐다는 사실을 말한다** — 조용히 감추지 않는다
+    ③ 「서로 다른 방문자 수」를 늘 함께 — 자동 승격 임계가 그 수(5명)다
+    ④ `text` 는 자동 승격하지 않는다
+    ⑤ 답변 종류가 `text` 가 아니면 문구 칸 대신 **API 경로 칸**
+    ⑥ 어휘 충돌은 경고하되 **막지 않는다**
+    ⑦ 내리기는 상태 전이지 삭제가 아니다
+    ⑧ 빈 큐는 **「없는 이유」와 함께** 말한다 — 0건을 지어내지 않는다
+
+  ■ 수를 화면이 세지 않는다 (§화면 정직성)
+    건수·방문자 수·충돌 판정은 전부 `GET /api/admin/talk-patterns*` 가 낸다.
+    화면은 받은 것만 그린다.
+
+  ■ 아직 정해지지 않은 것 (화면이 스스로 밝힌다)
+    ㉢ 원문 **단건 열람** 허용 여부 — 미정이라 그 경로를 만들지 않았고, 화면은
+       「건수·기간만 보고 내용에는 닿지 못한다」로 서 있다.
+    ㉠ 화면 ID — 가칭이라 헤더 배지를 점선으로 둔다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}팝콘톡 응답 패턴{% endblock %}
+
+{% block head_extra %}
+<style>
+  .tp-wrap{display:flex;flex-direction:column;gap:8px;height:100%;min-height:0}
+  .tp-card{background:var(--rv-card);border:1px solid var(--outline-variant);border-radius:9px}
+  .tp-chip{font:500 10px/1 var(--rv-font,var(--font));border:1px solid var(--outline);
+           border-radius:4px;padding:5px 8px;color:var(--rv-ink-soft);background:var(--rv-card);cursor:pointer}
+  .tp-chip[aria-pressed="true"]{background:var(--rv-ink);color:var(--rv-card);border-color:var(--rv-ink)}
+  .tp-row{display:grid;grid-template-columns:150px 1fr 108px 66px 62px 74px;gap:0 9px;
+          align-items:center;padding:7px 0;border-bottom:1px solid var(--outline-variant)}
+  .tp-mono{font-family:var(--font-num,monospace)}
+  .tp-badge{font:600 9px/1 var(--font);border-radius:3px;padding:4px 6px;white-space:nowrap}
+  .tp-btn{height:29px;padding:0 13px;border-radius:6px;background:var(--rv-ink);color:var(--rv-card);
+          border:none;font:600 11.5px/1 var(--font);cursor:pointer}
+  .tp-in{height:30px;border:1px solid var(--outline);border-radius:6px;background:#fff;
+         padding:0 9px;font:400 11px/1 var(--font-num,monospace);width:100%}
+  .tp-lbl{font:600 9.5px/1 var(--font);color:var(--rv-ink-soft)}
+  .tp-note{font:400 9px/1.55 var(--font);color:var(--rv-ink-soft)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tp-wrap" id="tp-root">
+
+  {# ── ① 「안 걸린 질문」 띠 — 이 화면의 핵심. 큐가 차면 여기가 열린다 ── #}
+  <section class="tp-card" style="flex:none;padding:10px 14px;display:flex;flex-direction:column;gap:7px" data-keep="1">
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+      <span style="font:600 13.5px/1.3 var(--font)">안 걸린 질문</span>
+      <span id="tp-qcount" class="tp-badge" style="border:1px solid var(--outline);color:var(--rv-faint)">—</span>
+      <span style="font:400 9.5px/1.5 var(--font);color:var(--rv-muted)">
+        우리가 아직 답을 못 만든 질문 — 새 의도의 후보입니다 ·
+        <b>서로 다른 방문자 <span id="tp-threshold">5</span>명</b>이 자동 승격 임계입니다</span>
+      <span style="flex:1"></span>
+      {# ② 회귀분을 뺐다는 사실을 «항상» 말한다 — 조용히 감추지 않는다 #}
+      <button type="button" id="tp-regress" class="tp-chip" aria-pressed="false" data-keep="1">회귀분 제외됨</button>
+      <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">intent_key IS NULL</span>
+    </div>
+    <div id="tp-queue"></div>
+  </section>
+
+  {# ── ② 목록(전면) + 오른쪽 레일 ── #}
+  <div style="flex:1;min-height:0;display:flex;gap:10px">
+
+    <section class="tp-card" style="flex:1;min-width:0;padding:11px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+        <span style="font:600 14px/1.3 var(--font)">답변 패턴</span>
+        <span id="tp-total" class="tp-mono tp-badge" style="border:1px solid var(--outline);color:var(--rv-ink-soft)">—</span>
+        <span id="tp-subnote" style="font:400 9.5px/1.5 var(--font);color:var(--rv-muted)"></span>
+        <span style="flex:1"></span>
+        <button type="button" class="tp-btn" id="tp-new">새 패턴</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center" id="tp-filters" data-keep="1">
+        <button type="button" class="tp-chip" data-f="all" aria-pressed="true">전체</button>
+        <button type="button" class="tp-chip" data-f="사용">사용</button>
+        <button type="button" class="tp-chip" data-f="자동">자동만</button>
+        <button type="button" class="tp-chip" data-f="대기">대기</button>
+        <button type="button" class="tp-chip" data-f="미사용">미사용</button>
+        <button type="button" class="tp-chip" data-f="dead">걸린 적 없음</button>
+        <input id="tp-q" class="tp-in" style="flex:1;min-width:120px;height:27px;font-family:var(--font)"
+               placeholder="의도명 · 어휘로 검색" data-keep="1">
+      </div>
+      <div class="tp-row" style="font:600 9px/1 var(--font);color:var(--rv-faint);padding:0 0 5px;border-bottom:1px solid var(--outline-variant)">
+        <span>의도명</span><span>어휘 (match_terms)</span><span>답변 종류</span>
+        <span style="text-align:right">걸린 횟수</span><span style="text-align:center">상태</span>
+        <span style="text-align:right">마지막 사용</span>
+      </div>
+      <div id="tp-list" style="flex:1;min-height:0;overflow:auto"></div>
+      <div id="tp-res" hidden></div>
+    </section>
+
+    <aside style="flex:none;width:392px;display:flex;flex-direction:column;gap:8px;overflow:auto">
+
+      {# 패턴 등록 — 저장하면 «대기». 아직 고객에게 안 나간다 #}
+      <section class="tp-card" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:8px" data-keep="1">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font:600 13px/1.3 var(--font)">패턴 등록</span>
+          <span style="font:400 9.5px/1.4 var(--font);color:var(--rv-muted)">저장하면 <b>대기</b> — 아직 고객에게 안 나갑니다</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <label style="flex:1;display:flex;flex-direction:column;gap:4px">
+            <span class="tp-lbl">의도명</span>
+            <input id="f-key" class="tp-in" placeholder="psu_wattage">
+          </label>
+          <label style="flex:none;width:96px;display:flex;flex-direction:column;gap:4px">
+            <span class="tp-lbl">최소 매치 수</span>
+            <input id="f-min" class="tp-in" type="number" min="1" value="1">
+          </label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:4px">
+          <span class="tp-lbl">표시명</span>
+          <input id="f-label" class="tp-in" style="font-family:var(--font)" placeholder="파워 용량 문의">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px">
+          <span class="tp-lbl">어휘 <span style="font-weight:400;color:var(--rv-dim)">· 큐에서 넘어온 값이 채워집니다</span></span>
+          <input id="f-terms" class="tp-in" style="font-family:var(--font)" placeholder="쉼표로 구분">
+        </label>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span class="tp-lbl">답변 종류</span>
+          <div style="display:flex;gap:5px" id="f-kinds" data-keep="1">
+            <button type="button" class="tp-chip" data-k="text" aria-pressed="true">text</button>
+            <button type="button" class="tp-chip" data-k="band_cards">band_cards</button>
+            <button type="button" class="tp-chip" data-k="constraint_parse">constraint_parse</button>
+            <button type="button" class="tp-chip" data-k="handoff">handoff</button>
+          </div>
+        </div>
+        {# ⑤ text 가 아니면 문구 칸 대신 API 경로 칸 #}
+        <label style="display:flex;flex-direction:column;gap:4px">
+          <span class="tp-lbl" id="f-anslbl">답변 문구</span>
+          <input id="f-ans" class="tp-in" style="font-family:var(--font)">
+          <span class="tp-note">답변 종류가 <span class="tp-mono">text</span>가 아니면 문구 칸 대신
+            <b>API 경로 칸</b>을 씁니다 — <b>수가 필요한 답은 서버가 셉니다</b>.
+            답 없는 「사용」은 DB가 거부합니다(<span class="tp-mono">ck_talk_intents_answer</span>) — 화면이 그 전에 막습니다.</span>
+        </label>
+        <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="tp-btn" id="f-save">저장 → 대기</button>
+          {# 상태 전이 — 목록에서 «고른» 패턴에 건다. 고른 것이 없으면 눌리지 않는다.
+             ⑦ 내리기는 «전이»지 삭제가 아니라 DELETE 단추를 두지 않는다. #}
+          <button type="button" class="tp-chip" id="f-approve" disabled>승인 → 사용</button>
+          <button type="button" class="tp-chip" id="f-down" disabled>내리기 → 미사용</button>
+          <span style="flex:1"></span>
+          <span class="tp-note" id="f-grade"></span>
+        </div>
+        <div class="tp-note" id="f-picked" style="color:var(--rv-faint)">목록에서 패턴을 고르면 상태를 바꿀 수 있습니다.</div>
+      </section>
+
+      {# 원문 보관 — owner 전용. 내용은 펼치지 않는다 #}
+      <section class="tp-card" id="tp-raw" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:8px" hidden>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font:600 13px/1.3 var(--font)">원문 보관</span>
+          <span class="tp-badge" style="color:var(--rv-amber);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)">owner 전용</span>
+          <span style="flex:1"></span>
+          <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">raw_text · <span id="tp-keepdays">90</span>일</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="tp-rawstats"></div>
+        <div class="tp-note"><b>원문 내용은 목록에 펼치지 않습니다</b> — 대량으로 읽히면 마스킹이 있어도
+          사실상 대화 열람입니다. 저장 <b>전</b> 마스킹 · <span id="tp-keepdays2">90</span>일 뒤
+          <span class="tp-mono">raw_text</span>만 NULL(행은 남습니다) · 고객 경로에서는 반환하지 않습니다.</div>
+        {# ㉢ 미정 — 단건 열람 경로를 «만들지 않았다». 화면이 그 사실을 말한다 #}
+        <div class="tp-note" style="border-left:3px solid var(--rv-red);padding-left:9px;color:var(--rv-red)">
+          <b>미정 ㉢</b> — 원문 <b>단건 열람</b>은 아직 정해지지 않아 경로를 만들지 않았습니다.
+          지금은 건수·기간만 보고 내용에는 닿지 못합니다.</div>
+      </section>
+
+      {# 자동 승격 규칙 + 상태 전이 #}
+      <section class="tp-card" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:600 13px/1.3 var(--font)">자동 승격은 무엇을 올리고 무엇을 안 올리나</span>
+        <span class="tp-note">· 서로 다른 방문자 <b>5명</b>이 같은 것을 물으면 올라갑니다 — 한 사람이 5번 물은 것은 1로 셉니다</span>
+        <span class="tp-note">· 회귀 트래픽(<span class="tp-mono">data_origin='test'</span>)은 세지 않습니다</span>
+        <span class="tp-note">· <b><span class="tp-mono">text</span>(자유 문구)는 자동 승격하지 않습니다</b> — 검증 없는 문장이 고객에게 나가는 유일한 경로입니다</span>
+        <span class="tp-note">· 올라간 것은 <b>자동</b> 상태로 들어가 사람 승인분과 구분되고, 사람이 내릴 수 있습니다</span>
+        <span style="font:600 12px/1.3 var(--font);padding-top:5px;border-top:1px solid var(--outline-variant)">상태는 전이지 삭제가 아니다</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px">
+          <span class="tp-note"><b>승인</b> <span class="tp-mono">대기 → 사용</span></span>
+          <span class="tp-note"><b>반려</b> <span class="tp-mono">대기 → 미사용</span></span>
+          <span class="tp-note"><b>내리기</b> <span class="tp-mono">사용/자동 → 미사용</span></span>
+          <span class="tp-note"><b>되돌림</b> <span class="tp-mono">미사용 → 대기</span></span>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  {# 고객 고지 — 「말 없이 쌓지 않는다」 #}
+  <div style="flex:none;font:400 10px/1.4 var(--font);color:var(--rv-muted);padding:2px 2px 0">
+    고객 팝콘톡 화면에 <b>「대화 내용은 상담 품질 개선에 사용됩니다.」</b> 상시 표시 — <b>말 없이 쌓지 않습니다</b>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function(){
+ var API='/api/admin/talk-patterns';
+ var state={filter:'all',q:'',kind:'text',regress:false,rows:[],picked:null};
+ var $=function(id){return document.getElementById(id);};
+ function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
+ function ago(iso){if(!iso)return '—';var d=new Date(iso),m=Math.floor((Date.now()-d)/60000);
+  if(m<60)return m+'분 전';if(m<1440)return Math.floor(m/60)+'시간 전';return Math.floor(m/1440)+'일 전';}
+
+ /* 상태 색 — ① 「자동」을 「사용」과 «섞지 않는다». 배경으로 갈라 한눈에 보이게 한다. */
+ var TONE={'사용':['var(--rv-green)','oklch(0.96 0.03 165)'],
+           '자동':['var(--rv-purple)','oklch(0.96 0.03 285)'],
+           '대기':['var(--rv-amber)','var(--rv-amber-bg)'],
+           '미사용':['var(--rv-faint)','var(--rv-panel)']};
+ function statusHtml(s){var t=TONE[s]||TONE['미사용'];
+  return '<span class="tp-badge" style="color:'+t[0]+';background:'+t[1]+';border:1px solid '+t[0]+'40">'+esc(s)+'</span>';}
+
+ function say(kind,msg,note){var b=$('tp-res');b.hidden=false;
+  var c=kind==='err'?'var(--rv-red)':'var(--rv-green)';
+  b.innerHTML='<div style="border:1px solid '+c+'55;border-radius:7px;padding:8px 11px;display:flex;flex-direction:column;gap:3px">'
+   +'<div style="font:600 11px/1.3 var(--font);color:'+c+'">'+esc(msg)+'</div>'
+   +(note?'<div class="tp-note">'+esc(note)+'</div>':'')+'</div>';}
+
+ function renderQueue(d){
+  $('tp-threshold').textContent=d.threshold;
+  $('tp-qcount').textContent=d.total_hits+'건';
+  var w=$('tp-queue');
+  if(!d.groups.length){
+   /* ⑧ 빈 큐는 «없는 이유»와 함께 말한다 — 0건을 지어내지 않는다. */
+   w.innerHTML='<div style="padding:9px 12px;border-radius:7px;background:var(--rv-panel);'
+    +'border:1px dashed var(--outline);display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">'
+    +'<span style="font:600 12px/1.4 var(--font)">아직 쌓인 질문이 없습니다</span>'
+    +'<span class="tp-note"><b>지금이 이 상태입니다</b> — 팝콘톡 트래픽이 아직 얕습니다. '
+    +(d.regression_excluded?'회귀분을 뺀 수입니다. ':'')
+    +'<b>0건을 지어내지 않고 없는 이유를 말합니다</b> — 장치를 먼저 세우고 트래픽을 기다립니다.</span></div>';
+   return;}
+  w.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'+d.groups.map(function(q){
+   /* ③ 「서로 다른 방문자 수」를 늘 함께 — 임계에 닿으면 화면이 먼저 말한다. */
+   var hot=q.at_threshold;
+   return '<div style="flex:1 1 200px;min-width:180px;display:flex;flex-direction:column;gap:5px;padding:8px 10px;'
+    +'border-radius:7px;background:var(--rv-panel);border:1px solid '+(hot?'var(--rv-amber)':'var(--outline)')+'">'
+    +'<span style="font:500 11px/1.35 var(--font)">'+(q.unknown_terms?'<i style="color:var(--rv-faint)">(어휘 미상 — 묶을 기준이 없습니다)</i>':esc(q.terms.join(' · ')))+'</span>'
+    +'<span style="display:flex;align-items:baseline;gap:8px">'
+    +'<span class="tp-mono" style="font-size:15px;font-weight:600">'+q.visitors+'</span>'
+    +'<span style="font:400 9px/1.3 var(--font);color:var(--rv-muted)">서로 다른 방문자 · '+q.hits+'건 · 최근 '+ago(q.last_at)+'</span></span>'
+    +(hot?'<span class="tp-badge" style="color:var(--rv-amber);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)">임계 도달 — 곧 자동 승격됩니다</span>':'')
+    +'<button type="button" class="tp-chip" data-terms="'+esc(q.terms.join(','))+'" style="height:25px;justify-content:center">의도로 만들기</button>'
+    +'</div>';}).join('')+'</div>';
+  w.querySelectorAll('[data-terms]').forEach(function(b){b.addEventListener('click',function(){
+   $('f-terms').value=b.getAttribute('data-terms');$('f-key').focus();});});}
+
+ function renderList(){
+  var rows=state.rows.filter(function(r){
+   if(state.filter==='dead')return r.hits===0;
+   if(state.filter!=='all'&&r.status!==state.filter)return false;
+   if(state.q){var q=state.q.toLowerCase();
+    return r.key.toLowerCase().indexOf(q)>-1||r.label.toLowerCase().indexOf(q)>-1
+      ||r.terms.join(' ').toLowerCase().indexOf(q)>-1;}
+   return true;});
+  $('tp-list').innerHTML=rows.length?rows.map(function(r){
+   /* ⑥ 어휘 충돌은 «경고»다 — 막지 않는다. 누구와 겹치는지까지 말한다. */
+   var warn=r.conflicts.length
+    ?'<span style="font:400 9px/1.3 var(--font);color:var(--rv-amber)">어휘 겹침: '
+      +esc(r.conflicts.map(function(c){return c.term+'→'+c.with.join(',');}).join(' · '))+'</span>':'';
+   return '<div class="tp-row" data-key="'+esc(r.key)+'" data-keep="1" style="cursor:pointer'+(state.picked===r.key?';background:var(--rv-panel)':'')+'">'
+    +'<span style="display:flex;flex-direction:column;gap:2px;min-width:0">'
+     +'<span class="tp-mono" style="font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.key)+'</span>'
+     +'<span style="font:400 9px/1.2 var(--font);color:var(--rv-faint)">'+esc(r.label)+'</span></span>'
+    +'<span style="display:flex;flex-direction:column;gap:2px;min-width:0">'
+     +'<span style="font:400 10.5px/1.4 var(--font);color:var(--rv-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.terms.join(' · '))+'</span>'+warn+'</span>'
+    +'<span class="tp-mono" style="font-size:10px;color:var(--rv-muted)">'+esc(r.kind)+(r.has_pack?' <span title="조건팩 있음">+팩</span>':'')+'</span>'
+    +'<span class="tp-mono" style="font-size:11.5px;text-align:right">'+r.hits+'</span>'
+    +'<span style="display:flex;justify-content:center">'+statusHtml(r.status)+'</span>'
+    +'<span style="font:400 9.5px/1.3 var(--font);color:var(--rv-faint);text-align:right">'+ago(r.last_at)+'</span>'
+    +'</div>';}).join(''):'<div class="tp-note" style="padding:14px 2px">조건에 맞는 패턴이 없습니다.</div>';}
+
+ function load(){
+  var qs='?include_regression='+(state.regress?'true':'false');
+  fetch(API+qs).then(function(r){return r.json();}).then(function(d){
+   if(!d.ok)return;state.rows=d.intents;
+   $('tp-total').textContent=d.counts.total+'종';
+   $('tp-subnote').innerHTML='조건팩이 붙은 것 '+d.counts.with_pack+'종 · 자동 승격분 '+d.counts.auto+'종'
+    +' · 팝콘톡이 이 표를 읽어 이미 쓰고 있습니다';
+   renderList();}).catch(function(){say('err','목록을 불러오지 못했습니다');});
+  fetch(API+'/queue'+qs).then(function(r){return r.json();}).then(function(d){
+   if(d.ok)renderQueue(d);}).catch(function(){});
+  /* 원문 카드는 owner 에게만 «존재»한다 — 403 이면 카드 자체를 그리지 않는다. */
+  fetch(API+'/raw-stats').then(function(r){return r.ok?r.json():null;}).then(function(d){
+   if(!d||!d.ok){$('f-grade').textContent='조회 권한으로 보고 있습니다 — 등록·승인은 owner 몫입니다';return;}
+   $('tp-raw').hidden=false;$('tp-keepdays').textContent=d.keep_days;$('tp-keepdays2').textContent=d.keep_days;
+   $('tp-rawstats').innerHTML=[['남은 건수',d.kept+'건','마스킹을 거친 값만 남습니다'],
+     ['가장 오래된 것',d.oldest_at?ago(d.oldest_at):'—','이 시각부터 '+d.keep_days+'일'],
+     ['다음 삭제 예정',d.next_purge_at?new Date(d.next_purge_at).toLocaleDateString('ko-KR'):'—','raw_text 만 NULL']]
+    .map(function(s){return '<div style="display:flex;flex-direction:column;gap:2px;padding-top:6px;border-top:1px solid var(--outline-variant)">'
+     +'<span style="font:500 9px/1 var(--font);color:var(--rv-faint)">'+esc(s[0])+'</span>'
+     +'<span class="tp-mono" style="font-size:13px;font-weight:600">'+esc(s[1])+'</span>'
+     +'<span style="font:400 8.5px/1.35 var(--font);color:var(--rv-muted)">'+esc(s[2])+'</span></div>';}).join('');
+  }).catch(function(){});}
+
+ /* 목록에서 고르기 — 고른 것에 상태 전이를 건다(선택은 사이드바 클릭으로 안 풀린다: data-keep) */
+ $('tp-list').addEventListener('click',function(e){var row=e.target.closest('[data-key]');if(!row)return;
+  var k=row.getAttribute('data-key');
+  state.picked=(state.picked===k)?null:k;
+  var r=state.rows.filter(function(x){return x.key===k;})[0];
+  var can=!!state.picked;
+  $('f-approve').disabled=!can;$('f-down').disabled=!can;
+  $('f-picked').innerHTML=can
+   ?('고른 패턴 <b class="tp-mono">'+esc(k)+'</b> · 지금 상태 <b>'+esc(r?r.status:'')+'</b>')
+   :'목록에서 패턴을 고르면 상태를 바꿀 수 있습니다.';
+  renderList();});
+
+ function transit(to){
+  if(!state.picked)return;
+  fetch(API+'/'+encodeURIComponent(state.picked)+'/status',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({status:to})})
+   .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+   .then(function(x){
+    if(!x.ok){say('err',(x.d&&x.d.detail)||'상태를 바꾸지 못했습니다');return;}
+    say('ok',x.d.note,x.d.from+' → '+x.d.to+' · 행을 지우지 않았습니다(상태 전이입니다).');
+    load();})
+   .catch(function(){say('err','서버에 연결하지 못했습니다');});}
+ $('f-approve').addEventListener('click',function(){transit('사용');});
+ $('f-down').addEventListener('click',function(){transit('미사용');});
+
+ /* 필터 · 검색 */
+ $('tp-filters').addEventListener('click',function(e){var b=e.target.closest('[data-f]');if(!b)return;
+  state.filter=b.getAttribute('data-f');
+  $('tp-filters').querySelectorAll('[data-f]').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
+  renderList();});
+ $('tp-q').addEventListener('input',function(){state.q=this.value.trim();renderList();});
+
+ /* ② 회귀분 토글 — 켜면 «섞였다»는 사실을 화면이 크게 말한다 */
+ $('tp-regress').addEventListener('click',function(){
+  state.regress=!state.regress;this.setAttribute('aria-pressed',state.regress);
+  this.textContent=state.regress?'회귀분 포함됨 — 집계가 오염됩니다':'회귀분 제외됨';
+  this.style.color=state.regress?'var(--rv-red)':'';load();});
+
+ /* ⑤ 답변 종류에 따라 문구 칸 ↔ API 경로 칸 */
+ $('f-kinds').addEventListener('click',function(e){var b=e.target.closest('[data-k]');if(!b)return;
+  state.kind=b.getAttribute('data-k');
+  $('f-kinds').querySelectorAll('[data-k]').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
+  var isText=state.kind==='text';
+  $('f-anslbl').textContent=isText?'답변 문구':'API 경로';
+  $('f-ans').placeholder=isText?'고객에게 보일 문구':'/api/talk/monitor-bands';});
+
+ $('tp-new').addEventListener('click',function(){$('f-key').focus();});
+
+ $('f-save').addEventListener('click',function(){
+  var terms=$('f-terms').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var isText=state.kind==='text';
+  var body={intent_key:$('f-key').value.trim(),label:$('f-label').value.trim(),
+   match_terms:terms,min_hits:parseInt($('f-min').value||'1',10),answer_kind:state.kind,
+   answer_body:isText?($('f-ans').value.trim()||null):null,
+   answer_ref:isText?null:($('f-ans').value.trim()||null)};
+  fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+   .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+   .then(function(x){
+    if(!x.ok){say('err',(x.d&&x.d.detail)||'저장하지 못했습니다');return;}
+    /* ⑥ 충돌은 저장을 막지 않는다 — 저장됐다고 말하고 겹침도 함께 말한다. */
+    var cf=(x.d.conflicts||[]).map(function(c){return c.with+'('+c.terms.join(',')+')';}).join(' · ');
+    say('ok',x.d.note,cf?('어휘가 겹칩니다 — '+cf+'. 막지 않았습니다: min_hits 로 갈리는 설계가 실재합니다.'):'');
+    ['f-key','f-label','f-terms','f-ans'].forEach(function(i){$(i).value='';});
+    load();})
+   .catch(function(){say('err','서버에 연결하지 못했습니다');});});
+
+ load();
+})();
+</script>
+{% endblock %}
