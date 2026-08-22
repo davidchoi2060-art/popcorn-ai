@@ -131,6 +131,10 @@ from pydantic import BaseModel
 from sqlalchemy import text   # /monitor-bands 가 집계 쿼리를 돈다
 
 from . import access_gate   # 방문자별 호출 횟수 제한의 단일 원천
+from . import visitor      # 방문자 키 — 자동 승격의 「서로 다른 사람」 판정에 쓴다
+# 회귀 표식 판정의 단일 원천. 언더스코어 함수를 다른 모듈이 가져다 쓰는 것은 이 저장소의
+# 기존 관례다 — `api/expert.py` 가 같은 함수를 그렇게 쓴다(그 파일 상단 주석 참조).
+from .recommend import _resolve_data_origin
 from . import llm
 from . import usage_floors as UF
 from .db import engine
@@ -457,6 +461,14 @@ def parse_talk(body: ParseBody, request: Request):
     else:
         note = None
 
+    # 질문을 원장에 남긴다(A-95). 실패해도 상담을 끊지 않는다 -- `_record_hit` 주석.
+    # 지금은 `talk_intents` 가 비어 있어 intent_key 가 NULL 로 들어간다 -- 그것이
+    # 「우리가 아직 답을 못 만든 질문」이고 이 표의 존재 이유다.
+    with engine.begin() as conn:
+        _record_hit(conn, request=request, text_raw=text, matched=[l for l, _v in
+                    [(c["l"], c["v"]) for c in kept]], unmatched_n=len(dropped),
+                    intent_key=None, answer_kind="constraint_parse", llm_called=True)
+
     return {
         "ok": True,
         "constraints": kept,
@@ -466,7 +478,9 @@ def parse_talk(body: ParseBody, request: Request):
         "note": note,
         "provider": result.provider, "model": result.model,
         "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
-        "stored": False,   # 대화 원문은 어디에도 저장하지 않는다
+        # A-95 로 «표에는» 남긴다(talk_intent_hits · 마스킹 후). 이 필드가 뜻하는 것은
+        # 여전히 「이 응답이 상담 원장(consult_sessions)을 만들지 않았다」이다.
+        "stored": False,
     }
 
 
@@ -548,3 +562,120 @@ def monitor_bands():
                AND (size_inch IS NULL OR ROUND(size_inch) <= 23)
         """)).scalar()
     return {"ok": True, "bands": out, "excluded": int(excluded or 0)}
+
+
+# ── 질문 이력 기록 (A-95·A-96 · 0061) ──────────────────────────────────────────
+# 정의서 `docs/design/req/req-talk-patterns.md` · 표 `talk_intent_hits`.
+#
+# 사장님 확정값 둘을 **여기가 든다** — 표에 박지 않는다(표에 적으면 바꿀 때
+# 마이그레이션이 필요해진다).
+RAW_KEEP_DAYS = 90            # 원문 보관 기간(A-95 §0-1 ㉯)
+AUTO_PROMOTE_VISITORS = 5     # 자동 승격 임계 — «서로 다른» 방문자 수(A-96 §0-2 ㉯)
+
+# ■ 마스킹 — 저장 «전»에 지운다 (A-95 §0-1 ㉮)
+#   지어내는 것이 아니라 «지우는» 것이라 A-02(재현성)와 무관하다.
+#   ⚠ 계좌는 «하이픈이 있는 것만» 본다. `\d{10,16}` 같은 순수 숫자 패턴을 쓰면
+#     「12000000원」 같은 예산 표기를 계좌로 오인해 고객이 말한 조건을 지운다.
+#     못 지우는 계좌가 남는 것보다 «조건을 지우는» 쪽이 더 나쁜 결함이라 보수적으로 잡는다.
+_MASKS = (
+    (re.compile(r"\d{6}\s*-\s*[1-4]\d{6}"), "[주민번호]"),
+    (re.compile(r"01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}"), "[전화번호]"),
+    (re.compile(r"0\d{1,2}[-.\s]\d{3,4}[-.\s]\d{4}"), "[전화번호]"),
+    (re.compile(r"[\w.+-]+@[\w-]+\.[\w.]{2,}"), "[이메일]"),
+    (re.compile(r"\d{2,6}-\d{2,6}-\d{2,7}"), "[계좌번호]"),
+)
+
+
+def mask_pii(s: str) -> str:
+    """개인정보로 보이는 조각을 치환한다. 실패하지 않는다 — 못 지우면 그대로 둔다.
+
+    ⚠ 이 함수가 예외를 던지면 `_record_hit` 이 원문을 통째로 버린다(아래).
+    「마스킹 없는 원문을 넣는 경로를 만들지 않는다」가 DB CHECK(`ck_talk_hits_masked`)
+    로도 걸려 있어, 여기가 뚫려도 표에는 못 들어간다.
+    """
+    out = s or ""
+    for pat, rep in _MASKS:
+        out = pat.sub(rep, out)
+    return out
+
+
+def _record_hit(conn, *, request, text_raw, matched, unmatched_n,
+                intent_key, answer_kind, llm_called, session_id=None):
+    """질문 한 건을 원장에 남긴다. **실패해도 상담을 끊지 않는다.**
+
+    이 기록은 부가 기능이다 — 여기서 예외가 나 고객 응답이 500 이 되면 본말이 전도된다.
+    그래서 전부 삼키고 로그만 남긴다(로그에도 문장은 안 찍는다 — 길이만).
+
+    ■ intent_key 는 지금 거의 항상 NULL 이다
+      `talk_intents` 가 아직 비어 있기 때문이다(TALKS 20종 이관 = 다음 단계).
+      **그것이 정상이고, 그 행이 이 표의 존재 이유다** — 「우리가 아직 답을 못 만든 질문」.
+    """
+    try:
+        origin = _resolve_data_origin(request)
+        try:
+            uid = visitor.resolve(conn, request, None)   # response 미전달 = 쿠키 안 심는다
+        except Exception:                                # noqa: BLE001
+            uid = None
+        raw = None
+        try:
+            raw = mask_pii(text_raw) if text_raw else None
+        except Exception:                                # noqa: BLE001
+            raw = None                                   # 마스킹이 실패하면 원문을 버린다
+        conn.execute(text("""
+            INSERT INTO talk_intent_hits
+                (session_id, intent_key, matched_terms, unmatched_n,
+                 raw_text, raw_masked_yn, raw_purge_at,
+                 visitor_key, answer_kind, llm_called, data_origin)
+            VALUES (:sid, :ik, CAST(:mt AS JSONB), :un,
+                    :raw, :masked, :purge,
+                    :vk, :ak, :llm, :origin)
+        """), {
+            "sid": session_id, "ik": intent_key,
+            "mt": json.dumps(matched or [], ensure_ascii=False),
+            "un": int(unmatched_n or 0),
+            "raw": raw,
+            "masked": raw is not None,
+            # 원문이 있으면 삭제 예정 시각이 «반드시» 있어야 한다(ck_talk_hits_purge).
+            "purge": None if raw is None else _purge_at(),
+            "vk": None if uid is None else str(uid),
+            "ak": answer_kind, "llm": bool(llm_called), "origin": origin,
+        })
+    except Exception as e:                               # noqa: BLE001
+        log.warning("[talk] hit record failed (chars=%d): %s",
+                    len(text_raw or ""), type(e).__name__)
+
+
+def _purge_at():
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) + timedelta(days=RAW_KEEP_DAYS)).replace(tzinfo=None)
+
+
+class HitBody(BaseModel):
+    text: str
+    intent_key: str | None = None
+    answer_kind: str | None = None
+
+
+@router.post("/hit")
+def record_hit(body: HitBody, request: Request):
+    """화면이 «서버를 안 거치고» 답한 질문을 알린다 — 그것도 원장에 남기기 위해서다.
+
+    ■ 왜 필요한가
+      모니터 구간(`monitorBands`)·인사말처럼 화면이 조기 처리하는 경로는 `/parse` 를
+      부르지 않는다. 그대로 두면 **가장 잘 답한 질문이 기록에서 빠진다** — 「무엇을
+      묻는지」를 모으는 표인데 정작 답이 있는 질문만 사라지는 셈이다.
+
+    ■ 이 경로는 LLM 을 태우지 않는다
+      그래서 `access_gate` 의 AI 한도를 쓰지 않는다. 다만 아무나 부를 수 있는 자리라
+      원문 길이 상한(`MAX_TEXT_LEN`)은 그대로 건다.
+    """
+    t = (body.text or "").strip()
+    if not t:
+        raise HTTPException(400, "문장이 비었습니다")
+    if len(t) > MAX_TEXT_LEN:
+        raise HTTPException(400, f"문장이 너무 깁니다(최대 {MAX_TEXT_LEN}자)")
+    with engine.begin() as conn:
+        _record_hit(conn, request=request, text_raw=t, matched=[], unmatched_n=0,
+                    intent_key=body.intent_key, answer_kind=body.answer_kind,
+                    llm_called=False)
+    return {"ok": True}

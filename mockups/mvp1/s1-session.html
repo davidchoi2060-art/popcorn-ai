@@ -925,8 +925,14 @@ function talkParse(t,packs,useFb,say,chips){
    ■ 없는 값은 항목째 뺀다 (사장님 확정: "해상도가 없으면 해당 항목은 빼도 됩니다")
      해상도를 모르는 상품이 있으면 그 줄을 지어내지 않고, 몇 건인지만 작게 밝힌다. */
 function monWon(n){return commaNum(n)+'원';}
-function monitorBands(){
+function monitorBands(srcText){
  addAI('지금 재고에서 <b>크기별</b>로 정리해 드릴게요.');
+ /* 이 질문도 원장에 남긴다(A-95) — 화면이 조기 처리하는 경로는 /parse 를 안 거쳐서,
+    그대로 두면 **가장 잘 답한 질문이 기록에서 빠진다.** 서버가 마스킹한 뒤 저장한다.
+    실패해도 화면은 아무 말도 하지 않는다 — 고객이 알 필요 없는 부가 기능이다. */
+ try{fetch('/api/talk/hit',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({text:srcText||'',intent_key:null,answer_kind:'band_cards'})}).catch(function(){});}
+ catch(e){}
  var wrap=document.createElement('div');
  wrap.style.cssText='display:flex;gap:10px;flex-wrap:wrap;padding-left:48px;margin-top:2px;';
  wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">불러오는 중…</span>';
@@ -965,7 +971,7 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
   if(t.indexOf('모니터')>-1
      && /(추천|어떤|골라|골르|보여|알려|뭐가|뭘로|괜찮|사고|살까|구매|필요)/.test(low)
      && !/(쓰고|쓰는|사용 중|사용중|있어|있는|보유|쓰던|그대로)/.test(low)){
-   monitorBands();return;}
+   monitorBands(t);return;}
   var mon=talkMon(t);
   /* 용도는 «서버 목록 + 서버 규칙»으로만 잡는다(위 TALKS 주석 · USAGES 블록).
      사유도 서버 하한(floor_note)만 말한다 — 화면이 이유를 지어내지 않는다.
