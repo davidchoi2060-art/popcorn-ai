@@ -118,6 +118,8 @@ import re
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from sqlalchemy import text   # /monitor-bands 가 집계 쿼리를 돈다
+
 from . import access_gate   # 방문자별 호출 횟수 제한의 단일 원천
 from . import llm
 from . import usage_floors as UF
@@ -214,6 +216,9 @@ def _build_prompt(text: str, usage_rows: list) -> str:
         "여기는 PC(컴퓨터) 견적 상담 창구다. 고객은 컴퓨터를 사거나 고치러 온 사람이다.",
         "- true: 컴퓨터·부품·게임·용도·예산·구매·조립·업그레이드·호환·재고·배송·가격·A/S 중"
         " 하나라도 걸리는 문장.",
+        "  **모니터·키보드·마우스·헤드셋·스피커 같은 주변기기 문의도 true 다** -- 우리는 그것도"
+        " 판다(견적서의 「함께 쓰면 좋은 구성」). 실측 2026-08-22: 「모니터 추천해줘」가"
+        " false 로 판정돼 상담이 끊겼다.",
         "  **무엇을 살지 밝히지 않은 막연한 요청도 true 다** -- 예: \"그냥 좋은 거"
         " 추천해주세요\", \"본체 하나 맞춰주세요\", \"겜만 할래요\", \"모르겠어요\".",
         "  구어·줄임말·오타여도 뜻이 PC 상담이면 true 다(겜 = 게임, 컴 = 컴퓨터, 본체 = PC).",
@@ -453,3 +458,83 @@ def parse_talk(body: ParseBody, request: Request):
         "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
         "stored": False,   # 대화 원문은 어디에도 저장하지 않는다
     }
+
+
+# ── 모니터 크기 구간 ────────────────────────────────────────────────────────────
+# 2026-08-22 사장님 지시: 「모니터 추천해줘」에 되묻지 말고 24 / 27 / 32인치를 사양과 함께
+# 바로 보여준다. 그전에는 AI 가 이 문장을 **「PC 상담이 아니다」로 반송**했다(실측 응답
+# `pc_related:false`) — 프롬프트가 "애매하면 true" 라고 시켜 놨는데도 그랬다.
+#
+# ⚠ 수를 화면이 세지 않는다(CLAUDE.md §화면 정직성). 구간·건수·가격대·대표 해상도를 전부
+# 여기서 계산해 내려보낸다. 화면은 받은 것만 그린다.
+#
+# ⚠ 구간 경계는 **반올림**이다 — 23.8형은 시장에서 「24인치」로 판다. 저장은 원문 그대로의
+# 정확한 값(23.8)이고 묶을 때만 반올림한다.
+#
+# ⚠ 하한을 0 으로 두면 23인치 이하가 24인치 구간에도 들어가고 `excluded` 에도 들어가
+# **이중으로 세어진다**(실측: 24인치가 129 가 아니라 174 로 나왔다 — 45 가 겹쳤다).
+# 구간과 제외는 겹치지 않아야 하고, 셋의 합 + excluded = 재고 모니터 전체여야 한다.
+MONITOR_BANDS = (
+    ("24", "24인치", 24, 25),       # 23.8·24.5 는 반올림으로 여기 묶인다
+    ("27", "27인치", 26, 29),
+    ("32", "32인치 이상", 30, 999),
+)
+
+
+@router.get("/monitor-bands")
+def monitor_bands():
+    """모니터를 크기 구간으로 묶어 돌려준다 — 되묻지 않고 바로 보여주기 위한 것.
+
+    ■ 무엇을 세나
+      재고가 있는 것만(`stock_qty > 0`). 화면이 「지금 살 수 있는 것」을 말해야 하기 때문이다.
+
+    ■ 없는 값은 지어내지 않는다
+      해상도·주사율이 비어 있으면 **그 항목을 빼고** 센다(2026-08-22 사장님 확정:
+      *"해상도가 없으면 해당 항목은 빼도 됩니다"*). 몇 건이 비었는지는 `res_unknown` 으로
+      함께 내려보내 화면이 「전부 안다」고 말하지 않게 한다.
+
+    ■ 23인치 이하는 구간에서 뺀다
+      재고가 있지만 대부분 CCTV·산업용 소형이고(15·17·19형), 고객이 「모니터 추천」으로
+      기대하는 물건이 아니다. 빼되 **`excluded` 로 그 수를 밝힌다** — 조용히 감추지 않는다.
+    """
+    out = []
+    with engine.connect() as conn:
+        for key, label, lo, hi in MONITOR_BANDS:
+            row = conn.execute(text("""
+                SELECT COUNT(*) AS n,
+                       MIN(sale_price) AS lo, MAX(sale_price) AS hi,
+                       COUNT(resolution) AS res_known,
+                       MAX(refresh_hz) AS hz_max,
+                       SUM(CASE WHEN refresh_hz >= 144 THEN 1 ELSE 0 END) AS hz144
+                  FROM v_companion_candidates
+                 WHERE part_type = 'MONITOR' AND stock_qty > 0
+                   AND size_inch IS NOT NULL
+                   AND ROUND(size_inch) BETWEEN :lo AND :hi
+            """), {"lo": lo, "hi": hi}).mappings().first()
+            if not row or not row["n"]:
+                continue
+            # 대표 해상도 — 그 구간에서 가장 흔한 것 둘. 비어 있는 것은 세지 않는다.
+            tops = conn.execute(text("""
+                SELECT resolution AS v, COUNT(*) AS n
+                  FROM v_companion_candidates
+                 WHERE part_type = 'MONITOR' AND stock_qty > 0
+                   AND size_inch IS NOT NULL AND resolution IS NOT NULL
+                   AND ROUND(size_inch) BETWEEN :lo AND :hi
+                 GROUP BY 1 ORDER BY 2 DESC LIMIT 2
+            """), {"lo": lo, "hi": hi}).mappings().all()
+            out.append({
+                "key": key, "label": label,
+                "count": int(row["n"]),
+                "price_min": int(row["lo"]) if row["lo"] is not None else None,
+                "price_max": int(row["hi"]) if row["hi"] is not None else None,
+                "resolutions": [{"v": t["v"], "n": int(t["n"])} for t in tops],
+                "res_unknown": int(row["n"]) - int(row["res_known"]),
+                "hz_max": int(row["hz_max"]) if row["hz_max"] is not None else None,
+                "hz144": int(row["hz144"] or 0),
+            })
+        excluded = conn.execute(text("""
+            SELECT COUNT(*) FROM v_companion_candidates
+             WHERE part_type = 'MONITOR' AND stock_qty > 0
+               AND (size_inch IS NULL OR ROUND(size_inch) <= 23)
+        """)).scalar()
+    return {"ok": True, "bands": out, "excluded": int(excluded or 0)}

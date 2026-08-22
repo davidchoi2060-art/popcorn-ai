@@ -306,6 +306,57 @@ PCIE = re.compile(r"PCIe\s?([\d.]+)", re.I)
 GPU_MODEL = re.compile(r"(RTX|GTX|GT|RX)\s?(\d{3,4})\s?(Ti|SUPER|XT|XTX)?", re.I)
 NUM = re.compile(r"([\d,]+(?:\.\d+)?)")
 INCH_L2 = {"27인치 모니터": 27, "24인치 모니터": 24, "23인치 이하": 23}
+# ⚠ INCH_L2 에 「32인치 이상」이 없다 — **일부러 없다.** 그 분류는 «범위»라 단일 값이 없고,
+# 32 를 박으면 34·40·49형이 전부 32형으로 «틀리게» 기록된다. 대신 아래 MON_INCH 가 원문의
+# 「32(형)」을 읽어 정확한 값을 넣는다(실측 2026-08-22: L2 가 32인치 이상이라 NULL 이던
+# 132건 중 122건이 원문에서 읽혔다 — 32형 90 · 34형 16 · 49형 5 · 31.5형 2 …).
+
+# 원문(형식 A — 키 없이 「/」로 나열)에서 모니터 사양을 읽는다.
+#   ASUS / 32(형) / 와이드(16:9) / 1920 x 1080, (FHD) / … / 주사율 : 170(Hz) /
+# 주사율만 「키 : 값」이라 EAV(B_MAP·kv)로 잡혔고 인치·해상도는 **키가 없어** 아무도 안 읽었다.
+# 쿨러 TDP(커밋 0123553)와 같은 모양 — 원문 부재가 아니라 파서 누락이다.
+MON_INCH = re.compile(r"(?<![0-9.])(\d{2}(?:\.\d)?)\s*\(형\)")
+# 약칭 앞의 콤마는 «있을 때도 없을 때도» 있다 — 원문에 「1920 x 1080, (FHD)」와
+# 「1920 x 1080(FHD)」가 섞여 있다. 콤마를 필수로 두면 뒤 형식에서 약칭을 통째로 잃는다
+# (교정 드라이런에서 삼성 S22E45K 등이 「1920 x 1080」으로 깎일 뻔했다).
+MON_RES = re.compile(r"(\d{3,4})\s*[xX×]\s*(\d{3,4})\s*,?\s*(?:\(([^)]{1,24})\))?")
+# 약칭을 줄여야 하는 것만 적는다 — `resolution` 은 varchar(20) 이고 원문을 그대로 넣으면
+# 잘린다(실측: 기존 26건 중 「3440 x 1440, (Ultra 」·「3840 x 2160, (4K-UHD」 처럼 **손상된
+# 값**이 있었다). 콤마를 빼고 이 표로 줄이면 실재 14종이 전부 20자 안에 들어간다.
+MON_RES_ABBR = {"Ultra WQHD": "UWQHD"}
+
+
+def monitor_inch(raw: str):
+    """원문에서 화면 크기(형) — 없으면 None. 지어내지 않는다."""
+    m = MON_INCH.search(raw or "")
+    if not m:
+        return None
+    v = float(m.group(1))
+    return int(v) if v.is_integer() else v
+
+
+def monitor_resolution(raw: str):
+    """원문에서 해상도 — 「1920 x 1080 (FHD)」 꼴. 없으면 None.
+
+    ⚠ 같은 원문에 「NNNxNNN」이 «해상도가 아닌 자리»로 또 있다 — 드라이런에서
+    「월마운트(VESA) : 100x100(mm)」을 해상도로 읽어 뷰소닉 VX3208 에
+    **「100 x 100」**을 넣을 뻔했다. 그래서 모양만 보지 않고 **값의 범위**로 거른다:
+    실재 최소 해상도는 1024 x 768 이고 VESA 규격은 75·100·200·400(mm) 이라 겹치지 않는다.
+    「모양이 맞으니 그 값이겠지」가 정확히 이 저장소가 여러 번 당한 병이다.
+
+    20자(컬럼 폭)를 넘으면 약칭을 버리고 숫자만 남긴다 — **자르지 않는다.**
+    잘린 값은 「(4K-UHD」처럼 뜻이 깨져 화면이 거짓말을 하게 된다.
+    """
+    for m in MON_RES.finditer(raw or ""):
+        w, h = int(m.group(1)), int(m.group(2))
+        if w < 1024 or h < 720 or w < h:      # 해상도가 아닌 수(VESA mm 등)를 버린다
+            continue
+        num = "%d x %d" % (w, h)
+        ab = (m.group(3) or "").strip()
+        ab = MON_RES_ABBR.get(ab, ab)
+        full = "%s (%s)" % (num, ab) if ab else num
+        return full if len(full) <= 20 else num
+    return None
 
 
 def _num(s):
@@ -412,8 +463,14 @@ def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
         put("form_factor", ff, "feature")
 
     elif part_type == "MONITOR":
+        # 원문 토큰을 먼저 본다 — put() 은 «먼저 넣은 값»이 이긴다. 정확한 「32(형)」이
+        # 범위 분류(INCH_L2)보다 앞서야 34·49형이 32형으로 뭉개지지 않는다.
+        mon_raw = " / ".join(feats)
+        put("size_inch", monitor_inch(mon_raw), "feature")
         put("size_inch", INCH_L2.get((l2 or "").strip()), "feature")
         put("refresh_hz", _num(kv.get("주사율")), "eav")
+        # 해상도도 원문이 먼저다 — kv 경로는 원문을 그대로 넣어 varchar(20) 에서 잘렸다.
+        put("resolution", monitor_resolution(mon_raw), "feature")
         put("resolution", kv.get("해상도"), "eav")
         put("panel", kv.get("패널") or kv.get("패널종류"), "eav")
 
@@ -717,6 +774,14 @@ def extract_from_text(part_type: str, raw: str, name: str = "") -> tuple:
             src["form_factor_list"] = "text_tokens"
             s.setdefault("form_factor", lst[0])       # 대표값(표시용) — 판정은 목록이 한다
             src.setdefault("form_factor", "text_tokens")
+    if part_type == "MONITOR":
+        # 형식 A(키 없이 나열)에 인치·해상도가 살아 있는데 B_MAP 에 MONITOR 가 없어
+        # respec 이 이 슬롯을 아예 안 건드렸다. CASE 의 case_form_list 와 같은 자리다.
+        for _f, _v in (("size_inch", monitor_inch(raw)),
+                       ("resolution", monitor_resolution(raw))):
+            if _v is not None:
+                s[_f] = _v
+                src[_f] = "text_tokens"
     for bkey, (field, conv) in mapping.items():
         if field in s or bkey not in kv:
             continue

@@ -909,6 +909,48 @@ function talkParse(t,packs,useFb,say,chips){
   /* aiCons: 라벨이 겹치면 AI 가 남는다 — 용도도 예외가 아니다(aiCons 주석). */
   apply(packs.concat(aiCons(sc).map(function(c){
    return {i:c.i,l:c.l,v:c.v,f:1,why:[]};})),null,pc,false);});}
+/* ---- 모니터 추천 — 되묻지 않고 크기 구간을 바로 편다 (2026-08-22 사장님 지시) ----
+   사장님 원문: "그냥 24인치(해상도~~, 144Hz~~), 27인치(~~), 32인치(~~) 이렇게 보여주면
+   좋겠는데..." · "그냥 필터나 물어보는 걸 아예 걷어내면 안되나?"
+
+   ■ AI 를 태우지 않는다
+     「모니터 추천해줘」는 조건 문장이 아니라 **목록 요청**이다. 실제로 AI 는 이 문장을
+     「PC 상담이 아니다」로 판정해 상담을 끊었다(2026-08-22 실측 `pc_related:false` —
+     프롬프트가 "애매하면 true" 라고 시켜 놨는데도). 인사말과 같은 자리에서 조기 처리한다.
+
+   ■ 수를 화면이 세지 않는다 (§화면 정직성)
+     건수·가격대·대표 해상도·144Hz 이상 개수는 전부 `GET /api/talk/monitor-bands` 가
+     센다. 화면은 받은 것만 그린다.
+
+   ■ 없는 값은 항목째 뺀다 (사장님 확정: "해상도가 없으면 해당 항목은 빼도 됩니다")
+     해상도를 모르는 상품이 있으면 그 줄을 지어내지 않고, 몇 건인지만 작게 밝힌다. */
+function monWon(n){return commaNum(n)+'원';}
+function monitorBands(){
+ addAI('지금 재고에서 <b>크기별</b>로 정리해 드릴게요.');
+ var wrap=document.createElement('div');
+ wrap.style.cssText='display:flex;gap:10px;flex-wrap:wrap;padding-left:48px;margin-top:2px;';
+ wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">불러오는 중…</span>';
+ msgs.appendChild(wrap);msgs.scrollTop=msgs.scrollHeight;
+ fetch('/api/talk/monitor-bands').then(function(r){return r.json();}).then(function(d){
+  if(!d||!d.ok||!d.bands||!d.bands.length){
+   wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">지금은 모니터 목록을 불러오지 못했습니다.</span>';return;}
+  wrap.innerHTML=d.bands.map(function(b){
+   var res=(b.resolutions||[]).map(function(r){
+    return '<div style="font-size:12.5px;color:#55555c;margin-top:3px;">'+esc(r.v)+' <span style="color:#9a968d;">'+r.n+'개</span></div>';}).join('');
+   var hz=b.hz144?'<div style="font-size:12.5px;color:#2b5fd9;font-weight:700;margin-top:5px;">144Hz 이상 '+b.hz144+'개</div>':'';
+   var unk=b.res_unknown?'<div style="font-size:11.5px;color:#9a968d;margin-top:4px;">해상도 미상 '+b.res_unknown+'건</div>':'';
+   return '<div style="flex:1 1 190px;min-width:180px;border:1px solid #ece9e3;border-radius:14px;padding:13px 15px;background:#fff;">'
+    +'<div style="font-size:15px;font-weight:800;color:#17171b;">'+esc(b.label)+'</div>'
+    +'<div style="font-size:12.5px;color:#8a8578;margin-top:2px;">'+b.count+'개 · '+monWon(b.price_min)+' ~ '+monWon(b.price_max)+'</div>'
+    +res+hz+unk+'</div>';}).join('');
+  var note=document.createElement('div');
+  note.style.cssText='padding-left:48px;margin-top:6px;font-size:12.5px;color:#8a8578;';
+  note.innerHTML='재고가 있는 것만 셌습니다'+(d.excluded?' · 23인치 이하·크기 미상 '+d.excluded+'건은 뺐습니다':'')
+   +'. 크기를 정하시면 그 구간에서 골라 <b>견적서의 「함께 쓰면 좋은 구성」</b>에 담아 드립니다.';
+  msgs.appendChild(note);msgs.scrollTop=msgs.scrollHeight;
+ }).catch(function(e){
+  wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">모니터 목록을 불러오지 못했습니다 — '+esc(e&&e.message||e)+'</span>';});
+}
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
  var bud=talkBudget(t);
  var hit=null,score=0;
@@ -918,6 +960,12 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
      PC 상담 여부를 판정하는 자리가 아니다 — 반송하지 않고 바로 되묻는다. */
   if(/^(안녕|하이|hi|헬로|ㅎㅇ|반갑)/.test(low)){addAI('안녕하세요! 팝콘톡입니다. 부품·가격·용도, PC에 관한 건 뭐든 물어보세요.');talkRow(TALK_SUGGEST);return;}
   if(/(감사|고마워|땡큐|thank)/.test(low)&&low.length<20){addAI('별말씀을요. 더 궁금한 게 생기면 언제든 물어보세요!');return;}
+  /* 모니터 «추천 요청»은 되묻지 않고 바로 편다(monitorBands 주석). 「쓰던 걸 쓴다」류는
+     보유 인지(talkMon)의 몫이라 여기서 걸러 낸다 — 그 문장에 목록을 들이밀면 동문서답이다. */
+  if(t.indexOf('모니터')>-1
+     && /(추천|어떤|골라|골르|보여|알려|뭐가|뭘로|괜찮|사고|살까|구매|필요)/.test(low)
+     && !/(쓰고|쓰는|사용 중|사용중|있어|있는|보유|쓰던|그대로)/.test(low)){
+   monitorBands();return;}
   var mon=talkMon(t);
   /* 용도는 «서버 목록 + 서버 규칙»으로만 잡는다(위 TALKS 주석 · USAGES 블록).
      사유도 서버 하한(floor_note)만 말한다 — 화면이 이유를 지어내지 않는다.
