@@ -492,12 +492,7 @@ var SCEN=[
  {t:'사무·인강용 조용하고 저렴하게',useFrom:true,cons:[['volume_off','선호','저소음']],f:0.34,why:['고소음 부품 제외']}
 ];
 var NUDGES=[
- {t:'더 조용하게',icon:'volume_off',cl:'선호',v:'저소음',f:0.82,why:['고소음 부품 추가 제외']},
- {t:'성능 더 올려',icon:'bolt',cl:'성능',v:'성능 상향',f:0.7,noFilter:true,why:['한 단계 낮은 부품 제외']},
- {t:'예산 아껴',icon:'savings',cl:'예산',v:'예산 절감',f:0.75,why:['상위가 부품 제외']},
- {t:'화이트로',icon:'palette',cl:'선호',v:'화이트',f:0.85,why:['화이트 외 케이스 제외']},
- {t:'저장공간 크게',icon:'hard_drive',cl:'저장',v:'대용량 저장',f:0.88,noFilter:true,why:['소용량 저장장치 제외']},
- {t:'그래픽 한 단계 위',icon:'monitor',cl:'그래픽',v:'GPU 상향',f:0.72,noFilter:true,why:['하위 GPU 제외']}
+ {t:'예산 아껴',icon:'savings',cl:'예산',v:'예산 절감',f:0.75,why:['상위가 부품 제외']}
 ];
 var usedNudges={};
 function addSpec(label,value,icon){addConstraint(icon,label,value);}
