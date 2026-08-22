@@ -1441,3 +1441,78 @@ grep -n "MAX_PHOTO_BYTES\|_MAGIC\|_no_photo" api/admin_profile_photo.py
 grep -n "_is_operator_photo_path" api/auth.py                 -- 정의 1 + 사용 1 = 2건
 curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/admin/operators/1/photo   -- 미로그인이면 401
 ```
+
+---
+
+## 19. [15차 개정] talk_intents · talk_intent_hits — 팝콘톡 응답 패턴 (2026-08-22, ADM-TLK-010, **적용됨**)
+
+> 마이그레이션 `0061_talk_patterns.py` · 결정 **A-95**(대화 원문 저장) · **A-96**(자동 승격)
+> 정의서 `docs/design/req/req-talk-patterns.md`
+
+### 19-A. 왜 생겼나
+
+팝콘톡 답변 패턴이 화면 코드(`s1-session.html` 의 `TALKS` 20종)에만 있어 ① 운영자가 못
+늘리고 ② 고객이 무엇을 묻는지 기록이 없고 ③ 어느 답이 실제로 쓰였는지 모른다.
+사장님 지시로 질문을 쌓아 패턴으로 재사용한다.
+
+### 19-B. talk_intents — 답변 패턴 정본
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `intent_key` | VARCHAR(64) PK | `monitor_recommend` 같은 키 |
+| `label` | VARCHAR(80) NOT NULL | 관리자 표시명 |
+| `match_terms` | JSONB NOT NULL | 이 의도로 접는 말 |
+| `min_hits` | SMALLINT NOT NULL | 몇 개가 걸려야 이 의도인가 |
+| `answer_kind` | VARCHAR(24) NOT NULL | `text` · `band_cards` · `constraint_parse` · `handoff` |
+| `answer_body` | TEXT | 문구 답변 |
+| `answer_ref` | VARCHAR(120) | `band_cards` 가 부를 API |
+| `status` | VARCHAR(12) NOT NULL | `대기` · `사용` · **`자동`** · `미사용` |
+| `approved_by` · `approved_at` | | 승인 주체·시각 |
+
+**CHECK 셋**: status 어휘 · answer_kind 어휘 · **「사용/자동인데 답이 둘 다 비면 거부」**.
+
+⚠ `answer_body` 에 부품명·가격·후보 수를 적지 않는다(A-01·A-02). 수가 필요한 답은
+`answer_ref` 로 두고 서버가 센다 — `/api/talk/monitor-bands` 가 첫 사례다.
+
+### 19-C. talk_intent_hits — 질문 이력 (원장)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `hit_id` | BIGSERIAL PK | |
+| `session_id` | BIGINT FK nullable | `/api/talk/parse` 는 세션을 안 만든다 — 없는 행이 실재한다 |
+| `intent_key` | VARCHAR(64) FK **nullable** | **NULL = 안 걸린 질문**. 이 표의 존재 이유 |
+| `matched_terms` | JSONB NOT NULL | 걸린 말 |
+| `unmatched_n` | SMALLINT NOT NULL | 어휘에 없던 말의 수 — 어휘 부족 신호 |
+| `raw_text` | TEXT nullable | **고객 문장 원문(A-95)** |
+| `raw_masked_yn` | BOOLEAN NOT NULL | 마스킹 여부 |
+| `raw_purge_at` | TIMESTAMP | 이 시각 이후 `raw_text` 만 NULL |
+| `visitor_key` | VARCHAR(64) | 자동 승격의 「서로 다른 사람」 판정 |
+| `answer_kind` · `llm_called` | | 무엇으로 답했나 · AI 를 태웠나 |
+| `data_origin` | VARCHAR(12) NOT NULL | `real`/`test` — test 는 자동 승격에서 뺀다 |
+
+### 19-D. ⚠ A-95 의 안전장치를 «DB가» 강제한다
+
+0056 이 「활성 보류 1건」을 부분 유니크 인덱스로 강제한 것과 같은 규칙이다.
+
+    ck_talk_hits_masked   마스킹을 안 거친 원문은 **INSERT 자체가 거부된다**
+    ck_talk_hits_purge    원문이 있으면 삭제 예정 시각이 **반드시** 있다
+
+**검증(2026-08-22, 7/7 통과 · 전부 롤백)**: 마스킹 없는 원문 → 거부 · 기한 없는 원문 →
+거부 · 답 없는 「사용」 의도 → 거부 · 모르는 status → 거부 · 정상 케이스 셋 → 통과.
+
+### 19-E. 인덱스 넷
+
+    ix_talk_hits_unmatched        WHERE intent_key IS NULL   「안 걸린 질문」 큐
+    ix_talk_hits_intent_visitor   WHERE data_origin='real'   자동 승격 집계
+    ix_talk_hits_purge            WHERE raw_text IS NOT NULL 원문 삭제 배치
+    ix_talk_intents_status                                   상태별 조회
+
+### 19-F. downgrade 는 표를 지우지 않는다
+
+쌓인 질문은 되돌릴 수 없는 원장이고, downgrade 로 지우면 A-95 로 모은 것이 통째로
+사라진다. 되돌려야 하면 사람이 판단해 DROP 한다 — 그 판단을 자동화하지 않는다.
+
+### 19-G. 아직 안 지어진 것
+
+표만 섰다. 남은 것 셋 — ② `api/talk.py` 기록 배선(마스킹 포함) ③ `TALKS` 20종 이관
+④ 관리자 화면(ADM-TLK-010). **코드가 이 표를 참조하기 전에는 아무 행도 생기지 않는다.**
