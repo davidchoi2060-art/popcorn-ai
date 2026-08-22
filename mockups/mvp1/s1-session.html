@@ -741,6 +741,19 @@ var TALKS=[
  {k:['재고','당일','출고','배송','언제'],a:'저희는 <b>용산 자체 실재고</b>로만 견적해요 — 견적에 뜨는 부품은 전부 지금 매장에 있는 것들이고, 오후 3시 전 결제면 보통 당일에서 최대 3일 이내에 조립 출고돼요.<br>특정 부품 재고가 궁금하면 이름을 알려주세요.'},
  {k:['업그레이드','업글','기존','쓰던','중고'],a:'기존 PC 업그레이드도 도와드려요. <b>지금 쓰시는 CPU(또는 보드)와 목적</b>을 알려주시면, 재사용 가능한 부품은 빼고 바꿀 것만 견적에 잡아드릴게요.',p:{i:'build',l:'상황',v:'기존 PC 업그레이드',f:0.8,noFilter:true,why:['보유 부품 재사용 전제 반영']}}
 ];
+/* ---- 답변 패턴의 정본은 «표»다 (2026-08-22 A-95 ③) ----
+   위 배열은 **폴백이다.** 정본은 `talk_intents` 표이고 `GET /api/talk/intents` 가 준다 —
+   운영자가 표에서 늘리면 코드를 안 고쳐도 반영된다(정의서 §3 의 「① 늘리려면 코드를
+   고쳐야 한다」가 그렇게 해소된다).
+
+   ⚠ 위 배열을 «지우지 않는다». 이 요청이 실패해도 팝콘톡은 답해야 한다 —
+   `LIVE` 가 아닐 때 정규식 폴백을 쓰는 것과 같은 방식이다.
+   ⚠ 그래서 둘은 «같은 모양»이어야 한다(k · min · a · p · chips). 서버가 형식을 바꾸면
+   폴백과 갈라져 둘을 함께 유지할 수 없다. */
+var _lastIntent=null;   /* 화면이 매치한 의도 — /parse 가 원장에 남길 때 함께 보낸다 */
+fetch('/api/talk/intents').then(function(r){return r.json();}).then(function(d){
+ if(d&&d.ok&&d.intents&&d.intents.length)TALKS=d.intents;
+}).catch(function(){});
 function talkRow(list){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';list.forEach(function(q){var ch=mkChip(q,true);ch.addEventListener('click',function(){row.style.opacity='.45';row.style.pointerEvents='none';talkSend(q);});row.appendChild(ch);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function talkChips(){var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;';TALK_SUGGEST.forEach(function(q){var c=mkChip(q,true);c.addEventListener('click',function(){talkSend(q);});row.appendChild(c);});msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 // 2026-08-22: api/candidates.py _budget_cap 과 같은 패턴(자릿수 상한 제거 + 콤마 표기 허용).
@@ -961,6 +974,7 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
  var bud=talkBudget(t);
  var hit=null,score=0;
  TALKS.forEach(function(x){var n=0;x.k.forEach(function(k){if(low.indexOf(k)>-1)n++;});var need=x.min||1;if(n>=need&&n>score){hit=x;score=n;}});
+ _lastIntent=(hit&&hit.key)||null;   /* 표에서 온 것만 key 를 갖는다 — 폴백이면 null */
  setTimeout(function(){USAGES_READY.then(function(){   /* 용도 목록이 도착한 뒤에 문장을 접는다 */
   /* 인사·감사는 조건도 반송도 아닌 «대화 예절»이라 AI 를 태우지 않는다(비용 0).
      PC 상담 여부를 판정하는 자리가 아니다 — 반송하지 않고 바로 되묻는다. */
@@ -1667,7 +1681,7 @@ function srvParse(t,done){
  function fin(cons,err,pc){if(wait&&wait.parentNode)wait.parentNode.removeChild(wait);
   done(cons,err,(pc===true||pc===false)?pc:null);}
  fetch('/api/talk/parse',{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({text:t})})
+   body:JSON.stringify({text:t,intent_key:_lastIntent})})
   .then(function(r){return r.text().then(function(b){
     var d=null;try{d=JSON.parse(b);}catch(e){}
     return {ok:r.ok,status:r.status,d:d,raw:b};});})

@@ -171,6 +171,10 @@ LABELS = ("예산", "용도", "선호")
 
 class ParseBody(BaseModel):
     text: str
+    # 화면이 «자기가 매치한» 의도를 함께 알린다(A-95 ③). 화면이 즉시 답해야 해서
+    # 서버 왕복을 기다릴 수 없기 때문이다. 없는 키를 보내도 FK 가 거부하므로
+    # 이 값을 그대로 믿어도 표가 오염되지 않는다.
+    intent_key: str | None = None
 
 
 def _usage_rows() -> list:
@@ -467,7 +471,7 @@ def parse_talk(body: ParseBody, request: Request):
     with engine.begin() as conn:
         _record_hit(conn, request=request, text_raw=text, matched=[l for l, _v in
                     [(c["l"], c["v"]) for c in kept]], unmatched_n=len(dropped),
-                    intent_key=None, answer_kind="constraint_parse", llm_called=True)
+                    intent_key=body.intent_key, answer_kind="constraint_parse", llm_called=True)
 
     return {
         "ok": True,
@@ -679,3 +683,37 @@ def record_hit(body: HitBody, request: Request):
                     intent_key=body.intent_key, answer_kind=body.answer_kind,
                     llm_called=False)
     return {"ok": True}
+
+
+@router.get("/intents")
+def list_intents():
+    """사용 중인 답변 패턴 — 화면이 이걸 받아 쓴다 (A-95 ③).
+
+    ■ 왜 화면 모양 그대로 주나
+      응답이 화면의 `TALKS` 배열과 «같은 모양»이라 화면은 배열만 갈아끼우면 된다.
+      새 형식을 만들면 이관이 「옮기기」가 아니라 「재작성」이 되고, 그러면 폴백
+      배열과 서버 값이 서로 다른 모양이 되어 둘을 함께 유지할 수 없다.
+
+    ■ ⚠ 화면은 폴백을 그대로 들고 있다
+      이 요청이 실패해도 팝콘톡은 답해야 한다. 화면의 `TALKS` 는 지우지 않는다 --
+      **이 표가 정본이고 화면 배열은 사본**이다.
+
+    ■ `자동`도 함께 준다
+      A-96 으로 승격된 것(`status='자동'`)은 사람 승인분(`사용`)과 같이 고객에게 나간다.
+      «구분해서 보여주는» 것은 관리자 화면의 몫이고, 고객 화면은 둘을 같이 쓴다.
+    """
+    out = []
+    with engine.connect() as conn:
+        for r in conn.execute(text("""
+            SELECT intent_key, match_terms, min_hits, answer_body, answer_pack
+              FROM talk_intents
+             WHERE status IN ('사용', '자동') AND answer_body IS NOT NULL
+             ORDER BY intent_key
+        """)).mappings().all():
+            item = {"key": r["intent_key"], "k": list(r["match_terms"] or []),
+                    "min": int(r["min_hits"] or 1), "a": r["answer_body"]}
+            # 조건팩은 «펼쳐서» 준다 -- 화면 TALKS 가 p·chips·chipsUse 를 최상위에 둔다.
+            for k, v in (r["answer_pack"] or {}).items():
+                item[k] = v
+            out.append(item)
+    return {"ok": True, "intents": out}
