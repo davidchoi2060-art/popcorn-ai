@@ -944,7 +944,7 @@ function monitorBands(srcText){
     그대로 두면 **가장 잘 답한 질문이 기록에서 빠진다.** 서버가 마스킹한 뒤 저장한다.
     실패해도 화면은 아무 말도 하지 않는다 — 고객이 알 필요 없는 부가 기능이다. */
  try{fetch('/api/talk/hit',{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({text:srcText||'',intent_key:null,answer_kind:'band_cards'})}).catch(function(){});}
+   body:JSON.stringify({text:srcText||'',intent_key:'monitor_recommend',answer_kind:'band_cards'})}).catch(function(){});}
  catch(e){}
  var wrap=document.createElement('div');
  wrap.style.cssText='display:flex;gap:10px;flex-wrap:wrap;padding-left:48px;margin-top:2px;';

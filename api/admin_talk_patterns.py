@@ -37,6 +37,10 @@ from sqlalchemy import text
 
 from .auth import current_operator
 from .db import engine
+# ⚠ 시각은 «반드시» 이 함수를 지난다 — DB 컬럼이 naive(UTC)라 `.isoformat()` 을 그대로
+# 내보내면 브라우저가 **로컬 시각으로 오독해 9시간이 어긋난다**(KST-UTC 차이).
+# 실제로 이 화면 검증에서 방금 한 질문이 「9시간 전」으로 떴다.
+from .timeutil import iso
 from .talk import AUTO_PROMOTE_VISITORS, RAW_KEEP_DAYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin-talk-patterns"])
@@ -50,6 +54,20 @@ def _owner():
     if me.get("role") != "owner":
         raise HTTPException(403, "관리자(owner)만 바꿀 수 있습니다")
     return me
+
+
+# 「우리가 아직 답을 못 만든 질문」의 정의 — **한 자리에만 적는다.**
+# 검증(2026-08-22)에서 `intent_key IS NULL` 만으로는 «답을 준 질문»까지 큐에 올라오는 것을
+# 확인했다. 셋을 함께 봐야 한다:
+#
+#     intent_key IS NULL          어느 답변 패턴에도 안 걸렸다
+#     matched_terms = '[]'        조건도 하나 못 읽었다 (예산·용도를 읽었으면 답한 것이다)
+#     answer_kind = constraint_parse   band_cards 처럼 «다른 방식으로 답한» 경로가 아니다
+#
+# 실측 대조: 「모니터도 하나 추천해주세요」(band_cards, 답을 줌)와 「예산 12000만원까지」
+# (matched=['예산'], 조건을 읽음)는 빠지고, 「오늘 서울 날씨 어때요?」만 남는다.
+UNANSWERED = ("h.intent_key IS NULL AND h.matched_terms = '[]'::jsonb"
+              " AND h.answer_kind = 'constraint_parse'")
 
 
 def _origin_where(include_regression: bool) -> str:
@@ -95,7 +113,7 @@ def list_patterns(include_regression: bool = False):
             "answer_ref": r["answer_ref"], "status": r["status"],
             "has_pack": bool(r["has_pack"]),
             "hits": int(r["hits"] or 0),
-            "last_at": r["last_at"].isoformat() if r["last_at"] else None,
+            "last_at": iso(r["last_at"]),
             # 충돌한 말과 «누구와» 겹치는지까지 준다 — 화면이 이유를 말할 수 있어야 한다.
             "conflicts": [{"term": t, "with": [k for k in clash[t] if k != r["intent_key"]]}
                           for t in mine],
@@ -126,13 +144,13 @@ def queue(include_regression: bool = False, limit: int = 8):
                        AS visitors,
                    MAX(h.created_at) AS last_at
               FROM talk_intent_hits h
-             WHERE h.intent_key IS NULL""" + _origin_where(include_regression) + """
+             WHERE """ + UNANSWERED + _origin_where(include_regression) + """
              GROUP BY 1, 2
              ORDER BY visitors DESC, hits DESC
              LIMIT :lim
         """), {"lim": max(1, min(limit, 40))}).mappings().all()
         total = conn.execute(text(
-            "SELECT COUNT(*) FROM talk_intent_hits h WHERE h.intent_key IS NULL"
+            "SELECT COUNT(*) FROM talk_intent_hits h WHERE " + UNANSWERED
             + _origin_where(include_regression))).scalar()
     groups = []
     for r in rows:
@@ -142,7 +160,7 @@ def queue(include_regression: bool = False, limit: int = 8):
             # 어휘가 비면 묶을 기준이 없다 — 지어내지 않고 그 사실을 이름으로 말한다.
             "unknown_terms": not (r["terms"] or []),
             "hits": int(r["hits"] or 0), "visitors": v,
-            "last_at": r["last_at"].isoformat() if r["last_at"] else None,
+            "last_at": iso(r["last_at"]),
             "at_threshold": v >= AUTO_PROMOTE_VISITORS,
         })
     return {"ok": True, "groups": groups, "total_hits": int(total or 0),
@@ -167,8 +185,8 @@ def raw_stats():
         """)).mappings().first()
     return {"ok": True, "keep_days": RAW_KEEP_DAYS,
             "kept": int(r["kept"] or 0),
-            "oldest_at": r["oldest"].isoformat() if r["oldest"] else None,
-            "next_purge_at": r["next_purge"].isoformat() if r["next_purge"] else None}
+            "oldest_at": iso(r["oldest"]),
+            "next_purge_at": iso(r["next_purge"])}
 
 
 class PatternBody(BaseModel):
