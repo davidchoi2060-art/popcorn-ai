@@ -272,6 +272,33 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 </div>
 </section>
+<!-- peripherals: 함께 구성 (본체 견적과 분리 — 근거 기반 제안, 엔진 검증 대상 아님)
+     ■ 2026-08-22 사장님 지시로 «호환성 검사 결과»(sec-fit) **위**로 올렸다.
+       순서를 바꿔도 어긋나지 않는 것을 먼저 확인했다:
+       · 「핵심 1~4」 배지는 fit·check·as·compare 넷에만 있고 이 섹션엔 없다 — 번호가 안 밀린다.
+       · 순번 주석(1: COMPATIBILITY · 2: INSPECTION)도 이 섹션엔 없다.
+       · nav(호환성·검수·A/S·비교)에 이 섹션 링크가 없어 메뉴 순서와도 안 어긋난다.
+       · 견적 카드의 「모니터·키보드는 아래 "함께 쓰면 좋은 구성"에서 ↓」 안내(정적 1곳 +
+         `renderList()` JS 1곳)는 **그대로 맞다** — 이 섹션은 그 카드보다 여전히 아래다.
+         («아래»의 기준은 sec-fit 이 아니라 그 안내가 놓인 견적 카드다.) -->
+<section id="sec-periph" style="background:#fff;border-radius:22px;border:1px solid #ece9e3;padding:30px 34px;margin-bottom:24px;">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+<span style="width:44px;height:44px;border-radius:13px;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:24px;color:#fff;">devices</span>
+<h2 style="margin:0;font-size:21px;font-weight:900;color:#17171b;">함께 쓰면 좋은 구성</h2>
+</div>
+<p style="margin:0 0 18px;font-size:14px;color:#6b6b73;">본체 견적과는 별개입니다 — 이미 갖고 계시면 그대로 두세요. 담을 때도 근거를 보고 정하시면 됩니다.</p>
+<!-- minmax(320px,...) 하한이 320px보다 좁은 컨테이너(375px 뷰포트 - 좌우 padding = 227px)에서도
+     그대로 유지돼 그리드가 부모 폭을 무시하고 넓어지는 문제(grid blowout, 375px 전수 점검에서
+     발견). min(320px,100%)로 하한을 컨테이너 폭 이내로 묶는다 — 320px 이상 여유가 있는
+     폭(481px+)에서는 min()이 그대로 320px로 평가되어 기존 카드 폭이 전혀 바뀌지 않는다. -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;">
+<!-- 주변기기 후보는 서버(GET /api/recommend 의 companion)가 준다. 목업 시절 예시 4종
+     (LG 27GS75Q 329,000원 · 앱코 K660 · 로지텍 G102 · 하이퍼엑스 Cloud III,
+     실재고 9/44/120/17대)가 마크업에 박혀 있어 서버가 못 주면 사실처럼 보였다. -->
+<div style="grid-column:1 / -1;border:1px dashed #ddd8ce;border-radius:16px;padding:18px 20px;font-size:13.5px;line-height:1.7;color:#8a8578;">함께 쓰는 구성은 실재고에서 골라 표시됩니다. 견적을 받으면 모니터 · 키보드 · 마우스 · 헤드셋 후보가 이 자리에 표시됩니다.</div>
+</div>
+<p id="s2p-sum" style="margin:16px 0 0;font-size:13.5px;color:#8a8578;font-weight:600;">아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.</p>
+</section>
 <!-- 1: COMPATIBILITY (green, full width) -->
 <section id="sec-fit" style="background:var(--success-container, #e9f6ef);border-radius:22px;padding:30px 34px;margin-bottom:24px;">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -442,25 +469,6 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <input class="s2quote__input" placeholder="외부 견적 입력" style="width:280px;padding:13px 16px;border:1.5px solid #ddd8ce;border-radius:11px;font-size:14px;font-family:inherit;outline:none;">
 <button style="padding:13px 22px;border:none;background:#17171b;border-radius:11px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">진단하기</button>
 </div>
-</section>
-<!-- peripherals: 함께 구성 (본체 견적과 분리 — 근거 기반 제안, 엔진 검증 대상 아님) -->
-<section id="sec-periph" style="background:#fff;border-radius:22px;border:1px solid #ece9e3;padding:30px 34px;margin-bottom:24px;">
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-<span style="width:44px;height:44px;border-radius:13px;background:#17171b;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:24px;color:#fff;">devices</span>
-<h2 style="margin:0;font-size:21px;font-weight:900;color:#17171b;">함께 쓰면 좋은 구성</h2>
-</div>
-<p style="margin:0 0 18px;font-size:14px;color:#6b6b73;">본체 견적과는 별개입니다 — 이미 갖고 계시면 그대로 두세요. 담을 때도 근거를 보고 정하시면 됩니다.</p>
-<!-- minmax(320px,...) 하한이 320px보다 좁은 컨테이너(375px 뷰포트 - 좌우 padding = 227px)에서도
-     그대로 유지돼 그리드가 부모 폭을 무시하고 넓어지는 문제(grid blowout, 375px 전수 점검에서
-     발견). min(320px,100%)로 하한을 컨테이너 폭 이내로 묶는다 — 320px 이상 여유가 있는
-     폭(481px+)에서는 min()이 그대로 320px로 평가되어 기존 카드 폭이 전혀 바뀌지 않는다. -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;">
-<!-- 주변기기 후보는 서버(GET /api/recommend 의 companion)가 준다. 목업 시절 예시 4종
-     (LG 27GS75Q 329,000원 · 앱코 K660 · 로지텍 G102 · 하이퍼엑스 Cloud III,
-     실재고 9/44/120/17대)가 마크업에 박혀 있어 서버가 못 주면 사실처럼 보였다. -->
-<div style="grid-column:1 / -1;border:1px dashed #ddd8ce;border-radius:16px;padding:18px 20px;font-size:13.5px;line-height:1.7;color:#8a8578;">함께 쓰는 구성은 실재고에서 골라 표시됩니다. 견적을 받으면 모니터 · 키보드 · 마우스 · 헤드셋 후보가 이 자리에 표시됩니다.</div>
-</div>
-<p id="s2p-sum" style="margin:16px 0 0;font-size:13.5px;color:#8a8578;font-weight:600;">아직 담은 주변기기가 없습니다 — 필요 없으면 그대로 진행하세요.</p>
 </section>
 <!-- closing banner -->
 <section class="s2closing" style="background:#17171b;color:#fff;border-radius:22px;padding:36px 40px;display:flex;align-items:center;justify-content:space-between;gap:32px;">
