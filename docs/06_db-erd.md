@@ -1467,6 +1467,7 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/admin/operators
 | `answer_body` | TEXT | 문구 답변 |
 | `answer_ref` | VARCHAR(120) | `band_cards` 가 부를 API |
 | `status` | VARCHAR(12) NOT NULL | `대기` · `사용` · **`자동`** · `미사용` |
+| `answer_pack` | JSONB | **0062 추가** — 답변과 함께 붙는 조건·칩(`p`·`chips`·`chipsUse`) |
 | `approved_by` · `approved_at` | | 승인 주체·시각 |
 
 **CHECK 셋**: status 어휘 · answer_kind 어휘 · **「사용/자동인데 답이 둘 다 비면 거부」**.
@@ -1512,7 +1513,26 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/admin/operators
 쌓인 질문은 되돌릴 수 없는 원장이고, downgrade 로 지우면 A-95 로 모은 것이 통째로
 사라진다. 되돌려야 하면 사람이 판단해 DROP 한다 — 그 판단을 자동화하지 않는다.
 
+### 19-H. [0062] answer_pack + TALKS 20종 이관 (2026-08-22, **적용됨**)
+
+20종 중 **7종이 답변과 함께 조건·칩을 붙인다** — `answer_body`(문구)만으로는 못 옮겨
+`answer_pack` JSONB 를 더했다. 담기는 모양은 화면이 이미 쓰던 그대로(`p`·`chips`·
+`chipsUse`)다 — 새 형식을 만들면 이관이 「옮기기」가 아니라 「재작성」이 된다.
+
+값은 손으로 옮기지 않았다: `TALKS` 를 Node 로 평가해 JSON 으로 뽑고 INSERT 를 생성했다.
+**전건 대조 통과**(어휘·min·답변·조건팩, 어긋남 0건).
+
+`status` 는 전부 `사용` — 이미 고객에게 나가던 문구라 「대기」로 넣으면 이관 순간
+팝콘톡이 답을 멈춘다.
+
+⚠ **화면은 폴백을 그대로 들고 있다.** `GET /api/talk/intents` 가 실패해도 답할 수 있어야
+한다 — 이 표가 정본이고 화면 배열은 사본이다.
+
 ### 19-G. 아직 안 지어진 것
 
-표만 섰다. 남은 것 셋 — ② `api/talk.py` 기록 배선(마스킹 포함) ③ `TALKS` 20종 이관
-④ 관리자 화면(ADM-TLK-010). **코드가 이 표를 참조하기 전에는 아무 행도 생기지 않는다.**
+~~표만 섰다. 남은 것 셋~~ → **② 기록 배선(2026-08-22 완료 · 마스킹 포함) ·
+③ TALKS 20종 이관(완료 · 0062)** 까지 끝났다. 오늘부터 질문이 실제로 쌓인다.
+
+**남은 것은 ④ 관리자 화면(ADM-TLK-010) 하나다.** 그 화면은 §화면 작업의 경계에 따라
+**요구사항 정의서까지만** 나와 있다(`docs/design/req/req-talk-patterns.md`) — 배치·
+컴포넌트·색은 사장님이 주시는 승인 디자인이 정한다.
