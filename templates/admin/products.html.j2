@@ -171,6 +171,11 @@
 .pp-dr-close{font:400 15px/1 var(--font);color:var(--rv-faint);cursor:pointer;padding:2px 4px;
          background:none;border:0}
 .pp-dr-close:hover{color:var(--on)}
+.pp-dr-mall-link{flex:none;display:inline-flex;align-items:center;font:500 10.5px/1 var(--font);
+    color:var(--rv-link);text-decoration:none;white-space:nowrap;padding:4px 7px;
+    border:1px solid rgba(0,0,0,.14);border-radius:4px}
+.pp-dr-mall-link:hover{background:var(--container-low);text-decoration:underline}
+.pp-dr-mall-link[hidden]{display:none}
 .pp-dr-sub{display:flex;gap:11px;margin:6px 0 10px;font:400 10.5px/1.3 var(--font-num);
        color:var(--rv-faint);flex-wrap:wrap}
 .pp-dr-tabs{display:flex;gap:15px;flex-wrap:wrap}
@@ -309,6 +314,8 @@ a.pp-btn-line{color:var(--on)}
     <div class="pp-dr-head">
       <div class="pp-dr-title-row">
         <span class="pp-dr-title" id="drTitle"></span>
+        <a class="pp-dr-mall-link" id="drMallLink" href="#" target="_blank" rel="noopener"
+           data-keep="1" title="팝콘PC 쇼핑몰 관리자 · 로그인 필요" hidden>몰 관리자에서 열기</a>
         <span class="pp-badge" id="drStatusBadge" hidden></span>
         <button type="button" class="pp-dr-close" id="drClose" aria-label="닫기">✕</button>
       </div>
@@ -646,6 +653,16 @@ a.pp-btn-line{color:var(--on)}
   }
 
   /* ══════════════════════ 상세/편집 서랍 ══════════════════════ */
+  // 몰 관리자 상품 수정 페이지 — URL은 이 한 자리에서만 만든다(§단일 원천). pd_no ==
+  // products.product_code(실측 확인, api/mall.py:15 주석 · CANON §3). 고객용 URL
+  // (api/mall.py의 BASE+DETAIL = /shop/product_detail.html?pd_no=)은 별개 경로라 여기
+  // 두지 않는다 — 필요해지면 이 상수 옆에 나란히 추가한다. 비로그인 접근은 몰이 로그인
+  // 화면으로 리다이렉트하고 로그인 후 이 상품으로 되돌린다(하네스 실측, 2026-08-23).
+  var MALL_ADMIN_BASE = "https://popcornpc.co.kr";
+  var MALL_ADMIN_EDIT_PATH = "/adm_cate/product_insert.php?pd_no=%s&atype=modify";
+  function mallAdminEditUrl(code){
+    return MALL_ADMIN_BASE + MALL_ADMIN_EDIT_PATH.replace("%s", encodeURIComponent(code));
+  }
   var DR_TABS = [["basic","기본 정보"],["spec","사양"],["supplier","공급처"],["parttype","분류 변경"]];
   var DRAWER = {
     code:null, data:null, activeTab:"basic",
@@ -692,6 +709,11 @@ a.pp-btn-line{color:var(--on)}
   function renderDrawerLoading(){
     document.getElementById("drTitle").textContent = "불러오는 중…";
     document.getElementById("drStatusBadge").hidden = true;
+    // 이전 상품의 몰 관리자 링크가 다음 상품 로딩 중에도 남아 있으면 옛 코드로 안내하는
+    // 사고가 된다 — 로딩을 그릴 때마다 즉시 숨기고 href를 지운다(renderDrawer가 새
+    // DRAWER.code로 다시 세운다).
+    var mallLinkL = document.getElementById("drMallLink");
+    if(mallLinkL){ mallLinkL.hidden = true; mallLinkL.removeAttribute("href"); }
     document.getElementById("drSub").innerHTML = "";
     document.getElementById("drTabs").innerHTML = "";
     document.getElementById("drBody").innerHTML = '<div class="pp-empty">불러오는 중…</div>';
@@ -718,6 +740,14 @@ a.pp-btn-line{color:var(--on)}
   function renderDrawer(){
     var d = DRAWER.data; if(!d) return;
     var t = document.getElementById("drTitle"); t.textContent = d.name; t.title = d.name;
+    // 몰 관리자 링크 — DRAWER.code는 openDrawer()가 이 상품을 열 때 이미 채워 놓았고
+    // (fetchDrawerData의 "DRAWER.code !== code" 가드로 다른 상품 응답은 여기까지 오지
+    // 않는다), 코드가 없으면(방어적) 빈 pd_no로 링크를 내밀지 않고 숨긴다.
+    var mallLink = document.getElementById("drMallLink");
+    if(mallLink){
+      if(DRAWER.code){ mallLink.href = mallAdminEditUrl(DRAWER.code); mallLink.hidden = false; }
+      else { mallLink.hidden = true; mallLink.removeAttribute("href"); }
+    }
     var badge = document.getElementById("drStatusBadge");
     // 목록 배지와 같은 신호(status_key, derive_status 단일 원천) — 결함 ⓐ-3.
     // review_pending(검수 큐 실행 건수)은 살아있는 신호가 아니다: 신규 등록은
