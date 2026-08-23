@@ -29,6 +29,7 @@ import urllib.parse
 import urllib.request
 
 import sys
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # cp949 콘솔에서 종료 안내가 죽었다(2026-08-23)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _tg_env import creds                                          # noqa: E402
@@ -165,7 +166,7 @@ def main() -> None:
     # 루프가 목록을 읽고 알아채게 두면 다른 지시에 섞이거나 목록이 길 때 놓친다.
     # 폰에서 끈 사람은 꺼진 줄 알고 자리를 뜨는데 루프가 계속 도는 것이 가장 나쁘다.
     if stop_requested(msgs):
-        print("\n[종료요청] 「텔레그램 종료」를 받았다 — 즉시 루프를 끝낼 것. "
+        print("\n[종료요청] 「텔레그램 종료」를 받았다 - 즉시 루프를 끝낼 것. "
               "종료 인사를 보낸 뒤 ScheduleWakeup(stop=true).")
     if dropped:
         print(f"\n※ 등록되지 않은 발신자의 메시지 {dropped}건을 버렸다 (내용은 읽지 않음).")
