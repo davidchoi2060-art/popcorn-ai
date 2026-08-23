@@ -20,6 +20,10 @@ import json
 import os
 import subprocess
 import sys
+# cp949 콘솔에서 --stdin 본문이 깨져 텔레그램이 400(strings must be UTF-8)을 냈다(2026-08-23).
+# read_telegram.py 와 같은 처방 — 표준입출력을 UTF-8 로 고정한다.
+sys.stdin.reconfigure(encoding="utf-8")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import urllib.error
 import urllib.request
 
