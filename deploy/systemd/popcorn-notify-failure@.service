@@ -24,12 +24,30 @@
 # 그래서 이어 붙여도 '@' 가 두 번 나올 일이 없다. 실제 배선은
 # deploy/systemd/popcorn-danawa-market@.service 의 OnFailure= 줄 참조.
 #
-# 받는 쪽(여기)은 %I(escape 를 사람이 읽는 형태로 되돌린 인스턴스 이름 —
-# 지금 오는 값들은 애초에 escape 가 필요 없는 평범한 문자들이라 %i 와 같다)를
-# scripts/notify_failure.py 에 인자로 넘긴다. 그 스크립트의 resolve_unit_name()
-# 이 "prefix-instance" 를 다시 "prefix@instance.service" 로 복원해
-# journalctl -u 에 쓴다 — 복원 규칙의 전제와 한계는 그 함수 docstring 참조
-# (지금은 인스턴스 이름에 하이픈이 없는 fast/slow 뿐이라 안전하다).
+# 받는 쪽(여기)은 반드시 %i 를 쓴다 — %I 가 아니다(2026-08-24 서버 실측 사고,
+# 아래). scripts/notify_failure.py 에 인자로 넘기면 그 스크립트의
+# resolve_unit_name() 이 "prefix-instance" 를 다시 "prefix@instance.service"
+# 로 복원해 journalctl -u 에 쓴다 — 복원 규칙의 전제와 한계는 그 함수 docstring
+# 참조(지금은 인스턴스 이름에 하이픈이 없는 fast/slow 뿐이라 안전하다).
+#
+# ── 왜 %I 가 아니라 %i 인가 (2026-08-24 서버 실측 사고) ──────────────────────
+# systemd 에서 '-' 는 '/' 의 escape 표현이다(경로에서 자동 생성되는 인스턴스
+# 이름 관례 — 예: /dev/sda1 이 인스턴스로 쓰이면 파일명은 dev-sda1). %i 는
+# "인스턴스 이름을 이 unit 의 이름에 실제로 쓰인 그대로"(escape 된 형태
+# 그대로, 추가 처리 없음) 주고, %I 는 그것을 **unescape** 해 사람이 읽는
+# 형태로 되돌린다 — 그 과정에서 '-' 를 전부 '/' 로 되돌린다. 우리는 %p-%i
+# 조인에서 '-' 를 "그냥 이어붙이는 구분자"로 썼을 뿐인데, %I 입장에서는 그
+# '-' 가 전부 "escape 된 '/'"로 보인다. 그래서 처음 이 파일을 %I 로 배선해
+# 실제 서버에 설치하고 popcorn-danawa-market@fast.service 를 일부러
+# 실패시켜 봤더니, journald 에 "popcorn-danawa-market-fast" 가 아니라
+# **"popcorn/danawa/market/fast"** 로 깨져 남았다(Description 문구·
+# scripts/notify_failure.py 가 받는 인자 양쪽 다). `journalctl -u
+# popcorn/danawa/market/fast.service` 는 존재하지 않는 unit 이라 마지막
+# 로그를 못 가져온다 — 알림은 가지만 «왜 실패했는지»가 빠진다. %i 로 바꾸면
+# scripts/notify_failure.py 의 resolve_unit_name() 이 원래 받기로 설계된
+# "하이픈이 살아있는 원문"이 그대로 오므로, **스크립트 쪽은 고치지 않았다**
+# (로컬에서 resolve_unit_name('popcorn-danawa-market-fast') 가
+# 'popcorn-danawa-market@fast.service' 를 내는 것으로 재확인함).
 #
 # 앞으로 다른 unit 의 OnFailure= 를 여기로 연결할 때: 그 unit 이 템플릿이
 # 아니면(이름에 '@' 가 없으면) OnFailure=popcorn-notify-failure@%n.service 를
@@ -48,7 +66,7 @@
 # 「실패 알림」 참조.
 
 [Unit]
-Description=팝콘PC AI unit 실패 알림 (%I 가 실패한 unit — U-57)
+Description=팝콘PC AI unit 실패 알림 (%i 가 실패한 unit — U-57)
 Documentation=file:///srv/popcorn-ai/deploy/README.md
 
 [Service]
@@ -74,7 +92,7 @@ EnvironmentFile=/etc/popcorn-ai.env
 # 비용이 없다.
 TimeoutStartSec=120
 
-ExecStart=/srv/popcorn-ai/.venv/bin/python /srv/popcorn-ai/scripts/notify_failure.py %I
+ExecStart=/srv/popcorn-ai/.venv/bin/python /srv/popcorn-ai/scripts/notify_failure.py %i
 
 Environment=PYTHONIOENCODING=utf-8
 Environment=PYTHONUNBUFFERED=1

@@ -404,7 +404,7 @@ popcorn-danawa-%i` 덕에 `journalctl -t popcorn-danawa-fast`(또는 `-slow`)로
 
 | 파일 | 역할 |
 |---|---|
-| `deploy/systemd/popcorn-notify-failure@.service` | 알림 템플릿. `%I`로 "실패한 unit 식별자"를 받아 `scripts/notify_failure.py`를 실행 |
+| `deploy/systemd/popcorn-notify-failure@.service` | 알림 템플릿. `%i`(반드시 `%i` — `%I`는 안 된다, 아래 참조)로 "실패한 unit 식별자"를 받아 `scripts/notify_failure.py`를 실행 |
 | `scripts/notify_failure.py` | journalctl로 마지막 로그를 뽑고, `scripts/notify_telegram.py`(기존 스크립트를 그대로 재사용 — 다시 구현하지 않는다)로 전송 |
 | `deploy/systemd/popcorn-danawa-market@.service` | (기존 파일 수정) `[Unit]`에 `OnFailure=popcorn-notify-failure@%p-%i.service` 한 줄 추가 |
 
@@ -421,6 +421,18 @@ popcorn-danawa-%i` 덕에 `journalctl -t popcorn-danawa-fast`(또는 `-slow`)로
 `resolve_unit_name()`)이 마지막 `-`를 `@`로 되돌려 `journalctl -u`에 쓸 이름을
 복원한다(인스턴스 이름 자체에 하이픈이 없다는 전제 — 지금 쓰는 fast/slow는
 문제없다). 전체 근거는 두 파일의 머리말 주석에 있다(여기서 반복하지 않는다).
+
+**⚠ 받는 쪽(`popcorn-notify-failure@.service`)은 `%i`를 쓴다 — `%I`가 아니다
+(2026-08-24 서버 실측 사고로 확정).** systemd에서 `-`는 `/`의 escape
+표현이다. `%i`는 인스턴스 이름을 escape된 그대로(추가 처리 없이) 주고,
+`%I`는 그것을 사람이 읽는 형태로 **unescape**한다 — 그 과정에서 `-`를 전부
+`/`로 되돌린다. 처음 `%I`로 배선해 서버에 실제로 설치하고
+`popcorn-danawa-market@fast.service`를 일부러 실패시켜 봤더니, journald에
+`popcorn-danawa-market-fast`가 아니라 **`popcorn/danawa/market/fast`**로
+깨져 남았다(Description 문구·스크립트가 받는 인자 양쪽 다) — `journalctl -u
+popcorn/danawa/market/fast.service`는 존재하지 않는 unit이라 마지막 로그를
+못 가져온다. `%i`로 바꾸면 `resolve_unit_name()`이 원래 받기로 설계된
+그대로("하이픈이 살아있는 원문")가 오므로 스크립트는 고치지 않았다.
 
 ### `notify_telegram.py`가 배포 서버(.env 없음)에서 동작하는가 — 판정
 
