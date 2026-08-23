@@ -164,14 +164,18 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           <button id="s4-mode-demo" style="border:1.5px solid #ddd8ce;background:#fff;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:800;color:#8a8578;cursor:pointer;font-family:inherit;">전환 미리보기</button>
         </div>
 
-        <!-- login gate -->
+        <!-- mall handoff step — 실제로는 인증이 없다(윈윈소프트 SSO 미연동, 2026-08-23 재확인,
+             지시서 A-98). 예전 문구("로그인이 필요합니다"/"로그인됩니다")는 일어나지 않는 일을
+             약속했다. 지금은 사실만 말한다: 이 화면은 회원 확인 없이 쇼핑몰로 견적을 넘기고,
+             로그인·결제는 이어지는 쇼핑몰 화면이 처리한다(CANON §3 — 결제·배송·환불·회원관리는
+             쇼핑몰 소관). -->
         <div id="s4-authgate" style="background:#f2edfb;border-radius:20px;padding:22px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <span style="width:38px;height:38px;border-radius:11px;background:#6a3fbf;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:20px;color:#fff;">lock</span>
-            <h3 style="margin:0;font-size:16px;font-weight:900;color:#4a2a94;">결제를 위해 로그인이 필요합니다</h3>
+            <span style="width:38px;height:38px;border-radius:11px;background:#6a3fbf;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:20px;color:#fff;">swap_horiz</span>
+            <h3 style="margin:0;font-size:16px;font-weight:900;color:#4a2a94;">인증 없이 쇼핑몰로 넘어갑니다</h3>
           </div>
-          <p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:#6b5a92;">기존 팝콘PC 쇼핑몰 계정으로 로그인됩니다. 여기까지의 구성이 그대로 이어집니다.</p>
-          <button style="width:100%;padding:14px;border:none;background:#6a3fbf;border-radius:12px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;" id="s4-login"><span style="font-family:'Material Symbols Outlined';font-size:19px;">login</span>로그인 / 회원가입으로 계속</button>
+          <p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:#6b5a92;">회원 확인 절차 없이 이 구성 그대로 쇼핑몰 장바구니로 인계됩니다. 로그인과 결제는 이어지는 팝콘PC 쇼핑몰 화면에서 진행합니다.</p>
+          <button style="width:100%;padding:14px;border:none;background:#6a3fbf;border-radius:12px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;" id="s4-login"><span style="font-family:'Material Symbols Outlined';font-size:19px;">arrow_forward</span>쇼핑몰로 계속하기</button>
         </div>
 
         <!-- 자체 결제 (own 모드) -->
@@ -223,7 +227,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
             <a href="s3-detail.html" style="flex:0 0 auto;padding:14px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:12px;font-size:14px;font-weight:800;color:#3a3a40;text-decoration:none;">부품 변경</a>
             <button id="s4-pay" disabled style="flex:1;padding:14px;border:none;background:#c9c5bd;border-radius:12px;font-size:15px;font-weight:800;color:#fff;cursor:not-allowed;font-family:inherit;">결제하기</button>
           </div>
-          <p id="s4-pay-cap" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;text-align:center;">로그인 후 결제할 수 있어요.</p>
+          <p id="s4-pay-cap" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;text-align:center;">확인 후 쇼핑몰로 넘길 수 있어요.</p>
         </div>
 
       </aside>
@@ -320,7 +324,7 @@ function tmsg(m){var t=document.getElementById('s4-toast');t.textContent=m;t.sty
 var login=document.getElementById('s4-login'),pay=document.getElementById('s4-pay'),cap=document.getElementById('s4-pay-cap'),gate=document.getElementById('s4-authgate');
 var own=document.getElementById('s4-own'),done=document.getElementById('s4-done'),badge=document.getElementById('s4-mode-badge');
 function opsPay(){try{return (JSON.parse(localStorage.getItem('popcorn-ops')||'{}').pay)||'mall';}catch(e){return 'mall';}}
-var mallLogged=false,pm='카드';
+var mallHandoffReady=false,pm='카드';/* 예전 이름 mallLogged — 실제로는 로그인이 아니라 "인계 확인을 마쳤는가"라 개명(2026-08-23, A-98) */
 function member(){return (window.popcornAuth&&window.popcornAuth.member())||null;}
 function renderMember(){
  var box=document.getElementById('s4-own-member');if(!box)return;
@@ -334,14 +338,14 @@ function check(){
  var mode=opsPay();
  var ok=false, msg='';
  /* 서버 값으로 구성이 그려지기 전에는 어떤 경로로도 인계 버튼이 열리지 않는다.
-    (쇼핑몰 로그인 단추만 눌러도 열리던 자리다 - 견적 없이 몰로 넘어갔다) */
+    (쇼핑몰로 계속하기 단추만 눌러도 열리던 자리다 - 견적 없이 몰로 넘어갔다) */
  if(!window.s4Live){
   if(pay){pay.disabled=true;pay.style.background='#c9c5bd';pay.style.cursor='not-allowed';}
   if(cap)cap.textContent=window.s4Msg||'견적 세션이 없어 인계할 수 없습니다.';
   return;
  }
  /* 인계 모드에서 우리는 결제를 받지 않는다 — 문구가 그렇게 말해야 한다(범위 확정 2026-08-11) */
- if(mode==='mall'){ok=mallLogged;msg=ok?'견적을 쇼핑몰 장바구니로 넘깁니다. 결제·배송은 쇼핑몰에서 진행됩니다.':'쇼핑몰 로그인 후 넘길 수 있어요.';}
+ if(mode==='mall'){ok=mallHandoffReady;msg=ok?'견적을 쇼핑몰 장바구니로 넘깁니다. 결제·배송은 쇼핑몰에서 진행됩니다.':'위 안내를 확인하면 쇼핑몰로 넘길 수 있어요.';}
  else{
   var m=member(),nm=(document.getElementById('s4-name')||{}).value,ph=(document.getElementById('s4-phone')||{}).value,ad=(document.getElementById('s4-addr')||{}).value,ag=(document.getElementById('s4-agree')||{}).checked;
   if(!m)msg='로그인 후 결제할 수 있어요.';
@@ -376,15 +380,15 @@ if(demo)demo.addEventListener('click',function(){
  tmsg('운영 모드 미리보기: '+(ops.pay==='own'?'자체 결제':'쇼핑몰 인계')+' — 실제로는 관리자 운영 전환 설정에서 발행');
  applyMode();
 });
-/* 2026-08-21 문안 교정 (길잡이 실측): 이 버튼은 이메일 입력도 인증 API 호출도 없이
-   mallLogged 플래그만 세운다 — 몰 SSO(윈윈소프트 API)가 아직 없다. 종전 토스트
-   "쇼핑몰 계정으로 로그인되었습니다"는 실제로 일어나지 않은 일을 사실처럼 말했다
-   (클릭 직후 GET /api/auth/me == authenticated:false로 확인됨). 문구만 고친다 —
-   ⚠ mallLogged=true·gate 숨김·check() 동작은 그대로다: 이 버튼은 지금도 결제(인계)
-   섹션을 여는 유일한 관문이고, 실제 로그인 없이 열린다는 사실은 이 교정으로 바뀌지
-   않는다. 인증을 실제로 붙일지 "(준비 중)"으로 막을지는 몰 SSO 연동 일정과 맞물린
-   판단이라 여기서 정하지 않는다(보고 대상). */
-if(login)login.addEventListener('click',function(){mallLogged=true;if(gate)gate.style.display='none';tmsg('쇼핑몰 로그인 연동은 아직 준비 중입니다 — 결제 화면을 미리 보여드립니다.');check();});
+/* 2026-08-23 문안 재교정 (지시서 A-98): 2026-08-21 교정이 열어 둔 물음("(준비 중)"으로
+   막을지 사실 그대로 말할지)에 답한다 — 실물은 회원 인증 없이 쇼핑몰로 인계하는 것이
+   설계다(CANON §3: 결제·배송·환불·회원관리는 쇼핑몰 소관). "준비 중"이라 적으면 나중에
+   붙는 것처럼 들리지만, 이 화면은 애초에 로그인을 하지 않는다 — 그래서 "아직 준비
+   중"이 아니라 "회원 확인 없이 넘어간다"는 사실을 그대로 말한다.
+   ⚠ 동작은 그대로다: 이 버튼은 지금도 결제(인계) 섹션을 여는 유일한 관문이고 실제
+   인증 호출은 여전히 없다 — mallLogged 였던 플래그 이름만 뜻에 맞게 mallHandoffReady
+   로 바꿨다(로그인 여부가 아니라 "인계 확인을 마쳤는가"). */
+if(login)login.addEventListener('click',function(){mallHandoffReady=true;if(gate)gate.style.display='none';tmsg('회원 확인 없이 쇼핑몰로 넘어갑니다 — 결제 화면을 미리 보여드립니다.');check();});
 ['s4-name','s4-phone','s4-addr'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',check);});
 var ag=document.getElementById('s4-agree');if(ag)ag.addEventListener('change',check);
 var pms=document.querySelectorAll('#s4-paymethods [data-pm]');

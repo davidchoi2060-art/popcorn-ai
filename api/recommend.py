@@ -28,6 +28,7 @@ from sqlalchemy import text
 from . import access_gate   # 접근 게이트의 단일 원천 — 열쇠 생성·소유자 확인·횟수 제한
 from . import llm       # LLM 호출의 단일 원천 — 이 파일에서 프로바이더를 직접 부르지 않는다
 from . import visitor
+from .catalog_map import gpu_chipset_key   # 「부품」(GPU 칩셋) 핀 정책 — 단일 원천(A-101)
 from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정의를 그대로 쓴다(새로 만들지 않는다)
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
@@ -83,7 +84,7 @@ def _load_pool(conn):
         " form_factor, form_factor_list, capacity_gb,"
         " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
         " radiator_rows, radiator_max_rows, tag_white, tag_silent, tag_rgb,"
-        " spec_sources, data_origin"
+        " spec_sources, data_origin, market_price"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
         # 조용히 결과가 줄어드는 게 아니라 화면이 통째로 죽는 자리라 이중으로 막는다.
@@ -450,17 +451,37 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                     f"(부품별 배분 상한은 유지 — 초과분은 아래에 정직 표기)"],
     }[tier]
     reasons = reasons + [n for n in (floor_note, relax_note) if n]
+    # market_price 배선(A-100 · 공유 계약 ②) — 몰 최저가 비교 재료.
+    # ⚠ 실측(2026-08-23, 이 물결 조사): `products.market_price`는 컬럼 자체는 NULL이
+    # 거의 없지만(재고 후보 3,059건 중 NULL 1건) **값이 있는 행도 거의 전부 0**이다
+    # (GPU 246/246 = 0, MB·SSD·CASE·POWER·GPU·HDD·쿨러 전 part_type = 0, 전체에서
+    # 양수 값은 CPU 1건·RAM 1건 «둘»뿐). PC 부품 시장가가 0원일 수 없으므로 이건
+    # "채워진 값"이 아니라 "아직 못 채운 값이 0으로 저장된 것"이다 — 그대로 내보내면
+    # "시장가 0원(최저가)"이라는 지어낸 사실이 된다(§화면 정직성 「0으로 지어내지
+    # 마라」의 정확한 위반 사례). 그래서 **엔진 경계에서 0 이하를 null로 정규화**한다
+    # (DB 컬럼 자체를 고치는 것은 이 파일의 소관이 아니다 — 적재 로직 소관).
+    def _mp(p):
+        v = p.get("market_price")
+        return v if (v is not None and v > 0) else None
+    market_vals = [_mp(chosen[s]) for s in SLOTS]
+    market_present = [v for v in market_vals if v is not None]
     return {
         "label": TIER_LABELS[tier],
         "items": [{"part_type": s, "product_code": chosen[s]["product_code"],
                    "sku": chosen[s]["sku"], "name": display_name(chosen[s]["product_name"]),
                    "price": chosen[s]["sale_price"], "maker": chosen[s].get("maker"),
+                   "market_price": _mp(chosen[s]),
                    "spec": _explain_spec(chosen[s]), "tags": _pref_tags(chosen[s])}
                   for s in SLOTS],
         "total": total,
         "compat": build_compat(chosen, rules),
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},
+        "totals": {"market_total": sum(market_present) if market_present else None,
+                   "market_missing": len(market_vals) - len(market_present)},
+        # 「부품」 핀이 없으면 빈 배열 — 화면이 매번 undefined 가드를 안 짜도 되게
+        # 항상 이 키를 둔다. 핀이 있으면 `_attach_pin()`이 덮어쓴다.
+        "pinned": [],
         "reasons": reasons,
     }
 
@@ -702,12 +723,47 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         pool = _load_pool(conn)
         total_n = len(pool)
 
+        # ── 「부품」 핀 정책(A-101 · 공유 계약 ①②) — 지금은 GPU만 다룬다 ──────────
+        # candidates.PART_PIN_LABELS 분기(아래 common/capped/hi_pool 구성 루프가 그대로
+        # 통과시킨다)가 재고에 있으면 GPU 슬롯 후보를 이 값으로 이미 좁힌다 — 그래서
+        # common/capped/hi_pool은 **이미 핀이 적용된 풀**이다. 여기서 따로 재는 것은
+        # **핀이 실패했을 때 무엇을 말할지**뿐이다: 재고 자체에 없는지, 아니면 있지만
+        # 이 티어 상한을 못 넘는지를 구분해야 화면이 정직하게 사유를 댈 수 있다.
+        part_v = next((c.v for c in body.constraints if c.l == "부품"), None)
+        gpu_matches = []
+        if part_v:
+            gpu_matches = [p for p in pool if p["part_type"] == "GPU"
+                           and gpu_chipset_key(p.get("product_name") or "") == part_v]
+        gpu_min_price = min((p["sale_price"] for p in gpu_matches), default=None)
+        GPU_I = SLOTS.index("GPU")
+
+        def _attach_pin(built, honored, cap_display):
+            """built(성공한 구성)에 pinned·reasons를 덧붙인다 — part_v가 없으면 아무 것도 안 한다."""
+            if not part_v or built is None:
+                return
+            gi = built["items"][GPU_I]
+            if honored:
+                note = f"지정 부품 반영: {gi['name']} {gi['price']:,}원"
+            elif not gpu_matches:
+                note = f"재고에 없는 부품: {part_v}"
+            else:
+                cap_txt = f"{cap_display:,}원" if cap_display is not None else "상한 없음"
+                note = f"지정 부품 최저가 {gpu_min_price:,}원 · 이 티어 상한 {cap_txt}"
+            built["pinned"] = [{"slot": "GPU", "requested": part_v, "chosen": gi["name"],
+                                 "honored": honored, "note": note}]
+            built["reasons"] = built["reasons"] + [note]
+
         # funnel.passed = v0 count와 동일 규칙(전 제약 순차 적용) — S1 카운터와 일치
         passed = pool
         for c in body.constraints:
             passed, _, _ = _apply_one(passed, c.l, c.v)
 
         # 3티어 공통 = 태그만 적용(예산 제외), 캡 풀 = 예산까지 적용
+        # ⚠ 이 루프는 「부품」도 포함해 적용한다 — PART_PIN_LABELS가 재고에 있으면 GPU
+        # 슬롯을 지정 칩셋으로 좁힌다. 그래서 common/capped는 **이미 핀이 걸린 풀**이다.
+        # 핀이 실패했을 때 되돌아갈 곳이 필요해 「부품」만 뺀 `*_full` 풀을 따로 만든다 —
+        # 재고에 없으면(gpu_matches==[]) PART_PIN_LABELS 자신이 거르지 않으므로
+        # 두 풀은 자동으로 같아진다(추가 분기 없이 이 사실 하나로 c 케이스가 정리된다).
         common = pool
         for c in body.constraints:
             if c.l != "예산":
@@ -715,6 +771,14 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         capped = common
         if cap is not None:
             capped, _, _ = _apply_one(capped, "예산", budget_v)
+
+        common_full = pool
+        for c in body.constraints:
+            if c.l not in ("예산", "부품"):
+                common_full, _, _ = _apply_one(common_full, c.l, c.v)
+        capped_full = common_full
+        if cap is not None:
+            capped_full, _, _ = _apply_one(capped_full, "예산", budget_v)
 
         # 용도 하한(슬라이스 58) — 서버가 실제로 건 하한만 근거로 말한다.
         # GPU는 성능 지표가 없어 권장 전원을 계층 근사로 쓴다. 그 사실을 숨기지 않는다.
@@ -733,10 +797,13 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # 고성능 풀 = 예산 배분율을 HIGHEND_CAP_X배로 늘려 적용(전면 해제가 아니다).
         # `common`(배분 미적용)을 그대로 주면 램 931만원이 다시 들어온다.
         hi_pool = common
+        hi_pool_full = common_full
         if cap is not None:
             hi_cap = int(cap * HIGHEND_CAP_X)
             hi_pool = [p for p in common
                        if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
+            hi_pool_full = [p for p in common_full
+                            if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
 
         rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
         check_rule_fields(pool, rules)    # 규칙 필드 누락은 조용한 전면 불통과 → 경고로 드러낸다
@@ -744,7 +811,19 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # "비싼 부품 차단" 상한은 무의미한데, 슬롯 후보를 예산마다 다르게 만들어
         # 150만원이 70만원보다 비싼 가성비 구성을 내놓았다(회귀 '가성비는 전 예산 공통' 실패).
         # 진짜 제약은 총액이고 그건 DFS 가지치기가 건다.
-        sets = {"value": _build_set("value", common, cap, rules, floor_note)}
+        # ── 가성비형 ──────────────────────────────────────────────────────────
+        built_v = _build_set("value", common, cap, rules, floor_note)
+        honored_v = None
+        if part_v:
+            if gpu_matches and built_v is None:
+                # 핀 풀(common)로는 성립하지 않는다 — 「부품」을 뺀 풀로 다시 짓는다(핀 해제).
+                built_v = _build_set("value", common_full, cap, rules, floor_note)
+                honored_v = False
+            else:
+                honored_v = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
+        sets = {"value": built_v}
+        _attach_pin(sets["value"], honored_v, cap)
+
         if sets["value"] is None:
             # 최소 구성이 예산 밖이면 견적 불성립 — 전 티어 불가(정직)
             sets["recommend"] = sets["highend"] = None
@@ -755,10 +834,24 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 남은 DDR4 보드와 맞지 않았다. **균형을 못 지킬 바엔 균형을 포기하고 견적을 낸다** —
             # 총액 상한은 그대로 지킨다. 포기했으면 근거에 그렇게 적는다(정직).
             relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
-            sets["recommend"] = _build_set("recommend", capped, cap, rules, floor_note)
-            if sets["recommend"] is None:
-                sets["recommend"] = _build_set("recommend", common, cap, rules, floor_note,
-                                               relaxed)
+
+            # ── 추천형 ────────────────────────────────────────────────────────
+            built_r = _build_set("recommend", capped, cap, rules, floor_note)
+            if built_r is None:
+                built_r = _build_set("recommend", common, cap, rules, floor_note, relaxed)
+            honored_r = None
+            if part_v:
+                if gpu_matches and built_r is None:
+                    built_r = _build_set("recommend", capped_full, cap, rules, floor_note)
+                    if built_r is None:
+                        built_r = _build_set("recommend", common_full, cap, rules, floor_note,
+                                             relaxed)
+                    honored_r = False
+                else:
+                    honored_r = bool(gpu_matches)
+            sets["recommend"] = built_r
+            _attach_pin(sets["recommend"], honored_r, cap)
+
             # 예산을 숫자로 말하지 않아도(‘200만원 이상’·‘AI 추천 예산’) 상한은 있어야 한다.
             # 없으면 고성능이 3,025만원이 된다 — 램 하나에 931만원을 쓰던 그 구성이
             # 예산 없는 경로로 그대로 돌아온다. 기준선은 **추천 구성**이다:
@@ -769,11 +862,28 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                 hi_note = (f"예산 상한을 정하지 않으셔서 추천 구성"
                            f"({sets['recommend']['total']:,}원)의 {HIGHEND_CAP_X:g}배"
                            f"({hi_limit:,}원)까지로 잡았습니다")
-            sets["highend"] = _build_set("highend", hi_pool, cap, rules, floor_note,
+            # 핀 실패 노트에 쓸 "이 티어 상한" 표시값 — highend의 실제 DFS 한도와 같다.
+            hi_cap_display = hi_limit if hi_limit is not None else (
+                int(cap * HIGHEND_CAP_X) if cap is not None else None)
+
+            # ── 고성능형 ──────────────────────────────────────────────────────
+            built_h = _build_set("highend", hi_pool, cap, rules, floor_note, hi_note, hi_limit)
+            if built_h is None:
+                built_h = _build_set("highend", common, cap, rules, floor_note,
+                                     hi_note or relaxed, hi_limit)
+            honored_h = None
+            if part_v:
+                if gpu_matches and built_h is None:
+                    built_h = _build_set("highend", hi_pool_full, cap, rules, floor_note,
                                          hi_note, hi_limit)
-            if sets["highend"] is None:
-                sets["highend"] = _build_set("highend", common, cap, rules, floor_note,
+                    if built_h is None:
+                        built_h = _build_set("highend", common_full, cap, rules, floor_note,
                                              hi_note or relaxed, hi_limit)
+                    honored_h = False
+                else:
+                    honored_h = bool(gpu_matches)
+            sets["highend"] = built_h
+            _attach_pin(sets["highend"], honored_h, hi_cap_display)
 
         uid = visitor.resolve(conn, request, response)
         # 이 견적의 「추측 못 할 열쇠」 — session_id 가 연속 정수라(최근 10건 5872~5881)

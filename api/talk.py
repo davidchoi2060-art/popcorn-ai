@@ -128,17 +128,19 @@
 import json
 import logging
 import re
+import statistics
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from sqlalchemy import text   # /monitor-bands 가 집계 쿼리를 돈다
+from sqlalchemy import bindparam, text   # /monitor-bands 가 집계 쿼리를 돈다
 
 from . import access_gate   # 방문자별 호출 횟수 제한의 단일 원천
 from . import visitor      # 방문자 키 — 자동 승격의 「서로 다른 사람」 판정에 쓴다
 # 회귀 표식 판정의 단일 원천. 언더스코어 함수를 다른 모듈이 가져다 쓰는 것은 이 저장소의
 # 기존 관례다 — `api/expert.py` 가 같은 함수를 그렇게 쓴다(그 파일 상단 주석 참조).
 from .recommend import _resolve_data_origin
+from . import catalog_map   # gpu_chipset_key — 「부품」 라벨·price-facts 의 GPU 정규화 단일 원천
 from . import llm
 from . import usage_floors as UF
 from .db import engine
@@ -170,7 +172,10 @@ PREF_VALUES = ("저소음", "화이트")
 _BUDGET_NUM = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+)\s*만")
 _BUDGET_BOUND = re.compile(r"(이상|이하)")
 
-LABELS = ("예산", "용도", "선호")
+# 「부품」 -- 2026-08-23 물결 계약 ①. 지금은 GPU 모델 지정만 다룬다(다른 부품은
+# 아직 추가하지 않는다 -- 값의 정규화 원천 `catalog_map.gpu_chipset_key`가 GPU만
+# 읽으므로, 여기서 CPU·SSD 등을 허용해도 뒤에서 전부 dropped가 된다).
+LABELS = ("예산", "용도", "선호", "부품")
 
 
 class ParseBody(BaseModel):
@@ -263,6 +268,11 @@ def _build_prompt(text: str, usage_rows: list) -> str:
         "   둘 이상이면 \" · \" 로 잇는다. 목록에 없는 용도는 넣지 않는다.",
         f'3. l="선호"  v: 다음 중에서만 고른다 -- {" / ".join(PREF_VALUES)}',
         "   둘 다면 \"저소음 · 화이트\". 그 밖의 선호(성능·크기·브랜드 등)는 넣지 않는다.",
+        '4. l="부품"  v: 고객이 그래픽카드(GPU) 모델을 콕 집어 «넣어달라·사달라·로 맞춰달라»고'
+        ' 명시했을 때만 쓴다. 값은 문장에 쓰인 모델명 그대로 적는다(예: "RTX 4070 SUPER").',
+        "   \"4060이랑 4060 Ti 차이가 뭐야\" 같은 비교·시세 질문에는 쓰지 않는다 --"
+        " 그건 넣어 달라는 요청이 아니라 묻는 것이다.",
+        "   그래픽카드가 아닌 부품(CPU·SSD·메모리 등)은 아직 이 라벨로 다루지 않는다 -- 넣지 않는다.",
         "",
         "[고객 문장]",
         text,
@@ -284,6 +294,21 @@ def _norm_budget(v: str):
     # 나와야 한다(입력 표기가 화면에 새어 나가면 같은 예산이 두 모양으로 보인다).
     n = int(m.group(1).replace(",", ""))
     return format(n, ",") + "만원" + (" " + b.group(1) if b else ""), None
+
+
+def _norm_part(v: str):
+    """부품 값 정규화 -- (정규형, None) 또는 (None, 사유).
+
+    지금은 GPU 모델만 다룬다(계약 ①). 정규화 원천은 `catalog_map.gpu_chipset_key`
+    하나뿐이다 -- 여기서 다시 정규식을 만들지 않는다(CANON §1, 정본 복제 금지).
+    모델이 재고 어휘로 못 읽는 문자열을 내면(오타·비GPU 부품·모델명 없음) 그대로
+    버린다 -- 못 읽는 값을 조건으로 들이면 화면이 "조건을 잡았다"고 말하는데
+    엔진은 아무것도 못 거른다(§화면 정직성과 같은 원칙).
+    """
+    key = catalog_map.gpu_chipset_key(v)
+    if key is None:
+        return None, "재고 어휘로 읽을 수 없는 부품입니다"
+    return key, None
 
 
 def _norm_from_set(v: str, allowed: list, kind: str):
@@ -370,6 +395,8 @@ def _validate(raw_items, usages: list) -> tuple:
             norm, why = _norm_budget(val)
         elif lab == "용도":
             norm, why = _norm_from_set(val, usages, "용도")
+        elif lab == "부품":
+            norm, why = _norm_part(val)
         else:
             norm, why = _norm_from_set(val, list(PREF_VALUES), "선호")
         if norm is None:
@@ -572,6 +599,184 @@ def monitor_bands():
     return {"ok": True, "bands": out, "excluded": int(excluded or 0)}
 
 
+# ── 가격 사실 — market_gap · GPU 재고가 · 가격 추세 ────────────────────────────
+# 2026-08-23 물결 계약 ③ · **A-99**(팝콘톡 고정 수치 4종에 실제 계산을 연결한다).
+#
+# ⚠ discount·price_compare·gpu_compare·price_trend 네 인텐트는 계산 코드 없이
+# 마이그레이션(`0062_talk_intents_seed.py`)에 "-3.2%"·"+18%"·"2~3만원" 같은 고정
+# 문자열을 박아 두고 "자체 데이터"·"실제 매입가 기준"이라 표방하고 있었다
+# (전수조사 promises C2). `0064_talk_price_facts.py`가 그 네 인텐트를
+# `answer_kind='band_cards'`·`answer_ref='/api/talk/price-facts'`로 바꾸고,
+# 이 엔드포인트가 그 자리에서 실제로 계산한다.
+#
+# ⚠ **성능 수치("+18% 빠르다")는 여기서 만들지 않는다** — 우리에게 벤치마크
+# 데이터가 없다(A-99 사장님 확정: "자료가 없는 주장은 말하지 않는다"). 이 엔드포인트가
+# 실제로 아는 것은 가격·재고 원장뿐이다 — 우리 판매가 대 시장가 차이 · GPU 재고가
+# 분포 · 부품별 가격 추세. 원천이 답할 수 없는 것은 판정하지 않는다(§화면 정직성과
+# 같은 원칙 — 저건 수, 이건 «있지도 않은 근거로 성능을 주장하는 것»).
+#
+# ⚠ **모든 수에 표본 n을 병기한다.** 표본이 0이면 그 항목은 null이다 — 0을
+# 「격차 없음」·「추세 없음」으로 읽히게 하지 않는다(§화면 정직성 「없다」와
+# 「못 쟀다」를 구분한다).
+_TREND_NOISE_REASONS = ("margin_policy", "margin_policy_undo")
+# margin_policy·margin_policy_undo는 마진 정책을 적용했다가 되돌리는 왕복이다
+# (범위 지도 실측: 최근 30일 전체 이력의 88.7%가 이 쌍이고, 날짜별로 정확히
+# 짝을 이뤄 순가격 변화가 0이다). 실제 가격 동향 신호가 아니므로 추세 계산에서 뺀다.
+_TREND_MIN_N = 5          # 이 밑이면 애초에 "여러 건"이라 말할 근거가 없다
+_TREND_MIN_DAYS = 3       # 서로 다른 날짜 수 — 1이면 «단일 시점 일괄 적재»이지 추세가 아니다
+
+
+@router.get("/price-facts")
+def price_facts(
+    gpu: str | None = Query(None, description="비교할 GPU 모델명(문장 그대로) — 선택"),
+    gpu2: str | None = Query(None, description="함께 비교할 두 번째 GPU 모델명 — 선택"),
+):
+    """가격·재고 원장이 실제로 아는 것만 — market_gap · GPU 재고가 · 가격 추세.
+
+    ■ market_gap — 우리 판매가 대 market_price 평균/중앙값 차(%)
+      `v_recommendation_candidates`에서 재고가 있고(`stock_qty>0`) 우리 판매가와
+      시장가가 둘 다 있는(`>0`) 행만 쓴다. 표본이 0이면 `null`이다.
+
+    ■ gpu/gpu2 — 재고 GPU의 건수·최저가·중앙값
+      값은 `catalog_map.gpu_chipset_key`로 정규화한다(단일 원천 — 여기서 다시
+      정규식을 만들지 않는다). **정규화에 실패한 모델명은 조용히 뺀다** — 지어낼
+      수치가 없으므로 그 항목 자체를 만들지 않는다(다른 라벨과 달리 이 자리는
+      "dropped 사유"를 실을 응답 칸이 계약에 없다).
+
+    ■ trend — `product_price_history` 최근 30일, part_type별 평균 변화율(%)
+      마진 정책 왕복(margin_policy·margin_policy_undo)은 순변화가 0인 잡음이라
+      뺀다. 그래도 **표본이 얇거나(<5건) 단일 시점 일괄 적재뿐이면(서로 다른 날짜
+      <3일) 그 part_type은 추세에 올리지 않는다** — 하나도 안 남으면 `trend`
+      전체가 `null`이고 `note`가 그 사실을 밝힌다(범위 지도 실측: 최근 30일
+      GPU 신호는 사실상 수작업 1건 + 단일 시점 스냅샷뿐이라, 지금 이 계산은
+      거의 항상 `null`을 낸다 — **그것이 정직한 답**이다).
+
+      ⚠ **`note`는 두 사유를 갈라 말한다**(확인자 결함 2026-08-23 · ⓐ 수정). "표본이
+      적다(<5건)"와 "날짜 커버리지가 없다(값은 많은데 전부 같은 날 — 단일 시점 일괄
+      적재)"는 원인이 다르다. 전자는 자료 자체가 부족하다는 뜻이고 후자는 자료는
+      있어도 「추이」를 잴 시간축이 없다는 뜻이라, part_type별로 어느 문턱에 걸렸는지
+      갈라 note 문구를 고른다(둘 다 걸리면 둘 다 밝힌다). RAM처럼 지금은 문턱을
+      넘는 part_type이 있어도, 30일 창이 굴러 그 날짜 분산 구간이 밀려나면 이
+      갈림이 그대로 되살아난다 — 한 쪽 사유로 뭉뚱그리면 그 순간 오답이 된다.
+    """
+    with engine.connect() as conn:
+        # ① market_gap
+        gap_rows = conn.execute(text("""
+            SELECT sale_price, market_price
+              FROM v_recommendation_candidates
+             WHERE stock_qty > 0 AND market_price > 0 AND sale_price > 0
+        """)).all()
+        pcts = [(r.sale_price - r.market_price) / r.market_price * 100 for r in gap_rows]
+        market_gap = None
+        if pcts:
+            market_gap = {
+                "n": len(pcts),
+                "avg_pct": round(sum(pcts) / len(pcts), 1),
+                "median_pct": round(statistics.median(pcts), 1),
+            }
+
+        # ② gpu/gpu2 — product_name 파싱 기반(재고 GPU의 99.6%가 이 경로로 추출된다,
+        # `model_name`은 39.8%만 채워져 있어 그것만 보면 후보 60%가 누락된다 — 범위 지도 실측)
+        gpu_out = []
+        wanted: dict[str, str] = {}
+        for raw in (gpu, gpu2):
+            if not raw:
+                continue
+            key = catalog_map.gpu_chipset_key(raw)
+            if key and key not in wanted:
+                wanted[key] = raw
+        if wanted:
+            cand_rows = conn.execute(text("""
+                SELECT product_name, sale_price
+                  FROM v_recommendation_candidates
+                 WHERE part_type = 'GPU' AND stock_qty > 0 AND sale_price > 0
+            """)).all()
+            by_key: dict[str, list] = {}
+            for r in cand_rows:
+                k = catalog_map.gpu_chipset_key(r.product_name)
+                if k:
+                    by_key.setdefault(k, []).append(r.sale_price)
+            for key in wanted:
+                prices = by_key.get(key) or []
+                gpu_out.append({
+                    "key": key,
+                    "n_in_stock": len(prices),
+                    "min_price": min(prices) if prices else None,
+                    "median_price": int(statistics.median(prices)) if prices else None,
+                })
+
+        # ③ trend — 마진 정책 왕복을 뺀 실신호만
+        # ⚠ 잡음 사유는 _TREND_NOISE_REASONS(621행) «상수를 그대로» 바인딩한다 —
+        # 여기에 리터럴을 다시 적으면 상수만 고치고 쿼리는 안 바뀌는 사고가 난다
+        # (확인자 결함 2026-08-23: 값이 우연히 같아 지금까지 안 드러났다).
+        hist_rows = conn.execute(
+            text("""
+                SELECT pr.part_type AS part_type, h.old_price AS old_price,
+                       h.new_price AS new_price, h.changed_at AS changed_at
+                  FROM product_price_history h
+                  JOIN products pr USING (product_code)
+                 WHERE h.changed_at >= now() - interval '30 days'
+                   AND h.field = 'sale'
+                   AND h.reason NOT IN :noise_reasons
+                   AND pr.data_origin IS DISTINCT FROM 'demo'
+                   AND h.old_price > 0 AND h.new_price IS NOT NULL
+            """).bindparams(bindparam("noise_reasons", expanding=True)),
+            {"noise_reasons": list(_TREND_NOISE_REASONS)},
+        ).all()
+        grouped: dict[str, dict] = {}
+        for r in hist_rows:
+            pct = (r.new_price - r.old_price) / r.old_price * 100
+            g = grouped.setdefault(r.part_type, {"n": 0, "pct_sum": 0.0, "days": set()})
+            g["n"] += 1
+            g["pct_sum"] += pct
+            g["days"].add(r.changed_at.date())
+        by_part = [
+            {"part_type": pt, "n": g["n"], "pct": round(g["pct_sum"] / g["n"], 1)}
+            for pt, g in grouped.items()
+            if g["n"] >= _TREND_MIN_N and len(g["days"]) >= _TREND_MIN_DAYS
+        ]
+        by_part.sort(key=lambda x: x["part_type"])
+        trend = {"window_days": 30, "by_part": by_part} if by_part else None
+
+    notes = []
+    if trend is None:
+        # ⚠ 확인자 결함(2026-08-23 · ⓐ): "표본이 얇다"와 "날짜 커버리지가 없다(단일
+        # 시점 일괄 적재)"는 다른 사유인데 이전 코드는 이유를 안 갈라 하나로 뭉갰다
+        # (docstring 647~654행은 이미 둘을 구분해 적어 두고도 note 문구는 안 그랬다).
+        # part_type별로 어느 문턱에 걸렸는지 갈라 note에 정확한 사유를 싣는다.
+        if not hist_rows:
+            notes.append("가격 이력이 없다(표본 n=0)")
+        else:
+            thin_parts = [pt for pt, g in grouped.items() if g["n"] < _TREND_MIN_N]
+            day_short_parts = [
+                pt for pt, g in grouped.items()
+                if g["n"] >= _TREND_MIN_N and len(g["days"]) < _TREND_MIN_DAYS
+            ]
+            if day_short_parts and not thin_parts:
+                notes.append(
+                    "가격 변경이 날짜 커버리지 없이 단일 시점 일괄 적재뿐이라 추이를 "
+                    f"말하지 않는다(표본 n={len(hist_rows)}, 날짜 부족 {len(day_short_parts)}종)"
+                )
+            elif thin_parts and not day_short_parts:
+                notes.append(f"가격 이력이 아직 얇아 추이를 말하지 않는다(표본 n={len(hist_rows)})")
+            else:
+                notes.append(
+                    "가격 이력이 표본도 얇고 날짜 커버리지도 없어 추이를 말하지 않는다"
+                    f"(표본 n={len(hist_rows)})"
+                )
+    if market_gap is None:
+        notes.append("시장가 비교 표본이 없다")
+    note = " ".join(notes) if notes else None
+
+    return {
+        "ok": True,
+        "market_gap": market_gap,
+        "gpu": gpu_out,
+        "trend": trend,
+        "note": note,
+    }
+
+
 # ── 질문 이력 기록 (A-95·A-96 · 0061) ──────────────────────────────────────────
 # 정의서 `docs/design/req/req-talk-patterns.md` · 표 `talk_intent_hits`.
 #
@@ -689,6 +894,11 @@ def record_hit(body: HitBody, request: Request):
     return {"ok": True}
 
 
+# 화면이 «서버 문구·API 참조를 받지 않고 자기가 조기 분기로» 답을 만드는 인텐트.
+# `list_intents()`가 이 목록만 명시로 뺀다 -- 이유는 그 함수 docstring 참조.
+SCREEN_HANDLED = frozenset({"monitor_recommend"})
+
+
 @router.get("/intents")
 def list_intents():
     """사용 중인 답변 패턴 — 화면이 이걸 받아 쓴다 (A-95 ③).
@@ -706,32 +916,44 @@ def list_intents():
       A-96 으로 승격된 것(`status='자동'`)은 사람 승인분(`사용`)과 같이 고객에게 나간다.
       «구분해서 보여주는» 것은 관리자 화면의 몫이고, 고객 화면은 둘을 같이 쓴다.
 
-    ■ ⚠ `answer_body` 가 있는 것만 준다 — 수가 «적다»고 놀라지 마라
-      표에는 21종이 있는데 이 응답은 20종이다. 빠지는 것은 `monitor_recommend`
-      (`answer_kind='band_cards'` · `answer_body` 가 NULL 이고 `answer_ref` 만 있다).
+    ■ ⚠ `answer_body` 또는 `answer_ref` 가 있는 것만 준다 — 규칙이 2026-08-23 바뀌었다
+      **낡음(2026-08-22 판)**: 예전엔 `answer_body IS NOT NULL` 하나만 걸러
+      `band_cards`(문구 없이 API 참조만 있는 답) 전부가 자동으로 빠졌다. 그런데
+      **A-99**(discount·price_compare·gpu_compare·price_trend 넷을 계산 없는 고정
+      수치에서 `band_cards`+`/api/talk/price-facts`로 바꾸는 결정)로 그 방식이 더는
+      맞지 않게 됐다 — `answer_body`만 보면 이 넷도 함께 사라지는데, 그 넷은 이미
+      고객에게 나가던(`status='사용'`) 정상 패턴이다.
 
-      **일부러 뺀다.** 그 답은 **화면이 조기 처리한다**(`talkSend` 의 모니터 분기 ->
-      `monitorBands()`). TALKS 배열에 실어 보내면 `k=['모니터']` 가 「모니터」 든 문장에
-      전부 매치되고 `a` 가 없어 **빈 말풍선**이 뜬다.
+      **지금 규칙**: `answer_body`나 `answer_ref` **둘 중 하나만 있어도** 내보내고,
+      각 행에 응답 참조 자리 `ref`(=`answer_ref`, 없으면 `null`)를 함께 싣는다.
+      화면은 `a`(문구)가 있으면 문구로, `ref`가 있으면(예: `/api/talk/price-facts`)
+      그 API 를 불러 카드로 보여준다 — 실제 렌더 분기는 화면 소관이다.
 
-      즉 이 목록은 「팝콘톡이 «문구로» 답하는 패턴」이고, `band_cards` 처럼 화면이
-      자기 방식으로 답하는 것은 **표에 있되 여기로는 안 나간다.** 관리자 화면
-      (`/api/admin/talk-patterns`)은 21종을 전부 보여준다 — 거기서는 「무엇이 등재돼
-      있나」가 질문이기 때문이다.
+      **그래도 `monitor_recommend` 하나는 명시로 뺀다**(`SCREEN_HANDLED`). 그 답은
+      **화면이 조기 처리한다**(`talkSend` 의 모니터 분기 -> `monitorBands()`).
+      TALKS 배열에 실어 보내면 `k=['모니터']` 가 「모니터」 든 문장에 전부 매치되고
+      `a` 도 `ref` 도 화면이 기대하는 처리기가 없어 **빈 말풍선**이 뜬다 — 「모니터는
+      쓰던 거」에 구간 카드가 뜨는 동문서답과 같은 병이다. `band_cards` 인 다른 넷은
+      화면에 조기 분기가 없어 `ref` 로 정상 처리되므로 빼지 않는다.
 
-      ⚠ 나중에 화면이 `band_cards` 를 «TALKS 경로로» 처리하게 바꾸면 이 조건도 함께
-      풀어야 한다. 그때까지는 이 조건이 빈 말풍선을 막는 유일한 장치다.
+      관리자 화면(`/api/admin/talk-patterns`)은 표 전체(총 21종, `scripts/state.py`
+      가 세지 이 파일에 수를 박지 않는다)를 그대로 보여준다 — 거기서는 「무엇이
+      등재돼 있나」가 질문이라 `SCREEN_HANDLED` 제외를 적용하지 않는다.
     """
     out = []
     with engine.connect() as conn:
         for r in conn.execute(text("""
-            SELECT intent_key, match_terms, min_hits, answer_body, answer_pack
+            SELECT intent_key, match_terms, min_hits, answer_body, answer_ref, answer_pack
               FROM talk_intents
-             WHERE status IN ('사용', '자동') AND answer_body IS NOT NULL
+             WHERE status IN ('사용', '자동')
+               AND (answer_body IS NOT NULL OR answer_ref IS NOT NULL)
              ORDER BY intent_key
         """)).mappings().all():
+            if r["intent_key"] in SCREEN_HANDLED:
+                continue
             item = {"key": r["intent_key"], "k": list(r["match_terms"] or []),
-                    "min": int(r["min_hits"] or 1), "a": r["answer_body"]}
+                    "min": int(r["min_hits"] or 1), "a": r["answer_body"],
+                    "ref": r["answer_ref"]}
             # 조건팩은 «펼쳐서» 준다 -- 화면 TALKS 가 p·chips·chipsUse 를 최상위에 둔다.
             for k, v in (r["answer_pack"] or {}).items():
                 item[k] = v

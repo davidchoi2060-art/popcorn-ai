@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import usage_floors as UF
+from .catalog_map import gpu_chipset_key   # 「부품」(GPU 칩셋) 라벨 정규화 — 단일 원천(A-101)
 from .db import engine
 from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천(슬라이스 A)
 
@@ -43,7 +44,9 @@ SILENT_SCOPE = {"GPU", "POWER", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
 WHITE_SCOPE = {"CASE"}
 
 # ── 라벨이 「거를 자격」을 정한다 — 값 문자열이 아니다 (2026-08-17) ────────────────
-# 아래 넷이 **들어오는 라벨 전부에 대한 처분표**다. 여기 없는 라벨은 거르지 않는다.
+# 아래 다섯이 **들어오는 라벨 전부에 대한 처분표**다(A-101로 PART_PIN_LABELS 추가 —
+# BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·VERBATIM_LABELS·PART_PIN_LABELS). 여기 없는
+# 라벨은 거르지 않는다.
 #
 # 병(실측 2026-08-17): 태그 필터가 라벨을 보지 않고 값에 '저소음'·'화이트'가 「들어 있는지」만
 #   봤다. 그래서 「요청」(고객 원문 요약)까지 필터를 받아 **같은 필터가 두 번** 걸렸다.
@@ -77,6 +80,13 @@ TAG_LABELS = frozenset({"선호"})
 # `/api/recommend` 가 consult_sessions.constraints 에 저장하고, 근거 설명 경로
 # (`recommend._explain_facts` 의 `고객_조건`)가 이 값을 그대로 재료로 쓴다.
 VERBATIM_LABELS = frozenset({"요청"})
+# 부품 지정 라벨(A-101 신설, 이번 물결 계약 ①) — 값은 `catalog_map.gpu_chipset_key()`가
+# 돌려주는 정규형("RTX 4070 SUPER" 형태). **지금은 GPU만 다룬다** — 다른 슬롯 지정은
+# 아직 없다(공유 계약 ①). GPU 슬롯 후보를 그 칩셋과 일치하는 것만으로 좁힌다. 재고에
+# 그 칩셋이 하나도 없으면 **거르지 않는다**(applied=false) — 후보 수를 0으로 떨어뜨리는
+# 대신 화면이 "재고에 없는 부품"이라는 사실을 말할 수 있게 한다(그 자리는
+# `recommend.py`의 핀 정책이 맡는다 — 이 파일은 카운터일 뿐 구성을 짜지 않는다).
+PART_PIN_LABELS = frozenset({"부품"})
 
 
 class Constraint(BaseModel):
@@ -130,6 +140,15 @@ def _apply_one(parts: list[dict], label: str, value: str):
         # 원문 요약이라 조건이 아니다. 값 안에 '화이트'·'저소음'이 들어 있어도 거르지 않는다 —
         # 거르면 화면의 선호 경로와 **같은 필터가 두 번** 걸린다(위 처분표 ①·②).
         return parts, False, "고객 원문 요약 — 조건이 아니므로 후보 수에는 영향 없음"
+    if label in PART_PIN_LABELS:
+        # A-101: GPU 슬롯만 다룬다. product_name → gpu_chipset_key() 정규형이 value와
+        # 같은 것만 남긴다. 값 자체가 이미 정규형이라 여기서 재정규화하지 않는다.
+        matched = [p for p in parts if p["part_type"] == "GPU"
+                   and gpu_chipset_key(p.get("product_name") or "") == value]
+        if not matched:
+            return parts, False, f"재고에 없는 부품: {value}"
+        kept = [p for p in parts if p["part_type"] != "GPU"] + matched
+        return kept, True, f"지정 부품(GPU) 일치 상품만 유지: {value}"
     if label in TAG_LABELS:
         applied, reasons = False, []
         if "저소음" in value:
@@ -172,7 +191,8 @@ def _slot_view(parts: list[dict]) -> tuple:
 def count_candidates(body: CountBody):
     with engine.connect() as conn:
         parts = [dict(r) for r in conn.execute(text(
-            "SELECT part_type, sale_price, tag_white, tag_silent, "
+            # product_name — 「부품」(GPU 칩셋 지정, A-101) 판정에 필요(gpu_chipset_key 입력).
+            "SELECT part_type, sale_price, tag_white, tag_silent, product_name, "
             + ", ".join(FLOOR_COLS)
             + " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
     total = len(parts)

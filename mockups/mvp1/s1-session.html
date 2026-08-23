@@ -267,7 +267,7 @@ var inp=document.getElementById('s1-input'),snd=document.getElementById('s1-send
    §화면 정직성: 후보 수는 서버 응답만 쓴다. 모르면 수를 지어내지 말고 «—» 로 둔다. */
 var poolN=null,consCount=0;
 /* 원천 표시 어휘 3종 — 배지와 부제에 같은 말을 쓴다(화면마다 다른 말을 하지 않게). */
-var SRC_NOTE={live:'조건 통과 실재고 (시드 데이터 기준)',
+var SRC_NOTE={live:'조건 통과 실재고 (실데이터 · Cloud SQL)',
               off:'서버에 연결되면 표시됩니다.',
               pending:'원천 준비 중 — 집계할 수 있는 재고가 아직 없습니다.'};
 function poolTxt(){return poolN==null?'—':poolN.toLocaleString()+'개';}
@@ -726,11 +726,11 @@ var TALKS=[
  {k:['조립비','공임','조립 비용','조립료'],a:'조립·검수 공임은 <b>3만원</b>입니다. 선정리·3시간 안정성 테스트·기본 세팅까지 포함이고, 견적서에 <b>별도 행으로 투명하게</b> 표기돼요 — 총액에 숨기지 않습니다.'},
  {k:['에이에스','a/s','as','보증','수리','고장','애프터'],a:'무상 보증 <b>2년</b>, 왕복 택배비는 저희 부담입니다. 초기 불량은 수령 7일 내 교환, 지원은 전화·원격·용산 방문 세 가지예요. <span style="font-size:11.5px;color:#a29d92;">(*정책 확정 전 예시)</span>'},
  {k:['다나와','최저가','타사','다른 데','견적 봐','견적서 봐'],a:'좋은 비교예요. 부품값 자체는 최저가 조합과 거의 같고, 차이는 <b>조립·선정리·3시간 검사·2년 A/S 포함 여부</b>입니다.<br>다른 곳 견적이 있으면 <b>그대로 붙여넣어 주세요</b> — 부품·가격·호환성을 그 자리에서 진단해 드릴게요.'},
- {k:['싸게','비싸','할인','깎','흥정'],a:'솔직히 말씀드리면 저희 견적은 최저가 조합보다 보통 <b>2~3만원</b> 높습니다. 그 차이가 조립·선정리·3시간 검사·2년 A/S 값이에요.<br>부품값은 똑같고, 견적서에서 <b>&quot;최저가보다 N만원 비싼 이유&quot;</b>로 그대로 보여드립니다.'},
+ {k:['싸게','비싸','할인','깎','흥정'],a:'솔직히 말씀드리면 저희 견적은 최저가 조합보다 <b>다소 높을 수 있습니다</b>. 그 차이가 조립·선정리·3시간 검사·2년 A/S 값이에요.<br>부품값은 똑같고, 견적서에서 <b>&quot;최저가보다 비싼 이유&quot;</b>를 금액과 함께 그대로 보여드립니다.'},
  {k:['매장','방문','오프라인','직접 가'],a:'서울 <b>용산</b>에 매장이 있습니다. 조립 과정을 직접 보실 수도 있고, 온라인 견적을 매장에서 그대로 이어받아 상담할 수도 있어요.'},
  {k:['화이트','디자인','예쁘','이쁘','감성'],a:'보기 좋은 PC, 중요하죠. <b>화이트·디자인 우선</b>으로 잡아둘게요 — 케이스·쿨러 색을 맞추고 선정리까지 신경 씁니다. 디자인 부품은 동급 성능 대비 1~3만원 정도 더 붙는 점만 참고하세요.',p:{i:'palette',l:'선호',v:'화이트',f:0.85,why:['화이트·디자인: 색상 불일치 부품 제외']}},
- {k:['4060','ti','비교','차이'],min:2,a:'좋은 질문이에요. 자체 판매 데이터 기준으로 <b>RTX 4060 Ti는 4060보다 1440p 게임에서 평균 +18%</b> 빠르고, 지금 저희 재고가는 <b>약 11만원 차이</b>예요.<br>· FHD(1080p) 위주면 4060으로 충분 — 차액으로 SSD를 올리는 게 체감이 커요.<br>· QHD(1440p)·고주사율 모니터면 Ti가 값을 해요.',p:{i:'memory',l:'관심 부품',v:'RTX 4060급 GPU',f:0.72,noFilter:true,why:['GPU 관심 대역 반영: 미들급 게이밍']}},
- {k:['가격','시세','동향','얼마','비싸','내려','올라'],a:'저희 <b>실제 매입가 기준</b>(외부 크롤링이 아니라 자체 데이터예요) 최근 4주 동향이에요.<br>· 그래픽카드: <b>-3.2%</b> 완만한 하락 — 급하지 않으면 나쁘지 않은 시점<br>· DDR5 메모리: <b>+5.1%</b> 상승 — 필요하면 미루지 않는 걸 권해요<br>· SSD(NVMe): 보합<br>특정 부품이 궁금하면 이름을 알려주세요. 재고가로 바로 답해드릴게요.'},
+ {k:['4060','ti','비교','차이'],min:2,a:'좋은 질문이에요. <b>RTX 4060 Ti</b>는 <b>RTX 4060</b>보다 상위 등급 GPU예요. 정확한 재고가·재고 수량 차이는 <b>서버에 연결되면 실제 데이터로 보여드립니다</b>.<br>· FHD(1080p) 위주면 4060 라인도 고려해볼 만하고, QHD(1440p)·고주사율 모니터면 상위 등급을 권해요.',p:{i:'memory',l:'관심 부품',v:'RTX 4060급 GPU',f:0.72,noFilter:true,why:['GPU 관심 대역 반영: 미들급 게이밍']}},
+ {k:['가격','시세','동향','얼마','비싸','내려','올라'],a:'저희 <b>실제 매입가 기준</b>(외부 크롤링이 아니라 자체 데이터예요)으로 가격 동향을 확인해 드려요. 정확한 변동폭은 <b>서버에 연결되면 실측치로 보여드립니다</b>.<br>특정 부품이 궁금하면 이름을 알려주세요 — 재고가로 바로 답해드릴게요.'},
  {k:['영상','편집','프리미어','다빈치','인코딩'],a:'영상편집은 게임과 우선순위가 달라요.<br>① <b>CPU 코어 수</b>(인코딩 속도) ② <b>램 32GB↑</b>(4K 타임라인) ③ <b>NVMe SSD</b>(소스 스크럽) 순이고, GPU는 그다음이에요.<br>어떤 툴로 어떤 영상(FHD/4K)을 만드실지 알려주시면 더 정확해져요.'},
  {k:['게임','롤','배그','발로란트','오버워치','로아','풀옵','프레임','fps'],a:'게임이 목적이면 <b>어떤 게임을 어느 화질로</b>가 핵심이에요.<br>· 롤·발로란트급은 엔트리 GPU로도 144fps<br>· 배그·오버워치는 미들급 GPU 권장<br>· 로아 같은 MMO는 CPU도 함께 중요해요.<br>주로 하시는 게임을 알려주시면 조건에 반영할게요.'},
  {k:['ddr','램','메모리'],a:'지금 새로 맞추신다면 <b>DDR5를 권해요</b>. AM5 등 최신 플랫폼이 DDR5 전용이라 업그레이드 수명이 길어요.<br>다만 <b>기존 DDR4 보드에서 램만 올리는 건</b> 규격이 달라 불가능해요 — 보드·CPU까지 함께 바꾸는 그림이 됩니다. 기존 PC 사양을 알려주시면 갈아탈 가치가 있는지 계산해드릴게요.',p:{i:'memory',l:'관심 부품',v:'DDR5 메모리',f:0.85,noFilter:true,why:['DDR5 플랫폼 관심 반영']}},
@@ -970,6 +970,80 @@ function monitorBands(srcText){
  }).catch(function(e){
   wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">모니터 목록을 불러오지 못했습니다 — '+esc(e&&e.message||e)+'</span>';});
 }
+/* ---- ref 기반 답변 렌더러 (A-99 ③ · 2026-08-23) ----------------------------
+   서버가 discount·price_compare·gpu_compare·price_trend 넷을 문장(answer_body)이
+   아니라 ref(answer_ref='/api/talk/price-facts')로 표(talk_intents)에 옮겨 두면,
+   그 행이 TALKS 를 갈아끼울 때 hit.a 는 비고 hit.ref 만 남는다(위 fetch('/api/talk/intents')).
+   화면이 그 문장을 지어내지 않는다 — 실제 시장가 엔드포인트를 불러 «받은 것만» 그린다.
+   monitorBands 와 같은 카드 계열, 같은 /api/talk/hit 기록 방식을 쓴다(새 디자인 없음). */
+function pctTxt(n){return (n>0?'+':'')+n+'%';}
+function priceFacts(t,hit){
+ /* GPU 칩셋을 문장에서 최대 둘까지 뽑는다 — 계약 정규식 그대로. */
+ var found=(t.match(/(RTX|GTX|RX)\s?\d{3,4}\s?(Ti|SUPER|XT)?/gi)||[]).map(function(s){return s.replace(/\s+/g,' ').trim();});
+ var gpu=found[0]||null,gpu2=found[1]||null;
+ /* 이 질문도 원장에 남긴다 — monitorBands 와 같은 자리·같은 이유(A-95). 모델을 하나도
+    못 뽑아도 "이 문장이 이 인텐트로 매치됐다"는 사실은 남긴다. */
+ try{fetch('/api/talk/hit',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({text:t||'',intent_key:(hit&&hit.key)||null,answer_kind:'band_cards'})}).catch(function(){});}
+ catch(e){}
+ /* ⚠ 확인자 결함 재수정(2026-08-23 · ⓐ): 위 되묻기는 gpu_compare 에서만 옳다 — 그
+    인텐트만 브랜드 접두어 없는 숫자 매치(talk_intents.match_terms, 예:
+    ['4060','ti','비교','차이'] min 2)라서 이 정규식이 못 뽑는 문장으로도 매치되고,
+    카드 자체가 "칩셋별 비교"라 모델명이 없으면 보여줄 게 없다. 그런데 같은 렌더러를
+    쓰는 discount·price_compare·price_trend 셋은 GPU 모델을 요구하지 않는 질문이다
+    (match_terms 예: discount=['싸게','비싸','할인','깎','흥정'] min 1,
+    price_trend=['상승','추세','오름','내림','최근','시세','올라'] min 1) — 서버
+    /api/talk/price-facts 도 gpu·gpu2 를 선택(optional)으로 문서화하고 있고, GPU 없이
+    호출해도 market_gap·trend 를 정상 반환한다(계약 ③). 이 셋에까지 되묻기를 적용하면
+    "더 싸게 안 될까요"·"요즘 시세 어때요"에 뜬금없이 GPU 모델명을 요구하는 동문서답이
+    된다 — 그래서 되묻기는 gpu_compare 하나로 좁힌다. */
+ if(!gpu && hit && hit.key==='gpu_compare'){
+  addAI('구체적인 모델명(예: <b>RTX 4060</b>)을 알려주시면 실제 데이터로 비교해드릴게요.');
+  return;
+ }
+ addAI('실제 데이터로 확인해볼게요.');
+ var wrap=document.createElement('div');
+ wrap.style.cssText='display:flex;gap:10px;flex-wrap:wrap;padding-left:48px;margin-top:2px;';
+ wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">불러오는 중…</span>';
+ msgs.appendChild(wrap);msgs.scrollTop=msgs.scrollHeight;
+ var q=[];if(gpu)q.push('gpu='+encodeURIComponent(gpu));if(gpu2)q.push('gpu2='+encodeURIComponent(gpu2));
+ fetch('/api/talk/price-facts'+(q.length?'?'+q.join('&'):'')).then(function(r){return r.json();}).then(function(d){
+  if(!d||!d.ok){wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">지금은 가격 정보를 불러오지 못했습니다.</span>';return;}
+  var cards=[];
+  /* 성능 비교(«빠르다»)는 절대 쓰지 않는다 — 자료가 없다. 아래는 전부 가격·재고·표본뿐이다. */
+  if(d.market_gap){
+   cards.push('<div style="flex:1 1 190px;min-width:180px;border:1px solid #ece9e3;border-radius:14px;padding:13px 15px;background:#fff;">'
+    +'<div style="font-size:15px;font-weight:800;color:#17171b;">시장 최저가 대비</div>'
+    +'<div style="font-size:12.5px;color:#8a8578;margin-top:2px;">평균 '+pctTxt(d.market_gap.avg_pct)+'</div>'
+    +'<div style="font-size:11.5px;color:#9a968d;margin-top:3px;">표본 '+d.market_gap.n+'건</div></div>');
+  }
+  (d.gpu||[]).forEach(function(g){
+   cards.push('<div style="flex:1 1 190px;min-width:180px;border:1px solid #ece9e3;border-radius:14px;padding:13px 15px;background:#fff;">'
+    +'<div style="font-size:15px;font-weight:800;color:#17171b;">'+esc(g.key)+'</div>'
+    +'<div style="font-size:12.5px;color:#8a8578;margin-top:2px;">재고 '+g.n_in_stock+'개</div>'
+    +'<div style="font-size:12.5px;color:#55555c;margin-top:3px;">최저 '+(g.min_price!=null?monWon(g.min_price):'—')+' · 중앙값 '+(g.median_price!=null?monWon(g.median_price):'—')+'</div></div>');
+  });
+  if(d.trend&&d.trend.by_part&&d.trend.by_part.length){
+   d.trend.by_part.forEach(function(p){
+    cards.push('<div style="flex:1 1 190px;min-width:180px;border:1px solid #ece9e3;border-radius:14px;padding:13px 15px;background:#fff;">'
+     +'<div style="font-size:15px;font-weight:800;color:#17171b;">'+esc(p.part_type)+' '+d.trend.window_days+'일 변동</div>'
+     +'<div style="font-size:12.5px;color:#8a8578;margin-top:2px;">'+pctTxt(p.pct)+' <span style="color:#9a968d;">(표본 '+p.n+'건)</span></div></div>');
+   });
+  }
+  wrap.innerHTML=cards.length?cards.join(''):'<span style="font-size:13.5px;color:#8a8578;">지금은 비교할 자료가 없습니다.</span>';
+  if(d.note){
+   var note=document.createElement('div');
+   note.style.cssText='padding-left:48px;margin-top:6px;font-size:12.5px;color:#8a8578;';
+   note.textContent=d.note;
+   msgs.appendChild(note);msgs.scrollTop=msgs.scrollHeight;
+  }
+ }).catch(function(e){
+  wrap.innerHTML='<span style="font-size:13.5px;color:#8a8578;">가격 정보를 불러오지 못했습니다 — '+esc(e&&e.message||e)+'</span>';
+ });
+}
+/* ref -> 렌더러 맵. 지금은 하나뿐이지만 맵으로 둔다 — 서버가 답변 종류를 늘려도
+   talkSend 쪽 분기를 다시 안 짜도 되게. */
+var TALK_RENDERERS={'/api/talk/price-facts':priceFacts};
 function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
  var bud=talkBudget(t);
  var hit=null,score=0;
@@ -986,6 +1060,14 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
      && /(추천|어떤|골라|골르|보여|알려|뭐가|뭘로|괜찮|사고|살까|구매|필요)/.test(low)
      && !/(쓰고|쓰는|사용 중|사용중|있어|있는|보유|쓰던|그대로)/.test(low)){
    monitorBands(t);return;}
+  /* ref 기반 답변 — hit 는 있는데 문장(a)이 없다는 것은 서버가 «화면이 말을 지어내지
+     말고 실제 자료로 답하라»고 ref 만 준 것이다(위 priceFacts 주석). 매칭되는 렌더러가
+     없으면(맵에 없는 ref) 지어내지 않고 hit 을 버려 아래 일반 흐름(안 잡힌 문장)으로 둔다. */
+  if(hit&&!hit.a&&hit.ref){
+   var _r=TALK_RENDERERS[hit.ref];
+   if(_r){_r(t,hit);return;}
+   hit=null;
+  }
   var mon=talkMon(t);
   /* 용도는 «서버 목록 + 서버 규칙»으로만 잡는다(위 TALKS 주석 · USAGES 블록).
      사유도 서버 하한(floor_note)만 말한다 — 화면이 이유를 지어내지 않는다.

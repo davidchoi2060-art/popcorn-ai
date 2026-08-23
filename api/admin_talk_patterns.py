@@ -37,7 +37,7 @@ from sqlalchemy import text
 
 from .auth import current_operator
 from .db import engine
-# ⚠ 시각은 «반드시» 이 함수를 지난다 — DB 컬럼이 naive(UTC)라 `.isoformat()` 을 그대로
+# ⚠ 시각은 «반드시» 이 함수를 지난다 — DB 컬럼이 naive(UTC)라 datetime 을 그대로
 # 내보내면 브라우저가 **로컬 시각으로 오독해 9시간이 어긋난다**(KST-UTC 차이).
 # 실제로 이 화면 검증에서 방금 한 질문이 「9시간 전」으로 떴다.
 from .timeutil import iso

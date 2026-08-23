@@ -617,11 +617,9 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  /* §2 검수 수치는 **마크업에서 걷어냈다** — 예전에는 목업 값(67·71°C · 412W · 34dB ·
     불량 0)이 마크업에 있고 이 자리에서 정직 문구로 «덮어썼다». 서버 없이 열면 그 값이
     그대로 남았으므로, 지금은 마크업 자체가 정직 문구를 들고 있다(여기서 할 일이 없다). */
- // §4 비교 — 최저가 데이터 없음(U-06 미정): 정직 헤더 + 시장가 문단 숨김
- var gt=document.getElementById('s2-gap-title');
- if(gt)gt.parentNode.textContent='직접 조립과 비교하면';
- var mk=document.getElementById('s2-market');
- if(mk)mk.closest('p').style.display='none';
+ // §4 비교 — U-06 해소(2026-08-23): 판정은 티어마다 다르다(sets[tier].totals.market_total
+ // 유무). 정적으로 한 번만 숨기면 티어 전환에 반응하지 않으므로, 아래 s2apply(k) 안으로
+ // 옮겨 매 호출마다 그 티어의 데이터로 다시 판정한다(§s2apply 내 "§4 비교 재판정" 참조).
  // 호환성 실값
  var fit=document.getElementById('sec-fit');
  var pctEl=fit?fit.querySelector('div[style*="font-size:52px"]'):null;
@@ -722,12 +720,22 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
       누른 사실은 promo_click_logs에 남는다 — 자주 눌리는 부품 = 설명만으로 납득이
       안 되는 부품이고, 그게 추천 기준을 손볼 지점이다. 기록 실패는 이동을 막지 않는다. */
    listWrap.innerHTML=s.items.map(function(it){
+    /* market_price(개별 부품 시장가)는 있을 때만 병기한다 — null 이면 아무것도 안 붙인다
+       (§화면 정직성 — 없는 값을 0 이나 "—"로 지어내지 않는다, 그냥 안 보여준다).
+       ⚠ 0 도 "없음"으로 취급한다 — 2026-08-23 실측(TestClient, v_recommendation_candidates
+       재고 후보 전수): GPU·CASE·MB·POWER·SSD 등 거의 전 부품의 market_price가 NULL이
+       아니라 **리터럴 0**으로 채워져 있다(GPU 246/246 전부 0, CPU 197건 중 196건 0).
+       0을 진짜 시장가로 보여주면 "시장가 0원"·"850,000원 비쌈" 같은 실제보다 더
+       나쁜 거짓말이 된다 — null과 같은 값으로 다룬다. */
+    var mk=(it.market_price!=null&&it.market_price>0)
+     ?' <span style="color:#e8b563;font-weight:600;font-size:11px;">(시장가 '+it.market_price.toLocaleString()+')</span>'
+     :'';
     return '<div data-click-part="'+it.product_code+'" role="button" tabindex="0"'
      +' title="이 부품의 근거 보기" style="display:flex;justify-content:space-between;'
      +'font-size:13.5px;gap:10px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px;">'
      +'<span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[it.part_type]||it.part_type)+'</span>'
      +'<span style="font-weight:700;text-align:right;">'+it.name
-     +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span></span></div>';
+     +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span>'+mk+'</span></div>';
    }).join('')
    +'<a href="#sec-periph" style="font-size:12.5px;color:#e8b563;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:15px;">devices</span>모니터·키보드는 아래 &quot;함께 쓰면 좋은 구성&quot;에서 ↓</a>';
    listWrap.querySelectorAll('[data-click-part]').forEach(function(row){
@@ -868,8 +876,74 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
        return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];})+'</span></li>';
    }).join('');
   }
+  /* S2→S3 안내(A-101) — sets[tier].pinned 중 honored=false 가 있으면 안내를 붙인다.
+     note(숫자 든 사유)는 **이미 서버가 reasons 배열에 넣어 보낸다**(api/recommend.py
+     _attach_pin — honored=true 는 "지정 부품 반영: …", honored=false 는 "재고에 없는
+     부품: …" 또는 "지정 부품 최저가 …원 · 이 티어 상한 …원"). 바로 위 reasons <ul> 이
+     그 문장을 이미 그대로 보여주므로, 여기서 note 를 다시 적으면 같은 문장이 두 번
+     보인다. 이 자리가 새로 더하는 것은 «부품 변경(S3)으로 가는 안내» 링크 하나뿐이다
+     — 기존 「전체 부품 보기 →」 링크 패턴(s3-detail.html)을 그대로 따른다. pinned 이
+     없거나 전부 honored=true 면 아무것도 만들지 않는다. 매 호출마다 다시 판정해
+     이전 티어의 안내가 남지 않게 한다. */
+  if(pe){
+   var pinGuide=document.getElementById('s2-pin-guide');
+   var unhonored=(s.pinned||[]).filter(function(p){return !p.honored;});
+   if(unhonored.length){
+    if(!pinGuide){
+     pinGuide=document.createElement('a');pinGuide.id='s2-pin-guide';
+     pinGuide.href='s3-detail.html';
+     pinGuide.style.cssText='display:flex;align-items:center;gap:5px;margin-top:8px;'
+      +'font-size:12.5px;color:#2b5fd9;font-weight:700;text-decoration:none;';
+     var guideAnchor=document.getElementById('s2-reasons')||bd||pe.parentNode;
+     guideAnchor.parentNode.insertBefore(pinGuide,guideAnchor.nextSibling);
+    }
+    pinGuide.textContent='요청하신 '+unhonored[0].slot+' 로 바꾸려면 부품 변경에서 직접 고를 수 있어요 →';
+    pinGuide.style.display='';
+   }else if(pinGuide){
+    pinGuide.style.display='none';
+   }
+  }
+  /* §4 비교("최저가보다 N원 비싼 이유") 재판정 — totals.market_total 이 있을 때만
+     보여준다. 없으면(엔진이 아직 안 주거나 이 티어 부품에 시장가가 없으면) 예전처럼
+     조용히 숨긴다 — 지어내지 않는다(§화면 정직성). 헤더 문구·시장가 문단·부품합계
+     열(개별 구매)이 전부 이 판정 하나를 따른다. */
   var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
-  if(cp)cp.textContent=s.total.toLocaleString();if(cp2)cp2.textContent=s.total.toLocaleString();
+  if(cp)cp.textContent=s.total.toLocaleString();
+  var gapHeading=document.querySelector('#sec-compare h2');
+  var marketEl=document.getElementById('s2-market'),gapEl=document.getElementById('s2-gap');
+  var marketP=marketEl?marketEl.closest('p'):null;
+  var missNote=document.getElementById('s2-market-missing-note');
+  if(!missNote&&marketP){
+   missNote=document.createElement('p');missNote.id='s2-market-missing-note';
+   missNote.style.cssText='margin:6px 0 0;font-size:12.5px;color:#9a968d;';
+   marketP.parentNode.insertBefore(missNote,marketP.nextSibling);
+  }
+  var totals=s.totals;
+  /* market_total도 0 이면 "없음"으로 다룬다 — 위 부품 행 market_price 주석과 같은 실측
+     근거(2026-08-23). 서버의 market_missing은 NULL만 세므로 이 0 사례를 못 잡는다 —
+     화면은 합계가 0 이하면 그 자체로 "시장가 비교 불가"로 보고 통째로 숨긴다. */
+  if(totals&&totals.market_total!=null&&totals.market_total>0){
+   var diff=s.total-totals.market_total;
+   if(cp2)cp2.textContent=totals.market_total.toLocaleString();
+   if(gapHeading){
+    if(diff>0)gapHeading.innerHTML='최저가보다 <span id="s2-gap-title">'+diff.toLocaleString()+'원</span> 비싼 이유';
+    else gapHeading.textContent='최저가와 비교하면';
+   }
+   if(marketP)marketP.style.display='';
+   if(marketEl)marketEl.textContent=totals.market_total.toLocaleString()+'원';
+   if(gapEl)gapEl.textContent=diff>0?diff.toLocaleString()+'원 더 비쌈':(diff<0?(-diff).toLocaleString()+'원 더 저렴':'0원');
+   if(missNote){
+    if(totals.market_missing>0){
+     missNote.textContent='시장가가 없는 부품 '+totals.market_missing+'개는 비교에서 뺐습니다.';
+     missNote.style.display='';
+    }else{missNote.style.display='none';}
+   }
+  }else{
+   if(cp2)cp2.textContent=s.total.toLocaleString();
+   if(gapHeading)gapHeading.textContent='직접 조립과 비교하면';
+   if(marketP)marketP.style.display='none';
+   if(missNote)missNote.style.display='none';
+  }
   s2why(k);        // 근거 문구는 이 티어의 확정 구성으로 따로 받아 온다(위 s2why 주석)
  };
  // null 티어 탭 비활성
