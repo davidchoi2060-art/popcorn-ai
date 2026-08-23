@@ -463,8 +463,19 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     def _mp(p):
         v = p.get("market_price")
         return v if (v is not None and v > 0) else None
-    market_vals = [_mp(chosen[s]) for s in SLOTS]
-    market_present = [v for v in market_vals if v is not None]
+    # market_pairs: SLOTS를 «한 번만» 순회해 (시세, 우리가격)을 함께 모은다.
+    # market_total·market_compare_total을 따로 계산하면 언젠가 갈라진다(§단일 원천).
+    # market_compare_total(신규, 2026-08-23) — market_total과 반드시 «같은 부품
+    # 집합»의 우리 가격 합. 근거(2026-08-23 하네스 실측): 추천형(게임·150만원)에서
+    # GPU 하나만 market_price가 없어, 화면이 "우리 총액(부품 8개 전부) vs
+    # market_total(시세 있는 7개만)"을 비교하고 있었다 — 579,190원 "더 비싸 보였다."
+    # 같은 7개끼리 비교하면 실제로는 5,910원 "더 쌌다"(§화면 정직성 위반 — 시세
+    # 없는 부품 하나가 통째로 우리 쪽에만 더해져 실제보다 훨씬 비싸 보이는 방향으로
+    # 틀렸다). market_total이 null이면 market_compare_total도 null.
+    market_pairs = [(_mp(chosen[s]), chosen[s]["sale_price"]) for s in SLOTS]
+    market_vals = [mp for mp, _ in market_pairs]
+    market_present = [mp for mp, _ in market_pairs if mp is not None]
+    compare_present = [sp for mp, sp in market_pairs if mp is not None]
     return {
         "label": TIER_LABELS[tier],
         "items": [{"part_type": s, "product_code": chosen[s]["product_code"],
@@ -478,6 +489,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},
         "totals": {"market_total": sum(market_present) if market_present else None,
+                   "market_compare_total": sum(compare_present) if market_present else None,
                    "market_missing": len(market_vals) - len(market_present)},
         # 「부품」 핀이 없으면 빈 배열 — 화면이 매번 undefined 가드를 안 짜도 되게
         # 항상 이 키를 둔다. 핀이 있으면 `_attach_pin()`이 덮어쓴다.

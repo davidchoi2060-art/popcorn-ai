@@ -736,7 +736,10 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
        나쁜 거짓말이 된다 — null과 같은 값으로 다룬다. */
     var mk=(it.market_price!=null&&it.market_price>0)
      ?' <span style="color:#e8b563;font-weight:600;font-size:11px;">(시장가 '+it.market_price.toLocaleString()+')</span>'
-     :'';
+     /* ⑤ 시세가 없는 부품은 빈칸이 아니라 "시세 자료 없음"으로 드러낸다(2026-08-23
+        하네스 지시) — 예전엔 아무것도 안 붙어, 그 부품이 아래 §4 비교표에서
+        빠졌다는 사실이 이 목록에서는 안 보였다. */
+     :' <span style="color:#a29d92;font-weight:600;font-size:11px;">(시세 자료 없음)</span>';
     return '<div data-click-part="'+it.product_code+'" role="button" tabindex="0"'
      +' title="이 부품의 근거 보기" style="display:flex;justify-content:space-between;'
      +'font-size:13.5px;gap:10px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px;">'
@@ -910,9 +913,9 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
     pinGuide.style.display='none';
    }
   }
-  /* §4 비교("시세 관측가보다 N원 비싼 이유") 재판정 — totals.market_total 이 있을 때만
-     보여준다. 없으면(엔진이 아직 안 주거나 이 티어 부품에 시장가가 하나도 없으면)
-     **섹션(#sec-compare) 자체를 숨긴다** — 지어내지 않는다(§화면 정직성).
+  /* §4 비교("시세 관측가보다 N원 비싼 이유") 재판정 — totals.market_compare_total 이
+     있을 때만 보여준다. 없으면(엔진이 아직 안 주거나 이 티어 부품에 시장가가 하나도
+     없으면) **섹션(#sec-compare) 자체를 숨긴다** — 지어내지 않는다(§화면 정직성).
      ⚠ 2026-08-23 확인자 결함(grade a): 예전엔 marketP 문단만 숨기고 표(특히
      "부품 합계" 행의 "시세 관측가" 칸)는 그대로 둔 채 cp2 에 s.total(우리 자체
      총액)을 복제해 넣고 있었다 — 시세 데이터가 전무한데 "시세 관측가를 관측했더니
@@ -920,9 +923,20 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
      조립·검사·A/S 비교 행 전부가 "시세 관측가" 열 제목 아래 있으므로, 시세 관측가가
      하나도 없으면 표 전체를 내리는 것이 맞다 — 헤더 문구·시장가 문단·부품합계 열이
      전부 이 판정 하나를 따른다. 섹션이 사라지는 동안 옆 A/S 박스가 전체 폭을 쓰도록
-     그리드도 함께 1열로 접는다(빈 칸만 남는 것을 막는다). */
+     그리드도 함께 1열로 접는다(빈 칸만 남는 것을 막는다).
+     ⚠ 2026-08-23 하네스 실측 재발(사과 대 오렌지 비교) — 팝콘PC 열에 cp.textContent
+     =s.total(부품 8개 «전부»의 합)을 넣고, 시세가 «있는» 7개만의 합인 market_total과
+     나란히 놓아 "579,190원 더 비싸다"고 말했다. 같은 7개끼리 비교하면 실제로는
+     5,910원 «더 쌌다» — 시세가 없는 부품 하나가 팝콘PC 쪽에만 더해져 실제보다 훨씬
+     비싸 보이게 만든 것이다. 이제 팝콘PC 열은 market_compare_total(그 7개의 우리
+     가격 합 — api/recommend.py 신규 필드, 다른 제작자 작업)을 쓴다. 두 열은 항상
+     «같은 부품 집합»을 가리켜야 한다.
+     ⚠ 가드는 market_compare_total 기준이다 — market_total만 있다고 "비교 가능"으로
+     보면 안 된다(배포 순서상 서버가 market_total은 주는데 market_compare_total은
+     아직 안 주는 창이 있을 수 있고, 그 창에서 옛 방식(s.total 대 market_total)으로
+     떨어지면 오늘 이 결함이 그대로 재발한다). `!=null`은 undefined(필드가 아예
+     없음)·null 둘 다 걸러낸다. */
   var cp=document.getElementById('s2-cmp-parts'),cp2=document.getElementById('s2-cmp-parts2');
-  if(cp)cp.textContent=s.total.toLocaleString();
   var secCompare=document.getElementById('sec-compare');
   var row2=document.querySelector('.s2-row-2');
   var gapHeading=document.querySelector('#sec-compare h2');
@@ -935,13 +949,16 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    marketP.parentNode.insertBefore(missNote,marketP.nextSibling);
   }
   var totals=s.totals;
-  /* market_total도 0 이면 "없음"으로 다룬다 — 위 부품 행 market_price 주석과 같은 실측
-     근거(2026-08-23). 서버의 market_missing은 NULL만 세므로 이 0 사례를 못 잡는다 —
-     화면은 합계가 0 이하면 그 자체로 "시장가 비교 불가"로 보고 섹션째 숨긴다. */
-  if(totals&&totals.market_total!=null&&totals.market_total>0){
-   var diff=s.total-totals.market_total;
+  /* market_total·market_compare_total 둘 다 0 이면 "없음"으로 다룬다 — 위 부품 행
+     market_price 주석과 같은 실측 근거(2026-08-23). 서버의 market_missing은 NULL만
+     세므로 이 0 사례를 못 잡는다 — 화면은 합계가 0 이하면 그 자체로 "시장가 비교
+     불가"로 보고 섹션째 숨긴다. */
+  if(totals&&totals.market_total!=null&&totals.market_total>0
+     &&totals.market_compare_total!=null&&totals.market_compare_total>0){
+   var diff=totals.market_compare_total-totals.market_total;
    if(secCompare)secCompare.style.display='';
    if(row2)row2.style.gridTemplateColumns='1fr 1.25fr';
+   if(cp)cp.textContent=totals.market_compare_total.toLocaleString();
    if(cp2)cp2.textContent=totals.market_total.toLocaleString();
    if(gapHeading){
     if(diff>0)gapHeading.innerHTML='시세 관측가보다 <span id="s2-gap-title">'+diff.toLocaleString()+'원</span> 비싼 이유';
@@ -952,7 +969,16 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    if(gapEl)gapEl.textContent=diff>0?diff.toLocaleString()+'원 더 비쌈':(diff<0?(-diff).toLocaleString()+'원 더 저렴':'0원');
    if(missNote){
     if(totals.market_missing>0){
-     missNote.textContent='시장가가 없는 부품 '+totals.market_missing+'개는 비교에서 뺐습니다.';
+     /* ③ 무엇을 뺐는지 밝힌다(2026-08-23 하네스 지시) — items[].market_price는
+        totals와 «같은 정규화»를 거친 값이다(api/recommend.py _mp() 한 함수가
+        market_pairs·items 둘 다에 쓰인다 — 새 판정을 여기서 따로 짓지 않는다).
+        PART_KO는 이 화면이 이미 쓰는 매핑(§부품 리스트, 위 720행대에서 정의)을
+        재사용한다 — 새로 만들지 않는다(§단일 원천). */
+     var missingParts=s.items.filter(function(it){return it.market_price==null||it.market_price<=0;})
+      .map(function(it){return PART_KO[it.part_type]||it.part_type;});
+     var haveN=s.items.length-missingParts.length;
+     missNote.textContent='시세를 확인한 '+haveN+'개 부품만 비교했습니다. 나머지 '
+      +missingParts.length+'개('+missingParts.join('·')+')는 시세 자료가 없어 양쪽에서 뺐습니다.';
      missNote.style.display='';
     }else{missNote.style.display='none';}
    }
@@ -961,6 +987,8 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    if(row2)row2.style.gridTemplateColumns='1fr';
    if(marketP)marketP.style.display='none';
    if(missNote)missNote.style.display='none';
+   if(cp)cp.textContent='—';
+   if(cp2)cp2.textContent='—';
   }
   s2why(k);        // 근거 문구는 이 티어의 확정 구성으로 따로 받아 온다(위 s2why 주석)
  };
