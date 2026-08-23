@@ -285,6 +285,111 @@ ImportError: jinja2 must be installed to use Jinja2Templates
 sudo journalctl -u popcorn-api -n 30 --no-pager
 ```
 
+## 다나와 시세 재수집 타이머 (A-109 차등 주기 · 2026-08-23)
+
+> 시세(GPU·CPU·CPU쿨러 등)는 자주 바뀌고 비활성 부품(MB·RAM 등)은 거의 안 바뀐다는
+> 실측(decision-log **U-56**의 실행 수단, A-109)에 따라 **부품 종류별로 재수집
+> 주기를 가른다.** 이 절은 `deploy/systemd/`의 unit 세 개를 서버에 앉히는 절차다.
+> **서버에서 직접 만들거나 고치지 않는다**(P-06) — 리포에서 고쳐 push 하고 서버는
+> 받기만 한다. 부품 묶음 정의(fast=GPU·CPU·CPU쿨러 공랭/수랭, slow=MB·RAM·SSD·HDD·
+> 케이스·파워)는 여기 다시 적지 않는다 — 단일 원천은 `tools/danawa_fetch.py`의
+> `PART_GROUPS`다.
+
+파일 셋(템플릿 서비스 하나 + 타이머 둘):
+
+| 파일 | 역할 |
+|---|---|
+| `deploy/systemd/popcorn-danawa-market@.service` | 템플릿. 인스턴스 `%i`가 `fast`\|`slow` — `tools/danawa_fetch.py --market --group %i --limit 5000`을 실행 |
+| `deploy/systemd/popcorn-danawa-market-fast.timer` | 주 1회(매주 월요일 05:00 KST) — `@fast.service` 실행 |
+| `deploy/systemd/popcorn-danawa-market-slow.timer` | 월 1회(매월 1일 01:00 KST) — `@slow.service` 실행 |
+
+### 설치
+
+```bash
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-danawa-market@.service /etc/systemd/system/
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-danawa-market-fast.timer /etc/systemd/system/
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-danawa-market-slow.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+**설치 전에 시각 표기부터 검증한다** — `Asia/Seoul` 시간대 접미사가 이 서버
+systemd(255)에서 실제로 원하는 대로 해석되는지 확인한다:
+
+```bash
+systemd-analyze calendar 'Mon *-*-* 05:00:00 Asia/Seoul'   # fast — 다음 월요일 05:00 KST가 나와야 한다
+systemd-analyze calendar '*-*-01 01:00:00 Asia/Seoul'      # slow — 다음 달 1일 01:00 KST가 나와야 한다
+```
+
+`Next elapse`가 기대한 KST 요일·시각과 다르거나 명령 자체가 오류를 내면, 각
+`.timer` 파일 안에 주석으로 이미 적어 둔 **UTC 대체 줄**로 바꾼다(파일 안에 위치·값이
+있다) — 바꾼 뒤 **같은 명령으로 다시 검증**하고서 설치한다.
+
+### 활성화 · 다음 실행 시각 확인
+
+```bash
+sudo systemctl enable --now popcorn-danawa-market-fast.timer
+sudo systemctl enable --now popcorn-danawa-market-slow.timer
+sudo systemctl list-timers 'popcorn-danawa*'
+```
+
+`list-timers`의 `NEXT` 열이 위 `systemd-analyze calendar` 결과와 같은 시각을
+가리키는지 대조한다. `popcorn-danawa-market@.service` 자체는 `enable`하지 않는다
+— 활성화 대상은 두 `.timer`뿐이다(서비스는 [Install]이 없다).
+
+### 수동 1회 실행 · 로그 확인
+
+> ⚠️ **첫 실행은 서버 캐시가 0건이라 전량 새로 수집한다.** 로컬 PC 캐시(3,631건·
+> 540MB)는 이 서버에 없다 — `fetch()`가 매 상품마다 실제로 다나와에 요청을 보낸다.
+> fast(대상 999건)는 약 37분, slow(대상 2,632건)는 약 96분 걸린다(2026-08-23
+> 하네스 실측 — 대상 건수는 카탈로그가 늘면 따라 늘고, 그러면 소요 시간도 늘어난다).
+> 타이머를 기다리지 않고 손으로 한 번 돌려 실제로 끝까지 도는지 먼저 확인하는
+> 편이 안전하다.
+
+```bash
+# 서비스를 직접 지정해서 지금 바로 한 번 돌린다(인스턴스명 필수 — 템플릿 자체는 못 돌린다)
+sudo systemctl start popcorn-danawa-market@fast.service
+sudo journalctl -u popcorn-danawa-market@fast.service -f
+```
+
+```bash
+sudo systemctl start popcorn-danawa-market@slow.service
+sudo journalctl -u popcorn-danawa-market@slow.service -f
+```
+
+`-f`는 실시간 추적이라 fast는 최대 약 37분, slow는 최대 약 96분 터미널을 붙잡는다
+— **계속 붙잡지 말고** `Ctrl+C`로 빠져나온 뒤 나중에 다시 확인해도 된다:
+
+```bash
+systemctl status popcorn-danawa-market@fast.service --no-pager      # 마지막 실행 결과(성공/실패)
+sudo journalctl -u popcorn-danawa-market@fast.service --since '2 hour ago'
+```
+
+### 끄는 법 · 되돌리는 법
+
+```bash
+sudo systemctl disable --now popcorn-danawa-market-fast.timer
+sudo systemctl disable --now popcorn-danawa-market-slow.timer
+```
+
+타이머만 끄면 **다음 예정 실행이 없어질 뿐**, 이미 끝난 수집(제안·자동 승인된 시세)은
+그대로 남는다 — 되돌리려면 `product_reviews`·`products.market_price`를 원장 규약대로
+손으로 되돌려야 하고, 이 unit 자체에는 되돌림 기능이 없다. unit 파일까지 걷으려면:
+
+```bash
+sudo rm /etc/systemd/system/popcorn-danawa-market-fast.timer \
+        /etc/systemd/system/popcorn-danawa-market-slow.timer \
+        /etc/systemd/system/popcorn-danawa-market@.service
+sudo systemctl daemon-reload
+```
+
+### 실패 확인 — 지금은 능동 알림이 없다
+
+타이머·서비스가 실패하면 **journald에는 남는다** — `systemctl status
+popcorn-danawa-market@fast.service`가 `failed`를 보여주고, `SyslogIdentifier=
+popcorn-danawa-%i` 덕에 `journalctl -t popcorn-danawa-fast`(또는 `-slow`)로도 찾을
+수 있다. **텔레그램 등으로 실패를 능동적으로 알리는 배선은 아직 없다** — 지금은
+사람이 `list-timers`나 `journalctl`을 열어야 안다. 알림 배선은 이번 범위 밖이다.
+
 ## 남아 있는 위험 (베타에서 감수하는 것 · 정직 기록)
 
 | 위험 | 지금 상태 | 해소 조건 |
