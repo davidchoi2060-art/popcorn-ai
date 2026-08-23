@@ -6,6 +6,15 @@
   .venv/Scripts/python tools/danawa_fetch.py --limit 200            # 판매중·재고>0 우선
   .venv/Scripts/python tools/danawa_fetch.py --all --limit 500
   .venv/Scripts/python tools/danawa_fetch.py --from-cache --dry      # 캐시 재파싱, 네트워크 0건
+  .venv/Scripts/python tools/danawa_fetch.py --market --limit 500   # 시세 전용 · 재고 후보
+                                                                      # 전체 대상(A-103)
+
+**대상 선정 두 갈래(2026-08-23 · A-103).** 기본값은 "사양 검수 대기"(`review_type=
+'spec_missing'`) 상품만 고른다 — 사양 제안이 목적이던 시절 그대로다. `--market`은 대상을
+"재고 후보 전체"(`v_recommendation_candidates`, `stock_qty>0`)로 바꾼다 — **시세는 사양
+검수 여부와 무관하게 필요하다.** 두 모집단은 다르다: 사양 검수 대기는 640건뿐인데
+시세가 필요한 재고 후보(danawa_code 보유)는 2,979건이라, 기본 모드로만 돌리면 MB·SSD·
+쿨러·HDD처럼 애초에 검수 대기가 아니었던 슬롯이 통째로 비어 버린다.
 
 **수집한 값을 정본에 바로 넣지 않는다.** `product_reviews.suggested_value`에 제안으로만
 올리고, 운영자가 검수 화면에서 확인해야 `product_specs`에 들어간다. 남의 페이지에서 온 값이
@@ -221,6 +230,11 @@ def main():
     ap.add_argument("--from-cache", action="store_true",
                      help="`.cache/danawa/`의 895건만 재수집 없이 파싱해 시세 관측"
                           "(market_price) 제안만 만든다 — 네트워크 요청 0건")
+    ap.add_argument("--market", action="store_true",
+                     help="대상을 «사양 검수 대기»(spec_missing) 대신 «재고 후보 전체»"
+                          "(v_recommendation_candidates, stock_qty>0)로 바꾼다 — 시세"
+                          "(market_price) 제안만 만든다. 이미 대기중인 market_price 제안이"
+                          " 있는 상품은 제외한다. 2026-08-23·A-103 참조")
     args = ap.parse_args()
 
     load_dotenv(os.path.join(ROOT, ".env"))
@@ -230,23 +244,60 @@ def main():
         run_from_cache(engine, args.dry)
         return
 
-    sell = "" if args.all else " AND p.status='판매중' AND p.stock_qty>0"
-    with engine.connect() as c:
-        rows = c.execute(text(f"""
-            SELECT p.product_code, p.danawa_code, p.part_type, p.product_name,
-                   p.locked_fields, array_agg(r.field_name) AS fields
-              FROM product_reviews r JOIN products p USING (product_code)
-             WHERE r.review_status='대기' AND r.review_type='spec_missing'
-               AND r.suggested_value IS NULL
-               AND p.danawa_code IS NOT NULL AND p.danawa_code ~ '^[0-9]+$'
-               {sell}
-             GROUP BY 1,2,3,4,5
-             ORDER BY p.product_code
-             LIMIT :n"""), {"n": args.limit}).all()
-    print(f"수집 대상 {len(rows):,}건"
-          + ("" if args.all else " (판매중·재고>0)") + f" · 캐시 {CACHE}\n")
-
+    # seen_price는 두 갈래 다 쓴다 — 시세 모드는 대상 선정에서 제외 목록으로,
+    # 아래 루프는 기존대로 (product_code, suggested_value) 중복 방지로.
     seen_price = _load_pending_market_price(engine)
+
+    if args.market:
+        # 2026-08-23 · A-103 · 하네스 실측: main()의 기존 대상 선정(바로 아래 else 분기)은
+        # "사양 검수 대기"(review_type='spec_missing' · suggested_value IS NULL) 행이 있는
+        # 상품만 고른다 — 640건뿐이다. 그런데 시세(market_price)는 사양 검수 여부와 무관하게
+        # **재고 후보 전체**(danawa_code 보유 2,979건)에 필요하다. 이 차이 때문에 오늘 캐시로
+        # 만든 제안 893건이 재고 후보의 8.0%밖에 못 채웠고 MB·SSD·쿨러·HDD 슬롯이 통째로
+        # 비었다 — 그 상품들은 애초에 spec_missing 대상이 아니라 수집 대상 자체가 아니었다.
+        #
+        # 모집단은 엔진이 실제로 쓰는 후보와 **같은 원천을 실조회**한다(술어를 여기 다시
+        # 적지 않는다 — CLAUDE.md §화면 정직성 "판정은 뷰·엔진과 같은 원천을 실조회한다").
+        # api/recommend.py의 _load_pool()이 견적에 쓰는 조회와 동일하게
+        # `v_recommendation_candidates WHERE stock_qty > 0`. 이 뷰가 이미 product_code·
+        # danawa_code·part_type·product_name·locked_fields를 컬럼으로 갖고 있어(실측 —
+        # information_schema.columns) products를 별도로 다시 조인하지 않는다: 조인하면
+        # 같은 값을 두 원천(뷰 컬럼 vs JOIN한 products 컬럼)에서 읽게 돼 갈라질 여지만
+        # 늘어난다.
+        already = {pc for pc, _sv in seen_price}
+        with engine.connect() as c:
+            raw = c.execute(text("""
+                SELECT product_code, danawa_code, part_type, product_name, locked_fields
+                  FROM v_recommendation_candidates
+                 WHERE stock_qty > 0
+                   AND danawa_code IS NOT NULL AND danawa_code ~ '^[0-9]+$'
+                   AND product_code != ALL(:excl)
+                 ORDER BY product_code
+                 LIMIT :n"""), {"n": args.limit, "excl": list(already)}).all()
+        # 사양 제안용 fields를 빈 목록으로 둔다 — 이 모드는 사양 검수 대기 행이 없으므로
+        # 뽑을 사양 제안이 원천적으로 없다(아래 루프의 `use = {f: v for ... if f in fields}`가
+        # 빈 집합과 비교돼 자연히 0건이 된다). 시세·사양을 억지로 가르지 않고 기존 루프
+        # 구조를 그대로 쓰기 위한 표기다.
+        rows = [(pc, code, pt, name, locked, []) for pc, code, pt, name, locked in raw]
+        print(f"수집 대상 {len(rows):,}건 (시세 모드 — 재고 후보 · danawa_code 보유"
+              f" · 대기중 제안 있는 상품 {len(already):,}건 제외) · 캐시 {CACHE}\n")
+    else:
+        sell = "" if args.all else " AND p.status='판매중' AND p.stock_qty>0"
+        with engine.connect() as c:
+            rows = c.execute(text(f"""
+                SELECT p.product_code, p.danawa_code, p.part_type, p.product_name,
+                       p.locked_fields, array_agg(r.field_name) AS fields
+                  FROM product_reviews r JOIN products p USING (product_code)
+                 WHERE r.review_status='대기' AND r.review_type='spec_missing'
+                   AND r.suggested_value IS NULL
+                   AND p.danawa_code IS NOT NULL AND p.danawa_code ~ '^[0-9]+$'
+                   {sell}
+                 GROUP BY 1,2,3,4,5
+                 ORDER BY p.product_code
+                 LIMIT :n"""), {"n": args.limit}).all()
+        print(f"수집 대상 {len(rows):,}건"
+              + ("" if args.all else " (판매중·재고>0)") + f" · 캐시 {CACHE}\n")
+
     price_props, price_fail, price_mismatch, price_dup = [], 0, 0, 0
     props, mismatch, nospec, fail = [], [], 0, 0
     for i, (pc, code, pt, name, locked_fields, fields) in enumerate(rows, 1):
@@ -294,6 +345,10 @@ def main():
     filled = sum(len(p["vals"]) for p in props)
     print(f"\n제안 가능 {len(props):,}건 상품 · 필드 {filled:,}개")
     print(f"코드 불일치(사양 미사용) {len(mismatch):,}건 · 사양 없음 {nospec:,}건")
+    if args.market:
+        print("  (시세 모드 — 사양 검수 대기 행이 없는 대상이라 사양 제안은 원천적으로"
+              " 0건입니다. 위 '사양 없음'은 결측이 아니라 이 모드의 정상 동작입니다"
+              " — 2026-08-23·A-103)")
     if mismatch[:5]:
         print("  불일치 샘플:")
         for pc, code, ours, theirs, sim in mismatch[:5]:
