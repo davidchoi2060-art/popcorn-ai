@@ -73,6 +73,10 @@ Documentation=file:///srv/popcorn-ai/deploy/README.md
 Type=oneshot
 User=popcorn
 Group=popcorn
+# 다른 unit(예: popcorn-danawa-market@.service)의 저널을 읽으려면 이 그룹이
+# 필요하다 — 2026-08-24 서버 실측 사고, 왜 계정 전체가 아니라 이 unit에만
+# 주는지·NoNewPrivileges와 충돌하지 않는 근거는 파일 하단 주석 참조.
+SupplementaryGroups=systemd-journal
 WorkingDirectory=/srv/popcorn-ai
 
 # TELEGRAM_BOT_TOKEN · TELEGRAM_CHAT_ID 를 여기서 읽는다. scripts/_tg_env.py 는
@@ -105,12 +109,60 @@ SyslogIdentifier=popcorn-notify-failure
 # 않는다(journalctl 조회 + 텔레그램 HTTP 전송뿐 — danawa 쪽 .cache 쓰기와
 # 다르다) — 그래서 ReadWritePaths 가 없다.
 #
-# User=popcorn 을 그대로 쓰는 이유: journald 는 각 사용자가 "자신과 같은
-# UID 가 남긴 로그"는 별도 권한(systemd-journal 그룹 등) 없이도 읽게 해준다.
-# 실패를 알려야 하는 unit 들(예: popcorn-danawa-market@.service)이 전부
-# User=popcorn 로 도므로, 이 알림 unit 도 같은 사용자로 두면 그 로그를 그대로
-# 읽을 수 있다 — 다른 사용자로 두면 journalctl 조회가 권한 부족으로 조용히
-# 빈 결과를 낼 수 있다.
+# User=popcorn 을 그대로 쓰는 이유: 실패를 알려야 하는 unit 들(예:
+# popcorn-danawa-market@.service)이 전부 User=popcorn 로 돈다 — 계정을
+# 새로 만들 이유가 없다.
+#
+# ⚠ 2026-08-24 서버 실측 정정 — 이 문단이 원래 "같은 UID 면 자기 로그는
+# 권한 없이도 본다"고만 적고 있었는데 **절반만 맞았다.** 그 규칙은 "자기
+# 자신이 낸 로그"에만 적용되고, 이 unit 이 실제로 읽어야 하는 것은 «다른»
+# unit 의 로그다(둘 다 User=popcorn 라 UID 는 같아도, journald 의 열람
+# 권한은 "요청하는 프로세스가 systemd-journal/adm 그룹에 있는가"로 갈린다 —
+# UID 가 같다고 자동으로 열리지 않는다). 그래서 서버에서 실제로
+# "No journal files were opened due to insufficient permissions." 로
+# 막혔다(폰에 도착한 알림 본문에 그 문구가 그대로 실렸다).
+#
+# ── 그래서 SupplementaryGroups=systemd-journal 를 추가했다(위 참조) ────────
+# ✗ 안 고른 방법 — `usermod -aG systemd-journal popcorn`: popcorn **계정
+#   자체**에 영구히 그룹을 준다. popcorn-api.service(고객이 여는 API
+#   서버 — deploy/popcorn-api.service 확인, 이 unit과 같은 User=popcorn
+#   Group=popcorn)도 그 즉시 저널 열람 권한을 갖는다. 그 프로세스는
+#   인터넷에서 오는 요청을 그대로 받고(CLAUDE.md 「남아 있는 위험」 —
+#   고객 인증이 아직 dev 어댑터), 이미 있는 취약점이 있다면 공격 표면을
+#   불필요하게 넓히는 선택이다.
+# ○ 고른 방법 — `SupplementaryGroups=`(이 unit 파일에만): systemd.exec(5)
+#   문서 — "이 옵션은 시스템 그룹 데이터베이스에 이미 설정된 보조 그룹
+#   목록을 덮어쓰지 않고 확장한다." `/etc/group` 자체는 그대로이고, **이
+#   unit 이 실행하는 프로세스에만** 한시적으로 그룹이 더해진다 — 같은
+#   User=popcorn 로 도는 다른 unit(popcorn-api·popcorn-danawa-market@)은
+#   이 unit 파일을 손대지 않는 한 영향이 없다. 최소 권한에 맞는 쪽이다.
+#
+# systemd 버전 확인: `SupplementaryGroups=`는 systemd.exec(5)의 오래된 핵심
+# 지시어(수 년째 문법이 안 바뀐, nginx 의 ssl-cert 그룹 부여 등에 널리 쓰이는
+# 관용구)라 이 서버의 systemd 255 에도 있다고 판단했다. ⚠ 이 판단은 문서·
+# 관행 지식이다 — 이 개발 PC(Windows, systemd 없음. WSL 도 설치돼 있지 않음을
+# `wsl --list`로 확인함)에서 `systemd-analyze verify`로 실제 파싱을 시험하지
+# 못했다 — 설치 시(daemon-reload) 오류 없이 로드되는지로 최종 확인해야 한다.
+#
+# ── NoNewPrivileges=true 와 충돌하는가 — 안 한다고 판단한다. 근거: ─────────
+#   ① systemd 가 프로세스를 띄우는 순서는 "자격증명(uid/gid/보조그룹) 설정
+#      → capability 조정 → NoNewPrivileges 적용(prctl PR_SET_NO_NEW_PRIVS)
+#      → execve()"다(systemd.exec(5) 「Process Properties」 절 서술 순서).
+#      SupplementaryGroups= 가 적용되는 setgroups() 호출은 NoNewPrivileges
+#      가 걸리기 «전», 대상 바이너리를 execve() 하기 «전»에 끝난다.
+#   ② 이건 우연이 아니라 권한 모델상 필연이다 — setgroups() 는 CAP_SETGID
+#      가 있어야 하는데, 이 호출은 systemd(사실상 root)가 자식 프로세스의
+#      자격증명을 자리잡아 주는 단계에서 이뤄진다. NoNewPrivileges 는 "이후
+#      execve() 로 «새로» 권한을 얻는 것"(setuid/setgid 비트, 파일
+#      capability)을 막는 장치이지, 이미 부여된 자격증명(uid/gid/보조그룹)을
+#      취소하거나 그 설정 자체를 막는 장치가 아니다.
+#   ③ 실무 선례 — `User=`+`SupplementaryGroups=`+`NoNewPrivileges=yes` 조합은
+#      systemd 하드닝 가이드(`systemd-analyze security`)가 권장하는 표준
+#      패턴이다(예: 여러 배포판의 nginx.service 가 ssl-cert 그룹을 이
+#      방식으로 받으면서 NoNewPrivileges=true 도 함께 쓴다) — 충돌한다면
+#      이 조합 자체가 성립하지 않았을 것이다.
+#   ⚠ 이 역시 문서·선례 기반 판단이다 — 이 서버에서 실제로 다른 unit 의
+#      로그가 알림 본문에 실리는지는 하네스가 재설치 후 실측으로 확정한다.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

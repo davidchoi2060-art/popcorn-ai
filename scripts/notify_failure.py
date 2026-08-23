@@ -142,28 +142,52 @@ def resolve_unit_name(raw: str) -> str:
 
 def fetch_last_logs(unit: str, lines: int = JOURNAL_LINES) -> str:
     """journalctl -u <unit> 의 마지막 lines 줄. 못 가져와도 예외를 올리지 않는다
-    — 로그를 못 읽었다는 이유로 알림 자체가 안 나가면 안 된다."""
+    — 로그를 못 읽었다는 이유로 알림 자체가 안 나가면 안 된다.
+
+    -q(--quiet)를 반드시 붙인다 — 2026-08-24 서버 실측: 이 알림 unit이 권한
+    부족으로 다른 unit의 저널을 못 읽을 때 journalctl이 내는 안내
+    ("Hint: You are currently not seeing messages ... insufficient
+    permissions")가 -q 없이는 그대로 본문에 실려 폰 화면을 그 안내문으로
+    채웠다. 지금은 deploy/systemd/popcorn-notify-failure@.service의
+    SupplementaryGroups=systemd-journal로 그 권한 부족 자체를 고쳤지만,
+    혹시 그 설정이 어떤 이유로 안 먹더라도 -q가 있으면 장황한 안내문 대신
+    아래 짧은 사유가 나간다.
+
+    폰으로 가는 본문에는 짧고 확실한 사유만 넣는다 — journalctl의 원문
+    stderr(버전·로캘에 따라 문구가 달라질 수 있다)는 이 스크립트 자신의
+    stderr(-> journald, `journalctl -u popcorn-notify-failure@...`로 서버에서
+    확인 가능)에만 남기고 폰 본문에는 넣지 않는다. 성공/실패 구분은
+    stderr 문자열 내용을 추측하지 않고 **반환코드**로 한다 — journalctl은
+    저널을 아예 못 열면(권한 등) 0이 아닌 코드를, 저널은 열었지만 그 unit의
+    항목이 없으면 0을 돌려준다(이 구분이 stderr 문구보다 버전에 덜 민감하다).
+    """
     try:
         proc = subprocess.run(
-            ["journalctl", "-u", unit, "-n", str(lines), "--no-pager",
+            ["journalctl", "-q", "-u", unit, "-n", str(lines), "--no-pager",
              "--no-hostname", "--output=short-iso"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=JOURNAL_TIMEOUT_SEC,
         )
     except FileNotFoundError:
-        return "(journalctl 실행 파일을 찾지 못했다)"
+        return "(journalctl 없음 - 서버에 journalctl 이 있는지 확인하라)"
     except subprocess.TimeoutExpired:
-        return f"(journalctl 응답 없음 - {JOURNAL_TIMEOUT_SEC}초 초과)"
+        return f"(journalctl 응답 없음 - {JOURNAL_TIMEOUT_SEC}초 초과. 서버에서 직접 확인하라)"
     except OSError as e:
-        return f"(journalctl 실행 실패: {e})"
+        print(f"[알림] journalctl 실행 실패(unit={unit}): {e}", file=sys.stderr)
+        return "(journalctl 실행 실패 - 서버에서 journalctl -u 로 직접 확인하라)"
 
     out = (proc.stdout or "").strip()
     if out:
         return out
+
+    # 로그를 못 가져온 경우 - 원문 stderr는 이 unit 자신의 journald 로그에만
+    # 남기고(폰 본문에는 안 넣는다), 폰에는 무엇을 해야 하는지만 짧게 말한다.
     err = (proc.stderr or "").strip()
     if err:
-        return f"(로그 없음, stderr: {err})"
-    return "(로그 없음 - unit 이름 복원이 틀렸을 수 있다. 위 unit 값을 확인하라)"
+        print(f"[알림] journalctl stderr(unit={unit}): {err}", file=sys.stderr)
+    if proc.returncode != 0:
+        return "(로그를 못 읽었다 - 권한 문제로 보인다. 서버에서 journalctl -u 로 직접 확인하라)"
+    return "(이 unit 이름으로 로그가 없다 - 이름 복원이 틀렸을 수 있다. 서버에서 journalctl -u 로 직접 확인하라)"
 
 
 def build_body(raw_id: str, unit: str, logs: str) -> str:
