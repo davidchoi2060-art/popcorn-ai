@@ -30,11 +30,17 @@ deploy/systemd/popcorn-notify-failure@.service 머리말에도 있다(중복 서
 위치를 가리키기 때문이다(서버에서 맞는 위치는 /etc/popcorn-ai.env). 이
 스크립트가 서버(.env 없음, 환경변수만)에서 동작하는지에 대한 판정과 근거는
 deploy/README.md 「실패 알림」 절에 있다.
+
+자격증명이 "있기는 하지만 형태가 이상한" 경우도 본다(credential_problems() —
+2026-08-24 서버 실측 사고로 신설. 근거는 그 함수 주석 참조). **값 자체는
+어떤 경우에도 로그에 남기지 않는다** — 길이·문자 종류(비ASCII·꺾쇠 포함 여부)·
+형식 일치 여부 같은 «형태»만 본다.
 """
 from __future__ import annotations
 
 import datetime
 import os
+import re
 import subprocess
 import sys
 
@@ -49,6 +55,66 @@ JOURNAL_TIMEOUT_SEC = 15
 SEND_TIMEOUT_SEC = 30
 
 KNOWN_SUFFIXES = (".service", ".timer", ".socket", ".path", ".mount", ".target", ".device")
+
+# ── 자격증명 «형태» 검증 (2026-08-24 서버 실측 사고로 신설) ──────────────────
+# 사장님이 자격증명을 넣은 뒤 서버에서 처음 실패를 발생시켜 봤더니, 안내에 쓴
+# 플레이스홀더 `<토큰>`·`<채팅 ID>` 가 실제 값 대신 그대로 /etc/popcorn-ai.env 에
+# 들어가 있었다. 전송을 시도하니 scripts/notify_telegram.py 가 쓰는
+# http.client._encode_request 가 UnicodeEncodeError('ascii' codec can't
+# encode ...)로 죽었다 — 꺾쇠·한글이 섞인 문자열을 아스키 HTTP 요청 줄로
+# 인코딩하지 못한 것이다. journald 에는 파이썬 트레이스백만 남아 «왜» 안
+# 가는지 알 수 없었다(형태: TELEGRAM_BOT_TOKEN 길이 8·비ASCII 있음·꺾쇠 있음,
+# TELEGRAM_CHAT_ID 길이 7·비ASCII 있음·꺾쇠 있음 — 이 문서화도 값이 아니라
+# «형태»만 옮겨 적은 것이다).
+#
+# 그래서 전송을 시도하기 «전»에 값의 형태만 미리 본다(값 자체는 아래 어떤
+# 반환값에도 넣지 않는다):
+#   ① 비어 있음
+#   ② 비ASCII 문자를 포함 — 플레이스홀더가 그대로일 때 «정확히» 이 모양이다
+#   ③ 꺾쇠 '<' '>' 를 포함 — `<...>` 표기 관례의 플레이스홀더 잔재
+#   ④ 텔레그램 형식이 아님 — scripts/_tg_env.py·scripts/notify_telegram.py를
+#      읽어 확인했지만 이 저장소에 이미 아는 형식(정규식 등)이 없었다. 그래서
+#      텔레그램 봇 API 문서가 공개한, 여러 해 안 바뀐 형식만 느슨하게 본다 —
+#      봇 토큰은 항상 "숫자:영숫자"(bot_id:secret) 모양이고, chat_id 는
+#      정수(그룹/채널은 음수)이거나 "@사용자명"이다. 이보다 엄격하게(예: 길이
+#      고정) 판정하면 정상 토큰을 막을 위험이 더 크다고 판단해 하지 않는다.
+_TOKEN_FORMAT_RE = re.compile(r"^\d+:[A-Za-z0-9_-]+$")
+_CHAT_ID_FORMAT_RE = re.compile(r"^-?\d+$|^@[A-Za-z0-9_]+$")
+
+
+def _credential_problem(name: str, value: str, format_re: re.Pattern[str],
+                         format_hint: str) -> str | None:
+    """<name> 값의 «형태»만 판정한다. 문제 없으면 None, 있으면 사람이 무엇을
+    어디서 어떻게 고쳐야 하는지 담은 한 줄. **값 자체는 어떤 경우에도 반환값에
+    넣지 않는다** — 길이·문자 종류·형식 일치 여부만 본다."""
+    if not value:
+        return f"{name} 값이 비어 있다 - /etc/popcorn-ai.env 에 실제 값을 넣어야 한다"
+    if "<" in value or ">" in value:
+        return (f"{name} 이 플레이스홀더 그대로다(꺾쇠 <, > 포함) - "
+                f"/etc/popcorn-ai.env 의 그 줄을 실제 값으로 바꿔야 한다")
+    if not value.isascii():
+        return (f"{name} 에 비ASCII 문자가 있다(플레이스홀더가 그대로 남았을 때 "
+                f"정확히 이 모양이다) - /etc/popcorn-ai.env 의 그 줄을 실제 값으로 "
+                f"바꿔야 한다")
+    if not format_re.match(value):
+        return (f"{name} 형식이 {format_hint} 이 아니다 - /etc/popcorn-ai.env 의 "
+                f"그 줄을 실제 값으로 바꿔야 한다")
+    return None
+
+
+def credential_problems(token: str, chat_id: str) -> list[str]:
+    """두 값의 형태 문제를 전부 모아 돌려준다(있는 만큼 전부) — 하나만
+    보고하고 끝내면 나머지 하나가 또 같은 사고를 낸다(실제로 서버에서 토큰·
+    chat_id 둘 다 동시에 플레이스홀더 그대로였다)."""
+    problems = []
+    for name, value, fmt_re, hint in (
+        ("TELEGRAM_BOT_TOKEN", token, _TOKEN_FORMAT_RE, "텔레그램 봇 토큰(숫자:영숫자)"),
+        ("TELEGRAM_CHAT_ID", chat_id, _CHAT_ID_FORMAT_RE, "정수 또는 @사용자명"),
+    ):
+        p = _credential_problem(name, value, fmt_re, hint)
+        if p:
+            problems.append(p)
+    return problems
 
 
 def resolve_unit_name(raw: str) -> str:
@@ -147,13 +213,28 @@ def main() -> int:
     # 직접 쓴다. 이 메시지가 이 스크립트에서 가장 중요한 줄이다 - 텔레그램이
     # 안 가는데 journald 에도 아무 흔적이 없으면 U-57 을 고친 것이 아니다.
     try:
-        _tg_env.creds()
+        token, chat_id = _tg_env.creds()
     except SystemExit:
         print(
             "[알림 실패] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 가 없다 - "
             "/etc/popcorn-ai.env 에 두 줄을 추가해야 한다(권한 640 root:popcorn "
             "유지, 절차는 deploy/README.md 「실패 알림」 참조). "
             f"원인 unit={unit}",
+            file=sys.stderr,
+        )
+        return 1
+
+    # 있기는 하지만 «형태»가 이상한 경우(2026-08-24 서버 실측 사고 — 위
+    # credential_problems() 주석 참조). 여기서 멈추면 http.client 안에서
+    # UnicodeEncodeError 트레이스백으로 죽는 대신, 무엇을 어디서 어떻게
+    # 고쳐야 하는지가 journald 에 분명히 남는다. 값은 어디에도 안 찍는다.
+    problems = credential_problems(token, chat_id)
+    if problems:
+        for p in problems:
+            print(f"[알림 실패] {p}", file=sys.stderr)
+        print(
+            f"[알림 실패] 원인 unit={unit} - 값을 고친 뒤 서비스를 다시 설치·"
+            "재시작할 필요는 없다(다음 실행 때 /etc/popcorn-ai.env 를 새로 읽는다).",
             file=sys.stderr,
         )
         return 1

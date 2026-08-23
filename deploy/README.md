@@ -462,19 +462,33 @@ sudo systemctl daemon-reload
 
 ### ⚠ 사장님이 직접 하셔야 하는 것 — `/etc/popcorn-ai.env`에 두 줄 추가
 
-리포에도 이 문서에도 토큰 값을 적지 않는다. 서버에서 **직접**:
+리포에도 이 문서에도 토큰 값을 적지 않는다.
+
+⚠ **2026-08-24 서버 실측 사고 — `printf ... >>` 처럼 «덧붙이는» 방식으로
+넣지 않는다.** 이 방식으로 넣었더니 이 문서 예시에 있던 꺾쇠 자리표시자
+(`<봇 토큰>`·`<채팅 ID>`)가 값으로 착각돼 **그대로** 들어갔다 — 전송이
+`http.client` 안에서 `UnicodeEncodeError`로 죽었고 journald에는 트레이스백만
+남아 «왜» 안 가는지 알 수 없었다(지금은 `scripts/notify_failure.py`가 이
+형태를 미리 걸러 분명한 문구를 남긴다 — 아래 「안전하게 실패를 흉내 내는
+법」③). 덧붙이기는 **같은 키 줄이 여러 개** 생기는 문제도 겹친다 — 뒷줄이
+이긴다고 해도 어느 줄이 실제로 쓰이는지 사람이 매번 헷갈린다.
+
+**반드시 편집기로 열어, 자기 눈으로 실제 값을 보면서 고친다:**
 
 ```bash
 sudo nano /etc/popcorn-ai.env
 ```
 
-아래 두 줄을 추가한다(`<...>` 자리에 실제 값을 넣는다 — 봇은 `@popcornpc_ai_bot`,
-값은 로컬 PC `.env`에 이미 있다):
+파일 맨 아래로 가 **직접 타이핑으로** 두 줄을 추가한다. 아래는 "이런 모양"
+이라는 설명이지 그대로 붙여 넣는 명령이 아니다 — `<`와 `>` 사이를 실제
+값으로 **바꿔서** 쓴다(값은 로컬 PC `.env`에 이미 있다 — 봇은
+`@popcornpc_ai_bot`):
 
-```
-TELEGRAM_BOT_TOKEN=<봇 토큰>
-TELEGRAM_CHAT_ID=<채팅 ID>
-```
+    TELEGRAM_BOT_TOKEN=<여기를 실제 봇 토큰으로 바꿔 쓴다>
+    TELEGRAM_CHAT_ID=<여기를 실제 채팅 ID로 바꿔 쓴다>
+
+**저장하기 전에 화면에서 `<`·`>`가 안 보이는지 눈으로 확인한다** — 꺾쇠가
+남아 있으면 아직 자리표시자 그대로라는 뜻이다.
 
 저장한 뒤 **권한이 그대로인지 확인한다** — 이 파일은 `640 root:popcorn`이어야
 한다(§0 참조 — `600`으로 두면 `popcorn` 계정으로 도는 진단 스크립트가 못 읽는
@@ -486,13 +500,43 @@ sudo chmod 640 /etc/popcorn-ai.env && sudo chown root:popcorn /etc/popcorn-ai.en
 ls -l /etc/popcorn-ai.env    # -rw-r----- root popcorn 이어야 한다
 ```
 
-**값을 출력하지 않고 존재만 확인**(CLAUDE.md §텔레그램 · T-07 마스킹 금지
-원칙과 같은 이유 — 값이 아니라 사실만 본다):
+**넣은 뒤, 값을 출력하지 않고 «형태»만 재서 스스로 확인한다**(CLAUDE.md
+§텔레그램 · T-07 마스킹 금지 원칙과 같은 이유 — 값이 아니라 사실만 본다).
+`scripts/notify_failure.py`의 `credential_problems()`가 서버에서 실제로 보는
+것과 같은 종류의 판정이다 — 존재(줄 수, 중복 검사 겸함) → 길이 →
+비ASCII 포함 여부:
 
 ```bash
-sudo grep -c '^TELEGRAM_BOT_TOKEN=' /etc/popcorn-ai.env   # 1 이어야 한다
-sudo grep -c '^TELEGRAM_CHAT_ID='   /etc/popcorn-ai.env   # 1 이어야 한다
+sudo grep -c '^TELEGRAM_BOT_TOKEN=' /etc/popcorn-ai.env   # 1 이어야 한다(0=없음, 2+=중복 줄)
+sudo grep -c '^TELEGRAM_CHAT_ID='   /etc/popcorn-ai.env   # 1 이어야 한다(0=없음, 2+=중복 줄)
+sudo bash -c "grep '^TELEGRAM_BOT_TOKEN=' /etc/popcorn-ai.env | cut -d= -f2- | wc -c"   # 40 안팎이 정상 — 한 자리 수면 의심
+sudo bash -c "grep '^TELEGRAM_CHAT_ID='   /etc/popcorn-ai.env | cut -d= -f2- | wc -c"   # chat_id 자릿수 + 1(개행) 정도
+sudo bash -c "grep '^TELEGRAM_BOT_TOKEN=' /etc/popcorn-ai.env | cut -d= -f2- | grep -cP '[^\x00-\x7F]'"   # 0 이어야 한다(1 이상=비ASCII 섞임=자리표시자 의심)
+sudo bash -c "grep '^TELEGRAM_CHAT_ID='   /etc/popcorn-ai.env | cut -d= -f2- | grep -cP '[^\x00-\x7F]'"   # 0 이어야 한다
 ```
+
+줄 수가 1이 아니거나, 길이가 한 자리 수이거나, 비ASCII 개수가 1 이상이면
+자리표시자가 그대로 남았거나 중복 줄이 있는 것이다 — 바로 아래 「이미 잘못
+들어간 줄을 고치는 법」을 따른다. **이 여섯 줄을 전부 통과해도 실제로 가는지는
+아래 「안전하게 실패를 흉내 내는 법」①로 한 번 더 확인한다** — 형태 검사가
+잡는 것은 "자리표시자·중복 잔재"뿐이고, 형태가 멀쩡한데 값 자체가 틀린
+경우(예: 다른 봇의 토큰)까지는 못 잡는다.
+
+### 이미 잘못 들어간 줄을 고치는 법 — 또 덧붙이지 않는다
+
+`printf ... >>` 등으로 이미 넣었다면 **같은 키 줄이 여러 개**일 수 있다.
+그 위에 한 줄 더 append하면 문제가 늘 뿐이다 — `EnvironmentFile=`은
+나중 줄이 앞 줄 값을 덮어쓰지만, 그걸 믿고 줄을 계속 쌓지 않는다(사람이 나중에
+어느 줄이 유효한지 알 길이 없어진다):
+
+```bash
+sudo nano /etc/popcorn-ai.env
+```
+
+`TELEGRAM_BOT_TOKEN=`·`TELEGRAM_CHAT_ID=`로 시작하는 줄을 **찾아서**(nano는
+`Ctrl+W`로 검색) 중복이 있으면 지우고 **정확히 한 줄씩만** 남긴 뒤, 남긴 줄의
+`=` 뒤 값을 실제 값으로 고쳐 쓴다. 저장 후 바로 위 여섯 줄 검사를 다시 돌려
+줄 수가 각 1인지, 형태가 정상인지 재확인한다.
 
 **이미 떠 있는 다른 서비스(`popcorn-api` 등)를 재시작할 필요는 없다** — 알림
 unit은 `Type=oneshot`이라 실패가 나서 호출될 때마다 그 순간의
@@ -550,6 +594,21 @@ sudo systemctl daemon-reload
 `TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 가 없다 - /etc/popcorn-ai.env 에 두 줄을
 추가해야 한다`가 **분명히** 남아야 한다. 아무 흔적도 없이 조용히 끝나면 그
 자체가 결함이다.
+
+④ **자격증명은 있지만 형태가 이상할 때도 트레이스백이 아니라 문구가 남는지
+확인한다**(2026-08-24 서버 실측 사고의 재발 방지 — `scripts/notify_failure.py`의
+`credential_problems()`). 위 「넣은 뒤... 형태만 재서 스스로 확인한다」의 여섯
+줄 검사가 이미 이 사고 자체를 막지만, 혹시 그 검사를 건너뛰고 값을 넣었다면
+①을 한 번 더 돌려 `journalctl`에 다음 중 하나처럼 **원인과 고칠 위치를 담은
+한 줄**이 남는지 본다(값 자체는 어디에도 안 찍힌다):
+
+    TELEGRAM_BOT_TOKEN 값이 비어 있다 - ...
+    TELEGRAM_BOT_TOKEN 이 플레이스홀더 그대로다(꺾쇠 <, > 포함) - ...
+    TELEGRAM_BOT_TOKEN 에 비ASCII 문자가 있다(...) - ...
+    TELEGRAM_BOT_TOKEN 형식이 텔레그램 봇 토큰(숫자:영숫자) 이 아니다 - ...
+
+`UnicodeEncodeError`나 `Traceback` 같은 파이썬 내부 오류 문자열이 보이면 이
+검사가 무너진 것이다 — 이 절 자체가 실패다.
 
 ### 재귀 방지
 
