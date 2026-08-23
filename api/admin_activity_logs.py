@@ -59,6 +59,11 @@ ACTION_LABELS = {
     "price_import_apply": "단가표 반영", "price_import_undo": "단가표 반영 되돌림",
     "review_process": "검수 처리", "review_bulk_confirm": "검수 일괄 확정",
     "review_undo": "검수 되돌림",
+    # A-108(2026-08-23) — 시세(market_price) 자동 승인. 사람이 누른 review_process와
+    # 구분되는 별개 action(operator_id=NULL, api/admin_reviews.py auto_approve_market_price
+    # 참조). 사전에 없으면 원문 "review_auto_approve"가 그대로 노출된다(위 _untranslated
+    # 주석 그대로) — 그래서 다른 action과 마찬가지로 여기 올린다.
+    "review_auto_approve": "시세 자동 승인",
     "sourcing_link": "매입 모델 연결", "sourcing_unlink": "매입 모델 연결 해제",
     "product_register": "상품 등록",
     "member_review_moderate": "후기 처리", "member_review_undo": "후기 처리 되돌림",
@@ -189,6 +194,23 @@ def _summary(action: str, d: dict) -> str:
         p = d.get("sale_price")
         price_txt = f"{p:,}원" if p is not None else "값 없음"
         return f"{d.get('sku')} · 판매가 {price_txt} 잠금"
+    if action == "review_auto_approve":
+        # detail 구조(api/admin_reviews.py auto_approve_market_price): mode·auto·review_id·
+        # field(항상 market_price)·value(str)·pct_change(float|None)·threshold_pct(float)·
+        # before. "무엇이 왜 자동 승인됐는지"가 한 줄에 다 보여야 한다(지시서 요구) — 값 +
+        # 변동률 + 기준을 함께 적는다. pct_change는 auto_approved=True일 때는 항상 값이
+        # 있지만(market_auto_approve_decision — ok=True면 pct는 None이 아니다) 방어적으로
+        # None도 다룬다.
+        pct = d.get("pct_change")
+        thr = d.get("threshold_pct")
+        val = d.get("value")
+        try:
+            val_txt = f"{int(val):,}원"
+        except (TypeError, ValueError):
+            val_txt = str(val) if val is not None else "값 없음"
+        pct_txt = f"{pct:+.1f}%" if isinstance(pct, (int, float)) else "산출 불가"
+        thr_txt = f"{thr:g}%" if isinstance(thr, (int, float)) else "-"
+        return f"시세 자동 승인 · market_price {val_txt} (변동 {pct_txt}, 기준 {thr_txt})"
     if action.endswith("_undo") or d.get("ref_log_id"):
         return f"원 기록 #{d.get('ref_log_id')} 되돌림"
     return action  # 미지의 action — 원문 폴백
@@ -215,7 +237,12 @@ def list_activity_logs(date_from: str | None = None, date_to: str | None = None)
             " WHERE TRUE" + _RANGE), _p).scalar_one()
         rows = conn.execute(text(
             "SELECT l.log_id, l.action, l.target_kind, l.target_id, l.detail, l.created_at,"
-            " COALESCE(o.name, '—') AS operator,"
+            # A-108(2026-08-23) — operator_id가 NULL인 행은 "운영자를 못 찾음"이 아니라
+            # "사람이 안 했다"는 뜻이다(api/admin_reviews.py _log(auto=True) — 자동 승인
+            # 전용, 슬라이스 37부터 사람 행은 항상 operator_id가 채워진다. 그 전 과거
+            # 행은 시드 운영자 id로 고정돼 있어 NULL이 아니다 — admin_reviews.py 주석
+            # 참조). COALESCE만 쓰면 둘 다 '—'로 뭉개져 "자동"임이 화면에서 사라진다.
+            " CASE WHEN l.operator_id IS NULL THEN '자동' ELSE COALESCE(o.name, '—') END AS operator,"
             # action 이름을 보지 않는다 — ref_log_id 역참조 EXISTS 하나가 판정 전부다(근거는
             # 파일 상단 주석). action LIKE로 좁히면 한국어로 지어진 되돌림·"되돌림"이라는
             # 낱말이 없는 되돌림류(sourcing_unlink 등)를 놓친다.

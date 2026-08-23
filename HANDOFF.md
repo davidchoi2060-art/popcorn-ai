@@ -1228,7 +1228,7 @@
   돌아온다**(하네스가 실제로 열어 확인). 서랍을 다시 열 때 옛 코드가 남지
   않도록 링크를 먼저 지우고 새로 세운다.
 
-  확인법: 원장 정합은 위 ③과 같은 방식으로 `price_history` 행수 = 잠금 건수 =
+  확인법: 원장 정합은 위 ③과 같은 방식으로 `product_price_history` 행수 = 잠금 건수 =
   승인 건수 대조를 다시 잰다 · `grep -n "market_compare_total" api/*.py
   templates/**/*.j2` 로 신설 필드가 응답·화면 양쪽에 있는지 확인 · 커버리지는
   `v_recommendation_candidates` 와 `field_name='market_price'` 승인 행을

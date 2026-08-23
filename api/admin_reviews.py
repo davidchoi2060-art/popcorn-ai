@@ -74,6 +74,63 @@ PRODUCT_PRICE_MIN = 1
 # 900000000` -> 0).
 PRODUCT_PRICE_MAX = 900_000_000
 
+# 시세(market_price) 자동 승인 임계값(A-108, 2026-08-23 사장님 확정 — A-103 개정).
+# 사장님 원문: "승인: 변동폭이 작은 건(예: 5% 미만)은 자동 승인하고, 큰 것만 사람이
+# 본다. A-103 을 그렇게 개정해라." A-103(다나와 시세는 제안 큐 경유 · 전량 사람 승인)은
+# 폐기가 아니라 개정이다 — "제안 큐를 거친다"(다나와가 정본에 직접 쓰지 않는다, A-18
+# 그대로)와 "큰 변동은 사람이 본다"는 그대로 남고, 바뀌는 것은 "얼마나 작아야 사람 없이
+# 넘어가는가" 하나뿐이다.
+#
+# 근거(조사자 실측 — 27일 표본 120건 실제 재수집): 변동 없음 31.4% · 변동률 중앙값
+# 0.62% · |변동률| > 5%는 20.3%뿐. 오늘 하루 3,520건을 사람이 초당 9~19건으로 훑었다 —
+# 그 속도로는 작은 변동도 큰 변동도 똑같이 "훑기"만 할 뿐 판단이 실리지 않는다(비용만
+# 있고 판단이 없다). 임계 미만을 자동으로 넘기고 사람의 눈을 나머지 20.3%(변동이 큰
+# 축)에 모으는 편이 지금(전량 훑기)보다 오히려 더 안전하다 — A-18의 근거("남의 값이
+# 그대로 견적 근거가 되면 정체성이 무너진다")를 버리는 게 아니라 지키는 길이다: 위험이
+# 큰 변동은 여전히 전량 사람이 본다.
+#
+# 이 값을 바꾸면 무엇이 달라지는가: 낮추면(예 3.0) 자동 승인 범위가 좁아져 사람이 더
+# 많이 보고, 높이면(예 10.0) 더 많은 변동이 사람 없이 넘어간다. 위 실측 분포에서 5.0은
+# 상위 20.3%(변동이 큰 쪽)만 사람에게 남기는 지점이다. 0으로 두면 사실상 전량 사람
+# 승인(개정 전 A-103)으로 되돌아간다.
+MARKET_AUTO_APPROVE_PCT = 5.0  # 이 미만의 |변동률(%)|은 자동 승인
+
+
+def market_auto_approve_decision(current, new_val: int) -> tuple[bool, float | None, str]:
+    """market_price 자동 승인 판정 — **한 자리**(단일 원천, A-108). 같은 판정을 다른
+    곳에 다시 적지 않는다 — 재사용자(예: tools/danawa_fetch.py)는 이 함수를 그대로
+    import해서 쓴다.
+
+    규칙(사장님 확정 2026-08-23):
+      · 새 값이 API 범위(PRODUCT_PRICE_MIN~PRODUCT_PRICE_MAX) 밖이거나 0 이하
+        -> 자동 승인하지 않는다. 기존 `_approve_product_field()` 가드(아래)를
+        느슨하게 하는 것이 아니다 — 그 가드보다 **앞에서** 한 번 더 본다(이 판정이
+        막아도, 사람이 화면에서 그대로 승인을 시도하면 그 가드가 다시 막는다 —
+        기존 가드는 그대로 살아 있다).
+      · 현재 값(`current` — products.market_price)이 없거나(NULL) 0 이하
+        -> 사람이 본다. 비교 기준이 없다(첫 값은 사람이 확인한다).
+      · |변동률| < MARKET_AUTO_APPROVE_PCT -> 자동 승인.
+      · 그 이상 -> 대기(사람이 본다).
+
+    인자: current(현재 products.market_price, int | None) · new_val(제안값, int).
+    반환: (auto_approved, pct_change, reason). pct_change는 비교 기준이 없거나
+    새 값이 범위 밖이면 None. reason은 사람이 읽는 문장이다 — 콘솔에 그대로
+    출력될 수 있어 ASCII 기호만 쓴다(화살표·줄표 대신 "->"·"-", 서버 stdout이 cp949).
+    """
+    if new_val is None or new_val <= 0 or new_val < PRODUCT_PRICE_MIN or new_val > PRODUCT_PRICE_MAX:
+        return False, None, (
+            f"제안값이 허용 범위 밖입니다(허용 {PRODUCT_PRICE_MIN:,}~{PRODUCT_PRICE_MAX:,})."
+            " 자동 승인하지 않습니다.")
+    if current is None or current <= 0:
+        return False, None, (
+            "현재 시세 값이 없거나 0입니다. 비교 기준이 없어 사람이 확인합니다(첫 값 검수).")
+    pct = (new_val - current) / current * 100.0
+    if abs(pct) < MARKET_AUTO_APPROVE_PCT:
+        return True, pct, (
+            f"변동률 {pct:+.2f}% - 임계값 {MARKET_AUTO_APPROVE_PCT}% 미만이라 자동 승인합니다.")
+    return False, pct, (
+        f"변동률 {pct:+.2f}% - 임계값 {MARKET_AUTO_APPROVE_PCT}% 이상이라 사람이 확인합니다.")
+
 
 def _risk(review_type: str, field: str | None) -> str:
     if review_type == "spec_conflict" and field in CRITICAL_FIELDS:
@@ -553,7 +610,7 @@ def _approve(conn, review, value, new_status: str) -> tuple[dict, int]:
     return before, pool_added
 
 
-def _approve_product_field(conn, review, value, new_status: str) -> tuple[dict, int]:
+def _approve_product_field(conn, review, value, new_status: str, *, auto: bool = False) -> tuple[dict, int]:
     """승인 전이 — **products 컬럼** 갈래(market_price 전용, A-103·A-104 2026-08-23).
 
     위 `_approve()`와 나란한 함수이지 그 내부 분기가 아니다 — 대상 테이블도
@@ -570,10 +627,22 @@ def _approve_product_field(conn, review, value, new_status: str) -> tuple[dict, 
         DB 컬럼 코멘트("field VARCHAR(20) -- purchase / sale / market")를 따른다.
         값이 같으면(승인값이 이미 반영된 값과 동일) 이력을 남기지 않는다 — 이 저장소의
         기존 규약(admin_price_import.py 등 "값이 같으면 원장에 안 남긴다")과 같다.
+
+    auto=True(A-108, 2026-08-23 사장님 확정 — 변동폭이 작은 시세 제안 자동 승인):
+        `reviewed_by`·`product_price_history.changed_by`에 operator_id 대신
+        **NULL**을 남긴다 — 사람이 아니라 시스템이 승인했다는 사실 자체가 값이다
+        (이 함수 밖 `auto_approve_market_price()`가 `new_status`로 '자동승인'을
+        넘겨 같은 사실을 review_status 축에도 이중으로 남긴다 — 두 컬럼이 같은
+        말을 한다). 승인 로직 자체(값 반영 · 잠금 · 이력 · 상태 전이)는 auto
+        여부와 무관하게 완전히 같다 — 바뀌는 것은 "누가 했다고 적을 것인가" 그
+        한 값뿐이다. 기본값 False는 기존 호출부(`_approve()`)와 완전히 같은
+        동작을 유지한다(하위 호환 무변경 — operator_id는 지금까지처럼
+        current_operator_id()가 들어간다).
     """
     field = review["field_name"]
     pc = review["product_code"]
     cast = PRODUCT_FIELD_CAST[field]
+    op = None if auto else current_operator_id()
 
     prod = conn.execute(text(
         f"SELECT {field} AS v, locked_fields FROM products"
@@ -619,21 +688,25 @@ def _approve_product_field(conn, review, value, new_status: str) -> tuple[dict, 
             " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
             " VALUES (:pc, 'market', :o, :n, 'market_observe', :ref, :op)"),
             {"pc": pc, "o": before["product_value"], "n": new_val,
-             "ref": review["review_id"], "op": current_operator_id()})
+             "ref": review["review_id"], "op": op})
 
     conn.execute(text(
         "UPDATE product_reviews SET review_status=:st, reviewed_by=:op, reviewed_at=now()"
         " WHERE review_id=:rid"),
-        {"st": new_status, "op": current_operator_id(), "rid": review["review_id"]})
+        {"st": new_status, "op": op, "rid": review["review_id"]})
     return before, 0
 
 
-def _log(conn, action: str, target_id: str, detail: dict) -> int:
+def _log(conn, action: str, target_id: str, detail: dict, *, auto: bool = False) -> int:
+    """작업 기록. auto=True면 operator_id에 NULL을 남긴다 — 사람이 아니라 시스템이
+    한 일이라는 뜻이다(자동 승인 전용, A-108). 기존 호출부는 전부 auto를 생략하므로
+    지금까지와 완전히 같게 current_operator_id()가 들어간다(하위 호환 무변경)."""
     import json
+    op = None if auto else current_operator_id()
     return conn.execute(text(
         "INSERT INTO admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)"
         " VALUES (:op, :a, 'product_review', :t, CAST(:d AS JSONB)) RETURNING log_id"),
-        {"op": current_operator_id(), "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
+        {"op": op, "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
 
 
 def _lock_waiting_review(conn, review_id: int):
@@ -645,6 +718,117 @@ def _lock_waiting_review(conn, review_id: int):
     if r["review_status"] != "대기":
         raise HTTPException(409, "이미 처리된 항목입니다")
     return r
+
+
+def auto_approve_market_price(review_id: int) -> dict:
+    """A-108(2026-08-23 사장님 확정 — A-103 개정) 재사용 가능한 승인 진입점.
+
+    외부 시세 수집기(tools/danawa_fetch.py 등)가 field_name='market_price' 검수행을
+    만든 뒤, review_id 하나씩 이 함수를 불러 변동폭이 작은 건을 사람 손 없이
+    정리한다. 판정은 market_auto_approve_decision() 한 곳에서만 한다(위) — 여기서
+    다시 %를 계산하지 않는다.
+
+    **승인 로직은 새로 만들지 않는다.** 실제 반영(값 쓰기 · locked_fields 잠금 ·
+    product_price_history 이력 · 검수행 상태 전이)은 사람이 화면에서 [확인]을 누를
+    때와 완전히 같은 코드(`_approve_product_field()`)가 한다. 이 함수가 보태는 일은
+    ① 자동 승인 대상인지 판정 ② `_approve_product_field(auto=True)` 호출 ③ 원장에
+    "시스템이 왜 했는지"를 남기는 것, 셋뿐이다.
+
+    **원장에서 자동/사람 승인을 구분하는 방법(기존 스키마 그대로 — 새 컬럼 없음)**:
+      review_status   기존에도 승인 "방식"에 따라 갈렸다(원문 그대로 승인 = '승인',
+                       직접 입력 = '수정' — process_review()의 기존 관례). 같은
+                       축에 **'자동승인'**을 더한다. review_status만 봐도 사람이
+                       버튼을 눌렀는지(승인/수정) 시스템이 넘겼는지(자동승인) 답이
+                       나온다.
+      reviewed_by      사람 승인은 항상 operator_id가 들어간다. 자동 승인은
+                       **NULL**로 남긴다 — undo()가 '대기'로 되돌릴 때 이미 NULL을
+                       쓰고 있어(아래 `_revert_one()` 참조), 이 컬럼이 "사람 아님"을
+                       표현하는 값으로 NULL을 쓰는 것은 이 파일의 기존 관례다.
+                       '대기'(미처리)와는 review_status가 다르므로 헷갈리지 않는다
+                       (대기+NULL = 미처리, 자동승인+NULL = 시스템 처리).
+      product_price_history.changed_by  같은 이유로 NULL(위 `_approve_product_field`의
+                       auto 파라미터가 이 컬럼도 함께 처리한다).
+      activity log     `admin_operator_activity_logs.action='review_auto_approve'`
+                       (사람 처리는 'review_process') · `operator_id`=NULL ·
+                       `detail`에 `pct_change`·`threshold_pct`·`before`(반영 전
+                       값·잠금 스냅샷)를 남긴다 — "누가"뿐 아니라 "왜"까지 이
+                       로그 하나로 답할 수 있다.
+
+    되돌리기: `POST /reviews/undo/{log_id}`가 이 함수의 반환값 `undo_id`를 그대로
+    받는다 — `undo()`의 허용 action 목록에 'review_auto_approve'를 추가했다(아래
+    `undo()` 참조). `detail`의 `mode`는 (action 이름과는 별개로) 'approve'로
+    남긴다 — `_revert_one()`이 `entry["mode"]`만 보고 반영 전 값으로 되돌리는
+    기존 코드를 그대로 타게 하기 위해서다(되돌리기 로직도 새로 만들지 않는다).
+    되돌리면 값 · 잠금 · 이력이 전부 역행하고 검수행은 다시 '대기'가 된다 — 사람
+    승인을 되돌릴 때와 똑같다.
+
+    반환(dict):
+      review_id       int
+      auto_approved   bool  — 자동 승인했는가
+      left_to_human   bool  — 대기 상태 그대로 사람 몫으로 남겼는가. 이미 처리돼
+                              있던 항목이면 "남긴" 것이 아니라 "이미 끝나 있었다"는
+                              뜻이라 False다(auto_approved·left_to_human이 둘 다
+                              False인 경우가 있다는 뜻).
+      reason          str   — 판정 근거(사람이 읽는 문장, ASCII 기호만)
+      pct_change      float | None  — 변동률(%). 비교 기준이 없거나 파싱 실패면 None
+      old_value       int | None    — 비교 기준이 된 현재 products.market_price
+      new_value       int | None    — 제안값(파싱 성공 시)
+      undo_id         int | None    — 자동 승인했을 때만 log_id, 아니면 None
+
+    field_name이 'market_price'가 아니거나 review_id 자체가 없으면 HTTPException을
+    올린다(호출측 계약 위반 — 정상적인 "사람에게 남긴다" 결과가 아니다). 이미 처리된
+    항목(대기 상태가 아님)은 예외를 올리지 않고 조용히(auto_approved=False,
+    left_to_human=False) 돌려준다 — 같은 제안을 두 번 넘겨도 호출자가 매번 예외
+    처리를 하지 않아도 되게 하기 위해서다.
+    """
+    with engine.begin() as conn:
+        try:
+            review = _lock_waiting_review(conn, review_id)
+        except HTTPException as e:
+            if e.status_code == 404:
+                raise
+            # 409 = 이미 대기 상태가 아니다 — 이미 끝난 일이니 자동 승인 대상도
+            # 새로 사람에게 남기는 것도 아니다.
+            return {"review_id": review_id, "auto_approved": False, "left_to_human": False,
+                    "reason": "이미 처리된 항목입니다(대기 상태가 아닙니다).",
+                    "pct_change": None, "old_value": None, "new_value": None, "undo_id": None}
+
+        if review["field_name"] != "market_price":
+            raise HTTPException(400,
+                f"market_price 전용 진입점입니다(field_name={review['field_name']!r}).")
+
+        if review["suggested_value"] is None:
+            return {"review_id": review_id, "auto_approved": False, "left_to_human": True,
+                    "reason": "제안값이 없습니다.", "pct_change": None,
+                    "old_value": None, "new_value": None, "undo_id": None}
+        try:
+            new_val = int(str(review["suggested_value"]).strip())
+        except (TypeError, ValueError):
+            return {"review_id": review_id, "auto_approved": False, "left_to_human": True,
+                    "reason": f"제안값 형식 오류입니다: {review['suggested_value']!r}",
+                    "pct_change": None, "old_value": None, "new_value": None, "undo_id": None}
+
+        current = conn.execute(text(
+            "SELECT market_price FROM products WHERE product_code=:pc"),
+            {"pc": review["product_code"]}).scalar()
+
+        ok, pct, reason = market_auto_approve_decision(current, new_val)
+        if not ok:
+            return {"review_id": review_id, "auto_approved": False, "left_to_human": True,
+                    "reason": reason, "pct_change": pct, "old_value": current,
+                    "new_value": new_val, "undo_id": None}
+
+        before, _pool_added = _approve_product_field(
+            conn, review, str(new_val), "자동승인", auto=True)
+        log_id = _log(conn, "review_auto_approve", str(review_id),
+                      {"mode": "approve", "auto": True, "review_id": review_id,
+                       "field": "market_price", "value": str(new_val),
+                       "pct_change": round(pct, 4) if pct is not None else None,
+                       "threshold_pct": MARKET_AUTO_APPROVE_PCT, "before": before},
+                      auto=True)
+        return {"review_id": review_id, "auto_approved": True, "left_to_human": False,
+                "reason": reason, "pct_change": pct, "old_value": current,
+                "new_value": new_val, "undo_id": log_id}
 
 
 # 같은 모델의 색상·패키지 변형 — 사양이 같은데 검수만 따로 해야 했다.
@@ -825,7 +1009,8 @@ def undo(log_id: int):
         log = conn.execute(text(
             "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id"),
             {"id": log_id}).mappings().first()
-        if log is None or log["action"] not in ("review_process", "review_bulk_confirm"):
+        if log is None or log["action"] not in (
+                "review_process", "review_bulk_confirm", "review_auto_approve"):
             raise HTTPException(404, "되돌릴 작업 기록이 없습니다")
         detail = log["detail"]
         if log["action"] == "review_bulk_confirm":
@@ -833,6 +1018,10 @@ def undo(log_id: int):
         else:
             # 함께 적용분(also)도 같은 로그에 담겨 있다 — **부분 원복은 없다**.
             # 하나만 되돌리면 같은 모델의 형제끼리 값이 갈려 어느 쪽이 맞는지 알 수 없다.
+            # review_auto_approve 로그도 여기로 온다 — also가 없어(자동 승인은 항상
+            # 단건) 아래 리스트 컴프리헨션이 빈 목록을 더해 entries=[detail] 하나가
+            # 된다. detail의 모양(mode·field·review_id·before)은 review_process와
+            # 같다(auto_approve_market_price() 참조) — _revert_one()을 그대로 탄다.
             entries = [detail] + [
                 {"mode": detail.get("mode"), "field": detail.get("field"),
                  "review_id": a["review_id"], "before": a["before"]}
