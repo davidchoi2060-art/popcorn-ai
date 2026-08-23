@@ -288,7 +288,7 @@ sudo journalctl -u popcorn-api -n 30 --no-pager
 ## 다나와 시세 재수집 타이머 (A-109 차등 주기 · 2026-08-23)
 
 > 시세(GPU·CPU·CPU쿨러 등)는 자주 바뀌고 비활성 부품(MB·RAM 등)은 거의 안 바뀐다는
-> 실측(decision-log **U-56**의 실행 수단, A-109)에 따라 **부품 종류별로 재수집
+> 실측(decision-log **A-111**의 실행 수단, A-109)에 따라 **부품 종류별로 재수집
 > 주기를 가른다.** 이 절은 `deploy/systemd/`의 unit 세 개를 서버에 앉히는 절차다.
 > **서버에서 직접 만들거나 고치지 않는다**(P-06) — 리포에서 고쳐 push 하고 서버는
 > 받기만 한다. 부품 묶음 정의(fast=GPU·CPU·CPU쿨러 공랭/수랭, slow=MB·RAM·SSD·HDD·
