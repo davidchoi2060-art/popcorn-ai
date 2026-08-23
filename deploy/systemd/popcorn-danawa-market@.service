@@ -15,12 +15,26 @@
 # popcorn-danawa-market-fast.timer · -slow.timer 둘이 담당한다.
 #
 # 설치 · 검증 · 되돌리는 절차는 deploy/README.md 「다나와 시세 재수집 타이머」 참조.
+#
+# 실패 알림(U-57 해소 · 2026-08-24): 이 unit(인스턴스 어느 쪽이든)이 실패하면
+# popcorn-notify-failure@.service 를 부른다(아래 [Unit]의 OnFailure=). 인스턴스
+# 이름은 %n(전체 이름, 예: popcorn-danawa-market@fast.service)이 아니라
+# %p-%i(예: popcorn-danawa-market-fast)를 넘긴다 — 이 unit 자신이 이미 '@' 를
+# 포함한 템플릿 인스턴스라, %n 을 그대로 쓰면 받는 쪽 인스턴스 이름에 '@' 가
+# 두 번 들어가 무효해지고 OnFailure= 의존성 자체가 조용히 사라진다(지금
+# 고치는 "실패해도 아무도 모른다"가 알림 배선 위에서 그대로 재발하는 것).
+# %p · %i 는 정의상 '@' 를 포함할 수 없어(그 자체가 '@' 로 나뉜 조각이므로)
+# 이 문제가 안 생긴다 — 자세한 근거는
+# deploy/systemd/popcorn-notify-failure@.service 머리말 참조. 받는 쪽은
+# "prefix-instance" 를 다시 "prefix@instance.service" 로 복원한다
+# (scripts/notify_failure.py 의 resolve_unit_name()).
 
 [Unit]
 Description=팝콘PC AI 다나와 시세 재수집 (%i 그룹 — A-109/A-110)
 Documentation=file:///srv/popcorn-ai/deploy/README.md
 After=network-online.target
 Wants=network-online.target
+OnFailure=popcorn-notify-failure@%p-%i.service
 
 [Service]
 Type=oneshot

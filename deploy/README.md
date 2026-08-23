@@ -382,13 +382,168 @@ sudo rm /etc/systemd/system/popcorn-danawa-market-fast.timer \
 sudo systemctl daemon-reload
 ```
 
-### 실패 확인 — 지금은 능동 알림이 없다
+### 실패 확인 — 이제 능동 알림이 있다 (U-57 해소, 절차는 아래 §「실패 알림」)
 
 타이머·서비스가 실패하면 **journald에는 남는다** — `systemctl status
 popcorn-danawa-market@fast.service`가 `failed`를 보여주고, `SyslogIdentifier=
 popcorn-danawa-%i` 덕에 `journalctl -t popcorn-danawa-fast`(또는 `-slow`)로도 찾을
-수 있다. **텔레그램 등으로 실패를 능동적으로 알리는 배선은 아직 없다** — 지금은
-사람이 `list-timers`나 `journalctl`을 열어야 안다. 알림 배선은 이번 범위 밖이다.
+수 있다(이건 전부터 있던 방법이다). **여기에 더해**, 이 unit에 `OnFailure=`를
+걸어 실패하면 텔레그램으로도 능동적으로 알린다 — 설치 · 시험 절차는 바로 아래
+「실패 알림 (OnFailure — U-57 해소)」 절 참조. **이 unit 하나에만 국한된 배선이
+아니다** — 같은 방식으로 다른 unit도 붙일 수 있게 템플릿으로 만들었다.
+
+## 실패 알림 (OnFailure — U-57 해소 · 2026-08-23 결정 · 2026-08-24 구현)
+
+> 배경: A-111로 다나와 재수집을 systemd timer로 걸면서, "**어디서** 도는지"는
+> 정해졌지만 "**실패하면 누가 아는지**"는 미정으로 남았다(`docs/decisions/decision-log.md`
+> **U-57**) — 실패해도 journald에만 남고 아무에게도 안 갔다. 이 절이 그 해소다.
+
+어떤 systemd unit이든 `OnFailure=`로 이 알림 unit을 걸면, 실패 시 최근 로그
+20줄과 함께 텔레그램으로 알린다. 지금 실제로 연결된 것은
+`popcorn-danawa-market@.service`(fast·slow 두 인스턴스) 하나뿐이다.
+
+| 파일 | 역할 |
+|---|---|
+| `deploy/systemd/popcorn-notify-failure@.service` | 알림 템플릿. `%I`로 "실패한 unit 식별자"를 받아 `scripts/notify_failure.py`를 실행 |
+| `scripts/notify_failure.py` | journalctl로 마지막 로그를 뽑고, `scripts/notify_telegram.py`(기존 스크립트를 그대로 재사용 — 다시 구현하지 않는다)로 전송 |
+| `deploy/systemd/popcorn-danawa-market@.service` | (기존 파일 수정) `[Unit]`에 `OnFailure=popcorn-notify-failure@%p-%i.service` 한 줄 추가 |
+
+**왜 `%n`이 아니라 `%p-%i`인가** — `popcorn-danawa-market@fast.service`처럼
+실패하는 unit 자신이 이미 `@`를 포함한 템플릿 인스턴스이면, 그 전체 이름을
+그대로 다른 unit의 인스턴스 자리에 넣을 수 없다(systemd 유닛 이름의 인스턴스
+부분은 `@` 문자를 허용하지 않는다 — `systemd-escape(1)` 기준 안전 문자는
+글자·숫자·`:`·`_`·`.`·`-`뿐이고 `@`는 escape 대상이다). `@%n.service`로 그대로
+쓰면 전개 결과에 `@`가 두 번 들어가 인스턴스 이름이 무효가 되고, systemd는 그
+`OnFailure=` 의존성 자체를 **조용히** 버린다 — 알림을 달아 놓고도 정작 실패하면
+아무 일도 안 일어나는, U-57과 같은 증상이 알림 배선 위에서 재발하는 것이다.
+그래서 `%p`(접두사)와 `%i`(인스턴스)를 하이픈으로 이어 붙인 값을 넘긴다 —
+이 둘은 정의상 `@`를 포함할 수 없다. 받는 쪽(`scripts/notify_failure.py`의
+`resolve_unit_name()`)이 마지막 `-`를 `@`로 되돌려 `journalctl -u`에 쓸 이름을
+복원한다(인스턴스 이름 자체에 하이픈이 없다는 전제 — 지금 쓰는 fast/slow는
+문제없다). 전체 근거는 두 파일의 머리말 주석에 있다(여기서 반복하지 않는다).
+
+### `notify_telegram.py`가 배포 서버(.env 없음)에서 동작하는가 — 판정
+
+**동작한다.** `scripts/_tg_env.py`의 `creds()`는 ① 프로젝트 `.env`를 먼저 보고
+② 없으면(또는 키가 없으면) **프로세스 환경변수**로 넘어간다(코드:
+`scripts/_tg_env.py`의 `creds()` — `_from_env_file()`이 `OSError`를 삼키고 빈
+dict를 반환 → `os.environ.get(...)`으로 폴백). 배포 서버 리포에는 `.env` 파일
+자체가 없으므로 ①은 항상 빈 값이고, `EnvironmentFile=/etc/popcorn-ai.env`가
+채운 **프로세스 환경변수**(②)가 쓰인다. `CLAUDE.md` §텔레그램의 "자격증명은
+프로젝트 `.env`(전역 환경변수 아님)"는 **이 PC(개발 PC)에서 여러 프로젝트 봇이
+섞이는 것**을 막으려는 규칙이고, 배포 서버는 애초에 다른 프로젝트가 없으니
+전제가 다르다 — `.env`가 없는 환경에서 환경변수 폴백은 이미 코드에 있던
+동작이지, 이번에 새로 만든 우회가 아니다.
+
+### 설치
+
+```bash
+# 신규
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-notify-failure@.service /etc/systemd/system/
+# 기존 파일 갱신(OnFailure= 한 줄이 추가됐다)
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-danawa-market@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+`popcorn-notify-failure@.service` 자체는 `enable`하지 않는다([Install]이 없다) —
+시작은 실패한 unit의 `OnFailure=`가 그때그때 담당한다.
+
+### ⚠ 사장님이 직접 하셔야 하는 것 — `/etc/popcorn-ai.env`에 두 줄 추가
+
+리포에도 이 문서에도 토큰 값을 적지 않는다. 서버에서 **직접**:
+
+```bash
+sudo nano /etc/popcorn-ai.env
+```
+
+아래 두 줄을 추가한다(`<...>` 자리에 실제 값을 넣는다 — 봇은 `@popcornpc_ai_bot`,
+값은 로컬 PC `.env`에 이미 있다):
+
+```
+TELEGRAM_BOT_TOKEN=<봇 토큰>
+TELEGRAM_CHAT_ID=<채팅 ID>
+```
+
+저장한 뒤 **권한이 그대로인지 확인한다** — 이 파일은 `640 root:popcorn`이어야
+한다(§0 참조 — `600`으로 두면 `popcorn` 계정으로 도는 진단 스크립트가 못 읽는
+사고가 이미 있었다). `nano`로 저장해도 기존 파일의 권한은 보통 유지되지만,
+새로 만들었거나 의심되면:
+
+```bash
+sudo chmod 640 /etc/popcorn-ai.env && sudo chown root:popcorn /etc/popcorn-ai.env
+ls -l /etc/popcorn-ai.env    # -rw-r----- root popcorn 이어야 한다
+```
+
+**값을 출력하지 않고 존재만 확인**(CLAUDE.md §텔레그램 · T-07 마스킹 금지
+원칙과 같은 이유 — 값이 아니라 사실만 본다):
+
+```bash
+sudo grep -c '^TELEGRAM_BOT_TOKEN=' /etc/popcorn-ai.env   # 1 이어야 한다
+sudo grep -c '^TELEGRAM_CHAT_ID='   /etc/popcorn-ai.env   # 1 이어야 한다
+```
+
+**이미 떠 있는 다른 서비스(`popcorn-api` 등)를 재시작할 필요는 없다** — 알림
+unit은 `Type=oneshot`이라 실패가 나서 호출될 때마다 그 순간의
+`/etc/popcorn-ai.env`를 새로 읽는다.
+
+### 안전하게 실패를 흉내 내는 법 — **진짜 수집 unit은 건드리지 않는다**
+
+① **알림 스크립트 자체만 시험**(가장 빠름 — OnFailure= 배선 자체는 확인 못
+한다, 존재하지 않는 가짜 unit 이름으로 스크립트 로직만 돈다). 인스턴스 이름에
+하이픈을 넣지 않는다 — `resolve_unit_name()`이 하이픈을 "%p-%i 조인"으로
+해석해 엉뚱하게 쪼갠다(예: `test-manual`은 `test@manual.service`로 잘못
+복원된다. 이 한계는 두 unit 파일 머리말에 이미 적혀 있다):
+
+```bash
+sudo systemctl start popcorn-notify-failure@smoketest.service
+sudo journalctl -u popcorn-notify-failure@smoketest.service -n 30 --no-pager
+```
+
+`smoketest`라는 실제 unit은 없으므로 본문에 "로그 없음" 문구가 함께 오는 게
+정상이다 — 그래도 텔레그램 발송 성공/실패 여부(그리고 자격증명이 없을 때
+③처럼 그 사실을 journald에 남기는지)는 이걸로 확인된다.
+
+② **`OnFailure=` 배선 자체까지 시험**(임시 템플릿 unit을 만들어 일부러
+실패시킨다 — `popcorn-danawa-market@.service`와 무관한 별도 이름이라 진짜
+수집에 영향이 없다):
+
+```bash
+sudo tee /etc/systemd/system/popcorn-notify-test@.service > /dev/null <<'EOF'
+[Unit]
+Description=알림 배선 시험용 (시험 후 반드시 삭제한다)
+OnFailure=popcorn-notify-failure@%p-%i.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/false
+EOF
+sudo systemctl daemon-reload
+sudo systemctl start popcorn-notify-test@demo.service   # ExecStart=/bin/false라 반드시 실패한다
+
+# 잠시 후(몇 초) 확인 — popcorn-notify-test@demo 가 실패 -> %p-%i 로
+# "popcorn-notify-test-demo" 가 되어 아래 인스턴스가 자동으로 시작된다:
+sudo journalctl -u popcorn-notify-failure@popcorn-notify-test-demo.service -n 30 --no-pager
+```
+
+**시험이 끝나면 반드시 치운다**:
+
+```bash
+sudo rm /etc/systemd/system/popcorn-notify-test@.service
+sudo systemctl daemon-reload
+```
+
+③ **자격증명이 없을 때의 동작도 확인해 둔다** — `/etc/popcorn-ai.env`에 두
+줄을 넣기 전에 위 ①을 먼저 돌려 보면, 텔레그램으로는 아무것도 안 오지만
+`journalctl -u popcorn-notify-failure@smoketest.service`에는
+`TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 가 없다 - /etc/popcorn-ai.env 에 두 줄을
+추가해야 한다`가 **분명히** 남아야 한다. 아무 흔적도 없이 조용히 끝나면 그
+자체가 결함이다.
+
+### 재귀 방지
+
+`popcorn-notify-failure@.service` 자신에는 `OnFailure=`를 걸지 않는다 — 걸면
+자격증명이 없는 채로 배포됐을 때 "알림 실패 → 자기 자신을 다시 호출 → 또
+실패 → ..."로 반복될 수 있다.
 
 ## 남아 있는 위험 (베타에서 감수하는 것 · 정직 기록)
 
