@@ -1,12 +1,14 @@
-"""다나와 상세 사양 파서 — 순수 함수만 (슬라이스 51).
+"""다나와 상세 사양·시세 파서 — 순수 함수만 (슬라이스 51 · 2026-08-23 시세 확장 A-103).
 
 **여기에 네트워크 코드는 없다.** HTML 문자열을 받아 값을 뽑는 일만 한다.
 수집(요청·속도 제한·중단)은 `tools/danawa_fetch.py` 소관이고, 그렇게 나눠야
 파서를 저장된 원문으로 재실행·검증할 수 있다.
 
-**수집한 값은 우리 사실이 아니다.** 그래서 이 모듈이 뽑은 값은 `product_specs`에 바로
-들어가지 않고 검수 큐의 **제안값(`suggested_value`)** 으로만 올라간다. 운영자가 확인해야
-정본이 된다 — "모든 견적에는 이유가 있습니다"의 이유가 남의 페이지일 수는 없다.
+**수집한 값은 우리 사실이 아니다.** 그래서 이 모듈이 뽑은 값은 `product_specs`·
+`products.market_price`에 바로 들어가지 않고 검수 큐의 **제안값(`suggested_value`)**
+으로만 올라간다. 운영자가 확인해야 정본이 된다 — "모든 견적에는 이유가 있습니다"의
+이유가 남의 페이지일 수는 없다. 시세(`parse_market_price`)도 같은 규칙이다(A-103 —
+A-18을 가격에도 그대로 확장 적용, 전량 사람 승인).
 
 **코드 오매핑이 실재한다.** 우리 메인보드에 랜케이블 pcode가 붙어 있는 경우를 실측했다.
 그래서 제목 유사도 검증(`title_similarity`)을 통과하지 못하면 사양을 쓰지 않고
@@ -50,6 +52,40 @@ def page_title(html: str) -> str:
         return ""
     t = TAG_RE.sub(" ", m.group(1))
     return re.sub(r"\s*:\s*다나와.*$", "", t).strip()
+
+
+# og:description 은 "최저가 82,560원, 현금최저가: 81,700원" 형식이다(실측 895/895 캐시 전량
+# 일치). 페이지 본문 곳곳에도 "최저가"라는 낱말이 광고 문구로 반복되므로(예: "최저가를
+# 확인하세요") **meta 태그 안에서만** 찾는다 — 태그가 없으면 파싱하지 않고 None.
+OGDESC_TAG_RE = re.compile(r'<meta\b[^>]*\bproperty="og:description"[^>]*>', re.I)
+CONTENT_ATTR_RE = re.compile(r'content="([^"]*)"', re.I)
+# "현금최저가"의 "최저가" 앞 글자는 "금"이다 — 그 글자가 아닐 때만 매치해 현금가를 피한다.
+MARKET_PRICE_RE = re.compile(r"(?<!금)최저가\s*[:：]?\s*([\d][\d,\.\s]*)\s*원")
+
+
+def parse_market_price(html: str) -> int | None:
+    """og:description의 «최저가 N원」에서 **일반 최저가**(현금최저가 아님)를 정수로 뽑는다.
+
+    현금최저가는 계좌이체 등 결제수단 조건부 가격이라 우리가 말하는 '시세 관측가'와는
+    다른 값이므로 쓰지 않는다. 쉼표·공백 같은 표기 변형은 견디고, 「최저가」 표기 자체가
+    없거나 meta 태그를 못 찾으면 **지어내지 않고 None**을 돌려준다.
+    """
+    if not html:
+        return None
+    tag_m = OGDESC_TAG_RE.search(html)
+    if not tag_m:
+        return None
+    content_m = CONTENT_ATTR_RE.search(tag_m.group(0))
+    text = content_m.group(1) if content_m else ""
+    if not text:
+        return None
+    price_m = MARKET_PRICE_RE.search(text)
+    if not price_m:
+        return None
+    digits = re.sub(r"[^\d]", "", price_m.group(1))
+    if not digits:
+        return None
+    return int(digits)
 
 
 def _norm(s: str) -> str:

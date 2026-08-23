@@ -14,9 +14,14 @@
     무조건 EXCLUDED였다(실사고: 0031이 올려놓은 완제품·베어본 분류를 08-15 적재가
     340건 되돌림, 검수 회부(123034)가 적재마다 지워짐). 지금은 part_type·category_group
     (분류) · ai_candidate_yn·review_required_yn(검수 게이트) · product_specs의
-    SPEC_COLS 전부(사양)까지 넓혔다 — 근거·제외 이유(stock_qty·status는 의도적으로
-    제외)는 `UPSERT_PRODUCTS_SQL` 상수 주석에 있다. 표기(잠금 문자열)는 두 갈래가
-    공존한다(`col` 맨 이름 / `specs.col` 접두어) — `_spec_locked()`가 둘 다 인식한다.
+    SPEC_COLS 전부(사양) · **market_price(시장가, 2026-08-23 A-104)까지** 넓혔다 —
+    근거·제외 이유(stock_qty·status는 의도적으로 제외)는 `UPSERT_PRODUCTS_SQL` 상수
+    주석에 있다. 표기(잠금 문자열)는 두 갈래가 공존한다(`col` 맨 이름 / `specs.col`
+    접두어) — `_spec_locked()`가 둘 다 인식한다. market_price는 사양이 아니라
+    `purchase_price`·`sale_price`와 같은 **상품 컬럼** 갈래라 맨 이름(`market_price`)
+    표기만 쓴다 — 승인 시 `locked_fields`에 실제로 추가하는 쪽은 `api/admin_reviews.py`의
+    `_approve_product_field()`다(이 물결에서 함께 확장). 이 파일은 그 잠금을 UPSERT가
+    존중하도록 CASE WHEN 가드만 추가한다 — 잠그는 동작 자체는 여기 없다.
   · 가격(purchase_price·sale_price)이 바뀌면 product_price_history에 reason='csv'로 남긴다
     (ERD §6 3원칙 3항 · §189 reason 열거값). 값이 같거나 잠긴 필드면 남기지 않고, 신규
     상품의 최초 가격은 비교할 이전 값이 없어 이력 대상이 아니다(등록 화면과 같은 규약).
@@ -289,7 +294,8 @@ def plan_impact(conn, plan: dict) -> dict:
     """
     codes = [p["pc"] for p in plan["prods"]]
     if not codes:
-        return {"new": 0, "update": 0, "pool_in": 0, "pool_out": 0}
+        return {"new": 0, "update": 0, "pool_in": 0, "pool_out": 0,
+                "review_new": 0, "review_planned": 0, "market_price_locked_preserved": 0}
     known = {r[0] for r in conn.execute(
         text("SELECT product_code FROM products WHERE product_code = ANY(:c)"),
         {"c": codes}).all()}
@@ -306,6 +312,13 @@ def plan_impact(conn, plan: dict) -> dict:
         "SELECT product_code, field_name FROM product_reviews"
         " WHERE review_status = '대기' AND product_code = ANY(:c)"), {"c": codes}).all()}
     review_new = len({(r["pc"], r["field"]) for r in plan["reviews"]} - pending)
+    # market_price 잠금 보존 (A-104 · 2026-08-23) — 승인값이 이번 적재에서 몇 건
+    # 지켜지는지를 드라이런이 직접 말한다. "잠갔다"만으로는 무엇이 지켜지는지 모른다
+    # (§화면 정직성과 같은 이유 — 건수만이 아니라 «무엇이 보호됐는가»).
+    market_price_locked_preserved = conn.execute(text(
+        "SELECT count(*) FROM products"
+        " WHERE product_code = ANY(:c) AND locked_fields ? 'market_price'"),
+        {"c": codes}).scalar_one()
     return {
         "new": sum(1 for c in codes if c not in known),
         "update": sum(1 for c in codes if c in known),
@@ -313,6 +326,7 @@ def plan_impact(conn, plan: dict) -> dict:
         "pool_out": len(pool_now - will),
         "review_new": review_new,
         "review_planned": len(plan["reviews"]),
+        "market_price_locked_preserved": market_price_locked_preserved,
     }
 
 
@@ -347,9 +361,13 @@ def plan_summary(plan: dict) -> dict:
 # apply_plan() 안 지역 변수로 있으면 함수를 실행(=DB에 쓰기)하지 않고는 손댈 수 없다
 # — '회귀는 정본을 쓰지 않는다'(슬라이스 50)를 지키면서 SQL 자체를 검증하는 유일한 길.
 #
-# **잠금 범위(2026-08-16 — 사장님 지시: "잠금을 사양·분류·검수 플래그까지 전부 넓혀라")**
+# **잠금 범위(2026-08-16 — 사장님 지시: "잠금을 사양·분류·검수 플래그까지 전부 넓혀라".
+#             2026-08-23 A-104가 market_price를 추가 — 시장가 제안 승인의 짝)**
 #   잠금 적용    purchase_price · sale_price(기존) + part_type · category_group(분류)
-#               + ai_candidate_yn · review_required_yn(검수 게이트)
+#               + ai_candidate_yn · review_required_yn(검수 게이트) + market_price
+#               (2026-08-23 — 다나와 제안을 사람이 승인한 값을 다음 CSV 적재가
+#               되돌리면 그 승인이 무의미해진다. A-16 "적재는 채우기만 하고 지우지
+#               않는다"의 가격판)
 #   잠금 제외    stock_qty · status — **의도적 판단**이다. 이 둘은 몰의 실시간 재고·
 #               판매상태를 옮겨 적은 값이라(CSV `상태값`이 그대로 stock_qty=1/0을
 #               결정한다 — build_plan 참조) 영구히 얼리면 몰이 품절로 바꿔도 우리는
@@ -358,13 +376,13 @@ def plan_summary(plan: dict) -> dict:
 #               잠그는 것이 맞지만, 재고·판매상태는 "몰이 지금 뭐라고 하는가"이지
 #               우리가 확정할 사실이 아니다 — CLAUDE.md "가격 원천은 몰. 소싱한
 #               경우만 우리가 덮어쓰고 잠근다"와 같은 구분선. 이 UPSERT의 갱신 컬럼은
-#               16개(product_code·sku 제외) — 잠금 인식 6개 + stock_qty·status(의도적
-#               제외) + 나머지 8개(product_name·maker·model_name·market_price·
-#               supplier·danawa_code·spec_source_text·data_origin)는 이번 지시
-#               (사양·분류·검수)의 대상이 아니라 손대지 않았다 — patch_product가 이미
-#               이 중 일부(product_name·maker·stock_qty·status)를 잠글 수 있는데
-#               이 UPSERT가 그 잠금을 못 보는 것은 **이번에 고치지 않은 기존
-#               결함**이다(보고 참조).
+#               16개(product_code·sku 제외) — 잠금 인식 7개(2026-08-23까지 6개 +
+#               market_price) + stock_qty·status(의도적 제외) + 나머지 7개
+#               (product_name·maker·model_name·supplier·danawa_code·
+#               spec_source_text·data_origin)는 이번 지시(사양·분류·검수·시장가)의
+#               대상이 아니라 손대지 않았다 — patch_product가 이미 이 중 일부
+#               (product_name·maker·stock_qty·status)를 잠글 수 있는데 이 UPSERT가
+#               그 잠금을 못 보는 것은 **이번에 고치지 않은 기존 결함**이다(보고 참조).
 UPSERT_PRODUCTS_SQL = """
     INSERT INTO products (product_code, sku, product_name, maker, model_name, part_type,
       category_group, status, ai_candidate_yn, review_required_yn, purchase_price,
@@ -406,14 +424,25 @@ UPSERT_PRODUCTS_SQL = """
                                 ELSE COALESCE(EXCLUDED.review_required_yn,
                                               products.review_required_yn) END,
       -- stock_qty·status는 위 모듈 주석대로 의도적으로 잠금 대상 밖이다.
-      market_price = EXCLUDED.market_price, supplier = EXCLUDED.supplier,
+      -- market_price도 이제 잠금을 본다 (A-104 · 2026-08-23 사장님 확정 — 시장가 제안
+      -- 승인 안 §1-3 실측: CSV '시중가'가 admin_reviews._approve_product_field()가
+      -- 넣은 승인값을 무조건 덮어써 «승인값이 살아남을 수 없었다». 매입가·판매가와
+      -- 정확히 같은 표현(CASE WHEN ... ELSE EXCLUDED... END) — 사장님이 명시적으로
+      -- COALESCE 대안은 택하지 않았다(decision-log A-104 "①을 택했다(②COALESCE·
+      -- ③컬럼 재정의는 택하지 않음)") — 그래서 잠기지 않은 상품은 이전과 똑같이
+      -- CSV 값이 없어도(EXCLUDED.market_price가 NULL이어도) 그대로 NULL로 덮인다,
+      -- 이 부분은 이번 결정으로 안 바뀐다.
+      market_price = CASE WHEN products.locked_fields ? 'market_price'
+                          THEN products.market_price
+                          ELSE EXCLUDED.market_price END,
+      supplier = EXCLUDED.supplier,
       danawa_code = EXCLUDED.danawa_code, stock_qty = EXCLUDED.stock_qty,
       spec_source_text = EXCLUDED.spec_source_text, data_origin = EXCLUDED.data_origin,
       updated_at = now()
 """
 # 잠금 가드가 있어야 하는 컬럼 — 회귀[44]가 이 목록과 SQL 본문을 대조한다(정적 검사).
 LOCK_AWARE_PRODUCT_COLS = ("purchase_price", "sale_price", "part_type", "category_group",
-                           "ai_candidate_yn", "review_required_yn")
+                           "ai_candidate_yn", "review_required_yn", "market_price")
 
 # ── 사양 UPSERT ────────────────────────────────────────────────────────────
 # 잠긴 사양은 이 SQL이 몰라도 된다 — build_plan()이 잠긴 필드를 이미 None으로 비워
@@ -507,7 +536,11 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     #   않는다(선례: admin_price_import.py:166,183 `if new_purchase != ...` ·
     #   admin_products.py:572 `if before[k]==v: continue`) — 안 지키면 적재 1회에 최대
     #   22,840행이 두 필드분 쌓여, 지금 28,994행인 원장이 한 번에 두 배 가까이 된다.
-    # · market_price는 이번 범위가 아니다(가격 둘만) — 이력 없이 계속 무조건 덮어쓴다.
+    # · market_price는 이 이력 대상에 없다(가격 이력은 여전히 매입가·판매가 둘만) —
+    #   승인값이 CSV 재적재에 덮이는 문제는 이력이 아니라 **잠금**(위 UPSERT_PRODUCTS_SQL의
+    #   market_price CASE WHEN, A-104)으로 막는다. 잠긴 market_price는 이제 이 UPSERT가
+    #   손대지 않으므로(=값이 안 바뀌므로) 애초에 남길 변경이 없다. 잠기지 않은
+    #   market_price는 예전처럼 이력 없이 계속 덮인다 — 이번 결정은 그걸 바꾸지 않았다.
     price_moves = []
     for p in prods:
         b = price_before.get(p["pc"])
