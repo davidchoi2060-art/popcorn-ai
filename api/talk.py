@@ -489,7 +489,21 @@ def parse_talk(body: ParseBody, request: Request):
 
     # 「PC 아님」과 「PC 얘기지만 조건이 없다」는 **다른 사실**이라 다른 문장을 준다.
     # 이 note 는 화면 상단 진행 바가 그대로 읽어 쓴다(shared/ui-progress.js okText).
-    if pc is False and not kept:
+    #
+    # ⚠ 2026-08-23 A-105 결함 수정 -- «판정을 지우는 것이 아니라 고객에게 보여줄
+    # 문구만 안 내는 것»이다. `body.intent_key`가 있으면 화면이 TALKS 매칭으로
+    # «이미 정본 답을 고른» 문장이라는 뜻이다(예: intent_key="as_warranty" +
+    # "보증 어떻게 되나요"). 그 정본 A/S 답변이 화면에 나가는데 이 note 가 동시에
+    # "PC 상담 문장이 아니다"·"조건으로 읽을 수 있는 내용이 없다"를 띄우면 한
+    # 화면이 두 가지 말을 한다(확인자 실재현 -- 반송 게이트를 고쳐 정본 답이 정상
+    # 출력된 뒤에도 상단 토스트가 반송 문구를 띄웠다). `pc_related` 는 그대로
+    # 싣는다 -- 그건 내부 판정이고 화면의 다른 반송 로직과 아래 `_record_hit`
+    # 원장 기록이 여전히 그 값을 쓴다. 지우는 것은 **note(고객 문구) 하나뿐**이고,
+    # `intent_key` 가 없을 때(진짜 잡담·조건 미해석)는 이 분기를 타지 않아 문구가
+    # 그대로 나간다.
+    if body.intent_key:
+        note = None
+    elif pc is False and not kept:
         note = "PC 상담 문장이 아니라고 판정했습니다."
     elif not kept:
         note = "조건으로 읽을 수 있는 내용이 없습니다."
@@ -765,7 +779,7 @@ def price_facts(
                     f"(표본 n={len(hist_rows)})"
                 )
     if market_gap is None:
-        notes.append("시장가 비교 표본이 없다")
+        notes.append("시세 관측가 비교 표본이 없다")
     note = " ".join(notes) if notes else None
 
     return {
@@ -774,6 +788,11 @@ def price_facts(
         "gpu": gpu_out,
         "trend": trend,
         "note": note,
+        # ㉣ 약관 대응(A-106 · 2026-08-23 사장님 확정) — 고객 응답에 「다나와」·「최저가」를
+        # 재게시하지 않는다. market_price·market_gap이 무엇을 근거로 하는지는 이 한 줄로
+        # 밝힌다: 특정 사이트 값을 그대로 옮긴 게 아니라 팝콘PC가 사람이 승인한 값이다
+        # (A-103·A-104 — 다나와 제안은 전량 검수 승인을 거쳐야 market_price에 들어간다).
+        "basis": "시세 관측가 - 팝콘PC가 관측·검수한 시장가(특정 사이트 재게시 아님)",
     }
 
 

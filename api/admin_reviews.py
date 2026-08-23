@@ -40,6 +40,40 @@ FIELD_CAST = {
 # JSONB 필드는 값이 JSON 배열 문자열이어야 한다 — 화면·수집기가 보내는 표기를 맞춘다
 JSON_FIELDS = {"form_factor_list", "socket_list"}
 
+# 검수 처리 가능한 **products 컬럼** 화이트리스트(위 FIELD_CAST는 product_specs 컬럼 —
+# 대상 테이블이 다르다). market_price 하나뿐이다(㉠ 시장가 제안 승인 — A-103·A-104,
+# 2026-08-23 사장님 확정): 다나와 최저가는 이 검수 큐로 «제안»까지만 오고, 사람이 이
+# 화면에서 승인해야만 products.market_price에 들어간다(A-18 "다나와는 제안까지만"을
+# 가격에도 그대로 확장). 잠금 표기는 `specs.{field}` 접두어가 아니라 **맨 컬럼명**이다
+# — `api/catalog_ingest.py`의 UPSERT가 `locked_fields ? 'market_price'`(접두어 없음,
+# purchase_price·sale_price와 같은 표기)로 읽기 때문에, 여기서 접두어를 붙이면 잠가도
+# 다음 CSV 적재가 그대로 되돌린다.
+PRODUCT_FIELD_CAST = {"market_price": "BIGINT"}
+
+# products 갈래 «가격» 필드의 범위 검증 — PRODUCT_FIELD_CAST 전체가 가격 컬럼이라는
+# 전제로 여기 한 자리에 둔다(지금은 market_price 하나뿐이지만, purchase_price·
+# sale_price류가 이 화이트리스트에 더해지면 같은 상한을 그대로 받는다). **가격이
+# 아닌 컬럼을 PRODUCT_FIELD_CAST에 추가할 때는 이 상수를 그대로 쓸 수 있는지부터
+# 다시 판단해야 한다** — product_specs 갈래(FIELD_CAST·위 _approve)는 이 상수와
+# 무관하게 그대로 동작한다(대상 테이블도 화이트리스트도 다르다).
+#
+# 하한(확인자 결함 2026-08-23 재현: review 신규 생성 -> action=manual value='-5000'
+# -> 기존 코드는 int('-5000') 캐스팅에 성공해 200을 내고 products.market_price=
+# -5000 · locked_fields=['market_price']로 저장했다). 가격은 0이거나 음수일 수
+# 없다 — products.market_price는 이미 «리터럴 0»으로 채워진 행이 다수이고 그 0은
+# "값이 없다"는 뜻이다(decision-log.md A-103 "2026-08-23 보완": 시장가 실측
+# 양수 467건 · 0 22,649건 · NULL 35건, 2026-08-23 재실측 동일). 0을 승인된 «값»
+# 으로 받아 주면 그 구분이 무너진다.
+PRODUCT_PRICE_MIN = 1
+
+# 상한(실측, 2026-08-23): `SELECT max(sale_price) FROM products` -> 900,000,000.
+# 수를 지어내지 않고 이 실측값을 그대로 상한으로 쓴다. 같은 실측에서
+# max(market_price)=259,280,000으로 이 상한의 3분의 1이 안 된다 — 지금 이미
+# 저장돼 있는 어떤 market_price 값도 이 상한에 걸리지 않는다(기존 데이터
+# 무영향 확인, 재확인법: `SELECT count(*) FROM products WHERE market_price >
+# 900000000` -> 0).
+PRODUCT_PRICE_MAX = 900_000_000
+
 
 def _risk(review_type: str, field: str | None) -> str:
     if review_type == "spec_conflict" and field in CRITICAL_FIELDS:
@@ -444,6 +478,11 @@ class ProcessBody(BaseModel):
 def _approve(conn, review, value, new_status: str) -> tuple[dict, int]:
     """승인 전이 공용 헬퍼(단건·일괄 공유). before 스냅샷과 pool_added를 반환."""
     field = review["field_name"]
+    if field in PRODUCT_FIELD_CAST:
+        # products 컬럼 갈래(market_price) — 아래 사양 갈래와 대상 테이블·게이트가
+        # 다르므로 별도 함수로 완전히 가른다(§보고: FIELD_CAST 분기가 product_specs
+        # 전용이라 market_price를 못 받는 실측 근거).
+        return _approve_product_field(conn, review, value, new_status)
     if field not in FIELD_CAST:
         raise HTTPException(400, f"처리할 수 없는 필드: {field}")
     pc = review["product_code"]
@@ -512,6 +551,81 @@ def _approve(conn, review, value, new_status: str) -> tuple[dict, int]:
         " WHERE review_id=:rid"),
         {"st": new_status, "op": current_operator_id(), "rid": review["review_id"]})
     return before, pool_added
+
+
+def _approve_product_field(conn, review, value, new_status: str) -> tuple[dict, int]:
+    """승인 전이 — **products 컬럼** 갈래(market_price 전용, A-103·A-104 2026-08-23).
+
+    위 `_approve()`와 나란한 함수이지 그 내부 분기가 아니다 — 대상 테이블도
+    (`product_specs`가 아니라 `products`) 게이트도 다르다:
+      · market_price는 `spec_field_defs`에 없다 — 추천 후보 게이트(필수 사양 충족
+        판정)의 대상이 아니므로 `review_required_yn`·`ai_candidate_yn`을 건드리지
+        않는다(그래서 pool_added는 항상 0).
+      · 잠금 키는 `specs.{field}` 접두어가 아니라 **맨 컬럼명**이다 — 이래야
+        `api/catalog_ingest.py`의 UPSERT(`locked_fields ? 'market_price'`, A-104)가
+        같은 문자열로 이 잠금을 읽는다.
+      · 값이 바뀌면 `product_price_history`에 한 행을 남긴다(reason='market_observe').
+        field 값은 'market_price'가 아니라 **'market'**이다 — 이 표가 이미 쓰고 있는
+        표기(`FIELD_KO = {"sale":..., "purchase":...}`, `api/admin_price_history.py`)와
+        DB 컬럼 코멘트("field VARCHAR(20) -- purchase / sale / market")를 따른다.
+        값이 같으면(승인값이 이미 반영된 값과 동일) 이력을 남기지 않는다 — 이 저장소의
+        기존 규약(admin_price_import.py 등 "값이 같으면 원장에 안 남긴다")과 같다.
+    """
+    field = review["field_name"]
+    pc = review["product_code"]
+    cast = PRODUCT_FIELD_CAST[field]
+
+    prod = conn.execute(text(
+        f"SELECT {field} AS v, locked_fields FROM products"
+        " WHERE product_code=:pc FOR UPDATE"), {"pc": pc}).mappings().one()
+
+    before = {
+        "product_value": prod["v"],
+        "locked_fields": prod["locked_fields"],
+        "review_status": review["review_status"],
+    }
+
+    # 빈 값은 조용히 NULL 확정으로 빠지지 않는다 — 값 형식 오류와 같은 값으로 취급해 400
+    # (확인자 결함 2026-08-23: 제품 20481003, action=manual value="" 재현 —
+    #  기존 코드는 여기서 new_val=None 을 만들어 market_price 를 조용히 지웠다).
+    # 사양(product_specs) 갈래(위 _approve, CAST 실패 시 400)와 같은 동작으로 맞춘다.
+    stripped = str(value).strip() if value is not None else ""
+    if stripped == "":
+        raise HTTPException(400, f"값 형식 오류: {value!r} → {field}")
+    try:
+        new_val = int(stripped)
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"값 형식 오류: {value!r} → {field}")
+
+    # 범위 검증(위 PRODUCT_PRICE_MIN·PRODUCT_PRICE_MAX 주석 참조) — 형식은 맞아도
+    # 값이 말이 안 되는 경우(음수·0·자릿수 오타)를 여기서 400으로 막는다. 화면
+    # 쪽 숫자 검사가 이 필드에서 빠져 있어도(별도 결함, 화면 담당 제작자 작업 중)
+    # 서버가 스스로 막아야 한다 — ASCII 기호만 쓴다(서버 stdout이 cp949).
+    if new_val < PRODUCT_PRICE_MIN or new_val > PRODUCT_PRICE_MAX:
+        raise HTTPException(400,
+            f"값 범위 오류: {new_val:,} -> {field}"
+            f" (허용 범위 {PRODUCT_PRICE_MIN:,}~{PRODUCT_PRICE_MAX:,})")
+
+    conn.execute(text(
+        f"UPDATE products SET {field} = CAST(:v AS {cast}),"
+        " locked_fields = CASE WHEN locked_fields ? :lf THEN locked_fields"
+        " ELSE locked_fields || jsonb_build_array(:lf) END, updated_at = now()"
+        " WHERE product_code = :pc"),
+        {"v": new_val, "lf": field, "pc": pc})
+
+    if before["product_value"] != new_val:
+        conn.execute(text(
+            "INSERT INTO product_price_history"
+            " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
+            " VALUES (:pc, 'market', :o, :n, 'market_observe', :ref, :op)"),
+            {"pc": pc, "o": before["product_value"], "n": new_val,
+             "ref": review["review_id"], "op": current_operator_id()})
+
+    conn.execute(text(
+        "UPDATE product_reviews SET review_status=:st, reviewed_by=:op, reviewed_at=now()"
+        " WHERE review_id=:rid"),
+        {"st": new_status, "op": current_operator_id(), "rid": review["review_id"]})
+    return before, 0
 
 
 def _log(conn, action: str, target_id: str, detail: dict) -> int:
@@ -667,15 +781,39 @@ def _revert_one(conn, entry: dict):
     if entry["mode"] == "approve":
         field, pc = entry["field"], r["product_code"]
         import json
-        conn.execute(text(f"""
-            UPDATE product_specs SET {field} = CAST(:v AS {FIELD_CAST[field]}),
-                   verified_yn = :vy, updated_at = now() WHERE product_code = :pc
-        """), {"v": before["spec_value"], "vy": before["verified_yn"], "pc": pc})
-        conn.execute(text(
-            "UPDATE products SET review_required_yn=:rr, ai_candidate_yn=:ac,"
-            " locked_fields=CAST(:lf AS JSONB), updated_at=now() WHERE product_code=:pc"),
-            {"rr": before["review_required_yn"], "ac": before["ai_candidate_yn"],
-             "lf": json.dumps(before["locked_fields"]), "pc": pc})
+        if field in PRODUCT_FIELD_CAST:
+            # products 컬럼 갈래(market_price) — 값·잠금·이력을 전부 역행한다
+            # (원장 규약: 되돌림은 삭제가 아니라 역방향 전이다). _approve_product_field와
+            # 짝을 이루는 되돌리기이지 위 사양 갈래의 분기가 아니다.
+            cast = PRODUCT_FIELD_CAST[field]
+            cur = conn.execute(text(
+                f"SELECT {field} AS v FROM products WHERE product_code=:pc FOR UPDATE"),
+                {"pc": pc}).scalar()
+            conn.execute(text(
+                f"UPDATE products SET {field} = CAST(:v AS {cast}),"
+                " locked_fields = CAST(:lf AS JSONB), updated_at = now()"
+                " WHERE product_code = :pc"),
+                {"v": before["product_value"],
+                 "lf": json.dumps(before["locked_fields"]), "pc": pc})
+            if cur != before["product_value"]:
+                # 역방향 이력 행 — 원래 행을 지우지 않고 반대 방향으로 새 행을 남긴다
+                # (margin_policy/margin_policy_undo와 같은 원장 패턴).
+                conn.execute(text(
+                    "INSERT INTO product_price_history"
+                    " (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
+                    " VALUES (:pc, 'market', :o, :n, 'market_observe_undo', :ref, :op)"),
+                    {"pc": pc, "o": cur, "n": before["product_value"],
+                     "ref": rid, "op": current_operator_id()})
+        else:
+            conn.execute(text(f"""
+                UPDATE product_specs SET {field} = CAST(:v AS {FIELD_CAST[field]}),
+                       verified_yn = :vy, updated_at = now() WHERE product_code = :pc
+            """), {"v": before["spec_value"], "vy": before["verified_yn"], "pc": pc})
+            conn.execute(text(
+                "UPDATE products SET review_required_yn=:rr, ai_candidate_yn=:ac,"
+                " locked_fields=CAST(:lf AS JSONB), updated_at=now() WHERE product_code=:pc"),
+                {"rr": before["review_required_yn"], "ac": before["ai_candidate_yn"],
+                 "lf": json.dumps(before["locked_fields"]), "pc": pc})
     conn.execute(text(
         "UPDATE product_reviews SET review_status='대기', reviewed_by=NULL, reviewed_at=NULL"
         " WHERE review_id=:rid"), {"rid": rid})

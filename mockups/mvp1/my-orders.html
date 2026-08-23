@@ -147,7 +147,7 @@ function renderRefund(){
   +'<div class="card" style="margin-bottom:14px;"><h2 style="margin:0 0 4px;font-size:19px;font-weight:900;color:#17171b;">'+kind+' 접수</h2><p style="margin:0;font-size:13px;color:#8a8578;font-weight:600;">'+o.no+' · '+won(o.total)+' · '+o.date+'</p></div>'
   +'<div class="card" style="margin-bottom:14px;"><h3 style="margin:0 0 12px;font-size:14.5px;font-weight:900;color:#17171b;">사유를 선택해 주세요</h3><div id="r-reasons" style="display:flex;gap:8px;flex-wrap:wrap;">'+REASONS.map(function(r){return '<span class="chip" data-r="'+r+'">'+r+'</span>';}).join('')+'</div>'
   +'<textarea id="r-note" placeholder="상세 내용 (선택)" style="width:100%;margin-top:12px;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:11px;font-size:13.5px;font-family:inherit;outline:none;min-height:70px;resize:vertical;"></textarea></div>'
-  +'<div class="card" style="background:#fbf3e2;border-color:#e6c98f;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;"><span class="msym" style="font-size:19px;color:#8a561a;flex:none;">info</span><p style="margin:0;font-size:12.5px;color:#8a561a;line-height:1.65;font-weight:600;">'+modeNote+'<br><span style="color:#a58044;">'+(kind==='주문 취소'?'조립 착수 전 취소는 전액 환불됩니다. 예약된 재고(hold)는 즉시 해제됩니다.':'초기 불량은 수령 7일 내 교환 우선, 왕복 택배비는 당사 부담입니다. <span style="color:#a29d92;">(*정책 확정 전 예시)</span>')+'</span></p></div>'
+  +'<div class="card" style="background:#fbf3e2;border-color:#e6c98f;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;"><span class="msym" style="font-size:19px;color:#8a561a;flex:none;">info</span><p style="margin:0;font-size:12.5px;color:#8a561a;line-height:1.65;font-weight:600;">'+modeNote+'<br><span style="color:#a58044;">'+(kind==='주문 취소'?'조립 착수 전 취소는 전액 환불됩니다. 예약된 재고(hold)는 즉시 해제됩니다.':'수령 7일 이내 불량은 교환·환불 왕복 배송비를 팝콘PC가 부담합니다(로젠택배 이용 시). 7일 이후 단순 변심 교환·반품은 왕복 배송비를 고객이 부담합니다.')+'</span></p></div>'
   +'<div style="display:flex;gap:10px;"><button class="btnp" id="r-submit" disabled style="background:#c9c5bd;cursor:not-allowed;">접수하기</button><button class="btn2" id="r-cancel">돌아가기</button></div>';
  var reason=null;
  document.querySelectorAll('#r-reasons .chip').forEach(function(c){c.onclick=function(){reason=c.dataset.r;document.querySelectorAll('#r-reasons .chip').forEach(function(x){x.classList.toggle('on',x===c);});var b=document.getElementById('r-submit');b.disabled=false;b.style.background='#2b5fd9';b.style.cursor='pointer';};});
@@ -214,11 +214,7 @@ if(mem&&mem.email){
 }
 })();
 </script>
-<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" hidden style="position:fixed;left:18px;bottom:18px;z-index:80;display:none;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:var(--font);font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
-<span class="msym" style="font-size:17px;">grid_view</span>허브</a>
-<style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
 <script src="../shared/auth.js"></script>
 <script src="../shared/ui-progress.js"></script>
 <script src="../shared/su-icons.js"></script>
-<script src="../shared/hub-fab.js"></script>
 </body></html>

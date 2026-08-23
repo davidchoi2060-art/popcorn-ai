@@ -96,7 +96,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           <div style="display:flex;gap:18px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--success-container-line, #d4e9dd);">
             <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">build</span>전문가 조립 · 검수</span>
             <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">bolt</span>당일에서 최대 3일 이내 출고</span>
-            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">shield</span>A/S 보증</span>
+            <span style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--success-ink, #2c4c3c);"><span style="font-family:'Material Symbols Outlined';font-size:19px;color:var(--success, #2f9e6d);">shield</span>제조사 보증 1년</span>
           </div>
         </div>
 
@@ -410,9 +410,6 @@ var so=document.getElementById('s4-soldout');if(so)so.addEventListener('click',f
 var cp=document.getElementById('s4-coupon');if(cp)cp.addEventListener('click',function(){tmsg('쿠폰 코드를 확인했어요 — 목업');});
 })();
 </script>
-<a href="index.html" id="hub-fab" aria-label="허브로 돌아가기" hidden style="position:fixed;left:18px;bottom:18px;z-index:80;display:none;align-items:center;gap:6px;padding:8px 13px 8px 11px;background:rgba(23,23,27,.72);color:#fff;font-family:var(--font);font-size:12.5px;font-weight:700;text-decoration:none;border-radius:999px;border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.18s;">
-<span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined';font-size:17px;">grid_view</span>허브</a>
-<style>#hub-fab:hover{background:rgba(23,23,27,.9);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.28)}</style>
 <script>
 (function(){
 var PART_INFO={
@@ -773,5 +770,4 @@ window.addEventListener('scroll',closeTip,{passive:true});
 <script src="../shared/auth.js"></script>
 <script src="../shared/ui-progress.js"></script>
 <script src="../shared/su-icons.js"></script>
-<script src="../shared/hub-fab.js"></script>
 </body></html>

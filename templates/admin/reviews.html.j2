@@ -595,17 +595,46 @@ input{font-family:var(--rv-mono)}
   }
 
   // ── 필드 메타 ────────────────────────────────────────────────────
-  function fieldLabel(k) { var m = S.fieldMeta[k]; return (m && m.label) ? m.label : k; }
-  function fieldUnit(k) { var m = S.fieldMeta[k]; return (m && m.unit) ? m.unit : ''; }
+  // products 컬럼 갈래(market_price 등) 폴백 — 2026-08-23 A-103·A-104.
+  // `S.fieldMeta`는 `/api/admin/spec-fields`(spec_field_defs, product_specs 전용)
+  // 하나만 읽는다. market_price는 products 컬럼이라 그 표에 없다(api/admin_reviews.py
+  // PRODUCT_FIELD_CAST 주석 — "market_price 하나뿐이다"). 그래서 라벨·단위·숫자여부
+  // 판정이 전부 원시 field_key로 폴백해 "대조 — market_price market_price"처럼
+  // 라벨 없이 필드명이 중복되고, 콤마·단위 없는 "61000"이 뜨고, 직접 입력 숫자
+  // 검사도 항상 통과(무검사)했다. 라벨·데이터타입·단위·표기방식을 이 표 하나에서만
+  // 판정한다(CANON §단일 원천) — products 갈래 필드가 늘면 이 표에 한 줄만 추가한다.
+  // data_type은 서버 캐스트와 맞춘다(api/admin_reviews.py PRODUCT_FIELD_CAST =
+  // {market_price: "BIGINT"}).
+  // ⚠ product_specs 필드(S.fieldMeta에 이미 있는 것)는 이 표를 절대 보지 않는다 —
+  // fieldMetaOf가 S.fieldMeta를 먼저 찾고, 거기 없을 때만 이 표로 떨어진다. 그래서
+  // 기존 사양 필드의 라벨·단위·검사 동작은 한 글자도 바뀌지 않는다.
+  var PRODUCT_FIELD_META = {
+    market_price: { label: '시세 관측가', data_type: 'BIGINT', unit: '원', price: true }
+  };
+  function fieldMetaOf(k) { return S.fieldMeta[k] || PRODUCT_FIELD_META[k] || null; }
+  function fieldLabel(k) { var m = fieldMetaOf(k); return (m && m.label) ? m.label : k; }
+  function fieldUnit(k) { var m = fieldMetaOf(k); return (m && m.unit) ? m.unit : ''; }
   function fieldNumeric(k) {
-    var m = S.fieldMeta[k];
-    return !!(m && (m.data_type === 'INTEGER' || m.data_type === 'NUMERIC'));
+    var m = fieldMetaOf(k);
+    return !!(m && (m.data_type === 'INTEGER' || m.data_type === 'NUMERIC' || m.data_type === 'BIGINT'));
   }
+  // 가격류(price:true)만 천 단위 콤마 + 단위를 붙여쓴다("61,000원") — 사양 필드의
+  // "220 W"식(값+공백+단위) 표기와는 다르게 둔다. price가 아닌 필드는 예전과 동일하다.
+  function fieldIsPrice(k) { var m = fieldMetaOf(k); return !!(m && m.price); }
   function withUnit(v, field) {
     if (v === null || v === undefined || v === '') return null;
+    if (fieldIsPrice(field)) {
+      var n = Number(v);
+      return (isNaN(n) ? String(v) : n.toLocaleString('ko-KR')) + (fieldUnit(field) || '원');
+    }
     var u = fieldUnit(field);
     return String(v) + (u ? ' ' + u : '');
   }
+  // 승인·직접입력 토스트의 «값» 부분에만 쓴다 — 필드명(row.field, 원시 키)은 그대로
+  // 둔다(이 화면이 목록 .fld·서랍 .fk에서 이미 원시 키를 그대로 보여주는 기존 설계와
+  // 같다). price가 아닌 필드는 항등 함수라 product_specs 필드의 토스트 문구는
+  // 한 글자도 바뀌지 않는다.
+  function toastValue(field, v) { return fieldIsPrice(field) ? (withUnit(v, field) || v) : v; }
 
   var RISK_KO = { '치명': 'oklch(0.52 0.16 30)', '주의': 'oklch(0.62 0.15 55)', '경미': '#8a8377' };
 
@@ -1188,7 +1217,7 @@ input{font-family:var(--rv-mono)}
     apiPost('/api/admin/reviews/' + row.review_id + '/process', { action: 'suggested', also: also })
       .then(function (res) {
         var n = 1 + also.length;
-        afterProcess(res, '제안값 승인 ' + n + '건 · ' + row.field + ' = ' + row.suggested_value, '승인');
+        afterProcess(res, '제안값 승인 ' + n + '건 · ' + row.field + ' = ' + toastValue(row.field, row.suggested_value), '승인');
       }).catch(function (err) { toast(err.message, 'err'); });
   }
   function reject() {
@@ -1212,7 +1241,7 @@ input{font-family:var(--rv-mono)}
     apiPost('/api/admin/reviews/' + row.review_id + '/process', { action: 'manual', value: v, also: also })
       .then(function (res) {
         var n = 1 + also.length;
-        afterProcess(res, '직접 입력 확정 ' + n + '건 · ' + row.field + ' = ' + v, '수정');
+        afterProcess(res, '직접 입력 확정 ' + n + '건 · ' + row.field + ' = ' + toastValue(row.field, v), '수정');
       }).catch(function (err) { S.manualError = err.message; renderDrawer(); });
   }
   function undoOne(logId, kind) {
