@@ -84,6 +84,43 @@
   explain` 이 그대로 쓰인다 — 이 파일이 남기는 quote_snapshots 의 JSON 모양이
   `recommend.py` 의 것과 동일해서(`{"parts":..., "compat":..., "reasons":...}`),
   그 엔드포인트가 세션 소유자 확인만 통과하면 별도 연결 없이도 동작한다.
+
+■ 2026-08-24 추가 — 전체 목록·검색 + 용도 하한 (customer-audit-2026-08-24 §4-5·§4-6)
+  사장님 확정: "expert 모드를 제대로 고쳐라 — 부품 목록 전체 + 검색, 그리고 용도
+  하한을 걸어라." 이 파일 담당(제작자 B, `api/expert.py` «하나만» — 화면은 제작자 C).
+
+  ① 부품 목록 전체 + 검색 = `GET /parts`(신설, 아래). `GET /slots`(표본 5개, 기존)는
+     **그대로 둔다**(필드 추가만) — 화면이 이미 그 응답 모양을 쓴다(A-71). CASE 774건을
+     한 번에 다 내리지 않는다 — CLAUDE.md §목록 화면 규약("서버는 전 행을 반환하지
+     않는다")과 같은 이유로, 슬롯 하나를 골라 검색·페이지로 청하는 별도 엔드포인트를
+     열었다. 계약은 함수 docstring 참조.
+
+  ② 용도 하한 — expert에는 "용도"를 묻는 문항이 없다(guided/chat과 다름). 세 갈래
+     (지시문 ㉮/㉯/㉰) 중 **㉰(막지 않고 알린다)를 택했다** — 아래 `_usage_gaps()`
+     docstring에 세 갈래 검토 근거를 전부 적었다. 요약:
+       ㉮ expert에 용도 질문 신설 — 화면 변경이라 제작자 C 몫. 이 물결에서는 안 한다
+          (계약만 열어 둠 — `_usage_gaps` 필드가 나중에 용도가 생겨도 그대로 유효하다).
+       ㉯ 용도 무관 최소 하한 — `usage_floors` 실측 27행이 **전부 용도별로만** 정의돼
+          있다(범용 행 없음). 새 하한값을 여기서 지어내면 §화면 정직성("숫자를 지어내지
+          않는다") 위반이다 — **새 데이터가 필요해 이 물결에서는 못 간다**(보고 대상).
+       ㉰ (채택) `usage_floors` 표 전체를 용도 무관하게 슬롯별로 묶어, 부품이 그 기준에
+          못 미치면 **막지 않고** `usage_gaps` 필드로 알린다. expert의 정체성("고객이
+          직접 고른다")을 지킨다 — GT710을 사는 것 자체는 막지 않되, "게임 기준엔
+          부족할 수 있다"는 사실은 서버가 준다(§화면 정직성 — 서버가 아는 사실을
+          화면에 숨기지 않는다의 반대 방향 적용: 화면이 모르는 걸 안다고 말하지 않듯,
+          서버도 아는 걸 감추지 않는다).
+
+     **별도로, 코드 결함도 있었다(㉰와는 무관하게 반드시 고쳐야 하는 것)**: expert
+     `sets.highend`("고성능형 대안")가 `_build_set("highend", pool, total, rules)`를
+     **`BUDGET_ALLOC` 배분 상한 없이** 불렀다. `SLOTS` 순서(CPU→MB→RAM→GPU→...)상 GPU가
+     4번째라, highend 티어의 가격 내림차순 탐색이 앞선 CPU·MB·RAM에 예산(1.5배)을
+     먼저 태우고 GPU는 예산 잔여로 떠밀렸다 — 실제 재현(CPU·RAM·보드 393만원 + GPU
+     4.7만원 GT710). `/api/recommend`의 highend 티어는 애초에 `hi_pool`(BUDGET_ALLOC로
+     각 부품 상한을 미리 거른 풀)을 쓰는데, 이 파일의 최초 배포판은 그 부분을 못
+     맞췄다고 **이미 스스로 기록해 두고 있었다**(위 §대안 설계 "못 맞춘 부분" 문단).
+     그 자리를 이번에 recommend.py와 같은 방식으로 고쳤다(`expert_build()` 참조) — 이건
+     ㉮/㉯/㉰ 중 어느 것도 아니고, "고성능형"이라 부르면서 실제로는 그 약속을 못 지킨
+     **버그 수정**이다.
 """
 import json
 import time
@@ -93,7 +130,9 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import access_gate
+from . import usage_floors as UF   # 용도 하한 단일 원천 — 읽기만 한다(usage_floors.py는 담당 밖)
 from . import visitor
+from .candidates import BUDGET_ALLOC   # 예산 배분 상한 단일 원천 — 읽기만 한다(candidates.py는 담당 밖)
 from .db import engine
 from .product_name import display_name
 from .recommend import (
@@ -122,6 +161,75 @@ EXPERT_SAMPLE_N = 5
 # 한다는 판단이다.
 _SLOT_CACHE: dict = {"at": 0.0, "data": None}
 _SLOT_CACHE_TTL = 120.0
+
+# 슬롯별 실재고 전체(가격 오름차순) — `/slots`(표본)와 `/parts`(검색·전체, 2026-08-24
+# 신설)가 함께 쓴다. `_SLOT_CACHE`는 "표본으로 이미 계산된 응답"을 캐시하고, 이건
+# "표본을 뽑기 «전» 원재료(슬롯별 전체 후보)"를 캐시한다 — 검색창에 한 글자씩 칠 때마다
+# DB를 새로 열지 않는다. TTL은 위와 같은 값·같은 근거를 쓴다.
+_POOL_CACHE: dict = {"at": 0.0, "by_slot": None}
+
+
+def _cached_by_slot() -> dict:
+    now = time.time()
+    if _POOL_CACHE["by_slot"] is not None and now - _POOL_CACHE["at"] < _SLOT_CACHE_TTL:
+        return _POOL_CACHE["by_slot"]
+    with engine.connect() as conn:
+        _pool, by_slot, _codes = _pool_ctx(conn)
+    _POOL_CACHE.update({"at": now, "by_slot": by_slot})
+    return by_slot
+
+
+def _floor_rows_by_slot() -> dict:
+    """usage_floors 전 행(용도 무관)을 슬롯별로 묶는다 — 아래 `_usage_gaps()` 참조.
+
+    `UF._rows()`(usage_floors.py 모듈 캐시, DB는 최초 1회만 — 새로 만들지 않고 그대로
+    부른다)를 슬롯별로 묶기만 한다. expert에는 "용도" 입력이 없어 `UF.match(value)`를
+    쓸 수 없다(용도 문구 자체가 없다) — 그래서 특정 용도로 좁히지 않고 **표 전체**를 쓴다.
+    """
+    out: dict = {}
+    for r in UF._rows():
+        out.setdefault(r["slot"], []).append(r)
+    return out
+
+
+def _usage_gaps(p: dict, floor_rows) -> list:
+    """이 부품이 «어느 용도 기준에는 못 미칠 수 있는지» — 막지 않고 알린다(㉰ 채택).
+
+    ■ 배경 — customer-audit-2026-08-24 §4-6(GT710 2GB 재발, CLAUDE.md에 박힌 그 사고)
+      expert에는 용도 질문이 없어 `usage_floors` 하한이 원천적으로 안 걸린다. 세 갈래를
+      검토했다(지시문 ㉮/㉯/㉰ — 상세 근거는 모듈 docstring 상단 "2026-08-24 추가" 참조):
+        ㉮ expert에도 용도를 묻는다 — 화면 변경, 제작자 C 몫. 이 필드가 그 선택지를
+           가로막지 않는다.
+        ㉯ 용도 없이도 걸리는 **최소 하한** — `usage_floors` 실측 27행이 전부 용도별로만
+           정의돼 있다(범용 행이 없다). 숫자를 여기서 새로 지어내면 §화면 정직성
+           위반이라 **새 데이터 없이는 못 간다**(보고 대상).
+        ㉰ (채택) 막지 않고 알린다 — expert의 정체성("고객이 직접 고른다")을 지키면서도
+           "게임엔 부족할 수 있다"는 사실은 준다.
+      판정은 `usage_floors.passes()`(NULL 불통과 원칙 포함 — 값을 모르면 "충분하다"고
+      말하지 않는다)를 그대로 재사용하고, 문구도 `usage_floors.floor_text()`(단일 원천)를
+      그대로 쓴다 — 숫자를 이 파일에서 새로 짓지 않는다.
+
+    반환: [{"usage_key", "usage_label", "note"}, ...] — 못 미치는 기준이 없으면 빈 배열
+    (필드는 항상 존재 — 화면이 undefined 가드를 안 짜도 되게, `_build_set`의 `pinned: []`
+    관례와 같다).
+
+    ■ 전력 고지(2026-08-24 문안검사 지적) — GPU는 성능 지표가 없어 `required_power_watt`를
+      계층 근사로만 쓴다(모듈 상단 참조). "그래픽카드 550W 이상"만 말하면 전력을 성능
+      기준처럼 들리게 한다 — `recommend.py`의 `floor_note`(1063-1064행)가 이미 쓰는 고지
+      문구를 그대로 재사용한다. `capacity_gb`(RAM·SSD 등)는 근사가 아니라 스펙 그 자체라
+      고지를 붙이지 않는다 — `field` 값으로 가른다.
+    """
+    out = []
+    for r in floor_rows:
+        floor = [(r["field"], r["op"], r["value"], r["label"], r["detail_fmt"])]
+        if not UF.passes(p, floor):
+            note = (f"{r['usage_label']} 하한({UF.floor_text([r])})에는"
+                     " 못 미칠 수 있어요")
+            if r["field"] == "required_power_watt":
+                note += ". GPU는 성능 지표가 없어 권장 전원을 등급 근사로 사용합니다"
+            out.append({"usage_key": r["usage_key"], "usage_label": r["usage_label"],
+                        "note": note})
+    return out
 
 
 def _price_spread_sample(sorted_pool: list, n: int) -> list:
@@ -178,7 +286,7 @@ def _sample_slot(by_slot: dict, slot: str, n: int) -> list:
     return [p for t, g in groups for p in _price_spread_sample(g, alloc[t])]
 
 
-def _expert_item(p: dict) -> dict:
+def _expert_item(p: dict, floor_rows=()) -> dict:
     """후보 한 건의 표시 정보 — `/api/recommend` 의 items[] 항목과 같은 필드 구성.
 
     `part_type` 은 여기서는 **그 부품의 실제 종류**(예: COOLER_CPU_AIR)를 그대로 둔다 —
@@ -188,10 +296,16 @@ def _expert_item(p: dict) -> dict:
     S2(`s2-result.html`)의 `PART_KO` 매핑이 슬롯명 기준이라 원부품 종류를 그대로 두면
     "COOLER_CPU_AIR" 이라는 raw 값이 화면에 그대로 노출된다. 그래서 `expert_build` 는
     이 함수의 결과에 `part_type` 만 슬롯명으로 덮어써서 쓴다.
+
+    `floor_rows`(2026-08-24 신설, 기존 필드는 그대로 — 추가만) — 이 부품이 속한 슬롯의
+    `usage_floors` 행 목록(`_floor_rows_by_slot()[slot]`). 넘기면 `usage_gaps` 를 계산해
+    싣는다(§용도 하한, `_usage_gaps()` 참조) — 안 넘기면(기본값 `()`) 빈 배열이라 기존
+    호출부를 굳이 다 고치지 않아도 깨지지 않는다.
     """
     return {"part_type": p["part_type"], "product_code": p["product_code"], "sku": p["sku"],
             "name": display_name(p["product_name"]), "price": p["sale_price"],
-            "maker": p.get("maker"), "spec": _explain_spec(p), "tags": _pref_tags(p)}
+            "maker": p.get("maker"), "spec": _explain_spec(p), "tags": _pref_tags(p),
+            "usage_gaps": _usage_gaps(p, floor_rows)}
 
 
 @router.get("/slots")
@@ -212,8 +326,8 @@ def expert_slots():
     if _SLOT_CACHE["data"] is not None and now - _SLOT_CACHE["at"] < _SLOT_CACHE_TTL:
         return _SLOT_CACHE["data"] | {"cached": True}
 
-    with engine.connect() as conn:
-        _pool, by_slot, _codes = _pool_ctx(conn)
+    by_slot = _cached_by_slot()
+    floor_by_slot = _floor_rows_by_slot()
 
     slots_out = {}
     for slot in SLOTS:
@@ -221,11 +335,99 @@ def expert_slots():
         slots_out[slot] = {
             "label": SLOT_KO.get(slot, slot),
             "total_candidates": len(by_slot.get(slot) or []),
-            "items": [_expert_item(p) for p in picks],
+            "items": [_expert_item(p, floor_by_slot.get(slot, ())) for p in picks],
         }
     data = {"slots": slots_out, "sample_size": EXPERT_SAMPLE_N, "generated_at": now_iso()}
     _SLOT_CACHE.update({"at": now, "data": data})
     return {**data, "cached": False}
+
+
+@router.get("/parts")
+def expert_parts(slot: str, q: str = "", part_type: str = "", page: int = 1,
+                  size: int = 20, sort: str = "price_asc"):
+    """1단계 확장(2026-08-24, customer-audit-2026-08-24 §4-5 후속) — 슬롯 하나의
+    **전체 후보**를 검색·페이지로 준다. 화면 계약은 이 docstring이 정본이다(제작자 C
+    참조 — s1-session.html은 이 파일 담당 밖이라 여기서는 짓지 않는다).
+
+    ■ 왜 새 엔드포인트인가 — `GET /slots`(기존, 필드 추가 외 불변)는 슬롯당
+      `EXPERT_SAMPLE_N`(=5)개 표본만 준다. "직접 고르세요"라면서 GPU 246개 중 5개
+      (2.0%)만 보여준 게 결함으로 지적됐다(§4-5). 그렇다고 `/slots`가 전 슬롯 전체를
+      한 번에 내리게 바꾸면 CASE 774건이 매번 실린다 — CLAUDE.md §목록 화면 규약
+      ("서버는 전 행을 반환하지 않는다", "화면은 '전체 N건 중 이 페이지'를 명시한다")을
+      정면으로 어긴다. 그래서 **표본(요약 카드용, 기존)과 전체 조회(검색용, 신설)를
+      엔드포인트로 나눴다** — 화면은 필요할 때만(예: "전체 보기 · 검색" 버튼) 이걸 청한다.
+
+    ■ 파라미터
+      slot        필수. SLOTS 8개(CPU/MB/RAM/GPU/CASE/COOLER/POWER/SSD) 중 하나.
+                  아니면 400.
+      q           선택. 상품명(표시용 — `product_name.display_name`, 판매조건 꼬리는
+                  부품 정보가 아니므로 검색 대상에서도 뺀다)·제조사에서 부분일치.
+                  공백으로 나눈 토큰 전부가 들어 있어야 일치("RTX 4060"이
+                  "RTX 4060 Ti"에 일치, 순서 무관 아님 — 각 토큰이 각자 부분일치).
+      part_type   선택. 그 슬롯 안의 세부 종류로 좁힌다 — 지금은 COOLER만 의미가
+                  있다(COOLER_CPU_AIR 공랭 / COOLER_CPU_AIO 수랭, `taxonomy.SLOT_TYPES`
+                  단일 원천). 그 슬롯에 없는 종류를 주면 400.
+      page        기본 1. 1 미만이면 1로 보정.
+      size        기본 20. 1~100로 보정(admin 목록의 500과 달리 고객 화면이라 더 작게 —
+                  근거: 이 화면은 표를 스캔하는 운영 도구가 아니라 카드/리스트를 보며
+                  고르는 자리다).
+      sort        `price_asc`(기본, `by_slot`이 이미 이 순서라 재정렬 비용이 없고
+                  "저렴한 것부터 둘러본다"는 탐색 방향이 자연스럽다) | `price_desc`.
+                  둘 다 아니면 400.
+
+    ■ 모집단 — `/slots`와 완전히 동일: `v_recommendation_candidates`
+      (`swap._pool_ctx` 경유, 검수 대기·`ai_candidate_yn=false`·품절 등은 뷰가 이미
+      제외). 120초 캐시를 `/slots`와 공유한다(`_cached_by_slot()`) — 검색창에 한 글자씩
+      칠 때마다 DB를 새로 열지 않는다. 세션·원장에 아무것도 남기지 않는다(읽기 전용).
+
+    ■ 응답 200
+      {"ok": true, "slot", "label", "q", "part_type", "total", "page", "size", "pages",
+       "items": [...]}
+      items[] 는 `/slots`의 `slots.<slot>.items[]`와 **완전히 같은 모양**이다
+      (`_expert_item()` 공용 — part_type·product_code·sku·name·price·maker·spec·tags·
+      usage_gaps). 같은 렌더 함수를 재사용할 수 있다.
+      total  검색·종류 필터를 적용한 «뒤»의 건수(페이지 아님) — 화면이 "전체 N건 중
+             이 페이지"를 이 값으로 말한다.
+
+    ■ 오류
+      400 {"detail": "알 수 없는 슬롯: X"} · {"detail": "이 슬롯에 없는 종류: Y"} ·
+          {"detail": "알 수 없는 정렬: Z"}
+    """
+    if slot not in SLOTS:
+        raise HTTPException(400, f"알 수 없는 슬롯: {slot}")
+    if part_type and part_type not in SLOT_TYPES[slot]:
+        raise HTTPException(400, f"이 슬롯에 없는 종류: {part_type}")
+    if sort not in ("price_asc", "price_desc"):
+        raise HTTPException(400, f"알 수 없는 정렬: {sort}")
+    size = max(1, min(size, 100))
+    page = max(1, page)
+
+    pool = _cached_by_slot().get(slot) or []           # 이미 price asc 정렬(_pool_ctx)
+    if part_type:
+        pool = [p for p in pool if p["part_type"] == part_type]
+
+    tokens = [t.lower() for t in q.strip().split() if t]
+    if tokens:
+        def _hit(p):
+            hay = f"{display_name(p['product_name'])} {p.get('maker') or ''}".lower()
+            return all(t in hay for t in tokens)
+        pool = [p for p in pool if _hit(p)]
+
+    if sort == "price_desc":
+        pool = list(reversed(pool))
+
+    total = len(pool)
+    start = (page - 1) * size
+    page_items = pool[start:start + size]
+    floor_rows = _floor_rows_by_slot().get(slot, ())
+
+    return {
+        "ok": True, "slot": slot, "label": SLOT_KO.get(slot, slot),
+        "q": q.strip(), "part_type": part_type or None,
+        "total": total, "page": page, "size": size,
+        "pages": (total + size - 1) // size,
+        "items": [_expert_item(p, floor_rows) for p in page_items],
+    }
 
 
 class ExpertBuildBody(BaseModel):
@@ -326,6 +528,7 @@ def expert_build(body: ExpertBuildBody, request: Request, response: Response):
         empty_slots = [s for s in SLOTS if chosen[s] is None]
         rules = load_compat_rules(conn)
         check_rule_fields(pool, rules)         # 규칙 필드 누락은 조용한 전면 불통과 -> 경고로 드러낸다
+        floor_by_slot = _floor_rows_by_slot()  # 용도 하한 표 전체(용도 무관) — §용도 하한
 
         if not empty_slots:
             # 8슬롯 전부 찼다 — recommend.py/swap.py 의 판정 함수를 손대지 않고 그대로 쓴다.
@@ -352,7 +555,8 @@ def expert_build(body: ExpertBuildBody, request: Request, response: Response):
 
         my_set = {
             "label": "직접 선택한 구성",
-            "items": [_expert_item(chosen[s]) | {"part_type": s} for s in SLOTS if chosen[s]],
+            "items": [_expert_item(chosen[s], floor_by_slot.get(s, ())) | {"part_type": s}
+                      for s in SLOTS if chosen[s]],
             "total": total,
             "compat": compat,
             # 예산 자체를 묻지 않는 모드라 상한이 없다 -- verdict="none"은 recommend.py가
@@ -367,11 +571,40 @@ def expert_build(body: ExpertBuildBody, request: Request, response: Response):
         alt_value = alt_highend = None
         if total > 0:
             alt_value = _build_set("value", pool, total, rules)
-            alt_highend = _build_set("highend", pool, total, rules)
+            # 고성능 대안 — 부품별 배분 상한(BUDGET_ALLOC)을 걸어야 한다. 안 걸면
+            # SLOTS 순서(CPU→MB→RAM→GPU→...)상 앞선 슬롯이 1.5배 예산을 먼저 차지해
+            # GPU(4번째)가 예산 잔여로 떠밀린다 — customer-audit-2026-08-24 §4-6 실사고
+            # (CPU·RAM·보드 393만원 + GPU 4.7만원 GT710 2GB). `/api/recommend`의 highend
+            # 티어는 애초에 이 hi_pool을 쓰는데(recommend.py `hi_pool` 계산과 동일 —
+            # 그 지역 변수는 함수 밖 즉석 코드라 import로 재사용할 수 없어 그대로 옮겼다.
+            # 위 모듈 docstring §대안 설계 "못 맞춘 부분"에 이미 이 위험이 예고돼 있었다),
+            # 이 파일의 최초 배포판은 놓치고 있었다 — 여기서 맞춘다.
+            hi_cap = int(total * HIGHEND_CAP_X)
+            hi_pool = [p for p in pool
+                       if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
+            alt_highend = _build_set("highend", hi_pool, total, rules)
+            if alt_highend is None:
+                # 배분 상한으로는 조합이 안 나올 수 있다(저예산) — recommend.py와 같은
+                # 완화 순서: 균형을 포기하고 총액 상한만 지켜 견적을 낸다
+                # (균형 없는 견적 > 견적 없음, §용도 하한 원칙 그대로).
+                alt_highend = _build_set(
+                    "highend", pool, total, rules,
+                    relax_note="부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다"
+                               "(총액 상한은 유지)")
             note = f"직접 고른 구성({total:,}원) 대비 서버가 계산한 대안입니다."
             for alt in (alt_value, alt_highend):
-                if alt is not None:
-                    alt["reasons"] = alt["reasons"] + [note]
+                if alt is None:
+                    continue
+                alt["reasons"] = alt["reasons"] + [note]
+                # 서버가 «계산한» 대안도 용도 하한 경고 대상이다(고객이 직접 고른 게
+                # 아니라 서버 판단이라도, GT710을 "고성능형"이라 부르며 내밀면 안 된다는
+                # 사실 자체는 위 BUDGET_ALLOC 수정으로 막혔지만, 그와 별개로 이 파일이
+                # 아는 사실은 숨기지 않는다). items[]는 `_build_set`(recommend.py, 담당
+                # 밖) 산출물이라 `_expert_item`을 거치지 않는다 — product_code로 이미
+                # 로드된 실재고(live_by_code)에서 원본을 되찾아 붙인다(새 쿼리 없음).
+                for item in alt["items"]:
+                    raw = live_by_code.get(item["product_code"]) or {}
+                    item["usage_gaps"] = _usage_gaps(raw, floor_by_slot.get(item["part_type"], ()))
 
         sets = {"recommend": my_set, "value": alt_value, "highend": alt_highend}
         comp = _companion(conn)
