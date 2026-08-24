@@ -4945,6 +4945,19 @@ def test_ledgers():
           "전부 _undo", [i["log_id"] for i in undo_rows if not i["is_undo"]])
 
 
+def _order_nos(items):
+    """/api/my/orders 응답에서 **주문**의 "no"만 고른다 — 인계(kind=="handoff")는 뺀다.
+
+    2026-08-24: 그 API가 orders·handoffs를 kind로 구분해 시각순 한 목록으로 합쳐
+    주기 시작했다(api/my_orders.py). 인계 번호는 `HO-1001` 꼴이라 `sorted()`가
+    `ORD-...`보다 **먼저** 뽑는다(`H` < `O`) — 필터 없이 `sorted(mine_nos)[0]`을
+    쓰면 인계 번호가 걸려, 주문 전용 API(`/api/my/refunds`)가 404(주문 없음)를
+    내고 "타인 주문 환불 접수 → 403" 기대가 어긋난다. kind가 없는 응답(구버전
+    서버·다른 배포 시점)은 전부 주문으로 본다(하위 호환).
+    """
+    return {o["no"] for o in items if o.get("kind", "order") == "order"}
+
+
 # ──────────────────── 6. 고객 축 계약 (구매 인증·회원 경계) ────────────────────
 def test_customer():
     print("\n[6] 고객 축 계약 — 회원 경계·구매 인증 (슬라이스 10·12·30·38)")
@@ -4958,10 +4971,14 @@ def test_customer():
     acct = get("/api/my/account")
     member_login("sy.lee@example.com")
     other = get("/api/my/orders")["items"]
-    mine_nos = {o["no"] for o in mine}
+    # kind로 주문만 고른다(_order_nos, 2026-08-24) — 이 아래 두 검사는 이름 그대로
+    # "타인 주문" 경계만 겨눈다. 인계(HO-…)는 환불 접수 대상이 아니다(결제를 안
+    # 받았다) — 섞이면 sorted()가 HO-를 먼저 집어 환불 검사가 404로 어긋난다.
+    mine_nos = _order_nos(mine)
+    other_nos = _order_nos(other)
     check("회원 경계: 타인 주문 미포함",
-          not (mine_nos & {o["no"] for o in other}), "교집합 없음",
-          mine_nos & {o["no"] for o in other})
+          not (mine_nos & other_nos), "교집합 없음",
+          mine_nos & other_nos)
     # 다른 회원 세션으로 타인 주문의 환불을 접수할 수 없다(경계가 세션으로 강제되는가)
     if mine_nos:
         st, _ = post("/api/my/refunds",
@@ -4973,7 +4990,12 @@ def test_customer():
     # 신규 이메일 로그인 = 가입(승인 게이트 없음) → 주문은 당연히 0건
     member_login("regress-guest@popcornpc.local", "회귀게스트")
     fresh = get("/api/my/orders")["items"]
-    check("신규 가입 회원 → 빈 주문 목록", fresh == [], [], fresh)
+    # "주문 목록"이라는 이름 그대로 주문만 본다 — 지금은 신규 계정에 이어지는 인계가
+    # 0건이라 fresh == [] 도 우연히 통과하지만(2026-08-24 실측, my_orders.py 참조),
+    # 그 우연에 기대지 않는다. kind로 걸러 인계가 섞여도 이 검사가 지어내지 않은
+    # 이유로 깨지지 않게 한다.
+    fresh_orders = [o for o in fresh if o.get("kind", "order") == "order"]
+    check("신규 가입 회원 → 빈 주문 목록", fresh_orders == [], [], fresh_orders)
     me = get("/api/auth/me")
     check("고객 세션 me", bool(me["authenticated"])
           and me["member"]["email"] == "regress-guest@popcornpc.local",
