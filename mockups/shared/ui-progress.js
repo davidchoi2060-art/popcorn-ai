@@ -192,7 +192,26 @@
       (typeof input === "object" && input && input.method) || "GET").toUpperCase();
     var write = method !== "GET" && method !== "HEAD";
     // 로그인·세션 확인은 사용자가 누른 '저장'이 아니다 — 조용히 지나간다
-    var quiet = /\/auth\/(login|logout|me)\b/.test(url);
+    //
+    // /api/candidates/count 도 같은 부류다(2026-08-24 추가, S1 확인자 실측 결함).
+    // POST 지만 SELECT 하나뿐이고 쓰지 않는다(api/candidates.py 전수 확인 —
+    // INSERT·UPDATE·DELETE·commit 0곳, consult_sessions 기록은 /api/recommend 몫이지
+    // 이 엔드포인트가 아니다). S1(mockups/mvp1/s1-session.html)이 이 URL을 셋으로 쓴다 —
+    // 현재 조건 조회(doCount, 타이핑마다 300ms 디바운스) · 완화 칩 가상 조회(relaxChips,
+    // "조건 하나를 빼면?" 을 Promise.all 로 병렬 조회) · 초기 1회 조회. 셋째는 preview
+    // 개념이 아예 없고, 완화 칩 쪽은 preview 표시 없이 나가 **가장 늦게 끝난 가상 조회가
+    // "완료" 배너로 뜨는 결함**이 있었다(사무용·40만원 입력 시 카드는 "630,000원부터
+    // 가능"인데 상단 토스트는 "지금 조건으로 만들 수 있어요" — 정반대). 이 URL은 저장소
+    // 전체에서 s1-session.html만 호출한다(grep 확인, 2026-08-24) — 다른 화면의 토스트
+    // 용법을 건드리지 않는다. S1은 이 세 호출 모두 이미 자기 영역 안에 진행 표시가 있다
+    // (완화 칩 "완화 효과를 세는 중…" 인라인 문구 · _pending · poolUnknown/srcBadge 실패
+    // 표시) — 전역 배너는 겹치기만 하고 있었다. 완화 칩 쪽에만 `preview:true`(아래
+    // isPreviewBody)를 붙이는 좁은 수정 대신 URL 자체를 quiet 로 분류한 이유: 이 URL은
+    // body 값과 무관하게 **항상** 읽기 전용이라(용도별 최소 사양·분류 변경·병합처럼
+    // "저장/미리보기 겸용"인 URL이 아니다) preview 규약보다 quiet 규약이 맞고, 초기
+    // 조회처럼 애초에 preview 개념이 없는 호출까지 함께 잡힌다.
+    var quiet = /\/auth\/(login|logout|me)\b/.test(url) ||
+      /\/api\/candidates\/count\b/.test(url);
     // 미리보기(본문 preview:true)는 저장과 같은 URL을 쓸 수 있어 URL 패턴(verb())만으로는
     // 못 가른다 — 배너를 띄우지 않고, 화면이 자기 자리에서 진행을 보여준다(㉯ 확정,
     // 2026-08-15). 미리보기가 아닌 요청의 동작은 이 한 줄 추가 전과 동일하다.
