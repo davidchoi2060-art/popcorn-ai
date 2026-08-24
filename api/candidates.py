@@ -12,6 +12,24 @@ v0 하드필터(정직한 최소 룰 — 그 외 제약은 applied=false로 정�
   ⚠ 라벨을 안 보고 값만 보던 시절엔 「요청」(고객 원문 요약)까지 걸러 같은 필터가 두 번
   걸렸다(2026-08-17 수정). 어느 라벨이 무엇을 거르는지는 아래 처분표가 정본이다.
 
+⚠ **총액(2026-08-24 신설 — customer-audit-2026-08-24.md §1-2)**: 위 배분율·태그는 슬롯
+  «각각»만 본다 — 슬롯마다 후보가 1개씩 있어도 그 최저가들의 «합»이 예산을 넘을 수 있고,
+  전에는 그걸 아무도 안 봤다(그래서 「222개 · 3구성 가능」 뒤에 확정을 누르면 「조립 불가」가
+  나왔다). `count_candidates()`가 이제 재사용 슬롯을 뺀 필수 슬롯 전부의 최저가 합을 예산과
+  대조한다(`over_budget`·`budget_floor_total` 필드, 함수 안 긴 주석 참조).
+
+⚠ **호환 규칙(2026-08-24 같은 날 오후 후속 — 위 총액 판정이 스스로 적어 두던 한계 해소)**:
+  위 총액 판정은 원래 "슬롯별 최저가끼리 소켓 등이 맞는지는 불문"했다 — 그 한계가 실제로
+  게임 57·58·59만원·영상편집 90만원에서 고객에게 닿는 것을 제작자가 실측으로 확인했다
+  (buildable=true를 냈지만 실제 `/api/recommend`는 세 티어 전부 null). recommend.py의 DFS
+  가지치기가 같은 날 고쳐지며 이 확인을 실시간(count 호출마다)으로 감당할 수 있게 돼서,
+  buildable이 "참"이 되려는 시점에 recommend.py의 "가성비(value)" 티어를 실제로 한 번 돌려
+  진짜 조립 가능한 조합이 있는지 확인한다(`compat_checked`·`compat_infeasible` 필드, 함수 안
+  "실제 조립 가능성 확인" 블록 참조). **여전히 v0인 지점**: 이 확인은 recommend.py를 그대로
+  «부르는» 것이지 candidates.py가 호환 판정을 다시 구현한 게 아니다(§단일 원천) — 그리고
+  탐색이 노드 상한에 닿아 "못 찾았다"(exhausted)면 "없다"로 단정하지 않고 기존 총액 판정을
+  그대로 믿는다(정직한 미확인으로 남긴다).
+
 effects = 제약 배열 순서대로 누적 적용한 델타. 순서를 바꾸면 최종 count는 같고
 델타 배분만 달라진다 — 이것이 이 계약의 정의된 결정론이다.
 """
@@ -250,6 +268,30 @@ def _slot_view(parts: list[dict]) -> tuple:
     return counts, empty
 
 
+def _slot_stats(parts: list[dict]) -> tuple:
+    """(슬롯별 후보 수, 슬롯별 최저가) — 총액 판정(2026-08-24 신설, 아래 참조)에 쓴다.
+
+    `_slot_view`와 같은 분할(part_type → 슬롯)이지만 한 번의 순회로 **최저가까지** 함께
+    얻는다. `_floor_slot`(=taxonomy.slot_of, 이 파일 상단에서 이미 usage_floors 하한
+    판정에 쓰고 있다)이 "COOLER_*는 COOLER, 그 외는 자기 자신"으로 QUOTE_SLOTS와 똑같은
+    분할을 이미 하고 있어서, `_slot_view`처럼 슬롯 8개마다 전체 목록을 다시 훑지 않고
+    **부품마다 한 번**만 본다(O(8n) → O(n)) — count는 화면이 타이핑할 때마다 부르므로
+    가벼운 쪽을 쓴다. QUOTE_SLOTS에 없는 part_type(HDD 등)은 두 결과 어디에도 안 남는다
+    — `_slot_view`가 HDD를 순회하지 않는 것과 같은 결과다.
+    """
+    counts: dict = {}
+    mins: dict = {}
+    for p in parts:
+        s = _floor_slot(p["part_type"])
+        if s not in QUOTE_SLOTS:
+            continue
+        counts[s] = counts.get(s, 0) + 1
+        price = p["sale_price"]
+        if s not in mins or price < mins[s]:
+            mins[s] = price
+    return counts, mins
+
+
 @router.post("/candidates/count")
 def count_candidates(body: CountBody):
     with engine.connect() as conn:
@@ -279,62 +321,285 @@ def count_candidates(body: CountBody):
                    if any(c.l in REUSE_LABELS and c.v == s for c in body.constraints)]
     empty = [s for s in empty if s not in reuse_slots]
 
-    # ── 재시도 — 엔진과 같은 규칙(recommend.py:757-761 「recommend」 티어와 동일 패턴) ──
-    # 배분율 필터(BUDGET_ALLOC)로 후보가 0이 된 슬롯이 있으면, 예산만 뺀 풀(엔진의
-    # `common` — 용도 하한·태그는 그대로 두고 배분율만 제거)로 **그 슬롯만** 다시 센다.
-    # 새 방식이 아니다: recommend.py는 capped 로 실패하면 common 으로 다시 짓는다
-    # (752-756행 근거: 배분율은 "한 부품에 몰빵하지 마라"는 균형 장치일 뿐 조립 조건이
-    # 아니다) — 그 규칙을 이 파일의 슬롯 단위 카운터에 그대로 옮겼다. 용도 하한·태그
-    # 필터는 조립 조건이라 재시도에서도 그대로 유지한다(예산만 뺀다).
+    # ============================================================================
+    # 총액 판정 (2026-08-24 신설) — customer-audit-2026-08-24.md §1-2 해소
+    # ============================================================================
+    # ■ 결함이었던 것: 이 아래 블록 전까지는 슬롯마다 "후보가 1개라도 있는가"만 봤다.
+    #   게임+40만원에서 슬롯 8개 전부 후보가 있었다(가장 싼 CPU·가장 싼 GPU·... 각자
+    #   1개 이상) — 그래서 buildable=true, "가성비·추천·고성능 3구성을 만들 수 있어요"
+    #   라고 말했다. 그런데 그 슬롯들의 최저가를 **합치면** 예산을 넘었다 — 확정을 누르면
+    #   `/api/recommend`(실제 DFS)가 그 사실을 정직하게 걸러 sets 전부를 null로 냈다
+    #   (customer-audit §1-2). 카운터가 "슬롯이 찼다"만 보고 "그 슬롯들의 합이 예산
+    #   안에 드는가"를 한 번도 안 물은 것이 거짓말의 근원이었다.
+    #
+    # ■ 왜 이 계산이 recommend.py와 일치하는가(검증 근거 — 줄번호는 적지 않는다, 코드는
+    #   같은 물결에서 다른 제작자가 고치는 중이라 줄번호가 바로 낡는다 — MAKER-CHECKLIST
+    #   §8. 심볼로 확인한다: `grep -n "def _dfs" api/recommend.py`)
+    #   recommend.py의 `_dfs()`는 슬롯을 채워 가며 "지금까지 쓴 돈 + 지금 고르는 부품값 +
+    #   **남은 슬롯 각각의 최저가 합**(변수명 `min_rest`) > 예산" 이면 그 자리에서
+    #   가지치기한다. 탐색 시작 시점(첫 슬롯)에서 이 부등식을 풀면: "전체 슬롯 최저가
+    #   합(min_rest[0]) > 예산"이면 그 풀로는 **가장 싼 후보조차** 가지치기당한다 — 즉
+    #   min_rest[0] > 예산이면 그 풀로는 어떤 조합도 안 나온다. 반대로 min_rest[0] <=
+    #   예산이면 슬롯마다 최저가를 그대로 고른 조합 자체가 예산 안이라 가지치기에 걸리지
+    #   않는다(호환 규칙은 별개 문제 — 아래 한계 참조). 이 min_rest[0]이 바로 "용도 하한을
+    #   만족하는 슬롯별 최저가의 합"이고, 그 계산에 쓰는 풀(아래 `common`, 예산만 뺀 풀)도
+    #   recommend.py의 `common`(제약 목록을 돌며 "예산" 라벨만 건너뛰고 나머지를 순서대로
+    #   적용하는 반복문 — 그 파일도 이 파일의 `_apply_one`을 그대로 가져다 쓴다)과 정확히
+    #   같은 절차다 — **같은 판정을 두 벌 적지 않으려고**(§단일 원천) 이 함수도
+    #   `_apply_one`을 그대로 재사용해 recommend.py와 똑같은 시퀀스를 돌린다.
+    #   value 티어는 이 min_rest[0]<=cap이 바로 성립/불성립을 가른다(배분율 없이 `common`
+    #   +cap 그대로 DFS를 돈다 — "가성비형은 배분율을 받지 않는다"는 그 파일 주석 그대로).
+    #   recommend 티어는 배분율 캡(`capped`)이 먼저 실패하면 배분율 없는 `common`+cap으로
+    #   재시도하므로 결국 같은 min_rest[0]<=cap 조건으로 귀결된다. highend 티어는
+    #   cap*HIGHEND_CAP_X(1.5배)로 더 느슨하므로 value·recommend가 되면 highend는 예산
+    #   쪽에서 항상 더 여유 있다. 그래서 **하나의 총액 판정(cap 기준)이 세 티어 전부의
+    #   예산 가능성을 동시에 결정한다** — "3구성을 만들 수 있어요"라는 한 문장짜리 verdict와
+    #   정확히 대응한다. TestClient로 실측 대조했다(제작 보고 ①·⑥ 참조) — 세 티어의
+    #   sets가 예산 하나로 함께 나거나 함께 살아 있었고, 하나만 null인 조합은 못 봤다.
+    #
+    # ■ 배분율(BUDGET_ALLOC)을 총액 판정의 근거로 쓰지 않는 이유 — 지시서가 짚은 대로
+    #   recommend.py를 읽어 확인했다: 배분율 캡으로 한 티어가 실패하면 recommend.py
+    #   스스로 배분율을 버리고 총액(cap)만으로 다시 짓는다("균형을 못 지킬 바엔 균형을
+    #   포기하고 견적을 낸다" — 그 파일 주석 원문. recommend·highend 둘 다 이 재시도가
+    #   있다). 즉 **배분율로 걸러진 풀(이 함수 위쪽의 `parts`, 제약을 순서대로 다 적용한
+    #   결과)을 총액 판정의 근거로 쓰면 안 된다** — 배분율 탓에 예산을 넘는 것처럼 보이는
+    #   거짓 불가능 판정이 나온다. 그래서 총액 판정은 반드시 배분율이 빠진 `common`으로
+    #   한다(아래 코드).
+    #
+    # ■ 한계 — 정직하게 남긴다(이 판정이 recommend.py의 "완전한 재현"은 아니다)
+    #   ① 호환 규칙(compat_rules — 소켓·전원 호환 등)은 여기서 안 본다. v0 카운터는
+    #      애초에 슬롯 사이의 호환을 본 적이 없다(이 파일 맨 위 docstring — "그 외 제약은
+    #      applied=false로 정직 표기"에 호환은 처음부터 없었다). "슬롯별 최저가 합 <= 예산"
+    #      이 참이어도 그 최저가 부품들끼리 호환이 안 맞으면 실제 DFS는 더 비싼 조합을
+    #      찾아야 하고 드물게 그마저 실패할 수 있다 — 이 판정은 **예산만의** 필요충분
+    #      조건이지 호환까지 포함한 것은 아니다. 이번 수정이 새로 만든 한계가 아니라 v0
+    #      카운터가 원래 갖고 있던 한계 위에 "총액"이라는 차원 하나를 정확하게 추가할 뿐이다.
+    #   ② 「부품」(GPU 칩셋) 핀이 걸려 있고 재고에 매칭되면, 아래 `common`도 그 칩셋으로
+    #      GPU 슬롯이 좁혀진 채로 최저가를 잰다. recommend.py는 그 풀로 실패하면 핀을
+    #      포기하고(honored=false) 다시 짓는 마지막 안전망이 있는데, 이 카운터는 그
+    #      안전망까지는 재현하지 않는다 — 핀이 걸린 채로 예산이 빠듯하면 실제로는
+    #      recommend.py가 대체 GPU로 성공할 수 있는데도 이 카운터는 over_budget=true로
+    #      더 보수적으로(불가능 쪽으로) 판단할 수 있다. 이번 물결 재현 범위(§1-2, GPU 핀
+    #      없는 용도+예산 조합)에는 걸리지 않았다(제작 보고 검증 ⑥ 참조) — 핀+빠듯한
+    #      예산의 조합은 이번 지시서 범위 밖이라 남겨 둔다.
+    budget_v = next((c.v for c in body.constraints if c.l in BUDGET_LABELS), "")
+    cap = _budget_cap(budget_v)
+
     retried_slots: list[str] = []
-    if empty:
+    over_budget = False
+    budget_floor_total = None
+    if empty or cap is not None:
+        # `common` — 예산(배분율 포함)만 뺀 풀. 재시도(아래)와 총액 판정(더 아래) 둘 다
+        # 이 풀 하나를 쓴다(풀을 두 벌 만들지 않는다). **필요할 때만** 만든다 — count는
+        # 화면이 타이핑할 때마다 부르므로, 예산도 없고 빈 슬롯도 없는 흔한 경우(대화
+        # 초반)엔 이 블록 전체를 건너뛰어 예전과 같은 비용으로 응답한다.
         common = pool
         for c in body.constraints:
             if c.l not in BUDGET_LABELS:
                 common, _, _ = _apply_one(common, c.l, c.v)
-        common_counts, _ = _slot_view(common)
-        still_empty = []
-        for s in empty:
-            n = common_counts.get(s, 0)
-            if n > 0:
-                slot_counts[s] = n
-                retried_slots.append(s)
-            else:
-                still_empty.append(s)
-        empty = still_empty
+        common_counts, common_mins = _slot_stats(common)
 
-    # 재시도로 살아난 슬롯이 있으면 예산 효과의 사유가 더는 사실 전부를 말하지 않는다 —
-    # "초과 부품 제외"만 남겨두면, 그 슬롯에 한해 배분 상한을 걷어냈다는 사실이 빠져
-    # 화면이 그대로 싣는 문구가 실제와 어긋난다(화면이 이 reason을 그대로 싣는다).
-    if retried_slots:
-        labels = " · ".join(SLOT_KO.get(s, s) for s in retried_slots)
-        note = (f" — {labels}는 배분 상한 적용 시 후보가 없어 그 부품에 한해"
-                " 배분 상한 없이 다시 포함(총액 예산은 별도 적용)")
-        for e in effects:
-            if e["label"] in BUDGET_LABELS and e["applied"]:
-                e["reason"] = e["reason"] + note
+        # ── 재시도 — 엔진과 같은 규칙(recommend.py가 배분율 캡으로 실패한 티어를 배분율
+        # 없는 `common`+cap으로 다시 짓는 것과 동일한 패턴 — 위 첫 번째 문단 참조).
+        # 배분율 필터(BUDGET_ALLOC)로 후보가 0이 된 슬롯이 있으면, 예산만 뺀 풀(common —
+        # 용도 하한·태그는 그대로 두고 배분율만 제거)로 **그 슬롯만** 다시 센다. 용도
+        # 하한·태그 필터는 조립 조건이라 재시도에서도 그대로 유지한다(예산만 뺀다).
+        if empty:
+            still_empty = []
+            for s in empty:
+                n = common_counts.get(s, 0)
+                if n > 0:
+                    slot_counts[s] = n
+                    retried_slots.append(s)
+                else:
+                    still_empty.append(s)
+            empty = still_empty
+
+        # 재시도로 살아난 슬롯이 있으면 예산 효과의 사유가 더는 사실 전부를 말하지 않는다
+        # — "초과 부품 제외"만 남겨두면, 그 슬롯에 한해 배분 상한을 걷어냈다는 사실이 빠져
+        # 화면이 그대로 싣는 문구가 실제와 어긋난다(화면이 이 reason을 그대로 싣는다).
+        if retried_slots:
+            labels = " · ".join(SLOT_KO.get(s, s) for s in retried_slots)
+            note = (f" — {labels}는 배분 상한 적용 시 후보가 없어 그 부품에 한해"
+                    " 배분 상한 없이 다시 포함(총액 예산은 별도 적용)")
+            for e in effects:
+                if e["label"] in BUDGET_LABELS and e["applied"]:
+                    e["reason"] = e["reason"] + note
+
+        # ── 총액 판정 — 위 긴 주석의 결론: 재사용 슬롯을 뺀 필수 슬롯 전부의 최저가
+        # 합(common 기준)이 예산을 넘으면, 슬롯이 다 찼어도 조립 가능한 조합이 없다.
+        # `empty`(재시도 이후)가 아직 남아 있으면 이 판정 자체가 의미 없다 — 슬롯 자체가
+        # 없는데 그 슬롯의 "최저가"를 말할 수 없다(그 경우는 위 empty_slots가 이미
+        # 정직하게 말하고 있다). 정확히 같음(=)은 통과다 — recommend.py의 가지치기도
+        # `>`(초과)일 때만 자르지 `>=`가 아니다(경계 — 제작 보고 검증 ③).
+        if cap is not None and not empty:
+            required = [s for s in QUOTE_SLOTS if s not in reuse_slots]
+            if all(s in common_mins for s in required):
+                budget_floor_total = sum(common_mins[s] for s in required)
+                over_budget = budget_floor_total > cap
 
     # 경계 — 필수 8슬롯을 전부 재사용으로 고르면 buildable은 참이지만 "3구성을 만들 수
     # 있다"는 문장은 사실이 아니다(새로 살 부품이 없다). verdict만 갈라 정직하게 말한다
     # — buildable을 false로 바꾸지는 않는다(정말 "안 되는" 것과는 다른 사실이라서다).
     all_reused = bool(reuse_slots) and set(reuse_slots) == set(QUOTE_SLOTS)
+
+    # ============================================================================
+    # 실제 조립 가능성 확인 (2026-08-24 물결 후속 — customer-audit §1-2 잔여 한계 해소)
+    # ============================================================================
+    # ■ 무엇을 고치나: 위 총액 판정(over_budget)은 슬롯별 "최저가끼리 합"만 본다 — 그
+    #   최저가들이 실제로 서로 조립되는지(소켓 등 compat_rules)는 안 본다고 위 총액
+    #   판정 블록 스스로 "■ 한계 ①"에 이미 적어 뒀다. 그 한계가 고객에게 실제로 닿는지
+    #   제작자가 직접 쟀다(TestClient + X-Popcorn-Test, DB에는 쓰지 않는 직접 함수 호출과
+    #   테스트표식 HTTP 호출을 병행) — 2026-08-24 기준 게임 57·58·59만원·영상편집 90만원
+    #   에서 이 함수는 buildable=true를 냈지만 실제 `/api/recommend`(호환 규칙까지 보는
+    #   진짜 탐색)는 세 티어 전부 null(search_exhausted 전부 false — "못 찾음"이 아니라
+    #   "없음"으로 확정)이었다. S1은 대화 중 이 카운터만 보고 "지금 조건으로 견적을 만들
+    #   수 있어요"를 여러 번 들려주다가, 확정을 눌러야만 진짜 결과(불가)를 알려주고 있었다.
+    #
+    # ■ 왜 지금은 감당되나(넘겨짚지 않고 직접 쟀다 — 근거 전문은 제작 보고): 이 물결에서
+    #   recommend.py의 DFS 가지치기가 고쳐졌다(`_price_cut`). 이 확인은 "가성비(value)"
+    #   티어 하나만 재사용한다 — recommend.py 파일 상단 docstring이 "가성비(최소 구성)가
+    #   불가능하면 전 티어 불가"라고 선언하므로 value 하나의 성패가 3티어 전부를 대변한다.
+    #   value(가격 오름차순 + 예산 이진 컷)는 그 가지치기 수정의 최대 수혜자라, 성공·실패
+    #   사례를 가리지 않고(극단 저예산 40만원·무상한 예산·다중 제약 포함) 실측에서 병리적
+    #   사례가 한 번도 없었다(전부 exhausted=False) — DFS 자체는 1ms 미만~23ms, 신선한
+    #   연결+`_load_pool`+`load_compat_rules`+DFS 전부 합쳐도 평균 65~98ms(최대 127ms,
+    #   대부분 탐색이 아니라 풀 재조회 쪽)였다. S1은 이미 이 카운터를 300ms 디바운스
+    #   뒤에만 부른다(s1-session.html scheduleCount) — 총 응답 시간이 기존(약 40~70ms)의
+    #   2~3배(약 110~170ms)가 되지만 사람이 지연으로 느끼는 문턱 안쪽이다.
+    #
+    # ■ 언제 확인하나 — buildable이 "참"이 되려는 시점에만(empty·over_budget·all_reused
+    #   중 무엇에도 안 걸려 진짜 "만들 수 있다"고 말하려는 바로 그 지점). 이미 불가능이
+    #   확정된 앞의 세 분기에서 또 확인하면 물을 것이 없고 비용만 든다.
+    #
+    # ■ recommend.py를 고치지 않고 «부른다»(지시서 계약) — `_load_pool`·
+    #   `load_compat_rules`·`_rules_for_active`·`_build_set`을 그대로 가져다 쓴다.
+    #   예산만 뺀 풀을 만드는 절차(`_apply_one` 순차 적용)도 위 총액 판정·recommend.py의
+    #   `common`이 이미 공유하는 절차 그대로다 — 새 판정 술어를 여기서 다시 적지 않는다
+    #   (§단일 원천). 순환 import를 피하려고 recommend는 이 블록 안에서만 지연 import한다
+    #   (모듈 최상단에서 서로를 import하면 recommend.py가 이미 candidates.py를 최상단에서
+    #   import하고 있어 순환이 생긴다 — 함수 호출 시점 지연 import는 그 문제가 없다).
+    #
+    # ■ 무엇을 새로 더했나(기존 필드는 이름도 뜻도 그대로 — 지시서 「더하는 건 되고 빼는
+    #   건 안 된다」) — `compat_checked`(이 확인을 실행했는가)·`compat_infeasible`(실행
+    #   했고 실제로 조립되는 조합을 못 찾았는가) 둘만 새로 낸다. `over_budget`이 이미
+    #   그렇듯, 이 판정으로 buildable이 false가 될 때도 `empty_slots`는 여전히 빈
+    #   배열이다 — 슬롯 자체가 빈 게 아니라 "그 슬롯들끼리 안 맞아서"이기 때문이고, 그
+    #   구분은 `verdict` 문장이 말로 한다(화면이 이 사유를 더 세분해 보여주는 것은
+    #   s1-session.html 소관이라 이 지시서 범위 밖 — over_budget이 이미 겪고 있는
+    #   한계와 같다: `empty_slots`가 비어 있으면 화면의 emptyCard()가 "0개" 문구로
+    #   떨어진다).
+    #
+    # ■ 한계 — 탐색이 상한(DFS_NODE_CAP)에 닿아 "못 찾았다"(exhausted=True)면 그건
+    #   "없다"가 아니다(recommend.py 자신의 구분, 파일 상단 참조). 그 경우는
+    #   compat_infeasible을 true로 만들지 않는다 — 확인하지 못한 것을 "안 된다"로
+    #   지어내지 않는다(§화면 정직성). 위 실측대로면 value 티어에서는 사실상 안 일어나지만,
+    #   일어나도 이 함수는 정직한 쪽(모른다 → 기존 총액 판정을 그대로 유지)으로 떨어진다.
+    #   DB 접속 실패 등으로 이 블록 자체가 예외를 내면 삼키지 않는다 — 이 함수의 첫 SELECT
+    #   (파일 맨 위 `parts` 조회)도 같은 이유로 방어하지 않으므로, 이 파일의 기존 관례와
+    #   같다(조용히 폴백하면 "더 정확한 확인 실패"가 "기존 판정도 무효"로 오인될 수 있다
+    #   — 500으로 실패를 드러내는 쪽이 정직하다).
+    compat_checked = False
+    compat_infeasible = False
+    if not empty and not over_budget and not all_reused:
+        from . import recommend as _rec   # 지연 import — 위 긴 주석 "recommend.py를…" 참조
+        with engine.connect() as conn2:
+            wide_pool = _rec._load_pool(conn2)
+            compat_rules = _rec.load_compat_rules(conn2)
+        wide_common = wide_pool
+        for c in body.constraints:
+            if c.l not in BUDGET_LABELS:
+                wide_common, _, _ = _apply_one(wide_common, c.l, c.v)
+        active_slots = [s for s in _rec.SLOTS if s not in reuse_slots]
+        rules_active, _rules_unknown = _rec._rules_for_active(compat_rules, reuse_slots)
+        compat_checked = True
+        real_meta: dict = {}
+        built = _rec._build_set("value", wide_common, cap, rules_active,
+                                 active_slots=active_slots, meta=real_meta)
+        compat_infeasible = built is None and not real_meta.get("exhausted")
+
     if empty:
         verdict = ("조건이 너무 좁아 "
                    + " · ".join(SLOT_KO.get(s, s) for s in empty)
                    + " 후보가 없어요 — 견적을 만들 수 없습니다. 조건을 하나만 완화해 주세요.")
+    elif over_budget:
+        # 「슬롯은 찼는데 총액이 안 맞는다」— 빈 슬롯과는 다른 사실이므로 다른 문장이다.
+        # 숫자는 전부 이 함수가 실제로 계산한 값이다(지어내지 않는다) — 최저가 합·예산
+        # 둘 다 근거로 남긴다.
+        verdict = (f"조건을 만족하는 부품은 자리마다 있지만, 가장 저렴하게만 담아도 "
+                   f"{budget_floor_total:,}원으로 예산 {cap:,}원을 넘어요 — "
+                   "견적을 만들 수 없습니다. 예산을 늘리거나 조건을 하나만 완화해 주세요.")
     elif all_reused:
         verdict = "선택하신 부품을 전부 재사용하시면 새로 담을 부품이 없습니다 — 이번 견적에는 새로 사는 부품이 없어요."
+    elif compat_infeasible:
+        # 총액(슬롯별 최저가 합)은 예산 안인데, 그 최저가 부품들끼리 실제로는 안 맞는
+        # 경우(소켓 등 호환 규칙) — 위 "실제 조립 가능성 확인" 블록 참조. budget_floor_total
+        # 은 이미 계산돼 있을 때만(cap 있고 빈 슬롯 없을 때) 근거로 함께 보여준다 — 못
+        # 잰 값(cap 없는 예산 등)은 지어내지 않는다.
+        floor_txt = (f" (가장 저렴하게 담으면 {budget_floor_total:,}원으로 예산 안에는 듭니다)"
+                     if budget_floor_total is not None else "")
+        verdict = ("조건을 만족하는 부품은 자리마다 있지만, 그 부품들끼리 실제로 조립되는 "
+                   f"조합을 찾지 못했습니다(호환 규칙){floor_txt} — 견적을 만들 수 없습니다. "
+                   "조건을 하나만 완화해 주세요.")
     else:
-        verdict = "지금 조건으로 가성비·추천·고성능 3구성을 만들 수 있어요."
+        # 문구 수정(2026-08-24) — "가성비·추천·고성능 3구성을 만들 수 있어요"는 셋 다
+        # 된다고 못박는 문장인데, 이 verdict는 그렇게 말하지 않는다(아래로 이유).
+        #
+        # ⚠ 아래 문단은 2026-08-24 오전 시점의 실측 기록이고, 지금은 낡았다 — 낡은 채로
+        # 지우지 않고 남긴다(왜 문구가 지금 모양인지의 경위이기 때문). 당시: 예산이 총액
+        # 판정 경계에 가까운 좁은 구간(게임 실측 예: 62·64·70·75만원)에서 "가성비=성공·
+        # 추천=null"이 실제로 나왔다 — 원인은 recommend.py `_dfs()`가 그때 갖고 있던
+        # 특성(추천 티어가 가격 내림차순으로 탐색하다 `DFS_NODE_CAP`에 먼저 닿음)이었다.
+        #
+        # 지금(같은 날 오후, DFS_NODE_CAP 결함이 recommend.py `_price_cut`으로 고쳐진
+        # 뒤) 같은 네 지점을 제작자가 다시 직접 쟀다(TestClient로 `/api/recommend` 실호출,
+        # 세션은 정리함) — 게임 62·64·70·75만원 전부 sets.value/recommend/highend가
+        # 모두 not null이고 search_exhausted도 전부 false다. 즉 그 반례는 더는 반례가
+        # 아니다. 그리고 바로 위 `compat_infeasible` 확인이 신설되면서, 이 else에
+        # 도달했다는 것 자체가 "총액도 맞고 실제로 조립되는 조합도 찾았다"(value 티어
+        # 성공 확정)는 뜻이 됐다 — 이 카운터가 실제로 확인한 사실이 하나 늘었다.
+        #
+        # 그래도 "3구성"이라고 셋을 못박지는 않는다 — "추천"·"고성능" 티어는 각자 다른
+        # 정렬(내림차순)과 다른 예산 상한(고성능은 1.5배)으로 별도 탐색하므로, 이 카운터가
+        # 확인한 "가성비 하나의 성공"이 나머지 둘까지 논리적으로 보장하지는 않는다(둘 다
+        # DFS_NODE_CAP에 닿을 가능성은 이론상 남아 있다 — 지금은 안 나오지만 "안 나온다"
+        # 는 관측이지 증명은 아니다). 그래서 이 함수가 실제로 보장하는 것("총액이 맞고,
+        # 적어도 하나의 실제 조립 가능한 조합을 찾았다")만 말한다.
+        verdict = "지금 조건으로 견적을 만들 수 있어요."
 
     return {
         "total": total, "count": len(parts), "effects": effects,
         "slots": slot_counts,
-        "buildable": not empty,
+        # 빈 슬롯이 없어도 총액이 예산을 넘거나(over_budget) 총액은 맞아도 그 최저가
+        # 부품들끼리 실제로 안 맞으면(compat_infeasible) buildable은 여전히 false다 —
+        # 그래야 이름 그대로 "조립 가능한가"를 말한다(customer-audit-2026-08-24 §1-2 및
+        # 그 잔여 한계 해소). 기존 필드(true=조립 가능·false=조립 불가)의 «뜻»은 그대로다
+        # — 그 판정에 반영하던 근거가 하나(빈 슬롯) → 둘(+ 총액) → 셋(+ 실제 조립 확인)
+        # 으로 정확해졌을 뿐이다.
+        "buildable": not empty and not over_budget and not compat_infeasible,
         "empty_slots": [{"slot": s, "label": SLOT_KO.get(s, s)} for s in empty],
         # 재사용을 고른 슬롯 — count·buildable에서 왜 그 슬롯이 안 보이는지 화면이
         # 설명할 수 있게(§화면 정직성: 판정을 지어내지 않으려면 근거가 실려야 한다).
         "reused_slots": [{"slot": s, "label": SLOT_KO.get(s, s)} for s in reuse_slots],
+        # 신설 필드(2026-08-24) — 「슬롯은 찼는데 총액이 안 맞는다」를 empty_slots와
+        # 구분해 화면이 쓸 수 있게 한다. 기존 필드(total·count·slots·buildable·
+        # empty_slots·reused_slots·verdict)는 이름도 뜻도 그대로다 — 추가만 했다.
+        "over_budget": over_budget,
+        # 재사용 슬롯을 뺀 필수 슬롯 전부의 최저가 합(원) — 계산했을 때만 값이 있고,
+        # 예산이 없거나(cap None) 빈 슬롯이 있어 계산 자체가 무의미하면 null이다
+        # ("못 쟀음"과 "0"을 구분한다 — MAKER-CHECKLIST §5).
+        "budget_floor_total": budget_floor_total,
+        # 신설 필드 둘(2026-08-24, 이 물결) — 「실제 조립 가능성 확인」 블록(위) 참조.
+        # 기존 필드는 하나도 지우지 않았다 — 이름도 뜻도 그대로, 추가만 했다.
+        # compat_checked   이 확인을 이번 응답에서 실제로 실행했는가. empty·over_budget·
+        #                  all_reused 중 하나라도 걸리면 물을 것이 없어 실행하지 않고
+        #                  false로 남는다 — "확인 안 함"과 "확인했고 문제 없음"을 화면이
+        #                  구분할 수 있게 한다(§화면 정직성: 모르는 것을 지어내지 않는다).
+        "compat_checked": compat_checked,
+        # compat_infeasible  확인했고, 실제로 조립되는 조합을 못 찾았다(탐색 상한 도달로
+        #                    "못 찾았다"인 경우는 제외 — 위 블록의 "■ 한계" 참조, 그때는
+        #                    false로 남아 기존 총액 판정을 그대로 믿는다).
+        "compat_infeasible": compat_infeasible,
         # 화면이 그대로 쓸 수 있는 한 문장 — 서버와 화면이 다른 말을 하지 않게
         "verdict": verdict,
     }

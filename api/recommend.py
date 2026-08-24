@@ -230,10 +230,25 @@ def check_rule_fields(pool, rules: dict) -> list:
     return missing
 
 
-def _tier_sort(parts, tier, has_cap):
+def _order_of(tier, has_cap) -> str:
+    """정렬 방향의 단일 판정 — `_tier_sort`(실제 정렬)와 `_dfs`(예산 이진 컷, 아래)가
+    같은 판단을 쓴다(2026-08-24 신설 — DFS_NODE_CAP 결함 수정). 둘이 따로 판단하면
+    한쪽만 바뀌었을 때 이진 컷이 정렬과 다른 방향으로 잘라 결과를 조용히 바꿀 수
+    있다(§단일 원천) — 그래서 판단을 이 함수 하나로 모은다. `_build_set`가
+    `_tier_sort`를 부를 때 쓴 것과 **같은 (tier, has_cap)**을 `_dfs`에도 그대로 넘긴다.
+    """
     if tier == "value":
+        return "asc"
+    if tier == "highend" or has_cap:
+        return "desc"
+    return "median"   # 추천 + 숫자 예산 없음 — 가격에 대해 단조가 아니라 이진 컷 대상 아님
+
+
+def _tier_sort(parts, tier, has_cap):
+    order = _order_of(tier, has_cap)
+    if order == "asc":
         return sorted(parts, key=lambda p: (p["sale_price"], p["product_code"]))
-    if tier == "highend" or has_cap:  # 추천(숫자 예산) = 내림차순 + 가지치기
+    if order == "desc":  # 추천(숫자 예산)·고성능 = 내림차순 + 가지치기
         return sorted(parts, key=lambda p: (-p["sale_price"], p["product_code"]))
     # 추천 + 숫자 예산 없음 — 중간 순위 우선
     asc = sorted(parts, key=lambda p: (p["sale_price"], p["product_code"]))
@@ -335,7 +350,60 @@ def _fwd_ok(slot, p, idx):
     return True
 
 
-def _dfs(slot_pools, budget_limit, rules: dict, slots=None):
+def _price_cut(cands, order, threshold):
+    """가격 정렬 후보에서 예산 상한을 넘을 «수밖에 없는» 구간을 이진 탐색으로 건너뛴다.
+
+    ㉰ 가지치기 추가 — 2026-08-24 「추천형이 예산 충분한데도 null」결함 수정의 핵심.
+    아래 `_dfs`의 docstring에 원인 실측이 있다 — 요약하면 **하나씩 `continue`로
+    건너뛰던 예산 초과 후보가 노드 카운터를 계속 소모해 DFS_NODE_CAP에 먼저 닿았다.**
+
+    `_narrow()`가 돌려주는 리스트는 `_tier_sort`가 정한 순서(가격 오름/내림차순)를
+    그대로 유지한다 — eq/contains 좁히기(인덱스 그룹·교집합)는 원본 리스트의 상대
+    순서를 보존하는 **필터**일 뿐 재정렬하지 않는다(`_narrow` 참조). 그 순서가 가격에
+    대해 단조이므로, "합계 + 남은 슬롯 최저가 합 > 예산" 판정도 이 슬롯 후보 하나의
+    가격이 "threshold(=예산 − 합계 − 남은 최저가 합)를 넘는가"라는 **가격 하나에 대한
+    단조 조건**으로 바꿔 쓸 수 있다. 단조 구간은 이진 탐색으로 한 번에 자를 수 있다 —
+    하나씩 검사하며 세지 않는다.
+
+    **결과를 바꾸지 않는다는 것이 이 함수의 전제다**: 잘라내는 것은 원래 루프가
+    `total + price + min_rest > budget_limit`로 하나씩 `continue`했을 바로 그
+    후보들뿐이다 — 남는 후보의 **집합과 순서**는 원래와 완전히 같다. 그래서 이미
+    노드 상한에 안 닿고 성공하던 입력은 이 함수가 있든 없든 **같은 첫 완성 구성**을
+    찾는다(먼저 찾는 후보의 순서 자체를 바꾸지 않으므로). 다만 상한에 막혀 실패하던
+    입력은 낭비되던 노드가 사라진 만큼 더 깊이 갈 수 있어 **찾던 못 찾던 결과가
+    달라질 수 있다** — 이건 버그가 아니라 이 수정이 고치려는 대상 그 자체다.
+
+    order="desc"(추천·고성능 — 예산 안 최고가 우선)면 threshold 이하가 시작되는
+    지점부터 끝까지 남기고, order="asc"(가성비 — 최저가 우선)면 threshold 이하인
+    접두만 남긴다. order="median"(추천 · 숫자 예산 미지정)은 가격에 대해 단조가
+    아니므로 자르지 않는다 — 그 경로는 budget_limit 자체가 항상 None이라(`_build_set`
+    이 tier=="recommend"·cap=None일 때 limit_override 없이 그대로 None을 넘긴다)
+    호출자가 이 함수를 아예 부르지 않는다.
+    """
+    if order == "median":
+        return cands
+    lo, hi = 0, len(cands)
+    if order == "desc":
+        # cands[mid] 가 threshold 를 넘는 동안 오른쪽을 좁힌다 — "threshold 이하가
+        # 시작되는" 첫 위치를 찾는다. 그 앞은 전부 초과이므로 통째로 버린다.
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if cands[mid]["sale_price"] <= threshold:
+                hi = mid
+            else:
+                lo = mid + 1
+        return cands[lo:]
+    # order == "asc" — "threshold 를 처음 넘는" 위치를 찾는다. 그 뒤는 전부 초과다.
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if cands[mid]["sale_price"] <= threshold:
+            lo = mid + 1
+        else:
+            hi = mid
+    return cands[:lo]
+
+
+def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc"):
     """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기.
 
     min_rest(남은 슬롯 최저가 합)는 **좁히기 전 전체 풀** 기준으로 둔다 — 더 느슨한 하한이라
@@ -344,6 +412,38 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None):
     `slots`(2026-08-24 추가) — 이번에 실제로 채울 자리 목록. 기본은 전체 SLOTS(8종).
     재사용 슬롯이 있으면 `_build_set`이 그 슬롯을 뺀 부분집합을 넘긴다 — DFS는 그 자리를
     아예 방문하지 않는다(고르지 않는다). SLOTS의 부분집합이라 상대 순서는 그대로다.
+
+    `order`(2026-08-24 추가) — `slot_pools`가 정렬된 방향("asc"/"desc"/"median").
+    `_build_set`이 `_order_of(tier, cap is not None)`로 계산해 넘긴다(정렬을 만든
+    판단과 **같은 판단** — 두 곳에서 따로 판단하면 한쪽만 바뀔 때 어긋난다). 이 값으로
+    `_price_cut`이 예산 초과가 확정된 구간을 이진 탐색으로 건너뛴다(아래 결함 기록 참조).
+
+    ── 결함(2026-08-24, customer-audit 후속 실측) ─────────────────────────────────
+    추천형(has_cap=True → 가격 내림차순)이 **예산이 충분한데도** 노드 상한
+    (DFS_NODE_CAP=2,000,000)에 먼저 닿아 «구성 없음»으로 처리되는 결함이 있었다
+    (게임·62/64/70/75만원 재현). 원인은 예산이 아니라 **탐색**이었다 — 실측
+    (게임·70만원, 예산 배분율(BUDGET_ALLOC)로는 RAM·SSD 슬롯이 통째로 비어 즉시
+    폴백하는 「배분 없음(common)」풀 기준, 깊이별 방문 수):
+
+        슬롯      방문(node)     예산초과 continue       비고
+        CPU            172           151(88%)
+        MB           1,367         1,319(96%)
+        RAM          4,337         4,197(97%)          MB.mem_type eq 로 좁혀도 이 비율
+        GPU         31,970        31,784(99%)          겨냥 규칙 없음 — 전량 순회
+        CASE       137,999       134,412(97%)
+        COOLER     650,500       647,328(99%)
+        POWER    1,173,661     1,160,442(99%)          겨냥 규칙이 gte라 좁히기 인덱스가
+                                                        없다 — COOLER 성공마다 507개
+                                                        (POWER 전량)를 처음부터 재순회
+        합계     2,000,006(=DFS_NODE_CAP+6)  — SSD는 방문조차 못 함
+
+    즉 **노드의 97~99%가 "규칙에 안 맞아서"가 아니라 "지금 남은 예산보다 비싸서"
+    버려졌다.** 내림차순이라 매 슬롯에서 제일 비싼 것부터 시도하는 게 원인이고,
+    그 버림을 하나씩 `continue`로 처리하며 매번 nodes[0]를 소모한 것이 상한 도달의
+    직접 원인이다(narrow 인덱스는 eq/contains 규칙만 좁히고, POWER의 규칙은 gte라
+    좁혀지지 않는다 — GPU는 겨냥 규칙 자체가 없다). `_price_cut`이 이 구간을
+    이진 탐색으로 건너뛴다 — 방향 판단(㉯ 슬롯 순서 변경 대신 ㉰ 가지치기 추가를
+    고른 이유)과 검증 결과는 이 파일이 아니라 작업 보고에 남긴다.
     """
     slots = SLOTS if slots is None else slots
     min_rest = [0] * (len(slots) + 1)
@@ -356,12 +456,15 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None):
         if i == len(slots):
             return dict(chosen)
         slot = slots[i]
-        for p in _narrow(slot, chosen, idx, slot_pools[slot]):
+        cands = _narrow(slot, chosen, idx, slot_pools[slot])
+        if budget_limit is not None:
+            cands = _price_cut(cands, order, budget_limit - total - min_rest[i + 1])
+        for p in cands:
             nodes[0] += 1
             if nodes[0] > DFS_NODE_CAP:
                 return None
             if budget_limit is not None and total + p["sale_price"] + min_rest[i + 1] > budget_limit:
-                continue
+                continue   # _price_cut 이후엔 걸릴 일이 없어야 정상 — 안전망으로 남긴다
             if not _slot_ok(slot, p, chosen, rules):
                 continue
             if not _fwd_ok(slot, p, idx):
@@ -374,9 +477,14 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None):
         return None
 
     got = go(0, {}, 0)
-    if got is None and nodes[0] > DFS_NODE_CAP:
+    exhausted = got is None and nodes[0] > DFS_NODE_CAP
+    if exhausted:
         print(f"[recommend] 탐색 노드 상한({DFS_NODE_CAP:,}) 도달, 구성 없음으로 처리")
-    return got
+    # (chosen, exhausted) 튜플로 반환한다(2026-08-24 추가) — 「없다」와 「못 찾았다」는
+    # 다른 사실이라 구분해 돌려준다(§화면 정직성). exhausted=True는 got=None을 항상
+    # 동반한다(cands 순회 중 nodes[0]가 상한을 넘는 즉시 그 자리에서 None을 반환하므로
+    # "상한을 넘겼는데 그 다음에 성공"은 있을 수 없다 — 상호배타적이다).
+    return got, exhausted
 
 
 def build_compat(chosen: dict, rules: dict, unknown_rules=()) -> dict:
@@ -507,7 +615,7 @@ def _explain_spec(p: dict) -> dict:
 
 
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
-               active_slots=None, unknown_rules=None, reuse_note=None):
+               active_slots=None, unknown_rules=None, reuse_note=None, meta=None):
     """`active_slots`·`unknown_rules`·`reuse_note`(2026-08-24 추가) — 재사용 슬롯 처리
     (customer-audit-2026-08-24 §1-1). 기본값은 전부 None/생략과 같은 뜻이라 기존 호출부
     (`api/expert.py`·이 파일의 `/api/showcase`)는 손대지 않아도 그대로 동작한다.
@@ -517,7 +625,17 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     unknown_rules 재사용 슬롯이 껴서 판정할 수 없는 호환 규칙 — build_compat에 그대로
                   전달해 unknown으로 정직하게 표시한다(통과로 지어내지 않는다).
     reuse_note    reasons에 덧붙일 재사용 안내(전력·호환 확인 불가 캐치프레이즈 포함).
+    meta          (2026-08-24 추가 — DFS_NODE_CAP 결함 수정 후속) 호출자가 준 딕셔너리에
+                  **부작용으로** `{"exhausted": bool}`을 채운다. 반환값의 `None | dict`
+                  계약은 그대로 지킨다(expert.py 등 기존 호출부는 이 인자를 안 줘서
+                  영향이 없다) — `chosen`이 None이어도 **왜** None인지(슬롯 자체가
+                  비었나 / DFS가 상한에 닿았나)를 반환값 하나로는 구분할 수 없어서
+                  마련한 별도 채널이다. `exhausted=True`는 "이 조건엔 구성이 없다"가
+                  아니라 "정해진 노드 안에서 못 찾았다"는 뜻 — 다른 사실이다
+                  (§화면 정직성, `/api/recommend`의 `search_exhausted` 계약 참조).
     """
+    if meta is not None:
+        meta["exhausted"] = False   # 기본값 — 슬롯이 비어 DFS를 아예 안 부르는 경우 등
     slots = active_slots if active_slots is not None else SLOTS
     slot_pools = {}
     for s in slots:
@@ -533,7 +651,11 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         limit = int(limit * HIGHEND_CAP_X)
     if limit_override is not None:
         limit = limit_override
-    chosen = _dfs(slot_pools, limit, rules, slots)
+    # order는 slot_pools를 정렬한 것과 같은 판단이어야 한다(_order_of가 단일 원천) —
+    # 위 _tier_sort 호출도 같은 (tier, cap is not None)을 썼다.
+    chosen, exhausted = _dfs(slot_pools, limit, rules, slots, order=_order_of(tier, cap is not None))
+    if meta is not None:
+        meta["exhausted"] = exhausted
     if chosen is None:
         return None
     total = sum(p["sale_price"] for p in chosen.values())
@@ -981,17 +1103,23 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # "비싼 부품 차단" 상한은 무의미한데, 슬롯 후보를 예산마다 다르게 만들어
         # 150만원이 70만원보다 비싼 가성비 구성을 내놓았다(회귀 '가성비는 전 예산 공통' 실패).
         # 진짜 제약은 총액이고 그건 DFS 가지치기가 건다.
+        # 탐색 소진 여부(2026-08-24 추가) — 티어별로 하나씩, 그 티어의 마지막(=sets에
+        # 실제로 남는) _build_set 호출이 덮어쓴다. "슬롯이 비었다"·"애초에 안 돌렸다"는
+        # False(소진 아님)로 남는다 — DFS_NODE_CAP에 닿은 경우만 True다(_build_set의
+        # meta 계약 참조). 아래 `search_exhausted` 응답 필드가 이 값을 그대로 낸다.
+        meta_v, meta_r, meta_h = {}, {}, {}
+
         # ── 가성비형 ──────────────────────────────────────────────────────────
         built_v = _build_set("value", common, cap, rules_active, floor_note,
                              active_slots=active_slots, unknown_rules=rules_unknown,
-                             reuse_note=reuse_note)
+                             reuse_note=reuse_note, meta=meta_v)
         honored_v = None
         if part_v:
             if gpu_matches and built_v is None:
                 # 핀 풀(common)로는 성립하지 않는다 — 「부품」을 뺀 풀로 다시 짓는다(핀 해제).
                 built_v = _build_set("value", common_full, cap, rules_active, floor_note,
                                      active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note)
+                                     reuse_note=reuse_note, meta=meta_v)
                 honored_v = False
             else:
                 honored_v = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
@@ -1012,21 +1140,22 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # ── 추천형 ────────────────────────────────────────────────────────
             built_r = _build_set("recommend", capped, cap, rules_active, floor_note,
                                  active_slots=active_slots, unknown_rules=rules_unknown,
-                                 reuse_note=reuse_note)
+                                 reuse_note=reuse_note, meta=meta_r)
             if built_r is None:
                 built_r = _build_set("recommend", common, cap, rules_active, floor_note, relaxed,
                                      active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note)
+                                     reuse_note=reuse_note, meta=meta_r)
             honored_r = None
             if part_v:
                 if gpu_matches and built_r is None:
                     built_r = _build_set("recommend", capped_full, cap, rules_active, floor_note,
                                          active_slots=active_slots, unknown_rules=rules_unknown,
-                                         reuse_note=reuse_note)
+                                         reuse_note=reuse_note, meta=meta_r)
                     if built_r is None:
                         built_r = _build_set("recommend", common_full, cap, rules_active, floor_note,
                                              relaxed, active_slots=active_slots,
-                                             unknown_rules=rules_unknown, reuse_note=reuse_note)
+                                             unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                             meta=meta_r)
                     honored_r = False
                 else:
                     honored_r = bool(gpu_matches)
@@ -1050,22 +1179,24 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # ── 고성능형 ──────────────────────────────────────────────────────
             built_h = _build_set("highend", hi_pool, cap, rules_active, floor_note, hi_note, hi_limit,
                                  active_slots=active_slots, unknown_rules=rules_unknown,
-                                 reuse_note=reuse_note)
+                                 reuse_note=reuse_note, meta=meta_h)
             if built_h is None:
                 built_h = _build_set("highend", common, cap, rules_active, floor_note,
                                      hi_note or relaxed, hi_limit,
                                      active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note)
+                                     reuse_note=reuse_note, meta=meta_h)
             honored_h = None
             if part_v:
                 if gpu_matches and built_h is None:
                     built_h = _build_set("highend", hi_pool_full, cap, rules_active, floor_note,
                                          hi_note, hi_limit, active_slots=active_slots,
-                                         unknown_rules=rules_unknown, reuse_note=reuse_note)
+                                         unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                         meta=meta_h)
                     if built_h is None:
                         built_h = _build_set("highend", common_full, cap, rules_active, floor_note,
                                              hi_note or relaxed, hi_limit, active_slots=active_slots,
-                                             unknown_rules=rules_unknown, reuse_note=reuse_note)
+                                             unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                             meta=meta_h)
                     honored_h = False
                 else:
                     honored_h = bool(gpu_matches)
@@ -1115,6 +1246,20 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 한다(customer-audit-2026-08-24 §1-1) — sets 안에 묻으면 실패 시 사라진다.
             "reused_slots": [{"slot": s, "label": SLOT_KO.get(s, s)}
                              for s in SLOTS if s in reuse_slots],
+            # 「없다」와 「못 찾았다」는 다른 사실이다(2026-08-24 추가 — DFS_NODE_CAP
+            # 결함 수정 계약). sets[tier]가 null인 이유가 둘 중 하나다:
+            #   True   탐색이 노드 상한(DFS_NODE_CAP)에 닿아 «포기»했다 — 이 조건에
+            #          맞는 구성이 있는지 없는지 **확인을 끝내지 못했다.**
+            #   False  탐색이 끝까지 갔고 그 안에 맞는 구성이 없었다(또는 그 티어의
+            #          모든 슬롯 후보가 이미 비어 있어 탐색조차 시작하지 않았다) —
+            #          «없다»고 말할 수 있는 확정 판정이다.
+            # sets[tier]가 실제 구성(dict)이면 그 탐색은 성립을 «찾은» 것이므로 항상
+            # False다(_dfs가 성공과 상한 도달을 동시에 반환할 수 없다 — _dfs 참조).
+            # 화면은 담당 밖이다 — 이 필드를 읽어 "지금은 답을 못 찾았습니다"처럼
+            # "구성이 없습니다"와 다른 문구를 쓸지는 화면 몫이다(이 파일은 계약만 낸다).
+            "search_exhausted": {"value": meta_v.get("exhausted", False),
+                                  "recommend": meta_r.get("exhausted", False),
+                                  "highend": meta_h.get("exhausted", False)},
             "sets": sets, "companion": comp}
 
 
