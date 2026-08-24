@@ -793,8 +793,12 @@ a.pp-btn-line{color:var(--on)}
     wireDrawerBody();
   }
 
+  // supplier(공급처 원문)는 products의 자유 텍스트 한 칸이다 — [공급처] 탭의
+  // 공급처별 매입가 표(product_supplier_prices)와는 다른 값이라 라벨을 "(원문)"으로
+  // 구분한다(둘을 같은 자리에 나란히 두면 헷갈린다 — 합치지 않는다).
   var BASIC_FIELDS = [
     ["name","상품명","text","product_name"], ["maker","제조사","text","maker"],
+    ["supplier","공급처(원문)","text","supplier"],
     ["sale_price","판매가","number","sale_price"], ["purchase_price","매입가","number","purchase_price"],
     ["stock_qty","재고","number","stock_qty"], ["status","상태","select","status"]
   ];
@@ -821,14 +825,18 @@ a.pp-btn-line{color:var(--on)}
         } else if(type==="number"){
           valHtml = '<input type="number" data-f="' + key + '" value="' + (raw==null?"":raw) + '" min="0">';
         } else {
-          valHtml = '<input type="text" data-f="' + key + '" value="' + esc(raw==null?"":raw) + '">';
+          var ph = key==="supplier" ? ' placeholder="공급처 원문(선택)"' : '';
+          valHtml = '<input type="text" data-f="' + key + '" value="' + esc(raw==null?"":raw) + '"' + ph + '>';
         }
       } else {
         if(key==="sale_price" || key==="purchase_price") valHtml = '<span class="val' + (raw==null?" dim":"") + '">' + fmtWon(raw) + '</span>';
         else if(key==="stock_qty") valHtml = '<span class="val">' + (raw==null?0:raw) + '개</span>';
         else valHtml = '<span class="val' + (raw==null||raw===""?" dim":"") + '">' + esc(raw==null||raw===""?"—":raw) + '</span>';
       }
-      return '<div class="pp-field"><span class="lb">' + label + '</span>' + valHtml + '<span class="lock">' + lockMark + '</span></div>';
+      // supplier는 [공급처] 탭(product_supplier_prices, 구조화된 매입가 표)과 다른
+      // 값이다 — 라벨 옆 물음표 없이도 구분되게 title 툴팁으로 근거를 남긴다.
+      var lbTitle = key==="supplier" ? ' title="몰 CSV 원문 값 — [공급처] 탭의 매입가 표와는 다른 필드입니다"' : '';
+      return '<div class="pp-field"><span class="lb"' + lbTitle + '>' + label + '</span>' + valHtml + '<span class="lock">' + lockMark + '</span></div>';
     }).join("");
 
     var gate = d.gate || [];
@@ -1157,11 +1165,11 @@ a.pp-btn-line{color:var(--on)}
   }
 
   /* ══════════════════════ 신규 등록 서랍 ══════════════════════ */
-  var REG = {name:"", maker:"", partSel:null, similar:null};
+  var REG = {name:"", maker:"", supplier:"", partSel:null, similar:null};
 
   function openRegDrawer(){
     closeDrawer();
-    REG = {name:"", maker:"", partSel:null, similar:null};
+    REG = {name:"", maker:"", supplier:"", partSel:null, similar:null};
     showVeilReg(true);
     renderRegDrawer();
     var nm; window.setTimeout(function(){ nm=document.getElementById("regName"); if(nm) nm.focus(); }, 0);
@@ -1175,18 +1183,22 @@ a.pp-btn-line{color:var(--on)}
             + esc(it.name) + ' <span class="pp-dim-text">(' + esc(it.sku) + ' · 일치도 ' + Math.round(it.score*100) + '%)</span></div>';
         }).join("") + '</div>';
   }
+  // supplier(공급처 원문)는 products의 자유 텍스트 한 칸 — [공급처] 탭의 매입가 표와
+  // 다른 값이라 라벨을 "(원문)"으로 구분한다(같은 화면 안에서 합치지 않는다).
   function renderRegDrawer(){
     var host = document.getElementById("regBody"); if(!host) return;
     host.innerHTML =
       '<div class="pp-field"><span class="lb">상품명</span><input id="regName" type="text" value="' + esc(REG.name) + '" placeholder="상품명을 입력하세요"><span></span></div>'
       + '<div class="pp-field"><span class="lb">분류</span><span id="regChoiceHost"></span><span></span></div>'
       + '<div class="pp-field"><span class="lb">제조사</span><input id="regMaker" type="text" value="' + esc(REG.maker) + '" placeholder="제조사(선택)"><span></span></div>'
+      + '<div class="pp-field"><span class="lb" title="몰 CSV 원문 값 — [공급처] 탭의 매입가 표와는 다른 필드입니다">공급처(원문)</span><input id="regSupplier" type="text" value="' + esc(REG.supplier) + '" placeholder="공급처 원문(선택)"><span></span></div>'
       + (REG.similar ? similarBlockHtml() : "")
       + '<div class="pp-dr-hint">등록하면 검수 대기 상태로 시작하고 추천 후보에는 들어가지 않습니다. 사양 검수와 판매가 산정을 통과해야 추천에 쓰입니다.</div>';
     var chost = document.getElementById("regChoiceHost");
     if(chost) buildChoiceSelect(chost, (META && META.part_choices) || [], REG.partSel, function(pt){ REG.partSel = pt; });
     var nm=document.getElementById("regName"); if(nm) nm.oninput=function(e){ REG.name=e.target.value; };
     var mk=document.getElementById("regMaker"); if(mk) mk.oninput=function(e){ REG.maker=e.target.value; };
+    var sp=document.getElementById("regSupplier"); if(sp) sp.oninput=function(e){ REG.supplier=e.target.value; };
     renderRegFooter();
   }
   function renderRegFooter(){
@@ -1205,7 +1217,8 @@ a.pp-btn-line{color:var(--on)}
     var name=(REG.name||"").trim();
     if(!name){ window.alert("상품명을 입력하세요"); return; }
     if(!REG.partSel){ window.alert("분류를 선택하세요"); return; }
-    var body={name:name, part_type:REG.partSel, maker:(REG.maker||"").trim()||null, confirm_similar: !!force};
+    var body={name:name, part_type:REG.partSel, maker:(REG.maker||"").trim()||null,
+      supplier:(REG.supplier||"").trim()||null, confirm_similar: !!force};
     fetch(API + "/products", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})
       .then(asJson).then(function(res){
         if(!res.ok){

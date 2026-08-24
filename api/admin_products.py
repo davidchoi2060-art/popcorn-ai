@@ -215,6 +215,12 @@ class RegisterBody(BaseModel):
     cost_price: int | None = None
     danawa_code: str | None = None
     maker: str | None = None
+    # products.supplier — **위 supplier_id와 다른 필드다**(혼동 주의). supplier_id는
+    # suppliers 테이블 FK로 단가표發 등록에서만 오고 product_supplier_prices(구조화된
+    # 공급처별 매입가 표)에 연결된다. 이 supplier는 products의 자유 텍스트 한 칸으로,
+    # 몰 CSV가 주는 값을 그대로 담는 별개 저장소다(둘을 합치지 않는다 — 사장님 지시).
+    # 선택 입력 — 비워도 등록된다.
+    supplier: str | None = None
     # 닮은 상품이 있어도 "다른 상품이다"라고 확인했으면 그대로 등록한다(슬라이스 68)
     confirm_similar: bool = False
 
@@ -266,12 +272,15 @@ def register_product(body: RegisterBody):
             r"SELECT COALESCE(MAX(CAST(SUBSTRING(sku FROM 3) AS INTEGER)), 0) + 1"
             r" FROM products WHERE sku ~ '^P-[0-9]+$'")).scalar()
         sku, pc = f"P-{num}", int(f"2048{num}")
+        # supplier는 VARCHAR(200) 자유 텍스트 — 선택 입력이라 안 넣으면 NULL(등록은 그대로 된다).
+        sup_val = (body.supplier or "").strip()[:200] or None
         conn.execute(text(
             "INSERT INTO products (product_code, sku, product_name, part_type, category_group,"
-            " status, ai_candidate_yn, review_required_yn, purchase_price, stock_qty, danawa_code)"
-            " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d)"),
+            " status, ai_candidate_yn, review_required_yn, purchase_price, stock_qty, danawa_code,"
+            " supplier)"
+            " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d, :sup)"),
             {"pc": pc, "sku": sku, "n": body.name.strip(), "pt": pt,
-             "cost": body.cost_price, "d": body.danawa_code})
+             "cost": body.cost_price, "d": body.danawa_code, "sup": sup_val})
         if body.maker and body.maker.strip():
             conn.execute(text("UPDATE products SET maker=:m WHERE product_code=:pc"),
                          {"m": body.maker.strip()[:60], "pc": pc})
@@ -324,6 +333,10 @@ def register_product(body: RegisterBody):
 EDITABLE = {
     "name": ("product_name", lambda v: (str(v).strip() or None)),
     "maker": ("maker", lambda v: (str(v).strip() or None)),
+    # products.supplier — 자유 텍스트(몰 CSV 값). product_supplier_prices(공급처별
+    # 매입가 표, 별도 탭)와는 다른 필드다 — 합치지 않는다. maker와 같은 규칙:
+    # 빈 문자열은 '지운다'는 뜻으로 NULL 저장, 컬럼 자체를 안 보내면 안 바뀐다.
+    "supplier": ("supplier", lambda v: (str(v).strip()[:200] or None)),
     "sale_price": ("sale_price", lambda v: None if v in ("", None) else int(v)),
     "purchase_price": ("purchase_price", lambda v: None if v in ("", None) else int(v)),
     "stock_qty": ("stock_qty", lambda v: int(v)),
@@ -399,6 +412,11 @@ def get_product(product_code: int):
             " WHERE p.product_code = :pc"), {"pc": product_code}).mappings().first()
         if r is None:
             raise HTTPException(404, "상품이 없습니다")
+        # **전체** 대기 건수(필드 종류 무관) — 표시용 보조 수치일 뿐, 차단 여부 판정에
+        # 이 값 자체를 쓰지 않는다(2026-08-24 결함 수정). 다나와 시세 제안
+        # (field_name='market_price')류 대기는 review_required_yn을 안 건드리는데
+        # 예전엔 이 수만 보고 "검수가 남았다"고 판정했다 — 아래 gate "review"·verdict
+        # 참고.
         pending = conn.execute(text(
             "SELECT count(*) FROM product_reviews WHERE product_code=:pc"
             " AND review_status='대기'"), {"pc": product_code}).scalar_one()
@@ -430,7 +448,12 @@ def get_product(product_code: int):
     # 아닌 상태가 된다(슬라이스 46과 같은 부류의 사고).
     gate = [
         {"key": "category", "label": "부품 분류",
-         "ok": r["category_group"] == "core_part" and r["part_type"] in PART_TYPE_LABELS,
+         # 추천 뷰의 part_type IN (...) 조건은 CORE_TYPES 10종뿐이다. PART_TYPE_LABELS는
+         # 주변기기·완제품까지 포함한 전체 어휘라 그걸로 재면 뷰가 거르는 조합을
+         # "분류는 맞다"고 잘못 통과시킬 수 있다(2026-08-24 실측: 지금은 실제로 그런
+         # 상품이 0건이지만, 뷰 조건과 다른 어휘로 판정하는 것 자체가 다음 적재에서
+         # 어긋날 여지를 남긴다 — CORE_TYPES가 이미 taxonomy.py 정본이라 이걸 쓴다).
+         "ok": r["category_group"] == "core_part" and r["part_type"] in CORE_TYPES,
          # 폴백은 "ETC(분류됨)"와 다른 사실이다 — part_type 자체가 없다는 뜻이라
          # PART_TYPE_LABELS(정본) 값과 같은 글자를 쓰지 않는다(화면 정직성 규약).
          "value": PART_TYPE_LABELS.get(r["part_type"], r["part_type"] or "미지정"),
@@ -442,7 +465,21 @@ def get_product(product_code: int):
          "fix": "분류를 바로잡으면 사양 자리가 생깁니다",
          "fix_screen": None},
         {"key": "review", "label": "필수 사양",
-         "ok": pending == 0 and bool(r["ai_candidate_yn"]) and not r["review_required_yn"],
+         # **차단 신호는 review_required_yn이다 — product_reviews 대기 행이 있다는
+         # 사실 자체가 아니다**(2026-08-24 결함 수정, derive_status와 같은 원천으로
+         # 맞춤). 다나와 시세 제안(field_name='market_price')·다나와 코드 재확인
+         # (field_name='danawa_code')류 대기 행은 review_required_yn을 건드리지
+         # 않는다(_approve_product_field는 products.market_price만 갱신 — api/
+         # admin_reviews.py 실측) — 그런데 예전 식(`pending == 0 and ...`)은 그런
+         # 대기 행이 하나만 있어도 이 항목을 "막힘"으로 셌다. 실사례: 94959는
+         # market_price 제안 대기 1건뿐이고 review_required_yn=false·in_pool=true인데
+         # 이 항목이 막힘으로 나왔다(danawa_code만 대기인 상품 31건 전수 확인 —
+         # 전부 review_required_yn=false). ai_candidate_yn은 그대로 함께 본다 —
+         # 필수 사양이 다 찼는데도 후보 승격이 안 된 상품이 core_part 대상 종류에서만
+         # 98건 실측된다(카탈로그 적재가 review_required_yn만 재계산하고 ai_candidate_yn
+         # 승격은 건드리지 않는 경로가 있다 — catalog_ingest.py 소관, 여기서 고치지
+         # 않는다).
+         "ok": bool(r["ai_candidate_yn"]) and not r["review_required_yn"],
          "value": (f"{done}/{total} 항목"
                    + (f" · 검수 대기 {pending}건" if pending else "")),
          "fix": "이 화면에서 사양 값을 넣으면 검수도 함께 해소됩니다",
@@ -465,23 +502,47 @@ def get_product(product_code: int):
     ]
     blocked = [g for g in gate if not g["ok"]]
 
+    # ── verdict: 한 문장 요약(하위호환) ─────────────────────────────────
+    # **gate와 같은 원천·같은 순서에서 고른다.** 예전엔 이 elif 사슬이 gate와 따로
+    # 놀아 서로 다른 조건·다른 순서로 판정했다 — review 자리가 특히 그랬다(위
+    # gate "review" 항목과 어긋난 채 원시 pending 값을 1순위로 봤다). 지금은
+    # blocked[0](gate 배열 순서상 첫 미통과 항목 — gate_first와 동일 기준)을
+    # 그대로 문장으로 옮긴다. 여러 사유가 동시에 걸려도 **하나만** 말하는 것은
+    # 그대로 유지한다 — 전부 말하는 건 이미 gate_blocked·gate_note·gate_first가
+    # 한다(슬라이스 95), verdict는 하위호환 한 줄 요약이라 화면 자리를 늘리지 않는다.
     if in_pool:
         verdict = "추천 가능 재고에 있습니다."
-    elif pending:
-        verdict = f"사양 검수가 남아 추천에서 빠져 있습니다(대기 {pending}건)."
-    elif r["status"] != "판매중":
-        # 상태로 빠진 것을 "조건 미달"로 뭉뚱그리면 운영자가 원인을 못 찾는다
-        verdict = f"판매 상태가 '{r['status']}'이라 추천에서 빠져 있습니다."
-    elif (r["stock_qty"] or 0) <= 0:
-        verdict = "재고가 없어 추천에서 빠져 있습니다."
-    elif r["sale_price"] is None:
-        verdict = "판매가가 없어 추천에서 빠져 있습니다."
-    elif r["category_group"] != "core_part":
-        verdict = "부품 분류가 아니라 추천 대상이 아닙니다."
-    elif r["specs"] is None:
-        verdict = "사양 정보가 없어 추천에서 빠져 있습니다(적재에서 부품 종류를 못 정함)."
-    else:
+    elif not blocked:
+        # gate 6개가 전부 통과인데 in_pool은 아닌 경우 — 뷰의 data_origin='demo'
+        # 제외처럼 gate가 못 담는 조건일 수 있다(2026-08-24 실측 20건, 전부 데모
+        # 상품). 없는 사유를 지어내지 않고 조건 미충족만 말한다.
         verdict = "추천 조건을 아직 만족하지 않습니다."
+    else:
+        first_key = blocked[0]["key"]
+        if first_key == "category":
+            verdict = "부품 분류가 아니라 추천 대상이 아닙니다."
+        elif first_key == "spec_row":
+            verdict = "사양 정보가 없어 추천에서 빠져 있습니다(적재에서 부품 종류를 못 정함)."
+        elif first_key == "review":
+            if r["review_required_yn"] and pending:
+                verdict = f"사양 검수가 남아 추천에서 빠져 있습니다(대기 {pending}건)."
+            elif r["review_required_yn"]:
+                # 등록 직후 등 검수 행 자체가 아직 없는 경우(derive_status 독스트링의
+                # ①과 같은 사례) — 없는 건수를 "(대기 0건)"으로 지어내지 않는다.
+                verdict = "사양 검수가 필요해 추천에서 빠져 있습니다."
+            else:
+                # review_required_yn은 이미 false(검수는 끝남) — ai_candidate_yn만
+                # 아직 false인 경우. "사양 검수가 남았다"고 하면 거짓말이 된다.
+                verdict = "추천 후보로 지정되지 않아 추천에서 빠져 있습니다."
+        elif first_key == "price":
+            verdict = "판매가가 없어 추천에서 빠져 있습니다."
+        elif first_key == "status":
+            # 상태로 빠진 것을 "조건 미달"로 뭉뚱그리면 운영자가 원인을 못 찾는다
+            verdict = f"판매 상태가 '{r['status']}'이라 추천에서 빠져 있습니다."
+        elif first_key == "stock":
+            verdict = "재고가 없어 추천에서 빠져 있습니다."
+        else:
+            verdict = "추천 조건을 아직 만족하지 않습니다."  # 안전망 — gate 키가 늘어날 때 대비
     return {
         "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
         "maker": r["maker"], "model_name": r["model_name"],
@@ -516,10 +577,23 @@ def get_product(product_code: int):
         "gate_first": None if not blocked else {
             "key": blocked[0]["key"], "label": blocked[0]["label"],
             "fix": blocked[0]["fix"], "fix_screen": blocked[0]["fix_screen"]},
-        "gate_note": ("추천 가능 재고에 있습니다 — 견적에 나갈 수 있습니다"
-                      if not blocked else
-                      f"추천 후보가 되려면 {len(blocked)}가지 남았습니다 — "
-                      + " · ".join(g["label"] for g in blocked)),
+        # **원천은 in_pool이다 — blocked가 비었다고 후보인 게 아니다**
+        # (2026-08-24 결함 수정). 예전엔 `not blocked`만 보고 "견적에 나갈 수
+        # 있습니다"를 냈는데, gate 6개는 v_recommendation_candidates의 WHERE를
+        # 옮겨 적은 것일 뿐이라 뷰가 보는데 gate가 못 담는 조건(data_origin='demo'
+        # 등, 실측 20건)이 있으면 "gate 전부 통과인데 in_pool=false"인 상품이
+        # 생긴다 — 그 상품에서 이 배너가 "견적 가능"을 말하고 같은 응답의
+        # verdict는 "조건 미충족"을 말해 서로 반대말을 했다. 지금은 위 verdict와
+        # **같은 순서·같은 기준**(in_pool -> blocked -> 그 외)으로 판정하고,
+        # 마지막 갈래(gate는 다 통과했지만 in_pool은 아닌 경우)는 새 문장을 짓지
+        # 않고 verdict를 그대로 재사용한다 — 문구를 두 곳에 따로 적으면 다음에
+        # 또 갈라진다.
+        "gate_note": (
+            "추천 가능 재고에 있습니다 — 견적에 나갈 수 있습니다" if in_pool
+            else (f"추천 후보가 되려면 {len(blocked)}가지 남았습니다 — "
+                  + " · ".join(g["label"] for g in blocked)) if blocked
+            else verdict
+        ),
     }
 
 
@@ -560,7 +634,7 @@ def patch_product(product_code: int, body: PatchBody):
 
     with engine.begin() as conn:
         cur = conn.execute(text(
-            "SELECT product_code, sku, product_name, maker, purchase_price, sale_price,"
+            "SELECT product_code, sku, product_name, maker, supplier, purchase_price, sale_price,"
             " stock_qty, status, locked_fields FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": product_code}).mappings().first()
         if cur is None:

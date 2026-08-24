@@ -22,6 +22,19 @@
     표기만 쓴다 — 승인 시 `locked_fields`에 실제로 추가하는 쪽은 `api/admin_reviews.py`의
     `_approve_product_field()`다(이 물결에서 함께 확장). 이 파일은 그 잠금을 UPSERT가
     존중하도록 CASE WHEN 가드만 추가한다 — 잠그는 동작 자체는 여기 없다.
+  · **2026-08-24 — supplier(공급처)를 추가로 넓혔다.** 이건 market_price와 다른 종류의
+    구멍이었다: market_price는 "잠갔는데도 덮인다"였지만 supplier는 **잠금과 무관하게
+    CSV 그 행의 공급처 칸이 비어 있기만 해도** 무조건 `EXCLUDED.supplier`가 들어가
+    기존 값을 NULL로 지웠다(실측: 공급처 칸이 비어 있던 4,153건 중 4,113건=99.0%가
+    NULL이 됨 · 값이 있던 18,618건은 14건=0.08%만 영향 — 그 14건은 이번 원인과 다를
+    가능성이 높고 이번 조사·수정 대상이 아니다). `purchase_price`·`sale_price`가 이미
+    갖고 있던 `COALESCE(EXCLUDED.col, products.col)`과 `locked_fields ? 'col'` 가드를
+    **한 CASE WHEN 표현에 합쳐서** 그대로 옮겼다 — "CSV가 비었을 때"와 "운영자가
+    잠갔을 때" 둘 다 이 한 줄로 지켜진다. 이미 NULL이 된 4,113건은 이 수정의 대상이
+    아니다(복구는 별도 작업, 원천 조사 중 — 여기서는 앞으로의 적재만 막는다). 나머지
+    6개(product_name·maker·model_name·danawa_code·spec_source_text·data_origin)도
+    같은 병(CSV 빈 칸이 그대로 NULL로 들어가 기존 값을 지움)을 앓고 있을 수 있으나
+    실측하지 않았다 — 이번 지시는 supplier 하나였다.
   · 가격(purchase_price·sale_price)이 바뀌면 product_price_history에 reason='csv'로 남긴다
     (ERD §6 3원칙 3항 · §189 reason 열거값). 값이 같거나 잠긴 필드면 남기지 않고, 신규
     상품의 최초 가격은 비교할 이전 값이 없어 이력 대상이 아니다(등록 화면과 같은 규약).
@@ -250,6 +263,13 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
             "stock": 1 if sale else 0,
             "spec_text": (r["스펙"] or "").strip()[:2000] or None,
             "origin": origin,
+            # product_imports 원본 냉동 보관용(2026-08-24 — 사장님 지시, 아래 apply_plan의
+            # product_imports INSERT 주석 참조). 원본 그대로 얕은 복사 — 이 시점 이후
+            # 코드가 r을 다시 안 건드리므로 사본 없이 그대로 써도 안전하지만, "이 필드는
+            # UPSERT 파라미터가 아니라 원본 보존용"이라는 사실을 명확히 하려고 별도 키로
+            # 분리했다(UPSERT_PRODUCTS_SQL은 이 키를 모른다 — 알려진 :파라미터 이름에
+            # 없는 키는 SQLAlchemy가 그냥 무시한다).
+            "raw": dict(r),
         })
         if pt:
             locked = _locked_for(refs, code)
@@ -362,27 +382,129 @@ def plan_summary(plan: dict) -> dict:
 # — '회귀는 정본을 쓰지 않는다'(슬라이스 50)를 지키면서 SQL 자체를 검증하는 유일한 길.
 #
 # **잠금 범위(2026-08-16 — 사장님 지시: "잠금을 사양·분류·검수 플래그까지 전부 넓혀라".
-#             2026-08-23 A-104가 market_price를 추가 — 시장가 제안 승인의 짝)**
+#             2026-08-23 A-104가 market_price를 추가 — 시장가 제안 승인의 짝.
+#             2026-08-24 supplier를 추가(아래 supplier 전용 문단). 같은 날 후속으로
+#             나머지 여섯 중 다섯을 추가 — 아래 "여섯 컬럼 확장" 문단)**
 #   잠금 적용    purchase_price · sale_price(기존) + part_type · category_group(분류)
 #               + ai_candidate_yn · review_required_yn(검수 게이트) + market_price
 #               (2026-08-23 — 다나와 제안을 사람이 승인한 값을 다음 CSV 적재가
 #               되돌리면 그 승인이 무의미해진다. A-16 "적재는 채우기만 하고 지우지
-#               않는다"의 가격판)
-#   잠금 제외    stock_qty · status — **의도적 판단**이다. 이 둘은 몰의 실시간 재고·
-#               판매상태를 옮겨 적은 값이라(CSV `상태값`이 그대로 stock_qty=1/0을
-#               결정한다 — build_plan 참조) 영구히 얼리면 몰이 품절로 바꿔도 우리는
-#               계속 판매중이라 말해 없는 물건을 팔거나, 반대로 재입고를 계속
-#               감춘다. 가격·분류·검수 플래그는 "우리가 소싱/판정해 안다"는 값이라
-#               잠그는 것이 맞지만, 재고·판매상태는 "몰이 지금 뭐라고 하는가"이지
-#               우리가 확정할 사실이 아니다 — CLAUDE.md "가격 원천은 몰. 소싱한
-#               경우만 우리가 덮어쓰고 잠근다"와 같은 구분선. 이 UPSERT의 갱신 컬럼은
-#               16개(product_code·sku 제외) — 잠금 인식 7개(2026-08-23까지 6개 +
-#               market_price) + stock_qty·status(의도적 제외) + 나머지 7개
-#               (product_name·maker·model_name·supplier·danawa_code·
-#               spec_source_text·data_origin)는 이번 지시(사양·분류·검수·시장가)의
-#               대상이 아니라 손대지 않았다 — patch_product가 이미 이 중 일부
-#               (product_name·maker·stock_qty·status)를 잠글 수 있는데 이 UPSERT가
-#               그 잠금을 못 보는 것은 **이번에 고치지 않은 기존 결함**이다(보고 참조).
+#               않는다"의 가격판) + supplier + product_name·maker·model_name·
+#               danawa_code·spec_source_text(전부 2026-08-24 — 아래 참조. product_name은
+#               잠금만 적용 — COALESCE는 NOT NULL 컬럼이라 못 넣었다, 아래 참조)
+#   잠금 제외    stock_qty · status · **data_origin** — 셋 다 무조건 EXCLUDED다.
+#               stock_qty·status는 기존 이유(몰의 실시간 값을 옮겨 적은 것이라
+#               영구히 얼리면 안 된다) 그대로다. data_origin은 2026-08-24 검토
+#               대상이었지만 **잠금·COALESCE 둘 다 일부러 안 넣기로 판단**했다
+#               (근거는 아래 "여섯 컬럼 확장" 문단 — 게이트 오분류 위험 + NOT NULL이라
+#               COALESCE가 무의미) — 그래서 이 컬럼만 이번 확장 전후로 SQL이 문자
+#               그대로 같다. 가격·분류·검수 플래그는 "우리가 소싱/판정해 안다"는
+#               값이라 잠그는 것이 맞지만, 재고·판매상태·데이터출처는 "몰이 지금
+#               뭐라고 하는가" 또는 "이 배치가 진짜인가"를 매번 다시 확인해야 하는
+#               값이라 영구히 얼리는 것과 안 맞는다 — CLAUDE.md "가격 원천은 몰.
+#               소싱한 경우만 우리가 덮어쓰고 잠근다"와 같은 구분선. 이 UPSERT의
+#               갱신 컬럼은 16개(product_code·sku 제외) — **잠금 인식 13개**
+#               (purchase_price·sale_price·part_type·category_group·
+#               ai_candidate_yn·review_required_yn·market_price·supplier·
+#               product_name·maker·model_name·danawa_code·spec_source_text,
+#               이 중 product_name·market_price 둘만 COALESCE 없이 잠금만) +
+#               **무조건 EXCLUDED 3개**(stock_qty·status·data_origin) = 16.
+#               patch_product의 EDITABLE(admin_products.py:333-343)은 이 중
+#               product_name(키 "name")·maker·supplier(및 stock_qty·status)만 잠글 수
+#               있다(실측) — model_name·danawa_code·spec_source_text·data_origin은
+#               지금은 patch_product로도 검수 승인으로도 못 고치는 값이라 «잠글 방법
+#               자체가 없다». product_name·maker를 이 UPSERT가 못 보던 것은 **기존
+#               결함**이었는데(supplier 확장 시점까지 미해소 상태로 보고됨) 이번에
+#               막았다.
+#
+# **supplier(공급처) 전용 — 왜 뒤늦게 보호되는가, A-104에서 왜 빠졌는가 (2026-08-24)**
+#   A-104(2026-08-23)는 market_price 하나만 다뤘다 — 그때 이 파일 docstring이 "나머지
+#   14개 컬럼"에 supplier를 포함해 "이번 지시 대상이 아니라 손대지 않았다"고 명시적으로
+#   적어 두었다(위 모듈 docstring 참조). 그 "미룬 일"이 실제 사고였다: supplier는
+#   `purchase_price`처럼 CASE WHEN 가드도 COALESCE도 없이 맨몸으로 `EXCLUDED.supplier`
+#   였다. CSV의 그 행이 공급처 칸을 못 채우면(원천이 이 칸을 비우는 이유는 조사 대상
+#   밖이다) `build_plan()`이 만드는 `sup` 값이 애초에 None이고(아래 참고), 그 None이
+#   `EXCLUDED.supplier`를 통해 그대로 들어가 products.supplier를 지웠다. 조사자 실측
+#   (이번 지시서 원문 표): CSV 공급처 칸이 **비어 있던** 4,153건 중 **4,113건(99.0%)**의
+#   products.supplier가 지금 NULL이고, 칸에 **값이 있던** 18,618건 중에는 **14건
+#   (0.08%)**만 NULL이다 — 전자는 사실상 전부 이 경로로 지워졌다는 뜻이고 후자 14건은
+#   다른 원인일 가능성이 높아 이번 조사·수정 대상이 아니다(products.supplier 전체
+#   NULL 건수와의 합산 대조는 이번 지시 범위 밖 — 새로 계산해 지어내지 않는다).
+#   build_plan()의 "sup" 필드 파생(:260행, `(r["공급처"] or "").strip()[:80] or None`)을
+#   직접 실행해 확인했다 — 빈 문자열(csv.DictReader가 칸이 있고 비어 있을 때 주는 값)·
+#   None(행이 헤더보다 짧을 때 restval로 주는 값)·공백만 있는 문자열 셋 다 None으로
+#   접히고, 값이 있으면 그대로 통과한다. 즉 `purchase_price`·`sale_price`가 `_int()`로
+#   빈 값을 None으로 접는 것과 **정확히 같은 모양**이라, 그 둘과 같은
+#   `COALESCE(EXCLUDED.col, products.col)` 하나로 "CSV가 비웠다"와 "운영자가 잠갔다"
+#   둘 다 지켜진다(market_price처럼 plain EXCLUDED만 쓰지 않는 이유이기도 하다 —
+#   market_price는 A-104에서 COALESCE 대안을 명시적으로 안 쓰기로 했지만 supplier는
+#   그 결정 대상이 아니었으므로 이 규칙에 매이지 않는다). 이미 NULL이 된 4,113건은
+#   복구하지 않는다 — 원천을 찾는 별도 작업이고, 이 수정은 앞으로의 적재만 막는다.
+#
+# **여섯 컬럼 확장 — product_name·maker·model_name·danawa_code·spec_source_text·
+#   data_origin (2026-08-24, 사장님 지시 — "나머지 여섯도 같이 보호하라. supplier에
+#   한 것과 같은 일이다")**
+#   빈 값 보호(①)는 **넷(maker·model_name·spec_source_text·danawa_code)에 COALESCE로
+#   넣었다.** 넣기 전에 build_plan()이 각 컬럼의 빈 값을 무엇으로 접는지 직접 실행해
+#   확인했다(코드로, 추측 아님) — 결과: 넷 다 SQL에 닿기 전에 이미 None으로 접혀 있어
+#   `NULLIF` 같은 추가 장치가 필요 없었다.
+#     · maker·model_name·spec_source_text·danawa_code — supplier와 똑같은
+#       `(r["..."] or "").strip()[:N] or None` 모양(252-264행 부근). 빈 문자열·
+#       None·공백만 있는 문자열 셋 다 None.
+#     · danawa_code는 한 가지 더 있다 — `dan_use`가 None이 되는 경우가 «CSV가
+#       비었다» 말고 하나 더 있다: 같은 배치 안에 다나와No가 중복이면 대표 1건만
+#       코드를 받고(dan_rep), DB에서 이미 다른 상품이 그 코드를 쥐고 있으면(dan_owner)
+#       도 None이 된다(240-248행). 이 COALESCE는 그 경우도 "이 상품에 새 값을 못
+#       준다"로 똑같이 취급해 기존 값을 지킨다 — 대표를 재조정하거나 소유권을
+#       바꾸는 로직은 아니고(그건 이번 지시 밖), «못 줄 땐 지우지 않는다»만 지킨다.
+#   **product_name·data_origin 둘은 COALESCE를 넣지 «않았다» — 시도했다가 뺐다.**
+#   실측(임시 테이블로 직접 재현): PostgreSQL은 `ON CONFLICT DO UPDATE`에서도 NOT NULL을
+#   **COALESCE가 평가되기 전, VALUES 단계**에서 검사한다 — `SET v=COALESCE(EXCLUDED.v,
+#   t.v)`를 걸어도 `:v`가 NULL이면 그 즉시 NotNullViolation으로 죽는다(충돌 여부와
+#   무관). 이 둘은 실측상 NOT NULL 컬럼이다(information_schema.columns.is_nullable=
+#   'NO'). 그래서 COALESCE를 적어도 :name·:origin이 NULL이면 문장 전체가 죽지, 기존
+#   값을 지켜주지 않는다 — **COALESCE가 "빈 값이면 지킨다"는 보호를 실제로 수행하는
+#   게 아니라, 아무것도 안 하고 죽는 것과 결과가 같다.** 적으나 안 적으나 같다면
+#   안 적는 쪽이 정직하다(있으나 마나 한 코드는 "여기 방어막이 있다"는 착시만 남긴다).
+#   그래서 이 둘의 실제 보호는 **호출부 쪽**에 있다 — product_name은 build_plan()이
+#   상품명 빈 행을 통째로 errors로 보내 그 상품코드가 이 배치에서 아예 UPSERT되지
+#   않는다(220-223행, `if code is None or not name: errors.append(...); continue`).
+#   data_origin은 아래 참조. 상세 근거·재현 방법은 UPSERT_PRODUCTS_SQL 본문의
+#   product_name·data_origin 인라인 주석에 그대로 남겼다(다음 사람이 같은 함정에
+#   COALESCE를 다시 넣지 않도록).
+#   잠금(②)은 **다섯만** 넣었다 — data_origin은 뺐다. 판단 근거:
+#     · product_name·maker — patch_product의 EDITABLE(admin_products.py:334-335)에
+#       이미 있다. 운영자가 상세에서 고치고 잠글 수 있는 필드인데 이 UPSERT가 그
+#       잠금을 못 보는 것은 위 "잠금 범위" 요약이 이미 **기존 결함**으로 짚어 온
+#       구멍이다 — 지금 막는다.
+#     · model_name·spec_source_text — patch_product·검수 승인 어디에도 이 값을
+#       locked_fields에 넣는 길이 없다(실측: EDITABLE 키 7개 중 없음,
+#       admin_reviews.PRODUCT_FIELD_CAST = {'market_price'}뿐이라 검수 승인 경로도
+#       아님). **지금은 가드가 죽은 코드다.** 그래도 넣은 이유: 넣어서 생기는 위험이
+#       없고(잠글 방법이 없으니 오작동할 수도 없다), 나중에 EDITABLE이 넓어질 때
+#       (오늘 supplier가 그랬듯) 엔진을 다시 배포하지 않아도 되게 하는 편이
+#       "지금 안 쓰니까 굳이" 보다 낫다고 판단했다.
+#     · danawa_code — 위와 같은 "지금은 무용지물" 이유가 똑같이 적용되지만,
+#       **값의 무게가 달라 넣었다.** 시세 관측(단가표 자동 매칭)이 이 컬럼 하나로
+#       이어지므로, 나중에 잠금 UI가 필요해질 개연성이 model_name·spec_source_text
+#       보다 높다고 판단했다 — 정성적 판단이라 사장님이 다르게 볼 수 있다(보고 참조).
+#     · **data_origin은 잠금도 COALESCE도 다 뺐다 — 이번 확장에서 문자 그대로
+#       바뀌지 않은 유일한 컬럼이다.** 잠금을 빼는 이유: 이 값은 CSV 한 행의
+#       속성이 아니라 적재 «작업 전체»에 매기는 real/demo 분류이고(build_plan()의
+#       `origin` 인자, CSV 컬럼이 아니다), `v_recommendation_candidates`·
+#       `admin_pool.py`가 `data_origin IS DISTINCT FROM 'demo'`로 추천 후보를
+#       거르는 **게이트**다(CANON.md 함정표 "시연용 상품이 견적에" 항목과 같은
+#       컬럼). 잠그면 다음 CSV 적재로도 오분류를 못 고친다 — 데모로 잘못 박힌
+#       실제 상품은 영영 후보에서 빠지고, 반대로 실제로는 데모인데 실데이터로
+#       잘못 잠긴 상품은 교정 시도가 와도 안 풀려 고객 견적에 계속 노출될 수
+#       있다. 사양·분류·가격 잠금은 "우리가 소싱/판정해 안다"는 값을 지키는
+#       장치인데, data_origin은 애초에 "이 배치가 진짜인가 시험인가"를 매번
+#       다시 선언하는 값이라 성격이 다르다. COALESCE를 빼는 이유는 product_name과
+#       같다 — data_origin도 실측상 NOT NULL 컬럼이라 COALESCE가 방어막 역할을
+#       못 한다(위 ① 문단 참조). 실제 보호는 호출부 쪽에 있다 — 둘 다
+#       (`admin_catalog_import.py` Form 검증 · `tools/catalog_import.py`
+#       argparse choices) origin을 'real'|'demo' 로만 강제해 :origin이 애초에
+#       NULL일 수 없다.
 UPSERT_PRODUCTS_SQL = """
     INSERT INTO products (product_code, sku, product_name, maker, model_name, part_type,
       category_group, status, ai_candidate_yn, review_required_yn, purchase_price,
@@ -391,8 +513,43 @@ UPSERT_PRODUCTS_SQL = """
     VALUES (:pc, :sku, :name, :maker, :model, :pt, :grp, :status, :ai, :rev, :pp, :sp2,
       :mp, :sup, :dan, :stock, :spec_text, :origin)
     ON CONFLICT (product_code) DO UPDATE SET
-      product_name = EXCLUDED.product_name, maker = EXCLUDED.maker,
-      model_name = EXCLUDED.model_name, status = EXCLUDED.status,
+      -- product_name(2026-08-24 — 나머지 여섯 확장, 아래 "여섯 컬럼 확장" 문단):
+      -- **잠금만 적용하고 COALESCE는 안 썼다 — 여기가 supplier·maker와 다르다.**
+      -- product_name은 NOT NULL 컬럼이다(실측: information_schema.columns.is_nullable=
+      -- 'NO'). 그런데 PostgreSQL은 `ON CONFLICT DO UPDATE`에서도 NOT NULL을 **VALUES
+      -- 단계(=충돌 판정 이전, SET절의 COALESCE가 평가되기도 전)에서** 검사한다 —
+      -- 임시 테이블로 직접 재현해 확인했다: NOT NULL 컬럼 하나짜리 표에 같은 모양의
+      -- `ON CONFLICT DO UPDATE SET col = COALESCE(EXCLUDED.col, t.col)`를 걸어도
+      -- 새로 주는 값이 NULL이면 COALESCE가 평가되기도 전에 그대로 위반으로 죽는다.
+      -- 즉 COALESCE를 적어도 상품명 파라미터가 NULL이면 무조건 이 문장 전체가
+      -- IntegrityError로 죽는다 — COALESCE는 실행되지도 못한다. 그래서 이 컬럼의
+      -- "빈 값 보호"는 SQL이 아니라 **build_plan()의 상위 검증**(221-223행,
+      -- 상품명이 비면 그 행 자체를 prods에 안 올리고 errors로 보낸다)이 전부 한다 —
+      -- 여기 도달하는 상품명 값은 원천적으로 빈 값일 수 없다. 잠금(②)은 유효하다 —
+      -- patch_product의 EDITABLE에 이미 있어(admin_products.py 334-335행, "name")
+      -- 운영자가 상세에서 고치고 잠글 수 있는데, 이 UPSERT가 그 잠금을 못 보는 것은
+      -- 위 잠금범위 주석이 이미 «이번에도 고치지 않은 기존 결함»으로 지목했던 바로
+      -- 그 구멍이다 — 이번에 막는다.
+      product_name = CASE WHEN products.locked_fields ? 'product_name'
+                          THEN products.product_name
+                          ELSE EXCLUDED.product_name END,
+      -- maker(같은 2026-08-24): product_name과 달리 **NULL 허용 컬럼**이라(실측:
+      -- is_nullable='YES') 위 NOT NULL 함정이 없다 — COALESCE가 정상 작동한다.
+      maker = CASE WHEN products.locked_fields ? 'maker'
+                   THEN products.maker
+                   ELSE COALESCE(EXCLUDED.maker, products.maker) END,
+      -- model_name: 빈 값 보호는 같은 이유로 필요하지만, **잠금은 지금 무용지물이다** —
+      -- EDITABLE·검수 승인(_approve_product_field, market_price 전용) 어디에도
+      -- 'model_name'을 locked_fields에 넣는 경로가 없다(실측: PRODUCT_FIELD_CAST =
+      -- {'market_price'}뿐). 그래도 가드를 미리 둔다 — CSV 빈 칸 보호(COALESCE)는
+      -- 잠금 유무와 무관하게 필요하므로 CASE 틀은 이미 있고, 나중에 EDITABLE이
+      -- 넓어지면(공급처가 방금 그랬듯) 이 엔진 쪽을 다시 배포할 필요가 없어진다.
+      -- 해가 되는 경우가 없다는 점이 danawa_code·spec_source_text와 같다(data_origin과
+      -- 다른 점 — 아래 참조).
+      model_name = CASE WHEN products.locked_fields ? 'model_name'
+                        THEN products.model_name
+                        ELSE COALESCE(EXCLUDED.model_name, products.model_name) END,
+      status = EXCLUDED.status,
       -- locked_fields는 JSONB 배열이다 — 요소 존재는 `?` 연산자로 본다.
       -- 운영자가 손으로 고친 값을 적재가 덮으면 검수 노동이 무효가 된다(ERD §4.3).
       -- 잠기지 않았어도 COALESCE로 기존 값을 지킨다 — 원천 CSV가 이 행에 매입가·판매가를
@@ -435,14 +592,62 @@ UPSERT_PRODUCTS_SQL = """
       market_price = CASE WHEN products.locked_fields ? 'market_price'
                           THEN products.market_price
                           ELSE EXCLUDED.market_price END,
-      supplier = EXCLUDED.supplier,
-      danawa_code = EXCLUDED.danawa_code, stock_qty = EXCLUDED.stock_qty,
-      spec_source_text = EXCLUDED.spec_source_text, data_origin = EXCLUDED.data_origin,
+      -- supplier(공급처, 2026-08-24 — 오늘 지시): purchase_price·sale_price와 완전히
+      -- 같은 표현이다. 근거는 위 "supplier(공급처) 전용" 문단 — CSV 빈 칸이 그대로
+      -- EXCLUDED.supplier(NULL)로 들어와 4,113건이 지워진 실사고를 이 CASE가 막는다.
+      supplier = CASE WHEN products.locked_fields ? 'supplier'
+                      THEN products.supplier
+                      ELSE COALESCE(EXCLUDED.supplier, products.supplier) END,
+      -- danawa_code(2026-08-24): **시세를 잇는 열쇠**라 잠금 가드를 지금 넣어 둔다 —
+      -- model_name과 같이 지금은 걸어 줄 UI 경로가 없어 무용지물이지만(위와 같은 실측),
+      -- 값의 무게가 다르다고 판단했다: 이 컬럼이 잘못 덮이면 단가표 자동 매칭이
+      -- 조용히 끊긴다(build_plan()의 중복 대표 판정과도 맞물린다 — 아래 참고).
+      -- 빈 값 보호는 두 원인을 함께 지킨다 — ① CSV의 다나와No 칸이 비어 있을 때
+      -- ② 이 배치 안에서 이 상품이 "대표"가 아니거나 DB에서 이미 다른 상품이 그
+      -- 코드를 쥐고 있을 때(build_plan의 dan_rep/dan_owner 판정, 240-248행) — 두
+      -- 경우 다 build_plan이 이미 dan_use=None으로 넘기므로 COALESCE가 기존 값을
+      -- 그대로 지킨다. **주의**: ②의 COALESCE는 "이 상품이 그 코드를 새로 받지
+      -- 못한다"만 막을 뿐, 기존에 갖고 있던(어쩌면 이제 안 맞는) danawa_code를
+      -- 적극적으로 재검증하지는 않는다 — 그건 이번 지시 범위 밖이다.
+      danawa_code = CASE WHEN products.locked_fields ? 'danawa_code'
+                        THEN products.danawa_code
+                        ELSE COALESCE(EXCLUDED.danawa_code, products.danawa_code) END,
+      stock_qty = EXCLUDED.stock_qty,
+      -- spec_source_text(2026-08-24): model_name과 같은 성격 — 빈 값 보호는 유효하고
+      -- 잠금 가드는 지금은 걸어 줄 UI 경로가 없어 무용지물이지만 미리 둔다(해될 게 없다).
+      spec_source_text = CASE WHEN products.locked_fields ? 'spec_source_text'
+                              THEN products.spec_source_text
+                              ELSE COALESCE(EXCLUDED.spec_source_text,
+                                            products.spec_source_text) END,
+      -- data_origin(2026-08-24): **잠금도 COALESCE도 안 썼다 — 결과적으로 이 줄은
+      -- 이번 확장 전과 문자 그대로 같다.** 잠금을 뺀 이유는 나머지 다섯과 다른
+      -- 종류의 컬럼이라서다(근거는 위 "여섯 컬럼 확장" 문단) — 이 값은 CSV 칸이
+      -- 아니라 적재 «작업 단위» 전체에 매기는 real/demo 분류이고
+      -- (`v_recommendation_candidates`·`admin_pool.py`가 data_origin='demo'를 추천
+      -- 후보에서 제외하는 «게이트»다), 잠그면 오분류를 다음 적재로도 못 고친다.
+      -- COALESCE를 뺀 이유는 product_name과 같다 — data_origin도 NOT NULL 컬럼이라
+      -- (실측: is_nullable='NO') PostgreSQL이 COALESCE 평가 전에 VALUES 단계에서
+      -- 이미 NOT NULL을 검사한다(위 product_name 주석 · 임시 테이블 재현 참조).
+      -- COALESCE(EXCLUDED.data_origin, ...)를 적어도 origin 파라미터가 NULL이면
+      -- 그대로 죽으므로 "빈 값이면 지키는" 방어막 역할을 못 한다 — 적으나 안 적으나
+      -- 결과가 같다면 없는 게 정직하다. 실제 보호는 **호출부의 값 자체 제한**이
+      -- 한다(둘 다 origin을 'real'|'demo' 로만 강제해 그 값이 애초에 NULL일 수 없다 —
+      -- admin_catalog_import.py 83행 Form 검증, tools/catalog_import.py 45행
+      -- argparse choices). 그래서 이 값은 항상 EXCLUDED를 그대로 쓴다.
+      data_origin = EXCLUDED.data_origin,
       updated_at = now()
 """
 # 잠금 가드가 있어야 하는 컬럼 — 회귀[44]가 이 목록과 SQL 본문을 대조한다(정적 검사).
+# **data_origin은 일부러 여기 없다** — 잠금(CASE WHEN locked_fields 가드)도 COALESCE도
+# 둘 다 없이 여전히 무조건 EXCLUDED다(이번 확장 전과 문자 그대로 같다). 근거는
+# UPSERT_PRODUCTS_SQL의 data_origin 인라인 주석(2026-08-24) — ① 잠그면 real/demo
+# 오분류를 다음 적재로도 못 고친다(추천 후보 게이트) ② NOT NULL 컬럼이라 COALESCE는
+# 애초에 방어막이 못 된다(PostgreSQL이 VALUES 단계에서 먼저 죽는다 — product_name과
+# 같은 함정). 이 목록에 넣지 않은 것 = 「빠뜨렸다」가 아니라 「잠그지 않기로 판단했다」.
 LOCK_AWARE_PRODUCT_COLS = ("purchase_price", "sale_price", "part_type", "category_group",
-                           "ai_candidate_yn", "review_required_yn", "market_price")
+                           "ai_candidate_yn", "review_required_yn", "market_price",
+                           "supplier", "product_name", "maker", "model_name",
+                           "danawa_code", "spec_source_text")
 
 # ── 사양 UPSERT ────────────────────────────────────────────────────────────
 # 잠긴 사양은 이 SQL이 몰라도 된다 — build_plan()이 잠긴 필드를 이미 None으로 비워
@@ -504,6 +709,43 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
 
     for i in range(0, len(prods), BATCH):
         conn.execute(ins_p, prods[i:i + BATCH])
+
+    # ── product_imports — 반영 행 원본 냉동 보관 (2026-08-24, 사장님 지시) ──────────
+    # **이건 새 기능이 아니라 «안 지키고 있던 기존 설계를 이제 지키는 것»이다.**
+    # ERD(`docs/06_db-erd.md` §3.1)는 이 표를 "CSV 업로드 원본 행을 JSONB로 통째
+    # 보존 — 목적은 재정규화 가능성"이라고 2026-07-07(ADR-001)에 이미 정의해 뒀다.
+    # 그런데 실제로는 `apply_plan`이 여기 쓰는 코드가 **아예 없었다** — 실측 0행.
+    # 그 "없음"은 나중에 다른 문서 세대에서 "성공 행 원본은 저장하지 않는다(원본
+    # CSV가 정본, 용량 중복 회피)"는 별도 근거로 재해석됐다(`api/admin_imports.py`
+    # 독스트링 · `templates/admin/catalog_import.html.j2` · `docs/design/req/
+    # req-product-bulk-import.md`의 쓰는 테이블 표 — 셋 다 "설계상 항상 0행"이라
+    # 명시). **오늘 그 근거가 실패로 드러났다**: 공급처 CSV 빈 칸이 4,113건을
+    # NULL로 덮었는데(위 supplier 전용 문단) 되짚을 원본이 어디에도 없었고, Cloud
+    # SQL point-in-time 복구도 창(7일)을 넘겨 못 썼다(사고 후 9일). "원본 CSV가
+    # 정본이라 안 남겨도 된다"는 전제가, 그 원본 CSV 파일 자체를 못 구하는 순간
+    # 무너진다는 뜻이다. **위 세 문서는 이 커밋 이후로 사실이 아니게 된다** — 이
+    # 파일 담당 범위 밖이라 고치지 않았다(보고 참조 — 각 파일 담당자·기록자가
+    # 갱신해야 한다).
+    #
+    # **전 행 vs 바뀐 행만 — 전 행을 택했다.** ERD의 존재 이유("재정규화 가능성")는
+    # 정규화 룰이 나중에 바뀌면 이 표에서 다시 돌리는 것이다 — 그 용도에는 "이번에
+    # 값이 안 바뀐 행"의 원본도 똑같이 필요하다(안 바뀐 행도 룰이 바뀌면 다르게
+    # 분류될 수 있다). "바뀐 행만"으로 좁히려면 "바뀜"의 정의가 필요한데, 그 정의를
+    # 잘못 짜면 오늘 고친 것과 똑같은 병(조용한 누락)을 새 코드에 또 심는 꼴이다 —
+    # 이번 사고의 교훈과 정면으로 어긋난다. 대신 **정리(오래된 것 치우기)는 별도
+    # 장치로 미룬다** — 이 파일은 짓지 않는다(제안만, 보고 참조).
+    #
+    # **원본은 build_plan()의 `r`(csv.DictReader가 만든 행 그대로, Korean 헤더)** —
+    # prods 항목에 "raw" 키로 이미 실어 왔다(위 prods.append 참조). csv_import_errors가
+    # 거부 행 원본을 담당하는 것과 대칭이다(성공 행은 여기, 거부 행은 거기 — 표 역할이
+    # 겹치지 않는다). BATCH(500)로 나눠 넣는다 — 위 상품 UPSERT와 같은 방식.
+    ins_pi = text(
+        "INSERT INTO product_imports (job_id, product_code, raw_row)"
+        " VALUES (:job, :pc, CAST(:raw AS JSONB))")
+    import_rows = [{"job": job_id, "pc": p["pc"], "raw": json.dumps(p["raw"], ensure_ascii=False)}
+                   for p in prods]
+    for i in range(0, len(import_rows), BATCH):
+        conn.execute(ins_pi, import_rows[i:i + BATCH])
 
     moves = []
     for p in prods:
