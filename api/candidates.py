@@ -30,6 +30,39 @@ v0 하드필터(정직한 최소 룰 — 그 외 제약은 applied=false로 정�
   탐색이 노드 상한에 닿아 "못 찾았다"(exhausted)면 "없다"로 단정하지 않고 기존 총액 판정을
   그대로 믿는다(정직한 미확인으로 남긴다).
 
+⚠ **최저 가능 예산(2026-08-24 물결 후속 — 사장님 지시: "저예산으로 견적이 안 될 때 얼마부터
+  가능한지 알려줘라")**: 위 두 실패(over_budget·compat_infeasible)는 지금까지 "왜 안 되는지"만
+  말했다. 그 두 경우에 한해(예산이 실제로 발목을 잡는 경우만 — empty·all_reused는 예산 문제가
+  아니라서 대상이 아니다) 예산 상한 없이 "가성비" 티어를 한 번 더 돌려 "이 조건이 성립하는
+  가장 낮은 예산"을 찾는다(`budget_min_total` 필드, 함수 안 `_min_feasible_budget` 참조).
+  비용을 먼저 쟀다(제작 보고 참조) — 원 단위 이진 탐색은 근접 구간에서 회당 최대 ~50ms까지
+  걸려 총 600~900ms이 나왔다. 예산은 애초에 "만원" 단위로만 입력·표시되므로 탐색도 "만원"
+  단위로 좁히면 실측 범위가 1~2회로 끝난다(총 10~70ms, DB 재조회 없음 — `wide_common`을
+  그대로 재사용한다). 못 찾으면(탐색 상한 도달·진짜 어떤 예산으로도 불가능) null로 남긴다 —
+  금액을 지어내지 않는다.
+
+⚠ **고성능 캐스케이드 정합(2026-08-24 같은 날 저녁 후속 — 확인자가 브라우저로 잡은 결함)**:
+  바로 위 "실제 조립 가능성 확인"은 **"value" 티어 하나만** 본다. 그런데 같은 날 낮에
+  `recommend.py`가 바뀌어, "value"가 실패해도(예산 안이든 호환 규칙이든) cap이 있으면
+  "highend"를 자기 상한(cap×`HIGHEND_CAP_X`, 1.5배)으로 **따로** 다시 짓는다 — 가성비가
+  막히면 추천·고성능도 자동으로 null이라던 이 파일의 옛 전제(위 "호환 규칙" 문단의
+  "value·recommend가 되면 highend는 예산 쪽에서 항상 더 여유 있다")가 **반대 방향으로
+  깨졌다**: value가 막혀도 highend는 살아있을 수 있다. 실측(게임 70만원) — 이 카운터는
+  over_budget=true로 buildable=false를 냈는데 `/api/recommend`는 실제로 sets.highend
+  (총액 1,049,800원, 1.5배 상한 1,050,000원 이내)를 냈다. 화면은 이 카운터의 buildable만
+  보고 확정 버튼을 잠갔으므로 **실제로 가능한 견적을 고객에게 숨긴 것**과 같다.
+  그래서 over_budget·compat_infeasible로 buildable이 false가 되려는 바로 그 지점에서(둘
+  다 cap이 있을 때만 성립하므로 자동으로 같이 걸린다), recommend.py의 캐스케이드와 같은
+  절차(hi_pool=배분 상한 적용 → 실패 시 wide_common으로 재시도)로 "highend"를 한 번 더
+  실제로 지어 본다(`compat_checked`가 이미 그렇듯 §단일 원천 — recommend.py를 그대로
+  부르고 새 판정을 만들지 않는다). 성공하면 `buildable`이 true가 되고(§4 아래
+  "buildable"의 뜻: "실제로 /api/recommend가 무엇이라도 낼 수 있는가"로 넓어졌다 — "예산
+  안에서 낼 수 있는가"가 아니다, 그건 여전히 `over_budget`/`compat_infeasible`가 따로
+  말한다), `highend_checked`·`highend_feasible`·`highend_total` 셋을 신설해 근거를 남긴다.
+  이미 buildable=true인 성공 경로는 이 블록 자체를 안 타므로 비용이 붙지 않는다(제작
+  보고 "비용부터" 참조) — 실패 경로 안에서 최대 DFS 2회(hi_pool 실패 시 wide_common
+  재시도)가 늘 뿐이다.
+
 effects = 제약 배열 순서대로 누적 적용한 델타. 순서를 바꾸면 최종 count는 같고
 델타 배분만 달라진다 — 이것이 이 계약의 정의된 결정론이다.
 """
@@ -292,6 +325,58 @@ def _slot_stats(parts: list[dict]) -> tuple:
     return counts, mins
 
 
+# ── 최저 가능 예산 탐색 (2026-08-24 물결 후속 — 위 모듈 docstring "최저 가능 예산" 참조) ──
+MIN_BUDGET_UNIT = 10_000     # "만원" 단위 — 예산 문구가 이미 이 단위로만 입력·표시된다
+                              # (`_budget_cap`의 파싱 단위와 같다 — 새 단위를 만들지 않는다)
+MIN_BUDGET_MAX_PROBES = 8    # 안전판(실측 필요 회수의 4배 이상 — 제작 보고 참조). 도달해도
+                              # 지어내지 않는다 — "그때까지 확인된 성공값"을 그대로 쓴다
+                              # (더 낮은 성공 지점을 아직 못 좁혔을 뿐인 안전한 방향의 근사).
+
+
+def _min_feasible_budget(rec_mod, wide_common, rules_active, active_slots, floor_hint,
+                          uncapped_built=None):
+    """이 조건(용도·선호·핀·재사용 — 예산만 뺀 `wide_common`)으로 "가성비(value)" 티어가
+    성립하는 가장 낮은 예산(만원 단위로 올림)을 찾는다. **실제로 성공을 확인한 값만**
+    돌려준다 — None이면 "모른다" 또는 "어떤 예산으로도 안 된다"이지 0이 아니다.
+
+    ① 먼저 예산 상한 없이 한 번 돌린다(`cap=None`). recommend.py `_dfs`의 예산 가지치기는
+       `budget_limit is not None`일 때만 걸리므로, 이 결과(`total`)를 상한으로 다시 걸어도
+       **같은 조합이 그대로 유효**하다 — 그 조합의 각 슬롯까지의 부분합은 항상 total
+       이하이고(전체 합이 total이므로), 그 상태로는 `_price_cut`도 `_dfs`의 예산 조건도 그
+       후보들을 자르지 않는다(예산을 늘리면 후보가 줄지 않고 늘 뿐이다). 즉 이 total은
+       **항상 성공이 보장된 안전한 상한**이다(§단일 원천 — recommend.py의 예산 가지치기
+       규칙을 그대로 신뢰하고 여기서 다시 구현하지 않는다).
+    ② 다만 이 total이 **가장 낮은** 성공 지점이라는 보장은 없다 — "가성비" 티어는 슬롯을
+       고정 순서로 방문하며 그 슬롯의 최저가부터 시도하는 백트래킹이라, 한 슬롯에서 조금
+       더 비싼 후보를 골랐다면 훨씬 싸게 끝났을 다른 조합은 애초에 탐색하지 않는다. 그래서
+       이 total과 `floor_hint`(부품별 최저가의 단순 합 — 항상 이보다 낮거나 같은 진짜
+       하한) 사이를 **만원 단위로** 이진 탐색해 더 낮은 성공 지점이 있는지 확인한다. DB를
+       다시 읽지 않는다 — `wide_common`은 이미 메모리에 있고, 만원 단위로 좁히면 실측
+       범위가 좁아(제작 보고: 오피스·게임·영화 등에서 3~4구간) 회당 비용이 작다.
+    """
+    built = uncapped_built
+    if built is None:
+        built = rec_mod._build_set("value", wide_common, None, rules_active,
+                                    active_slots=active_slots, meta={})
+    if built is None:
+        return None   # 탐색 상한 도달이든 진짜 불가능이든 — 어느 쪽도 지어내지 않는다
+
+    total = built["total"]
+    lo_u = (floor_hint or 0) // MIN_BUDGET_UNIT
+    hi_u = -(-total // MIN_BUDGET_UNIT)   # 올림 — hi_u*UNIT >= total은 이미 성공이 확인된 값
+    probes = 0
+    while hi_u - lo_u > 1 and probes < MIN_BUDGET_MAX_PROBES:
+        mid_u = (lo_u + hi_u) // 2
+        probes += 1
+        ok = rec_mod._build_set("value", wide_common, mid_u * MIN_BUDGET_UNIT, rules_active,
+                                 active_slots=active_slots, meta={}) is not None
+        if ok:
+            hi_u = mid_u
+        else:
+            lo_u = mid_u
+    return hi_u * MIN_BUDGET_UNIT
+
+
 @router.post("/candidates/count")
 def count_candidates(body: CountBody):
     with engine.connect() as conn:
@@ -501,7 +586,20 @@ def count_candidates(body: CountBody):
     #   — 500으로 실패를 드러내는 쪽이 정직하다).
     compat_checked = False
     compat_infeasible = False
-    if not empty and not over_budget and not all_reused:
+    budget_min_total = None   # 신설(2026-08-24 — 모듈 docstring "최저 가능 예산" 참조)
+    # highend 캐스케이드 확인(2026-08-24 저녁 신설 — 모듈 docstring "고성능 캐스케이드 정합"
+    # 참조). value가 막혀도 recommend.py는 cap이 있으면 highend를 따로 다시 짓는다 — 그
+    # 사실을 이 카운터도 반영해야 buildable이 /api/recommend와 같은 말을 한다.
+    highend_checked = False
+    highend_feasible = False
+    highend_total = None
+    highend_note = ""   # verdict에 붙일 문장 조각 — highend_feasible일 때만 채워진다
+    need_compat_check = not empty and not over_budget and not all_reused
+    # 최저 예산 탐색은 "예산이 실제로 발목을 잡는" 두 경우에만 돈다 — over_budget(총액부터
+    # 이미 안 맞음)이거나, 아래 compat_check 결과 compat_infeasible이 될 때. empty(재시도
+    # 후에도 후보가 없는 것 — 예산과 무관한 비budget 제약 때문)·all_reused(살 부품 자체가
+    # 없음)는 예산 문제가 아니라서 대상이 아니다.
+    if need_compat_check or (not empty and not all_reused and over_budget):
         from . import recommend as _rec   # 지연 import — 위 긴 주석 "recommend.py를…" 참조
         with engine.connect() as conn2:
             wide_pool = _rec._load_pool(conn2)
@@ -512,11 +610,43 @@ def count_candidates(body: CountBody):
                 wide_common, _, _ = _apply_one(wide_common, c.l, c.v)
         active_slots = [s for s in _rec.SLOTS if s not in reuse_slots]
         rules_active, _rules_unknown = _rec._rules_for_active(compat_rules, reuse_slots)
-        compat_checked = True
-        real_meta: dict = {}
-        built = _rec._build_set("value", wide_common, cap, rules_active,
-                                 active_slots=active_slots, meta=real_meta)
-        compat_infeasible = built is None and not real_meta.get("exhausted")
+
+        uncapped_built = None   # cap=None으로 이미 돌렸으면 아래에서 재사용(중복 DFS 방지)
+        if need_compat_check:
+            compat_checked = True
+            real_meta: dict = {}
+            built = _rec._build_set("value", wide_common, cap, rules_active,
+                                     active_slots=active_slots, meta=real_meta)
+            compat_infeasible = built is None and not real_meta.get("exhausted")
+            if cap is None:
+                uncapped_built = built   # 이번 호출이 이미 cap=None이었다 — 그대로 쓴다
+
+        # ── highend 캐스케이드 확인 — value/recommend가 막혔고(over_budget·compat_infeasible)
+        # cap이 있을 때만 돈다. recommend.py도 cap=None이면 이 시도를 안 한다(기준으로 삼을
+        # 추천 총액 자체가 없어서다 — 그 파일의 `if sets["value"] is None: ... if cap is not
+        # None: _build_highend(None, None) else: sets["highend"] = None` 그대로). 순서는
+        # `_build_highend`와 같다 — hi_pool(배분 상한 적용) 먼저, 실패하면 wide_common(배분
+        # 해제)으로 재시도(§단일 원천 — 새 판정을 만들지 않는다).
+        if (over_budget or compat_infeasible) and cap is not None:
+            highend_checked = True
+            hi_cap = int(cap * _rec.HIGHEND_CAP_X)
+            hi_pool = [p for p in wide_common
+                       if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
+            hi_built = _rec._build_set("highend", hi_pool, cap, rules_active,
+                                        active_slots=active_slots, meta={})
+            if hi_built is None:
+                hi_built = _rec._build_set("highend", wide_common, cap, rules_active,
+                                            active_slots=active_slots, meta={})
+            if hi_built is not None:
+                highend_feasible = True
+                highend_total = hi_built["total"]
+                highend_note = (f" 다만 예산의 {_rec.HIGHEND_CAP_X:g}배({hi_cap:,}원) 이내인 "
+                                f"고성능형은 지금 {highend_total:,}원에 만들 수 있어요.")
+
+        if over_budget or compat_infeasible:
+            budget_min_total = _min_feasible_budget(
+                _rec, wide_common, rules_active, active_slots,
+                floor_hint=budget_floor_total, uncapped_built=uncapped_built)
 
     if empty:
         verdict = ("조건이 너무 좁아 "
@@ -526,9 +656,24 @@ def count_candidates(body: CountBody):
         # 「슬롯은 찼는데 총액이 안 맞는다」— 빈 슬롯과는 다른 사실이므로 다른 문장이다.
         # 숫자는 전부 이 함수가 실제로 계산한 값이다(지어내지 않는다) — 최저가 합·예산
         # 둘 다 근거로 남긴다.
+        # min_txt(2026-08-24 신설, 오늘 저녁 highend_feasible 분기 추가) — 「왜 안 되는지」에
+        # 「얼마부터 되는지」를 덧붙인다(대체가 아니라 추가 — 위 budget_min_total 계산부
+        # 참조). ⚠ highend_feasible이면 "이 조건은 X원부터 가능합니다"를 무조건 쓰면 거짓이
+        # 된다 — 지금 예산으로도 고성능형(아래 highend_note)은 이미 가능하기 때문이다. 그래서
+        # 이때는 "예산 안에서는"으로 범위를 좁힌 문장을 쓴다(모듈 docstring "고성능 캐스케이드
+        # 정합" 참조 — 두 사실이 다 참이라 어느 쪽도 지우지 않고 함께 말한다). 못 찾았으면
+        # (budget_min_total이 None) 그대로 두고 금액을 지어내지 않는다.
+        min_txt = (
+            (f" 예산 안에서 만들려면 {budget_min_total:,}원부터 가능합니다."
+             if highend_feasible else
+             f" 이 조건은 {budget_min_total:,}원부터 견적이 가능합니다.")
+            if budget_min_total is not None else "")
+        cta = ("예산 안에서 만들고 싶으시면 예산을 늘리거나 조건을 하나만 완화해 주세요."
+               if highend_feasible else
+               "예산을 늘리거나 조건을 하나만 완화해 주세요.")
         verdict = (f"조건을 만족하는 부품은 자리마다 있지만, 가장 저렴하게만 담아도 "
                    f"{budget_floor_total:,}원으로 예산 {cap:,}원을 넘어요 — "
-                   "견적을 만들 수 없습니다. 예산을 늘리거나 조건을 하나만 완화해 주세요.")
+                   f"예산 안에서는 견적을 만들 수 없습니다.{highend_note}{min_txt} {cta}")
     elif all_reused:
         verdict = "선택하신 부품을 전부 재사용하시면 새로 담을 부품이 없습니다 — 이번 견적에는 새로 사는 부품이 없어요."
     elif compat_infeasible:
@@ -538,9 +683,27 @@ def count_candidates(body: CountBody):
         # 잰 값(cap 없는 예산 등)은 지어내지 않는다.
         floor_txt = (f" (가장 저렴하게 담으면 {budget_floor_total:,}원으로 예산 안에는 듭니다)"
                      if budget_floor_total is not None else "")
+        # min_txt(2026-08-24 신설, 오늘 저녁 highend_feasible 분기 추가 — over_budget과 같은
+        # 이유·같은 계산(budget_min_total), 같은 정직화). compat_infeasible이면
+        # budget_min_total은 항상 지금 예산보다 크다(더 비싼, 실제로 호환되는 대안을 쓴
+        # 결과이므로 — _min_feasible_budget 참조).
+        min_txt = (
+            (f" 예산 안에서 만들려면 {budget_min_total:,}원부터 가능합니다."
+             if highend_feasible else
+             f" 이 조건은 {budget_min_total:,}원부터 견적이 가능합니다.")
+            if budget_min_total is not None else "")
+        cta = ("예산 안에서 만들고 싶으시면 조건을 하나만 완화해 주세요."
+               if highend_feasible else
+               "조건을 하나만 완화해 주세요.")
+        # ⚠ "예산 안에서는"은 highend_feasible일 때만 붙인다 — compat_infeasible은 cap=None
+        # (예산 자체를 안 정한 경우)에도 성립할 수 있는데(위 need_compat_check는 cap 유무와
+        # 무관하다), 그 경우 highend 캐스케이드는 애초에 안 돈다(highend_checked=False로
+        # 남는다 — 위 "highend 캐스케이드 확인" 블록의 `cap is not None` 게이트 참조). 예산이
+        # 없는데 "예산 안에서는 안 됩니다"라고 하면 없는 예산 개념을 지어내는 것이 된다.
+        no_txt = "예산 안에서는 견적을 만들 수 없습니다." if highend_feasible else "견적을 만들 수 없습니다."
         verdict = ("조건을 만족하는 부품은 자리마다 있지만, 그 부품들끼리 실제로 조립되는 "
-                   f"조합을 찾지 못했습니다(호환 규칙){floor_txt} — 견적을 만들 수 없습니다. "
-                   "조건을 하나만 완화해 주세요.")
+                   f"조합을 찾지 못했습니다(호환 규칙){floor_txt} — "
+                   f"{no_txt}{highend_note}{min_txt} {cta}")
     else:
         # 문구 수정(2026-08-24) — "가성비·추천·고성능 3구성을 만들 수 있어요"는 셋 다
         # 된다고 못박는 문장인데, 이 verdict는 그렇게 말하지 않는다(아래로 이유).
@@ -576,7 +739,16 @@ def count_candidates(body: CountBody):
         # 그 잔여 한계 해소). 기존 필드(true=조립 가능·false=조립 불가)의 «뜻»은 그대로다
         # — 그 판정에 반영하던 근거가 하나(빈 슬롯) → 둘(+ 총액) → 셋(+ 실제 조립 확인)
         # 으로 정확해졌을 뿐이다.
-        "buildable": not empty and not over_budget and not compat_infeasible,
+        # ⚠ 넷째(2026-08-24 저녁, 모듈 docstring "고성능 캐스케이드 정합" 참조) —
+        # over_budget·compat_infeasible이어도 highend_feasible이면 buildable은 true다.
+        # "buildable"의 뜻이 "예산 안에서 되는가"에서 "/api/recommend가 실제로 무엇이든
+        # 낼 수 있는가"로 넓어졌다 — 확인자가 게임 70만원에서 실측: 이 카운터는
+        # buildable=false였는데 /api/recommend는 sets.highend를 실제로 냈다(화면은
+        # 이 카운터만 보고 확정 버튼을 잠갔다). "예산 안에서 되는가"는 여전히
+        # over_budget·compat_infeasible이 각자 따로, 정확히 그대로 말한다 — 이 필드들도
+        # 지우거나 이름을 바꾸지 않았다.
+        "buildable": not empty and (
+            (not over_budget and not compat_infeasible) or highend_feasible),
         "empty_slots": [{"slot": s, "label": SLOT_KO.get(s, s)} for s in empty],
         # 재사용을 고른 슬롯 — count·buildable에서 왜 그 슬롯이 안 보이는지 화면이
         # 설명할 수 있게(§화면 정직성: 판정을 지어내지 않으려면 근거가 실려야 한다).
@@ -600,6 +772,32 @@ def count_candidates(body: CountBody):
         #                    "못 찾았다"인 경우는 제외 — 위 블록의 "■ 한계" 참조, 그때는
         #                    false로 남아 기존 총액 판정을 그대로 믿는다).
         "compat_infeasible": compat_infeasible,
+        # 신설 필드(2026-08-24 — 사장님 지시 "저예산으로 견적이 안 될 때 얼마부터
+        # 가능한지 알려줘라", 모듈 docstring "최저 가능 예산" 참조). over_budget 또는
+        # compat_infeasible일 때만 채워진다 — 이미 되거나(둘 다 false) 예산 문제가 아니면
+        # (empty·all_reused) 물을 것이 없어 null로 남는다. 탐색해도 어떤 예산으로도 안
+        # 되거나 확인 자체가 막히면(모른다 포함)도 null이다 — 금액을 지어내지 않는다
+        # (`_min_feasible_budget` 참조). 값이 있으면 만원 단위로 올림한, **실제로 성공이
+        # 확인된** 예산이다.
+        "budget_min_total": budget_min_total,
+        # 신설 필드 셋(2026-08-24 저녁 — 모듈 docstring "고성능 캐스케이드 정합" 참조).
+        # 기존 필드는 하나도 지우거나 이름을 바꾸지 않았다 — 추가만 했다. over_budget·
+        # compat_infeasible 중 하나가 true이고 cap이 있을 때만 값이 채워진다(그 밖은
+        # buildable이 이미 true이거나 highend를 시도할 근거(cap) 자체가 없다).
+        # highend_checked   이 확인을 이번 응답에서 실제로 실행했는가("확인 안 함"과
+        #                    "확인했고 안 됨"을 화면이 구분할 수 있게 — compat_checked와
+        #                    같은 이유).
+        "highend_checked": highend_checked,
+        # highend_feasible  확인했고, 예산의 HIGHEND_CAP_X배(recommend.py 상수, 지금
+        #                    1.5) 이내에서 실제로 조립되는 조합을 찾았다. true면
+        #                    buildable도 true다(위 buildable 계산 참조) — /api/recommend가
+        #                    실제로 sets.highend를 낼 것이라는 뜻이다.
+        "highend_feasible": highend_feasible,
+        # highend_total     highend_feasible일 때만 값이 있는 실제 총액(원) — 지어낸
+        #                    값이 아니라 이 함수가 recommend.py의 _build_set을 그대로
+        #                    불러 실제로 지어 본 구성의 합이다. 예산 cap보다 크다(그래서
+        #                    over_budget/compat_infeasible이 애초에 true였다).
+        "highend_total": highend_total,
         # 화면이 그대로 쓸 수 있는 한 문장 — 서버와 화면이 다른 말을 하지 않게
         "verdict": verdict,
     }

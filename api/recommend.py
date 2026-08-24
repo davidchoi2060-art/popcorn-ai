@@ -10,7 +10,12 @@ A-02: 같은 입력 + 같은 재고 = 같은 구성. **구성 선택에는 LLM�
            ("캡 내 최고가 합산"은 캡 합이 136%라 예산 초과 — DFS 가지치기로 해소)
   고성능 = 전체 풀 + 가격 내림차순, 예산 캡 미적용(초과는 budget.verdict='over'로 정직 표기)
 숫자 예산이 없으면 캡·합 제약 없이 추천은 중간 순위 우선. tie-break = product_code 오름차순.
-가성비(최소 구성)가 불가능하면 전 티어 불가 — 최소 구성이 예산 밖이면 견적 자체가 불성립.
+가성비 탐색이 실패하면 전 티어 불가 — 예산 안에 드는 조합을 하나도 못 찾으면 견적 자체가
+불성립(추천·고성능도 시도하지 않는다).
+
+⚠ **가성비는 "최저가 조합"이 아니다.** `_dfs()`는 가격 오름차순으로 후보를 훑다가 처음
+성립하는 조합을 그 자리에서 확정할 뿐, 전체 조합을 나열해 총액을 비교하지 않는다(사전식
+첫 완성 구성 탐색). 왜 그런지·언제부터 이랬는지·실측 결과는 `_dfs()` 참조.
 
 v1 정직 한계(문서·응답에 명기): 성능 지표(벤치·FPS) 미보유 — 가격을 사양 근사(proxy)로 사용.
 NULL 스펙 필드는 해당 호환 검사 불통과로 간주(검증 불가 부품은 조립 보증 불가 → 제외).
@@ -444,6 +449,33 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc"):
     좁혀지지 않는다 — GPU는 겨냥 규칙 자체가 없다). `_price_cut`이 이 구간을
     이진 탐색으로 건너뛴다 — 방향 판단(㉯ 슬롯 순서 변경 대신 ㉰ 가지치기 추가를
     고른 이유)과 검증 결과는 이 파일이 아니라 작업 보고에 남긴다.
+
+    ── 가성비는 "최저가"를 보장하지 않는다 (2026-08-24, 가성비 문구 정정 후속) ────────
+    대외 문구(모듈 docstring·`_build_set`의 reasons["value"])가 한동안 "예산 안
+    최저가 조합"·"최소 구성"이라 말했는데 거짓이었다 — 이 함수는 전체 조합을 나열해
+    비교하지 않고 처음 성립하는 조합을 그 자리에서 확정한다(사전식 첫 완성 구성 탐색,
+    위 함수 설명 그대로). 엔진 최초 커밋(2026-07-23)부터 이 구조였다 — 오늘 생긴
+    문제가 아니다.
+
+    메커니즘: 슬롯은 호환 규칙(소켓·규격)으로 서로 묶여 있다. 오름차순 탐색이 앞
+    슬롯에서 고른 최저가 후보와 호환되는 뒤 슬롯 후보 중에는 비싼 것만 남을 수 있다.
+    예산을 올리면 그 "싼 앞 슬롯 + 비싼 뒤 슬롯" 경로가 새로 budget_limit을 통과해
+    (오름차순이라 더 싼 앞 슬롯 후보가 먼저 시도된다) 먼저 성립해 버려서, 예산을
+    낮췄을 때 찾았던(뒤로 밀려 있던 다른 앞 슬롯 후보의) 조합보다 총액이 더 높은 채로
+    확정될 수 있다 — 코드 버그가 아니라 "비교 없이 첫 성공을 반환"하는 탐색 방식의
+    구조적 한계다.
+
+    ⚠ 이 물결 지시서(2026-08-24)는 실제 사례로 게임·예산 34만원→339,800원,
+    36만원→348,300원을 제시했다(조사자 실측). 문구 교정 작업 중 이 사례를 TestClient·
+    `_build_set` 직접 호출로 재현을 시도했으나 — 11개 용도 × 2,000~5,000원 간격 예산
+    스윕(6,600건 이상, 20만~300만원 구간, 무용도 풀·GPU 부품 핀 포함) — **가성비
+    티어에서는 재현되지 않았다**(불성립 구간 다음은 항상 예산과 무관한 상수, 즉 오늘
+    조회된 카탈로그에서는 단조였다). 이 저장소는 재고·가격이 상시 변동한다(CANON.md·
+    CLAUDE.md 여러 곳 기록) — 조사 시점 이후 카탈로그가 바뀌었을 수 있다. 같은 스윕에서
+    **추천 티어(내림차순 + 예산 가지치기)는 지금도 비단조 구간이 실제로 있다** — 이
+    부류의 탐색이 비단조를 만들 수 있다는 사실 자체는 오늘도 확인된다. 위 메커니즘은
+    코드 구조이지 카탈로그 스냅샷이 아니다 — 특정 두 금액이 지금 재현되지 않는다고 이
+    사실 자체가 바뀌지는 않는다.
     """
     slots = SLOTS if slots is None else slots
     min_rest = [0] * (len(slots) + 1)
@@ -615,7 +647,8 @@ def _explain_spec(p: dict) -> dict:
 
 
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
-               active_slots=None, unknown_rules=None, reuse_note=None, meta=None):
+               active_slots=None, unknown_rules=None, reuse_note=None, meta=None,
+               alloc_capped=True):
     """`active_slots`·`unknown_rules`·`reuse_note`(2026-08-24 추가) — 재사용 슬롯 처리
     (customer-audit-2026-08-24 §1-1). 기본값은 전부 None/생략과 같은 뜻이라 기존 호출부
     (`api/expert.py`·이 파일의 `/api/showcase`)는 손대지 않아도 그대로 동작한다.
@@ -633,6 +666,14 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                   마련한 별도 채널이다. `exhausted=True`는 "이 조건엔 구성이 없다"가
                   아니라 "정해진 노드 안에서 못 찾았다"는 뜻 — 다른 사실이다
                   (§화면 정직성, `/api/recommend`의 `search_exhausted` 계약 참조).
+    alloc_capped  (2026-08-24 추가 — "최고 사양" 문구 정직화 후속) 이 호출의 `pool`이
+                  부품별 배분 상한(BUDGET_ALLOC)이 걸린 풀인가. 고성능형 reasons의
+                  "배분 상한은 유지" 문구가 호출부 조건과 무관하게 고정돼 있어, 배분
+                  상한 풀로 못 찾아 배분 없는 풀로 다시 지은 호출까지 "유지"라고
+                  말하는 자기모순이 있었다(205건 실측 — 응답 하나 안에서 서로 다른
+                  말을 하면 §화면 정직성 위반). 기본값 True는 기존 호출부
+                  (`api/expert.py`)의 겉보기 문구를 그대로 둔다 — 그 파일은 담당 밖이라
+                  이 값을 넘기지 않는다.
     """
     if meta is not None:
         meta["exhausted"] = False   # 기본값 — 슬롯이 비어 DFS를 아예 안 부르는 경우 등
@@ -660,12 +701,26 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         return None
     total = sum(p["sale_price"] for p in chosen.values())
     verdict = "none" if cap is None else ("within" if total <= cap else "over")
+    # 「최고 사양」은 가성비의 옛 「최저가」와 정확히 대칭인 과장이었다(2026-08-24 정정) —
+    # 같은 `_dfs`가 여기서도 "사전식 첫 성립 구성"을 반환할 뿐, 전체 조합을 나열해
+    # 비교하지 않는다(§_dfs 결함 기록 「가성비는 최저가를 보장하지 않는다」와 같은 구조).
+    # 방향은 `_order_of`(정렬 판단의 단일 원천 — `_tier_sort`·`_dfs`와 같은 판단)로
+    # 정한다 — 추천은 숫자 예산이 없으면 내림차순이 아니라 중간가 우선이라
+    # (`_order_of` 참조), 문구를 "내림차순"으로 고정하면 그 경로에서 다시 거짓말이 된다.
+    order_ko = {"asc": "오름차순", "desc": "내림차순",
+                "median": "중간가 우선"}[_order_of(tier, cap is not None)]
+    # 고성능형의 "배분 상한은 유지"는 조건과 무관하게 단정할 수 없다 — 배분 상한 풀
+    # (hi_pool)로 못 찾아 배분 없는 common으로 다시 지은 호출은 alloc_capped=False로
+    # 온다(호출부가 넘긴다). 그런 호출에도 "유지"라 고정해 말하면, 폴백 시 relax_note로
+    # 붙는 "…풀었습니다" 문구와 한 응답 안에서 서로 다른 말을 하게 된다(실사고 —
+    # 205건, 14.2%).
+    alloc_txt = "부품별 배분 상한은 유지" if alloc_capped else "부품별 배분 상한으로는 조합이 없어 해제"
     reasons = {
-        "value": ["조건 통과 부품에서 예산 안 최저가 조합", "조립 불가 조합은 탐색에서 제외"],
-        "recommend": ["예산 안에서 가격 기준 최고 사양 조합",
+        "value": ["조건 통과 부품에서 가격 오름차순 첫 성립 조합", "조립 불가 조합은 탐색에서 제외"],
+        "recommend": [f"조건 통과 부품에서 가격 {order_ko} 첫 성립 조합",
                       "성능 지표 미보유 — 가격을 사양 근사로 사용(정직 표기)"],
-        "highend": [f"예산의 {HIGHEND_CAP_X:g}배까지 허용한 최고 사양 조합"
-                    f"(부품별 배분 상한은 유지 — 초과분은 아래에 정직 표기)"],
+        "highend": [f"예산의 {HIGHEND_CAP_X:g}배까지 허용한 가격 {order_ko} 첫 성립 조합"
+                    f"({alloc_txt} — 초과분은 아래에 정직 표기)"],
     }[tier]
     reasons = reasons + [n for n in (floor_note, relax_note, reuse_note) if n]
     # market_price 배선(A-100 · 공유 계약 ②) — 몰 최저가 비교 재료.
@@ -1099,8 +1154,8 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 마침표로 문장을 끊는다 — floor_note 이어붙이기와 같은 이유(위 참조),
             # 같은 함정을 여기서도 반복하지 않는다.
             reuse_note = f"{reuse_note}. {pin_conflict_note}" if reuse_note else pin_conflict_note
-        # 가성비형은 **부품별 배분율을 받지 않는다**(슬라이스 58). 최저가를 고르는 티어에
-        # "비싼 부품 차단" 상한은 무의미한데, 슬롯 후보를 예산마다 다르게 만들어
+        # 가성비형은 **부품별 배분율을 받지 않는다**(슬라이스 58). 가격 오름차순으로 훑는
+        # 티어에 "비싼 부품 차단" 상한은 무의미한데, 슬롯 후보를 예산마다 다르게 만들어
         # 150만원이 70만원보다 비싼 가성비 구성을 내놓았다(회귀 '가성비는 전 예산 공통' 실패).
         # 진짜 제약은 총액이고 그건 DFS 가지치기가 건다.
         # 탐색 소진 여부(2026-08-24 추가) — 티어별로 하나씩, 그 티어의 마지막(=sets에
@@ -1126,17 +1181,72 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         sets = {"value": built_v}
         _attach_pin(sets["value"], honored_v, cap)
 
-        if sets["value"] is None:
-            # 최소 구성이 예산 밖이면 견적 불성립 — 전 티어 불가(정직)
-            sets["recommend"] = sets["highend"] = None
-        else:
-            # 배분율은 "한 부품에 몰빵하지 마라"는 균형 장치일 뿐 조립 조건이 아니다.
-            # 저예산에서는 그것이 슬롯을 전멸시켜 견적을 못 만든다 — 실측: 50만원 사무용에서
-            # RAM 배분 10%(5만원)가 DDR4 램(최저 84,900원)을 전부 걸러 남은 DDR5 8GB 하나가
-            # 남은 DDR4 보드와 맞지 않았다. **균형을 못 지킬 바엔 균형을 포기하고 견적을 낸다** —
-            # 총액 상한은 그대로 지킨다. 포기했으면 근거에 그렇게 적는다(정직).
-            relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
+        # 배분율은 "한 부품에 몰빵하지 마라"는 균형 장치일 뿐 조립 조건이 아니다.
+        # 저예산에서는 그것이 슬롯을 전멸시켜 견적을 못 만든다 — 실측: 50만원 사무용에서
+        # RAM 배분 10%(5만원)가 DDR4 램(최저 84,900원)을 전부 걸러 남은 DDR5 8GB 하나가
+        # 남은 DDR4 보드와 맞지 않았다. **균형을 못 지킬 바엔 균형을 포기하고 견적을 낸다** —
+        # 총액 상한은 그대로 지킨다. 포기했으면 근거에 그렇게 적는다(정직).
+        relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
 
+        def _build_highend(hi_note, hi_limit):
+            """고성능형 한 번 짓기 — 가성비 성립/실패 두 경로가 공유한다(2026-08-24
+            결함 수정). 고성능 상한(cap × HIGHEND_CAP_X)은 가성비·추천의 상한(cap)보다
+            «더 넓다» — 「총액 ≤ cap인 조합이 없다」가 「총액 ≤ cap×1.5인 조합이 없다」를
+            함의하지 않는다(조사자 실측 — 가성비 실패 264건 중 162건(61.4%)에서 고성능형이
+            실제로 성립, 11개 용도 전부에서 발생). 옛 코드는 가성비가 None이면 이 시도
+            자체를 안 했다 — 그래서 고성능으로도 지을 수 있던 견적이 "견적 불가"로 나갔다.
+            hi_pool(배분 상한 적용) 실패 시 common(배분 해제)으로 푸는 순서·부품 핀 처리는
+            기존 고성능형 로직을 그대로 옮겼을 뿐이다(§단일 원천 — 새 판정을 만들지 않는다).
+            """
+            hi_cap_display = hi_limit if hi_limit is not None else (
+                int(cap * HIGHEND_CAP_X) if cap is not None else None)
+            # alloc_capped는 "이 풀에 실제로 배분 상한이 걸렸는가"를 그대로 말한다 —
+            # cap이 None이면 hi_pool 계산 자체가 배분 필터를 건너뛰어(위 hi_pool 정의
+            # 참조) hi_pool이 common과 같아진다. 그런데도 True로 고정하면 "배분 상한은
+            # 유지"라고 말하는 게 다시 지어낸 사실이 된다 — cap 유무로 그대로 판정한다.
+            hi_alloc = cap is not None
+            built = _build_set("highend", hi_pool, cap, rules_active, floor_note, hi_note, hi_limit,
+                               active_slots=active_slots, unknown_rules=rules_unknown,
+                               reuse_note=reuse_note, meta=meta_h, alloc_capped=hi_alloc)
+            if built is None:
+                built = _build_set("highend", common, cap, rules_active, floor_note,
+                                   hi_note or relaxed, hi_limit,
+                                   active_slots=active_slots, unknown_rules=rules_unknown,
+                                   reuse_note=reuse_note, meta=meta_h, alloc_capped=False)
+            honored = None
+            if part_v:
+                if gpu_matches and built is None:
+                    built = _build_set("highend", hi_pool_full, cap, rules_active, floor_note,
+                                       hi_note, hi_limit, active_slots=active_slots,
+                                       unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                       meta=meta_h, alloc_capped=hi_alloc)
+                    if built is None:
+                        built = _build_set("highend", common_full, cap, rules_active, floor_note,
+                                           hi_note or relaxed, hi_limit, active_slots=active_slots,
+                                           unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                           meta=meta_h, alloc_capped=False)
+                    honored = False
+                else:
+                    honored = bool(gpu_matches)
+            sets["highend"] = built
+            _attach_pin(sets["highend"], honored, hi_cap_display)
+
+        if sets["value"] is None:
+            # 가성비 탐색이 예산 밖이면 추천형은 시도하지 않는다(그대로 둔다 — 정직 +
+            # 낭비 방지) — 추천의 폴백 풀(common)이 가성비가 쓰는 풀과 완전히 같고
+            # 상한(cap)도 같다. 가성비가 못 찾았으면 추천도 못 찾는다(조사자 실측 ·
+            # 표본 3건 재확인 — 추천형은 건드리지 않는다).
+            sets["recommend"] = None
+            # 고성능형은 위 이유로 «따로» 시도한다(2026-08-24 결함 수정) — 상한이
+            # 가성비보다 넓어 가성비 실패가 고성능 실패를 뜻하지 않는다. 예산이 있을
+            # 때만 시도한다: 예산이 없으면(cap=None) 상한을 잡을 유일한 근거가 추천
+            # 구성 총액인데 추천을 안 지었으니 기준이 없고, 그 경우 가성비 실패는
+            # 예산이 아니라 구조(풀·규칙) 문제라 상한을 넓혀도 풀리지 않는다.
+            if cap is not None:
+                _build_highend(None, None)
+            else:
+                sets["highend"] = None
+        else:
             # ── 추천형 ────────────────────────────────────────────────────────
             built_r = _build_set("recommend", capped, cap, rules_active, floor_note,
                                  active_slots=active_slots, unknown_rules=rules_unknown,
@@ -1172,36 +1282,9 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                 hi_note = (f"예산 상한을 정하지 않으셔서 추천 구성"
                            f"({sets['recommend']['total']:,}원)의 {HIGHEND_CAP_X:g}배"
                            f"({hi_limit:,}원)까지로 잡았습니다")
-            # 핀 실패 노트에 쓸 "이 티어 상한" 표시값 — highend의 실제 DFS 한도와 같다.
-            hi_cap_display = hi_limit if hi_limit is not None else (
-                int(cap * HIGHEND_CAP_X) if cap is not None else None)
 
             # ── 고성능형 ──────────────────────────────────────────────────────
-            built_h = _build_set("highend", hi_pool, cap, rules_active, floor_note, hi_note, hi_limit,
-                                 active_slots=active_slots, unknown_rules=rules_unknown,
-                                 reuse_note=reuse_note, meta=meta_h)
-            if built_h is None:
-                built_h = _build_set("highend", common, cap, rules_active, floor_note,
-                                     hi_note or relaxed, hi_limit,
-                                     active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note, meta=meta_h)
-            honored_h = None
-            if part_v:
-                if gpu_matches and built_h is None:
-                    built_h = _build_set("highend", hi_pool_full, cap, rules_active, floor_note,
-                                         hi_note, hi_limit, active_slots=active_slots,
-                                         unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                         meta=meta_h)
-                    if built_h is None:
-                        built_h = _build_set("highend", common_full, cap, rules_active, floor_note,
-                                             hi_note or relaxed, hi_limit, active_slots=active_slots,
-                                             unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                             meta=meta_h)
-                    honored_h = False
-                else:
-                    honored_h = bool(gpu_matches)
-            sets["highend"] = built_h
-            _attach_pin(sets["highend"], honored_h, hi_cap_display)
+            _build_highend(hi_note, hi_limit)
 
         uid = visitor.resolve(conn, request, response)
         # 이 견적의 「추측 못 할 열쇠」 — session_id 가 연속 정수라(최근 10건 5872~5881)

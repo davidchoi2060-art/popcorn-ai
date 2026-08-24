@@ -25,6 +25,7 @@ DB 대조는 프로젝트 .venv의 SQLAlchemy를 쓴다(DATABASE_URL, 로컬 전
 import glob
 import io
 import json
+import math
 import os
 import pathlib
 import sys
@@ -168,19 +169,41 @@ def drift(key, value):
 # (하네스 판단). 오탐이 나면 실패 메시지의 해소법대로 스냅샷 키를 지우고 다시
 # 돌리면 된다 — 조용한 은폐보다 시끄러운 오탐이 낫다(이 서버는 개발/스테이징,
 # I-01 — 시끄러워도 되는 곳이다).
-def _selftest_no_orphan(key, still_ok_sql, state_sql):
+def _selftest_no_orphan(key, still_ok_sql, state_sql, own_edit_fields=None):
     """이 검사가 지난 회차에 고른 대상(product_code)이 지금도 건강한지 본다.
 
     새 표를 만들지 않는다 — 이미 있는 `tests/.regression-snapshot.json`
     (`_snap_old`/`_snap_new`) 을 그대로 쓴다. 키가 없으면(첫 실행 · 스냅샷
     파일이 gitignore라 없는 환경) 조용히 통과한다 — 죽지 않는다.
+
+    `own_edit_fields`(선택, 예: {"sale_price","status"}) — 이 회귀 «자신»이 수정 중
+    잠그는 필드 이름 집합. 2026-08-24 오탐(구형 부품 100건 AI 후보 제외 후속) 후속 개선 —
+    지난 회차 대상이 `ai_candidate_yn` 잠금으로 정당히 제외됐는데(운영자 조치),
+    `still_ok_sql`은 그 사정을 모르고 실패로만 찍어 "검사 자신이 되돌리기를 놓쳤나"를
+    사람이 매번 DB를 손으로 파서 가려야 했다. `state_sql`이 함께 주는 `locked_fields`와
+    `own_edit_fields`가 겹치면 "이 검사 자신이 잠근 필드가 아직 남아 있다" = 되돌리기
+    누락 의심, 안 겹치면 "다른 필드로 제외됐다" = 운영자 조치 가능성이 높다는 실마리를
+    메시지에 덧붙인다. **판정 자체(FAIL 여부)는 바꾸지 않는다** — 안 겹쳐도 여전히
+    FAIL이다. 조용히 통과시키면 이 검사가 막던 진짜 사고(46158 — 되돌리기 누락이
+    검사 자신의 시야에서 사라짐)를 놓칠 수 있어서다("조용한 은폐보다 시끄러운 오탐이
+    낫다" — 위 자기 은폐 방지 절 그대로). 인자를 안 주는 호출부는 진단 문구만 안 붙을
+    뿐 이전과 동작이 같다.
     """
     last_pc = _snap_old.get(key)
     if last_pc is None or _engine is None:
         return
     ok = db_one(still_ok_sql, p=last_pc)
     state = None if ok else db_all(state_sql, p=last_pc)
-    check(f"자기 은폐 확인({key}) — 지난 회차 대상 product_code={last_pc}이 지금도 정상",
+    diag = ""
+    if not ok and own_edit_fields and state:
+        locked = set((state[0] or {}).get("locked_fields") or [])
+        overlap = locked & set(own_edit_fields)
+        fields_txt = "·".join(sorted(own_edit_fields))
+        verdict_txt = ("남아 있음 — 이 검사 자신의 되돌리기 누락 의심"
+                       if overlap else
+                       "없음 — 다른 필드로 제외됨(운영자 조치일 가능성)")
+        diag = f" [진단: 이 검사가 잠그는 필드({fields_txt})가 locked_fields에 {verdict_txt}]"
+    check(f"자기 은폐 확인({key}) — 지난 회차 대상 product_code={last_pc}이 지금도 정상" + diag,
           bool(ok), "이 검사의 시작 조건을 계속 만족함",
           "유지됨" if ok else {
               "product_code": last_pc,
@@ -380,9 +403,13 @@ def test_engine():
         if r and h:
             check(f"[{lab}] 추천 <= 고성능", r <= h, f"{r} <= {h}", f"{r} vs {h}")
 
-    # 가성비는 '예산과 무관한 최저가 조합'이다 — 예산이 달라도 같은 값이어야 한다.
+    # 가성비는 '예산과 무관한 가격 오름차순 첫 성립 조합'이다 — 예산이 달라도 같은 값이어야
+    # 한다. ⚠ 라벨 정정(2026-08-24, 로직은 그대로): 「최저가 조합」은 이 검사가 실제로
+    # 증명하는 것(총액이 예산과 무관하게 같은 값으로 수렴하는 수치 불변식)과 다른 이름이었다
+    # — recommend.py의 가성비 티어는 전역 최저가 탐색이 아니라 가격 오름차순으로 훑다 예산
+    # 안에서 처음 성립하는 조합을 쓴다. 검사 자체(len(vals)==1)는 그대로 옳다.
     vals = {s["value"]["total"] for s in (s70, s100, s150, sopen) if s.get("value")}
-    check("가성비는 전 예산 공통(최저가 조합)", len(vals) == 1, "1개 값", vals)
+    check("가성비는 전 예산 공통(가격 오름차순 첫 성립 조합)", len(vals) == 1, "1개 값", vals)
 
     # 추천은 예산을 채운다 — 상한 이내이면서 상한의 90% 이상. (캡 없음은 상한이 없어 제외)
     for lab, s in (("70만", s70), ("100만", s100), ("150만", s150)):
@@ -416,7 +443,27 @@ def test_engine():
     # ── 화면 정직성(슬라이스 48): 후보 수가 0이 아니어도 슬롯이 비면 견적은 불성립이다.
     # 화면은 이 판정을 서버에서만 받아야 한다 — 예전엔 후보 수>0이면 무조건
     # "3구성을 만들 수 있어요"라고 말해 거짓이 됐다.
-    NARROW = [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "30만원대"},
+    #
+    # ⚠ 예산대 「30만원대」→「70만원대」교체(2026-08-24, 구형 부품 100건 AI 후보 제외 후속 —
+    # 사장님 확정 · DBA 실측). 지키려는 것은 count==0이 아니라 **count>0인데도
+    # buildable=false인 간극**이다 — count가 아예 0이면 "후보가 없으니 조립도 안 된다"는
+    # 당연한 사실만 확인하게 되어, 슬라이스 48이 잡은 화면 거짓말(카운터>0을 보고 "3구성
+    # 가능"이라 말한 버그)을 더는 재현하지 못한다. 「30만원대」의 count>0은 이번에 뺀 구형
+    # 저가 CPU 7건(셀러론 G5905·펜티엄 G6400 등 — 게임 용도는 CPU 하한이 없어 가격만으로
+    # 통과)에 전적으로 기대고 있었다. 그 CPU가 빠지자 count=0으로 떨어져 간극 자체가
+    # 사라졌다(DBA 실측: 제외 전 count=7 buildable=False → 제외 후 count=0 buildable=False,
+    # 둘 다 GPU·쿨러·파워 슬롯이 비어 있었다 — 즉 buildable=False라는 판정 자체는 옳았고
+    # CPU 제외로 바뀐 게 아니다).
+    # GPU·COOLER·POWER가 비는 이유는 CPU 재고와 무관하다 — 실측(읽기 전용 조회):
+    # 현재 재고에서 GPU·POWER·COOLER_CPU_AIR·COOLER_CPU_AIO 중 tag_silent=true인 상품이
+    # **0건**이다(가격 무관, 카탈로그 전체). 그래서 예산대를 20만원대~200만원 이상까지
+    # 올려도 이 세 슬롯은 계속 비어 buildable=False가 그대로 유지되고, count만 CPU·
+    # 메인보드 후보가 늘며 여유를 얻는다(70만원대 실측: count=71, CPU 13 + MB 58). 낱개
+    # 상품 몇 건이 더 빠져도 0이 되지 않을 여유이면서, 같은 파일이 추천·고성능 비교에
+    # 100만·150만원을 "보통" 구간으로 쓰는 것과 견줘 여전히 타이트한 게임 예산이다.
+    # (GPU·파워·쿨러 중 하나라도 저소음 태그가 붙으면 이 값도 다시 손볼 대상이다 —
+    # 그건 이 검사의 실패가 아니라 카탈로그가 실제로 좋아졌다는 신호다.)
+    NARROW = [{"l": "용도", "v": "게임"}, {"l": "예산", "v": "70만원대"},
               {"l": "선호", "v": "저소음"}]
     _, cn = post("/api/candidates/count", {"constraints": NARROW})
     check("좁은 조건: 후보가 남아도 buildable=false",
@@ -460,6 +507,110 @@ def test_engine():
     if cs["slots"]["COOLER"] > 0:
         check("저소음 조건에서도 쿨러 슬롯이 산다",
               cs["buildable"] is True, "buildable=true", cs["buildable"])
+
+
+# ────── 45. 전 티어 불가 판정 — 고성능 상한(1.5배)까지 실제로 탐색했는가 (사장님 지시, 2026-08-24) ──────
+# 발단: 가성비(value) 티어가 예산 안에서 불가능하면, 캐스케이드가 추천·고성능도 시도조차
+# 않고 세 티어 전부 null로 응답하는 결함이 있었다. 추천은 가성비와 같은 예산 상한을 쓰므로
+# 그 단정이 맞지만, 고성능은 상한이 예산의 HIGHEND_CAP_X배(응답의 `highend_cap_x`, 지금
+# 1.5)라 가성비가 못 들어가는 예산에서도 성립할 수 있다. 조사자 실측(2026-07-23~2026-08-24):
+# 가성비 실패 264건 중 162건(61.4%)에서 고성능형이 실제로 성립했고, 그 간극에서 실제 고객
+# 19명이 "견적 불가"를 들었다.
+#
+# 이 검사가 확인하는 것은 "가성비가 실패하면 고성능도 실패해야 한다/말아야 한다"는 값이
+# 아니라 **"고성능이 null이라면 그 판정이 실제 탐색의 결과였는가"**다. 지금 결함은 탐색을
+# 안 하고 "없다"고 말한 것 — `search_exhausted.highend`(2026-08-24 오전 신설)가 그 둘을
+# 가른다: 상한에 닿아 "못 찾았다"(True)와 "확정적으로 없다"(False)는 다른 사실이다.
+#
+# 예산을 하드코딩하지 않는다(2026-08-24 같은 날 「30만원대」검사가 구형 부품 제외로
+# 무의미해진 전례가 있다 — CLAUDE.md §화면 정직성 참조). 대신 서버가 실측한 "최저 성립
+# 예산"(`/api/candidates/count`의 `budget_min_total` — 예산 상한 없이 가성비 티어를 돌려
+# 실제 성공한 값을 만원 단위로 이진 탐색해 좁힌 것, `api/candidates.py` `_min_feasible_
+# budget`)을 경계로 쓴다. 그 값을 M이라 하면, 예산을 ceil(M/highend_cap_x)만원까지 낮추면
+# 가성비는 못 들어가지만(예산 < M) 고성능의 상한(예산 × highend_cap_x)은 M에 닿는다 — 즉
+# "가성비를 성립시킨 바로 그 조합"이 고성능 상한 안에도 이미 들어간다는 뜻이다. 그 상태에서
+# 고성능이 null이면, 새 조합을 못 찾은 게 아니라 **이미 존재가 증명된 조합조차 못 찾은 것**
+# 이므로 exhausted=True(탐색은 했지만 못 찾음)여야지 exhausted=False(확정적으로 없음)일
+# 수는 없다. 카탈로그가 바뀌면 M도 같이 바뀌므로 경계도 매 실행 다시 잰다 — 숫자를 이
+# 파일에 박지 않는다.
+#
+# 용도는 셋을 고른다(전부 돌리면 회귀가 느려진다 — 근거는 제작 보고): GPU 하한이 서로
+# 다른 "고사양 게임"(550W)·"게임"(450W, 사장님이 든 원 사례) + GPU 하한이 아예 없는
+# "사무·인강"(램·SSD만) — 성격이 다른 용도에서도 같은 결함이 재현되는지, 그리고 GPU
+# 비용이 지배하지 않는 용도에서도 경계 논리가 성립하는지를 함께 본다.
+def test_tier_cascade_exhaustive():
+    print("\n[45] 전 티어 불가 판정 — 고성능 상한(1.5배)까지 실제로 탐색했는가 (사장님 지시)")
+    USAGES = ["고사양 게임", "게임", "사무·인강"]
+    # 5만원 — "이 예산으로는 절대 성립할 수 없다"를 확정하는 용도일 뿐, 실제 하한이 아니다.
+    # 부품 8슬롯(CPU·MB·RAM·GPU·CASE·COOLER·POWER·SSD) 최저가 합이 5만원 아래일 수 없어
+    # 카탈로그가 바뀌어도 안전하다 — over_budget=True를 얻어 budget_min_total을 계산시키는
+    # 트리거일 뿐, 이 값에서 경계를 계산하지 않는다(경계는 아래 M에서 서버가 실측한다).
+    PROBE_BUDGET = "5만원"
+    for usage in USAGES:
+        _st, cnt = post("/api/candidates/count",
+                        {"constraints": [{"l": "용도", "v": usage},
+                                         {"l": "예산", "v": PROBE_BUDGET}]})
+        cnt = cnt or {}
+        M = cnt.get("budget_min_total")
+        if M is None or cnt.get("empty_slots"):
+            print(f"  [SKIP] (I) [{usage}] 최저 성립 예산을 못 구했다 — "
+                  f"budget_min_total={M} empty_slots={cnt.get('empty_slots')}"
+                  " (카탈로그에 이 용도 후보가 없거나 전제가 깨졌다 — DB 미연결일 수도 있다)")
+            continue
+
+        _st, probe = post("/api/recommend", {"mode": "guided",
+                          "constraints": [{"l": "용도", "v": usage},
+                                          {"l": "예산", "v": PROBE_BUDGET}]})
+        x = (probe or {}).get("highend_cap_x")
+        if not x or x <= 1:
+            print(f"  [SKIP] (I) [{usage}] highend_cap_x를 응답에서 못 읽었다 — {x!r}")
+            continue
+
+        m_man = M // 10_000
+        gap_man = math.ceil(m_man / x)
+        while gap_man * x * 10_000 < M - 1e-6:   # 부동소수 경계 방어 — M에 못 미치면 한 단위 올린다
+            gap_man += 1
+        if gap_man >= m_man or gap_man < 1:
+            print(f"  [SKIP] (I) [{usage}] 경계 구간이 없다(M={M:,}원, highend_cap_x={x}) "
+                  "— 최저 성립가가 너무 낮아 1.5배 간극이 안 생긴다")
+            continue
+
+        _st, d = post("/api/recommend", {"mode": "guided",
+                      "constraints": [{"l": "용도", "v": usage},
+                                       {"l": "예산", "v": f"{gap_man}만원"}]})
+        d = d or {}
+        sets = d.get("sets") or {}
+        ex = d.get("search_exhausted") or {}
+
+        check(f"[{usage}] search_exhausted가 티어 3개를 bool로 밝힌다",
+              {"value", "recommend", "highend"} <= set(ex)
+              and all(isinstance(ex.get(k), bool) for k in ("value", "recommend", "highend")),
+              "value·recommend·highend 3개 bool", ex)
+
+        # 전제 확인 — 이 경계가 실제로 "가성비는 확정 실패"인지 먼저 본다. 아니면 아래
+        # 핵심 검사가 무엇을 증명하는지 알 수 없다(M이 안 좁혀졌을 가능성 — 그래도 아래
+        # 핵심 검사 자체는 여전히 유효하다: 더 낮은 예산에서 성립했다면 그 조합은 고성능
+        # 상한 안에는 당연히 들어간다).
+        check(f"[{usage}] 경계 예산({gap_man}만원 < 최저 성립가 {M:,}원)에서 가성비는 불성립",
+              sets.get("value") is None,
+              "value=None", (sets.get("value") or {}).get("total"))
+
+        # ★ 핵심 검사 — gap_man × highend_cap_x(x) >= M이므로, 가성비를 성립시킨 바로 그
+        # 조합이 고성능의 상한 안에도 이미 들어간다(더 비싼 조합을 새로 찾을 필요조차 없이
+        # 존재가 증명된 조합이다). 그런데도 null이면 "확정적으로 없다"(exhausted=False)일
+        # 수 없다 — 최소한 "상한에 닿아 못 찾았다"(exhausted=True)여야 한다. 시도조차 안
+        # 하고 "없다"고 말하는 것이 지금 결함이다.
+        highend = sets.get("highend")
+        cap_reach = gap_man * x * 10_000
+        check(f"[{usage}] 가성비가 막혀도 고성능은 자기 상한"
+              f"({gap_man}만원×{x}={cap_reach:,.0f}원 >= 최저 성립가 {M:,}원)으로 실제 탐색한다",
+              highend is not None or ex.get("highend") is True,
+              "고성능 성립 또는 search_exhausted.highend=True",
+              (f"highend=null search_exhausted.highend={ex.get('highend')}"
+               " — [처방] 가성비 실패 시 고성능을 함께 단정하지 말고, 고성능 자신의 상한"
+               "(cap × highend_cap_x)으로 독립 탐색했는지 recommend.py 캐스케이드를 확인하라"
+               if highend is None else
+               f"highend={highend.get('total')} (성립)"))
 
 
 # ─────────────── 11. 카탈로그 업로드 적재 (슬라이스 50) ───────────────
@@ -846,11 +997,15 @@ def test_product_edit():
     # 두 번째 원인(선택자가 피해 상품을 다시 안 본다)은 **C안**으로 막는다(하네스 판단,
     # 2026-08-15) — try/finally도 못 도는 잔여 위험(서버 프로세스가 죽는 경우 등)이
     # 이론이 아니라 오늘 밤 세 번 실재했다(T-05). _selftest_no_orphan 참조.
+    # own_edit_fields — 아래 "수정 → 되돌리기" 블록의 실제 changes(sale_price·status)와
+    # 맞춰 둔다(줄번호 대신 심볼로 확인: grep -n '"changes": {"sale_price"'). 어긋나면
+    # 진단 문구가 거짓말을 한다.
     _selftest_no_orphan(
         "last_target_product_edit",
         "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:p AND stock_qty > 0",
         "SELECT status, stock_qty, sale_price, locked_fields"
-        " FROM products WHERE product_code=:p")
+        " FROM products WHERE product_code=:p",
+        own_edit_fields={"sale_price", "status"})
     pc = db_one("SELECT product_code FROM v_recommendation_candidates"
                 " WHERE stock_qty > 0 ORDER BY product_code LIMIT 1")
     if pc is None:
@@ -5997,7 +6152,7 @@ def main():
         return 2
     print("\n로그인: " + str(d["operator"].get("name")) + " · 권한 " + d["operator"]["role"])
 
-    for fn in (test_engine, test_compat, test_gates, test_consistency,
+    for fn in (test_engine, test_tier_cascade_exhaustive, test_compat, test_gates, test_consistency,
                test_ledgers, test_customer, test_auth, test_ops, test_swap,
                test_upload, test_product_edit, test_spec_fields, test_pool_gate,
                test_screen_identity,
