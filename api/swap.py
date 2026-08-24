@@ -3,6 +3,19 @@
 orders.py가 최신 스냅샷 1건(ORDER BY snapshot_id DESC)을 집으므로 S4 주문에 자동 반영된다.
 UX-11: ① 호환 100% 통과 대안만 노출 ③ 연쇄는 정직 설명 후 승인 시 자동 동시 교체.
 
+■ 자연어 교체(`POST /refine`, 2026-08-24 감사 §4-3 해소) — 「부품 변경에서 직접 고를
+  수 있어요」 안내(S2)가 실제로 가리키는 곳이 이 경로다. 문장을 «조건»으로 바꾸는 일은
+  다시 만들지 않는다 — `api/talk.parse_talk`(그 안의 `_norm_part` -> `catalog_map.
+  gpu_chipset_key`, GPU 전용 정규화의 단일 원천, CANON §1)를 그대로 호출한다. 이
+  파일은 그 결과(정규화된 칩셋 키)를 받아 **이 견적의 대안 풀에서 실제로 찾고, 있으면
+  `_find_chain`(연쇄 해소)까지 거쳐 `_apply_changes`로 적용**하는 것만 새로 한다.
+  ⚠ **GPU만 된다** — `_norm_part`의 정규화 원천이 GPU 전용이라(감사 §2-1: "「부품」
+  라벨은 GPU 전용이다 — CPU·MB·RAM 지정은 구조적으로 100% 무음") CPU·MB·RAM 모델명은
+  이 경로로 못 알아듣는다. 넓히려면 `api/talk.py`의 프롬프트(부품 라벨 정의)를 고쳐야
+  하는데 그 파일은 이 물결에서 이 제작자의 담당이 아니고, 새 정규화 표를 여기 따로
+  만들면 `gpu_chipset_key`와 나란히 서는 두 번째 부품 인식 계통이 된다(§단일 원천
+  위반). **그래서 안 되는 것은 안 된다고 말한다** — 되는 척하지 않는다(`_refine_scope_note`).
+
 원칙:
 - 가격 = 스냅샷 보존: 비변경 슬롯은 스냅샷 가격 유지, 변경 슬롯만 라이브 풀 가격
   ("고객에게 보여준 그대로" — 원칙 6). price_diff = 라이브 신가 − 스냅샷 구가.
@@ -23,12 +36,14 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from . import access_gate   # 소유자 확인의 단일 원천 — 여기서 다시 만들지 않는다
 from . import visitor
+from . import talk          # S3 자연어 교체 — 문장 파싱(«부품» 라벨)의 단일 원천, 다시 만들지 않는다
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from .timeutil import iso, now_iso
 from .db import engine
 from .product_name import display_name   # 대안 제시도 고객이 보는 자리다
+from .catalog_map import gpu_chipset_key   # 상품명 -> 칩셋 키. talk.py가 쓰는 것과 같은 단일 원천
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
                         load_compat_rules, _cmp, _rule_applies)
 from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천 — SSD를 여기만 "저장장치"로 쓰고 있었다
@@ -273,12 +288,105 @@ def candidates(body: SwapQuery, request: Request, k: str | None = None):
                 } for c in chain]
                 entry["chain_reason"] = _chain_reason(s, chain, chosen, alt)
             alts.append(entry)
+        # 정렬(2026-08-24 감사 §4-7) — «가격 오름차순»(by_slot 원래 순서)이 아니라
+        # **지금 쓰는 부품과 가격이 가까운 순**으로 보여준다. 성능 지표가 있으면 그걸
+        # 쓰겠지만 없다(CLAUDE.md 그대로 — GPU도 required_power_watt는 전력 등급이지
+        # 성능이 아니고, CPU는 그런 근사값조차 없다) — 없는 지표를 지어내지 않는다.
+        # 가격 오름차순 그대로 두면 고성능형 CPU의 첫 대안이 셀러론이 된다(감사 실측:
+        # 호환 규칙이 소켓만 보므로 같은 소켓의 최저가 CPU가 언제나 1번으로 뜬다).
+        # 목록을 줄이지 않는다 — 필터가 아니라 순서만 바꾼다, 전부 그대로 보인다.
+        alts.sort(key=lambda e: (abs(e["price_diff"]), e["price"], e["product_code"]))
         slots[s] = {"alternatives": alts, "empty": not alts, "selected": True,
                     "empty_reason": "지금 판매 중인 재고에 이 부품의 대안이 없어요" if not alts else None}
     return {"session_id": body.session_id, "tier": body.tier,
             "snapshot_id": snap["snapshot_id"], "total": snap["total_amount"],
             "generated_at": iso(snap["created_at"]),
             "current": current, "compat": snap["items"].get("compat"), "slots": slots}
+
+
+def _apply_changes(conn, uid, session_id: int, tier: str, ch_by_slot: dict,
+                   extra_reason: str | None = None):
+    """스왑 적용의 단일 원천 — `apply()`(구조화 [변경] 버튼)와 `refine()`(자연어 교체)이
+    함께 쓴다(2026-08-24, 감사 §4-3 해소로 신설). 그전에는 이 전부가 `apply()` 안에
+    있었다 — 자연어 교체도 "검증된 조합만 적용"이 필요해 여기서 다시 짜지 않고 뽑아냈다.
+
+    ch_by_slot 은 **이미 검증 대상이 결정된** 변경 집합이다(연쇄 포함) — 호출부가
+    무엇을 바꿀지 정하고, 여기는 "그 조합이 실제로 조립되는지"만 다시 확인한다
+    (재고가 그 사이 빠졌을 수 있어 라이브 풀로 재대조한다, `apply()` 원래 로직 그대로).
+    호환 위반이면 409 — **자연어 요청이라고 해서 조립 안 되는 조합을 봐주지 않는다**
+    (S3의 약속 "부품을 바꿔도 조립 안 되는 구성은 나오지 않습니다"는 입력 경로와 무관하다).
+
+    반환: (snapshot_id, new_parts, total, compat)
+    """
+    snap = _load_snapshot(conn, session_id, tier)
+    parts = snap["items"]["parts"]
+    specs = _specs_by_code(conn, [it["product_code"] for it in parts])
+    chosen = _chosen_from_parts(parts, specs)
+    pool, by_slot, pool_codes = _pool_ctx(conn)
+    # 규칙은 요청마다 로드한다(엔진과 같은 원천). 슬라이스 40에서 이 줄을 '중복'으로 보고
+    # 지웠다가 apply가 NameError로 죽었다 — candidates와 apply는 각자 필요하다.
+    rules = load_compat_rules(conn)
+    live = {p["product_code"]: p for p in pool}
+
+    for slot, code in ch_by_slot.items():
+        alt = live.get(code)
+        if alt is None or alt["part_type"] not in SLOT_TYPES[slot]:
+            raise HTTPException(409, {"error": "swap_soldout",
+                                      "detail": "방금 그 대안이 품절됐어요 — 목록을 새로고침해 주세요"})
+        chosen[slot] = alt
+    violations = _valid(chosen, rules)
+    if violations:
+        raise HTTPException(409, {"error": "incompatible", "violations": violations,
+                                  "detail": "이 조합은 조립할 수 없어요 — " +
+                                            " · ".join(SLOT_KO[v] for v in violations) + " 재검토 필요"})
+
+    # 라인 재조립 — 비변경=스냅샷 그대로, 변경=라이브
+    new_parts = []
+    for it in parts:
+        s = it["part_type"]
+        if s in ch_by_slot:
+            p = chosen[s]
+            new_parts.append({"part_type": s, "product_code": p["product_code"],
+                              "sku": p["sku"], "name": display_name(p["product_name"]),
+                              "price": p["sale_price"]})
+        else:
+            new_parts.append(it)
+    total = sum(it["price"] for it in new_parts)
+    # 바꾸지 않은 슬롯이 여전히 미선택(None)일 수 있다 — build_compat은 8슬롯 전부
+    # dict라고 전제해 None에서 AttributeError로 500이 난다(코드 확인으로 발견 —
+    # apply는 원장에 쓰는 경로라 실호출로 재현하지 않았다). candidates()가 쓰는
+    # 것과 같은 null-안전 경로(_partial_compat)로 넘긴다. 8슬롯이 전부 찬 기존
+    # 경로는 그대로 build_compat을 쓴다(원래 코드 그대로 — 회귀 위험 없음).
+    if any(chosen[s] is None for s in SLOTS):
+        pc = _partial_compat(chosen, rules)
+        compat = {"power_headroom_pct": pc["power_headroom_pct"], "checks": pc["checks"]}
+    else:
+        compat = build_compat(chosen, rules)
+
+    # 교체 사실을 원장에 남긴다(슬라이스 46) — 그동안 swap_event_logs는 0행이었다.
+    # 이 기록이 "고객이 어떤 추천을 어떤 부품으로 바꿨나"의 유일한 원천이고,
+    # 추천 기준을 고칠 근거가 된다(부품 교체 기록 화면).
+    before_by_slot = {it["part_type"]: it for it in parts}
+    for slot, code in ch_by_slot.items():
+        was = before_by_slot.get(slot) or {}
+        delta = None
+        if was.get("price") is not None:
+            delta = chosen[slot]["sale_price"] - was["price"]
+        conn.execute(text(
+            "INSERT INTO swap_event_logs (from_product, to_product, session_id, slot,"
+            " price_delta, user_id) VALUES (:fp, :tp, :s, :sl, :pd, :uid)"),
+            {"fp": was.get("product_code"), "tp": code, "s": session_id,
+             "sl": slot, "pd": delta, "uid": uid})
+    reason = "고객 부품 변경 반영 (S3)" + (f" — {extra_reason}" if extra_reason else "")
+    reasons = (snap["items"].get("reasons") or []) + [reason]
+    sid = conn.execute(text(
+        "INSERT INTO quote_snapshots (session_id, quote_type, items, companion, total_amount)"
+        " VALUES (:s, :t, CAST(:it AS JSONB), CAST(:co AS JSONB), :ta) RETURNING snapshot_id"),
+        {"s": session_id, "t": tier,
+         "it": json.dumps({"parts": new_parts, "compat": compat, "reasons": reasons}),
+         "co": json.dumps(snap["companion"]) if snap["companion"] is not None else None,
+         "ta": total}).scalar()
+    return sid, new_parts, total, compat
 
 
 @router.post("/apply")
@@ -316,72 +424,151 @@ def apply(body: ApplyBody, request: Request, response: Response, k: str | None =
             conn, body.session_id, provided,
             what="swap.apply", not_found_detail="그 상담을 찾을 수 없습니다")
         uid = visitor.resolve(conn, request, response)   # 교체 이벤트를 사람에 잇는다
+        sid, new_parts, total, compat = _apply_changes(
+            conn, uid, body.session_id, body.tier, ch_by_slot)
+    return {"snapshot_id": sid, "items": new_parts, "total": total, "compat": compat,
+            "generated_at": now_iso()}
+
+
+class RefineBody(SwapQuery):
+    text: str
+
+
+def _refine_scope_note() -> str:
+    return ("지금은 그래픽카드(GPU) 교체만 자연어로 알아들어요 — 다른 부품은 아래"
+            " [변경] 버튼에서 대안을 골라 주세요.")
+
+
+@router.post("/refine")
+def refine(body: RefineBody, request: Request, response: Response, k: str | None = None):
+    """S3 상단 「자연어 교체 요청」 — 2026-08-24 감사 §4-3 해소.
+
+    ■ 무엇을 새로 하고 무엇을 재사용하나
+      문장 -> 조건 변환은 **다시 만들지 않는다.** `api/talk.parse_talk`(그 안의
+      `_norm_part` -> `catalog_map.gpu_chipset_key`, 「부품」 라벨의 단일 원천)를
+      **같은 요청 객체로 그대로 호출**한다 — 로그인 요구·429 방문자 한도·`talk_intent_hits`
+      원장 기록까지 전부 그 함수가 지금 하는 그대로 딸려 온다(따로 흉내 내지 않는다).
+      이 함수가 새로 하는 일은 그 결과(정규화된 칩셋 키)를 **이 견적의 실제 대안
+      풀에서 찾고**, `_find_chain`(연쇄 해소, `candidates()`와 같은 함수)으로 조립
+      가능성을 확인한 뒤 `_apply_changes`로 적용하는 것뿐이다.
+
+    ■ GPU만 된다 — 되는 척하지 않는다
+      `_norm_part`의 정규화 원천이 GPU 전용이다(모듈 docstring 참고). 「부품」 라벨이
+      아예 안 잡히면(CPU·MB·RAM 모델명이거나, 스왑 의도 자체가 없는 문장이거나) 어느
+      쪽인지 구분하지 않고 **지원 범위를 정직하게 말한다**(`_refine_scope_note`) —
+      "이해하지 못했습니다"로 뭉개면 고객은 "다른 부품도 이 창에 될 수도 있겠다"고
+      다시 시도하게 된다. 모델 문자열은 잡았는데 정규화만 실패했으면("RTX" 표기가
+      아니거나 오타) 그 사유를 따로 말한다 — 그래픽카드 얘기인 건 맞는데 모델을 못
+      읽었다는 것과, 애초에 그래픽카드 얘기가 아니라는 것은 다른 사실이다.
+
+    ■ 정직하게 막는 것 셋
+      ① 재고에 없음 — "그 모델은 지금 재고에 없습니다"(우리 재고는 RTX 50·RX 9000
+         계열이라 구형 모델을 부르는 고객이 실제로 많을 것이다 — 지시서 원문).
+      ② 이미 그 칩셋을 쓰고 있음 — 조용히 "성공"이라 말하지 않는다.
+      ③ 있지만 지금 구성과 호환되지 않음(연쇄로도 못 푼다) — `candidates()`가 대안
+         목록에서 이미 거르는 것과 **같은 판정**(`_find_chain`)이라 결과가 어긋나지
+         않는다.
+
+    응답(200 고정 — 실패도 "이해는 했지만 못 했다"는 정상 응답이지 오류가 아니다.
+    게이트 오류만 예외로 HTTP 상태를 쓴다):
+      {ok:true, applied:false, message, requested}                 -- 이해 실패·재고 없음·호환 불가·이미 보유
+      {ok:true, applied:true,  message, requested, snapshot_id,
+       items, total, compat}                                       -- 실제 교체
+      403/429/503  access_gate 그대로(candidates·apply와 같은 계약)
+      409          {error:"swap_soldout"|"incompatible", ...}       -- _apply_changes 그대로
+      429/502      talk.parse_talk 이 던지는 것 그대로(방문자 한도·LLM 실패)
+    """
+    text_in = (body.text or "").strip()
+    if not text_in:
+        raise HTTPException(400, "문장이 비었습니다")
+    provided = body.access_key or access_gate.key_from_request(request, k)
+
+    # 원장에 쓰기 «전에» 막는다(apply()와 같은 이유) — 그리고 값비싼 LLM 호출도 그
+    # 뒤에 한다(권한 없는 요청이 매번 LLM 비용을 태우지 않도록).
+    with engine.connect() as conn:
+        access_gate.require_session_owner(
+            conn, body.session_id, provided,
+            what="swap.refine", not_found_detail="그 상담을 찾을 수 없습니다")
+
+    parsed = talk.parse_talk(talk.ParseBody(text=text_in), request)
+    part_v = next((c["v"] for c in parsed["constraints"] if c["l"] == "부품"), None)
+    part_dropped = next((d for d in parsed["dropped"] if d.get("l") == "부품"), None)
+
+    if part_v is None:
+        if part_dropped is not None:
+            # 실측(2026-08-24, 검증): 프롬프트가 "그래픽카드가 아닌 부품은 이 라벨을
+            # 쓰지 않는다"고 지시해도 모델이 "9800X3D" 같은 CPU 모델명을 「부품」으로
+            # 시도했다가 `_norm_part`(GPU 정규식)에서 떨어지는 경우가 실제로 있다 —
+            # 그 값을 그대로 되돌려 "그래픽카드 모델명이 아니다" 하나로 뭉개지 않고
+            # **무엇을 어떻게 못 읽었는지 + 지금 지원 범위**를 함께 말한다(다음 시도가
+            # 다시 막히지 않게). 문장 자체를 되돌리지 않는다(모델이 값을 비웠으면
+            # 원문으로 대신한다) — 빈 인용은 "무엇을"이 없어 더 헷갈린다.
+            attempted = part_dropped.get("v") or text_in
+            msg = (f'"{attempted}"는 그래픽카드 모델명으로 알아듣지 못했어요. '
+                   f'{_refine_scope_note()} 예: "RTX 5070으로 바꿔줘".')
+        elif parsed["pc_related"] is False:
+            msg = ("PC 상담과 관련된 문장으로 보이지 않아요 — 부품을 바꾸고 싶으시면"
+                   ' 예: "RTX 5070으로 바꿔줘"처럼 말씀해 주세요.')
+        else:
+            msg = _refine_scope_note()
+        return {"ok": True, "applied": False, "message": msg, "requested": None}
+
+    with engine.begin() as conn:
+        # 두 번째 확인(defense in depth) — apply()가 이미 쓰는 패턴 그대로(원장에 쓰기
+        # 직전에 다시 검사). LLM 호출 사이에 세션이 무효화될 가능성은 낮지만, "왜 여기서
+        # 또 확인하나"라고 줄이면 이 경로만 apply()보다 느슨한 게이트가 된다.
+        access_gate.require_session_owner(
+            conn, body.session_id, provided,
+            what="swap.refine", not_found_detail="그 상담을 찾을 수 없습니다")
+        uid = visitor.resolve(conn, request, response)
         snap = _load_snapshot(conn, body.session_id, body.tier)
         parts = snap["items"]["parts"]
         specs = _specs_by_code(conn, [it["product_code"] for it in parts])
         chosen = _chosen_from_parts(parts, specs)
         pool, by_slot, pool_codes = _pool_ctx(conn)
-        # 규칙은 요청마다 로드한다(엔진과 같은 원천). 슬라이스 40에서 이 줄을 '중복'으로 보고
-        # 지웠다가 apply가 NameError로 죽었다 — candidates와 apply는 각자 필요하다.
         rules = load_compat_rules(conn)
-        live = {p["product_code"]: p for p in pool}
 
-        for slot, code in ch_by_slot.items():
-            alt = live.get(code)
-            if alt is None or alt["part_type"] not in SLOT_TYPES[slot]:
-                raise HTTPException(409, {"error": "swap_soldout",
-                                          "detail": "방금 그 대안이 품절됐어요 — 목록을 새로고침해 주세요"})
-            chosen[slot] = alt
-        violations = _valid(chosen, rules)
-        if violations:
-            raise HTTPException(409, {"error": "incompatible", "violations": violations,
-                                      "detail": "이 조합은 조립할 수 없어요 — " +
-                                                " · ".join(SLOT_KO[v] for v in violations) + " 재검토 필요"})
+        cur = chosen.get("GPU")
+        cur_key = gpu_chipset_key((cur or {}).get("product_name") or "") if cur else None
+        if cur_key and cur_key == part_v:
+            return {"ok": True, "applied": False,
+                    "message": f"지금 이미 {part_v} 그래픽카드를 쓰고 있어요.",
+                    "requested": part_v}
 
-        # 라인 재조립 — 비변경=스냅샷 그대로, 변경=라이브
-        new_parts = []
-        for it in parts:
-            s = it["part_type"]
-            if s in ch_by_slot:
-                p = chosen[s]
-                new_parts.append({"part_type": s, "product_code": p["product_code"],
-                                  "sku": p["sku"], "name": display_name(p["product_name"]),
-                                  "price": p["sale_price"]})
-            else:
-                new_parts.append(it)
-        total = sum(it["price"] for it in new_parts)
-        # 바꾸지 않은 슬롯이 여전히 미선택(None)일 수 있다 — build_compat은 8슬롯 전부
-        # dict라고 전제해 None에서 AttributeError로 500이 난다(코드 확인으로 발견 —
-        # apply는 원장에 쓰는 경로라 실호출로 재현하지 않았다). candidates()가 쓰는
-        # 것과 같은 null-안전 경로(_partial_compat)로 넘긴다. 8슬롯이 전부 찬 기존
-        # 경로는 그대로 build_compat을 쓴다(원래 코드 그대로 — 회귀 위험 없음).
-        if any(chosen[s] is None for s in SLOTS):
-            pc = _partial_compat(chosen, rules)
-            compat = {"power_headroom_pct": pc["power_headroom_pct"], "checks": pc["checks"]}
-        else:
-            compat = build_compat(chosen, rules)
+        # by_slot["GPU"]는 이미 가격 오름차순(_pool_ctx) — 여러 SKU가 같은 칩셋이면
+        # 최저가부터 조립 가능성을 확인한다("지정 부품 최저가"를 쓰는 recommend.py
+        # _attach_pin과 같은 관례, 이 파일에서 새로 정하지 않는다).
+        matches = [p for p in by_slot.get("GPU", [])
+                  if gpu_chipset_key(p.get("product_name") or "") == part_v]
+        if not matches:
+            return {"ok": True, "applied": False,
+                    "message": f"{part_v}는 지금 재고에 없습니다.", "requested": part_v}
 
-        # 교체 사실을 원장에 남긴다(슬라이스 46) — 그동안 swap_event_logs는 0행이었다.
-        # 이 기록이 "고객이 어떤 추천을 어떤 부품으로 바꿨나"의 유일한 원천이고,
-        # 추천 기준을 고칠 근거가 된다(부품 교체 기록 화면).
-        before_by_slot = {it["part_type"]: it for it in parts}
-        for slot, code in ch_by_slot.items():
-            was = before_by_slot.get(slot) or {}
-            delta = None
-            if was.get("price") is not None:
-                delta = chosen[slot]["sale_price"] - was["price"]
-            conn.execute(text(
-                "INSERT INTO swap_event_logs (from_product, to_product, session_id, slot,"
-                " price_delta, user_id) VALUES (:fp, :tp, :s, :sl, :pd, :uid)"),
-                {"fp": was.get("product_code"), "tp": code, "s": body.session_id,
-                 "sl": slot, "pd": delta, "uid": uid})
-        reasons = (snap["items"].get("reasons") or []) + ["고객 부품 변경 반영 (S3)"]
-        sid = conn.execute(text(
-            "INSERT INTO quote_snapshots (session_id, quote_type, items, companion, total_amount)"
-            " VALUES (:s, :t, CAST(:it AS JSONB), CAST(:co AS JSONB), :ta) RETURNING snapshot_id"),
-            {"s": body.session_id, "t": body.tier,
-             "it": json.dumps({"parts": new_parts, "compat": compat, "reasons": reasons}),
-             "co": json.dumps(snap["companion"]) if snap["companion"] is not None else None,
-             "ta": total}).scalar()
-    return {"snapshot_id": sid, "items": new_parts, "total": total, "compat": compat,
-            "generated_at": now_iso()}
+        picked, chain = None, None
+        for m in matches:
+            ch = _find_chain("GPU", m, chosen, by_slot, rules)
+            if ch is not None:
+                picked, chain = m, ch
+                break
+        if picked is None:
+            return {"ok": True, "applied": False,
+                    "message": (f"{part_v}는 지금 구성과 호환되지 않아요 — 다른 부품을"
+                                " 함께 바꿔야 하는데 그 방법도 찾지 못했습니다."),
+                    "requested": part_v}
+
+        ch_by_slot = {"GPU": picked["product_code"]}
+        for c in chain:
+            ch_by_slot[c["_slot"]] = c["_to"]["product_code"]
+
+        sid, new_parts, total, compat = _apply_changes(
+            conn, uid, body.session_id, body.tier, ch_by_slot,
+            extra_reason=f'자연어 요청 "{text_in[:60]}"')
+
+    chain_note = ""
+    if chain:
+        chain_note = " (" + " · ".join(SLOT_KO[c["_slot"]] for c in chain) + "도 함께 바꿨어요)"
+    return {"ok": True, "applied": True,
+            "message": (f'그래픽카드를 {display_name(picked["product_name"])}(으)로'
+                        f' 교체했어요{chain_note} — 총 {total:,}원'),
+            "requested": part_v, "snapshot_id": sid, "items": new_parts,
+            "total": total, "compat": compat}
