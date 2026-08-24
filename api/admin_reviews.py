@@ -524,9 +524,65 @@ def sourcing_unlink(log_id: int):
         return {"ok": True}
 
 
+def _parse_price(value: str | None) -> int | None:
+    """market_price류 문자열을 정수로 안전 파싱한다 — 실패하면 None.
+
+    `_approve_product_field()`·`auto_approve_market_price()`와 같은 파싱 규칙
+    (strip 후 int)이지만 예외를 던지지 않고 None으로 알린다는 점만 다르다. 이
+    구분이 필요한 이유: "0 이하로 파싱됨"(구조적으로 승인 불가 — 값을 안다)과
+    "파싱 자체가 안 됨"(값 형식이 이상함 — 수집기 결함일 수 있다)은 다른 문제라
+    같은 자동 처리 대상으로 묶지 않는다(아래 `_default_reject_reason()`·
+    `bulk_reject_zero_price()` 둘 다 파싱 성공 + 0 이하인 것만 다룬다).
+    """
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        return int(s)
+    except (TypeError, ValueError):
+        return None
+
+
+# 검수 종결(A-108 GPU 시세 결측 — 2026-08-24 사장님 확정 "0원-대기 건을 사람이
+# 개별 종결"). 다나와가 "최저가 0원"(판매자 없음)으로 관측한 시세 제안은
+# market_auto_approve_decision()이 자동 승인을 막고(위, new_val<=0 분기),
+# 사람이 승인해도 PRODUCT_PRICE_MIN=1이라 400으로 거부된다 — 그런데 "값이 없는
+# 게 맞다"로 큐에서 빼는 길이 지금까지 없었다. 새 review_status를 만들지 않고
+# **이미 있는 '보류'(action=reject)를 그대로 쓴다** — identity_conflict 건도
+# 같은 상태로 "기각(보류)만 된다"(위 qs 주석·reviews.html.j2의 "기각(보류)"
+# 버튼)는 이 파일의 기존 관례이고, list_reviews()의 기본 큐(status='대기')·
+# queue·by_field·by_type 집계가 이미 review_status='대기'만 세므로 '보류'로
+# 전이하는 것만으로 큐에서 자연히 빠진다(새 필터 로직 불필요).
+ZERO_PRICE_REASON = (
+    "다나와 관측값 0원(판매자 없음) - 시세로 쓸 수 없어 반려(보류)합니다."
+    " products.market_price는 바꾸지 않습니다.")
+
+
+def _default_reject_reason(review) -> str | None:
+    """반려(보류) 사유 자동 채움 — «왜 닫혔는지»가 남아야 한다(나중에 "이 상품
+    시세는 왜 없지?"에 답할 수 있어야 한다). 대상은 field_name='market_price'
+    이고 제안값이 0 이하로 파싱되는 행뿐이다 — 이 조건 하나만으로 판정이 이미
+    자명하기 때문에 사람이 사유를 안 적어도 서버가 채운다. 그 밖의 반려
+    (정체성 문제 등, 화면 쪽 사유 입력이 아직 없다)는 지금까지처럼 사유 없이
+    닫힌다 — 이 함수가 그 경우 None을 돌려주면 process_review()가 detail을
+    건드리지 않는다(하위 호환, 기존 로그 review_id=903·2와 동일한 동작)."""
+    if review["field_name"] != "market_price":
+        return None
+    v = _parse_price(review["suggested_value"])
+    if v is None or v > 0:
+        return None
+    return ZERO_PRICE_REASON
+
+
 class ProcessBody(BaseModel):
     action: str  # origin | suggested | manual | reject
     value: str | None = None
+    # 반려(보류) 사유(2026-08-24, §검수 종결) — action=reject일 때만 쓴다. 비우면
+    # _default_reject_reason()이 "0원이라 구조적으로 승인 불가"한 시세 제안에
+    # 한해 기본 사유를 채운다. 그 밖의 반려는 지금까지처럼 사유 없이도 닫힌다.
+    reason: str | None = None
     # 같은 모델의 변형에 같은 값을 함께 넣는다(슬라이스 85). **화면이 고른 것만** —
     # 서버가 알아서 확장하지 않는다. 목록은 /reviews/{id}/siblings가 제안한다.
     also: list[int] = []
@@ -891,12 +947,22 @@ def process_review(review_id: int, body: ProcessBody):
         review = _lock_waiting_review(conn, review_id)
 
         if body.action == "reject":
+            # 사유(2026-08-24, §검수 종결) — 화면이 보낸 값이 있으면 그대로,
+            # 없으면 "0원 결측"류만 서버가 기본 사유를 채운다(_default_reject_reason).
+            # 둘 다 없으면 None -> 아래 CASE가 detail을 건드리지 않는다(기존 동작 그대로).
+            reason = (body.reason or "").strip() or _default_reject_reason(review)
             conn.execute(text(
-                "UPDATE product_reviews SET review_status='보류', reviewed_by=:op, reviewed_at=now()"
-                " WHERE review_id=:rid"), {"op": current_operator_id(), "rid": review_id})
+                "UPDATE product_reviews SET review_status='보류', reviewed_by=:op, reviewed_at=now(),"
+                "  detail = CASE WHEN :rs IS NOT NULL"
+                "    THEN coalesce(detail, '') || ' [반려 사유: ' || :rs || ']' ELSE detail END"
+                " WHERE review_id=:rid"),
+                {"op": current_operator_id(), "rid": review_id, "rs": reason})
             log_id = _log(conn, "review_process", str(review_id),
-                          {"mode": "reject", "review_id": review_id,
-                           "before": {"review_status": "대기"}})
+                          {"mode": "reject", "review_id": review_id, "reason": reason,
+                           # before.detail — 되돌릴 때 원문으로 복원한다(_revert_one 참조).
+                           # reason이 None이라 detail을 안 건드렸어도 항상 스냅샷을 남겨
+                           # 되돌리기 로직을 한 갈래로 통일한다.
+                           "before": {"review_status": "대기", "detail": review["detail"]}})
             return {"ok": True, "undo_id": log_id, "pool_added": 0}
 
         value = {"origin": review["origin_value"], "suggested": review["suggested_value"],
@@ -952,6 +1018,54 @@ def bulk_confirm():
         return {"count": len(entries), "skipped": skipped, "undo_id": log_id, "pool_added": pool_total}
 
 
+@router.post("/reviews/bulk-reject-zero-price")
+def bulk_reject_zero_price():
+    """검수 종결(A-108 GPU 시세 결측 — 2026-08-24 사장님 확정 "0원-대기 건을 사람이
+    개별 종결"). market_price 제안이 0 이하로 관측돼 **구조적으로 승인 불가**한
+    대기 건을 일괄 반려(보류)한다.
+
+    **여전히 사람이 누른다.** 화면의 버튼 클릭이 트리거이지 스케줄·배치가 스스로
+    판단해 조용히 도는 게 아니다(A-108의 |변동률|<5% 자동 승인과는 다른 성격 —
+    거기는 사람 개입 없이 항상 돈다). 사장님 확정 "사람이 개별 종결"의 뜻을
+    "자동화가 스스로 판단해 닫지 않는다"로 읽었고, 그 전제 위에서 **자명한 조건
+    (field_name='market_price' ∧ 제안값 파싱 결과 0 이하)에 대한 일괄 처리 버튼**은
+    허용된다고 판단했다 — 이 파일의 기존 bulk_confirm()이 이미 같은 모양이다
+    (review_type='low_confidence' ∧ origin_value IS NOT NULL 이라는 자명한 조건을
+    일괄 확정). 조건이 애매한 건(파싱 실패·양수)은 아래에서 skip되어 이 버튼이
+    절대 건드리지 않는다 — 정상 제안을 실수로 종결하는 사고를 SQL과 파이썬 파싱
+    이중으로 막는다(가드).
+
+    products.market_price는 건드리지 않는다 — 반려는 "값을 안 넣는다"이지
+    "0으로 확정한다"가 아니다(§원장 규약 — 값이 없다는 사실 자체를 지어내지
+    않는다). 한 번에 한 트랜잭션·한 로그로 묶어 되돌리기도 한 덩어리다
+    (bulk_confirm()과 동일 패턴) — /reviews/undo/{log_id}가 review_bulk_reject를
+    review_bulk_confirm과 같은 방식으로 되돌린다(아래 undo() 참조).
+    """
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT * FROM product_reviews WHERE field_name='market_price'"
+            " AND review_status='대기' ORDER BY review_id FOR UPDATE")).mappings().all()
+        entries, skipped = [], 0
+        for r in rows:
+            v = _parse_price(r["suggested_value"])
+            if v is None or v > 0:
+                skipped += 1
+                continue
+            conn.execute(text(
+                "UPDATE product_reviews SET review_status='보류', reviewed_by=:op,"
+                " reviewed_at=now(), detail = coalesce(detail, '') || ' [반려 사유: '"
+                " || :rs || ']' WHERE review_id=:rid"),
+                {"op": current_operator_id(), "rid": r["review_id"], "rs": ZERO_PRICE_REASON})
+            entries.append({"mode": "reject", "review_id": r["review_id"],
+                            "reason": ZERO_PRICE_REASON,
+                            "before": {"review_status": "대기", "detail": r["detail"]}})
+        if not entries:
+            raise HTTPException(400, "종결할 0원 시세 제안이 없습니다")
+        log_id = _log(conn, "review_bulk_reject", f"{len(entries)}건", {"items": entries})
+        return {"count": len(entries), "skipped": skipped, "undo_id": log_id,
+                "note": f"시세 제안 {len(entries):,}건을 반려(보류)했습니다 — {ZERO_PRICE_REASON}"}
+
+
 def _revert_one(conn, entry: dict):
     rid = entry["review_id"]
     r = conn.execute(text(
@@ -998,6 +1112,15 @@ def _revert_one(conn, entry: dict):
                 " locked_fields=CAST(:lf AS JSONB), updated_at=now() WHERE product_code=:pc"),
                 {"rr": before["review_required_yn"], "ac": before["ai_candidate_yn"],
                  "lf": json.dumps(before["locked_fields"]), "pc": pc})
+    elif entry["mode"] == "reject" and "detail" in before:
+        # 반려(보류) 되돌리기 — 사유를 detail에 덧붙였다면 원문으로 복원한다
+        # (2026-08-24, §검수 종결 — process_review()의 reject 분기·
+        # bulk_reject_zero_price()와 짝을 이루는 되돌리기). 구버전 반려 로그
+        # (예: review_id=903·2, before에 "detail" 키가 없음)는 이 분기를 타지
+        # 않는다 — detail을 안 건드렸으니 되돌릴 것도 없다(하위 호환).
+        conn.execute(text(
+            "UPDATE product_reviews SET detail=:d WHERE review_id=:rid"),
+            {"d": before["detail"], "rid": rid})
     conn.execute(text(
         "UPDATE product_reviews SET review_status='대기', reviewed_by=NULL, reviewed_at=NULL"
         " WHERE review_id=:rid"), {"rid": rid})
@@ -1010,10 +1133,14 @@ def undo(log_id: int):
             "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id"),
             {"id": log_id}).mappings().first()
         if log is None or log["action"] not in (
-                "review_process", "review_bulk_confirm", "review_auto_approve"):
+                "review_process", "review_bulk_confirm", "review_auto_approve",
+                "review_bulk_reject"):
             raise HTTPException(404, "되돌릴 작업 기록이 없습니다")
         detail = log["detail"]
-        if log["action"] == "review_bulk_confirm":
+        if log["action"] in ("review_bulk_confirm", "review_bulk_reject"):
+            # 둘 다 {"items": [...]} 모양(bulk_confirm·bulk_reject_zero_price
+            # 참조) — 한 번에 한 트랜잭션으로 전부 되돌린다(부분 원복 없음, 위
+            # "함께 적용" 주석과 같은 이유).
             entries = detail["items"]
         else:
             # 함께 적용분(also)도 같은 로그에 담겨 있다 — **부분 원복은 없다**.
