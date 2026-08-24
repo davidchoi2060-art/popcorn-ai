@@ -721,12 +721,19 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   var s=Q.sets[k];if(!s)return;
   var el=document.getElementById('s2-setlabel');if(el)el.textContent=s.label;
   var pr=document.getElementById('s2-price');if(pr)pr.textContent=s.total.toLocaleString();
-  if(listHead)listHead.textContent='부품 상세 · '+s.items.length+'종 (전체)';
+  /* N종의 뜻이 재사용 여부로 달라진다 — 재사용이 없으면 s.items.length가 곧 전체
+     슬롯 수라 "(전체)"가 맞다. 재사용이 있으면 그 자리는 엔진이 아예 안 채워
+     s.items에 없으므로 "(전체)"라고 하면 8자리 중 하나가 빠졌다는 사실이 숨는다
+     (customer-audit-2026-08-24 §1-1). s.reused가 비어 있으면 이 줄의 결과는 예전과
+     한 글자도 다르지 않다(회귀 없음). */
+  if(listHead)listHead.textContent=(s.reused&&s.reused.length)
+   ?('부품 상세 · '+s.items.length+'종 (재사용 '+s.reused.length+'종 별도)')
+   :('부품 상세 · '+s.items.length+'종 (전체)');
   if(listWrap){
    /* 부품 행을 눌러 근거를 확인할 수 있게 한다(슬라이스 49).
       누른 사실은 promo_click_logs에 남는다 — 자주 눌리는 부품 = 설명만으로 납득이
       안 되는 부품이고, 그게 추천 기준을 손볼 지점이다. 기록 실패는 이동을 막지 않는다. */
-   listWrap.innerHTML=s.items.map(function(it){
+   var itemsHtml=s.items.map(function(it){
     /* market_price(개별 부품 시장가)는 있을 때만 병기한다 — null 이면 아무것도 안 붙인다
        (§화면 정직성 — 없는 값을 0 이나 "—"로 지어내지 않는다, 그냥 안 보여준다).
        ⚠ 0 도 "없음"으로 취급한다 — 2026-08-23 실측(TestClient, v_recommendation_candidates
@@ -746,7 +753,23 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
      +'<span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[it.part_type]||it.part_type)+'</span>'
      +'<span style="font-weight:700;text-align:right;">'+it.name
      +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span>'+mk+'</span></div>';
-   }).join('')
+   }).join('');
+   /* 재사용 슬롯(customer-audit-2026-08-24 §1-1) — s.items 에는 애초에 없다(엔진이
+      그 자리를 아예 안 채운다, api/recommend.py _build_set의 active_slots). 빠진
+      채로 두면 "부품 상세"가 실제로는 8자리 중 7자리만 보여주면서 스스로는
+      "(전체)"라고 말하는 모순이 생긴다(바로 위 listHead 분기 참조). 문구는 서버
+      sets[tier].reused[]가 이미 라벨·문구까지 정해 보낸다 — 여기서 새 문장을 짓지
+      않고 label·note 를 그대로 옮긴다. 가격 칸에는 0을 넣지 않는다(§화면 정직성 —
+      모르는 값을 0으로 지어내지 않는다) — note 문구 자체가 "포함되지 않았습니다"를
+      말하므로 가격 칸이 없는 것이 정직하다. s.reused 가 없거나 비어 있으면(재사용
+      없는 견적) reusedHtml 은 빈 문자열이라 아래 줄 결과는 예전과 완전히 같다. */
+   var reusedHtml=(s.reused&&s.reused.length)?s.reused.map(function(r){
+    return '<div style="display:flex;justify-content:space-between;gap:10px;'
+     +'font-size:13px;padding:2px 4px;margin:0 -4px;opacity:.72;">'
+     +'<span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[r.slot]||r.label)+'</span>'
+     +'<span style="font-weight:700;text-align:right;color:#c9c5bd;">'+r.note+'</span></div>';
+   }).join(''):'';
+   listWrap.innerHTML=itemsHtml+reusedHtml
    +'<a href="#sec-periph" style="font-size:12.5px;color:#e8b563;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:15px;">devices</span>모니터·키보드는 아래 &quot;함께 쓰면 좋은 구성&quot;에서 ↓</a>';
    listWrap.querySelectorAll('[data-click-part]').forEach(function(row){
     var go=function(){
@@ -797,7 +820,12 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
      색이 여전히 "좋다"고 말해 절반만 고친 것이 된다. */
   if(pctCapEl){
    var hp2=s.compat.power_headroom_pct;
-   pctCapEl.textContent=(hp2==null)?'확인 보류':'확인 완료';
+   /* 재사용 GPU·파워가 원인이면 "확인 보류"보다 구체적으로 말한다(2026-08-24,
+      customer-audit-2026-08-24 §1-1). 이유는 s2-reasons 목록에도 나오지만, 이
+      숫자("—") 바로 옆에서도 «왜»가 보여야 한다. s.reused가 비어 있으면(기존
+      expert 부분선택 등 다른 원인) 문구·조건 전부 기존 그대로 — 회귀 없음. */
+   var pwrReused=(s.reused||[]).some(function(r){return r.slot==='GPU'||r.slot==='POWER';});
+   pctCapEl.textContent=(hp2==null)?(pwrReused?'재사용 부품이라 확인 보류':'확인 보류'):'확인 완료';
    pctCapEl.style.color='var(--on-variant, #64748B)';
   }
   // 호환 근거는 규칙 수만큼 전부 보여준다(슬라이스 34 — 엔진이 판정한 규칙과 1:1).
@@ -832,13 +860,20 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   var nC=s.compat.checks.length,nF=0,nP=0;
   s.compat.checks.forEach(function(c){if(c.pass===false)nF++;else if(c.pass===null)nP++;});
   var okAll=nF===0&&nP===0;
+  var hasReuse=!!(s.reused&&s.reused.length);   // 재사용 슬롯이 있으면 nP의 원인이 다르다(아래 sub)
   var ttl=document.getElementById('s2-fit-title'),sub=document.getElementById('s2-fit-sub'),
       bdg=document.getElementById('s2-fit-badge');
   if(ttl)ttl.textContent=okAll?('호환성 '+nC+'종, 전부 통과했습니다')
                           :nF?('호환성 '+nC+'종 중 '+nF+'종이 통과하지 못했습니다')
                              :('호환성 '+nC+'종 중 '+nP+'종은 아직 확인할 수 없습니다');
+  /* sub 문구는 원래 expert 모드 "부품을 다 안 골라서"만 가정했다 — "나머지를 고르면
+     마저 확인합니다"는 재사용이 원인일 때는 사실이 아니다(더 고를 나머지가 없다,
+     이미 재사용하기로 정했다). hasReuse일 때만 다른 문구를 쓰고, 아니면 기존
+     문구를 한 글자도 바꾸지 않는다(customer-audit-2026-08-24 §1-1 — 회귀 없음). */
   if(sub)sub.textContent=nP
-   ?'부품을 다 고르지 않아 '+nC+'가지 중 '+nP+'가지는 아직 확인할 수 없습니다 — 나머지를 고르면 마저 확인합니다.'
+   ?(hasReuse
+     ?(s.reused.map(function(r){return r.label;}).join('·')+' — 쓰시던 부품이라 '+nC+'가지 중 '+nP+'가지는 확인할 수 없습니다.')
+     :'부품을 다 고르지 않아 '+nC+'가지 중 '+nP+'가지는 아직 확인할 수 없습니다 — 나머지를 고르면 마저 확인합니다.')
    :'조립이 되는 조합인지, 규칙(엔진)이 실제 재고에서 '+nC+'가지를 모두 확인했습니다.';
   if(bdg)bdg.textContent=okAll?('호환성 '+nC+'종 전부 통과')
                           :nF?('호환성 '+nC+'종 중 '+nF+'종 불통과')

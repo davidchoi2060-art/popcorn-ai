@@ -75,9 +75,10 @@
                 남는 차이는 부정·제외·비교 같은 **문맥**뿐이고, 그건 모델만 읽을 수 있다.
                 실측(2026-08-17, claude-haiku): 「배그 하고 싶어요」 -> 고사양 게임 ·
                 「배그는 안 하고 롤만 해요」 -> 게임. 둘 다 정본과 문맥을 함께 지켰다.
-         근거 ③ **정본은 여전히 강제된다.** 값은 `_norm_from_set` 이 `usage_label`
-                집합 밖이면 버리고, 어휘 자체가 매 요청 DB에서 온다. 모델이 이기는 것은
-                「어느 용도인가」의 판단뿐이고 「어떤 용도가 있는가」는 계속 표가 정한다.
+         근거 ③ **정본은 여전히 강제된다.** 값은 `_norm_usage`(2026-08-24까지는
+                `_norm_from_set`)가 `usage_label` 집합 밖이면 버리고, 어휘 자체가
+                매 요청 DB에서 온다. 모델이 이기는 것은 「어느 용도인가」의 판단뿐이고
+                「어떤 용도가 있는가」는 계속 표가 정한다.
 
      ⚠ 뒤집는다면(=서버가 원문 판정으로 덮어쓴다면) **부정문을 먼저 재라.** 그 층은
      「배그는 안 하고」를 «고사양 게임»으로 만든다.
@@ -172,6 +173,19 @@ PREF_VALUES = ("저소음", "화이트")
 _BUDGET_NUM = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+)\s*만")
 _BUDGET_BOUND = re.compile(r"(이상|이하)")
 
+# ⚠ 2026-08-24 신설(고객단 감사 §2-5): `_BUDGET_NUM`은 '-'를 매칭 대상에 안 넣어서
+# "-500만원"의 부호가 조용히 사라졌다 -- "500만원"으로 읽혀 조건 칩에 "500만원 이하"로
+# 뜨는데 음수였다는 사실은 어디에도 안 남았다. **판정은 여기서만 한다**(공유 계약 ③ --
+# `api/candidates.py`는 음수가 와도 상한으로 쓰지 않는 방어만 한다, 두 벌로 만들지 않는다).
+# 음수는 조용히 양수로 바꾸지 않고 dropped로 거른다.
+#
+# 숫자 바로 앞의 '-'인데 그 앞이 «숫자가 아닐 때»만 부호로 본다 -- "100-150만원"처럼
+# 두 숫자 사이에 낀 '-'는 앞이 숫자라 `(?<!\d)`에 걸리지 않는다(실측: `_BUDGET_NEG`가
+# 이 문자열에 매치 0). 그래서 범위 표기는 이 게이트를 안 타고 기존 그대로 동작한다 --
+# `_BUDGET_NUM`이 뒤 숫자("150만")를 예산으로 읽는 동작은 이 수정 전에도 그랬고
+# 지금도 그렇다(범위 자체를 새로 지원하는 것은 아니다 -- 상한 하나만 남긴다).
+_BUDGET_NEG = re.compile(r"(?<!\d)-\s*\d{1,3}(?:,\d{3})*\s*만")
+
 # 「부품」 -- 2026-08-23 물결 계약 ①. 지금은 GPU 모델 지정만 다룬다(다른 부품은
 # 아직 추가하지 않는다 -- 값의 정규화 원천 `catalog_map.gpu_chipset_key`가 GPU만
 # 읽으므로, 여기서 CPU·SSD 등을 허용해도 뒤에서 전부 dropped가 된다).
@@ -258,6 +272,9 @@ def _build_prompt(text: str, usage_rows: list) -> str:
         '   "이상"·"이하"는 고객이 실제로 그렇게 말했을 때만 붙인다'
         '("150만원 이상", "100만원 이하").',
         '   "쯤"·"정도"·"안팎"처럼 대략을 뜻하는 말은 경계가 아니다 -- 그냥 "150만원"으로 적는다.',
+        '   금액 앞에 마이너스(음수) 부호가 있으면 지우거나 "이하"로 바꿔 쓰지 말고 그대로'
+        ' 옮긴다(예: 고객이 "-500만원"이라 했으면 값도 "-500만원"으로 적는다). 부호가'
+        " 맞는 예산인지는 서버가 판단한다 -- 여기서 미리 해석하지 않는다.",
         "   금액이 문장에 없으면 이 항목을 넣지 않는다.",
         f'2. l="용도"  v: 다음 중에서만 고른다 -- {usage_line}',
         "   **괄호 안은 그 용도를 가리키는 말이다**(서버 정본). 문장에 그 말이 있으면"
@@ -272,6 +289,9 @@ def _build_prompt(text: str, usage_rows: list) -> str:
         ' 명시했을 때만 쓴다. 값은 문장에 쓰인 모델명 그대로 적는다(예: "RTX 4070 SUPER").',
         "   \"4060이랑 4060 Ti 차이가 뭐야\" 같은 비교·시세 질문에는 쓰지 않는다 --"
         " 그건 넣어 달라는 요청이 아니라 묻는 것이다.",
+        "   \"RTX 5070이면 배그 잘 돌아가요?\" 처럼 «~면 ~돼요/되나요/괜찮아요» 가정형으로"
+        " 성능·호환을 묻는 문장에도 쓰지 않는다 -- 이미 그 부품을 쓴다고 가정하고 묻는"
+        " 질문이지, 그 부품으로 바꿔 달라는 요청이 아니다.",
         "   그래픽카드가 아닌 부품(CPU·SSD·메모리 등)은 아직 이 라벨로 다루지 않는다 -- 넣지 않는다.",
         "",
         "[고객 문장]",
@@ -280,7 +300,13 @@ def _build_prompt(text: str, usage_rows: list) -> str:
 
 
 def _norm_budget(v: str):
-    """예산 값 정규화 -- (값, None) 또는 (None, 사유)."""
+    """예산 값 정규화 -- (값, None) 또는 (None, 사유).
+
+    ⚠ 음수는 여기서 걸러 dropped로 돌려준다(위 `_BUDGET_NEG` 참고) -- 부호를 지우고
+    양수로 고쳐 쓰지 않는다.
+    """
+    if _BUDGET_NEG.search(v):
+        return None, "예산이 음수라 반영하지 않았습니다"
     m = _BUDGET_NUM.search(v)
     if not m:
         return None, "금액을 읽을 수 없는 예산 표기입니다"
@@ -311,22 +337,71 @@ def _norm_part(v: str):
     return key, None
 
 
+def _pick_from_set(v: str, allowed: list) -> list:
+    """허용 목록 중 v 안에 실제로 있는 것들 -- 넓은 값이 좁은 값의 부분문자열이면
+    넓은 쪽을 버린다('게임' ⊂ '고사양 게임' 이면 '게임'을 버린다).
+
+    화면의 `liveParse`가 같은 처리를 한다(s1-session.html:846). 둘 다 남기면 조건
+    칩만 "고사양 게임 · 게임"으로 지저분해지고(실제로 걸리는 것은 하나뿐이다).
+    ⚠ 「용도」와 「선호」가 **함께** 쓰는 자리다 -- 여기서 하나만 남기도록 더 줄이지
+    않는다(선호는 여러 개가 실제로 함께 적용된다, `_norm_usage` 참고).
+    """
+    picked = [a for a in allowed if a in v]
+    return [a for a in picked if not any(a != b and a in b for b in picked)]
+
+
 def _norm_from_set(v: str, allowed: list, kind: str):
     """' · '로 이어진 값에서 허용 목록에 있는 것만 남긴다 -- (값, 사유).
 
-    ⚠ 넓은 값이 좁은 값의 부분문자열인 경우('게임' ⊂ '고사양 게임') 넓은 쪽을
-    버린다. 화면의 `liveParse`가 같은 처리를 하고(s1-session.html:846), 서버
-    `usage_floors.match`도 **먼저 맞는 usage_key 하나만** 쓴다 -- 둘 다 남기면
-    조건 칩만 "고사양 게임 · 게임"으로 지저분해지고 실제 하한은 하나뿐이라
-    화면과 서버가 다른 말을 하는 꼴이 된다.
+    ⚠ **여기서 고른 것은 전부 남는다** -- 「선호」전용이다(저소음·화이트 둘 다 실제로
+    거르는 태그다, `api/candidates._apply_one`). **「용도」는 이 함수를 쓰지 않는다**
+    -- `_norm_usage`를 쓴다(usage_floors.match()가 먼저 맞는 usage_key 하나만
+    적용하므로 여러 개를 남기면 화면과 서버가 다른 말을 하게 된다, 감사 2026-08-24 §2-3).
     """
     if not allowed:
         return None, f"서버에 정의된 {kind} 어휘가 없습니다"
-    picked = [a for a in allowed if a in v]
-    picked = [a for a in picked if not any(a != b and a in b for b in picked)]
+    picked = _pick_from_set(v, allowed)
     if not picked:
         return None, f"서버가 아는 {kind} 어휘가 아닙니다"
     return " · ".join(picked), None
+
+
+def _norm_usage(v: str, allowed: list):
+    """'용도' 값 정규화 -- **실제로 적용되는 하나**만 남긴다.
+
+    반환 (kept 값 또는 None, 실패 사유 또는 None, 밀려난 값들의 dropped 항목 목록).
+
+    ⚠ 2026-08-24 신설(고객단 감사 §2-3): LLM은 문장에 용도 단어가 여럿 섞이면 라벨을
+    여러 개 이어붙여 낼 수 있다(예: "AI 작업 · 방송 송출 · 영상편집 · 게임 · 디자인 ·
+    개발 · 사무·인강 · 주식·트레이딩"). 그런데 하한은 `usage_floors.match()`가
+    **먼저 맞는 usage_key 하나만** 적용한다(그 함수 docstring 그대로) -- 조건 칩이
+    8개를 보여주면서 실제로 거른 하한은 하나뿐인 상태는 §화면 정직성 위반이다
+    ("조건을 잡았다고 말하는데 실제 반영은 그중 하나뿐"인 것과 같은 병).
+
+    **선택은 `usage_floors.match()`를 그대로 불러 위임한다** -- 같은 원천 · 같은
+    순서(sort_order로 좁은 것 먼저, 그 함수 docstring)를 쓰고 술어를 여기서 다시
+    적지 않는다(CANON §1, 정본 복제 금지). 어떤 것이 밀렸는지는 dropped로 그대로
+    알린다 -- 조용히 지우지 않는다.
+    ⚠ 「선호」는 이 함수를 쓰지 않는다(`_norm_from_set`을 그대로 쓴다) -- 저소음·
+    화이트는 둘 다 실제로 함께 적용되므로 하나로 줄이면 안 된다.
+    """
+    if not allowed:
+        return None, "서버에 정의된 용도 어휘가 없습니다", []
+    picked = _pick_from_set(v, allowed)
+    if not picked:
+        return None, "서버가 아는 용도 어휘가 아닙니다", []
+    hit_rows = UF.match(v)          # 정본 판정 그대로 위임 -- 술어를 다시 적지 않는다
+    winner = hit_rows[0]["usage_label"] if hit_rows else None
+    if winner not in picked:
+        # match()가 못 골랐거나(방어적) picked 밖을 골랐으면 picked 순서상 첫 값을 쓴다
+        # -- usages 자체가 이미 sort_order 순이라(`_usage_rows` docstring) picked도
+        # 그 순서를 보존한다.
+        winner = picked[0]
+    extra = [{"l": "용도", "v": p,
+             "reason": f'용도가 여러 개라 "{winner}"만 반영했습니다'
+                       ' (서버는 용도 하나에만 하한을 적용합니다)'}
+             for p in picked if p != winner]
+    return winner, None, extra
 
 
 def _extract_json(raw: str) -> dict:
@@ -391,10 +466,11 @@ def _validate(raw_items, usages: list) -> tuple:
             dropped.append({"l": lab, "v": val,
                             "reason": "같은 항목이 두 번 나와 첫 값만 반영했습니다"})
             continue
+        extra_dropped: list = []
         if lab == "예산":
             norm, why = _norm_budget(val)
         elif lab == "용도":
-            norm, why = _norm_from_set(val, usages, "용도")
+            norm, why, extra_dropped = _norm_usage(val, usages)
         elif lab == "부품":
             norm, why = _norm_part(val)
         else:
@@ -404,6 +480,7 @@ def _validate(raw_items, usages: list) -> tuple:
             continue
         seen.add(lab)
         kept.append({"l": lab, "v": norm})
+        dropped.extend(extra_dropped)   # 용도가 여럿이면 밀려난 것들을 삼키지 않는다
         if len(kept) >= MAX_CONSTRAINTS:
             break
     return kept, dropped

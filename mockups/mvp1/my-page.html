@@ -86,7 +86,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
         <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">receipt_long</span>주문 · 배송</h3>
         <span style="display:flex;gap:12px;"><a href="my-orders.html" style="font-size:12px;font-weight:800;color:#2b5fd9;text-decoration:none;">전체 주문 →</a><a href="my-payments.html" style="font-size:12px;font-weight:800;color:#8a8578;text-decoration:none;">결제 내역</a></span>
       </div>
-      <p class="sub">주문 원장은 팝콘PC AI에 있습니다 — 결제 방식과 무관하게 여기서 추적돼요.</p>
+      <p class="sub">자체 결제 주문을 표시합니다. 쇼핑몰로 인계한 견적은 전체 주문 내역에서 함께 확인할 수 있습니다.</p>
       <div id="orders-box"></div>
     </div>
 
@@ -145,9 +145,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
  // 관리자 ADM-CUS-010의 "매핑 요청 발송"이 이 화면의 안내로 도착한다. 저장 API는 다음 슬라이스.
  // LIVE(슬라이스 30): /api/my/account가 실상태를 주면 그것으로 덮어쓴다. 실패 시 로컬 시안값.
  var MAP_KEY='popcorn-map-state', LIVE=false, MALL_ID=null;
- function mapState(){return localStorage.getItem(MAP_KEY)||'requested';}  // 시안 기본값 = 요청 도착
+ // 2026-08-24 새벽 감사 §1 고침 — 기본값이 '요청 도착'(시안값)이라, 실데이터가 없는데도
+ // (미로그인 · 첫 방문 · 로그아웃 후 남은 캐시) "쇼핑몰 계정 연결 요청이 도착했어요" 패널이
+ // 로그인 모달 뒤에 떠 있었다(비로그인 100% 재현). 기본값을 'none'으로 바꾸고,
+ // renderMap()은 로그인 상태(m)가 아니면 localStorage 캐시도 쓰지 않는다 — 공유 기기에서
+ // 로그아웃한 뒤에도 이전 로그인 때의 상태가 그대로 남아 보이는 것까지 막는다.
+ // 로그인 상태에서는 이 값이 /api/my/account 응답(d.map_state)으로 즉시 덮어써진다(LIVE).
+ function mapState(){return localStorage.getItem(MAP_KEY)||'none';}
  function renderMap(){
-  var st=mapState(), pill=document.getElementById('map-pill'), panel=document.getElementById('map-panel');
+  var st=m?mapState():'none', pill=document.getElementById('map-pill'), panel=document.getElementById('map-panel');
   if(st==='mapped'){
    pill.style.background='#eaf1fd';pill.style.color='#2149b0';
    pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · '+(MALL_ID||'MALL-2201');
@@ -280,7 +286,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   fetch('/api/my/orders')
    .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
                      if(!r.ok)throw new Error(r.status);return r.json();})
-   .then(function(d){renderOrdersBox(d.items||[]);})
+   .then(function(d){
+    // 담당 밖 방어: /api/my/orders는 my-orders.html과 같은 응답을 쓴다(공유 계약,
+    // 각 항목에 kind:'order'|'handoff'). 이 카드는 배송 진행률(ordStepsHtml)·"주문 상세"
+    // 링크처럼 주문 전용 구조를 가정하므로, 인계(kind==='handoff')를 섞으면 없는 배송
+    // 단계가 있는 척 그려진다. 이 자리는 요약 카드라 인계까지 넣지 않는다 — 전체 목록은
+    // 바로 위 "전체 주문 →" 링크(my-orders.html)가 인계까지 함께 보여준다.
+    var ordersOnly=(d.items||[]).filter(function(x){return x.kind!=='handoff';});
+    renderOrdersBox(ordersOnly);
+   })
    .catch(function(){renderOrdersBox([],'error');});
  }else{
   renderOrdersBox([],'logout');

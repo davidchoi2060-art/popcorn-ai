@@ -289,52 +289,16 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <!-- BUILD PREVIEW -->
 <section id="build" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">
 <div style="background:#fff;border:1px solid #ece9e3;border-radius:22px;padding:30px 32px;">
-<h2 style="margin:0 0 6px;font-size:22px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">추천 구성 미리보기 <span style="display:inline-flex;align-items:center;gap:5px;background:#b31b25;color:#fff;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.01em;"><span style="font-family:'Material Symbols Outlined';font-size:15px;">visibility</span>예시 화면</span></h2>
+<h2 style="margin:0 0 6px;font-size:22px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">추천 구성 미리보기 <span id="s0-build-badge" style="display:inline-flex;align-items:center;gap:5px;background:#b31b25;color:#fff;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.01em;"><span id="s0-build-badge-ic" style="font-family:'Material Symbols Outlined';font-size:15px;">visibility</span><span id="s0-build-badge-tx">예시 화면</span></span></h2>
 <p style="margin:0 0 20px;font-size:14px;color:#6b6b73;">실시간 재고 기준으로 지금 자주 선택되는 밸런스 구성입니다.</p>
-<div style="display:flex;flex-direction:column;">
-<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
-<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="7.5" width="11" height="11" rx="1.5"/><rect x="10.5" y="10.5" width="5" height="5" rx="1"/><path d="M10 7.5V4.5M16 7.5V4.5M10 21.5v-3M16 21.5v-3M7.5 10H4.5M7.5 16H4.5M21.5 10h-3M21.5 16h-3"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">CPU</span></span>
-<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-<div style="font-size:14.5px;font-weight:800;color:#17171b;">Intel Core i5-13400F</div>
-<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">10코어 하이브리드, 게임·작업 밸런스</div>
-</div>
-</div>
-<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
-<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="19" height="10.5" rx="1.5"/><circle cx="9" cy="13.2" r="2.4"/><circle cx="16" cy="13.2" r="2.4"/><path d="M6 18.5v3"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">GPU</span></span>
-<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-<div style="font-size:14.5px;font-weight:800;color:#17171b;">GeForce RTX 4060</div>
-<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">DLSS 3 지원, 이 예산대 프레임 방어</div>
-</div>
-</div>
-<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
-<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1"/><path d="M8 11.5h10"/><path d="M7 18.5v2M10 18.5v2M13.5 18.5v2M17 18.5v2M20 18.5v2"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">RAM</span></span>
-<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-<div style="font-size:14.5px;font-weight:800;color:#17171b;">DDR5 32GB (16GB×2)</div>
-<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">듀얼채널, QVL 통과 구성</div>
-</div>
-</div>
-<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
-<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9.5" width="19" height="7.5" rx="1"/><rect x="6" y="11.5" width="6.5" height="3.5" rx="0.6"/><circle cx="19.5" cy="13.2" r="1.1"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">SSD</span></span>
-<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-<div style="font-size:14.5px;font-weight:800;color:#17171b;">NVMe 1TB Gen4</div>
-<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">고속 로딩, 넉넉한 게임 저장</div>
-</div>
-</div>
-<div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f0eee9;">
-<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="18" height="18" rx="1.6"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 7v9M18.5 7v9"/><path d="M7 17.5h6"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">보드</span></span>
-<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-<div style="font-size:14.5px;font-weight:800;color:#17171b;">B760M DDR5</div>
-<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">안정 전원부, 확장 슬롯 여유</div>
-</div>
-</div>
-<div style="display:flex;align-items:center;gap:14px;padding:13px 0;">
-<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1.6"/><circle cx="11" cy="13" r="3.3"/><circle cx="11" cy="13" r="0.6"/><rect x="16.5" y="10.5" width="3.2" height="2.4" rx="0.5"/></svg></span><span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">파워</span></span>
-<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-<div style="font-size:14.5px;font-weight:800;color:#17171b;">정격 650W 80PLUS</div>
-<div style="font-size:13px;font-weight:600;color:#6b6b73;text-align:right;">전력 마진 30% 확보</div>
-</div>
-</div>
-</div>
+<!-- 부품 행은 /api/showcase 가 준 실제 구성으로 그린다(2026-08-24 정정 — 감사 §2-6).
+     예전엔 여기 Intel Core i5-13400F·GeForce RTX 4060(재고에 없는 칩셋)·DDR5 32GB·
+     NVMe 1TB 가 마크업에 고정돼 있었는데, 바로 아래 가격 바의 캡션(data-bind
+     showcase_caption)은 source==='recent' 일 때 "N시간 전 검증된 실제 견적"으로
+     바뀌는 실데이터였다 — 캡션은 진짜, 옆 부품은 가짜인 채로 나란히 있었다.
+     마크업에는 부품명을 적지 않는다 — 아래 스크립트(showcase fetch)가 채운다. -->
+<div id="s0-build-parts" style="display:flex;flex-direction:column;"></div>
+<div id="s0-build-empty" style="padding:13px 0;font-size:13px;font-weight:600;color:#8a8578;">구성 정보를 불러오는 중입니다.</div>
 <div class="s0-price-bar" style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:18px 22px;background:#17171b;border-radius:14px;">
 <span style="font-size:13.5px;font-weight:700;color:#9a968d;" data-bind="showcase_caption">실시간 재고 기준 예상 견적가</span>
 <span style="font-size:26px;font-weight:900;color:#fff;"><span data-bind="showcase_total">—</span><span style="font-size:15px;color:#9a968d;">원</span>
@@ -342,8 +306,16 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 </div>
 </div>
 <div style="background:#17171b;color:#fff;border-radius:22px;padding:30px 30px;display:flex;flex-direction:column;">
+<!-- 「예시 · 실측값 아님」 배지(2026-08-24, 감사 §2-6 후속). 이 패널(파이·용량바·FPS)은
+     지어낸 예시 수치다 — 실측 벤치마크 원천이 없다(그것이 이 결함의 본질이라 데이터를
+     만들어 채우지 않는다). 좌측 "추천 구성 미리보기" 배지가 source==='recent'일 때
+     "실제 견적"으로 바뀌면 이 옆 패널까지 실측처럼 읽힐 위험이 커진다 — 새 컴포넌트를
+     만들지 않고 이 파일이 이미 쓰는 배지(:292 "예시 화면"·:442 "예시 사진"과 같은
+     빨강 필·visibility 아이콘)를 재사용한다. 항상 표시(고정) — 이 패널은 어느 경우에도
+     실측이 아니므로 조건부로 숨기지 않는다. 기존 줄은 손대지 않고 배지만 덧붙인다
+     (margin-left:auto 로 같은 줄 오른쪽 끝에 붙는다 — 부모 flex 의 기존 선언은 그대로). -->
 <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#7fa8ff;margin-bottom:12px;">
-<span style="font-family:'Material Symbols Outlined';font-size:17px;">speed</span>예상 성능</div>
+<span style="font-family:'Material Symbols Outlined';font-size:17px;">speed</span>예상 성능<span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#b31b25;color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.01em;"><span style="font-family:'Material Symbols Outlined';font-size:13px;">visibility</span>예시 · 실측값 아님</span></div>
 <h3 style="margin:0 0 4px;font-size:24px;font-weight:900;line-height:1.25;">이 구성, 실제로<br>이만큼 나옵니다.</h3>
 <div style="font-size:12.5px;color:#9a968d;margin-bottom:20px;">RTX 4060 · QHD(2560×1440) · 높음 옵션 기준 추정</div>
 <!-- ① 부품별 금액 비율 (파이) -->
@@ -619,6 +591,35 @@ document.addEventListener('click',function(e){
   var h=Math.floor(m/60); if(h<24)return h+'시간 전';
   return Math.floor(h/24)+'일 전';
  }
+ /* ---- 추천 구성 미리보기 부품 행 (2026-08-24 — 감사 §2-6) ----------------
+    아이콘은 새로 만들지 않는다 — 이 파일이 이미 CPU·MB·RAM·GPU·SSD·POWER 6종에
+    쓰던 인라인 SVG를 그대로 옮긴다. CASE·COOLER는 이 화면에 그려둔 아이콘이
+    없다 — s4-cart.html이 썸네일 없는 쿨러를 라벨 배지로 대신하는 것과 같은
+    방식으로 아이콘 없이 라벨만 쓴다(새 그림을 지어내지 않는다). */
+ var SLOT_ICONS={
+  CPU:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="7.5" width="11" height="11" rx="1.5"/><rect x="10.5" y="10.5" width="5" height="5" rx="1"/><path d="M10 7.5V4.5M16 7.5V4.5M10 21.5v-3M16 21.5v-3M7.5 10H4.5M7.5 16H4.5M21.5 10h-3M21.5 16h-3"/></svg>',
+  MB:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="18" height="18" rx="1.6"/><rect x="7" y="7" width="6" height="6" rx="1"/><path d="M16 7v9M18.5 7v9"/><path d="M7 17.5h6"/></svg>',
+  RAM:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1"/><path d="M8 11.5h10"/><path d="M7 18.5v2M10 18.5v2M13.5 18.5v2M17 18.5v2M20 18.5v2"/></svg>',
+  GPU:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="19" height="10.5" rx="1.5"/><circle cx="9" cy="13.2" r="2.4"/><circle cx="16" cy="13.2" r="2.4"/><path d="M6 18.5v3"/></svg>',
+  SSD:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9.5" width="19" height="7.5" rx="1"/><rect x="6" y="11.5" width="6.5" height="3.5" rx="0.6"/><circle cx="19.5" cy="13.2" r="1.1"/></svg>',
+  POWER:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4a463d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.5" width="18" height="11" rx="1.6"/><circle cx="11" cy="13" r="3.3"/><circle cx="11" cy="13" r="0.6"/><rect x="16.5" y="10.5" width="3.2" height="2.4" rx="0.5"/></svg>'
+ };
+ /* 배지에 맞는 축약 — 하드코딩 행이 이미 '보드'·'파워'로 줄여 쓰던 것과 같은 관례.
+    api/taxonomy.py SLOT_LABELS(정본)의 정식 명칭 대신 이 46px 배지 폭에 맞춘 표시용 축약이다. */
+ var SLOT_KO={CPU:'CPU',MB:'보드',RAM:'RAM',GPU:'GPU',CASE:'케이스',COOLER:'쿨러',POWER:'파워',SSD:'SSD'};
+ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+ function buildRow(it,isLast){
+  var ic=SLOT_ICONS[it.part_type];
+  var iconBox=ic
+   ?'<span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;">'+ic+'</span>'
+   :'<span style="width:46px;height:46px;border-radius:12px;background:#f4f2ec;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#8a8578;">'+esc(SLOT_KO[it.part_type]||it.part_type)+'</span>';
+  return '<div style="display:flex;align-items:center;gap:14px;padding:13px 0;'+(isLast?'':'border-bottom:1px solid #f0eee9;')+'">'
+   +'<span style="flex:0 0 auto;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;">'+iconBox
+   +'<span style="font-size:10px;font-weight:800;color:#a29d92;letter-spacing:.02em;">'+esc(SLOT_KO[it.part_type]||it.part_type)+'</span></span>'
+   +'<div class="s0-spec-row" style="flex:1;display:flex;align-items:center;justify-content:flex-start;gap:16px;">'
+   +'<div style="font-size:14.5px;font-weight:800;color:#17171b;">'+esc(it.name)+'</div>'
+   +'</div></div>';
+ }
  fetch('/api/showcase').then(function(r){return r.ok?r.json():null;}).then(function(d){
   if(!d)return;
   function put(name,txt){
@@ -626,6 +627,15 @@ document.addEventListener('click',function(e){
     function(el){el.textContent=txt;});
   }
   put('live_stock_count',d.pool.toLocaleString());
+  var items=(d.pick&&d.pick.items)||[];
+  var partsBox=document.getElementById('s0-build-parts');
+  var emptyBox=document.getElementById('s0-build-empty');
+  if(partsBox&&items.length){
+   partsBox.innerHTML=items.map(function(it,i){return buildRow(it,i===items.length-1);}).join('');
+   if(emptyBox)emptyBox.style.display='none';
+  }else if(emptyBox){
+   emptyBox.textContent='지금 보여드릴 구성 예시가 없습니다.';
+  }
   if(d.pick){
    put('showcase_total',d.pick.total.toLocaleString());
    /* 조건을 밝히지 않으면 "예상 견적가"가 어디서 온 수인지 알 수 없다.
@@ -635,6 +645,18 @@ document.addEventListener('click',function(e){
    put('showcase_caption',
        d.source==='recent'?((t?t+' ':'')+'검증된 실제 견적')
                           :(d.usage+' · '+d.budget_label+' 기준 추천 구성'));
+   /* "예시 화면" 배지가 실제 검증된 견적과 나란히 있으면 서로 모순된다(감사 §2-6 —
+      캡션은 실데이터로 바뀌는데 배지는 그대로 "예시"라 말한다). source==='recent'
+      일 때만 배지도 같은 사실을 말하게 한다 — 새 배지를 만들지 않고 이 파일이
+      이미 "실시간 재고 검증" 배지에 쓰는 success 톤 + verified 아이콘을 그대로 쓴다. */
+   if(d.source==='recent'){
+    var bw=document.getElementById('s0-build-badge');
+    var bi=document.getElementById('s0-build-badge-ic');
+    var bt=document.getElementById('s0-build-badge-tx');
+    if(bw){bw.style.background='var(--success-container, #e9f6ef)';bw.style.color='var(--success-dark, #1c7a4d)';}
+    if(bi){bi.textContent='verified';bi.removeAttribute('data-su-done');}
+    if(bt)bt.textContent='실제 견적';
+   }
   }
   /* 호환 규칙 수는 서버가 정한다. **'통과'와 함께 말하는 숫자는 `rules_applied`** 다 —
      등록은 9종이지만 쿨러 높이(공랭)·라디에이터(수랭)가 배타적이라 한 구성엔 8종만 걸린다.
@@ -646,7 +668,13 @@ document.addEventListener('click',function(e){
      그래서 수는 마크업에서 걷어내고 `data-bind="showcase_rules"` 자리에만 채운다 —
      서버가 없으면 '—' 로 남는다. 이미지·alt 에도 수를 넣지 않는다(그림은 갱신되지 않는다). */
   put('showcase_rules',(d.rules_applied!=null?d.rules_applied:d.rules));
- }).catch(function(){});
+ }).catch(function(){
+  /* 실패를 삼키지 않는다 — 재고 수·캡션·총액은 원래 마크업(중립 문구)이 남으므로
+     조용해도 거짓말은 아니지만, 부품 행은 원래 마크업이 곧 "빈 상태 안내" 자체라
+     그대로 두면 "불러오는 중"이 영원히 참인 것처럼 보인다. 실패했다고 밝힌다. */
+  var eb=document.getElementById('s0-build-empty');
+  if(eb){eb.textContent='구성 정보를 불러오지 못했습니다.';eb.style.display='';}
+ });
 })();
 </script>
 <script src="../shared/auth.js"></script>

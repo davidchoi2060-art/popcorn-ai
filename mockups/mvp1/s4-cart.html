@@ -145,9 +145,16 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
             <div id="s4-periph-line" style="display:none;justify-content:space-between;font-size:14px;"></div>
             <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:#6b6b73;">배송비</span><b style="color:var(--success, #2f9e6d);">무료</b></div>
           </div>
-          <div style="display:flex;gap:8px;margin:16px 0;">
-            <input placeholder="쿠폰 코드" style="flex:1;padding:11px 14px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:13.5px;font-family:inherit;outline:none;">
-            <button style="flex:0 0 auto;padding:11px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" id="s4-coupon">적용</button>
+          <!-- 쿠폰 입력창 제거(2026-08-24, 감사 §4-4). 이전엔 어떤 코드를 넣어도 검증 없이
+               "쿠폰 코드를 확인했어요 — 목업"이라 확정적으로 답했다 — 아무것도 검증하지
+               않으면서 확인했다고 말했고, 내부 개발 용어 "목업"이 고객 문구에 그대로
+               나갔다. 애초에 이 화면(팝콘AI)에는 쿠폰을 검증할 권한이 없다 — 결제·할인은
+               쇼핑몰 소관이다(CANON §3). 입력창을 그대로 두고 "여기서는 확인하지
+               않습니다"라 적는 대안도 있었지만, 할 수 없는 일의 입력창을 두는 것 자체가
+               다음 사람에게 "여기서 될 것"이라는 기대를 준다 — 걷어낸다. -->
+          <div style="display:flex;align-items:center;gap:8px;margin:16px 0;padding:11px 14px;background:#f7f6f2;border-radius:10px;">
+            <span style="font-family:'Material Symbols Outlined';font-size:17px;color:#a29d92;flex:0 0 auto;">info</span>
+            <span style="font-size:12.5px;font-weight:600;color:#8a8578;line-height:1.5;">쿠폰·할인 적용은 팝콘PC 쇼핑몰 결제 화면에서 진행됩니다.</span>
           </div>
           <div style="background:#17171b;border-radius:14px;padding:18px 20px;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;">
@@ -303,7 +310,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   var pay = el('s4-pay');
   if(pay){pay.disabled = true; pay.style.background = '#c9c5bd'; pay.style.cursor = 'not-allowed';}
   var cap = el('s4-pay-cap'); if(cap) cap.textContent = W.s4Msg;
-  ['s4-coupon','s4-mode-demo','s4-soldout'].forEach(function(id){
+  /* 's4-coupon' 은 2026-08-24 쿠폰 입력창 제거로 더 이상 없다(감사 §4-4) */
+  ['s4-mode-demo','s4-soldout'].forEach(function(id){
    var b = el(id);
    if(b){b.disabled = true; b.style.opacity = '.45'; b.style.cursor = 'not-allowed';}
   });
@@ -407,7 +415,8 @@ if(pay)pay.addEventListener('click',function(){
 });
 applyMode();
 var so=document.getElementById('s4-soldout');if(so)so.addEventListener('click',function(){window.location.href='s3-detail.html';});
-var cp=document.getElementById('s4-coupon');if(cp)cp.addEventListener('click',function(){tmsg('쿠폰 코드를 확인했어요 — 목업');});
+/* 쿠폰 입력창을 걷어냈다(2026-08-24, 감사 §4-4) — #s4-coupon 은 더 이상 없다.
+   이 화면에는 쿠폰을 검증할 권한이 없다(CANON §3, 결제·할인은 쇼핑몰 소관). */
 })();
 </script>
 <script>

@@ -34,7 +34,7 @@ from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정�
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
 from . import usage_floors as UF
 from .timeutil import iso, now_iso
-from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap
+from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap, REUSE_LABELS
 from .db import engine
 from .product_name import display_name   # 견적은 파는 이름이 아니라 설명하는 이름을 쓴다
 
@@ -112,6 +112,35 @@ def load_compat_rules(conn) -> dict:
             continue
         by_slot.setdefault(r["slot"], []).append(dict(r))
     return by_slot
+
+
+def _rules_for_active(rules: dict, reused) -> tuple:
+    """호환 규칙을 재사용 슬롯 기준으로 나눈다 — (판정 가능한 규칙, 판정 불가 규칙) (2026-08-24).
+
+    customer-audit-2026-08-24 §1-1 · 공유 계약 ② — 재사용 슬롯은 **어떤 모델인지 모른다**.
+    그 슬롯을 slot(직접 대상)으로 삼는 규칙은 대상 부품 자체가 없어 평가할 수 없고,
+    ref_slot(비교 대상)으로 삼는 규칙은 비교할 값이 없다 — `_cmp`의 NULL 원칙("값을
+    모르면 통과시키지 않는다")과 같은 정신이지만, 여기서는 "불통과"가 아니라 "판정
+    자체를 하지 않는다"다(불통과로 처리하면 "재사용 GPU가 호환 안 됨"이라는, 실제로는
+    확인한 적 없는 결론을 지어내게 된다 — §화면 정직성이 금지하는 바로 그것).
+
+    반환한 `active`는 DFS(_dfs·_slot_ok·_narrow·_fwd_ok·build_search_index)에 그대로
+    넘긴다 — 그 함수들은 `chosen[ref_slot]`을 직접 읽으므로, ref_slot이 재사용이면
+    chosen에 그 키 자체가 없어 KeyError가 난다. active는 그런 규칙을 아예 안 담으므로
+    DFS는 재사용 슬롯을 참조하는 규칙을 만날 일이 없다. `unknown`은 화면에 "판정 못 함"을
+    정직하게 보여주는 재료로만 쓴다(build_compat).
+    """
+    active: dict = {}
+    unknown: list = []
+    for slot, rs in rules.items():
+        if slot in reused:
+            unknown.extend(rs)
+            continue
+        keep = [r for r in rs if r["ref_slot"] not in reused]
+        unknown.extend(r for r in rs if r["ref_slot"] in reused)
+        if keep:
+            active[slot] = keep
+    return active, unknown
 
 
 def applied_rule_count(rules: dict) -> int:
@@ -306,22 +335,27 @@ def _fwd_ok(slot, p, idx):
     return True
 
 
-def _dfs(slot_pools, budget_limit, rules: dict):
+def _dfs(slot_pools, budget_limit, rules: dict, slots=None):
     """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기.
 
     min_rest(남은 슬롯 최저가 합)는 **좁히기 전 전체 풀** 기준으로 둔다 — 더 느슨한 하한이라
     가지치기가 결과를 바꾸지 않는다(좁힌 풀로 계산하면 chosen에 따라 값이 달라져 계산 불가).
+
+    `slots`(2026-08-24 추가) — 이번에 실제로 채울 자리 목록. 기본은 전체 SLOTS(8종).
+    재사용 슬롯이 있으면 `_build_set`이 그 슬롯을 뺀 부분집합을 넘긴다 — DFS는 그 자리를
+    아예 방문하지 않는다(고르지 않는다). SLOTS의 부분집합이라 상대 순서는 그대로다.
     """
-    min_rest = [0] * (len(SLOTS) + 1)
-    for i in range(len(SLOTS) - 1, -1, -1):
-        min_rest[i] = min_rest[i + 1] + min(p["sale_price"] for p in slot_pools[SLOTS[i]])
+    slots = SLOTS if slots is None else slots
+    min_rest = [0] * (len(slots) + 1)
+    for i in range(len(slots) - 1, -1, -1):
+        min_rest[i] = min_rest[i + 1] + min(p["sale_price"] for p in slot_pools[slots[i]])
     idx = build_search_index(slot_pools, rules)
     nodes = [0]
 
     def go(i, chosen, total):
-        if i == len(SLOTS):
+        if i == len(slots):
             return dict(chosen)
-        slot = SLOTS[i]
+        slot = slots[i]
         for p in _narrow(slot, chosen, idx, slot_pools[slot]):
             nodes[0] += 1
             if nodes[0] > DFS_NODE_CAP:
@@ -345,17 +379,39 @@ def _dfs(slot_pools, budget_limit, rules: dict):
     return got
 
 
-def build_compat(chosen: dict, rules: dict) -> dict:
+def build_compat(chosen: dict, rules: dict, unknown_rules=()) -> dict:
     """호환성 요약 — **DB 규칙에서 생성**(슬라이스 34). recommend와 swap이 공유.
 
     표시 항목이 규칙과 1:1이 되어, 규칙을 추가하면 화면 근거도 자동으로 늘어난다.
     detail은 규칙의 detail_fmt({v}=대상값 / {r}=상대값)로 조립한다.
+
+    `unknown_rules`(2026-08-24 추가) — 재사용 슬롯이 껴서 판정 자체를 할 수 없는 규칙
+    (`recommend()`가 `_rules_for_active`로 갈라 넘긴다). **조용히 빠뜨리지 않는다** —
+    `rules`(판정 가능한 규칙)에서는 이미 빠져 있으므로, 여기서 pass/fail 이 아닌
+    unknown=True 항목으로 따로 올린다. 빠뜨리면 "검사 안 함"이 그냥 "언급 없음"이 되어
+    고객이 "통과했나 보다"로 오독할 수 있다(§화면 정직성 — 판정할 수 없는 것을 통과로
+    만들지 않는다). `expert.py`·`swap.py`는 이 인자를 안 넘긴다 — 기본값 `()`이라
+    기존 동작(재사용 개념이 없는 호출)은 그대로다.
+
+    ⚠ **`unknown_rules`는 "판정 불가"와 "이 구성엔 애초에 대상이 아님"을 섞어서 담고
+    있다**(2026-08-24 결함 수정 — customer-audit-2026-08-24 §1-1 후속). `_rules_for_active`는
+    재사용 슬롯을 slot(대상)·ref_slot(비교 상대) 어느 쪽으로 겨냥하든 전부 이 목록에
+    넣는다 — 갈라 담지 않는 것이 그 함수 안에서는 맞다(대상 슬롯이 재사용이면 chosen에
+    그 키 자체가 없어 `_rule_applies`를 부를 수 없다). 그런데 아래 루프에서 그대로 다
+    "확인 보류"로 찍으면, 대상 슬롯은 우리가 이미 아는 부품인데(재사용 아님) 그 규칙이
+    겨냥하는 종류가 아닌 경우(예: 공랭 쿨러 구성에서 수랭 전용 `radiator`)까지 「확인
+    보류」분모에 들어간다 — 존재하지도 않는 검사를 "아직 확인 못 함"으로 만드는 것이라
+    §화면 정직성이 금지하는 "판정을 지어낸다"의 다른 얼굴이다. 그래서 아래 루프에서
+    **기존 `_rule_applies`를 그대로 재사용해**(새 판정 술어를 적지 않는다 — §단일 원천)
+    "대상 슬롯을 이미 아는가"부터 가른다.
     """
     checks = []
     for slot in SLOTS:
         for rule in rules.get(slot, ()):
             # 겨냥하지 않은 부품에는 검사를 내밀지 않는다. 수랭 구성에 '쿨러 높이 여유'를
             # 띄우면 검증한 적 없는 것을 검증했다고 말하는 셈이다(슬라이스 82).
+            # rules가 이미 재사용 슬롯을 slot·ref_slot 어느 쪽으로도 안 담고 있으므로
+            # (_rules_for_active) chosen[slot]·chosen[ref_slot]은 항상 안전하다.
             if not _rule_applies(rule, chosen[slot]):
                 continue
             v = chosen[slot].get(rule["field"])
@@ -371,14 +427,41 @@ def build_compat(chosen: dict, rules: dict) -> dict:
             # 절대 만들지 않던 조합을 사람이 직접 만들 수 있게 열면서 드러났다.
             checks.append({
                 "key": rule["rule_key"], "label": rule["label"],
-                "pass": _cmp(rule["op"], v, r),
+                "pass": _cmp(rule["op"], v, r), "unknown": False,
                 "detail": fmt.replace("{v}", "—" if v is None else str(v))
                              .replace("{r}", "—" if r is None else str(r)),
             })
-    gpu, power = chosen["GPU"], chosen["POWER"]
+    for rule in unknown_rules:
+        # customer-audit-2026-08-24 §1-1 후속 결함 수정 — `unknown_rules`를 그대로 다
+        # 찍으면 «애초에 이 구성의 대상이 아닌 규칙»까지 「확인 보류」로 세게 된다.
+        # 두 가지를 분명히 가른다:
+        #   ① 규칙의 대상 슬롯(rule["slot"]) 자체가 재사용이라 chosen에 그 부품이 없다
+        #      → 그 부품이 무엇인지 몰라 규칙이 적용되는지조차 판정할 수 없다.
+        #      (예: gpu_len·case_board — 대상 CASE 자체가 재사용) → **계속 unknown**.
+        #   ② 대상 슬롯은 재사용이 아니라 chosen에 실제 부품이 있다(우리가 이미 아는
+        #      부품) — 이때는 기존 `_rule_applies`(§단일 원천, 판정 술어를 다시 적지
+        #      않는다)를 그대로 적용해, 그 부품의 part_type이 애초에 이 규칙의 대상이
+        #      아니면(예: 공랭 쿨러 구성에서 수랭 전용 `radiator` 규칙) **아예 목록에서
+        #      뺀다** — "확인 못 함"이 아니라 "해당 없음"이라 분모에도 들지 않는다.
+        # ref_slot(비교 상대)이 재사용인 것은 ①·② 어느 쪽이든 그대로 유지된다 —
+        # 대상 부품이 이 규칙에 걸린다는 것은 알아도 비교할 상대값을 모르기 때문이다.
+        known_target = chosen.get(rule["slot"])
+        if known_target is not None and not _rule_applies(rule, known_target):
+            continue
+        checks.append({
+            "key": rule["rule_key"], "label": rule["label"],
+            "pass": None, "unknown": True,
+            "detail": "재사용 부품이라 확인할 수 없습니다",
+        })
+    # GPU·POWER 어느 한쪽이라도 재사용이면 chosen에 그 키가 없다 — .get()으로 안전하게
+    # 읽고, 여유율은 null(계산 불가)로 낸다. null이 "사양 결측"과 "재사용이라 모름"
+    # 두 사유를 다 가질 수 있어 power_headroom_unknown으로 사유를 가른다.
+    gpu, power = chosen.get("GPU"), chosen.get("POWER")
     headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
-                if power["rated_watt"] and gpu["required_power_watt"] else None)
-    return {"power_headroom_pct": headroom, "checks": checks}
+                if gpu and power and power.get("rated_watt") and gpu.get("required_power_watt")
+                else None)
+    return {"power_headroom_pct": headroom, "checks": checks,
+            "power_headroom_unknown": gpu is None or power is None}
 
 
 # ---- 견적 이유의 재료 (재료 늘리기 단계 — AI는 붙이지 않는다) ----
@@ -423,9 +506,21 @@ def _explain_spec(p: dict) -> dict:
     return out
 
 
-def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None):
+def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
+               active_slots=None, unknown_rules=None, reuse_note=None):
+    """`active_slots`·`unknown_rules`·`reuse_note`(2026-08-24 추가) — 재사용 슬롯 처리
+    (customer-audit-2026-08-24 §1-1). 기본값은 전부 None/생략과 같은 뜻이라 기존 호출부
+    (`api/expert.py`·이 파일의 `/api/showcase`)는 손대지 않아도 그대로 동작한다.
+
+    active_slots  실제로 채울 자리(기본 SLOTS 전체). 재사용 슬롯을 뺀 부분집합이 오면
+                  그 자리는 DFS가 방문하지 않는다 — **고르지 않고, 값도 안 매긴다.**
+    unknown_rules 재사용 슬롯이 껴서 판정할 수 없는 호환 규칙 — build_compat에 그대로
+                  전달해 unknown으로 정직하게 표시한다(통과로 지어내지 않는다).
+    reuse_note    reasons에 덧붙일 재사용 안내(전력·호환 확인 불가 캐치프레이즈 포함).
+    """
+    slots = active_slots if active_slots is not None else SLOTS
     slot_pools = {}
-    for s in SLOTS:
+    for s in slots:
         cands = [p for p in pool if p["part_type"] in SLOT_TYPES[s]]
         if not cands:
             return None
@@ -438,7 +533,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         limit = int(limit * HIGHEND_CAP_X)
     if limit_override is not None:
         limit = limit_override
-    chosen = _dfs(slot_pools, limit, rules)
+    chosen = _dfs(slot_pools, limit, rules, slots)
     if chosen is None:
         return None
     total = sum(p["sale_price"] for p in chosen.values())
@@ -450,7 +545,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         "highend": [f"예산의 {HIGHEND_CAP_X:g}배까지 허용한 최고 사양 조합"
                     f"(부품별 배분 상한은 유지 — 초과분은 아래에 정직 표기)"],
     }[tier]
-    reasons = reasons + [n for n in (floor_note, relax_note) if n]
+    reasons = reasons + [n for n in (floor_note, relax_note, reuse_note) if n]
     # market_price 배선(A-100 · 공유 계약 ②) — 몰 최저가 비교 재료.
     # ⚠ 실측(2026-08-23, 이 물결 조사): `products.market_price`는 컬럼 자체는 NULL이
     # 거의 없지만(재고 후보 3,059건 중 NULL 1건) **값이 있는 행도 거의 전부 0**이다
@@ -472,7 +567,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     # 같은 7개끼리 비교하면 실제로는 5,910원 "더 쌌다"(§화면 정직성 위반 — 시세
     # 없는 부품 하나가 통째로 우리 쪽에만 더해져 실제보다 훨씬 비싸 보이는 방향으로
     # 틀렸다). market_total이 null이면 market_compare_total도 null.
-    market_pairs = [(_mp(chosen[s]), chosen[s]["sale_price"]) for s in SLOTS]
+    market_pairs = [(_mp(chosen[s]), chosen[s]["sale_price"]) for s in slots]
     market_vals = [mp for mp, _ in market_pairs]
     market_present = [mp for mp, _ in market_pairs if mp is not None]
     compare_present = [sp for mp, sp in market_pairs if mp is not None]
@@ -483,9 +578,9 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                    "price": chosen[s]["sale_price"], "maker": chosen[s].get("maker"),
                    "market_price": _mp(chosen[s]),
                    "spec": _explain_spec(chosen[s]), "tags": _pref_tags(chosen[s])}
-                  for s in SLOTS],
+                  for s in slots],
         "total": total,
-        "compat": build_compat(chosen, rules),
+        "compat": build_compat(chosen, rules, unknown_rules or ()),
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},
         "totals": {"market_total": sum(market_present) if market_present else None,
@@ -494,6 +589,13 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         # 「부품」 핀이 없으면 빈 배열 — 화면이 매번 undefined 가드를 안 짜도 되게
         # 항상 이 키를 둔다. 핀이 있으면 `_attach_pin()`이 덮어쓴다.
         "pinned": [],
+        # 재사용을 고른 슬롯 — 「이 자리는 쓰시던 부품을 그대로 쓰고, 이 견적에는 안
+        # 들어 있다」는 사실을 화면이 말할 수 있게(customer-audit-2026-08-24 §1-1,
+        # 공유 계약 ②). SLOTS 기준으로 slots(active)에 없는 자리를 역산한다 — 재사용
+        # 여부를 또 다른 곳에서 재판정하지 않는다(§단일 원천, active_slots가 이미 정답).
+        "reused": [{"slot": s, "label": SLOT_KO.get(s, s),
+                    "note": "쓰시던 부품을 사용합니다 - 이 견적에 포함되지 않았습니다"}
+                   for s in SLOTS if s not in slots],
         "reasons": reasons,
     }
 
@@ -735,6 +837,14 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         pool = _load_pool(conn)
         total_n = len(pool)
 
+        # ── 재사용 슬롯(2026-08-24 · customer-audit-2026-08-24 §1-1 · 공유 계약 ①②) ──
+        # 화면이 {"l":"재사용","v":"GPU"} 형태로 보낸다. 어휘·「필터가 아니라 제외」라는
+        # 판정은 candidates.REUSE_LABELS 처분표 하나뿐이다(여기서 다시 정의하지 않는다,
+        # CANON §1) — 이 함수가 새로 하는 일은 "그 슬롯을 DFS가 아예 안 채운다"뿐이다.
+        # 값은 SLOTS(8종)만 받는다 — HDD는 견적 슬롯이 아니라 애초에 채울 자리가 없다.
+        reuse_slots = {c.v for c in body.constraints if c.l in REUSE_LABELS and c.v in SLOTS}
+        active_slots = [s for s in SLOTS if s not in reuse_slots]   # SLOTS 순서를 보존한 부분집합
+
         # ── 「부품」 핀 정책(A-101 · 공유 계약 ①②) — 지금은 GPU만 다룬다 ──────────
         # candidates.PART_PIN_LABELS 분기(아래 common/capped/hi_pool 구성 루프가 그대로
         # 통과시킨다)가 재고에 있으면 GPU 슬롯 후보를 이 값으로 이미 좁힌다 — 그래서
@@ -742,12 +852,29 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # **핀이 실패했을 때 무엇을 말할지**뿐이다: 재고 자체에 없는지, 아니면 있지만
         # 이 티어 상한을 못 넘는지를 구분해야 화면이 정직하게 사유를 댈 수 있다.
         part_v = next((c.v for c in body.constraints if c.l == "부품"), None)
+        # ⚠ 설계 판단 — GPU를 재사용으로 고르면 「부품」 핀은 무시한다. "이 슬롯은 손대지
+        # 말라"(재사용)와 "이 모델을 사라"(핀)는 같은 슬롯에 동시에 성립할 수 없는
+        # 모순이고, 재사용 쪽이 더 구체적인 신호(값이 아니라 슬롯 자체를 지정)라고 본다.
+        # 무시하지 않으면 GPU가 active_slots에서 빠져 아래 GPU_I 색인이 다른 슬롯의
+        # item을 가리키게 된다(_attach_pin이 엉뚱한 부품에 "지정 부품 반영"이라고 쓰는
+        # 사고) — 그 사고를 피하는 방편이 아니라, 모순을 조용히 삼키지 않고 이유를 말로
+        # 남기는 쪽을 택한 것이다(아래 reuse_note에 합쳐 reasons로 나간다).
+        pin_conflict_note = None
+        if part_v and "GPU" in reuse_slots:
+            pin_conflict_note = "그래픽카드를 재사용하기로 하셔서 지정하신 부품 요청은 반영하지 않았습니다"
+            part_v = None
         gpu_matches = []
         if part_v:
             gpu_matches = [p for p in pool if p["part_type"] == "GPU"
                            and gpu_chipset_key(p.get("product_name") or "") == part_v]
         gpu_min_price = min((p["sale_price"] for p in gpu_matches), default=None)
-        GPU_I = SLOTS.index("GPU")
+        # SLOTS.index가 아니라 active_slots.index다 — items는 이제 active_slots 기준으로
+        # 만들어진다. CPU·MB·RAM 중 하나라도 재사용이면 GPU의 SLOTS상 위치(3)와 items
+        # 안에서의 실제 위치가 달라진다(앞쪽 슬롯이 빠지면 뒤 인덱스가 당겨진다) — 옛
+        # SLOTS.index를 그대로 썼다면 GPU가 아닌 다른 슬롯의 item에 핀을 붙이는 색인
+        # 사고가 났을 자리다. part_v가 살아있으면(위에서 GPU 재사용 시 이미 None 처리했다)
+        # "GPU"는 반드시 active_slots에 있다.
+        GPU_I = active_slots.index("GPU") if "GPU" in active_slots else None
 
         def _attach_pin(built, honored, cap_display):
             """built(성공한 구성)에 pinned·reasons를 덧붙인다 — part_v가 없으면 아무 것도 안 한다."""
@@ -796,15 +923,30 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # GPU는 성능 지표가 없어 권장 전원을 계층 근사로 쓴다. 그 사실을 숨기지 않는다.
         usage_v = next((c.v for c in body.constraints if c.l in ("용도", "상황")), "")
         floors = UF.summary(usage_v)
+        # ⚠ 설계 판단 — 재사용 슬롯의 하한은 "확인했다"고 말하지 않는다(customer-audit
+        # -2026-08-24 「전력 합계·용도 하한도 같은 문제다」). 그 슬롯은 애초에 고르지
+        # 않으니 비교할 값 자체가 없다 — floors(응답 usage_floors.items, 이 용도에
+        # 정의된 하한 목록)는 그대로 두고("정의돼 있다"는 사실 자체는 참이다),
+        # floor_note(근거 문구, "실제로 걸렀다"는 주장)만 확인 가능한 것과 확인
+        # 불가능한 것을 가른다 — 확인 못 한 걸 확인했다고 말하지 않는다.
         floor_note = None
-        if floors:
+        floors_checked = [f for f in floors if f["slot"] not in reuse_slots]
+        floors_unchecked = [f for f in floors if f["slot"] in reuse_slots]
+        if floors_checked:
             # 근거에는 **숫자가 있어야 한다**. "고사양 게임 GPU 등급"만으로는 무엇을 걸렀는지
             # 알 수 없다 — 얼마 이상인지가 근거다.
             unit = {"required_power_watt": "W", "capacity_gb": "GB"}
             said = " · ".join(f"{SLOT_KO.get(f['slot'], f['slot'])} "
-                              f"{f['value']:,}{unit.get(f['field'], '')} 이상" for f in floors)
+                              f"{f['value']:,}{unit.get(f['field'], '')} 이상" for f in floors_checked)
             floor_note = (f"{UF.label_of(usage_v)} 하한 — {said}."
                           " GPU는 성능 지표가 없어 권장 전원을 등급 근사로 사용합니다")
+        if floors_unchecked:
+            skip = " · ".join(SLOT_KO.get(f["slot"], f["slot"]) for f in floors_unchecked)
+            skip_note = f"{skip} 하한은 재사용 부품이라 확인하지 못했습니다"
+            # floor_note가 이미 있으면 마침표로 문장을 끊는다 — 안 그러면 "…사용합니다
+            # 그래픽카드 하한은…"처럼 두 문장이 붙어 읽힌다(실측으로 발견, TestClient
+            # 검증 중 reasons[] 출력에서 잡았다).
+            floor_note = f"{floor_note}. {skip_note}" if floor_note else skip_note
 
         # 고성능 풀 = 예산 배분율을 HIGHEND_CAP_X배로 늘려 적용(전면 해제가 아니다).
         # `common`(배분 미적용)을 그대로 주면 램 931만원이 다시 들어온다.
@@ -819,17 +961,37 @@ def recommend(body: RecommendBody, request: Request, response: Response):
 
         rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
         check_rule_fields(pool, rules)    # 규칙 필드 누락은 조용한 전면 불통과 → 경고로 드러낸다
+        # 재사용 슬롯이 낀 규칙은 DFS에서 아예 뺀다(rules_active) — chosen에 그 슬롯이
+        # 없어 규칙이 참조하면 KeyError가 난다. 뺀 규칙은 화면에서 사라지지 않고
+        # build_compat이 unknown으로 올린다(rules_unknown). 판정 규약은
+        # `_rules_for_active` 정본 하나다.
+        rules_active, rules_unknown = _rules_for_active(rules, reuse_slots)
+        # 재사용 안내 — SLOTS 순서로 고정해 매 요청 같은 문구가 나오게 한다(순서가
+        # constraints 입력 순서를 타면 같은 조건인데 다른 문장이 나올 수 있다).
+        reuse_note = None
+        if reuse_slots:
+            names = " · ".join(SLOT_KO.get(s, s) for s in SLOTS if s in reuse_slots)
+            reuse_note = (f"{names} — 쓰시던 부품을 재사용합니다(새로 사지 않음). "
+                          "그 부품이 관련된 호환성·전력 적합성은 확인할 수 없습니다")
+        if pin_conflict_note:
+            # 마침표로 문장을 끊는다 — floor_note 이어붙이기와 같은 이유(위 참조),
+            # 같은 함정을 여기서도 반복하지 않는다.
+            reuse_note = f"{reuse_note}. {pin_conflict_note}" if reuse_note else pin_conflict_note
         # 가성비형은 **부품별 배분율을 받지 않는다**(슬라이스 58). 최저가를 고르는 티어에
         # "비싼 부품 차단" 상한은 무의미한데, 슬롯 후보를 예산마다 다르게 만들어
         # 150만원이 70만원보다 비싼 가성비 구성을 내놓았다(회귀 '가성비는 전 예산 공통' 실패).
         # 진짜 제약은 총액이고 그건 DFS 가지치기가 건다.
         # ── 가성비형 ──────────────────────────────────────────────────────────
-        built_v = _build_set("value", common, cap, rules, floor_note)
+        built_v = _build_set("value", common, cap, rules_active, floor_note,
+                             active_slots=active_slots, unknown_rules=rules_unknown,
+                             reuse_note=reuse_note)
         honored_v = None
         if part_v:
             if gpu_matches and built_v is None:
                 # 핀 풀(common)로는 성립하지 않는다 — 「부품」을 뺀 풀로 다시 짓는다(핀 해제).
-                built_v = _build_set("value", common_full, cap, rules, floor_note)
+                built_v = _build_set("value", common_full, cap, rules_active, floor_note,
+                                     active_slots=active_slots, unknown_rules=rules_unknown,
+                                     reuse_note=reuse_note)
                 honored_v = False
             else:
                 honored_v = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
@@ -848,16 +1010,23 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
 
             # ── 추천형 ────────────────────────────────────────────────────────
-            built_r = _build_set("recommend", capped, cap, rules, floor_note)
+            built_r = _build_set("recommend", capped, cap, rules_active, floor_note,
+                                 active_slots=active_slots, unknown_rules=rules_unknown,
+                                 reuse_note=reuse_note)
             if built_r is None:
-                built_r = _build_set("recommend", common, cap, rules, floor_note, relaxed)
+                built_r = _build_set("recommend", common, cap, rules_active, floor_note, relaxed,
+                                     active_slots=active_slots, unknown_rules=rules_unknown,
+                                     reuse_note=reuse_note)
             honored_r = None
             if part_v:
                 if gpu_matches and built_r is None:
-                    built_r = _build_set("recommend", capped_full, cap, rules, floor_note)
+                    built_r = _build_set("recommend", capped_full, cap, rules_active, floor_note,
+                                         active_slots=active_slots, unknown_rules=rules_unknown,
+                                         reuse_note=reuse_note)
                     if built_r is None:
-                        built_r = _build_set("recommend", common_full, cap, rules, floor_note,
-                                             relaxed)
+                        built_r = _build_set("recommend", common_full, cap, rules_active, floor_note,
+                                             relaxed, active_slots=active_slots,
+                                             unknown_rules=rules_unknown, reuse_note=reuse_note)
                     honored_r = False
                 else:
                     honored_r = bool(gpu_matches)
@@ -879,18 +1048,24 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                 int(cap * HIGHEND_CAP_X) if cap is not None else None)
 
             # ── 고성능형 ──────────────────────────────────────────────────────
-            built_h = _build_set("highend", hi_pool, cap, rules, floor_note, hi_note, hi_limit)
+            built_h = _build_set("highend", hi_pool, cap, rules_active, floor_note, hi_note, hi_limit,
+                                 active_slots=active_slots, unknown_rules=rules_unknown,
+                                 reuse_note=reuse_note)
             if built_h is None:
-                built_h = _build_set("highend", common, cap, rules, floor_note,
-                                     hi_note or relaxed, hi_limit)
+                built_h = _build_set("highend", common, cap, rules_active, floor_note,
+                                     hi_note or relaxed, hi_limit,
+                                     active_slots=active_slots, unknown_rules=rules_unknown,
+                                     reuse_note=reuse_note)
             honored_h = None
             if part_v:
                 if gpu_matches and built_h is None:
-                    built_h = _build_set("highend", hi_pool_full, cap, rules, floor_note,
-                                         hi_note, hi_limit)
+                    built_h = _build_set("highend", hi_pool_full, cap, rules_active, floor_note,
+                                         hi_note, hi_limit, active_slots=active_slots,
+                                         unknown_rules=rules_unknown, reuse_note=reuse_note)
                     if built_h is None:
-                        built_h = _build_set("highend", common_full, cap, rules, floor_note,
-                                             hi_note or relaxed, hi_limit)
+                        built_h = _build_set("highend", common_full, cap, rules_active, floor_note,
+                                             hi_note or relaxed, hi_limit, active_slots=active_slots,
+                                             unknown_rules=rules_unknown, reuse_note=reuse_note)
                     honored_h = False
                 else:
                     honored_h = bool(gpu_matches)
@@ -935,6 +1110,11 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 서버가 실제로 건 하한 — 화면이 지어내지 않고 이것만 말한다
             "usage_floors": {"usage": UF.label_of(usage_v), "items": floors},
             "highend_cap_x": HIGHEND_CAP_X,
+            # 재사용 슬롯 — 티어별 sets[tier].reused와 같은 정보를 요청 단위로도 낸다.
+            # 전 티어가 None(불성립)이어도 "무엇을 재사용으로 골랐는지"는 화면이 알아야
+            # 한다(customer-audit-2026-08-24 §1-1) — sets 안에 묻으면 실패 시 사라진다.
+            "reused_slots": [{"slot": s, "label": SLOT_KO.get(s, s)}
+                             for s in SLOTS if s in reuse_slots],
             "sets": sets, "companion": comp}
 
 

@@ -283,7 +283,17 @@ function poolUnknown(why){
 }
 function animate(el,to){if(to==null){if(el.firstChild)el.firstChild.textContent='—';if(el===pool)mbarUpdate();return;}var f=parseInt((el.firstChild.textContent||'').replace(/[^0-9]/g,''))||0;var st=performance.now();(function tick(t){var p=Math.min((t-st)/500,1);el.firstChild.textContent=Math.round(f+(to-f)*(1-Math.pow(1-p,3))).toLocaleString();if(p<1)requestAnimationFrame(tick);})(performance.now());setTimeout(function(){el.firstChild.textContent=to.toLocaleString();},600);/* 백그라운드 탭(rAF 정지)에서도 최종값 보장 */if(el===pool)mbarUpdate();}
 function addAI(t){var d=document.createElement('div');d.style.cssText='display:flex;gap:12px;align-items:flex-start;max-width:88%;';d.innerHTML='<span style="flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">auto_awesome</span><div style="background:#f7f6f2;border-radius:4px 16px 16px 16px;padding:15px 18px;"><p style="margin:0;font-size:15px;line-height:1.65;color:#2c2c32;">'+t+'</p></div>';msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
-function addUser(t){var d=document.createElement('div');d.style.cssText='align-self:flex-end;max-width:80%;';d.innerHTML='<div style="background:#2b5fd9;color:#fff;border-radius:16px 4px 16px 16px;padding:14px 18px;"><p style="margin:0;font-size:15px;line-height:1.6;">'+t+'</p></div>';msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
+/* addUser — 고객이 «말한 것»을 그대로 옮기는 자리다. t 는 거의 항상 고객 원문(타이핑 ·
+   자유 입력)이라 esc() 로 반드시 이스케이프한다(고객단 점검 §3-1 — <img src=x
+   onerror=...> 가 실행까지 됐다, 실측 확인). esc() 는 아래에서 함수선언으로 정의돼
+   호이스팅되므로 이 위치에서 먼저 불러도 된다.
+   ⚠ 호출부 중 «코드가 만든» t 도 있다(가이드 칩 재선택 등) — 그 자리들은 t 안에
+   customer 텍스트가 섞이지 않는 한 이스케이프해도 겉보기가 그대로다(특수문자가 없으므로).
+   다만 일부러 <b> 태그를 심어 굵게 보이려던 호출부(가이드 재선택 안내)는 이제 그 태그도
+   글자로 보이게 되므로, 그 자리는 태그를 빼고 평문으로 고쳤다(아래 gAnswer 참고) — «고객
+   입력에서 온 값만 escape» 원칙과 달리 addUser 는 의미상 전부 «사용자 발화»라 예외를 두지
+   않는다(그게 이 함수의 계약이다). */
+function addUser(t){var d=document.createElement('div');d.style.cssText='align-self:flex-end;max-width:80%;';d.innerHTML='<div style="background:#2b5fd9;color:#fff;border-radius:16px 4px 16px 16px;padding:14px 18px;"><p style="margin:0;font-size:15px;line-height:1.6;">'+esc(t)+'</p></div>';msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
 function enable(){if(mode==='talk'&&!talkReady){if(cap)cap.textContent='용도와 예산을 알려주시면 견적을 만들 수 있어요.';return;}cb.disabled=false;cb.style.background='#2b5fd9';cb.style.cursor='pointer';
  /* 확정 안내도 서버 판정을 그대로 쓴다 — 「3구성 가능」은 화면이 스스로 할 수 있는 말이 아니다. */
  if(cap)cap.textContent=(LIVE&&lastCount&&lastCount.verdict)?lastCount.verdict
@@ -292,7 +302,14 @@ function candidates(n){if(n==null){poolUnknown(SRC_NOTE.off);return;}poolN=n;ani
 /* 완화 효과는 «서버에 물어야 아는 수»다. LIVE 에서는 relaxChips()가 실측으로 다시 그리고,
    서버가 없으면 몇 개가 되는지 말하지 않는다 — 목업의 '+1,240개'가 그렇게 생겼다. */
 function relax(){poolUnknown(SRC_NOTE.off);addAI('조건을 완화했어요. 다만 <b>몇 개가 되는지는 서버에 연결되면 표시됩니다</b> — 지금은 후보 수를 셀 수 없어요.');}
-function addConstraint(icon,label,value){var e=document.getElementById('s1-cons-empty');if(e)e.style.display='none';var box=document.getElementById('s1-cons');if(!box)return;var d=document.createElement('div');d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f6f2;border-radius:11px;';d.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+icon+'</span><div style="flex:1;"><div style="font-size:11.5px;color:#8a8578;font-weight:700;">'+label+'</div><b style="font-size:13.5px;color:#17171b;">'+value+'</b></div>';box.appendChild(d);}
+/* addConstraint(base) — icon·label 은 전부 코드가 정한 상수(Q_*.ci/cl · SLOT 아이콘 등,
+   고객이 못 건드린다) 라 그대로 두고, value 만 esc() 한다 — 「요청」 라벨(고객 원문을 16자
+   잘라 만드는 사이드바 참고 칩, send()/talkAnswer() 의 addSpec('요청', t.slice(0,16)…))이
+   여기로 고객 원문을 그대로 들일 수 있는 유일한 통로다(고객단 점검 §3-1). 이 함수는 이후
+   세 겹(판정·LIVE·정규화)으로 다시 감싸이는데(주석 296행 근처), 기존 칩을 갱신하는
+   경로(위 판정 wrapper)는 이미 textContent 라 안전했다 — 새 칩을 여기서 처음 만들 때만
+   innerHTML 이었다. */
+function addConstraint(icon,label,value){var e=document.getElementById('s1-cons-empty');if(e)e.style.display='none';var box=document.getElementById('s1-cons');if(!box)return;var d=document.createElement('div');d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f6f2;border-radius:11px;';d.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+icon+'</span><div style="flex:1;"><div style="font-size:11.5px;color:#8a8578;font-weight:700;">'+label+'</div><b style="font-size:13.5px;color:#17171b;">'+esc(value)+'</b></div>';box.appendChild(d);}
 /* 조건 배지("조건 N개")는 여기서 세지 않는다 — 아래 recountCons() 가 단일 원천이다
    (2026-08-19 사장님 확정 ②: 배지는 실제 적용된 것만 센다). 이 함수는 아래에서 여러 번
    `addConstraint=function...` 로 재정의돼(선호 별칭 정리 · LIVE scheduleCount · 판정 wrapper)
@@ -351,6 +368,14 @@ var Q_PURPOSE={id:'purpose',q:'누가 쓰실 PC인가요?',cl:'대상',ci:'perso
 var Q_QTY={id:'qty',q:'직원용이면, 몇 대 필요하세요?',cl:'수량',ci:'inventory_2',f:0.92,noFilter:true,opts:[{t:'1~5대',v:'1~5대',why:['대량 동일사양 재고로 압축']},{t:'6~20대',v:'6~20대',why:['대량 동일사양 재고로 압축']},{t:'20대+',v:'20대 이상',why:['대량 동일사양 재고로 압축']}]};
 var Q_EXISTING={id:'existing',q:'이번 구매는 어떤 경우세요?',cl:'구매 형태',ci:'sync',f:0.85,noFilter:true,opts:[{t:'처음 장만 (다 새로)',v:'신규 일체',why:[]},{t:'PC만 교체 (모니터는 쓰던 거)',v:'모니터 기존',why:['모니터 견적 제외']},{t:'업그레이드 (일부 재사용)',v:'업그레이드',why:['재사용 예정 부품 후보 제외']}]};
 var Q_REUSE={id:'reuse',q:'그대로 쓰실 부품을 골라 주세요.',cl:'재사용',ci:'recycling',multi:true,skip:true,f:0.9,noFilter:true,opts:[{t:'모니터',v:'모니터',why:['모니터 견적 제외']},{t:'케이스',v:'케이스',why:['케이스 견적 제외']},{t:'저장장치',v:'저장장치',why:['저장장치 견적 제외']},{t:'파워',v:'파워',why:['파워 견적 제외']},{t:'그래픽카드',v:'그래픽카드',why:['그래픽카드 견적 제외']},{t:'잘 모름-봐주세요',v:'점검 요청',why:['현 부품 호환 점검 대상']}]};
+/* ⚠ Q_REUSE 는 noFilter 지만 «서버로 아예 안 간다»는 뜻은 아니게 됐다(2026-08-24, 감사
+   §1-1 해소 — 고객이 "그래픽카드·파워는 쓰던 거 쓸게요"라고 골라도 S2 에 신품으로 청구되던
+   결함). noFilter 가 막는 것은 «후보 풀 필터 연출»(logFilter 의 "N개 줄었다" 같은 지어낸
+   효과)뿐이고, gAnswer() 가 st.id==='reuse' 를 별도로 갈라 addConstraint 는 그대로 부른다
+   (사이드바 노출 + consPairs 적재). 한글 옵션 라벨 -> part_type 변환(REUSE_PART_TYPE)과
+   서버로 나가는 모양({"l":"재사용","v":"GPU"} 를 항목마다 하나씩)은 wireConstraints() 가
+   맡는다(consPairs 근처, doCount/relaxChips/goRecommend 세 전송 지점이 전부 그것을 거친다) —
+   그 매핑이 이 파일의 유일한 자리다. */
 /* 용도 선택지는 «서버가 준다» — 어휘를 여기 박지 않는다(2026-08-17, 아래 USAGES 블록).
    ⚠ multi 를 뗐다: 서버 `usage_floors.match()` 는 **먼저 맞는 하나만** 쓴다. 여러 개를 고르게
    두면 화면엔 「게임 · 영상편집」 두 칩이 뜨는데 하한은 한 벌만 걸려 화면이 거짓말한다. */
@@ -401,6 +426,27 @@ var USAGES_READY=fetch('/api/usages')
    갱신되므로(아래 setProgress) 문항 수를 따로 맞출 필요는 없다. */
 var QUEUE=[Q_USE,Q_BUDGET,Q_EXISTING,Q_ENV,Q_PRIORITY];
 var qidx=0;
+/* _guidedRow = 지금 화면에 떠 있는 질문의 칩 행(guidedAsk 가 매번 갱신) ·
+   _guidedAnswered = 그 문항이 이미 답해졌는가(칩 클릭이든 자유입력이든). guidedAutoClose
+   (아래, talkParse.apply() 가 부른다)가 쓴다 — 정의는 아래에서 하되 함수선언이라
+   호이스팅되므로 여기서 앞서 언급해도 된다. */
+var _guidedRow=null,_guidedAnswered=false;
+/* guidedAutoClose(labels) — 자유입력으로 «지금 묻는 문항»에 해당하는 조건이 잡히면
+   그 문항을 gAnswer() 가 칩 클릭에서 하는 것과 같이 닫고 다음으로 넘어간다
+   (고객단 점검 §4-8 — 「이미 말한 것을 또 묻나?」에 대한 답). ⚠ **그 문항이 묻는 라벨이
+   실제로 잡혔을 때만 닫는다** — 예산만 말했는데 용도 질문을 닫으면 더 나쁘다(지시 원문).
+   noFilter 문항(대상·수량·구매 형태·연결·재사용)은 여기서 절대 안 닫힌다 — AI 가 만들 수
+   있는 라벨은 예산·용도·선호·부품 넷뿐이라(api/talk.py LABELS) st.cl 이 그중 하나가 아니면
+   labels.indexOf 가 항상 -1 이다. 별도로 st.noFilter 도 확인해 이중으로 막는다(재사용처럼
+   noFilter 인데 예외적으로 라벨이 있는 문항까지 실수로 걸리지 않게). */
+function guidedAutoClose(labels){
+ if(mode!=='guided'||_guidedAnswered||qidx>=QUEUE.length)return;
+ var st=QUEUE[qidx];
+ if(st.noFilter||labels.indexOf(st.cl)<0)return;
+ _guidedAnswered=true;
+ if(_guidedRow)lockRow(_guidedRow);
+ qidx++;setTimeout(guidedAsk,500);
+}
 function selChip(c,on){if(on){c.style.background='#e8effc';c.style.borderColor='#2b5fd9';c.style.color='#2149b0';}else{c.style.background='#fff';c.style.borderColor='#e2ded5';c.style.color='#3a3a40';}}
 function lockRow(row){Array.prototype.forEach.call(row.children,function(x){x.style.pointerEvents='none';});row.style.opacity='.7';}
 function renderHints(box,sel){box.innerHTML='';sel.forEach(function(o){if(!o.hint)return;var h=document.createElement('div');h.style.cssText='display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--success, #2f9e6d);font-weight:700;';h.innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">subdirectory_arrow_right</span>'+o.hint;box.appendChild(h);});}
@@ -415,7 +461,18 @@ function logFilter(label,delta,reasons){var wrap=document.getElementById('s1-fil
 /* noFilter 문항(대상·수량·구매 형태·재사용·연결)은 addConstraint·logFilter 를 부르지 않는다 —
    위 Q_PURPOSE 주석의 처분표 대조 결과. 답은 addUser 말풍선에만 남고 서버로 가지 않는다
    (2026-08-19 사장님 확정 ①). */
-function gAnswer(st,opts){if(opts.length){addUser(opts.map(function(o){return o.t;}).join(' · '));if(!st.noFilter){addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));var rs=[];opts.forEach(function(o){if(o.why)o.why.forEach(function(w){if(rs.indexOf(w)<0)rs.push(w);});});logFilter(st.cl,null,rs);}if(!LIVE)poolUnknown(SRC_NOTE.off);}else{addUser('건너뛸게요');}applyBranch(st,opts);qidx++;setTimeout(guidedAsk,500);}
+/* gAnswer — 칩 클릭 응답. _guidedAnswered 를 맨 먼저 세워 둔다: 자유입력 경로
+   (guidedAutoClose, 아래 talkParse.apply() 참고)가 이 문항을 «동시에» 닫으려는 경합을
+   막는다 — 칩을 눌렀으면 그걸로 끝, 뒤늦게 도착한 자유입력 결과가 같은 문항을 또 닫지
+   않는다. */
+function gAnswer(st,opts){_guidedAnswered=true;if(opts.length){addUser(opts.map(function(o){return o.t;}).join(' · '));
+ if(st.id==='reuse'){
+  /* Q_REUSE 예외 — noFilter 지만 addConstraint 는 부른다(위 Q_REUSE 주석). logFilter 는
+     그대로 건너뛴다 — 재사용은 후보 «풀」을 거르는 게 아니라서 "N개 줄었다"를 지어내면
+     거짓이 된다. */
+  addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));
+ }else if(!st.noFilter){addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));var rs=[];opts.forEach(function(o){if(o.why)o.why.forEach(function(w){if(rs.indexOf(w)<0)rs.push(w);});});logFilter(st.cl,null,rs);}
+ if(!LIVE)poolUnknown(SRC_NOTE.off);}else{addUser('건너뛸게요');}applyBranch(st,opts);qidx++;setTimeout(guidedAsk,500);}
 function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots.innerHTML='';for(var i=0;i<QUEUE.length;i++){var d=document.createElement('span');d.style.cssText='width:22px;height:6px;border-radius:3px;transition:.3s;background:'+(i<qidx?'#2b5fd9':(i===qidx?'#7fa8ff':'#e6e2da'))+';';dots.appendChild(d);}}var num=document.getElementById('s1-progress-num');if(num)num.textContent=qidx>=QUEUE.length?'완료':((qidx+1)+' / '+QUEUE.length);}
 function guidedAsk(){
  /* 용도 단계는 «서버 목록이 도착한 뒤»에 그린다 — 없는 채로 그리면 선택지가 빈 채 지나간다. */
@@ -437,6 +494,9 @@ function guidedAsk(){
   focusInput();qidx++;setTimeout(guidedAsk,700);return;}
  addAI((qidx===0?'몇 가지만 여쭤볼게요.<br>':'')+'<b>'+st.q+'</b>'+(st.multi?' <span style="font-weight:600;color:#8a8578;font-size:13px;">(여러 개 가능)</span>':''));
  var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-left:48px;align-items:center;';
+ /* 지금 묻는 문항의 칩 행을 기억해 둔다 — 자유입력이 같은 답을 잡으면(guidedAutoClose,
+    아래 talkParse.apply() 참고) 이 행을 잠그고 다음으로 넘어간다(고객단 점검 §4-8). */
+ _guidedRow=row;_guidedAnswered=false;
  if(st.multi){
   var sel=[];var hintBox=null;var hasHint=false;st.opts.forEach(function(o){if(o.hint)hasHint=true;});
   if(hasHint){hintBox=document.createElement('div');hintBox.style.cssText='padding-left:48px;display:flex;flex-direction:column;gap:4px;';}
@@ -451,7 +511,12 @@ function guidedAsk(){
    if(!answered){answered=true;selc=c;selChip(c,true);row.style.opacity='.85';gAnswer(st,[o]);return;}
    if(c===selc)return;
    if(selc)selChip(selc,false);selc=c;selChip(c,true);
-   addUser('아, <b>'+o.t+'</b>(으)로 바꿀게요');
+   /* o.t 는 Q_*.opts 의 코드 정의 라벨이라 특수문자가 없다 — 굵게 강조하던 <b> 는
+      addUser() 가 이제 인자 전체를 esc() 하면서(§3-1 XSS 수정) 글자 그대로 «&lt;b&gt;」로
+      보이게 되므로 뺐다. 굵기는 잃지만(사소한 스타일 손실), addUser 는 "고객이 말한 것"을
+      담는 자리라는 계약을 지키는 쪽을 택했다 — 이 한 자리만 예외로 두면 다음 사람이 같은
+      실수(직접 HTML 문자열을 addUser 에 심는 것)를 반복하기 쉽다. */
+   addUser('아, '+o.t+'(으)로 바꿀게요');
    /* noFilter 문항은 «반영했다»고 말하지 않는다 — 서버로 보내지도 않은 값이다(위 gAnswer 참고). */
    if(st.noFilter){addAI('네, <b>'+o.t+'</b>(으)로 알아둘게요.');}
    else{addConstraint(st.ci,st.cl,o.v);addAI('네, <b>'+st.cl+'</b>을(를) <b>'+o.v+'</b>(으)로 바꿔 반영했어요.');}
@@ -551,6 +616,12 @@ function fillVerdicts(d,err,pairs){
   var ok=(!err&&d&&d.buildable!==false&&d.count>0);
   b.disabled=!ok;b.style.opacity=ok?'1':'.45';b.style.cursor=ok?'pointer':'not-allowed';
   b.title=ok?'':(err?('후보 수를 세지 못했습니다 - '+err):((d&&d.verdict)||'조건 통과 부품 수를 세는 중입니다.'));});}
+/* addProposal(lead) — lead 는 전부 호출부가 코드로 짓는 문구다(호출부 전수 확인:
+   chatNudge/chatScenario/send()/apply() 가 넘기는 값은 고정 문자열 + 코드 정의 라벨(n.t 등)
+   뿐, 고객 원문을 직접 넣는 호출은 없다) — 그래서 esc() 를 씌우지 않는다(씌우면 일부러 넣은
+   <b> 강조가 깨진다, §3-1 지시의 "고객 입력에서 온 값만 escape"). specTags() 내부는 이미
+   x.v 마다 esc() 를 쓰고 있어(그 값이 「요청」 처럼 고객 원문일 수 있다) 별도 조치가 필요
+   없다. */
 function addProposal(lead){var d=document.createElement('div');d.style.cssText='display:flex;gap:12px;align-items:flex-start;max-width:92%;';d.innerHTML='<span style="flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">auto_awesome</span><div style="flex:1;background:#f7f9fc;border:1.5px solid #dbe4f5;border-radius:4px 16px 16px 16px;padding:16px 18px;"><div style="font-size:14.5px;font-weight:800;color:#17171b;margin-bottom:10px;">'+lead+'</div><div data-constags="1" style="display:flex;flex-wrap:wrap;margin-bottom:10px;">'+specTags()+'</div><div style="font-size:13px;color:#2149b0;font-weight:700;line-height:1.5;">'+verdictSlot()+'</div></div>';msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
  /* 이미 최신 서버 값이 있고 재계산 대기도 없으면 즉시 채운다 — 태그도 그 응답의 스냅샷으로. */
  if(LIVE&&!_pending&&lastCount)fillVerdicts(lastCount,null,lastSnap);}
@@ -766,7 +837,21 @@ function commaNum(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 // 옛 \d{2,3}은 "3000만원"에서 뒤 3자리 "300"만 집어 챗봇 답변 문구가 "예산 300만원대"로
 // 틀렸다(조사자 실측 — 재현: ?mode=talk "3000만원 정도 쓸 수 있어요"). 분기 임계값(150·100)은
 // 그대로 두고 읽는 값만 고친다.
-function talkBudget(t){var m=t.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*만/);if(!m)return null;var n=+m[1].replace(/,/g,'');return{i:'savings',l:'예산',v:commaNum(n)+'만원대',f:0.6,why:['예산 '+commaNum(n)+'만원대: 초과 부품 제외'],a:'예산 <b>'+commaNum(n)+'만원대</b>로 기억해둘게요. 이 예산이면 '+(n>=150?'QHD 게이밍·크리에이터급까지':(n>=100?'FHD 고사양~QHD 엔트리 게이밍':'사무·라이트 게이밍'))+' 구성이 가능해요. 용도를 알려주시면 더 좁혀드릴게요.'};}
+// ⚠ 2026-08-24 신설(고객단 감사 §2-5 후속 — 확인자 실측 재현: 「예산 -500만원 정도로요」).
+// 이 정규식은 '-' 부호를 «전혀» 보지 않아 "-500만원"이 "500만원"으로 읽히고, 그 값이
+// packs -> addSpec -> addConstraint 로 «서버 검증 없이» 바로 사이드바 조건이 됐다 —
+// 같은 순간 채팅은(서버 api/talk.py 의 방어) "반영하지 않았다"고 말하는 자기모순이었다.
+// 서버 `_BUDGET_NEG` 와 **같은 판정**을 여기서도 한다(그 파일 주석 근거 그대로 옮김):
+// 숫자 바로 앞의 '-'이되 그 앞이 «숫자가 아닐 때»만 부호로 본다 — "100-150만원"처럼 두
+// 숫자 사이에 낀 '-'는 앞이 숫자라 이 정규식에 걸리지 않으므로 범위 표기는 그대로 동작한다.
+var TALK_BUDGET_NEG=/(?<!\d)-\s*\d{1,3}(?:,\d{3})*\s*만/;
+function talkBudget(t){
+ // 음수면 조건 자체를 만들지 않는다 — null 을 돌려주면 호출부(talkAnswer 의 bud&&…
+ // 분기 셋)가 전부 자동으로 packs 에 안 넣는다. 사유는 여기서 다시 말하지 않는다 —
+ // LIVE 면 서버 dropped[] 가 이미 말하고, 비-LIVE 는 talkAnswer() 가 budNeg 로 따로
+ // 짧게 밝힌다(talkAnswer 의 TALK_BUDGET_NEG.test(t) 분기 참고) — 한 곳에서만 말한다.
+ if(TALK_BUDGET_NEG.test(t))return null;
+ var m=t.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*만/);if(!m)return null;var n=+m[1].replace(/,/g,'');return{i:'savings',l:'예산',v:commaNum(n)+'만원대',f:0.6,why:['예산 '+commaNum(n)+'만원대: 초과 부품 제외'],a:'예산 <b>'+commaNum(n)+'만원대</b>로 기억해둘게요. 이 예산이면 '+(n>=150?'QHD 게이밍·크리에이터급까지':(n>=100?'FHD 고사양~QHD 엔트리 게이밍':'사무·라이트 게이밍'))+' 구성이 가능해요. 용도를 알려주시면 더 좁혀드릴게요.'};}
 // ---- UX-17 ②-2: 조건 첫 발생 시 우측 패널 슬라이드-인 + 패널 용어 고객 언어 개역 ----
 function talkRelabel(){
  function sw(sel,from,to){var r=document.querySelector(sel);if(!r)return;var w=document.createTreeWalker(r,NodeFilter.SHOW_TEXT,null);var n;while((n=w.nextNode())){if(n.nodeValue&&n.nodeValue.indexOf(from)>-1){n.nodeValue=n.nodeValue.replace(from,to);return;}}}
@@ -813,6 +898,11 @@ function panelReveal(){
 var talkReady=false,talkNudged=false;
 function talkHas(labels){for(var i=0;i<consPairs.length;i++)if(labels.indexOf(consPairs[i].l)>-1)return true;return false;}
 function talkFlow(){
+ /* 이 진행 서사(「조건을 반영했어요 + 이 조건으로 견적 받기」 점진 공개 카드)는 talk 전용
+    연출이다(2026-08-24 — chat·guided 에도 정본 답변을 붙이면서, mode 와 무관하게 부르는
+    talkParse.apply() 가 이 함수도 항상 호출한다. 「답변 능력만 공통, 연출은 안 옮긴다」는
+    지시를 여기서 스스로 지킨다 — 호출부마다 mode 를 분기하지 않고 한 자리에서 막는다). */
+ if(mode!=='talk')return;
  if(talkReady)return;
  var hasUse=talkHas(['용도','상황']),hasBud=talkHas(['예산']);
  if(hasUse&&hasBud){talkReady=true;
@@ -901,26 +991,59 @@ var TALK_BOUNCE='그 주제는 제가 정확히 답하기 어렵습니다.<br><b
        차 있다. 서버가 `talk_intent_hits` 에 intent_key 를 정확히 남기고도(=올바르게
        골랐고도) 그 답이 화면에서 지워지는 사고였다(A-105 정본 A/S 문구가 비결정적으로
        사라짐). **say·list 가 둘 다 비어 있을 때만** 반송한다 — 아래 apply() 참고. */
+/* talkParse — 이제 talk 전용이 아니라 «정본 답변 + 조건 반영»의 단일 경로다
+   (2026-08-24, 감사 §4-1 해소 — 예전엔 mode==='talk' 분기(talkSend)만 이 함수를 불렀고,
+   chat·guided는 parseAll() 이라는 별도 경로로 조건만 뽑고 talk_intents 21종에는 구조적으로
+   응답하지 못했다). 지금은 talkAnswer(아래, talkSend 의 몸통을 뺀 것)가 세 모드(chat·
+   guided·talk) 모두에서 이 함수를 부른다 — 「모드와 상관없이 같은 답이 나오게 하라」는
+   지시를 여기 한 곳에서 지킨다. mode 별로 달라지는 것은 이 함수 안 두 곳뿐이다:
+   talkFlow()(호출은 하되 자기 안에서 talk 아니면 no-op) · addProposal 카드(talk 는 대신
+   talkFlow 를 쓴다) · guidedAutoClose(guided 아니면 no-op). 「연출은 안 옮긴다」는 이 세
+   가드로 지켜진다 — 답변(say)·조건 반영(list.forEach(talkApply))·반송 게이트는 전부 공통. */
 function talkParse(t,packs,useFb,say,chips){
  var vague='네, PC 관련 질문이군요! 조금만 더 구체적으로 알려주시면 정확히 답해드릴게요.<br>'
   +'예를 들어 <b>부품 이름</b>(RTX 4060, 라이젠5 7600…)이나 <b>하고 싶은 것</b>(게임 이름, 작업 종류), '
   +'<b>예산</b>을 함께 말씀해 주세요.';
- function apply(list,err,pc,fb){
+ function apply(list,err,pc,fb,dropped){
   /* 2026-08-23 확인자 실재현 · A-105: TALKS 매칭으로 이미 고른 정본 답변(say)이 있어도
      list(=packs+AI 조건)가 비어 있으면 pc===false 한 번에 통째로 버려졌다 — 「보증 어떻게
      되나요」가 서버 talk_intent_hits 엔 intent_key='as_warranty' 로 정확히 잡히고도
      화면엔 반송 문구만 떴다(콘솔 에러 없음·200 정상이라 조용히 넘어감). say 가 있으면
      이미 답을 골랐다는 뜻이므로 반송하지 않는다 — say·list 가 «둘 다» 비어 있는 진짜
-     잡담(예: 날씨)만 반송한다. */
+     잡담(예: 날씨)만 반송한다. ⚠ 2026-08-24: 이 게이트는 손대지 않았다 — chat·guided 도
+     이 함수를 타게 되면서 이 규칙이 «그대로» 두 모드에도 적용된다(지시 그대로). */
   if(pc===false&&!list.length&&!say.length){addAI(TALK_BOUNCE);talkChips();return;}
   say.forEach(function(a){addAI(a);});
   if(chips)talkRow(chips);
   list.forEach(talkApply);
-  if(err)addAI('말씀을 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
-    +(list.length?'문장에서 바로 읽어낸 조건만 반영했어요.':SRV_HINT));
-  else if(!say.length)addAI(list.length?'말씀하신 내용을 <b>조건으로 잡았어요.</b>':vague);
+  /* dropped[] — 서버가 못 읽은 조건을 사유와 함께 돌려준다(고객단 점검 §2-1 — 9800X3D 처럼
+     재고 어휘 밖의 부품 지정, "1,000,000원" 처럼 서버가 못 읽는 예산 표기). 예전엔
+     x.d.dropped 를 아무도 읽지 않았다. 「조건이 하나도 안 잡혔을 때의 기존 안내」(vague)와
+     겹쳐 두 번 말하지 않도록 — dn 이 있으면 그 자리에서 vague 를 대신하고, list/say 가
+     이미 있으면 별도로 덧붙인다(§단일 원천: 사유는 droppedNote() 한 곳에서만 문장으로 만든다). */
+  var dn=droppedNote(dropped);
+  if(err){
+   addAI('말씀을 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
+     +(list.length?'문장에서 바로 읽어낸 조건만 반영했어요.':SRV_HINT));
+  }else if(!say.length&&!list.length){
+   addAI(dn||vague);
+  }else{
+   if(!say.length)addAI('말씀하신 내용을 <b>조건으로 잡았어요.</b>');
+   if(dn)addAI(dn);
+  }
   if(fb)addAI(USE_FALLBACK_NOTE);   /* 폴백으로 잡은 용도는 그 사실을 밝힌다 */
-  if(list.length)talkFlow();
+  if(list.length){
+   talkFlow();   /* talk 가 아니면 함수 안에서 스스로 no-op(위 talkFlow 주석) */
+   /* chat·guided 는 talk 의 점진 공개 카드 대신, 이 파일이 원래 쓰던 태그+판정 카드를
+      보여준다 — 조건이 실제로 잡혔다는 사실을 사이드바뿐 아니라 대화창에서도 확인시킨다
+      (기존 chat 동작 유지, 감사에서 지적된 결함이 아니다). */
+   if(mode!=='talk')setTimeout(function(){addProposal('말씀 중 조건으로 읽어낸 부분만 반영했어요.');nudgeRow();},300);
+  }
+  /* guided 자유입력이 «지금 묻는 문항»의 조건을 잡았으면 그 문항을 닫는다(고객단 점검
+     §4-8). list 가 비었어도(정본 답변만 나온 경우) 호출은 하되 labels 가 빈 배열이라
+     안에서 그냥 아무 일도 안 한다 — guided 가 아니면 이 호출 자체가 no-op(guidedAutoClose
+     정의 참고). */
+  guidedAutoClose(list.map(function(c){return c.l;}));
  }
  /* 정규식 용도(useFb)는 **AI 가 답하지 못한 경로에만** 붙는다 — splitUse·aiCons 주석.
     붙이면 AI 의 옳은 용도(「배그는 안 하고 롤만 해요」-> 게임)를 덮는다. */
@@ -928,12 +1051,12 @@ function talkParse(t,packs,useFb,say,chips){
  /* 비-LIVE(file:// · API 없음)는 판정 주체가 아예 없다 -> pc=null, 반송 없음.
     옛 PCWORDS 가 여기서도 반송을 만들었지만, 어휘 판정을 «데모에서만» 남기면 그 목록이
     다시 자라 LIVE 로 새어 들어간다. 데모는 반송 대신 vague 로 안내한다(거짓말이 아니다). */
- if(!LIVE){apply(withFb,null,null,!!useFb);return;}
- srvOrdered(t,function(sc,err,pc){       /* 순서 보장 — srvOrdered 주석 참고 */
-  if(err){apply(withFb,err,null,!!useFb);return;}
+ if(!LIVE){apply(withFb,null,null,!!useFb,null);return;}
+ srvOrdered(t,function(sc,err,pc,dropped){       /* 순서 보장 — srvOrdered 주석 참고 */
+  if(err){apply(withFb,err,null,!!useFb,dropped);return;}
   /* aiCons: 라벨이 겹치면 AI 가 남는다 — 용도도 예외가 아니다(aiCons 주석). */
   apply(packs.concat(aiCons(sc).map(function(c){
-   return {i:c.i,l:c.l,v:c.v,f:1,why:[]};})),null,pc,false);});}
+   return {i:c.i,l:c.l,v:c.v,f:1,why:[]};})),null,pc,false,dropped);});}
 /* ---- 모니터 추천 — 되묻지 않고 크기 구간을 바로 편다 (2026-08-22 사장님 지시) ----
    사장님 원문: "그냥 24인치(해상도~~, 144Hz~~), 27인치(~~), 32인치(~~) 이렇게 보여주면
    좋겠는데..." · "그냥 필터나 물어보는 걸 아예 걷어내면 안되나?"
@@ -1062,8 +1185,26 @@ function priceFacts(t,hit){
 /* ref -> 렌더러 맵. 지금은 하나뿐이지만 맵으로 둔다 — 서버가 답변 종류를 늘려도
    talkSend 쪽 분기를 다시 안 짜도 되게. */
 var TALK_RENDERERS={'/api/talk/price-facts':priceFacts};
-function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);var low=t.toLowerCase();
+/* talkAnswer(t) — «정본 답변 조회»의 단일 경로 (2026-08-24, 고객단 점검 §4-1 해소).
+   전에는 이 몸통 전체가 talkSend() 안에 있어 mode==='talk' 일 때만 불렸다 — chat·guided
+   자유입력은 talk_intents 21종(A/S·조립비·호환·재고…)에 구조적으로 응답할 수 없었다
+   ("?mode=" 없이 들어오면 기본이 chat 이라 이게 «드문 경우»가 아니라 «기본 경험»이었다).
+   지금은 이 함수 하나가 세 모드(chat·guided·talk) 모두에서 «찾는» 일을 하고, talkSend
+   (talk 전용 입구, 아래)와 send()의 chat·guided 분기가 똑같이 이 함수를 부른다.
+   ⚠ 옮기지 않은 것 — greeting·모니터 되묻기·TALKS 매칭·talkParse 호출까지는 답변
+   «능력»이라 그대로 공유하지만, talkParse 안의 talkFlow()(점진 공개 「견적 받기」 카드)는
+   자기 안에서 mode==='talk' 를 확인해 다른 모드에서는 아무 일도 하지 않는다(연출은 안
+   옮긴다 — 지시 그대로, talkFlow 주석 참고). */
+function talkAnswer(t){
+ var low=t.toLowerCase();
  var bud=talkBudget(t);
+ // talkBudget() 이 음수를 null 로 걸러도, 「왜 예산이 안 잡혔는지」를 아무도 말하지 않게
+ // 되는 경로가 하나 남는다 — 비-LIVE(서버 없음)는 서버 dropped[] 자체가 없다(아래
+ // talkParse -> apply(withFb,null,null,!!useFb,null), dropped 인자가 null). 그래서 여기서
+ // «음수 예산을 말했다»는 사실만 따로 기억해 뒀다가, 비-LIVE 일 때만 짧게 밝힌다(아래
+ // packs 조립부 끝). LIVE 는 서버가 이미 말하므로 이 값을 만들어도 쓰지 않는다 — 두 번
+ // 말하지 않기 위해서다.
+ var budNeg=TALK_BUDGET_NEG.test(t);
  var hit=null,score=0;
  TALKS.forEach(function(x){var n=0;x.k.forEach(function(k){if(low.indexOf(k)>-1)n++;});var need=x.min||1;if(n>=need&&n>score){hit=x;score=n;}});
  _lastIntent=(hit&&hit.key)||null;   /* 표에서 온 것만 key 를 갖는다 — 폴백이면 null */
@@ -1112,8 +1253,17 @@ function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.re
   up=usePack();
   /* 팝콘톡 정규식이 못 보는 선호(저소음·화이트)를 chat 과 같은 기준으로 보충한다(슬라이스 48). */
   liveParse(t).forEach(function(c){if(c[1]==='선호')packs.push({i:c[0],l:c[1],v:c[2],f:1,why:[]});});
+  /* 음수 예산 — 비-LIVE 전용 안내(위 budNeg 주석). LIVE 는 서버 dropped[] 가 droppedNote() 로
+     이미 같은 사유를 말하므로(talkParse 안 apply()) 여기서는 건너뛴다 — 한 화면이 같은
+     사유를 두 번 말하지 않는다. */
+  if(budNeg&&!LIVE)say.push('예산이 음수라 조건으로 반영하지 않았습니다.');
   talkParse(t,packs,up,say,chips);
  });},400);}
+/* talkSend(t) — mode==='talk' 전용 입구. #talk-empty(팝콘톡 첫 화면의 안내 placeholder)
+   정리와 addUser 는 이 모드에서만 의미가 있어 여기 남긴다(chat·guided 는 send() 가 이미
+   자기 자리에서 addUser 를 부르고 나서 talkAnswer 를 부른다 — addUser 를 두 번 부르지
+   않는다). 나머지 전부는 이제 talkAnswer 가 한다. */
+function talkSend(t){var _te=document.getElementById('talk-empty');if(_te)_te.remove();addUser(t);talkAnswer(t);}
 function talkStart(){
  if(inp){inp.placeholder='무엇이 궁금하신가요?';setTimeout(function(){inp.focus();},300);}
 }
@@ -1156,6 +1306,40 @@ var BUDGET_TIERS={
 var USAGE_TIER={gaming_high:'highgame',game:'midgame',video:'edit',
                 stream:'stream',office:'office',dev:'dev'};
 var consPairs=[];
+/* ── 재사용(Q_REUSE) 전송 계약 (2026-08-24, 감사 §1-1 — 사장님 확정) ──
+   사이드바·조건 배지에는 consPairs 그대로("재사용":"그래픽카드 · 파워", 다른 라벨과 같은
+   모양 — 「선호」처럼 " · " 로 이은 문자열) 넣어 화면 표시는 공짜로 얻는다(specTags·
+   recountCons·styleConsChip 이 라벨/값을 몰라도 이미 일반적으로 동작한다). 다만 서버(엔진
+   제작자)가 받는 «전송 모양»은 다르다 — 값 하나가 아니라 **part_type 하나당 항목 하나**:
+     {"l":"재사용","v":"GPU"}   (여러 개면 항목을 여러 개 — 값을 " · "로 잇지 않는다)
+   그래서 consPairs 를 그대로 내보내지 않고, 서버로 나가는 세 지점(doCount·relaxChips·
+   goRecommend)이 전부 wireConstraints() 를 거친다 — «표시용 한 줄»과 «전송용 여러 줄»을
+   같은 원본(consPairs)에서 파생시키고, 파생 규칙은 여기 한 곳에만 둔다. */
+/* 한글 옵션 라벨 -> part_type. 정본은 api/taxonomy.py 의 SLOT_LABELS 다(케이스·파워·
+   그래픽카드는 그 표기와 완전히 같다 — 새로 짓지 않고 그대로 옮겼다). ⚠ '저장장치'는
+   taxonomy.py 에 없는 말이다(그 파일 자신의 경고: "swap.py 만 SSD를 '저장장치'로 표시했다
+   — 나머지는 SSD") — Q_REUSE 는 SSD·HDD 를 나눠 고르는 UI가 없어 **SSD 하나로만**
+   대응한다(이 시스템의 견적 8자리 중 SSD는 필수 슬롯이고 HDD는 아니다 — taxonomy.py
+   SLOTS 목록에 HDD 없음). '모니터'는 part_type 자체가 아니라서(견적 부품이 아니라
+   주변기기다) 빠지고, '점검 요청'(잘 모름-봐주세요)도 특정 부품을 가리키지 않아 빠진다 —
+   둘 다 사이드바에는 그대로 보이되(고객이 무엇을 골랐는지는 보여야 한다) 서버로는 안 간다. */
+var REUSE_PART_TYPE={'케이스':'CASE','파워':'POWER','그래픽카드':'GPU','저장장치':'SSD'};
+function reuseWireItems(v){
+ return consTokens(v).map(function(tok){return REUSE_PART_TYPE[tok];}).filter(Boolean)
+  .map(function(pt){return {l:'재사용',v:pt};});
+}
+/* wireConstraints(pairs) — consPairs(또는 그 스냅샷)를 서버 전송 모양으로 바꾼다.
+   '재사용' 만 항목을 펼치고, 나머지는 그대로 {l,v} 로 옮긴다. ⚠ consTokens 는 아래 정규화
+   블록(normCons 근처)에서 함수선언으로 정의된다 — 호이스팅되므로 이 위치에서 먼저 써도
+   된다(esc()·guidedAutoClose 와 같은 이유). */
+function wireConstraints(pairs){
+ var out=[];
+ (pairs||consPairs).forEach(function(p){
+  if(p.l==='재사용'){out=out.concat(reuseWireItems(p.v));return;}
+  out.push({l:p.l,v:p.v});
+ });
+ return out;
+}
 /* 지금 잡힌 용도 -> {k:예산대 키, from:서버 용도 라벨}. 못 고르면 null.
    ⚠ 라벨 우선순위는 matchUsage 와 같은 규칙이다(USAGES 배열 순 = sort_order) —
      '게임'이 '고사양 게임'의 부분문자열이라, 순서를 안 지키면 넓은 쪽이 먼저 걸린다. */
@@ -1321,7 +1505,11 @@ function doCount(){var seq=++_seq;
     지금의 consPairs 로 그리면, 요청이 나간 뒤 조건이 하나 더 붙은 사이에 응답이 도착했을 때
     새 태그에 옛 수가 붙는다(같은 사고의 반대 방향). */
  var snap=consPairs.map(function(p){return {l:p.l,v:p.v};});
- fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({constraints:snap})})
+ /* snap 은 «표시용» 그대로 둔다(applyCount 가 이 스냅샷으로 태그를 다시 그린다 — 재사용도
+    다른 라벨처럼 한 줄이어야 한다). 서버로 나가는 본문만 wireConstraints(snap) 으로
+    바꾼다(재사용 항목을 part_type 개수만큼 편다) — 같은 스냅샷에서 파생하므로 「무엇을
+    보여줬는지」와 「무엇을 물었는지」가 항상 같은 시점을 가리킨다. */
+ fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({constraints:wireConstraints(snap)})})
   .then(function(r){if(!r.ok)throw new Error('서버 응답 '+r.status);return r.json();})
   .then(function(d){if(seq!==_seq)return;_pending=false;applyCount(d,snap);})
   .catch(function(e){if(seq!==_seq)return;   /* 최신 요청의 실패만 화면에 말한다 */
@@ -1426,7 +1614,9 @@ function relaxChips(d){
  host.innerHTML='<div style="font-size:12px;color:#8a7a52;">완화 효과를 세는 중…</div>';
  var mine=++relaxSeq;
  Promise.all(live.map(function(p){
-  var rest=consPairs.filter(function(q){return q.l!==p.l;}).map(function(q){return {l:q.l,v:q.v};});
+  /* wireConstraints — 재사용을 part_type 개수만큼 편다(위 consPairs 근처 주석). 이 배열은
+     화면에 다시 그리지 않고 요청 본문으로만 쓰므로 표시용 변환이 따로 필요 없다. */
+  var rest=wireConstraints(consPairs.filter(function(q){return q.l!==p.l;}));
   return fetch('/api/candidates/count',{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({constraints:rest})}).then(function(r){return r.json();})
    .then(function(d){return {p:p,d:d};}).catch(function(){return null;});
@@ -1541,7 +1731,10 @@ enable=function(){
 };
 function goRecommend(btn){
  var orig=btn.textContent;btn.disabled=true;btn.textContent='견적 생성 중…';
- fetch('/api/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode,constraints:consPairs.map(function(p){return {l:p.l,v:p.v};})})})
+ /* wireConstraints — 최종 견적도 재사용을 part_type 개수만큼 편 모양으로 보낸다(§공유
+    계약, 위 consPairs 근처 주석). 이걸 빼먹으면 여기(최종 빌드)만 옛 모양으로 남아
+    미리보기(doCount)는 고쳐졌는데 실제 청구만 감사 §1-1 그대로인 상태가 된다. */
+ fetch('/api/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode,constraints:wireConstraints(consPairs)})})
   .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
   .then(function(res){
    if(!res.ok){
@@ -1642,7 +1835,12 @@ function liveParse(s){
      위험이 생기고, 그 위험은 세어 볼 방법이 없다(지어내지 않는다). 상한만 없애는 것은
      안전하다 — 콤마·긴 자릿수를 «더 받을» 뿐이라 지금 통과하는 2~4자리 입력은 그대로
      통과한다(예: "3000만원" 그대로 3000, 옛 코드도 이미 통과 — 확인자 라이브 콘솔 실측). */
-  var m=s.match(/(\d{1,3}(?:,\d{3})+|\d{2,})\s*만/);
+  // talkBudget() 과 같은 병 · 같은 방어(위 TALK_BUDGET_NEG 주석) — 이 함수의 예산 결과도
+  // 호출부에 따라 addSpec 까지 갈 수 있는 모양이라(지금은 두 호출부 다 막혀 있지만 —
+  // talkAnswer 는 선호만 취해 버리고, parseAll 은 2026-08-24부터 아무도 안 부른다 — 그
+  // 사실에 기대 여기를 비워두면 다음 호출부가 다시 뚫린다) 같은 파일 안에 같은 병을
+  // 남기지 않는다.
+  var m=TALK_BUDGET_NEG.test(s)?null:s.match(/(\d{1,3}(?:,\d{3})+|\d{2,})\s*만/);
   if(m)out.push(['savings','예산',commaNum(m[1].replace(/,/g,''))+'만원']);
   /* 용도는 서버 목록 + 서버 규칙으로만 잡는다(matchUsage). **하나만** 나온다 —
      서버 match() 도 먼저 맞는 usage_key 하나만 쓰므로 여기서 둘을 이으면 화면이 거짓말한다. */
@@ -1765,6 +1963,23 @@ addConstraint=function(icon,label,value){
  var n=normCons(label,value);
  _normBase(n.l==='선호'?srvIcon('선호',n.v):icon,n.l,n.v);};
 function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
+/* droppedNote(dropped) — POST /api/talk/parse 응답의 dropped[]({l,v,reason}) 를 사람이
+   읽는 한 줄(들)로 바꾼다(고객단 점검 §2-1 — 「9800X3D」·「1,000,000원」처럼 서버가 «왜»
+   못 읽었는지까지 정확히 계산해 돌려주는데 화면이 그 필드를 한 번도 읽지 않고 있었다,
+   x.d.dropped 참조 0건). §화면 정직성 "읽지 못한 입력은 『조건으로 못 읽었다』고
+   밝힌다"를 지킨다.
+   ⚠ 사유는 **서버가 준 reason 을 그대로** 쓴다 — 지어내지 않는다(지시 원문). v·reason 은
+   고객 원문에서 온 값일 수 있어(예: 부품명을 그대로 되돌려준다) esc() 한다.
+   여러 건이면 한 말풍선 안에 줄바꿈으로 «묶는다» — addAI 를 여러 번 불러 말풍선을 여러
+   개 만들지 않는다(지시: "여러 건이면 묶어서"). */
+function droppedNote(dropped){
+ if(!dropped||!dropped.length)return null;
+ var lines=dropped.map(function(d){
+  var label=d.v?('<b>'+esc(d.v)+'</b>'):(d.l?('<b>'+esc(d.l)+'</b>'):'일부 내용');
+  return label+'은(는) 조건으로 반영하지 못했어요 — '+esc(d.reason||'사유를 알 수 없습니다');
+ });
+ return lines.join('<br>');
+}
 function srvWait(){
  var d=document.createElement('div');d.style.cssText='display:flex;gap:12px;align-items:center;max-width:92%;';
  d.innerHTML='<span style="flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">auto_awesome</span><span style="font-size:13.5px;color:#8a8578;font-weight:700;">말씀을 조건으로 읽는 중이에요…</span>';
@@ -1778,8 +1993,10 @@ function srvWait(){
    ⚠ 화면은 어휘 목록으로 이 판정을 다시 하지 않는다 — 그것이 오늘 없앤 병이다. */
 function srvParse(t,done){
  var wait=srvWait();
- function fin(cons,err,pc){if(wait&&wait.parentNode)wait.parentNode.removeChild(wait);
-  done(cons,err,(pc===true||pc===false)?pc:null);}
+ /* dropped 를 네 번째 자리로 끝까지 들고 간다(§단일 원천 — 여기서 한 번만 서버 응답을
+    읽고, 나머지는 그대로 릴레이한다). 실패 경로(!x.ok·catch)는 dropped 를 모른다 — null. */
+ function fin(cons,err,pc,dropped){if(wait&&wait.parentNode)wait.parentNode.removeChild(wait);
+  done(cons,err,(pc===true||pc===false)?pc:null,dropped);}
  fetch('/api/talk/parse',{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({text:t,intent_key:_lastIntent})})
   .then(function(r){return r.text().then(function(b){
@@ -1791,11 +2008,21 @@ function srvParse(t,done){
     if(det&&window.popcornProgress&&window.popcornProgress.errText)
       det=window.popcornProgress.errText({detail:det})||det;
     /* 실패에는 판정이 없다(null). 429·502·키 없음이 반송 사유가 되어선 안 된다. */
-    fin(null,(typeof det==='string'&&det)||('서버 오류 '+x.status),null);return;}
-   fin(x.d.constraints||[],null,x.d.pc_related);})
-  .catch(function(e){fin(null,'서버에 연결하지 못했습니다 — '+(e&&e.message||e),null);});}
-var SRV_HINT='예산(예: 100만), 용도(게임·사무·영상편집), 조용하게·화이트처럼 말해주시면 그 자리에서 다시 세어드려요.';
-/* parseAll(t, done) — 문장 하나를 조건 목록으로 바꾸는 **단일 경로**(chat·guided 자유입력).
+    fin(null,(typeof det==='string'&&det)||('서버 오류 '+x.status),null,null);return;}
+   fin(x.d.constraints||[],null,x.d.pc_related,x.d.dropped||[]);})
+  .catch(function(e){fin(null,'서버에 연결하지 못했습니다 — '+(e&&e.message||e),null,null);});}
+/* ⚠ 부품 이름이 이 목록에 없었다(2026-08-24 전까지) — 서버는 «부품」 라벨(GPU 모델 지정)을
+   이미 받는데(api/talk.py LABELS) 이 안내엔 예산·용도·선호만 있었다(고객단 점검 §2-1
+   지적). 이 문자열이 «조건이 하나도 안 잡혔을 때»와 «AI 파싱 자체가 실패했을 때» 두 곳
+   모두에서 그대로 쓰이므로(아래 talkParse.apply 참고) 여기 한 곳만 고치면 둘 다 반영된다. */
+var SRV_HINT='예산(예: 100만), 용도(게임·사무·영상편집), 그래픽카드 모델명(예: RTX 4070 SUPER), 조용하게·화이트처럼 말해주시면 그 자리에서 다시 세어드려요.';
+/* parseAll(t, done) — 문장 하나를 조건 목록으로 바꾸는 옛 경로. **2026-08-24부터 아무도
+   부르지 않는다** — chat·guided 자유입력은 이제 talkAnswer()(talkSend 근처)를 거쳐
+   talkParse() 하나로 합쳐졌다(정본 답변 + 조건 반영을 한 번에, 감사 §4-1 해소). 이
+   함수가 하던 «정규식 폴백 + AI 병합»은 talkAnswer 의 up=usePack()·liveParse(선호)와
+   talkParse 안의 aiCons 병합이 그대로 이어받는다 — 능력이 사라진 게 아니라 옮겨갔다.
+   지우지 않고 남겨 둔 이유는 이 파일의 다른 곳들과 같다(Q_QTY·Q_PURPOSE 주석 참고) —
+   지우면 «왜 이렇게 합쳤나»의 이전 형태가 사라진다.
    done(list, err, pc, useFb):
      list  = [{i,l,v}] · **적용 순서가 규약이다**(정규식 먼저 · AI 나중 = 라벨 겹치면 AI 가 남는다)
      err   = AI 실패 사유. err 가 있어도 list(정규식 몫)는 살아 있다 — 부르는 쪽이 둘 다 말한다.
@@ -1821,40 +2048,46 @@ function parseAll(t,done){
    라벨 교체(addConstraint)가 «마지막에 적용된 것»을 남기므로, 줄을 세우는 자리는 «적용»이다. */
 var _parseQ=Promise.resolve();
 function srvOrdered(t,cb){
- var got=new Promise(function(res){srvParse(t,function(sc,err,pc){res([sc,err,pc]);});});
- _parseQ=_parseQ.then(function(){return got;}).then(function(r){cb(r[0],r[1],r[2]);})
-  /* 줄 세우기 자체가 깨진 것도 판정이 아니다 — pc=null 로 넘겨 반송을 막는다. */
-  .catch(function(e){cb(null,'조건을 반영하지 못했습니다 — '+((e&&e.message)||e),null);});}
-function send(){var t=inp.value.trim();if(!t)return;if(mode==='talk'){inp.value='';talkSend(t);return;}
+ var got=new Promise(function(res){srvParse(t,function(sc,err,pc,dropped){res([sc,err,pc,dropped]);});});
+ _parseQ=_parseQ.then(function(){return got;}).then(function(r){cb(r[0],r[1],r[2],r[3]);})
+  /* 줄 세우기 자체가 깨진 것도 판정이 아니다 — pc=null 로 넘겨 반송을 막는다. dropped 도 모른다. */
+  .catch(function(e){cb(null,'조건을 반영하지 못했습니다 — '+((e&&e.message)||e),null,null);});}
+function send(){var t=inp.value.trim();
+ if(!t){
+  /* 빈 입력·공백만 입력하고 전송·Enter — 예전엔 여기서 그냥 return 해 버튼도 입력창도
+     아무 반응이 없었다(고객단 점검 §4-10, "눌렀는데 아무 반응 없는 자리"). 새로 조건 삼을
+     말이 없으니 파싱 파이프라인은 타지 않되(빈 문장을 서버에 보내지 않는다 — /api/talk/parse
+     는 400 이다), 눌렀다는 사실 자체는 화면이 답한다 — 이 파일이 이미 쓰는 짧은 안내
+     패턴(addAI)과 같은 무게로 다룬다. 판단 근거: "입력창만 비운다"는 스페이스만 넣고 눌렀을
+     때 눈에 보이는 변화가 없어(이미 안 보이는 공백이라) 여전히 무반응처럼 느껴진다 —
+     그래서 안내 문구를 함께 쓴다(사장님 지시가 준 두 선택지 중 후자 · "짧은 안내"). 입력창은
+     공백만 있어도 비운다(남아 있던 공백을 지운다는 사실 자체가 반응이다). */
+  inp.value='';
+  addAI('보내실 내용을 입력해 주세요.');
+  return;
+ }
+ if(mode==='talk'){inp.value='';talkSend(t);return;}
  addUser(t);inp.value='';addSpec('요청',t.length>16?t.slice(0,16)+'…':t,'tune');
  if(LIVE){
-  /* 문장은 «전부» AI 를 탄다(위 parseAll 주석). 정규식은 AI 가 실패했을 때의 몫으로 남는다.
-     ⚠ chat·guided 는 «반송»하지 않는다(pc 판정을 쓰지 않는다) — 반송 문구는 팝콘톡(talk)의
-     장치이고, 여기서는 잡담도 「조건으로는 못 읽었다」로만 답한다(거짓을 말하지 않는다).
-     반송을 여기로 넓히는 것은 별건이다 — 넓힌다면 talkParse 와 «같은 규칙»(false 만, 조건이
-     하나도 없을 때만)을 써야 한다. */
-  parseAll(t,function(cons,err,pc,useFb){
-   if(err)addAI('말씀은 기록했어요. 다만 <b>AI 가 조건으로 읽지 못했어요</b> — '+esc(err)+'<br>'
-     +(cons.length?'아래 조건은 문장에서 바로 읽어낸 것만 반영했어요.':SRV_HINT));
-   if(useFb)addAI(USE_FALLBACK_NOTE);   /* 폴백으로 잡은 용도는 그 사실을 밝힌다 */
-   if(cons.length){
-    cons.forEach(function(c){addConstraint(c.i,c.l,c.v);});   // → scheduleCount() → 서버 재계산
-    /* ⚠ 예전 문구 「말씀 반영해 이렇게 잡았어요」는 사실이 아니었다 — cons 는 AI 가 실제로
-       조건으로 옮긴 부분일 뿐, 고객이 보낸 문장 전체("말씀")가 아니다. 부품명 요청처럼
-       조건이 되지 못한 부분도 있을 수 있다 — 그 원문은 아래 「요청」 칩에 참고용으로
-       남는다(specTags 의 ref 스타일 · chipMeta). 여기서 그 구분을 다시 판정하지 않는다 —
-       "어디까지 조건으로 읽었는지"만 정직하게 말한다. */
-    setTimeout(function(){addProposal('말씀 중 조건으로 읽어낸 부분만 반영했어요.');nudgeRow();},700);
-   }else if(!err){
-    addAI('말씀은 기록했어요. 다만 <b>후보 수를 바꾸는 조건</b>으로는 아직 못 읽었어요 — '+SRV_HINT);
-   }
-  });
+  /* ── chat·guided 도 talk 과 같은 「정본 답변 조회」 경로를 탄다 (2026-08-24, 감사 §4-1) ──
+     예전엔 여기서 parseAll(정규식+AI, 조건 추출만)을 불렀다 — talk_intents 21종(A/S·조립비·
+     호환·재고…)엔 구조적으로 응답할 수 없었다("?mode=" 없이 들어오면 기본이 chat 이라
+     드문 경우가 아니라 기본 경험이었다). talkAnswer(t) 는 mode==='talk' 분기에만 있던
+     TALKS 매칭·모니터/가격 카드·talkParse 호출을 그대로 공유한다(talkSend 근처 주석).
+     ⚠ 반송 게이트도 이제 chat·guided 에 그대로 적용된다 — talkParse.apply() 의
+     `if(pc===false&&!list.length&&!say.length)` 를 손대지 않았다(사장님 지시: "그 규칙이
+     chat 에서도 성립해야 한다"). 정본 답을 이미 골랐으면(say 가 있으면) 반송하지 않는
+     규칙은 그대로다 — 예전 chat 이 "반송하지 않는다"고 하드코딩했던 것과 달리, 지금은
+     talkParse 하나가 세 모드를 다 판단하므로 여기서 따로 판정하지 않는다(§단일 원천). */
+  talkAnswer(t);
   return;
  }
  poolUnknown(SRC_NOTE.off);
  logFilter('입력 이해',null,['입력하신 조건 반영']);
  /* 비-LIVE 는 서버가 없어 무엇이 실제 조건이 됐는지조차 모른다 — "반영했다"고 말할
-    근거가 없다. 다른 비-LIVE 자리(위 mg 리스너·overConstrain)와 같은 문구로 맞춘다. */
+    근거가 없다. 다른 비-LIVE 자리(위 mg 리스너·overConstrain)와 같은 문구로 맞춘다.
+    talkAnswer 를 안 타는 이유: 그 경로도 결국 talkParse 를 거치고, talkParse 의 !LIVE
+    분기는 이미 이 문구와 다른 자기 안내(vague)를 낸다 — 여기서 또 부르면 문구가 겹친다. */
  setTimeout(function(){addProposal('입력을 기록했어요.');nudgeRow();},400);}
 if(snd)snd.addEventListener('click',send);
 if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();send();}});

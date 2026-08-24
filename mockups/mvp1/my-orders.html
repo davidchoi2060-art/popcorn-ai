@@ -37,7 +37,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
   <!-- 목록 뷰 -->
   <div id="v-list">
-    <p style="margin:0 0 14px;font-size:12.5px;color:#8a8578;font-weight:600;">주문 원장은 결제 방식(자체/쇼핑몰 인계)과 무관하게 <b style="color:#3a3a40;">항상 여기에</b> 남습니다.</p>
+    <p style="margin:0 0 14px;font-size:12.5px;color:#8a8578;font-weight:600;">자체 결제 주문과 쇼핑몰 인계 견적을 함께 표시합니다. 인계 항목은 <b style="color:#3a3a40;">상태·배송·환불 정보가 없으며</b>, 처리 현황은 쇼핑몰에서 확인할 수 있습니다.</p>
     <div id="filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
     <div id="olist" style="display:flex;flex-direction:column;gap:12px;"></div>
   </div>
@@ -73,6 +73,9 @@ function stBadge(o){
 function show(v){['v-list','v-detail','v-refund'].forEach(function(id){document.getElementById(id).style.display=id===v?'':'none';});window.scrollTo(0,0);}
 // ---- 목록 ----
 function matches(o){
+ // 인계(kind==='handoff')는 주문이 아니다 — 상태·배송·환불 필터 어디에도 없다.
+ // "전체" 탭에서만 보이고, 다른 탭(진행 중·배송 중·완료·취소·환불)에는 억지로 끼워 넣지 않는다.
+ if(o.kind==='handoff')return cur==='all';
  if(cur==='all')return true;
  if(cur==='progress')return (o.status==='조립중'||o.status==='결제완료')&&!o.refund;
  if(cur==='shipping')return o.status==='배송중'&&!o.refund;
@@ -80,18 +83,43 @@ function matches(o){
  if(cur==='refund')return !!o.refund;
  return true;
 }
+// ---- 주문 카드(기존 그대로 — 문자열 변경 없음) ----
+function renderOrderCard(o){
+ return '<div class="card" data-o="'+o.no+'" style="cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">'
+   +'<div style="flex:1;min-width:220px;">'
+   +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><b style="font-size:14.5px;color:#17171b;">'+o.no+'</b>'+chBadge(o.channel)+stBadge(o)+'</div>'
+   +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+' · '+o.items[0][1].slice(0,34)+(o.items.length>1?' 외':'')+'</div></div>'
+   +'<b style="font-size:16px;color:#17171b;">'+won(o.total)+'</b>'
+   +'<span class="msym" style="font-size:20px;color:#c9c5bd;">chevron_right</span></div>';
+}
+// ---- 인계 카드 — 주문과 눈에 띄게 구분한다(2026-08-24 새벽 감사 §1-3) ----
+// 클릭해 들어갈 상세가 없다(data-o 없음 · cursor 기본) — 상태·배송·환불이 없는 기록에
+// 가짜 상세 화면을 만들지 않는다. 배지·카드 톤은 이 파일에 이미 있는 인계 팔레트
+// (#f2edfb/#4a2a94 — chBadge의 'mall' 분기, "주문 시점 스냅샷" 배지)를 그대로 쓴다.
+function renderHandoffCard(o){
+ var metaBits=[];
+ if(o.date)metaBits.push(o.date);
+ if(o.itemCount!=null)metaBits.push('부품 '+o.itemCount+'종');
+ if(o.hstatus)metaBits.push(o.hstatus);
+ var meta=(metaBits.length?metaBits.join(' · '):'상세 정보 없음')+' — 상태·배송·환불 없음';
+ var mallBtn=o.mallUrl
+  ?'<a class="btn2" href="'+o.mallUrl+'" target="_blank" rel="noopener" style="font-size:12px;padding:7px 12px;">쇼핑몰에서 확인<span class="msym" style="font-size:14px;">link</span></a>'
+  :'<span style="font-size:11.5px;color:#a29d92;font-weight:600;">팝콘PC 쇼핑몰에서 확인하실 수 있습니다</span>';
+ return '<div class="card" style="background:#faf8fd;border-color:#e6def5;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">'
+  +'<div style="flex:1;min-width:220px;">'
+  +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;"><b style="font-size:14.5px;color:#17171b;">'+(o.no||'인계 기록')+'</b><span style="background:#f2edfb;color:#4a2a94;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">쇼핑몰 인계 · 견적</span></div>'
+  +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+meta+'</div></div>'
+  +(o.total!=null?'<b style="font-size:16px;color:#17171b;">'+won(o.total)+'</b>':'')
+  +mallBtn
+  +'</div>';
+}
 function renderList(){
  var F=[['all','전체'],['progress','진행 중'],['shipping','배송 중'],['done','완료'],['refund','취소·환불']];
  document.getElementById('filters').innerHTML=F.map(function(f){return '<span class="chip'+(cur===f[0]?' on':'')+'" data-f="'+f[0]+'">'+f[1]+'</span>';}).join('');
  document.querySelectorAll('#filters .chip').forEach(function(c){c.onclick=function(){cur=c.dataset.f;renderList();};});
  var list=ORDERS.filter(matches);
  document.getElementById('olist').innerHTML=list.length?list.map(function(o){
-  return '<div class="card" data-o="'+o.no+'" style="cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">'
-   +'<div style="flex:1;min-width:220px;">'
-   +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><b style="font-size:14.5px;color:#17171b;">'+o.no+'</b>'+chBadge(o.channel)+stBadge(o)+'</div>'
-   +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+' · '+o.items[0][1].slice(0,34)+(o.items.length>1?' 외':'')+'</div></div>'
-   +'<b style="font-size:16px;color:#17171b;">'+won(o.total)+'</b>'
-   +'<span class="msym" style="font-size:20px;color:#c9c5bd;">chevron_right</span></div>';
+  return o.kind==='handoff'?renderHandoffCard(o):renderOrderCard(o);
  }).join(''):'<div class="card" style="text-align:center;color:#a29d92;padding:40px;">'+(cur==='all'?'아직 주문 내역이 없습니다.':'이 분류의 주문이 없습니다.')+'</div>';
  document.querySelectorAll('#olist [data-o]').forEach(function(el){el.onclick=function(){sel=el.dataset.o;renderDetail();show('v-detail');};});
 }
@@ -188,11 +216,27 @@ function fmtT(iso){
  return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+hm;
 }
 var noteOfMode=function(m){return m==='own'?'자체 처리 — 검토 후 결제 수단으로 환불됩니다.':'쇼핑몰 인계 모드 — 처리는 쇼핑몰 절차, 상태는 여기에 표시됩니다. (주문 원장은 본 시스템)';};
-var fromApi=function(o){return {no:o.no,date:fmtT(o.created_at),channel:o.channel,status:o.status,step:o.step,
+var fromApi=function(o){return {kind:'order',no:o.no,date:fmtT(o.created_at),channel:o.channel,status:o.status,step:o.step,
  items:o.items,total:o.total,
  pay:o.pay?{method:o.pay.method,state:o.pay.state,at:o.pay.at?fmtT(o.pay.at):''}:{method:'결제 대기',state:'—',at:''},
  ship:o.ship,refund_mode:o.refund_mode,
  refund:o.refund?{kind:kindOf(o.status),no:o.refund.no,reason:o.refund.reason,status:o.refund.status,modeNote:noteOfMode(o.refund.mode)}:null};};
+// ---- 인계 매핑 — kind==='handoff' (공유 계약: D가 /api/my/orders 각 항목에 kind를 얹는다) ----
+// ⚠ 정확한 필드명은 D가 확정한다. 계약이 준 것은 "인계 시각·총액·부품 수·(있으면) 상태·
+// (있으면) 몰 확인 경로"라는 «내용»뿐이라, 여러 후보 키를 방어적으로 읽는다(findKey) —
+// 실제 키 이름이 아래 후보와 다르면 이 한 함수만 고치면 된다. 못 찾은 값은 숫자를 지어내지
+// 않고(0으로 채우지 않고) 화면에서 그 항목만 뺀다(renderHandoffCard의 null 가드).
+function findKey(o,keys){for(var i=0;i<keys.length;i++){var v=o[keys[i]];if(v!==undefined&&v!==null)return v;}return undefined;}
+var fromHandoff=function(o){
+ var at=findKey(o,['created_at','handoff_at','at']);
+ var itemsArr=findKey(o,['items','parts']);
+ var itemCount=findKey(o,['item_count','items_count','parts_count']);
+ if(itemCount===undefined&&Array.isArray(itemsArr))itemCount=itemsArr.length;
+ return {kind:'handoff', no:findKey(o,['no','handoff_no']),
+  date:at?fmtT(at):'', total:findKey(o,['total','total_quoted','total_mall','amount']),
+  itemCount:itemCount, hstatus:findKey(o,['status','hstatus']),
+  mallUrl:findKey(o,['mall_url','record_url','link','url'])};
+};
 var qid=new URLSearchParams(location.search).get('id');
 var mem=null;try{mem=JSON.parse(localStorage.getItem('popcorn-member')||'null');}catch(e){}
 if(mem&&mem.email){
@@ -201,10 +245,14 @@ if(mem&&mem.email){
                      if(!r.ok)throw new Error(r.status);return r.json();})
   .then(function(d){
    LIVE=true;
-   ORDERS=d.items.map(fromApi);
+   // kind 가 없는 응답(D 작업 전)은 전부 order 로 취급된다 — fromApi 기본 분기가 그대로 유지된다.
+   ORDERS=d.items.map(function(o){return o.kind==='handoff'?fromHandoff(o):fromApi(o);});
    renderList();
    if(qid){
-    if(ORDERS.some(function(o){return o.no===qid;})){sel=qid;renderDetail();show('v-detail');}
+    // 인계는 상세 화면이 없다(order() 이하가 o.items.map 등 주문 전용 필드를 가정) —
+    // 딥링크가 인계 번호를 가리켜도 상세로 들어가지 않는다(크래시 방지).
+    var hit=ORDERS.filter(function(o){return o.no===qid&&o.kind!=='handoff';})[0];
+    if(hit){sel=qid;renderDetail();show('v-detail');}
     else{sel=null;show('v-list');}
    }
   })

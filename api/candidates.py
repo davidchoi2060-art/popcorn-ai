@@ -24,7 +24,7 @@ from sqlalchemy import text
 from . import usage_floors as UF
 from .catalog_map import gpu_chipset_key   # 「부품」(GPU 칩셋) 라벨 정규화 — 단일 원천(A-101)
 from .db import engine
-from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천(슬라이스 A)
+from .taxonomy import SLOT_LABELS as SLOT_KO, PART_LABELS, QUOTE_SLOTS   # 단일 원천(슬라이스 A)
 
 router = APIRouter(prefix="/api")
 
@@ -44,9 +44,9 @@ SILENT_SCOPE = {"GPU", "POWER", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
 WHITE_SCOPE = {"CASE"}
 
 # ── 라벨이 「거를 자격」을 정한다 — 값 문자열이 아니다 (2026-08-17) ────────────────
-# 아래 다섯이 **들어오는 라벨 전부에 대한 처분표**다(A-101로 PART_PIN_LABELS 추가 —
-# BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·VERBATIM_LABELS·PART_PIN_LABELS). 여기 없는
-# 라벨은 거르지 않는다.
+# 아래 여섯이 **들어오는 라벨 전부에 대한 처분표**다(A-101로 PART_PIN_LABELS 추가,
+# 2026-08-24 물결로 REUSE_LABELS 추가 — BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·
+# VERBATIM_LABELS·PART_PIN_LABELS·REUSE_LABELS). 여기 없는 라벨은 거르지 않는다.
 #
 # 병(실측 2026-08-17): 태그 필터가 라벨을 보지 않고 값에 '저소음'·'화이트'가 「들어 있는지」만
 #   봤다. 그래서 「요청」(고객 원문 요약)까지 필터를 받아 **같은 필터가 두 번** 걸렸다.
@@ -88,6 +88,47 @@ VERBATIM_LABELS = frozenset({"요청"})
 # `recommend.py`의 핀 정책이 맡는다 — 이 파일은 카운터일 뿐 구성을 짜지 않는다).
 PART_PIN_LABELS = frozenset({"부품"})
 
+# 재사용 라벨(2026-08-24 물결 — customer-audit-2026-08-24.md §1-1 해소, 공유 계약 ①).
+# guided 「업그레이드(일부 재사용)」에서 "그래픽카드·파워는 쓰던 거 쓸게요"를 고르면
+# 화면이 { "l": "재사용", "v": "GPU" } 를 보낸다. 값은 슬롯 키(CPU·MB·RAM·GPU·CASE·
+# COOLER·POWER·SSD) 또는 HDD(견적 8슬롯엔 없지만 핵심 부품이라 재고엔 있다).
+#
+# ⚠ 설계 판단 — 이 라벨은 **후보를 거르는 조건이 아니다** (다른 다섯과 다른 성격):
+#   TAG_LABELS·USAGE_LABELS 등은 "이 조건을 만족하는 부품만 남긴다"이지만, 재사용은
+#   "이 슬롯은 아예 새로 고르지 않는다"다 — 남길 후보를 고르는 게 아니라 슬롯 자체를
+#   대상에서 뺀다. 그래서 값을 판정 기준(비교값)이 아니라 **제외 대상 슬롯 지정**으로 쓴다.
+#
+#   ① count(「조건 통과 부품 수」)에서 뺀다 — 그 슬롯은 이번 견적에서 사지 않을 것이므로,
+#      "조건을 통과해 살 수 있는 부품 수"에 포함하면 사지도 않을 부품을 산다는 셈이 된다
+#      (customer-audit §1-1이 잡은 바로 그 결함 — 재사용을 골라도 count·총액에 반영이
+#      안 됐다). **하한값(2026-08-22 정정과 같은 정신)이 아니라 그 슬롯 자체를 뺀다.**
+#   ② 그런데 **buildable 판정(_slot_view의 empty)에서는 예외로 둔다** — 그 슬롯의 후보가
+#      0개인 이유가 "재고에 없어서"가 아니라 "안 사기로 해서"이기 때문이다. 그대로
+#      두면 매번 "GPU 후보가 없어 견적을 만들 수 없습니다"라는 **거짓** verdict가 뜬다
+#      (재고에는 있는데 "없다"고 말하는 것 — CLAUDE.md 「없다」와「범위 밖」을 구분한다의
+#      반대쪽 오류). count_candidates()가 reuse_slots를 따로 계산해 empty에서 뺀다.
+#   ③ HDD는 QUOTE_SLOTS(8슬롯)에 없다 — 견적에 필수가 아닌 선택 부품이라 애초에
+#      "빈 슬롯"으로 잡힌 적이 없다(_slot_view가 HDD를 순회조차 안 한다). 그래서 HDD는
+#      ②가 필요 없고 ①(count 제외)만 적용된다 — 별도 분기 없이 자연히 그렇게 된다.
+#   ④ 모르는 값("COOLER_CPU_AIR"처럼 part_type을 그대로 보내는 등)은 applied=false로
+#      정직하게 표기한다 — 값을 짐작해 임의 슬롯을 지우면 고객이 재사용하겠다고 하지
+#      않은 부품이 조용히 빠질 수 있다(반대 방향의 사고가 더 위험한 쪽이다).
+REUSE_LABELS = frozenset({"재사용"})
+
+
+def _reuse_part_types(value: str):
+    """재사용 값(슬롯 키 또는 HDD) → 뺄 part_type 집합. 모르는 값이면 None(정직한 미적용)."""
+    if value in QUOTE_SLOTS:
+        return QUOTE_SLOTS[value]
+    if value == "HDD":
+        return ("HDD",)
+    return None
+
+
+def _reuse_label_ko(value: str) -> str:
+    """재사용 값의 한글 표시 — 슬롯 어휘가 정본이고, HDD처럼 슬롯이 아니면 부품 어휘로 보완."""
+    return SLOT_KO.get(value) or PART_LABELS.get(value, value)
+
 
 class Constraint(BaseModel):
     l: str
@@ -106,13 +147,25 @@ def _budget_cap(value: str):
     받는 결함(조사자 실측). 자릿수 제한을 없애고 "1,500만원" 같은 콤마 구분 표기도 받는다.
     '만'이 없는 순수 숫자("150")·한글 수사("백오십만원")는 여전히 못 받는다 — 단위를
     지어내 해석하지 않는다.
+
+    ⚠ 2026-08-24 방어(공유 계약 ③ — customer-audit-2026-08-24 §2-5): "예산 -500만원"이
+    부호만 사라진 채 양수 상한 500만원으로 쓰이고 있었다 — `-`를 안 보는 옛 정규식이
+    "-500만원"에서 "500"만 집었기 때문이다. **음수를 거르는 «판정»은 여기서 새로 만들지
+    않는다** — `api/talk.py`의 `_norm_budget`가 AI 파싱 경로의 단일 원천으로 dropped
+    처리한다(같은 판정을 두 벌 두지 않는다, CANON §1). 이 함수가 하는 건 **판정이 아니라
+    방어**다: talk.py를 거치지 않고 직접 들어오는 값(guided 칩 등)까지 포함해, 부호가
+    "-"인 예산 값은 **어떤 경우에도 상한으로 쓰지 않는다**(None = 미적용). 왜 음수인지
+    이유는 가리지 않고, "상한으로 쓰지 않는다"만 지키면 부호 소실로 잘못된 상한이
+    매겨지는 사고는 막힌다.
     """
     if "이상" in value:
         return None
-    m = re.search(r"(\d{1,3}(?:,\d{3})+|\d+)\s*만", value)
+    m = re.search(r"(-)?\s*(\d{1,3}(?:,\d{3})+|\d+)\s*만", value)
     if not m:
         return None
-    return int(m.group(1).replace(",", "")) * 10000
+    if m.group(1):
+        return None   # 음수 예산 — 부호를 지우고 양수 상한으로 쓰지 않는다(위 방어 참조)
+    return int(m.group(2).replace(",", "")) * 10000
 
 
 def _apply_one(parts: list[dict], label: str, value: str):
@@ -149,6 +202,15 @@ def _apply_one(parts: list[dict], label: str, value: str):
             return parts, False, f"재고에 없는 부품: {value}"
         kept = [p for p in parts if p["part_type"] != "GPU"] + matched
         return kept, True, f"지정 부품(GPU) 일치 상품만 유지: {value}"
+    if label in REUSE_LABELS:
+        # 위 REUSE_LABELS 정의부의 ①~④ 설계 판단 참조. 필터가 아니라 **제외**다 — 값과
+        # 비교해 일부만 남기는 게 아니라, 그 슬롯의 part_type을 통째로 뺀다.
+        types = _reuse_part_types(value)
+        if types is None:
+            return parts, False, f"알 수 없는 재사용 부품 종류 — 후보 수에는 영향 없음: {value}"
+        kept = [p for p in parts if p["part_type"] not in types]
+        label_ko = _reuse_label_ko(value)
+        return kept, True, f"{label_ko} — 쓰시던 부품을 재사용(신규 구매 대상에서 제외)"
     if label in TAG_LABELS:
         applied, reasons = False, []
         if "저소음" in value:
@@ -169,7 +231,8 @@ def _apply_one(parts: list[dict], label: str, value: str):
 # 견적 슬롯 = 엔진과 같은 정의(recommend.SLOTS / SLOT_TYPES).
 # **part_type 단위로 세면 오판한다**: 쿨러는 공랭·수냉이 한 슬롯이라 AIO가 0이어도
 # AIR가 남아 있으면 견적이 성립한다(슬라이스 48에서 실제로 헷갈렸다).
-from .taxonomy import QUOTE_SLOTS   # 단일 원천 — recommend.SLOT_TYPES와 같은 표였다(슬라이스 A)
+# QUOTE_SLOTS는 파일 상단에서 이미 import했다(REUSE_LABELS 처분표도 그 표를 쓴다) —
+# 같은 이름을 두 번 들여오면 다음 사람이 "둘이 다른가?"를 의심한다.
 
 
 def _slot_view(parts: list[dict]) -> tuple:
@@ -207,6 +270,15 @@ def count_candidates(body: CountBody):
         })
     slot_counts, empty = _slot_view(parts)
 
+    # 재사용 슬롯 — REUSE_LABELS 정의부 ②: 그 슬롯이 empty인 이유는 "후보가 없어서"가
+    # 아니라 "사지 않기로 해서"다. buildable 판정에서는 뺀다 — 안 그러면 재고에 GPU가
+    # 있어도 매번 "GPU 후보가 없어 견적을 만들 수 없습니다"라는 거짓 verdict가 뜬다.
+    # HDD는 QUOTE_SLOTS(8슬롯)에 없어 _slot_view가 애초에 순회하지 않으므로 여기 대상이
+    # 아니다(③) — reuse_slots는 순수히 "이번엔 안 채워도 되는 필수 슬롯" 집합이다.
+    reuse_slots = [s for s in QUOTE_SLOTS
+                   if any(c.l in REUSE_LABELS and c.v == s for c in body.constraints)]
+    empty = [s for s in empty if s not in reuse_slots]
+
     # ── 재시도 — 엔진과 같은 규칙(recommend.py:757-761 「recommend」 티어와 동일 패턴) ──
     # 배분율 필터(BUDGET_ALLOC)로 후보가 0이 된 슬롯이 있으면, 예산만 뺀 풀(엔진의
     # `common` — 용도 하한·태그는 그대로 두고 배분율만 제거)로 **그 슬롯만** 다시 센다.
@@ -242,15 +314,27 @@ def count_candidates(body: CountBody):
             if e["label"] in BUDGET_LABELS and e["applied"]:
                 e["reason"] = e["reason"] + note
 
+    # 경계 — 필수 8슬롯을 전부 재사용으로 고르면 buildable은 참이지만 "3구성을 만들 수
+    # 있다"는 문장은 사실이 아니다(새로 살 부품이 없다). verdict만 갈라 정직하게 말한다
+    # — buildable을 false로 바꾸지는 않는다(정말 "안 되는" 것과는 다른 사실이라서다).
+    all_reused = bool(reuse_slots) and set(reuse_slots) == set(QUOTE_SLOTS)
+    if empty:
+        verdict = ("조건이 너무 좁아 "
+                   + " · ".join(SLOT_KO.get(s, s) for s in empty)
+                   + " 후보가 없어요 — 견적을 만들 수 없습니다. 조건을 하나만 완화해 주세요.")
+    elif all_reused:
+        verdict = "선택하신 부품을 전부 재사용하시면 새로 담을 부품이 없습니다 — 이번 견적에는 새로 사는 부품이 없어요."
+    else:
+        verdict = "지금 조건으로 가성비·추천·고성능 3구성을 만들 수 있어요."
+
     return {
         "total": total, "count": len(parts), "effects": effects,
         "slots": slot_counts,
         "buildable": not empty,
         "empty_slots": [{"slot": s, "label": SLOT_KO.get(s, s)} for s in empty],
+        # 재사용을 고른 슬롯 — count·buildable에서 왜 그 슬롯이 안 보이는지 화면이
+        # 설명할 수 있게(§화면 정직성: 판정을 지어내지 않으려면 근거가 실려야 한다).
+        "reused_slots": [{"slot": s, "label": SLOT_KO.get(s, s)} for s in reuse_slots],
         # 화면이 그대로 쓸 수 있는 한 문장 — 서버와 화면이 다른 말을 하지 않게
-        "verdict": ("지금 조건으로 가성비·추천·고성능 3구성을 만들 수 있어요."
-                    if not empty else
-                    "조건이 너무 좁아 "
-                    + " · ".join(SLOT_KO.get(s, s) for s in empty)
-                    + " 후보가 없어요 — 견적을 만들 수 없습니다. 조건을 하나만 완화해 주세요."),
+        "verdict": verdict,
     }
