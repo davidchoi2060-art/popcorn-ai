@@ -251,6 +251,29 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 }
 </style>
 
+<!-- expert 모드 전용 — 부품 검색 모달 (2026-08-24, customer-audit-2026-08-24 §4-5 해소)
+     s3-detail.html 의 [변경] 모달(#s3-modal, 읽기만 했다 — 담당 밖)과 같은 배치 패턴을
+     따른다: position:fixed;inset:0 스크림 + 가운데 카드. 새 컴포넌트 체계를 만들지 않고
+     이 화면에 이미 있는 오버레이 방식을 그대로 옮겼다. body 최상위 형제 요소로 둔다
+     (transform·overflow:hidden 조상이 없어야 position:fixed 자식이 뷰포트 기준으로 뜬다 —
+     #s1-grid 래퍼 밖에 둔 이유). 다른 모드에서는 openPartModal() 을 아무도 안 부르므로
+     DOM에 있어도(#s1-manual 처럼) 평소엔 display:none 그대로다. -->
+<div id="s1-pm-modal" style="position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;padding:24px;">
+<div id="s1-pm-scrim" style="position:absolute;inset:0;background:rgba(23,23,27,.45);backdrop-filter:blur(3px);"></div>
+<div style="position:relative;background:#fff;border-radius:20px;max-width:640px;width:100%;padding:24px;box-shadow:0 30px 70px -20px rgba(30,25,15,.5);max-height:calc(100vh - 48px);display:flex;flex-direction:column;">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;">
+<h3 style="margin:0;font-size:18px;font-weight:900;color:#17171b;">부품 선택 — <span id="s1-pm-title">부품</span></h3>
+<button id="s1-pm-close" type="button" style="flex:0 0 auto;border:none;background:none;cursor:pointer;padding:0;"><span style="font-family:'Material Symbols Outlined';font-size:24px;color:#8a8578;">close</span></button>
+</div>
+<div id="s1-pm-typebar" style="display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+<input id="s1-pm-q" type="text" placeholder="상품명·제조사로 검색 (예: RTX, 5070)" style="width:100%;padding:12px 14px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-family:inherit;outline:none;margin-bottom:10px;">
+<!-- §목록 화면 규약 "전체 N건 중 이 페이지" — 화면이 세지 않고 서버 total 을 그대로 옮긴다 -->
+<div id="s1-pm-status" style="font-size:12px;color:#8a8578;font-weight:700;margin-bottom:8px;">&nbsp;</div>
+<div id="s1-pm-list" style="flex:1;min-height:160px;max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+<div id="s1-pm-pager" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid #f0eee9;"></div>
+</div>
+</div>
+
 
 
 
@@ -426,6 +449,100 @@ var USAGES_READY=fetch('/api/usages')
    갱신되므로(아래 setProgress) 문항 수를 따로 맞출 필요는 없다. */
 var QUEUE=[Q_USE,Q_BUDGET,Q_EXISTING,Q_ENV,Q_PRIORITY];
 var qidx=0;
+/* ── 대화 상태 저장 (2026-08-24, 감사 §4-2 「뒤로가기·새로고침이 대화를 통째로 지운다」 해소) ──
+   무엇을 저장하나 — consPairs(조건) + guided 는 qidx·QUEUE 순서(분기 문항 포함)까지.
+   말풍선 원문(addAI/addUser 가 만든 HTML)은 저장하지 않는다: 대화 로그를 통째로 재생하면
+   저장량이 커지고, 서버 판정(verdict·effects)이 그 사이 바뀌면 옛 문구가 새 판정과
+   어긋난다. 이 화면은 이미 「제약은 객체 하나가 단일 원천」(consPairs) 원칙을 쓰므로
+   (§상태 관리 원칙), 그 원천과 guided 진행 위치만 되살리면 사이드바·말풍선·서버 판정이
+   전부 같은 값에서 다시 그려진다 — 「처음부터」는 면하고, 대화 자체를 통째로 재생할
+   필요는 없다는 것이 이 판단의 근거다.
+   어디에 저장하나 — sessionStorage. **탭마다 독립된 저장소**라, 이번 감사에서 함께 발견된
+   별개 결함(`localStorage['popcorn-quote']`가 전역 키라 탭 두 개로 비교 견적을 내면
+   서로 덮어쓰는 문제)과 같은 병을 만들지 않는다. localStorage 를 썼다면 탭 A(게임용
+   80만원)·탭 B(사무용 50만원)가 새로고침마다 서로의 조건을 흡수했을 것이다.
+   sessionStorage 는 새로고침·뒤로가기에도 남고(탭이 살아있는 동안의 저장소라 이 화면의
+   요구와 정확히 맞는다), 탭을 닫으면 사라진다(「며칠 뒤 되살아나면 안 된다」는 요구와도
+   맞는다 — 추가로 TTL 도 둔다, 아래).
+   언제 지우나 — ① DRAFT_TTL_MS(2시간)가 지나면 loadDraft() 가 스스로 버린다. 브라우저
+   탭을 하루 종일 켜 둔 채 방치했다가 열면 「어제 조건」이 뜨는 사고를 막는다. ② 복원
+   안내에 붙인 「여기」(새로 시작)를 누르면 즉시. **「견적을 확정해 S2 로 갔으면」은 지우는
+   시점으로 두지 않았다** — 감사 시나리오 자체가 "5문항 답하고 S2 -> 뒤로가기 -> 복원"을
+   요구하므로, 확정 시점에 지우면 그 뒤로가기가 다시 빈 상태가 되어 고치려는 문제를
+   그대로 재현한다. 대신 다른 탭·다른 날에는 sessionStorage 자체가 비어 있어 이 상태가
+   넘어가지 않는다.
+   모드별 — guided 만 qidx·QUEUE 순서를 저장한다(진행 위치라는 개념이 guided 에만 있다).
+   chat·talk 은 조건만으로 충분하다. expert 는 대상에서 뺐다: 그 화면의 선택 상태
+   (pick{})는 조건이 아니라 «서버가 그 순간 내려준 실재고 후보 목록의 인덱스»라, 나중에
+   달라졌을 수 있는 후보 목록에 옛 인덱스를 그대로 적용하면 고객이 고르지 않은 다른
+   부품이 조용히 선택될 위험이 있다 — 그건 복원이 아니라 새 오류를 만드는 것이다. */
+var DRAFT_KEY='popcorn-s1-draft',DRAFT_TTL_MS=2*60*60*1000;
+var ID_TO_Q={use:Q_USE,budget:Q_BUDGET,existing:Q_EXISTING,env:Q_ENV,priority:Q_PRIORITY,reuse:Q_REUSE,qty:Q_QTY,purpose:Q_PURPOSE};
+var _draftIcons={};   /* label -> 마지막으로 쓰인 아이콘. consPairs 자체엔 아이콘이 없어서
+ (§consPairs 근처 주석) 복원 때 addConstraint(icon,label,value) 를 다시 부르려면 따로
+ 쌓아 둬야 한다 — 아래쪽 최종 addConstraint 래핑이 호출마다 채운다. */
+function loadDraft(){
+ var raw;try{raw=sessionStorage.getItem(DRAFT_KEY);}catch(e){return null;}
+ if(!raw)return null;
+ var d;try{d=JSON.parse(raw);}catch(e){return null;}
+ if(!d||d.mode!==mode||!d.at)return null;
+ if(Date.now()-d.at>DRAFT_TTL_MS){try{sessionStorage.removeItem(DRAFT_KEY);}catch(e){}return null;}
+ return d;
+}
+function saveDraft(){
+ if(mode!=='guided'&&mode!=='chat'&&mode!=='talk')return;
+ if(!((mode==='guided'&&qidx>0)||consPairs.length>0))return;   /* 아직 진행이 없으면 저장하지 않는다 */
+ var d={mode:mode,at:Date.now(),consPairs:consPairs.map(function(p){return {l:p.l,v:p.v};}),icons:_draftIcons};
+ if(mode==='guided'){d.qidx=qidx;d.queueIds=QUEUE.map(function(q){return q.id;});}
+ try{sessionStorage.setItem(DRAFT_KEY,JSON.stringify(d));}catch(e){/* 저장 실패(용량·프라이빗
+  모드)는 조용히 넘어간다 — 상담 자체는 계속돼야 하고, 다음 조건 변경 때 다시 시도된다 */}
+}
+function clearDraft(){try{sessionStorage.removeItem(DRAFT_KEY);}catch(e){}}
+/* qidx·QUEUE 는 guided 의 첫 guidedAsk() 가 돌기 «전»(아래 모드 분기)에 맞춰야 Q1 이
+   잠깐 보였다가 다음 문항으로 바뀌는 깜빡임이 없다 — «용도» 문항은 /api/usages 응답을
+   기다리므로 보통 여유가 있지만(그 사이엔 guidedAsk() 가 렌더 없이 대기만 한다), qidx>0
+   으로 복원되면 그 대기 자체가 없어 곧장 렌더되므로 타이밍에 기대지 않는다.
+   consPairs 복원(사이드바 카드·서버 재계산)은 파일 맨 아래(전 스크립트 실행 뒤,
+   addConstraint 최종 래핑이 자리 잡은 뒤)에서 한다 — 여기서 그대로 부르면 아직 없는
+   정규화·저장 래핑을 건너뛴다. */
+var s1Draft=loadDraft();
+if(s1Draft&&mode==='guided'){
+ if(s1Draft.queueIds&&s1Draft.queueIds.length){
+  var _rq=s1Draft.queueIds.map(function(id){return ID_TO_Q[id];});
+  if(_rq.indexOf(undefined)<0){QUEUE=_rq;qidx=Math.max(0,Math.min(s1Draft.qidx||0,QUEUE.length));}
+  else s1Draft=null;   /* 모르는 문항 id — 코드가 바뀐 뒤 남은 초안. 지어내지 않고 복원을 포기한다 */
+ }else s1Draft=null;
+}
+/* 복원 사실을 고객에게 알린다(조용히 되살리지 않는다 — 지시 원문 "복원했다는 사실을
+   고객에게 밝혀라"). 「이어서 하시겠어요?」로 다시 묻지 않고 곧바로 이어가는 쪽을
+   택했다 — 이 화면이 갖고 있는 사실(조건·진행 위치)을 그대로 보여주면 되는 자리라,
+   한 번 더 확인받는 것은 guided 문항 사이에 불필요한 질문 하나를 더 끼우는 셈이고,
+   chat·talk 은 애초에 "예/아니요"로 답할 질문이 아니다(자유 대화 흐름을 끊는다).
+   대신 무엇을 이어가는지 조건 태그로 구체적으로 보여주고, 원치 않으면 바로 옆에서
+   되돌릴 수 있게(「여기」) 했다 — 침묵도 강요도 아닌 절충. 새 말풍선·칩을 그리지 않고
+   이미 있는 addAI() 를 그대로 쓴다(§화면 작업의 경계 — 새 UI 금지).
+   ⚠ specTags() 를 그대로 부르지 않는다 — 그 함수는 chipMeta(label)->effectMap[label]을
+   읽는데, `effectMap` 은 `var effectMap={};`(파일 아래쪽)이 실행돼야 채워진다. 이 자리는
+   그 줄보다 앞이라 실행 시점엔 여전히 undefined 라 TypeError 로 스크립트 전체가 죽는다
+   (실측: Playwright pageerror "Cannot read properties of undefined (reading '용도')"
+   — chipMeta 에서 발생, 최초 구현에서 실제로 재현·확인 후 고쳤다). 어차피 이 시점엔
+   서버 응답(effects[])이 아직 없어 «참고용» 판정 자체가 불가능하므로(응답 전 = «모름»),
+   specTags 의 ref 분기를 쓸 이유도 없다 — 같은 모양(비-ref 칩)만 여기서 직접 그린다. */
+function draftTagsHtml(pairs){var s='';(pairs||[]).forEach(function(x){
+ s+='<span style="display:inline-flex;align-items:center;background:#eef2fb;color:#2149b0;border:1px solid transparent;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;margin:0 4px 4px 0;">'+esc(x.v)+'</span>';
+});return s;}
+if(s1Draft){
+ var _tail=(mode==='guided')
+  ?('지금까지 <b>'+qidx+' / '+QUEUE.length+'</b>문항에 답하신 걸 이어갈게요.')
+  :'지금까지 답하신 조건을 이어갈게요.';
+ var _tags=draftTagsHtml(s1Draft.consPairs);
+ addAI('다시 오셨네요! '+_tail+(_tags?('<br>'+_tags):'')
+  +'<br><span style="font-size:12px;color:#8a8578;">조건을 지우고 새로 시작하려면 </span>'
+  +'<span id="s1-draft-reset" style="font-size:12px;font-weight:800;color:#2b5fd9;text-decoration:underline;cursor:pointer;">여기</span>'
+  +'<span style="font-size:12px;color:#8a8578;">를 눌러주세요.</span>');
+ var _dr=document.getElementById('s1-draft-reset');
+ if(_dr)_dr.addEventListener('click',function(){clearDraft();window.location.reload();});
+}
 /* _guidedRow = 지금 화면에 떠 있는 질문의 칩 행(guidedAsk 가 매번 갱신) ·
    _guidedAnswered = 그 문항이 이미 답해졌는가(칩 클릭이든 자유입력이든). guidedAutoClose
    (아래, talkParse.apply() 가 부른다)가 쓴다 — 정의는 아래에서 하되 함수선언이라
@@ -473,7 +590,7 @@ function gAnswer(st,opts){_guidedAnswered=true;if(opts.length){addUser(opts.map(
   addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));
  }else if(!st.noFilter){addConstraint(st.ci,st.cl,opts.map(function(o){return o.v;}).join(' · '));var rs=[];opts.forEach(function(o){if(o.why)o.why.forEach(function(w){if(rs.indexOf(w)<0)rs.push(w);});});logFilter(st.cl,null,rs);}
  if(!LIVE)poolUnknown(SRC_NOTE.off);}else{addUser('건너뛸게요');}applyBranch(st,opts);qidx++;setTimeout(guidedAsk,500);}
-function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots.innerHTML='';for(var i=0;i<QUEUE.length;i++){var d=document.createElement('span');d.style.cssText='width:22px;height:6px;border-radius:3px;transition:.3s;background:'+(i<qidx?'#2b5fd9':(i===qidx?'#7fa8ff':'#e6e2da'))+';';dots.appendChild(d);}}var num=document.getElementById('s1-progress-num');if(num)num.textContent=qidx>=QUEUE.length?'완료':((qidx+1)+' / '+QUEUE.length);}
+function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots.innerHTML='';for(var i=0;i<QUEUE.length;i++){var d=document.createElement('span');d.style.cssText='width:22px;height:6px;border-radius:3px;transition:.3s;background:'+(i<qidx?'#2b5fd9':(i===qidx?'#7fa8ff':'#e6e2da'))+';';dots.appendChild(d);}}var num=document.getElementById('s1-progress-num');if(num)num.textContent=qidx>=QUEUE.length?'완료':((qidx+1)+' / '+QUEUE.length);saveDraft();/* guided 진행 위치가 바뀔 때마다 저장(§DRAFT_KEY 근처 주석) */}
 function guidedAsk(){
  /* 용도 단계는 «서버 목록이 도착한 뒤»에 그린다 — 없는 채로 그리면 선택지가 빈 채 지나간다. */
  if(qidx<QUEUE.length&&QUEUE[qidx].id==='use'&&!USAGES_DONE){USAGES_READY.then(guidedAsk);return;}
@@ -683,7 +800,32 @@ var TAG_KO={silent:'저소음',white:'화이트',rgb:'RGB'};
 function fmtSpec(spec){if(!spec)return '';var out=[];Object.keys(spec).forEach(function(k){var v=spec[k];if(v==null||v==='')return;var m=SPEC_META[k];var label=m?m[0]:k.replace(/_/g,' ');var unit=m?m[1]:'';var vs=Array.isArray(v)?v.join('/'):String(v);out.push(label+' '+vs+unit);});return out.join(' · ');}
 function tagLine(tags){return (tags||[]).map(function(t){return TAG_KO[t]||t;}).join('/');}
 function specLine(o){if(!o)return '';if(o.none)return o.spec||'';var bits=[];var sp=fmtSpec(o.spec);if(sp)bits.push(sp);var tg=tagLine(o.tags);if(tg)bits.push(tg);return bits.join(' · ')||'등록된 사양 정보가 없습니다.';}
-function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:12px 14px;';var oh='';s.opts.forEach(function(o,i){var lb=o.none?o.t:(esc(o.name)+' · '+o.price.toLocaleString()+'원');oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+lb+'</option>';});var ak=SLOT_ASSET[s.key];var thumb=ak?('<img src="assets/parts/'+ak+'.png" alt="'+esc(s.label)+'" title="부품 설명 보기" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'):('<span style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;background:#eee8fa;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:23px;color:#6a3fbf;">'+s.ci+'</span>');row.innerHTML=thumb+'<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:10px;"><span style="flex:0 0 62px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select></div><div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:72px;display:flex;align-items:flex-start;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+esc(specLine(s.opts[pick[s.key]]))+'</span></div></div>';box.appendChild(row);var sel=row.querySelector('select');var stx=row.querySelector('.spectxt');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(stx)stx.textContent=specLine(s.opts[pick[s.key]]);renderReason();resetValidation();});});renderReason();}
+/* ── usage_gaps 표시 (2026-08-24, customer-audit-2026-08-24 §4-6 — GT710 사고의 «고객 쪽» 절반) ──
+   `api/expert.py::_usage_gaps()` 가 이미 «막지 않고 알린다»(㉰)로 설계했다 — expert 는
+   고객이 직접 고르는 자리라 저사양을 고르는 것 자체는 여전히 돼야 한다. 이 함수는 그
+   판정을 **지어내지 않고 그대로 옮긴다**: note 문구도 서버가 준 것(usage_floors.floor_text
+   단일 원천)을 esc() 만 해서 쓴다.
+   ⚠ 여러 용도 기준에 동시에 못 미치면(예: 저가 CPU가 5개 용도 하한에 다 걸림) 전부
+   나열하면 그 줄만 시끄러워진다 — 「직접 고른다」는 정체성과도 어긋나게 마치 «잘못된
+   선택»처럼 보인다. 그래서 **첫 번째 사유 하나만 본문에 보이고, 나머지는 개수만
+   덧붙이며 title 툴팁(이 파일이 이미 쓰는 패턴 — specTags() 의 참고용 칩과 같은 방식)에
+   전부 담는다.** `[]` 면 아무것도 반환하지 않는다(빈 배지를 만들지 않는다 — 지시 원문). */
+function gapHtml(gaps){
+ if(!gaps||!gaps.length)return '';
+ var first=esc(gaps[0].note);
+ var more=gaps.length>1?(' · 그 외 '+(gaps.length-1)+'개 용도 기준 더 있음(가리키면 전체 표시)'):'';
+ var full=gaps.map(function(g){return g.usage_label+' — '+g.note;}).join('\n');
+ return '<div class="usagegap" title="'+esc(full)+'" style="display:flex;align-items:flex-start;gap:6px;margin-top:7px;padding:8px 10px;background:#fdf3e2;border:1px solid #f0dfb0;border-radius:9px;">'
+  +'<span style="font-family:\'Material Symbols Outlined\';font-size:15px;color:#c77b1f;flex:0 0 auto;line-height:1.4;">warning</span>'
+  +'<span style="font-size:11.5px;line-height:1.5;color:#8a561a;font-weight:600;">'+first+more+'</span></div>';
+}
+/* select 아래 정보 줄(사양 요약 + usage_gaps 배지)을 한 덩어리로 만든다 — 최초 렌더와
+   드롭다운 change 갱신이 같은 문자열을 쓰게 해서 두 자리가 어긋나지 않는다. */
+function partInfoHtml(o){
+ return '<div style="font-size:11.5px;color:#8a8578;font-weight:600;margin-top:7px;padding-left:72px;display:flex;align-items:flex-start;gap:5px;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;color:#b0a89a;">info</span><span class="spectxt">'+esc(specLine(o))+'</span></div>'
+  +(o&&!o.none?gapHtml(o.usage_gaps):'');
+}
+function renderParts(){var box=document.getElementById('s1-parts');if(!box)return;box.innerHTML='';SLOTS.forEach(function(s){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:14px;background:#f7f6f2;border-radius:12px;padding:12px 14px;';var oh='';s.opts.forEach(function(o,i){var lb=o.none?o.t:(esc(o.name)+' · '+o.price.toLocaleString()+'원');oh+='<option value="'+i+'"'+(pick[s.key]===i?' selected':'')+'>'+lb+'</option>';});var ak=SLOT_ASSET[s.key];var thumb=ak?('<img src="assets/parts/'+ak+'.png" alt="'+esc(s.label)+'" title="부품 설명 보기" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'):('<span style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;background:#eee8fa;display:flex;align-items:center;justify-content:center;font-family:\'Material Symbols Outlined\';font-size:23px;color:#6a3fbf;">'+s.ci+'</span>');row.innerHTML=thumb+'<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="flex:0 0 62px;font-size:12px;font-weight:800;color:#8a8578;">'+s.label+'</span><select data-slot="'+s.key+'" style="flex:1 1 130px;min-width:0;padding:9px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;background:#fff;color:#17171b;outline:none;cursor:pointer;">'+oh+'</select><button type="button" data-fullsearch="'+s.key+'" style="flex:0 0 auto;padding:9px 12px;border:1.5px solid #ddd8ce;background:#fff;border-radius:10px;font-size:12.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;white-space:nowrap;">전체 '+(s.total||0).toLocaleString()+'건 · 검색</button></div><div class="infowrap">'+partInfoHtml(s.opts[pick[s.key]])+'</div></div>';box.appendChild(row);var sel=row.querySelector('select');var iw=row.querySelector('.infowrap');sel.addEventListener('change',function(){pick[s.key]=parseInt(sel.value);if(iw)iw.innerHTML=partInfoHtml(s.opts[pick[s.key]]);renderReason();resetValidation();});var fb=row.querySelector('[data-fullsearch]');if(fb)fb.addEventListener('click',function(){openPartModal(s.key);});});renderReason();}
 // 서버 표본 로드 — 실패해도 예전 21개 리터럴로 되돌아가지 않는다. 지어낸 부품을
 // 보여주느니 실패를 그대로 보여준다(§실패를 삼키지 않는다).
 function loadExpertSlots(){var box=document.getElementById('s1-parts');if(box)box.innerHTML='<div style="display:flex;align-items:center;gap:8px;color:#8a8578;font-size:13px;padding:14px 4px;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;">hourglass_top</span>실재고에서 부품 후보를 불러오는 중입니다…</div>';
@@ -704,7 +846,96 @@ function loadExpertSlots(){var box=document.getElementById('s1-parts');if(box)bo
   var evb=document.getElementById('s1-validate');if(evb)evb.disabled=true;
  });}
 function resetValidation(){var ph='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:150px;color:#a29d92;border:1.5px dashed #ddd8ce;border-radius:14px;padding:22px;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#d8d2c6;">rule</span><span style="font-size:12.5px;line-height:1.5;font-weight:600;">AI 검증하기를 누르면<br>여기에 결과가 나옵니다.</span></div>';var bn=document.getElementById('s1-vbanner');if(bn)bn.innerHTML='';var cp=document.getElementById('s1-compat');if(cp)cp.innerHTML=ph;var ins=document.getElementById('s1-inspect');if(ins)ins.innerHTML=ph;lastBuild=null;lockConfirm('부품을 검증해야 진행할 수 있어요.');}
-function renderReason(){var box=document.getElementById('s1-reason');if(!box)return;var html='';SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];var title=o.none?o.t:o.name;var price=o.none?'':(o.price.toLocaleString()+'원');html+='<div style="border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;overflow:hidden;"><div class="acc-h" style="display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;"><span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+s.ci+'</span><div style="flex:1;min-width:0;"><div style="font-size:11px;color:#8a8578;font-weight:700;">'+s.label+'</div><b style="font-size:13.5px;color:#17171b;">'+esc(title)+'</b></div>'+(price?'<span style="font-size:12.5px;font-weight:800;color:#3a3a40;flex:0 0 auto;">'+price+'</span>':'')+'<span class="acc-i" style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#c9c5bd;">expand_more</span></div><div class="acc-b" style="display:none;padding:2px 13px 13px 42px;"><p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:#55555c;">'+(o.none?esc(o.reason||''):('실재고 상품입니다 — '+esc(fmtSpec(o.spec)||'등록된 사양 정보가 없습니다.')))+'</p>'+(o.none?'':'<div style="font-size:11.5px;color:#8a8578;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;">inventory_2</span>'+(o.maker?esc(o.maker)+' · ':'')+'상품코드 '+o.product_code+(tagLine(o.tags)?' · '+esc(tagLine(o.tags)):'')+'</div>')+'</div></div>';});box.innerHTML=html;Array.prototype.forEach.call(box.querySelectorAll('.acc-h'),function(h){h.addEventListener('click',function(){var b=h.parentNode.querySelector('.acc-b');var ic=h.querySelector('.acc-i');if(b.style.display==='block'){b.style.display='none';if(ic)ic.textContent='expand_more';}else{b.style.display='block';if(ic)ic.textContent='expand_less';}});});}
+// ---- expert 전체 목록 · 검색 모달 (GET /api/expert/parts, 2026-08-24 신설) ----
+// «직접 고르세요」인데 슬롯당 5개 표본만 보이던 결함(customer-audit-2026-08-24 §4-5) 해소.
+// SLOTS[i].opts 는 이미 "서버가 준 항목 배열 + 맨 끝 «선택 안 함»"이라는 계약을 갖고
+// 있다(위 loadExpertSlots 주석) — 검색으로 고른 항목도 **같은 배열에 끼워 넣는다**.
+// 그러면 renderParts()·renderReason()·currentPicks()·validate() 전부 손대지 않고 그대로
+// 동작한다(전부 pick[key] 를 opts 의 인덱스로만 다룬다 — 그 항목이 표본 5개 중 하나인지
+// 검색으로 찾은 것인지 구분하지 않는다).
+var PM_STATE={slot:null,total:0,page:1,pages:1,q:'',part_type:''};
+// COOLER 만 part_type 이 둘이다(공랭·수랭, api/expert.py 문서 그대로) — 다른 슬롯은
+// 종류 필터 자체가 서버에 없으므로(주면 400) 그 슬롯일 때는 필터 바를 안 그린다.
+var PM_TYPES={COOLER:[['','전체'],['COOLER_CPU_AIR','공랭'],['COOLER_CPU_AIO','수랭']]};
+var _pmT=null;
+function pmScheduleFetch(){clearTimeout(_pmT);_pmT=setTimeout(pmFetch,300);}
+function openPartModal(key){
+ PM_STATE={slot:key,total:0,page:1,pages:1,q:'',part_type:''};
+ var s=slotOf(key);
+ var t=document.getElementById('s1-pm-title');if(t)t.textContent=(s&&s.label)||key;
+ var qi=document.getElementById('s1-pm-q');if(qi)qi.value='';
+ var tb=document.getElementById('s1-pm-typebar');
+ if(tb){
+  var types=PM_TYPES[key];
+  if(types){
+   tb.style.display='flex';tb.innerHTML='';
+   types.forEach(function(tp,i){var b=document.createElement('button');b.type='button';b.textContent=tp[1];
+    var on=i===0;b.style.cssText='padding:7px 13px;border-radius:999px;border:1.5px solid '+(on?'#17171b':'#e2ded5')+';background:'+(on?'#17171b':'#fff')+';color:'+(on?'#fff':'#3a3a40')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;';
+    b.addEventListener('click',function(){PM_STATE.part_type=tp[0];PM_STATE.page=1;Array.prototype.forEach.call(tb.children,function(c){var cur=c===b;c.style.borderColor=cur?'#17171b':'#e2ded5';c.style.background=cur?'#17171b':'#fff';c.style.color=cur?'#fff':'#3a3a40';});pmFetch();});
+    tb.appendChild(b);});
+  }else{tb.style.display='none';tb.innerHTML='';}
+ }
+ var modal=document.getElementById('s1-pm-modal');if(modal)modal.style.display='flex';
+ pmFetch();
+}
+function closePartModal(){var m=document.getElementById('s1-pm-modal');if(m)m.style.display='none';}
+function pmFetch(){
+ if(!PM_STATE.slot)return;
+ var list=document.getElementById('s1-pm-list'),status=document.getElementById('s1-pm-status'),pager=document.getElementById('s1-pm-pager');
+ if(list)list.innerHTML='<div style="padding:16px 4px;color:#8a8578;font-size:13px;display:flex;align-items:center;gap:8px;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;">hourglass_top</span>실재고에서 불러오는 중…</div>';
+ if(pager)pager.innerHTML='';
+ var qp=new URLSearchParams({slot:PM_STATE.slot,q:PM_STATE.q,part_type:PM_STATE.part_type,page:String(PM_STATE.page),size:'20',sort:'price_asc'});
+ fetch('/api/expert/parts?'+qp.toString()).then(function(r){if(!r.ok)throw new Error('서버 응답 '+r.status);return r.json();}).then(function(d){
+  PM_STATE.total=d.total;PM_STATE.pages=d.pages||1;PM_STATE.page=d.page||1;
+  // §목록 화면 규약 그대로 — 화면이 세지 않고 서버 total 을 옮긴다.
+  if(status)status.textContent='전체 '+(d.total||0).toLocaleString()+'건 중 이 페이지('+(d.items||[]).length+'개 표시)'+(PM_STATE.q?' · 검색 "'+PM_STATE.q+'"':'');
+  pmRenderList(d.items||[]);pmRenderPager();
+ }).catch(function(e){
+  if(list)list.innerHTML='<div style="padding:16px;border:1.5px dashed #e2b2a8;border-radius:12px;color:#b04a3a;font-size:13px;line-height:1.6;">목록을 불러오지 못했습니다 — '+esc((e&&e.message)||String(e))+'</div>';
+  if(status)status.textContent='전체 — 건';
+ });
+}
+function pmRenderList(items){
+ var list=document.getElementById('s1-pm-list');if(!list)return;
+ if(!items.length){list.innerHTML='<div style="padding:26px 10px;text-align:center;color:#a29d92;font-size:13px;line-height:1.6;">조건에 맞는 부품이 없습니다.<br>검색어를 지우거나 줄여 보세요.</div>';return;}
+ list.innerHTML='';
+ items.forEach(function(o){
+  var row=document.createElement('button');row.type='button';
+  row.style.cssText='display:block;width:100%;padding:12px 14px;border:1.5px solid #e2ded5;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;';
+  row.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;"><b style="font-size:13.5px;color:#17171b;">'+esc(o.name)+'</b><span style="flex:0 0 auto;font-size:13.5px;font-weight:800;color:#3a3a40;">'+o.price.toLocaleString()+'원</span></div>'
+   +'<div style="font-size:11.5px;color:#8a8578;margin-top:3px;">'+esc(fmtSpec(o.spec)||'등록된 사양 정보가 없습니다.')+(o.maker?' · '+esc(o.maker):'')+'</div>'
+   +gapHtml(o.usage_gaps);
+  row.addEventListener('click',function(){pickFromModal(o);});
+  list.appendChild(row);
+ });
+}
+function pmRenderPager(){
+ var p=document.getElementById('s1-pm-pager');if(!p)return;
+ p.innerHTML='';
+ if(PM_STATE.pages<=1)return;   // 한 페이지뿐이면 이전/다음이 다 비활성이라 버튼을 안 그린다
+ function navBtn(label,disabled,fn){var b=document.createElement('button');b.type='button';b.textContent=label;b.disabled=disabled;
+  b.style.cssText='padding:9px 16px;border:1.5px solid #ddd8ce;background:'+(disabled?'#f4f2ec':'#fff')+';color:'+(disabled?'#c9c5bd':'#3a3a40')+';border-radius:10px;font-size:13px;font-weight:700;cursor:'+(disabled?'not-allowed':'pointer')+';font-family:inherit;';
+  if(!disabled)b.addEventListener('click',fn);return b;}
+ var prev=navBtn('이전',PM_STATE.page<=1,function(){PM_STATE.page--;pmFetch();});
+ var mid=document.createElement('span');mid.style.cssText='font-size:12.5px;color:#8a8578;font-weight:700;';mid.textContent=PM_STATE.page+' / '+PM_STATE.pages+' 페이지';
+ var next=navBtn('다음',PM_STATE.page>=PM_STATE.pages,function(){PM_STATE.page++;pmFetch();});
+ p.appendChild(prev);p.appendChild(mid);p.appendChild(next);
+}
+function pickFromModal(o){
+ var s=slotOf(PM_STATE.slot);if(!s)return;
+ var idx=-1;for(var i=0;i<s.opts.length;i++){if(s.opts[i].product_code===o.product_code){idx=i;break;}}
+ if(idx<0){idx=s.opts.length-1;s.opts.splice(idx,0,o);}   // «선택 안 함»(늘 마지막) 바로 앞에 끼운다
+ pick[s.key]=idx;
+ closePartModal();
+ renderParts();renderReason();resetValidation();
+}
+(function(){
+ var cl=document.getElementById('s1-pm-close');if(cl)cl.addEventListener('click',closePartModal);
+ var sc=document.getElementById('s1-pm-scrim');if(sc)sc.addEventListener('click',closePartModal);
+ var qi=document.getElementById('s1-pm-q');if(qi)qi.addEventListener('input',function(){PM_STATE.q=qi.value;PM_STATE.page=1;pmScheduleFetch();});
+ document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var m=document.getElementById('s1-pm-modal');if(m&&m.style.display==='flex')closePartModal();}});
+})();
+function renderReason(){var box=document.getElementById('s1-reason');if(!box)return;var html='';SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];var title=o.none?o.t:o.name;var price=o.none?'':(o.price.toLocaleString()+'원');html+='<div style="border:1px solid #ece9e3;border-radius:11px;margin-bottom:7px;overflow:hidden;"><div class="acc-h" style="display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;"><span style="font-family:\'Material Symbols Outlined\';font-size:19px;color:#2b5fd9;">'+s.ci+'</span><div style="flex:1;min-width:0;"><div style="font-size:11px;color:#8a8578;font-weight:700;">'+s.label+'</div><b style="font-size:13.5px;color:#17171b;">'+esc(title)+'</b></div>'+(price?'<span style="font-size:12.5px;font-weight:800;color:#3a3a40;flex:0 0 auto;">'+price+'</span>':'')+'<span class="acc-i" style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#c9c5bd;">expand_more</span></div><div class="acc-b" style="display:none;padding:2px 13px 13px 42px;"><p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:#55555c;">'+(o.none?esc(o.reason||''):('실재고 상품입니다 — '+esc(fmtSpec(o.spec)||'등록된 사양 정보가 없습니다.')))+'</p>'+(o.none?'':'<div style="font-size:11.5px;color:#8a8578;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;">inventory_2</span>'+(o.maker?esc(o.maker)+' · ':'')+'상품코드 '+o.product_code+(tagLine(o.tags)?' · '+esc(tagLine(o.tags)):'')+'</div>')+(o.none?'':gapHtml(o.usage_gaps))+'</div></div>';});box.innerHTML=html;Array.prototype.forEach.call(box.querySelectorAll('.acc-h'),function(h){h.addEventListener('click',function(){var b=h.parentNode.querySelector('.acc-b');var ic=h.querySelector('.acc-i');if(b.style.display==='block'){b.style.display='none';if(ic)ic.textContent='expand_more';}else{b.style.display='block';if(ic)ic.textContent='expand_less';}});});}
 // ---- compatNotes()/compatSection()/applyFix()/inspectBlock() 를 지웠다(A-72) ----
 // 예전 compatNotes()는 서버 호환 규칙 9행 중 소켓·메모리 2행만 개념이 비슷했다(그나마
 // 자체 문자열 비교). 전력 여유는 서버 규칙이 아니라 자체 공식(need=(TDP합+100)*1.6)이었고,
@@ -1566,19 +1797,39 @@ function applyCount(d,snap){
   if(empty)empty.style.display='none';
   if(cap&&d.verdict&&!cb.disabled)cap.textContent=d.verdict;
  }}
-/* 경고 카드 문구를 실제 사유로 갈아끼운다 — '0개'와 '슬롯이 비었다'는 다른 사건이다 */
+/* 경고 카드 문구를 실제 사유로 갈아끼운다 — '0개'와 '슬롯이 비었다'는 다른 사건이다.
+   2026-08-24 확인자 실측 재현(게임 57만원) — 세 번째 사건을 가른다: `buildable===false`
+   인데 `empty_slots=[]`이고 `count>0`인 경우(오늘 신설된 `over_budget`·`compat_infeasible`
+   verdict 둘 다 이 모양이다). 예전엔 es.length(=0)만 보고 "0개예요"로 떨어져, 같은
+   대화창에 「지금 조건 통과 466개」(패널) · verdict(호환 규칙 때문이라는 정확한 설명) ·
+   이 카드("0개예요")가 동시에 떠 서로 모순됐다 — 466개인데 카드는 0개라 했다.
+   verdict 가 이미 정확한 사유를 말하고 있으므로 **이 경우엔 문구를 지어내지 않고 비운다**
+   (지시 원문 "모순 카드를 내지 마라 — 생략이 제일 깔끔하다"). 컨테이너(#s1-empty) 자체는
+   숨기지 않는다 — 완화 칩(relaxChips)이 이 컨테이너 «안»에 자기 자리(#s1-relax)를
+   심으므로, 카드를 통째로 접으면 칩까지 사라진다(지시 원문 "완화 칩은 그대로 살려라").
+   h3·p 는 이 함수가 재호출될 때마다 세 갈래 중 하나로 다시 채워지는 공유 DOM 이라,
+   숨긴 경우는 다음 호출에서 다시 보이도록 display 도 함께 되돌린다(상태가 새지 않게). */
 function emptyCard(d){
  if(!empty)return;
  var h=empty.querySelector('h3'),p=empty.querySelector('p');
  var es=(d.empty_slots||[]).map(function(s){return s.label;});
- if(h)h.textContent=es.length?'견적을 만들 수 없어요 — '+es.join(' · ')+' 후보가 없어요'
-                             :'조건을 만족하는 상품이 없어요';
- if(p)p.innerHTML=es.length
-   ? '통과한 부품은 <b>'+d.count.toLocaleString()+'개</b>지만 '
-     +'<b style="color:#b04a3a;">'+es.join(' · ')+'</b>가 한 개도 없어 조립이 성립하지 않아요. '
-     +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.'
-   : '지금 조건을 모두 만족하는 상품이 <b style="color:#b04a3a;">0개</b>예요. '
-     +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.';
+ var zero=(d.count===0);
+ if(es.length){
+  if(h){h.style.display='';h.textContent='견적을 만들 수 없어요 — '+es.join(' · ')+' 후보가 없어요';}
+  if(p){p.style.display='';p.innerHTML='통과한 부품은 <b>'+d.count.toLocaleString()+'개</b>지만 '
+    +'<b style="color:#b04a3a;">'+es.join(' · ')+'</b>가 한 개도 없어 조립이 성립하지 않아요. '
+    +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.';}
+ }else if(zero){
+  if(h){h.style.display='';h.textContent='조건을 만족하는 상품이 없어요';}
+  if(p){p.style.display='';p.innerHTML='지금 조건을 모두 만족하는 상품이 <b style="color:#b04a3a;">0개</b>예요. '
+    +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.';}
+ }else{
+  /* over_budget · compat_infeasible — count>0인데 슬롯은 전부 후보가 있다(그래서
+     empty_slots=[]). 서버가 못 준 "0개"를 화면이 짓지 않는다 — verdict(호출부
+     cap.textContent)가 이미 그 사유를 정확히 말한다. */
+  if(h){h.style.display='none';h.textContent='';}
+  if(p){p.style.display='none';p.innerHTML='';}
+ }
  relaxChips(d);
 }
 /* 제약을 하나 뺀다 — 원장이 아니라 화면 상태이므로 제자리에서 지운다 */
@@ -1962,6 +2213,16 @@ var _normBase=addConstraint;
 addConstraint=function(icon,label,value){
  var n=normCons(label,value);
  _normBase(n.l==='선호'?srvIcon('선호',n.v):icon,n.l,n.v);};
+/* ── 대화 상태 저장 훅 (2026-08-24) — 가장 바깥쪽 래핑 ──
+   여기서 한 번 더 감싸는 이유: consPairs 에는 아이콘이 없어서(위 consPairs 근처 주석)
+   복원 때 addConstraint(icon,label,value) 를 다시 부르려면 라벨별 마지막 아이콘을
+   따로 기억해 둬야 한다(_draftIcons). 그리고 조건이 바뀔 때마다(칩 클릭·자유 입력 반영
+   전부 이 함수를 지난다) saveDraft() 를 불러 sessionStorage 에 최신 상태를 남긴다 —
+   저장 시점을 사람이 일일이 챙기지 않아도 되게, 조건이 실제로 바뀌는 «그 자리»에
+   붙였다(§상태 관리 원칙 — 제약은 객체 하나가 단일 원천이므로, 그 원천이 바뀌는
+   자리가 곧 저장할 자리다). */
+var _draftBase=addConstraint;
+addConstraint=function(icon,label,value){_draftBase(icon,label,value);_draftIcons[label]=icon;saveDraft();};
 function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
 /* droppedNote(dropped) — POST /api/talk/parse 응답의 dropped[]({l,v,reason}) 를 사람이
    읽는 한 줄(들)로 바꾼다(고객단 점검 §2-1 — 「9800X3D」·「1,000,000원」처럼 서버가 «왜»
@@ -2099,6 +2360,23 @@ function mbarUpdate(){var l=document.getElementById('s1-mbar-line');if(l)l.textC
 
 var _mb=document.getElementById('s1-mbar-btn');
 if(_mb)_mb.addEventListener('click',function(){var as=document.getElementById('s1-aside');if(!as)return;var open=as.classList.toggle('m-sheet');_mb.textContent=open?'닫기':'조건·견적 보기';});
+/* ── 대화 상태 복원 — 조건을 실제로 채운다 (2026-08-24) ──
+   여기서 부르는 addConstraint 는 파일 맨 위부터 여기까지 쌓인 모든 래핑(정규화·LIVE
+   재계산·아이콘 기록+저장)을 전부 통과한 최종본이다 — 그래서 복원도 사람이 직접
+   답했을 때와 같은 경로를 탄다(사이드바 카드 생성 · budgetUpdate · scheduleCount 로
+   실서버 재계산). 알림 말풍선은 이미 위(모드 분기 전, s1Draft 판정 자리)에서 한 번만
+   띄웠다 — 여기서 또 addAI 를 부르면 같은 말이 두 번 뜬다.
+   USAGES_READY 를 기다리는 이유: 조건에 「용도」가 있으면 budgetUpdate() 가 예산대를
+   좁히는데, 그 판정(usageTier())은 서버 용도 목록(USAGES)이 있어야 한다 — 페이지를
+   막 연 시점엔 그 목록이 아직 안 왔을 수 있다(§USAGES 블록). 기다리지 않고 바로 채우면
+   예산대가 「전체 구성 기준」으로 잠깐 잘못 보일 수 있어 기다린다. */
+if(s1Draft&&(s1Draft.consPairs||[]).length){
+ USAGES_READY.then(function(){
+  s1Draft.consPairs.forEach(function(p){
+   addConstraint((s1Draft.icons&&s1Draft.icons[p.l])||'tune',p.l,p.v);
+  });
+ });
+}
 })();
 </script>
 
