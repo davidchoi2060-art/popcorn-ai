@@ -590,7 +590,8 @@ def expert_build(body: ExpertBuildBody, request: Request, response: Response):
                 alt_highend = _build_set(
                     "highend", pool, total, rules,
                     relax_note="부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다"
-                               "(총액 상한은 유지)")
+                               "(총액 상한은 유지)",
+                    alloc_capped=False)
             note = f"직접 고른 구성({total:,}원) 대비 서버가 계산한 대안입니다."
             for alt in (alt_value, alt_highend):
                 if alt is None:

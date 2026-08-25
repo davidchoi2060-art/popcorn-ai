@@ -6127,6 +6127,350 @@ def test_lock_scope():
           would_overwrite > 0, "> 0", would_overwrite)
 
 
+# ─────────────────────── [46]~[50] 검사 공백 메우기 (2026-08-25) ───────────────────────
+# 오늘 고친 다섯(팀원 한글명 배너·모델 필터 정본화·한도 되돌리기·공급처 122곳·배분
+# 상한 정직화)에 자동 검사가 하나도 없었다(확인자 실측). 값이 아니라 **관계**를 본다
+# (A-13 그대로) — 개수를 박지 않고, 두 경로가 같은지·서버가 지어내지 않는지를 본다.
+
+
+def test_dash_team_ko():
+    """[46] 작업 현황판 — 팀원 한글명이 다 있는가 (2026-08-25 신설)
+
+    `.claude/agents/*.md`가 팀원 정본이고 `api/dash.py`의 TEAM_KO는 표시용 사본이다
+    (그 파일 docstring이 이미 "정본이 아니라 표시용"이라 밝힌다). 사본이라 낡을 수
+    있다 — archivist·designchecker가 3주 가까이, 그다음 pathfinder가 또 같은 방식으로
+    TEAM_KO에서 빠진 채 방치됐다(2026-08-15·2026-08-25 두 차례, api/dash.py 주석 실측).
+    **같은 유형의 결함이 이미 두 번**이라 회귀에 고정한다 — 셋째 팀원이 또 빠지면
+    이 검사가 잡는다.
+    """
+    print("\n[46] 작업 현황판 — 팀원 한글명 전수 (2026-08-25 신설)")
+    agent_files = sorted(glob.glob(os.path.join(ROOT, ".claude", "agents", "*.md")))
+    agent_names = sorted(os.path.splitext(os.path.basename(p))[0] for p in agent_files)
+    check("[46] .claude/agents/*.md 팀원 정의 파일을 찾았다(0건이면 아래 비교가 무의미)",
+          len(agent_names) > 0, "> 0", len(agent_names))
+    if not agent_names:
+        return
+
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    from api.dash import TEAM_KO
+
+    missing = [n for n in agent_names if n not in TEAM_KO]
+    check(f"[46] TEAM_KO가 정의된 팀원 {len(agent_names)}명({', '.join(agent_names)})을"
+          " 전부 덮는다 — 빠지면 팀원 카드가 영문 이름 그대로 노출된다",
+          not missing, "누락 없음", missing)
+
+    # ── 자기검증: 이 비교 로직이 실제로 결함을 잡는지 — TEAM_KO **사본**에서 하나를
+    # 지우고 같은 비교를 다시 돌린다. api/dash.py 파일 자체는 건드리지 않는다.
+    victim = agent_names[-1]
+    fake_team_ko = {k: v for k, v in TEAM_KO.items() if k != victim}
+    sim_missing = [n for n in agent_names if n not in fake_team_ko]
+    check(f"[46] 자기검증 — TEAM_KO 사본에서 '{victim}'을 지우면 이 비교가 실제로 잡는다"
+          "(오늘 pathfinder 누락과 같은 상황을 재현 — api/dash.py는 건드리지 않음)",
+          sim_missing == [victim], [victim], sim_missing)
+
+    # ── 화면(GET /api/admin/dash/state)도 같은 판정을 서버 응답에 싣는다(조기경보 필드,
+    # 2026-08-15 신설) — 정적 비교와 서버 판정 두 경로가 같은 결론을 내는지 본다.
+    d = get("/api/admin/dash/state")
+    check("[46] /api/admin/dash/state 응답에 team_unmapped 필드가 있다",
+          isinstance(d, dict) and "team_unmapped" in d,
+          "필드 있음", sorted(d.keys()) if isinstance(d, dict) else d)
+    if isinstance(d, dict) and "team_unmapped" in d:
+        check("[46] 서버가 판정한 team_unmapped가 정적 비교(TEAM_KO 누락)와 일치한다",
+              sorted(d["team_unmapped"]) == sorted(missing), sorted(missing),
+              sorted(d["team_unmapped"]))
+
+    # ── 화면이 누락을 배너로 알리는 경로 — 정적 마크업 계약(브라우저 없이 검사) ──
+    dash_tmpl = os.path.join(ROOT, "templates", "admin", "dash.html.j2")
+    if os.path.exists(dash_tmpl):
+        tmpl = io.open(dash_tmpl, encoding="utf-8").read()
+        check("[46] 현황판에 팀원 한글명 누락 배너 마크업이 있다(hidden으로 미리 존재)",
+              'data-bind="team-unmapped-banner"' in tmpl, "있음", "없음")
+        check("[46] 배너가 서버 team_unmapped를 그대로 읽는다(화면이 지어내지 않는다)",
+              "renderTeamUnmapped(d.team_unmapped)" in tmpl, "있음", "없음")
+    else:
+        check("[46] templates/admin/dash.html.j2 가 있다", False, "파일 있음", "없음")
+
+
+def test_ai_response_log_models():
+    """[47] AI 응답 기록 — 모델 필터가 api/llm.py PROVIDERS 정본을 읽는가 (2026-08-25 신설)
+
+    화면의 「모델」 필터가 실측 모드에서도 클라이언트 미리보기 예시 배열에서만 옵션을
+    뽑고 있었다(claude-opus-4-8·gemini-2.5-pro·gpt-5-codex — 전부 폐기된 세대, 실제
+    로그가 쌓여도 그 이름으로 거르면 영원히 0건). 2026-08-25 정정으로
+    `GET /api/admin/ai-response-log`가 `models`를 `api/llm.py`의 `PROVIDERS[...].pricing`
+    키에서 직접 계산해 내려준다(api/admin_ai_logs.py). **개수를 박지 않는다** — 모델이
+    늘거나 세대가 갈리면 이 검사가 스스로 새 기대값을 계산한다. 두 곳(API 응답 ↔
+    PROVIDERS)이 같은지만 본다.
+    """
+    print("\n[47] AI 응답 기록 — 모델 필터 정본화 (2026-08-25 신설)")
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    from api.llm import PROVIDERS as LLM_PROVIDERS
+
+    expected = sorted({m for spec in LLM_PROVIDERS.values() for m in spec.pricing})
+    check("[47] api/llm.py PROVIDERS에 모델이 실제로 있다(0건이면 아래 비교가 무의미)",
+          len(expected) > 0, "> 0", len(expected))
+
+    d = get("/api/admin/ai-response-log")
+    got = sorted(d.get("models") or [])
+    check("[47] AI 응답 기록의 모델 필터 목록 = api/llm.py PROVIDERS 단가표 키"
+          "(개수를 박지 않는다 — 두 경로가 같은지만 본다)",
+          got == expected, expected, got)
+
+    # ── 자기검증 — 2026-08-25 발견 전까지 실제로 노출되던 폐기 모델명 3종은 지금
+    # PROVIDERS가 주는 값과 다르다(같으면 위 비교가 그 결함을 못 잡는다는 뜻). ──
+    stale = sorted(["claude-opus-4-8", "gemini-2.5-pro", "gpt-5-codex"])
+    check("[47] 자기검증 — 2026-08-25 이전 폐기 모델명 3종은 지금 정본과 다르다"
+          "(같았다면 위 비교가 그 결함을 구분하지 못했다는 뜻)",
+          stale != expected, "다름(검사가 구분함)", stale if stale == expected else "다름")
+
+    # ── 화면(측정 모드)이 서버 값을 읽는다 — 정적 계약(브라우저 없이 검사) ──
+    tmpl_path = os.path.join(ROOT, "templates", "admin", "ai_response_log.html.j2")
+    if os.path.exists(tmpl_path):
+        tmpl = io.open(tmpl_path, encoding="utf-8").read()
+        check("[47] 실측 모드의 모델 목록이 서버 값(S.server.models)을 읽는다"
+              "(미리보기 예시 배열 S.demo가 아니다)",
+              "S.server && S.server.models" in tmpl, "있음", "없음")
+    else:
+        check("[47] templates/admin/ai_response_log.html.j2 가 있다", False, "파일 있음", "없음")
+
+    # ── 화면이 실제로 렌더되는가 — 서버 렌더 결과([41]과 같은 방식) ──
+    st, html = get_html("/admin2/ai-response-log")
+    check("[47] /admin2/ai-response-log 200", st == 200, 200, st)
+    if st == 200:
+        check("[47] data-screen-id=ADM-AI-060", 'data-screen-id="ADM-AI-060"' in html,
+              True, 'data-screen-id="ADM-AI-060"' in html)
+
+
+def test_ai_integration_limit_clear():
+    """[48] AI 연동 설정 — 한도 되돌리기 왕복 (2026-08-25 신설)
+
+    `DELETE /api/admin/ai-integration/limits/{provider}`가 2026-08-25 신설됐다
+    (api/admin_ai_integration.py "■ 한도를 «미설정»으로 되돌리기" 참고) — 그 전에는
+    POST로 한 번 세운 한도를 다시 미설정으로 되돌릴 방법이 코드 어디에도 없었다.
+    한도를 세우고 → 지우고 → 실제로 null이 되는지 왕복으로 확인한다. 검사가 만든
+    상태는 검사가 되돌린다(try/finally) — 이 프로바이더가 검사 시작 전에 미설정이면
+    지운 상태가 곧 원상태라 되돌리기가 필요 없고, 무언가 설정돼 있었으면 그 값 그대로
+    복원한다.
+    """
+    print("\n[48] AI 연동 설정 — 한도 되돌리기 왕복 (2026-08-25 신설)")
+    PROVIDER = "codex"
+    J = {"Content-Type": "application/json"}
+
+    before_status = get("/api/admin/ai-integration/status")
+    prov = next((p for p in (before_status or {}).get("providers", [])
+                 if p["key"] == PROVIDER), None)
+    check(f"[48] status 응답에 '{PROVIDER}' 프로바이더가 있다", prov is not None,
+          PROVIDER, prov)
+    if prov is None:
+        return
+    before = prov["limit"]
+
+    def _restore():
+        if before.get("daily_usd") is not None:
+            restore_body = {"daily_usd": before["daily_usd"],
+                             "per_minute": before.get("per_minute"),
+                             "per_day": before.get("per_day"),
+                             "action": before.get("action"),
+                             "sub": {k: v for k, v in (before.get("sub") or {}).items()
+                                     if v is not None}}
+            post_raw(f"/api/admin/ai-integration/limits/{PROVIDER}",
+                     json.dumps(restore_body).encode(), J)
+        # else: 검사 시작 전부터 미설정이었다 — try 블록의 DELETE가 이미 그 상태를
+        # 재현했으므로 되돌릴 것이 없다(POST는 daily_usd<=0을 거절해 "미설정"을
+        # 직접 만들 방법이 없다 — 그래서 지운 상태가 곧 원상태다).
+
+    try:
+        st1, out1 = post_raw(
+            f"/api/admin/ai-integration/limits/{PROVIDER}",
+            json.dumps({"daily_usd": 5.0, "per_minute": 7, "per_day": 77,
+                        "action": "warn", "sub": {}}).encode(), J)
+        check("[48] 한도를 세울 수 있다(POST)", st1 == 200, 200, st1)
+        check("[48] 세운 값이 응답에 그대로 실린다(daily_usd=5.0 — 검사가 실제로"
+              " 상태를 바꿨는지 확인, 아니면 아래 DELETE 검사가 무의미하다)",
+              (out1 or {}).get("limit", {}).get("daily_usd") == 5.0,
+              5.0, (out1 or {}).get("limit", {}).get("daily_usd"))
+
+        st2, out2 = post_raw(f"/api/admin/ai-integration/limits/{PROVIDER}",
+                              None, {}, method="DELETE")
+        check("[48] 한도를 지울 수 있다(DELETE)", st2 == 200, 200, st2)
+        after = (out2 or {}).get("limit") or {}
+        check("[48] 지운 뒤 daily_usd가 null이다(«유지»가 아니라 실제로 미설정으로"
+              " 되돌아간다)", after.get("daily_usd") is None, None, after.get("daily_usd"))
+        check("[48] 지운 뒤 per_minute·per_day·action도 전부 null이다",
+              after.get("per_minute") is None and after.get("per_day") is None
+              and after.get("action") is None,
+              "전부 null", {"per_minute": after.get("per_minute"),
+                           "per_day": after.get("per_day"),
+                           "action": after.get("action")})
+        check("[48] 작업별 부분 한도(sub)도 전부 null이다",
+              bool(after.get("sub")) and all(v is None for v in after["sub"].values()),
+              "전부 null", after.get("sub"))
+
+        # ── 원천 대조 — API 말과 실제 저장이 같은지, DB에도 정말 행이 없는지 ──
+        cnt = db_one("SELECT COUNT(*) FROM cost_thresholds WHERE key = :k OR key LIKE :pfx",
+                     k=PROVIDER, pfx=f"{PROVIDER}:%")
+        if cnt is None:
+            print("  [SKIP] (I) [48] DB 원천 대조 — DB 미연결: " + _db_why)
+        else:
+            check("[48] cost_thresholds에 이 프로바이더 행이 실제로 없다(DB 원천 대조)",
+                  cnt == 0, 0, cnt)
+            cnt2 = db_one("SELECT COUNT(*) FROM rate_limit_policies WHERE key = :k", k=PROVIDER)
+            check("[48] rate_limit_policies에도 행이 없다(DB 원천 대조)", cnt2 == 0, 0, cnt2)
+
+        # ── 멱등성 — 이미 미설정인데 다시 지워도 실패하지 않는다 ──
+        st3, out3 = post_raw(f"/api/admin/ai-integration/limits/{PROVIDER}",
+                              None, {}, method="DELETE")
+        check("[48] 이미 미설정인데 다시 지워도 실패하지 않는다(멱등)", st3 == 200, 200, st3)
+        check("[48] 멱등 응답의 changed가 비어 있다", (out3 or {}).get("changed") == {},
+              {}, (out3 or {}).get("changed"))
+    finally:
+        _restore()
+
+    final = get("/api/admin/ai-integration/status")
+    fprov = next((p for p in (final or {}).get("providers", [])
+                  if p["key"] == PROVIDER), None)
+    check("[48] 검사가 끝난 뒤 원래 상태로 되돌렸다(daily_usd 기준 — 검사가 흔적을"
+          " 남기지 않는다)",
+          (fprov or {}).get("limit", {}).get("daily_usd") == before.get("daily_usd"),
+          before.get("daily_usd"), (fprov or {}).get("limit", {}).get("daily_usd"))
+
+    # ── 화면이 실제로 렌더되는가 — 서버 렌더 결과([41]과 같은 방식) ──
+    st, html = get_html("/admin2/ai-integration")
+    check("[48] /admin2/ai-integration 200", st == 200, 200, st)
+    if st == 200:
+        check("[48] data-screen-id=ADM-AI-040", 'data-screen-id="ADM-AI-040"' in html,
+              True, 'data-screen-id="ADM-AI-040"' in html)
+
+
+def test_supplier_scale():
+    """[49] 공급처 화면 — 규모(122곳) 전수 대조 (2026-08-25 신설)
+
+    공급처 회귀([22] test_suppliers)가 5곳일 때 만들어졌다. 지금은 122곳이다(사장님이
+    새로 대거 등록 — docs/open-items.md 실측). total==len(items)는 [22]가 이미 본다 —
+    이 검사가 새로 보는 것은 **행 하나하나의 「연결 상품」·「단가표 파일」·「파서
+    프리셋」이 화면이 지어낸 값이 아니라 서버가 실제로 센 값인지**를 122행 «전수»로
+    대조하는 것이다(표본 아님). `admin_suppliers.py`의 상관 서브쿼리(`_SELECT_BODY`)와
+    **다른 SQL 형태**(JOIN + GROUP BY)로 독립 계산해 같은 값이 나오는지 본다 — 같은
+    SQL을 그대로 베끼면 "그 SQL이 자기 자신과 같다"는 말밖에 안 된다.
+    """
+    print("\n[49] 공급처 화면 — 규모 전수 대조 (2026-08-25 신설)")
+    d = get("/api/admin/suppliers")
+    check("[49] 공급처 목록을 읽는다", isinstance(d, dict) and "items" in d, "items 있음", d)
+    if not isinstance(d, dict) or "items" not in d:
+        return
+    items = d["items"]
+
+    total_db = db_one("SELECT COUNT(*) FROM suppliers")
+    if total_db is None:
+        print("  [SKIP] (I) [49] 공급처 전수 대조 — DB 미연결: " + _db_why)
+        return
+
+    check("[49] API total = DB 전체 행 수", d.get("total") == total_db, total_db, d.get("total"))
+    check("[49] items 배열 길이 = total(응답이 스스로 자르지 않는다 — 페이지네이션 없음)",
+          len(items) == d.get("total"), d.get("total"), len(items))
+    # "5곳일 때만 검증됐다"의 다음 규모를 실제로 넘는지 — 하드코딩한 "122"가 아니라
+    # 그때의 상한을 넘는지만 본다(수가 더 늘어도 이 검사는 낡지 않는다).
+    check("[49] 이전에 검증됐던 규모(5곳)를 실제로 넘는 규모에서 대조했다",
+          total_db > 5, "> 5", total_db)
+
+    rows = db_all(
+        "SELECT s.supplier_id,"
+        " COUNT(DISTINCT p.psp_id) AS linked,"
+        " COUNT(DISTINCT f.file_id) AS files,"
+        " COUNT(DISTINCT pr.preset_id) AS presets"
+        " FROM suppliers s"
+        " LEFT JOIN product_supplier_prices p ON p.supplier_id = s.supplier_id"
+        " LEFT JOIN supplier_price_files f ON f.supplier_id = s.supplier_id"
+        " LEFT JOIN supplier_presets pr ON pr.supplier_id = s.supplier_id"
+        " GROUP BY s.supplier_id")
+    by_id = {r["supplier_id"]: r for r in rows}
+
+    missing, bad_linked, bad_files, bad_presets = [], [], [], []
+    for it in items:
+        r = by_id.get(it["id"])
+        if r is None:
+            missing.append(it["id"])
+            continue
+        if it["linked_products"] != r["linked"]:
+            bad_linked.append({"id": it["id"], "화면": it["linked_products"], "DB재계산": r["linked"]})
+        if it["price_files"] != r["files"]:
+            bad_files.append({"id": it["id"], "화면": it["price_files"], "DB재계산": r["files"]})
+        if it["preset_count"] != r["presets"]:
+            bad_presets.append({"id": it["id"], "화면": it["preset_count"], "DB재계산": r["presets"]})
+
+    check(f"[49] 공급처 {len(items)}곳 전수 — 없는 id 없음(DB와 API의 모집단이 같다)",
+          not missing, "없음", missing[:5])
+    check(f"[49] 공급처 {len(items)}곳 전수 — 「연결 상품」이 서버가 센 값이다"
+          "(화면이 지어내지 않는다, 독립 JOIN 재계산과 전수 일치)",
+          not bad_linked, "전부 일치", bad_linked[:5])
+    check(f"[49] 공급처 {len(items)}곳 전수 — 「단가표 파일」도 서버가 센 값이다",
+          not bad_files, "전부 일치", bad_files[:5])
+    check(f"[49] 공급처 {len(items)}곳 전수 — 「파서 프리셋」도 서버가 센 값이다",
+          not bad_presets, "전부 일치", bad_presets[:5])
+
+    # ── 자기검증 — 위 대조가 실제로 어긋남을 잡는지, 응답 사본 하나를 일부러
+    # 어긋내고 같은 비교를 돌려 본다(API에도 DB에도 쓰지 않는다) ──
+    if items:
+        victim = dict(items[0])
+        victim["linked_products"] = (victim["linked_products"] or 0) + 1
+        r = by_id.get(victim["id"])
+        broke = r is not None and victim["linked_products"] != r["linked"]
+        check("[49] 자기검증 — 「연결 상품」을 +1 어긋낸 사본은 이 비교에 걸린다"
+              "(화면이 진짜 숫자를 지어냈다면 이렇게 잡힌다는 뜻)",
+              broke, True, broke)
+
+    # ── admin2 화면이 실제로 전부 그린다 — 클라이언트가 자르지 않는다 ──
+    st, html = get_html("/admin2/suppliers")
+    check("[49] /admin2/suppliers 200", st == 200, 200, st)
+    if st == 200:
+        check("[49] data-screen-id=ADM-SRC-030", 'data-screen-id="ADM-SRC-030"' in html,
+              True, 'data-screen-id="ADM-SRC-030"' in html)
+        check("[49] 목록 렌더가 항목을 자르지 않는다(전체를 그대로 그린다 — slice 없음)",
+              "S.data.items.map(rowHtml)" in html and ".slice(" not in html,
+              "전체 렌더·slice 없음",
+              {"map 있음": "S.data.items.map(rowHtml)" in html, "slice 있음": ".slice(" in html})
+
+
+def test_alloc_capped_uncapped():
+    """[50] 견적 배분 상한 — 상한을 푼 경우 「유지」라고 거짓말하지 않는가 (2026-08-25 신설)
+
+    `api/recommend.py`의 `_build_highend()`가 `hi_alloc = cap is not None`으로 고쳐졌다
+    (2026-08-24, "최고 사양 문구 정직화 후속") — cap이 없으면(‘200만원 이상’ 등) 배분
+    상한 자체를 걸 근거가 없으므로 고성능형 reasons가 "부품별 배분 상한은 유지"라고
+    말하면 안 된다. **같은 날(2026-08-25) `api/expert.py`는 다른 제작자가 고치는
+    중이다**(`:590~593`, docs/open-items.md 3절) — 이 검사는 그 파일을 건드리지 않고
+    `api/recommend.py` 경로(`/api/recommend`, 이미 고쳐짐)만 본다.
+    """
+    print("\n[50] 견적 배분 상한 — 상한 해제 시 '유지' 주장 금지 (2026-08-25 신설)")
+    sopen = rec("200만원 이상")
+    h = sopen.get("highend")
+    check("[50] 상한 없는 예산('200만원 이상')으로 고성능형을 지을 수 있다"
+          "(못 지으면 아래 문구 검사가 무의미)", bool(h), "구성 있음", h)
+    if not h:
+        return
+    check("[50] 이 시나리오가 실제로 cap=None을 탔다(검사가 실제로 상한없음 경로를 검증)",
+          h["budget"]["cap"] is None, None, h["budget"]["cap"])
+
+    reasons_text = " / ".join(h.get("reasons") or [])
+    check("[50] cap=None인데 '부품별 배분 상한은 유지'라고 말하지 않는다"
+          "(말하면 거짓 — 배분 상한을 걸 기준 자체가 없다)",
+          "부품별 배분 상한은 유지" not in reasons_text, "미포함", reasons_text)
+    check("[50] 대신 '해제'로 정직하게 표기한다",
+          "부품별 배분 상한으로는 조합이 없어 해제" in reasons_text, "포함", reasons_text)
+
+    # ── 정적 소스 검사 — 이 판정이 실제로 cap 유무로 갈리는 코드인가(고정값으로
+    # 되돌아가면 이 줄들이 사라진다). api/expert.py는 건드리지 않으므로 api/recommend.py만.
+    rec_src = io.open(os.path.join(ROOT, "api", "recommend.py"), encoding="utf-8").read()
+    check("[50] api/recommend.py의 판정이 'cap is not None'으로 걸려 있다"
+          "(고정값(True)으로 되돌아가면 이 줄이 사라진다)",
+          "hi_alloc = cap is not None" in rec_src, "있음", "없음")
+    check("[50] 배분 상한 실패 시 common 폴백 호출은 명시적으로 alloc_capped=False를"
+          " 넘긴다(폴백인데 '유지'라 말하면 자기모순 — CLAUDE.md 실사고 205건, 14.2%)",
+          rec_src.count("alloc_capped=False") >= 2, ">= 2", rec_src.count("alloc_capped=False"))
+
+
 def main():
     print("=" * 74)
     print("팝콘PC AI 통합 회귀 세트 — 전량 불변식(I). 절대값 대신 관계·원천 대조 (A-13)")
@@ -6185,7 +6529,12 @@ def main():
                test_rebuild_screens,
                test_display_name,
                test_std_schema,
-               test_lock_scope):
+               test_lock_scope,
+               test_dash_team_ko,
+               test_ai_response_log_models,
+               test_ai_integration_limit_clear,
+               test_supplier_scale,
+               test_alloc_capped_uncapped):
         try:
             fn()
         except Exception as e:
