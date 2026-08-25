@@ -41,6 +41,15 @@
 > 사례다. 지우지 않고 여기서 정정한다(CANON §5 — 폐기된 것은 지우지 말고
 > 폐기라고 적는다. 이 노트는 폐기가 아니라 해소된 발견이라 「해소」로 적는다).
 
+> **2026-08-25 기록자 실측 — 정의서 유무 43개 전수 재확인.** `api/admin_ui_*.py`
+> (공용 헬퍼 `admin_ui_common.py` 제외) 43개를 화면 ID로 `docs/design/req/*.md`와
+> 대조한 결과 **43개 전부 정의서가 있다**(0개 없음). 유일한 예외는 위치뿐이다 — 상품
+> 사양 검수(`ADM-PRD-020`)의 정의서는 `docs/design/req/` 안이 아니라 한 단계 위
+> `docs/design/req-admin2-reviews-2026-08-13.md`에 있다(`req/` 하위 폴더 관례가 서기
+> 전에 쓰여 위치만 다르고 내용은 정상). 이 목차에서 실제로 빠져 있던 것은 **행 자체**
+> (팝콘톡 응답 패턴, 위 §7 `28B`로 추가)였지 정의서가 아니었다 — 상세 근거는
+> `docs/decisions/admin-identity.md` §「2026-08-25 전 화면 재정렬」.
+
 ## 0. 로그인 — LNB 밖
 
 > 로그인 화면은 좌측 메뉴에 없다(실측: `api/admin_nav.py` 전수 검색 "로그인" 0건 —
@@ -148,6 +157,7 @@
 |---|------|----------------|--------|------|
 | 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
 | 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **지음** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 재구축** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 커밋 `04a99dc`(그 커밋 메시지 자신은 당시 "재구축 중(제작 착수, 확인자 검증 전)"이라 적었다). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.** ⚠⚠ **해소(2026-08-15, 기록자 6차)** — 커밋 `04a99dc`의 1a 버전이 "검증 전인데 메뉴에 이미 노출돼 있다"는 우려를 남겨 뒀었다(admin_nav.py 5차 노트 — 그때는 이 화면의 href를 새로 만들지도 끊지도 않고 범위 밖으로 판단해 하네스 보고에만 남겼다). **그 뒤 확인자 재검증이 통과했다** — `review_pending_empty` 렌더 · DOM 순서 · `scrollLeft` 리셋 셋 다 해소 확인, 47.6%→100%. 메뉴 연결은 이번에 새로 한 것이 없다(기존 href 그대로 — 검증이 뒤늦게 노출을 따라잡았을 뿐이다). 셸 CSS 특정성 사고로 `.sf-src-link` 링크색·밑줄이 함께 죽어 있던 결함 수정(커밋 `77121d6`+`fbb9b61`)) |
+| 28B | 팝콘톡 응답 패턴 | [req-talk-patterns.md](req-talk-patterns.md) | `dc-talk-patterns.html`(1b「목록 전면」 확정본) · `dc-talk-patterns-1b.html` | **지음**(2026-08-25 기록자 신규 등재 — 이 목차에 행 자체가 없었다. `/admin2/talk-patterns` · **ADM-TLK-010(가칭)** · 결정 A-95·A-96 · 커밋 `a70c919`(2026-08-22, 라우트·템플릿) · `api/admin_talk_patterns.py`가 실데이터 API를 낸다. **위치는 nav 실제 순서를 따라 28과 29 사이에 끼웠다**(같은 관례를 쓴 20B·22B·23B 참조 — 뒤 섹션 전체 renumbering은 안 한다). 화면 자체의 `screen_id`는 코드가 아직 "가칭"으로 적어 뒀지만(`api/admin_ui_talk_patterns.py` 상단 주석), **라우트·템플릿·메뉴 연결은 이미 끝나 있다**(`api/admin_nav.py`의 `counts()`가 이 항목을 포함해 `total=41 · new=41 · todo=0`을 낸다 — 2026-08-25 재확인). 확인자 검증 여부는 이 목차 갱신 시점 기준 별도 통보 기록을 찾지 못해 **확인 필요**로 남긴다) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
 | 30 | **AI 연동 설정** | [req-ai-integration.md](req-ai-integration.md) | `dc-ai-integration.html` | **지음** (`/admin2/ai-integration`) |
 | 31 | **AI 사용량 · 비용** | [req-ai-usage-cost.md](req-ai-usage-cost.md) | `dc-ai-usage-cost.html` | **지음** (`/admin2/ai-usage-cost`) |
@@ -192,6 +202,7 @@
 | 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 지음 |
 | 20B | 재고 입고 | [dc-stock-inbound.html](../dc-stock-inbound.html) · [핸드오프 README](../dc-stock-inbound-README.md) | 지음 · 1b 골격 + 1a 목록 확정 혼합 · 확인자 3차 결함 0 · 메뉴 연결(2026-08-18) — ⚠ **이 표에서 원안 파일이 서브에이전트 손으로 받아진 첫 사례**(아래 「계약 요약」 절 정정 참조) |
 | 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 중 · UX-25 (2026-08-16 기록자 정정 — 위 §7 목차가 2026-08-15에 이미 「대기 아니라 작업 중」으로 스스로 고쳤는데 이 표만 옛 값 「재구축 대기」를 그대로 들고 있었다. 재확인: `/admin2/dash` curl 200 · `data-screen-id="ADM-AI-010"` 실재 — 라우트가 이미 있으므로 「대기」(라우트 없음)는 아니다) |
+| 28B | 팝콘톡 응답 패턴 | [dc-talk-patterns.html](../dc-talk-patterns.html) · [dc-talk-patterns-1b.html](../dc-talk-patterns-1b.html) | 지음 · 1b「목록 전면」 확정(2026-08-22) · 메뉴 연결(2026-08-25 재확인, `api/admin_nav.py counts()` 실행 — `todo=0`에 이미 포함) · **2026-08-25 기록자 신규 등재**(위 §7 목차·이 표 둘 다 행이 없었다) |
 
 ### 계약 요약으로 전달된 승인 디자인
 
