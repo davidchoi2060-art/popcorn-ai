@@ -261,8 +261,11 @@ button{font-family:inherit}
 
   // 미리보기(연동 후) 전용 — **클라이언트에만 존재한다.** 실측 모드는 이 배열을 절대
   // 쓰지 않는다(화면 정직성 규약 — 실제 모드에서는 예시 행을 만들지 않는다).
+  // model 값은 작업 종류(task)별 실제 배정(`api/llm.py`의 TASK_DEFAULTS, 2026-08-16
+  // 사장님 확정 실사용 배정)과 맞춰 뒀다 — 2026-08-25 정정 전에는 이미 폐기된 세대
+  // (claude-opus-4-8 · gemini-2.5-pro · gpt-5-codex)를 그대로 쓰고 있었다.
   var DEMO = [
-    { at: '2026-08-14 10:22:41', task: 'task.s2_explain', model: 'claude-opus-4-8', latency: '2.4s', tokens: 'in 1,840 / out 412',
+    { at: '2026-08-14 10:22:41', task: 'task.s2_explain', model: 'gpt-5.6-sol', latency: '2.4s', tokens: 'in 1,840 / out 412',
       question: 'RTX 4070 SUPER 조합을 왜 이 케이스로 골랐는지 설명',
       input: '다음 조합에 대한 근거 설명을 작성하라.\n- 케이스: LIAN LI LANCOOL 216 RGB (gpu_max_mm 392)\n- 그래픽카드: MSI RTX 4070 SUPER 벤투스 2X (length_mm 242)\n- 파워: Micronics Classic II 700W (required_power_watt 650)\n엔진 판정: 호환 · 여유 150mm · 전력 여유 50W',
       output: '선택하신 LANCOOL 216은 최대 392mm까지 그래픽카드를 받을 수 있어, 242mm인 RTX 4070 SUPER 벤투스 2X를 넣고도 150mm가 남습니다. 전원은 권장 650W에 700W를 맞춰 50W 여유가 있습니다. 케이스 전면 팬이 기본 2개 포함이라 추가 구매 없이 시작할 수 있습니다.',
@@ -272,7 +275,7 @@ button{font-family:inherit}
         { claim: 'RTX 4070 SUPER 242mm · 여유 150mm', engine: 'engine: length_mm = 242 · 여유 150 · 일치', kind: 'ok' },
         { claim: '케이스 전면 팬 기본 2개 포함', engine: 'engine: 해당 사양 없음 — 근거 표에 없는 문장', kind: 'bad' }
       ] },
-    { at: '2026-08-14 10:21:08', task: 'task.s1_parse', model: 'gpt-5-codex', latency: '0.9s', tokens: 'in 220 / out 96',
+    { at: '2026-08-14 10:21:08', task: 'task.s1_parse', model: 'claude-haiku-4-5-20251001', latency: '0.9s', tokens: 'in 220 / out 96',
       question: '배그 롤 돌릴 150만원대 본체 견적 부탁',
       input: '배그 롤 돌릴 150만원대 본체 견적 부탁드립니다. 램은 32기가로요.',
       output: '{"purpose":"게임","titles":["배틀그라운드","리그오브레전드"],"budget_krw":1500000,"memory_gb":32,"owned_parts":[]}',
@@ -281,13 +284,13 @@ button{font-family:inherit}
         { claim: '예산 1,500,000원', engine: 'engine: budget_krw = 1500000 · 일치', kind: 'ok' },
         { claim: '메모리 32GB', engine: 'engine: memory_gb = 32 · 일치', kind: 'ok' }
       ] },
-    { at: '2026-08-14 10:18:55', task: 'task.ops_assist', model: 'gemini-2.5-pro', latency: '1.6s', tokens: 'in 640 / out 210',
+    { at: '2026-08-14 10:18:55', task: 'task.ops_assist', model: 'gemini-3.7-flash', latency: '1.6s', tokens: 'in 640 / out 210',
       question: '이번 주 검수 대기가 왜 안 줄었는지',
       input: '이번 주 검수 대기가 왜 안 줄었나요?',
       output: '대기 건수가 유지된 것은 신규 수집이 처리량과 비슷했기 때문입니다. 정확한 수치는 상품 사양 검수 화면의 집계를 확인해 주세요.',
       check: 'na', flagged: false,
       facts: [{ claim: '신규 수집이 처리량과 비슷', engine: 'engine: 대조 대상 아님 — 운영 도우미 답변은 엔진 판정을 인용하지 않음', kind: 'na' }] },
-    { at: '2026-08-14 10:11:30', task: 'task.s2_explain', model: 'claude-opus-4-8', latency: '2.1s', tokens: 'in 1,610 / out 388',
+    { at: '2026-08-14 10:11:30', task: 'task.s2_explain', model: 'gpt-5.6-sol', latency: '2.1s', tokens: 'in 1,610 / out 388',
       question: 'AM5 보드에 DDR4를 못 쓰는 이유 설명',
       input: '엔진 판정: 비호환(mem_type 불일치). 사유 문장을 작성하라.',
       output: 'AM5 소켓 보드는 DDR5 전용이라 DDR4 메모리를 꽂을 수 없습니다. 선택하신 보드는 DDR5-5600까지 지원합니다.',
@@ -296,13 +299,13 @@ button{font-family:inherit}
         { claim: 'AM5는 DDR5 전용', engine: 'engine: mem_type = DDR5 · 일치', kind: 'ok' },
         { claim: 'DDR5-5600까지 지원', engine: 'engine: mem_speed_max = 5600 · 일치', kind: 'ok' }
       ] },
-    { at: '2026-08-14 09:58:12', task: 'task.s1_parse', model: 'gpt-5-codex', latency: '1.1s', tokens: 'in 190 / out 88',
+    { at: '2026-08-14 09:58:12', task: 'task.s1_parse', model: 'claude-haiku-4-5-20251001', latency: '1.1s', tokens: 'in 190 / out 88',
       question: '지금 쓰는 3060 살리고 나머지만 바꾸고 싶어요',
       input: '지금 쓰는 3060 살리고 나머지만 바꾸고 싶어요. 예산은 100 정도.',
       output: '{"purpose":"업그레이드","budget_krw":1000000,"owned_parts":["GPU: RTX 3060"]}',
       check: 'ok', flagged: false,
       facts: [{ claim: '보유 부품 RTX 3060', engine: 'engine: owned_parts 파싱 일치', kind: 'ok' }] },
-    { at: '2026-08-14 09:44:03', task: 'task.s2_explain', model: 'claude-opus-4-8', latency: '2.8s', tokens: 'in 1,720 / out 455',
+    { at: '2026-08-14 09:44:03', task: 'task.s2_explain', model: 'gpt-5.6-sol', latency: '2.8s', tokens: 'in 1,720 / out 455',
       question: '이 쿨러가 케이스에 들어가는지 설명',
       input: '엔진 판정: 호환. 쿨러 높이 160mm, 케이스 허용 165mm.',
       output: '선택하신 쿨러는 높이 160mm로 케이스 허용치 165mm 안에 들어갑니다. 다만 여유가 5mm뿐이라 케이스 측면 유리와 간섭이 있을 수 있습니다.',
@@ -311,7 +314,7 @@ button{font-family:inherit}
         { claim: '쿨러 160mm · 허용 165mm', engine: 'engine: cooler_height_mm = 160 · case_cooler_max = 165 · 일치', kind: 'ok' },
         { claim: '측면 유리 간섭 가능성', engine: 'engine: 해당 판정 없음 — 엔진이 내지 않은 추정', kind: 'bad' }
       ] },
-    { at: '2026-08-14 09:30:02', task: 'task.spec_fill', model: 'gemini-2.5-pro', latency: '3.1s', tokens: 'in 960 / out 140',
+    { at: '2026-08-14 09:30:02', task: 'task.spec_fill', model: 'claude-opus-5', latency: '3.1s', tokens: 'in 960 / out 140',
       question: '쿨러 발열 한도(cooler_tdp) 값을 웹에서 찾아 제안',
       input: '제품명: 쓰쿨러 XT 240 ARGB\n제조사 스펙 페이지에서 지원 TDP를 찾아 숫자만 제안하라.',
       output: '제조사 페이지 기준 지원 TDP는 220W로 확인됩니다. 출처: 제조사 공식 스펙 페이지.',
@@ -440,7 +443,14 @@ button{font-family:inherit}
     var tasks = (S.server && S.server.tasks) || Object.keys(TASK_COLOR).map(function (k) { return { key: k, label: taskLabel(k) }; });
     $('menuPeriod').innerHTML = menuHtml(['오늘', '최근 7일', '최근 30일'].map(function (v) { return { v: v, label: v }; }), S.f.period, 'set-period');
     $('menuTask').innerHTML = menuHtml([{ v: '', label: '전체' }].concat(tasks.map(function (t) { return { v: t.key, label: t.label }; })), S.f.task, 'set-task');
-    var models = Array.from(new Set(S.demo.map(function (r) { return r.model; }))).sort();
+    // 모델 목록 — 실측 모드는 서버 값(`api/llm.py` 정본을 그대로 읽어 내려준 것)을
+    // 쓴다(작업 종류 필터와 같은 패턴). 이전에는 이 필터만 모드와 무관하게 항상
+    // S.demo에서 뽑아, 실측 모드에서도 폐기된 모델명만 보여줬다(2026-08-25 정정).
+    // 미리보기 모드는 화면에 실제로 보이는 예시 행(S.demo)에서 뽑는다 — 필터를
+    // 눌러도 결과가 항상 0건인 옵션을 만들지 않기 위해서다.
+    var models = S.mode === 'preview'
+      ? Array.from(new Set(S.demo.map(function (r) { return r.model; }))).sort()
+      : ((S.server && S.server.models) || []);
     $('menuModel').innerHTML = menuHtml([{ v: '', label: '전체' }].concat(models.map(function (m) { return { v: m, label: m }; })), S.f.model, 'set-model');
     $('menuPeriod').hidden = S.openMenu !== 'period';
     $('menuTask').hidden = S.openMenu !== 'task';

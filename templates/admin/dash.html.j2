@@ -250,6 +250,18 @@ a{color:inherit;text-decoration:none}
     <span class="src">scripts/dash_watch.py</span>
   </div>
 
+  <!-- 팀원 한글 매핑 누락 — 상시 배너(감시자 끊김과 같은 패턴). hidden 으로 미리 마크업,
+       team_unmapped 가 비어 있지 않을 때만 노출. archivist·designchecker 가 3주 가까이
+       영문 그대로 새고도 아무 데도 안 걸렸던 재발을 막는 조기경보(api/dash.py 주석 참조) -->
+  <div class="banner" data-bind="team-unmapped-banner" hidden>
+    <span class="mk">● 팀원 한글명 누락</span>
+    <span class="ti" data-bind="team-unmapped-title">TEAM_KO 미등록</span>
+    <span class="ds">정본(.claude/agents/*.md)에는 있으나 TEAM_KO에 없는 이름은 팀원 카드에
+      영문 그대로 노출됩니다. archivist·designchecker가 이 상태로 3주 가까이 방치된 전례가
+      있어 상시로 알립니다.</span>
+    <span class="src">api/dash.py TEAM_KO</span>
+  </div>
+
   <!-- 오늘 카운터 — 전부 /api/admin/dash/state 의 today 만 쓴다. 못 잰 값은 "못 쟀음" -->
   <div class="cnt" data-repeat="counters"></div>
 
@@ -464,6 +476,19 @@ a{color:inherit;text-decoration:none}
     if (b) b.hidden = !!w.alive;
   }
 
+  // 팀원 한글 매핑 누락 — d.team_unmapped 는 서버가 판정한 목록(api/dash.py, 조기경보).
+  // 지어내지 않는다: 비어 있으면 배너를 숨기고, 있으면 그 이름을 그대로 나열한다.
+  function renderTeamUnmapped(list) {
+    var b = $('team-unmapped-banner');
+    if (!b) return;
+    list = list || [];
+    b.hidden = !list.length;
+    var t = $('team-unmapped-title');
+    if (t) t.textContent = list.length
+      ? 'TEAM_KO 미등록 ' + list.length + '건 — ' + list.join(', ')
+      : 'TEAM_KO 미등록';
+  }
+
   // ── 오늘 카운터 — dc-dash.html 순서 그대로. 못 잰 값은 "못 쟀음"(0 이 아니다) ──
   function cntColor(label, v) {
     if (v == null) return '';
@@ -492,6 +517,7 @@ a{color:inherit;text-decoration:none}
   function render(d) {
     if (d.ok) lastData = d;      // 필터 클릭이 재조회 없이 이 값으로 다시 그린다
     renderWatcher(d.watcher);
+    renderTeamUnmapped(d.team_unmapped);
     var dot = $('dot'), st = $('status');
     if (!d.ok) {
       dot.className = 'dot';

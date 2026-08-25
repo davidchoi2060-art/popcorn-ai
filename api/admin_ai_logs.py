@@ -23,11 +23,23 @@ response-log.html`. 실측 근거: `ai-screens-datamap.md` §4.
   API도 만들지 않았다 — 대상이 하나도 없는 쓰기 엔드포인트는 항상 404만 돌려주는
   죽은 코드다. LLM 연동이 재개되어 실제로 로그가 쌓이기 시작하면 그때 테이블·
   플래그 API를 함께 신설한다.
+
+■ 「모델」 필터도 이 정본에서 읽는다(2026-08-25 정정)
+  화면(`ai_response_log.html.j2`)의 「모델」 필터가 실측 모드에서도 클라이언트
+  미리보기 예시 배열(`S.demo`)에서만 옵션을 뽑고 있었다 — 뜬 이름 셋
+  (`claude-opus-4-8`·`gemini-2.5-pro`·`gpt-5-codex`)이 전부 폐기된 세대라, 실제
+  로그가 쌓이기 시작해도 그 이름으로 거르면 영원히 0건이었다(바로 옆 「작업 종류」
+  필터는 이미 서버 값을 쓰고 있었다 — 이 필드만 그 패턴이 빠져 있었다). 그래서 이
+  응답에 `models`를 추가했다. 새 목록을 짓지 않고 `api/llm.py`의
+  `PROVIDERS[...].pricing` 키(실제 호출에 쓰는 모델 문자열의 단일 원천 —
+  `api/admin_ai_tasks.py`·`api/admin_ai_integration.py`도 각자 docstring에서 같은
+  원천을 가리킨다)를 그대로 읽는다.
 """
 from fastapi import APIRouter
 from sqlalchemy import text
 
 from .db import engine
+from .llm import PROVIDERS
 
 router = APIRouter(prefix="/api/admin", tags=["ai-response-log"])
 
@@ -41,6 +53,13 @@ TASKS = [
     {"key": "task.ops_assist", "label": "운영 도우미 질의"},
     {"key": "task.spec_fill", "label": "웹 사양 채움"},
 ]
+
+# 모델 목록(닫힌 집합) — 정본은 `api/llm.py`의 `PROVIDERS[...].pricing` 딕셔너리
+# 키다(그 파일이 실제 호출에 쓰는 모델 문자열 그 자체). 여기서 새 목록을 짓지 않고
+# 그 레지스트리를 그대로 읽는다 — 모델 세대가 갈릴 때마다 이 화면만 따로 낡아
+# 폐기된 이름으로 거르면 계속 0건만 보이던 결함(2026-08-25 발견)을 다시 만들지
+# 않기 위해서다.
+MODELS = sorted({model for spec in PROVIDERS.values() for model in spec.pricing})
 
 
 @router.get("/ai-response-log")
@@ -95,6 +114,7 @@ def get_ai_response_log(task: str | None = None, model: str | None = None,
         "items": [],
         "total": 0,
         "tasks": TASKS,
+        "models": MODELS,
         "filters_echo": {"task": task, "model": model, "period": period,
                           "flagged": bool(flagged)},
         "reasons": reasons,

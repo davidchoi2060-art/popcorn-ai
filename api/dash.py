@@ -55,10 +55,16 @@ WATCH_HEARTBEAT = ROOT / ".claude" / "dash-watch.heartbeat"   # 감시자(로컬
 # agents/ 10명 전수 대조로 확인 — 10명 전원이 이제 있다). 한글은 CLAUDE.md
 # "★ 확인은 세 축이고..."·"하네스가 손으로 하던 넷을 기록자에게 넘긴다" 항목과
 # 각 정의 파일(archivist.md·designchecker.md)의 description 문구를 그대로 따랐다.
+# ⚠ 2026-08-25 제작자 실측 재발 — 2026-08-19 신설된 pathfinder 가 같은 방식으로
+# 빠져 있었다(.claude/agents/ 11명 전수 대조로 확인 — 이번에 11명 전원). 한글
+# "길잡이"는 CLAUDE.md "★ 길잡이(pathfinder) 신설 — 화면 «사이»를 본다" 항목과
+# pathfinder.md 의 role/description 을 그대로 따랐다 — 저장소 전반에 이미 쓰이는
+# 호칭이라 새로 짓지 않았다.
 TEAM_KO = {
     "investigator": "조사자", "maker": "제작자", "checker": "확인자",
     "writer": "문장가", "dba": "DBA", "crosschecker": "검증자", "sweeper": "점검자",
     "specfiller": "웹크롤링", "archivist": "기록자", "designchecker": "계약자",
+    "pathfinder": "길잡이",
     "general-purpose": "하네스", "Explore": "하네스", "Plan": "하네스",
 }
 

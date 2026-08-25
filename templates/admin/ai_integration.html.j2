@@ -39,6 +39,13 @@
        admin2 공용 팔레트(`--rv-font`=Pretendard, `--rv-mono`=JetBrains Mono)를 그대로 쓴다
        (이 화면 원안 자체가 admin2 공용 셸의 원본 재료 중 하나였다 — `_admin2_shell.html.j2`
        머리말 참조 — 그래서 팔레트 값 자체는 거의 그대로다).
+    ⑥ **"한도 초기화" 버튼 신설(2026-08-25, 원안에 없던 요소)** — 원안·요구사항 정의서
+       (`req-ai-integration.md`) 어디에도 "설정한 한도를 다시 미설정으로 되돌리는 법"이
+       없었다(설계 누락). `daily_usd`가 매 저장마다 0보다 큰 값을 강제해 **한 번 설정하면
+       영구히 못 지웠다.** `dw-foot`에 되돌리기·저장과 별도로 붙였다 — `confirm()` 확인을
+       거치는 명시적 동작 하나뿐이고, 입력칸을 비우고 저장하는 것으로는 지워지지 않는다
+       (실수로 폼을 비웠을 때 한도가 사라지는 사고 방지). 근거는
+       `api/admin_ai_integration.py` 모듈 docstring "■ 한도를 «미설정»으로 되돌리기".
 
   ■ 정본 — 좌측 메뉴·헤더·팔레트는 `_admin2_shell.html.j2` + `/shared/admin2/admin2.css`가
     그린다. 프로바이더 3사·작업 4종·동작 4종 카탈로그는 DB 테이블이 없다(조사자 datamap
@@ -199,6 +206,9 @@ input{font-family:var(--rv-mono)}
 .btn-revert{font:500 11.5px/1 var(--rv-font);color:#5b564d;background:var(--rv-card);
            border:1px solid rgba(0,0,0,.18);border-radius:5px;padding:8px 11px;cursor:pointer}
 .btn-revert:disabled{color:#b3ac9e;cursor:default}
+.btn-clear{font:500 11.5px/1 var(--rv-font);color:var(--rv-red);background:var(--rv-card);
+          border:1px solid var(--rv-red);border-radius:5px;padding:8px 11px;cursor:pointer}
+.btn-clear:disabled{color:#b3ac9e;border-color:rgba(0,0,0,.18);cursor:default}
 .btn-save{font:600 11.5px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);
          border:none;border-radius:5px;padding:9px 15px;cursor:pointer}
 .btn-save:disabled{color:#f0ece2;background:#bdb6a8;cursor:default}
@@ -326,6 +336,7 @@ input{font-family:var(--rv-mono)}
     </div>
     <div class="dw-foot">
       <span class="note" id="dwFootNote">—</span>
+      <button type="button" class="btn-clear" id="dwClear" data-action="clear-limit" disabled>한도 초기화</button>
       <button type="button" class="btn-revert" id="dwRevert" data-action="revert" disabled>되돌리기</button>
       <button type="button" class="btn-save" id="dwSave" data-action="save" disabled>저장</button>
     </div>
@@ -387,6 +398,7 @@ input{font-family:var(--rv-mono)}
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
     }).then(handle);
   }
+  function apiDelete(path) { return fetch(path, { method: 'DELETE', credentials: 'same-origin' }).then(handle); }
 
   function toast(msg, kind) { window.Admin2Shell && window.Admin2Shell.toast(msg, kind); }
   function canWrite() { return !!(window.Admin2Shell && window.Admin2Shell.canWrite('owner')); }
@@ -512,6 +524,14 @@ input{font-family:var(--rv-mono)}
     renderTable();
   }
 
+  /** true면 이 프로바이더에 저장된 한도가 하나도 없다("한도 초기화"가 지울 것도 없는 상태). */
+  function isUnset(l) {
+    if (!l) return true;
+    if (l.daily !== '' || l.perMin !== '' || l.perDay !== '' || l.action) return false;
+    var sub = l.sub || {};
+    return Object.keys(sub).every(function (k) { return sub[k] === ''; });
+  }
+
   function diffOf() {
     if (!S.sel || !S.saved || !S.draft) return [];
     var a = S.saved, b = S.draft, out = [];
@@ -597,18 +617,28 @@ input{font-family:var(--rv-mono)}
     $('dwSubNote').style.color = overSub ? 'var(--rv-red)' : '#8a8377';
 
     var owner = canWrite();
+    var nothingSet = isUnset(S.saved);
     $('dwDiff').hidden = !dirty;
     if (dirty) {
       $('dwDiffLines').innerHTML = diffs.map(function (d) { return '<div class="line">' + esc(d.line) + '</div>'; }).join('');
     }
     $('dwRevert').disabled = !dirty;
     $('dwSave').disabled = !(owner && dirty);
+    // 초기화는 "저장된" 정책을 지우는 동작이라 초안이 남아 있으면(dirty) 무엇을 지우는
+    // 건지 애매해진다 — 먼저 저장하거나 되돌려 draft==saved로 맞춘 뒤에만 켠다.
+    $('dwClear').disabled = !(owner && !dirty && !nothingSet);
     var note = $('dwFootNote');
     if (!owner) {
       note.textContent = '권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ') — 연결 상태 조회만 가능합니다';
       note.className = 'note warn';
+    } else if (dirty) {
+      note.textContent = '저장하면 즉시 반영되고 이력에 남습니다';
+      note.className = 'note';
+    } else if (nothingSet) {
+      note.textContent = '미설정 상태입니다';
+      note.className = 'note';
     } else {
-      note.textContent = dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다';
+      note.textContent = '변경 사항이 없습니다';
       note.className = 'note';
     }
   }
@@ -641,6 +671,29 @@ input{font-family:var(--rv-mono)}
     toast('저장 전 상태로 되돌렸습니다', 'ok');
   }
 
+  /** 저장된 한도를 미설정으로 되돌린다("되돌리기"와 다르다 — 저건 저장 전 초안을
+   * 버리는 것이고, 이건 서버에 이미 저장된 정책 자체를 지우는 것이다). 전용 버튼 +
+   * confirm() 확인을 거쳐야만 실행된다(입력칸을 비우고 저장하는 것만으로는 지워지지
+   * 않는다 — 의도치 않은 삭제 방지, api/admin_ai_integration.py 모듈 docstring 참고). */
+  function doClear() {
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
+    if (diffOf().length) { toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 초기화하세요', 'warn'); return; }
+    if (isUnset(S.saved)) { toast('이미 미설정 상태입니다', 'warn'); return; }
+    var p = findProvider(S.sel);
+    var vendor = p ? p.vendor : S.sel;
+    var ok = window.confirm(
+      vendor + '의 한도를 모두 미설정으로 되돌립니다. 일 한도·호출 제한·작업별 부분 한도·' +
+      '초과 시 동작이 함께 지워지며, 다시 쓰려면 값을 새로 입력해야 합니다. 계속할까요?');
+    if (!ok) return;
+    apiDelete('/api/admin/ai-integration/limits/' + encodeURIComponent(S.sel)).then(function (j) {
+      // 진행 바(ui-progress.js)가 j.message를 이미 보여준다 — 값만 반영한다
+      var pp = findProvider(S.sel);
+      if (pp) pp.limit = j.limit;
+      S.saved = cloneLimit(j.limit); S.draft = cloneLimit(j.limit);
+      renderTable(); renderDrawerFull();
+    }).catch(function () { /* ui-progress.js가 오류를 이미 표시한다 */ });
+  }
+
   function doSave() {
     if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
     var diffs = diffOf();
@@ -670,6 +723,7 @@ input{font-family:var(--rv-mono)}
       var pick = ev.target.closest('[data-action="pick-action"]');
       if (pick) { pickAction(pick.getAttribute('data-key')); return; }
       if (ev.target.closest('[data-action="close-drawer"]')) { closeDrawer(); return; }
+      if (ev.target.closest('[data-action="clear-limit"]')) { doClear(); return; }
       if (ev.target.closest('[data-action="revert"]')) { doRevert(); return; }
       if (ev.target.closest('[data-action="save"]')) { doSave(); return; }
       if (ev.target.closest('[data-action="retry"]')) { load(); return; }
