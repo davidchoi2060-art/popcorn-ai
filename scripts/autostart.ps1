@@ -17,7 +17,10 @@
     둘 다:
       트리거    로그온 시(-AtLogOn, 현재 사용자) — 부팅 시(OnStart)가 아니다. 이유는
                 아래 "왜 로그온인가" 참고.
-      실행      pythonw.exe(콘솔 창 없음) — python.exe 가 아니다.
+      실행      cmd.exe 로 감싸 python.exe 를 돌리고 로그를 프로젝트 logs 폴더의
+                autostart-api.log · autostart-dashwatch.log 에 남긴다.
+                pythonw.exe 직접 실행은 2026-08-26 에 폐기 — 출력이 갈 곳이 없어
+                즉시 실패하는데 이유가 아무 데도 안 남았다(Register-Tasks 주석 참조).
       실패 시   1분 간격 최대 3회 재시작(-RestartCount 3 -RestartInterval 1분).
       단일 실행 -MultipleInstances IgnoreNew — 작업 스케줄러 자신이 같은 작업을 중복
                 기동하지 않는다. dash_watch.py --service 는 **그와 별개로** 자체 PID
@@ -98,18 +101,40 @@ function Assert-Paths {
 function Register-Tasks {
     Assert-Paths
 
-    $apiAction = New-ScheduledTaskAction -Execute $VenvPyW `
-        -Argument "-m uvicorn --app-dir popcorn-ai api.main:app --port 8000" `
+    # ── 왜 cmd.exe 로 감싸는가 (2026-08-26 실사고) ────────────────────────────
+    # 처음엔 pythonw.exe 를 직접 실행하게 등록했다. 그런데 작업은 매번 즉시
+    # 실패했고(LastTaskResult=1) **이유가 어디에도 남지 않았다** — pythonw 는
+    # 창이 없어 표준 출력·오류가 갈 곳이 없다. 같은 명령을 손으로 돌리면
+    # 멀쩡히 뜬다(그때는 출력이 갈 파이프가 있다).
+    #
+    # 그래서 cmd 로 감싸 **로그를 파일로** 보낸다. 두 가지를 동시에 얻는다:
+    #   ① 출력이 갈 곳이 생겨 서버가 죽지 않는다
+    #   ② 다음에 실패하면 그 파일이 이유를 말해 준다
+    # 「알림·자동 실행 장치는, 그것이 실패했을 때 누가 아는가를 함께 물어야
+    #  한다」 — 이 저장소가 systemd 알림에서 이미 겪은 병이다(A-112).
+    $LogDir = Join-Path $ProjRoot "logs"
+    if (-not (Test-Path -LiteralPath $LogDir)) {
+        New-Item -ItemType Directory -Path $LogDir | Out-Null
+    }
+    $ApiLog   = Join-Path $LogDir "autostart-api.log"
+    $WatchLog = Join-Path $LogDir "autostart-dashwatch.log"
+
+    $apiAction = New-ScheduledTaskAction -Execute "cmd.exe" `
+        -Argument ("/c `"`"$VenvPy`" -m uvicorn --app-dir popcorn-ai api.main:app " +
+                   "--port 8000 >> `"$ApiLog`" 2>&1`"") `
         -WorkingDirectory $DevRoot
 
-    $watchAction = New-ScheduledTaskAction -Execute $VenvPyW `
-        -Argument "`"$DashWatch`" --service" `
+    $watchAction = New-ScheduledTaskAction -Execute "cmd.exe" `
+        -Argument ("/c `"`"$VenvPy`" `"$DashWatch`" --service " +
+                   ">> `"$WatchLog`" 2>&1`"") `
         -WorkingDirectory $ProjRoot
 
     $userId = "$env:USERDOMAIN\$env:USERNAME"
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
 
+    # -Hidden — cmd 로 감싸면 콘솔 창이 뜬다. 작업을 숨김으로 등록해 막는다.
     $settings = New-ScheduledTaskSettingsSet `
+        -Hidden `
         -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
         -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
         -ExecutionTimeLimit ([TimeSpan]::Zero) `

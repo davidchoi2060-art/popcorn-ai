@@ -72,3 +72,6 @@ docs/상품다운_*.xlsx
 # (`tools/monitor_spec_backfill.py --rollback` 이 읽는다). 운영 데이터의 사본이라
 # 소스가 아니고, 상품코드가 그대로 들어 있어 저장소에 넣지 않는다.
 _private/
+
+# 자동 실행 로그 (scripts/autostart.ps1)
+logs/autostart-*.log
