@@ -155,12 +155,18 @@ _NAV_LABEL = {
 }
 
 # 경로 실측(모듈 docstring "■★★" 참조) — 라벨이 아니라 경로로 admin_nav.NAV를 조회한다.
+# 값이 None 이면 "화면 없음"으로 회색 처리된다. 실재하는 화면을 None 으로 두면
+# 대시보드가 「할 일 N건」을 보여주면서 갈 곳은 없다고 말하는 거짓말이 된다 —
+# 2026-08-15 에 price-import·sourcing 두 화면이 admin_nav 에 연결됐는데 이 표만
+# 안 따라가 11일 동안 그랬다(2026-08-26 대시보드 매뉴얼을 쓰다 발견).
+# 아래 `_live_hrefs()` 가 admin_nav 를 정본으로 한 번 더 거르므로, 여기 적힌 경로가
+# 메뉴에서 사라지면 자동으로 회색이 된다 — 즉 지어낸 경로는 화면에 나가지 않는다.
 _TARGET_PATH = {
     "review": "/admin2/reviews",
     "category": "/admin2/category-mapping",
     "price": "/admin2/price-review",
-    "price_import": None,
-    "sourcing": None,
+    "price_import": "/admin2/price-import",
+    "sourcing": "/admin2/sourcing",
 }
 
 
