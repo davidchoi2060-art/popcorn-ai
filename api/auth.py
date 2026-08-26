@@ -372,7 +372,12 @@ OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
                         # 여기 등록으로 미들웨어가 먼저 막는다 — 같은 판정이라 충돌 없음.
                         "/api/admin/ai-task-settings",
                         "/api/admin/ai-integration",
-                        "/api/admin/ops-assistant")
+                        "/api/admin/ops-assistant",
+                        # 몰 공급처 수신 — 이 경로로 공급처별 매입가가 들어온다.
+                        # 그 값이 나중에 _reprice()를 타면 판매가까지 움직인다(A-114).
+                        # 모듈 자체 _require_owner() 가드가 이미 있고, 여기 등록으로
+                        # 미들웨어가 먼저 막는다 — 위 AI 3화면과 같은 이중 방어다.
+                        "/api/admin/mall-supplier")
 
 
 def _is_operator_photo_path(path: str) -> bool:
