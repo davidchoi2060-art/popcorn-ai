@@ -1,0 +1,510 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 상품 관리</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 상품 관리를 처음 맡는 직원</div>
+    <div><b>화면</b> 상품 관리 · 경로 <code>/admin2/products</code> · 화면 ID <code>ADM-PRD-010</code>
+      (코드 <code>api/admin_ui_products.py</code> 실측값입니다).</div>
+    <div><b>왜 이 화면인가</b> 활동 기록 실측(2026-08-25)에서 상품 관리 처리는 전체 관리자 동작 중
+      <b>2위</b>였습니다(누적 <b>2,941건</b>) — 1위는 상품 사양 검수(누적 3,694건, 이 매뉴얼의 첫
+      캡처 판). 건수는 2위지만 <b>화면 자체는 41개 관리자 화면 중 가장 크고 기능이 많습니다</b> —
+      목록·검색·필터·정렬·일괄 변경·신규 등록에 더해, 상품 하나를 열면 기본 정보·사양·공급처·
+      분류 변경 네 개 탭이 우측 서랍 안에 또 있습니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-25 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수(전체 23,151건 등)는
+      매일 바뀝니다 — 정확한 지금 값은 화면 위쪽 탭에서 직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>카탈로그에 올라 있는 상품 하나하나를 살펴보고 고치는 화면입니다. 상품명·제조사·공급처·
+    판매가·매입가·재고·판매 상태부터 부품 사양, 분류까지 이 화면 하나에서 확인하고 바꿀 수
+    있습니다. 지금 이 상품이 손님에게 추천될 수 있는 상태인지(추천 후보에 들어가 있는지), 아니라면
+    무엇이 남았는지도 이 화면이 바로 알려줍니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>특정 상품의 가격·재고·판매 상태를 확인하거나 바로 고치고 싶을 때</li>
+    <li>상품 사양이 다 채워졌는지, 이 상품이 왜 추천 후보에 못 들어가 있는지 확인하고 싶을 때</li>
+    <li>새 상품을 카탈로그에 등록해야 할 때</li>
+    <li>여러 상품의 판매 상태를 한꺼번에 바꾸고 싶을 때(예: 재고 없는 상품 일괄 처리)</li>
+    <li>전화 등으로 받은 매입가를 공급처별로 손으로 보정해야 할 때</li>
+    <li>상품 분류가 잘못돼 있어 바로잡아야 할 때(예: 적재가 잘못 분류해 추천에서 빠진 경우)</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>가장 자주 보게 되는 기본 화면(상태 탭 「전체」 · 필터 없음)입니다. 먼저 전체 모습을 보고,
+    아래에서 영역별로 확대해 하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/products-full.png" alt="상품 관리 화면 전체">
+      <b class="pin" style="--x:6.31%;--y:16.03%">1</b>
+      <b class="pin" style="--x:24.4%;--y:2.43%">2</b>
+      <b class="pin" style="--x:89.92%;--y:2.43%">3</b>
+      <b class="pin" style="--x:94.25%;--y:2.43%">4</b>
+      <b class="pin" style="--x:29.36%;--y:6.86%">5</b>
+      <b class="pin" style="--x:26.69%;--y:11.52%">6</b>
+      <b class="pin" style="--x:43.67%;--y:11.52%">7</b>
+      <b class="pin" style="--x:57.61%;--y:11.52%">8</b>
+      <b class="pin" style="--x:96.53%;--y:11.52%">9</b>
+      <div class="box" style="--x:13.69%;--y:15.83%;--w:85.24%;--h:1.85%"></div>
+      <b class="pin" style="--x:15%;--y:14.4%">10</b>
+      <b class="pin" style="--x:56.31%;--y:20.44%">11</b>
+      <b class="pin" style="--x:56.31%;--y:95.14%">12</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) ·
+      상태 탭 「전체」(기본값) · 필터 없음</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 지금 있는 화면이 진하게 표시됩니다. 「상품관리」
+      그룹 안에 있습니다.</li>
+    <li><span class="tag">2</span>경로 배지 — 이 화면의 API 경로(<code>/admin2/products</code>)와
+      필요 권한을 함께 보여줍니다. 자세한 문구는 <a href="#fig-b">그림 B</a> 참고.</li>
+    <li><span class="tag">3</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">4</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">5</span>상태 탭 — 「전체 / 추천 가능 / 검수 대기 / 재고 없음 / 가격 검토」
+      다섯 갈래. 클릭하면 서버가 그 범위로 다시 조회합니다(예시로 「검수 대기」를 표시).
+      자세한 배치는 <a href="#fig-c">그림 C</a> 참고.</li>
+    <li><span class="tag">6</span>상품 검색 — 상품번호·SKU·상품명을 300ms 후 서버에 질의합니다</li>
+    <li><span class="tag">7</span>분류 필터 — 실제 상품이 있는 분류만 나열합니다(지금 19종)</li>
+    <li><span class="tag">8</span>제조사 필터 — 입력하면 서버가 걸러 다시 조회합니다</li>
+    <li><span class="tag">9</span><span class="btnlabel">+ 상품 등록</span> — 새 상품을 만듭니다.
+      자세히는 <a href="#fig-j">그림 J</a> 참고.</li>
+    <li><span class="tag">10</span>일괄 변경 바(테두리 상자) — 평소엔 안내 문구만 보이고, 행을
+      선택해야 실제 도구가 나타납니다(<a href="#fig-e">그림 E</a>).</li>
+    <li><span class="tag">11</span>목록 표 — 자세한 구성은 <a href="#fig-d">그림 D</a> 참고</li>
+    <li><span class="tag">12</span>페이지네이션 — 현재 페이지 범위 / 전체 건수(지금 232페이지)</li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot shot--header">
+      <img src="/shared/manual/shots/products-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:2.64%;--y:49.04%">13</b>
+      <b class="pin" style="--x:7.41%;--y:49.04%">14</b>
+      <b class="pin" style="--x:13.48%;--y:49.04%">15</b>
+      <b class="pin" style="--x:24.23%;--y:49.04%">16</b>
+      <b class="pin" style="--x:88.46%;--y:49.04%">17</b>
+      <b class="pin" style="--x:93.42%;--y:49.04%">18</b>
+      <b class="pin" style="--x:97.89%;--y:49.04%">19</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">13</span>위치 표시 — 「상품관리」(그룹 이름)</li>
+    <li><span class="tag">14</span>위치 표시 — 「상품 관리」(화면 이름)</li>
+    <li><span class="tag">15</span>경로 배지 — 「/admin2/products」</li>
+    <li><span class="tag">16</span>권한 안내 — 「조회 viewer 이상 · 쓰기 operator 이상」. 실제
+      권한 판정과 일치합니다(⚠ 「조심할 것」 참고 — 다만 흐리게 비활성되지는 않습니다).</li>
+    <li><span class="tag">17</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">18</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">19</span>아바타 — 「내 정보」 화면으로 이동</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>검색·필터 + 일괄 변경 바 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1468/92.640625;max-width:1000px">
+      <img src="/shared/manual/shots/products-filterbar.png" alt="검색·필터·일괄 변경 바 확대">
+      <b class="pin" style="--x:16.1%;--y:30.22%">20</b>
+      <b class="pin" style="--x:35.54%;--y:30.22%">21</b>
+      <b class="pin" style="--x:51.49%;--y:30.22%">22</b>
+      <b class="pin" style="--x:83.94%;--y:30.22%">23</b>
+      <b class="pin" style="--x:90.07%;--y:30.22%">24</b>
+      <b class="pin" style="--x:96.03%;--y:30.22%">25</b>
+      <b class="pin" style="--x:50%;--y:58.96%">26</b>
+      <b class="pin" style="--x:50%;--y:89.53%">27</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 6~9번 + 10번 영역을 확대(선택 전 기본 상태 — 일괄
+      변경 도구는 아직 안 보입니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">20</span>상품 검색창</li>
+    <li><span class="tag">21</span>분류 필터</li>
+    <li><span class="tag">22</span>제조사 필터</li>
+    <li><span class="tag">23</span><span class="btnlabel">매입 견적으로</span>(회색·비활성) —
+      대상 화면이 아직 admin2에 없어 항상 눌리지 않습니다</li>
+    <li><span class="tag">24</span><span class="btnlabel">가격 검토로</span>(회색·비활성) — 위와
+      같은 이유로 항상 눌리지 않습니다</li>
+    <li><span class="tag">25</span><span class="btnlabel">+ 상품 등록</span></li>
+    <li><span class="tag">26</span>안내 문구 — 지금 이 재구축에서 새로 열린 기능(등록·상세·수정)과
+      비활성 사유를 설명합니다</li>
+    <li><span class="tag">27</span>일괄 변경 안내 — 「행을 선택하면 상태를 한 번에 바꿀 수
+      있습니다.」 체크박스를 선택하면 이 줄이 실제 도구(그림 E)로 바뀝니다</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>목록 표 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1430/329.15625;max-width:1000px">
+      <img src="/shared/manual/shots/products-table.png" alt="목록 표 확대(머리글 + 앞쪽 6행)">
+      <b class="pin" style="--x:2%;--y:5.47%">28</b>
+      <b class="pin" style="--x:2%;--y:18.36%">29</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 11번 영역을 확대(머리글 + 앞쪽 6행)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">28</span>표 머리글 — 상품번호 / 상품명 / 분류 / 필수사양 / 재고 / 판매가
+      / 상태(체크박스 열 포함 8열). 밑줄 있는 열(상품명·분류·필수사양·재고·판매가·상태)은 클릭하면
+      지금 불러온 페이지 안에서만 정렬됩니다(서버를 다시 부르지 않습니다).</li>
+    <li><span class="tag">29</span>행 — 왼쪽 체크박스는 일괄 변경용, 상품명을 누르면 우측에 상세
+      패널(서랍)이 열립니다. 필수사양 열은 「확인 완료 N/N」(초록)이거나 「미확인 N」 + 「완료/전체」
+      (주황)로 표시되고, 사양 행 자체가 없으면 「—」입니다.</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>일괄 변경 — 행 선택 상태 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1432/50;max-width:1000px">
+      <img src="/shared/manual/shots/products-bulk-active.png" alt="일괄 변경 바 — 2건 선택 상태">
+      <b class="pin" style="--x:2.72%;--y:48.59%">30</b>
+      <b class="pin" style="--x:11.88%;--y:50%">31</b>
+      <b class="pin" style="--x:17.97%;--y:50%">32</b>
+      <b class="pin" style="--x:31.02%;--y:50%">33</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 목록에서 체크박스 2개를 선택한 직후(서버에는 아무 요청도
+      보내지 않은 상태 — 선택만으로는 아무것도 바뀌지 않습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">30</span>선택 건수</li>
+    <li><span class="tag">31</span>바꿀 상태 선택 — 판매중 / 품절 / 단종 / 삭제대기 중 하나</li>
+    <li><span class="tag">32</span><span class="btnlabel">상태 바꾸기</span> — 확인 대화상자 후
+      실행됩니다</li>
+    <li><span class="tag">33</span>안내 문구 — 「확인 대화상자 후 실행 · 최대 2,000건 · 잠긴
+      상품은 사유와 함께 건너뜀」. 이 캡처 시점에는 아직 실행 전이라 오른쪽의
+      <span class="btnlabel">↩ 되돌리기</span>는 화면에 나타나지 않습니다(실행 후에만
+      나타나는 버튼입니다).</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>행을 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/products-full-detail.png" alt="상품명을 클릭해 상세 패널이 열린 상태의 전체 화면">
+      <div class="box" style="--x:66.67%;--y:4.95%;--w:33.33%;--h:95.05%"></div>
+      <b class="pin" style="--x:16%;--y:24.48%">34</b>
+      <b class="pin" style="--x:77.59%;--y:7.26%">35</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="1000" y1="257" x2="1116" y2="257" stroke="#c8451c" stroke-width="6" marker-end="url(#ah2)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 「검수 대기」 탭에서 첫 행(상품 50683 · Western Digital WD
+      1TB BLUE WD10EZEX SATA3/7200/64M /HDD)을 클릭한 직후</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">34</span>방금 클릭한 행 — 이 화면은 클릭한 행 자체에 별도의 강조 색을
+      입히지 않습니다. 오른쪽에 패널이 열리는 것으로 확인합니다.</li>
+    <li><span class="tag">35</span>우측에 뜨는 상세 패널(테두리 상자) — 확대는
+      <a href="#fig-g">그림 G</a> 이하 참고</li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>상세 패널 확대 — 기본 정보(읽기)</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:560/998;max-width:430px">
+      <img src="/shared/manual/shots/products-drawer-basic.png" alt="상세 패널 확대 — 기본 정보 탭, 읽기 상태">
+      <b class="pin" style="--x:32.77%;--y:2.43%">36</b>
+      <b class="pin" style="--x:72.13%;--y:2.43%">37</b>
+      <b class="pin" style="--x:86.83%;--y:2.43%">38</b>
+      <b class="pin" style="--x:94.98%;--y:2.43%">39</b>
+      <b class="pin" style="--x:50.09%;--y:4.74%">40</b>
+      <b class="pin" style="--x:50.09%;--y:8.11%">41</b>
+      <div class="box" style="--x:3.39%;--y:11.29%;--w:93.39%;--h:15.37%"></div>
+      <b class="pin" style="--x:5.39%;--y:9.9%">42</b>
+      <div class="box" style="--x:3.39%;--y:35.12%;--w:93.39%;--h:3.63%"></div>
+      <b class="pin" style="--x:5.39%;--y:33.6%">43</b>
+      <b class="pin" style="--x:92.33%;--y:97.22%">44</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 상품 50683(HDD) · 기본 정보 탭 · 읽기 상태</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">36</span>상품명 · 닫기(✕)</li>
+    <li><span class="tag">37</span><span class="btnlabel">몰 관리자에서 열기</span> — 새 탭에서
+      팝콘PC 쇼핑몰 관리자의 이 상품 수정 페이지로 이동합니다(로그인 필요, 별도 시스템)</li>
+    <li><span class="tag">38</span>상태 배지 — 「검수 대기 / 추천 가능 / 추천 제외」 셋 중 하나
+      (목록·탭의 4갈래 상태와는 다른 계산입니다 — ⚠ 「조심할 것」 참고)</li>
+    <li><span class="tag">39</span>product_code · SKU · 부품 종류 · 제조사</li>
+    <li><span class="tag">40</span>탭 4개 — 기본 정보 / 사양 N/M / 공급처 N / 분류 변경</li>
+    <li><span class="tag">42</span>게이트 체크리스트(테두리 상자) — 추천 후보가 되기 위한 6가지
+      조건을 한 번에 보여줍니다. 이 예시는 「추천 후보가 되려면 3가지 남았습니다 — 필수 사양 ·
+      판매 상태 · 재고」이고, 나머지 셋(부품 분류·사양 정보·판매가)은 이미 충족했습니다.</li>
+    <li><span class="tag">43</span>공급처(원문)(테두리 상자) — 오늘(2026-08-25) 이 화면에 새로
+      노출된 항목입니다. 몰 CSV가 준 원문 값이며, [공급처] 탭의 매입가 표와는 다른 자료입니다
+      (아래 「조심할 것」 참고). 이 예시는 「(주)좋은디에스아이」로 채워져 있습니다.</li>
+    <li><span class="tag">44</span><span class="btnlabel">수정</span> — 이 탭만 그 자리에서
+      편집으로 바뀝니다. 하단 왼쪽에는 「검수 승인·반려는 상품 사양 검수 소관」이라는 안내가
+      함께 있습니다.</li>
+  </ul>
+  <p>상품명·제조사·공급처(원문) 아래로는 판매가·매입가·재고·상태, 그리고 읽기 전용 참고 정보
+    (데이터 출처·모델명·다나와 코드·시장가·사양 원문·등록일·수정일)가 이어집니다 — 이 예시에서는
+    판매가 141,700원 · 매입가 50,000원 · 재고 0개 · 상태 「품절」이 그대로 보입니다.</p>
+
+  <h3 id="fig-g2"><span class="fig">그림 G-2</span>상세 패널 확대 — 기본 정보(편집 모드)</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:560/998;max-width:430px">
+      <img src="/shared/manual/shots/products-drawer-basic-edit.png" alt="상세 패널 확대 — 기본 정보 탭, 편집 모드">
+      <b class="pin" style="--x:59.38%;--y:29.91%">45</b>
+      <b class="pin" style="--x:59.38%;--y:40.31%">46</b>
+      <b class="pin" style="--x:59.38%;--y:61.18%">47</b>
+      <b class="pin" style="--x:82.17%;--y:97.22%">48</b>
+      <b class="pin" style="--x:92.33%;--y:97.22%">49</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 같은 상품 · [수정]을 누른 직후(저장은 누르지 않고 캡처만
+      했습니다 — 실제로는 아무것도 바뀌지 않았습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">45</span>공급처(원문) 입력칸 — 이제 직접 고칠 수 있습니다(등록·수정·
+      저장 시 잠금까지 오늘 새로 열렸습니다)</li>
+    <li><span class="tag">46</span>판매가 입력칸(숫자)</li>
+    <li><span class="tag">47</span>상태 선택칸 — 판매중 / 품절 / 단종 / 삭제대기 중 하나(목록의
+      「상태」 배지와는 다른 값입니다 — ⚠ 「조심할 것」 참고)</li>
+    <li><span class="tag">48</span><span class="btnlabel">취소</span> — 서버 값으로 되돌립니다
+      (아무것도 저장하지 않습니다)</li>
+    <li><span class="tag">49</span><span class="btnlabel">저장</span> — 확인 창 없이 즉시
+      저장되고, 고친 칸마다 잠금이 걸립니다. 저장하면 이 탭은 다시 읽기 상태로 돌아갑니다.</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>상세 패널 확대 — 사양 탭</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:560/998;max-width:430px">
+      <img src="/shared/manual/shots/products-drawer-spec.png" alt="상세 패널 확대 — 사양 탭, 읽기 상태">
+      <b class="pin" style="--x:50.09%;--y:8.11%">50</b>
+      <b class="pin" style="--x:50.09%;--y:13.02%">51</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 같은 상품 · 사양 탭(HDD 필수 사양 2/3)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">50</span>탭 전환 — 클릭하면 새로 서버를 부르지 않고(이미 받아 둔 상세
+      데이터 안에서) 그 자리에서 바로 바뀝니다</li>
+    <li><span class="tag">51</span>필수 사양 진행 — 「필수 사양 2/3」. 이 예시는 용량(1024 GB)·
+      인터페이스(SATA)는 채워졌고 규격만 비어 있습니다(「필수」 표시 + 「—」). RGB처럼 필수가
+      아닌 항목도 함께 나열됩니다.</li>
+  </ul>
+  <p>[수정]을 누르면 이 목록이 입력칸으로 바뀝니다. 저장하면 ① 값이 반영되고 ② 그 필드가
+    잠기며 ③ 채운 항목만큼 검수 대기가 풀리고 ④ 필수 사양이 모두 채워지면 이 상품이 추천 후보로
+    자동 승격됩니다.</p>
+
+  <h3 id="fig-i"><span class="fig">그림 I</span>상세 패널 확대 — 공급처 탭</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:560/998;max-width:430px">
+      <img src="/shared/manual/shots/products-drawer-supplier.png" alt="상세 패널 확대 — 공급처 탭, 등록된 공급처 없음">
+      <b class="pin" style="--x:50.09%;--y:8.11%">52</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 같은 상품 · 공급처 탭(이 상품은 등록된 공급처별 매입가가
+      없어 빈 상태입니다 — 오류가 아닙니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">52</span>공급처 탭 — 표 머리글은 「공급처 / 매입가 / 상태 / 갱신」이고,
+      행이 있으면 공급처마다 한 줄로 나열됩니다. 그림 G의 43번(공급처(원문))과는 다른 자료입니다:
+      이 탭은 <code>product_supplier_prices</code>(공급처별 구조화된 매입가 표)만 보여주고,
+      43번은 몰 CSV가 준 자유 텍스트 한 칸입니다 — 둘을 같은 값으로 여기지 마십시오.</li>
+  </ul>
+  <p>[수정]을 누르면 즉시 추가·삭제 도구가 나타납니다 — 이 탭은 다른 탭과 달리 [저장] 버튼이
+    없고, 공급처를 고르고 매입가를 넣어 「추가」를 누르거나 행의 「삭제」를 누르면 그 자리에서
+    바로 반영됩니다(같은 공급처를 다시 추가하면 매입가가 갱신됩니다).</p>
+
+  <h3 id="fig-j"><span class="fig">그림 J</span>상품 등록 서랍</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:560/998;max-width:430px">
+      <img src="/shared/manual/shots/products-reg.png" alt="상품 등록 서랍 — 빈 초기 상태">
+      <b class="pin" style="--x:59.38%;--y:7.26%">53</b>
+      <b class="pin" style="--x:59.38%;--y:12.52%">54</b>
+      <b class="pin" style="--x:59.38%;--y:17.78%">55</b>
+      <b class="pin" style="--x:59.38%;--y:22.98%">56</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · <span class="btnlabel">+ 상품 등록</span>을 누른 직후의 빈
+      초기 상태(아무것도 입력·제출하지 않았습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">53</span>상품명 입력 — 비워 두면 등록할 수 없습니다</li>
+    <li><span class="tag">54</span>분류 선택 — 첫 항목이 미리 골라져 있지 않고 「분류를
+      선택하세요」로 시작합니다. 고르지 않으면 등록할 수 없습니다.</li>
+    <li><span class="tag">55</span>제조사(선택 입력)</li>
+    <li><span class="tag">56</span>공급처(원문)(선택 입력) — 여기서도 등록 시점부터 넣을 수
+      있습니다</li>
+  </ul>
+  <p>이름이 기존 상품과 거의 같으면(일치도 임계 0.97) [등록] 대신 닮은 상품 목록과
+    <span class="btnlabel">그래도 등록</span> 버튼이 나타납니다 — 확인하기 전에는 등록되지
+    않습니다. 등록 직후 상품은 검수 대기 상태로 시작하고 추천 후보에는 들어가지 않습니다.</p>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>상태 탭(전체/추천 가능/검수 대기/재고 없음/가격 검토)을 누르면 서버가 그 범위로 다시
+      조회합니다 — 탭의 숫자와 실제 표시되는 행 수가 항상 일치합니다(그림 A의 5번).</li>
+    <li>상품 검색·분류 필터·제조사 필터를 조합해 좁혀 볼 수 있습니다(그림 C). 검색은 상품번호·
+      SKU·상품명을 함께 찾습니다.</li>
+    <li>표 머리글(상품명·분류·필수사양·재고·판매가·상태)을 눌러 지금 불러온 목록 안에서
+      정렬합니다(서버를 다시 부르지 않습니다).</li>
+    <li>상품명 또는 행 오른쪽 점 3개(⋯)를 누르면 우측에 상세 패널이 열립니다(그림 F).</li>
+    <li>상세 패널은 네 개 탭으로 나뉘고, 각 탭은 <span class="btnlabel">수정</span>을 눌러야
+      그 탭만 그 자리에서 편집으로 바뀝니다 — 다른 탭은 그대로 읽기 상태입니다.
+      <ul>
+        <li><a href="#fig-g">기본 정보</a>(그림 G·G-2) — 상품명·제조사·공급처(원문)·판매가·
+          매입가·재고·상태. 저장은 확인 창 없이 즉시 반영되고, 고친 칸마다 잠금이 걸립니다.</li>
+        <li><a href="#fig-h">사양</a>(그림 H) — 그 부품 종류가 쓰는 사양 값. 저장하면 값 반영 +
+          해당 필드 잠금 + 그 필드의 검수 대기 해소 + (필수 사양이 다 차면) 추천 후보 자동
+          승격까지 한 번에 일어납니다.</li>
+        <li><a href="#fig-i">공급처</a>(그림 I) — 공급처별 매입가 추가·삭제. 다른 탭과 달리
+          [저장] 버튼 없이 추가·삭제 각각 즉시 반영됩니다.</li>
+        <li>분류 변경 — 새 분류를 고르고 <span class="btnlabel">미리보기</span>를 눌러야 영향
+          (새로 필요한 사양 · 더는 안 쓰는 사양 · 추천 후보 진입/이탈)을 먼저 보여주고,
+          <span class="btnlabel">확정 변경</span>을 눌러야 실제로 바뀝니다. 확정하면 분류·
+          분류그룹·추천 후보 여부·검수 필요 여부 네 가지가 함께 잠깁니다.</li>
+      </ul>
+    </li>
+    <li>게이트 체크리스트(그림 G의 42번)는 추천 후보가 되기 위한 6가지 조건(부품 분류·사양 정보·
+      필수 사양·판매가·판매 상태·재고)을 한 번에 보여줍니다 — 하나씩 고치고 다시 열어 볼 필요
+      없이 남은 것을 전부 보여줍니다.</li>
+    <li><span class="btnlabel">몰 관리자에서 열기</span>(그림 G의 37번) — 새 탭에서 팝콘PC
+      쇼핑몰 관리자의 이 상품 수정 페이지로 이동합니다(로그인 필요, 이 화면과는 다른 시스템).</li>
+    <li>검수 대기 상품은 상세 패널 하단에 <span class="btnlabel">검수 큐로 →</span> 버튼이 나타나
+      상품 사양 검수 화면으로 이동합니다.</li>
+    <li>왼쪽 체크박스로 여러 상품을 선택하면 일괄 변경 바가 나타납니다(그림 E) — 바꿀 상태를
+      고르고 <span class="btnlabel">상태 바꾸기</span>를 누르면 확인 대화상자 후 최대 2,000건까지
+      한 번에 바뀝니다. 상태가 잠긴 상품은 사유와 함께 자동으로 건너뜁니다.</li>
+    <li><span class="btnlabel">↩ 되돌리기</span>(그림 E) — 방금 실행한 일괄 변경만 되돌립니다
+      (이번 세션에서 처리한 것만 — 아래 「조심할 것」 참고).</li>
+    <li><span class="btnlabel">+ 상품 등록</span>(그림 J)으로 새 상품을 만듭니다. 분류는 반드시
+      골라야 하고, 이름이 비슷한 상품이 있으면 먼저 확인을 구합니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>로컬 화면에서 고친 값이 운영 서비스에 그대로 반영됩니다.</b> 이 관리자 화면이 보는 DB는
+    개발용 별도 DB가 아니라 실제 팝콘PC 운영 DB입니다 — 저장·등록·일괄 변경 버튼을 실제로
+    누르면 진짜 상품 데이터가 바뀝니다.
+  </div>
+  <div class="callout">
+    <b>공급처(원문) 값이 통째로 사라진 적이 있습니다.</b> 2026-08-15에 카탈로그 일괄 적재 과정에서
+    이 값 4,113건이 한꺼번에 지워졌고, 자동 복구가 가능한 기간(7일)을 이미 넘겨 되살리지
+    못했습니다. 지금 잠금 기능이 있는 것도 이 사고 때문입니다 — [수정]으로 값을 넣고 저장하면
+    그 칸이 잠기고, 다음 일괄 적재가 그 값을 덮어쓰지 않습니다.
+  </div>
+  <div class="callout">
+    <b>잠금이 지키는 범위가 오늘(2026-08-25) 2개에서 13개 컬럼으로 늘었습니다.</b> 이 화면에서
+    실제로 잠글 수 있는 것은 [기본 정보] 저장 시 상품명·제조사·공급처(원문)·판매가·매입가(5개),
+    [분류 변경] 확정 시 분류·분류그룹·추천 후보 여부·검수 필요 여부(4개) — 모두 9개입니다.
+    나머지 4개(모델명·시장가·다나와 코드·사양 원문)는 이 화면이 아니라 상품 사양 검수 화면에서
+    잠깁니다. <b>재고와 「상태」(판매중/품절 등), 데이터 출처는 잠금 아이콘이 붙어 있어도 다음
+    카탈로그 일괄 적재가 그대로 덮어씁니다</b> — 코드가 이 세 가지만은 잠금과 무관하게 무조건
+    새 값으로 바꾸도록 정해 놓았기 때문입니다. 재고·상태를 고쳐도 다음 적재 전까지만 유지된다고
+    생각하십시오.
+  </div>
+  <div class="callout">
+    <b>상세 서랍에서 고친 값에는 되돌리기 버튼이 없습니다.</b> 목록 위쪽 일괄 변경 바에만
+    <span class="btnlabel">↩ 되돌리기</span>가 있고, 그마저도 <b>이번 브라우저 세션에서 처리한
+    것만</b> 기억합니다(새로고침하면 사라집니다). 기본 정보·사양·분류 변경을 잘못 고쳤다면,
+    되돌리는 방법은 원래 값을 다시 찾아 직접 입력해 저장하는 것뿐입니다.
+  </div>
+  <div class="callout">
+    <b>「상태」라는 같은 이름이 이 화면 안에서 세 가지 다른 것을 가리킵니다.</b> ① 목록 표의
+    「상태」 열과 위쪽 상태 탭 — 추천 가능/검수 대기/재고 없음/가격 검토(서버가 계산한 4갈래) ②
+    상세 서랍 제목 옆 배지(그림 G의 38번) — 검수 대기/추천 가능/추천 제외(3갈래, 비슷하지만 다른
+    계산) ③ [기본 정보] 탭에서 직접 고치는 「상태」 입력칸(그림 G-2의 47번) — 판매중/품절/단종/
+    삭제대기(실제로 저장되는 원래 값). ①·②는 화면이 계산해서 보여주는 것이고, ③만 실제로 바꿀
+    수 있는 값입니다.
+  </div>
+  <div class="callout">
+    <b>조회(viewer) 권한 계정은 버튼이 흐려지지 않습니다.</b> <span class="btnlabel">+ 상품
+    등록</span>·<span class="btnlabel">수정</span>·<span class="btnlabel">저장</span>·
+    <span class="btnlabel">상태 바꾸기</span> 모두 눌러 보면 그대로 눌리고, 실제로 서버에 요청을
+    보낸 뒤에야 403(권한 부족)으로 거부됩니다. (상품 사양 검수 화면은 반대로 버튼 자체가 미리
+    흐리게 비활성됩니다 — 화면마다 표시 방식이 다릅니다.)
+  </div>
+  <div class="callout">
+    <b>[+ 상품 등록]에서 [등록]·[그래도 등록]을 누르면 실제로 새 상품이 생깁니다.</b> 이 화면
+    안에는 되돌리는 기능(삭제)이 없습니다 — 잘못 등록했다면 다른 화면(삭제 상품 조회 등)에서
+    정리해야 합니다.
+  </div>
+  <div class="callout">
+    <b>분류 변경은 그 상품의 필수 사양·추천 후보 여부를 통째로 바꿉니다.</b>
+    <span class="btnlabel">미리보기</span>로 영향(새로 필요해지는 사양·더는 안 쓰는 사양·추천
+    후보 진입/이탈 여부)을 반드시 먼저 확인한 뒤 <span class="btnlabel">확정 변경</span>을
+    누르십시오 — 되돌리기 버튼이 없다는 점(위 항목)도 함께 기억하십시오.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「상태를 '단종'으로 바꿨는데 목록에는 '검수 대기'라고 뜬다」</b> → 실제로 사양 검수가
+      남아서가 아닙니다. 판매중이 아닌 상품을 놓치지 않으려고 붙이는 안전망 표시입니다(단종·
+      삭제대기처럼 달리 분류할 자리가 없으면 「검수 대기」 쪽으로 묶입니다). 상세를 열어 게이트
+      체크리스트에서 진짜 이유를 확인하십시오.</li>
+    <li><b>「게이트 6가지가 다 통과인데 상세 배지는 여전히 '추천 제외'다」</b> → 게이트 체크리스트와
+      실제 추천 후보 판정은 완전히 같은 조건이 아닙니다(예: 데모 데이터는 게이트를 다 통과해도
+      후보에서 빠집니다). 배지 옆 「추천 후보가 되려면…」 문구를 그대로 따르십시오.</li>
+    <li><b>「공급처(원문)에 값을 넣고 저장했는데 다음에 보니 사라졌다」</b> → 저장할 때 잠금이
+      걸렸는지(🔒 잠김 표시)를 먼저 확인하십시오. 잠금 없이 저장된 값은 다음 카탈로그 일괄
+      적재가 원문 값으로 다시 덮을 수 있습니다.</li>
+    <li><b>「사양 탭에 항목이 하나도 없다」</b> → 이 부품 종류에 등록된 사양 항목이 없는 것입니다
+      (일부 주변기기 종류는 필수 사양 자체가 없습니다). 오류가 아닙니다.</li>
+    <li><b>「일괄 변경으로 몇 건을 바꿨는데 선택한 것보다 적게 바뀌었다고 나온다」</b> → 정상입니다.
+      이미 그 상태인 상품과 「상태」 값이 잠긴 상품은 자동으로 건너뜁니다. 결과 문구에 몇 건이
+      잠겨서 빠졌는지 나옵니다.</li>
+    <li><b>「공급처 탭을 열었는데 비어 있다」</b> → 기본 정보 탭의 공급처(원문) 칸과는 다른
+      자료입니다. 이 탭은 공급처별로 등록된 구조화된 매입가 표만 보여주며, 등록된 적이 없으면
+      비어 있는 게 정상입니다.</li>
+    <li><b>「새 상품을 등록하려는데 계속 '이름이 거의 같은 상품이 있다'고 뜬다」</b> → 실제로 이미
+      등록된 상품일 가능성이 큽니다. 목록에 뜬 상품을 먼저 확인하고, 정말 다른 상품이 맞을 때만
+      <span class="btnlabel">그래도 등록</span>을 누르십시오.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_products.py</code> · <code>api/admin_ui_products.py</code> ·
+        <code>templates/admin/products.html.j2</code> · <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>mockups/shared/admin2/admin2-shell.js</code> · 잠금(<code>locked_fields</code>)이
+        실제로 몇 개 컬럼을 지키는지는 <code>api/catalog_ingest.py</code>의 UPSERT 문을 세어
+        확인했습니다(<code>CASE WHEN products.locked_fields ? '...'</code> 형태가 13번 — 어제는
+        2번이었습니다).</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발
+        서버)에 Playwright로 접속해 2026-08-25에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_products.py</code>(공용 도구
+        <code>scripts/manual_capture_common.py</code> 사용), 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는 같은
+        폴더의 <code>products-coords.json</code>에 있습니다.</li>
+      <li>실측 수치 — 캡처와 같은 순간 <code>GET /api/admin/products</code>(전체 23,151건 ·
+        추천 가능 6,618 · 검수 대기 3,450 · 재고 없음 13,083 · 가격 검토 0) ·
+        <code>GET /api/admin/product-meta</code>(분류 19종 · 제조사 627곳) ·
+        <code>GET /api/admin/spec-fields</code>(사양 항목 정의 31개, <code>spec_field_defs</code>와
+        일치) 응답을 그대로 옮겼습니다. 지어낸 숫자는 없습니다 — 매일 바뀌므로 지금 값은 화면에서
+        다시 확인하십시오.</li>
+      <li>이 스크립트는 읽기 전용입니다 — 등록·저장·일괄 변경 버튼을 실제로 누르지 않았습니다.
+        체크박스 선택(그림 E)은 서버에 요청을 보내지 않는 순수 화면 상태이고, [수정]으로 연 편집
+        모드(그림 G-2)도 [저장]을 누르지 않고 [취소]로 되돌렸습니다. 예시 상품(50683)은 「검수
+        대기」 탭에서 골랐고, 가능하면 잠금이 실제로 걸린 상품을 예시로 쓰려 했지만(최대 25건
+        조회) 이 캡처 시점에는 찾지 못해 첫 행을 그대로 썼습니다 — 그래서 그림 G의 잠금 아이콘은
+        이 문서에 나타나지 않습니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>products-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이 문서가 손으로
+      만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께 낡습니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_products.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — <code>pip install playwright</code> 후
+      <code>playwright install chromium</code>이 먼저 필요할 수 있습니다(새 환경인 경우).</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가
+      없어, 완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에 정확히
+      맞는지, 인쇄 시 페이지가 어떻게 나뉘는지)는 직접 확인하지 못했습니다. 좌표는 Playwright로
+      화면 요소의 실제 위치를 재서 계산한 값이며, 이 문서를 브라우저로 열어 캡처 위 번호가 실제
+      버튼·영역과 맞는지는 별도 확인이 필요합니다. 또한 이 캡처는 owner 등급 점검 계정으로만
+      찍었습니다 — 「조회」·「운영자」 등급 계정에서 쓰기 버튼이 눌리는지·거부되는지는 코드
+      (<code>api/auth.py</code>의 <code>required_role</code>)로는 확인했지만 화면으로 직접 보지는
+      못했습니다. 분류 변경 탭의 [미리보기]·[확정 변경] 화면도 코드로만 확인했고 실제로 캡처하지는
+      못했습니다(분류를 실제로 바꾸면 그 상품의 사양·후보 상태가 진짜로 바뀌므로, 이 캡처 작업은
+      읽기 전용 범위를 지키기 위해 누르지 않았습니다).</p>
+  </div>
+
+</div>

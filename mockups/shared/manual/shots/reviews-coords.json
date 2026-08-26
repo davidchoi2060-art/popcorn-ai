@@ -1,0 +1,2740 @@
+{
+  "reviews-full": {
+    "file": "reviews-full.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "lnb": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 12.62,
+        "h_pct": 100.0,
+        "cx_pct": 6.31,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 0,
+          "y": 0,
+          "width": 212,
+          "height": 1050
+        }
+      },
+      "lnb_active_item": {
+        "x_pct": 0.0,
+        "y_pct": 24.15,
+        "w_pct": 12.62,
+        "h_pct": 2.94,
+        "cx_pct": 6.31,
+        "cy_pct": 25.62,
+        "px": {
+          "x": 0,
+          "y": 253.625,
+          "width": 212,
+          "height": 30.875
+        }
+      },
+      "header": {
+        "x_pct": 12.62,
+        "y_pct": 0.0,
+        "w_pct": 87.38,
+        "h_pct": 4.95,
+        "cx_pct": 56.31,
+        "cy_pct": 2.48,
+        "px": {
+          "x": 212,
+          "y": 0,
+          "width": 1468,
+          "height": 52
+        }
+      },
+      "crumb": {
+        "x_pct": 13.69,
+        "y_pct": 1.86,
+        "w_pct": 3.7,
+        "h_pct": 1.14,
+        "cx_pct": 15.54,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 230,
+          "y": 19.5,
+          "width": 62.234375,
+          "height": 12
+        }
+      },
+      "done_today": {
+        "x_pct": 23.88,
+        "y_pct": 1.83,
+        "w_pct": 3.71,
+        "h_pct": 1.19,
+        "cx_pct": 25.74,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 401.1875,
+          "y": 19.25,
+          "width": 62.390625,
+          "height": 12.5
+        }
+      },
+      "undo_btn": {
+        "x_pct": 28.19,
+        "y_pct": 1.21,
+        "w_pct": 3.56,
+        "h_pct": 2.43,
+        "cx_pct": 29.97,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 473.578125,
+          "y": 12.75,
+          "width": 59.765625,
+          "height": 25.5
+        }
+      },
+      "hub": {
+        "x_pct": 88.72,
+        "y_pct": 1.26,
+        "w_pct": 2.39,
+        "h_pct": 2.33,
+        "cx_pct": 89.92,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1490.515625,
+          "y": 13.25,
+          "width": 40.15625,
+          "height": 24.5
+        }
+      },
+      "role_box": {
+        "x_pct": 91.71,
+        "y_pct": 1.26,
+        "w_pct": 5.08,
+        "h_pct": 2.33,
+        "cx_pct": 94.25,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1540.671875,
+          "y": 13.25,
+          "width": 85.328125,
+          "height": 24.5
+        }
+      },
+      "avatar": {
+        "x_pct": 97.38,
+        "y_pct": 1.19,
+        "w_pct": 1.55,
+        "h_pct": 2.48,
+        "cx_pct": 98.15,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1636,
+          "y": 12.5,
+          "width": 26,
+          "height": 26
+        }
+      },
+      "qside": {
+        "x_pct": 12.62,
+        "y_pct": 8.57,
+        "w_pct": 12.86,
+        "h_pct": 91.43,
+        "cx_pct": 19.05,
+        "cy_pct": 54.29,
+        "px": {
+          "x": 212,
+          "y": 90,
+          "width": 216,
+          "height": 960
+        }
+      },
+      "scope_count": {
+        "x_pct": 13.45,
+        "y_pct": 11.76,
+        "w_pct": 11.13,
+        "h_pct": 2.89,
+        "cx_pct": 19.02,
+        "cy_pct": 13.2,
+        "px": {
+          "x": 226,
+          "y": 123.5,
+          "width": 187,
+          "height": 30.296875
+        }
+      },
+      "live_line": {
+        "x_pct": 13.45,
+        "y_pct": 15.03,
+        "w_pct": 11.13,
+        "h_pct": 3.14,
+        "cx_pct": 19.02,
+        "cy_pct": 16.6,
+        "px": {
+          "x": 226,
+          "y": 157.796875,
+          "width": 187,
+          "height": 33
+        }
+      },
+      "chunks": {
+        "x_pct": 13.45,
+        "y_pct": 21.36,
+        "w_pct": 11.13,
+        "h_pct": 10.34,
+        "cx_pct": 19.02,
+        "cy_pct": 26.53,
+        "px": {
+          "x": 226,
+          "y": 224.296875,
+          "width": 187,
+          "height": 108.546875
+        }
+      },
+      "id_box": {
+        "x_pct": 13.45,
+        "y_pct": 33.13,
+        "w_pct": 11.13,
+        "h_pct": 8.56,
+        "cx_pct": 19.02,
+        "cy_pct": 37.41,
+        "px": {
+          "x": 226,
+          "y": 347.84375,
+          "width": 187,
+          "height": 89.828125
+        }
+      },
+      "fstats": {
+        "x_pct": 13.45,
+        "y_pct": 43.11,
+        "w_pct": 11.13,
+        "h_pct": 55.46,
+        "cx_pct": 19.02,
+        "cy_pct": 70.84,
+        "px": {
+          "x": 226,
+          "y": 452.671875,
+          "width": 187,
+          "height": 582.328125
+        }
+      },
+      "filterbar": {
+        "x_pct": 25.48,
+        "y_pct": 8.57,
+        "w_pct": 74.52,
+        "h_pct": 5.05,
+        "cx_pct": 62.74,
+        "cy_pct": 11.1,
+        "px": {
+          "x": 428,
+          "y": 90,
+          "width": 1252,
+          "height": 53
+        }
+      },
+      "search_box": {
+        "x_pct": 26.43,
+        "y_pct": 9.71,
+        "w_pct": 16.03,
+        "h_pct": 2.67,
+        "cx_pct": 34.44,
+        "cy_pct": 11.05,
+        "px": {
+          "x": 444,
+          "y": 102,
+          "width": 269.34375,
+          "height": 28
+        }
+      },
+      "pill_part": {
+        "x_pct": 42.88,
+        "y_pct": 9.74,
+        "w_pct": 6.32,
+        "h_pct": 2.62,
+        "cx_pct": 46.04,
+        "cy_pct": 11.05,
+        "px": {
+          "x": 720.34375,
+          "y": 102.25,
+          "width": 106.140625,
+          "height": 27.5
+        }
+      },
+      "pill_live": {
+        "x_pct": 49.61,
+        "y_pct": 9.74,
+        "w_pct": 7.27,
+        "h_pct": 2.62,
+        "cx_pct": 53.25,
+        "cy_pct": 11.05,
+        "px": {
+          "x": 833.484375,
+          "y": 102.25,
+          "width": 122.09375,
+          "height": 27.5
+        }
+      },
+      "pill_field": {
+        "x_pct": 57.3,
+        "y_pct": 9.74,
+        "w_pct": 6.32,
+        "h_pct": 2.62,
+        "cx_pct": 60.46,
+        "cy_pct": 11.05,
+        "px": {
+          "x": 962.578125,
+          "y": 102.25,
+          "width": 106.140625,
+          "height": 27.5
+        }
+      },
+      "pill_status": {
+        "x_pct": 64.03,
+        "y_pct": 9.74,
+        "w_pct": 6.32,
+        "h_pct": 2.62,
+        "cx_pct": 67.19,
+        "cy_pct": 11.05,
+        "px": {
+          "x": 1075.71875,
+          "y": 102.25,
+          "width": 106.140625,
+          "height": 27.5
+        }
+      },
+      "bulk_btn": {
+        "x_pct": 74.27,
+        "y_pct": 9.74,
+        "w_pct": 6.66,
+        "h_pct": 2.62,
+        "cx_pct": 77.6,
+        "cy_pct": 11.05,
+        "px": {
+          "x": 1247.703125,
+          "y": 102.25,
+          "width": 111.9375,
+          "height": 27.5
+        }
+      },
+      "thead": {
+        "x_pct": 25.48,
+        "y_pct": 13.62,
+        "w_pct": 74.52,
+        "h_pct": 3.05,
+        "cx_pct": 62.74,
+        "cy_pct": 15.14,
+        "px": {
+          "x": 428,
+          "y": 143,
+          "width": 1252,
+          "height": 32
+        }
+      },
+      "first_row": {
+        "x_pct": 25.48,
+        "y_pct": 16.67,
+        "w_pct": 74.52,
+        "h_pct": 3.29,
+        "cx_pct": 62.74,
+        "cy_pct": 18.31,
+        "px": {
+          "x": 428,
+          "y": 175,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "pager": {
+        "x_pct": 25.48,
+        "y_pct": 96.19,
+        "w_pct": 74.52,
+        "h_pct": 3.81,
+        "cx_pct": 62.74,
+        "cy_pct": 98.1,
+        "px": {
+          "x": 428,
+          "y": 1010,
+          "width": 1252,
+          "height": 40
+        }
+      },
+      "tab_review": {
+        "x_pct": 13.69,
+        "y_pct": 4.95,
+        "w_pct": 5.87,
+        "h_pct": 3.52,
+        "cx_pct": 16.63,
+        "cy_pct": 6.71,
+        "px": {
+          "x": 230,
+          "y": 52,
+          "width": 98.6875,
+          "height": 37
+        }
+      },
+      "tab_sourcing": {
+        "x_pct": 20.64,
+        "y_pct": 4.95,
+        "w_pct": 6.5,
+        "h_pct": 3.52,
+        "cx_pct": 23.89,
+        "cy_pct": 6.71,
+        "px": {
+          "x": 346.6875,
+          "y": 52,
+          "width": 109.21875,
+          "height": 37
+        }
+      }
+    }
+  },
+  "reviews-header": {
+    "file": "reviews-header.png",
+    "clip_px": {
+      "x": 212,
+      "y": 0,
+      "width": 1468,
+      "height": 52
+    },
+    "elements": {
+      "crumb": {
+        "x_pct": 1.23,
+        "y_pct": 37.5,
+        "w_pct": 4.24,
+        "h_pct": 23.08,
+        "cx_pct": 3.35,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 230,
+          "y": 19.5,
+          "width": 62.234375,
+          "height": 12
+        }
+      },
+      "now": {
+        "x_pct": 7.19,
+        "y_pct": 36.54,
+        "w_pct": 5.01,
+        "h_pct": 25.0,
+        "cx_pct": 9.7,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 317.578125,
+          "y": 19,
+          "width": 73.609375,
+          "height": 13
+        }
+      },
+      "done_today": {
+        "x_pct": 12.89,
+        "y_pct": 37.02,
+        "w_pct": 4.25,
+        "h_pct": 24.04,
+        "cx_pct": 15.01,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 401.1875,
+          "y": 19.25,
+          "width": 62.390625,
+          "height": 12.5
+        }
+      },
+      "undo_btn": {
+        "x_pct": 17.82,
+        "y_pct": 24.52,
+        "w_pct": 4.07,
+        "h_pct": 49.04,
+        "cx_pct": 19.85,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 473.578125,
+          "y": 12.75,
+          "width": 59.765625,
+          "height": 25.5
+        }
+      },
+      "hub": {
+        "x_pct": 87.09,
+        "y_pct": 25.48,
+        "w_pct": 2.74,
+        "h_pct": 47.12,
+        "cx_pct": 88.46,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 1490.515625,
+          "y": 13.25,
+          "width": 40.15625,
+          "height": 24.5
+        }
+      },
+      "role_box": {
+        "x_pct": 90.51,
+        "y_pct": 25.48,
+        "w_pct": 5.81,
+        "h_pct": 47.12,
+        "cx_pct": 93.42,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 1540.671875,
+          "y": 13.25,
+          "width": 85.328125,
+          "height": 24.5
+        }
+      },
+      "avatar": {
+        "x_pct": 97.0,
+        "y_pct": 24.04,
+        "w_pct": 1.77,
+        "h_pct": 50.0,
+        "cx_pct": 97.89,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 1636,
+          "y": 12.5,
+          "width": 26,
+          "height": 26
+        }
+      }
+    }
+  },
+  "reviews-sidebar": {
+    "file": "reviews-sidebar.png",
+    "clip_px": {
+      "x": 212,
+      "y": 90,
+      "width": 216,
+      "height": 960
+    },
+    "elements": {
+      "scope_count": {
+        "x_pct": 6.48,
+        "y_pct": 3.49,
+        "w_pct": 86.57,
+        "h_pct": 3.16,
+        "cx_pct": 49.77,
+        "cy_pct": 5.07,
+        "px": {
+          "x": 226,
+          "y": 123.5,
+          "width": 187,
+          "height": 30.296875
+        }
+      },
+      "live_line": {
+        "x_pct": 6.48,
+        "y_pct": 7.06,
+        "w_pct": 86.57,
+        "h_pct": 3.44,
+        "cx_pct": 49.77,
+        "cy_pct": 8.78,
+        "px": {
+          "x": 226,
+          "y": 157.796875,
+          "width": 187,
+          "height": 33
+        }
+      },
+      "chunk_all": {
+        "x_pct": 6.48,
+        "y_pct": 13.99,
+        "w_pct": 86.57,
+        "h_pct": 3.49,
+        "cx_pct": 49.77,
+        "cy_pct": 15.73,
+        "px": {
+          "x": 226,
+          "y": 224.296875,
+          "width": 187,
+          "height": 33.515625
+        }
+      },
+      "chunk_a": {
+        "x_pct": 6.48,
+        "y_pct": 17.9,
+        "w_pct": 86.57,
+        "h_pct": 3.49,
+        "cx_pct": 49.77,
+        "cy_pct": 19.64,
+        "px": {
+          "x": 226,
+          "y": 261.8125,
+          "width": 187,
+          "height": 33.515625
+        }
+      },
+      "chunk_b": {
+        "x_pct": 6.48,
+        "y_pct": 21.81,
+        "w_pct": 86.57,
+        "h_pct": 3.49,
+        "cx_pct": 49.77,
+        "cy_pct": 23.55,
+        "px": {
+          "x": 226,
+          "y": 299.328125,
+          "width": 187,
+          "height": 33.515625
+        }
+      },
+      "id_box": {
+        "x_pct": 6.48,
+        "y_pct": 26.86,
+        "w_pct": 86.57,
+        "h_pct": 9.36,
+        "cx_pct": 49.77,
+        "cy_pct": 31.54,
+        "px": {
+          "x": 226,
+          "y": 347.84375,
+          "width": 187,
+          "height": 89.828125
+        }
+      },
+      "id_count": {
+        "x_pct": 11.57,
+        "y_pct": 27.9,
+        "w_pct": 10.68,
+        "h_pct": 1.31,
+        "cx_pct": 16.91,
+        "cy_pct": 28.56,
+        "px": {
+          "x": 237,
+          "y": 357.84375,
+          "width": 23.0625,
+          "height": 12.59375
+        }
+      },
+      "id_link": {
+        "x_pct": 11.57,
+        "y_pct": 33.92,
+        "w_pct": 45.83,
+        "h_pct": 1.2,
+        "cx_pct": 34.49,
+        "cy_pct": 34.52,
+        "px": {
+          "x": 237,
+          "y": 415.671875,
+          "width": 98.984375,
+          "height": 11.5
+        }
+      },
+      "fstats_title": {
+        "x_pct": 6.48,
+        "y_pct": 37.78,
+        "w_pct": 86.57,
+        "h_pct": 1.2,
+        "cx_pct": 49.77,
+        "cy_pct": 38.38,
+        "px": {
+          "x": 226,
+          "y": 452.671875,
+          "width": 187,
+          "height": 11.5
+        }
+      },
+      "fstats_list": {
+        "x_pct": 6.48,
+        "y_pct": 39.81,
+        "w_pct": 86.57,
+        "h_pct": 58.63,
+        "cx_pct": 49.77,
+        "cy_pct": 69.12,
+        "px": {
+          "x": 226,
+          "y": 472.171875,
+          "width": 187,
+          "height": 562.828125
+        }
+      },
+      "fstats_first": {
+        "x_pct": 6.48,
+        "y_pct": 39.81,
+        "w_pct": 85.65,
+        "h_pct": 1.94,
+        "cx_pct": 49.31,
+        "cy_pct": 40.78,
+        "px": {
+          "x": 226,
+          "y": 472.171875,
+          "width": 185,
+          "height": 18.59375
+        }
+      }
+    }
+  },
+  "reviews-filterbar": {
+    "file": "reviews-filterbar.png",
+    "clip_px": {
+      "x": 428,
+      "y": 90,
+      "width": 1252,
+      "height": 53
+    },
+    "elements": {
+      "search_box": {
+        "x_pct": 1.28,
+        "y_pct": 22.64,
+        "w_pct": 21.51,
+        "h_pct": 52.83,
+        "cx_pct": 12.03,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 444,
+          "y": 102,
+          "width": 269.34375,
+          "height": 28
+        }
+      },
+      "pill_part": {
+        "x_pct": 23.35,
+        "y_pct": 23.11,
+        "w_pct": 8.48,
+        "h_pct": 51.89,
+        "cx_pct": 27.59,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 720.34375,
+          "y": 102.25,
+          "width": 106.140625,
+          "height": 27.5
+        }
+      },
+      "pill_live": {
+        "x_pct": 32.39,
+        "y_pct": 23.11,
+        "w_pct": 9.75,
+        "h_pct": 51.89,
+        "cx_pct": 37.26,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 833.484375,
+          "y": 102.25,
+          "width": 122.09375,
+          "height": 27.5
+        }
+      },
+      "pill_field": {
+        "x_pct": 42.7,
+        "y_pct": 23.11,
+        "w_pct": 8.48,
+        "h_pct": 51.89,
+        "cx_pct": 46.94,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 962.578125,
+          "y": 102.25,
+          "width": 106.140625,
+          "height": 27.5
+        }
+      },
+      "pill_status": {
+        "x_pct": 51.73,
+        "y_pct": 23.11,
+        "w_pct": 8.48,
+        "h_pct": 51.89,
+        "cx_pct": 55.97,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 1075.71875,
+          "y": 102.25,
+          "width": 106.140625,
+          "height": 27.5
+        }
+      },
+      "sel_count": {
+        "x_pct": 61.89,
+        "y_pct": 38.68,
+        "w_pct": 3.02,
+        "h_pct": 20.75,
+        "cx_pct": 63.4,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 1202.859375,
+          "y": 110.5,
+          "width": 37.84375,
+          "height": 11
+        }
+      },
+      "bulk_btn": {
+        "x_pct": 65.47,
+        "y_pct": 23.11,
+        "w_pct": 8.94,
+        "h_pct": 51.89,
+        "cx_pct": 69.94,
+        "cy_pct": 49.06,
+        "px": {
+          "x": 1247.703125,
+          "y": 102.25,
+          "width": 111.9375,
+          "height": 27.5
+        }
+      }
+    }
+  },
+  "reviews-table": {
+    "file": "reviews-table.png",
+    "clip_px": {
+      "x": 428,
+      "y": 143,
+      "width": 1252,
+      "height": 239.09375
+    },
+    "elements": {
+      "thead": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 13.38,
+        "cx_pct": 50.0,
+        "cy_pct": 6.69,
+        "px": {
+          "x": 428,
+          "y": 143,
+          "width": 1252,
+          "height": 32
+        }
+      },
+      "row_1": {
+        "x_pct": 0.0,
+        "y_pct": 13.38,
+        "w_pct": 100.0,
+        "h_pct": 14.44,
+        "cx_pct": 50.0,
+        "cy_pct": 20.6,
+        "px": {
+          "x": 428,
+          "y": 175,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "row_2": {
+        "x_pct": 0.0,
+        "y_pct": 27.82,
+        "w_pct": 100.0,
+        "h_pct": 14.44,
+        "cx_pct": 50.0,
+        "cy_pct": 35.04,
+        "px": {
+          "x": 428,
+          "y": 209.515625,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "row_3": {
+        "x_pct": 0.0,
+        "y_pct": 42.26,
+        "w_pct": 100.0,
+        "h_pct": 14.44,
+        "cx_pct": 50.0,
+        "cy_pct": 49.47,
+        "px": {
+          "x": 428,
+          "y": 244.03125,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "row_4": {
+        "x_pct": 0.0,
+        "y_pct": 56.69,
+        "w_pct": 100.0,
+        "h_pct": 14.44,
+        "cx_pct": 50.0,
+        "cy_pct": 63.91,
+        "px": {
+          "x": 428,
+          "y": 278.546875,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "row_5": {
+        "x_pct": 0.0,
+        "y_pct": 71.13,
+        "w_pct": 100.0,
+        "h_pct": 14.44,
+        "cx_pct": 50.0,
+        "cy_pct": 78.35,
+        "px": {
+          "x": 428,
+          "y": 313.0625,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "row_6": {
+        "x_pct": 0.0,
+        "y_pct": 85.56,
+        "w_pct": 100.0,
+        "h_pct": 14.44,
+        "cx_pct": 50.0,
+        "cy_pct": 92.78,
+        "px": {
+          "x": 428,
+          "y": 347.578125,
+          "width": 1252,
+          "height": 34.515625
+        }
+      }
+    }
+  },
+  "reviews-drawer": {
+    "file": "reviews-drawer.png",
+    "clip_px": {
+      "x": 1144,
+      "y": 143,
+      "width": 536,
+      "height": 907
+    },
+    "elements": {
+      "name": {
+        "x_pct": 3.54,
+        "y_pct": 1.62,
+        "w_pct": 74.12,
+        "h_pct": 2.16,
+        "cx_pct": 40.6,
+        "cy_pct": 2.7,
+        "px": {
+          "x": 1163,
+          "y": 157.71875,
+          "width": 397.28125,
+          "height": 19.5625
+        }
+      },
+      "code": {
+        "x_pct": 3.54,
+        "y_pct": 4.52,
+        "w_pct": 23.4,
+        "h_pct": 1.58,
+        "cx_pct": 15.24,
+        "cy_pct": 5.31,
+        "px": {
+          "x": 1163,
+          "y": 184,
+          "width": 125.40625,
+          "height": 14.296875
+        }
+      },
+      "part": {
+        "x_pct": 29.18,
+        "y_pct": 4.52,
+        "w_pct": 4.93,
+        "h_pct": 1.58,
+        "cx_pct": 31.64,
+        "cy_pct": 5.31,
+        "px": {
+          "x": 1300.40625,
+          "y": 184,
+          "width": 26.40625,
+          "height": 14.296875
+        }
+      },
+      "created": {
+        "x_pct": 36.35,
+        "y_pct": 4.52,
+        "w_pct": 17.09,
+        "h_pct": 1.58,
+        "cx_pct": 44.89,
+        "cy_pct": 5.31,
+        "px": {
+          "x": 1338.8125,
+          "y": 184,
+          "width": 91.625,
+          "height": 14.296875
+        }
+      },
+      "body": {
+        "x_pct": 0.19,
+        "y_pct": 7.53,
+        "w_pct": 99.81,
+        "h_pct": 86.24,
+        "cx_pct": 50.09,
+        "cy_pct": 50.65,
+        "px": {
+          "x": 1145,
+          "y": 211.296875,
+          "width": 535,
+          "height": 782.203125
+        }
+      },
+      "compare": {
+        "x_pct": 3.54,
+        "y_pct": 11.33,
+        "w_pct": 93.1,
+        "h_pct": 6.49,
+        "cx_pct": 50.09,
+        "cy_pct": 14.58,
+        "px": {
+          "x": 1163,
+          "y": 245.796875,
+          "width": 499,
+          "height": 58.828125
+        }
+      },
+      "specs_cap": {
+        "x_pct": 3.54,
+        "y_pct": 19.36,
+        "w_pct": 93.1,
+        "h_pct": 1.5,
+        "cx_pct": 50.09,
+        "cy_pct": 20.12,
+        "px": {
+          "x": 1163,
+          "y": 318.625,
+          "width": 499,
+          "height": 13.640625
+        }
+      },
+      "specs_wrap": {
+        "x_pct": 3.54,
+        "y_pct": 21.75,
+        "w_pct": 93.1,
+        "h_pct": 2.48,
+        "cx_pct": 50.09,
+        "cy_pct": 22.99,
+        "px": {
+          "x": 1163,
+          "y": 340.265625,
+          "width": 499,
+          "height": 22.5
+        }
+      },
+      "note": {
+        "x_pct": 3.54,
+        "y_pct": 95.32,
+        "w_pct": 31.07,
+        "h_pct": 3.24,
+        "cx_pct": 19.08,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1163,
+          "y": 1007.5625,
+          "width": 166.53125,
+          "height": 29.375
+        }
+      },
+      "btn_reject": {
+        "x_pct": 36.11,
+        "y_pct": 95.2,
+        "w_pct": 14.99,
+        "h_pct": 3.47,
+        "cx_pct": 43.6,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1337.53125,
+          "y": 1006.5,
+          "width": 80.359375,
+          "height": 31.5
+        }
+      },
+      "btn_manual": {
+        "x_pct": 52.59,
+        "y_pct": 95.2,
+        "w_pct": 15.65,
+        "h_pct": 3.47,
+        "cx_pct": 60.42,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1425.890625,
+          "y": 1006.5,
+          "width": 83.90625,
+          "height": 31.5
+        }
+      },
+      "btn_approve": {
+        "x_pct": 69.74,
+        "y_pct": 95.31,
+        "w_pct": 26.9,
+        "h_pct": 3.25,
+        "cx_pct": 83.19,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1517.796875,
+          "y": 1007.5,
+          "width": 144.203125,
+          "height": 29.5
+        }
+      }
+    }
+  },
+  "reviews-full-detail": {
+    "file": "reviews-full-detail.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "selected_row": {
+        "x_pct": 25.48,
+        "y_pct": 16.67,
+        "w_pct": 74.52,
+        "h_pct": 3.29,
+        "cx_pct": 62.74,
+        "cy_pct": 18.31,
+        "px": {
+          "x": 428,
+          "y": 175,
+          "width": 1252,
+          "height": 34.515625
+        }
+      },
+      "drawer": {
+        "x_pct": 68.1,
+        "y_pct": 13.62,
+        "w_pct": 31.9,
+        "h_pct": 86.38,
+        "cx_pct": 84.05,
+        "cy_pct": 56.81,
+        "px": {
+          "x": 1144,
+          "y": 143,
+          "width": 536,
+          "height": 907
+        }
+      },
+      "btn_approve": {
+        "x_pct": 90.35,
+        "y_pct": 95.95,
+        "w_pct": 8.58,
+        "h_pct": 2.81,
+        "cx_pct": 94.64,
+        "cy_pct": 97.36,
+        "px": {
+          "x": 1517.796875,
+          "y": 1007.5,
+          "width": 144.203125,
+          "height": 29.5
+        }
+      }
+    }
+  },
+  "reviews-drawer-suggested": {
+    "file": "reviews-drawer-suggested.png",
+    "clip_px": {
+      "x": 1144,
+      "y": 143,
+      "width": 536,
+      "height": 907
+    },
+    "elements": {
+      "name": {
+        "x_pct": 3.54,
+        "y_pct": 1.62,
+        "w_pct": 74.12,
+        "h_pct": 2.16,
+        "cx_pct": 40.6,
+        "cy_pct": 2.7,
+        "px": {
+          "x": 1163,
+          "y": 157.71875,
+          "width": 397.28125,
+          "height": 19.5625
+        }
+      },
+      "body": {
+        "x_pct": 0.19,
+        "y_pct": 7.53,
+        "w_pct": 99.81,
+        "h_pct": 86.24,
+        "cx_pct": 50.09,
+        "cy_pct": 50.65,
+        "px": {
+          "x": 1145,
+          "y": 211.296875,
+          "width": 535,
+          "height": 782.203125
+        }
+      },
+      "compare": {
+        "x_pct": 3.54,
+        "y_pct": 11.33,
+        "w_pct": 93.1,
+        "h_pct": 7.14,
+        "cx_pct": 50.09,
+        "cy_pct": 14.9,
+        "px": {
+          "x": 1163,
+          "y": 245.796875,
+          "width": 499,
+          "height": 64.78125
+        }
+      },
+      "sig_box": {
+        "x_pct": 3.54,
+        "y_pct": 20.02,
+        "w_pct": 93.1,
+        "h_pct": 11.16,
+        "cx_pct": 50.09,
+        "cy_pct": 25.6,
+        "px": {
+          "x": 1163,
+          "y": 324.578125,
+          "width": 499,
+          "height": 101.1875
+        }
+      },
+      "specs_cap": {
+        "x_pct": 3.54,
+        "y_pct": 32.72,
+        "w_pct": 93.1,
+        "h_pct": 1.5,
+        "cx_pct": 50.09,
+        "cy_pct": 33.47,
+        "px": {
+          "x": 1163,
+          "y": 439.765625,
+          "width": 499,
+          "height": 13.640625
+        }
+      },
+      "specs_wrap": {
+        "x_pct": 3.54,
+        "y_pct": 35.11,
+        "w_pct": 93.1,
+        "h_pct": 5.62,
+        "cx_pct": 50.09,
+        "cy_pct": 37.92,
+        "px": {
+          "x": 1163,
+          "y": 461.40625,
+          "width": 499,
+          "height": 51
+        }
+      },
+      "sib_cap": {
+        "x_pct": 3.54,
+        "y_pct": 42.27,
+        "w_pct": 93.1,
+        "h_pct": 1.5,
+        "cx_pct": 50.09,
+        "cy_pct": 43.02,
+        "px": {
+          "x": 1163,
+          "y": 526.40625,
+          "width": 499,
+          "height": 13.640625
+        }
+      },
+      "sib_list": {
+        "x_pct": 3.54,
+        "y_pct": 44.66,
+        "w_pct": 93.1,
+        "h_pct": 3.42,
+        "cx_pct": 50.09,
+        "cy_pct": 46.37,
+        "px": {
+          "x": 1163,
+          "y": 548.046875,
+          "width": 499,
+          "height": 31
+        }
+      },
+      "note": {
+        "x_pct": 3.54,
+        "y_pct": 95.32,
+        "w_pct": 42.59,
+        "h_pct": 3.24,
+        "cx_pct": 24.84,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1163,
+          "y": 1007.5625,
+          "width": 228.296875,
+          "height": 29.375
+        }
+      },
+      "btn_reject": {
+        "x_pct": 47.63,
+        "y_pct": 95.2,
+        "w_pct": 14.99,
+        "h_pct": 3.47,
+        "cx_pct": 55.13,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1399.296875,
+          "y": 1006.5,
+          "width": 80.359375,
+          "height": 31.5
+        }
+      },
+      "btn_manual": {
+        "x_pct": 64.11,
+        "y_pct": 95.2,
+        "w_pct": 15.65,
+        "h_pct": 3.47,
+        "cx_pct": 71.94,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1487.65625,
+          "y": 1006.5,
+          "width": 83.90625,
+          "height": 31.5
+        }
+      },
+      "btn_approve": {
+        "x_pct": 81.26,
+        "y_pct": 95.31,
+        "w_pct": 15.38,
+        "h_pct": 3.25,
+        "cx_pct": 88.95,
+        "cy_pct": 96.94,
+        "px": {
+          "x": 1579.5625,
+          "y": 1007.5,
+          "width": 82.4375,
+          "height": 29.5
+        }
+      }
+    }
+  },
+  "_meta": {
+    "captured_at": "2026-08-25T12:26:42.247788+00:00",
+    "base_url": "http://127.0.0.1:8107",
+    "viewport": {
+      "width": 1680,
+      "height": 1050
+    },
+    "screen": {
+      "screen_id": "ADM-PRD-020",
+      "path": "/admin2/reviews"
+    },
+    "stats": {
+      "queue": {
+        "total": 5886,
+        "bulkable": 0,
+        "single": 1,
+        "manual": 5885,
+        "sellable": 1444,
+        "suggested": 253,
+        "identity_conflict": 5,
+        "by_field": [
+          {
+            "field": "cooler_tdp",
+            "n": 1020,
+            "sellable": 341
+          },
+          {
+            "field": "form_factor",
+            "n": 677,
+            "sellable": 132
+          },
+          {
+            "field": "required_power_watt",
+            "n": 536,
+            "sellable": 34
+          },
+          {
+            "field": "pcie_gen",
+            "n": 450,
+            "sellable": 25
+          },
+          {
+            "field": "socket",
+            "n": 420,
+            "sellable": 75
+          },
+          {
+            "field": "length_mm",
+            "n": 356,
+            "sellable": 21
+          },
+          {
+            "field": "mem_type",
+            "n": 352,
+            "sellable": 94
+          },
+          {
+            "field": "cooler_height_mm",
+            "n": 340,
+            "sellable": 113
+          },
+          {
+            "field": "interface",
+            "n": 297,
+            "sellable": 45
+          },
+          {
+            "field": "form_factor_list",
+            "n": 271,
+            "sellable": 62
+          },
+          {
+            "field": "gpu_max_mm",
+            "n": 243,
+            "sellable": 84
+          },
+          {
+            "field": "tdp_watt",
+            "n": 192,
+            "sellable": 71
+          },
+          {
+            "field": "market_price",
+            "n": 146,
+            "sellable": 129
+          },
+          {
+            "field": "capacity_gb",
+            "n": 133,
+            "sellable": 66
+          },
+          {
+            "field": "socket_list",
+            "n": 129,
+            "sellable": 49
+          },
+          {
+            "field": "chipset",
+            "n": 128,
+            "sellable": 41
+          },
+          {
+            "field": "clock_mhz",
+            "n": 110,
+            "sellable": 46
+          },
+          {
+            "field": "danawa_code",
+            "n": 49,
+            "sellable": 5
+          },
+          {
+            "field": "rated_watt",
+            "n": 36,
+            "sellable": 10
+          }
+        ],
+        "verdict": "대기 5,886건 중 일괄 확정으로 끝낼 수 있는 건 0건, 값은 있지만 단건 검수가 필요한 건 1건입니다. 나머지 5,885건은 원문에 값이 없어 사람이 사양을 찾아 넣어야 합니다 — 재파싱(respec)으로는 더 회수되지 않습니다. 지금 매출에 영향을 주는 건 판매중·재고 있는 1,444건입니다."
+      },
+      "remaining": 5886,
+      "my_today": 0,
+      "status_counts": {
+        "대기": 5886,
+        "보류": 1,
+        "수정": 4,
+        "승인": 4075,
+        "처리": 1900,
+        "자동승인": 92
+      },
+      "spec_fields": {
+        "items": [
+          {
+            "field_key": "socket",
+            "label": "소켓",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "CPU",
+              "MB"
+            ],
+            "required_for": [
+              "CPU",
+              "MB"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 10,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 3475
+          },
+          {
+            "field_key": "socket_list",
+            "label": "지원 소켓 목록",
+            "data_type": "JSONB",
+            "unit": null,
+            "part_types": [
+              "COOLER_CPU_AIR",
+              "COOLER_CPU_AIO"
+            ],
+            "required_for": [
+              "COOLER_CPU_AIR",
+              "COOLER_CPU_AIO"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 11,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1199
+          },
+          {
+            "field_key": "chipset",
+            "label": "칩셋",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "MB"
+            ],
+            "required_for": [
+              "MB"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 20,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1970
+          },
+          {
+            "field_key": "mem_type",
+            "label": "메모리 규격",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "MB",
+              "RAM"
+            ],
+            "required_for": [
+              "MB",
+              "RAM"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 30,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 4085
+          },
+          {
+            "field_key": "capacity_gb",
+            "label": "용량",
+            "data_type": "INTEGER",
+            "unit": "GB",
+            "part_types": [
+              "RAM",
+              "SSD",
+              "HDD"
+            ],
+            "required_for": [
+              "RAM",
+              "SSD",
+              "HDD"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 40,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 3068
+          },
+          {
+            "field_key": "clock_mhz",
+            "label": "클럭",
+            "data_type": "INTEGER",
+            "unit": "MHz",
+            "part_types": [
+              "RAM"
+            ],
+            "required_for": [
+              "RAM"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 50,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1697
+          },
+          {
+            "field_key": "tdp_watt",
+            "label": "발열(TDP)",
+            "data_type": "INTEGER",
+            "unit": "W",
+            "part_types": [
+              "CPU"
+            ],
+            "required_for": [
+              "CPU"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 60,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 493
+          },
+          {
+            "field_key": "rated_watt",
+            "label": "정격 출력",
+            "data_type": "INTEGER",
+            "unit": "W",
+            "part_types": [
+              "POWER"
+            ],
+            "required_for": [
+              "POWER"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 70,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1203
+          },
+          {
+            "field_key": "required_power_watt",
+            "label": "권장 전원",
+            "data_type": "INTEGER",
+            "unit": "W",
+            "part_types": [
+              "GPU"
+            ],
+            "required_for": [
+              "GPU"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 80,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1950
+          },
+          {
+            "field_key": "length_mm",
+            "label": "길이",
+            "data_type": "INTEGER",
+            "unit": "mm",
+            "part_types": [
+              "GPU"
+            ],
+            "required_for": [
+              "GPU"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 90,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의 / B5 파워 길이 — GPU 카드 길이와 같은 '길이' 축",
+            "filled": 2130
+          },
+          {
+            "field_key": "gpu_max_mm",
+            "label": "그래픽카드 장착 길이",
+            "data_type": "INTEGER",
+            "unit": "mm",
+            "part_types": [
+              "CASE"
+            ],
+            "required_for": [
+              "CASE"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 100,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 2088
+          },
+          {
+            "field_key": "cooler_height_mm",
+            "label": "쿨러 높이",
+            "data_type": "INTEGER",
+            "unit": "mm",
+            "part_types": [
+              "CASE",
+              "COOLER_CPU_AIR"
+            ],
+            "required_for": [
+              "CASE",
+              "COOLER_CPU_AIR"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 110,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 2699
+          },
+          {
+            "field_key": "cooler_tdp",
+            "label": "쿨러 발열 한도",
+            "data_type": "INTEGER",
+            "unit": "W",
+            "part_types": [
+              "COOLER_CPU_AIR",
+              "COOLER_CPU_AIO"
+            ],
+            "required_for": [
+              "COOLER_CPU_AIR",
+              "COOLER_CPU_AIO"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 120,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 308
+          },
+          {
+            "field_key": "pcie_gen",
+            "label": "PCIe 세대",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "GPU"
+            ],
+            "required_for": [
+              "GPU"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 130,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의 / A8 성능 경고 — 세대는 하위호환이라 막지 않고 알린다",
+            "filled": 2422
+          },
+          {
+            "field_key": "form_factor",
+            "label": "규격",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "MB",
+              "SSD",
+              "HDD",
+              "POWER"
+            ],
+            "required_for": [
+              "MB",
+              "SSD",
+              "HDD",
+              "POWER"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 140,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 5950
+          },
+          {
+            "field_key": "form_factor_list",
+            "label": "수용 보드 규격",
+            "data_type": "JSONB",
+            "unit": null,
+            "part_types": [
+              "CASE"
+            ],
+            "required_for": [
+              "CASE"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 150,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 2058
+          },
+          {
+            "field_key": "interface",
+            "label": "인터페이스",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "SSD",
+              "HDD"
+            ],
+            "required_for": [
+              "SSD",
+              "HDD"
+            ],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 160,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1082
+          },
+          {
+            "field_key": "radiator_rows",
+            "label": "라디에이터 열",
+            "data_type": "INTEGER",
+            "unit": "열",
+            "part_types": [
+              "COOLER_CPU_AIO"
+            ],
+            "required_for": [],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 170,
+            "note": "수랭 라디에이터에 붙는 팬 줄 수 — 원문 '수랭팬개수'와 상품명 규격 중 큰 값",
+            "filled": 600
+          },
+          {
+            "field_key": "radiator_max_rows",
+            "label": "수랭 최대 열",
+            "data_type": "INTEGER",
+            "unit": "열",
+            "part_types": [
+              "CASE"
+            ],
+            "required_for": [],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 171,
+            "note": "케이스가 받는 라디에이터 최대 열 — 원문 '수랭쿨러 지원 : 최대 N열'",
+            "filled": 1536
+          },
+          {
+            "field_key": "tag_white",
+            "label": "화이트",
+            "data_type": "BOOLEAN",
+            "unit": null,
+            "part_types": [
+              "CASE"
+            ],
+            "required_for": [],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 200,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 18376
+          },
+          {
+            "field_key": "tag_rgb",
+            "label": "RGB",
+            "data_type": "BOOLEAN",
+            "unit": null,
+            "part_types": [
+              "CPU",
+              "MB",
+              "RAM",
+              "GPU",
+              "SSD",
+              "HDD",
+              "POWER",
+              "CASE",
+              "COOLER_CPU_AIR",
+              "COOLER_CPU_AIO"
+            ],
+            "required_for": [],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 201,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 18376
+          },
+          {
+            "field_key": "tag_silent",
+            "label": "저소음",
+            "data_type": "BOOLEAN",
+            "unit": null,
+            "part_types": [
+              "GPU",
+              "POWER",
+              "CASE",
+              "COOLER_CPU_AIR",
+              "COOLER_CPU_AIO"
+            ],
+            "required_for": [],
+            "is_engine": true,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 202,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 18376
+          },
+          {
+            "field_key": "size_inch",
+            "label": "화면 크기",
+            "data_type": "NUMERIC",
+            "unit": "인치",
+            "part_types": [
+              "MONITOR"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 300,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의 / B6 케이스 베이 판정(3.5\"/2.5\")",
+            "filled": 2497
+          },
+          {
+            "field_key": "resolution",
+            "label": "해상도",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "MONITOR"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 310,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 2335
+          },
+          {
+            "field_key": "refresh_hz",
+            "label": "주사율",
+            "data_type": "INTEGER",
+            "unit": "Hz",
+            "part_types": [
+              "MONITOR"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 320,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 2104
+          },
+          {
+            "field_key": "panel",
+            "label": "패널",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "MONITOR"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": true,
+            "sort_order": 330,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 837
+          },
+          {
+            "field_key": "switch_type",
+            "label": "스위치",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "KEYBOARD"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 340,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1
+          },
+          {
+            "field_key": "key_layout",
+            "label": "키 배열",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "KEYBOARD"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 350,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 1
+          },
+          {
+            "field_key": "connection",
+            "label": "연결 방식",
+            "data_type": "VARCHAR",
+            "unit": null,
+            "part_types": [
+              "KEYBOARD",
+              "MOUSE",
+              "HEADSET",
+              "SPEAKER",
+              "WEBCAM"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 360,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 5
+          },
+          {
+            "field_key": "ports",
+            "label": "포트 구성",
+            "data_type": "JSONB",
+            "unit": null,
+            "part_types": [
+              "MB",
+              "MONITOR"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": false,
+            "in_ingest": false,
+            "sort_order": 400,
+            "note": "초기 스키마에서 이관 — 코드 상수와 같은 정의",
+            "filled": 2
+          },
+          {
+            "field_key": "cpu_gpu",
+            "label": "내장그래픽",
+            "data_type": "BOOLEAN",
+            "unit": null,
+            "part_types": [
+              "CPU"
+            ],
+            "required_for": [],
+            "is_engine": false,
+            "is_custom": true,
+            "in_ingest": false,
+            "sort_order": 410,
+            "note": null,
+            "filled": 1
+          }
+        ],
+        "data_types": [
+          "BOOLEAN",
+          "INTEGER",
+          "JSONB",
+          "NUMERIC",
+          "VARCHAR"
+        ],
+        "data_type_help": {
+          "BOOLEAN": "예/아니오 — 있다·없다로 답하는 값",
+          "INTEGER": "정수 — 개수·와트·mm처럼 소수점이 없는 수",
+          "JSONB": "목록 — 지원 소켓처럼 값이 여러 개인 것",
+          "NUMERIC": "소수 — 인치·전압처럼 소수점이 필요한 수",
+          "VARCHAR": "짧은 글자 — 소켓·규격·인터페이스 같은 이름값"
+        },
+        "part_types": [
+          "CPU",
+          "MB",
+          "RAM",
+          "GPU",
+          "SSD",
+          "HDD",
+          "POWER",
+          "CASE",
+          "COOLER_CPU_AIR",
+          "COOLER_CPU_AIO",
+          "MONITOR",
+          "KEYBOARD",
+          "MOUSE",
+          "HEADSET",
+          "SPEAKER",
+          "WEBCAM",
+          "PC_COMPLETE",
+          "BAREBONE"
+        ],
+        "parts": [
+          {
+            "part_type": "CPU",
+            "label": "CPU",
+            "group": "core",
+            "in_quote": true,
+            "live": 276,
+            "total": 682,
+            "fields": [
+              {
+                "field_key": "socket",
+                "label": "소켓",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_socket",
+                  "socket"
+                ],
+                "filled": 255
+              },
+              {
+                "field_key": "tdp_watt",
+                "label": "발열(TDP)",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_tdp"
+                ],
+                "filled": 205
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 276
+              },
+              {
+                "field_key": "cpu_gpu",
+                "label": "내장그래픽",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 0
+              }
+            ]
+          },
+          {
+            "part_type": "MB",
+            "label": "메인보드",
+            "group": "core",
+            "in_quote": true,
+            "live": 545,
+            "total": 2049,
+            "fields": [
+              {
+                "field_key": "socket",
+                "label": "소켓",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "socket"
+                ],
+                "filled": 488
+              },
+              {
+                "field_key": "chipset",
+                "label": "칩셋",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 501
+              },
+              {
+                "field_key": "mem_type",
+                "label": "메모리 규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "mem"
+                ],
+                "filled": 500
+              },
+              {
+                "field_key": "form_factor",
+                "label": "규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "case_board"
+                ],
+                "filled": 487
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 545
+              },
+              {
+                "field_key": "ports",
+                "label": "포트 구성",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 0
+              }
+            ]
+          },
+          {
+            "part_type": "RAM",
+            "label": "메모리",
+            "group": "core",
+            "in_quote": true,
+            "live": 499,
+            "total": 1706,
+            "fields": [
+              {
+                "field_key": "mem_type",
+                "label": "메모리 규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "mem"
+                ],
+                "filled": 447
+              },
+              {
+                "field_key": "capacity_gb",
+                "label": "용량",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "용도 하한"
+                ],
+                "filled": 445
+              },
+              {
+                "field_key": "clock_mhz",
+                "label": "클럭",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 452
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 499
+              }
+            ]
+          },
+          {
+            "part_type": "GPU",
+            "label": "그래픽카드",
+            "group": "core",
+            "in_quote": true,
+            "live": 300,
+            "total": 2487,
+            "fields": [
+              {
+                "field_key": "required_power_watt",
+                "label": "권장 전원",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "power",
+                  "용도 하한"
+                ],
+                "filled": 266
+              },
+              {
+                "field_key": "length_mm",
+                "label": "길이",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "gpu_len"
+                ],
+                "filled": 279
+              },
+              {
+                "field_key": "pcie_gen",
+                "label": "PCIe 세대",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 275
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 300
+              },
+              {
+                "field_key": "tag_silent",
+                "label": "저소음",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 300
+              }
+            ]
+          },
+          {
+            "part_type": "SSD",
+            "label": "SSD",
+            "group": "core",
+            "in_quote": true,
+            "live": 302,
+            "total": 1047,
+            "fields": [
+              {
+                "field_key": "capacity_gb",
+                "label": "용량",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "용도 하한"
+                ],
+                "filled": 296
+              },
+              {
+                "field_key": "form_factor",
+                "label": "규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 257
+              },
+              {
+                "field_key": "interface",
+                "label": "인터페이스",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 260
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 302
+              }
+            ]
+          },
+          {
+            "part_type": "HDD",
+            "label": "HDD",
+            "group": "core",
+            "in_quote": true,
+            "live": 61,
+            "total": 327,
+            "fields": [
+              {
+                "field_key": "capacity_gb",
+                "label": "용량",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 54
+              },
+              {
+                "field_key": "form_factor",
+                "label": "규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 40
+              },
+              {
+                "field_key": "interface",
+                "label": "인터페이스",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 49
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 61
+              }
+            ]
+          },
+          {
+            "part_type": "POWER",
+            "label": "파워",
+            "group": "core",
+            "in_quote": true,
+            "live": 550,
+            "total": 1239,
+            "fields": [
+              {
+                "field_key": "rated_watt",
+                "label": "정격 출력",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "power"
+                ],
+                "filled": 527
+              },
+              {
+                "field_key": "form_factor",
+                "label": "규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 517
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 550
+              },
+              {
+                "field_key": "tag_silent",
+                "label": "저소음",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 550
+              }
+            ]
+          },
+          {
+            "part_type": "CASE",
+            "label": "케이스",
+            "group": "core",
+            "in_quote": true,
+            "live": 900,
+            "total": 2331,
+            "fields": [
+              {
+                "field_key": "gpu_max_mm",
+                "label": "그래픽카드 장착 길이",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "gpu_len"
+                ],
+                "filled": 801
+              },
+              {
+                "field_key": "cooler_height_mm",
+                "label": "쿨러 높이",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_height"
+                ],
+                "filled": 808
+              },
+              {
+                "field_key": "form_factor_list",
+                "label": "수용 보드 규격",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "case_board"
+                ],
+                "filled": 821
+              },
+              {
+                "field_key": "radiator_max_rows",
+                "label": "수랭 최대 열",
+                "required": false,
+                "is_engine": true,
+                "used_by": [
+                  "radiator"
+                ],
+                "filled": 595
+              },
+              {
+                "field_key": "tag_white",
+                "label": "화이트",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 900
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 900
+              },
+              {
+                "field_key": "tag_silent",
+                "label": "저소음",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 900
+              }
+            ]
+          },
+          {
+            "part_type": "COOLER_CPU_AIR",
+            "label": "CPU쿨러(공랭)",
+            "group": "core",
+            "in_quote": true,
+            "live": 343,
+            "total": 707,
+            "fields": [
+              {
+                "field_key": "socket_list",
+                "label": "지원 소켓 목록",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_socket"
+                ],
+                "filled": 286
+              },
+              {
+                "field_key": "cooler_height_mm",
+                "label": "쿨러 높이",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_height"
+                ],
+                "filled": 281
+              },
+              {
+                "field_key": "cooler_tdp",
+                "label": "쿨러 발열 한도",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_tdp"
+                ],
+                "filled": 158
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 343
+              },
+              {
+                "field_key": "tag_silent",
+                "label": "저소음",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 343
+              }
+            ]
+          },
+          {
+            "part_type": "COOLER_CPU_AIO",
+            "label": "CPU쿨러(수랭)",
+            "group": "core",
+            "in_quote": true,
+            "live": 244,
+            "total": 622,
+            "fields": [
+              {
+                "field_key": "socket_list",
+                "label": "지원 소켓 목록",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_socket"
+                ],
+                "filled": 210
+              },
+              {
+                "field_key": "cooler_tdp",
+                "label": "쿨러 발열 한도",
+                "required": true,
+                "is_engine": true,
+                "used_by": [
+                  "cooler_tdp"
+                ],
+                "filled": 46
+              },
+              {
+                "field_key": "radiator_rows",
+                "label": "라디에이터 열",
+                "required": false,
+                "is_engine": true,
+                "used_by": [
+                  "radiator"
+                ],
+                "filled": 221
+              },
+              {
+                "field_key": "tag_rgb",
+                "label": "RGB",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 244
+              },
+              {
+                "field_key": "tag_silent",
+                "label": "저소음",
+                "required": false,
+                "is_engine": true,
+                "used_by": [],
+                "filled": 244
+              }
+            ]
+          },
+          {
+            "part_type": "MONITOR",
+            "label": "모니터",
+            "group": "peripheral",
+            "in_quote": false,
+            "live": 581,
+            "total": 2593,
+            "fields": [
+              {
+                "field_key": "size_inch",
+                "label": "화면 크기",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 571
+              },
+              {
+                "field_key": "resolution",
+                "label": "해상도",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 542
+              },
+              {
+                "field_key": "refresh_hz",
+                "label": "주사율",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 500
+              },
+              {
+                "field_key": "panel",
+                "label": "패널",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 113
+              },
+              {
+                "field_key": "ports",
+                "label": "포트 구성",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 2
+              }
+            ]
+          },
+          {
+            "part_type": "KEYBOARD",
+            "label": "키보드",
+            "group": "peripheral",
+            "in_quote": false,
+            "live": 162,
+            "total": 930,
+            "fields": [
+              {
+                "field_key": "switch_type",
+                "label": "스위치",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 1
+              },
+              {
+                "field_key": "key_layout",
+                "label": "키 배열",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 1
+              },
+              {
+                "field_key": "connection",
+                "label": "연결 방식",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 1
+              }
+            ]
+          },
+          {
+            "part_type": "MOUSE",
+            "label": "마우스",
+            "group": "peripheral",
+            "in_quote": false,
+            "live": 53,
+            "total": 291,
+            "fields": [
+              {
+                "field_key": "connection",
+                "label": "연결 방식",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 1
+              }
+            ]
+          },
+          {
+            "part_type": "HEADSET",
+            "label": "헤드셋",
+            "group": "peripheral",
+            "in_quote": false,
+            "live": 40,
+            "total": 165,
+            "fields": [
+              {
+                "field_key": "connection",
+                "label": "연결 방식",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 1
+              }
+            ]
+          },
+          {
+            "part_type": "SPEAKER",
+            "label": "스피커",
+            "group": "peripheral",
+            "in_quote": false,
+            "live": 92,
+            "total": 420,
+            "fields": [
+              {
+                "field_key": "connection",
+                "label": "연결 방식",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 0
+              }
+            ]
+          },
+          {
+            "part_type": "WEBCAM",
+            "label": "웹캠",
+            "group": "peripheral",
+            "in_quote": false,
+            "live": 8,
+            "total": 16,
+            "fields": [
+              {
+                "field_key": "connection",
+                "label": "연결 방식",
+                "required": false,
+                "is_engine": false,
+                "used_by": [],
+                "filled": 0
+              }
+            ]
+          },
+          {
+            "part_type": "PC_COMPLETE",
+            "label": "완제품 PC",
+            "group": "built",
+            "in_quote": false,
+            "live": 236,
+            "total": 0,
+            "fields": []
+          },
+          {
+            "part_type": "BAREBONE",
+            "label": "베어본·미니PC",
+            "group": "built",
+            "in_quote": false,
+            "live": 3,
+            "total": 0,
+            "fields": []
+          }
+        ],
+        "ghosts": [],
+        "unrecorded": [],
+        "note": "사양 항목을 추가하면 product_specs에 컬럼이 생기고 추천 뷰가 재생성되며 마이그레이션 파일이 기록됩니다(복구·재구축 시 이 컬럼이 살아남습니다). 삭제는 열지 않습니다 — 컬럼을 지우면 그 안의 데이터가 함께 사라집니다."
+      }
+    }
+  }
+}

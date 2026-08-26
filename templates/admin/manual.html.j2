@@ -1,0 +1,260 @@
+{#
+  운영자 설명서(ADM-MAN-010) — `api/admin_ui_manual.py`가 렌더한다.
+
+  ■ 두 모드를 한 템플릿이 담당한다 (컨텍스트 `view` = "index" | "detail")
+      index    목차 — `toc`(행 목록) · `total_screens` · `ready_count`(전부 서버 계산값)
+      detail   설명서 한 화면 — `entry`(화이트리스트 항목) · `fragment_html`(조각 원문 또는 None)
+
+  ■ 본문 조각의 CSS를 여기로 옮겼다(하네스 지시 2026-08-25 — "이미 다 짜여 있으니
+    새로 만들지 말고 가져다 써라", 원본 `docs/manual/운영자매뉴얼-상품사양검수.html`의
+    <style>). **그대로 붙이지 않고 두 가지를 고쳤다** — 원본은 전역 선택자
+    (`:root`·`body`·`h1,h2,h3,p,a,code,ul,ol,li`·`*{box-sizing:border-box}`)를 썼는데,
+    이 템플릿은 admin2 공용 셸(`_admin2_shell.html.j2`)을 상속해 좌측 메뉴·헤더와
+    **한 페이지에서 같이** 뜬다. 그대로 얹으면 좌측 메뉴 색·글꼴·링크색까지 바뀐다.
+      ① 선택자 스코프 — 전부 `.manual-doc `를 앞에 붙였다(클래스 이름·값은 원본 그대로).
+      ② 변수 이름 — 원본 `:root` 블록은 bg·card·font 같은 이름의 커스텀 속성을
+        정의하는데, 그대로 가져오면 admin2.css `:root`의 **같은 이름**(admin2.css
+        자신이 "고객 화면 정본(design-system/tokens.css)과 이름을 맞췄다"고 밝힌
+        것들)과 겹친다. `.manual-doc`로 스코프해도 **이름이 같은 변수 두 벌**이라는
+        사실 자체가 남아 다음 사람을 헷갈리게 하고, 회귀([9] "화면이 디자인 토큰을
+        다시 정의하지 않는다")가 정확히 이 중복을 잡는다(1차 작성 때 실제로 걸렸다).
+        그래서 `.manual-doc` 안 변수는 전부 mn 접두를 붙였다(ink -> mn-ink 식) —
+        전역 토큰 이름과 절대 겹치지 않는다.
+
+  ■ 인쇄 — 본문 원본의 `@media print`(줄바꿈 방지·A4 여백 등)를 그대로 가져오고,
+    ⓐ 좌측 메뉴(`.a2-lnb`)·헤더(`.a2-hd`)·토스트·이 화면 툴바를 숨기는 규칙과
+    ⓑ 번호 동그라미가 "배경 그래픽 인쇄" 옵션이 꺼진 브라우저에서도 테두리로 보이게
+    하는 규칙을 더했다(요구사항 원문 — 배경이 날아가도 테두리로 식별).
+
+  ■ 캡처 자산 경로 — `/shared/manual/shots/*.png`(실제 파일은
+    `mockups/shared/manual/shots/`, 이유는 `api/admin_ui_manual.py` 모듈 docstring).
+    캡처가 없는 자리는 아래 스크립트가 `error` 이벤트를 문서 캡처 단계에서 잡아
+    자리 표시로 바꾼다(깨진 이미지 아이콘 대신).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}운영자 설명서{% if view == "detail" %} · {{ entry.title }}{% endif %}{% endblock %}
+
+{% block head_extra %}
+<style>
+/* ── 목차 · 툴바 · 빈 상태 — admin2 셸의 :root 변수를 그대로 쓴다(별도 정의 없음) ── */
+.a2-content-pad{padding:1.75rem}
+.mn-wrap{max-width:1040px;margin:0 auto}
+.mn-wrap h1{font:700 22px/1.3 var(--font-head,var(--font));margin:0 0 6px;color:var(--on)}
+.mn-lead{color:var(--rv-faint);font-size:13px;margin:0 0 14px}
+.mn-summary{font:500 12.5px/1 var(--font);color:var(--rv-faint);margin:0 0 16px}
+.mn-summary b{font-family:var(--font-num);color:var(--on)}
+
+table.mn-toc{width:100%;border-collapse:collapse;font-size:13px}
+table.mn-toc th,table.mn-toc td{border-bottom:1px solid var(--outline-variant);padding:8px 10px;text-align:left;vertical-align:middle}
+table.mn-toc th{font:600 10.5px/1 var(--font-num);color:var(--rv-faint);text-transform:uppercase;letter-spacing:.04em}
+table.mn-toc td.n{font-family:var(--font-num);color:var(--rv-faint);width:44px}
+table.mn-toc td.grp{color:var(--rv-faint);white-space:nowrap}
+table.mn-toc td.mn-has a{color:var(--rv-link);font-weight:600;text-decoration:none}
+table.mn-toc td.mn-has a:hover{text-decoration:underline}
+.mn-none{color:var(--rv-dim3)}
+
+.mn-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 16px}
+.mn-back{font:600 12px var(--font);color:var(--rv-link);text-decoration:none}
+.mn-back:hover{text-decoration:underline}
+.mn-print-btn{margin-left:auto;font:600 12px var(--font);border:1px solid var(--outline);
+  border-radius:5px;padding:7px 14px;background:var(--card);color:var(--on);cursor:pointer}
+.mn-print-btn:hover{background:var(--container-low)}
+
+.mn-empty{border:1px dashed var(--outline);border-radius:8px;padding:26px 22px;margin:0 auto;
+  max-width:640px;text-align:center;color:var(--rv-faint);font:400 13px/1.6 var(--font)}
+.mn-empty b{display:block;color:var(--on);font-size:14px;margin-bottom:8px}
+.mn-empty code{font-family:var(--font-num);background:var(--container-low);padding:1px 5px;border-radius:3px}
+
+/* ── 조각 안 캡처가 없을 때의 자리 표시(깨진 이미지 대신) ── */
+.manual-doc .shot{position:relative}
+.mn-shot-missing{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:10px;background:repeating-linear-gradient(45deg,#eee,#eee 10px,#f5f3ec 10px,#f5f3ec 20px);
+  color:#8a8377;font:600 12px/1.4 var(--font);border:1px dashed #c4bdae;border-radius:6px}
+
+/* ══════════════════════════════════════════════════════════════════════
+   아래부터 — 본문 조각의 원본 <style>(운영자매뉴얼-상품사양검수.html)을
+   `.manual-doc` 아래로 스코프해 옮긴 것. 클래스 이름·값은 그대로이고,
+   커스텀 속성만 `--mn-` 접두를 붙였다(위 docstring ② 참조 — 전역 토큰 이름 충돌 방지).
+   ══════════════════════════════════════════════════════════════════════ */
+.manual-doc{
+  --mn-ink:#26231e; --mn-muted:#726b5e; --mn-bg:#faf8f2; --mn-card:#ffffff; --mn-line:#ddd6c4;
+  --mn-accent:#c8451c; --mn-accent-bg:#fbe9e1; --mn-ok:#2f7d5a; --mn-warn:#a3620a;
+  --mn-font:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  --mn-mono:Consolas,"D2Coding","JetBrains Mono",ui-monospace,monospace;
+  background:var(--mn-bg);color:var(--mn-ink);font:15px/1.7 var(--mn-font);-webkit-font-smoothing:antialiased;
+  border-radius:8px;
+}
+.manual-doc *{box-sizing:border-box}
+.manual-doc .wrap{max-width:1040px;margin:0 auto;padding:30px 22px 90px}
+.manual-doc h1{font-size:26px;margin:0 0 6px}
+.manual-doc h2{font-size:20px;margin:44px 0 12px;padding-top:14px;border-top:3px solid var(--mn-ink)}
+.manual-doc h2 .num{color:var(--mn-accent);margin-right:6px}
+.manual-doc h3{font-size:16px;margin:26px 0 8px;color:#3a352c}
+.manual-doc h3 .fig{display:inline-block;background:var(--mn-ink);color:#fff;font:700 11px/1 var(--mn-mono);
+  padding:3px 6px;border-radius:4px;margin-right:8px;vertical-align:2px}
+.manual-doc p{margin:0 0 12px}
+.manual-doc code{font-family:var(--mn-mono);background:#efe9db;padding:1px 5px;border-radius:3px;font-size:.92em}
+.manual-doc a{color:var(--mn-accent)}
+.manual-doc ul,.manual-doc ol{margin:0 0 12px;padding-left:22px}
+.manual-doc li{margin:4px 0}
+.manual-doc .lead{color:var(--mn-muted);font-size:14.5px}
+
+.manual-doc .meta{background:var(--mn-card);border:1px solid var(--mn-line);border-left:5px solid var(--mn-ink);
+  border-radius:6px;padding:16px 20px;margin:18px 0 8px;font-size:13.5px;color:#3a352c}
+.manual-doc .meta div{margin:3px 0}
+.manual-doc .meta b{color:var(--mn-ink)}
+.manual-doc .meta .warn-line{color:var(--mn-warn);font-weight:700}
+
+.manual-doc .legend{display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:#f2efe5;
+  border:1px solid var(--mn-line);border-radius:6px;padding:10px 16px;margin:10px 0 26px;font-size:13px;color:#3a352c}
+.manual-doc .legend .it{display:flex;align-items:center;gap:7px}
+.manual-doc .legend .pin-demo{width:20px;height:20px;border-radius:10px;background:var(--mn-accent);color:#fff;
+  font:700 11px/20px var(--mn-mono);text-align:center;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.35)}
+.manual-doc .legend .box-demo{width:22px;height:16px;border:2px solid var(--mn-accent);border-radius:3px}
+.manual-doc .legend .arrow-demo{width:26px;height:2px;background:var(--mn-accent);position:relative}
+.manual-doc .legend .arrow-demo::after{content:'';position:absolute;right:-1px;top:-3px;border:4px solid transparent;
+  border-left-color:var(--mn-accent);border-right:0}
+
+.manual-doc figure{margin:14px 0 8px}
+.manual-doc figure .cap{font-size:12.5px;color:var(--mn-muted);margin:8px 2px 0}
+.manual-doc .shot{width:100%;background:#efeade;border:1px solid var(--mn-line);
+  border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.manual-doc .shot img{display:block;width:100%;height:100%}
+.manual-doc .shot--full{max-width:1000px;aspect-ratio:1680/1050}
+.manual-doc .shot--header{max-width:1000px;aspect-ratio:1468/52}
+.manual-doc .shot--sidebar{max-width:300px;aspect-ratio:216/960}
+.manual-doc .shot--filterbar{max-width:1000px;aspect-ratio:1252/53}
+.manual-doc .shot--table{max-width:1000px;aspect-ratio:1252/239.094}
+.manual-doc .shot--drawer{max-width:430px;aspect-ratio:536/907}
+
+.manual-doc .pin{position:absolute;left:var(--x);top:var(--y);transform:translate(-50%,-50%);
+  min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--mn-accent);color:#fff;
+  font:700 11.5px/20px var(--mn-mono);text-align:center;white-space:nowrap;
+  box-shadow:0 0 0 2px #fff,0 1px 5px rgba(0,0,0,.45);z-index:3}
+.manual-doc .box{position:absolute;left:var(--x);top:var(--y);width:var(--w);height:var(--h);
+  border:2px solid var(--mn-accent);border-radius:5px;box-shadow:0 0 0 1px rgba(255,255,255,.65) inset;
+  pointer-events:none;z-index:2}
+.manual-doc .arrow{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
+
+.manual-doc ul.pin-desc{list-style:none;padding:0;margin:10px 0 22px;display:grid;grid-template-columns:1fr;gap:5px}
+.manual-doc ul.pin-desc li{display:flex;gap:9px;align-items:flex-start;font-size:13.8px;margin:0}
+.manual-doc ul.pin-desc .tag{flex:none;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--mn-accent);
+  color:#fff;font:700 11.5px/20px var(--mn-mono);text-align:center}
+.manual-doc ul.pin-desc .warn{color:var(--mn-warn);font-weight:700}
+
+.manual-doc .btnlabel{display:inline-block;font:700 12.5px var(--mn-mono);background:var(--mn-ink);color:#fff;
+  padding:2px 8px;border-radius:4px}
+
+.manual-doc table.kv{width:100%;border-collapse:collapse;margin:10px 0 20px;font-size:13.8px}
+.manual-doc table.kv th,.manual-doc table.kv td{border:1px solid var(--mn-line);padding:7px 10px;text-align:left;vertical-align:top}
+.manual-doc table.kv th{background:#efeade;font-weight:700;white-space:nowrap}
+.manual-doc table.kv td.n{font-family:var(--mn-mono);text-align:right}
+
+.manual-doc .callout{border:1px solid var(--mn-line);border-left:5px solid var(--mn-warn);background:#fbf3e4;
+  border-radius:6px;padding:12px 16px;margin:14px 0}
+.manual-doc .callout.ok{border-left-color:var(--mn-ok);background:#eef6f0}
+.manual-doc .callout b{color:var(--mn-warn)}
+.manual-doc .callout.ok b{color:var(--mn-ok)}
+
+.manual-doc .foot{margin-top:60px;padding-top:16px;border-top:1px solid var(--mn-line);color:var(--mn-muted);font-size:12.8px}
+.manual-doc .foot h2{border-top:3px solid var(--mn-ink)}
+
+@media print{
+  @page{size:A4;margin:14mm 12mm}
+
+  /* ⓐ 메뉴·상단바·이 화면 툴바를 숨기고, 셸의 100vh/overflow:hidden 을 인쇄용으로 푼다
+     (안 풀면 화면 밖으로 넘어가는 매뉴얼 내용이 인쇄에서 통째로 잘린다). */
+  .a2-lnb, .a2-hd, .a2-toasts, .mn-toolbar{display:none!important}
+  .a2-shell{display:block!important;height:auto!important;overflow:visible!important}
+  .a2-main{overflow:visible!important;height:auto!important}
+  .a2-content-pad{overflow:visible!important;height:auto!important;padding:0!important}
+
+  .manual-doc{background:#fff;border-radius:0}
+  .manual-doc .wrap{max-width:none;padding:0}
+  .manual-doc *{ -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; color-adjust:exact!important; }
+  .manual-doc figure,.manual-doc .shot,.manual-doc .meta,.manual-doc .legend,.manual-doc .callout,
+    .manual-doc table.kv,.manual-doc ul.pin-desc{page-break-inside:avoid;break-inside:avoid}
+  .manual-doc h2{page-break-before:always}
+  .manual-doc h2:first-of-type{page-break-before:auto}
+  .manual-doc .shot--full,.manual-doc .shot--header,.manual-doc .shot--filterbar,.manual-doc .shot--table{max-width:100%}
+  .manual-doc a{color:inherit;text-decoration:underline}
+
+  /* ⓑ 번호 동그라미 인쇄 대비 — 인쇄 대화상자의 "배경 그래픽"이 꺼져 있으면(크롬 기본값)
+     위 color-adjust:exact 로도 배경색이 안 찍힌다. 흰 배경 + 테두리 + 글자색으로 바꿔
+     배경이 날아가도 원 모양과 번호가 계속 보이게 한다. */
+  .manual-doc .pin{background:#fff!important;color:var(--mn-accent)!important;
+    border:1.6px solid var(--mn-accent);box-shadow:none}
+  .manual-doc .legend .pin-demo{background:#fff!important;color:var(--mn-accent)!important;
+    border:1.6px solid var(--mn-accent);box-shadow:none}
+  .mn-shot-missing{display:none}
+}
+</style>
+<script>
+// 캡처 이미지가 없으면(404) 깨진 아이콘 대신 자리 표시로 바꾼다. `error` 이벤트는
+// 버블링하지 않으므로 document 캡처 단계에서 잡는다 — 이렇게 하면 이 스크립트가
+// <img> 태그보다 먼저(head_extra, 문서 파싱 초입) 등록돼 있어 나중에 로드되는
+// 이미지의 실패도 전부 잡힌다(개별 이미지에 onerror를 나중에 붙이는 방식은 이미
+// 실패가 지나간 뒤일 수 있어 놓칠 수 있다).
+document.addEventListener('error', function (e) {
+  var img = e.target;
+  if (!img || img.tagName !== 'IMG') return;
+  var shot = img.closest('.manual-doc .shot');
+  if (!shot) return;
+  img.style.display = 'none';
+  if (shot.querySelector('.mn-shot-missing')) return;
+  var ph = document.createElement('div');
+  ph.className = 'mn-shot-missing';
+  ph.textContent = '캡처 이미지 없음';
+  shot.appendChild(ph);
+}, true);
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="a2-content-pad">
+{% if view == "index" %}
+  <div class="mn-wrap">
+    <h1>운영자 설명서</h1>
+    <p class="mn-lead">관리자 화면을 처음 쓰는 직원이 그 화면의 사용법을 바로 찾아보는 곳입니다.
+      화면 목록은 왼쪽 메뉴와 같은 원천(<code>api/admin_nav.py</code>)에서 읽습니다.</p>
+    <p class="mn-summary">전체 <b>{{ total_screens }}</b>개 화면 중 <b>{{ ready_count }}</b>개 준비됨</p>
+    <table class="mn-toc">
+      <thead><tr><th>순서</th><th>그룹</th><th>화면</th><th>설명서</th></tr></thead>
+      <tbody>
+      {% for row in toc %}
+        <tr>
+          <td class="n">{{ row.order if row.order is not none else "—" }}</td>
+          <td class="grp">{{ row.group }}</td>
+          <td>{{ row.label }}</td>
+          <td class="{{ 'mn-has' if row.has_manual else '' }}">
+          {% if row.has_manual %}
+            <a href="/admin2/manual/{{ row.slug }}">설명서 보기</a>
+          {% else %}
+            <span class="mn-none">아직 없음</span>
+          {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="mn-wrap mn-wrap--detail">
+    <div class="mn-toolbar">
+      <a class="mn-back" href="/admin2/manual">&larr; 목차로</a>
+      <button type="button" class="mn-print-btn" data-action="print" onclick="window.print()">인쇄</button>
+    </div>
+  {% if fragment_html %}
+    <div class="manual-doc">{{ fragment_html | safe }}</div>
+  {% else %}
+    <div class="mn-empty">
+      <b>이 화면의 설명서는 아직 없습니다.</b>
+      대상 화면 — {{ entry.title }}{% if entry.screen_id %} (<code>{{ entry.screen_id }}</code>){% endif %}
+      · 경로 <code>{{ entry.nav_href }}</code>
+    </div>
+  {% endif %}
+  </div>
+{% endif %}
+</div>
+{% endblock %}

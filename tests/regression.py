@@ -5812,7 +5812,7 @@ def test_rebuild_screens():
     import re as _re41
     if ROOT not in sys.path:
         sys.path.insert(0, ROOT)
-    from api.admin_nav import NAV, counts as nav_counts
+    from api.admin_nav import NAV, counts as nav_counts, nav_for
 
     # "/admin2/" 의 화면 ID는 ADM-DASH-010 이다 — decision-log UX-22(2026-08-14)가
     # "구 NEW-DASH-010 정정(유래가 불확실한 폐기 개념의 잔재였다)"이라고 명시했다.
@@ -5890,7 +5890,26 @@ def test_rebuild_screens():
                  or (len(_re41.findall(r'data-action="lnb-group"', nav_html))  # 자체 셸 — 그룹 헤더(JS 훅)
                      + len(_re41.findall(r'class="off"', nav_html))            #          준비 중
                      + len(_re41.findall(r'<a\s+href="', nav_html))))          #          링크 있는 항목
-        want = nav_counts()["total"] + len(NAV)      # 항목 + 그룹 제목
+
+        # ⚠ 2026-08-25 정정 — `want` 를 `NAV` 고정식에서 **`nav_for()` 실제 반환 구조**로
+        #   바꿨다(기대 49 / 실제 92, 4건 실패로 발견). 옛 식 `nav_counts()["total"] +
+        #   len(NAV)`(41 항목 + 8 그룹)은 `NAV` 리스트 하나만 셌는데, 템플릿이 실제로
+        #   그리는 것은 `NAV` 가 아니라 `render()`(api/admin_ui_common.py)가 건네는
+        #   `nav_for(request.url.path)` 다 — 그리고 `nav_for()` 는 「운영자 매뉴얼」
+        #   합성 그룹 하나를 그 뒤에 더 붙인다(`admin_nav._manual_nav_group()`,
+        #   2026-08-25 신설). 그룹도 항목도 실제로 더 그려지는데 기대값은 그 사실을
+        #   몰랐다 — **검사가 낡은 것이지 화면이 틀린 게 아니었다.**
+        #   고친 원칙: 마크업을 다시 세지 않고 **`nav_for()` 가 돌려주는 구조를 그대로
+        #   센다** — 템플릿이 `{% for g in nav %}…{% for it in g.items %}` 로 그 구조를
+        #   그대로 그리므로(그룹 1개당 `data-action="lnb-group"` 1개, 항목 1개당
+        #   `<a href=` 또는 `class="off"` 1개 — 위 `items` 계산과 같은 분기), 그룹 수 +
+        #   전 그룹 항목 수 합이 렌더 결과와 정확히 같다. **숫자를 다시 박지 않는다** —
+        #   매뉴얼 그룹은 `NAV` 의 41화면을 "그룹명 · 화면명"으로 그대로 편 것 + "전체
+        #   목차" 1행이라, `NAV` 가 늘면 매뉴얼 그룹 항목 수도 같이 는다(지금 매뉴얼
+        #   조각은 1개뿐이지만 그 수는 `<a href=`/`class="off"` 어느 쪽으로 세든 항목
+        #   1개는 1개다 — 조각이 41개로 늘어도 이 합계식은 그대로 성립한다).
+        groups = nav_for(path)
+        want = len(groups) + sum(len(g["items"]) for g in groups)
         check(f"[41] {path} LNB 항목 수 = IA", items == want, want, items)
 
     # ⑥ 견본 배너와 실데이터 배지가 **한 화면에 같이 있으면 안 된다**

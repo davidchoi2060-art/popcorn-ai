@@ -1,0 +1,508 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 오픈 단계 설정</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 오픈 단계 설정을 처음 맡는 직원</div>
+    <div><b>화면</b> 오픈 단계 설정 · 경로 <code>/admin2/ops-settings</code> · 화면 ID <code>ADM-OPS-010</code>
+      (코드 <code>api/admin_ops.py</code>·<code>api/admin_ui_ops_stage.py</code> 실측값입니다.
+      옛 이름은 「운영 전환 설정」이었고, 2026-08-13 결정(A-34)으로 화면 라벨만 「오픈 단계 설정」으로
+      바뀌었습니다 — 화면 ID·데이터 API 경로는 그대로입니다.)</div>
+    <div><b>왜 이 화면부터인가</b> 활동 기록 실측(2026-08-25)에서 이 화면의 처리(<code>target_kind=ops</code>)가
+      전체 관리자 동작 중 <b>5위</b>였습니다(누적 1,007건 — 22개 종류 중 1위 상품 사양 검수
+      3,694건에는 크게 못 미치지만, 정산·회원·환불 같은 화면 여럿을 합친 것보다 많습니다).
+      다만 건수보다 더 중요한 이유가 있습니다 — <b>이 화면은 작지만 서비스 전체 동작을
+      바꿉니다.</b> 스위치 하나(결제)가 고객이 어디서 돈을 내는지 자체를 가릅니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-25 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실서비스 동작을 바꾸는 스위치 화면입니다. 로컬에서 값을 저장하면
+      배포된 고객 서버에도 즉시 반영됩니다(로컬과 배포가 같은 Cloud SQL을 봅니다) — 이 문서를 만드는
+      동안 스위치는 한 번도 누르지 않았습니다(근거는 맨 끝 「문서 정보」 참고). 캡처 시점의 건수·이력은
+      매일 바뀝니다 — 정확한 지금 값은 화면에서 직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p><b>회원·결제·정산·배송·환불 다섯 가지 기능을 「우리가 직접 하는지」 「팝콘PC 쇼핑몰에
+    맡기는지」 정하는 스위치 화면입니다.</b> 오늘(2026-08-25) 실측한 값은 다음과 같습니다.</p>
+  <table class="kv">
+    <thead><tr><th>기능</th><th>지금 값</th></tr></thead>
+    <tbody>
+      <tr><td>회원·가입</td><td>자체(own)</td></tr>
+      <tr><td>결제</td><td>쇼핑몰 인계(mall)</td></tr>
+      <tr><td>환불</td><td>쇼핑몰 인계(mall)</td></tr>
+      <tr><td>정산</td><td>쇼핑몰 인계(mall)</td></tr>
+      <tr><td>배송</td><td>쇼핑몰 인계(mall)</td></tr>
+    </tbody>
+  </table>
+  <p>다섯 중 넷이 「쇼핑몰」입니다 — 지금은 팝콘PC 쇼핑몰로 인계해 판매하는 단계(MVP1)이기
+    때문입니다. 이 화면 하나가 없으면 지금 값이 무엇인지 볼 방법이 API를 직접 부르는 것뿐이고,
+    값을 바꿀 방법이 아예 없습니다 — 다른 어떤 관리자 화면도 이 값에 쓰기 요청을 보내지 않습니다.</p>
+  <p>2026-08-13 결정(A-34)으로 이 화면은 「스위치판」에서 한 걸음 더 나아가
+    <b>「지금 어느 단계(MVP1/MVP2/MVP3)에 무엇이 열려 있는가」를 보여주는 현황판</b>을 겸하게
+    됐습니다. 그래서 성격이 다른 두 가지 축을 함께 보여줍니다.</p>
+  <ul>
+    <li><b>전환 축(5종)</b> — 사람이 켜고 끄는 정책 스위치. 회원·결제·정산·배송·환불.</li>
+    <li><b>구축 축(41항목)</b> — 관리자 기능이 실제로 지어졌는지 보여주는 진행 현황판. 이 화면에서
+      켜고 끌 수 없는 <b>조회 전용</b>입니다(정본은 <code>api/admin_nav.py</code>, 이 화면은
+      그 값을 그대로 옮겨 보여줄 뿐입니다).</li>
+  </ul>
+  <p><b>스위치 하나(결제)가 고객이 어디서 돈을 내는지를 통째로 가릅니다.</b> 결제가 「쇼핑몰
+    인계」이면 고객 결제는 <code>POST /api/handoff</code>로 열리고 <code>POST /api/orders</code>
+    (자체 결제)는 409로 막힙니다. 결제를 「자체」로 바꾸면 정반대가 됩니다 — 인계가 409로
+    막힙니다. 코드 근거는 <code>api/orders.py</code>·<code>api/handoff.py</code>이고,
+    그 결과는 아래 「무엇을 할 수 있는가」·「조심할 것」에서 다시 다룹니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>사업 단계가 바뀌어(MVP1 → MVP2) 결제·배송·환불·회원가입 중 일부를 자체로 전환할 때</li>
+    <li>「지금 이 기능이 실제로 자체인지 쇼핑몰인지」가 헷갈려 값을 확인하러 올 때</li>
+    <li>스위치를 바꾸는 것이 실제로 서버 동작을 바꾸는지(「동작 중」), 아직 코드가 없는지
+      (「미구현」)를 먼저 확인할 때 — 켜도 아무 일도 안 일어나는 스위치가 있습니다</li>
+    <li>사고 원인을 조사할 때 — 최근 변경 이력에서 누가·언제·무엇을 바꿨는지 찾고, 잘못 바뀐
+      것을 되돌릴 때</li>
+    <li>다음 단계(MVP2) 진입 준비가 얼마나 됐는지 — 전환 축 5종 중 몇 개가 실제로 「동작 중」인지
+      점검할 때</li>
+    <li>관리자 화면 구축 진행률(41개 중 몇 개 지어졌는지)을 한눈에 보고 싶을 때</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>이 화면은 <b>탭 넷(MVP1·MVP2·MVP3·단계 미정)</b>으로 조회 범위가 나뉩니다. 처음 열면
+    「현재 단계」인 MVP1 탭이 기본으로 열리는데, <b>MVP1에는 전환 축(스위치)이 하나도 없는 것이
+    정상입니다</b> — 다섯 스위치는 전부 MVP2·MVP3 소속입니다. 먼저 기본 진입 화면을 보고,
+    이어서 MVP2 탭으로 넘어가 실제 스위치가 나타나는 모습을 확인합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면 — 기본 진입(MVP1 탭)</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/ops-settings-full.png" alt="오픈 단계 설정 화면 전체 — 기본 진입(MVP1 탭)">
+      <b class="pin" style="--x:6.31%;--y:50.0%">1</b>
+      <b class="pin" style="--x:17.56%;--y:2.43%">2</b>
+      <b class="pin" style="--x:27.23%;--y:2.43%">3</b>
+      <b class="pin" style="--x:38.27%;--y:2.43%">4</b>
+      <b class="pin" style="--x:89.92%;--y:2.43%">5</b>
+      <b class="pin" style="--x:94.25%;--y:2.43%">6</b>
+      <b class="pin" style="--x:98.15%;--y:2.43%">7</b>
+      <b class="pin" style="--x:56.31%;--y:6.86%">8</b>
+      <b class="pin" style="--x:56.31%;--y:11.73%">9</b>
+      <div class="box" style="--x:13.69%;--y:14.69%;--w:65.83%;--h:12.58%"></div>
+      <b class="pin" style="--x:46.61%;--y:20.98%">10</b>
+      <div class="box" style="--x:13.69%;--y:28.41%;--w:65.83%;--h:8.75%"></div>
+      <b class="pin" style="--x:46.61%;--y:32.79%">11</b>
+      <b class="pin" style="--x:18.22%;--y:72.88%">12</b>
+      <b class="pin" style="--x:89.64%;--y:54.18%">13</b>
+      <b class="pin" style="--x:56.31%;--y:97.4%">14</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 기본
+      진입(MVP1 탭, 필터 없음)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 「시스템」 그룹 첫 항목이 「오픈 단계 설정」입니다.</li>
+    <li><span class="tag">2</span>위치 표시 — 「시스템 / 오픈 단계 설정」</li>
+    <li><span class="tag">3</span>현재 단계 배지 — 「현재 단계 MVP1 — 팝콘PC 인계로 판매」(고정
+      문구, API 값이 아니라 화면 코드에 박힌 값입니다)</li>
+    <li><span class="tag">4</span>판정 기준일 안내 — 「판정 기준일 2026-08-13 · 자동 판정 아님」.
+      마우스를 올리면(툴팁) 판정 근거 문서 경로가 뜹니다 — <b>서버가 요청마다 다시 판정하는 값이
+      아니라는 뜻</b>입니다(아래 「조심할 것」 참고)</li>
+    <li><span class="tag">5</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">6</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">7</span>아바타 — 「내 정보」 화면으로 이동</li>
+    <li><span class="tag">8</span>탭 4개 — MVP1(현재 단계) · MVP2(준비 현황) · MVP3(준비 현황) ·
+      단계 미정(전체 항목 수 칩). 기본은 MVP1이 눌려 있습니다</li>
+    <li><span class="tag">9</span>단계 안내 배너 — 지금 보는 탭이 무슨 뜻인지 설명하는 초록 띠
+      (MVP1일 때만 초록, 다른 탭은 회색 — 「지금 급한 것」과 「나중 준비 현황」을 색으로도 구분합니다)</li>
+    <li><span class="tag">10</span>전환 축 패널(테두리 상자) — <b>MVP1 탭에서는 텅 비어 있고
+      정상입니다.</b> 「MVP1에는 전환 축이 없습니다 — 빠진 것이 아니라 정상입니다」라는 안내만
+      보입니다. 스위치 다섯 개는 전부 MVP2·MVP3 탭에 있습니다(⚠ 아래 「조심할 것」 참고)</li>
+    <li><span class="tag">11</span>구축 축 패널(테두리 상자) — MVP1 탭에서는 실제 표가 아니라
+      「이 단계에 배정된 관리자 화면 목록이 아직 없습니다」라는 안내 문구만 보입니다. 실제 표는
+      <a href="#fig-h">그림 H</a>(단계 미정 탭)에서만 나타납니다</li>
+    <li><span class="tag">12</span>최근 변경 이력 패널 — 탭과 무관하게 항상 같은 내용(최근 20건)이
+      보입니다. 자세히는 <a href="#fig-i">그림 I</a></li>
+    <li><span class="tag">13</span>우측 레일 — 단계 프리셋 · 판정 기준 · 「이 화면이 감추지 않는
+      사실」 세 패널. 자세히는 <a href="#fig-j">그림 J</a>·<a href="#fig-k">그림 K</a></li>
+    <li><span class="tag">14</span>하단 상태 바 — 「변경 사항이 없습니다 · 구축 축은 조회
+      전용입니다」 + 되돌리기·저장 버튼. 지금은 바꾼 것이 없어 두 버튼 모두 비활성(회색)입니다</li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot shot--header">
+      <img src="/shared/manual/shots/ops-settings-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:2.29%;--y:49.04%">15</b>
+      <b class="pin" style="--x:16.72%;--y:49.04%">16</b>
+      <b class="pin" style="--x:29.35%;--y:49.04%">17</b>
+      <b class="pin" style="--x:88.46%;--y:49.04%">18</b>
+      <b class="pin" style="--x:93.42%;--y:49.04%">19</b>
+      <b class="pin" style="--x:97.89%;--y:49.04%">20</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">15</span>위치 표시(빵부스러기) — 그룹 이름 / 화면 이름</li>
+    <li><span class="tag">16</span>현재 단계 배지</li>
+    <li><span class="tag">17</span>판정 기준일 안내</li>
+    <li><span class="tag">18</span>허브</li>
+    <li><span class="tag">19</span>권한 표시</li>
+    <li><span class="tag">20</span>아바타</li>
+  </ul>
+
+  <h3><span class="fig">그림 C</span>탭 + 단계 안내 배너 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/90.2656">
+      <img src="/shared/manual/shots/ops-settings-tabs.png" alt="탭과 단계 안내 배너 확대">
+      <b class="pin" style="--x:4.33%;--y:21.6%">21</b>
+      <b class="pin" style="--x:11.93%;--y:21.6%">22</b>
+      <b class="pin" style="--x:19.56%;--y:21.6%">23</b>
+      <b class="pin" style="--x:27.33%;--y:21.6%">24</b>
+      <b class="pin" style="--x:15.28%;--y:78.8%">25</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 8·9번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">21</span>MVP1 탭 — 「현재 단계」 칩. 기본으로 눌려 있습니다</li>
+    <li><span class="tag">22</span>MVP2 탭 — 「준비 현황」 칩. 전환 축 4종(결제·환불·배송·회원)이
+      여기 있습니다</li>
+    <li><span class="tag">23</span>MVP3 탭 — 「준비 현황」 칩. 전환 축 1종(정산)이 여기 있습니다</li>
+    <li><span class="tag">24</span>단계 미정 탭 — 관리자 화면 41항목 전체(구축 축 실제 표)가 여기
+      있습니다</li>
+    <li><span class="tag">25</span>단계 안내 배너 — 「지금은 MVP1 — 팝콘PC 인계로 판매하는
+      단계입니다. 이 탭의 항목이 지금 급한 것입니다. 다른 탭의 미구축은 「빠뜨린 것」이 아니라
+      「지금 안 해도 되는 것」입니다」</li>
+  </ul>
+
+  <h3><span class="fig">그림 D</span>MVP2 탭 — 전환 축 4종이 나타난다</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/ops-settings-full-mvp2.png" alt="MVP2 탭 전체 화면 — 전환 축 4종 노출">
+      <b class="pin" style="--x:23.0%;--y:6.81%">26</b>
+      <b class="pin" style="--x:56.31%;--y:11.73%">27</b>
+      <div class="box" style="--x:13.75%;--y:18.22%;--w:65.71%;--h:22.58%"></div>
+      <b class="pin" style="--x:46.61%;--y:29.5%">28</b>
+      <b class="pin" style="--x:46.61%;--y:54.34%">29</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · MVP2 탭을 누른 직후(읽기 전용 클릭 — 값은 그대로입니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">26</span>MVP2 탭(눌린 상태)</li>
+    <li><span class="tag">27</span>배너 문구가 바뀝니다 — 「MVP2는 아직 오지 않은 단계입니다.
+      여기 미구축은 경고가 아니라 — 지금 단계가 아니어서 비어 있는 것이 정상입니다」</li>
+    <li><span class="tag">28</span>전환 축 패널(테두리 상자) — 결제·환불·배송·회원·가입 4행이
+      나타납니다. 자세히는 <a href="#fig-e">그림 E</a></li>
+    <li><span class="tag">29</span>구축 축 안내 카드 — 실제 표가 아니라 「정황상 대응 · 확정
+      아님」 칩이 붙은 카드 2장(주문 관리 5항목 · 클레임 4항목)입니다. 지금 관리자 메뉴에는 아예
+      없는 항목들이라 확정된 배정이 아니라는 점을 화면이 스스로 밝힙니다</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>전환 축 패널 확대(MVP2) — 결제·환불·배송·회원·가입</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1106/275.0625">
+      <img src="/shared/manual/shots/ops-settings-axes-mvp2.png" alt="전환 축 패널 확대 — MVP2 탭">
+      <b class="pin" style="--x:3.96%;--y:24.09%">30</b>
+      <b class="pin" style="--x:3.96%;--y:45.72%">31</b>
+      <b class="pin" style="--x:3.84%;--y:67.36%">32</b>
+      <b class="pin" style="--x:3.84%;--y:89.0%">33</b>
+      <b class="pin" style="--x:92.18%;--y:24.09%">34</b>
+      <b class="pin" style="--x:79.12%;--y:24.09%">35</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 D의 28번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">30</span>결제(pay) — <b>● 동작 중.</b> 값을 바꾸면 실제로 주문·인계
+      API 처리가 갈립니다(위 「1. 무엇을 하는 곳인가」 참고)</li>
+    <li><span class="tag">31</span>환불(refund) — <b>● 동작 중.</b> 값에 따라 고객·운영자가 보는
+      안내 문구가 갈립니다 — 다만 처리(상태 전이·재고 복귀) 자체는 값과 무관하게 동일합니다</li>
+    <li><span class="tag">32</span>배송(ship) — <b>○ 미구현.</b> 값은 저장되지만 그 값을 읽어서
+      처리를 가르는 코드가 없습니다 — 바꿔도 서버 동작은 그대로입니다</li>
+    <li><span class="tag">33</span>회원·가입(member) — <b>○ 미구현.</b> 응답에 값을 실어 보낼
+      뿐, 가입 흐름 자체는 이 값과 무관하게 동작합니다</li>
+    <li><span class="tag">34</span>own/mall 전환 버튼(행 안의 작은 토글) — 누르면 그 자리에서
+      바로 값이 바뀌는 것이 <b>아니라</b> 「변경됨」 표시만 붙습니다. 실제 반영은 하단 저장
+      버튼과 확인 모달을 거쳐야 합니다(아래 「무엇을 할 수 있는가」)</li>
+    <li><span class="tag">35</span>마지막 변경 시각</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>'결제(pay)' 상세 패널 — 이름을 누르면 열린다</h3>
+  <figure>
+    <div class="shot" style="max-width:430px;aspect-ratio:560/998">
+      <img src="/shared/manual/shots/ops-settings-drawer-pay.png" alt="결제(pay) 축 상세 패널">
+      <b class="pin" style="--x:50.09%;--y:12.33%">36</b>
+      <b class="pin" style="--x:50.09%;--y:23.65%">37</b>
+      <b class="pin" style="--x:50.09%;--y:38.96%">38</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 E의 「결제」 행에서 이름·요약 부분(토글 버튼이 아닌
+      왼쪽)을 눌러 연 상세 패널</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">36</span>값 선택 카드 — 「자체 결제」/「쇼핑몰 인계」 두 카드. 지금 값
+      (쇼핑몰 인계)에 검은 점이 채워져 있습니다. 카드 안 설명 문장도 함께 보입니다
+      (예: 「POST /api/handoff가 열리고 자체 결제는 409로 막힙니다」)</li>
+    <li><span class="tag">37</span>판정 설명(초록 테두리 = 동작 중) — 「동작 중 — 값이 바뀌면
+      서버 처리가 실제로 갈립니다」와 그 근거(파일·줄 번호)가 그대로 적혀 있습니다</li>
+    <li><span class="tag">38</span>「이 값이 바뀌면」 — 서버가 실제로 돌려주는 예상 영향
+      (<code>effects</code>) 중 이 축과 관련된 것만 보여줍니다(S4 결제 화면 · 주문 생성 API ·
+      재고 예약)</li>
+  </ul>
+
+  <h3><span class="fig">그림 G</span>전환 축 패널(MVP3) — 정산, 잠긴 스위치의 모습</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1106/96.5156">
+      <img src="/shared/manual/shots/ops-settings-axes-mvp3.png" alt="전환 축 패널 확대 — MVP3 탭, 정산">
+      <b class="pin" style="--x:3.5%;--y:68.64%">39</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · MVP3 탭 — 전환 축은 정산 1종뿐입니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">39</span>정산(settle) — <b>◆ 잠듦.</b> 서버가 결제(pay)와 항상 같은
+      값으로 강제 보정합니다. 그래서 own/mall 토글 버튼이 처음부터 흐리게(비활성으로) 보입니다 —
+      「정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다」라는 안내가 버튼에 마우스를
+      올리면 뜹니다</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>구축 축 표 — '단계 미정' 탭에서만 보인다</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1106/454.2656">
+      <img src="/shared/manual/shots/ops-settings-buildtable.png" alt="구축 축 표 — 단계 미정 탭">
+      <b class="pin" style="--x:50.0%;--y:18.93%">40</b>
+      <b class="pin" style="--x:50.0%;--y:36.98%">41</b>
+      <b class="pin" style="--x:50.0%;--y:93.2%">42</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 「단계 미정」 탭 — 8그룹 41항목, 오늘 실측 41/41(전부
+      구축됨)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">40</span>그룹행(예 — 대시보드) — 그룹명 · 「구축/전체」 건수 · 항목 칸
+      · 상태 칩</li>
+    <li><span class="tag">41</span>항목 칸(예 — 상품사양관리, 초록 칸 11개) — 초록 칸을 누르면
+      그 관리자 화면으로 <b>바로 이동합니다</b>(같은 탭, 이 화면을 벗어남). 회색 칸(미구축)은
+      갈 곳이 없어 눌리지 않습니다</li>
+    <li><span class="tag">42</span>합계 요약 — 「합계 8그룹 41항목 · 구축 41 · 미구축 0」. <b>이
+      숫자는 <code>api/admin_nav.py</code>를 그대로 옮긴 것</b>이라 새 관리자 화면이 생기면
+      매번 바뀝니다 — 지금 값(41/41)이 오늘의 값입니다</li>
+  </ul>
+
+  <h3 id="fig-i"><span class="fig">그림 I</span>최근 변경 이력 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1104/289.5">
+      <img src="/shared/manual/shots/ops-settings-history.png" alt="최근 변경 이력 확대(머리글 + 앞쪽 4행)">
+      <b class="pin" style="--x:50.0%;--y:17.36%">43</b>
+      <b class="pin" style="--x:91.83%;--y:32.38%">44</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 12번 영역을 확대(머리글 + 앞쪽 4행). 오늘 이
+      화면의 활동 기록은 회귀 검사(<code>tests/regression.py</code>)가 결제 값을 반대로 바꿨다
+      곧바로 되돌리기를 반복한 흔적이 대부분입니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">43</span>시각 · 담당자 · 무엇이 바뀌었나(from → to) — 「되돌려짐」
+      회색 태그가 붙은 행은 나중에 다른 되돌리기로 이미 취소된 변경입니다</li>
+    <li><span class="tag">44</span>되돌리기 버튼 — 두 경우에 비활성(흐리게)이 됩니다: ① 그 행
+      자체가 「되돌리기」 동작이라서(되돌린 것을 또 되돌릴 수는 없습니다) ② 이미 다른 되돌리기가
+      이 변경을 취소해서. <b>이 캡처에 보이는 행 전부가 이 두 경우 중 하나라 되돌리기 버튼이
+      모두 비활성입니다</b>(오늘 회귀 검사가 바꾸자마자 되돌리는 식으로 반복 실행됐기
+      때문입니다) — 사람이 프리셋으로 값 하나를 바꾸고 그대로 둔 경우라면 그 행의 버튼만
+      진한 테두리로 눌리는 상태가 됩니다</li>
+  </ul>
+
+  <h3 id="fig-j"><span class="fig">그림 J</span>우측 레일 확대(위쪽) — 단계 프리셋 · 판정 기준</h3>
+  <figure>
+    <div class="shot" style="max-width:320px;aspect-ratio:312/829.2344">
+      <img src="/shared/manual/shots/ops-settings-rail.png" alt="우측 레일 확대 — 프리셋과 판정 기준">
+      <b class="pin" style="--x:50.0%;--y:12.36%">45</b>
+      <b class="pin" style="--x:50.0%;--y:45.87%">46</b>
+      <b class="pin" style="--x:50.0%;--y:72.86%">47</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 13번 영역 위쪽. 「감추지 않는 사실」 나머지는
+      <a href="#fig-k">그림 K</a></p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">45</span>단계 프리셋 3종 — 「현행(쇼핑몰 중심)」 「자체 결제 전환」
+      「전면 자체 운영」. 지금 값과 똑같은 프리셋에는 「현재 값」 초록 표시가 붙습니다(오늘은
+      「현행」이 그 상태입니다). 누르면 <b>값만 채워질 뿐 바로 저장되지 않습니다</b></li>
+    <li><span class="tag">46</span>판정 기준 범례 — 「● 동작 중」·「◆ 잠듦」·「○ 미구현」(전환
+      축) · 「■ 구축됨」·「□ 미구축」(구축 축) 배지의 뜻을 설명합니다</li>
+    <li><span class="tag">47</span>「이 화면이 감추지 않는 사실」 카드 1 — 「두 축은 성격이
+      다릅니다」(전환 축은 사람이 켜고 끄는 스위치, 구축 축은 지어야 바뀌는 진척)</li>
+  </ul>
+
+  <h3 id="fig-k"><span class="fig">그림 K</span>「감추지 않는 사실」 나머지 — 스크롤해야 보인다</h3>
+  <figure>
+    <div class="shot" style="max-width:320px;aspect-ratio:312/829.2344">
+      <img src="/shared/manual/shots/ops-settings-rail-facts-more.png" alt="감추지 않는 사실 패널 — 스크롤한 아래쪽">
+      <b class="pin" style="--x:50.0%;--y:76.9%">48</b>
+      <b class="pin" style="--x:50.0%;--y:90.84%">49</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 우측 레일의 「이 화면이 감추지 않는 사실」 패널만 안쪽으로
+      끝까지 스크롤한 상태(패널 자체가 <code>overflow:auto</code>라 5개 카드가 한 화면에 다
+      안 들어옵니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">48</span>「이 화면은 이제 구축됨으로 잡힙니다」 — <code>admin_nav.py</code>에
+      이 화면의 경로(href)가 등록돼 41건 구축 안에 포함된다는 뜻입니다(그림 H의 41/41에 이
+      화면 자신도 들어 있습니다)</li>
+    <li><span class="tag">49</span>「판정은 자동이 아니라 스냅샷입니다」(주황 강조 카드) — 동작
+      중/잠듦/미구현 판정과 단계 배정이 2026-08-13 코드 감사를 그대로 옮긴 값이라는 경고입니다.
+      <b>서버가 매 요청 다시 판정하지 않습니다</b> — 아래 「조심할 것」에서 다시 다룹니다</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>탭(MVP1/MVP2/MVP3/단계 미정)을 눌러 조회 범위를 바꿉니다 — <b>조회만 바뀌고 값은
+      바뀌지 않습니다.</b></li>
+    <li>전환 축의 이름·요약 부분(그림 E)을 누르면 상세 패널(그림 F)이 열립니다 — 값 선택 카드,
+      판정 설명(근거 포함), 「이 값이 바뀌면」 목록을 봅니다.</li>
+    <li>행 안의 own/mall 토글 버튼이나 상세 패널의 값 카드를 눌러 값을 바꿉니다 — <b>이 순간
+      DB에 저장되는 것이 아니라</b> 그 행에 「변경됨」 표시만 붙습니다. 실제 반영은 아래 저장
+      절차를 거쳐야 합니다.
+      <ul>
+        <li>정산(settle)은 결제(pay)를 그대로 따르도록 잠겨 있어 <b>직접 고를 수 없습니다.</b></li>
+        <li>환불(refund)을 「자체」로 선택해도 결제가 「쇼핑몰」이면 저장 시 서버가 자동으로
+          「쇼핑몰」로 되돌립니다(PG 취소 권한이 없어서) — 화면이 이 보정을 저장 전 확인
+          단계에서 미리 보여줍니다.</li>
+      </ul>
+    </li>
+    <li><span class="btnlabel">저장 — 확인 단계로</span>를 누르면 확인 모달이 열립니다.
+      「요청한 것 vs 실제 적용될 것」 대조표에서 서버가 자동으로 보정한 값은 「서버 보정」
+      태그로 따로 표시됩니다. 결제를 「자체」로 바꾸는 경우에는 위험 경고와 함께 정확한 확인
+      문구(<code>인계를 막습니다</code>)를 그대로 입력해야만 확인 모달의 저장 버튼이 눌립니다 —
+      그 순간부터 팝콘PC 인계가 409로 막히기 때문입니다.</li>
+    <li>단계 프리셋 3종(현행/자체 결제 전환/전면 자체 운영) 버튼으로 값 조합을 한 번에
+      채웁니다 — 채우기만 하고 저장은 여전히 별도입니다.</li>
+    <li>최근 변경 이력(최대 20건)에서 누가·언제·무엇을 바꿨는지 보고, <span class="btnlabel">되돌리기</span>로
+      그 건 하나만 이전 값으로 복원합니다 — 이미 되돌려진 건은 다시 되돌릴 수 없습니다(그림 I).</li>
+    <li>하단의 <span class="btnlabel">되돌리기</span>(저장 전용) — 아직 저장하지 않은 임시 변경을
+      서버에 있는 값으로 원위치합니다. 위 이력의 되돌리기와는 다른 버튼입니다 — 저장 이력에
+      남지 않습니다.</li>
+    <li>구축 축 표(단계 미정 탭, 그림 H)에서 그룹별 「구축/전체」 건수와 항목 칸을 조회합니다.
+      초록 칸(구축됨)을 누르면 그 관리자 화면으로 바로 이동합니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout ok">
+    <b>처음 열면 스위치가 하나도 안 보이는 것은 고장이 아니라 정상입니다.</b> 기본 탭(MVP1)에는
+    전환 축이 원래 없습니다 — 「지금은 인계로 판매하는 단계라 켤 것이 없다」는 뜻입니다. 다섯
+    스위치를 보거나 바꾸려면 위 탭에서 <b>MVP2(결제·환불·배송·회원 4종)</b> 또는
+    <b>MVP3(정산 1종)</b>을 눌러야 합니다.
+  </div>
+  <div class="callout">
+    <b>이 화면의 저장은 즉시, 그리고 실제 배포된 고객 서버에도 반영됩니다.</b> 로컬 개발 환경과
+    배포 서버가 같은 Cloud SQL을 공유하기 때문입니다. 2026-08-12에 이 경로로 실제 사고가 났습니다
+    (스위치는 바뀌었는데 배포된 코드가 그 값을 처리하지 못하는 상태가 됨) — 화면 자신도 저장
+    확인 모달에 이 경고를 그대로 띄웁니다(「이 저장은 배포된 고객 서버에도 즉시 반영됩니다」).
+  </div>
+  <div class="callout">
+    <b>결제를 「자체」로 바꾸는 순간 팝콘PC 인계가 즉시 막힙니다(409).</b> 지금(2026-08-25) 확정된
+    유일한 구매 경로가 인계이므로, 이 전환은 사실상 「주문을 받을 곳이 없어지는」 조작입니다.
+    그래서 화면이 정확한 확인 문구 입력을 강제합니다 — 실수로 스치듯 저장할 수 없게 만든
+    장치입니다.
+  </div>
+  <div class="callout">
+    <b>다섯 스위치 중 실제로 서버 처리가 갈리는 것은 「결제」·「환불」 둘뿐입니다</b>(오늘 실측:
+    동작 중 2 · 잠듦 1(정산) · 미구현 2(배송·회원·가입)). 「배송」·「회원·가입」을 바꿔도 값과
+    이력은 남지만, 그 값을 읽어서 처리를 분기하는 코드가 아직 없어 <b>실제로는 아무 일도
+    일어나지 않습니다.</b> 이 판정(동작 중/잠듦/미구현)은 서버가 매 요청 다시 검사하는 것이
+    아니라 <b>2026-08-13 코드 감사를 그대로 옮긴 스냅샷</b>입니다(헤더의 「판정 기준일
+    2026-08-13」이 그 뜻입니다, 그림 K의 49번) — 그 뒤 코드가 바뀌어도 판정 문구는 자동으로
+    따라오지 않습니다.
+  </div>
+  <div class="callout">
+    <b>⚠ 이력이 남는 자리가 두 곳으로 갈라져 있고, 그중 하나는 죽어 있습니다.</b> DB 설계도
+    (<code>docs/06_db-erd.md</code>)에는 이 화면 전용 이력 표(<code>ops_settings_history</code>)가
+    따로 정의돼 있습니다. 오늘 직접 확인한 결과 이 표는 <b>딱 2행뿐</b>이고, 그 2행마저
+    2026-07-23 초기 시드 데이터입니다 — 그 이후로 이 표에 쓰는 코드가 <code>api/</code> 전체에
+    한 줄도 없습니다. 실제로 그 표의 마지막 행은 「pay: mall→own」이라 적혀 있는데, <b>지금 실제
+    값은 pay=mall입니다</b> — 표 자체가 지금 사실과 어긋나 있습니다. 화면이 실제로 보여주는
+    이력(그림 A의 12번, 그림 I)은 이 표가 아니라 <b>관리자 활동 기록
+    (<code>admin_operator_activity_logs</code>, <code>target_kind='ops'</code>)</b>에서 옵니다 —
+    여기는 오늘 기준 1,007건(변경 505건 + 되돌리기 502건, 계속 늘어나는 중)이 실제로 쌓여 있고
+    화면의 「최근 변경 이력」·「되돌리기」 버튼이 실제로 이 표를 읽고 씁니다. 정리하면 —
+    <b>이력은 남습니다. 다만 화면이 보여주는 이력과 DB 설계도가 말하는 전용 이력 표는 서로
+    다른 곳입니다.</b>
+  </div>
+  <div class="callout">
+    조회(viewer) 등급 계정은 값을 볼 수는 있어도 스위치·프리셋·저장·되돌리기 버튼이 전부
+    눌리지 않는 상태(회색, 마우스를 올리면 「권한이 부족합니다」)로 보입니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「화면을 열었는데 스위치가 하나도 없다」</b> → MVP1 탭이 기본으로 열려 있어서입니다
+      (정상 — 위 「조심할 것」 참고). MVP2 탭을 누르십시오.</li>
+    <li><b>「환불을 자체로 바꾸고 저장했는데 도로 쇼핑몰로 남아 있다」</b> → 결제(pay)가 여전히
+      쇼핑몰이면 서버가 자동으로 환불도 쇼핑몰로 보정합니다(쇼핑몰 결제 건은 PG 취소 권한이
+      없어서). 결제부터 자체로 바꿔야 합니다.</li>
+    <li><b>「정산 토글 버튼이 안 눌린다」</b> → 정산은 항상 결제와 같은 값으로 잠겨 있습니다
+      (그림 G). 결제를 바꾸면 정산도 자동으로 따라 바뀝니다.</li>
+    <li><b>「저장 버튼을 눌렀는데 아무 반응이 없다」</b> → 하단의 <span class="btnlabel">저장 —
+      확인 단계로</span>는 확인 모달을 여는 버튼입니다. 실제 반영은 그 모달 안에서 한 번 더
+      저장을 눌러야 일어납니다(2단계 확인).</li>
+    <li><b>「결제를 자체로 바꾸려는데 저장 버튼이 안 눌린다」</b> → 확인 모달의 입력칸에 정확한
+      확인 문구를 토씨 하나 틀리지 않고 입력해야 버튼이 활성화됩니다.</li>
+    <li><b>「이력에 되돌리기 버튼이 없는 행이 있다」</b> → 그 행 자체가 이미 「되돌리기」 동작
+      이거나(되돌린 것을 또 되돌릴 수는 없습니다), 이미 다른 되돌리기로 취소된 변경(「되돌려짐」
+      태그)입니다.</li>
+    <li><b>「구축 축 표를 보고 싶은데 안 보인다」</b> → MVP1/MVP2/MVP3 탭에는 안내 문구나
+      「정황상 대응」 카드만 있습니다. 실제 표(그룹별 8행, 41항목)는 <b>「단계 미정」 탭에만</b>
+      있습니다(그림 H).</li>
+    <li><b>「분명히 이력이 쌓이는데 DB의 ops_settings_history 표를 보면 텅 비어 보인다」</b> →
+      정상입니다. 그 표는 죽어 있고(2026-07-23 시드 2행뿐), 실제 이력은 활동 기록 표에
+      쌓입니다 — 위 「조심할 것」 참고.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_ops.py</code>(데이터 API: 조회·저장·되돌리기) ·
+        <code>api/admin_ui_ops_stage.py</code>(페이지 라우트·판정 스냅샷) ·
+        <code>templates/admin/ops_stage.html.j2</code>(화면·동작) ·
+        <code>templates/admin/_admin2_shell.html.j2</code> · <code>api/orders.py</code> ·
+        <code>api/handoff.py</code>(결제 스위치가 실제로 409를 가르는 지점) ·
+        <code>api/admin_nav.py</code>(구축 축 정본)를 직접 읽었습니다.</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-25에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_ops_settings.py</code>(공용 도구
+        <code>scripts/manual_capture_common.py</code> 사용), 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>ops-settings-coords.json</code>에 있습니다.</li>
+      <li><b>이 캡처는 스위치를 한 번도 누르지 않고 만들었습니다.</b> 캡처 스크립트를 코드로
+        대조한 결과, 탭 전환(<code>data-action="set-tab"</code>)과 상세 패널 열기/닫기
+        (<code>open-drawer</code>/<code>close-drawer</code>)는 화면 안 상태(JS 변수)만 바꿀 뿐
+        서버에 아무것도 보내지 않습니다 — 이 스크립트는 이 둘만 썼습니다. 실제로 값을 바꾸거나
+        (<code>set-mode</code>) 프리셋을 채우거나(<code>apply-preset</code>) 저장·되돌리기를
+        부르는 동작은 스크립트에 한 줄도 없습니다. 그래서 저장 전 「위험 확인」 모달(결제를
+        자체로 바꿀 때 뜨는 확인 문구 입력창)은 캡처하지 않았습니다 — 그 문구·조건은 코드
+        (<code>templates/admin/ops_stage.html.j2</code>의 <code>PHRASE</code>·
+        <code>needPhrase</code> 로직)를 직접 읽어 위 「무엇을 할 수 있는가」·「조심할 것」에
+        옮겼습니다.</li>
+      <li>실측 수치(현재 값·이력 건수·구축 41/41·활동 기록 순위 등) — 캡처와 같은 시각
+        <code>GET /api/admin/ops-settings</code> 응답과, 읽기 전용 SQL로 직접 확인한
+        <code>ops_settings_history</code>·<code>admin_operator_activity_logs</code> 건수를
+        그대로 옮겼습니다. 지어낸 숫자는 없습니다 — 매일 바뀌므로 지금 값은 화면에서 다시
+        확인하십시오.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>ops-settings-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이 문서가
+      손으로 만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께 낡습니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_ops_settings.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — 2026-08-25 기준 <code>.venv</code>에는 이미 설치돼
+      있습니다.</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가
+      없어, 완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에
+      정확히 맞는지, 768px 좁은 화면·인쇄 미리보기에서 레이아웃이 어떻게 나뉘는지)는 직접
+      확인하지 못했습니다. 좌표는 Playwright로 화면 요소의 실제 위치를 재서 계산한 값이며,
+      이 문서를 브라우저로 열어 캡처 위 번호가 실제 버튼·영역과 맞는지는 별도 확인이
+      필요합니다. 또한 이 캡처는 owner 등급 점검 계정으로만 찍었습니다 — 「조회」 등급 계정에서
+      버튼이 실제로 어떻게 흐리게 보이는지는 코드로는 확인했지만 화면으로 직접 보지는
+      못했습니다. 「저장 전 확인 모달」·「위험 경고 문구 입력」 상태도 위에서 밝힌 이유로
+      캡처하지 못하고 코드 대조로만 문서에 옮겼습니다.</p>
+  </div>
+
+</div>

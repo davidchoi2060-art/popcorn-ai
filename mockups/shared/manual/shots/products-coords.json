@@ -1,0 +1,1335 @@
+{
+  "products-full": {
+    "file": "products-full.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "lnb": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 12.62,
+        "h_pct": 100.0,
+        "cx_pct": 6.31,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 0,
+          "y": 0,
+          "width": 212,
+          "height": 1050
+        }
+      },
+      "lnb_active_item": {
+        "x_pct": 0.0,
+        "y_pct": 14.56,
+        "w_pct": 12.62,
+        "h_pct": 2.94,
+        "cx_pct": 6.31,
+        "cy_pct": 16.03,
+        "px": {
+          "x": 0,
+          "y": 152.875,
+          "width": 212,
+          "height": 30.875
+        }
+      },
+      "header": {
+        "x_pct": 12.62,
+        "y_pct": 0.0,
+        "w_pct": 87.38,
+        "h_pct": 4.95,
+        "cx_pct": 56.31,
+        "cy_pct": 2.48,
+        "px": {
+          "x": 212,
+          "y": 0,
+          "width": 1468,
+          "height": 52
+        }
+      },
+      "badge": {
+        "x_pct": 21.12,
+        "y_pct": 1.57,
+        "w_pct": 6.55,
+        "h_pct": 1.71,
+        "cx_pct": 24.4,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 354.875,
+          "y": 16.5,
+          "width": 110,
+          "height": 18
+        }
+      },
+      "roles_req": {
+        "x_pct": 28.27,
+        "y_pct": 1.26,
+        "w_pct": 11.05,
+        "h_pct": 2.33,
+        "cx_pct": 33.79,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 474.875,
+          "y": 13.25,
+          "width": 185.578125,
+          "height": 24.5
+        }
+      },
+      "hub": {
+        "x_pct": 88.72,
+        "y_pct": 1.26,
+        "w_pct": 2.39,
+        "h_pct": 2.33,
+        "cx_pct": 89.92,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1490.515625,
+          "y": 13.25,
+          "width": 40.15625,
+          "height": 24.5
+        }
+      },
+      "role_box": {
+        "x_pct": 91.71,
+        "y_pct": 1.26,
+        "w_pct": 5.08,
+        "h_pct": 2.33,
+        "cx_pct": 94.25,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1540.671875,
+          "y": 13.25,
+          "width": 85.328125,
+          "height": 24.5
+        }
+      },
+      "avatar": {
+        "x_pct": 97.38,
+        "y_pct": 1.19,
+        "w_pct": 1.55,
+        "h_pct": 2.48,
+        "cx_pct": 98.15,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1636,
+          "y": 12.5,
+          "width": 26,
+          "height": 26
+        }
+      },
+      "tabs": {
+        "x_pct": 12.62,
+        "y_pct": 4.95,
+        "w_pct": 87.38,
+        "h_pct": 3.9,
+        "cx_pct": 56.31,
+        "cy_pct": 6.9,
+        "px": {
+          "x": 212,
+          "y": 52,
+          "width": 1468,
+          "height": 41
+        }
+      },
+      "tab_review": {
+        "x_pct": 26.46,
+        "y_pct": 4.95,
+        "w_pct": 5.81,
+        "h_pct": 3.81,
+        "cx_pct": 29.36,
+        "cy_pct": 6.86,
+        "px": {
+          "x": 444.46875,
+          "y": 52,
+          "width": 97.578125,
+          "height": 40
+        }
+      },
+      "filters": {
+        "x_pct": 12.62,
+        "y_pct": 8.86,
+        "w_pct": 87.38,
+        "h_pct": 4.29,
+        "cx_pct": 56.31,
+        "cy_pct": 11.0,
+        "px": {
+          "x": 212,
+          "y": 93,
+          "width": 1468,
+          "height": 45
+        }
+      },
+      "search_box": {
+        "x_pct": 17.76,
+        "y_pct": 9.9,
+        "w_pct": 17.86,
+        "h_pct": 3.24,
+        "cx_pct": 26.69,
+        "cy_pct": 11.52,
+        "px": {
+          "x": 298.328125,
+          "y": 104,
+          "width": 300,
+          "height": 34
+        }
+      },
+      "cat_select": {
+        "x_pct": 40.22,
+        "y_pct": 9.9,
+        "w_pct": 6.9,
+        "h_pct": 3.24,
+        "cx_pct": 43.67,
+        "cy_pct": 11.52,
+        "px": {
+          "x": 675.65625,
+          "y": 104,
+          "width": 116,
+          "height": 34
+        }
+      },
+      "mfr_input": {
+        "x_pct": 52.55,
+        "y_pct": 9.96,
+        "w_pct": 10.12,
+        "h_pct": 3.14,
+        "cx_pct": 57.61,
+        "cy_pct": 11.52,
+        "px": {
+          "x": 882.8125,
+          "y": 104.53125,
+          "width": 170,
+          "height": 32.9375
+        }
+      },
+      "btn_new": {
+        "x_pct": 94.13,
+        "y_pct": 10.02,
+        "w_pct": 4.8,
+        "h_pct": 3.0,
+        "cx_pct": 96.53,
+        "cy_pct": 11.52,
+        "px": {
+          "x": 1581.359375,
+          "y": 105.25,
+          "width": 80.640625,
+          "height": 31.5
+        }
+      },
+      "filters_note": {
+        "x_pct": 12.62,
+        "y_pct": 13.14,
+        "w_pct": 87.38,
+        "h_pct": 1.83,
+        "cx_pct": 56.31,
+        "cy_pct": 14.06,
+        "px": {
+          "x": 212,
+          "y": 138,
+          "width": 1468,
+          "height": 19.25
+        }
+      },
+      "bulk": {
+        "x_pct": 13.69,
+        "y_pct": 15.83,
+        "w_pct": 85.24,
+        "h_pct": 1.85,
+        "cx_pct": 56.31,
+        "cy_pct": 16.76,
+        "px": {
+          "x": 230,
+          "y": 166.25,
+          "width": 1432,
+          "height": 19.390625
+        }
+      },
+      "table_wrap": {
+        "x_pct": 13.69,
+        "y_pct": 18.63,
+        "w_pct": 85.24,
+        "h_pct": 74.51,
+        "cx_pct": 56.31,
+        "cy_pct": 55.89,
+        "px": {
+          "x": 230,
+          "y": 195.640625,
+          "width": 1432,
+          "height": 782.359375
+        }
+      },
+      "thead": {
+        "x_pct": 13.75,
+        "y_pct": 18.73,
+        "w_pct": 85.12,
+        "h_pct": 3.43,
+        "cx_pct": 56.31,
+        "cy_pct": 20.44,
+        "px": {
+          "x": 231,
+          "y": 196.640625,
+          "width": 1430,
+          "height": 36
+        }
+      },
+      "first_row": {
+        "x_pct": 13.75,
+        "y_pct": 22.16,
+        "w_pct": 85.12,
+        "h_pct": 4.65,
+        "cx_pct": 56.31,
+        "cy_pct": 24.48,
+        "px": {
+          "x": 231,
+          "y": 232.640625,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "pager": {
+        "x_pct": 13.69,
+        "y_pct": 93.14,
+        "w_pct": 85.24,
+        "h_pct": 4.0,
+        "cx_pct": 56.31,
+        "cy_pct": 95.14,
+        "px": {
+          "x": 230,
+          "y": 978,
+          "width": 1432,
+          "height": 42
+        }
+      },
+      "legend": {
+        "x_pct": 12.62,
+        "y_pct": 97.14,
+        "w_pct": 87.38,
+        "h_pct": 2.86,
+        "cx_pct": 56.31,
+        "cy_pct": 98.57,
+        "px": {
+          "x": 212,
+          "y": 1020,
+          "width": 1468,
+          "height": 30
+        }
+      }
+    }
+  },
+  "products-header": {
+    "file": "products-header.png",
+    "clip_px": {
+      "x": 212,
+      "y": 0,
+      "width": 1468,
+      "height": 52
+    },
+    "elements": {
+      "crumb": {
+        "x_pct": 1.23,
+        "y_pct": 37.5,
+        "w_pct": 2.83,
+        "h_pct": 23.08,
+        "cx_pct": 2.64,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 230,
+          "y": 19.5,
+          "width": 41.484375,
+          "height": 12
+        }
+      },
+      "now": {
+        "x_pct": 5.78,
+        "y_pct": 36.54,
+        "w_pct": 3.27,
+        "h_pct": 25.0,
+        "cx_pct": 7.41,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 296.828125,
+          "y": 19,
+          "width": 48.046875,
+          "height": 13
+        }
+      },
+      "badge": {
+        "x_pct": 9.73,
+        "y_pct": 31.73,
+        "w_pct": 7.49,
+        "h_pct": 34.62,
+        "cx_pct": 13.48,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 354.875,
+          "y": 16.5,
+          "width": 110,
+          "height": 18
+        }
+      },
+      "roles_req": {
+        "x_pct": 17.91,
+        "y_pct": 25.48,
+        "w_pct": 12.64,
+        "h_pct": 47.12,
+        "cx_pct": 24.23,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 474.875,
+          "y": 13.25,
+          "width": 185.578125,
+          "height": 24.5
+        }
+      },
+      "hub": {
+        "x_pct": 87.09,
+        "y_pct": 25.48,
+        "w_pct": 2.74,
+        "h_pct": 47.12,
+        "cx_pct": 88.46,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 1490.515625,
+          "y": 13.25,
+          "width": 40.15625,
+          "height": 24.5
+        }
+      },
+      "role_box": {
+        "x_pct": 90.51,
+        "y_pct": 25.48,
+        "w_pct": 5.81,
+        "h_pct": 47.12,
+        "cx_pct": 93.42,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 1540.671875,
+          "y": 13.25,
+          "width": 85.328125,
+          "height": 24.5
+        }
+      },
+      "avatar": {
+        "x_pct": 97.0,
+        "y_pct": 24.04,
+        "w_pct": 1.77,
+        "h_pct": 50.0,
+        "cx_pct": 97.89,
+        "cy_pct": 49.04,
+        "px": {
+          "x": 1636,
+          "y": 12.5,
+          "width": 26,
+          "height": 26
+        }
+      }
+    }
+  },
+  "products-filterbar": {
+    "file": "products-filterbar.png",
+    "clip_px": {
+      "x": 212,
+      "y": 93,
+      "width": 1468,
+      "height": 92.640625
+    },
+    "elements": {
+      "search_box": {
+        "x_pct": 5.88,
+        "y_pct": 11.87,
+        "w_pct": 20.44,
+        "h_pct": 36.7,
+        "cx_pct": 16.1,
+        "cy_pct": 30.22,
+        "px": {
+          "x": 298.328125,
+          "y": 104,
+          "width": 300,
+          "height": 34
+        }
+      },
+      "cat_select": {
+        "x_pct": 31.58,
+        "y_pct": 11.87,
+        "w_pct": 7.9,
+        "h_pct": 36.7,
+        "cx_pct": 35.54,
+        "cy_pct": 30.22,
+        "px": {
+          "x": 675.65625,
+          "y": 104,
+          "width": 116,
+          "height": 34
+        }
+      },
+      "mfr_input": {
+        "x_pct": 45.7,
+        "y_pct": 12.45,
+        "w_pct": 11.58,
+        "h_pct": 35.55,
+        "cx_pct": 51.49,
+        "cy_pct": 30.22,
+        "px": {
+          "x": 882.8125,
+          "y": 104.53125,
+          "width": 170,
+          "height": 32.9375
+        }
+      },
+      "btn_purchase_quote": {
+        "x_pct": 81.02,
+        "y_pct": 13.49,
+        "w_pct": 5.84,
+        "h_pct": 33.46,
+        "cx_pct": 83.94,
+        "cy_pct": 30.22,
+        "px": {
+          "x": 1401.390625,
+          "y": 105.5,
+          "width": 85.734375,
+          "height": 31
+        }
+      },
+      "btn_price_review": {
+        "x_pct": 87.47,
+        "y_pct": 13.49,
+        "w_pct": 5.19,
+        "h_pct": 33.46,
+        "cx_pct": 90.07,
+        "cy_pct": 30.22,
+        "px": {
+          "x": 1496.125,
+          "y": 105.5,
+          "width": 76.234375,
+          "height": 31
+        }
+      },
+      "btn_new": {
+        "x_pct": 93.28,
+        "y_pct": 13.22,
+        "w_pct": 5.49,
+        "h_pct": 34.0,
+        "cx_pct": 96.03,
+        "cy_pct": 30.22,
+        "px": {
+          "x": 1581.359375,
+          "y": 105.25,
+          "width": 80.640625,
+          "height": 31.5
+        }
+      },
+      "filters_note": {
+        "x_pct": 0.0,
+        "y_pct": 48.57,
+        "w_pct": 100.0,
+        "h_pct": 20.78,
+        "cx_pct": 50.0,
+        "cy_pct": 58.96,
+        "px": {
+          "x": 212,
+          "y": 138,
+          "width": 1468,
+          "height": 19.25
+        }
+      },
+      "bulk_hint": {
+        "x_pct": 1.23,
+        "y_pct": 79.07,
+        "w_pct": 97.55,
+        "h_pct": 20.93,
+        "cx_pct": 50.0,
+        "cy_pct": 89.53,
+        "px": {
+          "x": 230,
+          "y": 166.25,
+          "width": 1432,
+          "height": 19.390625
+        }
+      }
+    }
+  },
+  "products-table": {
+    "file": "products-table.png",
+    "clip_px": {
+      "x": 231,
+      "y": 196.640625,
+      "width": 1430,
+      "height": 329.15625
+    },
+    "elements": {
+      "thead": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 10.94,
+        "cx_pct": 50.0,
+        "cy_pct": 5.47,
+        "px": {
+          "x": 231,
+          "y": 196.640625,
+          "width": 1430,
+          "height": 36
+        }
+      },
+      "row_1": {
+        "x_pct": 0.0,
+        "y_pct": 10.94,
+        "w_pct": 100.0,
+        "h_pct": 14.84,
+        "cx_pct": 50.0,
+        "cy_pct": 18.36,
+        "px": {
+          "x": 231,
+          "y": 232.640625,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "row_2": {
+        "x_pct": 0.0,
+        "y_pct": 25.78,
+        "w_pct": 100.0,
+        "h_pct": 14.84,
+        "cx_pct": 50.0,
+        "cy_pct": 33.2,
+        "px": {
+          "x": 231,
+          "y": 281.5,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "row_3": {
+        "x_pct": 0.0,
+        "y_pct": 40.62,
+        "w_pct": 100.0,
+        "h_pct": 14.84,
+        "cx_pct": 50.0,
+        "cy_pct": 48.05,
+        "px": {
+          "x": 231,
+          "y": 330.359375,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "row_4": {
+        "x_pct": 0.0,
+        "y_pct": 55.47,
+        "w_pct": 100.0,
+        "h_pct": 14.84,
+        "cx_pct": 50.0,
+        "cy_pct": 62.89,
+        "px": {
+          "x": 231,
+          "y": 379.21875,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "row_5": {
+        "x_pct": 0.0,
+        "y_pct": 70.31,
+        "w_pct": 100.0,
+        "h_pct": 14.84,
+        "cx_pct": 50.0,
+        "cy_pct": 77.73,
+        "px": {
+          "x": 231,
+          "y": 428.078125,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "row_6": {
+        "x_pct": 0.0,
+        "y_pct": 85.16,
+        "w_pct": 100.0,
+        "h_pct": 14.84,
+        "cx_pct": 50.0,
+        "cy_pct": 92.58,
+        "px": {
+          "x": 231,
+          "y": 476.9375,
+          "width": 1430,
+          "height": 48.859375
+        }
+      }
+    }
+  },
+  "products-bulk-active": {
+    "file": "products-bulk-active.png",
+    "clip_px": {
+      "x": 230,
+      "y": 166.25,
+      "width": 1432,
+      "height": 50
+    },
+    "elements": {
+      "sel_count": {
+        "x_pct": 2.49,
+        "y_pct": 34.59,
+        "w_pct": 0.46,
+        "h_pct": 28.0,
+        "cx_pct": 2.72,
+        "cy_pct": 48.59,
+        "px": {
+          "x": 265.703125,
+          "y": 183.546875,
+          "width": 6.609375,
+          "height": 14
+        }
+      },
+      "bulk_status": {
+        "x_pct": 9.16,
+        "y_pct": 18.0,
+        "w_pct": 5.45,
+        "h_pct": 64.0,
+        "cx_pct": 11.88,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 361.15625,
+          "y": 175.25,
+          "width": 78,
+          "height": 32
+        }
+      },
+      "btn_bulk": {
+        "x_pct": 15.3,
+        "y_pct": 18.5,
+        "w_pct": 5.34,
+        "h_pct": 63.0,
+        "cx_pct": 17.97,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 449.15625,
+          "y": 175.5,
+          "width": 76.4375,
+          "height": 31.5
+        }
+      },
+      "bulk_note": {
+        "x_pct": 21.34,
+        "y_pct": 36.0,
+        "w_pct": 19.37,
+        "h_pct": 28.0,
+        "cx_pct": 31.02,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 535.59375,
+          "y": 184.25,
+          "width": 277.34375,
+          "height": 14
+        }
+      }
+    }
+  },
+  "products-full-detail": {
+    "file": "products-full-detail.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "selected_row": {
+        "x_pct": 13.75,
+        "y_pct": 22.16,
+        "w_pct": 85.12,
+        "h_pct": 4.65,
+        "cx_pct": 56.31,
+        "cy_pct": 24.48,
+        "px": {
+          "x": 231,
+          "y": 232.640625,
+          "width": 1430,
+          "height": 48.859375
+        }
+      },
+      "drawer": {
+        "x_pct": 66.67,
+        "y_pct": 4.95,
+        "w_pct": 33.33,
+        "h_pct": 95.05,
+        "cx_pct": 83.33,
+        "cy_pct": 52.48,
+        "px": {
+          "x": 1120,
+          "y": 52,
+          "width": 560,
+          "height": 998
+        }
+      },
+      "dr_title": {
+        "x_pct": 67.8,
+        "y_pct": 6.36,
+        "w_pct": 19.59,
+        "h_pct": 1.8,
+        "cx_pct": 77.59,
+        "cy_pct": 7.26,
+        "px": {
+          "x": 1139,
+          "y": 66.796875,
+          "width": 329.046875,
+          "height": 18.890625
+        }
+      }
+    }
+  },
+  "products-drawer-basic": {
+    "file": "products-drawer-basic.png",
+    "clip_px": {
+      "x": 1120,
+      "y": 52,
+      "width": 560,
+      "height": 998
+    },
+    "elements": {
+      "title": {
+        "x_pct": 3.39,
+        "y_pct": 1.48,
+        "w_pct": 58.76,
+        "h_pct": 1.89,
+        "cx_pct": 32.77,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1139,
+          "y": 66.796875,
+          "width": 329.046875,
+          "height": 18.890625
+        }
+      },
+      "mall_link": {
+        "x_pct": 63.76,
+        "y_pct": 1.4,
+        "w_pct": 16.74,
+        "h_pct": 2.05,
+        "cx_pct": 72.13,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1477.046875,
+          "y": 66,
+          "width": 93.734375,
+          "height": 20.5
+        }
+      },
+      "status_badge": {
+        "x_pct": 82.1,
+        "y_pct": 1.43,
+        "w_pct": 9.46,
+        "h_pct": 2.0,
+        "cx_pct": 86.83,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1579.78125,
+          "y": 66.25,
+          "width": 52.953125,
+          "height": 20
+        }
+      },
+      "close": {
+        "x_pct": 93.17,
+        "y_pct": 1.48,
+        "w_pct": 3.62,
+        "h_pct": 1.9,
+        "cx_pct": 94.98,
+        "cy_pct": 2.43,
+        "px": {
+          "x": 1641.734375,
+          "y": 66.75,
+          "width": 20.265625,
+          "height": 19
+        }
+      },
+      "sub": {
+        "x_pct": 3.39,
+        "y_pct": 4.06,
+        "w_pct": 93.39,
+        "h_pct": 1.37,
+        "cx_pct": 50.09,
+        "cy_pct": 4.74,
+        "px": {
+          "x": 1139,
+          "y": 92.5,
+          "width": 523,
+          "height": 13.640625
+        }
+      },
+      "tabs": {
+        "x_pct": 3.39,
+        "y_pct": 6.43,
+        "w_pct": 93.39,
+        "h_pct": 3.36,
+        "cx_pct": 50.09,
+        "cy_pct": 8.11,
+        "px": {
+          "x": 1139,
+          "y": 116.140625,
+          "width": 523,
+          "height": 33.5
+        }
+      },
+      "gate": {
+        "x_pct": 3.39,
+        "y_pct": 11.29,
+        "w_pct": 93.39,
+        "h_pct": 15.37,
+        "cx_pct": 50.09,
+        "cy_pct": 18.97,
+        "px": {
+          "x": 1139,
+          "y": 164.640625,
+          "width": 523,
+          "height": 153.34375
+        }
+      },
+      "supplier_row": {
+        "x_pct": 3.39,
+        "y_pct": 35.12,
+        "w_pct": 93.39,
+        "h_pct": 3.63,
+        "cx_pct": 50.09,
+        "cy_pct": 36.93,
+        "px": {
+          "x": 1139,
+          "y": 402.484375,
+          "width": 523,
+          "height": 36.25
+        }
+      },
+      "body": {
+        "x_pct": 0.18,
+        "y_pct": 9.88,
+        "w_pct": 99.82,
+        "h_pct": 84.45,
+        "cx_pct": 50.09,
+        "cy_pct": 52.11,
+        "px": {
+          "x": 1121,
+          "y": 150.640625,
+          "width": 559,
+          "height": 842.859375
+        }
+      },
+      "foot": {
+        "x_pct": 0.18,
+        "y_pct": 94.34,
+        "w_pct": 99.82,
+        "h_pct": 5.66,
+        "cx_pct": 50.09,
+        "cy_pct": 97.17,
+        "px": {
+          "x": 1121,
+          "y": 993.5,
+          "width": 559,
+          "height": 56.5
+        }
+      },
+      "btn_edit": {
+        "x_pct": 87.88,
+        "y_pct": 95.74,
+        "w_pct": 8.91,
+        "h_pct": 2.96,
+        "cx_pct": 92.33,
+        "cy_pct": 97.22,
+        "px": {
+          "x": 1612.109375,
+          "y": 1007.5,
+          "width": 49.890625,
+          "height": 29.5
+        }
+      }
+    }
+  },
+  "products-drawer-basic-edit": {
+    "file": "products-drawer-basic-edit.png",
+    "clip_px": {
+      "x": 1120,
+      "y": 52,
+      "width": 560,
+      "height": 998
+    },
+    "elements": {
+      "tabs": {
+        "x_pct": 3.39,
+        "y_pct": 6.43,
+        "w_pct": 93.39,
+        "h_pct": 3.36,
+        "cx_pct": 50.09,
+        "cy_pct": 8.11,
+        "px": {
+          "x": 1139,
+          "y": 116.140625,
+          "width": 523,
+          "height": 33.5
+        }
+      },
+      "name_input": {
+        "x_pct": 24.46,
+        "y_pct": 28.36,
+        "w_pct": 69.82,
+        "h_pct": 3.1,
+        "cx_pct": 59.38,
+        "cy_pct": 29.91,
+        "px": {
+          "x": 1257,
+          "y": 334.984375,
+          "width": 391,
+          "height": 30.9375
+        }
+      },
+      "supplier_input": {
+        "x_pct": 24.46,
+        "y_pct": 38.76,
+        "w_pct": 69.82,
+        "h_pct": 3.1,
+        "cx_pct": 59.38,
+        "cy_pct": 40.31,
+        "px": {
+          "x": 1257,
+          "y": 438.859375,
+          "width": 391,
+          "height": 30.9375
+        }
+      },
+      "status_select": {
+        "x_pct": 24.46,
+        "y_pct": 59.58,
+        "w_pct": 69.82,
+        "h_pct": 3.21,
+        "cx_pct": 59.38,
+        "cy_pct": 61.18,
+        "px": {
+          "x": 1257,
+          "y": 646.609375,
+          "width": 391,
+          "height": 32
+        }
+      },
+      "body": {
+        "x_pct": 0.18,
+        "y_pct": 9.88,
+        "w_pct": 99.82,
+        "h_pct": 84.45,
+        "cx_pct": 50.09,
+        "cy_pct": 52.11,
+        "px": {
+          "x": 1121,
+          "y": 150.640625,
+          "width": 559,
+          "height": 842.859375
+        }
+      },
+      "foot": {
+        "x_pct": 0.18,
+        "y_pct": 94.34,
+        "w_pct": 99.82,
+        "h_pct": 5.66,
+        "cx_pct": 50.09,
+        "cy_pct": 97.17,
+        "px": {
+          "x": 1121,
+          "y": 993.5,
+          "width": 559,
+          "height": 56.5
+        }
+      },
+      "btn_save": {
+        "x_pct": 87.88,
+        "y_pct": 95.74,
+        "w_pct": 8.91,
+        "h_pct": 2.96,
+        "cx_pct": 92.33,
+        "cy_pct": 97.22,
+        "px": {
+          "x": 1612.109375,
+          "y": 1007.5,
+          "width": 49.890625,
+          "height": 29.5
+        }
+      },
+      "btn_cancel": {
+        "x_pct": 77.9,
+        "y_pct": 95.64,
+        "w_pct": 8.55,
+        "h_pct": 3.16,
+        "cx_pct": 82.17,
+        "cy_pct": 97.22,
+        "px": {
+          "x": 1556.21875,
+          "y": 1006.5,
+          "width": 47.890625,
+          "height": 31.5
+        }
+      }
+    }
+  },
+  "products-drawer-spec": {
+    "file": "products-drawer-spec.png",
+    "clip_px": {
+      "x": 1120,
+      "y": 52,
+      "width": 560,
+      "height": 998
+    },
+    "elements": {
+      "tabs": {
+        "x_pct": 3.39,
+        "y_pct": 6.43,
+        "w_pct": 93.39,
+        "h_pct": 3.36,
+        "cx_pct": 50.09,
+        "cy_pct": 8.11,
+        "px": {
+          "x": 1139,
+          "y": 116.140625,
+          "width": 523,
+          "height": 33.5
+        }
+      },
+      "progress": {
+        "x_pct": 3.39,
+        "y_pct": 12.19,
+        "w_pct": 93.39,
+        "h_pct": 1.65,
+        "cx_pct": 50.09,
+        "cy_pct": 13.02,
+        "px": {
+          "x": 1139,
+          "y": 173.640625,
+          "width": 523,
+          "height": 16.5
+        }
+      },
+      "body": {
+        "x_pct": 0.18,
+        "y_pct": 9.88,
+        "w_pct": 99.82,
+        "h_pct": 84.45,
+        "cx_pct": 50.09,
+        "cy_pct": 52.11,
+        "px": {
+          "x": 1121,
+          "y": 150.640625,
+          "width": 559,
+          "height": 842.859375
+        }
+      },
+      "foot": {
+        "x_pct": 0.18,
+        "y_pct": 94.34,
+        "w_pct": 99.82,
+        "h_pct": 5.66,
+        "cx_pct": 50.09,
+        "cy_pct": 97.17,
+        "px": {
+          "x": 1121,
+          "y": 993.5,
+          "width": 559,
+          "height": 56.5
+        }
+      }
+    }
+  },
+  "products-drawer-supplier": {
+    "file": "products-drawer-supplier.png",
+    "clip_px": {
+      "x": 1120,
+      "y": 52,
+      "width": 560,
+      "height": 998
+    },
+    "elements": {
+      "tabs": {
+        "x_pct": 3.39,
+        "y_pct": 6.43,
+        "w_pct": 93.39,
+        "h_pct": 3.36,
+        "cx_pct": 50.09,
+        "cy_pct": 8.11,
+        "px": {
+          "x": 1139,
+          "y": 116.140625,
+          "width": 523,
+          "height": 33.5
+        }
+      },
+      "body": {
+        "x_pct": 0.18,
+        "y_pct": 9.88,
+        "w_pct": 99.82,
+        "h_pct": 84.45,
+        "cx_pct": 50.09,
+        "cy_pct": 52.11,
+        "px": {
+          "x": 1121,
+          "y": 150.640625,
+          "width": 559,
+          "height": 842.859375
+        }
+      },
+      "foot": {
+        "x_pct": 0.18,
+        "y_pct": 94.34,
+        "w_pct": 99.82,
+        "h_pct": 5.66,
+        "cx_pct": 50.09,
+        "cy_pct": 97.17,
+        "px": {
+          "x": 1121,
+          "y": 993.5,
+          "width": 559,
+          "height": 56.5
+        }
+      }
+    }
+  },
+  "products-reg": {
+    "file": "products-reg.png",
+    "clip_px": {
+      "x": 1120,
+      "y": 52,
+      "width": 560,
+      "height": 998
+    },
+    "elements": {
+      "name_input": {
+        "x_pct": 24.46,
+        "y_pct": 5.71,
+        "w_pct": 69.82,
+        "h_pct": 3.1,
+        "cx_pct": 59.38,
+        "cy_pct": 7.26,
+        "px": {
+          "x": 1257,
+          "y": 109,
+          "width": 391,
+          "height": 30.9375
+        }
+      },
+      "choice_host": {
+        "x_pct": 24.46,
+        "y_pct": 10.92,
+        "w_pct": 69.82,
+        "h_pct": 3.21,
+        "cx_pct": 59.38,
+        "cy_pct": 12.52,
+        "px": {
+          "x": 1257,
+          "y": 160.9375,
+          "width": 391,
+          "height": 32
+        }
+      },
+      "maker_input": {
+        "x_pct": 24.46,
+        "y_pct": 16.23,
+        "w_pct": 69.82,
+        "h_pct": 3.1,
+        "cx_pct": 59.38,
+        "cy_pct": 17.78,
+        "px": {
+          "x": 1257,
+          "y": 213.9375,
+          "width": 391,
+          "height": 30.9375
+        }
+      },
+      "supplier_input": {
+        "x_pct": 24.46,
+        "y_pct": 21.43,
+        "w_pct": 69.82,
+        "h_pct": 3.1,
+        "cx_pct": 59.38,
+        "cy_pct": 22.98,
+        "px": {
+          "x": 1257,
+          "y": 265.875,
+          "width": 391,
+          "height": 30.9375
+        }
+      },
+      "body": {
+        "x_pct": 0.18,
+        "y_pct": 3.41,
+        "w_pct": 99.82,
+        "h_pct": 90.93,
+        "cx_pct": 50.09,
+        "cy_pct": 48.87,
+        "px": {
+          "x": 1121,
+          "y": 86,
+          "width": 559,
+          "height": 907.5
+        }
+      },
+      "foot": {
+        "x_pct": 0.18,
+        "y_pct": 94.34,
+        "w_pct": 99.82,
+        "h_pct": 5.66,
+        "cx_pct": 50.09,
+        "cy_pct": 97.17,
+        "px": {
+          "x": 1121,
+          "y": 993.5,
+          "width": 559,
+          "height": 56.5
+        }
+      }
+    }
+  },
+  "_meta": {
+    "captured_at": "2026-08-25T12:43:22.841180+00:00",
+    "base_url": "http://127.0.0.1:8000",
+    "viewport": {
+      "width": 1680,
+      "height": 1050
+    },
+    "screen": {
+      "screen_id": "ADM-PRD-010",
+      "path": "/admin2/products"
+    },
+    "stats": {
+      "kpis": {
+        "total": 23151,
+        "ok": 6618,
+        "review": 3450,
+        "oos": 13083,
+        "price": 0
+      },
+      "total": 23151,
+      "used_parts_count": 19,
+      "makers_count": 627,
+      "status_options": [
+        "판매중",
+        "품절",
+        "단종",
+        "삭제대기"
+      ],
+      "spec_fields_count": 31,
+      "example_product": {
+        "product_code": 50683,
+        "name": "Western Digital WD 1TB BLUE WD10EZEX SATA3/7200/64M /HDD",
+        "cat": "HDD",
+        "status_key": "review",
+        "verdict": "사양 검수가 남아 추천에서 빠져 있습니다(대기 1건).",
+        "gate_note": "추천 후보가 되려면 3가지 남았습니다 — 필수 사양 · 판매 상태 · 재고",
+        "gate_blocked": [
+          "review",
+          "status",
+          "stock"
+        ],
+        "locked_fields": [],
+        "spec_done": 2,
+        "spec_total": 3,
+        "supplier": "(주)좋은디에스아이",
+        "suppliers_count": 0,
+        "in_pool": false
+      }
+    }
+  }
+}

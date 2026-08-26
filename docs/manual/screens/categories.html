@@ -1,0 +1,513 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 상품 분류 관리</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 상품 분류(판매 탐색 트리)를 처음 관리하는 직원</div>
+    <div><b>화면</b> 상품 분류 관리 · 경로 <code>/admin2/categories</code> · 화면 ID <code>ADM-CAT-010</code>
+      (코드 <code>api/admin_ui_product_category.py</code>·<code>templates/admin/product_category.html.j2</code>
+      실측값입니다. 작업 지시에는 API 모듈이 <code>api/admin_ui_categories.py</code>로 적혀 있었으나
+      실제 파일명은 <code>api/admin_ui_product_category.py</code>입니다 — 화면 자체는 같은 화면이 맞습니다,
+      확인 기준은 경로(<code>/admin2/categories</code>)입니다). 데이터 API는
+      <code>api/admin_categories.py</code>(<code>GET/POST/PATCH/DELETE /api/admin/categories</code>,
+      <code>PUT /api/admin/categories/{id}/margin</code>)입니다.</div>
+    <div><b>왜 이 화면부터인가</b> 좌측 메뉴 「상품관리」 그룹의 맨 위 항목이고, 활동 기록 실측
+      (2026-08-25)에서 <code>category</code> 종류 처리가 관리자 전체 동작 중 4위(누적 1,489건)였습니다.
+      다만 뒤 「최근 500건 안 80건」에서 보듯, 이 <code>category</code> 표시에는 이 화면이 아니라
+      「상품 분류 매핑」 화면의 동작도 섞여 있습니다 — 자세한 것은 아래 「⚠ 조심할 것」참고.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-25 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과, 그리고 <code>document.elementFromPoint()</code>로 실제 클릭 가능 여부를
+      확인한 진단 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수(분류 34건 · 위반 523건 등)는
+      상품 적재·검수가 진행되며 바뀝니다 — 정확한 지금 값은 화면 상단 지표 카드를 직접 확인하십시오.</div>
+    <div class="warn-line">⚠ 이 화면과 이름이 닮은 「상품 분류 매핑」(<code>/admin2/category-mapping</code>,
+      <code>api/admin_category_mapping.py</code>)은 <b>다른 화면</b>입니다. 이 화면(상품 분류 관리)은
+      분류 트리 자체(대분류·소분류·이름·마진)를 만들고 다듬는 곳이고, 「상품 분류 매핑」은 <b>실제
+      상품을 그 트리 어딘가로 옮기는</b> 곳입니다. 일괄 이동 상한(<code>MAX_MOVE=2000</code>)은 그
+      다른 화면의 것이고, 이 화면에는 상품을 옮기는 기능 자체가 없습니다 — 혼동하지 않도록
+      아래 「⚠ 조심할 것」 1번에 근거와 함께 다시 적었습니다.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지 · 무엇이 가리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>상품을 담을 <b>판매 탐색 트리</b>(<code>categories</code> 표)를 만들고 다듬는 화면입니다.
+    대분류 밑에 소분류를 두는 2단 트리이고, 분류마다 이름 · 정렬순서 · 노출 여부 · 허용 부품 종류 ·
+    마진율을 관리합니다. <b>실제 상품을 이 트리의 어느 칸에 옮겨 담는 일은 이 화면이 하지 않습니다</b>
+    (그것은 「상품 분류 매핑」 화면 소관입니다) — 이 화면은 상품을 담을 <b>그릇 자체</b>를 만드는
+    자리입니다.</p>
+  <p>화면 상단 배너가 이 화면의 경계를 스스로 밝힙니다(실측 그대로 인용):</p>
+  <div class="callout ok">
+    <b>「엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다」</b><br>
+    「카테고리는 판매 탐색 축입니다 — 엔진(견적)은 이 표를 읽지 않습니다. 카테고리를 옮겨도 견적
+    결과는 달라지지 않습니다.」
+  </div>
+  <p>견적 엔진이 실제로 읽는 축은 <code>part_type</code>·<code>category_group</code>이고, 이 둘은
+    <code>categories</code> 표와 완전히 다른 컬럼입니다(<code>api/taxonomy.py</code> 실측 —
+    「판매용 분류는 별도 축인 categories가 맡는다 — 그쪽은 운영자가 자유롭게 만든다」). 이 화면에서
+    분류를 아무리 옮기거나 이름을 바꿔도 상품이 견적 추천 후보에서 빠지거나 들어오는 일은 <b>일어나지
+    않습니다.</b></p>
+  <p>2026-08-25 실측 기준: 분류 <b>34건</b>(대분류 6 · 소분류 28) · 개별 마진이 걸린 분류
+    <b>0건</b>(전부 전역 기본 12%를 상속) · 허용 종류 위반 <b>523건</b>(7개 노드에 분산 —
+    경고일 뿐 저장을 막지는 않습니다) · 분류 미배정 상품 <b>51건</b>(재고 있음 33건 포함) ·
+    분류를 고를 때 쓰는 표시 종류 <b>18종</b>(쿨러 공랭·수랭을 하나로 접은 값).</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>새 판매 카테고리(대분류 또는 소분류)를 만들어야 할 때</li>
+    <li>카테고리 이름을 바꾸거나 다른 상위 분류 밑으로 옮겨야 할 때</li>
+    <li>특정 분류에만 다른 마진율을 걸어야 할 때(걸지 않으면 상위 또는 전역 기본값을 그대로 상속)</li>
+    <li>상단 지표의 「허용 종류 위반」이 늘어난 것을 보고 원인을 살피러 올 때(단, 실제로 상품을 옮겨
+      바로잡는 것은 이 화면이 아니라 「상품 분류 매핑」 또는 상품 상세 화면입니다)</li>
+    <li>「분류 미배정 상품」이 있는지 확인하러 올 때(옮기는 것은 역시 다른 화면)</li>
+    <li>좌측 메뉴 「상품관리」 그룹의 「상품 분류 관리」에서 옵니다 — 직접 주소
+      (<code>/admin2/categories</code>)로도 들어올 수 있습니다</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>가장 자주 보게 되는 기본 화면(트리 전체 펼침 · 아무 분류도 선택하지 않은 상태)입니다. 먼저
+    전체 모습을 보고, 아래에서 영역별로 확대해 하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/categories-full.png" alt="상품 분류 관리 화면 전체">
+      <b class="pin" style="--x:6.31%;--y:50.0%">1</b>
+      <b class="pin" style="--x:14.93%;--y:2.43%">2</b>
+      <b class="pin" style="--x:27.82%;--y:2.43%">3</b>
+      <b class="pin" style="--x:36.58%;--y:2.43%">4</b>
+      <b class="pin" style="--x:89.92%;--y:2.43%">5</b>
+      <b class="pin" style="--x:94.25%;--y:2.43%">6</b>
+      <b class="pin" style="--x:98.15%;--y:2.43%">7</b>
+      <b class="pin" style="--x:56.31%;--y:7.92%">8</b>
+      <div class="box" style="--x:12.62%;--y:9.74%;--w:87.38%;--h:6.93%"></div>
+      <b class="pin" style="--x:14.62%;--y:11.74%">9</b>
+      <div class="box" style="--x:13.69%;--y:17.81%;--w:65.6%;--h:77.9%"></div>
+      <b class="pin" style="--x:15.69%;--y:19.81%">10</b>
+      <b class="pin" style="--x:16.19%;--y:97.0%">11</b>
+      <div class="box" style="--x:80.12%;--y:17.81%;--w:18.81%;--h:80.47%"></div>
+      <b class="pin" style="--x:82.12%;--y:19.81%">12</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 트리 전체 펼침(기본값)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 지금 있는 화면이 진하게 표시됩니다. 「상품관리」
+      그룹의 첫 항목입니다.</li>
+    <li><span class="tag">2</span>위치 표시 — 「상품관리 / 상품 분류 관리」</li>
+    <li><span class="tag">3</span>권한 안내 배지 — 「조회 viewer 이상 · 쓰기 operator 이상」</li>
+    <li><span class="tag">4</span><span class="btnlabel">되돌리기 (미구현)</span> — 항상 비활성입니다.
+      이 화면의 트리 편집(추가·수정·삭제·마진)에는 되돌리기 API가 아예 없습니다(아래 「조심할 것」
+      참고).</li>
+    <li><span class="tag">5</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">6</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">7</span>아바타 — 「내 정보」 화면으로 이동</li>
+    <li><span class="tag">8</span>경계 배너 — 이 화면의 범위를 스스로 밝히는 안내줄(위 「1」 참고)</li>
+    <li><span class="tag">9</span>상단 지표 카드(테두리 상자) — 분류 수 · 개별 마진 걸린 분류 ·
+      허용 종류 위반 · 분류 미배정 상품. 자세한 구성은 <a href="#fig-c">그림 C</a> 참고</li>
+    <li><span class="tag">10</span>분류 트리(테두리 상자) — 자세한 구성은 <a href="#fig-d">그림 D</a> 참고</li>
+    <li><span class="tag">11</span><span class="btnlabel">+ 대분류 추가</span> — 아무 분류도 선택하지
+      않은 상태의 기본 라벨입니다(분류를 선택하면 라벨이 바뀝니다 — <a href="#fig-f">그림 F</a> 참고)</li>
+    <li><span class="tag">12</span>우측 레일(테두리 상자) — 마진 상속 안내 · 알려진 사각지대 · 최근
+      변경 이력. 자세한 구성은 <a href="#fig-e">그림 E</a> 참고</li>
+  </ul>
+
+  <h3><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot shot--header">
+      <img src="/shared/manual/shots/categories-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:2.64%;--y:49.04%">13</b>
+      <b class="pin" style="--x:8.29%;--y:49.04%">14</b>
+      <b class="pin" style="--x:17.39%;--y:49.04%">15</b>
+      <b class="pin" style="--x:27.42%;--y:49.04%">16</b>
+      <b class="pin" style="--x:88.46%;--y:49.04%">17</b>
+      <b class="pin" style="--x:93.42%;--y:49.04%">18</b>
+      <b class="pin" style="--x:97.89%;--y:49.04%">19</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">13</span>위치 표시(빵부스러기) — 그룹 이름</li>
+    <li><span class="tag">14</span>위치 표시 — 화면 이름</li>
+    <li><span class="tag">15</span>권한 안내 배지 — 「조회 viewer 이상 · 쓰기 operator 이상」. 실제
+      서버 판정은 <code>api/auth.py</code>의 미들웨어가 하고, 이 배지는 그 기준을 그대로 옮겨
+      적은 것입니다.</li>
+    <li><span class="tag">16</span><span class="btnlabel">되돌리기 (미구현)</span> — 항상 비활성</li>
+    <li><span class="tag">17</span>허브</li>
+    <li><span class="tag">18</span>권한 표시</li>
+    <li><span class="tag">19</span>아바타</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>상단 지표 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/72.78">
+      <img src="/shared/manual/shots/categories-stats.png" alt="상단 지표 카드 확대">
+      <b class="pin" style="--x:13.16%;--y:58.24%">20</b>
+      <b class="pin" style="--x:37.72%;--y:58.24%">21</b>
+      <b class="pin" style="--x:62.28%;--y:58.24%">22</b>
+      <b class="pin" style="--x:86.84%;--y:58.24%">23</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 9번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">20</span>분류 — 전체 건수와 「대분류 N · 소분류 N」 분해. 화면이 서버가 준
+      <code>items[]</code>를 순회해 직접 더한 값입니다(서버가 이 요약 자체를 주지는 않습니다).</li>
+    <li><span class="tag">21</span>개별 마진이 걸린 분류 — <code>margin_rate</code>가 직접 채워진
+      노드 수. 0이면 전부 상속입니다.</li>
+    <li><span class="tag">22</span>허용 종류 위반 — 「경고이지 금지가 아닙니다」라고 카드 자신이
+      밝힙니다. 저장을 막는 값이 아닙니다.</li>
+    <li><span class="tag">23</span>분류 미배정 상품 — <code>category_id</code> 미지정 기준(다른
+      정의도 있습니다 — 아래 「조심할 것」 참고). 재고 있는 것만 따로 괄호로 보여줍니다.</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>분류 트리 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1102/382.8">
+      <img src="/shared/manual/shots/categories-tree.png" alt="분류 트리 확대(머리글 + 앞쪽 9개 분류)">
+      <b class="pin" style="--x:2%;--y:4%">24</b>
+      <b class="pin" style="--x:2%;--y:12.57%">25</b>
+      <div class="box" style="--x:0.09%;--y:26.21%;--w:99.18%;--h:9.53%"></div>
+      <b class="pin" style="--x:2.09%;--y:28.21%">26</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 10번 영역을 확대(머리글 + 「부품」 대분류와 그 소분류 앞쪽 9개)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">24</span>표 머리글 — 분류 / 허용 부품 종류 / 직속·자손 / 재고 있음 /
+      마진(5열)</li>
+    <li><span class="tag">25</span>대분류 행(굵게 표시, 「▾」 캐럿으로 접고 펼침) — 예시는 「부품」.
+      직속 상품 0 / 자손 13,515처럼 <b>대분류 자신에는 직접 담긴 상품이 거의 없고 소분류에 다
+      있습니다</b> — 배지는 반드시 「자손」(두 번째 숫자) 쪽을 봐야 합니다.</li>
+    <li><span class="tag">26</span>허용 종류 위반이 있는 소분류(테두리 상자) — 「▲ 위반 N」 주황
+      배지가 붙습니다. 예시는 「메인보드」(직속 2,107건 중 54건이 <code>allowed_part_types</code>를
+      어김) — 이 소분류를 눌러 연 상세는 <a href="#fig-g">그림 G</a>에서 다룹니다.</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>우측 레일 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:300px;aspect-ratio:316/844.95">
+      <img src="/shared/manual/shots/categories-rail.png" alt="우측 레일 확대 — 마진 상속 · 알려진 사각지대 · 최근 변경 이력">
+      <div class="box" style="--x:0%;--y:0%;--w:100%;--h:16.57%"></div>
+      <b class="pin" style="--x:2%;--y:2%">27</b>
+      <div class="box" style="--x:0%;--y:17.99%;--w:100%;--h:49.92%"></div>
+      <b class="pin" style="--x:2%;--y:19.99%">28</b>
+      <div class="box" style="--x:0%;--y:69.33%;--w:100%;--h:30.67%"></div>
+      <b class="pin" style="--x:2%;--y:71.33%">29</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 12번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">27</span>마진 상속 안내 — 지금 개별 마진이 몇 개 걸려 있고 나머지가 어느
+      값을 상속하는지 문장으로 알려줍니다. 계산 원천은 <code>api/pricing.resolve_margins</code>
+      하나이고, 이 화면은 그 결과만 받아 보여줍니다(다시 계산하지 않습니다).</li>
+    <li><span class="tag">28</span>알려진 사각지대(테두리 상자) — 이 화면이 스스로 밝히는 한계
+      세 가지: 「허용 종류가 기타(ETC)뿐인 소분류는 서로 구분되지 않는다」·「'미배정 상품' 수는
+      정의가 하나가 아니다」·「노출 토글은 지금 효과가 없다」. 문구는 아래 「조심할 것」에 그대로
+      옮겼습니다.</li>
+    <li><span class="tag">29</span>최근 변경 · 되돌리기(테두리 상자) — 최근 관리자 활동 로그에서
+      <code>kind==='category'</code>인 것만 최대 20건. 되돌리기 버튼은 항목마다 전부 「미구현」이고,
+      <b>일부 항목은 이 화면이 아니라 「상품 분류 매핑」 화면의 동작입니다</b>(아래 「조심할 것」
+      참고).</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>분류를 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/categories-full-detail.png" alt="분류를 클릭해 상세 서랍이 열린 상태의 전체 화면">
+      <div class="box" style="--x:13.75%;--y:27.37%;--w:65.06%;--h:3.48%"></div>
+      <b class="pin" style="--x:15.75%;--y:29.37%">30</b>
+      <div class="box" style="--x:66.19%;--y:9.74%;--w:33.81%;--h:90.26%"></div>
+      <b class="pin" style="--x:68.19%;--y:11.74%">31</b>
+      <b class="pin" style="--x:18.15%;--y:97.0%">32</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ah1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="1112" y1="1010" x2="392" y2="1018" stroke="#c8451c" stroke-width="6" marker-end="url(#ah1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 「메인보드」(허용 종류 위반 54건이 있는 소분류)를 클릭한 직후.
+      화살표는 반투명 배경막이 실제로 덮는 범위를 가리킵니다(12번 참고).</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">30</span>방금 클릭한 행(강조 표시)</li>
+    <li><span class="tag">31</span>우측에 뜨는 상세 서랍(테두리 상자) — 확대는
+      <a href="#fig-g">그림 G</a>·<a href="#fig-h">그림 H</a></li>
+    <li><span class="tag">32</span><b>「+ 하위 분류 추가 — 메인보드」로 바뀐 버튼</b> — 분류를
+      선택하면 왼쪽 아래 추가 버튼의 라벨이 이렇게 바뀝니다. 그런데 <b>지금 이 순간 이 버튼은
+      실제로 눌리지 않습니다</b> — 서랍과 함께 뜨는 반투명 배경막이 이 버튼 위까지 덮고 있어서입니다
+      (화살표가 그 범위를 가리킵니다). <code>document.elementFromPoint()</code>로 이 버튼의 정중앙
+      좌표를 실측한 결과, 그 자리에서 실제로 맨 위에 있는 요소는 버튼이 아니라 배경막
+      (<code>#pcBackdrop</code>)이었습니다 — 클릭은 하지 않고 좌표만 읽어 확인했습니다. 자세한
+      내용과 실제로 겪는 결과는 아래 「조심할 것」 2번을 반드시 읽으십시오.</li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>상세 서랍 확대 — 허용 종류 위반이 있는 분류</h3>
+  <figure>
+    <div class="shot" style="max-width:430px;aspect-ratio:568/947.7">
+      <img src="/shared/manual/shots/categories-drawer.png" alt="상세 서랍 확대 — 허용 종류 위반이 있는 분류(메인보드)">
+      <b class="pin" style="--x:50.09%;--y:2.64%">33</b>
+      <b class="pin" style="--x:50.09%;--y:5.26%">34</b>
+      <b class="pin" style="--x:47.27%;--y:12.79%">35</b>
+      <b class="pin" style="--x:37.59%;--y:20.13%">36</b>
+      <b class="pin" style="--x:85.21%;--y:20.17%">37</b>
+      <div class="box" style="--x:3.35%;--y:25.92%;--w:93.49%;--h:9.65%"></div>
+      <b class="pin" style="--x:5.35%;--y:27.92%">38</b>
+      <div class="box" style="--x:3.35%;--y:38.89%;--w:93.49%;--h:12.02%"></div>
+      <b class="pin" style="--x:5.35%;--y:40.89%">39</b>
+      <b class="pin" style="--x:50.09%;--y:57.15%">40</b>
+      <div class="box" style="--x:3.35%;--y:61.54%;--w:93.49%;--h:6.3%"></div>
+      <b class="pin" style="--x:5.35%;--y:63.54%">41</b>
+      <b class="pin" style="--x:70.49%;--y:97.18%">42</b>
+      <b class="pin" style="--x:81.38%;--y:97.18%">43</b>
+      <b class="pin" style="--x:92.62%;--y:97.18%">44</b>
+      <b class="pin" style="--x:34.28%;--y:97.18%">45</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 분류 「메인보드」(category_id 2 · 직속 2,107 · 자손 2,107 ·
+      허용 종류 위반 54건) · 아직 아무것도 고치지 않은 상태</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">33</span>분류 이름 · 「대분류/소분류」 배지 · 닫기(✕)</li>
+    <li><span class="tag">34</span><code>category_id</code> · 상위 경로(「부품 / 메인보드」) ·
+      직속·자손 상품 수</li>
+    <li><span class="tag">35</span>이름 입력창 — 80자 제한, 글자 수 표시</li>
+    <li><span class="tag">36</span>상위 분류 — 이동 드롭다운. 선택지는 <b>최상위(대분류) 노드만</b>
+      입니다(실데이터가 2단이라 그렇게 좁혀 둔 것 — 서버 자체는 더 깊은 이동도 받습니다). 자기
+      자신이나 자기 하위로 옮기려 하면 그 항목에 「순환」 표시가 붙고 고를 수 없습니다.</li>
+    <li><span class="tag">37</span>정렬순서 입력창(숫자)</li>
+    <li><span class="tag">38</span>허용 부품 종류 칩(테두리 상자) — 표시 종류 18종 중 원하는 만큼
+      선택합니다(칩 색이 진해지면 선택된 것). 비우면 「제한 없음」입니다. 저장은 화면이 자동으로
+      실제 <code>part_type</code> 코드로 바꿔 보냅니다(쿨러를 고르면 공랭·수랭 둘 다).</li>
+    <li><span class="tag">39</span>마진(테두리 상자) — 「상속 12%」 칩(직접 값이 없다는 뜻) · 마진율
+      입력창(예: <code>0.18</code> = 18%) · <span class="btnlabel">이 분류에 걸기</span> ·
+      <span class="btnlabel">상속으로 되돌리기</span>. 이 예시는 직접 걸린 값이 없어 「상속으로
+      되돌리기」는 눌리지 않는 상태입니다(걸린 값이 없으니 되돌릴 것도 없습니다).</li>
+    <li><span class="tag">40</span>노출 스위치 — 「노출 켜짐(is_visible=true)」. 아래 안내 문구가
+      스스로 「지금은 이 값을 읽는 소비처가 없어 꺼도 목록에서 사라지지 않습니다」라고 밝힙니다.</li>
+    <li><span class="tag">41</span>위반 경고(테두리 상자, 이 분류에 위반이 있을 때만 나타남) —
+      「이 분류에 허용 종류를 어기는 상품 54건이 이미 있습니다 — 경고일 뿐 저장은 막지 않습니다.
+      옮기는 것은 "상품 분류 매핑" 화면에서 합니다.」</li>
+    <li><span class="tag">42</span><span class="btnlabel">삭제</span> — <b>확인 창이 없습니다</b>
+      (아래 「조심할 것」 3번 참고). 이 예시(상품 2,107건)는 눌러도 서버까지 가지 않고 화면이
+      먼저 「상품 2,107건이 이 카테고리에 있습니다 — 먼저 옮기세요」라고 막습니다 — 다만 버튼
+      자체는 회색으로 비활성화돼 있지 않습니다(코드 확인, 실제로 누르지는 않았습니다).</li>
+    <li><span class="tag">43</span><span class="btnlabel">되돌리기</span> — 서버 저장을 되돌리는
+      것이 아니라, <b>아직 저장하지 않은 이 화면의 임시 수정을 저장 전 상태로 되돌리는</b> 버튼입니다.
+      바뀐 것이 없으면 비활성입니다.</li>
+    <li><span class="tag">44</span><span class="btnlabel">저장</span> — 바뀐 것이 없으면 비활성입니다.</li>
+    <li><span class="tag">45</span>하단 안내 문구 — 「변경 사항이 없습니다」처럼 지금 상태를 알려줍니다.
+      권한이 없으면 「권한이 부족합니다(필요: operator, 현재: …) — 조회만 가능합니다」로 바뀝니다.</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>상세 서랍 확대 — 저장 전 미확정 상태</h3>
+  <figure>
+    <div class="shot" style="max-width:430px;aspect-ratio:568/947.7">
+      <img src="/shared/manual/shots/categories-drawer-dirty.png" alt="상세 서랍 확대 — 정렬순서를 바꾼 뒤 아직 저장하지 않은 상태">
+      <b class="pin" style="--x:85.21%;--y:20.17%">46</b>
+      <div class="box" style="--x:3.35%;--y:69.32%;--w:93.49%;--h:6.24%"></div>
+      <b class="pin" style="--x:5.35%;--y:71.32%">47</b>
+      <b class="pin" style="--x:81.38%;--y:97.18%">48</b>
+      <b class="pin" style="--x:92.62%;--y:97.18%">49</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 같은 분류(메인보드)의 정렬순서를 20 → 21로 입력창에 <b>입력만</b>
+      하고 저장은 누르지 않은 상태 — 서버로는 아무 요청도 나가지 않습니다.</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">46</span>정렬순서 입력창 — 20에서 21로 바뀌었습니다. 이름 · 정렬순서 ·
+      마진율 세 입력창은 <b>수정할 때마다 서랍 전체를 다시 그리지 않습니다</b>(전체 재렌더를 하면
+      커서·포커스가 매번 날아가는 문제가 있어, 값만 갱신하고 나머지는 그대로 둡니다).</li>
+    <li><span class="tag">47</span>「변경됨 · 저장 필요」 상자(테두리 상자) — 바뀐 항목을
+      <code>sort_order: 20 -&gt; 21</code>처럼 한 줄씩 보여줍니다. 저장하지 않은 채 다른 분류를
+      클릭하거나 하위 분류를 추가하려고 하면 「저장하지 않은 변경이 있습니다 — 저장하거나 되돌린
+      뒤 옮기세요」 경고가 뜨고 그 동작이 막힙니다(변경 유실 방지 장치입니다).</li>
+    <li><span class="tag">48</span><span class="btnlabel">되돌리기</span> — 이제 활성화됩니다(저장
+      전 상태, 즉 정렬순서 20으로 되돌립니다 — 서버에는 아무 요청도 가지 않습니다).</li>
+    <li><span class="tag">49</span><span class="btnlabel">저장</span> — 이제 활성화됩니다. 누르면
+      <code>PATCH /api/admin/categories/2</code>가 실제로 나갑니다(이 캡처는 여기서 멈췄습니다 —
+      저장 버튼은 누르지 않았습니다).</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>트리 펼치기·접기 — 하위 분류가 있는 행의 캐럿(▾/▸)을 눌러 그 아래를 접거나 폅니다.</li>
+    <li>분류 클릭 → 우측에 상세 서랍이 열리고, 이름 · 상위 분류 · 정렬순서 · 허용 부품 종류 · 마진 ·
+      노출을 한 곳에서 고칩니다(그림 F·G).</li>
+    <li>이름 변경 · 상위 분류 이동 · 정렬순서 변경 → <span class="btnlabel">저장</span>을 눌러야
+      <code>PATCH /api/admin/categories/{id}</code>가 나갑니다(입력만으로는 서버에 반영되지
+      않습니다 — 그림 H).</li>
+    <li>허용 부품 종류 칩 토글 — 이 분류에 어떤 부품 종류가 들어와야 하는지 표시합니다. <b>강제하지
+      않습니다</b> — 이미 다른 종류 상품이 들어 있어도 저장은 됩니다. 대신 그 상품 수를 「위반」으로
+      세어 상단 지표와 이 분류의 배지·서랍에 계속 보여줍니다.</li>
+    <li><span class="btnlabel">이 분류에 걸기</span> / <span class="btnlabel">상속으로 되돌리기</span>
+      — 마진율을 이 분류에 직접 걸거나(0 이상 1 미만), 지워서 상위/전역 상속으로 되돌립니다. 결과
+      응답이 몇 건(자손 포함)이 영향받는지 알려주지만, <b>판매가는 그 자리에서 바뀌지 않습니다</b> —
+      "다음 재산정"에서만 반영됩니다.</li>
+    <li>노출 스위치 — 값은 저장되고 이력에 남지만, <b>지금은 이 값을 읽어 걸러내는 화면·API가
+      없습니다</b>(실측 — 목록 API가 값과 무관하게 전 노드를 돌려줍니다). 꺼도 아무 목록에서도
+      사라지지 않습니다.</li>
+    <li><span class="btnlabel">삭제</span> — 하위 분류가 있거나(먼저 옮기거나 지우라는 안내) 이
+      분류에 직접 담긴 상품이 있으면(먼저 옮기라는 안내) 화면이 먼저 막습니다. 그 조건을 넘으면
+      <b>확인 창 없이 즉시</b> <code>DELETE /api/admin/categories/{id}</code>가 나갑니다.</li>
+    <li><span class="btnlabel">+ 대분류 추가</span> — 트리에서 아무것도 안 고른 상태에서 누르면
+      최상위에 「새 대분류」를 즉시 만듭니다(확인 창 없음). 같은 자리에 같은 이름이 이미 있으면
+      새로 만들지 않고 그 분류를 열어 보여줍니다.</li>
+    <li><span class="btnlabel">+ 하위 분류 추가 — &lt;이름&gt;</span> — 분류를 고른 상태에서 버튼
+      라벨이 이렇게 바뀌고, 그 분류 바로 아래에 「새 소분류」를 만드는 용도로 설계돼 있습니다.
+      <b>다만 지금은 마우스로 실제로 눌리지 않습니다</b> — 반드시 아래 「조심할 것」 2번을 읽으십시오.</li>
+    <li>우측 레일의 「최근 변경 · 되돌리기」 — 최근 관리자 작업(전체 로그 중 최근 500건 안에서
+      <code>kind==='category'</code>인 것)을 열람만 합니다. 되돌리기 버튼은 전부 「미구현」입니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout ok">
+    <b>이 화면은 견적·추천 후보에 영향을 주지 않습니다 — 「분류를 잘못 옮기면 상품이 후보에서
+    빠진다」는 이 화면 이야기가 아닙니다.</b> 작업 지시에는 그런 위험이 있다고 적혀 있었지만, 코드를
+    실측한 결과 사실이 아니었습니다: 이 화면이 다루는 <code>categories.category_id</code>는
+    <code>api/recommend.py</code> 어디에서도 참조되지 않고(0건), 화면 배너도 「분류를 옮겨도 견적
+    결과는 바뀌지 않습니다」라고 스스로 밝힙니다. 견적 후보를 정말로 좌우하는 축은
+    <code>part_type</code>·<code>category_group</code>이고, 그건 상품 상세·카탈로그 적재가 다루는
+    <b>완전히 다른 컬럼</b>입니다. 마찬가지로 「일괄 이동 상한 <code>MAX_MOVE=2000</code>」도 실재하는
+    값이지만 <b>이 화면이 아니라 「상품 분류 매핑」 화면</b>(<code>api/admin_category_mapping.py:43</code>)
+    것입니다 — 이 화면에는 상품을 옮기는 기능 자체가 없습니다. 두 화면을 섞어 안내하면 운영자가
+    엉뚱한 화면에서 원인을 찾게 됩니다.
+  </div>
+  <div class="callout">
+    <b>「+ 하위 분류 추가 — &lt;이름&gt;」 버튼은 지금 마우스로 눌리지 않습니다(실측 확인).</b> 분류를
+    선택하면 이 버튼의 라벨이 바뀌지만, 그 순간 함께 뜨는 반투명 배경막(서랍을 닫는 용도)이 이
+    버튼 위까지 덮습니다. <code>document.elementFromPoint()</code>로 버튼 정중앙 좌표를 실측하니
+    실제로 맨 위에 있는 요소는 배경막(<code>#pcBackdrop</code>)이었고, 버튼 자신은
+    <code>isButtonReachable: false</code>였습니다(클릭은 하지 않고 좌표만 읽어 확인 — 그림 F 참고).
+    배경막을 없애려면 서랍을 닫아야 하는데, 서랍을 닫으면 선택 자체가 풀려 버튼 라벨이 곧바로
+    「+ 대분류 추가」로 되돌아갑니다 — 그래서 지금 구조로는 <b>「특정 분류 아래에 하위 분류를
+    만든다」는 이 버튼의 목적을 마우스 클릭만으로는 이룰 수 없습니다.</b> 급하면 일단
+    <span class="btnlabel">+ 대분류 추가</span>로 최상위에 만든 뒤, 서랍의 「상위 분류 — 이동」으로
+    원하는 대분류 밑으로 옮기는 두 단계로 우회할 수 있습니다. 이 결함은 화면 코드
+    (<code>templates/admin/product_category.html.j2</code>)를 고쳐야 풀리는데, 이 작업의 담당 파일
+    밖이라 여기서는 고치지 않았습니다 — 제작 보고서에 남깁니다.
+  </div>
+  <div class="callout">
+    <b><span class="btnlabel">삭제</span>·<span class="btnlabel">+ 대분류 추가</span>·「+ 하위 분류
+    추가」는 전부 확인 창이 없습니다.</b> 조건(하위 분류 없음 · 직속 상품 없음)만 맞으면 클릭 한
+    번으로 즉시 서버에 반영됩니다. 삭제된 분류는 <b>되돌릴 API가 없어</b> 되살릴 방법이 이력 열람
+    말고는 없습니다(이름 · 정렬순서 · 마진 설정을 사람이 다시 입력해야 합니다).
+  </div>
+  <div class="callout">
+    <b>되돌리기는 전부 「미구현」입니다.</b> 헤더의 되돌리기 버튼, 우측 레일 이력 목록의 되돌리기
+    버튼 모두 항상 비활성입니다. 트리 편집(추가·이름·이동·삭제·마진)은 활동 로그에 기록만 되고
+    역방향으로 되돌리는 API 자체가 없습니다(실측 — <code>api/admin_categories.py</code>에 undo
+    라우트 0개).
+  </div>
+  <div class="callout">
+    <b>우측 레일의 「최근 변경」 목록에는 이 화면과 무관한 항목도 섞여 나옵니다.</b> 이 목록은 활동
+    로그에서 <code>kind==='category'</code>인 것만 걸러 보여주는데, 그 종류 표시는 이 화면의 트리
+    편집뿐 아니라 「상품 분류 매핑」 화면의 「이동」·「이동 되돌림」에도 똑같이 붙습니다(실측
+    2026-08-25: 최근 500건 안 <code>category</code> 80건 중 46건이 「카테고리 매핑 이동」류였습니다).
+    그런데 이 화면은 그 항목에도 예외 없이 「미구현」 배지를 붙입니다 — <b>실제로는 「상품 분류
+    매핑」 화면에서 되돌릴 수 있는 항목인데도</b> 여기서는 구분 없이 「안 된다」로 보입니다.
+  </div>
+  <div class="callout">
+    <b>마진을 저장해도 판매가는 그 자리에서 바뀌지 않습니다.</b> 「다음 판매가 재산정」에서만
+    반영됩니다 — 서랍·응답 문구가 매번 이 사실을 알려주지만, 급하게 가격을 내려야 하는 상황에서
+    이 화면만 만지고 끝냈다고 착각하기 쉽습니다.
+  </div>
+  <div class="callout">
+    <b>노출(<code>is_visible</code>) 스위치는 지금 아무 효과가 없습니다.</b> 화면이 스스로 「사각지대」
+    카드로 이 사실을 밝힙니다 — 꺼도 상품 등록 화면의 분류 선택지 등 어디에서도 사라지지 않습니다.
+    값은 저장되고 이력에 남을 뿐입니다.
+  </div>
+  <div class="callout">
+    <b>「분류 미배정 상품」 수는 정의가 하나가 아닙니다.</b> 이 화면(과 이 API)이 세는 「미배정」은
+    <code>category_id IS NULL</code> 기준(2026-08-25 51건)뿐입니다. 「미분류」라는 <b>이름의 노드</b>에
+    담긴 상품이나 부품 종류 자체를 못 정한(<code>part_type='ETC'</code>) 상품은 다른 개념이고, 이
+    화면은 그 수를 세지 않습니다 — 세 수를 서로 더하거나 비교하지 않도록 주의하십시오.
+  </div>
+  <div class="callout">
+    <b>허용 종류가 기타(ETC)뿐인 소분류(2026-08-25 기준 13개)는 서로 구분되지 않습니다.</b> 예를 들어
+    케이블 · 쿨링용품 · 프린터가 각각 다른 소분류에 있어도, 전부 「기타(ETC)」 하나만 허용하므로
+    허용 종류 위반 판정으로는 서로 구분되지 않습니다. 이 화면은 이 사실을 밝히기만 하고 2차 판별은
+    하지 않습니다.
+  </div>
+  <div class="callout">
+    <b>로컬 서버에서 고친 것이 운영에 바로 반영됩니다.</b> 개발 DB와 운영 DB가 같은 Cloud SQL
+    인스턴스를 봅니다 — 로컬 화면에서 분류를 추가·삭제하거나 마진을 걸면 배포 서버
+    (<code>admin.popcornai.co.kr</code>)의 값도 즉시 바뀝니다. 이 문서를 만드는 과정에서는 조회
+    (GET)만 했고 쓰기 동작은 한 번도 누르지 않았습니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「분류를 옮겼는데 견적·추천에 아무 변화가 없다」</b> → 정상입니다. 이 화면은 견적 엔진이
+      읽는 축(<code>part_type</code>·<code>category_group</code>)과 무관합니다. 추천 후보를
+      바꾸려면 상품 상세에서 부품 종류·분류를 직접 고쳐야 합니다.</li>
+    <li><b>「어떤 분류 아래에 소분류를 새로 만들고 싶은데 버튼이 안 눌린다」</b> → 지금 구조의 알려진
+      한계입니다(위 「조심할 것」 2번). <span class="btnlabel">+ 대분류 추가</span>로 만든 뒤 「상위
+      분류 — 이동」으로 옮기는 두 단계로 우회하십시오.</li>
+    <li><b>「허용 종류 위반이 뜨는데 어떻게 없애나」</b> → 이 화면에서는 없앨 수 없습니다. 위반은 이미
+      분류에 들어와 있는 상품의 종류가 허용 목록과 다르다는 뜻이라, 실제로 상품을 옮기는 것은 「상품
+      분류 매핑」 화면이나 상품 상세의 몫입니다. 이 화면에서 허용 종류 자체를 넓히거나 좁힐 수는
+      있습니다.</li>
+    <li><b>「마진을 걸었는데 판매가가 그대로다」</b> → 정상입니다. 「판매가 재산정」에서 미리보기 후
+      확인해야 실제 판매가에 반영됩니다.</li>
+    <li><b>「분류를 지웠는데 되돌리고 싶다」</b> → 되돌리기 API가 없습니다. 같은 이름 · 같은 자리에
+      새로 만들고, 마진 · 허용 종류를 사람이 다시 입력해야 합니다.</li>
+    <li><b>「이력에 '카테고리 매핑 이동'이라고 뜨는데 여기서 되돌릴 수 없다」</b> → 이 화면 소관이
+      아닙니다. 「상품 분류 매핑」 화면(<code>/admin2/category-mapping</code>)에 가면 그 화면 자체의
+      되돌리기 기능으로 처리할 수 있습니다.</li>
+    <li><b>「쓰기 버튼을 눌러도 반응이 없다」</b> → 조회(viewer) 권한만 있으면 버튼이 눌리지 않고,
+      호버하면 「권한이 부족합니다(필요: operator, 현재: viewer)」 같은 안내가 뜹니다. 운영자
+      (operator) 이상 등급이 필요합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_categories.py</code> · <code>api/admin_ui_product_category.py</code> ·
+        <code>templates/admin/product_category.html.j2</code> ·
+        <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>mockups/shared/admin2/admin2-shell.js</code> · <code>api/taxonomy.py</code>
+        (엔진이 읽는 축이 <code>categories</code>와 다르다는 근거) ·
+        <code>api/admin_category_mapping.py</code>(「상품 분류 매핑」과의 경계 확인용, 읽기만
+        했습니다).</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발
+        서버)에 Playwright로 접속해 2026-08-25에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_categories.py</code>(공용 도구
+        <code>scripts/manual_capture_common.py</code>를 그대로 씁니다), 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는 같은
+        폴더의 <code>categories-coords.json</code>에 있습니다.</li>
+      <li>실측 수치(분류 34건 · 위반 523건 등) — 캡처와 같은 순간
+        <code>GET /api/admin/categories</code> · <code>GET /api/admin/activity-logs</code> 응답을
+        그대로 옮겼습니다. 지어낸 숫자는 없습니다 — 매일 바뀌므로 지금 값은 화면에서 다시
+        확인하십시오.</li>
+      <li>「+ 하위 분류 추가」 버튼이 실제로 눌리는지는 <code>document.elementFromPoint()</code>로
+        진단했습니다(클릭 자체는 하지 않았습니다 — <code>addSubCategory()</code>에 확인 창이 없어
+        실제 클릭은 곧바로 카테고리를 만듭니다). 진단 결과는
+        <code>categories-coords.json</code>의 <code>_meta.stats.addsub_button_diag</code>에도
+        남아 있습니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>categories-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이 문서가 손으로
+      만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께 낡습니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_categories.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — 2026-08-25 기준 <code>.venv</code>에는 이미 설치돼
+      있지만 <code>requirements.txt</code>에는 아직 없습니다(reviews 화면 매뉴얼과 같은 상태). 새
+      환경(다른 PC·재설치한 venv)에서는 <code>pip install playwright</code> 후
+      <code>playwright install chromium</code>이 먼저 필요합니다.</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가 없어,
+      완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에 정확히
+      맞는지, 인쇄 시 페이지가 어떻게 나뉘는지)는 직접 확인하지 못했습니다. 좌표는 Playwright로
+      화면 요소의 실제 위치를 재서 계산한 값이고, 스크린샷을 읽어 문구·구조가 서술과 맞는지는
+      대조했지만, 이 매뉴얼 문서 자체를 브라우저로 열어 번호가 실제 캡처 위 버튼·영역과 정확히
+      겹치는지는 별도 확인이 필요합니다. 또한 「조회」 등급 계정에서 쓰기 버튼이 실제로 어떻게
+      비활성으로 보이는지는 코드로는 확인했지만 화면으로 직접 보지는 못했습니다(이 캡처는 owner
+      등급 점검 계정으로만 찍었습니다).</p>
+  </div>
+
+</div>

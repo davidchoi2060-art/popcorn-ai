@@ -1,0 +1,412 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 상품 사양 검수</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 상품 사양 검수를 처음 맡는 직원</div>
+    <div><b>화면</b> 상품 사양 검수 · 경로 <code>/admin2/reviews</code> · 화면 ID <code>ADM-PRD-020</code>
+      (코드 <code>api/admin_reviews.py</code>·<code>api/admin_ui_reviews.py</code> 실측값입니다.
+      작업 지시에는 <code>ADM-PRD-060</code>으로 적혀 있었으나 실제 라우트·화면 코드의 값은
+      <code>ADM-PRD-020</code>이라 이 문서는 코드 쪽을 따랐습니다 — 번호가 다르면 이 화면이
+      맞는지 경로(<code>/admin2/reviews</code>)로 확인하십시오.)</div>
+    <div><b>왜 이 화면부터인가</b> 활동 기록 실측(2026-08-25)에서 <code>product_review</code> 처리가
+      전체 관리자 동작 중 가장 많았습니다(누적 3,694건 · 최근 7일 3,647건 — 2위 상품 관리(2,941건)를
+      크게 앞섭니다). 관리자 화면 매뉴얼의 두 번째 시범판입니다(첫 번째는
+      <code>운영자매뉴얼-매입소싱.md</code> — 화면 캡처 없이 코드만 읽고 쓴 글 버전이었습니다).
+      이번 판에서 화면 캡처 + 번호 주석 형식을 처음 넣었습니다 — 형식이 확정되면 나머지 화면으로 넓힙니다
+      (전체 화면 수는 여기 적지 않습니다 — <code>scripts/state.py</code>가 그때그때 잽니다).</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-25 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>)에 직접 띄워 촬영한 결과를 근거로
+      썼습니다(코드만 읽고 쓴 매입·소싱 판과 다른 점입니다).</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수(대기 5,886건 등)는
+      매일 바뀝니다 — 정확한 지금 값은 화면 좌측 상단에서 직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>카탈로그에 상품을 올릴 때 자동으로 채워지지 않았거나, 자동으로 채웠어도 그대로 믿기 어려운
+    사양값을 사람이 확인하는 화면입니다. <b>이 화면에서 「승인」해야만</b> 그 값이 정식 사양
+    (<code>product_specs</code>)에 들어가고, 그래야 그 상품이 견적 추천 후보 풀에 들어갈 수
+    있습니다 — 이 화면의 승인 동작이 검수 대기 상품을 추천 후보로 들여보내는 유일한 문입니다.</p>
+  <p>검수 대기 건은 성격이 다른 세 갈래로 갈립니다.</p>
+  <ul>
+    <li><b>제안 있음</b> — 다나와나 제조사 웹페이지에서 값을 찾아와 「이 값이 맞는지 확인해
+      주세요」라고 제안해 둔 것. 확인만 하면 됩니다.</li>
+    <li><b>값 없음</b> — 원문 어디에도 그 사양값이 없어서, 제안조차 못 하고 사람이 직접 찾아
+      입력해야 하는 것. 지금 큐의 대부분(97% 이상)이 이쪽입니다.</li>
+    <li><b>정체성 충돌</b> — 사양값이 아니라 다나와 코드나 상품명 자체가 잘못 연결된 것. 이 화면의
+      승인 경로로는 닫을 수 없습니다(기각만 가능 — 아래 「조심할 것」 참고).</li>
+  </ul>
+  <p>2026-08-25 실측 기준: 대기 <b>5,886건</b> — 제안 있음 <b>253건</b> / 값 없음 <b>5,633건</b>.
+    처리 방식으로 나누면 일괄 확정 가능 <b>0건</b> · 단건 검수 필요 <b>1건</b> · 원문에 값 자체가
+    없어 사람이 직접 넣어야 하는 것 <b>5,885건</b>(재파싱으로는 더 회수되지 않습니다). 지금
+    판매중이고 재고도 있어 매출에 바로 영향을 주는 것은 <b>1,444건</b>이고, 정체성 충돌은
+    <b>5건</b>입니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>새로 올린 상품의 필수 사양이 비어 있어 추천 후보에 들어가지 못하고 있을 때</li>
+    <li>다나와·웹에서 값을 찾아왔다는 「제안 있음」 건이 쌓였을 때, 그것을 확인·승인할 때</li>
+    <li>특정 사양 필드(예: 쿨러 발열 한도)를 몰아서 처리하고 싶을 때 — 왼쪽 「사양 필드별 대기」에서
+      그 필드를 눌러 좁혀 봅니다</li>
+    <li>지금 매출에 영향을 주는 것부터 급하게 처리하고 싶을 때 — 「판매중·재고 있는 것만」 필터</li>
+    <li>방금 잘못 승인·기각한 건을 되돌려야 할 때(단, 이 화면을 연 뒤 처리한 것만 — 아래 참고)</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>가장 자주 보게 되는 「사양 검수」 탭의 기본 화면(필터 없음 · 처리 상태 「대기」)입니다. 먼저
+    전체 모습을 보고, 아래에서 영역별로 확대해 하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/reviews-full.png" alt="상품 사양 검수 화면 전체">
+      <b class="pin" style="--x:6.31%;--y:25.62%">1</b>
+      <b class="pin" style="--x:15.54%;--y:2.43%">2</b>
+      <b class="pin" style="--x:25.74%;--y:2.43%">3</b>
+      <b class="pin" style="--x:29.97%;--y:2.43%">4</b>
+      <b class="pin" style="--x:19.02%;--y:13.20%">5</b>
+      <div class="box" style="--x:13.45%;--y:33.13%;--w:11.13%;--h:8.56%"></div>
+      <b class="pin" style="--x:15.45%;--y:23.36%">6</b>
+      <b class="pin" style="--x:15.45%;--y:35.13%">7</b>
+      <b class="pin" style="--x:15.45%;--y:45.11%">8</b>
+      <b class="pin" style="--x:26.48%;--y:11.07%">9</b>
+      <b class="pin" style="--x:27.48%;--y:15.12%">10</b>
+      <b class="pin" style="--x:23.89%;--y:6.71%">11</b>
+      <b class="pin" style="--x:62.74%;--y:98.10%">12</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 필터 없음(기본값)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 지금 있는 화면이 진하게 표시됩니다. 「상품사양관리」
+      그룹 안에 있습니다.</li>
+    <li><span class="tag">2</span>위치 표시 — 「상품사양관리 / 상품 사양 검수」</li>
+    <li><span class="tag">3</span>오늘 처리 — 이 계정이 오늘(서울 기준) 처리한 건수</li>
+    <li><span class="tag">4</span><span class="btnlabel">되돌리기</span> — 방금 처리한 것을 취소.
+      기본은 비활성(회색)이고, 이 화면에서 뭔가 처리해야 눌립니다</li>
+    <li><span class="tag">5</span>이 필터 범위 — 지금 조건에서 대기 중인 건수(큰 숫자)</li>
+    <li><span class="tag">6</span>할 수 있는 일 — 「전체 대기 / A·제안 있음 / B·값 없음」. 클릭하면
+      그 범위로 좁혀집니다</li>
+    <li><span class="tag">7</span>정체성 충돌 경고(테두리 상자) — 사양이 아니라 분류·코드 문제인
+      건이 있을 때만 나타납니다</li>
+    <li><span class="tag">8</span>사양 필드별 대기 — 필드마다 막대로 건수를 보여줍니다</li>
+    <li><span class="tag">9</span>검색·필터 바 — 자세한 구성은 <a href="#fig-d">그림 D</a> 참고</li>
+    <li><span class="tag">10</span>목록 표 — 자세한 구성은 <a href="#fig-e">그림 E</a> 참고</li>
+    <li><span class="tag">11</span>「단가표 편입 대기」 탭 — 이 화면과는 다른 원천(공급처 단가표)의
+      목록입니다. 아래 「무엇을 할 수 있는가」에서 간단히만 다룹니다</li>
+    <li><span class="tag">12</span>페이지네이션 — 현재 페이지 범위 / 전체 건수</li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot shot--header">
+      <img src="/shared/manual/shots/reviews-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:6.5%;--y:49.04%">13</b>
+      <b class="pin" style="--x:15.01%;--y:49.04%">14</b>
+      <b class="pin" style="--x:19.85%;--y:49.04%">15</b>
+      <b class="pin" style="--x:88.46%;--y:49.04%">16</b>
+      <b class="pin" style="--x:93.42%;--y:49.04%">17</b>
+      <b class="pin" style="--x:97.89%;--y:49.04%">18</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">13</span>위치 표시(빵부스러기) — 그룹 이름 / 화면 이름</li>
+    <li><span class="tag">14</span>오늘 처리 N건 — 서버가 서울 자정 기준으로 셉니다(새로고침해도
+      그대로 유지됩니다 — 화면이 세는 값이 아닙니다)</li>
+    <li><span class="tag">15</span><span class="btnlabel">되돌리기</span> — <b>이 화면을 연 뒤,
+      이 브라우저 세션에서 처리한 것만</b> 되돌릴 수 있습니다(아래 「조심할 것」 참고)</li>
+    <li><span class="tag">16</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">17</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">18</span>아바타 — 「내 정보」 화면으로 이동</li>
+  </ul>
+
+  <h3><span class="fig">그림 C</span>좌측 집계 패널 확대</h3>
+  <figure>
+    <div class="shot shot--sidebar">
+      <img src="/shared/manual/shots/reviews-sidebar.png" alt="좌측 집계 패널 확대">
+      <b class="pin" style="--x:49.77%;--y:6.9%">19</b>
+      <div class="box" style="--x:6.48%;--y:13.99%;--w:86.57%;--h:11.31%"></div>
+      <b class="pin" style="--x:49.77%;--y:19.64%">20</b>
+      <b class="pin" style="--x:16.91%;--y:28.56%">21</b>
+      <b class="pin" style="--x:34.49%;--y:34.52%">22</b>
+      <b class="pin" style="--x:8.48%;--y:38.78%">23</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 5~8번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">19</span>이 필터 범위(대기 건수) + 「판매중·재고&gt;0 — 지금 매출에 영향」 강조줄</li>
+    <li><span class="tag">20</span>전체 대기 / A·제안 있음 / B·값 없음(테두리 상자) — 클릭해서
+      그 범위로 좁혀 봅니다. 「B·값 없음」은 <code>총 대기 − 제안 있음</code>으로 계산됩니다
+      (원문값이 있고 없고가 아니라 <b>외부 제안이 있고 없고</b> 기준입니다)</li>
+    <li><span class="tag">21</span>정체성 충돌 5건 — 사양이 아니라 다나와코드·상품명 문제</li>
+    <li><span class="tag">22</span><span class="warn">「정체성 검수 화면으로 →」</span> — ⚠ 지금은
+      눌러도 화면이 이동하지 않고 안내 문구만 뜹니다(아래 「조심할 것」 참고)</li>
+    <li><span class="tag">23</span>사양 필드별 대기 — 필드 이름을 누르면 그 필드만 남습니다.
+      막대 길이는 가장 많은 필드 대비 비율입니다</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>검색·필터 바 확대</h3>
+  <figure>
+    <div class="shot shot--filterbar">
+      <img src="/shared/manual/shots/reviews-filterbar.png" alt="검색·필터 바 확대">
+      <b class="pin" style="--x:12.03%;--y:49.06%">24</b>
+      <b class="pin" style="--x:27.59%;--y:49.06%">25</b>
+      <b class="pin" style="--x:37.26%;--y:49.06%">26</b>
+      <b class="pin" style="--x:46.94%;--y:49.06%">27</b>
+      <b class="pin" style="--x:55.97%;--y:49.06%">28</b>
+      <b class="pin" style="--x:69.94%;--y:49.06%">29</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 9번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">24</span>검색창 — 상품명 · product_code · 사양 필드명을 함께 찾습니다</li>
+    <li><span class="tag">25</span>부품 종류 — 드롭다운으로 CPU·메인보드 등 하나를 고릅니다</li>
+    <li><span class="tag">26</span>판매중·재고 있는 것만 — 토글식 필터</li>
+    <li><span class="tag">27</span>사양 필드 — 특정 필드 하나로 좁힙니다(그림 C의 23번과 같은 필터를 공유)</li>
+    <li><span class="tag">28</span>처리 상태 — 기본값 「대기」. 승인·수정·자동승인·보류·처리로도 바꿔 볼 수 있습니다</li>
+    <li><span class="tag">29</span><span class="btnlabel">선택 항목 함께 적용</span> — 왼쪽 체크박스로
+      고른 행을 한 번에 처리(아래 「무엇을 할 수 있는가」에서 자세히 설명)</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>목록 표 확대</h3>
+  <figure>
+    <div class="shot shot--table">
+      <img src="/shared/manual/shots/reviews-table.png" alt="목록 표 확대(머리글 + 앞쪽 6행)">
+      <b class="pin" style="--x:2%;--y:4%">30</b>
+      <b class="pin" style="--x:2%;--y:16.38%">31</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 10번 영역을 확대(머리글 + 앞쪽 6행)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">30</span>표 머리글 — 상품 / 사양 필드 / 원문값 / 제안값 / 신뢰 신호 / 상태(6열)</li>
+    <li><span class="tag">31</span>행 — 클릭하면 우측에 상세 패널(서랍)이 열립니다. 왼쪽 체크박스는
+      「선택 항목 함께 적용」용입니다</li>
+  </ul>
+
+  <h3><span class="fig">그림 F</span>행을 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/reviews-full-detail.png" alt="행을 클릭해 상세 패널이 열린 상태의 전체 화면">
+      <div class="box" style="--x:68.10%;--y:13.62%;--w:31.90%;--h:86.38%"></div>
+      <b class="pin" style="--x:27.48%;--y:18.31%">32</b>
+      <b class="pin" style="--x:70.10%;--y:16.62%">33</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ah1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="1040" y1="192" x2="1136" y2="192" stroke="#c8451c" stroke-width="6" marker-end="url(#ah1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 목록 첫 행을 클릭한 직후(값이 없어 원문·제안 모두 「없음」인 건)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">32</span>방금 클릭한 행(선택 표시)</li>
+    <li><span class="tag">33</span>우측에 뜨는 상세 패널(테두리 상자) — 확대는
+      <a href="#fig-g">그림 G</a>·<a href="#fig-h">그림 H</a></li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>상세 패널 확대 — 제안값이 없는 경우</h3>
+  <figure>
+    <div class="shot shot--drawer">
+      <img src="/shared/manual/shots/reviews-drawer.png" alt="상세 패널 확대 — 제안값이 없는 경우">
+      <b class="pin" style="--x:40.60%;--y:2.70%">34</b>
+      <b class="pin" style="--x:15.24%;--y:5.31%">35</b>
+      <div class="box" style="--x:3.54%;--y:11.33%;--w:93.10%;--h:6.49%"></div>
+      <b class="pin" style="--x:5.54%;--y:12.33%">36</b>
+      <div class="box" style="--x:3.54%;--y:21.75%;--w:93.10%;--h:2.48%"></div>
+      <b class="pin" style="--x:5.54%;--y:20.36%">37</b>
+      <b class="pin" style="--x:43.60%;--y:96.94%">38</b>
+      <b class="pin" style="--x:60.42%;--y:96.94%">39</b>
+      <b class="pin" style="--x:83.19%;--y:96.94%">40</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 상품 「(3RSYS) R3 /케이스」 · gpu_max_mm 검수 건(값 없음)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">34</span>상품명 · 판매 상태 배지 · 닫기(✕)</li>
+    <li><span class="tag">35</span>product_code · 부품 종류 · 등록일</li>
+    <li><span class="tag">36</span>대조 — 원문 추출값 / 제안값. 이 예시는 둘 다 「없음」입니다</li>
+    <li><span class="tag">37</span>이 상품의 필수 사양 — 그 상품에 필요한 필수 항목 중 몇 개가
+      채워졌는지(이 예시는 「필수 3개 중 1개 채워짐 · 2개 비어 있음」)</li>
+    <li><span class="tag">38</span><span class="btnlabel">기각(보류)</span> — 이 검수 건을 보류로 넘깁니다</li>
+    <li><span class="tag">39</span><span class="btnlabel">직접 입력…</span> — 누르면 같은 자리에
+      입력창이 인라인으로 열립니다(별도 창이 아닙니다)</li>
+    <li><span class="tag">40</span>「값 없음 — 직접 입력 필요」(회색·비활성) — 승인할 제안값 자체가
+      없어 <span class="btnlabel">제안값 승인</span> 버튼이 이 문구로 바뀌고 눌리지 않습니다</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>상세 패널 확대 — 제안값이 있는 경우</h3>
+  <figure>
+    <div class="shot shot--drawer">
+      <img src="/shared/manual/shots/reviews-drawer-suggested.png" alt="상세 패널 확대 — 제안값이 있는 경우">
+      <b class="pin" style="--x:5.54%;--y:12.33%">41</b>
+      <div class="box" style="--x:3.54%;--y:20.02%;--w:93.10%;--h:11.16%"></div>
+      <b class="pin" style="--x:5.54%;--y:21.02%">42</b>
+      <div class="box" style="--x:3.54%;--y:35.11%;--w:93.10%;--h:5.62%"></div>
+      <b class="pin" style="--x:5.54%;--y:33.72%">43</b>
+      <div class="box" style="--x:3.54%;--y:44.66%;--w:93.10%;--h:3.42%"></div>
+      <b class="pin" style="--x:5.54%;--y:43.27%">44</b>
+      <b class="pin" style="--x:24.84%;--y:96.94%">45</b>
+      <b class="pin" style="--x:88.95%;--y:96.94%">46</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 상품 「1st Player SP5-G BLACK (미니타워)」 · gpu_max_mm 검수 건
+      (다나와 제안 295mm · 신뢰도 0.80)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">41</span>대조 — 이번엔 제안값이 채워져 있습니다(원문 「없음」 / 제안값
+      「295 mm · 다나와」)</li>
+    <li><span class="tag">42</span>신뢰 신호(테두리 상자) — 신뢰도 점수(0.80) · 막대 · 근거 문장
+      (「CASE 필수 사양 'gpu_max_mm' 미확인 — 적재 원천에서 추출 실패 [다나와 제안: 295 · 유사도
+      0.81 — 확인 후 승인하세요]」)</li>
+    <li><span class="tag">43</span>이 상품의 필수 사양(테두리 상자)</li>
+    <li><span class="tag">44</span>형제 — 같은 모델의 다른 대기 건(테두리 상자). 체크하면 함께
+      적용되고, 되돌릴 때도 함께 되돌아갑니다(부분 되돌리기 없음)</li>
+    <li><span class="tag">45</span>하단 안내 문구 — 「형제 포함 N건이 한 번에 적용되고, 되돌리기도
+      함께 묶입니다」처럼 지금 누르면 무슨 일이 일어나는지 미리 알려줍니다</li>
+    <li><span class="tag">46</span><span class="btnlabel">제안값 승인</span>(진한 배경·활성) —
+      제안값이 있으면 이 문구·색으로 바뀌고 눌립니다</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>목록에서 행을 클릭 → 우측에 상세 패널이 열리고, 원문값과 제안값을 나란히 비교합니다
+      (그림 G·H).</li>
+    <li><span class="btnlabel">제안값 승인</span> — 제안값을 그대로 정식 사양에 반영합니다. 승인
+      한 번에 ① 값 반영 ② 그 사양 필드 잠금(다음 카탈로그 적재가 덮어쓰지 않도록) ③ 이 검수 건
+      해소 ④ 그 상품의 필수 사양이 모두 채워지면 추천 후보 진입까지 함께 일어납니다. 결과로 실제
+      후보 풀에 몇 건이 새로 들어갔는지(<code>pool_added</code>)를 서버가 그대로 알려줍니다 —
+      화면이 미리 추측해서 보여주지 않습니다.</li>
+    <li><span class="btnlabel">직접 입력…</span> — 원문에도 제안에도 값이 없을 때, 사람이 조사한
+      값을 그 자리에서 입력합니다(그림 G의 39번). 숫자형 필드는 단위까지 안내해 줍니다.</li>
+    <li><span class="btnlabel">기각(보류)</span> — 이 검수 건을 「보류」 상태로 넘깁니다. 사유를
+      직접 적을 수 있고, 안 적으면 서버가 기본 사유를 채웁니다. 정체성 충돌(사양이 아니라 분류·코드
+      문제) 건은 이 화면에서 <b>기각만</b> 가능합니다 — 승인 경로로 닫을 수 없습니다.</li>
+    <li>형제(같은 모델의 다른 대기 건) 체크 — 색상만 다른 같은 모델이 여러 건 대기 중일 때, 체크한
+      건들에 같은 값을 한 번에 적용합니다. 이름이 닮았다는 것만으로 자동 판단하지 않고, 항상 사람이
+      직접 체크해야 합니다.</li>
+    <li><span class="btnlabel">선택 항목 함께 적용</span>(그림 D의 29번) — 목록에서 체크박스로 여러
+      행을 고른 뒤 한 번에 처리합니다. <b>새로 만든 일괄 처리 API가 아니라, 기존 단건 승인 API를
+      선택한 건수만큼 차례로 부르는 방식</b>입니다. 그래서 제안값이 없는 행은 승인할 값 자체가
+      없어 사유와 함께 자동으로 건너뛰고, 몇 건이 실제로 적용됐는지 결과 문구로 알려줍니다.</li>
+    <li>필터(그림 D) — 검색어 · 부품 종류 · 판매중·재고 있는 것만 · 사양 필드 · 처리 상태를 조합해
+      좁혀 볼 수 있습니다.</li>
+    <li>좌측 「할 수 있는 일」 칩(그림 C의 20번) — 전체 대기 / 제안 있음(A) / 값 없음(B)을 눌러
+      큰 갈래로 빠르게 좁힙니다.</li>
+    <li>좌측 「사양 필드별 대기」(그림 C의 23번) — 필드 하나를 눌러 그 필드만 몰아서 처리합니다.
+      같은 필드를 연달아 보면 판단 기준이 흔들리지 않습니다.</li>
+    <li><span class="btnlabel">되돌리기</span>(그림 B의 15번) — 방금 처리한 것을 취소합니다. 값 ·
+      잠금 · 게이트(후보 진입 여부) · 검수 상태를 전부 함께 되돌립니다.</li>
+    <li>주소 뒤에 <code>?suggested=1&amp;field=cooler_tdp</code>처럼 붙여 특정 조건으로 바로 열 수
+      있습니다(다른 화면에서 「이 필드를 검수하세요」로 링크를 걸 때 씁니다). 모르는 필드명·상태값이
+      섞여 있으면 조용히 무시하지 않고 그 값만 기본값으로 돌리며 이유를 알려줍니다.</li>
+    <li>둘째 탭 「단가표 편입 대기」(그림 A의 11번) — 이 화면과는 다른 원천(공급처가 보낸 단가표
+      원본 행)입니다. 카탈로그에 아직 없는 신규 모델을, 이름이 닮은 기존 상품에 연결하거나
+      신규 등록 검토로 넘깁니다. 사양 검수와 별개의 작업이라 이 문서에서는 자세히 다루지 않습니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>되돌리기는 이번 세션에서 처리한 것만 기억합니다.</b> 화면을 새로고침하거나 나갔다 다시
+    들어오면 되돌릴 목록이 비어 버튼이 다시 회색으로 돌아갑니다. 어제 처리한 것을 오늘 여기서
+    되돌릴 수 없습니다 — 잘못 처리했다면 <b>같은 화면을 나가지 말고 그 자리에서 바로</b> 되돌리십시오.
+  </div>
+  <div class="callout">
+    <b>「정체성 검수 화면으로 →」 링크(그림 C의 22번)는 지금 눌러도 화면이 이동하지 않습니다.</b>
+    코드를 확인한 결과, 이 링크는 경고 문구(「정체성 검수 화면(별도)으로 이동 — 다나와코드·상품명은
+    여기서 못 고칩니다」)만 띄우고 실제 이동은 하지 않습니다. 정체성 충돌 건을 실제로 바로잡으려면
+    <b>기각(보류)한 뒤 상품 관리 화면에서 직접</b> 그 상품을 찾아 고쳐야 합니다.
+  </div>
+  <div class="callout">
+    <b>큐의 대부분(오늘 기준 5,885건, 97% 이상)은 「재파싱으로 더 회수되지 않는」 건입니다.</b>
+    원문 자체에 그 사양값이 없어서 자동으로는 절대 못 채웁니다 — 제조사 홈페이지·판매 페이지
+    등에서 사람이 직접 찾아 <span class="btnlabel">직접 입력…</span>으로 넣어야 합니다.
+  </div>
+  <div class="callout">
+    <b>제안값이라고 다 정답은 아닙니다.</b> 신뢰도가 낮거나 보통이면 상세 패널이 「검증 없이
+    승인하지 마세요」·「출처를 확인한 뒤 승인하세요」라고 직접 경고합니다(그림 H의 42번). 다나와나
+    웹에서 자동으로 긁어온 값일 뿐이므로, 근거가 약하면 출처 링크를 열어 확인한 뒤 승인하십시오.
+  </div>
+  <div class="callout">
+    <b>조회 권한만 있으면 이 화면의 쓰기 버튼이 실제로 흐리게(비활성으로) 보입니다.</b> 승인·기각·
+    직접 입력·일괄 적용 버튼이 전부 눌리지 않는 상태로 나타납니다. (매입 견적 화면은 반대로
+    버튼이 흐려지지 않고 누른 뒤에야 거부됩니다 — 화면마다 표시 방식이 다릅니다.)
+  </div>
+  <div class="callout">
+    <b>「선택 항목 함께 적용」은 새 일괄 API가 아니라 기존 단건 API의 반복 호출입니다.</b> 제안값이
+    없는 행은 조용히 건너뛰므로, 선택한 건수와 실제로 처리된 건수가 다를 수 있습니다 — 결과 문구로
+    반드시 확인하십시오.
+  </div>
+  <div class="callout">
+    <b>좌측 집계(할 수 있는 일 · 사양 필드별 대기 · 정체성 충돌)는 「지금 켜진 필터」 기준입니다</b>
+    (자기 자신을 걸러 만드는 필터는 제외). 부품 종류나 검색어를 바꾸면 이 숫자들도 함께
+    바뀝니다 — 화면 맨 위 큰 숫자(대기 5,886건)와 헷갈리지 않도록 주의하십시오.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「제안값 승인 버튼이 안 눌린다(비활성)」</b> → 그 건에 제안값 자체가 없어 버튼 문구가
+      「값 없음 — 직접 입력 필요」로 바뀐 경우(그림 G의 40번)이거나, 내 권한이 「조회」뿐인
+      경우입니다. 값이 없으면 <span class="btnlabel">직접 입력…</span>을 쓰십시오.</li>
+    <li><b>「되돌리기 버튼이 계속 흐리다」</b> → 이 화면을 연 뒤로 아직 아무것도 처리하지 않았거나,
+      새로고침해서 방금 처리 목록이 비워진 경우입니다. 이전 세션에서 한 일은 이 버튼으로 되돌릴 수
+      없습니다.</li>
+    <li><b>「쿨러 발열 한도만 몰아서 처리하고 싶다」</b> → 왼쪽 「사양 필드별 대기」에서 「쿨러 발열
+      한도(2026-08-25 기준 1,020건)」를 클릭하면 그 필드만 남습니다. 이렇게 좁혀 놓고 계속
+      진행하면 판단 기준이 흔들리지 않습니다.</li>
+    <li><b>「정체성 충돌이라고 뜨는데 뭘 해야 할지 모르겠다」</b> → 사양값 문제가 아니라 다나와
+      코드나 상품명 자체가 잘못 연결된 경우입니다. 이 화면에서는 승인으로 닫을 수 없고 기각(보류)만
+      가능합니다 — 실제로 고치는 것은 상품 관리 화면의 몫입니다(⚠ 「정체성 검수 화면으로」 링크는
+      지금 실제로 이동하지 않으니, 상품 관리에서 직접 그 상품을 찾아 고쳐야 합니다).</li>
+    <li><b>「일괄 적용을 눌렀는데 선택한 것보다 적게 처리됐다고 나온다」</b> → 정상입니다. 제안값이
+      없는 행은 승인할 값이 없어 자동으로 건너뛰기 때문입니다. 결과 문구에 실제로 몇 건이
+      적용됐는지 나옵니다.</li>
+    <li><b>「형제로 여러 건이 같이 떴는데 다 체크해도 되나」</b> → 이름이 닮았다고 사양까지 같다는
+      보장은 없습니다. 색상 표기만 다른 게 확실할 때만 체크하고, 애매하면 하나씩 따로
+      처리하십시오 — 형제로 묶어 적용하면 되돌릴 때도 전부 함께 되돌아갑니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_reviews.py</code> · <code>api/admin_ui_reviews.py</code> ·
+        <code>templates/admin/reviews.html.j2</code> · <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>mockups/shared/admin2/admin2-shell.js</code></li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-25에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots.py</code>, 이미지는 <code>mockups/shared/manual/shots/</code>에
+        있고 화면에는 <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의
+        실측 좌표는 같은 폴더의 <code>reviews-coords.json</code>에 있습니다(2026-08-25 최초
+        촬영 당시에는 <code>docs/manual/shots/</code>에 있었는데, 운영자 설명서 화면
+        (<code>/admin2/manual</code>)이 웹으로 읽으려면 정적 자산 경로 아래 있어야 해서
+        옮겼습니다 — 원본은 그 자리에 그대로 남아 있습니다).</li>
+      <li>실측 수치(대기 건수 등) — 캡처와 같은 순간 <code>GET /api/admin/reviews</code> ·
+        <code>GET /api/admin/spec-fields</code> 응답을 그대로 옮겼습니다. 지어낸 숫자는
+        없습니다 — 매일 바뀌므로 지금 값은 화면에서 다시 확인하십시오.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>reviews-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이 문서가
+      손으로 만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께 낡습니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — 2026-08-25 기준 <code>.venv</code>에는 이미 설치돼
+      있지만 <code>requirements.txt</code>에는 아직 없습니다. 새 환경(다른 PC·재설치한 venv)에서는
+      <code>pip install playwright</code> 후 <code>playwright install chromium</code>이 먼저
+      필요합니다.</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가
+      없어, 완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에 정확히
+      맞는지, 인쇄 시 페이지가 어떻게 나뉘는지)는 직접 확인하지 못했습니다. 좌표는 Playwright로
+      화면 요소의 실제 위치를 재서 계산한 값이며, 이 문서를 브라우저로 열어 캡처 위 번호가 실제
+      버튼·영역과 맞는지, 인쇄 미리보기가 의도대로 나오는지는 별도 확인이 필요합니다. 또한 이
+      캡처는 owner 등급 점검 계정으로만 찍었습니다 — 「조회」・「운영자」 등급 계정에서 버튼이
+      실제로 어떻게 흐리게 보이는지는 코드로는 확인했지만 화면으로 직접 보지는 못했습니다.</p>
+  </div>
+
+</div>

@@ -367,8 +367,94 @@ NAV = [
 ]
 
 
+def _manual_nav_group(current_path: str = "") -> dict | None:
+    """「운영자 매뉴얼」 최상위 그룹 — 위 NAV 를 손으로 다시 적지 않고 그대로 반영한다.
+
+    2026-08-25 사장님 지시: 매뉴얼을 "시스템" 하위 한 줄이 아니라 **최상위 그룹**으로
+    두고, 그 아래 지금 메뉴 구조(41화면)를 그대로 반영한다 — "직원이 화면을 찾던
+    자리에서 그 화면의 설명서도 찾게 한다." 손으로 그룹·화면 목록을 복제하면 위 NAV가
+    바뀔 때 이 목록만 낡는다(이 저장소가 이미 여러 번 걸린 병 — `.claude/CANON.md` §1) —
+    그래서 항상 위 NAV 를 순회해서 만든다.
+
+    각 화면 라벨은 "그룹명 · 화면명"으로 평평하게 편다 — 셸(`_admin2_shell.html.j2`,
+    단일 소유 파일이라 이번 작업에서 고치지 않는다)이 그룹 «안에» 다시 하위 그룹을
+    그리는 기능이 없다(한 그룹 = 평평한 항목 목록 하나뿐). 진짜 하위 메뉴 트리가
+    필요해지면 셸을 고치는 별도 작업으로 남긴다(제작 보고서에 남김).
+
+    설명서가 있는지는 `api/admin_ui_manual.py`의 화이트리스트(`MANUAL_SCREENS`)가
+    안다 — **지연 import**로 그 모듈을 참조한다(모듈 최상단에서 하면 admin_ui_manual ->
+    admin_ui_common -> admin_nav 로 이어지는 역방향 참조가 되어 순환 import 가 된다.
+    함수 안에서, 즉 요청이 실제로 들어와 `nav_for()`가 호출되는 시점에 참조하면 그
+    시점엔 두 모듈 다 이미 전부 로드돼 있어 안전하다).
+
+    **무엇이 잘못돼도 다른 40여 개 화면의 메뉴가 죽으면 안 된다** — 이 함수는 모든
+    admin2 페이지 렌더 경로를 지난다(`nav_for()` 가 유일한 호출부이고, 그건
+    `admin_ui_common.render()` 가 전 화면에서 부른다). 그래서 실패하면 조용히 그룹
+    없이 넘어간다(500 을 내지 않는다).
+    """
+    try:
+        from .admin_ui_manual import MANUAL_SCREENS  # 지연 import — 순환 방지
+    except Exception:
+        return None
+
+    try:
+        by_href = {v.get("nav_href"): slug for slug, v in MANUAL_SCREENS.items()}
+        rows = []
+        for title, _icon, items in NAV:
+            for label, href, _note in items:
+                if not href:
+                    continue  # 원 화면 자체가 아직 없으면 매뉴얼도 있을 수 없다
+                slug = by_href.get(href)
+                m_href = f"/admin2/manual/{slug}" if slug else None
+                rows.append({
+                    "label": f"{title} · {label}", "href": m_href,
+                    "state": "new" if m_href else "todo", "note": None,
+                    "active": bool(m_href) and current_path.rstrip("/") == m_href.rstrip("/"),
+                })
+        rows.append({
+            "label": "전체 목차", "href": "/admin2/manual", "state": "new", "note": None,
+            "active": current_path.rstrip("/") == "/admin2/manual",
+        })
+        return {
+            "title": "운영자 매뉴얼", "icon": "help-circle", "items": rows,
+            "done": sum(1 for r in rows if r["state"] == "new"),
+            "total": len(rows),
+            "active": any(r["active"] for r in rows),
+        }
+    except Exception:
+        return None
+
+
+def nav_for_screens(current_path: str = "") -> list:
+    """`NAV` 를 그대로 편 것 — 「운영자 매뉴얼」 합성 그룹을 붙이기 «전» 순수 화면 목록.
+
+    `nav_for()`(바로 아래)가 이 위에 매뉴얼 그룹 하나를 얹는다. **화면 개수를 세거나
+    나열해야 하는 쪽**(예: 운영자 설명서 목차, `api/admin_ui_manual.py`)은 `nav_for()`가
+    아니라 **이 함수**를 써야 한다 — `nav_for()`를 그대로 쓰면 매뉴얼 그룹 자신(41개
+    화면을 "그룹명 · 화면명"으로 편 항목들 + "전체 목차")까지 다시 화면으로 세어져
+    이중 계산된다(실측: 41 + 42 = 83행이 목차에 뜬 것을 이 함수 분리로 고쳤다).
+    """
+    out = []
+    for title, icon, items in NAV:
+        rows = []
+        for label, new, note in items:
+            href = new           # 구화면으로는 잇지 않는다 — 아래 nav_for() 참고
+            state = "new" if new else "todo"
+            rows.append({
+                "label": label, "href": href, "state": state, "note": note,
+                "active": bool(href) and current_path.rstrip("/") == href.rstrip("/"),
+            })
+        out.append({
+            "title": title, "icon": icon, "items": rows,
+            "done": sum(1 for r in rows if r["state"] == "new"),
+            "total": len(rows),
+            "active": any(r["active"] for r in rows),
+        })
+    return out
+
+
 def nav_for(current_path: str = "") -> list:
-    """템플릿이 쓰기 좋은 형태로 편다.
+    """템플릿(좌측 메뉴)이 쓰기 좋은 형태로 편다 — `nav_for_screens()` + 매뉴얼 그룹.
 
     `state` 두 가지 — 화면이 어디까지 왔는지를 메뉴가 정직하게 말한다:
       new   재구축 완료. `/admin2/` 로 간다. **링크는 이것만 붙는다**
@@ -383,23 +469,21 @@ def nav_for(current_path: str = "") -> list:
       그때는 `old`(구화면 있음)를 state 로 남겨 재구축 순서의 근거로 썼다.
       2026-08-12 전면 재구축 확정으로 그 근거가 소멸해 `old` 자체를 폐지했다
       (모듈 docstring 개정 기록). 구화면은 계속 `/admin/*.html` 에서 직접 열 수 있다.
+
+    ■ 「운영자 매뉴얼」 그룹(2026-08-25) — `NAV` 자체에는 없다. `NAV`/`counts()`는
+      **이 함수가 반환한 뒤에도 여전히 원래 41화면만** 센다(`counts()`가 셈의 정본으로
+      여러 결정 로그·검증 스크립트에 쓰이고 있어, 매뉴얼 그룹을 더해 그 셈을 흔들면
+      안 된다 — 그래서 `NAV` 리스트 자체는 건드리지 않고, 이 함수의 반환값에만 맨 끝에
+      한 그룹을 더 붙인다). 화면을 나열/집계하는 다른 소비자는 `nav_for_screens()`를
+      쓴다 — 상세는 `_manual_nav_group()` 참조.
     """
-    out = []
-    for title, icon, items in NAV:
-        rows = []
-        for label, new, note in items:
-            href = new           # 구화면으로는 잇지 않는다 — 위 결정
-            state = "new" if new else "todo"
-            rows.append({
-                "label": label, "href": href, "state": state, "note": note,
-                "active": bool(href) and current_path.rstrip("/") == href.rstrip("/"),
-            })
-        out.append({
-            "title": title, "icon": icon, "items": rows,
-            "done": sum(1 for r in rows if r["state"] == "new"),
-            "total": len(rows),
-            "active": any(r["active"] for r in rows),
-        })
+    out = nav_for_screens(current_path)
+    try:
+        manual_group = _manual_nav_group(current_path)
+    except Exception:
+        manual_group = None
+    if manual_group:
+        out.append(manual_group)
     return out
 
 

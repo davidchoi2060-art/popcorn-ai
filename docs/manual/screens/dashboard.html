@@ -1,0 +1,380 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 대시보드</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 로그인한 모든 관리자 화면(admin2) 운영자 — 등급과 무관하게 로그인 직후
+      가장 먼저 보는 화면입니다</div>
+    <div><b>화면</b> 대시보드 · 경로 <code>/admin2/</code> · 화면 ID <code>ADM-DASH-010</code>
+      (코드 <code>api/admin_ui_home.py</code>·<code>templates/admin/home.html.j2</code> 실측값입니다.
+      데이터는 <code>api/admin_dashboard.py</code>의 <code>dashboard</code>·<code>quote_quality</code>·
+      <code>funnel</code>·<code>worklist</code> 네 함수를 이 화면이 그대로 불러와 채웁니다 — 새 쿼리를
+      따로 만들지 않았습니다.)
+      ⚠ 이름이 닮은 <code>/admin2/dash</code>(「AI 관리」 그룹의 <b>작업 현황판</b>,
+      <code>api/admin_ui_dash.py</code>)는 <b>다른 화면</b>입니다 — 이 문서가 다루는 것은
+      좌측 메뉴 맨 위 「대시보드」 하나뿐입니다.</div>
+    <div><b>왜 이 화면부터인가</b> 활동 기록으로 방문 빈도를 잴 수 있는 다른 화면과 달리, 이
+      화면은 「몇 번 조회됐는가」를 셀 근거가 없습니다 — 로그인하면 자동으로 열리는 진입 화면이기
+      때문입니다. 대신 <b>모든 운영자가 반드시 거쳐 가는 첫 화면</b>이라는 점, 그리고 이 화면의
+      카드를 눌러야 실제 업무 화면으로 넘어가는 구조라는 점에서 매뉴얼 대상으로 올렸습니다 —
+      이 화면을 모르면 새로 온 직원은 어디서부터 일을 시작해야 할지 알기 어렵습니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-25 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수(처리 가능 10,696건 등)는
+      매 순간 바뀝니다 — 정확한 지금 값은 화면 상단 「지금 할 일」 옆 숫자와 「조회 시각」 배지를
+      직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>운영자가 로그인하면 가장 먼저 보는 진입 화면입니다. 위에서 아래로 세 블록으로 이루어져
+    있습니다 — <b>① 지금 할 일</b>(카드 5장, 어느 업무가 얼마나 밀려 있는지) →
+    <b>② 오늘의 흐름</b>(오늘 하루의 상담·견적 성립 요약 한 줄) → <b>③ 하단 3패널</b>(견적 품질
+    누적·유입 깔때기·최근 운영자 활동). 전부 <b>조회 전용</b>입니다 — 카드를 눌러 다른 업무
+    화면으로 이동하는 것 말고는, 이 화면 자체에서 값을 저장·승인·삭제하는 동작이 없습니다
+    (새로 고침 버튼도 <code>location.reload()</code>뿐입니다).</p>
+  <p>수치는 방문마다 서버가 다시 세어 보여줍니다(캐시 없음) — 그래서 「지금 할 일」의 각 숫자가
+    무엇을 뜻하는지가 중요합니다.</p>
+  <ul>
+    <li><b>지금 할 일 옆 큰 숫자(처리 가능 10,696건)</b> — 카드 5장 중 <b>실제로 클릭할 수 있는
+      카드만</b> 더한 값입니다. 이 화면이 참조하는 원천(<code>worklist()</code> API)은 원래
+      항목 8개(전체 합 26,441건)를 갖고 있지만, 그중 <b>주문 처리·환불 처리·재고 입고 3개는
+      화면에 아예 올리지 않습니다</b> — 개수가 0이라서가 아니라(재고 입고만 15,725건입니다)
+      admin2가 「신규 고객 유입 채널」 범위 밖(결제·배송·환불·재고 원장은 쇼핑몰·별도 화면 소관)의
+      일이기 때문입니다. 남은 5개 중에서도 <b>2개는 카드가 비활성이라 처리 가능 합계에서
+      빠집니다</b>(아래 「조심할 것」 참고) — 그래서 이 큰 숫자는 「지금 이 화면에서 곧장 넘어가
+      처리할 수 있는 일」만을 뜻하고, 「지금 우리 회사 전체에 밀린 일」을 뜻하지 않습니다.</li>
+    <li><b>카드 각각의 숫자</b> — 그 업무 화면으로 넘어가면 볼 대기 건수입니다(예: 「상품 사양
+      검수」 5,886건 = <code>/admin2/reviews</code>의 대기 큐 건수와 같은 원천).</li>
+    <li><b>오늘의 흐름의 숫자</b> — <b>오늘(서울 자정 기준) 하루치만</b> 셉니다. 어제까지 누적이
+      아닙니다.</li>
+    <li><b>견적 품질·유입 깔때기의 숫자</b> — 반대로 <b>누적</b>입니다(견적 품질은
+      2026-08-19 이후 전체, 유입 깔때기는 방문자 키를 붙인 2026-08-09 이후 전체). 「오늘의
+      흐름」과 이름이 비슷해 보여도 <b>모집단이 다릅니다</b> — 자세한 것은 「조심할 것」참고.</li>
+  </ul>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>로그인 직후 — 항상 이 화면이 먼저 열립니다(좌측 메뉴 맨 위 「대시보드」)</li>
+    <li>오늘 여러 업무 중 무엇부터 처리할지, 카드 5장을 훑어 급한 것부터 고를 때</li>
+    <li>AI 견적이 잘 나오고 있는지(견적 성립률 누적)를 빠르게 확인할 때</li>
+    <li>방금 다른 운영자가 무슨 작업을 했는지 확인할 때(최근 운영자 활동 3건 — 전체는
+      「작업 기록」 화면에서)</li>
+    <li>재고 원장(<code>stock_movements</code>)에 실제로 어긋난 상품이 있는지 재고 정합 배지로
+      빠르게 훑을 때</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>가장 자주 보게 되는 기본 화면(로그인 직후·필터 없음)입니다. 먼저 전체 모습을 보고, 아래에서
+    영역별로 확대해 하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/dashboard-full.png" alt="대시보드 화면 전체">
+      <b class="pin" style="--x:6.31%;--y:9.38%">1</b>
+      <b class="pin" style="--x:14.93%;--y:2.43%">2</b>
+      <b class="pin" style="--x:22.94%;--y:2.43%">3</b>
+      <b class="pin" style="--x:27.41%;--y:2.43%">4</b>
+      <b class="pin" style="--x:89.92%;--y:2.43%">5</b>
+      <b class="pin" style="--x:94.25%;--y:2.43%">6</b>
+      <b class="pin" style="--x:98.15%;--y:2.43%">7</b>
+      <b class="pin" style="--x:25.44%;--y:7.05%">8</b>
+      <b class="pin" style="--x:56.31%;--y:19.8%">9</b>
+      <b class="pin" style="--x:56.31%;--y:33.75%">10</b>
+      <b class="pin" style="--x:56.31%;--y:44.86%">11</b>
+      <b class="pin" style="--x:56.31%;--y:55.82%">12</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 21:37(KST) · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 「대시보드」가 항상 최상위 그룹의 첫 항목이고,
+      지금 있는 화면이라 진하게 표시됩니다.</li>
+    <li><span class="tag">2</span>위치 표시 — 「대시보드 / 대시보드」(그룹명과 화면명이 같습니다)</li>
+    <li><span class="tag">3</span>조회 시각 배지 — 이 화면이 서버에서 그려진 시각(서울 기준).
+      아래 모든 수치는 이 시각 기준입니다.</li>
+    <li><span class="tag">4</span><span class="btnlabel">새로 고침</span> — 페이지를 다시 불러
+      전체 수치를 다시 잽니다(<code>location.reload()</code>)</li>
+    <li><span class="tag">5</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">6</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">7</span>아바타 — 「내 정보」 화면으로 이동</li>
+    <li><span class="tag">8</span>「지금 할 일」 처리 가능 합계 — 카드 중 <b>활성 카드만</b> 더한 값</li>
+    <li><span class="tag">9</span>「지금 할 일」 카드 5장 — 자세한 구성은 <a href="#fig-c">그림 C</a> 참고</li>
+    <li><span class="tag">10</span>「오늘의 흐름」 바 — 자세한 구성은 <a href="#fig-d">그림 D</a> 참고</li>
+    <li><span class="tag">11</span>하단 3패널(견적 품질·유입 깔때기·최근 운영자 활동) — 자세한
+      구성은 <a href="#fig-e">그림 E</a> 참고</li>
+    <li><span class="tag">12</span>하단 각주 — 서버 조회 실패 표기 방식·미로그인 처리·외부 CDN
+      미사용을 알리는 고정 문구</li>
+  </ul>
+
+  <h3><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot shot--header">
+      <img src="/shared/manual/shots/dashboard-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:2.64%;--y:49.04%">13</b>
+      <b class="pin" style="--x:7.31%;--y:49.04%">14</b>
+      <b class="pin" style="--x:11.81%;--y:49.04%">15</b>
+      <b class="pin" style="--x:16.92%;--y:49.04%">16</b>
+      <b class="pin" style="--x:88.46%;--y:49.04%">17</b>
+      <b class="pin" style="--x:93.42%;--y:49.04%">18</b>
+      <b class="pin" style="--x:97.89%;--y:49.04%">19</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">13</span>위치 표시(그룹) — 「대시보드」</li>
+    <li><span class="tag">14</span>위치 표시(화면명) — 「대시보드」</li>
+    <li><span class="tag">15</span>조회 시각 배지</li>
+    <li><span class="tag">16</span><span class="btnlabel">새로 고침</span></li>
+    <li><span class="tag">17</span>허브</li>
+    <li><span class="tag">18</span>권한 표시</li>
+    <li><span class="tag">19</span>아바타</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>「지금 할 일」 카드 5장 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1432/226">
+      <img src="/shared/manual/shots/dashboard-cards.png" alt="지금 할 일 카드 5장 확대">
+      <b class="pin" style="--x:16.43%;--y:23.67%">20</b>
+      <b class="pin" style="--x:50%;--y:23.67%">21</b>
+      <b class="pin" style="--x:83.57%;--y:23.67%">22</b>
+      <b class="pin" style="--x:30.3%;--y:9.62%">23</b>
+      <div class="box" style="--x:0%;--y:51.77%;--w:66.44%;--h:48.23%"></div>
+      <b class="pin" style="--x:16.43%;--y:75.88%">24</b>
+      <b class="pin" style="--x:50%;--y:75.88%">25</b>
+      <b class="pin" style="--x:29.97%;--y:61.84%">26</b>
+      <b class="pin" style="--x:63.53%;--y:61.84%">27</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 9번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">20</span>카드1 「상품 사양 검수」 — 5,886건(판매중·재고 있는 것
+      1,444건 포함) → <code>/admin2/reviews</code></li>
+    <li><span class="tag">21</span>카드2 「상품 분류 매핑」 — 4,810건(판매 분류가 없거나 부품
+      종류가 기타(ETC)인 상품, 기타(ETC) 4,759건 포함) → <code>/admin2/category-mapping</code></li>
+    <li><span class="tag">22</span>카드3 「가격 검토 대기」 — 0건(판매가가 없어 팔 수 없는 상품)
+      → <code>/admin2/price-review</code>. 지금 0건이어도 화면 자체는 연결돼 있어 카드는
+      눌립니다.</li>
+    <li><span class="tag">23</span><span class="btnlabel">이동 →</span> 배지 — 활성 카드(20~22번)
+      에만 붙습니다. 카드 전체가 링크입니다.</li>
+    <li><span class="tag">24</span>카드4 「단가표 반영」(테두리 상자 — 24·25번을 함께 묶었습니다,
+      두 카드가 같은 결함을 공유하는 짝이기 때문입니다) — 2건. ⚠ 배지가 「화면 없음」으로 잘못
+      나옵니다(실제로는 <code>/admin2/price-import</code>가 이미 있습니다 — 아래 「조심할
+      것」 참고)</li>
+    <li><span class="tag">25</span>카드5 「매입 견적(용산)」 — 3건. ⚠ 24번과 같은 문제
+      (실제 화면은 <code>/admin2/sourcing</code>)</li>
+    <li><span class="tag">26</span>~<span class="tag">27</span><span class="warn">「화면 없음」</span>
+      회색 배지 — 두 카드 모두 클릭이 안 되는 <code>&lt;div&gt;</code>일 뿐 링크가 아닙니다
+      (색이 옅어지고 커서도 바뀌지 않습니다)</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>「오늘의 흐름」 바 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1432/43">
+      <img src="/shared/manual/shots/dashboard-flow.png" alt="오늘의 흐름 바 확대">
+      <b class="pin" style="--x:8.7%;--y:50%">28</b>
+      <b class="pin" style="--x:18.99%;--y:50%">29</b>
+      <b class="pin" style="--x:37.62%;--y:50%">30</b>
+      <b class="pin" style="--x:96.8%;--y:50%">31</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 10번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">28</span>상담(오늘, 이탈 0) — 오늘(서울 기준) 하루 동안 시작된 상담
+      세션 수(3건). 「이탈」 = 상담은 시작했지만 견적까지 못 간 건수(오늘=견적 성립과 같아
+      이탈 0)</li>
+    <li><span class="tag">29</span>견적 성립(오늘 기준) — 오늘 견적 스냅샷이 생긴 상담 수(3건)</li>
+    <li><span class="tag">30</span>몰 인계 — 숫자 대신 「향후 사용예정」만 표시(아래 「조심할
+      것」 참고)</li>
+    <li><span class="tag">31</span>재고 정합 배지 — 초록 「✓ 이상 0건」이면
+      <code>stock_qty = SUM(qty_delta)</code> 불변식이 전 상품에서 지켜지고 있다는 뜻,
+      빨간 「⚠ 이상 N건」이면 원장과 실제 재고가 어긋난 상품이 있다는 뜻입니다(오늘 캡처는
+      0건 정상 상태만 확인했습니다).</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>하단 3패널 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1432/166.22">
+      <img src="/shared/manual/shots/dashboard-panels.png" alt="하단 3패널 확대">
+      <b class="pin" style="--x:19.38%;--y:10.68%">32</b>
+      <b class="pin" style="--x:4.26%;--y:28.58%">33</b>
+      <b class="pin" style="--x:16.43%;--y:72.91%">34</b>
+      <b class="pin" style="--x:50%;--y:10.98%">35</b>
+      <b class="pin" style="--x:50%;--y:24.06%">36</b>
+      <b class="pin" style="--x:50%;--y:61.97%">37</b>
+      <b class="pin" style="--x:50%;--y:74.6%">38</b>
+      <b class="pin" style="--x:50%;--y:85.65%">39</b>
+      <b class="pin" style="--x:77.91%;--y:10.53%">40</b>
+      <b class="pin" style="--x:83.57%;--y:27.6%">41</b>
+    </div>
+    <p class="cap">캡처 2026-08-25 · 그림 A의 11번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">32</span>표본 — 「107 / 122」(견적 성립 107건 / 전체 상담 122건, 누적)</li>
+    <li><span class="tag">33</span>견적 성립률 — 87.7%(위 표본의 나눗셈, 반올림 1자리)</li>
+    <li><span class="tag">34</span>상담 모드별 막대 — 가이드형 53% · 대화형 26% ·
+      <span class="warn">expert 16%</span> · 음성 5%. ⚠ 「expert」만 한글 라벨 없이 원문 그대로
+      노출됩니다(아래 「조심할 것」 참고)</li>
+    <li><span class="tag">35</span>패널2 제목 — 「유입 깔때기 — 접속 → 인계」(누적, 아래 37·38번의
+      「원천 없음」·「향후 사용예정」까지 포함해 5단계만 표시)</li>
+    <li><span class="tag">36</span>접속(방문자) — 7,227명. 이 막대가 100% 기준선이고, 아래 다른
+      단계는 이 값 대비 비율입니다.</li>
+    <li><span class="tag">37</span>장바구니 — 점선 막대 + 「원천 없음」. 0명이 아니라 <b>셀 방법
+      자체가 없다</b>는 뜻입니다(<code>carts</code> 테이블 없음)</li>
+    <li><span class="tag">38</span>몰 인계 — 점선 막대 + 「향후 사용예정」. 30번(오늘의 흐름의
+      「몰 인계」)과 같은 항목입니다.</li>
+    <li><span class="tag">39</span>하단 각주 — 37·38번이 왜 숫자 대신 문구로 나오는지 화면이
+      스스로 설명하는 문장</li>
+    <li><span class="tag">40</span>「작업 기록」 링크 — 누르면 <code>/admin2/activity-logs</code>
+      (전체 운영자 활동 원장)로 이동</li>
+    <li><span class="tag">41</span>최근 운영자 활동 첫 행 — 예: 「관리자 — AI 연동
+      <span class="warn">ai_integration_limit_clear</span> · codex」. ⚠ 일부 행은 동작명이
+      번역되지 않고 코드 원문 그대로 노출됩니다(아래 「조심할 것」 참고)</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>「지금 할 일」의 <b>활성 카드</b>(그림 C의 20~22번)를 클릭 → 그 업무의 목록 화면
+      (<code>/admin2/reviews</code>·<code>/admin2/category-mapping</code>·
+      <code>/admin2/price-review</code>)으로 바로 이동합니다. 카드 전체가 링크이고, 이 화면
+      쪽에서 별도로 확인창이 뜨지 않습니다.</li>
+    <li><span class="btnlabel">새로 고침</span>(그림 B의 16번) — 페이지를 다시 그려 카드·흐름·
+      3패널 수치를 전부 다시 서버에서 받아옵니다. 자동 갱신은 없습니다 — 눌러야 최신값입니다.</li>
+    <li>「작업 기록」 링크(그림 E의 40번) — <code>/admin2/activity-logs</code>로 이동해 전체
+      운영자 활동 원장을 조회합니다(이 화면은 최근 3건만 보여줍니다).</li>
+    <li>「내 정보」 아바타(그림 A의 7번) — 로그인한 본인 계정 화면으로 이동합니다.</li>
+    <li>「허브」(그림 A의 5번) — 새 탭에서 내부 접근 허브로 이동합니다.</li>
+    <li>수치 위에 마우스를 올리면(<code>title</code> 툴팁) 그 값의 산정 기준이 뜨는 자리가
+      여럿 있습니다 — 예: 「상담」·「견적 성립」에 「2026-08-19 이전은 시험 운영 기간으로
+      제외」, 재고 정합 배지가 조회 실패일 때 그 사유. 화면에 늘 보이는 문구가 아니라 <b>가리켜야
+      나오는 문구</b>라 지나치기 쉽습니다.</li>
+    <li>이 화면 자체에서 값을 저장·승인·반려·삭제하는 동작은 <b>없습니다</b> — 전부 조회와
+      다른 화면으로의 이동뿐입니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>「단가표 반영」·「매입 견적(용산)」 카드가 실제로 있는 화면을 「화면 없음」으로 잘못
+    안내합니다.</b> 코드를 확인한 결과 두 화면(<code>/admin2/price-import</code>·
+    <code>/admin2/sourcing</code>) 모두 이미 지어져 정상 동작 중입니다 — 이 대시보드의 안내판만
+    낡았습니다. 원인은 <code>api/admin_ui_home.py</code>의 <code>_TARGET_PATH</code> 딕셔너리가
+    <code>price_import</code>·<code>sourcing</code> 두 키를 여전히 <code>None</code>으로 고정해
+    둔 것입니다(2026-08-15 <code>api/admin_nav.py</code>에 두 화면의 실제 경로가 이미 연결됐는데도
+    이 딕셔너리만 함께 갱신되지 않았습니다). 지금 이 두 업무로 가려면 이 화면 카드를 누르지 말고
+    <b>왼쪽 메뉴 「매입 · 소싱」 그룹</b>에서 직접 들어가야 합니다.
+  </div>
+  <div class="callout">
+    <b>「지금 할 일」에는 재고 입고(15,725건 대기)·주문 처리·환불 처리가 아예 빠져 있습니다.</b>
+    개수가 0건이라서가 아닙니다 — 이 admin2 대시보드의 담당 범위가 애초에 아니기 때문입니다
+    (팝콘AI는 신규 고객 유입 채널이고, 결제·배송·환불·재고 입고 원장은 admin2 IA 범위 밖입니다).
+    재고 입고는 왼쪽 메뉴 「매입 · 소싱 / 재고 입고」에서 따로 확인해야 합니다.
+  </div>
+  <div class="callout">
+    <b>「몰 인계」는 숫자를 절대 보여주지 않고 항상 「향후 사용예정」이라고만 표시합니다</b> —
+    인계 실적을 셀 API(<code>handoffs</code> 기준)가 아직 없어서입니다. 「장바구니」도 숫자가
+    아니라 「원천 없음」이라고 표시합니다 — <code>carts</code> 테이블 자체가 없다는 뜻입니다.
+    <b>둘 다 0건이 아니라 「모른다」는 뜻</b>이니 0으로 읽으면 안 됩니다.
+  </div>
+  <div class="callout">
+    <b>「오늘의 흐름」과 하단 「유입 깔때기」는 이름이 비슷해도 서로 다른 모집단을 셉니다.</b>
+    오늘의 흐름(상담·견적 성립)은 <b>오늘(서울 기준) 하루치만</b>, 유입 깔때기(접속·AI 문의·견적
+    성공)는 <b>2026-08-09 이후 누적 전체 방문자</b> 기준입니다. 두 수를 같은 기준으로 비교하면
+    안 됩니다 — 예를 들어 오늘 상담 3건과 유입 깔때기의 AI 문의 57건은 애초에 비교 대상이
+    아닙니다.
+  </div>
+  <div class="callout">
+    <b>여러 수치에 「2026-08-19 15:57:46(UTC) 이전은 시험 운영 기간으로 제외」라는 산정 기준이
+    붙어 있는데, 화면 표면에는 안 보이고 그 항목에 마우스를 올려야만(title 툴팁) 나타납니다.</b>
+    그냥 보면 서비스 시작부터의 누적처럼 보일 수 있지만 실제로는 그 기준일 이후만 센 값입니다
+    (「상담」·「견적 성립」·「견적 품질」 패널 제목·「AI 문의」·「견적 성공」 행 전부 해당).
+  </div>
+  <div class="callout">
+    <b>일부 표시 문구가 한글로 안 바뀌고 코드 원문 그대로 나옵니다.</b> 「가이드형·대화형·음성」은
+    한글인데 상담 모드 하나(「expert」)만 원문 그대로 노출됩니다(그림 E의 34번 — 코드의 모드명
+    한글 사전에 이 모드 하나가 등록돼 있지 않습니다). 「최근 운영자 활동」에도 「AI 연동 한도
+    수정」처럼 번역된 문구와 「ai_integration_limit_clear」(그림 E의 41번)처럼 코드 원문이 섞여
+    나올 수 있습니다 — 그 동작 이름이 번역 사전에 없으면 원문이 그대로 표시됩니다.
+  </div>
+  <div class="callout">
+    <b>로컬(127.0.0.1:8000)에서 보는 이 화면은 배포 서버(admin.popcornai.co.kr)와 같은 Cloud
+    SQL을 봅니다.</b> 이 화면 자체에는 쓰기 버튼이 없지만, 카드를 눌러 들어간 업무 화면에서 값을
+    저장하면 배포 서버 고객 화면에도 즉시 반영됩니다.
+  </div>
+  <div class="callout">
+    <b>화면의 모든 수치는 상단 「조회 시각」 배지에 찍힌 그 순간의 값입니다.</b> 이 문서에 옮긴
+    숫자(처리 가능 10,696건 등)도 2026-08-25 21:37(KST) 캡처 시점 값일 뿐이며, 지금은 다른 값일
+    수 있습니다 — 정확한 값은 화면에서 새로 고침해 다시 확인해야 합니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「단가표 반영·매입 견적 카드가 회색이고 안 눌린다」</b> → 화면이 없는 게 아니라 이
+      대시보드의 안내 오류입니다(위 「조심할 것」 첫 항목 참고). 왼쪽 메뉴 「매입 · 소싱」
+      그룹에서 직접 들어가면 두 화면 다 정상 동작합니다.</li>
+    <li><b>「가격 검토 대기가 0건인데 카드가 눌린다」</b> → 정상입니다. 카드가 활성/비활성으로
+      갈리는 기준은 「지금 건수가 있는가」가 아니라 「그 화면이 admin2 메뉴에 연결돼 있는가」
+      입니다.</li>
+    <li><b>「몰 인계·장바구니 숫자가 안 보인다」</b> → 정상입니다. 둘 다 셀 원천 자체가 아직 없어
+      화면이 숫자 대신 「향후 사용예정」·「원천 없음」이라고 정직하게 표시하는 것입니다.</li>
+    <li><b>「재고 입고가 15,000건 넘게 밀려 있다는데 이 화면엔 안 보인다」</b> → 이 대시보드의
+      「지금 할 일」은 admin2 담당 범위만 보여줍니다. 재고 입고는 왼쪽 메뉴 「매입 · 소싱 /
+      재고 입고」에서 확인해야 합니다.</li>
+    <li><b>「새로고침을 눌러도 숫자가 그대로다」</b> → 서버가 캐시 없이 매번 다시 세므로(응답
+      헤더 <code>no-cache</code>), 그 사이 실제로 변화가 없었다는 뜻일 가능성이 큽니다. 다른
+      운영자가 방금 처리한 내용이라면 몇 초 뒤 다시 새로고침해 보십시오.</li>
+    <li><b>「재고 정합 배지가 빨갛게 「⚠ 이상 N건」이라고 뜬다」</b> → <code>stock_movements</code>
+      원장 합계와 실제 재고 수량이 어긋난 상품이 있다는 뜻입니다. 몇 건인지는 배지 숫자로
+      나오지만 어느 상품인지는 이 화면에서 더 찾을 수 없습니다 — 해당 문제는 개발팀에
+      보고해야 합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_ui_home.py</code> · <code>api/admin_dashboard.py</code> ·
+        <code>templates/admin/home.html.j2</code> · <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>api/admin_nav.py</code>(카드 활성/비활성 판정에 쓰는 「지금 메뉴에 연결된 경로」
+        목록의 정본)</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-25에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_dashboard.py</code>, 이미지는
+        <code>mockups/shared/manual/shots/dashboard-*.png</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>dashboard-coords.json</code>에 있습니다.</li>
+      <li>실측 수치(처리 가능 건수·견적 성립률 등) — 캡처와 같은 순간
+        <code>GET /api/admin/dashboard</code> · <code>GET /api/admin/quote-quality</code> ·
+        <code>GET /api/admin/funnel</code> · <code>GET /api/admin/worklist</code> 응답을 그대로
+        옮겼습니다. 지어낸 숫자는 없습니다 — 매 순간 바뀌므로 지금 값은 화면에서 다시
+        확인하십시오.</li>
+      <li>「화면 없음」 오표시 확인 — <code>docs/design/admin-screen-audit-2026-08-25.md</code>
+        (같은 날 다른 확인자가 41화면을 훑은 기록)의 #1·#19·#20 행이 먼저 지적했고, 이 문서는
+        <code>api/admin_ui_home.py</code>의 <code>_TARGET_PATH</code> 딕셔너리를 직접 읽고
+        이번 캡처(그림 C)로 재확인했습니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>dashboard-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이 문서가
+      손으로 만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께 낡습니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_dashboard.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다(<code>.venv</code>에 이미 설치돼 있습니다). 새 환경(다른
+      PC·재설치한 venv)에서는 <code>pip install playwright</code> 후
+      <code>playwright install chromium</code>이 먼저 필요합니다.</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가
+      없어, 완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에
+      정확히 맞는지, 인쇄 시 페이지가 어떻게 나뉘는지)는 직접 확인하지 못했습니다. 좌표는
+      Playwright로 화면 요소의 실제 위치를 재서 계산한 값입니다. 또한 이 캡처는 owner 등급
+      점검 계정으로만 찍었습니다 — 이 화면 자체는 등급별 분기 코드가 없어(조회 전용이라
+      권한 검사가 로그인 여부만 봅니다) 다른 등급에서도 같게 보일 것으로 판단하지만, 실제
+      화면으로 확인하지는 못했습니다. 재고 정합 배지가 「⚠ 이상 N건」(비정상)으로 표시된
+      모습도, 오늘은 원장이 정상(0건)이라 실제로 보지 못했습니다 — 코드(<code>admin_dashboard.py</code>
+      의 <code>quote_quality()</code>·<code>home.html.j2</code>의 <code>_flow()</code>)로만
+      확인했습니다.</p>
+  </div>
+
+</div>
