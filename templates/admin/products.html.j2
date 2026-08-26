@@ -230,9 +230,32 @@ a.pp-btn-line{color:var(--on)}
 .pp-gate-item .k{color:var(--rv-faint);min-width:76px}
 .pp-gate-item .v{color:var(--on)}
 
-.pp-sup-row{display:grid;grid-template-columns:1fr 96px 64px 118px 48px;gap:10px;align-items:center;
+/* 2026-08-26 A-114 후속 — 순위·잰 시각 칸이 늘어 7열이 됐다(원래 5열).
+   폭 배분: 순위30 · 공급처1fr · 매입가80 · 상태48 · 잰시각78 · 상세토글22 · 삭제44 */
+.pp-sup-row{display:grid;grid-template-columns:30px 1fr 80px 48px 78px 22px 44px;gap:8px;align-items:center;
         padding:8px 2px;border-bottom:1px solid rgba(0,0,0,.06);font:400 11px/1.3 var(--font)}
 .pp-sup-row.head{font:600 10px/1 var(--font);color:var(--rv-faint)}
+.pp-sup-row .pp-right{font-family:var(--font-num)}
+/* 품절·문의(구매 불가) 행 — 가격을 그대로 보여주면 "이 값에 살 수 있다"로 오인한다
+   (A-114 실측: 24건이 전체 최저가=품절 행이었다). 글자를 흐리게 + 매입가 취소선.
+   opacity가 아니라 color로 낮춘다 — opacity는 자손까지 함께 흐려져 품절 배지
+   (.pp-badge-bad, 자기 color를 명시한 요소라 상속을 안 받는다)까지 옅어지면
+   정작 "눈에 띄어야 할 표식"이 덜 보인다. */
+.pp-sup-row.oos{color:var(--rv-dim)}
+.pp-sup-row.oos .pp-right{text-decoration:line-through}
+.pp-sup-badge-oos{margin-left:6px;vertical-align:middle}
+.pp-sup-rank{font:600 10.5px/1 var(--font-num);color:var(--rv-faint);text-align:center}
+.pp-sup-toggle{font:600 11px/1 var(--font);color:var(--rv-faint);background:none;border:1px solid rgba(0,0,0,.18);
+    border-radius:4px;padding:3px 5px;cursor:pointer;width:100%}
+.pp-sup-toggle:hover{background:var(--container-low);color:var(--on)}
+/* 연락처·리베이트 펼침 줄 — 표 폭에 다 넣으면 넘쳐서(열이 이미 7개) 행 클릭형 펼치기로 뺐다 */
+.pp-sup-detail{padding:8px 10px 10px 36px;margin:-4px 0 4px;border-bottom:1px solid rgba(0,0,0,.06);
+    font:400 10.5px/1.6 var(--font);color:var(--rv-muted);background:var(--container-low)}
+.pp-sup-detail b{color:var(--on);font-weight:600}
+.pp-sup-banner{border:1px solid rgba(0,0,0,.1);border-radius:7px;padding:9px 12px;margin-bottom:10px;
+    background:var(--container-low);font:600 11.5px/1.4 var(--font);color:var(--on)}
+.pp-sup-banner b{font-family:var(--font-num)}
+.pp-sup-banner.warn{border-color:var(--error);color:var(--error)}
 .pp-sup-add{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .pp-sup-add select,.pp-sup-add input{font:400 11px/1.3 var(--font);border:1px solid rgba(0,0,0,.18);
     border-radius:5px;padding:7px 9px;background:var(--card)}
@@ -357,6 +380,10 @@ a.pp-btn-line{color:var(--on)}
   }
   function fmtWon(n){ return n == null ? "—" : n.toLocaleString("ko-KR") + "원"; }
   function fmtDate(s){ return s ? String(s).slice(0,16).replace("T"," ") : "—"; }
+  function fmtDateShort(s){ return s ? String(s).slice(0,10) : "—"; }
+  // 몰이 준 순위(0=1순위, 0066 마이그레이션 주석)를 사람이 읽는 "N위"로 바꿀 뿐,
+  // 값 자체는 서버가 준 mall_rank 그대로다 — 화면이 순위를 새로 매기지 않는다.
+  function fmtRank(mr){ return mr == null ? "—" : (mr + 1) + "위"; }
   function errText(j, status){
     return window.popcornProgress ? window.popcornProgress.errText(j, status, "") : ("오류 " + status);
   }
@@ -677,7 +704,10 @@ a.pp-btn-line{color:var(--on)}
     // 배너는 preview:true 본문엔 뜨지 않으므로(ui-progress.js가 스스로 제외 — ㉯
     // 확정) 이 화면이 자기 자리에서 진행을 보여준다: 클릭 즉시 버튼 비활성 + 인라인
     // "미리보기 중…". renderDrawerFooter가 이 값을 읽는다.
-    previewBusy:false
+    previewBusy:false,
+    // [공급처] 탭에서 연락처·리베이트를 펼친 행(psp_id -> true). 서랍을 새로 열면
+    // 비운다 — 다른 상품의 펼침 상태가 새 상품에 남으면 안 된다.
+    supExpanded:{}
   };
 
   function showVeilDrawer(v){
@@ -697,6 +727,7 @@ a.pp-btn-line{color:var(--on)}
     DRAWER.partSel=null; DRAWER.partPreview=null;
     DRAWER.editDraft={basic:null, spec:null};
     DRAWER.previewBusy=false;
+    DRAWER.supExpanded={};
     showVeilDrawer(true);
     renderDrawerLoading();
     fetchDrawerData();
@@ -920,17 +951,69 @@ a.pp-btn-line{color:var(--on)}
       : "읽기 전용입니다. [수정]으로 이 부품 종류에서 쓰는 사양을 채웁니다.") + '</div>';
   }
 
+  // 공급처 한 행 + (펼치면) 연락처·리베이트 줄. 연락처·발주번호를 표 칸에 다 펼치면
+  // 넘친다(열이 이미 7개) — 그래서 "상세" 토글로 뺐다(2026-08-26 A-114 후속, 판단은
+  // 제작자가 함 — 지시서가 방식을 명시하지 않고 판단하라고 남겼다).
+  function supplierRowHtml(s, editing){
+    var oos = (s.state && s.state !== "가능");   // 품절·문의 — "가능"만 실제 구매 가능
+    // 리베이트는 "값이 있을 때만" — 실측 대부분이 0(2026-08-26 확인, rebate_price
+    // 전량 0)이라 0/null을 똑같이 "없음"으로 본다. 0을 보여주면 "리베이트 0원"이라는
+    // 없는 사실을 지어내는 것과 같다.
+    var hasRebate = (s.rebate_pct != null && s.rebate_pct !== 0)
+      || (s.rebate_price != null && s.rebate_price !== 0);
+    var hasDetail = !!(s.contact_name || s.contact_phone || s.order_phone || hasRebate);
+    var expanded = hasDetail && !!DRAWER.supExpanded[s.psp_id];
+    var timeTxt = s.fetched_at ? ("몰 " + fmtDateShort(s.fetched_at))
+      : (s.at ? ("갱신 " + fmtDateShort(s.at)) : "—");
+    var timeTitle = s.fetched_at ? ("몰 수집 " + fmtDate(s.fetched_at))
+      : (s.at ? ("마지막 갱신 " + fmtDate(s.at)) : "");
+    var nameCell = esc(s.supplier)
+      + (oos ? ('<span class="pp-badge pp-badge-bad pp-sup-badge-oos">' + esc(s.state) + '</span>') : "");
+    var toggleCell = hasDetail
+      ? ('<button type="button" class="pp-sup-toggle" data-sup-toggle="' + s.psp_id + '"'
+         + ' aria-expanded="' + (expanded ? "true" : "false") + '" title="연락처·리베이트 보기">'
+         + (expanded ? "▾" : "▸") + '</button>')
+      : "";
+    var row = '<div class="pp-sup-row' + (oos ? " oos" : "") + '">'
+      + '<span class="pp-sup-rank">' + fmtRank(s.mall_rank) + '</span>'
+      + '<span>' + nameCell + '</span>'
+      + '<span class="pp-right">' + fmtWon(s.cost_price) + '</span>'
+      + '<span>' + esc(s.state || "—") + '</span>'
+      + '<span class="pp-dim-text" title="' + esc(timeTitle) + '">' + esc(timeTxt) + '</span>'
+      + '<span>' + toggleCell + '</span>'
+      + '<span>' + (editing ? ('<button type="button" class="pp-row-del" data-del-sup="' + s.supplier_id + '">삭제</button>') : "") + '</span>'
+      + '</div>';
+    if(!expanded) return row;
+    var parts = [
+      "담당자 " + (s.contact_name ? esc(s.contact_name) : "—"),
+      "전화 " + (s.contact_phone ? esc(s.contact_phone) : "—"),
+      "발주번호 " + (s.order_phone ? esc(s.order_phone) : "—")
+    ];
+    var rebateParts = [];
+    if(s.rebate_pct != null && s.rebate_pct !== 0) rebateParts.push(s.rebate_pct + "%");
+    if(s.rebate_price != null && s.rebate_price !== 0) rebateParts.push(fmtWon(s.rebate_price));
+    var detail = parts.join(" · ")
+      + (rebateParts.length ? (' · 리베이트 <b>' + rebateParts.join(" · ") + '</b>') : "")
+      + (s.contact_fetched_at ? (' · 연락처 확인 ' + fmtDateShort(s.contact_fetched_at)) : "");
+    return row + '<div class="pp-sup-detail">' + detail + '</div>';
+  }
+
   function supplierTabHtml(d){
     var editing = DRAWER.editing.supplier;
     var sups = d.suppliers || [];
-    var rows = '<div class="pp-sup-row head"><span>공급처</span><span class="pp-right">매입가</span><span>상태</span><span>갱신</span><span></span></div>'
-      + (sups.length ? sups.map(function(s){
-          return '<div class="pp-sup-row"><span>' + esc(s.supplier) + '</span>'
-            + '<span class="pp-right">' + fmtWon(s.cost_price) + '</span>'
-            + '<span>' + esc(s.state||"—") + '</span>'
-            + '<span class="pp-dim-text">' + fmtDate(s.at) + '</span>'
-            + '<span>' + (editing ? ('<button type="button" class="pp-row-del" data-del-sup="' + s.supplier_id + '">삭제</button>') : "") + '</span></div>';
-        }).join("") : '<div class="pp-empty" style="padding:20px 0">등록된 공급처가 없습니다.</div>');
+    // "살 수 있는 최저가" — 서버가 이미 품절·문의를 뺀 값을 골라 준다(cheapest_available).
+    // 화면은 그 값을 그대로 쓴다 — 여기서 sups를 다시 훑어 최저가를 만들지 않는다.
+    var banner = "";
+    if(sups.length){
+      banner = d.cheapest_available
+        ? ('<div class="pp-sup-banner">살 수 있는 최저가 <b>' + fmtWon(d.cheapest_available.cost_price)
+           + '</b> <span class="pp-dim-text">(' + esc(d.cheapest_available.supplier) + ')</span></div>')
+        : ('<div class="pp-sup-banner warn">판매 가능한 공급처가 없습니다 — 아래 가격은 전부 품절·문의 상태입니다.</div>');
+    }
+    var rows = '<div class="pp-sup-row head"><span>순위</span><span>공급처</span><span class="pp-right">매입가</span>'
+        + '<span>상태</span><span>잰 시각</span><span></span><span></span></div>'
+      + (sups.length ? sups.map(function(s){ return supplierRowHtml(s, editing); }).join("")
+         : '<div class="pp-empty" style="padding:20px 0">등록된 공급처가 없습니다.</div>');
     var addForm = editing ? (
         '<div class="pp-sup-add">'
         + '<label class="visually-hidden" for="supAddSel">공급처 선택</label><select id="supAddSel" aria-label="공급처 선택"></select>'
@@ -939,9 +1022,9 @@ a.pp-btn-line{color:var(--on)}
         + '<button type="button" class="pp-btn-line" id="btnSupAdd">추가</button>'
         + '</div>'
       ) : "";
-    return rows + addForm + '<div class="pp-dr-hint">' + (editing
-      ? "같은 공급처를 다시 추가하면 매입가가 갱신됩니다."
-      : "읽기 전용입니다. [수정]으로 매입가를 추가·삭제합니다.") + '</div>';
+    return banner + rows + addForm + '<div class="pp-dr-hint">' + (editing
+      ? "같은 공급처를 다시 추가하면 매입가가 갱신됩니다. 순위·리베이트·연락처는 몰 수집 도구가 채웁니다(이 화면에서 입력하지 않습니다)."
+      : "읽기 전용입니다. [수정]으로 매입가를 추가·삭제합니다. ▸는 연락처·리베이트를 펼칩니다. 몰 순위·가격은 매일 바뀔 수 있습니다.") + '</div>';
   }
 
   function partTypeTabHtml(d){
@@ -985,6 +1068,17 @@ a.pp-btn-line{color:var(--on)}
       var host = document.getElementById("ptChoiceHost");
       if(host) buildChoiceSelect(host, (META && META.all_choices) || [], DRAWER.partSel || DRAWER.data.part_type,
         function(pt){ DRAWER.partSel = pt; });
+    }
+    if(DRAWER.activeTab==="supplier"){
+      // 연락처·리베이트 펼침 토글 — 읽기 모드에서도 동작한다(편집과 무관, 발주 때
+      // 조회만 하는 경우가 더 흔하다).
+      document.querySelectorAll("#drBody [data-sup-toggle]").forEach(function(b){
+        b.onclick = function(){
+          var id = b.dataset.supToggle;
+          DRAWER.supExpanded[id] = !DRAWER.supExpanded[id];
+          renderDrawerBody();
+        };
+      });
     }
     if(DRAWER.activeTab==="supplier" && DRAWER.editing.supplier){
       var sel = document.getElementById("supAddSel");

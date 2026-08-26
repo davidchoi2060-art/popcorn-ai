@@ -14,6 +14,23 @@ from .timeutil import iso
 from .auth import current_operator_id
 from .db import engine
 
+
+def _finite_or_none(v):
+    """NUMERIC 컬럼 값을 JSON에 실어도 안전한 float로 바꾼다.
+
+    Postgres NUMERIC은 'NaN'을 실제 값으로 담을 수 있는데(정수·부동소수와 다른 점),
+    2026-08-26 실측으로 product_supplier_prices.rebate_pct 4행이 실제로 Decimal('NaN')
+    이었다(몰 수집 도구의 파싱 이상 — 이 파일 소관 밖). Starlette JSONResponse는
+    allow_nan=False라 NaN을 그대로 내보내면 그 상품 상세 전체가 500이 된다("Out of
+    range float values are not JSON compliant"). 값이 없다는 뜻으로 취급해 None을
+    돌려준다 — 화면은 이미 None을 "리베이트 없음"으로 다룬다.
+    """
+    if v is None:
+        return None
+    f = float(v)
+    return f if f == f and f not in (float("inf"), float("-inf")) else None
+
+
 router = APIRouter(prefix="/api/admin")
 
 # part_type 어휘는 taxonomy가 단일 원천(슬라이스 A) — 여기서 다시 정의하지 않는다.
@@ -425,12 +442,31 @@ def get_product(product_code: int):
             " AND stock_qty > 0"), {"pc": product_code}).first() is not None
         # 공급처별 매입가 — 화면 표는 지금까지 마크업 하드코딩이었다(용산도매A 352,000 등).
         # 신규 등록 화면에도 그 값이 그대로 떠서 **없는 공급처가 있는 것처럼** 보였다.
+        # 2026-08-26 A-114 후속: 몰 수집 칸(mall_rank·rebate_*·mall_state_raw·fetched_at)과
+        # 공급처 연락처(suppliers.contact_*)를 더한다 — 받아 놓고 화면에 못 보내던 값들
+        # (0066 마이그레이션). order_price는 뺀다: 몰 마크업에서 행별 구분이 안 돼 항상
+        # NULL이라 화면에 실으면 "발주가 0원"으로 오해를 부른다.
+        # 정렬은 몰 순위(mall_rank, NULL=옛 엑셀 유입은 뒤로) 우선 — 몰 순서=싼 순이라
+        # 화면이 다시 정렬하지 않아도 된다.
         sups = [dict(x) for x in conn.execute(text(
             "SELECT sp.psp_id, sp.supplier_id, s.name AS supplier, sp.cost_price,"
-            " sp.supply_state, sp.updated_at"
+            " sp.supply_state, sp.updated_at,"
+            " sp.mall_rank, sp.rebate_pct, sp.rebate_price, sp.mall_state_raw, sp.fetched_at,"
+            " s.contact_name, s.contact_phone, s.order_phone, s.contact_raw, s.contact_fetched_at"
             " FROM product_supplier_prices sp JOIN suppliers s USING (supplier_id)"
             " WHERE sp.product_code = :pc"
-            " ORDER BY sp.cost_price NULLS LAST, sp.psp_id"), {"pc": product_code}).mappings()]
+            " ORDER BY sp.mall_rank NULLS LAST, sp.cost_price NULLS LAST, sp.psp_id"),
+            {"pc": product_code}).mappings()]
+        # "살 수 있는 최저가" — 품절 행의 가격을 최저가로 오인하지 않게 서버가 미리 골라
+        # 낸다(A-114 실측: 102780류 24건이 "전체 최저가가 품절인 곳"이었다). 화면은 이
+        # 값을 그대로 쓰고 스스로 재계산하지 않는다. supply_state=='가능' 판정은
+        # api/admin_price_import.py _reprice()의 매입가 선정 기준과 같다.
+        avail = [s for s in sups if s["supply_state"] == "가능" and s["cost_price"] is not None]
+        cheapest_available = None
+        if avail:
+            best = min(avail, key=lambda s: s["cost_price"])
+            cheapest_available = {"psp_id": best["psp_id"], "supplier_id": best["supplier_id"],
+                                   "supplier": best["supplier"], "cost_price": best["cost_price"]}
     done, total = spec_progress(r["part_type"], r["specs"])
     locked = list(r["locked_fields"] or [])
     # 목록 배지와 같은 신호(결함 ⓐ-3) — `review_pending`(검수 큐 실행 건수)은
@@ -560,8 +596,22 @@ def get_product(product_code: int):
         "review_pending": pending, "in_pool": in_pool,
         "suppliers": [{"psp_id": s["psp_id"], "supplier_id": s["supplier_id"],
                        "supplier": s["supplier"], "cost_price": s["cost_price"],
-                       "state": s["supply_state"], "at": iso(s["updated_at"])}
+                       "state": s["supply_state"], "state_raw": s["mall_state_raw"],
+                       "at": iso(s["updated_at"]),
+                       # 몰 수집 칸 — 전부 NULL 가능(옛 엑셀 유입행, 0066 마이그레이션 주석)
+                       "mall_rank": s["mall_rank"],
+                       "rebate_pct": _finite_or_none(s["rebate_pct"]),
+                       "rebate_price": s["rebate_price"],
+                       "fetched_at": iso(s["fetched_at"]),
+                       # 공급처(업체) 단위 연락처 — suppliers 조인. 발주할 때 필요하다는
+                       # 사장님 명시 지시(2026-08-26)로 연다. 로그에는 남기지 않는다.
+                       "contact_name": s["contact_name"], "contact_phone": s["contact_phone"],
+                       "order_phone": s["order_phone"], "contact_raw": s["contact_raw"],
+                       "contact_fetched_at": iso(s["contact_fetched_at"])}
                       for s in sups],
+        # "살 수 있는 최저가" — 없으면(전부 품절/문의) null. 화면은 null일 때
+        # "판매 가능한 공급처가 없다"고 말하고 절대 품절가를 최저가로 대신 쓰지 않는다.
+        "cheapest_available": cheapest_available,
         "editable": sorted(EDITABLE), "status_options": list(STATUS_OK),
         "created_at": iso(r["created_at"]),
         "updated_at": iso(r["updated_at"]) if r["updated_at"] else None,
