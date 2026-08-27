@@ -6,7 +6,7 @@
 > 같은 사실을 두 곳에 적지 않는다 — 중복이 문서를 어긋나게 만든다(2026-07-29 정리).
 > 결정을 바꾸거나 미정을 확정할 때는 **이 파일을 먼저 갱신**하고, 그 다음 목업·프롬프트에 반영한다.
 >
-> 최초 작성: 2026-07-02 · 최종 갱신: **2026-08-26(A-114)**
+> 최초 작성: 2026-07-02 · 최종 갱신: **2026-08-27(A-116)**
 > 단계: ~~모델링~~ → **모델링 + DB·API 수직 슬라이스 구현**(2026-07-23 개정 — §2 P-04)
 > 출처: `CLAUDE.md`, `HANDOFF.md`, `docs/prompts/S0~S4`, `docs/infra/GCP_SETUP.md`
 >
@@ -6098,6 +6098,185 @@ DDR3·SATA+512GB)은 코드 상수로 옮겨 심지 않았다 — 1회성 정리
 product_supplier_prices GROUP BY product_code) t GROUP BY cnt ORDER BY cnt` — 상품당
 공급처 수 분포. 이 결정 전에는 「1곳」이 6,559건이었다.
 
+
+---
+
+### A-115 — 전 공급처 품절 상품을 추천 후보에서 제외 (✅ 2026-08-26 사장님 지시 · 2026-08-27 실행)
+
+**결정**: 사장님 지시(2026-08-26) 원문 — "전 공급처 품절인 상품을 추천 후보에서 빼라." A-114(공급처·가격의
+유일 원천은 몰의 상품별 공급처 화면)로 전 상품의 공급처를 받아 보니 **공급처가 한 곳도 「가능」이 아닌 상품**이
+있었다 — 전부 품절·단종이라 주문이 들어와도 살 수 없는데 지금 견적에 나가고 있었다.
+
+**대상 선정 기준**(하네스 실측 SQL 그대로):
+```sql
+SELECT product_code FROM product_supplier_prices
+WHERE mall_rank IS NOT NULL
+GROUP BY product_code
+HAVING COUNT(*) FILTER (WHERE supply_state = '가능') = 0
+```
+
+**왜 `mall_rank IS NOT NULL`이 반드시 필요한가**: 2026-08-25 공급처 정리(구 엑셀 연결,
+`docs/supplier-consolidation-2026-08-25.md`)로 들어온 기존 6,561행은 `mall_rank`가 전부 NULL이고,
+그 행의 재고 상태는 이번 몰 수집으로 확인된 값이 아니다(0066 마이그레이션 · A-114 §실측 — 순위·리베이트·
+발주가 자체가 "몰에서 아직 안 읽었다"는 뜻으로 비어 있다). 그 행까지 포함해 판정하면 **모르는 재고 상태를
+품절로(또는 그 반대로 가능으로) 잘못 단정**하게 된다 — 이번 몰 수집분(`mall_rank`가 매겨진 행)만으로
+한정해야 "실제로 확인된 전 공급처 품절"만 잡는다.
+
+**실행(2026-08-27, DBA)**: 적용 직전 재측정 233건 — 사전 드라이런과 정확히 일치. 233건 전부
+`status='판매중'` · `data_origin='real'` · 당시 `ai_candidate_yn=true`였고, 233/233이 그 시점
+`v_recommendation_candidates`에 실재했다(= 이탈 233건 전부 실제 후보 이탈). A-113과 같은 방식으로
+`ai_candidate_yn=false` + `locked_fields`에 `'ai_candidate_yn'` 원소 추가(기존 잠금 181건—대부분
+`market_price`—은 그대로 보존, 교체가 아니라 추가). `status`·다른 컬럼은 건드리지 않았다. 재측정·
+슬롯 0 검사·UPDATE·활동 로그 삽입을 한 트랜잭션 안에서 원자적으로 실행했다.
+
+**후보풀 변화**(`v_recommendation_candidates`, part_type별 — 적용 직후 재조회 실측):
+```
+CASE   774 -> 721 (-53)     SSD  222 -> 200 (-22)
+GPU    228 -> 181 (-47)     CPU  158 -> 144 (-14)
+MB     453 -> 413 (-40)     COOLER_CPU_AIR 150 -> 146 (-4)
+POWER  507 -> 481 (-26)     COOLER_CPU_AIO  46 ->  43 (-3)
+RAM    383 -> 360 (-23)     HDD   38 ->  37 (-1)
+합계 2,959 -> 2,726 (-233)
+```
+어느 슬롯도 0이 되지 않았다(견적 슬롯 단위, 공랭+수랭 합산: CASE 721·POWER 481·MB 413·RAM 360·
+SSD 200·GPU 181·COOLER 189·CPU 144·HDD 37). `v_companion_candidates`(주변기기)는 영향
+0건—대상 233건이 전부 core part_type이었다(HDD 포함 10종 안에서만 발생).
+
+**원장**: `admin_operator_activity_logs.log_id=16063`(action=`candidate_exclude_no_supplier`,
+target_kind=`product_bulk`, target_id=`no-supplier-exclude-2026-08-27`). `detail->'before'`에
+233건 전원의 `{pc, part_type, locked_fields, ai_candidate_yn}` 스냅샷을 담아 되돌림 근거로 남겼다.
+
+**되돌리는 법**(A-113과 동일 로직): `log_id=16063`의 `detail->'before'`(JSONB 배열)를 그대로 순회하며
+각 `pc`에 대해 `UPDATE products SET ai_candidate_yn=<그 값>, locked_fields=<그 값>
+WHERE product_code=<pc>`를 실행하고(값과 잠금을 함께 원복—값만 되돌리고 잠금이 남으면 적재가
+영영 못 채운다), 끝나면 `action='candidate_exclude_no_supplier_undo'`로
+`detail={"ref_log_id":16063,"restored":N}` 되돌림 로그를 새로 남긴다(같은 `ref_log_id`로 이미
+되돌린 기록이 있으면 중단—중복 실행 방지).
+
+**검증**: `/api/recommend`를 6개 용도·예산 조합(게임 70·100·150만원 · 사무용 50만원 · 영상편집
+250만원 · 게임 500만원 이상)으로 직접 호출—전부 HTTP 200, 제외된 233건 중 어느 것도 결과에
+섞이지 않았다. 게임/70만원·사무용/50만원은 value·recommend 티어가 비었는데(highend는 성립),
+이는 A-115와 무관한 기존 용도 하한 제약이다—`/api/candidates/count`가 게임 용도의
+`budget_min_total=750,000`을 실측으로 확인했고, 제외된 GPU 47건의 최저가(313,100원 · 하한
+450W 이상 기준)가 제외 후 최저가(275,100원)보다 높으며 제외된 CASE 최저가(14,300원)도 제외
+후 최저가(12,100원)보다 높아 **하한을 구성하는 최저가 부품 자체가 이번 제외로 바뀌지 않았음을
+실측 확인**했다. 회귀 960건·통과 960건·실패 0건(포트 8104, `REGRESSION_BASE`로 로컬 8000·
+배포 8110은 건드리지 않음). 값 변화 알림(`pool_size: 2,959 -> 2,726` 외 일부 티어 총액)은 실패가
+아니라 이번 변경이 실제로 반영됐다는 신호다. 테스트로 만든 `consult_sessions`·`quote_snapshots`
+6세션·14스냅샷은 검증 직후 정리했다(로컬 DB가 곧 운영 DB — CLAUDE.md §베타 배포 상태).
+
+**확인법**: `SELECT detail FROM admin_operator_activity_logs WHERE log_id=16063`으로 대상 233건·
+기준 SQL·되돌림용 스냅샷(`before`)을 직접 확인한다.
+
+---
+
+### A-116 — 매입가를 몰 최저가로 반영하고 판매가를 함께 재계산 (✅ 2026-08-26 사장님 지시 · 2026-08-27 실행)
+
+**결정**: 사장님 지시(2026-08-26) 둘을 합친 것 — "손해 87건의 매입가를 몰 최저가로 바꾸고 판매가도
+함께 재계산해라" + "내릴 것 158건의 매입가를 몰 최저가로 반영해라". 대상 = **245건**(87 + 158,
+중복 없음). 하네스 실측으로는 "다른 것"이 **287건**(오를 것 129 · 내릴 것 158)이고 그중 87건이
+"매입가 > 판매가"(손해)다 — 87 ⊂ 129 이므로 245건은 129−87=**42건을 제외한 수**다. 오를 것 중
+아직 손해는 아닌 42건은 이번 대상이 아니다(매입가가 몰 최저가보다 낮아도 여전히 판매가보다는
+낮아 손해가 아닌 상태 — 별도 판단 필요, 이 항목에서 정하지 않는다).
+
+**대상 선정 기준**(하네스 지시 SQL 그대로, 실행 직전 재측정도 245 일치):
+```sql
+WITH live AS (
+  SELECT product_code, MIN(cost_price) AS mall_min
+  FROM product_supplier_prices
+  WHERE supply_state = '가능' AND mall_rank IS NOT NULL
+  GROUP BY product_code)
+SELECT p.product_code, p.purchase_price, l.mall_min
+FROM live l JOIN products p USING (product_code)
+WHERE p.purchase_price IS NOT NULL
+  AND l.mall_min <> p.purchase_price
+  AND ( l.mall_min < p.purchase_price          -- ① 내릴 것 158건
+     OR l.mall_min > p.sale_price )            -- ② 팔면 손해 87건
+```
+
+**왜 `가능` + `mall_rank IS NOT NULL`만 보는가**(A-114·A-115와 같은 원칙): 옛 엑셀 연결행은
+`mall_rank`가 NULL이라 재고 상태를 모른다 — 포함하면 모르는 상태를 가능/불가능으로 잘못
+단정한다. `supply_state='가능'`만 보는 이유는 품절 공급처가 더 싼 경우가 실제로 있어서다
+(전수 확인 — 이번 대상 245건 전부에서 `가능` 상태 매물 중 최저가만 썼다. 살 수 없는 가격을
+매입가로 쓸 수 없다).
+
+**실행(2026-08-27, DBA)**: 적용 직전 재측정 245건 — 사전 드라이런과 정확히 일치. `locked_fields`에
+`purchase_price`·`sale_price`가 걸린 상품은 245건 중 **0건**(228건이 다른 필드—대부분
+`market_price`—로 잠겨 있었으나 이번 두 필드와는 무관, 손대지 않았다). 판매가는
+`api.pricing.sale_from_purchase`(카드수수료 2.585% + 마진, `resolve_margins`로 판매 분류
+트리 상속 — `category_margin_policies` 0행이라 현재는 전부 전역 12%로 귀결)로 **새 매입가
+기준** 재계산했다. **이번 변경으로 `locked_fields`를 새로 걸지 않았다**(몰 값은 매일 바뀌므로
+다음 수집이 갱신해야 한다). 재측정·계산·UPDATE·활동 로그 삽입을 한 트랜잭션 안에서
+원자적으로 실행했다.
+
+**매입가 변화**(245건 전부 변경): 오름 87건(합계 +5,948,090원) · 내림 158건(합계 −2,758,411원) ·
+순증 +3,189,679원. 최대 상승 5건 — 109253(SSD 삼성전자 870 EVO 4TB) 675,000→2,210,000 ·
+126178(SSD 삼성전자 9100 PRO 4TB) 1,600,000→2,093,000 · 127284(메모리 마이크론 DDR5-5600
+CL46) 3,500,000→3,800,000 · 127594(메모리 BIWIN DDR5-5600 32GB) 660,000→906,200 ·
+124169(메모리 마이크론 DDR5-5600 CL46) 1,760,000→1,920,000. 최대 하락 5건 —
+126197(SSD 키오시아 EXCERIA PLUS G4) 810,000→557,000 · 128438(SSD 키오시아 EXCERIA
+BASIC) 740,000→511,000 · 126256(SSD 키오시아 EXCERIA PLUS G3) 740,000→520,000 ·
+128874(SSD 키오시아 EXCERIA PRO G2) 1,032,000→920,000 · 114762(SSD 삼성전자 870 EVO
+병행수입 2TB) 1,190,000→1,120,000.
+
+**판매가 변화**(245건 전부 변경 — 매입가가 항상 바뀌므로 공식상 판매가도 함께 바뀐다): 오름
+232건(합계 +19,578,500원) · 내림 13건(합계 −581,800원). 매입가는 내렸는데 판매가는 오른
+경우가 섞여 있는 이유 — 기존 판매가가 그 시점 매입가에 공식대로 매겨져 있지 않았던 상품들이라,
+매입가가 내려도 공식이 요구하는 판매가가 기존 저장값보다 높을 수 있다(그래서 "함께
+재계산"이 필요했다). 부품별 내역(건수 / 매입가 오름 / 매입가 내림): CPU 91(7/84) · SSD
+37(12/25) · 그래픽카드 37(32/5) · 메모리 36(13/23) · 메인보드 24(7/17) · 파워 12(8/4) ·
+케이스 5(5/0) · HDD 3(3/0).
+
+**손해 해소 확인**: 재계산 후 245건 중 `sale_price < purchase_price`로 남은 건 **0건**(마진식이
+항상 매입가에 수수료+마진을 더하므로 수학적으로 보장됨).
+
+**후보풀 영향**: `v_recommendation_candidates` 총 2,726건 — 적용 전후 **동일**(진입 0 · 이탈
+0, 245건 전부 적용 전에도 이미 후보였고 적용 후에도 그대로다). 게이트 8종(`sale_price IS
+NOT NULL`·`status`·`ai_candidate_yn`·`review_required_yn`·`category_group`·`part_type`
+·`data_origin` 등) 중 이번 작업은 **어느 것도 건드리지 않았다** — 가격 숫자만 바뀌었고
+NULL이 된 값이 없어 이론상·실측상 모두 이동이 없었다. 슬롯별로도 0인 곳이 없다(CASE
+721·POWER 481·MB 413·RAM 360·SSD 200·GPU 181·COOLER 189·CPU 144·HDD 37).
+
+**원장**: `admin_operator_activity_logs.log_id=16091`(action=`mall_min_reprice`,
+target_kind=`product_bulk`, target_id=`mall-min-reprice-2026-08-27`). `detail->'before'`에
+245건 전원의 `{pc, purchase, sale, locked_purchase, locked_sale}` 스냅샷을 담아 되돌림
+근거로 남겼다. `product_price_history`에 245×2=490행(field=`purchase`/`sale`,
+reason=`mall_min_reprice`, ref_id=16091)을 남겼다 — 매입가 이력에는 그 최저가를 준
+공급처 `supplier_id`도 함께 기록했다.
+
+**되돌리는 법**: `log_id=16091`의 `detail->'before'`(JSONB 배열, 245건)를 순회하며 각
+`pc`에 대해 **되돌리는 시점의 `locked_fields`를 다시 확인**해, 그 사이 사람이 손으로 잠그지
+않은 필드만 `purchase_price`/`sale_price`를 스냅샷 값으로 복원하고(잠근 필드는 건드리지
+않는다 — 사람이 고친 값을 지우지 않기 위해서다), `product_price_history`에
+`reason='mall_min_reprice_undo'`로 남긴다. 끝나면 `action='mall_min_reprice_undo'`로
+`detail={"ref_log_id":16091, "restored_purchase":N, "restored_sale":N,
+"skipped_locked":[...]}` 되돌림 로그를 새로 남긴다(같은 `ref_log_id`로 이미 되돌린 기록이
+있으면 중단 — 중복 실행 방지). `admin_reprice.py`의 `undo()`와 같은 모양(역방향 전이,
+삭제 아님)이되 매입가까지 함께 되돌리도록 확장했다.
+
+**검증**: `/api/recommend`를 대표 예산 3개(게임 70만원·게임 150만원·사무용 50만원)로
+직접 호출 — 전부 HTTP 200. 게임 150만원은 가성비·추천·고성능 3티어 모두 성립
+(755,600 ≤ 1,500,000 ≤ 2,250,000, 서열 불변식 유지). 게임 70만원·사무용 50만원은
+가성비·추천 티어가 비었으나(고성능만 성립, verdict=`over`) 이는 **이번 변경과 무관한
+기존 용도 하한 제약**이다 — 회귀 스냅샷에도 그 조합은 애초에 없고, 이번 작업으로 가장
+저렴한 GPU가 바뀐 폭도 6,200원(128935 275,100원 → 118329 281,300원, 118329는 이번
+대상이 아니라 가격 불변)에 불과해 하한 성립 여부 자체를 바꾸지 않았다. 회귀 960건·통과
+960건·실패 0건(포트 8104, `REGRESSION_BASE`로 로컬 8000·배포 8110은 건드리지 않음).
+값 변화 알림 9건(`value_100만: 740,900→755,600` 외, `docs/decisions/decision-log.md`가
+아니라 회귀 콘솔 출력 참조)은 실패가 아니라 이번 가격 변경이 실제로 반영됐다는 신호다.
+가격 원장 드리프트 검사(products 현재값 = product_price_history 마지막 값)도 스냅샷
+대비 늘지 않아 통과 — 245건의 UPDATE와 INSERT가 정확히 짝을 이뤘다는 독립 증거다.
+테스트로 만든 `consult_sessions` 4건·`quote_snapshots` 6건은 검증 직후 정리했다
+(로컬 DB가 곧 운영 DB — CLAUDE.md §베타 배포 상태).
+
+**손대지 않은 것**: `ai_candidate_yn`·해당 컬럼의 `locked_fields`(A-115 작업 중 — 겹치지
+않음, 표본 대조로 확인). 245건 중 `locked_fields`에 다른 필드(`market_price`·
+`specs.tdp_watt`·`specs.socket`·`specs.clock_mhz`·`specs.pcie_gen`)가 걸린 228건은
+그 잠금을 그대로 두었다(이번 작업 대상이 아닌 필드). 오를 것 중 아직 손해가 아닌 42건은
+이번 지시 범위 밖이라 매입가·판매가 모두 그대로다.
+
+**확인법**: `SELECT detail FROM admin_operator_activity_logs WHERE log_id=16091`로 대상
+245건·재계산 근거·되돌림용 스냅샷(`before`)을 직접 확인한다.
 
 ---
 
