@@ -605,7 +605,7 @@ a.ph-move{color:var(--rv-ink)}
       return '<button type="button" class="ph-item' + (on ? ' on' : '') + '" role="listitem"'
         + ' aria-current="' + (on ? 'true' : 'false') + '"'
         + ' data-action="select-product" data-code="' + p.product_code + '">'
-        + '<span class="ph-item-info"><span class="nm">' + esc(p.name || '(상품명 없음)') + '</span>'
+        + '<span class="ph-item-info"><span class="nm">' + esc(Admin2Text.stripHtml(p.name) || '(상품명 없음)') + '</span>'
         + '<span class="cd num">' + esc(p.sku || String(p.product_code)) + '</span></span>'
         + '<span class="cnt num">' + fmt(p.count) + '건</span>'
         + '</button>';
@@ -638,7 +638,7 @@ a.ph-move{color:var(--rv-ink)}
       : '확인 중…';
     box.innerHTML =
       '<div>'
-      + '<div class="ph-card-name">' + esc(p.name || '(상품명 없음)') + '</div>'
+      + '<div class="ph-card-name">' + esc(Admin2Text.stripHtml(p.name) || '(상품명 없음)') + '</div>'
       + '<div class="ph-card-sub"><span class="num">' + esc(p.sku || String(p.product_code)) + '</span>'
       + ' · <span id="phCardCat">' + esc(catText) + '</span></div>'
       + '</div>'

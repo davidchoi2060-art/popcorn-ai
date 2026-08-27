@@ -532,8 +532,10 @@
             ? '<button type="button" class="si-b" data-action="hold" data-code="' + it.product_code + '"' + (w ? '' : ' disabled title="' + esc(writeNote()) + '"') + '>보류</button>'
             : '');
     }
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var nm = Admin2Text.stripHtml(it.name);
     return '<div class="si-row' + (on ? ' on' : '') + '" data-action="select" data-code="' + it.product_code + '" data-src="' + src + '" data-keep="1">'
-      + '<div class="l1"><span class="nm" title="' + esc(it.name) + '">' + esc(it.name) + '</span>'
+      + '<div class="l1"><span class="nm" title="' + esc(nm) + '">' + esc(nm) + '</span>'
       + '<span class="si-tag ' + tag.cls + '" title="' + esc(it.note || '') + '">' + esc(tag.txt) + '</span>'
       + '<span class="st num">' + fmt(it.stock) + '</span></div>'
       + '<div class="meta">' + esc(it.sku) + ' · ' + esc(it.cat) + (it.status ? ' · ' + esc(it.status) : '') + '</div>'
@@ -662,7 +664,7 @@
     $('siConfirmCard').hidden = !has;
     $('siGateCard').hidden = !has;
     if (!has) { $('siHoldBox').hidden = true; return; }
-    $('siPName').textContent = p.name;
+    $('siPName').textContent = Admin2Text.stripHtml(p.name);
     $('siPMeta').textContent = p.sku + ' · ' + p.cat
       + ' · 상태 ' + (p.status || '조회 안 됨') + ' · 현재고 ' + fmt(p.stock)
       + (p.safety_stock != null ? ' · 안전재고 ' + fmt(p.safety_stock) + '(읽기 전용)' : '')
@@ -939,7 +941,7 @@
       act = '<button type="button" class="si-hb blocked" disabled title="' + esc(h.undo_note || '') + '">' + lab + '</button>';
     }
     var nt = '';
-    if (S.hist.pc == null) nt += '<b>' + esc(h.name || h.sku || ('상품 ' + h.product_code)) + '</b> · ';
+    if (S.hist.pc == null) nt += '<b>' + esc(Admin2Text.stripHtml(h.name) || h.sku || ('상품 ' + h.product_code)) + '</b> · ';
     nt += esc(h.operator || '—') + (h.why ? ' · why=' + esc(h.why) : '') + ' · ' + esc(h.note || '');
     return '<div class="si-hrow' + (h.undone_by != null || h.kind === 'undo' ? ' undone' : '') + '" data-log="' + h.log_id + '">'
       + '<span class="when">' + esc(fmtDT(h.at)) + '</span>'

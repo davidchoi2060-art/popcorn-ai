@@ -414,8 +414,9 @@ a.sc-fixbtn{color:var(--rv-canvas)}
     var sub = '';
     if (domPair) {
       var pctOfSlot = dom.n ? Math.round(domPair.n * 100 / dom.n) : null;
-      sub = '그중 한 조합 — ' + esc(domPair.from_name || '(상품 정보 없음)') + '(' + esc(domPair.from_sku || '—') + ') → '
-        + esc(domPair.to_name || '(상품 정보 없음)') + '(' + esc(domPair.to_sku || '—') + ') — 이 ' + fmt(domPair.n) + '건'
+      // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+      sub = '그중 한 조합 — ' + esc(Admin2Text.stripHtml(domPair.from_name) || '(상품 정보 없음)') + '(' + esc(domPair.from_sku || '—') + ') → '
+        + esc(Admin2Text.stripHtml(domPair.to_name) || '(상품 정보 없음)') + '(' + esc(domPair.to_sku || '—') + ') — 이 ' + fmt(domPair.n) + '건'
         + (pctOfSlot != null ? '(' + esc(dom.label) + ' 교체의 ' + pctOfSlot + '%)' : '') + '을 차지합니다.';
     }
     box.innerHTML =
@@ -494,10 +495,10 @@ a.sc-fixbtn{color:var(--rv-canvas)}
       var dcls = deltaCls(p.avg_delta);
       return '<div class="sc-row" role="row">'
         + '<div class="sc-cell prod" role="cell"><span class="sc-chip">' + esc(p.slot_label || '—') + '</span>'
-        + '<div class="nm">' + esc(p.from_name || '(상품 정보 없음)') + '</div>'
+        + '<div class="nm">' + esc(Admin2Text.stripHtml(p.from_name) || '(상품 정보 없음)') + '</div>'
         + '<div class="cd num">' + esc(p.from_sku || '—') + '</div></div>'
         + '<div class="sc-cell prod" role="cell">'
-        + '<div class="nm">' + esc(p.to_name || '(상품 정보 없음)') + '</div>'
+        + '<div class="nm">' + esc(Admin2Text.stripHtml(p.to_name) || '(상품 정보 없음)') + '</div>'
         + '<div class="cd num">' + esc(p.to_sku || '—') + '</div></div>'
         + '<div class="sc-cell num" role="cell">' + fmt(p.n) + '건<div class="sub">전체의 ' + fmt(p.pct) + '%</div></div>'
         + '<div class="sc-cell num ' + dcls + '" role="cell">' + esc(won(p.avg_delta)) + '</div>'
@@ -520,7 +521,7 @@ a.sc-fixbtn{color:var(--rv-canvas)}
       var width = max ? Math.round((c.n || 0) * 100 / max) : 0;
       return '<div class="sc-cliprow">'
         + '<span class="sc-cliprank num">' + (i + 1) + '</span>'
-        + '<div class="sc-clipinfo"><div class="nm">' + esc(c.name || '(상품 정보 없음)') + '</div>'
+        + '<div class="sc-clipinfo"><div class="nm">' + esc(Admin2Text.stripHtml(c.name) || '(상품 정보 없음)') + '</div>'
         + '<div class="cd num">' + esc(c.label || c.part_type || '—') + ' · ' + esc(String(c.sku != null ? c.sku : (c.product_code != null ? c.product_code : '—'))) + '</div></div>'
         + '<div class="sc-cliptrack"><span class="sc-clipbar" style="width:' + width + '%"></span></div>'
         + '<span class="sc-clipn num">' + fmt(c.n) + '건</span>'
@@ -542,9 +543,9 @@ a.sc-fixbtn{color:var(--rv-canvas)}
     var match = clickKey !== '' && clickKey === pairKey;
     box.innerHTML =
       '<div class="sc-ovrow"><span class="lbl">근거 클릭 1위</span>'
-      + '<span class="val">' + esc(topClick.name || '(상품 정보 없음)') + ' <span class="num">(' + esc(clickKey) + ')</span> — ' + fmt(topClick.n) + '건</span></div>'
+      + '<span class="val">' + esc(Admin2Text.stripHtml(topClick.name) || '(상품 정보 없음)') + ' <span class="num">(' + esc(clickKey) + ')</span> — ' + fmt(topClick.n) + '건</span></div>'
       + '<div class="sc-ovrow"><span class="lbl">교체 목적지 1위</span>'
-      + '<span class="val">' + esc(topPair.to_name || '(상품 정보 없음)') + ' <span class="num">(' + esc(pairKey || '—') + ')</span> — ' + fmt(topPair.n) + '건</span></div>'
+      + '<span class="val">' + esc(Admin2Text.stripHtml(topPair.to_name) || '(상품 정보 없음)') + ' <span class="num">(' + esc(pairKey || '—') + ')</span> — ' + fmt(topPair.n) + '건</span></div>'
       + '<div class="sc-ovmark ' + (match ? 'yes' : 'no') + '">' + (match ? '같은 상품입니다' : '다른 상품입니다') + '</div>';
   }
 

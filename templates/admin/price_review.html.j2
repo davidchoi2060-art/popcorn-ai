@@ -480,9 +480,11 @@
   function rowHtml(item) {
     var noPurchase = item.purchase == null;
     var why = noPurchase ? '제안할 수 없음 — 매입가가 없습니다' : (item.why || '첫 산정');
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var nm = Admin2Text.stripHtml(item.name);
     return '<div class="pr-row" role="row" tabindex="0" data-code="' + esc(item.product_code) + '">'
       + '<span role="cell" class="c-num">' + esc(item.product_code) + '</span>'
-      + '<span role="cell" class="c-name" title="' + esc(item.name) + '">' + esc(item.name) + '</span>'
+      + '<span role="cell" class="c-name" title="' + esc(nm) + '">' + esc(nm) + '</span>'
       + '<span role="cell" class="c-num' + (noPurchase ? ' c-err' : '') + '">'
       + (noPurchase ? '없음' : fmtWon(item.purchase)) + '</span>'
       + '<span role="cell" class="c-num c-muted">미정</span>'
@@ -510,7 +512,7 @@
     S.openCode = code;
     S.suppliers = null;
 
-    $('dwTitle').textContent = item.name || ('상품 ' + code);
+    $('dwTitle').textContent = Admin2Text.stripHtml(item.name) || ('상품 ' + code);
     $('dwCode').textContent = 'No.' + item.product_code + (item.sku ? ' · ' + item.sku : '');
     $('dwCat').textContent = item.cat || '—';
     $('dwPurchase').textContent = item.purchase == null ? '없음' : fmtWon(item.purchase);

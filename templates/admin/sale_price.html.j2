@@ -413,7 +413,8 @@
       '<div class="sp-card' + (S.selCode === c.product_code ? ' on' : '') + '" data-action="open-card" data-code="' + c.product_code + '">' +
       '<span class="sp-badge ' + BADGE_CLS[c.kind] + '">' + esc(c.kind_label) + '</span>' +
       diffHtml +
-      '<div class="sp-card-name">' + esc(c.name) + '</div>' +
+      // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+      '<div class="sp-card-name">' + esc(Admin2Text.stripHtml(c.name)) + '</div>' +
       '<div class="sp-card-sub num">' + c.product_code + ' · ' + esc(c.cat) + '</div>' +
       '<div class="sp-card-reason">' + esc(c.reason) + '</div>' +
       '<div class="sp-card-meta">' + esc(metaBits.join(' · ')) + '</div>' +
@@ -469,7 +470,7 @@
     if (!d) return;
     $('dwBadge').className = 'sp-badge ' + (BADGE_CLS[d.kind] || 'sp-badge-unknown');
     $('dwBadge').textContent = d.kind_label;
-    $('dwTitle').textContent = d.name;
+    $('dwTitle').textContent = Admin2Text.stripHtml(d.name);
     var metaBits = [
       '<b>상품번호</b> ' + d.product_code,
       '<b>부품 종류</b> ' + esc(d.cat),

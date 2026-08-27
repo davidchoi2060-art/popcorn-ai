@@ -979,11 +979,14 @@ input{font-family:var(--rv-font)}
         var bad = !!p.violates || p.category_id == null;
         var etc = p.part_type === 'ETC';
         var statusLive = p.status === '판매중';
+        // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다 —
+        // p.name(원본)은 그대로 둔다(2026-08-27, 사장님 발견 결함).
+        var nm = Admin2Text.stripHtml(p.name);
         return '<button type="button" class="cm-row' + (on ? ' on' : '') + (bad ? ' flag' : '') +
           '" data-action="toggle-row" data-code="' + p.product_code + '" role="checkbox" aria-checked="' + (on ? 'true' : 'false') +
-          '" aria-label="' + esc(p.name) + ' 선택">' +
+          '" aria-label="' + esc(nm) + ' 선택">' +
           '<span class="cm-check' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '✓' : '') + '</span>' +
-          '<span class="nm">' + esc(p.name) + '</span>' +
+          '<span class="nm">' + esc(nm) + '</span>' +
           '<span class="cd num">' + esc(p.product_code) + '</span>' +
           '<span class="pt' + (etc ? ' etc' : '') + '"' + (etc ? ' title="부품 종류 축: ' + esc(etcLabel()) + ' (part_type=ETC)"' : '') + '>' + esc(p.part_label) + '</span>' +
           '<span class="ct' + (bad ? ' warn' : '') + '">' + esc(p.category_id == null ? '(없음)' : p.category) +

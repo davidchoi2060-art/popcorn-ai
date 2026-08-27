@@ -471,9 +471,11 @@
     var stockCls = item.stock === 0 ? ' zero' : '';
     var inprog = item.quotes && item.quotes.length ? ' inprogress' : '';
     var sel = String(item.product_code) === String(S.selectedCode) ? ' selected' : '';
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var nm = Admin2Text.stripHtml(item.name);
     return '<div class="src-row' + inprog + sel + '" role="row" tabindex="0" data-code="' + esc(item.product_code) + '">'
-      + '<span role="cell" class="c-name" title="' + esc(item.name) + '">'
-      + '<span class="nm">' + esc(item.name) + '</span>'
+      + '<span role="cell" class="c-name" title="' + esc(nm) + '">'
+      + '<span class="nm">' + esc(nm) + '</span>'
       + '<span class="cat">' + esc(item.cat) + '</span></span>'
       + '<span role="cell"><span class="src-mlbl">SKU: </span>' + esc(item.sku) + '</span>'
       + '<span role="cell" class="c-num' + stockCls + '"><span class="src-mlbl">재고: </span>'
@@ -533,8 +535,9 @@
   }
 
   function renderPanelHead(item, badge) {
+    var nm = Admin2Text.stripHtml(item.name);
     $('srcPanelHead').innerHTML =
-      '<div class="src-ph-name" title="' + esc(item.name) + '">' + esc(item.name) + '</div>'
+      '<div class="src-ph-name" title="' + esc(nm) + '">' + esc(nm) + '</div>'
       + '<div class="src-ph-meta">No.' + esc(item.product_code) + ' · SKU ' + esc(item.sku) + ' · ' + esc(item.cat) + '</div>'
       + '<div class="src-ph-meta">재고 ' + fmtNum(item.stock) + ' · 안전재고 ' + fmtNum(item.safety_stock) + '</div>'
       + '<span class="src-badge ' + badge.cls + '">' + esc(badge.label) + '</span>';

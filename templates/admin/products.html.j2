@@ -575,11 +575,15 @@ a.pp-btn-line{color:var(--on)}
   function rowHtml(p){
     var st = ST[p.status_key] || {label:p.status_key||"—", cls:"pp-badge-ok"};
     var skuLine = (p.sku && String(p.sku)!==p.product_code) ? ("SKU " + esc(p.sku)) : esc(p.product_code);
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다 —
+    // p.name(원본)은 그대로 둔다(2026-08-27, 사장님 발견 결함). 편집 입력값(BASIC_FIELDS)에는
+    // 쓰지 않는다 — 여기는 목록의 읽기 전용 행이다.
+    var nm = Admin2Text.stripHtml(p.name);
     return '<div class="pp-row" data-pc="' + p.product_code + '">'
       + '<span><input type="checkbox" class="pp-chk" data-pc="' + p.product_code + '"'
         + (SEL[p.product_code]?" checked":"") + ' aria-label="선택"></span>'
       + '<span class="pp-code">' + p.product_code + '</span>'
-      + '<span class="pp-name-wrap"><button type="button" class="pp-name" data-open="' + p.product_code + '" title="' + esc(p.name) + '">' + esc(p.name) + '</button>'
+      + '<span class="pp-name-wrap"><button type="button" class="pp-name" data-open="' + p.product_code + '" title="' + esc(nm) + '">' + esc(nm) + '</button>'
         + '<span class="pp-sku">' + skuLine + '</span></span>'
       + '<span class="pp-cat">' + esc(p.cat) + '</span>'
       + '<span>' + specBadge(p) + '</span>'
@@ -770,7 +774,9 @@ a.pp-btn-line{color:var(--on)}
 
   function renderDrawer(){
     var d = DRAWER.data; if(!d) return;
-    var t = document.getElementById("drTitle"); t.textContent = d.name; t.title = d.name;
+    var t = document.getElementById("drTitle");
+    var drNm = Admin2Text.stripHtml(d.name);   // 몰 HTML 태그 표시 방지(d.name 원본은 그대로)
+    t.textContent = drNm; t.title = drNm;
     // 몰 관리자 링크 — DRAWER.code는 openDrawer()가 이 상품을 열 때 이미 채워 놓았고
     // (fetchDrawerData의 "DRAWER.code !== code" 가드로 다른 상품 응답은 여기까지 오지
     // 않는다), 코드가 없으면(방어적) 빈 pd_no로 링크를 내밀지 않고 숨긴다.
@@ -862,7 +868,10 @@ a.pp-btn-line{color:var(--on)}
       } else {
         if(key==="sale_price" || key==="purchase_price") valHtml = '<span class="val' + (raw==null?" dim":"") + '">' + fmtWon(raw) + '</span>';
         else if(key==="stock_qty") valHtml = '<span class="val">' + (raw==null?0:raw) + '개</span>';
-        else valHtml = '<span class="val' + (raw==null||raw===""?" dim":"") + '">' + esc(raw==null||raw===""?"—":raw) + '</span>';
+        // 읽기 전용 표시만 태그를 벗긴다(name·supplier 등 — 몰 원문에 <font>가 섞일 수
+        // 있다). 위 편집(editing) 분기의 <input value=...>는 원본 그대로 둔다 —
+        // 고치지 않고 저장해도 DB가 조용히 바뀌면 안 되기 때문이다.
+        else valHtml = '<span class="val' + (raw==null||raw===""?" dim":"") + '">' + esc(raw==null||raw===""?"—":Admin2Text.stripHtml(raw)) + '</span>';
       }
       // supplier는 [공급처] 탭(product_supplier_prices, 구조화된 매입가 표)과 다른
       // 값이다 — 라벨 옆 물음표 없이도 구분되게 title 툴팁으로 근거를 남긴다.
@@ -886,7 +895,9 @@ a.pp-btn-line{color:var(--on)}
       ["등록일", fmtDate(d.created_at)],
       ["수정일", fmtDate(d.updated_at)]
     ].map(function(r){
-      return '<div class="pp-field"><span class="lb">' + r[0] + '</span><span class="val dim">' + esc(r[1]) + '</span><span></span></div>';
+      // "사양 원문"(spec_source_text)에 몰 HTML 태그가 섞일 수 있다 — 읽기 전용 정보이므로
+      // 표시 직전에 벗긴다(다른 행은 이미 가공된 값이라 영향 없음).
+      return '<div class="pp-field"><span class="lb">' + r[0] + '</span><span class="val dim">' + esc(Admin2Text.stripHtml(r[1])) + '</span><span></span></div>';
     }).join("");
 
     return gateHtml + rows + infoRows + '<div class="pp-dr-hint">' + (editing
@@ -1274,7 +1285,7 @@ a.pp-btn-line{color:var(--on)}
     return '<div class="pp-impact"><b>이름이 거의 같은 상품이 있습니다</b> — 같은 상품이면 등록 대신 기존 상품을 수정하세요.'
       + items.map(function(it){
           return '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08)">'
-            + esc(it.name) + ' <span class="pp-dim-text">(' + esc(it.sku) + ' · 일치도 ' + Math.round(it.score*100) + '%)</span></div>';
+            + esc(Admin2Text.stripHtml(it.name)) + ' <span class="pp-dim-text">(' + esc(it.sku) + ' · 일치도 ' + Math.round(it.score*100) + '%)</span></div>';
         }).join("") + '</div>';
   }
   // supplier(공급처 원문)는 products의 자유 텍스트 한 칸 — [공급처] 탭의 매입가 표와

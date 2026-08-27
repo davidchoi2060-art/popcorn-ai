@@ -960,7 +960,8 @@ input{font-family:var(--rv-mono)}
       var sv = withUnit(r.suggested_value, r.field);
       return '<div class="row' + (on ? ' on' : '') + '" data-keep="1" data-action="open-row" data-id="' + r.review_id + '">' +
         '<span class="chk' + (ck ? ' on' : '') + '" data-action="check-row" data-id="' + r.review_id + '">' + (ck ? '✓' : '') + '</span>' +
-        '<span class="rname"><span class="nm">' + esc(r.name) + '</span>' +
+        // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+        '<span class="rname"><span class="nm">' + esc(Admin2Text.stripHtml(r.name)) + '</span>' +
         (r.live ? '<span class="live">●</span>' : '') + '</span>' +
         '<span class="fld">' + esc(r.field || '—') + '</span>' +
         '<span class="ov' + (ov ? '' : ' noval') + '">' + esc(ov || '없음') + '</span>' +
@@ -1040,8 +1041,11 @@ input{font-family:var(--rv-mono)}
       if (linked) {
         btn = '<span class="src-btn linked" data-action="sourcing-unlink" data-rid="' + esc(r.src_row_id) + '">연결됨 · 해제</span>';
       } else if (r.cand) {
+        // r.cand.name = products.product_name(우리 카탈로그의 후보) — 몰 HTML 태그가
+        // 섞일 수 있어 벗긴다. r.name(아래 src-row)은 공급처가 올린 단가표 원문
+        // model_name이라 이 결함의 대상이 아니다(다른 원천).
         btn = '<span class="src-btn" data-action="sourcing-link" data-rid="' + esc(r.src_row_id) +
-          '" data-sku="' + esc(r.cand.sku) + '" title="후보: ' + esc(r.cand.name) + ' (유사도 ' + r.cand.sim.toFixed(2) + ')">후보에 연결</span>';
+          '" data-sku="' + esc(r.cand.sku) + '" title="후보: ' + esc(Admin2Text.stripHtml(r.cand.name)) + ' (유사도 ' + r.cand.sim.toFixed(2) + ')">후보에 연결</span>';
       } else {
         btn = '<span class="src-btn dis" title="유사 후보 없음 — 신규 상품 등록 필요(비범위)">연결 대상 없음</span>';
       }
@@ -1097,7 +1101,7 @@ input{font-family:var(--rv-mono)}
     var row = S.drawerOpen ? findItem(S.sel) : null;
     if (!row || S.tab !== 'review') { drawer.hidden = true; return; }
     drawer.hidden = false;
-    $('dwName').textContent = row.name;
+    $('dwName').textContent = Admin2Text.stripHtml(row.name);
     var liveEl = $('dwLive');
     liveEl.textContent = row.live ? '● 판매중·재고 있음' : '○ 판매중지';
     liveEl.style.color = row.live ? 'oklch(0.52 0.16 30)' : '#8a8377';
@@ -1176,7 +1180,7 @@ input{font-family:var(--rv-mono)}
           var on = !!S.sibChecked[i];
           return '<div class="sib-row" data-action="toggle-sib" data-i="' + i + '">' +
             '<span class="chk' + (on ? ' on' : '') + '">' + (on ? '✓' : '') + '</span>' +
-            '<span class="nm">' + esc(s.name) + '</span>' +
+            '<span class="nm">' + esc(Admin2Text.stripHtml(s.name)) + '</span>' +
             '<span class="cd">' + esc(s.product_code) + '</span></div>';
         }).join('') + '</div></div>';
     }
@@ -1244,7 +1248,7 @@ input{font-family:var(--rv-mono)}
     if (!guard()) return;
     var row = findItem(S.sel); if (!row) return;
     apiPost('/api/admin/reviews/' + row.review_id + '/process', { action: 'reject' })
-      .then(function (res) { afterProcess(res, '기각(보류) 1건 · ' + row.name, '기각'); })
+      .then(function (res) { afterProcess(res, '기각(보류) 1건 · ' + Admin2Text.stripHtml(row.name), '기각'); })
       .catch(function (err) { toast(err.message, 'err'); });
   }
   function manualCommit() {

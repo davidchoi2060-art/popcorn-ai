@@ -493,8 +493,10 @@ a.rp-link{color:var(--rv-link)}
 
   // ── ② 미리보기 결과 ────────────────────────────────────────────
   function exampleRowHtml(item) {
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var nm = Admin2Text.stripHtml(item.name || '');
     return '<div class="rp-ex-row">'
-      + '<span class="rp-ex-name" title="' + esc(item.name || '') + '">' + esc(item.name || '') + '</span>'
+      + '<span class="rp-ex-name" title="' + esc(nm) + '">' + esc(nm) + '</span>'
       + '<span class="rp-ex-code">' + esc(item.product_code) + ' · ' + esc(item.part_label || '') + '</span>'
       + '<span class="rp-ex-price">' + fmt(item.purchase) + ' → ' + fmt(item.current) + ' → ' + fmt(item.proposed) + '원</span>'
       + '</div>';

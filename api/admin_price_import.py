@@ -17,6 +17,7 @@ from sqlalchemy import bindparam, text
 from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
+from .html_text import strip_html_display
 from .price_parser import parse_price_file
 
 router = APIRouter(prefix="/api/admin")
@@ -427,7 +428,9 @@ def undo(log_id: int):
                 "SELECT product_code, COALESCE(product_name, sku, product_code::text) AS label"
                 " FROM products WHERE product_code = ANY(:codes)"),
                 {"codes": conflicts}).mappings().all()
-            label_by_code = {r["product_code"]: r["label"] for r in labels}
+            # product_name 원문에 몰 HTML 태그가 섞여 있을 수 있다 — 오류 문구에 그대로
+            # 넣으면 글자로 새어 보인다(2026-08-27 A-38 ⑤ 후속).
+            label_by_code = {r["product_code"]: strip_html_display(r["label"]) for r in labels}
             listed = ", ".join(f"{c}({label_by_code.get(c, c)})" for c in conflicts)
             raise HTTPException(409,
                 "반영 이후 다른 변경이 감지되어 되돌릴 수 없습니다"

@@ -552,8 +552,9 @@ a.sf-src-link{color:var(--rv-link);text-decoration:underline}
       ? '<span class="sf-note-cell">' + esc(it.note) + '</span>'
       : '<span class="sf-note-empty">—</span>';
     var rowCls = 'sf-tbl-row sf-sugg-grid' + (low ? ' sf-row-warn' : '');
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
     return '<div class="' + rowCls + '">'
-      + '<div class="sf-prod">' + esc(it.name) + '<span class="code">' + esc(it.product_code) + '</span></div>'
+      + '<div class="sf-prod">' + esc(Admin2Text.stripHtml(it.name)) + '<span class="code">' + esc(it.product_code) + '</span></div>'
       + '<div class="sf-mono">' + esc(it.value) + '</div>'
       + '<div>' + srcName + src + '</div>'
       + '<div class="sf-conf' + (low ? ' low' : '') + '" style="text-align:right">' + confText + '</div>'

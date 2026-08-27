@@ -540,9 +540,11 @@ input,textarea{font-family:var(--rv-font)}
 
   // ── 서열 사다리(1b) — 이미 매긴 것만, 같은 슬롯 안 ──────────────
   function ladderRowHtml(it, canW) {
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var nm = Admin2Text.stripHtml(it.product_name);
     return '<div class="pg-lrow" data-code="' + it.product_code + '">'
       + '<span class="sc num">' + it.grade + '</span>'
-      + '<span class="nm" title="' + esc(it.product_name) + '">' + esc(it.product_name)
+      + '<span class="nm" title="' + esc(nm) + '">' + esc(nm)
           + '<span class="pt">' + esc(it.part_label) + '</span></span>'
       + '<span class="bs" title="' + esc(it.basis || '') + '">' + esc(it.basis || '') + '</span>'
       + '<span class="src">' + (it.source ? esc(it.source) : '<span class="dim">출처 없음</span>') + '</span>'
@@ -592,9 +594,11 @@ input,textarea{font-family:var(--rv-font)}
   // ── 등급 없는 것 — 비싼 것부터(1a 성질) ─────────────────────────
   function ungradedRowHtml(it, canW) {
     var priceTxt = it.sale_price == null ? '—' : (fmt(it.sale_price) + '원');
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var nm = Admin2Text.stripHtml(it.product_name);
     return '<div class="pg-urow" data-code="' + it.product_code + '">'
       + '<span class="cd num">' + it.product_code + '</span>'
-      + '<span class="nm" title="' + esc(it.product_name) + '">' + esc(it.product_name)
+      + '<span class="nm" title="' + esc(nm) + '">' + esc(nm)
           + '<span class="pt">' + esc(it.part_label) + (it.in_pool === false ? ' · 후보 아님' : '') + '</span></span>'
       + '<span class="pr num">' + priceTxt + '</span>'
       + '<span class="ac"><button type="button" class="pg-mini pg-mini--primary" data-action="row-grade" data-code="' + it.product_code + '"'
@@ -648,16 +652,17 @@ input,textarea{font-family:var(--rv-font)}
     }
     for (var i = 0; i < list.length; i++) {
       var it = list[i];
+      // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
       if (score === it.grade) {
-        return '지금 서열: ' + it.grade + '점(' + it.product_name + ')과 동점입니다';
+        return '지금 서열: ' + it.grade + '점(' + Admin2Text.stripHtml(it.product_name) + ')과 동점입니다';
       }
       if (score > it.grade) {
         if (i === 0) {
-          return '지금 서열: ' + it.grade + '점(' + it.product_name + ') 위 · 이 슬롯 최고점이 됩니다';
+          return '지금 서열: ' + it.grade + '점(' + Admin2Text.stripHtml(it.product_name) + ') 위 · 이 슬롯 최고점이 됩니다';
         }
         var prev = list[i - 1];
-        return '지금 서열: ' + prev.grade + '점(' + prev.product_name + ') 아래 · '
-          + it.grade + '점(' + it.product_name + ') 위';
+        return '지금 서열: ' + prev.grade + '점(' + Admin2Text.stripHtml(prev.product_name) + ') 아래 · '
+          + it.grade + '점(' + Admin2Text.stripHtml(it.product_name) + ') 위';
       }
     }
     var last = list[list.length - 1];
@@ -665,7 +670,7 @@ input,textarea{font-family:var(--rv-font)}
     if (morePages) {
       return '지금 불러온 목록(최저 ' + last.grade + '점) 보다 낮습니다 — 다음 페이지에서 정확한 위치를 확인하세요';
     }
-    return '지금 서열: ' + last.grade + '점(' + last.product_name + ') 아래 · 이 슬롯 최저점이 됩니다';
+    return '지금 서열: ' + last.grade + '점(' + Admin2Text.stripHtml(last.product_name) + ') 아래 · 이 슬롯 최저점이 됩니다';
   }
   function updateBarAndPreview() {
     var scoreEl = $('scoreInput');
@@ -709,7 +714,7 @@ input,textarea{font-family:var(--rv-font)}
 
     body.innerHTML =
       '<div class="pg-pitem">'
-        + '<div class="pg-pitem-nm">' + esc(item.product_name) + '</div>'
+        + '<div class="pg-pitem-nm">' + esc(Admin2Text.stripHtml(item.product_name)) + '</div>'
         + '<div class="pg-pitem-meta">'
           + '<span class="num">#' + item.product_code + '</span>'
           + '<span>' + esc(item.part_label) + '</span>'
@@ -868,7 +873,8 @@ input,textarea{font-family:var(--rv-font)}
   function onRowDelete(code) {         // 「삭제」 — 서열 사다리에서
     if (!writable()) return;
     var item = findLadderItem(code);
-    var label = item ? item.product_name : ('상품 ' + code);
+    // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
+    var label = item ? Admin2Text.stripHtml(item.product_name) : ('상품 ' + code);
     if (!confirm('『' + label + '』의 등급을 삭제합니다. 다시 매기려면 점수·근거를 새로 입력해야 합니다. 계속할까요?')) return;
     apiDelete('/api/admin/grades/' + code).then(function () {
       if (S.mode === 'target' && S.targetItem && String(S.targetItem.product_code) === String(code)) {

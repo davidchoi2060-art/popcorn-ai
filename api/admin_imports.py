@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from .timeutil import iso
 from .db import engine
+from .html_text import strip_html_display
 
 router = APIRouter(prefix="/api/admin")
 
@@ -95,7 +96,10 @@ def job_rows(job_id: int, limit: int = 100):
         "reason": e["reason"], "cells": cells(e["raw_row"]),
     } for e in errs] + [{
         "kind": "kept", "row_no": None, "sku": e["sku"],
-        "reason": f"적재됨 — {e['product_name'][:40]}" if e["product_name"] else "적재됨",
+        # 태그를 먼저 벗기고 자른다 — 40자로 먼저 자르면 몰 원문의 <font ...> 중간을
+        # 잘라 "…NO.05.90614M <font colo" 같은 조각이 남는다(2026-08-27 A-38 ⑤ 후속).
+        "reason": (f"적재됨 — {strip_html_display(e['product_name'])[:40]}"
+                   if e["product_name"] else "적재됨"),
         "cells": cells(e["raw_row"]),
     } for e in kept]
 

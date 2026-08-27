@@ -466,9 +466,10 @@ a.dp-empty-link{color:var(--rv-ink)}
         '<div class="dp-items">' +
           g.items.map(function (it) {
             var sel = it.code === S.sel && S.drawerOpen;
+            // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
             return '<div class="dp-card' + (sel ? ' sel' : '') + '" data-keep="1" data-action="open-item" data-code="' + it.code + '" style="border-left-color:' + g.color + '">' +
               '<span class="dp-c-code">' + esc(it.sku) + '</span>' +
-              '<span class="dp-c-name">' + esc(it.name) + '</span>' +
+              '<span class="dp-c-name">' + esc(Admin2Text.stripHtml(it.name)) + '</span>' +
               '<span class="dp-c-cat">' + esc(it.cat) + '</span>' +
               '<span class="dp-c-at num">' + fmtAt(it.at) + '</span>' +
               '<span class="dp-c-note">' + esc(it.note) + '</span>' +
@@ -508,7 +509,7 @@ a.dp-empty-link{color:var(--rv-ink)}
     var it = findItem(S.sel);
     if (!it) { closeDrawer(); return; }
 
-    $('dwName').textContent = it.name;
+    $('dwName').textContent = Admin2Text.stripHtml(it.name);
     $('dwStatusPill').textContent = it.status;
     $('dwSku').textContent = it.sku;
     $('dwCode').textContent = it.code;
@@ -520,7 +521,7 @@ a.dp-empty-link{color:var(--rv-ink)}
       ? (fmtAt(it.at) + ' · ' + esc(it.operator || '—') + ' · 활동 로그 <span style="font-family:var(--rv-mono)">log_id ' + it.log_id + '</span>. ' + esc(it.note))
       : esc(it.note);
     var into = it.into
-      ? '<div class="dw-decision-link">옮겨간 원본 → <a href="/admin2/products">' + esc(it.into.sku) + ' ' + esc(it.into.name || '') + ' (상품 관리에서 확인)</a></div>'
+      ? '<div class="dw-decision-link">옮겨간 원본 → <a href="/admin2/products">' + esc(it.into.sku) + ' ' + esc(Admin2Text.stripHtml(it.into.name) || '') + ' (상품 관리에서 확인)</a></div>'
       : '';
     var decision = '<div class="dw-decision" style="border-color:' + decisionColor + '66;background:' + decisionBg + ';border-left-color:' + decisionColor + '">' +
       '<div class="dw-decision-t" style="color:' + decisionColor + '">경로 판정 — ' + esc(PATH_TITLE[it.path] || it.path) + '</div>' +
@@ -593,7 +594,7 @@ a.dp-empty-link{color:var(--rv-ink)}
         '<button type="button" class="btn-cancel" data-action="cancel-delete">확인</button>';
     } else if (d.step === 1) {
       title = '완전 삭제 확인';
-      body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(d.name) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
+      body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(Admin2Text.stripHtml(d.name)) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
         '<div class="dm-alt">먼저 서버에서 참조 현황(재고 원장·가격 이력·찜 등)을 확인합니다. 참조가 없으면 바로 삭제됩니다.</div>';
       foot = '<span class="dm-note">operator 등급이면 실행됩니다 — 권한 강화는 하지 않기로 확정(2026-08-14)</span>' +
         '<button type="button" class="btn-cancel" data-action="cancel-delete">취소</button>' +
@@ -602,7 +603,7 @@ a.dp-empty-link{color:var(--rv-ink)}
       title = '완전 삭제 — 2단계 중 2단계';
       var refs = d.refs || [];
       var hasStock = refs.some(function (r) { return r.table === 'stock_movements'; });
-      body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(d.name) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
+      body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(Admin2Text.stripHtml(d.name)) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
         '<div class="dm-refs-box"><div class="dm-refs-t">함께 지워지는 것 — 서버가 알려준 참조 ' + refs.length + '종</div>' +
         '<div class="dm-refs-list">' + refs.map(function (r) { return esc(r.label) + ' ' + fmt(r.count) + '행'; }).join('<br>') + '</div>' +
         (hasStock ? '<div class="dm-refs-warn"><b>재고 원장까지 함께 사라집니다</b> — 이 프로젝트에서 원장을 실제로 지우는 유일한 경로입니다.</div>' : '') +
