@@ -22,6 +22,14 @@
 
 ■ 읽기 전용이라 안전하다
   전사본을 고치지 않는다. 큐 파일만 쓴다(우리가 만든 파일이다).
+
+■ 다른 모듈이 "하네스에게 알린다" — `notify_harness()` (2026-08-27, 요청·승인 결함⑦)
+  화면(`say()`, `POST /say`)이 아니라 **서버 코드**가 알려야 하는 경우(예: 새 요청
+  등록)를 위한 진입점이다. `say()`는 이 프로세스의 로컬 디스크(`QUEUE`)에 쓰는데,
+  배포 서버는 `ProtectSystem=strict`라 그 경로에 못 쓴다 — 그래서 `notify_harness()`는
+  DB(`harness_notify_queue`, 0071)에 쓴다. 읽는 쪽(`_queue_pending()` → `/state`의
+  `queued`)은 파일과 DB를 합쳐서 돌려주므로 `scripts/dash_watch.py`는 손대지 않았다.
+  상세 근거는 `notify_harness()`/`_db_queue_pending()`/`0071_harness_notify_queue.py`.
 """
 import asyncio
 import datetime
@@ -1076,17 +1084,44 @@ class Say(BaseModel):
     text: str
 
 
-def _queue_pending() -> list[dict]:
-    if not QUEUE.exists():
+def _db_queue_pending() -> list[dict]:
+    """`harness_notify_queue`(0071)의 미읽음 — say()/`QUEUE` 파일의 «DB 짝»
+    (`notify_harness()` 아래 참조 — 배포 서버는 파일을 못 쓴다).
+
+    실패해도 `_queue_pending()`(따라서 `/state` 전체)을 죽이지 않는다 — 알림 큐 하나
+    때문에 현황판이 500이 되면 안 된다. 마이그레이션 0071 이 아직 없는 환경(구 DB)에서도
+    이 함수는 조용히 빈 목록을 돌려준다.
+    """
+    try:
+        from .db import engine
+        from sqlalchemy import text as _t
+        with engine.connect() as conn:
+            rows = conn.execute(_t(
+                "SELECT text, created_at FROM harness_notify_queue"
+                " WHERE read_at IS NULL ORDER BY notify_id LIMIT 20")).mappings().all()
+        return [{"ts": _iso_tz(r["created_at"]), "text": r["text"], "read": False} for r in rows]
+    except Exception as e:                                     # noqa: BLE001
+        print(f"[dash] harness_notify_queue read failed: {type(e).__name__}: {e}")
         return []
+
+
+def _queue_pending() -> list[dict]:
+    """`poll()`(`scripts/dash_watch.py`)이 보는 `queued` — 파일 큐 + DB 큐(0071)를 합친다.
+
+    `poll()`은 원소가 어디서 왔는지 모른다(`{"ts","text"}` 모양만 본다) — 그래서 합쳐도
+    감시자 쪽은 한 글자도 안 고친다. 순서는 파일 먼저 · DB 나중(둘 다 대체로 시각순이라
+    크게 안 어긋난다 — 엄격한 전역 정렬이 필요해지면 그때 합쳐서 정렬한다).
+    """
     out = []
-    for line in _tail_lines(QUEUE, 20):
-        try:
-            d = json.loads(line)
-        except Exception:                                    # noqa: BLE001
-            continue
-        if not d.get("read"):
-            out.append(d)
+    if QUEUE.exists():
+        for line in _tail_lines(QUEUE, 20):
+            try:
+                d = json.loads(line)
+            except Exception:                                    # noqa: BLE001
+                continue
+            if not d.get("read"):
+                out.append(d)
+    out.extend(_db_queue_pending())
     return out
 
 
@@ -1096,6 +1131,11 @@ def say(body: Say):
 
     **여기서 세션에 직접 밀어 넣지 않는다.** 그런 경로가 없다(앱 내부다).
     텔레그램과 같은 구조이고, 같은 한계를 갖는다 — 도중에는 못 읽는다.
+
+    ⚠ **로컬 전용이라 봐도 된다.** 배포 서버는 이 파일(`QUEUE`)에 못 쓴다
+    (`notify_harness()` 문서 참조) — 배포 서버에서 이 엔드포인트를 부르면 500이 난다.
+    다른 모듈이 "하네스에게 알린다"를 하려면 이 엔드포인트를 부르지 말고
+    `notify_harness()`를 직접 부른다(로컬·배포 어디서도 동작한다).
     """
     t = (body.text or "").strip()
     if not t:
@@ -1105,6 +1145,46 @@ def say(body: Say):
     with io.open(QUEUE, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return {"ok": True, "verdict": "전달 완료 · 작업 완료 후 읽음"}
+
+
+# ── DB 큐 쓰기 — say() 의 짝, 배포 서버에서도 동작한다 (2026-08-27, 요청·승인 결함⑦) ──
+def notify_harness(message: str, *, source: str = "") -> bool:
+    """다른 모듈이 "하네스에게 알린다"고 부르는 단일 진입점.
+
+    `say()`와 목적은 같지만(큐에 한 줄 넣기 — Monitor 가 보고 깨운다) **DB**
+    (`harness_notify_queue`, 0071)에 쓴다. `say()`는 이 프로세스 자신의 로컬 디스크에
+    쓰는데, 배포 서버는 systemd `ProtectSystem=strict`라 `.claude/`(QUEUE 가 가리키는
+    경로)에 쓰기가 막혀 있다(`deploy/popcorn-api.service`의 `ReadWritePaths`는 `.cache`
+    하나뿐 — 2026-08-27 실측). `say()`를 그대로 불렀다면 배포 서버에서 조용히 실패해
+    "알렸다는데 아무도 못 받는" 사고가 났을 것이다 — 캡처 · 「진행 흐름」이 같은 systemd
+    제약을 이미 두 번 우회한 것과 같은 판단으로 DB를 골랐다(모듈 0071 참조).
+
+    **실패해도 예외를 던지지 않는다** — 알림은 부가 기능이지, 이걸 부르는 쪽의 원래
+    동작(예: 요청 등록)이 알림 실패 때문에 500이 되면 안 된다. 실패는 콘솔에만 남는다
+    (ASCII 만 — cp949 stdout 이 em-dash·화살표를 만나면 500을 낸 전례가 있다, 그래서
+    이 함수 자신의 로그 문자열에도 그 규칙을 지킨다).
+
+    쓸 때마다 **읽은 지 30일 지난 행**을 함께 지운다(`dash_events`처럼 별도 배치를
+    두지 않는다 — 이 표는 쓰기 빈도가 훨씬 낮아 사흘이 아니라 30일로 느슨하게 잡았다).
+    미읽음 행은 지우지 않는다 — 감시자가 오래 꺼져 있어도 알림 자체가 사라지면 안 된다.
+    """
+    text_ = (message or "").strip()
+    if not text_:
+        return False
+    try:
+        from .db import engine
+        from sqlalchemy import text as _t
+        with engine.begin() as conn:
+            conn.execute(_t(
+                "INSERT INTO harness_notify_queue (text, source) VALUES (:t, :s)"),
+                {"t": text_[:2000], "s": (source or "")[:40]})
+            conn.execute(_t(
+                "DELETE FROM harness_notify_queue"
+                " WHERE read_at IS NOT NULL AND read_at < now() - interval '30 days'"))
+        return True
+    except Exception as e:                                     # noqa: BLE001
+        print(f"[dash] notify_harness failed: {type(e).__name__}: {e}")
+        return False
 
 
 # ── 진행 흐름 밀어 올리기 — 감시자 -> 배포 서버 (2026-08-27 신설) ────────────────
@@ -1260,19 +1340,34 @@ def memo_del(memo_id: int):
 
 @router.post("/mark-read")
 def mark_read():
-    """세션이 큐를 읽었다고 표시. 화면의 「대기 중」이 사라진다."""
-    if not QUEUE.exists():
-        return {"ok": True, "marked": 0}
-    lines = io.open(QUEUE, encoding="utf-8").read().splitlines()
-    out, n = [], 0
-    for line in lines:
-        try:
-            d = json.loads(line)
-        except Exception:                                    # noqa: BLE001
-            continue
-        if not d.get("read"):
-            d["read"] = True
-            n += 1
-        out.append(json.dumps(d, ensure_ascii=False))
-    io.open(QUEUE, "w", encoding="utf-8").write("\n".join(out) + ("\n" if out else ""))
+    """세션이 큐를 읽었다고 표시. 화면의 「대기 중」이 사라진다.
+
+    파일 큐 «와» DB 큐(`harness_notify_queue`, 0071) 둘 다 마크한다(2026-08-27,
+    `notify_harness()` 가 생기면서 — 파일만 마크하면 DB 쪽 알림이 30초마다 계속
+    다시 나온다). 둘 다 **블랭킷**(지금 미읽음 전부)으로 마크한다 — 파일 쪽의 기존
+    정책 그대로다. 파일이 없거나 DB 에 미읽음이 없어도 실패로 보지 않는다.
+    """
+    n = 0
+    if QUEUE.exists():
+        lines = io.open(QUEUE, encoding="utf-8").read().splitlines()
+        out = []
+        for line in lines:
+            try:
+                d = json.loads(line)
+            except Exception:                                    # noqa: BLE001
+                continue
+            if not d.get("read"):
+                d["read"] = True
+                n += 1
+            out.append(json.dumps(d, ensure_ascii=False))
+        io.open(QUEUE, "w", encoding="utf-8").write("\n".join(out) + ("\n" if out else ""))
+    try:
+        from .db import engine
+        from sqlalchemy import text as _t
+        with engine.begin() as conn:
+            r = conn.execute(_t(
+                "UPDATE harness_notify_queue SET read_at = now() WHERE read_at IS NULL"))
+            n += r.rowcount
+    except Exception as e:                                       # noqa: BLE001
+        print(f"[dash] harness_notify_queue mark-read failed: {type(e).__name__}: {e}")
     return {"ok": True, "marked": n}

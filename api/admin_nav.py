@@ -363,6 +363,13 @@ NAV = [
         ("운영자 · 권한", "/admin2/operators", None),
         ("작업 기록", "/admin2/activity-logs", None),
         ("엑셀 다운로드 관리", "/admin2/excel-exports", "신설 — 정적 뼈대(큐·API 없음)"),
+        # ADM-SYS-060 · 2026-08-27 사장님 지시로 등록(원래 관례는 "검증 통과 후 등록"
+        # — api/admin_ui_requests.py 모듈 docstring 참조. 이번엔 사장님이 먼저 걸라고
+        # 하셨다). 이 그룹에 «등급별로 감추는» 규칙은 없다(이 파일 전체에 role 판정
+        # 0건 — 접근 제어는 화면·API 쪽 `auth.py`가 진다) — 그래서 이 링크는 viewer·
+        # operator·owner 모두에게 똑같이 보인다. 이 화면은 그게 맞다: 직원(운영자)이
+        # 요청을 올리는 자리라 감추면 정작 쓸 사람이 못 본다.
+        ("요청 · 승인", "/admin2/requests", None),
     ]),
 ]
 

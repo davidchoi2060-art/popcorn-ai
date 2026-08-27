@@ -1,0 +1,600 @@
+{#
+  요청 · 승인(ADM-SYS-060 · 제안) — 1b 상태별 레인. `api/admin_ui_requests.py` 참조.
+
+  ■ 출처 — 승인 디자인 `docs/design/dc-work-request.html` `data-screen-label="1b 상태별
+    레인"` 안쪽. 색·서체·간격은 원안 그대로 옮기고 런타임만 순수 JS 로 바꿨다
+    (`talk_patterns.html.j2`가 세운 관례). 톤 색(`WR_TONE`, 아래 스크립트)은 원안의
+    `T`/`STATUS_TONE` 상수를 그대로 옮긴 값이다 — `:root` 를 다시 정의하지 않는다
+    (회귀 [30], 이 화면은 JS 인라인 스타일로만 칠한다. `talk_patterns.html.j2`의
+    `TONE` 객체와 같은 방식).
+
+  ■ 원안과 다르게 조정한 곳(치수는 지켰고, «캔버스 고정 높이»만 실화면에 맞게 열었다)
+    · 원안은 1440×960 정적 캔버스라 레인 카드 목록·하단 상세 띠가 `overflow:hidden`
+      이다(스크린샷용). 실 데이터는 그 안에 안 들어갈 수 있어 `.wr-lane-cards`·
+      `.wr-thread`에 `overflow:auto`를 준다 — padding·radius·gap·색은 원안 값 그대로.
+    · 캡처 붙이기 순서를 조정했다(§인터랙션 ① 원안은 「캡처 붙이기 → 등록」인데, 캡처는
+      `request_id`가 있어야 저장할 자리가 생긴다 — 「등록 → 방금 만든 요청 상세에서
+      붙여넣기」로 한 걸음 늦춘다. 붙여넣기로 올린다는 substance 는 그대로다).
+    · 1b 원안에는 「판정(작은 것/큰 것)」·「처리 결과」를 위한 버튼이 없다 —
+      원안은 그 둘을 «하네스가 API 로 하는 일»로만 그렸다(사람이 누르는 자리가 아니다).
+      그런데 이 시스템에는 「하네스」라는 로그인 주체가 없다(`api/admin_requests.py`
+      모듈 docstring 참조 — 결정 5 미정). 그래서 owner 세션에 «하네스 판정 · 처리»
+      라는 이름의 별도 구역을 추가했다 — 「사장님 결재」(승인·반려·보류)와는 시각적으로
+      분리해 무엇이 결재고 무엇이 기술 판단인지 헷갈리지 않게 했다. **직원 화면에는
+      이 구역도, 결재 구역도 전부 없다**(버튼이 숨겨지는 게 아니라 아예 렌더되지 않는다).
+      ⚠ **2026-08-27 정정** — 이 문장은 처음부터 «의도»였지 «구현»이 아니었다. 실제로는
+      JS `hidden` 토글만 있어 직원 세션도 DOM 에는 두 구역이 실려 있었고(확인자가
+      operator 등급으로 실측), 개발자 도구로 `hidden` 만 지우면 열렸다. 지금은
+      `api/admin_ui_requests.py`가 렌더 시점에 role 을 판정해 `is_owner`를 넘기고,
+      아래 두 구역을 Jinja `if is_owner` 조건으로 감싼다 — 이제 이 문장이 실제
+      동작과 같다. JS 는 owner 세션 안에서 상태별로 접었다 펴는 일만 한다.
+
+  ■ 숫자는 전부 서버 값이다 — `GET /api/admin/requests/meta`(방치 기준일 · 캡처 한도)
+    와 `GET /api/admin/requests`(건수 · total · stale_total)만 쓴다. 화면이 세지 않는다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}요청 · 승인{% endblock %}
+
+{% block head_extra %}
+<style>
+  .wr-wrap{display:flex;flex-direction:column;gap:8px;height:100%;min-height:0;padding:0 2px}
+  .wr-toolbar{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .wr-btn{height:31px;padding:0 13px;border-radius:6px;background:var(--rv-ink);color:var(--rv-nav-ink);
+          border:none;font:600 12px/1 var(--font);cursor:pointer;white-space:nowrap}
+  .wr-btn[disabled]{opacity:.45;cursor:not-allowed}
+  .wr-btn-line{height:29px;padding:0 12px;border-radius:6px;border:1px solid var(--outline);
+               background:var(--rv-card);color:var(--rv-ink-soft);font:600 11px/1 var(--font);cursor:pointer;white-space:nowrap}
+  .wr-btn-line[disabled]{opacity:.45;cursor:not-allowed}
+  .wr-scope{font:400 9.5px/1.5 var(--font);color:var(--rv-faint);border-left:2px solid rgba(0,0,0,.14);padding-left:8px}
+  .wr-stale{font:600 9.5px/1.4 var(--font);border-radius:5px;padding:6px 9px;white-space:nowrap}
+
+  .wr-lanes{flex:1;min-height:0;display:flex;gap:9px;align-items:stretch}
+  .wr-lane{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:10px 11px;
+           border-radius:9px;overflow:hidden;background:var(--rv-card);border:1px solid var(--outline-variant)}
+  .wr-lane[data-hot="1"]{background:var(--rv-amber-bg);border-color:var(--rv-amber-line)}
+  .wr-lane-head{display:flex;align-items:baseline;gap:7px;padding-bottom:7px;border-bottom:1px solid var(--outline-variant)}
+  .wr-lane-title{font:600 12.5px/1.3 var(--font);white-space:nowrap}
+  .wr-lane-sub{font:400 9px/1.5 var(--font);color:var(--rv-muted)}
+  .wr-lane-cards{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow:auto}
+  .wr-card{display:flex;flex-direction:column;gap:4px;padding:8px 9px;border-radius:7px;
+           background:var(--rv-card);border:1px solid var(--outline-variant);cursor:pointer;text-align:left}
+  .wr-card[data-picked="1"]{box-shadow:0 0 0 2px oklch(0.42 0.11 165 / .35)}
+  .wr-card-top{display:flex;align-items:center;gap:6px}
+  .wr-card-title{font:600 11px/1.4 var(--font);color:var(--rv-ink)}
+  .wr-card-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .wr-card-who{font:400 9px/1 var(--font);color:var(--rv-muted)}
+  .wr-card-target{font:400 9px/1 var(--font-num);color:var(--rv-faint);border:1px solid var(--outline);
+                   border-radius:3px;padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+  .wr-card-meta{font:400 9px/1.45 var(--font);color:var(--rv-muted)}
+  .wr-card-act{align-self:flex-start;font:600 9px/1 var(--font);color:var(--rv-nav-ink);background:var(--rv-ink);border-radius:3px;padding:4px 6px}
+  .wr-lane-empty{padding:9px 10px;border-radius:6px;background:var(--rv-panel);border:1px dashed var(--outline);
+                  font:400 9.5px/1.6 var(--font);color:var(--rv-ink-soft)}
+
+  .wr-detail{flex:none;max-height:44vh;background:var(--rv-card);border:1px solid var(--outline-variant);
+             border-radius:9px;padding:10px 14px;display:flex;gap:14px;align-items:stretch;overflow:hidden}
+  .wr-detail[hidden]{display:none}  /* 저작 display:flex 가 UA [hidden] 을 이긴다 — 명시 오버라이드 필수 */
+  .wr-detail-empty{flex:none;background:var(--rv-card);border:1px dashed var(--outline);border-radius:9px;
+                    padding:16px;font:400 11px/1.6 var(--font);color:var(--rv-muted);text-align:center}
+  .wr-detail-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;overflow:auto}
+  .wr-detail-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .wr-detail-title{font:600 12.5px/1.35 var(--font)}
+  .wr-detail-id{font:400 9.5px/1 var(--font-num);color:var(--rv-faint)}
+  .wr-meta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:baseline}
+  .wr-meta-item{display:flex;align-items:baseline;gap:6px}
+  .wr-meta-k{font:500 9px/1 var(--font);color:var(--rv-faint)}
+  .wr-meta-v{font:500 11px/1 var(--font)}
+  .wr-body-box{font:400 11px/1.7 var(--font);color:var(--rv-ink);padding:9px 11px;border-radius:7px;
+               background:var(--rv-panel);border:1px solid var(--outline-variant);white-space:pre-wrap}
+  .wr-note-box{font:400 10.5px/1.6 var(--font);padding:8px 10px;border-radius:6px;border:1px solid;white-space:pre-wrap}
+  .wr-thread{display:flex;flex-direction:column;gap:6px;overflow:auto;max-height:150px}
+  .wr-thread-row{display:flex;gap:9px;align-items:flex-start;padding:7px 9px;border-radius:7px;background:var(--rv-panel);border:1px solid var(--outline-variant)}
+  .wr-thread-who{flex:none;width:44px;text-align:center;font:600 9.5px/1 var(--font);border-radius:3px;padding:4px 6px}
+  .wr-thread-body{font:400 11px/1.6 var(--font);color:var(--rv-ink)}
+  .wr-thread-at{flex:none;font:400 9px/1.4 var(--font-num);color:var(--rv-dim)}
+  .wr-comment-row{display:flex;gap:8px;align-items:flex-end}
+  .wr-textarea{flex:1;min-height:32px;border:1px solid var(--outline);border-radius:6px;background:#fff;
+               padding:7px 10px;font:400 11px/1.5 var(--font);resize:vertical}
+  .wr-input{height:32px;border:1px solid var(--outline);border-radius:6px;background:#fff;padding:0 10px;font:400 11px/1 var(--font)}
+  .wr-select{height:32px;border:1px solid var(--outline);border-radius:6px;background:#fff;padding:0 8px;font:400 11px/1 var(--font)}
+  .wr-lbl{font:600 9.5px/1 var(--font);color:var(--rv-ink-soft)}
+
+  .wr-decision{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:9px;margin-top:2px}
+  .wr-decision[hidden]{display:none}  /* 저작 display:flex 가 UA [hidden] 을 이긴다 — 명시 오버라이드 필수 */
+  .wr-decision-title{font:600 11.5px/1.4 var(--font)}
+  .wr-decision-note{font:400 9.5px/1.55 var(--font);color:var(--rv-ink-soft)}
+  .wr-decision-btns{display:flex;gap:6px;flex-wrap:wrap}
+  .wr-btn-approve{height:29px;padding:0 13px;border-radius:6px;background:var(--rv-green);color:#fff;border:none;font:600 11px/1 var(--font);cursor:pointer}
+  .wr-btn-approve[disabled]{opacity:.4;cursor:not-allowed}
+  .wr-btn-reject{height:29px;padding:0 12px;border-radius:6px;border:1px solid var(--rv-red);color:var(--rv-red);background:#fff;font:600 11px/1 var(--font);cursor:pointer}
+  .wr-btn-hold{height:29px;padding:0 12px;border-radius:6px;border:1px solid var(--outline);color:var(--rv-ink-soft);background:#fff;font:500 11px/1 var(--font);cursor:pointer}
+  .wr-inline-form{display:none;gap:6px;align-items:flex-end;margin-top:4px}
+  .wr-inline-form[data-open="1"]{display:flex}
+
+  .wr-detail-right{flex:none;width:330px;display:flex;flex-direction:column;gap:6px;padding-left:14px;border-left:1px solid var(--outline-variant);overflow:auto}
+  .wr-shots{display:flex;gap:7px;flex-wrap:wrap}
+  .wr-shot{flex:none;width:118px;height:70px;border-radius:6px;border:1px solid var(--outline);overflow:hidden;background:var(--rv-panel)}
+  .wr-shot img{width:100%;height:100%;object-fit:cover;display:block}
+  .wr-shot-add{flex:none;width:118px;height:70px;border-radius:6px;border:1px dashed var(--outline);display:flex;
+               align-items:center;justify-content:center;text-align:center;font:500 8.5px/1.3 var(--font);color:var(--rv-faint);cursor:text}
+  .wr-shot-add:focus{outline:2px solid var(--rv-link);outline-offset:1px}
+  .wr-rule-title{font:600 9.5px/1.4 var(--font)}
+  .wr-rule-body{font:400 9px/1.55 var(--font);color:var(--rv-muted)}
+
+  .wr-create{flex:none;background:var(--rv-card);border:1px solid var(--outline-variant);border-radius:9px;
+             padding:12px 14px;display:none;flex-direction:column;gap:8px}
+  .wr-create[data-open="1"]{display:flex}
+  .wr-create-row{display:flex;gap:8px;flex-wrap:wrap}
+  .wr-create-field{display:flex;flex-direction:column;gap:4px}
+  .wr-msg{flex:none;font:400 10.5px/1.6 var(--font);padding:8px 10px;border-radius:6px;border:1px solid}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wr-wrap" id="wr-root" data-keep="1">
+
+  <div class="wr-toolbar" data-keep="1">
+    <button type="button" class="wr-btn" id="wr-new-btn">요청 등록</button>
+    <span class="wr-scope" id="wr-scope">확인 중…</span>
+    <span style="flex:1"></span>
+    <span class="wr-stale" id="wr-stale-banner">확인 중…</span>
+  </div>
+
+  <div class="wr-create" id="wr-create" data-keep="1">
+    <div style="display:flex;align-items:baseline;gap:8px">
+      <span style="font:600 13px/1.3 var(--font)">새 요청</span>
+      <span style="font:400 9.5px/1.4 var(--font);color:var(--rv-muted)">등록하면 상태는 「접수」다 — 등록 뒤 상세에서 캡처를 붙여넣기(Ctrl+V)로 더할 수 있다</span>
+    </div>
+    <label class="wr-create-field">
+      <span class="wr-lbl">제목</span>
+      <input id="wr-f-title" class="wr-input" style="width:100%" maxlength="200" placeholder="무엇이 불편했는지 한 줄로">
+    </label>
+    <label class="wr-create-field">
+      <span class="wr-lbl">본문</span>
+      <textarea id="wr-f-body" class="wr-textarea" style="min-height:64px" placeholder="어떤 화면에서 · 무엇을 하다가 · 어떻게 됐는지"></textarea>
+    </label>
+    <div class="wr-create-row">
+      <label class="wr-create-field" style="flex:1;min-width:200px">
+        <span class="wr-lbl">대상 화면(선택)</span>
+        <select id="wr-f-target" class="wr-select" style="width:100%"><option value="">선택 안 함</option></select>
+      </label>
+      <label class="wr-create-field" style="width:140px">
+        <span class="wr-lbl">급함 정도(선택)</span>
+        <select id="wr-f-urgency" class="wr-select" style="width:100%"><option value="">선택 안 함</option></select>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" class="wr-btn-line" id="wr-create-cancel">취소</button>
+      <button type="button" class="wr-btn" id="wr-create-submit">등록</button>
+    </div>
+  </div>
+
+  <div class="wr-lanes" id="wr-lanes"></div>
+
+  <div class="wr-detail-empty" id="wr-detail-empty">레인에서 요청 카드를 고르면 여기에 상세 · 대화 · 캡처가 나온다.</div>
+  <div class="wr-detail" id="wr-detail" data-keep="1" hidden>
+    <div class="wr-detail-left">
+      <div class="wr-detail-head">
+        <span id="wr-d-status"></span>
+        <span class="wr-detail-title" id="wr-d-title"></span>
+        <span class="wr-detail-id" id="wr-d-id"></span>
+        <span style="flex:1"></span>
+        <button type="button" class="wr-btn-line" id="wr-d-cancel" hidden>요청 취소</button>
+      </div>
+      <div class="wr-meta-row" id="wr-d-meta"></div>
+      <div class="wr-body-box" id="wr-d-body"></div>
+      <div id="wr-d-notes"></div>
+
+      <div class="wr-thread" id="wr-d-thread"></div>
+      <div class="wr-comment-row" id="wr-d-comment-row">
+        <textarea id="wr-f-comment" class="wr-textarea" placeholder="댓글 쓰기 — 하네스가 물으면 여기서 답한다"></textarea>
+        <button type="button" class="wr-btn-line" id="wr-comment-submit">남기기</button>
+      </div>
+
+      {% if is_owner %}
+      {# owner 전용 — 「하네스 판정 · 처리」. is_owner=False 세션에는 이 블록 자체가
+         서버에서 렌더되지 않는다(요청·승인 결함① 수정, 2026-08-27 — `api/admin_ui_requests.py`
+         가 role 을 판정해 넘긴다). #}
+      <div class="wr-decision" id="wr-verdict-box" hidden>
+        <span class="wr-decision-title">하네스 판정 · 처리 <span style="font-weight:400;font-size:9.5px;color:var(--rv-muted)">(owner 세션 — 결정 5가 미정이라 하네스 전용 로그인이 없다)</span></span>
+        <div id="wr-verdict-step1">
+          <span class="wr-decision-note">읽어 보고 「작은 것」이면 바로 고치고 처리로, 「큰 것」이면 결재대기로 올린다. 판정 근거는 필수다.</span>
+          <div class="wr-inline-form" data-open="1" style="margin-top:6px">
+            <textarea id="wr-f-verdict-note" class="wr-textarea" placeholder="왜 그렇게 보는지 — 사장님이 결재를 판단할 재료"></textarea>
+            <button type="button" class="wr-btn-line" data-verdict="작은 것">작은 것 · 처리</button>
+            <button type="button" class="wr-btn-line" data-verdict="큰 것">큰 것 · 결재대기</button>
+          </div>
+        </div>
+        <div id="wr-verdict-step2">
+          <span class="wr-decision-note">처리 결과를 남긴다. 실패하면 상태를 완료로 만들지 않는다 — 실패 사유가 이 자리(대화)에 남는다.</span>
+          <div class="wr-inline-form" data-open="1" style="margin-top:6px">
+            <textarea id="wr-f-resolve-note" class="wr-textarea" placeholder="무엇을 고쳤는지 · 배포됐는지 · 커밋(성공) 또는 실패 사유"></textarea>
+            <button type="button" class="wr-btn-line" id="wr-resolve-ok">완료로 남기기</button>
+            <button type="button" class="wr-btn-line" id="wr-resolve-fail">실패로 남기기</button>
+          </div>
+        </div>
+      </div>
+
+      {# owner 전용 — 「사장님 결재」. #}
+      <div class="wr-decision" id="wr-decision-box" hidden>
+        <span class="wr-decision-title" id="wr-decision-title">사장님 결재</span>
+        <span class="wr-decision-note">승인하면 하네스가 고치고 배포까지 끝나면 완료로 전이한다. 반려는 사유가 필수다 — 사유 없는 반려는 다음에 되짚을 수 없다.</span>
+        <div class="wr-decision-btns">
+          <button type="button" class="wr-btn-approve" id="wr-approve-btn">승인</button>
+          <button type="button" class="wr-btn-reject" id="wr-reject-open">반려 · 사유 필수</button>
+          <button type="button" class="wr-btn-hold" id="wr-hold-open">보류</button>
+        </div>
+        <div class="wr-inline-form" id="wr-reject-form">
+          <textarea id="wr-f-reject-reason" class="wr-textarea" placeholder="반려 사유(필수) — 없으면 저장되지 않는다"></textarea>
+          <button type="button" class="wr-btn-line" id="wr-reject-submit">반려 확정</button>
+        </div>
+        <div class="wr-inline-form" id="wr-hold-form">
+          <textarea id="wr-f-hold-reason" class="wr-textarea" placeholder="보류 사유(선택)"></textarea>
+          <button type="button" class="wr-btn-line" id="wr-hold-submit">보류 확정</button>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="wr-detail-right">
+      <span style="font:600 12px/1.3 var(--font)">캡처</span>
+      <div class="wr-shots" id="wr-d-shots"></div>
+      <div class="wr-shot-add" id="wr-shot-add" tabindex="0">여기를 클릭하고<br>Ctrl+V 로<br>붙여넣기</div>
+      <span class="wr-rule-title" id="wr-capture-title">확인 중…</span>
+      <span class="wr-rule-body" id="wr-capture-body"></span>
+    </div>
+  </div>
+
+  <div class="wr-msg" id="wr-msg" hidden></div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function(){
+ var API='/api/admin/requests';
+ var DEC='/api/admin/request-decisions';
+ var $=function(id){return document.getElementById(id);};
+ function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
+ function ago(iso){if(!iso)return '—';var d=new Date(iso),m=Math.floor((Date.now()-d)/60000);
+  if(m<1)return '방금';if(m<60)return m+'분 전';if(m<1440)return Math.floor(m/60)+'시간 전';return Math.floor(m/1440)+'일 전';}
+
+ var T={ok:{bg:'oklch(0.96 0.03 165)',bd:'oklch(0.74 0.09 165 / .55)',fg:'oklch(0.37 0.1 165)'},
+         warn:{bg:'oklch(0.96 0.04 85)',bd:'oklch(0.78 0.1 80 / .6)',fg:'oklch(0.42 0.11 70)'},
+         err:{bg:'oklch(0.96 0.03 30)',bd:'oklch(0.75 0.11 33 / .55)',fg:'oklch(0.45 0.15 30)'},
+         none:{bg:'#f4f0e7',bd:'rgba(0,0,0,.13)',fg:'#6f6a61'}};
+ var STATUS_TONE={접수:'none',검토:'none',처리:'ok',결재대기:'warn',승인:'ok',반려:'err',보류:'warn',완료:'ok',취소:'none'};
+ function chip(label,tone){var t=T[tone]||T.none;
+  return '<span style="font:600 9.5px/1 var(--font);white-space:nowrap;border-radius:3px;padding:4px 6px;'
+   +'color:'+t.fg+';background:'+t.bg+';border:1px solid '+t.bd+'">'+esc(label)+'</span>';}
+ function statusChip(s){return chip(s,STATUS_TONE[s]||'none');}
+
+ var LANES=[
+  {title:'접수 · 검토',keys:['접수','검토'],sub:'아직 아무도 안 봤거나 하네스가 읽는 중이다',empty:'새로 올라온 것이 없다'},
+  {title:'결재 대기',keys:['결재대기'],sub:'하네스가 「큰 것」으로 보고 올린 것 — 사장님 차례다',empty:'올라온 결재가 없다',ownerOnly:true},
+  {title:'처리 · 승인',keys:['처리','승인'],sub:'하네스가 고쳤거나 고치는 중이다',empty:'진행 중인 것이 없다'},
+  {title:'닫힘',keys:['완료','반려','보류','취소'],sub:'완료 · 반려 · 보류 · 취소가 여기 모인다',empty:'닫힌 것이 없다'}
+ ];
+
+ var state={meta:null,items:[],picked:null,pickedDetail:null};
+
+ function say(kind,msg){var b=$('wr-msg');if(!msg){b.hidden=true;return;}
+  b.hidden=false;var c=kind==='err'?'#b31b25':'var(--outline)';
+  b.style.borderColor=c;b.style.color=kind==='err'?'#b31b25':'var(--rv-ink-soft)';b.textContent=msg;}
+
+ function loadMeta(){
+  return fetch(API+'/meta').then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+   .then(function(x){
+    if(!x.ok){say('err','설정을 불러오지 못했다.');return;}
+    state.meta=x.d;
+    $('wr-new-btn').hidden=false;
+    var ts=x.d.target_screens||[];
+    var sel=$('wr-f-target');
+    ts.forEach(function(o){var op=document.createElement('option');op.value=o.href;op.textContent=o.label;sel.appendChild(op);});
+    var usel=$('wr-f-urgency');
+    (x.d.urgencies||[]).forEach(function(u){var op=document.createElement('option');op.value=u;op.textContent=u;usel.appendChild(op);});
+    var cp=x.d.capture_policy||{};
+    $('wr-capture-title').textContent='한도 '+(cp.max_kb||'—')+'KB · 붙여넣기(Ctrl+V)로 올린다';
+    $('wr-capture-body').textContent=(cp.allowed_label||'')+' 만 · 형식은 파일 앞머리로 판정 · SVG 는 등록할 수 없다.'
+     +(x.d.harness_notify&&!x.d.harness_notify.configured?' '+x.d.harness_notify.note:'');
+   }).catch(function(){say('err','설정을 불러오지 못했다 — 서버에 연결하지 못했다.');});}
+
+ // 급함 「높음」을 레인 «안에서만» 맨 위로 올린다(2026-08-27 사장님 결정 — 값 자체
+ // 「낮음·보통·높음」은 그대로 두고 높음만 눈에 띄게). 레인 사이를 옮기지 않는다 —
+ // 급함은 상태를 바꾸지 않는다. 나머지 순서는 서버가 준 순서(updated_at DESC, 최근
+ // 손댄 것 먼저, `GET /api/admin/requests`)를 그대로 둔다 — `Array.sort`는 ES2019부터
+ // 표준 안정 정렬이라 동순위(둘 다 높음이거나 둘 다 아님)는 원래 순서가 안 깨진다.
+ // 원안(`dc-work-request.html`)에는 급함 자체가 없어 정렬 규칙도 없다 — 이 화면이
+ // 새로 정한다. 색은 더하지 않는다: 결함③에서 카드 메타 문구 색을 상태별로 되살렸는데
+ // (반려=적·결재대기=호박) 급함까지 색을 얹으면 카드가 색투성이가 된다 — 위치만으로
+ // 「눈에 띈다」는 요구를 채운다. 방치(오래 묵음)와는 각자 다른 신호다: 방치는 이미
+ // 붉은 「방치」 칩으로 표시되고 있어 손대지 않는다 — 급함 높음 + 방치가 겹친 카드는
+ // 레인 맨 위 자리(급함 정렬) «와» 붉은 방치 칩(기존)을 «동시에» 받는다. 둘을 하나로
+ // 합치면(예: 방치도 위로 올리기) 「무엇 때문에 위에 있는지」가 흐려진다 — 신호를
+ // 굳이 하나로 뭉치지 않는다.
+ function sortByUrgency(cards){
+  cards.sort(function(a,b){
+   var ua=a.urgency==='높음'?0:1,ub=b.urgency==='높음'?0:1;
+   return ua-ub;});
+  return cards;}
+
+ function renderLanes(){
+  var wrap=$('wr-lanes');
+  var isOwner=state.meta&&state.meta.viewer&&state.meta.viewer.is_owner;
+  wrap.innerHTML='';
+  LANES.forEach(function(def){
+   var cards=sortByUrgency(state.items.filter(function(r){return def.keys.indexOf(r.status)>=0;}));
+   var hot=def.ownerOnly&&cards.length>0;
+   var lane=document.createElement('div');
+   lane.className='wr-lane';
+   if(hot)lane.setAttribute('data-hot','1');
+   var ownerChip=def.ownerOnly?chip('owner만','warn'):'';
+   lane.innerHTML='<div class="wr-lane-head"><span class="wr-lane-title">'+esc(def.title)+'</span>'
+    +chip(cards.length+'건',hot?'warn':'none')+'<span style="flex:1"></span>'+ownerChip+'</div>'
+    +'<span class="wr-lane-sub">'+esc(def.sub)+'</span>'
+    +'<div class="wr-lane-cards" data-keep="1"></div>';
+   var listEl=lane.querySelector('.wr-lane-cards');
+   if(!cards.length){
+    listEl.innerHTML='<div class="wr-lane-empty">'+esc(def.empty)+'</div>';
+   } else {
+    cards.forEach(function(r){listEl.appendChild(cardEl(r));});
+   }
+   wrap.appendChild(lane);});}
+
+ function cardEl(r){
+  var b=document.createElement('button');
+  b.type='button';b.className='wr-card';
+  if(state.picked===r.request_id)b.setAttribute('data-picked','1');
+  var staleChip=r.is_stale?chip('방치','err'):'';
+  b.innerHTML='<div class="wr-card-top">'+statusChip(r.status)+staleChip
+   +'<span style="flex:1"></span><span style="font:400 9px/1 var(--font-num);color:var(--rv-faint)">'+ago(r.updated_at)+'</span></div>'
+   +'<span class="wr-card-title">'+esc(r.title)+'</span>'
+   +'<div class="wr-card-row"><span class="wr-card-who">'+esc(r.created_by_name||'')+'</span>'
+   +(r.target_screen_label?'<span class="wr-card-target">'+esc(r.target_screen_label)+'</span>':'')+'</div>'
+   +'<span class="wr-card-meta" style="color:'+cardMetaColor(r.status)+'">'+esc(cardMeta(r))+'</span>'
+   +(r.status==='결재대기'?'<span class="wr-card-act">결재 필요</span>':'');
+  b.addEventListener('click',function(){pick(r.request_id);});
+  return b;}
+
+ // 원안 dc-work-request.html:471 mkCard().metaStyle 그대로 — 반려는 err · 결재대기는
+ // warn · 그 외는 무채색(T.none.fg). 고정 회색이면 레인에서 반려·결재대기가 눈에 안 띈다
+ // (요청·승인 결함③ 수정, 2026-08-27). 위 T 객체(이 파일 상단)를 그대로 재사용한다 —
+ // 톤 팔레트를 여기서 다시 정의하지 않는다.
+ function cardMetaColor(status){
+  if(status==='반려')return T.err.fg;
+  if(status==='결재대기')return T.warn.fg;
+  return T.none.fg;}
+
+ function cardMeta(r){
+  if(r.status==='반려')return '반려 — '+(r.reject_reason||'');
+  if(r.status==='보류')return r.hold_reason?('보류 — '+r.hold_reason):'보류 — 나중에 다시 본다';
+  if(r.status==='완료')return r.result_note?('완료 — '+r.result_note):'완료';
+  if(r.status==='결재대기')return r.verdict_note?('하네스: 큰 것 — '+r.verdict_note):'하네스가 큰 것으로 봤다';
+  if(r.status==='처리')return r.verdict_note?('하네스: 작은 것 — '+r.verdict_note):'하네스가 작은 것으로 봤다';
+  if(r.status==='접수')return r.idle_days>0?(r.idle_days+'일째 아무도 보지 않았다'):'등록됨';
+  if(r.status==='취소')return '요청자가 취소했다';
+  return '검토 중이다';}
+
+ function loadList(){
+  return fetch(API+'?limit=150').then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+   .then(function(x){
+    if(!x.ok){say('err','목록을 불러오지 못했다.');return;}
+    state.items=x.d.items||[];
+    $('wr-scope').textContent=x.d.scope==='mine'
+     ?'직원은 자기가 올린 것만 본다 — 남의 요청은 목록에 나오지 않는다.'
+     :'사장님은 전체를 본다.';
+    var st=x.d.stale_total||0;
+    var days=(state.meta&&state.meta.stale_days)||'—';
+    $('wr-stale-banner').textContent=st>0
+     ?(st+'건이 '+days+'일 넘게 방치됐다 — 조용히 묻히면 직원이 다시 올리지 않는다')
+     :'방치된 요청이 없다';
+    $('wr-stale-banner').style.color=st>0?T.err.fg:T.none.fg;
+    $('wr-stale-banner').style.background=st>0?T.err.bg:T.none.bg;
+    $('wr-stale-banner').style.border='1px solid '+(st>0?T.err.bd:T.none.bd);
+    if(x.d.total>x.d.items.length){
+     $('wr-stale-banner').title='전체 '+x.d.total+'건 중 '+x.d.items.length+'건을 표시했다.';}
+    renderLanes();
+    if(state.picked)openDetail(state.picked);
+   }).catch(function(){say('err','목록을 불러오지 못했다 — 서버에 연결하지 못했다.');});}
+
+ function pick(id){state.picked=id;renderLanes();openDetail(id);}
+
+ function openDetail(id){
+  fetch(API+'/'+id).then(function(r){return r.json().then(function(d){return{ok:r.ok,status:r.status,d:d};});})
+   .then(function(x){
+    if(!x.ok){
+     if(x.status===404){$('wr-detail').hidden=true;$('wr-detail-empty').hidden=false;
+      $('wr-detail-empty').textContent='요청을 찾을 수 없다 — 새로고침한다.';state.picked=null;renderLanes();}
+     return;}
+    state.pickedDetail=x.d;renderDetail(x.d);
+   }).catch(function(){say('err','상세를 불러오지 못했다.');});}
+
+ function renderDetail(d){
+  $('wr-detail-empty').hidden=true;$('wr-detail').hidden=false;
+  $('wr-d-status').innerHTML=statusChip(d.status);
+  $('wr-d-title').textContent=d.title;
+  $('wr-d-id').textContent='#REQ-'+String(d.request_id).padStart(4,'0');
+  $('wr-d-body').textContent=d.body;
+
+  var meta=[['올린 사람',d.created_by_name],['대상 화면',d.target_screen_label||'선택 안 함'],
+    ['올린 시각',new Date(d.created_at).toLocaleString('ko-KR')],['급함 정도',d.urgency||'선택 안 함']];
+  $('wr-d-meta').innerHTML=meta.map(function(m){return '<span class="wr-meta-item"><span class="wr-meta-k">'
+    +esc(m[0])+'</span><span class="wr-meta-v">'+esc(m[1])+'</span></span>';}).join('');
+
+  var notes=[];
+  if(d.verdict_note)notes.push(['하네스 판정: '+d.verdict,d.verdict_note,'warn']);
+  if(d.result_note)notes.push(['처리 결과',d.result_note,'ok']);
+  if(d.reject_reason)notes.push(['반려 사유',d.reject_reason,'err']);
+  if(d.hold_reason)notes.push(['보류 사유',d.hold_reason,'warn']);
+  $('wr-d-notes').innerHTML=notes.map(function(n){var t=T[n[2]];
+   return '<div class="wr-note-box" style="border-color:'+t.bd+';background:'+t.bg+';color:'+t.fg+'">'
+    +'<b>'+esc(n[0])+'</b><br>'+esc(n[1])+'</div>';}).join('');
+
+  $('wr-d-thread').innerHTML=(d.comments||[]).map(function(c){
+   var tone=c.author_kind==='하네스'?'none':(c.author_kind==='사장님'?'warn':'ok');
+   var t=T[tone];
+   return '<div class="wr-thread-row"><span class="wr-thread-who" style="color:'+t.fg+';background:'+t.bg+';border:1px solid '+t.bd+'">'
+    +esc(c.author_kind)+'</span><span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">'
+    +'<span class="wr-thread-body">'+esc(c.body)+'</span>'
+    +'<span style="font:400 9px/1.3 var(--font);color:var(--rv-faint)">'+esc(c.author_name)+'</span></span>'
+    +'<span class="wr-thread-at">'+ago(c.created_at)+'</span></div>';}).join('')
+   ||'<div style="font:400 10px/1.6 var(--font);color:var(--rv-faint)">아직 대화가 없다.</div>';
+
+  $('wr-d-shots').innerHTML=(d.captures||[]).map(function(p,i){
+   return '<div class="wr-shot"><img src="'+p.url+'" alt="캡처 '+(i+1)+'" loading="lazy"></div>';}).join('');
+
+  var me=state.meta.viewer;var isOwner=me.is_owner;
+  var mine=d.created_by===me.operator_id;
+  $('wr-d-cancel').hidden=!((mine||isOwner)&&(d.status==='접수'||d.status==='검토'));
+  var closed=(d.status==='완료'||d.status==='반려'||d.status==='취소');
+  $('wr-shot-add').style.display=closed?'none':'flex';
+  $('wr-d-comment-row').style.display=closed&&!isOwner?'none':'flex';
+
+  // owner 전용 두 구역 — is_owner=False 세션에는 서버가 이 노드를 아예 렌더하지
+  // 않는다(요청·승인 결함① 수정, 2026-08-27). 직원 세션에서 $()가 null 을 돌려주므로
+  // null 가드 없이 만지면 예외가 나 이 함수 이하가 전부 죽는다 — 존재할 때만 만진다.
+  var verdictBox=$('wr-verdict-box'),decisionBox=$('wr-decision-box');
+  if(verdictBox)verdictBox.hidden=!isOwner;
+  if(decisionBox)decisionBox.hidden=!isOwner;
+  if(isOwner&&verdictBox&&decisionBox){
+   $('wr-verdict-step1').style.display=(d.status==='접수'||d.status==='검토')?'block':'none';
+   $('wr-verdict-step2').style.display=(d.status==='처리'||d.status==='승인')?'block':'none';
+   if($('wr-verdict-step1').style.display==='none'&&$('wr-verdict-step2').style.display==='none'){
+    verdictBox.hidden=true;}
+   $('wr-approve-btn').disabled=(d.status!=='결재대기');
+   $('wr-approve-btn').title=(d.status!=='결재대기')?'결재대기 상태에서만 승인할 수 있다':'';
+   var canDecide=!closed;
+   $('wr-reject-open').disabled=!canDecide;$('wr-hold-open').disabled=!canDecide;
+   $('wr-decision-title').textContent=d.status==='결재대기'?'사장님 결재 — 결재대기':'사장님 결재';
+   if(closed)decisionBox.hidden=true;
+   $('wr-reject-form').setAttribute('data-open','0');
+   $('wr-hold-form').setAttribute('data-open','0');
+  }
+ }
+
+ // ── 요청 등록 ──────────────────────────────────────────────
+ $('wr-new-btn').addEventListener('click',function(){$('wr-create').setAttribute('data-open','1');$('wr-f-title').focus();});
+ $('wr-create-cancel').addEventListener('click',function(){$('wr-create').setAttribute('data-open','0');});
+ $('wr-create-submit').addEventListener('click',function(){
+  var title=$('wr-f-title').value.trim(),body=$('wr-f-body').value.trim();
+  if(!title){say('err','제목을 입력해야 한다.');$('wr-f-title').focus();return;}
+  if(!body){say('err','본문을 입력해야 한다.');$('wr-f-body').focus();return;}
+  say('','');
+  fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    title:title,body:body,target_screen_href:$('wr-f-target').value||null,urgency:$('wr-f-urgency').value||null})})
+   .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+   .then(function(x){
+    if(!x.ok){say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'등록하지 못했다.');return;}
+    ['wr-f-title','wr-f-body'].forEach(function(i){$(i).value='';});
+    $('wr-f-target').value='';$('wr-f-urgency').value='';
+    $('wr-create').setAttribute('data-open','0');
+    state.picked=x.d.item.request_id;
+    loadList();
+   }).catch(function(){say('err','서버에 연결하지 못했다.');});});
+
+ // ── 취소 ──────────────────────────────────────────────
+ $('wr-d-cancel').addEventListener('click',function(){
+  if(!state.picked)return;
+  fetch(API+'/'+state.picked+'/cancel',{method:'POST'})
+   .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+   .then(function(x){if(x.ok)loadList();})
+   .catch(function(){});});
+
+ // ── 댓글 ──────────────────────────────────────────────
+ $('wr-comment-submit').addEventListener('click',function(){
+  if(!state.picked)return;
+  var body=$('wr-f-comment').value.trim();
+  if(!body){say('err','댓글 내용을 입력해야 한다.');return;}
+  fetch(API+'/'+state.picked+'/comments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})})
+   .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+   .then(function(x){if(x.ok){$('wr-f-comment').value='';loadList();}})
+   .catch(function(){});});
+
+ // ── 캡처 붙여넣기 ──────────────────────────────────────────────
+ $('wr-shot-add').addEventListener('paste',function(e){
+  if(!state.picked)return;
+  var items=(e.clipboardData&&e.clipboardData.items)||[];
+  var img=null;
+  for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf('image/')===0){img=items[i].getAsFile();break;}}
+  if(!img){say('err','클립보드에 이미지가 없다.');return;}
+  var maxBytes=(state.meta.capture_policy&&state.meta.capture_policy.max_bytes)||0;
+  if(maxBytes&&img.size>maxBytes){
+   say('err','캡처가 한도('+state.meta.capture_policy.max_kb+'KB)를 넘는다 — 올리기 전에 막았다'
+    +'(보낸 크기 '+Math.round(img.size/1024)+'KB).');return;}
+  say('','');
+  fetch(API+'/'+state.picked+'/captures',{method:'POST',body:img})
+   .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+   .then(function(x){
+    if(!x.ok){say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'캡처를 올리지 못했다.');return;}
+    openDetail(state.picked);
+   }).catch(function(){say('err','서버에 연결하지 못했다.');});});
+
+ // ── 하네스 판정 · 처리 · 사장님 결재(owner) ──────────────────────────────────────────────
+ // is_owner=False 세션에는 wr-verdict-box·wr-decision-box 가 서버에서 아예 렌더되지
+ // 않는다(요청·승인 결함① 수정, 2026-08-27) — 그 안의 버튼 id 는 전부 존재하지 않으므로
+ // $(id).addEventListener(...) 를 가드 없이 부르면 TypeError 로 스크립트 전체가 죽는다
+ // (아래에서 이 IIFE 마지막 줄 loadMeta().then(loadList) 까지 실행되지 못한다). 그래서
+ // 이 구역 전체를 두 노드 존재 여부로 한 번에 가른다.
+ if($('wr-verdict-box')&&$('wr-decision-box')){
+  $('wr-verdict-step1').addEventListener('click',function(e){
+   var b=e.target.closest('[data-verdict]');if(!b||!state.picked)return;
+   var note=$('wr-f-verdict-note').value.trim();
+   if(!note){say('err','판정 근거를 남겨야 한다.');return;}
+   fetch(DEC+'/'+state.picked+'/verdict',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({verdict:b.getAttribute('data-verdict'),note:note})})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){if(x.ok){$('wr-f-verdict-note').value='';loadList();}
+     else say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'판정하지 못했다.');})
+    .catch(function(){});});
+
+  var resolve=function(success){
+   if(!state.picked)return;
+   var note=$('wr-f-resolve-note').value.trim();
+   if(!note){say('err','처리 결과를 남겨야 한다.');return;}
+   fetch(DEC+'/'+state.picked+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({success:success,note:note})})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){if(x.ok){$('wr-f-resolve-note').value='';loadList();}
+     else say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'처리 결과를 남기지 못했다.');})
+    .catch(function(){});};
+  $('wr-resolve-ok').addEventListener('click',function(){resolve(true);});
+  $('wr-resolve-fail').addEventListener('click',function(){resolve(false);});
+
+  $('wr-approve-btn').addEventListener('click',function(){
+   if(!state.picked||this.disabled)return;
+   fetch(DEC+'/'+state.picked+'/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){if(x.ok)loadList();
+     else say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'승인하지 못했다.');})
+    .catch(function(){});});
+
+  $('wr-reject-open').addEventListener('click',function(){
+   if(this.disabled)return;
+   var f=$('wr-reject-form');f.setAttribute('data-open',f.getAttribute('data-open')==='1'?'0':'1');});
+  $('wr-reject-submit').addEventListener('click',function(){
+   if(!state.picked)return;
+   var reason=$('wr-f-reject-reason').value.trim();
+   if(!reason){say('err','반려 사유를 입력해야 한다 — 사유 없이는 저장되지 않는다.');return;}
+   fetch(DEC+'/'+state.picked+'/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){if(x.ok){$('wr-f-reject-reason').value='';loadList();}
+     else say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'반려하지 못했다.');})
+    .catch(function(){});});
+
+  $('wr-hold-open').addEventListener('click',function(){
+   if(this.disabled)return;
+   var f=$('wr-hold-form');f.setAttribute('data-open',f.getAttribute('data-open')==='1'?'0':'1');});
+  $('wr-hold-submit').addEventListener('click',function(){
+   if(!state.picked)return;
+   fetch(DEC+'/'+state.picked+'/hold',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({reason:$('wr-f-hold-reason').value.trim()||null})})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){if(x.ok){$('wr-f-hold-reason').value='';loadList();}
+     else say('err',(window.popcornProgress&&window.popcornProgress.errText(x.d,0))||'보류하지 못했다.');})
+    .catch(function(){});});
+ }
+
+ loadMeta().then(loadList);
+})();
+</script>
+{% endblock %}

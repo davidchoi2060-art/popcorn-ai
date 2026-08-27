@@ -377,7 +377,16 @@ OWNER_WRITE_PREFIXES = ("/api/admin/operators", "/api/admin/ops-settings",
                         # 그 값이 나중에 _reprice()를 타면 판매가까지 움직인다(A-114).
                         # 모듈 자체 _require_owner() 가드가 이미 있고, 여기 등록으로
                         # 미들웨어가 먼저 막는다 — 위 AI 3화면과 같은 이중 방어다.
-                        "/api/admin/mall-supplier")
+                        "/api/admin/mall-supplier",
+                        # 요청 · 승인(ADM-SYS-060 · 제안) — 판정 · 처리 · 승인 · 반려 · 보류.
+                        # `/api/admin/requests`(등록·댓글·취소·캡처, operator 이상)와는
+                        # 다른 접두어다 — 안 갈랐으면 이 한 줄로 등록도 승인도 함께
+                        # owner 전용이 되어 직원이 아예 등록을 못 한다. 안 넣으면 반대로
+                        # 운영자가 자기 요청을 스스로 승인할 수 있다(api/admin_requests.py
+                        # 모듈 docstring §URL 을 둘로 가른 이유). 모듈 자체 `_owner()`
+                        # 가드가 이미 있고, 여기 등록으로 미들웨어가 먼저 막는다 — 위
+                        # AI 3화면 · 몰 공급처 수신과 같은 이중 방어다.
+                        "/api/admin/request-decisions")
 
 
 def _is_operator_photo_path(path: str) -> bool:

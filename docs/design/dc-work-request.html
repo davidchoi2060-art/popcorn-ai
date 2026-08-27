@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8e4dc;color:#26231e;font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#26231e;text-decoration:none}a:hover{color:oklch(0.5 0.12 165)}
+</style>
+</helmet>
+
+<section style="padding:34px 40px 60px;display:flex;flex-direction:column;gap:22px">
+  <div style="max-width:1340px">
+    <div style="font:600 20px/1.3 'IBM Plex Sans KR',sans-serif">요청 · 승인 (ADM-SYS-060 · 제안) — 2안</div>
+    <div style="font:400 12px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d;margin-top:6px">이 화면은 <b>세 사람이 한 자리를 봅니다</b> — 직원이 올리고, 하네스가 판단하고, 사장님이 결재합니다. 두 안이 가른 축은 <b>「한 줄기 목록 + 상세」 vs 「상태별 레인」</b>입니다. 공통 전제: <b>반려는 별도 상태이고 사유가 필수</b>(기존 방식은 보류에 텍스트로 섞여 <b>셀 수 없었고 실제 사용 0건</b>) · <b>승인·반려·보류는 owner 전용</b>(경로를 <span style="font-family:'IBM Plex Mono',monospace">OWNER_WRITE_PREFIXES</span>에 넣지 않으면 <b>운영자가 자기 요청을 승인합니다</b>) · <b>캡처는 DB에 담고 매직넘버로 판정</b>(프로필 사진이 이미 쓰는 방식 — 새로 궁리하지 않습니다) · <b>한도 초과는 올리기 «전»에</b> 알립니다 · <b>고치다 실패하면 「완료」로 만들지 않고 실패 사유를 그 자리에</b> · <b>오래 방치된 것을 눈에 띄게</b>(조용히 묻히면 다시 안 올립니다).</div>
+    <div style="font:400 11.5px/1.7 'IBM Plex Sans KR',sans-serif;color:oklch(0.45 0.15 30);margin-top:7px;border-left:3px solid oklch(0.52 0.16 30);padding-left:10px">제목·본문·이름·시각은 <b>자리 확인용 모형</b>이고 실제 화면은 서버 응답만 씁니다. 트윅 여섯: <b>서버 응답 16가지</b> · <b>보는 사람</b>(직원 / 사장님 — 결재 단추와 남의 요청이 갈립니다) · <b>목록 상태 4가지</b>(0건 · 방치분 포함) · <b>캡처 한도</b>(결정 3 — 1MB / 3MB / 줄여서 올리기) · <b>하네스 알림 수단</b>(결정 5 — 🟥 미정) · <b>고른 요청의 단계</b>(접수 → 완료 8단계).</div>
+  </div>
+
+  <div style="display:flex;gap:44px;align-items:flex-start">
+
+    <div id="1a" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1a</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">한 줄기 목록 + 상세 — 대화가 붙은 자리</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">요청 하나를 <b>세 사람의 대화로</b> 읽는다. <b>「내가 올린 것이 어떻게 됐나」가 가장 잘 보인다</b> · 대신 <b>결재 대기가 목록에 섞여 있다</b></span>
+      </div>
+      <div data-screen-label="1a 목록+상세" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;position:relative;display:flex;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="41">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+          <div style="margin-top:8px;padding:8px 16px 0;border-top:1px solid rgba(255,255,255,.09);font:400 9px/1.6 'IBM Plex Sans KR',sans-serif;color:#8b8477">직원이 <b style="color:#cfc9bd">매일 여러 번</b> 쓰는 자리입니다 — 「시스템」 하위에 두면 찾기 어려울 수 있습니다(결정 1)</div>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">시스템</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">요청 · 승인</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap">ADM-SYS-060 · 제안</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap">/admin2/requests · 제안</span>
+            <span style="flex:1"></span>
+            <span style="{{ notifyChipStyle }}">{{ notifyChip }}</span>
+            <span style="{{ gradeBadgeStyle }}">{{ gradeBadge }}</span>
+            <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.14);background:#ddd7c9"></span>
+          </header>
+
+          <div style="flex:1;min-height:0;overflow:hidden;padding:9px 16px;display:flex;gap:11px">
+
+            <div style="flex:none;width:426px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="flex:none;height:31px;padding:0 13px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 12px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">요청 등록</span>
+                <span style="flex:1;height:31px;border:1px solid rgba(0,0,0,.2);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 10px;font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">제목 · 본문으로 찾기</span>
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <sc-for list="{{ filters }}" as="f" hint-placeholder-count="6">
+                  <span style="{{ f.style }}">{{ f.label }}</span>
+                </sc-for>
+              </div>
+              <div style="{{ scopeNoteStyle }}">{{ scopeNote }}</div>
+              <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow:hidden">
+                <sc-if value="{{ listHasRows }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <sc-for list="{{ reqRows }}" as="q" hint-placeholder-count="6">
+                      <div style="{{ q.cardStyle }}">
+                        <div style="display:flex;align-items:center;gap:7px">
+                          <span style="{{ q.statusStyle }}">{{ q.status }}</span>
+                          <span style="{{ q.staleStyle }}">{{ q.stale }}</span>
+                          <span style="flex:1"></span>
+                          <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ q.at }}</span>
+                        </div>
+                        <span style="font:600 12px/1.4 'IBM Plex Sans KR',sans-serif">{{ q.title }}</span>
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <span style="font:400 9.5px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ q.who }}</span>
+                          <span style="{{ q.targetStyle }}">{{ q.target }}</span>
+                          <span style="flex:1"></span>
+                          <span style="{{ q.metaStyle }}">{{ q.meta }}</span>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:18px 16px;border-radius:8px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.22)">
+                    <span style="font:600 13.5px/1.4 'IBM Plex Sans KR',sans-serif">아직 등록된 요청이 없습니다</span>
+                    <span style="font:400 11px/1.75 'IBM Plex Sans KR',sans-serif;color:#4a463e">화면을 쓰다 불편한 것을 <b>캡처와 글로</b> 올려 주십시오. 지금 이 흐름은 파일(<span style="font-family:'IBM Plex Mono',monospace">OWNER-DECISIONS.md</span> · <span style="font-family:'IBM Plex Mono',monospace">docs/open-items.md</span>)에 있어 <b>직원이 쓸 수 없습니다</b> — 사장님과 하네스만 봅니다.</span>
+                    <span style="height:33px;align-self:flex-start;padding:0 16px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 12px/1 'IBM Plex Sans KR',sans-serif">첫 요청 등록</span>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+              <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:11px 14px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="{{ detailStatusStyle }}">{{ detailStatus }}</span>
+                  <span style="font:600 15px/1.35 'IBM Plex Sans KR',sans-serif">표 글자가 작아서 단가를 잘못 읽습니다</span>
+                  <span style="flex:1"></span>
+                  <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#8a8377">#REQ-0142</span>
+                </div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">
+                  <sc-for list="{{ detailMeta }}" as="m" hint-placeholder-count="4">
+                    <span style="display:flex;align-items:baseline;gap:6px">
+                      <span style="font:500 9px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">{{ m.k }}</span>
+                      <span style="font:500 11px/1 'IBM Plex Sans KR',sans-serif">{{ m.v }}</span>
+                    </span>
+                  </sc-for>
+                </div>
+                <div style="font:400 11.5px/1.75 'IBM Plex Sans KR',sans-serif;color:#26231e;padding:9px 11px;border-radius:7px;background:#f7f4ee;border:1px solid rgba(0,0,0,.09)">단가표 반영 화면에서 숫자 열이 너무 작아 8과 6을 헷갈립니다. 어제 3건을 다시 입력했습니다. 캡처 두 장 붙였습니다 — 왼쪽이 지금, 오른쪽이 확대한 모습입니다.</div>
+                <div style="display:flex;gap:8px">
+                  <sc-for list="{{ shots }}" as="s" hint-placeholder-count="2">
+                    <div style="{{ s.style }}">
+                      <span style="font:500 9px/1.4 'IBM Plex Mono',monospace;color:#6f6a61;text-align:center">{{ s.label }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px;justify-content:center;padding-left:4px">
+                    <span style="font:600 10px/1.4 'IBM Plex Sans KR',sans-serif">{{ shotRuleTitle }}</span>
+                    <span style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ shotRuleBody }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:1;min-height:0;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:11px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">진행 · 대화</span>
+                  <span style="font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">누가 무엇을 했고 지금 어디까지 왔는지 <b>이 자리에 남습니다</b> — 직원이 물어보지 않아도 압니다</span>
+                </div>
+                <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:7px;overflow:hidden">
+                  <sc-for list="{{ thread }}" as="t" hint-placeholder-count="5">
+                    <div style="{{ t.rowStyle }}">
+                      <span style="{{ t.whoStyle }}">{{ t.who }}</span>
+                      <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                        <span style="{{ t.bodyStyle }}">{{ t.body }}</span>
+                        <span style="{{ t.subStyle }}">{{ t.sub }}</span>
+                      </span>
+                      <span style="flex:none;font:400 9px/1.4 'IBM Plex Mono',monospace;color:#a09889">{{ t.at }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="flex:none;display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid rgba(0,0,0,.1)">
+                  <span style="flex:1;height:32px;border:1px solid rgba(0,0,0,.22);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 10px;font:400 11px/1 'IBM Plex Sans KR',sans-serif;color:#a09889">댓글 쓰기 — 하네스가 물으면 여기서 답합니다</span>
+                  <span style="flex:none;height:32px;padding:0 13px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">남기기</span>
+                </div>
+                <sc-if value="{{ resShow }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ resBoxStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버가 준 문구를 그대로</span></div>
+                    <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                    <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="{{ decisionBarStyle }}">
+                <span style="flex:none;font:600 11.5px/1.4 'IBM Plex Sans KR',sans-serif;white-space:nowrap">{{ decisionTitle }}</span>
+                <span style="flex:1;font:400 9.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ decisionNote }}</span>
+                <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+                  <span style="flex:none;display:flex;gap:6px">
+                    <span style="height:31px;padding:0 14px;border-radius:6px;background:oklch(0.42 0.11 165);color:#fff;display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">승인</span>
+                    <span style="height:31px;padding:0 13px;border-radius:6px;border:1px solid oklch(0.72 0.12 33 / .6);color:oklch(0.45 0.15 30);display:flex;align-items:center;font:600 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">반려 · 사유 필수</span>
+                    <span style="height:31px;padding:0 13px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">보류</span>
+                  </span>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;height:30px;border-top:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;gap:14px;padding:0 18px">
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">승인 · 반려 · 보류 경로는 <span style="font-family:'IBM Plex Mono',monospace">OWNER_WRITE_PREFIXES</span>에 등록해야 합니다 — <b>안 넣으면 운영자가 자기 요청을 승인합니다</b></span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">모든 시각은 서울 표시</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ overlayOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#f7f4ee;display:flex;align-items:center;justify-content:center;padding:70px">
+            <div style="width:660px;display:flex;flex-direction:column;gap:13px">
+              <span style="{{ overlayChipStyle }}">{{ overlayCode }}</span>
+              <div style="font:600 22px/1.35 'IBM Plex Sans KR',sans-serif">{{ overlayMsg }}</div>
+              <div style="font:400 12.5px/1.8 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ overlayNote }}</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div id="1b" style="flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;background:#26231e;color:#f4f1ea;border-radius:4px;padding:5px 8px">1b</span>
+        <span style="font:600 14px/1.3 'IBM Plex Sans KR',sans-serif">상태별 레인 — 결재 대기가 자기 자리를 가진다</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61"><b>사장님이 열면 할 일이 한 눈에</b> 들어온다 · <b>방치분이 숨을 자리가 없다</b> · 대신 <b>대화는 한 번 더 눌러야 보인다</b></span>
+      </div>
+      <div data-screen-label="1b 상태별 레인" style="width:1440px;height:960px;background:#f7f4ee;overflow:hidden;position:relative;display:flex;border:1px solid rgba(0,0,0,.14);box-shadow:0 18px 44px rgba(38,35,30,.14)">
+        <nav style="width:212px;flex:none;background:#211f1b;color:#cfc9bd;padding:13px 0 10px;display:flex;flex-direction:column;gap:1px">
+          <div style="padding:0 16px 11px;font:600 14px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea">admin2</div>
+          <sc-for list="{{ nav }}" as="m" hint-placeholder-count="41">
+            <div style="{{ m.style }}"><span style="{{ m.iconStyle }}">{{ m.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></div>
+          </sc-for>
+          <div style="margin-top:8px;padding:8px 16px 0;border-top:1px solid rgba(255,255,255,.09);font:400 9px/1.6 'IBM Plex Sans KR',sans-serif;color:#8b8477">직원이 <b style="color:#cfc9bd">매일 여러 번</b> 쓰는 자리입니다 — 최상위로 올릴지는 결정 1</div>
+        </nav>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <header style="height:52px;flex:none;border-bottom:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;padding:0 18px;gap:10px">
+            <span style="font:400 12px/1 'IBM Plex Sans KR',sans-serif;color:#8a8377">시스템</span><span style="color:#c4bdae">/</span>
+            <span style="font:600 13px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">요청 · 승인</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap">ADM-SYS-060 · 제안</span>
+            <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8a8377;padding:3px 6px;border:1px solid rgba(0,0,0,.14);border-radius:4px;white-space:nowrap">/admin2/requests · 제안</span>
+            <span style="flex:1"></span>
+            <span style="{{ notifyChipStyle }}">{{ notifyChip }}</span>
+            <span style="{{ gradeBadgeStyle }}">{{ gradeBadge }}</span>
+            <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.14);background:#ddd7c9"></span>
+          </header>
+
+          <div style="flex:1;min-height:0;overflow:hidden;padding:9px 16px;display:flex;flex-direction:column;gap:8px">
+
+            <div style="flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="flex:none;height:31px;padding:0 13px;border-radius:6px;background:#26231e;color:#f4f1ea;display:flex;align-items:center;font:600 12px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">요청 등록</span>
+              <span style="{{ scopeNoteStyle }}">{{ scopeNote }}</span>
+              <span style="flex:1"></span>
+              <span style="{{ staleBannerStyle }}">{{ staleBanner }}</span>
+            </div>
+
+            <div style="flex:1;min-height:0;display:flex;gap:9px;align-items:stretch">
+              <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="4">
+                <div style="{{ l.laneStyle }}">
+                  <div style="display:flex;align-items:baseline;gap:7px;padding-bottom:7px;border-bottom:1px solid rgba(0,0,0,.11)">
+                    <span style="font:600 12.5px/1.3 'IBM Plex Sans KR',sans-serif;white-space:nowrap">{{ l.title }}</span>
+                    <span style="{{ l.countStyle }}">{{ l.count }}</span>
+                    <span style="flex:1"></span>
+                    <span style="{{ l.ownerOnlyStyle }}">{{ l.ownerOnly }}</span>
+                  </div>
+                  <span style="font:400 9px/1.5 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ l.sub }}</span>
+                  <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow:hidden">
+                    <sc-for list="{{ l.cards }}" as="c" hint-placeholder-count="3">
+                      <div style="{{ c.cardStyle }}">
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <span style="{{ c.statusStyle }}">{{ c.status }}</span>
+                          <span style="{{ c.staleStyle }}">{{ c.stale }}</span>
+                          <span style="flex:1"></span>
+                          <span style="font:400 9px/1 'IBM Plex Mono',monospace;color:#8a8377">{{ c.at }}</span>
+                        </div>
+                        <span style="font:600 11px/1.4 'IBM Plex Sans KR',sans-serif">{{ c.title }}</span>
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                          <span style="font:400 9px/1 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ c.who }}</span>
+                          <span style="{{ c.targetStyle }}">{{ c.target }}</span>
+                        </div>
+                        <span style="{{ c.metaStyle }}">{{ c.meta }}</span>
+                        <span style="{{ c.actStyle }}">{{ c.act }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ l.isEmpty }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:9px 10px;border-radius:6px;background:#f4f0e7;border:1px dashed rgba(0,0,0,.2);font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ l.emptyText }}</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="flex:none;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:10px 14px;display:flex;gap:14px;align-items:stretch">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="{{ detailStatusStyle }}">{{ detailStatus }}</span>
+                  <span style="font:600 12.5px/1.35 'IBM Plex Sans KR',sans-serif">표 글자가 작아서 단가를 잘못 읽습니다</span>
+                  <span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#8a8377">#REQ-0142</span>
+                  <span style="flex:1"></span>
+                  <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+                    <span style="flex:none;display:flex;gap:6px">
+                      <span style="height:29px;padding:0 13px;border-radius:6px;background:oklch(0.42 0.11 165);color:#fff;display:flex;align-items:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">승인</span>
+                      <span style="height:29px;padding:0 12px;border-radius:6px;border:1px solid oklch(0.72 0.12 33 / .6);color:oklch(0.45 0.15 30);display:flex;align-items:center;font:600 11px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">반려 · 사유 필수</span>
+                      <span style="height:29px;padding:0 12px;border-radius:6px;border:1px solid rgba(0,0,0,.22);color:#4a463e;display:flex;align-items:center;font:500 11px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap">보류</span>
+                    </span>
+                  </sc-if>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <sc-for list="{{ threadShort }}" as="t" hint-placeholder-count="3">
+                    <div style="{{ t.rowStyle }}">
+                      <span style="{{ t.whoStyle }}">{{ t.who }}</span>
+                      <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                        <span style="{{ t.bodyStyle }}">{{ t.body }}</span>
+                        <span style="{{ t.subStyle }}">{{ t.sub }}</span>
+                      </span>
+                      <span style="flex:none;font:400 9px/1.4 'IBM Plex Mono',monospace;color:#a09889">{{ t.at }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ resShow }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ resBoxStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="{{ resCodeStyle }}">{{ resCode }}</span><span style="font:400 9.5px/1.4 'IBM Plex Sans KR',sans-serif;color:#8a8377">서버 문구 그대로</span></div>
+                    <div style="{{ resMsgStyle }}">{{ resMsg }}</div>
+                    <div style="{{ resNoteStyle }}">{{ resNote }}</div>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="flex:none;width:330px;display:flex;flex-direction:column;gap:6px;padding-left:14px;border-left:1px solid rgba(0,0,0,.1)">
+                <span style="font:600 12px/1.3 'IBM Plex Sans KR',sans-serif">캡처</span>
+                <div style="display:flex;gap:7px">
+                  <sc-for list="{{ shots }}" as="s" hint-placeholder-count="2">
+                    <div style="{{ s.style }}">
+                      <span style="font:500 8.5px/1.4 'IBM Plex Mono',monospace;color:#6f6a61;text-align:center">{{ s.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="font:600 9.5px/1.4 'IBM Plex Sans KR',sans-serif">{{ shotRuleTitle }}</span>
+                <span style="font:400 9px/1.55 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ shotRuleBody }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;height:30px;border-top:1px solid rgba(0,0,0,.12);background:#fffdf9;display:flex;align-items:center;gap:14px;padding:0 18px">
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61"><b>반려는 별도 상태</b>이고 사유가 필수입니다 — 기존 방식은 보류에 텍스트로 섞여 <b>셀 수 없었고 실제 사용 0건</b>이었습니다</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px/1.4 'IBM Plex Sans KR',sans-serif;color:#6f6a61">고치다 실패하면 <b>「완료」로 만들지 않습니다</b></span>
+          </div>
+        </div>
+
+        <sc-if value="{{ overlayOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#f7f4ee;display:flex;align-items:center;justify-content:center;padding:70px">
+            <div style="width:660px;display:flex;flex-direction:column;gap:13px">
+              <span style="{{ overlayChipStyle }}">{{ overlayCode }}</span>
+              <div style="font:600 22px/1.35 'IBM Plex Sans KR',sans-serif">{{ overlayMsg }}</div>
+              <div style="font:400 12.5px/1.8 'IBM Plex Sans KR',sans-serif;color:#4a463e">{{ overlayNote }}</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="max-width:1340px;display:flex;gap:18px;flex-wrap:wrap">
+    <div style="flex:1;min-width:430px;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">여덟 단계 — 무엇이 새로 필요한가</div>
+      <div style="font:400 11px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">기존 표로는 안 됩니다: 활동 로그는 <b>「지금 상태」 컬럼이 없고</b>(append-only), <span style="font-family:'IBM Plex Mono',monospace">dash_memos</span>는 <b>1회 소비형 큐</b>이며, <span style="font-family:'IBM Plex Mono',monospace">product_reviews</span>는 상품 사양 전용입니다. <b>요청 표와 댓글 표 둘이 신설</b>됩니다.</div>
+      <sc-for list="{{ stages }}" as="s" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:82px 1fr;gap:11px;padding:6px 0;border-top:1px solid rgba(0,0,0,.08)">
+          <span style="{{ s.chipStyle }}">{{ s.name }}</span>
+          <span style="display:flex;flex-direction:column;gap:2px">
+            <span style="font:500 11px/1.5 'IBM Plex Sans KR',sans-serif">{{ s.who }}</span>
+            <span style="font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ s.note }}</span>
+          </span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;width:400px;background:#fffdf9;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:600 13px/1.3 'IBM Plex Sans KR',sans-serif">사장님이 정하셔야 하는 다섯</div>
+      <div style="font:400 10.5px/1.7 'IBM Plex Sans KR',sans-serif;color:#5b564d">화면을 그리시기 전에 닫혀야 하는 것들입니다. 3·5는 <b>화면 문구가 갈리므로 트윅으로 갈라 뒀습니다</b>.</div>
+      <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="5">
+        <div style="display:flex;gap:9px;padding:7px 0;border-top:1px solid rgba(0,0,0,.08)">
+          <span style="{{ d.numStyle }}">{{ d.n }}</span>
+          <span style="display:flex;flex-direction:column;gap:2px">
+            <span style="font:600 11px/1.5 'IBM Plex Sans KR',sans-serif">{{ d.what }}</span>
+            <span style="font:400 9.5px/1.6 'IBM Plex Sans KR',sans-serif;color:#6f6a61">{{ d.why }}</span>
+          </span>
+        </div>
+      </sc-for>
+      <div style="font:600 12.5px/1.3 'IBM Plex Sans KR',sans-serif;padding-top:9px;border-top:1px solid rgba(0,0,0,.12)">이 화면이 정하지 않은 것</div>
+      <sc-for list="{{ outOfScope }}" as="o" hint-placeholder-count="4">
+        <div style="display:flex;gap:9px;padding:5px 0;border-top:1px solid rgba(0,0,0,.07)">
+          <span style="flex:1;font:500 10.5px/1.55 'IBM Plex Sans KR',sans-serif">{{ o.what }}</span>
+          <span style="flex:none;width:128px;font:400 9.5px/1.55 'IBM Plex Sans KR',sans-serif;color:#6f6a61;text-align:right">{{ o.where }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;serverState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;응답 없음&quot;,&quot;등록 성공 → 접수&quot;,&quot;캡처 한도 초과 · 올리기 전 차단&quot;,&quot;캡처 형식 거절 · SVG&quot;,&quot;하네스 판단 · 작은 것&quot;,&quot;하네스 판단 · 큰 것 → 결재대기&quot;,&quot;승인 → 완료&quot;,&quot;반려 · 사유 있음&quot;,&quot;반려 · 사유 없음 → 막음&quot;,&quot;보류&quot;,&quot;하네스가 고치다 실패&quot;,&quot;이미 처리된 것을 또 처리&quot;,&quot;403 조회 등급이 등록 시도&quot;,&quot;403 운영자가 승인 시도&quot;,&quot;취소 · 처리 전만&quot;,&quot;401 미로그인&quot;,&quot;서버 연결 실패&quot;],&quot;default&quot;:&quot;하네스 판단 · 큰 것 → 결재대기&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;서버 응답&quot;},&quot;viewer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;사장님(owner)&quot;,&quot;직원(운영자)&quot;],&quot;default&quot;:&quot;사장님(owner)&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;누가 보고 있나 — 결재 단추와 남의 요청이 갈립니다&quot;},&quot;list&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;7건 · 방치 2건 포함&quot;,&quot;내가 올린 것만 · 3건&quot;,&quot;결재대기만 · 1건&quot;,&quot;0건 · 첫 요청을 기다린다&quot;],&quot;default&quot;:&quot;7건 · 방치 2건 포함&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;목록 상태&quot;},&quot;stage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;접수&quot;,&quot;검토&quot;,&quot;처리&quot;,&quot;결재대기&quot;,&quot;승인&quot;,&quot;반려&quot;,&quot;보류&quot;,&quot;완료&quot;],&quot;default&quot;:&quot;결재대기&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;고른 요청의 단계&quot;},&quot;shotLimit&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1MB — 프로필 사진과 같은 값&quot;,&quot;3MB — DB가 커진다&quot;,&quot;줄여서 올리기 — 화질 손실&quot;],&quot;default&quot;:&quot;1MB — 프로필 사진과 같은 값&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;결정 3 — 캡처 한도 (미정)&quot;},&quot;notify&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;미정 — 아직 하네스가 깨지 않는다&quot;,&quot;작업 현황판 「말 걸기」 경로&quot;],&quot;default&quot;:&quot;미정 — 아직 하네스가 깨지 않는다&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;결정 5 — 하네스 알림 수단 (미정)&quot;}}">
+const NAVL=[['대시보드','대'],['상품 분류 관리','분'],['상품 관리','상'],['상품 일괄 등록','일'],['삭제 상품 조회','삭'],['조립 호환 지도','지'],['조립 사양 표준','표'],['상품 사양 정의','정'],['상품 사양 검수','검'],['조립 호환 규칙','규'],['용도별 최소 사양','용'],['부품 등급 관리','등'],['추천 기준 보기','추'],['추천 가능 재고 현황','풀'],['견적 상담 기록','상'],['부품 교체 · 클릭','교'],['판매가 관리','판'],['가격 검토 대기','검'],['마진 정책','마'],['판매가 재산정','재'],['가격 이력','이'],['공급처','공'],['매입 견적(용산)','견'],['재고 입고','입'],['단가표 반영','단'],['쇼핑몰 동기화','동'],['인계 기록','인'],['유입 성과','성'],['작업 현황판','판'],['웹 사양 채움','채'],['팝콘톡 응답 패턴','톡'],['AI 작업 설정','AI'],['AI 연동 설정','연'],['AI 사용량·비용','비'],['AI 응답 기록','기'],['운영 도우미 설정','도'],['오픈 단계 설정','단'],['요청 · 승인','요'],['운영자 · 권한','권'],['작업 기록','록'],['엑셀 다운로드 관리','엑']];
+
+const T = {
+  ok:   {bg:'oklch(0.96 0.03 165)', bd:'oklch(0.74 0.09 165 / .55)', fg:'oklch(0.37 0.1 165)'},
+  warn: {bg:'oklch(0.96 0.04 85)',  bd:'oklch(0.78 0.1 80 / .6)',    fg:'oklch(0.42 0.11 70)'},
+  err:  {bg:'oklch(0.96 0.03 30)',  bd:'oklch(0.75 0.11 33 / .55)',  fg:'oklch(0.45 0.15 30)'},
+  none: {bg:'#f4f0e7',              bd:'rgba(0,0,0,.13)',            fg:'#6f6a61'}
+};
+
+const STATUS_TONE = {접수:'none', 검토:'none', 처리:'ok', 결재대기:'warn', 승인:'ok', 반려:'err', 보류:'warn', 완료:'ok'};
+
+const RESULTS = {
+  '응답 없음': {zone:'', tone:'none', code:'—', msg:'', note:''},
+  '등록 성공 → 접수': {zone:'d', tone:'ok', code:'201', msg:'요청을 등록했습니다 — 상태는 「접수」입니다',
+    note:'아직 아무도 보지 않은 상태입니다. 하네스가 읽으면 「검토」로 옮겨지고, 작은 것이면 바로 고쳐 결과가 이 자리에 붙습니다. 캡처는 붙여넣기(Ctrl+V)로 올렸습니다 — 파일로 저장해 찾아 올리지 않아도 됩니다.'},
+  '캡처 한도 초과 · 올리기 전 차단': {zone:'d', tone:'err', code:'차단 · 업로드 전', msg:'이 캡처는 한도를 넘습니다 — 올리기 전에 알립니다',
+    note:'다 올린 뒤 거부하면 시간을 버립니다. Content-Length 를 먼저 보고, 스트림 중 초과하면 즉시 끊습니다(프로필 사진이 이미 쓰는 방식). 1920×1080 PNG 는 흔히 1~3MB 라 이 경계에 자주 닿습니다 — 한도는 결정 3 입니다.'},
+  '캡처 형식 거절 · SVG': {zone:'d', tone:'err', code:'400', msg:'JPEG · PNG · WebP 만 올릴 수 있습니다',
+    note:'파일 앞머리(매직넘버)로 판정합니다 — 확장자와 클라이언트가 보낸 MIME 은 믿지 않습니다. SVG 는 명시적으로 거부합니다(스크립트가 숨을 수 있고, 같은 출처에서 관리자 세션 문맥으로 돕니다).'},
+  '하네스 판단 · 작은 것': {zone:'d', tone:'ok', code:'200 · 판정', msg:'작은 것으로 보고 바로 고쳤습니다 — 결재를 올리지 않았습니다',
+    note:'무엇을 고쳤는지 · 언제 배포됐는지 · 커밋이 무엇인지가 이 자리에 남습니다. 사장님은 이미 고친 것도 되돌리라고 지시할 수 있습니다. 「작은 것 / 큰 것」의 경계 기준은 별도 문서 몫입니다.'},
+  '하네스 판단 · 큰 것 → 결재대기': {zone:'d', tone:'warn', code:'200 · 결재 상신', msg:'큰 것으로 보고 사장님 결재로 올렸습니다',
+    note:'하네스가 스스로 고치지 않는 쪽을 골랐습니다. 왜 큰 것으로 봤는지를 댓글로 함께 남깁니다 — 그 설명이 없으면 사장님이 판단할 재료가 없습니다.'},
+  '승인 → 완료': {zone:'d', tone:'ok', code:'200', msg:'승인했습니다 — 하네스가 고치고 배포되면 「완료」로 전이합니다',
+    note:'자동 전이는 배포까지 끝난 뒤입니다. 고치는 중에는 「승인」에 머물러 있습니다 — 아직 안 된 것을 됐다고 말하지 않습니다.'},
+  '반려 · 사유 있음': {zone:'d', tone:'err', code:'200', msg:'반려했습니다 — 사유가 함께 기록됐습니다',
+    note:'반려는 보류와 «별도 상태»입니다. 기존 방식은 보류 + 「[반려 사유: …]」 텍스트라 반려와 보류를 셀 수 없었고 실제 사용 0건이었습니다.'},
+  '반려 · 사유 없음 → 막음': {zone:'d', tone:'err', code:'400', msg:'반려 사유를 적어 주십시오',
+    note:'사유 없는 반려는 다음에 되짚을 수 없습니다. 화면이 저장 전에 막습니다 — 조용히 빈 값으로 넣지 않습니다.'},
+  '보류': {zone:'d', tone:'warn', code:'200', msg:'보류했습니다 — 나중에 다시 봅니다', note:'사유는 선택입니다. 다만 보류가 길어지면 방치 표시가 붙습니다 — 조용히 묻히면 직원이 다시 올리지 않게 됩니다.'},
+  '하네스가 고치다 실패': {zone:'d', tone:'err', code:'실패', msg:'고치다 실패했습니다 — 상태를 「완료」로 만들지 않았습니다',
+    note:'실패 사유가 이 자리에 그대로 남습니다. 됐다고 말해 두고 안 된 상태가 가장 나쁩니다 — 직원이 확인할 방법이 없어집니다.'},
+  '이미 처리된 것을 또 처리': {zone:'d', tone:'err', code:'409', msg:'이미 처리된 요청입니다',
+    note:'막습니다. 두 사람이 같은 요청을 동시에 열었을 때 뒤에 누른 쪽이 앞의 결정을 덮지 않도록 서버가 거부합니다.'},
+  '403 조회 등급이 등록 시도': {zone:'d', tone:'err', code:'403', msg:'등록은 운영자 등급부터 가능합니다',
+    note:'조회 등급(viewer)은 목록만 봅니다. 새 직원은 운영자 등급입니다(2026-08-26 확정) — 등록과 댓글이 가능합니다.'},
+  '403 운영자가 승인 시도': {zone:'d', tone:'err', code:'403', msg:'승인은 관리자만 가능합니다',
+    note:'이 경로가 OWNER_WRITE_PREFIXES 에 등록돼 있어 막혔습니다. 등록하지 않으면 기본 규칙(운영자 이상 쓰기)이 적용돼 «운영자가 자기 요청을 승인»할 수 있습니다.'},
+  '취소 · 처리 전만': {zone:'d', tone:'none', code:'200', msg:'요청을 취소했습니다', note:'처리가 시작된 뒤에는 취소할 수 없습니다 — 하네스가 이미 손을 댄 것을 없애면 그 작업의 이유가 사라집니다.'},
+  '401 미로그인': {zone:'over', tone:'err', code:'401', msg:'로그인이 필요합니다', note:'/admin2/login 으로 안내합니다.'},
+  '서버 연결 실패': {zone:'over', tone:'err', code:'네트워크 실패', msg:'서버에 연결할 수 없습니다', note:'세션 만료(401) · 네트워크 실패 · 서버 오류를 갈라 말합니다.'}
+};
+
+const REQS = [
+  {id:'0142', title:'표 글자가 작아서 단가를 잘못 읽습니다', who:'박서연 · 운영자', target:'단가표 반영', at:'오늘 09:12', status:'결재대기', meta:'하네스: 큰 것 — 공용 표 스타일을 건드립니다', shots:2},
+  {id:'0141', title:'입고 저장 뒤 목록이 안 갱신됩니다', who:'박서연 · 운영자', target:'재고 입고', at:'오늘 08:40', status:'처리', meta:'고쳤습니다 · 배포됨 · a3f19c2', shots:1},
+  {id:'0138', title:'견적 인쇄에서 공급처 이름이 잘립니다', who:'박서연 · 운영자', target:'매입 견적(용산)', at:'어제 17:05', status:'검토', meta:'하네스가 읽는 중 — 어느 폭에서 잘리는지 물었습니다', shots:1},
+  {id:'0131', title:'유입 성과에 지난달 비교가 있으면 좋겠습니다', who:'김도현 · 운영자', target:'유입 성과', at:'8일 전', status:'보류', meta:'보류 8일 — 나중에 다시 본다고 했습니다', shots:0, stale:true},
+  {id:'0127', title:'상품 검색이 초성으로도 되면 좋겠습니다', who:'박서연 · 운영자', target:'상품 관리', at:'11일 전', status:'접수', meta:'11일 동안 아무도 보지 않았습니다', shots:0, stale:true},
+  {id:'0119', title:'로그인 유지가 하루도 안 갑니다', who:'김도현 · 운영자', target:'로그인', at:'2주 전', status:'반려', meta:'세션은 절대 8시간이 규칙입니다 — 사유 기록됨', shots:0},
+  {id:'0115', title:'엑셀 내려받기가 중간에 끊깁니다', who:'박서연 · 운영자', target:'엑셀 다운로드 관리', at:'2주 전', status:'완료', meta:'고쳤습니다 · 배포됨 · 7c02f4e', shots:2}
+];
+
+const THREAD = [
+  {who:'직원', body:'단가표 반영 화면에서 숫자 열이 너무 작아 8과 6을 헷갈립니다. 어제 3건을 다시 입력했습니다.', sub:'캡처 2장 · 대상 화면 「단가표 반영」', at:'09:12'},
+  {who:'하네스', body:'확인했습니다. 숫자 열만 키우면 다른 열과 어긋나서, 공용 표 스타일을 함께 봐야 합니다.', sub:'판정: 큰 것 — 이 화면 하나로 끝나지 않습니다(39개 화면이 같은 셸을 씁니다)', at:'09:31'},
+  {who:'하네스', body:'숫자에만 고정폭 글꼴을 쓰고 한 단계 키우는 안, 표 전체를 키우는 안 둘 중 어느 쪽이 좋을지 사장님 결정이 필요합니다.', sub:'결재 상신 — 상태 「결재대기」', at:'09:33'},
+  {who:'직원', body:'단가 열만 커도 충분합니다. 다른 열은 지금이 편합니다.', sub:'댓글 — 하네스가 물어서 답했습니다', at:'09:48'},
+  {who:'사장님', body:'', sub:'', at:''}
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.serverState ?? '하네스 판단 · 큰 것 → 결재대기';
+    const r = RESULTS[st] || RESULTS['응답 없음'];
+    const t = T[r.tone];
+    const viewer = this.props.viewer ?? '사장님(owner)';
+    const isOwner = viewer === '사장님(owner)';
+    const listMode = this.props.list ?? '7건 · 방치 2건 포함';
+    const shotLimit = this.props.shotLimit ?? '1MB — 프로필 사진과 같은 값';
+    const notify = this.props.notify ?? '미정 — 아직 하네스가 깨지 않는다';
+    const stage = this.props.stage ?? '결재대기';
+
+    const nav = NAVL.map(([label, icon]) => {
+      const on = label === '요청 · 승인';
+      return { label, icon,
+        style:"display:flex;align-items:center;gap:8px;padding:1px 16px;font:500 10px/1.25 'IBM Plex Sans KR',sans-serif;color:" + (on ? '#f4f1ea' : '#a29b8d') + ';background:' + (on ? 'rgba(255,255,255,.09)' : 'transparent'),
+        iconStyle:"flex:none;width:17px;height:17px;border-radius:4px;display:flex;align-items:center;justify-content:center;font:600 8px/1 'IBM Plex Sans KR',sans-serif;color:#cfc9bd;background:rgba(255,255,255,.07)" };
+    });
+
+    const chip = (label, tone, extra) => "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap;border-radius:3px;padding:4px 6px;color:" + T[tone].fg + ';background:' + T[tone].bg + ';border:1px solid ' + T[tone].bd + (extra || '');
+
+    const listEmpty = listMode === '0건 · 첫 요청을 기다린다';
+    let pool = listEmpty ? [] : REQS;
+    if (listMode === '내가 올린 것만 · 3건') pool = REQS.filter(q => q.who.indexOf('박서연') === 0).slice(0, 3);
+    if (listMode === '결재대기만 · 1건') pool = REQS.filter(q => q.status === '결재대기');
+    if (!isOwner) pool = pool.filter(q => q.who.indexOf('박서연') === 0);
+
+    const mkCard = (q, compact) => ({
+      title:q.title, who:q.who, at:q.at, status:q.status,
+      cardStyle:'display:flex;flex-direction:column;gap:' + (compact ? '4px' : '5px') + ';padding:' + (compact ? '8px 9px' : '9px 11px') + ';border-radius:7px;background:#fffdf9;border:1px solid ' +
+        (q.status === '결재대기' ? T.warn.bd : 'rgba(0,0,0,.12)') + (q.id === '0142' ? ';box-shadow:0 0 0 2px oklch(0.42 0.11 165 / .35)' : ''),
+      statusStyle: chip(q.status, STATUS_TONE[q.status]),
+      stale: q.stale ? '방치' : '',
+      staleStyle: q.stale ? chip('', 'err') : 'display:none',
+      target:q.target,
+      targetStyle:"font:400 9px/1 'IBM Plex Mono',monospace;color:#8a8377;border:1px solid rgba(0,0,0,.13);border-radius:3px;padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis",
+      meta:q.meta,
+      metaStyle:"font:400 9px/1.45 'IBM Plex Sans KR',sans-serif;color:" + (q.status === '반려' ? T.err.fg : (q.status === '결재대기' ? T.warn.fg : '#6f6a61')),
+      act: q.status === '결재대기' && isOwner ? '결재 필요' : '',
+      actStyle: q.status === '결재대기' && isOwner
+        ? "align-self:flex-start;font:600 9px/1 'IBM Plex Sans KR',sans-serif;color:#f4f1ea;background:#26231e;border-radius:3px;padding:4px 6px"
+        : 'display:none'
+    });
+
+    const reqRows = pool.map(q => mkCard(q, false));
+
+    const laneDefs = [
+      {title:'접수 · 검토', keys:['접수','검토'], sub:'아직 아무도 안 봤거나 하네스가 읽는 중입니다', empty:'새로 올라온 것이 없습니다'},
+      {title:'결재 대기', keys:['결재대기'], sub:'하네스가 「큰 것」으로 보고 올린 것 — 사장님 차례입니다', empty:'올라온 결재가 없습니다', ownerOnly:true},
+      {title:'처리 · 승인', keys:['처리','승인'], sub:'하네스가 고쳤거나 고치는 중입니다', empty:'진행 중인 것이 없습니다'},
+      {title:'닫힘', keys:['완료','반려','보류'], sub:'완료 · 반려(사유 있음) · 보류가 여기 모입니다', empty:'닫힌 것이 없습니다'}
+    ];
+    const lanes = laneDefs.map(d => {
+      const cards = pool.filter(q => d.keys.indexOf(q.status) >= 0);
+      const hot = d.ownerOnly && cards.length > 0;
+      return {
+        title:d.title, sub:d.sub,
+        count: cards.length + '건',
+        countStyle:"flex:none;font:600 9.5px/1 'IBM Plex Mono',monospace;white-space:nowrap;border-radius:3px;padding:4px 6px;" +
+          (hot ? 'color:' + T.warn.fg + ';background:' + T.warn.bg + ';border:1px solid ' + T.warn.bd : 'color:#6f6a61;border:1px solid rgba(0,0,0,.16)'),
+        ownerOnly: d.ownerOnly ? 'owner만' : '',
+        ownerOnlyStyle: d.ownerOnly ? chip('', 'warn') : 'display:none',
+        laneStyle:'flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:10px 11px;border-radius:9px;overflow:hidden;background:' +
+          (hot ? 'oklch(0.975 0.02 85)' : '#fffdf9') + ';border:1px solid ' + (hot ? T.warn.bd : 'rgba(0,0,0,.12)'),
+        cards: cards.map(q => mkCard(q, true)),
+        isEmpty: cards.length === 0,
+        emptyText: d.empty
+      };
+    });
+
+    const staleCount = pool.filter(q => q.stale).length;
+
+    const thread = THREAD.map((m, n) => {
+      const last = n === THREAD.length - 1;
+      const tone = m.who === '하네스' ? 'none' : (m.who === '사장님' ? 'warn' : 'ok');
+      const body = last ? (isOwner ? '이 자리에서 승인 · 반려 · 보류를 정합니다 — 반려는 사유가 필수입니다.' : '사장님 결재를 기다리는 중입니다.') : m.body;
+      const sub = last ? (isOwner ? '결정하면 그 사실과 사유가 이 스레드에 그대로 남습니다' : '결재가 나면 이 자리에 결과가 붙습니다 — 물어보지 않아도 압니다') : m.sub;
+      return {
+        who:m.who, at: last ? '대기' : m.at, body, sub,
+        rowStyle:'display:flex;gap:9px;align-items:flex-start;padding:7px 9px;border-radius:7px;background:' + (last ? T.warn.bg : '#f7f4ee') + ';border:1px solid ' + (last ? T.warn.bd : 'rgba(0,0,0,.08)'),
+        whoStyle:"flex:none;width:44px;text-align:center;" + chip('', tone),
+        bodyStyle:"font:400 11px/1.6 'IBM Plex Sans KR',sans-serif;color:#26231e",
+        subStyle:"font:400 9px/1.45 'IBM Plex Sans KR',sans-serif;color:#6f6a61"
+      };
+    });
+
+    const limitBytes = shotLimit.indexOf('3MB') === 0 ? '3MB' : '1MB';
+    const shrink = shotLimit.indexOf('줄여서') >= 0;
+
+    const stageTone = STATUS_TONE[stage] || 'none';
+
+    return {
+      nav, reqRows, lanes, thread, isOwner,
+      threadShort: thread.slice(-3),
+      listEmpty,
+      listHasRows: !listEmpty,
+      filters: ['전체', '내가 올린 것', '결재 대기', '처리됨', '안 된 것', '방치'].map((label, n) => ({
+        label,
+        style:"height:26px;padding:0 9px;border-radius:5px;display:flex;align-items:center;font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap;" +
+          (n === 0 ? 'background:#26231e;color:#f4f1ea;border:1px solid #26231e'
+           : (label === '방치' ? 'color:' + T.err.fg + ';background:' + T.err.bg + ';border:1px solid ' + T.err.bd
+              : 'color:#4a463e;background:#fffdf9;border:1px solid rgba(0,0,0,.2)'))
+      })),
+      scopeNote: isOwner
+        ? '사장님은 전체를 봅니다 — 상태 · 올린 사람 · 대상 화면으로 거릅니다.'
+        : '직원은 «자기가 올린 것»만 봅니다 — 남의 요청은 목록에 나오지 않습니다.',
+      scopeNoteStyle: "font:400 9.5px/1.5 'IBM Plex Sans KR',sans-serif;color:#8a8377;border-left:2px solid rgba(0,0,0,.14);padding-left:8px",
+      staleBanner: staleCount > 0 ? staleCount + '건이 여러 날 방치됐습니다 — 조용히 묻히면 직원이 다시 올리지 않습니다' : '방치된 요청이 없습니다',
+      staleBannerStyle: "flex:none;font:600 9.5px/1.4 'IBM Plex Sans KR',sans-serif;white-space:nowrap;border-radius:5px;padding:6px 9px;" +
+        (staleCount > 0 ? 'color:' + T.err.fg + ';background:' + T.err.bg + ';border:1px solid ' + T.err.bd
+                        : 'color:#6f6a61;background:#f4f0e7;border:1px solid rgba(0,0,0,.13)'),
+      gradeBadge: isOwner ? '사장님 — 승인 · 반려 · 보류' : '운영자 — 등록 · 댓글 · 취소',
+      gradeBadgeStyle: "font:600 10px/1 'IBM Plex Sans KR',sans-serif;border-radius:4px;padding:5px 8px;white-space:nowrap;" +
+        (isOwner ? 'color:#4a463e;border:1px solid rgba(0,0,0,.18)' : 'color:' + T.warn.fg + ';background:' + T.warn.bg + ';border:1px solid ' + T.warn.bd),
+      notifyChip: notify.indexOf('미정') === 0 ? '하네스 알림 미정 — 결정 5' : notify,
+      notifyChipStyle: "font:600 9.5px/1 'IBM Plex Sans KR',sans-serif;white-space:nowrap;border-radius:4px;padding:5px 7px;" +
+        (notify.indexOf('미정') === 0 ? 'color:' + T.err.fg + ';background:' + T.err.bg + ';border:1px solid ' + T.err.bd
+                                    : 'color:' + T.ok.fg + ';background:' + T.ok.bg + ';border:1px solid ' + T.ok.bd),
+      detailStatus: stage,
+      detailStatusStyle: chip('', stageTone),
+      detailMeta: [
+        {k:'올린 사람', v:'박서연 · 운영자'},
+        {k:'대상 화면', v:'단가표 반영'},
+        {k:'올린 시각', v:'오늘 09:12'},
+        {k:'하네스 판정', v:'큰 것 — 공용 표 스타일'}
+      ],
+      shots: [
+        {label:'캡처 1\n지금 모습\n1920×1080'},
+        {label:'캡처 2\n확대한 모습\n1920×1080'}
+      ].map(s => ({ label:s.label,
+        style:'flex:none;width:118px;height:70px;border-radius:6px;border:1px dashed rgba(0,0,0,.26);background:repeating-linear-gradient(135deg,#f0ece2 0 6px,#e6e1d5 6px 12px);display:flex;align-items:center;justify-content:center;white-space:pre-line' })),
+      shotRuleTitle: shrink
+        ? '브라우저에서 줄여 올립니다 (결정 3)'
+        : '한도 ' + limitBytes + ' · 붙여넣기(Ctrl+V)로 올립니다 (결정 3)',
+      shotRuleBody: (shrink
+        ? '올리기 전에 브라우저가 크기를 줄입니다 — 한도에 걸리지 않는 대신 화질이 떨어져 「글자가 작다」는 요청의 캡처가 흐려질 수 있습니다. '
+        : (limitBytes === '1MB'
+           ? '1920×1080 PNG 는 흔히 1~3MB 라 이 한도에 자주 닿습니다 — 넘으면 올리기 «전»에 알립니다. '
+           : 'DB 가 그만큼 커집니다(캡처는 프로필 사진과 달리 여러 장 붙습니다) — 대신 화면 캡처가 대체로 그대로 들어갑니다. '))
+        + 'Postgres BYTEA 에 담아 디스크를 쓰지 않습니다(배포 서버는 쓰기 경로가 한 곳뿐입니다). 파일 앞머리로 판정해 JPEG · PNG · WebP 만 받고 SVG 는 거부합니다.',
+      decisionTitle: isOwner ? '사장님 결재' : '사장님 결재 대기 중',
+      decisionNote: isOwner
+        ? '승인하면 하네스가 고치고, 배포까지 끝나면 「완료」로 전이합니다. 반려는 사유가 필수입니다 — 사유 없는 반려는 다음에 되짚을 수 없습니다. 이미 처리된 것을 또 처리하면 서버가 막습니다.'
+        : '직원 화면에는 결재 단추가 없습니다. 이 경로가 OWNER_WRITE_PREFIXES 에 등록돼 있어야 서버도 막습니다 — 등록하지 않으면 운영자가 자기 요청을 승인할 수 있습니다.',
+      decisionBarStyle: 'flex:none;display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:9px;background:' +
+        (isOwner ? T.warn.bg : '#f4f0e7') + ';border:1px solid ' + (isOwner ? T.warn.bd : 'rgba(0,0,0,.16)'),
+      stages: [
+        {name:'접수', tone:'none', who:'직원이 올림 — 아직 아무도 안 봄', note:'며칠 지나면 방치 표시가 붙습니다. 조용히 묻히면 다시 안 올립니다.'},
+        {name:'검토', tone:'none', who:'하네스가 읽고 판단 중', note:'모르는 것은 댓글로 묻습니다 — 직원이 그 자리에서 답합니다.'},
+        {name:'처리', tone:'ok', who:'하네스가 「작은 것」으로 보고 바로 고침', note:'결과가 붙습니다 — 무엇을 고쳤는지 · 언제 배포됐는지 · 커밋이 무엇인지. 사장님은 되돌리라고 지시할 수 있습니다.'},
+        {name:'결재대기', tone:'warn', who:'하네스가 「큰 것」으로 보고 사장님께 올림', note:'왜 큰 것으로 봤는지를 함께 남깁니다 — 그 설명이 없으면 판단할 재료가 없습니다.'},
+        {name:'승인', tone:'ok', who:'사장님이 하라고 함 → 하네스가 고침', note:'배포까지 끝나야 「완료」입니다. 고치는 중에는 여기 머무릅니다.'},
+        {name:'반려', tone:'err', who:'사장님이 안 한다고 함 — 사유 필수', note:'별도 상태입니다. 보류에 텍스트로 섞으면 반려와 보류를 셀 수 없습니다(기존 방식이 그래서 사용 0건이었습니다).'},
+        {name:'보류', tone:'warn', who:'나중에 다시 본다 — 사유 선택', note:'길어지면 방치 표시가 붙습니다.'},
+        {name:'완료', tone:'ok', who:'고치고 배포까지 끝남', note:'실패하면 이 상태로 오지 않습니다 — 실패 사유가 그 자리에 남습니다.'}
+      ].map(s => Object.assign({}, s, {
+        chipStyle:'align-self:flex-start;text-align:center;' + chip('', s.tone)})),
+      decisions: [
+        {n:'1', what:'메뉴 위치 — 「시스템」 하위인가, 최상위인가', why:'직원이 하루에 여러 번 쓰는 화면이면 시스템 그룹 안쪽은 찾기 어렵습니다. 두 안 모두 「시스템」 하위로 그렸고, 사이드바에 그 사실을 적어 뒀습니다.'},
+        {n:'2', what:'화면 이름 — 「요청 · 승인」이 맞는지', why:'「요구사항」은 우리 안에서 «요구사항 정의서»를 뜻해 겹칩니다. 직원이 쓰는 말로 「요청」이 맞다고 봅니다.'},
+        {n:'3', what:'캡처 한도 — 1MB / 3MB / 줄여서 올리기', why:'화면 문구가 갈리므로 트윅으로 세 모습을 갈라 뒀습니다. 1920×1080 PNG 가 흔히 1~3MB 이고, 줄이면 「글자가 작다」는 요청의 캡처가 흐려집니다.'},
+        {n:'4', what:'승인 권한 — 지금 owner 가 15명이다', why:'승인이 owner 전용이면 15명이 승인할 수 있습니다(활성 14 · 정지 4 · operator 1 · viewer 2). 사장님만 승인하시려면 등급 정리가 먼저이고, 그것은 이 화면 범위 밖입니다.'},
+        {n:'5', what:'하네스에게 어떻게 알릴지', why:'지금 하네스는 사장님 메시지로만 깨어납니다. 알림 수단이 없으면 요청이 「접수」에서 며칠 머무릅니다 — 상단 배지로 그 미정 상태를 드러냈습니다.'}
+      ].map(d => Object.assign({}, d, {
+        numStyle:"flex:none;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font:600 10px/1 'IBM Plex Mono',monospace;color:#f4f1ea;background:#26231e"})),
+      outOfScope: [
+        {what:'「작은 것 / 큰 것」의 경계 기준', where:'별도 문서'},
+        {what:'배치 · 색 · 컴포넌트', where:'사장님 화면 설계서'},
+        {what:'owner 15명 등급 정리', where:'운영자 · 권한'},
+        {what:'기존 결정 파일을 옮길지', where:'별도 판단'}
+      ],
+      resShow: r.zone === 'd',
+      resCode: r.code,
+      resMsg: r.msg,
+      resNote: r.note,
+      resBoxStyle: 'flex:none;background:' + t.bg + ';border:1px solid ' + t.bd + ';border-radius:7px;padding:9px 11px;display:flex;flex-direction:column;gap:4px',
+      resCodeStyle: "font:600 9.5px/1 'IBM Plex Mono',monospace;color:" + t.fg + ';border:1px solid ' + t.bd + ';border-radius:3px;padding:4px 6px;background:#fffdf9',
+      resMsgStyle: "font:600 11.5px/1.45 'IBM Plex Sans KR',sans-serif;color:" + t.fg,
+      resNoteStyle: "font:400 10px/1.6 'IBM Plex Sans KR',sans-serif;color:#4a463e",
+      overlayOn: r.zone === 'over',
+      overlayCode: r.code,
+      overlayMsg: r.msg,
+      overlayNote: r.note,
+      overlayChipStyle: "align-self:flex-start;font:600 10px/1 'IBM Plex Mono',monospace;color:" + t.fg + ';border:1px solid ' + t.bd + ';border-radius:4px;padding:5px 8px;background:' + t.bg
+    };
+  }
+}
+</script>
+</body>
+</html>
