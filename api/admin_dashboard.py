@@ -323,3 +323,76 @@ def worklist():
          "hint": f"판매 분류가 없거나 부품 종류가 {etc_label}인 상품"},
     ]
     return {"items": items, "total": sum(i["count"] for i in items), "pool": pool}
+
+
+# ── 몰 공급처·가격 자동 갱신 상태 (2026-08-27) ──────────────────────────────
+#
+# 배경: `tools/mall_daily_sync.py`(새벽 systemd timer, 배포 서버 전용)가 매일
+# ①추천 후보 목록 ②몰에서 공급처·가격 수집 ③「가능」 최저가로 매입가·판매가
+# 재계산 ④전 공급처 품절 상품 후보 제외를 자동으로 돈다. **이 배치의 결과를 볼
+# 자리는 작업 현황판(api/dash.py)이 아니라 이 관리자 대시보드다** — 현황판은
+# 하네스의 로컬 세션 전사본(~/.claude/projects/...)을 읽는 화면이라 배포 서버
+# 프로세스가 거기에 닿을 길이 없다(사장님 확인, 2026-08-27). 그래서 그 배치가
+# DB(mall_sync_runs — db/migrations/versions/0067)에 실행 결과를 남기고, 이
+# 함수가 그것을 읽는다.
+#
+# 개별 상품 되돌리기 근거(before 스냅샷)는 이 표에 없다 — A-115·A-116과 같은
+# 모양으로 admin_operator_activity_logs 에 남고, mall_sync_runs.reprice_log_id·
+# exclude_log_id 가 그 행을 가리킨다(같은 것을 두 벌 두지 않는다).
+MALL_SYNC_STALE_HOURS = 30
+# 주기는 하루(24h)다. 시작 시각 지터(systemd RandomizedDelaySec)·실행 자체가
+# 길어질 가능성(공급처 수천 건을 1.5초 간격으로 읽으면 1시간 안팎)을 감안해
+# 24h + 6h 여유를 뒀다 — 이보다 오래 "가장 최근 실행 시작"이 없으면 정상적인
+# 하루 주기로 보기 어렵다(타이머가 죽었거나 서버가 꺼져 있을 수 있다). 재검토
+# 시점: 실행 시간이 실측으로 몇 시간대까지 늘어나면(카탈로그가 커지면) 이 값도
+# deploy/README.md의 시각 배치와 함께 다시 잰다(다나와 타이머 §재검토 시점과
+# 같은 방식).
+
+
+def mall_sync_status(conn) -> dict:
+    """가장 최근 실행 한 건 — 대시보드가 "언제·성공/실패·건수"를 그대로 보여준다.
+
+    mall_sync_runs 가 없으면(마이그레이션 미적용) 이 함수는 **그대로 예외를 올린다**
+    — 다른 세 집계 함수(dashboard·quote_quality·funnel·worklist)와 같은 방식으로
+    호출부(admin_ui_home._safe)가 잡아 "조회 실패"로 보여준다. 여기서 따로 감싸지
+    않는다(단일 원천 — 실패 처리 방식을 두 벌로 두지 않는다).
+    """
+    row = conn.execute(text(
+        "SELECT run_id, started_at, finished_at, ok, fail_reason, target_count,"
+        " collected_count, price_changed_count, held_count, excluded_count"
+        " FROM mall_sync_runs ORDER BY run_id DESC LIMIT 1")).mappings().first()
+    if row is None:
+        return {"state": "never", "started_at": None, "finished_at": None, "age_hours": None}
+
+    age_h = (datetime.utcnow() - row["started_at"]).total_seconds() / 3600 if row["started_at"] else None
+    stale = age_h is not None and age_h > MALL_SYNC_STALE_HOURS
+    if row["finished_at"] is None:
+        # 시작만 있고 끝이 없다 — 아직 도는 중일 수도, 응답 없이 죽었을 수도 있다.
+        # 지어내지 않고 "얼마나 지났나"만으로 가른다(성공/실패로 단정하지 않는다).
+        state = "stalled" if stale else "running"
+    elif row["ok"]:
+        # 성공은 했지만 그 뒤로 새 실행이 오래 없었다 — 타이머가 죽었을 수 있다는
+        # 신호다(지시서 "하루 넘게 안 돌았으면 그것도 경고로").
+        state = "stale_ok" if stale else "ok"
+    else:
+        state = "fail"   # 실패는 신선도와 무관하게 항상 fail — 가장 눈에 띄어야 한다
+
+    return {
+        "state": state, "run_id": row["run_id"],
+        "started_at": iso(row["started_at"]) if row["started_at"] else None,
+        "finished_at": iso(row["finished_at"]) if row["finished_at"] else None,
+        "ok": row["ok"], "fail_reason": row["fail_reason"],
+        "target_count": row["target_count"], "collected_count": row["collected_count"],
+        "price_changed_count": row["price_changed_count"], "held_count": row["held_count"],
+        "excluded_count": row["excluded_count"],
+        "age_hours": round(age_h, 1) if age_h is not None else None,
+    }
+
+
+@router.get("/mall-sync-status")
+def mall_sync_status_route():
+    """HTTP 경로 — 다른 세 함수(worklist 등)와 같은 관례로 라우트도 둔다(직접 호출과
+    별개 — admin_ui_home.py는 함수를 그대로 부르지만, 다른 도구가 HTTP로 조회할 수도
+    있으므로 라우트 없이 함수만 두지 않는다)."""
+    with engine.connect() as conn:
+        return mall_sync_status(conn)

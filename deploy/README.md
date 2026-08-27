@@ -616,6 +616,206 @@ sudo systemctl daemon-reload
 자격증명이 없는 채로 배포됐을 때 "알림 실패 → 자기 자신을 다시 호출 → 또
 실패 → ..."로 반복될 수 있다.
 
+## 몰 공급처·가격 일일 자동 반영 (2026-08-27 신설 · 사장님 지시)
+
+> 2026-08-26에 사람이 손으로 한 절차(추천 후보 조회 → 몰에서 공급처·가격 수집 →
+> 「가능」 최저가로 매입가·판매가 재계산 → 전 공급처 품절 상품 후보 제외,
+> decision-log **A-114~A-116**)를 매일 새벽 자동으로 반복한다. **서버에서 직접
+> 만들거나 고치지 않는다**(P-06) — 리포에서 고쳐 push하고 서버는 받기만 한다.
+
+파일 셋:
+
+| 파일 | 역할 |
+|---|---|
+| `tools/mall_daily_sync.py` | 실행 본체. 1~4단계를 순서대로 돈다(`--apply` 없으면 드라이런) |
+| `deploy/systemd/popcorn-mall-sync.service` | 단일 서비스(템플릿 아님) — `tools/mall_daily_sync.py --apply` 실행 |
+| `deploy/systemd/popcorn-mall-sync.timer` | 매일 03:00 KST 1회 — 시각 근거는 파일 안 주석(다나와 타이머와의 겹침 회피) |
+
+### 결과를 보는 곳 — 작업 현황판이 아니라 **관리자 대시보드**
+
+⚠ **2026-08-27 사장님 확인으로 방향이 바뀌었다.** 처음엔 작업 현황판
+(`.claude/dash-queue.jsonl`, `api/dash.py`)에 남기려 했는데, 그 화면은 **하네스의
+로컬 세션 전사본**(`~/.claude/projects/...`, 사장님 PC에만 있다)을 읽는 화면이라
+배포 서버에서 도는 이 배치가 거기에 닿을 방법이 없다. 그래서 결과를
+**`mall_sync_runs` 표(`db/migrations/versions/0067_mall_sync_runs.py`)에 남기고**,
+`/admin2/`(관리자 대시보드, `api/admin_dashboard.mall_sync_status` ·
+`api/admin_ui_home.py` · `templates/admin/home.html.j2`)가 그것을 읽어 "오늘의
+흐름" 바로 아래 한 줄로 보여준다. **로그인만 하면 보인다** — 별도 조작이 없다.
+
+    정상    몰 공급처·가격 2026-08-27 03:00 — 수집 2,726건 · 가격 12건 변경 · 보류 1건 · 후보 제외 3건
+    실패    ⚠ 몰 갱신 실패(2026-08-27 03:00) — 몰 세션이 만료되었습니다(로그인 페이지로 redirect 감지) —
+            MALL_ADMIN_COOKIE 를 다시 넣어야 합니다
+    미실행  몰 갱신 — 아직 실행된 적 없습니다
+    오래됨  ⚠ 몰 갱신 2026-08-25 03:00 — ... (마지막 실행 후 31시간 경과)
+
+마지막 줄("오래됨")이 "하루 넘게 안 돎" 판정이다 — 가장 최근 실행의 `started_at`이
+30시간(하루 주기 + 지터·실행시간 여유, `api/admin_dashboard.MALL_SYNC_STALE_HOURS`)
+넘게 지나면, 그 실행이 성공이었어도 경고(⚠)로 바뀐다. 성공은 조용히, 실패·오래됨은
+눈에 띄게(warn 배지, 기존 "재고 정합" 자리와 같은 색).
+
+### 설치
+
+```bash
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-mall-sync.service /etc/systemd/system/
+sudo install -m 644 /srv/popcorn-ai/deploy/systemd/popcorn-mall-sync.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+**설치 전에 시각 표기부터 검증한다**(다나와 타이머와 같은 절차):
+
+```bash
+systemd-analyze calendar '*-*-* 03:00:00 Asia/Seoul'   # 다음 날 03:00 KST가 나와야 한다
+```
+
+`Next elapse`가 기대와 다르면 `.timer` 파일 안 UTC 대체 줄로 바꾼 뒤 같은 명령으로
+다시 검증하고 설치한다(파일 안에 위치·값이 이미 있다).
+
+**마이그레이션을 먼저 적용한다** — `mall_sync_runs` 표가 없으면 대시보드 타일이
+"조회 실패"로만 보인다(정상 — 아직 표가 없다는 뜻, 화면이 숫자를 지어내지 않는다):
+
+```bash
+cd /srv/popcorn-ai/db && ../.venv/bin/python -m alembic upgrade head
+```
+
+### ⚠ 사장님이 직접 하셔야 하는 것 — `/etc/popcorn-ai.env`에 `MALL_ADMIN_COOKIE` 추가
+
+리포에도 이 문서에도 쿠키 값을 적지 않는다. **제작자는 이 값을 서버에 넣지 않는다**
+— 값을 다루는 것은 하네스가 사장님과 직접 한다(제작팀 규약). 아래는 "어디에 어떤
+이름으로"만 정한 것이다.
+
+절차는 위 「실패 알림」 절의 텔레그램 토큰 추가 절차와 **완전히 같다**(같은 실수를
+반복하지 않기 위해 여기서 반복하지 않는다 — 그 절 「⚠ 사장님이 직접 하셔야 하는
+것」을 그대로 따른다). 다른 점은 이름과 얻는 곳뿐이다:
+
+```
+sudo nano /etc/popcorn-ai.env
+```
+
+파일 맨 아래에 **직접 타이핑으로** 한 줄 추가한다(`<`·`>` 사이를 실제 값으로
+바꿔서 — 그대로 붙여 넣지 않는다):
+
+    MALL_ADMIN_COOKIE=<여기를 실제 쿠키 값으로 바꿔 쓴다>
+
+**값을 얻는 법**(`tools/mall_supplier_fetch.py` 모듈 docstring §과거 방식과 동일):
+사장님 계정으로 `popcornpc.co.kr` 관리자에 로그인한 브라우저에서 개발자도구
+Network 탭 → `/adm_cate/` 로 시작하는 아무 요청이나 열어 Request Headers의
+`Cookie` 값 전체를 복사한다.
+
+⚠ **이 쿠키는 언젠가 만료된다.** 만료되면 다음 실행이 즉시 "세션 만료"로 실패
+기록을 남기고(대시보드에 눈에 띄게 표시된다 — 위 「실패」 예시), 사람이 새로
+복사해 같은 줄을 고쳐 넣어야 한다(덧붙이지 않는다 — 위 텔레그램 절차와 같은 이유,
+같은 키 줄이 여러 개면 어느 것이 유효한지 헷갈린다).
+
+저장한 뒤 권한·형태 확인은 위 「실패 알림」 절과 같은 방식이다(`chmod 640
+root:popcorn`, 줄 수 1인지, 꺾쇠·비ASCII 없는지) — `MALL_ADMIN_COOKIE`로 이름만
+바꿔 같은 여섯 줄 점검을 돌린다.
+
+### 활성화 · 수동 1회 실행
+
+```bash
+sudo systemctl enable --now popcorn-mall-sync.timer
+sudo systemctl list-timers 'popcorn-mall-sync*'
+```
+
+첫 실행은 서버 캐시가 0건이라 전량 새로 수집한다(다나와 타이머와 같은 사정) —
+타이머를 기다리지 않고 손으로 먼저 한 번 돌려 끝까지 도는지 확인하는 편이 안전하다.
+**먼저 `--apply` 없이(드라이런) 확인한다**:
+
+```bash
+sudo -u popcorn /srv/popcorn-ai/.venv/bin/python /srv/popcorn-ai/tools/mall_daily_sync.py --limit 20
+```
+
+`--limit 20`으로 소수만 먼저 돌려 콘솔 요약(수집·가격 변경·보류·후보 제외 건수)이
+말이 되는지 본 뒤, `--limit` 없이(전체) 드라이런 한 번, 그 다음에야 서비스를
+직접 실행한다(`--apply`가 실제로 걸린다):
+
+```bash
+sudo systemctl start popcorn-mall-sync.service
+sudo journalctl -u popcorn-mall-sync.service -f
+```
+
+`-f`는 실시간 추적이라 최대 약 1~2시간(현재 대상 규모 기준, `popcorn-mall-sync.service`
+파일 안 타임아웃 산정 참조) 터미널을 붙잡는다 — 계속 붙잡지 말고 `Ctrl+C`로 빠져나온
+뒤 나중에 다시 확인해도 된다:
+
+```bash
+systemctl status popcorn-mall-sync.service --no-pager
+sudo journalctl -u popcorn-mall-sync.service --since '2 hour ago'
+```
+
+실행이 끝나면 `/admin2/`(관리자 대시보드)를 열어 위 「정상」 문구가 실제로 뜨는지
+확인한다 — journald 로그와 대시보드 둘 다 같은 실행을 말해야 한다.
+
+### 끄는 법 · 되돌리는 법
+
+```bash
+sudo systemctl disable --now popcorn-mall-sync.timer
+```
+
+타이머만 끄면 **다음 예정 실행이 없어질 뿐**, 이미 반영된 값은 그대로 남는다.
+unit 파일까지 걷으려면:
+
+```bash
+sudo rm /etc/systemd/system/popcorn-mall-sync.timer /etc/systemd/system/popcorn-mall-sync.service
+sudo systemctl daemon-reload
+```
+
+**그날 반영분을 되돌리려면**(값이 잘못 들어갔을 때 — 원장은 삭제가 아니라 역방향
+전이다) 세 단계 전부 근거가 남아 있다:
+
+1. 대시보드 또는 `SELECT * FROM mall_sync_runs ORDER BY run_id DESC LIMIT 5`로
+   되돌릴 실행의 `run_id`·`reprice_log_id`·`exclude_log_id`를 확인한다.
+2. **매입가·판매가**(3단계) — `reprice_log_id`가 가리키는
+   `admin_operator_activity_logs` 행의 `detail->'before'`(상품별 `{pc, purchase,
+   sale, locked_sale}` 스냅샷)를 순회하며 `products.purchase_price`·`sale_price`를
+   복원하고 `product_price_history`에 `reason='mall_daily_sync_reprice_undo'`로
+   역방향 행을 남긴다 — `api/admin_price_import.undo()`(ADM-PRC-040, `/api/admin/
+   price-import/undo/{log_id}`와 같은 모양, 다만 그 엔드포인트는 `supplier_price_files`
+   기반이라 이 log_id를 직접 받지 않는다 — **지금은 이 되돌림이 API로 노출돼 있지
+   않다**, DBA가 같은 패턴의 SQL로 손으로 수행한다. 도구화는 이번 작업 범위 밖이다).
+3. **후보 제외**(4단계) — `exclude_log_id`가 가리키는 로그의 `detail->'before'`
+   (상품별 `{pc, part_type, locked_fields, ai_candidate_yn}` 스냅샷)를 순회하며
+   `products.ai_candidate_yn`·`locked_fields`를 함께 원복한다(값만 되돌리고 잠금이
+   남으면 다음 실행이 영영 못 채운다 — A-115와 같은 규칙). 끝나면
+   `action='mall_daily_sync_exclude_no_supplier_undo'`로
+   `detail={"ref_log_id":<exclude_log_id>,"restored":N}` 되돌림 로그를 새로 남긴다
+   (같은 `ref_log_id`로 이미 되돌린 기록이 있으면 중단 — 중복 실행 방지, A-115·A-116과
+   같은 안전장치).
+
+`mall_sync_runs` 행 자체는 지우지 않는다 — "그날 실행이 있었다"는 사실은 되돌려도
+남는다(원장 규약).
+
+### 실패 확인
+
+`popcorn-mall-sync.service`에도 `OnFailure=`가 걸려 있다(위 「실패 알림」 절과 같은
+메커니즘, 이 unit은 템플릿이 아니라 `%n`을 그대로 쓴다 — 파일 안 주석 참조). 실패하면
+**텔레그램으로도** 오고, **대시보드에도** 뜬다(둘은 서로 다른 실패 정의를 쓸 수 있다
+— 텔레그램은 "systemd 가 실패로 판정"[비정상 종료 코드], 대시보드는 `mall_daily_sync.py`
+자신이 "세션 만료·0건 수집"처럼 **정상 종료(exit 1)로 명시적으로 실패를 기록한 것**도
+포함한다 — 예를 들어 `_abort_reason()`이 잡는 경우들은 프로세스가 깔끔하게 종료돼도
+대시보드에는 실패로 남는다).
+
+### 안전하게 실패를 흉내 내는 법 — 진짜 수집 unit은 건드리지 않는다
+
+① **세션 만료를 실제로 재현**: `/etc/popcorn-ai.env`의 `MALL_ADMIN_COOKIE`를
+임시로 무효한 값(예: 마지막 몇 글자를 바꾼 값)으로 바꾼 뒤 드라이런을 돌린다 —
+`tools/mall_supplier_fetch.py`의 `LoginRequired` 감지가 즉시 걸리고
+`tools/mall_daily_sync.py`가 3·4단계를 건너뛰는지, 대시보드가 "세션 만료" 문구를
+보여주는지(`--apply`로 돌렸을 때) 확인한다. 확인 후 **반드시 원래 값으로 되돌린다**
+(진짜 자동 실행이 이 값으로 밤새 실패하지 않도록).
+
+② **큰 변동 보류를 실제로 재현**: `MALL_SYNC_BIG_SWING_RATIO`를 1에 가깝게
+(예: `1.01`) 잠깐 낮춰 드라이런을 돌리면, 실제로는 정상 범위인 가격 변동도 대부분
+보류 목록에 걸린다 — "그 건만 보류되고 나머지는 정상 반영되는지"(값을 준 건 전부가
+아니라 조건에 걸린 건만 보류)를 확인하는 데 쓴다. 이 값은 서버 `/etc/popcorn-ai.env`
+에 영구히 두지 않는다(진짜 실행에서 정상 변동까지 전부 보류되면 자동화의 의미가
+없어진다) — 손으로 한 번 돌릴 때만 임시로 준다:
+
+```bash
+sudo -u popcorn MALL_SYNC_BIG_SWING_RATIO=1.01 \
+  /srv/popcorn-ai/.venv/bin/python /srv/popcorn-ai/tools/mall_daily_sync.py --limit 50
+```
+
 ## 남아 있는 위험 (베타에서 감수하는 것 · 정직 기록)
 
 | 위험 | 지금 상태 | 해소 조건 |

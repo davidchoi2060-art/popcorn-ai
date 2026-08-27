@@ -198,6 +198,20 @@
       </span>
     </div>
 
+    {#
+      몰 공급처·가격 자동 갱신(tools/mall_daily_sync.py, 새벽 systemd timer · 배포
+      서버) — 2026-08-27 사장님 확인: 이 배치 결과는 작업 현황판이 아니라 이
+      대시보드가 유일한 표시 자리다. 위 "오늘의 흐름"과 같은 dash-flow 틀을 그대로
+      재사용한다(새 CSS 없음 — .stock .badge ok/warn/error 는 이미 있다).
+    #}
+    <div class="dash-flow" title="{{ mall_sync.reason or '' }}">
+      <span class="lbl">몰 공급처·가격</span>
+      <span class="stock">
+        <span class="lbl2">자동 갱신</span>
+        <span class="badge {{ mall_sync.status }}">{{ mall_sync.text }}</span>
+      </span>
+    </div>
+
     <div class="dash-row3">
       <div class="dash-panel">
         <div class="hd" title="{{ quality.scope_note or '' }}">

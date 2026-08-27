@@ -190,16 +190,27 @@ def _looks_like_login_redirect(raw: bytes) -> bool:
     return "location.replace" in krtxt and "로그인" in krtxt
 
 
-def fetch(pd_no: int, cookie: str, cache_only: bool = False):
+def fetch(pd_no: int, cookie: str, cache_only: bool = False, refetch: bool = False):
     """캐시 우선. 없으면 1회 요청 -> (html, fetched_at, from_cache).
 
     cache_only=True면 네트워크를 아예 쓰지 않는다(--from-cache) -- 캐시에 없으면
     (None, None, False).
+
+    refetch=True면 캐시 파일이 있어도 무시하고 다시 요청해 덮어쓴다.
+    ⚠ 2026-08-27 결함 수정(tools/mall_daily_sync.py 를 짜다 발견) -- 이 함수는 전부터
+    `refetch` 매개변수 자체가 없었다. 호출부 run()은 `--refetch` 플래그로 `need_network`
+    라는 변수를 계산해 놓고도(쿠키를 미리 물어야 하는지 판단하는 데만 썼다) 정작
+    이 함수를 부를 때는 그 값을 넘기지 않았다 -- 그래서 캐시 파일이 한 번 생기면
+    `--refetch` 를 줘도 **영원히 그 파일을 그대로 돌려줬다.** 몰 가격은 매일 바뀌는데
+    자동화가 매일 새벽 어제와 똑같은 캐시만 읽으면 "자동 반영"이 "어제 값 재반영"이
+    된다 -- 이 자동화의 존재 이유 자체가 무너지는 결함이라 여기서 고친다(engine·엔진
+    로직이 아니라 이 CLI 전용 파일이라 CANON 의 "api/ 아래는 건드리지 않는다"와도
+    무관하고, 이번 지시서가 "고칠 것이 있으면"이라고 명시적으로 허용했다).
     로그인 리다이렉트로 보이면 LoginRequired -- 호출부가 전체 수집을 멈춘다.
     """
     os.makedirs(CACHE, exist_ok=True)
     p = os.path.join(CACHE, f"{pd_no}.html")
-    if os.path.exists(p):
+    if os.path.exists(p) and not refetch:
         observed = datetime.fromtimestamp(os.path.getmtime(p))
         return io.open(p, encoding="utf-8").read(), observed, True
     if cache_only:
@@ -331,7 +342,14 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
     stats = {
         "target": len(codes), "cached": 0, "fetched": 0, "fetch_fail": 0,
         "from_file": 0, "from_file_missing": 0, "from_file_login_like": 0,
-        "login_abort": False, "rows_total": 0, "state_unknown": 0, "price_mismatch": 0,
+        "login_abort": False,
+        # 연속 실패로 순환중단(MAX_FAIL)에 걸려 «목표를 다 돌지 못하고» 멈췄는가.
+        # 2026-08-27 신설(tools/mall_daily_sync.py 필요) -- 예전엔 이 상태를 콘솔에
+        # 문자열로만 찍고 stats 에는 아무 표시가 없어, 호출부가 "부분 수집으로
+        # 멈췄다"를 프로그램적으로 알 방법이 없었다(사람이 로그를 읽어야만 알았다).
+        # 자동화는 로그를 안 읽으므로 이 값으로 판정한다.
+        "circuit_break_abort": False,
+        "rows_total": 0, "state_unknown": 0, "price_mismatch": 0,
         "psp_insert": 0, "psp_update": 0,
         "contact_filled": 0, "contact_would_fill": 0, "contact_conflict": [],
         "supplier_matched": set(), "supplier_unmatched": {},
@@ -368,7 +386,7 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
                 if need_network and not cache_only and cookie_val is None:
                     cookie_val = _cookie_header()   # 필요할 때만 요구 -- 전량 캐시 히트면 필요 없다
                 html, observed, from_cache = fetch(
-                    pd_no, cookie_val or "", cache_only=cache_only)
+                    pd_no, cookie_val or "", cache_only=cache_only, refetch=refetch)
             except LoginRequired as e:
                 remaining = len(codes) - n
                 print(f"\n중단: {e} -- 이후 {remaining}건을 시도하지 않았습니다.")
@@ -387,6 +405,7 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
                 done[key] = {"status": "fetch_fail", "ts": datetime.now().isoformat()}
                 if consec_fail >= MAX_FAIL:
                     print(f"\n중단: 연속 실패 {consec_fail}건 -- 차단이 의심됩니다")
+                    stats["circuit_break_abort"] = True
                     break
                 continue
             consec_fail = 0

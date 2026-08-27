@@ -1,0 +1,81 @@
+# 팝콘PC AI — 몰 공급처·가격 일일 자동 반영 (2026-08-27 신설, 사장님 지시)
+#
+# 매일 새벽 한 번 tools/mall_daily_sync.py --apply 를 돈다. 그 스크립트가 하는 일
+# (순서대로):
+#   1) 추천 후보 상품 목록(v_recommendation_candidates)
+#   2) 그 상품들을 /adm_cate/product_com_list.php?pd_no= 에서 1.5초 간격으로 읽어
+#      product_supplier_prices·suppliers 에 반영(tools/mall_supplier_fetch.py)
+#   3) 「가능」 공급처 최저가로 products.purchase_price 갱신 + 판매가 재계산
+#      (api/admin_price_import._reprice)
+#   4) 전 공급처가 품절인 상품을 추천 후보에서 제외(ai_candidate_yn=false)
+#
+# 어제(2026-08-26)까지는 3·4단계를 사람이 DBA 스크래치패드로 손으로 했다(decision-log
+# A-115·A-116). 이 unit 이 그것을 매일 자동으로 반복한다.
+#
+# 이 unit 은 템플릿(@)이 아니라 단일 서비스다 — fast/slow 로 나눌 이유가 없다(몰
+# 공급처는 하나의 창구뿐이고 부품별로 주기를 가를 근거가 없다, popcorn-danawa-market@
+# 와는 다른 성격).
+#
+# 이 unit 자체를 systemctl enable 하지 않는다(그래서 [Install] 이 없다) — 활성화는
+# popcorn-mall-sync.timer 가 담당한다. 설치·검증·되돌리는 절차는 deploy/README.md
+# 「몰 공급처·가격 일일 자동 반영」 참조.
+#
+# 실패 알림 — 이 unit 은 «템플릿이 아니다»(이름에 '@' 가 없다) — 그래서
+# popcorn-notify-failure@.service 문서 자신이 명시한 안전한 경우("그 unit 이 템플릿이
+# 아니면 OnFailure=popcorn-notify-failure@%n.service 를 그대로 써도 된다 — %n 은
+# 이미 완전한 이름이고 '@' 충돌이 없다")에 그대로 해당한다. popcorn-danawa-market@
+# 처럼 %p-%i 로 바꿔 넘길 필요가 없다 — A-112 가 잡은 함정(OnFailure=...@%n 에서
+# '@' 가 두 번 들어가는 것)은 실패하는 unit 자신이 이미 템플릿 인스턴스일 때만
+# 생긴다. 여기서는 %n 이 그대로 "popcorn-mall-sync.service"이므로 안전하다.
+
+[Unit]
+Description=팝콘PC AI 몰 공급처·가격 일일 자동 반영
+Documentation=file:///srv/popcorn-ai/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+OnFailure=popcorn-notify-failure@%n.service
+
+[Service]
+Type=oneshot
+User=popcorn
+Group=popcorn
+WorkingDirectory=/srv/popcorn-ai
+
+# 비밀값은 이 파일에 쓰지 않는다 — /etc/popcorn-ai.env(권한 640, root:popcorn)에서 읽는다.
+# 필요한 키: DATABASE_URL(이미 있음) · MALL_ADMIN_COOKIE(이번에 새로 추가해야 한다 —
+# 절차는 deploy/README.md 「몰 공급처·가격 일일 자동 반영」 §쿠키 참조. 값을 다루는
+# 것은 사장님·하네스 몫이고 이 파일은 이름만 참조한다).
+EnvironmentFile=/etc/popcorn-ai.env
+
+# ── 시작 타임아웃 ────────────────────────────────────────────────────────
+# 2026-08-27 기준 추천 후보(1단계 대상)는 약 2,726건(decision-log A-115 적용 후
+# 실측)이고, 2단계는 요청 간격 1.5초로 순차 수집한다(tools/mall_supplier_fetch.DELAY,
+# A-18 규약과 동일). 2,726 * 1.5초 ≈ 68분 — 3·4단계(DB 조회·UPDATE만, 네트워크 없음)
+# 는 그에 비해 무시할 수준이다. 아래 값(4시간)은:
+#   · 실측(68분)의 약 3.5배 여유
+#   · --limit 을 안 주므로(기본 전체) 카탈로그가 늘면 대상도 늘어난다 — 14,400초 /
+#     1.5초 ≈ 9,600건까지는 이 타임아웃 안에서 끝난다(현재의 약 3.5배 규모까지 여유)
+#   · popcorn-danawa-market@.service 의 타임아웃 산정 방식(실측치의 3~8배)과 같은
+#     기준을 적용했다
+# 타임아웃에 걸려도 journald 에 실패로 남고 OnFailure= 가 알린다 — 조용히 사라지지 않는다.
+TimeoutStartSec=14400
+
+ExecStart=/srv/popcorn-ai/.venv/bin/python /srv/popcorn-ai/tools/mall_daily_sync.py --apply
+
+Environment=PYTHONIOENCODING=utf-8
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=popcorn-mall-sync
+
+# 최소 권한 — popcorn-api.service·popcorn-danawa-market@.service 와 같은 프로파일.
+# 이 도구가 파일시스템에 쓰는 유일한 자리는 .cache/mall_supplier/
+# (tools/mall_supplier_fetch.py 의 CACHE, 몰 원문 HTML 캐시) — 그래서
+# ReadWritePaths 도 그 한 곳뿐이다. 정본(product_supplier_prices·products·
+# admin_operator_activity_logs·mall_sync_runs)에 대한 쓰기는 전부 DATABASE_URL 을
+# 통한 네트워크 쓰기(Cloud SQL)라 ProtectSystem=strict 의 파일시스템 잠금과 무관하다.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/popcorn-ai/.cache

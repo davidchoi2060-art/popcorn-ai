@@ -88,6 +88,11 @@ from .admin_dashboard import (
     quote_quality as _quote_quality_data,
     funnel as _funnel_data,
     worklist as _worklist_data,
+    # 다른 넷과 같은 관례 — 인자 없이 자기 커넥션을 여는 라우트 함수 쪽을 부른다.
+    # `mall_sync_status(conn)` 자체는 conn 을 받는 헬퍼라 _safe(label, fn) 의
+    # "fn()" 호출 관례(무인자)와 안 맞는다 — admin_dashboard.pending_counts(conn)와
+    # dashboard()의 관계와 같은 짝이다.
+    mall_sync_status_route as _mall_sync_status_data,
 )
 from .auth import resolve_session, COOKIE
 from .timeutil import KST
@@ -234,6 +239,76 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
     return {"consult": consult, "quoted": quoted, "drop_fmt": drop_fmt, "stock": stock}
 
 
+def _mall_sync_view(st: dict | None, err) -> dict:
+    """몰 공급처·가격 자동 갱신(tools/mall_daily_sync.py) — 가장 최근 실행 한 줄.
+
+    2026-08-27 사장님 확인: 이 배치의 결과는 작업 현황판이 아니라 **이 대시보드**가
+    유일한 표시 자리다(배치가 배포 서버에서 돌아 로컬 세션 전사본에 안 닿는다).
+    그래서 여기서 "언제 · 성공/실패 · 건수"를 한 줄로 낸다 — 지시서가 준 문구
+    형태(성공/실패/미실행 세 예시)를 그대로 따른다.
+
+    상태 배지는 기존 "재고 정합" 자리가 쓰던 ok/warn/error 셋을 그대로 재사용한다
+    (dash-flow .stock .badge — home.html.j2, 새 CSS를 만들지 않는다). 다만 그 셋의
+    의미를 이 자리에 맞게 다시 정한다:
+      ok    최근 실행이 성공했고 24h+6h(MALL_SYNC_STALE_HOURS) 안에 시작됐다 — 조용히.
+      warn  실패했거나(신선도 무관 — 실패는 항상 눈에 띄어야 한다) 성공은 했지만
+            오래 안 돌았다("하루 넘게 안 돌았으면 그것도 경고로") — 진행 중인데
+            너무 오래 걸리는 것도 여기 포함(stalled).
+      error 아직 한 번도 실행된 적이 없다(표는 있지만 행이 0) 또는 조회 자체가
+            실패했다(마이그레이션 미적용 등 — err 인자로 들어온다).
+    """
+    if st is None:
+        return {"status": "error", "text": "몰 갱신 상태를 불러오지 못했습니다",
+                "reason": err}
+
+    if st["state"] == "never":
+        return {"status": "error", "text": "몰 갱신 — 아직 실행된 적 없습니다",
+                "reason": "mall_sync_runs 에 실행 기록이 없습니다"
+                          "(타이머가 아직 등록 전이거나 첫 실행 전일 수 있습니다)"}
+
+    when = "—"
+    if st.get("started_at"):
+        try:
+            when = datetime.fromisoformat(st["started_at"]).astimezone(KST).strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            when = "—"
+
+    if st["state"] == "running":
+        return {"status": "ok", "text": f"몰 갱신 실행 중 — {when} 시작",
+                "reason": None}
+
+    if st["state"] == "stalled":
+        return {"status": "warn",
+                "text": f"⚠ 몰 갱신 — {when} 시작 후 {st['age_hours']:.0f}시간째 응답이 없습니다",
+                "reason": "실행이 끝나지 않았거나(오래 걸리는 중) 타이머가 멈췄을 수 있습니다"
+                          " — 서버에서 journalctl -u popcorn-mall-sync.service 로 확인하세요"}
+
+    if st["state"] == "fail":
+        reason = st.get("fail_reason") or "사유가 기록되지 않았습니다"
+        return {"status": "warn", "text": f"⚠ 몰 갱신 실패({when}) — {reason}",
+                "reason": reason}
+
+    # ok 또는 stale_ok — 성공한 마지막 실행의 건수를 그대로 보여준다. 0건도 값이다
+    # (측정했는데 0인 것과 못 잰 것은 다르다 — count 가 None 일 때만 생략한다).
+    parts = []
+    if st.get("collected_count") is not None:
+        parts.append(f"수집 {st['collected_count']:,}건")
+    if st.get("price_changed_count") is not None:
+        parts.append(f"가격 {st['price_changed_count']:,}건 변경")
+    if st.get("held_count") is not None:
+        parts.append(f"보류 {st['held_count']:,}건")
+    if st.get("excluded_count") is not None:
+        parts.append(f"후보 제외 {st['excluded_count']:,}건")
+    body = " · ".join(parts)
+    text_ = f"몰 갱신 {when}" + (f" — {body}" if body else "")
+
+    if st["state"] == "stale_ok":
+        return {"status": "warn",
+                "text": f"⚠ {text_} (마지막 실행 후 {st['age_hours']:.0f}시간 경과)",
+                "reason": "새벽 타이머가 하루 넘게 돌지 않았습니다 — 서버 타이머 상태를 확인하세요"}
+    return {"status": "ok", "text": text_, "reason": None}
+
+
 def _quality_view(quality: dict | None, err) -> dict:
     if quality is None:
         return {"status": "error", "reason": err, "modes": []}
@@ -315,9 +390,10 @@ def home(request: Request) -> HTMLResponse:
     quality, err_quality = _safe("견적 품질 · 재고 정합", _quote_quality_data)
     fn, err_funnel = _safe("유입 깔때기", _funnel_data)
     wl, err_worklist = _safe("지금 할 일", _worklist_data)
+    mall_sync, err_mall_sync = _safe("몰 갱신 상태", _mall_sync_status_data)
 
     work_items, active_total = _work_items(wl)
-    errors = [e for e in (err_dash, err_quality, err_funnel, err_worklist) if e]
+    errors = [e for e in (err_dash, err_quality, err_funnel, err_worklist, err_mall_sync) if e]
 
     return render(
         request, "admin/home.html.j2",
@@ -333,4 +409,5 @@ def home(request: Request) -> HTMLResponse:
         funnel_steps=_funnel_view(fn, err_funnel),
         logs=_recent_logs(dash),
         dash_error=err_dash,
+        mall_sync=_mall_sync_view(mall_sync, err_mall_sync),
     )
