@@ -294,7 +294,9 @@
     var usel=$('wr-f-urgency');
     (x.d.urgencies||[]).forEach(function(u){var op=document.createElement('option');op.value=u;op.textContent=u;usel.appendChild(op);});
     var cp=x.d.capture_policy||{};
-    $('wr-capture-title').textContent='한도 '+(cp.max_kb||'—')+'KB · 붙여넣기(Ctrl+V)로 올린다';
+    // max_kb 도 stale_days 와 같은 falsy 0 버그 자리였다(`CAPTURE_MAX_BYTES` 를
+    // 1024 미만으로 설정하면 정수 나눗셈으로 0 이 나온다) — 같은 수정, 같은 관례.
+    $('wr-capture-title').textContent='한도 '+(cp.max_kb!=null?cp.max_kb:'—')+'KB · 붙여넣기(Ctrl+V)로 올린다';
     $('wr-capture-body').textContent=(cp.allowed_label||'')+' 만 · 형식은 파일 앞머리로 판정 · SVG 는 등록할 수 없다.'
      +(x.d.harness_notify&&!x.d.harness_notify.configured?' '+x.d.harness_notify.note:'');
    }).catch(function(){say('err','설정을 불러오지 못했다 — 서버에 연결하지 못했다.');});}
@@ -384,7 +386,11 @@
      ?'직원은 자기가 올린 것만 본다 — 남의 요청은 목록에 나오지 않는다.'
      :'사장님은 전체를 본다.';
     var st=x.d.stale_total||0;
-    var days=(state.meta&&state.meta.stale_days)||'—';
+    // stale_days 는 서버 설정값(기본 3)이라 0 도 유효하다 — `||` 로 기본값을
+    // 주면 0 이 falsy 라 '—'로 떨어진다(방치 기준일이 0일인데 "—일 넘게
+    // 방치됐다"로 보임, 2026-08-27 falsy 0 버그 수정). `!= null` 판정은 이 파일
+    // 다른 자리(예: cardMeta 의 idle_days>0, 아래 meta 배열)가 이미 쓰는 관례다.
+    var days=(state.meta&&state.meta.stale_days!=null)?state.meta.stale_days:'—';
     $('wr-stale-banner').textContent=st>0
      ?(st+'건이 '+days+'일 넘게 방치됐다 — 조용히 묻히면 직원이 다시 올리지 않는다')
      :'방치된 요청이 없다';
@@ -465,6 +471,10 @@
    $('wr-approve-btn').title=(d.status!=='결재대기')?'결재대기 상태에서만 승인할 수 있다':'';
    var canDecide=!closed;
    $('wr-reject-open').disabled=!canDecide;$('wr-hold-open').disabled=!canDecide;
+   // 죽은 코드 아님(2026-08-27 재검토) — Jinja 는 이 제목을 페이지 로드 시 «한 번»만
+   // '사장님 결재'로 렌더한다(위 owner 블록). 이 줄은 요청을 열 때마다(renderDetail)
+   // 다시 돌아 「결재대기」면 접미사를 붙이고, 아니면 접미사 없는 원래 문구로 되돌린다 —
+   // else 분기를 지우면 결재대기 건을 본 다음 다른 건을 열어도 접미사가 남는다.
    $('wr-decision-title').textContent=d.status==='결재대기'?'사장님 결재 — 결재대기':'사장님 결재';
    if(closed)decisionBox.hidden=true;
    $('wr-reject-form').setAttribute('data-open','0');
@@ -535,6 +545,18 @@
  // $(id).addEventListener(...) 를 가드 없이 부르면 TypeError 로 스크립트 전체가 죽는다
  // (아래에서 이 IIFE 마지막 줄 loadMeta().then(loadList) 까지 실행되지 못한다). 그래서
  // 이 구역 전체를 두 노드 존재 여부로 한 번에 가른다.
+ //
+ // 이 섹션 제목 주석을 아래 if(...) «안»으로 옮겨도 operator 세션의 원문 HTML 에서
+ // 사라지지 않는다(2026-08-27 재검토) — 이 <script> 블록 전체가 Jinja 의 is_owner
+ // 조건문(위 owner 전용 div 둘을 감싸는 것)으로 감싸여 있지 않고 페이지마다 그대로
+ // 전송되므로, JS 런타임 조건문 안이든 밖이든
+ // «주석 텍스트 자체»는 이미 응답 바이트에 포함돼 있다(HTML 위 두 div 와 달리, 이
+ // <script> 는 role 에 따라 렌더를 다르게 하지 않는다). 실제로 감추려면 이 블록
+ // 전체를 새 Jinja 조건으로 한 번 더 감싸야 하는데, 그건 «주석 위치 이동»이 아니라
+ // 구조 변경이고, 이 화면이 최근에 owner 가드를 잘못 다뤄 전체가 멈췄던 전례가 있어
+ // (파일 상단 이력 참조) 위생 목적만으로 손대지 않는다. 그래서 제목 주석은 그대로
+ // 둔다 — 바로 아래 코드 블록 전체를 설명하는 자리이므로 원래 위치가 더 맞다(이
+ // 파일의 다른 섹션 주석들도 전부 코드 «앞»에 붙는다).
  if($('wr-verdict-box')&&$('wr-decision-box')){
   $('wr-verdict-step1').addEventListener('click',function(e){
    var b=e.target.closest('[data-verdict]');if(!b||!state.picked)return;
