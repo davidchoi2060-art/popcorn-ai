@@ -62,6 +62,11 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 var ORDERS=[];
 var STEPS=['결제 완료','조립·검사','출고·배송','배송 완료'];
 var cur='all', sel=null, LIVE=false;
+/* 이 화면은 /api/my/orders 가 준 상품명(o.items[][1])·인계 상태 문구(o.hstatus)·환불
+   사유(o.refund.reason)·몰 확인 링크(mallUrl)처럼 서버(카탈로그·회원 입력)를 거쳐 온
+   텍스트를 innerHTML 에 여러 곳에서 심는다 — s0-landing.html 과 같은 5글자(& < > " ')
+   버전. 속성값(href="...","data-o="...")에도 안전하다(2026-08-27 상품명 이스케이프 감사). */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function kindOf(st){return (st==='조립중'||st==='결제완료'||st==='취소')?'주문 취소':(st==='완료'?'반품·교환':'환불');}
 var won=function(n){return n.toLocaleString()+'원';};
 function chBadge(ch){return ch==='own'?'<span style="background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">자체</span>':'<span style="background:#f2edfb;color:#4a2a94;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">쇼핑몰 인계</span>';}
@@ -85,10 +90,12 @@ function matches(o){
 }
 // ---- 주문 카드(기존 그대로 — 문자열 변경 없음) ----
 function renderOrderCard(o){
- return '<div class="card" data-o="'+o.no+'" style="cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">'
+ /* o.no 는 data-o 속성값으로도 쓰이므로(따옴표 이스케이프가 필요한 문맥) esc() 를
+    거친다. o.items[0][1] 은 주문에 담긴 첫 부품의 상품명(카탈로그 원문)이다. */
+ return '<div class="card" data-o="'+esc(o.no)+'" style="cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">'
    +'<div style="flex:1;min-width:220px;">'
-   +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><b style="font-size:14.5px;color:#17171b;">'+o.no+'</b>'+chBadge(o.channel)+stBadge(o)+'</div>'
-   +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+' · '+o.items[0][1].slice(0,34)+(o.items.length>1?' 외':'')+'</div></div>'
+   +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><b style="font-size:14.5px;color:#17171b;">'+esc(o.no)+'</b>'+chBadge(o.channel)+stBadge(o)+'</div>'
+   +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+' · '+esc(o.items[0][1].slice(0,34))+(o.items.length>1?' 외':'')+'</div></div>'
    +'<b style="font-size:16px;color:#17171b;">'+won(o.total)+'</b>'
    +'<span class="msym" style="font-size:20px;color:#c9c5bd;">chevron_right</span></div>';
 }
@@ -102,13 +109,16 @@ function renderHandoffCard(o){
  if(o.itemCount!=null)metaBits.push('부품 '+o.itemCount+'종');
  if(o.hstatus)metaBits.push(o.hstatus);
  var meta=(metaBits.length?metaBits.join(' · '):'상세 정보 없음')+' — 상태·배송·환불 없음';
+ /* mallUrl 은 href 속성값이라 esc() 로 따옴표까지 걷어야 한다(URL 안의 &도 &amp;로
+    바꿔야 유효한 HTML 속성이다 — 흔한 관례). o.no·meta(hstatus 등 서버 텍스트 포함)도
+    같은 이유로 esc() 한다. */
  var mallBtn=o.mallUrl
-  ?'<a class="btn2" href="'+o.mallUrl+'" target="_blank" rel="noopener" style="font-size:12px;padding:7px 12px;">쇼핑몰에서 확인<span class="msym" style="font-size:14px;">link</span></a>'
+  ?'<a class="btn2" href="'+esc(o.mallUrl)+'" target="_blank" rel="noopener" style="font-size:12px;padding:7px 12px;">쇼핑몰에서 확인<span class="msym" style="font-size:14px;">link</span></a>'
   :'<span style="font-size:11.5px;color:#a29d92;font-weight:600;">팝콘PC 쇼핑몰에서 확인하실 수 있습니다</span>';
  return '<div class="card" style="background:#faf8fd;border-color:#e6def5;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">'
   +'<div style="flex:1;min-width:220px;">'
-  +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;"><b style="font-size:14.5px;color:#17171b;">'+(o.no||'인계 기록')+'</b><span style="background:#f2edfb;color:#4a2a94;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">쇼핑몰 인계 · 견적</span></div>'
-  +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+meta+'</div></div>'
+  +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;"><b style="font-size:14.5px;color:#17171b;">'+esc(o.no||'인계 기록')+'</b><span style="background:#f2edfb;color:#4a2a94;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;">쇼핑몰 인계 · 견적</span></div>'
+  +'<div style="font-size:12.5px;color:#8a8578;font-weight:600;">'+esc(meta)+'</div></div>'
   +(o.total!=null?'<b style="font-size:16px;color:#17171b;">'+won(o.total)+'</b>':'')
   +mallBtn
   +'</div>';
@@ -132,29 +142,37 @@ function renderDetail(){
   return '<div style="flex:1;text-align:center;"><div style="width:24px;height:24px;border-radius:50%;margin:0 auto 5px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;'+(onS?'background:#2b5fd9;color:#fff;':'background:#eee9df;color:#a29d92;')+'">'+(i+1)+'</div><span style="font-size:11.5px;font-weight:700;'+(onS?'color:#17171b;':'color:#b5b0a4;')+'">'+s+'</span></div>'+(i<3?'<div style="flex:0.6;height:2px;background:'+(i<o.step-1?'#2b5fd9':'#e6e2da')+';margin-top:-16px;"></div>':'');
  }).join('')+'</div>';
  var rows=o.items.map(function(it){
-  return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #f0eee9;"><span style="flex:0 0 96px;font-size:11.5px;font-weight:800;color:#8a8578;">'+it[0]+'</span><div style="flex:1;font-size:13.5px;font-weight:700;color:#17171b;">'+it[1]+'</div><b style="font-size:13.5px;color:#17171b;">'+won(it[2])+'</b></div>';
+  return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #f0eee9;"><span style="flex:0 0 96px;font-size:11.5px;font-weight:800;color:#8a8578;">'+esc(it[0])+'</span><div style="flex:1;font-size:13.5px;font-weight:700;color:#17171b;">'+esc(it[1])+'</div><b style="font-size:13.5px;color:#17171b;">'+won(it[2])+'</b></div>';
  }).join('');
  var rIdx=o.refund?['접수','검토','수거·처리','완료'].indexOf(o.refund.status||'접수'):0;
  var rChips=(o.refund&&rIdx<0)
   ?'<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:#b31b25;color:#fff;">반려됨</span><span style="font-size:11.5px;color:#a15055;font-weight:600;align-self:center;">— 필요하시면 다시 접수할 수 있어요</span>'
   :['접수','검토','수거·처리','완료'].map(function(s,i){return '<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;'+(i===rIdx?'background:#b31b25;color:#fff;':'background:#fff;color:#a15055;')+'">'+s+'</span>';}).join('');
- var refundBlock=o.refund?'<div class="card" style="background:#fbecec;border-color:#f0cfd1;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="msym" style="font-size:19px;color:#b31b25;">assignment_return</span><b style="font-size:14px;color:#8a1f22;">'+o.refund.kind+' 접수 '+o.refund.no+'</b><span style="font-size:12px;color:#a15055;font-weight:700;">· '+o.refund.reason+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+rChips+'</div><p style="margin:8px 0 0;font-size:12px;color:#a15055;font-weight:600;">'+o.refund.modeNote+'</p></div>':'';
+ /* o.refund.kind·modeNote 는 이 파일의 kindOf()/noteOfMode() 가 만드는 고정 문구라
+    손대지 않는다. o.refund.no(환불 접수번호)·reason(POST /api/my/refunds 로 보낸
+    reason_type 을 서버가 그대로 되돌려 준 값)은 서버 왕복 텍스트라 esc() 한다. */
+ var refundBlock=o.refund?'<div class="card" style="background:#fbecec;border-color:#f0cfd1;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="msym" style="font-size:19px;color:#b31b25;">assignment_return</span><b style="font-size:14px;color:#8a1f22;">'+o.refund.kind+' 접수 '+esc(o.refund.no)+'</b><span style="font-size:12px;color:#a15055;font-weight:700;">· '+esc(o.refund.reason)+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+rChips+'</div><p style="margin:8px 0 0;font-size:12px;color:#a15055;font-weight:600;">'+o.refund.modeNote+'</p></div>':'';
  var actions='';
  if(!o.refund||o.refund.status==='반려'){
   var kind=kindOf(o.status);
   actions='<button class="btn2" id="d-refund" style="color:#8a1f22;border-color:#e8c9cb;">'+kind+' 접수</button>';
  }
+ /* o.no(제목)·o.pay.method/state/at·o.ship.carrier/no 는 결제·배송 원장을 거쳐 온
+    텍스트다 — 대부분 우리 쪽 고정 상태값이지만 송장번호·결제수단처럼 외부(택배사·PG)
+    표기가 섞일 수 있는 필드까지 한 번에 걷는다(2026-08-27 감사, "서버를 거친 텍스트는
+    예외 없이"). o.status 는 stBadge()/actions 판단에도 쓰이는 내부 상태값(enum)이라
+    그대로 둔다. */
  document.getElementById('v-detail').innerHTML=
   '<a href="#!" id="d-back" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:800;color:#8a8578;text-decoration:none;margin-bottom:14px;"><span class="msym" style="font-size:17px;">arrow_back</span>주문 목록</a>'
   +refundBlock
   +'<div class="card" style="margin-bottom:14px;">'
-  +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;"><h2 style="margin:0;font-size:19px;font-weight:900;color:#17171b;">'+o.no+'</h2>'+chBadge(o.channel)+stBadge(o)+'<span style="margin-left:auto;font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+'</span></div>'
+  +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;"><h2 style="margin:0;font-size:19px;font-weight:900;color:#17171b;">'+esc(o.no)+'</h2>'+chBadge(o.channel)+stBadge(o)+'<span style="margin-left:auto;font-size:12.5px;color:#8a8578;font-weight:600;">'+o.date+'</span></div>'
   +steps+'</div>'
   +'<div class="card" style="margin-bottom:14px;"><h3 style="margin:0 0 6px;font-size:15px;font-weight:900;color:#17171b;">주문 구성 <span style="font-size:11.5px;font-weight:700;color:#6a3fbf;background:#f2edfb;padding:3px 9px;border-radius:999px;">주문 시점 스냅샷</span></h3><p style="margin:0 0 8px;font-size:12px;color:#8a8578;font-weight:600;">이후 가격이 변해도 이 주문에는 영향이 없습니다 — 그때 가격·사양 그대로 보존됩니다.</p>'+rows
   +'<div style="display:flex;justify-content:space-between;padding-top:12px;"><b style="font-size:14px;color:#8a8578;">총 결제금액</b><b style="font-size:17px;color:#17171b;">'+won(o.total)+'</b></div></div>'
   +'<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">'
-  +'<div class="card"><h3 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:7px;"><span class="msym" style="font-size:18px;color:#2b5fd9;">credit_card</span>결제</h3><div style="font-size:13px;color:#55555c;line-height:1.9;">'+o.pay.method+'<br>상태: <b style="color:#17171b;">'+o.pay.state+'</b> · '+o.pay.at+'</div><a href="my-payments.html" style="font-size:12.5px;font-weight:800;color:#2b5fd9;text-decoration:none;">결제 내역에서 보기 →</a></div>'
-  +'<div class="card"><h3 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:7px;"><span class="msym" style="font-size:18px;color:#2b5fd9;">local_shipping</span>배송</h3><div style="font-size:13px;color:#55555c;line-height:1.9;">'+(o.ship?(o.ship.carrier+'<br>송장 <b style="color:#17171b;">'+o.ship.no+'</b>'):'출고 전 — 조립·검사가 끝나면 송장이 등록됩니다.')+'</div></div>'
+  +'<div class="card"><h3 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:7px;"><span class="msym" style="font-size:18px;color:#2b5fd9;">credit_card</span>결제</h3><div style="font-size:13px;color:#55555c;line-height:1.9;">'+esc(o.pay.method)+'<br>상태: <b style="color:#17171b;">'+esc(o.pay.state)+'</b> · '+o.pay.at+'</div><a href="my-payments.html" style="font-size:12.5px;font-weight:800;color:#2b5fd9;text-decoration:none;">결제 내역에서 보기 →</a></div>'
+  +'<div class="card"><h3 style="margin:0 0 10px;font-size:14px;font-weight:900;color:#17171b;display:flex;align-items:center;gap:7px;"><span class="msym" style="font-size:18px;color:#2b5fd9;">local_shipping</span>배송</h3><div style="font-size:13px;color:#55555c;line-height:1.9;">'+(o.ship?(esc(o.ship.carrier)+'<br>송장 <b style="color:#17171b;">'+esc(o.ship.no)+'</b>'):'출고 전 — 조립·검사가 끝나면 송장이 등록됩니다.')+'</div></div>'
   +'</div>'
   +'<div style="display:flex;gap:10px;">'+actions+'<a class="btn2" href="s2-result.html">그때 견적서 다시 보기</a>'+(o.status==='완료'?'<a class="btnp" href="my-review-write.html?order='+encodeURIComponent(o.no)+'">후기 쓰기</a>':'')+'</div>';
  document.getElementById('d-back').onclick=function(e){e.preventDefault();renderList();show('v-list');};
@@ -172,7 +190,7 @@ function renderRefund(){
  var REASONS=['단순 변심','초기 불량','오배송·구성 오류','기타'];
  document.getElementById('v-refund').innerHTML=
   '<a href="#!" id="r-back" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:800;color:#8a8578;text-decoration:none;margin-bottom:14px;"><span class="msym" style="font-size:17px;">arrow_back</span>주문 상세</a>'
-  +'<div class="card" style="margin-bottom:14px;"><h2 style="margin:0 0 4px;font-size:19px;font-weight:900;color:#17171b;">'+kind+' 접수</h2><p style="margin:0;font-size:13px;color:#8a8578;font-weight:600;">'+o.no+' · '+won(o.total)+' · '+o.date+'</p></div>'
+  +'<div class="card" style="margin-bottom:14px;"><h2 style="margin:0 0 4px;font-size:19px;font-weight:900;color:#17171b;">'+kind+' 접수</h2><p style="margin:0;font-size:13px;color:#8a8578;font-weight:600;">'+esc(o.no)+' · '+won(o.total)+' · '+o.date+'</p></div>'
   +'<div class="card" style="margin-bottom:14px;"><h3 style="margin:0 0 12px;font-size:14.5px;font-weight:900;color:#17171b;">사유를 선택해 주세요</h3><div id="r-reasons" style="display:flex;gap:8px;flex-wrap:wrap;">'+REASONS.map(function(r){return '<span class="chip" data-r="'+r+'">'+r+'</span>';}).join('')+'</div>'
   +'<textarea id="r-note" placeholder="상세 내용 (선택)" style="width:100%;margin-top:12px;padding:12px 14px;border:1.5px solid #e6e2da;border-radius:11px;font-size:13.5px;font-family:inherit;outline:none;min-height:70px;resize:vertical;"></textarea></div>'
   +'<div class="card" style="background:#fbf3e2;border-color:#e6c98f;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;"><span class="msym" style="font-size:19px;color:#8a561a;flex:none;">info</span><p style="margin:0;font-size:12.5px;color:#8a561a;line-height:1.65;font-weight:600;">'+modeNote+'<br><span style="color:#a58044;">'+(kind==='주문 취소'?'조립 착수 전 취소는 전액 환불됩니다. 예약된 재고(hold)는 즉시 해제됩니다.':'수령 7일 이내 불량은 교환·환불 왕복 배송비를 팝콘PC가 부담합니다(로젠택배 이용 시). 7일 이후 단순 변심 교환·반품은 왕복 배송비를 고객이 부담합니다.')+'</span></p></div>'

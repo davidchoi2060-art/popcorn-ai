@@ -260,6 +260,14 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
  var W = window;
  function el(id){return document.getElementById(id);}
 
+ /* 파일 전역 esc() — 이 파일은 여러 개의 독립 IIFE 로 나뉘어 있어(회원 표시 · 주변기기
+    · 주문 원장 LIVE) 지역 함수로 두면 한 곳에만 있고 나머지에서 못 쓴다. window 에
+    걸어 두면(이 파일이 W.s4SetTotal 등에 이미 쓰는 방식과 같다) 모든 IIFE 가 그대로
+    부를 수 있다. 회원 닉네임(m.nick)·이메일(m.email)·부품/주변기기 상품명처럼 서버를
+    거쳐 온 텍스트를 innerHTML 에 심을 때 쓴다. s0-landing.html 과 같은 5글자
+    (& < > " ') 버전 — 속성값 문맥에도 안전하다(2026-08-27 상품명 이스케이프 감사). */
+ window.esc = function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+
  /* 견적 스냅샷이 실제로 쓸 수 있는 상태인지 - LIVE 스크립트와 같은 판정을 쓴다 */
  W.s4HasQuote = function(){
   var raw; try{raw = localStorage.getItem('popcorn-quote');}catch(e){return false;}
@@ -337,7 +345,10 @@ function member(){return (window.popcornAuth&&window.popcornAuth.member())||null
 function renderMember(){
  var box=document.getElementById('s4-own-member');if(!box)return;
  var m=member();
- if(m)box.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><span style="width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-weight:900;color:#2b5fd9;">'+(m.nick||'?').charAt(0)+'</span><div><b style="font-size:13.5px;color:#17171b;">'+m.nick+'</b> 님으로 주문합니다<br><span style="font-size:11.5px;color:#8a8578;">'+m.email+' · 상담·주문이 계정에 저장돼요</span></div></div>';
+ /* m.nick·m.email 은 회원이 가입 시 직접 입력한 값이다(공급처명·상품명과 같은 급의
+    서버 원문) — esc() 없이 심으면 자기 자신의 닉네임으로 이 화면을 여는 모든 사람에게
+    스크립트를 실행시킬 수 있다(s1-session.html 실사고와 같은 계열). */
+ if(m)box.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><span style="width:36px;height:36px;border-radius:11px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-weight:900;color:#2b5fd9;">'+esc((m.nick||'?').charAt(0))+'</span><div><b style="font-size:13.5px;color:#17171b;">'+esc(m.nick)+'</b> 님으로 주문합니다<br><span style="font-size:11.5px;color:#8a8578;">'+esc(m.email)+' · 상담·주문이 계정에 저장돼요</span></div></div>';
  else box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="font-size:13px;font-weight:800;color:#3a3a40;">주문하려면 로그인해 주세요</span><button id="s4-own-login" style="padding:10px 16px;border:none;background:#2b5fd9;border-radius:10px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;">로그인 · 가입</button></div>';
  var lb=document.getElementById('s4-own-login');
  if(lb)lb.onclick=function(){window.popcornAuth.open('login',function(){renderMember();check();});};
@@ -467,7 +478,9 @@ window.addEventListener('scroll',closeTip,{passive:true});
  if(!arr.length)return;
  var icons={'모니터':'desktop_windows','키보드':'keyboard','마우스':'mouse','헤드셋':'headphones'};
  var sum=0,h='<div style="display:flex;align-items:center;gap:8px;padding:12px 22px;background:#fbf3e2;font-size:12.5px;font-weight:800;color:#8a561a;"><span style="font-family:\'Material Symbols Outlined\';font-size:17px;">devices</span>함께 구성 (주변기기 '+arr.length+'종) — 견적서에서 담으신 항목</div>';
- arr.forEach(function(it){sum+=it.p;h+='<div style="display:flex;align-items:center;gap:14px;padding:12px 22px;border-bottom:1px solid #f7f6f2;"><span style="flex:0 0 44px;text-align:center;"><span style="font-family:\'Material Symbols Outlined\';font-size:22px;color:#c77b1f;">'+(icons[it.c]||'devices')+'</span></span><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+it.c+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.n+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.p.toLocaleString()+'원</div></div>';});
+ /* it.c(카테고리 라벨)·it.n(상품명) 은 S2 companion(server c.label·c.name)에서 그대로
+    옮겨진 값이라 카탈로그 원문이다 — esc() 한다. it.p 는 숫자(합계에도 쓰임)라 그대로. */
+ arr.forEach(function(it){sum+=it.p;h+='<div style="display:flex;align-items:center;gap:14px;padding:12px 22px;border-bottom:1px solid #f7f6f2;"><span style="flex:0 0 44px;text-align:center;"><span style="font-family:\'Material Symbols Outlined\';font-size:22px;color:#c77b1f;">'+(icons[it.c]||'devices')+'</span></span><span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+esc(it.c)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+esc(it.n)+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.p.toLocaleString()+'원</div></div>';});
  box.innerHTML=h;
  var line=document.getElementById('s4-periph-line');
  if(line){line.style.display='flex';line.innerHTML='<span style="color:#6b6b73;">함께 구성 ('+arr.length+'종)</span><b style="color:#17171b;">'+sum.toLocaleString()+'원</b>';}
@@ -506,12 +519,15 @@ window.addEventListener('scroll',closeTip,{passive:true});
   S.items.forEach(function(it){
    var d=document.createElement('div');
    d.style.cssText='display:flex;align-items:center;gap:14px;padding:5px 22px 5px 8px;border-bottom:1px solid #f7f6f2;';
+   /* it.name(주문 원장에 실릴 최종 상품명)·part_type 폴백(PKO 에 없는 분류가 서버
+      원문 그대로 나오는 경우) 은 esc() 한다 — alt 속성값 문맥은 따옴표까지 이스케이프
+      하는 이 파일의 esc()(위 window.esc)라야 안전하다. */
    var img=PIMG[it.part_type]
-    ?'<img src="assets/parts/'+PIMG[it.part_type]+'.png" alt="'+it.part_type+'" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'
+    ?'<img src="assets/parts/'+PIMG[it.part_type]+'.png" alt="'+esc(it.part_type)+'" title="부품 설명 보기" style="flex:0 0 auto;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #ece9e3;background:#fff;cursor:pointer;">'
     /* 쿨러는 부품 이미지가 없다. 아이콘 폰트(mode_fan)는 매핑에 없어 'mode_fan'이라는
        글자로 그대로 노출됐다 — 이미지가 없으면 라벨로 대신한다(슬라이스 48). */
-    :'<span style="flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #ece9e3;background:#faf9f6;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span>';
-   d.innerHTML=img+'<span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+(PKO[it.part_type]||it.part_type)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+it.name+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.price.toLocaleString()+'원</div>';
+    :'<span style="flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #ece9e3;background:#faf9f6;font-size:11.5px;font-weight:800;color:#8a8578;">'+esc(PKO[it.part_type]||it.part_type)+'</span>';
+   d.innerHTML=img+'<span style="flex:0 0 52px;font-size:11.5px;font-weight:800;color:#8a8578;">'+esc(PKO[it.part_type]||it.part_type)+'</span><div style="flex:1;font-size:14.5px;font-weight:700;color:#17171b;">'+esc(it.name)+'</div><div style="font-size:14.5px;font-weight:800;color:#17171b;">'+it.price.toLocaleString()+'원</div>';
    slot.appendChild(d);
   });
   /* 부품 0개는 "불러오지 못함"이 아니라 "선택 안 함"이다 (하네스 지시 2026-08-21).
@@ -606,8 +622,10 @@ window.addEventListener('scroll',closeTip,{passive:true});
       +';padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;">'
       +'<span style="font-family:\'Material Symbols Outlined\';font-size:16px;">'
       +pv.ic+'</span>'
-      /* 서버 라벨이 이미 '통과'로 끝나는 규칙이 있다(쿨러 발열(TDP) 통과) — 중복을 지운다 */
-      +c.label.replace(/\s*통과$/,'')+' '+pv.val+'</span>';
+      /* 서버 라벨이 이미 '통과'로 끝나는 규칙이 있다(쿨러 발열(TDP) 통과) — 중복을 지운다.
+         c.label(compat_rules 원문)은 이 파일의 다른 서버 텍스트와 같은 이유로 esc() 한다
+         — .replace() 는 문자열이라 esc() 뒤에도 '통과' 접미 제거는 그대로 동작한다. */
+      +esc(c.label.replace(/\s*통과$/,''))+' '+pv.val+'</span>';
     }).join('');
     if(nF){
      var vt=document.getElementById('s4-verified-title');

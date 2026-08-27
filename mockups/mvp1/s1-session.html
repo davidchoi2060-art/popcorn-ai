@@ -1755,7 +1755,13 @@ function renderEffects(effects){
  effects.forEach(function(e){
   var d=document.createElement('div');d.style.cssText='background:#232320;border-radius:10px;padding:10px 12px;';
   var right=e.applied?'<b style="font-size:12.5px;color:#ff9d7a;font-variant-numeric:tabular-nums;flex:0 0 auto;">−'+e.delta.toLocaleString()+'</b>':'<span style="font-size:10.5px;color:#9a968d;border:1px solid #3a3a35;border-radius:999px;padding:2px 8px;flex:0 0 auto;white-space:nowrap;">영향 없음</span>';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:800;color:#e6e2da;">'+e.label+'</span>'+right+'</div><div style="font-size:11.5px;color:#9a968d;line-height:1.45;margin-top:3px;">'+e.reason+'</div>';
+  /* e.label 은 이 화면이 보낸 제약 라벨(예산/용도/부품 등 고정 어휘)의 그대로 에코라
+     보통은 안전하지만, e.reason(api/candidates.py _apply_one)은 「지정 부품(GPU) 일치」·
+     「재사용 부품 종류」 판정 실패 시 **고객이 보낸 원문 value 를 그대로 문장에 끼워
+     돌려준다**("재고에 없는 부품: {value}" 류, _apply_one 243·253·261·264행) — addUser()가
+     막던 것과 같은 반사형 주입 통로다(2026-08-27 감사, s1 자체 재발 방지 원칙과 같은
+     이유로 둘 다 esc() 한다). */
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:800;color:#e6e2da;">'+esc(e.label)+'</span>'+right+'</div><div style="font-size:11.5px;color:#9a968d;line-height:1.45;margin-top:3px;">'+esc(e.reason)+'</div>';
   box.appendChild(d);});
  box.scrollTop=box.scrollHeight;}
 function applyCount(d,snap){
@@ -1815,9 +1821,13 @@ function emptyCard(d){
  var es=(d.empty_slots||[]).map(function(s){return s.label;});
  var zero=(d.count===0);
  if(es.length){
+  /* h.textContent 는 애초에 안전하지만(브라우저가 태그로 해석하지 않는다), p.innerHTML
+     은 그렇지 않다 — es(empty_slots[].label, 서버 슬롯 라벨)를 두 자리 다 esc() 로
+     통일해 둔다(2026-08-27 감사, 슬롯 라벨은 보통 고정 어휘라 위험도는 낮지만 서버를
+     거친 문자열을 innerHTML 에 심는 규칙은 예외를 두지 않는다). */
   if(h){h.style.display='';h.textContent='견적을 만들 수 없어요 — '+es.join(' · ')+' 후보가 없어요';}
   if(p){p.style.display='';p.innerHTML='통과한 부품은 <b>'+d.count.toLocaleString()+'개</b>지만 '
-    +'<b style="color:#b04a3a;">'+es.join(' · ')+'</b>가 한 개도 없어 조립이 성립하지 않아요. '
+    +'<b style="color:#b04a3a;">'+esc(es.join(' · '))+'</b>가 한 개도 없어 조립이 성립하지 않아요. '
     +'아래에서 한 조건만 완화하면 바로 후보가 생깁니다.';}
  }else if(zero){
   if(h){h.style.display='';h.textContent='조건을 만족하는 상품이 없어요';}

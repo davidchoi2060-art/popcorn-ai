@@ -48,6 +48,12 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <script>
 (function(){
 var won=function(n){return n.toLocaleString()+'원';};
+/* p.method(결제수단)·p.order(주문번호) 는 /api/my/payments 를 거친 서버 텍스트다 —
+   p.order 는 href 속성값으로도 쓰이므로(따옴표 이스케이프가 필요한 문맥) esc() 한다.
+   s0-landing.html 과 같은 5글자(& < > " ') 버전(2026-08-27 감사). p.state 는 stCol
+   조회 키로도 쓰는 우리 쪽 고정 상태값(승인/취소/환불)이라 낮은 우선순위지만 서버를
+   거친 문자열이라는 원칙에 맞춰 함께 이스케이프한다. */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 var stCol={'승인':['#eaf1fd','#2149b0'],'취소':['#f4f2ec','#6b6b73'],'환불':['#fbecec','#8a1f22']};
 function render(rows){
  if(!rows.length){document.getElementById('plist').innerHTML='<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">아직 결제 내역이 없습니다.</div>';return;}
@@ -55,9 +61,9 @@ function render(rows){
   var c=stCol[p.state]||['#f4f2ec','#6b6b73'];
   return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #f0eee9;">'
    +'<span style="flex:0 0 92px;font-size:12.5px;color:#8a8578;font-weight:700;">'+p.at+'</span>'
-   +'<div style="flex:1;min-width:180px;"><b style="font-size:14px;color:#17171b;">'+p.method+'</b> <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;'+(p.mode==='own'?'background:#eaf1fd;color:#2149b0;':'background:#f2edfb;color:#4a2a94;')+'">'+(p.mode==='own'?'자체':'쇼핑몰 인계')+'</span>'
-   +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-top:2px;"><a href="my-orders.html?id='+p.order+'" style="color:#2b5fd9;text-decoration:none;font-weight:800;">'+p.order+'</a> 주문</div></div>'
-   +'<span style="font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:'+c[0]+';color:'+c[1]+';">'+p.state+'</span>'
+   +'<div style="flex:1;min-width:180px;"><b style="font-size:14px;color:#17171b;">'+esc(p.method)+'</b> <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;'+(p.mode==='own'?'background:#eaf1fd;color:#2149b0;':'background:#f2edfb;color:#4a2a94;')+'">'+(p.mode==='own'?'자체':'쇼핑몰 인계')+'</span>'
+   +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-top:2px;"><a href="my-orders.html?id='+esc(p.order)+'" style="color:#2b5fd9;text-decoration:none;font-weight:800;">'+esc(p.order)+'</a> 주문</div></div>'
+   +'<span style="font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:'+c[0]+';color:'+c[1]+';">'+esc(p.state)+'</span>'
    +'<b style="font-size:15px;color:#17171b;font-variant-numeric:tabular-nums;">'+won(p.amount)+'</b></div>';
  }).join('');
 }

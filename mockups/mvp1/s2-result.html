@@ -518,6 +518,12 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
 // ---- 엔진 v1 LIVE 렌더 (슬라이스 5) — localStorage popcorn-quote 가 있을 때만 견적을 그린다.
 //      없으면 «더미 원형»이 아니라 빈 상태다(s2NoQuote — 2026-08-17). ----
 (function(){
+ /* 파일 전역 esc() — companion·부품 목록처럼 서버 텍스트(catalog 상품명·사양·라벨)를
+    innerHTML 에 심는 자리에서 쓴다. s0-landing.html 과 같은 5글자(& < > " ') 버전 —
+    속성값 문맥(예: data-p="...")에도 안전하다(따옴표까지 이스케이프). 아래 s2NoQuote()
+    안의 지역 esc(3글자, <>&만)는 그 함수 전용 변수라 이름은 같아도 별개다 — 손대지
+    않는다(2026-08-27, 상품명 이스케이프 감사 — 원인·경위는 커밋 로그 참조). */
+ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
  /* ★ 견적 데이터가 없으면 «견적을 보여주지 않는다».
     예전에는 여기서 그냥 return 했고, 그러면 목업 시절 예시값(Ryzen 5 7500F · RTX 4060 ·
     「호환성 5종 전부 통과」 · 검사 수치 5칸)이 **진짜 견적처럼** 남았다. 세션 없이 URL로
@@ -638,13 +644,19 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  var PICON={MONITOR:'desktop_windows',KEYBOARD:'keyboard',MOUSE:'mouse',HEADSET:'headphones',SPEAKER:'speaker',WEBCAM:'videocam'};
  if(periphGrid&&Q.companion&&Q.companion.length){
   S2P_META={};s2pSel={};
+  /* c.name·c.label·c.spec 는 카탈로그 원문(공급처 상품명·사양)이라 esc() 없이 심으면
+     안 된다(2026-08-27 감사 — 원래 넷 중 하나). c.sku 도 마찬가지 원천(products.sku)
+     이고 여기서는 «속성값»(data-p="...")으로 들어가므로 따옴표까지 이스케이프하는
+     이 파일 esc()가 필요하다 — 3글자 버전이면 sku 안의 " 하나로 속성이 깨질 수 있다.
+     c.price·c.stock 은 숫자(toLocaleString()/그대로 연결)라 HTML 특수문자를 담을 수
+     없어 손대지 않는다. */
   periphGrid.innerHTML=Q.companion.map(function(c){
    S2P_META[c.sku]=[c.label,c.name,c.product_code];
    return '<div style="border:1px solid #ece9e3;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;">'
-    +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">'+(PICON[c.part_type]||'devices')+'</span><span style="font-size:12px;font-weight:800;color:#8a8578;">'+c.label+'</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 '+c.stock+'대</span></div>'
-    +'<div><b style="font-size:15.5px;color:#17171b;">'+c.name+'</b>'+(c.spec?'<span style="font-size:12.5px;color:#8a8578;font-weight:600;"> · '+c.spec+'</span>':'')+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:\'Material Symbols Outlined\';font-size:20px;color:#2b5fd9;">'+(PICON[c.part_type]||'devices')+'</span><span style="font-size:12px;font-weight:800;color:#8a8578;">'+esc(c.label)+'</span><span style="margin-left:auto;background:#eaf1fd;color:#2149b0;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;">실재고 '+c.stock+'대</span></div>'
+    +'<div><b style="font-size:15.5px;color:#17171b;">'+esc(c.name)+'</b>'+(c.spec?'<span style="font-size:12.5px;color:#8a8578;font-weight:600;"> · '+esc(c.spec)+'</span>':'')+'</div>'
     +'<p style="margin:0;font-size:13px;line-height:1.6;color:#55555c;background:#f7f6f2;border-radius:10px;padding:10px 12px;flex:1;"><b style="color:#853d97;">이 견적 기준:</b> 이 견적과 포트·용도 호환을 확인했습니다 — 상세 매칭 근거는 준비 중입니다.</p>'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">'+c.price.toLocaleString()+'원</b><button class="s2p-add" data-p="'+c.sku+'" data-price="'+c.price+'" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div></div>';
+    +'<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;color:#17171b;">'+c.price.toLocaleString()+'원</b><button class="s2p-add" data-p="'+esc(c.sku)+'" data-price="'+c.price+'" data-action="periph-add" style="padding:9px 18px;border:1.5px solid #ddd8ce;background:#fff;border-radius:999px;font-size:13px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;">담기</button></div></div>';
   }).join('');
   periphGrid.querySelectorAll('.s2p-add').forEach(function(b){
    b.addEventListener('click',function(){
@@ -747,11 +759,14 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
         하네스 지시) — 예전엔 아무것도 안 붙어, 그 부품이 아래 §4 비교표에서
         빠졌다는 사실이 이 목록에서는 안 보였다. */
      :' <span style="color:#a29d92;font-weight:600;font-size:11px;">(시세 자료 없음)</span>';
+    /* it.name(display_name 처리된 상품명)과 PART_KO 미스매치 시 폴백(it.part_type,
+       서버 분류 원문)은 esc() 로 감싼다 — it.product_code 는 정수(attribute 문맥이라도
+       숫자만 온다는 것을 parseInt 사용부(774-779행)가 이미 전제한다)라 손대지 않는다. */
     return '<div data-click-part="'+it.product_code+'" role="button" tabindex="0"'
      +' title="이 부품의 근거 보기" style="display:flex;justify-content:space-between;'
      +'font-size:13.5px;gap:10px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px;">'
-     +'<span style="color:#9a968d;flex:0 0 auto;">'+(PART_KO[it.part_type]||it.part_type)+'</span>'
-     +'<span style="font-weight:700;text-align:right;">'+it.name
+     +'<span style="color:#9a968d;flex:0 0 auto;">'+esc(PART_KO[it.part_type]||it.part_type)+'</span>'
+     +'<span style="font-weight:700;text-align:right;">'+esc(it.name)
      +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span>'+mk+'</span></div>';
    }).join('');
    /* 재사용 슬롯(customer-audit-2026-08-24 §1-1) — s.items 에는 애초에 없다(엔진이
@@ -849,7 +864,9 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    if(c.pass===true){col='var(--success, #2f9e6d)';bg='var(--success-container, #e9f6ef)';ic='check_circle';badge='통과';}
    else if(c.pass===false){col='#b31b25';bg='#fbecec';ic='error';badge='불통과';}
    else{col='#8a561a';bg='#fdf3e2';ic='help';badge='확인 보류';}
-   checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:'+col+';">'+ic+'</span><span style="font-size:14.5px;font-weight:700;color:var(--success-ink, #2c4c3c);">'+c.label+'</span><span style="display:inline-block;width:fit-content;font-size:10.5px;font-weight:800;color:'+col+';background:'+bg+';padding:2px 7px;border-radius:6px;">'+badge+'</span><span style="font-size:12px;color:var(--success-sage, #7aa891);">'+c.detail+'</span>';
+   /* c.label·c.detail 은 compat_rules 원문(detail_fmt 는 스펙 값을 {v}/{r} 로 치환한
+      서버 조립 문자열)이라 서버를 거쳐 온 텍스트다 — esc() 로 감싼다. */
+   checkCards[i].innerHTML='<span style="font-family:\'Material Symbols Outlined\';font-size:24px;color:'+col+';">'+ic+'</span><span style="font-size:14.5px;font-weight:700;color:var(--success-ink, #2c4c3c);">'+esc(c.label)+'</span><span style="display:inline-block;width:fit-content;font-size:10.5px;font-weight:800;color:'+col+';background:'+bg+';padding:2px 7px;border-radius:6px;">'+badge+'</span><span style="font-size:12px;color:var(--success-sage, #7aa891);">'+esc(c.detail)+'</span>';
   }
   /* 검사 «종 수»는 서버가 정한다 — 마크업에는 수를 두지 않는다.
      예전에는 마크업의 '5종'(목업 하드코딩, 실제 8종)을 글자로 찾아 덮어썼다. 그래서
@@ -915,10 +932,11 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
      +'line-height:1.65;color:#55555c;background:#f7f6f2;border-radius:10px;';
     pe.parentNode.appendChild(rw);
    }
+   /* 이 파일 전역 esc()(5글자)로 통일 — 예전엔 <>& 만 걷는 인라인 치환을 따로
+      들고 있었다(같은 일을 하는 세 번째 구현, 2026-08-27 감사에서 통합). */
    rw.innerHTML=s.reasons.map(function(t){
     return '<li style="display:flex;gap:6px;"><span style="color:#853d97;font-weight:800;">·</span>'
-     +'<span>'+String(t).replace(/[<>&]/g,function(c){
-       return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];})+'</span></li>';
+     +'<span>'+esc(t)+'</span></li>';
    }).join('');
   }
   /* S2→S3 안내(A-101) — sets[tier].pinned 중 honored=false 가 있으면 안내를 붙인다.

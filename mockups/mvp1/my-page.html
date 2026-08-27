@@ -151,12 +151,16 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
  // renderMap()은 로그인 상태(m)가 아니면 localStorage 캐시도 쓰지 않는다 — 공유 기기에서
  // 로그아웃한 뒤에도 이전 로그인 때의 상태가 그대로 남아 보이는 것까지 막는다.
  // 로그인 상태에서는 이 값이 /api/my/account 응답(d.map_state)으로 즉시 덮어써진다(LIVE).
+ /* MALL_ID(연결된 몰 회원 식별자)·r.item(후기 대상 상품명)·head 주문/배송 텍스트처럼
+    /api/my/* 를 거쳐 온 값을 innerHTML 에 심는 자리에서 쓴다 — s0-landing.html 과 같은
+    5글자(& < > " ') 버전, 속성값 문맥(data-toast="...")에도 안전하다(2026-08-27 감사). */
+ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
  function mapState(){return localStorage.getItem(MAP_KEY)||'none';}
  function renderMap(){
   var st=m?mapState():'none', pill=document.getElementById('map-pill'), panel=document.getElementById('map-panel');
   if(st==='mapped'){
    pill.style.background='#eaf1fd';pill.style.color='#2149b0';
-   pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · '+(MALL_ID||'MALL-2201');
+   pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · '+esc(MALL_ID||'MALL-2201');
    panel.hidden=true;
   }else if(st==='requested'){
    pill.style.background='#fbf3e2';pill.style.color='#8a561a';
@@ -231,11 +235,13 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     +(any?'<a class="btnp" href="my-review-write.html" style="margin-top:4px;display:inline-flex;padding:9px 14px;font-size:12.5px;"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</a>':'');
    return;
   }
+  /* r.item(구매·리뷰 대상 상품명)·r.order_no 는 카탈로그·주문 원장을 거친 서버
+     텍스트다 — esc() 한다(2026-08-27 감사). */
   box.innerHTML=written.map(function(r){
    return '<div style="border:1.5px solid #ece9e3;border-radius:14px;padding:14px 16px;margin-bottom:8px;">'
     +'<span style="display:inline-flex;align-items:center;gap:5px;background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;"><span class="msym" style="font-size:13px;">verified</span>구매 인증</span>'
-    +'<p style="margin:8px 0 0;font-size:12.5px;color:#3a3a40;font-weight:700;line-height:1.5;">'+r.item+'</p>'
-    +'<div style="font-size:11px;color:#a29d92;font-weight:600;margin-top:6px;">'+r.order_no+' · '+fmtMD(r.at)+' · <a href="s2-result.html" style="color:#8a8578;">구성 보기</a></div>'
+    +'<p style="margin:8px 0 0;font-size:12.5px;color:#3a3a40;font-weight:700;line-height:1.5;">'+esc(r.item)+'</p>'
+    +'<div style="font-size:11px;color:#a29d92;font-weight:600;margin-top:6px;">'+esc(r.order_no)+' · '+fmtMD(r.at)+' · <a href="s2-result.html" style="color:#8a8578;">구성 보기</a></div>'
     +'</div>';
   }).join('');
  }
@@ -258,13 +264,15 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   if(state==='error'){box.innerHTML=noteBox('주문 내역을 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.');return;}
   if(!items.length){box.innerHTML=noteBox('아직 주문 내역이 없습니다.');return;}
   var head=items[0], rest=items.slice(1,2);
-  var itemLine=(head.items&&head.items[0]?head.items[0][1]:'구성 정보 없음')+((head.items||[]).length>1?' 외':'');
+  /* itemLine(상품명)·head.no·head.ship.carrier/no(택배사·송장번호) 는 서버 텍스트다.
+     data-toast 는 속성값 문맥이라 esc() 가 특히 필요하다(2026-08-27 감사). */
+  var itemLine=esc((head.items&&head.items[0]?head.items[0][1]:'구성 정보 없음'))+((head.items||[]).length>1?' 외':'');
   var shipBtn=head.ship
-   ?'<button class="btn2" data-toast="송장 '+head.ship.carrier+' '+head.ship.no+' — 배송 조회 (목업)"><span class="msym" style="font-size:15px;">package_2</span>송장 조회</button>'
+   ?'<button class="btn2" data-toast="송장 '+esc(head.ship.carrier)+' '+esc(head.ship.no)+' — 배송 조회 (목업)"><span class="msym" style="font-size:15px;">package_2</span>송장 조회</button>'
    :'';
   var html='<div style="border:1.5px solid #ece9e3;border-radius:14px;padding:16px;margin-bottom:10px;">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-   +'<b style="font-size:13.5px;color:#17171b;">'+head.no+' <span style="font-weight:600;color:#8a8578;">· '+fmtMD(head.created_at)+'</span></b>'
+   +'<b style="font-size:13.5px;color:#17171b;">'+esc(head.no)+' <span style="font-weight:600;color:#8a8578;">· '+fmtMD(head.created_at)+'</span></b>'
    +'<b style="font-size:14px;color:#17171b;">'+(head.total||0).toLocaleString()+'원</b></div>'
    +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-bottom:12px;">'+itemLine+' <a href="s2-result.html" style="color:#2b5fd9;">구성 보기</a></div>'
    +(head.status!=='취소'?'<div style="display:flex;align-items:center;gap:4px;margin-bottom:12px;">'+ordStepsHtml(head.step)+'</div>':'')
@@ -273,7 +281,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   if(rest.length){
    var r=rest[0];
    html+='<div style="display:flex;justify-content:space-between;align-items:center;border:1.5px dashed #ddd8ce;border-radius:14px;padding:13px 16px;">'
-    +'<span style="font-size:12.5px;color:#8a8578;font-weight:700;">'+r.no+' · '+fmtMD(r.created_at)+' · '+r.status+'</span>'
+    +'<span style="font-size:12.5px;color:#8a8578;font-weight:700;">'+esc(r.no)+' · '+fmtMD(r.created_at)+' · '+r.status+'</span>'
     +(r.status==='완료'
       ?'<a class="btnp" href="my-review-write.html?order='+encodeURIComponent(r.no)+'" style="padding:9px 14px;font-size:12.5px;"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</a>'
       :'<a class="btn2" href="my-orders.html?id='+encodeURIComponent(r.no)+'" style="padding:9px 14px;font-size:12.5px;">주문 상세</a>')

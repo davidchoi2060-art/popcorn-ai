@@ -111,6 +111,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   var TAGS=["게임 성능 만족","조용해요","조립 상태 좋음","배송 빨랐어요","근거 설명이 좋았어요","사무용으로 충분"];
   var pick=0, rating=0, picked=[], LIVE=false;
 
+  /* o.item(후기 대상 주문의 상품명)·o.no 는 /api/my/account 의 reviewable[] 를 거친
+     카탈로그·주문 원장 텍스트다 — s0-landing.html 과 같은 5글자(& < > " ') 버전
+     (2026-08-27 감사). */
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function money(n){return n.toLocaleString()+"원";}
   function noteBox(msg){return '<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">'+msg+'</div>';}
   function renderState(msg){
@@ -123,10 +127,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
       return '<div data-o="'+i+'" style="border:1.5px solid '+(on?"#2b5fd9":"#ece9e3")+';background:'+(on?"#f7faff":"#fff")+';border-radius:14px;padding:13px 16px;margin-bottom:9px;cursor:'+(o.written?"default":"pointer")+';opacity:'+(o.written?".6":"1")+';">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">'
         +'<span style="display:inline-flex;align-items:center;gap:7px;"><span style="display:inline-flex;align-items:center;gap:4px;background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;"><span class="msym" style="font-size:13px;">verified</span>구매 인증</span>'
-        +'<b style="font-size:13px;color:#17171b;">'+o.no+'</b><span style="font-size:11.5px;color:#a29d92;font-weight:700;">'+o.at+'</span></span>'
+        +'<b style="font-size:13px;color:#17171b;">'+esc(o.no)+'</b><span style="font-size:11.5px;color:#a29d92;font-weight:700;">'+o.at+'</span></span>'
         +(o.written?'<span style="font-size:11.5px;font-weight:800;color:#8a8578;">이미 후기를 남긴 주문</span>'
           :'<span style="font-size:11.5px;font-weight:800;color:'+(on?"#2149b0":"#8a8578")+';">'+(on?"선택됨":"이 주문으로 쓰기")+'</span>')
-        +'</div><div style="font-size:12.5px;color:#8a8578;font-weight:600;margin-top:5px;">'+o.item+' · '+money(o.total)+'</div></div>';
+        +'</div><div style="font-size:12.5px;color:#8a8578;font-weight:600;margin-top:5px;">'+esc(o.item)+' · '+money(o.total)+'</div></div>';
     }).join("");
     document.querySelectorAll("[data-o]").forEach(function(el){
       el.onclick=function(){
@@ -138,11 +142,14 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   }
   function renderSnap(){
     var o=ORDERS[pick];
+    /* p[0]("구성" 고정 라벨)은 renderOrders() 밑 ORDERS 매핑(parts:[["구성",x.item]])이
+       늘 같은 문자열만 넣는 로컬 상수라 손대지 않는다. p[1]은 o.item과 같은 값(상품명)
+       이라 esc() 한다. */
     document.getElementById("snapParts").innerHTML='<div style="border:1.5px dashed #ddd8ce;border-radius:14px;padding:14px 16px;">'
-      +'<div style="font-size:12.5px;font-weight:800;color:#3a3a40;margin-bottom:9px;">'+o.no+' · '+o.item+'</div>'
+      +'<div style="font-size:12.5px;font-weight:800;color:#3a3a40;margin-bottom:9px;">'+esc(o.no)+' · '+esc(o.item)+'</div>'
       +o.parts.map(function(p){
         return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0eee9;font-size:12.5px;">'
-          +'<span style="color:#8a8578;font-weight:700;width:88px;flex:none;">'+p[0]+'</span><span style="color:#3a3a40;font-weight:600;flex:1;">'+p[1]+'</span></div>';
+          +'<span style="color:#8a8578;font-weight:700;width:88px;flex:none;">'+p[0]+'</span><span style="color:#3a3a40;font-weight:600;flex:1;">'+esc(p[1])+'</span></div>';
       }).join("")
       +'<div style="font-size:11.5px;color:#a29d92;font-weight:700;margin-top:9px;">주문 시점 스냅샷 — 이후 부품 가격이 바뀌어도 이 구성은 그대로 보존됩니다.</div></div>';
   }

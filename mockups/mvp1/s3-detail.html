@@ -254,6 +254,10 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
 <script>
 // ---- 스왑 엔진 LIVE (슬라이스 8) — popcorn-quote + candidates 성공 시에만. 아니면 정적 원형 ----
 (function(){
+ /* 파일 전역 esc() — 카탈로그 상품명(p.name·a.name·c.to.name)·호환 규칙 문구(c.label·
+    c.detail)·서버 사유 문구(empty_reason·chain_reason)를 innerHTML 에 심는 자리에서
+    쓴다. s0-landing.html 과 같은 5글자(& < > " ') 버전(2026-08-27 상품명 이스케이프 감사). */
+ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
  var C=null;
  var PKO={CPU:'CPU',MB:'메인보드',RAM:'메모리',GPU:'그래픽카드',CASE:'케이스',COOLER:'CPU쿨러',POWER:'파워',SSD:'저장장치'};
  var PIMG={CPU:'cpu',GPU:'gpu',MB:'mb',RAM:'ram',SSD:'ssd',POWER:'psu',CASE:'case'};
@@ -404,7 +408,7 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
     :'<span style="flex:0 0 72px;height:72px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid #ece9e3;background:#fff;"><span style="font-family:\'Material Symbols Outlined\';font-size:28px;color:#8a8578;">mode_fan</span></span>';
    h+='<div class="s3-row" style="display:flex;align-items:center;gap:16px;padding:5px 22px 5px 8px;border-bottom:1px solid #f0eee9;">'+img
     +'<div style="flex:1;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11.5px;font-weight:800;color:#8a8578;">'+PKO[slot]+'</span>'+badge+'</div>'
-    +'<div style="font-size:16px;font-weight:800;color:#17171b;">'+p.name+'</div></div>'
+    +'<div style="font-size:16px;font-weight:800;color:#17171b;">'+esc(p.name)+'</div></div>'
     +'<div class="s3-row-price" style="text-align:right;margin-right:16px;"><div style="font-size:16px;font-weight:900;color:#17171b;">'+p.price.toLocaleString()+'<span style="font-size:12px;color:#8a8578;">원</span></div></div>'
     +'<button style="flex:0 0 auto;padding:10px 18px;border:1.5px solid #d8d4cc;background:#fff;border-radius:10px;font-size:13.5px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-live-swap="'+slot+'">변경</button></div>';
   });
@@ -445,8 +449,13 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
      이전 col/ok 2색 row() 는 pv.col/pv.ic/pv.val 을 받는 rowRaw() 로 남기고,
      pass→시각을 고르는 판단은 passVisual() 하나로 모았다 — 파워 정격 여유(수치,
      null 없음)는 그대로 rowRaw() 를 직접 부른다. */
+  /* lab·sub 는 호출부에서 c.label·c.detail(compat_rules 서버 원문) 또는 이 파일 자체의
+     고정 문자열('파워 정격 여유'·'권장 대비')이 온다 — 여기 한 곳에서 esc() 하면 두
+     호출부(457·462행) 모두 안전해진다(고정 문자열을 esc() 해도 특수문자가 없어 결과는
+     그대로다). val 은 passVisual()이 주는 우리 쪽 고정 문자열('정상'/'불통과'/'확인
+     보류')이거나 숫자+% 라 손대지 않는다. */
   var rowRaw=function(lab,val,sub,col,ic){
-   return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:'+col+';">'+ic+'</span>'+lab+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+sub+'</span>':'')+'</span><b style="font-size:12.5px;color:'+col+';">'+val+'</b></div>';};
+   return '<div style="display:flex;align-items:center;justify-content:space-between;background:#232320;border-radius:10px;padding:10px 13px;"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#e6e2da;"><span style="font-family:\'Material Symbols Outlined\';font-size:18px;color:'+col+';">'+ic+'</span>'+esc(lab)+(sub?'<span style="font-size:11px;color:#9a968d;font-weight:600;">'+esc(sub)+'</span>':'')+'</span><b style="font-size:12.5px;color:'+col+';">'+val+'</b></div>';};
   function passVisual(p){
    if(p===true)return{col:'var(--success-bright, #5fd6a0)',ic:'check_circle',val:'정상'};
    if(p===false)return{col:'#ff8f84',ic:'error',val:'불통과'};
@@ -551,7 +560,7 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
   document.getElementById('s3-part').textContent=PKO[slot];
   var alts=document.getElementById('s3-alts');alts.innerHTML='';
   if(s.empty){
-   alts.innerHTML='<div style="padding:20px;text-align:center;color:#8a8578;font-size:13.5px;font-weight:700;">'+s.empty_reason+'</div>';
+   alts.innerHTML='<div style="padding:20px;text-align:center;color:#8a8578;font-size:13.5px;font-weight:700;">'+esc(s.empty_reason)+'</div>';
   }else{
    /* ⚠ 대안 버튼의 "✓ 호환 N종 통과" 배지는 손대지 않는다(2026-08-21 검토 후 유지로
       확정 — 아래 row()/nF·nP 수정과 겉모양은 같은 문제처럼 보였지만 다른 사안이다).
@@ -579,13 +588,15 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
     var chainHtml='';
     if(a.chain){
      var c=a.chain[0];
-     chainHtml='<div style="margin-top:9px;background:#fbf3e2;border-radius:9px;padding:9px 11px;font-size:12px;color:#8a561a;font-weight:700;line-height:1.5;">'+a.chain_reason
-      +'<br>→ '+PKO[c.slot]+'를 <b>'+c.to.name+'</b>(으)로 함께 바꿉니다 ('+(c.to.price_diff>=0?'+':'')+c.to.price_diff.toLocaleString()+'원)</div>'
+     chainHtml='<div style="margin-top:9px;background:#fbf3e2;border-radius:9px;padding:9px 11px;font-size:12px;color:#8a561a;font-weight:700;line-height:1.5;">'+esc(a.chain_reason)
+      +'<br>→ '+PKO[c.slot]+'를 <b>'+esc(c.to.name)+'</b>(으)로 함께 바꿉니다 ('+(c.to.price_diff>=0?'+':'')+c.to.price_diff.toLocaleString()+'원)</div>'
       +'<div style="margin-top:8px;font-size:12.5px;font-weight:800;color:#2b5fd9;">연쇄 변경하고 계속하기 →</div>';
     }
     var b=document.createElement('button');
     b.style.cssText='display:block;width:100%;padding:14px 16px;border:1.5px solid #e2ded5;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;';
-    b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+a.name+'</span><span style="font-size:12.5px;color:var(--success-dark, #1c7a4d);font-weight:700;">✓ 호환 '+((C.compat&&C.compat.checks||[]).length)+'종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
+    /* a.name·c.to.name(대안·연쇄 교체 상품명)·a.chain_reason(연쇄 사유 문구) 전부
+       카탈로그·서버 원문이라 esc() 한다(2026-08-27 감사 — 원래 넷 중 하나, 588행). */
+    b.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><span><span style="display:block;font-size:14.5px;font-weight:800;color:#17171b;">'+esc(a.name)+'</span><span style="font-size:12.5px;color:var(--success-dark, #1c7a4d);font-weight:700;">✓ 호환 '+((C.compat&&C.compat.checks||[]).length)+'종 통과'+(a.chain?' · 연쇄 변경 포함':'')+'</span></span><span style="flex:0 0 auto;font-size:14px;font-weight:800;color:#c77b1f;">'+diff+'</span></div>'+chainHtml;
     b.addEventListener('click',function(){applySwap(slot,a,b);});
     alts.appendChild(b);
    });
