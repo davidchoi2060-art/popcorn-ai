@@ -25,6 +25,7 @@
 """
 import asyncio
 import datetime
+import hashlib
 import io
 import json
 import os
@@ -37,7 +38,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .timeutil import now_iso
+from .timeutil import iso as _iso_tz, now_iso
 
 router = APIRouter(prefix="/api/admin/dash", tags=["admin-dash"])
 
@@ -48,6 +49,26 @@ PROJ_KEY = "E--DEV"
 SESS_DIR = Path(os.path.expanduser("~")) / ".claude" / "projects" / PROJ_KEY
 QUEUE = ROOT / ".claude" / "dash-queue.jsonl"      # 화면 -> 세션 (우리가 만든 파일)
 WATCH_HEARTBEAT = ROOT / ".claude" / "dash-watch.heartbeat"   # 감시자(로컬) 생존 신호
+
+
+# ── 로컬 / 배포 서버 판정 (2026-08-27 — 「진행 흐름」을 배포 서버에서도 보이게) ──────
+#
+# 로컬은 세션 전사본(`SESS_DIR`)을 직접 읽는다. 배포 서버에는 그 폴더 자체가 없다
+# (사장님 PC 전용 경로라 서버에 배포해도 안 생긴다) — **폴더 유무 자체가 이미 정확한
+# 신호**다. 배포마다 별도 설정을 맞출 필요가 없고, 설정을 빼먹어 조용히 틀린 쪽으로
+# 판정하는 사고도 없다(설정이 아예 없다).
+#
+# `POPCORN_DASH_MODE=server|local` 로 강제할 수 있다 — 점검용(예: 로컬에서 "서버라면
+# 어떻게 보이는지" 확인). 값이 없거나 다른 문자열이면 자동판정으로 되돌아간다.
+def _is_server_mode() -> bool:
+    override = os.environ.get("POPCORN_DASH_MODE", "").strip().lower()
+    if override in ("server", "local"):
+        return override == "server"
+    try:
+        return not (SESS_DIR.is_dir() and any(SESS_DIR.glob("*.jsonl")))
+    except OSError:
+        return True
+
 
 # 팀원 이름 -> 한글. `.claude/agents/*.md` 가 정본이고 여기는 표시용이다.
 # ⚠ 2026-08-15 점검자 실측 — 신설 팀원 둘(archivist·designchecker)이 빠져 있어
@@ -426,27 +447,240 @@ def _event(d: dict) -> dict | None:
                 body = res[0].get("content")
                 if isinstance(body, list):
                     body = " ".join(str(b.get("text", "")) for b in body if isinstance(b, dict))
-                txt = re.sub(r"\s+", " ", str(body or ""))[:220]
+                full = re.sub(r"\s+", " ", str(body or ""))
+                # 자르기 전에 원문 전체로 검사한다 — 도구 stdout 은 무엇이든 담길 수
+                # 있어 Grep·Glob 입력과 같은 절단-미탐 위험이 있다(_tool_detail 참고).
+                txt = _REDACTED_MARK if _has_secret(full) else full[:220]
                 return {"who": "result", "ts": ts, "blocks": [{"kind": "result", "text": txt}]}
     return None
 
 
 def _tool_detail(name: str, inp: dict) -> str:
-    """도구 호출을 한 줄로. **전체 명령을 그대로 싣지 않는다** — 비밀값이 섞일 수 있다."""
+    """도구 호출을 한 줄로. **전체 명령을 그대로 싣지 않는다** — 비밀값이 섞일 수 있다.
+
+    ⚠ **자르기 «전»에 원문 전체로 비밀값을 검사한다**(2026-08-27 결함 수정 — 확인자가
+    JWT 를 84자 뒤에 이어붙인 시험으로 재현). 여기서 쓰는 표시 길이(Grep·Glob 70자,
+    그 밖 90~110자)는 짧다 — 자른 «뒤»에 검사하면 긴 토큰이 절단 지점에 걸려 남는
+    조각이 길이 기준(예: 32자 이상)을 못 채워 미탐이 난다. 그래서 순서를 뒤집었다:
+    원문에서 걸리면 잘라 보여주지 않고 통째로 가리고, 안 걸려야만 자른다. Bash 는
+    `description` 이 있어 원래도 위험이 낮았지만(자유 서술이라 비밀값이 잘 안 실린다),
+    Grep·Glob·Skill·그 밖 MCP 도구(마지막 분기)는 입력 자체가 비밀값일 수 있어 열려
+    있었다. `_has_secret`/`_REDACTED_MARK` 는 이 함수보다 아래에 있지만, 파이썬은
+    호출 시점에 이름을 찾으므로(모듈이 전부 로드된 뒤 요청이 온다) 문제없다.
+    """
     if name == "Bash":
-        return re.sub(r"\s+", " ", str(inp.get("description") or inp.get("command") or ""))[:110]
+        raw = str(inp.get("description") or inp.get("command") or "")
+        if _has_secret(raw):
+            return _REDACTED_MARK
+        return re.sub(r"\s+", " ", raw)[:110]
     if name in ("Read", "Write", "Edit"):
-        return str(inp.get("file_path") or "")[-70:]
+        raw = str(inp.get("file_path") or "")
+        if _has_secret(raw):
+            return _REDACTED_MARK
+        return raw[-70:]
     if name in ("Grep", "Glob"):
-        return str(inp.get("pattern") or "")[:70]
+        raw = str(inp.get("pattern") or "")
+        if _has_secret(raw):
+            return _REDACTED_MARK
+        return raw[:70]
     if name == "Agent":
         raw = str(inp.get("subagent_type") or "")
         canon = ALIAS.get(raw, raw)                    # 옛 이름은 지금 이름으로 접는다
         who = TEAM_KO.get(canon, canon)
-        return "%s — %s" % (who, str(inp.get("description") or "")[:60])
+        desc = str(inp.get("description") or "")
+        if _has_secret(desc):
+            return _REDACTED_MARK
+        return "%s — %s" % (who, desc[:60])
     if name == "Skill":
-        return str(inp.get("skill") or "")
-    return re.sub(r"\s+", " ", json.dumps(inp, ensure_ascii=False))[:90]
+        raw = str(inp.get("skill") or "")
+        if _has_secret(raw):
+            return _REDACTED_MARK
+        return raw
+    raw = json.dumps(inp, ensure_ascii=False)
+    if _has_secret(raw):
+        return _REDACTED_MARK
+    return re.sub(r"\s+", " ", raw)[:90]
+
+
+# ── 비밀값 가림 — 배포 서버로 밀어 올리기 전에 쓴다 (2026-08-27 · 같은 날 결함 수정) ──
+#
+# `_tool_detail()`가 이미 명령 전문을 자르지만(위 주석), 잘린 조각 안에도 접속
+# 문자열·쿠키·환경변수 식별자가 남을 수 있다(2026-08-26 조사자 전수 검사: 세션
+# 전사본에 접속 문자열 2건 · 쿠키·세션 토큰류 241건 · `ADMIN_PW` 식별자 143건 실재).
+# 그래서 **감시자가 보내기 전(로컬)** 과 **서버가 받을 때(POST /push)** 두 곳에서
+# 같은 이 함수로 한 번씩, 총 두 번 건다 — 감시자 쪽 코드가 낡거나 우회돼도 서버가
+# 마지막 방어선이 되게. 의심스러우면 보낸다/보이는다가 아니라 **가린다** 쪽으로 정한다.
+#
+# ⚠ **결함 수정(확인자 실측)** — `POST /push` 로 넷을 보내니 대조군(접속 문자열)
+# 하나만 가려지고 셋이 평문으로 저장됐다: `UI_CHECK_PW=x1y2` · `admin_pw=hunter2`
+# (소문자) · `OLD_ADMIN_PW=hunter2new`(접두 변형). 원인 셋, 고침 셋:
+#   ① 이 식별자 정규식에 `re.I` 가 없었다(쿠키·세션 패턴엔 있었는데 이 패턴만 없었다)
+#      → 추가.
+#   ② `\b` 는 `_` 를 «단어 문자»로 봐서 밑줄로 이어붙은 접두(`OLD_ADMIN_PW`)·접미
+#      (`ADMIN_PW2`)를 못 가른다 → `\b` 를 없애 **부분 문자열 포함**으로 바꿨다
+#      (의심 기준 검사이므로 과탐은 감수한다 — 위 주석 그대로).
+#   ③ `UI_CHECK_PW` 처럼 이 프로젝트가 실제로 쓰는 이름이 하드코딩 목록에 없었다
+#      → 아래 `_secret_names()` 가 `.env` 류 파일의 **키 이름만** 동적으로 읽어 채운다.
+_SECRET_PATTERNS = [
+    # DB·서비스 접속 문자열: scheme://user:pass@host
+    re.compile(r"[a-zA-Z][\w+.\-]{1,20}://[^\s'\"<>]+:[^\s'\"<>@]+@[^\s'\"<>]+"),
+    # .env 식별자 «생김새» — 아직 아래 동적 목록에 없는 새 이름도 관례로 잡는 2차 방어선.
+    # re.I 로 대소문자 무시, `\b` 없이(밑줄·숫자로 이어붙은 접두·접미 변형까지 잡는다).
+    re.compile(r"(ADMIN_PW|ADMIN_EMAIL|DATABASE_URL|[A-Z][A-Z0-9_]*PASSWORD[A-Z0-9_]*"
+               r"|[A-Z][A-Z0-9_]*SECRET[A-Z0-9_]*|[A-Z][A-Z0-9_]*API_?KEY[A-Z0-9_]*"
+               r"|[A-Z][A-Z0-9_]*ACCESS_?KEY[A-Z0-9_]*|PRIVATE_KEY)", re.I),
+    # 관리자 세션 쿠키(api/auth.py COOKIE) · 쿠키·세션 헤더 모양
+    re.compile(r"popcorn_admin_session|Set-Cookie\s*:|(?<![A-Za-z])Cookie\s*:", re.I),
+    re.compile(r"\bsession(_id)?\s*=\s*[A-Za-z0-9%._-]{12,}", re.I),
+    # JWT 모양(header.payload.signature)
+    re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b"),
+    # 순수 16진수 32자 이상 — 해시·토큰
+    re.compile(r"\b[0-9a-fA-F]{32,}\b"),
+]
+
+# ── 비밀값 «이름» 목록 — 하드코딩하지 않고 실제 설정 파일에서 읽는다 ─────────────
+#
+# 위 정규식의 PASSWORD/SECRET/API_KEY 류 「생김새」 규칙은 그 관례를 따르지 않는
+# 이름(`UI_CHECK_PW` 처럼 짧은 약어)을 못 잡는다. 그렇다고 이름을 이 파일에 목록으로
+# 박으면 새 비밀값이 생길 때마다 이 파일을 고쳐야 하고, 안 고치면 다시 낡는다(이번
+# 결함이 그렇게 생겼다). 그래서 **값은 절대 읽지 않고 키 «이름»만** 두 후보 경로에서
+# 읽는다 — 존재하는 파일만 읽고 없으면 조용히 건너뛴다(다른 OS·환경엔 나머지 하나가
+# 원래 없다):
+#   로컬 개발 PC(윈도우)   프로젝트 루트 `.env`
+#   배포 서버(리눅스)      systemd 가 읽는 `/etc/popcorn-ai.env`
+#                         (전역 CLAUDE.md 정본 경로 — 배포 명령이 이 파일을 그대로
+#                         source 한다. `api/db.py` 의 `load_dotenv(REPO_ROOT/".env")`는
+#                         배포 서버에 그 파일이 없으면 조용히 no-op 이라, 서버의 실제
+#                         비밀값은 이 경로로 들어온다고 봐야 한다 — 그래서 이 경로도
+#                         봐야 "서버가 마지막 방어선" 이라는 설계 의도가 서버에서도
+#                         실제로 선다)
+# 새 비밀값을 `.env`(또는 `/etc/popcorn-ai.env`)에 추가하면, 프로세스 재시작 없이도
+# (mtime 캐시라) 다음 호출부터 자동으로 가림 대상에 들어간다 — 이 파일을 고칠 일이 없다.
+_ENV_CANDIDATES = [ROOT / ".env", Path("/etc/popcorn-ai.env")]
+_env_names_cache: dict = {"sig": None, "names": frozenset()}
+
+
+def _env_secret_names() -> frozenset:
+    """후보 경로들의 키 «이름»만 읽는다 — 값은 절대 읽지도 돌려주지도 않는다."""
+    names = set()
+    for path in _ENV_CANDIDATES:
+        try:
+            for line in io.open(path, encoding="utf-8", errors="ignore"):
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key = line.split("=", 1)[0].strip()
+                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                    names.add(key.upper())
+        except OSError:
+            continue
+    return frozenset(names)
+
+
+def _secret_names() -> frozenset:
+    """`_env_secret_names()` 캐시 — 후보 파일들의 mtime 서명이 바뀌면 다시 읽는다."""
+    sig = []
+    for path in _ENV_CANDIDATES:
+        try:
+            sig.append(path.stat().st_mtime)
+        except OSError:
+            sig.append(None)
+    sig_t = tuple(sig)
+    if _env_names_cache["sig"] != sig_t:
+        _env_names_cache["names"] = _env_secret_names()
+        _env_names_cache["sig"] = sig_t
+    return _env_names_cache["names"]
+
+
+def _has_secret(text) -> bool:
+    """비밀값처럼 «보이는» 문자열인가. 확신이 아니라 의심 기준 — 과탐이 누락보다 낫다."""
+    t = str(text or "")
+    if not t:
+        return False
+    for pat in _SECRET_PATTERNS:
+        if pat.search(t):
+            return True
+    # `.env` 류 파일에 실재하는 키 이름 — 대소문자 무시 + 부분 문자열 포함(접두·접미
+    # 변형도 잡는다: "OLD_ADMIN_PW"·"ADMIN_PW2" 는 "ADMIN_PW" 를 부분 문자열로 담는다).
+    names = _secret_names()
+    if names:
+        tu = t.upper()
+        for name in names:
+            if name in tu:
+                return True
+    # 공백 없이 32자 이상 이어지고 대/소문자·숫자가 섞인 덩어리 — 토큰으로 의심
+    for m in re.finditer(r"[A-Za-z0-9+/_=-]{32,}", t):
+        s = m.group(0)
+        if re.search(r"[A-Z]", s) and re.search(r"[a-z]", s) and re.search(r"[0-9]", s):
+            return True
+    return False
+
+
+_REDACTED_MARK = "[가림 — 비밀값으로 보여 전송 제외]"
+
+
+def _event_hash(e: dict) -> str:
+    """사건 하나의 안정된 지문 — 감시자의 "본 것" 기억과 서버의 중복 거르기가 **같은
+    정의**를 쓴다(결함 ③ 수정, 2026-08-27).
+
+    `who`·`ts`·`blocks`(가리기 «전» 원문)로 만든다 — 내용이 같으면 감시자가 재시작돼
+    다시 보내거나, 여러 세션이 겹쳐 같은 사건을 보내도 항상 같은 값이 나온다.
+    `tokens`·`agents` 는 뺀다 — 사건의 「같음」과 무관한 부가 집계라 흔들려도 판정이
+    갈리면 안 된다. `blocks` 는 `sort_keys=True` 로 직렬화해 키 순서 차이를 없앤다.
+
+    ⚠ **가리기 «전» 내용으로 잰다.** `_redact_event()` 뒤의 내용으로 재면, 서로 다른
+    비밀값을 담은 서로 다른 사건이 똑같은 `[가림 — ...]` 문구로 바뀐 뒤 우연히 같은
+    지문이 될 수 있다 — 사건의 정체성은 원문이 정하는 것이지 가림 문구가 정하는 게
+    아니다.
+
+    ⚠ **서버(`push_events`)는 감시자가 보낸 값을 믿지 않고 받은 내용으로 스스로 다시
+    계산한다.** 로컬 감시자와 배포 서버가 서로 다른 시점에 배포된 `api/dash.py` 를
+    돌 수 있어(감시자는 재시작 전까지 옛 리비전을 계속 import 한다) 클라이언트가
+    보낸 해시를 그대로 신뢰하면 두 프로세스의 계산이 어긋날 수 있다 — 서버가 자기가
+    저장할 내용으로 직접 계산하면 이 위험이 아예 없다.
+    """
+    try:
+        blob = json.dumps({"who": e.get("who"), "ts": e.get("ts"), "blocks": e.get("blocks") or []},
+                          ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:                                            # noqa: BLE001
+        blob = "%s|%s|%s" % (e.get("who"), e.get("ts"), e.get("blocks"))
+    return hashlib.sha1(blob.encode("utf-8", "ignore")).hexdigest()
+
+
+def _redact_event(e: dict) -> tuple[dict, int]:
+    """사건 하나(`_event()` 결과와 같은 모양)의 블록을 검사해 의심스러운 것만 가린다.
+
+    블록 단위로 가린다 — 한 사건에 도구 호출 여러 개가 섞여 있으면 그중 의심되는
+    것만 지우고 나머지는 남긴다(사건 전체를 지우면 화면에서 맥락이 통째로 빈다).
+    반환값 둘째 항목은 이번에 가린 블록 수 — 호출부가 「몇 건 가렸는지」를 잴 때 쓴다.
+
+    ⚠ **결함 수정(2026-08-27)** — 적중 판정은 `detail`·`text`·`name` 셋을 다 보면서
+    실제로 지우는 것은 `detail`·`text` 둘뿐이었다(비대칭). `name`(도구 이름, 예:
+    "Bash")이 단독으로 걸리는 경우는 실무에서 사실상 없지만(도구 이름은 고정된
+    목록이라 사용자 입력이 아니다), 판정과 처리가 다른 필드를 보면 "가렸다고
+    세어 놓고 안 가린" 상태가 생긴다 — 판정한 필드는 전부 지운다.
+    """
+    n = 0
+    blocks = []
+    for b in (e.get("blocks") or []):
+        if not isinstance(b, dict):
+            continue
+        bb = dict(b)
+        hit = False
+        for key in ("detail", "text", "name"):
+            v = bb.get(key)
+            if v is not None and _has_secret(v):
+                hit = True
+                break
+        if hit:
+            for key in ("detail", "text", "name"):
+                if key in bb:
+                    bb[key] = _REDACTED_MARK
+            n += 1
+        blocks.append(bb)
+    out = dict(e)
+    out["blocks"] = blocks
+    return out, n
 
 
 def _event_agents(d: dict, id2agent: dict) -> list[str]:
@@ -537,6 +771,37 @@ def _agent_events(path: Path, agent: str, cap: int = 200) -> list[dict]:
     return out[-cap:]
 
 
+def _recent_events(limit: int = 60, path: Path | None = None) -> list[dict]:
+    """윈도 사건 목록 — `state()` 의 기본(팀원 필터 없음) 경로가 쓰던 로직을 뺐다(2026-08-27).
+
+    **감시자(`scripts/dash_watch.py`)가 배포 서버로 밀어 올릴 때도 이 함수를 그대로
+    부른다** — 화면에 보이는 것과 서버로 올라가는 것이 다른 코드에서 각자 계산되면
+    둘이 갈라질 위험이 생긴다(같은 정의를 두 곳에 적지 않는다는 원칙, CANON.md).
+    `path` 를 안 주면 `_latest_session()` 으로 스스로 찾는다 — `state()` 호출 맥락
+    밖(감시자 프로세스)에서도 단독으로 쓸 수 있게.
+    """
+    p = path or _latest_session()
+    if p is None:
+        return []
+    sc = _scan(p)                       # 자란 만큼만 읽음 — 반복 호출에 안전(오프셋 기억)
+    id2agent = sc.get("agent_ids", {})
+    evts = []
+    for line in _tail_lines(p, limit * 6):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            o = json.loads(line)
+        except Exception:                                        # noqa: BLE001
+            continue
+        e = _event(o)
+        if e is None:
+            continue
+        e["agents"] = _event_agents(o, id2agent)   # 팀원 카드 필터가 쓴다(클라 추측 없음)
+        evts.append(e)
+    return evts[-limit:]
+
+
 # 백그라운드 작업 출력을 「지금 도는 것」으로 볼 수 있는 창. 넘으면 지난 일이다.
 AGENT_WINDOW_S = 1800          # 30분
 AGENT_LIVE_S = 60              # 이보다 최근에 쓰였으면 아직 쓰는 중
@@ -595,16 +860,21 @@ def state(limit: int = 40, watcher: int = 0, agent: str = ""):
     기본(파라미터 없음)은 그대로 최근 `limit*6` 줄짜리 창(`_tail_lines`)이다.
     화면은 팀원 카드를 누르면 이 파라미터를 붙여 재조회하고, 해제하면 다시 없이
     부른다(폴링·SSE 갱신도 같은 `load()` 를 타므로 필터가 계속 걸린 채 갱신된다).
+
+    **배포 서버에서는 세션 전사본이 없다**(2026-08-27) — `_is_server_mode()` 가
+    참이면 `_state_server()` 로 넘긴다. 응답 모양은 그대로다(화면 템플릿 불변).
     """
     if watcher:
         _WATCH_PING["ts"] = time.time()
         _WATCH_PING["iso"] = now_iso()          # 타임존 포함 — naive면 배포 서버(UTC)를 브라우저가 로컬로 오독한다(timeutil)
+    if _is_server_mode():
+        return _state_server(limit=limit, agent=(agent or "").strip())
     p = _latest_session()
     if p is None:
         return {"ok": False, "reason": "세션 전사본 없음", "dir": str(SESS_DIR),
                 "events": [], "agents": [], "agents_older": 0,
                 "agents_window_min": AGENT_WINDOW_S // 60, "queued": _queue_pending(),
-                "watcher": _watcher()}
+                "watcher": _watcher(), "mode": "local"}
     # 팀원 명단·활동을 먼저 잰다 — `_scan()` 이 이때 `_SCAN["agent_ids"]`(사건 태깅용
     # tool_use_id -> 팀원 이름 맵)을 채운다. 사건 목록보다 먼저 불러야 아래 태깅이
     # 최신 상태를 쓴다.
@@ -618,22 +888,7 @@ def state(limit: int = 40, watcher: int = 0, agent: str = ""):
     if agent:
         evts = _agent_events(p, agent, cap=AGENT_EVENTS_CAP)
     else:
-        id2agent = _SCAN.get("agent_ids", {})
-        evts = []
-        for line in _tail_lines(p, limit * 6):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                o = json.loads(line)
-            except Exception:                                    # noqa: BLE001
-                continue
-            e = _event(o)
-            if e is None:
-                continue
-            e["agents"] = _event_agents(o, id2agent)   # 팀원 카드 필터가 쓴다(클라 추측 없음)
-            evts.append(e)
-        evts = evts[-limit:]
+        evts = _recent_events(limit, path=p)
     st = p.stat()
     agents, agents_older = _bg_tasks()
     return {
@@ -651,6 +906,91 @@ def state(limit: int = 40, watcher: int = 0, agent: str = ""):
         "today": _today(tot),                # 오늘 처리한 것 — 셀 수 있는 것만
         "watcher": _watcher(),               # 감시자 생존 — heartbeat 또는 ping, 신선한 쪽
         "team_unmapped": team_unmapped,       # 정의는 있으나 TEAM_KO 미등록(위 주석) — 추가만
+        "mode": "local",                     # 로컬(전사본 직접 읽기) — _state_server()는 "server"
+    }
+
+
+# 서버에 마지막으로 데이터가 올라온 지 이만큼(초) 지나면 「오래됨」이다 — 감시자 폴링
+# 주기(30초)의 20배. `_team()` 의 팀원 지연 기준(DELAY_S=600, 10분)과 같은 값을 쓴다
+# — 근거를 새로 만들지 않고 이미 있는 "10분이면 물린 것" 판단을 그대로 재사용한다.
+PUSH_STALE_S = 600
+
+
+def _state_server(limit: int = 40, agent: str = "") -> dict:
+    """배포 서버용 `/state` — 로컬 전사본 대신 `dash_events`(감시자가 밀어 올린 것)를 읽는다.
+
+    **응답 모양은 로컬과 같다** — 화면(`dash.html.j2`)을 바꾸지 않기 위해서다. 다른 점은
+    ① `events` 의 원천이 DB ② `session`/`idle_s` 가 "전사본 신선도"가 아니라 "마지막으로
+    올라온 시각까지의 경과"를 뜻한다(그래서 기존 dot·상태 문구 로직이 손 안 대고도 맞게
+    작동한다 — 8초 미만 "작업 중", 120초 미만 "대기", 그 이상 "멈춤 N분") ③ `push` 필드가
+    추가로 붙는다 — 화면의 작은 추가 배지(헤더) 하나가 이 값을 읽는다(§④, template 쪽
+    최소 추가).
+
+    팀원 명단(`roster`)은 `_team()` 을 그대로 부른다 — `.claude/agents/*.md` 는 git으로
+    배포되므로 이름·역할은 정확히 나온다. 다만 실행 중/완료 같은 **활동 수치는 여기서
+    잴 방법이 없어 전부 0/대기로 나온다**(전사본이 없다) — 지어내지 않고 정직하게 비운다.
+    팀원 카드·백그라운드 작업 배지는 이번 작업 범위가 아니다(지시서 §범위 밖).
+    """
+    roster, tot = _team()
+    team_unmapped = [a["name"] for a in roster if a.get("defined") and not a.get("ko_mapped", True)]
+    try:
+        from api.db import engine
+        from sqlalchemy import text as _t
+        with engine.connect() as conn:
+            rows = conn.execute(_t(
+                "SELECT ev_ts, who, blocks, agents, tokens FROM dash_events"
+                " ORDER BY event_id DESC LIMIT :n"), {"n": max(limit, 1) * 3}).mappings().all()
+            summary = conn.execute(_t(
+                "SELECT MAX(received_at) AS last_at, COUNT(*) AS n FROM dash_events")).mappings().first()
+    except Exception as e:                                        # noqa: BLE001
+        # DB 예외 원문을 그대로 내보내지 않는다(CLAUDE.md 규약) -- 예외 종류만 알린다.
+        return {"ok": False, "reason": "진행 흐름 DB 조회 실패: %s" % type(e).__name__,
+                "events": [], "agents": [], "agents_older": 0,
+                "agents_window_min": AGENT_WINDOW_S // 60, "queued": _queue_pending(),
+                "watcher": _watcher(), "roster": roster, "today": _today(tot),
+                "team_unmapped": team_unmapped, "mode": "server"}
+    evts = []
+    for r in reversed(rows):                    # DESC 로 뽑았으니 화면 순서(오래된 -> 최신)로 되돌린다
+        blocks = r["blocks"] if isinstance(r["blocks"], list) else (json.loads(r["blocks"]) if r["blocks"] else [])
+        ags = r["agents"] if isinstance(r["agents"], list) else (json.loads(r["agents"]) if r["agents"] else None)
+        evts.append({"who": r["who"], "ts": r["ev_ts"], "blocks": blocks,
+                     "tokens": r["tokens"], "agents": ags or ["harness"]})
+    agent_filter = None
+    if agent:
+        evts = [e for e in evts if agent in (e.get("agents") or ["harness"])]
+        agent_filter = agent
+    evts = evts[-limit:]
+    last_at = summary["last_at"] if summary else None
+    n_total = int(summary["n"]) if summary and summary["n"] is not None else 0
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if last_at is not None:
+        if last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=datetime.timezone.utc)
+        # 로컬-DB 서버 간 초 단위 시계 오차로 음수가 나올 수 있다(실측) — 0으로 붙인다.
+        age_s = max(0, int((now - last_at).total_seconds()))
+    else:
+        age_s = None
+    return {
+        "ok": True,
+        "session": None,                        # 로컬처럼 "세션 파일 하나"가 아니다 — 화면은 빈칸으로 둔다
+        "idle_s": age_s if age_s is not None else 999999,  # 재사용: "마지막 수신 후 경과"(위 함수 docstring ②)
+        "size_mb": 0,
+        "events": evts,
+        "agent_filter": agent_filter,
+        "agents": [], "agents_older": 0,         # 백그라운드 작업 배지 — 서버에서는 알 길이 없다(범위 밖)
+        "agents_window_min": AGENT_WINDOW_S // 60,
+        "queued": _queue_pending(),              # 서버 자신의 큐 파일(로컬과 별개 — 기존 동작 그대로)
+        "roster": roster,
+        "today": _today(tot),
+        "watcher": _watcher(),
+        "team_unmapped": team_unmapped,
+        "mode": "server",
+        "push": {                                # §④ — 화면의 작은 추가 배지가 읽는다(template 최소 추가)
+            "last": _iso_tz(last_at) if last_at is not None else None,
+            "age_s": age_s,
+            "stale": age_s is None or age_s > PUSH_STALE_S,
+            "count": n_total,
+        },
     }
 
 
@@ -765,6 +1105,93 @@ def say(body: Say):
     with io.open(QUEUE, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return {"ok": True, "verdict": "전달 완료 · 작업 완료 후 읽음"}
+
+
+# ── 진행 흐름 밀어 올리기 — 감시자 -> 배포 서버 (2026-08-27 신설) ────────────────
+#
+# 로컬 감시자(`scripts/dash_watch.py`)가 `_recent_events()` 로 뽑은 것과 **같은 모양**
+# (who·ts·blocks·tokens·agents)을 그대로 받는다 — 원문 전사본 줄이 아니다. 받은 뒤에도
+# `_redact_event()` 로 한 번 더 가린다(감시자 쪽 필터가 낡거나 우회돼도 여기가 마지막
+# 방어선). `dash_events` 는 원장이 아니라 표시용 캐시라 매 호출마다 보관 기간을 넘긴
+# 것을 함께 정리한다(별도 배치 불필요 — 0068 마이그레이션 설명 참조). 같은 사건이
+# 두 번 오면 `event_hash` 유니크 인덱스가 한 벌만 남긴다(0069 마이그레이션 —
+# `_event_hash()`/`push_events()` 결함 ③ 수정 참고).
+class PushEventIn(BaseModel):
+    ts: str | None = None
+    who: str | None = None
+    blocks: list = []
+    tokens: int | None = None
+    agents: list[str] | None = None
+
+
+class PushBody(BaseModel):
+    session: str = ""
+    events: list[PushEventIn] = []
+
+
+DASH_EVENTS_KEEP_DAYS = 3        # dash_events 보관 기간 — 원장이 아니라 표시 캐시다
+DASH_EVENTS_KEEP_ROWS = 5000     # 화면이 실제 보는 건 limit(기본 40~60)뿐 — 넉넉한 상한
+PUSH_BATCH_CAP = 200             # 한 요청에 담을 수 있는 사건 수 — 폭주 방지
+
+
+@router.post("/push")
+def push_events(body: PushBody):
+    """감시자가 로컬 「진행 흐름」을 배포 서버로 민다.
+
+    `/api/admin/dash/*` 전체와 같은 세션 인증을 그대로 받는다(`api/auth.py` 미들웨어) —
+    이 라우트만 따로 여는 예외를 만들지 않았다. 성공 여부와 무관하게 `_WATCH_PING`
+    을 갱신한다 — 이 호출 자체가 "감시자가 방금 서버에 닿았다"는 증거이기 때문이다
+    (`?watcher=1` 핑과 같은 취급).
+
+    ⚠ **결함 수정(2026-08-27) — 서버가 중복을 거른다.** 확인자 실측: 같은 사건을 두
+    번 보내면 매번 `inserted:1` 이 나와 행이 둘 생겼다 — 서버 쪽 중복 방어가
+    «전무»했다. 감시자가 실패 뒤 재시도하면(`scripts/dash_watch.py` 결함 ② 수정)
+    같은 사건을 두 번 보낼 수 있고, 이 프로젝트는 **세션마다 감시자를 새로 띄우라고
+    지시**해(`CLAUDE.md` §첫 세션 시작 ④) 재시작될 때마다 최근 60건을 다시 밀어
+    올릴 수 있다 — 정상적인 사용 자체가 중복을 만든다. 그래서 `event_hash`
+    (`_event_hash()`, 0069 마이그레이션의 유니크 인덱스)로 DB 가 원자적으로 막는다.
+    **유니크 인덱스를 골랐다** — 삽입 직전 SELECT 로 존재를 먼저 물으면 두 요청이
+    거의 동시에 오면 둘 다 "없음"을 보고 둘 다 INSERT 하는 경합(TOCTOU)이 생긴다.
+    `ON CONFLICT ... DO NOTHING` 은 DB 가 원자적으로 처리해 그 경합이 없다.
+    **해시는 감시자가 보낸 값을 쓰지 않고 서버가 받은 내용으로 스스로 계산한다**
+    (`_event_hash` 문서 참고 — 감시자·서버가 서로 다른 리비전을 돌 수 있어서다).
+    """
+    _WATCH_PING["ts"] = time.time()
+    _WATCH_PING["iso"] = now_iso()
+    evs = body.events[:PUSH_BATCH_CAP]
+    if not evs:
+        return {"ok": True, "inserted": 0, "redacted": 0, "duplicate": 0}
+    from api.db import engine
+    from sqlalchemy import text as _t
+    inserted = redacted = duplicate = 0
+    with engine.begin() as conn:
+        for ev in evs:
+            raw = ev.model_dump()
+            h = _event_hash(raw)                    # 가리기 «전» 원문으로 지문을 낸다
+            e, n = _redact_event(raw)
+            redacted += n
+            row = conn.execute(_t(
+                "INSERT INTO dash_events (session_id, ev_ts, who, blocks, agents, tokens, source, event_hash)"
+                " VALUES (:sid, :ts, :who, CAST(:blocks AS JSONB), CAST(:agents AS JSONB), :tok, :src, :h)"
+                " ON CONFLICT (event_hash) DO NOTHING"),
+                {"sid": (body.session or "")[:80], "ts": str(e.get("ts") or "")[:40],
+                 "who": str(e.get("who") or "")[:16],
+                 "blocks": json.dumps(e.get("blocks") or [], ensure_ascii=False),
+                 "agents": json.dumps(e.get("agents") or [], ensure_ascii=False),
+                 "tok": e.get("tokens"), "src": "dash_watch", "h": h})
+            if row.rowcount:
+                inserted += 1
+            else:
+                duplicate += 1               # event_hash 충돌 — 이미 저장된 사건, 새 행 없음
+        # 보관 정책 — 원장이 아니다. 사흘 지난 것과 최신 5,000행을 넘는 것을 지운다
+        # (0068 마이그레이션 설명 §보관). 푸시가 들어올 때 함께 돈다 — 별도 배치가 없다.
+        conn.execute(_t("DELETE FROM dash_events WHERE received_at < now() - make_interval(days => :d)"),
+                     {"d": DASH_EVENTS_KEEP_DAYS})
+        conn.execute(_t(
+            "DELETE FROM dash_events WHERE event_id NOT IN"
+            " (SELECT event_id FROM dash_events ORDER BY event_id DESC LIMIT :keep)"),
+            {"keep": DASH_EVENTS_KEEP_ROWS})
+    return {"ok": True, "inserted": inserted, "redacted": redacted, "duplicate": duplicate}
 
 
 # ── 메모 (0044 · 사용자 요청 2026-08-12) ─────────────────────────────────

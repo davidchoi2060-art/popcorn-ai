@@ -233,6 +233,10 @@ a{color:inherit;text-decoration:none}
 {# 감시자(scripts/dash_watch.py) 생존 — 짧은 상시 표시. 끊기면 위 배너가 더 크게 다시 말한다
    (둘 다 두는 이유: 2026-08-12 22:29 유실 전례 — 신호 하나로는 놓칠 수 있다). #}
 <span class="num" style="font-size:11px" data-bind="watcher">감시자 확인 중…</span>
+{# 배포 서버 전용 — 「마지막으로 언제 것을 받았나」(2026-08-27 신설). 로컬(파일을 직접
+   읽는 쪽)에서는 이 개념이 없어 JS 가 항상 숨긴다 — hidden 속성으로 미리 마크업해
+   로컬 화면의 겉모양은 그대로 유지한다. #}
+<span class="num" style="font-size:11px" data-bind="push" hidden></span>
 {# SSE/폴링 전환 표시 — dc-dash.html 헤더 문구. 지어내지 않는다: 실제로 EventSource 가
    열려 있는지, onerror 로 폴백했는지 그대로 반영한다(정적 문구로 고정하지 않는다). #}
 <span class="num" style="font-size:11px;color:var(--on-variant)" data-bind="stream"></span>
@@ -476,6 +480,21 @@ a{color:inherit;text-decoration:none}
     if (b) b.hidden = !!w.alive;
   }
 
+  // 배포 서버 전용 — 「마지막으로 언제 것을 받았나」(d.push, api/dash._state_server).
+  // 로컬(d.mode !== 'server')에서는 이 개념이 없어 숨긴다 — 로컬 화면은 항상 최신
+  // 파일을 직접 읽으므로 "수신 시각"이라는 말 자체가 성립하지 않는다.
+  function renderPush(d) {
+    var el = $('push');
+    if (!el) return;
+    if (d.mode !== 'server' || !d.push) { el.hidden = true; return; }
+    el.hidden = false;
+    var p = d.push;
+    el.textContent = p.last
+      ? ('서버 표시 · 마지막 수신 ' + hhmmss(p.last) + ' (' + ago(p.age_s) + ')')
+      : '서버 표시 · 수신 기록 없음';
+    el.style.color = p.stale ? 'var(--error)' : 'var(--on-variant)';
+  }
+
   // 팀원 한글 매핑 누락 — d.team_unmapped 는 서버가 판정한 목록(api/dash.py, 조기경보).
   // 지어내지 않는다: 비어 있으면 배너를 숨기고, 있으면 그 이름을 그대로 나열한다.
   function renderTeamUnmapped(list) {
@@ -517,6 +536,7 @@ a{color:inherit;text-decoration:none}
   function render(d) {
     if (d.ok) lastData = d;      // 필터 클릭이 재조회 없이 이 값으로 다시 그린다
     renderWatcher(d.watcher);
+    renderPush(d);
     renderTeamUnmapped(d.team_unmapped);
     var dot = $('dot'), st = $('status');
     if (!d.ok) {

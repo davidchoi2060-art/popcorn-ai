@@ -15,6 +15,13 @@
   `.env` 의 ADMIN_EMAIL/ADMIN_PW 로 로그인해 `/api/admin/dash/state` 의 `queued` 를 읽는다.
   (비밀값은 출력하지 않는다. 로그인 실패는 한 번만 알리고 계속 재시도한다.)
 
+■ 진행 흐름도 반대 방향으로 민다 (2026-08-27 신설)
+  위 "서버 큐도 본다"가 서버→세션 방향(사장님이 대시보드에 남긴 말)이라면, 이건
+  반대 방향(로컬→서버)이다: 배포 서버는 세션 전사본이 없어 「진행 흐름」이 항상 비므로,
+  이 스크립트가 `api.dash._recent_events()`(화면에 보이는 것과 같은 결과)를 30초마다
+  가져와 `POST /api/admin/dash/push`로 민다. 비밀값은 두 번 가린다 — 여기서 한 번
+  (`api.dash._redact_event`), 서버가 받을 때 한 번 더. 상세는 아래 `push_progress`.
+
 ■ 출력 한 줄 = 알림 한 번 (Monitor 계약)
   [현황판·로컬] / [현황판·서버] 접두어로 어느 쪽에서 온 말인지 구분한다.
 
@@ -106,6 +113,93 @@ try:
 except Exception:                                              # noqa: BLE001
     def now_iso() -> str:
         return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+# ── 진행 흐름 밀어 올리기 (2026-08-27 — 「진행 흐름」을 배포 서버에서도 보이게) ──────
+#
+# `api.dash` 의 순수 함수를 **직접 import** 해서 쓴다 — HTTP 로 로컬 API 서버(포트
+# 8000)를 거치지 않는다. 「말 걸기」 큐를 로컬 API 서버 생사와 무관하게 파일을 직접
+# 읽는 것(`read_local`)과 같은 이유다 — 로컬 dev 서버는 상시 기동이 아니다(수동 기동,
+# 전역 CLAUDE.md). 이 import 는 FastAPI·SQLAlchemy 까지 끌고 오는 무거운 import 라
+# (`api/dash.py` 가 그것들을 module 최상단에서 문다) 실패해도 감시자 본연의 기능
+# (하트비트·말 걸기 큐)은 죽지 않아야 한다 — 그래서 실패를 조용히 흡수하고 이 기능만 끈다.
+DASH_EVENTS_AVAILABLE = True
+try:
+    from api.dash import _recent_events as dash_recent_events
+    from api.dash import _redact_event as dash_redact_event
+    from api.dash import _latest_session as dash_latest_session
+    from api.dash import _event_hash as dash_event_hash
+except Exception:                                              # noqa: BLE001
+    DASH_EVENTS_AVAILABLE = False
+
+
+def _session_label() -> str:
+    try:
+        p = dash_latest_session()
+        return p.stem if p else "unknown"
+    except Exception:                                          # noqa: BLE001
+        return "unknown"
+
+
+PUSH_EVENTS_LIMIT = 60           # 화면이 한 번에 보여주는 것과 같은 크기(사장님 지시서 실측)
+
+
+def push_progress(deploy: "Server", seen_events: set, warn_state: dict) -> None:
+    """로컬 진행 흐름 중 **새것만** 배포 서버로 민다.
+
+    **화면에 보이는 것만 고른다**: `dash_recent_events()` 는 `api/dash.py` 의
+    `_event()`/`_tool_detail()`/`_scan()` 이 이미 걸러낸 결과와 **같은 함수**를 그대로
+    쓴다(전사본 원문 줄을 직접 읽지 않는다). **고른 뒤에도 한 번 더 가린다**:
+    `dash_redact_event()` 로 여기서 먼저 지우고, 서버가 `POST /push` 에서 같은 필터로
+    다시 건다(감시자 쪽 필터가 낡아도 서버가 마지막 방어선이 되도록 — 이중 방어다).
+
+    `warn_state` 는 실패를 **상태 전이에서만** 한 번 알리기 위한 가변 상자다(계속
+    실패해도 30초마다 알리지 않는다 — 머리 주석의 "출력 한 줄 = 알림 한 번" 계약을
+    지킨다. 성공은 절대 stdout 에 찍지 않는다 — 정상 동작이 30초마다 알림을 내면
+    그 자체가 노이즈다).
+
+    ⚠ **결함 수정(확인자 실측 2026-08-27)** — 예전엔 사건을 `seen_events` 에 "봤다"고
+    찍는 시점이 `deploy.push()` 를 부르기 «전»이었다. 그래서 전송이 실패해도 이미
+    "본 것"으로 찍혀 **다음 주기에 다시 안 보냈는데**, 로그는 "다음 주기(30초)에
+    다시 시도한다"고 말하고 있었다 — 거짓말이었다(가짜 실패로 재현: 1회차 실패 뒤
+    2회차에 `push()` 호출 자체가 안 됨). 지금은 **`push()` 가 성공을 돌려준 뒤에만**
+    `seen_events` 에 넣는다 — 실패하면 이번 주기의 사건은 여전히 "안 본 것"이라
+    다음 주기의 `dash_recent_events()` 가 그 사건을 다시 돌려주는 한(사건이 최근
+    60건 창 안에 남아 있는 한) 정말로 다시 보낸다.
+
+    ⚠ **그래서 같은 사건을 두 번 보낼 수 있다** — 의도한 트레이드오프다. "실패 뒤
+    재시도"가 "실패하면 영영 못 본다"보다 훨씬 안전하다(중복은 지우면 그만이지만
+    놓친 사건은 되살릴 방법이 없다). 대신 **서버가 `event_hash` 로 중복을 막는다**
+    (`api/dash.push_events`, 0069 마이그레이션 결함 ③ 수정) — 감시자는 안심하고
+    중복 전송할 수 있고 서버가 한 벌만 남긴다.
+    """
+    if not DASH_EVENTS_AVAILABLE or deploy.creds is None:
+        return
+    try:
+        evts = dash_recent_events(PUSH_EVENTS_LIMIT)
+    except Exception:                                          # noqa: BLE001
+        return
+    fresh = []
+    fresh_keys = []
+    for e in evts:
+        k = dash_event_hash(e)
+        if k in seen_events:
+            continue
+        fresh_keys.append(k)
+        try:
+            red, _n = dash_redact_event(e)
+        except Exception:                                      # noqa: BLE001
+            red = e
+        fresh.append(red)
+    if not fresh:
+        return
+    ok, _inserted, _redacted = deploy.push(_session_label(), fresh)
+    if ok:
+        seen_events.update(fresh_keys)     # 성공을 «확인한 뒤에만» 본 것으로 찍는다
+        warn_state["warned"] = False
+    elif not warn_state.get("warned"):
+        print("[현황판·서버] 진행 흐름 전송 실패 — 다음 주기(30초)에 다시 시도한다.")
+        warn_state["warned"] = True
 
 
 def write_heartbeat() -> None:
@@ -263,6 +357,30 @@ class Server:
             self.mark_read()
         return n
 
+    def push(self, session: str, events: list) -> tuple:
+        """진행 흐름 사건들을 서버(`POST /api/admin/dash/push`)로 민다.
+
+        `local`(127.0.0.1:8000) 에도 기술적으로 부를 수 있지만 실제로는 `deploy`
+        인스턴스에만 쓴다 — 로컬은 화면이 파일을 직접 읽으므로 스스로에게 밀어
+        올릴 이유가 없다. 실패해도 예외를 던지지 않는다 — 다음 주기에 다시 시도한다
+        (`push_progress` 의 알림 계약이 "조용히 다음 주기" 를 전제한다).
+        """
+        try:
+            payload = json.dumps({"session": session, "events": events},
+                                  ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(
+                self.base + "/api/admin/dash/push",
+                data=payload, headers={"Content-Type": "application/json"}, method="POST")
+            r = self.op.open(req, timeout=20)
+            body = json.loads(r.read().decode("utf-8", "ignore"))
+            return True, body.get("inserted", 0), body.get("redacted", 0)
+        except urllib.error.HTTPError as e:                  # 401 = 세션 만료 → 재로그인
+            if e.code == 401 and self.login():
+                return self.push(session, events)
+            return False, 0, 0
+        except Exception:                                    # noqa: BLE001
+            return False, 0, 0
+
 
 # ── 중복 실행 방지 (service 모드 전용 — 머리 주석 "역할을 가른다" 참고) ──────────
 
@@ -346,15 +464,24 @@ def release_service_lock() -> None:
 # ── 두 모드 ──────────────────────────────────────────────────────────────
 
 def service_loop() -> None:
-    """하트비트 전용 — 큐를 절대 소비하지 않는다. 작업 스케줄러가 이 모드로 띄운다."""
+    """하트비트 전용 — 큐를 절대 소비하지 않는다. 작업 스케줄러가 이 모드로 띄운다.
+
+    **진행 흐름은 민다**(2026-08-27) — 방향이 로컬->서버라 "큐를 절대 소비하지 않는다"
+    (서버->세션 방향, 위 머리 주석 참고)와는 다른 데이터·다른 방향이라 무관하다.
+    세션 창이 하나도 안 떠 있어도 마지막 전사본 내용은 여전히 유효한 "최근 진행
+    상황"이라 계속 민다 — service 모드가 항상 켜져 있는 유일한 경로이기도 하다.
+    """
     deploy = Server(SERVER, "서버")
     deploy.login()
+    seen_events: set = set()
+    push_state = {"warned": False}
     last_srv = 0.0
     while True:
         write_heartbeat()
         if time.time() - last_srv >= POLL_SERVER_S:
             last_srv = time.time()
             deploy.ping()
+            push_progress(deploy, seen_events, push_state)
         time.sleep(POLL_LOCAL_S)
 
 
@@ -367,6 +494,8 @@ def notify_loop() -> None:
     잠그지 않는다 — 여러 세션이 동시에 이 모드를 띄울 수 있다(머리 주석 참고).
     """
     seen: set = set()
+    seen_events: set = set()                    # 진행 흐름 밀어 올리기 중복 방지(2026-08-27)
+    push_state = {"warned": False}
     # 시작 시점의 «안 읽음»도 찍는다 — 감시가 죽어 있던 사이에 온 것을 놓치지 않기 위해서다.
     local = Server(LOCAL_BASE, "로컬")
     local.login()
@@ -380,6 +509,7 @@ def notify_loop() -> None:
         if time.time() - last_srv >= POLL_SERVER_S:
             last_srv = time.time()
             deploy.poll(seen)
+            push_progress(deploy, seen_events, push_state)
         time.sleep(POLL_LOCAL_S)
 
 
