@@ -248,7 +248,25 @@ _ADMIN_LEGACY_GONE_HTML = (
 #   git mv(P-09 「파일은 지우지 않는다」 — 위치만 바꿈, 이력 보존). `_legacy/` 는
 #   리포 루트라 아래 캐치올 마운트(MOCKUPS_DIR) 밖이다 — 서빙되지 않는다(실측).
 #   이 라우트의 410은 파일 존재와 무관하므로 옮긴 뒤에도 그대로다.
-_ADMIN_AUTH_DOOR_SCREENS = {"my-profile"}
+#
+# ■ 2026-08-28 전환 — `my-profile`을 뺐다 (하나 -> 0, 사장님 확정 「채우고 닫는다」)
+#
+#   「하나씩 뺀다」의 세 번째 적용이다. `/admin2/my-profile`(ADM-SYS-022,
+#   `api/admin_ui_my_profile.py` + `templates/admin/my_profile.html.j2`)이 대체
+#   화면으로 서 있고, 확인자·계약자·문안검사 3축 검증을 통과했다(커밋 `922e7d0`
+#   → 결함 수정 `6023cba`·`d4573d2`) — 예외의 전제(「대체 화면이 없다」)가 사라졌다.
+#   `/admin/my-profile.html`도 이제 410을 받는다. **예외 집합이 빈다** — login·
+#   operators·my-profile 셋 다 대체 화면으로 넘어갔다.
+#
+#   ⚠ **`operators` 전환과 달리 파일은 옮기지 않았다.** `mockups/admin/my-profile.html`
+#   은 그대로 `mockups/admin/`에 남아 있다(git mv 없음) — 이 작업의 담당 범위가
+#   `mockups/admin/*`을 명시적으로 제외했기 때문이다. 410은 **경로 차단**이지 파일
+#   삭제가 아니므로 파일이 그 자리에 남아 있어도 라우트는 그대로 410을 낸다. 다만
+#   `tests/regression.py`의 `test_password_policy`·`test_session_revoke`·
+#   `test_my_profile`은 이 파일을 **파일시스템에서 직접** 읽는다(`io.open`, 위
+#   cleanups 주석·`docs/design/dc-my-profile.html:771` 참조) — 지금은 그대로 통과
+#   하지만 파일을 지우는 날 조용히 깨진다. 이 전환은 그 회귀를 고치지 않는다(별건).
+_ADMIN_AUTH_DOOR_SCREENS = set()
 
 
 @app.get("/admin", include_in_schema=False)
@@ -261,9 +279,10 @@ def _legacy_admin_page_gone(page_name: str = ""):
     마운트가 그대로 서빙한다 — `mockups/admin/` 에 남은 구 화면 8개가 상대경로로
     읽기 때문이다(admin2 참조는 0건 — 2026-08-17 재실측, 위 블록 주석 참조).
 
-    `_ADMIN_AUTH_DOOR_SCREENS`(내 정보)는 차단하지 않고 실제
-    파일을 그대로 서빙한다 — 위 "인증·세션 화면" 블록 참조. `NoCacheStatic`이 이
-    캐치올 대신 여기서 먼저 잡히므로, 캐시 미적용 정책(no-cache)도 동일하게 직접
+    `_ADMIN_AUTH_DOOR_SCREENS`는 2026-08-28부터 빈 집합이다(위 "2026-08-28 전환"
+    참조) — login·operators·my-profile 셋 다 admin2 대체 화면으로 넘어가, 이제
+    `/admin/<이름>.html`은 예외 없이 전부 410이다. `NoCacheStatic`이 이 캐치올
+    대신 여기서 먼저 잡히므로, 캐시 미적용 정책(no-cache)도 동일하게 직접
     건다 — 옛 로그인 화면이 브라우저에 캐시돼 새 배포가 안 보이는 사고(슬라이스 71)를
     이 경로에서도 반복하지 않는다.
 

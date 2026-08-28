@@ -377,6 +377,16 @@ ID」에 맞춘다).
 - **⚠ 딸린 화면(ADM-SYS-022, 바로 아래)이 이제 admin2에 있다** — `templates/admin/login.html.j2:362`의 `must_change_password` 분기 주석은 "「내 정보」는 admin2 에 아직 없어서 대시보드로 보낸다"는 2026-08-17 당시의 판단을 그대로 담고 있다(`go()`가 항상 `DASH`로만 이동, 361행). 그 전제가 오늘 바뀌었으니 **대시보드로 보낼지 `/admin2/my-profile`로 바로 보낼지는 다시 판단할 거리다** — 코드 파일이라 기록자는 고치지 않고 보고만 한다.
 - **확인법:** `api/admin_ui_login.py`의 `screen_id="ADM-SYS-021"`(60행 부근) · `grep -n "ADMIN2_OPEN_PATHS" api/auth.py`.
 
+> **⚠ 2026-08-28 갱신(기록자, 지우지 않고 이어 적는다) — 위 우려가 더는 미룰 이유가
+> 없어졌다.** `_ADMIN_AUTH_DOOR_SCREENS`가 오늘 `my-profile`을 마지막으로 빼며 빈
+> 집합이 됐다(login → operators → my-profile, 셋 다 admin2 대체 화면으로 전환
+> 완료 — 상세 `docs/decisions/decision-log.md` **A-117**). 위에서 인용한 주석의
+> 전제("「내 정보」는 admin2 에 아직 없어서")는 이제 사실이 아니다. 그런데
+> `templates/admin/login.html.j2:360-366`의 분기는 오늘도 대시보드로만 보낸다 —
+> 재판단할 거리는 그대로 열려 있다. 코드 파일이라 기록자는 고치지 않는다.
+> 확인법: `grep -n "_ADMIN_AUTH_DOOR_SCREENS = " api/main.py`(`set()`) ·
+> `sed -n '355,367p' templates/admin/login.html.j2`(여전히 `go(1600)` → `DASH`뿐인지).
+
 ### 내 정보 (ADM-SYS-022) — 신설 2026-08-19 · **등재 2026-08-20**
 
 - **목적:** 운영자가 자기 계정(이름·연락처·직무·비밀번호·세션·기기 기억·사진)을 스스로 조회·수정한다.

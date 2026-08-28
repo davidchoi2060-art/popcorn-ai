@@ -82,10 +82,17 @@
 > 바꿨다. 재확인: `grep -n "my-profile" templates/admin/_admin2_shell.html.j2` → 131·145행
 > 실재(0건이 아니다). 그 커밋은 CDP 실클릭으로 `location.pathname`이 실제로
 > `/admin2/my-profile`이 되는 것까지 확인했고 회귀 896/896 통과였다.
+>
+> ⇒ **2026-08-28 갱신(같은 날 두 번째, 기록자) — 구 화면 문이 완전히 닫혔다.**
+> `/admin/my-profile.html`도 이제 410이다(구 로그인·구 운영자·권한에 이어 세
+> 번째이자 마지막 — `docs/decisions/decision-log.md` **A-117**). 같은 물결에서
+> 이 화면(아래 표)이 구 화면에는 있던 「로그인 실패 횟수」(`login_fail_count`)를
+> 서버에서 받고도 안 그리던 것도 채웠다. 신원 격자는 `spec-my-profile.md` §㉡의
+> **5칸**을 그대로 두고 잠금 배지 옆에 별도로 얹었다 — 격자 칸 수는 안 바뀌었다.
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 0B | 내 정보 | [req-my-profile.md](req-my-profile.md) | [spec-my-profile.md](../spec-my-profile.md) | **지음 · 커밋·배포·링크 연결 완료**(**ADM-SYS-022** · 경로 `/admin2/my-profile` · `api/admin_ui_my_profile.py` + `templates/admin/my_profile.html.j2` + `api/admin_profile_photo.py`. 커밋 `922e7d0`(화면 신설) · `6023cba`(문구 교정 약 90곳) · `d4573d2`(401 구조화)로 서버에 반영됐다(HEAD `ead6dd3` 대조 완료). 2026-08-19 계약자 재점검 결함 셋 중 하나(사진 정책 API 임의 신설)는 같은 날 **A-70**으로 추인 해소, 나머지는 미정 **U-19~U-23**으로 남았다. **회귀 스위트는 이 화면(사진 API)을 다루지 않는다**(coverage gap, 그대로). **2026-08-28 기록자 정정 — 「링크 미연결」은 낡았다.** 상단바 아바타 링크가 커밋 `c5d7610`(2026-08-21)로 이미 연결됐다(위 §0B 안내문 2026-08-28 갱신 참조). 상세는 `HANDOFF.md` 「2026-08-20」) |
+| 0B | 내 정보 | [req-my-profile.md](req-my-profile.md) | [spec-my-profile.md](../spec-my-profile.md) | **지음 · 커밋·배포·링크 연결 완료**(**ADM-SYS-022** · 경로 `/admin2/my-profile` · `api/admin_ui_my_profile.py` + `templates/admin/my_profile.html.j2` + `api/admin_profile_photo.py`. 커밋 `922e7d0`(화면 신설) · `6023cba`(문구 교정 약 90곳) · `d4573d2`(401 구조화)로 서버에 반영됐다(HEAD `ead6dd3` 대조 완료). 2026-08-19 계약자 재점검 결함 셋 중 하나(사진 정책 API 임의 신설)는 같은 날 **A-70**으로 추인 해소, 나머지는 미정 **U-19~U-23**으로 남았다. **회귀 스위트는 이 화면(사진 API)을 다루지 않는다**(coverage gap, 그대로). **2026-08-28 기록자 정정 — 「링크 미연결」은 낡았다.** 상단바 아바타 링크가 커밋 `c5d7610`(2026-08-21)로 이미 연결됐다(위 §0B 안내문 2026-08-28 갱신 참조). **같은 날 두 번째 갱신 — 「로그인 실패 횟수」를 채웠다.** 구 화면(`mockups/admin/my-profile.html:382`)엔 있었는데 이 화면이 서버 값(`login_fail_count`)을 받고도 안 그리고 있었다 — 잠금 배지 옆에 채웠다(신원 격자 5칸은 그대로). 구 화면 문도 같은 날 닫혔다(`/admin/my-profile.html` → 410, `docs/decisions/decision-log.md` **A-117**). 상세는 `HANDOFF.md` 「2026-08-20」) |
 
 ## 1. 대시보드
 

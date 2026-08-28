@@ -264,6 +264,12 @@
               <span class="mp-badge" id="mpRole" data-bind="role_label" hidden></span>
               <span class="mp-badge" id="mpStatus" data-bind="status" hidden></span>
               <span class="mp-badge bad" id="mpLocked" hidden>로그인 잠금</span>
+              {# 로그인 실패 횟수 — `mpLocked`는 «이미 잠긴 뒤»에만 뜨는 이진 배지라
+                 "5회 중 4회" 같은 조짐을 알 길이 없다(2026-08-28, 구 /admin/my-profile.html
+                 이 항상 보여주던 것이 신 화면엔 없었다). 신원 격자(㉡)는 5칸으로 확정돼
+                 있어(spec-my-profile.md §㉡ "신원 격자는 5칸이다") 거기 6번째 칸으로
+                 넣지 않고, 구 화면과 같은 자리(계정 잠금 옆)에 항상 붙는 note로 둔다. #}
+              <span class="mp-n" id="mpFails" hidden></span>
             </div>
             <div class="mp-grid" id="mpGrid" data-repeat="identity"></div>
             <div class="mp-lock">
@@ -640,6 +646,18 @@ setTimeout(function () {
     st.textContent = d.status || '';
     show(st, !!d.status);
     show($('mpLocked'), !!d.is_locked);
+    /* 로그인 실패 횟수 — 구 화면(mockups/admin/my-profile.html:382)은 잠금 여부와
+       무관하게 «항상» "로그인 실패 N회"를 보여줬다(0회일 때도). 같은 원칙을 따른다 —
+       0이라고 감추면 "표시되면 이미 뭔가 있었다"는 잘못된 신호가 된다. login_fail_count는
+       NOT NULL DEFAULT 0(0018_operator_password.py)이라 사실상 항상 오지만, 서버가
+       빼먹은 경우까지 0으로 지어내지 않고 그 칸을 숨긴다(모르는 것을 지어내지 않는다). */
+    var mpFails = $('mpFails');
+    var hasFailCount = d.login_fail_count !== null && d.login_fail_count !== undefined;
+    if (hasFailCount) {
+      mpFails.textContent = '로그인 실패 ' + Number(d.login_fail_count) + '회';
+      mpFails.className = 'mp-n' + (d.is_locked ? ' bad' : '');
+    }
+    show(mpFails, hasFailCount);
     show($('mpPwBanner'), !!d.must_change_password);
 
     /* 로그인 방식 — `provider_verified` 가 false 면 「미검증」을 «텍스트로» 병기한다.

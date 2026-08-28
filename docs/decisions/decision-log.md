@@ -6,7 +6,7 @@
 > 같은 사실을 두 곳에 적지 않는다 — 중복이 문서를 어긋나게 만든다(2026-07-29 정리).
 > 결정을 바꾸거나 미정을 확정할 때는 **이 파일을 먼저 갱신**하고, 그 다음 목업·프롬프트에 반영한다.
 >
-> 최초 작성: 2026-07-02 · 최종 갱신: **2026-08-27(A-116)**
+> 최초 작성: 2026-07-02 · 최종 갱신: **2026-08-28(A-117)**
 > 단계: ~~모델링~~ → **모델링 + DB·API 수직 슬라이스 구현**(2026-07-23 개정 — §2 P-04)
 > 출처: `CLAUDE.md`, `HANDOFF.md`, `docs/prompts/S0~S4`, `docs/infra/GCP_SETUP.md`
 >
@@ -6277,6 +6277,99 @@ reason=`mall_min_reprice`, ref_id=16091)을 남겼다 — 매입가 이력에는
 
 **확인법**: `SELECT detail FROM admin_operator_activity_logs WHERE log_id=16091`로 대상
 245건·재계산 근거·되돌림용 스냅샷(`before`)을 직접 확인한다.
+
+---
+
+## 「내 정보」 구 화면 문 닫기 완결 (2026-08-28)
+
+### A-117 「내 정보」 구 화면 문 닫기 완결 — `_ADMIN_AUTH_DOOR_SCREENS` 예외 집합이 빈다 (✅ 2026-08-28 사장님 확정)
+
+**확정 방식**: 사장님 지시 — 「새 화면부터 확인하고 정한다」→ 확인자·계약자·문안검사
+3축 검증 통과(커밋 `922e7d0` → 결함 수정 `6023cba`·`d4573d2`) → 「채우고 닫는다」.
+A-66이 시작한 「하나씩 뺀다」(login → operators → my-profile)의 **세 번째이자 마지막**
+적용이다.
+
+**한 것 — 셋**:
+
+    ① 예외 집합을 비웠다   api/main.py `_ADMIN_AUTH_DOOR_SCREENS`: {"my-profile"} →
+                          set(). `/admin/my-profile.html`도 이제 410 — login·
+                          operators·my-profile 셋 다 admin2 대체 화면으로 전환
+                          완료, 남는 예외 0개. ⚠ `operators` 전환과 달리 파일은
+                          옮기지 않았다 — `mockups/admin/my-profile.html`이 git mv
+                          없이 그 자리에 그대로 남아 있다(이 작업의 담당 범위가
+                          `mockups/admin/*`을 명시적으로 제외했다). 410은 경로
+                          차단이지 파일 삭제가 아니므로 무관하게 동작한다.
+    ② 로그인 실패 횟수를   `templates/admin/my_profile.html.j2` — 구 화면
+       채웠다              (`mockups/admin/my-profile.html:382`)엔 있었는데 신
+                          화면(ADM-SYS-022)이 서버 값(`login_fail_count`)을 받고도
+                          그리지 않고 있었다. 문을 닫으면 그 값을 볼 화면이 하나도
+                          안 남기 때문에 먼저 채웠다. 신원 격자는
+                          `spec-my-profile.md` §㉡이 명시한 **5칸을 그대로 두고**
+                          (원안 데이터 8행 중 앞 5개만 격자 — 로그인 방식·가입·
+                          승인·마지막 로그인·비밀번호 설정), 잠금 배지(`mpLocked`)
+                          옆에 별도 note로 얹었다. **0회일 때도 항상 보여준다** —
+                          감추면 "보이면 이미 있었다"는 잘못된 신호가 된다(구
+                          화면도 그랬다). 서버가 값을 아예 안 보낸 경우(NULL·
+                          undefined)에만 칸을 숨긴다 — 모르는 것을 0으로 지어내지
+                          않는다.
+    ③ 낙오 링크 11곳을    A-66 「남은 일 1」("admin2 템플릿 12곳의 낙오 링크 —
+       정정했다             build_map 1곳만 이번에 잡았다. 나머지 11곳은 아직
+                          실측·정정 전이다")의 잔여분. ai_integration·
+                          ai_usage_cost·compat_rules·part_grade·policy_weights·
+                          price_review·product_deleted·reviews·sourcing·
+                          suppliers·usage_floors — 401 안내의
+                          `<a href="/admin/login.html">`(410)을 `/admin2/login`으로
+                          정정. 확인자가 11곳 전부 실제로 눌러 로그인 화면 도착까지
+                          확인했다.
+
+**기록자가 직접 확인한 것**(코드로 재확인 — 하네스가 전한 값이 옮기는 동안 다섯 번
+틀렸던 전례가 있어, 옮겨 적기 전에 직접 읽었다):
+
+    api/main.py                          `_ADMIN_AUTH_DOOR_SCREENS = set()`(269행) — 일치
+    templates/admin/my_profile.html.j2   `login_fail_count` 참조 3곳(651·655·657행),
+                                          `mpLocked` 옆 배치(266·272행) — 일치
+    git diff --stat                      main.py·my_profile.html.j2 + 템플릿 11개,
+                                          정확히 13개 파일 변경 — 그 외 추가 변경 없음
+                                          (git status로 대조). ai_integration·
+                                          suppliers 표본 대조 — `/admin/login.html`
+                                          → `/admin2/login` 일치. `grep -rln
+                                          "admin/login.html" templates/admin/*.html.j2`
+                                          0건 — 남은 죽은 링크 없음(직접 실행)
+
+HTTP 410/200 실응답·회귀 960/960은 기록자가 직접 실행하지 않았다(부작용 있는 검사는
+기록자 범위 밖 — 읽기·문서 쓰기만) — 하네스·확인자 보고를 그대로 옮긴다.
+
+**남은 일 — 임의로 메우지 않는다**:
+
+    U-19~U-23(§5, 2026-08-19 등재)   신원 카드 문구·배치 5건, 오늘로 아흐레째
+                                     사장님 결정 대기 그대로다. 이번 전환은
+                                     그중 무엇도 해소하지 않았다 — 별개다.
+    admin-identity.md ADM-SYS-021   `login.html.j2:360-366`의
+                                     `must_change_password` 분기가 여전히
+                                     대시보드로만 보낸다. 그 주석("「내 정보」는
+                                     admin2 에 아직 없어서")은 2026-08-17 당시
+                                     판단인데 **오늘로 전제가 완전히 사라졌다**
+                                     (문이 닫힐 만큼 검증된 화면이다) — 재판단
+                                     대상은 그대로 열려 있다(코드 파일이라
+                                     기록자는 고치지 않는다).
+    tests/regression.py             `test_password_policy`·`test_session_revoke`·
+                                     `test_my_profile` 셋이
+                                     `mockups/admin/my-profile.html`을 `io.open`으로
+                                     파일시스템에서 직접 읽는다 — 대응이 다르다.
+                                     앞의 둘은 `except OSError`로 감싸 파일이
+                                     없으면 `[SKIP]`으로 넘어가지만(3373·3457행
+                                     부근), `test_my_profile`의 `io.open`(4151행)은
+                                     감싸는 처리가 없어 파일이 사라지면 그 함수의
+                                     나머지 검사 전부가 dispatcher 의 일반 예외
+                                     처리(6559행) 하나로 뭉뚱그려진다. 코드라
+                                     기록자는 고치지 않는다.
+
+**확인법**: `grep -n "_ADMIN_AUTH_DOOR_SCREENS = " api/main.py`(`set()`이어야 한다) ·
+`grep -n "login_fail_count" templates/admin/my_profile.html.j2` · `git diff --stat`
+(이번 물결에서 바뀐 파일이 13개인지 — `/admin2/login` 총 참조 파일 수는 기존 5개
+(login·my_profile·build_map·candidate_pool·stock_inbound)를 포함해 더 많으므로
+grep 총합이 아니라 diff 로 **이번에 바뀐 것**을 본다) · `grep -rn "admin/login.html"
+templates/admin/*.html.j2`(0건이어야 한다).
 
 ---
 
