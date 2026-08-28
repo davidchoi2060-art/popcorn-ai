@@ -75,23 +75,30 @@
 > **링크는 여전히 없다**(기록자 `grep -n "my-profile" templates/admin/_admin2_shell.html.j2`
 > 확인 — 0건). 즉 「검증 전이라 안 잇는다」던 조건은 더 이상 사실이 아니고, **잇는 일
 > 자체가 남아 있을 뿐이다.** 화면 파일이라 기록자는 손대지 않는다.
+>
+> ⇒ **2026-08-28 갱신(기록자 정정) — 그 「남은 일」이 이미 됐다.** 사장님이 "내정보
+> 수정은 어디를 클릭해야 들어갈 수 있지?"라고 물으신 것을 계기로 커밋 `c5d7610`
+> (2026-08-21)이 상단바 아바타를 `<span>`에서 실제 링크(`href="/admin2/my-profile"`)로
+> 바꿨다. 재확인: `grep -n "my-profile" templates/admin/_admin2_shell.html.j2` → 131·145행
+> 실재(0건이 아니다). 그 커밋은 CDP 실클릭으로 `location.pathname`이 실제로
+> `/admin2/my-profile`이 되는 것까지 확인했고 회귀 896/896 통과였다.
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 0B | 내 정보 | [req-my-profile.md](req-my-profile.md) | [spec-my-profile.md](../spec-my-profile.md) | **지어짐 · 커밋·배포됨 · 링크 미연결**(2026-08-20 갱신 — **ADM-SYS-022** · 경로 `/admin2/my-profile` · `api/admin_ui_my_profile.py` + `templates/admin/my_profile.html.j2` + `api/admin_profile_photo.py`. 커밋 `922e7d0`(화면 신설) · `6023cba`(문구 교정 약 90곳) · `d4573d2`(401 구조화)로 서버에 반영됐다(HEAD `ead6dd3` 대조 완료). 2026-08-19 계약자 재점검 결함 셋 중 하나(사진 정책 API 임의 신설)는 같은 날 **A-70**으로 추인 해소, 나머지는 미정 **U-19~U-23**으로 남았다. **회귀 스위트는 이 화면(사진 API)을 다루지 않는다**(coverage gap, 그대로). ⚠ **검증은 통과했는데 상단바 아바타 링크가 아직 없다**(`_admin2_shell.html.j2` grep 0건) — 「검증 전이라 안 잇는다」던 조건(§2 규약)이 더는 해당하지 않으므로 남은 것은 연결 작업뿐이다. 상세는 `HANDOFF.md` 「2026-08-20」) |
+| 0B | 내 정보 | [req-my-profile.md](req-my-profile.md) | [spec-my-profile.md](../spec-my-profile.md) | **지음 · 커밋·배포·링크 연결 완료**(**ADM-SYS-022** · 경로 `/admin2/my-profile` · `api/admin_ui_my_profile.py` + `templates/admin/my_profile.html.j2` + `api/admin_profile_photo.py`. 커밋 `922e7d0`(화면 신설) · `6023cba`(문구 교정 약 90곳) · `d4573d2`(401 구조화)로 서버에 반영됐다(HEAD `ead6dd3` 대조 완료). 2026-08-19 계약자 재점검 결함 셋 중 하나(사진 정책 API 임의 신설)는 같은 날 **A-70**으로 추인 해소, 나머지는 미정 **U-19~U-23**으로 남았다. **회귀 스위트는 이 화면(사진 API)을 다루지 않는다**(coverage gap, 그대로). **2026-08-28 기록자 정정 — 「링크 미연결」은 낡았다.** 상단바 아바타 링크가 커밋 `c5d7610`(2026-08-21)로 이미 연결됐다(위 §0B 안내문 2026-08-28 갱신 참조). 상세는 `HANDOFF.md` 「2026-08-20」) |
 
 ## 1. 대시보드
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 1 | **대시보드** | [req-dashboard.md](req-dashboard.md) | `dc-dashboard-3안.html` | **재구축 중** (ADM-DASH-010 · UX-22 → 1b) |
+| 1 | **대시보드** | [req-dashboard.md](req-dashboard.md) | `dc-dashboard-3안.html` | **지음**(`/admin2/` · ADM-DASH-010 · UX-22 → 1b 카드 그리드형. **2026-08-28 기록자 정정 — 「재구축 중」은 낡았다.** `templates/admin/home.html.j2` 상단 주석이 2026-08-15에 이미 「재구축」을 완료로 적어 뒀다(Phoenix·Bootstrap·외부 CDN 전부 걷어내고 admin2.css 전용으로 다시 지음). 그 뒤로도 재고 정합 쿼리 성능 개선(`97b878d`)·몰 값 야간 자동 반영(`f20abb1`, 2026-08-27, 대시보드에 그 결과가 뜬다)까지 계속 붙었다 — 공사 중이 아니라 이미 서서 자라는 화면이다. 「레이아웃 견본」 배너 0건, `api/admin_nav.py`에 href 실재. 확인법: `git log --oneline -- templates/admin/home.html.j2`) |
 
 ## 2. 상품관리
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
 | 2 | **상품 분류 관리** | [req-product-category.md](req-product-category.md) | `dc-product-category.html` | **지음** (`/admin2/categories` · ADM-CAT-010) |
-| 3 | **상품 관리** | [req-products.md](req-products.md) | `dc-products-3안.html` | **재구축 대기** (ADM-PRD-010 · UX-23 → 1a · 셸 CSS 특정성 사고 방어 수정 — `.pp-btn-line`, 검수 대기 상품 상세 서랍에서만 렌더돼 무증상이었다. 커밋 `77121d6`+`fbb9b61`) |
+| 3 | **상품 관리** | [req-products.md](req-products.md) | `dc-products-3안.html` | **지음**(`/admin2/products` · ADM-PRD-010 · UX-23 → 1a 탭형 서랍. **2026-08-28 기록자 정정 — 「재구축 대기」(=착수 전)는 낡은 정도가 아니라 사실과 반대였다.** 재구축 자체는 커밋 `cbb124c`(2026-08-15, 「상품 관리 화면 재구축(dc-products-3안 1a) + 중복 판정 결함 4건」)로 끝났고, 그 뒤로도 공급처 정보 배선·상품명 HTML 태그 제거(`4eb7adb`, 2026-08-27)까지 계속 기능이 붙었다. 셸 CSS 특정성 사고 방어 수정 — `.pp-btn-line`, 검수 대기 상품 상세 서랍에서만 렌더돼 무증상이었다. 커밋 `77121d6`+`fbb9b61`. 확인법: `git log --oneline -- templates/admin/products.html.j2`) |
 | 4 | **상품 분류 매핑** | [req-product-category-map.md](req-product-category-map.md) | `dc-product-category-map.html` | **지음** (`/admin2/category-mapping`) |
 | 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **지음** (`/admin2/catalog-import` · ADM-CSV-010 · UX-21 → 1b · 라우트·템플릿 커밋 `82a55a1` · ⚠⚠ owner 업로드가 영구히 잠기던 결함 수정(셸 스크립트 중복 로드로 `window.Admin2Shell` 인스턴스가 둘 생겨 권한 갱신이 안 됐다, 커밋 `08541f7`) · 확인자 재검증 통과(`script[src]` 정확히 2개 · 잠금 문구 사라짐 · 파일 입력 3개 열림 · `canWrite('owner')===true`) · 메뉴 연결 `9fdae6d`) |
 | 6 | **삭제 상품 조회** | [req-product-deleted.md](req-product-deleted.md) | `dc-product-deleted-2안.html` | **지음** (`/admin2/deleted-products` · ADM-DEL-010 · UX-26 → 1b + 빈 상태 1c · 라우트·템플릿 커밋 `82a55a1` · 로딩 표시 CSS 결함 수정(`hidden`인데 `display:flex`였다, 커밋 `107e819`) · 확인자 재검증 통과(화면 수치 ↔ API 응답 전수 대조 일치) · 메뉴 연결 `9fdae6d` · 셸 CSS 특정성 사고 방어 수정 — `.dp-empty-link`(커밋 `77121d6`+`fbb9b61`)) |
@@ -100,8 +107,8 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 7 | **조립 호환 지도** | [req-build-map.md](req-build-map.md) | `dc-build-map-v2.html` | **재구축 대기** (`/admin2/build-map` · UX-20 → v2 클릭 고정) |
-| 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **재구축 중** (`/admin2/spec-standard` · UX-24 → **1a**) |
+| 7 | **조립 호환 지도** | [req-build-map.md](req-build-map.md) | `dc-build-map-v2.html` | **지음**(`/admin2/build-map` · **ADM-STD-020** · UX-20 → v2 클릭 고정. **2026-08-28 기록자 정정 — 「재구축 대기」는 10일 전에 끝난 일이었다.** `templates/admin/build_map.html.j2`는 2026-08-15 커밋 `6fe0de9`(「결함 2건 수정 후 재실측 통과」)로 v2(대상 유지 hover→click 고정)까지 완성됐고, `api/admin_ui_build_map.py` docstring도 같은 날짜로 "v2 재구축" 완료를 적어 뒀다. UX-20이 요구한 3탭(지도형·진단형·매트릭스형)이 템플릿에 실재한다(`grep -c "지도형\|진단형\|매트릭스형" templates/admin/build_map.html.j2` = 16 — 주석뿐 아니라 tab 버튼·`data-view-panel` 패널까지). 데이터는 `GET /api/admin/std/compat-map` 하나(읽기 전용), 「레이아웃 견본」 배너 0건. `api/admin_nav.py`에도 href가 이미 있다(298행). 이 행을 마지막으로 고친 것은 그보다 «뒤»인 2026-08-25 커밋 `0662d43`인데도 옛 상태말을 그대로 옮겨 적어, 나중에 편집된 문서가 더 낡은 사실을 담고 있었다 — 확인법은 `git log --oneline -- templates/admin/build_map.html.j2`와 `git log -3 -- docs/design/req/INDEX.md`의 날짜 대조) |
+| 8 | **조립 사양 표준** | [req-spec-standard.md](req-spec-standard.md) | `dc-spec-standard-2안.html` | **지음**(`/admin2/spec-standard` · ADM-STD-010 · UX-24 → **1a**(결핍 패널 + 표 · 모달 — 처음엔 1b였다가 같은 날 사장님이 배치를 다시 골랐다, `decision-log.md` UX-24). **2026-08-28 기록자 정정 — 「재구축 중」은 낡았다.** `templates/admin/spec_standard.html.j2` 상단 주석이 1a 재구축 완료를 적어 뒀고, 이름·단위·메모 편집 API 후속 반영까지 「검증 통과」로 커밋됐다(`c48623e`, 2026-08-15). 그 뒤 사장님 신고로 팝업 위치 결함도 고쳤다(`b1eb47e`, 2026-08-16) — 그 뒤로 추가 커밋 없이 안정 상태다. ⚠ **코드 자체의 어긋남(문서 아님, 손대지 않고 보고만 한다)**: `api/admin_ui_spec_standard.py`의 라우트 docstring은 아직 「UX-24 → 1b」라고 적혀 있다 — 같은 날 있었던 1b→1a 정교화 «이전» 문구가 안 고쳐진 채 남은 것으로 보인다. 실제 화면·decision-log·이 목차는 셋 다 1a로 일치한다. 확인법: `git log --oneline -- templates/admin/spec_standard.html.j2` · `grep -n "UX-24" api/admin_ui_spec_standard.py`) |
 | 9 | **상품 사양 정의** | [req-spec-field-defs.md](req-spec-field-defs.md) | `dc-spec-field-defs-2안.html` | **지음** (`/admin2/spec-field-defs` · ADM-PRD-050 · UX-27 → 1a · 라우트·템플릿 커밋 `82a55a1` · 확인자 재검증 통과(결함 없음) · 메뉴 연결 `9fdae6d`) |
 | 10 | **상품 사양 검수** | [req-admin2-reviews-2026-08-13.md](../req-admin2-reviews-2026-08-13.md) | `dc-review-screen.html` | **지음** (`/admin2/reviews`) |
 | 11 | **조립 호환 규칙** | [req-compat-rules.md](req-compat-rules.md) · [req-compat-required.md](req-compat-required.md)(「필수 사양 안내」 탭) | `dc-compat-rules-2안.html` | **지음** (`/admin2/compat-rules` · ADM-ENG-010 · UX-28 → 1b · 커밋 `3ffe740` · 메뉴 연결 `68daf6e`. **+2026-08-15: 「필수 사양 안내」 탭 신설**(`spec-compat-required.md` 계약 — 결정 로그 ⑤ 설계 간극을 채움) · 확인자 2차 검증 결함 0 · 커밋 `89019e2`. 메뉴는 안 바뀜 — 기존 화면 안 탭 추가 · 셸 CSS 특정성 사고 방어 수정 — `.cr-btn--ghost`(커밋 `77121d6`+`fbb9b61`)) |
@@ -141,7 +148,7 @@
 | 22 | 가격 검토 대기 | [req-price-review-queue.md](req-price-review-queue.md) | `spec-price-review.md`(계약) | **지음** (`/admin2/price-review` · ADM-PRC-010 · 확인자 검증 통과 · 메뉴 연결 `879ee61` · 커밋 `28c49dd`(뒤늦게 반영, 내용 변경 없음 — 이 목차 최종 편집 뒤에 커밋돼 그 사이 "미커밋"으로 남아 있었다. 조사자 목록엔 없던 여덟 번째 사례, 기록자가 같은 검사 중 발견)) |
 | 22B | 마진 정책 | [req-margin-policy.md](req-margin-policy.md) | `spec-margin-policy.md`(계약) | **지음** (`/admin2/margin-policy` · ADM-PRC-020 · 확인자 2차 검증 결함 0 · 커밋 `a4d5d44` · 메뉴 연결 `879ee61` · 셸 CSS 특정성 사고로 `.mp-link` 링크색이 본문색으로 보이던 결함 수정(커밋 `77121d6`+`fbb9b61`)) |
 | 23 | 가격 이력 | [req-price-history.md](req-price-history.md) · [spec-price-history.md](../spec-price-history.md)(2026-08-15 「(신규)」 표기 정정) | — | **지음** — 구현 `/admin2/price-history`(커밋 `140a5ba`·`77dbbef`·`bdf7e7c`) · 검증 확인자 브라우저 실측 통과 3라운드(①7행 3종 판정·ref_id null 실값·401/400/404 경계·768px ②마이그레이션 0050 「비움」 표시 — DB↔DOM 5행 대조·new_price=0 실데이터로 0과 NULL 구분 확인 ③「부품 종류」 확인 중… 고정 결함 — 10ms 폴링 프레임 단위 캡처로 재발 0·정상 로딩 노출은 유지 확인) · 계약 정정 `8e35508` · 연결 `api/admin_nav.py` `91dd3a1` · 셸 CSS 특정성 사고 방어 수정 — `.ph-move`(커밋 `77121d6`+`fbb9b61`) |
-| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안, 커밋 `82a55a1`) | **지음** (`/admin2/reprice` · **ADM-PRC-050** — ID·경로 대조 완료(spec-reprice.md가 남겨 둔 "대조 필요"를 이걸로 해소 — `api/admin_ui_reprice.py`의 `APIRouter(prefix="/admin2")` + `@router.get("/reprice")`로 실측). **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). **확인자 검증 통과(2026-08-15)** — 「지난 회차」 표가 맨 앞·`note` 열 실재·간격 "1분 1.5초" 형식 확인, 금지 문구(「99.99%」·「세 번째도」 등) grep 전수 0건, **apply(7,174건)->undo 왕복 실완주(log_id 7720)로 구 화면의 핵심 결함("새로고침하면 되돌릴 방법이 사라진다") 해소 확인**, 되돌린 뒤 수치 원값과 완전 일치(7,279/6,899/275/105/0), 미로그인 401을 preview·apply·undo·페이지 네 곳 모두 확인(계약 §⑧ "무세션 실측 못 함" 항목 해소), 콘솔 에러 0·404 자원 0·외부 CDN 0. **nav 항목 자체가 없던 유일한 화면**이었는데 이번에 신설 + 메뉴 연결(`api/admin_nav.py` 커밋 `c6d662e` — 「판매가」 그룹 물리적 끝에 배치, 근거는 그 커밋의 6차 노트). ⚠ 남은 결함 하나(마크다운 별표 노출)는 다른 제작자가 수정 중이고 ⓐ류(문구 렌더링)라 연결을 막지 않았다. 셸 CSS 특정성 사고로 `.rp-link` 링크색이 본문색으로 보이던 결함 수정(커밋 `77121d6`+`fbb9b61`)) |
+| 23B | 판매가 재산정 | [req-reprice.md](req-reprice.md) | `spec-reprice.md`(계약 · 1a 안, 커밋 `82a55a1`) | **지음** (`/admin2/reprice` · **ADM-PRC-050** — ID·경로 대조 완료(spec-reprice.md가 남겨 둔 "대조 필요"를 이걸로 해소 — `api/admin_ui_reprice.py`의 `APIRouter(prefix="/admin2")` + `@router.get("/reprice")`로 실측). **1a 안 확정**(회차 표 → 범위 → 미리보기 → 실행 한 줄기, 「지난 회차 기록」이 화면의 축이지 경고 배너가 아니다, 2026-08-15 사장님 결정). **확인자 검증 통과(2026-08-15)** — 「지난 회차」 표가 맨 앞·`note` 열 실재·간격 "1분 1.5초" 형식 확인, 금지 문구(「99.99%」·「세 번째도」 등) grep 전수 0건, **apply(7,174건)->undo 왕복 실완주(log_id 7720)로 구 화면의 핵심 결함("새로고침하면 되돌릴 방법이 사라진다") 해소 확인**, 되돌린 뒤 수치 원값과 완전 일치(7,279/6,899/275/105/0), 미로그인 401을 preview·apply·undo·페이지 네 곳 모두 확인(계약 §⑧ "무세션 실측 못 함" 항목 해소), 콘솔 에러 0·404 자원 0·외부 CDN 0. **nav 항목 자체가 없던 유일한 화면**이었는데 이번에 신설 + 메뉴 연결(`api/admin_nav.py` 커밋 `c6d662e` — 「판매가」 그룹 물리적 끝에 배치, 근거는 그 커밋의 6차 노트). ⚠ 남은 결함 하나(마크다운 별표 노출)는 다른 제작자가 수정 중이고 ⓐ류(문구 렌더링)라 연결을 막지 않았다 — **2026-08-28 기록자 정정: 그 결함은 같은 날 안에 해소됐다**(커밋 `635ee75`, 「서버 note 의 마크다운 볼드가 별표 그대로 노출되던 결함 수정」 — `mdBold()`가 `esc()`로 전체 이스케이프한 뒤 `**text**`만 `<strong>`으로 바꾼다. 확인법: `grep -n "function mdBold" templates/admin/reprice.html.j2`). 셸 CSS 특정성 사고로 `.rp-link` 링크색이 본문색으로 보이던 결함 수정(커밋 `77121d6`+`fbb9b61`)) |
 
 ## 6. 인계 · 성과
 
@@ -155,7 +162,7 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **재구축 중** (`/admin2/dash` · UX-25 단일안 · 2026-08-15 실측: 「대기」였는데 실제로는 작업 중이었다) |
+| 27 | **작업 현황판** | [req-dash.md](req-dash.md) | `dc-dash.html` | **지음**(`/admin2/dash` · ADM-AI-010 · UX-25 단일안. **2026-08-28 기록자 정정 — 2026-08-15에 「대기」를 「작업 중」으로 한 번 고쳤는데, 그새 재구축 자체가 끝나 있었다.** 재구축 커밋 `92e60f3`(2026-08-15, 「작업 현황판 재구축 + 팀원 한글 매핑 누락 조기 발견 장치」) 이후로도 흐름 압축·서버측 진행 표시(`e2cac70`, 2026-08-27)까지 계속 붙었다. 확인법: `git log --oneline -- templates/admin/dash.html.j2`) |
 | 28 | 웹 사양 채움 | [req-spec-fill.md](req-spec-fill.md)(2026-08-15 전면 재작성 — 구 [방향 제안](../spec-fill-ui-direction-2026-08-13.md) — 폐기) | `spec-spec-fill.md`(계약 · 1a 안) | **지음** (`/admin2/spec-fill` · **ADM-AI-020**. ⚠ admin2 화면 중 유일하게 Phoenix 벤더를 실제 로드하던 화면 — 2026-08-14 18:40 지어짐, 그 4시간59분 뒤 Phoenix 금지 확정. **2026-08-15 승인 디자인(1a·실행 원장 중심) 도착, 재구축** — 실측: `api/admin_ui_spec_fill.py`·`templates/admin/spec_fill.html.j2` 커밋 `04a99dc`(그 커밋 메시지 자신은 당시 "재구축 중(제작 착수, 확인자 검증 전)"이라 적었다). 같은 물결 사장님 확정 셋: ①실행 수단=사람 없이 도는 작업 ②대상 필드=`cooler_tdp` 하나 ⑤승인 경로=이미 개방(커밋 `e84d61f`) — 나머지 ③④⑥은 미정(req-spec-fill.md 참조). **⚠ 「승인 경로 개방」과 「화면 재구축 완료」는 다른 사실이다 — 섞지 않는다.** ⚠⚠ **해소(2026-08-15, 기록자 6차)** — 커밋 `04a99dc`의 1a 버전이 "검증 전인데 메뉴에 이미 노출돼 있다"는 우려를 남겨 뒀었다(admin_nav.py 5차 노트 — 그때는 이 화면의 href를 새로 만들지도 끊지도 않고 범위 밖으로 판단해 하네스 보고에만 남겼다). **그 뒤 확인자 재검증이 통과했다** — `review_pending_empty` 렌더 · DOM 순서 · `scrollLeft` 리셋 셋 다 해소 확인, 47.6%→100%. 메뉴 연결은 이번에 새로 한 것이 없다(기존 href 그대로 — 검증이 뒤늦게 노출을 따라잡았을 뿐이다). 셸 CSS 특정성 사고로 `.sf-src-link` 링크색·밑줄이 함께 죽어 있던 결함 수정(커밋 `77121d6`+`fbb9b61`)) |
 | 28B | 팝콘톡 응답 패턴 | [req-talk-patterns.md](req-talk-patterns.md) | `dc-talk-patterns.html`(1b「목록 전면」 확정본) · `dc-talk-patterns-1b.html` | **지음**(2026-08-25 기록자 신규 등재 — 이 목차에 행 자체가 없었다. `/admin2/talk-patterns` · **ADM-TLK-010(가칭)** · 결정 A-95·A-96 · 커밋 `a70c919`(2026-08-22, 라우트·템플릿) · `api/admin_talk_patterns.py`가 실데이터 API를 낸다. **위치는 nav 실제 순서를 따라 28과 29 사이에 끼웠다**(같은 관례를 쓴 20B·22B·23B 참조 — 뒤 섹션 전체 renumbering은 안 한다). 화면 자체의 `screen_id`는 코드가 아직 "가칭"으로 적어 뒀지만(`api/admin_ui_talk_patterns.py` 상단 주석), **라우트·템플릿·메뉴 연결은 이미 끝나 있다**(`api/admin_nav.py`의 `counts()`가 이 항목을 포함해 `total=41 · new=41 · todo=0`을 낸다 — 2026-08-25 재확인). 확인자 검증 여부는 이 목차 갱신 시점 기준 별도 통보 기록을 찾지 못해 **확인 필요**로 남긴다) |
 | 29 | **AI 작업 설정** | [req-ai-task-settings.md](req-ai-task-settings.md) | `dc-ai-task-settings.html` | **지음** (`/admin2/ai-task-settings`) |
@@ -191,17 +198,17 @@
 | 35 | 운영자 · 권한 | [dc-operators-roles.html](../dc-operators-roles.html) | 지음 |
 | 36 | 작업 기록 | [dc-activity-logs.html](../dc-activity-logs.html) | 지음 |
 | 37 | 엑셀 다운로드 관리 | [dc-excel-export.html](../dc-excel-export.html) | 지음 |
-| 7 | 조립 호환 지도 **(v2 · 정본)** | [dc-build-map-v2.html](../dc-build-map-v2.html) | 재구축 대기 · UX-20 → 클릭 고정 |
+| 7 | 조립 호환 지도 **(v2 · 정본)** | [dc-build-map-v2.html](../dc-build-map-v2.html) | 지음 · UX-20 → 클릭 고정 · 메뉴 연결 (2026-08-28 기록자 정정 — 위 §3 목차와 같은 자기모순. 근거는 그 행 참조) |
 | 7 | 조립 호환 조감도 (3안 비교본 — v2로 대체됨) | [dc-build-map-3안.html](../dc-build-map-3안.html) | 참고용 |
-| 1 | 대시보드 **(3안 비교본)** | [dc-dashboard-3안.html](../dc-dashboard-3안.html) | 재구축 중 · UX-22 → 1b |
-| 3 | 상품 관리 **(3안 비교본)** | [dc-products-3안.html](../dc-products-3안.html) | 재구축 대기 · UX-23 → 1a |
+| 1 | 대시보드 **(3안 비교본)** | [dc-dashboard-3안.html](../dc-dashboard-3안.html) | 지음 · UX-22 → 1b · 메뉴 연결 (2026-08-28 기록자 정정 — 위 §1 목차와 같은 자기모순. 근거는 그 행 참조) |
+| 3 | 상품 관리 **(3안 비교본)** | [dc-products-3안.html](../dc-products-3안.html) | 지음 · UX-23 → 1a · 메뉴 연결 (2026-08-28 기록자 정정 — 위 §2 목차와 같은 자기모순. 근거는 그 행 참조) |
 | 5 | 상품 일괄 등록 | [dc-product-bulk-import.html](../dc-product-bulk-import.html) | 지음 · UX-21 → 1b · 메뉴 연결 |
 | 6 | 삭제 상품 조회 **(2안 + 빈 상태)** | [dc-product-deleted-2안.html](../dc-product-deleted-2안.html) | 지음 · UX-26 → 1b + 빈 상태 1c · 메뉴 연결 |
-| 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 재구축 중 · UX-24 → **1a** |
+| 8 | 조립 사양 표준 **(2안 비교본)** | [dc-spec-standard-2안.html](../dc-spec-standard-2안.html) | 지음 · UX-24 → **1a** · 메뉴 연결 (2026-08-28 기록자 정정 — 위 §3 목차와 같은 자기모순. 근거는 그 행 참조) |
 | 9 | 상품 사양 정의 **(2안 비교본)** | [dc-spec-field-defs-2안.html](../dc-spec-field-defs-2안.html) | 지음 · UX-27 → 1a · 메뉴 연결 |
 | 11 | 조립 호환 규칙 **(2안 비교본)** | [dc-compat-rules-2안.html](../dc-compat-rules-2안.html) | 지음 |
 | 20B | 재고 입고 | [dc-stock-inbound.html](../dc-stock-inbound.html) · [핸드오프 README](../dc-stock-inbound-README.md) | 지음 · 1b 골격 + 1a 목록 확정 혼합 · 확인자 3차 결함 0 · 메뉴 연결(2026-08-18) — ⚠ **이 표에서 원안 파일이 서브에이전트 손으로 받아진 첫 사례**(아래 「계약 요약」 절 정정 참조) |
-| 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 재구축 중 · UX-25 (2026-08-16 기록자 정정 — 위 §7 목차가 2026-08-15에 이미 「대기 아니라 작업 중」으로 스스로 고쳤는데 이 표만 옛 값 「재구축 대기」를 그대로 들고 있었다. 재확인: `/admin2/dash` curl 200 · `data-screen-id="ADM-AI-010"` 실재 — 라우트가 이미 있으므로 「대기」(라우트 없음)는 아니다) |
+| 27 | 작업 현황판 **(단일안)** | [dc-dash.html](../dc-dash.html) | 지음 · UX-25 · 메뉴 연결 (2026-08-16 기록자 정정 — 위 §7 목차가 2026-08-15에 이미 「대기 아니라 작업 중」으로 스스로 고쳤는데 이 표만 옛 값 「재구축 대기」를 그대로 들고 있었다. 재확인: `/admin2/dash` curl 200 · `data-screen-id="ADM-AI-010"` 실재 — 라우트가 이미 있으므로 「대기」(라우트 없음)는 아니다. **2026-08-28 재정정** — 「작업 중」도 그새 낡았다. 위 §7 목차와 같은 자기모순, 근거는 그 행 참조) |
 | 28B | 팝콘톡 응답 패턴 | [dc-talk-patterns.html](../dc-talk-patterns.html) · [dc-talk-patterns-1b.html](../dc-talk-patterns-1b.html) | 지음 · 1b「목록 전면」 확정(2026-08-22) · 메뉴 연결(2026-08-25 재확인, `api/admin_nav.py counts()` 실행 — `todo=0`에 이미 포함) · **2026-08-25 기록자 신규 등재**(위 §7 목차·이 표 둘 다 행이 없었다) |
 
 ### 계약 요약으로 전달된 승인 디자인
