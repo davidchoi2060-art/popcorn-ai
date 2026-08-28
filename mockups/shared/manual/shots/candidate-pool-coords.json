@@ -1,0 +1,1182 @@
+{
+  "candidate-pool-full": {
+    "file": "candidate-pool-full.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "lnb": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 12.62,
+        "h_pct": 100.0,
+        "cx_pct": 6.31,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 0,
+          "y": 0,
+          "width": 212,
+          "height": 1050
+        }
+      },
+      "lnb_active_item": {
+        "x_pct": 0.0,
+        "y_pct": 44.4,
+        "w_pct": 12.62,
+        "h_pct": 3.38,
+        "cx_pct": 6.31,
+        "cy_pct": 46.1,
+        "px": {
+          "x": 0,
+          "y": 466.25,
+          "width": 212,
+          "height": 35.5
+        }
+      },
+      "header": {
+        "x_pct": 12.62,
+        "y_pct": 0.0,
+        "w_pct": 87.38,
+        "h_pct": 5.69,
+        "cx_pct": 56.31,
+        "cy_pct": 2.85,
+        "px": {
+          "x": 212,
+          "y": 0,
+          "width": 1468,
+          "height": 59.796875
+        }
+      },
+      "kicker": {
+        "x_pct": 13.71,
+        "y_pct": 7.23,
+        "w_pct": 85.19,
+        "h_pct": 2.1,
+        "cx_pct": 56.31,
+        "cy_pct": 8.28,
+        "px": {
+          "x": 230.390625,
+          "y": 75.890625,
+          "width": 1431.21875,
+          "height": 22.0625
+        }
+      },
+      "cards": {
+        "x_pct": 13.71,
+        "y_pct": 10.64,
+        "w_pct": 85.19,
+        "h_pct": 17.22,
+        "cx_pct": 56.31,
+        "cy_pct": 19.25,
+        "px": {
+          "x": 230.390625,
+          "y": 111.75,
+          "width": 1431.21875,
+          "height": 180.796875
+        }
+      },
+      "band": {
+        "x_pct": 13.71,
+        "y_pct": 27.86,
+        "w_pct": 85.19,
+        "h_pct": 4.2,
+        "cx_pct": 56.31,
+        "cy_pct": 29.96,
+        "px": {
+          "x": 230.390625,
+          "y": 292.546875,
+          "width": 1431.21875,
+          "height": 44.140625
+        }
+      },
+      "grid_wrap": {
+        "x_pct": 13.71,
+        "y_pct": 32.07,
+        "w_pct": 61.92,
+        "h_pct": 45.91,
+        "cx_pct": 44.67,
+        "cy_pct": 55.02,
+        "px": {
+          "x": 230.390625,
+          "y": 336.6875,
+          "width": 1040.234375,
+          "height": 482.03125
+        }
+      },
+      "rail": {
+        "x_pct": 76.45,
+        "y_pct": 32.07,
+        "w_pct": 22.45,
+        "h_pct": 62.33,
+        "cx_pct": 87.68,
+        "cy_pct": 63.23,
+        "px": {
+          "x": 1284.421875,
+          "y": 336.6875,
+          "width": 377.1875,
+          "height": 654.484375
+        }
+      },
+      "foot": {
+        "x_pct": 13.71,
+        "y_pct": 96.35,
+        "w_pct": 85.19,
+        "h_pct": 3.31,
+        "cx_pct": 56.31,
+        "cy_pct": 98.01,
+        "px": {
+          "x": 230.390625,
+          "y": 1011.703125,
+          "width": 1431.21875,
+          "height": 34.765625
+        }
+      }
+    }
+  },
+  "candidate-pool-header": {
+    "file": "candidate-pool-header.png",
+    "clip_px": {
+      "x": 212,
+      "y": 0,
+      "width": 1468,
+      "height": 59.796875
+    },
+    "elements": {
+      "crumb": {
+        "x_pct": 1.41,
+        "y_pct": 37.63,
+        "w_pct": 4.87,
+        "h_pct": 23.07,
+        "cx_pct": 3.85,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 232.6875,
+          "y": 22.5,
+          "width": 71.515625,
+          "height": 13.796875
+        }
+      },
+      "now": {
+        "x_pct": 8.27,
+        "y_pct": 36.66,
+        "w_pct": 7.77,
+        "h_pct": 25.01,
+        "cx_pct": 12.15,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 333.359375,
+          "y": 21.921875,
+          "width": 114.03125,
+          "height": 14.953125
+        }
+      },
+      "badge_readonly": {
+        "x_pct": 16.82,
+        "y_pct": 32.11,
+        "w_pct": 4.25,
+        "h_pct": 34.07,
+        "cx_pct": 18.94,
+        "cy_pct": 49.15,
+        "px": {
+          "x": 458.890625,
+          "y": 19.203125,
+          "width": 62.4375,
+          "height": 20.375
+        }
+      },
+      "badge_asof": {
+        "x_pct": 21.85,
+        "y_pct": 32.11,
+        "w_pct": 7.07,
+        "h_pct": 34.07,
+        "cx_pct": 25.39,
+        "cy_pct": 49.15,
+        "px": {
+          "x": 532.828125,
+          "y": 19.203125,
+          "width": 103.84375,
+          "height": 20.375
+        }
+      },
+      "hub": {
+        "x_pct": 85.2,
+        "y_pct": 25.87,
+        "w_pct": 3.12,
+        "h_pct": 46.59,
+        "cx_pct": 86.76,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1462.75,
+          "y": 15.46875,
+          "width": 45.875,
+          "height": 27.859375
+        }
+      },
+      "role_box": {
+        "x_pct": 89.11,
+        "y_pct": 25.87,
+        "w_pct": 6.66,
+        "h_pct": 46.59,
+        "cx_pct": 92.44,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1520.125,
+          "y": 15.46875,
+          "width": 97.796875,
+          "height": 27.859375
+        }
+      },
+      "avatar": {
+        "x_pct": 96.55,
+        "y_pct": 24.17,
+        "w_pct": 2.04,
+        "h_pct": 49.99,
+        "cx_pct": 97.57,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1629.421875,
+          "y": 14.453125,
+          "width": 29.890625,
+          "height": 29.890625
+        }
+      }
+    }
+  },
+  "candidate-pool-cards": {
+    "file": "candidate-pool-cards.png",
+    "clip_px": {
+      "x": 230.390625,
+      "y": 111.75,
+      "width": 1431.21875,
+      "height": 180.796875
+    },
+    "elements": {
+      "pass_card": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 26.2,
+        "h_pct": 100.0,
+        "cx_pct": 13.1,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 230.390625,
+          "y": 111.75,
+          "width": 375.046875,
+          "height": 180.796875
+        }
+      },
+      "pass_lbl": {
+        "x_pct": 1.52,
+        "y_pct": 23.32,
+        "w_pct": 23.17,
+        "h_pct": 9.15,
+        "cx_pct": 13.1,
+        "cy_pct": 27.89,
+        "px": {
+          "x": 252.078125,
+          "y": 153.90625,
+          "width": 331.671875,
+          "height": 16.546875
+        }
+      },
+      "pass_v": {
+        "x_pct": 1.52,
+        "y_pct": 35.65,
+        "w_pct": 23.17,
+        "h_pct": 28.04,
+        "cx_pct": 13.1,
+        "cy_pct": 49.67,
+        "px": {
+          "x": 252.078125,
+          "y": 176.203125,
+          "width": 331.671875,
+          "height": 50.703125
+        }
+      },
+      "pass_sub": {
+        "x_pct": 1.52,
+        "y_pct": 66.87,
+        "w_pct": 23.17,
+        "h_pct": 9.8,
+        "cx_pct": 13.1,
+        "cy_pct": 71.77,
+        "px": {
+          "x": 252.078125,
+          "y": 232.65625,
+          "width": 331.671875,
+          "height": 17.71875
+        }
+      },
+      "rc_1": {
+        "x_pct": 27.01,
+        "y_pct": 0.0,
+        "w_pct": 13.96,
+        "h_pct": 100.0,
+        "cx_pct": 33.99,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 616.9375,
+          "y": 111.75,
+          "width": 199.734375,
+          "height": 180.796875
+        }
+      },
+      "rc_1_v": {
+        "x_pct": 28.12,
+        "y_pct": 24.72,
+        "w_pct": 11.73,
+        "h_pct": 17.49,
+        "cx_pct": 33.99,
+        "cy_pct": 33.46,
+        "px": {
+          "x": 632.875,
+          "y": 156.4375,
+          "width": 167.859375,
+          "height": 31.625
+        }
+      },
+      "rc_1_gobtn": {
+        "x_pct": 28.12,
+        "y_pct": 46.66,
+        "w_pct": 2.9,
+        "h_pct": 13.04,
+        "cx_pct": 29.57,
+        "cy_pct": 53.18,
+        "px": {
+          "x": 632.875,
+          "y": 196.109375,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "rc_2": {
+        "x_pct": 41.77,
+        "y_pct": 0.0,
+        "w_pct": 13.96,
+        "h_pct": 100.0,
+        "cx_pct": 48.75,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 828.171875,
+          "y": 111.75,
+          "width": 199.734375,
+          "height": 180.796875
+        }
+      },
+      "rc_2_v": {
+        "x_pct": 42.88,
+        "y_pct": 24.72,
+        "w_pct": 11.73,
+        "h_pct": 17.49,
+        "cx_pct": 48.75,
+        "cy_pct": 33.46,
+        "px": {
+          "x": 844.109375,
+          "y": 156.4375,
+          "width": 167.859375,
+          "height": 31.625
+        }
+      },
+      "rc_2_gobtn": {
+        "x_pct": 42.88,
+        "y_pct": 46.66,
+        "w_pct": 2.9,
+        "h_pct": 13.04,
+        "cx_pct": 44.33,
+        "cy_pct": 53.18,
+        "px": {
+          "x": 844.109375,
+          "y": 196.109375,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "rc_3": {
+        "x_pct": 56.53,
+        "y_pct": 0.0,
+        "w_pct": 13.96,
+        "h_pct": 100.0,
+        "cx_pct": 63.5,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1039.40625,
+          "y": 111.75,
+          "width": 199.734375,
+          "height": 180.796875
+        }
+      },
+      "rc_3_v": {
+        "x_pct": 57.64,
+        "y_pct": 24.72,
+        "w_pct": 11.73,
+        "h_pct": 17.49,
+        "cx_pct": 63.5,
+        "cy_pct": 33.46,
+        "px": {
+          "x": 1055.34375,
+          "y": 156.4375,
+          "width": 167.859375,
+          "height": 31.625
+        }
+      },
+      "rc_3_gobtn": {
+        "x_pct": 57.64,
+        "y_pct": 78.77,
+        "w_pct": 2.9,
+        "h_pct": 13.04,
+        "cx_pct": 59.09,
+        "cy_pct": 85.3,
+        "px": {
+          "x": 1055.34375,
+          "y": 254.171875,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "rc_4": {
+        "x_pct": 71.29,
+        "y_pct": 0.0,
+        "w_pct": 13.96,
+        "h_pct": 100.0,
+        "cx_pct": 78.26,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1250.640625,
+          "y": 111.75,
+          "width": 199.734375,
+          "height": 180.796875
+        }
+      },
+      "rc_4_v": {
+        "x_pct": 72.4,
+        "y_pct": 24.72,
+        "w_pct": 11.73,
+        "h_pct": 17.49,
+        "cx_pct": 78.26,
+        "cy_pct": 33.46,
+        "px": {
+          "x": 1266.578125,
+          "y": 156.4375,
+          "width": 167.859375,
+          "height": 31.625
+        }
+      },
+      "rc_4_gobtn": {
+        "x_pct": 72.4,
+        "y_pct": 46.66,
+        "w_pct": 2.9,
+        "h_pct": 13.04,
+        "cx_pct": 73.85,
+        "cy_pct": 53.18,
+        "px": {
+          "x": 1266.578125,
+          "y": 196.109375,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "rc_5": {
+        "x_pct": 86.04,
+        "y_pct": 0.0,
+        "w_pct": 13.96,
+        "h_pct": 100.0,
+        "cx_pct": 93.02,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1461.875,
+          "y": 111.75,
+          "width": 199.734375,
+          "height": 180.796875
+        }
+      },
+      "rc_5_v": {
+        "x_pct": 87.16,
+        "y_pct": 24.72,
+        "w_pct": 11.73,
+        "h_pct": 17.49,
+        "cx_pct": 93.02,
+        "cy_pct": 33.46,
+        "px": {
+          "x": 1477.8125,
+          "y": 156.4375,
+          "width": 167.859375,
+          "height": 31.625
+        }
+      },
+      "rc_5_gobtn": {
+        "x_pct": 87.16,
+        "y_pct": 46.66,
+        "w_pct": 2.9,
+        "h_pct": 13.04,
+        "cx_pct": 88.61,
+        "cy_pct": 53.18,
+        "px": {
+          "x": 1477.8125,
+          "y": 196.109375,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      }
+    }
+  },
+  "candidate-pool-band": {
+    "file": "candidate-pool-band.png",
+    "clip_px": {
+      "x": 230.390625,
+      "y": 292.546875,
+      "width": 1431.21875,
+      "height": 44.140625
+    },
+    "elements": {
+      "band_right": {
+        "x_pct": 87.89,
+        "y_pct": 32.85,
+        "w_pct": 10.98,
+        "h_pct": 32.57,
+        "cx_pct": 93.38,
+        "cy_pct": 49.13,
+        "px": {
+          "x": 1488.3125,
+          "y": 307.046875,
+          "width": 157.203125,
+          "height": 14.375
+        }
+      }
+    }
+  },
+  "candidate-pool-table": {
+    "file": "candidate-pool-table.png",
+    "clip_px": {
+      "x": 230.390625,
+      "y": 336.6875,
+      "width": 1040.234375,
+      "height": 482.03125
+    },
+    "elements": {
+      "grid_title": {
+        "x_pct": 1.64,
+        "y_pct": 3.31,
+        "w_pct": 96.71,
+        "h_pct": 3.88,
+        "cx_pct": 50.0,
+        "cy_pct": 5.24,
+        "px": {
+          "x": 247.484375,
+          "y": 352.625,
+          "width": 1006.046875,
+          "height": 18.6875
+        }
+      },
+      "thead": {
+        "x_pct": 1.64,
+        "y_pct": 9.33,
+        "w_pct": 96.71,
+        "h_pct": 6.7,
+        "cx_pct": 50.0,
+        "cy_pct": 12.68,
+        "px": {
+          "x": 247.484375,
+          "y": 381.65625,
+          "width": 1006.046875,
+          "height": 32.28125
+        }
+      },
+      "tfoot": {
+        "x_pct": 1.64,
+        "y_pct": 88.93,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 92.57,
+        "px": {
+          "x": 247.484375,
+          "y": 765.375,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_1": {
+        "x_pct": 1.64,
+        "y_pct": 16.03,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 19.67,
+        "px": {
+          "x": 247.484375,
+          "y": 413.9375,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_2": {
+        "x_pct": 1.64,
+        "y_pct": 23.31,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 26.95,
+        "px": {
+          "x": 247.484375,
+          "y": 449.03125,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_3": {
+        "x_pct": 1.64,
+        "y_pct": 30.59,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 34.23,
+        "px": {
+          "x": 247.484375,
+          "y": 484.125,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_4": {
+        "x_pct": 1.64,
+        "y_pct": 37.87,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 41.51,
+        "px": {
+          "x": 247.484375,
+          "y": 519.21875,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_5": {
+        "x_pct": 1.64,
+        "y_pct": 45.15,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 48.79,
+        "px": {
+          "x": 247.484375,
+          "y": 554.3125,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_6": {
+        "x_pct": 1.64,
+        "y_pct": 52.43,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 56.07,
+        "px": {
+          "x": 247.484375,
+          "y": 589.40625,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_7": {
+        "x_pct": 1.64,
+        "y_pct": 59.71,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 63.35,
+        "px": {
+          "x": 247.484375,
+          "y": 624.5,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_8": {
+        "x_pct": 1.64,
+        "y_pct": 66.99,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 70.63,
+        "px": {
+          "x": 247.484375,
+          "y": 659.59375,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_9": {
+        "x_pct": 1.64,
+        "y_pct": 74.27,
+        "w_pct": 96.71,
+        "h_pct": 7.28,
+        "cx_pct": 50.0,
+        "cy_pct": 77.91,
+        "px": {
+          "x": 247.484375,
+          "y": 694.6875,
+          "width": 1006.046875,
+          "height": 35.09375
+        }
+      },
+      "row_10": {
+        "x_pct": 1.64,
+        "y_pct": 81.55,
+        "w_pct": 96.71,
+        "h_pct": 7.38,
+        "cx_pct": 50.0,
+        "cy_pct": 85.24,
+        "px": {
+          "x": 247.484375,
+          "y": 729.78125,
+          "width": 1006.046875,
+          "height": 35.59375
+        }
+      }
+    }
+  },
+  "candidate-pool-rail": {
+    "file": "candidate-pool-rail.png",
+    "clip_px": {
+      "x": 1284.421875,
+      "y": 336.6875,
+      "width": 377.1875,
+      "height": 654.484375
+    },
+    "elements": {
+      "sec_thin": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 23.2,
+        "cx_pct": 50.0,
+        "cy_pct": 11.6,
+        "px": {
+          "x": 1284.421875,
+          "y": 336.6875,
+          "width": 377.1875,
+          "height": 151.8125
+        }
+      },
+      "sec_combined": {
+        "x_pct": 0.0,
+        "y_pct": 25.3,
+        "w_pct": 100.0,
+        "h_pct": 32.83,
+        "cx_pct": 50.0,
+        "cy_pct": 41.72,
+        "px": {
+          "x": 1284.421875,
+          "y": 502.296875,
+          "width": 377.1875,
+          "height": 214.859375
+        }
+      },
+      "sec_golist": {
+        "x_pct": 0.0,
+        "y_pct": 60.24,
+        "w_pct": 100.0,
+        "h_pct": 39.76,
+        "cx_pct": 50.0,
+        "cy_pct": 80.12,
+        "px": {
+          "x": 1284.421875,
+          "y": 730.953125,
+          "width": 377.1875,
+          "height": 260.21875
+        }
+      },
+      "thin_threshold_badge": {
+        "x_pct": 26.19,
+        "y_pct": 2.26,
+        "w_pct": 28.65,
+        "h_pct": 3.02,
+        "cx_pct": 40.51,
+        "cy_pct": 3.77,
+        "px": {
+          "x": 1383.203125,
+          "y": 351.484375,
+          "width": 108.0625,
+          "height": 19.796875
+        }
+      },
+      "thin_lock_badge": {
+        "x_pct": 4.53,
+        "y_pct": 6.34,
+        "w_pct": 40.39,
+        "h_pct": 3.02,
+        "cx_pct": 24.73,
+        "cy_pct": 7.85,
+        "px": {
+          "x": 1301.515625,
+          "y": 378.171875,
+          "width": 152.359375,
+          "height": 19.796875
+        }
+      }
+    }
+  },
+  "candidate-pool-golist": {
+    "file": "candidate-pool-golist.png",
+    "clip_px": {
+      "x": 1284.421875,
+      "y": 730.953125,
+      "width": 377.1875,
+      "height": 260.21875
+    },
+    "elements": {
+      "title": {
+        "x_pct": 4.53,
+        "y_pct": 5.69,
+        "w_pct": 90.94,
+        "h_pct": 6.89,
+        "cx_pct": 50.0,
+        "cy_pct": 9.13,
+        "px": {
+          "x": 1301.515625,
+          "y": 745.75,
+          "width": 343,
+          "height": 17.921875
+        }
+      },
+      "go_row_1": {
+        "x_pct": 4.53,
+        "y_pct": 16.55,
+        "w_pct": 90.94,
+        "h_pct": 15.63,
+        "cx_pct": 50.0,
+        "cy_pct": 24.36,
+        "px": {
+          "x": 1301.515625,
+          "y": 774.015625,
+          "width": 343,
+          "height": 40.671875
+        }
+      },
+      "go_row_1_btn": {
+        "x_pct": 84.45,
+        "y_pct": 19.64,
+        "w_pct": 11.02,
+        "h_pct": 9.06,
+        "cx_pct": 89.96,
+        "cy_pct": 24.17,
+        "px": {
+          "x": 1602.953125,
+          "y": 782.0625,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "go_row_2": {
+        "x_pct": 4.53,
+        "y_pct": 32.18,
+        "w_pct": 90.94,
+        "h_pct": 15.63,
+        "cx_pct": 50.0,
+        "cy_pct": 39.99,
+        "px": {
+          "x": 1301.515625,
+          "y": 814.6875,
+          "width": 343,
+          "height": 40.671875
+        }
+      },
+      "go_row_2_btn": {
+        "x_pct": 84.45,
+        "y_pct": 35.27,
+        "w_pct": 11.02,
+        "h_pct": 9.06,
+        "cx_pct": 89.96,
+        "cy_pct": 39.8,
+        "px": {
+          "x": 1602.953125,
+          "y": 822.734375,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "go_row_3": {
+        "x_pct": 4.53,
+        "y_pct": 47.81,
+        "w_pct": 90.94,
+        "h_pct": 15.63,
+        "cx_pct": 50.0,
+        "cy_pct": 55.62,
+        "px": {
+          "x": 1301.515625,
+          "y": 855.359375,
+          "width": 343,
+          "height": 40.671875
+        }
+      },
+      "go_row_3_btn": {
+        "x_pct": 84.45,
+        "y_pct": 50.9,
+        "w_pct": 11.02,
+        "h_pct": 9.06,
+        "cx_pct": 89.96,
+        "cy_pct": 55.43,
+        "px": {
+          "x": 1602.953125,
+          "y": 863.40625,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "go_row_4": {
+        "x_pct": 4.53,
+        "y_pct": 63.44,
+        "w_pct": 90.94,
+        "h_pct": 15.63,
+        "cx_pct": 50.0,
+        "cy_pct": 71.25,
+        "px": {
+          "x": 1301.515625,
+          "y": 896.03125,
+          "width": 343,
+          "height": 40.671875
+        }
+      },
+      "go_row_4_btn": {
+        "x_pct": 84.45,
+        "y_pct": 66.53,
+        "w_pct": 11.02,
+        "h_pct": 9.06,
+        "cx_pct": 89.96,
+        "cy_pct": 71.06,
+        "px": {
+          "x": 1602.953125,
+          "y": 904.078125,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      },
+      "go_row_5": {
+        "x_pct": 4.53,
+        "y_pct": 79.07,
+        "w_pct": 90.94,
+        "h_pct": 15.25,
+        "cx_pct": 50.0,
+        "cy_pct": 86.69,
+        "px": {
+          "x": 1301.515625,
+          "y": 936.703125,
+          "width": 343,
+          "height": 39.671875
+        }
+      },
+      "go_row_5_btn": {
+        "x_pct": 84.45,
+        "y_pct": 82.16,
+        "w_pct": 11.02,
+        "h_pct": 9.06,
+        "cx_pct": 89.96,
+        "cy_pct": 86.69,
+        "px": {
+          "x": 1602.953125,
+          "y": 944.75,
+          "width": 41.5625,
+          "height": 23.578125
+        }
+      }
+    }
+  },
+  "_meta": {
+    "captured_at": "2026-08-27T23:41:20.523159+00:00",
+    "base_url": "http://127.0.0.1:8000",
+    "viewport": {
+      "width": 1680,
+      "height": 1050
+    },
+    "screen": {
+      "screen_id": "ADM-ENG-030",
+      "path": "/admin2/candidate-pool"
+    },
+    "stats": {
+      "pool_total": 2726,
+      "core_total": 13173,
+      "ok_total": 2726,
+      "rate": 20.7,
+      "pool_matches_ok": true,
+      "reasons": [
+        {
+          "key": "no_specs",
+          "label": "사양 미등록(행 없음)",
+          "link": "products.html",
+          "count": 0
+        },
+        {
+          "key": "need_review",
+          "label": "검수 대기",
+          "link": "review-queue.html",
+          "count": 3450
+        },
+        {
+          "key": "not_candidate",
+          "label": "후보 미승격",
+          "link": "review-queue.html",
+          "count": 333
+        },
+        {
+          "key": "no_price",
+          "label": "가격 검토 대기",
+          "link": "price-review.html",
+          "count": 0
+        },
+        {
+          "key": "oos",
+          "label": "재고 없음 · 매입",
+          "link": "stock-inbound.html",
+          "count": 6664
+        }
+      ],
+      "reason_total": 10447,
+      "categories": [
+        {
+          "name": "그래픽카드",
+          "total": 2481,
+          "ok": 181,
+          "no_specs": 0,
+          "need_review": 754,
+          "not_candidate": 65,
+          "no_price": 0,
+          "oos": 1481
+        },
+        {
+          "name": "케이스",
+          "total": 2329,
+          "ok": 721,
+          "no_specs": 0,
+          "need_review": 399,
+          "not_candidate": 53,
+          "no_price": 0,
+          "oos": 1156
+        },
+        {
+          "name": "메인보드",
+          "total": 2047,
+          "ok": 413,
+          "no_specs": 0,
+          "need_review": 390,
+          "not_candidate": 50,
+          "no_price": 0,
+          "oos": 1194
+        },
+        {
+          "name": "메모리",
+          "total": 1703,
+          "ok": 360,
+          "no_specs": 0,
+          "need_review": 192,
+          "not_candidate": 25,
+          "no_price": 0,
+          "oos": 1126
+        },
+        {
+          "name": "파워",
+          "total": 1236,
+          "ok": 481,
+          "no_specs": 0,
+          "need_review": 87,
+          "not_candidate": 26,
+          "no_price": 0,
+          "oos": 642
+        },
+        {
+          "name": "SSD",
+          "total": 1043,
+          "ok": 200,
+          "no_specs": 0,
+          "need_review": 183,
+          "not_candidate": 53,
+          "no_price": 0,
+          "oos": 607
+        },
+        {
+          "name": "CPU쿨러(공랭)",
+          "total": 706,
+          "ok": 146,
+          "no_specs": 0,
+          "need_review": 493,
+          "not_candidate": 4,
+          "no_price": 0,
+          "oos": 63
+        },
+        {
+          "name": "CPU",
+          "total": 679,
+          "ok": 144,
+          "no_specs": 0,
+          "need_review": 221,
+          "not_candidate": 53,
+          "no_price": 0,
+          "oos": 261
+        },
+        {
+          "name": "CPU쿨러(수랭)",
+          "total": 622,
+          "ok": 43,
+          "no_specs": 0,
+          "need_review": 537,
+          "not_candidate": 3,
+          "no_price": 0,
+          "oos": 39
+        },
+        {
+          "name": "HDD",
+          "total": 327,
+          "ok": 37,
+          "no_specs": 0,
+          "need_review": 194,
+          "not_candidate": 1,
+          "no_price": 0,
+          "oos": 95
+        }
+      ],
+      "categories_n": 10,
+      "thin": [
+        {
+          "name": "케이스(화이트 태그)",
+          "count": 285,
+          "why": "\"화이트 감성\" 제약 결합 시 견적 실패 위험",
+          "link": "stock-inbound.html"
+        },
+        {
+          "name": "750W 이상 파워",
+          "count": 299,
+          "why": "고성능 GPU 견적의 전력 병목",
+          "link": "stock-inbound.html"
+        }
+      ],
+      "thin_threshold": 3,
+      "note": "S1 후보 카운터와 같은 집합(추천 뷰 ∧ 재고>0)입니다 · 규칙·정책 버전 표기는 버전 관리 도입 후 실값으로 바뀝니다 · 주변기기 풀은 별도 집계(준비 중).",
+      "reason_targets": {
+        "no_specs": {
+          "label": "상품 관리",
+          "href": "/admin2/products"
+        },
+        "need_review": {
+          "label": "상품 사양 검수",
+          "href": "/admin2/reviews"
+        },
+        "not_candidate": {
+          "label": "상품 사양 검수",
+          "href": "/admin2/reviews"
+        },
+        "no_price": {
+          "label": "가격 검토 대기",
+          "href": "/admin2/price-review"
+        },
+        "oos": {
+          "label": "재고 입고",
+          "href": null
+        }
+      }
+    }
+  }
+}

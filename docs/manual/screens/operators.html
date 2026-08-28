@@ -257,8 +257,13 @@
   <figure>
     <div class="shot" style="max-width:460px;aspect-ratio:576/998">
       <img src="/shared/manual/shots/operators-drawer-active.png" alt="상세 패널 확대 — 활성 계정">
-      <b class="pin" style="--x:41.56%;--y:2.31%">30</b>
-      <b class="pin" style="--x:41.56%;--y:4.14%">31</b>
+      <!-- 2026-08-28 겹침 수정: 이름·이메일 두 줄이 coords.json 실측으로 세로 16.7px
+           (zoom 1.15 반영) 간격뿐이라 23px 배지 둘이 겹쳤다. 두 줄 다 가로로 넓은
+           텍스트 행(x_pct 10.76~72.34%)이라 세로는 각 줄의 실측 중심 그대로 두고
+           가로로만 좌우로 벌렸다 — 이름은 왼쪽 절반, 이메일은 오른쪽 절반, 여전히
+           같은 행 안이다. 재검증: 두 배지 중심 간 거리 36.1px(기준 18px의 2배). -->
+      <b class="pin" style="--x:38.54%;--y:2.31%">30</b>
+      <b class="pin" style="--x:44.58%;--y:4.14%">31</b>
       <b class="pin" style="--x:77.84%;--y:3.13%">32</b>
       <b class="pin" style="--x:87.49%;--y:3.13%">33</b>
       <b class="pin" style="--x:95.05%;--y:3.13%">34</b>
@@ -343,8 +348,10 @@
   <figure>
     <div class="shot" style="max-width:460px;aspect-ratio:576/998">
       <img src="/shared/manual/shots/operators-drawer-suspended.png" alt="상세 패널 확대 — 정지된 계정, 정지 해제 상태">
-      <b class="pin" style="--x:41.56%;--y:2.31%">49</b>
-      <b class="pin" style="--x:41.56%;--y:4.14%">50</b>
+      <!-- 2026-08-28 겹침 수정: 그림 G(핀30·31)와 같은 드로어 레이아웃·같은 결함 —
+           이름·이메일 두 줄 간격 16.7px < 배지 23px. 같은 방식으로 가로로 벌렸다. -->
+      <b class="pin" style="--x:38.54%;--y:2.31%">49</b>
+      <b class="pin" style="--x:44.58%;--y:4.14%">50</b>
       <b class="pin" style="--x:87.49%;--y:3.13%">51</b>
       <div class="box" style="--x:3.3%;--y:24.8%;--w:93.58%;--h:11.95%"></div>
       <b class="pin" style="--x:50.09%;--y:30.04%">52</b>

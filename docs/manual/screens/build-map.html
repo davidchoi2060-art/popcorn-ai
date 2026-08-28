@@ -1,0 +1,488 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 조립 호환 지도</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.
+    ⚠ 이 화면은 좌측 메뉴 이름과 화면 안 이름이 다릅니다 — 아래 「① 이 화면이 무엇을 하는
+    곳인가」 첫 번째 안내를 반드시 먼저 읽으십시오.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 조립 호환 지도를 처음 보는 직원</div>
+    <div><b>화면</b> 조립 호환 지도(좌측 메뉴 표시명) · 경로 <code>/admin2/build-map</code> ·
+      화면 ID <code>ADM-STD-020</code> (코드 <code>api/admin_ui_build_map.py</code>·
+      <code>api/admin_std.py</code> 실측값입니다) · 화면을 열면 다른 이름(「조립 호환
+      조감도」)이 보입니다 — 잘못 들어온 것이 아닙니다.</div>
+    <div><b>왜 이 화면인가</b> "이 부품과 저 부품이 맞는지 판정하려면 무엇을 알아야 하고, 우리는
+      지금 어디까지 아는가"에 답하는 읽기 전용 진단 화면입니다. 관계(부품 쌍) 하나하나마다
+      「규칙이 있는가 · 양쪽 사양 값이 찼는가 · 그래서 지금 판정 가능한가」를 한 곳에서 보여주는
+      유일한 화면입니다 — 이 화면이 없으면 규칙 자체는 <code>compat_rules</code> 테이블을
+      직접 조회해야 하고, 항목별 충족률은 「조립 사양 표준」 화면에 있지만 그 항목이 어느 관계
+      판정에 쓰이는지는 거기서 보이지 않습니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-27 — 이 문서는 그 시점의 화면 코드와, 그 코드가
+      실제로 그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+      개발 서버)에 직접 띄워 촬영한 결과, 그리고 같은 시각 <code>GET /api/admin/std/compat-map</code>
+      응답을 근거로 썼습니다. 지어낸 숫자는 없습니다.</div>
+    <div class="warn-line">이 화면의 숫자(관계 28건 등)는 DB 상태에 따라 바뀝니다 — 이 문서의
+      값은 2026-08-27 스냅샷입니다. 정확한 지금 값은 화면에서 직접 확인하십시오. (참고로 요구사항
+      정의서 <code>docs/design/req/req-build-map.md</code>가 적어 둔 2026-08-14 스냅샷과
+      오늘 값이 정확히 같습니다 — 관계 28 · 범위 안 22 · 검사 적용 9 · 판정 가능 11 · 사양 항목
+      64. 우연히 같을 뿐이며, 화면은 매번 이 API를 다시 조회합니다.)</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역(번호가 있는 핀이 함께 표시됩니다)</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 바뀌는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+
+  <div class="callout">
+    <b>⚠ 좌측 메뉴 이름과 화면 안 이름이 다릅니다.</b> 좌측 메뉴(「상품사양관리」 그룹)에는
+    <b>「조립 호환 지도」</b>라고 나오는데, 화면 자신은 브라우저 탭 제목·화면 상단 위치 표시
+    (breadcrumb)·본문 어디에서도 <b>「조립 호환 조감도」</b>라고 표시합니다. 오늘 실측:
+    <code>&lt;title&gt;팝콘PC 관리자 · 조립 호환 조감도&lt;/title&gt;</code>, 상단 위치 표시
+    「상품사양관리 / 조립 호환 조감도」. 어느 쪽을 정식 이름으로 할지는 아직 결정되지 않았습니다
+    (2026-08-27 기준 미결). 이 문서는 좌측 메뉴 이름을 제목으로 삼되, 화면을 열면 다른 이름이
+    뜬다는 사실을 미리 알려 드립니다 — <b>메뉴에서 「조립 호환 지도」를 눌렀는데 화면에 「조립
+    호환 조감도」라고 뜨더라도 정상입니다.</b>
+  </div>
+
+  <p>「조립 사양 표준」 화면이 "어떤 사양 항목이 비어 있는가"를 부품 단위로 말한다면, 이 화면은
+    "그게 왜 문제인가"를 <b>관계(부품 쌍) 단위</b>로 말합니다. 아무것도 고치지 않는 읽기 전용
+    화면입니다 — 규칙을 만들거나 사양 값을 입력하는 동작이 전혀 없습니다.</p>
+  <p>부품 쌍마다 서버가 상태 하나를 판정해 내려줍니다(화면은 이 값을 그대로 쓰고 다시 계산하지
+    않습니다 — 세 가지 보기가 각자 계산하면 서로 어긋나기 때문입니다). 상태는 항상 색 + 기호 +
+    글자를 함께 씁니다(색약 배려):</p>
+  <table class="kv">
+    <tr><th>기호</th><th>이름</th><th>뜻</th></tr>
+    <tr><td>◆</td><td>규칙 미등록</td><td>양쪽 사양 값은 이미 찼는데, 아직 아무 규칙도 이 관계를
+      막고 있지 않습니다 — 지금 당장 견적 엔진은 이 조합을 걸러내지 못합니다</td></tr>
+    <tr><td>○</td><td>사양 값 부족</td><td>규칙이 있든 없든, 판정에 필요한 사양 값 중 하나 이상이
+      0%입니다 — 코드 주석 그대로 "값이 하나라도 0%면 그 쌍은 판정이 반쪽"입니다</td></tr>
+    <tr><td>●</td><td>검사 적용</td><td>활성 규칙(<code>compat_rules</code>)이 이미 걸려
+      있습니다. ⚠ 사양 충족률이 100%라는 뜻은 <b>아닙니다</b> — 아래 「조심할 것」 참고</td></tr>
+    <tr><td>·</td><td>범위 밖</td><td>지금 단계에서는 판정 대상이 아닙니다(모니터·팬·확장카드·
+      ODD처럼 아직 부품 분류가 안 됐거나 주변기기라 사양 자체가 없음)</td></tr>
+  </table>
+  <p>오늘 실측(<code>GET /api/admin/std/compat-map</code>): 관계 <b>28건</b> 중 범위 안
+    <b>22건</b>, 그중 검사 적용 <b>9건</b> · 규칙 미등록 <b>3건</b> · 사양 값 부족 <b>10건</b>
+    (범위 밖 <b>6건</b>은 별도) · 판정 가능(관련 값이 하나도 0%가 아닌 것) <b>11건</b> · 부품별
+    사양 항목 합계 <b>64개</b>. 관계가 걸리는 부품은 <b>10종</b>(CPU·메인보드·메모리·그래픽카드·
+    파워·케이스·SSD·HDD·CPU쿨러(공랭)·CPU쿨러(수랭))이고, 그 밖에 <b>참조만 되는 5종</b>(모니터·
+    팬·확장카드·광학드라이브·"구성 전체")도 지도에 노드로만 나타납니다 — 아직 부품 분류가 안 됐거나
+    (팬·확장카드·광학드라이브는 ETC로 미분류) 사양 체계가 없어서(모니터, "구성 전체") 범위 밖으로
+    빠져 있습니다.</p>
+  <p>관계마다 <code>A1</code>~<code>F5</code> 같은 코드(pair_key)가 붙습니다. 앞 글자는 여섯
+    묶음(group)을 가리킵니다 — A: 메인보드 중심(대부분의 관계가 메인보드로 수렴) · B: 물리 공간
+    (케이스 수용 여부) · C: 전력 · D: 냉각·간섭 · E: 출력(영상) · F: 선택 부품(팬·확장카드·ODD,
+    부품 분류 선행 필요). ⚠ 이 묶음 이름 자체는 API 응답(<code>groups</code>)에는 있지만 화면
+    어디에도 문구로 나오지 않습니다(코드 확인 — 화면 스크립트가 이 값을 읽는 곳이 0곳입니다)
+    — 코드 앞 글자로만 짐작할 수 있습니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>새 호환 규칙을 등록하기 전에, 그 관계에 실제로 사양 값이 준비됐는지(판정 가능한지) 먼저
+      확인할 때</li>
+    <li>특정 부품(예: SSD)이 걸린 관계가 몇 개나 있고 그중 몇 개나 규칙으로 막혀 있는지 궁금할 때
+      — 부품을 클릭해 고정(pin)하고 살펴봅니다</li>
+    <li>「조립 사양 표준」 화면에서 특정 사양 필드의 충족률이 낮다는 것을 본 뒤, 그 필드가 어느
+      관계 판정에 쓰이는지 거슬러 올라와 확인할 때</li>
+    <li>규칙이 없는 관계부터 우선순위를 정해 다음에 등록할 규칙 순서를 정할 때 — 「진단형」 탭이
+      이 용도로 맞춰져 있습니다(규칙 미등록을 맨 앞 레인에 둡니다)</li>
+    <li>부품 × 부품 격자로 「전혀 정의되지 않은 관계」와 「정의는 됐지만 상태가 무엇인지」를
+      한눈에 훑어보고 싶을 때 — 「매트릭스형」 탭</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>이 화면은 <b>세 가지 표현(탭)</b>을 갖고 있습니다 — 지도형·진단형·매트릭스형. 셋 다
+    <b>같은 조회 한 번</b>(<code>GET /api/admin/std/compat-map</code>)으로 그려지고, 탭을
+    바꿔도 다시 조회하지 않습니다(코드 확인 — 탭 전환은 <code>hidden</code> 속성만 바꿉니다).
+    아래에서 기본 탭(지도형)부터 하나씩 확대해 설명하고, 이어서 부품 고정(pin) 기능, 진단형·
+    매트릭스형 순으로 다룹니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면(지도형, 기본 탭)</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1680/1050">
+      <img src="/shared/manual/shots/build-map-full.png" alt="조립 호환 지도 전체 화면(지도형 탭)">
+      <b class="pin" style="--x:6.31%;--y:19.05%">1</b>
+      <b class="pin" style="--x:15.98%;--y:2.8%">2</b>
+      <b class="pin" style="--x:22.75%;--y:2.8%">3</b>
+      <b class="pin" style="--x:29.58%;--y:2.8%">4</b>
+      <b class="pin" style="--x:64.2%;--y:2.8%">5</b>
+      <div class="box" style="--x:13.71%;--y:7.23%;--w:85.19%;--h:3.55%"></div>
+      <b class="pin" style="--x:56.31%;--y:9.0%">6</b>
+      <div class="box" style="--x:13.71%;--y:11.87%;--w:85.19%;--h:6.8%"></div>
+      <b class="pin" style="--x:56.31%;--y:15.28%">7</b>
+      <div class="box" style="--x:13.71%;--y:19.99%;--w:60.28%;--h:74.35%"></div>
+      <b class="pin" style="--x:43.85%;--y:57.17%">8</b>
+      <div class="box" style="--x:74.81%;--y:19.99%;--w:24.1%;--h:74.35%"></div>
+      <b class="pin" style="--x:86.86%;--y:57.17%">9</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 지도형 탭 · 고정(pin) 없음</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 지금 있는 화면이 진하게 표시됩니다. 「상품사양관리」
+      그룹 안에 있습니다(메뉴 라벨은 「조립 호환 지도」)</li>
+    <li><span class="tag">2</span>위치 표시(빵부스러기) 그룹 이름 — 「상품사양관리」</li>
+    <li><span class="tag">3</span>위치 표시 화면 이름 — 「조립 호환 조감도」(⚠ 메뉴 라벨과 다릅니다 — 위 참고)</li>
+    <li><span class="tag">4</span>표현 전환 탭 3개(지도형·진단형·매트릭스형) — 자세한 위치는 <a href="#fig-b">그림 B</a></li>
+    <li><span class="tag">5</span>요약 표시 — 「관계 28 · 사양 64」(조회 성공 시) 또는 「세션 만료」·「조회 실패」(실패 시, 붉은 글자)</li>
+    <li><span class="tag">6</span>대상 고정(pin) 안내줄(테두리 상자) — 지금은 고정된 부품이 없어 "부품을 클릭하면 고정되어 탭을 바꿔도 유지됩니다" 안내만 보입니다</li>
+    <li><span class="tag">7</span>요약 카드 4개(테두리 상자) — 호환 관계 22(전체 28, 범위 밖 6) · 검사 적용 9(규칙 등록 완료) · 판정 가능 11(양측 사양 값 확보) · 사양 항목 64(부품별 합계)</li>
+    <li><span class="tag">8</span>지도 영역(테두리 상자) — 부품 노드와 관계선. 자세히는 <a href="#fig-c">그림 C</a></li>
+    <li><span class="tag">9</span>우측 레일(테두리 상자) — 부품별 사양 충족률 + 관계 목록. 자세히는 <a href="#fig-d">그림 D</a></li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/59.796875">
+      <img src="/shared/manual/shots/build-map-header.png" alt="상단 헤더 확대(위치 표시 · 탭 3개 · 요약 · 허브 · 권한 · 아바타)">
+      <b class="pin" style="--x:3.85%;--y:49.16%">10</b>
+      <b class="pin" style="--x:11.59%;--y:49.16%">11</b>
+      <b class="pin" style="--x:19.41%;--y:49.16%">12</b>
+      <b class="pin" style="--x:24.17%;--y:49.16%">13</b>
+      <b class="pin" style="--x:29.75%;--y:49.16%">14</b>
+      <b class="pin" style="--x:59.03%;--y:49.15%">15</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">16</b>
+      <b class="pin" style="--x:92.44%;--y:49.16%">17</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">18</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">10</span>위치 표시 그룹 — 「상품사양관리」</li>
+    <li><span class="tag">11</span>위치 표시 화면 이름 — 「조립 호환 조감도」</li>
+    <li><span class="tag">12</span><span class="btnlabel">지도형</span> 탭 — 기본 선택. 제약의 그물이 주인공(관계 하나 = 선 하나)</li>
+    <li><span class="tag">13</span><span class="btnlabel">진단형</span> 탭 — 격차가 주인공(규칙이 안 막는 관계를 일감으로 세움)</li>
+    <li><span class="tag">14</span><span class="btnlabel">매트릭스형</span> 탭 — 부품 × 부품 격자, 빈칸이 곧 "정의된 관계 없음"</li>
+    <li><span class="tag">15</span>요약 표시 — 조회 성공 시 "관계 N · 사양 N"</li>
+    <li><span class="tag">16</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">17</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">18</span>아바타 — 「내 정보」 화면으로 이동</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>지도 영역 확대(관계선 · 노드 · 범례)</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:1012.625/780.703125">
+      <img src="/shared/manual/shots/build-map-mapview.png" alt="지도 영역 확대 — 부품 노드와 관계선, 좌하단 범례">
+      <div class="box" style="--x:1.46%;--y:86.8%;--w:15.05%;--h:11.3%"></div>
+      <b class="pin" style="--x:8.99%;--y:92.45%">19</b>
+      <b class="pin" style="--x:50.0%;--y:12.59%">20</b>
+      <b class="pin" style="--x:71.84%;--y:73.38%">21</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 그림 A의 8번 영역을 확대(고정 없음)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">19</span>좌하단 범례(테두리 상자) — 상태 4종을 선 색 · 기호 · 글자 · 건수로 함께 표시(◆ 규칙 미등록 3 · ○ 사양 값 부족 10 · ● 검사 적용 9 · · 범위 밖 6, "아까운 순")</li>
+    <li><span class="tag">20</span>부품 노드 예시 — CPU. 굵은 글자는 코드(CPU), 옅은 글자는 한글 이름. 관계선이 몰리는 노드일수록 화면 중앙에 배치됩니다(배치 자체는 데이터가 아니라 화면이 정한 고정값입니다)</li>
+    <li><span class="tag">21</span>부품 노드 예시 — SSD. 관계선 위에는 그 관계의 코드(예 "A5")가 작은 라벨로 붙습니다 — 선의 색과 굵기가 상태를 나타냅니다(검사 적용은 굵고 진하게, 범위 밖은 점선으로 옅게)</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>우측 레일 확대(부품별 충족률 · 관계 목록, 고정 없음)</h3>
+  <figure>
+    <div class="shot" style="max-width:300px;aspect-ratio:404.796875/780.703125">
+      <img src="/shared/manual/shots/build-map-rail.png" alt="우측 레일 확대 — 부품별 사양 충족률과 전체 관계 목록">
+      <b class="pin" style="--x:50.0%;--y:2.67%">22</b>
+      <div class="box" style="--x:4.22%;--y:4.62%;--w:91.55%;--h:33.54%"></div>
+      <b class="pin" style="--x:50.0%;--y:21.39%">23</b>
+      <b class="pin" style="--x:50.0%;--y:42.01%">24</b>
+      <b class="pin" style="--x:9%;--y:46%">25</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 그림 A의 9번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">22</span>캡션 「부품 10종 · 사양 충족률」</li>
+    <li><span class="tag">23</span>부품별 충족률 막대 목록(테두리 상자) — 사양 항목 수가 많은 순서로 10종이 나열됩니다(메인보드 15개 항목으로 최다). 오늘 값 예시: 메인보드 65% · 케이스 50% · 그래픽카드 38%(최저) · 파워 54% · CPU 86% · 메모리 57% · CPU쿨러(수랭) 50% · CPU쿨러(공랭) 58% · HDD 49% · SSD 88%(최고)</li>
+    <li><span class="tag">24</span>관계 목록 제목 — 고정된 부품이 없으면 「관계 28건 · 우선순위순」입니다. ⚠ 이 28은 범위 밖(out) 6건까지 포함한 <b>전체</b> 건수입니다 — 위 「호환 관계」 요약 카드의 22(범위 안만)와 다릅니다, 헷갈리지 않도록 주의하십시오</li>
+    <li><span class="tag">25</span>관계 목록 시작 지점 — 아래로 스크롤됩니다(목록 전체 높이가 이 레일 영역보다 커서 테두리 상자로 표시하지 않았습니다). 규칙 미등록(◆) → 사양 값 부족(○) → 검사 적용(●) → 범위 밖(·) 순으로 정렬됩니다("아까운 순" — 코드 주석 그대로). 각 행에 관계 코드 · 부품 쌍(코드 그대로, 예 "RAM ↔ MB") · 상태 배지 · 무엇을 비교하는지 · 연관 사양 충족률이 나옵니다</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li><b>표현(탭) 전환</b> — 지도형·진단형·매트릭스형 세 탭을 자유롭게 오갑니다. 셋 다 같은
+      데이터를 다른 방식으로 보여줄 뿐이라, 어느 탭에서 본 숫자든 서로 다르지 않습니다.</li>
+    <li><b>부품에 마우스 올리기(미리보기)</b> — 그 부품이 걸린 관계선·행이 진해지고 나머지는
+      흐려집니다. 마우스를 떼면 즉시 원래대로 돌아갑니다.</li>
+    <li><b>부품 클릭(고정, pin)</b> — 지도의 노드, 우측 레일의 부품 행, 진단형의 부품 카드,
+      매트릭스의 행 머리 중 <b>어디를 클릭해도</b> 같은 부품이 고정됩니다. 고정하면 상단에
+      📌 표시가 있는 안내줄이 뜨고, <b>탭을 바꿔도 고정이 풀리지 않습니다</b> — 세 표현을 같은
+      대상으로 비교할 수 있게 하기 위한 기능입니다. 다시 클릭하면 해제되고, 안내줄의
+      <span class="btnlabel">해제 ✕</span> 버튼이나 부품이 아닌 곳(바깥)을 클릭해도 해제됩니다.
+      자세히는 <a href="#fig-e">그림 E</a>·<a href="#fig-f">그림 F</a>.</li>
+    <li><b>진단형 탭</b> — 상단에 「검사 대상 22건 · 규칙 적용 9건 · 미적용 13건 — 규칙 등록
+      필요」를 큼직하게 보여준 뒤, 상태 4종을 레인(세로 칸)으로 나눠 관계 카드를 배치합니다.
+      규칙 미등록 레인이 맨 왼쪽입니다 — 다음에 규칙을 등록할 후보를 그 순서대로 검토하면
+      됩니다. 자세히는 <a href="#fig-g">그림 G</a>·<a href="#fig-h">그림 H</a>.</li>
+    <li><b>매트릭스형 탭</b> — 부품 10종(+참조 5종) × 같은 목록의 격자입니다. 칸 안에 그 두 부품
+      사이 관계의 기호와 코드가 함께 표시됩니다(예 "◆A5"). <b>완전히 빈 칸은 그 두 부품 사이에
+      정의된 관계 자체가 없다는 뜻</b>입니다(미검사와는 다릅니다 — 미검사·미등록 상태도 칸에
+      기호로 나타납니다). 오른쪽에는 부품 × 사양 충족률 표가 나란히 있어, 어느 부품의 어느
+      항목이 0%인지 색으로 바로 보입니다. 자세히는 <a href="#fig-i">그림 I</a>·<a href="#fig-j">그림 J</a>.</li>
+    <li>이 화면에는 저장·되돌리기 버튼이 없습니다 — 애초에 아무것도 쓰지 않기 때문입니다.
+      값을 못 받으면 자동으로 다시 시도하지 않고, 화면에 뜨는 [다시 시도] 버튼을 눌러야 합니다.</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>부품을 클릭해 고정한 뒤 — 전체 화면</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1680/1050">
+      <img src="/shared/manual/shots/build-map-pin-full.png" alt="부품(메모리)을 클릭해 고정한 뒤의 전체 화면 — 관련 관계선 강조, 나머지 흐림">
+      <div class="box" style="--x:13.71%;--y:7.23%;--w:85.19%;--h:4.24%"></div>
+      <b class="pin" style="--x:56.31%;--y:9.35%">26</b>
+      <b class="pin" style="--x:96.29%;--y:9.35%">27</b>
+      <b class="pin" style="--x:59.02%;--y:40.06%">28</b>
+      <b class="pin" style="--x:86.86%;--y:51.92%">29</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ah-bm1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="991" y1="421" x2="360" y2="98" stroke="#c8451c" stroke-width="6" marker-end="url(#ah-bm1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 우측 레일에서 「메모리(RAM)」 행을 클릭해 고정한 직후. 화살표 = 클릭한 노드(28)에서 그 결과가 반영되는 안내줄(26)로. 어떤 부품을 고정할지는 하드코딩하지 않고, 캡처 시점에 「규칙 미등록」 상태인 관계가 걸린 부품을 스크립트가 직접 골랐습니다.</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">26</span>대상 고정 안내줄(테두리 상자) — 「📌 RAM 메모리」 + 「고정됨 — 탭을 바꿔도 유지」 문구로 바뀝니다</li>
+    <li><span class="tag">27</span><span class="btnlabel">해제 ✕</span> 버튼 — 누르면 고정이 풀립니다</li>
+    <li><span class="tag">28</span>고정된 부품 노드(RAM) — 굵은 테두리 + 📌 표시로 다른 노드와 구분됩니다. 화살표가 가리키듯, <b>이 노드를 클릭한 결과</b>가 왼쪽 위 안내줄(26)과 오른쪽 레일 제목(29)에 함께 반영됩니다</li>
+    <li><span class="tag">29</span>우측 레일 제목이 「RAM 연관 관계 4건 — 고정됨」으로 바뀝니다(RAM이 걸린 관계는 A4·A5·A6·D3 넷입니다) — 자세히는 <a href="#fig-f">그림 F</a></li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>고정 후 — 우측 레일 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:300px;aspect-ratio:404.796875/773.453125">
+      <img src="/shared/manual/shots/build-map-pin-rail.png" alt="메모리(RAM)를 고정한 뒤 우측 레일 확대 — 부품 목록의 고정 표시와 필터링된 관계 목록">
+      <div class="box" style="--x:4.22%;--y:21.59%;--w:91.55%;--h:3.39%"></div>
+      <b class="pin" style="--x:50.0%;--y:23.28%">30</b>
+      <b class="pin" style="--x:50.0%;--y:42.4%">31</b>
+      <div class="box" style="--x:4.22%;--y:44.37%;--w:91.55%;--h:49.22%"></div>
+      <b class="pin" style="--x:50.0%;--y:68.98%">32</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 그림 A의 9번 영역을, RAM을 고정한 상태로 다시 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">30</span>부품 목록에서 고정된 행(RAM, 테두리 상자) — 📌 표시 + 굵은 테두리로 강조되고, 다른 부품 행은 흐려집니다</li>
+    <li><span class="tag">31</span>관계 목록 제목 — 「RAM 연관 관계 4건 — 고정됨」</li>
+    <li><span class="tag">32</span>필터링된 관계 목록(테두리 상자, 고정 전 28건 → 4건으로 좁혀짐, 우선순위 그대로 정렬) — 오늘 값: <b>A5</b> RAM↔MB "모듈 개수 ≤ 슬롯 수 · 최대 용량"(규칙 미등록) → <b>A6</b> RAM↔MB "램 클럭 ≤ 보드 지원 상한"(규칙 미등록, "상한 초과 시 다운클럭 동작") → <b>D3</b> COOLER_CPU_AIR↔RAM "램 방향 여유 ≥ 램 높이"(사양 값 부족, "업계 표준 도구도 미지원 항목") → <b>A4</b> RAM↔MB "메모리 규격(DDR4/DDR5)"(검사 적용)</li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>진단형 탭(고정 유지)</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/990.203125">
+      <img src="/shared/manual/shots/build-map-diag.png" alt="진단형 탭 전체 — 상단 요약, 상태별 레인, 우측 부품 목록. 탭을 바꿔도 RAM 고정이 유지된다">
+      <div class="box" style="--x:1.25%;--y:1.63%;--w:97.49%;--h:4.5%"></div>
+      <b class="pin" style="--x:50.0%;--y:3.87%">33</b>
+      <div class="box" style="--x:1.25%;--y:7.28%;--w:97.49%;--h:9.41%"></div>
+      <b class="pin" style="--x:50.0%;--y:11.99%">34</b>
+      <b class="pin" style="--x:3.59%;--y:11.99%">35</b>
+      <b class="pin" style="--x:7.89%;--y:12.9%">36</b>
+      <b class="pin" style="--x:16.17%;--y:11.99%">37</b>
+      <div class="box" style="--x:1.25%;--y:18.08%;--w:70.86%;--h:75.92%"></div>
+      <b class="pin" style="--x:36.68%;--y:56.04%">38</b>
+      <div class="box" style="--x:72.96%;--y:22.28%;--w:25.72%;--h:71.62%"></div>
+      <b class="pin" style="--x:85.82%;--y:58.09%">39</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 지도형 탭에서 RAM을 고정한 뒤 「진단형」 탭으로 전환한 직후(다시 조회하지 않고 같은 데이터를 다르게 그림)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">33</span>대상 고정 안내줄(테두리 상자) — <b>탭을 바꿨는데도 「📌 RAM · 고정됨」이 그대로 남아 있습니다</b>(요구사항이 실제로 지켜지는지 이 캡처로 확인했습니다)</li>
+    <li><span class="tag">34</span>상단 요약(테두리 상자) — 「검사 대상 22 / 규칙 적용 9」 큰 숫자 + 「미적용 13건 — 규칙 등록 필요」 문구 + 우측에 그림 A와 같은 4개 카드</li>
+    <li><span class="tag">35</span>규칙 적용 건수 — 9</li>
+    <li><span class="tag">36</span>검사 대상(범위 안) 건수 — 22</li>
+    <li><span class="tag">37</span>안내 문구 — 「검사 대상 22건 · 규칙 적용 9건 / 미적용 13건 — 규칙 등록 필요」(굵게)</li>
+    <li><span class="tag">38</span>레인 4개(테두리 상자) — 왼쪽부터 규칙 미등록(3) · 사양 값 부족(10) · 검사 적용(9) · 범위 밖(6) 순. 고정된 RAM이 걸린 카드는 진하게, 나머지는 흐리게 표시됩니다</li>
+    <li><span class="tag">39</span>우측 「사양 등록 필수」 목록(테두리 상자) — 부품 10종을 충족률 막대와 함께 세로로 나열(레일과 같은 정보를 진단형 맥락으로 다시 보여줌). 필수 사양 중 0%인 항목이 있으면 그 항목 이름이 작은 태그로 붙습니다</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>진단형 — 「규칙 미등록」 레인 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:220px;aspect-ratio:251.421875/751.734375">
+      <img src="/shared/manual/shots/build-map-diag-lane.png" alt="진단형 탭의 첫 번째 레인(규칙 미등록) 확대 — 첫 카드는 RAM-MB 모듈 개수 관계">
+      <div class="box" style="--x:0.4%;--y:0.4%;--w:99.2%;--h:5.64%"></div>
+      <b class="pin" style="--x:50.0%;--y:3.22%">40</b>
+      <div class="box" style="--x:4.97%;--y:10.42%;--w:90.06%;--h:16.14%"></div>
+      <b class="pin" style="--x:50.0%;--y:18.49%">41</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 그림 G의 첫 번째 레인(맨 왼쪽)을 확대. 이 레인의 첫 카드가 고정된 RAM과 관련된 A5입니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">40</span>레인 머리글(테두리 상자) — 기호 ◆ · 「규칙 미등록」 · 건수(3) · 설명 「사양 값 확보 · 규칙 등록 필요」</li>
+    <li><span class="tag">41</span>첫 카드(테두리 상자, A5 · RAM↔MB) — 「모듈 개수 ≤ 슬롯 수 · 최대 용량」, 관련 사양 MB.메모리 슬롯 수 89% · MB.최대 메모리 용량 86% · RAM.모듈 개수 82%가 함께 나옵니다. 이 레인의 나머지 두 카드는 A6(RAM↔MB, 램 클럭)·C3(POWER↔GPU, 보조전원 커넥터)입니다(스크롤해야 보입니다)</li>
+  </ul>
+
+  <h3 id="fig-i"><span class="fig">그림 I</span>매트릭스형 탭(고정 유지)</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/990.203125">
+      <img src="/shared/manual/shots/build-map-matrix.png" alt="매트릭스형 탭 전체 — 규칙 적용률 카드, 범례 카드, 부품×부품 격자, 부품×사양 충족률 표">
+      <div class="box" style="--x:1.25%;--y:1.63%;--w:97.49%;--h:4.5%"></div>
+      <b class="pin" style="--x:50.0%;--y:3.87%">42</b>
+      <b class="pin" style="--x:2.97%;--y:12.44%">43</b>
+      <b class="pin" style="--x:5.46%;--y:13.12%">44</b>
+      <div class="box" style="--x:8.59%;--y:7.28%;--w:90.15%;--h:10.21%"></div>
+      <b class="pin" style="--x:53.67%;--y:12.39%">45</b>
+      <div class="box" style="--x:8.53%;--y:22.75%;--w:42.29%;--h:1.9%"></div>
+      <b class="pin" style="--x:29.67%;--y:23.7%">46</b>
+      <div class="box" style="--x:2.26%;--y:24.65%;--w:48.56%;--h:67.98%"></div>
+      <b class="pin" style="--x:26.54%;--y:58.64%">47</b>
+      <div class="box" style="--x:52.84%;--y:23.2%;--w:45.84%;--h:70.7%"></div>
+      <b class="pin" style="--x:75.76%;--y:58.55%">48</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 「진단형」에 이어 「매트릭스형」 탭으로 전환한 직후 — RAM 고정이 여기서도 유지됩니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">42</span>대상 고정 안내줄(테두리 상자) — 매트릭스형 탭에서도 「📌 RAM · 고정됨」이 그대로입니다</li>
+    <li><span class="tag">43</span>규칙 적용률 — 9</li>
+    <li><span class="tag">44</span>「/ 22」(범위 안 대비) — 아래에 「미적용 13건」 문구</li>
+    <li><span class="tag">45</span>상태 4종 요약 카드(테두리 상자) — 그림 A의 범례와 같은 4개 숫자를 카드로 나열</li>
+    <li><span class="tag">46</span>격자 열 머리글(테두리 상자) — 부품 15종(핵심 10 + 참조 5)의 줄임 이름(예 COOLER_CPU_AIR→AIR, 모니터→MON)</li>
+    <li><span class="tag">47</span>부품 × 부품 격자(테두리 상자) — 자세히는 <a href="#fig-j">그림 J</a></li>
+    <li><span class="tag">48</span>부품 × 사양 충족률 표(테두리 상자) — 부품별로 사양 칩이 나열되고, 진하게=필수 사양·옅게=경고 사양·붉게=값 0%로 구분됩니다</li>
+  </ul>
+
+  <h3 id="fig-j"><span class="fig">그림 J</span>매트릭스 — 부품 × 부품 격자 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:560px;aspect-ratio:742.453125/743.78125">
+      <img src="/shared/manual/shots/build-map-matrix-grid.png" alt="부품 x 부품 격자 확대 — RAM 행이 고정 표시로 강조됨">
+      <div class="box" style="--x:14.38%;--y:5.14%;--w:83.62%;--h:2.53%"></div>
+      <b class="pin" style="--x:56.2%;--y:6.41%">49</b>
+      <div class="box" style="--x:1.99%;--y:7.67%;--w:96.01%;--h:90.5%"></div>
+      <b class="pin" style="--x:50.0%;--y:52.92%">50</b>
+      <div class="box" style="--x:1.99%;--y:19.74%;--w:96.01%;--h:6.03%"></div>
+      <b class="pin" style="--x:50.0%;--y:22.76%">51</b>
+    </div>
+    <p class="cap">캡처 2026-08-27 · 그림 I의 격자 영역을 확대. 굵은 테두리 행이 고정된 RAM입니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">49</span>열 머리글(테두리 상자) — 부품 15종을 줄인 이름으로 표시</li>
+    <li><span class="tag">50</span>격자 전체(테두리 상자) — 각 칸에 그 두 부품 사이 관계의 기호+코드가 함께 표시됩니다(예 "◆A5" · "●A1"). <b>완전히 빈 칸은 두 부품 사이에 정의된 관계 자체가 없다는 뜻</b>(대각선 칸은 자기 자신이라 항상 회색으로 비활성)입니다</li>
+    <li><span class="tag">51</span>고정된 부품(RAM)의 행(테두리 상자) — 굵은 테두리 + 📌로 강조되고, RAM이 걸린 칸(MB·COOLER_CPU_AIR 열의 교차 칸)은 진하게, 나머지는 흐리게 표시됩니다</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>「검사 적용(●)」이 사양 충족률 100%를 뜻하지 않습니다.</b> 이 상태는 활성 규칙
+    (<code>compat_rules</code>)이 걸려 있다는 뜻일 뿐입니다. 예를 들어 D2(CPU쿨러(공랭)↔CPU,
+    발열(TDP) 판정)는 오늘 값으로 「검사 적용」이지만, 관련 사양 충족률은 20%·50%·74%에
+    그칩니다 — 코드에 남은 메모 그대로 "규칙 등록 완료 · 사양 값 부족으로 후보 탈락 다수"입니다.
+    규칙이 걸려 있어도 정작 그 규칙을 적용할 값이 없는 상품은 후보에서 조용히 빠질 수 있습니다.
+  </div>
+  <div class="callout">
+    <b>"검사 적용(●)"은 <code>compat_rules</code> 기준이지 <code>std</code> 스키마 자체가
+    엔진에 반영된다는 뜻이 아닙니다.</b> 이 화면이 참조하는 <code>std.compat_pairs</code>·
+    <code>std.spec_defs</code>는 새로 세우는 표준이고, 실제 견적 엔진은
+    <code>public.compat_rules</code>·<code>public.product_specs</code>만 읽습니다(화면
+    하단에 항상 떠 있는 안내 문구 그대로).
+  </div>
+  <div class="callout">
+    <b>이 화면은 아무것도 쓰지 않습니다.</b> 규칙을 새로 걸거나 사양 값을 입력하는 동작이
+    전혀 없습니다. 규칙 편집은 「조립 호환 규칙」(정의서만 있고 아직 화면은 없습니다), 값 입력은
+    「조립 사양 표준」·「상품 사양 검수」 화면의 몫입니다.
+  </div>
+  <div class="callout">
+    <b>「대상 고정」은 마우스를 올리기(hover)만으로는 되지 않습니다.</b> 올려두기는 미리보기일
+    뿐이라 마우스를 떼면 즉시 사라집니다. 탭을 바꿔도 남는 「고정」은 반드시 <b>클릭</b>해야
+    됩니다(그림 E). 클릭 없이 마우스만 올린 채 탭을 누르면, 탭으로 이동하는 순간 마우스가 부품을
+    벗어나 강조가 풀립니다.
+  </div>
+  <div class="callout">
+    <b>레일 제목의 「관계 28건」과 요약 카드의 「호환 관계 22」는 다른 수입니다.</b> 고정 없이 볼 때
+    레일 제목의 28은 범위 밖(out) 6건까지 포함한 <b>전체</b> 관계 수이고, 상단 요약 카드의 22는
+    범위 <b>안</b>만 센 수입니다. 같은 화면 안에서 분모가 다른 두 숫자이니 헷갈리지 않도록
+    주의하십시오.
+  </div>
+  <div class="callout">
+    <b>관계 목록의 부품 이름은 화면 전체에서 한글로 안 바뀝니다.</b> 지도의 노드 라벨(작은 글씨)만
+    한글 이름을 보여주고, 우측 레일·진단형 카드·매트릭스 격자에 나오는 "RAM ↔ MB" 같은 부품 쌍
+    표기는 코드(part_type) 그대로입니다.
+  </div>
+  <div class="callout">
+    <b>값을 받지 못하면 사유를 구분해 안내합니다.</b> 세션 만료(401)면 "세션 만료" +
+    <code>/admin2/login</code>으로 이동하는 링크가, 그 밖의 실패면 "데이터 조회 실패 —
+    {서버 오류 메시지}" + [다시 시도] 버튼이 뜹니다(코드 확인). 자동으로 다시 조회하지 않으므로
+    반드시 버튼을 눌러야 합니다.
+  </div>
+  <div class="callout">
+    <b>이 화면의 숫자는 매번 새로 조회됩니다.</b> 관계 28건·범위 안 22건 같은 수치는 DB 상태에
+    따라 바뀝니다. 지금 정확한 값은 화면을 열어 직접 확인하십시오.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「메뉴에서 눌렀는데 화면 제목이 다르다」</b> → 정상입니다. 좌측 메뉴는 「조립 호환
+      지도」, 화면 안은 「조립 호환 조감도」입니다. 위 「① 이 화면이 무엇을 하는 곳인가」 참고.</li>
+    <li><b>「지도에 선이 너무 많아서 뭐가 뭔지 모르겠다」</b> → 궁금한 부품 하나를 클릭해
+      고정하십시오(그림 E). 그 부품이 걸린 관계선만 진해지고 나머지는 흐려집니다.</li>
+    <li><b>「탭을 바꿨더니 방금 보던 부품 강조가 사라졌다」</b> → 마우스를 올리기만(hover) 했을
+      가능성이 큽니다. 탭을 넘나들며 유지하려면 반드시 <b>클릭</b>해서 고정해야 합니다.</li>
+    <li><b>「매트릭스 칸이 비어 있다」</b> → 그 두 부품 사이에는 정의된 관계 자체가 없다는
+      뜻입니다(아직 검사를 안 한 것과는 다릅니다 — 미검사 상태는 기호가 있는 칸으로 나타납니다).</li>
+    <li><b>「SSD가 왜 여기서 안 보이나 했더니 관계가 하나뿐이다」</b> → SSD가 걸리는 관계는
+      A8(SSD↔메인보드, "인터페이스별 장착 위치") 하나뿐입니다. 오늘 실측으로 이 관계는 활성
+      규칙이 없는 상태(<code>rule_active=false</code>)이고 사양 값도 일부 0%라 상태는
+      「사양 값 부족」입니다 — SSD는 지금 이 화면 기준으로 어떤 활성 규칙의 보호도 받지
+      못합니다.</li>
+    <li><b>「규칙이 이미 걸려 있다는데(●) 왜 후보가 잘 안 늘어나나」</b> → 규칙이 걸려 있어도
+      관련 사양 값이 비어 있으면(0%) 그 규칙을 적용할 상품 자체가 적습니다. 위 「조심할 것」의
+      D2 사례를 참고하십시오.</li>
+    <li><b>「화면에 '세션 만료'라고 뜬다」</b> → 로그인이 끊긴 상태입니다. 안내에 뜨는 링크로
+      다시 로그인하십시오.</li>
+    <li><b>「이 문서에 적힌 숫자와 화면 숫자가 다르다」</b> → 정상입니다. 이 문서는 2026-08-27
+      스냅샷이고, 화면은 열 때마다 다시 조회합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_ui_build_map.py</code> · <code>api/admin_std.py</code>
+        (<code>compat_map</code> 엔드포인트) · <code>templates/admin/build_map.html.j2</code> ·
+        <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>mockups/shared/admin2/admin2-shell.js</code></li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-27에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_build_map.py</code>, 이미지는
+        <code>mockups/shared/manual/shots/build-map-*.png</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>build-map-coords.json</code>에 있습니다.</li>
+      <li>실측 수치(관계 28건 등) — 캡처와 같은 순간 <code>GET /api/admin/std/compat-map</code>
+        응답을 그대로 옮겼습니다. 지어낸 숫자는 없습니다 — DB 상태에 따라 바뀌므로 지금 값은
+        화면에서 다시 확인하십시오. 어떤 부품을 고정(pin)해 보여줄지도 하드코딩하지 않고,
+        캡처 스크립트가 그 순간 「규칙 미등록」 상태인 관계가 걸린 부품을 API 응답에서 직접
+        찾아 골랐습니다(오늘은 RAM이 뽑혔습니다 — 데이터가 바뀌면 다른 부품이 뽑힐 수
+        있습니다).</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>·
+      <code>--w</code>·<code>--h</code> 값도 새 <code>build-map-coords.json</code>에 맞춰 다시
+      옮겨야 합니다(좌표는 손으로 만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면
+      함께 낡습니다 — 단, 그림 D의 25번처럼 목록이 화면보다 길어 실측 높이가 뜻이 없는 항목은
+      이 문서를 만들 때 사람이 화면 안쪽 지점을 가늠해 골랐습니다). <b>화살표(그림 E의 SVG
+      선)는 좌표 JSON에 담기지 않습니다</b> — viewBox 1680×1050 기준 원시 픽셀 좌표를 이 문서
+      안에 직접 적어 두었으므로, 화면 레이아웃이 바뀌면 사람이 캡처를 보고 다시 맞춰야 합니다.</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_build_map.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — <code>.venv</code>에는 이미 설치돼 있지만
+      <code>requirements.txt</code>에는 없습니다. 새 환경(다른 PC·재설치한 venv)에서는
+      <code>pip install playwright</code> 후 <code>playwright install chromium</code>이 먼저
+      필요합니다.</p>
+    <p><b>확인하지 못한 것</b></p>
+    <ul>
+      <li>이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가 없어, 완성된 이 HTML
+        문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀·상자 좌표가 캡처 위에 정확히
+        맞는지, 그림 E의 화살표가 실제로 노드→안내줄을 정확히 잇는지)는 직접 확인하지
+        못했습니다 — 별도 확인이 필요합니다.</li>
+      <li>오류 상태 화면(401 「세션 만료」 카드, 그 밖의 「데이터 조회 실패」 카드)은 캡처하지
+        못했습니다. 재현하려면 이 화면의 인증 세션을 깨야 하는데, 캡처 시점에 다른 네 명이
+        같은 개발 서버·로그인 세션을 동시에 쓰고 있어 그들의 작업에 영향을 줄 위험이 있다고
+        판단해 시도하지 않았습니다.</li>
+      <li>관계가 0건인 경우(이론상 상태 — 정의서도 "지금까지 실사용에서 관측되지 않았다"고
+        적어 두었습니다)는 오늘도 28건이 항상 존재해 캡처할 수 없었습니다.</li>
+      <li>조회 전용(뷰어) 등급 계정에서 이 화면이 어떻게 보이는지는 확인하지 못했습니다 —
+        캡처는 owner 등급 점검 계정으로만 찍었습니다(이 화면은 애초에 쓰기 동작이 없어
+        등급별 차이가 크지 않을 것으로 보이지만, 실제로 비교 확인하지는 않았습니다).</li>
+      <li>API 응답의 <code>groups</code>(관계 여섯 묶음의 이름·설명)는 화면 스크립트가 어디서도
+        읽지 않는 것으로 코드에서 확인했습니다 — 다만 이것이 "아직 안 쓴 것"인지 "쓸 계획이
+        없는 것"인지는 이 작업 범위 밖이라 판단하지 못했습니다.</li>
+    </ul>
+  </div>
+
+</div>

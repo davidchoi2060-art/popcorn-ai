@@ -1,0 +1,483 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 추천 가능 재고 현황</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 추천 가능 재고 현황을 처음 맡는 직원</div>
+    <div><b>화면</b> 추천 가능 재고 현황 · 경로 <code>/admin2/candidate-pool</code> · 화면 ID <code>ADM-ENG-030</code>
+      (<code>api/admin_pool.py</code>·<code>api/admin_ui_candidate_pool.py</code>·<code>templates/admin/candidate_pool.html.j2</code>
+      실측값입니다. 좌측 메뉴(<code>api/admin_nav.py</code>, "상품사양관리" 그룹)에도 같은 경로·라벨로 이미
+      연결돼 있습니다 — "신설 예정" 표시 없이 바로 눌러 들어갈 수 있습니다.)</div>
+    <div><b>왜 이 화면인가</b> 이 화면은 <b>견적 엔진이 실제로 고를 수 있는 부품</b>을 보여줍니다 — 여기서
+      빠지면 아무리 좋은 부품이어도 고객 견적에는 나가지 않습니다. 직원이 "왜 이 부품이 견적에 안
+      나오지?"라고 물을 때 와야 하는 자리가 여기입니다. 최근 실제로 있었던 일들이 이 화면과 바로
+      이어집니다 — 살 수 없는 부품 233건을 후보에서 뺐고(후보 풀이 2,959건에서 2,726건으로
+      줄었습니다), 전 공급처가 품절인 상품 121건도 함께 뺐으며, 반대로 품절인데 더 싼 상품 499건을
+      찾아낸 사례도 있었습니다(그중 한 건은 6.5배 차이였습니다). 후보에 있고 없고가 매출에 직접
+      닿는다는 뜻이고, 이 화면은 "지금 몇 개가 있고 없는지, 왜 없는지"를 부품 종류별로 보여주는
+      자리입니다(아래 1 참고). 공교롭게도 이번 캡처(2026-08-28) 시점의 통과 건수도 정확히
+      <b>2,726건</b>이었습니다 — 우연히 같은 후보 풀을 보고 있는 것입니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-28 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      Playwright로 직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수(통과 2,726건 등)는 매일
+      바뀝니다 — 정확한 지금 값은 화면 좌측 상단 큰 숫자에서 직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 같은 항목이 화면의 다른 자리에도 나타난다는 표시</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>지금 카탈로그에서 <b>실제로 견적에 쓰일 수 있는 부품이 얼마나 되는지</b>, 못 쓰이는 것은 <b>어떤
+    이유로 못 쓰이는지</b>를 부품 종류(10종 — CPU·메인보드·그래픽카드·메모리·SSD·HDD·파워·케이스·
+    공랭쿨러·수랭쿨러)별로 집계해 보여주는 <b>조회 전용</b> 화면입니다. 시연용(demo) 데이터는 처음부터
+    세지 않습니다.</p>
+  <p>판정은 다섯 단계 게이트를 <b>배타적으로</b>(순서대로 첫 미충족 사유 하나만) 셉니다.</p>
+  <ul>
+    <li><b>① 사양 없음</b> — <code>product_specs</code>에 그 상품의 행이 아예 없음(그릇조차 없는 상태)</li>
+    <li><b>② 검수 대기</b> — 사양 행은 있지만 아직 사람 검수를 거치지 않음</li>
+    <li><b>③ 후보 미승격</b> — 검수는 끝났는데 추천 후보로 승격되지 않음(정상적으로는 드물어야 함)</li>
+    <li><b>④ 가격 검토 대기</b> — 판매가가 아직 안 매겨짐</li>
+    <li><b>⑤ 재고 없음 · 매입</b> — 재고가 0이거나 판매중 상태가 아님</li>
+  </ul>
+  <p>다섯을 전부 통과하면 <b>통과(ok)</b>입니다. 이 통과 합계는 <b>고객 화면(S1)의 후보 카운터와 정확히
+    같은 정의</b>(추천 뷰 ∧ 재고&gt;0)를 씁니다 — 어긋나면 두 계산이 서로 다른 말을 하고 있다는
+    뜻입니다.</p>
+  <p>2026-08-28 캡처 기준 실측: 판정 대상(조립 부품 10종, 시연 제외) <b>13,173건</b> 중 통과
+    <b>2,726건(20.7%)</b>. 사유별로는 사양 없음 <b>0건</b> · 검수 대기 <b>3,450건</b> · 후보 미승격
+    <b>333건</b> · 가격 검토 대기 <b>0건</b> · 재고 없음 · 매입 <b>6,664건</b>입니다. 지금은 임계값(통과
+    3개 이하) 미만으로 떨어진 부품 종류가 하나도 없어 "위험 카테고리 없음" 상태입니다.</p>
+  <p>이 화면 자체에서 값을 바꾸는 조작은 없습니다(렌더 코드에 서버로 보내는 쓰기 요청이 0건입니다) —
+    문제를 발견하면 사유가 가리키는 다른 화면으로 이동해서 고칩니다(아래 4 참고).</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>운영자나 판매 담당이 <b>"왜 이 부품이 견적에 안 나오지?"</b>라고 물어올 때 — 이 화면이 그
+      질문에 사유별로 답합니다.</li>
+    <li>새 상품을 대량으로 올리거나(카탈로그 적재) 검수를 많이 처리한 뒤, <b>추천 후보 풀이 실제로
+      얼마나 늘었는지</b> 결과를 확인할 때.</li>
+    <li>매입·소싱 담당이 <b>어느 부품 종류부터 채워야 하는지</b> 우선순위를 정할 때 — 통과율이 낮은
+      종류(그림 E)나 우측 레일의 얇은 카테고리·결합 조건(그림 F)을 봅니다.</li>
+    <li>"화이트 케이스로 견적을 짰는데 부품이 안 나온다" 같은 신고가 들어왔을 때 — 카테고리 총량만
+      봐서는 안 보이는 결합 조건(화이트 케이스·750W 이상 파워)의 실제 재고를 따로 확인합니다.</li>
+    <li>검수 대기가 매출에 실제로 얼마나 영향을 주는지(판매 가능한 것 중 몇 %가 아직 후보가 아닌지)
+      가늠할 때.</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>먼저 전체 모습을 보고, 아래에서 영역별로 확대해 하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/candidate-pool-full.png" alt="추천 가능 재고 현황 화면 전체">
+      <div class="box" style="--x:0%;--y:44.4%;--w:12.62%;--h:3.38%"></div>
+      <b class="pin" style="--x:6.31%;--y:46.1%">1</b>
+      <div class="box" style="--x:12.62%;--y:0%;--w:87.38%;--h:5.69%"></div>
+      <b class="pin" style="--x:13.62%;--y:1.5%">2</b>
+      <b class="pin" style="--x:14.71%;--y:8.28%">3</b>
+      <div class="box" style="--x:13.71%;--y:10.64%;--w:85.19%;--h:17.22%"></div>
+      <b class="pin" style="--x:14.71%;--y:12.14%">4</b>
+      <div class="box" style="--x:13.71%;--y:27.86%;--w:85.19%;--h:4.2%"></div>
+      <b class="pin" style="--x:14.71%;--y:29.36%">5</b>
+      <div class="box" style="--x:13.71%;--y:32.07%;--w:61.92%;--h:45.91%"></div>
+      <b class="pin" style="--x:14.71%;--y:33.57%">6</b>
+      <div class="box" style="--x:76.45%;--y:32.07%;--w:22.45%;--h:62.33%"></div>
+      <b class="pin" style="--x:77.45%;--y:33.57%">7</b>
+      <div class="box" style="--x:13.71%;--y:96.35%;--w:85.19%;--h:3.31%"></div>
+      <b class="pin" style="--x:14.71%;--y:97.85%">8</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="cpArrow1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="1562" y1="293" x2="1473" y2="937" stroke="#c8451c" stroke-width="4" marker-end="url(#cpArrow1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 화살표는 같은
+      사유(⑤ 재고 없음 · 매입)가 상단 카드 줄과 우측 레일에 각각 나타나며 <b>둘 다 이동 버튼이
+      비활성</b>임을 보여줍니다(자세한 대조는 그림 C·그림 G).</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>좌측 메뉴(LNB)의 활성 항목(테두리 상자) — 「추천 가능 재고 현황」이
+      진하게 표시됩니다. 「상품사양관리」 그룹 안에 있습니다.</li>
+    <li><span class="tag">2</span>위치 표시(빵부스러기) + 배지 2개(테두리 상자) — 자세한 구성은
+      <a href="#fig-b">그림 B</a></li>
+    <li><span class="tag">3</span>이 화면이 답하는 질문 — 「우리 카탈로그에서 지금 견적에 쓸 수 있는
+      것이 얼마나 되고, 나머지는 왜 못 쓰나」</li>
+    <li><span class="tag">4</span>상단 카드 줄(통과 큰 카드 + 사유 5종 카드, 테두리 상자) — 자세한 구성은
+      <a href="#fig-c">그림 C</a></li>
+    <li><span class="tag">5</span>배타 안내 띠(테두리 상자) — 자세한 구성은 <a href="#fig-d">그림 D</a></li>
+    <li><span class="tag">6</span>본표 — 부품 종류 × 사유(테두리 상자) — 자세한 구성은
+      <a href="#fig-e">그림 E</a></li>
+    <li><span class="tag">7</span>우측 레일(얇은 카테고리 · 결합 조건 · 사유별 이동, 테두리 상자) —
+      자세한 구성은 <a href="#fig-f">그림 F</a>·<a href="#fig-g">그림 G</a></li>
+    <li><span class="tag">8</span>하단 고정 문구(테두리 상자) — 이 화면 전체가 지켜야 하는 정합성을
+      요약합니다: 「"후보 수 &gt; 0"은 "견적 가능"이 아닙니다 — 슬롯 하나가 0이면 조립 자체가
+      불가능합니다 · 통과 합계는 S1 후보 카운터와 정확히 같아야 합니다(어긋나면 두 계산이 서로 다른
+      말을 하는 것) · 이 화면에서 고치는 것은 없습니다」</li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/59.796875">
+      <img src="/shared/manual/shots/candidate-pool-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:3.85%;--y:49.16%">9</b>
+      <b class="pin" style="--x:12.15%;--y:49.16%">10</b>
+      <b class="pin" style="--x:18.94%;--y:49.15%">11</b>
+      <b class="pin" style="--x:25.39%;--y:49.15%">12</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">13</b>
+      <b class="pin" style="--x:92.44%;--y:49.16%">14</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">15</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">9</span>위치 표시(빵부스러기) — 「상품사양관리 / 추천 가능 재고 현황」</li>
+    <li><span class="tag">10</span>화면 이름 — 지금 있는 화면</li>
+    <li><span class="tag">11</span>「조회 전용」 배지 — 이 화면은 집계만 보여줍니다. 값을 바꾸려면
+      사유가 가리키는 다른 화면으로 이동합니다(마우스를 올리면 이 문구가 브라우저 기본 툴팁으로
+      뜹니다)</li>
+    <li><span class="tag">12</span>조회 시각 배지 — 데이터를 받아온 시각(브라우저 기준). 응답이 오기
+      전엔 숨겨져 있다가 렌더가 끝나면 나타납니다</li>
+    <li><span class="tag">13</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">14</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">15</span>아바타 — 「내 정보」 화면으로 이동</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>상단 카드 줄 확대 — 통과 카드 + 사유 5종</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1431.21875/180.796875">
+      <img src="/shared/manual/shots/candidate-pool-cards.png" alt="상단 카드 줄 확대">
+      <div class="box" style="--x:0%;--y:0%;--w:26.2%;--h:100%"></div>
+      <b class="pin" style="--x:1.5%;--y:3%">16</b>
+      <div class="box" style="--x:27.01%;--y:0%;--w:13.96%;--h:100%"></div>
+      <b class="pin" style="--x:28.51%;--y:3%">17</b>
+      <div class="box" style="--x:41.77%;--y:0%;--w:13.96%;--h:100%"></div>
+      <b class="pin" style="--x:43.27%;--y:3%">18</b>
+      <div class="box" style="--x:56.53%;--y:0%;--w:13.96%;--h:100%"></div>
+      <b class="pin" style="--x:58.03%;--y:3%">19</b>
+      <div class="box" style="--x:71.29%;--y:0%;--w:13.96%;--h:100%"></div>
+      <b class="pin" style="--x:72.79%;--y:3%">20</b>
+      <div class="box" style="--x:86.04%;--y:0%;--w:13.96%;--h:100%"></div>
+      <b class="pin" style="--x:87.54%;--y:3%">21</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 4번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">16</span>통과 카드 — 큰 숫자(2,726)와 「S1 후보 카운터와 같은 정의」라는
+      부제. 마우스를 올리면 실제 S1 집합(<code>pool_total</code>)과 일치하는지까지 툴팁으로 확인할 수
+      있습니다(정지 화면으로는 안 보입니다 — 아래 「조심할 것」 참고)</li>
+    <li><span class="tag">17</span>사유 카드 ① 사양 미등록(행 없음) — 지금 0건. 「이동」을 누르면 상품
+      관리 화면으로 갑니다</li>
+    <li><span class="tag">18</span>사유 카드 ② 검수 대기 — 지금 3,450건. 「이동」을 누르면 상품 사양
+      검수 화면으로 갑니다</li>
+    <li><span class="tag">19</span>사유 카드 ③ 후보 미승격 — 지금 333건. 카드 안에 「검수가 끝났는데
+      후보가 되지 못한 상품 — 정상적으로는 드뭅니다. 0이 아니면 확인이 필요합니다」라는 경고 문구가
+      함께 나옵니다</li>
+    <li><span class="tag">20</span>사유 카드 ④ 가격 검토 대기 — 지금 0건. 「이동」을 누르면 가격 검토
+      대기 화면으로 갑니다</li>
+    <li><span class="tag">21</span>사유 카드 ⑤ 재고 없음 · 매입 — 지금 6,664건인데 「이동」 배지
+      배경이 나머지 넷(짙은 색)과 다르게 옅은 회색입니다 — 눌러도 이동하지 않습니다(아래 「조심할
+      것」 참고)</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>배타 안내 띠 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1431.21875/44.140625">
+      <img src="/shared/manual/shots/candidate-pool-band.png" alt="배타 안내 띠 확대">
+      <b class="pin" style="--x:2.5%;--y:50%">22</b>
+      <b class="pin" style="--x:93.38%;--y:49.13%">23</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 5번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">22</span>배타 순서 안내 문장 — 「사양 없음 → 검수 대기 → 후보 미승격 →
+      가격 검토 → 재고 없음 순서로 첫 미충족 사유 하나만 셉니다. 그래서 사유 합계 + 통과 = 판정 대상
+      전체입니다. 시연용(demo) 데이터는 애초에 세지 않습니다.」</li>
+    <li><span class="tag">23</span>대상 · 통과 요약 — 「대상 13,173 · 통과 2,726」(본표 하단 합계 행과
+      같은 수)</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>본표 확대 — 부품 종류 × 사유</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:1040.234375/482.03125">
+      <img src="/shared/manual/shots/candidate-pool-table.png" alt="본표 확대 — 부품 종류 x 사유">
+      <b class="pin" style="--x:2.64%;--y:5.24%">24</b>
+      <div class="box" style="--x:1.64%;--y:9.33%;--w:96.71%;--h:6.7%"></div>
+      <b class="pin" style="--x:2.64%;--y:10.83%">25</b>
+      <div class="box" style="--x:1.64%;--y:16.03%;--w:96.71%;--h:7.28%"></div>
+      <b class="pin" style="--x:2.64%;--y:17.53%">26</b>
+      <div class="box" style="--x:1.64%;--y:88.93%;--w:96.71%;--h:7.28%"></div>
+      <b class="pin" style="--x:2.64%;--y:90.43%">27</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 6번 영역을 확대(부품 종류 10행 + 합계)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">24</span>표 제목 — 「부품 종류 × 사유」</li>
+    <li><span class="tag">25</span>표 머리글(테두리 상자) — 부품 종류 / 통과 / 사양 없음 / 검수 대기 /
+      후보 미승격 / 가격 검토 / 재고 없음 / 통과율(8열)</li>
+    <li><span class="tag">26</span>행 예시(테두리 상자, 그래픽카드) — 「사양 없음」·「가격 검토」 열은
+      0건이라 「—」로 옅게 나옵니다. 「검수 대기」·「후보 미승격」 열은 값이 있으면 밑줄 있는 진한
+      색 글자(클릭 가능)입니다. 「재고 없음」 열은 값이 커도(1,481건) 밑줄 없는 회색 글자입니다 —
+      클릭해도 이동하지 않습니다. 통과율(7.3%)은 20% 미만이라 붉은색입니다</li>
+    <li><span class="tag">27</span>합계 행(테두리 상자) — 표 전체의 합. 통과 2,726 · 검수 대기 3,450 ·
+      후보 미승격 333 · 재고 없음 6,664 · 통과율 20.7%</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>우측 레일 확대 — 얇은 카테고리 · 결합 조건 · 사유별 이동</h3>
+  <figure>
+    <div class="shot" style="max-width:340px;aspect-ratio:377.1875/654.484375">
+      <img src="/shared/manual/shots/candidate-pool-rail.png" alt="우측 레일 확대">
+      <div class="box" style="--x:0%;--y:0%;--w:100%;--h:23.2%"></div>
+      <b class="pin" style="--x:1%;--y:2%">28</b>
+      <b class="pin" style="--x:40.51%;--y:3.77%">29</b>
+      <b class="pin" style="--x:24.73%;--y:7.85%">30</b>
+      <div class="box" style="--x:0%;--y:25.3%;--w:100%;--h:32.83%"></div>
+      <b class="pin" style="--x:1%;--y:27.3%">31</b>
+      <div class="box" style="--x:0%;--y:60.24%;--w:100%;--h:39.76%"></div>
+      <b class="pin" style="--x:1%;--y:62.24%">32</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 7번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">28</span>「얇은 카테고리」 섹션(테두리 상자) — 지금은 「위험 카테고리 없음 —
+      열 부품 모두 임계값을 넘습니다. 다만 슬롯 하나가 0이면 조립 자체가 불가능하므로, 0에 가까워지는
+      축은 계속 지켜봐야 합니다」라는 안내 문장이 나옵니다(빈 표를 그냥 안 보여주는 대신 명시적으로
+      안내합니다)</li>
+    <li><span class="tag">29</span>임계값 배지 — 「기준 통과 3개 이하」. 부품 종류의 통과 건수가 이 수
+      이하면 얇은 카테고리로 분류됩니다</li>
+    <li><span class="tag">30</span>「임계값 조정 — 향후 사용예정」 배지 — 회색 고정 배지입니다. 눌러도
+      아무 일도 일어나지 않습니다(코드 상수라 이 화면에서 못 바꿉니다)</li>
+    <li><span class="tag">31</span>「제약이 겹치면 사정이 달라진다」 섹션(테두리 상자) — 카테고리
+      총량만 보면 안 보이는 결합 조건 2종을 항상 함께 보여줍니다. 지금 화이트 태그 케이스 285개 ·
+      750W 이상 파워 299개입니다</li>
+    <li><span class="tag">32</span>「사유별로 가야 하는 화면」 섹션(테두리 상자) — 사유 5종을 한 번에
+      훑고 이동합니다. 자세한 대조는 <a href="#fig-g">그림 G</a></li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>사유별로 가야 하는 화면 확대 — 이동 가능/불가 대조</h3>
+  <figure>
+    <div class="shot" style="max-width:360px;aspect-ratio:377.1875/260.21875">
+      <img src="/shared/manual/shots/candidate-pool-golist.png" alt="사유별로 가야 하는 화면 확대">
+      <div class="box" style="--x:4.53%;--y:16.55%;--w:90.94%;--h:15.63%"></div>
+      <b class="pin" style="--x:5.53%;--y:18.05%">33</b>
+      <div class="box" style="--x:4.53%;--y:32.18%;--w:90.94%;--h:15.63%"></div>
+      <b class="pin" style="--x:5.53%;--y:33.68%">34</b>
+      <div class="box" style="--x:4.53%;--y:47.81%;--w:90.94%;--h:15.63%"></div>
+      <b class="pin" style="--x:5.53%;--y:49.31%">35</b>
+      <div class="box" style="--x:4.53%;--y:63.44%;--w:90.94%;--h:15.63%"></div>
+      <b class="pin" style="--x:5.53%;--y:64.94%">36</b>
+      <div class="box" style="--x:4.53%;--y:79.07%;--w:90.94%;--h:15.25%"></div>
+      <div class="box" style="--x:84.45%;--y:82.16%;--w:11.02%;--h:9.06%"></div>
+      <b class="pin" style="--x:5.53%;--y:80.57%">37</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 7번(그림 F의 32번) 영역을 다시 확대 — 안쪽 작은 테두리
+      상자는 5번 행의 비활성 「이동」 배지만 따로 표시합니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">33</span>① 사양 미등록(행 없음) 행 — 「상품 관리」로 이동(짙은 「이동」 배지 —
+      실제로 눌립니다)</li>
+    <li><span class="tag">34</span>② 검수 대기 행 — 「상품 사양 검수」로 이동(짙은 「이동」 배지)</li>
+    <li><span class="tag">35</span>③ 후보 미승격 행 — 「상품 사양 검수」로 이동(짙은 「이동」 배지.
+      ②와 같은 화면인데 사유만 다릅니다)</li>
+    <li><span class="tag">36</span>④ 가격 검토 대기 행 — 「가격 검토 대기」 화면으로 이동(짙은
+      「이동」 배지)</li>
+    <li><span class="tag">37</span>⑤ 재고 없음 · 매입 행(안쪽 작은 테두리 상자 = 비활성 「이동」
+      배지) — 배경이 옅은 회색입니다. 이 캡처 시점엔 실제로 이동하지 않았습니다. 목적지 화면(재고
+      입고, <code>/admin2/stock-inbound</code>)은 이미 있었는데, 이 화면의 링크표(<code>api/admin_ui_
+      candidate_pool.py</code>의 <code>REASON_TARGET_PATH</code>)에 그 경로가 빠져 있었기 때문입니다 —
+      2026-08-28에 코드는 고쳐졌으나 서버 재시작 전이라 이 캡처엔 반영되지 않았습니다(아래 「조심할
+      것」 참고)</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>상단 카드 줄에서 통과 건수(2,726)와 사유별 건수를 한눈에 봅니다(그림 C). 통과 카드에 마우스를
+      올리면 S1 후보 카운터와 일치하는지까지 확인할 수 있습니다.</li>
+    <li>본표에서 부품 종류(10종)별로 통과 · 사유별 건수 · 통과율을 봅니다(그림 E). 통과율은 20% 미만
+      붉은색 · 30% 미만 주황(amber) · 그 이상 초록색이고, 색만이 아니라 숫자가 항상 함께 나옵니다.</li>
+    <li>표의 사유 칸이나 우측 「사유별로 가야 하는 화면」에서 숫자 · 이동 배지를 눌러 그 사유를 실제로
+      처리할 수 있는 화면으로 이동합니다(그림 E · G). <b>다섯 중 넷은 실제로 이동합니다</b> — 사양
+      미등록→상품 관리, 검수 대기 · 후보 미승격→상품 사양 검수(같은 화면, 사유만 다름), 가격 검토
+      대기→가격 검토 대기 화면. <b>재고 없음 · 매입만 지금은 이동하지 않습니다</b>(아래 「조심할 것」
+      1번).</li>
+    <li>우측 레일에서 얇은 카테고리(통과 3개 이하)를 확인합니다 — 지금은 「위험 카테고리 없음」입니다
+      (그림 F).</li>
+    <li>카테고리 총량만 보면 안 보이는 결합 조건 2종(화이트 케이스 · 750W 이상 파워)의 실제 재고를
+      확인합니다(그림 F) — 지금 화이트 케이스 285개 · 750W 이상 파워 299개입니다.</li>
+    <li><b>이 화면 자체에서 값을 바꾸는 조작은 없습니다.</b> 렌더 코드(<code>candidate_pool.html.j2</code>의
+      인라인 스크립트)에 서버로 쓰기 요청을 보내는 부분이 전혀 없고, <code>GET /api/admin/
+      candidate-pool</code> 하나만 부릅니다. 문제를 발견하면 위에서 이동한 화면(상품 관리 · 상품 사양
+      검수 · 가격 검토 대기)에서 실제로 고치고, 재고 문제는 「재고 입고」 화면(좌측 메뉴 「매입 ·
+      소싱」 그룹에서 직접 찾아 들어갑니다)에서 처리합니다.</li>
+    <li>등급 제한이 없습니다 — 로그인만 되어 있으면 조회(viewer) 등급도 owner와 똑같이 전체를 볼 수
+      있습니다(쓰기 버튼 자체가 없어 등급별로 숨길 것도 없습니다).</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>「재고 없음 · 매입」 이동 배지는 이 캡처(2026-08-28) 기준 비활성이고, 코드는 고쳐졌지만 서버에는
+    아직 반영되지 않았습니다.</b> 원인은 <code>api/admin_ui_candidate_pool.py</code>의
+    <code>REASON_TARGET_PATH</code> 딕셔너리에 "oos"(재고 없음) 키가 없었던 것입니다 — 이 사유는 링크를
+    절대 못 받았습니다(그림 C의 21번 · 그림 G의 37번). 목적지 화면인 「재고 입고」
+    (<code>/admin2/stock-inbound</code>)는 실제로 이미 있고 좌측 메뉴에도 연결돼 있는데
+    (<code>api/admin_nav.py</code>, 2026-08-18 커밋 <code>8a31bf0</code>으로 연결), 이 화면의 링크표만
+    그 사실을 반영하지 못하고 있었습니다. <b>커밋 이력 실측 — 처음부터 실수가 아니라 갱신 누락입니다.</b>
+    <code>api/admin_ui_candidate_pool.py</code>는 2026-08-15 커밋 <code>82a55a1</code>로 처음 들어왔고,
+    그 시점엔 「재고 입고」 화면 자체가 <code>admin_nav.NAV</code>에 없어 "oos"를 빼는 것이 맞는
+    판단이었습니다(코드 주석에 그렇게 적혀 있었고 그때는 사실과도 일치했습니다). 그런데 사흘 뒤
+    2026-08-18 <code>8a31bf0</code>이 「재고 입고」를 NAV에 연결한 뒤로 이 파일은 오늘(2026-08-28)까지
+    <b>한 번도 다시 고쳐지지 않았습니다</b>(<code>git log --follow</code> 확인 — 커밋이 이 하나뿐).
+    <code>api/admin_ui_home.py</code>의 <code>_TARGET_PATH</code>가 같은 종류의 일을 11일 동안 겪은
+    전례가 있습니다(그 파일 주석 참고). <b>지금은 코드에 "oos": "/admin2/stock-inbound"를 추가해
+    고쳤지만, 이 서버(<code>127.0.0.1:8000</code>)는 2026-08-27 06:14부터 <code>--reload</code> 없이
+    떠 있어 파이썬 코드 변경은 재시작 전까지 반영되지 않습니다</b> — 그래서 이 캡처와 지금 실제 화면은
+    여전히 비활성으로 보입니다. 다음 배포·재시작 뒤에는 나머지 넷과 똑같이 눌리며, 그때 이 캡처를
+    다시 찍어야 합니다.
+  </div>
+  <div class="callout">
+    <b>표의 「재고 없음」 열은 값이 커도 눌리지 않습니다.</b> 「사양 없음」·「가격 검토」 열이 안 눌리는
+    것은 값이 0(「—」)이기 때문이지만, 「재고 없음」 열은 값이 1,481건처럼 커도 위 첫 항목과 같은
+    이유로 안 눌립니다 — 둘을 같은 이유로 헷갈리지 마십시오(그림 E의 26번). 위와 같은 코드로
+    풀리는 값이라, 배포 뒤에는 이 열도 함께 눌리게 됩니다.
+  </div>
+  <div class="callout ok">
+    <b>재입고되면 화면을 다시 열기만 해도 자동으로 반영됩니다.</b> 이 화면은 저장된 집계가 없습니다 —
+    <code>api/admin_pool.py</code>가 매 요청마다 <code>products</code>·<code>product_specs</code>를
+    직접 다시 읽어 다섯 사유를 처음부터 다시 계산합니다. 승인 버튼이나 별도 새로고침 동작이 없어도,
+    재고가 들어오고 판매중으로 바뀌면 다음에 이 화면을 열 때 그 상품은 자동으로 통과 쪽으로
+    옮겨갑니다.
+  </div>
+  <div class="callout">
+    <b>상품명이 화면 어디에도 없습니다.</b> <code>api/admin_pool.py</code>의 SELECT 문에는
+    <code>product_name</code>이 들어 있지만, 그 뒤 집계 코드가 <code>part_type</code>·
+    <code>review_required_yn</code> 등만 읽고 상품명은 한 번도 참조하지 않습니다 — DB에서 가져오기만
+    하고 버리는 죽은 컬럼입니다. 애초에 이 화면은 상품 목록이 아니라 「부품 종류 × 사유」 집계표라
+    개별 상품을 보여줄 필요가 없습니다. 특정 상품을 알아보려면 사유 칸을 눌러 다른 화면(상품 관리 ·
+    상품 사양 검수)으로 가야 하고, 거기서 비로소 상품명 · 상품코드가 보입니다.
+  </div>
+  <div class="callout">
+    <b>「후보 미승격」 333건은 화면이 스스로 "확인이 필요하다"고 밝히는 수치입니다.</b> 이 사유는
+    검수까지 끝났는데 후보가 되지 못한, 정상적으로는 드물어야 하는 상태입니다. 그림 C의 19번 카드에
+    "0이 아니면 확인이 필요합니다"라는 문구가 그대로 나옵니다 — 숫자가 작지 않다고 무시하지 마십시오.
+  </div>
+  <div class="callout">
+    <b>통과 카드가 S1과 일치하는지는 마우스를 올려야 보입니다.</b> 카드 자체에는 "S1 후보 카운터와
+    같은 정의"라는 문구만 있고, 실제 일치 여부(<code>pool_total</code>과 <code>ok_total</code>의 대조
+    결과)는 카드에 마우스를 올렸을 때 뜨는 브라우저 기본 툴팁(<code>title</code> 속성)에만 있습니다 —
+    이 문서의 캡처(정지 이미지)로는 보이지 않는 정보입니다. 2026-08-28 캡처 시점 응답 값으로는 둘 다
+    2,726건으로 일치했습니다.
+  </div>
+  <div class="callout">
+    <b>「임계값 조정 — 향후 사용예정」 배지는 눌러도 반응이 없습니다.</b> 얇은 카테고리 기준(통과 3개
+    이하)은 <code>api/admin_pool.py</code>의 코드 상수(<code>THIN_THRESHOLD=3</code>)이고, 이 화면에는
+    그 값을 바꾸는 기능이 없습니다 — 배지는 안내용일 뿐입니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「재고 없음 6,664건인데 눌러도 아무 데도 안 간다」</b> → 이 문서의 캡처 시점(2026-08-28) 기준
+      정상입니다(위 「조심할 것」 1 · 2번). 코드는 같은 날 고쳐졌으나 서버 재시작 전이라 아직 반영되지
+      않았습니다 — 배포 뒤에는 눌러서 이동합니다. 그 전까지는 「재고 입고」 화면을 좌측 메뉴에서 직접
+      찾아 들어가야 합니다.</li>
+    <li><b>「숫자 칸이 「—」로만 나온다」</b> → 그 사유가 0건이라는 뜻입니다. 지금은 「사양 없음」·
+      「가격 검토」 두 열이 전 부품 종류에서 0건입니다.</li>
+    <li><b>「위험 카테고리 안내가 하나도 안 보인다」</b> → 정상 상태입니다. 지금은 통과 건수가
+      임계값(3개) 이하로 떨어진 부품 종류가 없다는 뜻이고, 화면이 「위험 카테고리 없음」이라고
+      명시적으로 알려 줍니다(빈 표를 그냥 안 보여주는 것과 다릅니다).</li>
+    <li><b>「상품 이름을 알고 싶은데 안 보인다」</b> → 이 화면은 상품 목록이 아니라 부품 종류별
+      집계표입니다(위 「조심할 것」 4번). 사유 칸을 눌러 다른 화면으로 가야 개별 상품명이 보입니다.</li>
+    <li><b>「재고를 방금 입고했는데 이 화면 숫자가 그대로다」</b> → 화면을 새로 열지 않아서입니다. 이
+      화면은 폴링이나 자동 갱신이 없습니다 — 브라우저를 새로고침하거나 다시 들어가야 최신 값이
+      반영됩니다.</li>
+    <li><b>「부품 종류가 하나도 안 보인다」</b> → 정상이 아닙니다. 조립 부품 10종은 언제나 존재해야
+      하므로, 이 상태라면 DB 연결 실패를 의심해야 합니다 — 화면은 이 경우 집계를 아예 못 받았다는
+      오류 카드(재시도 버튼 포함)를 보여줍니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_pool.py</code>(집계 로직) · <code>api/admin_ui_candidate_pool.py</code>
+        (라우트 · 사유별 이동 대상) · <code>templates/admin/candidate_pool.html.j2</code>(화면) ·
+        <code>templates/admin/_admin2_shell.html.j2</code> · <code>mockups/shared/admin2/admin2-shell.js</code>
+        · <code>api/admin_nav.py</code>(좌측 메뉴 연결 여부 대조)</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발
+        서버)에 Playwright로 접속해 2026-08-28에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_candidate_pool.py</code>(공용 도구
+        <code>scripts/manual_capture_common.py</code>를 그대로 씁니다), 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는 <code>/shared/manual/shots/</code>
+        경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는 같은 폴더의
+        <code>candidate-pool-coords.json</code>에 있습니다.</li>
+      <li>실측 수치(통과 2,726건 등) — 캡처와 같은 순간 <code>GET /api/admin/candidate-pool</code>
+        응답을 그대로 옮겼습니다. 지어낸 숫자는 없습니다 — 매일 바뀌므로 지금 값은 화면에서 다시
+        확인하십시오.</li>
+      <li>「사유별로 가야 하는 화면」의 이동 가능 여부(그림 C · G) — 같은 순간
+        <code>window.REASON_TARGETS</code>(서버가 렌더 시점에 심어 준 값)를 읽어 확인했습니다.
+        추측이 아니라 그 화면이 실제로 그린 값입니다.</li>
+    </ul>
+    <p><b>2026-08-28 코드 수정 — 이 문서 작성 직후, 배포 전.</b> 이 문서를 쓰는 동안 결함 둘이 발견·수정됐습니다:
+      ① <code>api/admin_ui_candidate_pool.py</code>의 <code>REASON_TARGET_PATH</code>에
+      <code>"oos": "/admin2/stock-inbound"</code>를 추가(위 5장·아래 「확인하지 못한 것」) ②
+      <code>candidate_pool.html.j2</code>의 세션 만료 로그인 버튼 주소를 구 경로
+      <code>/admin/login.html</code>에서 <code>/admin2/login</code>으로 교정. 이 서버
+      (<code>127.0.0.1:8000</code>)는 2026-08-27 06:14부터 <code>--reload</code> 없이 떠 있어, 템플릿
+      변경(②)은 재시작 없이 바로 반영됐지만(서버 응답으로 확인) 파이썬 모듈 변경(①)은 다음
+      재시작·배포까지 반영되지 않습니다. <b>그래서 이 문서의 캡처 7장은 다시 찍지 않았습니다</b> — ①은
+      아직 화면에 안 보이는 상태라 지금 다시 찍어도 그림 C·G가 이전과 똑같이 나오고, ②는 애초에 캡처된
+      적 없는 상태(세션 만료 401 화면)라 다시 찍을 대상 자체가 없습니다. <b>다음에 이 서버가
+      재시작(배포)된 뒤에는 그림 C의 21번·그림 G의 37번을 다시 찍어 「이동」 배지가 활성으로 바뀐
+      모습으로 갱신해야 합니다</b> — 그 전까지는 이 문서의 캡처가 여전히 사실과 일치합니다(비활성
+      상태를 비활성으로 정확히 보여주고 있습니다).</p>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>candidate-pool-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이 문서가 손으로
+      만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께 낡습니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_candidate_pool.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — <code>.venv</code>에는 이미 설치돼 있지만
+      <code>requirements.txt</code>에는 아직 없습니다. 새 환경(다른 PC · 재설치한 venv)에서는
+      <code>pip install playwright</code> 후 <code>playwright install chromium</code>이 먼저
+      필요합니다.</p>
+    <p><b>확인하지 못한 것</b></p>
+    <ul>
+      <li>이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가 없어, 완성된 HTML 문서
+        자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에 정확히 맞는지, 인쇄 시
+        페이지가 어떻게 나뉘는지)는 직접 확인하지 못했습니다.</li>
+      <li>이 캡처는 owner 등급 점검 계정으로만 찍었습니다. 코드에는 등급별 분기가 없어(조회 전용이라
+        쓰기 버튼 자체가 없습니다) viewer · 운영자 등급에서도 화면이 똑같이 보일 것으로 판단했지만,
+        그 등급 계정으로 직접 열어 대조하지는 못했습니다.</li>
+      <li><b>2026-08-28 정정 — 고쳤고, 반영도 확인했습니다.</b> 세션이 만료된 상태(401)의 실제 화면은
+        여전히 눈으로(브라우저로) 재현하지 않았지만, 로그인 버튼 주소는 코드와 서버 응답 양쪽으로
+        확인했습니다. 이전 버전의 이 문서는 그 주소가 신설 경로(<code>/admin2/login</code>)가 아니라
+        구 경로(<code>/admin/login.html</code>)를 가리킨다고 적었는데, 그 구 경로는
+        <code>CLAUDE.md</code>가 명시적으로 금지하는 패턴입니다(구 <code>/admin/*.html</code>로의
+        안내·링크·버튼 연결 금지 — "관리자 UI는 /admin2 아래 전면 신규 개편" 항목). 이번에
+        <code>/admin2/login</code>으로 고쳤고, 로그인 세션으로 이 화면을 실제로 받아 온 HTML에
+        <code>/admin/login.html</code> 문자열이 0건, <code>/admin2/login</code>이 1건인 것을 확인했습니다
+        (템플릿은 서버 재시작 없이 바로 반영됩니다). 이 화면 코드 안에서 같은 구 경로가 더 있는지도
+        훑었고, 이 자리 하나뿐이었습니다 — 다른 화면에는 같은 구 경로가 다수 남아 있지만
+        (예: <code>reviews.html.j2</code>·<code>price_review.html.j2</code> 등) 그건 이 작업의 담당
+        파일이 아니라 손대지 않았습니다.</li>
+      <li><b>2026-08-28 정정 — 커밋 이력을 추적해 답을 확인했습니다.</b>
+        <code>api/admin_ui_candidate_pool.py</code>의 <code>REASON_TARGET_PATH</code>에 "oos" 키가
+        없던 것은 처음부터 의도된 설계도, 처음부터의 실수도 아니었습니다. 이 파일은 2026-08-15
+        커밋 <code>82a55a1</code>로 처음 들어왔는데, 그 시점엔 「재고 입고」 화면 자체가
+        <code>admin_nav.NAV</code>에 없어 "oos"를 빼는 것이 맞는 판단이었습니다. 사흘 뒤 2026-08-18
+        커밋 <code>8a31bf0</code>이 「재고 입고」를 NAV에 연결했는데, 이 파일은 그 뒤 오늘(2026-08-28)
+        까지 한 번도 다시 고쳐지지 않았습니다(<code>git log --follow</code>로 확인 — 커밋이 이
+        하나뿐입니다). 즉 <b>"당시엔 맞았던 판단이 나중에 어긋난 채 갱신을 놓친 경우"</b>이고,
+        <code>api/admin_ui_home.py</code>의 <code>_TARGET_PATH</code>가 같은 종류의 일을 11일 동안
+        겪은 전례와 같은 병입니다. 이번에 <code>"oos": "/admin2/stock-inbound"</code>를 추가해
+        고쳤습니다 — 다만 서버 재시작 전이라 아직 화면에는 안 보입니다(위 「조심할 것」 1번).</li>
+      <li>매입 · 재고 담당자가 실제 업무에서 이 화면을 얼마나 자주 참고하는지(운영 관행)는 확인하지
+        못했습니다 — 코드와 데이터로 확인 가능한 사실만 담았습니다.</li>
+    </ul>
+  </div>
+
+</div>

@@ -53,8 +53,10 @@ FRAGMENTS_DIR = Path(__file__).resolve().parent.parent / "docs" / "manual" / "sc
 # 키와 완전 일치할 때만 통과한다** — 그 값(`fragment`)은 이 파일 안에 문자열 리터럴로
 # 박혀 있어(사용자 입력이 아니다) 임의 파일 읽기가 될 수 없다.
 #
-# `order`는 "사용 빈도 순서로 만들어 갈 예정"(지시서)을 담는 자리 — 지금은 전부 비워
-# 두고(딱 하나뿐이라 순서가 의미 없다), 다음 화면부터 채우면 목차가 그 순서로 보인다.
+# `order`는 목차·LNB에 보이는 순서다. 1~7은 활동 기록 실측 건수 내림차순(아래 주석
+# 참조 — 6번 대시보드만 예외), 8~11은 실측 근거가 없어(넷은 조회 전용 화면이라 활동
+# 기록 자체가 없다) 하네스가 판단으로 정했다 — 각 항목 주석에 근거를 적는다
+# (2026-08-28, 제작자 다섯이 만든 조각을 하네스가 한 번에 등록).
 # `api/admin_nav.py`의 `_manual_nav_group()`도 이 딕셔너리를 그대로 읽는다(지연 import) —
 # LNB의 "운영자 매뉴얼" 하위 항목과 이 화이트리스트가 다른 소스를 갖지 않는다.
 MANUAL_SCREENS: dict[str, dict] = {
@@ -102,6 +104,59 @@ MANUAL_SCREENS: dict[str, dict] = {
         "title": "대시보드",
         "screen_id": "ADM-DASH-010",
         "order": 6,
+    },
+    # ── order 7~11 (2026-08-28 하네스 등록) ──────────────────────────────────
+    # 7 은 위 6개와 같은 잣대(활동 기록 실측)를 쓸 수 있다. 8~11은 못 쓴다 — 다섯 중
+    # 넷이 조회 전용 화면이라 렌더 함수에 `_log()` 호출이 0건이다(제작자 각자 확인).
+    # "0건"이 아니라 잴 수 있는 지표 자체가 없다는 뜻이라, 8~11의 순서는 실측이 아니라
+    # 하네스 판단이다 — 다음 사람이 이 숫자를 실측값으로 오해하지 않도록 항목마다
+    # 근거를 적는다.
+    "category-mapping": {
+        "fragment": "category-mapping.html",
+        "nav_href": "/admin2/category-mapping",
+        "title": "상품 분류 매핑",
+        "screen_id": "ADM-CAT-020",
+        # 실측 근거 있음(2026-08-28) — 활동 기록 "카테고리 매핑 이동" 405건 +
+        # "되돌림" 374건 = 779건. 위 5개(999~3,694)보다 작지만 6번 대시보드(실측
+        # 없이 "직원이 로그인해 제일 먼저 보는 화면"이라는 이유로 예외 배치)보다는
+        # 뒤가 맞다 — 이 화면은 실측이 있으므로 실측이 아예 없는 8~11보다는 앞에 둔다.
+        "order": 7,
+    },
+    "activity-logs": {
+        "fragment": "activity-logs.html",
+        "nav_href": "/admin2/activity-logs",
+        "title": "작업 기록",
+        "screen_id": "ADM-SYS-030",
+        # 실측 근거 없음 — 하네스 판단(2026-08-28). 다른 화면에서 한 일을 되짚는
+        # 자리라, 매핑(7번)을 쓴 다음 함께 쓸 것으로 보고 바로 뒤에 두었다.
+        "order": 8,
+    },
+    "build-map": {
+        "fragment": "build-map.html",
+        "nav_href": "/admin2/build-map",
+        "title": "조립 호환 지도",
+        "screen_id": "ADM-STD-020",
+        # 실측 근거 없음 — 하네스 판단(2026-08-28). 부품 궁합을 확인할 때 찾을
+        # 화면으로 보고 배치했다.
+        "order": 9,
+    },
+    "candidate-pool": {
+        "fragment": "candidate-pool.html",
+        "nav_href": "/admin2/candidate-pool",
+        "title": "추천 가능 재고 현황",
+        "screen_id": "ADM-ENG-030",
+        # 실측 근거 없음 — 하네스 판단(2026-08-28). "왜 이 부품이 견적에 안
+        # 나오는가"를 물을 때 찾을 화면으로 보고 배치했다.
+        "order": 10,
+    },
+    "consult-sessions": {
+        "fragment": "consult-sessions.html",
+        "nav_href": "/admin2/consult-sessions",
+        "title": "견적 상담 기록",
+        "screen_id": "ADM-ORD-010",
+        # 실측 근거 없음 — 하네스 판단(2026-08-28). 조회 전용 · 참고용이라 맨
+        # 뒤에 두었다.
+        "order": 11,
     },
 }
 

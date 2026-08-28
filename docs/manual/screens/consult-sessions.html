@@ -1,0 +1,489 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 견적 상담 기록</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 견적 상담 기록을 처음 맡는 직원</div>
+    <div><b>화면</b> 견적 상담 기록 · 경로 <code>/admin2/consult-sessions</code> · 화면 ID <code>ADM-ORD-010</code>
+      (코드 <code>api/admin_ui_consult_sessions.py</code>·<code>api/admin_sessions.py</code>·
+      <code>templates/admin/consult_sessions.html.j2</code> 실측값입니다.)</div>
+    <div><b>왜 이 화면인가</b> 이 화면이 없으면 "이 고객이 왜 이 견적을 받았는지"를 나중에 증명할
+      방법이 없습니다. 상담은 조건(제약 객체)을 그대로 저장하고, 티어별 견적은 부품·가격·근거를
+      스냅샷으로 남깁니다 — 이 화면은 그 저장된 원문을 <b>당시 그대로</b> 다시 보여주는 유일한
+      창구입니다(계약 문서 <code>docs/design/spec-consult-sessions.md</code>, 요구사항 정의서
+      <code>docs/design/req/req-consult-sessions.md</code>).</div>
+    <div><b>이 화면의 성격</b> <b>조회 전용(읽기 전용 관측창)</b>입니다. 값을 고치는 버튼이 하나도
+      없습니다 — 검수·재고 화면처럼 "승인"·"수정" 같은 동작이 없습니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-28 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">⚠ 이 화면이 보여주는 숫자(전체 세션·완주율·방식별 건수 등)는 시각마다
+      바뀝니다. 그리고 <b>「전체 세션」 숫자는 이미 걸러진 값입니다</b> — 무엇을 걸렀는지, 왜
+      그런데도 완전히 믿을 수는 없는지는 아래 <a href="#warn-scope">⑤ 조심할 것 · 첫 항목</a>을
+      반드시 먼저 읽으십시오. 정확한 지금 값은 화면에서 직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>고객이 견적 상담(S1~S5)을 진행하면 서버는 그 조건(제약 객체)과, 조건이 만들어낸 티어별 견적
+    (가성비·추천·고성능 — 부품 구성·가격·컴패니언 제안)을 원장에 그대로 저장합니다. 이 화면은 그
+    저장된 내용을 <b>세션 하나 단위로</b> 다시 펼쳐 보여줍니다 — "그때 그 가격이 맞았나", "이 고객이
+    왜 이 부품을 받았나" 같은 질문에 답하는 소명 창구입니다. 재고가 지금 바뀌었어도 이 화면은
+    <b>당시 저장된 값</b>을 그대로 보여줍니다(지금 재고로 다시 계산하지 않습니다 — 아래 ⑤ 참고).</p>
+  <p>세션은 성격이 다른 상태 넷으로 갈립니다.</p>
+  <ul>
+    <li><b>완주</b> — 상담이 끝까지 진행돼 최소 1건 이상의 견적 스냅샷이 저장된 경우.</li>
+    <li><b>이탈</b> — 상담은 시작됐지만 스냅샷이 하나도 없는 경우(견적이 만들어지지 않음).</li>
+    <li><b>완주 → 인계(handoffs)</b> — 완주한 세션이 팝콘PC 쇼핑몰로 실제 인계된 경우(지금 쌓이는
+      원장).</li>
+    <li><b>완주 → 주문(orders)</b> — 완주한 세션이 <code>orders</code> 표와 연결된 경우(2026-08-10
+      이후로는 갱신되지 않는 옛 원장 — 아래 ⑤ 참고).</li>
+  </ul>
+  <p>2026-08-28 캡처 시점 실측(화면 「전체 세션」 KPI 기준, 아래 ⑤에서 설명하는 걸러진 값):
+    전체 <b>130건</b> — 완주 <b>115건(88.5%)</b> / 이탈 <b>15건</b> · 오늘 <b>1건</b> · 완주
+    이후 orders 연결 <b>0건</b> / handoffs 연결 <b>3건</b>.</p>
+  <table class="kv">
+    <thead><tr><th>상담 방식</th><th>이 페이지(130건) 안 건수</th></tr></thead>
+    <tbody>
+      <tr><td>맡김(guided)</td><td class="n">71건</td></tr>
+      <tr><td>함께(chat)</td><td class="n">34건</td></tr>
+      <tr><td>직접(expert)</td><td class="n">19건</td></tr>
+      <tr><td>팝콘톡(talk)</td><td class="n">6건</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>고객 문의·분쟁 대응 시 "그때 무슨 조건으로 어떤 견적을 받았는지"를 확인해야 할 때</li>
+    <li>상담 방식(맡김/함께/직접/팝콘톡)별 실제 사용 비중이 기획 의도와 맞는지 확인할 때</li>
+    <li>완주율·이탈률 추이를 볼 때(단, 절대적인 상담 건수 근거로는 쓰지 않습니다 — 아래 ⑤ 참고)</li>
+    <li>특정 세션이 실제로 팝콘PC 쇼핑몰로 인계(handoffs)됐는지, 인계 시점의 가격이 지금 몰 가격과
+      일치했는지 확인할 때</li>
+    <li>완주했는데 스냅샷 부품 구성이 어땠는지, 함께 제안된 컴패니언(주변기기)이 무엇이었는지 다시
+      볼 때</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>먼저 전체 모습을 보고, 아래에서 영역별로 확대해 하나씩 설명합니다. 캡처는 방식 필터 없음(기본값)
+    상태입니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1680/1050;max-width:1000px">
+      <img src="/shared/manual/shots/consult-sessions-full.png" alt="견적 상담 기록 화면 전체">
+      <b class="pin" style="--x:6.31%;--y:49.48%">1</b>
+      <b class="pin" style="--x:15.98%;--y:2.80%">2</b>
+      <b class="pin" style="--x:28.96%;--y:2.80%">3</b>
+      <b class="pin" style="--x:47.76%;--y:2.80%">4</b>
+      <b class="pin" style="--x:56.31%;--y:10.94%">5</b>
+      <div class="box" style="--x:13.85%;--y:15.97%;--w:84.92%;--h:16.36%"></div>
+      <b class="pin" style="--x:15.00%;--y:17.50%">6</b>
+      <b class="pin" style="--x:56.31%;--y:35.35%">7</b>
+      <b class="pin" style="--x:56.31%;--y:40.03%">8</b>
+      <b class="pin" style="--x:56.31%;--y:43.70%">9</b>
+      <b class="pin" style="--x:56.31%;--y:86.70%">10</b>
+      <b class="pin" style="--x:56.31%;--y:91.67%">11</b>
+      <b class="pin" style="--x:56.31%;--y:95.97%">12</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 방식 필터 없음(기본값)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 지금 있는 화면이 진하게 표시됩니다. 「상품사양관리」
+      그룹 안에 있습니다.</li>
+    <li><span class="tag">2</span>위치 표시(빵부스러기) — 「상품사양관리 / 견적 상담 기록」</li>
+    <li><span class="tag">3</span>「조회 전용·쓰기 없음」 배지 — 이 화면에는 값을 바꾸는 버튼이
+      없습니다.</li>
+    <li><span class="tag">4</span><span class="btnlabel">다시 조회</span> 버튼 — 옆에 마지막으로
+      조회한 시각이 함께 표시됩니다. 확대는 <a href="#fig-b">그림 B</a>.</li>
+    <li><span class="tag">5</span>안내 띠 — 「완주 이후 상태는 두 원장을 함께 확인해야 합니다」
+      (orders·handoffs 두 원장의 관계를 항상 먼저 알려줍니다)</li>
+    <li><span class="tag">6</span>KPI 5장(테두리 상자) — 전체 세션 / 오늘 / 완주율 / 이탈 / 완주
+      이후(orders·handoffs). 확대는 <a href="#fig-c">그림 C</a>.</li>
+    <li><span class="tag">7</span>상담 방식 칩 — 전체·맡김·함께·팝콘톡·직접. 눌러서 그 방식만 좁혀
+      봅니다. 확대는 <a href="#fig-d">그림 D</a>.</li>
+    <li><span class="tag">8</span>목록 표 머리글 — 세션 / 시각 / 방식 / 제약 요약 / 대표 견적 /
+      상태(6열). 확대는 <a href="#fig-e">그림 E</a>.</li>
+    <li><span class="tag">9</span>목록 행 — 클릭하면 오른쪽에 상세 서랍이 열립니다. 확대는
+      <a href="#fig-f">그림 F</a>.</li>
+    <li><span class="tag">10</span>페이지네이션 — 「이전 / 다음」. 지금은 전체가 200건 미만이라 둘 다
+      비활성입니다(아래 「자주 겪는 상황」 참고).</li>
+    <li><span class="tag">11</span>조회 한계 안내 — 한 번에 최대 200건, 기간 필터는 아직 지원되지
+      않는다는 사실을 감추지 않고 그대로 밝힙니다.</li>
+    <li><span class="tag">12</span>경계 안내 — 결제·배송·환불은 쇼핑몰 소관, 인계 상세 관리는
+      「인계 기록」 화면 소관이라는 것을 밝힙니다.</li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1468/59.8;max-width:1000px">
+      <img src="/shared/manual/shots/consult-sessions-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:3.85%;--y:49.16%">13</b>
+      <b class="pin" style="--x:11.15%;--y:49.16%">14</b>
+      <b class="pin" style="--x:18.70%;--y:49.15%">15</b>
+      <b class="pin" style="--x:30.14%;--y:49.15%">16</b>
+      <b class="pin" style="--x:40.22%;--y:49.15%">17</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">18</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">19</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">13</span>그룹 이름 — 「상품사양관리」</li>
+    <li><span class="tag">14</span>화면 이름 — 「견적 상담 기록」</li>
+    <li><span class="tag">15</span>「조회 전용·쓰기 없음」 배지</li>
+    <li><span class="tag">16</span>마지막 조회 시각 — 화면이 세지 않고 서버 응답을 받은 시각을 그대로
+      찍습니다.</li>
+    <li><span class="tag">17</span><span class="btnlabel">다시 조회</span> — 목록·KPI·방식 칩을
+      전부 다시 불러옵니다(지금 열려 있던 상세 서랍은 대상 세션이 새 목록에도 있으면 유지됩니다).</li>
+    <li><span class="tag">18</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">19</span>아바타 — 「내 정보」 화면으로 이동. 옆에 로그인한 계정 이름과
+      등급이 표시됩니다.</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>KPI 카드 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1426.6/171.75;max-width:1000px">
+      <img src="/shared/manual/shots/consult-sessions-kpis.png" alt="KPI 카드 확대">
+      <b class="pin" style="--x:9.68%;--y:50%">20</b>
+      <b class="pin" style="--x:29.84%;--y:50%">21</b>
+      <b class="pin" style="--x:50%;--y:50%">22</b>
+      <b class="pin" style="--x:70.16%;--y:50%">23</b>
+      <b class="pin" style="--x:90.32%;--y:50%">24</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 6번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">20</span>전체 세션 — <b>이미 시험 데이터를 걸러낸 값입니다.</b> 아래에
+      "이 페이지 N건 표시 중" + 걸러낸 기준이 함께 적힙니다. 자세한 내용은 <a href="#warn-scope">⑤
+      첫 항목</a>.</li>
+    <li><span class="tag">21</span>오늘 — 서버가 서울(KST) 자정 기준으로 셉니다.</li>
+    <li><span class="tag">22</span>완주율 — <b>전체 건수 기준</b>이 큰 글자, <b>이 페이지 기준</b>은
+      아래 작은 글자로 병기됩니다. 두 기준을 섞지 않습니다.</li>
+    <li><span class="tag">23</span>이탈 — 완주율과 같은 방식으로 전체·페이지 두 기준을 병기합니다.</li>
+    <li><span class="tag">24</span>완주 이후(orders·handoffs) — 두 원장 각각의 연결 건수를 별도
+      줄로 보여줍니다(둘을 더하거나 섞지 않습니다).</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>상담 방식 칩 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1426.6/31.3;max-width:1000px">
+      <img src="/shared/manual/shots/consult-sessions-mchips.png" alt="상담 방식 칩 확대">
+      <b class="pin" style="--x:11.77%;--y:50%">25</b>
+      <b class="pin" style="--x:27.59%;--y:50%">26</b>
+      <b class="pin" style="--x:36.26%;--y:50%">27</b>
+      <b class="pin" style="--x:45.94%;--y:50%">28</b>
+      <b class="pin" style="--x:55.08%;--y:50%">29</b>
+      <b class="pin" style="--x:64.66%;--y:50%">30</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 7번 영역을 확대 · 캡처 시점에는 방식 4종이 전부 1건
+      이상이라 「미사용」(점선 테두리) 표시는 보이지 않습니다 — 0건인 방식이 있으면 그렇게
+      표시됩니다.</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">25</span>안내 문구 — 「이 페이지 130건 안에서 집계(필터도 이 범위 안에서만
+      동작)」. 화면 맨 위 KPI의 전체 건수와 <b>같은 130건</b>이지만, 늘어나 200건을 넘으면 이 칩의
+      집계 범위와 KPI 전체 건수가 갈라질 수 있습니다.</li>
+    <li><span class="tag">26</span>전체 — 필터 해제</li>
+    <li><span class="tag">27</span>맡김(guided) — 캡처 시점 71건</li>
+    <li><span class="tag">28</span>함께(chat) — 캡처 시점 34건</li>
+    <li><span class="tag">29</span>팝콘톡(talk) — 캡처 시점 6건</li>
+    <li><span class="tag">30</span>직접(expert) — 캡처 시점 19건. 과거 자료(2026-08-13 요구사항
+      정의서)에는 "실사용 0건"이라 적혀 있는데, 그건 전체 원장(시험 데이터 포함) 기준의 예전
+      스냅샷입니다 — 지금 화면은 걸러진 최근 구간만 보므로 다른 값이 나옵니다(아래 「자주 겪는
+      상황」 참고).</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>목록 표 확대</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1426.6/332.2;max-width:1000px">
+      <img src="/shared/manual/shots/consult-sessions-table.png" alt="목록 표 확대(머리글 + 앞쪽 6행)">
+      <b class="pin" style="--x:50%;--y:5.23%">31</b>
+      <b class="pin" style="--x:50%;--y:17.93%">32</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 8번 영역을 확대(머리글 + 앞쪽 6행)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">31</span>표 머리글 — 세션 / 시각 / 방식 / 제약 요약 / 대표 견적 / 상태(6열)</li>
+    <li><span class="tag">32</span>행 — 세션 번호(#로 시작) · 시각 · 방식(색점+이름) · 제약 요약
+      (조건을 " · "로 이어 붙인 한 줄, 길면 말줄임 — 마우스를 올리면 전체가 툴팁으로 뜹니다) ·
+      대표 견적(대표 스냅샷의 총액과 부품 수, 없으면 「—」) · 상태 배지(완주/이탈/완주→인계/완주→주문).
+      클릭하면 오른쪽에 상세 서랍이 열립니다(<a href="#fig-f">그림 F</a>).</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>행을 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:1680/1050;max-width:1000px">
+      <img src="/shared/manual/shots/consult-sessions-full-detail.png" alt="행을 클릭해 상세 서랍이 열린 상태의 전체 화면">
+      <div class="box" style="--x:60.30%;--y:5.69%;--w:39.70%;--h:94.31%"></div>
+      <b class="pin" style="--x:56.31%;--y:44.05%">33</b>
+      <b class="pin" style="--x:63.30%;--y:8.69%">34</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ah-cs1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="946" y1="462" x2="1028" y2="462" stroke="#c8451c" stroke-width="6" marker-end="url(#ah-cs1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 세션 #10603(완주, 핸드오프·주문 연결 없음) 행을 클릭한 직후</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">33</span>방금 클릭한 행(선택 표시 — 배경이 옅게 바뀌고 왼쪽에 굵은 선이
+      붙습니다)</li>
+    <li><span class="tag">34</span>오른쪽에 뜨는 상세 서랍(테두리 상자) — 완주 세션의 확대는
+      <a href="#fig-g">그림 G</a>, 이탈 세션은 <a href="#fig-h">그림 H</a>, 완주→인계 세션은
+      <a href="#fig-i">그림 I</a></li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>상세 서랍 확대 — 완주 세션</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:667/990.2;max-width:430px">
+      <img src="/shared/manual/shots/consult-sessions-drawer-done.png" alt="상세 서랍 확대 — 완주 세션(제약·티어 스냅샷·부품 구성)">
+      <b class="pin" style="--x:7.32%;--y:2.92%">35</b>
+      <b class="pin" style="--x:52.16%;--y:2.92%">36</b>
+      <b class="pin" style="--x:94.91%;--y:2.92%">37</b>
+      <!-- 2026-08-28 겹침 수정: 36(title)과 38(meta) 둘 다 실측으로 폭 90%대 가로 줄이라
+           중심에서 벗어나도 같은 줄을 가리킨다. 대각선으로 살짝만 떨어져 있어(10.3px,
+           21.2px) 아직 겹쳤다 — 38을 meta 줄 안에서 왼쪽으로 옮겼다. -->
+      <b class="pin" style="--x:44.9%;--y:5.81%">38</b>
+      <b class="pin" style="--x:50.07%;--y:15.81%">39</b>
+      <div class="box" style="--x:3.25%;--y:21.22%;--w:93.65%;--h:8.98%"></div>
+      <b class="pin" style="--x:50.07%;--y:25.71%">40</b>
+      <b class="pin" style="--x:50.07%;--y:50.54%">41</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 세션 #10603 · 방식 함께(chat) · 대표(추천) 1,000,000원·8부품
+      (가성비 755,600원 / 고성능 1,500,000원)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">35</span>상태 배지 — 「✓ 완주」</li>
+    <li><span class="tag">36</span>제목 — 「세션 #10603」</li>
+    <li><span class="tag">37</span>닫기(✕)</li>
+    <li><span class="tag">38</span>메타 줄 — 시각 · 방식 · 회원(항상 「비로그인 세션」 — 아래 ⑤
+      참고) · 방문자 키(회원이 아닌 익명 발급 번호)</li>
+    <li><span class="tag">39</span>① 제약 객체 — 원문 그대로(칩). 상담 시작 시점의 조건이 그대로
+      저장되고, 나중에 값이 바뀌지 않습니다.</li>
+    <li><span class="tag">40</span>② 티어 스냅샷(테두리 상자) — 가성비/추천/고성능 3장, 각각 총액과
+      부품 수. 대표로 쓰인 카드에는 「대표」 배지가 붙습니다(추천 티어 우선, 없으면 마지막 생성분).</li>
+    <li><span class="tag">41</span>대표 스냅샷 부품 구성표 — 슬롯 · 상품명 · 당시 가격(지금 가격이
+      아닙니다). 이 아래로 스크롤하면 컴패니언(주변기기) 제안 목록과, ④ 완주 이후 상태, ⑤ 상담
+      방식 분포가 이어집니다(부품 수가 많으면 한 화면에 다 안 보일 수 있습니다 — 서랍은 자체
+      스크롤 영역입니다).</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>상세 서랍 확대 — 이탈 세션</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:667/990.2;max-width:430px">
+      <img src="/shared/manual/shots/consult-sessions-drawer-dropped.png" alt="상세 서랍 확대 — 이탈 세션(스냅샷 없음)">
+      <b class="pin" style="--x:7.43%;--y:2.92%">42</b>
+      <b class="pin" style="--x:52.26%;--y:2.92%">43</b>
+      <b class="pin" style="--x:50.07%;--y:15.81%">44</b>
+      <b class="pin" style="--x:50.07%;--y:24.99%">45</b>
+      <b class="pin" style="--x:50.07%;--y:34.87%">46</b>
+      <b class="pin" style="--x:50.07%;--y:50.42%">47</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 세션 #7808 · 방식 함께(chat) · 스냅샷 0건(이탈)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">42</span>상태 배지 — 「— 이탈」</li>
+    <li><span class="tag">43</span>제목 — 「세션 #7808」</li>
+    <li><span class="tag">44</span>① 제약 객체 — <b>「요청: (자유입력 예시 — 실제 문구 대신 표시)」는
+      이 문서를 만들며 가린 자리입니다.</b> 나머지(용도/선호/예산)는 정해진 값 중에서 고르는 칩이라
+      원문 그대로입니다. <b>실제 화면에서는 「요청:」 칩도 고객이 입력한 문장이 그대로 보입니다</b>
+      — 이 매뉴얼 문서에서만, 개인정보를 문서에 남기지 않으려고 표준 문구로 바꿨습니다.</li>
+    <li><span class="tag">45</span>③ 스냅샷 없음 — 이탈. 「상담은 시작됐지만 견적이 만들어지지
+      않았습니다」를 그대로 말합니다. 아래 줄은 추정 문구인데, <b>화면 스스로 "추정을 단정으로
+      적지 않는다"고 밝힙니다.</b></li>
+    <li><span class="tag">46</span>④ 완주 이후 상태 — 이탈 세션은 orders·handoffs 두 줄 모두
+      「연결된 게 없다」가 아니라 <b>「왜 없는지」</b>(견적 자체가 없어서 인계·주문할 것도 없다)를
+      말합니다.</li>
+    <li><span class="tag">47</span>⑤ 상담 방식 분포(가로 막대) — 완주 세션 서랍(그림 G)에는 이
+      섹션이 스크롤 아래에 있어 안 보였지만, 이탈 세션은 내용이 짧아 스크롤 없이 전부 보입니다.</li>
+  </ul>
+
+  <h3 id="fig-i"><span class="fig">그림 I</span>상세 서랍 확대 — 완주 → 인계 세션</h3>
+  <figure>
+    <div class="shot" style="aspect-ratio:667/990.2;max-width:430px">
+      <img src="/shared/manual/shots/consult-sessions-drawer-handoff.png" alt="상세 서랍 확대 — 완주 -> 인계 세션(orders·handoffs 두 줄)">
+      <b class="pin" style="--x:13.58%;--y:2.92%">48</b>
+      <b class="pin" style="--x:50.07%;--y:66.38%">49</b>
+      <div class="box" style="--x:3.25%;--y:67.92%;--w:93.65%;--h:11.04%"></div>
+      <b class="pin" style="--x:50.07%;--y:70.03%">50</b>
+      <b class="pin" style="--x:50.07%;--y:75.89%">51</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 세션 #9971 · 방식 맡김(guided) · HO-1009로 인계됨 · 서랍을
+      아래로 스크롤해 ④ 완주 이후 상태가 보이는 위치에서 캡처했습니다(부품 구성·컴패니언
+      섹션은 이 그림 위쪽에 있어 잘렸습니다 — 그 부분은 그림 G와 같은 구성입니다).</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">48</span>상태 배지 — 「완주 → 인계(handoffs)」. 목록 행의 배지와 같은
+      기준(handoff_no 유무)으로 서랍이 직접 판단합니다 — 서버가 주는 원문 <code>status</code>
+      문자열은 사실 지금도 "완주"로만 오는데(아직 주문 전용 계산이라), 화면이 그 원문을 그대로
+      쓰지 않고 스냅샷·주문·인계 연결 유무로 다시 판정합니다.</li>
+    <li><span class="tag">49</span>④ 완주 이후 상태 — 두 원장 모두 확인(제목)</li>
+    <li><span class="tag">50</span>orders 줄 — 「연결된 주문 없음(orders 기준)」</li>
+    <li><span class="tag">51</span>handoffs 줄(테두리 상자로 orders 줄과 함께 묶임) — 인계 번호
+      (HO-1009) · 상태(인계) · 우리 견적 합계(729,800원) · 몰 합계(729,900원) · 가격 확인
+      완료 여부 · 인계 시각. <b>우리 합계와 몰 합계가 다를 수 있습니다</b> — 인계 시점 몰 가격이
+      바뀌었거나 아직 확인 전이면 그렇습니다.</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>목록을 최신순으로 봅니다 — 시각·방식·제약 요약·대표 견적(총액+부품 수, 없으면 「견적
+      미생성」)·상태를 한 줄로 확인합니다.</li>
+    <li>상담 방식 칩(그림 D)을 눌러 그 방식만 좁혀 봅니다. <b>지금 조회된 페이지 안에서만</b>
+      걸러집니다 — 서버에 새로 요청하지 않습니다.</li>
+    <li>목록 행을 클릭 → 오른쪽 상세 서랍에서 그 세션의 제약 객체 전체, 티어 스냅샷 3벌(있는
+      경우), 대표 스냅샷의 부품 구성·가격·컴패니언 제안, 완주 이후 상태(orders·handoffs 둘 다),
+      상담 방식 분포를 확인합니다.</li>
+    <li>KPI 카드(그림 C)에서 오늘 생성된 세션 수, 완주율/이탈(전체·이 페이지 두 기준), 완주 이후
+      원장별 연결 건수를 확인합니다.</li>
+    <li>페이지를 넘깁니다(전체가 200건을 넘으면 동작합니다 — 지금은 130건뿐이라 다음 페이지가
+      없습니다).</li>
+    <li><span class="btnlabel">다시 조회</span>로 목록·집계를 전부 새로 불러옵니다.</li>
+  </ul>
+  <p><b>할 수 없는 것</b> — 값을 고치거나, 세션을 지우거나, 지금 재고로 견적을 다시 계산해 보는
+    기능은 없습니다. 기간을 지정해 검색하는 기능도 아직 없습니다(백엔드 확장 대기 — 화면이 그
+    사실을 안내 문구로 먼저 말합니다).</p>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout" id="warn-scope">
+    <b>이 화면의 「전체 세션」 숫자는 이미 걸러진 값입니다 — 그런데 그 값도 100% 검증된 값은
+    아닙니다.</b> 원장(<code>consult_sessions</code>) 전체는 2026-08-28 실측 기준 10,509건인데,
+    그중 83.6%(8,780건)에 회귀 시험이 남긴 표식이 붙어 있고, 2026-08-19 15:57:46(UTC) 이전
+    구간은 그 표식 여부와 무관하게 "시험 운영 기간"으로 통째로 제외됩니다(그 이전은 회귀·점검
+    트래픽과 뒤섞여 있어 표식만으로는 못 가릅니다 — 결정 기록 A-81). 이 화면은 그 기준을 서버
+    SQL에서부터 적용하므로, <b>화면에 걸러 보는 버튼이 따로 없어도 이미 걸러진 값만 보입니다</b>
+    (캡처 시점 130건 — 10,509건이 아닙니다). <b>다만</b> 이 130건도 "확인된 고객 상담"이라는
+    보장은 아닙니다 — 자동 시험 표식이 없는 수동 점검(직원이 화면·API를 직접 눌러본 것)도 구분
+    없이 섞입니다. 실제로 세션 #10497은 2026-08-27 확인자가 검증 작업 중 직접 만든 세션입니다.
+    <b>그래서 이 화면의 숫자를 "정확한 고객 상담 횟수"로 그대로 인용하지 않습니다</b> — 유입
+    성과를 판단하려면 이 화면 하나가 아니라 다른 근거(인계 원장 등)와 함께 봅니다.
+  </div>
+  <div class="callout">
+    <b>「완주 → 주문(orders)」 상태 배지의 실제 예시가 캡처 시점 화면에는 없습니다(0건).</b>
+    <code>orders</code> 표는 2026-08-10 이후로 갱신되지 않는 옛 원장인데, 지금 화면이 보여주는
+    구간(2026-08-19 15:57:46 UTC 이후)과 겹치지 않기 때문입니다. 지금 실제로 쌓이는 것은
+    <code>handoffs</code>(완주 → 인계) 쪽입니다. 두 원장을 헷갈리지 않도록 화면 상단 안내 띠와
+    KPI가 항상 둘을 나눠 보여줍니다.
+  </div>
+  <div class="callout">
+    <b>「재현」은 지금 재고로 다시 계산한 값이 아니라, 저장된 원문 그대로입니다.</b> 부품 가격이
+    지금은 달라졌어도 서랍에는 <b>당시 가격</b>이 그대로 남습니다. 지금 재고·가격으로 다시
+    계산해 "그때와 비교"하는 기능은 이 화면에 없습니다(이관 대상으로 코드에 명시돼 있습니다).
+  </div>
+  <div class="callout">
+    <b>페이지 이동·기간 필터가 잠겨 있습니다.</b> 지금은 전체가 130건(200건 이하)이라 체감하기
+    어렵지만, 늘어나 200건을 넘으면 <span class="btnlabel">다음 ▶</span>이 눌립니다. 기간을
+    지정해 검색하는 기능은 아직 없고, 화면이 그 한계를 감추지 않고 안내 문구로 먼저 말합니다.
+  </div>
+  <div class="callout">
+    <b>회원 이름·이메일이 하나도 안 보이는 것이 정상입니다.</b> 상담은 로그인 전에 이뤄지는
+    세션이라 <code>member_id</code>가 거의 항상 비어 있습니다(실 인증이 아직 붙기 전입니다).
+    「비로그인 세션」이라는 표시를 오류로 오해하지 않습니다.
+  </div>
+  <div class="callout">
+    <b>상담 방식 칩(그림 D)의 건수는 KPI의 "전체 세션"과 분모가 다를 수 있습니다.</b> 지금은 둘
+    다 130건(이 페이지 전체 = 전체 세션)이라 같아 보이지만, 방식 칩은 항상 <b>「이 페이지 안에서만」</b>
+    집계하고 KPI의 완주율·이탈은 <b>전체(페이지를 넘는 구간 포함)</b> 기준입니다 — 전체 건수가
+    200건을 넘는 순간부터 두 숫자의 기준이 갈라집니다.
+  </div>
+  <div class="callout">
+    <b>이 화면에는 값을 되돌리거나 고치는 기능이 전혀 없습니다.</b> 다른 admin2 화면(예: 상품
+    사양 검수)에 있는 <span class="btnlabel">되돌리기</span> 같은 버튼이 이 화면에는 처음부터
+    없습니다 — 조회 전용이기 때문입니다. "왜 버튼이 없지"라고 다른 화면과 비교하지 않습니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「완주 → 주문(orders) 배지를 본 적이 없다」</b> → 정상입니다. 위 「조심할 것」 두 번째
+      항목 참고 — <code>orders</code> 연결은 지금 화면이 보는 구간에서 0건입니다.</li>
+    <li><b>「직접(expert) 모드 건수가 예전에 들었던 것(0건)과 다르다」</b> → 2026-08-13에 작성된
+      요구사항 정의서는 <b>그때까지의 전체 원장(시험 데이터 포함)</b>을 기준으로 "직접 모드
+      실사용 0건"이라 적었습니다. 지금 화면은 2026-08-19 15:57:46(UTC) 이후로 걸러진 최근
+      구간만 보므로, 그 이후 새로 쌓인 직접 모드 상담(캡처 시점 19건)이 반영됩니다. 두 수치는
+      서로 다른 시점·다른 모집단이라 다른 것이 정상입니다.</li>
+    <li><b>「페이지 이동 버튼이 둘 다 눌리지 않는다」</b> → 지금 전체 세션이 200건(페이지당 상한)보다
+      적어서 1페이지뿐이기 때문입니다. 늘어나면 자동으로 눌립니다.</li>
+    <li><b>「방금 만들어진 상담이 목록에 안 보인다」</b> → 화면을 처음 연 시점 데이터를 메모리에
+      들고 있습니다. <span class="btnlabel">다시 조회</span>를 눌러 새로 불러옵니다.</li>
+    <li><b>「이 매뉴얼의 상세 서랍 그림(그림 H)에서 '요청:' 칩 문구가 이상하다」</b> → 이 문서를
+      만들며 개인정보(고객이 직접 입력한 문장)를 문서에 남기지 않으려고 표준 문구로 가린
+      자리입니다. <b>실제 화면에서는 고객이 입력한 문장이 원문 그대로 보입니다.</b></li>
+    <li><b>「완주 → 인계 세션인데 우리 견적 합계와 몰 합계 금액이 다르다」</b> → 정상일 수 있습니다.
+      인계 시점 이후 몰 가격이 바뀌었거나, 아직 가격 확인이 끝나지 않은 경우 두 금액이 다를 수
+      있습니다. 서랍의 「가격 확인 완료/미확인」 표시로 어느 상태인지 확인합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_ui_consult_sessions.py</code>(페이지 라우트) ·
+        <code>api/admin_sessions.py</code>(데이터 원천, <code>GET /api/admin/sessions</code>) ·
+        <code>api/session_scope.py</code>(A-81 「시험 운영 기간」 제외 술어) ·
+        <code>templates/admin/consult_sessions.html.j2</code> ·
+        <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>mockups/shared/admin2/admin2-shell.js</code></li>
+      <li>계약·요구사항 — <code>docs/design/spec-consult-sessions.md</code>(승인 디자인 계약) ·
+        <code>docs/design/req/req-consult-sessions.md</code>(요구사항 정의서, 2026-08-13
+        작성 — 위 「자주 겪는 상황」에 적었듯 그 시점 실측치는 지금과 모집단이 다릅니다) ·
+        결정 기록 <code>docs/decisions/decision-log.md</code> A-81</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발
+        서버)에 Playwright로 접속해 2026-08-28에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_consult_sessions.py</code>(공용 도구
+        <code>scripts/manual_capture_common.py</code>를 그대로 씀), 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>consult-sessions-coords.json</code>에 있습니다.</li>
+      <li>실측 수치(세션 건수·완주율·방식 분포 등) — 캡처와 같은 순간
+        <code>GET /api/admin/sessions</code> 응답과 <code>consult_sessions</code>·
+        <code>quote_snapshots</code>·<code>handoffs</code>·<code>orders</code> 표를 직접 SELECT한
+        결과를 그대로 옮겼습니다. 지어낸 숫자는 없습니다 — 매 순간 바뀌므로 지금 값은 화면에서
+        다시 확인하십시오.</li>
+      <li><b>예시로 쓴 세션 3종</b> — 완주 #10603(방식 함께) · 이탈 #7808(방식 함께) · 완주→인계
+        #9971(방식 맡김, HO-1009). 검증 작업 중 만들어진 것으로 이미 알려진 세션(#10497)은
+        예시에서 의도적으로 제외했습니다 — 그 밖의 세션은 실제 고객 상담인지 팀 점검인지 구분할
+        방법이 없어 임의로 더 골라내지 않았습니다(위 ⑤ 첫 항목 참고).</li>
+      <li><b>가림(레닥션) 처리</b> — 이 화면은 회원 이름·이메일을 아예 표시하지 않습니다(상담이
+        로그인 전 세션이라 회원 정보가 없습니다). 방문자 키(<code>user_id</code>)는 익명 발급된
+        숫자라 그대로 두었습니다. <b>가린 것은 상담 제약 중 "요청:"(자유입력) 칩 하나뿐입니다</b>
+        — 고객이 직접 타이핑한 문장이 들어가는 유일한 자리라, 목록 행의 제약 요약과 상세 서랍의
+        제약 칩 양쪽에서 표준 문구("요청: (자유입력 예시 — 실제 문구 대신 표시)")로 바꿨습니다.
+        용도·예산·선호처럼 정해진 값 중에서 고르는 칩은 자유 텍스트가 아니므로 원문 그대로
+        두었습니다. 좌표 JSON(<code>consult-sessions-coords.json</code>)에도 상담 제약 원문은
+        저장하지 않았습니다 — 건수·모드 분포 같은 집계만 남겼습니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>·
+      <code>aspect-ratio</code> 값도 새 <code>consult-sessions-coords.json</code>에 맞춰 다시
+      옮겨야 합니다(좌표는 손으로 만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면
+      함께 낡습니다). <a href="#fig-f">그림 F</a>의 화살표(<code>&lt;line&gt;</code> 좌표)는
+      좌표 JSON이 자동으로 채우지 않는 자리라 — 실측 bounding box로 1차 계산은 해 두었지만
+      (스크립트의 <code>_arrow_full_detail</code> 값), 화면이 바뀌면 사람이 다시 확인해야
+      합니다.</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_consult_sessions.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — <code>.venv</code>에는 이미 설치돼 있지만
+      <code>requirements.txt</code>에는 없습니다. 새 환경에서는 <code>pip install playwright</code>
+      후 <code>playwright install chromium</code>이 먼저 필요합니다. 읽기 전용입니다 — 새 상담
+      세션을 만들지 않고, 기존 세션 중 골라서만 엽니다.</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가
+      없어, 완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에
+      정확히 맞는지, 그림 F의 화살표가 실제로 행과 서랍을 자연스럽게 잇는지, 인쇄 시 페이지가
+      어떻게 나뉘는지)는 캡처 PNG를 직접 눈으로 확인한 것 이상으로는 검증하지 못했습니다(좌표는
+      Playwright 실측값이고, 캡처 PNG 9장은 직접 열어 레이아웃·가림 처리가 의도대로 됐는지
+      확인했습니다 — 다만 그 위에 이 문서가 그리는 핀·상자·화살표 오버레이까지 얹은 최종 렌더는
+      못 봤습니다). 또한 이 캡처는 owner 등급 점검 계정으로만 찍었습니다 — 「조회」 등급 계정에서
+      화면이 다르게 보이는지는 요구사항 정의서상 "열람은 등급 무관"이라고만 돼 있고 코드로도
+      추가 분기를 확인하지 못했습니다(권한별 차이가 없을 가능성이 높지만 직접 로그인해 보지는
+      않았습니다). 「완주 → 주문(orders)」 상태의 실제 화면 예시도, 캡처 시점 데이터에 해당
+      세션이 없어 확보하지 못했습니다.</p>
+  </div>
+
+</div>

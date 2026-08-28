@@ -1,0 +1,528 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 작업 기록</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 작업 기록을 처음 쓰는 직원</div>
+    <div><b>화면</b> 작업 기록 · 경로 <code>/admin2/activity-logs</code> · 화면 ID <code>ADM-SYS-030</code>
+      (근거 — <code>api/admin_ui_activity_logs.py</code> 라우트 · <code>api/admin_activity_logs.py</code>
+      모듈 docstring 1행 · <code>docs/design/req/req-activity-logs.md</code> ②)</div>
+    <div><b>이 화면의 성격</b> 14개 이상의 관리자 모듈(상품·검수·카테고리·운영자·재고·정산·환불·
+      운영 전환·AI 연동·업무 요청 …)이 전부 같은 함수 하나(<code>api/admin_orders.py::_log()</code>)를
+      불러 <code>admin_operator_activity_logs</code> 한 테이블에 남기는 기록을 모아 보여주는
+      단일 창구입니다. 이 화면이 없으면 그 기록을 볼 방법은 API를 직접 호출하는 것뿐입니다.
+      실측(2026-08-28, <code>SELECT COUNT(*)</code>) 기준 원장 누적 <b>14,326행</b>입니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-28 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수·시각은 매일(사실상 매분)
+      바뀝니다 — 정확한 지금 값은 화면에서 직접 확인하십시오. 또한 이 화면은 <b>누가 무엇을 했는지</b>를
+      보여주므로 캡처에는 실제 운영자 이름이 그대로 찍힙니다 — 아래 모든 캡처에서 운영자 이름은
+      가짜 값으로 바꿔치기했습니다(문서 끝 「문서 정보」에 무엇을 가렸는지 정리했습니다).</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>이 시스템의 <b>「되돌림은 삭제가 아니라 역방향 전이다」</b>라는 원장 규약을 눈으로 확인하는
+    유일한 공용 창구입니다. 상품·카테고리·검수·재고·운영자·정산·환불·운영 전환·AI 연동 등
+    서로 다른 화면에서 일어난 일이 전부 한 표에 시각 역순으로 쌓입니다. 이 화면이 하는 일은
+    셋입니다.</p>
+  <ul>
+    <li><b>누가 · 언제 · 어느 도메인에서 · 무슨 행위를 했는지</b> 한 줄로 봅니다(예:
+      「이보라 · 2026-08-27 22:52 · 카테고리 · 카테고리 매핑 이동」).</li>
+    <li>서버가 만든 <b>사람이 읽는 요약 문장</b>(예: 「카테고리 매핑 이동」·「원 기록 #16714
+      되돌림」)을 그대로 보여줍니다 — 이 화면이 <code>detail</code>(jsonb) 원문을 다시 해석해
+      다른 문장을 만들지 않습니다(원문 자체를 이 목록 API가 내려주지도 않습니다).</li>
+    <li>되돌려진 원본 행에 <b>「되돌려짐」</b> 표시를 붙입니다(<code>ref_log_id</code> 역참조).
+      되돌림 행 자체도 지우거나 숨기지 않고 「…되돌림」이라는 별도의 정상 행위로 보여줍니다.</li>
+  </ul>
+  <p><b>이 화면은 조회 전용입니다.</b> 로그를 지우거나 고치는 기능이 없고(원장이므로 쓰기 API
+    자체가 없습니다), <b>이 화면을 보는 행위 자체는 기록에 남지 않습니다</b> — 렌더 함수에
+    <code>_log()</code> 호출이 0건입니다(<code>api/admin_ui_activity_logs.py</code>·
+    <code>api/admin_activity_logs.py</code> 실측). 안심하고 눌러 보고 뒤져도 됩니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <p>대부분 다음 둘 중 하나입니다.</p>
+  <ul>
+    <li><b>「내가 아까 뭘 했더라」</b> — 다른 화면에서 상품 분류를 옮기거나 사양을 고치고
+      나왔는데, 그게 실제로 저장됐는지 · 몇 시에 · 내 이름으로 남았는지 확인하고 싶을 때.
+      기간을 <span class="btnlabel">오늘</span>로, 운영자를 자기 계정으로 좁혀서 봅니다
+      (④ 「거르는 법」 참고).</li>
+    <li><b>「이거 누가 바꿨지」</b> — 다른 화면에서 값이 예상과 달라져 있는 것을 발견했을 때
+      (예: 상품 분류 관리 화면에서 카테고리 매핑이 옮겨져 있다), 누가 · 언제 · 왜 그렇게 됐는지
+      원인을 찾을 때. 도메인 필터로 좁히고 대상 ID로 검색합니다.</li>
+  </ul>
+  <p><b>다른 화면에서 한 일이 여기 어떻게 나타나는지 — 실제 예</b>. 상품 분류 관리 화면
+    (<code>/admin2/categories</code>)에서 카테고리의 매핑을 옮기거나 되돌리면, 도메인
+    <span class="btnlabel">카테고리</span> · 행위 <span class="btnlabel">카테고리 매핑 이동</span>
+    (또는 <span class="btnlabel">카테고리 매핑 이동 되돌림</span>) 행으로 이 화면에 곧바로
+    쌓입니다. 2026-08-28 캡처 시점에 불러온 배치(최근 500건) 안에서 실측한 결과, <b>도메인
+    「카테고리」가 80건으로 이 배치의 세 번째로 큰 덩어리</b>였고(1위 상품 124 · 2위 운영자
+    122), 그중 <b>「카테고리 매핑 이동」이 20건 · 그 20건 전부가 곧바로 「되돌려짐」 상태</b>
+    였습니다 — 즉 이 배치에서 카테고리 매핑 이동은 옮기자마자 곧바로 되돌리는 왕복 패턴으로
+    나타났습니다(검증 작업의 흔적으로 보입니다 — ⑤ 참고). 아래 그림 E·F·G·H가 이 실제 사례를
+    그대로 따라갑니다.</p>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>먼저 필터 없이(기간 「전체 기간」) 연 기본 화면을 전체로 보고, 아래에서 영역별로 확대해
+    하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/activity-logs-full.png" alt="작업 기록 화면 전체">
+      <b class="pin" style="--x:6.31%;--y:47.09%">1</b>
+      <b class="pin" style="--x:14.91%;--y:2.8%">2</b>
+      <b class="pin" style="--x:26.44%;--y:2.8%">3</b>
+      <b class="pin" style="--x:37.3%;--y:2.8%">4</b>
+      <b class="pin" style="--x:88.43%;--y:2.8%">5</b>
+      <b class="pin" style="--x:93.39%;--y:2.8%">6</b>
+      <b class="pin" style="--x:97.88%;--y:2.8%">7</b>
+      <b class="pin" style="--x:13.62%;--y:6.69%">8</b>
+      <b class="pin" style="--x:13.62%;--y:11.1%">9</b>
+      <!-- 2026-08-28 겹침 수정: 원래 --y:13.48% — coords.json 실측 statusbar 범위는
+           y_pct 12.48~16.69%(중심 14.58%)라 13.48%도 그 안이었지만, 핀9(11.1%, note
+           범위 10.1~12.48% 안)와 13px 간격밖에 안 돼 배지 둘이 겹쳤다. statusbar 범위
+           안에서 더 아래쪽(15.0%, 여전히 12.48~16.69% 안)으로 옮겨 같은 요소를 계속
+           가리키면서 간격을 벌렸다. 재검증: 핀9~10 거리 27.9px(zoom 1.15 반영, 기준
+           18px의 약 1.6배) · 핀10~11 거리 29.4px(기존보다 넓어짐, 새 겹침 없음). -->
+      <b class="pin" style="--x:13.62%;--y:15.0%">10</b>
+      <b class="pin" style="--x:14.62%;--y:18.69%">11</b>
+      <b class="pin" style="--x:14.85%;--y:95.73%">12</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 필터
+      없음(기간 「전체 기간」, 기본값) · 이름은 가짜 값으로 치환</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 「시스템」 그룹 안 「작업 기록」이 지금 있는
+      화면으로 진하게 표시됩니다.</li>
+    <li><span class="tag">2</span>위치 표시(빵부스러기) — 「시스템 / 작업 기록」</li>
+    <li><span class="tag">3</span>「읽기 전용 원장 · 삭제·수정 없음」 배지 — 이 화면 고유
+      표시입니다(다른 목록 화면에는 없습니다).</li>
+    <li><span class="tag">4</span>표시 범위 요약 — 「원장 조건 내 N건 · 표시 M건」. 지금 조건
+      (기간)에 맞는 전체 건수와, 실제로 이 화면이 받아 온 건수를 함께 밝힙니다.</li>
+    <li><span class="tag">5</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">6</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">7</span>아바타 — 「내 정보」 화면으로 이동</li>
+    <li><span class="tag">8</span>필터 바 — 자세한 구성은 <a href="#fig-c">그림 C</a> 참고</li>
+    <li><span class="tag">9</span>참고 문구 — 자동화·회귀 흔적을 구분해 숨기는 기능이 이 화면에
+      없다는 안내(⑤ 참고)</li>
+    <li><span class="tag">10</span>상태줄 — 지금 조건의 건수 · 서버 상한 캡 칩 · 새로고침 ·
+      필터 안내 문구</li>
+    <li><span class="tag">11</span>목록 표 — 시각 · 운영자 · 도메인 · 행위 · 요약 · 되돌림
+      6열. 자세한 구성은 <a href="#fig-e">그림 E</a> 참고</li>
+    <li><span class="tag">12</span>페이지네이션 — 페이지당 16건(이 화면이 불러온 배치를
+      화면에서 나눈 것 — 서버 페이지네이션이 아닙니다, ⑤ 참고)</li>
+  </ul>
+
+  <h3><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot shot--header" style="aspect-ratio:1468/59.8">
+      <img src="/shared/manual/shots/activity-logs-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:2.63%;--y:49.16%">13</b>
+      <b class="pin" style="--x:7.71%;--y:49.16%">14</b>
+      <b class="pin" style="--x:15.82%;--y:49.15%">15</b>
+      <b class="pin" style="--x:28.25%;--y:49.15%">16</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">17</b>
+      <b class="pin" style="--x:92.44%;--y:49.16%">18</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">19</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">13</span>위치 표시(빵부스러기) — 그룹 이름</li>
+    <li><span class="tag">14</span>위치 표시 — 화면 이름 「작업 기록」</li>
+    <li><span class="tag">15</span>「읽기 전용 원장 · 삭제·수정 없음」 배지</li>
+    <li><span class="tag">16</span>표시 범위 요약 — 「원장 조건 내 N건 · 표시 M건」</li>
+    <li><span class="tag">17</span>허브</li>
+    <li><span class="tag">18</span>권한 표시</li>
+    <li><span class="tag">19</span>아바타 — 「내 정보」로 이동</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>필터 바 확대</h3>
+  <figure>
+    <div class="shot shot--filterbar" style="aspect-ratio:1468/46.25">
+      <img src="/shared/manual/shots/activity-logs-filterbar.png" alt="필터 바 확대">
+      <b class="pin" style="--x:10.48%;--y:64.9%">20</b>
+      <b class="pin" style="--x:23.75%;--y:64.9%">21</b>
+      <b class="pin" style="--x:31.59%;--y:64.9%">22</b>
+      <b class="pin" style="--x:39.04%;--y:64.9%">23</b>
+      <b class="pin" style="--x:46.49%;--y:64.9%">24</b>
+      <b class="pin" style="--x:62.71%;--y:64.9%">25</b>
+      <b class="pin" style="--x:78.0%;--y:64.92%">26</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 A의 8번 영역을 확대(필터 없음 상태)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">20</span>조회 기간 — 오늘 · 최근 7일 · 최근 30일 · 전체 기간(기본값).
+      누르면 그 즉시 서버에 다시 요청합니다(새로고침 겸함).</li>
+    <li><span class="tag">21</span>운영자 필터 — 지금 불러온 배치 안에 실제로 나타난 운영자만
+      드롭다운에 뜹니다(자세히는 <a href="#fig-d">그림 D</a>).</li>
+    <li><span class="tag">22</span>도메인 필터 — 상품 · 카테고리 · 운영자 · 검수·매입 … 지금
+      배치에 나타난 도메인만 뜹니다.</li>
+    <li><span class="tag">23</span>행위 필터 — 「카테고리 매핑 이동」처럼 이미 한글로 번역된
+      이름 기준입니다.</li>
+    <li><span class="tag">24</span>되돌림 필터 — 되돌려짐 · 판정 불가(결함) · 되돌려지지 않음
+      셋 중 하나로 좁힙니다.</li>
+    <li><span class="tag">25</span>검색창 — 대상 ID · 요약 문장만 봅니다(행위 이름 자체는
+      검색 대상이 아닙니다 — ⑤ 참고). 입력하는 즉시 반응합니다(서버 왕복 없음).</li>
+    <li><span class="tag">26</span><span class="btnlabel">필터 초기화</span> — 검색어를 포함해
+      전부 되돌립니다. 기간이 「전체 기간」이 아니었다면 다시 불러옵니다.</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>운영자 필터 드롭다운 — 연 상태</h3>
+  <figure>
+    <div class="shot" style="max-width:300px;aspect-ratio:241.5/216.6">
+      <img src="/shared/manual/shots/activity-logs-operator-filter.png" alt="운영자 필터 드롭다운 — 이름을 가짜 값으로 바꾼 상태">
+      <b class="pin" style="--x:22.16%;--y:7.23%">27</b>
+      <b class="pin" style="--x:50%;--y:59.02%">28</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 운영자 필터 버튼을 눌러 연 상태(이름은 문서화를 위해 가짜
+      값으로 바꿨습니다 — 실제 화면에는 진짜 운영자 이름이 뜹니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">27</span>운영자 필터 버튼 — 누르면 아래 목록이 펼쳐집니다.</li>
+    <li><span class="tag">28</span>운영자 목록(테두리 상자) — 맨 위 「전체」(필터 해제) +
+      지금 배치에 등장한 운영자를 <b>건수 많은 순</b>으로 나열합니다. 옆 숫자는 <b>이 배치
+      안에서만의 건수</b>입니다(전역 집계가 아닙니다). 캡처 시점 이 배치에는 서로 다른
+      운영자 4명이 있었습니다 — 한 사람이 압도적으로 많고(전체의 약 90%), 이름 자체가
+      「(치울것)」처럼 테스트용임을 밝히는 계정도 있었습니다(⑤ 참고).</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>도메인·되돌림 필터를 적용한 결과</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/454.5">
+      <img src="/shared/manual/shots/activity-logs-filtered-table.png" alt="도메인=카테고리, 되돌림=되돌려짐으로 좁힌 목록">
+      <b class="pin" style="--x:32.37%;--y:6.6%">29</b>
+      <b class="pin" style="--x:48.83%;--y:6.6%">30</b>
+      <b class="pin" style="--x:6.88%;--y:21.67%">31</b>
+      <b class="pin" style="--x:21.73%;--y:21.67%">32</b>
+      <div class="box" style="--x:1.41%;--y:35.32%;--w:97.18%;--h:64.68%"></div>
+      <b class="pin" style="--x:3%;--y:37%">33</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 도메인 「카테고리」 + 되돌림 「되돌려짐」 적용 — 그림 C의
+      22·24번을 실제로 눌러 좁힌 결과(② 「이거 누가 바꿨지」 예시 그대로)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">29</span>도메인 필터 버튼 — 값이 선택되면 진한 배경(「set」 상태)으로
+      바뀝니다.</li>
+    <li><span class="tag">30</span>되돌림 필터 버튼 — 마찬가지로 진한 배경으로 바뀝니다.</li>
+    <li><span class="tag">31</span>건수 — 「이 조건 20건 (불러온 500건 중)」으로 즉시 갱신됩니다.</li>
+    <li><span class="tag">32</span>서버 상한 캡 칩 — 「최근 500건만 표시 — 서버 상한(전체
+      14,326건 중)」. 이 문구는 필터와 무관하게 <b>이 화면이 서버에서 받아 온 배치 자체</b>가
+      상한에 걸렸는지를 말합니다(필터링된 20건과는 다른 숫자입니다 — ⑤ 참고).</li>
+    <li><span class="tag">33</span>남은 행(테두리 상자) — 전부 「카테고리 매핑 이동」이고 전부
+      「되돌려짐」 배지가 붙어 있습니다. 캡처 시점 이 배치에서는 「카테고리 매핑 이동」 20건
+      <b>전부</b>가 되돌려진 상태였습니다.</li>
+  </ul>
+
+  <h3><span class="fig">그림 F</span>행을 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/activity-logs-full-detail.png" alt="행을 클릭해 상세 서랍이 열린 상태의 전체 화면">
+      <b class="pin" style="--x:56.07%;--y:23.32%">34</b>
+      <div class="box" style="--x:61.67%;--y:0%;--w:38.33%;--h:100%"></div>
+      <b class="pin" style="--x:63%;--y:2%">35</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ah1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="990" y1="245" x2="1080" y2="245" stroke="#c8451c" stroke-width="6" marker-end="url(#ah1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 그림 E의 필터가 걸린 채로, 맨 위 행(카테고리 매핑 이동
+      · 되돌려짐)을 클릭한 직후</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">34</span>방금 클릭한 행(선택 표시 — 배경이 옅게 바뀌고 왼쪽에 진한
+      선이 붙습니다)</li>
+    <li><span class="tag">35</span>우측에 뜨는 상세 서랍(테두리 상자) — 확대는
+      <a href="#fig-g">그림 G</a>·<a href="#fig-h">그림 H</a>. 같은 행을 다시 클릭하면
+      닫힙니다.</li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>상세 서랍 확대 — 「되돌려짐」 상태(원본 행)</h3>
+  <figure>
+    <div class="shot shot--drawer" style="aspect-ratio:644/1050">
+      <img src="/shared/manual/shots/activity-logs-drawer-undone.png" alt="상세 서랍 확대 — 되돌려짐 상태">
+      <div class="box" style="--x:0.16%;--y:0%;--w:99.84%;--h:7.39%"></div>
+      <b class="pin" style="--x:2%;--y:2%">36</b>
+      <b class="pin" style="--x:47.8%;--y:2.63%">37</b>
+      <b class="pin" style="--x:87.23%;--y:2.63%">38</b>
+      <b class="pin" style="--x:94.98%;--y:2.63%">39</b>
+      <b class="pin" style="--x:5%;--y:5.24%">40</b>
+      <div class="box" style="--x:3.37%;--y:10.95%;--w:93.42%;--h:4.74%"></div>
+      <b class="pin" style="--x:5%;--y:9.3%">41</b>
+      <div class="box" style="--x:3.37%;--y:19.58%;--w:93.42%;--h:6.79%"></div>
+      <b class="pin" style="--x:5%;--y:18.3%">42</b>
+      <b class="pin" style="--x:5%;--y:28%">43</b>
+      <b class="pin" style="--x:89.67%;--y:97.09%">44</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 카테고리 매핑 이동(대상 428) · 이 예시의 실제 log_id는
+      16714, 되돌린 기록은 16715</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">36</span>헤더 영역(테두리 상자) — 도메인 칩 · 행위 · 되돌림 배지 ·
+      닫기(✕)가 한 줄에 나란히 표시됩니다.</li>
+    <li><span class="tag">37</span>행위 텍스트 — 「카테고리 매핑 이동」. 도메인 칩과 되돌림
+      배지 사이 남는 폭을 전부 차지해(<code>flex:1</code>) 한 줄로 표시됩니다.</li>
+    <li><span class="tag">38</span>되돌림 배지 — 「되돌려짐」. 배경이 채워진 알약 모양으로
+      표시됩니다.</li>
+    <li><span class="tag">39</span>닫기(✕) 버튼 — 서랍을 닫습니다.</li>
+    <li><span class="tag">40</span>메타 줄 — log_id · 시각 · 운영자(가림) · 대상 ID(428, 이
+      카테고리의 번호)</li>
+    <li><span class="tag">41</span>요약 상자(테두리 상자) — 서버가 만든 문장을 그대로 보여줍니다.
+      이 예시는 「카테고리 매핑 이동」입니다.</li>
+    <li><span class="tag">42</span>상태 상자(테두리 상자) — 「이 기록은 되돌려졌습니다」 +
+      되돌린 기록의 log_id·행위·시각(이 예시는 「되돌림 기록: log_id 16715 · 카테고리 매핑
+      이동 되돌림 · 2026-08-27 22:52.」)</li>
+    <li><span class="tag">43</span>detail(jsonb) 원문 안내 — 이 목록 API는 원문을 내려주지
+      않는다는 사실과, 위 요약은 서버가 원문을 해석해 만든 결과라는 설명</li>
+    <li><span class="tag">44</span><span class="btnlabel">log_id 복사</span> — 클립보드에
+      log_id 숫자만 복사합니다.</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>상세 서랍 확대 — 되돌림 행 자체(정상 상태)</h3>
+  <figure>
+    <div class="shot shot--drawer" style="aspect-ratio:644/1050">
+      <img src="/shared/manual/shots/activity-logs-drawer-undorow.png" alt="상세 서랍 확대 — 되돌림 행 자체, 정상(미발견) 상태">
+      <b class="pin" style="--x:8.04%;--y:2.63%">45</b>
+      <b class="pin" style="--x:84.7%;--y:2.63%">46</b>
+      <div class="box" style="--x:3.37%;--y:10.95%;--w:93.42%;--h:4.74%"></div>
+      <b class="pin" style="--x:5%;--y:9%">47</b>
+      <div class="box" style="--x:3.37%;--y:19.58%;--w:93.42%;--h:8.74%"></div>
+      <b class="pin" style="--x:5%;--y:18%">48</b>
+    </div>
+    <p class="cap">캡처 2026-08-28 · 검색창에 「되돌림」을 입력해 찾은 첫 행 — 방금 그림 G에서
+      본 원본(log_id 16714)을 되돌린 바로 그 행(log_id 16715, 행위 「카테고리 매핑 이동
+      되돌림」)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">45</span>도메인 칩 「카테고리」와 행위 텍스트 「카테고리 매핑 이동
+      되돌림」이 한 줄에 나란히 표시됩니다.</li>
+    <li><span class="tag">46</span>되돌림 배지 — 「되돌려지지 않음」. <b>되돌림 행 자체는
+      더 되돌릴 대상이 아니므로 이 표시가 정상입니다</b>(아래 47·48 설명 참고).</li>
+    <li><span class="tag">47</span>요약 상자(테두리 상자) — 「원 기록 #16714 되돌림」. 되돌림
+      행의 요약은 항상 이 <code>원 기록 #.. 되돌림</code> 형태입니다 — 이 화면의 검색이
+      「되돌림」 한 단어로 이런 행만 정확히 찾아낼 수 있는 이유입니다.</li>
+    <li><span class="tag">48</span>상태 상자(테두리 상자) — 「이 화면이 불러온 범위 안에서는
+      되돌림 기록을 찾지 못했습니다」. 되돌림 행 자체는 삭제된 것처럼 화면에서 숨지 않고,
+      「…되돌림」이라는 별도의 정상 행위로 그대로 남아 있습니다 — 다만 그 자체를 「되돌리는」
+      더 상위 기록은 없으므로 이 상태가 정상입니다.</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>조회 기간을 <span class="btnlabel">오늘</span> · <span class="btnlabel">최근 7일</span> ·
+      <span class="btnlabel">최근 30일</span> · <span class="btnlabel">전체 기간</span> 중
+      하나로 좁혀 봅니다(그림 C의 20번). 누르면 그 즉시 서버에서 다시 불러옵니다.</li>
+    <li>운영자 · 도메인 · 행위 · 되돌림 네 드롭다운으로 좁혀 봅니다(그림 C의 21~24번). 이미
+      불러온 배치(최대 500건) 안에서 화면이 직접 거르므로 서버 왕복 없이 즉시 반영됩니다.</li>
+    <li>검색창에 대상 ID나 요약 문장의 일부를 입력해 좁혀 봅니다(그림 C의 25번) — 행위 이름
+      자체는 검색 대상이 아닙니다.</li>
+    <li><span class="btnlabel">필터 초기화</span>(그림 C의 26번)로 전부(검색어 포함) 되돌립니다.</li>
+    <li>상태줄의 <span class="btnlabel">새로고침</span>으로 같은 기간을 다시 불러옵니다 — 이
+      원장은 계속 쌓이므로, 방금 다른 화면에서 한 일이 아직 안 보이면 이 버튼을 누릅니다.</li>
+    <li>목록에서 행을 클릭 → 우측에 상세 서랍이 열리고, 서버가 만든 요약 문장과 되돌림 판정
+      근거를 봅니다(그림 F·G·H). 같은 행을 다시 클릭하면 닫힙니다.</li>
+    <li>상세 서랍의 <span class="btnlabel">log_id 복사</span>로 그 기록의 번호만 클립보드에
+      복사합니다(다른 화면·문의에 근거로 남길 때 씁니다).</li>
+    <li>페이지 번호로 이동합니다(그림 A의 12번) — 페이지당 16건, 이미 불러온 배치를 화면에서
+      나눈 것입니다.</li>
+    <li>상태줄의 서버 상한 캡 칩(그림 E의 32번)으로 「지금 보고 있는 것이 그 기간의 전부인지,
+      상한(500건)에 걸려 일부만인지」를 확인합니다.</li>
+    <li>(조건부) 「▲ 판정 불일치」 배너 — 서버가 내려준 되돌림 판정과, 이 화면이 불러온 배치
+      안에서 요약 문장을 직접 대조해 재구성한 판정이 서로 다른 행이 있으면 뜹니다. 캡처
+      시점(2026-08-28)에는 <b>불일치 0건</b>이라 배너가 뜨지 않았습니다(⑤ 참고).</li>
+  </ul>
+  <p><b>거르는 법 — 14,326건에서 원하는 것을 찾는 순서.</b> 이 화면의 핵심은 필터 조합입니다.</p>
+  <ul>
+    <li><b>「내가 아까 뭘 했더라」</b>: 기간 <span class="btnlabel">오늘</span> → 운영자를
+      자기 계정으로 선택. 필요하면 도메인까지 좁힙니다.</li>
+    <li><b>「이거 누가 바꿨지」</b>: 도메인을 그 화면에 해당하는 값(예: 카테고리)으로 선택 →
+      검색창에 대상 ID(예: 카테고리 번호) 입력. 시각 역순이라 맨 위가 가장 최근입니다.</li>
+    <li><b>「되돌려진 것만 몰아서 보고 싶다」</b>: 되돌림 필터를 <span class="btnlabel">되돌려짐</span>
+      으로 선택(그림 E가 실제 예시입니다).</li>
+    <li><b>「되돌림 행 자체를 찾고 싶다」</b>: 검색창에 <code>되돌림</code>을 입력합니다 —
+      되돌림 행의 요약은 항상 「원 기록 #.. 되돌림」 형태라 정확히 그 행들만 남습니다
+      (그림 H의 방법 그대로).</li>
+    <li>기간을 좁혀도 <b>다른 필터(운영자·도메인·행위·되돌림·검색어)는 그대로 유지</b>됩니다
+      — 「필터 초기화」만 전부(기간 포함) 되돌립니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout ok">
+    <b>상세 서랍의 「행위」 텍스트가 세로로 쪼개져 보이던 화면 결함은 2026-08-28 고쳤습니다.</b>
+    원인은 <code>templates/admin/activity_logs.html.j2</code>의 상세 서랍 머리글에서 도메인
+    칩을 감싸는 <code>#alDKindWrap</code>이 표 행 전용 클래스(<code>.al-row</code>)를 그대로
+    재사용한 것이었습니다 — 그 클래스의 <code>width:100%</code>가 인라인 <code>style</code>
+    (display·padding만 덮어씀)로는 지워지지 않고 그대로 적용돼, 도메인 칩 상자가 헤더 폭의
+    대부분을 차지하며 옆 칸(행위 텍스트)을 <code>width: 0px</code>로 붕괴시켰습니다(고치기
+    전 <code>getComputedStyle</code>·<code>getBoundingClientRect</code> 실측으로 재현·확인).
+    같은 헤더의 되돌림 배지(<code>#alDUndone</code>)에도 반대 증상의 같은 병이 잠복해
+    있었습니다 — 칩 모양을 내는 <code>.ud</code> 규칙도 <code>.al-row</code>로 스코프돼
+    있었는데 이 배지는 애초에 <code>.al-row</code> 안에 있지 않아 배경·테두리·패딩이 전혀
+    적용되지 않고 맨 텍스트로만 떠 있었습니다. 고친 방법은 <code>.kd</code>·<code>.ud</code>
+    두 칩 모양 규칙을 <code>.al-row</code> 스코프에서 떼어 독립 선택자로 바꾸고, 서랍
+    머리글의 <code>#alDKindWrap</code>에서 <code>.al-row</code> 클래스를 뺀 것입니다 — 표
+    행은 지금도 <code>.al-row</code>의 자손이라 겉모습이 그대로이고(고치기 전후 실측 대조로
+    확인), 서랍은 더 이상 표 행 전용 속성(<code>width:100%</code>·모바일 폭에서 숨김 등)을
+    물려받지 않습니다. <b>값 자체(도메인·행위·되돌림 판정)는 처음부터 정확했습니다</b> —
+    깨져 있던 것은 그 값을 배치하는 레이아웃뿐이었습니다. 이 문서의 그림 F·G·H와 좌표는
+    고친 뒤 다시 찍은 캡처입니다.
+  </div>
+  <div class="callout">
+    <b>이 화면을 보는 것 자체는 기록에 남지 않습니다.</b> 이 화면의 렌더 함수에는
+    <code>_log()</code> 호출이 0건입니다 — 조회 전용이라 쓰기 API 자체가 없기 때문입니다.
+    안심하고 눌러 보고 필터를 이것저것 바꿔 봐도 됩니다.
+  </div>
+  <div class="callout">
+    <b>필터는 「지금 불러온 최대 500건」 안에서만 작동합니다 — 서버가 아는 조건은 기간뿐입니다.</b>
+    운영자·도메인·행위·되돌림·검색 다섯은 전부 <b>이미 받아 온 배치를 화면이 직접 거르는
+    것</b>이지, 서버에 다시 묻는 것이 아닙니다. 그래서 기간을 「전체 기간」으로 두면 원장
+    전체(캡처 시점 14,326건)가 아니라 <b>가장 최근 500건 안에서만</b> 운영자·도메인 등을
+    좁혀 볼 수 있습니다 — 500건보다 오래된 기록은 필터를 아무리 조합해도 이 화면에 아예
+    나타나지 않습니다. 옛 기록을 찾으려면 기간을 좁혀(예: 특정 날짜 범위) 그 기간 안의
+    500건을 따로 불러와야 합니다.
+  </div>
+  <div class="callout ok">
+    <b>「되돌려짐 표시가 일부 원본에서 안 뜨는」 과거 결함은 서버 쪽에서 이미 고쳐졌습니다.</b>
+    요구사항 정의서(2026-08-13 작성)는 되돌림 판정 SQL이 <code>action LIKE '%undo'</code>라
+    영문 접미사가 아닌 한글 되돌림 행위(「카테고리 매핑 이동 되돌림」 등)를 놓친다고 지적했는데,
+    코드 확인 결과(<code>api/admin_activity_logs.py</code> 상단 주석) 지금은
+    <code>ref_log_id</code> 역참조 <code>EXISTS</code> 하나로 판정을 통일했습니다 — action
+    문자열은 더 이상 보지 않습니다. 이 화면은 그래도 자체 안전장치(서버 판정과 배치 내
+    재구성 결과를 대조하는 「▲ 판정 불일치」 배너)를 하나 더 갖고 있고, 2026-08-28 캡처
+    시점 실측으로 불일치 0건을 확인했습니다.
+  </div>
+  <div class="callout">
+    <b>새 도메인·행위가 생기면 한동안 영문 원문이 그대로 보일 수 있습니다.</b> 실제로
+    2026-08-28 캡처 시점, 새로 생긴 도메인 <code>request</code>(업무 요청 관련으로 보입니다)
+    와 그 아래 행위 10종(<code>work_request_create</code>·<code>work_request_verdict</code> 등,
+    그리고 기존 도메인의 새 행위 <code>ai_integration_limit_clear</code>)이 아직 한글
+    번역 사전에 없어 원문 그대로 노출되고 있었습니다(그림 A 참고 — 「AI 연동」 도메인 아래
+    <code>ai_integration_limit_clear</code> 행위가 그대로 보입니다). 서버 응답의
+    <code>unmapped_kinds</code>·<code>unmapped_actions</code> 필드가 이런 누락을 스스로
+    알려줍니다 — 화면이 빈칸으로 지우지 않고 원문을 그대로 보여주는 것은 의도된 동작입니다
+    (없는 번역을 지어내지 않습니다).
+  </div>
+  <div class="callout">
+    <b>운영자·도메인·행위 드롭다운 옆 숫자는 전역 집계가 아니라 「지금 불러온 배치 안에서의
+    건수」입니다.</b> 기간이나 다른 필터를 바꾸면 배치 자체가 달라져 이 숫자들도 함께
+    바뀝니다 — 화면 위쪽의 「표시 범위 요약」·상태줄의 「전체 N건」과 헷갈리지 않도록
+    주의하십시오(그 둘은 서버가 센 전체 건수입니다).
+  </div>
+  <div class="callout">
+    <b>검색은 대상 ID와 요약 문장만 봅니다 — 행위 이름·운영자 이름은 검색 대상이 아닙니다.</b>
+    「분류 변경」을 검색창에 입력해도 요약 문장에 그 글자가 없으면 안 걸립니다. 행위로
+    좁히려면 검색창이 아니라 행위 드롭다운(그림 C의 23번)을 씁니다.
+  </div>
+  <div class="callout">
+    <b>페이지네이션은 서버가 아니라 화면이 나눈 것입니다.</b> 「다음 500건」으로 넘어가는
+    수단이 없습니다 — 지금 API는 기간 파라미터만 지원하고 오프셋(건너뛰기) 파라미터가
+    없습니다. 500건을 넘는 기간을 조회하면 상태줄의 캡 칩이 「최근 500건만 표시」라고
+    정직하게 밝히지만, 그 초과분을 이 화면에서 더 불러올 방법은 지금은 없습니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「방금 다른 화면에서 한 일이 안 보인다」</b> → 상태줄의 <span class="btnlabel">새로고침</span>
+      을 누르십시오. 이 화면은 원장을 실시간으로 계속 지켜보고 있지 않습니다 — 기간 pill을
+      누르거나 새로고침해야 방금 쌓인 기록을 받아 옵니다.</li>
+    <li><b>「찾는 기록이 필터를 다 걸어도 안 보인다」</b> → 기간이 너무 넓어 500건 상한에
+      걸렸을 수 있습니다. 상태줄의 캡 칩이 「최근 500건만 표시」로 바뀌어 있는지 먼저
+      확인하고, 기간을 좁혀 다시 불러오십시오.</li>
+    <li><b>「운영자 필터에 뜨는 이름이 낯설거나 「(치울것)」 같은 표시가 있다」</b> → 회귀
+      테스트·화면 점검 작업이 남긴 계정일 가능성이 큽니다(요구사항 정의서도 이 원장의
+      상당수가 실사용이 아니라 반복 테스트 흔적으로 보인다고 지적합니다). 이 화면은 실사용
+      기록과 자동화 흔적을 구분해 보여주지 않습니다 — 운영자 필터로 특정 계정만 좁혀 보는
+      것이 지금 할 수 있는 최선입니다.</li>
+    <li><b>「되돌림 배지가 「되돌려지지 않음」인데 정말 안 되돌려진 게 맞는지 궁금하다」</b> →
+      이 화면은 <b>최근 표시 범위(최대 500건) 밖의 되돌림은 확인할 수 없습니다.</b> 상세
+      서랍의 상태 설명이 이 한계를 그대로 밝힙니다. 또한 환불 완료처럼 애초에 되돌릴 수
+      없는 처리도 같은 표시로 보입니다 — 서버가 그 둘을 구분해 내려주지 않습니다.</li>
+    <li><b>「행위 열에 영어가 그대로 보인다」</b> → 아직 한글 번역 사전에 없는 새 행위입니다
+      (⑤ 참고). 결함이 아니라 「모르는 것을 지어내지 않는다」는 이 화면의 원칙대로 동작한
+      것입니다 — 다만 그 행위가 무엇인지는 이 화면만으로는 알 수 없으니, 해당 도메인
+      화면(예: 새로 생긴 업무 요청 관련 화면)에서 확인해야 합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_ui_activity_logs.py</code> · <code>api/admin_activity_logs.py</code> ·
+        <code>templates/admin/activity_logs.html.j2</code> · <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>docs/design/req/req-activity-logs.md</code>(요구사항 정의서)</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-28에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_activity_logs.py</code>(공용 도구
+        <code>scripts/manual_capture_common.py</code>를 그대로 씀), 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>activity-logs-coords.json</code>에 있습니다.</li>
+      <li>실측 수치(원장 총 건수 · 배치 내 도메인 분포 · undone 건수 · 미번역 kind/action
+        목록 등) — 캡처와 같은 순간 <code>GET /api/admin/activity-logs</code> 응답을 그대로
+        옮겼습니다(<code>activity-logs-coords.json</code>의 <code>_meta.stats</code>). 지어낸
+        숫자는 없습니다 — 매일 바뀌므로 지금 값은 화면에서 다시 확인하십시오.</li>
+      <li><b>개인정보 처리</b> — 이 화면은 실제 운영자 이름을 그대로 보여줍니다. 캡처 직전마다
+        ① 목록 표의 「운영자」 열 ② 상세 서랍의 운영자 줄 ③ 운영자 필터 드롭다운의 이름 목록,
+        이 세 자리의 텍스트를 실존하지 않는 가짜 한글 이름 5종으로 순환 치환했습니다
+        (<code>redact_operators()</code>, DOM 텍스트만 바꾸고 서버에는 아무것도 보내지
+        않습니다). <code>operator_id</code>가 NULL이라 「자동」으로 표시되는 값과, 필터
+        드롭다운의 「전체」(초기화 옵션)는 사람 이름이 아니므로 바꾸지 않았습니다 — 자동
+        처리와 사람을 구분해 보여주는 것 자체가 이 화면의 실제 동작이기 때문입니다.
+        좌표 JSON에도 이름 원본은 담지 않았습니다 — 집계(건수)만 <code>_meta.stats</code>에
+        남겼습니다. <b>남긴 것</b>은 이름을 제외한 전부입니다 — 시각 · 도메인 · 행위 ·
+        요약 문장 · 되돌림 판정 · 대상 ID(카테고리 번호 등) · 건수는 전부 실제 캡처 시점
+        값 그대로입니다.</li>
+      <li><b>검증 작업 흔적</b> — 2026-08-28 캡처 시점, 불러온 배치(최근 500건)는 <b>거의
+        전부가 같은 날짜(2026-08-27) 안의 회귀·화면 점검 작업 흔적</b>이었습니다(운영자
+        4명 중 이름 자체가 「(치울것)」인 계정이 있었고, 새 도메인 <code>request</code>의
+        행위 이름도 <code>work_request_create</code>·<code>work_request_cancel</code>처럼
+        테스트성 흐름을 보였습니다). 이 문서는 그것을 감추거나 다른 구간으로 바꿔치기하지
+        않고 <b>있는 그대로</b> 캡처했습니다 — 이유는 셋입니다. ① 이름 외에는 가릴 개인정보나
+        민감정보가 아니고 ② 이 화면 자신이 「자동화 흔적을 구분해 숨기지 않는다」고 정직하게
+        밝히는 화면이라 실제 예시로도 정확하고 ③ 마침 이 상황이 요구사항 정의서 §③의 예측
+        (「kind='operator'의 상당수가 실사용이 아니라 반복 테스트로 보인다」)을 그대로
+        검증하는 살아있는 사례였습니다. 다만 그림 E~H의 「카테고리 매핑 이동」 예시가 실제
+        업무 화면 조작이 아니라 검증 작업의 왕복(옮기고 바로 되돌리기)일 가능성이 크다는
+        점은 밝혀 둡니다 — 필터·서랍 동작 자체를 보여주는 목적에는 지장이 없습니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>activity-logs-coords.json</code>에 맞춰 다시 옮겨야 합니다(좌표는 이
+      문서가 손으로 만든 값이 아니라 그 시점 캡처의 실측값이므로, 화면이 바뀌면 함께
+      낡습니다). 「카테고리 매핑 이동」 예시로 잡히는 실제 log_id·대상은 매번 다시 찍을
+      때마다 바뀔 수 있습니다 — 이 스크립트는 특정 log_id를 하드코딩하지 않고, 그 시점
+      필터 결과의 첫 행을 매번 동적으로 찾습니다.</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_activity_logs.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다 — <code>.venv</code>에는 이미 설치돼 있지만
+      <code>requirements.txt</code>에는 없습니다. 새 환경(다른 PC·재설치한 venv)에서는
+      <code>pip install playwright</code> 후 <code>playwright install chromium</code>이
+      먼저 필요합니다.</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 직접 보는
+      도구)가 없어, 완성된 이 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가
+      캡처 위에 정확히 맞는지, 그림 F의 화살표 위치가 실제로 행과 서랍을 정확히 잇는지,
+      인쇄 시 페이지가 어떻게 나뉘는지)는 직접 확인하지 못했습니다 — 좌표는 Playwright로
+      화면 요소의 실제 위치를 재서 계산한 값이지만, 이 문서를 브라우저로 열어 캡처 위 번호가
+      실제 버튼·영역과 맞는지는 별도 확인이 필요합니다. 이 캡처는 owner 등급 점검 계정으로만
+      찍었습니다 — 이 화면에는 등급별로 잠기는 쓰기 버튼이 없어(조회 전용) 등급에 따라
+      달리 보일 자리는 없을 것으로 판단했지만, 화면으로 직접 대조하지는 못했습니다. 이전
+      버전에서 위 「⑤ 조심할 것」 첫 항목에 있던 상세 서랍 헤더 레이아웃 결함은 이 작업에서
+      <code>templates/admin/activity_logs.html.j2</code>를 고쳤고, Playwright로
+      <code>getComputedStyle</code>·<code>getBoundingClientRect</code>를 재고 스크린샷을
+      찍어 고침을 확인했습니다(그림 G의 실제 예시 log_id 16714 재현 포함, 표 행 쪽은 겉모습이
+      바뀌지 않았는지도 대조했습니다) — 다만 그 확인은 화면 자체에 대한 것이고, 이 문서
+      (<code>activity-logs.html</code>) 자신을 브라우저로 열어 위 핀 좌표가 새 캡처 위에
+      정확히 맞는지는 여전히 별도 확인이 필요합니다.</p>
+  </div>
+
+</div>

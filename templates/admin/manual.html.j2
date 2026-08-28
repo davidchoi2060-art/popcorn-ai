@@ -116,7 +116,12 @@ table.mn-toc td.mn-has a:hover{text-decoration:underline}
 .manual-doc .legend .arrow-demo::after{content:'';position:absolute;right:-1px;top:-3px;border:4px solid transparent;
   border-left-color:var(--mn-accent);border-right:0}
 
-.manual-doc figure{margin:14px 0 8px}
+/* 그림 컨테이너에 가로 스크롤을 준다(2026-08-28 — 결함 ②의 짝). 아래 shot 최소폭
+   규칙이 컨테이너보다 넓어질 수 있는데, 그 여분을 이 figure 안에서만 스크롤로
+   흡수한다 — 본문 전체(mn-wrap)를 넓히지 않는다(옵션 ㉡, 다만 «전체 페이지가
+   옆으로 밀린다»는 부작용은 figure 로 범위를 좁혀 없앴다). 인쇄에서는 아래
+   @media print 가 도로 visible 로 되돌린다(스크롤은 화면 전용 개념). */
+.manual-doc figure{margin:14px 0 8px;overflow-x:auto}
 .manual-doc figure .cap{font-size:12.5px;color:var(--mn-muted);margin:8px 2px 0}
 .manual-doc .shot{width:100%;background:#efeade;border:1px solid var(--mn-line);
   border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -128,6 +133,42 @@ table.mn-toc td.mn-has a:hover{text-decoration:underline}
 .manual-doc .shot--table{max-width:1000px;aspect-ratio:1252/239.094}
 .manual-doc .shot--drawer{max-width:430px;aspect-ratio:536/907}
 
+/* 그림 최소폭 — 결함 ②: 고정 픽셀 배지(.pin, 1자리 23px·2자리 26.05px) + 그림이
+   뷰포트에 비례해 줄어드는 조합이 원인이었다(회귀 보고 2026-08-28). 그림이 설계
+   폭(shot--full 등의 max-width)일 때는 실측으로 겹침 0건을 확인했다(1680px 뷰포트,
+   전 11개 매뉴얼 97개 그림 전수) — 그림이 줄면 좌표(%) 간격도 같이 줄지만 배지
+   크기는 고정이라 언젠가 겹친다. 옵션 ㉠(배지도 비례 축소)은 배지 폰트가 함께
+   작아져 좁은 창에서 오히려 안 읽히는 새 문제를 만든다 — 대신 옵션 ㉡(그림 최소폭
+   + 가로 스크롤)을 택했다: 그림은 «설계폭의 100%»가 아니라 실측으로 이미 안전이
+   확인된 폭까지만 줄고, 그 밑으로는 안 줄이고 스크롤한다.
+   기준값 실측(Playwright, 1192px 뷰포트, 설계폭 1000px 그림 12개 지점 평균) — 이
+   폭에서 겹침이 있어도 15쌍·최대 4.56px(육안으로 숫자가 읽히는 수준, 원래 결함의
+   11.9px보다 한참 작다)뿐이었다. 그 실측폭(865px)에 가까운 860px을 기준 삼아, 다른
+   설계폭에는 같은 비율(860/1000 ≈ 0.86)을 적용했다 — 임의 숫자가 아니라 실측 비율.
+     1000px 설계(shot--full·header·filterbar·table, 그리고 본문 조각의 인라인
+       style="max-width:1000px") -> 최소 860px
+     900px  -> 최소 774px   760px -> 최소 654px   560px -> 최소 482px
+     460px  -> 최소 396px   430px(shot--drawer 포함) -> 최소 370px
+     300px 이하(shot--sidebar 등)는 손대지 않았다 — 480px 뷰포트까지는 겹침이 없었다.
+   ⚠ 340~360px 대는 요청받은 4개 뷰포트(1680·1192·768·480) 밖에서 발견했다 — 480px
+   에서는 멀쩡했지만 320px·280px 로 더 좁혀 실측하니 4곳(candidate-pool 그림 다수·
+   category-mapping)이 겹치기 시작했다(최대 11.41px, oy 기준). 요청 범위 밖이라
+   보고만 하고 넘어갈 수도 있었지만, 같은 원인(고정 배지+가변 그림)이고 고치는
+   법도 같아서 지금 함께 막았다 — 다음 사람이 320px 에서 같은 결함을 또 찾지 않게.
+   본문 조각(docs/manual/screens/*.html)의 인라인 style 값은 다른 제작자 소유라
+   고치지 않았다 — 대신 `[style*="max-width:NNNpx"]` 속성 선택자로 값을 «읽기만»
+   해서 최소폭을 매겼다(HTML 변경 0건). */
+.manual-doc .shot--full,.manual-doc .shot--header,.manual-doc .shot--filterbar,.manual-doc .shot--table,
+.manual-doc .shot[style*="max-width:1000px"]{min-width:860px}
+.manual-doc .shot[style*="max-width:900px"]{min-width:774px}
+.manual-doc .shot[style*="max-width:760px"]{min-width:654px}
+.manual-doc .shot[style*="max-width:560px"]{min-width:482px}
+.manual-doc .shot[style*="max-width:460px"]{min-width:396px}
+.manual-doc .shot--drawer,.manual-doc .shot[style*="max-width:430px"]{min-width:370px}
+.manual-doc .shot[style*="max-width:360px"]{min-width:310px}
+.manual-doc .shot[style*="max-width:345px"]{min-width:297px}
+.manual-doc .shot[style*="max-width:340px"]{min-width:292px}
+
 .manual-doc .pin{position:absolute;left:var(--x);top:var(--y);transform:translate(-50%,-50%);
   min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--mn-accent);color:#fff;
   font:700 11.5px/20px var(--mn-mono);text-align:center;white-space:nowrap;
@@ -138,9 +179,44 @@ table.mn-toc td.mn-has a:hover{text-decoration:underline}
 .manual-doc .arrow{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
 
 .manual-doc ul.pin-desc{list-style:none;padding:0;margin:10px 0 22px;display:grid;grid-template-columns:1fr;gap:5px}
-.manual-doc ul.pin-desc li{display:flex;gap:9px;align-items:flex-start;font-size:13.8px;margin:0}
-.manual-doc ul.pin-desc .tag{flex:none;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--mn-accent);
+/* li는 flex 컨테이너가 아니다(2026-08-28 수정 — 회귀 결함).
+   예전엔 `display:flex`였다. li의 자식은 번호 배지(.tag) 하나뿐이 아니라, 그 뒤로
+   텍스트와 <code>·<a>·<b>·<span class="btnlabel"> 이 감싸는 컨테이너 없이 그대로
+   나열돼 있다(11개 매뉴얼 조각 242개 핀 설명 공통 구조 — 조각 파일은 다른 제작자
+   소유라 구조를 바꾸지 않았다). flex 컨테이너의 자식은 CSS Display 스펙상 전부
+   "blockify"된다 — 인라인 요소(code/a/b/span)뿐 아니라 자유 텍스트 구간도 각각
+   익명 상자로 쪼개져 별도 flex item이 된다. 그 결과 한 문단으로 흘러야 할 문장이
+   여러 상자로 조각나 겹치거나(그림G 핀37 — 312자 · code 3개 → 39조각 · 270px 높이),
+   flex-shrink가 아이템을 극단으로 눌러 "되돌리기" 같은 짧은 라벨이 한 글자씩 세로로
+   쌓이는 결함이 있었다(측정: `getComputedStyle(code).display === 'block'`).
+   고친 방법 — 번호 배지만 li에서 absolute로 빼고 나머지는 그대로 보통 흐름(normal
+   flow)에 둔다. 인라인 요소가 다시 인라인으로 남아 주변 텍스트와 한 문단처럼 흐르고
+   자연스럽게 줄바꿈된다. 매달림 들여쓰기(첫 줄만이 아니라 모든 줄이 배지 오른쪽에서
+   시작하는 정렬)는 li의 `padding-left`가 모든 줄에 동일하게 적용해 유지한다 — 예전
+   flex의 `align-items:flex-start`가 주던 정렬과 동등하다.
+   padding-left 36px 근거 — 배지 실측 폭은 1자리 23px · 2자리 26.05px(전수 535개
+   측정, 예외 없음) — 최댓값 26.05px + 원래 flex의 gap 9px = 35.05px, 반올림 여유
+   36px(1자리 배지는 원래보다 gap이 ~4px 넓어지지만 배지 535곳 중 99곳뿐이고 육안
+   차이가 없다 — 새로 측정해 대조함, 아래 회귀 보고 참조). */
+.manual-doc ul.pin-desc li{position:relative;margin:0;padding:0 0 0 36px;font-size:13.8px;min-height:20px}
+.manual-doc ul.pin-desc .tag{display:inline-block;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--mn-accent);
   color:#fff;font:700 11.5px/20px var(--mn-mono);text-align:center}
+/* 항목에 배지가 «둘 이상»이면 — 이 정의가 없어서 결함이 났다(2026-08-28 수정).
+   dashboard.html:171 의 "26~27"(한 항목에 <span class="tag"> 둘)이 위 li 규칙의
+   전제(배지 하나만 절대배치)를 깨, 두 배지가 li 좌상단(0,0)에 완전히 겹쳐 그려지고
+   "26"이 나중에 그려진 "27" 뒤에 완전히 가려졌다(li 534개 전수 재검사 — 이 1건뿐.
+   위 배지 535개는 .tag «개수»이고 li 는 534개다 — 이 li 하나가 배지를 둘 가져
+   535=534+1 로 맞아떨어진다. `.claude/CANON.md` 사례처럼 "항목당 배지 하나"를
+   전제한 전수 스캔이 놓쳤던 경우).
+   고친 규칙 — «첫 자식 배지만» li 왼쪽 여백(36px) 자리에 절대배치한다(옵션 ㉠).
+   li > .tag 가 하나뿐인 절대다수(533/534)는 그 하나가 곧 첫 자식이므로 기존과
+   완전히 동일하게 동작한다("li 좌상단 절대배치" 그대로) — 회귀 없음. 둘째 배지부터는
+   `display:inline-block`(위 기본 규칙)만 적용돼 인라인으로 남는다 — "26"은 배지
+   자리에 고정되고 "~27"은 그 뒤로 본문과 함께 자연스럽게 흐른다(배지 모양은 첫
+   배지와 동일 — 인라인이라 주변 텍스트 사이 gap이 살짝 다를 뿐, 육안 이질감 없음
+   실측 확인: 아래 재검증 보고 참조). 항목에 배지가 셋 이상이어도 같은 규칙이 그대로
+   적용된다(둘째부터 전부 인라인) — 다음에 같은 사례가 또 생겨도 정의돼 있다. */
+.manual-doc ul.pin-desc li>.tag:first-child{position:absolute;left:0;top:0}
 .manual-doc ul.pin-desc .warn{color:var(--mn-warn);font-weight:700}
 
 .manual-doc .btnlabel{display:inline-block;font:700 12.5px var(--mn-mono);background:var(--mn-ink);color:#fff;
@@ -177,7 +253,11 @@ table.mn-toc td.mn-has a:hover{text-decoration:underline}
     .manual-doc table.kv,.manual-doc ul.pin-desc{page-break-inside:avoid;break-inside:avoid}
   .manual-doc h2{page-break-before:always}
   .manual-doc h2:first-of-type{page-break-before:auto}
-  .manual-doc .shot--full,.manual-doc .shot--header,.manual-doc .shot--filterbar,.manual-doc .shot--table{max-width:100%}
+  /* 결함 ②의 화면 전용 가로 스크롤(figure{overflow-x:auto})을 인쇄에서 되돌린다 —
+     인쇄는 스크롤할 수 없으니 도로 자연스러운 흐름(visible)으로 둔다. 아래 min-width:0
+     과 짝이다 — min-width 를 안 풀면 A4 폭보다 넓은 그림이 스크롤 없이 그냥 잘린다. */
+  .manual-doc figure{overflow-x:visible}
+  .manual-doc .shot--full,.manual-doc .shot--header,.manual-doc .shot--filterbar,.manual-doc .shot--table{max-width:100%;min-width:0}
   .manual-doc a{color:inherit;text-decoration:underline}
 
   /* ⓑ 번호 동그라미 인쇄 대비 — 인쇄 대화상자의 "배경 그래픽"이 꺼져 있으면(크롬 기본값)
@@ -187,6 +267,20 @@ table.mn-toc td.mn-has a:hover{text-decoration:underline}
     border:1.6px solid var(--mn-accent);box-shadow:none}
   .manual-doc .legend .pin-demo{background:#fff!important;color:var(--mn-accent)!important;
     border:1.6px solid var(--mn-accent);box-shadow:none}
+  /* ⓒ 결함 ③(2026-08-28) — ⓑ 를 두 곳에만 걸고 「이미 한 번 고친 것」을 나머지에
+     안 옮겼다. 흰 배경에 흰 글자가 되는 조합(옅어짐)은 "밝은 배경(color:#fff)" 이
+     아니라 "어두운/채색 배경 + 흰 글자"인 요소에서만 난다 — 전체 <style> 을
+     grep(`color:#fff`)해 그 조합을 쓰는 요소를 모두 찾았다: 이 파일엔 다섯 곳
+     (.pin·.legend .pin-demo·ul.pin-desc .tag·h3 .fig·.btnlabel) 뿐이고 위 둘만
+     대비가 있었다 — 즉 «세 곳»이 빠져 있었고 그중 하나(.tag)가 원래 결함 ③이다.
+     나머지 둘(.fig·.btnlabel)은 같이 훑다 찾은 같은 격차라 함께 고친다.
+     (.warn 은 배경이 없는 글자색 규칙이라 이 문제와 무관 — 대상에서 뺐다.) */
+  .manual-doc ul.pin-desc .tag{background:#fff!important;color:var(--mn-accent)!important;
+    border:1.6px solid var(--mn-accent);box-shadow:none}
+  .manual-doc h3 .fig{background:#fff!important;color:var(--mn-ink)!important;
+    border:1.6px solid var(--mn-ink)}
+  .manual-doc .btnlabel{background:#fff!important;color:var(--mn-ink)!important;
+    border:1.6px solid var(--mn-ink)}
   .mn-shot-missing{display:none}
 }
 </style>

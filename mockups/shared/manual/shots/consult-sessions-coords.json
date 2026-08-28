@@ -1,0 +1,1094 @@
+{
+  "consult-sessions-full": {
+    "file": "consult-sessions-full.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "lnb": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 12.62,
+        "h_pct": 100.0,
+        "cx_pct": 6.31,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 0,
+          "y": 0,
+          "width": 212,
+          "height": 1050
+        }
+      },
+      "lnb_active_item": {
+        "x_pct": 0.0,
+        "y_pct": 47.79,
+        "w_pct": 12.62,
+        "h_pct": 3.38,
+        "cx_pct": 6.31,
+        "cy_pct": 49.48,
+        "px": {
+          "x": 0,
+          "y": 501.75,
+          "width": 212,
+          "height": 35.5
+        }
+      },
+      "header": {
+        "x_pct": 12.62,
+        "y_pct": 0.0,
+        "w_pct": 87.38,
+        "h_pct": 5.69,
+        "cx_pct": 56.31,
+        "cy_pct": 2.85,
+        "px": {
+          "x": 212,
+          "y": 0,
+          "width": 1468,
+          "height": 59.796875
+        }
+      },
+      "crumb": {
+        "x_pct": 13.85,
+        "y_pct": 2.14,
+        "w_pct": 4.26,
+        "h_pct": 1.31,
+        "cx_pct": 15.98,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 232.6875,
+          "y": 22.5,
+          "width": 71.515625,
+          "height": 13.796875
+        }
+      },
+      "now": {
+        "x_pct": 19.84,
+        "y_pct": 2.09,
+        "w_pct": 5.04,
+        "h_pct": 1.42,
+        "cx_pct": 22.36,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 333.359375,
+          "y": 21.921875,
+          "width": 84.640625,
+          "height": 14.953125
+        }
+      },
+      "ro_badge": {
+        "x_pct": 25.57,
+        "y_pct": 1.61,
+        "w_pct": 6.8,
+        "h_pct": 2.38,
+        "cx_pct": 28.96,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 429.5,
+          "y": 16.890625,
+          "width": 114.15625,
+          "height": 25
+        }
+      },
+      "last_at": {
+        "x_pct": 33.05,
+        "y_pct": 2.2,
+        "w_pct": 11.83,
+        "h_pct": 1.21,
+        "cx_pct": 38.96,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 555.15625,
+          "y": 23.0625,
+          "width": 198.703125,
+          "height": 12.65625
+        }
+      },
+      "refresh_btn": {
+        "x_pct": 45.56,
+        "y_pct": 1.33,
+        "w_pct": 4.41,
+        "h_pct": 2.93,
+        "cx_pct": 47.76,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 765.359375,
+          "y": 14.015625,
+          "width": 74.109375,
+          "height": 30.75
+        }
+      },
+      "hub": {
+        "x_pct": 87.07,
+        "y_pct": 1.47,
+        "w_pct": 2.73,
+        "h_pct": 2.65,
+        "cx_pct": 88.43,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 1462.75,
+          "y": 15.46875,
+          "width": 45.875,
+          "height": 27.859375
+        }
+      },
+      "avatar": {
+        "x_pct": 96.99,
+        "y_pct": 1.38,
+        "w_pct": 1.78,
+        "h_pct": 2.85,
+        "cx_pct": 97.88,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 1629.421875,
+          "y": 14.453125,
+          "width": 29.890625,
+          "height": 29.890625
+        }
+      },
+      "banner": {
+        "x_pct": 13.85,
+        "y_pct": 7.45,
+        "w_pct": 84.92,
+        "h_pct": 6.99,
+        "cx_pct": 56.31,
+        "cy_pct": 10.94,
+        "px": {
+          "x": 232.6875,
+          "y": 78.1875,
+          "width": 1426.625,
+          "height": 73.40625
+        }
+      },
+      "kpis": {
+        "x_pct": 13.85,
+        "y_pct": 15.97,
+        "w_pct": 84.92,
+        "h_pct": 16.36,
+        "cx_pct": 56.31,
+        "cy_pct": 24.15,
+        "px": {
+          "x": 232.6875,
+          "y": 167.6875,
+          "width": 1426.625,
+          "height": 171.75
+        }
+      },
+      "mchip_row": {
+        "x_pct": 13.85,
+        "y_pct": 33.86,
+        "w_pct": 84.92,
+        "h_pct": 2.98,
+        "cx_pct": 56.31,
+        "cy_pct": 35.35,
+        "px": {
+          "x": 232.6875,
+          "y": 355.53125,
+          "width": 1426.625,
+          "height": 31.3125
+        }
+      },
+      "listwrap": {
+        "x_pct": 13.85,
+        "y_pct": 38.38,
+        "w_pct": 84.92,
+        "h_pct": 50.62,
+        "cx_pct": 56.31,
+        "cy_pct": 63.69,
+        "px": {
+          "x": 232.6875,
+          "y": 402.9375,
+          "width": 1426.625,
+          "height": 531.5625
+        }
+      },
+      "thead": {
+        "x_pct": 13.85,
+        "y_pct": 38.38,
+        "w_pct": 84.92,
+        "h_pct": 3.31,
+        "cx_pct": 56.31,
+        "cy_pct": 40.03,
+        "px": {
+          "x": 232.6875,
+          "y": 402.9375,
+          "width": 1426.625,
+          "height": 34.765625
+        }
+      },
+      "tbody": {
+        "x_pct": 13.85,
+        "y_pct": 41.69,
+        "w_pct": 84.92,
+        "h_pct": 42.71,
+        "cx_pct": 56.31,
+        "cy_pct": 63.04,
+        "px": {
+          "x": 232.6875,
+          "y": 437.703125,
+          "width": 1426.625,
+          "height": 448.5
+        }
+      },
+      "pager": {
+        "x_pct": 13.85,
+        "y_pct": 84.4,
+        "w_pct": 84.92,
+        "h_pct": 4.6,
+        "cx_pct": 56.31,
+        "cy_pct": 86.7,
+        "px": {
+          "x": 232.6875,
+          "y": 886.203125,
+          "width": 1426.625,
+          "height": 48.296875
+        }
+      },
+      "limit_note": {
+        "x_pct": 13.85,
+        "y_pct": 90.53,
+        "w_pct": 84.92,
+        "h_pct": 2.28,
+        "cx_pct": 56.31,
+        "cy_pct": 91.67,
+        "px": {
+          "x": 232.6875,
+          "y": 950.59375,
+          "width": 1426.625,
+          "height": 23.90625
+        }
+      },
+      "boundary_note": {
+        "x_pct": 13.85,
+        "y_pct": 94.34,
+        "w_pct": 84.92,
+        "h_pct": 3.25,
+        "cx_pct": 56.31,
+        "cy_pct": 95.97,
+        "px": {
+          "x": 232.6875,
+          "y": 990.59375,
+          "width": 1426.625,
+          "height": 34.109375
+        }
+      }
+    }
+  },
+  "consult-sessions-header": {
+    "file": "consult-sessions-header.png",
+    "clip_px": {
+      "x": 212,
+      "y": 0,
+      "width": 1468,
+      "height": 59.796875
+    },
+    "elements": {
+      "crumb": {
+        "x_pct": 1.41,
+        "y_pct": 37.63,
+        "w_pct": 4.87,
+        "h_pct": 23.07,
+        "cx_pct": 3.85,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 232.6875,
+          "y": 22.5,
+          "width": 71.515625,
+          "height": 13.796875
+        }
+      },
+      "now": {
+        "x_pct": 8.27,
+        "y_pct": 36.66,
+        "w_pct": 5.77,
+        "h_pct": 25.01,
+        "cx_pct": 11.15,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 333.359375,
+          "y": 21.921875,
+          "width": 84.640625,
+          "height": 14.953125
+        }
+      },
+      "ro_badge": {
+        "x_pct": 14.82,
+        "y_pct": 28.25,
+        "w_pct": 7.78,
+        "h_pct": 41.81,
+        "cx_pct": 18.7,
+        "cy_pct": 49.15,
+        "px": {
+          "x": 429.5,
+          "y": 16.890625,
+          "width": 114.15625,
+          "height": 25
+        }
+      },
+      "last_at": {
+        "x_pct": 23.38,
+        "y_pct": 38.57,
+        "w_pct": 13.54,
+        "h_pct": 21.17,
+        "cx_pct": 30.14,
+        "cy_pct": 49.15,
+        "px": {
+          "x": 555.15625,
+          "y": 23.0625,
+          "width": 198.703125,
+          "height": 12.65625
+        }
+      },
+      "refresh_btn": {
+        "x_pct": 37.69,
+        "y_pct": 23.44,
+        "w_pct": 5.05,
+        "h_pct": 51.42,
+        "cx_pct": 40.22,
+        "cy_pct": 49.15,
+        "px": {
+          "x": 765.359375,
+          "y": 14.015625,
+          "width": 74.109375,
+          "height": 30.75
+        }
+      },
+      "hub": {
+        "x_pct": 85.2,
+        "y_pct": 25.87,
+        "w_pct": 3.12,
+        "h_pct": 46.59,
+        "cx_pct": 86.76,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1462.75,
+          "y": 15.46875,
+          "width": 45.875,
+          "height": 27.859375
+        }
+      },
+      "avatar": {
+        "x_pct": 96.55,
+        "y_pct": 24.17,
+        "w_pct": 2.04,
+        "h_pct": 49.99,
+        "cx_pct": 97.57,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1629.421875,
+          "y": 14.453125,
+          "width": 29.890625,
+          "height": 29.890625
+        }
+      }
+    }
+  },
+  "consult-sessions-kpis": {
+    "file": "consult-sessions-kpis.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 167.6875,
+      "width": 1426.625,
+      "height": 171.75
+    },
+    "elements": {
+      "kpi_total": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 19.36,
+        "h_pct": 100.0,
+        "cx_pct": 9.68,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 232.6875,
+          "y": 167.6875,
+          "width": 276.125,
+          "height": 171.75
+        }
+      },
+      "kpi_today": {
+        "x_pct": 20.16,
+        "y_pct": 0.0,
+        "w_pct": 19.36,
+        "h_pct": 100.0,
+        "cx_pct": 29.84,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 520.3125,
+          "y": 167.6875,
+          "width": 276.125,
+          "height": 171.75
+        }
+      },
+      "kpi_donerate": {
+        "x_pct": 40.32,
+        "y_pct": 0.0,
+        "w_pct": 19.36,
+        "h_pct": 100.0,
+        "cx_pct": 50.0,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 807.9375,
+          "y": 167.6875,
+          "width": 276.125,
+          "height": 171.75
+        }
+      },
+      "kpi_drop": {
+        "x_pct": 60.48,
+        "y_pct": 0.0,
+        "w_pct": 19.36,
+        "h_pct": 100.0,
+        "cx_pct": 70.16,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1095.5625,
+          "y": 167.6875,
+          "width": 276.125,
+          "height": 171.75
+        }
+      },
+      "kpi_after": {
+        "x_pct": 80.64,
+        "y_pct": 0.0,
+        "w_pct": 19.36,
+        "h_pct": 100.0,
+        "cx_pct": 90.32,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1383.1875,
+          "y": 167.6875,
+          "width": 276.125,
+          "height": 171.75
+        }
+      }
+    }
+  },
+  "consult-sessions-mchips": {
+    "file": "consult-sessions-mchips.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 355.53125,
+      "width": 1426.625,
+      "height": 31.3125
+    },
+    "elements": {
+      "cap": {
+        "x_pct": 0.0,
+        "y_pct": 21.71,
+        "w_pct": 23.54,
+        "h_pct": 56.59,
+        "cx_pct": 11.77,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 232.6875,
+          "y": 362.328125,
+          "width": 335.765625,
+          "height": 17.71875
+        }
+      },
+      "chip_all": {
+        "x_pct": 24.34,
+        "y_pct": 0.0,
+        "w_pct": 6.5,
+        "h_pct": 100.0,
+        "cx_pct": 27.59,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 579.9375,
+          "y": 355.53125,
+          "width": 92.671875,
+          "height": 31.3125
+        }
+      },
+      "chip_guided": {
+        "x_pct": 31.48,
+        "y_pct": 0.0,
+        "w_pct": 9.56,
+        "h_pct": 100.0,
+        "cx_pct": 36.26,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 681.796875,
+          "y": 355.53125,
+          "width": 136.421875,
+          "height": 31.3125
+        }
+      },
+      "chip_chat": {
+        "x_pct": 41.69,
+        "y_pct": 0.0,
+        "w_pct": 8.51,
+        "h_pct": 100.0,
+        "cx_pct": 45.94,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 827.40625,
+          "y": 355.53125,
+          "width": 121.421875,
+          "height": 31.3125
+        }
+      },
+      "chip_talk": {
+        "x_pct": 50.84,
+        "y_pct": 0.0,
+        "w_pct": 8.48,
+        "h_pct": 100.0,
+        "cx_pct": 55.08,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 958.015625,
+          "y": 355.53125,
+          "width": 120.921875,
+          "height": 31.3125
+        }
+      },
+      "chip_expert": {
+        "x_pct": 59.96,
+        "y_pct": 0.0,
+        "w_pct": 9.4,
+        "h_pct": 100.0,
+        "cx_pct": 64.66,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1088.125,
+          "y": 355.53125,
+          "width": 134.09375,
+          "height": 31.3125
+        }
+      }
+    }
+  },
+  "consult-sessions-table": {
+    "file": "consult-sessions-table.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 402.9375,
+      "width": 1426.625,
+      "height": 332.234375
+    },
+    "elements": {
+      "thead": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 10.46,
+        "cx_pct": 50.0,
+        "cy_pct": 5.23,
+        "px": {
+          "x": 232.6875,
+          "y": 402.9375,
+          "width": 1426.625,
+          "height": 34.765625
+        }
+      },
+      "row_1": {
+        "x_pct": 0.07,
+        "y_pct": 10.46,
+        "w_pct": 99.86,
+        "h_pct": 14.92,
+        "cx_pct": 50.0,
+        "cy_pct": 17.93,
+        "px": {
+          "x": 233.6875,
+          "y": 437.703125,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      },
+      "row_2": {
+        "x_pct": 0.07,
+        "y_pct": 25.39,
+        "w_pct": 99.86,
+        "h_pct": 14.92,
+        "cx_pct": 50.0,
+        "cy_pct": 32.85,
+        "px": {
+          "x": 233.6875,
+          "y": 487.28125,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      },
+      "row_3": {
+        "x_pct": 0.07,
+        "y_pct": 40.31,
+        "w_pct": 99.86,
+        "h_pct": 14.92,
+        "cx_pct": 50.0,
+        "cy_pct": 47.77,
+        "px": {
+          "x": 233.6875,
+          "y": 536.859375,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      },
+      "row_4": {
+        "x_pct": 0.07,
+        "y_pct": 55.23,
+        "w_pct": 99.86,
+        "h_pct": 14.92,
+        "cx_pct": 50.0,
+        "cy_pct": 62.69,
+        "px": {
+          "x": 233.6875,
+          "y": 586.4375,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      },
+      "row_5": {
+        "x_pct": 0.07,
+        "y_pct": 70.15,
+        "w_pct": 99.86,
+        "h_pct": 14.92,
+        "cx_pct": 50.0,
+        "cy_pct": 77.62,
+        "px": {
+          "x": 233.6875,
+          "y": 636.015625,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      },
+      "row_6": {
+        "x_pct": 0.07,
+        "y_pct": 85.08,
+        "w_pct": 99.86,
+        "h_pct": 14.92,
+        "cx_pct": 50.0,
+        "cy_pct": 92.54,
+        "px": {
+          "x": 233.6875,
+          "y": 685.59375,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      }
+    }
+  },
+  "consult-sessions-full-detail": {
+    "file": "consult-sessions-full-detail.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "selected_row": {
+        "x_pct": 13.91,
+        "y_pct": 41.69,
+        "w_pct": 84.8,
+        "h_pct": 4.72,
+        "cx_pct": 56.31,
+        "cy_pct": 44.05,
+        "px": {
+          "x": 233.6875,
+          "y": 437.703125,
+          "width": 1424.625,
+          "height": 49.578125
+        }
+      },
+      "drawer": {
+        "x_pct": 60.3,
+        "y_pct": 5.69,
+        "w_pct": 39.7,
+        "h_pct": 94.31,
+        "cx_pct": 80.15,
+        "cy_pct": 52.85,
+        "px": {
+          "x": 1013,
+          "y": 59.796875,
+          "width": 667,
+          "height": 990.203125
+        }
+      }
+    }
+  },
+  "_arrow_full_detail": {
+    "x1": 946,
+    "y1": 462,
+    "x2": 1028,
+    "y2": 462,
+    "viewBox": "0 0 1680 1050",
+    "note": "실측 bounding box로 계산한 1차값 — 렌더 확인 전"
+  },
+  "consult-sessions-drawer-done": {
+    "file": "consult-sessions-drawer-done.png",
+    "clip_px": {
+      "x": 1013,
+      "y": 59.796875,
+      "width": 667,
+      "height": 990.203125
+    },
+    "elements": {
+      "status": {
+        "x_pct": 3.25,
+        "y_pct": 1.63,
+        "w_pct": 8.15,
+        "h_pct": 2.58,
+        "cx_pct": 7.32,
+        "cy_pct": 2.92,
+        "px": {
+          "x": 1034.6875,
+          "y": 75.890625,
+          "width": 54.328125,
+          "height": 25.578125
+        }
+      },
+      "title": {
+        "x_pct": 12.95,
+        "y_pct": 1.9,
+        "w_pct": 78.42,
+        "h_pct": 2.04,
+        "cx_pct": 52.16,
+        "cy_pct": 2.92,
+        "px": {
+          "x": 1099.359375,
+          "y": 78.578125,
+          "width": 523.078125,
+          "height": 20.1875
+        }
+      },
+      "close_btn": {
+        "x_pct": 92.92,
+        "y_pct": 1.75,
+        "w_pct": 3.98,
+        "h_pct": 2.32,
+        "cx_pct": 94.91,
+        "cy_pct": 2.92,
+        "px": {
+          "x": 1632.78125,
+          "y": 77.171875,
+          "width": 26.53125,
+          "height": 23
+        }
+      },
+      "meta": {
+        "x_pct": 3.25,
+        "y_pct": 5.02,
+        "w_pct": 93.65,
+        "h_pct": 1.58,
+        "cx_pct": 50.07,
+        "cy_pct": 5.81,
+        "px": {
+          "x": 1034.6875,
+          "y": 109.515625,
+          "width": 624.625,
+          "height": 15.6875
+        }
+      },
+      "constraints_cap": {
+        "x_pct": 3.25,
+        "y_pct": 9.84,
+        "w_pct": 93.65,
+        "h_pct": 1.22,
+        "cx_pct": 50.07,
+        "cy_pct": 10.45,
+        "px": {
+          "x": 1034.6875,
+          "y": 157.25,
+          "width": 624.625,
+          "height": 12.078125
+        }
+      },
+      "constraints_chips": {
+        "x_pct": 3.25,
+        "y_pct": 14.4,
+        "w_pct": 93.65,
+        "h_pct": 2.81,
+        "cx_pct": 50.07,
+        "cy_pct": 15.81,
+        "px": {
+          "x": 1034.6875,
+          "y": 202.421875,
+          "width": 624.625,
+          "height": 27.859375
+        }
+      },
+      "tier_cap": {
+        "x_pct": 3.25,
+        "y_pct": 21.22,
+        "w_pct": 93.65,
+        "h_pct": 8.98,
+        "cx_pct": 50.07,
+        "cy_pct": 25.71,
+        "px": {
+          "x": 1034.6875,
+          "y": 269.9375,
+          "width": 624.625,
+          "height": 88.921875
+        }
+      },
+      "tiercard_1": {
+        "x_pct": 3.25,
+        "y_pct": 21.22,
+        "w_pct": 30.18,
+        "h_pct": 8.98,
+        "cx_pct": 18.34,
+        "cy_pct": 25.71,
+        "px": {
+          "x": 1034.6875,
+          "y": 269.9375,
+          "width": 201.3125,
+          "height": 88.921875
+        }
+      },
+      "tiercard_2": {
+        "x_pct": 34.98,
+        "y_pct": 21.22,
+        "w_pct": 30.18,
+        "h_pct": 8.98,
+        "cx_pct": 50.07,
+        "cy_pct": 25.71,
+        "px": {
+          "x": 1246.34375,
+          "y": 269.9375,
+          "width": 201.3125,
+          "height": 88.921875
+        }
+      },
+      "tiercard_3": {
+        "x_pct": 66.72,
+        "y_pct": 21.22,
+        "w_pct": 30.18,
+        "h_pct": 8.98,
+        "cx_pct": 81.81,
+        "cy_pct": 25.71,
+        "px": {
+          "x": 1458,
+          "y": 269.9375,
+          "width": 201.3125,
+          "height": 88.921875
+        }
+      },
+      "parts_box": {
+        "x_pct": 3.25,
+        "y_pct": 34.21,
+        "w_pct": 93.65,
+        "h_pct": 32.67,
+        "cx_pct": 50.07,
+        "cy_pct": 50.54,
+        "px": {
+          "x": 1034.6875,
+          "y": 398.515625,
+          "width": 624.625,
+          "height": 323.5
+        }
+      }
+    }
+  },
+  "consult-sessions-drawer-dropped": {
+    "file": "consult-sessions-drawer-dropped.png",
+    "clip_px": {
+      "x": 1013,
+      "y": 59.796875,
+      "width": 667,
+      "height": 990.203125
+    },
+    "elements": {
+      "status": {
+        "x_pct": 3.25,
+        "y_pct": 1.63,
+        "w_pct": 8.36,
+        "h_pct": 2.58,
+        "cx_pct": 7.43,
+        "cy_pct": 2.92,
+        "px": {
+          "x": 1034.6875,
+          "y": 75.890625,
+          "width": 55.734375,
+          "height": 25.578125
+        }
+      },
+      "title": {
+        "x_pct": 13.16,
+        "y_pct": 1.9,
+        "w_pct": 78.21,
+        "h_pct": 2.04,
+        "cx_pct": 52.26,
+        "cy_pct": 2.92,
+        "px": {
+          "x": 1100.765625,
+          "y": 78.578125,
+          "width": 521.671875,
+          "height": 20.1875
+        }
+      },
+      "constraints_chips": {
+        "x_pct": 3.25,
+        "y_pct": 14.4,
+        "w_pct": 93.65,
+        "h_pct": 2.81,
+        "cx_pct": 50.07,
+        "cy_pct": 15.81,
+        "px": {
+          "x": 1034.6875,
+          "y": 202.421875,
+          "width": 624.625,
+          "height": 27.859375
+        }
+      },
+      "dropbox": {
+        "x_pct": 3.25,
+        "y_pct": 21.22,
+        "w_pct": 93.65,
+        "h_pct": 7.54,
+        "cx_pct": 50.07,
+        "cy_pct": 24.99,
+        "px": {
+          "x": 1034.6875,
+          "y": 269.9375,
+          "width": 624.625,
+          "height": 74.625
+        }
+      },
+      "ledgerlines": {
+        "x_pct": 3.25,
+        "y_pct": 32.76,
+        "w_pct": 93.65,
+        "h_pct": 4.21,
+        "cx_pct": 50.07,
+        "cy_pct": 34.87,
+        "px": {
+          "x": 1034.6875,
+          "y": 384.21875,
+          "width": 624.625,
+          "height": 41.671875
+        }
+      },
+      "dist_box": {
+        "x_pct": 3.25,
+        "y_pct": 45.88,
+        "w_pct": 93.65,
+        "h_pct": 9.08,
+        "cx_pct": 50.07,
+        "cy_pct": 50.42,
+        "px": {
+          "x": 1034.6875,
+          "y": 514.109375,
+          "width": 624.625,
+          "height": 89.953125
+        }
+      }
+    }
+  },
+  "consult-sessions-drawer-handoff": {
+    "file": "consult-sessions-drawer-handoff.png",
+    "clip_px": {
+      "x": 1013,
+      "y": 59.796875,
+      "width": 667,
+      "height": 990.203125
+    },
+    "elements": {
+      "status": {
+        "x_pct": 3.25,
+        "y_pct": 1.63,
+        "w_pct": 20.66,
+        "h_pct": 2.58,
+        "cx_pct": 13.58,
+        "cy_pct": 2.92,
+        "px": {
+          "x": 1034.6875,
+          "y": 75.890625,
+          "width": 137.78125,
+          "height": 25.578125
+        }
+      },
+      "ledger_cap": {
+        "x_pct": 3.25,
+        "y_pct": 65.77,
+        "w_pct": 93.65,
+        "h_pct": 1.22,
+        "cx_pct": 50.07,
+        "cy_pct": 66.38,
+        "px": {
+          "x": 1034.6875,
+          "y": 711.09375,
+          "width": 624.625,
+          "height": 12.078125
+        }
+      },
+      "ledgerline_orders": {
+        "x_pct": 3.25,
+        "y_pct": 67.92,
+        "w_pct": 93.65,
+        "h_pct": 4.21,
+        "cx_pct": 50.07,
+        "cy_pct": 70.03,
+        "px": {
+          "x": 1034.6875,
+          "y": 732.359375,
+          "width": 624.625,
+          "height": 41.671875
+        }
+      },
+      "ledgerline_handoffs": {
+        "x_pct": 3.25,
+        "y_pct": 72.83,
+        "w_pct": 93.65,
+        "h_pct": 6.13,
+        "cx_pct": 50.07,
+        "cy_pct": 75.89,
+        "px": {
+          "x": 1034.6875,
+          "y": 780.921875,
+          "width": 624.625,
+          "height": 60.65625
+        }
+      }
+    }
+  },
+  "_meta": {
+    "captured_at": "2026-08-27T23:49:51.181138+00:00",
+    "base_url": "http://127.0.0.1:8000",
+    "viewport": {
+      "width": 1680,
+      "height": 1050
+    },
+    "screen": {
+      "screen_id": "ADM-ORD-010",
+      "path": "/admin2/consult-sessions"
+    },
+    "stats": {
+      "total": 130,
+      "done_total": 115,
+      "drop_total": 15,
+      "today": 1,
+      "limit": 200,
+      "offset": 0,
+      "items_in_page": 130,
+      "mode_dist_in_page": {
+        "chat": 34,
+        "guided": 71,
+        "expert": 19,
+        "talk": 6
+      },
+      "handoff_n_in_page": 3,
+      "order_n_in_page": 0,
+      "scope_note": "2026-08-19 15:57:46(UTC) 이전은 「시험 운영 기간」으로 분리해 이 수치에서 제외했습니다 — 그 이전은 회귀·점검 트래픽과 섞여 있었습니다(data_origin='real' · 기준선 이후만 집계).",
+      "examples": {
+        "done": {
+          "session_id": 10603,
+          "mode": "chat",
+          "tier_total": 1000000,
+          "part_count": 8
+        },
+        "dropped": {
+          "session_id": 7808,
+          "mode": "chat"
+        },
+        "handoff": {
+          "session_id": 9971,
+          "mode": "guided",
+          "handoff_no": "HO-1009"
+        }
+      }
+    }
+  }
+}
