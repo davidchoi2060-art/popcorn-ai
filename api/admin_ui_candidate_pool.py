@@ -17,6 +17,12 @@
   비활성 처리한다 — 스펙의 명시 요구사항("admin2 에 없는 화면은 「없음」으로 비활성한다")
   과 정확히 일치한다. "재고 입고"는 admin_nav.NAV 자체에 항목이 아예 없다(라우트 파일도
   없음 — 의도된 비활성).
+  ⚠ **위 두 문장은 2026-08-15 스냅샷이고 둘 다 지금은 낡았다(2026-08-28 정정, CANON
+  §5 — 지우지 않고 옆에 남긴다).** 가격 검토 대기는 그날 안에 NAV href 가 채워졌고
+  (`admin_nav.py:334`), 재고 입고는 2026-08-18 커밋 `8a31bf0`으로 라우트 파일
+  (`api/admin_ui_stock_inbound.py`)과 NAV 연결이 **둘 다** 생겼다. 그런데 이 파일의
+  `REASON_TARGET_PATH`(아래)는 그 뒤로 한 번도 안 고쳐져 "재고 없음·매입" 이동 배지가
+  10일 넘게 이유 없이 비활성이었다 — 상세 경위는 `REASON_TARGET_PATH` 바로 위 주석.
   `admin_pool.py`가 사유·얇은 카테고리 항목에 함께 주는 `link` 필드는 옛
   `/admin/*.html` 파일명 문자열이라 admin2 경로가 아니고, "구화면으로는 다시 잇지
   않는다"는 결정(`api/admin_nav.py` 모듈 docstring, 2026-08-12)과도 어긋나므로
@@ -74,15 +80,29 @@ REASON_TARGET_LABEL = {
 # 선언을 직접 읽어 확인했다(아래 값 옆 근거). admin_nav.py는 여전히 "그 경로가 지금
 # NAV 어딘가에 실제로 링크돼 있는가"만 확인하는 용도로 쓴다(읽기만 — 고치지 않는다).
 #
-# "oos"(재고 입고)는 이 표에 없다 — admin_nav.NAV 자체에 그 항목이 없다(의도된 비활성,
-# req-candidate-pool.md 실측 그대로). 경로를 몰라도 상관없다: 화면이 아예 없으므로
-# 아래 `_reason_targets()`가 자동으로 href=None으로 비활성 처리한다 — "코드가 몰라서"가
-# 아니라 "화면이 없어서"라는 점은 다르지만 겉보기 결과(비활성)는 지금과 같다.
+# ⚠ 정정(2026-08-28, 제작자 — 매뉴얼 작성 중 발견) — 바로 위 문단("oos"가 이 표에 없는
+# 이유)은 **쓰인 시점(2026-08-14/15)엔 사실**이었으나 더는 아니다. **지우지 않고 옆에
+# 정정을 남긴다**(CANON §5 — 뒤집힌 근거를 지우지 않는다). `git log --follow` 실측:
+# 이 파일은 커밋 82a55a1(2026-08-15 17:46)로 최초 커밋된 뒤 **오늘까지 한 번도 다시
+# 고쳐지지 않았다.** 그런데 admin_nav.py는 그 사흘 뒤 커밋 8a31bf0(2026-08-18 12:04
+# "재고 입고 메뉴 연결 · 목차 등재")으로 `/admin2/stock-inbound`를 NAV에 실제로
+# 연결했다(A-58 해소 — admin_nav.py 그 커밋 메시지·9차 노트 참고). 즉 위 문단이 말하는
+# "화면이 아예 없다"는 전제가 2026-08-18부터 거짓이 됐는데, 이 표만 안 따라가 **10일
+# 넘게** "재고 없음·매입" 이동 배지가 이유 없이 비활성으로 남았다(그림 C의 21번·그림
+# G의 37번 캡처 — 매뉴얼 작성 중 결함으로 지적됨). `api/admin_ui_home.py`의
+# `_TARGET_PATH`가 같은 종류의 사고를 11일 동안 겪은 전례가 있다(그 파일 주석 참고 —
+# price-import·sourcing 두 화면). **원인도 같다: 경로를 조회 키로 쓰는 이 방식은
+# admin_nav 쪽 변화를 스스로 알아채지 못한다 — 사람이 이 표를 다시 훑어야 한다.**
+# 아래 `_reason_targets()`가 `NAV`를 정본으로 한 번 더 거르므로, 여기 적은 경로가
+# 나중에 메뉴에서 사라지면 자동으로 다시 비활성이 된다 — 지어낸 경로가 화면에 나가지
+# 않는다는 안전장치는 그대로 유효하다.
 REASON_TARGET_PATH = {
     "no_specs": "/admin2/products",       # api/admin_ui_products.py `@router.get("/products")`
     "need_review": "/admin2/reviews",     # api/admin_ui_reviews.py `@router.get("/reviews")`
     "not_candidate": "/admin2/reviews",   # 위와 같은 화면 — 사유만 다르다
     "no_price": "/admin2/price-review",   # api/admin_ui_price_review.py `@router.get("/admin2/price-review")`
+    "oos": "/admin2/stock-inbound",       # api/admin_ui_stock_inbound.py `@router.get("/admin2/stock-inbound")`
+                                           # NAV 연결 2026-08-18(8a31bf0) — 위 정정 참고
 }
 
 

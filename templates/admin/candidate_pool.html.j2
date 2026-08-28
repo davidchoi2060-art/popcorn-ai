@@ -21,8 +21,11 @@
     "결정 필요 지점"으로 남긴 미결 사항이다(목적지 화면과 별도 합의 필요). 지금은 화면
     이동만 되고, 어떤 사유·부품으로 왔는지는 넘어가지 않는다. 이동 대상 자체는 화면이 짓지
     않고 라우트(`api/admin_ui_candidate_pool.py`)가 정본(`api/admin_nav.NAV`)에서 찾아
-    `REASON_TARGETS`로 내려준다 — admin2에 없는 화면(가격 검토 대기·재고 입고)은 href가
-    없어 자동으로 비활성이 된다.
+    `REASON_TARGETS`로 내려준다 — admin2에 없는 화면은 href가 없어 자동으로 비활성이 된다.
+    ⚠ 2026-08-28 정정: 위 예시(가격 검토 대기·재고 입고)는 작성 당시(2026-08-14) 기준이고
+    둘 다 지금은 admin2에 있다(가격 검토 대기는 그 직후, 재고 입고는 2026-08-18 연결) —
+    지어낸 경로만 자동으로 걸러진다는 메커니즘 설명 자체는 그대로 유효하다. 상세 경위는
+    `api/admin_ui_candidate_pool.py`의 `REASON_TARGET_PATH` 주석.
 
   ■ 얇은 카테고리 vs 결합 조건 2종 — API의 `thin` 배열 하나에 **카테고리 임계값 미만 항목** +
     **화이트 케이스·750W 이상 파워(둘은 조건과 무관하게 항상 포함)** 이 섞여 온다
@@ -380,7 +383,7 @@ table.grid td.nolink{color:var(--on-variant);cursor:default}
       var un = err && err.status === 401;
       if (un) {
         showError('세션 만료', '관리자 로그인 후 다시 조회합니다.',
-          '<a href="/admin/login.html" style="display:inline-block;padding:8px 18px;border-radius:6px;' +
+          '<a href="/admin2/login" style="display:inline-block;padding:8px 18px;border-radius:6px;' +
           'background:var(--on);color:var(--bg);font:500 12px/1 var(--font)">로그인</a>');
       } else {
         showError('데이터 조회 실패',
