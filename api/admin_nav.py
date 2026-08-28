@@ -418,14 +418,25 @@ def _manual_nav_group(current_path: str = "") -> dict | None:
                     "state": "new" if m_href else "todo", "note": None,
                     "active": bool(m_href) and current_path.rstrip("/") == m_href.rstrip("/"),
                 })
+        # done/total 은 «화면 몇 개 중 몇 개에 매뉴얼이 있는가»를 세는 진행률이다 —
+        # admin_ui_manual.manual_index() 가 같은 값을 이미 이렇게 정의해 뒀다
+        # (`ready_count=sum(has_manual)`, `total_screens=nav_counts()["new"]`, 이 파일
+        # docstring 참조). 아래서 append 하는 「전체 목차」 행은 화면이 아니라 목차
+        # 자신으로 가는 링크 하나일 뿐이라 이 진행률의 대상이 아니다 — rows 에 넣은 뒤에
+        # 세면 분자·분모가 함께 +1 되어 매뉴얼 6개인데 "7/42"(자기 자신을 매뉴얼로
+        # 착각한 값)이 된다(2026-08-28 기록자 실측·수정). 그래서 done/total 은 목차
+        # 행을 append 하기 «전» rows 로 계산하고, 행 자체는(메뉴에서 목차로 가는 유일한
+        # 길이라) 그대로 items 에 남긴다.
+        done = sum(1 for r in rows if r["state"] == "new")
+        total = len(rows)
         rows.append({
             "label": "전체 목차", "href": "/admin2/manual", "state": "new", "note": None,
             "active": current_path.rstrip("/") == "/admin2/manual",
         })
         return {
             "title": "운영자 매뉴얼", "icon": "help-circle", "items": rows,
-            "done": sum(1 for r in rows if r["state"] == "new"),
-            "total": len(rows),
+            "done": done,
+            "total": total,
             "active": any(r["active"] for r in rows),
         }
     except Exception:
