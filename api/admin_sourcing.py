@@ -14,6 +14,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from datetime import datetime
 
@@ -261,8 +262,9 @@ def record_reply(quote_id: int, body: ReplyBody):
         raise HTTPException(400, "회신 매입가는 1원 이상이어야 합니다")
     with engine.begin() as conn:
         q = conn.execute(text(
-            "SELECT quote_id, product_code, status FROM product_sourcing_quotes"
-            " WHERE quote_id=:i FOR UPDATE"), {"i": quote_id}).mappings().first()
+            "SELECT quote_id, product_code, status, price, memo, replied_at"
+            " FROM product_sourcing_quotes WHERE quote_id=:i FOR UPDATE"),
+            {"i": quote_id}).mappings().first()
         if q is None:
             raise HTTPException(404, "견적 요청이 없습니다")
         if q["status"] not in ("요청", "회신"):
@@ -271,15 +273,93 @@ def record_reply(quote_id: int, body: ReplyBody):
             "UPDATE product_sourcing_quotes SET price=:p, memo=:m, status='회신',"
             " replied_at=now() WHERE quote_id=:i"),
             {"p": body.price, "m": body.memo, "i": quote_id})
+        # 되돌리기 재료(2026-08-28, req-activity-undo.md §④와 맞물린다) — 이 UPDATE 가
+        # 덮어쓰는 네 필드(price·status·replied_at·memo)의 이전 값을 UPDATE 전에 읽어
+        # 둔다(admin_stock.inbound·admin_category_mapping.move 의 before 관례와 동일 —
+        # 실제로 바뀌는 값만 담는다). 최초 회신이면 price=NULL·status='요청'이고,
+        # 이미 회신된 값을 다시 고치는 경우(가드가 status in ('요청','회신') 둘 다
+        # 허용)에는 그 이전 회신값이 담긴다 — 되돌리기가 구현되면 이 분기를 그대로
+        # 복원해야 한다(무조건 NULL로 되돌리면 틀린 값이 된다).
+        # ⚠ 되돌리기 라우트는 아직 만들지 않는다 — 이 남기기 작업의 범위 밖이다.
         _log(conn, "sourcing_reply", str(quote_id),
-             {"quote_id": quote_id, "product_code": q["product_code"], "price": body.price},
+             {"quote_id": quote_id, "product_code": q["product_code"], "price": body.price,
+              "before": {"price": q["price"], "status": q["status"],
+                         "replied_at": iso(q["replied_at"]) if q["replied_at"] else None,
+                         "memo": q["memo"]}},
              kind="sourcing")
         return {"ok": True, "price": body.price}
 
 
 @router.post("/sourcing/quotes/{quote_id}/confirm")
 def confirm_quote(quote_id: int):
-    """매입 확정 — psp 갱신 + 재판정(가격 이력 reason='sourcing'). 재고는 늘지 않는다(T10 경계)."""
+    """매입 확정 — psp 갱신 + 재판정(가격 이력 reason='sourcing'). 재고는 늘지 않는다(T10 경계).
+
+    트랜잭션 본문·잠금 순서는 `_confirm_quote_tx` 참조. 여기서는 그 안에서 데드락이
+    나는 경우만 잡는다(아래).
+    """
+    try:
+        return _confirm_quote_tx(quote_id)
+    except OperationalError as exc:
+        # SQLSTATE 40P01 = deadlock_detected(PostgreSQL). **실측**(제작자, 2026-08-29,
+        # threading.Barrier로 같은 상품의 형제 견적 둘을 동시에 confirm) — 서버 로그:
+        #   psycopg2.errors.DeadlockDetected: deadlock detected
+        #   CONTEXT:  while locking tuple (...) in relation "products"
+        # 이 원인은 `_confirm_quote_tx` 머리말의 ⚠⚠ 항목 참조. SQLAlchemy는 이를
+        # sqlalchemy.exc.OperationalError로 감싸고 원본은 .orig에 담는다.
+        # 트랜잭션 정리: `with engine.begin()`은 블록 밖으로 예외가 나가면 자동으로
+        # rollback한다(api/auth.py의 register_device() try/with 관례와 동일) — 서버가
+        # 이미 이 트랜잭션을 강제 종료한 뒤이므로 여기서 conn.rollback()을 따로 부를
+        # 필요가 없고, 부를 conn도 이 스코프엔 없다(트랜잭션은 _confirm_quote_tx
+        # 안에서 열고 닫힌다).
+        # 재시도가 유효한 이유: 데드락은 PostgreSQL이 둘 중 하나만 강제 종료하는
+        # 것이지 요청 자체가 틀린 게 아니다 — 살아남은 쪽은 이미 정상 커밋됐다.
+        # "다른 사람이 먼저 확정했습니다"라고 말하지 않는다 — 그건 아래 상태 확인
+        # (status != '회신') 409의 몫이고, 이 견적이 실제로 그 상태가 됐다면 재시도 시
+        # 그 문구로 안내된다. 여기서는 "동시에 시도해서 겹쳤다"만 말한다.
+        if getattr(exc.orig, "pgcode", None) == "40P01":
+            raise HTTPException(
+                409, "다른 확정 요청과 동시에 처리되어 충돌했습니다. 다시 시도하세요")
+        raise   # 다른 원인의 OperationalError(예: 접속 끊김)는 그대로 500으로 — 지어낸 안내를 붙이지 않는다
+
+
+def _confirm_quote_tx(quote_id: int):
+    """confirm_quote()의 트랜잭션 본문.
+
+    잠금 순서(2026-08-28, 되돌리기 재료 추가하며 정리):
+      ① product_sourcing_quotes(이 quote_id) + products(그 product_code) — 첫 SELECT의
+         FOR UPDATE JOIN 이 이 둘을 잠근다.
+      ② product_sourcing_quotes(같은 batch_id의 형제 견적들, 이 quote_id 제외).
+      ③ sourcing_batches(이 batch_id).
+      ④ product_supplier_prices — INSERT ... ON CONFLICT DO UPDATE 자체가 잠근다(별도
+         선행 잠금 없음).
+    ②·③을 이 순서로 둔 이유는 되돌리기 재료(before 값)를 한 블록에서 같이 읽으려는
+    것이었다 — **batch_id는 항상 product_code 하나에 묶이므로**(`request_quotes()`의
+    `product_code: int` 단일값 — 배치 하나 = 상품 하나) 같은 batch_id 안의 형제 견적은
+    전부 같은 상품이다.
+
+    ⚠⚠ **이 순서는 데드락을 막지 않는다 — 2026-08-29 확인자가 두 스레드로 실제
+    재현했고, 제작자가 같은 방법으로 재확인했다(서버 로그로 원인까지 확정).** 이전
+    버전의 이 주석은 "①의 products 행 잠금에서 이미 완전히 직렬화된다"고 적었는데
+    — **그 전제가 틀렸다.** ①을 "products 행 하나를 순간적으로 잠그는 단일 동작"으로
+    뭉뚱그려 본 것이 원인이다. 실제로는 같은 SELECT 문 안에서도 quotes 행을 먼저
+    잠그고(이 quote_id로 조회) 그다음 products 행을 잠근다(product_code로 조인) —
+    **그 사이에 다른 트랜잭션이 끼어들 수 있다.** 같은 상품의 형제 견적 둘
+    (quote A·quote B)을 동시에 confirm하면:
+      Tx-A  ①에서 quote A 를 먼저 잠그고 → products 잠금 대기 (Tx-B 가 쥐고 있음)
+      Tx-B  ①에서 quote B + products 를 다 잠그고
+            → ②에서 형제 잠금으로 quote A 를 요구 (Tx-A 가 쥐고 있음)
+      → 순환 대기. PostgreSQL이 둘 중 하나를 DeadlockDetected로 강제 종료한다
+        (실측 CONTEXT: 'while locking tuple (...) in relation "products"' — 정확히
+        Tx-A가 ①의 products 잠금 단계에서 죽는다. quote A가 죽으면 그 UPDATE가 아직
+        커밋 전이라 quote A는 '회신'에 남고, Tx-B가 이어서 그 sibling-cancel(위 ②)로
+        quote A를 '취소'로 덮는다 — 즉 죽은 쪽을 그대로 재시도해도 이미 '취소'라
+        아래 상태 확인 409를 만난다. 그래서 이 함수를 부르는 confirm_quote()는
+        "다시 시도하세요"만 말하고 "성공한다"고 약속하지 않는다).
+    락 순서 자체를 바꾸는 것(예: quote_id와 무관하게 항상 product_code로 먼저 잠그기)은
+    이 수정의 범위가 아니다 — 별건으로 사장님께 올린다. confirm_quote()의 예외 처리는
+    데드락이 나더라도 운영자에게 500 대신 "동시 시도" 사실을 알리는 완화책일 뿐,
+    이 순서 자체의 데드락 가능성을 없애지 않는다.
+    """
     with engine.begin() as conn:
         q = conn.execute(text(
             "SELECT q.quote_id, q.product_code, q.supplier_id, q.price, q.status, q.batch_id,"
@@ -301,6 +381,24 @@ def confirm_quote(quote_id: int):
         prod_before = conn.execute(text(
             "SELECT purchase_price, sale_price FROM products WHERE product_code=:pc"),
             {"pc": q["product_code"]}).mappings().one()
+        # 되돌리기 재료(2026-08-28) — 같은 배치의 다른 요청·회신 견적은 아래에서
+        # '취소'로 함께 바뀐다(자동 취소, batch_id 단위 — sourcing_batches 는 견적 하나만
+        # '진행'으로 남기는 설계). 되돌리려면 그 견적들 각자의 이전 상태('요청' 또는
+        # '회신')가 있어야 하므로 그 UPDATE 가 status 를 지우기 전에 잠그고 읽는다.
+        siblings_before = conn.execute(text(
+            "SELECT quote_id, status FROM product_sourcing_quotes"
+            " WHERE batch_id=:b AND quote_id<>:i AND status IN ('요청','회신') FOR UPDATE"),
+            {"b": q["batch_id"], "i": quote_id}).mappings().all()
+        # 되돌리기 재료(2026-08-28 추가) — sourcing_batches.status 도 아래에서 '완료'로
+        # 바뀐다. 지금은 이 컬럼을 쓰는 곳이 INSERT('진행')와 이 UPDATE('완료') 둘뿐이라
+        # '진행'만 나오지만, 그건 «지금 코드» 기준일 뿐이다 — 나중에 이 컬럼을 쓰는
+        # 자리가 늘면 그 순간부터 이 판단이 깨지는데 로그에 값이 없으면 그때는 아무도
+        # 모른다(orders._advance_one 이 TRANSITIONS 로 결정되는 status 도 매번 실제로
+        # 읽어 `before["status"]`에 남기는 것과 같은 이유 — `api/admin_orders.py:177`).
+        # UPDATE 대상 행이라 FOR UPDATE 로 잠근다(잠금 순서는 함수 머리말 참조).
+        batch_before = conn.execute(text(
+            "SELECT status FROM sourcing_batches WHERE batch_id=:b FOR UPDATE"),
+            {"b": q["batch_id"]}).scalar()
         conn.execute(text(
             "INSERT INTO product_supplier_prices (product_code, supplier_id, cost_price, supply_state)"
             " VALUES (:pc, :s, :c, '가능')"
@@ -332,7 +430,25 @@ def confirm_quote(quote_id: int):
         log_id = _log(conn, "sourcing_confirm", q["sku"],
                       {"quote_id": quote_id, "product_code": q["product_code"],
                        "supplier_id": q["supplier_id"], "price": q["price"],
-                       "before": {"cost_price": before[0] if before else None},
+                       # 되돌리기 재료(2026-08-28, req-activity-undo.md §④와 맞물린다) —
+                       # 이 확정이 건드리는 세 갈래(이 견적 자신 · 공급처 매입가 ·
+                       # 상품 가격)의 이전 값. cost_price 는 기존 필드 그대로(소비자
+                       # admin_activity_logs.py:171 요약 문구가 이 키를 읽는다 — 이름을
+                       # 바꾸지 않았다), supply_state·quote_status·purchase_price·
+                       # sale_price 는 이번에 추가했다. purchase_price·sale_price 는
+                       # 이미 읽어 둔 prod_before(위 ㉰ 결과 패널용)를 그대로 쓴다 —
+                       # 두 번 계산하지 않는다.
+                       "before": {"quote_status": q["status"],
+                                  "batch_status": batch_before,
+                                  "cost_price": before[0] if before else None,
+                                  "supply_state": before[1] if before else None,
+                                  "purchase_price": prod_before["purchase_price"],
+                                  "sale_price": prod_before["sale_price"]},
+                       # 자동 취소된 형제 견적 — 각자 이전 상태를 담아야 개별 복원이
+                       # 된다(전부 '취소'로 뭉뚱그리면 원래 '요청'이었는지 '회신'이었는지
+                       # 사라진다).
+                       "cancelled_siblings": [{"quote_id": s["quote_id"], "status": s["status"]}
+                                              for s in siblings_before],
                        "reprice": rp}, kind="sourcing")
         return {"ok": True, "sku": q["sku"], "price": q["price"],
                 "purchase_changed": rp["purchase_changed"], "sale_changed": rp["sale_changed"],
