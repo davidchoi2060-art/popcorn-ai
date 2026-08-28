@@ -445,7 +445,7 @@
       box.innerHTML = '<div class="sp-errbox"><div class="t">' + (un ? '세션 만료' : '조회 실패') + '</div>'
         + '<div class="d">' + (un ? '관리자 로그인 후 다시 조회합니다.'
             : ('공급처 목록을 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>'
-        + (un ? '<a href="/admin/login.html">로그인</a>'
+        + (un ? '<a href="/admin2/login">로그인</a>'
               : '<button type="button" data-action="retry-load">다시 시도</button>') + '</div>';
       return;
     }

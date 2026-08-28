@@ -450,7 +450,7 @@ input,textarea{font-family:var(--rv-font)}
       + '<div class="pg-errbox-ti">' + (un ? '세션 만료' : '조회 실패') + '</div>'
       + '<div class="pg-errbox-ds">' + (un ? '관리자 로그인 후 다시 시도합니다.'
           : esc((err && err.message) || '알 수 없는 오류')) + '</div>'
-      + (un ? '<a href="/admin/login.html">로그인</a>'
+      + (un ? '<a href="/admin2/login">로그인</a>'
              : '<button type="button" data-action="' + retryAction + '">다시 시도</button>')
       + '</div>';
   }

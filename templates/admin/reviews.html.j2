@@ -813,7 +813,7 @@ input{font-family:var(--rv-mono)}
     var tbody = $('tbody');
     tbody.innerHTML = '<div class="errbox"><div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
       '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.' : ('검수 목록을 받지 못했습니다 — ' + esc(S.loadErr.message))) + '</div>' +
-      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry-list">다시 시도</button>') +
+      (un ? '<a href="/admin2/login">로그인</a>' : '<button type="button" data-action="retry-list">다시 시도</button>') +
       '</div>';
     $('scopeCount').textContent = '—';
     $('chunks').innerHTML = ''; $('fstatsList').innerHTML = ''; $('idBox').hidden = true;

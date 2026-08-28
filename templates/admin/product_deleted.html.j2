@@ -400,7 +400,7 @@ a.dp-empty-link{color:var(--rv-ink)}
     box.innerHTML = '<div class="ti">' + (un ? '세션 만료' : '조회 실패') + '</div>' +
       '<div class="ds">' + (un ? '관리자 로그인 후 다시 조회합니다.'
         : ('삭제 상품 목록을 받지 못했습니다 — ' + esc(S.loadErr ? S.loadErr.message : ''))) + '</div>' +
-      (un ? '<a href="/admin/login.html">로그인</a>' : '<button type="button" data-action="retry-list">다시 시도</button>');
+      (un ? '<a href="/admin2/login">로그인</a>' : '<button type="button" data-action="retry-list">다시 시도</button>');
     $('dpMain').appendChild(box);
   }
 
