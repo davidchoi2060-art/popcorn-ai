@@ -47,13 +47,33 @@
     서버, 절대 죽이지 않는다)에는 dev-login 1회 + 화면이 부르는 GET들만 나간다.
 """
 import json
+import os
 import pathlib
+import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from playwright.sync_api import sync_playwright
 
-BASE = "http://127.0.0.1:8000"
+
+def _resolve_base() -> str:
+    """BASE 우선순위: CLI 인자(``--base=URL``) > 환경변수(``MANUAL_CAPTURE_BASE``) > 기본값.
+
+    2026-08-28 신설 — **이 파일 «자신의 한계»를 고치는 예외다**(위 docstring의 "공용
+    파일을 다시 고치지 않는다"는 화면을 추가할 때의 규약이지, 지금처럼 이 상수 자체가
+    하드코딩이라 막힌 경우의 규약이 아니다). 포트 8000은 사장님 서버라 절대 재시작하지
+    않는데, 캡처 대상 화면의 파이썬 코드를 고치면 그 변경을 반영한 서버를 8000이 «아닌»
+    포트에 새로 띄워야 캡처할 수 있다 — 그런데 BASE가 상수라 가리킬 방법이 없었다
+    (candidate-pool 매뉴얼의 "oos" REASON_TARGET_PATH 재촬영이 이 문제로 미뤄졌다).
+    **기본값은 바꾸지 않는다** — 인자·환경변수를 안 주면 지금까지와 똑같이 8000을 본다.
+    """
+    for arg in sys.argv[1:]:
+        if arg.startswith("--base="):
+            return arg.split("=", 1)[1]
+    return os.environ.get("MANUAL_CAPTURE_BASE", "http://127.0.0.1:8000")
+
+
+BASE = _resolve_base()
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 # 2026-08-25 확정 위치 — **바꾸지 않는다**(운영자 매뉴얼 화면 `/admin2/manual/*` 이
 # `/shared/manual/shots/…` 로 읽는 실제 서빙 경로 — `mockups/` 가 서버 루트에 통째로

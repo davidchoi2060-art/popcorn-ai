@@ -987,8 +987,8 @@
     }
   },
   "_meta": {
-    "captured_at": "2026-08-27T23:41:20.523159+00:00",
-    "base_url": "http://127.0.0.1:8000",
+    "captured_at": "2026-08-28T03:14:08.827907+00:00",
+    "base_url": "http://127.0.0.1:8002",
     "viewport": {
       "width": 1680,
       "height": 1050
@@ -1174,7 +1174,7 @@
         },
         "oos": {
           "label": "재고 입고",
-          "href": null
+          "href": "/admin2/stock-inbound"
         }
       }
     }
