@@ -184,10 +184,12 @@ def _cookie_header() -> str:
         raise RuntimeError(
             "MALL_ADMIN_COOKIE가 없습니다 -- 이 페이지는 로그인 세션이 있어야 열립니다"
             "(2026-08-26 실측: 익명 GET은 200 OK로 응답하면서 본문이 로그인 페이지로"
-            " 튕깁니다). 몰 관리자(popcornpc.co.kr)에 사장님 계정으로 로그인한 브라우저"
-            "에서 개발자도구 Network 탭 -> adm_cate 요청 하나 -> Request Headers의"
-            " Cookie 값을 그대로 복사해 .env에 MALL_ADMIN_COOKIE=<복사한 값>으로"
-            " 넣으세요. 이 스크립트는 로그인 폼을 대신 제출하지 않습니다.")
+            " 튕깁니다). 몰 관리자(popcornpc.co.kr)에 로그인한 브라우저에서 개발자도구"
+            " 콘솔에 copy(document.cookie) 를 넣어 복사한 뒤, 그 값을 이 실행에만"
+            " 환경변수로 지정하세요(PowerShell: $env:MALL_ADMIN_COOKIE='<값>')."
+            " ** .env 나 코드에 넣지 마십시오 -- A-124/CLAUDE.md 규약입니다."
+            " 만료돼도 파일에는 남아, 다음 실행이 '세션 만료'로 조용히 실패합니다. **"
+            " 이 스크립트는 로그인 폼을 대신 제출하지 않습니다.")
     return v
 
 
@@ -493,8 +495,9 @@ def _print_report(stats: dict, samples: list, apply_: bool, from_dir: bool = Fal
         print(f"대상 {stats['target']}건 -- 캐시 재사용 {stats['cached']}건 · 신규 요청"
               f" {stats['fetched']}건 · 요청 실패 {stats['fetch_fail']}건")
     if stats["login_abort"]:
-        print("몰 세션이 없어 중단했습니다 -- MALL_ADMIN_COOKIE를 .env에 넣고 다시"
-              " 실행하세요(모듈 docstring 참조).")
+        print("몰 세션이 없어 중단했습니다 -- 브라우저에서 쿠키를 다시 뽑아"
+              " MALL_ADMIN_COOKIE 환경변수로 지정하고 다시 실행하세요"
+              " (.env 에 넣지 않습니다 -- A-124. 모듈 docstring 참조).")
     print(f"파싱된 업체 행 합계 {stats['rows_total']}건")
     print(f"  재고상태 판정 불가(select 미인식) {stats['state_unknown']}건 -- 이 행은"
           " 반영 대상에서 제외했습니다")
