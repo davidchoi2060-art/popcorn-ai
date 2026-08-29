@@ -1566,3 +1566,109 @@ def recommend_explain(body: ExplainBody, request: Request, k: str | None = None)
         _EXPLAIN_CACHE.clear()
     _EXPLAIN_CACHE[cache_key] = {"text": out, "provider": res.provider, "model": res.model}
     return {"ok": True, "tier": body.tier, "cached": False} | _EXPLAIN_CACHE[cache_key]
+
+
+# ============================================================================
+# S2 재검증 — 굳은 견적을 서버에 다시 묻는다 (사장님 결정 2026-08-29: "S2 가 열릴
+# 때 서버에 다시 묻는다")
+#
+# ■ 무엇이 일어났었나
+#   견적은 `localStorage['popcorn-quote']`에 `{at:Date.now(), data:...}`로 저장되고,
+#   S2는 그걸 읽을 때 `.at`을 검사하지도(만료 판단 0건) 서버에 되묻지도(재조회 0건)
+#   않은 채 그대로 그렸다 — `relTime()`이 "N분 전 기준"이라 **적기만** 했다. 실제로
+#   가성비형 견적에 담긴 상품(118329)이 19:39:46에 마지막으로 화면에 들어갔고
+#   19:55:01(mall_sync_runs.run_id=2, "전 공급처 품절")에 후보에서 빠졌다 — 15분
+#   15초 뒤 고객이 "부품 변경"을 누르면 이미 살 수 없는 부품이었다.
+#   `_recent_pick()`(위, 첫 화면 쇼케이스)은 "과거 견적을 그대로 내걸 수 없다"며
+#   이미 매번 재검증한다 — 그 재검증이 고객 개인 견적에는 없었다.
+#
+# ■ 판정은 여기서 다시 만들지 않는다 — `_load_pool()`이 여전히 정본이다(CANON §1)
+#   `api/swap.py`의 `_pool_ctx`가 이미 같은 일을 한다
+#   (`"unavailable": it["product_code"] not in pool_codes`) — 그 방식을 그대로
+#   따른다. `swap.py`를 import하지 않는 이유는 그 파일이 이미 이 파일을 import하고
+#   있어서다(`swap.py` "from .recommend import ...") — 반대로 돌리면 순환
+#   임포트다. 그래서 **같은 원천 함수(`_load_pool`)**를 여기서 직접 불러 **같은
+#   한 줄**(pool_codes 집합)로 판정한다 — 두 번째 판정 계통을 만들지 않는다.
+#
+# ■ 왜 session_id·access_key 게이트를 안 거는가
+#   `swap.candidates`가 게이트를 요구하는 이유는 session_id(연속 정수)만 알면
+#   **남의 견적 전체**(구성·가격)를 통째로 읽어낼 수 있어서였다(2026-08-17 확정).
+#   이 경로는 다르다 — 호출자가 **이미 자기 localStorage에 들고 있는** 부품 코드를
+#   보내고, "이 상품이 지금도 팔리는가"라는 사실 하나만 돌려받는다. 그 사실은
+#   누구에게 물어도 같다(상품 상세 페이지를 보면 누구나 알 수 있는 공개 정보다) —
+#   session_id를 몰라도 남의 것을 훔쳐볼 수 없으므로 게이트가 막을 위협이 없다.
+#   게이트를 걸면 이 가벼운 확인 하나에 403·429·503 세 가지 실패 모드가 새로
+#   붙는데, 그 비용을 정당화할 이유가 없다.
+#
+# ■ 왜 원장에 쓰지 않는가
+#   `showcase()`와 같은 이유(위 주석 참조) — S2가 열릴 때마다(새로고침·탭 전환 포함
+#   가능) 부르는 경로라 매번 consult_sessions에 남기면 상담 원장이 오염된다.
+#   이 경로는 **읽기만** 한다 — 쓰기가 전혀 없다.
+#
+# ■ 사유를 나눈다 — "품절"로 뭉뚱그리지 않는다
+#   `_load_pool()`(= `v_recommendation_candidates` + `stock_qty>0`)이 거르는 문은
+#   8개다(재고·가격·판매상태·후보플래그·검수회부·분류·부품종류·데모축). 지금까지는
+#   이 중 **하나라도** 걸리면 전부 "품절"이라 불렸다(`api/admin_pool.py`에서 8개
+#   중 3개만 베껴 오진했던 것과 같은 함정 — CANON §2). `review_required_yn`(검수
+#   회부)·`status` 변경·분류 변경은 **재고가 있어도** 걸린다 — 그런 경우까지
+#   "품절"이라 말하면 거짓이다.
+#   그렇다고 8개 문을 전부 되짚어 "검수 회부라서 빠졌습니다"처럼 운영 내부 사정을
+#   고객에게 노출하지도 않는다 — 그건 판단이 아니라 관리자 화면의 말이다. 그래서
+#   **딱 하나만 나눈다**: `stock_qty`(뜻이 하나뿐인 컬럼)가 실제로 0 이하인 경우만
+#   "품절"이라 부르고, 그 밖의 모든 탈락 사유는 "지금은 담을 수 없다"는 정직한
+#   중립 문구로 묶는다. 가부(可否) 판정 자체는 여전히 `pool_codes` 하나로만
+#   정해진다 — `reason`은 그 위에 얹는 부가 설명일 뿐, 가부를 다시 계산하지 않는다.
+#   실제로 118329는 `stock_qty=1`(우리 재고 원장은 그대로)인 채 `ai_candidate_yn`만
+#   `mall_daily_sync`가 false로 내렸다(전 공급처 품절 — tools/mall_daily_sync.py
+#   `_exclude_no_supplier`) — 우리 `stock_qty` 기준으로는 "sold_out"이 아니라
+#   "unlisted"가 사실에 더 가깝다(공급처 재고이지 우리 재고 원장이 아니다).
+# ============================================================================
+class RevalidateBody(BaseModel):
+    product_codes: list[int]
+
+
+_REVALIDATE_MAX_CODES = 64   # 견적 1건 최대 8슬롯 × 티어 3개를 다 합쳐도 24 안팎 — 넉넉한 상한
+
+
+@router.post("/recommend/revalidate")
+def revalidate(body: RevalidateBody):
+    """S2가 화면을 그릴 때 다시 묻는 자리 — 넣어준 부품 코드가 지금도 살 수 있는지.
+
+    읽기 전용(원장에 쓰지 않는다) · 게이트 없음(공개 카탈로그 사실만 돌려준다, 위 주석).
+
+    응답: {generated_at, any_unavailable, items:[{product_code, unavailable, reason, message}]}
+      reason  null(구매 가능) · "sold_out"(재고 0) · "unlisted"(그 밖의 사유로 후보 이탈)
+              · "not_found"(상품 자체를 더는 찾을 수 없음 — 코드 오류 포함)
+    """
+    codes = sorted(set(body.product_codes))
+    if not codes:
+        raise HTTPException(400, "확인할 부품 코드가 없습니다")
+    if len(codes) > _REVALIDATE_MAX_CODES:
+        raise HTTPException(400, f"한 번에 확인할 수 있는 부품 수({_REVALIDATE_MAX_CODES}개)를 넘었습니다")
+
+    with engine.connect() as conn:
+        pool_codes = {p["product_code"] for p in _load_pool(conn)}   # 정본 — 두 번째 판정을 만들지 않는다
+        missing = [c for c in codes if c not in pool_codes]
+        stock_by_code = {}
+        if missing:
+            stock_by_code = {r["product_code"]: r["stock_qty"] for r in conn.execute(text(
+                "SELECT product_code, stock_qty FROM products"
+                " WHERE product_code = ANY(:c)"), {"c": missing}).mappings().all()}
+
+    items = []
+    for c in codes:
+        if c in pool_codes:
+            items.append({"product_code": c, "unavailable": False, "reason": None, "message": None})
+            continue
+        stock = stock_by_code.get(c)
+        if stock is None:
+            reason, msg = "not_found", "이 상품 정보를 더 이상 찾을 수 없습니다"
+        elif stock <= 0:
+            reason, msg = "sold_out", "지금 재고가 없습니다"
+        else:
+            reason, msg = "unlisted", "지금은 이 견적에 포함할 수 없는 상품입니다"
+        items.append({"product_code": c, "unavailable": True, "reason": reason, "message": msg})
+
+    return {"generated_at": now_iso(),
+            "any_unavailable": any(it["unavailable"] for it in items),
+            "items": items}

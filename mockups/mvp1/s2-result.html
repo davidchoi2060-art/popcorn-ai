@@ -492,7 +492,20 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
    덮어쓰지 않고 탭 자체를 막는다(s2NoQuote). */
 function s2apply(k){}
 document.querySelectorAll('.s2tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.s2tab').forEach(function(x){x.classList.remove('is-active');x.setAttribute('aria-selected','false');});t.classList.add('is-active');t.setAttribute('aria-selected','true');s2apply(t.getAttribute('data-set'));});});
-document.querySelectorAll('button').forEach(function(b){var x=(b.textContent||'').trim();if(x.indexOf('부품 변경')===0){b.addEventListener('click',function(){window.location.href='s3-detail.html';});}else if(x.indexOf('장바구니 담기')===0){b.addEventListener('click',function(){window.location.href='s4-cart.html';});}});
+/* ★ 2026-08-29 확인자 실측 결함 수정 — 「장바구니 담기」 텍스트를 가진 버튼이 이
+   화면에 셋(상단 navbar 166행 · 본문 268행 · 하단 마감 CTA 481행)이다. 이 forEach
+   가 그 셋 모두를 찾아 «같은 핸들러 함수»를 붙인다 — 재검증 게이트(아래 LIVE
+   렌더 스크립트의 s2LockCart/s2UnlockCart)는 버튼을 다시 찾아 개별로 막지 않고,
+   이 핸들러 본문의 window.s2CartBlocked 검사 하나로 이동 자체를 막는다. 버튼이
+   몇 개든 이 forEach 에 걸리는 한 같은 검사를 통과해야 이동한다 — 문구가 같은
+   4번째 버튼이 생겨도 이 시점에 자동으로 같은 핸들러를 받는다(버튼마다 disabled
+   를 다시 걸어야 하는 목록 방식과 달리, 새 버튼을 챙겨야 한다는 사실 자체를
+   잊을 수 없다). 기본값 false — 재검증이 아직 안 돌았거나 실패해도(fail-open)
+   막지 않는다. 「부품 변경」에는 이 검사를 걸지 않는다 — 재검증이 막는 것은
+   장바구니뿐이고, 부품을 바꾸는 길은 항상 열려 있어야 한다(고객의 유일한
+   다음 걸음). */
+window.s2CartBlocked=false;
+document.querySelectorAll('button').forEach(function(b){var x=(b.textContent||'').trim();if(x.indexOf('부품 변경')===0){b.addEventListener('click',function(){window.location.href='s3-detail.html';});}else if(x.indexOf('장바구니 담기')===0){b.addEventListener('click',function(){if(window.s2CartBlocked)return;window.location.href='s4-cart.html';});}});
 // 함께 구성(주변기기) 담기 토글 — 본체 견적과 분리, 근거 기반 제안 (A-02 유지)
 var s2pSel={};
 // 카드와 이름은 서버 companion 이 준다(LIVE 렌더가 채운다) — 예시 4종은 폐기했다
@@ -720,6 +733,18 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
  // 부품 리스트 컨테이너
  var listWrap=document.getElementById('s2-cpu')?document.getElementById('s2-cpu').closest('div[style*="flex-direction:column"]'):null;
  var listHead=document.getElementById('s2-listhead');   // 종 수는 서버가 정한다(마크업엔 없다)
+ /* 재검증(2026-08-29, 사장님 결정 "S2 가 열릴 때 서버에 다시 묻는다")이 쓰는 버튼 자리.
+    listWrap 의 innerHTML 은 s2apply 마다 통째로 새로 그려지지만(위), 이 버튼 행
+    div(266~269행 「부품 변경」·「장바구니 담기」)는 텍스트 매칭으로 찾는 이 파일의
+    기존 관례(495·593·1123행)를 그대로 따른다 — element 자체는 listWrap 의 다음
+    형제라 한 번만 구해 두면 tab 전환에도 그대로 유효하다.
+    ★ btnRow 는 재검증 배너를 꽂을 «위치»(insertBefore 기준점)로만 쓴다
+    (2026-08-29 확인자 실측 결함 수정). 예전엔 btnByText(btnRow,...)로 이 행 «안»의
+    버튼 하나만 찾아 막았는데, 「장바구니 담기」는 이 화면에 셋(navbar 166행 ·
+    이 행 268행 · 마감 CTA 481행)이라 나머지 둘이 안 막힌 채 s4-cart.html 로
+    샜다. 게이트는 이제 아래 s2CartBtns()(문서 전체 검색) + window.s2CartBlocked
+    (495행이 읽는 이동 자체의 관문)로 옮겼다 — btnByText 는 더는 쓰지 않는다. */
+ var btnRow=listWrap?listWrap.nextElementSibling:null;
  /* 「이 구성을 고른 이유」 — 서버가 **확정 저장된 견적**을 읽어 만든 근거 문구로 바꾼다.
     견적 응답(POST /api/recommend)에 싣지 않은 이유는 서버 쪽 주석 그대로다: 그 경로는
     고객이 기다리는 자리라 LLM 호출을 동기로 끼우면 견적 전체가 느려진다. 그래서 견적을
@@ -727,9 +752,25 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
     보내는 것은 session_id·티어 둘뿐이다 — 부품·가격·수치를 화면이 실어 보내면 그 순간
     설명의 재료를 화면이 지어낼 수 있게 된다(§화면 정직성). */
  var WHY={};                       // 티어별 캐시 — 탭을 오갈 때마다 다시 부르지 않는다
+ /* REVAL — 재검증 응답 캐시(product_code -> {unavailable, reason, message}).
+    처음엔 비어 있다(응답 도착 전) — 그때는 «구매 가능»을 지어내지 않고 그냥 판단을
+    보류한 채로 둔다(아래 itemsHtml·s2apply 끝부분 배너가 이 상태를 함께 쓴다).
+    revalFailed 는 재검증 자체가 실패했다는 사실(네트워크 오류 등) — REVAL 이 비어
+    있는 것과는 다른 사실이라 따로 표시한다(아래 s2Revalidate). */
+ var REVAL={},revalFailed=false;
+ /* WHY_INFLIGHT — 같은 티어를 향한 explain 요청이 이미 나가 있으면 또 보내지 않는다.
+    재검증(s2Revalidate, 아래)이 응답을 받으면 지금 보이는 티어로 s2apply 를 다시
+    부르는데, revalidate 는 DB 조회 하나뿐이라 LLM 호출이 낀 explain 보다 훨씬 빨리
+    끝난다 — 그래서 explain 응답이 오기 «전에» s2apply 가 한 번 더 불려 s2why 를 또
+    호출할 수 있다. WHY[k] 캐시만으로는 이 창(첫 응답이 아직 안 왔을 때)을 못 막아
+    같은 티어에 explain 요청이 두 번(=LLM 비용 두 번) 나갈 뻔했다 — 요청 시작 시
+    켜고 성공·실패 어느 쪽으로 끝나든 끈다. */
+ var WHY_INFLIGHT={};
  function s2why(k){
   if(!fp||!Q.session_id)return;
   if(WHY[k]){fp.textContent=WHY[k];fp.setAttribute('data-why-source','server');return;}
+  if(WHY_INFLIGHT[k])return;   // 이미 요청 중 — 재검증발 재호출이 겹쳐 부르지 않는다
+  WHY_INFLIGHT[k]=true;
   fp.textContent=WHY_FALLBACK;fp.setAttribute('data-why-source','fallback');
   /* 열쇠(access_key)는 견적 응답이 준 값을 그대로 되돌려 보낸다 - 서버가 「이 상담의
      주인인가」를 그것으로 판정한다. 화면에는 «보여주지» 않는다(링크·본문에 싣지 않는다).
@@ -739,6 +780,7 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    .then(function(r){return r.json().catch(function(){return null;})
      .then(function(j){return {st:r.status,ok:r.ok,j:j};});})
    .then(function(res){
+    WHY_INFLIGHT[k]=false;
     var j=res.j;
     /* 실패를 조용히 넘기지 않는다 — 사유는 서버 로그가 남기고 여기서도 콘솔에 적는다.
        고객 화면에는 기본 문구를 그대로 두되, 403·429·503 은 «서로 다른 사건»이라
@@ -758,6 +800,7 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
     fp.textContent=j.text;fp.setAttribute('data-why-source','server');
    })
    .catch(function(e){
+    WHY_INFLIGHT[k]=false;
     console.warn('[s2] why text request failed -',e);
     var at1=document.querySelector('.s2tab.is-active');
     if(at1&&at1.getAttribute('data-set')!==k)return;
@@ -774,6 +817,34 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    return '상세 근거 문구 요청이 한도를 넘었습니다 — '+(s?(s+'초 뒤에'):'잠시 뒤')+' 다시 시도하면 표시됩니다.';}
   if(st===503)return '상세 근거 문구는 아직 준비되지 않았습니다 — 준비되면 표시됩니다.';
   return '상세 근거 문구는 서버에 연결되면 표시됩니다.';
+ }
+ /* 재검증 게이트가 쓰는 셋. 「버튼을 찾는」 부분은 여기 한 곳에만 둔다(document 전체
+    검색이라 btnRow 같은 범위 제한이 없다 — navbar·본문·마감 CTA 셋 다 잡힌다).
+    다만 진짜 방어선은 이 disabled 세팅이 아니라 위 495행의 window.s2CartBlocked
+    검사다: 여기서 그 플래그를 같이 세팅하므로, 아래 disabled 세팅이 어떤 이유로
+    한 인스턴스를 못 잡아도(예: 그 버튼이 이 함수가 도는 시점 이후에 DOM 에
+    붙었다면) 이동 자체는 막힌다 — 이 둘은 같은 사실 하나에서 나오므로 서로
+    어긋나지 않는다. 비활성 표시는 s2NoQuote()(위 594행)가 이미 쓰는 것과 같은
+    결(disabled + opacity + not-allowed + title)이다 — 새로 만들지 않는다.
+    「부품 변경」은 이 함수들이 절대 건드리지 않는다 — 고객의 유일한 다음 걸음. */
+ function s2CartBtns(){
+  var out=[];
+  Array.prototype.forEach.call(document.querySelectorAll('button'),function(b){
+   if((b.textContent||'').trim().indexOf('장바구니 담기')===0)out.push(b);
+  });
+  return out;
+ }
+ function s2LockCart(reason){
+  window.s2CartBlocked=true;
+  s2CartBtns().forEach(function(b){
+   b.disabled=true;b.style.opacity='.45';b.style.cursor='not-allowed';b.title=reason;
+  });
+ }
+ function s2UnlockCart(){
+  window.s2CartBlocked=false;
+  s2CartBtns().forEach(function(b){
+   b.disabled=false;b.style.opacity='';b.style.cursor='';b.title='';
+  });
  }
  // 탭 → 실데이터 apply
  s2apply=function(k){
@@ -806,6 +877,19 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
         하네스 지시) — 예전엔 아무것도 안 붙어, 그 부품이 아래 §4 비교표에서
         빠졌다는 사실이 이 목록에서는 안 보였다. */
      :' <span style="color:#a29d92;font-weight:600;font-size:11px;">(시세 자료 없음)</span>';
+    /* 재검증 배지(2026-08-29, 사장님 결정) — REVAL[it.product_code] 가 아직 없으면
+       (재검증 응답 도착 전) 아무것도 안 붙인다 — 응답이 오면 s2Revalidate 가 이
+       s2apply 를 다시 불러 배지가 그때 붙는다(아래). 「품절」은 재고(stock_qty)가
+       실제로 0인 경우에만 쓴다 — 검수 회부·판매상태 변경 등 다른 사유까지 전부
+       「품절」이라 부르면 거짓말이 된다(서버 api/recommend.py `/recommend/revalidate`
+       주석 — CANON §2, admin_pool.py 8개 조건 중 3개만 베낀 오진과 같은 함정).
+       그래서 reason==='sold_out' 일 때만 「품절」, 그 밖은 서버가 이미 중립적으로
+       고른 "구매 불가"를 그대로 쓴다. */
+    var rv=REVAL[it.product_code];
+    var rvBadge=(rv&&rv.unavailable)
+     ?' <span style="color:#b31b25;font-weight:800;font-size:11px;background:#fbecec;'
+      +'padding:2px 7px;border-radius:6px;">'+esc(rv.reason==='sold_out'?'품절':'구매 불가')+'</span>'
+     :'';
     /* it.name(display_name 처리된 상품명)과 PART_KO 미스매치 시 폴백(it.part_type,
        서버 분류 원문)은 esc() 로 감싼다 — it.product_code 는 정수(attribute 문맥이라도
        숫자만 온다는 것을 parseInt 사용부(774-779행)가 이미 전제한다)라 손대지 않는다. */
@@ -814,7 +898,7 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
      +'font-size:13.5px;gap:10px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px;">'
      +'<span style="color:#9a968d;flex:0 0 auto;">'+esc(PART_KO[it.part_type]||it.part_type)+'</span>'
      +'<span style="font-weight:700;text-align:right;">'+esc(it.name)
-     +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span>'+mk+'</span></div>';
+     +' <span style="color:#9a968d;font-weight:600;">'+it.price.toLocaleString()+'</span>'+mk+rvBadge+'</span></div>';
    }).join('');
    /* 재사용 슬롯(customer-audit-2026-08-24 §1-1) — s.items 에는 애초에 없다(엔진이
       그 자리를 아예 안 채운다, api/recommend.py _build_set의 active_slots). 빠진
@@ -1090,6 +1174,49 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
    if(cp)cp.textContent='—';
    if(cp2)cp2.textContent='—';
   }
+  /* 재검증 배너 + 장바구니 잠금(2026-08-29, 사장님 결정 "S2 가 열릴 때 서버에 다시
+     묻는다") — REVAL 은 s2Revalidate() 응답이 오기 전엔 비어 있어 bad.length 가
+     항상 0 이다(위 REVAL 선언 주석 — «아직 모른다»를 «가능하다»로 지어내지 않고
+     그냥 배너 없이 넘어간다). 응답이 오면 s2Revalidate 의 콜백이 이 s2apply 를
+     다시 불러 여기까지 재실행된다 — 그때 실제로 빠진 부품이 있으면 배너가 뜬다.
+     ★ cartBtn 을 btnRow 안에서 «하나만» 찾던 것을 걷었다(2026-08-29 확인자 실측
+     결함 — 상단 navbar·하단 마감 CTA 두 버튼이 안 막혀 s4-cart.html 까지 샜다).
+     아래는 s2CartBtns()(위에서 정의, 문서 전체에서 같은 텍스트를 찾는다)로 셋
+     모두를 다루는 s2LockCart/s2UnlockCart 를 부른다. */
+  var rbnr=document.getElementById('s2-reval-banner');
+  if(!rbnr&&listWrap){
+   rbnr=document.createElement('div');rbnr.id='s2-reval-banner';
+   rbnr.style.cssText='margin-top:12px;padding:12px 14px;border-radius:11px;font-size:12.5px;'
+    +'line-height:1.6;font-weight:700;display:none;';
+   listWrap.parentNode.insertBefore(rbnr,btnRow||null);
+  }
+  if(rbnr){
+   var badParts=(s.items||[]).filter(function(it){var rv=REVAL[it.product_code];return rv&&rv.unavailable;});
+   if(badParts.length){
+    // 살 수 없는 부품을 아무 표시 없이 두지 않는다(§화면 정직성) — 그리고 "품절입니다"로
+    // 끝내지 않는다(막다른 길 금지) — 다음 걸음(부품 변경, 이미 있는 S3 흐름)을 명시한다.
+    var names=badParts.map(function(it){
+     var rv=REVAL[it.product_code];
+     return (PART_KO[it.part_type]||it.part_type)+'('+(rv.message||'구매 불가')+')';
+    }).join(' · ');
+    rbnr.style.display='block';rbnr.style.background='#fbecec';rbnr.style.color='#8a1620';
+    rbnr.textContent='이 구성 중 '+badParts.length+'개 부품을 지금은 담을 수 없습니다 — '+names
+     +'. 아래 [부품 변경]에서 다른 부품으로 바꿔 주세요.';
+    // 담을 수 없는 부품이 낀 채로 결제 화면까지 넘어가지 않게 막는다 — 셋 다.
+    s2LockCart('지금 담을 수 없는 부품이 있습니다 — 먼저 부품 변경에서 바꿔 주세요');
+   }else if(revalFailed){
+    // 재검증 자체가 실패한 경우(네트워크 오류 등) — 견적을 아예 못 보게 막지 않는다
+    // (그러면 더 나쁘다) 그리고 조용히 넘어가지도 않는다(원래 결함이 그대로 남는다) —
+    // 확인이 안 됐다는 사실만 알리고, 장바구니 담기는 그대로 둔다(fail-open).
+    rbnr.style.display='block';rbnr.style.background='#f4f2ec';rbnr.style.color='#7a756b';
+    rbnr.textContent='부품 재고 확인에 실패했습니다 — 화면 정보가 방금 확인한 것이 아닐 수'
+     +' 있습니다. [부품 변경]에서 다시 확인할 수 있습니다.';
+    s2UnlockCart();
+   }else{
+    rbnr.style.display='none';
+    s2UnlockCart();
+   }
+  }
   s2why(k);        // 근거 문구는 이 티어의 확정 구성으로 따로 받아 온다(위 s2why 주석)
  };
  // null 티어 탭 비활성
@@ -1105,6 +1232,55 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   :(Q.sets.recommend?'recommend':(Q.sets.value?'value':'highend'));
  document.querySelectorAll('.s2tab').forEach(function(t){var on=t.getAttribute('data-set')===first;t.classList.toggle('is-active',on);t.setAttribute('aria-selected',on?'true':'false');});
  s2apply(first);
+ /* ---- 재검증 — S2 가 열릴 때 서버에 다시 묻는다(2026-08-29 사장님 결정) ----
+    localStorage 스냅샷은 «만들어진 순간»의 사실이다. 그 뒤로 후보 자격이 바뀔 수
+    있다 — 실측: 가성비형 견적에 담긴 상품 118329 가 19:39:46 마지막으로 화면에
+    들어갔고 19:55:01(mall_sync_runs.run_id=2, "전 공급처 품절")에 후보에서 빠졌다.
+    15분 15초 뒤 「부품 변경」을 눌렀다면 이미 살 수 없는 부품이었다. 판정은 서버
+    (`POST /api/recommend/revalidate`, api/recommend.py)가 `_load_pool()` 하나로
+    내린다 — 여기서는 그 결과를 REVAL 에 채우고 다시 그리기만 한다.
+    세 티어(value·recommend·highend)에 등장하는 부품 코드를 한 번에 모아 묻는다 —
+    같은 코드가 여러 티어에 겹칠 수 있어(Set) 같은 상품을 두 번 묻지 않는다. */
+ function s2RevalCodes(){
+  var set={};
+  ['value','recommend','highend'].forEach(function(t){
+   var s=Q.sets[t];if(!s)return;
+   (s.items||[]).forEach(function(it){if(it.product_code!=null)set[it.product_code]=1;});
+  });
+  return Object.keys(set).map(function(x){return parseInt(x,10);});
+ }
+ function s2Revalidate(){
+  var codes=s2RevalCodes();
+  if(!codes.length)return;
+  fetch('/api/recommend/revalidate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({product_codes:codes})})
+   .then(function(r){return r.json().catch(function(){return null;})
+     .then(function(j){return {ok:r.ok,j:j};});})
+   .then(function(res){
+    if(!res.ok||!res.j||!Array.isArray(res.j.items)){
+     console.warn('[s2] revalidate response unusable - status='+(res.j?'parsed':'unparsed'));
+     revalFailed=true;
+    }else{
+     REVAL={};
+     res.j.items.forEach(function(it){REVAL[it.product_code]=it;});
+     revalFailed=false;
+    }
+    // 늦게 온 응답이 그 사이 사용자가 옮겨 간 다른 화면을 덮지 않는다 — 지금
+    // 활성 탭 기준으로만 다시 그린다(s2why 의 같은 관례를 그대로 따른다).
+    var at=document.querySelector('.s2tab.is-active');
+    s2apply(at?at.getAttribute('data-set'):first);
+   })
+   .catch(function(e){
+    // 실패를 삼키지 않는다 — 조용히 넘어가면 원래 결함(굳은 견적을 그대로 보여줌)이
+    // 그대로 남는다. 그렇다고 견적 자체를 막지도 않는다(그러면 더 나쁘다) — 위
+    // s2apply 의 revalFailed 분기가 "확인 못 했다"는 사실만 화면에 알린다.
+    console.warn('[s2] revalidate request failed -',e);
+    revalFailed=true;
+    var at2=document.querySelector('.s2tab.is-active');
+    s2apply(at2?at2.getAttribute('data-set'):first);
+   });
+ }
+ s2Revalidate();
  /* 선택 = 곧 상태다. 탭을 누른 그 순간 저장한다 — 버튼을 누를 때까지 미루면
     그 사이 어떤 경로로 나가든(링크·뒤로가기) 선택이 사라진다. capture로 붙여
     더미 핸들러보다 먼저 기록한다. */
