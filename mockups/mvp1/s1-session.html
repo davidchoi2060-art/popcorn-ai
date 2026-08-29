@@ -2465,20 +2465,28 @@ if(s1Draft&&(s1Draft.consPairs||[]).length){
    사이드바 칩까지 재현)이고, 이건 «아직 전송 전인 원문 한 줄»이라 입력창 값 하나만
    채운다. 둘 다 있어도(옛 조건 복원 + 새 문구 채움) 서로 다른 자리를 채워 겹치지 않고,
    어느 쪽이 "이겨야" 하는지 판단할 필요 자체가 없다 — 둘 다 그대로 살린다.
-   ⚠ 한 번 쓰면 반드시 지운다(읽자마자 removeItem, 실패해도 계속 진행) — 안 지우면
-   다음에 이 화면을 열 때마다(뒤로가기·재방문) 옛 문구가 매번 되살아난다. TTL 은 새로
-   만들지 않고 이미 있는 DRAFT_TTL_MS(2시간)를 그대로 쓴다 — S2->S1 리다이렉트는 거의
-   항상 즉시라 보통 안에 들지만, 탭을 오래 열어 둔 뒤 우연히 남은 값을 몇 시간 뒤에
-   되살리지는 않는다. */
+   ⚠ 지우는 시점을 한 곳에 몰지 않는다(2026-08-29, 확인자 실측 — 처음 버전은 읽자마자
+   무조건 removeItem 한 뒤에야 모드를 봤다. expert 모드로 열면 입력창이 없어 아무것도
+   못 보여주는데 키는 이미 사라진 뒤였다 — 이 항목이 고치려던 결함(고객이 쓴 말이
+   조용히 사라짐)을 «expert 로 들어왔을 때»로 다시 만드는 것과 같았다). 지금은 «지금
+   당장 보여줄 수 있는가»를 지우기보다 앞에 둔다: 입력창이 없으면(expert) 지우지
+   않고 남겨 값을 살려 두고, 다음에 입력창이 있는 모드로 오면 그때 지우며 보여준다.
+   TTL(DRAFT_TTL_MS, 2시간 — s1Draft 것을 그대로 쓴다·새로 만들지 않음)은 모드 판정보다
+   먼저 본다: 파싱 실패·빈 문구·시간 초과처럼 «다시 봐도 못 쓸 값»은 모드와 무관하게
+   그 자리에서 지운다 — expert 라고 봐줄 이유가 없는 값이기 때문이다. 그래서 남겨 두는
+   값은 항상 아직 TTL 안인 값뿐이고, 그 값도 무한정 남지 않는다 — 다음 방문(모드
+   무관)의 TTL 검사가 만료를 잡는다. 탭을 닫으면 sessionStorage 자체가 사라지므로
+   그 경로는 따로 다루지 않는다. 지우는 시도는 여전히 try/catch 로 감싸 실패해도
+   계속 진행한다. */
 (function(){
  var raw;try{raw=sessionStorage.getItem('popcorn-s2-refine-draft');}catch(e){return;}
  if(!raw)return;
- try{sessionStorage.removeItem('popcorn-s2-refine-draft');}catch(e){}   /* 읽자마자 지운다 — 1회성 */
- if(!inp||mode==='expert')return;   /* expert 는 입력창 자체를 숨긴다(위 mode==='expert' 초기화) — 채울 자리가 없다 */
  var d=null;try{d=JSON.parse(raw);}catch(e){}
- if(!d)return;
- var text=d.text?String(d.text).trim():'';
- if(!text||!d.at||(Date.now()-d.at)>DRAFT_TTL_MS)return;
+ var text=d&&d.text?String(d.text).trim():'';
+ var stale=!d||!text||!d.at||(Date.now()-d.at)>DRAFT_TTL_MS;   /* 파싱 실패·빈 문구·TTL 초과 — 모드를 볼 것도 없이 지운다 */
+ if(stale){try{sessionStorage.removeItem('popcorn-s2-refine-draft');}catch(e){}return;}
+ if(!inp||mode==='expert')return;   /* expert 는 입력창 자체를 숨긴다(위 mode==='expert' 초기화) — 지금은 보여줄 자리가 없을 뿐 값은 아직 유효하므로 지우지 않는다(다음 방문에서 위 TTL 검사가 다시 판정) */
+ try{sessionStorage.removeItem('popcorn-s2-refine-draft');}catch(e){}   /* 여기서부터는 실제로 채워 보여주므로 1회성으로 지운다 */
  inp.value=text;
  addAI('이전 화면에서 남기신 요청을 입력창에 옮겨 놨어요 — 확인하시고 <b>보내기</b>를 누르면 이 상담 조건에 반영됩니다.<br>'
   +'<span style="font-size:12.5px;color:#8a8578;">"'+esc(text)+'"</span>');
