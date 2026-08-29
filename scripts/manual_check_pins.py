@@ -1,5 +1,18 @@
 # -*- coding: utf-8 -*-
-"""운영자 매뉴얼 — 핀(.pin 배지) 좌표 자동 검사 (2026-08-29 신설, 같은 날 인쇄 폭 추가).
+"""운영자 매뉴얼 — 핀(.pin 배지) 좌표 자동 검사 (2026-08-29 신설, 같은 날 인쇄 폭 추가,
+같은 날 「그림이 지금 화면과 같은가」 신선도 검사 추가).
+
+⚠ **이 파일이 원래 못 보는 것 (2026-08-29 결함⑥ — 왜 신선도 검사를 더했는가)**:
+아래 두 검사(경계 이탈·상호 겹침)는 **매뉴얼 문서 안의 그림·핀만** 본다 — "이미지 «안»
+에서 핀끼리 안 겹치는가"다. **"그 이미지가 지금 관리자 화면과 같은가"는 이 두 검사
+어느 쪽도 보지 않는다.** 2026-08-27 커밋 f888e07(`admin2.css`, `--a2-zoom:1.15` 신설 —
+이 파일은 그 커밋을 건드리지 않는다)이 콘텐츠 영역을 15% 키우고 재배치했는데, 그 전에
+찍은 캡처 6개(dashboard·products·reviews·categories·operators·ops-settings)가 낡은
+채로도 이 스크립트는 계속 "위반 0건"을 냈다 — 거짓말은 아니었다(원래 그건 안 재는
+검사였다), 다만 아무도 신선도를 자동으로 재고 있지 않았다. 그래서 **셋째 검사**
+(`scripts/manual_check_freshness.py`, 좌표 JSON의 실측 px를 지금 화면에서 같은
+선택자로 다시 재 비교)를 추가해 **기본 실행에 넣는다** — "기본에 안 들어간 검사는
+아무도 안 돌린다"가 바로 위 인쇄 검사가 두 달 숨어 있던 이유였다.
 
 배경 — 2026-08-28에 핀 9쌍 겹침을 고쳤는데, 2026-08-29에 새 매뉴얼 5개(259개 핀)에서
 또 6곳(경계 이탈 3곳 · 상호 겹침 3곳)이 나왔다. 「핀을 어디에 두면 안 되는지」가 코드
@@ -37,15 +50,26 @@ print·폭만 PRINT_WIDTH로 바꿔 같은 판정을 추가한다 — 판정 기
 사용법(서버를 먼저 띄우고, --base로 «그 포트»를 가리킨다 — 기본값은 8000, 이 검사는
 읽기 전용 GET만 나가므로 사장님 서버에 그대로 돌려도 안전하다):
 
-    .venv/Scripts/python scripts/manual_check_pins.py                 # 화면 4폭 + 인쇄, 기본값
+    .venv/Scripts/python scripts/manual_check_pins.py                 # 화면4폭+인쇄+신선도, 기본값
     .venv/Scripts/python scripts/manual_check_pins.py --base=http://127.0.0.1:8002
     .venv/Scripts/python scripts/manual_check_pins.py --slugs=catalog-import,margin-policy
     .venv/Scripts/python scripts/manual_check_pins.py --print-only     # 인쇄만(빠른 반복용)
     .venv/Scripts/python scripts/manual_check_pins.py --screen-only    # 화면 4폭만(기존 동작)
+    .venv/Scripts/python scripts/manual_check_pins.py --freshness-only # 신선도만(빠른 반복용)
+    .venv/Scripts/python scripts/manual_check_pins.py --no-freshness   # 핀 검사만(기존 동작 그대로)
+    .venv/Scripts/python scripts/manual_check_pins.py --fresh-threshold=3.0
 
-종료 코드 0 = 전 폭(화면 4 + 인쇄)·전 화면 위반 0건. 0이 아니면 위반이 있다(회귀·CI에서
-그대로 쓸 수 있다). **기본값이 인쇄까지 포함한다** — 옵션으로 두면 다음 사람이 잊고
-안 돌린다(이번 결함이 정확히 그렇게 숨어 있었다).
+종료 코드 0 = 전 폭(화면 4 + 인쇄) 핀 위반 0건 **그리고** 신선도 위반 0건. 0이 아니면
+위반이 있다(회귀·CI에서 그대로 쓸 수 있다). **기본값이 인쇄·신선도까지 포함한다** —
+옵션으로 두면 다음 사람이 잊고 안 돌린다(인쇄 검사가 정확히 그렇게 두 달 숨어
+있었다). `--screen-only`/`--print-only`는 **핀 검사 쪽 폭 선택만** 바꾼다(기존 동작
+그대로 — 신선도는 폭 개념이 없어 이 두 옵션과 무관하게 계속 돈다). 신선도만 끄거나
+신선도만 돌리려면 `--no-freshness`/`--freshness-only`를 따로 쓴다.
+
+신선도 검사가 «무엇을»·«왜»·«어떻게» 재는지는 `scripts/manual_check_freshness.py`
+모듈 docstring 참고 — 이 파일은 그 판정 로직을 다시 적지 않고 그 모듈의
+`run_freshness_checks()`를 그대로 불러 쓴다(판정 기준을 두 곳에 적지 않는다, 이
+파일 자신이 화면 검사·인쇄 검사에서 이미 지키는 원칙과 같다).
 
 대상 화면 목록은 `api/admin_ui_manual.py`의 `MANUAL_SCREENS`를 다시 읽지 않는다(그 파일은
 이 작업의 담당 밖이라 import하지 않는다 — 순환 의존·부팅 부작용을 피한다). 대신
@@ -57,6 +81,8 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from manual_capture_common import BASE, capture_session, log  # noqa: E402
+from manual_check_freshness import PX_THRESHOLD as FRESH_PX_THRESHOLD  # noqa: E402
+from manual_check_freshness import run_freshness_checks  # noqa: E402
 
 FRAGMENTS_DIR = pathlib.Path(__file__).resolve().parent.parent / "docs" / "manual" / "screens"
 WIDTHS = [1680, 1192, 768, 480]
@@ -211,6 +237,11 @@ def main() -> int:
     slugs = None
     check_screen = True
     check_print = True
+    # 신선도(그림 vs 실화면) — 기본 True. `--screen-only`/`--print-only`는 «핀 검사의
+    # 폭 선택»만 바꾸는 기존 옵션이라 건드리지 않는다(신선도는 폭 개념이 없다 — 위
+    # docstring 참고) — 끄거나 단독으로 돌리려면 별도 옵션을 쓴다.
+    check_fresh = True
+    fresh_threshold = FRESH_PX_THRESHOLD
     for arg in sys.argv[1:]:
         if arg.startswith("--base="):
             base = arg.split("=", 1)[1]
@@ -220,12 +251,21 @@ def main() -> int:
             check_print = False
         elif arg == "--print-only":
             check_screen = False
+        elif arg == "--freshness-only":
+            check_screen = False
+            check_print = False
+        elif arg == "--no-freshness":
+            check_fresh = False
+        elif arg.startswith("--fresh-threshold="):
+            fresh_threshold = float(arg.split("=", 1)[1])
     slugs = slugs or discover_slugs()
 
     screen_violations = 0
     screen_total = 0
     print_violations = 0
     print_total = 0
+    fresh_checked = fresh_bad_screens = fresh_bad_elements = 0
+    fresh_skip = fresh_live = 0
 
     with capture_session() as page:
         if check_screen:
@@ -277,12 +317,30 @@ def main() -> int:
                 for v in o:
                     log(f"    print [겹침] {v['fig']} pins={v['pins']} {v['w']}x{v['h']}px")
 
-    total_violations = screen_violations + print_violations
+        if check_fresh:
+            # 신선도(그림 vs 실화면) — 판정 로직은 여기 다시 적지 않는다(정의는
+            # scripts/manual_check_freshness.py 한 곳). 같은 브라우저 세션(page)을
+            # 그대로 넘겨 브라우저를 두 번 띄우지 않는다. 반환 5개(건너뜀·동적 제외
+            # 총합 포함) — 그 모듈의 `run_freshness_checks()` docstring 참고.
+            (fresh_checked, fresh_bad_screens, fresh_bad_elements,
+             fresh_skip, fresh_live) = run_freshness_checks(
+                page, base, slugs, threshold=fresh_threshold)
+
+    total_violations = screen_violations + print_violations + fresh_bad_elements
     log("")
     if check_screen:
         log(f"화면 4폭 - 핀 {screen_total}개 · 위반 {screen_violations}건")
     if check_print:
         log(f"인쇄(print {PRINT_WIDTH}px) - 핀 {print_total}개 · 위반 {print_violations}건")
+    if check_fresh:
+        fresh_extras = []
+        if fresh_skip:
+            fresh_extras.append(f"건너뜀 {fresh_skip}건")
+        if fresh_live:
+            fresh_extras.append(f"동적 요소 제외 {fresh_live}건")
+        fresh_extra_s = f" · {' · '.join(fresh_extras)}" if fresh_extras else ""
+        log(f"신선도(그림 vs 실화면, {fresh_threshold}px 문턱) - 화면 {fresh_checked}개 검사 "
+            f"· 위반 화면 {fresh_bad_screens}개 · 위반 요소 {fresh_bad_elements}개{fresh_extra_s}")
     log(f"합계 위반 {total_violations}건 (0이면 통과)")
     return 1 if total_violations else 0
 
