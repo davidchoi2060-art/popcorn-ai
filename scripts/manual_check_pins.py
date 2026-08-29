@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""운영자 매뉴얼 — 핀(.pin 배지) 좌표 자동 검사 (2026-08-29 신설).
+"""운영자 매뉴얼 — 핀(.pin 배지) 좌표 자동 검사 (2026-08-29 신설, 같은 날 인쇄 폭 추가).
 
 배경 — 2026-08-28에 핀 9쌍 겹침을 고쳤는데, 2026-08-29에 새 매뉴얼 5개(259개 핀)에서
 또 6곳(경계 이탈 3곳 · 상호 겹침 3곳)이 나왔다. 「핀을 어디에 두면 안 되는지」가 코드
@@ -23,14 +23,29 @@
 (margin-policy 핀 47·50 실례 — 1680px에서도 위반이었다). 즉 "좁은 폭에서만 보면 된다"는
 가정 자체가 틀렸다 — 네 폭을 다 재야 하는 이유다.
 
+⚠ **왜 인쇄(print) 폭도 본다 (2026-08-29 결함⑤ 후속)** — 이 스크립트는 원래 화면(screen)
+4폭만 쟀다. 그런데 `@media print`는 **전혀 다른 CSS 규칙 집합**이라(그림 min-width 바닥이
+풀리는 폭도 다르고, `.pin` 배지 크기도 print 전용 규칙으로 따로 줄어든다 — `manual.html.j2`
+`@media print` 안 `.manual-doc .pin{transform:...scale(...)}` 참고) 화면 4폭이 0건이어도
+인쇄에서는 별개로 위반이 날 수 있다 — 실제로 그랬다: 화면은 늘 0건이었는데 인쇄
+전용 폭(A4 186mm ≈ 703px)에서 74장이 폭 초과, 그걸 고치자 핀 겹침이 79건 새로 났고,
+**둘 다 이 스크립트가 스크린 폭만 재는 한 영원히 안 걸렸을 것이다**(확인자가 별도
+스크립트로 재현해서야 드러났다). 그래서 화면 검사와 **같은 `analyze()`**로, 미디어만
+print·폭만 PRINT_WIDTH로 바꿔 같은 판정을 추가한다 — 판정 기준(사각형 교차)을 두 벌로
+적지 않는다.
+
 사용법(서버를 먼저 띄우고, --base로 «그 포트»를 가리킨다 — 기본값은 8000, 이 검사는
 읽기 전용 GET만 나가므로 사장님 서버에 그대로 돌려도 안전하다):
 
-    .venv/Scripts/python scripts/manual_check_pins.py
+    .venv/Scripts/python scripts/manual_check_pins.py                 # 화면 4폭 + 인쇄, 기본값
     .venv/Scripts/python scripts/manual_check_pins.py --base=http://127.0.0.1:8002
     .venv/Scripts/python scripts/manual_check_pins.py --slugs=catalog-import,margin-policy
+    .venv/Scripts/python scripts/manual_check_pins.py --print-only     # 인쇄만(빠른 반복용)
+    .venv/Scripts/python scripts/manual_check_pins.py --screen-only    # 화면 4폭만(기존 동작)
 
-종료 코드 0 = 전 폭·전 화면 위반 0건. 0이 아니면 위반이 있다(회귀·CI에서 그대로 쓸 수 있다).
+종료 코드 0 = 전 폭(화면 4 + 인쇄)·전 화면 위반 0건. 0이 아니면 위반이 있다(회귀·CI에서
+그대로 쓸 수 있다). **기본값이 인쇄까지 포함한다** — 옵션으로 두면 다음 사람이 잊고
+안 돌린다(이번 결함이 정확히 그렇게 숨어 있었다).
 
 대상 화면 목록은 `api/admin_ui_manual.py`의 `MANUAL_SCREENS`를 다시 읽지 않는다(그 파일은
 이 작업의 담당 밖이라 import하지 않는다 — 순환 의존·부팅 부작용을 피한다). 대신
@@ -48,6 +63,15 @@ WIDTHS = [1680, 1192, 768, 480]
 HEIGHT = 1400  # 실측(2026-08-29): 이 페이지는 뷰포트 높이가 바뀌어도 배지·그림 렌더 크기에
 # 영향이 없다(admin2 셸이 오버레이 스크롤바를 쓴다 — 스크롤이 가로폭을 잠식하지 않는다).
 # 값 자체는 스크롤 걱정 없이 넉넉히만 잡으면 된다.
+
+# 인쇄 폭 — `manual.html.j2`의 `@media print{ @page{size:A4;margin:14mm 12mm} }`와
+# 같은 계산이다: 210mm(A4 폭) - 12mm*2(좌우 여백) = 186mm, 96dpi 환산 186*96/25.4 ≈
+# 703px(둘을 따로 적지 않으려 했지만 이 스크립트는 CSS를 파싱하지 않으므로 상수로 둔다 —
+# `@page` 여백이 바뀌면 이 값도 함께 고친다). 확인자의 재현 스크립트와 같은 값.
+PRINT_WIDTH = 703
+PRINT_HEIGHT = 4000  # emulate_media("print")는 `page.pdf()`처럼 실제 페이지를 나누지 않고
+# 연속 레이아웃으로 그린다(page-break-*는 무시됨) — 그래서 세로로 긴 매뉴얼 한 장을 통째로
+# 담을 넉넉한 높이만 있으면 된다(스크롤·페이지 경계 걱정 없음). 확인자 재현 스크립트와 동일.
 
 # 사각형 교차를 셀 때 부동소수 렌더링 잡음을 무시하는 문턱(px). 0에 가깝게 잡아도 되지만
 # 완전히 0으로 하면 브라우저 서브픽셀 반올림(0.0x px 수준)이 "위반"으로 잘못 잡힌다.
@@ -87,6 +111,44 @@ JS = r"""
 """
 
 
+def _console_safe(s: str) -> str:
+    """콘솔이 인코딩 못 하는 문자를 안전하게 바꾼다 — 크래시 대신 이스케이프로 남긴다.
+
+    ⚠ 여기서 고치는 것은 "정적 로그 문자열에 em-dash를 썼다"가 «아니다» — 이 스크립트의
+    로그 문자열 자체는 이미 ASCII다. 문제는 fig 제목이 `docs/manual/screens/*.html`
+    원문 <h3> 텍스트를 그대로 읽어온 **동적** 값이라는 점이다(다른 제작자 소유 —
+    이 스크립트가 원문을 고치지 않는다). 그 원문에 em-dash(U+2014) 같은 문자가 있으면
+    cp949 콘솔에서 print() 자체가 UnicodeEncodeError로 죽는다(2026-08-29 확인자 재현 —
+    products.html 그림 E "…일괄 변경 — 행 선택…"이 실제 그 문자를 담고 있다, 실측
+    확인: '\\u2014'.encode('cp949')가 실패한다). 이 스크립트가 원문 문자열 «값»을 바꿀
+    수는 없으니, print() 직전에만 — 실제 콘솔 인코딩(sys.stdout.encoding)이 못 담는
+    문자만 골라 — 이스케이프 표기로 바꾼다. cp949를 가정하지 않는다: UTF-8 콘솔에서는
+    그대로 통과한다(encode 성공 시 원문 그대로 반환).
+    """
+    enc = sys.stdout.encoding or "utf-8"
+    try:
+        s.encode(enc)
+        return s
+    except UnicodeEncodeError:
+        return s.encode(enc, errors="backslashreplace").decode(enc)
+
+
+def _sanitize_shots(shots):
+    """`page.evaluate(JS)`가 돌려준 fig 제목·핀 번호를 로그에 안전하게 만들어 둔다.
+
+    `analyze()`가 만드는 `boundary`/`overlap` 딕셔너리도, 화면 루프·`_check_print()`
+    양쪽의 `log()` 호출부도 전부 이 값을 그대로 이어받는다 — 호출부마다 각자
+    `_console_safe()`를 부르게 하면 하나를 빠뜨릴 수 있으므로(CANON.md "한 문단에
+    수정이 둘일 때 하나만 적용" 함정과 같은 모양), `page.evaluate(JS)` 직후 딱 한
+    곳에서만 적용해 이후 경로 전체가 안전해지게 한다.
+    """
+    for s in shots:
+        s["fig"] = _console_safe(s["fig"])
+        for p in s["pins"]:
+            p["num"] = _console_safe(p["num"])
+    return shots
+
+
 def analyze(shots, noise=NOISE_PX):
     boundary, overlap, total = [], [], 0
     for s in shots:
@@ -120,50 +182,109 @@ def discover_slugs() -> list[str]:
     return sorted(p.stem for p in FRAGMENTS_DIR.glob("*.html"))
 
 
+def _check_print(page, base: str, slug: str):
+    """슬러그 하나를 인쇄 미디어(emulate_media="print") · PRINT_WIDTH(703px)에서 잰다.
+
+    화면 검사와 **같은 `analyze()`**를 그대로 쓴다 — 판정 기준(사각형 교차)을 두 곳에
+    다시 적지 않는다. 반환값은 화면 루프의 `per_width[w]`와 같은 `(total, boundary,
+    overlap)` 튜플, `.manual-doc`이 없으면(설명서 없음) `None`.
+
+    끝나기 전에 `emulate_media("screen")`으로 되돌린다 — 이 함수가 화면 루프 «뒤»에
+    슬러그마다 한 번씩 불리므로, 되돌려 놓지 않으면 다음 슬러그의 goto가 print 미디어를
+    문 채로 남는다(같은 페이지·세션을 화면·인쇄 양쪽이 순서대로 재사용하기 때문).
+    """
+    page.emulate_media(media="print")
+    page.set_viewport_size({"width": PRINT_WIDTH, "height": PRINT_HEIGHT})
+    page.goto(f"{base}/admin2/manual/{slug}", wait_until="networkidle")
+    if not page.query_selector(".manual-doc"):
+        page.emulate_media(media="screen")
+        return None
+    page.wait_for_timeout(80)
+    shots = _sanitize_shots(page.evaluate(JS))
+    result = analyze(shots)
+    page.emulate_media(media="screen")
+    return result
+
+
 def main() -> int:
     base = BASE
     slugs = None
+    check_screen = True
+    check_print = True
     for arg in sys.argv[1:]:
         if arg.startswith("--base="):
             base = arg.split("=", 1)[1]
         elif arg.startswith("--slugs="):
             slugs = [s.strip() for s in arg.split("=", 1)[1].split(",") if s.strip()]
+        elif arg == "--screen-only":
+            check_print = False
+        elif arg == "--print-only":
+            check_screen = False
     slugs = slugs or discover_slugs()
 
-    violations = 0
-    grand_total = 0
-    with capture_session() as page:
-        for slug in slugs:
-            per_width = {}
-            for w in WIDTHS:
-                page.set_viewport_size({"width": w, "height": HEIGHT})
-                page.goto(f"{base}/admin2/manual/{slug}", wait_until="networkidle")
-                if not page.query_selector(".manual-doc"):
-                    log(f"[SKIP] {slug} - /admin2/manual/{slug} 에 .manual-doc 없음(설명서 없음)")
-                    per_width = None
-                    break
-                page.wait_for_timeout(80)
-                shots = page.evaluate(JS)
-                total, b, o = analyze(shots)
-                per_width[w] = (total, b, o)
-            if not per_width:
-                continue
-            total0 = per_width[WIDTHS[0]][0]
-            grand_total += total0
-            bad = {w: (b, o) for w, (t, b, o) in per_width.items() if b or o}
-            if not bad:
-                log(f"[OK] {slug}  핀 {total0}개  전 폭 경계이탈 0 · 겹침 0")
-                continue
-            log(f"[FAIL] {slug}  핀 {total0}개")
-            for w, (b, o) in bad.items():
-                violations += len(b) + len(o)
-                for v in b:
-                    log(f"    {w}px [경계] {v['fig']} pin={v['pin']} {v['side']} {v['px']}px")
-                for v in o:
-                    log(f"    {w}px [겹침] {v['fig']} pins={v['pins']} {v['w']}x{v['h']}px")
+    screen_violations = 0
+    screen_total = 0
+    print_violations = 0
+    print_total = 0
 
-    log(f"\n총 핀 {grand_total}개 · 위반 {violations}건 (0이면 통과)")
-    return 1 if violations else 0
+    with capture_session() as page:
+        if check_screen:
+            for slug in slugs:
+                per_width = {}
+                for w in WIDTHS:
+                    page.set_viewport_size({"width": w, "height": HEIGHT})
+                    page.goto(f"{base}/admin2/manual/{slug}", wait_until="networkidle")
+                    if not page.query_selector(".manual-doc"):
+                        log(f"[SKIP] {slug} - /admin2/manual/{slug} 에 .manual-doc 없음(설명서 없음)")
+                        per_width = None
+                        break
+                    page.wait_for_timeout(80)
+                    shots = _sanitize_shots(page.evaluate(JS))
+                    total, b, o = analyze(shots)
+                    per_width[w] = (total, b, o)
+                if not per_width:
+                    continue
+                total0 = per_width[WIDTHS[0]][0]
+                screen_total += total0
+                bad = {w: (b, o) for w, (t, b, o) in per_width.items() if b or o}
+                if not bad:
+                    log(f"[OK] {slug}  핀 {total0}개  화면 4폭 경계이탈 0 · 겹침 0")
+                    continue
+                log(f"[FAIL] {slug}  핀 {total0}개  (화면)")
+                for w, (b, o) in bad.items():
+                    screen_violations += len(b) + len(o)
+                    for v in b:
+                        log(f"    {w}px [경계] {v['fig']} pin={v['pin']} {v['side']} {v['px']}px")
+                    for v in o:
+                        log(f"    {w}px [겹침] {v['fig']} pins={v['pins']} {v['w']}x{v['h']}px")
+
+        if check_print:
+            # 인쇄 폭 검사(2026-08-29 결함⑤ 후속) — 왜 필요한지는 파일 docstring 참고.
+            for slug in slugs:
+                result = _check_print(page, base, slug)
+                if result is None:
+                    log(f"[SKIP] {slug} - print({PRINT_WIDTH}px) 에도 .manual-doc 없음")
+                    continue
+                total, b, o = result
+                print_total += total
+                if not (b or o):
+                    log(f"[OK] {slug}  핀 {total}개  print({PRINT_WIDTH}px) 경계이탈 0 · 겹침 0")
+                    continue
+                log(f"[FAIL] {slug}  핀 {total}개  (print {PRINT_WIDTH}px)")
+                print_violations += len(b) + len(o)
+                for v in b:
+                    log(f"    print [경계] {v['fig']} pin={v['pin']} {v['side']} {v['px']}px")
+                for v in o:
+                    log(f"    print [겹침] {v['fig']} pins={v['pins']} {v['w']}x{v['h']}px")
+
+    total_violations = screen_violations + print_violations
+    log("")
+    if check_screen:
+        log(f"화면 4폭 - 핀 {screen_total}개 · 위반 {screen_violations}건")
+    if check_print:
+        log(f"인쇄(print {PRINT_WIDTH}px) - 핀 {print_total}개 · 위반 {print_violations}건")
+    log(f"합계 위반 {total_violations}건 (0이면 통과)")
+    return 1 if total_violations else 0
 
 
 if __name__ == "__main__":
