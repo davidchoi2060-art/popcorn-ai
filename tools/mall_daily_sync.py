@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
-"""몰 공급처·가격 일일 자동 반영 -- 새벽 systemd timer 가 부른다 (2026-08-27 신설).
+"""몰 공급처·가격 갱신 -- 손으로 돌린다 (2026-08-27 자동 실행용으로 신설,
+2026-08-29 decision-log A-124로 손으로 돌리는 것으로 확정).
+
+⚠ **새벽 systemd timer 가 부르지 않는다.** 2026-08-27 작성 당시에는 그것이
+목적이었지만(deploy/systemd/popcorn-mall-sync.timer 가 그 산출물이다), 그 무인
+새벽 실행이 매번 유효한 쿠키를 요구하는 것과 부딪혀(§쿠키 참조) A-124가 자동
+스케줄을 켜지 않기로 정했다. 이 파일의 로직·안전장치는 그대로 유효하다 --
+바뀐 것은 "누가 언제 --apply 로 돌리는가"뿐이다(지금은 사람이 필요할 때 손으로).
 
 사장님이 어제(2026-08-26) 사람 손으로 한 절차를 그대로 자동화한다. 그 절차는 넷이다
 (순서대로 실행한다):
@@ -56,9 +63,12 @@
 
 ■ 쿠키
   MALL_ADMIN_COOKIE 를 환경에서 읽는다(tools/mall_supplier_fetch.py 가 이미 그렇게
-  한다 -- 이 파일은 그 규약을 그대로 따른다). **이 파일은 쿠키 값을 서버에 넣지
-  않는다** -- 어디에 어떤 이름으로 넣어야 하는지는 deploy/README.md 에 적었고,
-  실제로 넣는 것은 사장님과 하네스가 한다(비밀값을 다루는 것은 제작자 소관이 아니다).
+  한다 -- 이 파일은 그 규약을 그대로 따른다). **이 파일은 쿠키 값을 어디에도
+  저장하지 않는다** -- A-124(2026-08-29) 이후에는 서버 설정 파일(`/etc/popcorn-ai.env`)
+  에도 넣지 않는다. 사장님이 로그인해 둔 브라우저에서 값을 확인해 하네스에게
+  전달하면, 하네스가 그 값을 **이 실행 프로세스 하나에만 유효한 환경변수**로
+  넘겨 돌린다(비밀값을 다루는 것은 제작자 소관이 아니다). 절차는
+  deploy/README.md 「몰 공급처·가격 갱신」 §쿠키를 얻는 법.
 
 ■ 드라이런이 기본이다
   --apply 를 줘야 실제로 DB 에 쓴다(mall_sync_runs 행조차 만들지 않는다 -- 이
@@ -70,7 +80,7 @@ Usage:
   .venv/Scripts/python tools/mall_daily_sync.py --selftest
   .venv/Scripts/python tools/mall_daily_sync.py                 (드라이런 -- 전체 후보, DB 안 씀)
   .venv/Scripts/python tools/mall_daily_sync.py --limit 20       (드라이런 -- 20건만, 손으로 확인할 때)
-  .venv/Scripts/python tools/mall_daily_sync.py --apply          (실제 반영 -- systemd 가 매일 이걸 돌린다)
+  .venv/Scripts/python tools/mall_daily_sync.py --apply          (실제 반영 -- 필요할 때 사람이 손으로 돌린다. 자동 스케줄 없음, decision-log A-124)
 """
 import argparse
 import json

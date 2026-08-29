@@ -6,50 +6,63 @@
 페이지가 실제로 보여주는 "업체 여러 곳"(순위·공급가·리베이트·재고상태·연락처)을
 전부 읽어 product_supplier_prices(공급처별 값)와 suppliers(업체 연락처)에 채운다.
 
-■ 지금 쓰는 방식 (2026-08-26 사장님 결정 -- 쿠키를 파일에 두지 않는다)
-  이 페이지는 로그인 세션이 있어야 열린다(아래 §과거 방식 참조). **하네스가 브라우저로
-  직접 페이지를 읽어 HTML을 파일로 떨군다** -- .env에 쿠키를 넣지 않는다. 그래서 이
-  도구는 두 갈래로 나뉜다:
+■ 두 경로가 있다 -- 어느 쪽도 "폐기"가 아니다, run()의 file_map 인자로 갈린다
+  (아래 §실행 참조). **2026-08-29 결정(decision-log A-124)** -- 몰 공급처·가격
+  갱신은 자동 타이머로 돌리지 않고 손으로 돌린다. tools/mall_daily_sync.py 가
+  run()을 항상 file_map=None 으로 부르므로(그 파일 참조), **손으로 돌릴 때
+  실제로 타는 것은 ②(네트워크+쿠키) 경로다** -- "안 쓰는 것"은 이 경로 자체가
+  아니라 **자동 스케줄**이다. 쿠키는 여전히 .env 나 코드에 두지 않는다(아래
+  §세션) -- 하네스가 그 실행 한 번에만 유효한 환경변수로 넘긴다. 절차는
+  deploy/README.md 「몰 공급처·가격 갱신」 §쿠키를 얻는 법 참조.
 
-      가져오기      하네스가 브라우저로 페이지를 받아 파일로 저장한다(이 스크립트 밖의 일)
-      파싱·적재     이 스크립트가 --from-dir <폴더> 로 그 파일들을 읽어 처리한다
+      ① 파일 경로 (--from-dir)   하네스가 브라우저로 페이지를 직접 읽어 HTML을
+                                  파일로 떨군다 -- .env에 쿠키를 넣지 않는다.
+                                  가져오기(하네스가 브라우저로 페이지를 받아
+                                  파일로 저장, 이 스크립트 밖의 일)와 파싱·적재
+                                  (이 스크립트가 --from-dir <폴더> 로 그 파일들을
+                                  읽어 처리)로 나뉜다. 파일 이름은 상품번호를
+                                  담아야 한다(예: 121807.html -- 파일명 선두
+                                  숫자를 pd_no로 읽는다).
+      ② 네트워크+쿠키 경로       --from-dir 를 안 주면(file_map=None) 이 스크립트가
+         (file_map=None)          직접 몰에 GET 요청을 보낸다. 로그인 세션이
+                                  있어야 열리는 페이지라 MALL_ADMIN_COOKIE 를
+                                  os.environ 에서 읽는다(아래 §세션).
 
-  파일 이름은 상품번호를 담아야 한다(예: 121807.html -- 파일명 선두 숫자를 pd_no로
-  읽는다). 아래 §과거 방식(네트워크 직접 수집)은 지우지 않고 남겨 둔다 -- 나중에
-  로그인 세션을 다시 확보하면 그대로 쓴다. 지금 기본은 파일 처리다.
-
-■ (과거 방식 -- 2026-08-25 작성 당시 설계. 2026-08-26 사장님 결정으로 지금은 쓰지
-  않는다 -- 코드는 지우지 않고 남긴다) 세션 -- 이 페이지는 로그인 없이는 안 열린다
-  (2026-08-26 실측, 익명 GET)
+■ 세션 -- 이 페이지는 로그인 없이는 안 열린다 (2026-08-26 실측, 익명 GET)
     GET https://popcornpc.co.kr/adm_cate/product_com_list.php?pd_no=121807
     -> 200 OK인데 본문이 alert('로그인 하십시오') + location.replace('../bbs/login.php?...')
 
   로그인은 POST 폼 제출이라 이 스크립트가 대신하지 않는다(CLAUDE.md 규약 -- 몰에는
   GET만, 폼 제출 금지. 그리고 비밀번호를 이 저장소 어디에도 남기지 않는다는 규칙과도
-  맞다). 대신 **이미 로그인된 세션의 쿠키 값**을 사람이 한 번 복사해 .env에 넣는
-  방식이었다(지금은 쓰지 않음 -- 위 §지금 쓰는 방식 참조):
+  맞다). 대신 **이미 로그인된 세션의 쿠키 값**을 사람이 확인해 하네스에게 전달하고,
+  하네스가 그 값을 **그 실행 프로세스 하나에만 유효한 환경변수**로 넘긴다 -- 파일에는
+  쓰지 않는다(2026-08-26 결정 · 2026-08-29 A-124로 재확인, 예외 없음):
 
     1. 사장님 계정으로 popcornpc.co.kr 관리자에 브라우저로 로그인한다(평소 하던 대로).
     2. 개발자도구 Network 탭에서 /adm_cate/ 로 시작하는 아무 요청이나 열어
        Request Headers의 Cookie 값 전체를 복사한다.
-    3. .env에 한 줄 추가: MALL_ADMIN_COOKIE=<복사한 값 그대로>
+    3. 하네스가 그 값을 MALL_ADMIN_COOKIE 환경변수로 지정해 이 스크립트(또는
+       tools/mall_daily_sync.py)를 그 실행 한 번만 돌린다 -- .env 파일에는
+       추가하지 않는다.
     4. 세션은 유효기간이 있다 -- 로그인 페이지로 다시 튕기면(LoginRequired) 이 스크립트가
        즉시 전체 수집을 멈추고 이유를 말한다("이 상품 하나가 이상하다"가 아니라
-       "세션이 죽었다"이므로 낱개 실패로 취급하지 않는다). 다시 복사해 갱신한다.
+       "세션이 죽었다"이므로 낱개 실패로 취급하지 않는다). 그 실행은 버리고, 새
+       값을 다시 청해 처음부터 다시 돌린다.
 
   쿠키 값은 코드에 박지 않는다 -- 매번 os.environ에서 읽는다. .env는 gitignore 대상이라
-  이 값도 리포에 남지 않는다.
+  이 값도 리포에 남지 않는다(A-124 이후에는 .env 에도 넣지 않는다 -- 그 실행에만
+  쓰고 버리는 값이다).
 
 ■ 대상 -- --from-dir를 쓰면 대상은 그 폴더의 파일들이다(그 안에서도 --codes/--limit으로
-  다시 추릴 수 있다). --from-dir 없이 네트워크 경로(위 §과거 방식)를 쓰면 기본은 추천
+  다시 추릴 수 있다). --from-dir 없이 ②(네트워크+쿠키) 경로를 쓰면 기본은 추천
   후보(v_recommendation_candidates, 2026-08-26 실측 약 2,959건)다.
 
 ■ 드라이런이 기본이다. --apply를 줘야 실제로 DB에 쓴다. --from-dir/--from-cache는
-  네트워크를 아예 쓰지 않는다. (과거 방식인) 네트워크 경로는 드라이런에서도 몰에는
+  네트워크를 아예 쓰지 않는다. ②(네트워크+쿠키) 경로는 드라이런에서도 몰에는
   실제로 GET 요청을 보낸다(그래야 "몇 건이 어떻게 바뀔지" 셀 수 있다) -- DB에 안
-  쓴다는 뜻이지 네트워크를 안 쓴다는 뜻이 아니었다.
+  쓴다는 뜻이지 네트워크를 안 쓴다는 뜻이 아니다.
 
-■ 속도·중단 (저장소 규약 A-18과 동일, 네트워크 경로에 한함 -- 지금은 안 씀)
+■ 속도·중단 (저장소 규약 A-18과 동일, ②네트워크+쿠키 경로에 한함)
   요청 간격 1.5초, 연속 실패 5회면 멈춘다. 받은 원문은 .cache/mall_supplier/{pd_no}.html에
   남아 재실행 시 그 상품은 네트워크 요청 없이 캐시를 다시 쓴다(이어서 하기). 상품별
   처리 결과는 .cache/mall_supplier/_progress.json에 남는다 -- --apply로 이미 반영된
@@ -113,8 +126,8 @@ Usage:
   .venv/Scripts/python tools/mall_supplier_fetch.py --from-dir <하네스가 받아둔 폴더> --codes 121807
   .venv/Scripts/python tools/mall_supplier_fetch.py --from-dir <하네스가 받아둔 폴더> --limit 50
   .venv/Scripts/python tools/mall_supplier_fetch.py --from-dir <하네스가 받아둔 폴더> --apply --limit 500
-  .venv/Scripts/python tools/mall_supplier_fetch.py --codes 121807 --limit 1   (과거 방식 -- 세션 있을 때만)
-  .venv/Scripts/python tools/mall_supplier_fetch.py --from-cache               (네트워크 경로가 남긴 캐시 재파싱)
+  .venv/Scripts/python tools/mall_supplier_fetch.py --codes 121807 --limit 1   (②네트워크+쿠키 경로 -- MALL_ADMIN_COOKIE 필요, 손으로 돌릴 때 쓰는 경로)
+  .venv/Scripts/python tools/mall_supplier_fetch.py --from-cache               (②경로가 남긴 캐시 재파싱)
 """
 import argparse
 import io
@@ -332,8 +345,10 @@ def target_codes(conn, codes_arg: str, limit):
 def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reapply: bool,
         file_map: dict = None):
     """file_map이 주어지면(--from-dir) 그 {pd_no: 파일경로} 맵에서 HTML을 읽는다 --
-    네트워크(fetch/쿠키)는 전혀 쓰지 않는다. file_map이 None이면 기존 네트워크·캐시
-    경로(과거 방식, 모듈 docstring §과거 방식 참조)를 그대로 쓴다."""
+    네트워크(fetch/쿠키)는 전혀 쓰지 않는다. file_map이 None이면 ②네트워크+쿠키
+    경로(모듈 docstring §두 경로가 있다 참조)를 그대로 쓴다 -- tools/mall_daily_sync.py
+    가 이 경로로 file_map=None 을 넘긴다(decision-log A-124, 손으로 돌릴 때 실제로
+    타는 경로)."""
     progress = _load_progress()
     done = progress.setdefault("done", {})
     with engine.connect() as conn:
