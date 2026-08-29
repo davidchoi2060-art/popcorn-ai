@@ -276,20 +276,14 @@ def main() -> int:
             else:
                 log("[MISS] #kpis 를 못 찾았습니다 — consult-sessions-kpis.png 건너뜀")
 
-            # ---- 6) 방식 칩 확대 ------------------------------------------------------
-            mchip_box = get_boxes(page, {"mchip_row": "#mchipRow"})["mchip_row"]
-            if mchip_box:
-                shoot(page, "consult-sessions-mchips", mchip_box, {
-                    "cap": "#mchipRow > *:nth-child(1)",
-                    "chip_all": "#mchipRow > *:nth-child(2)",
-                    "chip_guided": "#mchipRow > *:nth-child(3)",
-                    "chip_chat": "#mchipRow > *:nth-child(4)",
-                    "chip_talk": "#mchipRow > *:nth-child(5)",
-                    "chip_expert": "#mchipRow > *:nth-child(6)",
-                }, coords)
-            else:
-                log("[MISS] #mchipRow 를 못 찾았습니다 — consult-sessions-mchips.png 건너뜀")
-
+            # ---- 6) 방식 칩 확대 — 2026-08-29 결함③ 해소로 중단 ------------------------
+            # 실제 #mchipRow는 세로 31px(줌 반영)뿐인 가로 한 줄이라, "화면 네 폭에서 전부
+            # 보이기"와 "인쇄에서 안 잘리기"를 동시에 만족하는 이미지 크기가 없었다(강제로
+            # 넓히면 인쇄에서 A4 인쇄 가능 폭을 447px 넘겨 칩이 잘리고, 풀면 좁은 화면에서
+            # 칩이 안 보였다 — docs/manual/screens/consult-sessions.html 그림 D 주석 참고).
+            # 그래서 그 문서는 이 캡처 대신 설명 목록만 쓴다. 여기서 더 안 찍는다 — 안 그러면
+            # 아무도 안 쓰는 이미지·좌표가 매 캡처마다 계속 새로 생긴다.
+            #
             # ---- 7) 목록 표 확대(머리글 + 앞쪽 N행) -----------------------------------
             redact_all(page)
             row_count = page.evaluate("document.querySelectorAll('#tbody .row').length")

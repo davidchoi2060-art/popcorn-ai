@@ -1,0 +1,565 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 재고 입고</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 재고 입고를 처음 맡는 직원</div>
+    <div><b>화면</b> 재고 입고 · 경로 <code>/admin2/stock-inbound</code> · 화면 ID <code>ADM-SRC-020</code>
+      (코드 <code>api/admin_ui_stock_inbound.py</code>·<code>api/admin_stock.py</code> 실측값입니다.
+      요구사항 정의서 §②가 「구 화면의 기존 ID를 유지한다」고 이 번호를 그대로 확정해 두었습니다 —
+      근거는 구 <code>mockups/admin/stock-inbound.html</code>의 <code>data-screen-id="ADM-SRC-020"</code>.
+      LNB 는 「매입 · 소싱」 그룹입니다.)</div>
+    <div><b>왜 이 화면부터인가</b> 관리자 화면 매뉴얼 열두 번째 판입니다. 실사람이 실제로 쓴 흔적이
+      관측된 「유일한」 화면이라는 조사 결과(davidchoi2060 계정 7건 · 2026-08-27 실측 — 다른
+      화면들의 활동 기록은 대부분 시드·점검 계정이었습니다), 그리고 재고 원장
+      <code>stock_movements</code>가 지금도 쌓이고 있는 활성 원장(9,338행)이라는 사실이 겹칩니다.
+      운영 시작 절차의 「7단계」(<code>api/admin_setup.py</code>)가 「재고가 0이면 추천에서
+      빠집니다」라고 직접 못박은 자리이기도 합니다. 요구사항 정의서(<code>docs/design/req/req-stock-inbound.md</code>,
+      494행)도 남은 화면 중 가장 깁니다 — 다룰 것이 그만큼 많다는 뜻입니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-29 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 사장님 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 재고 원장을 바꾸는 «작업 화면»입니다. 캡처 시점의 건수(입고
+      대기 15,725건 등)는 매일 바뀝니다 — 정확한 지금 값은 화면 좌측 상단에서 직접 확인하십시오.
+      이 문서의 결과 화면(그림 H·I·K)은 이 문서를 쓰려고 실제로 <b>입고 확정 → 되돌리기</b>,
+      <b>보류 → 해제</b>를 한 차례씩 실행해 얻은 진짜 서버 응답이며, 실행 직후 전부 원상 복귀했습니다
+      (근거는 맨 끝 「문서 정보」).</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>실제로 들어온 재고 수량을 원장에 <b>「기록」</b>하는 작업 화면입니다. 매입 견적(무엇을 얼마에
+    살지 «정하는» 화면)과 추천 가능 재고(그 결과를 «읽기만» 하는 화면) 사이에서, 이 화면만이
+    <code>products.stock_qty</code>와 <code>stock_movements</code>를 실제로 바꿉니다 — 재고 값 하나를
+    고치면 원장 행 하나가 <b>반드시 같은 트랜잭션</b>으로 함께 남고, 되돌리는 것도 그 행을 지우는
+    게 아니라 <b>반대 방향 원장 행을 추가</b>하는 것입니다.</p>
+  <p>추천 후보 조회는 재고를 게이트로 씁니다 — <code>v_recommendation_candidates</code>를 읽는 세 자리
+    (<code>api/candidates.py</code> · <code>api/recommend.py</code> 두 곳)가 전부
+    <code>stock_qty &gt; 0</code>을 조건에 겁니다. 검수·가격·사양이 전부 끝난 상품도 재고가 0이면
+    견적에 쓰이지 않습니다 — 이 화면은 <b>검수 · 가격 · 재고, 3중 게이트의 마지막 관문</b>입니다.</p>
+  <p>목록의 「입고 대기」는 저장된 상태가 아니라 조회할 때마다 계산되는 <b>파생 목록</b>입니다
+    (재고 0 또는 상품별 안전재고 미달, <code>단종</code>·<code>삭제대기</code> 제외). 그래서 "처리
+    완료"를 표시하는 별도 칸이 없습니다 — 재고가 실제로 올라가야만 그 상품이 목록에서 빠집니다.
+    구 화면이 겪은 결함 대부분(§5)이 이 사실을 화면 쪽에서만 흉내 내려다 생긴 것이었습니다 —
+    "수정"·"보류"를 눌러도 서버에 닿지 않아 새로고침하면 그대로 되돌아왔습니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>매입한 상품이 실제로 도착해 재고를 실제 수량으로 반영해야 할 때</li>
+    <li>재고 0으로 추천 후보에서 빠진 상품을 되살릴 때</li>
+    <li>검수·가격은 끝났는데 재고만 비어 매출로 못 잇는 상품을 몰아 처리할 때 — 「재고 0」·
+      「안전재고 미달」 칩으로 좁혀 봅니다</li>
+    <li>실사 결과에 맞춰 수량을 조정해야 할 때(사유를 「실사 조정」으로 선택)</li>
+    <li>대기 목록에 없는 상품(이미 재고가 있는 상품 등)에 추가 입고를 기록해야 할 때 —
+      「직접 등록」</li>
+    <li>당분간 손대지 않을 상품에 보류를 걸어 목록에서 잠시 빼 둘 때</li>
+    <li>방금 잘못 입력한 수량을 되돌릴 때, 또는 예전에 처리한 입고를 되돌려야 할 때</li>
+    <li>언제 · 무엇을 · 몇 개 · 누가 처리했고 되돌려졌는지 이력을 확인할 때</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>가장 먼저 보게 되는 기본 화면(조회 조건 없음 · 좌측 목록 + 우측 빈 패널)입니다. 먼저 전체
+    모습을 보고, 아래에서 영역별로 확대해 하나씩 설명합니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면(기본 상태)</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/stock-inbound-full.png" alt="재고 입고 화면 전체(기본 상태)">
+      <b class="pin" style="--x:6.31%;--y:33.45%">1</b>
+      <b class="pin" style="--x:15.58%;--y:2.8%">2</b>
+      <b class="pin" style="--x:28.49%;--y:2.8%">3</b>
+      <b class="pin" style="--x:88.43%;--y:2.8%">4</b>
+      <b class="pin" style="--x:93.39%;--y:2.8%">5</b>
+      <b class="pin" style="--x:97.88%;--y:2.8%">6</b>
+      <b class="pin" style="--x:25.69%;--y:8.6%">7</b>
+      <b class="pin" style="--x:41.86%;--y:8.6%">8</b>
+      <b class="pin" style="--x:48.13%;--y:8.6%">9</b>
+      <div class="box" style="--x:13.58%;--y:11.17%;--w:36.77%;--h:2.96%"></div>
+      <b class="pin" style="--x:17.04%;--y:12.65%">10</b>
+      <b class="pin" style="--x:23.99%;--y:12.65%">11</b>
+      <b class="pin" style="--x:30.48%;--y:12.65%">12</b>
+      <b class="pin" style="--x:35.59%;--y:12.65%">13</b>
+      <b class="pin" style="--x:31.96%;--y:16.56%">14</b>
+      <b class="pin" style="--x:31.96%;--y:25.48%">15</b>
+      <b class="pin" style="--x:31.96%;--y:97.64%">16</b>
+      <b class="pin" style="--x:75.68%;--y:10.13%">17</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) ·
+      조회 조건 없음(기본값) · 이 순간 실측 입고 대기 <b>15,725</b>건(재고 0 15,723 · 안전재고 미달 2)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 「매입 · 소싱」 그룹 안의 「재고 입고」가 진하게 표시됩니다</li>
+    <li><span class="tag">2</span>위치 표시 — 「매입 · 소싱 / 재고 입고」</li>
+    <li><span class="tag">3</span>헤더 건수 위젯 — 「입고 대기 N건」(서버 <code>total</code> 값. 화면이 세지 않습니다)</li>
+    <li><span class="tag">4</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">5</span>권한 표시 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">6</span>아바타 — 「내 정보」 화면으로 이동</li>
+    <li><span class="tag">7</span>검색창 — 상품명 · SKU</li>
+    <li><span class="tag">8</span>분류 선택 — 서버(<code>product-meta</code>)가 준 목록입니다. 화면이 페이지
+      안에서 뽑지 않습니다</li>
+    <li><span class="tag">9</span><span class="btnlabel">직접 등록</span> — 대기 목록 밖 상품을 검색해
+      입고하는 모드로 전환합니다(자세히는 그림 L)</li>
+    <li><span class="tag">10</span>조회 조건 칩(테두리 상자) — 「입고 대기 · 재고 0 · 안전재고 미달 ·
+      보류」 넷</li>
+    <li><span class="tag">11</span>「재고 0」 칩 — 두 대기 유형 중 하나(서로 배타)</li>
+    <li><span class="tag">12</span>「안전재고 미달」 칩 — 재고는 있지만(&gt;0) 상품별 기준선 아래인
+      상품. 지금 <b>2건</b>뿐입니다(기준 컬럼 <code>safety_stock</code> 자체를 설정한 상품이 30건뿐이라
+      그렇습니다 — 아래 「조심할 것」)</li>
+    <li><span class="tag">13</span>「보류」 칩 — 누르면 <code>hold=only</code>로 다시 조회해 보류 중인
+      상품만 봅니다</li>
+    <li><span class="tag">14</span>칩 기준 문장 — 「이 수는 지금 조회 조건 안에서 센 수」라는 서버
+      문장이 그대로 섭니다(화면이 기준을 지어내지 않습니다)</li>
+    <li><span class="tag">15</span>목록 카드 한 장 — 상품 한 건. 자세한 구성은 <a href="#fig-d">그림 D</a></li>
+    <li><span class="tag">16</span>페이지네이션 — 「전체 N건 중 이 페이지」</li>
+    <li><span class="tag">17</span>우측 작업 패널(선택 전) — 좌측에서 상품을 고르면 여기가 채워집니다.
+      그림 E부터</li>
+  </ul>
+
+  <h3><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/59.8">
+      <img src="/shared/manual/shots/stock-inbound-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:3.39%;--y:49.16%">18</b>
+      <b class="pin" style="--x:9.24%;--y:49.16%">19</b>
+      <b class="pin" style="--x:18.17%;--y:49.15%">20</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">21</b>
+      <b class="pin" style="--x:92.44%;--y:49.16%">22</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">23</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">18</span>위치 표시(빵부스러기) — 그룹 이름 / 화면 이름</li>
+    <li><span class="tag">19</span>화면 이름(「재고 입고」)</li>
+    <li><span class="tag">20</span>건수 위젯 — 조회 조건이 바뀔 때마다 함께 바뀝니다(예: 「보류」
+      칩을 누르면 「보류 N건」으로 문구 자체가 바뀝니다)</li>
+    <li><span class="tag">21</span>허브</li>
+    <li><span class="tag">22</span>권한 표시</li>
+    <li><span class="tag">23</span>아바타</li>
+  </ul>
+
+  <h3><span class="fig">그림 C</span>검색·필터·조회 조건 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:649.9/144.1">
+      <img src="/shared/manual/shots/stock-inbound-filters.png" alt="검색·필터·조회 조건 확대">
+      <b class="pin" style="--x:33.78%;--y:21.14%">24</b>
+      <b class="pin" style="--x:75.58%;--y:21.14%">25</b>
+      <b class="pin" style="--x:91.8%;--y:21.14%">26</b>
+      <b class="pin" style="--x:11.44%;--y:50.66%">27</b>
+      <b class="pin" style="--x:29.39%;--y:50.66%">28</b>
+      <b class="pin" style="--x:46.16%;--y:50.66%">29</b>
+      <b class="pin" style="--x:59.37%;--y:50.66%">30</b>
+      <b class="pin" style="--x:50%;--y:79.17%">31</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 그림 A의 7~14번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">24</span>검색창 — 입력 후 300ms 지나거나 Enter를 누르면 조회합니다</li>
+    <li><span class="tag">25</span>분류 선택</li>
+    <li><span class="tag">26</span><span class="btnlabel">직접 등록</span> 토글</li>
+    <li><span class="tag">27</span>「입고 대기」 칩 — 기본(보류 제외 · 전체) 상태. 지금 눌려 있습니다</li>
+    <li><span class="tag">28</span>「재고 0」 칩</li>
+    <li><span class="tag">29</span>「안전재고 미달」 칩</li>
+    <li><span class="tag">30</span>「보류」 칩 — 누르면 조회 대상이 <code>hold=only</code>로 바뀝니다
+      (다른 세 칩과 동시에 눌리지 않습니다)</li>
+    <li><span class="tag">31</span>칩 기준 문장(서버 <code>kind_scope</code> 그대로) — 「두 유형은
+      배타이며(재고 0 우선) 합이 조건 안 전체와 같습니다」</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>목록 카드 한 장 — 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:649.9/508.8">
+      <img src="/shared/manual/shots/stock-inbound-rows.png" alt="목록 카드 4장 확대">
+      <b class="pin" style="--x:50%;--y:12.5%">32</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 그림 A의 15번 영역을 확대(앞쪽 4장)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">32</span>카드 한 장의 구성 — 위에서 아래로 <b>① 상품명 + 대기 유형 태그(회색
+      「재고 0」· 호박색 「안전재고 미달」· 보라색 「보류」 중 하나 — 색은 코드로 확인했고 이 캡처
+      순간엔 전부 재고 0 이라 회색만 보입니다) + 현재 재고(우측)</b> · <b>② SKU · 분류 · 상태</b> 줄 ·
+      <b>③ 추천 후보 진입 판정</b>(굵은 라벨 + 사유 — 서버가 준 <code>pool_label</code>·
+      <code>pool_note</code> 그대로) · <b>④ 조작 줄</b>(수량 입력 · 사유 선택 · <span class="btnlabel">바로
+      확정</span> · <span class="btnlabel">보류</span>). 보류 중인 카드는 ④ 대신 보류 사유 · 보류
+      시각 · 처리자와 <span class="btnlabel">보류 해제</span>만 나옵니다</li>
+  </ul>
+
+  <h3><span class="fig">그림 E</span>상품을 선택하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/stock-inbound-full-detail.png" alt="검색으로 P-9103을 찾아 선택한 직후의 전체 화면">
+      <div class="box" style="--x:52.46%;--y:12.54%;--w:46.45%;--h:18.39%"></div>
+      <div class="box" style="--x:52.46%;--y:38.35%;--w:46.45%;--h:14.97%"></div>
+      <div class="box" style="--x:52.46%;--y:64.16%;--w:46.45%;--h:29.6%"></div>
+      <b class="pin" style="--x:31.96%;--y:25.48%">33</b>
+      <b class="pin" style="--x:75.68%;--y:9.28%">34</b>
+      <b class="pin" style="--x:75.68%;--y:21.74%">35</b>
+      <b class="pin" style="--x:75.68%;--y:45.84%">36</b>
+      <b class="pin" style="--x:75.68%;--y:78.96%">37</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="siah1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="862" y1="267" x2="881" y2="97" stroke="#c8451c" stroke-width="6" marker-end="url(#siah1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 검색창에 「P-9103」을 입력해 결과 1건을 클릭한 직후
+      (검수·판매가·사양 행은 이미 충족된 그래픽카드 재고 0 상품)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">33</span>방금 클릭한 카드(화살표 시작) — 목록 클릭은 상세 조회(GET)만
+      부릅니다. 재고를 바꾸지 않습니다</li>
+    <li><span class="tag">34</span>우측 패널 제목 — 선택한 상품명 · SKU · 분류 · 상태 · 현재고 ·
+      안전재고 · 매입가 · 공급처</li>
+    <li><span class="tag">35</span>확정 카드(테두리 상자) — 확대는 <a href="#fig-f">그림 F</a></li>
+    <li><span class="tag">36</span>추천 후보 진입 판정 카드(테두리 상자) — 확대는 <a href="#fig-g">그림 G</a></li>
+    <li><span class="tag">37</span>이 상품의 입고 이력(테두리 상자) — 그림 J와 같은 구성 · 같은 조회</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>확정 카드 확대 — 수량 입력 후</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:780.3/193.1">
+      <img src="/shared/manual/shots/stock-inbound-panel-confirm.png" alt="확정 카드 확대 — 수량 1 입력 상태">
+      <b class="pin" style="--x:10.3%;--y:27.91%">38</b>
+      <b class="pin" style="--x:35.85%;--y:27.91%">39</b>
+      <b class="pin" style="--x:68.25%;--y:27.91%">40</b>
+      <b class="pin" style="--x:91.76%;--y:27.91%">41</b>
+      <b class="pin" style="--x:40.38%;--y:56.25%">42</b>
+      <b class="pin" style="--x:50%;--y:82.81%">43</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 수량칸에 「1」을 입력한 직후(서버에는 아직 아무것도
+      보내지 않은 상태 — 되읽기용 미리보기만 바뀝니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">38</span>입고 수량 입력칸 — <b>수량 상한이 코드에 없습니다.</b> 큰 자릿수는
+      확정 전 미리보기(42번)로 되읽어 확인하십시오</li>
+    <li><span class="tag">39</span>사유 「입고」(<code>inbound</code>) — 기본 선택</li>
+    <li><span class="tag">40</span>사유 「실사 조정」(<code>adjust</code>)</li>
+    <li><span class="tag">41</span><span class="btnlabel">입고 확정</span> — 이 버튼과 목록 카드의
+      <span class="btnlabel">바로 확정</span>은 완전히 같은 동작입니다</li>
+    <li><span class="tag">42</span>미리보기(되읽기) — 「확정하면 재고 0 → 1 · 원장에 <code>inbound /
+      manual</code> 행. 입력 1 되읽음.」 <b>이 문장은 화면이 계산한 예측일 뿐</b>입니다 — 확정 뒤
+      실제 결과는 그림 H처럼 서버 응답으로 따로 뜹니다</li>
+    <li><span class="tag">43</span>고정 안내 — 매입가 입력칸이 없는 이유(원장에 단가 컬럼 없음) ·
+      수량 상한이 없는 이유</li>
+  </ul>
+
+  <h3 id="fig-g"><span class="fig">그림 G</span>추천 후보 진입 판정 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:780.3/157.2">
+      <img src="/shared/manual/shots/stock-inbound-panel-gates.png" alt="추천 후보 진입 판정 카드 확대">
+      <b class="pin" style="--x:13.7%;--y:43.14%">44</b>
+      <b class="pin" style="--x:37.9%;--y:43.14%">45</b>
+      <b class="pin" style="--x:62.1%;--y:43.14%">46</b>
+      <b class="pin" style="--x:86.3%;--y:43.14%">47</b>
+      <b class="pin" style="--x:50%;--y:78.87%">48</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 같은 상품(P-9103) · 수량 1 입력 상태</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">44</span>검수 게이트 — 초록 체크 「통과」</li>
+    <li><span class="tag">45</span>판매가 게이트 — 초록 체크 「산정 완료」</li>
+    <li><span class="tag">46</span>사양 행 게이트 — 초록 체크 「<code>product_specs</code> 행 있음」</li>
+    <li><span class="tag">47</span>재고 게이트 — 수량을 입력하기 전엔 빨간 X(「0 — 수량 입력 전」),
+      1을 입력하면 초록으로 바뀝니다(「확정하면 0 → 1」)</li>
+    <li><span class="tag">48</span>서버 판정 문장 — <b>여기가 이 화면에서 가장 오해하기 쉬운
+      자리입니다.</b> 이 예시는 위 네 게이트가 전부 초록인데도 판정은 「추천 후보 제외」입니다 —
+      이유는 아래 「조심할 것」 1번</li>
+  </ul>
+
+  <h3><span class="fig">그림 H</span>입고 확정 — 서버 응답(실제로 확정한 결과)</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:780.3/90.8">
+      <img src="/shared/manual/shots/stock-inbound-result-ok.png" alt="입고 확정 결과 — 서버 응답 그대로">
+      <b class="pin" style="--x:13.28%;--y:27.21%">49</b>
+      <b class="pin" style="--x:48.5%;--y:26.32%">50</b>
+      <b class="pin" style="--x:44.84%;--y:64.07%">51</b>
+      <b class="pin" style="--x:93.53%;--y:49.99%">52</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · <span class="btnlabel">입고 확정</span>을 실제로 눌러 받은
+      서버 응답입니다(이 문서를 쓰려고 수행 · 직후 되돌렸습니다 — 문서 끝 참고)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">49</span>결과 코드 — 「200 · pool_entered=false」. HTTP 는 성공(200)인데
+      후보 진입은 실패했다는 뜻을 코드 배지에 함께 담습니다</li>
+    <li><span class="tag">50</span>결과 메시지 — 「입고 완료 — 재고 0 → 1 · 다만 추천 후보에는 들어가지
+      않았습니다」. <b>화면이 재고를 다시 계산하지 않습니다</b> — <code>stock_before</code>·
+      <code>stock_after</code> 는 서버가 준 값 그대로입니다</li>
+    <li><span class="tag">51</span>사유 — 「<code>pool_entered=false</code> · SKU P-9103 · 기록 #17309.
+      확정 전 서버 판정 사유: 추천 후보 뷰 미조회 — 재고 외 조건 미충족」. 그림 G의 판정 문장(48번)과
+      <b>같은 원천</b>에서 나온 사유입니다 — 화면이 사유를 새로 짓지 않습니다</li>
+    <li><span class="tag">52</span><span class="btnlabel">되돌리기</span> — 방금 만든 기록(#17309)을
+      즉시 되돌립니다. 결과는 그림 I</li>
+  </ul>
+
+  <h3><span class="fig">그림 I</span>되돌리기 — 서버 응답</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:780.3/71.8">
+      <img src="/shared/manual/shots/stock-inbound-result-undo.png" alt="되돌리기 결과 — 서버 응답 그대로">
+      <b class="pin" style="--x:4.46%;--y:34.4%">53</b>
+      <b class="pin" style="--x:22.91%;--y:33.28%">54</b>
+      <b class="pin" style="--x:49.12%;--y:67.79%">55</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 그림 H의 <span class="btnlabel">되돌리기</span>를 누른 직후</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">53</span>결과 코드 — 「200」</li>
+    <li><span class="tag">54</span>결과 메시지 — 「되돌림 완료 — 재고 1 · 역방향 원장 행 기록」</li>
+    <li><span class="tag">55</span>사유 — 「SKU P-9103 · 원 기록 #17309. 원장 행은 삭제하지 않는다 —
+      <code>adjust · -qty</code> 행이 추가됐다. 입고 전 상태가 품절이었으면 품절로 되돌아간다.」
+      (이 상품은 입고 전 상태가 이미 「판매중」이었어서 상태는 그대로였습니다 — 재고만 0으로
+      돌아갔습니다)</li>
+  </ul>
+
+  <h3><span class="fig">그림 J</span>입고 이력 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:780.3/329.8">
+      <img src="/shared/manual/shots/stock-inbound-history.png" alt="이 상품의 입고 이력 확대">
+      <b class="pin" style="--x:8.65%;--y:5.79%">56</b>
+      <b class="pin" style="--x:50%;--y:19.86%">57</b>
+      <b class="pin" style="--x:43.06%;--y:91.26%">58</b>
+      <b class="pin" style="--x:91.17%;--y:91.26%">59</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 그림 H·I 를 실행한 직후 — 방금 만든 「입고 → 되돌림」
+      쌍이 맨 위에 섭니다(이 상품의 입고 이력 전체 14건 중 1~4)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">56</span>제목 — 상품을 선택했으므로 「이 상품의 입고 이력」. 선택하지 않은
+      화면 하단은 「입고 이력 — 전체(이 화면 처리분)」로 바뀝니다(그림 A 참고 · 같은 조회·같은
+      판정을 공유합니다)</li>
+    <li><span class="tag">57</span>이력 행 — 시각 · 종류(입고/실사 조정/되돌림) · 증감(+1·-1) · 비고
+      (담당자 · 사유 · 재고 전후) · 우측 상태 버튼. 방금 만든 「입고」·「되돌림」 행이 위 두 줄에
+      섭니다. 「되돌림」 행 자체는 <span class="btnlabel">되돌림 완료</span>(비활성)로, 이미 되돌려진
+      원 입고 행은 <span class="btnlabel">이미 되돌림</span>(비활성)으로 표시됩니다 — 그림 K 참고</li>
+    <li><span class="tag">58</span>범위 안내(서버 문장 그대로) — 「이 화면으로 처리한 입고·되돌림만
+      표시합니다. 상품 상세의 중복 편입 조정 · 카탈로그 적재 · 환불 복원은 여기 나오지 않습니다」</li>
+    <li><span class="tag">59</span>「전체 N건 중 이 페이지」</li>
+  </ul>
+
+  <h3><span class="fig">그림 K</span>보류 상태 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:900px;aspect-ratio:780.3/61.3">
+      <img src="/shared/manual/shots/stock-inbound-hold.png" alt="보류 등록 직후의 보류 상자">
+      <b class="pin" style="--x:5.04%;--y:49.99%">60</b>
+      <b class="pin" style="--x:48.68%;--y:50%">61</b>
+      <b class="pin" style="--x:93.64%;--y:50%">62</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · 사유를 적고 <span class="btnlabel">보류</span>를 실제로 눌러
+      받은 서버 응답입니다(이 문서를 쓰려고 수행 · 직후 해제했습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">60</span>「보류 중」 배지 — 상자 전체가 보라색 톤으로 바뀝니다</li>
+    <li><span class="tag">61</span>사유 · 보류 시각 · 처리자 — 사유는 입력 필수입니다(비우면 서버가
+      400으로 거부합니다)</li>
+    <li><span class="tag">62</span><span class="btnlabel">보류 해제</span> — 행을 지우지 않고 해제
+      시각만 기록합니다. 해제 즉시 이 상품은 기본 조회(입고 대기)에 다시 나타납니다. <b>보류 중에는
+      입고 확정이 막히지만 되돌리기는 막히지 않습니다</b>(§5)</li>
+  </ul>
+
+  <h3><span class="fig">그림 L</span>직접 등록 — 카탈로그 검색</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:649.9/411.6">
+      <img src="/shared/manual/shots/stock-inbound-direct.png" alt="직접 등록 모드 — RTX 검색 결과">
+      <b class="pin" style="--x:50%;--y:3%">63</b>
+      <b class="pin" style="--x:50%;--y:22.74%">64</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 01:22 KST · <span class="btnlabel">직접 등록</span> 토글 후 「RTX」로
+      검색한 결과(읽기 전용 — 이 화면은 확정을 누르지 않았습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">63</span>직접 등록 안내 — 「대기 목록 밖 상품 검색. 검색어 입력 후 조회
+      (최대 50건). 매입가 입력칸 없음(원장에 단가 컬럼 없음)」</li>
+    <li><span class="tag">64</span>검색 결과 카드 — 대기 목록 카드와 같은 모양이지만 「대기 목록 밖」
+      배지가 붙고, 대기 유형 태그(재고 0 등) 대신 이 배지가 섭니다. <span class="btnlabel">바로
+      확정</span>을 누르면 <b>표에 올리지 않고 곧바로 확정</b>됩니다 — 「확인 후 표에서 확정」 같은
+      중간 단계가 없습니다</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>조회 조건 — 검색어(상품명 · SKU) · 분류 · 대기 유형 칩(재고 0/안전재고 미달, 서로 배타) ·
+      보류 칩. 칩의 수는 전부 서버가 준 값이고 「지금 조건 안에서 센 수」라는 문장(<code>kind_scope</code>)
+      까지 서버가 함께 줍니다(그림 C의 31번).</li>
+    <li>단건 입고 확정 — 목록 카드의 <span class="btnlabel">바로 확정</span>과 우측 패널의
+      <span class="btnlabel">입고 확정</span>은 <b>완전히 같은 함수 · 같은 엔드포인트</b>를 씁니다.
+      수량은 확정과 함께 한 번만 전송됩니다 — 별도의 「수정 저장」 동작이 없습니다(그림 F).</li>
+    <li>직접 등록 — 대기 목록 밖 상품(이미 재고가 있는 상품 등)을 검색해(검색어 필수 · 최대 50건)
+      같은 확정 흐름으로 입고합니다. 매입가 입력칸이 없습니다(그림 L).</li>
+    <li>보류 / 보류 해제 — 사유를 적어 보류하면 서버 상태(<code>stock_inbound_holds</code>)로 남고
+      기본 조회에서 빠집니다. 해제는 행을 지우지 않고 해제 시각을 기록합니다(그림 K).</li>
+    <li>되돌리기 — 방금 처리한 것은 물론 <b>예전 회차도</b> 입고 이력에서 찾아 되돌립니다. 되돌릴 수
+      있는지는 서버가 판정해 이유까지 함께 줍니다(§5의 1번).</li>
+    <li>이력 조회 — 화면 하단(전체, 이 화면 처리분)과 상품 선택 시 우측 패널(그 상품만)이 같은
+      조회 · 같은 판정을 씁니다. 서버 페이지네이션이며 「전체 N건 중 이 페이지」를 명시합니다
+      (그림 J).</li>
+    <li>추천 후보 진입 판정 확인 — 상품을 선택하면 서버가 <code>v_recommendation_candidates</code>를
+      실제로 조회해 판정과 사유를 함께 줍니다. 확정 전에는 다섯 갈래(포함 · 입고 시 진입 · 제외 ·
+      입고해도 진입 불가 · 판정 보류) 중 하나로, 확정 후에는 <code>pool_entered</code> 참/거짓으로
+      알려줍니다(그림 G · H).</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>게이트 넷(검수 · 판매가 · 사양 행 · 재고)이 전부 초록이어도 추천 후보에 안 들어갈 수
+    있습니다.</b> 이 화면이 직접 확인하는 것은 <code>v_recommendation_candidates</code>가 요구하는
+    여덟 조건 중 <b>셋</b>(검수 · 판매가 · 사양 행)뿐입니다. 나머지 다섯(<code>ai_candidate_yn</code> ·
+    <code>category_group</code> · 핵심 부품 종류 여부 · <code>data_origin</code> · 판매 상태)은 이
+    화면에 표시되지 않습니다. 그림 G · H의 실제 예시(P-9103)가 정확히 이 경우입니다 — 셋을 전부
+    만족했는데도 판정은 「추천 후보 제외」였고, 실제로 확정해도 <code>pool_entered=false</code>였습니다.
+    문구가 「재고 외 조건 미충족」이라고만 뜨면 그 나머지 다섯 중 하나가 원인입니다 — <b>이 화면은
+    어느 것인지 짚어 주지 않습니다</b>(2026-08-18 이전에는 셋만 보고 「입고 시 추천 가능」이라고
+    잘못 단정한 적이 있어, 지금은 모르는 것을 모른다고 그대로 둡니다).
+  </div>
+  <div class="callout">
+    <b>되돌리기는 서버가 판정합니다 — 화면은 그 판정을 표시만 합니다.</b> 이력의 <span class="btnlabel">되돌리기</span>
+    버튼이 비활성이면 아래 다섯 사유 중 하나이고, 버튼에 마우스를 올리면 그 사유가 그대로 뜹니다.
+    <ul style="margin:6px 0 0;padding-left:18px">
+      <li>되돌림 기록 자체는 되돌릴 수 없다(그림 J의 「되돌림」 행)</li>
+      <li>이미 되돌린 입고다(원 기록에 「이미 되돌림」이 표시됩니다)</li>
+      <li>상품을 찾을 수 없다 — 조회 이후 삭제됐다</li>
+      <li>입고분보다 지금 재고가 적다 — 그 사이 판매 · 조정이 있어 되돌리면 재고가 음수가 된다</li>
+      <li>기록에 수량 정보가 없다(옛 기록 잔재)</li>
+    </ul>
+    그리고 <b>브라우저 세션에 기대지 않습니다</b> — 이력이 서버 조회이므로, 화면을 나갔다 다시
+    들어와도, 예전 회차도 이력에서 찾아 되돌릴 수 있습니다(구 화면은 <code>lastAction</code>이라는
+    브라우저 변수에만 의존해 새로고침하면 되돌릴 방법이 사라졌습니다).
+  </div>
+  <div class="callout">
+    <b>보류 중에는 입고 확정이 막히지만, 되돌리기는 막히지 않습니다.</b> 보류는 「이 상품에 지금 손대지
+    않는다」는 뜻이지 「이 상품의 과거 기록을 건드리지 못하게 잠근다」는 뜻이 아닙니다 — 잘못 들어간
+    수량을 보류 중에도 바로잡을 수 있어야 하기 때문입니다.
+  </div>
+  <div class="callout">
+    <b>매입가 입력칸이 없습니다.</b> 이 화면이 쓰는 원장(<code>stock_movements</code>)에는 단가 컬럼
+    자체가 없습니다 — 칸을 «숨긴» 것이 아니라 애초에 저장할 곳이 없습니다. 매입가를 바꾸려면 단가표
+    반영(ADM-PRC-040) 또는 매입 견적(ADM-SRC-010)으로 가야 합니다. 목록 · 패널에 보이는 매입가는
+    참조 표시일 뿐입니다.
+  </div>
+  <div class="callout">
+    <b>입고 수량에 상한이 없습니다.</b> 코드에는 <code>1 이상</code>이라는 하한만 있고 상한이 없습니다.
+    자릿수가 큰 값을 입력하면 확정을 누르기 전에 반드시 미리보기(그림 F의 42번)로 되읽어 확인하십시오
+    — 오타 한 번이 원장에 그대로 남습니다(되돌릴 수는 있습니다).
+  </div>
+  <div class="callout">
+    <b>입고 이력은 「이 화면으로 처리한 것만」입니다.</b> 상품 상세의 중복 편입 조정 · 카탈로그 적재 ·
+    환불 복원은 이 화면의 이력에 나오지 않습니다(그림 J의 58번 안내). 이 상품의 재고가 왜 지금
+    값인지 «전체» 내력을 보려면 상품 상세 또는 작업 기록으로 가야 합니다.
+  </div>
+  <div class="callout">
+    <b>「오늘 입고」 수치와 「매입 확정분」 라벨이 이 화면에 없습니다.</b> 둘 다 구 화면에는 있었지만
+    지어낸 값이었습니다(전자는 새로고침하면 0으로 돌아가는 브라우저 카운터, 후자는 매입 견적과
+    실제로 연결되지 않은 채 「재고 0이면 매입 확정분」으로 붙는 라벨이었습니다). 서버가 실제로 셀
+    수 있게 되기 전까지는 <b>없는 채로 둡니다</b> — 화면에 안 보이는 게 정상입니다.
+  </div>
+  <div class="callout">
+    <b>재고는 입고 확정 즉시 견적에 반영됩니다.</b> 되돌릴 수 있지만, 확정과 되돌리기 사이에 이미
+    나간 견적은 그 재고 그대로 나갑니다 — 되돌리기가 「없던 일로 만드는 것」은 아닙니다. 그리고
+    <b>인계(쇼핑몰로 견적을 넘기는 것)는 재고를 차감하지 않습니다</b> — 재고를 줄이는 경로는 자체
+    주문과 실사 조정뿐입니다.
+  </div>
+  <div class="callout">
+    <b>조회 권한(viewer)만 있으면 쓰기 버튼이 비활성으로 보입니다</b>(코드 확인 — <code>can_write</code>
+    가 <code>false</code>면 확정 · 보류 · 해제 · 되돌리기 버튼에 <code>disabled</code> + 사유 문구가
+    붙습니다). <b>이 캡처는 owner 등급 점검 계정으로만 찍어서, viewer 등급에서 실제로 버튼이 흐리게
+    보이는 화면은 눈으로 확인하지 못했습니다</b> — 코드 근거만 있습니다(문서 끝 「확인하지 못한 것」).
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「확정 버튼이 안 눌린다」</b> → 그 상품이 보류 중이거나(패널에 「확정 불가 — 보류 중」으로
+      뜹니다), 내 권한이 「조회」뿐인 경우입니다. 보류 중이면 먼저 해제하십시오.</li>
+    <li><b>「되돌리기 버튼이 비활성이거나 안 보인다」</b> → §5의 다섯 사유(이미 되돌림 · 재고 부족 ·
+      기록 없음 등) 중 하나입니다. 버튼에 마우스를 올리면 정확한 사유가 뜹니다.</li>
+    <li><b>「분명 입고했는데 추천 후보에 안 뜬다」</b> → <code>pool_entered=false</code> 결과입니다.
+      검수 · 판매가 · 사양 행 중 하나가 비었거나, 화면에 안 보이는 나머지 다섯 조건(§5의 1번) 중
+      하나 때문입니다. 사유 문구(그림 H의 51번)를 먼저 읽으십시오.</li>
+    <li><b>「보류했더니 목록에서 상품이 사라졌다」</b> → 정상입니다. 보류분은 기본 조회에서 빠집니다
+      — 「보류」 칩(그림 C의 30번)을 누르면 다시 찾을 수 있습니다.</li>
+    <li><b>「직접 등록에서 검색해도 아무것도 안 나온다」</b> → 검색어를 아직 안 넣었으면 「검색 전」
+      안내가, 검색했는데 결과가 없으면 「검색 결과 없음」 안내가 각각 다르게 뜹니다 — 화면이 이 둘을
+      가릅니다. 검색어를 넣어야 조회됩니다(전량을 미리 보내지 않습니다).</li>
+    <li><b>「수량을 입력만 하고 확정을 안 눌렀는데 저장됐을까」</b> → 아닙니다. 입력은 미리보기
+      (그림 F의 42번)만 바꿀 뿐 서버에 아무것도 보내지 않습니다 — <span class="btnlabel">입고 확정</span>
+      또는 <span class="btnlabel">바로 확정</span>을 눌러야만 원장에 남습니다.</li>
+    <li><b>「예전에 처리한 입고를 지금도 되돌릴 수 있나」</b> → 그렇습니다. 이력에서 과거 회차를 찾아
+      되돌릴 수 있습니다(단, 그 사이 재고가 입고분보다 줄었으면 409로 거부됩니다 — §5).</li>
+    <li><b>「안전재고 미달 칩을 눌렀는데 몇 건 안 보인다」</b> → 정상입니다. <code>safety_stock</code>
+      (안전재고 기준)을 설정한 상품 자체가 전체 중 극소수이고, 그중에서도 지금 기준 미달인 상품은
+      2건뿐입니다. 이 기준을 두는 화면은 아직 없습니다 — 상품 상세(ADM-PRD-010)에서 관리합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_stock.py</code>(데이터 · 판정 로직 전문) ·
+        <code>api/admin_ui_stock_inbound.py</code>(라우트) ·
+        <code>templates/admin/stock_inbound.html.j2</code>(화면) ·
+        <code>templates/admin/_admin2_shell.html.j2</code> · <code>mockups/shared/admin2/admin2-shell.js</code></li>
+      <li>요구사항 정의서 — <code>docs/design/req/req-stock-inbound.md</code>(494행, 2026-08-17 작성 ·
+        2026-08-18 대기 유형 후속 갱신)</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 사장님
+        서버)에 Playwright로 접속해 2026-08-29 01:22 KST에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_stock_inbound.py</code>, 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는 <code>/shared/manual/shots/</code>
+        경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는 같은 폴더의
+        <code>stock-inbound-coords.json</code>에 있습니다.</li>
+      <li>실측 수치 — 캡처와 같은 순간 <code>GET /api/admin/stock-inbound</code> ·
+        <code>GET /api/admin/stock-inbound/history</code> 응답을 그대로 옮겼습니다. 지어낸 숫자는
+        없습니다 — 매일 바뀌므로 지금 값은 화면에서 다시 확인하십시오.</li>
+    </ul>
+    <p><b>이 문서를 쓰려고 실제로 실행하고 되돌린 것</b> — 재고 원장을 바꾸는 화면이라 「결과가 서버
+      응답 그대로 선다」는 계약(그림 H · I)은 코드만 읽어서는 화면으로 보여줄 수 없었습니다. 그래서
+      상품 P-9103(product_code 20489103 · GIGABYTE RTX 5090 — 코드 주석에 이미 이 화면의 검증용으로
+      여러 차례 쓰인 상품으로 남아 있던 자리입니다)에 실제로 아래를 한 차례씩 실행했고, 캡처 스크립트가
+      실행 전후 서버 값을 대조해 <b>원상 복귀를 실측으로 확인했습니다</b>(<code>reverted_ok: true</code>,
+      <code>stock-inbound-coords.json</code>의 <code>_meta.stats</code>에 전체 값 기록):</p>
+    <ul>
+      <li>입고 확정(수량 1 · 사유 입고) → 재고 0 → 1, <code>pool_entered=false</code>, 기록 #17309 →
+        즉시 되돌리기 → 재고 1 → 0</li>
+      <li>보류 등록(사유 「운영자 매뉴얼 캡처 시연」, 보류 #9) → 즉시 보류 해제</li>
+      <li>실행 전/후 대조 — 전체 입고 대기 총계 <b>15,725건</b>(재고 0 15,723 · 안전재고 미달 2) ·
+        보류 총계 <b>0건</b> · P-9103 상태(재고 0 · 판매중 · 보류 없음)가 실행 전후 정확히 일치.
+        이 화면으로 처리한 전체 이력은 <b>35건 → 37건</b>(입고·되돌림 한 쌍만큼 증가 — 재고
+        불변식과는 별개로, 이력 자체는 늘어난 채 남는 것이 맞습니다. 되돌림은 삭제가 아니라
+        역방향 행이기 때문입니다).</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍습니다. <b>⚠ 다시 돌리면 위 두 사이클
+      (입고 확정 → 되돌리기, 보류 → 해제)이 P-9103에 한 번 더 실행돼 이력이 2건 더 늘어납니다</b>
+      (재고·보류 상태 자체는 매번 원상 복귀합니다 — 스크립트가 스스로 확인하고, 확인에 실패하면
+      <code>[FATAL]</code>로 알리며 종료 코드 1을 냅니다).</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_stock_inbound.py</code></pre>
+    <p><b>확인하지 못한 것</b> — 이 작업에는 브라우저(화면을 눈으로 보는 도구)가 없어, 완성된 HTML
+      문서가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에 정확히 맞는지)는 직접 확인하지
+      못했습니다. 그 밖에 이번 캡처가 다루지 못한 것:</p>
+    <ul>
+      <li>viewer · operator 등급 계정에서 쓰기 버튼이 실제로 흐리게 보이는 화면 — 코드
+        (<code>can_write</code>·<code>can_write_note</code>)로는 확인했지만 owner 등급 점검 계정으로만
+        캡처해 눈으로 보지는 못했습니다.</li>
+      <li>대기 유형 「안전재고 미달」(호박색) · 「보류」(보라색) 태그가 <b>목록 카드</b>에 실제로 어떤
+        색으로 보이는지 — CSS(<code>.si-tag.low</code>·<code>.si-tag.hold</code>)로는 확인했지만, 캡처
+        시점에 조회된 카드가 전부 「재고 0」(회색 태그) 상품이라 이 두 색을 직접 담은 목록 카드
+        스크린샷은 없습니다(그림 K가 보류의 «패널» 표시는 담았지만 «목록 행»의 보류 태그는
+        아닙니다).</li>
+      <li>추천 후보 진입 판정 다섯 갈래 중 「포함」(<code>in</code>)·「입고 시 진입」(<code>enters</code>)
+        상태의 실제 화면 — 캡처 시점에 조회한 예시들은 전부 「제외」·「입고해도 불가」·「판정 보류」
+        였습니다(정의서 §④가 이미 밝힌 대로, 3중 게이트를 통과해도 후보 뷰에 실제로 들어가는
+        상품은 소수입니다). 이 두 상태의 판정 문구는 코드(<code>POOL_LABELS</code>)로는 확인했지만
+        실제 화면 예시로는 못 찾았습니다 — 지어내지 않고 비워 둡니다.</li>
+      <li>정의서 §「사장님 결정 대기」의 다섯 항목 중 보류(㉡ 서버 상태) · 대기 유형(㉮ 서버에 만든다)
+        둘은 이미 구현돼 이번에 그대로 캡처했습니다. 나머지 셋(안전재고 기준을 정하는 화면 · 「매입
+        확정분」 라벨을 매입 견적과 연결할지 · 「오늘 입고」 수치)은 <b>이 화면에 여전히 없습니다</b>
+        — 화면이 스스로 「읽기 전용」·「표시하지 않는다」로 밝히고 있는 그대로이며, 이 문서도 지어내지
+        않았습니다.</li>
+    </ul>
+  </div>
+
+</div>

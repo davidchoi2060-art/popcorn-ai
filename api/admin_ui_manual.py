@@ -158,6 +158,61 @@ MANUAL_SCREENS: dict[str, dict] = {
         # 뒤에 두었다.
         "order": 11,
     },
+    # ── order 12~16 (2026-08-29 하네스 등록 — 제작자 다섯이 만든 조각을 한 번에 등록) ──
+    # 조사자가 여러 잣대로 재서 추천한 순서다(2026-08-29):
+    #   12 재고 입고        실사람 쓰기가 «관측된 유일한» 화면(7건) · stock_movements 9,338행
+    #                       admin_setup.py 7단계
+    #   13 상품 일괄 등록    정의서가 스스로 「가장 위험한 쓰기, 되돌리기 없다」
+    #                       감사 기록에 «안 남는다»(INSERT 0건)
+    #   14 공급처           「매입·소싱 파이프라인의 관문」 · setup 3단계
+    #                       sourcing 이 링크로 가리키는 «유일한» 대상
+    #   15 단가표 반영       31개 정의서 중 «유일하게» 「매일」 근거가 문서화됨 · setup 6단계
+    #   16 마진 정책        setup 2단계 「상품보다 «먼저» 정해야 한다」
+    #
+    # ⚠ 기존 1~11 의 order 는 «활동 기록 건수»로 매겨졌는데, 조사자 실측 결과 그 기록의
+    #    대부분이 시드·점검 계정이었다(용도별 최소 사양 912건 → 실사람 0 · 부품 등급 90건 → 0).
+    #    즉 «잣대 자체가 오염돼 있었다». 전체 재배열은 별건으로 남긴다.
+    #
+    # 다섯 값(fragment·nav_href·title·screen_id)은 등록 전 전수 대조했다 — fragment 5개
+    # 전부 `docs/manual/screens/`에 실재, 참조 이미지(shots) missing 0/5, nav_href·title은
+    # `api/admin_nav.py`의 `NAV` 항목과 문자열 일치, screen_id는 각 `api/admin_ui_*.py`의
+    # 실제 `render(screen_id=...)` 호출과 일치(확인: stock_inbound.py:41 · catalog_import.py:47 ·
+    # suppliers.py:51 · price_import.py:208 · margin_policy.py:150).
+    "stock-inbound": {
+        "fragment": "stock-inbound.html",
+        "nav_href": "/admin2/stock-inbound",
+        "title": "재고 입고",
+        "screen_id": "ADM-SRC-020",
+        "order": 12,
+    },
+    "catalog-import": {
+        "fragment": "catalog-import.html",
+        "nav_href": "/admin2/catalog-import",
+        "title": "상품 일괄 등록",
+        "screen_id": "ADM-CSV-010",
+        "order": 13,
+    },
+    "suppliers": {
+        "fragment": "suppliers.html",
+        "nav_href": "/admin2/suppliers",
+        "title": "공급처",
+        "screen_id": "ADM-SRC-030",
+        "order": 14,
+    },
+    "price-import": {
+        "fragment": "price-import.html",
+        "nav_href": "/admin2/price-import",
+        "title": "단가표 반영",
+        "screen_id": "ADM-PRC-040",
+        "order": 15,
+    },
+    "margin-policy": {
+        "fragment": "margin-policy.html",
+        "nav_href": "/admin2/margin-policy",
+        "title": "마진 정책",
+        "screen_id": "ADM-PRC-020",
+        "order": 16,
+    },
 }
 
 

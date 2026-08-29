@@ -91,9 +91,16 @@
            범위 10.1~12.48% 안)와 13px 간격밖에 안 돼 배지 둘이 겹쳤다. statusbar 범위
            안에서 더 아래쪽(15.0%, 여전히 12.48~16.69% 안)으로 옮겨 같은 요소를 계속
            가리키면서 간격을 벌렸다. 재검증: 핀9~10 거리 27.9px(zoom 1.15 반영, 기준
-           18px의 약 1.6배) · 핀10~11 거리 29.4px(기존보다 넓어짐, 새 겹침 없음). -->
+           18px의 약 1.6배) · 핀10~11 거리 29.4px(기존보다 넓어짐, 새 겹침 없음).
+           2026-08-29 정정 — 위 재검증은 1680px 한 폭만 잰 값이었다("새 겹침 없음"이
+           틀렸다). scripts/manual_check_pins.py(사각형 교차 · 4개 폭)로 다시 재니
+           그림이 min-width 바닥까지 줄어드는 1192·768·480px에서는 %는 그대로인데
+           px 간격만 좁아져 핀10 아래변과 핀11 위변이 0.26~0.27px 겹쳤다(가로도
+           16px 넘게 겹쳐 가로만으로는 안 풀린다). 핀11만 --y:19.9%로 더 내려 4개
+           폭 전부에서 중심 간 거리 27px 이상을 다시 확보했다(tablewrap 범위
+           16.69~92.45% 안 · 여전히 같은 표 요소를 가리킨다). -->
       <b class="pin" style="--x:13.62%;--y:15.0%">10</b>
-      <b class="pin" style="--x:14.62%;--y:18.69%">11</b>
+      <b class="pin" style="--x:14.62%;--y:19.9%">11</b>
       <b class="pin" style="--x:14.85%;--y:95.73%">12</b>
     </div>
     <p class="cap">캡처 2026-08-28 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 필터
@@ -149,13 +156,13 @@
   <figure>
     <div class="shot shot--filterbar" style="aspect-ratio:1468/46.25">
       <img src="/shared/manual/shots/activity-logs-filterbar.png" alt="필터 바 확대">
-      <b class="pin" style="--x:10.48%;--y:64.9%">20</b>
-      <b class="pin" style="--x:23.75%;--y:64.9%">21</b>
-      <b class="pin" style="--x:31.59%;--y:64.9%">22</b>
-      <b class="pin" style="--x:39.04%;--y:64.9%">23</b>
-      <b class="pin" style="--x:46.49%;--y:64.9%">24</b>
-      <b class="pin" style="--x:62.71%;--y:64.9%">25</b>
-      <b class="pin" style="--x:78.0%;--y:64.92%">26</b>
+      <b class="pin" style="--x:10.48%;--y:50%">20</b>
+      <b class="pin" style="--x:23.75%;--y:50%">21</b>
+      <b class="pin" style="--x:31.59%;--y:50%">22</b>
+      <b class="pin" style="--x:39.04%;--y:50%">23</b>
+      <b class="pin" style="--x:46.49%;--y:50%">24</b>
+      <b class="pin" style="--x:62.71%;--y:50%">25</b>
+      <b class="pin" style="--x:78.0%;--y:50%">26</b>
     </div>
     <p class="cap">캡처 2026-08-28 · 그림 A의 8번 영역을 확대(필터 없음 상태)</p>
   </figure>
@@ -254,11 +261,11 @@
     <div class="shot shot--drawer" style="aspect-ratio:644/1050">
       <img src="/shared/manual/shots/activity-logs-drawer-undone.png" alt="상세 서랍 확대 — 되돌려짐 상태">
       <div class="box" style="--x:0.16%;--y:0%;--w:99.84%;--h:7.39%"></div>
-      <b class="pin" style="--x:2%;--y:2%">36</b>
+      <b class="pin" style="--x:4%;--y:2%">36</b>
       <b class="pin" style="--x:47.8%;--y:2.63%">37</b>
       <b class="pin" style="--x:87.23%;--y:2.63%">38</b>
       <b class="pin" style="--x:94.98%;--y:2.63%">39</b>
-      <b class="pin" style="--x:5%;--y:5.24%">40</b>
+      <b class="pin" style="--x:12%;--y:5.24%">40</b>
       <div class="box" style="--x:3.37%;--y:10.95%;--w:93.42%;--h:4.74%"></div>
       <b class="pin" style="--x:5%;--y:9.3%">41</b>
       <div class="box" style="--x:3.37%;--y:19.58%;--w:93.42%;--h:6.79%"></div>

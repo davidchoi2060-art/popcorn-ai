@@ -1,0 +1,481 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 상품 일괄 등록</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 상품 일괄 등록을 처음 맡는 직원</div>
+    <div><b>화면</b> 상품 일괄 등록 · 경로 <code>/admin2/catalog-import</code> · 화면 ID <code>ADM-CSV-010</code>
+      (코드 <code>api/admin_catalog_import.py</code>·<code>api/admin_ui_catalog_import.py</code>·
+      <code>templates/admin/catalog_import.html.j2</code> 실측값입니다. 요구사항 정의서
+      <code>docs/design/req/req-product-bulk-import.md</code>가 같은 ID를 씁니다).</div>
+    <div><b>왜 이 화면부터인가</b> 사용 빈도가 아니라 <b>위험도</b>로 먼저 다룹니다. 정의서 ①이
+      스스로 "가장 위험한 쓰기 동작을 가진 작업 화면이다 … 적용 후에는 되돌리기가 없다"고
+      명시하고, 코드를 실측한 결과 이 화면의 반영 동작은 <b>작업 기록(감사 로그)에 단 한 줄도
+      남기지 않습니다</b>(아래 ⑤ 참고). 되돌릴 수 없는 데다 감사 흔적도 옅은 조합은 이 매뉴얼
+      세트에서 이 화면이 유일합니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-29 — 이 문서는 그 시점의 화면 코드와, 그 코드가 실제로
+      그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는 개발 서버)에
+      직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 건수(배치 13건·카탈로그
+      23,151건 등)는 매일 바뀝니다 — 정확한 지금 값은 화면에서 직접 확인하십시오. 이 문서의
+      드라이런(미리보기) 화면 캡처는 <b>실카탈로그와 겹치지 않는 가짜 상품코드(9999901·9999902)로
+      만든 테스트용 예시</b>입니다 — 실제로 반영(적용)되지 않았습니다(아래 문서 정보 참고).</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>CSV 파일 하나로 상품 정본(<code>products</code>, 실측 시점 23,151건)을 <b>한 번에 대량
+    갱신</b>하는 화면입니다. 정의서 원문 그대로 "가장 위험한 쓰기 동작을 가진 작업 화면"입니다 —
+    파일 한 장이 카탈로그 전체를 upsert(있으면 갱신·없으면 신규)로 덮을 수 있고, <b>적용한
+    뒤에는 되돌리는 방법이 없습니다.</b></p>
+  <p>업로드만 하는 화면이 아닙니다. 옛 3화면(업로드·이력·오류건/원본자료)을 하나로 합친
+    화면이라, <b>업로드 → 미리보기 → 확인 → 적용</b>의 마법사와 <b>과거 배치 이력·거부 행
+    조회판</b>이 한 화면 안에 함께 있습니다. 미리보기(드라이런) 없이 곧바로 반영하는 경로는
+    없습니다 — 미리보기는 DB를 전혀 건드리지 않는 순수 계산이고, 실제로 값이 바뀌는 순간은
+    오직 [적용] 한 번뿐입니다.</p>
+  <p>대량(파일 단위) 갱신의 <b>유일한</b> 경로입니다. 상품 하나씩 고치는 일은 이 화면이 아니라
+    "상품 관리" 화면의 상세 편집이 맡습니다.</p>
+  <p>권한이 화면 안에서 갈립니다 — <b>업로드·적용(쓰기)은 owner 등급만</b> 할 수 있고,
+    <b>배치 이력·거부 행 조회(읽기)는 로그인만 되어 있으면 등급과 무관하게</b> 볼 수 있습니다.
+    이 비대칭은 설계 의도입니다: 파일 하나가 정본 전체를 되돌릴 수 없이 덮을 수 있어 새로
+    올리는 일은 owner로 좁히되, "누가 언제 무엇을 올렸는지" 확인하는 일까지 막을 이유는 없기
+    때문입니다.</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>팝콘PC(윈윈) 관리자에서 새로 내려받은 상품 CSV를 카탈로그에 반영해야 할 때</li>
+    <li>사양 EAV(원문 스펙을 다시 파싱한 결과, <code>db_products</code>+<code>db_specs</code> 두
+      파일 세트)를 함께 반영해야 할 때</li>
+    <li>특정 상품이 카탈로그에 왜 반영되지 않았는지(제외·오류) 원인을 확인해야 할 때</li>
+    <li>과거에 누가 언제 어떤 파일을 올렸고, 몇 건이 반영·검수 회부·오류였는지 확인해야 할 때</li>
+    <li>거부된 행의 원본 값과 거부 사유를 확인해 원본 CSV를 고쳐야 할 때</li>
+  </ul>
+  <p>반대로, <b>상품 하나만 고칠 때는 여기 오지 않습니다</b> — "상품 관리"의 상세 편집이 더
+    안전하고 정확합니다(이 화면은 컬럼 매핑 기능이 없어 파일 헤더 14열이 정확히 일치해야만
+    받습니다).</p>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>먼저 전체 모습을 보고, 아래에서 영역별로 확대해 하나씩 설명합니다. 순서는 실제 사용
+    흐름(업로드 전 → 업로드 패널 → 배치 이력 → 드라이런 미리보기 → 배치 상세)을 그대로
+    따릅니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면(업로드 전 · owner 등급)</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/catalog-import-full.png" alt="상품 일괄 등록 화면 전체(업로드 전)">
+      <b class="pin" style="--x:6.31%;--y:4%">1</b>
+      <b class="pin" style="--x:6.31%;--y:24.93%">2</b>
+      <b class="pin" style="--x:18.1%;--y:2.8%">3</b>
+      <b class="pin" style="--x:88.43%;--y:2.8%">4</b>
+      <b class="pin" style="--x:97.88%;--y:2.8%">5</b>
+      <b class="pin" style="--x:56.31%;--y:7.13%">6</b>
+      <div class="box" style="--x:13.91%;--y:9.76%;--w:19.17%;--h:55.46%"></div>
+      <b class="pin" style="--x:16%;--y:12%">7</b>
+      <div class="box" style="--x:34.45%;--y:13.76%;--w:62.89%;--h:16.43%"></div>
+      <b class="pin" style="--x:65.89%;--y:15%">8</b>
+      <div class="box" style="--x:13.85%;--y:66.63%;--w:84.92%;--h:31.62%"></div>
+      <b class="pin" style="--x:16%;--y:69%">9</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 업로드 전 초기 진입 상태</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — "상품관리" 그룹 안에 있습니다</li>
+    <li><span class="tag">2</span>지금 있는 화면("상품 일괄 등록") — 진하게 표시됩니다</li>
+    <li><span class="tag">3</span>위치 표시(빵부스러기) — "상품관리 / 상품 일괄 등록"</li>
+    <li><span class="tag">4</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">5</span>권한 표시 · 아바타 — 로그인한 계정 이름과 등급</li>
+    <li><span class="tag">6</span>권한 안내줄 — "업로드·적용은 owner 등급만 가능합니다 · 이력·오류
+      조회는 로그인한 모든 등급에 열려 있습니다"</li>
+    <li><span class="tag">7</span>좌측 「올리기 전에 — 고정 계약」 카드(테두리 상자) — 확대는
+      <a href="#fig-c">그림 C</a></li>
+    <li><span class="tag">8</span>업로드 패널(테두리 상자) — 드롭존·EAV·원천 선택·경고·미리보기
+      버튼. 확대는 <a href="#fig-d">그림 D</a></li>
+    <li><span class="tag">9</span>배치 이력(테두리 상자) — 확대는 <a href="#fig-e">그림 E</a></li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/59.796875">
+      <img src="/shared/manual/shots/catalog-import-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:3.03%;--y:49.16%">10</b>
+      <b class="pin" style="--x:9.53%;--y:49.16%">11</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">12</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">13</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">10</span>위치 표시 — 그룹 이름("상품관리")</li>
+    <li><span class="tag">11</span>화면 이름 — "상품 일괄 등록"</li>
+    <li><span class="tag">12</span>허브 — 새 탭에서 내부 접근 허브로 이동</li>
+    <li><span class="tag">13</span>권한 표시 · 아바타 — 계정 이름·등급, 클릭하면 「내 정보」로 이동</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>좌측 「올리기 전에 — 고정 계약」 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:300px;aspect-ratio:322/582.375">
+      <img src="/shared/manual/shots/catalog-import-aside.png" alt="좌측 고정 계약 카드 확대">
+      <b class="pin" style="--x:49.84%;--y:4%">14</b>
+      <b class="pin" style="--x:49.84%;--y:22.35%">15</b>
+      <b class="pin" style="--x:49.84%;--y:48.47%">16</b>
+      <b class="pin" style="--x:49.84%;--y:67.83%">17</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · owner 등급에게만 보입니다(조회·운영자 등급은 이 카드 자체가 없습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">14</span>캡션 "올리기 전에 — 고정 계약"</li>
+    <li><span class="tag">15</span>카드① — 마스터 CSV 헤더 14열이 정확히 있어야 한다는 계약(열
+      이름을 그대로 나열). 하나라도 없으면 즉시 거부되고 무엇이 없는지 알려줍니다</li>
+    <li><span class="tag">16</span>카드② — "자체상품코드 = 쇼핑몰 상품코드(pd_no)". 이 코드가
+      정본 코드를 그대로 결정하므로, 잘못된 코드는 라이브 몰 상품과 충돌하거나 엉뚱한 상품을
+      덮어씁니다</li>
+    <li><span class="tag">17</span>카드③ — 삭제는 없다 · 운영자가 잠근 값은 안 덮는다 · 미리보기 후
+      1시간 안에 적용하지 않으면 파일이 청소된다</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>업로드 패널 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1102.625/582.375">
+      <img src="/shared/manual/shots/catalog-import-form.png" alt="업로드 패널 확대">
+      <b class="pin" style="--x:50%;--y:10%">18</b>
+      <b class="pin" style="--x:50%;--y:41%">19</b>
+      <b class="pin" style="--x:50%;--y:71.46%">20</b>
+      <b class="pin" style="--x:50%;--y:80.15%">21</b>
+      <b class="pin" style="--x:91.46%;--y:93.49%">22</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 그림 A의 8번 영역을 확대(파일 선택 전)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">18</span>마스터 CSV 드롭존 — 끌어다 놓거나 클릭해서 선택. 필수 · 최대
+      64MB · UTF-8 · 헤더 14열 정확히 일치</li>
+    <li><span class="tag">19</span>사양 EAV 세트(선택) — <code>db_products</code>+<code>db_specs</code>
+      두 파일. 하나만 올리면 그 자리에서 막힙니다</li>
+    <li><span class="tag">20</span>데이터 원천 — "실데이터"/"데모" 중 명시적으로 선택(기본값은
+      「실데이터」입니다 — 아래 ⑤ 참고)</li>
+    <li><span class="tag">21</span>경고문 — "적용 후 되돌리기가 없습니다. 자체상품코드는 라이브 몰
+      상품코드(pd_no)와 같은 값입니다"</li>
+    <li><span class="tag">22</span><span class="btnlabel">미리보기(드라이런)</span> — 마스터 CSV를
+      고르기 전까지는 눌리지 않습니다(회색)</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>배치 이력 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1426.625/331.96875">
+      <img src="/shared/manual/shots/catalog-import-history.png" alt="배치 이력 확대">
+      <b class="pin" style="--x:3%;--y:6%">23</b>
+      <b class="pin" style="--x:11.2%;--y:6%">24</b>
+      <b class="pin" style="--x:84.55%;--y:6%">25</b>
+      <b class="pin" style="--x:50%;--y:13.51%">26</b>
+      <b class="pin" style="--x:50%;--y:25.19%">27</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 그림 A의 9번 영역을 확대(업로더 이름은 문서화를 위해 가짜
+      값 "홍길동"으로 바꿨습니다 — 실제 화면에는 실명이 그대로 나옵니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">23</span>제목 "배치 이력"</li>
+    <li><span class="tag">24</span>전체 배치 수 · 실데이터/데모 내역 — "전체 13건 · 실데이터 8 · 데모 5"</li>
+    <li><span class="tag">25</span>현재 카탈로그 실측 — "23,151건(실데이터 23,122 · 데모 29) — 배치
+      합계와 다를 수 있습니다"(아래 ⑥ 참고)</li>
+    <li><span class="tag">26</span>표 머리글 — 배치 / 시각 / 업로더 / 파일명 / 원천 / 업로드 행 /
+      반영 / 검수 / 오류 / 상태(10열)</li>
+    <li><span class="tag">27</span>행(대표로 배치 #27) — 클릭하면 우측에 상세 서랍이 열립니다(그림
+      G·H)</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>드라이런(미리보기) 결과 — 테스트 예시</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1102.625/517.1875">
+      <img src="/shared/manual/shots/catalog-import-report.png" alt="드라이런 미리보기 결과 확대">
+      <b class="pin" style="--x:50%;--y:11.05%">28</b>
+      <b class="pin" style="--x:50%;--y:19.92%">29</b>
+      <b class="pin" style="--x:50%;--y:71.31%">30</b>
+      <b class="pin" style="--x:73.07%;--y:92.47%">31</b>
+      <b class="pin" style="--x:88.64%;--y:92.47%">32</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · <b>실카탈로그와 무관한 테스트용 더미 CSV</b>(가짜 상품코드
+      9999901·9999902, origin=데모)를 올려 미리보기까지만 진행한 화면입니다 — [적용]은 누르지
+      않았습니다(DB 미변경)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">28</span>요약 문장 — "N행을 읽어 M건을 넣을 계획입니다(신규·갱신·검수
+      새로 회부·제외·오류)". 이 예시는 "2행을 읽어 2건을 넣을 계획입니다(신규 2 · 갱신 0 · 검수
+      새로 회부 3 · 제외 0 · 오류 0). 추천 후보 구성은 바뀌지 않습니다"</li>
+    <li><span class="tag">29</span>부품 종류별 분포 — 이 예시는 "메모리 1 · ETC 1"</li>
+    <li><span class="tag">30</span>경고문 — "적재는 상품코드 기준 덮어쓰기이며 삭제는 없습니다 …
+      적용 후 되돌리기는 없습니다 — 이전 값 스냅샷을 남기지 않습니다"</li>
+    <li><span class="tag">31</span><span class="btnlabel">처음부터 다시</span> — 폼을 초기화하고
+      1단계로 돌아갑니다(DB에는 아무 영향 없음)</li>
+    <li><span class="tag">32</span><span class="btnlabel">되돌릴 수 없음을 알고 N건 적용</span>
+      (진한 빨강) — <b>이 버튼을 눌러야만</b> 실제로 반영됩니다. 문구 자체가 되돌릴 수 없다는
+      사실을 확인시킵니다</li>
+  </ul>
+
+  <h3><span class="fig">그림 G</span>배치 이력 행을 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/catalog-import-full-detail.png" alt="배치 이력 행을 클릭해 상세 서랍이 열린 상태의 전체 화면">
+      <b class="pin" style="--x:20%;--y:74.6%">33</b>
+      <div class="box" style="--x:61.67%;--y:5.69%;--w:38.33%;--h:94.31%"></div>
+      <b class="pin" style="--x:80.83%;--y:8%">34</b>
+      <svg class="arrow" viewBox="0 0 1680 1050">
+        <defs>
+          <marker id="ci-ah1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c8451c"></path>
+          </marker>
+        </defs>
+        <line x1="905" y1="783" x2="1030" y2="783" stroke="#c8451c" stroke-width="6" marker-end="url(#ci-ah1)"></line>
+      </svg>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 배치 이력에서 배치 #27 행을 클릭한 직후(그 배치가 거부 행을
+      가지고 있어 「거부 행」 탭이 자동으로 먼저 열렸습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">33</span>방금 클릭한 행(밝게 표시)</li>
+    <li><span class="tag">34</span>우측에 뜨는 상세 서랍(테두리 상자) — 확대는 <a href="#fig-h">그림 H</a></li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>상세 서랍 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:430px;aspect-ratio:644/990.203125">
+      <img src="/shared/manual/shots/catalog-import-drawer.png" alt="상세 서랍 확대">
+      <b class="pin" style="--x:47.11%;--y:2.1%">35</b>
+      <b class="pin" style="--x:50.08%;--y:6%">36</b>
+      <b class="pin" style="--x:50.08%;--y:9.82%">37</b>
+      <b class="pin" style="--x:50%;--y:15%">38</b>
+      <b class="pin" style="--x:50.08%;--y:96.72%">39</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 배치 #27 · 「거부 행」 탭(업로더 이름은 가짜 값으로 가렸습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">35</span>배치 번호 · 원본 파일명 · 닫기(✕)</li>
+    <li><span class="tag">36</span>시각 · 업로더 · 원천 · "N행 → 반영 N · 검수 N · 오류 N" 요약줄</li>
+    <li><span class="tag">37</span>탭 — 「거부 행 N」 / 「반영 상품 N」. 거부 행이 있으면 그 탭이
+      먼저 열립니다</li>
+    <li><span class="tag">38</span>거부 행 목록 — 행 번호·거부 사유(빨강)·원본 셀 값(값이 있는
+      칸만, 32컬럼 중 최대 14개). 이 예시는 "행 1 · 자체상품코드 또는 상품명 없음"</li>
+    <li><span class="tag">39</span>하단 안내 — "원본 셀은 적재가 거부한 행만 보관합니다 … 성공 행은
+      상품 목록에서 SKU로 조회하세요"</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li>마스터 CSV(필수, 헤더 14열 고정) + 사양 EAV 2파일 세트(선택, 둘 다 올리거나 둘 다 비움)를
+      선택 · 교체 · 지우기 — 컬럼을 사람이 매핑하는 기능은 없습니다(고정 헤더 계약).</li>
+    <li>데이터 원천을 "실데이터"/"데모" 중 명시적으로 고릅니다(그림 D의 20번).</li>
+    <li><span class="btnlabel">미리보기(드라이런)</span> — DB를 전혀 바꾸지 않고 계획만 세워
+      보여줍니다: 신규·갱신·검수 새로 회부·제외·오류 건수를 문장으로 먼저 말하고, 이어서 부품
+      종류별 분포 · 제외 사유별 집계 · 오류 사유별 집계(표본, 총 건수가 표본보다 크면 그 사실도
+      알림) · 사양 EAV 반영 여부 · 잠금(locked_fields) 존중 여부를 보여줍니다.</li>
+    <li>미리보기를 확인한 뒤 <span class="btnlabel">되돌릴 수 없음을 알고 N건 적용</span> — 실제로
+      반영합니다. 적용 시점에 미리보기 때 본 건수(<code>expect_ok</code>)를 함께 보내, 그 사이 DB가
+      바뀌었으면(다른 배치 적용·검수 승인 등) 거부하고 다시 검증하라고 안내합니다(409).</li>
+    <li>적용이 끝나면 배치 번호와 함께 반영 결과(반영·검수·오류)와 <b>지금</b> 카탈로그·추천
+      후보·검수 대기 총량을 보여줍니다.</li>
+    <li><span class="btnlabel">처음부터 다시</span> — 폼을 초기화하고 1단계로 되돌립니다.</li>
+    <li>배치 이력 표에서 과거 배치를 열람합니다 — 시각 · 업로더 · 파일명 · 원천(실데이터/데모) ·
+      업로드 행 · 반영 · 검수 · 오류 · 상태.</li>
+    <li>배치 행을 클릭 → 상세 서랍에서 「거부 행」(원본 셀+사유, 배치당 최대 200행 저장) 또는
+      「반영 상품」(SKU만, 원본 셀 없음) 탭을 봅니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+
+  <div class="callout">
+    <b>적용 후에는 되돌리기가 없습니다.</b> 이 화면에는 다른 admin2 화면들에 흔히 있는
+    <span class="btnlabel">되돌리기</span> 버튼이 아예 없습니다 — 적재는 상품코드 기준
+    upsert(있으면 갱신·없으면 신규)이고 <b>이전 값 스냅샷 자체를 남기지 않기</b> 때문에 기술적으로
+    되돌릴 수단이 없습니다. 잘못 올렸다면 할 수 있는 일은 하나뿐입니다 — <b>고친 CSV를 다시
+    올려 upsert로 값을 바로잡는 것</b>(지우거나 원래대로 되돌리는 것이 아니라, 다시 한 번
+    덮어쓰는 것). 그래서 [적용]을 누르기 전, 미리보기 화면에서 신규·갱신·제외·오류 건수와 사유를
+    반드시 눈으로 확인해야 합니다.
+  </div>
+
+  <div class="callout">
+    <b>이 화면이 무엇을 반영해도 작업 기록(감사 로그)에는 한 줄도 남지 않습니다.</b> 코드
+    실측: <code>api/admin_catalog_import.py</code>와 <code>api/catalog_ingest.py</code>(적용
+    로직) 어디에도 <code>admin_operator_activity_logs</code>에 쓰는 코드가 <b>0건</b>입니다.
+    다른 대부분의 쓰기 화면(검수 승인·가격 재산정·카테고리 이동 등)은 "작업 기록"
+    (<code>/admin2/activity-logs</code>) 화면에서 "누가 언제 무엇을 했는지"를 찾을 수 있지만,
+    <b>이 화면은 거기 절대 나오지 않습니다.</b> "내가 아까 뭘 올렸더라"는 작업 기록에서 찾지
+    마십시오 — 찾을 수 있는 곳은 딱 한 곳, <b>이 화면 자신의 「배치 이력」 표</b>
+    (<code>csv_import_jobs</code> 원장, 그림 A의 9번·그림 E)뿐입니다. 다만 그마저도 "누가·언제·
+    파일명·집계 건수(신규/갱신을 나누지 않은 반영 수·검수·오류)"까지만 알려줍니다 — <b>어느
+    상품의 어느 값이 무엇에서 무엇으로 바뀌었는지는 어디에도 기록되지 않습니다.</b> 반영된 행의
+    원본 셀조차 저장하지 않습니다(<code>product_imports</code> 표는 설계상 항상 0행 — 상세는
+    아래 문서 정보 참고). 유일한 예외는 <b>가격</b>입니다 — 매입가·판매가가 이 적재로 바뀌면
+    <code>product_price_history</code>에 사유 <code>'csv'</code>로 남습니다(상품별 원장, 코드
+    주석 근거). 그래도 "이 배치를 누가 올렸는가"를 이어 붙이려면 결국 배치 이력의 시각과 대조하는
+    수밖에 없습니다.
+  </div>
+
+  <div class="callout">
+    <b>분류·검수 회부는 지금은 잠기지만, 예전엔 안 그랬습니다 — 과거 사고를 알아야 지금 왜
+    이렇게 조심스러운지 이해됩니다.</b> 실사고 둘: ① 2026-08-15 몰에서 받은 24,721행짜리 파일을
+    올렸더니(이 화면의 배치 이력에 남은 <b>배치 #25</b>, 2026-08-15 23:32), 다른 작업이 미리
+    "완제품·베어본"으로 분류해 둔 상품 340건이 다시 "미분류(ETC)"로 되돌아가 추천 후보에서
+    빠졌습니다. ② 상품 123034는 사람이 검수로 회부해 둔 채(검수 대기)였는데, 같은 적재가 그
+    검수 회부 표시를 재계산해 <b>사람이 빼 둔 상품을 다시 추천 후보로 되돌렸습니다.</b> 지금은
+    (코드 실측, <code>api/catalog_ingest.py</code>의 UPSERT 문) 매입가·판매가 둘뿐 아니라
+    <b>분류(part_type·category_group)·검수 게이트(ai_candidate_yn·review_required_yn)·시장가
+    ·공급처·상품명·제조사까지 총 10개 컬럼</b>이 잠금(<code>locked_fields</code>)을 존중합니다
+    — 상품 상세에서 분류를 고치거나 검수로 회부하면 그 값은 이 화면이 다시 올려도 안 덮입니다.
+    <b>다만 아직 구멍이 남아 있습니다</b>: 모델명·다나와코드·스펙원문출처는 SQL엔 방어 코드가
+    있어도 그 값을 실제로 잠그는 화면 동작이 없어 사실상 무용지물이고, <b>데이터
+    원천(실데이터/데모)은 일부러 잠금 대상에서 뺐습니다</b> — 바로 아래 참고.
+  </div>
+
+  <div class="callout">
+    <b>「데이터 원천」을 잘못 고르면 그 실수는 잠기지 않고 매번 다시 덮어씁니다.</b> 실데이터/
+    데모 구분(<code>data_origin</code>)은 추천 후보 뷰가 보는 게이트입니다 — 데모로 잘못
+    올라간 상품은 추천 후보에서 즉시 빠지고, 반대로 시험용 데이터를 실데이터로 올리면 고객
+    견적에 노출될 수 있습니다. 이 값은 <b>일부러 잠금 대상에서 제외</b>했습니다(파일 한 행의
+    속성이 아니라 "이 배치 전체가 진짜인가 시험인가"를 매번 다시 선언하는 값이기 때문 —
+    잠그면 나중에 오분류를 바로잡을 수 없어집니다). 즉 <b>같은 상품을 "데모"로 한 번 잘못
+    올리면, 그다음에 누가 정확한 파일을 "실데이터"로 다시 올리기 전까지는 계속 잘못된 채로
+    남습니다.</b> 그림 D의 20번 원천 선택 토글(기본값 「실데이터」)을 매번 확인하십시오.
+  </div>
+
+  <div class="callout">
+    <b>상품명 열은 정제 없이 그대로 들어갑니다.</b> 이 화면은 컬럼 매핑·정제 기능이 없어
+    "상품명" 열의 문자열을 원문 그대로 <code>products.product_name</code>에 넣습니다. 실제로
+    2026-08-15 적재에서 몰의 판매조건 꼬리 표기("회원가입 … 2.5%")가 대괄호로 감싸는 형태로
+    바뀌면서, 그 꼬리를 지우던 정규식이 앞의 '[' 만 남기는 바람에 <b>841건의 상품명에 깨진
+    대괄호가 남았습니다.</b> 견적 화면에 노출되는 표시용 이름은 별도 파생 규칙
+    (<code>product_name.display_name()</code>)이 다시 다듬지만, <b>이 화면이 올리는 원본
+    <code>product_name</code> 자체는 다듬지 않습니다.</b> 올리기 전에 상품명 열을 눈으로 한 번
+    훑어보는 습관이 필요합니다.
+  </div>
+
+  <div class="callout">
+    <b>「제외(skip)」 사유는 미리보기 화면을 벗어나면 다시 볼 수 없습니다.</b>
+    <code>csv_import_jobs</code>에는 반영·검수·오류 집계 컬럼만 있고 <b>제외 집계 컬럼 자체가
+    없습니다.</b> 왜 24,721행 중 일부만 반영됐는지(예: 원천이 '삭제대기'·'내부관리용'으로
+    표시한 행)를 알아야 한다면, 반드시 <b>적용 전 미리보기 화면에서</b> 그 사유를 확인해야
+    합니다 — 적용 뒤 배치 이력에서는 되짚을 수 없습니다.
+  </div>
+
+  <div class="callout">
+    <b>거부 행 원본은 배치당 최대 200행까지만 저장됩니다.</b> 오류가 200건을 넘으면 그 이상은
+    애초에 저장되지 않습니다(코드 상수). 서랍의 「거부 행」 탭에 표시된 건수가 배치 이력 표의
+    "오류" 숫자보다 적으면, 나머지는 원본을 다시 볼 방법이 없다는 뜻입니다(화면이 그 차이를
+    문구로 알려줍니다).
+  </div>
+
+  <div class="callout">
+    <b>등급에 따라 화면 자체가 통째로 바뀝니다.</b> 조회(viewer)·운영자(operator) 등급으로
+    열면 버튼이 흐리게(비활성으로) 보이는 게 아니라, 업로드 패널 전체가 "새 일괄 등록은 owner
+    등급만 할 수 있습니다"라는 잠김 안내로 바뀝니다(그림 D 전체가 사라집니다). 배치 이력·거부
+    행 조회는 등급과 무관하게 그대로 보입니다.
+  </div>
+
+  <div class="callout">
+    <b>미리보기 후 1시간이 지나면 처음부터 다시 해야 합니다.</b> 확인만 하고 적용을 미루면
+    서버 임시 파일이 청소되어, [적용]을 눌러도 "업로드가 만료되었거나 없습니다"(404)가 뜹니다
+    — 업로드부터 다시 해야 합니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「미리보기(드라이런) 버튼이 안 눌린다」</b> → 마스터 CSV를 아직 선택하지 않았거나,
+      사양 EAV를 한 파일만 선택한 경우입니다(그림 D의 19번 — <code>db_products</code>·
+      <code>db_specs</code>는 함께 올리거나 함께 비워야 합니다).</li>
+    <li><b>「업로드 패널 자체가 안 보이고 잠김 안내만 뜬다」</b> → 로그인 계정이 owner 등급이
+      아닙니다. 배치 이력·거부 행 조회는 그대로 이용할 수 있습니다.</li>
+    <li><b>「적용을 눌렀더니 404가 떴다」</b> → 미리보기 후 1시간이 지나 임시 파일이
+      청소됐습니다. 업로드부터 다시 하십시오.</li>
+    <li><b>「적용을 눌렀더니 '확인하신 N건과 지금 계획 M건이 다릅니다'(409)가 떴다」</b> →
+      미리보기와 적용 사이에 다른 작업(다른 배치의 적용, 검수 승인, 다른 운영자의 상품 상세
+      수정 등)으로 DB가 바뀌었습니다. 미리보기부터 다시 해야 합니다 — 안전장치이지 오류가
+      아닙니다.</li>
+    <li><b>「배치 이력의 반영 합계와 지금 카탈로그 건수가 다르다」</b> → 정상입니다. 적재는
+      upsert이고 삭제가 없어, 같은 파일을 두 번 올리면 두 번째 배치의 반영 건수가 이전 배치와
+      겹쳐 합계에 중복 계상됩니다(그림 E의 배치 #25·#27이 실제로 같은 파일명을 두 번 올린
+      사례입니다). 그래서 배치 이력 표가 "현재 카탈로그 실측"을 배치 합계와 별도로 함께
+      보여줍니다.</li>
+    <li><b>「올렸는데 특정 상품 값이 하나도 안 바뀐 것 같다」</b> → 그 필드가 상품 상세에서
+      잠겨(<code>locked_fields</code>) 있을 가능성이 큽니다. "상품 관리"에서 그 상품을 열어
+      잠금 표시를 확인하십시오(위 ⑤ 참고).</li>
+    <li><b>「누가 이 배치를 올렸는지 작업 기록에서 못 찾겠다」</b> → 작업 기록
+      (<code>/admin2/activity-logs</code>)에는 이 화면의 동작이 전혀 남지 않습니다. 이 화면
+      자신의 「배치 이력」 표에서만 확인됩니다(위 ⑤의 감사 기록 관련 항목 참고).</li>
+    <li><b>「거부 행 서랍에 사유는 보이는데 그 상품이 어떤 상품인지 모르겠다」</b> → 거부된
+      행은 애초에 <code>products</code>에 들어간 적이 없는 행입니다(자체상품코드·상품명 등
+      필수값이 없거나 형식이 틀려 반려된 원본 CSV 행). 서랍에 표시된 원본 셀(딜러가·상태값·
+      시중가 등)로 원본 CSV에서 같은 행을 찾아 고치십시오.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_catalog_import.py</code>(업로드·드라이런·적용) ·
+        <code>api/catalog_ingest.py</code>(적재 로직 단일 원천, UPSERT SQL·잠금 범위) ·
+        <code>api/admin_imports.py</code>(배치 이력·행 상세 조회) ·
+        <code>api/admin_ui_catalog_import.py</code> · <code>templates/admin/catalog_import.html.j2</code> ·
+        <code>api/admin_activity_logs.py</code>(작업 기록 화면 — 이 화면 관련 항목이 없음을
+        확인하는 데 썼습니다) · <code>templates/admin/_admin2_shell.html.j2</code> ·
+        <code>mockups/shared/admin2/admin2-shell.js</code></li>
+      <li>요구사항 정의서 — <code>docs/design/req/req-product-bulk-import.md</code>(2026-08-13
+        작성, 이 화면 ID·데이터 계약·비범위의 근거).</li>
+      <li>감사 기록이 안 남는다는 판단의 확인법 — <code>grep -n
+        "admin_operator_activity_logs" api/admin_catalog_import.py api/catalog_ingest.py</code>
+        (일치 0건). 배치 이력이 유일한 기록이라는 판단의 근거는
+        <code>api/admin_imports.py</code>의 <code>GET /api/admin/import-jobs</code>가
+        <code>csv_import_jobs</code>만 읽는다는 것과, <code>product_imports</code>가 설계상
+        항상 0행이라는 것(적재 로직 어디에도 그 표에 쓰는 코드가 없습니다 — 정의서 ④의 실측과
+        일치)입니다.</li>
+      <li>잠금(<code>locked_fields</code>) 범위의 확인법 — <code>api/catalog_ingest.py</code>의
+        <code>UPSERT_PRODUCTS_SQL</code> 상수 안에서 <code>locked_fields ?</code>(JSONB 존재
+        연산자)로 가드되는 컬럼을 세면 됩니다. 이 문서 작성 시점 실측으로 10개
+        (<code>purchase_price</code>·<code>sale_price</code>·<code>part_type</code>·
+        <code>category_group</code>·<code>ai_candidate_yn</code>·<code>review_required_yn</code>·
+        <code>market_price</code>·<code>supplier</code>·<code>product_name</code>·<code>maker</code>)
+        였고, 그 옆 인라인 주석이 <code>model_name</code>·<code>danawa_code</code>·
+        <code>spec_source_text</code>는 "가드는 있지만 잠그는 화면 동작이 없어 지금은 무용지물"
+        이라고, <code>data_origin</code>은 "의도적으로 잠금·COALESCE 둘 다 뺐다"고 스스로
+        밝히고 있습니다.</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-29에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_catalog_import.py</code>, 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>catalog-import-coords.json</code>에 있습니다.</li>
+      <li><b>드라이런 캡처(그림 F·G·H)는 실카탈로그와 무관합니다.</b> 캡처 스크립트가 가짜
+        상품코드(9999901·9999902)로 만든 더미 CSV를 <code>origin=데모</code>로 올려 미리보기만
+        진행했습니다 — 미리보기(드라이런)는 <code>build_plan()</code>이 스스로 "DB를 바꾸지
+        않는다"고 명시하는 순수 계산이고, <b>[적용] 버튼은 캡처 과정에서 한 번도 누르지
+        않았습니다.</b> 그림 G·H의 배치 #27은 이 더미 업로드와 무관한, <b>실제로 과거에 반영된
+        진짜 배치</b>입니다(배치 이력에서 거부 행이 있는 첫 배치를 골라 열었습니다).</li>
+      <li>업로더 실명 — 배치 이력·상세 서랍에 나오는 「업로더」는 실제 계정 이름입니다. 이
+        문서의 캡처는 촬영 직전 매번 그 값을 가짜 이름 "홍길동"으로 바꿔 가렸습니다(화면 DOM
+        텍스트만 바꾼 것이라 서버 값은 그대로입니다). 실제 화면에는 실명이 그대로 보입니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>catalog-import-coords.json</code>에 맞춰 다시 옮겨야 합니다.</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_catalog_import.py</code></pre>
+    <p>이 스크립트는 미리보기(드라이런) 캡처를 위해 더미 CSV를 <b>1회 업로드</b>합니다(DB
+      미변경) — <code>[적용]</code> 버튼은 스크립트 안에서도 절대 호출하지 않습니다. Playwright가
+      필요합니다(<code>pip install playwright</code> 후 <code>playwright install chromium</code>).</p>
+    <p><b>확인하지 못한 것</b> — 이 문서를 만드는 작업에는 브라우저(화면을 눈으로 보는 도구)가
+      없어, 완성된 HTML 문서 자체가 브라우저에서 실제로 어떻게 보이는지(핀 좌표가 캡처 위에
+      정확히 맞는지, 그림 G의 화살표가 시각적으로 자연스러운지, 인쇄 시 페이지가 어떻게
+      나뉘는지)는 직접 확인하지 못했습니다. 좌표는 Playwright로 화면 요소의 실제 위치를 재서
+      계산한 값입니다. 또한 이 캡처는 owner 등급 점검 계정으로만 찍었습니다 — 「조회」·「운영자」
+      등급 계정에서 업로드 패널이 실제로 어떻게 잠김 안내로 바뀌는지는 코드
+      (<code>lockedHtml()</code>)로는 확인했지만 화면으로 직접 보지는 못했습니다. 좌측 메뉴(LNB)의
+      "상품 일괄 등록" 항목이 이번 캡처에서는 정상적으로 진하게 표시됐지만(그림 A의 2번),
+      <code>api/admin_nav.py</code>의 현재 커밋(<code>d508897</code>, 이 화면의 담당 범위
+      밖이라 고치지 않았습니다)에 있는 정적 표는 이 항목의 링크 값을 비워 둔(<code>None</code>)
+      채입니다 — 지금 켜져 있는 서버가 그보다 이전 상태를 메모리에 들고 있을 가능성이 있고,
+      서버가 재기동되면 메뉴 표시가 달라질 수 있습니다(이 화면 자체의 동작과는 무관 — 직접
+      주소로 들어가면 항상 정상 동작합니다). 이 항목의 소유 파일이 아니라 고치지 않고
+      보고로만 남깁니다.</p>
+  </div>
+
+</div>

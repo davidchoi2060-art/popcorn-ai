@@ -1,0 +1,551 @@
+<div class="wrap">
+
+  <h1>운영자 매뉴얼 — 마진 정책</h1>
+  <p class="lead">화면을 처음 쓰는 직원이 이 문서만 보고 바로 일을 시작할 수 있도록 썼습니다.</p>
+
+  <div class="meta">
+    <div><b>대상</b> 관리자 화면(admin2)의 마진 정책을 처음 맡는 직원</div>
+    <div><b>화면</b> 마진 정책 · 경로 <code>/admin2/margin-policy</code> · 화면 ID <code>ADM-PRC-020</code>
+      (코드 <code>api/admin_ui_margin_policy.py</code>·<code>templates/admin/margin_policy.html.j2</code>
+      실측값. 좌측 메뉴 그룹은 「판매가」입니다.)</div>
+    <div><b>왜 이 화면부터인가</b> 「오픈 단계 설정」(운영 시작 절차)의 2단계가 이 화면입니다
+      (<code>api/admin_setup.py</code> 원문: <i>"마진 0%면 판매가 = 매입가라 이익이 없습니다.
+      <b>상품보다 먼저</b> 정해야 합니다 — 나중에 바꾸면 이미 산정된 판매가를 전부 다시 계산해야
+      합니다"</i>). 순서는 ① 운영자 계정 → <b>② 마진 정책</b> → ③ 공급처 → ④ 상품 등록 →
+      ⑤ 사양 검수 …입니다 — 여기서 정한 값이 「가격 검토 대기」·「판매가 관리」·「판매가
+      재산정」이 판매가를 계산하는 <b>출발점</b>이 됩니다.</div>
+    <div><b>코드·캡처 확인 기준일</b> 2026-08-29 — 이 문서는 그 시점의 화면 코드와, 그 코드가
+      실제로 그리는 화면을 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+      개발 서버)에 직접 띄워 촬영한 결과를 근거로 썼습니다.</div>
+    <div class="warn-line">이 화면은 실데이터를 다룹니다. 캡처 시점의 수치(카드수수료 2.585%·
+      전역 마진 12%·미리보기 대상 7,187건 등)는 정책이 바뀌면 함께 바뀝니다 — 정확한 지금
+      값은 화면에서 직접 확인하십시오.</div>
+  </div>
+
+  <div class="legend">
+    <div class="it"><span class="pin-demo">1</span> 눌러야 할 자리 · 봐야 할 정보(번호는 아래 목록과 1:1)</div>
+    <div class="it"><span class="box-demo"></span> 테두리 상자 = 하나로 묶어 보는 영역</div>
+    <div class="it"><span class="arrow-demo"></span> 화살표 = 누르면 무엇이 열리는지</div>
+  </div>
+
+  <h2><span class="num">1</span>이 화면이 무엇을 하는 곳인가</h2>
+  <p>상품 하나하나의 판매가가 아니라, <b>판매가를 계산하는 «규칙» 자체</b>를 정하는 화면입니다.
+    값 넷을 영향이 큰 순서로 한 자리에 모아 둡니다 — <b>①카드수수료 → ②전역 기본 마진율 →
+    ③분류별 예외 마진 → ④부품별 예산 배분율</b>. 여기서 정한 값이 아래로 흘러 판매가·견적
+    구성의 근거가 됩니다.</p>
+
+  <p><b>이 화면이 없으면(또는 값이 정해지지 않으면) 무엇이 막히는가 — 셋입니다.</b></p>
+  <ul>
+    <li>「가격 검토 대기」 화면이 판정할 수 있는 이상값 유형이 «매입가 급등»뿐이고,
+      <b>«마진 정책 위반»</b>이라는 유형 자체가 성립하지 않습니다(분류별 예외가 0건이라
+      비교할 정책이 없기 때문 — 이 화면이 그 빈자리를 채웁니다).</li>
+    <li>지금까지는 <b>전 상품에 같은 마진율</b>이 걸렸습니다 — 그래픽카드와 케이스가 같은
+      마진율일 이유가 없는데도 나눌 방법이 없었습니다. 이 화면의 ③이 그 갈래를 엽니다
+      (지금은 실제로 0건 — 아래 §5 참고).</li>
+    <li>「추천 기준 보기」(ADM-ENG-020) 화면이 부품별 예산 배분율 편집을 <b>「향후
+      사용예정」으로 잠가</b> 두고 있었는데, 그 자리가 가리키는 곳이 바로 여기 ④입니다
+      (다만 지금도 «편집»은 안 됩니다 — 아래 §4·§5에서 왜인지 자세히 설명합니다).</li>
+  </ul>
+
+  <p><b>⚠ 값 넷의 출처가 서로 다릅니다 — 반드시 구분해서 기억하십시오.</b></p>
+  <table class="kv">
+    <tr><th>절</th><th>값</th><th>실제 저장소</th><th>지금 상태</th><th>이 화면에서 고칠 수 있나</th></tr>
+    <tr><td>①</td><td>카드수수료</td><td><code>pricing_settings</code>(진짜 DB, 이력형)</td>
+      <td>2.585%</td><td>예 — <b>관리자(owner)만</b></td></tr>
+    <tr><td>②</td><td>전역 기본 마진율</td><td><code>pricing_settings</code>(①과 같은 표)</td>
+      <td>12%</td><td>예 — <b>관리자(owner)만</b></td></tr>
+    <tr><td>③</td><td>분류별 예외 마진</td><td><code>category_margin_policies</code>(진짜 DB)</td>
+      <td><b>0행</b>(정상 — 아래 §5)</td><td>예 — <b>관리자·운영자(owner+operator)</b></td></tr>
+    <tr><td>④</td><td>부품별 예산 배분율</td><td><code>candidates.BUDGET_ALLOC</code>
+      (<b>진짜 코드 상수</b> — DB 표 자체가 없음)</td><td>CPU 25%·그래픽카드 40%… 10종</td>
+      <td><b>아니오</b> — 이 화면을 포함해 <b>어느 화면에서도</b> 못 고칩니다. 코드를 고쳐
+      배포해야 합니다(아래 §5)</td></tr>
+  </table>
+  <p class="cap" style="margin-top:-8px">③은 지금 0행이지만 «표는 실재»합니다 — 운영자가
+    아직 예외를 안 걸었을 뿐, 조회·저장 API가 정상적으로 그 표를 읽고 씁니다. ④는 표
+    자체가 없어서 위 셋과 성격이 다릅니다 — 화면은 이 차이를 배지("읽기 전용 · 향후
+    사용예정")로 미리 밝히고 있어 "바꿀 수 있을 것처럼 보이는데 안 되는" 함정은 아닙니다
+    (입력칸·저장 버튼 자체가 없습니다 — 실측 확인).</p>
+
+  <h2><span class="num">2</span>언제 여기 오는가</h2>
+  <ul>
+    <li>카드사와 계약한 수수료율이 바뀌었을 때(①) — 전 상품에 걸리므로 영향이 가장 큽니다.</li>
+    <li>회사 전체의 기본 이익률(마진율)을 조정해야 할 때(②).</li>
+    <li>특정 분류(예: 그래픽카드)만 다른 마진율을 걸고 싶을 때(③) — 34개 분류 목록에서
+      골라 서랍을 엽니다.</li>
+    <li>「가격 검토 대기」·「상품 분류 관리」·「추천 기준 보기」에서 마진·배분율 칸이 잠겨
+      있거나 이 화면을 가리키는 링크를 만났을 때.</li>
+    <li>지난 마진 변경이 왜 그렇게 됐는지(거의 다 되돌려진 이유) 확인하고 싶을 때 — 우측
+      패널의 이력 요약을 먼저 보고 「가격 이력」으로 넘어갑니다.</li>
+    <li><b>값을 실제로 바꾸기 «전»에 영향을 먼저 보고 싶을 때</b> — 다만 §5의 함정(미리보기가
+      «지금 입력값»이 아니라 «이미 저장된 값» 기준이라는 것)을 먼저 읽으십시오.</li>
+  </ul>
+
+  <h2><span class="num">3</span>화면 살펴보기</h2>
+  <p>이 화면은 <b>뷰포트(1,050px)보다 훨씬 깁니다</b> — 카드 넷과 우측 패널을 다 펼치면
+    세로로 약 2,300px입니다. 그래서 그림 A는 «맨 위에서 스크롤하지 않은 첫인상»만 보여주고,
+    그 아래 이어지는 절들은 그림 D~H에서 하나씩 확대해 보여줍니다.</p>
+
+  <h3><span class="fig">그림 A</span>전체 화면(스크롤 전)</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/margin-policy-full.png" alt="마진 정책 화면 전체(스크롤 전)">
+      <b class="pin" style="--x:6.31%;--y:34.32%">1</b>
+      <b class="pin" style="--x:14.91%;--y:2.8%">2</b>
+      <b class="pin" style="--x:88.43%;--y:2.8%">3</b>
+      <b class="pin" style="--x:93.39%;--y:2.8%">4</b>
+      <b class="pin" style="--x:97.88%;--y:2.8%">5</b>
+      <div class="box" style="--x:13.85%;--y:7.45%;--w:84.92%;--h:18.13%"></div>
+      <b class="pin" style="--x:15.7%;--y:9.6%">6</b>
+      <b class="pin" style="--x:15.7%;--y:22.9%">7</b>
+      <b class="pin" style="--x:18.02%;--y:30.26%">8</b>
+      <b class="pin" style="--x:19.11%;--y:59.73%">9</b>
+      <b class="pin" style="--x:87.33%;--y:29.92%">10</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 뷰포트 1680×1050 · 로그인 계정 「UI점검」(owner 등급) · 스크롤 전(맨 위)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">1</span>왼쪽 메뉴(LNB) — 「판매가」 그룹 안에 「마진 정책」이 진하게 표시됩니다.</li>
+    <li><span class="tag">2</span>위치 표시(빵부스러기) — 「판매가 / 마진 정책」.</li>
+    <li><span class="tag">3</span>허브 — 새 탭에서 내부 접근 허브로 이동.</li>
+    <li><span class="tag">4</span>권한 표시 — 로그인한 계정 이름과 등급.</li>
+    <li><span class="tag">5</span>아바타 — 「내 정보」 화면으로 이동.</li>
+    <li><span class="tag">6</span>상단 붉은 경고(테두리 상자) — 「분류별 마진이 안 먹는 경로가
+      둘 있습니다」. 이 화면에서 가장 먼저 읽어야 할 내용입니다 — 확대는 <a href="#fig-c">그림 C</a>.</li>
+    <li><span class="tag">7</span>권한 안내 — 카드수수료·전역 마진(owner만)과 분류별 예외
+      (owner+operator)의 등급이 다르다는 안내.</li>
+    <li><span class="tag">8</span>①카드수수료 절이 시작되는 자리 — 확대는 <a href="#fig-d">그림 D</a>.</li>
+    <li><span class="tag">9</span>②전역 기본 마진율 절이 시작되는 자리(아래로 잘려 안 보임) —
+      확대는 <a href="#fig-e">그림 E</a>. 이 아래로 ③분류별 예외·④배분율이 더 이어집니다
+      (그림 F·G).</li>
+    <li><span class="tag">10</span>우측 패널(aside) 시작 지점 — 확대는 <a href="#fig-h">그림 H</a>.</li>
+  </ul>
+
+  <h3 id="fig-b"><span class="fig">그림 B</span>상단 헤더 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1468/59.8">
+      <img src="/shared/manual/shots/margin-policy-header.png" alt="상단 헤더 확대">
+      <b class="pin" style="--x:2.63%;--y:49.16%">11</b>
+      <b class="pin" style="--x:7.71%;--y:49.16%">12</b>
+      <b class="pin" style="--x:86.76%;--y:49.16%">13</b>
+      <b class="pin" style="--x:92.44%;--y:49.16%">14</b>
+      <b class="pin" style="--x:97.57%;--y:49.16%">15</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 그림 A 상단을 잘라 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">11</span>위치 표시(그룹) — 「판매가」.</li>
+    <li><span class="tag">12</span>위치 표시(현재 화면) — 「마진 정책」.</li>
+    <li><span class="tag">13</span>허브.</li>
+    <li><span class="tag">14</span>권한 표시.</li>
+    <li><span class="tag">15</span>아바타.</li>
+  </ul>
+
+  <h3 id="fig-c"><span class="fig">그림 C</span>상단 경고 + 권한 안내 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:1000px;aspect-ratio:1426.6/190.4">
+      <img src="/shared/manual/shots/margin-policy-warn.png" alt="상단 경고 밴드와 권한 안내 확대">
+      <b class="pin" style="--x:2.5%;--y:11%">16</b>
+      <b class="pin" style="--x:2.5%;--y:53.5%">17</b>
+      <b class="pin" style="--x:1.5%;--y:80%">18</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 그림 A의 6~7번 영역을 확대</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">16</span>경고 제목 — 「분류별 마진이 안 먹는 경로가 둘 있습니다」.</li>
+    <li><span class="tag">17</span>근거 표기 — <code>admin_price_review.py:62</code> ·
+      <code>admin_price_import.py:180</code>(코드 파일·줄번호를 그대로 보여줍니다).</li>
+    <li><span class="tag">18</span>권한 안내 배지 — 「①②는 관리자(owner)만 · ③은 관리자·운영자
+      (owner+operator)」.</li>
+  </ul>
+
+  <h3 id="fig-d"><span class="fig">그림 D</span>① 카드수수료 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:1021.8/379.5">
+      <img src="/shared/manual/shots/margin-policy-card-fee.png" alt="카드수수료 카드 확대(미리보기를 누른 뒤)">
+      <b class="pin" style="--x:6.86%;--y:8.1%">19</b>
+      <b class="pin" style="--x:21.95%;--y:8.1%">20</b>
+      <b class="pin" style="--x:10.38%;--y:32.78%">21</b>
+      <b class="pin" style="--x:22.96%;--y:32.81%">22</b>
+      <b class="pin" style="--x:4%;--y:44%">23</b>
+      <b class="pin" style="--x:4%;--y:79%">24</b>
+      <b class="pin" style="--x:6.33%;--y:90.16%">25</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 「미리보기」를 누른 직후(값은 캡처 시점 실측 — 매일 바뀝니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">19</span>①카드수수료.</li>
+    <li><span class="tag">20</span>배지 — 「전 상품 공통 — 마진보다 영향이 큽니다」.</li>
+    <li><span class="tag">21</span>저장된 값(캡처 시점 2.585%).</li>
+    <li><span class="tag">22</span>입력칸 — 이 스크립트는 값을 바꾸지 않았습니다(저장된 값 그대로).</li>
+    <li><span class="tag">23</span>영향 표(6칸) — 「미리보기」를 눌러야 채워집니다(대상·오름·내림·
+      변화없음·잠김·못 셈).</li>
+    <li><span class="tag">24</span>비교 안내문 — 방금 본 대상 건수가 아래 ②절 미리보기(판매중·
+      재고 있음 기준)와 «범위가 다르다»는 것을 알려 줍니다.</li>
+    <li><span class="tag">25</span><span class="btnlabel">미리보기</span> — <b>GET</b> 요청이라
+      값을 바꾸지 않습니다(아래 §5 참고).</li>
+  </ul>
+
+  <h3 id="fig-e"><span class="fig">그림 E</span>② 전역 기본 마진율 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:1021.8/638.8">
+      <img src="/shared/manual/shots/margin-policy-card-margin.png" alt="전역 기본 마진율 카드 확대">
+      <b class="pin" style="--x:8.65%;--y:4.73%">26</b>
+      <b class="pin" style="--x:9.22%;--y:19.31%">27</b>
+      <b class="pin" style="--x:20.63%;--y:19.33%">28</b>
+      <b class="pin" style="--x:4%;--y:31%">29</b>
+      <b class="pin" style="--x:4%;--y:39%">30</b>
+      <b class="pin" style="--x:4%;--y:60.5%">31</b>
+      <b class="pin" style="--x:6.33%;--y:73.88%">32</b>
+      <b class="pin" style="--x:7.5%;--y:84.7%">33</b>
+      <b class="pin" style="--x:17.66%;--y:84.7%">34</b>
+      <b class="pin" style="--x:4%;--y:90%">35</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 화면을 열 때 이미 채워져 있는 상태(별도 클릭 없음)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">26</span>②전역 기본 마진율 — 예외가 없는 모든 분류에 걸립니다.</li>
+    <li><span class="tag">27</span>저장된 값(캡처 시점 12%).</li>
+    <li><span class="tag">28</span>입력칸.</li>
+    <li><span class="tag">29</span>제안가 계산식 — <b>지금 입력칸의 값</b>으로 실시간 재계산되는
+      참고용 수식입니다(서버에 물어보지 않습니다 — 실제 결과는 아래 30번과 다른 경로입니다).</li>
+    <li><span class="tag">30</span>영향 표 — 화면을 여는 순간 자동으로 한 번 조회됩니다(판매중·
+      재고 있음 기준).</li>
+    <li><span class="tag">31</span>고지 — 「미리보기 전용 경로가 아직 없습니다」. 30번 숫자는
+      «저장된 값» 기준이지 지금 28번 입력칸의 값 기준이 아니라는 뜻입니다.</li>
+    <li><span class="tag">32</span><span class="btnlabel">미리보기</span>.</li>
+    <li><span class="tag">33</span><span class="btnlabel">확인하고 저장</span> — <b>①카드수수료와
+      ②전역 마진을 «함께»</b> 저장합니다(한 표에 같이 들어가는 값이라 버튼이 하나입니다).</li>
+    <li><span class="tag">34</span><span class="btnlabel">변경 취소</span> — 입력칸을 저장된
+      값으로 되돌립니다(아직 저장 전이라 서버 호출 없음).</li>
+    <li><span class="tag">35</span>저장 안내문 — 「다음 견적부터 적용됩니다 — 이미 만든 견적은
+      그대로입니다」.</li>
+  </ul>
+
+  <h3 id="fig-f"><span class="fig">그림 F</span>③ 분류별 예외 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:1021.8/689.4">
+      <img src="/shared/manual/shots/margin-policy-card-category.png" alt="분류별 예외 카드 확대(34행 목록)">
+      <b class="pin" style="--x:7.05%;--y:4%">36</b>
+      <b class="pin" style="--x:17.78%;--y:4.46%">37</b>
+      <b class="pin" style="--x:4%;--y:9%">38</b>
+      <b class="pin" style="--x:4%;--y:14%">39</b>
+      <div class="box" style="--x:2.42%;--y:25.22%;--w:95.46%;--h:56.72%"></div>
+      <b class="pin" style="--x:4%;--y:27%">40</b>
+      <b class="pin" style="--x:4%;--y:84.5%">41</b>
+      <b class="pin" style="--x:6.48%;--y:94.58%">42</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 지금은 예외 0건 — 34개 분류 전부가 「전역 기본」</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">36</span>③분류별 예외.</li>
+    <li><span class="tag">37</span>배지 — 「0건 — 정상입니다」(⚠ 「설정을 못 불러왔다」가
+      아닙니다 — 아래 §5 참고).</li>
+    <li><span class="tag">38</span>설명문 — 「아직 예외를 두지 않았고 34개 분류 전부가 전역값
+      12%를 씁니다.」</li>
+    <li><span class="tag">39</span>대분류 6개 요약 칩 — 각 상품 수 + 「전역」/「예외 있음」 태그
+      (지금은 6개 전부 「전역」).</li>
+    <li><span class="tag">40</span>34행 목록(테두리 상자, 스크롤) — 대분류 6 + 소분류 28. 행마다
+      상품 수 · 지금 적용값과 출처(「12% · 전역 기본」) · <span class="btnlabel">예외 걸기</span>
+      (이미 예외가 있으면 <span class="btnlabel">수정</span>으로 바뀝니다) 버튼이 있습니다.
+      행을 누르면 서랍이 열립니다 — <a href="#fig-i">그림 I</a>.</li>
+    <li><span class="tag">41</span>하단 안내문 — 「분류가 없는 상품 51건(전체 23,151건)에는 예외를
+      걸 수 없고 전역값이 걸립니다」+ 「상품 분류 관리의 마진 칸은 읽기 전용으로 바뀌고 이
+      화면을 가리킵니다」.</li>
+    <li><span class="tag">42</span><span class="btnlabel">예외 추가</span> — ⚠ 새 항목을 만드는
+      폼이 «아니라» 40번 목록으로 스크롤해 강조 효과만 줍니다(아래 §6 참고).</li>
+  </ul>
+
+  <h3><span class="fig">그림 G</span>④ 부품별 예산 배분율 카드 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:760px;aspect-ratio:1021.8/292.8">
+      <img src="/shared/manual/shots/margin-policy-card-budget.png" alt="부품별 예산 배분율 카드 확대(읽기 전용)">
+      <b class="pin" style="--x:9.35%;--y:10.49%">43</b>
+      <b class="pin" style="--x:23.85%;--y:10.5%">44</b>
+      <b class="pin" style="--x:4%;--y:20%">45</b>
+      <b class="pin" style="--x:4%;--y:70%">46</b>
+    </div>
+    <p class="cap">캡처 2026-08-29</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">43</span>④부품별 예산 배분율.</li>
+    <li><span class="tag">44</span>배지 — 「읽기 전용 · 향후 사용예정」.</li>
+    <li><span class="tag">45</span>배분율 칩 10개(그래픽카드 40%·CPU 25%·메인보드 15%… ) —
+      입력칸도 버튼도 없습니다.</li>
+    <li><span class="tag">46</span>안내문 — 「이 값은 DB에 없습니다 — 코드 상수라 쓰기 경로가
+      없고, 편집을 열려면 코드에서 DB로 옮기는 작업이 먼저입니다.」</li>
+  </ul>
+
+  <h3 id="fig-h"><span class="fig">그림 H</span>우측 패널 확대</h3>
+  <figure>
+    <div class="shot" style="max-width:300px;aspect-ratio:386.4/897.3">
+      <img src="/shared/manual/shots/margin-policy-aside.png" alt="우측 패널 확대 — 이력 요약 · 저장 시점 안내 · 이 화면에서 안 하는 것">
+      <div class="box" style="--x:0%;--y:0%;--w:100%;--h:23.49%"></div>
+      <b class="pin" style="--x:4.5%;--y:2%">47</b>
+      <b class="pin" style="--x:50.26%;--y:7.54%">48</b>
+      <b class="pin" style="--x:50.26%;--y:20.35%">49</b>
+      <div class="box" style="--x:0%;--y:52.92%;--w:100%;--h:47.08%"></div>
+      <b class="pin" style="--x:4.5%;--y:54%">50</b>
+      <b class="pin" style="--x:82.22%;--y:59.92%">51</b>
+      <b class="pin" style="--x:84.03%;--y:67.45%">52</b>
+      <b class="pin" style="--x:85.44%;--y:71.21%">53</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 카드 셋 중 위·아래(1·3번째) — 가운데 카드(「저장하면 무엇이
+      언제 바뀌나」)는 두 상자 사이 빈틈에 보입니다</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">47</span>이력 요약 카드(테두리 상자) — 「지난 마진 변경은 거의 전부
+      되돌려졌습니다」.</li>
+    <li><span class="tag">48</span>큰 숫자 — 「N건 중 → M건이 되돌려졌습니다(비율%)」(캡처 시점
+      21,654건 중 21,652건, 99.99% — 아래 §5 참고).</li>
+    <li><span class="tag">49</span><a class="mp-link">가격 이력에서 margin_policy 보기 →</a>.</li>
+    <li><span class="tag">50</span>「이 화면에서 안 하는 것」 카드(테두리 상자) — 개별 상품 판매가
+      확정 · 대량 재계산 실행 · 예외 잡기/잠금 · 마진 이력 조회가 각각 어느 화면 소관인지
+      알려 줍니다. ⚠ 이 카드의 문구 하나가 낡아 있습니다 — 아래 §5·§6 참고.</li>
+    <li><span class="tag">51</span>→ 가격 검토 대기.</li>
+    <li><span class="tag">52</span>→ 판매가 관리.</li>
+    <li><span class="tag">53</span>→ 가격 이력.</li>
+  </ul>
+
+  <h3 id="fig-i"><span class="fig">그림 I</span>분류 행을 클릭하면 열리는 위치</h3>
+  <figure>
+    <div class="shot shot--full">
+      <img src="/shared/manual/shots/margin-policy-full-drawer.png" alt="분류 목록의 행을 클릭해 서랍이 열린 상태의 전체 화면(CPU 예시)">
+      <b class="pin" style="--x:44.35%;--y:52.93%">54</b>
+      <b class="pin" style="--x:30%;--y:5%">55</b>
+      <div class="box" style="--x:66.32%;--y:0%;--w:33.68%;--h:100%"></div>
+      <b class="pin" style="--x:68%;--y:3%">56</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 목록에서 「CPU」 행의 <span class="btnlabel">예외 걸기</span>를
+      클릭한 직후(읽기 전용 — 이 클릭은 서버에 아무것도 보내지 않습니다)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">54</span>방금 클릭한 행(CPU) — 클릭은 로컬 상태만 바꿉니다(API 호출 없음).</li>
+    <li><span class="tag">55</span>뒤 화면이 살짝 어둡게 처리됩니다(스크림) — 스크림을 클릭하면
+      서랍이 닫힙니다.</li>
+    <li><span class="tag">56</span>열린 서랍(테두리 상자, 우측 고정) — 확대는 <a href="#fig-j">그림 J</a>·
+      <a href="#fig-k">그림 K</a>.</li>
+  </ul>
+
+  <h3 id="fig-j"><span class="fig">그림 J</span>서랍 확대 — 값을 바꾸기 전(기본 상태)</h3>
+  <figure>
+    <div class="shot" style="max-width:430px;aspect-ratio:565.8/1050">
+      <img src="/shared/manual/shots/margin-policy-drawer.png" alt="분류별 예외 마진 서랍 확대 — 기본 상태(저장 버튼 비활성)">
+      <b class="pin" style="--x:35.97%;--y:2.62%">57</b>
+      <b class="pin" style="--x:35.97%;--y:5.82%">58</b>
+      <b class="pin" style="--x:94.2%;--y:3.07%">59</b>
+      <b class="pin" style="--x:15.01%;--y:13.24%">60</b>
+      <b class="pin" style="--x:5%;--y:16.5%">61</b>
+      <b class="pin" style="--x:5%;--y:37%">62</b>
+      <b class="pin" style="--x:5%;--y:56%">63</b>
+      <div class="box" style="--x:3.83%;--y:65.38%;--w:92.51%;--h:10.9%"></div>
+      <b class="pin" style="--x:5%;--y:67%">64</b>
+      <b class="pin" style="--x:5%;--y:96%">65</b>
+      <b class="pin" style="--x:87.16%;--y:96.87%">66</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 서랍을 연 직후(입력칸이 지금 유효한 값 그대로)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">57</span>서랍 제목 — 「분류별 예외 마진 — CPU」.</li>
+    <li><span class="tag">58</span>경로 · 상품 수 · 지금 값 — 「부품 &gt; CPU · 상품 682건 ·
+      지금은 전역 기본 12%를 상속하고 있습니다」.</li>
+    <li><span class="tag">59</span>닫기(✕).</li>
+    <li><span class="tag">60</span>새 마진율 입력칸 — 서랍을 여는 순간 <b>지금 유효한 값</b>이
+      기본으로 채워집니다(캡처 시점 12).</li>
+    <li><span class="tag">61</span>입력 규칙 안내 — 「0% 이상 100% 미만 · 음수는 거부(역마진) ·
+      화면이 더 좁힐지는 미정」.</li>
+    <li><span class="tag">62</span>저장하면 바뀌는 것(4칸) — 전부 <b>「못 셈」</b>입니다. 이
+      화면이 쓰는 미리보기 API(<code>GET /reprice/preview</code>)에 «분류로 좁혀 세는»
+      파라미터가 없어서, 지어내지 않고 못 셈으로 둡니다.</li>
+    <li><span class="tag">63</span>고지 — 「이 숫자는 서버가 «저장 전»에 센 값이 아닙니다」(전체
+      영향은 그림 E의 미리보기로 참고하라는 안내).</li>
+    <li><span class="tag">64</span>위험 경고(테두리 상자, 빨강) — 「저장하면 이 예외는 되돌릴
+      수 없습니다. 분류별 마진은 되돌리기 API 자체가 없습니다.」</li>
+    <li><span class="tag">65</span>하단 버튼 영역 — <span class="btnlabel">취소</span> /
+      <span class="btnlabel">확인하고 저장</span>.</li>
+    <li><span class="tag">66</span><span class="btnlabel">확인하고 저장</span> — 지금은
+      <b>비활성</b>입니다(입력칸 값이 지금 유효한 값과 같아 «고친 값이 없다»는 판정).</li>
+  </ul>
+
+  <h3 id="fig-k"><span class="fig">그림 K</span>서랍 확대 — 값을 바꾼 뒤(저장 전 미확정 상태)</h3>
+  <figure>
+    <div class="shot" style="max-width:430px;aspect-ratio:565.8/1050">
+      <img src="/shared/manual/shots/margin-policy-drawer-dirty.png" alt="분류별 예외 마진 서랍 확대 — 값을 바꾼 뒤 저장 전 상태(저장 버튼 활성)">
+      <b class="pin" style="--x:15.01%;--y:13.24%">67</b>
+      <b class="pin" style="--x:5%;--y:23%">68</b>
+      <b class="pin" style="--x:87.16%;--y:96.87%">69</b>
+    </div>
+    <p class="cap">캡처 2026-08-29 · 입력칸 값을 12 → 15로 바꾼 직후 — <b>이 스크립트는 여기서
+      멈췄고 저장 버튼을 누르지 않았습니다</b>(입력칸에 값만 채우는 것은 로컬 상태만 바꾸고
+      서버에 아무것도 보내지 않습니다 — 코드로 확인)</p>
+  </figure>
+  <ul class="pin-desc">
+    <li><span class="tag">67</span>값을 12 → 15로 바꿈(아직 저장 전, 로컬 입력값일 뿐).</li>
+    <li><span class="tag">68</span>제안가 계산식이 새 값(15%)으로 다시 계산됩니다 — 그림 E의
+      29번과 같은 원리로 «참고용 즉시 계산»이지 서버 미리보기가 아닙니다.</li>
+    <li><span class="tag">69</span><span class="btnlabel">확인하고 저장</span> — 이제
+      <b>활성</b>입니다(값이 지금 유효한 값과 달라졌으므로). ⚠ 이 문서는 이 버튼을 누르지
+      않았습니다 — 눌렀다면 <code>category_margin_policies</code>에 실제로 행이 하나
+      생기고 «지금의 정상 상태(0건)»가 깨졌을 것입니다.</li>
+  </ul>
+
+  <h2><span class="num">4</span>무엇을 할 수 있는가</h2>
+  <ul>
+    <li><b>①카드수수료 · ②전역 기본 마진율</b> — 입력칸에 새 값을 넣고 <span class="btnlabel">미리보기</span>를
+      눌러 지금 «저장된» 정책 기준의 영향(대상·오름·내림·변화없음·잠김 건수)을 확인한 뒤,
+      <span class="btnlabel">확인하고 저장</span>으로 «함께» 저장합니다. 저장은 <b>관리자(owner)만</b>
+      가능합니다. 저장하면 <code>pricing_settings</code>에 새 행이 하나 추가되고 <b>즉시
+      유효</b>해집니다(다음 견적부터 — 이미 만든 견적은 <code>quote_snapshots</code>에 판매가가
+      박혀 있어 그대로입니다).</li>
+    <li><b>③분류별 예외</b> — 34행 목록에서 분류 하나를 골라 <span class="btnlabel">예외
+      걸기</span>(또는 이미 걸려 있으면 <span class="btnlabel">수정</span>)를 누르면 서랍이
+      열립니다(그림 I). 새 마진율을 입력하고 <span class="btnlabel">확인하고 저장</span>을
+      누르면 <code>PUT /api/admin/categories/{cid}/margin</code>이 그 분류에 값을 걸고,
+      하위 분류 중 자기 값이 없는 곳은 그 값을 상속합니다. <b>관리자·운영자(owner+operator)</b>
+      둘 다 가능합니다. 이미 예외가 걸려 있으면 서랍 안에서 <span class="btnlabel">예외
+      삭제</span>로 지울 수 있고, 지우면 전역 기본값으로 돌아갑니다.</li>
+    <li><b>④부품별 예산 배분율</b> — <b>조회만</b> 됩니다. 이 화면에서도, 다른 어떤 관리자
+      화면에서도 고칠 수 없습니다(§1 표 참고).</li>
+    <li>우측 패널의 링크(가격 이력·가격 검토 대기·판매가 관리)로 관련 화면으로 이동할 수
+      있습니다. 「상품 분류 관리」·「추천 기준 보기」의 잠긴 편집 칸도 이 화면을 가리키도록
+      돼 있습니다.</li>
+  </ul>
+
+  <h2><span class="num">5</span>⚠ 조심할 것</h2>
+  <div class="callout">
+    <b>분류별 예외를 걸어도 「가격 검토 대기」 승인과 「단가표 일일 반영」에는 적용되지
+    않습니다.</b> 이 두 경로(<code>admin_price_review.py:62</code> · <code>admin_price_import.py:180</code>)는
+    코드를 확인한 결과 <b>전역값만</b> 읽고 있습니다 — 분류별 정책을 부르지 않습니다. 지금
+    실제로 분류별 마진이 반영되는 경로는 <b>대량 재산정(「판매가 재산정」 화면이 쓰는
+    <code>/reprice/preview</code>)뿐</b>입니다. 화면 자신이 이 사실을 상단 경고로 이미
+    밝히고 있습니다(그림 C) — 의도인지 누락인지 코드·문서 어디에도 근거가 없다는 점까지
+    포함해서입니다.
+  </div>
+  <div class="callout">
+    <b>「미리보기」는 «지금 입력칸의 값»이 아니라 «이미 저장된 값»으로 계산합니다.</b> 이
+    화면이 쓰는 <code>GET /reprice/preview</code>에는 가상의 새 값을 받아 미리 계산해 주는
+    파라미터(<code>dry_run</code>)가 없습니다. 그래서 <b>실제 순서는 「저장 → 확인 →
+    (필요하면) 되돌림」</b>입니다 — 값을 바꾸고 미리보기를 눌러도 그 새 값 기준 결과는
+    보여주지 않습니다(그림 E의 29번 계산식만 참고용으로 즉시 갱신될 뿐입니다).
+  </div>
+  <div class="callout">
+    <b>③분류별 예외는 저장하면 되돌릴 수 없습니다.</b> ①②(카드수수료·전역 마진)는
+    <code>pricing_settings</code>가 이력형(INSERT만·행 누적)이라 이전 값으로 되돌릴 길이
+    있지만, ③은 <b>되돌리기 API 자체가 없습니다</b>(<code>api/admin_ui_product_category.py</code>가
+    "실측 0건"이라 명시). 잘못 걸었으면 예외를 <b>삭제</b>해 전역값으로 되돌리는 것이
+    유일한 길이고, 그 사이에 이미 돈 재산정 결과는 남습니다.
+  </div>
+  <div class="callout">
+    <b>지난 마진 변경(<code>margin_policy</code> 이력)은 캡처 시점 21,654건 중 21,652건
+    (99.99%)이 되돌려졌습니다.</b> 대량 재산정이 실제로 여러 번 돌았고 거의 전부 되돌려졌다는
+    뜻인데, <b>왜 그런지는 이 화면을 포함해 어느 화면도 설명하지 않습니다</b>. 값을 바꾸기
+    전에 우측 패널의 이 숫자와 「가격 이력」을 먼저 보십시오.
+  </div>
+  <div class="callout">
+    <b>④부품별 예산 배분율은 이 화면에서도, 어디에서도 못 바꿉니다.</b> <code>candidates.BUDGET_ALLOC</code>는
+    DB 표가 아니라 <b>코드에 박힌 상수</b>입니다(쓰기 API 자체가 없습니다). 편집을 열려면
+    코드에서 DB로 옮기는 작업이 먼저 필요합니다 — 화면은 이 사실을 배지("읽기 전용 · 향후
+    사용예정")와 안내문으로 이미 밝히고 있어, "바꿀 수 있을 것처럼 보이는데 안 되는" 함정은
+    아닙니다(입력칸·저장 버튼이 원래 없습니다).
+  </div>
+  <div class="callout">
+    <b>우측 패널의 「대량 재계산 실행 → 판매가 재산정 — 화면 없음」 문구는 낡았습니다.</b>
+    이 화면이 만들어질 당시엔 실제로 그 화면이 없었지만, 지금은 <b>「판매가 재산정」
+    (ADM-PRC-050, 경로 <code>/admin2/reprice</code>)이 실재</b>하고 좌측 메뉴 「판매가」
+    그룹에도 연결돼 있습니다(2026-08-29 실측 확인). 필요하면 좌측 메뉴에서 직접 찾으십시오
+    — 이 화면의 문구가 갱신될 때까지는 그대로 참고하십시오.
+  </div>
+  <div class="callout">
+    <b>같은 화면 안에서 저장 권한 등급이 다릅니다.</b> ①카드수수료·②전역 마진은 <b>관리자
+    (owner)만</b> 저장할 수 있고, ③분류별 예외는 <b>관리자·운영자(owner+operator)</b>
+    둘 다 저장할 수 있습니다. 조회 등급 이하는 모든 입력칸·버튼이 비활성이고, 마우스를
+    올리면(title) 사유가 나타납니다.
+  </div>
+
+  <h2><span class="num">6</span>자주 겪는 상황</h2>
+  <ul>
+    <li><b>「미리보기를 눌렀는데 입력칸에 새로 넣은 값이 반영 안 된 것 같다」</b> → 정상입니다.
+      미리보기는 «이미 저장된» 값으로 계산합니다(§5 참고). 새 값의 실제 영향을 보려면
+      먼저 저장해야 합니다.</li>
+    <li><b>「확인하고 저장 버튼이 안 눌린다」</b> → 셋 중 하나입니다. ① 입력값이 저장된 값과
+      같다(고친 것이 없음) ② 아직 미리보기를 한 번도 안 눌렀다(①②는 미리보기를 눌러야
+      저장 버튼이 활성화됩니다) ③ 내 권한이 부족하다. 버튼에 마우스를 올리면 정확한 사유가
+      나타납니다.</li>
+    <li><b>「예외 추가 버튼을 눌렀는데 아무 창도 안 뜬다」</b> → 정상입니다. 이 버튼은 새 항목을
+      만드는 폼이 아니라 34행 목록으로 스크롤해 강조 표시만 합니다. 실제로 예외를 걸려면
+      목록에서 원하는 분류를 찾아 그 행의 <span class="btnlabel">예외 걸기</span>를
+      누르십시오.</li>
+    <li><b>「분류별 예외를 걸었는데 가격 검토 대기 승인에는 안 먹는 것 같다」</b> → 정상입니다
+      (지금은요). 그 경로는 코드상 전역값만 읽습니다 — §5의 상단 경고 참고.</li>
+    <li><b>「목록의 모든 분류가 '예외 걸기'라고만 나온다」</b> → 정상입니다. 지금
+      <code>category_margin_policies</code>가 0행이라 어느 분류도 자기 마진이 없습니다
+      (34개 전부 전역 상속). 값을 하나라도 저장하면 그 행만 「수정」으로 바뀝니다.</li>
+    <li><b>「판매가 재산정 화면이 없다고 나오는데?」</b> → 이 화면 문구가 낡았습니다(§5 참고).
+      좌측 메뉴 「판매가」 그룹에서 「판매가 재산정」을 직접 찾으십시오.</li>
+    <li><b>「④부품별 예산 배분율을 고치고 싶다」</b> → 이 화면에서는(그리고 지금은 어느
+      화면에서도) 안 됩니다. 개발 담당자에게 코드(<code>api/candidates.py</code>의
+      <code>BUDGET_ALLOC</code>) 수정과 배포를 요청해야 합니다.</li>
+  </ul>
+
+  <div class="foot">
+    <h2 style="border-top:none;padding-top:0;margin-top:40px">문서 정보</h2>
+    <p>이 문서는 다음을 근거로 작성했습니다.</p>
+    <ul>
+      <li>코드 — <code>api/admin_ui_margin_policy.py</code> · <code>templates/admin/margin_policy.html.j2</code> ·
+        <code>api/admin_categories.py</code>(분류·마진 상속 API) · <code>api/admin_engine_rules.py</code>
+        (전역 마진·카드수수료 저장 API) · <code>api/admin_reprice.py</code>(이 화면이 쓰는
+        미리보기 API) · <code>api/pricing.py</code>(마진 상속 단일 원천) · <code>api/candidates.py</code>
+        (배분율 코드 상수) · <code>api/admin_setup.py</code>(운영 시작 순서 2단계) ·
+        <code>api/admin_nav.py</code> · <code>templates/admin/_admin2_shell.html.j2</code>.</li>
+      <li>실제 화면 캡처 — 로컬 서버(<code>127.0.0.1:8000</code>, 실서비스와 같은 DB를 보는
+        개발 서버)에 Playwright로 접속해 2026-08-29에 직접 찍었습니다. 캡처 스크립트
+        <code>scripts/manual_shots_margin_policy.py</code>, 이미지는
+        <code>mockups/shared/manual/shots/</code>에 있고 화면에는
+        <code>/shared/manual/shots/</code> 경로로 서빙됩니다. 각 캡처 안 요소의 실측 좌표는
+        같은 폴더의 <code>margin-policy-coords.json</code>에 있습니다.</li>
+      <li>이 화면은 표준 뷰포트(1680×1050)보다 훨씬 길어서(전체 약 2,300px), 캡처 스크립트가
+        <b>두 단계</b>로 찍습니다 — ① 표준 뷰포트로 전체 화면 첫인상·헤더·상단 경고·서랍
+        흐름(서랍은 <code>position:fixed</code>라 뷰포트를 키우면 실제보다 길게 늘어나
+        보입니다) ② <code>page.set_viewport_size()</code>로 뷰포트를 1680×2360으로 늘려
+        (재로그인·재로드 없이 리플로우만) 카드 ①~④와 우측 패널을 스크롤 계산 없이 그대로
+        캡처합니다. 자세한 이유는 스크립트 상단 docstring에 남겼습니다.</li>
+      <li>실측 수치(카드수수료·마진율·미리보기 대상 건수·분류 수·이력 건수 등) — 캡처와 같은
+        순간 <code>GET /api/admin/categories</code> · <code>GET /api/admin/reprice/preview</code>
+        (scope=live·all) 응답과 화면에 실제로 그려진 텍스트를 그대로 옮겼습니다. 지어낸
+        숫자는 없습니다 — 정책이 바뀌면 이 값도 바뀌므로 지금 값은 화면에서 다시
+        확인하십시오.</li>
+      <li>이 화면의 값 넷 중 셋(①②③)이 실제 DB(<code>pricing_settings</code>·
+        <code>category_margin_policies</code>)이고, 하나(④)는 코드 상수
+        (<code>candidates.BUDGET_ALLOC</code>, DB 표 없음)라는 사실은 해당 코드를 직접
+        읽어 확인했습니다. 작업 지시에 인용된 "모듈 docstring이 '코드 상수로 대체 표시
+        중'이라고 적고 있다"는 문장은 이 화면 자신의 모듈(<code>api/admin_ui_margin_policy.py</code>)에는
+        없습니다 — grep으로 대조한 결과 실제로는 <b>다른 화면</b>(<code>api/admin_engine_rules.py</code>,
+        "추천 기준 보기" ADM-ENG-020)의 모듈 docstring 4행에 있는 문장이었습니다. 그
+        화면이 코드 상수로 대체 표시 중인 항목도 배분율(<code>BUDGET_ALLOC</code>)과
+        <code>policy_weights</code>(0행)라 가리키는 대상은 같지만, 인용 출처가 이 화면
+        자신이 아니라는 점은 정정해 둡니다.</li>
+    </ul>
+    <p><b>화면이 바뀌면</b> 아래 명령으로 캡처를 다시 찍고, 이 문서의 <code>--x</code>·<code>--y</code>
+      값도 새 <code>margin-policy-coords.json</code>에 맞춰 다시 옮겨야 합니다.</p>
+    <pre style="background:#efeade;border:1px solid var(--line);border-radius:5px;padding:10px 14px;overflow:auto"><code>.venv/Scripts/python scripts/manual_shots_margin_policy.py</code></pre>
+    <p>이 스크립트는 Playwright를 씁니다. 기본 대상은 <code>http://127.0.0.1:8000</code>이고,
+      <code>--base=URL</code> 또는 환경변수 <code>MANUAL_CAPTURE_BASE</code>로 다른 포트를
+      가리킬 수 있습니다. <b>DB에 쓰지 않습니다</b> — 「미리보기」(GET)만 클릭하고, 값을
+      바꾸는 「확인하고 저장」·「확인하고 삭제」는 한 번도 누르지 않았습니다(서랍의 입력칸에
+      값을 채우는 것도 로컬 상태만 바꿉니다 — 코드로 확인했습니다).</p>
+    <p><b>확인하지 못한 것</b> — 이 캡처는 owner 등급 점검 계정으로만 찍었습니다. 「운영자
+      (operator)」 등급에서 ①②(카드수수료·전역 마진) 입력칸이 실제로 어떻게 비활성으로
+      보이는지, 「조회」 등급에서 ③(분류별 예외)의 서랍이 어떻게 막히는지는 코드로는
+      확인했지만 화면으로 직접 보지는 못했습니다. 또한 서랍의 <span class="btnlabel">예외
+      삭제</span> → 「확인하고 삭제」 확인 화면은 <b>캡처하지 않았습니다</b> — 그 화면은
+      해당 분류에 이미 자기 마진이 걸려 있을 때만(<code>hasOwn</code>) 나타나는데, 지금
+      <code>category_margin_policies</code>가 0행이라 어느 분류도 그 조건을 만족하지
+      않습니다. 그 화면을 보여주려면 먼저 실제로 예외를 하나 저장해야 하는데, 이 작업
+      지시가 "마진 값을 실제로 바꾸지 마라"고 명시해 저장하지 않았습니다 — 지어낸
+      스크린샷을 만들지 않았습니다. 완성된 이 HTML 문서 자체가 브라우저에서 실제로 어떻게
+      보이는지(핀 좌표가 캡처 위에 정확히 맞는지, 반응형 폭에서 겹치지 않는지)도 직접
+      열어 확인하지는 못했습니다 — 좌표는 Playwright로 화면 요소의 실제 위치를 재서 계산한
+      값입니다.</p>
+  </div>
+
+</div>

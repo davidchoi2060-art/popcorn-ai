@@ -1,0 +1,1923 @@
+{
+  "margin-policy-full": {
+    "file": "margin-policy-full.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "lnb": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 12.62,
+        "h_pct": 100.0,
+        "cx_pct": 6.31,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 0,
+          "y": 0,
+          "width": 212,
+          "height": 1050
+        }
+      },
+      "lnb_active_item": {
+        "x_pct": 0.0,
+        "y_pct": 32.63,
+        "w_pct": 12.62,
+        "h_pct": 3.38,
+        "cx_pct": 6.31,
+        "cy_pct": 34.32,
+        "px": {
+          "x": 0,
+          "y": 342.625,
+          "width": 212,
+          "height": 35.5
+        }
+      },
+      "header": {
+        "x_pct": 12.62,
+        "y_pct": 0.0,
+        "w_pct": 87.38,
+        "h_pct": 5.69,
+        "cx_pct": 56.31,
+        "cy_pct": 2.85,
+        "px": {
+          "x": 212,
+          "y": 0,
+          "width": 1468,
+          "height": 59.796875
+        }
+      },
+      "crumb": {
+        "x_pct": 13.85,
+        "y_pct": 2.14,
+        "w_pct": 2.13,
+        "h_pct": 1.31,
+        "cx_pct": 14.91,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 232.6875,
+          "y": 22.5,
+          "width": 35.765625,
+          "height": 13.796875
+        }
+      },
+      "hub": {
+        "x_pct": 87.07,
+        "y_pct": 1.47,
+        "w_pct": 2.73,
+        "h_pct": 2.65,
+        "cx_pct": 88.43,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 1462.75,
+          "y": 15.46875,
+          "width": 45.875,
+          "height": 27.859375
+        }
+      },
+      "role_box": {
+        "x_pct": 90.48,
+        "y_pct": 1.47,
+        "w_pct": 5.82,
+        "h_pct": 2.65,
+        "cx_pct": 93.39,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 1520.125,
+          "y": 15.46875,
+          "width": 97.796875,
+          "height": 27.859375
+        }
+      },
+      "avatar": {
+        "x_pct": 96.99,
+        "y_pct": 1.38,
+        "w_pct": 1.78,
+        "h_pct": 2.85,
+        "cx_pct": 97.88,
+        "cy_pct": 2.8,
+        "px": {
+          "x": 1629.421875,
+          "y": 14.453125,
+          "width": 29.890625,
+          "height": 29.890625
+        }
+      },
+      "warn": {
+        "x_pct": 13.85,
+        "y_pct": 7.45,
+        "w_pct": 84.92,
+        "h_pct": 12.57,
+        "cx_pct": 56.31,
+        "cy_pct": 13.73,
+        "px": {
+          "x": 232.6875,
+          "y": 78.1875,
+          "width": 1426.625,
+          "height": 131.96875
+        }
+      },
+      "permnote": {
+        "x_pct": 13.85,
+        "y_pct": 21.33,
+        "w_pct": 84.92,
+        "h_pct": 4.25,
+        "cx_pct": 56.31,
+        "cy_pct": 23.45,
+        "px": {
+          "x": 232.6875,
+          "y": 223.953125,
+          "width": 1426.625,
+          "height": 44.625
+        }
+      },
+      "card_fee_title": {
+        "x_pct": 15.32,
+        "y_pct": 29.22,
+        "w_pct": 5.41,
+        "h_pct": 2.06,
+        "cx_pct": 18.02,
+        "cy_pct": 30.26,
+        "px": {
+          "x": 257.375,
+          "y": 306.859375,
+          "width": 90.8125,
+          "height": 21.671875
+        }
+      },
+      "card_margin_title": {
+        "x_pct": 15.32,
+        "y_pct": 58.69,
+        "w_pct": 7.58,
+        "h_pct": 2.06,
+        "cx_pct": 19.11,
+        "cy_pct": 59.73,
+        "px": {
+          "x": 257.375,
+          "y": 616.28125,
+          "width": 127.328125,
+          "height": 21.671875
+        }
+      },
+      "aside_title": {
+        "x_pct": 76.97,
+        "y_pct": 28.96,
+        "w_pct": 20.71,
+        "h_pct": 1.92,
+        "cx_pct": 87.33,
+        "cy_pct": 29.92,
+        "px": {
+          "x": 1293.171875,
+          "y": 304.0625,
+          "width": 347.890625,
+          "height": 20.125
+        }
+      }
+    }
+  },
+  "margin-policy-header": {
+    "file": "margin-policy-header.png",
+    "clip_px": {
+      "x": 212,
+      "y": 0,
+      "width": 1468,
+      "height": 59.796875
+    },
+    "elements": {
+      "crumb": {
+        "x_pct": 1.41,
+        "y_pct": 37.63,
+        "w_pct": 2.44,
+        "h_pct": 23.07,
+        "cx_pct": 2.63,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 232.6875,
+          "y": 22.5,
+          "width": 35.765625,
+          "height": 13.796875
+        }
+      },
+      "now": {
+        "x_pct": 5.83,
+        "y_pct": 36.66,
+        "w_pct": 3.76,
+        "h_pct": 25.01,
+        "cx_pct": 7.71,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 297.609375,
+          "y": 21.921875,
+          "width": 55.25,
+          "height": 14.953125
+        }
+      },
+      "hub": {
+        "x_pct": 85.2,
+        "y_pct": 25.87,
+        "w_pct": 3.12,
+        "h_pct": 46.59,
+        "cx_pct": 86.76,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1462.75,
+          "y": 15.46875,
+          "width": 45.875,
+          "height": 27.859375
+        }
+      },
+      "role_box": {
+        "x_pct": 89.11,
+        "y_pct": 25.87,
+        "w_pct": 6.66,
+        "h_pct": 46.59,
+        "cx_pct": 92.44,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1520.125,
+          "y": 15.46875,
+          "width": 97.796875,
+          "height": 27.859375
+        }
+      },
+      "avatar": {
+        "x_pct": 96.55,
+        "y_pct": 24.17,
+        "w_pct": 2.04,
+        "h_pct": 49.99,
+        "cx_pct": 97.57,
+        "cy_pct": 49.16,
+        "px": {
+          "x": 1629.421875,
+          "y": 14.453125,
+          "width": 29.890625,
+          "height": 29.890625
+        }
+      }
+    }
+  },
+  "margin-policy-warn": {
+    "file": "margin-policy-warn.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 78.1875,
+      "width": 1426.625,
+      "height": 190.390625
+    },
+    "elements": {
+      "warn": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 69.31,
+        "cx_pct": 50.0,
+        "cy_pct": 34.66,
+        "px": {
+          "x": 232.6875,
+          "y": 78.1875,
+          "width": 1426.625,
+          "height": 131.96875
+        }
+      },
+      "warn_title": {
+        "x_pct": 1.36,
+        "y_pct": 8.37,
+        "w_pct": 97.28,
+        "h_pct": 10.99,
+        "cx_pct": 50.0,
+        "cy_pct": 13.87,
+        "px": {
+          "x": 252.078125,
+          "y": 94.125,
+          "width": 1387.84375,
+          "height": 20.921875
+        }
+      },
+      "warn_ref": {
+        "x_pct": 1.36,
+        "y_pct": 50.5,
+        "w_pct": 97.28,
+        "h_pct": 10.44,
+        "cx_pct": 50.0,
+        "cy_pct": 55.72,
+        "px": {
+          "x": 252.078125,
+          "y": 174.34375,
+          "width": 1387.84375,
+          "height": 19.875
+        }
+      },
+      "permnote": {
+        "x_pct": 0.0,
+        "y_pct": 76.56,
+        "w_pct": 100.0,
+        "h_pct": 23.44,
+        "cx_pct": 50.0,
+        "cy_pct": 88.28,
+        "px": {
+          "x": 232.6875,
+          "y": 223.953125,
+          "width": 1426.625,
+          "height": 44.625
+        }
+      }
+    }
+  },
+  "margin-policy-full-drawer": {
+    "file": "margin-policy-full-drawer.png",
+    "clip_px": {
+      "x": 0,
+      "y": 0,
+      "width": 1680,
+      "height": 1050
+    },
+    "elements": {
+      "selected_row": {
+        "x_pct": 15.38,
+        "y_pct": 50.55,
+        "w_pct": 57.94,
+        "h_pct": 4.75,
+        "cx_pct": 44.35,
+        "cy_pct": 52.93,
+        "px": {
+          "x": 258.375,
+          "y": 530.796875,
+          "width": 973.46875,
+          "height": 49.890625
+        }
+      },
+      "scrim": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 100.0,
+        "cx_pct": 50.0,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 0,
+          "y": 0,
+          "width": 1680,
+          "height": 1050
+        }
+      },
+      "drawer": {
+        "x_pct": 66.32,
+        "y_pct": 0.0,
+        "w_pct": 33.68,
+        "h_pct": 100.0,
+        "cx_pct": 83.16,
+        "cy_pct": 50.0,
+        "px": {
+          "x": 1114.203125,
+          "y": 0,
+          "width": 565.796875,
+          "height": 1050
+        }
+      }
+    }
+  },
+  "margin-policy-drawer": {
+    "file": "margin-policy-drawer.png",
+    "clip_px": {
+      "x": 1114.203125,
+      "y": 0,
+      "width": 565.796875,
+      "height": 1050
+    },
+    "elements": {
+      "title": {
+        "x_pct": 3.83,
+        "y_pct": 1.75,
+        "w_pct": 64.27,
+        "h_pct": 2.14,
+        "cx_pct": 35.97,
+        "cy_pct": 2.82,
+        "px": {
+          "x": 1135.890625,
+          "y": 18.390625,
+          "width": 363.65625,
+          "height": 22.421875
+        }
+      },
+      "sub": {
+        "x_pct": 3.83,
+        "y_pct": 4.32,
+        "w_pct": 64.27,
+        "h_pct": 1.98,
+        "cx_pct": 35.97,
+        "cy_pct": 5.31,
+        "px": {
+          "x": 1135.890625,
+          "y": 45.40625,
+          "width": 363.65625,
+          "height": 20.796875
+        }
+      },
+      "close_btn": {
+        "x_pct": 92.06,
+        "y_pct": 1.75,
+        "w_pct": 4.28,
+        "h_pct": 2.63,
+        "cx_pct": 94.2,
+        "cy_pct": 3.07,
+        "px": {
+          "x": 1635.09375,
+          "y": 18.390625,
+          "width": 24.21875,
+          "height": 27.59375
+        }
+      },
+      "value_input": {
+        "x_pct": 3.83,
+        "y_pct": 11.27,
+        "w_pct": 22.36,
+        "h_pct": 3.94,
+        "cx_pct": 15.01,
+        "cy_pct": 13.24,
+        "px": {
+          "x": 1135.890625,
+          "y": 118.359375,
+          "width": 126.5,
+          "height": 41.375
+        }
+      },
+      "hint": {
+        "x_pct": 3.83,
+        "y_pct": 15.21,
+        "w_pct": 92.51,
+        "h_pct": 1.89,
+        "cx_pct": 50.09,
+        "cy_pct": 16.16,
+        "px": {
+          "x": 1135.890625,
+          "y": 159.734375,
+          "width": 523.421875,
+          "height": 19.875
+        }
+      },
+      "impact_grid": {
+        "x_pct": 3.83,
+        "y_pct": 35.53,
+        "w_pct": 92.51,
+        "h_pct": 10.79,
+        "cx_pct": 50.09,
+        "cy_pct": 40.92,
+        "px": {
+          "x": 1135.890625,
+          "y": 373.0625,
+          "width": 523.421875,
+          "height": 113.265625
+        }
+      },
+      "notice": {
+        "x_pct": 3.83,
+        "y_pct": 54.4,
+        "w_pct": 92.51,
+        "h_pct": 8.12,
+        "cx_pct": 50.09,
+        "cy_pct": 58.47,
+        "px": {
+          "x": 1135.890625,
+          "y": 571.234375,
+          "width": 523.421875,
+          "height": 85.3125
+        }
+      },
+      "redbox": {
+        "x_pct": 3.83,
+        "y_pct": 65.38,
+        "w_pct": 92.51,
+        "h_pct": 10.9,
+        "cx_pct": 50.09,
+        "cy_pct": 70.83,
+        "px": {
+          "x": 1135.890625,
+          "y": 686.4375,
+          "width": 523.421875,
+          "height": 114.46875
+        }
+      },
+      "footbtns": {
+        "x_pct": 3.83,
+        "y_pct": 95.16,
+        "w_pct": 92.51,
+        "h_pct": 3.42,
+        "cx_pct": 50.09,
+        "cy_pct": 96.87,
+        "px": {
+          "x": 1135.890625,
+          "y": 999.15625,
+          "width": 523.421875,
+          "height": 35.90625
+        }
+      },
+      "save_btn": {
+        "x_pct": 77.98,
+        "y_pct": 95.16,
+        "w_pct": 18.36,
+        "h_pct": 3.42,
+        "cx_pct": 87.16,
+        "cy_pct": 96.87,
+        "px": {
+          "x": 1555.421875,
+          "y": 999.15625,
+          "width": 103.890625,
+          "height": 35.90625
+        }
+      }
+    }
+  },
+  "margin-policy-drawer-dirty": {
+    "file": "margin-policy-drawer-dirty.png",
+    "clip_px": {
+      "x": 1114.203125,
+      "y": 0,
+      "width": 565.796875,
+      "height": 1050
+    },
+    "elements": {
+      "value_input": {
+        "x_pct": 3.83,
+        "y_pct": 11.27,
+        "w_pct": 22.36,
+        "h_pct": 3.94,
+        "cx_pct": 15.01,
+        "cy_pct": 13.24,
+        "px": {
+          "x": 1135.890625,
+          "y": 118.359375,
+          "width": 126.5,
+          "height": 41.375
+        }
+      },
+      "formula": {
+        "x_pct": 3.83,
+        "y_pct": 21.05,
+        "w_pct": 92.51,
+        "h_pct": 5.71,
+        "cx_pct": 50.09,
+        "cy_pct": 23.9,
+        "px": {
+          "x": 1135.890625,
+          "y": 221,
+          "width": 523.421875,
+          "height": 59.96875
+        }
+      },
+      "save_btn": {
+        "x_pct": 77.98,
+        "y_pct": 95.16,
+        "w_pct": 18.36,
+        "h_pct": 3.42,
+        "cx_pct": 87.16,
+        "cy_pct": 96.87,
+        "px": {
+          "x": 1555.421875,
+          "y": 999.15625,
+          "width": 103.890625,
+          "height": 35.90625
+        }
+      },
+      "footbtns": {
+        "x_pct": 3.83,
+        "y_pct": 95.16,
+        "w_pct": 92.51,
+        "h_pct": 3.42,
+        "cx_pct": 50.09,
+        "cy_pct": 96.87,
+        "px": {
+          "x": 1135.890625,
+          "y": 999.15625,
+          "width": 523.421875,
+          "height": 35.90625
+        }
+      }
+    }
+  },
+  "margin-policy-card-fee": {
+    "file": "margin-policy-card-fee.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 286.96875,
+      "width": 1021.84375,
+      "height": 379.453125
+    },
+    "elements": {
+      "title": {
+        "x_pct": 2.42,
+        "y_pct": 5.24,
+        "w_pct": 8.89,
+        "h_pct": 5.71,
+        "cx_pct": 6.86,
+        "cy_pct": 8.1,
+        "px": {
+          "x": 257.375,
+          "y": 306.859375,
+          "width": 90.8125,
+          "height": 21.671875
+        }
+      },
+      "badge": {
+        "x_pct": 12.32,
+        "y_pct": 5.11,
+        "w_pct": 19.27,
+        "h_pct": 5.98,
+        "cx_pct": 21.95,
+        "cy_pct": 8.1,
+        "px": {
+          "x": 358.53125,
+          "y": 306.359375,
+          "width": 196.953125,
+          "height": 22.6875
+        }
+      },
+      "saved": {
+        "x_pct": 8.44,
+        "y_pct": 30.54,
+        "w_pct": 3.88,
+        "h_pct": 4.48,
+        "cx_pct": 10.38,
+        "cy_pct": 32.78,
+        "px": {
+          "x": 318.953125,
+          "y": 402.84375,
+          "width": 39.671875,
+          "height": 17
+        }
+      },
+      "input": {
+        "x_pct": 16.77,
+        "y_pct": 27.35,
+        "w_pct": 12.38,
+        "h_pct": 10.9,
+        "cx_pct": 22.96,
+        "cy_pct": 32.81,
+        "px": {
+          "x": 404.0625,
+          "y": 390.765625,
+          "width": 126.5,
+          "height": 41.375
+        }
+      },
+      "impact": {
+        "x_pct": 2.42,
+        "y_pct": 41.29,
+        "w_pct": 95.46,
+        "h_pct": 33.35,
+        "cx_pct": 50.15,
+        "cy_pct": 57.96,
+        "px": {
+          "x": 257.375,
+          "y": 443.640625,
+          "width": 975.46875,
+          "height": 126.546875
+        }
+      },
+      "compare_note": {
+        "x_pct": 2.42,
+        "y_pct": 77.67,
+        "w_pct": 95.46,
+        "h_pct": 5.34,
+        "cx_pct": 50.15,
+        "cy_pct": 80.34,
+        "px": {
+          "x": 257.375,
+          "y": 581.6875,
+          "width": 975.46875,
+          "height": 20.25
+        }
+      },
+      "preview_btn": {
+        "x_pct": 2.42,
+        "y_pct": 85.43,
+        "w_pct": 7.82,
+        "h_pct": 9.46,
+        "cx_pct": 6.33,
+        "cy_pct": 90.16,
+        "px": {
+          "x": 257.375,
+          "y": 611.125,
+          "width": 79.890625,
+          "height": 35.90625
+        }
+      }
+    }
+  },
+  "margin-policy-card-margin": {
+    "file": "margin-policy-card-margin.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 684.8125,
+      "width": 1021.84375,
+      "height": 638.75
+    },
+    "elements": {
+      "title": {
+        "x_pct": 2.42,
+        "y_pct": 3.04,
+        "w_pct": 12.46,
+        "h_pct": 3.39,
+        "cx_pct": 8.65,
+        "cy_pct": 4.73,
+        "px": {
+          "x": 257.375,
+          "y": 704.203125,
+          "width": 127.328125,
+          "height": 21.671875
+        }
+      },
+      "saved": {
+        "x_pct": 8.44,
+        "y_pct": 17.98,
+        "w_pct": 1.55,
+        "h_pct": 2.66,
+        "cx_pct": 9.22,
+        "cy_pct": 19.31,
+        "px": {
+          "x": 318.953125,
+          "y": 799.671875,
+          "width": 15.875,
+          "height": 17
+        }
+      },
+      "input": {
+        "x_pct": 14.44,
+        "y_pct": 16.09,
+        "w_pct": 12.38,
+        "h_pct": 6.48,
+        "cx_pct": 20.63,
+        "cy_pct": 19.33,
+        "px": {
+          "x": 380.265625,
+          "y": 787.59375,
+          "width": 126.5,
+          "height": 41.375
+        }
+      },
+      "formula": {
+        "x_pct": 2.42,
+        "y_pct": 29.28,
+        "w_pct": 95.46,
+        "h_pct": 6.13,
+        "cx_pct": 50.15,
+        "cy_pct": 32.35,
+        "px": {
+          "x": 257.375,
+          "y": 871.84375,
+          "width": 975.46875,
+          "height": 39.171875
+        }
+      },
+      "impact": {
+        "x_pct": 2.42,
+        "y_pct": 37.21,
+        "w_pct": 95.46,
+        "h_pct": 19.81,
+        "cx_pct": 50.15,
+        "cy_pct": 47.12,
+        "px": {
+          "x": 257.375,
+          "y": 922.515625,
+          "width": 975.46875,
+          "height": 126.546875
+        }
+      },
+      "notice": {
+        "x_pct": 2.42,
+        "y_pct": 58.83,
+        "w_pct": 95.46,
+        "h_pct": 10.09,
+        "cx_pct": 50.15,
+        "cy_pct": 63.87,
+        "px": {
+          "x": 257.375,
+          "y": 1060.5625,
+          "width": 975.46875,
+          "height": 64.4375
+        }
+      },
+      "preview_btn": {
+        "x_pct": 2.42,
+        "y_pct": 71.07,
+        "w_pct": 7.82,
+        "h_pct": 5.62,
+        "cx_pct": 6.33,
+        "cy_pct": 73.88,
+        "px": {
+          "x": 257.375,
+          "y": 1138.796875,
+          "width": 79.890625,
+          "height": 35.90625
+        }
+      },
+      "save_btn": {
+        "x_pct": 2.42,
+        "y_pct": 82.05,
+        "w_pct": 10.17,
+        "h_pct": 5.31,
+        "cx_pct": 7.5,
+        "cy_pct": 84.7,
+        "px": {
+          "x": 257.375,
+          "y": 1208.890625,
+          "width": 103.890625,
+          "height": 33.90625
+        }
+      },
+      "cancel_btn": {
+        "x_pct": 13.6,
+        "y_pct": 81.89,
+        "w_pct": 8.13,
+        "h_pct": 5.62,
+        "cx_pct": 17.66,
+        "cy_pct": 84.7,
+        "px": {
+          "x": 371.609375,
+          "y": 1207.890625,
+          "width": 83.046875,
+          "height": 35.90625
+        }
+      },
+      "savenote": {
+        "x_pct": 2.42,
+        "y_pct": 88.95,
+        "w_pct": 95.46,
+        "h_pct": 6.11,
+        "cx_pct": 50.15,
+        "cy_pct": 92.0,
+        "px": {
+          "x": 257.375,
+          "y": 1252.984375,
+          "width": 975.46875,
+          "height": 39
+        }
+      }
+    }
+  },
+  "margin-policy-card-category": {
+    "file": "margin-policy-card-category.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 1341.953125,
+      "width": 1021.84375,
+      "height": 689.390625
+    },
+    "elements": {
+      "title": {
+        "x_pct": 2.42,
+        "y_pct": 2.89,
+        "w_pct": 9.26,
+        "h_pct": 3.14,
+        "cx_pct": 7.05,
+        "cy_pct": 4.46,
+        "px": {
+          "x": 257.375,
+          "y": 1361.84375,
+          "width": 94.65625,
+          "height": 21.671875
+        }
+      },
+      "badge": {
+        "x_pct": 12.69,
+        "y_pct": 2.81,
+        "w_pct": 10.17,
+        "h_pct": 3.29,
+        "cx_pct": 17.78,
+        "cy_pct": 4.46,
+        "px": {
+          "x": 362.375,
+          "y": 1361.34375,
+          "width": 103.90625,
+          "height": 22.6875
+        }
+      },
+      "text": {
+        "x_pct": 2.42,
+        "y_pct": 7.44,
+        "w_pct": 95.46,
+        "h_pct": 3.2,
+        "cx_pct": 50.15,
+        "cy_pct": 9.04,
+        "px": {
+          "x": 257.375,
+          "y": 1393.21875,
+          "width": 975.46875,
+          "height": 22.0625
+        }
+      },
+      "chips": {
+        "x_pct": 2.42,
+        "y_pct": 12.3,
+        "w_pct": 95.46,
+        "h_pct": 10.92,
+        "cx_pct": 50.15,
+        "cy_pct": 17.76,
+        "px": {
+          "x": 257.375,
+          "y": 1426.78125,
+          "width": 975.46875,
+          "height": 75.25
+        }
+      },
+      "first_chip": {
+        "x_pct": 2.42,
+        "y_pct": 12.3,
+        "w_pct": 15.19,
+        "h_pct": 4.79,
+        "cx_pct": 10.01,
+        "cy_pct": 14.7,
+        "px": {
+          "x": 257.375,
+          "y": 1426.78125,
+          "width": 155.25,
+          "height": 33.03125
+        }
+      },
+      "list": {
+        "x_pct": 2.42,
+        "y_pct": 25.22,
+        "w_pct": 95.46,
+        "h_pct": 56.72,
+        "cx_pct": 50.15,
+        "cy_pct": 53.58,
+        "px": {
+          "x": 257.375,
+          "y": 1515.828125,
+          "width": 975.46875,
+          "height": 391
+        }
+      },
+      "first_row": {
+        "x_pct": 2.51,
+        "y_pct": 25.37,
+        "w_pct": 95.27,
+        "h_pct": 7.24,
+        "cx_pct": 50.15,
+        "cy_pct": 28.99,
+        "px": {
+          "x": 258.375,
+          "y": 1516.828125,
+          "width": 973.46875,
+          "height": 49.890625
+        }
+      },
+      "bottom1": {
+        "x_pct": 2.42,
+        "y_pct": 83.77,
+        "w_pct": 95.46,
+        "h_pct": 2.94,
+        "cx_pct": 50.15,
+        "cy_pct": 85.24,
+        "px": {
+          "x": 257.375,
+          "y": 1919.46875,
+          "width": 975.46875,
+          "height": 20.25
+        }
+      },
+      "add_btn": {
+        "x_pct": 2.42,
+        "y_pct": 91.98,
+        "w_pct": 8.13,
+        "h_pct": 5.21,
+        "cx_pct": 6.48,
+        "cy_pct": 94.58,
+        "px": {
+          "x": 257.375,
+          "y": 1976.046875,
+          "width": 83.046875,
+          "height": 35.90625
+        }
+      }
+    }
+  },
+  "margin-policy-card-budget": {
+    "file": "margin-policy-card-budget.png",
+    "clip_px": {
+      "x": 232.6875,
+      "y": 2049.734375,
+      "width": 1021.84375,
+      "height": 292.796875
+    },
+    "elements": {
+      "title": {
+        "x_pct": 2.42,
+        "y_pct": 6.79,
+        "w_pct": 13.87,
+        "h_pct": 7.4,
+        "cx_pct": 9.35,
+        "cy_pct": 10.49,
+        "px": {
+          "x": 257.375,
+          "y": 2069.625,
+          "width": 141.734375,
+          "height": 21.671875
+        }
+      },
+      "badge": {
+        "x_pct": 17.3,
+        "y_pct": 6.62,
+        "w_pct": 13.1,
+        "h_pct": 7.75,
+        "cx_pct": 23.85,
+        "cy_pct": 10.5,
+        "px": {
+          "x": 409.453125,
+          "y": 2069.125,
+          "width": 133.84375,
+          "height": 22.6875
+        }
+      },
+      "chips": {
+        "x_pct": 2.42,
+        "y_pct": 18.3,
+        "w_pct": 95.46,
+        "h_pct": 45.32,
+        "cx_pct": 50.15,
+        "cy_pct": 40.96,
+        "px": {
+          "x": 257.375,
+          "y": 2103.3125,
+          "width": 975.46875,
+          "height": 132.6875
+        }
+      },
+      "first_chip": {
+        "x_pct": 2.42,
+        "y_pct": 18.3,
+        "w_pct": 11.15,
+        "h_pct": 21.09,
+        "cx_pct": 7.99,
+        "cy_pct": 28.84,
+        "px": {
+          "x": 257.375,
+          "y": 2103.3125,
+          "width": 113.890625,
+          "height": 61.75
+        }
+      },
+      "note": {
+        "x_pct": 2.42,
+        "y_pct": 68.33,
+        "w_pct": 95.46,
+        "h_pct": 14.21,
+        "cx_pct": 50.15,
+        "cy_pct": 75.43,
+        "px": {
+          "x": 257.375,
+          "y": 2249.796875,
+          "width": 975.46875,
+          "height": 41.59375
+        }
+      }
+    }
+  },
+  "margin-policy-aside": {
+    "file": "margin-policy-aside.png",
+    "clip_px": {
+      "x": 1272.921875,
+      "y": 286.96875,
+      "width": 386.390625,
+      "height": 897.28125
+    },
+    "elements": {
+      "hist_card": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 100.0,
+        "h_pct": 23.49,
+        "cx_pct": 50.0,
+        "cy_pct": 11.74,
+        "px": {
+          "x": 1272.921875,
+          "y": 286.96875,
+          "width": 386.390625,
+          "height": 210.734375
+        }
+      },
+      "hist_big": {
+        "x_pct": 5.24,
+        "y_pct": 5.17,
+        "w_pct": 90.04,
+        "h_pct": 4.74,
+        "cx_pct": 50.26,
+        "cy_pct": 7.54,
+        "px": {
+          "x": 1293.171875,
+          "y": 333.375,
+          "width": 347.890625,
+          "height": 42.546875
+        }
+      },
+      "hist_link": {
+        "x_pct": 5.24,
+        "y_pct": 19.13,
+        "w_pct": 90.04,
+        "h_pct": 2.45,
+        "cx_pct": 50.26,
+        "cy_pct": 20.35,
+        "px": {
+          "x": 1293.171875,
+          "y": 458.609375,
+          "width": 347.890625,
+          "height": 22
+        }
+      },
+      "scope_card": {
+        "x_pct": 0.0,
+        "y_pct": 52.92,
+        "w_pct": 100.0,
+        "h_pct": 47.08,
+        "cx_pct": 50.0,
+        "cy_pct": 76.46,
+        "px": {
+          "x": 1272.921875,
+          "y": 761.828125,
+          "width": 386.390625,
+          "height": 422.421875
+        }
+      },
+      "go_price_review": {
+        "x_pct": 69.17,
+        "y_pct": 58.86,
+        "w_pct": 26.11,
+        "h_pct": 2.12,
+        "cx_pct": 82.22,
+        "cy_pct": 59.92,
+        "px": {
+          "x": 1540.1875,
+          "y": 815.125,
+          "width": 100.875,
+          "height": 18.984375
+        }
+      },
+      "go_sale_price": {
+        "x_pct": 72.78,
+        "y_pct": 66.39,
+        "w_pct": 22.5,
+        "h_pct": 2.12,
+        "cx_pct": 84.03,
+        "cy_pct": 67.45,
+        "px": {
+          "x": 1554.125,
+          "y": 882.65625,
+          "width": 86.9375,
+          "height": 18.984375
+        }
+      },
+      "go_price_history": {
+        "x_pct": 75.61,
+        "y_pct": 70.15,
+        "w_pct": 19.67,
+        "h_pct": 2.12,
+        "cx_pct": 85.44,
+        "cy_pct": 71.21,
+        "px": {
+          "x": 1565.0625,
+          "y": 916.421875,
+          "width": 76,
+          "height": 18.984375
+        }
+      }
+    }
+  },
+  "_meta": {
+    "captured_at": "2026-08-28T16:29:31.829295+00:00",
+    "base_url": "http://127.0.0.1:8000",
+    "viewport": {
+      "width": 1680,
+      "height": 1050
+    },
+    "screen": {
+      "screen_id": "ADM-PRC-020",
+      "path": "/admin2/margin-policy"
+    },
+    "stats": {
+      "categories_total": 34,
+      "categories_top": 6,
+      "categories_sub": 28,
+      "categories_with_own_margin": 0,
+      "unmapped": 51,
+      "default_margin": 0.12,
+      "preview_live": {
+        "scope": "live",
+        "scope_label": "판매중 · 재고 있음",
+        "formula": "판매가 = 매입가 × (1 + 카드수수료 2.585% + 마진 12.0%) = 매입가 × 1.14585 → 1,000원 단위 반올림",
+        "card_fee_rate": 0.02585,
+        "margin_rate": 0.12,
+        "margins_used": [
+          {
+            "margin_rate": 0.12,
+            "count": 7187
+          }
+        ],
+        "margin_varies": false,
+        "target": 7187,
+        "changed": 6833,
+        "up_count": 6561,
+        "up_sum": 267789670,
+        "down_count": 272,
+        "down_sum": -11248500,
+        "same": 354,
+        "locked_count": 0,
+        "outlier_count": 9,
+        "negative_count": 10,
+        "examples": {
+          "up": [
+            {
+              "product_code": 127159,
+              "name": "NVIDIA H200 141GB 엔비디아코리아 정품[문의 필수]",
+              "part_label": "그래픽카드",
+              "purchase": 53000000,
+              "current": 54406400,
+              "proposed": 60730000,
+              "margin_rate": 0.12,
+              "delta": 6323600,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.027
+            },
+            {
+              "product_code": 127789,
+              "name": "NVIDIA H200 141GB 엔비디아코리아 정품 DELL OEM [현금구매 추가할인 -2.5%] [문의 필수]",
+              "part_label": "그래픽카드",
+              "purchase": 53000000,
+              "current": 54406400,
+              "proposed": 60730000,
+              "margin_rate": 0.12,
+              "delta": 6323600,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.027
+            },
+            {
+              "product_code": 113324,
+              "name": "NVIDIA H100 80GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 45000000,
+              "current": 46194100,
+              "proposed": 51563000,
+              "margin_rate": 0.12,
+              "delta": 5368900,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.027
+            },
+            {
+              "product_code": 129573,
+              "name": "삼성전자 DDR5-5600 ECC/REG 512GB [64G x 8]",
+              "part_label": "메모리",
+              "purchase": 31600000,
+              "current": 32438500,
+              "proposed": 36209000,
+              "margin_rate": 0.12,
+              "delta": 3770500,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.027
+            },
+            {
+              "product_code": 113893,
+              "name": "삼성전자 DDR4-3200 ECC/REG 512GB [64G x 8]",
+              "part_label": "메모리",
+              "purchase": 26800000,
+              "current": 27511200,
+              "proposed": 30709000,
+              "margin_rate": 0.12,
+              "delta": 3197800,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.027
+            },
+            {
+              "product_code": 128930,
+              "name": "NVIDIA RTX PRO 6000 Blackwell 워크스테이션 에디션 D7 96GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 25176000,
+              "current": 25844100,
+              "proposed": 28848000,
+              "margin_rate": 0.12,
+              "delta": 3003900,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.027
+            }
+          ],
+          "down": [
+            {
+              "product_code": 103332,
+              "name": "마이크로닉스 Classic II 700W +12V Single Rail 85+ [중고]",
+              "part_label": "기타(ETC)",
+              "purchase": 20000,
+              "current": 3252000,
+              "proposed": 23000,
+              "margin_rate": 0.12,
+              "delta": -3229000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 162.6
+            },
+            {
+              "product_code": 128925,
+              "name": "NVIDIA RTX PRO 5000 Blackwell D7 48GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 14174000,
+              "current": 19145000,
+              "proposed": 16241000,
+              "margin_rate": 0.12,
+              "delta": -2904000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.351
+            },
+            {
+              "product_code": 128511,
+              "name": "NVIDIA RTX PRO 4000 Blackwell D7 24GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 5303000,
+              "current": 7915500,
+              "proposed": 6076000,
+              "margin_rate": 0.12,
+              "delta": -1839500,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.493
+            },
+            {
+              "product_code": 128927,
+              "name": "NVIDIA RTX PRO 2000 Blackwell D7 16GB  엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 2856000,
+              "current": 4844400,
+              "proposed": 3273000,
+              "margin_rate": 0.12,
+              "delta": -1571400,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 1.696
+            },
+            {
+              "product_code": 115485,
+              "name": "Seagate 파이어쿠다 540 M.2 NVMe (2TB)",
+              "part_label": "SSD",
+              "purchase": 649000,
+              "current": 1494900,
+              "proposed": 744000,
+              "margin_rate": 0.12,
+              "delta": -750900,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 2.303
+            },
+            {
+              "product_code": 112046,
+              "name": "Antec NEPTUNE 240 ARGB",
+              "part_label": "CPU쿨러(수랭)",
+              "purchase": 123000,
+              "current": 345200,
+              "proposed": 141000,
+              "margin_rate": 0.12,
+              "delta": -204200,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 2.807
+            }
+          ],
+          "outlier": [
+            {
+              "product_code": 92983,
+              "name": "제작 공임1",
+              "part_label": "기타(ETC)",
+              "purchase": 100,
+              "current": 30000,
+              "proposed": 0,
+              "margin_rate": 0.12,
+              "delta": -30000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 300.0
+            },
+            {
+              "product_code": 103332,
+              "name": "마이크로닉스 Classic II 700W +12V Single Rail 85+ [중고]",
+              "part_label": "기타(ETC)",
+              "purchase": 20000,
+              "current": 3252000,
+              "proposed": 23000,
+              "margin_rate": 0.12,
+              "delta": -3229000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 162.6
+            },
+            {
+              "product_code": 112046,
+              "name": "Antec NEPTUNE 240 ARGB",
+              "part_label": "CPU쿨러(수랭)",
+              "purchase": 123000,
+              "current": 345200,
+              "proposed": 141000,
+              "margin_rate": 0.12,
+              "delta": -204200,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 2.807
+            },
+            {
+              "product_code": 109633,
+              "name": "NX1142 DP V1.2 케이블 1.5M(NX-DPDP12-G015)",
+              "part_label": "기타(ETC)",
+              "purchase": 2900,
+              "current": 7000,
+              "proposed": 3000,
+              "margin_rate": 0.12,
+              "delta": -4000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 2.414
+            },
+            {
+              "product_code": 87576,
+              "name": "(쿨러마스터) CM STORM QUICK FIRE RAPID-i 청축 /키보드",
+              "part_label": "키보드",
+              "purchase": 64100,
+              "current": 153600,
+              "proposed": 73000,
+              "margin_rate": 0.12,
+              "delta": -80600,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 2.396
+            },
+            {
+              "product_code": 99366,
+              "name": "제작 및 3년 하드웨어 무상서비스 (1년 출장+2년 택배)",
+              "part_label": "기타(ETC)",
+              "purchase": 25000,
+              "current": 59000,
+              "proposed": 29000,
+              "margin_rate": 0.12,
+              "delta": -30000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 2.36
+            }
+          ],
+          "negative": [
+            {
+              "product_code": 116362,
+              "name": "AMD 라데온 PRO WX3200 D5 4GB LP 대원CTS",
+              "part_label": "그래픽카드",
+              "purchase": 450000,
+              "current": 359300,
+              "proposed": 516000,
+              "margin_rate": 0.12,
+              "delta": 156700,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 0.798
+            },
+            {
+              "product_code": 127581,
+              "name": "자비오씨엔씨 엑사비오 X270EW 무결점",
+              "part_label": "모니터",
+              "purchase": 110000,
+              "current": 95500,
+              "proposed": 126000,
+              "margin_rate": 0.12,
+              "delta": 30500,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 0.868
+            },
+            {
+              "product_code": 128459,
+              "name": "GIGABYTE Gen4 4000E M.2 NVMe 피씨디렉트 (500GB)",
+              "part_label": "SSD",
+              "purchase": 162000,
+              "current": 150900,
+              "proposed": 186000,
+              "margin_rate": 0.12,
+              "delta": 35100,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 0.931
+            },
+            {
+              "product_code": 126191,
+              "name": "GIGABYTE Gen4 4000E M.2 NVMe 제이씨현 (500GB)",
+              "part_label": "SSD",
+              "purchase": 162000,
+              "current": 151000,
+              "proposed": 186000,
+              "margin_rate": 0.12,
+              "delta": 35000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 0.932
+            },
+            {
+              "product_code": 119649,
+              "name": "지클릭커 G-TRACTER HOMG-2 게이밍 장패드",
+              "part_label": "기타(ETC)",
+              "purchase": 1300,
+              "current": 1000,
+              "proposed": 1000,
+              "margin_rate": 0.12,
+              "delta": 0,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 0.769
+            },
+            {
+              "product_code": 127543,
+              "name": "JBCNC MP-242 마우스패드",
+              "part_label": "기타(ETC)",
+              "purchase": 420,
+              "current": 400,
+              "proposed": 0,
+              "margin_rate": 0.12,
+              "delta": -400,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 0.952
+            }
+          ],
+          "locked": []
+        },
+        "max_apply": 20000,
+        "note": "**미리보기입니다 — 아무것도 바뀌지 않았습니다.** 오름과 내림을 따로 냅니다: 합치면 이상치 한 건이 나머지 전부를 덮습니다. 잠긴 판매가(운영자가 손으로 정한 값)는 세기만 하고 바꾸지 않습니다."
+      },
+      "preview_all": {
+        "scope": "all",
+        "scope_label": "전체",
+        "formula": "판매가 = 매입가 × (1 + 카드수수료 2.585% + 마진 12.0%) = 매입가 × 1.14585 → 1,000원 단위 반올림",
+        "card_fee_rate": 0.02585,
+        "margin_rate": 0.12,
+        "margins_used": [
+          {
+            "margin_rate": 0.12,
+            "count": 18991
+          }
+        ],
+        "margin_varies": false,
+        "target": 18991,
+        "changed": 18533,
+        "up_count": 16673,
+        "up_sum": 893950220,
+        "down_count": 1860,
+        "down_sum": -1080927850,
+        "same": 457,
+        "locked_count": 1,
+        "outlier_count": 248,
+        "negative_count": 1123,
+        "examples": {
+          "up": [
+            {
+              "product_code": 115377,
+              "name": "TYAN TAKO-FT83-(B29R48-16C29G)-RTX4090 6GPU (512GB, SSD 2TB + 18TB)",
+              "part_label": "그래픽카드",
+              "purchase": 50680000,
+              "current": 47673800,
+              "proposed": 58072000,
+              "margin_rate": 0.12,
+              "delta": 10398200,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.941
+            },
+            {
+              "product_code": 119657,
+              "name": "AMD EPYC 7763 (밀라노) (정품)",
+              "part_label": "CPU",
+              "purchase": 12300000,
+              "current": 4921700,
+              "proposed": 14094000,
+              "margin_rate": 0.12,
+              "delta": 9172300,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.4
+            },
+            {
+              "product_code": 113325,
+              "name": "NVIDIA A100 80GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 25000000,
+              "current": 20847400,
+              "proposed": 28646000,
+              "margin_rate": 0.12,
+              "delta": 7798600,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.834
+            },
+            {
+              "product_code": 127627,
+              "name": "AMD 라이젠 스레드리퍼 PRO 3995WX (캐슬 픽-W)(정품)",
+              "part_label": "CPU",
+              "purchase": 6783000,
+              "current": 0,
+              "proposed": 7772000,
+              "margin_rate": 0.12,
+              "delta": 7772000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.0
+            },
+            {
+              "product_code": 128931,
+              "name": "NVIDIA RTX PRO 6000 Blackwell MAX-Q 워크스테이션 에디션 D7 96GB (병행수입)",
+              "part_label": "그래픽카드",
+              "purchase": 19700000,
+              "current": 15901000,
+              "proposed": 22573000,
+              "margin_rate": 0.12,
+              "delta": 6672000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.807
+            },
+            {
+              "product_code": 128753,
+              "name": "NVIDIA RTX PRO 6000 Blackwell 서버 에디션 D7 96GB 서린 (벌크)",
+              "part_label": "그래픽카드",
+              "purchase": 24863000,
+              "current": 22080000,
+              "proposed": 28489000,
+              "margin_rate": 0.12,
+              "delta": 6409000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.888
+            }
+          ],
+          "down": [
+            {
+              "product_code": 113464,
+              "name": "[NVIDIA] Quadro NVLINK HB BRIDGE 3-Slot 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 45000,
+              "current": 900000000,
+              "proposed": 52000,
+              "margin_rate": 0.12,
+              "delta": -899948000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 20000.0
+            },
+            {
+              "product_code": 111669,
+              "name": "AONE PCIe 16x 008C 라이저 카드",
+              "part_label": "기타(ETC)",
+              "purchase": 4000,
+              "current": 26666700,
+              "proposed": 5000,
+              "margin_rate": 0.12,
+              "delta": -26661700,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 6666.675
+            },
+            {
+              "product_code": 105053,
+              "name": "잘만 ZM700-TX 80Plus 230V EU /파워",
+              "part_label": "기타(ETC)",
+              "purchase": 57700,
+              "current": 19393900,
+              "proposed": 66000,
+              "margin_rate": 0.12,
+              "delta": -19327900,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 336.116
+            },
+            {
+              "product_code": 128933,
+              "name": "NVIDIA RTX PRO 6000 Blackwell 서버 에디션 D7 96GB (병행수입)",
+              "part_label": "그래픽카드",
+              "purchase": 16500000,
+              "current": 24123600,
+              "proposed": 18907000,
+              "margin_rate": 0.12,
+              "delta": -5216600,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 1.462
+            },
+            {
+              "product_code": 103323,
+              "name": "마이크로닉스 CASLON BTC 700W 87+ 마이닝 [중고]",
+              "part_label": "기타(ETC)",
+              "purchase": 20000,
+              "current": 3252000,
+              "proposed": 23000,
+              "margin_rate": 0.12,
+              "delta": -3229000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 162.6
+            },
+            {
+              "product_code": 103332,
+              "name": "마이크로닉스 Classic II 700W +12V Single Rail 85+ [중고]",
+              "part_label": "기타(ETC)",
+              "purchase": 20000,
+              "current": 3252000,
+              "proposed": 23000,
+              "margin_rate": 0.12,
+              "delta": -3229000,
+              "status": "판매중",
+              "stock_qty": 1,
+              "ratio": 162.6
+            }
+          ],
+          "outlier": [
+            {
+              "product_code": 113464,
+              "name": "[NVIDIA] Quadro NVLINK HB BRIDGE 3-Slot 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 45000,
+              "current": 900000000,
+              "proposed": 52000,
+              "margin_rate": 0.12,
+              "delta": -899948000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 20000.0
+            },
+            {
+              "product_code": 111669,
+              "name": "AONE PCIe 16x 008C 라이저 카드",
+              "part_label": "기타(ETC)",
+              "purchase": 4000,
+              "current": 26666700,
+              "proposed": 5000,
+              "margin_rate": 0.12,
+              "delta": -26661700,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 6666.675
+            },
+            {
+              "product_code": 105054,
+              "name": "GIGABYTE GA-H110-D3A BTC [중고]",
+              "part_label": "기타(ETC)",
+              "purchase": 100,
+              "current": 77000,
+              "proposed": 0,
+              "margin_rate": 0.12,
+              "delta": -77000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 770.0
+            },
+            {
+              "product_code": 104327,
+              "name": "인텔 셀러론 G3930 벌크 [중고]",
+              "part_label": "CPU",
+              "purchase": 100,
+              "current": 73000,
+              "proposed": 0,
+              "margin_rate": 0.12,
+              "delta": -73000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 730.0
+            },
+            {
+              "product_code": 103083,
+              "name": "인텔 셀러론 G3900 벌크 [중고]",
+              "part_label": "CPU",
+              "purchase": 100,
+              "current": 69000,
+              "proposed": 0,
+              "margin_rate": 0.12,
+              "delta": -69000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 690.0
+            },
+            {
+              "product_code": 102803,
+              "name": "BIOSTAR TB250 [중고]",
+              "part_label": "기타(ETC)",
+              "purchase": 100,
+              "current": 59000,
+              "proposed": 0,
+              "margin_rate": 0.12,
+              "delta": -59000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 590.0
+            }
+          ],
+          "negative": [
+            {
+              "product_code": 119657,
+              "name": "AMD EPYC 7763 (밀라노) (정품)",
+              "part_label": "CPU",
+              "purchase": 12300000,
+              "current": 4921700,
+              "proposed": 14094000,
+              "margin_rate": 0.12,
+              "delta": 9172300,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.4
+            },
+            {
+              "product_code": 127627,
+              "name": "AMD 라이젠 스레드리퍼 PRO 3995WX (캐슬 픽-W)(정품)",
+              "part_label": "CPU",
+              "purchase": 6783000,
+              "current": 0,
+              "proposed": 7772000,
+              "margin_rate": 0.12,
+              "delta": 7772000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.0
+            },
+            {
+              "product_code": 116472,
+              "name": "[NVIDIA] Quadro RTX 6000 D6 24GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 5220000,
+              "current": 0,
+              "proposed": 5981000,
+              "margin_rate": 0.12,
+              "delta": 5981000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.0
+            },
+            {
+              "product_code": 127628,
+              "name": "AMD 라이젠 스레드리퍼 3990X (캐슬 픽 정품)(쿨러미포함)",
+              "part_label": "CPU",
+              "purchase": 5020000,
+              "current": 0,
+              "proposed": 5752000,
+              "margin_rate": 0.12,
+              "delta": 5752000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.0
+            },
+            {
+              "product_code": 113325,
+              "name": "NVIDIA A100 80GB 엔비디아코리아 정품",
+              "part_label": "그래픽카드",
+              "purchase": 25000000,
+              "current": 20847400,
+              "proposed": 28646000,
+              "margin_rate": 0.12,
+              "delta": 7798600,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.834
+            },
+            {
+              "product_code": 128931,
+              "name": "NVIDIA RTX PRO 6000 Blackwell MAX-Q 워크스테이션 에디션 D7 96GB (병행수입)",
+              "part_label": "그래픽카드",
+              "purchase": 19700000,
+              "current": 15901000,
+              "proposed": 22573000,
+              "margin_rate": 0.12,
+              "delta": 6672000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 0.807
+            }
+          ],
+          "locked": [
+            {
+              "product_code": 46158,
+              "name": "(POWEREX) REX III 500W Triple V2.3 벌크 /파워",
+              "part_label": "파워",
+              "purchase": 38000,
+              "current": 43000,
+              "proposed": 44000,
+              "margin_rate": 0.12,
+              "delta": 1000,
+              "status": "품절",
+              "stock_qty": 0,
+              "ratio": 1.132
+            }
+          ]
+        },
+        "max_apply": 20000,
+        "note": "**미리보기입니다 — 아무것도 바뀌지 않았습니다.** 오름과 내림을 따로 냅니다: 합치면 이상치 한 건이 나머지 전부를 덮습니다. 잠긴 판매가(운영자가 손으로 정한 값)는 세기만 하고 바꾸지 않습니다."
+      },
+      "history_summary_text": "21,654건 중 →21,652건이 되돌려졌습니다 (99.99%)",
+      "cat_badge_text": "0건 — 정상입니다",
+      "cat_text": "아직 예외를 두지 않았고 34개 분류 전부가 전역값 12%를 씁니다. 설정을 못 불러온 것이 아닙니다 — category_margin_policies가 비어 있는 것이 지금의 정상 상태입니다.",
+      "nav_reprice_linked": true
+    }
+  }
+}
