@@ -492,7 +492,7 @@ function loadDraft(){
 function saveDraft(){
  if(mode!=='guided'&&mode!=='chat'&&mode!=='talk')return;
  if(!((mode==='guided'&&qidx>0)||consPairs.length>0))return;   /* 아직 진행이 없으면 저장하지 않는다 */
- var d={mode:mode,at:Date.now(),consPairs:consPairs.map(function(p){return {l:p.l,v:p.v};}),icons:_draftIcons};
+ var d={mode:mode,at:Date.now(),consPairs:consPairs.map(function(p){return {l:p.l,v:p.v,relaxed:p.relaxed};}),icons:_draftIcons};
  if(mode==='guided'){d.qidx=qidx;d.queueIds=QUEUE.map(function(q){return q.id;});}
  try{sessionStorage.setItem(DRAFT_KEY,JSON.stringify(d));}catch(e){/* 저장 실패(용량·프라이빗
   모드)는 조용히 넘어간다 — 상담 자체는 계속돼야 하고, 다음 조건 변경 때 다시 시도된다 */}
@@ -1562,12 +1562,17 @@ function reuseWireItems(v){
 /* wireConstraints(pairs) — consPairs(또는 그 스냅샷)를 서버 전송 모양으로 바꾼다.
    '재사용' 만 항목을 펼치고, 나머지는 그대로 {l,v} 로 옮긴다. ⚠ consTokens 는 아래 정규화
    블록(normCons 근처)에서 함수선언으로 정의된다 — 호이스팅되므로 이 위치에서 먼저 써도
-   된다(esc()·guidedAutoClose 와 같은 이유). */
+   된다(esc()·guidedAutoClose 와 같은 이유).
+   ⚠ p.relaxed(아래 relaxCons, dropCons 근처) 항목은 값을 빈 문자열로 보낸다 — 화면엔
+   "완화됨"이 보이지만 서버는 그 라벨이 «없는 것과 같은» 취급을 하게 한다. 빈 문자열은
+   api/candidates.py _budget_cap('')·api/usage_floors.py match('') 둘 다 "값 없음"으로
+   읽어 그 라벨을 필터로 쓰지 않는다(2026-08-29 확인) — 라벨 자체는 남아 있어야
+   U-08(용도 또는 상황 + 예산 라벨 존재)을 넘는다. */
 function wireConstraints(pairs){
  var out=[];
  (pairs||consPairs).forEach(function(p){
   if(p.l==='재사용'){out=out.concat(reuseWireItems(p.v));return;}
-  out.push({l:p.l,v:p.v});
+  out.push({l:p.l,v:p.relaxed?'':p.v});
  });
  return out;
 }
@@ -1721,7 +1726,10 @@ addConstraint=function(icon,label,value){
   if(box&&box.lastElementChild&&box.lastElementChild.id!=='s1-cons-empty')consMap[label]=box.lastElementChild;
  }
  var found=false;
- for(var i=0;i<consPairs.length;i++){if(consPairs[i].l===label){consPairs[i].v=value;found=true;break;}}
+ /* relaxed=false — 이 라벨에 «실제 값»이 다시 쓰였다는 뜻이다. relaxCons(아래)가 붙인
+    relaxed 표시는 여기서만 지운다(다른 경로로 값이 갱신될 때마다 자동으로 풀리게 —
+    다음에 이 라벨을 손대는 자리를 일일이 찾아 지우지 않아도 된다). */
+ for(var i=0;i<consPairs.length;i++){if(consPairs[i].l===label){consPairs[i].v=value;consPairs[i].relaxed=false;found=true;break;}}
  if(!found)consPairs.push({l:label,v:value});
  budgetUpdate();
  recountCons();   /* mbarUpdate() 포함 — 배지도 이 시점 기준(응답 전이면 낙관적으로)으로 다시 센다 */
@@ -1735,7 +1743,7 @@ function doCount(){var seq=++_seq;
  /* 보낸 조건을 그대로 들고 있는다 — 응답이 왔을 때 «그 응답이 답한 조건»으로 태그를 그린다.
     지금의 consPairs 로 그리면, 요청이 나간 뒤 조건이 하나 더 붙은 사이에 응답이 도착했을 때
     새 태그에 옛 수가 붙는다(같은 사고의 반대 방향). */
- var snap=consPairs.map(function(p){return {l:p.l,v:p.v};});
+ var snap=consPairs.map(function(p){return {l:p.l,v:p.v,relaxed:p.relaxed};});
  /* snap 은 «표시용» 그대로 둔다(applyCount 가 이 스냅샷으로 태그를 다시 그린다 — 재사용도
     다른 라벨처럼 한 줄이어야 한다). 서버로 나가는 본문만 wireConstraints(snap) 으로
     바꾼다(재사용 항목을 part_type 개수만큼 편다) — 같은 스냅샷에서 파생하므로 「무엇을
@@ -1842,7 +1850,10 @@ function emptyCard(d){
  }
  relaxChips(d);
 }
-/* 제약을 하나 뺀다 — 원장이 아니라 화면 상태이므로 제자리에서 지운다 */
+/* 제약을 하나 뺀다 — 원장이 아니라 화면 상태이므로 제자리에서 지운다.
+   ⚠ U-08(아래 enable() 미러 가드)이 최소조건으로 요구하는 라벨(예산·용도·상황)은 이
+   함수로 직접 지우지 않는다 — 완화 버튼은 relaxCons(바로 아래)를 쓴다. dropCons 는
+   그 라벨들 외의 완전 삭제(선호·재사용·요청 등)와, relaxCons 자신의 위임 대상으로만 쓴다. */
 function dropCons(label){
  for(var i=consPairs.length-1;i>=0;i--)if(consPairs[i].l===label)consPairs.splice(i,1);
  var n=consMap[label];if(n&&n.parentNode)n.parentNode.removeChild(n);delete consMap[label];
@@ -1854,6 +1865,35 @@ function dropCons(label){
  recountCons();
  budgetUpdate();scheduleCount();
 }
+/* ── 완화 버튼의 진입점 (2026-08-29 실사고 해소) ──
+   증상: 예산 40만원(사무·인강 하한 40~80만원 아래)에서 「예산 조건(40만원) 풀기」를
+   누르면 후보가 2,721개까지 늘어 buildable=true 가 되는데도 [견적 확정하기]가 «영구히»
+   disabled 로 굳었다. dropCons 가 '예산' 라벨을 consPairs 에서 통째로 지우기 때문에,
+   아래 enable() 의 U-08 미러 가드 has(['용도','상황'])&&has(['예산'])가 그 뒤로는 영원히
+   거짓이 된다 — has() 는 consPairs 안의 라벨 존재만 보는데, 그 라벨이 다시 채워질
+   방법이 화면에 없었다(서버 /api/recommend 도 같은 이유로 400 constraints_insufficient를
+   낸다 — api/recommend.py:1001-1008, labels = {c.l for c in body.constraints}).
+   U-08 이 실제로 보는 것은 "그 라벨에 사람이 한 번이라도 답했는가"이지 값의 «내용»이
+   아니다(서버는 값을 파싱해 상한·하한으로 못 쓰면 그냥 "후보 수에는 영향 없음"으로
+   적용을 건너뛴다 — _apply_one, BUDGET_LABELS/USAGE_LABELS 분기 참조). 그래서 라벨은
+   남기고 표시 값만 "완화됨"으로 바꾼다: has() 는 여전히 참이 되어 확정 버튼이 열리고,
+   실제 필터는 wireConstraints()(위)가 relaxed 항목을 빈 문자열로 보내 해제한다 —
+   _budget_cap('') 는 None(상한 미적용), usage_floors.match('') 는 즉시 []
+   (api/usage_floors.py:48 "if not value: return []")라 두 라벨 다 "값 없음"과 똑같이
+   처리된다. 화면에는 원래 값을 지우고 "완화됨(반영 안 함)"만 남긴다 — 원래 값(예:
+   "40만원 이하")을 이어 붙이면 budgetSaid()·usageTier() 의 숫자·용도 정규식이 그 옛
+   값을 다시 읽어 "말씀하신 40만원…" 같은 문구가 되살아난다(완화했는데 아직 유효한
+   것처럼 보이면 안 된다 — 지시 원문). U-08 가드 자체(enable())는 건드리지 않는다 —
+   "그 조건에 한 번이라도 답했는가"라는 원래 목적은 완화 후에도 참이기 때문이다.
+   U-08 과 무관한 라벨(선호·재사용·요청 등)은 그대로 dropCons 로 완전히 지운다 — 그
+   라벨들의 기존 동작은 바꾸지 않는다. */
+var U08_LABELS={'예산':1,'용도':1,'상황':1};
+var RELAX_ICON={'예산':'savings','용도':'interests','상황':'build'};
+function relaxCons(label){
+ if(!U08_LABELS[label]){dropCons(label);return;}
+ addConstraint(RELAX_ICON[label]||'tune',label,'조건 완화(반영 안 함)');
+ for(var i=0;i<consPairs.length;i++)if(consPairs[i].l===label){consPairs[i].relaxed=true;break;}
+}
 /* 완화 칩을 실측으로 다시 그린다 — '이걸 풀면 몇 개가 되고, 견적이 되는가'를 서버에 묻는다.
    목업의 '+1,240개'는 서버가 모르는 수였다(슬라이스 48). */
 function relaxChips(d){
@@ -1861,8 +1901,17 @@ function relaxChips(d){
  if(!host){
   var e=document.getElementById('s1-empty');if(!e)return;
   var b0=e.querySelector('button');if(!b0||!b0.parentNode)return;
+  var editBtn=null;
   Array.prototype.forEach.call(e.querySelectorAll('button'),function(b){
-   if((b.textContent||'').indexOf('직접 수정')<0)b.style.display='none';});  /* 하드코딩 칩 은폐 */
+   if((b.textContent||'').indexOf('직접 수정')<0)b.style.display='none';else editBtn=b;});  /* 하드코딩 칩 은폐 */
+  /* "조건 직접 수정하기" — 완화 칩 둘 다 "여전히 불가"로 남을 수 있다(용도·예산이 각자
+     완화돼도 buildable 이 안 될 때). 그때 사람이 직접 값을 다시 말할 수 있어야 하는데,
+     이 버튼은 마크업엔 있었지만 리스너가 하나도 없어 눌러도 아무 일이 없었다(2026-08-29
+     점검 실측 — 이 카드가 열려 있는 동안은 항상 보이고 크기도 있다, 106.9×20px. 사라져
+     보이는 건 완화가 이미 성공해 카드 자체(#s1-empty)가 닫힌 뒤뿐이다). 이미 같은 목적으로
+     쓰는 focusInput()(#s1-addcond 핸들러, 아래 함수 선언 — 호이스팅되어 여기서 먼저 써도
+     된다)을 그대로 재사용한다: 입력창을 열고 포커스를 준다. */
+  if(editBtn)editBtn.addEventListener('click',focusInput);
   host=document.createElement('div');host.id='s1-relax';
   host.style.cssText='display:flex;flex-direction:column;gap:10px;';
   b0.parentNode.insertBefore(host,b0);
@@ -1901,7 +1950,7 @@ function relaxChips(d){
     +'<span style="font-size:10.5px;border-radius:999px;padding:2px 8px;white-space:nowrap;'
      +(ok?'background:#e8eefc;color:#2f5fd0;">견적 가능'
         :'background:#f7e7e4;color:#b04a3a;">여전히 불가')+'</span></span>';
-   bt.addEventListener('click',function(){dropCons(x.p.l);});
+   bt.addEventListener('click',function(){relaxCons(x.p.l);});
    host.appendChild(bt);
   });
   if(!rs.length)host.innerHTML='';
@@ -2384,6 +2433,10 @@ if(s1Draft&&(s1Draft.consPairs||[]).length){
  USAGES_READY.then(function(){
   s1Draft.consPairs.forEach(function(p){
    addConstraint((s1Draft.icons&&s1Draft.icons[p.l])||'tune',p.l,p.v);
+   /* addConstraint 는 항상 새 값을 "완화 아님"으로 되돌린다(아래 relaxCons 주석) —
+      완화된 채로 저장된 라벨은 복원 직후 다시 relaxed=true 로 표시해야 새로고침 뒤에도
+      확정 버튼이 다시 잠기지 않는다(2026-08-29). */
+   if(p.relaxed)for(var k=0;k<consPairs.length;k++)if(consPairs[k].l===p.l){consPairs[k].relaxed=true;break;}
   });
  });
 }
