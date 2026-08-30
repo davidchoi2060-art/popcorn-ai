@@ -53,8 +53,8 @@ PRODUCT_FIELD_CAST = {"market_price": "BIGINT"}
 # products 갈래 «가격» 필드의 범위 검증 — PRODUCT_FIELD_CAST 전체가 가격 컬럼이라는
 # 전제로 여기 한 자리에 둔다(지금은 market_price 하나뿐이지만, purchase_price·
 # sale_price류가 이 화이트리스트에 더해지면 같은 상한을 그대로 받는다). **가격이
-# 아닌 컬럼을 PRODUCT_FIELD_CAST에 추가할 때는 이 상수를 그대로 쓸 수 있는지부터
-# 다시 판단해야 한다** — product_specs 갈래(FIELD_CAST·위 _approve)는 이 상수와
+# 아닌 컬럼을 PRODUCT_FIELD_CAST에 추가할 때는 아래 상한 체계를 그대로 쓸 수 있는지부터
+# 다시 판단해야 한다** — product_specs 갈래(FIELD_CAST·위 _approve)는 이 상한과
 # 무관하게 그대로 동작한다(대상 테이블도 화이트리스트도 다르다).
 #
 # 하한(확인자 결함 2026-08-23 재현: review 신규 생성 -> action=manual value='-5000'
@@ -66,13 +66,96 @@ PRODUCT_FIELD_CAST = {"market_price": "BIGINT"}
 # 으로 받아 주면 그 구분이 무너진다.
 PRODUCT_PRICE_MIN = 1
 
-# 상한(실측, 2026-08-23): `SELECT max(sale_price) FROM products` -> 900,000,000.
-# 수를 지어내지 않고 이 실측값을 그대로 상한으로 쓴다. 같은 실측에서
-# max(market_price)=259,280,000으로 이 상한의 3분의 1이 안 된다 — 지금 이미
-# 저장돼 있는 어떤 market_price 값도 이 상한에 걸리지 않는다(기존 데이터
-# 무영향 확인, 재확인법: `SELECT count(*) FROM products WHERE market_price >
-# 900000000` -> 0).
-PRODUCT_PRICE_MAX = 900_000_000
+# 상한 — 2026-08-30 «방식째» 개정(사장님 지시: "상한값도 고쳐줘" — 근거가 무너진 뒤).
+#
+# **이전 값(단일 900,000,000)은 오염값 그 자체를 실측해 상한으로 삼은 것이었다.**
+# product 113464([NVIDIA] Quadro NVLINK HB BRIDGE 3-Slot, part_type=GPU, 매입
+# 45,000원짜리 브릿지 액세서리)의 sale_price가 원천 CSV 두 벌에서 일반회원가
+# 컬럼이 900000000(양수)/-900000000(음수)으로 훼손된 채 들어왔고(딜러 3단계가
+# 셋 다 같은 값이라 크기 자체를 신뢰할 수 없었다), 2026-08-23 당시
+# `SELECT max(sale_price) FROM products`로 그 오염값을 «실측»해 그대로 상한으로
+# 썼다. **오염값이 상한이 되면, 같은 오염이 다시 들어와도 이 검증을 통과한다** —
+# 2026-08-30 사장님 지적으로 드러났다. 원본은 정본 공식 `pricing.sale_from_purchase()`
+# 로 매입가에서 재계산해 52,000원으로 바로잡았다(log_id=18018, product_price_history
+# reason='manual', locked_fields=['sale_price']). 같은 사고로 함께 발견된 111669
+# (라이저 케이블, ETC)도 26,666,700원 -> 5,000원(log_id=18019)으로 바로잡았다.
+# ⚠ 이 둘은 **sale_price**가 오염된 것이었다 — sale_price·purchase_price는 지금도
+# PRODUCT_FIELD_CAST에 없어 이 검증(market_price 전용) 대상이 아니다(위 주석,
+# §보고에서 범위를 넓힐지 별도로 판단했다). 그래도 「실측 최댓값 = 상한」이라는
+# **방식** 자체는 market_price 쪽에도 그대로 있었으므로 방식을 고친다.
+#
+# **바뀐 방식**: 「그때그때의 실측 최댓값」을 상한으로 쓰지 않는다 — 그 방식은
+# 오염값 하나에도 상한이 따라 올라가는 구조였다. 대신 **부품 종류(part_type)별
+# 상한 3단**을 둔다. 워크스테이션(PC_COMPLETE)과 액세서리(GPU 브릿지·케이블 등)는
+# 정상가 자체가 자릿수로 다르다 — 하나의 상한을 같이 쓰면, 넓게 잡을 때(옛
+# 900,000,000처럼) 액세서리의 오염을 못 잡고, 좁게 잡을 때 워크스테이션이 막힌다.
+#
+# 근거(2026-08-30 실측, data_origin<>'demo' 기준 market_price 부품종류별 최댓값):
+#
+#   PC_COMPLETE   259,280,000  워크스테이션(H100 NVL 4-way 등) — 정상 고가품
+#   GPU            45,000,000  CPU 18,449,990 · ETC 18,400,000 · RAM 11,007,000
+#   CASE            5,172,480  SSD 5,014,880 · HDD 3,607,110 · MB 2,161,520
+#   그 외 주변기기   전부 1,000,000 미만(파워 984,000이 최고)
+#   BAREBONE·SPEAKER·WEBCAM   시중가 실측 0(관측 없음) — sale_price 실측
+#                             (베어본 9,697,700)으로 대체 판단, STANDARD 단에 둔다
+#
+# 각 단은 위 실측 최댓값의 약 4~20배 여유를 둔다 — 정상 성장(신제품·구성 확대)은
+# 막지 않으면서 자릿수가 다른 오염값은 여전히 확실히 걸린다:
+#
+#   SYSTEM(10억)    PC_COMPLETE 전용. 실측 259,280,000의 약 3.9배 — 다중 GPU
+#                   워크스테이션이 지금보다 커져도(예: 8-way) 받을 여유를 둔다
+#   HIGH(2억)       GPU·CPU·RAM·ETC. 실측 최댓값(GPU 45,000,000)의 약 4.4배.
+#                   ETC는 "적재 시 부품 종류를 정하지 못한 상품"(taxonomy.py)이라
+#                   재단기 같은 고가 산업 장비도 섞여 있다(112935, 18,400,000원) —
+#                   이 상한은 그 값도 통과시킨다
+#   STANDARD(2천만) 그 외 전부(케이스·SSD·HDD·메인보드·베어본·파워·쿨러·모니터·
+#                   키보드 등 주변기기) + 미분류 part_type의 기본값. 실측
+#                   최댓값(케이스 5,172,480)의 약 3.9배
+#
+# **이번 사고(9억)를 다시 대입하면**: 113464는 part_type=GPU라 HIGH(2억) 대상이다
+# — 900,000,000 > 200,000,000이므로 이 필드가 market_price였다면 걸린다(경계값
+# 재현은 이 작업 보고 참고). PC_COMPLETE(H100 워크스테이션, 최대 259,280,000)는
+# SYSTEM(10억) 안에 있어 전부 통과한다 — H100 워크스테이션 4건이 막히지 않는다.
+#
+# **한계 — 지우지 않고 남긴다**: ETC는 잡화 분류라 성격이 균질하지 않다.
+# 111669(라이저 케이블)의 오염값 26,666,700은 HIGH(2억)보다 작아 «이 상한만으로는»
+# 걸리지 않는다 — ETC 안에 실제로 18,400,000원짜리 산업 장비가 이미 있어서(112935),
+# ETC 하나에 26,666,700원보다 낮은 상한을 걸면 그 실제 상품을 막는다. "라이저
+# 케이블 한 장이 얼마까지 정상인가"는 가격 상한이 아니라 부품 세분류(ETC를 더
+# 쪼개는 일) 문제이고, 그건 이 파일의 범위 밖이다.
+PRODUCT_PRICE_MAX_SYSTEM = 1_000_000_000     # PC_COMPLETE 전용
+PRODUCT_PRICE_MAX_HIGH = 200_000_000         # GPU · CPU · RAM · ETC
+PRODUCT_PRICE_MAX_STANDARD = 20_000_000      # 그 외 전부 + 미분류 기본값
+
+# part_type -> 적용 상한 3단 매핑. **부품 어휘(19종) 자체의 단일 원천은 여전히
+# api/taxonomy.py PART_TYPES다** — 여기서 종류를 새로 정의하지 않고, 이미 있는
+# 19종 각각에 위 세 상수 중 하나만 매긴다(새 숫자를 여기서 만들지 않는다).
+# 목록에 없는 part_type(미래에 새 종류가 생기거나 값이 비어 있는 경우)은
+# product_price_max()가 STANDARD(가장 낮은 단)로 떨어뜨린다 — 모르는 종류에
+# 관대한 상한을 주지 않는다(안전 쪽 기본값).
+_PRICE_TIER_BY_PART_TYPE = {
+    "PC_COMPLETE": PRODUCT_PRICE_MAX_SYSTEM,
+    "GPU": PRODUCT_PRICE_MAX_HIGH, "CPU": PRODUCT_PRICE_MAX_HIGH,
+    "RAM": PRODUCT_PRICE_MAX_HIGH, "ETC": PRODUCT_PRICE_MAX_HIGH,
+    "MB": PRODUCT_PRICE_MAX_STANDARD, "CASE": PRODUCT_PRICE_MAX_STANDARD,
+    "SSD": PRODUCT_PRICE_MAX_STANDARD, "HDD": PRODUCT_PRICE_MAX_STANDARD,
+    "BAREBONE": PRODUCT_PRICE_MAX_STANDARD, "POWER": PRODUCT_PRICE_MAX_STANDARD,
+    "COOLER_CPU_AIR": PRODUCT_PRICE_MAX_STANDARD,
+    "COOLER_CPU_AIO": PRODUCT_PRICE_MAX_STANDARD,
+    "MONITOR": PRODUCT_PRICE_MAX_STANDARD, "KEYBOARD": PRODUCT_PRICE_MAX_STANDARD,
+    "MOUSE": PRODUCT_PRICE_MAX_STANDARD, "HEADSET": PRODUCT_PRICE_MAX_STANDARD,
+    "SPEAKER": PRODUCT_PRICE_MAX_STANDARD, "WEBCAM": PRODUCT_PRICE_MAX_STANDARD,
+}  # 19종 = api/taxonomy.py PART_TYPES 전체(2026-08-30 실측 대조 — admin_products.
+   # PART_TYPE_LABELS가 그 taxonomy.PART_LABELS의 별칭이라 이 파일에서 재확인했다)
+
+
+def product_price_max(part_type: str | None) -> int:
+    """part_type별 가격 상한(위 표 참고). 모르는 종류·None은 STANDARD(가장 낮은
+    단)로 떨어진다 — 안전 쪽 기본값이다. `_approve_product_field()`·
+    `market_auto_approve_decision()` 둘 다 이 함수 하나만 부른다(판정을 두 곳에
+    다시 적지 않는다)."""
+    return _PRICE_TIER_BY_PART_TYPE.get(part_type, PRODUCT_PRICE_MAX_STANDARD)
+
 
 # 시세(market_price) 자동 승인 임계값(A-108, 2026-08-23 사장님 확정 — A-103 개정).
 # 사장님 원문: "승인: 변동폭이 작은 건(예: 5% 미만)은 자동 승인하고, 큰 것만 사람이
@@ -96,14 +179,15 @@ PRODUCT_PRICE_MAX = 900_000_000
 MARKET_AUTO_APPROVE_PCT = 5.0  # 이 미만의 |변동률(%)|은 자동 승인
 
 
-def market_auto_approve_decision(current, new_val: int) -> tuple[bool, float | None, str]:
+def market_auto_approve_decision(current, new_val: int, part_type: str | None = None) -> tuple[bool, float | None, str]:
     """market_price 자동 승인 판정 — **한 자리**(단일 원천, A-108). 같은 판정을 다른
     곳에 다시 적지 않는다 — 재사용자(예: tools/danawa_fetch.py)는 이 함수를 그대로
     import해서 쓴다.
 
-    규칙(사장님 확정 2026-08-23):
-      · 새 값이 API 범위(PRODUCT_PRICE_MIN~PRODUCT_PRICE_MAX) 밖이거나 0 이하
-        -> 자동 승인하지 않는다. 기존 `_approve_product_field()` 가드(아래)를
+    규칙(사장님 확정 2026-08-23 · 상한은 2026-08-30 part_type별 3단으로 개정 —
+    위 product_price_max() 주석 참고):
+      · 새 값이 API 범위(PRODUCT_PRICE_MIN~product_price_max(part_type)) 밖이거나
+        0 이하 -> 자동 승인하지 않는다. 기존 `_approve_product_field()` 가드(아래)를
         느슨하게 하는 것이 아니다 — 그 가드보다 **앞에서** 한 번 더 본다(이 판정이
         막아도, 사람이 화면에서 그대로 승인을 시도하면 그 가드가 다시 막는다 —
         기존 가드는 그대로 살아 있다).
@@ -112,14 +196,17 @@ def market_auto_approve_decision(current, new_val: int) -> tuple[bool, float | N
       · |변동률| < MARKET_AUTO_APPROVE_PCT -> 자동 승인.
       · 그 이상 -> 대기(사람이 본다).
 
-    인자: current(현재 products.market_price, int | None) · new_val(제안값, int).
+    인자: current(현재 products.market_price, int | None) · new_val(제안값, int) ·
+    part_type(그 상품의 부품 종류 — 상한 단을 가른다. 모르면 None을 넘긴다, 그러면
+    STANDARD(가장 낮은 단)가 적용된다).
     반환: (auto_approved, pct_change, reason). pct_change는 비교 기준이 없거나
     새 값이 범위 밖이면 None. reason은 사람이 읽는 문장이다 — 콘솔에 그대로
     출력될 수 있어 ASCII 기호만 쓴다(화살표·줄표 대신 "->"·"-", 서버 stdout이 cp949).
     """
-    if new_val is None or new_val <= 0 or new_val < PRODUCT_PRICE_MIN or new_val > PRODUCT_PRICE_MAX:
+    cap = product_price_max(part_type)
+    if new_val is None or new_val <= 0 or new_val < PRODUCT_PRICE_MIN or new_val > cap:
         return False, None, (
-            f"제안값이 허용 범위 밖입니다(허용 {PRODUCT_PRICE_MIN:,}~{PRODUCT_PRICE_MAX:,})."
+            f"제안값이 허용 범위 밖입니다(허용 {PRODUCT_PRICE_MIN:,}~{cap:,})."
             " 자동 승인하지 않습니다.")
     if current is None or current <= 0:
         return False, None, (
@@ -700,8 +787,10 @@ def _approve_product_field(conn, review, value, new_status: str, *, auto: bool =
     cast = PRODUCT_FIELD_CAST[field]
     op = None if auto else current_operator_id()
 
+    # part_type도 함께 잠근다(FOR UPDATE) — 2026-08-30부터 상한이 part_type별
+    # 3단이라 아래 범위 검증에 필요하다(위 product_price_max() 참고).
     prod = conn.execute(text(
-        f"SELECT {field} AS v, locked_fields FROM products"
+        f"SELECT {field} AS v, locked_fields, part_type FROM products"
         " WHERE product_code=:pc FOR UPDATE"), {"pc": pc}).mappings().one()
 
     before = {
@@ -722,14 +811,17 @@ def _approve_product_field(conn, review, value, new_status: str, *, auto: bool =
     except (TypeError, ValueError):
         raise HTTPException(400, f"값 형식 오류: {value!r} → {field}")
 
-    # 범위 검증(위 PRODUCT_PRICE_MIN·PRODUCT_PRICE_MAX 주석 참조) — 형식은 맞아도
-    # 값이 말이 안 되는 경우(음수·0·자릿수 오타)를 여기서 400으로 막는다. 화면
-    # 쪽 숫자 검사가 이 필드에서 빠져 있어도(별도 결함, 화면 담당 제작자 작업 중)
-    # 서버가 스스로 막아야 한다 — ASCII 기호만 쓴다(서버 stdout이 cp949).
-    if new_val < PRODUCT_PRICE_MIN or new_val > PRODUCT_PRICE_MAX:
+    # 범위 검증(위 PRODUCT_PRICE_MIN·product_price_max() 주석 참조) — 형식은 맞아도
+    # 값이 말이 안 되는 경우(음수·0·자릿수 오타)를 여기서 400으로 막는다. 상한은
+    # 2026-08-30부터 part_type별 3단이다(워크스테이션과 액세서리를 같은 자로
+    # 재지 않는다 — 위 주석). 화면 쪽 숫자 검사가 이 필드에서 빠져 있어도(별도
+    # 결함, 화면 담당 제작자 작업 중) 서버가 스스로 막아야 한다 — ASCII 기호만
+    # 쓴다(서버 stdout이 cp949).
+    cap = product_price_max(prod["part_type"])
+    if new_val < PRODUCT_PRICE_MIN or new_val > cap:
         raise HTTPException(400,
             f"값 범위 오류: {new_val:,} -> {field}"
-            f" (허용 범위 {PRODUCT_PRICE_MIN:,}~{PRODUCT_PRICE_MAX:,})")
+            f" (허용 범위 {PRODUCT_PRICE_MIN:,}~{cap:,}, 부품종류 {prod['part_type'] or '미분류'} 기준)")
 
     conn.execute(text(
         f"UPDATE products SET {field} = CAST(:v AS {cast}),"
@@ -864,11 +956,15 @@ def auto_approve_market_price(review_id: int) -> dict:
                     "reason": f"제안값 형식 오류입니다: {review['suggested_value']!r}",
                     "pct_change": None, "old_value": None, "new_value": None, "undo_id": None}
 
-        current = conn.execute(text(
-            "SELECT market_price FROM products WHERE product_code=:pc"),
-            {"pc": review["product_code"]}).scalar()
+        # part_type도 함께 읽는다(2026-08-30) — market_auto_approve_decision()의
+        # 상한이 이제 part_type별 3단이라 판정에 필요하다(위 product_price_max() 참고).
+        prod_row = conn.execute(text(
+            "SELECT market_price, part_type FROM products WHERE product_code=:pc"),
+            {"pc": review["product_code"]}).mappings().first()
+        current = prod_row["market_price"] if prod_row else None
+        part_type = prod_row["part_type"] if prod_row else None
 
-        ok, pct, reason = market_auto_approve_decision(current, new_val)
+        ok, pct, reason = market_auto_approve_decision(current, new_val, part_type)
         if not ok:
             return {"review_id": review_id, "auto_approved": False, "left_to_human": True,
                     "reason": reason, "pct_change": pct, "old_value": current,
