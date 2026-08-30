@@ -242,6 +242,12 @@ def main() -> int:
     # docstring 참고) — 끄거나 단독으로 돌리려면 별도 옵션을 쓴다.
     check_fresh = True
     fresh_threshold = FRESH_PX_THRESHOLD
+    # 신선도 상세(`[건너뜀]`·`[안보임]`·`[LIVE]` 줄)를 보려면 이 옵션이 필요하다.
+    # ⚠ 2026-08-30 확인자가 잡은 결함 — 이 분기가 «없어서» 여기서는 상세를 영영 볼 수
+    # 없었다. 에러도 경고도 없이 조용히 무시됐고, 이 파일이 자기 docstring에서 「기본
+    # 진입점」이라 부르는 곳이라 별도 모듈을 직접 돌려야 한다는 걸 몰라야만 안 걸리는
+    # 함정이었다. 핀 검사 쪽은 원래 상세 개념이 없어 이 플래그를 안 본다.
+    verbose = False
     for arg in sys.argv[1:]:
         if arg.startswith("--base="):
             base = arg.split("=", 1)[1]
@@ -256,6 +262,8 @@ def main() -> int:
             check_print = False
         elif arg == "--no-freshness":
             check_fresh = False
+        elif arg in ("--verbose", "-v"):
+            verbose = True
         elif arg.startswith("--fresh-threshold="):
             fresh_threshold = float(arg.split("=", 1)[1])
     slugs = slugs or discover_slugs()
@@ -324,7 +332,7 @@ def main() -> int:
             # 총합 포함) — 그 모듈의 `run_freshness_checks()` docstring 참고.
             (fresh_checked, fresh_bad_screens, fresh_bad_elements,
              fresh_skip, fresh_live) = run_freshness_checks(
-                page, base, slugs, threshold=fresh_threshold)
+                page, base, slugs, threshold=fresh_threshold, verbose=verbose)
 
     total_violations = screen_violations + print_violations + fresh_bad_elements
     log("")
