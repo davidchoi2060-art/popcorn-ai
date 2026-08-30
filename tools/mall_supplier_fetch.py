@@ -376,6 +376,30 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
         "supplier_excluded_stock_status": 0,
         "products_with_available_price": 0, "products_no_available_supplier": 0,
         "cheapest_is_unavailable": 0, "cheapest_unavailable_samples": [],
+        # 2026-08-30 신설 -- 「추천 후보 2,707건 중 47건이 product_supplier_prices에
+        # 행이 0개」 사고 조사 대응. 위 supplier_excluded_stock_status·supplier_unmatched는
+        # «행» 단위 집계라 "그 상품 하나가 결국 공급처를 하나도 못 얻었는가"를 말해주지
+        # 않는다 -- 그 상품에 매칭된 행이 하나라도 있으면 안 보인다. 여기는 **상품** 단위다.
+        # sid가 None이어도 price_raw·o_price·state는 파싱돼 있다(mall_supplier_parse.
+        # resolve_supplier 참조) -- 그 값 자체는 버리지 않았다는 것을 이 집계로 증명한다.
+        "products_supplier_unresolved": 0,
+        "products_supplier_unresolved_reason": {},   # {"excluded_stock_status": N, ...}
+        # 2026-08-31 개정(확인자 지적 ①) -- 예전엔 여기가 "최대 20건"이었고, 20건을
+        # 넘는 나머지는 "표본에 없습니다"라는 안내조차 없이 그냥 빠졌다(48건 중 28건 --
+        # 첫 5건이 우연히 표본 안에 있으면 그 안내 문구 자체가 안 뜨는 조건이었다).
+        # 이유는 이 반복문 안에서 이미 다 계산돼 있으므로(reasons 딕셔너리) 기록
+        # 자체를 잃을 이유가 없다 -- 그래서 표본이 아니라 **계산된 전부**를 담는다
+        # (계산 비용은 이미 지불했다, 담는 것은 dict 하나 append뿐이다). 콘솔에 몇 줄
+        # 찍을지는 표시 시점(_print_report·mall_daily_sync.py)의 문제이지 수집
+        # 시점에서 잘라 버릴 일이 아니다 -- 그 둘을 섞은 것이 원래 결함이었다.
+        "products_supplier_unresolved_samples": [],  # pd_no·행수·이유·회사명 원문 -- 전건
+        "products_no_rows_parsed": 0,   # 응답은 받았는데 공급처 행 자체가 0개(구조 변경 의심)
+        # 2026-08-31 신설(확인자 지적 ②) -- 전에는 건수만 있고 «어떤 상품인지»가 stats
+        # 어디에도 안 남았다. 그래서 _print_report의 "표본으로 확인하세요"라는 안내가
+        # 가리키는 표본이 실제로는 없었다. products_supplier_unresolved_samples와 같은
+        # 원칙으로 전건을 담는다(이 경우는 rows 자체가 없어 reason·names가 의미 없으므로
+        # pd_no만 담는다).
+        "products_no_rows_parsed_samples": [],
     }
     samples, cookie_val, consec_fail = [], None, 0
 
@@ -446,12 +470,20 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
             else:
                 stats["products_no_available_supplier"] += 1
 
+        # 상품 단위 추적(2026-08-30 신설) -- 이 상품의 행 중 하나라도 실제로 반영
+        # 가능(공급처 특정 + 가격 + 상태)했는지, 아니면 전부 회사를 못 찾았는지.
+        # row_kinds는 이 상품에서 나온 match_kind 전체 -- 나중에 "왜"(재고상태 오염뿐인지,
+        # 미등록 업체뿐인지, 섞였는지)를 가른다.
+        product_resolved = False
+        row_kinds = set()
+
         for r in rows:
             if r["state"] is None:
                 stats["state_unknown"] += 1
             if r["price_mismatch"]:
                 stats["price_mismatch"] += 1
             sid, sname, remainder, kind = resolve_supplier(r["contact_blob"], suppliers)
+            row_kinds.add(kind)
             if kind == "excluded_stock_status":
                 # 미매칭(unmatched)이 아니라 "공급처가 아닌 값" -- 등록 후보 목록에
                 # 섞이지 않게 애초에 다른 집계로 뺀다.
@@ -468,8 +500,34 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
             # 반영 가능 조건 -- 상태를 모르거나(state None) 가격이 없거나 공급처를 못
             # 찾으면 반영하지 않는다(모르는 것을 지어내지 않는다).
             if sid is not None and r["o_price"] is not None and r["state"] is not None:
+                product_resolved = True
                 _plan_and_maybe_apply(engine, apply_, pd_no, sid, sname, remainder,
                                        r, observed, stats)
+
+        # 이 상품이 결국 공급처를 하나도 못 얻었는가 -- product_supplier_prices에 이번
+        # 실행으로 새로 쓸 행이 0개라는 뜻이다(기존 행이 있었다면 갱신도 안 됐다는 뜻).
+        # rows가 0이면(응답은 받았는데 pd_no 행 자체가 없음) 별도 집계로 뺀다 -- "회사명을
+        # 못 읽었다"와 "공급처 화면 구조 자체가 바뀌었다"는 원인이 다르다.
+        if not rows:
+            stats["products_no_rows_parsed"] += 1
+            stats["products_no_rows_parsed_samples"].append(pd_no)
+        elif not product_resolved:
+            stats["products_supplier_unresolved"] += 1
+            if row_kinds == {"excluded_stock_status"}:
+                reason = "excluded_stock_status"       # A -- 회사명 자리에 재고상태값
+            elif row_kinds == {"unmatched"}:
+                reason = "unmatched"                    # B -- suppliers에 없는 이름
+            elif row_kinds <= {"excluded_stock_status", "unmatched"}:
+                reason = "mixed"                        # C -- 위 둘이 섞임
+            else:
+                reason = "other"                        # 그 밖(예: 가격·상태 파싱 실패)
+            reasons = stats["products_supplier_unresolved_reason"]
+            reasons[reason] = reasons.get(reason, 0) + 1
+            # 2026-08-31 -- 20건 캡을 없앴다(위 stats 초기화 주석 참조).
+            names = sorted({(r["contact_blob"] or "").strip() for r in rows
+                            if r["contact_blob"]})[:5]
+            stats["products_supplier_unresolved_samples"].append({
+                "pd_no": pd_no, "rows": len(rows), "reason": reason, "names": names})
 
         done[key] = {"status": "applied" if apply_ else "parsed",
                      "rows": len(rows), "ts": datetime.now().isoformat()}
@@ -513,6 +571,31 @@ def _print_report(stats: dict, samples: list, apply_: bool, from_dir: bool = Fal
               f" 이름 {len(stats['supplier_unmatched'])}종 -- 상위 10:")
         for name, cnt in top:
             print(f"    {cnt:>4}건  {name}")
+    if stats.get("products_no_rows_parsed"):
+        nr_all = stats.get("products_no_rows_parsed_samples", [])
+        nr_shown = nr_all[:10]
+        tail = (f" 외 {len(nr_all) - len(nr_shown)}건(표본 {len(nr_shown)}/{len(nr_all)}건 표시)"
+                if len(nr_all) > len(nr_shown) else "")
+        print(f"  공급처 행 자체가 0개인 상품 {stats['products_no_rows_parsed']}건"
+              " -- 응답은 받았는데 pd_no 행을 하나도 못 뽑았습니다"
+              f"(공급처 화면 구조가 바뀌었을 수 있습니다) -- pd_no: {nr_shown}{tail}")
+    if stats.get("products_supplier_unresolved"):
+        reasons = stats["products_supplier_unresolved_reason"]
+        breakdown = " · ".join(f"{k}={v}" for k, v in sorted(reasons.items(), key=lambda kv: -kv[1]))
+        us_all = stats["products_supplier_unresolved_samples"]
+        us_shown = us_all[:20]
+        print(f"  판정 불가(상품 단위) -- 가격·재고상태는 파싱됐지만 이 상품의 행 «전부»가"
+              f" 공급처를 못 찾아 product_supplier_prices에 한 행도 못 쓴 상품"
+              f" {stats['products_supplier_unresolved']}건({breakdown})."
+              " suppliers에 가짜 업체를 만들지 않았고, 전 공급처 품절로도 단정하지"
+              f" 않았습니다 -- 사람이 확인해야 합니다(표본 {len(us_shown)}/{len(us_all)}건):")
+        for s in us_shown:
+            print(f"    pd_no={s['pd_no']} 행수={s['rows']} 이유={s['reason']}"
+                  f" 회사명원문={s['names']}")
+        if len(us_all) > len(us_shown):
+            print(f"    (나머지 {len(us_all) - len(us_shown)}건도 위 이유별 집계 수치에는"
+                  " 포함돼 있습니다 -- 전건은 stats['products_supplier_unresolved_samples']"
+                  "에 있습니다, 이 화면은 표본만 보여줍니다.)")
     print(f"판매중 공급처가 있는 상품 {stats['products_with_available_price']}건 · 전 공급처"
           f" 품절/단종이라 살 수 있는 곳이 없는 상품 {stats['products_no_available_supplier']}건")
     if stats["cheapest_is_unavailable"]:

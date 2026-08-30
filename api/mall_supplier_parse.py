@@ -355,6 +355,23 @@ def resolve_supplier(name_blob, suppliers: list):
     원문 정확 일치 -> 정규화 일치 -> 정규화 접두 일치(긴 이름부터 -- 짧은 이름이
     먼저 걸려 잘못 잘리는 것을 막는다). 활성 공급처를 우선하되 없으면 중지 상태도 쓴다
     (중지된 곳으로만 매칭되면 사람이 검토해야 한다 -- 호출부가 match_kind로 안다).
+
+    ⚠ **sid가 None이어도 그 행의 가격·재고상태(o_price·state)는 멀쩡히 파싱돼 있다**
+    (2026-08-30 실측 -- 추천 후보 2,707건 중 47건이 product_supplier_prices에 행이
+    0개였던 사고의 근본 원인 조사). 이 함수는 "회사를 못 찾았다"만 판정할 뿐 그
+    데이터를 버리지 않는다 -- 버리는 지점은 호출부다: `product_supplier_prices.
+    supplier_id`가 NOT NULL FK라서(db 스키마), sid가 None인 행은 애초에 그 표에 쓸
+    수 없다(가짜 supplier_id를 만들어 끼워 넣지 않는다 -- CANON "suppliers 표에 가짜
+    업체를 만들지 마라"). 그래서 tools/mall_supplier_fetch.py의 run()이 이 함수가
+    돌려준 kind별로 **제품 단위 결과**(이 상품이 결국 공급처를 하나도 못 얻었는가)를
+    따로 집계해 보고한다 -- DB에 못 쓴다고 그 사실 자체가 조용히 사라지면 안 된다.
+    tools/mall_daily_sync.py 4단계는 그 결과(product_supplier_prices 행이 0개)를
+    "전 공급처 품절"과 **다르게** 본다 -- 0개는 "확인해 보니 다 품절"이 아니라 "아직
+    아무것도 확인 못 함"이라 자동으로 추천 후보에서 빼면 안 된다(A-115가 이미 같은
+    논리로 mall_rank NULL 행을 "확인된 품절"에서 뺐다 -- 모르는 상태를 품절로 단정하지
+    않는다는 원칙의 연장). unmatched로 남는 이름(예: "RSystem")을 자동으로
+    `suppliers`에 등록하지도 않는다 -- 업체 등록은 사람이 `POST /api/admin/suppliers`
+    (api/admin_suppliers.py)로 하는 일이다, 이 파서·수집기가 대신 판단하지 않는다.
     """
     blob = (name_blob or "").strip()
     if not blob:
