@@ -206,6 +206,7 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
             <span style="font-size:13px;font-weight:700;color:#8a8578;">총 견적 금액 <span style="font-size:11px;">(부가세 포함)</span></span>
             <span style="font-size:24px;font-weight:900;color:#17171b;" data-bind="s3_total">—<span style="font-size:13px;color:#8a8578;">원</span></span>
           </div>
+          <div id="s3-cart-block-banner" style="display:none;margin-bottom:10px;padding:10px 12px;border-radius:10px;font-size:12.5px;line-height:1.6;font-weight:700;background:#fbe9e7;color:#b04a3a;"></div>
           <div style="display:flex;flex-direction:column;gap:10px;">
             <button style="width:100%;padding:15px;border:none;background:#2b5fd9;border-radius:12px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;" data-go="s4">장바구니 담기</button>
             <button style="width:100%;padding:13px;border:1.5px solid #ddd8ce;background:#fff;border-radius:12px;font-size:14px;font-weight:800;color:#3a3a40;cursor:pointer;font-family:inherit;" data-go="s2">제안서로 돌아가기</button>
@@ -239,7 +240,21 @@ function close(){modal.style.display='none';}
 document.getElementById('s3-close').addEventListener('click',close);
 document.getElementById('s3-scrim').addEventListener('click',close);
 document.querySelectorAll('[data-swap]').forEach(function(btn){btn.addEventListener('click',function(){var row=btn.parentElement;var nm=row.querySelector('div[style*="font-size:16px"][style*="font-weight:800"]');open(nm?nm.textContent.trim():'부품');});});
-document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(){var t=b.getAttribute('data-go');window.location.href=(t==='s4'?'s4-cart.html':'s2-result.html');});});
+/* ★ 장바구니 게이트(2026-08-30, 사장님 결정 "S3 에도 같은 게이트를 붙인다") — S2 커밋
+   4714746 의 짝이다. S2 게이트는 s2-result.html «안»의 버튼만 잠갔고 이 파일엔 이
+   검사가 전무해서, 396행 부근 renderParts() 가 그리는 「품절 — 대안으로 교체 필요」
+   배지를 보고도 이 버튼을 누르면 그대로 s4-cart.html 로 직행했다(2026-08-30 조사자
+   실측 — disabled 바인딩 0건). S2 와 같은 결로 고친다: 버튼 «개수»가 아니라
+   «s4 로의 이동»을 막는다 — window.s3CartBlocked 하나를 이 이동 핸들러가 읽는다.
+   이 화면은 「장바구니 담기」가 지금은 하나(data-go="s4")뿐이지만, S2 가 겪은 함정
+   (같은 문구의 버튼이 늘어도 하나만 잠가 나머지가 샌 사고)을 되풀이하지 않도록
+   버튼을 다시 찾아 개별로 막지 않고 이 이동 자체를 막는 방식을 그대로 따른다.
+   기본값 false — LIVE 스크립트(아래 두 번째 <script>)가 아직 안 돌았거나 실패해도
+   막지 않는다(fail-open). data-go="s2"(제안서로 돌아가기)는 절대 막지 않는다 —
+   그리고 이 파일 자체가 «부품 변경 화면»이라 각 행의 [변경]·자연어 교체 요청은
+   이 게이트와 무관하게 항상 열려 있다(고객의 유일한 다음 걸음). */
+window.s3CartBlocked=false;
+document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(){var t=b.getAttribute('data-go');if(t==='s4'&&window.s3CartBlocked)return;window.location.href=(t==='s4'?'s4-cart.html':'s2-result.html');});});
 /* 「자연어 교체 요청」 버튼의 실제 동작은 아래 LIVE 스크립트(2026-08-24 감사 §4-3
    해소)가 담당한다 — 여기서 목업 시절의 가짜 성공 토스트를 걸지 않는다. 예전에는
    이 자리에 그 가짜 핸들러가 있었는데, 이 IIFE가 문서 파싱 시점에 먼저 실행돼
@@ -380,6 +395,12 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
   if(rfi){rfi.disabled=true;rfi.value='';
    rfi.placeholder='구성 정보를 표시할 수 없어 교체 요청을 받지 않습니다.';}
   var md=document.getElementById('s3-modal');if(md)md.style.display='none';
+  /* fail-open(2026-08-30 사장님 결정 "판정 자체를 못 하면 막지 마라") — 이전 로드에서
+     담을 수 없는 부품이 있어 걸어 둔 잠금이 있어도, 지금은 그 판정 자체를 다시 확인할
+     수 없는 상태이므로 막아두지 않는다. s3CartBtns/s3LockCart/s3UnlockCart 는 아래
+     renderParts() 보다 앞서 정의돼 있다(함수 선언은 끌어올려진다 — 같은 IIFE 스코프). */
+  var cbnr0=document.getElementById('s3-cart-block-banner');if(cbnr0){cbnr0.style.display='none';cbnr0.textContent='';}
+  s3UnlockCart();
   console.warn('[s3] offline - '+title+' :',why);
  }
 
@@ -394,11 +415,38 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
  if(!Q.sets[tier]){s3Offline('off','구성 없음',
   '상담에서 받은 조건으로는 조립할 수 있는 구성이 없습니다. 예산 또는 용도 조건을 바꿔 다시 상담하세요.');return;}
 
+ /* 장바구니 게이트가 쓰는 셋 — 위 232행 부근(첫 <script>)의 window.s3CartBlocked 검사와
+    짝이다. 「버튼을 찾는」 부분은 여기 한 곳뿐이고(document 전체 검색이라 이 화면에
+    같은 문구 버튼이 늘어도 자동으로 잡힌다), 실제 방어선은 이 disabled 세팅이 아니라
+    그 window.s3CartBlocked 검사다 — 여기서 그 플래그를 같이 세팅하므로 서로 어긋나지
+    않는다(s2-result.html s2CartBtns/s2LockCart/s2UnlockCart 와 같은 결). */
+ function s3CartBtns(){
+  var out=[];
+  Array.prototype.forEach.call(document.querySelectorAll('button'),function(b){
+   if((b.textContent||'').trim().indexOf('장바구니 담기')===0)out.push(b);
+  });
+  return out;
+ }
+ function s3LockCart(reason){
+  window.s3CartBlocked=true;
+  s3CartBtns().forEach(function(b){
+   b.disabled=true;b.style.opacity='.45';b.style.cursor='not-allowed';b.title=reason;
+  });
+ }
+ function s3UnlockCart(){
+  window.s3CartBlocked=false;
+  s3CartBtns().forEach(function(b){
+   b.disabled=false;b.style.opacity='';b.style.cursor='';b.title='';
+  });
+ }
+
  function renderParts(){
   if(!partsBox)return;
   var h='';
+  var badParts=[];   // 판단과 표시가 같은 값(p.unavailable, api/swap.py :250 서버 실측)에서 나온다
   C.current.forEach(function(p){
    var slot=p.slot,sl=C.slots[slot]||{alternatives:[]},n=sl.alternatives.length;
+   if(p.unavailable)badParts.push(PKO[slot]||slot);
    var badge=p.unavailable
     ?'<span style="background:#fbe9e7;color:#b04a3a;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">품절 — 대안으로 교체 필요</span>'
     :(n?'<span style="background:var(--success-container, #e9f6ef);color:var(--success-dark, #1c7a4d);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">안전 대안 '+n+'개</span>'
@@ -415,6 +463,19 @@ document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('c
   partsBox.innerHTML=h;
   partsBox.querySelectorAll('[data-live-swap]').forEach(function(b){b.addEventListener('click',function(){openLive(b.getAttribute('data-live-swap'));});});
   totalEls.forEach(function(el){el.innerHTML=C.total.toLocaleString()+'<span style="font-size:13px;color:#8a8578;">원</span>';});
+  /* 담을 수 없는 부품이 낀 채로 결제 화면까지 넘어가지 않게 막는다. 이 화면은
+     «부품 변경 화면 자체»라 여기서 막는 것은 [장바구니 담기]뿐이다 — 위 행의
+     [변경]·자연어 교체 요청은 이 판단과 무관하게 항상 열려 있다. */
+  var cbnr=document.getElementById('s3-cart-block-banner');
+  if(badParts.length){
+   if(cbnr){cbnr.style.display='block';
+    cbnr.textContent='이 구성 중 '+badParts.length+'개 부품을 지금은 담을 수 없습니다 — '
+     +badParts.join(' · ')+'. 위 목록의 [변경]에서 다른 부품으로 바꿔 주세요.';}
+   s3LockCart('지금 담을 수 없는 부품이 있습니다 — 위 목록의 [변경]에서 다른 부품으로 바꿔 주세요');
+  }else{
+   if(cbnr){cbnr.style.display='none';cbnr.textContent='';}
+   s3UnlockCart();
+  }
  }
  function renderCompat(){
   var cm=C.compat;if(!compatCard)return;

@@ -303,7 +303,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <span style="width:46px;height:46px;border-radius:13px;background:var(--success, #2f9e6d);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Outlined';font-size:26px;color:#fff;">shield</span>
 <div>
 <h2 id="s2-fit-title" style="margin:0;font-size:24px;font-weight:900;color:var(--success-deep, #0f5132);">호환성 검사 결과</h2>
-<p id="s2-fit-sub" style="margin:4px 0 0;font-size:14px;color:var(--success-muted, #3d7a5c);">조립이 되는 조합인지, 규칙(엔진)이 실제 재고에서 확인합니다.</p>
+<!-- LIVE 로드 전 정적 문구 — 아래 s2apply()의 같은 문구(2026-08-30 "실제 재고에서" 제거 사유 주석)와 한 글자씩 맞춘다 -->
+<p id="s2-fit-sub" style="margin:4px 0 0;font-size:14px;color:var(--success-muted, #3d7a5c);">조립이 되는 조합인지, 호환 규칙(엔진)이 확인합니다.</p>
 </div>
 </div>
 <span style="background:var(--success, #2f9e6d);color:#fff;font-size:13px;font-weight:800;padding:7px 15px;border-radius:999px;">핵심 1</span>
@@ -1017,12 +1018,22 @@ document.querySelectorAll('.s2p-add').forEach(function(b){
   /* sub 문구는 원래 expert 모드 "부품을 다 안 골라서"만 가정했다 — "나머지를 고르면
      마저 확인합니다"는 재사용이 원인일 때는 사실이 아니다(더 고를 나머지가 없다,
      이미 재사용하기로 정했다). hasReuse일 때만 다른 문구를 쓰고, 아니면 기존
-     문구를 한 글자도 바꾸지 않는다(customer-audit-2026-08-24 §1-1 — 회귀 없음). */
+     문구를 한 글자도 바꾸지 않는다(customer-audit-2026-08-24 §1-1 — 회귀 없음).
+     ★ 마지막 분기(더 고를 것도 재사용도 없을 때)는 2026-08-30까지 "규칙(엔진)이
+     «실제 재고에서» N가지를 모두 확인했습니다"였다 — 거짓이었다. s.compat.checks
+     가 재는 것은 compat_rules 9종(socket·mem·gpu_len·case_board·cooler_socket·
+     cooler_tdp·cooler_height·radiator·power)이고 전부 «물리·전기 적합성»이지
+     재고 유무가 아니다(재고는 S2 재검증 REVAL·S3 swap.py unavailable이 따로
+     확인한다 — 이 문장과는 다른 판정). "실제 재고에서"를 지우고 방향을 "호환
+     규칙(엔진)이 N가지를 확인했습니다"로 바꿔 재는 대상과 말하는 대상을 같게
+     맞춘다(사장님 결정, 재는 것이 곧 말하는 것). 같은 파일의 위 ttl·아래 bdg
+     문구("호환성 N종 …")는 같은 s.compat.checks를 가리켜 이미 사실과 맞으므로
+     손대지 않았다. */
   if(sub)sub.textContent=nP
    ?(hasReuse
      ?(s.reused.map(function(r){return r.label;}).join('·')+' — 쓰시던 부품이라 '+nC+'가지 중 '+nP+'가지는 확인할 수 없습니다.')
      :'부품을 다 고르지 않아 '+nC+'가지 중 '+nP+'가지는 아직 확인할 수 없습니다 — 나머지를 고르면 마저 확인합니다.')
-   :'조립이 되는 조합인지, 규칙(엔진)이 실제 재고에서 '+nC+'가지를 모두 확인했습니다.';
+   :'조립이 되는 조합인지, 호환 규칙(엔진)이 '+nC+'가지를 모두 확인했습니다.';
   if(bdg)bdg.textContent=okAll?('호환성 '+nC+'종 전부 통과')
                           :nF?('호환성 '+nC+'종 중 '+nF+'종 불통과')
                              :('호환성 '+nC+'종 중 '+nP+'종 확인 보류');
