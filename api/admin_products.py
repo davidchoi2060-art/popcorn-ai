@@ -71,8 +71,15 @@ _STATUS_CASE = """
          ELSE 'review' END
 """
 
+# 상품명 검색은 **띄어쓰기를 무시한다**(요청 35 · 2026-08-31). 원천이 같은 제품을
+# "RTX 4060Ti" · "RTX4060Ti" · "RTX 4060 Ti" 로 제각각 적어 와서, 운영자가 본 대로
+# 치면 안 나온다. 양쪽에서 공백을 지우고 비교한다 — 값을 고치지 않고 «비교만» 느슨하게
+# 한다(원천 표기를 우리가 바꾸면 마켓에 나가는 이름이 달라진다).
+# ⚠ 인덱스를 못 타는 비교라 sku·maker 는 기존 방식을 남겨 둔다(정확히 치는 값이고,
+#   그쪽까지 공백 제거로 바꾸면 전 컬럼이 순차 검색이 된다).
 _WHERE = """
-    WHERE (:q = '' OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%'
+    WHERE (:q = '' OR REPLACE(p.product_name, ' ', '') ILIKE '%%' || REPLACE(:q, ' ', '') || '%%'
+           OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%'
            OR p.maker ILIKE '%%' || :q || '%%')
       AND (:part_type = '' OR p.part_type = :part_type)
       AND (:maker = '' OR p.maker = :maker)
@@ -373,7 +380,7 @@ PRICE_HISTORY_FIELD = {"sale_price": "sale", "purchase_price": "purchase"}
 
 
 @router.get("/product-meta")
-def product_meta():
+def product_meta(part_type: str = ""):
     """등록·수정 화면이 쓰는 선택지 — 화면에 하드코딩하면 서버가 아는 것과 갈린다.
 
     실제로 등록 화면의 분류 셀렉트에 3종만 있어서 파워·케이스·메모리를 등록할 수 없었다
@@ -385,10 +392,16 @@ def product_meta():
     # 목록은 지금까지 '현재 페이지에 로드된 행'에서 분류·제조사를 뽑아 썼다.
     # 서버 페이지네이션이라 한 페이지에 없는 값은 필터에 아예 안 나왔고,
     # 그래서 상세에서 고른 분류가 목록 필터엔 없는 일이 생겼다.
+    # 제조사 목록은 **고른 분류 안에서만** 낸다(요청 36 · 2026-08-31).
+    # 메인보드를 골라도 전 제조사가 나와, 운영자가 고른 제조사에 그 분류 상품이
+    # 하나도 없는 조합을 만들 수 있었다 — 결과 0건을 보고 "상품이 없다"고 읽는다.
+    # `part_type` 이 없으면 전체다(등록·수정 화면은 분류가 정해지기 «전»에도 부른다).
+    pt = (part_type or "").strip()
     with engine.connect() as conn:
         makers = [r[0] for r in conn.execute(text(
             "SELECT maker FROM products WHERE maker IS NOT NULL AND maker <> ''"
-            " GROUP BY maker ORDER BY count(*) DESC, maker"))]
+            "   AND (:pt = '' OR part_type = :pt)"
+            " GROUP BY maker ORDER BY count(*) DESC, maker"), {"pt": pt})]
         used = [r[0] for r in conn.execute(text(
             "SELECT part_type FROM products WHERE part_type IS NOT NULL"
             " GROUP BY part_type ORDER BY count(*) DESC"))]

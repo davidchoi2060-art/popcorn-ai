@@ -239,6 +239,49 @@ certbot이 systemd 타이머로 자동 갱신한다. 80의 `/.well-known/acme-ch
 
 ---
 
+## 적재 원본 보관 — `POPCORN_ARCHIVE_DIR` (요청 39 · 2026-08-31)
+
+상품 일괄 등록으로 **실제 적재된** 파일을 나중에 다시 내려받을 수 있게 보관한다.
+확인 전 스테이징(`POPCORN_UPLOAD_DIR`, 1시간 뒤 자동 청소)과 **다른 자리**다 —
+같은 자리에 두면 청소가 보관분까지 지운다.
+
+### 설정하지 않으면 재부팅에 날아간다
+
+기본값은 OS 임시 폴더(`/tmp/popcorn-import-archive`)이고, `/tmp`는 배포 서버 재부팅 시
+비워질 수 있다. **영속 경로를 지정해야 보관이 보관답게 된다.**
+
+```bash
+sudo -u popcorn mkdir -p /srv/popcorn-uploads/archive
+sudo nano /etc/popcorn-ai.env      # 아래 한 줄 추가
+```
+
+```
+POPCORN_ARCHIVE_DIR=/srv/popcorn-uploads/archive
+```
+
+```bash
+sudo systemctl restart popcorn-api
+```
+
+리포 폴더(`/srv/popcorn-ai/...`) 안에 두지 않는다 — 앱 계정은 리포에 쓸 수 없고
+써서도 안 된다(working tree drift · 슬라이스 81 실사고).
+
+### 용량
+
+적재 1회당 약 28MB(마스터 12.6 + 사양 매핑 3.6 + 사양 값 11.8). 자동 삭제는 없다 —
+보관이 목적이라 TTL을 걸지 않았다. 늘어나면 오래된 배치부터 손으로 지운다:
+
+```bash
+ls -lh /srv/popcorn-uploads/archive
+du -sh /srv/popcorn-uploads/archive
+```
+
+### 확인
+
+`GET /api/admin/catalog-import/jobs/<배치번호>/files` 가 보관 목록을 준다(owner 전용).
+2026-08-31 이전 배치는 파일이 없다 — 그때는 적재 후 스테이징을 지우기만 했다.
+없는 것을 있는 척하지 않고 빈 목록과 그 사유를 함께 돌려준다.
+
 ## 백업 — 미룰 수 없는 항목
 
 직원이 검수 확정·가격 승인·입고를 시작하면 **그 순간부터 원장이 쌓인다.** 되돌림도 역방향

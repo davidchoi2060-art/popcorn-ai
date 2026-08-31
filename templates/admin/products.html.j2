@@ -394,9 +394,20 @@ a.pp-btn-line{color:var(--on)}
   /* ══════════════════════ 메타(선택지) — 서버가 준다 ══════════════════════ */
   var META = null, SPEC_FIELDS = null, SUPPLIERS = null;
 
-  function loadMeta(){
-    return fetch(API + "/product-meta").then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(m){ if(m){ META = m; fillFilterSelects(); fillBulkStatusSelect(); } })
+  // 분류를 고르면 **그 분류의 제조사만** 받는다(요청 36 · 2026-08-31). 전에는 항상
+  // 전체를 받아, 메인보드를 고르고 메인보드를 안 파는 제조사를 고를 수 있었다 —
+  // 결과 0건이 나오고 운영자는 "상품이 없다"고 읽는다.
+  // 분류 선택지(used_parts)는 «전체» 기준을 유지한다 — 좁힌 목록으로 다시 그리면
+  // 지금 고른 분류만 남아 다른 분류로 못 옮긴다.
+  function loadMeta(pt){
+    var url = API + "/product-meta" + (pt ? "?part_type=" + encodeURIComponent(pt) : "");
+    return fetch(url).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(m){
+        if(!m) return;
+        if(META && pt) { META.makers = m.makers; }   // 제조사만 갈아 끼운다
+        else { META = m; }
+        fillFilterSelects(); fillBulkStatusSelect();
+      })
       .catch(function(){});
   }
   function loadSpecFields(){
@@ -413,8 +424,14 @@ a.pp-btn-line{color:var(--on)}
     var cats = (META && META.used_parts) || [];
     var mfrs = (META && META.makers) || [];
     var selCat = document.getElementById("fcat");
-    if(selCat) selCat.innerHTML = '<option value="all">분류 전체 (' + cats.length + '종)</option>'
-      + cats.map(function(c){ return '<option value="' + esc(c.part_type) + '">' + esc(c.label) + '</option>'; }).join("");
+    if(selCat){
+      // ⚠ innerHTML 을 다시 쓰면 **고른 값이 풀린다.** 제조사만 갈아 끼우려고
+      //   loadMeta 를 다시 부르는 경로(요청 36)가 생겨서, 되그린 뒤 선택을 돌려놓는다.
+      var keep = selCat.value;
+      selCat.innerHTML = '<option value="all">분류 전체 (' + cats.length + '종)</option>'
+        + cats.map(function(c){ return '<option value="' + esc(c.part_type) + '">' + esc(c.label) + '</option>'; }).join("");
+      if(keep) selCat.value = keep;
+    }
     var dl = document.getElementById("fmfrList");
     if(dl) dl.innerHTML = mfrs.map(function(m){ return '<option value="' + esc(m) + '">'; }).join("");
   }
@@ -1345,7 +1362,20 @@ a.pp-btn-line{color:var(--on)}
     clearTimeout(typing);
     typing = setTimeout(function(){ PAGE=1; load(); }, 300);
   });
-  document.getElementById("fcat").addEventListener("change", function(e){ fcat=e.target.value; PAGE=1; load(); });
+  document.getElementById("fcat").addEventListener("change", function(e){
+    fcat=e.target.value; PAGE=1;
+    // 분류가 바뀌면 제조사 선택지를 그 분류 것으로 다시 받는다(요청 36).
+    // 이미 고른 제조사가 새 분류에 없으면 결과가 0건이 되므로 함께 푼다 —
+    // 화면이 "그 제조사 상품이 없다"고 말하는 대신 필터를 정직하게 되돌린다.
+    var pt = (fcat==="all" ? "" : fcat);
+    loadMeta(pt).then(function(){
+      var mf = document.getElementById("fmfr");
+      if(mf && fmfr!=="all" && (!META || (META.makers||[]).indexOf(fmfr)<0)){
+        mf.value=""; fmfr="all";
+      }
+      load();
+    });
+  });
   document.getElementById("fmfr").addEventListener("input", function(e){
     var v=e.target.value.trim();
     fmfr = v===""? "all" : v;

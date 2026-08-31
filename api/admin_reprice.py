@@ -99,13 +99,19 @@ def _classify(rows, fee, margin, mmap=None):
     """
     mmap = mmap or {}
     up, down, same, locked, outlier, negative = [], [], 0, [], [], []
-    used = {}          # 어떤 마진이 몇 건에 쓰였는가
+    used = {}          # 어떤 마진이 몇 건에 쓰였는가 — 모집단은 target 과 «같아야» 한다
+
+    def _count(m):
+        used[m] = used.get(m, 0) + 1
     for r in rows:
         cur = r["sale_price"]
         m = mmap.get(r["category_id"], margin)
         # **적용한 그 값을 센다.** 따로 한 번 더 계산하면 계산과 보고가 갈라진다 —
         # 실제로 전역만 쓰면서 "분류별로 썼다"고 보고할 수 있었다(사보타주로 확인).
-        used[m] = used.get(m, 0) + 1
+        # ⚠ 세는 «시점»은 행마다가 아니라 **target 에 드는 행마다**다(2026-08-31).
+        #    전에는 여기서 무조건 세어 sum(used) == len(rows) 였는데, target 은
+        #    up+down+same+locked 라 «잠금+무변동» 행이 어느 통에도 안 들어가 하나가 남았다
+        #    (103332 · 7186 대 7187). 세는 값은 여전히 «적용한 그 m» 이라 위 계약은 그대로다.
         new = sale_from_purchase(r["purchase_price"], fee, m)
         purchase = float(r["purchase_price"])
         item = {"product_code": r["product_code"], "name": r["product_name"],
@@ -118,8 +124,10 @@ def _classify(rows, fee, margin, mmap=None):
         # 잠긴 것은 어느 통에도 넣지 않는다 — 바꾸지 않을 것이므로 변동에 세면 거짓말이다
         if "sale_price" in (r["locked_fields"] or []):
             if new != cur:
+                _count(m)          # locked 는 target 에 든다 — 세어야 합이 맞는다
                 locked.append(item)
             continue
+        _count(m)
         if cur is not None and cur < purchase:
             negative.append(item)
         if cur is not None and cur >= purchase * OUTLIER_X:

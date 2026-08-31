@@ -449,6 +449,11 @@ input{font-family:var(--rv-mono)}
   gap:8px;background:var(--rv-panel);flex-wrap:wrap}
 .pc-dw-foot .nt{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);flex:1;min-width:160px}
 .pc-dw-foot .nt.warn{color:var(--rv-red)}
+/* 하위 분류 추가 — 서랍 푸터(2026-08-31). 삭제(빨강)·저장(강조)과 구분되게 중립 톤을
+   쓴다: 만드는 동작이라 위험 색을 주면 안 되고, 저장처럼 주된 동작도 아니다. */
+.pc-btn-addsub{font:500 11.5px/1 var(--rv-font);background:var(--rv-card);border-radius:5px;padding:8px 11px;
+  cursor:pointer;color:var(--rv-ink-soft);border:1px solid rgba(0,0,0,.16)}
+.pc-btn-addsub.dis{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
 .pc-btn-del{font:500 11.5px/1 var(--rv-font);background:var(--rv-card);border-radius:5px;padding:8px 11px;cursor:pointer;
   color:var(--rv-red);border:1px solid oklch(0.52 0.16 30 / .33)}
 .pc-btn-del.dis{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed}
@@ -848,22 +853,18 @@ input{font-family:var(--rv-mono)}
   function renderAddBtn() {
     var btn = $('pcAddTop');
     if (!btn) return;
-    var sel = (S.drawerOpen && S.selId != null) ? nodeById(S.selId) : null;
     var own = owner();
-    if (sel) {
-      btn.textContent = '+ 하위 분류 추가 — ' + truncName(sel.name, 16);
-      btn.setAttribute('data-action', 'add-sub');
-    } else {
-      btn.textContent = '+ 대분류 추가';
-      btn.setAttribute('data-action', 'add-top');
-    }
+    // 이 버튼은 **대분류 전용**이다(2026-08-31). 하위 분류는 서랍 푸터의
+    // pcAddSubBtn 이 맡는다 — 라벨만 바꾸던 방식은 서랍에 가려 못 눌렀다
+    // (renderDrawer 의 「+ 하위 분류 추가」 주석 참고).
+    btn.textContent = '+ 대분류 추가';
+    btn.setAttribute('data-action', 'add-top');
     // 결함 3과 같은 이유(disAttrs() 위 주석 참고) — 진짜 disabled + title로 이유를
     // 밝힌다. 권한 판정은 이 화면이 이미 쓰는 owner() 그대로다(다른 기준을 새로
     // 쓰지 않는다).
     btn.classList.toggle('dis', !own);
     btn.disabled = !own;
     if (!own) btn.title = permText();
-    else if (sel) btn.title = sel.name;
     else btn.removeAttribute('title');
   }
 
@@ -1033,8 +1034,19 @@ input{font-family:var(--rv-mono)}
     var saveDis = !(own && dirty);
     var saveTitle = !own ? permText() : (!dirty ? '변경 사항이 없습니다' : '');
     var revTitle = dirty ? '' : '되돌릴 변경이 없습니다';
+    // 「+ 하위 분류 추가」는 **서랍 안**에 둔다(2026-08-31 사장님 확정 — (가)안 개정).
+    // 트리 하단 버튼이 라벨만 바꾸던 (가)안(2026-08-14)은 «한 번도 동작한 적이 없다»:
+    // 부모를 고르면 서랍이 열리는데 그 서랍과 백드롭이 버튼을 통째로 덮어(실측 —
+    // 버튼 x=233..405, 백드롭 x=212..961) 클릭이 닿지 않았다. 콘솔도 조용하고
+    // 라벨은 제대로 바뀌어서 코드만 읽어서는 안 보였다.
+    // 여기가 맞는 자리인 이유: 부모를 고른 상태에서만 열리고, 서랍 머리에 그 부모
+    // 이름이 이미 떠 있어 «어느 분류 아래»가 드러난다((가)안의 요구가 그것이었다).
+    var addSubDis = !own;
     html += '<div class="pc-dw-foot">' +
       '<span class="nt' + (own ? '' : ' warn') + '" id="pcFootNote">' + esc(footNoteText) + '</span>' +
+      '<button type="button" class="pc-btn-addsub' + (own ? '' : ' dis') + '" id="pcAddSubBtn"' +
+        disAttrs(addSubDis, permText()) + ' data-action="add-sub"' +
+        ' title="' + esc(d.name) + ' 아래에 소분류를 만듭니다">+ 하위 분류 추가</button>' +
       '<button type="button" class="pc-btn-del' + (own ? '' : ' dis') + '"' + disAttrs(delDis, permText()) + ' data-action="delete-node">삭제</button>' +
       '<button type="button" class="pc-btn-revert' + (dirty ? '' : ' dis') + '" id="pcRevertBtn"' + disAttrs(revDis, revTitle) + ' data-action="revert-draft">되돌리기</button>' +
       '<button type="button" class="pc-btn-save' + (own && dirty ? '' : ' dis') + '" id="pcSaveBtn"' + disAttrs(saveDis, saveTitle) + ' data-action="save-draft">저장</button>' +

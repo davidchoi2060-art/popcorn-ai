@@ -169,6 +169,16 @@
 .ci-dw-tab .num{font-family:var(--font-num)}
 .ci-dw-body{flex:1;min-height:0;overflow:auto;padding:13px 18px;display:flex;flex-direction:column;gap:8px}
 .ci-dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:var(--container);font:400 10.5px/1.6 var(--font);color:var(--rv-muted)}
+/* 적재 원본 내려받기(요청 39). 배치 상세 안이라 «이 배치의» 파일임이 분명하다. */
+.ci-dl{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:7px}
+.ci-dl-lb{font-weight:700;color:var(--rv-ink);font-size:10.5px}
+.ci-dl-btn{display:inline-flex;align-items:center;gap:5px;text-decoration:none;
+  font:500 11px/1 var(--font);color:var(--rv-ink);background:var(--card);
+  border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:6px 10px}
+.ci-dl-btn:hover{border-color:rgba(0,0,0,.32)}
+.ci-dl-btn .sz{color:var(--rv-muted);font-size:10px}
+.ci-dl-none{color:var(--rv-muted);margin-bottom:7px}
+.ci-dw-note{color:var(--rv-muted)}
 .ci-rej{border:1px solid rgba(0,0,0,.11);border-left:3px solid var(--rv-red);border-radius:6px;padding:9px 12px;background:#faf7f0}
 .ci-rej .row1{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
 .ci-rej .ln{font:600 10px/1.3 var(--font-num);color:var(--rv-faint)}
@@ -253,7 +263,10 @@
     lastImpact: null, lastSkipTotal: 0,
     jobs: null, jobsErr: null,
     drawerJobId: null, drawerListMeta: null, drawerData: null, drawerErr: null,
-    drawerLoading: false, drawerTab: null
+    drawerLoading: false, drawerTab: null,
+    // 적재 원본 보관 목록(요청 39 · 2026-08-31). owner 가 아니면 서버가 403을 주므로
+    // 그때는 null 로 두고 단추를 아예 그리지 않는다 — 눌러도 안 되는 단추를 두지 않는다.
+    drawerFiles: null
   };
   var PART_LABELS = {};
 
@@ -567,8 +580,13 @@
   function openDrawer(jobId, listMeta) {
     S.drawerJobId = jobId; S.drawerListMeta = listMeta || null;
     S.drawerData = null; S.drawerErr = null; S.drawerLoading = true; S.drawerTab = null;
+    S.drawerFiles = null;
     $('ciBackdrop').hidden = false; $('ciDrawer').hidden = false;
     renderJobs(); renderDrawer();
+    // 보관 목록은 **곁다리 조회**다 — 실패해도 서랍 본문을 막지 않는다(owner 아니면 403).
+    apiGet('/api/admin/catalog-import/jobs/' + jobId + '/files').then(function (f) {
+      if (S.drawerJobId === jobId) { S.drawerFiles = f; renderDrawer(); }
+    }).catch(function () { /* 권한 없음·미보관 — 단추를 안 그린다 */ });
     apiGet('/api/admin/import-jobs/' + jobId + '/rows?limit=500').then(function (j) {
       S.drawerLoading = false; S.drawerData = j;
       var errs = (j.rows || []).filter(function (r) { return r.kind === 'error'; });
@@ -635,7 +653,32 @@
       }
     }
     $('ciDwBody').innerHTML = bodyHtml;
-    $('ciDwFoot').textContent = d.note || '';
+
+    // ── 적재 원본 내려받기 (요청 39 · 2026-08-31) ──────────────────────────
+    //   2026-08-31 이전 배치는 파일이 없다 — 그때는 적재 후 스테이징을 지우기만 했다.
+    //   **없는 것을 있는 척하지 않는다**: 단추를 안 그리고 그 사유를 서버 문장으로 적는다.
+    var f = S.drawerFiles, dlHtml = '';
+    if (f && (f.items || []).length) {
+      dlHtml = '<div class="ci-dl"><span class="ci-dl-lb">적재한 원본</span>'
+        + f.items.map(function (it) {
+            return '<a class="ci-dl-btn" download href="/api/admin/catalog-import/jobs/'
+              + S.drawerJobId + '/files/' + encodeURIComponent(it.kind) + '">'
+              + esc(it.label) + ' <span class="sz">' + fmtBytes(it.bytes) + '</span></a>';
+          }).join('')
+        + '</div>';
+    } else if (f && f.note) {
+      dlHtml = '<div class="ci-dl ci-dl-none">' + esc(f.note) + '</div>';
+    }
+    $('ciDwFoot').innerHTML = dlHtml
+      + (d.note ? '<div class="ci-dw-note">' + esc(d.note) + '</div>' : '');
+  }
+
+  /* 바이트를 사람이 읽는 크기로 — 내려받기 전에 «얼마나 큰지» 알려준다(28MB 짜리가 있다). */
+  function fmtBytes(n) {
+    if (typeof n !== 'number' || n < 0) return '';
+    if (n < 1024) return n + 'B';
+    if (n < 1048576) return (n / 1024).toFixed(0) + 'KB';
+    return (n / 1048576).toFixed(1) + 'MB';
   }
 
   // ── 이벤트 위임 (data-action) ────────────────────────────────────────

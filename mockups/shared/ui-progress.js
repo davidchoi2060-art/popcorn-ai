@@ -185,6 +185,123 @@
     }
   }
 
+  /* ── 비밀번호 재확인(reauth) ──────────────────────────────────────────────
+   *
+   * 기기 기억(「이 기기에서 로그인 유지」)으로 만든 세션은 `password_verified=false`라
+   * OWNER_WRITE_PREFIXES 쓰기에서 미들웨어가 401 + `error:"reauth_required"`로 막는다
+   * (api/auth.py · 2026-08-15 사장님 지시 "민감한 일엔 다시 묻는다").
+   *
+   * **서버만 지어져 있고 화면이 없었다**(2026-08-31 실측: reauth를 처리하는 화면 0곳).
+   * 그래서 사장님은 "비밀번호 확인이 필요합니다"만 보고 확인할 방법이 없었다 —
+   * 요청 승인·운영자 관리·일괄 등록 등 **11개 경로가 전부 같은 상태**였다.
+   *
+   * 화면마다 붙이지 않고 여기 한 곳에 둔다 — 이 래퍼가 이미 전 화면의 쓰기를 감싼다
+   * (§단일 원천: 두 벌로 만들면 화면마다 다른 문장을 말한다).
+   *
+   * ⚠ 비밀번호는 **서버로 보내는 것 외에 아무 데도 두지 않는다** — 변수에 담아 두거나
+   *   로그·배너에 싣지 않는다. 창이 닫히면 그 값은 사라진다.
+   */
+  var reauthPending = null;      // 창을 동시에 둘 띄우지 않는다
+
+  function isReauth(j) {
+    var d = j && j.detail;
+    return !!(d && typeof d === "object" && d.error === "reauth_required");
+  }
+
+  function askPassword(msg) {
+    return new Promise(function (resolve) {
+      var back = document.createElement("div");
+      back.setAttribute("style", "position:fixed;inset:0;z-index:2147483646;" +
+        "background:rgba(38,35,30,.42);display:flex;align-items:center;justify-content:center");
+      var box = document.createElement("div");
+      box.setAttribute("style", "background:#fff;border-radius:10px;padding:20px 22px;" +
+        "width:min(360px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.28);" +
+        "font:400 13px/1.5 'Pretendard',system-ui,sans-serif;color:#2b2721");
+      var h = document.createElement("div");
+      h.setAttribute("style", "font-weight:700;font-size:14.5px;margin-bottom:6px");
+      h.textContent = "비밀번호 확인";
+      var p = document.createElement("div");
+      p.setAttribute("style", "font-size:12px;color:#6b645a;margin-bottom:13px");
+      p.textContent = msg || "민감한 작업이라 비밀번호를 한 번 더 확인합니다.";
+      var inp = document.createElement("input");
+      inp.type = "password";
+      inp.autocomplete = "current-password";
+      inp.setAttribute("style", "width:100%;box-sizing:border-box;padding:9px 11px;" +
+        "border:1px solid rgba(0,0,0,.22);border-radius:6px;font-size:13px");
+      var err = document.createElement("div");
+      err.setAttribute("style", "color:#b31b25;font-size:11.5px;min-height:16px;margin-top:6px");
+      var row = document.createElement("div");
+      row.setAttribute("style", "display:flex;gap:8px;justify-content:flex-end;margin-top:12px");
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "취소";
+      cancel.setAttribute("style", "padding:8px 13px;border-radius:6px;cursor:pointer;" +
+        "border:1px solid rgba(0,0,0,.18);background:#fff;font-size:12.5px");
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "확인";
+      ok.setAttribute("style", "padding:8px 15px;border-radius:6px;cursor:pointer;border:0;" +
+        "background:#2b2721;color:#fff;font-size:12.5px;font-weight:600");
+      row.appendChild(cancel); row.appendChild(ok);
+      box.appendChild(h); box.appendChild(p); box.appendChild(inp);
+      box.appendChild(err); box.appendChild(row);
+      back.appendChild(box);
+      document.body.appendChild(back);
+      setTimeout(function () { inp.focus(); }, 30);
+
+      var done = false;
+      function close(val) {
+        if (done) return;
+        done = true;
+        inp.value = "";                       // 값을 DOM 에 남기지 않는다
+        document.removeEventListener("keydown", onKey, true);
+        try { back.remove(); } catch (e) { back.parentNode.removeChild(back); }
+        resolve(val);
+      }
+      function submit() {
+        var v = inp.value;
+        if (!v) { err.textContent = "비밀번호를 입력하세요"; inp.focus(); return; }
+        close(v);
+      }
+      function onKey(e) {
+        if (e.key === "Escape") { e.stopPropagation(); close(null); }
+        else if (e.key === "Enter" && document.activeElement === inp) { e.preventDefault(); submit(); }
+      }
+      document.addEventListener("keydown", onKey, true);
+      cancel.addEventListener("click", function () { close(null); });
+      ok.addEventListener("click", submit);
+      back.addEventListener("click", function (e) { if (e.target === back) close(null); });
+    });
+  }
+
+  /* 성공하면 true. 취소·실패면 false — 호출자는 원래 응답을 그대로 돌려준다. */
+  function runReauth() {
+    if (reauthPending) return reauthPending;
+    var msg = null;
+    reauthPending = (function attempt() {
+      return askPassword(msg).then(function (pw) {
+        if (pw === null) return false;
+        return _fetch("/api/admin/auth/reauth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pw })
+        }).then(function (r) {
+          if (r.ok) return true;
+          // 틀렸으면 같은 창에서 다시 묻는다 — 서버 문장을 그대로 쓴다
+          return r.json().then(function (j) { return j; }, function () { return null; })
+            .then(function (j) {
+              msg = errText(j, r.status, "비밀번호 확인");
+              return attempt();
+            });
+        });
+      });
+    })();
+    return reauthPending.then(
+      function (v) { reauthPending = null; return v; },
+      function () { reauthPending = null; return false; }
+    );
+  }
+
   var _fetch = window.fetch;
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : (input && input.url) || "";
@@ -220,7 +337,8 @@
 
     active++;
     show(SPIN + "<span>" + verb(url, method) + " 중…</span>");
-    return _fetch.apply(this, arguments).then(
+    var self = this, args = arguments;
+    return _fetch.apply(self, args).then(
       function (res) {
         active--;
         // 본문을 읽어도 호출자가 다시 읽을 수 있게 복제해서 본다
@@ -237,12 +355,43 @@
                  "#b31b25", 6000);
           }
         };
-        if (clone) {
-          clone.json().then(done, function () { done(null); });
-        } else {
-          done(null);
-        }
-        return res;
+        var read = clone
+          ? clone.json().then(function (j) { return j; }, function () { return null; })
+          : Promise.resolve(null);
+        return read.then(function (j) {
+          // ── 비밀번호 재확인이 필요하다면 묻고 **원래 요청을 다시 보낸다** ──
+          //    화면은 이 일이 있었는지 모른다 — 성공 응답만 받는다.
+          //    ⚠ 본문이 문자열·FormData 라 재시도가 안전하다(new Request() 사용처 0곳).
+          if (res.status === 401 && isReauth(j)) {
+            hide();
+            return runReauth().then(function (okd) {
+              if (!okd) { done(j); return res; }       // 취소 — 원래 401 을 그대로 준다
+              active++;
+              show(SPIN + "<span>" + verb(url, method) + " 중…</span>");
+              return _fetch.apply(self, args).then(function (res2) {
+                active--;
+                var c2 = null;
+                try { c2 = res2.clone(); } catch (e) { c2 = null; }
+                var done2 = function (j2) {
+                  if (active > 0) return;
+                  if (res2.ok) {
+                    show('<span style="font-size:15px;">✓</span><span>' +
+                         esc(okText(j2, "완료되었습니다")) + "</span>", "#1c7a4d", 3200);
+                  } else {
+                    show('<span style="font-size:15px;">!</span><span>' +
+                         esc(errText(j2, res2.status, method + " " + path(url))) + "</span>",
+                         "#b31b25", 6000);
+                  }
+                };
+                if (c2) c2.json().then(done2, function () { done2(null); });
+                else done2(null);
+                return res2;
+              }, function (e2) { active--; throw e2; });
+            });
+          }
+          done(j);
+          return res;
+        });
       },
       function (err) {
         active--;

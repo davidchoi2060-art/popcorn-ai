@@ -20,10 +20,12 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import tempfile
 import time
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import text
 
 from .auth import current_operator
@@ -40,11 +42,30 @@ STAGE_TTL = 60 * 60           # 1시간 — 확인 없이 방치된 업로드는
 STAGE_DIR = os.environ.get("POPCORN_UPLOAD_DIR") or os.path.join(
     tempfile.gettempdir(), "popcorn-uploads")
 
+# ■ 적재한 원본 보관 (요청 39 · 2026-08-31 사장님 확정)
+#   스테이징(STAGE_DIR)은 «확인 전» 파일이라 1시간 뒤 청소되지만, **실제로 적재된**
+#   파일은 나중에 다시 받을 수 있어야 한다. 그래서 apply 가 성공한 것만 여기로 옮긴다.
+#   ⚠ 리포 폴더에 두지 않는다 — 앱 계정은 리포에 쓸 수 없고 써서도 안 된다
+#     (working tree drift · CLAUDE.md 슬라이스 81 실사고). 운영에서는
+#     `POPCORN_ARCHIVE_DIR` 로 영속 볼륨을 가리킨다.
+#   ⚠ STAGE_DIR 의 하위가 아니어야 한다 — _sweep() 이 훑는 자리에 두면 언젠가 지워진다.
+ARCHIVE_DIR = os.environ.get("POPCORN_ARCHIVE_DIR") or os.path.join(
+    tempfile.gettempdir(), "popcorn-import-archive")
+
+# 보관하는 세 종류. 값은 스테이징 kind 와 같게 두어 옮길 때 이름을 다시 짜지 않는다.
+ARCHIVE_KINDS = {"master": "마스터", "dbp": "사양 매핑", "dbs": "사양 값"}
+
 
 def _stage_path(staging_id: str, kind: str) -> str:
     if not staging_id.isalnum() or len(staging_id) > 40:
         raise HTTPException(400, "잘못된 staging_id")
     return os.path.join(STAGE_DIR, f"{staging_id}.{kind}")
+
+
+def _archive_path(job_id: int, kind: str) -> str:
+    if kind not in ARCHIVE_KINDS and kind != "meta":
+        raise HTTPException(400, "잘못된 파일 종류")
+    return os.path.join(ARCHIVE_DIR, f"{int(job_id)}.{kind}")
 
 
 def _sweep():
@@ -187,6 +208,24 @@ def apply(staging_id: str = Form(...), expect_ok: int = Form(...)):
                 "SELECT count(*) FROM product_reviews"
                 " WHERE review_status = '대기'")).scalar_one(),
         }
+    # 지우기 «전에» 보관한다(요청 39). 보관에 실패해도 적재는 이미 끝났으므로
+    # 요청을 실패로 만들지 않는다 — 대신 무엇이 안 남았는지 응답에 밝힌다
+    # (슬라이스 81 과 같은 취지: 파일을 못 써도 조용히 넘어가지 않는다).
+    archived, archive_error = [], None
+    try:
+        os.makedirs(ARCHIVE_DIR, exist_ok=True)
+        for kind in ("master", "dbp", "dbs"):
+            src = _stage_path(staging_id, kind)
+            if os.path.exists(src):
+                shutil.copyfile(src, _archive_path(job_id, kind))
+                archived.append(kind)
+        with io.open(_archive_path(job_id, "meta"), "w", encoding="utf-8") as f:
+            json.dump({"file_name": meta["file_name"], "origin": meta["origin"],
+                       "kinds": archived}, f, ensure_ascii=False)
+    except OSError as e:
+        archive_error = f"{type(e).__name__}: {e}"
+        archived = []
+
     for kind in ("master", "dbp", "dbs", "meta"):
         try:
             os.remove(_stage_path(staging_id, kind))
@@ -197,7 +236,61 @@ def apply(staging_id: str = Form(...), expect_ok: int = Form(...)):
     return {
         "job_id": job_id, "ok": s["ok"], "review": s["review"], "error": s["error"],
         "after": after,
+        "archived": archived,
+        "archive_error": archive_error,
         "verdict": (f"배치 #{job_id} 적재 완료 — {s['ok']:,}건 반영."
                     f" 현재 카탈로그 {after['catalog']:,}건 ·"
-                    f" 추천 후보 {after['pool']:,}건 · 검수 대기 {after['review']:,}건."),
+                    f" 추천 후보 {after['pool']:,}건 · 검수 대기 {after['review']:,}건."
+                    + (f" 올린 파일 {len(archived)}개를 보관했습니다(다시 내려받을 수 있습니다)."
+                       if archived else
+                       " ⚠ 올린 파일을 보관하지 못했습니다 — 적재는 정상입니다.")),
     }
+
+
+# ── 적재한 원본 다시 받기 (요청 39 · 2026-08-31) ─────────────────────────────
+#   ⚠ **2026-08-31 이전 배치는 파일이 없다.** 그때는 apply 가 스테이징을 지우기만 했고
+#     보관하지 않았다 — 없는 것을 있는 척하지 않고 404 로 그 사실을 말한다.
+
+@router.get("/catalog-import/jobs/{job_id}/files")
+def job_files(job_id: int):
+    """이 배치에 보관된 파일 목록. 화면이 내려받기 단추를 그릴지 이걸로 정한다."""
+    op = current_operator() or {}
+    if op.get("role") != "owner":
+        raise HTTPException(403, "관리자(owner)만 적재 원본을 볼 수 있습니다")
+    meta_p = _archive_path(job_id, "meta")
+    if not os.path.exists(meta_p):
+        return {"job_id": job_id, "items": [],
+                "note": "이 배치는 원본을 보관하지 않았습니다"
+                        " — 원본 보관은 2026-08-31 적재분부터입니다."}
+    with io.open(meta_p, encoding="utf-8") as f:
+        meta = json.load(f)
+    items = []
+    for kind in meta.get("kinds") or []:
+        p = _archive_path(job_id, kind)
+        if os.path.exists(p):
+            items.append({"kind": kind, "label": ARCHIVE_KINDS.get(kind, kind),
+                          "bytes": os.path.getsize(p)})
+    return {"job_id": job_id, "file_name": meta.get("file_name"),
+            "origin": meta.get("origin"), "items": items}
+
+
+@router.get("/catalog-import/jobs/{job_id}/files/{kind}")
+def job_file_download(job_id: int, kind: str):
+    op = current_operator() or {}
+    if op.get("role") != "owner":
+        raise HTTPException(403, "관리자(owner)만 적재 원본을 내려받을 수 있습니다")
+    if kind not in ARCHIVE_KINDS:
+        raise HTTPException(400, "잘못된 파일 종류")
+    path = _archive_path(job_id, kind)
+    if not os.path.exists(path):
+        raise HTTPException(404, "보관된 파일이 없습니다"
+                                 " — 원본 보관은 2026-08-31 적재분부터입니다.")
+    # 내려받는 이름은 **올릴 때 그 이름**을 쓴다 — 운영자가 자기 파일로 알아본다.
+    meta_p = _archive_path(job_id, "meta")
+    base = f"import-{job_id}"
+    if os.path.exists(meta_p):
+        with io.open(meta_p, encoding="utf-8") as f:
+            base = (json.load(f).get("file_name") or base)
+    stem, ext = os.path.splitext(base)
+    name = f"{stem}{ext or '.csv'}" if kind == "master" else f"{stem}-{kind}{ext or '.csv'}"
+    return FileResponse(path, media_type="text/csv", filename=name)
