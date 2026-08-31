@@ -405,6 +405,45 @@
 
  function pick(id){state.picked=id;renderLanes();openDetail(id);}
 
+ // ── 바깥을 누르면 상세를 닫는다 (요청 41 · 2026-09-01) ──────────────────────
+ //  `data-keep="1"` 은 이 화면에 이미 붙어 있었는데 **그것을 읽는 핸들러가 없어**
+ //  아무 일도 하지 않았다 — 규약(CLAUDE.md §data-keep)만 예비돼 있고 배선이 빠진
+ //  상태였다. 상품 분류 관리와 «같은 방식»으로 잇는다(두 화면이 다르게 동작하면
+ //  운영자가 화면마다 다시 배워야 한다).
+ //
+ //  ⚠ 닫기는 «선택 해제»까지 함께 한다 — 카드의 선택 테두리만 남고 상세가 사라지면
+ //    무엇을 보고 있는지 화면이 거짓말을 한다.
+ //  ⚠ 입력 중에는 닫지 않는다: 댓글을 쓰다 잘못 눌러 사라지면 쓴 글이 날아간다.
+ //    상세 안에서 시작한 드래그가 밖에서 끝나는 경우도 같은 이유로 무시한다.
+ // ⚠ #wr-root 에도 data-keep 이 붙어 있다 — 화면 «전체»를 감싸는 자리라 그대로
+ //   쓰면 어디를 눌러도 「안쪽」이 되어 영영 안 닫힌다. 그 하나만 뺀다.
+ var KEEP_SEL='[data-keep]:not(#wr-root)';
+ function closeDetail(){
+  if(state.picked===null)return;
+  state.picked=null;state.pickedDetail=null;
+  $('wr-detail').hidden=true;
+  $('wr-detail-empty').hidden=false;
+  renderLanes();
+ }
+ var _downInsideKeep=false;
+ document.addEventListener('mousedown',function(e){
+  _downInsideKeep=!!(e.target.closest&&e.target.closest(KEEP_SEL));
+ },true);
+ document.addEventListener('click',function(e){
+  if(state.picked===null)return;
+  if(_downInsideKeep)return;                       // 안에서 시작한 클릭·드래그
+  if(e.target.closest&&e.target.closest(KEEP_SEL))return;
+  var a=document.activeElement;                    // 입력 중이면 두지 않는다
+  if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.closest(KEEP_SEL))return;
+  closeDetail();
+ });
+ document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape'||state.picked===null)return;
+  var a=document.activeElement;
+  if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;   // 입력 취소가 먼저다
+  closeDetail();
+ });
+
  function openDetail(id){
   fetch(API+'/'+id).then(function(r){return r.json().then(function(d){return{ok:r.ok,status:r.status,d:d};});})
    .then(function(x){

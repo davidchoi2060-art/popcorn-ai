@@ -269,6 +269,7 @@ class Server:
             urllib.request.HTTPSHandler(context=ssl.create_default_context()))
         self.creds = None
         self.warned = False
+        self.my_name = None                 # 로그인 뒤 채운다(내가 쓴 댓글 가려내기용)
         try:
             from dotenv import load_dotenv
             load_dotenv(os.path.join(ROOT, ".env"))
@@ -292,7 +293,19 @@ class Server:
                 self.base + "/api/admin/auth/login",
                 data=json.dumps({"email": self.creds[0], "password": self.creds[1]}).encode(),
                 headers={"Content-Type": "application/json"})
-            return self.op.open(req, timeout=20).status == 200
+            ok = self.op.open(req, timeout=20).status == 200
+            if ok:
+                # 자기 «표시 이름»을 기억한다 — 요청 큐 댓글에서 «내가 쓴 것»을
+                # 가려내는 유일한 단서다. author_kind 로는 못 가른다: 하네스가
+                # owner 계정으로 로그인하므로 내가 쓴 댓글도 「사장님」으로 찍힌다
+                # (2026-09-01 실측 — 내가 쓴 것이 나에게 알림으로 돌아왔다).
+                try:
+                    me = urllib.request.Request(self.base + "/api/admin/auth/me")
+                    with self.op.open(me, timeout=20) as r2:
+                        self.my_name = ((json.load(r2) or {}).get("operator") or {}).get("name")
+                except Exception:                            # noqa: BLE001
+                    self.my_name = None
+            return ok
         except Exception:                                    # noqa: BLE001
             return False
 
@@ -356,6 +369,95 @@ class Server:
         if n:
             self.mark_read()
         return n
+
+    # ── 요청 · 승인 큐 감시 (2026-09-01 사장님 지시) ────────────────────────
+    #   왜 여기 얹나: 감시자는 «PC 에 한 벌»이어야 한다(기억 dash-watcher-one-per-machine).
+    #   요청 큐만 보는 감시자를 따로 띄우면 로그인·재시도·하트비트를 두 벌 관리하게 되고,
+    #   둘 중 하나가 조용히 죽어도 아무도 모른다. 이 클래스는 이미 로그인을 쥐고 있다.
+    #
+    #   ⚠ **목록 API 에 `last_comment` 가 없다**(2026-09-01 실측 — 처음엔 있다고 «짐작»하고
+    #     짰다가 그 코드가 영영 안 울릴 상태였다). 있는 것은 `comment_count` 뿐이다.
+    #     그래서 «수가 늘었을 때만» 상세를 한 번 읽어 누가 썼는지 본다 — 매 주기 전 건의
+    #     상세를 읽지 않는다(15건이면 15요청이 30초마다 나간다).
+    #
+    #   ⚠ 수를 세어 비교하지 «않고» 본 것을 기억한다 — 이 파일이 2026-08-12 에 그 방식으로
+    #     메시지를 잃은 전례가 있다(머리 주석 ①②). 다만 댓글은 예외적으로 수를 쓴다:
+    #     댓글 «식별자»를 목록이 주지 않아 다른 방법이 없다. 대신 수를 seen 에 담아
+    #     «늘어난 순간»만 잡고, 줄어드는 경우(삭제)는 무시한다.
+    #
+    #   하네스(나) 가 단 댓글은 알리지 않는다 — 방금 내가 쓴 것을 나에게 알리면
+    #   알림이 자기 꼬리를 문다.
+    def poll_requests(self, seen: set) -> int:
+        try:
+            req = urllib.request.Request(self.base + "/api/admin/requests")
+            with self.op.open(req, timeout=20) as r:
+                if r.status != 200:
+                    return 0
+                items = (json.load(r) or {}).get("items") or []
+        except Exception:                                    # noqa: BLE001
+            return 0
+
+        first_run = not seen
+        n = 0
+        for it in items:
+            rid = it.get("request_id")
+            if rid is None:
+                continue
+            status = it.get("status") or "?"
+            title = (it.get("title") or "").strip()
+
+            # ① 상태 축 — 새 요청이거나 레인이 바뀌면
+            skey = ("req", rid, status)
+            if skey not in seen:
+                known = any(k[0] == "req" and k[1] == rid for k in seen)
+                seen.add(skey)
+                if not first_run:
+                    if not known:
+                        print("[요청·새글 #%s] %s — %s" % (rid, status, title[:120]))
+                    else:
+                        who = it.get("decided_by_name") or ""
+                        print("[요청·상태 #%s] -> %s%s — %s"
+                              % (rid, status, (" (" + who + ")") if who else "", title[:100]))
+                    n += 1
+
+            # ② 댓글 축 — 수가 «늘었을 때만» 상세를 읽어 사장님 것인지 본다
+            cnt = it.get("comment_count") or 0
+            prev = next((k[2] for k in seen if k[0] == "cmt" and k[1] == rid), None)
+            if prev is None or cnt > prev:
+                seen.discard(("cmt", rid, prev))
+                seen.add(("cmt", rid, cnt))
+                if not first_run and prev is not None and cnt > prev:
+                    for c in self._owner_comments(rid, cnt - prev):
+                        print("[요청·댓글 #%s] 사장님: %s" % (rid, c[:200]))
+                        n += 1
+
+        if first_run:
+            lanes = {}
+            for it in items:
+                lanes[it.get("status")] = lanes.get(it.get("status"), 0) + 1
+            print("[요청·시작] 감시 시작 — %s"
+                  % (" · ".join("%s %d" % (k, v) for k, v in sorted(lanes.items())) or "비어 있음"))
+        return n
+
+    def _owner_comments(self, rid: int, take: int) -> list:
+        """방금 늘어난 만큼의 «사장님» 댓글 본문. 하네스가 쓴 것은 뺀다."""
+        try:
+            req = urllib.request.Request(self.base + "/api/admin/requests/%d" % rid)
+            with self.op.open(req, timeout=20) as r:
+                if r.status != 200:
+                    return []
+                d = json.load(r) or {}
+        except Exception:                                    # noqa: BLE001
+            return []
+        out = []
+        for c in (d.get("comments") or [])[-max(1, take):]:
+            if c.get("author_kind") != "사장님":
+                continue
+            # 하네스가 owner 계정으로 쓴 것은 뺀다 — 이름으로만 가를 수 있다.
+            if self.my_name and c.get("author_name") == self.my_name:
+                continue
+            out.append(" ".join((c.get("body") or "").split()))
+        return out
 
     def push(self, session: str, events: list) -> tuple:
         """진행 흐름 사건들을 서버(`POST /api/admin/dash/push`)로 민다.
@@ -495,6 +597,7 @@ def notify_loop() -> None:
     """
     seen: set = set()
     seen_events: set = set()                    # 진행 흐름 밀어 올리기 중복 방지(2026-08-27)
+    seen_requests: set = set()                  # 요청·승인 큐 중복 방지(2026-09-01)
     push_state = {"warned": False}
     # 시작 시점의 «안 읽음»도 찍는다 — 감시가 죽어 있던 사이에 온 것을 놓치지 않기 위해서다.
     local = Server(LOCAL_BASE, "로컬")
@@ -510,6 +613,10 @@ def notify_loop() -> None:
             last_srv = time.time()
             deploy.poll(seen)
             push_progress(deploy, seen_events, push_state)
+            # 요청·승인 큐도 같은 주기로 본다(2026-09-01) — 사장님이 요청을 올리거나
+            # 결재하신 것을 세션이 «모르고 지나가던» 문제를 막는다. 배포 서버 것을
+            # 본다: 사장님은 admin.popcornai.co.kr 에서 올리신다.
+            deploy.poll_requests(seen_requests)
         time.sleep(POLL_LOCAL_S)
 
 
