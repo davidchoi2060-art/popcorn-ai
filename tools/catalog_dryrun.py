@@ -19,7 +19,16 @@ ensure_utf8_console()
 
 from api.catalog_map import extract_specs, map_part_type   # noqa: E402
 
-SRC = r"E:\GDRIVE\0.신사업\2.AI 영업사원\2단계\산출물"
+# 원천 CSV 폴더. PC 마다 구글 드라이브 문자가 다르다(집 E: / 회사 D:) --
+# 환경변수가 있으면 그것을, 없으면 실재하는 후보를 쓴다. 하드코딩 한 줄이던 것이
+# 2026-08-31 PC 이전에서 회사 PC(D:)와 안 맞아 이렇게 바꿨다.
+_SRC_CANDIDATES = [
+    r"D:\GDRIVE\0.신사업\2.AI 영업사원\2단계\산출물",
+    r"E:\GDRIVE\0.신사업\2.AI 영업사원\2단계\산출물",
+]
+SRC = os.environ.get("POPCORN_SRC_DIR") or next(
+    (p for p in _SRC_CANDIDATES if os.path.isdir(p)), _SRC_CANDIDATES[0]
+)
 MASTER = os.path.join(SRC, "최종_정제완료_상품데이터.csv")
 DB_PRODUCTS = os.path.join(SRC, "db_products.csv")
 DB_SPECS = os.path.join(SRC, "db_product_specs.csv")
