@@ -71,14 +71,26 @@ _STATUS_CASE = """
          ELSE 'review' END
 """
 
-# 상품명 검색은 **띄어쓰기를 무시한다**(요청 35 · 2026-08-31). 원천이 같은 제품을
-# "RTX 4060Ti" · "RTX4060Ti" · "RTX 4060 Ti" 로 제각각 적어 와서, 운영자가 본 대로
-# 치면 안 나온다. 양쪽에서 공백을 지우고 비교한다 — 값을 고치지 않고 «비교만» 느슨하게
-# 한다(원천 표기를 우리가 바꾸면 마켓에 나가는 이름이 달라진다).
-# ⚠ 인덱스를 못 타는 비교라 sku·maker 는 기존 방식을 남겨 둔다(정확히 치는 값이고,
-#   그쪽까지 공백 제거로 바꾸면 전 컬럼이 순차 검색이 된다).
+# 상품명 검색 — 띄어쓰기에 걸리지 않게 «두 갈래»로 본다(요청 35).
+#
+#   ① 조각 전부 포함  「Bri B」 -> 'Bri' 와 'B' 가 «둘 다» 들어간 이름을 찾는다.
+#      사장님 예시(2026-09-01 댓글): 「Bri 한칸 띄우고 B」로 「Britz BA 100」이 나와야 한다.
+#      ⚠ 처음엔 ②만 넣었는데 그것으로는 이 예시가 «0건»이었다 — 'BriB' 는 'BritzBA100'
+#        안에 없다. 조각을 나눠 보는 것이 사장님이 말씀하신 「유관검색어」다.
+#   ② 공백 무시 통짜  「RTX4060」 <-> 「RTX 4060 Ti」. 원천이 같은 제품을 제각각 적어
+#      와서, 운영자가 본 대로 붙여 쳐도 나와야 한다.
+#
+# 값을 고치지 않고 «비교만» 느슨하게 한다 — 원천 표기를 바꾸면 마켓에 나가는 이름이
+# 달라진다. sku·maker 는 기존 방식 그대로다(정확히 치는 값이고, 그쪽까지 느슨하게
+# 하면 전 컬럼이 순차 검색이 된다).
+# ⚠ ①의 NOT EXISTS 는 «조각이 하나도 없으면 참»이라 빈 검색어를 막아야 한다 —
+#   그래서 바깥 가드를 `:q = ''` 가 아니라 `btrim(:q) = ''` 로 둔다(공백만 친 경우 포함).
 _WHERE = """
-    WHERE (:q = '' OR REPLACE(p.product_name, ' ', '') ILIKE '%%' || REPLACE(:q, ' ', '') || '%%'
+    WHERE (btrim(:q) = ''
+           OR NOT EXISTS (
+                SELECT 1 FROM unnest(string_to_array(btrim(:q), ' ')) AS t(tok)
+                 WHERE tok <> '' AND p.product_name NOT ILIKE '%%' || tok || '%%')
+           OR REPLACE(p.product_name, ' ', '') ILIKE '%%' || REPLACE(:q, ' ', '') || '%%'
            OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%'
            OR p.maker ILIKE '%%' || :q || '%%')
       AND (:part_type = '' OR p.part_type = :part_type)
