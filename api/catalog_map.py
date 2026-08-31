@@ -305,6 +305,16 @@ WATT_NAME = re.compile(r"(\d{3,4})\s?W\b", re.I)
 PCIE = re.compile(r"PCIe\s?([\d.]+)", re.I)
 GPU_MODEL = re.compile(r"(RTX|GTX|GT|RX)\s?(\d{3,4})\s?(Ti|SUPER|XT|XTX)?", re.I)
 NUM = re.compile(r"([\d,]+(?:\.\d+)?)")
+
+# RAM 총용량 — 이름 교정 경로 (2026-08-31). eav/feature가 «모듈당» 값을 총량으로 잘못
+# 받는 사고가 실측됐다(예: 상품명 "DDR5 32GB [16G x 2]"인데 특성값에 홀로 있는
+# "16(GB)"를 그대로 받아 32가 아니라 16이 저장됨). 이름에는 총량과 모듈 구성이 함께
+# 적히는 경우가 많고, 실측 70건 전부 "명시 총량 = 모듈당×개수"였다 — 이 두 표기가
+# 서로를 검증해 주므로 RAM에서는 이름이 eav/feature보다 더 믿을 만하다(_cap_ram_name
+# 사용처 주석 참조). SSD/HDD는 반대로 eav/feature 불일치가 0건이라 그대로 둔다.
+RAM_DDR = re.compile(r"DDR[2345]", re.I)
+RAM_TOTAL = re.compile(r"(\d+(?:\.\d+)?)\s?(TB|GB)\b(?!\s*[xX×]\s*\d)", re.I)
+RAM_MODxN = re.compile(r"(\d+(?:\.\d+)?)\s?G(?:B)?\s*[xX×]\s*(\d+)", re.I)
 INCH_L2 = {"27인치 모니터": 27, "24인치 모니터": 24, "23인치 이하": 23}
 # ⚠ INCH_L2 에 「32인치 이상」이 없다 — **일부러 없다.** 그 분류는 «범위»라 단일 값이 없고,
 # 32 를 박으면 34·40·49형이 전부 32형으로 «틀리게» 기록된다. 대신 아래 MON_INCH 가 원문의
@@ -411,6 +421,11 @@ def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
 
     elif part_type == "RAM":
         put("mem_type", next((v.upper() for v in feats if MEM_TYPE.match(v)), None), "feature")
+        # 이름을 eav/feature보다 먼저 본다 — SSD/HDD(eav→feature→name)와 순서가
+        # 다르다. RAM은 원천 특성값이 모듈당/총량을 구분하지 못해 eav·feature가
+        # 틀린 값(모듈당)을 총량인 것처럼 내놓는 사고가 실측됐고, 이름 쪽은 두 표기
+        # (총량·모듈×개수)가 서로 일치해 더 믿을 만하다(위 RAM_DDR 주석 참조).
+        put("capacity_gb", _cap_ram_name(name), "name")
         put("capacity_gb", _cap(kv.get("메모리 용량") or kv.get("용량")), "eav")
         put("capacity_gb", _cap_feat(feats), "feature")
         put("clock_mhz", _num(kv.get("동작 클럭") or kv.get("클럭")), "eav")
@@ -518,6 +533,46 @@ def _cap_name(name):
         return None
     n = float(m.group(1))
     return int(n * 1024) if m.group(2).upper() == "TB" else int(n)
+
+
+def _cap_ram_name(name):
+    """RAM 총용량을 상품명에서 읽는다 — `_cap_name()`을 그대로 못 쓴다: 묶음상품
+    ([SSD + RAM] 류)에서 SSD 용량(1TB/2TB)을 먼저 집어 RAM 용량으로 착각하고
+    (실측 119879·120880·120881), "16Gx2"처럼 총량 없이 모듈×개수만 있는 표기는
+    아예 못 읽는다(리터럴 "GB"/"TB" 요구 — 실측 문제 92건 중 22건이 이 형태).
+
+    두 신호를 이름에서 찾되 **DDR2/3/4/5 표기 이후로만** 찾는다 — 묶음상품은 SSD
+    용량이 DDR 표기보다 앞에 오므로 이 한 줄로 오독을 막는다. **DDR 표기 자체가
+    없으면 아예 시도하지 않는다**(실측: `part_type='RAM'`인데 실은 그래픽카드인
+    오분류 상품 — 예 "…RTX 4070 SUPER…D6X 12GB DUAL" — 이 이름의 유일한 용량
+    토큰은 VRAM 12GB다. DDR 표기가 없다는 것은 이 이름을 RAM 총량 판단 근거로
+    믿을 수 없다는 신호이므로, 그 신호를 무시하고 전체에서 찾지 않는다 — 가를 수
+    없으면 값을 안 쓴다):
+      ① 명시 총량 — "32GB"·"128GB". 바로 뒤에 배수(x2 등)가 오면 그건 총량이
+         아니라 모듈당 표기이므로 제외한다("32GB x 4"에서 32를 총량으로 안 읽는다
+         — 진짜 총량 128GB는 그 앞에 따로 있다. 없으면 ②로 넘어간다).
+      ② 모듈당 × 개수 — "16Gx2"·"16G x 2"·"32GB x 4". ①이 없을 때만 쓴다.
+    실측(2026-08-31 조사자): 이름에 ①·②가 둘 다 있는 70건 전부 ①=②였다 —
+    지어낸 규칙이 아니라 원천 표기 자체가 서로 검증해 주는 관계다.
+
+    가를 수 없으면(DDR 표기가 없거나, 있어도 둘 다 못 찾으면) None을 돌려준다 —
+    틀린 값보다 빈 값이 낫다.
+    """
+    if not name:
+        return None
+    m = RAM_DDR.search(name)
+    if not m:
+        return None
+    zone = name[m.start():]
+    mt = RAM_TOTAL.search(zone)
+    if mt:
+        n = float(mt.group(1))
+        return int(n * 1024) if mt.group(2).upper() == "TB" else int(n)
+    mm = RAM_MODxN.search(zone)
+    if mm:
+        per, cnt = float(mm.group(1)), int(mm.group(2))
+        return int(per * cnt) if cnt > 0 else None
+    return None
 
 
 def _storage(feats, kv):

@@ -152,8 +152,8 @@ from sqlalchemy import text                          # noqa: E402
 # 이 파일 안의 기존 호출부(run·_selftest·_plan_and_maybe_apply)를 한 글자도 안 고치기
 # 위한 것이지, 이름을 감추려는 것이 아니다.
 from api.mall_supplier_parse import (                 # noqa: E402
-    STATE_MAP, CLICK_NARA_SUPPLIER_ID, parse_rows, load_suppliers, resolve_supplier,
-    cheapest_summary as _cheapest_summary,
+    STATE_MAP, CLICK_NARA_SUPPLIER_ID, SELF_STOCK_ACCOUNTS, parse_rows, load_suppliers,
+    resolve_supplier, cheapest_summary as _cheapest_summary,
     PSP_UPSERT as _PSP_UPSERT, SUPPLIER_CONTACT_UPDATE as _SUPPLIER_CONTACT_UPDATE,
 )
 
@@ -287,15 +287,60 @@ def _scan_from_dir(dir_path: str):
 # 더 이상 정의하지 않는다.
 
 
+def _apply_self_stock_guard(resolved: list) -> list:
+    """한 상품의 모든 행을 resolve_supplier()로 매칭한 결과
+    [(r, (sid, sname, remainder, kind)), ...] -> [(r, sid, sname, remainder, kind,
+    self_stock_conflict), ...].
+
+    순수 함수(DB 없음) -- --selftest로 검증한다. 2026-08-31 신설 -- 자사 재고 특례
+    (match_kind='self_stock_account', api/mall_supplier_parse.SELF_STOCK_ACCOUNTS)가
+    가리키는 공급처가 «같은 상품 안»에 이미 다른 행(정상 매칭 또는 먼저 나온 자사
+    재고 행)으로도 채워져 있으면, 그 self_stock_account 행을 excluded_stock_status로
+    되돌린다(sid도 None으로 되돌린다) -- 그대로 두면 PSP_UPSERT의
+    UNIQUE(product_code, supplier_id) 충돌로 «나중에 처리되는 행이 앞 행을 덮어써»
+    정상 행의 값이 조용히 사라진다(2026-08-31 실측 4건: 110585·118517·119574·
+    121957 -- "재고있음 herosys" 행과 "주식회사 팝콘컴퓨터 Tpop1234 통합관리자" 행이
+    «서로 다른 idx·가격·재고상태»로 같은 상품 안에 공존한다). resolve_supplier()는
+    행 하나만 보고 형제 행을 모르므로 이 판단을 못 한다(그 함수 주석 ① 참조) --
+    이 함수가 호출부(run())를 대신해 그 경계를 메운다.
+
+    self_stock_conflict=True인 행은 정보를 잃지 않는다 -- 같은 supplier_id를 가리키는
+    다른 행이 이미 그 공급처의 진짜 값(가격·상태·연락처)을 담고 있기 때문이다."""
+    normal_sids = {sid for _r, (sid, _sn, _rm, kind) in resolved
+                   if sid is not None and kind != "self_stock_account"}
+    accepted_self_stock_sids = set()
+    out = []
+    for r, (sid, sname, remainder, kind) in resolved:
+        conflict = False
+        if kind == "self_stock_account":
+            if sid in normal_sids or sid in accepted_self_stock_sids:
+                conflict = True
+                sid, sname, remainder, kind = None, None, r["contact_blob"], "excluded_stock_status"
+            else:
+                accepted_self_stock_sids.add(sid)
+        out.append((r, sid, sname, remainder, kind, conflict))
+    return out
+
+
 # ==================================================================== DB ==
 
 
 def _plan_and_maybe_apply(engine, apply_: bool, pc: int, sid: int, sname, remainder,
-                           r: dict, observed, stats: dict):
+                           r: dict, observed, stats: dict, fill_contact: bool = True):
     """읽기 전용 SELECT로 신규/갱신을 분류하고, apply_면 실제로 쓴다.
 
     드라이런에서도 이 SELECT는 실행한다(그래야 "몇 건이 신규고 몇 건이 갱신인지"를
-    실제로 셀 수 있다) -- DB에 쓰지는 않는다."""
+    실제로 셀 수 있다) -- DB에 쓰지는 않는다.
+
+    fill_contact=False -- 이 행의 연락처(전화·발주번호·contact_raw)는 suppliers에
+    반영하지 않는다(product_supplier_prices의 가격·상태는 그대로 반영한다 -- 이
+    플래그가 막는 것은 연락처뿐이다). 2026-08-31 신설 -- 자사 재고 특례
+    (match_kind='self_stock_account', api/mall_supplier_parse.SELF_STOCK_ACCOUNTS)가
+    쓴다: "재고있음 herosys" 행의 발주번호(010-9923-8834)·원문("재고있음 herosys")은
+    이미 확보된 진짜 담당자 정보(예: 444의 Tpop1234 통합관리자·010-6330-3544)보다
+    못한 값이다 -- "같은 계정"이라는 사장님 확인은 «가격을 어느 회사 것으로 볼지»에
+    대한 확인이지 "이 전화번호로 담당자 연락처를 덮어써도 된다"는 확인이 아니다.
+    기본값 True라 기존 호출부(run()의 일반 매칭 행)는 동작이 그대로다."""
     with engine.connect() as conn:
         existed = conn.execute(text(
             "SELECT 1 FROM product_supplier_prices WHERE product_code=:pc AND supplier_id=:s"),
@@ -303,7 +348,7 @@ def _plan_and_maybe_apply(engine, apply_: bool, pc: int, sid: int, sname, remain
         cur_phone = conn.execute(text(
             "SELECT contact_phone FROM suppliers WHERE supplier_id=:s"), {"s": sid}).scalar()
     stats["psp_update" if existed else "psp_insert"] += 1
-    will_fill_contact = bool(remainder or r["phone"] or r["order_phone"])
+    will_fill_contact = fill_contact and bool(remainder or r["phone"] or r["order_phone"])
     if will_fill_contact:
         stats["contact_filled" if apply_ else "contact_would_fill"] += 1
         if cur_phone and r["phone"] and cur_phone != r["phone"]:
@@ -373,7 +418,20 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
         # 업체명 자리에 재고 상태값("재고있음" 등)이 온 행 -- 공급처가 아니라서 매칭을
         # 시도하지 않는다(mall_supplier_parse.STOCK_STATUS_TOKENS). unmatched와 섞으면
         # "새 공급처로 등록해야 하나"로 오인한다 -- 별도 집계(지시서 요구사항).
+        # ⚠ 2026-08-31부터 이 집계에는 herosys(자사 재고) 행이 «빠진다» -- 그 행은
+        # 아래 supplier_self_stock_matched/supplier_self_stock_same_product_conflict로
+        # 따로 센다(mall_supplier_parse.SELF_STOCK_ACCOUNTS 참조). 그래서 이 수는
+        # 2026-08-26 신설 당시(426건 전부 여기 잡히던 때)보다 줄어든다 -- 값이 줄었다고
+        # 결함이 아니라 이 특례가 정확히 의도한 재분류다.
         "supplier_excluded_stock_status": 0,
+        # 2026-08-31 신설 -- 자사 재고 특례(SELF_STOCK_ACCOUNTS)로 실제 공급처 매칭이
+        # 이뤄진 «행수». supplier_matched(공급처 集合, 곳 수)와 다르게 이건 행 단위다.
+        "supplier_self_stock_matched": 0,
+        # 2026-08-31 신설 -- 자사 재고 행이 가리키는 공급처가 «같은 상품 안»에 이미
+        # 정상 라벨로 매칭돼 있어(실측 4건) 특례를 적용하지 않고 재고상태 제외로
+        # 되돌린 행수(mall_supplier_parse.py의 resolve_supplier() 주석 ① 참조 --
+        # 그대로 적용하면 PSP_UPSERT UNIQUE 충돌로 정상 행의 값이 사라진다).
+        "supplier_self_stock_same_product_conflict": 0,
         "products_with_available_price": 0, "products_no_available_supplier": 0,
         "cheapest_is_unavailable": 0, "cheapest_unavailable_samples": [],
         # 2026-08-30 신설 -- 「추천 후보 2,707건 중 47건이 product_supplier_prices에
@@ -477,12 +535,24 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
         product_resolved = False
         row_kinds = set()
 
-        for r in rows:
+        # 먼저 이 상품의 «모든» 행을 매칭해 둔다(형제 행을 먼저 봐야 자사 재고
+        # 특례의 같은-상품 충돌을 막을 수 있다 -- resolve_supplier()는 행 하나만
+        # 보므로 이걸 모른다. 2026-08-31 신설, api/mall_supplier_parse.py의
+        # resolve_supplier() 주석 ① 참조). 이 상품에 herosys 행이 없으면(대다수)
+        # normal_sids 계산·충돌 검사 자체가 사실상 공짜다 -- 매칭은 원래 하던 일이고
+        # 순서만 "행마다 즉시 처리"에서 "먼저 전부 매칭 후 처리"로 바뀌었을 뿐이다.
+        resolved = [(r, resolve_supplier(r["contact_blob"], suppliers)) for r in rows]
+        guarded = _apply_self_stock_guard(resolved)
+
+        for r, sid, sname, remainder, kind, self_stock_conflict in guarded:
             if r["state"] is None:
                 stats["state_unknown"] += 1
             if r["price_mismatch"]:
                 stats["price_mismatch"] += 1
-            sid, sname, remainder, kind = resolve_supplier(r["contact_blob"], suppliers)
+            if self_stock_conflict:
+                stats["supplier_self_stock_same_product_conflict"] += 1
+            elif kind == "self_stock_account":
+                stats["supplier_self_stock_matched"] += 1
             row_kinds.add(kind)
             if kind == "excluded_stock_status":
                 # 미매칭(unmatched)이 아니라 "공급처가 아닌 값" -- 등록 후보 목록에
@@ -501,8 +571,12 @@ def run(engine, codes: list, apply_: bool, refetch: bool, cache_only: bool, reap
             # 찾으면 반영하지 않는다(모르는 것을 지어내지 않는다).
             if sid is not None and r["o_price"] is not None and r["state"] is not None:
                 product_resolved = True
+                # fill_contact=False -- 자사 재고 특례 행의 연락처(발주번호
+                # 010-9923-8834·원문 "재고있음 herosys")로 그 공급처의 이미 확보된
+                # 담당자 정보를 덮어쓰지 않는다(_plan_and_maybe_apply 문서 참조).
                 _plan_and_maybe_apply(engine, apply_, pd_no, sid, sname, remainder,
-                                       r, observed, stats)
+                                       r, observed, stats,
+                                       fill_contact=(kind != "self_stock_account"))
 
         # 이 상품이 결국 공급처를 하나도 못 얻었는가 -- product_supplier_prices에 이번
         # 실행으로 새로 쓸 행이 0개라는 뜻이다(기존 행이 있었다면 갱신도 안 됐다는 뜻).
@@ -563,6 +637,15 @@ def _print_report(stats: dict, samples: list, apply_: bool, from_dir: bool = Fal
     print(f"  공급처가 아닌 값이라 제외(업체명 자리에 재고 상태값 -- \"재고있음\" 등)"
           f" {stats['supplier_excluded_stock_status']}건 -- 미매칭 목록에 넣지 않았습니다"
           "(공급처 등록 대상이 아닙니다)")
+    if stats.get("supplier_self_stock_matched") or stats.get("supplier_self_stock_same_product_conflict"):
+        print(f"  자사 재고 특례(herosys -> supplier_id=444 주식회사 팝콘컴퓨터)로 매칭"
+              f" {stats['supplier_self_stock_matched']}건 -- 위 제외 집계에서 빠져"
+              " 공급처로 반영됩니다(2026-08-31 사장님 확정)")
+        if stats.get("supplier_self_stock_same_product_conflict"):
+            print(f"    이 중 같은 상품 안에 이미 정상 라벨로 매칭된 444 행이 있어"
+                  f" 특례를 적용하지 않고 제외로 되돌린 건"
+                  f" {stats['supplier_self_stock_same_product_conflict']}건"
+                  "(정상 행의 값을 지키기 위해 -- 위 제외 집계에 포함됩니다)")
     print(f"  공급처 매칭 성공(고유 업체) {len(stats['supplier_matched'])}곳")
     if stats["supplier_unmatched"]:
         total_un = sum(stats["supplier_unmatched"].values())
@@ -930,6 +1013,92 @@ def _selftest() -> bool:
     sid6d, *_, kind6d = resolve_supplier("재고있음", _FIXTURE_SUPPLIERS)
     check(kind6d == "excluded_stock_status",
           f"'재고있음' 단독(꼬리 문자열 없음)도 excluded(실제 kind={kind6d})")
+
+    # ── 자사 재고 특례(SELF_STOCK_ACCOUNTS) -- 2026-08-31 신설 ─────────────────
+    # 지시서 실사례: "재고있음 herosys"는 새 공급처가 아니라 이미 아는 회사다
+    # (사장님 확정). 실제 SELF_STOCK_ACCOUNTS를 그대로 읽어 계정명·대상 id가 바뀌어도
+    # 이 테스트가 따라간다(하드코딩 이중관리 방지).
+    _acct, _acct_sid = next(iter(SELF_STOCK_ACCOUNTS.items()))
+    _self_stock_suppliers = _FIXTURE_SUPPLIERS + [
+        {"supplier_id": _acct_sid, "name": "주식회사 팝콘컴퓨터", "status": "활성"}]
+
+    sid7, sname7, rem7, kind7 = resolve_supplier(f"재고있음 {_acct}", _self_stock_suppliers)
+    check(sid7 == _acct_sid and kind7 == "self_stock_account" and rem7 is None,
+          f"'재고있음 {_acct}' -> self_stock_account/{_acct_sid}, 연락처는 안 뽑음"
+          f"(remainder=None)(실제 sid={sid7}/kind={kind7}/remainder={rem7!r})")
+
+    # 토큰 자체는 무엇이든 상관없다 -- 계정 식별자("herosys")만 본다(위
+    # SELF_STOCK_ACCOUNTS 주석 -- 이 오염이 몰의 «현재 상태»를 그대로 흘려보낸
+    # 것으로 보이므로 토큰이 바뀔 수 있다).
+    sid8, _n8, _r8, kind8 = resolve_supplier(f"품절 {_acct}", _self_stock_suppliers)
+    check(sid8 == _acct_sid and kind8 == "self_stock_account",
+          f"토큰이 달라도('품절 {_acct}') 계정이 같으면 self_stock_account"
+          f"(실제 sid={sid8}/kind={kind8})")
+
+    # herosys가 «아닌» 계정은 여전히 제외(다른 계정도 같은 오염이라는 것은 아직
+    # 확인된 사실이 아니다 -- 지어내지 않는다).
+    sid9, _n9, _r9, kind9 = resolve_supplier("재고있음 어떤다른계정", _self_stock_suppliers)
+    check(sid9 is None and kind9 == "excluded_stock_status",
+          f"herosys가 아닌 계정('어떤다른계정')은 여전히 excluded_stock_status"
+          f"(실제 sid={sid9}/kind={kind9}) -- 지어낸 매핑을 만들지 않는다")
+
+    # suppliers 목록에 대상 id 자체가 없으면(캐시가 낡았거나 다른 시드) 안전하게
+    # excluded_stock_status로 떨어진다 -- _FIXTURE_SUPPLIERS(원본, id=444 없음)로
+    # 확인한다. 가짜 업체를 새로 만들지 않는다(CANON).
+    sid10, _n10, _r10, kind10 = resolve_supplier(f"재고있음 {_acct}", _FIXTURE_SUPPLIERS)
+    check(sid10 is None and kind10 == "excluded_stock_status",
+          f"suppliers 목록에 대상 id가 없으면 안전하게 excluded_stock_status로 폴백"
+          f"(실제 sid={sid10}/kind={kind10}) -- 가짜 업체를 만들지 않는다")
+
+    # ── 같은 상품 안 충돌 가드(_apply_self_stock_guard) -- 2026-08-31 신설 ─────
+    # 2026-08-31 실측 4건(110585·118517·119574·121957)의 구조를 그대로 재현한다:
+    # 같은 상품 안에 자사 재고 행(herosys)과 정상 라벨 행이 «같은 공급처»를
+    # 가리키며 공존한다. 이걸 그대로 쓰면 나중 행이 앞 행을 덮어써 정상 행의
+    # 값을 잃는다 -- 가드가 그 자사 재고 행만 골라 되돌리는지 확인한다.
+    _fake_r = lambda tag: {"idx": tag, "contact_blob": tag, "o_price": 1, "state": "가능"}
+    _resolved_conflict = [
+        (_fake_r("normal_row"), (_acct_sid, "주식회사 팝콘컴퓨터", "Tpop1234 통합관리자", "contains")),
+        (_fake_r("self_stock_row"), (_acct_sid, "주식회사 팝콘컴퓨터", None, "self_stock_account")),
+    ]
+    guarded = _apply_self_stock_guard(_resolved_conflict)
+    g_normal = next(g for g in guarded if g[0]["idx"] == "normal_row")
+    g_self = next(g for g in guarded if g[0]["idx"] == "self_stock_row")
+    check(g_normal[1] == _acct_sid and g_normal[4] == "contains" and g_normal[5] is False,
+          f"충돌 가드 -- 정상 라벨 행은 그대로 남는다(실제 sid={g_normal[1]}/"
+          f"kind={g_normal[4]}/conflict={g_normal[5]})")
+    check(g_self[1] is None and g_self[4] == "excluded_stock_status" and g_self[5] is True,
+          f"충돌 가드 -- 같은 공급처를 가리키는 자사 재고 행은 excluded_stock_status로"
+          f" 되돌리고 conflict=True로 표시한다(실제 sid={g_self[1]}/kind={g_self[4]}/"
+          f"conflict={g_self[5]}) -- 정상 행의 값을 지키기 위해서다")
+
+    # 자사 재고 행 «둘»(이론상 -- 실측은 상품당 1개뿐이었다)이 같은 공급처를
+    # 가리켜도 첫 번째만 받아들이고 둘째는 충돌로 되돌린다(자기 자신과의 충돌도
+    # 같은 규칙으로 막는다 -- UPSERT 충돌은 상대가 정상 행이든 자사 재고 행이든
+    # 똑같이 일어난다).
+    _resolved_dup_self = [
+        (_fake_r("self_a"), (_acct_sid, "x", None, "self_stock_account")),
+        (_fake_r("self_b"), (_acct_sid, "x", None, "self_stock_account")),
+    ]
+    guarded2 = _apply_self_stock_guard(_resolved_dup_self)
+    g_a = next(g for g in guarded2 if g[0]["idx"] == "self_a")
+    g_b = next(g for g in guarded2 if g[0]["idx"] == "self_b")
+    check(g_a[4] == "self_stock_account" and g_a[5] is False,
+          f"충돌 가드 -- 자사 재고 행이 둘이면 첫 번째는 그대로 받아들인다"
+          f"(실제 kind={g_a[4]}/conflict={g_a[5]})")
+    check(g_b[1] is None and g_b[4] == "excluded_stock_status" and g_b[5] is True,
+          f"충돌 가드 -- 자사 재고 행이 둘이면 두 번째는 충돌로 되돌린다"
+          f"(실제 sid={g_b[1]}/kind={g_b[4]}/conflict={g_b[5]})")
+
+    # 자사 재고 행이 «없으면» 가드는 아무것도 바꾸지 않는다(회귀 방지 -- 기존
+    # 다중 공급처 상품의 매칭 결과가 이 리팩터로 달라지면 안 된다).
+    _resolved_no_self = [
+        (_fake_r("a"), (501, "A", None, "contains")),
+        (_fake_r("b"), (None, None, "b", "unmatched")),
+    ]
+    guarded3 = _apply_self_stock_guard(_resolved_no_self)
+    check([(g[1], g[4], g[5]) for g in guarded3] == [(501, "contains", False), (None, "unmatched", False)],
+          f"충돌 가드 -- 자사 재고 행이 없으면 입력 그대로 통과(실제"
+          f" {[(g[1], g[4], g[5]) for g in guarded3]})")
 
     # 판매중 최저가 판정(§③) -- 실측 8행은 마침 전체 최저가(278,490)가 이미 판매중이라
     # "전체 최저가가 품절에 있다"는 갈래를 못 덮는다. 그 갈래는 합성 데이터로 따로 확인한다.

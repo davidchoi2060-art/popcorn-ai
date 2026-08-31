@@ -97,6 +97,12 @@ _STOCK_STATUS_RE = re.compile(
     r'^(?:%s)(?=\s|$)' % '|'.join(re.escape(t) for t in
                                     sorted(STOCK_STATUS_TOKENS, key=len, reverse=True)))
 
+# 2026-08-31 사장님 확정 -- 이 오염 중 «herosys» 계정 하나는 "회사가 아닌 값"이
+# 아니라 "회사명이 깨져 나온 것"이었다("재고있음 herosys"는 suppliers.supplier_id=444
+# 주식회사 팝콘컴퓨터와 같은 계정). 전수(2,959개 캐시) 실측 -- 이 오염이 실제로
+# 관측된 값은 "재고있음 herosys" «단 하나뿐»(426행, 다른 토큰·다른 계정은 0건)이라
+# herosys 이외 계정은 아직 확인된 사실이 없다. 아래 SELF_STOCK_ACCOUNTS와
+# resolve_supplier()가 처리한다 -- 이 표에 없는 나머지는 여전히 excluded_stock_status.
 CORP_TOKENS = ("주식회사", "주시회사", "(주)", "㈜")
 
 # 클릭나라 특례 -- docs/supplier-consolidation-2026-08-25.md 8-3-1, 사장님 확정
@@ -104,6 +110,48 @@ CORP_TOKENS = ("주식회사", "주시회사", "(주)", "㈜")
 # '클릭나라'/'(주)클릭나라' 두 표기 모두 supplier_id=2로 잇는다. 495((주)클릭나라)는
 # 그 결정으로 '중지' 상태로 접힌 동일 업체라 새 몰 수집분도 거기로 보내면 안 된다.
 CLICK_NARA_SUPPLIER_ID = 2
+
+# 자사 재고 특례 -- 사장님 확정(2026-08-31, 지시서 원문: "「재고있음 herosys」와
+# 「주식회사 팝콘컴퓨터(supplier_id=444)」는 같은 계정이다"). 회사명 칸이
+# STOCK_STATUS_TOKENS로 깨져 나오는 행 중 «herosys» 계정(companyid=herosys 링크로
+# 실측 -- tools/mall_supplier_fetch.py의 _STOCK_STATUS_ROW_HTML 주석 참조)은 새
+# 공급처가 아니라 이미 있는 444(주식회사 팝콘컴퓨터)다. 전화번호로는 못 잇는다 --
+# 444는 order_phone 010-6330-3544인데 이 행은 010-9923-8834로 다르다(2026-08-31
+# 실측, 426행 전부 동일값). **근거는 오직 사장님의 위 확인 하나뿐이다.**
+#
+# 클릭나라 특례와 같은 모양으로 "이름 문자열"이 아니라 "계정 식별자 -> supplier_id"
+# 고정 사전을 쓴다 -- 회사명 칸이 이미 깨져 있어 이름 매칭이 원천적으로 성립하지
+# 않기 때문이다(정규화·포함 일치를 시도해도 "herosys"라는 문자열 자체가 suppliers.name
+# 그 무엇과도 안 닮았다).
+#
+# 키는 STOCK_STATUS_TOKENS 토큰 다음에 오는 «나머지 문자열»(소문자, 공백 트림)이다
+# -- 앞의 토큰 자체가 무엇인지는 안 가린다("재고있음 herosys"뿐 아니라 가정상
+# "품절 herosys"·"단종 herosys"가 와도 같은 계정으로 잇는다). 이렇게 일반화한 이유:
+# 이 오염은 몰이 그 상품의 «현재 재고 상태»를 (엉뚱한 자리에) 그대로 흘려보낸 것으로
+# 보이므로 토큰은 상품 상태에 따라 바뀔 수 있다 -- 실제 상태 판정 자체는 이 사전과
+# 무관하게 state_raw/state 필드가 이미 정확히 담당한다, 여기서 가리는 것은 "그 값을
+# «누구 몫»으로 볼지"뿐이다. herosys가 아닌 다른 나머지 문자열은 이 사전에 없으므로
+# 여전히 excluded_stock_status로 빠진다(다른 계정도 같은 오염을 낸다는 것은 아직
+# 확인된 사실이 아니다 -- 지어내지 않는다. 지금까지 실측된 값은 "herosys" 하나뿐).
+#
+# ⚠ resolve_supplier()는 "이 행이 «누구 것인가»"만 답한다. 아래 둘은 호출부 책임이다
+# (CLICK_NARA_SUPPLIER_ID도 같은 경계 -- 이 함수는 한 행만 보고 값을 매기지, 그
+# 값을 실제로 쓸지·다른 데이터를 덮어쓸지는 판단하지 않는다):
+#   ① 같은 상품 안에 이미 «정상 라벨»로 이 supplier_id에 매칭되는 다른 행이 있으면
+#      (2026-08-31 실측 4건 -- 110585·118517·119574·121957: "재고있음 herosys" 행과
+#      "주식회사 팝콘컴퓨터 Tpop1234 통합관리자" 행이 «서로 다른 idx·가격·재고상태»로
+#      «같은 상품 안에» 공존한다) 자사 재고 행까지 그대로 쓰면 PSP_UPSERT의
+#      UNIQUE(product_code, supplier_id) 충돌로 나중 처리되는 행이 앞 행을 덮어써
+#      «정상 행의 값이 조용히 사라진다»(idx가 큰 쪽이 나중이라 방향도 예측 불가).
+#      resolve_supplier()는 형제 행을 모르므로 이 충돌을 못 막는다 -- 호출부가 같은
+#      상품의 다른 행을 먼저 훑어야 한다(tools/mall_supplier_fetch.py의 run() 참조).
+#   ② 이 행의 연락처(전화·발주번호·contact_raw)를 suppliers에 그대로 채우면 안 된다
+#      -- "재고있음 herosys"의 발주번호(010-9923-8834)·원문 그 자체("재고있음
+#      herosys")는 이미 확보된 444의 진짜 담당자 정보(Tpop1234 통합관리자·
+#      010-6330-3544)보다 못한 값이다. "같은 계정"이라는 확인은 «가격을 어느 회사
+#      것으로 볼지»에 대한 확인이지 "이 전화번호로 담당자 연락처를 덮어써도 된다"는
+#      확인이 아니다 -- 잃을 게 있는 곳에서는 손대지 않는다.
+SELF_STOCK_ACCOUNTS = {"herosys": 444}
 
 
 # ==================================================================== 파싱 ==
@@ -351,10 +399,19 @@ def resolve_supplier(name_blob, suppliers: list):
     매칭 실패면 (None, None, name_blob, 'unmatched'). 업체명 자리에 재고 상태값이
     온 행이면 (None, None, name_blob, 'excluded_stock_status') -- 이건 "모르는
     회사"가 아니라 "애초에 회사가 아닌 값"이라 매칭을 시도하지 않는다(위
-    STOCK_STATUS_TOKENS 참조). 우선순위: **재고 상태값 제외** -> 클릭나라 특례 ->
-    원문 정확 일치 -> 정규화 일치 -> 정규화 접두 일치(긴 이름부터 -- 짧은 이름이
+    STOCK_STATUS_TOKENS 참조). **다만 그 나머지 문자열이 SELF_STOCK_ACCOUNTS에 있는
+    계정("herosys")이면** (supplier_id, matched_name, None, 'self_stock_account')
+    -- 이건 "회사가 아닌 값"이 아니라 "이미 아는 회사(444)의 깨진 표시"다(2026-08-31
+    사장님 확정, 위 SELF_STOCK_ACCOUNTS 참조). 우선순위: **재고 상태값 판정**(그 중
+    자사 계정이면 self_stock_account, 아니면 excluded_stock_status) -> 클릭나라 특례
+    -> 원문 정확 일치 -> 정규화 일치 -> 정규화 접두 일치(긴 이름부터 -- 짧은 이름이
     먼저 걸려 잘못 잘리는 것을 막는다). 활성 공급처를 우선하되 없으면 중지 상태도 쓴다
     (중지된 곳으로만 매칭되면 사람이 검토해야 한다 -- 호출부가 match_kind로 안다).
+
+    ⚠ **self_stock_account는 "누구 것인가"만 답한다 -- "그대로 써도 되는가"는 호출부
+    책임이다.** 같은 상품 안에 이 supplier_id로 이미 정상 매칭된 다른 행이 있을 수
+    있고(실측 4건), 이 행의 연락처를 suppliers에 덮어쓰면 안 된다. 두 경계 모두 위
+    SELF_STOCK_ACCOUNTS 주석 ①②에 있다 -- 이 함수 밖(호출부)에서 지켜야 한다.
 
     ⚠ **sid가 None이어도 그 행의 가격·재고상태(o_price·state)는 멀쩡히 파싱돼 있다**
     (2026-08-30 실측 -- 추천 후보 2,707건 중 47건이 product_supplier_prices에 행이
@@ -376,7 +433,17 @@ def resolve_supplier(name_blob, suppliers: list):
     blob = (name_blob or "").strip()
     if not blob:
         return None, None, None, "empty"
-    if _STOCK_STATUS_RE.match(blob):
+    stock_m = _STOCK_STATUS_RE.match(blob)
+    if stock_m:
+        account = blob[stock_m.end():].strip().lower()
+        self_sid = SELF_STOCK_ACCOUNTS.get(account)
+        if self_sid is not None:
+            s = next((s for s in suppliers if s["supplier_id"] == self_sid), None)
+            if s is not None:
+                return s["supplier_id"], s["name"], None, "self_stock_account"
+            # suppliers 목록에 그 id가 없으면(캐시가 낡았거나 다른 시드) 새 업체를
+            # 만들지 않는다 -- 안전하게 재고상태 제외로 떨어진다(CANON "suppliers에
+            # 가짜 업체를 만들지 마라"와 같은 이유).
         return None, None, blob, "excluded_stock_status"
     norm_blob = _normalize_name(blob)
     if norm_blob.startswith(_normalize_name("클릭나라")):
