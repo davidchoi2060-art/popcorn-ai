@@ -195,6 +195,13 @@
 .pp-field input,.pp-field select{font:400 11.5px/1.3 var(--font);border:1px solid rgba(0,0,0,.18);
     border-radius:5px;padding:7px 9px;background:var(--card);width:100%}
 .pp-dr-hint{font:400 10px/1.65 var(--font);color:var(--rv-dim);margin-top:9px}
+/* 사양 탭 하단의 «채울 때 보는 값»(요청 38). 편집 칸과 섞이지 않게 배경을 달리하고
+   제목으로 읽기 전용임을 먼저 말한다 — 여기서 고치는 자리가 아니다. */
+.pp-specsrc{margin-top:12px;padding:9px 11px 3px;border-radius:7px;
+  background:var(--container);border:1px solid rgba(0,0,0,.06)}
+.pp-specsrc-h{font:600 10px/1.5 var(--font);color:var(--rv-faint);margin-bottom:5px;
+  letter-spacing:.02em}
+.pp-specsrc .pp-field .val{white-space:pre-wrap;word-break:break-word}
 .pp-dr-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:12px 18px;display:flex;
         align-items:center;gap:8px;background:var(--container);flex-wrap:wrap}
 .pp-dr-foot .note{font:400 10.5px/1.4 var(--font);color:var(--rv-faint);flex:1;min-width:120px}
@@ -850,11 +857,19 @@ a.pp-btn-line{color:var(--on)}
   // supplier(공급처 원문)는 products의 자유 텍스트 한 칸이다 — [공급처] 탭의
   // 공급처별 매입가 표(product_supplier_prices)와는 다른 값이라 라벨을 "(원문)"으로
   // 구분한다(둘을 같은 자리에 나란히 두면 헷갈린다 — 합치지 않는다).
+  // 요청 37(2026-09-01) — 상품코드·SKU 를 뺀 나머지를 고칠 수 있게 넓혔다.
+  // 뒤 셋(모델명·다나와 코드·시장가)은 그동안 읽기 전용이라 아래 infoRows 에만
+  // 있었다 — 편집으로 옮기면서 «두 곳에 같은 값이 뜨지 않도록» infoRows 에서 뺀다.
+  // ⚠ 시장가는 검수 승인 경로(admin_reviews.PRODUCT_FIELD_CAST)도 건드리는 값이다.
+  //   여기서 고치면 잠기고, 그 뒤로는 적재도 검수도 덮지 않는다.
   var BASIC_FIELDS = [
     ["name","상품명","text","product_name"], ["maker","제조사","text","maker"],
     ["supplier","공급처(원문)","text","supplier"],
     ["sale_price","판매가","number","sale_price"], ["purchase_price","매입가","number","purchase_price"],
-    ["stock_qty","재고","number","stock_qty"], ["status","상태","select","status"]
+    ["stock_qty","재고","number","stock_qty"], ["status","상태","select","status"],
+    ["model_name","모델명","text","model_name"],
+    ["danawa_code","다나와 코드","text","danawa_code"],
+    ["market_price","시장가","number","market_price"]
   ];
   function basicTabHtml(d){
     var editing = DRAWER.editing.basic;
@@ -903,11 +918,11 @@ a.pp-btn-line{color:var(--on)}
             + '<span class="k">' + esc(g.label) + '</span><span class="v">' + esc(g.value) + '</span></div>';
         }).join("") + '</div></div>';
 
+    // 모델명·다나와 코드·시장가는 위 BASIC_FIELDS 로 «옮겼다»(요청 37) — 여기 남겨
+    // 두면 같은 값이 한 탭에 두 번 뜨고, 하나는 고쳐지는데 하나는 안 고쳐져
+    // 어느 쪽이 진짜인지 알 수 없게 된다.
     var infoRows = [
       ["데이터 출처", d.origin==="real"?"실데이터":(d.origin==="demo"?"데모":(d.origin||"—"))],
-      ["모델명", d.model_name||"—"],
-      ["다나와 코드", d.danawa_code||"—"],
-      ["시장가", d.market_price==null?"—":fmtWon(d.market_price)],
       ["사양 원문", d.spec_source_text||"—"],
       ["등록일", fmtDate(d.created_at)],
       ["수정일", fmtDate(d.updated_at)]
@@ -974,7 +989,27 @@ a.pp-btn-line{color:var(--on)}
       }
       return '<div class="pp-field"><span class="lb">' + esc(f.label) + '</span>' + valHtml + '<span class="lock">' + lockMark + '</span></div>';
     }).join("");
-    return head + rows + '<div class="pp-dr-hint">' + (editing
+    // ── 사양을 채울 «근거»를 같은 화면에 둔다 (요청 38 · 2026-09-01) ─────────
+    //   사양 값은 상품명·사양 원문을 읽어서 넣는데, 그것이 [기본 정보] 탭에만 있어
+    //   운영자가 탭을 오가며 외워 옮겨야 했다 — 그 사이에 값을 잘못 옮기면
+    //   «지어낸 사양»이 정본에 들어간다(A-18 이 막으려는 바로 그것).
+    //   ⚠ 읽기 전용이다. 여기서 고치게 하지 않는다 — 기본 정보는 [기본 정보] 탭이
+    //     단일 원천이고, 두 자리에서 고치면 어느 쪽이 맞는지 알 수 없게 된다.
+    //   ⚠ 값을 지어내지 않는다: 빈 값은 «—» 로 두고 채워진 척하지 않는다.
+    var srcRows = [
+      ["상품명", d.name || "—"],
+      ["제조사", d.maker || "—"],
+      ["모델명", d.model_name || "—"],
+      ["사양 원문", d.spec_source_text || "—"]
+    ].map(function (r) {
+      // 사양 원문에 몰 HTML 태그가 섞여 온다 — 기본 정보 탭과 «같은» 함수로 벗긴다.
+      return '<div class="pp-field"><span class="lb">' + r[0] + '</span>'
+        + '<span class="val dim">' + esc(Admin2Text.stripHtml(r[1])) + '</span><span></span></div>';
+    }).join("");
+    var srcHtml = '<div class="pp-specsrc">'
+      + '<div class="pp-specsrc-h">채울 때 보는 값 — 읽기 전용</div>' + srcRows + '</div>';
+
+    return head + rows + srcHtml + '<div class="pp-dr-hint">' + (editing
       ? "값을 저장하면 그 필드가 잠기고, 채워진 필드의 검수 대기가 함께 해소됩니다."
       : "읽기 전용입니다. [수정]으로 이 부품 종류에서 쓰는 사양을 채웁니다.") + '</div>';
   }

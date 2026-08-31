@@ -354,22 +354,52 @@ def register_product(body: RegisterBody):
 # undo가 그것을 되돌린다. 역참조 키는 규약대로 `ref_log_id`.
 
 # 화면에서 고칠 수 있는 필드 -> (DB 컬럼, 파서). 여기 없는 것은 화면이 못 바꾼다.
+# ⚠ 문자열 필드는 **None 을 먼저 걸러야 한다**(2026-09-01 요청 37 검증에서 드러남).
+#   `str(v).strip() or None` 만 쓰면 v 가 None 일 때 `str(None)` == "None" 이 되고,
+#   그 네 글자가 참값이라 **문자열 "None" 이 상품 정보로 저장된다.** 화면에는 제조사가
+#   「None」인 상품으로 보인다. maker·supplier 에 원래 있던 결함이고, 값을 «지우는»
+#   경로(빈 칸 저장)가 열리면서 실제로 밟게 됐다.
+def _s(v, n=None):
+    """문자열 정리 — None 은 None 으로 둔다(지운다는 뜻). n 은 길이 상한."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    return (s[:n] if n else s) or None
+
+
 EDITABLE = {
-    "name": ("product_name", lambda v: (str(v).strip() or None)),
-    "maker": ("maker", lambda v: (str(v).strip() or None)),
+    "name": ("product_name", _s),
+    "maker": ("maker", _s),
     # products.supplier — 자유 텍스트(몰 CSV 값). product_supplier_prices(공급처별
     # 매입가 표, 별도 탭)와는 다른 필드다 — 합치지 않는다. maker와 같은 규칙:
     # 빈 문자열은 '지운다'는 뜻으로 NULL 저장, 컬럼 자체를 안 보내면 안 바뀐다.
-    "supplier": ("supplier", lambda v: (str(v).strip()[:200] or None)),
+    "supplier": ("supplier", lambda v: _s(v, 200)),
     "sale_price": ("sale_price", lambda v: None if v in ("", None) else int(v)),
     "purchase_price": ("purchase_price", lambda v: None if v in ("", None) else int(v)),
     "stock_qty": ("stock_qty", lambda v: int(v)),
     "status": ("status", lambda v: str(v).strip()),
+    # ── 요청 37 (2026-09-01 사장님 지시) ────────────────────────────────────
+    #   "상품코드·SKU 말고는 다 변경할 수 있어야 한다 — 특가판매로 시장가가 바뀌고
+    #    다나와 코드도 고치는 경우가 있다."
+    #   ⚠ 잠금이 실제로 지켜지는지 «먼저» 확인하고 넣었다. `CLAUDE.md`에는 "잠금이
+    #     지키는 것은 매입가·판매가 둘뿐"이라 적혀 있지만 **그 서술이 낡았다** —
+    #     catalog_ingest.UPSERT_PRODUCTS_SQL 에 셋 다 가드가 이미 있다
+    #     (model_name:549 · market_price:592 · danawa_code:612 · 2026-08-24 확장).
+    #     그때 주석이 "나중에 EDITABLE 이 넓어질 때를 위해 미리 넣는다"고 적어 뒀고,
+    #     오늘 그 "나중"이 왔다. 즉 여기 추가하는 것만으로 잠금이 살아난다.
+    "model_name": ("model_name", _s),
+    # ⚠ danawa_code 는 부분 UNIQUE 인덱스가 걸려 있다(0001_initial_schema:127 —
+    #   `WHERE danawa_code IS NOT NULL`). 남의 코드를 넣으면 23505 로 죽으므로
+    #   저장 전에 미리 보고 사람이 읽는 문장으로 막는다(아래 patch_product).
+    "danawa_code": ("danawa_code", _s),
+    "market_price": ("market_price", lambda v: None if v in ("", None) else int(v)),
 }
 STATUS_OK = ("판매중", "품절", "단종", "삭제대기")
 # 가격·재고는 정본 수치다 — 음수나 터무니없는 값이 들어가면 견적이 통째로 흔들린다
 LIMIT = {"sale_price": (0, 100_000_000), "purchase_price": (0, 100_000_000),
-         "stock_qty": (0, 100_000)}
+         "stock_qty": (0, 100_000),
+         # 시장가도 정본 수치다 — 가격 검토 화면이 이 값을 기준으로 삼는다(요청 37).
+         "market_price": (0, 100_000_000)}
 
 # EDITABLE의 가격 필드 -> product_price_history.field 값(실측: 이 테이블은 'sale'/
 # 'purchase' 둘만 쓴다 — 'sale_price' 문자열 그대로가 아니다). PATCH가 이 필드들을
@@ -698,10 +728,30 @@ def patch_product(product_code: int, body: PatchBody):
     with engine.begin() as conn:
         cur = conn.execute(text(
             "SELECT product_code, sku, product_name, maker, supplier, purchase_price, sale_price,"
-            " stock_qty, status, locked_fields FROM products WHERE product_code=:pc FOR UPDATE"),
+            " stock_qty, status, model_name, danawa_code, market_price, locked_fields"
+            " FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": product_code}).mappings().first()
         if cur is None:
             raise HTTPException(404, "상품이 없습니다")
+
+        # danawa_code 는 부분 UNIQUE 라 남의 코드를 넣으면 23505 로 죽는다 — 그러면
+        # 운영자에게는 "500 오류"만 보인다. **누가 이미 쓰고 있는지**를 먼저 찾아
+        # 그 상품코드와 이름을 함께 말한다(찾아가 고칠 수 있어야 한다).
+        # 시세 관측이 이 컬럼 하나로 이어지므로 조용히 덮게 두면 안 된다.
+        if "danawa_code" in parsed:
+            _, newdc = parsed["danawa_code"]
+            if newdc is not None and newdc != cur["danawa_code"]:
+                dup = conn.execute(text(
+                    "SELECT product_code, product_name FROM products"
+                    " WHERE danawa_code = :d AND product_code <> :pc LIMIT 1"),
+                    {"d": newdc, "pc": product_code}).mappings().first()
+                if dup:
+                    raise HTTPException(409, {
+                        "error": "danawa_code_taken",
+                        "detail": f"다나와 코드 {newdc} 는 이미 상품 {dup['product_code']}"
+                                  f"({dup['product_name'][:40]})가 쓰고 있습니다"
+                                  " — 한 코드는 한 상품에만 붙습니다.",
+                        "taken_by": dup["product_code"]})
 
         before, sets, params = {}, [], {"pc": product_code}
         for k, (col, v) in parsed.items():
