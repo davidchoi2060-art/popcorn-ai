@@ -3,9 +3,10 @@
 
   ■ 이 화면이 답하는 질문
     "상품을 옮길 자리(판매 분류 트리)를 어떻게 세우고 다듬는가" — 트리 자체를 보는
-    조회와, 노드를 추가·이동·삭제하고 마진을 거는 쓰기가 한 화면에 있다. 실제 상품을
+    조회와, 노드를 추가·이동·삭제하는 쓰기가 한 화면에 있다. 실제 상품을
     분류에 배정하는 일은 이 화면이 하지 않는다("상품 분류 매핑" 화면 소관 — 이 화면은
-    "옮길 자리"만 만든다).
+    "옮길 자리"만 만든다). **마진을 거는 일도 이 화면이 하지 않는다**(2026-09-01부터 —
+    파일 하단 "■★ 마진·재고 표시 제거" 참고, "마진 정책" 화면 소관).
 
   ■ 출처 — 사장님이 Claude Design에서 확정한 원안
     파일: `docs/design/dc-product-category.html`(`<x-dc>` + `DCLogic` + `support.js`
@@ -22,17 +23,23 @@
     실측으로 확인한 필드 이름과 몇 가지 함정이다.
 
     ① **노드 식별자는 `category_id`다**(`id`가 아니다). 목록은 `items[]`이고 최상위
-       "요약" 객체는 없다 — 통계(전체 수·대분류 수·위반 합계·마진 걸린 수)는 이 화면이
+       "요약" 객체는 없다 — 통계(전체 수·대분류 수·위반 합계)는 이 화면이
        `items[]`를 순회해 **직접 합산**한다(서버가 준 실제 수를 더하는 것이지 새 값을
-       지어내는 게 아니다 — CANON §2-1과 배치되지 않는다고 판단했다).
+       지어내는 게 아니다 — CANON §2-1과 배치되지 않는다고 판단했다). ⚠ "마진 걸린
+       수" 카드는 2026-09-01 제거됐다(파일 하단 "■★ 마진·재고 표시 제거" 참고) — 이
+       항목의 "마진 걸린 수"는 당시 서술이라 지금은 해당 없음.
     ② **상품 수는 두 필드로 온다**: `product_count`(이 노드 직속) ·
        `subtree_count`(이 노드 + 자손 전체 합산, 서버가 재귀 CTE로 이미 계산). 목록의
        "직속 / 자손" 열은 이 둘을 그대로 쓴다 — 원안의 `totalOf()`(자기 직속 +
        자손 재귀합)가 실제로는 `subtree_count`와 같은 정의였다.
     ③ **재고 있음(`in_stock_count`)은 직속만 온다**(자손 미포함, SQL 확인:
-       `p.category_id = c.category_id`만 본다). 원안은 이 열도 자손까지 합친 값을
+       `p.category_id = c.category_id`만 본다). ⚠ 이 항목은 **역사 기록이다** —
+       "재고 있음" 열 자체가 2026-09-01 화면에서 빠졌다(`stockUnder()`도 그때 함께
+       지웠다, 파일 하단 "■★ 마진·재고 표시 제거" 참고). API는 `in_stock_count`를
+       여전히 준다("상품 분류 매핑" 화면이 그 값을 쓴다) — 아래 서술은 **이 화면이
+       그 값을 쓰던 시절**의 기록이다: 원안은 이 열도 자손까지 합친 값을
        보여준다 — 서버에 자손 합산 필드가 따로 없어, **이 화면이 트리를 걸으며
-       클라이언트에서 합산**한다(`stockUnder()`). 실제 서버 값(직속)과 화면 표시값
+       클라이언트에서 합산**했다(`stockUnder()`). 실제 서버 값(직속)과 화면 표시값
        (자손 포함 합계)이 다르다는 뜻이라 향후 서버에 전용 집계 필드가 생기면 이
        클라이언트 합산을 지우는 편이 낫다 — 검증 대상으로 보고서에 남긴다.
     ④ **허용 부품 종류는 두 형태로 온다**: `allowed_part_types`(저장용 실제
@@ -42,15 +49,17 @@
        루트의 `part_types:[{key,label}]`)만으로 한다. 저장할 때는 `part_types[].key`
        값을 보낸다(`_clean_types`가 `DISPLAY_LABELS`의 키를 기대함 — 라벨 문자열을
        그대로 보내면 400이 난다).
-    ⑤ **마진은 세 값이 온다**: `margin_rate`(이 노드에 직접 건 값, 없으면 null) ·
+    ⑤⑥ ⚠ **역사 기록 — 이 화면은 더 이상 마진을 표시·수정하지 않는다**(2026-09-01,
+       파일 하단 "■★ 마진·재고 표시 제거" 참고). 아래 둘은 **이 화면이 마진을
+       다루던 시절**의 기록이고, API 자체는 지금도 그대로다(`margin_policy.html.j2`가
+       이어서 쓴다) — 이 화면의 서랍·통계·목록에서 마진 관련 마크업·JS를 찾지 마라.
+       ⑤ 마진은 세 값이 온다: `margin_rate`(이 노드에 직접 건 값, 없으면 null) ·
        `margin_effective`(실제 적용값) · `margin_source`(어디서 왔는지 서버가 이미
        문장으로 만들어 줌 — "전역 기본" | "이 분류" | "상속: 상위이름", 세 형태가
-       전부다). 화면은 이 문장을 그대로 쓰거나 살짝 풀어 쓸 뿐 상속 경로를 다시
-       계산하지 않는다 — 계산 원천은 여전히 `api/pricing.resolve_margins` 하나다.
-    ⑥ **마진 설정·해제는 같은 엔드포인트다** — `PUT .../margin`에
+       전부다). 계산 원천은 `api/pricing.resolve_margins` 하나다.
+       ⑥ 마진 설정·해제는 같은 엔드포인트다 — `PUT .../margin`에
        `{margin_rate:0.12}`(설정)와 `{margin_rate:null}`(해제=상속으로 되돌리기)을
-       **같은 PUT**으로 보낸다. 별도 DELETE가 없다(처음 지시서는 DELETE로 잘못
-       적었었다).
+       **같은 PUT**으로 보낸다. 별도 DELETE가 없다.
     ⑦ **PATCH의 이동에는 함정이 하나 있다** — `parent_id`를 `null`로 보내는 것과
        "부모를 바꾸지 않음"을 서버가 구분할 수 없어(둘 다 필드 미변경처럼 보임),
        최상위로 옮길 때는 `parent_id`가 아니라 **`move_to_root:true`**를 보낸다.
@@ -139,11 +148,12 @@
        아래 "■★ 소분류 직접 생성 — (가)안" 참고.
     ④ **토스트는 셸의 `Admin2Shell.toast()`를 그대로 쓴다**(action 콜백 인자도 이미
        지원 — `admin2-shell.js` 실측) — 화면이 따로 토스트를 구현하지 않는다.
-    ⑤ **이름·정렬순서·마진율 입력은 전체 재렌더를 하지 않는다** — `innerHTML`을
-       키 입력마다 통째로 바꾸면 커서·포커스가 매번 날아간다(실사용 시 한 글자
-       치면 입력창 밖으로 포커스가 튕기는 사고). 그래서 이 세 입력은 `input` 이벤트에서
-       상태만 갱신하고, 저장 여부·차이 목록처럼 **입력창이 아닌 영역만** 부분
-       갱신한다(`patchFooter()`).
+    ⑤ **이름·정렬순서 입력은 전체 재렌더를 하지 않는다**(2026-09-01까지는 마진율
+       입력도 셋째로 같은 방식이었다 — 그 입력 자체가 화면에서 빠졌다, "■★ 마진·재고
+       표시 제거" 참고) — `innerHTML`을 키 입력마다 통째로 바꾸면 커서·포커스가 매번
+       날아간다(실사용 시 한 글자 치면 입력창 밖으로 포커스가 튕기는 사고). 그래서 이
+       입력들은 `input` 이벤트에서 상태만 갱신하고, 저장 여부·차이 목록처럼
+       **입력창이 아닌 영역만** 부분 갱신한다(`patchFooter()`).
     ⑥ **서랍은 화면 콘텐츠 영역 기준으로 덮는다** — 원안은 `top:52px`(원안 자체
        헤더 높이) 고정값을 썼다. 셸 헤더는 `min-height:52px`로 위젯이 늘면 줄바꿈될
        수 있어, 고정 픽셀 대신 이 화면의 콘텐츠 래퍼(`position:relative`) 안에서
@@ -152,10 +162,10 @@
        `#4a463e`·`#5b564d`(본문 보조색) 두 값은 정확히 일치하는 토큰이 없어 가장
        가까운 `--rv-ink-soft`(#403c35)로 합쳤다(이미 ai_task_settings·reviews가
        설명 텍스트에 쓰는 것과 같은 역할의 토큰) · `#d3cec2`(leaf 캐럿 비활성색)는
-       `--rv-dim4`(#cfc9bd)로 · 마진 "직접" 칩의 강조 배경(`#e6e0d2`)은 대응 토큰이
-       없어 배경 대신 `1.5px solid var(--rv-ink)` 테두리로 강조를 옮겼다(같은
-       "직접 값" 강조 목적을 ai_task_settings의 `.ats-cf.adopted`가 테두리로 표현하는
-       것과 같은 방식). 확인자가 치수·색 대조표를 만들 때 이 목록을 참고하면 된다.
+       `--rv-dim4`(#cfc9bd)로 옮겼다. ⚠ 이 항목이 원래 셋째로 들던 "마진 '직접' 칩의
+       강조 배경(`#e6e0d2`) → 테두리 강조" 예시는 2026-09-01 그 칩 자체가 화면에서
+       빠지며 함께 없어졌다("■★ 마진·재고 표시 제거" 참고) — 확인자가 치수·색
+       대조표를 만들 때 이 목록에서 마진 칩을 찾지 않아도 된다.
     ⑧ **화살표는 diff 줄에서만 ASCII `->`** — 서버 stdout cp949 함정 전례(CLAUDE.md
        「함정」)를 따라 ai_task_settings와 같은 원칙을 지켰다. 그 외 순수 표시용
        유니코드 기호(▸▾·▲●○▼✕)는 다른 admin2 화면들도 이미 쓰고 있어(예:
@@ -242,6 +252,36 @@
     `href=None`(신설 예정)이라 이 화면에서 그 화면으로 가는 실제 링크를 만들지
     않았다(P-09: 없는 화면으로 링크하지 않는다) — 원안처럼 화면 이름을 **글자로만**
     언급한다(토스트·서랍 문구에서 "상품 분류 매핑"이라고 부르되 클릭은 안 됨).
+
+  ■★ 마진·재고 표시 제거 — 사장님 지시 (2026-09-01)
+    사장님 원문: "상품 분류 관리에서 상품의 분류만을 관리하는 것이라서 ... 재고? 마진
+    등은 의미 없음." 목록 열(재고 있음·마진) · 상단 통계 카드(개별 마진이 걸린 분류) ·
+    우측 레일의 "마진 상속" 정보 상자 · 서랍의 마진 입력칸·상속 표시·"이 분류에
+    걸기"·"상속으로 되돌리기"를 전부 뺐다. 남긴 것: 분류/허용 부품 종류/직속·자손,
+    분류 수·허용 종류 위반·분류 미배정 상품, 이름·상위 분류·정렬순서·허용 부품 종류·
+    노출·위반 안내·변경 이력.
+
+    **데이터는 지우지 않았다** — `categories.margin_rate`·`category_margin_policies`·
+    `api/pricing.resolve_margins`(마진 단일 원천)는 그대로다. `GET /api/admin/categories`
+    응답도 바꾸지 않았다 — 같은 응답을 다른 화면이 함께 쓴다: "상품 분류 매핑"
+    (`product_category_map.html.j2`)이 `in_stock_count`를, "마진 정책"
+    (`margin_policy.html.j2`)이 `margin_rate`/`margin_effective`/`margin_source`/
+    `margin_note`/`default_margin`을 읽는다(둘 다 실측 확인 — grep, 코드 읽음).
+
+    **분류별 마진을 실제로 걸고 푸는 자리는 이제 "마진 정책"(ADM-PRC-020,
+    `margin_policy.html.j2`) 화면 하나뿐이다.** 그 화면은 이미 2026-08-15부터
+    "③ 분류별 예외" 서랍에서 같은 `PUT /api/admin/categories/{cid}/margin`을
+    불러 왔고, 자신의 문구에 "「상품 분류 관리」의 마진 칸은 읽기 전용으로 바뀌고
+    이 화면을 가리킵니다"라고 이미 예고해 두고 있었다 — 이번 변경은 그 예고(읽기
+    전용화)보다 한 단계 더 나가 완전히 제거했다(사장님이 직접 그렇게 지시했다).
+
+    **재고(`in_stock_count`)는 애초 이 화면에서도 쓰기 기능이 없던 단순 표시였다**
+    (이 화면에 재고를 고치는 동작은 원래 없었다 — 재고의 유일한 원장은
+    `stock_movements`이고 이 화면은 그 경로를 쓴 적이 없다). 지워도 잃는 기능이 없다.
+
+    지운 것과 함께 정리한 죽은 코드: `stockUnder()`·`marginRowText()`·
+    `marginSourceSentence()`·`setMargin()`·`clearMargin()`·`pct()`(전부 마진·재고
+    표시 전용이라 호출자가 사라지면 함수 자체도 지웠다) · `S.marginDraft` 상태.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -295,12 +335,12 @@ input{font-family:var(--rv-mono)}
 
 .pc-split{flex:1;min-height:0;display:flex;gap:14px;padding:12px 18px 18px}
 .pc-listcol{flex:1;min-width:0;display:flex;flex-direction:column}
-.pc-thead{flex:none;display:grid;grid-template-columns:1fr 132px 96px 96px 128px;gap:12px;align-items:center;
+.pc-thead{flex:none;display:grid;grid-template-columns:1fr 132px 96px;gap:12px;align-items:center;
   padding:9px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;
   font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);overflow:hidden;scrollbar-gutter:stable}
 .pc-tbody{flex:1;min-height:0;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
   border-radius:0 0 7px 7px;overflow:auto;scrollbar-gutter:stable}
-.pc-row{display:grid;grid-template-columns:1fr 132px 96px 96px 128px;gap:12px;align-items:center;
+.pc-row{display:grid;grid-template-columns:1fr 132px 96px;gap:12px;align-items:center;
   padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;background:transparent;
   border-left:3px solid transparent}
 .pc-row.top{background:#faf7f0}
@@ -319,10 +359,7 @@ input{font-family:var(--rv-mono)}
 .pc-row .types.none{color:var(--rv-dim)}
 .pc-row .types.set{color:var(--rv-muted)}
 .pc-row .types.etc{color:var(--rv-amber)}
-.pc-row .counts,.pc-row .stock{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);text-align:right}
-.pc-row .margin{font:400 10px/1.3 var(--rv-font);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pc-row .margin.own{color:var(--rv-ink)}
-.pc-row .margin.inh{color:var(--rv-dim)}
+.pc-row .counts{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);text-align:right}
 
 .pc-tree-empty{padding:40px;text-align:center}
 .pc-tree-empty[hidden]{display:none}
@@ -336,10 +373,7 @@ input{font-family:var(--rv-mono)}
 .pc-etcnote{font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint);flex:1;min-width:0}
 
 .pc-rail{width:316px;flex:none;display:flex;flex-direction:column;gap:12px;overflow:auto}
-.pc-mgbox{flex:none;background:var(--rv-panel);border:1px solid rgba(0,0,0,.11);border-radius:8px;padding:13px 15px}
 .pc-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:9px}
-.pc-mgbox .bd{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-ink-soft)}
-.pc-mgbox .ft{font:400 10px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:7px}
 
 .pc-blindbox{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.11);border-radius:8px;
   padding:13px 15px;display:flex;flex-direction:column;gap:9px}
@@ -410,24 +444,6 @@ input{font-family:var(--rv-mono)}
   color:var(--rv-ink-soft);background:var(--rv-card);border:1px solid rgba(0,0,0,.18)}
 .pc-chip.on{color:var(--rv-canvas);background:var(--rv-ink);border-color:var(--rv-ink)}
 
-.pc-mgfield{border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:11px 13px;background:#faf7f0}
-.pc-mgfield .row1{display:flex;align-items:center;gap:9px}
-.pc-mgchip{font:600 10.5px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-panel2);
-  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap;flex:none}
-.pc-mgchip.own{color:var(--rv-ink);background:var(--rv-card);border:1.5px solid var(--rv-ink)}
-.pc-mgfield .src{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:0}
-.pc-mgfield .row2{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
-.pc-mgfield .row2 label{font:400 10.5px/1.3 var(--rv-font);color:var(--rv-dim)}
-.pc-mgfield input{width:96px;font:500 12px/1.3 var(--rv-mono);color:var(--rv-ink);background:var(--rv-card);
-  border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:8px 10px;outline:none}
-.pc-mgbtn{font:500 11px/1 var(--rv-font);background:var(--rv-card);border:1px solid rgba(0,0,0,.22);border-radius:5px;
-  padding:8px 11px;cursor:pointer;color:var(--rv-ink)}
-.pc-mgbtn.dis{color:var(--rv-dim2);cursor:not-allowed}
-.pc-mgclear{font:500 11px/1 var(--rv-font);background:var(--rv-card);border:1px solid rgba(0,0,0,.16);border-radius:5px;
-  padding:8px 11px;cursor:pointer;color:var(--rv-ink-soft)}
-.pc-mgclear.dis{color:var(--rv-dim2);cursor:not-allowed}
-.pc-mgfield .hint{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-faint);margin-top:8px}
-
 .pc-visbox{display:flex;align-items:flex-start;gap:9px;border:1px solid rgba(0,0,0,.12);border-radius:7px;
   padding:10px 12px;background:#faf7f0;cursor:pointer;width:100%;text-align:left}
 .pc-vismark{font:600 11px/1 var(--rv-mono);margin-top:2px;flex:none}
@@ -469,8 +485,8 @@ input{font-family:var(--rv-mono)}
   .pc-rail{width:100%}
   .pc-drawer{position:fixed;top:0;width:100%}
   .pc-thead,.pc-row{grid-template-columns:1fr 96px}
-  .pc-thead span:nth-child(2),.pc-thead span:nth-child(4),.pc-thead span:nth-child(5),
-  .pc-row .types,.pc-row .stock,.pc-row .margin{display:none}
+  .pc-thead span:nth-child(2),
+  .pc-row .types{display:none}
 }
 </style>
 {% endblock %}
@@ -488,7 +504,7 @@ input{font-family:var(--rv-mono)}
   <div class="pc-banner">
     <span class="mk">경계</span>
     <span class="hd">엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다</span>
-    <span class="ds" id="pcNote">부품 종류(part_type, 엔진이 읽는 닫힌 집합)와 다른 축입니다. 이 화면이 하는 일은 판매 탐색·마진 상속·오분류 경고입니다.</span>
+    <span class="ds" id="pcNote">부품 종류(part_type, 엔진이 읽는 닫힌 집합)와 다른 축입니다. 이 화면이 하는 일은 판매 탐색·오분류 경고입니다.</span>
   </div>
 
   <div class="pc-loading" id="pcLoading"><div>불러오는 중…</div></div>
@@ -505,7 +521,7 @@ input{font-family:var(--rv-mono)}
     <div class="pc-split">
       <div class="pc-listcol">
         <div class="pc-thead">
-          <span>분류</span><span>허용 부품 종류</span><span>직속 / 자손</span><span>재고 있음</span><span>마진</span>
+          <span>분류</span><span>허용 부품 종류</span><span>직속 / 자손</span>
         </div>
         <div class="pc-tbody" id="pcRows"></div>
         <div class="pc-tree-empty" id="pcTreeEmpty" hidden>
@@ -519,12 +535,6 @@ input{font-family:var(--rv-mono)}
       </div>
 
       <aside class="pc-rail">
-        <div class="pc-mgbox">
-          <div class="pc-cap">마진 상속</div>
-          <div class="bd" id="pcMarginInfo"></div>
-          <div class="ft" id="pcMarginNote"></div>
-        </div>
-
         <div class="pc-blindbox">
           <div class="pc-cap">알려진 사각지대</div>
           <div class="pc-blind-item warn">
@@ -566,7 +576,7 @@ input{font-family:var(--rv-mono)}
     data: null, loadErr: null,
     history: null, historyErr: null,
     selId: null, draft: null, drawerOpen: false,
-    collapsed: {}, parentOpen: false, marginDraft: ''
+    collapsed: {}, parentOpen: false
   };
 
   function $(id) { return document.getElementById(id); }
@@ -577,7 +587,6 @@ input{font-family:var(--rv-mono)}
   }
   function mdBold(s) { return esc(s || '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
   function fmt(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
-  function pct(r) { return (r == null) ? '—' : (Number(r) * 100).toFixed(1).replace(/\.0$/, '') + '%'; }
   function fmtDt(iso) {
     if (!iso) return '—';
     var d = new Date(iso);
@@ -667,12 +676,6 @@ input{font-family:var(--rv-mono)}
     }
     return false;
   }
-  function stockUnder(id) {
-    var n = nodeById(id);
-    var total = (n && n.in_stock_count) || 0;
-    childrenOf(id).forEach(function (c) { total += stockUnder(c.category_id); });
-    return total;
-  }
   // ETC 전용 소분류 판정 — **코드**(allowed_part_types)로 한다. 표시 라벨 문자열로
   // 판정하면 라벨이 바뀔 때마다(2026-08-13: "미분류" -> "기타(ETC)") 전 소분류가
   // 매치 실패해 카운트가 조용히 0이 된다. 코드 "ETC"는 DB products.part_type에
@@ -725,17 +728,6 @@ input{font-family:var(--rv-mono)}
     var ta = typeKeysToText(origKeys), td = typeKeysToText(d.type_keys);
     if (ta !== td) out.push('allowed_part_types: ' + ta + ' -> ' + td);
     return out;
-  }
-
-  function marginRowText(n) {
-    return pct(n.margin_effective) + ' ' + (n.margin_source || '—');
-  }
-  function marginSourceSentence(n) {
-    if (n.margin_rate != null) return '이 분류에 직접 걸린 값입니다.';
-    var s = n.margin_source || '';
-    if (s === '전역 기본') return '전역 기본값에서 상속하고 있습니다(개별 값 없음).';
-    if (s.indexOf('상속: ') === 0) return '상위 "' + s.slice(4) + '"에서 상속하고 있습니다.';
-    return s || '—';
   }
 
   // ── 로드 ─────────────────────────────────────────────────────────
@@ -793,11 +785,9 @@ input{font-family:var(--rv-mono)}
     var arr = items();
     var total = arr.length;
     var top = arr.filter(function (n) { return n.parent_id == null; }).length;
-    var marginSet = arr.filter(function (n) { return n.margin_rate != null; }).length;
     var violTotal = arr.reduce(function (s, n) { return s + (n.violations || 0); }, 0);
     var cards = [
       { lb: '분류', v: fmt(total), nt: '대분류 ' + fmt(top) + ' · 소분류 ' + fmt(total - top), warn: false },
-      { lb: '개별 마진이 걸린 분류', v: fmt(marginSet), nt: marginSet ? '나머지는 상속' : '전부 전역 상속', warn: false },
       { lb: '허용 종류 위반', v: fmt(violTotal), nt: '경고이지 금지가 아닙니다', warn: violTotal > 0 },
       { lb: '분류 미배정 상품', v: fmt(S.data.unmapped),
         nt: 'category_id 미지정 기준 · 재고 있음 ' + fmt(S.data.unmapped_in_stock) + '건 포함', warn: false }
@@ -833,8 +823,6 @@ input{font-family:var(--rv-mono)}
             '</span>' +
             '<span class="types ' + typesCls + '">' + esc(typesText) + '</span>' +
             '<span class="counts num">' + fmt(n.product_count) + ' / ' + fmt(n.subtree_count) + '</span>' +
-            '<span class="stock num">' + fmt(stockUnder(n.category_id)) + '</span>' +
-            '<span class="margin ' + (n.margin_rate != null ? 'own' : 'inh') + '">' + esc(marginRowText(n)) + '</span>' +
           '</div>'
         );
         if (!isCol) walk(n.category_id, depth + 1);
@@ -870,21 +858,6 @@ input{font-family:var(--rv-mono)}
 
   function renderRail() {
     var arr = items();
-    var marginSet = arr.filter(function (n) { return n.margin_rate != null; }).length;
-    var total = arr.length;
-    var g = S.data.default_margin;
-    var infoTxt;
-    if (marginSet === 0) {
-      infoTxt = '노드에 값을 걸지 않으면 조상 방향으로 찾다가 없으면 전역 기본값으로 떨어집니다. 지금은 개별 마진이 걸린 노드가 0개라 ' +
-        fmt(total) + '개 전부가 전역 기본 ' + pct(g) + '를 상속합니다.';
-    } else {
-      infoTxt = '노드에 값을 걸지 않으면 조상 방향으로 찾다가 없으면 전역 기본값으로 떨어집니다. 지금은 개별 마진이 걸린 노드가 ' +
-        fmt(marginSet) + '개이고, 나머지 ' + fmt(total - marginSet) + '개는 조상 또는 전역 기본 ' + pct(g) + '를 상속합니다.';
-    }
-    $('pcMarginInfo').textContent = infoTxt;
-    $('pcMarginNote').innerHTML = S.data.margin_note ? mdBold(S.data.margin_note)
-      : '계산 원천은 api/pricing.resolve_margins 하나입니다 — 이 화면이 따로 계산하지 않습니다.';
-
     var etcCount = arr.filter(function (n) { return isEtcOnly(n.allowed_part_types); }).length;
     $('pcEtcBlindHd').textContent = '허용 종류가 ' + etcLabel() + '뿐인 소분류 ' + fmt(etcCount) + '개는 서로 구분되지 않습니다';
 
@@ -995,21 +968,6 @@ input{font-family:var(--rv-mono)}
     }
     html += '</div>';
 
-    // 마진
-    var mrOwn = n.margin_rate != null;
-    var mgChip = mrOwn ? ('직접 ' + pct(n.margin_rate)) : ('상속 ' + pct(n.margin_effective));
-    var mgbtnDis = !own;
-    var mgclearDis = !(own && mrOwn);
-    html += '<div class="pc-field"><span class="lb">마진</span><div class="pc-mgfield">' +
-      '<div class="row1"><span class="pc-mgchip' + (mrOwn ? ' own' : '') + '">' + esc(mgChip) + '</span>' +
-      '<span class="src">' + esc(marginSourceSentence(n)) + '</span></div>' +
-      '<div class="row2"><label for="pcMarginInput">마진율</label>' +
-      '<input id="pcMarginInput" value="' + esc(S.marginDraft || '') + '" placeholder="예: 0.18"' + (own ? '' : ' disabled') + '>' +
-      '<button type="button" class="pc-mgbtn' + (own ? '' : ' dis') + '"' + disAttrs(mgbtnDis, permText()) + ' data-action="set-margin">이 분류에 걸기</button>' +
-      '<button type="button" class="pc-mgclear' + (own && mrOwn ? '' : ' dis') + '"' + disAttrs(mgclearDis, !own ? permText() : '이 분류에 직접 걸린 마진이 없습니다') + ' data-action="clear-margin">상속으로 되돌리기</button></div>' +
-      '<div class="hint">0 이상 1 미만. 걸면 이 분류와 하위 <b>' + fmt(n.subtree_count) + '건</b>이 다음 재산정에서 이 값을 씁니다 — <b>판매가는 지금 바뀌지 않습니다.</b></div>' +
-      '</div></div>';
-
     // 노출
     html += '<div class="pc-field"><span class="lb">노출</span>' +
       '<button type="button" class="pc-visbox" data-action="toggle-visible" role="switch" aria-checked="' + (d.is_visible ? 'true' : 'false') + '"' + (own ? '' : ' disabled') + '>' +
@@ -1094,7 +1052,7 @@ input{font-family:var(--rv-mono)}
     if (S.selId === id && S.drawerOpen) { closeDrawer(); return; }
     var n = nodeById(id);
     if (!n) return;
-    S.selId = id; S.draft = draftFromNode(n); S.drawerOpen = true; S.parentOpen = false; S.marginDraft = '';
+    S.selId = id; S.draft = draftFromNode(n); S.drawerOpen = true; S.parentOpen = false;
     renderTree(); renderDrawer(); renderAddBtn();
   }
   function closeDrawer() {
@@ -1212,27 +1170,6 @@ input{font-family:var(--rv-mono)}
     }).catch(function (err) { toast(err.message, 'err'); });
   }
 
-  function setMargin() {
-    if (!guard() || S.selId == null) return;
-    var v = parseFloat(S.marginDraft);
-    if (isNaN(v) || v < 0 || v >= 1) { toast('마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)', 'err'); return; }
-    apiPut('/api/admin/categories/' + S.selId + '/margin', { margin_rate: v }).then(function (res) {
-      toast((res && res.verdict) || '마진을 설정했습니다', 'ok');
-      S.marginDraft = '';
-      return refreshAfterWrite(S.selId);
-    }).catch(function (err) { toast(err.message, 'err'); });
-  }
-  function clearMargin() {
-    if (!guard() || S.selId == null) return;
-    var n = nodeById(S.selId);
-    if (n && n.margin_rate == null) { toast('이 분류에 직접 걸린 마진이 없습니다', 'err'); return; }
-    apiPut('/api/admin/categories/' + S.selId + '/margin', { margin_rate: null }).then(function (res) {
-      toast((res && res.verdict) || '상속으로 되돌렸습니다', 'ok');
-      S.marginDraft = '';
-      return refreshAfterWrite(S.selId);
-    }).catch(function (err) { toast(err.message, 'err'); });
-  }
-
   // ── 입력(포커스 보존 — 통 재렌더 대신 부분 갱신) ────────────────────
   document.addEventListener('input', function (e) {
     if (e.target.id === 'pcNameInput') {
@@ -1246,8 +1183,6 @@ input{font-family:var(--rv-mono)}
       if (!S.draft) return;
       S.draft.sort_order = parseInt(e.target.value, 10) || 0;
       patchFooter();
-    } else if (e.target.id === 'pcMarginInput') {
-      S.marginDraft = e.target.value;
     }
   });
 
@@ -1284,8 +1219,6 @@ input{font-family:var(--rv-mono)}
         break;
       }
       case 'toggle-visible': { if (!guard() || !S.draft) break; S.draft.is_visible = !S.draft.is_visible; renderDrawer(); break; }
-      case 'set-margin': setMargin(); break;
-      case 'clear-margin': clearMargin(); break;
       case 'delete-node': deleteNode(); break;
       case 'revert-draft': revertDraft(); break;
       case 'save-draft': saveDraft(); break;

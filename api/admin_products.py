@@ -71,27 +71,65 @@ _STATUS_CASE = """
          ELSE 'review' END
 """
 
-# 상품명 검색 — 띄어쓰기에 걸리지 않게 «두 갈래»로 본다(요청 35).
+# 상품명 검색 — «낱말 시작에서만» 맞춘다(요청 35, 2026-09-01 사장님 지시로 전면 재작성).
 #
-#   ① 조각 전부 포함  「Bri B」 -> 'Bri' 와 'B' 가 «둘 다» 들어간 이름을 찾는다.
-#      사장님 예시(2026-09-01 댓글): 「Bri 한칸 띄우고 B」로 「Britz BA 100」이 나와야 한다.
-#      ⚠ 처음엔 ②만 넣었는데 그것으로는 이 예시가 «0건»이었다 — 'BriB' 는 'BritzBA100'
-#        안에 없다. 조각을 나눠 보는 것이 사장님이 말씀하신 「유관검색어」다.
-#   ② 공백 무시 통짜  「RTX4060」 <-> 「RTX 4060 Ti」. 원천이 같은 제품을 제각각 적어
-#      와서, 운영자가 본 대로 붙여 쳐도 나와야 한다.
+#   이전엔 조각이 상품명 «아무 위치에나» 있으면 맞다고 봤다 — 그래서 한 글자 'B' 로
+#   카탈로그의 55.5%(12,854/23,151)가 나왔고, 자릿수를 다 띄운 「RTX 4 0 6 0」이
+#   정상 「RTX 4060」(203건)의 4.5배인 919건을 냈다. 실측: `tests/regression.py` 밖,
+#   운영 DB(popcorn_pc) 직접 조회로 재현·확인함.
+#
+#   ① 낱말 시작 일치 — 조각은 상품명 «낱말의 시작» 위치에서만 인정한다. 'B' 는
+#      'Britz' 의 앞에서는 맞고 'ABKO' 안의 B 에서는 안 맞는다. 낱말 경계는
+#      영숫자가 아닌 문자(공백·하이픈·괄호·슬래시 등)로 본다 — DB 로케일이
+#      en_US.UTF8 라 한글도 «영숫자»로 잡혀 정상적으로 한 낱말을 이룬다(실측 확인).
+#      사장님 예시(2026-09-01): 「Bri B」로 「Britz BA 100」계열이 나와야 한다 —
+#      'Bri' 가 'Britz' 앞에서, 'B' 가 'BA' 앞에서 각각(독립적으로) 맞아 통과한다.
+#   ② 한 글자 조각은 아예 뺀다(2026-09-01 사장님 추가 지시 — 원문: "검색시에
+#      한글자는 빼고 해줘.. 우리 직원들이 검색할때 Mainboard DA 이런식으로 하지
+#      5 0 6 이런식으로 띄워서 하지 않거든"). 그래서 「RTX 4 0 6 0」은 '4'·'0'·'6'·'0'
+#      이 전부 빠지고 'RTX' 만 남는다 — 결과 수가 'RTX' 단독 검색과 같아진다(이건
+#      버그가 아니라 "RTX 계열 전체"로 넓어진 것이다. 209 근처를 기대하면 안 된다).
+#      ⚠ 「B」처럼 «남는 조각이 하나도 없는» 경우 조각 검사를 통째로 끄고 카탈로그
+#      전체(23,151건)를 내보내면 안 된다 — 그래서 그때만 예외로, 원본 검색어
+#      전체를 하나의 낱말-시작 조각처럼 취급한다(비워서 0건을 내는 대신 이 쪽을
+#      택함 — 실측으로 55.5%도 0%도 아닌 20.9%(4,847건)가 나옴을 확인).
+#   ③ 붙여 쓴 모델명 다리 — 「RTX4060」 <-> 「RTX 4060 Ti」. letters/digits 경계에서
+#      자동으로 조각이 갈리므로(정규식 `[[:alpha:]]+|[[:digit:]]+`) 띄어 쓰나 붙여
+#      쓰나 같은 조각 집합 {RTX, 4060} 이 된다. 조립PC 목록처럼 상품명 자체가
+#      "[14400F/16G/500G/RTX4060]" 식으로 구분자 없이 붙어 있는 경우까지 잡으려고,
+#      조각을 다시 이어붙인(구두점만 제거한) 문자열로 한 번 더 대조한다 — 단
+#      **조각이 2개 이상일 때만** 켠다. 1개일 때 켜 두면 한 글자가 다시 «아무
+#      데나» 맞는 옛 버그로 돌아간다(실측: 이 다리를 놓기 전엔 'RTX 4060'=200건 ·
+#      'RTX4060'=203건으로 갈라졌었다 — 지금은 둘 다 203건으로 같다).
 #
 # 값을 고치지 않고 «비교만» 느슨하게 한다 — 원천 표기를 바꾸면 마켓에 나가는 이름이
-# 달라진다. sku·maker 는 기존 방식 그대로다(정확히 치는 값이고, 그쪽까지 느슨하게
-# 하면 전 컬럼이 순차 검색이 된다).
-# ⚠ ①의 NOT EXISTS 는 «조각이 하나도 없으면 참»이라 빈 검색어를 막아야 한다 —
-#   그래서 바깥 가드를 `:q = ''` 가 아니라 `btrim(:q) = ''` 로 둔다(공백만 친 경우 포함).
+# 달라진다. **sku·maker 는 이번 수정 대상이 아니다** — 기존 방식(정확히 치는 값)
+# 그대로 두었다. 그쪽까지 느슨하게 하면 전 컬럼이 순차 검색이 된다.
+# ⚠ 이 WHERE 는 이미(수정 전부터) 인덱스(`idx_products_name_trgm`)를 못 탄다 —
+#   OR 로 묶인 상관 서브쿼리 때문에 옵티마이저가 항상 Seq Scan 을 택한다(EXPLAIN
+#   실측 확인). 그래서 이번 수정으로 «인덱스가 새로 죽는» 것은 아니다. sku·maker
+#   비교를 그대로 둔 것은 그 값들의 판정을 안 바꾸기 위해서지 인덱스 때문이 아니다.
 _WHERE = """
     WHERE (btrim(:q) = ''
-           OR NOT EXISTS (
-                SELECT 1 FROM unnest(string_to_array(btrim(:q), ' ')) AS t(tok)
-                 WHERE tok <> '' AND p.product_name NOT ILIKE '%%' || tok || '%%')
-           OR REPLACE(p.product_name, ' ', '') ILIKE '%%' || REPLACE(:q, ' ', '') || '%%'
-           OR p.product_name ILIKE '%%' || :q || '%%' OR p.sku ILIKE '%%' || :q || '%%'
+           OR (
+                (SELECT array_agg(m[1]) FROM regexp_matches(btrim(:q), '[[:alpha:]]+|[[:digit:]]+', 'g') m WHERE length(m[1]) >= 2) IS NOT NULL
+                AND NOT EXISTS (
+                      SELECT 1
+                        FROM unnest((SELECT array_agg(m[1]) FROM regexp_matches(btrim(:q), '[[:alpha:]]+|[[:digit:]]+', 'g') m WHERE length(m[1]) >= 2)) AS tok,
+                             (SELECT ' ' || regexp_replace(p.product_name, '[^[:alnum:]]+', ' ', 'g') || ' ') AS nm(norm)
+                       WHERE nm.norm NOT ILIKE '%% ' || tok || '%%')
+              )
+           OR (
+                (SELECT array_agg(m[1]) FROM regexp_matches(btrim(:q), '[[:alpha:]]+|[[:digit:]]+', 'g') m WHERE length(m[1]) >= 2) IS NULL
+                AND (' ' || regexp_replace(p.product_name, '[^[:alnum:]]+', ' ', 'g') || ' ')
+                    ILIKE '%% ' || btrim(:q) || '%%'
+              )
+           OR (
+                array_length((SELECT array_agg(m[1]) FROM regexp_matches(btrim(:q), '[[:alpha:]]+|[[:digit:]]+', 'g') m WHERE length(m[1]) >= 2), 1) > 1
+                AND regexp_replace(p.product_name, '[^[:alnum:]]+', '', 'g')
+                    ILIKE '%%' || array_to_string((SELECT array_agg(m[1]) FROM regexp_matches(btrim(:q), '[[:alpha:]]+|[[:digit:]]+', 'g') m WHERE length(m[1]) >= 2), '') || '%%'
+              )
+           OR p.sku ILIKE '%%' || :q || '%%'
            OR p.maker ILIKE '%%' || :q || '%%')
       AND (:part_type = '' OR p.part_type = :part_type)
       AND (:maker = '' OR p.maker = :maker)
