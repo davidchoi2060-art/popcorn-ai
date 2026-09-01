@@ -21,6 +21,19 @@ r"""운영자 매뉴얼용 화면 캡처 — 상품 분류 관리(ADM-CAT-010, �
     (지시서 자체가 "혼동하지 마라"고 경고해 둔 두 화면을 지시서 스스로 다시 섞은 사례로
     보인다 — 제작 보고서에 남긴다).
 
+■★ 2026-09-01 추가 정정 — 마진·재고 표시 제거에 맞춰 선택자를 고쳤다
+    사장님 지시(2026-09-01, `templates/admin/product_category.html.j2` 상단 주석 "■★ 마진·재고
+    표시 제거" 참고)로 이 화면에서 마진·재고 관련 UI가 전부 빠졌다: 상단 지표 카드가 4장에서
+    3장으로(개별 마진이 걸린 분류 카드 삭제), 우측 레일이 3상자에서 2상자로(마진 상속 안내
+    상자 삭제), 목록 표가 5열에서 3열로(재고 있음·마진 열 삭제), 서랍에서 마진 입력칸·상속
+    표시·"이 분류에 걸기"·"상속으로 되돌리기"가 삭제됐다. 이 스크립트가 그 UI를 겨누던
+    선택자(`#pcStats .pc-stat:nth-child(4)` · `.pc-mgbox` · `.pc-mgfield` · `#pcMarginInput` ·
+    `[data-action="set-margin"]` · `[data-action="clear-margin"]`)를 아래에서 지웠다 — 지우지
+    않았으면 `shoot()`가 "못찾음"만 로그에 남기고 조용히 넘어가 아무도 몰랐을 것이다(운영자
+    매뉴얼 작업 지시가 실제로 이 상태를 지적했다). 분류별 마진은 이제
+    `scripts/manual_shots_margin_policy.py`가 찍는 화면(마진 정책, `/admin2/margin-policy`)
+    소관이다.
+
 무엇을 하는가
     1. 로컬 서버(127.0.0.1:8000 — **사장님 서버, 절대 죽이지 않는다**)에 Playwright로 접속한다.
     2. GET /api/admin/auth/dev-login 으로 점검 계정 세션을 심는다.
@@ -173,11 +186,14 @@ def main() -> int:
             # ---- 4) 상단 지표 카드 확대 ------------------------------------------------
             stats_box = get_boxes(page, {"stats": "#pcStats"})["stats"]
             if stats_box:
+                # 2026-09-01 사장님 지시로 "개별 마진이 걸린 분류" 카드가 빠져 지금은 3장뿐이다
+                # (템플릿 renderStats() 실측 — card_4 자리에 대응하는 4번째 카드가 없다). 예전
+                # 4장짜리 선택자를 그대로 두면 조용히 "못찾음"만 남고 아무도 모른다(파일 상단
+                # docstring 결함 사례와 같은 함정) — 3장으로 맞춘다.
                 shoot(page, "categories-stats", stats_box, {
                     "card_1": "#pcStats .pc-stat:nth-child(1)",
                     "card_2": "#pcStats .pc-stat:nth-child(2)",
                     "card_3": "#pcStats .pc-stat:nth-child(3)",
-                    "card_4": "#pcStats .pc-stat:nth-child(4)",
                 }, coords)
             else:
                 log("[MISS] #pcStats 를 못 찾았습니다 - categories-stats.png 건너뜀")
@@ -195,11 +211,12 @@ def main() -> int:
             else:
                 log("[MISS] 트리 행을 못 찾았습니다(분류 0건?) - categories-tree.png 건너뜀")
 
-            # ---- 6) 우측 레일 확대(마진 상속 · 사각지대 · 최근 변경) ----------------------
+            # ---- 6) 우측 레일 확대(사각지대 · 최근 변경 — 2026-09-01부터 마진 상속 상자 삭제) ----
             rail_box = get_boxes(page, {"rail": ".pc-rail"})["rail"]
             if rail_box:
+                # 2026-09-01 마진·재고 표시 제거로 ".pc-mgbox"(마진 상속 안내 상자) 자체가
+                # 화면에서 없어졌다 — 남은 것은 사각지대·최근 변경 2상자뿐이다.
                 shoot(page, "categories-rail", rail_box, {
-                    "margin_box": ".pc-mgbox",
                     "blind_box": ".pc-blindbox",
                     "hist_box": ".pc-histbox",
                     "hist_first": "#pcHistBody .pc-hist-row:first-child",
@@ -229,6 +246,11 @@ def main() -> int:
 
                 drawer_box = get_boxes(page, {"drawer": "#pcDrawer"})["drawer"]
                 if drawer_box:
+                    # 2026-09-01 마진·재고 표시 제거로 마진 입력칸("pc-mgfield"/"pcMarginInput")과
+                    # "이 분류에 걸기"/"상속으로 되돌리기" 버튼(data-action="set-margin"/
+                    # "clear-margin")이 서랍에서 통째로 빠졌다 — 셋 다 지금 화면엔 없는 선택자라
+                    # 지웠다(남겨 두면 조용히 "못찾음"만 로그에 남고 아무도 모른다 — 파일 상단
+                    # docstring 참고).
                     shoot(page, "categories-drawer", drawer_box, {
                         "name_row": ".pc-dw-hd .row1",
                         "depth_badge": ".pc-dw-hd .depth",
@@ -238,10 +260,6 @@ def main() -> int:
                         "parent_sel": ".pc-parentsel",
                         "sort_input": "#pcSortInput",
                         "chips": ".pc-chips",
-                        "margin_field": ".pc-mgfield",
-                        "margin_input": "#pcMarginInput",
-                        "btn_set_margin": '[data-action="set-margin"]',
-                        "btn_clear_margin": '[data-action="clear-margin"]',
                         "visbox": ".pc-visbox",
                         "violnote": ".pc-violnote",
                         "diff_area": "#pcDiffArea",
