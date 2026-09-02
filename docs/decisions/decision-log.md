@@ -6,7 +6,7 @@
 > 같은 사실을 두 곳에 적지 않는다 — 중복이 문서를 어긋나게 만든다(2026-07-29 정리).
 > 결정을 바꾸거나 미정을 확정할 때는 **이 파일을 먼저 갱신**하고, 그 다음 목업·프롬프트에 반영한다.
 >
-> 최초 작성: 2026-07-02 · 최종 갱신: **2026-08-29(A-124)**
+> 최초 작성: 2026-07-02 · 최종 갱신: **2026-09-02(A-125)**
 > 단계: ~~모델링~~ → **모델링 + DB·API 수직 슬라이스 구현**(2026-07-23 개정 — §2 P-04)
 > 출처: `CLAUDE.md`, `HANDOFF.md`, `docs/prompts/S0~S4`, `docs/infra/GCP_SETUP.md`
 >
@@ -6661,6 +6661,61 @@ ADM-SYS-060 DOM 노출 결함       커밋 f64bc2a 메시지 「① 직원 화�
 (타이머를 만든 커밋 — "아직 안 한 것"에 등록 보류 사유가 남아 있다) ·
 `deploy/README.md` §「몰 공급처·가격 갱신」(이 결정을 반영해 손으로 돌리는
 절차로 고쳤다).
+
+---
+
+## admin2 화면ID 배지 제거 — 정본 확정 (2026-09-02)
+
+### A-125 셸 화면ID 배지 제거를 정본으로 확정한다 (✅ 2026-09-02 사장님 확정 · 기록자 등재)
+
+**결정**: 셸(`templates/admin/_admin2_shell.html.j2`)이 매 화면 헤더에 자동으로
+얹던 화면ID 배지(`<span class="a2-badge">{{ screen_id }}</span>`, 예:
+`ADM-CAT-020`)를 없앤 상태(커밋 `2f19716`, 2026-08-21)를 **정본으로 확정한다.**
+되살리지 않는다.
+
+**근거**: 그 제거는 2026-08-21에 코드로 이미 반영됐는데, 그것을 정본으로
+확정하는 결정 기록이 그동안 없었다 — 결정 로그의 빈자리를 요청 #32 검증
+(계약자)이 발견했고, 사장님이 2026-09-02 "없앤 것을 정본으로 확정한다"고
+결정했다.
+
+**영향**: 승인 디자인(`docs/design/dc-*.html`)이 이 결정 전까지 화면ID 배지
+마크업(`ADM-XXX-0NN` 칩)을 그대로 담고 있어 이미 확정된 코드 상태와 어긋나
+있었다. 이 결정과 같은 물결로 정합화한다(기록자, 확인법 아래) — 승인 디자인은
+지금 화면의 실제 모습을 보여줘야 하는 자료이지, 셸이 더는 안 그리는 요소를
+계속 보여줄 이유가 없다.
+
+**잔여 어긋남 — 검증 결과 해소(어긋남 없음)**: 검증 과정에서 `templates/admin/
+{products,mall_sync,home,candidate_pool}.html.j2` 4개 화면이 `header_extra`
+블록 안에서 `.a2-badge` 클래스를 계속 쓰고 있어 이 결정과 어긋나는 예외로
+**의심됐다.** 실측 결과 **넷 다 화면ID 용도가 아니었다** — 같은 클래스명을
+재사용할 뿐 담는 내용이 화면ID(`ADM-XXX-0NN`)와 무관하다(문자열 grep이 아니라
+각 파일의 실제 span 내용을 직접 대조):
+
+    products.html.j2:53        <span class="a2-badge">/admin2/products</span>
+                                용도 = 경로(path) 표시
+    mall_sync.html.j2:188      <span class="a2-badge">조회 전용</span>
+                                용도 = 조회 전용 안내
+    home.html.j2:128           <span class="a2-badge dash-time">{{ generated_at }} 조회</span>
+                                용도 = 조회 시각 표시
+    candidate_pool.html.j2:141 <span class="a2-badge" title="...">조회 전용</span>
+                                용도 = 조회 전용 안내
+    candidate_pool.html.j2:142 <span class="a2-badge" data-bind="asof" style="display:none">—</span>
+                                용도 = 숨김 플레이스홀더(비표시)
+
+4개 파일 전부에서 `ADM-[A-Z]+-[0-9]+` 형태를 담은 `.a2-badge`는 **0건**이다.
+그래서 이 4개는 애초에 이번 결정(화면ID 배지 제거)의 적용 대상이 아니었다 —
+"화면ID 배지를 없앤다"는 취지와 어긋날 것이 없으므로 **사장님 결정 대기가
+성립하지 않는다.** 이 4개 화면의 코드는 원래도 고칠 것이 없어 손대지 않았다.
+
+**확인법**: `grep -n "a2-badge" templates/admin/_admin2_shell.html.j2`(셸의
+실제 `<header>` 마크업 — 105~107행 — 에는 배지가 없고, `.a2-badge` 문자열은
+주석(header_extra 설명)에만 남아 있어야 한다) · `grep -n "a2-badge"
+templates/admin/{products,mall_sync,home,candidate_pool}.html.j2`(총 6줄 —
+`products.html.j2:50`은 이 사실을 설명하는 주석이고, 나머지 5줄이 실제
+span으로 위 실측표와 일치해야 한다 — 화면ID 형태가 하나라도 나오면 이 결론은
+무효다) · `git show --stat 2f19716`(제거 커밋 원문) ·
+`grep -lE ">ADM-[A-Z]+-[0-9]+</span>" docs/design/dc-*.html`(정합화 후 0건이어야
+한다).
 
 ---
 

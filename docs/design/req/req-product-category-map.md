@@ -94,7 +94,7 @@
 | `POST /api/admin/category-mapping/move` `{product_codes:[...], category_id}` | 여러 상품을 한 카테고리로 이동(상한 2,000건) |
 | `POST /api/admin/category-mapping/undo` `{log_id}` | 방금 이동을 되돌림(상품별 원래 카테고리로 정확히 복구) |
 
-`scope` 5종: `unmapped`(미매핑) · `violation`(허용 종류 위반) · `unclassified`
+`scope` 6종: `unmapped`(미매핑) · `violation`(허용 종류 위반) · `unclassified`
 (`part_type='ETC'`) · `category`(특정 카테고리 직속만) · `subtree`(그 카테고리+하위
 전체) · `all`(전체). 서버가 매기는 우선순위(`open_at`): 미매핑 > 위반 > 미분류 > 전체
 — 앞 범위가 0건이면 다음으로 넘어간다.

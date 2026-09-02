@@ -23,17 +23,17 @@
        (직속만)와 `subtree`(그 노드+자손 전체)를 **서로 다른 scope 값**으로 받는다.
        그래서 이 화면은 "카테고리" 탭을 하나의 UI 개념으로 유지하되, 트리 모드
        토글값을 그대로 실제 `scope` 파라미터로 보낸다(`apiScopeFor()`).
-    ② **범위별 배지 4종(`counts.unmapped`·`violation`·`unclassified`·`all_products`)은
-       검색어·부품 종류·재고 필터의 영향을 받지 않는다** — 실측: 서버의 `counts` 하위
-       질의는 `_filters()`가 만든 WHERE 절을 전혀 받지 않고 `products` 테이블 전체를
-       센다(`admin_category_mapping.py:mapping()` 안 `counts = conn.execute(...)` 호출에
-       필터 파라미터가 넘어가지 않는다). **오직 현재 열린 범위의 `total`만 그 범위의
-       scope+검색어+부품 종류+재고 필터를 전부 반영한다.** 원안의 `counts()`는 이걸
-       전 탭에 대해 클라이언트에서 매번 다시 계산했지만(더미 데이터라 공짜였다), 실제
-       서버는 그런 왕복을 주지 않는다 — 그래서 **비활성 탭의 큰 수는 항상 전체 기준
-       배지**, **활성 탭의 큰 수만 지금 필터가 반영된 `total`**로 그린다(각각 정확히
-       서버가 준 값이고, 어느 쪽도 지어내지 않는다). 필터 바 안내 문구가 이 구분을
-       그대로 밝힌다.
+    ② **(2026-09-02 정정) 범위별 배지 4종(`counts.unmapped`·`violation`·`unclassified`·
+       `all_products`)은 검색어·부품 종류·재고 필터를 반영한다** — 아래는 그 전까지의
+       실측이었고 지금은 고쳐진 상태다: 서버의 `counts` 하위 질의가 `_filters()`가
+       만든 WHERE 절을 전혀 안 받고 `products` 테이블 전체를 셌다(확인자 결함 ①,
+       `admin_category_mapping.py:mapping()`). scope(탭 축)는 배지마다 달라 하나의
+       WHERE로 합칠 수 없으므로, **scope를 뺀 검색어·부품 종류·재고만** `_common_filters()`
+       하나로 만들어 각 FILTER 절에 얹는다 — 각 배지는 "자기 scope × 이 공통 필터"로
+       센다. 그래서 지금은 **비활성 탭 포함 배지 4종 전부가 검색어·부품 종류·재고
+       필터를 반영**하고, 지금 열린 범위에서는 그 배지 값과 `total`이 같은 정의(scope+
+       검색어+부품 종류+재고)라 항상 일치한다. 아래 필터 바 안내 문구("다른 탭의 배지
+       숫자는 … 항상 전체 기준")는 이제 사실이 아니라 지웠다(`renderFilters()`).
     ③ **이동 상한은 `max_move` 응답 필드를 쓴다**(코드 상수 `MAX_MOVE = 2000`,
        `api/admin_category_mapping.py` 41번째 줄 부근 — 화면은 이 숫자를 박지 않고
        매 응답의 `max_move`를 그대로 읽는다. 상수가 바뀌어도 화면이 저절로 맞다).
@@ -139,9 +139,12 @@
   ■ 2026-08-13 셸 통합 — `templates/admin/_admin2_shell.html.j2`를 상속한다. 사이드바·
     헤더·팔레트·토스트 컨테이너·서체 변수(`--rv-*`)는 셸/`admin2.css`가 그린다.
     **좌측 메뉴 항목 구성(IA)은 이 화면 소관이 아니다** — 정본은 `api/admin_nav.py`.
-    그 파일의 "상품 분류 매핑" 항목은 여전히 `href=None`(신설 예정)이다 — 담당 파일
-    밖이라 고치지 않았다. `api/admin_nav.py`의 href를 `/admin2/category-mapping`으로
-    올려야 LNB에서 이 화면에 들어올 수 있다(제작 보고서에 남김).
+    (2026-09-02 정정) 그 파일의 "상품 분류 매핑" 항목은 이미 `href="/admin2/category-mapping"`
+    로 연결돼 있다 — LNB 연결 커밋(`bd087b0`, 2026-08-14 18:40:01)이 이 화면을 만든
+    커밋(`df264fc`, 같은 날 18:41:08)보다 1분 먼저다. 바로 위 문장("여전히 href=None…
+    담당 파일 밖이라 고치지 않았다")은 그래서 **처음부터 사실이 아니었다** — 담당 파일
+    밖이라 안 고친 것과, 사실을 틀리게 적어 두는 것은 다르다. 실제로 몰라서 다시
+    확인이 필요하면 `grep -n '상품 분류 매핑' api/admin_nav.py`.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -427,12 +430,20 @@ input{font-family:var(--rv-font)}
   border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:7px 10px;cursor:pointer;white-space:nowrap}
 .cm-blocked{margin-top:9px;font:400 10.5px/1.5 var(--rv-font);color:var(--rv-red)}
 
+/* 결함 ③ 수정(2026-09-02, 확인자 실측 — 768px에서 「상태」 헤더가 체크박스 밑 x=40에
+   홀로 떨어지고 행마다 잘린 부품종류 배지가 끼었다). 트랙이 3개(30px 1fr 92px)인데
+   헤더는 4열(체크박스·상품명·상품코드는 안 숨기고 부품종류·현재분류·판매가·재고 4개만
+   nth-child(4~7)로 숨겨 4개가 남음)을, 행은 5열(.ct·.pr·.sk 3개만 숨겨 .cd·.pt가 남아
+   5개)을 보여 서로 어긋나 있었다. 노출 열을 헤더·행 양쪽 다 **체크박스+상품명+상태**
+   3개로 맞춘다(트랙 수와 일치) — 상품코드·부품종류·현재분류·판매가·재고는 좁은
+   화면에서 전부 숨긴다. */
 @media (max-width:768px){
   .cm-split{flex-direction:column}
   .cm-tree{width:100%}
   .cm-thead,.cm-row{grid-template-columns:30px 1fr 92px}
-  .cm-thead span:nth-child(4),.cm-thead span:nth-child(5),.cm-thead span:nth-child(6),.cm-thead span:nth-child(7),
-  .cm-row .ct,.cm-row .pr,.cm-row .sk{display:none}
+  .cm-thead span:nth-child(3),.cm-thead span:nth-child(4),.cm-thead span:nth-child(5),
+  .cm-thead span:nth-child(6),.cm-thead span:nth-child(7),
+  .cm-row .cd,.cm-row .pt,.cm-row .ct,.cm-row .pr,.cm-row .sk{display:none}
 }
 </style>
 {% endblock %}
@@ -901,8 +912,12 @@ input{font-family:var(--rv-font)}
     $('cmStockMark').textContent = S.inStock ? '●' : '○';
     var narrowed = !!(S.q || S.part || S.inStock);
     $('cmResetBtn').classList.toggle('active', narrowed);
+    // "다른 탭의 배지 숫자는 … 항상 전체 기준" 안내는 지웠다(결함 ①, 2026-09-02) — 서버
+    // counts 질의가 이제 scope 뺀 공통 필터(검색어·부품 종류·재고)를 얹어 비활성 탭
+    // 배지도 이 필터를 반영하므로 그 문구가 거짓말이 됐다(api/admin_category_mapping.py
+    // `_common_filters()`). 지금은 탭 배지·`total`이 같은 정의를 쓴다는 사실만 말한다.
     $('cmFilterNote').textContent = narrowed
-      ? '지금 열린 범위(' + fmt(S.list.total) + '건)에는 이 필터가 반영됩니다 — 다른 탭의 배지 숫자는 검색어·부품 종류·재고 필터와 무관하게 항상 전체 기준입니다.'
+      ? '지금 조건(검색어·부품 종류·재고 필터)이 이 범위와 위 탭 배지 숫자에 모두 반영됩니다.'
       : '탭 배지는 페이지가 아니라 각 범위 전체 기준입니다 · 목록은 서버 페이지네이션';
   }
 
@@ -1078,7 +1093,10 @@ input{font-family:var(--rv-font)}
     var mbtn = $('cmMoveBtn');
     var canMove = canWrite && sc > 0 && target;
     mbtn.disabled = !canMove;
-    mbtn.textContent = target ? (target.name + '(으)로 이동') : '이동';
+    // 결함 ④ 수정(2026-09-02) — 승인 디자인 dc-product-category-map.html:576
+    // `moveLabel: canWrite ? (...) : '이동 (권한 없음)'`과 같은 분기. 전에는 권한이
+    // 없어도 버튼 글자가 그냥 '이동'이라 disabled 속성을 안 보면 왜 안 눌리는지 몰랐다.
+    mbtn.textContent = !canWrite ? '이동 (권한 없음)' : (target ? (target.name + '(으)로 이동') : '이동');
     mbtn.title = !canWrite ? permText() : (sc === 0 ? '옮길 상품을 먼저 선택하세요' : (!target ? '대상 분류를 먼저 고르세요' : ''));
 
     var remBox = $('cmRemainder');

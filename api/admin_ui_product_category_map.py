@@ -19,10 +19,16 @@
   이상**이면 된다(카테고리 관리 화면은 owner 전용 — 다르다, `api/admin_category_mapping.
   py`의 `_operator()` 실측).
 
-■ 좌측 메뉴(LNB) 참고 — `api/admin_nav.py`의 "상품관리" 그룹 "상품 분류 매핑" 항목은
-  이 라우트가 만들어진 시점에도 여전히 `href=None`(신설 예정)이다. 그 파일은 이 작업의
-  담당 범위 밖이라 고치지 않았다 — href를 `/admin2/category-mapping`으로 올려야 LNB에서
-  이 화면으로 갈 수 있다(제작 보고서에 남김).
+■ 좌측 메뉴(LNB) 참고(2026-09-02 기록자 정정 — 요청 #32 검증 발견) — `api/admin_nav.py`의
+  "상품관리" 그룹 "상품 분류 매핑" 항목은 이 라우트가 만들어진 시점(커밋 `df264fc`,
+  2026-08-14 18:41:08)에 이미 `href="/admin2/category-mapping"`로 연결돼 있었다
+  (커밋 `bd087b0`, 같은 날 18:40:01 — 1분 먼저 admin2 셸 정본화 물결이 IA 전체의 href를
+  올렸다). 정의서(`docs/design/req/req-product-category-map.md`, 2026-08-13 작성)
+  시점엔 실제로 `href=None`이었는데, 그 서술이 다음 날 이 주석에 그대로 옮겨져 낡은 채
+  남아 있었다. **왜 고쳤나**: 옛 서술을 사실로 읽으면 "LNB 연결이 안 됐다"고 오판해
+  이미 끝난 href 연결을 다시 하려 들 수 있다 — 실측: `grep -n "상품 분류 매핑"
+  api/admin_nav.py`(href 값 확인) · `git log -1 --format=%ai bd087b0`·`df264fc`
+  (시각 비교).
 """
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse

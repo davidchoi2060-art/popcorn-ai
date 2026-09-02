@@ -73,7 +73,9 @@ def _clean_name(v) -> str:
 def _clean_types(v):
     """allowed_part_types 검증 — 없는 part_type을 걸면 그 카테고리는 영영 경고만 낸다.
 
-    화면은 **표시 종류 16종**을 보낸다(쿨러가 하나). 저장은 **실제 part_type**으로
+    화면은 **표시 종류 18종**을 보낸다(쿨러가 하나 — 2026-09-02 기록자 정정, 16종은
+    오기. 확인: `len(api.taxonomy.DISPLAY_LABELS)`, 아래 170행과 같은 오기였다).
+    저장은 **실제 part_type**으로
     푼다 — `'COOLER'` → 공랭·수랭 둘 다. 이 표를 읽는 것은 위반 판정
     (`allowed_part_types @> part_type`)이고, 그쪽은 실제 값과 대조하기 때문이다.
     표시 키를 그대로 넣으면 쿨러 1,373건이 전부 '허용 종류 위반'으로 뜬다.
@@ -167,7 +169,9 @@ def categories():
     return {
         "items": items,
         "unmapped": unmapped, "unmapped_in_stock": unmapped_live,
-        # 고르는 자리는 **표시 종류 16종**이다(쿨러 하나 — 사용자 결정 2026-08-05).
+        # 고르는 자리는 **표시 종류 18종**이다(쿨러 하나 — 사용자 결정 2026-08-05).
+        # 19종(part_type distinct) − 쿨러 1(공랭·수랭이 한 자리) = 18. 확인:
+        # `len(api.taxonomy.DISPLAY_LABELS)` — 2026-09-02 기록자 재확인, 16종은 오기.
         # 저장은 `_clean_types`가 실제 part_type으로 푼다.
         "part_types": [{"key": k, "label": v} for k, v in DISPLAY_LABELS.items()],
         "default_margin": default_margin,
