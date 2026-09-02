@@ -360,6 +360,14 @@ input{font-family:var(--rv-mono)}
 .pc-row .types.set{color:var(--rv-muted)}
 .pc-row .types.etc{color:var(--rv-amber)}
 .pc-row .counts{font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-muted);text-align:right}
+/* 요청 #28 추가(2026-09-02) — "직속/자손" 두 수를 상품관리로 보내는 링크. 0건은
+   cnt-zero로 두고(지시서: 0건은 링크로 만들지 않는다) 색을 그대로 두어 링크처럼
+   보이지 않게 한다 — .cnt-link만 밑줄+링크색. 3클래스 조합(.pc-row .counts .cnt-link)
+   이라 파일 상단 `a{color:inherit;text-decoration:none}` 리셋보다 명시도가 높다. */
+.pc-row .counts .cnt-link{color:var(--rv-link);text-decoration:underline;
+    text-decoration-color:rgba(0,0,0,.22);text-underline-offset:2px;cursor:pointer}
+.pc-row .counts .cnt-link:hover{text-decoration-color:var(--rv-link)}
+.pc-row .counts .cnt-zero{cursor:default}
 
 .pc-tree-empty{padding:40px;text-align:center}
 .pc-tree-empty[hidden]{display:none}
@@ -412,6 +420,12 @@ input{font-family:var(--rv-mono)}
   border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
 .pc-dw-hd .x{font:400 15px/1 var(--rv-font);color:var(--rv-faint);cursor:pointer;padding:2px 4px;background:none;border:0}
 .pc-dw-hd .meta{display:flex;gap:12px;margin-top:7px;font:400 10.5px/1.3 var(--rv-mono);color:var(--rv-faint);flex-wrap:wrap}
+/* 요청 #28 추가(2026-09-02) — 서랍 머리의 "직속 N · 자손 M"도 같은 두 링크(트리 배지와
+   동일 규칙: 0건은 비링크). */
+.pc-dw-hd .meta .cnt-link{color:var(--rv-link);text-decoration:underline;
+    text-decoration-color:rgba(0,0,0,.22);text-underline-offset:2px;cursor:pointer}
+.pc-dw-hd .meta .cnt-link:hover{text-decoration-color:var(--rv-link)}
+.pc-dw-hd .meta .cnt-zero{cursor:default}
 
 .pc-dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:14px}
 .pc-field .lb{display:block;font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:7px}
@@ -587,6 +601,26 @@ input{font-family:var(--rv-mono)}
   }
   function mdBold(s) { return esc(s || '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
   function fmt(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  // 요청 #28 추가(2026-09-02, 사장님 지시 "분류에 묶여있는 상품수량을 클릭하면 해당
+  // 상품분류를 물고, 상품관리 화면으로 리다이렉션") — 트리 배지·서랍 머리의 "직속/자손"
+  // 두 수를 상품관리(/admin2/products)로 보내는 링크로 바꾼다. desc=false는 직속만
+  // (include_desc 생략=0), desc=true는 그 분류+자손 전체(include_desc=1) — 서버 판정은
+  // api/admin_products.py `_WHERE`가 이 화면의 subtree_count(재귀 CTE)와 같은 정의로
+  // 센다. **0건은 링크로 만들지 않는다**(지시서 원문 — 0건 목록으로 보내는 건 의미가
+  // 없고, 스타일도 링크처럼 보이면 안 된다) — 클릭한 수와 도착한 화면의 총계가 항상
+  // 일치해야 하는데, 두 화면이 category_id 하나로 같은 조건을 세므로 자연히 맞는다.
+  function countLink(n, count, desc) {
+    var txt = fmt(count);
+    if (!count) return '<span class="cnt-zero">' + txt + '</span>';
+    var href = '/admin2/products?category_id=' + n.category_id + (desc ? '&include_desc=1' : '');
+    var title = desc ? '이 분류와 하위 분류의 상품 보기' : '이 분류의 상품 보기';
+    // data-action="goto-products" — 실제 이동은 <a href>가 한다(새 탭·가운데 클릭도
+    // 그대로 동작). 이 값을 주는 이유는 클릭 위임(아래 case 'goto-products')의
+    // closest('[data-action]')가 이 링크를 먼저 찾아, 조상 행의 select-node(트리
+    // 노드 선택)로 전파되지 않게 하기 위해서다 — 숫자를 눌렀는데 서랍도 함께
+    // 열리는 것은 이 클릭이 하려는 일(다른 화면으로 이동)과 다르다.
+    return '<a class="cnt-link" href="' + href + '" data-action="goto-products" title="' + esc(title) + '">' + txt + '</a>';
+  }
   function fmtDt(iso) {
     if (!iso) return '—';
     var d = new Date(iso);
@@ -822,7 +856,7 @@ input{font-family:var(--rv-mono)}
               (n.violations ? '<span class="bdg viol-b">▲ 위반 ' + fmt(n.violations) + '</span>' : '') +
             '</span>' +
             '<span class="types ' + typesCls + '">' + esc(typesText) + '</span>' +
-            '<span class="counts num">' + fmt(n.product_count) + ' / ' + fmt(n.subtree_count) + '</span>' +
+            '<span class="counts num">' + countLink(n, n.product_count, false) + ' / ' + countLink(n, n.subtree_count, true) + '</span>' +
           '</div>'
         );
         if (!isCol) walk(n.category_id, depth + 1);
@@ -921,7 +955,7 @@ input{font-family:var(--rv-mono)}
       '</div>' +
       '<div class="meta"><span>category_id ' + n.category_id + '</span>' +
       '<span>' + esc((parent ? parent.name + ' / ' : '') + n.name) + '</span>' +
-      '<span>직속 ' + fmt(n.product_count) + ' · 자손 ' + fmt(n.subtree_count) + '</span></div></div>';
+      '<span>직속 ' + countLink(n, n.product_count, false) + ' · 자손 ' + countLink(n, n.subtree_count, true) + '</span></div></div>';
 
     html += '<div class="pc-dw-body">';
 
@@ -1196,6 +1230,12 @@ input{font-family:var(--rv-mono)}
       case 'retry-load': reloadAll(); break;
       case 'retry-history': S.historyErr = null; renderRail(); loadHistory().then(renderRail); break;
       case 'toggle-collapse': { e.stopPropagation(); toggleCollapse(Number(t.getAttribute('data-id'))); break; }
+      // 요청 #28 추가(2026-09-02) — 실제 이동은 <a href>(countLink)가 한다. 이 case는
+      // 아무 일도 하지 않는 자리표시자다: closest('[data-action]')가 이 <a>를 먼저
+      // 찾아 조상 행의 'select-node'(트리 노드 선택 → 서랍 열림)로 떨어지지 않게
+      // 막는 역할만 한다 — preventDefault를 부르지 않으므로 브라우저 기본 이동은
+      // 그대로 진행된다(새 탭 열기·가운데 클릭도 살아 있다).
+      case 'goto-products': break;
       case 'select-node': selectNode(Number(t.getAttribute('data-id'))); break;
       case 'close-drawer': closeDrawer(); break;
       case 'add-top': addTopCategory(); break;

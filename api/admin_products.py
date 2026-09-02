@@ -134,6 +134,26 @@ _WHERE = """
       AND (:part_type = '' OR p.part_type = :part_type)
       AND (:maker = '' OR p.maker = :maker)
       AND (:origin = '' OR p.data_origin = :origin)
+      -- 요청 #28 추가(2026-09-02, 사장님 지시 "분류에 묶여있는 상품수량을 클릭하면
+      -- 해당 상품분류를 물고 상품관리 화면으로 리다이렉션") — 상품 분류 관리 화면
+      -- (product_category.html.j2)의 트리·서랍에서 "분류에 묶인 상품 수"를 눌러
+      -- 넘어올 때 쓰는 축. p.category_id는 **판매 탐색 카테고리**(categories 테이블,
+      -- api/admin_categories.py 가 단일 원천)이고 바로 위 part_type(부품 종류,
+      -- taxonomy.py 가 단일 원천)과는 다른 축이라 섞지 않는다 — 같은 자리에 합치면
+      -- "분류 필터가 걸린 채로 부품 종류를 바꿨을 때 어느 쪽이 이겼는지" 알 수 없다.
+      -- category_id=0 이면 무필터. include_desc=0 은 그 분류에 **직속**한 상품만,
+      -- =1 은 그 분류 **+ 자손 전체** — 재귀 CTE는 admin_categories.py `_rows()`의
+      -- n_sub(subtree_count) 집계와 같은 정의다(⚠ 정의가 두 모듈에 각자 SQL로 존재한다
+      -- — 그쪽이 바뀌면 여기도 맞춰야 클릭한 수와 도착한 화면의 총계가 계속 일치한다).
+      AND (:category_id = 0 OR
+           (:include_desc = 0 AND p.category_id = :category_id) OR
+           (:include_desc = 1 AND p.category_id IN (
+              WITH RECURSIVE t AS (
+                SELECT category_id FROM categories WHERE category_id = :category_id
+                UNION ALL
+                SELECT c2.category_id FROM categories c2 JOIN t ON c2.parent_id = t.category_id
+              ) SELECT category_id FROM t
+           )))
 """
 
 _QUERY = text(f"""
@@ -224,15 +244,23 @@ def spec_progress(part_type: str, specs: dict | None) -> tuple[int, int]:
 
 @router.get("/products")
 def list_products(q: str = "", part_type: str = "", status: str = "", origin: str = "",
-                  maker: str = "", page: int = 1, size: int = 100):
+                  maker: str = "", page: int = 1, size: int = 100,
+                  category_id: int = 0, include_desc: int = 0):
     # def(비동기 아님) — psycopg2 동기 드라이버, FastAPI 스레드풀 실행
     size = max(1, min(size, 500))     # 상한 — 브라우저가 버티는 범위
     page = max(1, page)
     # maker는 **서버에서 거른다**(슬라이스 66). 화면이 현재 페이지 안에서만 걸러
     # 22,841건 중 100건에만 필터가 먹었다 — 운영자는 "그 제조사 상품이 없다"고 읽는다.
+    # 요청 #28 추가(2026-09-02) — category_id 는 음수 방어만(0=무필터, 그 밖은 그대로
+    # _WHERE 로 넘겨 없는 id 면 자연히 0건). include_desc 는 0/1 두 값만 뜻이 있어
+    # 진리값으로 정규화한다 — 그 밖의 정수를 보내도 "자손 포함"을 켜거나 끄는 것
+    # 외의 다른 뜻이 되지 않게 한다.
+    category_id = max(0, category_id)
+    include_desc = 1 if include_desc else 0
     p = {"q": q.strip(), "part_type": part_type.strip(), "status": status.strip(),
          "origin": origin.strip(), "maker": maker.strip(),
-         "size": size, "offset": (page - 1) * size}
+         "size": size, "offset": (page - 1) * size,
+         "category_id": category_id, "include_desc": include_desc}
     with engine.connect() as conn:
         rows = conn.execute(_QUERY, p).all()
         total_count = conn.execute(_COUNT, p).scalar_one()
