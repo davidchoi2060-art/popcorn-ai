@@ -27,12 +27,11 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
 from .db import engine
+from .timeutil import iso as _iso   # 시각 표기 단일 원천(슬라이스 62) — naive를 UTC로 간주해
+                                    # 타임존을 붙인다. 자체 isoformat()을 쓰면 브라우저가
+                                    # 로컬 시각으로 오해해 9시간이 어긋난다(회귀가 잡았다).
 
 router = APIRouter(prefix="/api/admin")
-
-
-def _iso(dt):
-    return dt.isoformat() if dt else None
 
 
 def _cell_state(c: dict, last_batch_id) -> str:
