@@ -95,9 +95,10 @@ SILENT_SCOPE = {"GPU", "POWER", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO"}
 WHITE_SCOPE = {"CASE"}
 
 # ── 라벨이 「거를 자격」을 정한다 — 값 문자열이 아니다 (2026-08-17) ────────────────
-# 아래 여섯이 **들어오는 라벨 전부에 대한 처분표**다(A-101로 PART_PIN_LABELS 추가,
-# 2026-08-24 물결로 REUSE_LABELS 추가 — BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·
-# VERBATIM_LABELS·PART_PIN_LABELS·REUSE_LABELS). 여기 없는 라벨은 거르지 않는다.
+# 아래 일곱이 **들어오는 라벨 전부에 대한 처분표**다(A-101로 PART_PIN_LABELS 추가,
+# 2026-08-24 물결로 REUSE_LABELS 추가, 격자 물결(2026-09-07)로 PLATFORM_LABELS 추가 —
+# BUDGET_LABELS·USAGE_LABELS·TAG_LABELS·VERBATIM_LABELS·PART_PIN_LABELS·REUSE_LABELS·
+# PLATFORM_LABELS). 여기 없는 라벨은 거르지 않는다.
 #
 # 병(실측 2026-08-17): 태그 필터가 라벨을 보지 않고 값에 '저소음'·'화이트'가 「들어 있는지」만
 #   봤다. 그래서 「요청」(고객 원문 요약)까지 필터를 받아 **같은 필터가 두 번** 걸렸다.
@@ -138,6 +139,21 @@ VERBATIM_LABELS = frozenset({"요청"})
 # 대신 화면이 "재고에 없는 부품"이라는 사실을 말할 수 있게 한다(그 자리는
 # `recommend.py`의 핀 정책이 맡는다 — 이 파일은 카운터일 뿐 구성을 짜지 않는다).
 PART_PIN_LABELS = frozenset({"부품"})
+
+# 플랫폼 라벨(격자 물결 2026-09-07 신설 — `docs/design/prebuilt-grid-benchmark-2026-09-07.md`
+# §5 첫 구현 과제). 사전 생성 견적 격자는 3축(용도·예산·플랫폼)인데 앞 둘은 이미
+# USAGE_LABELS·BUDGET_LABELS로 엔진이 받고 있었고 **플랫폼만 못 받았다** — 이 라벨이
+# 그 빈 자리를 채운다.
+#
+# 값 어휘: 「인텔」·「AMD」 둘뿐이다(후보 풀 실측 2026-09-07 — CPU maker는 이 두 값으로
+# 100% 채워져 있다, 인텔 77·AMD 67). 다른 표기(Intel·intel 등)는 아직 안 들어온다 —
+# 화면·파서가 이 두 한글 값만 보내는 것이 계약이고, 여기서 별칭을 늘리지 않는다.
+#
+# CPU만 거르는 이유: 메인보드의 `maker`는 ASUS·MSI 같은 제조사라 「플랫폼」(인텔/AMD
+# 소켓 계열)이 아니다 — 값이 같은 이름 공간이 아니므로 MB에 이 조건을 걸면 전부 탈락한다.
+# 대신 소켓 호환 규칙(compat_rules)이 CPU가 정해지면 그에 맞는 보드로 이미 좁힌다 —
+# 플랫폼 라벨이 CPU만 걸러도 나머지 슬롯은 호환 게이트가 알아서 따라간다.
+PLATFORM_LABELS = frozenset({"플랫폼"})
 
 # 재사용 라벨(2026-08-24 물결 — customer-audit-2026-08-24.md §1-1 해소, 공유 계약 ①).
 # guided 「업그레이드(일부 재사용)」에서 "그래픽카드·파워는 쓰던 거 쓸게요"를 고르면
@@ -253,6 +269,13 @@ def _apply_one(parts: list[dict], label: str, value: str):
             return parts, False, f"재고에 없는 부품: {value}"
         kept = [p for p in parts if p["part_type"] != "GPU"] + matched
         return kept, True, f"지정 부품(GPU) 일치 상품만 유지: {value}"
+    if label in PLATFORM_LABELS:
+        # 위 PLATFORM_LABELS 정의부 참조. 값이 어휘(인텔/AMD) 밖이면 거르지 않는다 —
+        # 후보 수를 0으로 떨어뜨리는 대신 화면이 "알 수 없는 플랫폼"이라는 사실을 말한다.
+        if value not in ("인텔", "AMD"):
+            return parts, False, f"알 수 없는 플랫폼 — 후보 수에는 영향 없음: {value}"
+        kept = [p for p in parts if p["part_type"] != "CPU" or p.get("maker") == value]
+        return kept, True, f"플랫폼 지정 — {value} CPU만 유지"
     if label in REUSE_LABELS:
         # 위 REUSE_LABELS 정의부의 ①~④ 설계 판단 참조. 필터가 아니라 **제외**다 — 값과
         # 비교해 일부만 남기는 게 아니라, 그 슬롯의 part_type을 통째로 뺀다.
