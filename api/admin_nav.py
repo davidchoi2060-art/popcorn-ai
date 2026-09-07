@@ -356,6 +356,7 @@ NAV = [
         ("AI 사용량 · 비용", "/admin2/ai-usage-cost", None),
         ("AI 응답 기록", "/admin2/ai-response-log", "신설"),
         ("운영 도우미 설정", "/admin2/ops-assistant", "신설 — 처음엔 조회 전용"),
+        ("격자 관리", "/admin2/grid", "신설(ADM-GRD-010) · 사전 생성 견적 격자 조회"),
     ]),
 
     ("시스템", "server", [

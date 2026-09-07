@@ -1,0 +1,492 @@
+{#
+  격자 관리 (ADM-GRD-010) — 2026-09-07 신설, **조회 전용**(재생성 쓰기는 이번 범위 밖)
+
+  ■ 계약 — docs/design/incoming/dc-grid-admin.html(Claude Design 원안, <x-dc>+React
+    형식). 이 화면은 원안을 그대로 옮기지 않고(형식이 다르다) 원안의 마크업 구조·
+    상태 표현(칸 7상태 중 재생성 쓰기가 없어 실제 발생 가능한 6상태 · 빈칸-미생성
+    점선/빈칸-의도 무테두리 구분)만 옮긴다.
+
+  ■ 데이터 — 단일 목록 API: GET /api/admin/grid(`api/admin_grid.py`, 담당 밖).
+    칸마다 서버가 이미 판정한 `state`(ok/over/stock/fail/missing/intent 6버킷,
+    `_cell_state()` 정본)를 그대로 쓴다 — 이 화면이 상태를 다시 판정하지 않는다
+    (§화면 정직성 "판정도 지어내지 않는다" — 원천이 이미 판정한 것을 화면이 다시
+    계산하면 갈라진다).
+    칸 상세는 GET /api/admin/grid/cells/{cell_id}(items·reasons·예산 구간).
+
+  ■ 재생성 버튼 셋(전체·칸·실패 칸)은 disabled + title="향후 사용예정"이다 —
+    쓰기 API가 없다. 눌러도 아무 일도 안 일어나는 버튼을 활성으로 두면 "실패를
+    조용히 삼키는" 화면이 된다(CLAUDE.md §실패를 삼키지 않는다와 같은 원칙을
+    반대 방향으로 적용 — 아예 못 누르게 해서 헛동작을 막는다).
+
+  ■ "실패 칸만 표시"는 실제로 동작한다(쓰기가 아니라 클라이언트 필터라 API가
+    필요 없다) — `state==='fail'`이 아닌 칸을 흐리게 한다.
+
+  ■ 플랫폼 토글은 클라이언트에서 같은 응답 안의 인텔/AMD 칸을 갈아 끼운다 — 서버가
+    두 플랫폼 칸을 한 번에 이미 다 내려주므로 재조회하지 않는다.
+
+  ■ 색 — admin2 공통 팔레트(`/shared/admin2/admin2.css`)의 상태 별칭만 쓴다
+    (`--state-done`·`--state-run`·`--state-fail`·`--state-wait`·`--outline`).
+    라벨은 항상 색과 함께 나온다(색약 배려 — CLAUDE.md 디자인 계약).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}격자 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+.body{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto}
+.kicker{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.card{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px}
+.card[hidden]{display:none}
+
+/* ── 배너 ── */
+.banner{padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.banner.dash{border-style:dashed}
+.banner .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.banner .ttl{font:600 13px/1.3 var(--font)}
+.banner .msg{font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.banner .grow{flex:1}
+.btn{border:0;border-radius:6px;padding:8px 13px;font:600 12px/1 var(--font);cursor:pointer}
+.btn.primary{background:var(--primary-bright);color:var(--on-primary)}
+.btn.ghost{background:var(--card);color:var(--on);border:1px solid var(--outline)}
+.btn[disabled]{cursor:not-allowed;opacity:.55}
+
+/* ── 요약 바 ── */
+.grd-bar{padding:12px 18px;display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+.grd-stat{display:flex;flex-direction:column;gap:2px}
+.grd-stat .lbl{font:500 11px/1.3 var(--font);color:var(--on-variant)}
+.grd-stat .v{font:600 20px/1.2 var(--font-num);font-variant-numeric:tabular-nums}
+.grd-stat .v .sub{font:400 13px/1 var(--font-num);color:var(--on-variant)}
+.grd-status{display:flex;align-items:center;gap:6px;font:600 13px/1.4 var(--font)}
+
+/* ── 토글·범례 ── */
+.grd-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.grd-tabs{display:inline-flex;background:var(--container);border-radius:7px;padding:3px;gap:2px}
+.grd-tab{border:0;border-radius:5px;padding:6px 15px;font:600 12.5px/1 var(--font);cursor:pointer;background:transparent;color:var(--on-variant)}
+.grd-tab[aria-selected="true"]{background:var(--card);color:var(--on);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.grd-hint{font:400 11.5px/1.3 var(--font);color:var(--on-variant)}
+.grd-legend{display:flex;gap:12px;flex-wrap:wrap;font:400 11.5px/1 var(--font);color:var(--on-variant)}
+.grd-legend .sw{display:inline-flex;align-items:center;gap:5px}
+.grd-legend .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.grd-legend .dot.intent{border-radius:2px;border:1px solid var(--outline);background:repeating-linear-gradient(45deg,var(--surface) 0 3px,var(--outline-variant) 3px 4px)}
+.grd-legend .dot.missing{border-radius:2px;border:1px solid var(--state-wait);background:var(--container)}
+
+/* ── 격자 ── */
+.grd-wrap{overflow:auto;padding:2px}
+.grd-grid{display:grid;gap:1px;background:var(--outline-variant);min-width:1180px}
+.grd-corner{background:var(--container-low);padding:8px 12px;font:500 11px/1.3 var(--font);color:var(--on-variant);display:flex;flex-direction:column;justify-content:flex-end;gap:2px}
+.grd-corner b{font:600 12px/1.3 var(--font);color:var(--on)}
+.grd-colhead{border:0;background:var(--container-low);padding:8px 10px;font:600 12px/1.3 var(--font);color:var(--on);text-align:left;cursor:pointer;border-bottom:2px solid transparent}
+.grd-colhead.hl{background:var(--primary-container);border-bottom-color:var(--primary-bright)}
+.grd-rowhead{border:0;background:var(--container-low);padding:8px 10px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;cursor:pointer;border-right:2px solid transparent}
+.grd-rowhead .nm{font:600 13px/1.3 var(--font)}
+.grd-rowhead .bg{font:400 11px/1.3 var(--font-num);color:var(--on-variant)}
+.grd-rowhead.hl{background:var(--primary-container);border-right-color:var(--primary-bright)}
+.grd-cell{border:0;min-height:80px;padding:9px 11px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:5px;background:var(--card);font-family:var(--font);cursor:pointer}
+.grd-cell:disabled{cursor:default}
+.grd-cell.hl{background:var(--primary-container)}
+.grd-cell.dim{opacity:.28}
+.grd-cell.sel{box-shadow:inset 0 0 0 2px var(--primary-bright)}
+.grd-cell .top{display:flex;align-items:center;gap:5px;font:600 11px/1.2 var(--font)}
+.grd-cell .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.grd-cell .total{font:600 14px/1.2 var(--font-num);font-variant-numeric:tabular-nums}
+.grd-cell .ago{font:400 11px/1.2 var(--font);color:var(--on-variant)}
+.grd-axis-note{font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.grd-axis-note a{color:var(--on-variant)}
+
+/* ── 서랍 ── */
+.grd-drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:100vw;background:var(--card);
+  box-shadow:0 12px 30px rgba(15,23,42,.14);border-left:1px solid var(--outline-variant);
+  display:flex;flex-direction:column;z-index:20}
+.grd-drawer[hidden]{display:none}
+.grd-dhd{padding:16px 20px;border-bottom:1px solid var(--outline-variant);display:flex;align-items:flex-start;gap:8px}
+.grd-dhd .coord{font:600 15px/1.3 var(--font-head)}
+.grd-dclose{background:transparent;border:1px solid var(--outline-variant);border-radius:6px;width:30px;height:30px;cursor:pointer;color:var(--on-variant);font:400 15px/1 var(--font)}
+.grd-dbody{flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.grd-dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font:400 12px/1.4 var(--font)}
+.grd-dl dt{color:var(--on-variant)}
+.grd-dl dd{margin:0;font-family:var(--font-num)}
+table.grd-items{width:100%;border-collapse:collapse;font:400 12px/1.4 var(--font)}
+table.grd-items caption{text-align:left;padding:8px 14px;font:600 12px/1.3 var(--font);background:var(--container-low);border-bottom:1px solid var(--outline-variant)}
+table.grd-items th{font-weight:500;color:var(--on-variant);font-size:11px;text-align:left;padding:6px 14px}
+table.grd-items td{padding:8px 14px;border-top:1px solid var(--outline-variant);vertical-align:top}
+table.grd-items td.price{text-align:right;font-family:var(--font-num);white-space:nowrap}
+table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:var(--container-low);font-weight:600}
+.stock-badge{display:inline-block;margin-left:6px;font:600 10px/1 var(--font);color:var(--state-run);border:1px solid var(--state-run);border-radius:3px;padding:2px 4px;vertical-align:middle}
+.grd-reasons{margin:0;padding-left:18px;font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.grd-empty-note{border:1px dashed var(--outline);border-radius:8px;padding:14px;font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.grd-dft{padding:14px 20px;border-top:1px solid var(--outline-variant);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grd-dft .note{font:400 11px/1.3 var(--font);color:var(--on-variant)}
+
+.err-card{margin:auto;max-width:460px;padding:22px 24px;text-align:center}
+
+@media (max-width:768px){
+  .grd-drawer{width:100vw}
+  .grd-bar{flex-direction:column;align-items:stretch}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="a2-badge" title="이 화면은 조회만 합니다 — 칸을 다시 만들려면 재생성 API가 필요한데 아직 없습니다(향후 사용예정)">조회 전용</span>
+{% endblock %}
+
+{% block content %}
+<div class="body">
+  <div class="kicker">사전 생성 견적 격자 · 티어 7 × 용도 8 × 플랫폼 2 · 축(티어 경계·용도 목록)은 이 화면에서 고치지 않습니다</div>
+
+  <div data-bind="content-area">
+    <div class="card banner" data-bind="empty-banner" hidden style="border-style:dashed">
+      <div>
+        <div class="ttl">배치 기록 없음 — 격자 전체 미생성</div>
+        <div class="msg">아직 한 번도 배치가 실행되지 않았습니다. 재생성 API가 아직 없어 이 화면에서는 실행할 수 없습니다.</div>
+      </div>
+    </div>
+
+    <div class="card banner" data-bind="partial-banner" hidden style="border:1px solid var(--state-fail)">
+      <span class="dot" style="background:var(--state-fail)"></span>
+      <span class="ttl" style="color:var(--state-fail)">부분 실패</span>
+      <span class="msg" data-bind="partial-msg"></span>
+      <span class="grow"></span>
+      <button type="button" class="btn ghost" data-action="toggle-fail-only">실패 칸만 표시</button>
+      <button type="button" class="btn ghost" disabled title="향후 사용예정">실패 칸 재생성</button>
+    </div>
+
+    <div class="card grd-bar">
+      <div class="grd-stat">
+        <span class="lbl">채워진 칸</span>
+        <span class="v"><span data-bind="filled-count">—</span><span class="sub"> / <span data-bind="target-count">—</span></span></span>
+      </div>
+      <div class="grd-stat">
+        <span class="lbl">마지막 배치</span>
+        <span class="v" data-bind="last-batch-at" style="font-size:14px">—</span>
+      </div>
+      <div class="grd-stat">
+        <span class="lbl">배치 상태</span>
+        <span class="grd-status"><span class="dot" data-bind="batch-dot"></span><span data-bind="batch-status">—</span></span>
+      </div>
+      <span class="grow" style="flex:1"></span>
+      <button type="button" class="btn primary" disabled title="향후 사용예정 — 재생성 API가 아직 없습니다">전체 재생성</button>
+    </div>
+
+    <div class="grd-tools">
+      <div class="grd-tabs" data-keep="1" role="tablist" aria-label="플랫폼">
+        <button type="button" class="grd-tab" data-action="platform" data-platform="인텔" role="tab" aria-selected="true">인텔</button>
+        <button type="button" class="grd-tab" data-action="platform" data-platform="AMD" role="tab" aria-selected="false">AMD</button>
+      </div>
+      <span class="grd-hint">행·열 머리를 누르면 해당 줄 강조(필터 아님)</span>
+      <span style="flex:1"></span>
+      <div class="grd-legend">
+        <span class="sw"><span class="dot" style="background:var(--state-done)"></span>정상</span>
+        <span class="sw"><span class="dot" style="background:var(--state-run)"></span>예산 상한 초과</span>
+        <span class="sw"><span class="dot" style="background:var(--state-run)"></span>재고 소진 슬롯 있음</span>
+        <span class="sw"><span class="dot" style="background:var(--state-fail)"></span>생성 실패</span>
+        <span class="sw"><span class="dot missing"></span>빈 칸(미생성)</span>
+        <span class="sw"><span class="dot intent"></span>빈 칸(의도)</span>
+      </div>
+    </div>
+
+    <div class="card grd-wrap" data-keep="1">
+      <div data-bind="grid-body" aria-label="견적 격자">격자 로딩 중…</div>
+    </div>
+
+    <div class="grd-axis-note">축(티어 경계·용도 목록)은 별도 화면에서 관리 · 이 화면은 칸의 내용물만 다루며 부품 손 교체는 없음(재생성만)</div>
+  </div>
+
+  <div class="card err-card" data-bind="load-error" hidden>
+    <div style="font:600 14px/1.4 var(--font);margin-bottom:6px" data-bind="err-title">데이터 조회 실패</div>
+    <div style="font:400 12px/1.6 var(--font);color:var(--on-variant);margin-bottom:14px" data-bind="err-msg"></div>
+    <div data-bind="err-actions"></div>
+  </div>
+</div>
+
+<aside class="grd-drawer" data-keep="1" hidden data-bind="drawer" aria-label="칸 상세">
+  <div class="grd-dhd">
+    <div style="flex:1;min-width:0">
+      <div class="coord" data-bind="d-coord">—</div>
+      <div class="grd-status" style="margin-top:6px"><span class="dot" data-bind="d-dot"></span><span data-bind="d-label">—</span></div>
+    </div>
+    <button type="button" class="grd-dclose" data-action="close-drawer" aria-label="닫기">×</button>
+  </div>
+  <div class="grd-dbody" data-bind="d-body">
+    <div style="text-align:center;color:var(--on-variant);font:400 12px/1.5 var(--font)">불러오는 중…</div>
+  </div>
+  <div class="grd-dft">
+    <button type="button" class="btn primary" disabled title="향후 사용예정 — 재생성 API가 아직 없습니다">이 칸 재생성</button>
+    <button type="button" class="btn ghost" disabled title="이력 · 판매 실적 — 향후 사용예정">견적 이력 보기</button>
+  </div>
+</aside>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (k) { return document.querySelector('[data-bind="' + k + '"]'); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+  var num = function (n) { return (n == null ? '—' : Number(n).toLocaleString('ko-KR')); };
+  var won = function (n) { return n == null ? '—' : num(n) + '원'; };
+  var manwon = function (n) { return n == null ? null : Math.round(n / 10000) + '만원'; };
+  var set = function (k, html) { var e = $(k); if (e) e.innerHTML = html; };
+
+  var STATE_META = {
+    ok:      { label: '정상',            color: 'var(--state-done)' },
+    over:    { label: '예산 상한 초과',    color: 'var(--state-run)' },
+    stock:   { label: '재고 소진 슬롯 있음', color: 'var(--state-run)' },
+    fail:    { label: '생성 실패',        color: 'var(--state-fail)' },
+    missing: { label: '빈 칸(미생성)',     color: 'var(--state-wait)' },
+    intent:  { label: '빈 칸(의도)',       color: 'var(--outline)' }
+  };
+
+  var state = { data: null, platform: '인텔', hlTier: null, hlUse: null, failOnly: false, selectedCellId: null };
+  var byCoord = {};   // "tier|usage|platform" -> cell
+
+  function budgetRange(bmin, bmax) {
+    var lo = manwon(bmin), hi = manwon(bmax);
+    if (lo == null && hi == null) return '—';
+    if (hi == null) return lo + ' 이상';
+    if (bmin === 0) return hi + ' 이하';
+    return lo + ' ~ ' + hi;
+  }
+
+  function agoText(iso) {
+    if (!iso) return '';
+    var ms = Date.now() - new Date(iso).getTime();
+    if (ms < 0) ms = 0;
+    var min = Math.floor(ms / 60000);
+    if (min < 1) return '방금';
+    if (min < 60) return min + '분 전';
+    var hr = Math.floor(min / 60);
+    if (hr < 24) return hr + '시간 전';
+    return Math.floor(hr / 24) + '일 전';
+  }
+
+  function key(tier, usage, platform) { return tier + '|' + usage + '|' + platform; }
+
+  function renderGrid() {
+    var d = state.data;
+    if (!d) return;
+    var cols = 'grid-template-columns:150px repeat(' + d.usages.length + ',minmax(134px,1fr));';
+    var html = '<div class="grd-grid" style="' + cols + '" role="grid">';
+
+    html += '<div class="grd-corner"><span>티어 ↓ / 용도 →</span><b>' + esc(state.platform) + '</b></div>';
+    d.usages.forEach(function (u, ui) {
+      html += '<button type="button" class="grd-colhead' + (state.hlUse === ui ? ' hl' : '') +
+        '" data-action="hl-use" data-idx="' + ui + '" role="columnheader">' + esc(u) + '</button>';
+    });
+
+    d.tiers.forEach(function (t, ti) {
+      html += '<button type="button" class="grd-rowhead' + (state.hlTier === ti ? ' hl' : '') +
+        '" data-action="hl-tier" data-idx="' + ti + '" role="rowheader">' +
+        '<span class="nm">' + esc(t.name) + '</span><span class="bg">' + esc(budgetRange(t.budget_min, t.budget_max)) + '</span></button>';
+
+      d.usages.forEach(function (u, ui) {
+        var c = byCoord[key(t.name, u, state.platform)];
+        if (!c) { html += '<div class="grd-cell" style="cursor:default"></div>'; return; }
+        var meta = STATE_META[c.state] || { label: c.state, color: 'var(--outline)' };
+        var hl = state.hlTier === ti || state.hlUse === ui;
+        var dim = state.failOnly && c.state !== 'fail';
+        var sel = state.selectedCellId === c.cell_id;
+        var cls = 'grd-cell' + (hl ? ' hl' : '') + (dim ? ' dim' : '') + (sel ? ' sel' : '');
+        var bg = '';
+        if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
+        else if (c.state === 'missing') bg = 'background:var(--container);';
+        var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
+        var ago = c.quote ? agoText(c.quote.generated_at) : '';
+        html += '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
+          '" ' + (c.state === 'intent' ? 'disabled' : '') +
+          ' aria-label="' + esc(t.name + ' × ' + u + ' × ' + state.platform + ' · ' + meta.label) + '">' +
+          '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
+          '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
+          '<span class="total">' + total + '</span>' +
+          '<span class="ago">' + esc(ago) + '</span></button>';
+      });
+    });
+
+    html += '</div>';
+    set('grid-body', html);
+  }
+
+  function renderSummary() {
+    var d = state.data;
+    set('filled-count', num(d.filled_count));
+    set('target-count', num(d.target_count));
+
+    var eb = $('empty-banner'), pb = $('partial-banner');
+    if (!d.last_batch) {
+      eb.hidden = false; pb.hidden = true;
+      set('last-batch-at', '—');
+      set('batch-status', '기록 없음');
+      $('batch-dot').style.background = 'var(--state-wait)';
+    } else {
+      eb.hidden = true;
+      var lb = d.last_batch;
+      set('last-batch-at', new Date(lb.generated_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' }));
+      if (lb.fail_count > 0) {
+        pb.hidden = false;
+        set('batch-status', '일부 실패');
+        $('batch-dot').style.background = 'var(--state-fail)';
+        set('partial-msg', '마지막 배치(' + esc(lb.batch_id) + ')에서 ' + num(lb.target_count) + '칸 중 ' + num(lb.fail_count) + '칸 생성 실패');
+      } else {
+        pb.hidden = true;
+        set('batch-status', '성공');
+        $('batch-dot').style.background = 'var(--state-done)';
+      }
+    }
+  }
+
+  function render(d) {
+    state.data = d;
+    byCoord = {};
+    d.cells.forEach(function (c) { byCoord[key(c.tier, c.usage, c.platform)] = c; });
+    renderSummary();
+    renderGrid();
+  }
+
+  // ── 칸 상세 서랍 ──────────────────────────────────────────────
+  function verdictLabel(v) {
+    return v === 'within' ? '범위 내' : v === 'over' ? '상한 초과' : v === 'none' ? '상한 없음(개방형 티어)' : '—';
+  }
+
+  function openDrawer(cellId) {
+    state.selectedCellId = cellId;
+    renderGrid();
+    var drawer = $('drawer');
+    drawer.hidden = false;
+    set('d-body', '<div style="text-align:center;color:var(--on-variant);font:400 12px/1.5 var(--font)">불러오는 중…</div>');
+    set('d-coord', '—'); set('d-label', '—');
+
+    fetch('/api/admin/grid/cells/' + cellId, { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (c) {
+        var meta = STATE_META[c.intended_empty ? 'intent' : (c.quote ? (byCoord[key(c.tier, c.usage, c.platform)] || {}).state || 'ok' : 'missing')] || {};
+        set('d-coord', esc(c.tier + ' × ' + c.usage + ' × ' + c.platform));
+        set('d-label', esc(meta.label || '—'));
+        $('d-dot').style.background = meta.color || 'var(--outline)';
+
+        var q = c.quote;
+        var body = '<dl class="grd-dl">' +
+          '<dt>예산 구간</dt><dd>' + esc(budgetRange(c.budget_min, c.budget_max)) + '</dd>' +
+          '<dt>생성 시각</dt><dd>' + (q ? esc(new Date(q.generated_at).toLocaleString('ko-KR')) : '—') + '</dd>' +
+          '<dt>배치 ID</dt><dd>' + (q ? esc(q.batch_id) : '—') + '</dd>' +
+          '</dl>';
+
+        if (c.intended_empty) {
+          body += '<div class="grd-empty-note">의도적으로 비운 칸 — 이 예산 구간에서는 이 용도 구성을 시드가 채우지 않았습니다. 재생성 대상이 아닙니다.</div>';
+        } else if (!q) {
+          body += '<div class="grd-empty-note">아직 생성되지 않은 칸 — 배치 대상이지만 현재본 견적이 없습니다.</div>';
+        } else {
+          var items = q.items || [];
+          body += '<table class="grd-items"><caption>견적 구성 · 슬롯 ' + items.length + '</caption>' +
+            '<thead><tr><th>슬롯</th><th>부품명</th><th style="text-align:right">가격</th></tr></thead><tbody>' +
+            items.map(function (it) {
+              return '<tr><td>' + esc(it.slot) + '</td><td>' + esc(it.name) +
+                (it.in_stock ? '' : '<span class="stock-badge">재고 소진</span>') +
+                '</td><td class="price">' + won(it.price) + '</td></tr>';
+            }).join('') +
+            '</tbody><tfoot><tr><td colspan="2">총액</td><td class="price">' + won(q.total) + '</td></tr>' +
+            '<tr><td colspan="2">예산 구간 대비</td><td class="price">' + esc(verdictLabel(q.verdict)) + '</td></tr></tfoot></table>';
+
+          if (q.reasons && q.reasons.length) {
+            body += '<div><div style="font:600 12px/1.3 var(--font);margin-bottom:6px">엔진이 적은 근거</div>' +
+              '<ul class="grd-reasons">' + q.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul></div>';
+          }
+          if (q.batch_id !== (state.data.last_batch && state.data.last_batch.batch_id)) {
+            body += '<div class="grd-empty-note">최근 배치(' + esc(state.data.last_batch ? state.data.last_batch.batch_id : '') +
+              ')에서 이 칸이 갱신되지 않았습니다 — 이전 배치(' + esc(q.batch_id) + ') 견적을 표시합니다.</div>';
+          }
+        }
+        set('d-body', body);
+      })
+      .catch(function (err) {
+        set('d-body', '<div class="grd-empty-note">상세 조회 실패 — ' + esc(err.message) + '</div>');
+      });
+  }
+
+  function closeDrawer() {
+    state.selectedCellId = null;
+    $('drawer').hidden = true;
+    renderGrid();
+  }
+
+  // ── 이벤트 ────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    if (action === 'platform') {
+      document.querySelectorAll('.grd-tab').forEach(function (b) { b.setAttribute('aria-selected', 'false'); });
+      t.setAttribute('aria-selected', 'true');
+      state.platform = t.getAttribute('data-platform');
+      state.selectedCellId = null;
+      $('drawer').hidden = true;
+      renderGrid();
+    } else if (action === 'hl-tier') {
+      var idx = Number(t.getAttribute('data-idx'));
+      state.hlTier = state.hlTier === idx ? null : idx;
+      renderGrid();
+    } else if (action === 'hl-use') {
+      var uidx = Number(t.getAttribute('data-idx'));
+      state.hlUse = state.hlUse === uidx ? null : uidx;
+      renderGrid();
+    } else if (action === 'open-cell') {
+      openDrawer(Number(t.getAttribute('data-cell-id')));
+    } else if (action === 'close-drawer') {
+      closeDrawer();
+    } else if (action === 'toggle-fail-only') {
+      state.failOnly = !state.failOnly;
+      t.style.background = state.failOnly ? 'var(--primary-container)' : '';
+      renderGrid();
+    }
+  });
+
+  document.addEventListener('mousedown', function (e) {
+    if (state.selectedCellId == null) return;
+    if (e.target.closest('[data-keep]')) return;
+    closeDrawer();
+  });
+
+  // ── 로드 ─────────────────────────────────────────────────────
+  function showError(title, msg, actionsHtml) {
+    var ca = $('content-area');
+    if (ca) ca.hidden = true;
+    var box = $('load-error');
+    if (!box) return;
+    box.hidden = false;
+    set('err-title', esc(title));
+    set('err-msg', esc(msg));
+    set('err-actions', actionsHtml);
+  }
+
+  fetch('/api/admin/grid', { credentials: 'same-origin' })
+    .then(function (r) {
+      if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+      return r.json();
+    })
+    .then(render)
+    .catch(function (err) {
+      var un = err && err.status === 401;
+      if (un) {
+        showError('세션 만료', '관리자 로그인 후 다시 조회합니다.',
+          '<a href="/admin2/login" style="display:inline-block;padding:8px 18px;border-radius:6px;' +
+          'background:var(--on);color:var(--bg);font:500 12px/1 var(--font)">로그인</a>');
+      } else {
+        showError('격자 조회 실패',
+          '데이터를 받지 못했습니다 — ' + (err && err.message ? err.message : String(err)),
+          '<button type="button" data-action="retry" style="padding:8px 18px;border-radius:6px;' +
+          'background:var(--on);color:var(--bg);border:0;cursor:pointer;font:500 12px/1 var(--font)">다시 시도</button>');
+        var again = $('err-actions').querySelector('[data-action="retry"]');
+        if (again) again.addEventListener('click', function () { location.reload(); });
+      }
+    });
+})();
+</script>
+{% endraw %}
+{% endblock %}
