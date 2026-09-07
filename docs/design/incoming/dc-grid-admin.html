@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="7f3b81c9-538d-4119-a742-50db7cfb525a"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+:root{
+  --bg:#F0F5F9; --surface:#F0F5F9; --card:#ffffff; --container:#E4ECF4; --container-low:#EAF2F8;
+  --on:#111827; --on-variant:#64748B; --outline:#94A3B8; --outline-variant:#DCE7F2;
+  --primary:#65A1D4; --primary-bright:#4A90E2; --on-primary:#ffffff; --primary-container:#DCE7F2;
+  --secondary:#5071d5; --tertiary:#6E8FD6; --tertiary-container:#DCE7F2;
+  --error:#C0392B; --on-error:#ffffff;
+  --nav:#1E293B; --on-nav:#F0F5F9; --on-nav-muted:#94A3B8;
+  --state-wait:var(--outline); --state-run:#D97706;
+  --state-fail:var(--error); --state-done:var(--success);
+  --success:#2f9e6d; --success-bright:#5fd6a0; --success-dark:#1c7a4d; --success-deep:#0f5132;
+  --success-muted:#3d7a5c; --success-ink:#2c4c3c; --success-sage:#7aa891;
+  --success-teal:#10a37f; --success-teal-bright:#6ee7d6;
+  --success-container:#e9f6ef; --success-container-line:#d4e9dd; --on-success:#ffffff;
+  --phoenix-font-sans-serif:var(--font);
+  --font:'Noto Sans KR','Pretendard',system-ui,sans-serif;
+  --font-head:'Noto Sans KR','Pretendard',system-ui,sans-serif;
+  --font-num:'Noto Sans KR','Pretendard',system-ui,sans-serif;
+  --r-sm:.25rem; --r:.5rem; --r-md:.75rem; --r-lg:1rem; --r-full:9999px;
+  --sp-xs:4px; --sp-sm:8px; --sp-md:16px; --sp-lg:24px; --sp-xl:32px;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 12px 30px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webkit-font-smoothing:antialiased}
+a{color:var(--primary-bright);text-decoration:none}a:hover{color:var(--secondary);text-decoration:underline}
+button{font-family:var(--font)}
+button:focus-visible{outline:2px solid var(--primary-bright);outline-offset:2px}
+@keyframes grd-spin{to{transform:rotate(360deg)}}
+@keyframes grd-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@media (max-width:768px){[data-grd-bar]{flex-direction:column;align-items:stretch}[data-grd-drawer]{width:100vw}}
+</style>
+</helmet>
+
+<main data-screen-id="ADM-GRD-010" data-domain="ai" data-screen-label="격자 관리" style="min-height:100vh;padding:var(--sp-lg);display:flex;flex-direction:column;gap:var(--sp-md);font-family:var(--font);color:var(--on)">
+
+  <header style="display:flex;align-items:baseline;gap:var(--sp-sm);flex-wrap:wrap">
+    <h1 style="margin:0;font:600 20px/1.3 var(--font-head)">격자 관리</h1>
+    <span style="font:400 13px/1.3 var(--font);color:var(--on-variant)">사전 생성 견적 격자 · 티어 7 × 용도 8 × 플랫폼 2</span>
+  </header>
+
+  <!-- 실패: 401 -->
+  <section hidden="{{ not401 }}" role="alert" style="background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-md);padding:var(--sp-xl);display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-sm)">
+    <div style="font:600 15px/1.4 var(--font-head)">세션 만료 — 로그인 필요</div>
+    <div style="font:400 13px/1.5 var(--font);color:var(--on-variant)">격자 조회 권한 확인 실패(401). 다시 로그인 후 이 화면으로 돌아옵니다.</div>
+    <button data-action="relogin" style="margin-top:var(--sp-sm);background:var(--primary-bright);color:var(--on-primary);border:0;border-radius:var(--r);padding:10px 16px;font:600 13px/1 var(--font);cursor:pointer">다시 로그인</button>
+  </section>
+
+  <!-- 실패: 500 -->
+  <section hidden="{{ not500 }}" role="alert" style="background:var(--card);border:1px solid var(--state-fail);border-radius:var(--r-md);padding:var(--sp-xl);display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-sm)">
+    <div style="font:600 15px/1.4 var(--font-head);color:var(--state-fail)">격자 조회 실패 (500)</div>
+    <div style="font:400 13px/1.5 var(--font);color:var(--on-variant)">서버 오류. 요청 ID <span data-bind="error_request_id" style="font-family:var(--font-num)">000000</span></div>
+    <button data-action="retry" style="margin-top:var(--sp-sm);background:var(--card);color:var(--on);border:1px solid var(--outline);border-radius:var(--r);padding:10px 16px;font:600 13px/1 var(--font);cursor:pointer">다시 시도</button>
+  </section>
+
+  <div hidden="{{ hasError }}" style="display:flex;flex-direction:column;gap:var(--sp-md)">
+
+    <!-- 부분 실패 -->
+    <section hidden="{{ notPartial }}" role="alert" style="background:var(--card);border:1px solid var(--state-fail);border-radius:var(--r);padding:var(--sp-sm) var(--sp-md);display:flex;align-items:center;gap:var(--sp-md);flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:6px;font:600 13px/1 var(--font);color:var(--state-fail)"><span style="width:8px;height:8px;border-radius:50%;background:var(--state-fail)"></span>부분 실패</span>
+      <span style="font:400 13px/1.4 var(--font)">마지막 배치에서 <b data-bind="total_count" style="font-family:var(--font-num)">000</b>칸 중 <b data-bind="fail_count" style="font-family:var(--font-num);color:var(--state-fail)">0</b>칸 생성 실패</span>
+      <span style="flex:1"></span>
+      <button data-action="filter-fail" sc-camel-on-click="{{ toggleFailOnly }}" aria-pressed="{{ failOnly }}" style="{{ failOnlyBtnStyle }}">실패 칸만 표시</button>
+      <button data-action="regen-failed" sc-camel-on-click="{{ askRegenFailed }}" style="background:var(--card);color:var(--on);border:1px solid var(--outline);border-radius:var(--r);padding:8px 12px;font:600 12px/1 var(--font);cursor:pointer">실패 칸 재생성</button>
+    </section>
+
+    <!-- 빈 상태: 배치 미실행 -->
+    <section hidden="{{ notEmpty }}" style="background:var(--card);border:1px dashed var(--outline);border-radius:var(--r-md);padding:var(--sp-lg);display:flex;align-items:center;gap:var(--sp-md);flex-wrap:wrap">
+      <div style="flex:1;min-width:240px">
+        <div style="font:600 15px/1.4 var(--font-head)">배치 기록 없음 — 격자 전체 미생성</div>
+        <div style="font:400 13px/1.5 var(--font);color:var(--on-variant);margin-top:var(--sp-xs)">첫 배치 실행 시 채울 칸 <span data-bind="target_count" style="font-family:var(--font-num)">00</span>개 · 칸당 약 5초 · 전체 약 6분 소요</div>
+      </div>
+      <button data-action="regen-all" sc-camel-on-click="{{ askRegenAll }}" style="background:var(--primary-bright);color:var(--on-primary);border:0;border-radius:var(--r);padding:10px 16px;font:600 13px/1 var(--font);cursor:pointer">첫 배치 실행</button>
+    </section>
+
+    <!-- ③ 상단 요약 바 -->
+    <section data-grd-bar="1" aria-label="격자 요약" style="background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-md);padding:var(--sp-md) var(--sp-lg);display:flex;align-items:center;gap:var(--sp-xl);flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font:500 11px/1.3 var(--font);color:var(--on-variant)">채워진 칸</span>
+        <span style="font:600 22px/1.2 var(--font-num);font-variant-numeric:tabular-nums"><span data-bind="filled_count">{{ filledText }}</span><span style="font:400 14px/1 var(--font-num);color:var(--on-variant)"> / <span data-bind="total_count">000</span></span></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font:500 11px/1.3 var(--font);color:var(--on-variant)">마지막 배치</span>
+        <span data-bind="last_batch_at" style="font:500 15px/1.4 var(--font-num);font-variant-numeric:tabular-nums">{{ lastBatchText }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font:500 11px/1.3 var(--font);color:var(--on-variant)">배치 상태</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font:600 14px/1.4 var(--font)"><span style="{{ batchDotStyle }}"></span><span data-bind="batch_status">{{ batchStatusText }}</span></span>
+      </div>
+      <div hidden="{{ notRunningAll }}" style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px" aria-live="polite">
+        <div style="display:flex;justify-content:space-between;font:500 12px/1.3 var(--font)"><span style="color:var(--state-run)">재생성 중</span><span data-bind="regen_progress" style="font-family:var(--font-num);font-variant-numeric:tabular-nums">{{ progressText }}</span></div>
+        <div style="height:6px;background:var(--container);border-radius:var(--r-full);overflow:hidden"><div style="{{ progressBarStyle }}"></div></div>
+        <div style="font:400 11px/1.3 var(--font);color:var(--on-variant)">남은 시간 약 <span data-bind="regen_eta" style="font-family:var(--font-num)">{{ etaText }}</span> · 진행 중인 칸은 격자에서 표시</div>
+      </div>
+      <span hidden="{{ runningAll }}" style="flex:1"></span>
+      <button data-action="regen-all" sc-camel-on-click="{{ askRegenAll }}" disabled="{{ isBusy }}" style="{{ regenAllBtnStyle }}">전체 재생성</button>
+    </section>
+
+    <!-- 토글 + 범례 -->
+    <div style="display:flex;align-items:center;gap:var(--sp-md);flex-wrap:wrap">
+      <div data-keep="1" role="tablist" aria-label="플랫폼" style="display:inline-flex;background:var(--container);border-radius:var(--r);padding:3px;gap:2px">
+        <button role="tab" data-action="platform-intel" aria-selected="{{ isIntel }}" sc-camel-on-click="{{ setIntel }}" style="{{ intelTabStyle }}">인텔</button>
+        <button role="tab" data-action="platform-amd" aria-selected="{{ isAmd }}" sc-camel-on-click="{{ setAmd }}" style="{{ amdTabStyle }}">AMD</button>
+      </div>
+      <span style="font:400 12px/1.3 var(--font);color:var(--on-variant)">행·열 머리를 누르면 해당 줄 강조(필터 아님)</span>
+      <span style="flex:1"></span>
+      <div hidden="{{ hideLegend }}" style="display:flex;gap:var(--sp-md);flex-wrap:wrap;font:400 12px/1 var(--font);color:var(--on-variant)">
+        <sc-for list="{{ legend }}" as="l" hint-placeholder-count="6">
+          <span style="display:inline-flex;align-items:center;gap:5px"><span style="{{ l.swatch }}"></span>{{ l.label }}</span>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- ① 격자판 -->
+    <section aria-label="견적 격자" style="background:var(--card);border:1px solid var(--outline-variant);border-radius:var(--r-md);overflow:auto">
+      <div role="grid" style="display:grid;grid-template-columns:152px repeat(8,minmax(136px,1fr));gap:1px;background:var(--outline-variant);min-width:1240px">
+        <div role="columnheader" style="background:var(--container-low);padding:var(--sp-sm) var(--sp-md);font:500 11px/1.3 var(--font);color:var(--on-variant);display:flex;flex-direction:column;justify-content:flex-end"><span>티어 ↓ / 용도 →</span><span data-bind="platform_label" style="font:600 12px/1.3 var(--font);color:var(--on)">{{ platformLabel }}</span></div>
+        <sc-for list="{{ uses }}" as="u" hint-placeholder-count="8">
+          <button role="columnheader" data-action="hl-use" aria-pressed="{{ u.on }}" sc-camel-on-click="{{ u.onClick }}" style="{{ u.style }}">{{ u.label }}</button>
+        </sc-for>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+          <button role="rowheader" data-repeat="tiers" data-action="hl-tier" aria-pressed="{{ r.on }}" sc-camel-on-click="{{ r.onClick }}" style="{{ r.style }}">
+            <span data-bind="tier.name" style="font:600 13px/1.3 var(--font)">{{ r.name }}</span>
+            <span data-bind="tier.budget_range" style="font:400 11px/1.3 var(--font-num);color:var(--on-variant)">{{ r.budget }}</span>
+          </button>
+          <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="8">
+            <button role="gridcell" data-repeat="cells" data-action="open-cell" aria-label="{{ c.aria }}" sc-camel-on-click="{{ c.onClick }}" disabled="{{ c.disabled }}" style="{{ c.style }}">
+              <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px/1.2 var(--font)">
+                <span hidden="{{ c.isRun }}" style="{{ c.dot }}"></span>
+                <span hidden="{{ c.notRun }}" style="width:9px;height:9px;border:2px solid var(--state-run);border-right-color:transparent;border-radius:50%;animation:grd-spin .8s linear infinite"></span>
+                <span data-bind="cell.status_label" style="{{ c.labelStyle }}">{{ c.label }}</span>
+              </span>
+              <span data-bind="cell.total_price" style="{{ c.totalStyle }}">{{ c.total }}</span>
+              <span data-bind="cell.generated_ago" style="font:400 11px/1.2 var(--font);color:var(--on-variant)">{{ c.ago }}</span>
+            </button>
+          </sc-for>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- 로딩 -->
+    <div hidden="{{ notLoading }}" aria-live="polite" style="font:400 12px/1.3 var(--font);color:var(--on-variant);display:inline-flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border:2px solid var(--outline);border-right-color:transparent;border-radius:50%;animation:grd-spin .8s linear infinite"></span>격자 로딩 중</div>
+
+    <div style="font:400 12px/1.5 var(--font);color:var(--on-variant)">
+      <a href="#" data-action="grid-axis" style="color:var(--on-variant)">축(티어 경계·용도 목록)</a>은 별도 화면에서 관리 · 이 화면은 칸의 내용물만 다루며 부품 손 교체는 없음(재생성만)
+    </div>
+  </div>
+
+  <!-- ② 칸 상세 서랍 -->
+  <aside data-grd-drawer="1" data-keep="1" ref="{{ drawerRef }}" hidden="{{ drawerClosed }}" aria-label="칸 상세" style="position:fixed;top:0;right:0;bottom:0;width:440px;max-width:100vw;background:var(--card);box-shadow:var(--shadow);border-left:1px solid var(--outline-variant);display:flex;flex-direction:column;z-index:20">
+    <div style="padding:var(--sp-md) var(--sp-lg);border-bottom:1px solid var(--outline-variant);display:flex;align-items:flex-start;gap:var(--sp-sm)">
+      <div style="flex:1;min-width:0">
+        <div data-bind="cell.coord" style="font:600 16px/1.3 var(--font-head)">{{ sel.coord }}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font:600 12px/1 var(--font)"><span style="{{ sel.dot }}"></span><span data-bind="cell.status_label" style="{{ sel.labelStyle }}">{{ sel.label }}</span></div>
+      </div>
+      <button data-action="close-drawer" aria-label="닫기" sc-camel-on-click="{{ closeDrawer }}" style="background:transparent;border:1px solid var(--outline-variant);border-radius:var(--r);width:32px;height:32px;cursor:pointer;color:var(--on-variant);font:400 16px/1 var(--font)">×</button>
+    </div>
+    <div style="flex:1;overflow:auto;padding:var(--sp-md) var(--sp-lg);display:flex;flex-direction:column;gap:var(--sp-md)">
+      <dl style="margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px var(--sp-md);font:400 12px/1.4 var(--font)">
+        <dt style="color:var(--on-variant)">생성 시각</dt><dd data-bind="cell.generated_at" style="margin:0;font-family:var(--font-num);font-variant-numeric:tabular-nums">0000-00-00 00:00</dd>
+        <dt style="color:var(--on-variant)">배치 ID</dt><dd data-bind="cell.batch_id" style="margin:0;font-family:var(--font-num)">B-00000000-000</dd>
+        <dt style="color:var(--on-variant)">예산 구간</dt><dd data-bind="tier.budget_range" style="margin:0;font-family:var(--font-num)">{{ sel.budget }}</dd>
+      </dl>
+
+      <div hidden="{{ sel.noItems }}" style="border:1px solid var(--outline-variant);border-radius:var(--r);overflow:hidden">
+        <sc-raw-table style="width:100%;border-collapse:collapse;font:400 12px/1.4 var(--font)">
+          <sc-raw-caption style="text-align:left;padding:8px var(--sp-md);font:600 12px/1.3 var(--font);background:var(--container-low);border-bottom:1px solid var(--outline-variant)">견적 구성 · 슬롯 8</sc-raw-caption>
+          <sc-raw-thead><sc-raw-tr style="color:var(--on-variant);font-size:11px"><sc-raw-th scope="col" style="text-align:left;padding:6px var(--sp-md);font-weight:500">슬롯</sc-raw-th><sc-raw-th scope="col" style="text-align:left;padding:6px 8px;font-weight:500">부품명</sc-raw-th><sc-raw-th scope="col" style="text-align:right;padding:6px var(--sp-md);font-weight:500">가격</sc-raw-th></sc-raw-tr></sc-raw-thead>
+          <sc-raw-tbody>
+            <sc-for list="{{ items }}" as="it" hint-placeholder-count="8">
+              <sc-raw-tr data-repeat="items" style="border-top:1px solid var(--outline-variant)">
+                <sc-raw-th scope="row" data-bind="item.slot" style="text-align:left;padding:8px var(--sp-md);font-weight:500;color:var(--on-variant);white-space:nowrap;vertical-align:top">{{ it.slot }}</sc-raw-th>
+                <sc-raw-td data-bind="item.product_name" style="padding:8px;vertical-align:top;overflow-wrap:anywhere">{{ it.name }}<span hidden="{{ it.inStock }}" style="display:inline-block;margin-left:6px;font:600 10px/1 var(--font);color:var(--state-run);border:1px solid var(--state-run);border-radius:var(--r-sm);padding:2px 4px;vertical-align:middle">재고 소진</span></sc-raw-td>
+                <sc-raw-td data-bind="item.price" style="padding:8px var(--sp-md);text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:top">{{ it.price }}</sc-raw-td>
+              </sc-raw-tr>
+            </sc-for>
+          </sc-raw-tbody>
+          <sc-raw-tfoot>
+            <sc-raw-tr style="border-top:2px solid var(--outline-variant);background:var(--container-low)"><sc-raw-th scope="row" colspan="2" style="text-align:left;padding:10px var(--sp-md);font-weight:600">총액</sc-raw-th><sc-raw-td data-bind="cell.total_price" style="padding:10px var(--sp-md);text-align:right;font:600 14px/1.2 var(--font-num);font-variant-numeric:tabular-nums;white-space:nowrap">{{ sel.total }}</sc-raw-td></sc-raw-tr>
+            <sc-raw-tr><sc-raw-th scope="row" colspan="2" style="text-align:left;padding:8px var(--sp-md);font-weight:500;color:var(--on-variant)">예산 구간 대비</sc-raw-th><sc-raw-td style="padding:8px var(--sp-md);text-align:right"><span style="display:inline-flex;align-items:center;gap:5px;font:600 12px/1 var(--font)"><span style="{{ sel.verdictDot }}"></span><span data-bind="cell.budget_verdict">{{ sel.verdict }}</span></span></sc-raw-td></sc-raw-tr>
+          </sc-raw-tfoot>
+        </sc-raw-table>
+      </div>
+
+      <div hidden="{{ sel.hasItems }}" style="border:1px dashed var(--outline);border-radius:var(--r);padding:var(--sp-md);font:400 12px/1.5 var(--font);color:var(--on-variant)">{{ sel.emptyNote }}</div>
+
+      <div hidden="{{ sel.notRun }}" aria-live="polite" style="display:flex;align-items:center;gap:8px;font:500 12px/1.3 var(--font);color:var(--state-run)"><span style="width:12px;height:12px;border:2px solid var(--state-run);border-right-color:transparent;border-radius:50%;animation:grd-spin .8s linear infinite"></span>재생성 중 · 약 5초</div>
+    </div>
+    <div style="padding:var(--sp-md) var(--sp-lg);border-top:1px solid var(--outline-variant);display:flex;gap:var(--sp-sm);flex-wrap:wrap">
+      <button data-action="regen-cell" sc-camel-on-click="{{ askRegenCell }}" disabled="{{ sel.regenDisabled }}" style="{{ sel.regenBtnStyle }}">이 칸 재생성</button>
+      <button data-action="quote-history" disabled="true" aria-describedby="grd-hist-note" style="background:var(--card);color:var(--on-variant);border:1px solid var(--outline-variant);border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:not-allowed;opacity:.6">견적 이력 보기</button>
+      <span id="grd-hist-note" style="align-self:center;font:400 11px/1.3 var(--font);color:var(--on-variant)">이력 · 판매 실적 — 향후 사용예정</span>
+    </div>
+  </aside>
+
+  <!-- 확인 대화상자 -->
+  <div hidden="{{ noConfirm }}" style="position:fixed;inset:0;background:rgba(17,24,39,.4);z-index:30;display:flex;align-items:center;justify-content:center;padding:var(--sp-lg)">
+    <div role="dialog" aria-modal="true" aria-labelledby="grd-confirm-title" style="background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow);width:100%;max-width:440px;padding:var(--sp-lg);display:flex;flex-direction:column;gap:var(--sp-md)">
+      <div id="grd-confirm-title" style="font:600 16px/1.3 var(--font-head)">{{ confirm.title }}</div>
+      <div style="display:flex;gap:8px;align-items:flex-start;padding:var(--sp-sm) var(--sp-md);background:var(--container-low);border:1px solid var(--outline-variant);border-radius:var(--r);font:500 12px/1.5 var(--font)">
+        <span style="flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:var(--state-fail)"></span>
+        <span>{{ confirm.warning }}</span>
+      </div>
+      <ul style="margin:0;padding-left:18px;font:400 13px/1.6 var(--font);color:var(--on-variant)">
+        <sc-for list="{{ confirm.facts }}" as="f" hint-placeholder-count="3"><li>{{ f }}</li></sc-for>
+      </ul>
+      <div style="display:flex;justify-content:flex-end;gap:var(--sp-sm)">
+        <button data-action="confirm-cancel" sc-camel-on-click="{{ cancelConfirm }}" style="background:var(--card);color:var(--on);border:1px solid var(--outline);border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:pointer">취소</button>
+        <button data-action="confirm-ok" sc-camel-on-click="{{ runConfirm }}" style="{{ confirm.okStyle }}">{{ confirm.ok }}</button>
+      </div>
+    </div>
+  </div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;screenState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;normal&quot;,&quot;tsType&quot;:&quot;'normal'|'empty'|'loading'|'partial'|'err401'|'err500'&quot;,&quot;options&quot;:[&quot;normal&quot;,&quot;empty&quot;,&quot;loading&quot;,&quot;partial&quot;,&quot;err401&quot;,&quot;err500&quot;],&quot;section&quot;:&quot;화면 상태&quot;},&quot;showLegend&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;표시&quot;}}">
+class Component extends DCLogic {
+  state = { platform:'intel', selected:null, hlTier:null, hlUse:null, confirm:null, failOnly:false, overrides:{}, runAll:null, runCell:null, done:{} };
+  drawerRef = React.createRef();
+
+  componentDidMount(){
+    this._md = (e) => {
+      if(!this.state.selected) return;
+      if(e.target.closest && e.target.closest('[data-keep], [role="dialog"], [data-action="open-cell"]')) return;
+      this.setState({ selected:null });
+    };
+    document.addEventListener('mousedown', this._md);
+  }
+  componentWillUnmount(){ document.removeEventListener('mousedown', this._md); clearInterval(this._iv); clearTimeout(this._to); }
+
+  static TIERS = [['팝콘 3','~60만',6],['팝콘 5','60~100만',7],['팝콘 5+','100~150만',7],['팝콘 7','150~220만',7],['팝콘 7+','220~300만',7],['팝콘 9','300~450만',7],['팝콘 X','450만~',8]];
+  static USES = ['사무·인터넷','온라인게임','고사양게임','영상편집·방송','디자인·3D설계','개발·프로그래밍','AI 작업','특수형'];
+  static SLOTS = ['CPU','메인보드','메모리','그래픽카드','SSD','파워','케이스','쿨러'];
+  static ST = {
+    ok:     { label:'정상',          color:'var(--state-done)' },
+    over:   { label:'예산 상한 초과', color:'var(--state-run)' },
+    stock:  { label:'재고 소진 슬롯', color:'var(--state-run)' },
+    fail:   { label:'생성 실패',      color:'var(--state-fail)' },
+    intent: { label:'빈 칸(의도)',    color:'var(--outline)' },
+    missing:{ label:'빈 칸(미생성)',  color:'var(--state-wait)' },
+    run:    { label:'재생성 중',      color:'var(--state-run)' },
+  };
+
+  zeros(d){ return String(10**d).slice(1).replace(/\B(?=(\d{3})+(?!\d))/g,',') + '원'; }
+
+  baseStatus(t,u,platform,screen){
+    if(u===7) return 'intent';
+    if(u===6 && t<=2) return 'intent';
+    if(t===0 && (u===2||u===3||u===4)) return 'intent';
+    if(t===1 && u===4) return 'intent';
+    if(screen==='empty') return 'missing';
+    const amd = platform==='amd';
+    if(screen==='partial'){ if((t===5&&u===6)||(t===4&&u===2)||(t===2&&u===3)) return 'fail'; }
+    if(amd){ if(t===3&&u===1) return 'over'; if(t===6&&u===5) return 'missing'; if(t===1&&u===0) return 'stock'; }
+    else   { if(t===3&&u===2) return 'over'; if(t===1&&u===1) return 'stock'; if(t===5&&u===6&&screen!=='partial') return 'fail'; if(t===6&&u===4) return 'missing'; if(t===2&&u===5) return 'missing'; }
+    return 'ok';
+  }
+
+  renderVals(){
+    const C = Component, s = this.state;
+    const screen = this.props.screenState ?? 'normal';
+    const platform = s.platform;
+    const isLoading = screen==='loading';
+    const isEmpty = screen==='empty';
+    const hasError = screen==='err401' || screen==='err500';
+    const busy = !!s.runAll || isLoading || hasError;
+    const dot = (col) => 'width:8px;height:8px;border-radius:50%;background:'+col+';flex:none';
+    const key = (t,u) => t+'-'+u;
+
+    const statusOf = (t,u) => {
+      const k = key(t,u);
+      if(s.runAll && s.runAll.current===k) return 'run';
+      if(s.runCell===k) return 'run';
+      if(s.overrides[k]) return s.overrides[k];
+      return this.baseStatus(t,u,platform,screen);
+    };
+
+    const uses = C.USES.map((label,u) => ({ label, on: s.hlUse===u,
+      onClick: () => this.setState({ hlUse: s.hlUse===u ? null : u }),
+      style:'background:'+(s.hlUse===u?'var(--primary-container)':'var(--container-low)')+';border:0;border-bottom:'+(s.hlUse===u?'2px solid var(--primary-bright)':'2px solid transparent')+';padding:var(--sp-sm) var(--sp-md);font:600 12px/1.3 var(--font);color:var(--on);text-align:left;cursor:pointer' }));
+
+    let filled=0, total=0, targets=[];
+    const rows = C.TIERS.map(([name,budget,digits],t) => {
+      const cells = C.USES.map((uLabel,u) => {
+        const st = statusOf(t,u), meta = C.ST[st];
+        const k = key(t,u);
+        const empty = st==='intent'||st==='missing';
+        const hl = s.hlTier===t || s.hlUse===u;
+        const selected = s.selected===k;
+        if(st!=='intent') total++;
+        if(st==='ok'||st==='over'||st==='stock') filled++;
+        if(st!=='intent') targets.push(k);
+        const dim = s.failOnly && st!=='fail';
+        let bg = 'var(--card)';
+        if(st==='intent') bg = 'repeating-linear-gradient(45deg, var(--surface) 0 7px, var(--outline-variant) 7px 8px)';
+        else if(st==='missing') bg = 'var(--container)';
+        else if(hl) bg = 'var(--primary-container)';
+        if(hl && st==='missing') bg = 'var(--primary-container)';
+        const border = selected ? 'inset 0 0 0 2px var(--primary-bright)' : (st==='fail' ? 'inset 0 0 0 1px var(--state-fail)' : (st==='missing' ? 'inset 0 0 0 1px var(--state-wait)' : 'none'));
+        const done = s.done[k];
+        return { key:k, label: meta.label, isRun: st==='run', notRun: st!=='run',
+          aria: name+' × '+uLabel+' × '+(platform==='amd'?'AMD':'인텔')+' · '+meta.label,
+          dot: dot(meta.color),
+          labelStyle:'color:'+(st==='intent'?'var(--on-variant)':st==='ok'?'var(--success-dark)':meta.color),
+          total: isLoading ? '' : (empty ? (st==='missing' ? '생성 필요' : '—') : this.zeros(digits)),
+          totalStyle:'font:'+(empty?'500 12px/1.2':'600 14px/1.2')+' var(--font-num);font-variant-numeric:tabular-nums;color:'+(st==='missing'?'var(--on)':empty?'var(--on-variant)':'var(--on)'),
+          ago: isLoading ? '' : (empty ? (st==='missing' ? '배치 대상' : '예산상 불가 조합') : (done ? '방금' : (st==='fail' ? '마지막 시도 0시간 전' : '0시간 전'))),
+          disabled: st==='intent' || isLoading,
+          onClick: () => this.setState({ selected: k }),
+          style:'display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;min-height:84px;padding:10px 12px;border:0;text-align:left;cursor:'+(st==='intent'?'default':'pointer')+';background:'+bg+';box-shadow:'+border+';opacity:'+(dim?'.3':'1')+';font-family:var(--font)'+(isLoading?';animation:grd-pulse 1.4s ease-in-out infinite':'') };
+      });
+      return { name, budget, cells, on: s.hlTier===t,
+        onClick: () => this.setState({ hlTier: s.hlTier===t ? null : t }),
+        style:'background:'+(s.hlTier===t?'var(--primary-container)':'var(--container-low)')+';border:0;border-right:'+(s.hlTier===t?'2px solid var(--primary-bright)':'2px solid transparent')+';padding:var(--sp-sm) var(--sp-md);display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;cursor:pointer' };
+    });
+    this._targets = targets;
+
+    const legend = ['ok','over','stock','fail','missing','intent'].map(k => ({ label: C.ST[k].label,
+      swatch: k==='intent' ? 'width:12px;height:12px;border:1px solid var(--outline);background:repeating-linear-gradient(45deg, var(--surface) 0 3px, var(--outline-variant) 3px 4px)' :
+              k==='missing' ? 'width:12px;height:12px;border:1px solid var(--state-wait);background:var(--container)' : dot(C.ST[k].color) }));
+
+    // 선택 칸
+    let sel = { coord:'', label:'', dot:dot('transparent'), labelStyle:'', budget:'', total:'', verdict:'', verdictDot:dot('transparent'), noItems:true, hasItems:false, notRun:true, emptyNote:'', regenDisabled:true, regenBtnStyle:'' };
+    let items = [];
+    if(s.selected){
+      const [t,u] = s.selected.split('-').map(Number);
+      const st = statusOf(t,u), meta = C.ST[st];
+      const [name,budget,digits] = C.TIERS[t];
+      const hasItems = st==='ok'||st==='over'||st==='stock'||st==='run';
+      const verdictMap = { ok:['범위 내','var(--state-done)'], over:['상한 초과','var(--state-run)'], stock:['범위 내 · 재고 소진 슬롯 있음','var(--state-run)'], run:['재생성 후 판정','var(--state-run)'] };
+      const v = verdictMap[st] || ['—','var(--outline)'];
+      sel = { coord: name+' × '+C.USES[u]+' × '+(platform==='amd'?'AMD':'인텔'), label: meta.label, dot: dot(meta.color),
+        labelStyle:'color:'+(st==='ok'?'var(--success-dark)':st==='intent'?'var(--on-variant)':meta.color),
+        budget, total: hasItems ? this.zeros(digits) : '—', verdict: v[0], verdictDot: dot(v[1]),
+        noItems: !hasItems, hasItems, notRun: st!=='run',
+        emptyNote: st==='intent' ? '의도적으로 비운 칸 — 예산 구간에서 이 용도 구성이 불가능. 재생성 대상 아님.' : st==='missing' ? '아직 생성되지 않은 칸 — 배치 대상이나 견적 없음. 재생성으로 채울 수 있음.' : '생성 실패 — 마지막 시도에서 구성 산출 실패. 로그 ID ' + 'L-00000000',
+        regenDisabled: st==='intent' || st==='run' || !!s.runAll,
+        regenBtnStyle:'background:'+(st==='intent'||st==='run'||s.runAll?'var(--container)':'var(--primary-bright)')+';color:'+(st==='intent'||st==='run'||s.runAll?'var(--on-variant)':'var(--on-primary)')+';border:0;border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:'+(st==='intent'||st==='run'||s.runAll?'not-allowed':'pointer') };
+      if(hasItems) items = C.SLOTS.map((slot,i) => ({ slot,
+        name: i===3 ? 'GIGABYTE 지포스 RTX 5060 EAGLE OC D7 8GB 제이씨현' : '부품명',
+        price: this.zeros(i===3 ? 7 : 6),
+        inStock: !(st==='stock' && i===4) }));
+    }
+
+    // 전체 재생성 진행
+    const ra = s.runAll;
+    const progressText = ra ? String(ra.done).padStart(2,'0')+' / '+String(ra.total).padStart(2,'0') : '00 / 00';
+    const etaText = ra ? Math.max(1, Math.ceil((ra.total-ra.done)*5/60))+'분' : '0분';
+    const pct = ra ? Math.round(ra.done/ra.total*100) : 0;
+
+    const confirmMap = {
+      all: { title:'전체 재생성', warning:'되돌릴 수 없음 — 지금 격자의 모든 견적이 새 배치 결과로 교체되며 이전 견적은 복구되지 않음.', facts:['대상 칸 '+targets.length+'개 (빈 칸(의도) 제외)','칸당 약 5초 · 전체 약 6분 소요','진행 중에는 칸 단위로 순차 갱신 · 완료 전까지 개별 재생성 불가'], ok:'전체 재생성 실행', okStyle:'background:var(--state-fail);color:var(--on-error);border:0;border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:pointer' },
+      cell:{ title:'이 칸 재생성', warning:'되돌릴 수 없음 — 이 칸의 현재 견적이 새 결과로 교체됨.', facts:[sel.coord,'약 5초 소요 · 완료 시 칸 갱신'], ok:'재생성 실행', okStyle:'background:var(--primary-bright);color:var(--on-primary);border:0;border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:pointer' },
+      failed:{ title:'실패 칸 재생성', warning:'실패 칸만 다시 생성 — 정상 칸은 건드리지 않음.', facts:['대상: 생성 실패 칸','칸당 약 5초'], ok:'실패 칸 재생성', okStyle:'background:var(--primary-bright);color:var(--on-primary);border:0;border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:pointer' },
+    };
+    const confirm = confirmMap[s.confirm] || { title:'', warning:'', facts:[], ok:'', okStyle:'' };
+
+    const tab = (on) => 'border:0;border-radius:var(--r-sm);padding:7px 16px;font:600 13px/1 var(--font);cursor:pointer;background:'+(on?'var(--card)':'transparent')+';color:'+(on?'var(--on)':'var(--on-variant)')+(on?';box-shadow:0 1px 2px rgba(15,23,42,.06)':'');
+    const batchStatus = isEmpty ? '기록 없음' : screen==='partial' ? '일부 실패' : ra ? '실행 중' : '성공';
+    const batchCol = isEmpty ? 'var(--state-wait)' : screen==='partial' ? 'var(--state-fail)' : ra ? 'var(--state-run)' : 'var(--state-done)';
+
+    return {
+      not401: screen!=='err401', not500: screen!=='err500', hasError,
+      notPartial: screen!=='partial', notEmpty: !isEmpty, notLoading: !isLoading,
+      hideLegend: this.props.showLegend===false,
+      filledText: isLoading ? '—' : String(filled).padStart(2,'0'),
+      lastBatchText: isEmpty ? '—' : '0000-00-00 00:00',
+      batchStatusText: batchStatus, batchDotStyle: dot(batchCol),
+      runningAll: !!ra, notRunningAll: !ra, progressText, etaText,
+      progressBarStyle:'height:100%;width:'+pct+'%;background:var(--state-run);transition:width .3s',
+      isBusy: busy,
+      regenAllBtnStyle:'background:'+(busy?'var(--container)':'var(--card)')+';color:'+(busy?'var(--on-variant)':'var(--state-fail)')+';border:1px solid '+(busy?'var(--outline-variant)':'var(--state-fail)')+';border-radius:var(--r);padding:10px 14px;font:600 13px/1 var(--font);cursor:'+(busy?'not-allowed':'pointer'),
+      failOnly: s.failOnly, toggleFailOnly: () => this.setState({ failOnly: !s.failOnly }),
+      failOnlyBtnStyle:'background:'+(s.failOnly?'var(--primary-container)':'var(--card)')+';color:var(--on);border:1px solid '+(s.failOnly?'var(--primary-bright)':'var(--outline)')+';border-radius:var(--r);padding:8px 12px;font:600 12px/1 var(--font);cursor:pointer',
+      isIntel: platform==='intel', isAmd: platform==='amd',
+      setIntel: () => this.setState({ platform:'intel', selected:null }), setAmd: () => this.setState({ platform:'amd', selected:null }),
+      intelTabStyle: tab(platform==='intel'), amdTabStyle: tab(platform==='amd'),
+      platformLabel: platform==='amd' ? 'AMD' : '인텔',
+      legend, uses, rows,
+      drawerRef: this.drawerRef, drawerClosed: !s.selected, closeDrawer: () => this.setState({ selected:null }),
+      sel, items,
+      askRegenAll: () => this.setState({ confirm:'all' }),
+      askRegenCell: () => this.setState({ confirm:'cell' }),
+      askRegenFailed: () => this.setState({ confirm:'failed' }),
+      noConfirm: !s.confirm, confirm,
+      cancelConfirm: () => this.setState({ confirm:null }),
+      runConfirm: () => this.execConfirm(),
+    };
+  }
+
+  execConfirm(){
+    const mode = this.state.confirm;
+    if(mode==='cell'){
+      const k = this.state.selected;
+      this.setState({ confirm:null, runCell:k });
+      this._to = setTimeout(() => this.setState(s => ({ runCell:null, overrides:{...s.overrides,[k]:'ok'}, done:{...s.done,[k]:true} })), 2500);
+    } else {
+      const targets = mode==='failed' ? this._targets.filter(k => { const [t,u]=k.split('-').map(Number); return this.baseStatus(t,u,this.state.platform,this.props.screenState??'normal')==='fail'; }) : this._targets.slice();
+      if(!targets.length){ this.setState({ confirm:null }); return; }
+      this.setState({ confirm:null, selected:null, failOnly:false, runAll:{ done:0, total:targets.length, current:targets[0] } });
+      let i = 0;
+      clearInterval(this._iv);
+      this._iv = setInterval(() => {
+        const k = targets[i]; i++;
+        this.setState(s => {
+          const overrides = {...s.overrides,[k]:'ok'}, done = {...s.done,[k]:true};
+          if(i>=targets.length){ clearInterval(this._iv); return { overrides, done, runAll:null }; }
+          return { overrides, done, runAll:{ done:i, total:targets.length, current:targets[i] } };
+        });
+      }, 350);
+    }
+  }
+}
+</script>
+
+
+</body></html>
