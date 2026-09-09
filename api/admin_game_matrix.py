@@ -132,6 +132,7 @@ def _games(conn) -> list:
     rows = conn.execute(text(
         "SELECT g.game_id, g.name, g.genre, g.rec_gpu, g.min_gpu,"
         " g.rec_ram_gb, g.min_ram_gb, g.official_source_url, g.checked_date,"
+        " g.description,"
         " count(m.cell_id) AS mapped_cells"
         " FROM games g LEFT JOIN game_cell_map m ON m.game_id = g.game_id"
         " GROUP BY g.game_id ORDER BY g.game_id")).mappings().all()
@@ -140,7 +141,7 @@ def _games(conn) -> list:
         "rec_gpu": r["rec_gpu"], "min_gpu": r["min_gpu"],
         "rec_ram_gb": r["rec_ram_gb"], "min_ram_gb": r["min_ram_gb"],
         "source_url": r["official_source_url"], "checked_date": r["checked_date"],
-        "mapped_cells": r["mapped_cells"],
+        "mapped_cells": r["mapped_cells"], "description": r["description"],
         # 원천 컬럼이 비었다는 «사실» — 재판정이 아니다(머리 주석 참조)
         "unjudgeable": r["rec_gpu"] is None,
         "unjudgeable_reason": None if r["rec_gpu"] is not None else "원천에 rec_gpu 없음",
