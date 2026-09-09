@@ -23,13 +23,17 @@
   하한을 이미 명시했다). 그래서 불성립 칸에는 사유를 **지어내지 않고** 저장돼
   있지 않다는 사실을 그대로 내려보낸다(`unmatched[].reason_available=false`).
 
-■ 「불성립」과 「판정 불가」는 다른 라벨이다 (정의서 §⑤③·§⑥)
-  둘을 가르는 근거는 **원천 컬럼의 사실**뿐이다 — 재판정이 아니다.
-    게임    `rec_gpu IS NULL`      -> 판정 불가(원천에 rec_gpu 없음)
-    AI 작업 `min_vram_gb IS NULL`  -> 판정 불가(min_vram_gb 없음)
-  그 밖에 매핑이 0건인 항목은 「매핑 없음 · 사유 미제공」이다 — 스킵 사유가
-  테이블에 없으므로 「재고 최고 VRAM으로도 부족」인지 「파싱 실패」인지 우리는
-  모른다. 모르는 것을 아는 척하지 않는다.
+■ 「불성립」과 「판정 불가」는 다른 라벨이다 (정의서 §⑤③·§⑥, 2026-09-09 개정)
+  ⚠ 이 절의 옛 버전은 "스킵 사유가 테이블에 없어 모른다"고 적혀 있었다 — 그때는
+  사실이었다(배치가 이유를 계산만 하고 저장은 안 했다). 0080 마이그레이션 +
+  배치 개정(tools/game_cell_mapper.py)으로 games/ai_workloads.mapping_skip_reason
+  에 실제 사유가 저장된다. 이 절을 낡은 채로 두면 화면이 다시 「사유 미제공」
+  으로 후퇴한다.
+  판정은 **`mapping_skip_reason` 컬럼의 사실**뿐이다 — 여기서 재판정하지 않는다.
+    NULL           -> 매핑 성공(성립) 또는 애초에 대상 아님
+    rec_gpu_missing / min_vram_gb_missing -> 판정 불가(원천에 값 없음)
+    rec_gpu_parse_failed / zero_matching_cells 등 -> 매핑 없음(사유 있음, 아래 참조)
+  사람이 읽는 문구는 game_matrix_reasons.py(단일 원천)가 배치와 공유한다.
 
 ■ 인증 — 다른 `admin_*.py` 와 같은 관행. 이 라우터의 prefix 가 `/api/admin` 이라
   `api/auth.py` 의 `auth_middleware` 가 세션을 이미 강제한다(전 `/api/admin/*`
@@ -43,6 +47,7 @@ from sqlalchemy import text
 
 from .db import engine
 from .timeutil import iso as _iso   # 시각 표기 단일 원천(슬라이스 62)
+from . import game_matrix_reasons as reasons
 
 router = APIRouter(prefix="/api/admin")
 
@@ -132,7 +137,7 @@ def _games(conn) -> list:
     rows = conn.execute(text(
         "SELECT g.game_id, g.name, g.genre, g.rec_gpu, g.min_gpu,"
         " g.rec_ram_gb, g.min_ram_gb, g.official_source_url, g.checked_date,"
-        " g.description,"
+        " g.description, g.mapping_skip_reason,"
         " count(m.cell_id) AS mapped_cells"
         " FROM games g LEFT JOIN game_cell_map m ON m.game_id = g.game_id"
         " GROUP BY g.game_id ORDER BY g.game_id")).mappings().all()
@@ -142,9 +147,12 @@ def _games(conn) -> list:
         "rec_ram_gb": r["rec_ram_gb"], "min_ram_gb": r["min_ram_gb"],
         "source_url": r["official_source_url"], "checked_date": r["checked_date"],
         "mapped_cells": r["mapped_cells"], "description": r["description"],
-        # 원천 컬럼이 비었다는 «사실» — 재판정이 아니다(머리 주석 참조)
-        "unjudgeable": r["rec_gpu"] is None,
-        "unjudgeable_reason": None if r["rec_gpu"] is not None else "원천에 rec_gpu 없음",
+        # 사유는 배치(tools/game_cell_mapper.py)가 실제 계산한 값이다(0080) —
+        # "rec_gpu가 비었나"만 보던 이전 판정을 대체한다. 원천에 값은 있는데
+        # 서열표에 없어 파싱이 실패한 경우(구형 카드)와 값 자체가 없는 경우를
+        # 이제 구분해서 말할 수 있다(§단일 원천 — game_matrix_reasons.py).
+        "unjudgeable": r["mapping_skip_reason"] is not None,
+        "unjudgeable_reason": reasons.label_of(r["mapping_skip_reason"]),
     } for r in rows]
 
 
@@ -152,7 +160,7 @@ def _workloads(conn) -> list:
     rows = conn.execute(text(
         "SELECT w.workload_id, w.task, w.model_size, w.min_vram_gb, w.rec_vram_gb,"
         " w.min_ram_gb, w.recommended_tier, w.source_url, w.checked_date,"
-        " w.description,"
+        " w.description, w.mapping_skip_reason,"
         " count(m.cell_id) AS mapped_cells"
         " FROM ai_workloads w"
         " LEFT JOIN workload_cell_map m ON m.workload_id = w.workload_id"
@@ -164,8 +172,9 @@ def _workloads(conn) -> list:
         "recommended_tier": r["recommended_tier"], "source_url": r["source_url"],
         "checked_date": r["checked_date"], "mapped_cells": r["mapped_cells"],
         "description": r["description"],
-        "unjudgeable": r["min_vram_gb"] is None,
-        "unjudgeable_reason": None if r["min_vram_gb"] is not None else "min_vram_gb 없음",
+        # games와 같은 방식(0080) — 배치가 실제 계산한 사유를 그대로 노출한다.
+        "unjudgeable": r["mapping_skip_reason"] is not None,
+        "unjudgeable_reason": reasons.label_of(r["mapping_skip_reason"]),
     } for r in rows]
 
 

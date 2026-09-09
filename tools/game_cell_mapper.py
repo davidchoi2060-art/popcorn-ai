@@ -132,14 +132,15 @@ def _map_games(conn, ladder: dict, chipsets_by_len: list, cell_index: dict):
     for g in games:
         if not g["rec_gpu"]:
             skip_reasons["rec_gpu_missing"] += 1
-            skip_detail.append({"game": g["name"], "reason": "rec_gpu_missing"})
+            skip_detail.append({"game_id": g["game_id"], "game": g["name"],
+                                 "reason": "rec_gpu_missing"})
             continue
 
         rec_chipset, rec_score = _match_chipset_text(g["rec_gpu"], ladder, chipsets_by_len)
         if rec_score is None:
             skip_reasons["rec_gpu_parse_failed"] += 1
-            skip_detail.append({"game": g["name"], "reason": "rec_gpu_parse_failed",
-                                 "rec_gpu": g["rec_gpu"]})
+            skip_detail.append({"game_id": g["game_id"], "game": g["name"],
+                                 "reason": "rec_gpu_parse_failed", "rec_gpu": g["rec_gpu"]})
             continue
 
         min_chipset, min_score = (None, None)
@@ -170,8 +171,8 @@ def _map_games(conn, ladder: dict, chipsets_by_len: list, cell_index: dict):
                           "matched_cells": matched})
         if matched == 0:
             skip_reasons["zero_matching_cells"] += 1
-            skip_detail.append({"game": g["name"], "reason": "zero_matching_cells",
-                                 "rec_chipset": rec_chipset})
+            skip_detail.append({"game_id": g["game_id"], "game": g["name"],
+                                 "reason": "zero_matching_cells", "rec_chipset": rec_chipset})
 
     return insert_rows, per_game, len(games), skip_reasons, skip_detail
 
@@ -190,7 +191,8 @@ def _map_workloads(conn, cell_index: dict):
         label = (w["task"] or "") + ((" " + w["model_size"]) if w["model_size"] else "")
         if w["min_vram_gb"] is None:
             skip_reasons["min_vram_gb_missing"] += 1
-            skip_detail.append({"workload": label, "reason": "min_vram_gb_missing"})
+            skip_detail.append({"workload_id": w["workload_id"], "workload": label,
+                                 "reason": "min_vram_gb_missing"})
             continue
 
         matched = 0
@@ -213,7 +215,8 @@ def _map_workloads(conn, cell_index: dict):
                               "matched_cells": matched})
         if matched == 0:
             skip_reasons["zero_matching_cells"] += 1
-            skip_detail.append({"workload": label, "reason": "zero_matching_cells"})
+            skip_detail.append({"workload_id": w["workload_id"], "workload": label,
+                                 "reason": "zero_matching_cells"})
 
     return insert_rows, per_workload, len(workloads), skip_reasons, skip_detail
 
@@ -250,6 +253,18 @@ def main():
               f" workloads_mapped={sum(1 for w in per_workload if w['matched_cells'] > 0)}"
               f" workload_rows={len(wl_rows)}")
 
+        # 스킵 사유를 games/ai_workloads.mapping_skip_reason 에 남긴다(0080) —
+        # 매핑에 성공한 것은 NULL 로 지운다(이전 실행에서 실패했다가 이번에
+        # 성공했으면 낡은 사유가 남으면 안 된다). game_skip_detail/wl_skip_detail
+        # 은 마지막에 걸린 사유 하나만 담는다(한 게임이 rec_gpu_missing과
+        # zero_matching_cells를 동시에 겪을 수는 없다 — 앞 단계에서 continue한다).
+        game_skip_by_id = {d["game_id"]: d["reason"] for d in game_skip_detail if "game_id" in d}
+        wl_skip_by_id = {d["workload_id"]: d["reason"] for d in wl_skip_detail if "workload_id" in d}
+        mapped_game_ids = {gid for gid, _, _, _ in game_rows}
+        mapped_wl_ids = {wid for wid, _, _, _ in wl_rows}
+        all_game_ids = {g["game_id"] for g in per_game} | set(game_skip_by_id)
+        all_wl_ids = {w["workload_id"] for w in per_workload} | set(wl_skip_by_id)
+
         if not args.dry:
             with engine.begin() as wconn:
                 wconn.execute(text("TRUNCATE TABLE game_cell_map"))
@@ -266,8 +281,20 @@ def main():
                         " gpu_used, computed_at) VALUES (:wid, :cid, :lvl, :gpu, now())"),
                         [{"wid": wid, "cid": cid, "lvl": lvl, "gpu": gpu}
                          for wid, cid, lvl, gpu in wl_rows])
+                # 스킵 사유 갱신 — games 23건 · ai_workloads 14건뿐이라 건별 UPDATE로 충분하다.
+                for gid in all_game_ids:
+                    reason = None if gid in mapped_game_ids else game_skip_by_id.get(gid)
+                    wconn.execute(text(
+                        "UPDATE games SET mapping_skip_reason = :r WHERE game_id = :i"),
+                        {"r": reason, "i": gid})
+                for wid in all_wl_ids:
+                    reason = None if wid in mapped_wl_ids else wl_skip_by_id.get(wid)
+                    wconn.execute(text(
+                        "UPDATE ai_workloads SET mapping_skip_reason = :r WHERE workload_id = :i"),
+                        {"r": reason, "i": wid})
             print(f"[game_cell_mapper] written game_cell_map={len(game_rows)}"
-                  f" workload_cell_map={len(wl_rows)}")
+                  f" workload_cell_map={len(wl_rows)}"
+                  f" skip_reason_updated games={len(all_game_ids)} workloads={len(all_wl_ids)}")
         else:
             print("[game_cell_mapper] --dry mode -- no rows written")
 
