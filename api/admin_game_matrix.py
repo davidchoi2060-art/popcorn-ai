@@ -151,6 +151,7 @@ def _workloads(conn) -> list:
     rows = conn.execute(text(
         "SELECT w.workload_id, w.task, w.model_size, w.min_vram_gb, w.rec_vram_gb,"
         " w.min_ram_gb, w.recommended_tier, w.source_url, w.checked_date,"
+        " w.description,"
         " count(m.cell_id) AS mapped_cells"
         " FROM ai_workloads w"
         " LEFT JOIN workload_cell_map m ON m.workload_id = w.workload_id"
@@ -161,6 +162,7 @@ def _workloads(conn) -> list:
         "rec_vram_gb": r["rec_vram_gb"], "min_ram_gb": r["min_ram_gb"],
         "recommended_tier": r["recommended_tier"], "source_url": r["source_url"],
         "checked_date": r["checked_date"], "mapped_cells": r["mapped_cells"],
+        "description": r["description"],
         "unjudgeable": r["min_vram_gb"] is None,
         "unjudgeable_reason": None if r["min_vram_gb"] is not None else "min_vram_gb 없음",
     } for r in rows]

@@ -214,6 +214,8 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
             <span class="sub" data-bind="sel-sub"></span>
             <span class="cnt" data-bind="sel-count"></span>
           </div>
+          <p class="gm-desc" data-bind="sel-desc" hidden
+             style="margin:4px 0 10px;font-size:13px;line-height:1.55;color:var(--muted,#666);max-width:72ch"></p>
 
           <div class="gm-empty" data-bind="sel-unmapped" hidden>
             <div class="ttl" data-bind="sel-unmapped-title">매핑 없음</div>
@@ -455,6 +457,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var sel = state.sel;
     if (!sel) {
       set('sel-name', '—'); set('sel-sub', ''); set('sel-count', '');
+      show('sel-desc', false);
       show('cells-wrap', false); show('sel-unmapped', false);
       show('sel-filtered', false); show('fail-card', false);
       return;
@@ -465,6 +468,9 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
       ? (it.genre || '') + ' · rec_gpu 「' + (it.rec_gpu == null ? '원천에 값 없음' : it.rec_gpu) + '」'
       : (it.model_size || '모델 크기 미상') + ' · min_vram ' +
         (it.min_vram_gb == null ? '원천에 값 없음' : it.min_vram_gb + 'GB')));
+    // AI 작업 쉬운 설명(0077 ai_workloads.description) - 서버 값 그대로, 없으면 숨긴다
+    set('sel-desc', esc(it.description || ''));
+    show('sel-desc', !isGame && !!it.description);
 
     var rows = sel.cells;
     var cheapest = rows.length ? rows[0].total : null;
