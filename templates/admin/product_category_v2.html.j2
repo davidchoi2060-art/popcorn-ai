@@ -1,0 +1,594 @@
+{#
+  상품 분류 관리 — 신규 4단 컬럼 시안 (ADM-CAT-011 가칭, 2026-09-09 신설)
+
+  ■ 이 화면이 답하는 질문
+    ADM-CAT-010(`product_category.html.j2`)과 같은 데이터·같은 API를 쓰되, 승인
+    디자인(`docs/design/incoming/dc-product-unified-admin.html`의 isCategory 블록)이
+    제안한 "대분류·중분류·소분류·세분류 4단을 나란히 놓고 이어서 관리"하는 배치로
+    다시 짠 시안이다. 검증 후 사장님이 어느 화면을 남길지 정한다 — 그때까지 두
+    화면은 나란히 존재한다(ADM-CAT-010은 손대지 않았다).
+
+  ■ 범위 — 생성 · 이름 수정 · 삭제(이름을 비우고 저장) · 노출 토글 · 계층 탐색
+    (컬럼을 이어가며 하위로 내려가는 것)에 집중한다. ADM-CAT-010에 있는 마진
+    설정 · 활동 이력 · 허용 부품 종류 · 위반 집계는 이번 범위에서 뺐다 — 승인
+    디자인 자체에도 그 UI가 없다(원안 그대로 옮긴 것이지 임의로 줄인 것이 아니다).
+
+  ■ 데이터 — `GET/POST/PATCH/DELETE /api/admin/categories(/{cid})`
+    (`api/admin_categories.py`, 이 화면은 그 응답을 읽기만 한다. 새 API 없음).
+    노드 식별자는 `category_id`(`id`가 아니다). 트리는 `items[]` 평면 목록이고
+    `parent_id`로 재귀 계산한다 — 깊이 컬럼(`depth`)은 서버에 없다.
+
+  ■ 4단 컬럼 — LEVELS=['대분류','중분류','소분류','세분류']는 **화면 표시용
+    상수**다(서버가 주는 값이 아니다 — 카테고리 트리 자체엔 "단계 이름"이라는
+    개념이 없다, `parent_id` 사슬만 있다). 컬럼 i의 부모는 "컬럼 i-1에서 고른
+    노드"(`selected[i-1]`)이고, 아직 아무것도 안 골랐으면 그 컬럼은 잠긴다
+    (locked) — **하드코딩된 깊이 제한이 아니라 선택 상태에서 파생한 값**이라,
+    지금 실데이터가 2단(대분류→소분류)뿐이라 3·4번째 컬럼이 항상 잠겨 보여도
+    트리가 깊어지면 화면을 다시 지을 필요가 없다.
+
+  ■★ 권한 — **지시서 원문과 다르게 만들었다.** 지시서는 "생성·수정·이동·
+    노출토글·삭제: owner만"이라 적었지만, 실제 서버 문턱은 그렇지 않다(실측,
+    두 근거를 모두 읽었다):
+      ① `api/admin_categories.py`의 `_operator()` — owner·operator 둘 다 통과
+         (2026-08-13 사장님 결정 — 독스트링 "쓰기는 owner·operator... operator도
+         권한을 줘도 됩니다").
+      ② 실제로 요청을 먼저 가로채는 `api/auth.py`의 `required_role()` —
+         `/api/admin/categories`는 `OWNER_WRITE_PREFIXES`에 없어 쓰기 최소 등급이
+         **operator**다. 브라우저가 실제로 받는 403 본문은 미들웨어가 만드는
+         `f"권한이 부족합니다(필요: {need}, 현재: {role})"`이지,
+         `_operator()`의 "운영자 이상만..." 문구가 아니다(그 코드는 지금 라우팅
+         구조에서 도달 불가능 — ADM-CAT-010이 이미 실측해 둔 사실).
+    화면이 서버보다 더 엄격한 문턱을 지어내 "owner만 된다"고 말하면, 실제로는
+    쓸 수 있는 operator 운영자에게 거짓 제약을 보여주는 것이라 판단했다(CANON
+    §2-1 "화면이 숫자를 지어내지 않는다"의 판정 버전 — CLAUDE.md "화면이 판정도
+    지어내지 않는다"). 그래서 이 화면은 실제 문턱(operator 이상)과 서버가 돌려
+    주는 403 문구를 그대로 쓴다. 다르게 정하는 것이 맞다면 이 파일의 `owner()`
+    함수 한 곳만 고치면 된다 — 제작 보고서에도 남긴다.
+
+  ■ 삭제 규칙 — 이름을 빈칸으로 만들고 [변경 저장]을 누르면 삭제를 시도한다
+    (승인 디자인 그대로). 서버가 자식·상품이 걸려 있다며 409를 주면(문장은 이미
+    완성된 한국어) 그 문장을 대화상자로 그대로 보여준다("카테고리를 삭제할 수
+    없습니다" + 서버 문구, 지어내지 않는다). 같은 부모 아래 이름 중복(409),
+    없는 상위(404), 이름 비었거나 80자 초과(400)도 서버 문구를 그대로 쓴다.
+
+  ■ 색·서체는 admin2 토큰(`--rv-*`, `mockups/shared/admin2/admin2.css`)만 쓴다.
+    승인 디자인의 `--color-accent` 등 커스텀 팔레트·Google Fonts `@import`·외부
+    CDN(`_ds` 번들)은 그대로 옮기지 않았다(A-30, admin2 팔레트 규약).
+
+  ■ 좌측 메뉴 연결 — 하지 않는다(지시서 원문). 검증 통과 후 하네스가
+    `api/admin_nav.py`를 별도로 고친다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}상품 분류 관리(신규){% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+button{font-family:inherit}
+input{font-family:var(--rv-font)}
+.num{font-family:var(--rv-mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+
+.pv-permhint{font:500 10px/1 var(--rv-font);color:var(--rv-ink-soft);background:var(--rv-panel2);
+  border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:5px 8px;white-space:nowrap}
+
+.pv-root{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+
+.pv-loading,.pv-errbox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:40px}
+.pv-loading[hidden],.pv-errbox[hidden]{display:none}
+.pv-errbox .ti{font:600 14px/1.4 var(--rv-font);color:var(--rv-muted)}
+.pv-errbox .ds{font:400 12px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center;max-width:420px}
+.pv-errbox button{display:inline-block;padding:8px 18px;border-radius:6px;background:var(--rv-ink);
+  color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
+
+.pv-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;position:relative}
+.pv-body[hidden]{display:none}
+
+.pv-banner{flex:none;margin:12px 18px 0;border:1px solid rgba(0,0,0,.13);background:var(--rv-panel2);
+  border-left:3px solid var(--rv-faint);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.pv-banner .mk{font:600 11px/1 var(--rv-mono);color:var(--rv-muted);white-space:nowrap}
+.pv-banner .hd{font:600 11.5px/1.4 var(--rv-font)}
+.pv-banner .ds{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:200px}
+
+.pv-toolbar{flex:none;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px 18px 0}
+.pv-toolbar h1{font:600 26px/1.25 var(--rv-font);margin:0 0 4px;color:var(--rv-ink);flex:none}
+.pv-toolbar .sub{font:400 12.5px/1.5 var(--rv-font);color:var(--rv-ink-soft);margin:0}
+.pv-toolbar .ttl-wrap{flex:1;min-width:260px}
+.pv-toolbar .actions{display:flex;gap:8px;flex:none}
+.pv-btn-save-all{font:600 12px/1 var(--rv-font);color:var(--rv-canvas);background:var(--rv-ink);border:none;
+  border-radius:6px;padding:10px 16px;cursor:pointer}
+.pv-btn-save-all.dis{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+
+.pv-usage{flex:none;margin:12px 18px 0;font:400 11.5px/1.6 var(--rv-font);padding:10px 13px;
+  background:var(--rv-panel2);color:var(--rv-ink-soft);border-radius:7px}
+.pv-usage b{color:var(--rv-ink)}
+
+.pv-cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(230px,1fr));gap:14px;
+  padding:14px 18px}
+.pv-col{display:flex;flex-direction:column;min-height:420px;background:var(--rv-card);
+  border:1px solid rgba(0,0,0,.11);border-radius:9px;overflow:hidden}
+.pv-col.locked{background:var(--rv-panel2)}
+.pv-col-hd{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid rgba(0,0,0,.09)}
+.pv-col-hd .step{font:600 9.5px/1 var(--rv-mono);color:var(--rv-faint);letter-spacing:.04em}
+.pv-col-hd h4{margin:0;flex:1;font:600 15.5px/1.3 var(--rv-font);color:var(--rv-ink);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-col-hd .cnt{font:600 9.5px/1 var(--rv-mono);color:var(--rv-muted);background:var(--rv-panel);
+  border-radius:9px;padding:4px 8px;white-space:nowrap;flex:none}
+.pv-col-hd .add{font:600 11px/1 var(--rv-font);border-radius:5px;padding:6px 9px;cursor:pointer;
+  color:var(--rv-canvas);background:var(--rv-ink);border:none;flex:none}
+.pv-col-hd .add.dis,.pv-col-hd .add:disabled{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+
+.pv-parenthint{padding:7px 12px;font:400 10.5px/1.4 var(--rv-font);color:var(--rv-faint);
+  border-bottom:1px solid rgba(0,0,0,.06);min-height:32px;display:flex;align-items:center}
+
+.pv-rows{flex:1;overflow:auto;padding:6px}
+.pv-empty{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
+  font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);text-align:center}
+
+.pv-row{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px}
+.pv-row.on{background:var(--rv-panel2)}
+.pv-row .dot{flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  border:0;background:transparent;cursor:pointer;padding:0}
+.pv-row .dot span{width:9px;height:9px;border:1.5px solid var(--rv-dim2);display:block}
+.pv-row.on .dot span{border-color:var(--rv-ink);background:var(--rv-ink)}
+.pv-row .name-in{flex:1;min-width:0;font:400 12.5px/1.3 var(--rv-font);color:var(--rv-ink);
+  background:var(--rv-card);border:1px solid rgba(0,0,0,.14);border-radius:5px;padding:6px 8px;outline:none}
+.pv-row .name-in.dirty{background:var(--rv-panel2);border-color:var(--rv-ink)}
+.pv-row .vis{flex:none;display:flex;align-items:center;gap:3px;font:400 9.5px/1 var(--rv-font);
+  color:var(--rv-faint);cursor:pointer;white-space:nowrap}
+.pv-row .vis input{accent-color:var(--rv-ink);margin:0;cursor:pointer}
+.pv-row .child{flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  border:0;background:transparent;cursor:pointer;font:500 13px/1 var(--rv-mono);color:var(--rv-muted);padding:0}
+.pv-row .child:disabled{color:var(--rv-dim4);cursor:default}
+
+.pv-col-ft{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid rgba(0,0,0,.09)}
+.pv-col-ft .dirty-nt{flex:1;font:400 10.5px/1.3 var(--rv-font);color:var(--rv-faint);min-width:0}
+.pv-col-ft .save{font:600 11px/1 var(--rv-font);border-radius:5px;padding:7px 11px;cursor:pointer;
+  color:var(--rv-canvas);background:var(--rv-ink);border:none;white-space:nowrap}
+.pv-col-ft .save.dis,.pv-col-ft .save:disabled{color:#f0ece2;background:var(--rv-dim2);cursor:not-allowed}
+
+.pv-delrule{flex:none;margin:0 18px 20px;font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
+.pv-delrule b{color:var(--rv-ink)}
+
+.pv-backdrop{position:fixed;inset:0;background:rgba(38,35,30,.32);z-index:40;display:flex;
+  align-items:center;justify-content:center}
+.pv-backdrop[hidden]{display:none}
+.pv-dialog{background:var(--rv-card);border:1px solid rgba(0,0,0,.14);border-radius:10px;
+  padding:20px 22px;width:min(420px,90vw);box-shadow:0 20px 48px rgba(38,35,30,.28)}
+.pv-dialog .ti{font:600 14.5px/1.4 var(--rv-font);color:var(--rv-ink);margin-bottom:9px}
+.pv-dialog .bd{font:400 12px/1.6 var(--rv-font);color:var(--rv-ink-soft);margin-bottom:16px}
+.pv-dialog .ok{display:block;margin-left:auto;font:600 12px/1 var(--rv-font);color:var(--rv-canvas);
+  background:var(--rv-ink);border:none;border-radius:6px;padding:9px 16px;cursor:pointer}
+
+@media (max-width:1100px){
+  .pv-cols{grid-template-columns:repeat(2,minmax(230px,1fr))}
+}
+@media (max-width:768px){
+  .pv-cols{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="pv-permhint">조회 viewer 이상 · 쓰기 operator 이상</span>
+{% endblock %}
+
+{% block content %}
+<div class="pv-root">
+  <div class="pv-loading" id="pvLoading"><div>불러오는 중…</div></div>
+
+  <div class="pv-errbox" id="pvErrBox" hidden>
+    <div class="ti">조회 실패</div>
+    <div class="ds" id="pvErrMsg"></div>
+    <button type="button" data-action="retry-load">다시 시도</button>
+  </div>
+
+  <div class="pv-body" id="pvBody" hidden>
+    <div class="pv-banner">
+      <span class="mk">경계</span>
+      <span class="hd">엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다</span>
+      <span class="ds">부품 종류(part_type, 엔진이 읽는 닫힌 집합)와 다른 축입니다. 이 화면은 대분류 → 중분류 → 소분류 → 세분류를 한 화면에서 이어서 관리하는 신규 시안입니다(ADM-CAT-011 가칭) — 기존 「상품 분류 관리」와 같은 데이터를 씁니다.</span>
+    </div>
+
+    <div class="pv-toolbar">
+      <div class="ttl-wrap">
+        <h1>상품 분류 관리(신규)</h1>
+        <p class="sub">대분류 → 중분류 → 소분류 → 세분류를 한 화면에서 연속으로 관리합니다.</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="pv-btn-save-all" id="pvSaveAll" data-action="save-all">전체 저장</button>
+      </div>
+    </div>
+
+    <div class="pv-usage">
+      <b>사용법</b> · 각 분류 상단의 <b>[+ 생성]</b>으로 새 카테고리를 만들고, 카테고리명을 직접 수정한 뒤 <b>[변경 저장]</b>을 누르면 반영됩니다. <b>카테고리명을 빈칸으로 만든 뒤 저장하면 삭제</b>됩니다. 컬럼에서 분류를 고르면(점 또는 › 단추) 그 아래 하위 컬럼이 열립니다.
+    </div>
+
+    <div class="pv-cols" id="pvCols"></div>
+
+    <div class="pv-delrule">
+      <b>삭제 규칙</b> · 카테고리명을 지우고 [변경 저장]을 누르면 삭제됩니다. 단, 해당 카테고리 아래에 하위 카테고리가 있거나 매핑된 상품이 있으면 삭제되지 않고 대화상자로 이유가 표시됩니다.
+    </div>
+  </div>
+
+  <div class="pv-backdrop" id="pvDialogBd" hidden>
+    <div class="pv-dialog" data-keep="1">
+      <div class="ti">카테고리를 삭제할 수 없습니다</div>
+      <div class="bd" id="pvDialogBody"></div>
+      <button type="button" class="ok" data-action="close-dialog">확인</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var LEVELS = ['대분류', '중분류', '소분류', '세분류'];
+
+  var S = {
+    data: null, loadErr: null,
+    selected: [null, null, null, null],
+    drafts: {},          // category_id -> 편집 중인 이름(문자열)
+    dialog: null          // 삭제 차단 메시지(문자열) — 있으면 대화상자가 뜬다
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null) ? '—' : Number(n).toLocaleString('ko-KR'); }
+
+  // ── API ──────────────────────────────────────────────────────────
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiJson(method, path, body) {
+    return fetch(path, { method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+  function apiPost(path, body) { return apiJson('POST', path, body); }
+  function apiPatch(path, body) { return apiJson('PATCH', path, body); }
+  function apiDelete(path) { return fetch(path, { method: 'DELETE', credentials: 'same-origin' }).then(handle); }
+
+  // ── 권한 · 토스트 — 셸(admin2-shell.js)의 것을 그대로 쓴다 ──
+  // ⚠ 실제 서버 문턱은 operator 이상이다(파일 상단 "■★ 권한" 주석 참고) — 이
+  // 화면은 서버가 실제로 허용하는 등급을 그대로 반영한다. "owner만"으로
+  // 지어내지 않는다.
+  function canWrite() { return window.Admin2Shell.canWrite('operator'); }
+  function toast(msg, kind) { window.Admin2Shell.toast(msg, kind); }
+  function guard() {
+    if (!canWrite()) {
+      var me = window.Admin2Shell.getMe();
+      toast('권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      return false;
+    }
+    return true;
+  }
+  function permTitle() {
+    var me = window.Admin2Shell.getMe();
+    return '권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+  }
+  function disAttrs(disabled) {
+    return disabled ? (' disabled title="' + esc(permTitle()) + '"') : '';
+  }
+
+  // ── 트리 데이터 헬퍼 ─────────────────────────────────────────────
+  function items() { return (S.data && S.data.items) || []; }
+  function nodeById(id) {
+    var arr = items();
+    for (var i = 0; i < arr.length; i++) if (arr[i].category_id === id) return arr[i];
+    return null;
+  }
+  function childrenOf(pid) {
+    return items().filter(function (n) { return n.parent_id === pid; })
+      .sort(function (a, b) { return (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name)); });
+  }
+
+  // 컬럼 i의 정의 — **선택 상태에서 파생**한다(고정 깊이 아님). 컬럼 0의 부모는
+  // 항상 null(최상위). 컬럼 i(i>0)의 부모는 "컬럼 i-1에서 고른 노드"고, 아직
+  // 아무것도 안 골랐으면 그 컬럼은 잠긴다.
+  function columnAt(i) {
+    var parentId = i === 0 ? null : S.selected[i - 1];
+    var locked = i > 0 && parentId == null;
+    var parentNode = parentId != null ? nodeById(parentId) : null;
+    var kids = locked ? [] : childrenOf(parentId);
+    return { i: i, title: LEVELS[i], parentId: parentId, locked: locked, parentNode: parentNode, kids: kids };
+  }
+
+  function selectNode(i, id) {
+    if (S.selected[i] === id) return;
+    var next = S.selected.slice();
+    next[i] = id;
+    for (var k = i + 1; k < 4; k++) next[k] = null;
+    S.selected = next;
+    renderColsFrom(i + 1);
+    highlightColumn(i);   // 선택 강조만 갱신 — innerHTML을 다시 쓰면 이름 입력에
+                           // 포커스가 가 있을 때(onFocus로 select가 불리는 경우
+                           // 포함) 그 포커스가 즉시 날아간다(입력 한 글자도 못 침).
+    renderToolbar();
+  }
+
+  // 컬럼 i의 행 DOM을 다시 만들지 않고 선택 표시(.on)만 옮긴다 — 이름 입력이
+  // 그 컬럼 안에 있을 수 있어(포커스로 select가 트리거된 경우) innerHTML 교체를
+  // 피한다("입력 중 전체 재렌더 금지" 원칙, ADM-CAT-010과 같은 이유).
+  function highlightColumn(i) {
+    var el = $('pvCol' + i);
+    if (!el) return;
+    var rows = el.querySelectorAll('.pv-row');
+    for (var r = 0; r < rows.length; r++) {
+      var id = Number(rows[r].getAttribute('data-id'));
+      rows[r].classList.toggle('on', id === S.selected[i]);
+    }
+  }
+
+  // ── 쓰기 동작 ────────────────────────────────────────────────────
+  function createIn(i) {
+    if (!guard()) return;
+    var col = columnAt(i);
+    if (col.locked) return;
+    var defaultName = '새 ' + LEVELS[i];
+    var dup = col.kids.filter(function (n) { return n.name === defaultName; })[0];
+    if (dup) { selectNode(i, dup.category_id); return; }
+    apiPost('/api/admin/categories', { name: defaultName, parent_id: col.parentId, sort_order: 0 })
+      .then(function (r) {
+        return reloadTree().then(function () {
+          selectNode(i, r.category_id);
+          toast(r.verdict, 'ok');
+        });
+      })
+      .catch(function (err) { toast(err.message, 'err'); });
+  }
+
+  function toggleVisible(node) {
+    if (!guard()) return;
+    var next = !node.is_visible;
+    apiPatch('/api/admin/categories/' + node.category_id, { is_visible: next })
+      .then(function (r) { node.is_visible = next; toast(r.verdict, 'ok'); renderAll(); })
+      .catch(function (err) { toast(err.message, 'err'); renderAll(); });
+  }
+
+  // 여러 category_id를 한 번에 저장한다 — 컬럼별 [변경 저장]과 상단 [전체
+  // 저장]이 이 함수 하나를 쓴다. 이름이 빈칸이면 삭제(DELETE), 원래 이름과
+  // 다르면 수정(PATCH), 같으면 손대지 않는다. 서버 409(자식/상품이 걸림)는
+  // 대화상자로, 그 외 오류는 토스트로 그대로 보여준다 — 문구를 지어내지 않는다.
+  function saveIds(ids) {
+    ids = ids.filter(function (id) { return id in S.drafts; });
+    if (!ids.length) return;
+    if (!guard()) return;
+    var jobs = ids.map(function (id) {
+      var node = nodeById(id);
+      if (!node) { delete S.drafts[id]; return Promise.resolve({ id: id, ok: true, skipped: true }); }
+      var name = String(S.drafts[id] || '').trim();
+      if (name === '') {
+        return apiDelete('/api/admin/categories/' + id)
+          .then(function (r) { return { id: id, ok: true, verdict: r.verdict }; })
+          .catch(function (err) { return { id: id, ok: false, err: err }; });
+      }
+      if (name === node.name) { return Promise.resolve({ id: id, ok: true, skipped: true }); }
+      return apiPatch('/api/admin/categories/' + id, { name: name })
+        .then(function (r) { return { id: id, ok: true, verdict: r.verdict }; })
+        .catch(function (err) { return { id: id, ok: false, err: err }; });
+    });
+    Promise.all(jobs).then(function (results) {
+      var blocked = null, okCount = 0;
+      results.forEach(function (r) {
+        if (r.ok) { if (!r.skipped) okCount++; delete S.drafts[r.id]; }
+        else if (r.err && r.err.status === 409) { blocked = blocked || r.err.message; }
+        else { toast((r.err && r.err.message) || '저장 실패', 'err'); }
+      });
+      if (okCount) toast(okCount + '건 저장했습니다', 'ok');
+      if (blocked) { S.dialog = blocked; }
+      if (okCount) { reloadTree(); } else { renderAll(); }
+    });
+  }
+
+  // ── 로드 ─────────────────────────────────────────────────────────
+  function loadTree() {
+    return apiGet('/api/admin/categories').then(function (j) { S.data = j; S.loadErr = null; })
+      .catch(function (err) { S.loadErr = err; });
+  }
+  function reloadTree() { return loadTree().then(renderAll); }
+
+  function boot() {
+    renderAll();
+    window.Admin2Shell.meReady.then(renderAll);
+    loadTree().then(renderAll);
+  }
+
+  // ── 렌더 ─────────────────────────────────────────────────────────
+  function renderAll() {
+    var loading = $('pvLoading'), errBox = $('pvErrBox'), body = $('pvBody');
+    if (S.loadErr) {
+      loading.hidden = true; body.hidden = true; errBox.hidden = false;
+      $('pvErrMsg').textContent = S.loadErr.message;
+      return;
+    }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    loading.hidden = true; errBox.hidden = true; body.hidden = false;
+    for (var i = 0; i < 4; i++) renderColumn(i);
+    renderToolbar();
+    renderDialog();
+  }
+
+  function renderColsFrom(startIdx) {
+    for (var i = startIdx; i < 4; i++) renderColumn(i);
+  }
+
+  function rowHtml(i, n) {
+    var isSel = S.selected[i] === n.category_id;
+    var dirty = n.category_id in S.drafts;
+    var val = dirty ? S.drafts[n.category_id] : n.name;
+    var isLeafCol = (i === 3);
+    var write = canWrite();
+    return '<div class="pv-row' + (isSel ? ' on' : '') + '" data-id="' + n.category_id + '" data-idx="' + i + '">' +
+      '<button type="button" class="dot" data-action="select-node" data-idx="' + i + '" data-id="' + n.category_id + '" title="선택"><span></span></button>' +
+      '<input class="name-in' + (dirty ? ' dirty' : '') + '" type="text" data-role="name-in" data-idx="' + i + '" data-id="' + n.category_id + '" value="' + esc(val) + '" placeholder="빈칸 저장 시 삭제"' + (write ? '' : ' disabled') + '>' +
+      '<label class="vis" title="노출"><input type="checkbox" data-action="toggle-visible" data-idx="' + i + '" data-id="' + n.category_id + '"' + (n.is_visible ? ' checked' : '') + (write ? '' : ' disabled') + '>노출</label>' +
+      '<button type="button" class="child" data-action="select-node" data-idx="' + i + '" data-id="' + n.category_id + '" title="하위 분류 보기"' + (isLeafCol ? ' disabled' : '') + '>' + (isLeafCol ? '' : '›') + '</button>' +
+      '</div>';
+  }
+
+  function renderColumn(i) {
+    var el = $('pvCol' + i);
+    if (!el) return;
+    var col = columnAt(i);
+    var write = canWrite();
+    var dirtyIds = col.kids.map(function (n) { return n.category_id; }).filter(function (id) { return id in S.drafts; });
+
+    var parentHint = i === 0 ? '최상위 분류'
+      : col.locked ? (LEVELS[i - 1] + '를 먼저 선택하세요.')
+      : ((col.parentNode ? col.parentNode.name : '') + ' › ' + col.title);
+
+    var rowsHtml = col.locked
+      ? '<div class="pv-empty">' + esc(LEVELS[i - 1] + '를 먼저 선택하면 이 컬럼이 열립니다.') + '</div>'
+      : (col.kids.length ? col.kids.map(function (n) { return rowHtml(i, n); }).join('')
+         : '<div class="pv-empty">' + esc(col.title + '가 없습니다. [+ 생성]으로 추가하세요.') + '</div>');
+
+    el.className = 'pv-col' + (col.locked ? ' locked' : '');
+    el.innerHTML =
+      '<div class="pv-col-hd">' +
+        '<span class="step">0' + (i + 1) + '</span>' +
+        '<h4>' + esc(col.title) + '</h4>' +
+        '<span class="cnt num">' + fmt(col.kids.length) + '개</span>' +
+        '<button type="button" class="add' + ((col.locked || !write) ? ' dis' : '') + '" data-action="add-node" data-idx="' + i + '"' +
+          (col.locked ? ' disabled title="상위 분류를 먼저 고르세요"' : disAttrs(!write)) + '>+ 생성</button>' +
+      '</div>' +
+      '<div class="pv-parenthint">' + esc(parentHint) + '</div>' +
+      '<div class="pv-rows">' + rowsHtml + '</div>' +
+      '<div class="pv-col-ft">' +
+        '<span class="dirty-nt">' + (dirtyIds.length ? ('변경 ' + fmt(dirtyIds.length) + '건 미저장') : '변경 없음') + '</span>' +
+        '<button type="button" class="save' + ((!dirtyIds.length || !write) ? ' dis' : '') + '" data-action="save-col" data-idx="' + i + '"' +
+          (!dirtyIds.length ? ' disabled' : disAttrs(!write)) + '>변경 저장</button>' +
+      '</div>';
+  }
+
+  function renderToolbar() {
+    var allDirty = Object.keys(S.drafts).length;
+    var btn = $('pvSaveAll');
+    if (!btn) return;
+    var write = canWrite();
+    btn.classList.toggle('dis', !allDirty || !write);
+    if (!allDirty) { btn.disabled = true; btn.removeAttribute('title'); }
+    else if (!write) { btn.disabled = true; btn.title = permTitle(); }
+    else { btn.disabled = false; btn.removeAttribute('title'); btn.title = ''; }
+    btn.textContent = allDirty ? ('전체 저장 (' + allDirty + ')') : '전체 저장';
+  }
+
+  function renderDialog() {
+    var bd = $('pvDialogBd');
+    if (!S.dialog) { bd.hidden = true; return; }
+    bd.hidden = false;
+    $('pvDialogBody').textContent = S.dialog;
+  }
+
+  // ── 입력 중 가벼운 갱신(전체 재렌더 금지 — 커서가 튄다) ──────────
+  function onNameInput(inputEl) {
+    var id = Number(inputEl.getAttribute('data-id'));
+    var node = nodeById(id);
+    S.drafts[id] = inputEl.value;
+    inputEl.classList.toggle('dirty', node ? inputEl.value !== node.name : true);
+    var idx = Number(inputEl.getAttribute('data-idx'));
+    patchColumnFooter(idx);
+    renderToolbar();
+  }
+
+  function patchColumnFooter(i) {
+    var el = $('pvCol' + i);
+    if (!el) return;
+    var col = columnAt(i);
+    var write = canWrite();
+    var dirtyIds = col.kids.map(function (n) { return n.category_id; }).filter(function (id) { return id in S.drafts; });
+    var nt = el.querySelector('.pv-col-ft .dirty-nt');
+    var save = el.querySelector('.pv-col-ft .save');
+    if (nt) nt.textContent = dirtyIds.length ? ('변경 ' + fmt(dirtyIds.length) + '건 미저장') : '변경 없음';
+    if (save) {
+      var disabled = !dirtyIds.length || !write;
+      save.classList.toggle('dis', disabled);
+      save.disabled = disabled;
+      if (!dirtyIds.length) save.removeAttribute('title');
+      else if (!write) save.title = permTitle();
+      else save.removeAttribute('title');
+    }
+  }
+
+  // ── 컬럼 컨테이너 초기 배치 ──────────────────────────────────────
+  (function initCols() {
+    var wrap = $('pvCols');
+    var html = '';
+    for (var i = 0; i < 4; i++) html += '<section class="pv-col" id="pvCol' + i + '"></section>';
+    wrap.innerHTML = html;
+  })();
+
+  // ── 이벤트 위임 ──────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    switch (action) {
+      case 'retry-load':
+        S.loadErr = null; renderAll(); loadTree().then(renderAll);
+        break;
+      case 'add-node':
+        createIn(Number(t.getAttribute('data-idx')));
+        break;
+      case 'select-node':
+        selectNode(Number(t.getAttribute('data-idx')), Number(t.getAttribute('data-id')));
+        break;
+      case 'save-col': {
+        var i = Number(t.getAttribute('data-idx'));
+        saveIds(columnAt(i).kids.map(function (n) { return n.category_id; }));
+        break;
+      }
+      case 'save-all':
+        saveIds(Object.keys(S.drafts).map(Number));
+        break;
+      case 'close-dialog':
+        S.dialog = null; renderDialog();
+        break;
+    }
+  });
+
+  // 대화상자 바깥(반투명 배경) 클릭으로 닫기 — 이 노드는 innerHTML로 다시
+  // 그려지지 않는 정적 요소라 위임이 아니라 직접 바인딩한다. 안쪽(.pv-dialog)
+  // 클릭이 배경까지 버블돼도 target이 배경 자신일 때만 닫는다.
+  $('pvDialogBd').addEventListener('click', function (e) {
+    if (e.target === e.currentTarget) { S.dialog = null; renderDialog(); }
+  });
+
+  document.addEventListener('input', function (e) {
+    if (e.target.matches('[data-role="name-in"]')) onNameInput(e.target);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (e.target.matches('[data-role="name-in"]')) {
+      selectNode(Number(e.target.getAttribute('data-idx')), Number(e.target.getAttribute('data-id')));
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.matches('[data-action="toggle-visible"]')) {
+      var id = Number(e.target.getAttribute('data-id'));
+      var node = nodeById(id);
+      if (node) toggleVisible(node); else e.target.checked = !e.target.checked;
+    }
+  });
+
+  boot();
+})();
+</script>
+{% endraw %}
+{% endblock %}

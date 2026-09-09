@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/industry-fefb4ce6-0800-4e90-b375-83a8a8825a63/styles.css">
+  <script src="_ds/industry-fefb4ce6-0800-4e90-b375-83a8a8825a63/_ds_bundle.js"></script>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: var(--color-bg); }
+    a { color: var(--color-accent-700); } a:hover { color: var(--color-accent-900); }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  </style>
+</helmet>
+<div style="display:grid; grid-template-columns: 224px minmax(0,1fr); min-height:100vh; font-family: var(--font-body); color: var(--color-text);">
+  <aside style="border-right:1px solid var(--color-divider); padding: var(--space-4) var(--space-3); display:flex; flex-direction:column; gap: var(--space-4); background: var(--color-bg);">
+    <div style="display:flex; align-items:center; gap: var(--space-2); padding: 0 var(--space-1);">
+      <div class="blueprint" style="width:30px;height:30px;display:grid;place-items:center;font-family:var(--font-heading);font-weight:600;font-size:16px;background:var(--color-accent);color:var(--color-bg);border-color:var(--color-accent);"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>W</div>
+      <div style="font-family:var(--font-heading);font-weight:600;font-size:17px;line-height:1.1;">통합관리 솔루션</div>
+    </div>
+    <nav style="display:flex; flex-direction:column; gap: var(--space-3);">
+      <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="3">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <button onClick="{{ g.toggle }}" style="display:flex; align-items:center; gap:8px; width:100%; padding:7px var(--space-2); border:0; background:transparent; cursor:pointer; font: inherit; font-size:13px; font-weight:500; color: var(--color-text); text-align:left;" style-hover="background: color-mix(in srgb, var(--color-text) 6%, transparent)">
+            <span style="display:inline-flex; color: var(--color-accent-700);">{{ g.icon }}</span>
+            <span style="flex:1;">{{ g.label }}</span>
+            <span style="font-size:11px; color: var(--color-neutral-600);">{{ g.chevron }}</span>
+          </button>
+          <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:2px; padding-left: 26px;">
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                <button onClick="{{ it.go }}" style="display:block; width:100%; text-align:left; padding:6px var(--space-2); border:0; border-left:1px solid var(--color-divider); background: {{ it.bg }}; color: {{ it.color }}; font: inherit; font-size:13px; cursor:pointer;" style-hover="color: var(--color-accent-700)">{{ it.label }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </nav>
+  </aside>
+
+  <div style="display:flex; flex-direction:column; min-width:0;">
+    <header style="display:flex; align-items:center; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom:1px solid var(--color-divider);">
+      <div style="font-family:var(--font-heading); font-weight:600; font-size:16px; flex:1;">{{ sectionLabel }}</div>
+      <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+        <div style="width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--color-divider);font-family:var(--font-heading);font-weight:600;">관</div>
+        <span>관리자</span>
+      </div>
+    </header>
+
+    <main style="padding: var(--space-6); display:flex; flex-direction:column; gap: var(--space-6); max-width: 1400px; width:100%;">
+
+      <!-- 상품관리 대시보드 -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; flex-direction:column; gap: var(--space-6);">
+          <div>
+            <h1 style="font-size:34px; margin:0 0 var(--space-1);">상품관리</h1>
+            <p style="margin:0; font-size:14px; color: var(--color-neutral-700);">상품 관련 기능을 한 곳에서 관리합니다. 앞으로 필요한 기능을 이 메뉴 아래 계속 추가할 수 있습니다.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4);">
+            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+              <div class="card blueprint" style="padding: var(--space-4); gap: var(--space-1);">
+                <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                <div class="card-kicker">{{ s.label }}</div>
+                <div style="font-family:var(--font-heading); font-weight:600; font-size:40px; line-height:1;">{{ s.value }}</div>
+                <div class="card-meta">{{ s.desc }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div>
+            <h4 style="margin:0 0 var(--space-3);">빠른 메뉴</h4>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+              <sc-for list="{{ quickMenu }}" as="q" hint-placeholder-count="3">
+                <button onClick="{{ q.go }}" class="card blueprint" style="text-align:left; cursor:pointer; font: inherit; color: inherit; padding: var(--space-4); align-items:flex-start;" style-hover="background: color-mix(in srgb, var(--color-accent) 8%, transparent)">
+                  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                  <div class="card-title">{{ q.title }}</div>
+                  <p class="card-body" style="text-wrap: pretty;">{{ q.desc }}</p>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- 통합카테고리관리 -->
+      <sc-if value="{{ isCategory }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; flex-direction:column; gap: var(--space-4);">
+          <div style="display:flex; flex-wrap:wrap; align-items:flex-end; gap: var(--space-3);">
+            <div style="flex:1; min-width:260px;">
+              <h1 style="font-size:34px; margin:0 0 var(--space-1);">통합카테고리관리</h1>
+              <p style="margin:0; font-size:14px; color: var(--color-neutral-700);">대분류 → 중분류 → 소분류 → 세분류를 한 화면에서 연속으로 관리합니다.</p>
+            </div>
+            <div style="display:flex; gap: var(--space-2);">
+              <button class="btn btn-secondary" onClick="{{ resetDemo }}">데모 초기화</button>
+              <button class="btn btn-primary blueprint" onClick="{{ saveAll }}"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>전체 저장</button>
+            </div>
+          </div>
+
+          <div style="font-size:13px; line-height:1.6; padding: var(--space-3) var(--space-4); background: var(--color-accent-100); color: var(--color-accent-900); text-wrap: pretty;">
+            <strong>사용법</strong> · 각 분류 상단의 <strong>[생성]</strong>으로 새 카테고리를 만들고, 카테고리명을 직접 수정한 뒤 <strong>[변경 저장]</strong>을 누르면 반영됩니다. <strong>카테고리명을 빈칸으로 만든 뒤 저장하면 삭제</strong>됩니다.
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-6) var(--space-4);">
+            <sc-for list="{{ columns }}" as="col" hint-placeholder-count="4">
+              <section class="blueprint" style="display:flex; flex-direction:column; min-height:420px;">
+                <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                <div style="display:flex; align-items:center; gap:8px; padding: var(--space-3); border-bottom:1px solid var(--color-divider);">
+                  <span class="card-kicker">{{ col.step }}</span>
+                  <h4 style="margin:0; flex:1; font-size:19px;">{{ col.title }}</h4>
+                  <span class="tag tag-neutral">{{ col.count }}</span>
+                  <button class="btn btn-secondary" onClick="{{ col.create }}" disabled="{{ col.locked }}" style="padding:4px 10px; font-size:13px;">+ 생성</button>
+                </div>
+                <div style="padding: var(--space-2) var(--space-3); font-size:12px; color: var(--color-neutral-600); border-bottom:1px solid color-mix(in srgb, var(--color-text) 8%, transparent); min-height:34px; display:flex; align-items:center;">{{ col.parentHint }}</div>
+                <div style="flex:1; display:flex; flex-direction:column; padding: var(--space-2);">
+                  <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                    <div style="flex:1; display:grid; place-items:center; padding: var(--space-6); font-size:13px; color: var(--color-neutral-500); text-align:center; text-wrap: pretty;">{{ col.emptyText }}</div>
+                  </sc-if>
+                  <sc-for list="{{ col.items }}" as="it" hint-placeholder-count="3">
+                    <div style="display:flex; align-items:center; gap:6px; padding: 4px 6px; background: {{ it.bg }};">
+                      <button onClick="{{ it.select }}" title="선택" style="width:22px;height:22px;flex:none;display:grid;place-items:center;border:0;background:transparent;cursor:pointer;color: {{ it.dotColor }};">
+                        <span style="width:9px;height:9px;border:1.5px solid currentColor;background: {{ it.dotFill }};display:block;"></span>
+                      </button>
+                      <input class="input" value="{{ it.name }}" onChange="{{ it.onInput }}" onFocus="{{ it.select }}" placeholder="빈칸 저장 시 삭제" style="min-height:32px; font-size:14px; background: {{ it.inputBg }};">
+                      <label title="노출" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color: var(--color-neutral-700); cursor:pointer; flex:none;">
+                        <input type="checkbox" checked="{{ it.visible }}" onChange="{{ it.toggleVisible }}" style="accent-color: var(--color-accent); margin:0;">노출
+                      </label>
+                      <button onClick="{{ it.select }}" disabled="{{ it.isLeaf }}" title="하위 분류 보기" style="width:22px;height:22px;flex:none;display:grid;place-items:center;border:0;background:transparent;cursor:pointer;color: var(--color-neutral-600); font-size:14px;">{{ it.childMark }}</button>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; padding: var(--space-3); border-top:1px solid var(--color-divider);">
+                  <span style="flex:1; font-size:12px; color: var(--color-neutral-600);">{{ col.dirtyText }}</span>
+                  <button class="btn btn-primary" onClick="{{ col.save }}" disabled="{{ col.clean }}" style="padding:5px 12px; font-size:13px;">변경 저장</button>
+                </div>
+              </section>
+            </sc-for>
+          </div>
+
+          <div style="font-size:13px; line-height:1.6; color: var(--color-neutral-700); text-wrap: pretty;">
+            <strong style="color: var(--color-text);">삭제 규칙</strong> · 카테고리명을 지우고 <strong>[변경 저장]</strong>을 누르면 삭제됩니다. 단, 해당 카테고리 아래에 하위 카테고리가 하나라도 있으면 삭제되지 않고 경고창이 표시됩니다.
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- 기타 화면 -->
+      <sc-if value="{{ isOther }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; flex-direction:column; gap: var(--space-6);">
+          <div>
+            <h1 style="font-size:34px; margin:0 0 var(--space-1);">{{ other.title }}</h1>
+            <p style="margin:0; font-size:14px; color: var(--color-neutral-700);">{{ other.subtitle }}</p>
+          </div>
+          <div class="blueprint" style="display:grid; place-items:center; padding: var(--space-8); text-align:center; gap: var(--space-2);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <span style="color: var(--color-accent-700);">{{ other.icon }}</span>
+            <h2 style="margin:0; font-size:26px;">{{ other.title }}</h2>
+            <p style="margin:0; font-size:14px; color: var(--color-neutral-700); max-width:440px; text-wrap: pretty;">{{ other.body }}</p>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{ dialogOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="dialog-backdrop" style="animation: fadeIn .15s ease; z-index: 50;">
+      <div class="dialog blueprint" style="background: var(--color-bg);">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div class="dialog-title">카테고리를 삭제할 수 없습니다</div>
+        <div class="dialog-body">{{ dialogBody }}</div>
+        <div class="dialog-actions"><button class="btn btn-primary" onClick="{{ closeDialog }}">확인</button></div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;category&quot;,&quot;options&quot;:[&quot;category&quot;,&quot;dashboard&quot;,&quot;product&quot;,&quot;settings&quot;,&quot;members&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;화면&quot;},&quot;seedDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;데이터&quot;}}">
+const LEVELS = ['대분류', '중분류', '소분류', '세분류'];
+const DEMO = [
+  [1, null, '의류'], [2, null, '식품'], [3, null, '생활가전'],
+  [4, 1, '상의'], [5, 1, '하의'], [6, 2, '신선식품'], [7, 2, '가공식품'],
+  [8, 4, '티셔츠'], [9, 4, '셔츠'], [10, 5, '청바지'],
+  [11, 8, '반팔'], [12, 8, '긴팔'],
+];
+const svg = (paths) => React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }, ...paths.map((d, i) => React.createElement('path', { key: i, d })));
+const ICONS = {
+  settings: svg(['M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z']),
+  users: svg(['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75']),
+  box: svg(['M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z', 'M3.3 7 12 12l8.7-5', 'M12 22V12']),
+};
+const SCREENS = {
+  dashboard: { section: '상품관리' },
+  category: { section: '상품관리' },
+  product: { section: '상품관리', title: '상품등록', subtitle: '쇼핑몰에서 일반적으로 가장 많이 사용하는 항목을 기준으로 구성한 상품 등록 초안입니다.', body: '기본정보 · 카테고리 · 가격 · 재고 · 이미지 · 배송정보를 등록하는 폼을 이 영역에 구성합니다.', icon: 'box' },
+  settings: { section: '환경설정', title: '기본환경설정', subtitle: '환경설정 메뉴의 첫 화면입니다.', body: '앞으로 기본정보, 운영설정, 코드관리 등의 기능을 이 영역에 계속 추가할 수 있습니다.', icon: 'settings' },
+  members: { section: '회원관리', title: '회원관리', subtitle: '회원 관련 관리 기능을 구성할 영역입니다.', body: '앞으로 회원목록, 권한, 등급, 거래처 등의 기능을 이 영역에 계속 추가할 수 있습니다.', icon: 'users' },
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.nextId = 100;
+    this.state = {
+      screen: props.startScreen ?? 'category',
+      open: { settings: false, members: false, product: true },
+      cats: this.seed(props.seedDemo ?? true),
+      drafts: {}, selected: [null, null, null, null], dialog: null,
+    };
+  }
+  seed(demo) {
+    return demo ? DEMO.map(([id, parentId, name]) => ({ id, parentId, name, visible: true })) : [];
+  }
+  levelOf(c, cats) { let l = 1, p = c.parentId; while (p != null) { l++; p = cats.find(x => x.id === p)?.parentId ?? null; } return l; }
+  hasChildren(id) { return this.state.cats.some(c => c.parentId === id); }
+  saveIds(ids) {
+    const { cats, drafts } = this.state;
+    let blocked = null; const del = new Set(); const next = cats.map(c => {
+      if (!(c.id in drafts) || !ids.includes(c.id)) return c;
+      const name = drafts[c.id].trim();
+      if (name === '') { if (this.hasChildren(c.id)) { blocked = blocked || c; return c; } del.add(c.id); return c; }
+      return { ...c, name };
+    }).filter(c => !del.has(c.id));
+    const nd = { ...drafts }; ids.forEach(id => { if (!(blocked && blocked.id === id)) delete nd[id]; });
+    const sel = this.state.selected.map(s => del.has(s) ? null : s);
+    this.setState({ cats: next, drafts: nd, selected: sel, dialog: blocked ? `'${blocked.name}' 아래에 하위 카테고리가 있어 삭제할 수 없습니다. 하위 카테고리를 먼저 삭제해 주세요.` : null });
+  }
+  renderVals() {
+    const { screen, open, cats, drafts, selected, dialog } = this.state;
+    const go = (s) => () => this.setState({ screen: s });
+    const navGroups = [
+      { key: 'settings', label: '환경설정', icon: ICONS.settings, items: [{ label: '기본환경설정', s: 'settings' }] },
+      { key: 'members', label: '회원관리', icon: ICONS.users, items: [{ label: '회원목록', s: 'members' }] },
+      { key: 'product', label: '상품관리', icon: ICONS.box, items: [{ label: '카테고리 관리', s: 'category' }, { label: '상품등록', s: 'product' }] },
+    ].map(g => ({ ...g, open: open[g.key], chevron: open[g.key] ? '⌃' : '⌄',
+      toggle: () => this.setState({ open: { ...open, [g.key]: !open[g.key] }, ...(g.key === 'product' && !open[g.key] ? {} : {}), screen: g.key === 'product' ? 'dashboard' : screen }),
+      items: g.items.map(it => ({ ...it, go: go(it.s), bg: screen === it.s ? 'var(--color-accent-100)' : 'transparent', color: screen === it.s ? 'var(--color-accent-800)' : 'var(--color-text)' })) }));
+
+    const columns = LEVELS.map((title, i) => {
+      const parentId = i === 0 ? null : selected[i - 1];
+      const locked = i > 0 && parentId == null;
+      const parent = parentId != null ? cats.find(c => c.id === parentId) : null;
+      const items = locked ? [] : cats.filter(c => c.parentId === parentId).map(c => {
+        const isSel = selected[i] === c.id, dirty = c.id in drafts;
+        return {
+          id: c.id, name: dirty ? drafts[c.id] : c.name, visible: c.visible, isLeaf: i === 3,
+          childMark: i === 3 ? '' : '›',
+          bg: isSel ? 'var(--color-accent-100)' : 'transparent',
+          dotColor: isSel ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
+          dotFill: isSel ? 'var(--color-accent-600)' : 'transparent',
+          inputBg: dirty ? 'var(--color-accent-100)' : 'var(--color-surface)',
+          select: () => { if (selected[i] === c.id) return; const s = selected.slice(); s[i] = c.id; for (let k = i + 1; k < 4; k++) s[k] = null; this.setState({ selected: s }); },
+          onInput: (e) => this.setState({ drafts: { ...drafts, [c.id]: e.target.value } }),
+          toggleVisible: () => this.setState({ cats: cats.map(x => x.id === c.id ? { ...x, visible: !x.visible } : x) }),
+        };
+      });
+      const dirtyCount = items.filter(it => it.id in drafts).length;
+      return {
+        step: `0${i + 1}`, title, count: `${items.length}개`, locked, items, empty: !locked && items.length === 0,
+        emptyText: `${title}가 없습니다. [+ 생성]으로 추가하세요.`,
+        parentHint: i === 0 ? '최상위 분류' : locked ? `${LEVELS[i - 1]}를 먼저 선택하세요.` : `${parent?.name} › ${title}`,
+        clean: dirtyCount === 0, dirtyText: dirtyCount ? `변경 ${dirtyCount}건 미저장` : '변경 없음',
+        create: () => { const id = this.nextId++; const s = selected.slice(); s[i] = id; for (let k = i + 1; k < 4; k++) s[k] = null;
+          this.setState({ cats: [...cats, { id, parentId, name: `새 ${title}`, visible: true }], selected: s }); },
+        save: () => this.saveIds(items.map(it => it.id)),
+      };
+    });
+
+    const total = cats.length, top = cats.filter(c => c.parentId == null).length, vis = cats.filter(c => c.visible).length;
+    const o = SCREENS[screen] || SCREENS.dashboard;
+    return {
+      navGroups, sectionLabel: o.section, columns, dialogOpen: !!dialog, dialogBody: dialog,
+      closeDialog: () => this.setState({ dialog: null }),
+      isDashboard: screen === 'dashboard', isCategory: screen === 'category', isOther: !!o.title,
+      other: { title: o.title, subtitle: o.subtitle, body: o.body, icon: ICONS[o.icon] || null },
+      stats: [
+        { label: '전체 대분류', value: top, desc: '최상위 상품 카테고리' },
+        { label: '전체 카테고리', value: total, desc: '대·중·소·세분류 합계' },
+        { label: '노출 카테고리', value: vis, desc: '현재 노출 설정된 카테고리' },
+        { label: '상품관리 기능', value: 2, desc: '현재 구현: 상품등록 · 카테고리 관리' },
+      ],
+      quickMenu: [
+        { title: '카테고리 관리', desc: '대분류 → 중분류 → 소분류 → 세분류 생성·수정·삭제', go: go('category') },
+        { title: '상품 등록', desc: '기본정보 · 카테고리 · 가격 · 재고 · 이미지 · 배송정보를 등록합니다.', go: go('product') },
+        { title: '상품 목록', desc: '추후 전체 상품 조회·검색 기능을 추가할 수 있습니다.', go: () => {} },
+      ],
+      resetDemo: () => this.setState({ cats: this.seed(true), drafts: {}, selected: [null, null, null, null] }),
+      saveAll: () => this.saveIds(Object.keys(drafts).map(Number)),
+    };
+  }
+}
+</script>
+</body>
+</html>
