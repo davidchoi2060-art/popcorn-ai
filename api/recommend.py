@@ -751,6 +751,12 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     # 카운터(`/api/candidates/count`)의 빈 슬롯 판정과 «같은 답»이라 둘이 어긋나지는
     # 않는다(카운터가 buildable=false를 낼 때 엔진도 None이다).
     cooler_note, drop_cooler = _bundled_cooler(chosen)
+    # DFS가 실제로 예산과 비교한 원 총액(쿨러 포함) — 쿨러 생략 전에 반드시 잰다.
+    # _min_feasible_budget(candidates.py)이 「이 total로 cap을 다시 걸어도 같은 조합이
+    # 재현된다」는 전제를 쓰는데, 쿨러 생략 후 total로 cap을 걸면 DFS는 여전히 쿨러
+    # 포함 8슬롯 총액을 그 cap과 비교해 실패한다(실사고로 발견 — 651,600으로 다시
+    # 물으면 664,400이 필요했다). 그 단일 원천을 여기 하나로 둔다 — 추정하지 않는다.
+    raw_total = sum(p["sale_price"] for p in chosen.values())
     out_slots = slots            # 견적서에 실제로 실리는 자리
     compat_rules = rules         # 호환 판정에 쓸 규칙(쿨러를 빼면 쿨러 규칙도 뺀다)
     omitted = []
@@ -826,6 +832,10 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                    "spec": _explain_spec(chosen[s]), "tags": _pref_tags(chosen[s])}
                   for s in out_slots],
         "total": total,
+        # 내부용(화면에 노출하지 않는다) — DFS가 실제로 예산과 비교한 쿨러 포함 원 총액.
+        # candidates.py _min_feasible_budget이 상한 재계산에 쓴다(위 머리 주석 참조).
+        # 쿨러가 생략되지 않았으면 total과 같다.
+        "raw_total": raw_total,
         "compat": build_compat(chosen, compat_rules, unknown_rules or ()),
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},

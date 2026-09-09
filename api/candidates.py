@@ -384,7 +384,14 @@ def _min_feasible_budget(rec_mod, wide_common, rules_active, active_slots, floor
     if built is None:
         return None   # 탐색 상한 도달이든 진짜 불가능이든 — 어느 쪽도 지어내지 않는다
 
-    total = built["total"]
+    # ⚠ CPU 기본 쿨러 생략(2026-09-09) 이후로 docstring ①의 전제가 깨졌다 — `total`은
+    # DFS가 고른 조합에서 COOLER를 뺀 값인데, 그 값을 cap으로 다시 걸면 DFS는 여전히
+    # COOLER를 포함한 8슬롯 총액을 그 cap과 비교해 실패한다(총액 651,600을 만든 조합이
+    # cap=651,600에서는 못 찾아지는 실사고로 발견 — DFS 내부 비교 대상과 보고하는
+    # total이 다른 값이었다). `raw_total`(recommend.py, 쿨러 생략 «전» 실제 DFS 내부
+    # 총액)로 상한을 잡아야 다음 cap 시도에서 DFS가 같은 조합을 다시 찾을 수 있다
+    # (docstring ①을 다시 성립시키는 보정 — 추정하지 않고 원천값을 그대로 쓴다).
+    total = built.get("raw_total", built["total"])
     lo_u = (floor_hint or 0) // MIN_BUDGET_UNIT
     hi_u = -(-total // MIN_BUDGET_UNIT)   # 올림 — hi_u*UNIT >= total은 이미 성공이 확인된 값
     probes = 0
