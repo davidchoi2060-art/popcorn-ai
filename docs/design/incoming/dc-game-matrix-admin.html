@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-fefb4ce6-0800-4e90-b375-83a8a8825a63/styles.css">
+<script src="_ds/industry-fefb4ce6-0800-4e90-b375-83a8a8825a63/_ds_bundle.js"></script>
+</helmet>
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding-bottom:var(--space-8)">
+
+  <div class="nav" style="border-bottom:1px solid var(--color-divider)">
+    <span class="nav-brand">POPCORN&nbsp;/&nbsp;ADMIN2</span>
+    <a href="#">격자 관리</a>
+    <a href="#" aria-current="page">게임·AI 연계 매트릭스</a>
+    <a href="#">부품 카탈로그</a>
+    <a href="#">권한</a>
+  </div>
+
+  <div style="max-width:1400px;margin:0 auto;padding:var(--space-6) var(--space-6) 0">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--space-4);margin-bottom:var(--space-3)">
+      <div style="flex:1 1 380px;min-width:0">
+        <h6 class="text-muted" style="margin:0 0 var(--space-1)">ADM-GRD-020 (가칭) · /admin2/game-matrix</h6>
+        <h1 style="font-size:38px;margin:0">게임·AI 연계 매트릭스</h1>
+        <p class="text-muted" style="font-size:13px;margin:var(--space-1) 0 0">조회 전용 화면 — 매핑 재계산은 배치(<code>tools/game_cell_mapper.py</code>)가 한다.</p>
+      </div>
+      <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+        <span class="tag tag-outline">표본 데이터 시안 — 실제 수치는 API 조회</span>
+        <button class="btn btn-secondary" type="button">배치 로그</button>
+        <button class="btn btn-primary blueprint" type="button" style="position:relative">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          CSV 내려받기
+        </button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);padding:var(--space-3) 0;border-top:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider);font-size:13px">
+      <span class="text-muted">기준 <b style="color:var(--color-text)">{{ meta.checkedDate }}</b> 조회</span>
+      <span class="text-muted">게임 <b style="color:var(--color-text)">{{ meta.gamesMapped }}</b> / {{ meta.gamesTotal }} 매핑</span>
+      <span class="text-muted">AI 작업 <b style="color:var(--color-text)">{{ meta.aiMapped }}</b> / {{ meta.aiTotal }} 매핑</span>
+      <span class="text-muted">견적 있는 칸 <b style="color:var(--color-text)">{{ meta.cellCount }}</b></span>
+      <span class="text-muted">gpu_ladder <b style="color:var(--color-text)">{{ meta.ladderRows }}</b>행</span>
+      <span class="text-muted" style="margin-left:auto">파생 캐시 — 배치 재실행마다 재계산</span>
+    </div>
+  </div>
+
+  <div style="max-width:1400px;margin:0 auto;padding:var(--space-6)">
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-6);align-items:flex-start">
+
+      <div style="flex:1 1 260px;max-width:320px;min-width:240px;display:flex;flex-direction:column;gap:var(--space-3)">
+        <div class="seg" style="width:100%">
+          <label class="seg-opt" style="flex:1;justify-content:center">
+            <input type="radio" name="matrix-tab" checked="{{ isGames }}" onChange="{{ selectGames }}">
+            게임 {{ meta.gamesTotal }}
+          </label>
+          <label class="seg-opt" style="flex:1;justify-content:center">
+            <input type="radio" name="matrix-tab" checked="{{ isAi }}" onChange="{{ selectAi }}">
+            AI 작업 {{ meta.aiTotal }}
+          </label>
+        </div>
+
+        <div class="blueprint" style="position:relative;padding:var(--space-3)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <h6 class="text-muted" style="margin:0 0 var(--space-2)">{{ listHeading }}</h6>
+          <div style="display:flex;flex-direction:column;gap:2px;max-height:520px;overflow:auto">
+            <sc-for list="{{ items }}" as="it" hint-placeholder-count="8">
+              <button type="button" onClick="{{ it.onClick }}" style="{{ it.style }}">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0;text-align:left">
+                  <span style="font-family:var(--font-heading);font-size:15px;line-height:1.2">{{ it.name }}</span>
+                  <span class="text-muted" style="font-size:11px">{{ it.sub }}</span>
+                </span>
+                <span class="{{ it.tagClass }}" style="flex:none">{{ it.tagText }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:3 1 480px;min-width:320px;display:flex;flex-direction:column;gap:var(--space-4)">
+
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:flex-end">
+          <div class="field" style="flex:1 1 160px;min-width:150px">
+            <label>용도</label>
+            <select class="input" value="{{ usageFilter }}" onChange="{{ onUsage }}">
+              <sc-for list="{{ usageOptions }}" as="u" hint-placeholder-count="9">
+                <option value="{{ u }}">{{ u }}</option>
+              </sc-for>
+            </select>
+          </div>
+          <div class="field" style="flex:0 0 auto">
+            <label>플랫폼</label>
+            <div class="seg">
+              <sc-for list="{{ platformOptions }}" as="p" hint-placeholder-count="3">
+                <label class="seg-opt">
+                  <input type="radio" name="platform" checked="{{ p.checked }}" onChange="{{ p.onChange }}">
+                  {{ p.label }}
+                </label>
+              </sc-for>
+            </div>
+          </div>
+          <div class="field" style="flex:0 0 auto">
+            <label>매칭 등급</label>
+            <div class="seg">
+              <sc-for list="{{ levelOptions }}" as="l" hint-placeholder-count="3">
+                <label class="seg-opt">
+                  <input type="radio" name="level" checked="{{ l.checked }}" onChange="{{ l.onChange }}">
+                  {{ l.label }}
+                </label>
+              </sc-for>
+            </div>
+          </div>
+          <span class="text-muted" style="font-size:12px;padding-bottom:8px">가격 오름차순 고정</span>
+        </div>
+
+        <sc-if value="{{ gridBlocked }}" hint-placeholder-val="{{ false }}">
+          <div class="blueprint" style="position:relative;padding:var(--space-8);text-align:center">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <h4 style="margin:0 0 var(--space-2)">{{ blockedTitle }}</h4>
+            <p class="text-muted" style="font-size:13px;margin:0">{{ blockedBody }}</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ gridOk }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+            <div class="blueprint" style="position:relative;padding:var(--space-3) var(--space-4)">
+              <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+              <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:baseline;margin-bottom:var(--space-2)">
+                <h3 style="margin:0">{{ selected.name }}</h3>
+                <span class="text-muted" style="font-size:12px">{{ selected.sub }}</span>
+                <span class="text-muted" style="font-size:12px;margin-left:auto">{{ resultSummary }}</span>
+              </div>
+
+              <sc-if value="{{ selected.unmapped }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:var(--space-6) 0;text-align:center">
+                  <h5 style="margin:0 0 var(--space-1)">매핑 없음</h5>
+                  <p class="text-muted" style="font-size:13px;margin:0">{{ selected.unmappedNote }}</p>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+                <div style="overflow-x:auto">
+                <table class="table" style="min-width:640px">
+                  <thead>
+                    <tr>
+                      <th style="white-space:nowrap">칸 ID</th>
+                      <th style="white-space:nowrap">등급 · 용도</th>
+                      <th style="white-space:nowrap">플랫폼</th>
+                      <th>GPU</th>
+                      <th style="text-align:right;white-space:nowrap">견적가</th>
+                      <th style="white-space:nowrap">판정</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                      <tr onClick="{{ r.onClick }}" style="{{ r.style }}">
+                        <td style="font-size:12px;white-space:nowrap" class="text-muted">{{ r.id }}</td>
+                        <td style="font-family:var(--font-heading);font-size:15px;white-space:nowrap">{{ r.tierUsage }}</td>
+                        <td style="white-space:nowrap">{{ r.platform }}</td>
+                        <td style="font-size:13px">{{ r.gpu }}</td>
+                        <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">{{ r.price }}</td>
+                        <td style="white-space:nowrap"><span class="{{ r.tagClass }}" style="white-space:nowrap">{{ r.level }}</span></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ emptyByFilter }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:var(--space-6) 0;text-align:center">
+                  <p class="text-muted" style="font-size:13px;margin:0">필터 조건에 성립하는 칸이 없다 — 필터를 넓혀 확인.</p>
+                </div>
+              </sc-if>
+            </div>
+
+            <div class="blueprint" style="position:relative;padding:var(--space-3) var(--space-4)">
+              <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+              <h6 class="text-muted" style="margin:0 0 var(--space-2)">불성립 · 판정 불가 (원인이 다르면 라벨도 다르다)</h6>
+              <div style="overflow-x:auto">
+              <table class="table" style="min-width:640px">
+                <tbody>
+                  <sc-for list="{{ failRows }}" as="f" hint-placeholder-count="4">
+                    <tr>
+                      <td style="font-size:12px;white-space:nowrap" class="text-muted">{{ f.id }}</td>
+                      <td style="font-family:var(--font-heading);font-size:15px;white-space:nowrap">{{ f.tierUsage }}</td>
+                      <td style="white-space:nowrap">{{ f.platform }}</td>
+                      <td style="font-size:13px">{{ f.gpu }}</td>
+                      <td style="font-size:12px" class="text-muted">{{ f.reason }}</td>
+                      <td style="white-space:nowrap"><span class="tag tag-neutral" style="white-space:nowrap">{{ f.label }}</span></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              </div>
+              <p class="text-muted" style="font-size:12px;margin:var(--space-2) 0 0">{{ failNote }}</p>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="flex:1 1 300px;max-width:360px;min-width:260px;display:flex;flex-direction:column;gap:var(--space-4)">
+        <div class="blueprint" style="position:relative;padding:var(--space-3) var(--space-4)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <h6 class="text-muted" style="margin:0 0 var(--space-2)">근거</h6>
+          <sc-if value="{{ ev.empty }}" hint-placeholder-val="{{ true }}">
+            <p class="text-muted" style="font-size:13px;margin:0">칸을 하나 고르면 그 판정에 쓰인 GPU 칩셋·서열 점수·요구 사양 원문을 여기 보여준다.</p>
+          </sc-if>
+          <sc-if value="{{ ev.shown }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+              <div>
+                <div style="font-family:var(--font-heading);font-size:19px">{{ ev.cellId }}</div>
+                <div class="text-muted" style="font-size:12px">{{ ev.cellDesc }}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <sc-for list="{{ ev.lines }}" as="ln" hint-placeholder-count="5">
+                  <div style="display:flex;gap:var(--space-3);font-size:13px;border-bottom:1px solid color-mix(in srgb, var(--color-text) 8%, transparent);padding-bottom:var(--space-1)">
+                    <span class="text-muted" style="flex:0 0 92px">{{ ln.k }}</span>
+                    <span style="flex:1;min-width:0;text-wrap:pretty">{{ ln.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="font-family:var(--font-heading);font-size:16px;color:var(--color-accent-700)">{{ ev.verdict }}</div>
+              <div class="text-muted" style="font-size:11px">출처 {{ ev.source }} · {{ ev.checked }} 확인</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div class="blueprint" style="position:relative;padding:var(--space-3) var(--space-4)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <h6 class="text-muted" style="margin:0 0 var(--space-2)">미매핑 {{ skipped.count }}건</h6>
+          <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+            <sc-for list="{{ skipped.list }}" as="s" hint-placeholder-count="6">
+              <div style="display:flex;gap:var(--space-2);align-items:baseline;font-size:13px">
+                <span style="flex:1;min-width:0">{{ s.name }}</span>
+                <span class="text-muted" style="font-size:11px;text-align:right;flex:0 0 46%">{{ s.reason }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <p class="text-muted" style="font-size:11px;margin:var(--space-3) 0 0;text-wrap:pretty">{{ skipped.note }}</p>
+        </div>
+
+        <div class="blueprint" style="position:relative;padding:var(--space-3) var(--space-4)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <h6 class="text-muted" style="margin:0 0 var(--space-2)">미정 — 확정 대기</h6>
+          <div style="display:flex;flex-direction:column;gap:var(--space-2);font-size:12px">
+            <div>화면 ID <span class="text-muted">— ADM-GRD-020은 가칭</span></div>
+            <div>스킵 사유 테이블 적재 <span class="text-muted">— 1차 범위 여부</span></div>
+            <div>권한 범위 <span class="text-muted">— 조회 등급 공통 노출 여부</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;skipReasonsAvailable&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;상태 가정&quot;},&quot;gridState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;정상&quot;,&quot;매핑 미실행&quot;,&quot;격자 데이터 없음&quot;],&quot;default&quot;:&quot;정상&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;상태 가정&quot;}}">
+const TIERS = [
+  { name: "팝콘3", ram: 8, base: 690000 },
+  { name: "팝콘5", ram: 16, base: 990000 },
+  { name: "팝콘7", ram: 16, base: 1390000 },
+  { name: "팝콘9", ram: 32, base: 1890000 },
+  { name: "팝콘11", ram: 32, base: 2490000 },
+  { name: "팝콘13", ram: 64, base: 3290000 },
+  { name: "팝콘X", ram: 64, base: 4590000 }
+];
+const GPUS = {
+  "인텔": [
+    { chipset: "UHD 770", score: 8, vram: 0 },
+    { chipset: "GTX 1650", score: 30, vram: 4 },
+    { chipset: "RTX 3050", score: 45, vram: 8 },
+    { chipset: "RTX 4060", score: 65, vram: 8 },
+    { chipset: "RTX 5060 Ti", score: 85, vram: 16 },
+    { chipset: "RTX 5070 Ti", score: 108, vram: 16 },
+    { chipset: "RTX 5090", score: 160, vram: 32 }
+  ],
+  "AMD": [
+    { chipset: "Radeon 760M", score: 14, vram: 0 },
+    { chipset: "RX 6400", score: 28, vram: 4 },
+    { chipset: "RX 7600", score: 55, vram: 8 },
+    { chipset: "RX 9060 XT", score: 72, vram: 16 },
+    { chipset: "RX 9070", score: 92, vram: 16 },
+    { chipset: "RX 9070 XT", score: 104, vram: 16 },
+    { chipset: "RX 7900 XTX", score: 120, vram: 24 }
+  ]
+};
+const USAGES = [
+  { name: "사무", w: 0 }, { name: "웹서핑", w: 0 }, { name: "학습", w: 1 },
+  { name: "게임", w: 2 }, { name: "고사양게임", w: 3 }, { name: "영상편집", w: 3 },
+  { name: "3D·설계", w: 4 }, { name: "AI작업", w: 5 }
+];
+const LADDER_SRC = "공개 상대성능 집계 (gpu_ladder)";
+const CHECKED = "2026-09-08";
+
+const GAMES = [
+  { id: 1, name: "리그 오브 레전드", genre: "MOBA", minGpu: "HD 6570", minScore: 6, minRam: 2, recGpu: "GTX 1050", recScore: 26, recRam: 4 },
+  { id: 2, name: "발로란트", genre: "FPS", minGpu: "Intel HD 4000", minScore: 5, minRam: 4, recGpu: "GTX 1050 Ti", recScore: 30, recRam: 8 },
+  { id: 3, name: "오버워치 2", genre: "FPS", minGpu: "GTX 600 시리즈 / HD 7000", minScore: 10, minRam: 6, recGpu: "GTX 1060 / RX 580", recScore: 42, recRam: 8 },
+  { id: 4, name: "배틀그라운드", genre: "배틀로얄", minGpu: "GTX 960 / R7 370", minScore: 22, minRam: 8, recGpu: "GTX 1060 3GB", recScore: 42, recRam: 16 },
+  { id: 5, name: "로스트아크", genre: "MMORPG", minGpu: "GTX 750 Ti", minScore: 16, minRam: 8, recGpu: "GTX 1060", recScore: 42, recRam: 16 },
+  { id: 6, name: "마인크래프트", genre: "샌드박스", minGpu: "HD 4000", minScore: 5, minRam: 4, recGpu: "GTX 700 시리즈", recScore: 20, recRam: 8 },
+  { id: 7, name: "FC 26", genre: "스포츠", minGpu: "GTX 1050 Ti", minScore: 30, minRam: 8, recGpu: "GTX 1660", recScore: 38, recRam: 8 },
+  { id: 8, name: "스타크래프트 II", genre: "RTS", minGpu: "GTX 650", minScore: 9, minRam: 4, recGpu: "GTX 1050", recScore: 26, recRam: 8 },
+  { id: 9, name: "명조", genre: "액션 RPG", minGpu: "GTX 1050 Ti", minScore: 30, minRam: 8, recGpu: "RTX 2060", recScore: 48, recRam: 16 },
+  { id: 10, name: "검은사막", genre: "MMORPG", minGpu: "GTX 950", minScore: 20, minRam: 8, recGpu: "GTX 1660 Ti", recScore: 44, recRam: 16 },
+  { id: 11, name: "디아블로 IV", genre: "핵앤슬래시", minGpu: "GTX 660 / R9 280", minScore: 12, minRam: 8, recGpu: "RX 6700 XT", recScore: 60, recRam: 16 },
+  { id: 12, name: "헬다이버즈 2", genre: "TPS", minGpu: "GTX 1050 Ti", minScore: 30, minRam: 8, recGpu: "RTX 2060", recScore: 48, recRam: 16 },
+  { id: 13, name: "엘든 링", genre: "액션 RPG", minGpu: "GTX 1060 3GB", minScore: 42, minRam: 12, recGpu: "RTX 3070", recScore: 70, recRam: 16 },
+  { id: 14, name: "사이버펑크 2077", genre: "오픈월드", minGpu: "GTX 1060 6GB", minScore: 42, minRam: 12, recGpu: "RTX 3060", recScore: 52, recRam: 16 },
+  { id: 15, name: "몬스터 헌터 와일즈", genre: "액션", minGpu: "GTX 1660", minScore: 38, minRam: 16, recGpu: "RTX 4060", recScore: 65, recRam: 16 },
+  { id: 16, name: "크라이시스 리마스터드", genre: "FPS", skip: "rec_gpu_parse_failed", raw: "GTX 1050 Ti 또는 동급 이상" },
+  { id: 17, name: "데드 스페이스 리메이크", genre: "호러", skip: "rec_gpu_parse_failed", raw: "RX 5700 XT (8GB VRAM 필요)" },
+  { id: 18, name: "스타필드", genre: "오픈월드", skip: "min_gpu_parse_failed_partial", raw: "AMD Radeon RX 5700 / NVIDIA 동급" },
+  { id: 19, name: "철권 8", genre: "대전", skip: "rec_gpu_parse_failed", raw: "GeForce RTX 2070 이상 권장" },
+  { id: 20, name: "배틀필드 6", genre: "FPS", skip: "rec_gpu_parse_failed", raw: "RTX 3060 Ti / RX 6700 XT 급" },
+  { id: 21, name: "원신", genre: "오픈월드", skip: "rec_gpu_missing", raw: "(원천에 값 없음)" },
+  { id: 22, name: "붕괴: 스타레일", genre: "턴제 RPG", skip: "rec_gpu_missing", raw: "(원천에 값 없음)" },
+  { id: 23, name: "콜 오브 듀티: BO7", genre: "FPS", skip: "rec_gpu_missing", raw: "(원천에 값 없음)" }
+];
+
+const WORKLOADS = [
+  { id: 1, name: "Llama 3.1 8B · Q4 추론", size: "8B", minVram: 6, recVram: 8, minRam: 16 },
+  { id: 2, name: "Qwen2.5 7B · Q4 추론", size: "7B", minVram: 6, recVram: 8, minRam: 16 },
+  { id: 3, name: "SDXL 이미지 생성", size: "3.5B", minVram: 8, recVram: 12, minRam: 16 },
+  { id: 4, name: "Whisper large-v3 전사", size: "1.5B", minVram: 10, recVram: 12, minRam: 16 },
+  { id: 5, name: "Mistral 12B · Q4 추론", size: "12B", minVram: 10, recVram: 16, minRam: 32 },
+  { id: 6, name: "SD 1.5 LoRA 학습", size: "0.9B", minVram: 12, recVram: 16, minRam: 32 },
+  { id: 7, name: "Llama 3.1 8B · FP16 추론", size: "8B", minVram: 16, recVram: 24, minRam: 32 },
+  { id: 8, name: "Llama 3.3 70B · Q4 추론", size: "70B", minVram: 40, recVram: 48, minRam: 64, skip: "zero_matching_cells" },
+  { id: 9, name: "Llama 3.3 70B · FP16 추론", size: "70B", minVram: 140, recVram: 160, minRam: 128, skip: "zero_matching_cells" },
+  { id: 10, name: "Mixtral 8x22B · Q4 추론", size: "141B", minVram: 96, recVram: 112, minRam: 128, skip: "zero_matching_cells" },
+  { id: 11, name: "Flux.1 dev · FP16 생성", size: "12B", minVram: 48, recVram: 48, minRam: 64, skip: "zero_matching_cells" },
+  { id: 12, name: "SVD-XT 비디오 생성", size: "1.5B", minVram: 40, recVram: 48, minRam: 64, skip: "zero_matching_cells" },
+  { id: 13, name: "DeepSeek-R1 405B · Q4", size: "405B", minVram: 220, recVram: 256, minRam: 256, skip: "zero_matching_cells" },
+  { id: 14, name: "사내 문서 RAG 임베딩", size: "0.3B", minVram: null, recVram: null, minRam: 16, skip: "min_vram_gb_missing" }
+];
+
+const SKIP_LABEL = {
+  rec_gpu_parse_failed: "rec_gpu 파싱 실패",
+  min_gpu_parse_failed_partial: "min_gpu 부분 파싱 실패",
+  rec_gpu_missing: "원천에 rec_gpu 없음",
+  zero_matching_cells: "재고 최고 VRAM으로도 부족 (정상 판정)",
+  min_vram_gb_missing: "min_vram_gb 없음 — 판정 불가"
+};
+
+function buildCells() {
+  const out = [];
+  TIERS.forEach((t, ti) => {
+    USAGES.forEach(u => {
+      if (u.w > ti + 1) return;
+      ["인텔", "AMD"].forEach(p => {
+        const gpu = GPUS[p][ti];
+        out.push({
+          id: "T" + (ti * 2 + 3) + "-" + u.name + "-" + (p === "인텔" ? "INT" : "AMD"),
+          tier: t.name, tierIdx: ti, usage: u.name, platform: p,
+          gpu: gpu, ram: t.ram,
+          price: t.base + u.w * 180000 + (p === "AMD" ? -30000 : 0)
+        });
+      });
+    });
+  });
+  return out;
+}
+const CELLS = buildCells();
+const won = n => n.toLocaleString("ko-KR") + "원";
+
+class Component extends DCLogic {
+  state = { tab: "games", gameId: 4, workId: 1, usage: "전체", platform: "전체", level: "전체", cellId: null };
+
+  judgeGame(g, c) {
+    if (g.skip) return null;
+    const r = c.gpu.score;
+    if (r >= g.recScore && c.ram >= g.recRam) return "권장충족";
+    if (r >= g.minScore && c.ram >= g.minRam) return "최소충족";
+    return null;
+  }
+  judgeWork(w, c) {
+    if (w.skip === "min_vram_gb_missing") return null;
+    if (c.gpu.vram >= w.recVram && c.ram >= w.minRam) return "권장구성";
+    if (c.gpu.vram >= w.minVram && c.ram >= w.minRam) return "구동가능";
+    return null;
+  }
+  judge(item, c) { return this.state.tab === "games" ? this.judgeGame(item, c) : this.judgeWork(item, c); }
+  mappedCount(item) { return CELLS.filter(c => this.judge(item, c)).length; }
+
+  failReason(item, c) {
+    if (this.state.tab === "games") {
+      if (item.skip) return "판정 불가 — " + SKIP_LABEL[item.skip];
+      if (c.gpu.score < item.minScore) return "GPU 서열 " + c.gpu.score + " < 최소 " + item.minScore;
+      return "RAM " + c.ram + "GB < 최소 " + item.minRam + "GB";
+    }
+    if (item.skip === "min_vram_gb_missing") return "판정 불가 — min_vram_gb 없음";
+    if (c.gpu.vram < item.minVram) return "VRAM " + c.gpu.vram + "GB < 최소 " + item.minVram + "GB";
+    return "RAM " + c.ram + "GB < 최소 " + item.minRam + "GB";
+  }
+
+  itemStyle(on) {
+    return "display:flex;align-items:center;gap:var(--space-2);width:100%;text-align:left;cursor:pointer;padding:7px 9px;border:0;border-left:3px solid " +
+      (on ? "var(--color-accent)" : "transparent") + ";background:" + (on ? "var(--color-accent-100)" : "transparent") + ";font-family:var(--font-body);color:var(--color-text)";
+  }
+  rowStyle(on) {
+    return "cursor:pointer;" + (on ? "background:var(--color-accent-100);box-shadow:inset 3px 0 0 var(--color-accent)" : "");
+  }
+
+  renderVals() {
+    const s = this.state;
+    const isGames = s.tab === "games";
+    const src = isGames ? GAMES : WORKLOADS;
+    const item = src.find(x => x.id === (isGames ? s.gameId : s.workId)) || src[0];
+    const skipReasons = this.props.skipReasonsAvailable ?? false;
+    const gridState = this.props.gridState ?? "정상";
+
+    const items = src.map(x => {
+      const on = x.id === item.id;
+      const n = x.skip ? 0 : this.mappedCount(x);
+      return {
+        name: x.name,
+        sub: isGames ? x.genre + " · " + (x.skip ? "미매핑" : "칸 " + n + "개") : x.size + " · " + (x.skip ? "미매핑" : "칸 " + n + "개"),
+        tagText: x.skip ? "스킵" : (isGames ? "매핑" : "매핑"),
+        tagClass: x.skip ? "tag tag-neutral" : "tag tag-accent",
+        style: this.itemStyle(on),
+        onClick: () => this.setState(isGames ? { gameId: x.id, cellId: null } : { workId: x.id, cellId: null })
+      };
+    });
+
+    const filtered = CELLS.filter(c =>
+      (s.usage === "전체" || c.usage === s.usage) &&
+      (s.platform === "전체" || c.platform === s.platform));
+
+    const matched = filtered.map(c => ({ c, lv: this.judge(item, c) })).filter(x => x.lv)
+      .filter(x => s.level === "전체" || x.lv === s.level)
+      .sort((a, b) => a.c.price - b.c.price);
+
+    const rows = matched.map(({ c, lv }) => ({
+      id: c.id, tierUsage: c.tier + " · " + c.usage, platform: c.platform,
+      gpu: c.gpu.chipset + (c.gpu.vram ? " " + c.gpu.vram + "GB" : " (내장)"),
+      price: won(c.price), level: lv,
+      tagClass: lv === "권장충족" || lv === "권장구성" ? "tag tag-accent" : "tag tag-outline",
+      style: this.rowStyle(s.cellId === c.id),
+      onClick: () => this.setState({ cellId: c.id })
+    }));
+
+    const fails = filtered.filter(c => !this.judge(item, c)).sort((a, b) => a.price - b.price).slice(0, 5);
+    const failRows = fails.map(c => ({
+      id: c.id, tierUsage: c.tier + " · " + c.usage, platform: c.platform,
+      gpu: c.gpu.chipset + (c.gpu.vram ? " " + c.gpu.vram + "GB" : " (내장)"),
+      reason: this.failReason(item, c),
+      label: item.skip ? "판정 불가" : "불성립"
+    }));
+
+    const cell = CELLS.find(c => c.id === s.cellId);
+    let ev = { empty: true, shown: false, lines: [] };
+    if (cell) {
+      const lv = this.judge(item, cell);
+      const lines = isGames ? [
+        { k: "GPU 칩셋", v: cell.gpu.chipset + " · ladder_score " + cell.gpu.score },
+        { k: "기준 rank", v: "권장 " + (item.recScore ?? "—") + " / 최소 " + (item.minScore ?? "—") },
+        { k: "rec_gpu 원문", v: item.recGpu ?? item.raw ?? "—" },
+        { k: "min_gpu 원문", v: item.minGpu ?? "—" },
+        { k: "RAM", v: cell.ram + "GB · 권장 " + (item.recRam ?? "—") + "GB / 최소 " + (item.minRam ?? "—") + "GB" },
+        { k: "견적가", v: won(cell.price) }
+      ] : [
+        { k: "GPU VRAM", v: cell.gpu.chipset + " · " + cell.gpu.vram + "GB" },
+        { k: "요구 VRAM", v: "권장 " + (item.recVram ?? "—") + "GB / 최소 " + (item.minVram ?? "—") + "GB" },
+        { k: "RAM", v: cell.ram + "GB · 최소 " + item.minRam + "GB" },
+        { k: "양자화", v: item.name.includes("Q4") ? "Q4 양자화 기준" : "FP16 기준" },
+        { k: "견적가", v: won(cell.price) }
+      ];
+      ev = {
+        empty: false, shown: true, cellId: cell.id,
+        cellDesc: cell.tier + " · " + cell.usage + " · " + cell.platform + " · " + item.name,
+        lines,
+        verdict: lv ? (isGames ? lv + " (제조사 기준)" : lv + " (양자화 기준 명시)") : "불성립 — " + this.failReason(item, cell),
+        source: isGames ? "제조사 공식 요구사양 · " + LADDER_SRC : "모델 카드 · " + LADDER_SRC,
+        checked: CHECKED
+      };
+    }
+
+    const skippedSrc = src.filter(x => x.skip);
+    const skipped = {
+      count: skippedSrc.length,
+      list: skippedSrc.map(x => ({ name: x.name, reason: skipReasons ? SKIP_LABEL[x.skip] : "사유 미제공" })),
+      note: skipReasons
+        ? "사유는 game_cell_mapper 배치가 테이블에 남긴 값을 조회한 것."
+        : "스킵 사유는 배치 SUMMARY_JSON에만 있고 테이블에 없다 — 배치 로그만 확인 가능. 사유가 적재되면 이 자리에 표시한다."
+    };
+
+    return {
+      meta: {
+        checkedDate: CHECKED, gamesTotal: GAMES.length, gamesMapped: GAMES.filter(g => !g.skip).length,
+        aiTotal: WORKLOADS.length, aiMapped: WORKLOADS.filter(w => !w.skip).length,
+        cellCount: CELLS.length, ladderRows: 34
+      },
+      isGames, isAi: !isGames,
+      listHeading: isGames ? "게임 목록 — 매핑 / 스킵" : "AI 작업 목록 — 매핑 / 스킵",
+      selectGames: () => this.setState({ tab: "games", cellId: null }),
+      selectAi: () => this.setState({ tab: "ai", cellId: null }),
+      items,
+      usageOptions: ["전체"].concat(USAGES.map(u => u.name)),
+      usageFilter: s.usage,
+      onUsage: e => this.setState({ usage: e.target.value, cellId: null }),
+      platformOptions: ["전체", "인텔", "AMD"].map(p => ({
+        label: p, checked: s.platform === p, onChange: () => this.setState({ platform: p, cellId: null })
+      })),
+      levelOptions: (isGames ? ["전체", "권장충족", "최소충족"] : ["전체", "권장구성", "구동가능"]).map(l => ({
+        label: l, checked: s.level === l, onChange: () => this.setState({ level: l })
+      })),
+      gridOk: gridState === "정상",
+      gridBlocked: gridState !== "정상",
+      blockedTitle: gridState === "격자 데이터 없음" ? "격자 데이터 없음" : "매핑 미실행",
+      blockedBody: gridState === "격자 데이터 없음"
+        ? "is_current 견적이 0건 — 격자 관리(ADM-GRD-010)에서 먼저 생성한다."
+        : "game_cell_map이 0행 — 매핑 배치가 아직 한 번도 돌지 않았다.",
+      selected: {
+        name: item.name,
+        sub: isGames ? item.genre + " · rec_gpu 「" + (item.recGpu ?? item.raw) + "」" : item.size + " · min_vram " + (item.minVram ?? "—") + "GB",
+        unmapped: !!item.skip,
+        unmappedNote: skipReasons ? SKIP_LABEL[item.skip] : "사유 미제공 — 배치 로그만 확인 가능"
+      },
+      hasRows: rows.length > 0,
+      emptyByFilter: !item.skip && rows.length === 0,
+      resultSummary: item.skip ? "성립 칸 0개" : "성립 칸 " + rows.length + "개 · 최저가 " + (rows[0] ? rows[0].price : "—"),
+      rows, failRows,
+      failNote: "불성립(요구 사양 미달)과 판정 불가(원천 데이터 부족)는 라벨을 섞지 않는다. 상위 5칸만 표시.",
+      ev, skipped
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,648 @@
+{#
+  게임·AI 연계 매트릭스 (ADM-GRD-020 — **가칭**) · /admin2/game-matrix
+  2026-09-09 신설, **조회 전용**(매핑 재계산은 배치 `tools/game_cell_mapper.py`)
+
+  ⚠ 화면 ID 는 가칭이다 — `docs/design/req/req-game-matrix.md` §미정 첫 항
+    (사장님 확정 대기). 우측 하단 「미정 — 확정 대기」 패널이 그 사실을 화면에서도
+    말한다. 확정되면 `api/admin_ui_game_matrix.py` 의 `screen_id` 한 줄만 고친다.
+
+  ■ 계약
+    요구사항  docs/design/req/req-game-matrix.md (7항목 정의서)
+    원안      docs/design/incoming/dc-game-matrix-admin.html (Claude Design, <x-dc> 형식)
+    데이터    GET /api/admin/game-matrix (api/admin_game_matrix.py)
+
+  ■ 원안과 달리한 것 — 근거와 함께
+    ① 팔레트 — 원안 `_ds/.../styles.css` 의 blueprint 팔레트(#5980a6·--color-accent
+       계열)를 admin2 토큰(`/shared/admin2/admin2.css`)으로 치환했다. admin2 화면은
+       팔레트 단일 원천이 그 파일 하나여야 한다(셸 정본 머리 주석). 통과·권장 등급에
+       초록(`--success-dark`)을 쓰는 것은 A-45(admin2 초록 허용) — **색만으로
+       판정을 말하지 않고 라벨을 항상 병기**한다(색약 배려).
+    ② 서체 — 원안 styles.css 첫 줄의 Google Fonts @import 를 가져오지 않았다
+       (A-30 자체 호스팅 · 외부 CDN 0건). 셸이 이미 `/shared/fonts/fonts.css` 를 싣는다.
+    ③ 상단 nav — 원안의 자체 상단 메뉴(POPCORN/ADMIN2 + 링크 4개)를 버리고 공용
+       셸의 LNB·헤더를 쓴다. 메뉴 정본은 `api/admin_nav.py` 하나다(CANON §1).
+    ④ 표본 데이터 — 원안 스크립트의 TIERS·GPUS·GAMES·WORKLOADS 배열과 그 안의
+       수(ladder_rows 34 등)는 **한 줄도 옮기지 않았다.** 시안용 더미다
+       (§화면 정직성 — 화면은 서버 응답만 그린다).
+    ⑤ 「배치 로그」·「CSV 내려받기」 단추 — 원안에 있으나 그 API 가 없다. 지우지
+       않고 `disabled` + 사유를 `title` 로 드러낸다(이웃 화면 `grid.html.j2` 와 같은
+       관행 — 눌러도 아무 일도 안 일어나는 단추를 활성으로 두지 않는다).
+
+  ■ 화면이 스스로 판정하지 않는다
+    성립/등급은 배치가 `game_cell_map.match_level` 에 적어 둔 값을 그대로 쓴다.
+    불성립 칸의 «사유»는 어디에도 저장돼 있지 않으므로(정의서 §③ 마지막 항의
+    하한) 화면이 지어내지 않고 「사유 미저장」이라고 말한다.
+    「불성립」과 「판정 불가」는 원인이 달라 라벨도 다르다 — 가르는 근거는 원천
+    컬럼의 사실(`rec_gpu` / `min_vram_gb` 가 비었는가)뿐이고 서버가 판정해 준다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}게임·AI 연계 매트릭스{% endblock %}
+
+{% block head_extra %}
+<style>
+.gm-body *{box-sizing:border-box}
+.gm-body{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto}
+.gm-kicker{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.gm-card{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px}
+.gm-card[hidden]{display:none}
+
+/* ── 요약 바 ── */
+.gm-meta{padding:11px 16px;display:flex;align-items:center;gap:22px;flex-wrap:wrap;font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.gm-meta b{font:600 13px/1.3 var(--font-num);color:var(--on);font-variant-numeric:tabular-nums}
+.gm-meta .tail{margin-left:auto}
+.gm-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gm-btn{border:1px solid var(--outline);border-radius:6px;background:var(--card);color:var(--on);padding:7px 12px;font:600 12px/1 var(--font);cursor:pointer}
+.gm-btn[disabled]{cursor:not-allowed;opacity:.55}
+
+/* ── 배너(빈 상태) ── */
+.gm-banner{padding:16px 18px;display:flex;flex-direction:column;gap:4px;border-style:dashed}
+.gm-banner[hidden]{display:none}
+.gm-banner .ttl{font:600 13px/1.3 var(--font)}
+.gm-banner .msg{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+
+/* ── 3열 골격 ── */
+.gm-cols{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.gm-cols[hidden]{display:none}
+.gm-col-l{flex:1 1 250px;max-width:310px;min-width:230px;display:flex;flex-direction:column;gap:10px}
+.gm-col-c{flex:3 1 460px;min-width:320px;display:flex;flex-direction:column;gap:12px}
+.gm-col-r{flex:1 1 280px;max-width:340px;min-width:250px;display:flex;flex-direction:column;gap:12px}
+
+/* ── 탭(게임 / AI 작업) ── */
+.gm-seg{display:inline-flex;background:var(--container);border-radius:7px;padding:3px;gap:2px;width:100%}
+.gm-seg button{flex:1;border:0;border-radius:5px;padding:7px 10px;font:600 12.5px/1 var(--font);cursor:pointer;background:transparent;color:var(--on-variant)}
+.gm-seg button[aria-selected="true"]{background:var(--card);color:var(--on);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* ── 좌측 목록 ── */
+.gm-list{padding:10px 12px 12px}
+.gm-list h6{margin:0 0 8px;font:500 11px/1.3 var(--font);color:var(--on-variant)}
+.gm-items{display:flex;flex-direction:column;gap:2px;max-height:520px;overflow:auto}
+.gm-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;padding:7px 9px;border:0;border-left:3px solid transparent;background:transparent;font-family:var(--font);color:var(--on)}
+.gm-item[aria-current="true"]{border-left-color:var(--on);background:var(--primary-container)}
+.gm-item .nm{font:600 13px/1.25 var(--font);display:block}
+.gm-item .sub{font:400 11px/1.3 var(--font);color:var(--on-variant);display:block}
+.gm-item .txt{flex:1;min-width:0}
+
+/* ── 태그 ── */
+.gm-tag{display:inline-block;flex:none;border-radius:4px;padding:2px 6px;font:600 10.5px/1.5 var(--font);white-space:nowrap;border:1px solid var(--outline);color:var(--on-variant);background:transparent}
+.gm-tag.ok{border-color:var(--success-dark);color:var(--success-dark)}
+.gm-tag.min{border-color:var(--outline);color:var(--on-variant)}
+.gm-tag.none{border-color:var(--state-wait);color:var(--on-variant);background:var(--container-low)}
+
+/* ── 필터 ── */
+.gm-filters{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:12px 14px}
+.gm-field{display:flex;flex-direction:column;gap:4px}
+.gm-field label{font:500 11px/1.3 var(--font);color:var(--on-variant)}
+.gm-field select{border:1px solid var(--outline);border-radius:6px;background:var(--card);color:var(--on);padding:6px 9px;font:400 12px/1.3 var(--font);min-width:130px}
+.gm-hint{font:400 11.5px/1.3 var(--font);color:var(--on-variant);margin-left:auto;padding-bottom:6px}
+
+/* ── 결과 ── */
+.gm-head{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:12px 14px 0}
+.gm-head .nm{font:600 15px/1.3 var(--font)}
+.gm-head .sub{font:400 12px/1.4 var(--font);color:var(--on-variant)}
+.gm-head .cnt{margin-left:auto;font:400 12px/1.4 var(--font);color:var(--on-variant)}
+.gm-scroll{overflow-x:auto;padding:10px 14px 14px}
+table.gm-t{width:100%;border-collapse:collapse;font:400 12px/1.45 var(--font);min-width:600px}
+table.gm-t th{font:500 11px/1.3 var(--font);color:var(--on-variant);text-align:left;padding:6px 8px;border-bottom:1px solid var(--outline-variant);white-space:nowrap}
+table.gm-t td{padding:8px;border-bottom:1px solid var(--outline-variant);vertical-align:middle}
+table.gm-t td.num{text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.gm-t td.id{font:400 11px/1.3 var(--font-num);color:var(--on-variant);white-space:nowrap}
+table.gm-t td.nm{font:600 13px/1.3 var(--font);white-space:nowrap}
+table.gm-t tbody tr[data-action]{cursor:pointer}
+table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);box-shadow:inset 3px 0 0 var(--on)}
+.gm-empty{padding:26px 14px;text-align:center}
+.gm-empty[hidden]{display:none}
+.gm-empty .ttl{font:600 13px/1.4 var(--font);margin-bottom:4px}
+.gm-empty .msg{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.gm-note{font:400 11px/1.6 var(--font);color:var(--on-variant);padding:0 14px 12px}
+
+/* ── 우측 패널 ── */
+.gm-panel{padding:12px 14px}
+.gm-panel h6{margin:0 0 8px;font:500 11px/1.3 var(--font);color:var(--on-variant)}
+.gm-ev-cell{font:600 14px/1.3 var(--font-num)}
+.gm-ev-desc{font:400 11.5px/1.4 var(--font);color:var(--on-variant);margin-bottom:10px}
+.gm-ev-lines{display:flex;flex-direction:column;gap:6px}
+.gm-ev-lines .ln{display:flex;gap:10px;font:400 12px/1.5 var(--font);border-bottom:1px solid var(--outline-variant);padding-bottom:5px}
+.gm-ev-lines .k{flex:0 0 84px;color:var(--on-variant)}
+.gm-ev-lines .v{flex:1;min-width:0;overflow-wrap:anywhere}
+.gm-ev-verdict{margin-top:10px;font:600 13px/1.4 var(--font)}
+.gm-ev-src{margin-top:6px;font:400 11px/1.5 var(--font);color:var(--on-variant);overflow-wrap:anywhere}
+.gm-ev-src a{color:var(--on-variant)}
+.gm-skip{display:flex;flex-direction:column;gap:6px}
+.gm-skip .row{display:flex;gap:8px;align-items:baseline;font:400 12px/1.4 var(--font)}
+.gm-skip .row .n{flex:1;min-width:0}
+.gm-skip .row .r{flex:0 0 46%;text-align:right;font-size:11px;color:var(--on-variant)}
+.gm-open{display:flex;flex-direction:column;gap:6px;font:400 12px/1.5 var(--font)}
+.gm-open .sub{color:var(--on-variant)}
+
+.gm-err{margin:auto;max-width:460px;padding:22px 24px;text-align:center}
+.gm-err[hidden]{display:none}
+.gm-err .ttl{font:600 14px/1.4 var(--font);margin-bottom:6px}
+.gm-err .msg{font:400 12px/1.6 var(--font);color:var(--on-variant);margin-bottom:14px}
+
+@media (max-width:768px){
+  .gm-cols{flex-direction:column}
+  .gm-col-l,.gm-col-c,.gm-col-r{max-width:none;width:100%}
+  .gm-items{max-height:300px}
+  .gm-meta{flex-direction:column;align-items:flex-start;gap:6px}
+  .gm-meta .tail{margin-left:0}
+  .gm-hint{margin-left:0}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="a2-badge" title="이 화면은 조회만 합니다 — 매핑 재계산은 배치(tools/game_cell_mapper.py)가 합니다">조회 전용</span>
+{% endblock %}
+
+{% block content %}
+<div class="gm-body" data-domain="ai">
+  <div class="gm-kicker">게임·AI 작업이 어느 격자 칸에서 성립하는지 확인합니다 · 매핑은 파생 캐시이며 배치 재실행마다 다시 계산됩니다</div>
+
+  <div data-bind="content-area">
+    <div class="gm-card gm-meta">
+      <span>기준 <b data-bind="m-checked">—</b></span>
+      <span>게임 <b data-bind="m-games">—</b> / <span data-bind="m-games-total">—</span> 매핑</span>
+      <span>AI 작업 <b data-bind="m-ai">—</b> / <span data-bind="m-ai-total">—</span> 매핑</span>
+      <span>견적 있는 칸 <b data-bind="m-cells">—</b></span>
+      <span>gpu_ladder <b data-bind="m-ladder">—</b>행</span>
+      <span class="tail gm-tools">
+        <button type="button" class="gm-btn" disabled title="향후 사용예정 — 배치 로그 조회 API가 아직 없습니다">배치 로그</button>
+        <button type="button" class="gm-btn" disabled title="향후 사용예정 — 내려받기 API가 아직 없습니다">CSV 내려받기</button>
+      </span>
+    </div>
+
+    <div class="gm-card gm-banner" data-bind="blocked" hidden>
+      <span class="ttl" data-bind="blocked-title">—</span>
+      <span class="msg" data-bind="blocked-msg">—</span>
+    </div>
+
+    <div class="gm-cols" data-bind="cols">
+      {# ── 좌: 탭 + 목록 ────────────────────────────────────── #}
+      <div class="gm-col-l" data-keep="1">
+        <div class="gm-seg" role="tablist" aria-label="분류">
+          <button type="button" role="tab" data-action="tab" data-tab="games" aria-selected="true">게임 <span data-bind="tab-games-n">—</span></button>
+          <button type="button" role="tab" data-action="tab" data-tab="ai" aria-selected="false">AI 작업 <span data-bind="tab-ai-n">—</span></button>
+        </div>
+        <div class="gm-card gm-list">
+          <h6 data-bind="list-heading">게임 목록 — 매핑 / 미매핑</h6>
+          <div class="gm-items" data-bind="items">불러오는 중…</div>
+        </div>
+      </div>
+
+      {# ── 중: 필터 + 성립 칸 + 불성립·판정 불가 ──────────────── #}
+      <div class="gm-col-c">
+        <div class="gm-card gm-filters" data-keep="1">
+          <div class="gm-field">
+            <label for="gmUsage">용도</label>
+            <select id="gmUsage" data-bind="f-usage" data-action="filter"><option value="">전체</option></select>
+          </div>
+          <div class="gm-field">
+            <label for="gmPlatform">플랫폼</label>
+            <select id="gmPlatform" data-bind="f-platform" data-action="filter"><option value="">전체</option></select>
+          </div>
+          <div class="gm-field">
+            <label for="gmLevel">매칭 등급</label>
+            <select id="gmLevel" data-bind="f-level" data-action="filter"><option value="">전체</option></select>
+          </div>
+          <span class="gm-hint">정렬 · 견적가 오름차순 고정</span>
+        </div>
+
+        <div class="gm-card" data-keep="1">
+          <div class="gm-head">
+            <span class="nm" data-bind="sel-name">—</span>
+            <span class="sub" data-bind="sel-sub"></span>
+            <span class="cnt" data-bind="sel-count"></span>
+          </div>
+
+          <div class="gm-empty" data-bind="sel-unmapped" hidden>
+            <div class="ttl" data-bind="sel-unmapped-title">매핑 없음</div>
+            <div class="msg" data-bind="sel-unmapped-msg"></div>
+          </div>
+
+          <div class="gm-empty" data-bind="sel-filtered" hidden>
+            <div class="ttl">조회 결과 없음</div>
+            <div class="msg">필터 조건에 성립하는 칸이 없습니다 — 조회 조건을 넓혀 확인하십시오.</div>
+          </div>
+
+          <div class="gm-scroll" data-bind="cells-wrap" hidden>
+            <table class="gm-t">
+              <thead>
+                <tr>
+                  <th>칸 ID</th><th>등급 · 용도</th><th>플랫폼</th><th>GPU</th>
+                  <th style="text-align:right">견적가</th><th>판정</th>
+                </tr>
+              </thead>
+              <tbody data-bind="cells" data-repeat="cell"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="gm-card" data-keep="1" data-bind="fail-card" hidden>
+          <div class="gm-head"><span class="nm" style="font-size:13px">불성립 · 판정 불가</span>
+            <span class="sub">원인이 다르면 라벨도 다릅니다</span>
+            <span class="cnt" data-bind="fail-count"></span></div>
+          <div class="gm-scroll">
+            <table class="gm-t">
+              <thead>
+                <tr><th>칸 ID</th><th>등급 · 용도</th><th>플랫폼</th><th>GPU</th>
+                <th style="text-align:right">견적가</th><th>판정</th></tr>
+              </thead>
+              <tbody data-bind="fails" data-repeat="fail"></tbody>
+            </table>
+          </div>
+          <div class="gm-note" data-bind="fail-note"></div>
+        </div>
+      </div>
+
+      {# ── 우: 근거 · 미매핑 · 미정 ───────────────────────────── #}
+      <div class="gm-col-r" data-keep="1">
+        <div class="gm-card gm-panel">
+          <h6>근거</h6>
+          <div data-bind="ev-empty">칸을 하나 선택하면 그 판정에 쓰인 GPU 칩셋·서열 점수·요구 사양 원문을 표시합니다.</div>
+          <div data-bind="ev-body" hidden></div>
+        </div>
+
+        <div class="gm-card gm-panel">
+          <h6><span data-bind="skip-title">미매핑</span></h6>
+          <div class="gm-skip" data-bind="skips"></div>
+          <div class="gm-note" style="padding:10px 0 0">스킵 사유는 배치의 SUMMARY_JSON에만 있고 테이블에 저장되지 않습니다 — 배치 로그로만 확인할 수 있습니다. 사유가 적재되면 이 자리에 표시합니다.</div>
+        </div>
+
+        <div class="gm-card gm-panel">
+          <h6>미정 — 확정 대기</h6>
+          <div class="gm-open">
+            <div>화면 ID <span class="sub">— ADM-GRD-020은 가칭</span></div>
+            <div>스킵 사유 테이블 적재 <span class="sub">— 1차 범위 여부</span></div>
+            <div>권한 범위 <span class="sub">— 조회 등급 공통 노출 여부</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gm-card gm-err" data-bind="load-error" hidden>
+    <div class="ttl" data-bind="err-title">데이터 조회 실패</div>
+    <div class="msg" data-bind="err-msg"></div>
+    <div data-bind="err-actions"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (k) { return document.querySelector('[data-bind="' + k + '"]'); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var num = function (n) { return n == null ? '—' : Number(n).toLocaleString('ko-KR'); };
+  var won = function (n) { return n == null ? '—' : num(n) + '원'; };
+  var set = function (k, html) { var e = $(k); if (e) e.innerHTML = html; };
+  var show = function (k, on) { var e = $(k); if (e) e.hidden = !on; };
+
+  // 「권장」 계열은 통과이므로 초록(A-45) — 라벨을 «항상» 함께 낸다(색약 배려).
+  var OK_LEVELS = { '권장충족': 1, '권장구성': 1 };
+
+  var state = {
+    base: null,        // GET /api/admin/game-matrix (선택 없음) 응답
+    tab: 'games',
+    itemId: null,
+    filters: { usage: '', platform: '', level: '' },
+    sel: null,         // 선택 항목의 칸 상세(응답의 selection)
+    cellId: null
+  };
+
+  function items() {
+    if (!state.base) return [];
+    return state.tab === 'games' ? state.base.games : state.base.workloads;
+  }
+  function idOf(it) { return state.tab === 'games' ? it.game_id : it.workload_id; }
+  function nameOf(it) {
+    if (state.tab === 'games') return it.name;
+    return it.task + (it.model_size ? ' · ' + it.model_size : '');
+  }
+  function subOf(it) {
+    var head = state.tab === 'games'
+      ? (it.genre || '')
+      : (it.min_vram_gb == null ? 'min_vram 미상' : 'min_vram ' + it.min_vram_gb + 'GB');
+    var tail = it.mapped_cells > 0 ? ('칸 ' + num(it.mapped_cells) + '개')
+      : (it.unjudgeable ? '판정 불가' : '매핑 없음');
+    return head ? head + ' · ' + tail : tail;
+  }
+
+  // ── 오류 표시 — 사유를 구분해서 말한다(삼키지 않는다) ────────────
+  function showError(title, msg, actionsHtml) {
+    var ca = $('content-area'); if (ca) ca.hidden = true;
+    show('load-error', true);
+    set('err-title', esc(title));
+    set('err-msg', esc(msg));
+    set('err-actions', actionsHtml || '');
+    var again = $('err-actions').querySelector('[data-action="retry"]');
+    if (again) again.addEventListener('click', function () { location.reload(); });
+  }
+  function failed(err) {
+    if (err && err.status === 401) {
+      showError('세션 만료', '관리자 로그인 후 다시 조회합니다.',
+        '<a href="/admin2/login" style="display:inline-block;padding:8px 18px;border-radius:6px;' +
+        'background:var(--on);color:var(--bg);font:500 12px/1 var(--font);text-decoration:none">로그인</a>');
+    } else {
+      showError('매트릭스 조회 실패',
+        '데이터를 받지 못했습니다 — ' + (err && err.message ? err.message : String(err)),
+        '<button type="button" data-action="retry" class="gm-btn">다시 시도</button>');
+    }
+  }
+  function getJson(url) {
+    return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+      return r.json();
+    });
+  }
+
+  // ── 요약 바 ────────────────────────────────────────────────────
+  function renderMeta() {
+    var m = state.base.meta;
+    set('m-checked', m.checked_date
+      ? new Date(m.checked_date).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
+      : '매핑 미실행');
+    set('m-games', num(m.games_mapped)); set('m-games-total', num(m.games_total));
+    set('m-ai', num(m.ai_mapped)); set('m-ai-total', num(m.ai_total));
+    set('m-cells', num(m.cell_count)); set('m-ladder', num(m.ladder_rows));
+    set('tab-games-n', num(m.games_total));
+    set('tab-ai-n', num(m.ai_total));
+  }
+
+  // 빈 상태 셋 중 앞의 둘 — 격자 자체가 없는가 / 이 분류의 매핑이 한 번도 안 돌았는가.
+  // 「필터 결과 0건」은 선택 뒤에 판단하므로 여기서 다루지 않는다.
+  function renderBlocked() {
+    var m = state.base.meta;
+    var mapRows = state.tab === 'games' ? m.game_map_rows : m.workload_map_rows;
+    if (m.cell_count === 0) {
+      set('blocked-title', '격자 데이터 없음');
+      set('blocked-msg', '현재본(is_current) 견적이 0건입니다 — 격자 관리(ADM-GRD-010)에서 먼저 생성하십시오.');
+      show('blocked', true); show('cols', false); return true;
+    }
+    if (mapRows === 0) {
+      set('blocked-title', '매핑 미실행');
+      set('blocked-msg', (state.tab === 'games' ? 'game_cell_map' : 'workload_cell_map') +
+        '이 0행입니다 — 매핑 배치(tools/game_cell_mapper.py)가 아직 한 번도 실행되지 않았습니다.');
+      show('blocked', true); show('cols', false); return true;
+    }
+    show('blocked', false); show('cols', true); return false;
+  }
+
+  // ── 좌측 목록 ──────────────────────────────────────────────────
+  function renderList() {
+    var list = items();
+    set('list-heading', state.tab === 'games' ? '게임 목록 — 매핑 / 미매핑' : 'AI 작업 목록 — 매핑 / 미매핑');
+    if (!list.length) { set('items', '<div class="gm-note" style="padding:8px 0">등록된 항목이 없습니다.</div>'); return; }
+    set('items', list.map(function (it) {
+      var id = idOf(it);
+      var tag = it.mapped_cells > 0
+        ? '<span class="gm-tag ok">매핑</span>'
+        : '<span class="gm-tag none">' + (it.unjudgeable ? '판정 불가' : '미매핑') + '</span>';
+      return '<button type="button" class="gm-item" data-action="pick" data-id="' + id + '"' +
+        (state.itemId === id ? ' aria-current="true"' : '') + '>' +
+        '<span class="txt"><span class="nm">' + esc(nameOf(it)) + '</span>' +
+        '<span class="sub">' + esc(subOf(it)) + '</span></span>' + tag + '</button>';
+    }).join(''));
+  }
+
+  // ── 필터 선택지 — 전부 서버가 준 값(화면이 만들지 않는다) ────────
+  function fillSelect(k, values, keep) {
+    var e = $(k); if (!e) return;
+    e.innerHTML = '<option value="">전체</option>' + values.map(function (v) {
+      return '<option value="' + esc(v) + '">' + esc(v) + '</option>';
+    }).join('');
+    e.value = values.indexOf(keep) >= 0 ? keep : '';
+  }
+  function renderFilters() {
+    fillSelect('f-usage', state.base.usages, state.filters.usage);
+    fillSelect('f-platform', state.base.platforms, state.filters.platform);
+    var levels = state.tab === 'games' ? state.base.game_levels : state.base.workload_levels;
+    fillSelect('f-level', levels, state.filters.level);
+    state.filters.usage = $('f-usage').value;
+    state.filters.platform = $('f-platform').value;
+    state.filters.level = $('f-level').value;
+  }
+
+  // ── 우측: 미매핑 목록 ──────────────────────────────────────────
+  function renderSkips() {
+    var skipped = items().filter(function (it) { return it.mapped_cells === 0; });
+    set('skip-title', '미매핑 ' + num(skipped.length) + '건');
+    if (!skipped.length) {
+      set('skips', '<div class="gm-note" style="padding:0">미매핑 항목이 없습니다.</div>');
+      return;
+    }
+    set('skips', skipped.map(function (it) {
+      var reason = it.unjudgeable ? ('판정 불가 — ' + it.unjudgeable_reason) : '사유 미제공';
+      return '<div class="row"><span class="n">' + esc(nameOf(it)) + '</span>' +
+        '<span class="r">' + esc(reason) + '</span></div>';
+    }).join(''));
+  }
+
+  // ── 중앙: 선택 항목의 칸 ──────────────────────────────────────
+  function levelTag(lv) {
+    return '<span class="gm-tag ' + (OK_LEVELS[lv] ? 'ok' : 'min') + '">' + esc(lv) + '</span>';
+  }
+
+  function renderSelection() {
+    var sel = state.sel;
+    if (!sel) {
+      set('sel-name', '—'); set('sel-sub', ''); set('sel-count', '');
+      show('cells-wrap', false); show('sel-unmapped', false);
+      show('sel-filtered', false); show('fail-card', false);
+      return;
+    }
+    var it = sel.item, isGame = sel.kind === 'game';
+    set('sel-name', esc(nameOf(it)));
+    set('sel-sub', esc(isGame
+      ? (it.genre || '') + ' · rec_gpu 「' + (it.rec_gpu == null ? '원천에 값 없음' : it.rec_gpu) + '」'
+      : (it.model_size || '모델 크기 미상') + ' · min_vram ' +
+        (it.min_vram_gb == null ? '원천에 값 없음' : it.min_vram_gb + 'GB')));
+
+    var rows = sel.cells;
+    var cheapest = rows.length ? rows[0].total : null;
+    set('sel-count', '성립 칸 ' + num(rows.length) + '개' +
+      (rows.length ? ' · 최저가 ' + won(cheapest) : '') +
+      ' (전체 매핑 ' + num(it.mapped_cells) + '칸)');
+
+    // 매핑 0건 — 「판정 불가」와 「사유 미제공」을 같은 문구로 뭉개지 않는다.
+    if (it.mapped_cells === 0) {
+      set('sel-unmapped-title', it.unjudgeable ? '판정 불가' : '매핑 없음');
+      set('sel-unmapped-msg', it.unjudgeable
+        ? esc(it.unjudgeable_reason) + ' — 원천 데이터가 없어 배치가 판정할 수 없습니다.'
+        : '사유 미제공 — 배치 로그만 확인 가능합니다.');
+      show('sel-unmapped', true); show('sel-filtered', false); show('cells-wrap', false);
+    } else if (!rows.length) {
+      show('sel-unmapped', false); show('sel-filtered', true); show('cells-wrap', false);
+    } else {
+      show('sel-unmapped', false); show('sel-filtered', false); show('cells-wrap', true);
+      set('cells', rows.map(function (r) {
+        return '<tr data-action="cell" data-cell-id="' + r.cell_id + '"' +
+          (state.cellId === r.cell_id ? ' aria-selected="true"' : '') + '>' +
+          '<td class="id">' + num(r.cell_id) + '</td>' +
+          '<td class="nm">' + esc(r.tier + ' · ' + r.usage) + '</td>' +
+          '<td>' + esc(r.platform) + '</td>' +
+          '<td>' + esc(r.gpu_used) + '</td>' +
+          '<td class="num">' + won(r.total) + '</td>' +
+          '<td>' + levelTag(r.match_level) + '</td></tr>';
+      }).join(''));
+    }
+
+    // 불성립 · 판정 불가
+    var fails = sel.unmatched;
+    if (!fails.length) { show('fail-card', false); return; }
+    show('fail-card', true);
+    set('fail-count', num(sel.unmatched_total) + '칸 중 ' + num(sel.unmatched_shown) + '칸 표시');
+    var label = it.unjudgeable ? '판정 불가' : '불성립';
+    set('fails', fails.map(function (f) {
+      return '<tr><td class="id">' + num(f.cell_id) + '</td>' +
+        '<td class="nm">' + esc(f.tier + ' · ' + f.usage) + '</td>' +
+        '<td>' + esc(f.platform) + '</td>' +
+        '<td>' + esc(f.gpu_name == null ? 'GPU 항목 없음' : f.gpu_name) + '</td>' +
+        '<td class="num">' + won(f.total) + '</td>' +
+        '<td><span class="gm-tag none">' + label + '</span></td></tr>';
+    }).join(''));
+    set('fail-note', (it.unjudgeable
+      ? '원천 데이터가 없어 이 항목은 어느 칸에서도 판정할 수 없습니다 — 불성립(요구 사양 미달)과 구분해 표기합니다.'
+      : '탈락 사유는 저장되지 않습니다 — 매핑 표에는 성립한 칸만 기록됩니다(배치 로그로만 확인 가능). ' +
+        '칸의 GPU가 gpu_ladder에 없어 배치가 그 칸 자체를 판정에서 제외한 경우도 이 목록에 함께 나올 수 있으며, 구분 정보는 저장되지 않습니다.') +
+      ' 견적가 오름차순 상위 ' + num(sel.unmatched_shown) + '칸만 표시합니다.');
+  }
+
+  // ── 우측: 근거 패널 ────────────────────────────────────────────
+  function line(k, v) {
+    return '<div class="ln"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
+  }
+  function renderEvidence() {
+    var sel = state.sel;
+    var cell = sel && sel.cells.filter(function (c) { return c.cell_id === state.cellId; })[0];
+    if (!cell) { show('ev-empty', true); show('ev-body', false); return; }
+    show('ev-empty', false); show('ev-body', true);
+
+    var it = sel.item, isGame = sel.kind === 'game';
+    var g = state.base.ladder[cell.gpu_used] || null;
+    var lines = '';
+    if (isGame) {
+      lines += line('GPU 칩셋', cell.gpu_used + (g ? ' · ladder_score ' + g.ladder_score : ' · 서열 미등재'));
+      lines += line('VRAM', g ? g.vram_gb + 'GB (서열표 대표값)' : '서열표에 없음');
+      lines += line('rec_gpu 원문', it.rec_gpu == null ? '원천에 값 없음' : it.rec_gpu);
+      lines += line('min_gpu 원문', it.min_gpu == null ? '원천에 값 없음' : it.min_gpu);
+      lines += line('요구 RAM', '권장 ' + (it.rec_ram_gb == null ? '미상' : it.rec_ram_gb + 'GB') +
+        ' / 최소 ' + (it.min_ram_gb == null ? '미상' : it.min_ram_gb + 'GB'));
+    } else {
+      lines += line('GPU 칩셋', cell.gpu_used + (g ? ' · VRAM ' + g.vram_gb + 'GB' : ' · 서열 미등재'));
+      lines += line('요구 VRAM', '권장 ' + (it.rec_vram_gb == null ? '미상' : it.rec_vram_gb + 'GB') +
+        ' / 최소 ' + (it.min_vram_gb == null ? '미상' : it.min_vram_gb + 'GB'));
+      lines += line('요구 RAM', it.min_ram_gb == null ? '미상' : '최소 ' + it.min_ram_gb + 'GB');
+      lines += line('권장 티어', it.recommended_tier || '미지정');
+    }
+    lines += line('견적가', won(cell.total));
+
+    var src = [];
+    if (it.source_url) src.push('<a href="' + esc(it.source_url) + '" target="_blank" rel="noopener">' +
+      (isGame ? '게임 요구사양 출처' : '작업 사양 출처') + '</a>' +
+      (it.checked_date ? ' · ' + esc(it.checked_date) + ' 확인' : ''));
+    if (g) src.push('<a href="' + esc(g.source_url) + '" target="_blank" rel="noopener">gpu_ladder 출처</a>' +
+      (g.checked_date ? ' · ' + esc(g.checked_date) + ' 확인' : ''));
+    if (!src.length) src.push('출처 미기록');
+
+    set('ev-body',
+      '<div class="gm-ev-cell">칸 ' + num(cell.cell_id) + '</div>' +
+      '<div class="gm-ev-desc">' + esc(cell.tier + ' · ' + cell.usage + ' · ' + cell.platform + ' · ' + nameOf(it)) + '</div>' +
+      '<div class="gm-ev-lines">' + lines + '</div>' +
+      '<div class="gm-ev-verdict" style="color:' + (OK_LEVELS[cell.match_level] ? 'var(--success-dark)' : 'var(--on)') + '">' +
+      '판정 ' + esc(cell.match_level) + ' (배치 판정값)</div>' +
+      '<div class="gm-ev-src">' + src.join('<br>') + '</div>');
+  }
+
+  // ── 조회 ───────────────────────────────────────────────────────
+  function selectionUrl() {
+    var p = [];
+    p.push((state.tab === 'games' ? 'game_id=' : 'workload_id=') + encodeURIComponent(state.itemId));
+    if (state.filters.usage) p.push('usage=' + encodeURIComponent(state.filters.usage));
+    if (state.filters.platform) p.push('platform=' + encodeURIComponent(state.filters.platform));
+    if (state.filters.level) p.push('level=' + encodeURIComponent(state.filters.level));
+    return '/api/admin/game-matrix?' + p.join('&');
+  }
+
+  function loadSelection() {
+    if (state.itemId == null) { state.sel = null; renderSelection(); renderEvidence(); return; }
+    getJson(selectionUrl()).then(function (d) {
+      state.base = d;                 // 목록·요약도 최신 응답으로 갱신한다(같은 페이로드)
+      state.sel = d.selection;
+      state.cellId = null;
+      renderMeta(); renderList(); renderSkips();
+      renderSelection(); renderEvidence();
+    }).catch(failed);
+  }
+
+  function pickFirst() {
+    var list = items();
+    state.itemId = list.length ? idOf(list[0]) : null;
+  }
+
+  // ── 이벤트 ─────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    if (action === 'tab') {
+      var tab = t.getAttribute('data-tab');
+      if (tab === state.tab) return;
+      state.tab = tab;
+      document.querySelectorAll('.gm-seg button').forEach(function (b) {
+        b.setAttribute('aria-selected', b.getAttribute('data-tab') === tab ? 'true' : 'false');
+      });
+      state.filters.level = '';
+      state.cellId = null;
+      renderFilters();
+      if (renderBlocked()) { renderList(); renderSkips(); state.sel = null; renderSelection(); renderEvidence(); return; }
+      pickFirst(); renderList(); renderSkips(); loadSelection();
+    } else if (action === 'pick') {
+      var id = Number(t.getAttribute('data-id'));
+      if (id === state.itemId) return;
+      state.itemId = id; state.cellId = null;
+      renderList(); loadSelection();
+    } else if (action === 'cell') {
+      var cid = Number(t.getAttribute('data-cell-id'));
+      state.cellId = state.cellId === cid ? null : cid;
+      renderSelection(); renderEvidence();
+    }
+  });
+
+  document.addEventListener('change', function (e) {
+    var t = e.target.closest('[data-action="filter"]');
+    if (!t) return;
+    state.filters.usage = $('f-usage').value;
+    state.filters.platform = $('f-platform').value;
+    state.filters.level = $('f-level').value;
+    state.cellId = null;
+    loadSelection();
+  });
+
+  // 바깥 클릭 = 칸 선택 해제. 사이드바·필터·표·패널은 `data-keep` 이라 풀리지 않는다.
+  document.addEventListener('mousedown', function (e) {
+    if (state.cellId == null) return;
+    if (e.target.closest('[data-keep]')) return;
+    state.cellId = null;
+    renderSelection(); renderEvidence();
+  });
+
+  // ── 최초 로드 ──────────────────────────────────────────────────
+  getJson('/api/admin/game-matrix').then(function (d) {
+    state.base = d;
+    renderMeta(); renderFilters(); renderList(); renderSkips();
+    if (renderBlocked()) return;
+    pickFirst(); renderList(); loadSelection();
+  }).catch(failed);
+})();
+</script>
+{% endraw %}
+{% endblock %}
