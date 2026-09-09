@@ -34,6 +34,7 @@ from . import access_gate   # 접근 게이트의 단일 원천 — 열쇠 생�
 from . import llm       # LLM 호출의 단일 원천 — 이 파일에서 프로바이더를 직접 부르지 않는다
 from . import visitor
 from .catalog_map import gpu_chipset_key   # 「부품」(GPU 칩셋) 핀 정책 — 단일 원천(A-101)
+from .catalog_map import cpu_bundled_cooler   # CPU 기본 쿨러 판정 — 단일 원천(2026-09-09)
 from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정의를 그대로 쓴다(새로 만들지 않는다)
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
@@ -148,12 +149,18 @@ def _rules_for_active(rules: dict, reused) -> tuple:
     return active, unknown
 
 
-def applied_rule_count(rules: dict) -> int:
+def applied_rule_count(rules: dict, cooler_omitted: bool = False) -> int:
     """한 구성에 **실제로 걸리는** 검사 수 — 등록 규칙 수와 다르다.
 
     등록은 9종인데 그중 둘은 쿨러 방식에 따라 **배타적**이다:
     쿨러 높이(공랭 전용)와 라디에이터(수랭 전용). 한 구성의 쿨러는 하나뿐이라
-    둘 중 하나만 걸린다 — 그래서 **어떤 구성도 9종을 다 통과하지 않고 항상 8종이다.**
+    둘 중 하나만 걸린다 — 그래서 **보통 구성은 9종을 다 통과하지 않고 8종이다.**
+
+    ⚠ CPU 기본 쿨러 생략(2026-09-09)은 **세 번째 경우**다 — COOLER 슬롯 자체가
+    없으면 slot="COOLER"인 규칙(cooler_socket·cooler_tdp 등 제한 없는 규칙 포함)도
+    "해당 없음"이라 아예 안 걸린다. `cooler_omitted=True`면 그 슬롯을 통째로 뺀다
+    (recommend.py의 build_compat이 COOLER 관련 규칙을 걷어내는 것과 같은 판단 —
+    §단일 원천, 새 판정 술어를 다시 적지 않는다).
 
     첫 화면이 "호환성 9종 통과"라고 말하면 S2·S3 가 같은 견적을 "8종"이라 말한다.
     두 화면이 서로 다른 말을 하는 것은 '호환성 5종'과 같은 종류의 거짓이고,
@@ -164,7 +171,9 @@ def applied_rule_count(rules: dict) -> int:
     8을 상수로 박지 않는 이유 — 규칙은 이미 8종에서 9종으로 한 번 늘었다.
     """
     n = 0
-    for _slot, rs in rules.items():
+    for slot, rs in rules.items():
+        if cooler_omitted and slot == "COOLER":
+            continue
         free = [r for r in rs if not r.get("part_types")]
         limited = [r for r in rs if r.get("part_types")]
         best = 0
@@ -646,6 +655,40 @@ def _explain_spec(p: dict) -> dict:
     return out
 
 
+# ---- CPU 기본(번들) 쿨러 (2026-09-09 사장님 확정) ----
+# 상품명이 쿨러 포함을 «명시»한 CPU를 골랐을 때, 그 기본 쿨러로 충분한 TDP면 쿨러 자리를
+# 비운다 — 고객이 필요 없는 쿨러를 사지 않게 하는 것이고, 총액은 그만큼 줄어든다.
+#
+# 판정은 **한 곳**에서만 한다: 「이 CPU가 쿨러를 끼워 주는가」는 `catalog_map.
+# cpu_bundled_cooler`(상품명 표현), 「그 쿨러로 충분한가」는 아래 임계 하나다. 이 술어를
+# 화면·카운터·다른 모듈에 다시 적지 않는다(§단일 원천 — 두 곳에 적으면 언젠가 갈라져
+# 「쿨러 없는 견적」과 「쿨러 있는 판정」이 한 화면에서 동시에 나온다).
+CPU_BUNDLED_COOLER_TDP = 100   # 이 값 미만이면 기본 쿨러로 충분하다고 본다(사장님 확정)
+
+
+def _bundled_cooler(chosen: dict):
+    """(근거 문구, 쿨러 자리를 비울까) — CPU가 정해진 뒤에만 답할 수 있는 판정.
+
+    셋으로 갈린다. **셋 다 근거를 남긴다** — 쿨러가 빠진 것도, 「포함이라는데 왜 또 넣었나」도
+    고객이 물을 수 있는 자리라 서버가 답을 적어 보낸다(§화면 정직성 — 서버가 준 근거를
+    화면이 그대로 쓴다).
+        TDP < 임계   기본 쿨러로 충분 -> 쿨러 자리를 비운다(총액이 그만큼 준다)
+        TDP >= 임계  기본 쿨러는 있지만 성능 유지에 부족 -> 지금대로 별도 쿨러
+        TDP 미확인   «모르는 것을 지어내지 않는다» -> 별도 쿨러(안전한 쪽) + 그 사실을 밝힌다
+    """
+    cpu = chosen.get("CPU")
+    if cpu is None or "COOLER" not in chosen:
+        return None, False   # 재사용·미선택으로 CPU나 쿨러 자리가 없으면 판정할 것이 없다
+    if not cpu_bundled_cooler(cpu.get("product_name")):
+        return None, False   # 명시가 없으면 지금 동작 그대로 — 추론하지 않는다
+    tdp = cpu.get("tdp_watt")
+    if tdp is None:
+        return "기본 쿨러 포함 CPU이나 TDP 미확인 — 확인 전까지 별도 쿨러 포함", False
+    if tdp < CPU_BUNDLED_COOLER_TDP:
+        return f"CPU 기본 쿨러 사용 (TDP {tdp}W — 기본 쿨러로 충분)", True
+    return f"기본 쿨러 포함 CPU이나 TDP {tdp}W — 성능 유지용 별도 쿨러 추가", False
+
+
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
                active_slots=None, unknown_rules=None, reuse_note=None, meta=None,
                alloc_capped=True):
@@ -699,6 +742,32 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         meta["exhausted"] = exhausted
     if chosen is None:
         return None
+    # ── CPU 기본 쿨러 (2026-09-09) ────────────────────────────────────────────
+    # **탐색이 끝난 뒤에** 판정한다 — 어떤 CPU가 뽑히는지는 DFS가 정하기 때문이다.
+    # 그래서 이 구성은 "쿨러까지 호환되는 조합"으로 이미 검증된 것이고, 우리는 그중
+    # 쿨러 하나를 «사지 않기로» 하는 것이다(총액은 그 가격만큼 준다 — 사장님 확정 문구
+    # "총액에서 쿨러 가격만큼 절약된다" 그대로). ⚠ 한계: 쿨러 후보가 아예 없으면 DFS가
+    # 그전에 실패하므로, 기본 쿨러 CPU라도 이 자리는 "쿨러가 없어 견적 불가"가 된다 —
+    # 카운터(`/api/candidates/count`)의 빈 슬롯 판정과 «같은 답»이라 둘이 어긋나지는
+    # 않는다(카운터가 buildable=false를 낼 때 엔진도 None이다).
+    cooler_note, drop_cooler = _bundled_cooler(chosen)
+    out_slots = slots            # 견적서에 실제로 실리는 자리
+    compat_rules = rules         # 호환 판정에 쓸 규칙(쿨러를 빼면 쿨러 규칙도 뺀다)
+    omitted = []
+    if drop_cooler:
+        chosen = {s: p for s, p in chosen.items() if s != "COOLER"}
+        out_slots = [s for s in slots if s != "COOLER"]
+        # 쿨러를 겨냥하거나 쿨러를 비교 상대로 삼는 규칙은 «해당 없음»이다 — 별도 쿨러가
+        # 없으니 검사할 대상 자체가 없다(build_compat이 공랭 구성에서 라디에이터 규칙을
+        # 빼는 것과 같은 처리). 남겨 두면 chosen에 없는 키를 읽어 KeyError로 죽는다.
+        compat_rules = {s: rs for s, rs in rules.items() if s != "COOLER"}
+        compat_rules = {s: [r for r in rs if r["ref_slot"] != "COOLER"]
+                        for s, rs in compat_rules.items()}
+        # 「의도적으로 비었다」와 「후보가 없어 비었다」는 다른 사실이다(§화면 정직성).
+        # reused(쓰시던 부품)와도 다르다 — 그래서 세 번째 자리를 따로 만든다. 항상 이
+        # 키를 두어 화면이 undefined 가드를 짜지 않게 한다(pinned·reused와 같은 관례).
+        omitted = [{"slot": "COOLER", "label": SLOT_KO.get("COOLER", "COOLER"),
+                    "reason": "cpu_bundled_cooler", "note": cooler_note}]
     total = sum(p["sale_price"] for p in chosen.values())
     verdict = "none" if cap is None else ("within" if total <= cap else "over")
     # 「최고 사양」은 가성비의 옛 「최저가」와 정확히 대칭인 과장이었다(2026-08-24 정정) —
@@ -722,7 +791,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         "highend": [f"예산의 {HIGHEND_CAP_X:g}배까지 허용한 가격 {order_ko} 첫 성립 조합"
                     f"({alloc_txt} — 초과분은 아래에 정직 표기)"],
     }[tier]
-    reasons = reasons + [n for n in (floor_note, relax_note, reuse_note) if n]
+    reasons = reasons + [n for n in (floor_note, relax_note, reuse_note, cooler_note) if n]
     # market_price 배선(A-100 · 공유 계약 ②) — 몰 최저가 비교 재료.
     # ⚠ 실측(2026-08-23, 이 물결 조사): `products.market_price`는 컬럼 자체는 NULL이
     # 거의 없지만(재고 후보 3,059건 중 NULL 1건) **값이 있는 행도 거의 전부 0**이다
@@ -744,7 +813,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     # 같은 7개끼리 비교하면 실제로는 5,910원 "더 쌌다"(§화면 정직성 위반 — 시세
     # 없는 부품 하나가 통째로 우리 쪽에만 더해져 실제보다 훨씬 비싸 보이는 방향으로
     # 틀렸다). market_total이 null이면 market_compare_total도 null.
-    market_pairs = [(_mp(chosen[s]), chosen[s]["sale_price"]) for s in slots]
+    market_pairs = [(_mp(chosen[s]), chosen[s]["sale_price"]) for s in out_slots]
     market_vals = [mp for mp, _ in market_pairs]
     market_present = [mp for mp, _ in market_pairs if mp is not None]
     compare_present = [sp for mp, sp in market_pairs if mp is not None]
@@ -755,9 +824,9 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                    "price": chosen[s]["sale_price"], "maker": chosen[s].get("maker"),
                    "market_price": _mp(chosen[s]),
                    "spec": _explain_spec(chosen[s]), "tags": _pref_tags(chosen[s])}
-                  for s in slots],
+                  for s in out_slots],
         "total": total,
-        "compat": build_compat(chosen, rules, unknown_rules or ()),
+        "compat": build_compat(chosen, compat_rules, unknown_rules or ()),
         "budget": {"cap": cap, "verdict": verdict,
                    "over_by": max(0, total - cap) if cap is not None else 0},
         "totals": {"market_total": sum(market_present) if market_present else None,
@@ -772,7 +841,11 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         # 여부를 또 다른 곳에서 재판정하지 않는다(§단일 원천, active_slots가 이미 정답).
         "reused": [{"slot": s, "label": SLOT_KO.get(s, s),
                     "note": "쓰시던 부품을 사용합니다 - 이 견적에 포함되지 않았습니다"}
+                   # `slots`(원래 채우기로 한 자리)를 기준으로 본다 — `out_slots`로 보면
+                   # 기본 쿨러로 «빼기로 한» 자리가 「쓰시던 부품」으로 둔갑한다.
                    for s in SLOTS if s not in slots],
+        # 엔진이 «일부러» 뺀 자리 — 재사용도 아니고 후보가 없는 것도 아니다(2026-09-09).
+        "omitted": omitted,
         "reasons": reasons,
     }
 
@@ -884,7 +957,13 @@ def showcase():
         # **화면이 '통과'와 함께 말하는 숫자는 rules_applied 다** — 배타 규칙 때문에
         # 어떤 구성도 등록 수 전부를 통과하지 않는다(위 applied_rule_count 주석).
         "rules": sum(len(v) for v in rules.values()),
-        "rules_applied": applied_rule_count(rules),
+        # pick이 실제로 COOLER 슬롯을 안 갖고 있으면(CPU 기본 쿨러 생략) 그 규칙들도
+        # "해당 없음"이라 적용 수에서 뺀다 — 그래야 화면이 말하는 수가 이 구성이 실제로
+        # 통과한 검사 수와 일치한다(§화면 정직성).
+        "rules_applied": applied_rule_count(
+            rules,
+            cooler_omitted=bool(pick and not any(
+                i.get("part_type") == "COOLER" for i in pick.get("items", [])))),
         "usage": SHOWCASE["usage"], "budget_label": SHOWCASE["budget"],
         "source": source,                   # recent = 실제 견적 · built = 지금 만든 것
         "pick": pick,

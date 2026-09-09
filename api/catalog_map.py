@@ -186,6 +186,38 @@ def is_sodimm(raw: str) -> bool:
     return bool(NB_ONLY.search(cls)) and not PC_ALSO.search(cls)
 
 
+# CPU 기본(번들) 쿨러 — 상품명이 **스스로 밝힌 것만** 인정한다 (2026-09-09 사장님 확정).
+#
+# 왜 「명시 표현만」인가: 여기서 True를 잘못 내면 견적에서 쿨러 자리가 통째로 빠진다 —
+# 고객이 받는 것은 **조립할 수 없는 구성**이다(§데이터 「선호 태그」의 추론 금지와 같은
+# 원칙이지만 실패 비용이 더 크다). 그래서 방향이 비대칭이다: 못 알아보면 쿨러를 그냥
+# 넣으면 되지만(지금 동작 그대로), 잘못 알아보면 되돌릴 방법이 없다.
+#
+#   · '정품'으로 추론하지 않는다 — 인텔 K/KF·AMD 일부 정품은 쿨러가 «없다».
+#   · '정품쿨러' 같은 표현도 위 세 계열에 없으면 False로 둔다 — 쿨러를 한 개 더 사는
+#     쪽은 조립이 되고, 빼는 쪽은 안 된다. 넓히려면 실측 후 이 목록에 «명시»로 추가한다.
+CPU_COOLER_EXCLUDED = re.compile(r"쿨러\s*미\s*포함|쿨러\s*없음|미포함\s*쿨러")
+CPU_COOLER_BUNDLED = re.compile(
+    r"쿨러\s*포함"          # "쿨러포함" · "쿨러 포함"
+    r"|\+\s*쿨러"           # "벌크+쿨러RS1" — 상품명이 «더해서 준다»고 적은 형태
+    r"|동판\s*쿨러"         # "동판쿨러RM1"
+    r"|쿨러\s*[A-Za-z]{1,3}\s?\d",   # "쿨러RS1" · "쿨러RM1" — 쿨러 모델명이 붙은 형태
+    re.I)
+
+
+def cpu_bundled_cooler(product_name: str) -> bool:
+    """CPU 상품명이 **기본(번들) 쿨러 포함을 명시**하는가 — 견적 엔진의 단일 원천.
+
+    ⚠ **'미포함'을 «먼저» 본다.** "AMD 라이젠5-5세대 7500F ... 쿨러미포함"은 '쿨러'라는
+    글자를 갖고 있어서, 포함 쪽 패턴을 먼저 돌리는 순간 오판할 수 있는 실제 사고 지점이다
+    (그 오판의 결과가 「쿨러 없는 견적」 = 조립 불가). 순서가 곧 안전장치라 바꾸지 않는다.
+    """
+    name = product_name or ""
+    if CPU_COOLER_EXCLUDED.search(name):
+        return False
+    return bool(CPU_COOLER_BUNDLED.search(name))
+
+
 def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):
     """(part_type, category_group, skip_reason) — 분류 판정 + 중고 표시로 후보 제외.
 

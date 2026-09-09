@@ -391,7 +391,15 @@ def test_engine():
             check(f"[{lab}·{tier}] 부품 가격 합 = 총액",
                   sum(i["price"] for i in st["items"]) == st["total"],
                   sum(i["price"] for i in st["items"]), st["total"])
-            check(f"[{lab}·{tier}] 슬롯 8개 구성", len(st["items"]) == 8, 8, len(st["items"]))
+            # 슬롯 수 = 8개, 다만 CPU 기본 쿨러 생략(2026-09-09)이면 7개다 — 고정값이
+            # 아니라 "COOLER가 빠졌으면 그 사실이 omitted에 근거와 함께 남아 있다"는
+            # 관계식으로 본다(§화면 정직성 — 왜 빠졌는지 말 없이 그냥 줄지 않는다).
+            n = len(st["items"])
+            omitted = st.get("omitted") or []
+            cooler_omitted = any(o.get("slot") == "COOLER" and o.get("note") for o in omitted)
+            check(f"[{lab}·{tier}] 슬롯 8개 구성(쿨러 생략 시 7개 + 근거)",
+                  n == 8 or (n == 7 and cooler_omitted),
+                  "8 또는 (7 + 쿨러 생략 근거)", f"{n}개, omitted={omitted}")
 
     # 티어 서열 — 가성비 <= 추천 <= 고성능. 재고가 어떻게 바뀌어도 성립해야 한다.
     for lab, s in (("70만", s70), ("100만", s100), ("150만", s150), ("캡없음", sopen)):
@@ -953,13 +961,24 @@ def test_compat():
             _bad.append(f"{_n}: 짝 없는 닫는 태그 {_C(_st.stray).most_common(2)}")
     check("관리자 화면 구조 감사(푸터·id 중복·끊긴 참조·태그)", not _bad, "이상 없음", _bad)
 
-    compat = rec("100만원")["value"]["compat"]
+    _rset = rec("100만원")["value"]
+    compat = _rset["compat"]
     keys = {c["key"] for c in compat["checks"]}
     akeys = {r["key"] for r in active}
     # 1:1은 **적용 부품이 지정되지 않은 규칙**에서만 성립한다. 종류를 좁힌 규칙은 어떤
     # 부품이 뽑혔느냐에 따라 빠질 수 있다(수랭 구성엔 '쿨러 높이 여유'가 없는 게 정상).
     # 개수를 맞추는 검사는 티어가 수랭을 고르는 순간 무작위로 실패한다.
-    always = {r["key"] for r in active if not (r.get("part_types") or [])}
+    #
+    # CPU 기본 쿨러 생략(2026-09-09)도 같은 부류다 — COOLER 슬롯 자체가 없는 구성에서는
+    # 대상이 COOLER인 규칙(cooler_socket·cooler_tdp)도 "해당 없음"이지 "누락"이 아니다.
+    # /api/admin/engine-rules 응답에는 slot 필드가 없다 — rule 문자열이 "COOLER.xxx"로
+    # 시작하는 것이 대상 슬롯을 말해 준다(compat_rules.slot='COOLER'와 같은 사실 —
+    # §단일 원천, API 표현만 다르다).
+    # 이걸 안 빼면 쿨러 생략 티어를 뽑을 때마다 이 검사가 무작위로 실패한다(수랭과 같은 병).
+    _cooler_omitted = any(o.get("slot") == "COOLER" for o in (_rset.get("omitted") or []))
+    always = {r["key"] for r in active
+              if not (r.get("part_types") or [])
+              and not (_cooler_omitted and str(r.get("rule", "")).startswith("COOLER."))}
     check("근거는 활성 규칙에서만 나온다", keys <= akeys, "부분집합", sorted(keys - akeys))
     check("적용 부품 제한 없는 규칙은 근거에 전부 있다", always <= keys,
           "누락 없음", sorted(always - keys))
@@ -4745,13 +4764,22 @@ def test_usage_floors():
     check("적용 수 <= 등록 수", (sc.get("rules_applied") or 0) <= sc["rules"],
           "<= %s" % sc["rules"], sc.get("rules_applied"))
     # **실제 견적이 돌린 검사 수와 같아야 한다** — 이 한 줄이 두 화면을 붙들어 둔다.
+    # ⚠ CPU 기본 쿨러 생략(2026-09-09) 이후로는 티어마다 검사 수가 다를 수 있다
+    # (쿨러 슬롯이 있는 티어는 8, 생략된 티어는 그보다 적다 — 정당한 차이,
+    # applied_rule_count의 cooler_omitted 분기와 같은 사실). 그래서 "전 티어가 같은
+    # 수"가 아니라 "showcase가 뽑은 pick과 같은 쿨러 유무를 가진 티어들끼리는 같은 수"로
+    # 관계식을 좁힌다 — showcase의 rules_applied 자체가 pick 기준으로 계산되기 때문이다.
     _q = post("/api/recommend", {"mode": "guided",
                                  "constraints": [{"l": "용도", "v": "게임"},
                                                  {"l": "예산", "v": "150만원"}]})[1]
     _tiers = (_q or {}).get("sets") or {}
+    _pk_has_cooler = bool(sc.get("pick") and any(
+        i.get("part_type") == "COOLER" for i in sc["pick"].get("items", [])))
     _counts = sorted({len(v["compat"]["checks"]) for v in _tiers.values()
-                      if isinstance(v, dict) and v.get("compat")})
-    check("적용 수 = 실제 견적이 돌린 검사 수",
+                      if isinstance(v, dict) and v.get("compat")
+                      and bool(any(i.get("part_type") == "COOLER"
+                                   for i in v.get("items", []))) == _pk_has_cooler})
+    check("적용 수 = 실제 견적이 돌린 검사 수(같은 쿨러 유무 티어 기준)",
           _counts != [] and all(c == sc.get("rules_applied") for c in _counts),
           sc.get("rules_applied"), _counts)
 
