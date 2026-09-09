@@ -104,7 +104,7 @@
 
 | # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
 |---|------|----------------|--------|------|
-| 2 | **상품 분류 관리** | [req-product-category.md](req-product-category.md) | `dc-product-category.html` | **지음** (`/admin2/categories` · ADM-CAT-010) |
+| 2 | **상품 분류 관리** | [req-product-category.md](req-product-category.md) | `dc-product-category.html`(구) · `dc-product-unified-admin.html`(신) | **지음 — 2026-09-09 v2로 교체**(`/admin2/categories-v2` · ADM-CAT-011 가칭, 정본). 구 `/admin2/categories`(ADM-CAT-010)는 P-09 동결 — 파일 보존, 신규 링크 금지 |
 | 3 | **상품 관리** | [req-products.md](req-products.md) | `dc-products-3안.html` | **지음**(`/admin2/products` · ADM-PRD-010 · UX-23 → 1a 탭형 서랍. **2026-08-28 기록자 정정 — 「재구축 대기」(=착수 전)는 낡은 정도가 아니라 사실과 반대였다.** 재구축 자체는 커밋 `cbb124c`(2026-08-15, 「상품 관리 화면 재구축(dc-products-3안 1a) + 중복 판정 결함 4건」)로 끝났고, 그 뒤로도 공급처 정보 배선·상품명 HTML 태그 제거(`4eb7adb`, 2026-08-27)까지 계속 기능이 붙었다. 셸 CSS 특정성 사고 방어 수정 — `.pp-btn-line`, 검수 대기 상품 상세 서랍에서만 렌더돼 무증상이었다. 커밋 `77121d6`+`fbb9b61`. 확인법: `git log --oneline -- templates/admin/products.html.j2`) |
 | 4 | **상품 분류 매핑** | [req-product-category-map.md](req-product-category-map.md) | `dc-product-category-map.html` | **지음** (`/admin2/category-mapping`) |
 | 5 | **상품 일괄 등록** | [req-product-bulk-import.md](req-product-bulk-import.md) | `dc-product-bulk-import.html` | **지음** (`/admin2/catalog-import` · ADM-CSV-010 · UX-21 → 1b · 라우트·템플릿 커밋 `82a55a1` · ⚠⚠ owner 업로드가 영구히 잠기던 결함 수정(셸 스크립트 중복 로드로 `window.Admin2Shell` 인스턴스가 둘 생겨 권한 갱신이 안 됐다, 커밋 `08541f7`) · 확인자 재검증 통과(`script[src]` 정확히 2개 · 잠금 문구 사라짐 · 파일 입력 3개 열림 · `canWrite('owner')===true`) · 메뉴 연결 `9fdae6d`) |

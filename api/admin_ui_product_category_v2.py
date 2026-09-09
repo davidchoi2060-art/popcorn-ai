@@ -1,9 +1,10 @@
 """상품 분류 관리 신규 화면(ADM-CAT-011 가칭) — `api/main.py`가 자동으로 싣는다.
 
-**기존 `/admin2/categories`(ADM-CAT-010, `api/admin_ui_product_category.py`)는 그대로
-둔다** — 이 화면은 그 옆에 별도로 짓는 신규 시안이다. 검증이 끝나면 사장님이 어느
-쪽을 남길지 정한다(지시서 원문). 그때까지 두 화면은 **같은 백엔드**를 공유한다 —
-`api/admin_categories.py`에 새 API를 추가하지 않았다.
+■★ 정본 확정(2026-09-09 사장님 지시) — LNB("상품관리" > "상품 분류 관리")가
+  이제 이 화면(`/admin2/categories-v2`)을 가리킨다. 구 `/admin2/categories`
+  (ADM-CAT-010, `api/admin_ui_product_category.py`)는 P-09 동결 — 그대로
+  남지만 수정·신규 링크 금지. 두 화면은 **같은 백엔드**를 공유한다 —
+  `api/admin_categories.py`에 새 API를 추가하지 않았다.
 
 ■ 참고한 승인 디자인 — `docs/design/incoming/dc-product-unified-admin.html`의
   `isCategory` 블록(카테고리 관리 부분만). 그 파일의 DEMO 데이터(의류·식품)는

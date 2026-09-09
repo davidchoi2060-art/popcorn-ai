@@ -286,7 +286,7 @@ NAV = [
     ]),
 
     ("상품관리", "box", [
-        ("상품 분류 관리", "/admin2/categories", None),
+        ("상품 분류 관리", "/admin2/categories-v2", None),   # 2026-09-09 신규(v2)로 교체 — 구 /admin2/categories(ADM-CAT-010)는 P-09 동결
         ("상품 관리", "/admin2/products", None),
         ("상품 분류 매핑", "/admin2/category-mapping", None),
         ("상품 일괄 등록", "/admin2/catalog-import", None),

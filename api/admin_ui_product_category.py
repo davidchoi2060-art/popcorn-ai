@@ -1,5 +1,11 @@
 """상품 분류 관리(ADM-CAT-010) 페이지 라우트 — `api/main.py`가 자동으로 싣는다(§discovery).
 
+■★ P-09 동결(2026-09-09 사장님 지시) — LNB는 이제 이 화면이 아니라 v2를
+  가리킨다(`api/admin_nav.py`, `/admin2/categories-v2`). 이 파일·템플릿은
+  삭제하지 않고 그대로 둔다(비교·롤백 대비) — 다만 **수정 금지, 신규
+  링크·안내 금지**. 다음 사람이 이 화면을 고치려 하면 먼저 v2
+  (`api/admin_ui_product_category_v2.py`)로 갈지부터 확인한다.
+
 화면 자체는 `docs/design/dc-product-category.html`(사장님 Claude Design 승인 원안)을
 `templates/admin/product_category.html.j2`로 옮긴 것이다.
 
