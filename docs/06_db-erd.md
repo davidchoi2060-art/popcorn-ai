@@ -1536,3 +1536,154 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/admin/operators
 **남은 것은 ④ 관리자 화면(ADM-TLK-010) 하나다.** 그 화면은 §화면 작업의 경계에 따라
 **요구사항 정의서까지만** 나와 있다(`docs/design/req/req-talk-patterns.md`) — 배치·
 컴포넌트·색은 사장님이 주시는 승인 디자인이 정한다.
+## 20. [16차 개정] 상품 원본 관리 확장 — 몰 반출용 필드군 (2026-09-10, ADM-PRD-011, **적용 예정**)
+
+> 마이그레이션 `0081_product_origin_fields.py` · 계약 요약 `docs/design/spec-product-unified.md`
+> §4 사장님 확정 ② · 정의서 `docs/design/req/req-product-new.md` §④ (판정 전수표)
+> 결정 로그 미등재 — 이 개정 자체가 §4-② 실행이며, 등재는 기록자 몫(CLAUDE.md §팀 운용).
+
+### 20-A. 왜 생겼나
+
+통합 상품관리 v6 승인 디자인(`docs/design/incoming/dc-product-unified-admin.html`)의
+등록 폼 12섹션을 현행 스키마와 전수 대조한 결과(req-product-new.md §④), 31항목이
+"표 신설 필요"였다. 이 화면의 성격은 **몰(팝콘PC 윈윈)로 내보낼 상품 원본 관리**로
+확정됐다(spec-product-unified.md §4-②) — 팝콘AI가 직접 판매하지 않는다는 결정
+(2026-08-11)은 유지되며, 이 필드군은 "우리가 배송·혜택을 수행한다"가 아니라
+**"몰에 실어 보낼 값을 여기서 관리한다"**는 뜻이다.
+
+### 20-B. 설계 판단 — 이 개정에서 하네스가 정한 것 (사장님 결정 대기가 아닌 것만)
+
+정의서 §「사장님 결정이 필요한 지점」 11건 중 **스키마 형태 자체**에 관한 것만
+이 개정에서 판단했다. 값의 의미·정책(분류 필수 여부·SKU 발번 정책 등)은
+그대로 열어 둔다 — 표를 만드는 것과 그 표를 어떻게 쓸지는 다른 결정이다.
+
+| 판단 | 근거 |
+|---|---|
+| 「정상가」= `products.list_price` **신규 컬럼** (기존 `market_price` 재사용 안 함) | 정의서 결정4 — `market_price`는 가격 검토 화면이 쓰는 시장 관측가. 재사용하면 두 화면이 서로 다른 의미로 같은 값을 흔든다 |
+| 옵션 재고(`product_options.option_stock`)는 **컬럼만 생성, 원장 연동은 보류** | `stock_qty = SUM(qty_delta)` 불변식(CANON §2-2)을 옵션 단위로 확장할지는 재고 정책 결정이라 이 개정 범위 밖. 컬럼에 주석으로 명시 |
+| 임시저장(draft)은 **표를 만들지 않는다** | 정의서 결정8이 저장 위치 3안(서버표/브라우저/미저장)을 열어 둔 채다 — 표부터 만들면 사실상 ㉮로 정하는 것이 된다 |
+| 다건 항목(이미지·옵션·추가상품·태그·채널)은 **별도 표**, 스칼라 항목은 `products` 컬럼 추가 | 기존 스키마 원칙(§1 "레이어 분리") — 1:N을 컬럼에 욱여넣지 않는다 |
+
+### 20-C. products 신규 컬럼 (스칼라 10종)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `supplier_product_code` | VARCHAR(80) | 공급사 상품코드. `danawa_code`·`supplier`(명칭)와 다른 축 |
+| `barcode` | VARCHAR(64) | GTIN/바코드 |
+| `is_visible` | BOOLEAN NOT NULL DEFAULT true | `status`(판매 가능 여부)와 별개 축 — 노출 on/off |
+| `min_order_qty` | INTEGER NOT NULL DEFAULT 1 | 1회 최소 구매수량 |
+| `tax_type` | VARCHAR(8) NOT NULL DEFAULT '과세' | `과세`·`면세`·`영세` |
+| `is_reserve_sale` | BOOLEAN NOT NULL DEFAULT false | 예약구매 |
+| `list_price` | INTEGER | 정상가(§20-B). `sale_price`와 같은 상한(0~100,000,000) |
+| `description_html` | TEXT | 상세설명 본문. `spec_source_text`(사양 추출용 원문)와 다른 것 |
+| `point_buy` | INTEGER NOT NULL DEFAULT 0 | 구매 적립 포인트 |
+| `point_review` | INTEGER NOT NULL DEFAULT 0 | 리뷰 적립 포인트 |
+
+CHECK: `tax_type IN ('과세','면세','영세')` · `min_order_qty >= 1` ·
+`list_price BETWEEN 0 AND 100000000`(NULL 허용) · `point_buy >= 0` · `point_review >= 0`.
+
+### 20-D. 신규 테이블 (다건 7종)
+
+**product_media** — 대표/추가 이미지·동영상 (1:N)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `media_id` | SERIAL PK | |
+| `product_code` | VARCHAR FK → products | |
+| `media_type` | VARCHAR(10) NOT NULL | `image`·`video` |
+| `role` | VARCHAR(10) NOT NULL | `main`·`sub` — `main`은 상품당 1건(부분 유니크) |
+| `url` | TEXT NOT NULL | |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | 추가 이미지 표시 순서 |
+| `created_at` | TIMESTAMPTZ NOT NULL DEFAULT now() | |
+
+부분 유니크 `uq_media_one_main`: `(product_code) WHERE role='main' AND media_type='image'`
+— 대표 이미지는 상품당 하나(원안 §04 "첫 장이 목록·상세 상단에 쓰인다").
+추가 이미지 9건 상한은 **DB 제약이 아니라 API 검증**(정의서 결정7 — 서버 규칙이 아직
+없다고 명시된 수치를 스키마에 하드코딩하지 않는다).
+
+**product_options** — 옵션 행 (1:N)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `option_id` | SERIAL PK | |
+| `product_code` | VARCHAR FK → products | |
+| `option_name` | VARCHAR(80) NOT NULL | 예: 색상 |
+| `option_value` | VARCHAR(80) NOT NULL | 예: 화이트 |
+| `extra_price` | INTEGER NOT NULL DEFAULT 0 | 추가금액 |
+| `option_stock` | INTEGER NOT NULL DEFAULT 0 | ⚠ **원장 미연동** — §20-B 참조 |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | |
+
+**product_addons** — 추가상품 (1:N)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `addon_id` | SERIAL PK | |
+| `product_code` | VARCHAR FK → products | |
+| `addon_name` | VARCHAR(120) NOT NULL | |
+| `addon_price` | INTEGER NOT NULL DEFAULT 0 | |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | |
+
+**product_shipping_policy** — 배송·반품/교환 (1:1, PK=product_code)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `product_code` | VARCHAR PK/FK → products | |
+| `ship_method` | VARCHAR(12) NOT NULL DEFAULT '택배' | `택배`·`직접배송`·`방문수령` |
+| `ship_fee` | INTEGER NOT NULL DEFAULT 0 | |
+| `free_ship_over` | INTEGER | NULL = 무료배송 기준 없음 |
+| `return_fee` | INTEGER NOT NULL DEFAULT 0 | |
+| `exchange_fee` | INTEGER NOT NULL DEFAULT 0 | |
+| `return_note` | TEXT | |
+
+**product_notice** — 상품정보제공고시·A/S (1:1, PK=product_code)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `product_code` | VARCHAR PK/FK → products | |
+| `notice_group` | VARCHAR(40) | 품목군. 선택지는 **API가 제공**(정의서 §④ 09 — 원안 마크업 상수를 그대로 옮기지 않는다) |
+| `origin` | VARCHAR(80) | 제조국. `products.data_origin`(데이터 출처 구분)과 **동명이의** — 컬럼명 충돌 피해 `origin` 유지하되 테이블이 다름 |
+| `warranty_note` | TEXT | 품질보증기준(자유 문구). `products.warranty_months`(정수 개월)와 **다른 것**(정의서 결정 — 뜻이 다름) |
+| `as_name` | VARCHAR(80) | A/S 책임자 |
+| `as_phone` | VARCHAR(20) | A/S 연락처 |
+| `remarks` | TEXT | 특이사항 |
+
+**product_channels** — 채널별 노출 (1:N)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `product_code` | VARCHAR FK → products | |
+| `channel` | VARCHAR(20) NOT NULL | 선택지는 API 제공(원안: 자사몰·네이버 스마트스토어·쿠팡) |
+| `is_enabled` | BOOLEAN NOT NULL DEFAULT true | |
+| PK | `(product_code, channel)` | |
+
+`orders.channel`(주문 유입 채널)과 **다른 것** — 이쪽은 노출 설정, 저쪽은 주문 원장.
+
+**product_channel_keywords** — 검색 태그·채널 키워드 (1:N)
+
+| 컬럼 | 형 | 비고 |
+|---|---|---|
+| `keyword_id` | SERIAL PK | |
+| `product_code` | VARCHAR FK → products | |
+| `channel` | VARCHAR(20) | NULL = 공통 키워드. 값 있으면 그 채널 전용(원안 §08 "공통을 채널로 복사, 복사 후 독립") |
+| `keyword` | VARCHAR(40) NOT NULL | |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | |
+
+`product_specs.tag_white`/`tag_rgb`/`tag_silent`(사양 플래그·선호 태그)와 **다른 것**
+— 저쪽은 호환·추천 엔진이 읽는 구조화 플래그, 이쪽은 검색·마케팅용 자유 키워드.
+채널별 상한(네이버 10·쿠팡 20 — 정의서 결정7)은 API 검증, DB 제약 아님.
+
+### 20-E. 정의서 판정과의 대조 (검증용)
+
+req-product-new.md §④ "✕ 표 신설 필요" 31항목 중 이 개정이 담은 것 30항목,
+**남긴 것 1항목** = 임시저장(draft, §20-B 근거로 의도적 보류).
+"△ 유사" 3항목 중 정상가는 §20-C로 해소, 나머지 둘(품질보증기준·카테고리 4단)은
+스키마 변경이 아니므로 이 개정 대상 아님(품질보증기준은 §20-D notice 표로 별도 컬럼
+확보, 카테고리 4단은 `categories` 인접목록이 이미 깊이 무제한이라 §19까지의 스키마로
+충분 — req-product-category-v2.md 소관).
+
+### 20-F. downgrade
+
+전부 신규 생성이라 역방향은 단순 DROP이다. 실사용 데이터가 들어간 뒤 downgrade하면
+그 데이터가 사라진다 — `grid_quotes`(§19-F)와 달리 이 표들은 아직 운영자가 쓴 값이
+없는 시점의 마이그레이션이라 원장 보존 예외를 두지 않는다. 데이터가 쌓인 뒤에는
+이 downgrade를 그대로 실행하지 않는다(DBA 소관 판단).
