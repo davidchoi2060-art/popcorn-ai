@@ -71,6 +71,7 @@ references/telegram_offset.json
 # docs/decisions/decision-log.md 의 A-31 후속 기록 참조.
 docs/상품다운_*.csv
 docs/상품다운_*.xlsx
+temp/
 
 # 되돌림 스냅샷 — DB 백필 도구가 바꾸기 «전» 값을 여기에 남긴다
 # (`tools/monitor_spec_backfill.py --rollback` 이 읽는다). 운영 데이터의 사본이라
