@@ -39,7 +39,33 @@
 
   data-screen-id/data-domain/빵부스러기/역할 표시는 공용 셸이 이미 렌더한다(요청 컨텍스트는
   api/admin_ui_products.py 가 그대로 준다) — 본문에서 다시 만들지 않는다(옛 버전은 <h2>로
-  같은 정보를 중복해서 그리고 있었다).
+  같은 정보를 중복해서 그리고 있었다.
+
+  ── 2026-09-10 개편(A-127, req-products.md ⑤-B 실측 판정 반영) ──────────────────
+  담당 파일은 이 템플릿과 api/admin_ui_products.py 뿐이다(api/admin_products.py = API 본체는
+  다른 담당). 원안(v6, dc-product-unified-admin.html)에 있고 현행에 없던 기능 8종 중 실측으로
+  "현행 API로 가능"인 것만 추가하고, 신설(컬럼·엔드포인트)이 필요한 것은 기능을 짓지 않고
+  파란 배지("[향후 사용예정]")로만 남긴다 — 화면이 되는 척하지 않는다.
+
+    추가함(전부 기존 GET /api/admin/products 파라미터·응답 필드만으로 배선):
+      · [상품 등록] — 목록 내 등록 서랍(POST /api/admin/products 직접 호출)을 걸어내고
+        /admin2/product-new(신설 화면, 다른 담당자가 동시에 짓는다)로 이동하는 링크로 교체.
+        이관 전 과도기 동안 이 화면에 등록 기능 자체가 없어지지만, 계약(A-127 ①)이 이미
+        그 화면을 "상품 등록/수정"으로 확정했고 지시가 "이미 있다고 가정하고 링크만 걸어라"다.
+      · 재고상태 필터 — req-products.md ⑤-B B-7 "부분가능" 판정 그대로: 4값(전체/재고
+        있음/재고 없음/10개 이하) 중 "재고 없음"만 기존 status=oos 파라미터로 이미 되므로
+        그 축을 그대로 재사용한다(상태 탭의 "재고 없음"과 **같은 서버 판정** — 별도 정의를
+        만들지 않는다. 두 원천이 같은 걸 다르게 말하면 안 된다, ④-B4 선례). "재고 있음"·
+        "10개 이하"는 GET /products에 조회 조건이 없어(B-7 "신설(파라미터)") 셀렉트에
+        disabled + 사유 텍스트로 남긴다(색만으로 비활성을 표시하지 않는다).
+      · [초기화](B-12) · 페이지당 건수 선택(B-13, API size 상한 500 기존) · 페이지 번호
+        버튼(B-14, 응답 page·pages 기존) · 되돌리기 [닫기](B-15) · 빈 상태 문구 2종 분리
+        (B-16, total===0 여부로 판정 — 서버 값, 화면이 세지 않는다).
+    배지만 남김(넣지 않음 — 신설 필요, `.pp-badge-future` 파란 배지 "[향후 사용예정]"):
+      CSV 내려받기(B-1) · 일괄 삭제(B-2, 일괄 엔드포인트 없음) · 일괄 노출/숨김(B-3, 노출
+      컬럼 자체가 없음) · 행 복사(B-4) · 서버 정렬(B-8, 지금 정렬은 여전히 "이 페이지
+      안에서만" — 그 사실을 배지 옆에 함께 밝힌다).
+    안 건드림: 상태 탭 5버킷·검색·분류 필터·서랍 4탭·일괄 상태변경 — 기존 배선 그대로.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -101,7 +127,21 @@
 .pp-btn-outline{font:600 10.5px/1 var(--font);color:var(--on);background:var(--card);
             border:1px solid rgba(0,0,0,.26);border-radius:5px;padding:8px 11px;cursor:pointer}
 .pp-btn-outline:hover{background:var(--container-low)}
+.pp-btn-outline:disabled{cursor:not-allowed;opacity:.5}
+.pp-btn-outline[disabled]:hover{background:var(--card)}
+/* 등록 이동 링크 — 버튼(.pp-btn-dark)과 같은 자리에 <a>로 앉는다. a 기본 밑줄·색 상속을
+   막아야 버튼처럼 보인다(위쪽 a.pp-btn-line 규칙과 같은 이유의 명시 규칙). */
+a.pp-btn-dark{color:var(--on-primary);text-decoration:none;display:inline-flex;align-items:center}
 .pp-filters-note{flex:none;padding:5px 18px 0;font:400 9.5px/1.5 var(--font);color:var(--rv-dim)}
+/* 2026-09-10 개편 — 신설 필요 판정(req-products.md ⑤-B)이라 넣지 않고 배지로만 남기는
+   기능 표시. 파란색 = "동작 아님·예정만" (경고 배지 pp-badge-warn과 색을 갈라 혼동 방지). */
+.pp-badge-future{display:inline-flex;align-items:center;font:600 9.5px/1 var(--font);
+    color:var(--rv-link);background:oklch(0.95 0.03 250);border:1px solid oklch(0.5 0.13 250 / .35);
+    border-radius:4px;padding:4px 7px;white-space:nowrap}
+.pp-soon-row{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:8px 18px 0}
+.pp-soon-row .lb{font:500 10.5px/1.4 var(--font);color:var(--rv-dim)}
+.pp-pager button.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary);cursor:default}
 
 /* 일괄 변경 바 */
 .pp-bulk{flex:none;margin:9px 18px 0}
@@ -314,16 +354,40 @@ a.pp-btn-line{color:var(--on)}
     <input id="fmfr" class="pp-select pp-mfr" type="text" list="fmfrList" autocomplete="off"
            placeholder="제조사 전체" aria-label="제조사 필터">
     <datalist id="fmfrList"></datalist>
+    {# 2026-09-10 개편 — req-products.md ⑤-B B-7 "부분가능" 판정 그대로 배선한다.
+       "재고 없음"만 기존 status=oos(상태 탭과 같은 서버 판정 — 재고 0 또는 상태 품절)를
+       재사용해 실제로 동작한다. "재고 있음"·"10개 이하"는 GET /products에 조회 조건
+       자체가 없어(B-7 "신설(파라미터)") 고를 수 없게 disabled + 라벨에 사유를 병기한다
+       (색에만 의존하지 않는다, MAKER-CHECKLIST §3). #}
+    <label class="visually-hidden" for="fstock">재고상태 필터</label>
+    <select id="fstock" class="pp-select" aria-label="재고상태 필터">
+      <option value="">재고상태 전체</option>
+      <option value="oos">재고 없음</option>
+      <option value="instock" disabled title="현재 조회 조건에 없습니다 — 신설 예정">재고 있음(향후 지원)</option>
+      <option value="low" disabled title="현재 조회 조건에 없습니다 — 신설 예정">10개 이하(향후 지원)</option>
+    </select>
+    <button type="button" class="pp-btn-outline" id="btnReset">초기화</button>
     <span class="pp-grow"></span>
     <button type="button" class="pp-btn-ghost" disabled aria-disabled="true"
             title="이 화면은 아직 admin2에 없습니다">매입 견적으로</button>
     <button type="button" class="pp-btn-ghost" disabled aria-disabled="true"
             title="이 화면은 아직 admin2에 없습니다">가격 검토로</button>
-    <button type="button" class="pp-btn-dark" id="btnNew">+ 상품 등록</button>
+    {# 2026-09-10 개편 — 목록 내 등록 서랍(POST /api/admin/products 직접 호출)을 걸어내고
+       상품등록/수정 화면(/admin2/product-new, A-127 ① 확정 · 신설 화면)으로 이동하는
+       링크로 바꾼다. 그 화면은 다른 담당자가 같은 물결에서 짓는다 — 이 파일은 링크만 건다. #}
+    <a class="pp-btn-dark" id="btnNew" href="/admin2/product-new">+ 상품 등록</a>
   </div>
-  <div class="pp-filters-note">등록·상세·수정이 이번 재구축으로 활성화됩니다 — 등록은 빈 분류
-    선택을 강제하고 유사 상품 검사(임계 0.97)를 거칩니다 · 매입 견적·가격 검토 이동은 대상
-    화면이 없어 비활성</div>
+  <div class="pp-filters-note">상품 등록은 상품등록/수정 화면(/admin2/product-new)에서 진행한다 ·
+    재고상태의 '재고 없음'은 상태 탭의 '재고 없음'과 같은 기준(재고 0 또는 상태 품절)이다 ·
+    매입 견적·가격 검토 이동은 대상 화면이 없어 비활성이다.</div>
+  <div class="pp-soon-row" data-keep="1">
+    <span class="lb">향후 지원 예정</span>
+    <span class="pp-badge-future">[향후 사용예정] CSV 내려받기</span>
+    <span class="pp-badge-future">[향후 사용예정] 일괄 삭제</span>
+    <span class="pp-badge-future">[향후 사용예정] 일괄 노출 / 숨김</span>
+    <span class="pp-badge-future">[향후 사용예정] 행 복사</span>
+    <span class="pp-badge-future">[향후 사용예정] 서버 정렬(현재는 이 페이지 안에서만 정렬)</span>
+  </div>
 
   <div class="pp-bulk" data-keep="1">
     <div id="bulkHintWrap"><span class="pp-bulk-hint">행을 선택하면 상태를 한 번에 바꿀 수 있습니다.</span></div>
@@ -336,6 +400,9 @@ a.pp-btn-line{color:var(--on)}
       <span class="pp-grow"></span>
       <span class="pp-bulk-result" id="bulkResult" role="status" aria-live="polite"></span>
       <button type="button" class="pp-btn-outline" id="btnUndo" hidden>↩ 되돌리기</button>
+      {# 2026-09-10 개편 — req-products.md B-15 "가능(화면 배선만)". 되돌리지 않고 안내만
+         닫는 자리 — 지금까지는 되돌리기 버튼뿐이라 안내를 지울 방법이 없었다. #}
+      <button type="button" class="pp-btn-outline" id="btnDismissUndo" hidden>닫기</button>
     </div>
   </div>
 
@@ -373,17 +440,6 @@ a.pp-btn-line{color:var(--on)}
     </div>
     <div class="pp-dr-body" id="drBody"></div>
     <div class="pp-dr-foot" id="drFoot"></div>
-  </aside>
-
-  <aside class="pp-drawer" id="regDrawer" data-keep="1" hidden role="dialog" aria-modal="true" aria-label="상품 등록">
-    <div class="pp-dr-head">
-      <div class="pp-dr-title-row">
-        <span class="pp-dr-title">상품 등록</span>
-        <button type="button" class="pp-dr-close" id="regClose" aria-label="닫기">✕</button>
-      </div>
-    </div>
-    <div class="pp-dr-body" id="regBody"></div>
-    <div class="pp-dr-foot" id="regFoot"></div>
   </aside>
 </div>
 {% endblock %}
@@ -542,6 +598,13 @@ a.pp-btn-line{color:var(--on)}
   var cur="all", q="", fcat="all", fmfr="all";
   var sortKey=null, sortDir=1;
   var SEL = {};
+  // 2026-09-10 개편 — 재고상태 필터(req-products.md ⑤-B B-7 "부분가능"). 서버에
+  // stockState라는 별도 파라미터가 없다 — 「재고 없음」은 상태 탭 "재고 없음"(status=oos)과
+  // **완전히 같은 서버 판정**이므로 새 축을 만들지 않고 cur 값 자체를 공유한다("oos"이면
+  // 이 select도 "oos"를 보이고, 반대로 이 select에서 "oos"를 고르면 cur를 "oos"로 바꾼다).
+  // 두 컨트롤이 같은 값을 다르게 말하는 상태(④-B4가 경고하는 "한 화면 두 원천")를
+  // 구조적으로 없앤다. "재고 있음"·"10개 이하"는 서버에 조회 조건 자체가 없어(신설
+  // 대상) <option disabled>로만 두고 고를 수 없게 한다.
   // 요청 #28 추가(2026-09-02) — 분류 관리 화면(product_category.html.j2)에서 "분류에
   // 묶인 상품 수"를 눌러 넘어올 때 쓰는 축. products.category_id(판매 분류)이고 위
   // fcat(part_type, 부품 종류)과는 다른 축이라 별개 상태로 둔다 — 섞으면 카테고리
@@ -597,8 +660,16 @@ a.pp-btn-line{color:var(--on)}
         + '<span>' + t.label + '</span><span class="n">' + (typeof n==="number"?n.toLocaleString("ko-KR"):n) + '</span></button>';
     }).join("") + '<span class="pp-tabs-note">탭 클릭 = 서버 재조회 — 배지와 행 수가 항상 일치합니다</span>';
     host.querySelectorAll("[data-k]").forEach(function(b){
-      b.onclick = function(){ if(cur===b.dataset.k) return; cur=b.dataset.k; PAGE=1; load(); };
+      b.onclick = function(){ if(cur===b.dataset.k) return; cur=b.dataset.k; PAGE=1; syncStockSelect(); load(); };
     });
+    syncStockSelect();
+  }
+  // 2026-09-10 개편 — 재고상태 필터와 상태 탭이 "재고 없음"을 같은 값(cur==="oos")으로
+  // 공유한다는 사실을 화면에도 반영한다: 탭에서 [재고 없음]을 누르면 이 select도
+  // "재고 없음"을 보이고, 다른 탭으로 가면 select는 "전체"로 돌아간다.
+  function syncStockSelect(){
+    var sel = document.getElementById("fstock"); if(!sel) return;
+    sel.value = (cur==="oos") ? "oos" : "";
   }
 
   var SORT_GETTERS = {
@@ -658,7 +729,16 @@ a.pp-btn-line{color:var(--on)}
       return;
     }
     var list = applySort(DATA);
-    if(!list.length){ host.innerHTML = '<div class="pp-empty">조건에 맞는 상품이 없습니다.</div>'; return; }
+    if(!list.length){
+      // 2026-09-10 개편 — req-products.md B-16 "가능"·⑦-A 빈 결과 2종 요구.
+      // 서버가 준 TOTAL(이 조회 조건의 전체 건수)이 0이고 **조회 조건이 전부 기본값**일
+      // 때만 "등록된 상품이 없습니다" — 그 밖(필터가 걸려 있는데 0건)은 "조회 조건에
+      // 맞는 상품이 없습니다". 두 문구 다 서버 TOTAL만 근거로 하고 화면이 수를 세지 않는다.
+      var noFilter = cur==="all" && q==="" && fcat==="all" && fmfr==="all" && !catId;
+      var msg = (TOTAL===0 && noFilter) ? "등록된 상품이 없습니다." : "조회 조건에 맞는 상품이 없습니다.";
+      host.innerHTML = '<div class="pp-empty">' + esc(msg) + '</div>';
+      return;
+    }
     host.innerHTML = list.map(rowHtml).join("");
     syncHeadCheckbox();
   }
@@ -669,6 +749,11 @@ a.pp-btn-line{color:var(--on)}
     head.checked = total>0 && sel===total;
     head.indeterminate = sel>0 && sel<total;
   }
+  // 2026-09-10 개편 — req-products.md B-13 "가능"(API size 이미 있음, 상한 500).
+  // 원안(v6)의 10/20/50은 그 화면의 데모 규모 기준이라 그대로 옮기지 않는다(⑥-B
+  // 경고 — 원안 수치를 그대로 옮기면 안 된다). 이 카탈로그는 23,151건 규모라
+  // 그 규모에 맞는 값(50/100/200/500)으로 고른다 — API 상한도 500이다.
+  var PAGE_SIZE_CHOICES = [50, 100, 200, 500];
   function renderPager(){
     var foot = document.getElementById("pgBar"); if(!foot) return;
     if(STATE!=="ok"){ foot.innerHTML=""; return; }
@@ -676,6 +761,12 @@ a.pp-btn-line{color:var(--on)}
     var to = Math.min(PAGE*SIZE, TOTAL);
     foot.innerHTML =
       '<span class="cnt">전체 <b>' + TOTAL.toLocaleString("ko-KR") + '</b>건 중 ' + from + '–' + to + '</span>'
+      + '<label class="visually-hidden" for="fsize">페이지당 건수</label>'
+      + '<select id="fsize" class="pp-select" aria-label="페이지당 건수">'
+      + PAGE_SIZE_CHOICES.map(function(n){
+          return '<option value="' + n + '"' + (n===SIZE?" selected":"") + '>' + n + '건씩</option>';
+        }).join("")
+      + '</select>'
       + '<div class="pp-pager">'
       + '<button type="button" id="pgPrev"' + (PAGE<=1?" disabled":"") + '>‹ 이전</button>'
       + '<span class="pp-pages">' + PAGE + ' / ' + PAGES + '</span>'
@@ -684,6 +775,8 @@ a.pp-btn-line{color:var(--on)}
     var pv=document.getElementById("pgPrev"), nx=document.getElementById("pgNext");
     if(pv) pv.onclick=function(){ if(PAGE>1){ PAGE--; load(); } };
     if(nx) nx.onclick=function(){ if(PAGE<PAGES){ PAGE++; load(); } };
+    var sz=document.getElementById("fsize");
+    if(sz) sz.onchange=function(e){ SIZE=Number(e.target.value)||100; PAGE=1; load(); };
   }
 
   /* ══════════════════════ 분류 필터 칩(요청 #28, 2026-09-02) ══════════════════════ */
@@ -730,6 +823,21 @@ a.pp-btn-line{color:var(--on)}
     PAGE=1; load();
   }
 
+  // 2026-09-10 개편 — req-products.md B-12 "가능(화면 배선만)". 조회 조건 전부를
+  // 기본값으로 되돌린다(⑥-A "조회 조건이 기본값이면 비활성" 요구는 클릭할 때마다
+  // 항상 안전하게 두 번 눌러도 무해하므로, 별도 disabled 계산 없이 항상 활성으로 둔다
+  // — 계산이 틀려 "눌러도 안 된다"가 되는 것보다 "이미 기본값인데 한 번 더 눌러도
+  // 그대로"인 편이 안전하다).
+  function resetFilters(){
+    cur="all"; q=""; fcat="all"; fmfr="all"; PAGE=1;
+    var qEl=document.getElementById("q"); if(qEl) qEl.value="";
+    var catEl=document.getElementById("fcat"); if(catEl) catEl.value="all";
+    var mfrEl=document.getElementById("fmfr"); if(mfrEl) mfrEl.value="";
+    clearCategoryFilter();   // load()까지 함께 호출한다 — 아래 별도 load() 불필요
+    loadMeta();
+    syncStockSelect();
+  }
+
   /* ══════════════════════ 일괄 상태 변경 + 되돌리기 ══════════════════════ */
   var MAX_BULK_HINT = 2000;   // 서버 상한(admin_products.MAX_BULK) — 문구 표시에만 쓴다, 클라이언트가 막지 않는다
   var BULK_UNDO_ID = null;
@@ -747,7 +855,18 @@ a.pp-btn-line{color:var(--on)}
     el.textContent = text || "";
     el.style.color = bad ? "var(--error)" : "";
   }
-  function showUndo(v){ var b=document.getElementById("btnUndo"); if(b) b.hidden=!v; }
+  // 2026-09-10 개편 — req-products.md B-15. 되돌리기 버튼과 [닫기]는 짝이다 — 방금
+  // 일괄 변경의 결과 안내(bulkResult)와 되돌릴 수단을 함께 보였다가, [닫기]는 되돌리지
+  // 않고 안내만 지운다(취소 아님 — 이미 반영된 변경은 그대로 둔다).
+  function showUndo(v){
+    var b=document.getElementById("btnUndo"); if(b) b.hidden=!v;
+    var d=document.getElementById("btnDismissUndo"); if(d) d.hidden=!v;
+  }
+  function dismissUndo(){
+    BULK_UNDO_ID = null;
+    setBulkResult("", false);
+    showUndo(false);
+  }
 
   function bulkApply(){
     var codes = Object.keys(SEL).map(Number);
@@ -817,13 +936,7 @@ a.pp-btn-line{color:var(--on)}
     if(veil) veil.hidden = !v;
     if(dr) dr.hidden = !v;
   }
-  function showVeilReg(v){
-    var veil=document.getElementById("veil"), dr=document.getElementById("regDrawer");
-    if(veil) veil.hidden = !v;
-    if(dr) dr.hidden = !v;
-  }
   function openDrawer(code){
-    closeRegDrawer();
     DRAWER.code=String(code); DRAWER.data=null; DRAWER.activeTab="basic";
     DRAWER.editing={basic:false, spec:false, supplier:false, parttype:false};
     DRAWER.partSel=null; DRAWER.partPreview=null;
@@ -1395,75 +1508,6 @@ a.pp-btn-line{color:var(--on)}
       }).catch(function(){});
   }
 
-  /* ══════════════════════ 신규 등록 서랍 ══════════════════════ */
-  var REG = {name:"", maker:"", supplier:"", partSel:null, similar:null};
-
-  function openRegDrawer(){
-    closeDrawer();
-    REG = {name:"", maker:"", supplier:"", partSel:null, similar:null};
-    showVeilReg(true);
-    renderRegDrawer();
-    var nm; window.setTimeout(function(){ nm=document.getElementById("regName"); if(nm) nm.focus(); }, 0);
-  }
-  function closeRegDrawer(){ showVeilReg(false); }
-  function similarBlockHtml(){
-    var items = REG.similar || [];
-    return '<div class="pp-impact"><b>이름이 거의 같은 상품이 있습니다</b> — 같은 상품이면 등록 대신 기존 상품을 수정하세요.'
-      + items.map(function(it){
-          return '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08)">'
-            + esc(Admin2Text.stripHtml(it.name)) + ' <span class="pp-dim-text">(' + esc(it.sku) + ' · 일치도 ' + Math.round(it.score*100) + '%)</span></div>';
-        }).join("") + '</div>';
-  }
-  // supplier(공급처 원문)는 products의 자유 텍스트 한 칸 — [공급처] 탭의 매입가 표와
-  // 다른 값이라 라벨을 "(원문)"으로 구분한다(같은 화면 안에서 합치지 않는다).
-  function renderRegDrawer(){
-    var host = document.getElementById("regBody"); if(!host) return;
-    host.innerHTML =
-      '<div class="pp-field"><span class="lb">상품명</span><input id="regName" type="text" value="' + esc(REG.name) + '" placeholder="상품명을 입력하세요"><span></span></div>'
-      + '<div class="pp-field"><span class="lb">분류</span><span id="regChoiceHost"></span><span></span></div>'
-      + '<div class="pp-field"><span class="lb">제조사</span><input id="regMaker" type="text" value="' + esc(REG.maker) + '" placeholder="제조사(선택)"><span></span></div>'
-      + '<div class="pp-field"><span class="lb" title="몰 CSV 원문 값 — [공급처] 탭의 매입가 표와는 다른 필드입니다">공급처(원문)</span><input id="regSupplier" type="text" value="' + esc(REG.supplier) + '" placeholder="공급처 원문(선택)"><span></span></div>'
-      + (REG.similar ? similarBlockHtml() : "")
-      + '<div class="pp-dr-hint">등록하면 검수 대기 상태로 시작하고 추천 후보에는 들어가지 않습니다. 사양 검수와 판매가 산정을 통과해야 추천에 쓰입니다.</div>';
-    var chost = document.getElementById("regChoiceHost");
-    if(chost) buildChoiceSelect(chost, (META && META.part_choices) || [], REG.partSel, function(pt){ REG.partSel = pt; });
-    var nm=document.getElementById("regName"); if(nm) nm.oninput=function(e){ REG.name=e.target.value; };
-    var mk=document.getElementById("regMaker"); if(mk) mk.oninput=function(e){ REG.maker=e.target.value; };
-    var sp=document.getElementById("regSupplier"); if(sp) sp.oninput=function(e){ REG.supplier=e.target.value; };
-    renderRegFooter();
-  }
-  function renderRegFooter(){
-    var host = document.getElementById("regFoot"); if(!host) return;
-    host.innerHTML = '<span class="note">분류를 선택하지 않으면 등록할 수 없습니다.</span>'
-      + '<button type="button" class="pp-btn-line" id="regCancel">취소</button>'
-      + (REG.similar
-          ? '<button type="button" class="pp-btn-primary" id="regForce">그래도 등록</button>'
-          : '<button type="button" class="pp-btn-primary" id="regSubmit">등록</button>');
-    var c;
-    if((c=document.getElementById("regCancel"))) c.onclick=closeRegDrawer;
-    if((c=document.getElementById("regSubmit"))) c.onclick=function(){ regSubmit(false); };
-    if((c=document.getElementById("regForce"))) c.onclick=function(){ regSubmit(true); };
-  }
-  function regSubmit(force){
-    var name=(REG.name||"").trim();
-    if(!name){ window.alert("상품명을 입력하세요"); return; }
-    if(!REG.partSel){ window.alert("분류를 선택하세요"); return; }
-    var body={name:name, part_type:REG.partSel, maker:(REG.maker||"").trim()||null,
-      supplier:(REG.supplier||"").trim()||null, confirm_similar: !!force};
-    fetch(API + "/products", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})
-      .then(asJson).then(function(res){
-        if(!res.ok){
-          if(res.status===409 && res.j && res.j.detail && res.j.detail.items){
-            REG.similar = res.j.detail.items;
-            renderRegDrawer();
-          }
-          return;   // 그 밖의 실패는 전역 진행 바가 사유를 보여준다
-        }
-        closeRegDrawer();
-        load(); loadMeta();
-      }).catch(function(){});
-  }
-
   /* ══════════════════════ 초기 배선(한 번만) ══════════════════════ */
   var typing=null, typingM=null;
   document.getElementById("q").addEventListener("input", function(e){
@@ -1492,6 +1536,14 @@ a.pp-btn-line{color:var(--on)}
     typingM = setTimeout(function(){ PAGE=1; load(); }, 300);
   });
   document.getElementById("catChipClear").addEventListener("click", clearCategoryFilter);
+  // 2026-09-10 개편 — 재고상태 필터. "재고 없음"을 고르면 상태 탭과 같은 축(cur="oos")을
+  // 그대로 쓴다(위 var 선언부 주석 참조) — 별도 파라미터를 만들지 않는다.
+  document.getElementById("fstock").addEventListener("change", function(e){
+    var v = e.target.value;
+    cur = (v==="oos") ? "oos" : "all";
+    PAGE=1; load();
+  });
+  document.getElementById("btnReset").addEventListener("click", resetFilters);
   document.querySelectorAll("#thead [data-sort]").forEach(function(el){
     function doSort(){
       var k=el.dataset.sort;
@@ -1519,14 +1571,13 @@ a.pp-btn-line{color:var(--on)}
     var t = ev.target.closest && ev.target.closest("[data-open]");
     if(t) openDrawer(t.dataset.open);
   });
-  document.getElementById("btnNew").addEventListener("click", openRegDrawer);
   document.getElementById("btnBulk").addEventListener("click", bulkApply);
   document.getElementById("btnUndo").addEventListener("click", bulkUndo);
-  document.getElementById("veil").addEventListener("click", function(){ closeDrawer(); closeRegDrawer(); });
+  document.getElementById("btnDismissUndo").addEventListener("click", dismissUndo);
+  document.getElementById("veil").addEventListener("click", function(){ closeDrawer(); });
   document.getElementById("drClose").addEventListener("click", closeDrawer);
-  document.getElementById("regClose").addEventListener("click", closeRegDrawer);
   document.addEventListener("keydown", function(e){
-    if(e.key==="Escape"){ closeDrawer(); closeRegDrawer(); }
+    if(e.key==="Escape"){ closeDrawer(); }
   });
 
   // 요청 전 상태
