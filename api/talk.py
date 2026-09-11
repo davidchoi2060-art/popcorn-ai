@@ -151,11 +151,28 @@ router = APIRouter(prefix="/api/talk", tags=["talk"])
 log = logging.getLogger(__name__)
 
 MAX_TEXT_LEN = 300
-# 한 번의 파싱에 이 이상이 필요한 문장은 없다(라벨이 3종뿐이다). 모델이 목록을
-# 길게 뱉어도 여기서 끊는다 -- 화면 조건 칩이 무한히 늘어나는 것을 막는 상한.
-MAX_CONSTRAINTS = 6
+# 한 번의 파싱에 이 이상이 필요한 문장은 없다(라벨이 6종이고 같은 라벨은 한 번만
+# 남는다 -- `_validate` 의 seen). 모델이 목록을 길게 뱉어도 여기서 끊는다 -- 화면
+# 조건 칩이 무한히 늘어나는 것을 막는 상한. 2026-09-11 A-128 ②로 4→6종이 되며 6→8.
+MAX_CONSTRAINTS = 8
 LLM_TIMEOUT_SEC = 12          # 고객이 기다리는 자리다. 길게 잡지 않는다.
-LLM_MAX_OUTPUT_TOKENS = 256   # JSON 한 덩어리면 충분하다(최악 비용 상한).
+# JSON 한 덩어리 + 고객에게 할 한두 문장(reply, A-128 ②)이면 충분하다(최악 비용 상한).
+# reply 가 붙기 전에는 256 이었다 -- 한국어 두 문장이 토큰 100 안팎이라 그만큼 늘렸다.
+LLM_MAX_OUTPUT_TOKENS = 400
+
+# 대화 이력(A-128 ② · 2026-09-11 사장님 확정 「같은 말로 계속 되묻지 않는다」).
+# 화면이 최근 대화를 함께 보내면 프롬프트에 싣는다. 이 수를 넘는 옛 턴은 **잘라낸다**
+# -- 매 호출이 이력 전체를 다시 태우므로 토큰 비용이 대화 길이의 제곱으로 는다.
+# 이력이 없으면(None) 옛 호출처(mockups/mvp1/s1-session.html)와 똑같이 동작한다.
+HISTORY_MAX_TURNS = 6
+# 모델이 reply 를 안 냈을 때 화면에 빈 말풍선이 뜨지 않게 하는 최소 문장. 조건·부품·
+# 가격을 말하지 않는다 -- 되묻기·확인만(§화면 정직성).
+REPLY_FALLBACK_HAS_CONS = "말씀하신 조건으로 찾아볼게요."
+REPLY_FALLBACK_NO_CONS = "어떤 PC가 필요하신지 조금 더 말씀해 주시겠어요?"
+# pc_related=false 일 때의 안내. 모델 문장을 쓰지 않고 이 한 줄로 고정한다 -- 잡담에
+# 모델이 잡담으로 답하는 것(날씨를 알려주는 등)을 구조적으로 막기 위해서다.
+REPLY_NOT_PC = "PC 견적을 도와드리는 자리예요 - 어떤 PC가 필요하세요?"
+REPLY_MAX_LEN = 200
 
 # 선호 어휘 -- `api/candidates.py`의 `_apply_one`이 실제로 거르는 태그 둘.
 # 여기서 늘리려면 그 파일이 먼저 늘어야 한다(늘리지 않고 여기만 늘리면 화면이
@@ -189,7 +206,29 @@ _BUDGET_NEG = re.compile(r"(?<!\d)-\s*\d{1,3}(?:,\d{3})*\s*만")
 # 「부품」 -- 2026-08-23 물결 계약 ①. 지금은 GPU 모델 지정만 다룬다(다른 부품은
 # 아직 추가하지 않는다 -- 값의 정규화 원천 `catalog_map.gpu_chipset_key`가 GPU만
 # 읽으므로, 여기서 CPU·SSD 등을 허용해도 뒤에서 전부 dropped가 된다).
-LABELS = ("예산", "용도", "선호", "부품")
+LABELS = ("예산", "용도", "선호", "부품", "플랫폼", "제외")
+
+# 「플랫폼」 -- A-128 ② (2026-09-11). 값 어휘는 `api/candidates._apply_one` 의
+# PLATFORM_LABELS 분기가 실제로 받는 둘(「인텔」·「AMD」 -- 그 파일은 라벨 집합만
+# `PLATFORM_LABELS` 상수로 두고 값 둘은 분기 안 리터럴이라 import 할 튜플이 없다).
+# 그쪽과 한 글자씩 같아야 한다 -- 다르면 엔진이 "알 수 없는 플랫폼"으로 거르지 않는다.
+# ⚠ 기본값(인텔)은 **여기서 넣지 않는다** -- 고객이 말했을 때만 낸다. 기본 인텔은
+# 격자 조회(grid_public) 소관이다. 파서가 넣으면 화면이 "고객이 말한 조건"이라 표시한다.
+PLATFORM_VALUES = ("인텔", "AMD")
+
+# 「제외」 -- A-128 ② (2026-09-11 디자이너 진단 「제외조건 미인식」 해소). 고객이
+# "모니터는 있어요"·"윈도우 빼고"·"본체만" 이라 하면 그것을 조건으로 남긴다.
+# 여러 개가 함께 산다(" · " 로 잇는다 -- 선호와 같은 처리). 이 값은 후보를 거르는
+# 조건이 아니라 **견적에서 뺄 항목의 표시**라 엔진 어휘가 따로 없다 -- 소비처는
+# 격자 조회·화면(칩)이고, 셋 다 그대로 넘긴다.
+EXCLUDE_VALUES = ("모니터 보유", "OS 제외", "본체만")
+
+_HISTORY_ROLES = ("user", "assistant")
+
+
+class HistoryTurn(BaseModel):
+    role: str          # 'user' | 'assistant' -- 그 밖의 값은 `_trim_history` 가 버린다
+    text: str
 
 
 class ParseBody(BaseModel):
@@ -198,6 +237,26 @@ class ParseBody(BaseModel):
     # 서버 왕복을 기다릴 수 없기 때문이다. 없는 키를 보내도 FK 가 거부하므로
     # 이 값을 그대로 믿어도 표가 오염되지 않는다.
     intent_key: str | None = None
+    # 최근 대화(A-128 ②). **선택** -- 없으면 옛 호출처와 똑같이 stateless 로 동작한다.
+    # 서버는 이력을 저장하지 않는다(consult_sessions 를 안 쓰는 것은 그대로) -- 화면이
+    # 들고 있다가 매번 보낸다. `HISTORY_MAX_TURNS` 를 넘는 앞쪽은 잘라낸다.
+    history: list[HistoryTurn] | None = None
+
+
+def _trim_history(history) -> list:
+    """이력 -> [(role, text)] 최근 HISTORY_MAX_TURNS 턴. 빈 문장·모르는 role 은 뺀다.
+
+    턴 하나의 길이도 `MAX_TEXT_LEN` 으로 자른다 -- 본문 문장과 같은 상한이다(화면이
+    긴 안내문을 assistant 턴으로 실어 보내면 그것만으로 프롬프트가 불어난다).
+    """
+    out = []
+    for t in history or []:
+        role = (t.role or "").strip().lower()
+        txt = (t.text or "").strip()
+        if role not in _HISTORY_ROLES or not txt:
+            continue
+        out.append((role, txt[:MAX_TEXT_LEN]))
+    return out[-HISTORY_MAX_TURNS:]
 
 
 def _usage_rows() -> list:
@@ -220,8 +279,12 @@ def _usage_rows() -> list:
     return out
 
 
-def _build_prompt(text: str, usage_rows: list) -> str:
-    """매 요청마다 접는다 -- 용도 어휘가 DB에서 바뀌면 다음 요청부터 반영된다."""
+def _build_prompt(text: str, usage_rows: list, history: list | None = None) -> str:
+    """매 요청마다 접는다 -- 용도 어휘가 DB에서 바뀌면 다음 요청부터 반영된다.
+
+    `history` 는 `_trim_history` 를 거친 [(role, text)] 이다. 비었거나 None 이면 이력
+    문단이 통째로 빠져 옛 프롬프트와 같은 모양이 된다(옛 호출처 호환).
+    """
     # 라벨만 주면 모델은 '배그'가 어느 용도인지 알 방법이 없어 **추론한다**(실측:
     # 「배그 하고 싶어요」 -> 용도 «게임», 정본은 «고사양 게임»). 정본이 이미 그 답을
     # 갖고 있으므로(`match_terms`) 라벨과 함께 넘긴다 -- 여기 목록을 박지 않는다.
@@ -237,22 +300,39 @@ def _build_prompt(text: str, usage_rows: list) -> str:
         pairs[0] if pairs else None)
     ex_line = ('   예: 문장에 "%s" 가 있으면 값은 "%s" 로 적는다.' % (ex[1], ex[0])) if ex else None
     # 표에 어휘가 하나도 없으면 예시가 없다 -- 그 줄만 빠진다(문단 사이 빈 줄 ""은 남긴다).
+    # 이력 문단(A-128 ②) -- 이력이 있을 때만 붙는다. 없으면 None 줄들이라 빠진다.
+    hist_lines: list = []
+    if history:
+        hist_lines = [
+            "[지금까지의 대화 -- 오래된 것부터]",
+            *("%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in history),
+            "",
+            "[이력 규칙]",
+            "- constraints 에는 **이력에서 이미 읽힌 조건 전부 + 이번 문장에서 새로 읽힌 것**을"
+            " 합쳐 «누적 조건 전체»로 낸다. 화면은 이 목록을 그대로 쓴다 -- 이전 것을 빼면"
+            " 고객이 말한 조건이 사라진다.",
+            "- 같은 라벨을 이번 문장이 새 값으로 바꿨으면(예: 예산을 고쳐 말함) 새 값 하나만 낸다.",
+            "- 고객이 이미 말한 것을 reply 에서 다시 묻지 않는다.",
+            "",
+        ]
     return "\n".join(ln for ln in [
-        "당신은 PC 견적 상담의 «입력 파서»다. 고객 문장을 두 가지로만 바꾼다 --",
-        "① 이 문장이 PC 상담인가(pc) ② 문장에서 읽히는 구조화 조건(constraints).",
+        "당신은 PC 견적 상담의 «입력 파서이자 상담원»이다. 고객 문장을 세 가지로만 바꾼다 --",
+        "① 이 문장이 PC 상담인가(pc) ② 문장에서 읽히는 구조화 조건(constraints)",
+        "③ 고객에게 할 한두 문장(reply).",
         "",
         "[절대 금지]",
         "- 부품 이름·가격·후보 수·견적을 말하지 않는다. 그것은 다른 시스템이 한다.",
-        "- 문장에 없는 예산·용도·선호를 만들지 않는다. 없으면 그 항목을 아예 빼라.",
+        "- 문장에 없는 예산·용도·선호·플랫폼·제외를 만들지 않는다. 없으면 그 항목을 아예 빼라.",
         "- 문장이 모순되어도(예: 예산은 낮은데 최고 사양 요구) 한쪽을 지우지 않는다."
         " 읽히는 대로 둘 다 넣는다.",
         "- 추측·보완·친절한 해석을 하지 않는다. 적힌 것만 옮긴다.",
         "",
         "[출력 형식] JSON 하나만 출력한다. 설명·코드블록·앞뒤 문장을 붙이지 않는다.",
-        '{"pc":true,"constraints":[{"l":"라벨","v":"값"}]}',
-        "두 항목은 **언제나 함께** 넣는다. pc 는 true/false 중 하나이며 문자열이 아니다.",
+        '{"pc":true,"constraints":[{"l":"라벨","v":"값"}],"reply":"고객에게 할 말"}',
+        "세 항목은 **언제나 함께** 넣는다. pc 는 true/false 중 하나이며 문자열이 아니다.",
         "조건으로 읽을 것이 없으면 constraints 를 빈 목록으로 두되 pc 는 그대로 판정한다.",
         "",
+        *hist_lines,
         "[pc -- 이 문장이 PC 상담인가]",
         "여기는 PC(컴퓨터) 견적 상담 창구다. 고객은 컴퓨터를 사거나 고치러 온 사람이다.",
         "- true: 컴퓨터·부품·게임·용도·예산·구매·조립·업그레이드·호환·재고·배송·가격·A/S 중"
@@ -293,6 +373,29 @@ def _build_prompt(text: str, usage_rows: list) -> str:
         " 성능·호환을 묻는 문장에도 쓰지 않는다 -- 이미 그 부품을 쓴다고 가정하고 묻는"
         " 질문이지, 그 부품으로 바꿔 달라는 요청이 아니다.",
         "   그래픽카드가 아닌 부품(CPU·SSD·메모리 등)은 아직 이 라벨로 다루지 않는다 -- 넣지 않는다.",
+        f'5. l="플랫폼"  v: 다음 중에서만 고른다 -- {" / ".join(PLATFORM_VALUES)}',
+        "   고객이 CPU 계열을 **직접 말했을 때만** 넣는다(\"라이젠\"·\"AMD로\" -> \"AMD\","
+        " \"인텔로\"·\"i5\"·\"i7\" -> \"인텔\"). 말하지 않았으면 **넣지 않는다** -- 기본값을"
+        " 여기서 정하지 않는다.",
+        f'6. l="제외"  v: 다음 중에서만 고른다 -- {" / ".join(EXCLUDE_VALUES)}',
+        "   고객이 견적에서 빼 달라고 한 것이다. 여럿이면 \" · \" 로 잇는다"
+        ' (예 "모니터 보유 · OS 제외 · 본체만").',
+        '   - "모니터는 있어요"·"모니터 빼고"·"모니터는 쓰던 거" -> "모니터 보유"',
+        '   - "윈도우 빼고"·"OS 없이"·"윈도우는 있어요" -> "OS 제외"',
+        '   - "본체만"·"본체 하나만"·"컴퓨터만" -> "본체만"',
+        "   고객이 그런 말을 하지 않았으면 넣지 않는다.",
+        "",
+        "[reply -- 고객에게 할 한두 문장 · 다섯 규칙]",
+        "① 조건을 하나라도 읽었으면 **무엇을 알아들었는지 확인**하는 문장으로 쓴다"
+        ' (예 "150만원 게임용으로 찾아볼게요").',
+        "② 조건을 하나도 못 읽었으면 고객이 한 말의 **맥락을 받아 구체적으로** 되묻는다"
+        ' (예 "친구가 쓰는 거 비슷한 거" -> "친구분 PC로 주로 뭐 하시나요?").'
+        ' "무엇을 도와드릴까요?" 같은 일반 문장은 쓰지 않는다.',
+        "③ 이력에 이미 있는 것을 다시 묻지 않는다.",
+        "④ 수치·부품명·가격·후보 수를 **지어내지 않는다** -- \"RTX 4070이 좋아요\" 같은 추천·"
+        "평가 금지. 조건 확인과 되묻기만 한다. 고객이 말한 숫자·이름을 그대로 되짚는 것은 된다.",
+        "⑤ 반말 금지 -- 존댓말(~요·~세요)로 쓴다. 두 문장을 넘기지 않는다.",
+        "pc 가 false 이면 reply 는 비워도 된다(서버가 안내 문장을 대신 넣는다).",
         "",
         "[고객 문장]",
         text,
@@ -419,6 +522,24 @@ def _extract_json(raw: str) -> dict:
     return obj
 
 
+def _reply_text(obj: dict, pc, kept: list) -> str:
+    """모델이 낸 reply -> 고객에게 보일 한 문장(A-128 ②).
+
+    - pc 가 False 면 모델 문장을 **쓰지 않고** `REPLY_NOT_PC` 로 고정한다 -- 잡담에
+      모델이 잡담으로 답하는 것(날씨 알려주기 등)을 구조적으로 막는다.
+    - 모델이 비웠거나 문자열이 아니면 조건 유무에 따른 최소 문장으로 채운다 -- 빈
+      말풍선을 띄우지 않는다. 지어내지 않는 문장이다(조건·부품·가격 없음).
+    - 길이는 `REPLY_MAX_LEN` 으로 자른다(두 문장 상한을 어긴 출력 방어).
+    """
+    if pc is False:
+        return REPLY_NOT_PC
+    r = obj.get("reply")
+    r = r.strip() if isinstance(r, str) else ""
+    if not r:
+        return REPLY_FALLBACK_HAS_CONS if kept else REPLY_FALLBACK_NO_CONS
+    return r[:REPLY_MAX_LEN]
+
+
 def _pc_verdict(obj: dict):
     """모델이 말한 「PC 상담인가」 -> True · False · **None(모름)**.
 
@@ -473,6 +594,15 @@ def _validate(raw_items, usages: list) -> tuple:
             norm, why, extra_dropped = _norm_usage(val, usages)
         elif lab == "부품":
             norm, why = _norm_part(val)
+        elif lab == "플랫폼":
+            # 값이 둘뿐이고 하나만 산다 -- "인텔 · AMD" 처럼 둘을 이으면 엔진이 둘 다
+            # 못 읽어(리터럴 비교) 거르지 않는다. 그래서 첫 것만 남기고 나머지는 dropped.
+            picked = _pick_from_set(val, list(PLATFORM_VALUES))
+            norm, why = (picked[0], None) if picked else (None, "서버가 아는 플랫폼 어휘가 아닙니다")
+            extra_dropped = [{"l": lab, "v": p, "reason": "플랫폼은 하나만 반영했습니다"}
+                             for p in picked[1:]]
+        elif lab == "제외":
+            norm, why = _norm_from_set(val, list(EXCLUDE_VALUES), "제외")
         else:
             norm, why = _norm_from_set(val, list(PREF_VALUES), "선호")
         if norm is None:
@@ -508,9 +638,17 @@ def parse_talk(body: ParseBody, request: Request):
       소유자 개념이 없는 자리라 403 은 없고 **429 만** 난다.
 
     응답 규약(추가분)
-      200 {ok, constraints[], dropped[], pc_related: true|false|null, note, ...}
+      200 {ok, constraints[], dropped[], pc_related: true|false|null, note, reply,
+           history_used, ...}
       429 {error:"rate_limited", scope:"visitor", window:"minute"|"day",
            used, limit, retry_after_sec, detail}  + `Retry-After` 헤더
+
+    ■ A-128 ② (2026-09-11) -- 이력·reply·라벨 2종(플랫폼·제외)
+      `body.history` 가 있으면 최근 `HISTORY_MAX_TURNS` 턴을 프롬프트에 싣고 모델에게
+      «이력의 조건 + 이번 문장의 조건 = 누적 전체»를 내게 한다 -- 화면이 매번 합치지
+      않는다. 없으면(None) 옛 호출처와 똑같이 stateless 다. `reply` 는 같은 호출에서
+      모델이 만든 고객 문장(확인 또는 맥락 되묻기)이고, pc=false 면 서버 고정 안내다.
+      호출 횟수는 그대로 1회다.
     """
     text = (body.text or "").strip()
     if not text:
@@ -524,12 +662,14 @@ def parse_talk(body: ParseBody, request: Request):
 
     usage_rows = _usage_rows()
     usages = [lab for lab, _terms in usage_rows]
-    prompt = _build_prompt(text, usage_rows)
+    history = _trim_history(body.history)
+    prompt = _build_prompt(text, usage_rows, history)
     # 문장 자체는 로그에 남기지 않는다(원문 비적재 규약) -- 길이만 남긴다.
     # terms 는 프롬프트에 실린 정본 어휘 수다 -- 표가 늘면 프롬프트도 길어지므로
     # (비용) 여기서 세어 둔다. 어휘 자체는 찍지 않는다(로그는 ASCII 기호만).
-    log.info("[talk] parse request: chars=%d usages=%d terms=%d", len(text), len(usages),
-             sum(len(t) for _lab, t in usage_rows))
+    # hist 는 프롬프트에 실린 이력 턴 수(잘라낸 뒤) -- 이력 문장도 찍지 않는다.
+    log.info("[talk] parse request: chars=%d usages=%d terms=%d hist=%d", len(text),
+             len(usages), sum(len(t) for _lab, t in usage_rows), len(history))
 
     try:
         result = llm.call(prompt, task_key="task.s1_parse", customer_facing=True,
@@ -555,9 +695,10 @@ def parse_talk(body: ParseBody, request: Request):
 
     kept, dropped = _validate(obj.get("constraints"), usages)
     pc = _pc_verdict(obj)
-    log.info("[talk] parse done: provider=%s pc=%s kept=%d dropped=%d elapsed=%.2fs",
+    reply = _reply_text(obj, pc, kept)
+    log.info("[talk] parse done: provider=%s pc=%s kept=%d dropped=%d reply_chars=%d elapsed=%.2fs",
              result.provider, "none" if pc is None else ("yes" if pc else "no"),
-             len(kept), len(dropped), result.elapsed_sec)
+             len(kept), len(dropped), len(reply), result.elapsed_sec)
     if pc is None:
         # 삼키지 않는다 -- 판정을 못 얻은 것도 사실이므로 로그에 남긴다. 화면은 이때
         # 반송하지 않고 「조건이 없다」쪽으로만 안내한다(정상 문의를 끊지 않는다).
@@ -602,6 +743,12 @@ def parse_talk(body: ParseBody, request: Request):
         # true | false | null(모름). null 을 false 로 읽지 않는 것이 규약이다.
         "pc_related": pc,
         "note": note,
+        # A-128 ② -- 고객에게 보일 한두 문장(같은 호출에서 모델이 만든 것 · pc=false 면
+        # 서버 고정 안내). 옛 호출처는 이 키를 읽지 않으므로 그대로 무시된다.
+        "reply": reply,
+        # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 화면이 «누적 조건 전체»를 받았는지
+        # 판단할 근거 -- 0 이면 이력 없이 판정한 응답이다.
+        "history_used": len(history),
         "provider": result.provider, "model": result.model,
         "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
         # A-95 로 «표에는» 남긴다(talk_intent_hits · 마스킹 후). 이 필드가 뜻하는 것은
