@@ -742,6 +742,10 @@ a.pp-btn-line{color:var(--on)}
 
   var PAGE=1, SIZE=100, TOTAL=0, PAGES=1, STATE="loading", FAIL_MSG="", DATA=[], KPIS=null;
   var cur="all", q="", fcat="all", fmfr="all";
+  // 2026-09-11 검색 패널 개편(A-127) — 노출여부(visible: ''/'on'/'off')·판매상태
+  // 다중선택(saleStatusSel: {"판매중":true,...} 형태 — 체크된 값만 키로 존재, 하나도
+  // 없으면 무필터). 둘 다 서버 파라미터 이름 그대로 변수명을 맞춘다(load()에서 그대로 보낸다).
+  var visible="", saleStatusSel={};
   var sortKey=null, sortDir=1;
   var SEL = {};
   // 2026-09-10 개편 — 재고상태 필터(req-products.md ⑤-B B-7 "부분가능"). 서버에
@@ -759,12 +763,19 @@ a.pp-btn-line{color:var(--on)}
   // 불러 채운다(URL로 이름을 실어 보내면 위조·인코딩 문제가 생긴다 — 지시서 원문).
   // null이면 아직 못 불러온 것, 빈 문자열이 아니라 null로 "모름"을 구분한다.
   var catId=0, includeDesc=0, catName=null;
+  // 2026-09-11 검색 패널 개편(A-127) — 카테고리 4단 트리. CAT_TREE_DATA는
+  // GET /api/admin/categories 응답 items 그대로(전체 트리, parent_id 인접리스트,
+  // API 변경 불요 — 여기서 depth를 계산한다). CAT_SEL[0..3]은 대/중/소/세분류 각 단계에서
+  // 선택된 category_id(미선택 null). "표시용 선택 상태"이고, 적용 시점(applyCategorySelection)에
+  // 가장 깊이 선택된 값이 catId·includeDesc(위, 요청 #28의 기존 상태)로 반영된다 — catId는
+  // 이 화면의 "서버로 실제 보내는 값"의 단일 원천 그대로 두고 트리는 그 값을 만드는 UI다.
+  var CAT_TREE_DATA=null, CAT_SEL=[null,null,null,null];
 
   function fromApi(it){
     return {product_code:String(it.product_code), sku:it.sku, name:it.name, cat:it.cat,
       maker: it.maker || "—", spec_done:it.spec_done, spec_total:it.spec_total,
       spec_row_missing:it.spec_row_missing, stock:it.stock, sale_price:it.sale_price,
-      status_key:it.status_key};
+      status_key:it.status_key, is_visible:it.is_visible};
   }
 
   function load(){
@@ -774,6 +785,15 @@ a.pp-btn-line{color:var(--on)}
       + "&part_type=" + encodeURIComponent(fcat==="all" ? "" : fcat)
       + "&maker=" + encodeURIComponent(fmfr==="all" ? "" : fmfr)
       + "&status=" + encodeURIComponent(tab.param);
+    // 2026-09-11 개편 — 노출여부(visible: ''/'on'/'off', 그대로 서버 파라미터명과 동일)와
+    // 판매상태 다중선택(sale_status: 콤마구분 — saleStatusSel에서 체크된 키만 뽑는다).
+    // ⚠ 이 tab.param(=status)과 sale_status는 서로 다른 값 공간이다 — status는 파생버킷
+    // 키(ok/review/oos/price), sale_status는 products.status 원본 값(판매중/품절/단종).
+    // 결합 규칙: 서버 _WHERE가 둘을 AND로 묶는다(admin_products.py 주석 참조) — 화면은
+    // 그냥 둘 다 보내기만 하면 된다.
+    url += "&visible=" + encodeURIComponent(visible || "");
+    var saleStatusList = Object.keys(saleStatusSel).filter(function(k){ return saleStatusSel[k]; });
+    if(saleStatusList.length){ url += "&sale_status=" + encodeURIComponent(saleStatusList.join(",")); }
     // 요청 #28 추가(2026-09-02) — 분류 관리에서 넘어온 category_id 축. fcat(part_type)과는
     // 별개라 항상 함께 보낸다(catId=0이면 서버도 무필터로 본다 — api/admin_products.py).
     if(catId){ url += "&category_id=" + catId + "&include_desc=" + includeDesc; }
@@ -850,6 +870,12 @@ a.pp-btn-line{color:var(--on)}
     // p.name(원본)은 그대로 둔다(2026-08-27, 사장님 발견 결함). 편집 입력값(BASIC_FIELDS)에는
     // 쓰지 않는다 — 여기는 목록의 읽기 전용 행이다.
     var nm = Admin2Text.stripHtml(p.name);
+    // 2026-09-11 개편 — 노출 여부 배지(req-products.md ⑤-B B-6 표시분, is_visible 컬럼).
+    // p.is_visible이 boolean이 아니면(응답에 없거나 null) "모름"으로 — 서버가 안 준 값을
+    // 노출/숨김 둘 중 하나로 지어내지 않는다(CANON §2-1).
+    var visHtml = (p.is_visible === true) ? '<span class="pp-badge pp-badge-ok">노출</span>'
+      : (p.is_visible === false) ? '<span class="pp-badge pp-badge-bad">숨김</span>'
+      : '<span class="pp-dim-text">—</span>';
     return '<div class="pp-row" data-pc="' + p.product_code + '">'
       + '<span><input type="checkbox" class="pp-chk" data-pc="' + p.product_code + '"'
         + (SEL[p.product_code]?" checked":"") + ' aria-label="선택"></span>'
@@ -860,7 +886,7 @@ a.pp-btn-line{color:var(--on)}
       + '<span>' + specBadge(p) + '</span>'
       + '<span class="pp-right' + (p.stock===0?" pp-stock zero":"") + '">' + p.stock + '</span>'
       + '<span class="pp-price">' + fmtWon(p.sale_price) + '</span>'
-      + '<span><span class="pp-badge ' + st.cls + '">' + esc(st.label) + '</span></span>'
+      + '<span style="display:flex;flex-direction:column;gap:3px;align-items:flex-start"><span class="pp-badge ' + st.cls + '">' + esc(st.label) + '</span>' + visHtml + '</span>'
       + '<button type="button" class="pp-menu-btn" data-open="' + p.product_code + '" title="상세 보기" aria-label="상세 보기">⋯</button>'
       + '</div>';
   }
@@ -959,7 +985,9 @@ a.pp-btn-line{color:var(--on)}
   }
   function clearCategoryFilter(){
     catId=0; includeDesc=0; catName=null;
+    CAT_SEL=[null,null,null,null];   // 2026-09-11 — 트리 선택 상태도 함께 초기화한다(같은 catId를 공유하므로 칩과 트리가 어긋나면 안 된다)
     renderCatChip();
+    renderCatTree();
     // URL에서도 지운다(history.replaceState) — 새로고침해도 필터가 되살아나지
     // 않게. 이 두 키만 지운다 — 다른 querystring은 건드리지 않는다(지시서 원문).
     var u = new URL(window.location.href);
@@ -969,6 +997,124 @@ a.pp-btn-line{color:var(--on)}
     PAGE=1; load();
   }
 
+  /* ══════════════════════ 카테고리 4단 트리(2026-09-11 검색 패널 개편, A-127) ══════════ */
+  // GET /api/admin/categories(admin_categories.py)가 parent_id 인접리스트로 전체 트리를
+  // 준다 — API는 이미 있고 바꾸지 않는다. 여기서 parent_id를 따라 depth(0=대분류…3=세분류)를
+  // 계산해 4개 연속 select를 구성한다. 서버가 실제로 준 깊이만큼만 활성 — req-products.md
+  // 실측(2026-09-10): depth1=7·depth2=30·depth3=1·depth4=0(세분류 0건). 화면은 이 실측을
+  // 코드에 박지 않고 매번 응답으로 실제 자식 존재 여부를 판정한다(디자인 예시 수치를
+  // 코드에 박지 말라는 MAKER-CHECKLIST 원칙과 같은 이유 — 데이터는 늘 바뀔 수 있다).
+  var CAT_LEVEL_LABELS = ["대분류", "중분류", "소분류", "세분류"];
+  function loadCategoryTree(){
+    return fetch(API + "/categories").then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        CAT_TREE_DATA = (j && j.items) || [];
+        renderCatTree();
+      })
+      .catch(function(){ CAT_TREE_DATA = CAT_TREE_DATA || []; renderCatTree(); });
+  }
+  function catChildrenOf(parentId){
+    return (CAT_TREE_DATA || []).filter(function(c){ return c.parent_id === parentId; })
+      .sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0) || String(a.name).localeCompare(String(b.name)); });
+  }
+  function renderCatTree(){
+    var host = document.getElementById("catTree"); if(!host) return;
+    if(!CAT_TREE_DATA){ host.innerHTML = '<span class="pp-dim-text">불러오는 중…</span>'; return; }
+    var html = "";
+    for(var depth=0; depth<4; depth++){
+      var kids = depth===0 ? catChildrenOf(null) : (CAT_SEL[depth-1]!=null ? catChildrenOf(CAT_SEL[depth-1]) : []);
+      var disabled = kids.length===0;
+      var title = disabled
+        ? (depth===0 ? "카테고리가 없습니다" : "하위 분류가 없습니다 — 서버에 등록된 하위 분류가 없어 신설 예정입니다")
+        : "";
+      html += '<select class="pp-select" data-cat-depth="' + depth + '" aria-label="카테고리 ' + CAT_LEVEL_LABELS[depth] + '"'
+        + (disabled ? ' disabled title="' + esc(title) + '"' : '') + '>'
+        + '<option value="">' + CAT_LEVEL_LABELS[depth] + (disabled ? '(하위 없음)' : '') + '</option>'
+        + kids.map(function(c){
+            return '<option value="' + c.category_id + '"' + (CAT_SEL[depth]===c.category_id?" selected":"") + '>' + esc(c.name) + '</option>';
+          }).join("")
+        + '</select>';
+    }
+    host.innerHTML = html;
+    host.querySelectorAll("[data-cat-depth]").forEach(function(sel){
+      sel.onchange = function(){
+        var depth = Number(sel.dataset.catDepth);
+        var val = sel.value ? Number(sel.value) : null;
+        CAT_SEL[depth] = val;
+        // 하위 단계는 전부 초기화 — 대분류를 바꿨는데 예전 소분류 선택이 남으면
+        // 서로 다른 계통의 조합(예: CPU 밑에 있던 소분류가 GPU를 고른 뒤에도 남는 것)이 된다.
+        for(var i=depth+1;i<4;i++) CAT_SEL[i]=null;
+        applyCategorySelection();
+        renderCatTree();
+      };
+    });
+  }
+  // 가장 깊이 선택된 단계의 category_id를 이 화면의 단일 원천(catId)에 반영한다.
+  // include_desc=1로 둔다 — 트리에서 중분류까지만 골랐다면 그 아래(소·세분류) 상품도
+  // 함께 보고 싶은 것이 자연스러운 기대이고(연쇄 선택 UI의 일반적 동작), catChip도 이
+  // 값을 그대로 표시해 화면 두 곳(칩·트리)이 항상 같은 값을 말한다.
+  function applyCategorySelection(){
+    var picked = null;
+    for(var i=3;i>=0;i--){ if(CAT_SEL[i]!=null){ picked = CAT_SEL[i]; break; } }
+    if(picked==null){ catId=0; includeDesc=0; catName=null; }
+    else {
+      catId = picked; includeDesc = 1;
+      var hit = (CAT_TREE_DATA||[]).filter(function(c){ return c.category_id===picked; })[0];
+      catName = hit ? hit.name : null;
+    }
+    renderCatChip();
+    PAGE=1; load();
+  }
+  // URL로 넘어온 category_id(요청 #28 경로)는 트리 선택 상태(CAT_SEL)에는 반영하지
+  // 않는다 — 어느 깊이인지 모르는 단일 id만으로 4단 트리를 역산하는 것은 트리 구조를
+  // 다시 훑어야 하는 별도 작업이라 이번 개편 범위 밖이다(칩 표시·목록 필터링 자체는
+  // 기존 catId 경로 그대로 정상 동작한다 — 트리 UI만 그 상태를 "표시"하지 못할 뿐이다).
+
+  /* ══════════════════════ 판매상태 다중선택 체크박스(2026-09-11, A-127) ══════════════ */
+  // ⚠ 기존 상태 탭(#tabs, STATUS_TABS 5버킷 — 위 728행 근처)은 **그대로 유지한다**.
+  // 이 체크박스는 그 탭과 **다른 축**이다 — products.status 원본 컬럼값(정본 어휘
+  // STATUS_OK: 판매중·품절·단종·삭제대기, admin_products.py:475)을 다루고, 탭은 검수·
+  // 재고·가격까지 얹은 파생 판정(status_key: ok/review/oos/price)을 다룬다.
+  //
+  // ★ 탭·체크박스 결합 규칙(지시서가 요구한 "명확히 정의해서 주석으로 남겨라") ★
+  //   탭 = 현재 보기 모드(무엇을 볼지 큰 틀을 정한다) — 예: [재고 없음] 탭
+  //   체크박스 = 탭과 무관하게 걸리는 제2축(그 안에서 원본 상태값으로 다시 좁힌다)
+  //   결합 = AND. 서버 _WHERE가 :status(탭)과 :sale_status(체크박스)를 둘 다
+  //   독립된 AND 조건으로 걸기 때문에(admin_products.py _WHERE 참조), 화면은 그 둘을
+  //   그대로 나란히 보내기만 하면 "둘 다 만족하는 상품만" 자동으로 좁혀진다.
+  //   예: 탭=[재고 없음](status=oos) + 체크박스=[판매중] → "재고 0이거나 상태가 품절인
+  //   상품들 중에서, 그리고 원본 status 컬럼이 '판매중'인 것만" — 실무적으로는 "품절로
+  //   표시 전환 대기 중인, 아직 판매중 라벨이 붙어 있는 재고소진 상품"을 찾는 조합이 된다.
+  //   체크박스를 하나도 안 고르면(빈 배열) 이 축 자체가 걸리지 않는다 — 탭 결과 그대로.
+  //
+  //   3개만 제공하는 이유(4번째 "삭제대기" 제외) — 지시서가 명시적으로 "판매중/품절/
+  //   단종" 3개를 못박았다. STATUS_OK 정본 어휘 4종 중 "삭제대기"는 이미 삭제 처리
+  //   대상이라 이 조회 보조 필터의 대상에서 뺀 것으로 해석한다(운영자가 목록에서
+  //   찾아보고 싶은 대상이 아니라 이미 처리 흐름에 들어간 상태이기 때문 — 필요해지면
+  //   지시서 재확인 후 추가한다, 임의로 넣지 않는다).
+  var SALE_STATUS_LABELS = ["판매중", "품절", "단종"];
+  function renderSaleStatusChecks(){
+    var host = document.getElementById("saleStatusChecks"); if(!host) return;
+    host.innerHTML = SALE_STATUS_LABELS.map(function(label){
+      var checked = !!saleStatusSel[label];
+      return '<label><input type="checkbox" data-sale-status="' + esc(label) + '"'
+        + (checked ? " checked" : "") + '>' + esc(label) + '</label>';
+    }).join("");
+  }
+  // 이벤트는 host에 위임한다(체크박스가 renderSaleStatusChecks로 다시 그려질 때마다
+  // 리스너를 새로 붙일 필요가 없다 — #rows의 change 위임과 같은 패턴).
+  function wireSaleStatusChecks(){
+    var host = document.getElementById("saleStatusChecks"); if(!host) return;
+    host.addEventListener("change", function(ev){
+      var cb = ev.target.closest && ev.target.closest("[data-sale-status]");
+      if(!cb) return;
+      var key = cb.dataset.saleStatus;
+      if(cb.checked) saleStatusSel[key] = true; else delete saleStatusSel[key];
+      PAGE=1; load();
+    });
+  }
+
+
   // 2026-09-10 개편 — req-products.md B-12 "가능(화면 배선만)". 조회 조건 전부를
   // 기본값으로 되돌린다(⑥-A "조회 조건이 기본값이면 비활성" 요구는 클릭할 때마다
   // 항상 안전하게 두 번 눌러도 무해하므로, 별도 disabled 계산 없이 항상 활성으로 둔다
@@ -976,12 +1122,19 @@ a.pp-btn-line{color:var(--on)}
   // 그대로"인 편이 안전하다).
   function resetFilters(){
     cur="all"; q=""; fcat="all"; fmfr="all"; PAGE=1;
+    // 2026-09-11 검색 패널 개편 — 신설 필터도 함께 초기화한다. qType은 서버로 안 나가는
+    // 화면 표시용 값이라 여기서 리셋해도 load()에 영향은 없다(그래도 눈에 보이는 값이라
+    // "초기화"가 그 값만 빼놓으면 운영자가 "안 지워졌다"고 오인한다).
+    visible=""; saleStatusSel={};
     var qEl=document.getElementById("q"); if(qEl) qEl.value="";
+    var qTypeEl=document.getElementById("qType"); if(qTypeEl) qTypeEl.value="all";
     var catEl=document.getElementById("fcat"); if(catEl) catEl.value="all";
     var mfrEl=document.getElementById("fmfr"); if(mfrEl) mfrEl.value="";
-    clearCategoryFilter();   // load()까지 함께 호출한다 — 아래 별도 load() 불필요
+    var visEl=document.getElementById("fvisible"); if(visEl) visEl.value="";
+    clearCategoryFilter();   // load()까지 함께 호출한다 — 아래 별도 load() 불필요(CAT_SEL도 여기서 초기화됨)
     loadMeta();
     syncStockSelect();
+    renderSaleStatusChecks();
   }
 
   /* ══════════════════════ 일괄 상태 변경 + 되돌리기 ══════════════════════ */
@@ -1793,6 +1946,18 @@ a.pp-btn-line{color:var(--on)}
     typingM = setTimeout(function(){ PAGE=1; load(); }, 300);
   });
   document.getElementById("catChipClear").addEventListener("click", clearCategoryFilter);
+  // 2026-09-11 검색 패널 개편(A-127) — 검색 대상 선택(qType)은 화면 표시용 UI일 뿐 서버로
+  // 보내지 않는다(admin_products.py의 q 파라미터는 대상 구분이 없다 — 지어낸 필터링
+  // 효과를 보이지 않기 위해 change 리스너도 재조회를 걸지 않는다. 값 자체는 그냥
+  // select에 남아 있을 뿐 아무 데도 쓰이지 않는다 — 코드로도 "장식"임을 분명히 한다).
+  // 노출 여부(fvisible) — select 변경 즉시 서버 재조회(다른 select들과 같은 관례).
+  document.getElementById("fvisible").addEventListener("change", function(e){
+    visible = e.target.value; PAGE=1; load();
+  });
+  // [검색] 버튼 — 지금 화면에 있는 조회 조건 그대로 다시 쏘는 수동 트리거(지시서 요구:
+  // 자동조회가 안 되는 필터를 위한 안전판). q·qType 입력은 바뀐 즉시 로컬 변수(q)에
+  // 반영되므로(위 input 리스너) 여기서 다시 읽을 필요 없이 그냥 load()만 부르면 된다.
+  document.getElementById("btnSearch").addEventListener("click", function(){ PAGE=1; load(); });
   // 2026-09-10 개편 — 재고상태 필터. "재고 없음"을 고르면 상태 탭과 같은 축(cur="oos")을
   // 그대로 쓴다(위 var 선언부 주석 참조) — 별도 파라미터를 만들지 않는다.
   document.getElementById("fstock").addEventListener("change", function(e){
@@ -1836,15 +2001,18 @@ a.pp-btn-line{color:var(--on)}
   document.addEventListener("keydown", function(e){
     if(e.key==="Escape"){ closeDrawer(); }
   });
+  wireSaleStatusChecks();
 
   // 요청 전 상태
   renderAll();
+  renderSaleStatusChecks();
   // 요청 #28 추가(2026-09-02) — load() 가 catId 를 읽기 전에 URL부터 반영해야 한다.
   // renderCatChip()은 이름이 오기 전에도 "분류 #<id>"로 즉시 보여준다(폴백 우선 표시,
   // loadCategoryName()이 끝나면 실제 이름으로 다시 그린다).
   readCategoryFromUrl();
   renderCatChip();
   loadCategoryName();
+  loadCategoryTree();
   loadMeta();
   loadSpecFields();
   loadSuppliers();
