@@ -1,0 +1,942 @@
+{#
+  상품 등록·수정 (ADM-PRD-011 가칭) — admin2 신규 구축 · 2026-09-11
+
+  ■ 계약 — `docs/design/req/req-product-new.md`(요구사항 정의서, ④ ○ 판정 11항목) ·
+    `docs/design/spec-product-unified.md`(§4 사장님 확정 4건) ·
+    `docs/decisions/decision-log.md` A-127. 원안(`docs/design/incoming/
+    dc-product-unified-admin.html` isProduct 블록)은 참고일 뿐이고 정의서가 상위다
+    (지시서 그대로 — 원안과 정의서가 갈리면 정의서를 따른다).
+
+  ■ 서버 — `api/admin_products.py` 만 부른다(새 API 없음, 담당 밖이라 고치지 않는다):
+      GET   /api/admin/product-meta            선택지(분류·제조사·판매상태)
+      GET   /api/admin/product-similar          등록 전 중복 판정
+      POST  /api/admin/products                신규 등록
+      GET   /api/admin/products/{code}          수정 모드 초기값
+      PATCH /api/admin/products/{code}          단건 수정(EDITABLE 필드만)
+    카테고리 선택지만 예외로 `GET /api/admin/categories`(`api/admin_categories.py`,
+    이미 존재 · 읽기 전용 · products.html.j2 도 같은 API 를 쓴다)를 추가로 읽는다 —
+    "선택지는 서버가 준다"(MAKER-CHECKLIST) 원칙상 카테고리 트리를 이 화면이 하드코딩할
+    수 없고, `product-meta` 응답에는 카테고리가 없다(실측 — 아래 참조). 이 호출도
+    **읽기 전용**이고 새 API 신설이 아니다.
+
+  ■ ⚠ 자기검증으로 드러난 사실 — 정의서 ④ ○ 판정(11항목)은 "products 테이블에 그
+    컬럼이 있다"는 판정이지 "이 화면이 부를 API 가 그 값을 주고받는다"는 뜻이
+    아니었다. `api/admin_products.py` 를 직접 읽어 실측했다:
+
+      항목        등록(POST /products)              수정(PATCH /products/{code})
+      상품명      됨(name)                           됨(EDITABLE.name)
+      SKU         서버 자동 발번(입력 아님)            표시만(EDITABLE 밖)
+      제조사      됨(maker, 선택)                     됨(EDITABLE.maker)
+      브랜드      ✕ RegisterBody 에 필드 자체 없음     ✕ EDITABLE·조회 SELECT 모두 없음
+      모델명      ✕ RegisterBody 에 필드는 있으나      됨(EDITABLE.model_name)
+                    supplier_id 지정 등록에서만 쓰이고
+                    products.model_name 에는 저장 안 됨
+                    (INSERT 컬럼 목록에 없음 — 실측)
+      분류        됨(part_type, 필수)                 ✕ EDITABLE 밖(별도 API
+                                                        `/part-type` 는 이 화면
+                                                        허용 API 목록 밖 — 안 쓴다)
+      판매상태    ✕ INSERT 가 '판매중' 고정             됨(EDITABLE.status)
+      카테고리    ✕ RegisterBody·INSERT 모두 없음       ✕ EDITABLE·조회 SELECT 모두 없음
+      판매가      ✕ RegisterBody 없음(NULL 유지 정책)   됨(EDITABLE.sale_price)
+      매입가      됨(cost_price → purchase_price)      됨(EDITABLE.purchase_price)
+      재고수량    ✕ INSERT 가 0 고정                    됨(EDITABLE.stock_qty)
+
+    11항목을 전부 화면에 그대로 두되(지시서 요구), 서버가 실제로 주고받지 않는
+    자리는 **`disabled` + `title`/안내문으로 사유를 병기**한다(MAKER-CHECKLIST
+    "비활성은 진짜 disabled + 이유를 title로" 그대로) — 입력하면 저장되는 것처럼
+    가장하지 않는다. 브랜드·카테고리는 두 모드 모두 비활성(서버가 아예 다루지
+    않는다), 나머지는 모드별로 갈린다(표 그대로).
+
+  ■ 12섹션 — 원안 12개 접이식 섹션(spec-product-unified.md §1) 중 정의서 ○ 판정
+    11항목을 담는 3섹션(01 기본정보·02 카테고리·03 판매가격·재고)만 실제 입력을
+    갖는다. 나머지 9섹션(00 상품복사 · 04 이미지·동영상 · 05 옵션·추가상품 ·
+    06 상세설명 · 07 배송·반품/교환 · 08 검색태그·채널키워드 · 09 고시·A/S ·
+    10 구매·리뷰 혜택 · 11 노출채널)은 섹션 제목만 두고 "API 미연결 — 향후
+    사용예정" 배지로 둔다(지시서 그대로) — 입력창을 만들어 저장되는 척하지 않는다.
+    (ERD 는 0081 마이그레이션으로 이미 products 컬럼·신규 테이블 7종을 만들어
+    뒀지만, 그 컬럼·표를 읽고 쓰는 API 는 아직 없다 — `api/admin_products.py`
+    전수 확인. 표가 있다고 화면이 저장 가능한 것처럼 그리면 거짓말이 된다.)
+
+  ■ 흐름(지시서 ①~⑤) — ① 진입 시 전 항목 빈 값(예시 값 없음, 분류는 "분류를
+    선택하세요") ② 선택지는 product-meta 로 ③ 저장 전 product-similar 로 중복
+    판정, 있으면 목록 제시 + "기존 상품 수정으로 이동"/"다른 상품으로 등록
+    (confirm_similar=true)" ④ POST 로 등록, 409/400 서버 사유 그대로 ⑤ 수정
+    모드(?code=)는 GET 으로 초기값, PATCH 로 저장(EDITABLE 만), locked_fields 표시.
+
+  ■ 등록 성공 후 이동 대상 — 정의서 "사장님 결정이 필요한 지점" 9번이 미정이다
+    (목록 복귀 / 수정 모드 계속 / 연속 등록 중 무엇도 확정되지 않았다). 이 화면이
+    임의로 하나를 골라 자동 이동시키지 않는다 — 등록 성공 문구(서버 응답 그대로)와
+    함께 "상품 관리로 이동"·"방금 등록한 상품 수정 열기" 두 선택지를 제시해
+    운영자가 고르게 한다(화면이 결정을 대신 지어내지 않는다).
+
+  ■ 부품 어휘(분류 2단 선택) — `api/taxonomy.py` 의 `choice_tree()` 출력 형태를
+    그대로 따른다(정본은 서버, 화면은 트리 모양만 그린다 — CANON §1).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}{{ crumb_now }}{% endblock %}
+
+{% block head_extra %}
+<style>
+.pn-wrap,.pn-wrap *{box-sizing:border-box}
+.pn-wrap{flex:1;min-height:0;overflow:auto;padding:20px 24px 40px;background:var(--rv-canvas)}
+.pn-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}
+.pn-head h1{margin:0 0 4px;font:600 24px/1.25 var(--rv-font);color:var(--rv-ink)}
+.pn-head .sub{margin:0;font:400 12.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.pn-head .grow{flex:1}
+.pn-headbtns{display:flex;gap:8px}
+
+.pn-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 12px;
+  border:1px solid rgba(0,0,0,.12);border-radius:7px;background:var(--rv-card);
+  font:400 12px/1.4 var(--rv-font);color:var(--rv-muted);margin-bottom:14px}
+.pn-toolbar .grow{flex:1}
+.pn-req-mark{color:var(--rv-red);font-weight:700}
+
+.pn-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.pn-main{flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.pn-aside{flex:0 0 320px;max-width:360px;min-width:260px;position:sticky;top:0;
+  display:flex;flex-direction:column;gap:12px}
+
+.pn-card{background:var(--rv-card);border:1px solid rgba(0,0,0,.12);border-radius:8px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:11px}
+.pn-card[hidden]{display:none}
+.pn-card-hd{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
+.pn-kicker{flex:none;font:600 10px/1 var(--rv-mono);color:var(--rv-faint);
+  border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:3px 6px}
+.pn-card-hd h3{margin:0;flex:1;min-width:0;font:600 15px/1.3 var(--rv-font);color:var(--rv-ink)}
+.pn-badge-req{flex:none;font:600 9.5px/1 var(--rv-font);color:#fff;background:var(--rv-red);
+  border-radius:3px;padding:3px 7px}
+.pn-badge-stub{flex:none;font:600 9.5px/1 var(--rv-font);color:var(--rv-muted);
+  border:1px dashed rgba(0,0,0,.28);border-radius:3px;padding:3px 7px;white-space:nowrap}
+.pn-chev{flex:none;font-size:10px;color:var(--rv-faint);transition:transform .15s ease}
+.pn-card[data-open="n"] .pn-card-body{display:none}
+.pn-card[data-open="n"] .pn-chev{transform:rotate(-90deg)}
+.pn-card-body{display:flex;flex-direction:column;gap:11px}
+.pn-stub-note{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+
+.pn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.pn-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pn-field.span2{grid-column:1 / -1}
+.pn-field label{display:flex;align-items:center;gap:6px;font:600 11.5px/1.3 var(--rv-font);color:var(--rv-ink-soft)}
+.pn-lock{flex:none;display:inline-flex;align-items:center;gap:3px;font:600 9px/1 var(--rv-font);
+  color:var(--rv-purple);border:1px solid oklch(0.5 0.11 285 / .35);border-radius:3px;padding:2px 5px}
+.pn-lock[hidden]{display:none}
+.pn-input,.pn-select{height:34px;border:1px solid rgba(0,0,0,.2);border-radius:6px;
+  background:var(--rv-card);padding:0 10px;font:400 12.5px/1 var(--rv-font);color:var(--rv-ink);width:100%}
+.pn-input:disabled,.pn-select:disabled{background:var(--rv-panel2);color:var(--rv-dim);cursor:not-allowed;border-style:dashed}
+.pn-input::placeholder{color:var(--rv-dim3)}
+.pn-num-wrap{display:flex;align-items:center;gap:7px}
+.pn-num-wrap .pn-input{flex:1;min-width:0;text-align:right}
+.pn-unit{flex:none;font:400 11.5px/1 var(--rv-font);color:var(--rv-muted)}
+.pn-2col{display:flex;gap:6px}
+.pn-2col select{flex:1;min-width:0}
+.pn-fnote{font:400 10.5px/1.55 var(--rv-font);color:var(--rv-muted)}
+.pn-fnote.warn{color:var(--rv-amber)}
+.pn-fnote.err{color:var(--rv-red)}
+.pn-fnote[hidden]{display:none}
+.pn-static{min-height:34px;display:flex;align-items:center;padding:0 2px;font:500 12.5px/1.4 var(--rv-mono);color:var(--rv-ink-soft)}
+
+.pn-similar{border-color:var(--rv-amber-line);background:var(--rv-amber-bg)}
+.pn-similar[hidden]{display:none}
+.pn-sim-head{font:600 12.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.pn-sim-list{display:flex;flex-direction:column}
+.pn-sim-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 0;border-top:1px solid rgba(0,0,0,.08)}
+.pn-sim-item:first-child{border-top:0}
+.pn-sim-name{flex:1 1 220px;min-width:0;font:500 12px/1.4 var(--rv-font);color:var(--rv-ink)}
+.pn-sim-meta{flex:none;font:400 10.5px/1.4 var(--rv-mono);color:var(--rv-muted)}
+.pn-sim-actbtns{display:flex;gap:8px;margin-top:8px}
+
+.pn-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;
+  padding:0 14px;border-radius:6px;font:600 12.5px/1 var(--rv-font);cursor:pointer;
+  white-space:nowrap;border:1px solid rgba(0,0,0,.2);background:var(--rv-card);color:var(--rv-ink-soft);text-decoration:none}
+.pn-btn:hover{background:var(--rv-panel2)}
+.pn-btn.pri{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink)}
+.pn-btn.pri:hover{background:var(--rv-ink-soft)}
+.pn-btn:disabled{background:var(--rv-panel);color:var(--rv-dim);border-color:rgba(0,0,0,.1);cursor:not-allowed}
+.pn-btn-block{width:100%}
+
+.pn-result{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:8px;
+  border:1px solid rgba(0,0,0,.13);background:var(--rv-panel)}
+.pn-result .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pn-result .code{flex:none;font:600 9.5px/1 var(--rv-mono);border:1px solid rgba(0,0,0,.16);
+  border-radius:3px;padding:4px 6px;color:var(--rv-muted)}
+.pn-result .msg{font:600 12.5px/1.4 var(--rv-font);color:var(--rv-muted)}
+.pn-result .nt{font:400 10.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
+.pn-result .act{display:flex;gap:7px;flex-wrap:wrap;margin-top:2px}
+.pn-result.ok{border-color:oklch(0.74 0.09 165 / .55);background:color-mix(in oklch,var(--rv-green) 7%,var(--rv-card))}
+.pn-result.ok .code,.pn-result.ok .msg{color:var(--rv-green);border-color:oklch(0.74 0.09 165 / .55)}
+.pn-result.warn{border-color:var(--rv-amber-line);background:var(--rv-amber-bg)}
+.pn-result.warn .code,.pn-result.warn .msg{color:var(--rv-amber);border-color:var(--rv-amber-line)}
+.pn-result.err{border-color:oklch(0.75 0.11 33 / .55);background:color-mix(in oklch,var(--rv-red) 6%,var(--rv-card))}
+.pn-result.err .code,.pn-result.err .msg{color:var(--rv-red);border-color:oklch(0.75 0.11 33 / .55)}
+
+.pn-aside-meta{display:flex;flex-direction:column;gap:4px;font:400 11px/1.6 var(--rv-mono);color:var(--rv-muted)}
+.pn-aside-meta b{color:var(--rv-ink-soft);font-weight:600}
+.pn-lockline{display:flex;flex-wrap:wrap;gap:5px}
+.pn-lockline[hidden]{display:none}
+
+.pn-hdmeta{font:400 10px/1 var(--rv-mono);color:var(--rv-muted);margin-left:4px}
+.pn-hdmeta b{font-weight:600;color:var(--rv-ink)}
+.pn-hdmeta[hidden]{display:none}
+
+.pn-load{padding:24px 4px;text-align:center;font:400 12px/1.7 var(--rv-font);color:var(--rv-muted)}
+.pn-load[hidden]{display:none}
+.pn-load.err{color:var(--rv-red)}
+.pn-load a,.pn-load button{display:inline-block;margin-top:8px;font:600 12px/1 var(--rv-font);
+  color:var(--rv-ink);background:var(--rv-card);border:1px solid rgba(0,0,0,.22);border-radius:6px;
+  padding:8px 14px;cursor:pointer;text-decoration:none}
+.pn-body[hidden]{display:none}
+
+@media (max-width:768px){
+  .pn-row{flex-direction:column}
+  .pn-aside{position:static;max-width:none;flex:none;width:100%}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="pn-hdmeta" id="pnHdMeta" data-bind="header-meta" hidden></span>
+{% endblock %}
+
+{% block content %}
+<div class="pn-wrap">
+
+  <div class="pn-head">
+    <div style="flex:1;min-width:220px">
+      <h1 id="pnH1">{{ crumb_now }}</h1>
+      <p class="sub" id="pnSub">몰 반출용 상품 원본 관리 · 필수 항목 입력 후 저장 · 선택 항목은 저장 후 수정</p>
+    </div>
+    <div class="grow"></div>
+    <div class="pn-headbtns" id="pnHeadBtns"></div>
+  </div>
+
+  <div class="pn-load" id="pnInitLoad">불러오는 중</div>
+  <div class="pn-load err" id="pnInitErr" hidden></div>
+
+  <div class="pn-body" id="pnBody" hidden>
+
+    <div class="pn-toolbar">
+      <span><span class="pn-req-mark">*</span> 표시는 필수 입력 항목입니다 · 섹션 제목 선택 시 접기/펼치기</span>
+      <span class="grow"></span>
+      <button type="button" class="pn-btn" data-action="expand-all" style="height:26px;padding:0 9px;font-size:11.5px">전체 펼치기</button>
+      <button type="button" class="pn-btn" data-action="collapse-all" style="height:26px;padding:0 9px;font-size:11.5px">전체 접기</button>
+    </div>
+
+    <div class="pn-row">
+      <div class="pn-main">
+
+        <!-- 00 상품복사 — API 미연결 -->
+        <section class="pn-card" id="pnSec-copy" data-open="n" data-sec="copy">
+          <div class="pn-card-hd" data-action="toggle-section" data-sec="copy">
+            <span class="pn-kicker">00</span><h3>상품복사</h3>
+            <span class="pn-badge-stub">API 미연결 — 향후 사용예정</span>
+            <span class="pn-chev">▾</span>
+          </div>
+          <div class="pn-card-body">
+            <div class="pn-stub-note">기존 상품의 입력값을 초기값으로 가져오는 기능입니다. 복사 대상·제외
+              항목과 저장 위치가 아직 확정되지 않았습니다(정의서 「사장님 결정이 필요한 지점」 8).
+              이 화면은 빈 값에서 시작합니다.</div>
+          </div>
+        </section>
+
+        <!-- 01 기본정보 -->
+        <section class="pn-card" id="pnSec-basic" data-open="y" data-sec="basic">
+          <div class="pn-card-hd" data-action="toggle-section" data-sec="basic">
+            <span class="pn-kicker">01</span><h3>기본정보</h3>
+            <span class="pn-badge-req">필수</span>
+            <span class="pn-chev">▾</span>
+          </div>
+          <div class="pn-card-body">
+            <div class="pn-grid">
+              <div class="pn-field span2">
+                <label for="pnName">상품명 <span class="pn-req-mark">*</span></label>
+                <input id="pnName" class="pn-input" type="text" placeholder="상품명을 입력하세요" autocomplete="off" data-bind="name">
+                <div class="pn-fnote err" id="pnNameErr" hidden></div>
+              </div>
+              <div class="pn-field">
+                <label for="pnSku">SKU</label>
+                <input id="pnSku" class="pn-input" type="text" disabled data-bind="sku">
+                <div class="pn-fnote" id="pnSkuNote"></div>
+              </div>
+              <div class="pn-field">
+                <label>분류 <span class="pn-req-mark">*</span><span class="pn-lock" id="pnLockPartType" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <span id="pnPartTypeHost" data-bind="part-type-host"></span>
+                <div class="pn-fnote" id="pnPartTypeNote" hidden></div>
+              </div>
+              <div class="pn-field">
+                <label for="pnMaker">제조사<span class="pn-lock" id="pnLockMaker" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <input id="pnMaker" class="pn-input" type="text" list="pnMakerList" placeholder="제조사를 입력하세요(선택)" autocomplete="off" data-bind="maker">
+                <datalist id="pnMakerList"></datalist>
+              </div>
+              <div class="pn-field">
+                <label for="pnBrand">브랜드</label>
+                <input id="pnBrand" class="pn-input" type="text" disabled placeholder="" data-bind="brand">
+                <div class="pn-fnote warn">이 API(등록·수정)는 브랜드 필드를 조회·저장하지 않습니다 —
+                  products.brand 컬럼은 있으나 응답에 포함되지 않습니다.</div>
+              </div>
+              <div class="pn-field">
+                <label for="pnModel">모델명<span class="pn-lock" id="pnLockModel" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <input id="pnModel" class="pn-input" type="text" placeholder="모델명을 입력하세요(선택)" autocomplete="off" data-bind="model_name">
+                <div class="pn-fnote warn" id="pnModelNote" hidden></div>
+              </div>
+              <div class="pn-field">
+                <label for="pnStatus">판매상태<span class="pn-lock" id="pnLockStatus" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <select id="pnStatus" class="pn-select" disabled data-bind="status">
+                  <option value="">불러오는 중</option>
+                </select>
+                <div class="pn-fnote warn" id="pnStatusNote" hidden></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 02 카테고리 -->
+        <section class="pn-card" id="pnSec-cat" data-open="y" data-sec="cat">
+          <div class="pn-card-hd" data-action="toggle-section" data-sec="cat">
+            <span class="pn-kicker">02</span><h3>카테고리</h3>
+            <span class="pn-badge-req">필수</span>
+            <span class="pn-chev">▾</span>
+          </div>
+          <div class="pn-card-body">
+            <div class="pn-grid">
+              <div class="pn-field span2">
+                <label for="pnCategory">카테고리</label>
+                <select id="pnCategory" class="pn-select" disabled data-bind="category">
+                  <option value="">불러오는 중</option>
+                </select>
+                <div class="pn-fnote warn">이 API(등록·수정)는 카테고리(category_id)를 조회·저장하지
+                  않습니다 — 선택해도 반영되지 않고 기존 값도 표시되지 않습니다. 카테고리 변경은
+                  <a href="/admin2/category-mapping" target="_blank" rel="noopener">상품 분류 매핑</a>에서 처리하세요.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 03 판매가격 · 재고 -->
+        <section class="pn-card" id="pnSec-price" data-open="y" data-sec="price">
+          <div class="pn-card-hd" data-action="toggle-section" data-sec="price">
+            <span class="pn-kicker">03</span><h3>판매가격 · 재고</h3>
+            <span class="pn-badge-req">필수</span>
+            <span class="pn-chev">▾</span>
+          </div>
+          <div class="pn-card-body">
+            <div class="pn-grid">
+              <div class="pn-field">
+                <label for="pnSalePrice">판매가<span class="pn-lock" id="pnLockSalePrice" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <div class="pn-num-wrap"><input id="pnSalePrice" class="pn-input" type="number" min="0" max="100000000" step="1" data-bind="sale_price"><span class="pn-unit">원</span></div>
+                <div class="pn-fnote err" id="pnSalePriceErr" hidden></div>
+                <div class="pn-fnote warn" id="pnSalePriceNote" hidden></div>
+              </div>
+              <div class="pn-field">
+                <label for="pnPurchasePrice">매입가<span class="pn-lock" id="pnLockPurchasePrice" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <div class="pn-num-wrap"><input id="pnPurchasePrice" class="pn-input" type="number" min="0" max="100000000" step="1" data-bind="purchase_price"><span class="pn-unit">원</span></div>
+                <div class="pn-fnote err" id="pnPurchasePriceErr" hidden></div>
+              </div>
+              <div class="pn-field">
+                <label for="pnStockQty">재고수량<span class="pn-lock" id="pnLockStockQty" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
+                <div class="pn-num-wrap"><input id="pnStockQty" class="pn-input" type="number" min="0" max="100000" step="1" data-bind="stock_qty"><span class="pn-unit">개</span></div>
+                <div class="pn-fnote err" id="pnStockQtyErr" hidden></div>
+                <div class="pn-fnote warn" id="pnStockQtyNote" hidden></div>
+              </div>
+            </div>
+            <div class="pn-fnote">재고수량을 고치면 서버가 재고 원장(stock_movements)에 함께 남깁니다 —
+              화면이 재고를 다시 계산하지 않습니다.</div>
+          </div>
+        </section>
+
+        {% set stubs = [
+          ("04", "image", "상품이미지 · 동영상", "대표 이미지 1건 · 추가 이미지 최대 9건 · 동영상 URL. 저장 표(product_media)는 마이그레이션 0081로 이미 만들어졌지만, 이 화면이 부르는 API에는 읽기·쓰기 엔드포인트가 없습니다."),
+          ("05", "opt", "옵션 · 추가상품", "옵션 사용 여부 · 옵션 행(옵션명·옵션값·추가금액·재고) · 추가상품. 저장 표(product_options·product_addons)는 있지만 이 화면이 부르는 API에는 엔드포인트가 없습니다."),
+          ("06", "desc", "상세설명", "상품 특징 · 사양 · 구성품 본문(마크다운). 저장 컬럼(products.description_html)은 있지만 이 화면이 부르는 API에는 엔드포인트가 없습니다."),
+          ("07", "ship", "배송 · 반품/교환", "배송방법 · 배송비 · 무료배송 기준금액 · 반품/교환 배송비 · 반품/교환 안내 — 몰 반출용 값의 보관처입니다(본 시스템이 배송을 수행한다는 뜻이 아닙니다). 저장 표(product_shipping_policy)는 있지만 API 엔드포인트가 없습니다."),
+          ("08", "tags", "검색 태그 · 채널 키워드", "공통 키워드 · 네이버 태그 · 쿠팡 검색어. 저장 표(product_channel_keywords)는 있지만 API 엔드포인트가 없습니다."),
+          ("09", "notice", "상품정보제공고시 · A/S", "품목군 · 제조국 · 품질보증기준 · A/S 책임자 · A/S 연락처 · 특이사항. 저장 표(product_notice)는 있지만 API 엔드포인트가 없습니다."),
+          ("10", "benefit", "구매 · 리뷰 혜택", "구매 적립 포인트 · 리뷰 적립 포인트. 저장 컬럼(products.point_buy·point_review)은 있지만 API 엔드포인트가 없습니다."),
+          ("11", "channel", "노출 채널", "자사몰 · 네이버 스마트스토어 · 쿠팡 노출 설정 — 몰 반출 대상 채널을 고르는 자리입니다. 저장 표(product_channels)는 있지만 API 엔드포인트가 없습니다."),
+        ] %}
+        {% for num, key, label, note in stubs %}
+        <section class="pn-card" id="pnSec-{{ key }}" data-open="n" data-sec="{{ key }}">
+          <div class="pn-card-hd" data-action="toggle-section" data-sec="{{ key }}">
+            <span class="pn-kicker">{{ num }}</span><h3>{{ label }}</h3>
+            <span class="pn-badge-stub">API 미연결 — 향후 사용예정</span>
+            <span class="pn-chev">▾</span>
+          </div>
+          <div class="pn-card-body">
+            <div class="pn-stub-note">{{ note }}</div>
+          </div>
+        </section>
+        {% endfor %}
+
+      </div>
+
+      <aside class="pn-aside">
+        <div class="pn-card">
+          <div class="pn-card-hd" style="cursor:default"><h3 id="pnAsideTitle">{{ crumb_now }}</h3></div>
+          <div class="pn-card-body">
+            <div class="pn-aside-meta" id="pnAsideMeta"></div>
+            <div class="pn-lockline" id="pnLockLine" hidden></div>
+            <div class="pn-result" id="pnResult" data-bind="result">
+              <div class="top"><span class="code" id="pnResCode">—</span><span class="msg" id="pnResMsg">저장하면 여기에 서버 응답이 그대로 섭니다</span></div>
+              <div class="nt" id="pnResNote">화면이 저장 결과를 지어내지 않습니다 — 서버가 준 사유를 그대로 표시합니다.</div>
+              <div class="act" id="pnResAct"></div>
+            </div>
+            <button type="button" class="pn-btn pri pn-btn-block" id="pnSubmitBtn" data-action="submit">저장</button>
+            <div style="display:flex;gap:8px" id="pnAsideBtns2"></div>
+          </div>
+        </div>
+
+        <div class="pn-card pn-similar" id="pnSimilar" hidden>
+          <div class="pn-card-hd" style="cursor:default"><h3 style="font-size:13px">이름이 거의 같은 상품</h3></div>
+          <div class="pn-card-body">
+            <div class="pn-sim-head" id="pnSimHead">이름이 거의 같은 상품이 이미 있습니다 — 같은 상품이면 등록 대신 기존 상품을 수정하세요.</div>
+            <div class="pn-sim-list" id="pnSimList" data-repeat="similar-item"></div>
+            <div class="pn-sim-actbtns">
+              <button type="button" class="pn-btn pri" data-action="force-register">다른 상품으로 등록</button>
+              <button type="button" class="pn-btn" data-action="cancel-similar">취소</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var LOGIN = '/admin2/login';
+  var API = '/api/admin';
+
+  // EDITABLE(PATCH) 의 UI 키 -> DB 컬럼명(locked_fields 는 컬럼명으로 온다 — api/admin_products.py 실측)
+  var COL_OF = { name: 'product_name', maker: 'maker', model_name: 'model_name',
+    status: 'status', sale_price: 'sale_price', purchase_price: 'purchase_price', stock_qty: 'stock_qty' };
+
+  var CODE = (new URLSearchParams(location.search).get('code') || '').trim();
+  var MODE = CODE ? 'edit' : 'register';
+
+  var S = {
+    meta: null,          // GET /product-meta
+    categories: null,    // GET /api/admin/categories (표시 전용 — 저장 불가)
+    baseline: null,      // 수정 모드: GET /products/{code} 원본(diff 기준)
+    partTypeTree: null,  // meta.part_choices (등록 전용 — 수정은 분류 비활성)
+    partTypeSel: null,   // 현재 고른 part_type 코드(등록)
+    similar: null,
+    busy: false,
+    sections: {}         // sec key -> open bool
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function numOrNull(v) { var t = String(v == null ? '' : v).trim(); return t === '' ? null : Number(t); }
+
+  // ── API — 실패를 삼키지 않는다. 401 은 status 로 갈라 세션 만료 안내로 간다 ──
+  function handle(res) {
+    return res.clone().json().catch(function () { return null; }).then(function (j) {
+      if (!res.ok) {
+        var msg = (window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
+        var e = new Error(msg); e.status = res.status; e.body = j; throw e;
+      }
+      return j;
+    });
+  }
+  function apiGet(url) { return fetch(url, { credentials: 'same-origin' }).then(handle); }
+  function apiPost(url, body) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+  function apiPatch(url, body) {
+    return fetch(url, { method: 'PATCH', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle);
+  }
+
+  function writable() { return !!(window.Admin2Shell && window.Admin2Shell.canWrite('operator')); }
+  function writeNote() { return 'viewer 등급은 상품을 등록·수정할 수 없습니다'; }
+
+  // ── 초기 진입 화면 ──────────────────────────────────────────────────────
+  function showInitError(html) {
+    $('pnInitLoad').hidden = true;
+    $('pnInitErr').hidden = false;
+    $('pnInitErr').innerHTML = html;
+    $('pnBody').hidden = true;
+  }
+  function showBody() {
+    $('pnInitLoad').hidden = true;
+    $('pnInitErr').hidden = true;
+    $('pnBody').hidden = false;
+  }
+
+  // ── 섹션 접기/펼치기 ──────────────────────────────────────────────────
+  function setSectionOpen(key, open) {
+    var el = $('pnSec-' + key);
+    if (!el) return;
+    el.setAttribute('data-open', open ? 'y' : 'n');
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    var el;
+    if ((el = t.closest('[data-action="toggle-section"]'))) {
+      var sec = el.getAttribute('data-sec');
+      var card = $('pnSec-' + sec);
+      var open = card && card.getAttribute('data-open') === 'y';
+      setSectionOpen(sec, !open);
+      return;
+    }
+    if ((el = t.closest('[data-action="expand-all"]'))) {
+      document.querySelectorAll('.pn-card[data-sec]').forEach(function (c) { c.setAttribute('data-open', 'y'); });
+      return;
+    }
+    if ((el = t.closest('[data-action="collapse-all"]'))) {
+      document.querySelectorAll('.pn-card[data-sec]').forEach(function (c) { c.setAttribute('data-open', 'n'); });
+      return;
+    }
+    if ((el = t.closest('[data-action="submit"]'))) { if (!el.disabled) onSubmit(); return; }
+    if ((el = t.closest('[data-action="reset-form"]'))) { resetForm(); return; }
+    if ((el = t.closest('[data-action="force-register"]'))) { doRegister(true); return; }
+    if ((el = t.closest('[data-action="cancel-similar"]'))) { hideSimilar(); return; }
+    if ((el = t.closest('[data-action="goto-similar"]'))) {
+      var code = el.getAttribute('data-code');
+      if (code) location.href = '/admin2/product-new?code=' + encodeURIComponent(code);
+      return;
+    }
+  });
+
+  // ── 분류(part_type) 2단 선택 — taxonomy.choice_tree() 출력을 그대로 그린다 ──
+  function findLeafGroup(tree, leafKey) {
+    for (var i = 0; i < tree.length; i++) {
+      if (tree[i].key === leafKey) return { top: tree[i], sub: null };
+      if (tree[i].options) {
+        for (var j = 0; j < tree[i].options.length; j++) {
+          if (tree[i].options[j].key === leafKey) return { top: tree[i], sub: tree[i].options[j] };
+        }
+      }
+    }
+    return null;
+  }
+  function buildPartTypeSelect(tree, currentKey) {
+    var host = $('pnPartTypeHost');
+    var found = currentKey ? findLeafGroup(tree, currentKey) : null;
+    var sel1 = document.createElement('select');
+    sel1.className = 'pn-select'; sel1.id = 'pnPartType1'; sel1.setAttribute('aria-label', '분류(1단)');
+    sel1.innerHTML = '<option value="">분류를 선택하세요</option>' + tree.map(function (t) {
+      return '<option value="' + esc(t.key) + '"' + (found && found.top.key === t.key ? ' selected' : '') + '>' + esc(t.label) + '</option>';
+    }).join('');
+    var sel2 = document.createElement('select');
+    sel2.className = 'pn-select'; sel2.id = 'pnPartType2'; sel2.setAttribute('aria-label', '분류(2단)');
+    sel2.style.display = 'none';
+    var wrap = document.createElement('div'); wrap.className = 'pn-2col';
+    wrap.appendChild(sel1); wrap.appendChild(sel2);
+    host.innerHTML = ''; host.appendChild(wrap);
+    function sync() {
+      var top = tree.filter(function (t) { return t.key === sel1.value; })[0];
+      if (top && top.options) {
+        sel2.style.display = '';
+        sel2.innerHTML = top.options.map(function (o) {
+          return '<option value="' + esc(o.key) + '"' + (found && found.sub && found.sub.key === o.key ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+        }).join('');
+        S.partTypeSel = sel2.value || null;
+      } else {
+        sel2.style.display = 'none'; sel2.innerHTML = '';
+        S.partTypeSel = top ? top.key : null;
+      }
+    }
+    sel1.addEventListener('change', sync);
+    sel2.addEventListener('change', function () { S.partTypeSel = sel2.value || null; });
+    sync();
+  }
+
+  // ── 카테고리(표시 전용) — GET /api/admin/categories 를 한 번 읽어 들여쓴 select ──
+  function buildCategoryOptions(items) {
+    var byParent = {};
+    items.forEach(function (it) {
+      var p = it.parent_id == null ? 0 : it.parent_id;
+      (byParent[p] = byParent[p] || []).push(it);
+    });
+    Object.keys(byParent).forEach(function (k) {
+      byParent[k].sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0) || a.category_id - b.category_id; });
+    });
+    var out = [];
+    function walk(parentId, depth) {
+      (byParent[parentId] || []).forEach(function (it) {
+        out.push('<option value="' + it.category_id + '">' + '　'.repeat(depth) + esc(it.name) + '</option>');
+        walk(it.category_id, depth + 1);
+      });
+    }
+    walk(0, 0);
+    return out.join('');
+  }
+
+  // ── 필드 활성/비활성 — 모드별 실제 서버 저장 가능 여부(코드 실측, 머리말 표 참조) ──
+  function applyModeGates() {
+    var edit = MODE === 'edit';
+    // 상품명 — 두 모드 모두 저장된다
+    $('pnName').disabled = false;
+    // SKU — 입력창 자체가 없다(자동 발번/표시 전용)
+    $('pnSku').disabled = true;
+    $('pnSkuNote').textContent = edit
+      ? 'SKU는 수정할 수 없습니다(수정 가능 필드 목록 밖입니다).'
+      : "등록하면 서버가 자동으로 발번합니다(형식 P-{일련번호}) — 이 화면에서 직접 입력하지 않습니다.";
+    // 분류 — 등록만 가능, 수정은 별도 화면 소관
+    if (edit) {
+      $('pnPartTypeNote').hidden = false;
+      $('pnPartTypeNote').className = 'pn-fnote warn';
+      $('pnPartTypeNote').textContent = '분류 변경은 이 화면에서 지원하지 않습니다(별도 API — 담당 밖). 현재 값만 표시합니다.';
+    } else {
+      $('pnPartTypeNote').hidden = true;
+    }
+    // 제조사 — 두 모드 모두 저장된다
+    $('pnMaker').disabled = false;
+    // 브랜드 — 항상 비활성(머리말 표)
+    $('pnBrand').disabled = true;
+    // 모델명 — 등록 시 저장 안 됨, 수정 시 저장됨
+    $('pnModel').disabled = !edit;
+    $('pnModelNote').hidden = edit;
+    if (!edit) $('pnModelNote').textContent = '등록 API가 이 값을 저장하지 않습니다 — 공급처 연결 등록에서만 쓰입니다. 등록 후 수정에서 입력하세요.';
+    // 판매상태 — 등록은 '판매중' 고정, 수정은 선택 가능
+    $('pnStatus').disabled = !edit || !S.meta;
+    $('pnStatusNote').hidden = edit;
+    if (!edit) $('pnStatusNote').textContent = "등록하면 '판매중'으로 고정됩니다(서버 정책) — 등록 후 수정에서 변경하세요.";
+    // 카테고리 — 항상 비활성(머리말 표)
+    $('pnCategory').disabled = true;
+    // 판매가 — 등록 시 저장 안 됨(NULL 유지), 수정 시 저장됨
+    $('pnSalePrice').disabled = !edit;
+    $('pnSalePriceNote').hidden = edit;
+    if (!edit) $('pnSalePriceNote').textContent = '등록 시 판매가는 비워진 상태로 시작합니다(서버 정책) — 등록 후 수정에서 입력하세요.';
+    // 매입가 — 두 모드 모두 저장된다(등록은 cost_price 파라미터로)
+    $('pnPurchasePrice').disabled = false;
+    // 재고수량 — 등록 시 0 고정, 수정 시 저장됨
+    $('pnStockQty').disabled = !edit;
+    $('pnStockQtyNote').hidden = edit;
+    if (!edit) $('pnStockQtyNote').textContent = '등록 시 재고수량은 0으로 시작합니다(서버 정책) — 등록 후 수정에서 입력하세요.';
+
+    if (!writable()) {
+      ['pnName', 'pnMaker', 'pnModel', 'pnStatus', 'pnSalePrice', 'pnPurchasePrice', 'pnStockQty'].forEach(function (id) {
+        var el = $(id); el.disabled = true; el.title = writeNote();
+      });
+      if (S.partTypeSel !== undefined) {
+        var s1 = $('pnPartType1'), s2 = $('pnPartType2');
+        if (s1) { s1.disabled = true; s1.title = writeNote(); }
+        if (s2) { s2.disabled = true; s2.title = writeNote(); }
+      }
+      $('pnSubmitBtn').disabled = true;
+      $('pnSubmitBtn').title = writeNote();
+    }
+  }
+
+  // ── product-meta 로드 — 분류·제조사·판매상태 선택지 원천(서버가 준다) ──
+  function loadMeta() {
+    return apiGet(API + '/product-meta').then(function (j) {
+      S.meta = j;
+      // 분류 선택 UI는 **등록 모드에서만** 만든다. 수정 모드는 PATCH 가 part_type 을
+      // 받지 않는다(EDITABLE 밖 — 머리말 표) — 여기서 상호작용 가능한 select 를
+      // 만들면 운영자가 분류를 바꿔 골라도 저장 시 조용히 버려진다("저장되는 것처럼
+      // 가장하지 마라" 위반). 수정 모드는 fillFromBaseline() 이 이미 그린 정적
+      // 텍스트(pn-static)를 그대로 둔다 — 여기서 건드리지 않는다.
+      if (MODE === 'register') {
+        var tree = j.part_choices || [];
+        S.partTypeTree = tree;
+        buildPartTypeSelect(tree, null);
+      }
+      var dl = $('pnMakerList');
+      dl.innerHTML = (j.makers || []).map(function (m) { return '<option value="' + esc(m) + '">'; }).join('');
+      var st = $('pnStatus');
+      var opts = (j.status_options || []).map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
+      st.innerHTML = opts || '<option value="">선택지 없음</option>';
+      if (MODE === 'register') {
+        // 서버가 항상 '판매중'으로 고정 — 실제 정책값을 그대로 보여준다(지어내지 않는다)
+        if ((j.status_options || []).indexOf('판매중') >= 0) st.value = '판매중';
+      } else if (S.baseline) {
+        st.value = S.baseline.status || '';
+      }
+      applyModeGates();
+    }).catch(function (e) {
+      $('pnPartTypeHost').innerHTML = '<span class="pn-fnote err">분류 선택지를 불러오지 못했습니다 — ' + esc(e.message || '') + '</span>';
+      $('pnMaker').disabled = true; $('pnMaker').title = '제조사 선택지를 불러오지 못했습니다';
+      $('pnStatus').innerHTML = '<option value="">선택지 없음</option>';
+      $('pnStatus').disabled = true; $('pnStatus').title = e.message || '';
+      throw e;
+    });
+  }
+
+  // ── 카테고리 — 표시 전용(저장 불가, 머리말 표 참조) ──
+  function loadCategories() {
+    var sel = $('pnCategory');
+    return apiGet(API + '/categories').then(function (j) {
+      S.categories = j;
+      sel.innerHTML = '<option value="">표시 안 됨 — 조회 API에 카테고리 값이 없습니다</option>' + buildCategoryOptions(j.items || []);
+    }).catch(function (e) {
+      sel.innerHTML = '<option value="">카테고리 목록을 불러오지 못했습니다</option>';
+      sel.title = e.message || '';
+    });
+  }
+
+  // ── 잠금 표시 — locked_fields(DB 컬럼명)를 UI 필드에 매핑해 배지만 켠다 ──
+  function renderLocks(locked) {
+    var arr = locked || [];
+    Object.keys(COL_OF).forEach(function (key) {
+      var col = COL_OF[key];
+      var cap = key.replace(/(^|_)([a-z])/g, function (_, p1, p2) { return (p1 ? '_' : '') + p2.toUpperCase(); });
+      var id = 'pnLock' + cap;
+      var badge = $(id);
+      if (badge) badge.hidden = arr.indexOf(col) < 0;
+    });
+    var line = $('pnLockLine');
+    if (arr.length) {
+      line.hidden = false;
+      line.innerHTML = '<span class="pn-fnote">서버 잠금 필드(다음 자동 적재가 안 덮음): <b>' + esc(arr.join(', ')) + '</b></span>';
+    } else {
+      line.hidden = true;
+    }
+  }
+
+  // ── 등록 모드 ──────────────────────────────────────────────────────────
+  function resetForm() {
+    $('pnName').value = ''; $('pnMaker').value = ''; $('pnModel').value = '';
+    $('pnSalePrice').value = ''; $('pnPurchasePrice').value = ''; $('pnStockQty').value = '';
+    var s1 = $('pnPartType1'); if (s1) s1.value = '';
+    var s2 = $('pnPartType2'); if (s2) { s2.value = ''; s2.style.display = 'none'; }
+    S.partTypeSel = null;
+    hideSimilar();
+    clearResult();
+  }
+  function initAsideRegister() {
+    $('pnAsideMeta').innerHTML = '<span>새 상품을 등록합니다. 저장하면 서버가 SKU·상품코드를 발번합니다.</span>';
+    $('pnSubmitBtn').textContent = '등록';
+    $('pnAsideBtns2').innerHTML =
+      '<button type="button" class="pn-btn" data-action="reset-form" style="flex:1">입력 초기화</button>' +
+      '<a class="pn-btn" href="/admin2/products" style="flex:1">상품 관리로 이동</a>';
+  }
+  function collectRegisterBody() {
+    return {
+      name: $('pnName').value.trim(),
+      part_type: S.partTypeSel || null,
+      maker: $('pnMaker').value.trim() || null,
+      cost_price: numOrNull($('pnPurchasePrice').value)
+    };
+  }
+  function onSubmit() {
+    if (S.busy) return;
+    if (MODE === 'register') checkSimilarThenRegister();
+    else doPatch();
+  }
+  function checkSimilarThenRegister() {
+    var body = collectRegisterBody();
+    S.busy = true; $('pnSubmitBtn').disabled = true;
+    var url = API + '/product-similar?name=' + encodeURIComponent(body.name)
+      + '&part_type=' + encodeURIComponent(body.part_type || '');
+    apiGet(url).then(function (j) {
+      S.busy = false; $('pnSubmitBtn').disabled = !writable();
+      if (j.items && j.items.length) { showSimilar(j.items, j.threshold); return; }
+      doRegister(false);
+    }).catch(function (e) {
+      S.busy = false; $('pnSubmitBtn').disabled = !writable();
+      showResult(resultFromError(e, '중복 확인'));
+    });
+  }
+  function showSimilar(items, threshold) {
+    S.similar = items;
+    $('pnSimilar').hidden = false;
+    $('pnSimHead').textContent = '이름이 거의 같은 상품이 ' + items.length + '건 있습니다(일치도 '
+      + Math.round((threshold || 0.97) * 100) + '% 이상) — 같은 상품이면 등록 대신 기존 상품을 수정하세요.';
+    $('pnSimList').innerHTML = items.map(function (it) {
+      return '<div class="pn-sim-item">'
+        + '<span class="pn-sim-name">' + esc(Admin2Text.stripHtml(it.name)) + '</span>'
+        + '<span class="pn-sim-meta">' + esc(it.sku) + ' · 일치도 ' + Math.round(it.score * 100) + '%</span>'
+        + '<button type="button" class="pn-btn" data-action="goto-similar" data-code="' + it.product_code + '">기존 상품 수정으로 이동</button>'
+        + '</div>';
+    }).join('');
+  }
+  function hideSimilar() { $('pnSimilar').hidden = true; S.similar = null; }
+  function doRegister(confirmSimilar) {
+    if (S.busy) return;
+    var body = collectRegisterBody();
+    body.confirm_similar = !!confirmSimilar;
+    S.busy = true; $('pnSubmitBtn').disabled = true;
+    apiPost(API + '/products', body).then(function (r) {
+      S.busy = false; $('pnSubmitBtn').disabled = !writable();
+      hideSimilar();
+      showResult({
+        tone: 'ok', code: '200', msg: r.note || ('등록 완료 — SKU ' + r.sku),
+        note: 'SKU <b>' + esc(r.sku) + '</b> · 상품코드 <b>' + esc(String(r.product_code)) + '</b>. ' + esc(r.note || ''),
+        act: '<a class="pn-btn pri" href="/admin2/product-new?code=' + r.product_code + '">방금 등록한 상품 수정 열기</a>'
+          + '<a class="pn-btn" href="/admin2/products">상품 관리로 이동</a>'
+      });
+    }).catch(function (e) {
+      S.busy = false; $('pnSubmitBtn').disabled = !writable();
+      if (e.status === 409 && e.body && e.body.detail && e.body.detail.items) {
+        showSimilar(e.body.detail.items, (S.meta && 0.97) || 0.97);
+        return;
+      }
+      showResult(resultFromError(e, '등록'));
+    });
+  }
+
+  // ── 수정 모드 ──────────────────────────────────────────────────────────
+  function initAsideEdit() {
+    $('pnSubmitBtn').textContent = '저장';
+    $('pnAsideBtns2').innerHTML = '<a class="pn-btn pn-btn-block" href="/admin2/products">수정 취소 — 상품 관리로 복귀</a>';
+  }
+  function fillFromBaseline(d) {
+    $('pnSku').value = d.sku || '';
+    $('pnName').value = d.name || '';
+    $('pnMaker').value = d.maker || '';
+    $('pnModel').value = d.model_name || '';
+    $('pnSalePrice').value = d.sale_price == null ? '' : d.sale_price;
+    $('pnPurchasePrice').value = d.purchase_price == null ? '' : d.purchase_price;
+    $('pnStockQty').value = d.stock_qty == null ? '' : d.stock_qty;
+    $('pnPartTypeHost').innerHTML = '<span class="pn-static">' + esc(d.cat || d.part_type || '—') + '</span>';
+    var meta = [];
+    meta.push('상품코드 <b>' + esc(String(d.product_code)) + '</b>');
+    meta.push('SKU <b>' + esc(d.sku || '—') + '</b>');
+    if (d.origin) meta.push('데이터 출처 <b>' + esc(d.origin) + '</b>');
+    $('pnAsideMeta').innerHTML = '<span>' + meta.join(' · ') + '</span>';
+    var hd = $('pnHdMeta'); hd.hidden = false;
+    hd.innerHTML = '코드 <b>' + esc(String(d.product_code)) + '</b> · SKU <b>' + esc(d.sku || '—') + '</b>';
+    renderLocks(d.locked_fields);
+  }
+  function loadProduct() {
+    return apiGet(API + '/products/' + encodeURIComponent(CODE)).then(function (j) {
+      S.baseline = j;
+      fillFromBaseline(j);
+    });
+  }
+  function diffChanges() {
+    var b = S.baseline || {};
+    var changes = {};
+    var name = $('pnName').value.trim();
+    if (name !== (b.name || '')) changes.name = name;
+    var maker = $('pnMaker').value.trim();
+    if (maker !== (b.maker || '')) changes.maker = maker;
+    var model = $('pnModel').value.trim();
+    if (model !== (b.model_name || '')) changes.model_name = model;
+    var status = $('pnStatus').value;
+    if (status && status !== (b.status || '')) changes.status = status;
+    var sp = $('pnSalePrice').value.trim();
+    var spNum = sp === '' ? null : Number(sp);
+    if (spNum !== (b.sale_price == null ? null : b.sale_price)) changes.sale_price = sp === '' ? '' : spNum;
+    var pp = $('pnPurchasePrice').value.trim();
+    var ppNum = pp === '' ? null : Number(pp);
+    if (ppNum !== (b.purchase_price == null ? null : b.purchase_price)) changes.purchase_price = pp === '' ? '' : ppNum;
+    var sq = $('pnStockQty').value.trim();
+    if (sq !== '' && Number(sq) !== (b.stock_qty == null ? null : b.stock_qty)) changes.stock_qty = Number(sq);
+    return changes;
+  }
+  function doPatch() {
+    if (S.busy) return;
+    var changes = diffChanges();
+    S.busy = true; $('pnSubmitBtn').disabled = true;
+    apiPatch(API + '/products/' + encodeURIComponent(CODE), { changes: changes, lock: true }).then(function (r) {
+      S.busy = false; $('pnSubmitBtn').disabled = !writable();
+      showResult({ tone: 'ok', code: '200', msg: r.note || ('저장 완료 — ' + r.changed + '건 변경'),
+        note: '변경 <b>' + r.changed + '</b>건' + (r.fields && r.fields.length ? ' — ' + esc(r.fields.join(', ')) : '') + '.', act: '' });
+      // baseline 을 저장 성공한 값으로 **먼저 직접 갱신**한다 — 뒤이은 재조회가 실패해도
+      // 다음 diff 가 이번 저장을 기준으로 계산되게 하기 위해서다(재조회 실패로 baseline 이
+      // 낡은 채 남으면 다음 저장이 이미 반영된 값을 다시 "변경"으로 잘못 판단한다).
+      if (S.baseline) {
+        Object.keys(changes).forEach(function (k) {
+          S.baseline[k] = changes[k] === '' ? null : changes[k];
+        });
+        if (r.locked_fields) S.baseline.locked_fields = r.locked_fields;
+        renderLocks(S.baseline.locked_fields);
+      }
+      // 서버의 온전한 최신 상태(다른 경로의 변경 포함)로 다시 맞춘다 — 실패해도 위에서
+      // 이미 반영한 값이 있어 조용히 무너지지 않는다.
+      loadProduct().catch(function () {});
+    }).catch(function (e) {
+      S.busy = false; $('pnSubmitBtn').disabled = !writable();
+      showResult(resultFromError(e, '저장'));
+    });
+  }
+
+  // ── 결과 표시 — 서버가 준 사유를 그대로(§CANON, if(!res.ok) return; 금지) ──
+  function showResult(r) {
+    var box = $('pnResult');
+    box.className = 'pn-result ' + (r.tone || 'none');
+    $('pnResCode').textContent = r.code || '—';
+    $('pnResMsg').textContent = r.msg || '';
+    $('pnResNote').innerHTML = r.note || '';
+    $('pnResAct').innerHTML = r.act || '';
+  }
+  function clearResult() {
+    showResult({ tone: 'none', code: '—', msg: '저장하면 여기에 서버 응답이 그대로 섭니다',
+      note: '화면이 저장 결과를 지어내지 않습니다 — 서버가 준 사유를 그대로 표시합니다.', act: '' });
+  }
+  function resultFromError(e, where) {
+    var st = e && e.status;
+    var detail = (e && e.message) || '';
+    if (st === 401) {
+      return { tone: 'err', code: '401', msg: '세션이 만료됐습니다 — 다시 로그인 후 시도하십시오',
+        note: '입력값은 서버에 닿지 않았습니다 — 저장되지 않았습니다.',
+        act: '<a class="pn-btn" href="' + LOGIN + '">로그인 화면으로 이동</a>' };
+    }
+    if (st === 403) {
+      return { tone: 'err', code: '403', msg: detail || '권한이 부족합니다', note: where + ' 실패 — 서버 사유 그대로.', act: '' };
+    }
+    if (st === 400) {
+      return { tone: 'err', code: '400', msg: detail, note: '서버가 거부한 값입니다 — 해당 항목을 확인하십시오.', act: '' };
+    }
+    if (st === 404) {
+      return { tone: 'err', code: '404', msg: detail, note: '조회 시점 이후 상태가 바뀌었을 수 있습니다.',
+        act: '<a class="pn-btn" href="/admin2/products">상품 관리로 이동</a>' };
+    }
+    if (st === 409) {
+      var taken = e.body && e.body.detail && e.body.detail.taken_by;
+      return { tone: 'err', code: '409', msg: detail,
+        note: taken ? '점유 상품코드 <b>' + esc(String(taken)) + '</b>' : '',
+        act: taken ? '<a class="pn-btn" href="/admin2/product-new?code=' + taken + '">점유 상품으로 이동</a>' : '' };
+    }
+    if (st >= 500) {
+      return { tone: 'err', code: String(st), msg: '서버 오류로 ' + where + '하지 못했습니다', note: '사유: ' + esc(detail), act: '' };
+    }
+    if (st === undefined) {
+      return { tone: 'err', code: '연결 실패', msg: '서버에 닿지 못했습니다 — ' + (detail || '네트워크'),
+        note: '입력값은 저장되지 않았습니다.', act: '' };
+    }
+    return { tone: 'err', code: String(st), msg: detail || ('오류 ' + st), note: '', act: '' };
+  }
+
+  // ── 시작 ───────────────────────────────────────────────────────────────
+  function start() {
+    clearResult();
+    if (MODE === 'edit') {
+      initAsideEdit();
+      loadProduct().then(function () {
+        showBody();
+        return Promise.all([loadMeta().catch(function () {}), loadCategories()]);
+      }).catch(function (e) {
+        if (e && e.status === 404) {
+          showInitError('상품이 없습니다 — 조회 시점 이후 삭제됐거나 잘못된 코드입니다.'
+            + '<br><a href="/admin2/products">상품 관리로 이동</a>');
+        } else if (e && e.status === 401) {
+          showInitError('세션이 만료됐습니다.<br><a href="' + LOGIN + '">로그인 화면으로 이동</a>');
+        } else {
+          showInitError('상품을 불러오지 못했습니다 — ' + esc((e && e.message) || '알 수 없는 오류')
+            + '<br><button type="button" data-action-inline="retry">다시 시도</button>');
+          var btn = document.querySelector('[data-action-inline="retry"]');
+          if (btn) btn.addEventListener('click', start);
+        }
+      });
+    } else {
+      initAsideRegister();
+      showBody();
+      Promise.all([loadMeta().catch(function () {}), loadCategories()]).catch(function () {});
+    }
+  }
+
+  if (window.Admin2Shell && window.Admin2Shell.meReady) {
+    window.Admin2Shell.meReady.then(function () { applyModeGates(); });
+  }
+  start();
+})();
+</script>
+{% endraw %}
+{% endblock %}
