@@ -154,11 +154,31 @@ _WHERE = """
                 SELECT c2.category_id FROM categories c2 JOIN t ON c2.parent_id = t.category_id
               ) SELECT category_id FROM t
            )))
+      -- 2026-09-11 검색 패널 개편(A-127, req-products.md ⑤-B B-... 노출여부 필터) —
+      -- products.is_visible 컬럼은 마이그레이션 0081로 이미 생겼다(db/migrations/versions/
+      -- 0081_product_origin_fields.py:56·89) 그런데 지금까지 이 목록 API가 그 컬럼을
+      -- 읽지도 응답에 담지도 않았다. ''=전체, 'on'=is_visible IS TRUE, 'off'=is_visible
+      -- IS FALSE. 빈 문자열 비교로 3상태를 표현한다 — 다른 두 필터(:status·:origin)와
+      -- 같은 관례(전 파일 공통 패턴).
+      AND (:visible = '' OR p.is_visible = (:visible = 'on'))
+      -- 2026-09-11 — 판매상태 다중선택 체크박스(신설, 판매중/품절/단종). 콤마구분 문자열로
+      -- 받아 string_to_array + ANY로 비교한다. ⚠ 기존 :status 파라미터(위 _STATUS_CASE 비교,
+      -- 상태 탭이 쓰는 파생 버킷 ok/review/oos/price 축)와 **이름을 공유하지 않는다** —
+      -- 체크박스는 products.status **원본 컬럼값**(STATUS_OK: 판매중·품절·단종·삭제대기,
+      -- 정본 어휘)을 다룬다. 두 축은 서로 다른 값 집합이라(파생 버킷 키 "ok"와 원본 값
+      -- "판매중"은 전혀 다른 문자열이다) 같은 파라미터에 섞어 보내면 서버가 어느 쪽으로
+      -- 해석할지 모호해진다 — 그 모호함 자체가 "한 화면이 두 원천으로 말한다"(④-B4가
+      -- 경고하는 사고)와 같은 종류라 별도 파라미터(:sale_status)로 분리했다. 이 조건과
+      -- 위 :status 조건은 **_WHERE 안에서 함께 AND로 묶인다** — _QUERY·_COUNT·_KPI 셋 다
+      -- 이 _WHERE를 공유하므로 탭(status)과 체크박스(sale_status)가 항상 같은 방식으로
+      -- 결합된다(예: 탭="재고 없음"+체크박스="판매중" → "판매중인데 재고 0·품절"만).
+      AND (:sale_status = '' OR p.status = ANY(string_to_array(:sale_status, ',')))
 """
 
 _QUERY = text(f"""
     SELECT p.product_code, p.sku, p.product_name, p.maker, p.part_type,
            p.status, p.review_required_yn, p.sale_price, p.stock_qty, p.data_origin,
+           p.is_visible,
            COALESCE(sp.cnt, 0) AS supplier_count,
            to_jsonb(ps) AS specs
     FROM products p
@@ -245,7 +265,8 @@ def spec_progress(part_type: str, specs: dict | None) -> tuple[int, int]:
 @router.get("/products")
 def list_products(q: str = "", part_type: str = "", status: str = "", origin: str = "",
                   maker: str = "", page: int = 1, size: int = 100,
-                  category_id: int = 0, include_desc: int = 0):
+                  category_id: int = 0, include_desc: int = 0,
+                  visible: str = "", sale_status: str = ""):
     # def(비동기 아님) — psycopg2 동기 드라이버, FastAPI 스레드풀 실행
     size = max(1, min(size, 500))     # 상한 — 브라우저가 버티는 범위
     page = max(1, page)
@@ -257,10 +278,19 @@ def list_products(q: str = "", part_type: str = "", status: str = "", origin: st
     # 외의 다른 뜻이 되지 않게 한다.
     category_id = max(0, category_id)
     include_desc = 1 if include_desc else 0
+    # 2026-09-11 검색 패널 개편(A-127) — visible: ''=전체 · 'on'/'off' 외 값은 무필터로
+    # 접는다(URL을 손으로 바꿔도 예상 밖 SQL 상태가 되지 않게). sale_status: 콤마구분
+    # products.status 값 목록 — 각 조각을 STATUS_OK로 검증하지는 않는다(존재하지 않는
+    # 값을 보내도 그냥 0건으로 자연히 걸러진다 — category_id의 기존 관례와 같다).
+    visible = visible.strip().lower()
+    if visible not in ("on", "off"):
+        visible = ""
+    sale_status = sale_status.strip()
     p = {"q": q.strip(), "part_type": part_type.strip(), "status": status.strip(),
          "origin": origin.strip(), "maker": maker.strip(),
          "size": size, "offset": (page - 1) * size,
-         "category_id": category_id, "include_desc": include_desc}
+         "category_id": category_id, "include_desc": include_desc,
+         "visible": visible, "sale_status": sale_status}
     with engine.connect() as conn:
         rows = conn.execute(_QUERY, p).all()
         total_count = conn.execute(_COUNT, p).scalar_one()
@@ -289,6 +319,10 @@ def list_products(q: str = "", part_type: str = "", status: str = "", origin: st
             "sale_price": r.sale_price,
             "status_key": status_key,
             "origin": r.data_origin,
+            # 2026-09-11 개편 — 노출 여부(req-products.md ⑤-B B-6). is_visible 컬럼은
+            # 0081로 이미 있으나 이 응답에 담긴 적이 없었다 — 표에 노출 상태를
+            # 보여주려면 화면이 이 값을 받아야 한다.
+            "is_visible": r.is_visible,
         })
     return {"items": items, "kpis": kpis,
             "page": page, "size": size, "total": total_count,
