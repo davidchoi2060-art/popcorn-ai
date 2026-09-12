@@ -1,0 +1,567 @@
+{
+ "vram_gb": {
+  "stats": {
+   "total": 2488,
+   "already": 282,
+   "filled": 2130,
+   "null": 74,
+   "anomaly": 2
+  },
+  "blocked": [
+   [
+    103643,
+    "GIGABYTE AORUS SLI HB 브릿지 L",
+    "no_gb"
+   ],
+   [
+    104198,
+    "MSI NV링크 브릿지",
+    "no_gb"
+   ],
+   [
+    104764,
+    "D4 16G PC4-30900 CL18 Xtreem 블랙 (8Gx2) 서린",
+    "no_gb"
+   ],
+   [
+    105573,
+    "(G.SKILL) DDR4 16G PC4-30900 CL18 TRIDENT Z RGB 8Gx2 /RAM",
+    "no_gb"
+   ],
+   [
+    107157,
+    "AFOX 지포스 G210 D3 512MB LP",
+    "no_gb"
+   ],
+   [
+    109488,
+    "지포스 GTX 1660 슈퍼 [중고 / 보증2년이상남음]",
+    "no_gb"
+   ],
+   [
+    110226,
+    "FORSA 지포스 G210 D3 512MB 64-bit LP",
+    "no_gb"
+   ],
+   [
+    110662,
+    "인텔 코어i5-12세대 12400F + H610 + 이엠텍 RTX2060 SUPER",
+    "no_gb"
+   ],
+   [
+    113281,
+    "NVIDIA 쿼드로 Sync II 엔비디아코리아 정품",
+    "no_gb"
+   ],
+   [
+    113331,
+    "NVIDIA A16",
+    "no_gb"
+   ],
+   [
+    113333,
+    "NVIDIA A2",
+    "no_gb"
+   ],
+   [
+    113335,
+    "Quadro Sync ll",
+    "no_gb"
+   ],
+   [
+    113462,
+    "NVIDIA 쿼드로 RTX NVLINK BRIDGE 3-Slot 엔비디아코리아 정품",
+    "no_gb"
+   ],
+   [
+    113463,
+    "NVIDIA Quadro NVLINK BRIDGE 2 Slot 엔비디아코리아 정품",
+    "no_gb"
+   ],
+   [
+    113464,
+    "[NVIDIA] Quadro NVLINK HB BRIDGE 3-Slot 엔비디아코리아 정품",
+    "no_gb"
+   ],
+   [
+    114909,
+    "ZOTAC 지포스 RTX 4070 Ti AMP AIRO 스파이더맨:어크로스 더 유니버스 번들",
+    "no_gb"
+   ],
+   [
+    114910,
+    "ZOTAC GAMING 지포스 RTX 4070 AMP AIRO 스파이더맨:어크로스 더 유니버스 번들",
+    "no_gb"
+   ],
+   [
+    115256,
+    "[중고] GIGABYTE 지포스 RTX 3060 GAMING OC 12G",
+    "no_gb"
+   ],
+   [
+    115261,
+    "[중고] INNO3D 지포스 RTX 3060 Ti TWIN X2 LHR",
+    "no_gb"
+   ],
+   [
+    115273,
+    "파이온 메르시 (5600X/3060TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115274,
+    "파이온 메르시 (i5-12400F/3060TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115275,
+    "파이온 메르시 (i5-12400F/3060/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115276,
+    "파이온 메르시 (5600X/3060/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115277,
+    "파이온 메르시-C (5600X/3060/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115278,
+    "파이온 메르시-C (5600X/3060TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115279,
+    "파이온 메르시-C (i5-12400F/3060/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115280,
+    "파이온 메르시-C (i5-12400F/3060TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115285,
+    "[중고] NVIDIA GEFORCE RTX3060 12G 그래픽카드",
+    "no_gb"
+   ],
+   [
+    115286,
+    "[중고]NVIDIA GEFORCE RTX3060TI 8G 그래픽카드",
+    "no_gb"
+   ],
+   [
+    115292,
+    "파이온 메르시 (i7-12700F/3070TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115293,
+    "파이온 메르시 (i5-12400F/3070/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115294,
+    "파이온 메르시 (i5-12400F/3070TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115295,
+    "파이온 메르시 (i7-12700F/3070/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115296,
+    "파이온 메르시 (5600X/3070/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115297,
+    "파이온 메르시 (5600X/3070TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115298,
+    "파이온 메르시 (5800X/3070TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115299,
+    "파이온 메르시 (5800X/3070/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115300,
+    "파이온 메르시-C (5600X/3070/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115301,
+    "파이온 메르시-C (i5-12400F/3070TI/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115302,
+    "파이온 메르시-C (i5-12400F/3070/NVMe 512GB/16GB)",
+    "unknown_chip_no_mem_tag:16"
+   ],
+   [
+    115307,
+    "[중고]NVIDIA GEFORCE RTX3070TI 8G 그래픽카드",
+    "no_gb"
+   ],
+   [
+    115309,
+    "[LC3070] Coms 모니터 받침대/스탠드, 브론즈 크리스탈 (310x620) 두께 5mm",
+    "no_gb"
+   ],
+   [
+    115362,
+    "UgreenU-40808 TRS5.5 Stereo스테레오마이크케이블10m",
+    "no_gb"
+   ],
+   [
+    115363,
+    "NEXT-4080DP-AOC DP v1.4 8K@60Hz UHD Metal Cable 80M",
+    "no_gb"
+   ],
+   [
+    115364,
+    "[U4080] Coms 아이폰 USB 데이타/충전 케이블 1M",
+    "no_gb"
+   ],
+   [
+    115366,
+    "ALPHACOOL Core 지포스 RTX 4090 레퍼런스 디자인 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115367,
+    "ALPHACOOL Core 지포스 RTX 4090 슈프림 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115368,
+    "ALPHACOOL Core 지포스 RTX 4090 Master 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115369,
+    "ALPHACOOL Core 지포스 RTX 4090 AMP 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115370,
+    "ALPHACOOL Core 지포스 RTX 4090 STRIX + TUF 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115380,
+    "Ugreen U-40907 차량용 모바일 송풍구 거치대",
+    "no_gb"
+   ],
+   [
+    116375,
+    "[중고] NVIDIA GEFORCE 1660 6G",
+    "no_gb"
+   ],
+   [
+    116376,
+    "[중고] NVIDIA GEFORCE 1660Ti 6G",
+    "no_gb"
+   ],
+   [
+    116418,
+    "TAGER 지포스 GTX 1650 K D6 4G DUAL",
+    "no_gb"
+   ],
+   [
+    116430,
+    "FORSA 지포스 G210 D3 512MB",
+    "no_gb"
+   ],
+   [
+    116431,
+    "AFOX 지포스 G210 D3 512MB LP 디앤디컴",
+    "no_gb"
+   ],
+   [
+    116432,
+    "TAGER 지포스 G210 D3 512MB LP",
+    "no_gb"
+   ],
+   [
+    119459,
+    "[중고]NVIDIA 지포스 RTX2060 SUPER 8G 그래픽카드",
+    "no_gb"
+   ],
+   [
+    119460,
+    "[중고]NVIDIA 지포스 RTX2070 SUPER 8G 그래픽카드",
+    "no_gb"
+   ],
+   [
+    119565,
+    "NVIDIA Ampere generation NV링크 브릿지 3-Slot",
+    "no_gb"
+   ],
+   [
+    119566,
+    "NVIDIA Ampere generation NV링크 브릿지 2-Slot",
+    "no_gb"
+   ],
+   [
+    119784,
+    "발키리 DL125 ARGB (WHITE)",
+    "no_gb"
+   ],
+   [
+    120036,
+    "FSP DAGGER PRO 850W GOLD 화이트 ATX 3.0(12V-2x6)",
+    "no_gb"
+   ],
+   [
+    123268,
+    "액슬 지포스 G210 D3 512MB 에즈윈",
+    "no_gb"
+   ],
+   [
+    123270,
+    "AFOX 지포스 G210 D3 512MB 대원씨티에스",
+    "no_gb"
+   ],
+   [
+    123669,
+    "이엠텍 지포스 RTX 5070 Ti MIRACLE WHITE D7 16GB이엠텍 [회원가입 현금할인 -2.5%]",
+    "no_gb"
+   ],
+   [
+    123672,
+    "GAINWARD 지포스 RTX 5070 Ti 피닉스 D7 16GB회원가입 -2.5% 현금할인]",
+    "no_gb"
+   ],
+   [
+    128408,
+    "GIGABYTE AORUS 지포스 RTX 5090 AI BOX 제이씨현",
+    "no_gb"
+   ],
+   [
+    128412,
+    "GIGABYTE AORUS 지포스 RTX 5090 AI BOX 피씨디렉트",
+    "no_gb"
+   ],
+   [
+    20484101,
+    "이엠텍 RTX 4060 Ti STORM X2",
+    "no_gb"
+   ],
+   [
+    20484102,
+    "갤럭시 GALAX RTX 4060 2X",
+    "no_gb"
+   ],
+   [
+    20484103,
+    "MSI RTX 4070 SUPER 벤투스 2X",
+    "no_gb"
+   ],
+   [
+    20484821,
+    "이엠텍 RTX 4060 STORM X2 WHITE",
+    "no_gb"
+   ],
+   [
+    20489103,
+    "GIGABYTE AORUS 지포스 RTX 5090 AI BOX 피씨디렉트",
+    "no_gb"
+   ]
+  ],
+  "anomalies": [
+   [
+    115377,
+    "TYAN TAKO-FT83-(B29R48-16C29G)-RTX4090 6GPU (512GB, SSD 2TB + 18TB)",
+    "anomaly:RTX\\s*4090:512:allowed=[24]"
+   ],
+   [
+    121111,
+    "NVIDIA H100 NVL 188GB  제조사OEM </p><font color=red> [현금구매 추가할인 -2%] </FONT>",
+    "anomaly:\\bH100\\s*NVL\\b:188:allowed=[94]"
+   ]
+  ]
+ },
+ "cpu_cores": {
+  "stats": {
+   "total": 683,
+   "already": 263,
+   "filled": 388,
+   "null": 32,
+   "anomaly": 0
+  },
+  "blocked": [
+   [
+    100619,
+    "인텔 코어i5-7세대 7600 (카비레이크) (정품)",
+    "no_model:intel_core:7600"
+   ],
+   [
+    106457,
+    "인텔 제온 스케일러블 골드 6134 (스카이레이크) 정품",
+    "no_model:xeon:6134"
+   ],
+   [
+    106470,
+    "인텔 제온 스케일러블 실버 4215 (캐스케이드레이크) (정품)",
+    "no_model:xeon:4215"
+   ],
+   [
+    106537,
+    "AMD 3세대 라이젠5 마티스 3500X (정품 멀티팩)(쿨러포함)",
+    "no_model:ryzen:3500X"
+   ],
+   [
+    106741,
+    "AMD 3세대 라이젠5 마티스 3500 (정품 멀티팩)(쿨러포함)",
+    "no_model:ryzen:3500"
+   ],
+   [
+    108502,
+    "AMD 라이젠3 PRO 르누아르 4350G (정품 멀티팩)(쿨러포함)",
+    "no_model:ryzen:4350G"
+   ],
+   [
+    108503,
+    "AMD 라이젠7 PRO 르누아르 4750G (정품 멀티팩)(쿨러포함)",
+    "no_model:ryzen:4750G"
+   ],
+   [
+    108504,
+    "AMD 라이젠5 PRO 4650G (르누아르)(멀티팩(정품)(쿨러포함)",
+    "no_model:ryzen:4650G"
+   ],
+   [
+    109762,
+    "AMD 라이젠3-2세대 3200GE (피카소)(멀티팩)",
+    "no_model:ryzen:3200GE"
+   ],
+   [
+    110010,
+    "인텔 제온 스케일러블 실버 4210 (캐스케이드레이크)(정품)",
+    "no_model:xeon:4210"
+   ],
+   [
+    119282,
+    "인텔 프로세서 300 (랩터레이크 리프레시) (정품)",
+    "no_family:300"
+   ],
+   [
+    123034,
+    "[회원가입 계좌이체 맞춤할인 -2.5%]",
+    "no_family:"
+   ],
+   [
+    123851,
+    "AMD 라이젠5-4세대 5600T (버미어) (멀티팩(정품))[회원가입 계좌이체 맞춤할인 -2.5%]",
+    "no_model:ryzen:5600T"
+   ],
+   [
+    126913,
+    "인텔 프로세서 300 (랩터레이크 리프레시) (벌크)",
+    "no_family:300"
+   ],
+   [
+    126943,
+    "인텔 제온 스케일러블 골드 6526Y (에메랄드 래피드) (벌크)",
+    "no_model:xeon:6526Y"
+   ],
+   [
+    126944,
+    "인텔 제온 스케일러블 플래티넘 8568Y+ (에메랄드 래피드) (벌크)",
+    "no_model:xeon:8568Y"
+   ],
+   [
+    127719,
+    "AMD 라이젠5-5세대 7400 (라파엘) (멀티팩 정품)",
+    "no_model:ryzen:7400"
+   ],
+   [
+    128699,
+    "AMD 라이젠5-5세대 7500X3D (라파엘) (멀티팩 정품)",
+    "no_model:ryzen:7500X3D"
+   ],
+   [
+    128735,
+    "AMD 라이젠7-6세대 9850X3D (그래니트 릿지) (멀티팩 정품)",
+    "no_model:ryzen:9850X3D"
+   ],
+   [
+    128742,
+    "AMD 라이젠7-6세대 9850X3D (그래니트 릿지) (정품)",
+    "no_model:ryzen:9850X3D"
+   ],
+   [
+    129419,
+    "인텔 코어 울트라5 시리즈2 250KF Plus (애로우레이크 리프레시) (정품)",
+    "no_model:core_ultra:250KF"
+   ],
+   [
+    129420,
+    "인텔 코어 울트라5 시리즈2 250K Plus (애로우레이크 리프레시) (정품)",
+    "no_model:core_ultra:250K"
+   ],
+   [
+    129421,
+    "인텔 코어 울트라7 시리즈2 270K Plus (애로우레이크 리프레시) (정품)",
+    "no_model:core_ultra:270K"
+   ],
+   [
+    129422,
+    "인텔 코어 울트라7 시리즈2 270K Plus (애로우레이크 리프레시) (벌크)",
+    "no_model:core_ultra:270K"
+   ],
+   [
+    129423,
+    "인텔 코어 울트라5 시리즈2 250KF Plus (애로우레이크 리프레시) (벌크)",
+    "no_model:core_ultra:250KF"
+   ],
+   [
+    129424,
+    "인텔 코어 울트라5 시리즈2 250K Plus (애로우레이크 리프레시) (벌크)",
+    "no_model:core_ultra:250K"
+   ],
+   [
+    129472,
+    "AMD 라이젠9-6세대 9950X3D2 (그래니트 릿지) (정품)",
+    "no_model:ryzen:"
+   ],
+   [
+    129473,
+    "AMD 라이젠9-6세대 9950X3D2 (그래니트 릿지) (멀티팩 정품)",
+    "no_model:ryzen:"
+   ],
+   [
+    129691,
+    "AMD 라이젠7-5세대 7700X3D (라파엘) (정품)",
+    "no_model:ryzen:7700X3D"
+   ],
+   [
+    129692,
+    "AMD 라이젠7-5세대 7700X3D (라파엘) (멀티팩 정품)",
+    "no_model:ryzen:7700X3D"
+   ],
+   [
+    20489104,
+    "이엠텍 지포스 RTX 4060 STORM X2 WHITE",
+    "no_family:4060"
+   ],
+   [
+    20489108,
+    "검증용테스트상품_1789107805",
+    "no_family:"
+   ]
+  ],
+  "anomalies": []
+ }
+}

@@ -1,0 +1,181 @@
+{
+ "vram_gb": {
+  "stats": {
+   "total": 300,
+   "already": 0,
+   "filled": 282,
+   "null": 18,
+   "anomaly": 0
+  },
+  "blocked": [
+   [
+    110226,
+    "FORSA 지포스 G210 D3 512MB 64-bit LP",
+    "no_gb"
+   ],
+   [
+    113281,
+    "NVIDIA 쿼드로 Sync II 엔비디아코리아 정품",
+    "no_gb"
+   ],
+   [
+    115362,
+    "UgreenU-40808 TRS5.5 Stereo스테레오마이크케이블10m",
+    "no_gb"
+   ],
+   [
+    115363,
+    "NEXT-4080DP-AOC DP v1.4 8K@60Hz UHD Metal Cable 80M",
+    "no_gb"
+   ],
+   [
+    115366,
+    "ALPHACOOL Core 지포스 RTX 4090 레퍼런스 디자인 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115367,
+    "ALPHACOOL Core 지포스 RTX 4090 슈프림 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115368,
+    "ALPHACOOL Core 지포스 RTX 4090 Master 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115369,
+    "ALPHACOOL Core 지포스 RTX 4090 AMP 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    115370,
+    "ALPHACOOL Core 지포스 RTX 4090 STRIX + TUF 워터블럭 with 백플레이트",
+    "no_gb"
+   ],
+   [
+    120036,
+    "FSP DAGGER PRO 850W GOLD 화이트 ATX 3.0(12V-2x6)",
+    "no_gb"
+   ],
+   [
+    123268,
+    "액슬 지포스 G210 D3 512MB 에즈윈",
+    "no_gb"
+   ],
+   [
+    123270,
+    "AFOX 지포스 G210 D3 512MB 대원씨티에스",
+    "no_gb"
+   ],
+   [
+    128408,
+    "GIGABYTE AORUS 지포스 RTX 5090 AI BOX 제이씨현",
+    "no_gb"
+   ],
+   [
+    128412,
+    "GIGABYTE AORUS 지포스 RTX 5090 AI BOX 피씨디렉트",
+    "no_gb"
+   ],
+   [
+    20484101,
+    "이엠텍 RTX 4060 Ti STORM X2",
+    "no_gb"
+   ],
+   [
+    20484102,
+    "갤럭시 GALAX RTX 4060 2X",
+    "no_gb"
+   ],
+   [
+    20484103,
+    "MSI RTX 4070 SUPER 벤투스 2X",
+    "no_gb"
+   ],
+   [
+    20484821,
+    "이엠텍 RTX 4060 STORM X2 WHITE",
+    "no_gb"
+   ]
+  ],
+  "anomalies": []
+ },
+ "cpu_cores": {
+  "stats": {
+   "total": 276,
+   "already": 0,
+   "filled": 263,
+   "null": 13,
+   "anomaly": 0
+  },
+  "blocked": [
+   [
+    123034,
+    "[회원가입 계좌이체 맞춤할인 -2.5%]",
+    "no_family:"
+   ],
+   [
+    127719,
+    "AMD 라이젠5-5세대 7400 (라파엘) (멀티팩 정품)",
+    "no_model:ryzen:7400"
+   ],
+   [
+    128699,
+    "AMD 라이젠5-5세대 7500X3D (라파엘) (멀티팩 정품)",
+    "no_model:ryzen:7500X3D"
+   ],
+   [
+    128735,
+    "AMD 라이젠7-6세대 9850X3D (그래니트 릿지) (멀티팩 정품)",
+    "no_model:ryzen:9850X3D"
+   ],
+   [
+    129419,
+    "인텔 코어 울트라5 시리즈2 250KF Plus (애로우레이크 리프레시) (정품)",
+    "no_model:core_ultra:250KF"
+   ],
+   [
+    129420,
+    "인텔 코어 울트라5 시리즈2 250K Plus (애로우레이크 리프레시) (정품)",
+    "no_model:core_ultra:250K"
+   ],
+   [
+    129421,
+    "인텔 코어 울트라7 시리즈2 270K Plus (애로우레이크 리프레시) (정품)",
+    "no_model:core_ultra:270K"
+   ],
+   [
+    129422,
+    "인텔 코어 울트라7 시리즈2 270K Plus (애로우레이크 리프레시) (벌크)",
+    "no_model:core_ultra:270K"
+   ],
+   [
+    129423,
+    "인텔 코어 울트라5 시리즈2 250KF Plus (애로우레이크 리프레시) (벌크)",
+    "no_model:core_ultra:250KF"
+   ],
+   [
+    129424,
+    "인텔 코어 울트라5 시리즈2 250K Plus (애로우레이크 리프레시) (벌크)",
+    "no_model:core_ultra:250K"
+   ],
+   [
+    129473,
+    "AMD 라이젠9-6세대 9950X3D2 (그래니트 릿지) (멀티팩 정품)",
+    "no_model:ryzen:"
+   ],
+   [
+    129691,
+    "AMD 라이젠7-5세대 7700X3D (라파엘) (정품)",
+    "no_model:ryzen:7700X3D"
+   ],
+   [
+    129692,
+    "AMD 라이젠7-5세대 7700X3D (라파엘) (멀티팩 정품)",
+    "no_model:ryzen:7700X3D"
+   ]
+  ],
+  "anomalies": []
+ }
+}
