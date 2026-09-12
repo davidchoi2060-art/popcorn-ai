@@ -6582,7 +6582,8 @@ def main():
                test_ai_integration_limit_clear,
                test_supplier_scale,
                test_alloc_capped_uncapped,
-               test_usage_tier_rules_invariants):
+               test_usage_tier_rules_invariants,
+               test_usage_alloc_invariants):
         try:
             fn()
         except Exception as e:
@@ -6658,6 +6659,96 @@ def test_usage_tier_rules_invariants():
         check("[51] 규칙의 slot 이 엔진 슬롯 어휘(taxonomy.SLOTS) 안에 있다", not bad, "없음", bad)
     except Exception as e:                               # noqa: BLE001
         print(f"  [SKIP] taxonomy 로드 실패 — {e}")
+
+
+def test_usage_alloc_invariants():
+    """[52] 용도별 예산 배분(usage_alloc · 0086) — 표와 카드가 설계 문서와 어긋나지 않는가 (2026-09-12 신설)
+
+    docs/design/usage-alloc-2026-09-12.md §회귀 불변식 그대로:
+    ① 활성 usage_alloc.usage_key ⊆ usage_floors.usage_key ∪ {NULL} — 엔진은 UF.match 가 고른
+       키를 그대로 UA.for_usage 에 넘긴다. 하한 표에 없는 키는 영원히 매치되지 않는다.
+    ② 모든 행 0 ≤ pct_min < pct_max ≤ 1.
+    ③ 용도별(기본 행 상속 후) pct_min 합 < 1 — 아니면 어떤 조합도 하한을 못 넘는다.
+    ④ 카드 관계식(스냅샷 아님): 현재 grid_quotes 의 추천 티어 카드 중 배분을 받은 카드
+       (payload.alloc 이 있고 하한 유지·해제 아님)의 GPU 비율이 그 용도 [pct_min, pct_max×2.0]
+       안이다(×2.0 = 마지막 상한 단계 ALLOC_STAGES). 해제 카드(applied_stage='none' 또는
+       floor_applied=false)는 건너뛴다. 0086 이전 배치 카드(alloc 키 없음)도 건너뛰되 수를
+       알린다 — 배치를 다시 돌리면 이 검사가 실제로 카드를 본다.
+    """
+    print("\n[52] 용도별 예산 배분 — usage_alloc 표·카드 정합 (2026-09-12 신설)")
+    rows = db_all("SELECT usage_key, slot, pct_min, pct_max FROM usage_alloc WHERE active")
+    if not rows:
+        print("  [SKIP] usage_alloc 없음/비어 있음(0086 미적용 또는 DB 미접속)")
+        return
+    floor_keys = {r["usage_key"] for r in db_all("SELECT DISTINCT usage_key FROM usage_floors")}
+    keys = {r["usage_key"] for r in rows if r["usage_key"] is not None}
+    check("[52] 활성 usage_alloc.usage_key ⊆ usage_floors.usage_key ∪ {NULL}",
+          keys <= floor_keys, "차집합 없음", sorted(keys - floor_keys))
+    bad = [(r["usage_key"], r["slot"], float(r["pct_min"]), float(r["pct_max"])) for r in rows
+           if not (0 <= float(r["pct_min"]) < float(r["pct_max"]) <= 1)]
+    check("[52] 모든 행 0 ≤ pct_min < pct_max ≤ 1", not bad, "위반 없음", bad)
+
+    # ③ 기본(NULL) 행 위에 용도 행을 덮은 «실효» 하한의 합 — 엔진(UA.for_usage)과 같은 상속.
+    base = {r["slot"]: float(r["pct_min"]) for r in rows if r["usage_key"] is None}
+    eff = {None: dict(base)}
+    for k in keys:
+        d = dict(base)
+        d.update({r["slot"]: float(r["pct_min"]) for r in rows if r["usage_key"] == k})
+        eff[k] = d
+    over = {k: round(sum(d.values()), 3) for k, d in eff.items() if sum(d.values()) >= 1}
+    check("[52] 용도별 실효 pct_min 합 < 1 (아니면 어떤 조합도 하한을 못 넘는다)",
+          not over, "전부 < 1", over)
+
+    # ④ 카드 관계식 — 용도 문구 → usage_key 는 서버와 같은 판정(usage_floors.match_terms)으로.
+    # ⚠ 순서까지 같아야 한다(2026-09-13 실사고): DISTINCT 로 뽑으면 순서가 없어 「사무·인터넷」이
+    # web(인터넷)으로 붙었다 — 서버 UF.match 는 ORDER BY sort_order 라 office 가 먼저 이긴다.
+    # 술어를 두 곳에 적으면 이렇게 갈라진다. 서버와 같은 ORDER BY 로 첫 매치를 쓴다.
+    terms = db_all("SELECT usage_key, match_terms FROM usage_floors WHERE active"
+                   " ORDER BY sort_order, floor_id")
+    def _key_of(usage_txt):
+        for t in terms:
+            if any(m in usage_txt for m in (t["match_terms"] or [])):
+                return t["usage_key"]
+        return None
+    cards = db_all(
+        "SELECT c.usage, c.tier, q.payload FROM grid_quotes q JOIN grid_cells c USING (cell_id)"
+        " WHERE q.is_current AND q.payload IS NOT NULL")
+    pre, skipped, bad_cards, seen = 0, 0, [], 0
+    for c in cards:
+        p = c["payload"] if isinstance(c["payload"], dict) else json.loads(c["payload"])
+        al = p.get("alloc")
+        if not al:
+            pre += 1
+            continue
+        if al.get("applied_stage") == "none" or not al.get("floor_applied"):
+            skipped += 1
+            continue
+        k = _key_of(c["usage"])
+        mm = eff.get(k, eff[None])
+        gmin = mm.get("GPU", 0.0)
+        gmax = max((float(r["pct_max"]) for r in rows if r["slot"] == "GPU"
+                    and r["usage_key"] == (k if k in keys else None)), default=1.0) * 2.0
+        gpu = next((i for i in p.get("items", []) if i.get("part_type") == "GPU"), None)
+        tot = p.get("raw_total") or p.get("total")
+        if not gpu or not tot:
+            continue
+        seen += 1
+        pct = gpu["price"] / tot
+        if not (gmin - 1e-9 <= pct <= gmax + 1e-9):
+            bad_cards.append((c["tier"], c["usage"], round(pct, 3), gmin, gmax))
+    if seen == 0:
+        print(f"  [INFO] 배분(alloc) 정보를 가진 현재 카드 0장 — 0086 이전 배치 {pre}장, 해제 {skipped}장."
+              " tools/grid_generate.py 를 다시 돌리면 이 관계식이 실제 카드를 본다")
+    else:
+        check(f"[52] 추천 카드 GPU 비율 ∈ 용도 [pct_min, pct_max×2.0] ({seen}장 검사 · 해제 {skipped}장 건너뜀"
+              f" · 0086 이전 {pre}장 건너뜀)", not bad_cards, "위반 없음", bad_cards[:10])
+
+    # 정적 소스 — 엔진이 상수가 아니라 표를 읽는다(되돌아가면 이 줄이 사라진다).
+    rec_src = io.open(os.path.join(ROOT, "api", "recommend.py"), encoding="utf-8").read()
+    check("[52] api/recommend.py 가 BUDGET_ALLOC 상수를 직접 읽지 않는다(정본은 usage_alloc 표)",
+          "BUDGET_ALLOC.get(" not in rec_src, "없음", "있음")
+    check("[52] api/recommend.py 폴백이 단계(ALLOC_STAGES ×1.0→×1.5→×2.0)를 거친다",
+          "ALLOC_STAGES = (1.0, 1.5, 2.0)" in rec_src and "for x in ALLOC_STAGES" in rec_src, "있음", "없음")
 
 if __name__ == "__main__":
     sys.exit(main())

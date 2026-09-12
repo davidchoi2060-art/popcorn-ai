@@ -87,6 +87,10 @@ FLOOR_COLS = ("capacity_gb", "required_power_watt")
 from .taxonomy import slot_of as _floor_slot   # part_type → 하한 슬롯(단일 원천)
 
 # 예산 상한 배분율 — "어느 부품도 자기 배분율 상한을 초과할 수 없다"
+# ⚠ 2026-09-12(0086)부터 **정본은 `usage_alloc` 표**(용도별 하한+상한 · api/usage_alloc.py)다.
+# 이 상수는 표를 못 읽을 때(DB 미접속·0086 미적용)의 폴백이고, 표에 없는 슬롯(MB·SSD·
+# POWER·CASE·COOLER)의 상한으로만 여전히 쓰인다. admin_engine_rules·admin_ui_margin_policy·
+# expert.py 는 아직 이 상수를 직접 읽는다(그 파일들은 이 작업의 담당 밖).
 BUDGET_ALLOC = {
     "CPU": 0.25, "GPU": 0.40, "MB": 0.15, "RAM": 0.10, "SSD": 0.12, "HDD": 0.08,
     "POWER": 0.10, "CASE": 0.08, "COOLER_CPU_AIR": 0.08, "COOLER_CPU_AIO": 0.08,
@@ -235,15 +239,31 @@ def _budget_cap(value: str):
     return int(m.group(2).replace(",", "")) * 10000
 
 
-def _apply_one(parts: list[dict], label: str, value: str):
-    """제약 1건 적용 — (남은 parts, applied, reason). 한 제약에 복수 태그면 순차 결합."""
+def alloc_filter(parts: list[dict], cap: int, usage_key: str | None = None, x: float = 1.0):
+    """부품별 배분 **상한** 필터 — `sale_price <= cap × pct_max × x`. 배분율의 단일 원천은
+    `usage_alloc.for_usage(usage_key)`(0086 · 용도별 상한, 표를 못 읽으면 BUDGET_ALLOC 폴백).
+    x 는 폴백 단계(recommend.py ALLOC_STAGES: ×1.0 → ×1.5 → ×2.0). 하한(pct_min)은 여기서
+    쓰지 않는다 — 후보를 하한으로 거르면 저가 티어에서 후보가 0 이 된다(설계 문서 ⚠)."""
+    from . import usage_alloc as UA   # 지연 import — usage_alloc 이 BUDGET_ALLOC 폴백으로 이 모듈을 읽는다
+    alloc = UA.for_usage(usage_key)
+    return [p for p in parts
+            if p["sale_price"] <= int(cap * UA.pct_max_of(alloc, p["part_type"], x))]
+
+
+def _apply_one(parts: list[dict], label: str, value: str, usage_key: str | None = None):
+    """제약 1건 적용 — (남은 parts, applied, reason). 한 제약에 복수 태그면 순차 결합.
+
+    `usage_key`(2026-09-12 추가 · 0086) — 예산 분기의 배분 상한을 용도별로 고른다.
+    기본 None 은 usage_alloc 의 기본(NULL) 행 — 기존 호출부는 그대로 동작한다."""
     if label in BUDGET_LABELS:
         cap = _budget_cap(value)
         if cap is None:
             return parts, False, "상한 없는 예산 표현 — 후보 수에는 영향 없음"
-        kept = [p for p in parts
-                if p["sale_price"] <= int(cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
-        return kept, True, "부품별 예산 상한(CPU 25%·GPU 40% 등 배분율) 초과 부품 제외"
+        from . import usage_alloc as UA
+        alloc = UA.for_usage(usage_key)
+        kept = alloc_filter(parts, cap, usage_key)
+        said = "·".join(f"{s} {round(alloc[s][1] * 100)}%" for s in ("GPU", "CPU", "RAM") if s in alloc)
+        return kept, True, f"부품별 예산 상한({said} 등 배분율) 초과 부품 제외"
     if label in USAGE_LABELS:
         # 슬라이스 58: 용도가 실제로 부품을 거른다. 이전에는 "구성 단계(스코어)에서 반영"이라고
         # 답하고 아무것도 하지 않아, 고사양 게임에 GT710 2GB가 나왔다.
@@ -417,10 +437,14 @@ def count_candidates(body: CountBody):
             + " FROM v_recommendation_candidates WHERE stock_qty > 0")).mappings().all()]
     total = len(parts)
     pool = parts   # 원본(무필터) — 아래 재시도가 배분율만 뺀 풀을 다시 만드는 데 쓴다
+    # 용도별 배분(0086) — 엔진(recommend.py)과 같은 usage_key 를 같은 판정(UF.match)으로 고른다.
+    usage_v = next((c.v for c in body.constraints if c.l in USAGE_LABELS), "")
+    usage_hit = UF.match(usage_v)
+    usage_key = usage_hit[0]["usage_key"] if usage_hit else None
     effects = []
     for c in body.constraints:
         before = len(parts)
-        parts, applied, reason = _apply_one(parts, c.l, c.v)
+        parts, applied, reason = _apply_one(parts, c.l, c.v, usage_key)
         effects.append({
             "label": c.l, "value": c.v, "applied": applied,
             "delta": before - len(parts), "count_after": len(parts), "reason": reason,
@@ -660,8 +684,7 @@ def count_candidates(body: CountBody):
         if (over_budget or compat_infeasible) and cap is not None:
             highend_checked = True
             hi_cap = int(cap * _rec.HIGHEND_CAP_X)
-            hi_pool = [p for p in wide_common
-                       if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
+            hi_pool = alloc_filter(wide_common, hi_cap, usage_key)   # 용도별 상한(0086)
             hi_built = _rec._build_set("highend", hi_pool, cap, rules_active,
                                         active_slots=active_slots, meta={})
             if hi_built is None:

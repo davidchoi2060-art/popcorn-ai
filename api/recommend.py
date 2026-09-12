@@ -40,8 +40,11 @@ from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정�
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
 from . import usage_floors as UF
 from . import usage_tier_rules as UTR   # 용도×예산 티어 겨냥(0085) — 하한 위의 목표, 조립 조건 아님
+from . import usage_alloc as UA         # 용도별 예산 배분(0086) — 상한은 후보 필터, 하한은 완성 조합 판정
 from .timeutil import iso, now_iso
-from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap, REUSE_LABELS
+# BUDGET_ALLOC 상수는 이 파일에서 더 읽지 않는다(2026-09-12) — 배분율의 정본은 usage_alloc 표,
+# 상수는 그 모듈 안에서 DB 폴백으로만 쓰인다. 상한 필터는 candidates.alloc_filter 하나다.
+from .candidates import SLOT_KO, _apply_one, _budget_cap, REUSE_LABELS, alloc_filter
 from .db import engine
 from .product_name import display_name   # 견적은 파는 이름이 아니라 설명하는 이름을 쓴다
 
@@ -61,6 +64,13 @@ TIER_LABELS = {"value": "가성비형 견적", "recommend": "추천형 견적", 
 # "예산 무시"는 견적이 아니다 — 램 하나에 예산의 776%를 쓰는 구성이 나왔다.
 # 1.5배는 "조금 더 쓰면 이만큼 나아진다"를 보여주면서 부품 균형을 지키는 선이다.
 HIGHEND_CAP_X = 1.5
+
+# 용도별 배분(0086 · docs/design/usage-alloc-2026-09-12.md §엔진 적용 4) — 폴백 단계.
+# 옛 순서 「배분 상한 풀 실패 → 전면 해제(common)」가 441만 서버램을 불렀다(해제되는 순간
+# 가격 내림차순이 RAM 에서 가장 비싼 것을 잡는다). 이제 상한을 ×1.0 → ×1.5 → ×2.0 으로
+# 넓혀 가고, 그래도 없을 때만 해제한다. 단계는 응답 alloc.applied_stage 와 reasons 에 남는다.
+ALLOC_STAGES = (1.0, 1.5, 2.0)
+ALLOC_FLOOR_RELAXED = "시장 배분 하한으로는 조합이 없어 상한만 적용"
 
 
 class Constraint(BaseModel):
@@ -421,8 +431,13 @@ def _price_cut(cands, order, threshold):
     return cands[:lo]
 
 
-def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc"):
+def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc", leaf_ok=None):
     """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기.
+
+    `leaf_ok(chosen, total) -> bool`(2026-09-12 추가 · 0086) — **완성된 조합**에 대한 판정.
+    False 면 그 조합을 버리고 다음을 본다(가지치기가 아니다 — 리프에서만 부른다). 용도별
+    배분 하한(슬롯가/총액 < pct_min)이 이걸로 걸린다. 후보를 하한으로 미리 거르면 저가
+    티어에서 후보가 0 이 되므로(설계 문서 ⚠) 리프 판정으로 둔다. 노드 상한은 그대로다.
 
     min_rest(남은 슬롯 최저가 합)는 **좁히기 전 전체 풀** 기준으로 둔다 — 더 느슨한 하한이라
     가지치기가 결과를 바꾸지 않는다(좁힌 풀로 계산하면 chosen에 따라 값이 달라져 계산 불가).
@@ -499,6 +514,8 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc"):
 
     def go(i, chosen, total):
         if i == len(slots):
+            if leaf_ok is not None and not leaf_ok(chosen, total):
+                return None          # 완성됐지만 판정 탈락 — 버리고 계속 탐색
             return dict(chosen)
         slot = slots[i]
         cands = _narrow(slot, chosen, idx, slot_pools[slot])
@@ -695,10 +712,19 @@ def _bundled_cooler(chosen: dict):
 
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
                active_slots=None, unknown_rules=None, reuse_note=None, meta=None,
-               alloc_capped=True):
+               alloc_capped=True, usage_key=None, alloc_stage=None, alloc_floor=False):
     """`active_slots`·`unknown_rules`·`reuse_note`(2026-08-24 추가) — 재사용 슬롯 처리
     (customer-audit-2026-08-24 §1-1). 기본값은 전부 None/생략과 같은 뜻이라 기존 호출부
     (`api/expert.py`·이 파일의 `/api/showcase`)는 손대지 않아도 그대로 동작한다.
+
+    usage_key·alloc_stage·alloc_floor (2026-09-12 추가 · 0086 용도별 배분)
+                  alloc_stage 가 None 이 아니면 이 호출은 배분을 받는 티어(추천·고성능)다 —
+                  응답에 `alloc:{usage_key, applied_stage, floor_applied, items}` 를 싣고
+                  reasons 에 **실제 비율**을 적는다(UA.summary). 값은 1.0|1.5|2.0(상한 배율)
+                  또는 "none"(해제). alloc_floor=True 면 DFS 리프에서 슬롯가/총액 < pct_min
+                  인 조합을 버린다(후보 필터가 아니다 — `_dfs.leaf_ok`). 가성비(value)는
+                  배분을 받지 않으므로(슬라이스 58) 호출부가 이 셋을 넘기지 않는다 → alloc
+                  는 None 으로 나간다(화면이 undefined 가드를 안 짜도 되게 키는 항상 둔다).
 
     active_slots  실제로 채울 자리(기본 SLOTS 전체). 재사용 슬롯을 뺀 부분집합이 오면
                   그 자리는 DFS가 방문하지 않는다 — **고르지 않고, 값도 안 매긴다.**
@@ -741,7 +767,13 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         limit = limit_override
     # order는 slot_pools를 정렬한 것과 같은 판단이어야 한다(_order_of가 단일 원천) —
     # 위 _tier_sort 호출도 같은 (tier, cap is not None)을 썼다.
-    chosen, exhausted = _dfs(slot_pools, limit, rules, slots, order=_order_of(tier, cap is not None))
+    # 배분 하한(0086) — 완성 조합 판정. 총액은 DFS 가 본 원 총액(쿨러 포함)이다.
+    leaf_ok = None
+    if alloc_floor:
+        _alloc = UA.for_usage(usage_key)
+        leaf_ok = lambda ch, tot: not UA.violations(_alloc, ch, tot)   # noqa: E731
+    chosen, exhausted = _dfs(slot_pools, limit, rules, slots, order=_order_of(tier, cap is not None),
+                             leaf_ok=leaf_ok)
     if meta is not None:
         meta["exhausted"] = exhausted
     if chosen is None:
@@ -802,6 +834,21 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                     f"({alloc_txt} — 초과분은 아래에 정직 표기)"],
     }[tier]
     reasons = reasons + [n for n in (floor_note, relax_note, reuse_note, cooler_note) if n]
+    # 용도별 배분(0086) — 배분을 받은 티어만 말한다. 비율은 DFS 가 판정한 원 총액(raw_total ·
+    # 쿨러 포함) 기준이다 — 하한 판정과 같은 분모여야 "통과했다"는 말이 참이다.
+    alloc = None
+    if alloc_stage is not None:
+        # chosen 은 쿨러 생략 뒤 상태일 수 있다 — 표에 쿨러 행은 없으니 항목엔 영향 없고,
+        # 분모만 raw_total(DFS 가 하한을 판정한 그 총액)로 둔다.
+        alloc = {"usage_key": usage_key, "applied_stage": alloc_stage,
+                 "floor_applied": bool(alloc_floor),
+                 "items": UA.items(usage_key, chosen, raw_total)}
+        stage_note = None
+        if alloc_stage not in ("none", 1.0):
+            stage_note = (f"시장 배분 상한 ×1.0 으로는 조합이 없어 상한을 ×{alloc_stage:g} 로 넓혔습니다"
+                          "(총액 상한은 유지)")
+        summ = UA.summary(usage_key, chosen, raw_total)
+        reasons = reasons + [n for n in (stage_note, summ) if n]
     # market_price 배선(A-100 · 공유 계약 ②) — 몰 최저가 비교 재료.
     # ⚠ 실측(2026-08-23, 이 물결 조사): `products.market_price`는 컬럼 자체는 NULL이
     # 거의 없지만(재고 후보 3,059건 중 NULL 1건) **값이 있는 행도 거의 전부 0**이다
@@ -860,6 +907,8 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                    for s in SLOTS if s not in slots],
         # 엔진이 «일부러» 뺀 자리 — 재사용도 아니고 후보가 없는 것도 아니다(2026-09-09).
         "omitted": omitted,
+        # 용도별 예산 배분(0086) — 배분을 받은 티어(추천·고성능)만 값이 있고 가성비는 None.
+        "alloc": alloc,
         "reasons": reasons,
     }
 
@@ -1162,14 +1211,19 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                                  "honored": honored, "note": note}]
             built["reasons"] = built["reasons"] + [note]
 
-        # funnel.passed = v0 count와 동일 규칙(전 제약 순차 적용) — S1 카운터와 일치
+        # funnel.passed = v0 count와 동일 규칙(전 제약 순차 적용) — S1 카운터와 일치.
+        # 용도별 배분(0086)이라 예산 필터가 usage_key 를 받는다 — 카운터(candidates.count)와
+        # 같은 판정(UF.match)으로 같은 키를 고른다.
+        usage_v = next((c.v for c in body.constraints if c.l in ("용도", "상황")), "")
+        usage_hit = UF.match(usage_v)
+        usage_key = usage_hit[0]["usage_key"] if usage_hit else None
         passed = pool
         for c in body.constraints:
-            passed, _, _ = _apply_one(passed, c.l, c.v)
+            passed, _, _ = _apply_one(passed, c.l, c.v, usage_key)
 
-        # 3티어 공통 = 태그만 적용(예산 제외), 캡 풀 = 예산까지 적용
+        # 3티어 공통 = 태그만 적용(예산 제외). 예산(배분 상한)은 아래 캐스케이드가 단계별로 건다.
         # ⚠ 이 루프는 「부품」도 포함해 적용한다 — PART_PIN_LABELS가 재고에 있으면 GPU
-        # 슬롯을 지정 칩셋으로 좁힌다. 그래서 common/capped는 **이미 핀이 걸린 풀**이다.
+        # 슬롯을 지정 칩셋으로 좁힌다. 그래서 common은 **이미 핀이 걸린 풀**이다.
         # 핀이 실패했을 때 되돌아갈 곳이 필요해 「부품」만 뺀 `*_full` 풀을 따로 만든다 —
         # 재고에 없으면(gpu_matches==[]) PART_PIN_LABELS 자신이 거르지 않으므로
         # 두 풀은 자동으로 같아진다(추가 분기 없이 이 사실 하나로 c 케이스가 정리된다).
@@ -1177,21 +1231,14 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         for c in body.constraints:
             if c.l != "예산":
                 common, _, _ = _apply_one(common, c.l, c.v)
-        capped = common
-        if cap is not None:
-            capped, _, _ = _apply_one(capped, "예산", budget_v)
 
         common_full = pool
         for c in body.constraints:
             if c.l not in ("예산", "부품"):
                 common_full, _, _ = _apply_one(common_full, c.l, c.v)
-        capped_full = common_full
-        if cap is not None:
-            capped_full, _, _ = _apply_one(capped_full, "예산", budget_v)
 
         # 용도 하한(슬라이스 58) — 서버가 실제로 건 하한만 근거로 말한다.
         # GPU는 성능 지표가 없어 권장 전원을 계층 근사로 쓴다. 그 사실을 숨기지 않는다.
-        usage_v = next((c.v for c in body.constraints if c.l in ("용도", "상황")), "")
         floors = UF.summary(usage_v)
         # ⚠ 설계 판단 — 재사용 슬롯의 하한은 "확인했다"고 말하지 않는다(customer-audit
         # -2026-08-24 「전력 합계·용도 하한도 같은 문제다」). 그 슬롯은 애초에 고르지
@@ -1218,23 +1265,17 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 검증 중 reasons[] 출력에서 잡았다).
             floor_note = f"{floor_note}. {skip_note}" if floor_note else skip_note
 
-        # 고성능 풀 = 예산 배분율을 HIGHEND_CAP_X배로 늘려 적용(전면 해제가 아니다).
-        # `common`(배분 미적용)을 그대로 주면 램 931만원이 다시 들어온다.
-        hi_pool = common
-        hi_pool_full = common_full
-        if cap is not None:
-            hi_cap = int(cap * HIGHEND_CAP_X)
-            hi_pool = [p for p in common
-                       if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
-            hi_pool_full = [p for p in common_full
-                            if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
+        # 고성능 풀 = 배분 상한을 HIGHEND_CAP_X 배 총액에 건다(전면 해제가 아니다) — `common`
+        # (배분 미적용)을 그대로 주면 램 931만원이 다시 들어온다. 배분율 자체는 용도별(0086,
+        # usage_alloc)이고, 단계(×1.0→×1.5→×2.0→해제)는 아래 `_alloc_cascade` 가 건다.
+        hi_cap = int(cap * HIGHEND_CAP_X) if cap is not None else None
 
         # ── 용도×예산 티어 겨냥(usage_tier_rules · 0085 · 2026-09-12 사장님 확정) ──────
         # 하한(UF) 바로 위에서 한 번 더 거른다: "이 예산 티어에선 시장이 이 급을 산다"
         # (팝콘 X AI = VRAM 32GB·RAM 64GB·CPU 24코어 — docs/design/usage-tier-rules
         # -2026-09-12.md, 시장 표본에서 옮김). usage_key 는 UF.match 가 고른 것을 그대로
-        # 받는다(용도 문구 해석을 두 벌 두지 않는다). cap 이 None 이면 규칙이 없다 —
-        # 어느 티어를 겨냥할지 정할 근거가 없다.
+        # 받는다(용도 문구 해석을 두 벌 두지 않는다 · 위 passed 계산에서 이미 골랐다).
+        # cap 이 None 이면 규칙이 없다 — 어느 티어를 겨냥할지 정할 근거가 없다.
         #   · 추천·고성능 티어 풀에만 건다. **가성비(value)는 그대로 둔다** — 설계 문서가
         #     가성비를 언급하지 않고, 가성비는 "조건 안 최저가"가 정의라 겨냥을 걸면
         #     정의가 바뀐다(배분율을 안 받는 것과 같은 이유 · 슬라이스 58).
@@ -1243,8 +1284,6 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         #   · 걸러서 조합이 안 나오면 **이 규칙만 풀고**(usage_floors 는 유지) 다시 짓고
         #     근거에 남긴다 — "배분율이 조합을 막으면 푼다"(슬라이스 58)와 같은 패턴.
         #     겨냥은 목표이지 조립 조건이 아니다.
-        usage_hit = UF.match(usage_v)
-        usage_key = usage_hit[0]["usage_key"] if usage_hit else None
         tier_rules = {s: rs for s, rs in UTR.for_usage(usage_key, cap).items()
                       if s not in reuse_slots}
         tier_note = UTR.summary(tier_rules)
@@ -1257,9 +1296,7 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             return [p for p in parts
                     if not (rs := tier_rules.get(_slot_of(p["part_type"]))) or UTR.passes(p, rs)]
 
-        capped_t, common_t = _tier_filter(capped), _tier_filter(common)
-        capped_full_t, common_full_t = _tier_filter(capped_full), _tier_filter(common_full)
-        hi_pool_t, hi_pool_full_t = _tier_filter(hi_pool), _tier_filter(hi_pool_full)
+        common_t, common_full_t = _tier_filter(common), _tier_filter(common_full)
 
         def _join(*notes):
             """근거 문구 이어붙이기 — 마침표로 문장을 끊는다(floor_note 이어붙이기와 같은 이유)."""
@@ -1317,37 +1354,48 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # 총액 상한은 그대로 지킨다. 포기했으면 근거에 그렇게 적는다(정직).
         relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
 
-        def _highend_once(hi_note, hi_limit, pools, extra_note):
-            """고성능형 캐스케이드 한 번 — hi_pool(배분 상한) → common(배분 해제) → 핀 해제.
-            `pools` = (hi_pool, common, hi_pool_full, common_full) 네 풀, `extra_note` 는
-            usage_tier_rules 근거(겨냥 적용 / 풀림)를 reasons 에 덧붙인다.
-            반환 (built, honored)."""
-            hp, cm, hpf, cmf = pools
-            hi_alloc = cap is not None
+        def _alloc_cascade(tier, base, base_full, extra_note, hi_note=None, hi_limit=None, meta=None):
+            """용도별 배분 캐스케이드(0086 · 설계 문서 §엔진 적용 3·4) — 반환 (built, honored).
+
+            순서:  하한 유지 · 상한 ×1.0 → ×1.5 → ×2.0
+                 → 하한 해제 · 상한 ×1.0 → ×1.5 → ×2.0   (reasons: ALLOC_FLOOR_RELAXED)
+                 → 배분 전면 해제(common · 옛 폴백)        (reasons: relaxed)
+            옛 순서 「상한 풀 실패 → 전면 해제」가 441만 서버램을 불렀다 — 해제되는 순간 가격
+            내림차순이 RAM 에서 가장 비싼 것을 잡는다. 상한을 넓혀 가며 찾으면 그 병이 안 도진다.
+            하한은 후보 필터가 아니라 DFS 리프 판정(`_build_set.alloc_floor`)이다 — 저가 티어에서
+            후보를 0 으로 만들지 않는다. 상한 배율의 기준 총액은 추천 = cap, 고성능 = cap×1.5.
+            cap 이 없으면 배분을 걸 근거가 없다 — 해제 단계 하나만(옛 동작 그대로, 회귀 [50]).
+            부품 핀: 핀 풀(base)로 전 단계 실패 → 핀을 뺀 풀(base_full)로 같은 단계를 다시 돈다.
+            """
+            acap = cap if tier == "recommend" else hi_cap
             fn = _join(floor_note, extra_note)
-            built = _build_set("highend", hp, cap, rules_active, fn, hi_note, hi_limit,
-                               active_slots=active_slots, unknown_rules=rules_unknown,
-                               reuse_note=reuse_note, meta=meta_h, alloc_capped=hi_alloc)
-            if built is None:
-                built = _build_set("highend", cm, cap, rules_active, fn,
-                                   hi_note or relaxed, hi_limit,
-                                   active_slots=active_slots, unknown_rules=rules_unknown,
-                                   reuse_note=reuse_note, meta=meta_h, alloc_capped=False)
+            hi_alloc = cap is not None
+            kw = dict(active_slots=active_slots, unknown_rules=rules_unknown,
+                      reuse_note=reuse_note, meta=meta, usage_key=usage_key)
+
+            def _try(pool):
+                if cap is None:
+                    return _build_set(tier, pool, cap, rules_active, fn, hi_note, hi_limit,
+                                      alloc_capped=False, alloc_stage="none", **kw)
+                for use_floor in (True, False):
+                    for x in ALLOC_STAGES:
+                        b = _build_set(tier, alloc_filter(pool, acap, usage_key, x), cap, rules_active,
+                                       fn, hi_note if use_floor else _join(hi_note, ALLOC_FLOOR_RELAXED),
+                                       hi_limit, alloc_capped=hi_alloc, alloc_stage=x,
+                                       alloc_floor=use_floor, **kw)
+                        if b is not None:
+                            return b
+                return _build_set(tier, pool, cap, rules_active, fn, _join(hi_note, relaxed), hi_limit,
+                                  alloc_capped=False, alloc_stage="none", **kw)
+
+            built = _try(base)
             honored = None
             if part_v:
                 if gpu_matches and built is None:
-                    built = _build_set("highend", hpf, cap, rules_active, fn,
-                                       hi_note, hi_limit, active_slots=active_slots,
-                                       unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                       meta=meta_h, alloc_capped=hi_alloc)
-                    if built is None:
-                        built = _build_set("highend", cmf, cap, rules_active, fn,
-                                           hi_note or relaxed, hi_limit, active_slots=active_slots,
-                                           unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                           meta=meta_h, alloc_capped=False)
+                    built = _try(base_full)   # 핀 해제
                     honored = False
                 else:
-                    honored = bool(gpu_matches)
+                    honored = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
             return built, honored
 
         def _build_highend(hi_note, hi_limit):
@@ -1357,60 +1405,30 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             함의하지 않는다(조사자 실측 — 가성비 실패 264건 중 162건(61.4%)에서 고성능형이
             실제로 성립, 11개 용도 전부에서 발생). 옛 코드는 가성비가 None이면 이 시도
             자체를 안 했다 — 그래서 고성능으로도 지을 수 있던 견적이 "견적 불가"로 나갔다.
-            hi_pool(배분 상한 적용) 실패 시 common(배분 해제)으로 푸는 순서·부품 핀 처리는
-            기존 고성능형 로직을 그대로 옮겼을 뿐이다(§단일 원천 — 새 판정을 만들지 않는다).
 
-            usage_tier_rules(0085): 겨냥 규칙을 건 풀(`*_t`)로 위 캐스케이드를 먼저 돌고,
+            usage_tier_rules(0085): 겨냥 규칙을 건 풀(`*_t`)로 배분 캐스케이드를 먼저 돌고,
             전부 실패하면 **겨냥만 풀고**(usage_floors 는 그대로) 원래 풀로 한 번 더 돈다.
             alloc_capped 는 "이 풀에 실제로 배분 상한이 걸렸는가"를 그대로 말한다 —
-            cap이 None이면 hi_pool 계산 자체가 배분 필터를 건너뛰어 hi_pool이 common과
-            같아진다. 그런데도 True로 고정하면 지어낸 사실이 된다 — cap 유무로 판정한다.
+            cap이 None이면 배분 필터를 건너뛴다(`hi_alloc = cap is not None`). 그런데도
+            True로 고정하면 지어낸 사실이 된다 — cap 유무로 판정한다.
             """
-            hi_cap_display = hi_limit if hi_limit is not None else (
-                int(cap * HIGHEND_CAP_X) if cap is not None else None)
+            hi_cap_display = hi_limit if hi_limit is not None else hi_cap
             built, honored = None, None
             if tier_rules:
-                built, honored = _highend_once(
-                    hi_note, hi_limit, (hi_pool_t, common_t, hi_pool_full_t, common_full_t), tier_note)
+                built, honored = _alloc_cascade("highend", common_t, common_full_t, tier_note,
+                                                hi_note, hi_limit, meta_h)
                 if built is None:
                     utr_relaxed_tiers.append("highend")
             if built is None:
-                built, honored = _highend_once(
-                    hi_note, hi_limit, (hi_pool, common, hi_pool_full, common_full),
-                    tier_relaxed if tier_rules else None)
+                built, honored = _alloc_cascade("highend", common, common_full,
+                                                tier_relaxed if tier_rules else None,
+                                                hi_note, hi_limit, meta_h)
             sets["highend"] = built
             _attach_pin(sets["highend"], honored, hi_cap_display)
 
-        def _recommend_once(pools, extra_note):
-            """추천형 캐스케이드 한 번 — capped → common(배분 해제) → 핀 해제. 반환 (built, honored)."""
-            cp, cm, cpf, cmf = pools
-            fn = _join(floor_note, extra_note)
-            built_r = _build_set("recommend", cp, cap, rules_active, fn,
-                                 active_slots=active_slots, unknown_rules=rules_unknown,
-                                 reuse_note=reuse_note, meta=meta_r)
-            if built_r is None:
-                built_r = _build_set("recommend", cm, cap, rules_active, fn, relaxed,
-                                     active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note, meta=meta_r)
-            honored_r = None
-            if part_v:
-                if gpu_matches and built_r is None:
-                    built_r = _build_set("recommend", cpf, cap, rules_active, fn,
-                                         active_slots=active_slots, unknown_rules=rules_unknown,
-                                         reuse_note=reuse_note, meta=meta_r)
-                    if built_r is None:
-                        built_r = _build_set("recommend", cmf, cap, rules_active, fn,
-                                             relaxed, active_slots=active_slots,
-                                             unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                             meta=meta_r)
-                    honored_r = False
-                else:
-                    honored_r = bool(gpu_matches)
-            return built_r, honored_r
-
         if sets["value"] is None:
             # 가성비 탐색이 예산 밖이면 추천형은 시도하지 않는다(그대로 둔다 — 정직 +
-            # 낭비 방지) — 추천의 폴백 풀(common)이 가성비가 쓰는 풀과 완전히 같고
+            # 낭비 방지) — 추천의 마지막 폴백 풀(common)이 가성비가 쓰는 풀과 완전히 같고
             # 상한(cap)도 같다. 가성비가 못 찾았으면 추천도 못 찾는다(조사자 실측 ·
             # 표본 3건 재확인 — 추천형은 건드리지 않는다).
             sets["recommend"] = None
@@ -1426,16 +1444,16 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         else:
             # ── 추천형 ────────────────────────────────────────────────────────
             # usage_tier_rules(0085): 겨냥 풀로 먼저, 안 되면 겨냥만 풀고 원래 풀로.
+            # 각 풀 안에서 배분 캐스케이드(0086)가 돈다.
             built_r, honored_r = None, None
             if tier_rules:
-                built_r, honored_r = _recommend_once(
-                    (capped_t, common_t, capped_full_t, common_full_t), tier_note)
+                built_r, honored_r = _alloc_cascade("recommend", common_t, common_full_t,
+                                                    tier_note, meta=meta_r)
                 if built_r is None:
                     utr_relaxed_tiers.append("recommend")
             if built_r is None:
-                built_r, honored_r = _recommend_once(
-                    (capped, common, capped_full, common_full),
-                    tier_relaxed if tier_rules else None)
+                built_r, honored_r = _alloc_cascade("recommend", common, common_full,
+                                                    tier_relaxed if tier_rules else None, meta=meta_r)
             sets["recommend"] = built_r
             _attach_pin(sets["recommend"], honored_r, cap)
 
