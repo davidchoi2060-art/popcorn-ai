@@ -57,6 +57,9 @@ router = APIRouter(prefix="/api/swap")
 SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_power_watt,"
              " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
              " radiator_rows, radiator_max_rows,"
+             # capacity_gb·vram_gb·cpu_cores — usage_floors(하한)·usage_tier_rules(티어별 겨냥,
+             # 0085)가 읽는 필드. 여기 없으면 대안이 NULL 불통과로 조용히 0건이 된다(슬라이스 46).
+             " capacity_gb, vram_gb, cpu_cores,"
              " form_factor, form_factor_list, tag_white, tag_silent")
 
 

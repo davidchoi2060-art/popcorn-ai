@@ -39,6 +39,7 @@ from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정�
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
 from . import usage_floors as UF
+from . import usage_tier_rules as UTR   # 용도×예산 티어 겨냥(0085) — 하한 위의 목표, 조립 조건 아님
 from .timeutil import iso, now_iso
 from .candidates import BUDGET_ALLOC, SLOT_KO, _apply_one, _budget_cap, REUSE_LABELS
 from .db import engine
@@ -90,6 +91,9 @@ def _load_pool(conn):
         " form_factor, form_factor_list, capacity_gb,"
         " length_mm, gpu_max_mm, cooler_height_mm, cooler_tdp,"
         " radiator_rows, radiator_max_rows, tag_white, tag_silent, tag_rgb,"
+        # vram_gb·cpu_cores(0083·0084) — usage_tier_rules(0085)가 쓴다. 뷰에는 이미 있고
+        # 여기 안 실으면 NULL 불통과로 **조용히 0건**이 된다(슬라이스 46 전례).
+        " vram_gb, cpu_cores,"
         " spec_sources, data_origin, market_price"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
@@ -1225,6 +1229,42 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             hi_pool_full = [p for p in common_full
                             if p["sale_price"] <= int(hi_cap * BUDGET_ALLOC.get(p["part_type"], 1.0))]
 
+        # ── 용도×예산 티어 겨냥(usage_tier_rules · 0085 · 2026-09-12 사장님 확정) ──────
+        # 하한(UF) 바로 위에서 한 번 더 거른다: "이 예산 티어에선 시장이 이 급을 산다"
+        # (팝콘 X AI = VRAM 32GB·RAM 64GB·CPU 24코어 — docs/design/usage-tier-rules
+        # -2026-09-12.md, 시장 표본에서 옮김). usage_key 는 UF.match 가 고른 것을 그대로
+        # 받는다(용도 문구 해석을 두 벌 두지 않는다). cap 이 None 이면 규칙이 없다 —
+        # 어느 티어를 겨냥할지 정할 근거가 없다.
+        #   · 추천·고성능 티어 풀에만 건다. **가성비(value)는 그대로 둔다** — 설계 문서가
+        #     가성비를 언급하지 않고, 가성비는 "조건 안 최저가"가 정의라 겨냥을 걸면
+        #     정의가 바뀐다(배분율을 안 받는 것과 같은 이유 · 슬라이스 58).
+        #   · 재사용 슬롯은 뺀다 — 고르지 않는 자리에 겨냥을 "확인했다"고 말할 수 없다
+        #     (floors_checked 와 같은 판단).
+        #   · 걸러서 조합이 안 나오면 **이 규칙만 풀고**(usage_floors 는 유지) 다시 짓고
+        #     근거에 남긴다 — "배분율이 조합을 막으면 푼다"(슬라이스 58)와 같은 패턴.
+        #     겨냥은 목표이지 조립 조건이 아니다.
+        usage_hit = UF.match(usage_v)
+        usage_key = usage_hit[0]["usage_key"] if usage_hit else None
+        tier_rules = {s: rs for s, rs in UTR.for_usage(usage_key, cap).items()
+                      if s not in reuse_slots}
+        tier_note = UTR.summary(tier_rules)
+        tier_relaxed = "시장 표준 구성으로는 조합이 없어 하한만 적용"
+        utr_relaxed_tiers: list = []
+
+        def _tier_filter(parts):
+            if not tier_rules:
+                return parts
+            return [p for p in parts
+                    if not (rs := tier_rules.get(_slot_of(p["part_type"]))) or UTR.passes(p, rs)]
+
+        capped_t, common_t = _tier_filter(capped), _tier_filter(common)
+        capped_full_t, common_full_t = _tier_filter(capped_full), _tier_filter(common_full)
+        hi_pool_t, hi_pool_full_t = _tier_filter(hi_pool), _tier_filter(hi_pool_full)
+
+        def _join(*notes):
+            """근거 문구 이어붙이기 — 마침표로 문장을 끊는다(floor_note 이어붙이기와 같은 이유)."""
+            return ". ".join(n for n in notes if n) or None
+
         rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
         check_rule_fields(pool, rules)    # 규칙 필드 누락은 조용한 전면 불통과 → 경고로 드러낸다
         # 재사용 슬롯이 낀 규칙은 DFS에서 아예 뺀다(rules_active) — chosen에 그 슬롯이
@@ -1277,6 +1317,39 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # 총액 상한은 그대로 지킨다. 포기했으면 근거에 그렇게 적는다(정직).
         relaxed = "부품별 배분 상한으로는 조합이 없어 균형 제약을 풀었습니다(총액 상한은 유지)"
 
+        def _highend_once(hi_note, hi_limit, pools, extra_note):
+            """고성능형 캐스케이드 한 번 — hi_pool(배분 상한) → common(배분 해제) → 핀 해제.
+            `pools` = (hi_pool, common, hi_pool_full, common_full) 네 풀, `extra_note` 는
+            usage_tier_rules 근거(겨냥 적용 / 풀림)를 reasons 에 덧붙인다.
+            반환 (built, honored)."""
+            hp, cm, hpf, cmf = pools
+            hi_alloc = cap is not None
+            fn = _join(floor_note, extra_note)
+            built = _build_set("highend", hp, cap, rules_active, fn, hi_note, hi_limit,
+                               active_slots=active_slots, unknown_rules=rules_unknown,
+                               reuse_note=reuse_note, meta=meta_h, alloc_capped=hi_alloc)
+            if built is None:
+                built = _build_set("highend", cm, cap, rules_active, fn,
+                                   hi_note or relaxed, hi_limit,
+                                   active_slots=active_slots, unknown_rules=rules_unknown,
+                                   reuse_note=reuse_note, meta=meta_h, alloc_capped=False)
+            honored = None
+            if part_v:
+                if gpu_matches and built is None:
+                    built = _build_set("highend", hpf, cap, rules_active, fn,
+                                       hi_note, hi_limit, active_slots=active_slots,
+                                       unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                       meta=meta_h, alloc_capped=hi_alloc)
+                    if built is None:
+                        built = _build_set("highend", cmf, cap, rules_active, fn,
+                                           hi_note or relaxed, hi_limit, active_slots=active_slots,
+                                           unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                           meta=meta_h, alloc_capped=False)
+                    honored = False
+                else:
+                    honored = bool(gpu_matches)
+            return built, honored
+
         def _build_highend(hi_note, hi_limit):
             """고성능형 한 번 짓기 — 가성비 성립/실패 두 경로가 공유한다(2026-08-24
             결함 수정). 고성능 상한(cap × HIGHEND_CAP_X)은 가성비·추천의 상한(cap)보다
@@ -1286,39 +1359,54 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             자체를 안 했다 — 그래서 고성능으로도 지을 수 있던 견적이 "견적 불가"로 나갔다.
             hi_pool(배분 상한 적용) 실패 시 common(배분 해제)으로 푸는 순서·부품 핀 처리는
             기존 고성능형 로직을 그대로 옮겼을 뿐이다(§단일 원천 — 새 판정을 만들지 않는다).
+
+            usage_tier_rules(0085): 겨냥 규칙을 건 풀(`*_t`)로 위 캐스케이드를 먼저 돌고,
+            전부 실패하면 **겨냥만 풀고**(usage_floors 는 그대로) 원래 풀로 한 번 더 돈다.
+            alloc_capped 는 "이 풀에 실제로 배분 상한이 걸렸는가"를 그대로 말한다 —
+            cap이 None이면 hi_pool 계산 자체가 배분 필터를 건너뛰어 hi_pool이 common과
+            같아진다. 그런데도 True로 고정하면 지어낸 사실이 된다 — cap 유무로 판정한다.
             """
             hi_cap_display = hi_limit if hi_limit is not None else (
                 int(cap * HIGHEND_CAP_X) if cap is not None else None)
-            # alloc_capped는 "이 풀에 실제로 배분 상한이 걸렸는가"를 그대로 말한다 —
-            # cap이 None이면 hi_pool 계산 자체가 배분 필터를 건너뛰어(위 hi_pool 정의
-            # 참조) hi_pool이 common과 같아진다. 그런데도 True로 고정하면 "배분 상한은
-            # 유지"라고 말하는 게 다시 지어낸 사실이 된다 — cap 유무로 그대로 판정한다.
-            hi_alloc = cap is not None
-            built = _build_set("highend", hi_pool, cap, rules_active, floor_note, hi_note, hi_limit,
-                               active_slots=active_slots, unknown_rules=rules_unknown,
-                               reuse_note=reuse_note, meta=meta_h, alloc_capped=hi_alloc)
+            built, honored = None, None
+            if tier_rules:
+                built, honored = _highend_once(
+                    hi_note, hi_limit, (hi_pool_t, common_t, hi_pool_full_t, common_full_t), tier_note)
+                if built is None:
+                    utr_relaxed_tiers.append("highend")
             if built is None:
-                built = _build_set("highend", common, cap, rules_active, floor_note,
-                                   hi_note or relaxed, hi_limit,
-                                   active_slots=active_slots, unknown_rules=rules_unknown,
-                                   reuse_note=reuse_note, meta=meta_h, alloc_capped=False)
-            honored = None
-            if part_v:
-                if gpu_matches and built is None:
-                    built = _build_set("highend", hi_pool_full, cap, rules_active, floor_note,
-                                       hi_note, hi_limit, active_slots=active_slots,
-                                       unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                       meta=meta_h, alloc_capped=hi_alloc)
-                    if built is None:
-                        built = _build_set("highend", common_full, cap, rules_active, floor_note,
-                                           hi_note or relaxed, hi_limit, active_slots=active_slots,
-                                           unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                           meta=meta_h, alloc_capped=False)
-                    honored = False
-                else:
-                    honored = bool(gpu_matches)
+                built, honored = _highend_once(
+                    hi_note, hi_limit, (hi_pool, common, hi_pool_full, common_full),
+                    tier_relaxed if tier_rules else None)
             sets["highend"] = built
             _attach_pin(sets["highend"], honored, hi_cap_display)
+
+        def _recommend_once(pools, extra_note):
+            """추천형 캐스케이드 한 번 — capped → common(배분 해제) → 핀 해제. 반환 (built, honored)."""
+            cp, cm, cpf, cmf = pools
+            fn = _join(floor_note, extra_note)
+            built_r = _build_set("recommend", cp, cap, rules_active, fn,
+                                 active_slots=active_slots, unknown_rules=rules_unknown,
+                                 reuse_note=reuse_note, meta=meta_r)
+            if built_r is None:
+                built_r = _build_set("recommend", cm, cap, rules_active, fn, relaxed,
+                                     active_slots=active_slots, unknown_rules=rules_unknown,
+                                     reuse_note=reuse_note, meta=meta_r)
+            honored_r = None
+            if part_v:
+                if gpu_matches and built_r is None:
+                    built_r = _build_set("recommend", cpf, cap, rules_active, fn,
+                                         active_slots=active_slots, unknown_rules=rules_unknown,
+                                         reuse_note=reuse_note, meta=meta_r)
+                    if built_r is None:
+                        built_r = _build_set("recommend", cmf, cap, rules_active, fn,
+                                             relaxed, active_slots=active_slots,
+                                             unknown_rules=rules_unknown, reuse_note=reuse_note,
+                                             meta=meta_r)
+                    honored_r = False
+                else:
+                    honored_r = bool(gpu_matches)
+            return built_r, honored_r
 
         if sets["value"] is None:
             # 가성비 탐색이 예산 밖이면 추천형은 시도하지 않는다(그대로 둔다 — 정직 +
@@ -1337,27 +1425,17 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                 sets["highend"] = None
         else:
             # ── 추천형 ────────────────────────────────────────────────────────
-            built_r = _build_set("recommend", capped, cap, rules_active, floor_note,
-                                 active_slots=active_slots, unknown_rules=rules_unknown,
-                                 reuse_note=reuse_note, meta=meta_r)
+            # usage_tier_rules(0085): 겨냥 풀로 먼저, 안 되면 겨냥만 풀고 원래 풀로.
+            built_r, honored_r = None, None
+            if tier_rules:
+                built_r, honored_r = _recommend_once(
+                    (capped_t, common_t, capped_full_t, common_full_t), tier_note)
+                if built_r is None:
+                    utr_relaxed_tiers.append("recommend")
             if built_r is None:
-                built_r = _build_set("recommend", common, cap, rules_active, floor_note, relaxed,
-                                     active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note, meta=meta_r)
-            honored_r = None
-            if part_v:
-                if gpu_matches and built_r is None:
-                    built_r = _build_set("recommend", capped_full, cap, rules_active, floor_note,
-                                         active_slots=active_slots, unknown_rules=rules_unknown,
-                                         reuse_note=reuse_note, meta=meta_r)
-                    if built_r is None:
-                        built_r = _build_set("recommend", common_full, cap, rules_active, floor_note,
-                                             relaxed, active_slots=active_slots,
-                                             unknown_rules=rules_unknown, reuse_note=reuse_note,
-                                             meta=meta_r)
-                    honored_r = False
-                else:
-                    honored_r = bool(gpu_matches)
+                built_r, honored_r = _recommend_once(
+                    (capped, common, capped_full, common_full),
+                    tier_relaxed if tier_rules else None)
             sets["recommend"] = built_r
             _attach_pin(sets["recommend"], honored_r, cap)
 
@@ -1412,6 +1490,13 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             "funnel": {"total": total_n, "passed": len(passed)},
             # 서버가 실제로 건 하한 — 화면이 지어내지 않고 이것만 말한다
             "usage_floors": {"usage": UF.label_of(usage_v), "items": floors},
+            # 용도×예산 티어 겨냥(0085) — 서버가 실제로 건 규칙만. applied 는 "규칙이 있어
+            # 걸었다", relaxed 는 "겨냥 풀로 조합이 안 나와 추천/고성능 어느 한 티어에서
+            # 겨냥만 풀었다"(어느 티어인지는 relaxed_tiers · 그 티어 reasons 에도 문구가 있다).
+            "usage_tier_rules": {"applied": bool(tier_rules), "usage_key": usage_key,
+                                 "items": UTR.items(tier_rules), "note": tier_note,
+                                 "relaxed": bool(utr_relaxed_tiers),
+                                 "relaxed_tiers": utr_relaxed_tiers},
             "highend_cap_x": HIGHEND_CAP_X,
             # 재사용 슬롯 — 티어별 sets[tier].reused와 같은 정보를 요청 단위로도 낸다.
             # 전 티어가 None(불성립)이어도 "무엇을 재사용으로 골랐는지"는 화면이 알아야

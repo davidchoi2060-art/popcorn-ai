@@ -6581,7 +6581,8 @@ def main():
                test_ai_response_log_models,
                test_ai_integration_limit_clear,
                test_supplier_scale,
-               test_alloc_capped_uncapped):
+               test_alloc_capped_uncapped,
+               test_usage_tier_rules_invariants):
         try:
             fn()
         except Exception as e:
@@ -6612,6 +6613,51 @@ def main():
     print("=" * 74)
     return 1 if fails else 0
 
+
+
+def test_usage_tier_rules_invariants():
+    """[51] 용도×예산 티어 겨냥(usage_tier_rules · 0085) — 표가 엔진과 어긋나지 않는가 (2026-09-12 신설)
+
+    ① 활성 규칙의 usage_key ⊆ usage_floors.usage_key — 엔진은 `UF.match` 가 고른 키를
+       그대로 `UTR.for_usage` 에 넘긴다. 하한 표에 없는 키는 **영원히 매치되지 않아**
+       규칙이 조용히 죽는다(어휘를 두 벌 두지 않는다는 규약의 검사).
+    ② 규칙이 쓰는 field 가 v_recommendation_candidates 에 있다 — 없으면 `_load_pool`
+       SELECT 가 실패하거나, 있어도 `.get()` 이 None 을 줘 NULL 불통과로 **조용한 0건**
+       (슬라이스 46 전례). 뷰뿐 아니라 `_load_pool` 의 SELECT 목록에도 있어야 한다.
+    """
+    print("\n[51] 용도×예산 티어 겨냥 — usage_tier_rules 표 정합 (2026-09-12 신설)")
+    rows = db_all("SELECT usage_key, slot, field FROM usage_tier_rules WHERE active")
+    if not rows:
+        print("  [SKIP] usage_tier_rules 없음/비어 있음(0085 미적용 또는 DB 미접속)")
+        return
+    floor_keys = {r["usage_key"] for r in db_all("SELECT DISTINCT usage_key FROM usage_floors")}
+    rule_keys = {r["usage_key"] for r in rows}
+    check("[51] 활성 usage_tier_rules.usage_key ⊆ usage_floors.usage_key",
+          rule_keys <= floor_keys, "차집합 없음", sorted(rule_keys - floor_keys))
+
+    view_cols = {r["column_name"] for r in db_all(
+        "SELECT column_name FROM information_schema.columns"
+        " WHERE table_name='v_recommendation_candidates'")}
+    rule_fields = {r["field"] for r in rows}
+    check("[51] 규칙이 쓰는 field 가 v_recommendation_candidates 에 있다(없으면 조용한 0건)",
+          rule_fields <= view_cols, "차집합 없음", sorted(rule_fields - view_cols))
+
+    # _load_pool SELECT 목록 — 뷰에 있어도 여기 안 실으면 같은 결말이다(슬라이스 46).
+    rec_src = io.open(os.path.join(ROOT, "api", "recommend.py"), encoding="utf-8").read()
+    ls = rec_src.index("def _load_pool(")
+    le = rec_src.index("FROM v_recommendation_candidates", ls)
+    sel = rec_src[ls:le]
+    missing = sorted(f for f in rule_fields if f not in sel)
+    check("[51] 규칙이 쓰는 field 를 recommend._load_pool 이 SELECT 한다",
+          not missing, "누락 없음", missing)
+
+    # 슬롯 어휘 — 규칙의 slot 이 엔진 슬롯이 아니면 `_slot_of` 가 절대 맞추지 못한다.
+    try:
+        from api.taxonomy import SLOTS as _SLOTS
+        bad = sorted({r["slot"] for r in rows} - set(_SLOTS))
+        check("[51] 규칙의 slot 이 엔진 슬롯 어휘(taxonomy.SLOTS) 안에 있다", not bad, "없음", bad)
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] taxonomy 로드 실패 — {e}")
 
 if __name__ == "__main__":
     sys.exit(main())
