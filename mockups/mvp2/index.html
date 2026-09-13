@@ -10,7 +10,8 @@
   반입 시 걷어낸 것: Claude Design 편집기 런타임(디자인 툴 전용 부트스트랩 스크립트 · 커스텀 래퍼 태그 ·
   React 외부 CDN · Google Fonts 링크). 실제 로직은 처음부터 순수 vanilla JS(app.js)라 껍데기만 벗겼다.
   서체는 자체 호스팅(../shared/fonts/fonts.css) — 외부 CDN 0건 규약.
-  ⚠ 아직 하드코딩 데모다(A-128 ①). 서버 호출 0건 — ②에서 격자 API 에 붙인다.
+  현 상태(2026-09-14): 세 API 연결됨 — POST /api/talk/parse · POST /api/grid/recommend · GET /api/grid/workstations(용도 목록 API 포함).
+  부품 교체 대화는 준비 중(app.js requestChange 가 안내만 한다).
 -->
 <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -18,11 +19,11 @@
 <style>body{margin:0;background:var(--bg);font-family:var(--font);color:var(--on)}a{color:var(--primary-bright)}a:hover{color:var(--primary)}</style>
 </head>
 <body data-screen-id="CUS-QUO-010" data-domain="customer">
-<div style="min-height:100vh;background:#F0F5F9;color:#111827;font-family:'Noto Sans KR','Pretendard',system-ui,sans-serif">
+<div style="min-height:100vh;background:var(--bg);color:var(--on);font-family:var(--font)">
   <header class="header">
     <button class="brand" data-action="home" aria-label="팝콘PC AI 처음으로">팝콘PC <span>AI</span><i></i></button>
     <span class="header-label">당신에게 맞는 PC를 찾는 가장 쉬운 대화</span>
-    <div class="header-actions"><span class="demo-badge">체험용 목업</span><button class="text-button" data-action="saved">저장한 견적 <span id="savedCount">0</span></button><button class="new-chat" data-action="home">＋ 새 대화</button></div>
+    <div class="header-actions"><span class="demo-badge">베타</span><button class="text-button" data-action="saved">저장한 견적 <span id="savedCount">0</span></button><button class="new-chat" data-action="home">＋ 새 대화</button></div>
   </header>
   <main id="app">
     <section id="welcome" class="welcome" data-screen-label="시작">
@@ -36,36 +37,37 @@
           <div class="composer-bottom"><span><b class="spark">✦</b> 한 줄이면 충분해요</span><button class="send" type="submit" aria-label="PC 구성 추천받기">↑</button></div>
         </form>
         <div class="prompt-chips"><button data-prompt="100만원 이하로 게임용 PC를 추천해줘. 모니터는 이미 있어.">게임용 100만원대</button><button data-prompt="사무용으로 조용하고 저렴한 70만원 이하 PC를 찾고 있어.">조용한 사무용</button><button data-prompt="150만원으로 영상 편집용 PC를 추천해줘.">영상 편집용</button><button data-prompt="아직 잘 모르겠어. 처음 사는 PC를 추천해줘.">아직 잘 모르겠어요</button></div>
-        <div class="trust-row"><span>✓ 재고 확인</span><span>✓ 호환성 검증</span><span>✓ 추천 이유까지</span></div>
-        <p class="demo-note">체험용 목업입니다. 추천·가격·검증 표시는 예시이며 실제 구매로 연결되지 않습니다.</p>
+        <div class="trust-row"><span>실제 재고</span><span>호환 규칙 통과</span><span>추천 이유 표시</span></div>
+        <p class="demo-note">베타 운영 중입니다. 추천·가격·재고는 실제 값이며, 구매 연결은 준비 중입니다.</p>
       </div>
       <div class="film hero-film">
         <img src="assets/pc-front.png" alt="제작 예시 PC의 외관과 내부" class="film-poster">
         <div class="film-shade"></div>
-        <div class="film-top"><span class="film-label">팝콘 오리지널</span><span class="film-number">01 / 03</span></div>
+        <div class="film-top"><span class="film-label">팝콘 오리지널</span><span class="film-number">준비 중</span></div>
         <button class="play-big" data-action="video" aria-label="제작 영상 영역 미리보기"><span>▶</span></button>
         <div class="film-caption"><span class="eyebrow light">일상을 바꾸는 한 대</span><h2>당신의 일상이<br>달라지는 순간.</h2><p>완성 PC부터 꼼꼼한 조립 과정까지</p></div>
         <div class="film-bottom"><span>제작 영상 영역 · 현재는 예시 이미지</span><button data-action="video">영상 미리보기 <span>↗</span></button></div>
       </div>
     </section>
-    <div id="welcomeFoot" class="welcome-foot"><span>좋은 PC의 시작은, 좋은 대화에서.</span><div><b>01</b> 원하는 PC 말하기 <i>—</i><b>02</b> 추천 구성 고르기 <i>—</i><b>03</b> 내 취향으로 조정하기</div></div>
+    <!-- A6/I7: 「내 취향으로 조정하기」·「대화로 조정할 수 있어요」·placeholder 「더 저렴하게, 화이트로…」는 부품 교체 대화가 붙으면 되돌린다. -->
+    <div id="welcomeFoot" class="welcome-foot"><span>좋은 PC의 시작은, 좋은 대화에서.</span><div><b>01</b> 원하는 PC 말하기 <i>—</i><b>02</b> 추천 구성 고르기 <i>—</i><b>03</b> 부품과 이유 확인하기</div></div>
     <section id="workspace" class="workspace" hidden data-screen-label="상담·견적">
       <div class="mobile-tabs"><button class="active" data-tab="chat">대화</button><button data-tab="quote">내 견적</button></div>
       <div class="chat-pane">
-        <div class="chat-heading"><div><span class="ai-mark">✦</span><b>PC 메이트</b><span class="subtle">함께 고르고, 더 잘 맞게</span></div><span class="mode-label">예시 상담</span></div>
+        <div class="chat-heading"><div><span class="ai-mark">✦</span><b>PC 메이트</b><span class="subtle">함께 고르고, 더 잘 맞게</span></div><span class="mode-label">상담</span></div>
         <div id="messages" class="messages" aria-live="polite" aria-relevant="additions"></div>
         <div class="chat-bottom">
           <div id="quickActions" class="quick-actions"></div>
-          <form id="chatForm" class="composer chat-composer"><label for="chatInput" class="sr-only">견적 변경 요청</label><textarea id="chatInput" rows="2" maxlength="500" placeholder="더 저렴하게, 화이트로, 메모리는 32GB로…" required></textarea><button type="submit" class="send" aria-label="변경 요청 보내기">↑</button></form>
-          <div class="chat-footnote">예시 데이터로 작동하는 목업 · 실제 AI 및 재고 미연결</div>
+          <form id="chatForm" class="composer chat-composer"><label for="chatInput" class="sr-only">견적 변경 요청</label><textarea id="chatInput" rows="2" maxlength="500" placeholder="예산·용도를 말씀해 주세요" required></textarea><button type="submit" class="send" aria-label="변경 요청 보내기">↑</button></form>
+          <div class="chat-footnote">AI가 조건을 읽고 실제 재고에서 구성합니다 · 부품 교체 대화는 준비 중</div>
         </div>
       </div>
-      <aside id="quotePane" class="quote-pane"><div class="quote-empty"><span class="ai-mark">✦</span><h2>마음에 드는 구성을<br>골라주세요.</h2><p>부품과 가격을 확인하고<br>대화로 조정할 수 있어요.</p></div></aside>
+      <aside id="quotePane" class="quote-pane"><div class="quote-empty"><span class="ai-mark">✦</span><h2>마음에 드는 구성을<br>골라주세요.</h2><p>구성을 고르면<br>부품과 이유를 볼 수 있어요.</p></div></aside>
     </section>
   </main>
   <dialog id="videoDialog" class="video-dialog"><div class="dialog-header"><div><span class="eyebrow">제작 영상</span><h2>만들어지는 순간까지, 투명하게.</h2></div><button data-close="videoDialog" class="close" aria-label="영상 미리보기 닫기">×</button></div><div class="video-stage"><video id="previewVideo" controls playsinline poster="assets/pc-front.png" hidden></video><img id="videoPoster" src="assets/pc-front.png" alt="제작 영상 연결 전 대표 이미지"><div id="videoEmpty" class="video-empty"><span class="circle-play">▶</span><b>제작할 영상이 이곳에서 재생됩니다.</b><span>지금은 대표 이미지로 화면 구성을 확인할 수 있어요.</span></div></div><div class="video-footer"><p>선택한 영상은 이 브라우저에서만 미리 재생하며 업로드하지 않습니다.</p><label class="primary file-label" for="videoFile">내 영상으로 미리보기<input id="videoFile" type="file" accept="video/*" hidden></label></div></dialog>
-  <dialog id="savedDialog"><div class="dialog-header"><h2>저장한 견적</h2><button class="close" data-close="savedDialog" aria-label="저장한 견적 닫기">×</button></div><div id="savedList"></div><p class="demo-note">이 브라우저에 저장된 예시 견적입니다.</p></dialog>
-  <dialog id="conditionsDialog"><div class="dialog-header"><h2>내 조건 수정</h2><button class="close" data-close="conditionsDialog" aria-label="조건 수정 닫기">×</button></div><form id="conditionsForm"><label>예산 상한 (만원)<input type="number" name="budget" min="50" max="500" step="1" required></label><label>주요 용도<select name="purpose"><option value="office">사무용</option><option value="game">일반 게임용</option><option value="highgame">고사양 게임용</option><option value="creator">이미지/영상 작업용</option><option value="ai">AI 작업용</option></select></label><label class="check-label"><input type="checkbox" name="monitor">모니터는 이미 있어요</label><p class="demo-note">조건을 바꾸면 새로운 추천 목록을 보여드립니다.</p><button class="primary" type="submit">이 조건으로 다시 추천</button></form></dialog>
+  <dialog id="savedDialog"><div class="dialog-header"><h2>저장한 견적</h2><button class="close" data-close="savedDialog" aria-label="저장한 견적 닫기">×</button></div><div id="savedList"></div><p class="demo-note">이 브라우저에 저장한 견적 — 저장 시점 가격입니다.</p></dialog>
+  <dialog id="conditionsDialog"><div class="dialog-header"><h2>내 조건 수정</h2><button class="close" data-close="conditionsDialog" aria-label="조건 수정 닫기">×</button></div><form id="conditionsForm"><label>예산 상한 (만원)<input type="number" name="budget" min="50" step="1" required></label><label>주요 용도<select name="purpose"><!-- 용도 목록은 서버가 준다 — app.js 가 채운다 --></select></label><label class="check-label"><input type="checkbox" name="monitor">모니터는 이미 있어요</label><p class="demo-note">조건을 바꾸면 새로운 추천 목록을 보여드립니다.</p><button class="primary" type="submit">이 조건으로 다시 추천</button></form></dialog>
   <div id="toast" class="toast" role="status"></div>
 </div>
 <script src="app.js"></script>
