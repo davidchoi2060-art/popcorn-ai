@@ -57,15 +57,18 @@ def for_usage(usage_key: str | None, cap: int | None) -> dict:
     """
     if not usage_key or cap is None:
         return {}
-    best: dict = {}                       # (slot, field) -> row
+    best: dict = {}                       # (slot, field, op) -> row
     for r in _rows():
         if r["usage_key"] != usage_key or r["budget_min"] >= cap:
             continue
-        k = (r["slot"], r["field"])
+        # op 까지 키에 넣는다(2026-09-13) — 같은 필드에 gte(하한)와 lte(상한)를 함께 둘 수 있어야
+        # 「X 티어 개발·영상·디자인은 RAM 64GB 까지」(사장님 확정 「정직하게」 — 128GB 로 예산을
+        # 채우지 않는다)가 표현된다. (slot, field) 만으로 키를 잡으면 둘 중 하나가 묻힌다.
+        k = (r["slot"], r["field"], r["op"])
         if k not in best or r["budget_min"] > best[k]["budget_min"]:
             best[k] = r
     out: dict = {}
-    for (slot, field), r in best.items():
+    for (slot, field, _op), r in best.items():
         out.setdefault(slot, []).append((field, r["op"], r["value"], r["label"]))
     return out
 

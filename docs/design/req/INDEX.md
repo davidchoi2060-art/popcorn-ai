@@ -187,6 +187,19 @@
 | 36 | **작업 기록** | [req-activity-logs.md](req-activity-logs.md) | `dc-activity-logs.html` | **지음** (`/admin2/activity-logs`) |
 | 37 | **엑셀 다운로드 관리** | [req-excel-export.md](req-excel-export.md) | `dc-excel-export.html` | **지음** (`/admin2/excel-exports`) |
 
+## 9. 고객 화면 — LNB 밖
+
+> 고객 화면은 좌측 메뉴(`api/admin_nav.py`)에 없다. 번호 `9`는 이 목차 뒤에 두기 위한
+> 표기일 뿐 LNB 순번이 아니다(§0 로그인과 같은 관례). 고객 화면 ID 는 관리자 `ADM-`
+> 체계가 아니다 — `mockups/mvp2/index.html` 의 `data-screen-id="CUS-QUO-010"` 이 정본.
+> 기존 고객단 정의서(`req-customer-s1-session.md` · `req-expert-part-picker.md` ·
+> `req-quote-save-share.md`)는 이 절 신설(2026-09-13) 이전 것이라 아직 행이 없다 —
+> 행을 세우려면 각각 실측이 먼저다(상태를 적지 말고 재서 안다).
+
+| # | 화면 | 요구사항 정의서 | 디자인 | 상태 |
+|---|------|----------------|--------|------|
+| 9-1 | AI 워크스테이션 진열(고객 대화형 견적 화면 CUS-QUO-010 하단 부속 · `/mvp2/`) | [req-ai-workstation-shelf.md](req-ai-workstation-shelf.md) | — | **정의서** 작성(2026-09-13 · 사장님 확정 「용도 = AI 작업 AND (예산 없음 또는 ≥ 550만)」 반영). 신설 API `GET /api/grid/workstations` 계약은 정의서 ④ — 제작 전. 전제 `0088`(`products.builtpc_kind`·`builtpc_spec`) DBA 작업 중. 미정 W-1~W-6(몰 완제품 페이지 경로 · 상담 인계 수단 등) |
+
 ---
 
 ## 디자인 원안 (사장님 확정본)

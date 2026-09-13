@@ -120,6 +120,10 @@ CREATE TABLE products (
                                                    --   NULL = 기준 미설정(미달 판정 대상 아님).
                                                    --   확정 근거: 사용자 확정 2026-07-14 "안전재고 개념 유지"
 
+  -- [0088 · 2026-09-13] 완제품 워크스테이션 표시 — 사람이 정한 값, 적재가 안 덮음(아래 문단)
+  builtpc_kind        VARCHAR(20),                 -- 'ai_workstation' | NULL. 향후 'office'·'gaming' 등 여지(사장님 확정 뒤 추가, CHECK 없음)
+  builtpc_spec        JSONB,                       -- {cpu, ram_gb, ssd, gpu, gpu_count} 사람이 확인한 사양 요약 · 고객 화면 표시용 (product_specs 와 다른 것)
+
   created_at          TIMESTAMP NOT NULL DEFAULT now(),
   updated_at          TIMESTAMP NOT NULL DEFAULT now()
 );
@@ -127,9 +131,12 @@ CREATE TABLE products (
 CREATE INDEX idx_products_candidate ON products (status, ai_candidate_yn, part_type);
 CREATE INDEX idx_products_name_trgm ON products USING gin (product_name gin_trgm_ops);
 CREATE UNIQUE INDEX idx_products_danawa ON products (danawa_code) WHERE danawa_code IS NOT NULL;  -- [Ver 4.0]
+CREATE INDEX ix_products_builtpc_kind ON products (builtpc_kind) WHERE builtpc_kind IS NOT NULL;  -- [0088] 표시 대상만(수십 건)
 ```
 
 기존 `margin_locked` 단일 플래그는 폐기하고 `locked_fields`로 대체한다.
+
+**[0088 개정 · 2026-09-13] 완제품 워크스테이션 표시는 컬럼(`builtpc_kind`)이지 상품명 파싱이 아니다.** 사장님 승인으로 팝콘PC 몰의 NVIDIA AI 전용 완제품 워크스테이션(2026-09-13 실측 26종, 598만~2억 2,546만)을 고객 화면에 내보이는데, 「이 상품이 그것이다」라는 판정을 상품명(`… <font color=blue>[AI / 빅데이터 / 딥러닝]</font><p> [14900K/64G/1TB/RTX5090]`)에서 매번 파싱하면 몰이 태그·용도 표기를 바꾸는 날 표시가 조용히 0건이 된다(CLAUDE.md — 이름으로 동작을 추정하는 검사는 표기가 바뀌는 날 빠져나간다). 그래서 ① 판정은 명시 컬럼에 둔다 — 상품명 파싱은 `tools/tag_ai_workstation.py`가 **초안을 한 번 만들 때**만 쓰고, 화면·API는 컬럼만 본다. ② **적재가 되돌리지 않는다** — `api/catalog_ingest.py` `UPSERT_PRODUCTS_SQL`(508~639행)의 INSERT 목록·SET 절 어디에도 두 컬럼이 없으므로 `ON CONFLICT DO UPDATE`가 건드리지 않는다(0031 완제품 분류가 340건 되돌아간 것은 `part_type`이 SET 절 안에 있었기 때문 — 이 둘은 그 경우가 아니며, 적재 경로에 products DELETE/TRUNCATE도 없다). 그래서 `locked_fields` 잠금이 필요 없고, 앞으로 이 두 컬럼을 UPSERT SET 절에 넣는 것이 곧 이 보장을 깨는 일이다. ③ `builtpc_spec`은 **사람이 확인한 값**이다 — 도구는 파싱 실패 필드를 비우고(지어내지 않는다) `NULL`인 행에만 쓰며, 이미 값이 있는 행은 건너뛴다. `product_specs`(부품 단위 정형 사양, 호환 엔진 입력)와 다른 것으로 호환 엔진·추천은 이 JSON을 읽지 않는다.
 
 ### 3.3 product_specs — AI 연산 정형 필드 (1:1)
 
