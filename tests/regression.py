@@ -6583,7 +6583,8 @@ def main():
                test_supplier_scale,
                test_alloc_capped_uncapped,
                test_usage_tier_rules_invariants,
-               test_usage_alloc_invariants):
+               test_usage_alloc_invariants,
+               test_grid_workstations):
         try:
             fn()
         except Exception as e:
@@ -6749,6 +6750,100 @@ def test_usage_alloc_invariants():
           "BUDGET_ALLOC.get(" not in rec_src, "없음", "있음")
     check("[52] api/recommend.py 폴백이 단계(ALLOC_STAGES ×1.0→×1.5→×2.0)를 거친다",
           "ALLOC_STAGES = (1.0, 1.5, 2.0)" in rec_src and "for x in ALLOC_STAGES" in rec_src, "있음", "없음")
+
+def test_grid_workstations():
+    """[53] AI 워크스테이션 진열 `GET /api/grid/workstations` (2026-09-13 신설)
+
+    docs/design/req/req-ai-workstation-shelf.md ④-2 의 회귀 불변식 그대로:
+    ① threshold_won == grid_cells 「팝콘 9」 budget_min — 응답 값을 DB 와 대조하고,
+       api/grid_workstations.py 소스에 550만 리터럴(5500000 · 5_500_000)이 없음을 감시한다.
+    ② items 전부 builtpc_kind='ai_workstation'(+ PC_COMPLETE · 판매중) 이고,
+       예산 있을 때 over_budget:true 행 ≤ 2. 예산 없을 때 5개 이하 · over_budget 전부 false.
+    """
+    print("\n[53] AI 워크스테이션 진열 — /api/grid/workstations 불변식 (2026-09-13 신설)")
+    thr_db = db_one("SELECT MIN(budget_min) FROM grid_cells WHERE tier='팝콘 9'")
+    if thr_db is None:
+        print("  [SKIP] grid_cells 팝콘 9 없음 또는 DB 미접속")
+        return
+    ai_codes = {int(r["product_code"]) for r in db_all(
+        "SELECT product_code FROM products WHERE part_type='PC_COMPLETE'"
+        " AND status='판매중' AND builtpc_kind='ai_workstation'")}
+
+    src = io.open(os.path.join(ROOT, "api", "grid_workstations.py"), encoding="utf-8").read()
+    check("[53] api/grid_workstations.py 에 하한 리터럴(5500000·5_500_000·5,500,000) 없음 — 정본은 grid_cells",
+          not any(s in src for s in ("5500000", "5_500_000", "5,500,000")), "없음", "있음")
+    check("[53] api/grid_workstations.py 가 grid_cells 에서 하한을 읽는다",
+          "FROM grid_cells" in src and "budget_min" in src, "있음", "없음")
+
+    u = _uq("AI 작업")
+    # 예산 있음 — 하한 위(하한×2 + 여유)와 실제 데이터 중간값을 함께 본다
+    probes = [int(thr_db) * 2, 13000000]
+    for b in probes:
+        d = get(f"/api/grid/workstations?usage={u}&budget_won={b}")
+        check(f"[53] threshold_won == grid_cells 팝콘 9 budget_min (예산 {b:,})",
+              d.get("threshold_won") == int(thr_db), int(thr_db), d.get("threshold_won"))
+        check(f"[53] shown:true · ok:true (예산 {b:,} ≥ 하한)",
+              d.get("ok") is True and d.get("shown") is True, True, (d.get("ok"), d.get("shown")))
+        items = d.get("items") or []
+        bad = [i["product_code"] for i in items if int(i["product_code"]) not in ai_codes]
+        check(f"[53] items 전부 builtpc_kind='ai_workstation' 판매중 PC_COMPLETE (예산 {b:,} · {len(items)}건)",
+              not bad, "없음", bad)
+        over = [i for i in items if i.get("over_budget")]
+        check(f"[53] 예산 있을 때 over_budget 행 ≤ 2 (예산 {b:,})", len(over) <= 2, "≤2", len(over))
+        check(f"[53] over_budget 판정 = price > budget (예산 {b:,})",
+              all(bool(i["price"] > b) == bool(i["over_budget"]) for i in items), "일치", "불일치")
+        check(f"[53] counts 가 items 와 맞다 (예산 {b:,})",
+              d.get("counts") == {"within_budget": len(items) - len(over), "over_budget": len(over)},
+              {"within_budget": len(items) - len(over), "over_budget": len(over)}, d.get("counts"))
+        prices = [(i["price"], i["product_code"]) for i in items if not i["over_budget"]]
+        check(f"[53] 예산 안 정렬 sale_price ASC, product_code ASC (예산 {b:,})",
+              prices == sorted(prices), "정렬됨", prices[:5])
+
+    # 예산 없음 — 5개 · 전부 over_budget:false · within_budget:null
+    d = get(f"/api/grid/workstations?usage={u}")
+    items = d.get("items") or []
+    check("[53] 예산 없음 → shown:true · 5개 이하 · over_budget 전부 false",
+          d.get("shown") is True and len(items) <= 5 and not any(i["over_budget"] for i in items),
+          "5개 이하·false", (d.get("shown"), len(items), [i["over_budget"] for i in items]))
+    check("[53] 예산 없음 → counts.within_budget:null", (d.get("counts") or {}).get("within_budget") is None,
+          None, (d.get("counts") or {}).get("within_budget"))
+    check("[53] 예산 없음 → items 전부 builtpc_kind='ai_workstation'",
+          all(int(i["product_code"]) in ai_codes for i in items), "전부", [i["product_code"] for i in items])
+    check("[53] threshold_won == grid_cells 팝콘 9 budget_min (예산 없음)",
+          d.get("threshold_won") == int(thr_db), int(thr_db), d.get("threshold_won"))
+
+    # 판정 실패는 400 이 아니라 shown:false + reason
+    d = get(f"/api/grid/workstations?usage={u}&budget_won={int(thr_db) - 1}")
+    check("[53] 예산 < 하한 → shown:false reason budget_below_threshold · items:[]",
+          d.get("shown") is False and d.get("reason") == "budget_below_threshold" and d.get("items") == [],
+          "budget_below_threshold", (d.get("shown"), d.get("reason"), len(d.get("items") or [])))
+    d = get(f"/api/grid/workstations?usage={_uq('게임')}&budget_won=10000000")
+    check("[53] usage≠AI 작업 → shown:false reason usage_not_ai",
+          d.get("ok") is True and d.get("shown") is False and d.get("reason") == "usage_not_ai",
+          "usage_not_ai", (d.get("ok"), d.get("shown"), d.get("reason")))
+    d = get("/api/grid/workstations")
+    check("[53] usage 없음 → shown:false reason usage_missing (400 아님)",
+          d.get("ok") is True and d.get("shown") is False and d.get("reason") == "usage_missing",
+          "usage_missing", (d.get("ok"), d.get("shown"), d.get("reason")))
+    st = anon_status(f"/api/grid/workstations?usage={u}&budget_won=abc")
+    check("[53] budget_won 비정수 → 422/400 아님(예산 없음으로 처리)", st == 200, 200, st)
+
+    # 응답 필드 계약 — 정의서 ④-2 출력 키 그대로(이미지·티어명·부품 목록 없음)
+    d = get(f"/api/grid/workstations?usage={u}&budget_won=13000000")
+    top_keys = {"ok", "shown", "reason", "usage", "budget_won", "budget_bound", "threshold_won",
+                "items", "counts", "note"}
+    check("[53] 응답 최상위 키 = 계약 그대로", set(d.keys()) == top_keys, sorted(top_keys), sorted(d.keys()))
+    item_keys = {"product_code", "name", "price", "spec", "in_stock", "stock_qty", "over_budget", "mall_url"}
+    check("[53] items[] 키 = 계약 그대로(이미지·tier·parts 없음)",
+          all(set(i.keys()) == item_keys for i in (d.get("items") or [])), sorted(item_keys),
+          sorted({k for i in (d.get("items") or []) for k in i.keys()}))
+    check("[53] items[].name 에 HTML 태그 없음 · [사양] 유지",
+          all("<" not in i["name"] and "[" in i["name"] for i in (d.get("items") or [])), "태그 없음·[ 있음",
+          [i["name"] for i in (d.get("items") or []) if "<" in i["name"] or "[" not in i["name"]][:3])
+    check("[53] items[].mall_url 형식 = api/mall.py DETAIL(pd_no=product_code)",
+          all(i["mall_url"] == "https://popcornpc.co.kr/shop/product_detail.html?pd_no=%s" % i["product_code"]
+              for i in (d.get("items") or [])), "일치", "불일치")
+
 
 if __name__ == "__main__":
     sys.exit(main())
