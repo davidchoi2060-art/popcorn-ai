@@ -19,6 +19,7 @@
 import argparse
 import io
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,9 +29,34 @@ ensure_utf8_console()
 from dotenv import load_dotenv                      # noqa: E402
 from sqlalchemy import create_engine, text          # noqa: E402
 
-from api.catalog_map import is_accessory, wrong_slot   # noqa: E402
+from api.catalog_map import is_accessory, wrong_slot, server_ram_verdict   # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 서버용 램(RDIMM/REG) — 기계가 확신 못 하는 두 부류는 교정하지 않고 **검수만** 회부한다
+# (2026-09-13). ① 두 번째 분류 토큰이 '데스크탑'인데 REG 토큰이 붙은 것(원천 모순) ②
+# 원문에 분류 토큰이 없고 **상품명에만** ECC/REG가 있는 것(이름으로 판정하지 않는 원칙).
+# 둘 다 사람이 봐야 결정된다 — 조립 불가 위험은 있지만 잘못 내리는 쪽도 손해다.
+NAME_SERVER_HINT = re.compile(r"\bECC\b|\bREG\b|RDIMM", re.I)
+REVIEW_FIELD = "part_type"
+
+
+def server_ram_reviews(rows) -> list:
+    """(product_code, part_type, name, 사유) — RAM 중 검수 회부만 할 것."""
+    out = []
+    for pc, pt, name, raw, _st, _q in rows:
+        if pt != "RAM":
+            continue
+        v = server_ram_verdict(raw)
+        if v == "conflict":
+            out.append((pc, pt, name,
+                        "원문 분류가 '데스크탑'인데 REG 토큰이 있음 — 원천 오기(서버용 RDIMM)인지"
+                        " 실제 데스크톱 ECC인지 확인 필요. 서버용이면 etc로 내릴 것"))
+        elif v is None and NAME_SERVER_HINT.search(name or ""):
+            out.append((pc, pt, name,
+                        "상품명에만 ECC/REG — 원문에 분류 토큰이 없어 자동 판정하지 않음."
+                        " 서버용(RDIMM/REG)이면 데스크톱 슬롯 아님 → etc로 내릴 것"))
+    return out
 
 
 def danawa_hits(engine) -> list:
@@ -111,19 +137,33 @@ def main():
     for pc, pt, name, why in hit[:8]:
         print(f"  [{pt:14s}] {(name or '')[:46]:48s} | {why[:40]}")
 
+    # 서버용 램 — 교정하지 않고 검수만 회부할 것(위 `server_ram_reviews` 주석)
+    known = {h[0] for h in hit}
+    refer = [r for r in server_ram_reviews(rows) if r[0] not in known]
+    with engine.connect() as c:
+        already = {pc for (pc,) in c.execute(text(
+            "SELECT product_code FROM product_reviews WHERE field_name = :f"
+            " AND review_status = '대기' AND product_code = ANY(:c)"),
+            {"f": REVIEW_FIELD, "c": [r[0] for r in refer]}).all()}
+    refer = [r for r in refer if r[0] not in already]
+    print(f"\n서버용 램 검수 회부(교정 안 함) {len(refer):,}건")
+    for pc, pt, name, why in refer:
+        print(f"  [{pc}] {(name or '')[:52]:54s} | {why[:34]}")
+
     if args.dry:
         print("\n--dry 모드 — DB를 바꾸지 않았습니다.")
         return
-    if not hit:
+    if not hit and not refer:
         print("\n교정할 항목이 없습니다.")
         return
 
     codes = [pc for pc, _, _, _ in hit]
     with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE products SET category_group = 'etc', ai_candidate_yn = false,
-                                review_required_yn = false, updated_at = now()
-             WHERE product_code = ANY(:c)"""), {"c": codes})
+        if codes:
+            conn.execute(text("""
+                UPDATE products SET category_group = 'etc', ai_candidate_yn = false,
+                                    review_required_yn = false, updated_at = now()
+                 WHERE product_code = ANY(:c)"""), {"c": codes})
         closed = 0
         for pc, _pt, _name, why in hit:
             r = conn.execute(text("""
@@ -132,13 +172,37 @@ def main():
                  WHERE product_code = :pc AND review_status = '대기'"""),
                 {"pc": pc, "why": why})
             closed += r.rowcount
+        # 슬롯이 틀린 것은 **자동으로 슬롯을 바꾸지 않는다** — 어느 자리인지는 사람이 정한다.
+        # 그래서 교정(etc로 내림)과 별도로 검수 행을 하나 남긴다(SO-DIMM 전례와 같은 처방).
+        opened = 0
+        for pc, pt, _name, why in hit:
+            if "슬롯 아님" not in why:
+                continue
+            r = conn.execute(text("""
+                INSERT INTO product_reviews (product_code, review_type, field_name, detail,
+                                             review_status, origin_value)
+                SELECT :pc, 'spec_conflict', :f,
+                       '[분류 교정] ' || :why || ' — category_group을 etc로 내렸습니다.'
+                       ' 어느 슬롯인지는 사람이 정합니다(자동 이동 안 함).', '대기', :pt
+                 WHERE NOT EXISTS (SELECT 1 FROM product_reviews x
+                                    WHERE x.product_code = :pc AND x.field_name = :f
+                                      AND x.review_status = '대기')"""),
+                {"pc": pc, "f": REVIEW_FIELD, "why": why, "pt": pt})
+            opened += r.rowcount
+        for pc, pt, _name, why in refer:
+            r = conn.execute(text("""
+                INSERT INTO product_reviews (product_code, review_type, field_name, detail,
+                                             review_status, origin_value)
+                VALUES (:pc, 'spec_conflict', :f, '[검수 회부] ' || :why, '대기', :pt)"""),
+                {"pc": pc, "f": REVIEW_FIELD, "why": why, "pt": pt})
+            opened += r.rowcount
 
     with engine.connect() as c:
         pool = c.execute(text("SELECT count(*) FROM v_recommendation_candidates"
                               " WHERE stock_qty > 0")).scalar()
         review = c.execute(text("SELECT count(*) FROM product_reviews"
                                 " WHERE review_status='대기'")).scalar()
-    print(f"\n교정 {len(hit):,}건 · 검수 해소 {closed:,}건")
+    print(f"\n교정 {len(hit):,}건 · 검수 해소 {closed:,}건 · 검수 회부(신규 행) {opened:,}건")
     print(f"  추천 후보 {pool_before:,} -> {pool:,} · 검수 대기 {review_before:,} -> {review:,}")
 
 

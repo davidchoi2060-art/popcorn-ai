@@ -411,6 +411,55 @@ def test_engine():
         if r and h:
             check(f"[{lab}] 추천 <= 고성능", r <= h, f"{r} <= {h}", f"{r} vs {h}")
 
+    # ── 슬롯별 가격 정책(2026-09-13 · recommend.py SLOT_PRICE_POLICY) ─────────────
+    # 「용량이 곧 성능」인 슬롯(RAM·SSD)은 추천·고성능에서도 규칙을 통과한 후보 중 **최저가**다.
+    # 실사고: 팝콘 X 개발 = 서버램 32GB 238만(일반 DDR5 64GB 가 135만부터), X AI = 서버램
+    # 64GB 441만 — 내림차순이 같은 용량에서 가장 비싼 램을 잡았다. 관계식: 응답의 RAM 가격 ≤
+    # 같은 (capacity_gb, mem_type) 이고 재고>0 인 후보 중 «배분 하한(pct_min × 원총액)을
+    # 넘는» 최저가. 하한이 걸린 응답(alloc.floor_applied)이면 그 하한 미만 후보는 엔진도
+    # 버렸으므로 분모에서 뺀다 — 이 검사가 실패하려면 정렬 방향이 RAM 에서 다시 내림차순이
+    # 되거나(_order_of), 이진 컷이 오름차순 슬롯을 내림차순으로 잘라 저가 후보를 건너뛰어야
+    # 한다(_dfs.order_of). 응답이 slot_policy 로 「이 슬롯은 최저가」라고 말한 것만 검사한다
+    # — 말하지 않은 슬롯을 검사하면 정책이 아니라 검사가 규칙을 지어내는 것이다.
+    # SSD 는 (capacity_gb) 만으로 묶는다(호환 규칙이 SSD 를 겨냥하지 않는다 — 위 규칙 로드
+    # 실측). DB 미연결이면 건너뛰고 그 사실을 알린다(조용히 통과시키지 않는다).
+    _POLICY_KEY = {"RAM": ("capacity_gb", "mem_type"), "SSD": ("capacity_gb",)}
+    for lab, s in (("70만", s70), ("100만", s100), ("150만", s150), ("캡없음", sopen)):
+        for tier in ("recommend", "highend"):
+            st = s.get(tier)
+            if not st:
+                continue
+            pol = (st.get("slot_policy") or {}).get("slots") or {}
+            check(f"[{lab}·{tier}] slot_policy 가 RAM·SSD 를 최저가로 밝힌다",
+                  all(pol.get(k, {}).get("order") == "asc" for k in ("RAM", "SSD")),
+                  "RAM·SSD asc", pol)
+            items = {i["part_type"]: i for i in st["items"]}
+            alloc = st.get("alloc") or {}
+            floor_on = bool(alloc.get("floor_applied"))
+            pct_min = {a["slot"]: a.get("pct_min") or 0 for a in (alloc.get("items") or [])
+                       if isinstance(a, dict) and a.get("slot")}
+            raw_total = st.get("raw_total") or st["total"]
+            for slot, keys in _POLICY_KEY.items():
+                if pol.get(slot, {}).get("order") != "asc" or slot not in items:
+                    continue
+                it = items[slot]
+                spec = it.get("spec") or {}
+                if any(spec.get(k) is None for k in keys):
+                    print(f"  [SKIP] (I) [{lab}·{tier}] {slot} 사양 결측 — {spec}")
+                    continue
+                where = " AND ".join(f"{k} = :{k}" for k in keys)
+                floor_price = math.ceil(pct_min.get(slot, 0) * raw_total) if floor_on else 0
+                db_min = db_one(f"SELECT min(sale_price) FROM v_recommendation_candidates"
+                                f" WHERE stock_qty > 0 AND sale_price IS NOT NULL AND part_type = :pt"
+                                f" AND {where} AND sale_price >= :fl",
+                                pt=slot, fl=floor_price, **{k: spec[k] for k in keys})
+                if db_min is None:
+                    print(f"  [SKIP] (I) [{lab}·{tier}] {slot} 최저가 대조 — DB 미연결 또는 후보 없음")
+                    continue
+                check(f"[{lab}·{tier}] {slot} 은 같은 용량 후보 중 최저가"
+                      f"({'·'.join(f'{k}={spec[k]}' for k in keys)}, 하한 {floor_price:,})",
+                      it["price"] <= db_min, f"<= {db_min:,}", f"{it['price']:,} ({it['name'][:40]})")
+
     # 가성비는 '예산과 무관한 가격 오름차순 첫 성립 조합'이다 — 예산이 달라도 같은 값이어야
     # 한다. ⚠ 라벨 정정(2026-08-24, 로직은 그대로): 「최저가 조합」은 이 검사가 실제로
     # 증명하는 것(총액이 예산과 무관하게 같은 값으로 수렴하는 수치 불변식)과 다른 이름이었다
@@ -767,13 +816,21 @@ def test_upload():
             ("모듈러 파워", "파워(POWER)", "",
              "리안리 / M ATX,SFX / 정격출력 : 750(W) / 케이블연결 : 풀모듈러", True),
             ("HDMI 케이블", "메인보드(M/B)", "", "케이블/AV(영상.음성)통합관련 / HDMI 케이블", False),
+            # 서버용 램(RDIMM/REG)은 데스크톱 슬롯에 안 꽂힌다 — 두 번째 분류 토큰이 '서버용'
+            ("서버용 램", "메모리(RAM)", "",
+             "G.SKILL / 서버용 / DDR5 / 48(GB) / 5600(MHz),PC5-44800 / ECC / 온다이ECC / REG", False),
+            # 온다이 ECC는 일반 DDR5 전부가 가진다 — 'ECC'만 보고 거르면 램 후보가 통째로 사라진다
+            # (실제 상품 112894 의 원문 그대로)
+            ("온다이ECC 일반 DDR5", "메모리(RAM)", "",
+             "마이크론 / 데스크탑 / DDR5 / 16(GB) / 5600(MHz),PC5-44800 / CL46-45-45"
+             " / 전압 : 1.1(V) / 패키지 구성 : 1(EA) / 온다이ECC /", True),
         ]
         bad = []
         for lab, l2, l3, raw, want in CLS:
             _pt, grp, _why = map_part_type("PC/주요부품", l2, l3, lab, raw)
             if (grp == "core_part") != want:
                 bad.append(f"{lab}->{grp}")
-        check("적재 분류: 비부품은 거르고 진짜 부품은 지킨다", not bad, "전 8종 정확", bad)
+        check("적재 분류: 비부품은 거르고 진짜 부품은 지킨다", not bad, "전 10종 정확", bad)
     except Exception as e:                               # noqa: BLE001
         print(f"  [SKIP] (I) 적재 분류 판정 — {e}")
 
@@ -4694,6 +4751,17 @@ def test_usage_floors():
                 " USING (product_code) WHERE c.part_type='RAM' AND c.stock_qty>0"
                 " AND p.spec_source_text ~ 'SO ?DIMM'")
     check("노트북 메모리가 후보 풀에 없다", nb == 0, 0, nb)
+    # 서버용 램(RDIMM/REG)도 같은 처방 — 두 번째 분류 토큰이 '서버'·'서버용'인 것은 후보 풀에 없다.
+    # (2026-09-13 실측: ECC/REG 64GB 441만원이 팝콘 X AI 견적에 올라왔다.) '데스크탑'+REG 모순
+    # 4건은 검수 회부 대상이라 여기서 세지 않는다.
+    sv = db_one("SELECT count(*) FROM v_recommendation_candidates c JOIN products p"
+                " USING (product_code) WHERE c.part_type='RAM'"
+                " AND p.spec_source_text ~ '^[^/]*/ *서버용? *(/|$)'")
+    check("서버용 램이 후보 풀에 없다", sv == 0, 0, sv)
+    # 지켜야 할 것: 온다이 ECC는 일반 DDR5 전부가 가진다 — 'ECC'로 걸렀다면 이 상품이 사라진다
+    od = db_one("SELECT count(*) FROM v_recommendation_candidates WHERE product_code = 112894"
+                " AND part_type = 'RAM'")
+    check("온다이ECC 일반 DDR5(112894)가 후보 풀에 남아 있다", od == 1, 1, od)
 
     # ⑥ 티어 선택이 화면 왕복에도 유지되는가 (사용자 보고 — S3에서 돌아오면 추천형으로
     # 리셋돼, 고성능형을 고른 줄 알고 누른 [장바구니 담기]가 다른 구성으로 넘어갔다).

@@ -72,6 +72,24 @@ HIGHEND_CAP_X = 1.5
 ALLOC_STAGES = (1.0, 1.5, 2.0)
 ALLOC_FLOOR_RELAXED = "시장 배분 하한으로는 조합이 없어 상한만 적용"
 
+# 슬롯별 가격 정책(2026-09-13 사장님 승인) — 「용량이 곧 성능」인 슬롯은 규칙(용도 하한·
+# 겨냥·배분 상한)을 통과한 후보 중 **최저가**를 고른다. 추천·고성능 티어에서도.
+# 실측 결함(배치 20260913-02): 팝콘 X 개발 = RAM 「서버램 32GB ECC/REG 238만」(일반 DDR5
+# 64GB 가 135만부터 있는데) · X AI = 「서버램 64GB 441만」. 원인: recommend/highend 가 전
+# 슬롯에 「가격 내림차순 첫 성립」이라 **같은 용량이면 가장 비싼 램**을 잡는다 — 규칙을
+# 더 걸어도 그 안에서 또 가장 비싼 것을 잡는다. 같은 64GB 램은 용량이 성능이고 가격 차이는
+# 버퍼드/서버용/RGB 다 — 고객이 말하지 않은 이유로 300만을 더 쓰게 하는 것은 「모든
+# 견적에는 이유가 있다」를 배신한다. 예산 소진(내림차순)은 GPU·CPU·MB·쿨러·파워·케이스만.
+# ⚠ 그 결과 총액이 예산 상한에 못 미칠 수 있다 — **그것이 맞다**(사장님 원문 "굳이
+# 1500만을 맞추라는 의미가 아니야"). 배분 하한(pct_min)이 RAM 에 걸려 최저가가 하한
+# 미만이면 리프 판정이 버리고 오름차순이 다음 최저가로 자연히 올라간다 — 그것이 RAM 을
+# 예산 쪽으로 미는 유일한 힘이며 그 값은 시장 하한(5~10%)이다.
+# 판정은 `_order_of(tier, has_cap, slot)` 한 곳이다(§단일 원천) — `_tier_sort` 와 `_dfs` 의
+# 예산 이진 컷(`_price_cut`)이 같은 슬롯별 방향을 본다. 값은 "cheapest" 하나뿐이고 그 외
+# 슬롯은 티어 기본 정렬이다.
+SLOT_PRICE_POLICY = {"RAM": "cheapest", "SSD": "cheapest", "HDD": "cheapest"}
+SLOT_POLICY_NOTE = "메모리·저장장치는 용량 기준 충족 중 최저가(용량이 곧 성능 — 예산을 채우지 않습니다)"
+
 
 class Constraint(BaseModel):
     l: str
@@ -258,22 +276,30 @@ def check_rule_fields(pool, rules: dict) -> list:
     return missing
 
 
-def _order_of(tier, has_cap) -> str:
+def _order_of(tier, has_cap, slot=None) -> str:
     """정렬 방향의 단일 판정 — `_tier_sort`(실제 정렬)와 `_dfs`(예산 이진 컷, 아래)가
     같은 판단을 쓴다(2026-08-24 신설 — DFS_NODE_CAP 결함 수정). 둘이 따로 판단하면
     한쪽만 바뀌었을 때 이진 컷이 정렬과 다른 방향으로 잘라 결과를 조용히 바꿀 수
     있다(§단일 원천) — 그래서 판단을 이 함수 하나로 모은다. `_build_set`가
-    `_tier_sort`를 부를 때 쓴 것과 **같은 (tier, has_cap)**을 `_dfs`에도 그대로 넘긴다.
+    `_tier_sort`를 부를 때 쓴 것과 **같은 (tier, has_cap, slot)**을 `_dfs`에도 그대로 넘긴다.
+
+    `slot`(2026-09-13 추가 · SLOT_PRICE_POLICY) — 슬롯별 가격 정책. "cheapest" 슬롯(RAM·
+    SSD·HDD)은 추천·고성능에서도 오름차순이다. None 이면 티어 기본(옛 동작 그대로 —
+    `_build_set` 의 reasons 문구처럼 «티어 전체»의 방향을 묻는 자리). `_dfs` 는 슬롯마다
+    이 함수를 다시 불러 그 슬롯의 방향으로 이진 컷을 한다 — 오름차순으로 정렬된 슬롯에
+    내림차순 컷을 하면 예산 안 후보를 조용히 버린다.
     """
     if tier == "value":
+        return "asc"
+    if slot is not None and SLOT_PRICE_POLICY.get(slot) == "cheapest":
         return "asc"
     if tier == "highend" or has_cap:
         return "desc"
     return "median"   # 추천 + 숫자 예산 없음 — 가격에 대해 단조가 아니라 이진 컷 대상 아님
 
 
-def _tier_sort(parts, tier, has_cap):
-    order = _order_of(tier, has_cap)
+def _tier_sort(parts, tier, has_cap, slot=None):
+    order = _order_of(tier, has_cap, slot)
     if order == "asc":
         return sorted(parts, key=lambda p: (p["sale_price"], p["product_code"]))
     if order == "desc":  # 추천(숫자 예산)·고성능 = 내림차순 + 가지치기
@@ -431,7 +457,8 @@ def _price_cut(cands, order, threshold):
     return cands[:lo]
 
 
-def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc", leaf_ok=None):
+def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc", leaf_ok=None,
+         order_of=None):
     """사전식 첫 완성 구성 탐색. budget_limit 있으면 합 가지치기.
 
     `leaf_ok(chosen, total) -> bool`(2026-09-12 추가 · 0086) — **완성된 조합**에 대한 판정.
@@ -450,6 +477,12 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc", leaf_o
     `_build_set`이 `_order_of(tier, cap is not None)`로 계산해 넘긴다(정렬을 만든
     판단과 **같은 판단** — 두 곳에서 따로 판단하면 한쪽만 바뀔 때 어긋난다). 이 값으로
     `_price_cut`이 예산 초과가 확정된 구간을 이진 탐색으로 건너뛴다(아래 결함 기록 참조).
+
+    `order_of`(2026-09-13 추가 · SLOT_PRICE_POLICY) — `slot -> "asc"|"desc"|"median"`.
+    슬롯별 가격 정책이 생기며 방향이 슬롯마다 다르다(RAM·SSD 는 추천·고성능에서도 asc).
+    `_build_set` 이 `lambda s: _order_of(tier, cap is not None, s)` 를 넘긴다 — 정렬(`_tier_sort`)
+    을 만든 것과 **같은 함수·같은 인자**다. 주면 `order` 대신 이것을 슬롯마다 쓴다(없으면
+    `order` 하나로 전 슬롯 — 옛 호출 호환).
 
     ── 결함(2026-08-24, customer-audit 후속 실측) ─────────────────────────────────
     추천형(has_cap=True → 가격 내림차순)이 **예산이 충분한데도** 노드 상한
@@ -520,7 +553,8 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc", leaf_o
         slot = slots[i]
         cands = _narrow(slot, chosen, idx, slot_pools[slot])
         if budget_limit is not None:
-            cands = _price_cut(cands, order, budget_limit - total - min_rest[i + 1])
+            slot_order = order_of(slot) if order_of is not None else order
+            cands = _price_cut(cands, slot_order, budget_limit - total - min_rest[i + 1])
         for p in cands:
             nodes[0] += 1
             if nodes[0] > DFS_NODE_CAP:
@@ -756,7 +790,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         cands = [p for p in pool if p["part_type"] in SLOT_TYPES[s]]
         if not cands:
             return None
-        slot_pools[s] = _tier_sort(cands, tier, cap is not None)
+        slot_pools[s] = _tier_sort(cands, tier, cap is not None, s)
     # 고성능도 총액 상한을 받는다(슬라이스 58). 상한 없이 가격 내림차순으로 두면
     # 120만원 예산에 램 931만원 + 데이터센터 SSD 492만원을 얹은 1,741만원이 나온다 —
     # GPU는 그대로 RTX 4060인 채로. "가장 비싼 것"은 "용도에 필요한 최고 성능"이 아니다.
@@ -766,14 +800,16 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     if limit_override is not None:
         limit = limit_override
     # order는 slot_pools를 정렬한 것과 같은 판단이어야 한다(_order_of가 단일 원천) —
-    # 위 _tier_sort 호출도 같은 (tier, cap is not None)을 썼다.
+    # 위 _tier_sort 호출도 같은 (tier, cap is not None, slot)을 썼다. 슬롯별 정책
+    # (SLOT_PRICE_POLICY)이 있어 방향이 슬롯마다 다르므로 `order_of` 로 «함수»를 넘긴다.
     # 배분 하한(0086) — 완성 조합 판정. 총액은 DFS 가 본 원 총액(쿨러 포함)이다.
     leaf_ok = None
     if alloc_floor:
         _alloc = UA.for_usage(usage_key)
         leaf_ok = lambda ch, tot: not UA.violations(_alloc, ch, tot)   # noqa: E731
     chosen, exhausted = _dfs(slot_pools, limit, rules, slots, order=_order_of(tier, cap is not None),
-                             leaf_ok=leaf_ok)
+                             leaf_ok=leaf_ok,
+                             order_of=lambda s: _order_of(tier, cap is not None, s))
     if meta is not None:
         meta["exhausted"] = exhausted
     if chosen is None:
@@ -833,7 +869,13 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         "highend": [f"예산의 {HIGHEND_CAP_X:g}배까지 허용한 가격 {order_ko} 첫 성립 조합"
                     f"({alloc_txt} — 초과분은 아래에 정직 표기)"],
     }[tier]
-    reasons = reasons + [n for n in (floor_note, relax_note, reuse_note, cooler_note) if n]
+    # 슬롯별 가격 정책(SLOT_PRICE_POLICY) — 티어 기본 방향과 «다른» 슬롯이 있을 때만 말한다
+    # (가성비는 전 슬롯 asc 라 정책이 아무것도 바꾸지 않는다 — 없는 사실을 적지 않는다).
+    # 고객이 「왜 총액이 예산보다 적은가」를 이 한 줄로 안다.
+    policy_slots = [s for s in slots
+                    if _order_of(tier, cap is not None, s) != _order_of(tier, cap is not None)]
+    policy_note = SLOT_POLICY_NOTE if policy_slots else None
+    reasons = reasons + [n for n in (policy_note, floor_note, relax_note, reuse_note, cooler_note) if n]
     # 용도별 배분(0086) — 배분을 받은 티어만 말한다. 비율은 DFS 가 판정한 원 총액(raw_total ·
     # 쿨러 포함) 기준이다 — 하한 판정과 같은 분모여야 "통과했다"는 말이 참이다.
     alloc = None
@@ -909,6 +951,11 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         "omitted": omitted,
         # 용도별 예산 배분(0086) — 배분을 받은 티어(추천·고성능)만 값이 있고 가성비는 None.
         "alloc": alloc,
+        # 슬롯별 가격 정책(2026-09-13) — 이 티어에서 실제로 정렬 방향을 바꾼 슬롯만.
+        # 화면·회귀가 「RAM 은 최저가로 골랐다」를 응답에서 읽는다(지어내지 않는다).
+        "slot_policy": {"tier_order": _order_of(tier, cap is not None),
+                        "slots": {s: {"policy": SLOT_PRICE_POLICY[s], "order": "asc"}
+                                  for s in policy_slots}},
         "reasons": reasons,
     }
 

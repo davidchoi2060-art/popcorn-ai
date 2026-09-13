@@ -140,6 +140,51 @@ SODIMM = re.compile(r"SO[\s\-]?DIMM", re.I)
 NB_ONLY = re.compile(r"(^|/)\s*노트북\s*(/|$)")
 PC_ALSO = re.compile(r"(^|/)\s*PC\s*(/|$)", re.I)
 
+# 서버용 메모리(RDIMM/REG·LRDIMM)도 데스크톱 보드에 꽂히지 않는다 — SO-DIMM과 같은 처방
+# (2026-09-13 실측: "삼성 DDR5-4800 ECC/REG 64GB"가 팝콘 X AI 견적 441만원에 올라왔다).
+# 원천은 두 번째 분류 토큰에 '서버'(36건)·'서버용'(16건)을 적고, 뒤쪽 토큰에 'REG'를 따로 둔다
+# ("G.SKILL / 서버용 / DDR5 / 48(GB) / … / ECC / 온다이ECC / REG").
+# ⚠ **'ECC'만으로는 안 된다** — 온다이 ECC는 일반 DDR5 전부가 갖고 있고, 데스크톱 ECC UDIMM도
+#   실재한다(W680 보드). 서버 판정은 «서버» 토큰 또는 «REG/RDIMM/LRDIMM 단독 토큰»뿐이다.
+# ⚠ 두 번째 토큰이 '데스크탑'인데 REG가 붙은 것(실측 4건)은 원천이 스스로 모순된 것이다 —
+#   원천 오기인지 진짜 데스크톱 ECC인지 기계가 못 가른다 → 자동 교정하지 않고 검수로 보낸다.
+# ⚠ 원문이 상품명 복사본("RAM / [중고] SK하이닉스 … ECC/REG")이면 분류 토큰이 없는 것이다 —
+#   '/'로 쪼갠 조각에 'REG'가 남아도 그건 상품명이지 분류가 아니다(이름으로 판정 금지 원칙).
+SERVER_CLS = ("서버", "서버용")
+DESKTOP_CLS = re.compile(r"^데스크?[탑톱]$")
+REG_TOKEN = re.compile(r"^(REG|RDIMM|LRDIMM)$", re.I)
+
+
+def _all_class_tokens(raw: str) -> list:
+    """`:`가 없는 토큰 전부(순서 유지). 서버 토큰은 5번째 뒤에 오므로 `_class_tokens`로는 부족하다."""
+    return [t.strip() for t in (raw or "").split("/") if t.strip() and ":" not in t]
+
+
+def _is_name_copy(tokens: list) -> bool:
+    """분류 토큰이 아니라 상품명을 '/'로 쪼갠 조각인가 — 긴 토큰(공백 포함 24자 초과)이 있으면."""
+    return any(len(t) > 24 and " " in t for t in tokens)
+
+
+def server_ram_verdict(raw: str) -> str | None:
+    """'server'(확실) · 'conflict'(데스크탑 토큰 + REG — 사람이 봐야 함) · None. 분류 토큰만 본다."""
+    toks = _all_class_tokens(raw)
+    if len(toks) < 2 or _is_name_copy(toks):
+        return None
+    if toks[1] in SERVER_CLS:
+        return "server"
+    if any(REG_TOKEN.match(t) for t in toks):
+        return "conflict" if DESKTOP_CLS.match(toks[1]) else "server"
+    return None
+
+
+def is_server_ram(raw: str) -> bool:
+    """서버용(RDIMM/REG) 메모리인가 — 분류 토큰만 본다(상품명은 보지 않는다).
+
+    두 번째 토큰이 '서버'·'서버용'이거나, 'REG'·'RDIMM'·'LRDIMM'이 단독 토큰으로 있으면 True.
+    '데스크탑'+REG 모순 건과 상품명 복사본 원문은 False(검수 대상 — `server_ram_verdict`).
+    """
+    return server_ram_verdict(raw) == "server"
+
 
 def _class_tokens(raw: str, n: int = 5) -> str:
     """원천의 **분류 영역** — 앞쪽 토큰 중 키-값이 아닌 것들.
@@ -175,6 +220,8 @@ def wrong_slot(part_type: str, raw: str) -> str | None:
         return "원문 사양이 메모리(DDR·CL) — 저장장치가 아님"
     if part_type == "RAM" and is_sodimm(raw):
         return "원문 분류가 노트북 전용(SO-DIMM) — 데스크톱 메모리 슬롯 아님"
+    if part_type == "RAM" and is_server_ram(raw):
+        return "원문 분류가 서버용(RDIMM/REG) — 데스크톱 메모리 슬롯 아님"
     return None
 
 
