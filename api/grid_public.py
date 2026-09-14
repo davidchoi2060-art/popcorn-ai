@@ -146,16 +146,17 @@ def tier_index_for(tiers: list[dict], won: int | None, bound: str | None) -> int
     """반열림 [budget_min, budget_max) 로 중심 티어 인덱스를 고른다.
 
     · 예산 없음 → DEFAULT_TIER.
-    · '이하' 는 상한이다 — 경계값(예: 150만)이 그대로 다음 티어 [150,220) 에 떨어지면
-      「150만 이하」에 220만짜리 칸이 중심이 된다. 그래서 (값-1) 이 들어가는 티어로.
-    · '이상'·bound 없음 → 그 값이 들어가는 티어(지시 그대로).
+    · '이하' 와 **bound 없음** 은 둘 다 상한이다 — 고객이 「150만원」이라 하면 「150만원까지」다.
+      경계값(150만)이 그대로 다음 티어 [150,220) 에 떨어지면 150만 예산에 219만짜리가 중심이
+      된다(2026-09-14 실사고: ③ 화면 연결 첫 검증에서 카드 3장 전부 «예산 초과»). 그래서 (값-1).
+    · '이상' 만 그 값이 들어가는 티어(하한이니까).
     """
     if won is None:
         for i, t in enumerate(tiers):
             if t["name"] == DEFAULT_TIER:
                 return i
         return 0
-    probe = max(won - 1, 0) if bound == "이하" else won
+    probe = won if bound == "이상" else max(won - 1, 0)
     for i, t in enumerate(tiers):
         lo, hi = t["budget_min"], t["budget_max"]
         if probe >= lo and (hi is None or probe < hi):
@@ -289,11 +290,16 @@ def recommend(body: RecommendBody):
                     "usage": r["usage"], "platform": r["platform"],
                     "name": f"{r['tier']} · {_usage_short(r['usage'])}",
                     "total": total,
-                    "over_budget": bool(budget_won is not None and total is not None
-                                        and total > budget_won),
+                    # '이상' 은 하한이라 「예산 초과」 판정이 성립하지 않는다 — 300만원 이상이라
+                    # 했는데 399만 카드에 초과 배지가 붙었다(2026-09-14 ③ 검증). 상한이 있을 때만.
+                    "over_budget": bool(bound != "이상" and budget_won is not None
+                                        and total is not None and total > budget_won),
                     "status": r["status"],
                     "parts": parts,
                     "reasons": list(payload.get("reasons") or []),
+                    # 엔진이 뺀 슬롯과 그 사유(예: CPU 번들 쿨러 — 2026-09-09 확정). 이걸 안 넘기면
+                    # 화면은 「부품 7개」만 보고 빈 슬롯인지 의도인지 모른다(③ 첫 검증 지적).
+                    "omitted": list(payload.get("omitted") or []),
                     "generated_at": _iso(r["generated_at"]),
                 })
 

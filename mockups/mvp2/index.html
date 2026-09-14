@@ -10,8 +10,9 @@
   반입 시 걷어낸 것: Claude Design 편집기 런타임(디자인 툴 전용 부트스트랩 스크립트 · 커스텀 래퍼 태그 ·
   React 외부 CDN · Google Fonts 링크). 실제 로직은 처음부터 순수 vanilla JS(app.js)라 껍데기만 벗겼다.
   서체는 자체 호스팅(../shared/fonts/fonts.css) — 외부 CDN 0건 규약.
-  현 상태(2026-09-14): 세 API 연결됨 — POST /api/talk/parse · POST /api/grid/recommend · GET /api/grid/workstations(용도 목록 API 포함).
-  부품 교체 대화는 준비 중(app.js requestChange 가 안내만 한다).
+  현 상태(2026-09-14): 세 API 연결됨 — POST /api/talk/parse · POST /api/grid/recommend · GET /api/grid/workstations(용도 목록 GET /api/usages 포함).
+  화면의 숫자·부품·판정(예산 초과·추천)은 전부 서버 값. 예시인 것은 이미지뿐(④ 소관).
+  부품 교체 대화·장바구니는 준비 중(app.js requestChange·addToCart 가 안내만 한다 — 가짜 변경안을 내밀지 않는다).
 -->
 <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
@@ -38,7 +39,7 @@
         </form>
         <div class="prompt-chips"><button data-prompt="100만원 이하로 게임용 PC를 추천해줘. 모니터는 이미 있어.">게임용 100만원대</button><button data-prompt="사무용으로 조용하고 저렴한 70만원 이하 PC를 찾고 있어.">조용한 사무용</button><button data-prompt="150만원으로 영상 편집용 PC를 추천해줘.">영상 편집용</button><button data-prompt="아직 잘 모르겠어. 처음 사는 PC를 추천해줘.">아직 잘 모르겠어요</button></div>
         <div class="trust-row"><span>실제 재고</span><span>호환 규칙 통과</span><span>추천 이유 표시</span></div>
-        <p class="demo-note">베타 운영 중입니다. 추천·가격·재고는 실제 값이며, 구매 연결은 준비 중입니다.</p>
+        <p class="demo-note">베타 운영 중입니다. 추천·가격·재고는 실제 값이고, 이미지는 예시입니다. 부품 조정·구매 연결은 준비 중입니다.</p>
       </div>
       <div class="film hero-film">
         <img src="assets/pc-front.png" alt="제작 예시 PC의 외관과 내부" class="film-poster">
@@ -58,8 +59,8 @@
         <div id="messages" class="messages" aria-live="polite" aria-relevant="additions"></div>
         <div class="chat-bottom">
           <div id="quickActions" class="quick-actions"></div>
-          <form id="chatForm" class="composer chat-composer"><label for="chatInput" class="sr-only">견적 변경 요청</label><textarea id="chatInput" rows="2" maxlength="500" placeholder="예산·용도를 말씀해 주세요" required></textarea><button type="submit" class="send" aria-label="변경 요청 보내기">↑</button></form>
-          <div class="chat-footnote">AI가 조건을 읽고 실제 재고에서 구성합니다 · 부품 교체 대화는 준비 중</div>
+          <form id="chatForm" class="composer chat-composer"><label for="chatInput" class="sr-only">견적 변경 요청</label><textarea id="chatInput" rows="2" maxlength="500" placeholder="예산·용도를 말씀해 주세요 (부품 조정은 준비 중)" required></textarea><button type="submit" class="send" aria-label="변경 요청 보내기">↑</button></form>
+          <div class="chat-footnote">AI가 조건을 읽고 실제 재고에서 구성합니다 · 부품 조정은 준비 중입니다</div>
         </div>
       </div>
       <aside id="quotePane" class="quote-pane"><div class="quote-empty"><span class="ai-mark">✦</span><h2>마음에 드는 구성을<br>골라주세요.</h2><p>구성을 고르면<br>부품과 이유를 볼 수 있어요.</p></div></aside>
