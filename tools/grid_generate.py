@@ -120,6 +120,7 @@ def _mark_batch_session(wconn, res: dict) -> None:
     sid = ((res.get("json") or {}).get("session_id")) if res.get("ok") else None
     if sid is None:
         return
+    from sqlalchemy import text
     wconn.execute(text(
         "UPDATE consult_sessions SET data_origin='test' WHERE session_id=:sid AND data_origin='real'"
     ), {"sid": sid})
