@@ -815,6 +815,12 @@ def case_form_list(raw: str) -> list:
 # 고객이 "조용하게"라고 말한 이유를 배신한다.
 TAG_WHITE_RE = re.compile(r"화이트|WHITE|백색", re.I)
 TAG_SILENT_RE = re.compile(r"무소음|저소음|정숙|사일런트|SILENT|LOW\s*NOISE", re.I)
+# 화이트가 의미 있는 슬롯(외관 색상이 있는 부품). tag_silent와 같은 방식 —
+# CASE 전용 하드코딩(슬라이스 48)에서 슬롯 목록으로 확장(2026-09-14 실측:
+# POWER 102 · RAM 78 · 공랭쿨러 47 · GPU 26 · 수랭쿨러 22 · MB 10건이
+# 원문에 색 토큰이 있는데도 못 뽑히고 있었다). SSD·CPU는 원문에 색 토큰이
+# 거의 없어 대상에서 뺀다(지어내지 않는다).
+TAG_WHITE_SLOTS = ("CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO", "POWER", "RAM", "GPU", "MB")
 # 저소음이 의미 있는 슬롯(소음원). 그 밖의 부품에 붙이면 필터가 무의미해진다.
 TAG_SILENT_SLOTS = ("GPU", "POWER", "CASE", "COOLER_CPU_AIR", "COOLER_CPU_AIO")
 
@@ -827,7 +833,7 @@ def extract_tags(part_type: str, name: str, raw: str) -> tuple:
     """
     src = (name or "") + " " + (raw or "")
     tags, sources = {}, {}
-    if part_type == "CASE" and TAG_WHITE_RE.search(src):
+    if part_type in TAG_WHITE_SLOTS and TAG_WHITE_RE.search(src):
         tags["tag_white"] = True
         sources["tag_white"] = "name_explicit"
     if part_type in TAG_SILENT_SLOTS and TAG_SILENT_RE.search(src):

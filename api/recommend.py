@@ -552,9 +552,20 @@ def _dfs(slot_pools, budget_limit, rules: dict, slots=None, order="desc", leaf_o
             return dict(chosen)
         slot = slots[i]
         cands = _narrow(slot, chosen, idx, slot_pools[slot])
+        slot_order = order_of(slot) if order_of is not None else order
+        # K/KF/X 접미 CPU — 기본쿨러 제외(2026-09-14 사장님 지적 3). CPU 는 이미 확정된
+        # 뒤라 chosen["CPU"]를 읽을 수 있다(SLOTS 순서상 COOLER 보다 항상 앞). **필터**라
+        # 서 순서(가격 오름/내림차순)를 안 바꾼다 — 정렬된 부분집합은 여전히 정렬돼 있으므로
+        # 아래 _price_cut 의 단조 전제를 깨지 않는다(그래서 _price_cut «앞»에 둔다).
+        if slot == "COOLER" and "CPU" in chosen:
+            cands = _cooler_official_only(cands, chosen["CPU"])
         if budget_limit is not None:
-            slot_order = order_of(slot) if order_of is not None else order
             cands = _price_cut(cands, slot_order, budget_limit - total - min_rest[i + 1])
+        # U7-K/U9/i9/R9-X 급 — 수냉을 정렬 순서에서 앞당긴다(강제 아님). **재배치**라서
+        # _price_cut 의 단조 전제를 깰 수 있다 — 그래서 _price_cut «뒤»에 둔다(그 함수의
+        # docstring 계약 그대로: 결과 집합·순서는 이미 정해진 뒤에만 이 재배치가 돈다).
+        if slot == "COOLER" and "CPU" in chosen:
+            cands = _cooler_prefer_aio(cands, chosen["CPU"], slot_order)
         for p in cands:
             nodes[0] += 1
             if nodes[0] > DFS_NODE_CAP:
@@ -710,6 +721,122 @@ def _explain_spec(p: dict) -> dict:
     return out
 
 
+# ---- K/KF/X(X3D 포함) 접미 CPU — 쿨러 슬롯 후보 조정 (2026-09-14 사장님 지적 3) ----
+# 실측(2026-09-14, D:/Hermes-Workspace/crawl/rules_analysis.md §1-2·1-3): K/KF/X/X3D
+# 접미 CPU(270K·250K·7800X3D 등)에 시장 기본쿨러는 **0%**(U7-K n=52 전부 사제, U5-K
+# n=48 전부 사제) — 그런데 우리 견적은 12,800원 싸이번 BREEZE AC92(자칭 cooler_tdp=
+# 160)를 붙였다. compat_rules 의 `cooler_tdp>=CPU.tdp_watt` 자체는 통과한다(160≥125) —
+# 그 규칙이 틀린 게 아니라 **자칭 TDP를 그대로 믿는 한계**다(조사자 실측,
+# D:/Hermes-Workspace/scratch/stock_capability.md §5-5).
+#
+# 접미 판정은 **정규식**으로 한다 — product_specs 에 별도 열이 없고, 지어내지 않는다.
+CPU_UNLOCKED_SUFFIX_RE = re.compile(
+    r"(?<![0-9A-Za-z])\d{3,5}(?:X3D\d?|KF|K|X)(?![0-9A-Za-z])")
+
+
+def _cpu_unlocked_suffix(product_name: str) -> bool:
+    """CPU 상품명이 K/KF/X(X3D 포함) 접미를 가지는가 — 모델 번호 뒤 접미 문자만 본다.
+
+    실측 검증(제안 CPU 63종 수동 대조, product_name 전수): 울트라 K/KF·i-K/KF·라이젠
+    X/X3D 는 전부 잡고, 논-K(i5-14400F·5600G·9600 등)·Xeon·Threadripper PRO(WX)·APU
+    G계열은 전부 걸러진다(WX·GT·G 는 접미 집합에 없다). 오탐 표본 0건(직접 검증).
+    """
+    return bool(CPU_UNLOCKED_SUFFIX_RE.search(product_name or ""))
+
+
+# U7-K/U9/i9/R9-X 급 — 시장이 수냉을 다수 쓰는 등급(rules_analysis.md §1-2, 70~100%).
+# 접미 판정으로 충분하다(사장님 지시 — 등급 목록까지 세분화할 필요 없음). R7-X3D 는
+# 제외한다 — 시장 실측이 오히려 공랭 다수(69.4%, 발열이 낮아서)라 여기 넣으면 시장과
+# 어긋난다(같은 문서 §1-2 해석 참조).
+CPU_AIO_PREFERRED_RE = re.compile(
+    r"울트라\s*7.*?\d{3,4}K(?![0-9A-Za-z])|Ultra\s*7.*?\d{3,4}K(?![0-9A-Za-z])"
+    r"|울트라\s*9|Ultra\s*9"
+    r"|(?<![0-9A-Za-z])i9(?![0-9A-Za-z])"
+    r"|라이젠\s*9.*?\d{3,4}X|Ryzen\s*9.*?\d{3,4}X",
+    re.I)
+
+
+def _cpu_aio_preferred(product_name: str) -> bool:
+    """U7-K/U9/i9/R9-X 급인가 — 수냉을 정렬에서 앞당기는 근거(강제 아님)."""
+    return bool(CPU_AIO_PREFERRED_RE.search(product_name or ""))
+
+
+def _cooler_official_only(cands, cpu):
+    """K/KF/X 접미 CPU 확정 후 COOLER 후보에서 시장 근거로 저가 잡쿨러를 뺀다.
+
+    ⚠ 2026-09-14 최초 구현(cooler_tdp 존재 여부만 확인)은 **no-op 이었다** — 재고 쿨러
+    190건 전부 cooler_tdp 를 갖고 있어(자칭값 포함) 아무것도 못 걸렀다(담당자 self_check
+    에서 정직하게 보고됨). 12,800원 싸이번 BREEZE AC92가 cooler_tdp=160(자칭)이라
+    그대로 통과했다 — 원인은 규칙이 아니라 **자칭 TDP를 검증 없이 믿는 것**.
+
+    그래서 **가격 하한**을 추가한다 — 근거는 시장 표본(D:/Hermes-Workspace/crawl/
+    rules_extract.json cooler_price_won): 기본/정품(플라워) 최고가 13,200원 대
+    공랭(싱글타워) 최저가 18,310원 — 그 사이에 시장에 존재하지 않는 공백이 있다.
+    우리 재고에도 같은 공백대(12,300~19,500원)에 92mm 소형팬이 TDP 100~230W를
+    자칭하는 상품 20여 종이 있다(2026-09-14 실측) — 시장 공백대와 정확히 겹친다.
+    하한은 20,000원(재고 AIR 145건 중 134건 생존 — 슬롯이 죽지 않는다).
+
+    지어낸 숫자가 아니라 **시장에 존재하지 않는 가격대의 상한**이다. `cooler_tdp`
+    존재 확인은 그대로 두되(향후 진짜 무기재 저가 상품이 들어올 때의 안전망), 실제
+    효과는 이 가격 하한이 낸다.
+    """
+    if not _cpu_unlocked_suffix(cpu.get("product_name")):
+        return cands
+    kept = [p for p in cands if p.get("cooler_tdp") is not None
+            and (p.get("sale_price") or 0) >= 20000]
+    return kept if kept else cands   # 좁히기가 슬롯을 통째로 비우면 안 된다(소프트 선호일 뿐)
+
+
+def _cooler_prefer_aio(cands, cpu, slot_order):
+    """U7-K/U9/i9/R9-X 급 — 수냉을 정렬 순서에서 앞당긴다(강제 아님, 2026-09-14).
+
+    **가능하면** 정렬 순서로만 앞당긴다 — 강제가 아니라서 수냉이 후보에 없으면
+    공랭으로 자연스럽게 넘어간다(그룹이 비면 그냥 사라질 뿐 별도 분기가 필요 없다).
+
+    ⚠ 이미 이 물결이 적용한 `SLOT_PRICE_POLICY`(A-129~131)를 깨지 않는다 — 쿨러는
+    SLOT_PRICE_POLICY 에 없어 티어 기본 정렬을 그대로 쓰고, `slot_order=="asc"`
+    (가성비형 = 최저가 우선)에서는 이 재배치를 적용하지 않는다. 안정 분할(stable
+    partition)이라 각 그룹(수냉/공랭) 내부의 기존 가격 순서는 그대로 유지된다 —
+    「그 안에서 최저가」는 여전히 성립한다(지시서 「주의」 그대로).
+
+    ⚠ `_price_cut` **이후에만** 부른다(호출부 `_dfs.go()` 참조) — `_price_cut` 은
+    입력이 가격 단조 정렬돼 있다는 전제로 이진 탐색한다. 수냉 중앙값(93,400원)이
+    공랭 중앙값(31,000원)보다 훨씬 높아, 재배치를 먼저 하면 단조성이 깨지고
+    `_price_cut` 이 예산 안 후보를 조용히 잘라낼 수 있다 — 그래서 순서를 반드시
+    `_price_cut` 뒤에 바꾼다(결과가 이미 확정된 후보 집합 안에서만 순서를 바꾸므로
+    안전하다).
+    """
+    if slot_order == "asc" or not cands:
+        return cands
+    if not _cpu_aio_preferred(cpu.get("product_name")):
+        return cands
+    aio = [p for p in cands if p["part_type"] == "COOLER_CPU_AIO"]
+    if not aio:
+        return cands
+    air = [p for p in cands if p["part_type"] != "COOLER_CPU_AIO"]
+    return aio + air
+
+
+def _cpu_cooler_policy_note(chosen: dict):
+    """K/KF/X 접미 CPU 견적에 붙는 근거 문구 — COOLER 슬롯이 실제로 있을 때만.
+
+    §화면 정직성 — 실제 로직에서 나온 이유만 적는다. 문구는 **정책의 존재**(공식
+    스펙(cooler_tdp) 없는 쿨러는 후보에서 뺀다)를 말한다 — 「이 구성에서 무언가를
+    실제로 뺐다」는 결과 단정이 아니다. ⚠ 지금 재고 190건 전부 cooler_tdp 를 갖고
+    있어(§`_cooler_official_only` 정직 기록) 이 정책은 **이번 구성에서는 실제로
+    아무것도 걸러내지 않았을 수 있다** — 그런데도 "기본쿨러 제외"라고만 쓰면
+    「12,800원 항목이 빠졌다」는, 이 구성에서는 사실이 아닌 말이 될 위험이 있어
+    문구에 "공식 스펙 없는 쿨러"라는 조건을 명시한다(정책의 범위를 있는 그대로).
+    """
+    cpu = chosen.get("CPU")
+    if cpu is None or "COOLER" not in chosen:
+        return None
+    if not _cpu_unlocked_suffix(cpu.get("product_name")):
+        return None
+    return ("K/KF/X 접미 CPU — 2만원 미만 저가 쿨러 제외"
+            "(시장 공백대 12,800~19,500원, D:/Hermes-Workspace/crawl/rules_analysis.md)")
+
+
 # ---- CPU 기본(번들) 쿨러 (2026-09-09 사장님 확정) ----
 # 상품명이 쿨러 포함을 «명시»한 CPU를 골랐을 때, 그 기본 쿨러로 충분한 TDP면 쿨러 자리를
 # 비운다 — 고객이 필요 없는 쿨러를 사지 않게 하는 것이고, 총액은 그만큼 줄어든다.
@@ -846,6 +973,12 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         # 키를 두어 화면이 undefined 가드를 짜지 않게 한다(pinned·reused와 같은 관례).
         omitted = [{"slot": "COOLER", "label": SLOT_KO.get("COOLER", "COOLER"),
                     "reason": "cpu_bundled_cooler", "note": cooler_note}]
+    # K/KF/X 접미 CPU 쿨러 정책 근거(2026-09-14 사장님 지적 3) — **COOLER 슬롯이 실제로
+    # 남아 있는** 구성에만 붙는다. drop_cooler(기본쿨러 생략)와는 겹치지 않는 자리다:
+    # drop_cooler=True 면 CPU 상품명이 쿨러 «포함»을 명시한 경우이고, 접미 판정과
+    # 번들 명시는 겹치지 않는다(직접 대조: cpu_bundled_cooler()가 True 인 CPU 63종 중
+    # 접미 판정이 True 인 것 0건 — AMD 정품 멀티팩·인텔 쿨러RS1 번들은 전부 논-K).
+    cpu_cooler_note = _cpu_cooler_policy_note(chosen)
     total = sum(p["sale_price"] for p in chosen.values())
     verdict = "none" if cap is None else ("within" if total <= cap else "over")
     # 「최고 사양」은 가성비의 옛 「최저가」와 정확히 대칭인 과장이었다(2026-08-24 정정) —
@@ -875,7 +1008,9 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     policy_slots = [s for s in slots
                     if _order_of(tier, cap is not None, s) != _order_of(tier, cap is not None)]
     policy_note = SLOT_POLICY_NOTE if policy_slots else None
-    reasons = reasons + [n for n in (policy_note, floor_note, relax_note, reuse_note, cooler_note) if n]
+    reasons = reasons + [n for n in
+                         (policy_note, floor_note, relax_note, reuse_note, cooler_note, cpu_cooler_note)
+                         if n]
     # 용도별 배분(0086) — 배분을 받은 티어만 말한다. 비율은 DFS 가 판정한 원 총액(raw_total ·
     # 쿨러 포함) 기준이다 — 하한 판정과 같은 분모여야 "통과했다"는 말이 참이다.
     alloc = None
