@@ -109,6 +109,22 @@ def _budget_label(budget_min: int, budget_max) -> str:
     return f"{cap // 10000}만원"
 
 
+def _mark_batch_session(wconn, res: dict) -> None:
+    """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시.
+
+    2026-09-14 실사고: 배치 6회가 real 상담 485행을 남겨 «오늘 상담 수»류 지표를 왜곡했다.
+    X-Popcorn-Test 헤더는 .env 스위치가 켜져야 먹고(서버는 꺼져 있다) 그 스위치를
+    켜 두면 회귀가 거짓 통과한다(CLAUDE.md §회귀). 그래서 헤더 대신 응답의 session_id 로
+    바로 되짚어 표시한다 — 지우지 않는다(원장). 사장님 지시 "지워" 의 적용.
+    """
+    sid = ((res.get("json") or {}).get("session_id")) if res.get("ok") else None
+    if sid is None:
+        return
+    wconn.execute(text(
+        "UPDATE consult_sessions SET data_origin='test' WHERE session_id=:sid AND data_origin='real'"
+    ), {"sid": sid})
+
+
 def _call_recommend(usage: str, budget_min: int, budget_max, platform: str) -> dict:
     constraints = [
         {"l": "용도", "v": usage},
@@ -257,6 +273,7 @@ def main():
         if not args.dry:
             with engine.begin() as wconn:
                 write_row(wconn, cell["cell_id"], batch_id, judged)
+                _mark_batch_session(wconn, res)
 
         if conn_fail_streak >= 3:
             print("[grid_generate] FATAL: 3 consecutive connection errors -- "
