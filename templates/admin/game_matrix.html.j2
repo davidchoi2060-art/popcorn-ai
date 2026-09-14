@@ -1,5 +1,5 @@
 {#
-  게임·AI 연계 매트릭스 (ADM-GRD-020 — **가칭**) · /admin2/game-matrix
+  용도별 상품 매트릭스 (ADM-GRD-020 · 구 「게임·AI 연계 매트릭스」 — 2026-09-14 개명·이동) · /admin2/game-matrix
   2026-09-09 신설, **조회 전용**(매핑 재계산은 배치 `tools/game_cell_mapper.py`)
 
   ⚠ 화면 ID 는 가칭이다 — `docs/design/req/req-game-matrix.md` §미정 첫 항
@@ -37,7 +37,7 @@
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
-{% block title %}게임·AI 연계 매트릭스{% endblock %}
+{% block title %}용도별 상품 매트릭스{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -386,7 +386,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var mapRows = state.tab === 'games' ? m.game_map_rows : m.workload_map_rows;
     if (m.cell_count === 0) {
       set('blocked-title', '격자 데이터 없음');
-      set('blocked-msg', '현재본(is_current) 견적이 0건입니다 — 격자 관리(ADM-GRD-010)에서 먼저 생성하십시오.');
+      set('blocked-msg', '현재본(is_current) 견적이 0건입니다 — 상품 매트릭스 관리(ADM-GRD-010)에서 먼저 생성하십시오.');
       show('blocked', true); show('cols', false); return true;
     }
     if (mapRows === 0) {

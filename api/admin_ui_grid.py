@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""격자 관리(ADM-GRD-010) 페이지 라우트 — `api/main.py`가 자동으로 싣는다(§discovery).
+"""상품 매트릭스 관리(ADM-GRD-010 · 구 「격자 관리」) 페이지 라우트 — `api/main.py`가 자동으로 싣는다(§discovery).
 
 원안 `docs/design/incoming/dc-grid-admin.html`(`data-screen-id="ADM-GRD-010"`
 `data-domain="ai"`)을 계약 삼아, 다른 admin2 화면과 같은 관행으로 셸만 얹는다
@@ -23,5 +23,5 @@ def grid_page(request: Request) -> HTMLResponse:
     return render(
         request, "admin/grid.html.j2",
         screen_id="ADM-GRD-010", domain="ai",
-        crumb_group="AI 관리", crumb_now="격자 관리",
+        crumb_group="상품관리", crumb_now="상품 매트릭스 관리",
     )

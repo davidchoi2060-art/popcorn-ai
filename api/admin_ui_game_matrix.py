@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""게임·AI 연계 매트릭스(ADM-GRD-020 가칭) 페이지 라우트.
+"""용도별 상품 매트릭스(ADM-GRD-020 · 구 「게임·AI 연계 매트릭스」) 페이지 라우트.
 
 `api/main.py` 가 자동으로 싣는다(§discovery — `api/` 평면에 두어야 잡힌다).
 
@@ -25,5 +25,5 @@ def game_matrix_page(request: Request) -> HTMLResponse:
     return render(
         request, "admin/game_matrix.html.j2",
         screen_id="ADM-GRD-020", domain="ai",
-        crumb_group="AI 관리", crumb_now="게임·AI 연계 매트릭스",
+        crumb_group="상품관리", crumb_now="용도별 상품 매트릭스",
     )
