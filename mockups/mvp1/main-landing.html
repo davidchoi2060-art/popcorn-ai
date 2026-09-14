@@ -482,9 +482,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // CTA 라우팅 (목업): 견적 시작 계열 → S0 입력 게이트(→ 이후 S1), 작동 방식 보기 → HOW 섹션
+  // CTA 라우팅: 견적 시작 계열 → 대화형 화면 /mvp2/ (A-134 · 2026-09-14 사장님 지시 —
+  // A-133 「검토만」을 사장님이 뒤집음). 이전 목적지 s0-landing.html(S0 입력 게이트 → S1)은
+  // 파일로 남아 있고 직접 열면 여전히 돈다 — 링크만 바뀐다. 절대 경로인 이유: 이 파일은
+  // /mvp1/ 아래에 있고 /mvp2/ 는 형제 폴더라 상대 경로 '../mvp2/' 는 file:// 에서만 맞다.
   document.querySelectorAll('[data-cta="start"]').forEach(function (b) {
-    b.addEventListener('click', function () { window.location.href = 's0-landing.html'; });
+    b.addEventListener('click', function () { window.location.href = '/mvp2/'; });
   });
   (function () {
     var howBtn = document.querySelector('[data-cta="how"]');
