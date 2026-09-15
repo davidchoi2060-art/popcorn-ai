@@ -100,6 +100,20 @@ class Constraint(BaseModel):
 class RecommendBody(BaseModel):
     mode: str
     constraints: list[Constraint] = []
+    # ── 스펙 하한(A-135 격자 재설계 최종 단계, 2026-09-16) ──────────────────
+    # 예산과 무관한 후보 필터 입력. `tools/grid_generate.py`가 spec_tiers·
+    # game_grade_resolution_tiers 에서 읽은 값을 여기로 직접 넘긴다("가격은
+    # 결과, 스펙이 입력"). None 이면 하한 없음 = 기존 동작 그대로 — 대화 UI
+    # (S1 등)는 이 필드를 보내지 않으므로 실사용자 흐름에는 영향이 없다.
+    # 아래 usage_floors(용도 하한)와는 **별개 독립 축**이다: 후자는 대화가
+    # 말한 「용도」 문구에서 서버가 계산하는 하한이고, 이것은 배치가 스펙
+    # 티어를 직접 지정하는 하한이다. 필터 구현은 같은 함수(`_apply_spec_floor`
+    # → `UF.passes`)를 공유하되 둘 다 걸려 있으면 자동으로 AND(더 엄격한 쪽)가
+    # 된다 — 아래 `_spec_floor_filter` 참조.
+    gpu_watt_min: int | None = None
+    cpu_cores_min: int | None = None
+    ram_min_gb: int | None = None
+    ssd_min_gb: int | None = None
 
 
 def _load_pool(conn):
@@ -129,6 +143,74 @@ def _load_pool(conn):
         # 조용히 결과가 줄어드는 게 아니라 화면이 통째로 죽는 자리라 이중으로 막는다.
         " FROM v_recommendation_candidates"
         " WHERE stock_qty > 0 AND sale_price IS NOT NULL")).mappings().all()]
+
+
+# ---- 스펙 하한 필터 (A-135 격자 재설계 최종 단계 — 2026-09-16) ----
+# grid_generate.py가 spec_tiers/game_grade_resolution_tiers 값을 예산과 무관하게
+# 직접 넘기는 경로. `usage_floors`(용도 하한, 위 UF)의 GPU watt 하한과 **별개
+# 독립 축**이지만 필터 «방식»은 같은 것을 그대로 재사용한다 — `UF.passes()`는
+# 이미 "값을 모르면 불통과"(NULL 원칙) + gte/lte 비교를 구현하고 있고, 이 하한도
+# 같은 계약(모르는 스펙을 통과시키지 않는다)을 지켜야 하므로 새 비교 로직을
+# 따로 적지 않는다(§단일 원천). 둘 다 걸려 있으면(대화가 고른 용도 하한 +
+# 이 스펙 하한) 한쪽이 먼저 거른 풀 위에서 다른 쪽이 다시 거르므로 **자동으로
+# AND(더 엄격한 쪽)**가 된다 — 이 함수는 usage_floors 필터링 코드를 덧쓰지
+# 않고, `pool` 로드 직후(=DFS 진입보다 훨씬 앞, 후보 풀 단계)에서 한 번만
+# 적용된다. 이후 이 파일의 `common`·`common_full`·`passed`·`common_t`·
+# `common_full_t` 등은 전부 이 필터가 이미 적용된 `pool`에서 파생되므로
+# 별도로 다시 걸 필요가 없다.
+#
+# 4개 슬롯 모두 QUOTE_SLOTS(taxonomy.py)에서 part_type이 슬롯과 1:1이라
+# (GPU→GPU, CPU→CPU, RAM→RAM, SSD→SSD — COOLER처럼 두 종류가 한 슬롯인 경우가
+# 없다) part_type 직접 비교로 충분하다(slot_of() 변환이 필요 없다).
+SPEC_FLOOR_SPECS = (
+    # (slot=part_type, field, unit, 한글 라벨)
+    ("GPU", "required_power_watt", "W", "그래픽카드"),
+    ("CPU", "cpu_cores", "코어", "CPU"),
+    ("RAM", "capacity_gb", "GB", "메모리"),
+    ("SSD", "capacity_gb", "GB", "SSD"),
+)
+
+
+def _apply_spec_floor(pool: list, slot: str, field: str, min_value, unit: str, label: str):
+    """스펙 하한 한 슬롯 필터. min_value가 None이면 하한 없음(기존 동작 그대로) —
+    아무것도 거르지 않고 그대로 돌려준다.
+
+    반환: (필터링된 풀, 적용 문구|None, 빈 슬롯 문구|None).
+    빈 슬롯 문구는 **그 슬롯에 원래 후보가 있었는데 이 하한으로 전부 탈락한 경우에만**
+    남긴다(§화면 정직성 — 지어내지 않는다: 원래도 후보가 0이던 슬롯까지 "이 하한 때문"
+    이라고 말하면 사실이 아니다).
+    """
+    if min_value is None:
+        return pool, None, None
+    before = sum(1 for p in pool if p["part_type"] == slot)
+    floors = [(field, "gte", min_value, label, None)]
+    out = [p for p in pool if p["part_type"] != slot or UF.passes(p, floors)]
+    note = f"{label} {min_value:,}{unit} 이상"
+    empty_note = None
+    if before > 0 and not any(p["part_type"] == slot for p in out):
+        empty_note = f"{label} {min_value:,}{unit} 이상 조건을 만족하는 후보가 없습니다"
+    return out, note, empty_note
+
+
+def _spec_floor_filter(pool: list, gpu_watt_min=None, cpu_cores_min=None,
+                        ram_min_gb=None, ssd_min_gb=None):
+    """스펙 하한 4종을 후보 풀 단계에서 한 번에 적용한다 — `RecommendBody`의 값을
+    그대로 받는다. 반환: (필터링된 풀, 적용 문구 목록, 빈 슬롯 문구 목록).
+
+    순서(GPU→CPU→RAM→SSD)는 SPEC_FLOOR_SPECS 순서 그대로이고, 슬롯마다 서로
+    다른 part_type만 보므로 순서가 결과에 영향을 주지 않는다(각 필터는 자기
+    슬롯 바깥의 부품을 건드리지 않는다).
+    """
+    values = {"GPU": gpu_watt_min, "CPU": cpu_cores_min, "RAM": ram_min_gb, "SSD": ssd_min_gb}
+    notes: list = []
+    empties: list = []
+    for slot, field, unit, label in SPEC_FLOOR_SPECS:
+        pool, note, empty_note = _apply_spec_floor(pool, slot, field, values[slot], unit, label)
+        if note:
+            notes.append(note)
+        if empty_note:
+            empties.append(empty_note)
+    return pool, notes, empties
 
 
 def load_compat_rules(conn) -> dict:
@@ -1385,6 +1467,13 @@ def recommend(body: RecommendBody, request: Request, response: Response):
 
     with engine.begin() as conn:
         pool = _load_pool(conn)
+        # ── 스펙 하한(A-135, 위 SPEC_FLOOR_SPECS 참조) — 예산과 무관하게 후보
+        # 풀 단계에서 바로 적용한다(DFS 진입보다 훨씬 앞). body에 값이 없으면
+        # (guided/chat/expert/talk 등 기존 대화 흐름) 전부 None이라 여기서는
+        # 아무것도 걸러지지 않고 기존 동작 그대로다 — grid_generate.py처럼
+        # 명시적으로 넘긴 호출만 영향을 받는다.
+        pool, spec_floor_notes, spec_floor_empties = _spec_floor_filter(
+            pool, body.gpu_watt_min, body.cpu_cores_min, body.ram_min_gb, body.ssd_min_gb)
         total_n = len(pool)
 
         # ── 재사용 슬롯(2026-08-24 · customer-audit-2026-08-24 §1-1 · 공유 계약 ①②) ──
@@ -1495,6 +1584,17 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 그래픽카드 하한은…"처럼 두 문장이 붙어 읽힌다(실측으로 발견, TestClient
             # 검증 중 reasons[] 출력에서 잡았다).
             floor_note = f"{floor_note}. {skip_note}" if floor_note else skip_note
+        # ── 스펙 하한(A-135, body.gpu_watt_min 등) — usage_floors와 별개 독립
+        # 축이지만 같은 reasons 흐름에 합류시킨다(화면·배치가 근거를 한 곳에서
+        # 읽게). 실제 적용된 하한값만 문구로 옮긴다(지어내지 않는다) — pool
+        # 로드 직후에 이미 걸렸으므로 여기서는 "무엇을 걸었는지"만 말한다.
+        spec_floor_note = None
+        if spec_floor_notes:
+            spec_floor_note = "스펙 하한(지정) — " + " · ".join(spec_floor_notes)
+            floor_note = f"{floor_note}. {spec_floor_note}" if floor_note else spec_floor_note
+        if spec_floor_empties:
+            empty_note = " ".join(spec_floor_empties)
+            floor_note = f"{floor_note}. {empty_note}" if floor_note else empty_note
 
         # ── CPU 내장그래픽(iGPU) — GPU 슬롯 생략 허용 판정(2026-09-15) ──────────
         # 이 용도에 GPU 성능 하한(usage_floors)이 걸려 있으면 iGPU만으로는 그
@@ -1504,6 +1604,7 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # 없는 모순 — GPU 재사용·핀 충돌과 같은 판단 방식).
         allow_igpu_omit = (
             not any(f["slot"] == "GPU" for f in floors_checked)
+            and body.gpu_watt_min is None
             and "GPU" not in reuse_slots
             and not part_v
         )
@@ -1752,6 +1853,12 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             "funnel": {"total": total_n, "passed": len(passed)},
             # 서버가 실제로 건 하한 — 화면이 지어내지 않고 이것만 말한다
             "usage_floors": {"usage": UF.label_of(usage_v), "items": floors},
+            # 스펙 하한(A-135, body.gpu_watt_min 등) — 배치(grid_generate.py)가
+            # 실제로 적용됐는지 사후 검증할 때 이 필드를 읽는다. 값은 요청 그대로
+            # (지어내지 않는다) — None인 항목은 하한이 걸리지 않은 것이다.
+            "spec_floor": {"gpu_watt_min": body.gpu_watt_min, "cpu_cores_min": body.cpu_cores_min,
+                           "ram_min_gb": body.ram_min_gb, "ssd_min_gb": body.ssd_min_gb,
+                           "notes": spec_floor_notes, "empty": spec_floor_empties},
             # 용도×예산 티어 겨냥(0085) — 서버가 실제로 건 규칙만. applied 는 "규칙이 있어
             # 걸었다", relaxed 는 "겨냥 풀로 조합이 안 나와 추천/고성능 어느 한 티어에서
             # 겨냥만 풀었다"(어느 티어인지는 relaxed_tiers · 그 티어 reasons 에도 문구가 있다).

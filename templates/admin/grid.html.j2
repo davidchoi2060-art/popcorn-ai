@@ -134,7 +134,7 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
 
 {% block content %}
 <div class="body">
-  <div class="kicker">사전 생성 견적 격자 · 티어 7 × 용도 8 × 플랫폼 2 · 축(티어 경계·용도 목록)은 이 화면에서 고치지 않습니다</div>
+  <div class="kicker">사전 생성 견적 격자(스펙 축) · 비게임 스펙티어 6 × 용도 6 + 게임 등급 6 × 해상도 3 · 플랫폼 2 · 축(스펙 하한·용도 목록)은 이 화면에서 고치지 않습니다</div>
 
   <div data-bind="content-area">
     <div class="card banner" data-bind="empty-banner" hidden style="border-style:dashed">
@@ -188,7 +188,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     </div>
 
     <div class="card grd-wrap" data-keep="1">
-      <div data-bind="grid-body" aria-label="견적 격자">격자 로딩 중…</div>
+      <div class="grd-section-title" style="font:600 13px/1.3 var(--font);margin-bottom:6px">비게임 용도 — 스펙 티어 × 용도</div>
+      <div data-bind="grid-body" aria-label="견적 격자(비게임)">격자 로딩 중…</div>
+    </div>
+
+    <div class="card grd-wrap" data-keep="1" style="margin-top:16px">
+      <div class="grd-section-title" style="font:600 13px/1.3 var(--font);margin-bottom:6px">게임 — 부하 등급 × 해상도</div>
+      <div data-bind="game-grid-body" aria-label="견적 격자(게임)">격자 로딩 중…</div>
     </div>
 
     <div class="grd-axis-note">축(티어 경계·용도 목록)은 별도 화면에서 관리 · 이 화면은 칸의 내용물만 다루며 부품 손 교체는 없음(재생성만)</div>
@@ -245,8 +251,8 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     intent:  { label: '빈 칸(의도)',       color: 'var(--outline)' }
   };
 
-  var state = { data: null, platform: '인텔', hlTier: null, hlUse: null, failOnly: false, selectedCellId: null };
-  var byCoord = {};   // "tier|usage|platform" -> cell
+  var state = { data: null, platform: '인텔', hlTier: null, hlUse: null, failOnly: false, selectedCellId: null, cellDetail: null, activeVariant: '추천' };
+  var byCoord = {};   // "tierKey|usage|platform" 또는 "G|grade|resolution|platform" -> cell
 
   function budgetRange(bmin, bmax) {
     var lo = manwon(bmin), hi = manwon(bmax);
@@ -268,16 +274,18 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     return Math.floor(hr / 24) + '일 전';
   }
 
-  function key(tier, usage, platform) { return tier + '|' + usage + '|' + platform; }
+  function key(tierKey, usage, platform) { return tierKey + '|' + usage + '|' + platform; }
+  function gameKey(grade, resolution, platform) { return 'G|' + grade + '|' + resolution + '|' + platform; }
 
   function renderGrid() {
     var d = state.data;
     if (!d) return;
-    var cols = 'grid-template-columns:150px repeat(' + d.usages.length + ',minmax(134px,1fr));';
+    var usages = d.usages;   // 비게임 6종
+    var cols = 'grid-template-columns:150px repeat(' + usages.length + ',minmax(134px,1fr));';
     var html = '<div class="grd-grid" style="' + cols + '" role="grid">';
 
-    html += '<div class="grd-corner"><span>티어 ↓ / 용도 →</span><b>' + esc(state.platform) + '</b></div>';
-    d.usages.forEach(function (u, ui) {
+    html += '<div class="grd-corner"><span>스펙 티어 ↓ / 용도 →</span><b>' + esc(state.platform) + '</b></div>';
+    usages.forEach(function (u, ui) {
       html += '<button type="button" class="grd-colhead' + (state.hlUse === ui ? ' hl' : '') +
         '" data-action="hl-use" data-idx="' + ui + '" role="columnheader">' + esc(u) + '</button>';
     });
@@ -285,10 +293,10 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     d.tiers.forEach(function (t, ti) {
       html += '<button type="button" class="grd-rowhead' + (state.hlTier === ti ? ' hl' : '') +
         '" data-action="hl-tier" data-idx="' + ti + '" role="rowheader">' +
-        '<span class="nm">' + esc(t.name) + '</span><span class="bg">' + esc(budgetRange(t.budget_min, t.budget_max)) + '</span></button>';
+        '<span class="nm">' + esc(t.name) + '</span></button>';
 
-      d.usages.forEach(function (u, ui) {
-        var c = byCoord[key(t.name, u, state.platform)];
+      usages.forEach(function (u, ui) {
+        var c = byCoord[key(t.tier_key, u, state.platform)];
         if (!c) { html += '<div class="grd-cell" style="cursor:default"></div>'; return; }
         var meta = STATE_META[c.state] || { label: c.state, color: 'var(--outline)' };
         var hl = state.hlTier === ti || state.hlUse === ui;
@@ -312,6 +320,45 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
 
     html += '</div>';
     set('grid-body', html);
+  }
+
+  function renderGameGrid() {
+    var d = state.data;
+    if (!d) return;
+    var resolutions = ['1080p', '1440p', '4K'];
+    var cols = 'grid-template-columns:150px repeat(' + resolutions.length + ',minmax(134px,1fr));';
+    var html = '<div class="grd-grid" style="' + cols + '" role="grid">';
+
+    html += '<div class="grd-corner"><span>부하 등급 ↓ / 해상도 →</span><b>' + esc(state.platform) + '</b></div>';
+    resolutions.forEach(function (r, ri) {
+      html += '<div class="grd-colhead" role="columnheader">' + esc(r) + '</div>';
+    });
+
+    d.game_grades.forEach(function (g) {
+      html += '<div class="grd-rowhead" role="rowheader"><span class="nm">' + esc(g.label) + '</span></div>';
+      resolutions.forEach(function (r) {
+        var c = byCoord[gameKey(g.grade, r, state.platform)];
+        if (!c) { html += '<div class="grd-cell" style="cursor:default"></div>'; return; }
+        var meta = STATE_META[c.state] || { label: c.state, color: 'var(--outline)' };
+        var sel = state.selectedCellId === c.cell_id;
+        var cls = 'grd-cell' + (sel ? ' sel' : '');
+        var bg = '';
+        if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
+        else if (c.state === 'missing') bg = 'background:var(--container);';
+        var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
+        var ago = c.quote ? agoText(c.quote.generated_at) : '';
+        html += '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
+          '" ' + (c.state === 'intent' ? 'disabled' : '') +
+          ' aria-label="' + esc(g.label + ' × ' + r + ' × ' + state.platform + ' · ' + meta.label) + '">' +
+          '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
+          '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
+          '<span class="total">' + total + '</span>' +
+          '<span class="ago">' + esc(ago) + '</span></button>';
+      });
+    });
+
+    html += '</div>';
+    set('game-grid-body', html);
   }
 
   function renderSummary() {
@@ -345,9 +392,16 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
   function render(d) {
     state.data = d;
     byCoord = {};
-    d.cells.forEach(function (c) { byCoord[key(c.tier, c.usage, c.platform)] = c; });
+    d.cells.forEach(function (c) {
+      if (c.usage === '게임') {
+        byCoord[gameKey(c.game_grade, c.game_resolution, c.platform)] = c;
+      } else {
+        byCoord[key(c.tier_key, c.usage, c.platform)] = c;
+      }
+    });
     renderSummary();
     renderGrid();
+    renderGameGrid();
   }
 
   // ── 칸 상세 서랍 ──────────────────────────────────────────────
@@ -357,7 +411,9 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
 
   function openDrawer(cellId) {
     state.selectedCellId = cellId;
+    state.activeVariant = '추천';
     renderGrid();
+    renderGameGrid();
     var drawer = $('drawer');
     drawer.hidden = false;
     set('d-body', '<div style="text-align:center;color:var(--on-variant);font:400 12px/1.5 var(--font)">불러오는 중…</div>');
@@ -366,54 +422,85 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     fetch('/api/admin/grid/cells/' + cellId, { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (c) {
-        var meta = STATE_META[c.intended_empty ? 'intent' : (c.quote ? (byCoord[key(c.tier, c.usage, c.platform)] || {}).state || 'ok' : 'missing')] || {};
-        set('d-coord', esc(c.tier + ' × ' + c.usage + ' × ' + c.platform));
+        state.cellDetail = c;
+        var coordText = c.usage === '게임'
+          ? ('게임 · ' + esc(c.game_grade) + '등급 · ' + esc(c.game_resolution) + ' × ' + esc(c.platform))
+          : (esc(c.tier_key) + ' · ' + esc(c.usage) + ' × ' + esc(c.platform));
+        var byC = c.usage === '게임'
+          ? byCoord[gameKey(c.game_grade, c.game_resolution, c.platform)]
+          : byCoord[key(c.tier_key, c.usage, c.platform)];
+        var meta = STATE_META[c.intended_empty ? 'intent' : ((byC || {}).state || (c.quotes && c.quotes['추천'] ? 'ok' : 'missing'))] || {};
+        set('d-coord', coordText);
         set('d-label', esc(meta.label || '—'));
         $('d-dot').style.background = meta.color || 'var(--outline)';
-
-        var q = c.quote;
-        var body = '<dl class="grd-dl">' +
-          '<dt>예산 구간</dt><dd>' + esc(budgetRange(c.budget_min, c.budget_max)) + '</dd>' +
-          '<dt>생성 시각</dt><dd>' + (q ? esc(new Date(q.generated_at).toLocaleString('ko-KR')) : '—') + '</dd>' +
-          '<dt>배치 ID</dt><dd>' + (q ? esc(q.batch_id) : '—') + '</dd>' +
-          '</dl>';
-
-        if (c.intended_empty) {
-          body += '<div class="grd-empty-note">의도적으로 비운 칸 — 이 예산 구간에서는 이 용도 구성을 시드가 채우지 않았습니다. 재생성 대상이 아닙니다.</div>';
-        } else if (!q) {
-          body += '<div class="grd-empty-note">아직 생성되지 않은 칸 — 배치 대상이지만 현재본 견적이 없습니다.</div>';
-        } else {
-          var items = q.items || [];
-          body += '<table class="grd-items"><caption>견적 구성 · 슬롯 ' + items.length + '</caption>' +
-            '<thead><tr><th>슬롯</th><th>부품명</th><th style="text-align:right">가격</th></tr></thead><tbody>' +
-            items.map(function (it) {
-              return '<tr><td>' + esc(it.slot) + '</td><td>' + esc(it.name) +
-                (it.in_stock ? '' : '<span class="stock-badge">재고 소진</span>') +
-                '</td><td class="price">' + won(it.price) + '</td></tr>';
-            }).join('') +
-            '</tbody><tfoot><tr><td colspan="2">총액</td><td class="price">' + won(q.total) + '</td></tr>' +
-            '<tr><td colspan="2">예산 구간 대비</td><td class="price">' + esc(verdictLabel(q.verdict)) + '</td></tr></tfoot></table>';
-
-          if (q.reasons && q.reasons.length) {
-            body += '<div><div style="font:600 12px/1.3 var(--font);margin-bottom:6px">엔진이 적은 근거</div>' +
-              '<ul class="grd-reasons">' + q.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul></div>';
-          }
-          if (q.batch_id !== (state.data.last_batch && state.data.last_batch.batch_id)) {
-            body += '<div class="grd-empty-note">최근 배치(' + esc(state.data.last_batch ? state.data.last_batch.batch_id : '') +
-              ')에서 이 칸이 갱신되지 않았습니다 — 이전 배치(' + esc(q.batch_id) + ') 견적을 표시합니다.</div>';
-          }
-        }
-        set('d-body', body);
+        renderDrawerBody();
       })
       .catch(function (err) {
         set('d-body', '<div class="grd-empty-note">상세 조회 실패 — ' + esc(err.message) + '</div>');
       });
   }
 
+  function renderDrawerBody() {
+    var c = state.cellDetail;
+    if (!c) return;
+    var q = c.quotes ? c.quotes[state.activeVariant] : null;
+
+    var body = '';
+    if (c.game_info) {
+      body += '<div class="grd-empty-note" style="background:var(--surface-variant)">' +
+        '그래픽카드 스펙 <b>' + esc(c.game_info.gpu_tier_key || '—') + '</b>' +
+        (c.game_info.cpu_tier_key_override ? ' · CPU 기준 <b>' + esc(c.game_info.cpu_tier_key_override) + '</b>(비대칭)' : '') +
+        (c.game_info.note ? '<br>' + esc(c.game_info.note) : '') +
+        (c.game_info.games && c.game_info.games.length
+          ? '<br>이 등급 게임: ' + esc(c.game_info.games.join(', ')) : '') +
+        '</div>';
+    }
+
+    body += '<div class="grd-tabs" data-keep="1" role="tablist" aria-label="구성 종류" style="margin:10px 0">' +
+      ['가성비', '추천', '고성능'].map(function (v) {
+        return '<button type="button" class="grd-tab" data-action="variant" data-variant="' + v +
+          '" role="tab" aria-selected="' + (state.activeVariant === v ? 'true' : 'false') + '">' + v + '</button>';
+      }).join('') + '</div>';
+
+    body += '<dl class="grd-dl">' +
+      '<dt>예산 구간</dt><dd>' + esc(budgetRange(c.budget_min, c.budget_max)) + '</dd>' +
+      '<dt>생성 시각</dt><dd>' + (q ? esc(new Date(q.generated_at).toLocaleString('ko-KR')) : '—') + '</dd>' +
+      '<dt>배치 ID</dt><dd>' + (q ? esc(q.batch_id) : '—') + '</dd>' +
+      '</dl>';
+
+    if (c.intended_empty) {
+      body += '<div class="grd-empty-note">의도적으로 비운 칸 — 이 구성은 시드가 채우지 않았습니다. 재생성 대상이 아닙니다.</div>';
+    } else if (!q) {
+      body += '<div class="grd-empty-note">아직 생성되지 않은 구성(' + esc(state.activeVariant) + ') — 배치 대상이지만 현재본 견적이 없습니다.</div>';
+    } else {
+      var items = q.items || [];
+      body += '<table class="grd-items"><caption>견적 구성 · 슬롯 ' + items.length + '</caption>' +
+        '<thead><tr><th>슬롯</th><th>부품명</th><th style="text-align:right">가격</th></tr></thead><tbody>' +
+        items.map(function (it) {
+          return '<tr><td>' + esc(it.slot) + '</td><td>' + esc(it.name) +
+            (it.in_stock ? '' : '<span class="stock-badge">재고 소진</span>') +
+            '</td><td class="price">' + won(it.price) + '</td></tr>';
+        }).join('') +
+        '</tbody><tfoot><tr><td colspan="2">총액</td><td class="price">' + won(q.total) + '</td></tr>' +
+        '<tr><td colspan="2">예산 구간 대비</td><td class="price">' + esc(verdictLabel(q.verdict)) + '</td></tr></tfoot></table>';
+
+      if (q.reasons && q.reasons.length) {
+        body += '<div><div style="font:600 12px/1.3 var(--font);margin-bottom:6px">엔진이 적은 근거</div>' +
+          '<ul class="grd-reasons">' + q.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul></div>';
+      }
+      if (q.batch_id !== (state.data.last_batch && state.data.last_batch.batch_id)) {
+        body += '<div class="grd-empty-note">최근 배치(' + esc(state.data.last_batch ? state.data.last_batch.batch_id : '') +
+          ')에서 이 칸이 갱신되지 않았습니다 — 이전 배치(' + esc(q.batch_id) + ') 견적을 표시합니다.</div>';
+      }
+    }
+    set('d-body', body);
+  }
+
   function closeDrawer() {
     state.selectedCellId = null;
     $('drawer').hidden = true;
     renderGrid();
+    renderGameGrid();
   }
 
   // ── 이벤트 ────────────────────────────────────────────────────
@@ -422,12 +509,16 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     if (!t) return;
     var action = t.getAttribute('data-action');
     if (action === 'platform') {
-      document.querySelectorAll('.grd-tab').forEach(function (b) { b.setAttribute('aria-selected', 'false'); });
+      document.querySelectorAll('.grd-tab[data-platform]').forEach(function (b) { b.setAttribute('aria-selected', 'false'); });
       t.setAttribute('aria-selected', 'true');
       state.platform = t.getAttribute('data-platform');
       state.selectedCellId = null;
       $('drawer').hidden = true;
       renderGrid();
+      renderGameGrid();
+    } else if (action === 'variant') {
+      state.activeVariant = t.getAttribute('data-variant');
+      renderDrawerBody();
     } else if (action === 'hl-tier') {
       var idx = Number(t.getAttribute('data-idx'));
       state.hlTier = state.hlTier === idx ? null : idx;
@@ -444,6 +535,7 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
       state.failOnly = !state.failOnly;
       t.style.background = state.failOnly ? 'var(--primary-container)' : '';
       renderGrid();
+      renderGameGrid();
     }
   });
 

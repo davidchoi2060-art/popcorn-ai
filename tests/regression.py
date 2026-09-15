@@ -6780,7 +6780,7 @@ def test_usage_alloc_invariants():
                 return t["usage_key"]
         return None
     cards = db_all(
-        "SELECT c.usage, c.tier, q.payload FROM grid_quotes q JOIN grid_cells c USING (cell_id)"
+        "SELECT c.usage, c.tier_key, q.payload FROM grid_quotes q JOIN grid_cells c USING (cell_id)"
         " WHERE q.is_current AND q.payload IS NOT NULL")
     pre, skipped, bad_cards, seen = 0, 0, [], 0
     for c in cards:
@@ -6804,7 +6804,7 @@ def test_usage_alloc_invariants():
         seen += 1
         pct = gpu["price"] / tot
         if not (gmin - 1e-9 <= pct <= gmax + 1e-9):
-            bad_cards.append((c["tier"], c["usage"], round(pct, 3), gmin, gmax))
+            bad_cards.append((c["tier_key"], c["usage"], round(pct, 3), gmin, gmax))
     if seen == 0:
         print(f"  [INFO] 배분(alloc) 정보를 가진 현재 카드 0장 — 0086 이전 배치 {pre}장, 해제 {skipped}장."
               " tools/grid_generate.py 를 다시 돌리면 이 관계식이 실제 카드를 본다")
@@ -6820,37 +6820,34 @@ def test_usage_alloc_invariants():
           "ALLOC_STAGES = (1.0, 1.5, 2.0)" in rec_src and "for x in ALLOC_STAGES" in rec_src, "있음", "없음")
 
 def test_grid_workstations():
-    """[53] AI 워크스테이션 진열 `GET /api/grid/workstations` (2026-09-13 신설)
+    """[53] AI 워크스테이션 진열 `GET /api/grid/workstations` (2026-09-13 신설,
+    2026-09-15 A-135 격자 재설계로 예산 하한 삭제 — 정책 개정 반영)
 
-    docs/design/req/req-ai-workstation-shelf.md ④-2 의 회귀 불변식 그대로:
-    ① threshold_won == grid_cells 「팝콘 9」 budget_min — 응답 값을 DB 와 대조하고,
-       api/grid_workstations.py 소스에 550만 리터럴(5500000 · 5_500_000)이 없음을 감시한다.
+    docs/design/req/req-ai-workstation-shelf.md ④-2(2026-09-15 개정판)의 회귀 불변식:
+    ① shown = (usage == "AI 작업") — 예산과 무관. threshold_won 은 참고 정보(spec_tiers
+       T5 gpu_watt_min)일 뿐 판정에 안 쓴다. api/grid_workstations.py 소스에 550만
+       리터럴(5500000 · 5_500_000)이 없음을 감시한다(하한을 되살리지 않는지 확인).
     ② items 전부 builtpc_kind='ai_workstation'(+ PC_COMPLETE · 판매중) 이고,
        예산 있을 때 over_budget:true 행 ≤ 2. 예산 없을 때 5개 이하 · over_budget 전부 false.
     """
-    print("\n[53] AI 워크스테이션 진열 — /api/grid/workstations 불변식 (2026-09-13 신설)")
-    thr_db = db_one("SELECT MIN(budget_min) FROM grid_cells WHERE tier='팝콘 9'")
-    if thr_db is None:
-        print("  [SKIP] grid_cells 팝콘 9 없음 또는 DB 미접속")
-        return
+    print("\n[53] AI 워크스테이션 진열 — /api/grid/workstations 불변식 (2026-09-15 예산하한삭제 개정)")
+    thr_db = db_one("SELECT gpu_watt_min FROM spec_tiers WHERE tier_key='T5'")
     ai_codes = {int(r["product_code"]) for r in db_all(
         "SELECT product_code FROM products WHERE part_type='PC_COMPLETE'"
         " AND status='판매중' AND builtpc_kind='ai_workstation'")}
 
     src = io.open(os.path.join(ROOT, "api", "grid_workstations.py"), encoding="utf-8").read()
-    check("[53] api/grid_workstations.py 에 하한 리터럴(5500000·5_500_000·5,500,000) 없음 — 정본은 grid_cells",
+    check("[53] api/grid_workstations.py 에 하한 리터럴(5500000·5_500_000·5,500,000) 없음 — 예산 하한을 되살리지 않는다",
           not any(s in src for s in ("5500000", "5_500_000", "5,500,000")), "없음", "있음")
-    check("[53] api/grid_workstations.py 가 grid_cells 에서 하한을 읽는다",
-          "FROM grid_cells" in src and "budget_min" in src, "있음", "없음")
+    check("[53] api/grid_workstations.py 가 usage 만으로 판정한다(예산 하한 없음)",
+          "budget_below_threshold" not in src, "없음", "있음")
 
     u = _uq("AI 작업")
-    # 예산 있음 — 하한 위(하한×2 + 여유)와 실제 데이터 중간값을 함께 본다
-    probes = [int(thr_db) * 2, 13000000]
+    # 예산 있음 — 하한과 무관하게 항상 노출돼야 한다(구 하한보다 훨씬 낮은 값 포함)
+    probes = [1, 500000, 13000000]
     for b in probes:
         d = get(f"/api/grid/workstations?usage={u}&budget_won={b}")
-        check(f"[53] threshold_won == grid_cells 팝콘 9 budget_min (예산 {b:,})",
-              d.get("threshold_won") == int(thr_db), int(thr_db), d.get("threshold_won"))
-        check(f"[53] shown:true · ok:true (예산 {b:,} ≥ 하한)",
+        check(f"[53] shown:true · ok:true (예산 {b:,} — 예산과 무관하게 노출)",
               d.get("ok") is True and d.get("shown") is True, True, (d.get("ok"), d.get("shown")))
         items = d.get("items") or []
         bad = [i["product_code"] for i in items if int(i["product_code"]) not in ai_codes]
@@ -6877,14 +6874,8 @@ def test_grid_workstations():
           None, (d.get("counts") or {}).get("within_budget"))
     check("[53] 예산 없음 → items 전부 builtpc_kind='ai_workstation'",
           all(int(i["product_code"]) in ai_codes for i in items), "전부", [i["product_code"] for i in items])
-    check("[53] threshold_won == grid_cells 팝콘 9 budget_min (예산 없음)",
-          d.get("threshold_won") == int(thr_db), int(thr_db), d.get("threshold_won"))
 
-    # 판정 실패는 400 이 아니라 shown:false + reason
-    d = get(f"/api/grid/workstations?usage={u}&budget_won={int(thr_db) - 1}")
-    check("[53] 예산 < 하한 → shown:false reason budget_below_threshold · items:[]",
-          d.get("shown") is False and d.get("reason") == "budget_below_threshold" and d.get("items") == [],
-          "budget_below_threshold", (d.get("shown"), d.get("reason"), len(d.get("items") or [])))
+    # 판정 실패는 400 이 아니라 shown:false + reason — 예산 하한 케이스는 삭제(usage 만 본다)
     d = get(f"/api/grid/workstations?usage={_uq('게임')}&budget_won=10000000")
     check("[53] usage≠AI 작업 → shown:false reason usage_not_ai",
           d.get("ok") is True and d.get("shown") is False and d.get("reason") == "usage_not_ai",

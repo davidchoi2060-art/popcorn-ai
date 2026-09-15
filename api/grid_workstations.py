@@ -13,17 +13,22 @@
 ■ 읽기 전용 — SELECT 만. 세션도 원장도 쓰지 않는다(`grid_public.py` 와 같은 등급이라
   같은 `/api/grid/*` 접두 · 인증 게이트 밖 — 그 파일 머리말의 실측 그대로).
 
-■ 노출 판정(사장님 확정 2026-09-13)
-      shown = (usage == "AI 작업") AND (budget_won is None OR budget_won >= threshold_won)
-  threshold_won 은 **`grid_cells` 의 `팝콘 9` `budget_min`** 을 요청마다 읽는다
-  (`grid_public._load_tiers` 와 같은 이유 — 리터럴을 두지 않는다. 0082 가 경계를 바꾸면
-  이 파일은 고칠 것이 없다). 회귀 `tests/regression.py` 가 이 파일에 550만 리터럴이
-  없음을 감시한다.
+■ 노출 판정(2026-09-15 개정 — A-135 격자 재설계에 따른 사장님 확정)
+      shown = (usage == "AI 작업")
+  예산 하한(구 "550만원 이상")을 삭제했다 — A-135로 격자가 "가격 구간을 먼저
+  정하고 그 안에 스펙을 맞추는" 방식에서 "용도·스펙이 먼저, 가격은 결과"로
+  전환됐고, 이 진열의 판정도 같은 논리를 따른다. `grid_cells`(구 팝콘9
+  budget_min)도 스펙 축(`tier_key`)으로 바뀌어 예산 하한 개념 자체가 사라졌다
+  (구 값은 `grid_cells_legacy_v1`로 보존만, 더 이상 참조하지 않는다).
+  `threshold_won`은 이제 조건이 아니라 참고 정보 — `spec_tiers` T5(팝콘X)의
+  `gpu_watt_min`을 실어 "이 워크스테이션이 어느 스펙 등급에 해당하는지"만
+  알린다(가격 기준 아님). 회귀 `tests/regression.py`가 이 파일에 550만
+  리터럴이 없음을 감시한다(구 감시 목적과 이름은 같지만, 이제는 "예산 하한을
+  되살리지 않는다"는 뜻으로 유지한다).
 
 ■ 400/500 을 내지 않는다 — 격자 API 관례 「부족한 것은 말로 한다」.
   · usage 없음 → shown:false · reason:"usage_missing"
   · usage ≠ AI 작업 → shown:false · reason:"usage_not_ai"
-  · 예산 < 하한 → shown:false · reason:"budget_below_threshold"
   · budget_won 이 정수가 아니거나 0 이하 → 「예산 없음」으로 보고 note 에 사유
   · `builtpc_kind` 컬럼 없음(0088 미적용) → shown 은 조건대로 · items:[] · note "0088 미적용"
 
@@ -44,7 +49,7 @@ from .product_name import display_name
 router = APIRouter(prefix="/api/grid", tags=["grid-public"])
 
 USAGE_AI = "AI 작업"           # talk.py 용도 라벨 · grid_public.USAGE_TO_GRID 의 키와 같은 값
-THRESHOLD_TIER = "팝콘 9"       # 하한을 읽어 올 티어 — 값(budget_min)은 grid_cells 가 정본
+THRESHOLD_TIER = "T5"          # 참고 정보용 — spec_tiers 최상위 스펙(팝콘X). 판정에는 안 쓴다
 OVER_BUDGET_N = 2              # 예산 초과분 중 「바로 위」 몇 개
 NO_BUDGET_N = 5                # 예산 없을 때 가격 오름차순 몇 개
 BUILTPC_KIND = "ai_workstation"
@@ -54,7 +59,7 @@ BUILTPC_KIND = "ai_workstation"
 MALL_URL = MALL_DETAIL
 
 _SQL_THRESHOLD = text(
-    "SELECT MIN(budget_min) FROM grid_cells WHERE tier = :t")
+    "SELECT gpu_watt_min FROM spec_tiers WHERE tier_key = :t")
 
 _SQL_ITEMS = text(
     "SELECT product_code, product_name, sale_price, stock_qty, builtpc_spec"
@@ -154,17 +159,13 @@ def workstations(usage: str | None = Query(default=None),
     with engine.connect() as conn:
         threshold = _load_threshold(conn)
         if threshold is None:
-            notes.append(f"grid_cells 에 '{THRESHOLD_TIER}' 없음 — 하한을 정할 수 없어 노출하지 않음")
+            notes.append(f"spec_tiers 에 '{THRESHOLD_TIER}' 없음 — 참고 스펙값 없이 진행")
 
-        # 판정 — 용도 먼저, 예산 다음 (정의서 ⑦-A 순서)
+        # 판정 — 용도만 본다(2026-09-15 예산 하한 삭제, 정의서 ④ 참조)
         if usage_v is None:
             return _out(False, "usage_missing", threshold, [], empty_counts)
         if usage_v != USAGE_AI:
             return _out(False, "usage_not_ai", threshold, [], empty_counts)
-        if threshold is None:
-            return _out(False, "budget_below_threshold", threshold, [], empty_counts)
-        if won is not None and won < threshold:
-            return _out(False, "budget_below_threshold", threshold, [], empty_counts)
 
         rows, why = _load_items(conn)
 
