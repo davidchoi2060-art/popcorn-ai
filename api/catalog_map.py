@@ -265,6 +265,49 @@ def cpu_bundled_cooler(product_name: str) -> bool:
     return bool(CPU_COOLER_BUNDLED.search(name))
 
 
+# CPU 내장그래픽(iGPU) 유무 — 상품명 패턴 판정(제조사별 명명 규칙, 2026-09-15 실측).
+#
+# `cpu_gpu`(0020) 컬럼이 죽은 필드라(1/678만 채워짐) DB 값을 못 믿는다. `cpu_bundled_cooler`
+# 와 같은 이유로 **상품명에서 판정**한다 — 다만 근거 성격이 다르다: 쿨러는 "상품명이
+# 스스로 밝힌 것만" 인정하는 표현 매칭이고, 여기는 **인텔·AMD가 실제로 지키는 모델
+# 명명 규칙**(구조적 패턴)이다. 표현이 아니라 규칙이므로 판정 방향이 비대칭이 아니다.
+#
+# 실측 검증(2026-09-15, docs/design/office-subdivide-plan-2026-09-15.md §1-3, 재고
+# CPU 683행 중 판매중+재고>0 276건 전수 대조): 오탐(규칙과 실제가 다른 사례) 0건 —
+# 제온 4건만 F-suffix 규칙 예외로 별도 처리했고, 그 밖은 전수 일치했다.
+CPU_IGPU_INTEL_NO_IGPU = re.compile(r"(?<![0-9A-Za-z])\d{3,5}K?F(?![0-9A-Za-z])")
+CPU_IGPU_AMD_HAS_IGPU = re.compile(r"(?<![0-9A-Za-z])\d{3,4}G[ET]?(?![0-9A-Za-z])")
+
+
+def cpu_has_igpu(product_name: str, maker: str) -> bool:
+    """CPU가 내장그래픽을 갖는가 — 제조사별 모델 명명 규칙으로 판정한다.
+
+    ⚠ 제조사를 먼저 본다 — 인텔·AMD 규칙이 정반대다(인텔은 '없다'는 표시,
+    AMD는 '있다'는 표시). 제조사를 안 가르면 서로의 접미 문자를 오판한다.
+
+      인텔: 모델 번호가 F(또는 KF)로 끝나면 iGPU 없음 — 그 밖(K 포함)은 있음.
+            "14700F"·"245KF" → 없음. "13600K"·"14700" → 있음(K는 배수잠금
+            해제일 뿐 iGPU 유무와 무관 — `_cpu_unlocked_suffix`와 같은 접미
+            판정이지만 **다른 질문**이라 별도 정규식이다).
+            ⚠ 제온(Xeon) 계열은 F 유무와 무관하게 대부분 iGPU가 없다 — 재고
+            표본 4건 전부 F가 없는데도 실제로는 서버용이라 iGPU 미탑재.
+            상품명에 '제온'·'Xeon'이 있으면 F 판정보다 먼저 False로 확정한다.
+      AMD:  모델 번호가 G·GE·GT로 끝나면 iGPU 있음(APU) — 그 밖은 없음.
+            "5600G"·"8700G"·"5500GT" → 있음. "7600"·"9700X" → 없음.
+
+    값 모르면(maker가 인텔·AMD 둘 다 아니면) False로 둔다 — 지어내지 않는다.
+    """
+    name = product_name or ""
+    mk = (maker or "").strip()
+    if mk in ("인텔", "Intel", "INTEL", "intel"):
+        if "제온" in name or "xeon" in name.lower():
+            return False
+        return not bool(CPU_IGPU_INTEL_NO_IGPU.search(name))
+    if mk in ("AMD", "amd"):
+        return bool(CPU_IGPU_AMD_HAS_IGPU.search(name))
+    return False
+
+
 def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):
     """(part_type, category_group, skip_reason) — 분류 판정 + 중고 표시로 후보 제외.
 

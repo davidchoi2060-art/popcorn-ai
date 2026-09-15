@@ -35,6 +35,7 @@ from . import llm       # LLM 호출의 단일 원천 — 이 파일에서 프�
 from . import visitor
 from .catalog_map import gpu_chipset_key   # 「부품」(GPU 칩셋) 핀 정책 — 단일 원천(A-101)
 from .catalog_map import cpu_bundled_cooler   # CPU 기본 쿨러 판정 — 단일 원천(2026-09-09)
+from .catalog_map import cpu_has_igpu   # CPU 내장그래픽 판정 — 단일 원천(2026-09-15)
 from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정의를 그대로 쓴다(새로 만들지 않는다)
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
@@ -871,9 +872,37 @@ def _bundled_cooler(chosen: dict):
     return f"기본 쿨러 포함 CPU이나 TDP {tdp}W — 성능 유지용 별도 쿨러 추가", False
 
 
+# ---- CPU 내장그래픽(iGPU) — GPU 슬롯 생략 (2026-09-15 사장님 확정) ----
+# 사무·주식·문서 등 GPU 성능 하한이 없는 용도에서, CPU가 내장그래픽을 갖고 있으면
+# GPU 슬롯 자체를 비운다 — 위 CPU 기본 쿨러와 정확히 같은 패턴(탐색이 끝난 뒤,
+# «살 필요 없는 부품»을 사후에 빼서 총액을 줄인다).
+#
+# 실사고 근거(2026-09-15): 사무용 70만원 견적이 iGPU CPU(라이젠3 3200G)를 이미
+# 골라 놓고도 GPU 슬롯에 RTX3050(297,700원)을 «또» 사고 있었다 — 65만원짜리
+# 견적의 거의 절반이 쓸모없는 GPU였다. 이걸 생략하면 총액이 그만큼 준다.
+#
+# ⚠ **GPU 성능 하한이 있는 용도(게임·영상편집 등)에는 적용하지 않는다** — 그
+# 판정은 여기서 하지 않는다(호출부가 `floors_checked`에 GPU 항목이 있는지로
+# 미리 걸러 `igpu_gpu_omit=True`를 넘길지 결정한다). 이 함수는 "CPU가 iGPU를
+# 가졌는가"만 본다 — 용도가 GPU를 요구하는지는 이 함수의 관심사가 아니다.
+def _igpu_gpu_omit(chosen: dict, allow: bool):
+    """(근거 문구, GPU 자리를 비울까) — CPU가 정해진 뒤에만 답할 수 있는 판정.
+
+    allow=False(호출부가 이 용도엔 GPU 성능 하한이 있다고 판단)면 항상 (None, False) —
+    iGPU가 있어도 그 용도엔 별도 GPU가 필요하다는 뜻이라 생략하지 않는다.
+    """
+    cpu = chosen.get("CPU")
+    if not allow or cpu is None or "GPU" not in chosen:
+        return None, False   # 재사용·미선택으로 CPU나 GPU 자리가 없으면 판정할 것이 없다
+    if not cpu_has_igpu(cpu.get("product_name"), cpu.get("maker")):
+        return None, False   # iGPU가 없으면 지금 동작 그대로 — 추론하지 않는다
+    return "CPU 내장그래픽 사용 (별도 그래픽카드 불필요)", True
+
+
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
                active_slots=None, unknown_rules=None, reuse_note=None, meta=None,
-               alloc_capped=True, usage_key=None, alloc_stage=None, alloc_floor=False):
+               alloc_capped=True, usage_key=None, alloc_stage=None, alloc_floor=False,
+               allow_igpu_omit=False):
     """`active_slots`·`unknown_rules`·`reuse_note`(2026-08-24 추가) — 재사용 슬롯 처리
     (customer-audit-2026-08-24 §1-1). 기본값은 전부 None/생략과 같은 뜻이라 기존 호출부
     (`api/expert.py`·이 파일의 `/api/showcase`)는 손대지 않아도 그대로 동작한다.
@@ -908,6 +937,10 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                   말을 하면 §화면 정직성 위반). 기본값 True는 기존 호출부
                   (`api/expert.py`)의 겉보기 문구를 그대로 둔다 — 그 파일은 담당 밖이라
                   이 값을 넘기지 않는다.
+    allow_igpu_omit (2026-09-15 추가) 이 용도에 GPU 성능 하한이 없을 때만 True로
+                  넘긴다(호출부가 `floors_checked`로 판정 — 이 함수는 그 판정을
+                  다시 하지 않는다). True면 CPU가 내장그래픽을 가졌을 때 GPU 슬롯을
+                  사후에 비운다(`_igpu_gpu_omit`, CPU 기본 쿨러와 같은 패턴).
     """
     if meta is not None:
         meta["exhausted"] = False   # 기본값 — 슬롯이 비어 DFS를 아예 안 부르는 경우 등
@@ -973,6 +1006,21 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
         # 키를 두어 화면이 undefined 가드를 짜지 않게 한다(pinned·reused와 같은 관례).
         omitted = [{"slot": "COOLER", "label": SLOT_KO.get("COOLER", "COOLER"),
                     "reason": "cpu_bundled_cooler", "note": cooler_note}]
+    # ── CPU 내장그래픽(iGPU) — GPU 슬롯 생략 (2026-09-15) ────────────────────
+    # 쿨러 생략과 같은 자리, 같은 패턴이다 — **탐색이 끝난 뒤** 판정한다(GPU
+    # 탈락 자체가 DFS 결과를 바꾸면 안 되므로, 이미 성립한 구성에서 사후에
+    # 뺀다). `allow_igpu_omit`은 호출부가 판정한다(이 용도에 GPU 성능 하한이
+    # 없을 때만 True — `floors_checked`에 GPU 항목이 있으면 호출부가 False로
+    # 넘겨 이 분기 자체를 스킵한다).
+    igpu_note, drop_gpu = _igpu_gpu_omit(chosen, allow_igpu_omit)
+    if drop_gpu:
+        chosen = {s: p for s, p in chosen.items() if s != "GPU"}
+        out_slots = [s for s in out_slots if s != "GPU"]
+        compat_rules = {s: rs for s, rs in compat_rules.items() if s != "GPU"}
+        compat_rules = {s: [r for r in rs if r["ref_slot"] != "GPU"]
+                        for s, rs in compat_rules.items()}
+        omitted = omitted + [{"slot": "GPU", "label": SLOT_KO.get("GPU", "GPU"),
+                               "reason": "cpu_has_igpu", "note": igpu_note}]
     # K/KF/X 접미 CPU 쿨러 정책 근거(2026-09-14 사장님 지적 3) — **COOLER 슬롯이 실제로
     # 남아 있는** 구성에만 붙는다. drop_cooler(기본쿨러 생략)와는 겹치지 않는 자리다:
     # drop_cooler=True 면 CPU 상품명이 쿨러 «포함»을 명시한 경우이고, 접미 판정과
@@ -1009,7 +1057,8 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                     if _order_of(tier, cap is not None, s) != _order_of(tier, cap is not None)]
     policy_note = SLOT_POLICY_NOTE if policy_slots else None
     reasons = reasons + [n for n in
-                         (policy_note, floor_note, relax_note, reuse_note, cooler_note, cpu_cooler_note)
+                         (policy_note, floor_note, relax_note, reuse_note, cooler_note, cpu_cooler_note,
+                          igpu_note)
                          if n]
     # 용도별 배분(0086) — 배분을 받은 티어만 말한다. 비율은 DFS 가 판정한 원 총액(raw_total ·
     # 쿨러 포함) 기준이다 — 하한 판정과 같은 분모여야 "통과했다"는 말이 참이다.
@@ -1447,6 +1496,18 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # 검증 중 reasons[] 출력에서 잡았다).
             floor_note = f"{floor_note}. {skip_note}" if floor_note else skip_note
 
+        # ── CPU 내장그래픽(iGPU) — GPU 슬롯 생략 허용 판정(2026-09-15) ──────────
+        # 이 용도에 GPU 성능 하한(usage_floors)이 걸려 있으면 iGPU만으로는 그
+        # 하한을 만족한다고 말할 수 없다(게임·영상편집 등) — 생략하지 않는다.
+        # 「부품」(GPU 칩셋) 핀이 걸려 있으면 고객이 그 GPU를 직접 지정한
+        # 것이므로도 생략하지 않는다(핀과 생략은 같은 슬롯에 동시에 성립할 수
+        # 없는 모순 — GPU 재사용·핀 충돌과 같은 판단 방식).
+        allow_igpu_omit = (
+            not any(f["slot"] == "GPU" for f in floors_checked)
+            and "GPU" not in reuse_slots
+            and not part_v
+        )
+
         # 고성능 풀 = 배분 상한을 HIGHEND_CAP_X 배 총액에 건다(전면 해제가 아니다) — `common`
         # (배분 미적용)을 그대로 주면 램 931만원이 다시 들어온다. 배분율 자체는 용도별(0086,
         # usage_alloc)이고, 단계(×1.0→×1.5→×2.0→해제)는 아래 `_alloc_cascade` 가 건다.
@@ -1515,14 +1576,14 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         # ── 가성비형 ──────────────────────────────────────────────────────────
         built_v = _build_set("value", common, cap, rules_active, floor_note,
                              active_slots=active_slots, unknown_rules=rules_unknown,
-                             reuse_note=reuse_note, meta=meta_v)
+                             reuse_note=reuse_note, meta=meta_v, allow_igpu_omit=allow_igpu_omit)
         honored_v = None
         if part_v:
             if gpu_matches and built_v is None:
                 # 핀 풀(common)로는 성립하지 않는다 — 「부품」을 뺀 풀로 다시 짓는다(핀 해제).
                 built_v = _build_set("value", common_full, cap, rules_active, floor_note,
                                      active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note, meta=meta_v)
+                                     reuse_note=reuse_note, meta=meta_v, allow_igpu_omit=allow_igpu_omit)
                 honored_v = False
             else:
                 honored_v = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
@@ -1553,7 +1614,8 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             fn = _join(floor_note, extra_note)
             hi_alloc = cap is not None
             kw = dict(active_slots=active_slots, unknown_rules=rules_unknown,
-                      reuse_note=reuse_note, meta=meta, usage_key=usage_key)
+                      reuse_note=reuse_note, meta=meta, usage_key=usage_key,
+                      allow_igpu_omit=allow_igpu_omit)
 
             def _try(pool):
                 if cap is None:
