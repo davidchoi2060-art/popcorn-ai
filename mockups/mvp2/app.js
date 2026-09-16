@@ -1,8 +1,19 @@
-// CUS-QUO-010 — A-128 ③ 실 API 연결 + A-135 격자 매트릭스 재설계(2026-09-16).
-//   ① POST /api/talk/parse   {text, history}   → constraints(단일 원천)·reply·pc_related
-//   ② POST /api/grid/recommend {constraints}   → cards[](스펙 티어 1차 축) · 카드마다 quotes 3종(가성비/추천/고성능, 재조회 없이 탭 전환)
+// CUS-QUO-010 — A-128 ③ 실 API 연결 + A-135 격자 매트릭스 재설계(2026-09-16) + 격자 안내 재설계(2026-09-16 오후).
+//   ① POST /api/talk/parse   {text, state(이전 턴 TalkState|null), history} → state(누적 좌표)·missing·dropped·reply·pc_related
+//   ② POST /api/grid/recommend {state}            → card_sets[](용도별 묶음) · assumed[] · ai_estimated[] · needs[]
+//        카드마다 quotes 3종(가성비/추천/고성능, 재조회 없이 탭 전환)
 //   ③ GET  /api/grid/workstations?usage=&budget_won= → shown 일 때 AI 워크스테이션 진열(격자 카드와 별도)
 // 파싱은 서버만 한다 — 화면에 정규식 파서를 두지 않는다(둘이 갈린다).
+//
+// ── 격자 안내 재설계(docs/design/talk-grid-guide-redesign-2026-09-16.md §4·§6·§7) 화면 계약 ──
+//   · state.talk 가 서버 TalkState 그대로다(usages[], budget_won, budget_bound, platform, tier_key,
+//     game{names,grade,grade_src,resolution}, exclude[], prefs[]). 매 턴 되돌려 보내고 응답 state 로 교체한다.
+//     화면은 state 를 고치지 않는다 — 조건 변경은 문장으로 파서에 보낸다(닫힌 어휘를 화면이 다시 들지 않는다).
+//   · missing 이 비어 있을 때만 격자를 부른다. missing 이 있으면 AI 가 reply 로 이미 되물었다.
+//   · 서버 내부 사유(notes[]/note)는 화면에 싣지 않는다 — console.debug 로만(결함 ④ 해소).
+//     needs[] 가 있으면 카드 없이 끝, 안내 문구도 띄우지 않는다(되묻기는 AI 의 reply 뿐).
+//   · 서버 응답의 필드명은 아래 TALK / GRID 조회 함수 한 곳에서만 읽는다 — 서버 제작자가 이름을
+//     다르게 지으면 거기만 고친다.
 // 실패는 삼키지 않는다 — 고객에게는 읽을 수 있는 한 줄 + 다시 시도(폴백 UI 없음, A-128). 서버 원문은 console.warn 으로만.
 // 파일 구조: [렌더 — 순수 함수, DOM 없음 · node 에서 require 가능] → [브라우저 — fetch·DOM]. 렌더는 인자만 본다.
 //
@@ -49,12 +60,82 @@ const SLOT_ALIAS={
 };
 function slotOf(x){return SLOT_ALIAS[x]||x||'';}
 
+// ── 서버 계약 조회 — 응답 필드명을 읽는 유일한 자리 ─────────────────────────
+// 설계서 §4(TalkState) · §7(card_sets). 서버 제작자가 이름을 다르게 지으면 여기만 고친다.
+const TALK={
+ state:p=>p&&p.state&&typeof p.state==='object'?p.state:null,
+ missing:p=>Array.isArray(p&&p.missing)?p.missing:[],
+ dropped:p=>Array.isArray(p&&p.dropped)?p.dropped:[],
+ reply:p=>(p&&p.reply)||'',
+ pcRelated:p=>p?p.pc_related:null,
+ assumed:p=>Array.isArray(p&&p.assumed)?p.assumed:[],
+ evidence:p=>Array.isArray(p&&p.evidence)?p.evidence:[],
+};
+// TalkState 안 좌표
+const ST={
+ usages:s=>Array.isArray(s&&s.usages)?s.usages.filter(Boolean):[],
+ budgetWon:s=>s&&Number.isFinite(s.budget_won)?s.budget_won:null,
+ budgetBound:s=>(s&&s.budget_bound)||null,
+ platform:s=>(s&&s.platform)||null,
+ tierKey:s=>(s&&s.tier_key)||null,
+ game:s=>s&&s.game&&typeof s.game==='object'?s.game:null,
+ gameNames:s=>{const g=ST.game(s);return Array.isArray(g&&g.names)?g.names.filter(Boolean):[];},
+ gameGrade:s=>{const g=ST.game(s);return (g&&g.grade)||null;},
+ gameGradeSrc:s=>{const g=ST.game(s);return (g&&g.grade_src)||null;},
+ gameResolution:s=>{const g=ST.game(s);return (g&&g.resolution)||null;},
+ exclude:s=>Array.isArray(s&&s.exclude)?s.exclude.filter(Boolean):[],
+ prefs:s=>Array.isArray(s&&s.prefs)?s.prefs.filter(Boolean):[],
+};
+const ASSUMED_RES_1080='game.resolution=1080p';   // 설계서 §6 ③ — 서버가 해상도를 1080p 로 가정했다는 표시
+const GRID={
+ // card_sets[] 가 없고 cards[] 만 오면(하위호환·옛 서버) 응답 자체를 set 하나로 본다 — 지어내지 않고 감싼다.
+ sets:g=>{
+  if(Array.isArray(g&&g.card_sets))return g.card_sets.filter(s=>s&&typeof s==='object');
+  if(g&&Array.isArray(g.cards))return [g];
+  return [];
+ },
+ setUsage:s=>(s&&(s.usage||s.usage_grid))||'',
+ setUsageGrid:s=>(s&&(s.usage_grid||s.usage))||'',
+ setKind:s=>(s&&s.kind)||(s&&s.usage_kind)||null,
+ setCards:s=>Array.isArray(s&&s.cards)?s.cards:[],
+ setCenterTier:s=>(s&&(s.center_tier_key||s.center_tier))||null,
+ setEmptyCells:s=>Array.isArray(s&&s.empty_cells)?s.empty_cells:[],
+ // 등급·해상도 — 실측(2026-09-16 오후) 서버는 set 이 아니라 응답 최상위(game_grade/game_resolution)와 카드마다 준다.
+ // set 에 있으면 그것, 없으면 그 set 의 첫 카드, 그다음 응답 최상위 순(값은 어느 자리든 서버 것).
+ setGrade:(s,g)=>(s&&(s.game_grade||s.grade))||(GRID.setCards(s)[0]||{}).game_grade||(g&&g.game_grade)||null,
+ setResolution:(s,g)=>(s&&(s.game_resolution||s.resolution))||(GRID.setCards(s)[0]||{}).game_resolution||(g&&g.game_resolution)||null,
+ assumed:g=>Array.isArray(g&&g.assumed)?g.assumed:[],
+ assumedRes1080:g=>GRID.assumed(g).some(a=>a===ASSUMED_RES_1080||a==='resolution=1080p'),
+ aiEstimated:g=>Array.isArray(g&&g.ai_estimated)?g.ai_estimated.filter(e=>e&&typeof e==='object'):[],
+ needs:g=>Array.isArray(g&&g.needs)?g.needs:[],
+ // notes[]/note — 서버 내부 사유. 화면에 실리지 않는다(console.debug 전용). 이 함수의 반환값을 마크업에 넣지 말 것.
+ internalNotes:g=>{const out=[];if(Array.isArray(g&&g.notes))out.push(...g.notes);if(g&&typeof g.note==='string'&&g.note)out.push(g.note);return out;},
+ budgetWon:g=>g&&Number.isFinite(g.budget_won)?g.budget_won:null,
+ budgetBound:g=>(g&&g.budget_bound)||null,
+};
+
 // ── 렌더(순수) ─────────────────────────────────────────────────────────────
-function usageOf(constraints){const c=(constraints||[]).find(x=>x&&x.l==='용도');return c?c.v:null;}
-function purposeButtons(usages,constraints){const cur=usageOf(constraints);return (usages||[]).map(u=>`<button type="button" data-purpose="${esc(u.label)}" aria-pressed="${cur===u.label}" class="${cur===u.label?'active':''}"><span class="purpose-radio" aria-hidden="true"></span><span><b>${esc(u.label)}</b>${u.floor_note?`<small>${esc(u.floor_note)}</small>`:''}</span></button>`).join('');}
-function conditionsMarkup(constraints,usages){
- const chips=(constraints||[]).map(c=>`<button data-action="conditions">${esc(c.l)}: ${esc(c.v)} ✎</button>`).join('');
- return `<div class="purpose-picker"><div class="purpose-heading"><b>용도를 바꾸려면 고르세요</b><span>하나만 고르세요</span></div><div class="purpose-options" role="group" aria-label="PC 사용 용도">${usages?purposeButtons(usages,constraints):'<span class="condition-note">용도 목록 불러오는 중…</span>'}</div></div><div class="condition-row"><span class="condition-label">내 조건</span>${chips||'<span class="condition-note">읽힌 조건 없음</span>'}</div>`;
+function usageOf(talk){const u=ST.usages(talk);return u.length?u[0]:null;}
+// state.talk → 조건 칩 목록(라벨·값). 예산·용도들·게임명·등급·해상도·플랫폼·제외 순 — 서버 값만.
+function conditionChips(talk){
+ const chips=[];
+ const b=ST.budgetWon(talk);
+ if(b!=null)chips.push({l:'예산',v:money(b)+'원'+(ST.budgetBound(talk)?' '+ST.budgetBound(talk):'')});
+ ST.usages(talk).forEach(u=>chips.push({l:'용도',v:u}));
+ ST.gameNames(talk).forEach(n=>chips.push({l:'게임',v:n}));
+ const grade=ST.gameGrade(talk);
+ if(grade)chips.push({l:'등급',v:grade+(ST.gameGradeSrc(talk)==='ai_estimate'?' (AI 추정)':'')});
+ const res=ST.gameResolution(talk);
+ if(res)chips.push({l:'해상도',v:res});
+ const pf=ST.platform(talk);
+ if(pf)chips.push({l:'플랫폼',v:pf});
+ ST.exclude(talk).forEach(x=>chips.push({l:'제외',v:x}));
+ return chips;
+}
+function purposeButtons(usages,talk){const cur=ST.usages(talk);return (usages||[]).map(u=>{const on=cur.includes(u.label);return `<button type="button" data-purpose="${esc(u.label)}" aria-pressed="${on}" class="${on?'active':''}"><span class="purpose-radio" aria-hidden="true"></span><span><b>${esc(u.label)}</b>${u.floor_note?`<small>${esc(u.floor_note)}</small>`:''}</span></button>`;}).join('');}
+function conditionsMarkup(talk,usages){
+ const chips=conditionChips(talk).map(c=>`<button data-action="conditions">${esc(c.l)}: ${esc(c.v)} ✎</button>`).join('');
+ return `<div class="purpose-picker"><div class="purpose-heading"><b>용도를 바꾸려면 고르세요</b><span>여러 개면 함께 말해 주세요</span></div><div class="purpose-options" role="group" aria-label="PC 사용 용도">${usages?purposeButtons(usages,talk):'<span class="condition-note">용도 목록 불러오는 중…</span>'}</div></div><div class="condition-row"><span class="condition-label">내 조건</span>${chips||'<span class="condition-note">읽힌 조건 없음</span>'}</div>`;
 }
 function partLine(p){return esc(p&&p.name||'이름 없음')+(p&&p.in_stock===false?' <em>재고 확인 필요</em>':'');}
 // 서버 필드명이 items(신) 또는 parts(구) 일 수 있고, 슬롯 표기가 cat(라벨)/slot/part_type(코드)일 수 있다.
@@ -127,7 +208,8 @@ function cardMarkup(card,i,centerTier,activeVariant){
  const vs=variantsOf(card);
  const hasThree=!!cardQuotes(card);
  const v=vs[activeKey]||vs.reco||vs.value||vs.perf||null;
- const featured=!!(tierKeyOf(card)&&centerTier&&tierKeyOf(card)===centerTier);
+ // 서버는 center_tier(이름)·center_tier_key(키) 둘을 준다 — 어느 쪽으로 와도 같은 카드가 중심이다.
+ const featured=!!centerTier&&(tierKeyOf(card)===centerTier||tierDisplayName(card)===centerTier);
  const over=variantOver(v,card);
  const overBy=(over&&v&&Number.isFinite(v.total)&&Number.isFinite(v.budget_won))?money(v.total-v.budget_won):'';
  const parts=v?normalizeParts(v.items||v.parts):[];
@@ -155,13 +237,56 @@ function matrixMarkup(g){
  }).join('');
  return `<div class="tier-matrix"><span class="tier-matrix-caption">스펙 티어 축 · 조회된 ${items.length}개 티어(전체 목록은 준비 중)</span><div class="tier-strip">${cells}</div></div>`;
 }
+// ── card_sets 렌더(설계서 §6 ① · §7) ─────────────────────────────────────────
+// 카드 번호(data-card-index)는 set 을 가로질러 한 줄로 이어진다 — state.quotes 가 평평한 목록이라
+// 선택·탭 전환이 set 을 몰라도 된다. flattenSets 가 그 순서를 정하는 유일한 자리.
+function flattenSets(g){
+ const out=[];
+ GRID.sets(g).forEach((s,si)=>GRID.setCards(s).forEach(c=>out.push({card:c,setIndex:si,centerTier:GRID.setCenterTier(s)})));
+ return out;
+}
+// set 제목 줄 — 용도 · 등급 · 해상도(게임) / 용도(비게임). 배지: "1080p 기준"(assumed) · "AI 추정 ○등급"(ai_estimated).
+// 값은 전부 서버 응답에서 온다 — 화면이 등급·해상도를 지어내지 않는다.
+function setHeadingText(s,g){
+ const parts=[GRID.setUsage(s)||'용도 미확인'];
+ if(GRID.setKind(s)==='game'){const gr=GRID.setGrade(s,g),res=GRID.setResolution(s,g);if(gr)parts.push(gr+'등급');if(res)parts.push(res);}
+ return parts.join(' · ');
+}
+function aiEstimateFor(g,s){
+ if(GRID.setKind(s)!=='game')return null;
+ const list=GRID.aiEstimated(g);
+ if(!list.length)return null;
+ const gr=GRID.setGrade(s,g);
+ return list.find(e=>!gr||!e.grade||e.grade===gr)||null;
+}
+function setHeadingMarkup(g,s,showHeading){
+ const isGame=GRID.setKind(s)==='game';
+ const est=aiEstimateFor(g,s);
+ const badges=[
+  isGame&&GRID.assumedRes1080(g)?'<span class="rec-tag">1080p 기준</span>':'',
+  est&&est.grade?`<span class="rec-tag">AI 추정 ${esc(est.grade)}등급</span>`:'',
+ ].join('');
+ const estLine=est&&est.grade?`<p class="condition-note">이 게임은 AI 가 ${esc(est.grade)}등급으로 추정했습니다.</p>`:'';
+ if(!showHeading&&!badges&&!estLine)return '';
+ // 제목 줄은 기존 .parts-heading(굵은 제목 + 작은 보조) 를 그대로 쓴다 — 새 배치를 그리지 않는다.
+ return `<div class="parts-heading set-heading" data-set-usage="${esc(GRID.setUsage(s))}"><b>${showHeading?esc(setHeadingText(s,g)):'추천 구성'}</b><span>${badges}</span></div>${estLine}`;
+}
+function cardSetMarkup(g,s,offset,showHeading){
+ const cards=GRID.setCards(s);
+ const center=GRID.setCenterTier(s);
+ const cardHtml=cards.map((q,i)=>cardMarkup(q,offset+i,center,DEFAULT_VARIANT)).join('');
+ const emptyHtml=GRID.setEmptyCells(s).map(e=>`<p class="condition-note">${esc(e.tier||'')}: ${esc(e.reason||'')}</p>`).join('');
+ const none=cards.length?'':'<p class="condition-note">이 조건에 맞는 격자 카드가 없습니다.</p>';
+ return `${setHeadingMarkup(g,s,showHeading)}${matrixMarkup(s)}<div class="recommendations">${cardHtml}</div>${none}${emptyHtml}${GRID.setUsageGrid(s)===USAGE_AI?`<div data-workstations data-set-usage="${esc(GRID.setUsageGrid(s))}"></div>`:''}`;
+}
+// 서버 내부 사유(notes/note)는 여기서 읽지 않는다 — 마크업에 실을 경로가 없다(결함 ④).
 function recommendationMarkup(g){
- const cards=Array.isArray(g.cards)?g.cards:[];
- const cardHtml=cards.map((q,i)=>cardMarkup(q,i,g.center_tier,DEFAULT_VARIANT)).join('');
- const empties=Array.isArray(g.empty_cells)?g.empty_cells:[];
- const emptyHtml=empties.map(e=>`<p class="condition-note">${esc(e.tier||'')}: ${esc(e.reason||'')}</p>`).join('');
- const none=cards.length?'':`<p class="condition-note">이 조건에 맞는 격자 카드가 없습니다.${g.note?' '+esc(g.note):''}</p>`;
- return `${matrixMarkup(g)}<div class="recommendations">${cardHtml}</div>${none}${emptyHtml}<div data-workstations></div><p class="demo-note">${IMG_NOTE}</p>`;
+ const sets=GRID.sets(g);
+ if(!sets.length)return `<p class="condition-note">이 조건에 맞는 격자 카드가 없습니다.</p><p class="demo-note">${IMG_NOTE}</p>`;
+ const multi=sets.length>1;
+ let offset=0;
+ const html=sets.map(s=>{const h=cardSetMarkup(g,s,offset,multi);offset+=GRID.setCards(s).length;return h;}).join('');
+ return `${html}<p class="demo-note">${IMG_NOTE}</p>`;
 }
 function specSummary(spec){
  if(!spec||typeof spec!=='object')return '사양 정보 없음';
@@ -174,7 +299,7 @@ function workstationsMarkup(w){
  if(!w||w.shown!==true)return '';   // 서버 판정 — 안 보일 때는 자리도 두지 않는다
  const items=Array.isArray(w.items)?w.items:[];
  const cards=items.map(it=>`<article class="rec-card"><div class="rec-top"><span class="rec-num">완제품</span><span>${it.over_budget===true?'<span class="rec-tag over">예산 초과</span>':''}${it.in_stock===false?'<span class="rec-tag">재고 확인 필요</span>':''}</span></div><h3>${esc(it.name||'이름 없음')}</h3><div class="rec-price">${money(it.price)}<small>원</small></div><p class="rec-desc">${esc(specSummary(it.spec))}</p>${it.mall_url?`<a class="primary" href="${esc(it.mall_url)}" target="_blank" rel="noopener">팝콘PC 몰에서 보기 ↗</a>`:'<span class="condition-note">몰 링크 없음</span>'}</article>`).join('');
- return `<div class="parts-heading"><b>팝콘PC AI 워크스테이션</b><span>완제품 · 격자와 별도 진열</span></div>${cards?`<div class="recommendations">${cards}</div>`:''}${w.note?`<p class="condition-note">${esc(w.note)}</p>`:''}`;
+ return `<div class="parts-heading"><b>팝콘PC AI 워크스테이션</b><span>완제품 · 격자와 별도 진열</span></div>${cards?`<div class="recommendations">${cards}</div>`:'<p class="condition-note">진열할 완제품이 없습니다.</p>'}`;   // w.note(서버 내부 사유)는 화면에 싣지 않는다 — 브라우저 쪽 console.debug
 }
 // 오른쪽 "내 견적" 패널도 카드와 같은 3종 탭을 갖는다(같은 state.quotes 원본을 다시 읽을 뿐 재조회 없음).
 function quoteMarkup(card,activeVariant){
@@ -199,7 +324,7 @@ function errorMessage(status,data){
  if(d&&typeof d==='object'&&d.message)return String(d.message);
  return (status>=500?'서버 오류':'요청 오류')+`(${status})`;
 }
-const render={money,esc,conditionsMarkup,cardMarkup,recommendationMarkup,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,VARIANT_DEFS,IMG_NOTE,NOT_READY};
+const render={money,esc,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY};
 if(typeof module!=='undefined'&&module.exports){module.exports=render;return;}   // node(자기검증) — 여기서 끝
 if(!root.document||root.PopcornApp)return;
 
@@ -207,7 +332,8 @@ if(!root.document||root.PopcornApp)return;
 const $=s=>document.querySelector(s);
 const API='';   // 같은 오리진(127.0.0.1:8000)에서 서빙 — 외부 CDN·절대 주소 없음
 const SAVE_KEY='popcorn-quotes-v2';   // 옛 키(popcorn-demo-quotes)는 가짜 가격이라 읽지 않는다
-const state={constraints:[],history:[],quotes:[],grid:null,selected:null,selectedVariant:DEFAULT_VARIANT,cardVariant:{},busy:false,retry:null,usages:null,videoUrl:null,saved:[]};
+const state={talk:null,history:[],quotes:[],grid:null,selected:null,selectedVariant:DEFAULT_VARIANT,cardVariant:{},busy:false,retry:null,usages:null,videoUrl:null,saved:[]};
+// state.talk = 서버 TalkState(설계서 §4) 그대로. 화면은 이것을 만들거나 고치지 않는다 — 파서 응답으로만 교체된다.
 try{const saved=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]');if(Array.isArray(saved))state.saved=saved.filter(x=>x&&Array.isArray(x.parts)&&Number.isFinite(x.total)).slice(0,10);}catch{}
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3200);}
 
@@ -238,51 +364,68 @@ async function submit(text){
  const thinking=addMessage('assistant','조건을 읽는 중…');
  setBusy(true);
  let p;
- try{p=await api('POST','/api/talk/parse',{text,history});}
+ try{p=await api('POST','/api/talk/parse',{text,state:state.talk,history});}   // 이전 턴 state 를 되돌려 보낸다(누적)
  catch(e){thinking.remove();setBusy(false);showError(e,()=>submit(text));return;}
  thinking.remove();
  pushHistory('user',text);
- state.constraints=Array.isArray(p.constraints)?p.constraints.filter(c=>c&&c.l&&c.v):[];
- const reply=p.reply||'';
+ const next=TALK.state(p);
+ if(next)state.talk=next;   // 서버가 state 를 안 주면(옛 서버) 이전 것을 유지 — 화면이 state 를 만들지 않는다
+ else console.warn('talk/parse: 응답에 state 가 없습니다(옛 계약?)',Object.keys(p||{}));
+ const reply=TALK.reply(p);
  if(reply){addMessage('assistant',reply);pushHistory('assistant',reply);}
- if(Array.isArray(p.dropped)&&p.dropped.length){addMessage('assistant','반영하지 못한 조건: '+p.dropped.map(d=>`${d.l||'?'}=${d.v||'?'}(${d.reason||'사유 없음'})`).join(' · '));}
- if(p.pc_related===false){setBusy(false);return;}   // 서버 판정 — 카드로 가지 않는다(null 은 모름이라 진행)
- if(!usageOf(state.constraints)){setBusy(false);return;}   // 용도가 없으면 격자를 부르지 않는다 — 파서가 이미 되물었다
- await recommend();
+ const dropped=TALK.dropped(p);
+ if(dropped.length){addMessage('assistant','반영하지 못한 조건: '+dropped.map(d=>`${d.field||d.l||'?'}=${d.value??d.v??'?'}(${d.reason||'사유 없음'})`).join(' · '));}
+ if(TALK.evidence(p).length)console.debug('talk/parse evidence',TALK.evidence(p));
+ if(TALK.pcRelated(p)===false){setBusy(false);return;}   // 서버 판정 — 카드로 가지 않는다(null 은 모름이라 진행)
+ const missing=TALK.missing(p);
+ if(missing.length){console.debug('talk/parse missing — 격자를 부르지 않는다(AI 가 reply 로 되물었다)',missing);setBusy(false);return;}
+ if(!next){setBusy(false);return;}   // state 가 없으면 격자에 보낼 것이 없다
+ await recommend({missingWasEmpty:true});
  setBusy(false);
 }
 
-// ── ② constraints → 격자 카드(스펙 티어 1차 축, 카드마다 3종 내장) ─────────
-async function recommend(){
+// ── ② state → 격자 카드(용도별 card_sets, 카드마다 3종 내장) ─────────────────
+async function recommend(opts){
+ if(!state.talk){toast('먼저 용도와 예산을 말씀해 주세요.');return;}
  document.querySelectorAll('[data-select]').forEach(b=>b.disabled=true);
  let g;
- try{g=await api('POST','/api/grid/recommend',{constraints:state.constraints});}
- catch(e){showError(e,()=>{setBusy(true);recommend().finally(()=>setBusy(false));});return;}
- state.grid=g;state.quotes=Array.isArray(g.cards)?g.cards:[];state.selected=null;state.cardVariant={};
+ try{g=await api('POST','/api/grid/recommend',{state:state.talk});}
+ catch(e){showError(e,()=>{setBusy(true);recommend(opts).finally(()=>setBusy(false));});return;}
+ const notes=GRID.internalNotes(g);
+ if(notes.length)console.debug('grid/recommend notes(서버 내부 사유 — 화면에 싣지 않음)',notes);
+ state.grid=g;state.quotes=flattenSets(g).map(x=>x.card);state.selected=null;state.cardVariant={};
  $('#workspace').classList.remove('has-quote','mobile-quote');
- const needs=Array.isArray(g.needs)?g.needs:[];
- if(needs.length){if(g.note)addMessage('assistant',g.note);return;}   // 서버가 더 필요하다고 한 것 — 카드 없이 끝(되묻기는 파서의 reply)
+ const needs=GRID.needs(g);
+ if(needs.length){   // 서버가 더 필요하다고 한 것 — 카드 없이 끝. 안내 문구도 띄우지 않는다(되묻기는 AI 의 reply 뿐)
+  if(opts&&opts.missingWasEmpty)console.warn('grid/recommend needs 가 있는데 talk/parse missing 은 비어 있었다 — 두 서버의 판정이 어긋남',needs,state.talk);
+  else console.debug('grid/recommend needs',needs);
+  return;
+ }
  const node=document.createElement('div');node.className='message recommendation-message';
- node.innerHTML=conditionsMarkup(state.constraints,state.usages)+recommendationMarkup(g);
+ node.innerHTML=conditionsMarkup(state.talk,state.usages)+recommendationMarkup(g);
  $('#messages').append(node);setQuick();
  requestAnimationFrame(()=>{const m=$('#messages');m.scrollTop=node.offsetTop-m.offsetTop-16;});
  loadUsages(node);
- if(g.usage_grid===USAGE_AI)await workstations(node,g);
+ for(const s of GRID.sets(g)){if(GRID.setUsageGrid(s)===USAGE_AI)await workstations(node,g,s);}
 }
 async function loadUsages(node){
  if(!state.usages){try{const u=await api('GET','/api/usages');state.usages=Array.isArray(u.usages)?u.usages:[];}catch(e){state.usages=null;const box=node.querySelector('.purpose-options');if(box)box.innerHTML=`<span class="condition-note">용도 목록을 불러오지 못했습니다 — ${esc(e.message)}</span>`;return;}}
- const box=node.querySelector('.purpose-options');if(box)box.innerHTML=purposeButtons(state.usages,state.constraints);
+ const box=node.querySelector('.purpose-options');if(box)box.innerHTML=purposeButtons(state.usages,state.talk);
 }
 
-// ── ③ AI 워크스테이션 진열 — 격자 카드와 별도(용도===AI 일 때만) ───────────
-async function workstations(node,g){
- const slot=node.querySelector('[data-workstations]');if(!slot)return;
- const q=new URLSearchParams({usage:g.usage_grid});
- if(Number.isFinite(g.budget_won))q.set('budget_won',String(g.budget_won));
- if(g.budget_bound)q.set('budget_bound',g.budget_bound);
+// ── ③ AI 워크스테이션 진열 — 격자 카드와 별도(set 의 용도===AI 일 때만) ─────
+async function workstations(node,g,s){
+ const usage=GRID.setUsageGrid(s);
+ const slot=node.querySelector(`[data-workstations][data-set-usage="${CSS.escape(usage)}"]`)||node.querySelector('[data-workstations]');if(!slot)return;
+ const q=new URLSearchParams({usage});
+ const budget=GRID.budgetWon(g)??ST.budgetWon(state.talk);
+ const bound=GRID.budgetBound(g)||ST.budgetBound(state.talk);
+ if(Number.isFinite(budget))q.set('budget_won',String(budget));
+ if(bound)q.set('budget_bound',bound);
  let w;
  try{w=await api('GET','/api/grid/workstations?'+q.toString());}
- catch(e){slot.innerHTML=`<p class="condition-note">AI 워크스테이션 진열을 불러오지 못했습니다 — ${esc(e.message)} <button class="secondary" data-action="retry">다시 시도</button></p>`;state.retry=()=>workstations(node,g);return;}
+ catch(e){slot.innerHTML=`<p class="condition-note">AI 워크스테이션 진열을 불러오지 못했습니다 — ${esc(e.message)} <button class="secondary" data-action="retry">다시 시도</button></p>`;state.retry=()=>workstations(node,g,s);return;}
+ if(w&&w.note)console.debug('grid/workstations note(서버 내부 사유 — 화면에 싣지 않음)',w.note);
  slot.innerHTML=workstationsMarkup(w);
 }
 
@@ -292,7 +435,8 @@ function setCardVariant(index,key){
  const card=state.quotes[index];if(!card)return;
  const article=document.querySelector(`.rec-card[data-card-index="${index}"]`);
  if(!article)return;
- const html=cardMarkup(card,index,state.grid&&state.grid.center_tier,key);
+ const entry=flattenSets(state.grid)[index];
+ const html=cardMarkup(card,index,entry?entry.centerTier:null,key);
  const tmp=document.createElement('div');tmp.innerHTML=html;
  article.replaceWith(tmp.firstElementChild);
 }
@@ -311,14 +455,16 @@ function requestChange(text){
  addMessage('user',text);addMessage('assistant',NOT_READY+' 예산·용도를 바꾸려면 「＋ 새 대화」에서 다시 말씀해 주세요.');
 }
 function selectTab(tab){$('#workspace').classList.toggle('mobile-quote',tab==='quote');document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));}
-function save(){if(!state.selected)return;const v=variantsOf(state.selected)[state.selectedVariant]||variantsOf(state.selected).reco;if(!v)return;const flat={name:tierDisplayName(state.selected),total:v.total,parts:normalizeParts(v.items||v.parts),constraints:copy(state.constraints),savedAt:new Date().toISOString()};state.saved.unshift(flat);state.saved=state.saved.slice(0,10);try{localStorage.setItem(SAVE_KEY,JSON.stringify(state.saved));toast('이 브라우저에 견적을 저장했어요.');}catch{toast('브라우저 저장이 제한되어 이번 화면에서만 보관해요.');}$('#savedCount').textContent=state.saved.length;}
+function save(){if(!state.selected)return;const v=variantsOf(state.selected)[state.selectedVariant]||variantsOf(state.selected).reco;if(!v)return;const flat={name:tierDisplayName(state.selected),total:v.total,parts:normalizeParts(v.items||v.parts),talk:state.talk?copy(state.talk):null,savedAt:new Date().toISOString()};state.saved.unshift(flat);state.saved=state.saved.slice(0,10);try{localStorage.setItem(SAVE_KEY,JSON.stringify(state.saved));toast('이 브라우저에 견적을 저장했어요.');}catch{toast('브라우저 저장이 제한되어 이번 화면에서만 보관해요.');}$('#savedCount').textContent=state.saved.length;}
 function showSaved(){$('#savedList').innerHTML=state.saved.length?state.saved.map((q,i)=>`<div class="saved-item"><div><b>${esc(q.name)}</b><small>${money(q.total)}원 · ${new Date(q.savedAt).toLocaleDateString('ko-KR')}</small></div><button class="primary" data-load="${i}">불러오기</button></div>`).join(''):'<div class="empty-saved">아직 저장한 견적이 없어요.<br>구성을 선택한 뒤 “견적 저장”을 눌러주세요.</div>';$('#savedDialog').showModal();}
-async function showConditions(){const f=$('#conditionsForm');const b=state.grid&&Number.isFinite(state.grid.budget_won)?Math.round(state.grid.budget_won/10000):'';f.elements.budget.value=b;const cur=usageOf(state.constraints);
+// 조건 다이얼로그 — 현재 값은 state.talk(서버 TalkState)에서 읽는다. 제출은 문장으로 파서에 보낸다(init 참고) —
+// 화면이 state 를 직접 고쳐 recommend 를 부르면 서버 검증(§5)을 건너뛰게 되므로 하지 않는다.
+async function showConditions(){const f=$('#conditionsForm');const won=ST.budgetWon(state.talk);f.elements.budget.value=won!=null?Math.round(won/10000):'';const cur=ST.usages(state.talk);
  if(!state.usages){try{const u=await api('GET','/api/usages');state.usages=Array.isArray(u.usages)?u.usages:[];}catch(e){toast('용도 목록을 불러오지 못했습니다 — '+e.message);}}
- const sel=f.elements.purpose;sel.innerHTML=(state.usages||[]).map(u=>`<option value="${esc(u.label)}"${u.label===cur?' selected':''}>${esc(u.label)}</option>`).join('')||(cur?`<option value="${esc(cur)}" selected>${esc(cur)}</option>`:'');f.elements.monitor.checked=state.constraints.some(c=>c.l==='제외'&&/모니터 보유/.test(c.v));$('#conditionsDialog').showModal();}
+ const sel=f.elements.purpose;sel.innerHTML=(state.usages||[]).map(u=>`<option value="${esc(u.label)}"${u.label===cur[0]?' selected':''}>${esc(u.label)}</option>`).join('')||(cur[0]?`<option value="${esc(cur[0])}" selected>${esc(cur[0])}</option>`:'');f.elements.monitor.checked=ST.exclude(state.talk).includes('모니터 보유');$('#conditionsDialog').showModal();}
 function addToCart(){toast('장바구니는 준비 중입니다.');}
 function openVideo(q){$('#videoDialog h2').textContent=q?tierDisplayName(q)+' · 대표 예시 이미지':'만들어지는 순간까지, 투명하게.';$('#previewVideo').pause();$('#previewVideo').removeAttribute('src');$('#previewVideo').poster=POSTER;$('#videoPoster').src=POSTER;const video=state.videoUrl;$('#previewVideo').hidden=!video;$('#videoPoster').hidden=!!video;$('#videoEmpty').hidden=!!video;if(video){$('#previewVideo').src=video;$('#previewVideo').load();}$('#videoDialog').showModal();}
-function home(){$('#welcome').hidden=false;$('#welcomeFoot').hidden=false;$('#workspace').hidden=true;$('#messages').innerHTML='';$('#quotePane').innerHTML='<div class="quote-empty"><span class="ai-mark">✦</span><h2>마음에 드는 구성을<br>골라주세요.</h2><p>구성을 고르면<br>부품과 이유를 볼 수 있어요.</p></div>';/* 교체 대화가 붙으면 「대화로 조정할 수 있어요」로 되돌린다 */state.selected=null;state.selectedIndex=null;state.selectedVariant=DEFAULT_VARIANT;state.cardVariant={};state.constraints=[];state.history=[];state.quotes=[];state.grid=null;state.retry=null;$('#workspace').classList.remove('has-quote','mobile-quote');$('#startInput').value='';window.scrollTo(0,0);$('#startInput').focus();}
+function home(){$('#welcome').hidden=false;$('#welcomeFoot').hidden=false;$('#workspace').hidden=true;$('#messages').innerHTML='';$('#quotePane').innerHTML='<div class="quote-empty"><span class="ai-mark">✦</span><h2>마음에 드는 구성을<br>골라주세요.</h2><p>구성을 고르면<br>부품과 이유를 볼 수 있어요.</p></div>';/* 교체 대화가 붙으면 「대화로 조정할 수 있어요」로 되돌린다 */state.selected=null;state.selectedIndex=null;state.selectedVariant=DEFAULT_VARIANT;state.cardVariant={};state.talk=null;state.history=[];state.quotes=[];state.grid=null;state.retry=null;$('#workspace').classList.remove('has-quote','mobile-quote');$('#startInput').value='';window.scrollTo(0,0);$('#startInput').focus();}
 
 document.addEventListener('click',e=>{
  const tabBtn=e.target.closest('[data-variant-key]');
@@ -336,7 +482,7 @@ document.addEventListener('click',e=>{
  if(b.dataset.buildVideo!==undefined){openVideo(state.quotes[Number(b.dataset.buildVideo)]);return;}
  if(b.dataset.select!==undefined){selectQuote(Number(b.dataset.select),b.dataset.selectVariant);return;}
  if(b.dataset.tab){selectTab(b.dataset.tab);return;}
- if(b.dataset.load!==undefined){const q=copy(state.saved[Number(b.dataset.load)]);if(!q)return;$('#savedDialog').close();showWorkspace();state.constraints=Array.isArray(q.constraints)?q.constraints:[];q.fromSaved=true;q.quotes={reco:q};state.selected=q;state.selectedVariant='reco';$('#messages').innerHTML='';$('#workspace').classList.add('has-quote');addMessage('assistant','저장한 '+(q.name||'견적')+'을 불러왔어요(저장 시점 값 — 현재 가격·재고와 다를 수 있어요).');setQuick();renderQuote();selectTab('quote');return;}
+ if(b.dataset.load!==undefined){const q=copy(state.saved[Number(b.dataset.load)]);if(!q)return;$('#savedDialog').close();showWorkspace();state.talk=q.talk&&typeof q.talk==='object'?q.talk:null;q.fromSaved=true;q.quotes={reco:q};state.selected=q;state.selectedVariant='reco';$('#messages').innerHTML='';$('#workspace').classList.add('has-quote');addMessage('assistant','저장한 '+(q.name||'견적')+'을 불러왔어요(저장 시점 값 — 현재 가격·재고와 다를 수 있어요).');setQuick();renderQuote();selectTab('quote');return;}
  const actions={home,saved:showSaved,video:()=>openVideo(state.selected),conditions:showConditions,save,cart:addToCart,retry:()=>{const r=state.retry;state.retry=null;if(r){b.disabled=true;b.dataset.done='1';r();}/* A7: 한 번 누른 '다시 시도'는 성공 후에도 다시 살리지 않는다 */}};
  actions[b.dataset.action]?.();
 });
@@ -359,9 +505,9 @@ root.PopcornApp={init,render};
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController();
  const toolSpecs=[
-  {name:'start_pc_recommendation',description:'Send a Korean PC request to the parser and grid APIs (live server data).',inputSchema:{type:'object',properties:{request:{type:'string',minLength:1,maxLength:300}},required:['request'],additionalProperties:false},async execute(input){if(typeof input?.request!=='string'||!input.request.trim()||input.request.length>300)throw new Error('A request of 1–300 characters is required.');await submit(input.request);return {constraints:copy(state.constraints),builds:state.quotes.map((q,i)=>{const v=variantsOf(q)[state.cardVariant[i]||DEFAULT_VARIANT];return {index:i,tier:tierDisplayName(q),total:v&&v.total,over_budget:v&&v.over_budget};})};}},
+  {name:'start_pc_recommendation',description:'Send a Korean PC request to the parser and grid APIs (live server data).',inputSchema:{type:'object',properties:{request:{type:'string',minLength:1,maxLength:300}},required:['request'],additionalProperties:false},async execute(input){if(typeof input?.request!=='string'||!input.request.trim()||input.request.length>300)throw new Error('A request of 1–300 characters is required.');await submit(input.request);return {state:state.talk?copy(state.talk):null,builds:state.quotes.map((q,i)=>{const v=variantsOf(q)[state.cardVariant[i]||DEFAULT_VARIANT];return {index:i,tier:tierDisplayName(q),total:v&&v.total,over_budget:v&&v.over_budget};})};}},
   {name:'select_pc_build',description:'Select one of the current recommendation cards and show it in the quote pane.',inputSchema:{type:'object',properties:{index:{type:'integer',minimum:0}},required:['index'],additionalProperties:false},execute(input){if(!Number.isInteger(input?.index)||!state.quotes[input.index])throw new Error('Choose an available build index.');selectQuote(input.index);const v=variantsOf(state.selected)[state.selectedVariant];return {tier:tierDisplayName(state.selected),total:v&&v.total};}},
-  {name:'read_pc_quote',description:'Read the currently selected quote (server card) without modifying it.',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{},additionalProperties:false},execute(){return {constraints:copy(state.constraints),quote:copy(state.selected),variant:state.selectedVariant};}}
+  {name:'read_pc_quote',description:'Read the currently selected quote (server card) without modifying it.',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{},additionalProperties:false},execute(){return {state:state.talk?copy(state.talk):null,quote:copy(state.selected),variant:state.selectedVariant};}}
  ];
  for(const spec of toolSpecs){try{Promise.resolve(document.modelContext.registerTool({...spec,annotations:{readOnlyHint:false,...spec.annotations}},{signal:lifecycle.signal})).catch(()=>{});}catch{}}
  window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});

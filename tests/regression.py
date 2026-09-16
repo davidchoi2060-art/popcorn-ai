@@ -6652,7 +6652,8 @@ def main():
                test_alloc_capped_uncapped,
                test_usage_tier_rules_invariants,
                test_usage_alloc_invariants,
-               test_grid_workstations):
+               test_grid_workstations,
+               test_talk_grid_contract):
         try:
             fn()
         except Exception as e:
@@ -6902,6 +6903,158 @@ def test_grid_workstations():
     check("[53] items[].mall_url 형식 = api/mall.py DETAIL(pd_no=product_code)",
           all(i["mall_url"] == "https://popcornpc.co.kr/shop/product_detail.html?pd_no=%s" % i["product_code"]
               for i in (d.get("items") or [])), "일치", "불일치")
+
+
+def test_talk_grid_contract():
+    """[54] 팝콘톡 「격자 안내」 계약 (2026-09-16 신설 — A-137 재설계).
+
+    이 재설계가 고친 병: 「게임명」을 담는 라벨 계약이 api/talk.py 와
+    api/grid_public.py 에 **서로 다르게, 그리고 불완전하게** 정의돼 있었다.
+    grid_public.py 는 talk.py 에 «존재하지 않는» '요청' 라벨을 최우선으로 뒤졌고,
+    talk.py 의 LABELS 에는 '게임명' 자체가 없었다. 그래서 고객이 "오버워치"라고
+    세 번 말해도 매번 「게임명을 알 수 없습니다」가 반복됐다 — **콘솔은 조용했고
+    회귀는 통과했다.** 그 병이 다시 나지 않게 이 섹션이 네 가지를 지킨다.
+
+    ⚠ LLM 을 부르지 않는다 — 회귀가 돈을 쓰면 안 된다(건당 약 $0.006).
+      parse 는 400 가드만, 나머지는 state 를 직접 만들어 recommend 로 검사한다.
+    """
+    print("\n[54] 팝콘톡 격자 안내 계약 — 어휘 단일원천·등급 정본·내부 사유 차단 (2026-09-16 신설)")
+
+    # ── ① 어휘 단일원천 — 계약을 두 벌 두지 않는다 ────────────────────────
+    # 이 검사가 실패하려면: grid_public.py 가 해상도 어휘를 talk_schema 에서
+    # import 하지 않고 «판정에 쓰는 코드»에 리터럴로 다시 적어야 한다 —
+    # 재설계 전 이 파일이 딱 그래서, talk.py 와 어휘가 갈릴 자리를 만들고 있었다.
+    #
+    # ⚠ 대상은 grid_public.py 뿐이다. talk.py 는 **프롬프트 문자열에 어휘가 들어가는
+    #   것이 정상**이다 — AI 에게 「우리가 아는 해상도는 이 셋」이라고 가르치는 자리라
+    #   (설계서 §9), 그 문자열까지 막으면 AI 가 좌표를 낼 수 없다. 대신 그 어휘도
+    #   출처는 DB 다(talk_schema.vocab_prompt_block 이 만든다).
+    # ⚠ 주석·docstring 도 제외한다 — 설계 근거·도헤드 기록을 남기기로 한 자리라
+    #   리터럴이 있는 게 정상이다. 그래서 줄 단위가 아니라 **AST 로 실제 문자열
+    #   리터럴 노드만** 본다(docstring 은 Expr 문이라 걸러낸다).
+    # ⚠ 한계: 어휘를 다른 이름의 상수에 담거나 쪼개 조합하면 통과한다
+    #   (§회귀 세트 「이름·모양으로 동작을 추정하는 검사」). 그래서 ②·④ 가
+    #   실제 «동작»을 따로 본다.
+    import ast as _ast
+    import re as _re
+    VOCAB_LITERALS = ("1080p", "1440p", "4K")
+    for src_path in ("api/talk.py", "api/grid_public.py"):
+        raw = pathlib.Path(ROOT, *src_path.split("/")).read_text(encoding="utf-8")
+        imports_schema = bool(_re.search(r"from\s+\.talk_schema\s+import|import\s+talk_schema", raw))
+        check(f"[54] {src_path} 가 talk_schema 를 import 한다(계약 단일 원천)",
+              imports_schema, True, imports_schema)
+        if src_path != "api/grid_public.py":
+            continue          # talk.py 는 프롬프트에 어휘가 들어가는 것이 정상(위 ⚠)
+        tree = _ast.parse(raw)
+        # docstring 노드(모듈·클래스·함수 첫 Expr 문자열)를 모아 제외 대상으로 표시
+        doc_nodes = set()
+        for node in _ast.walk(tree):
+            if isinstance(node, (_ast.Module, _ast.ClassDef, _ast.FunctionDef,
+                                 _ast.AsyncFunctionDef)):
+                body = getattr(node, "body", None) or []
+                if (body and isinstance(body[0], _ast.Expr)
+                        and isinstance(body[0].value, _ast.Constant)
+                        and isinstance(body[0].value.value, str)):
+                    doc_nodes.add(id(body[0].value))
+        live = [n.value for n in _ast.walk(tree)
+                if isinstance(n, _ast.Constant) and isinstance(n.value, str)
+                and id(n) not in doc_nodes]
+        for lit in VOCAB_LITERALS:
+            hits = [s for s in live if lit in s]
+            check(f"[54] {src_path} 의 «실행 코드»에 해상도 리터럴 '{lit}' 이 없다(talk_schema 가 정본)",
+                  len(hits) == 0, 0, hits[:3])
+
+    # ── ② 등급 정본 — DB 가 AI 추정을 이긴다 ──────────────────────────────
+    # 이 검사가 실패하려면: validate_state 가 confirmed_games 대조를 건너뛰고
+    # AI 가 보낸 grade 를 그대로 쓰게 돼야 한다(= 남의 말이 우리 원장을 이긴다).
+    rows = db_all("SELECT g.name, a.grade FROM game_grade_assignments a"
+                  " JOIN games g ON g.game_id = a.game_id"
+                  " WHERE a.grade IS NOT NULL ORDER BY g.game_id LIMIT 1")
+    if not rows:
+        check("[54] game_grade_assignments 에 확정 등급이 있다(②의 전제)",
+              False, "1건 이상", 0, kind="DB")
+    else:
+        db_name, db_grade = rows[0]["name"], rows[0]["grade"]
+        wrong = "S" if db_grade != "S" else "E"      # 일부러 DB 와 다른 등급을 보낸다
+        _st, d = post("/api/grid/recommend", {"state": {
+            "usages": ["게임"],
+            "game": {"names": [db_name], "grade": wrong, "grade_src": "ai_estimate"}}})
+        d = d or {}
+        check(f"[54] 확정 게임({db_name})은 DB 등급이 이긴다 — AI 가 {wrong} 라 해도 {db_grade}",
+              d.get("game_grade") == db_grade, db_grade, d.get("game_grade"))
+        check("[54] 확정 게임은 ai_estimated 에 오르지 않는다(추정이 아니라 정본)",
+              d.get("ai_estimated") == [], [], d.get("ai_estimated"))
+        check("[54] 덮어쓴 사실을 dropped 로 알린다(조용히 바꾸지 않는다)",
+              any(x.get("field") == "game.grade" for x in (d.get("dropped") or [])),
+              "game.grade dropped 있음", d.get("dropped"))
+
+    # ── ②-b G-5 — 공개 경로로 원장을 오염시킬 수 없다 (2026-09-16 사장님 확정) ──
+    # 이 검사가 실패하려면: grade_src 없이 grade 만 보낸 요청을 서버가 다시
+    # ai_estimate 로 승격시켜야 한다 — 그러면 누구나 talk_game_estimates 에
+    # 이름 빈 행을 무한히 쌓을 수 있다(실제로 확인자 검증만으로 12행 쌓였다).
+    n_before = db_one("SELECT COUNT(*) FROM talk_game_estimates")
+    _st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["게임"], "game": {"names": ["존재하지않는게임XYZ"], "grade": "C"}}})
+    d = d or {}
+    check("[54] grade_src 없는 grade 는 ai_estimate 로 승격되지 않는다(G-5)",
+          d.get("ai_estimated") == [], [], d.get("ai_estimated"))
+    n_after = db_one("SELECT COUNT(*) FROM talk_game_estimates")
+    if n_before is None:
+        check("[54] talk_game_estimates 증가 검사 — DB 미접속으로 건너뜀",
+              True, "건너뜀", _db_why, kind="DB")
+    else:
+        check("[54] 그 요청은 talk_game_estimates 에 아무것도 남기지 않는다(G-5)",
+              n_after == n_before, n_before, n_after)
+
+    # 이름 없는 추정도 기록하지 않는다 — 사람이 확정할 대상이 없는 행이라.
+    _st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["게임"], "game": {"names": [], "grade": "C", "grade_src": "ai_estimate"}}})
+    d = d or {}
+    n_noname = db_one("SELECT COUNT(*) FROM talk_game_estimates")
+    if n_after is not None:
+        check("[54] 게임명 없는 추정은 기록하지 않는다(G-5) — 카드·배지는 그대로",
+              n_noname == n_after and d.get("ai_estimated") != [], "증가 0·배지 있음",
+              (n_noname - n_after, d.get("ai_estimated")))
+
+    # ── ③ 내부 사유를 고객에게 보여주지 않는다 ────────────────────────────
+    # 이 검사가 실패하려면: app.js 가 서버 notes/note 를 addMessage 로 말풍선에
+    # 실어야 한다 — 재설계 전에 실제로 그랬고, 고객이 디버그 문장을 읽었다.
+    appjs = pathlib.Path(ROOT, "mockups", "mvp2", "app.js").read_text(encoding="utf-8")
+    bad = [m.group(0)[:90] for m in _re.finditer(r"addMessage\([^)]*\)", appjs)
+           if _re.search(r"\bnotes?\b", m.group(0))]
+    check("[54] app.js 의 addMessage 인자에 note/notes 가 없다(내부 사유 차단)",
+          len(bad) == 0, 0, bad[:3])
+    check("[54] recommend 응답의 notes 는 배열이다(옛 화면이 문자열로 못 쓰게)",
+          isinstance(d.get("notes"), list), list, type(d.get("notes")).__name__)
+
+    # ── ④ card_sets 수 == 게임 계열을 하나로 합친 usages 수 ────────────────
+    # 이 검사가 실패하려면: 용도별 반복이 빠지거나(카드 한 벌만 나옴) 게임 계열을
+    # 합치지 않아야 한다(게임+고사양 게임에 같은 칸을 두 번 내밀게 된다).
+    _st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["게임", "영상편집"], "game": {"grade": "E", "grade_src": "catalog"}}})
+    d = d or {}
+    check("[54] 용도 2종(게임+영상편집) → card_sets 2",
+          len(d.get("card_sets") or []) == 2, 2, len(d.get("card_sets") or []))
+    _st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["게임", "고사양 게임"], "game": {"grade": "E", "grade_src": "catalog"}}})
+    d = d or {}
+    check("[54] 게임 계열 2종 → card_sets 1(같은 칸을 두 번 내밀지 않는다)",
+          len(d.get("card_sets") or []) == 1, 1, len(d.get("card_sets") or []))
+
+    # ── 가드 — 부족한 입력에 500 을 내지 않는다 ───────────────────────────
+    st = anon_status("/api/talk/parse", {"text": ""})
+    check("[54] parse 빈 문장 → 400 (LLM 호출 없이 막는다)", st == 400, 400, st)
+    _st, d = post("/api/grid/recommend", {"state": {}})
+    d = d or {}
+    check("[54] recommend state {} → 200 + needs['usages'] (400 아님)",
+          d.get("ok") is True and d.get("needs") == ["usages"],
+          "ok·needs=['usages']", (d.get("ok"), d.get("needs")))
+    _st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["요리"], "game": {"grade": "Z", "resolution": "8K"}}})
+    d = d or {}
+    check("[54] 어휘 밖 값은 500 이 아니라 dropped 로 접힌다",
+          d.get("ok") is True and len(d.get("dropped") or []) >= 2,
+          "ok·dropped 2건 이상", (d.get("ok"), len(d.get("dropped") or [])))
 
 
 if __name__ == "__main__":

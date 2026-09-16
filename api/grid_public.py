@@ -2,9 +2,31 @@
 """고객용 격자 추천 API — `POST /api/grid/recommend` (A-135 스펙축 재설계, 2026-09-16).
 
 ■ 무엇을 하나
-  talk.py 가 낸 constraints(예산·용도·플랫폼 …)를 받아 사전 생성 견적 격자
-  (grid_cells × grid_quotes.is_current, 0092)에서 칸을 찾아 카드로 돌려준다.
+  talk.py 가 낸 **격자 좌표 state**(api/talk_schema.TalkState — 용도·예산·플랫폼·
+  게임 등급/해상도 …)를 받아 사전 생성 견적 격자(grid_cells × grid_quotes.is_current,
+  0092)에서 칸을 찾아 **용도별 카드 묶음(card_sets)** 으로 돌려준다.
   실시간 recommend 엔진을 돌리지 않는다 — 격자가 추천 원천이다(A-126·A-128).
+
+■ 입력 계약 전환(2026-09-16 오후, docs/design/talk-grid-guide-redesign-2026-09-16.md §7·§8)
+  · 정본 입력은 `state`(TalkState dict). 검증은 talk_schema.validate_state 로 매 요청
+    DB 어휘와 대조한다 — AI/화면이 낸 값을 그대로 믿지 않는다(어휘 밖은 null 로 접고
+    notes 에 남기며, 같은 dropped[] 를 응답에도 실어 화면이 '반영 못 한 조건'을 말할 수
+    있게 한다). 400/422 를 내지 않는 방침은 그대로다.
+  · 하위호환으로 옛 `constraints[{l,v}]` 도 받는다(mvp1 이 아직 옛 모양을 쓸 수 있다).
+    둘 다 오면 state 우선. constraints 만 오면 _pick/_usage_grid_of/_platform_of/
+    parse_budget 로 state 를 만든 뒤 같은 길을 탄다 — 단, 게임명 탐색은 더 이상 하지
+    않으므로(아래) 옛 모양의 게임 용도는 needs=["game.grade"] 로 끝난다.
+  · 게임명·등급은 AI 가 좌표(state.game.grade)로 준다 — 이 파일이 '요청'·'선호' 값에서
+    games.name 을 뒤지던 _find_game_name/GAME_NAME_LABEL_PRIORITY 는 삭제했다.
+  · 사장님 확정 정책 3항목(설계서 §6)을 이 파일이 구현한다:
+      ① 용도가 둘 이상 → usages[] 마다 격자 조회, card_sets[] 로 전부 돌려준다.
+        게임 계열 용도가 여럿(게임+고사양 게임)이면 게임 카드는 한 벌만.
+      ② 목록 밖 게임(grade_src="ai_estimate") → 추정 등급으로 바로 카드 + 응답
+        ai_estimated[] 로 화면 배지. 그 시점에 talk_game_estimates(0093) 에 한 행.
+      ③ 해상도 null → 1080p 로 카드를 내고 assumed:["game.resolution=1080p"].
+  · `notes[]` 는 서버 내부 사유(로그·디버그용)다. 화면은 이것을 고객 말풍선에 싣지
+    않는다(되묻기는 AI 의 reply 만) — 옛 화면이 실수로 못 쓰게 필드명을 `note`(문자열)
+    에서 `notes`(배열)로 바꿨다.
 
 ■ 스키마 대전환(0091·0092, 이 재작성의 배경 — A-135)
   옛 판(0072~0082): grid_cells.tier 는 브랜드명 문자열이고 budget_min/max 가
@@ -30,7 +52,10 @@
   `api/auth.py` `_is_gated()` 는 `/api/admin/` 만 본다 → `/api/grid/` 는 대상이
   아니다. `api/customer_auth.py` 는 `/api/my/` 만 401 을 낸다 → 게스트도 통과.
 
-■ 읽기 전용이다 — SELECT 만. 세션도 원장도 쓰지 않는다.
+■ 읽기 전용에 예외 하나 — talk_game_estimates(0093) INSERT
+  SELECT 만 하던 파일이다. 예외는 §6 ② 의 추정 기록 한 행뿐이며 별도 트랜잭션으로
+  쓰고, 실패해도 카드 응답은 버리지 않고 로그(log.exception)+notes 로만 남긴다
+  (api/llm.py 의 cost_logged 판단과 같은 결). 세션·다른 원장은 쓰지 않는다.
 
 ■ 지어내지 않는 것
   · `reasons`·`omitted` 는 payload 그대로(재작성 금지).
@@ -40,18 +65,22 @@
   · budget_min/max 가 NULL(배치 미실행)이면 그대로 null 을 내보낸다 — 만든 숫자를
     채우지 않는다.
 
-■ 이번 재작성에서 사장님 확정 없이 이 파일이 직접 판단한 것 셋(보고서에 명시)
-  ① DEFAULT_TIER_KEY = "T1"(팝콘2, 입문급) — 예산 없을 때 중심 티어. 지시서
-     원문이 "미정이면 T1로 가정"이라 명시해 그대로 따른다.
+■ 사장님 확정 없이 이 파일이 직접 판단한 것(보고서에 명시)
+  ① DEFAULT_TIER_KEY = "T1"(팝콘2, 입문급) — 예산도 tier_key 힌트도 없을 때 중심
+     티어. 지시서 원문이 "미정이면 T1로 가정"이라 명시해 그대로 따른다.
   ② `tier_index_for` 의 예산 매칭 규칙을 반열림 구간 비교에서 "관측 가격점 중
      가장 가까운 티어" 규칙으로 바꿨다 — budget_min==budget_max(단일 관측점)라
      옛 [min,max) 구간 비교가 사실상 항상 실패하기 때문이다(아래 함수 docstring
      참고). 새 가격을 지어내지 않고 실측 점들만 재료로 쓰지만, 이 대체 규칙
      자체는 사장님 확정 사항이 아니다.
-  ③ 게임 용도의 "게임명"을 파서가 아직 전용 라벨로 주지 않는다(2026-09-16 실측
-     — api/talk.py LABELS 에 '게임명' 없음). '요청'(원문 보관)·'선호' 값 안에서
-     games.name 부분일치를 시도하되, 못 찾으면 needs=["게임명"]으로 되묻는다.
+  ③ (해소, 2026-09-16 오후) 게임명 탐색·해상도 고정은 사라졌다 — 둘 다 AI 가
+     state.game 좌표로 준다. 해상도 null 은 설계서 §6 ③ 대로 1080p 가정.
+  ④ 비게임 tier_key 힌트와 예산이 **둘 다** 있으면 예산을 중심으로 쓴다(설계서
+     §11 "이번엔 예산 우선 유지"). 힌트와 예산이 고른 칸이 다르면 notes 에 남긴다.
+     힌트만 있으면 그 칸을 중심으로 한다.
 """
+import json
+import logging
 import re
 
 from fastapi import APIRouter
@@ -59,8 +88,12 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .db import engine
+from .talk_schema import (DEFAULT_RESOLUTION, TalkState, is_game_usage, load_vocab,
+                          missing_for, validate_state)
 from .taxonomy import SLOT_LABELS
 from .timeutil import iso as _iso
+
+log = logging.getLogger("grid_public")
 
 router = APIRouter(prefix="/api/grid", tags=["grid-public"])
 
@@ -68,12 +101,12 @@ router = APIRouter(prefix="/api/grid", tags=["grid-public"])
 DEFAULT_TIER_KEY = "T1"          # 예산 없을 때 중심 tier_key — 위 ① 참고(가정값)
 TIERS_UP = 2                     # 중심 + 위 2개(0072 이래 정책 유지, 이번 변경 범위 밖)
 DEFAULT_PLATFORM = "인텔"        # 사장님 확정(2026-09-11), 스키마와 무관
-PLATFORMS = ("인텔", "AMD")      # grid_cells.platform 이 정본
+# 플랫폼 어휘는 talk_schema.PLATFORM_VALUES 하나만 쓴다(validate_state 가 거른다) — 여기
+# 따로 두지 않는다(단일 원천). 옛 PLATFORMS 상수는 미참조라 지웠다(2026-09-16 확인자 G-2).
 GAME_USAGE = "게임"              # grid_cells.usage 의 게임 축 리터럴(0092)
-DEFAULT_GAME_RESOLUTION = "1080p"
-# ⚠ 파서(api/talk.py)가 아직 해상도를 묻는 입력을 받지 않는다 — 항상 1080p로
-# 고정한다(지시 4번, 위 헤더 ③번과 같은 결의 미정 사항). 화면이 해상도 선택
-# UI 를 붙이는 날 이 상수 사용처(_resolve_game)만 고치면 된다.
+# 해상도 기본값은 talk_schema.DEFAULT_RESOLUTION(1080p) 하나만 쓴다 — 여기 따로 두지
+# 않는다(단일 원천). null 이면 그 값으로 카드를 내고 assumed 에 표시한다(§6 ③).
+ASSUMED_RESOLUTION = f"game.resolution={DEFAULT_RESOLUTION}"
 
 # ── 용도 매핑 — 파서 9종 → grid_cells.usage 6종(비게임) + '게임'(게임 3종 합류) ──
 # 비게임 6종은 2026-09-16 실측 SQL 로 확인한 값 그대로다:
@@ -83,7 +116,10 @@ DEFAULT_GAME_RESOLUTION = "1080p"
 # **1:1로 이미 같은 문자열**이다(0090·0092 가 같은 어휘를 썼다) — 그래서 옛 판처럼
 # 여러 파서 용도를 하나로 접는 매핑표가 필요 없다. 게임 계열 3종(게임·캐주얼 게임·
 # 고사양 게임)만 GAME_USAGE 로 합류시킨다 — 세부(등급·해상도)는 tier_key 가 아니라
-# game_grade+game_resolution 이 결정한다(아래 _resolve_game).
+# game_grade+game_resolution 이 결정한다(아래 _game_card_set).
+# 이 매핑의 키는 usage_floors.usage_label 9종과 같다 — talk_schema.load_vocab 이 매
+# 요청 DB 에서 읽는 그 어휘다. state.usages 는 validate_state 가 이미 그 어휘로
+# 걸러 주므로 여기서는 값→격자 용도 변환만 한다.
 USAGE_TO_GRID = {
     "AI 작업": "AI 작업",
     "디자인": "디자인",
@@ -95,13 +131,6 @@ USAGE_TO_GRID = {
     "캐주얼 게임": GAME_USAGE,
     "고사양 게임": GAME_USAGE,
 }
-
-# 게임명을 찾을 때 뒤질 라벨과 그 순서 — '게임명' 은 파서가 아직 안 내지만(위 ③)
-# 낼 날을 대비해 최우선으로 본다. '요청'은 고객 원문을 그대로 보관하는 자리
-# (api/talk.py VERBATIM_LABELS), '선호'는 자유 태그 자리 — 둘 다 games.name 이
-# 우연히 들어 있을 수 있는 유일한 통로다(용도 값 자체는 `_norm_usage`가 표준
-# 라벨 하나로 접어버려 게임 제목이 못 들어온다, api/talk.py:472-507).
-GAME_NAME_LABEL_PRIORITY = ("게임명", "요청", "선호")
 
 # grid_quotes.tier_variant(한글) → 응답 키(카드 3종 구조, 지시 6번 예시 그대로)
 VARIANT_KEY_MAP = {"가성비": "value", "추천": "reco", "고성능": "perf"}
@@ -119,12 +148,14 @@ def _cat_label(slot: str) -> str:
 
 # ── 입력 ────────────────────────────────────────────────────────────────
 class Constraint(BaseModel):
+    """옛 모양(mvp1) — 하위호환으로만 받는다."""
     l: str | None = None
     v: str | None = None
 
 
 class RecommendBody(BaseModel):
-    constraints: list[Constraint] = []
+    state: dict | None = None            # 정본 — talk_schema.TalkState 모양의 dict
+    constraints: list[Constraint] = []   # 하위호환(옛 모양). state 가 있으면 무시
     history_note: str | None = None     # 받기만 한다 — 이 단계에선 판정에 쓰지 않는다
 
 
@@ -266,52 +297,53 @@ def _usage_grid_of(constraints: list[Constraint]) -> tuple[str | None, str | Non
     return None, v
 
 
-def _find_game_name(conn, constraints: list[Constraint]) -> str | None:
-    """'게임명'·'요청'·'선호' 라벨 값 안에서 games.name 부분일치를 찾는다(우선순위
-    순서 그대로). 여러 이름이 후보로 걸리면 긴 이름부터 검사해 짧은 이름이 긴
-    이름의 부분 문자열로 오매칭되는 위험을 줄인다. 못 찾으면 None — 지어내지 않는다."""
-    names = conn.execute(text("SELECT name FROM games")).scalars().all()
-    names_sorted = sorted((n for n in names if n), key=len, reverse=True)
-    for lab in GAME_NAME_LABEL_PRIORITY:
-        for c in constraints:
-            if (c.l or "").strip() != lab or not (c.v or "").strip():
-                continue
-            v = c.v.strip()
-            for g in names_sorted:
-                if g in v:
-                    return g
-    return None
+def _state_from_constraints(cons: list[Constraint]) -> tuple[TalkState, list[str]]:
+    """옛 모양(constraints[{l,v}]) → TalkState. 하위호환 전용(mvp1).
+
+    옛 로직(_pick/_usage_grid_of/_platform_of/parse_budget) 그대로 읽어 좌표로 옮긴다.
+    게임명·등급은 넣지 않는다 — 옛 모양엔 그 좌표가 없고 이 파일은 더 이상 게임명을
+    뒤지지 않는다(AI 가 state.game 을 준다). 그래서 옛 모양의 게임 용도는 아래
+    본체에서 needs=["game.grade"] 로 끝난다. 반환 (state, notes)."""
+    notes: list[str] = []
+    budget_won, bound = parse_budget(_pick(cons, "예산"))
+    usage_grid, usage_raw = _usage_grid_of(cons)
+    usages: list[str] = []
+    if usage_grid is not None:
+        # USAGE_TO_GRID 의 키(파서 라벨) 중 usage_raw 가 가리키는 것을 usages 로. 게임
+        # 계열은 격자 용도가 같아도 라벨을 보존한다(is_game_usage 가 라벨을 본다).
+        label = usage_raw if usage_raw in USAGE_TO_GRID else next(
+            (lab for lab in sorted(USAGE_TO_GRID, key=len, reverse=True) if lab in (usage_raw or "")),
+            None)
+        if label:
+            usages.append(label)
+    elif usage_raw:
+        notes.append(f"legacy constraints: usage '{usage_raw}' not in USAGE_TO_GRID")
+    state = TalkState(usages=usages, budget_won=budget_won, budget_bound=bound,
+                      platform=_platform_of(cons))
+    return state, notes
 
 
-def _resolve_game(conn, constraints: list[Constraint]) -> dict:
-    """게임 용도일 때 game_grade·game_resolution·game_name 판정.
+def _record_estimate(state: TalkState) -> tuple[bool, str | None]:
+    """§6 ② — ai_estimate 로 카드를 낸 시점에 talk_game_estimates(0093) 한 행.
 
-    반환 {grade, resolution, game_name, needs[], note}.
-    해상도는 DEFAULT_GAME_RESOLUTION 고정(위 헤더·상수 주석 참고 — 파서 미지원).
-    """
-    resolution = DEFAULT_GAME_RESOLUTION
-    name = _find_game_name(conn, constraints)
-    if name is None:
-        return {"grade": None, "resolution": resolution, "game_name": None,
-                "needs": ["게임명"],
-                "note": "게임 용도인데 게임명을 알 수 없어 등급을 정할 수 없습니다"
-                        "('요청'·'선호' 값에서 게임명을 찾지 못했습니다 — 파서가"
-                        " 아직 게임명을 전용 라벨로 넘기지 않습니다)"}
-    row = conn.execute(text(
-        "SELECT grade FROM game_grade_assignments a"
-        " JOIN games g ON g.game_id = a.game_id WHERE g.name = :n"),
-        {"n": name}).mappings().first()
-    grade = row["grade"] if row else None
-    if grade is None:
-        # 게임은 특정됐지만 등급이 없다(예: GTA — 재고값 없음+버전 특정 불가로
-        # 미배정, 0091 마이그레이션 주석 그대로). 이미 이름을 아니 '게임명'을
-        # 다시 물어도 소용없다 — needs 를 채우지 않고 사실만 note 로 남긴다.
-        return {"grade": None, "resolution": resolution, "game_name": name,
-                "needs": [],
-                "note": f"게임 '{name}'은(는) 아직 부하 등급이 확정되지 않아"
-                        " 카드를 만들 수 없습니다"}
-    return {"grade": grade, "resolution": resolution, "game_name": name,
-            "needs": [], "note": None}
+    별도 트랜잭션. 실패해도 예외를 올리지 않는다 — 카드 응답은 이미 만들어졌고 기록
+    누락은 로그(log.exception)와 notes 로만 드러낸다(api/llm.py cost_logged 와 같은
+    판단: 이미 낸 답을 버리지 않되 누락을 조용히 감추지도 않는다).
+    반환 (logged, error_text)."""
+    g = state.game
+    names = list(g.names) if g else []
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO talk_game_estimates (game_name_raw, names_all, grade)"
+                " VALUES (:raw, CAST(:names AS jsonb), :grade)"),
+                {"raw": names[0] if names else "", "names": json.dumps(names, ensure_ascii=False),
+                 "grade": g.grade})
+        return True, None
+    except Exception as e:      # noqa: BLE001 — 기록 실패는 카드를 막지 않는다(헤더 참고)
+        log.exception("[grid_public] talk_game_estimates insert failed (grade=%s names=%r)",
+                      g.grade if g else None, names)
+        return False, f"{type(e).__name__}: {e}"
 
 
 # ── 견적 카드 조립 ──────────────────────────────────────────────────────
@@ -496,98 +528,156 @@ def _build_game_cards(conn, grade: str, resolution: str, game_name: str | None,
     return cards, empty_cells
 
 
+# ── 용도별 카드 묶음(card_set) ────────────────────────────────────────────
+def _nongame_card_set(conn, usage: str, state: TalkState, platform: str,
+                      notes: list[str]) -> dict:
+    """비게임 용도 하나 → card_set. tier_key 힌트가 있으면 그 칸 중심, 없으면 예산으로
+    tier_index_for. 둘 다 있으면 예산 우선(헤더 ④·설계서 §11)."""
+    usage_grid = USAGE_TO_GRID[usage]
+    tiers = _load_tiers(conn, usage_grid, platform)
+    ci = tier_index_for(tiers, state.budget_won, state.budget_bound)
+    hint_i = next((i for i, t in enumerate(tiers) if t["tier_key"] == state.tier_key), None)
+    if state.tier_key is not None:
+        if state.budget_won is None:
+            ci = hint_i if hint_i is not None else ci
+            if hint_i is None:
+                notes.append(f"{usage}: tier_key hint {state.tier_key} not in spec_tiers - ignored")
+        elif hint_i is not None and hint_i != ci:
+            notes.append(f"{usage}: tier_key hint {state.tier_key} != budget pick"
+                         f" {tiers[ci]['tier_key']} - budget wins")
+    elif state.budget_won is None:
+        notes.append(f"{usage}: no budget, no tier_key hint - center {DEFAULT_TIER_KEY}")
+    considered = tiers[ci: ci + 1 + TIERS_UP]
+    cards, empty_cells = _build_nongame_cards(
+        conn, considered, usage_grid, platform, state.budget_won, state.budget_bound)
+    if not cards:
+        notes.append(f"{usage}: no cards in considered tiers {[t['tier_key'] for t in considered]}")
+    return {
+        "usage": usage, "usage_grid": usage_grid, "kind": "nongame",
+        "cards": cards, "empty_cells": empty_cells,
+        "center_tier": tiers[ci]["name"], "center_tier_key": tiers[ci]["tier_key"],
+        "tiers_considered": [t["tier_key"] for t in considered],
+    }
+
+
+def _game_card_set(conn, usage: str, state: TalkState, platform: str,
+                   notes: list[str]) -> dict:
+    """게임 계열 용도 → card_set 하나(칸 최대 1개). grade 는 이미 있다고 전제(호출부가
+    needs 로 거른다). 해상도 null 이면 DEFAULT_RESOLUTION — assumed 는 호출부가 단다."""
+    g = state.game
+    resolution = g.resolution or DEFAULT_RESOLUTION
+    game_name = g.names[0] if g.names else None
+    cards, empty_cells = _build_game_cards(
+        conn, g.grade, resolution, game_name, platform, state.budget_won, state.budget_bound)
+    if not cards:
+        notes.append(f"{usage}: no cards at grade={g.grade} resolution={resolution} platform={platform}")
+    return {
+        "usage": usage, "usage_grid": GAME_USAGE, "kind": "game",
+        "cards": cards, "empty_cells": empty_cells,
+        "center_tier": None, "center_tier_key": None, "tiers_considered": [],
+    }
+
+
 # ── 본체 ────────────────────────────────────────────────────────────────
 @router.post("/recommend")
 def recommend(body: RecommendBody):
-    """constraints → 격자 카드. 400 을 내지 않는다 — 부족한 것은 `needs` 로
-    말하고 카드 0장(화면/LLM 이 되묻는다).
+    """state(TalkState) → 용도별 격자 카드 묶음. 400 을 내지 않는다 — 부족한 것은
+    `needs` 로 말하고 카드 0장(되묻는 문장은 AI 의 reply 가 맡는다, 이 응답의
+    notes 는 화면에 싣지 않는다).
 
-    응답 {ok, cards[], center_tier, center_tier_key, tiers_considered[],
-          usage_grid, usage_kind, game_grade, game_resolution, game_name,
-          platform, budget_won, budget_bound, needs[], note, empty_cells[]}
+    응답 {ok,
+          card_sets: [{usage, usage_grid, kind("nongame"|"game"), cards[], empty_cells[],
+                       center_tier, center_tier_key, tiers_considered[]}],
+          cards[]          ← 하위호환: card_sets[0].cards 그대로(없으면 []),
+          assumed[]        예: ["game.resolution=1080p"]  (§6 ③),
+          ai_estimated[]   예: [{game_names:[...], grade:"C"}]  (§6 ② 화면 배지),
+          needs[]          "usages" | "game.grade"  (talk_schema.missing_for — talk.py 와 같은 함수),
+          dropped[]        validate_state 가 접은 값 [{field, value, reason}] 그대로 — 화면이
+                           '반영하지 못한 조건'(예: resolution=8K → 1080p)을 고객에게 말할 수
+                           있게 싣는다(parse 응답의 dropped 와 같은 모양). legacy 경로는 [],
+          notes[]          서버 내부 사유(로그·디버그) — 고객 문구 아님,
+          platform, budget_won, budget_bound, game_grade, game_resolution, game_name}
 
-      cards[].quotes = {value, reco, perf} — 칸 하나의 3종 구성(지시 6번 핵심
-      변화). 각 안에 {quote_id, total, over_budget, status, parts, reasons,
-      omitted, generated_at}. 카드 최상위에도 대표(추천) variant 값을 그대로
-      얹는다(하위호환) — 화면 제작자가 quotes.reco 대신 top-level 필드를 계속
-      써도 동작한다.
-      kind: "nongame"(tier_key 축) | "game"(game_grade+game_resolution 축).
+      cards[].quotes = {value, reco, perf} — 칸 하나의 3종 구성. 각 안에 {quote_id,
+      total, over_budget, status, parts, reasons, omitted, generated_at}. 카드
+      최상위에도 대표(추천) variant 값을 그대로 얹는다(하위호환).
       empty_cells  고려한 칸 중 카드가 안 나온 것의 사유 — intended_empty 면 그
                    사실, 현재본 견적이 없으면 '현재본 없음'.
     """
-    cons = body.constraints or []
-    budget_won, bound = parse_budget(_pick(cons, "예산"))
-    usage_grid, usage_raw = _usage_grid_of(cons)
-    platform = _platform_of(cons)
-
-    needs: list[str] = []
     notes: list[str] = []
-    if usage_grid is None:
-        needs.append("용도")
-        if usage_raw:
-            notes.append(f"용도 '{usage_raw}' 는 격자 용도로 대응되지 않음")
-    if budget_won is None:
-        # T1(팝콘2) — 사장님 미정 시 가정값(위 헤더 ① 참고, 보고서에 명시).
-        notes.append("예산 없음 — T1(팝콘2) 중심")
-
-    cards: list[dict] = []
-    empty_cells: list[dict] = []
-    center_tier_name = None
-    center_tier_key = None
-    tiers_considered_keys: list[str] = []
-    game_grade = game_resolution = game_name = None
+    dropped: list[dict] = []
 
     with engine.connect() as conn:
-        if usage_grid == GAME_USAGE:
-            g = _resolve_game(conn, cons)
-            game_grade, game_resolution, game_name = g["grade"], g["resolution"], g["game_name"]
-            needs.extend(g["needs"])
-            if g["note"]:
-                notes.append(g["note"])
-            if game_grade is not None:
-                cards, empty_cells = _build_game_cards(
-                    conn, game_grade, game_resolution, game_name, platform, budget_won, bound)
-        elif usage_grid is not None:
-            tiers = _load_tiers(conn, usage_grid, platform)
-            ci = tier_index_for(tiers, budget_won, bound)
-            considered = tiers[ci: ci + 1 + TIERS_UP]
-            center_tier_name = tiers[ci]["name"]
-            center_tier_key = tiers[ci]["tier_key"]
-            tiers_considered_keys = [t["tier_key"] for t in considered]
-            cards, empty_cells = _build_nongame_cards(
-                conn, considered, usage_grid, platform, budget_won, bound)
+        # ── 입력 → TalkState ─────────────────────────────────────────
+        vocab = load_vocab(conn)     # validate_state · missing_for 둘 다 쓴다(legacy 경로 포함)
+        if body.state is not None:
+            state, dropped = validate_state(body.state, vocab)
+            for d in dropped:
+                notes.append(f"dropped {d['field']}={d['value']!r}: {d['reason']}")
         else:
-            # 용도 미정 — 카드는 안 만들지만(아래 needs=["용도"]) 참고용 중심
-            # 티어는 계산해 보고한다. usage 를 모르니 관측 가격도 없다 —
-            # tier_index_for 는 비교 재료가 없어 DEFAULT_TIER_KEY 로 떨어진다.
-            tiers = _load_tiers(conn, None, platform)
-            ci = tier_index_for(tiers, budget_won, bound)
-            considered = tiers[ci: ci + 1 + TIERS_UP]
-            center_tier_name = tiers[ci]["name"]
-            center_tier_key = tiers[ci]["tier_key"]
-            tiers_considered_keys = [t["tier_key"] for t in considered]
+            state, legacy_notes = _state_from_constraints(body.constraints or [])
+            notes.extend(legacy_notes)
+            if body.constraints:
+                notes.append("input=legacy constraints (no state)")
 
-    if usage_grid is not None and usage_grid != GAME_USAGE and not cards:
-        notes.append("고려한 티어에 카드 없음")
-    if usage_grid == GAME_USAGE and game_grade is not None and not cards:
-        notes.append("해당 등급·해상도 칸에 카드 없음")
+        platform = state.platform or DEFAULT_PLATFORM
+        game_usages = [u for u in state.usages if is_game_usage(u)]
+        nongame_usages = [u for u in state.usages if not is_game_usage(u)
+                          and u in USAGE_TO_GRID]
+        for u in state.usages:
+            if not is_game_usage(u) and u not in USAGE_TO_GRID:
+                notes.append(f"usage '{u}' not in USAGE_TO_GRID - skipped")
+
+        # ── needs — 카드를 막는 좌표. talk.py 의 missing 과 같은 함수(단일 원천) ──
+        needs = missing_for(state, vocab)
+        game_grade = state.game.grade if (game_usages and state.game) else None
+
+        # ── usages[] 마다 card_set ───────────────────────────────────
+        card_sets: list[dict] = []
+        assumed: list[str] = []
+        ai_estimated: list[dict] = []
+        game_resolution = game_name = None
+        for u in nongame_usages:
+            card_sets.append(_nongame_card_set(conn, u, state, platform, notes))
+        if game_usages and game_grade is not None:
+            # 게임 계열 용도가 여럿(게임+고사양 게임)이어도 격자 칸은 같다 — 한 벌만.
+            # usage 라벨은 가장 먼저 온 게임 계열 용도를 쓴다.
+            if len(game_usages) > 1:
+                notes.append(f"game usages {game_usages} merged into one card set")
+            cs = _game_card_set(conn, game_usages[0], state, platform, notes)
+            card_sets.append(cs)
+            game_resolution = state.game.resolution or DEFAULT_RESOLUTION
+            game_name = state.game.names[0] if state.game.names else None
+            if state.game.resolution is None:
+                assumed.append(ASSUMED_RESOLUTION)
+            if state.game.grade_src == "ai_estimate":
+                ai_estimated.append({"game_names": list(state.game.names), "grade": game_grade})
+
+    # ── §6 ② 추정 기록 — 카드를 낸 시점, 별도 트랜잭션, 실패해도 응답은 그대로 ──
+    # ⚠ G-5 (2026-09-16 사장님 확정): **게임명이 빈 추정은 기록하지 않는다.**
+    #   "요즘 대작 다 돌리고 싶어요" 처럼 이름 없이 등급만 추정된 경우 원장에 남겨도
+    #   사람이 확정할 대상(어느 게임인가)이 없어 `game_name_raw=''` 행만 쌓인다.
+    #   카드는 그대로 내고 배지도 띄우되(ai_estimated 는 채운다) 표에는 안 넣는다.
+    if ai_estimated and state.game is not None and state.game.names:
+        logged, err = _record_estimate(state)
+        if not logged:
+            notes.append(f"talk_game_estimates insert failed: {err}")
+    elif ai_estimated:
+        notes.append("ai_estimate without game names - not recorded (G-5)")
 
     return {
         "ok": True,
-        "cards": cards,
-        "center_tier": center_tier_name,
-        "center_tier_key": center_tier_key,
-        "tiers_considered": tiers_considered_keys,
-        "usage_grid": usage_grid,
-        "usage_kind": ("game" if usage_grid == GAME_USAGE
-                       else ("nongame" if usage_grid else None)),
+        "card_sets": card_sets,
+        "cards": card_sets[0]["cards"] if card_sets else [],     # 하위호환
+        "assumed": assumed,
+        "ai_estimated": ai_estimated,
+        "needs": needs,
+        "dropped": dropped,
+        "notes": notes,
+        "platform": platform,
+        "budget_won": state.budget_won,
+        "budget_bound": state.budget_bound,
         "game_grade": game_grade,
         "game_resolution": game_resolution,
         "game_name": game_name,
-        "platform": platform,
-        "budget_won": budget_won,
-        "budget_bound": bound,
-        "needs": needs,
-        "note": " · ".join(notes),
-        "empty_cells": empty_cells,
     }

@@ -1,8 +1,19 @@
-"""S1 자유입력 파싱(POST /api/talk/parse) — 문장을 «조건»으로 바꾸고, «PC 상담인지»를 판정한다.
+"""S1 자유입력 파싱(POST /api/talk/parse) — 문장을 «격자 좌표(state)»로 바꾸고, «PC 상담인지»를 판정한다.
 
 `api/main.py`가 자동으로 싣는다(pkgutil 1단계 스캔 — 등록 코드 없음).
 
-■ 무엇을 하는 자리인가
+■ 2026-09-16 「격자 안내」 재설계 (docs/design/talk-grid-guide-redesign-2026-09-16.md)
+  AI 의 역할이 «키워드 추출기»에서 «격자의 어느 칸인지 가리키는 안내자»로 바뀌었다.
+  출력은 `{l, v}` constraints 가 아니라 **격자 좌표 state**(§4 — usages · budget_won ·
+  tier_key · game{names, grade, grade_src, resolution} …)이고, 스키마·어휘 로더·검증·
+  프롬프트 [격자] 문단은 전부 `api/talk_schema.py`(단일 원천, grid_public 과 공유)에 있다.
+  응답의 `constraints[]` 는 mvp1(s1-session.html) 하위호환으로만 남긴 것이다
+  (`_legacy_constraints`). 옛 검증층(`_validate`·`_norm_*`·LABELS 등)은 도헤드 표시로
+  남겨 두었다 — 지우지 않는다(되돌림 근거). 아래 문단들 중 «constraints»·«라벨»을 말하는
+  것은 그 옛 경로의 기록이다 — 결정의 근거(A-03 · 문장은 항상 AI 가 본다 · 어휘는 DB ·
+  실패를 삼키지 않는다 · A-95)는 그대로 유효하다.
+
+■ 무엇을 하는 자리인가 (옛 기록 — 모양만 바뀌었다)
   고객이 S1에서 자연어로 말한 문장을 화면이 이미 쓰는 제약 형태(`{l, v}` —
   정본은 `api/candidates.Constraint`)로 바꾼다. **그리고 그 문장이 PC 상담인지도
   여기서 판정한다**(`pc_related`) — 같은 한 번의 호출로.
@@ -145,20 +156,26 @@ from . import catalog_map   # gpu_chipset_key — 「부품」 라벨·price-fac
 from . import llm
 from . import usage_floors as UF
 from .db import engine
+# 「격자 좌표」 계약의 단일 원천(2026-09-16 재설계 -- docs/design/talk-grid-guide-redesign-2026-09-16.md).
+# 스키마(TalkState·ParseResult) · 어휘 로더(load_vocab) · 검증(validate_state·missing_for) ·
+# 프롬프트 [격자] 문단(vocab_prompt_block)이 전부 저기 있다. 여기서 다시 적지 않는다.
+from . import talk_schema as TS
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
 log = logging.getLogger(__name__)
 
 MAX_TEXT_LEN = 300
-# 한 번의 파싱에 이 이상이 필요한 문장은 없다(라벨이 6종이고 같은 라벨은 한 번만
-# 남는다 -- `_validate` 의 seen). 모델이 목록을 길게 뱉어도 여기서 끊는다 -- 화면
-# 조건 칩이 무한히 늘어나는 것을 막는 상한. 2026-09-11 A-128 ②로 4→6종이 되며 6→8.
+# ⚠ 도헤드(dead, 2026-09-16 격자 안내 재설계) -- 옛 `_validate` 만 쓰던 상한. 새 경로는
+# state 객체라 배열 길이 상한이 없다(배열 필드는 어휘 집합 크기가 곧 상한). 지우지 않고
+# 남긴다 -- 옛 경로를 되살릴 때의 근거가 이 줄에 있다.
 MAX_CONSTRAINTS = 8
-LLM_TIMEOUT_SEC = 12          # 고객이 기다리는 자리다. 길게 잡지 않는다.
-# JSON 한 덩어리 + 고객에게 할 한두 문장(reply, A-128 ②)이면 충분하다(최악 비용 상한).
-# reply 가 붙기 전에는 256 이었다 -- 한국어 두 문장이 토큰 100 안팎이라 그만큼 늘렸다.
-LLM_MAX_OUTPUT_TOKENS = 400
+# 고객이 기다리는 자리다. 길게 잡지 않는다. 프롬프트가 격자 설명서(vocab_prompt_block)만큼
+# 길어져 12 -> 15 로 올렸다(2026-09-16 실측: 프롬프트 ~4천 토큰 · claude-haiku 3~6초).
+LLM_TIMEOUT_SEC = 15
+# JSON 한 덩어리(state 객체 + missing + evidence 몇 줄) + 고객에게 할 한두 문장(reply).
+# 옛 constraints 배열(400)보다 state 객체가 길어(필드 이름이 토큰을 먹는다) 600 으로.
+LLM_MAX_OUTPUT_TOKENS = 600
 
 # 대화 이력(A-128 ② · 2026-09-11 사장님 확정 「같은 말로 계속 되묻지 않는다」).
 # 화면이 최근 대화를 함께 보내면 프롬프트에 싣는다. 이 수를 넘는 옛 턴은 **잘라낸다**
@@ -174,6 +191,16 @@ REPLY_FALLBACK_NO_CONS = "어떤 PC가 필요하신지 조금 더 말씀해 주�
 REPLY_NOT_PC = "PC 견적을 도와드리는 자리예요 - 어떤 PC가 필요하세요?"
 REPLY_MAX_LEN = 200
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ⚠ 도헤드(dead) 구역 -- 2026-09-16 「격자 안내」 재설계로 POST /parse 가 더는 쓰지 않는다.
+#   여기부터 `_validate` 까지(PREF_VALUES · _BUDGET_* · LABELS · PLATFORM_VALUES ·
+#   EXCLUDE_VALUES · _norm_budget · _norm_part · _pick_from_set · _norm_from_set ·
+#   _norm_usage · _validate)는 옛 «{l,v} constraints» 경로의 검증층이다. 새 경로의 어휘·
+#   검증은 전부 `api/talk_schema.py`(PREF_VALUES 등 상수도 저기로 옮겨졌다)에 있다.
+#   **지우지 않는다** -- 옛 응답 모양(constraints[])을 아직 읽는 호출처가 있고
+#   (mockups/mvp1/s1-session.html `srvParse`, grep 2026-09-16), 되돌릴 때의 근거가 여기다.
+#   새 코드는 이 구역의 이름을 참조하지 않는다 -- 참조가 생기면 도헤드 표시를 지워라.
+# ══════════════════════════════════════════════════════════════════════════════
 # 선호 어휘 -- `api/candidates.py`의 `_apply_one`이 실제로 거르는 태그 둘.
 # 여기서 늘리려면 그 파일이 먼저 늘어야 한다(늘리지 않고 여기만 늘리면 화면이
 # 조건을 잡았다고 말하는데 후보 수가 그대로다).
@@ -222,8 +249,14 @@ PLATFORM_VALUES = ("인텔", "AMD")
 # 조건이 아니라 **견적에서 뺄 항목의 표시**라 엔진 어휘가 따로 없다 -- 소비처는
 # 격자 조회·화면(칩)이고, 셋 다 그대로 넘긴다.
 EXCLUDE_VALUES = ("모니터 보유", "OS 제외", "본체만")
+# ── 도헤드 상수 구역 끝(함수 쪽 도헤드는 `_norm_budget` ~ `_validate`) ──────────────
 
 _HISTORY_ROLES = ("user", "assistant")
+
+# 이전 턴 state 가 없을 때 프롬프트에 적는 말 -- 첫 문장임을 모델에게 알린다.
+_NO_PREV_STATE = "(없음 -- 첫 문장이다. 빈 state 에서 시작한다)"
+# 카드를 막는 missing 좌표 두 개(§6) -- 모델에게 «이 둘 중에서만» 적으라고 알린다.
+_MISSING_KEYS = (TS.MISSING_USAGES, TS.MISSING_GAME_GRADE)
 
 
 class HistoryTurn(BaseModel):
@@ -241,6 +274,11 @@ class ParseBody(BaseModel):
     # 서버는 이력을 저장하지 않는다(consult_sessions 를 안 쓰는 것은 그대로) -- 화면이
     # 들고 있다가 매번 보낸다. `HISTORY_MAX_TURNS` 를 넘는 앞쪽은 잘라낸다.
     history: list[HistoryTurn] | None = None
+    # 이전 턴의 TalkState(§4) -- 화면이 저장해 두었다가 그대로 되돌려 보낸다(2026-09-16
+    # 격자 안내 재설계). **선택** -- 없으면 빈 state 에서 시작한다. 서버는 이 값을 믿지
+    # 않는다: 프롬프트에 «이전까지 파악한 상태»로 실을 뿐이고, 모델이 낸 새 state 를
+    # `validate_state` 가 다시 검증한다. 화면이 조작해 보낸 어휘 밖 값도 그 층에서 걸린다.
+    state: dict | None = None
 
 
 def _trim_history(history) -> list:
@@ -262,6 +300,10 @@ def _trim_history(history) -> list:
 def _usage_rows() -> list:
     """용도 정본 -> [(라벨, 그 용도를 가리키는 말들)]. 중복 제거 · 정렬 순서 유지.
 
+    ⚠ 도헤드(dead, 2026-09-16) -- 옛 `_build_prompt` 만 썼다. 새 프롬프트는 같은 어휘를
+    `talk_schema.load_vocab(conn).usages`(= `usage_floors.list_usages()`)로 받는다. 지우지
+    않는다(옛 경로 되돌림 근거) -- 새 코드가 참조하면 이 표시를 지워라.
+
     ⚠ **여기서 어휘를 만들지 않는다.** 라벨도 어휘도 전부 `usage_floors` 행에서 온다
     (`usage_label` · `match_terms`). 한 usage_key 에 하한 행이 여럿이라 같은 라벨이
     여러 번 나오는데, 어휘는 행마다 같으므로 **처음 만난 행의 것만** 쓴다.
@@ -279,60 +321,82 @@ def _usage_rows() -> list:
     return out
 
 
-def _build_prompt(text: str, usage_rows: list, history: list | None = None) -> str:
-    """매 요청마다 접는다 -- 용도 어휘가 DB에서 바뀌면 다음 요청부터 반영된다.
+def _prev_state_json(prev: dict | None) -> str:
+    """이전 턴 state -> 프롬프트에 실을 한 줄 JSON.
 
-    `history` 는 `_trim_history` 를 거친 [(role, text)] 이다. 비었거나 None 이면 이력
-    문단이 통째로 빠져 옛 프롬프트와 같은 모양이 된다(옛 호출처 호환).
+    화면이 보낸 dict 를 **그대로 싣지 않는다** -- `TalkState` 로 한 번 접어 스키마 밖 키를
+    떨군다(화면·중간자가 프롬프트에 임의 문장을 끼워 넣는 통로를 막는다). 접다 실패하면
+    (형식이 깨진 값) 없는 것으로 친다 -- 그 사실은 호출부가 로그로 남긴다.
     """
-    # 라벨만 주면 모델은 '배그'가 어느 용도인지 알 방법이 없어 **추론한다**(실측:
-    # 「배그 하고 싶어요」 -> 용도 «게임», 정본은 «고사양 게임»). 정본이 이미 그 답을
-    # 갖고 있으므로(`match_terms`) 라벨과 함께 넘긴다 -- 여기 목록을 박지 않는다.
-    usage_line = " / ".join(
-        "%s(%s)" % (lab, ", ".join(terms)) if terms else lab for lab, terms in usage_rows
-    ) if usage_rows else "(지금 정의된 용도가 없다)"
-    # 예시도 표에서 뽑는다 -- '배그 -> 고사양 게임' 을 문자열로 박으면 표에서 그 말이
-    # 빠진 날 프롬프트만 옛 어휘로 가르친다(이 파일이 오늘 고친 병과 같은 모양이다).
-    # 고를 때는 «이름과 안 닮은» 말을 먼저 본다(글자가 하나도 안 겹치는 것) --
-    # '고사양게임 -> 고사양 게임' 처럼 띄어쓰기만 다른 예시는 아무것도 안 가르친다.
-    pairs = [(lab, t) for lab, terms in usage_rows for t in terms if t != lab]
-    ex = next((p for p in pairs if not (set(p[1]) & set(p[0]))), None) or (
-        pairs[0] if pairs else None)
-    ex_line = ('   예: 문장에 "%s" 가 있으면 값은 "%s" 로 적는다.' % (ex[1], ex[0])) if ex else None
-    # 표에 어휘가 하나도 없으면 예시가 없다 -- 그 줄만 빠진다(문단 사이 빈 줄 ""은 남긴다).
-    # 이력 문단(A-128 ②) -- 이력이 있을 때만 붙는다. 없으면 None 줄들이라 빠진다.
-    hist_lines: list = []
-    if history:
-        hist_lines = [
-            "[지금까지의 대화 -- 오래된 것부터]",
-            *("%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in history),
-            "",
-            "[이력 규칙]",
-            "- constraints 에는 **이력에서 이미 읽힌 조건 전부 + 이번 문장에서 새로 읽힌 것**을"
-            " 합쳐 «누적 조건 전체»로 낸다. 화면은 이 목록을 그대로 쓴다 -- 이전 것을 빼면"
-            " 고객이 말한 조건이 사라진다.",
-            "- 같은 라벨을 이번 문장이 새 값으로 바꿨으면(예: 예산을 고쳐 말함) 새 값 하나만 낸다.",
-            "- 고객이 이미 말한 것을 reply 에서 다시 묻지 않는다.",
-            "",
-        ]
-    return "\n".join(ln for ln in [
-        "당신은 PC 견적 상담의 «입력 파서이자 상담원»이다. 고객 문장을 세 가지로만 바꾼다 --",
-        "① 이 문장이 PC 상담인가(pc) ② 문장에서 읽히는 구조화 조건(constraints)",
-        "③ 고객에게 할 한두 문장(reply).",
+    if not prev:
+        return _NO_PREV_STATE
+    try:
+        st = TS.TalkState.model_validate(prev)
+    except Exception:                                    # noqa: BLE001
+        return _NO_PREV_STATE
+    return json.dumps(st.model_dump(), ensure_ascii=False)
+
+
+def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
+                  history: list | None = None) -> str:
+    """매 요청마다 접는다 -- 격자 어휘(티어·등급·확정 게임·용도)가 DB 에서 바뀌면 다음
+    요청부터 반영된다. 골격은 설계서 §9(docs/design/talk-grid-guide-redesign-2026-09-16.md).
+
+    문단 순서: 역할 -> [절대 금지] -> [출력 형식](§4 스키마) -> [격자 4문단](talk_schema.
+    vocab_prompt_block, 어휘는 전부 DB) -> [pc 판정] -> [규칙] -> [reply 규칙] ->
+    [이전까지 파악한 상태] -> [대화 이력] -> [이번 문장].
+
+    ⚠ [pc 판정]과 [절대 금지] 문단은 옛 프롬프트(2026-08-17~09-11)의 것을 **그대로**
+    옮겼다 -- 그 둘은 실측으로 잘 되던 부분이라 손대지 않는다(재설계 지시).
+
+    `history` 는 `_trim_history` 를 거친 [(role, text)]. 비었으면 «(없음)» 한 줄만 남는다.
+    `prev_state` 는 화면이 되돌려 보낸 이전 턴 state(dict) -- 없으면 첫 문장이다.
+    """
+    hist_lines: list = (
+        ["%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in history]
+        if history else ["(없음)"]
+    )
+    return "\n".join([
+        "당신은 PC 견적 상담원이다. 고객 말을 듣고 아래 «격자»의 어느 칸인지 판단한다 --",
+        "견적·부품·가격은 말하지 않는다(다른 시스템이 한다). 출력은 ① 이 문장이 PC 상담인가(pc)",
+        "② 누적 상태(state) ③ 아직 비어 있는 좌표(missing) ④ 판단 근거(evidence)",
+        "⑤ 고객에게 할 한두 문장(reply) -- 다섯뿐이다.",
         "",
         "[절대 금지]",
         "- 부품 이름·가격·후보 수·견적을 말하지 않는다. 그것은 다른 시스템이 한다.",
-        "- 문장에 없는 예산·용도·선호·플랫폼·제외를 만들지 않는다. 없으면 그 항목을 아예 빼라.",
+        "- 문장에 없는 예산·용도·선호·플랫폼·제외를 만들지 않는다. 없으면 null 또는 빈 배열로 둔다.",
         "- 문장이 모순되어도(예: 예산은 낮은데 최고 사양 요구) 한쪽을 지우지 않는다."
         " 읽히는 대로 둘 다 넣는다.",
-        "- 추측·보완·친절한 해석을 하지 않는다. 적힌 것만 옮긴다.",
+        "- 추측·보완·친절한 해석을 하지 않는다. 적힌 것만 옮긴다(예외는 아래 [규칙]의 게임 등급"
+        " 추정 하나뿐이다).",
         "",
         "[출력 형식] JSON 하나만 출력한다. 설명·코드블록·앞뒤 문장을 붙이지 않는다.",
-        '{"pc":true,"constraints":[{"l":"라벨","v":"값"}],"reply":"고객에게 할 말"}',
-        "세 항목은 **언제나 함께** 넣는다. pc 는 true/false 중 하나이며 문자열이 아니다.",
-        "조건으로 읽을 것이 없으면 constraints 를 빈 목록으로 두되 pc 는 그대로 판정한다.",
+        "{",
+        '  "pc": true,',
+        '  "state": {',
+        '    "usages": ["게임", "영상편집"],       // 아래 [용도] 라벨 중 0~N개(해당하는 것 전부)',
+        '    "budget_won": 2000000,               // 원 단위 정수 | null. "150만"·"150" 은 1500000',
+        '    "budget_bound": null,                // "이상" | "이하" | null (고객이 그 말을 했을 때만)',
+        '    "platform": null,                    // "인텔" | "AMD" | null (CPU 계열을 직접 말했을 때만)',
+        '    "tier_key": null,                    // 비게임 용도의 성능 힌트. 아래 [성능 티어] 의 tier_key | null',
+        '    "game": {                            // usages 에 게임 계열이 있을 때만. 아니면 null',
+        '      "names": ["오버워치"],               // 고객이 말한 게임명 원문 0~N개',
+        '      "grade": "E",                      // 아래 [게임 부하 등급] 중 하나 | null',
+        '      "grade_src": "catalog",            // "catalog"(확정 목록) | "ai_estimate"(추정) | null',
+        '      "resolution": null                 // "1080p" | "1440p" | "4K" | null',
+        "    },",
+        f'    "exclude": [],                       // {" / ".join(vocab.excludes)} 중 0~N개',
+        f'    "prefs": []                          // {" / ".join(vocab.prefs)} 중 0~N개',
+        "  },",
+        f'  "missing": [],                         // 카드를 내기에 아직 비어 있는 좌표. {" / ".join(_MISSING_KEYS)} 중에서만',
+        '  "evidence": ["\'오버워치\'는 확정 목록에서 E"],   // 판단 근거 한 줄씩',
+        '  "reply": "고객에게 할 말"',
+        "}",
+        "다섯 항목은 **언제나 함께** 넣는다. pc 는 true/false 중 하나이며 문자열이 아니다.",
+        "모르는 값은 지어내지 말고 null(배열은 [])로 둔다.",
         "",
-        *hist_lines,
+        TS.vocab_prompt_block(vocab),
+        "",
         "[pc -- 이 문장이 PC 상담인가]",
         "여기는 PC(컴퓨터) 견적 상담 창구다. 고객은 컴퓨터를 사거나 고치러 온 사람이다.",
         "- true: 컴퓨터·부품·게임·용도·예산·구매·조립·업그레이드·호환·재고·배송·가격·A/S 중"
@@ -346,65 +410,63 @@ def _build_prompt(text: str, usage_rows: list, history: list | None = None) -> s
         "- false: PC 와 **분명히** 무관한 주제일 때만이다 -- 날씨·요리·연애·정치·건강·"
         "여행·번역·일반 지식 질문 등.",
         "- 애매하면 true 다. false 는 상담을 그 자리에서 끊는 판정이라 확실할 때만 쓴다.",
+        "- 이전 상태가 있고 이번 문장이 그것을 고치는 말이면(예산 변경·용도 추가) true 다.",
         "",
-        "[쓸 수 있는 라벨과 값 -- 이 목록 밖의 값은 쓰지 않는다]",
-        '1. l="예산"  v: "숫자만원" 형식. 예 "150만원".',
-        '   "이상"·"이하"는 고객이 실제로 그렇게 말했을 때만 붙인다'
-        '("150만원 이상", "100만원 이하").',
-        '   "쯤"·"정도"·"안팎"처럼 대략을 뜻하는 말은 경계가 아니다 -- 그냥 "150만원"으로 적는다.',
-        '   금액 앞에 마이너스(음수) 부호가 있으면 지우거나 "이하"로 바꿔 쓰지 말고 그대로'
-        ' 옮긴다(예: 고객이 "-500만원"이라 했으면 값도 "-500만원"으로 적는다). 부호가'
-        " 맞는 예산인지는 서버가 판단한다 -- 여기서 미리 해석하지 않는다.",
-        "   금액이 문장에 없으면 이 항목을 넣지 않는다.",
-        f'2. l="용도"  v: 다음 중에서만 고른다 -- {usage_line}',
-        "   **괄호 안은 그 용도를 가리키는 말이다**(서버 정본). 문장에 그 말이 있으면"
-        " 괄호가 아니라 **앞의 이름**을 값으로 적는다.",
-        ex_line,
-        "   여러 이름의 말이 함께 있으면 **문장이 실제로 하겠다는 쪽**을 적는다 --"
-        " 부정·제외된 말(\"~는 안 하고\" · \"~ 말고\")은 그 용도로 세지 않는다.",
-        "   둘 이상이면 \" · \" 로 잇는다. 목록에 없는 용도는 넣지 않는다.",
-        f'3. l="선호"  v: 다음 중에서만 고른다 -- {" / ".join(PREF_VALUES)}',
-        "   둘 다면 \"저소음 · 화이트\". 그 밖의 선호(성능·크기·브랜드 등)는 넣지 않는다.",
-        '4. l="부품"  v: 고객이 그래픽카드(GPU) 모델을 콕 집어 «넣어달라·사달라·로 맞춰달라»고'
-        ' 명시했을 때만 쓴다. 값은 문장에 쓰인 모델명 그대로 적는다(예: "RTX 4070 SUPER").',
-        "   \"4060이랑 4060 Ti 차이가 뭐야\" 같은 비교·시세 질문에는 쓰지 않는다 --"
-        " 그건 넣어 달라는 요청이 아니라 묻는 것이다.",
-        "   \"RTX 5070이면 배그 잘 돌아가요?\" 처럼 «~면 ~돼요/되나요/괜찮아요» 가정형으로"
-        " 성능·호환을 묻는 문장에도 쓰지 않는다 -- 이미 그 부품을 쓴다고 가정하고 묻는"
-        " 질문이지, 그 부품으로 바꿔 달라는 요청이 아니다.",
-        "   그래픽카드가 아닌 부품(CPU·SSD·메모리 등)은 아직 이 라벨로 다루지 않는다 -- 넣지 않는다.",
-        f'5. l="플랫폼"  v: 다음 중에서만 고른다 -- {" / ".join(PLATFORM_VALUES)}',
-        "   고객이 CPU 계열을 **직접 말했을 때만** 넣는다(\"라이젠\"·\"AMD로\" -> \"AMD\","
-        " \"인텔로\"·\"i5\"·\"i7\" -> \"인텔\"). 말하지 않았으면 **넣지 않는다** -- 기본값을"
-        " 여기서 정하지 않는다.",
-        f'6. l="제외"  v: 다음 중에서만 고른다 -- {" / ".join(EXCLUDE_VALUES)}',
-        "   고객이 견적에서 빼 달라고 한 것이다. 여럿이면 \" · \" 로 잇는다"
-        ' (예 "모니터 보유 · OS 제외 · 본체만").',
-        '   - "모니터는 있어요"·"모니터 빼고"·"모니터는 쓰던 거" -> "모니터 보유"',
-        '   - "윈도우 빼고"·"OS 없이"·"윈도우는 있어요" -> "OS 제외"',
-        '   - "본체만"·"본체 하나만"·"컴퓨터만" -> "본체만"',
-        "   고객이 그런 말을 하지 않았으면 넣지 않는다.",
+        "[규칙]",
+        "- state 는 **누적**이다. 이전까지 파악한 상태를 그대로 가져오고, 이번 문장이 바꾼 것만"
+        " 고친다. 이번 문장에 없다고 이전 값을 지우지 않는다.",
+        "- 용도가 여럿이면 usages 에 **전부** 넣는다(게임도 하고 편집도 하면 둘 다).",
+        "  [용도] 괄호 안의 말이 문장에 있으면 **그 라벨**을 쓴다(서버 정본 어휘). 부정·제외된"
+        " 말(\"~는 안 하고\")은 그 용도로 세지 않는다.",
+        "  게임 계열 라벨(게임·고사양 게임·캐주얼 게임)이 괄호로 안 정해지면 고객이 말한 게임의"
+        " 등급으로 가늠한다 -- 애매하면 \"게임\".",
+        "- game 은 usages 에 게임 계열이 있을 때만 채운다. names 에는 고객이 말한 게임명을"
+        " 원문 그대로(줄임말이면 줄임말 그대로) 넣는다.",
+        "- 게임이 [우리가 등급을 확정한 게임] 목록에 있으면 그 등급을 쓰고 grade_src=\"catalog\"."
+        " 목록에 없는 게임이거나 게임명 없이 «대작·최신 게임·다 돌리고 싶다» 같은 말이면 위"
+        " 등급 설명으로 추정하고 grade_src=\"ai_estimate\". 목록에 여러 게임이 걸리면 가장"
+        " 무거운 등급을 쓴다.",
+        "- 게임 계열인데 게임명도 등급을 가늠할 말도 없으면 grade=null 로 두고 missing 에"
+        f" \"{TS.MISSING_GAME_GRADE}\" 를 적는다.",
+        "- 해상도(game.resolution)는 문장에 **모니터·해상도·주사율** 언급이 있을 때만 채운다"
+        " (\"1440p\"·\"QHD\" -> \"1440p\", \"4K\"·\"UHD\" -> \"4K\", \"FHD\"·\"1080p\" -> \"1080p\")."
+        " 없으면 null -- 서버가 기본값을 정한다. 지어내지 않는다.",
+        "- tier_key 는 비게임 용도에서 고객 말이 성능 수준을 가리킬 때만(예: \"4K 편집\"·"
+        "\"가볍게 문서만\") [성능 티어] 설명을 보고 고른다. 가늠할 말이 없으면 null.",
+        "- budget_won 은 원 단위 정수다. \"150만\"·\"150\"(만원 생략)·\"백오십\" -> 1500000."
+        " 금액이 문장에 없으면 이전 값 유지, 이전에도 없으면 null.",
+        f"- usages 가 비었으면 missing 에 \"{TS.MISSING_USAGES}\" 를 적는다. missing 은"
+        f" {' / '.join(_MISSING_KEYS)} 둘 중에서만 고른다 -- 해상도·예산은 missing 이 아니다.",
+        "- 문장에 없는 것을 만들지 않는다. 판단 근거를 evidence 에 한 줄씩 적는다(게임명->등급,"
+        " 용도 판단, 티어 힌트 근거 등).",
         "",
-        "[reply -- 고객에게 할 한두 문장 · 다섯 규칙]",
-        "① 조건을 하나라도 읽었으면 **무엇을 알아들었는지 확인**하는 문장으로 쓴다"
-        ' (예 "150만원 게임용으로 찾아볼게요").',
-        "② 조건을 하나도 못 읽었으면 고객이 한 말의 **맥락을 받아 구체적으로** 되묻는다"
-        ' (예 "친구가 쓰는 거 비슷한 거" -> "친구분 PC로 주로 뭐 하시나요?").'
-        ' "무엇을 도와드릴까요?" 같은 일반 문장은 쓰지 않는다.',
-        "③ 이력에 이미 있는 것을 다시 묻지 않는다.",
-        "④ 수치·부품명·가격·후보 수를 **지어내지 않는다** -- \"RTX 4070이 좋아요\" 같은 추천·"
-        "평가 금지. 조건 확인과 되묻기만 한다. 고객이 말한 숫자·이름을 그대로 되짚는 것은 된다.",
+        "[reply -- 고객에게 할 한두 문장]",
+        "① missing 이 있으면 **그중 하나만** 자연스럽게 되묻는다(예: 게임 등급이 비었으면"
+        ' "주로 어떤 게임 하세요?").',
+        "② missing 이 없으면 **무엇을 알아들었는지 확인**하는 문장으로 쓴다"
+        ' (예 "오버워치 위주 게임용으로 찾아볼게요").',
+        "③ 이력·이전 상태에 이미 있는 것을 다시 묻지 않는다.",
+        "④ 수치·부품명·가격·후보 수·등급 이름을 **지어내지 않는다** -- \"RTX 4070이 좋아요\" 같은"
+        " 추천·평가 금지. 고객이 말한 숫자·이름을 그대로 되짚는 것은 된다.",
         "⑤ 반말 금지 -- 존댓말(~요·~세요)로 쓴다. 두 문장을 넘기지 않는다.",
         "pc 가 false 이면 reply 는 비워도 된다(서버가 안내 문장을 대신 넣는다).",
         "",
-        "[고객 문장]",
+        "[이전까지 파악한 상태]",
+        _prev_state_json(prev_state),
+        "",
+        "[대화 이력 -- 오래된 것부터]",
+        *hist_lines,
+        "",
+        "[이번 문장]",
         text,
-    ] if ln is not None)
+    ])
 
 
 def _norm_budget(v: str):
     """예산 값 정규화 -- (값, None) 또는 (None, 사유).
 
+    ⚠ 도헤드(dead, 2026-09-16) -- 여기부터 `_validate` 까지 옛 constraints 경로 전용.
+    새 경로의 예산 검증은 `talk_schema._pick_budget`(원 단위 정수). 상단 도헤드 구역 주석 참조.
     ⚠ 음수는 여기서 걸러 dropped로 돌려준다(위 `_BUDGET_NEG` 참고) -- 부호를 지우고
     양수로 고쳐 쓰지 않는다.
     """
@@ -522,8 +584,11 @@ def _extract_json(raw: str) -> dict:
     return obj
 
 
-def _reply_text(obj: dict, pc, kept: list) -> str:
+def _reply_text(obj: dict, pc, kept) -> str:
     """모델이 낸 reply -> 고객에게 보일 한 문장(A-128 ②).
+
+    `kept` 는 「조건을 하나라도 읽었는가」의 진릿값이면 된다 -- 옛 경로는 constraints
+    목록을, 새 경로(2026-09-16)는 «state 에 용도가 있는가»를 넘긴다.
 
     - pc 가 False 면 모델 문장을 **쓰지 않고** `REPLY_NOT_PC` 로 고정한다 -- 잡담에
       모델이 잡담으로 답하는 것(날씨 알려주기 등)을 구조적으로 막는다.
@@ -562,6 +627,9 @@ def _pc_verdict(obj: dict):
 
 def _validate(raw_items, usages: list) -> tuple:
     """모델이 준 목록 -> (반영할 제약, 버린 것 + 사유).
+
+    ⚠ 도헤드(dead, 2026-09-16) -- 옛 constraints 경로의 검증층. 새 경로는
+    `talk_schema.validate_state`. 상단 도헤드 구역 주석 참조. 도헤드 구역은 여기서 끝난다.
 
     **버린 것을 삼키지 않는다** -- 사유와 함께 돌려줘 화면이 말할 수 있게 한다.
     """
@@ -616,39 +684,88 @@ def _validate(raw_items, usages: list) -> tuple:
     return kept, dropped
 
 
+def _legacy_constraints(state: "TS.TalkState") -> list:
+    """state -> 옛 «{l, v}» constraints 배열(하위호환 전용).
+
+    소비처는 `mockups/mvp1/s1-session.html` 의 `srvParse` 하나뿐이다(grep 2026-09-16 --
+    `x.d.constraints||[]`). mvp2(app.js)는 `state` 를 읽는다. 그 화면이 걷히면 이 함수와
+    응답의 `constraints` 키를 함께 지운다. 옛 라벨 6종 중 「부품」은 새 스키마에 자리가 없어
+    안 나온다. 옛 표기 규약(예산 "1,500만원 이하" · 여럿은 " · " 로 잇기)은 그대로 흉내 낸다.
+    """
+    out: list = []
+    if state.budget_won:
+        v = format(state.budget_won // 10000, ",") + "만원"
+        if state.budget_bound:
+            v += " " + state.budget_bound
+        out.append({"l": "예산", "v": v})
+    if state.usages:
+        out.append({"l": "용도", "v": " · ".join(state.usages)})
+    if state.prefs:
+        out.append({"l": "선호", "v": " · ".join(state.prefs)})
+    if state.platform:
+        out.append({"l": "플랫폼", "v": state.platform})
+    if state.exclude:
+        out.append({"l": "제외", "v": " · ".join(state.exclude)})
+    return out
+
+
+def _evidence_lines(obj: dict) -> list:
+    """모델의 evidence -> 문자열 목록. 형식이 틀리면 빈 목록(판단 근거는 표시용이라 502 사유가
+    아니다). 줄 하나의 길이는 REPLY_MAX_LEN 으로 자른다 -- 로그·화면 표시용 문자열이다."""
+    ev = obj.get("evidence")
+    if isinstance(ev, str):
+        ev = [ev]
+    if not isinstance(ev, list):
+        return []
+    return [e.strip()[:REPLY_MAX_LEN] for e in ev if isinstance(e, str) and e.strip()][:12]
+
+
 @router.post("/parse")
 def parse_talk(body: ParseBody, request: Request):
-    """고객 문장 -> (PC 상담인가) + 조건 목록. 부품·가격·후보 수는 말하지 않는다(A-01·A-02).
+    """고객 문장 -> (PC 상담인가) + 격자 좌표(state). 부품·가격·후보 수는 말하지 않는다(A-01·A-02).
 
-    화면은 **모든 문장**을 이 경로로 보낸다(2026-08-17 결정 뒤집기 -- 모듈 docstring).
-    실패는 502로 올라가고 화면은 "AI가 조건으로 못 읽었다"고 밝히며 정규식 결과만
-    반영한다 -- 조건을 지어내지 않는다.
+    2026-09-16 「격자 안내」 재설계(docs/design/talk-grid-guide-redesign-2026-09-16.md §7).
+    AI 는 «키워드 추출기»가 아니라 «격자의 어느 칸인지 가리키는 안내자»다 -- 출력은 격자
+    좌표(usages · tier_key · game.grade/resolution · budget …)이고, 서버는 그 좌표가 DB
+    어휘 안인지만 확인한다(`talk_schema.validate_state`). 등급의 정본은 DB 다 -- 게임명이
+    확정 목록에 있으면 AI 가 뭐라 했든 DB 등급으로 덮어쓴다(그 층이 한다).
 
-    ■ 응답이 «반송해야 하는 문장»과 «조건이 없는 문장»을 가른다
+    화면은 **모든 문장**을 이 경로로 보낸다(2026-08-17 결정 -- 모듈 docstring). 실패는
+    502로 올라가고 화면은 "AI가 조건으로 못 읽었다"고 밝힌다 -- 조건을 지어내지 않는다.
+
+    ■ state 는 누적이다
+      화면이 이전 턴의 `state` 를 되돌려 보내고, 모델은 「이전 state + 이번 문장」 -> 「새
+      state」 를 낸다. 서버는 이전 state 를 프롬프트에 실을 뿐 저장하지 않는다(consult_sessions
+      를 안 쓰는 것은 그대로).
+
+    ■ 응답이 «반송해야 하는 문장»과 «좌표가 모자란 문장»을 가른다
       `pc_related` 가 **`false` 일 때만** 화면이 「PC 상담 전용」 안내로 반송한다.
-      `true` 이고 `constraints` 가 비었으면 그것은 「PC 얘기지만 조건이 없다」이고
-      (예: "그냥 좋은 거 추천해주세요") 화면은 무엇을 말해 주면 되는지 안내한다.
-      `null` 은 **모름**이다 -- 반송하지 않는다. 502(전 프로바이더 실패·한도·키 없음)
-      도 마찬가지로 판정이 아니다. 이 셋을 한 응답으로 뭉개면 정상 문의가 끊긴다.
+      `true` 이고 `missing` 이 비어 있지 않으면 「PC 얘기지만 카드를 내기엔 모자란다」이고,
+      그때 고객에게 보이는 문장은 언제나 모델의 `reply`(되묻기)다 -- 서버 내부 사유를
+      말풍선에 싣지 않는다(설계서 §7 「되묻기는 AI 만 한다」). `null` 은 **모름**이다 --
+      반송하지 않는다. 502 도 판정이 아니다.
 
     ■ 방문자별 호출 횟수 제한 (2026-08-17 사장님 확정 -- 세 구멍 중 ②)
       이 경로는 인증 요구가 0 이라 **한 사람이 프로바이더 하루치(기본 일 500 · $2)를
       혼자 태울 수 있었다.** 축·한도·근거는 `api/access_gate` 에 한 벌로 있다
-      (여기서 다시 정의하지 않는다 -- CANON §1).
-      소유자 개념이 없는 자리라 403 은 없고 **429 만** 난다.
+      (여기서 다시 정의하지 않는다 -- CANON §1). 소유자 개념이 없는 자리라 403 은 없고
+      **429 만** 난다.
 
-    응답 규약(추가분)
-      200 {ok, constraints[], dropped[], pc_related: true|false|null, note, reply,
-           history_used, ...}
+    응답 규약
+      200 {ok, state{usages,budget_won,budget_bound,platform,tier_key,game{names,grade,
+           grade_src,resolution}|null,exclude,prefs}, missing[], dropped[{field,value,reason}],
+           evidence[], reply, assumed[], pc_related: true|false|null, note,
+           constraints[{l,v}](하위호환 -- mvp1 전용, `_legacy_constraints`),
+           history_used, provider, model, elapsed_sec, cost_usd, tokens_in, tokens_out, stored}
       429 {error:"rate_limited", scope:"visitor", window:"minute"|"day",
            used, limit, retry_after_sec, detail}  + `Retry-After` 헤더
+      502 {detail: 사유}  -- LLM 한도·전 프로바이더 실패·설정 없음·응답이 JSON 이 아님
 
-    ■ A-128 ② (2026-09-11) -- 이력·reply·라벨 2종(플랫폼·제외)
-      `body.history` 가 있으면 최근 `HISTORY_MAX_TURNS` 턴을 프롬프트에 싣고 모델에게
-      «이력의 조건 + 이번 문장의 조건 = 누적 전체»를 내게 한다 -- 화면이 매번 합치지
-      않는다. 없으면(None) 옛 호출처와 똑같이 stateless 다. `reply` 는 같은 호출에서
-      모델이 만든 고객 문장(확인 또는 맥락 되묻기)이고, pc=false 면 서버 고정 안내다.
-      호출 횟수는 그대로 1회다.
+    ■ assumed
+      게임 계열인데 `game.resolution` 이 null 이면 서버가 1080p 로 카드를 낸다(§6 ③). 그
+      사실을 `assumed:["game.resolution=1080p"]` 로 밝힌다 -- state 자체는 null 그대로 둔다
+      (고객이 말한 것과 서버가 가정한 것을 섞지 않는다 -- 격자 조회가 같은 기본값을 쓴다).
+      ⚠ `missing` 이 비어 있을 때만 낸다 -- 카드를 안 내는 턴에 가정을 말하지 않는다.
     """
     text = (body.text or "").strip()
     if not text:
@@ -657,19 +774,24 @@ def parse_talk(body: ParseBody, request: Request):
         raise HTTPException(400, f"문장이 너무 깁니다(최대 {MAX_TEXT_LEN}자)")
 
     # 입력 검사 뒤 · LLM 호출 앞. 형식이 틀린 요청(400)은 비용이 없어 세지 않는다.
+    # 격자 어휘도 같은 연결에서 읽는다 -- 매 요청 DB 에서(정본은 DB, 캐시 없음).
     with engine.connect() as conn:
         access_gate.check_rate(conn, request, what="talk.parse")
+        vocab = TS.load_vocab(conn)
 
-    usage_rows = _usage_rows()
-    usages = [lab for lab, _terms in usage_rows]
     history = _trim_history(body.history)
-    prompt = _build_prompt(text, usage_rows, history)
+    prev_ok = bool(body.state) and _prev_state_json(body.state) != _NO_PREV_STATE
+    if body.state and not prev_ok:
+        # 화면이 보낸 이전 state 가 스키마로 안 접힌다 -- 첫 문장처럼 다룬다. 삼키지 않고
+        # 로그에 남긴다(문장·값은 찍지 않는다 -- 키 수만).
+        log.warning("[talk] prev state rejected (keys=%d) - treated as none", len(body.state))
+    prompt = _build_prompt(text, vocab, body.state if prev_ok else None, history)
     # 문장 자체는 로그에 남기지 않는다(원문 비적재 규약) -- 길이만 남긴다.
-    # terms 는 프롬프트에 실린 정본 어휘 수다 -- 표가 늘면 프롬프트도 길어지므로
+    # games/usages/tiers 는 프롬프트에 실린 격자 어휘 수 -- 표가 늘면 프롬프트도 길어지므로
     # (비용) 여기서 세어 둔다. 어휘 자체는 찍지 않는다(로그는 ASCII 기호만).
-    # hist 는 프롬프트에 실린 이력 턴 수(잘라낸 뒤) -- 이력 문장도 찍지 않는다.
-    log.info("[talk] parse request: chars=%d usages=%d terms=%d hist=%d", len(text),
-             len(usages), sum(len(t) for _lab, t in usage_rows), len(history))
+    log.info("[talk] parse request: chars=%d usages=%d games=%d tiers=%d hist=%d prev=%s",
+             len(text), len(vocab.usages), len(vocab.confirmed_games), len(vocab.tiers),
+             len(history), "yes" if prev_ok else "no")
 
     try:
         result = llm.call(prompt, task_key="task.s1_parse", customer_facing=True,
@@ -693,64 +815,67 @@ def parse_talk(body: ParseBody, request: Request):
                     result.provider, result.model, e)
         raise HTTPException(502, f"AI 응답을 조건으로 읽지 못했습니다 - {e}")
 
-    kept, dropped = _validate(obj.get("constraints"), usages)
+    # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
+    state, dropped = TS.validate_state(obj.get("state") or {}, vocab)
+    # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
+    # "game.resolution" 처럼 계약 밖 좌표를 적어도 카드가 막히지 않게).
+    missing = TS.missing_for(state, vocab)
+    # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
+    # 2026-09-16). missing 이 있으면 카드가 안 나가는데 「1080p 가정」 배지가 붙는 것은
+    # 앞서 가는 말이다 -- 되묻는 턴에는 가정도 없다.
+    assumed: list = []
+    if not missing and state.game is not None and state.game.resolution is None:
+        assumed.append(f"game.resolution={TS.DEFAULT_RESOLUTION}")
     pc = _pc_verdict(obj)
-    reply = _reply_text(obj, pc, kept)
-    log.info("[talk] parse done: provider=%s pc=%s kept=%d dropped=%d reply_chars=%d elapsed=%.2fs",
+    reply = _reply_text(obj, pc, bool(state.usages))
+    evidence = _evidence_lines(obj)
+    log.info("[talk] parse done: provider=%s pc=%s usages=%d game=%s missing=%d dropped=%d"
+             " reply_chars=%d tokens_in=%s elapsed=%.2fs",
              result.provider, "none" if pc is None else ("yes" if pc else "no"),
-             len(kept), len(dropped), len(reply), result.elapsed_sec)
+             len(state.usages),
+             "none" if state.game is None else f"{state.game.grade}/{state.game.grade_src}",
+             len(missing), len(dropped), len(reply), result.tokens_in, result.elapsed_sec)
     if pc is None:
         # 삼키지 않는다 -- 판정을 못 얻은 것도 사실이므로 로그에 남긴다. 화면은 이때
         # 반송하지 않고 「조건이 없다」쪽으로만 안내한다(정상 문의를 끊지 않는다).
         log.warning("[talk] no pc verdict in response from %s/%s - treated as unknown",
                     result.provider, result.model)
 
-    # 「PC 아님」과 「PC 얘기지만 조건이 없다」는 **다른 사실**이라 다른 문장을 준다.
-    # 이 note 는 화면 상단 진행 바가 그대로 읽어 쓴다(shared/ui-progress.js okText).
-    #
-    # ⚠ 2026-08-23 A-105 결함 수정 -- «판정을 지우는 것이 아니라 고객에게 보여줄
-    # 문구만 안 내는 것»이다. `body.intent_key`가 있으면 화면이 TALKS 매칭으로
-    # «이미 정본 답을 고른» 문장이라는 뜻이다(예: intent_key="as_warranty" +
-    # "보증 어떻게 되나요"). 그 정본 A/S 답변이 화면에 나가는데 이 note 가 동시에
-    # "PC 상담 문장이 아니다"·"조건으로 읽을 수 있는 내용이 없다"를 띄우면 한
-    # 화면이 두 가지 말을 한다(확인자 실재현 -- 반송 게이트를 고쳐 정본 답이 정상
-    # 출력된 뒤에도 상단 토스트가 반송 문구를 띄웠다). `pc_related` 는 그대로
-    # 싣는다 -- 그건 내부 판정이고 화면의 다른 반송 로직과 아래 `_record_hit`
-    # 원장 기록이 여전히 그 값을 쓴다. 지우는 것은 **note(고객 문구) 하나뿐**이고,
-    # `intent_key` 가 없을 때(진짜 잡담·조건 미해석)는 이 분기를 타지 않아 문구가
-    # 그대로 나간다.
+    # note -- 상단 진행 바(shared/ui-progress.js okText)가 읽는 서버 내부 사유. **고객
+    # 말풍선에는 싣지 않는다**(설계서 §7 -- 결함 ④: 되묻기는 AI 의 reply 만 한다).
+    # A-105(2026-08-23): `intent_key` 가 있으면 화면이 이미 정본 답을 골랐으므로 문구를 비운다.
     if body.intent_key:
         note = None
-    elif pc is False and not kept:
+    elif pc is False and not state.usages:
         note = "PC 상담 문장이 아니라고 판정했습니다."
-    elif not kept:
-        note = "조건으로 읽을 수 있는 내용이 없습니다."
+    elif missing:
+        note = "카드를 내기엔 좌표가 아직 모자랍니다: " + ", ".join(missing)
     else:
         note = None
 
     # 질문을 원장에 남긴다(A-95). 실패해도 상담을 끊지 않는다 -- `_record_hit` 주석.
-    # 지금은 `talk_intents` 가 비어 있어 intent_key 가 NULL 로 들어간다 -- 그것이
-    # 「우리가 아직 답을 못 만든 질문」이고 이 표의 존재 이유다.
+    # matched_terms 에는 채워진 좌표 이름을 남긴다(옛 경로의 라벨 목록과 같은 자리).
+    filled = [k for k, v in state.model_dump().items() if v not in (None, [], {})]
     with engine.begin() as conn:
-        _record_hit(conn, request=request, text_raw=text, matched=[l for l, _v in
-                    [(c["l"], c["v"]) for c in kept]], unmatched_n=len(dropped),
-                    intent_key=body.intent_key, answer_kind="constraint_parse", llm_called=True)
+        _record_hit(conn, request=request, text_raw=text, matched=filled,
+                    unmatched_n=len(dropped), intent_key=body.intent_key,
+                    answer_kind="constraint_parse", llm_called=True)
 
+    parsed = TS.ParseResult(state=state, missing=missing, dropped=dropped, evidence=evidence,
+                            reply=reply, assumed=assumed, pc_related=pc)
     return {
         "ok": True,
-        "constraints": kept,
-        "dropped": dropped,
-        # true | false | null(모름). null 을 false 로 읽지 않는 것이 규약이다.
-        "pc_related": pc,
+        **parsed.model_dump(),
+        # 하위호환 -- mvp1(s1-session.html `srvParse`)이 아직 옛 모양을 읽는다. mvp2 는 `state`.
+        "constraints": _legacy_constraints(state),
         "note": note,
-        # A-128 ② -- 고객에게 보일 한두 문장(같은 호출에서 모델이 만든 것 · pc=false 면
-        # 서버 고정 안내). 옛 호출처는 이 키를 읽지 않으므로 그대로 무시된다.
-        "reply": reply,
-        # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 화면이 «누적 조건 전체»를 받았는지
-        # 판단할 근거 -- 0 이면 이력 없이 판정한 응답이다.
+        # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 0 이면 이력 없이 판정한 응답이다.
         "history_used": len(history),
         "provider": result.provider, "model": result.model,
         "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
+        # 프롬프트가 격자 설명서만큼 길어졌다(설계서 §10 「토큰 수 실측」) -- 화면·확인자가
+        # 비용을 볼 수 있게 토큰 수도 싣는다. None 이면 프로바이더가 안 준 것이다.
+        "tokens_in": result.tokens_in, "tokens_out": result.tokens_out,
         # A-95 로 «표에는» 남긴다(talk_intent_hits · 마스킹 후). 이 필드가 뜻하는 것은
         # 여전히 「이 응답이 상담 원장(consult_sessions)을 만들지 않았다」이다.
         "stored": False,
