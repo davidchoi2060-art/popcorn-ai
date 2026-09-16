@@ -33,6 +33,28 @@
 ■ 칸 상세의 `in_stock`은 **지금 재고를 실조회**한 값이다(payload 저장 시점의
   재고가 아니다) — 견적 생성 뒤 품절될 수 있어, 저장된 값을 그대로 믿으면 이미
   틀린 사실을 말하게 된다.
+
+■ 2026-09-16 승인 디자인(dc-grid-admin-2026-09-16.html) 반영 — `/grid` 응답에
+  다섯 필드 추가(기존 필드는 손대지 않았다):
+  · `tiers[].floor`      스펙 티어 행 머리의 하한 요약 문자열(`spec_tiers` 실컬럼
+                         조합, `_tier_floor_text()`) — 원안이 TIERS 배열의 하드코딩
+                         `floor` 텍스트로 보여주던 것을 서버 값으로 대체.
+  · `game_grades[].game_count`  등급별 배정 게임 수(`game_grade_assignments`
+                         실카운트) — 원안 GRADES 배열의 `games.length`를 대체.
+  · `cells[].game_gpu_tier_key` / `cells[].game_cpu_tier_key_override`
+                         게임 칸의 GPU/CPU 스펙 티어(`game_grade_resolution_tiers`
+                         조인) — 목록 표에서 S등급 칸을 GPU/CPU 분리 표기하려면
+                         상세 조회 전에도 이 값이 필요하다(원안 §④ isSplit 분기).
+  · `cells[].variants_present`  이 칸에 실제로 존재하는 tier_variant 목록(부분
+                         집합일 수 있다 — 배치 실패로 3종 중 일부만 있을 수 있음).
+                         목록 칸의 점 3개(`d1`/`d2`/`d3`)가 지어낸 값이 아니라
+                         이 배열의 존재 여부를 그대로 그리게 한다.
+  · `unassigned_games`   `game_grade_assignments.grade IS NULL`인 게임(GTA 1건)
+                         — 정의서 §⑦ 참고 정보, 강제 아님.
+  · `game_info.grade_label` / `game_info.grade_note`(`/grid/cells/{id}`)
+                         등급 자체의 명칭·판정 사유(`game_load_grades` 조인) —
+                         기존엔 등급×해상도의 note만 있었고 "왜 이 등급인가"라는
+                         등급 레벨 근거가 빠져 있었다(원안 §165-174 게임 서랍).
 """
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
@@ -74,6 +96,13 @@ def _cell_label(tier_key, usage, game_grade, game_resolution,
     return f"{tier_names.get(tier_key, tier_key)} · {usage}"
 
 
+def _tier_floor_text(row: dict) -> str:
+    """스펙 티어 행 머리에 쓰는 하한 요약 — spec_tiers 실컬럼만 쓴다(지어내지 않는다).
+    T0는 gpu_vram_min_gb/gpu_watt_min이 실제로 NULL(0091 CHECK 제약)이라 'GPU 하한 없음'."""
+    gpu = f"VRAM {row['gpu_vram_min_gb']}GB" if row["gpu_vram_min_gb"] is not None else "GPU 하한 없음"
+    return f"{gpu} · {row['cpu_cores_min']}코어 · RAM {row['ram_min_gb']}GB · SSD {row['ssd_min_gb']}GB"
+
+
 @router.get("/grid")
 def grid():
     """격자 전체 — 칸 108개(현재 스키마 기준, 지어내지 않는다: 실제로는 매 요청
@@ -83,30 +112,59 @@ def grid():
         cells = conn.execute(text(
             "SELECT c.cell_id, c.tier_key, c.usage, c.game_grade, c.game_resolution,"
             " c.platform, c.budget_min, c.budget_max, c.intended_empty,"
-            " q.quote_id, q.batch_id, q.generated_at, q.total, q.verdict, q.status"
+            " q.quote_id, q.batch_id, q.generated_at, q.total, q.verdict, q.status,"
+            " t.gpu_tier_key AS game_gpu_tier_key,"
+            " t.cpu_tier_key_override AS game_cpu_tier_key_override"
             " FROM grid_cells c"
             " LEFT JOIN grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
             "   AND q.tier_variant = :rv"
+            " LEFT JOIN game_grade_resolution_tiers t"
+            "   ON t.grade = c.game_grade AND t.resolution = c.game_resolution"
             " ORDER BY c.cell_id"
         ), {"rv": REPRESENTATIVE_VARIANT}).mappings().all()
 
+        # 칸별 3종(가성비/추천/고성능) 존재 여부 — 목록 표의 점 3개가 쓴다.
+        # 대표본(추천) 외 나머지 두 종은 여기서만 "있다/없다"를 판정하고 상세는 내려주지
+        # 않는다(상세는 /grid/cells/{id}가 전담 — 목록 응답을 3배로 부풀리지 않는다).
+        variant_rows = conn.execute(text(
+            "SELECT cell_id, tier_variant FROM grid_quotes WHERE is_current"
+        )).all()
+        variants_by_cell: dict[int, set] = {}
+        for row_cell_id, row_variant in variant_rows:
+            variants_by_cell.setdefault(row_cell_id, set()).add(row_variant)
+
         tier_rows = conn.execute(text(
-            "SELECT tier_key, popcorn_name FROM spec_tiers ORDER BY sort_order"
+            "SELECT tier_key, popcorn_name, gpu_vram_min_gb, cpu_cores_min,"
+            " ram_min_gb, ssd_min_gb FROM spec_tiers ORDER BY sort_order"
         )).mappings().all()
         tier_names = {t["tier_key"]: t["popcorn_name"] for t in tier_rows}
-        tiers_out = [{"tier_key": t["tier_key"], "name": t["popcorn_name"]}
-                     for t in tier_rows]
+        tiers_out = [{"tier_key": t["tier_key"], "name": t["popcorn_name"],
+                      "floor": _tier_floor_text(t)} for t in tier_rows]
 
+        # 등급별 배정 게임 수 — 행 머리의 "배정 N종"(실카운트, game_grade_assignments).
+        grade_counts = dict(conn.execute(text(
+            "SELECT grade, count(*) FROM game_grade_assignments"
+            " WHERE grade IS NOT NULL GROUP BY grade"
+        )).all())
         grade_rows = conn.execute(text(
             "SELECT grade, label FROM game_load_grades ORDER BY sort_order"
         )).mappings().all()
         grade_labels = {g["grade"]: g["label"] for g in grade_rows}
-        grades_out = [{"grade": g["grade"], "label": g["label"]} for g in grade_rows]
+        grades_out = [{"grade": g["grade"], "label": g["label"],
+                       "game_count": grade_counts.get(g["grade"], 0)} for g in grade_rows]
 
         usages = conn.execute(text(
             "SELECT DISTINCT usage FROM grid_cells WHERE usage <> '게임'"
             " ORDER BY usage"
         )).scalars().all()
+
+        # 미배정 게임(grade IS NULL) — 등급 격자에 나타나지 않는 게임을 참고로 노출
+        # (정의서 §⑦ · GTA 1건, 강제 아님 — 실제로 있으면 그대로 보여준다).
+        unassigned_games = conn.execute(text(
+            "SELECT g.name, a.note FROM game_grade_assignments a"
+            " JOIN games g ON g.game_id = a.game_id"
+            " WHERE a.grade IS NULL ORDER BY g.name"
+        )).mappings().all()
 
         target_total = conn.execute(text(
             "SELECT count(*) FROM grid_cells WHERE NOT intended_empty")).scalar_one()
@@ -138,6 +196,7 @@ def grid():
         "tiers": tiers_out,
         "game_grades": grades_out,
         "usages": list(usages),
+        "unassigned_games": [{"name": g["name"], "note": g["note"]} for g in unassigned_games],
         "cells": [{
             "cell_id": c["cell_id"], "tier_key": c["tier_key"],
             "usage": c["usage"], "game_grade": c["game_grade"],
@@ -147,6 +206,12 @@ def grid():
             "platform": c["platform"], "budget_min": c["budget_min"],
             "budget_max": c["budget_max"], "intended_empty": c["intended_empty"],
             "state": _cell_state(c, last_batch_id),
+            # 게임 칸만 채워진다(비게임은 tier_key로 이미 스펙을 안다) — S등급처럼
+            # GPU/CPU가 갈리는 칸을 목록에서도 구분해 보여주려고 조인해 둔 값.
+            "game_gpu_tier_key": c["game_gpu_tier_key"],
+            "game_cpu_tier_key_override": c["game_cpu_tier_key_override"],
+            "variants_present": sorted(variants_by_cell.get(c["cell_id"], set()),
+                                        key=VARIANTS.index),
             "quote": None if c["quote_id"] is None else {
                 "quote_id": c["quote_id"], "batch_id": c["batch_id"],
                 "generated_at": _iso(c["generated_at"]), "total": c["total"],
@@ -213,6 +278,9 @@ def grid_cell(cell_id: int):
                 "SELECT gpu_tier_key, cpu_tier_key_override, note"
                 " FROM game_grade_resolution_tiers WHERE grade=:g AND resolution=:r"),
                 {"g": grade, "r": resolution}).mappings().first()
+            grade_row = conn.execute(text(
+                "SELECT label, note FROM game_load_grades WHERE grade=:g"),
+                {"g": grade}).mappings().first()
             games = conn.execute(text(
                 "SELECT g.name FROM game_grade_assignments a"
                 " JOIN games g ON g.game_id = a.game_id"
@@ -222,6 +290,8 @@ def grid_cell(cell_id: int):
                 "gpu_tier_key": spec_row["gpu_tier_key"] if spec_row else None,
                 "cpu_tier_key_override": spec_row["cpu_tier_key_override"] if spec_row else None,
                 "note": spec_row["note"] if spec_row else None,
+                "grade_label": grade_row["label"] if grade_row else None,
+                "grade_note": grade_row["note"] if grade_row else None,
                 "games": list(games),
             }
 

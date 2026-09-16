@@ -5,13 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팝콘PC AI — 대화로 완성하는 견적</title>
 <!--
-  CUS-QUO-010 (가칭) — 대화형 견적 화면. 결정 로그 A-128(2026-09-11).
-  원안: temp/팝콘디자인적용/Popcorn AI 견적.dc.html (디자이너 · 팝콘 톤 적용본).
-  반입 시 걷어낸 것: Claude Design 편집기 런타임(디자인 툴 전용 부트스트랩 스크립트 · 커스텀 래퍼 태그 ·
-  React 외부 CDN · Google Fonts 링크). 실제 로직은 처음부터 순수 vanilla JS(app.js)라 껍데기만 벗겼다.
+  CUS-QUO-010 (가칭) — 대화형 견적 화면. 결정 로그 A-128(2026-09-11) → A-135 격자 매트릭스 재설계(2026-09-16).
+  원안(A-128 반입): temp/팝콘디자인적용/Popcorn AI 견적.dc.html (디자이너 · 팝콘 톤 적용본).
+  원안(A-135 반영): docs/design/incoming/dc-grid-matrix-2026-09-16.html (DesignComposer 프로토타입 —
+  React 류사 문법이라 그대로 옮기지 않고 "이렇게 보여야 한다"는 구조만 vanilla로 재구현했다. 상세는
+  app.js 머리말 참조). 반입 시 걷어낸 것: Claude Design/DesignComposer 편집기 런타임(부트스트랩 스크립트 ·
+  커스텀 래퍼 태그 · React 외부 CDN · Google Fonts 링크). 실제 로직은 처음부터 순수 vanilla JS(app.js)라
+  껍데기만 벗겼다. 색 토큰은 원안의 --color-accent-* 를 옮기지 않고 이 화면 기존 토큰(--blue 등)·
+  design-system/tokens.css 만 쓴다(CLAUDE.md §디자인 계약 — 임의 HEX 금지).
   서체는 자체 호스팅(../shared/fonts/fonts.css) — 외부 CDN 0건 규약.
-  현 상태(2026-09-14): 세 API 연결됨 — POST /api/talk/parse · POST /api/grid/recommend · GET /api/grid/workstations(용도 목록 GET /api/usages 포함).
+  현 상태(2026-09-16): 세 API 연결됨 — POST /api/talk/parse · POST /api/grid/recommend · GET /api/grid/workstations(용도 목록 GET /api/usages 포함).
   화면의 숫자·부품·판정(예산 초과·추천)은 전부 서버 값. 예시인 것은 이미지뿐(④ 소관).
+  ⚠ api/grid_public.py 는 다른 담당이 스펙 축(tier_key)·quotes 3종 구조로 재작성 중이다(2026-09-16) —
+  이 화면은 그 계약(카드.quotes.{value|가성비, reco|추천, perf|고성능})을 미리 맞춰 짰고, 실제 배포 뒤
+  필드명이 다르면 cardQuotes() 조회 순서만 좁히면 된다(app.js 머리말 참조).
+  카드 안 3종 탭(가성비/추천/고성능)은 재조회 없이 클라이언트 상태(state.cardVariant)로만 전환한다.
   부품 교체 대화·장바구니는 준비 중(app.js requestChange·addToCart 가 안내만 한다 — 가짜 변경안을 내밀지 않는다).
 -->
 <link rel="stylesheet" href="../shared/fonts/fonts.css">

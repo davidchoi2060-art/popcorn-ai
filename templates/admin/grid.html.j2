@@ -1,10 +1,31 @@
 {#
   상품 매트릭스 관리 (ADM-GRD-010 · 구 「격자 관리」 — 2026-09-14 개명·이동) — 2026-09-07 신설, **조회 전용**(재생성 쓰기는 이번 범위 밖)
 
-  ■ 계약 — docs/design/incoming/dc-grid-admin.html(Claude Design 원안, <x-dc>+React
-    형식). 이 화면은 원안을 그대로 옮기지 않고(형식이 다르다) 원안의 마크업 구조·
-    상태 표현(칸 7상태 중 재생성 쓰기가 없어 실제 발생 가능한 6상태 · 빈칸-미생성
-    점선/빈칸-의도 무테두리 구분)만 옮긴다.
+  ■ 계약 — docs/design/incoming/dc-grid-admin-2026-09-16.html(2026-09-16 사장님
+    승인 디자인, DesignComposer <x-dc>+sc-for/sc-if 형식). 이 화면은 원안을
+    그대로 옮기지 않고(형식이 다르다 — jinja2 + 바닐라 JS로 번역) 원안의 배치·
+    구획·컴포넌트 구조를 정식 반영한다(2026-09-16, 이전 물결의 임시 축 정렬을
+    이 리비전이 대체). 원안 색상 토큰(--color-*)은 design-system/tokens.css가
+    아니라 admin2.css 상태 별칭(--state-*·--primary 등)으로 매핑했다 — admin2
+    화면은 tokens.css를 읽지 않는다(§디자인 계약 admin2 예외).
+
+  ■ 구조 — 원안대로 비게임(6티어×6용도) 표와 게임(6등급×3해상도) 표를 별도
+    구획으로 분리(이미 있던 골격 유지). 추가:
+    · 티어 행 머리에 스펙 하한 요약(`tiers[].floor`, 서버 실컬럼)
+    · 게임 등급 행 머리에 "배정 N종"(`game_grades[].game_count`, 실카운트)
+    · 칸에 3종(가성비/추천/고성능) 존재 여부 점 3개(`cells[].variants_present`)
+    · S등급처럼 GPU/CPU 하한이 갈리는 게임 칸은 목록에서도 "GPU/CPU 분리" 배지 +
+      스펙 줄(`game_gpu_tier_key`/`game_cpu_tier_key_override`)로 미리 알린다
+    · 미배정 게임(`unassigned_games`, GTA 등) 참고 문구 — 등급 격자 밖 정보
+
+  ■ 서랍 — 3종 탭(가성비/추천/고성능)은 이미 있던 구조 그대로. 추가:
+    · S등급 등 GPU/CPU 비대칭 칸은 두 값을 분리 표기(`.grd-split`, 원안 §isSplit)
+    · 게임 칸에 배정 게임 태그 목록 + 등급 판정 사유(`game_info.grade_note`,
+      `game_load_grades` 조인 — 등급×해상도 note와는 별개로 등급 자체의 근거)
+
+  ■ 원안의 샘플값(TIERS·GRADES 배열 하드코딩 price·floor·games)은 레이아웃
+    참고용일 뿐 실제 데이터로 옮기지 않았다 — 전부 `GET /api/admin/grid` 및
+    `GET /api/admin/grid/cells/{id}` 응답에서만 가져온다(CLAUDE.md §화면 정직성).
 
   ■ 데이터 — 단일 목록 API: GET /api/admin/grid(`api/admin_grid.py`, 담당 밖).
     칸마다 서버가 이미 판정한 `state`(ok/over/stock/fail/missing/intent 6버킷,
@@ -81,6 +102,8 @@
 .grd-colhead.hl{background:var(--primary-container);border-bottom-color:var(--primary-bright)}
 .grd-rowhead{border:0;background:var(--container-low);padding:8px 10px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;cursor:pointer;border-right:2px solid transparent}
 .grd-rowhead .nm{font:600 13px/1.3 var(--font)}
+.grd-rowhead .key{font:500 10px/1.3 var(--font-num);color:var(--on-variant)}
+.grd-rowhead .floor{font:400 10.5px/1.35 var(--font);color:var(--on-variant);margin-top:1px}
 .grd-rowhead .bg{font:400 11px/1.3 var(--font-num);color:var(--on-variant)}
 .grd-rowhead.hl{background:var(--primary-container);border-right-color:var(--primary-bright)}
 .grd-cell{border:0;min-height:80px;padding:9px 11px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:5px;background:var(--card);font-family:var(--font);cursor:pointer}
@@ -92,6 +115,10 @@
 .grd-cell .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .grd-cell .total{font:600 14px/1.2 var(--font-num);font-variant-numeric:tabular-nums}
 .grd-cell .ago{font:400 11px/1.2 var(--font);color:var(--on-variant)}
+.grd-cell .split-badge{font:600 9px/1 var(--font-num);color:var(--secondary);border:1px solid var(--secondary);border-radius:3px;padding:1px 4px;align-self:flex-start}
+.grd-variants{display:flex;gap:3px;align-items:center}
+.grd-variants i{width:5px;height:5px;border-radius:50%;background:var(--outline-variant);flex:none}
+.grd-variants i.on{background:var(--primary-bright)}
 .grd-axis-note{font:400 12px/1.5 var(--font);color:var(--on-variant)}
 .grd-axis-note a{color:var(--on-variant)}
 
@@ -116,6 +143,14 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
 .stock-badge{display:inline-block;margin-left:6px;font:600 10px/1 var(--font);color:var(--state-run);border:1px solid var(--state-run);border-radius:3px;padding:2px 4px;vertical-align:middle}
 .grd-reasons{margin:0;padding-left:18px;font:400 12px/1.6 var(--font);color:var(--on-variant)}
 .grd-empty-note{border:1px dashed var(--outline);border-radius:8px;padding:14px;font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.grd-split{margin:0;display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--outline-variant);border-radius:8px;overflow:hidden}
+.grd-split > div{padding:8px 12px}
+.grd-split > div:first-child{border-right:1px solid var(--outline-variant)}
+.grd-split .lbl{font:500 10px/1.3 var(--font);letter-spacing:.04em;color:var(--on-variant);text-transform:uppercase}
+.grd-split .val{font:600 20px/1.2 var(--font-head)}
+.grd-split .note{grid-column:1/-1;margin:0;padding:6px 12px;border-top:1px solid var(--outline-variant);font:400 12px/1.5 var(--font);color:var(--on-variant)}
+.grd-games{display:flex;flex-wrap:wrap;gap:6px}
+.grd-games .tag{font:500 11px/1 var(--font);padding:5px 9px;border-radius:12px;background:var(--primary-container);color:var(--on)}
 .grd-dft{padding:14px 20px;border-top:1px solid var(--outline-variant);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .grd-dft .note{font:400 11px/1.3 var(--font);color:var(--on-variant)}
 
@@ -197,6 +232,8 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
       <div data-bind="game-grid-body" aria-label="견적 격자(게임)">격자 로딩 중…</div>
     </div>
 
+    <p class="grd-axis-note" data-bind="unassigned-note" hidden></p>
+
     <div class="grd-axis-note">축(티어 경계·용도 목록)은 별도 화면에서 관리 · 이 화면은 칸의 내용물만 다루며 부품 손 교체는 없음(재생성만)</div>
   </div>
 
@@ -262,20 +299,17 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     return lo + ' ~ ' + hi;
   }
 
-  function agoText(iso) {
-    if (!iso) return '';
-    var ms = Date.now() - new Date(iso).getTime();
-    if (ms < 0) ms = 0;
-    var min = Math.floor(ms / 60000);
-    if (min < 1) return '방금';
-    if (min < 60) return min + '분 전';
-    var hr = Math.floor(min / 60);
-    if (hr < 24) return hr + '시간 전';
-    return Math.floor(hr / 24) + '일 전';
-  }
-
   function key(tierKey, usage, platform) { return tierKey + '|' + usage + '|' + platform; }
   function gameKey(grade, resolution, platform) { return 'G|' + grade + '|' + resolution + '|' + platform; }
+
+  // 3종(가성비/추천/고성능) 현재본 존재 여부 점 3개 — 서버가 준 variants_present
+  // 그대로 그린다(화면이 있음/없음을 판정하지 않는다, CLAUDE.md §화면 정직성).
+  function variantDots(c) {
+    var present = (c && c.variants_present) || [];
+    return '<span class="grd-variants">' + ['가성비', '추천', '고성능'].map(function (v) {
+      return '<i class="' + (present.indexOf(v) !== -1 ? 'on' : '') + '" title="' + esc(v) + (present.indexOf(v) !== -1 ? ' 있음' : ' 없음') + '"></i>';
+    }).join('') + '</span>';
+  }
 
   function renderGrid() {
     var d = state.data;
@@ -293,7 +327,8 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     d.tiers.forEach(function (t, ti) {
       html += '<button type="button" class="grd-rowhead' + (state.hlTier === ti ? ' hl' : '') +
         '" data-action="hl-tier" data-idx="' + ti + '" role="rowheader">' +
-        '<span class="nm">' + esc(t.name) + '</span></button>';
+        '<span class="nm">' + esc(t.name) + '</span><span class="key">' + esc(t.tier_key) + '</span>' +
+        (t.floor ? '<span class="floor">' + esc(t.floor) + '</span>' : '') + '</button>';
 
       usages.forEach(function (u, ui) {
         var c = byCoord[key(t.tier_key, u, state.platform)];
@@ -307,14 +342,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
         if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
         else if (c.state === 'missing') bg = 'background:var(--container);';
         var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
-        var ago = c.quote ? agoText(c.quote.generated_at) : '';
         html += '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
           '" ' + (c.state === 'intent' ? 'disabled' : '') +
           ' aria-label="' + esc(t.name + ' × ' + u + ' × ' + state.platform + ' · ' + meta.label) + '">' +
           '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
           '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
           '<span class="total">' + total + '</span>' +
-          '<span class="ago">' + esc(ago) + '</span></button>';
+          '<span class="ago">' + variantDots(c) + '</span></button>';
       });
     });
 
@@ -335,7 +369,8 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     });
 
     d.game_grades.forEach(function (g) {
-      html += '<div class="grd-rowhead" role="rowheader"><span class="nm">' + esc(g.label) + '</span></div>';
+      html += '<div class="grd-rowhead" role="rowheader"><span class="nm">' + esc(g.grade) + '등급 · ' + esc(g.label) + '</span>' +
+        '<span class="floor">배정 ' + num(g.game_count) + '종</span></div>';
       resolutions.forEach(function (r) {
         var c = byCoord[gameKey(g.grade, r, state.platform)];
         if (!c) { html += '<div class="grd-cell" style="cursor:default"></div>'; return; }
@@ -346,19 +381,36 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
         if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
         else if (c.state === 'missing') bg = 'background:var(--container);';
         var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
-        var ago = c.quote ? agoText(c.quote.generated_at) : '';
+        var isSplit = !!c.game_cpu_tier_key_override;
+        var specLine = c.game_gpu_tier_key
+          ? ('GPU ' + esc(c.game_gpu_tier_key) + (isSplit ? ' · CPU ' + esc(c.game_cpu_tier_key_override) : ''))
+          : '';
         html += '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
           '" ' + (c.state === 'intent' ? 'disabled' : '') +
           ' aria-label="' + esc(g.label + ' × ' + r + ' × ' + state.platform + ' · ' + meta.label) + '">' +
           '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
-          '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
+          '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span>' +
+          (isSplit ? '<span class="split-badge" title="GPU/CPU 하한 비대칭">GPU/CPU 분리</span>' : '') + '</span>' +
+          (specLine ? '<span class="ago">' + specLine + '</span>' : '') +
           '<span class="total">' + total + '</span>' +
-          '<span class="ago">' + esc(ago) + '</span></button>';
+          '<span class="ago">' + variantDots(c) + '</span></button>';
       });
     });
 
     html += '</div>';
     set('game-grid-body', html);
+  }
+
+  function renderUnassignedNote() {
+    var d = state.data;
+    var el = $('unassigned-note');
+    if (!el) return;
+    var list = d.unassigned_games || [];
+    if (!list.length) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = '참고 · 미배정 ' + num(list.length) + '건(' +
+      list.map(function (g) { return esc(g.name); }).join(', ') +
+      ') — 등급 격자에는 나타나지 않습니다. ' + esc(list[0].note || '');
   }
 
   function renderSummary() {
@@ -402,6 +454,7 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     renderSummary();
     renderGrid();
     renderGameGrid();
+    renderUnassignedNote();
   }
 
   // ── 칸 상세 서랍 ──────────────────────────────────────────────
@@ -444,16 +497,22 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     var c = state.cellDetail;
     if (!c) return;
     var q = c.quotes ? c.quotes[state.activeVariant] : null;
+    var gi = c.game_info;
+    var isSplit = !!(gi && gi.cpu_tier_key_override);
 
     var body = '';
-    if (c.game_info) {
-      body += '<div class="grd-empty-note" style="background:var(--surface-variant)">' +
-        '그래픽카드 스펙 <b>' + esc(c.game_info.gpu_tier_key || '—') + '</b>' +
-        (c.game_info.cpu_tier_key_override ? ' · CPU 기준 <b>' + esc(c.game_info.cpu_tier_key_override) + '</b>(비대칭)' : '') +
-        (c.game_info.note ? '<br>' + esc(c.game_info.note) : '') +
-        (c.game_info.games && c.game_info.games.length
-          ? '<br>이 등급 게임: ' + esc(c.game_info.games.join(', ')) : '') +
-        '</div>';
+
+    // S등급처럼 GPU/CPU 하한이 갈리는 칸 — 단일 값으로 뭉뚱그리면 거짓 정보이므로
+    // 두 축을 분리해 보여준다(원안 §isSplit 분기, 정의서 §⑦).
+    if (isSplit) {
+      body += '<dl class="grd-split">' +
+        '<div><span class="lbl">그래픽카드 기준</span><div class="val">' + esc(gi.gpu_tier_key) + '</div></div>' +
+        '<div><span class="lbl">CPU 기준(override)</span><div class="val">' + esc(gi.cpu_tier_key_override) + '</div></div>' +
+        '<p class="note">S등급은 GPU/CPU 하한이 비대칭입니다. 단일 티어로 뭉뚱그리면 거짓 정보가 되어 두 축을 분리해 보여줍니다.' +
+        (gi.note ? ' ' + esc(gi.note) : '') + '</p></dl>';
+    } else if (gi) {
+      body += '<div class="grd-empty-note">그래픽카드 스펙 <b>' + esc(gi.gpu_tier_key || '—') + '</b>' +
+        (gi.note ? '<br>' + esc(gi.note) : '') + '</div>';
     }
 
     body += '<div class="grd-tabs" data-keep="1" role="tablist" aria-label="구성 종류" style="margin:10px 0">' +
@@ -492,6 +551,26 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
         body += '<div class="grd-empty-note">최근 배치(' + esc(state.data.last_batch ? state.data.last_batch.batch_id : '') +
           ')에서 이 칸이 갱신되지 않았습니다 — 이전 배치(' + esc(q.batch_id) + ') 견적을 표시합니다.</div>';
       }
+    }
+
+    // 게임 칸 — 이 등급에 배정된 게임 목록 + 등급 판정 사유(원안 §165-174,
+    // game_grade_assignments·game_load_grades 실조회. 지어낸 태그가 아니다).
+    if (gi) {
+      body += '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+        '<span style="font:500 10px/1.3 var(--font);letter-spacing:.06em;text-transform:uppercase;color:var(--on-variant)">이 등급에 배정된 게임 · ' +
+        num((gi.games || []).length) + '종</span>' +
+        '<span style="font:400 11px/1 var(--font);color:var(--on-variant)">game_grade_assignments</span></div>';
+      body += '<div class="grd-games">' +
+        (gi.games && gi.games.length
+          ? gi.games.map(function (g) { return '<span class="tag">' + esc(g) + '</span>'; }).join('')
+          : '<span style="font:400 12px/1.5 var(--font);color:var(--on-variant)">배정된 게임 없음</span>') +
+        '</div>';
+      if (gi.grade_note) {
+        body += '<p style="margin:0;font:400 13px/1.5 var(--font);color:var(--on-variant)">' +
+          '<b style="color:var(--on)">등급 판정 사유</b> · ' + esc(gi.grade_note) + '</p>';
+      }
+      body += '</div>';
     }
     set('d-body', body);
   }

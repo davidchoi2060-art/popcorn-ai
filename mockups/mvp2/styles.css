@@ -38,3 +38,40 @@
 /* Popcorn tokens: state colors always paired with text */
 .primary,.send,button.primary{background:var(--blue-strong)}.primary:hover,.send:hover{background:#3f7fcc;filter:none}.verification span{color:var(--success);background:var(--success-bg);border:1px solid #cfe9db;border-radius:8px;padding:6px 10px;font-weight:600}.under.over{color:var(--error);font-weight:600}.part-highlight td{background:var(--success-bg)}.change-total b:last-child{color:var(--blue-strong)}.toast{background:#111827;color:#fff}body{background:#f0f5f9}
 .user-bubble{background:#4a90e2;color:#fff}
+
+/* ── A-135 격자 매트릭스 카드 재설계(2026-09-16) ──────────────────────────────
+   원안: docs/design/incoming/dc-grid-matrix-2026-09-16.html (DesignComposer 프로토타입).
+   구조만 옮기고 색은 원안의 --color-accent-* 토큰 대신 기존 토큰/로컬 변수만 쓴다
+   (CLAUDE.md §디자인 계약 — 임의 HEX 금지). 원안의 "청사진" 모서리 장식(corner tl/tr/bl/br)은
+   Popcorn Light 톤(D-07)과 다른 스킨이라 옮기지 않는다 — 탭·매트릭스·생략행 "구조"만 반영. */
+.rec-headline{margin:4px 0 2px;font-size:13px;color:var(--muted);font-weight:600}
+.tier-matrix{margin:2px 0 14px}
+.tier-matrix-caption{display:block;font-size:11px;color:var(--muted);letter-spacing:.02em;margin-bottom:7px}
+.tier-strip{display:flex}
+.tier-cell{flex:1;min-width:0;border:1px solid var(--line);margin-left:-1px;padding:9px 4px;text-align:center;background:#fff;display:flex;flex-direction:column;gap:2px}
+.tier-cell:first-child{margin-left:0;border-radius:10px 0 0 10px}
+.tier-cell:last-child{border-radius:0 10px 10px 0}
+.tier-cell-key{font-size:12px;font-weight:700;color:var(--ink);letter-spacing:-.2px}
+.tier-cell-label{font-size:10px;color:var(--muted)}
+.tier-cell.is-center{background:var(--soft);border-color:var(--blue)}
+.tier-cell.is-center .tier-cell-key{color:var(--blue-strong)}
+.tier-cell.is-hit{background:var(--container-low)}
+.tier-kicker{display:block;font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.tier-name{margin:2px 0 0;font-size:26px;font-weight:700;letter-spacing:-.6px;color:var(--ink)}
+.tier-tabs{display:flex;border-bottom:1px solid var(--line);margin:13px 0 0}
+.tier-tab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:8px 4px;font-size:13px;font-weight:600;color:var(--muted);border-radius:0}
+.tier-tab.active{color:var(--ink);border-bottom-color:var(--blue-strong)}
+.tier-tab:hover{color:var(--blue-strong)}
+.tier-price-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:13px}
+.tier-price{font-size:26px;font-weight:700;letter-spacing:-.6px}
+.tier-price small{font-size:13px;font-weight:500;margin-left:2px;color:var(--muted)}
+.tier-price-note{font-size:11px;color:var(--muted);white-space:nowrap}
+.omitted-spec{color:var(--muted);font-style:italic}
+.reason-list{margin:8px 0 0;padding-left:18px;font-size:12px;color:var(--muted);line-height:1.7}
+.tradeoff summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--ink);margin:0}
+.tradeoff summary::-webkit-details-marker{display:none}
+.tradeoff .chev{transition:transform .15s;flex:none}
+.tradeoff[open] .chev{transform:rotate(180deg)}
+.rec-tag.over{background:var(--container);color:var(--error)}
+.card-actions{display:flex;gap:8px;margin-top:14px}
+@media(max-width:768px){.tier-cell{padding:7px 2px}.tier-cell-key{font-size:11px}.tier-cell-label{font-size:9px}.tier-name{font-size:22px}.tier-price{font-size:22px}}

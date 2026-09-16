@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-fefb4ce6-0800-4e90-b375-83a8a8825a63/styles.css">
+<script src="_ds/industry-fefb4ce6-0800-4e90-b375-83a8a8825a63/_ds_bundle.js"></script>
+<style>body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)} a{color:var(--color-accent-700)} a:hover{color:var(--color-accent-900)} button{font-family:inherit} .seg-opt{cursor:pointer}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column">
+<details style="border-bottom:1px solid var(--color-divider);padding:8px 24px;font-size:12px;color:var(--color-neutral-700);background:var(--color-neutral-100)">
+<summary style="cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-accent-700)">설계 메모 — CUS-QUO-010 · 요구사항 2026-09-15 기준</summary>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;padding:10px 0 4px;line-height:1.5">
+<div><b>가정</b> · 스펙 티어 T0~T5 = 팝콘1~5·팝콘X(2026-09-15 확정) · 중심 티어 ±1 = 최대 3장 · 가격은 배치 관측값(샘플)</div>
+<div><b>핵심 판단</b> · 카드는 "가격"이 아니라 "스펙 하한(티어)"이 1차 축 — 티어 이름을 크게, 가격은 관측값으로 아래에 · 3종 구성은 카드 안 탭(재조회 없음) · 생략 슬롯도 행으로 남겨 사유 노출</div>
+<div><b>상태</b> · 왼쪽 용도 버튼으로 시나리오 전환: 사무용(T0·iGPU 생략) · 롤(L등급) · 고사양 게임(S등급 CPU 비대칭) · AI(워크스테이션 별도) · 트레이딩(빈 칸) · 상단 우측 "서버 실패" 토글</div>
+</div>
+</details>
+<header class="nav" style="border-bottom:1px solid var(--color-divider);padding:10px 24px">
+<div class="nav-brand" style="display:flex;align-items:baseline;gap:10px">팝콘PC <span style="font-family:var(--font-body);font-weight:400;font-size:12px;color:var(--color-neutral-600);letter-spacing:.04em">모든 견적에는 이유가 있습니다</span></div>
+<span style="font-size:11px;color:var(--color-neutral-600);letter-spacing:.06em">CUS-QUO-010 · /mvp2/</span>
+<label class="seg" style="font-size:12px"><span class="seg-opt" style="padding:4px 10px"><input type="checkbox" checked="{{ serverOk }}" onChange="{{ toggleServer }}">정상</span><span class="seg-opt" style="padding:4px 10px"><input type="checkbox" checked="{{ serverDown }}" onChange="{{ toggleServer }}">서버 실패</span></label>
+</header>
+<div style="display:flex;flex-wrap:wrap;flex:1;align-items:stretch">
+<aside style="flex:1 1 300px;max-width:380px;min-width:280px;border-right:1px solid var(--color-divider);display:flex;flex-direction:column;padding:20px 20px 16px;gap:16px">
+<h6 style="margin:0;color:var(--color-neutral-600)">01 · 용도와 예산을 말해주세요</h6>
+<div style="display:flex;flex-direction:column;gap:10px;flex:1">
+<sc-for list="{{ messages }}" as="m" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:3px;align-self:{{ m.align }};max-width:92%">
+<span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-500)">{{ m.who }}</span>
+<div class="blueprint" style="padding:8px 12px;font-size:14px;line-height:1.5;background:{{ m.bg }};color:{{ m.fg }}"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>{{ m.text }}</div>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:11px;letter-spacing:.06em;color:var(--color-neutral-600)">용도 바로 고르기</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ usages }}" as="u" hint-placeholder-count="9">
+<button class="btn {{ u.cls }}" style="font-size:13px;padding:5px 10px" onClick="{{ u.onClick }}">{{ u.label }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;gap:6px">
+<input class="input" placeholder="예: 롤 하려고요, 100만원쯤" value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onDraftKey }}">
+<button class="btn btn-primary blueprint" style="flex:none" onClick="{{ send }}"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>보내기</button>
+</div>
+</aside>
+<main style="flex:3 1 520px;min-width:0;padding:20px 28px 40px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+<div>
+<h6 style="margin:0 0 4px;color:var(--color-neutral-600)">02 · 격자가 찾은 후보</h6>
+<h2 style="margin:0">{{ headline }}</h2>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+<sc-for list="{{ constraintTags }}" as="t" hint-placeholder-count="3"><span class="tag tag-outline">{{ t }}</span></sc-for>
+</div>
+</div>
+<sc-if value="{{ showMatrix }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-500)">스펙 티어 축 · {{ usageLabel }}</span>
+<div style="display:flex">
+<sc-for list="{{ matrix }}" as="c" hint-placeholder-count="6">
+<div title="{{ c.title }}" style="width:52px;height:38px;border:1px solid var(--color-divider);margin-left:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:{{ c.bg }};color:{{ c.fg }};font-family:var(--font-heading);font-weight:600;font-size:13px;line-height:1.1"><span>{{ c.key }}</span><span style="font-family:var(--font-body);font-weight:400;font-size:9px;opacity:.8">{{ c.brand }}</span></div>
+</sc-for>
+</div>
+<span style="font-size:11px;color:var(--color-neutral-600)">{{ matrixNote }}</span>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+<div class="blueprint" style="padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:14px"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+<span style="flex:1">격자 조회에 실패했습니다 (POST /api/grid/recommend · 500). 지어낸 카드는 보여드리지 않습니다.</span>
+<button class="btn btn-secondary" onClick="{{ toggleServer }}">다시 시도</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+<div class="blueprint" style="padding:28px 24px;display:flex;flex-direction:column;gap:6px;max-width:560px"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+<h4 style="margin:0">이 용도·가격대는 준비 중입니다</h4>
+<p style="margin:0;font-size:14px;color:var(--color-neutral-700)">{{ emptyReason }}</p>
+<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-secondary" onClick="{{ raiseBudget }}">예산 조건 빼고 보기</button><button class="btn btn-ghost" onClick="{{ pickOffice }}">다른 용도로</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasCards }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:22px;align-items:start">
+<sc-for list="{{ cards }}" as="card" hint-placeholder-count="3">
+<article class="blueprint" style="display:flex;flex-direction:column;background:{{ card.bg }};outline:{{ card.outline }};outline-offset:-1px">
+<i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:14px 16px 0">
+<div>
+<span class="card-kicker">{{ card.tierKey }} · {{ card.role }}</span>
+<h3 style="margin:2px 0 0;font-size:30px">{{ card.brand }}</h3>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+<sc-if value="{{ card.center }}" hint-placeholder-val="{{ false }}"><span class="tag tag-accent">내 조건 중심</span></sc-if>
+<sc-if value="{{ card.over }}" hint-placeholder-val="{{ false }}"><span class="tag" style="background:var(--color-neutral-900);color:var(--color-neutral-100)">예산 초과 +{{ card.overBy }}</span></sc-if>
+</div>
+</div>
+<div style="padding:12px 16px 0;display:flex;gap:0;border-bottom:1px solid var(--color-divider)">
+<sc-for list="{{ card.tabs }}" as="tab" hint-placeholder-count="3">
+<button onClick="{{ tab.onClick }}" style="flex:1;background:transparent;border:0;border-bottom:2px solid {{ tab.line }};padding:6px 4px 8px;font-family:var(--font-heading);font-weight:600;font-size:15px;color:{{ tab.color }};cursor:pointer" style-hover="color:var(--color-accent-700)">{{ tab.label }}</button>
+</sc-for>
+</div>
+<div style="padding:14px 16px 0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap">
+<div style="font-family:var(--font-heading);font-weight:600;font-size:34px;line-height:1">{{ card.price }}<span style="font-size:16px;margin-left:3px">만원</span></div>
+<span style="font-size:11px;color:var(--color-neutral-600)">배치 관측가 · {{ card.platform }}</span>
+</div>
+<dl style="margin:0;padding:12px 16px 0;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13.5px">
+<sc-for list="{{ card.specs }}" as="s" hint-placeholder-count="4">
+<dt style="color:var(--color-neutral-600);letter-spacing:.04em;font-size:11px;text-transform:uppercase;align-self:center">{{ s.k }}</dt><dd style="margin:0;color:{{ s.color }}">{{ s.v }}</dd>
+</sc-for>
+</dl>
+<p style="margin:12px 16px 0;font-size:13px;line-height:1.5;color:var(--color-accent-800);border-left:0;padding:8px 10px;background:var(--color-accent-100)">{{ card.leadReason }}</p>
+<button onClick="{{ card.toggle }}" style="margin:12px 16px 0;background:transparent;border:1px solid var(--color-divider);padding:7px 10px;font-size:13px;color:var(--color-text);display:flex;justify-content:space-between;align-items:center;cursor:pointer" style-hover="background:var(--color-neutral-200)"><span>부품 8종 · 이유 {{ card.reasonCount }}개 {{ card.toggleLabel }}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="transform:{{ card.chev }}"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<sc-if value="{{ card.expanded }}" hint-placeholder-val="{{ false }}">
+<div style="padding:12px 16px 0;display:flex;flex-direction:column;gap:12px">
+<table class="table" style="font-size:13px"><thead><tr><th style="padding-left:0">슬롯</th><th>부품</th><th style="text-align:right;padding-right:0">가격</th></tr></thead><tbody>
+<sc-for list="{{ card.parts }}" as="p" hint-placeholder-count="8">
+<tr style="opacity:{{ p.opacity }}"><td style="padding-left:0;color:var(--color-neutral-600);white-space:nowrap">{{ p.slot }}</td><td style="font-style:{{ p.italic }}">{{ p.name }}</td><td style="text-align:right;padding-right:0;font-variant-numeric:tabular-nums;white-space:nowrap">{{ p.price }}</td></tr>
+</sc-for>
+</tbody></table>
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-500)">왜 이 구성인가</span>
+<sc-for list="{{ card.reasons }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;gap:8px;font-size:13px;line-height:1.45"><span style="font-family:var(--font-heading);font-weight:600;color:var(--color-accent-700);flex:none;width:18px">{{ r.n }}</span><span>{{ r.text }}</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<div style="display:flex;gap:8px;padding:16px 16px 16px;margin-top:auto">
+<button class="btn btn-primary blueprint" style="flex:1"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>이 구성으로 진행</button>
+<button class="btn btn-secondary" title="장바구니"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>담기</button>
+</div>
+</article>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showWs }}" hint-placeholder-val="{{ false }}">
+<section style="margin-top:12px;padding-top:20px;border-top:1px solid var(--color-divider);display:flex;flex-direction:column;gap:14px">
+<div><h6 style="margin:0 0 4px;color:var(--color-neutral-600)">03 · AI 워크스테이션 — 격자와 별도 진열</h6><p style="margin:0;font-size:13px;color:var(--color-neutral-700)">GET /api/grid/workstations · 용도가 AI일 때만 보입니다. 위 카드와 다른 기준(VRAM 우선)으로 짜여 있어 섞지 않습니다.</p></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:22px">
+<sc-for list="{{ workstations }}" as="w" hint-placeholder-count="2">
+<article class="blueprint" style="padding:14px 16px;display:flex;flex-direction:column;gap:8px"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+<span class="card-kicker">WORKSTATION · {{ w.vram }}</span>
+<h4 style="margin:0">{{ w.name }}</h4>
+<div style="font-family:var(--font-heading);font-weight:600;font-size:26px;line-height:1">{{ w.price }}<span style="font-size:14px;margin-left:3px">만원</span></div>
+<p style="margin:0;font-size:13px;color:var(--color-neutral-700)">{{ w.note }}</p>
+<button class="btn btn-secondary" style="align-self:flex-start;margin-top:4px">상세 보기</button>
+</article>
+</sc-for>
+</div>
+</section>
+</sc-if>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showMatrix&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;레이아웃&quot;}}">
+const TIERS = [
+  {key:'T0',brand:'팝콘1',price:65,gpu:null,cpu:'인텔 코어 i3-14100 (내장그래픽)',ram:'DDR5 16GB',ssd:'NVMe 500GB',board:'H610M',psu:'500W 80+ 스탠다드',cs:'미니타워',cool:'기본 쿨러'},
+  {key:'T1',brand:'팝콘2',price:112,gpu:'RTX 4060 8GB',cpu:'인텔 코어 i5-14400F',ram:'DDR5 16GB',ssd:'NVMe 1TB',board:'B760M',psu:'600W 80+ 브론즈',cs:'미들타워',cool:'타워형 공랭'},
+  {key:'T2',brand:'팝콘3',price:152,gpu:'RTX 4060 Ti 16GB',cpu:'인텔 코어 i5-14600KF',ram:'DDR5 32GB',ssd:'NVMe 1TB',board:'B760',psu:'700W 80+ 브론즈',cs:'미들타워',cool:'타워형 공랭'},
+  {key:'T3',brand:'팝콘4',price:214,gpu:'RTX 4070 Super 12GB',cpu:'인텔 코어 i7-14700F',ram:'DDR5 32GB',ssd:'NVMe 2TB',board:'B760',psu:'750W 80+ 골드',cs:'미들타워',cool:'240 수랭'},
+  {key:'T4',brand:'팝콘5',price:305,gpu:'RTX 4080 Super 16GB',cpu:'인텔 코어 i7-14700K',ram:'DDR5 32GB',ssd:'NVMe 2TB',board:'Z790',psu:'850W 80+ 골드',cs:'빅타워',cool:'360 수랭'},
+  {key:'T5',brand:'팝콘X',price:455,gpu:'RTX 4090 24GB',cpu:'인텔 코어 i9-14900K',ram:'DDR5 64GB',ssd:'NVMe 4TB',board:'Z790',psu:'1000W 80+ 플래티넘',cs:'빅타워',cool:'360 수랭'}
+];
+const USAGES = [
+  {key:'office',label:'사무용',center:0,budget:65,say:'사무용으로 65만원 정도면 될까요?',reason:'문서·웹·화상회의 중심이라 GPU 하한이 없습니다. 내장그래픽으로 확정하고 그래픽카드 슬롯은 생략했습니다.'},
+  {key:'trading',label:'트레이딩',center:1,budget:30,say:'주식 트레이딩용, 30만원으로요.',reason:'다중 모니터 출력 하한만 걸립니다.',empty:'트레이딩 용도의 30만원 이하 칸은 배치가 찾은 구성이 없습니다(intended_empty). 가장 가까운 칸은 T0 팝콘3 · 관측가 65만원입니다.'},
+  {key:'game',label:'게임',center:1,budget:null,say:'게임용으로 하나 맞춰주세요.',reason:'게임 등급을 말씀하지 않으셔서 일반 게임(game) 갈래로 잡았습니다. 하시는 게임을 알려주시면 등급에 맞춰 다시 좁힙니다.'},
+  {key:'game_casual',label:'롤·캐주얼',center:1,budget:null,grade:'L',say:'롤 하려고요.',reason:'리그 오브 레전드는 부하 등급 L(경량 캐주얼)입니다. 이 게임은 고사양 그래픽카드가 필요하지 않습니다 — 그래서 구성이 저렴합니다.'},
+  {key:'gaming_high',label:'고사양 게임',center:4,budget:250,grade:'S',res:'4K',say:'사이버펑크 2077을 4K로, 250만원쯤.',reason:'사이버펑크 2077은 부하 등급 S · 4K 해상도 → GPU 하한 T4. S등급은 CPU 하한을 한 단계 낮게 잡습니다(GPU/CPU 비대칭, cpu_tier_key_override).'},
+  {key:'design',label:'디자인',center:2,budget:150,say:'포토샵·일러스트 작업용, 150만원.',reason:'2D 디자인은 RAM 32GB 하한이 먼저 걸립니다. 150만원은 T2 경계값이라 T2에 포함으로 판정했습니다.'},
+  {key:'video',label:'영상 편집',center:2,budget:170,say:'유튜브 영상 편집용 170만원.',reason:'영상 편집은 CPU 코어 수와 SSD 용량 하한이 먼저 걸립니다.'},
+  {key:'video_3d',label:'3D·렌더',center:3,budget:220,say:'블렌더 3D 렌더용 220만원.',reason:'3D 렌더는 GPU VRAM 12GB 하한이 걸립니다.'},
+  {key:'ai',label:'AI',center:3,budget:300,say:'로컬 LLM 돌릴 AI용 PC, 300만원.',reason:'AI 용도는 VRAM 하한이 가장 큽니다. 격자 카드와 별도로 AI 워크스테이션도 아래에 진열합니다.'}
+];
+const VARIANTS = [
+  {key:'value',label:'가성비',mul:0.92,ssd:'NVMe 500GB',ramDown:true,why:'같은 스펙 하한 안에서 SSD·메모리를 하한값으로 낮춘 구성입니다.'},
+  {key:'reco',label:'추천',mul:1,why:'스펙 하한을 여유 있게 만족하는 기준 구성입니다.'},
+  {key:'perf',label:'고성능',mul:1.14,ssdUp:true,ramUp:true,why:'같은 칸에서 메모리·SSD를 한 단계 올린 구성입니다. 다음 티어 하한에는 미치지 않습니다.'}
+];
+const PARTS = [['CPU','cpu',.28],['메인보드','board',.1],['그래픽카드','gpu',.33],['메모리','ram',.08],['SSD','ssd',.07],['파워','psu',.06],['케이스','cs',.05],['쿨러','cool',.03]];
+const WS = [
+  {name:'AI 워크스테이션 · 듀얼 GPU',vram:'48GB VRAM',price:780,note:'RTX 4090 ×2 · 128GB RAM · 1600W. 30B급 모델 로컬 추론·LoRA 학습.'},
+  {name:'AI 워크스테이션 · 싱글 GPU',vram:'24GB VRAM',price:470,note:'RTX 4090 ×1 · 64GB RAM. 13B급 추론과 이미지 생성.'}
+];
+
+class Component extends DCLogic {
+  state = { usage:'game_casual', budget:null, sel:{}, open:{}, down:false, draft:'', log:[] };
+  pick(key, budget) {
+    const u = USAGES.find(x=>x.key===key);
+    const b = budget===undefined ? u.budget : budget;
+    this.setState(s=>({usage:key,budget:b,sel:{},open:{},log:[...s.log,{who:'고객',text:budget===undefined?u.say:'예산은 빼고 보여주세요.'}].slice(-4)}));
+  }
+  renderVals() {
+    const S = this.state, mode = this.props.compareMode ?? 'tabs';
+    const u = USAGES.find(x=>x.key===S.usage);
+    const budget = S.budget;
+    const center = budget==null ? (u.grade ? u.center : 1) : u.center;
+    const isError = S.down;
+    const isEmpty = !isError && !!u.empty && budget!=null;
+    const idxs = isEmpty ? [] : [center-1,center,center+1].filter(i=>i>=0&&i<6);
+    const fmt = n => n.toLocaleString('ko-KR');
+    const cards = idxs.map(i=>{
+      const t = TIERS[i];
+      const vk = S.sel[t.key] || 'reco';
+      const v = VARIANTS.find(x=>x.key===vk);
+      const price = Math.round(t.price*v.mul);
+      const over = budget!=null && price>budget;
+      const ram = v.ramDown ? (i===0?'DDR5 8GB':'DDR5 16GB') : v.ramUp ? (i>=4?'DDR5 64GB':'DDR5 32GB') : t.ram;
+      const ssd = v.ssd && i<3 ? v.ssd : v.ssdUp ? (i>=3?'NVMe 4TB':'NVMe 2TB') : t.ssd;
+      const cur = {...t, ram, ssd};
+      const parts = PARTS.map(([slot,k,w])=>{
+        const omitted = k==='gpu' && !t.gpu;
+        return {slot, name: omitted ? '생략 — iGPU 확정이라 그래픽카드 없음' : cur[k], price: omitted ? '0' : fmt(Math.round(price*w*10))+'천', opacity: omitted?.6:1, italic: omitted?'italic':'normal'};
+      });
+      const reasons = [u.reason, `${t.key} ${t.brand} 하한: ${t.gpu?`GPU VRAM ${t.gpu.match(/\d+GB/)?.[0]||''}`:'GPU 하한 없음'} · CPU ${[4,6,8,12,16,24][i]}코어 · RAM ${[8,16,32,32,32,64][i]}GB · SSD ${[500,1000,1000,2000,2000,4000][i]>=1000?[1,1,2,2,4][i-1]+'TB':'500GB'}.`, v.why];
+      if (i!==center) reasons.push(i<center?'조건보다 한 단계 아래 티어입니다. 예산이 빠듯하면 이 칸을 고르셔도 하한은 지킵니다.':'조건보다 한 단계 위 티어입니다. 여유가 있다면 다음 단계 부하까지 대비합니다.');
+      if (over) reasons.push(`말씀하신 예산 ${budget}만원을 ${price-budget}만원 넘습니다. 억지로 맞추지 않고 그대로 보여드립니다.`);
+      const open = !!S.open[t.key];
+      return {
+        tierKey:t.key, brand:t.brand, role: i===center?'중심 티어':(i<center?'한 단계 아래':'한 단계 위'), center:i===center, over, overBy: over?`${price-budget}만`:'' ,
+        bg: i===center?'color-mix(in srgb, var(--color-accent-100) 60%, transparent)':'transparent',
+        outline: i===center?'1px solid var(--color-accent)':'none',
+        price: fmt(price), platform: '인텔', leadReason: u.reason.split(' — ')[0].split('. ')[0]+'.',
+        tabs: VARIANTS.map(x=>({label:x.label, line: x.key===vk?'var(--color-accent)':'transparent', color: x.key===vk?'var(--color-text)':'var(--color-neutral-500)', onClick:()=>this.setState(s=>({sel:{...s.sel,[t.key]:x.key}}))})),
+        specs:[{k:'GPU',v:t.gpu||'생략 (내장그래픽)',color:t.gpu?'inherit':'var(--color-neutral-600)'},{k:'CPU',v:cur.cpu,color:'inherit'},{k:'RAM',v:ram,color:'inherit'},{k:'SSD',v:ssd,color:'inherit'}],
+        parts, reasons: reasons.map((text,n)=>({n:String(n+1).padStart(2,'0'),text})), reasonCount: reasons.length,
+        expanded: open, toggleLabel: open?'접기':'펼치기', chev: open?'rotate(180deg)':'none',
+        toggle:()=>this.setState(s=>({open:{...s.open,[t.key]:!s.open[t.key]}}))
+      };
+    });
+    const tags = [u.label + (u.grade?` · ${u.grade}등급`:'') + (u.res?` · ${u.res}`:''), budget==null?'예산 미지정 → 기본 T1 중심':`예산 ${budget}만원`, '플랫폼 인텔'];
+    const last = S.log[S.log.length-1];
+    const baseLog = [{who:'팝콘',text:'어떤 용도로 쓰실 PC인가요? 예산이 있으면 함께 알려주세요.'},{who:'고객',text: last ? last.text : u.say}];
+    const reply = isError ? '격자 조회에 실패했어요. 다시 시도해주세요.' : isEmpty ? '해당 가격대 칸이 아직 준비 중입니다.' : `${u.label} 조건으로 ${cards.length}장을 찾았어요. ${TIERS[center].brand}(${TIERS[center].key})이 중심이에요.`;
+    const messages = [...baseLog, {who:'팝콘',text:reply}].map(m=>({...m, align: m.who==='고객'?'flex-end':'flex-start', bg: m.who==='고객'?'var(--color-accent-900)':'transparent', fg: m.who==='고객'?'var(--color-neutral-100)':'var(--color-text)'}));
+    return {
+      serverOk:!S.down, serverDown:S.down, toggleServer:()=>this.setState(s=>({down:!s.down})),
+      messages, draft:S.draft, onDraft:e=>this.setState({draft:e.target.value}),
+      onDraftKey:e=>{ if(e.key==='Enter') this.parse(); }, send:()=>this.parse(),
+      usages: USAGES.map(x=>({label:x.label, cls: x.key===S.usage?'btn-primary':'btn-secondary', onClick:()=>this.pick(x.key)})),
+      headline: isError?'조회 실패':isEmpty?'후보 0장':`후보 ${cards.length}장 · ${TIERS[center].brand} 중심`,
+      constraintTags: tags, usageLabel: u.label, showMatrix: this.props.showMatrix ?? true,
+      matrix: TIERS.map((t,i)=>{ const hit = idxs.includes(i); const c = i===center && !isEmpty; return {key:t.key, brand:t.brand, title:`${t.key} ${t.brand} · 관측가 ${t.price}만원`, bg: c?'var(--color-accent)':hit?'var(--color-accent-200)':'transparent', fg: c?'var(--color-bg)':hit?'var(--color-accent-900)':'var(--color-neutral-500)'}; }),
+      matrixNote: isEmpty ? '해당 칸 없음 — 가장 가까운 칸 T0' : `중심 ${TIERS[center].key} ±1 · 예산은 칸을 정하지 않고 결과가에만 표시됩니다`,
+      isError, isEmpty, emptyReason: u.empty||'', raiseBudget:()=>this.pick(S.usage,null), pickOffice:()=>this.pick('office'),
+      hasCards: !isError && cards.length>0, cards,
+      showWs: !isError && S.usage==='ai', workstations: WS.map(w=>({...w, price: fmt(w.price)}))
+    };
+  }
+  parse() {
+    const t = this.state.draft.trim(); if(!t) return;
+    const m = t.match(/(\d{2,4})\s*만/); const budget = m ? +m[1] : undefined;
+    const hit = USAGES.find(u => u.label.split('·').some(l=>t.includes(l))) || (/롤|LoL|메이플|로아/i.test(t)?USAGES[3]:/사이버펑크|배그|고사양|4K/i.test(t)?USAGES[4]:/사무|문서|엑셀/.test(t)?USAGES[0]:/AI|LLM|딥러닝/i.test(t)?USAGES[8]:USAGES[2]);
+    this.setState(s=>({usage:hit.key,budget:budget===undefined?hit.budget:budget,sel:{},open:{},draft:'',log:[...s.log,{who:'고객',text:t}].slice(-4)}));
+  }
+}
+</script>
+</body>
+</html>
