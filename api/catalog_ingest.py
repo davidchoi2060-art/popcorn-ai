@@ -69,7 +69,9 @@ SPEC_COLS = ["socket", "socket_list", "chipset", "mem_type", "capacity_gb", "clo
              "tdp_watt", "rated_watt", "required_power_watt", "length_mm", "gpu_max_mm",
              "cooler_height_mm", "cooler_tdp", "pcie_gen", "form_factor", "interface",
              "size_inch", "resolution", "refresh_hz", "panel",
-             "radiator_rows", "radiator_max_rows"]
+             # gpu_power_draw_watt(0094) — 카드 실소비전력. 파워 호환 규칙이 읽는다.
+             # 여기 없으면 적재 경로가 새 값을 통째로 버린다.
+             "radiator_rows", "radiator_max_rows", "gpu_power_draw_watt"]
 JSON_COLS = {"socket_list", "form_factor_list"}
 # product_specs의 VARCHAR 길이(DB 실측) — 초과 값은 잘라 넣고 검수로 알린다
 SPEC_MAXLEN = {"socket": 30, "chipset": 50, "mem_type": 10, "pcie_gen": 20,
@@ -161,6 +163,14 @@ def read_refs(conn) -> dict:
     """계획 수립에 필요한 현재 DB 상태(잠금·다나와 점유·GPU 참조표·기존 사양)."""
     gpu_ref = dict(conn.execute(text(
         "SELECT chipset_key, recommended_watt FROM gpu_power_reference")).all())
+    # 카드 실소비전력 참조표(0094) — **위 표와 다른 축**이다. 위는 «시스템 권장 파워»(등급),
+    # 이건 «카드 자체 소비전력». (chipset_key, vram_gb) 복합키라 dict 키가 튜플이다.
+    # 표가 아직 없는 환경(구버전 DB)에서도 적재가 죽지 않게 감싼다.
+    try:
+        gpu_draw_ref = {(r[0], r[1]): r[2] for r in conn.execute(text(
+            "SELECT chipset_key, vram_gb, draw_watt FROM gpu_power_draw_reference")).all()}
+    except Exception:
+        gpu_draw_ref = {}
     # build_plan()이 이 값으로 잠긴 사양을 계획에서 뺀다(_locked_for) — 예전엔 여기서
     # 만들기만 하고 아무도 안 읽었다(2026-08-15까지의 실사고: 소비처가
     # tools/catalog_import.py의 화면 출력뿐이었다). product 컬럼 잠금(part_type 등)은
@@ -178,8 +188,8 @@ def read_refs(conn) -> dict:
     existing = {r[0]: {k: v for k, v in zip(gf, r[1:]) if v is not None}
                 for r in conn.execute(text(
                     f"SELECT product_code, {', '.join(gf)} FROM product_specs")).all()}
-    return {"gpu_ref": gpu_ref, "locked": locked, "dan_owner": dan_owner,
-            "existing": existing}
+    return {"gpu_ref": gpu_ref, "gpu_draw_ref": gpu_draw_ref, "locked": locked,
+            "dan_owner": dan_owner, "existing": existing}
 
 
 def _locked_for(refs: dict, code: int) -> set:
@@ -197,6 +207,7 @@ def _spec_locked(locked: set, col: str) -> bool:
 def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str) -> dict:
     """행 목록 → 적재 계획. **DB를 바꾸지 않는다** — 이 결과가 곧 드라이런 리포트다."""
     gpu_ref, dan_owner = refs["gpu_ref"], refs["dan_owner"]
+    gpu_draw_ref = refs.get("gpu_draw_ref") or {}   # 카드 실소비전력 참조표(0094)
     existing = refs.get("existing") or {}
 
     # 실측: 다나와No가 채워진 행 중 중복이 있다(같은 제품을 색상·패키지별 코드로 관리).
@@ -229,7 +240,8 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
             continue
         skey = (r["자체상품코드"] or "").strip()
         sale = (r["상태값"] or "").strip() == "판매중"
-        sp, src = extract_specs(pt, kvs.get(skey, {}), feats.get(skey, []), name, l2, gpu_ref) \
+        sp, src = extract_specs(pt, kvs.get(skey, {}), feats.get(skey, []), name, l2,
+                                gpu_ref, gpu_draw_ref) \
             if pt else ({}, {})
         need = _required_for(pt)
         # 적재는 채우기만 하고 지우지 않는다(apply_plan의 COALESCE) — 따라서 '없는 사양'은

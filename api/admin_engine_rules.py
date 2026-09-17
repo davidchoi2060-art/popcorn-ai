@@ -79,17 +79,24 @@ def engine_rules():
             "SELECT COUNT(*) FROM v_recommendation_candidates WHERE stock_qty>0")).scalar_one()
         rule_rows = conn.execute(text(
             "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, blocking, active,"
-            " part_types"
+            " part_types, ref_offset, null_ref_mode"
             " FROM compat_rules ORDER BY sort_order, rule_id")).mappings().all()
 
     checks = []
     for r in rule_rows:
         skip_reason = _load_skip_reason(r)
+        # 규칙 식에 `ref_offset`(0094)을 그대로 드러낸다 — 운영자 화면이 «+200W» 를 숨기면
+        # 판정과 화면이 다른 규칙을 말하게 된다(UX-28 이 금지하는 바로 그것).
+        off = r["ref_offset"] or 0
+        ref_expr = f"{r['ref_slot']}.{r['ref_field']}" + (f" + {off}" if off else "")
         checks.append({
             "key": r["rule_key"], "label": r["label"],
-            "rule": f"{r['slot']}.{r['field']} {OP_KO.get(r['op'], r['op'])} {r['ref_slot']}.{r['ref_field']}",
+            "rule": f"{r['slot']}.{r['field']} {OP_KO.get(r['op'], r['op'])} {ref_expr}",
             "source": f"product_specs.{r['field']} / {r['ref_field']}",
             "blocking": r["blocking"], "active": r["active"],
+            # null_ref_mode='skip' = 상대값이 없으면 «판정 불가»(통과도 탈락도 아님).
+            # 화면이 이 사실을 말해야 운영자가 "왜 이 GPU 는 파워 검사가 없지"를 안다.
+            "null_ref_mode": r["null_ref_mode"],
             # 빈 목록 = 슬롯 전체. 값이 있으면 그 종류에만 걸린다 — 쿨러 슬롯처럼 성격이
             # 다른 부품이 섞이는 자리에서 겨냥하지 않은 부품까지 죽이지 않기 위한 조건이다.
             "part_types": r["part_types"] or [],

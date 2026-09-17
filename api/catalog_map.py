@@ -425,6 +425,9 @@ MHZ = re.compile(r"^([\d,]+)\(MHz\)", re.I)
 WATT_FEAT = re.compile(r"^([\d,]+)\(W\)$", re.I)
 WATT_NAME = re.compile(r"(\d{3,4})\s?W\b", re.I)
 PCIE = re.compile(r"PCIe\s?([\d.]+)", re.I)
+# GPU VRAM 용량 — 'RTX 3050 6GB' · 'D6 8G'. 카드 실소비전력 참조표의 복합키 절반(0094).
+# 뒤에서부터 찾지 않고 첫 매치를 쓴다: 상품명 구조가 '<칩> <용량>' 이라 앞쪽이 VRAM 이다.
+_GPU_VRAM = re.compile(r"(\d{1,3})\s*G(?:B)?\b", re.I)
 GPU_MODEL = re.compile(r"(RTX|GTX|GT|RX)\s?(\d{3,4})\s?(Ti|SUPER|XT|XTX)?", re.I)
 NUM = re.compile(r"([\d,]+(?:\.\d+)?)")
 INCH_L2 = {"27인치 모니터": 27, "24인치 모니터": 24, "23인치 이하": 23}
@@ -500,11 +503,46 @@ def gpu_chipset_key(name: str):
     return f"{m.group(1).upper()} {m.group(2)}{suffix}"
 
 
+def gpu_vram_gb(name: str):
+    """상품명에서 VRAM 용량(GB) — 'RTX 3050 6GB' -> 6. 못 읽으면 None.
+
+    카드 실소비전력 참조표가 (chipset_key, vram_gb) **복합키**인 이유(0094):
+    같은 칩 이름이라도 VRAM 으로 TDP 가 갈린다 —
+    RTX 3050 6G=70W/8G=130W · RTX 4060 Ti 8G=160/16G=165 · RTX 3080 10G=320/12G=350.
+    """
+    m = _GPU_VRAM.search(name or "")
+    return int(m.group(1)) if m else None
+
+
+def gpu_power_draw(name: str, vram_gb, draw_ref: dict):
+    """(chipset_key, vram_gb) -> 카드 실소비전력. **모르면 None**(지어내지 않는다).
+
+    `draw_ref` 는 {(CHIPSET_KEY, vram_gb|0): watt}. 정확 일치가 없으면 «그 칩의 값이
+    하나뿐일 때만» VRAM 무시 매칭으로 내려간다 — 값이 VRAM 으로 갈리는 칩에서 VRAM 을
+    모르면 채우지 않는다(둘 중 하나를 고르는 건 값을 지어내는 것이다).
+    """
+    key = gpu_chipset_key(name)
+    if not key or not draw_ref:
+        return None
+    key = key.upper()
+    vram = vram_gb if vram_gb is not None else gpu_vram_gb(name)
+    hit = draw_ref.get((key, vram if vram is not None else 0))
+    if hit is not None:
+        return hit
+    same = {w for (k, _v), w in draw_ref.items() if k == key}
+    return next(iter(same)) if len(same) == 1 else None
+
+
 def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
-                  gpu_ref: dict) -> tuple:
+                  gpu_ref: dict, gpu_draw_ref: dict | None = None) -> tuple:
     """(specs, sources) — 뽑힌 값만 담는다. 못 뽑은 필드는 넣지 않는다(NULL 유지).
 
     sources: 필드 → 'eav'(키 직결) | 'feature'(특성 값) | 'name'(상품명) | 'reference'(표준표)
+
+    `gpu_ref`      = {chipset_key: recommended_watt}  — «시스템 권장 파워»(성능 등급축).
+    `gpu_draw_ref` = {(chipset_key, vram_gb): draw_watt} — «카드 실소비전력»(0094).
+      **두 표를 섞지 마라.** 한 컬럼이 두 일을 하던 것이 2026-09-17 사고의 원인이다.
+      기본값 None 이라 이 인자를 안 넘기는 기존 호출부(회귀 하네스 등)는 그대로 돈다.
     """
     s, src = {}, {}
 
@@ -546,6 +584,9 @@ def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
         key = gpu_chipset_key(name)
         if key and key in gpu_ref:
             put("required_power_watt", gpu_ref[key], "reference")
+        # 카드 실소비전력(0094) — 호환 규칙 'power' 가 읽는 값. 위의 등급값과 **다른 축**이다.
+        # 칩을 못 읽거나 표에 없으면 넣지 않는다(NULL) — 규칙이 'skip' 으로 판정 불가 처리한다.
+        put("gpu_power_draw_watt", gpu_power_draw(name, None, gpu_draw_ref or {}), "reference")
 
     elif part_type == "POWER":
         put("rated_watt", _num(kv.get("정격출력")), "eav")

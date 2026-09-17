@@ -41,6 +41,9 @@ RANGE = {
     "gpu_max_mm": (120, 600), "cooler_height_mm": (20, 220), "length_mm": (100, 450),
     "tdp_watt": (15, 400), "rated_watt": (150, 2000), "cooler_tdp": (30, 400),
     "clock_mhz": (1600, 9000), "required_power_watt": (150, 1200),
+    # gpu_power_draw_watt(0094) — 카드 실소비전력. GT 710(19W)이 하한, RTX 5090(575W)이
+    # 현 상한 근처다. 여유를 둬 (10, 900).
+    "gpu_power_draw_watt": (10, 900),
     "capacity_gb": (1, 65536), "refresh_hz": (24, 600),
 }
 ENUM = {
@@ -52,7 +55,7 @@ FF_OK = {"ATX", "m-ATX", "mini-ITX", "E-ATX"}
 # product_specs에서 INTEGER인 필드 — 소수 제안은 캐스트가 실패한다
 INT_FIELDS = {"length_mm", "rated_watt", "refresh_hz", "capacity_gb", "clock_mhz",
               "tdp_watt", "required_power_watt", "gpu_max_mm", "cooler_height_mm",
-              "cooler_tdp"}
+              "cooler_tdp", "gpu_power_draw_watt"}
 
 
 def verdict(field: str, value, sim: float, min_sim: float) -> str | None:

@@ -49,23 +49,32 @@ REQUIRED = {
 
 
 def load_gpu_ref():
-    """DB에서 참조표를 읽는다(없으면 빈 dict — dry-run은 DB 없이도 돌아야 한다)."""
+    """DB에서 참조표를 읽는다(없으면 빈 dict — dry-run은 DB 없이도 돌아야 한다).
+
+    둘을 함께 읽어 (등급표, 실소비전력표) 로 돌려준다 — 0094 부터 GPU 는 축이 둘이다.
+    """
     try:
         from dotenv import load_dotenv
         from sqlalchemy import create_engine, text
         load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
         e = create_engine(os.environ["DATABASE_URL"])
         with e.connect() as c:
-            return dict(c.execute(text(
+            ref = dict(c.execute(text(
                 "SELECT chipset_key, recommended_watt FROM gpu_power_reference")).all())
+            try:
+                draw = {(r[0], r[1]): r[2] for r in c.execute(text(
+                    "SELECT chipset_key, vram_gb, draw_watt FROM gpu_power_draw_reference")).all()}
+            except Exception:
+                draw = {}
+            return ref, draw
     except Exception as ex:
         print(f"  (GPU 참조표 로드 실패 — reference 계층 제외: {type(ex).__name__})")
-        return {}
+        return {}, {}
 
 
 def main():
-    gpu_ref = load_gpu_ref()
-    print(f"GPU 권장파워 참조표: {len(gpu_ref)}종\n")
+    gpu_ref, gpu_draw_ref = load_gpu_ref()
+    print(f"GPU 권장파워 참조표: {len(gpu_ref)}종 · 카드 소비전력 참조표: {len(gpu_draw_ref)}행\n")
 
     # product_id → 자체상품코드 (EAV 조인 키)
     pid_to_code = {}
@@ -107,7 +116,8 @@ def main():
         st["sale"] += 1
         if code not in kvs and code not in feats:
             no_spec_row += 1
-        specs, src = extract_specs(pt, kvs.get(code, {}), feats.get(code, []), name, l2, gpu_ref)
+        specs, src = extract_specs(pt, kvs.get(code, {}), feats.get(code, []), name, l2,
+                                   gpu_ref, gpu_draw_ref)
         need = REQUIRED.get(pt, [])
         for f in need:
             if specs.get(f) is not None:

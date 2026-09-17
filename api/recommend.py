@@ -34,6 +34,10 @@ from . import access_gate   # 접근 게이트의 단일 원천 — 열쇠 생�
 from . import llm       # LLM 호출의 단일 원천 — 이 파일에서 프로바이더를 직접 부르지 않는다
 from . import visitor
 from .catalog_map import gpu_chipset_key   # 「부품」(GPU 칩셋) 핀 정책 — 단일 원천(A-101)
+# 전원 여유율·파워 요구량의 단일 원천(2026-09-17 신설) — 같은 3줄이 recommend/swap/
+# expert 세 파일에 복제돼 있던 것을 한 곳으로 모았다(§단일 원천).
+from .power_rule import (SYSTEM_POWER_OVERHEAD_W, headroom_pct as power_headroom_pct,
+                         required_watt as power_required_watt)
 from .catalog_map import cpu_bundled_cooler   # CPU 기본 쿨러 판정 — 단일 원천(2026-09-09)
 from .catalog_map import cpu_has_igpu   # CPU 내장그래픽 판정 — 단일 원천(2026-09-15)
 from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정의를 그대로 쓴다(새로 만들지 않는다)
@@ -137,6 +141,9 @@ def _load_pool(conn):
         # vram_gb·cpu_cores(0083·0084) — usage_tier_rules(0085)가 쓴다. 뷰에는 이미 있고
         # 여기 안 실으면 NULL 불통과로 **조용히 0건**이 된다(슬라이스 46 전례).
         " vram_gb, cpu_cores,"
+        # gpu_power_draw_watt(0094) — 호환 규칙 'power'가 읽는 **카드 실소비전력**.
+        # 여기 안 실으면 규칙이 NULL 을 보고 GPU 가 통째로 탈락한다(슬라이스 39·43·46 전례).
+        " gpu_power_draw_watt,"
         " spec_sources, data_origin, market_price"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
@@ -221,7 +228,7 @@ def load_compat_rules(conn) -> dict:
     """
     rows = conn.execute(text(
         "SELECT rule_key, slot, field, op, ref_slot, ref_field, label, detail_fmt, blocking,"
-        " part_types"
+        " part_types, ref_offset, null_ref_mode"
         " FROM compat_rules WHERE active ORDER BY sort_order, rule_id")).mappings().all()
     by_slot: dict = {}
     for r in rows:
@@ -319,6 +326,59 @@ def _cmp(op: str, v, r) -> bool:
     return False   # 미지의 연산자 — 불통과(조용히 통과시키지 않는다)
 
 
+def _power_offset(rules: dict) -> int:
+    """규칙 표에 적힌 파워 오프셋(+200W)을 읽는다 — **DB 가 정본**이다.
+
+    운영자가 규칙 화면에서 이 값을 바꾸면 여유율 숫자도 함께 따라가야 한다(판정과
+    화면이 다른 수를 쓰면 "규칙은 막았는데 여유율은 110%" 같은 모순이 나온다).
+    규칙 행을 못 찾으면 `power_rule.SYSTEM_POWER_OVERHEAD_W` 폴백.
+    """
+    for rule in rules.get("POWER", ()):
+        if rule.get("rule_key") == "power":
+            off = rule.get("ref_offset")
+            return SYSTEM_POWER_OVERHEAD_W if off is None else int(off)
+    return SYSTEM_POWER_OVERHEAD_W
+
+
+def rule_ref_value(rule, r):
+    """상대값에 규칙의 `ref_offset` 을 적용한다 — 「+200W」 같은 정액 여유의 단일 원천.
+
+    엔진의 규칙 어휘는 「slot.field <op> ref_slot.ref_field」 **2항**뿐이라 상수를
+    표현할 수 없었다(마이그레이션 0094). 새 연산자를 만들면 `_cmp`·eq 인덱스·전방검사·
+    화면 표기 네 군데를 동시에 고쳐야 하므로, 대신 **상대값에 더하는 정수 한 칸**을 둔다.
+    `ref_offset` 기본값이 0 이라 기존 8개 규칙의 판정은 한 글자도 바뀌지 않는다.
+    """
+    off = rule.get("ref_offset") or 0
+    if r is None or not off:
+        return r
+    return r + off
+
+
+def rule_verdict(rule, v, r):
+    """규칙 한 줄의 판정 — True(통과) / False(불통과) / **None(판정 불가)**.
+
+    `None` 은 `null_ref_mode='skip'` 규칙에서 값이 없을 때만 나온다. 통과도 탈락도
+    아니다: 규칙을 적용하지 않고, 화면에는 「확인할 수 없음」으로 남긴다.
+
+    왜 필요한가 — `gpu_power_draw_watt` 는 이번에 **일반 소비자용 GPU 만** 채웠다
+    (사장님 지시 2026-09-17 #4). 워크스테이션 계열은 칩 파서가 대부분을 못 읽어 NULL 로
+    남는데, 기존 NULL 불통과(ERD §3.7)를 그대로 두면 그 제품군 견적이 통째로 0건이
+    된다 — CLAUDE.md 가 경고하는 «조용한 죽음». 또 "값을 모른다"를 "호환되지 않는다"로
+    말하는 것은 §화면 정직성 위반이다(`_rules_for_active` 가 재사용 슬롯에 대해 이미
+    같은 판단을 한다 — 같은 정신, 다른 사유).
+
+    **기본은 여전히 'block'(NULL 불통과)이다.** 규칙 행이 명시적으로 'skip' 을 켠
+    경우에만 판정 불가가 된다.
+
+    ⚠ 'skip' 은 **상대값(r)이 없을 때만** 적용한다(컬럼 이름이 `null_ref_mode` 인 이유).
+    대상값(v — 여기선 POWER.rated_watt)이 NULL 인 것은 다른 문제다: 정격을 모르는 파워를
+    "판정 불가"로 통과시키면 조립 안전장치가 그 파워에서 통째로 꺼진다. 그건 계속 불통과다.
+    """
+    if r is None and rule.get("null_ref_mode") == "skip":
+        return None
+    return _cmp(rule["op"], v, rule_ref_value(rule, r))
+
+
 def _rule_applies(rule, p) -> bool:
     """이 규칙이 이 부품을 겨냥하는가 — `part_types`가 비면 슬롯 전체(기존 동작).
 
@@ -335,13 +395,17 @@ def _slot_ok(slot, p, chosen, rules: dict):
 
     필드가 풀에 없으면 `.get()`이 None을 주고 NULL 불통과 규칙이 걸린다 — 500으로 죽는 대신
     "판정할 수 없으니 통과시키지 않는다"로 떨어진다(누락은 check_rule_fields가 경고로 알린다).
+
+    ⚠ `null_ref_mode='skip'` 규칙(0094 신설)은 값이 없을 때 **판정 불가(None)** 를 준다.
+    그건 불통과가 아니다 — 그 규칙을 건너뛴다. 「모른다」를 「호환 안 됨」으로 바꾸면
+    값을 아직 안 채운 제품군(워크스테이션 GPU)의 견적이 통째로 0건이 된다.
     """
     for rule in rules.get(slot, ()):
         if not _rule_applies(rule, p):
             continue
         v = p.get(rule["field"])
         r = chosen[rule["ref_slot"]].get(rule["ref_field"])
-        if not _cmp(rule["op"], v, r):
+        if rule_verdict(rule, v, r) is False:
             return False
     return True
 
@@ -473,13 +537,23 @@ def _narrow(slot, chosen, idx, pool):
 
 
 def _fwd_ok(slot, p, idx):
-    """이 후보를 고르면 뒤 슬롯이 확실히 비는가 — 비면 지금 자른다(극값 기준)."""
+    """이 후보를 고르면 뒤 슬롯이 확실히 비는가 — 비면 지금 자른다(극값 기준).
+
+    ⚠ 상대값에 `ref_offset`(0094)을 반드시 더해서 비교한다. 안 더하면 이 전방 검사가
+    실제 판정(`_slot_ok`)보다 **느슨해져** 자르기가 유효한 구성을 살려 두는 방향이라
+    결과는 안 바뀌지만, 더하면 잘라 낼 수 있는 분기를 놓친다. 판단을 두 벌로 두지
+    않기 위해 `rule_ref_value` 하나만 쓴다(§단일 원천).
+    """
     for ref_slot, rule, _target, ext in idx["fwd"]:
         if ref_slot != slot:
             continue
         rv = p.get(rule["ref_field"])
         if rv is None:
+            # 'skip' 규칙은 상대값이 없으면 **판정 자체를 안 한다** — 자를 근거도 없다.
+            if rule.get("null_ref_mode") == "skip":
+                continue
             return False                  # 상대 값이 없으면 대상 슬롯이 전부 불통과
+        rv = rule_ref_value(rule, rv)
         if rule["op"] == "gte" and ext < rv:
             return False
         if rule["op"] == "lte" and ext > rv:
@@ -715,6 +789,19 @@ def build_compat(chosen: dict, rules: dict, unknown_rules=()) -> dict:
             v = chosen[slot].get(rule["field"])
             r = chosen[rule["ref_slot"]].get(rule["ref_field"])
             fmt = rule["detail_fmt"] or "{v} / {r}"
+            verdict = rule_verdict(rule, v, r)
+            if verdict is None:
+                # 'skip' 규칙 · 값 없음 = **판정 불가**(0094). 통과로도 불통과로도 찍지
+                # 않는다 — "확인할 수 없다"를 그대로 말한다(§화면 정직성).
+                checks.append({
+                    "key": rule["rule_key"], "label": rule["label"],
+                    "pass": None, "unknown": True,
+                    "detail": "이 부품은 사양이 없어 확인할 수 없습니다",
+                })
+                continue
+            # {r} 은 **오프셋이 더해진 값**(= 실제로 요구하는 값)을 보여준다. 고객에게
+            # 의미 있는 숫자는 "파워를 몇 W 로 올려야 하나"이지 카드 TDP 가 아니다.
+            r_shown = rule_ref_value(rule, r)
             # 결측 참조 필드(None)를 str()에 그대로 넣으면 문구에 "None"이 샌다
             # (재현: "라디에이터 장착 불통과 · 3열 ≤ 케이스 None열" — 판정(_cmp)은
             # 이미 NULL 불통과로 맞고 문구만 오염됐다). 화면(S1 inspectBlock 등)이
@@ -725,9 +812,9 @@ def build_compat(chosen: dict, rules: dict, unknown_rules=()) -> dict:
             # 절대 만들지 않던 조합을 사람이 직접 만들 수 있게 열면서 드러났다.
             checks.append({
                 "key": rule["rule_key"], "label": rule["label"],
-                "pass": _cmp(rule["op"], v, r), "unknown": False,
+                "pass": verdict, "unknown": False,
                 "detail": fmt.replace("{v}", "—" if v is None else str(v))
-                             .replace("{r}", "—" if r is None else str(r)),
+                             .replace("{r}", "—" if r_shown is None else str(r_shown)),
             })
     for rule in unknown_rules:
         # customer-audit-2026-08-24 §1-1 후속 결함 수정 — `unknown_rules`를 그대로 다
@@ -755,9 +842,10 @@ def build_compat(chosen: dict, rules: dict, unknown_rules=()) -> dict:
     # 읽고, 여유율은 null(계산 불가)로 낸다. null이 "사양 결측"과 "재사용이라 모름"
     # 두 사유를 다 가질 수 있어 power_headroom_unknown으로 사유를 가른다.
     gpu, power = chosen.get("GPU"), chosen.get("POWER")
-    headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
-                if gpu and power and power.get("rated_watt") and gpu.get("required_power_watt")
-                else None)
+    # 여유율의 단일 원천은 `api/power_rule.py` — 같은 3줄이 recommend/swap/expert 에
+    # 복제돼 있었고 하나만 고치면 나머지 둘이 조용히 옛 값을 썼다(§단일 원천).
+    # 분모는 이제 «카드 소비전력 + 시스템 오버헤드»(규칙이 요구하는 값 그 자체)다.
+    headroom = power_headroom_pct(gpu, power, _power_offset(rules))
     return {"power_headroom_pct": headroom, "checks": checks,
             "power_headroom_unknown": gpu is None or power is None}
 

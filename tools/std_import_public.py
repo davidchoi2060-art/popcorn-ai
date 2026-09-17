@@ -41,7 +41,7 @@ ENGINE = create_engine(os.environ["DATABASE_URL"])
 # `public.product_specs` 컬럼 → std 필드 (이름이 같다). 값 변환이 필요한 것만 표시.
 NUM_COLS = ["tdp_watt", "rated_watt", "required_power_watt", "length_mm", "gpu_max_mm",
             "cooler_height_mm", "cooler_tdp", "radiator_rows", "radiator_max_rows",
-            "capacity_gb", "clock_mhz", "size_inch"]
+            "capacity_gb", "clock_mhz", "size_inch", "gpu_power_draw_watt"]
 TEXT_COLS = ["socket", "chipset", "mem_type", "form_factor", "interface"]
 LIST_COLS = ["socket_list", "form_factor_list"]
 INT_FROM_TEXT = ["pcie_gen"]        # '4.0' · 'PCIe5.0' 처럼 문자열로 저장돼 있다

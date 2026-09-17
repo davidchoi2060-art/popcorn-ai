@@ -139,7 +139,9 @@ from .recommend import (
     SLOTS, SLOT_TYPES, load_compat_rules, check_rule_fields, build_compat, _build_set,
     _cmp, _rule_applies, _explain_spec, _pref_tags, _companion, HIGHEND_CAP_X,
     _resolve_data_origin,   # 회귀 표식 판정 — recommend.py 정본, 새로 만들지 않는다
+    rule_verdict, rule_ref_value, _power_offset,   # 규칙 판정·오프셋(0094) — 정본 그대로
 )
+from .power_rule import headroom_pct as power_headroom_pct   # 여유율 단일 원천(§단일 원천)
 from .swap import _pool_ctx, _valid
 from .taxonomy import SLOT_LABELS as SLOT_KO
 from .timeutil import now_iso
@@ -454,21 +456,25 @@ def _partial_compat(chosen: dict, rules: dict) -> dict:
             if not _rule_applies(rule, a):
                 continue   # 겨냥하지 않은 부품(예: 라디에이터 규칙 vs 공랭) — build_compat과 동일
             v, r = a.get(rule["field"]), b.get(rule["ref_field"])
-            ok = _cmp(rule["op"], v, r)
+            ok = rule_verdict(rule, v, r)
             fmt = rule["detail_fmt"] or "{v} / {r}"
+            if ok is None:
+                # 'skip' 규칙 · 값 없음 = 판정 불가(0094). 불통과가 아니다.
+                checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": None,
+                               "detail": "이 부품은 사양이 없어 확인할 수 없습니다"})
+                continue
+            r_shown = rule_ref_value(rule, r)   # 오프셋 반영값(= 실제 요구치)
             # 결측 참조 필드(None)가 str()로 들어가 문구에 "None"이 새는 문제 —
             # recommend.py build_compat()과 같은 결함, 같은 처방("—"). 두 파일 다
             # 규칙 9행을 판정하는 자리라 엔진 정본에 새 공용 함수를 늘리지 않고
-            # 각자 고친다(판정 _cmp·_rule_applies 는 그대로 recommend.py 것을 쓴다).
+            # 각자 고친다(판정 rule_verdict·_rule_applies 는 recommend.py 것을 쓴다).
             checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": ok,
                            "detail": fmt.replace("{v}", "—" if v is None else str(v))
-                                         .replace("{r}", "—" if r is None else str(r))})
+                                         .replace("{r}", "—" if r_shown is None else str(r_shown))})
             if not ok:
                 violations.append(slot)
     gpu, power = chosen.get("GPU"), chosen.get("POWER")
-    headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
-                if gpu and power and power.get("rated_watt") and gpu.get("required_power_watt")
-                else None)
+    headroom = power_headroom_pct(gpu, power, _power_offset(rules))   # 단일 원천: api/power_rule.py
     return {"power_headroom_pct": headroom, "checks": checks,
             "violations": sorted(set(violations))}
 

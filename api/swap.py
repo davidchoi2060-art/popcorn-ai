@@ -45,7 +45,12 @@ from .db import engine
 from .product_name import display_name   # 대안 제시도 고객이 보는 자리다
 from .catalog_map import gpu_chipset_key   # 상품명 -> 칩셋 키. talk.py가 쓰는 것과 같은 단일 원천
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
-                        load_compat_rules, _cmp, _rule_applies)
+                        load_compat_rules, _cmp, _rule_applies, rule_verdict, rule_ref_value,
+                        _power_offset)
+# 파워 여유율·요구량·고객 문구의 단일 원천(2026-09-17) — 아래 `_chain_reason` 이 고객에게
+# «권장 N W» 를 말하는 근거다. 같은 계산을 여기서 다시 적지 않는다(§단일 원천).
+from .power_rule import (headroom_pct as power_headroom_pct, required_watt as power_required_watt,
+                         shortage_text)
 from .taxonomy import SLOT_LABELS as SLOT_KO   # 단일 원천 — SSD를 여기만 "저장장치"로 쓰고 있었다
 
 router = APIRouter(prefix="/api/swap")
@@ -60,6 +65,8 @@ SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_powe
              # capacity_gb·vram_gb·cpu_cores — usage_floors(하한)·usage_tier_rules(티어별 겨냥,
              # 0085)가 읽는 필드. 여기 없으면 대안이 NULL 불통과로 조용히 0건이 된다(슬라이스 46).
              " capacity_gb, vram_gb, cpu_cores,"
+             # gpu_power_draw_watt(0094) — 파워 호환 규칙이 읽는 카드 실소비전력.
+             " gpu_power_draw_watt,"
              " form_factor, form_factor_list, tag_white, tag_silent")
 
 
@@ -147,17 +154,21 @@ def _partial_compat(chosen: dict, rules: dict) -> dict:
             if not _rule_applies(rule, p):
                 continue   # 겨냥하지 않은 부품(예: 라디에이터 규칙 vs 공랭) — build_compat과 동일
             v, r = p.get(rule["field"]), ref.get(rule["ref_field"])
-            ok = _cmp(rule["op"], v, r)
+            ok = rule_verdict(rule, v, r)
             fmt = rule["detail_fmt"] or "{v} / {r}"
+            if ok is None:
+                # 'skip' 규칙 · 값 없음 = 판정 불가(0094). 불통과가 아니다.
+                checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": None,
+                               "detail": "이 부품은 사양이 없어 확인할 수 없습니다"})
+                continue
+            r_shown = rule_ref_value(rule, r)   # 오프셋 반영값(= 실제 요구치)을 보여준다
             checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": ok,
                            "detail": fmt.replace("{v}", "—" if v is None else str(v))
-                                         .replace("{r}", "—" if r is None else str(r))})
+                                         .replace("{r}", "—" if r_shown is None else str(r_shown))})
             if not ok:
                 violations.append(slot)
     gpu, power = chosen.get("GPU"), chosen.get("POWER")
-    headroom = (int(power["rated_watt"] / gpu["required_power_watt"] * 100)
-                if gpu and power and power.get("rated_watt") and gpu.get("required_power_watt")
-                else None)
+    headroom = power_headroom_pct(gpu, power, _power_offset(rules))   # 단일 원천: api/power_rule.py
     return {"power_headroom_pct": headroom, "checks": checks,
             "violations": sorted(set(violations))}
 
@@ -171,12 +182,19 @@ def _valid(chosen, rules) -> list:
     return [s for s in SLOTS if not _slot_ok(s, chosen[s], chosen, rules)]
 
 
-def _chain_reason(alt_slot: str, chain: list, chosen: dict, alt: dict) -> str:
+def _chain_reason(alt_slot: str, chain: list, chosen: dict, alt: dict, rules: dict) -> str:
+    """연쇄 교체가 필요한 이유 — 고객이 읽는 문장.
+
+    ⚠ 2026-09-17 수정 전 이 자리는 고객에게 **거짓말**을 하고 있었다:
+        "이 그래픽카드는 필요 전력이 550W라 현재 파워(500W)로는 부족해요"
+    그 550 은 `required_power_watt`(성능 «등급»)였다. RTX 3050 6GB 의 실제 소비전력은
+    70W 고 팝콘PC 는 그 카드를 500W 파워로 실제로 판다 — 숫자도 틀렸고 결론도 틀렸다.
+    사장님 지시(#2): **결론만 간단히** 「파워 용량이 부족해요(권장 330W)」.
+    카드 TDP 숫자는 고객에게 다 밝히지 않는다. 문구 정본은 `power_rule.shortage_text`.
+    """
     for c in chain:
         if c["_slot"] == "POWER":
-            return (f"이 {SLOT_KO[alt_slot]}는 필요 전력이 {alt.get('required_power_watt')}W라"
-                    f" 현재 파워({chosen['POWER']['rated_watt']}W)로는 부족해요"
-                    " — 파워를 함께 바꿔야 조립할 수 있어요.")
+            return shortage_text(power_required_watt(alt, _power_offset(rules)))
     names = " · ".join(SLOT_KO[c["_slot"]] for c in chain)
     return f"이 부품을 쓰려면 {names}을(를) 함께 바꿔야 조립할 수 있어요."
 
@@ -289,7 +307,7 @@ def candidates(body: SwapQuery, request: Request, k: str | None = None):
                            "price_diff": c["_to"]["sale_price"]
                                          - (c["_from"].get("snap_price") or c["_from"].get("sale_price"))},
                 } for c in chain]
-                entry["chain_reason"] = _chain_reason(s, chain, chosen, alt)
+                entry["chain_reason"] = _chain_reason(s, chain, chosen, alt, rules)
             alts.append(entry)
         # 정렬(2026-08-24 감사 §4-7) — «가격 오름차순»(by_slot 원래 순서)이 아니라
         # **지금 쓰는 부품과 가격이 가까운 순**으로 보여준다. 성능 지표가 있으면 그걸

@@ -28,7 +28,10 @@ CRITICAL_FIELDS = {"length_mm", "gpu_max_mm", "rated_watt", "socket"}
 FIELD_CAST = {
     **{f: "INTEGER" for f in (
         "length_mm", "rated_watt", "refresh_hz", "capacity_gb", "clock_mhz",
-        "tdp_watt", "required_power_watt", "gpu_max_mm", "cooler_height_mm", "cooler_tdp")},
+        "tdp_watt", "required_power_watt", "gpu_max_mm", "cooler_height_mm", "cooler_tdp",
+        # gpu_power_draw_watt(0094) — 카드 실소비전력. 참조표 값이 틀렸을 때 운영자가
+        # 여기서 고친다. 빠지면 값을 고칠 방법이 없다.
+        "gpu_power_draw_watt")},
     "size_inch": "NUMERIC(4,1)",
     **{f: "VARCHAR" for f in (
         "socket", "chipset", "mem_type", "form_factor", "interface", "pcie_gen",
