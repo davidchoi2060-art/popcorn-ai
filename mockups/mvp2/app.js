@@ -1,5 +1,6 @@
 // CUS-QUO-010 — A-128 ③ 실 API 연결 + A-135 격자 매트릭스 재설계(2026-09-16) + 격자 안내 재설계(2026-09-16 오후).
-//   ① POST /api/talk/parse   {text, state(이전 턴 TalkState|null), history} → state(누적 좌표)·missing·dropped·reply·pc_related
+//   ① POST /api/talk/parse   {text, state(이전 턴 TalkState|null), chat_flow(잡담 카운터|null), history}
+//        → state(누적 좌표)·missing·dropped·reply·pc_related·chat_flow·stage·silent
 //   ② POST /api/grid/recommend {state}            → card_sets[](용도별 묶음) · assumed[] · ai_estimated[] · needs[]
 //        카드마다 quotes 3종(가성비/추천/고성능, 재조회 없이 탭 전환)
 //   ③ GET  /api/grid/workstations?usage=&budget_won= → shown 일 때 AI 워크스테이션 진열(격자 카드와 별도)
@@ -68,6 +69,11 @@ const TALK={
  dropped:p=>Array.isArray(p&&p.dropped)?p.dropped:[],
  reply:p=>(p&&p.reply)||'',
  pcRelated:p=>p?p.pc_related:null,
+ // 잡담 흐름(2026-09-17) — 서버 talk_schema.ChatFlow 그대로. state 와 **형제**다(격자 좌표가 아니다).
+ // 화면은 이 수를 «해석하지 않고» 다음 요청에 되돌려 보내기만 한다 — 경계(3/4/5)는 서버가 정한다.
+ chatFlow:p=>(p&&p.chat_flow&&typeof p.chat_flow==='object')?p.chat_flow:null,
+ stage:p=>(p&&typeof p.stage==='string')?p.stage:null,
+ silent:p=>p?p.silent===true:false,
  assumed:p=>Array.isArray(p&&p.assumed)?p.assumed:[],
  evidence:p=>Array.isArray(p&&p.evidence)?p.evidence:[],
 };
@@ -332,8 +338,10 @@ if(!root.document||root.PopcornApp)return;
 const $=s=>document.querySelector(s);
 const API='';   // 같은 오리진(127.0.0.1:8000)에서 서빙 — 외부 CDN·절대 주소 없음
 const SAVE_KEY='popcorn-quotes-v2';   // 옛 키(popcorn-demo-quotes)는 가짜 가격이라 읽지 않는다
-const state={talk:null,history:[],quotes:[],grid:null,selected:null,selectedVariant:DEFAULT_VARIANT,cardVariant:{},busy:false,retry:null,usages:null,videoUrl:null,saved:[]};
+const state={talk:null,chatFlow:null,history:[],quotes:[],grid:null,selected:null,selectedVariant:DEFAULT_VARIANT,cardVariant:{},busy:false,retry:null,usages:null,videoUrl:null,saved:[]};
 // state.talk = 서버 TalkState(설계서 §4) 그대로. 화면은 이것을 만들거나 고치지 않는다 — 파서 응답으로만 교체된다.
+// state.chatFlow = 서버 ChatFlow(잡담 카운터) 그대로. **talk 안에 넣지 않는다** — 격자 좌표가 아니고
+//   /api/grid/recommend 에 보내는 state 에 섞이면 안 된다(api/talk_schema.py §1-b 근거).
 try{const saved=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]');if(Array.isArray(saved))state.saved=saved.filter(x=>x&&Array.isArray(x.parts)&&Number.isFinite(x.total)).slice(0,10);}catch{}
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3200);}
 
@@ -364,14 +372,29 @@ async function submit(text){
  const thinking=addMessage('assistant','조건을 읽는 중…');
  setBusy(true);
  let p;
- try{p=await api('POST','/api/talk/parse',{text,state:state.talk,history});}   // 이전 턴 state 를 되돌려 보낸다(누적)
+ try{p=await api('POST','/api/talk/parse',{text,state:state.talk,chat_flow:state.chatFlow,history});}   // 이전 턴 state·잡담 카운터를 되돌려 보낸다(누적)
  catch(e){thinking.remove();setBusy(false);showError(e,()=>submit(text));return;}
  thinking.remove();
  pushHistory('user',text);
  const next=TALK.state(p);
  if(next)state.talk=next;   // 서버가 state 를 안 주면(옛 서버) 이전 것을 유지 — 화면이 state 를 만들지 않는다
  else console.warn('talk/parse: 응답에 state 가 없습니다(옛 계약?)',Object.keys(p||{}));
+ const flow=TALK.chatFlow(p);
+ if(flow)state.chatFlow=flow;   // 화면은 이 수를 해석하지 않는다 — 다음 요청에 그대로 돌려보낼 뿐(경계는 서버가 센다)
  const reply=TALK.reply(p);
+ // ── 잡담 5회차~ : 말풍선을 만들지 않는다 ────────────────────────────────────
+ // 사장님 지시는 「양해를 구하고 답변하지 않는다」이고, 그 양해는 4회차(stage='guide')에
+ // 이미 한 번 나갔다. 여기서 짧은 안내를 다시 말풍선으로 내면 그것도 «답변»이고, 잡담이
+ // 이어지는 동안 같은 문장이 매 턴 쌓여 대화 기록이 안내문으로 덮인다(4회차 한 번이라는
+ // 지시도 사실상 깨진다). 그래서 **대화에는 아무것도 남기지 않는다**.
+ // 다만 화면이 죽은 것처럼 보이면 안 되므로, 기록에 남지 않는 toast 로 «받긴 했다»만
+ // 알린다(말풍선 아님 · history 에 안 들어감 · 3.2초 뒤 사라짐). 입력창은 그대로 살아
+ // 있다 — PC 질문 한 마디면 서버가 카운터를 0 으로 되돌려 즉시 복귀한다(④⑤).
+ if(TALK.silent(p)){
+  console.debug('talk/parse silent — 잡담 단계',TALK.stage(p),TALK.chatFlow(p));
+  toast('PC 견적 이야기를 해주시면 이어서 도와드릴게요.');
+  setBusy(false);return;
+ }
  if(reply){addMessage('assistant',reply);pushHistory('assistant',reply);}
  const dropped=TALK.dropped(p);
  if(dropped.length){addMessage('assistant','반영하지 못한 조건: '+dropped.map(d=>`${d.field||d.l||'?'}=${d.value??d.v??'?'}(${d.reason||'사유 없음'})`).join(' · '));}

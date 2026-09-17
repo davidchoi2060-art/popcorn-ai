@@ -90,6 +90,99 @@ class ParseResult(BaseModel):
     pc_related: bool | None = None
 
 
+# ── 1-b. 잡담 흐름 카운터 (2026-09-17 사장님 확정 「폭을 넓힌다」) ──────────────
+# ■ 왜 TalkState 가 아닌가 — **별도 축이다**
+#   TalkState 는 «격자 좌표» 계약이다(usages · budget_won · game …). 저기 담긴 값은
+#   전부 「고객이 어떤 PC 를 원하는가」를 가리키는 좌표이고, 그대로 grid_public 으로
+#   넘어가 카드를 고른다. 「잡담을 몇 번 했는가」는 **격자의 좌표가 아니다** — 그 수로는
+#   어떤 칸도 가리킬 수 없고, 격자 조회가 읽을 일도 없다. TalkState 에 끼워 넣으면
+#   ① validate_state 가 «어휘 밖 값» 판정을 할 수 없는 필드가 하나 섞이고
+#   ② /api/grid/recommend 가 받는 state 에도 따라 들어가 두 API 의 계약이 함께 늘고
+#   ③ 화면이 state 를 그대로 되돌려 보내는 규약(「화면은 state 를 고치지 않는다」)과
+#      충돌한다 — 카운터는 화면이 매 턴 «바뀐 값으로» 갈아 끼워야 하는 값이다.
+#   그래서 요청·응답의 **최상위 형제 필드**(`chat_flow`)로 둔다. 좌표와 흐름을 섞지 않는다.
+#
+# ■ history 문자열로 세지 않는다
+#   「직전 답변이 REPLY_NOT_PC 였는가」를 문자열 비교로 판정하는 방식은 표기가 바뀌는
+#   날 조용히 빠져나간다(CLAUDE.md §회귀 세트 — 이름·문자열 모양으로 동작을 추정하는
+#   검사). 명시적인 **수**로 왕복시키고, 전이는 아래 순수함수 하나가 한다.
+#
+# ■ 화면이 조작할 수 있다 — 그래도 새 방어를 만들지 않는다
+#   카운터를 화면이 들고 있으므로 매 요청 0 으로 보내면 잡담을 무한히 할 수 있다.
+#   그것을 막는 것은 **`rate_limit_policies` 의 `visitor.ai` 행**이다(분당 8 · 하루 120,
+#   2026-09-17 실측). 잡담 한 번도 LLM 호출 한 번이라 그 한도를 그대로 먹는다 —
+#   여기에 서버측 세션 저장소를 새로 만들지 않는다(consult_sessions 를 안 쓰는 규약도 그대로).
+#
+# 단계 이름 — talk.py · app.js · 회귀가 같은 문자열을 본다.
+STAGE_PC = "pc"          # 이번 문장이 PC 관련(또는 첫 문장) — 카운터 0
+STAGE_OPEN = "open"      # 잡담 1~3회차 — 자연스럽게 받아준다
+STAGE_GUIDE = "guide"    # 잡담 4회차 — 역할을 알리고 방향을 튼다(안내 1회)
+STAGE_SILENT = "silent"  # 잡담 5회차부터 — 답변 문장을 내지 않는다
+# 사장님 확정 경계(2026-09-17). 「3회 허용 -> 4회 안내 -> 5회부터 침묵」.
+SMALLTALK_ALLOW_MAX = 3      # 이 수까지는 그대로 받아준다
+SMALLTALK_GUIDE_AT = 4       # 이 수에서 역할 안내 1회
+SMALLTALK_SILENT_FROM = 5    # 이 수부터 침묵. 카운터는 여기서 멈춘다(정수 무한 증가 방지)
+
+
+class ChatFlow(BaseModel):
+    """대화 흐름 카운터 — TalkState 와 **형제**이고 부분집합이 아니다(위 근거).
+
+    `smalltalk_turns` 는 «PC 와 무관하다고 판정된 문장이 연속으로 몇 번 나왔는가».
+    PC 질문이 오면 0 으로 리셋한다 — 고객이 돌아왔으니 다시 3회 여유를 준다(④⑤).
+    """
+    smalltalk_turns: int = 0
+
+
+def stage_for(turns: int) -> str:
+    """카운터 -> 단계 이름. 전이와 표시가 같은 경계를 보게 하는 단일 원천."""
+    if turns <= 0:
+        return STAGE_PC
+    if turns <= SMALLTALK_ALLOW_MAX:
+        return STAGE_OPEN
+    if turns == SMALLTALK_GUIDE_AT:
+        return STAGE_GUIDE
+    return STAGE_SILENT
+
+
+def clamp_turns(raw) -> int:
+    """화면이 보낸 카운터 -> 0 .. SMALLTALK_SILENT_FROM 의 정수.
+
+    화면 값을 믿지 않는다 — 형식이 틀리거나 범위 밖이면 접는다(음수·문자열·bool·None).
+    ⚠ bool 은 int 의 하위형이라 먼저 걸러야 한다(True 가 1 로 새어 들어간다).
+    """
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        try:
+            raw = int(str(raw).strip())
+        except (TypeError, ValueError):
+            return 0
+    if raw < 0:
+        return 0
+    return min(raw, SMALLTALK_SILENT_FROM)
+
+
+def advance_smalltalk(prev_turns, pc_related: bool | None) -> tuple[int, str]:
+    """(직전 카운터, 이번 문장의 pc 판정) -> (새 카운터, 단계).
+
+    **순수함수다** — DB·LLM·시각을 보지 않는다. 회귀가 이 함수만으로 전이 전체를
+    검사할 수 있게(= LLM 을 부르지 않고) 이 모양으로 뽑았다.
+
+      pc_related is True  -> (0, "pc")        PC 질문 -> 리셋(⑤). 고객이 돌아왔다.
+      pc_related is None  -> (그대로, 단계)   **모름은 잡담이 아니다.** 카운터를 올리지
+                                              않는다 — 모르는 것을 잡담으로 단정하면
+                                              진짜 고객이 입을 닫는다(모듈 docstring
+                                              「pc_related 는 bool 이 아니면 None」과 같은 원칙).
+      pc_related is False -> (직전+1, 단계)   1~3 받아줌 · 4 안내 · 5부터 침묵.
+                                              SMALLTALK_SILENT_FROM 에서 멈춘다.
+    """
+    prev = clamp_turns(prev_turns)
+    if pc_related is True:
+        return 0, STAGE_PC
+    if pc_related is None:
+        return prev, stage_for(prev)
+    nxt = min(prev + 1, SMALLTALK_SILENT_FROM)
+    return nxt, stage_for(nxt)
+
+
 # ── 2. 어휘 로더 (§3 「정본은 DB」) ──────────────────────────────────────────
 @dataclass
 class Vocab:

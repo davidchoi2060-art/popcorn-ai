@@ -186,10 +186,57 @@ HISTORY_MAX_TURNS = 6
 # 가격을 말하지 않는다 -- 되묻기·확인만(§화면 정직성).
 REPLY_FALLBACK_HAS_CONS = "말씀하신 조건으로 찾아볼게요."
 REPLY_FALLBACK_NO_CONS = "어떤 PC가 필요하신지 조금 더 말씀해 주시겠어요?"
-# pc_related=false 일 때의 안내. 모델 문장을 쓰지 않고 이 한 줄로 고정한다 -- 잡담에
-# 모델이 잡담으로 답하는 것(날씨를 알려주는 등)을 구조적으로 막기 위해서다.
-REPLY_NOT_PC = "PC 견적을 도와드리는 자리예요 - 어떤 PC가 필요하세요?"
+# ── 잡담 허용 단계 (2026-09-17 사장님 확정 「폭을 넓힌다」) ──────────────────
+# **낡음** — 옛 규약(2026-08-17~09-16): `pc_related=false` 면 모델 문장을 버리고
+#   `REPLY_NOT_PC` 한 줄로 고정해 반송했다. 근거는 「잡담에 모델이 잡담으로 답하는 것을
+#   구조적으로 막는다」였다. 그 규약이 **PC 를 사러 온 사람을 문전박대했다**:
+#     고객  "내가 지금 게임을 시작하려고 하는데, 어떤 게임을 해볼까?"
+#     화면  "PC 견적을 도와드리는 자리예요 - 어떤 PC가 필요하세요?"   (배포 서버 실측)
+#   게임 이야기는 견적으로 가는 길목인데 그 자리에서 대화를 끊었다.
+# **지금 규약**: 잡담을 «단계»로 받는다(카운터 계약은 talk_schema §1-b).
+#     1~3회차  모델 문장을 그대로 낸다(게임 추천·일상 대화 허용 — 프롬프트 [잡담] 문단이
+#              허용/금지 경계를 긋는다). 친근함 우선.
+#     4회차    역할 안내 1회 — 아래 REPLY_ROLE_GUIDE 로 **고정**한다(모델 문장을 쓰지 않는다).
+#              이 한 줄이 「다음부터는 답하지 않는다」는 양해까지 함께 구한다(③).
+#     5회차~   답변 문장을 내지 않는다(reply="" · silent=true). 화면은 말풍선을 만들지 않는다.
+#     PC 질문  즉시 복귀 + 카운터 0(④⑤) — 침묵 상태에서도 그렇다.
+# ⚠ 침묵은 «문장을 안 내는 것»이지 «LLM 을 안 부르는 것»이 아니다. ④를 지키려면 이번 말이
+#   PC 관련인지 판정해야 하고 그건 LLM 만 할 수 있다. 키워드로 미리 걸러 호출을 줄이지
+#   **않는다** -- 2026-09-16 「격자 안내」 재설계가 벗어난 방식이 바로 그것이다. 비용은
+#   `rate_limit_policies`(visitor.ai 분당 8 · 하루 120)가 막는다.
+REPLY_ROLE_GUIDE = ("PC 견적을 도와드리는 자리라 다른 이야기는 여기까지만 함께할게요."
+                    " 어떤 PC가 필요하신지 말씀해 주시면 바로 도와드릴게요.")
+# 옛 이름 — 뜻이 「PC 아님 반송 문구」에서 「역할 안내 1회」로 바뀌었다. 지우지 않는다
+# (외부 참조 grep 2026-09-17: 없음. 되돌림 근거로만 남긴다).
+REPLY_NOT_PC = REPLY_ROLE_GUIDE
 REPLY_MAX_LEN = 200
+
+# ── 프롬프트 [잡담] 문단 — 허용/금지의 «경계» (2026-09-17) ────────────────────
+# 사장님이 허락하신 것은 「게임 추천·일상 대화」이지 「견적을 마음대로 말해도 된다」가
+# 아니다. 그래서 A-03(AI 는 견적을 만들지 않는다)은 잡담 turn 에서도 그대로 산다 --
+# 아래 문단이 그 경계를 프롬프트에 명시한다.
+# ⚠ 게임 «등급»의 정본은 DB 다(game_load_grades · game_grade_assignments). 모델이
+#   "롤은 사양 낮아도 돼요" 같은 등급성 판단을 말하면 같은 화면에 뜨는 격자 카드와
+#   어긋난다(카드는 DB 등급으로 만든다). 게임 «이야기»는 하되 «사양 등급 단정»은 막는다.
+SMALLTALK_BLOCK = "\n".join([
+    "[잡담 -- pc 가 false 일 때의 reply]",
+    "여기는 PC 견적 창구지만 사람을 문전박대하지 않는다. pc 가 false 여도 reply 는"
+    " **자연스럽게 응대한다**(친근함 우선). 딱딱한 반송 문구를 쓰지 않는다.",
+    "허용 -- 게임 이야기·게임 추천 · 인사 · 날씨 같은 일상 · 공감 · 가벼운 잡담.",
+    "금지 -- 다음 넷은 잡담에서도 절대 말하지 않는다. 다른 시스템이 답할 일이다:",
+    "  · 부품 추천 -- \"RTX 4060이면 충분해요\" 같은 말. AI 는 견적을 만들지 않는다.",
+    "  · 가격 -- \"그건 50만원이면 돼요\". 서버가 모르는 수를 말하는 것이다.",
+    "  · 사양 판정 -- \"그 컴퓨터면 돌아갑니다\". 우리에겐 보유 PC 진단 기능이 없다.",
+    "  · 재고·배송·할인 주장.",
+    "⚠ 우리 내부 용어를 고객에게 말하지 않는다 -- \"원장\"·\"격자\"·\"좌표\"·\"등급\"·\"state\" 같은"
+    " 말은 서버가 쓰는 말이지 고객이 듣는 말이 아니다(실측 2026-09-17: 모델이 \"저희 원장이\"라고"
+    " 말했다). 말할 수 없는 것은 그냥 \"견적으로 보여드릴게요\" 정도로 넘긴다.",
+    "게임 이야기는 해도, **그 게임이 사양을 얼마나 먹는지는 단정하지 않는다**"
+    " -- \"이건 사양 낮아도 돼요\"·\"고사양이라 좋은 컴퓨터가 필요해요\" 같은 등급성 판단 금지."
+    " 게임 부하 등급은 서버가 정하고 화면 카드가 보여준다. 모델이 말하면 카드와 어긋난다.",
+    "잡담 reply 도 존댓말 두 문장 이내다. 끝에 PC 이야기를 억지로 붙이지 않아도 된다"
+    " -- 서버가 때가 되면 역할을 안내한다.",
+])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ⚠ 도헤드(dead) 구역 -- 2026-09-16 「격자 안내」 재설계로 POST /parse 가 더는 쓰지 않는다.
@@ -279,6 +326,12 @@ class ParseBody(BaseModel):
     # 않는다: 프롬프트에 «이전까지 파악한 상태»로 실을 뿐이고, 모델이 낸 새 state 를
     # `validate_state` 가 다시 검증한다. 화면이 조작해 보낸 어휘 밖 값도 그 층에서 걸린다.
     state: dict | None = None
+    # 대화 흐름 카운터(2026-09-17 잡담 허용 단계). 계약은 `talk_schema.ChatFlow` --
+    # **TalkState 와 형제**이고 부분집합이 아니다(그 파일 §1-b 에 근거). 화면이 응답의
+    # 같은 필드를 그대로 되돌려 보낸다. 없으면 0(첫 문장)으로 본다. 서버는 이 값을 믿지
+    # 않는다 -- `clamp_turns` 가 범위 밖·형식 오류를 접는다. 화면이 0 으로 조작해 잡담을
+    # 무한히 할 수 있다는 것은 알고 둔 것이고, 그건 `rate_limit_policies`(visitor.ai)가 막는다.
+    chat_flow: dict | None = None
 
 
 def _trim_history(history) -> list:
@@ -409,8 +462,14 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "  구어·줄임말·오타여도 뜻이 PC 상담이면 true 다(겜 = 게임, 컴 = 컴퓨터, 본체 = PC).",
         "- false: PC 와 **분명히** 무관한 주제일 때만이다 -- 날씨·요리·연애·정치·건강·"
         "여행·번역·일반 지식 질문 등.",
-        "- 애매하면 true 다. false 는 상담을 그 자리에서 끊는 판정이라 확실할 때만 쓴다.",
+        "- 애매하면 true 다. false 는 격자 좌표를 뽑지 않는 판정이라 확실할 때만 쓴다"
+        "(상담을 끊는 판정이 아니다 -- 서버가 [잡담] 단계로 받아준다).",
         "- 이전 상태가 있고 이번 문장이 그것을 고치는 말이면(예산 변경·용도 추가) true 다.",
+        "- 게임 «고르기·공략·재미»만 묻고 컴퓨터를 사거나 맞출 뜻이 없어 보이면 false 다"
+        " (예: \"어떤 게임 해볼까?\", \"그 게임 재밌어요?\"). 반송하려는 것이 아니라 아래"
+        " [잡담] 규칙으로 받아주기 위한 구분이다 -- 같은 사람이 곧 PC 를 물으면 true 로 돌아온다.",
+        "",
+        SMALLTALK_BLOCK,
         "",
         "[규칙]",
         "- state 는 **누적**이다. 이전까지 파악한 상태를 그대로 가져오고, 이번 문장이 바꾼 것만"
@@ -449,7 +508,7 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "④ 수치·부품명·가격·후보 수·등급 이름을 **지어내지 않는다** -- \"RTX 4070이 좋아요\" 같은"
         " 추천·평가 금지. 고객이 말한 숫자·이름을 그대로 되짚는 것은 된다.",
         "⑤ 반말 금지 -- 존댓말(~요·~세요)로 쓴다. 두 문장을 넘기지 않는다.",
-        "pc 가 false 이면 reply 는 비워도 된다(서버가 안내 문장을 대신 넣는다).",
+        "pc 가 false 이면 위 [잡담] 규칙을 따른다 -- 비우지 말고 자연스럽게 응대한다.",
         "",
         "[이전까지 파악한 상태]",
         _prev_state_json(prev_state),
@@ -584,23 +643,35 @@ def _extract_json(raw: str) -> dict:
     return obj
 
 
-def _reply_text(obj: dict, pc, kept) -> str:
-    """모델이 낸 reply -> 고객에게 보일 한 문장(A-128 ②).
+def _reply_text(obj: dict, pc, kept, stage: str = TS.STAGE_PC) -> str:
+    """모델이 낸 reply -> 고객에게 보일 한 문장(A-128 ② · 2026-09-17 잡담 단계).
 
     `kept` 는 「조건을 하나라도 읽었는가」의 진릿값이면 된다 -- 옛 경로는 constraints
     목록을, 새 경로(2026-09-16)는 «state 에 용도가 있는가»를 넘긴다.
+    `stage` 는 `talk_schema.advance_smalltalk` 가 낸 단계(pc/open/guide/silent).
 
-    - pc 가 False 면 모델 문장을 **쓰지 않고** `REPLY_NOT_PC` 로 고정한다 -- 잡담에
-      모델이 잡담으로 답하는 것(날씨 알려주기 등)을 구조적으로 막는다.
+    - stage == silent  -> **빈 문자열**. 5회차부터는 답하지 않는다(사장님 확정 ③).
+      «호출을 안 하는 것»이 아니라 «문장을 안 내는 것»이다 -- 판정은 이미 LLM 이 했다.
+    - stage == guide   -> `REPLY_ROLE_GUIDE` 로 **고정**. 4회차 안내 1회는 서버 문장이다
+      (모델에게 맡기면 매번 다른 말이 나가고, 「다음부터 답하지 않는다」는 양해가 빠진다).
+    - stage == open    -> **모델 문장을 그대로 쓴다**(2026-09-17 규약 변경). 게임 추천·
+      일상 대화를 허용한 자리다. 경계(부품·가격·사양 판정·재고 금지)는 프롬프트
+      `SMALLTALK_BLOCK` 이 긋는다 -- 문장을 버려서 막던 것을 규칙으로 막는 쪽으로 바꿨다.
     - 모델이 비웠거나 문자열이 아니면 조건 유무에 따른 최소 문장으로 채운다 -- 빈
       말풍선을 띄우지 않는다. 지어내지 않는 문장이다(조건·부품·가격 없음).
     - 길이는 `REPLY_MAX_LEN` 으로 자른다(두 문장 상한을 어긴 출력 방어).
     """
-    if pc is False:
-        return REPLY_NOT_PC
+    if stage == TS.STAGE_SILENT:
+        return ""
+    if stage == TS.STAGE_GUIDE:
+        return REPLY_ROLE_GUIDE
     r = obj.get("reply")
     r = r.strip() if isinstance(r, str) else ""
     if not r:
+        if pc is False:
+            # 잡담인데 모델이 문장을 안 냈다 -- 빈 말풍선 대신 역할 안내를 낸다.
+            # 여기서 일상 대화를 «지어내지» 않는다(서버는 날씨를 모른다).
+            return REPLY_ROLE_GUIDE
         return REPLY_FALLBACK_HAS_CONS if kept else REPLY_FALLBACK_NO_CONS
     return r[:REPLY_MAX_LEN]
 
@@ -755,6 +826,7 @@ def parse_talk(body: ParseBody, request: Request):
       200 {ok, state{usages,budget_won,budget_bound,platform,tier_key,game{names,grade,
            grade_src,resolution}|null,exclude,prefs}, missing[], dropped[{field,value,reason}],
            evidence[], reply, assumed[], pc_related: true|false|null, note,
+           chat_flow{smalltalk_turns}, stage:"pc"|"open"|"guide"|"silent", silent: bool,
            constraints[{l,v}](하위호환 -- mvp1 전용, `_legacy_constraints`),
            history_used, provider, model, elapsed_sec, cost_usd, tokens_in, tokens_out, stored}
       429 {error:"rate_limited", scope:"visitor", window:"minute"|"day",
@@ -827,14 +899,19 @@ def parse_talk(body: ParseBody, request: Request):
     if not missing and state.game is not None and state.game.resolution is None:
         assumed.append(f"game.resolution={TS.DEFAULT_RESOLUTION}")
     pc = _pc_verdict(obj)
-    reply = _reply_text(obj, pc, bool(state.usages))
+    # 잡담 흐름 전이(2026-09-17) -- 순수함수 하나가 정한다(talk_schema.advance_smalltalk).
+    # 화면이 보낸 카운터는 그 함수가 clamp 한다. pc=None(모름)은 잡담으로 세지 않는다.
+    prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
+    turns, stage = TS.advance_smalltalk(prev_turns, pc)
+    reply = _reply_text(obj, pc, bool(state.usages), stage)
     evidence = _evidence_lines(obj)
     log.info("[talk] parse done: provider=%s pc=%s usages=%d game=%s missing=%d dropped=%d"
-             " reply_chars=%d tokens_in=%s elapsed=%.2fs",
+             " reply_chars=%d stage=%s turns=%d tokens_in=%s elapsed=%.2fs",
              result.provider, "none" if pc is None else ("yes" if pc else "no"),
              len(state.usages),
              "none" if state.game is None else f"{state.game.grade}/{state.game.grade_src}",
-             len(missing), len(dropped), len(reply), result.tokens_in, result.elapsed_sec)
+             len(missing), len(dropped), len(reply), stage, turns,
+             result.tokens_in, result.elapsed_sec)
     if pc is None:
         # 삼키지 않는다 -- 판정을 못 얻은 것도 사실이므로 로그에 남긴다. 화면은 이때
         # 반송하지 않고 「조건이 없다」쪽으로만 안내한다(정상 문의를 끊지 않는다).
@@ -846,8 +923,13 @@ def parse_talk(body: ParseBody, request: Request):
     # A-105(2026-08-23): `intent_key` 가 있으면 화면이 이미 정본 답을 골랐으므로 문구를 비운다.
     if body.intent_key:
         note = None
-    elif pc is False and not state.usages:
-        note = "PC 상담 문장이 아니라고 판정했습니다."
+    elif stage == TS.STAGE_SILENT:
+        note = "잡담이 %d회째라 답변하지 않았습니다." % turns
+    elif stage == TS.STAGE_GUIDE:
+        note = "잡담이 %d회째라 역할을 안내했습니다." % turns
+    elif pc is False:
+        note = "PC 상담 문장이 아니라고 판정했습니다(잡담 %d/%d회)." % (
+            turns, TS.SMALLTALK_ALLOW_MAX)
     elif missing:
         note = "카드를 내기엔 좌표가 아직 모자랍니다: " + ", ".join(missing)
     else:
@@ -869,6 +951,15 @@ def parse_talk(body: ParseBody, request: Request):
         # 하위호환 -- mvp1(s1-session.html `srvParse`)이 아직 옛 모양을 읽는다. mvp2 는 `state`.
         "constraints": _legacy_constraints(state),
         "note": note,
+        # 대화 흐름 카운터(2026-09-17) -- 화면이 그대로 들고 있다가 다음 요청에 되돌려
+        # 보낸다(state 왕복과 같은 방식). **TalkState 안이 아니라 형제 필드**다 --
+        # 근거는 talk_schema §1-b. `stage` 는 화면이 다시 계산하지 않게 서버가 붙인다
+        # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
+        "chat_flow": TS.ChatFlow(smalltalk_turns=turns).model_dump(),
+        "stage": stage,
+        # 침묵 턴 표시. reply 가 빈 문자열인 것과 같은 사실이지만, 화면이 «빈 문자열»을
+        # 「모델이 실수로 안 냈다」와 구분해 다룰 수 있게 명시 플래그로 준다.
+        "silent": stage == TS.STAGE_SILENT,
         # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 0 이면 이력 없이 판정한 응답이다.
         "history_used": len(history),
         "provider": result.provider, "model": result.model,

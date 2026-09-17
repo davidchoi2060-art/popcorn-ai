@@ -7056,6 +7056,110 @@ def test_talk_grid_contract():
           d.get("ok") is True and len(d.get("dropped") or []) >= 2,
           "ok·dropped 2건 이상", (d.get("ok"), len(d.get("dropped") or [])))
 
+    # ── ⑤ 잡담 허용 단계 (2026-09-17 사장님 확정 「폭을 넓힌다」) ──────────────
+    # 고친 병: pc_related=false 면 모델 문장을 버리고 한 줄로 반송했다. 그래서
+    # "게임을 시작하려는데 어떤 게임을 해볼까?" 라 물은 **PC 를 사러 온 사람**이
+    # 문전박대당했다(배포 서버 실측). 지금은 3회 허용 -> 4회 안내 -> 5회부터 침묵이고
+    # PC 질문이 오면 카운터가 0 으로 리셋된다.
+    #
+    # ⚠ **LLM 을 부르지 않는다** — 전이 전체를 순수함수(`talk_schema.advance_smalltalk`)로
+    #   뽑아 두었으므로 그 함수만 돌린다. 이 섹션은 네트워크도 DB 도 쓰지 않는다.
+    # ⚠ 문자열 모양으로 동작을 추정하지 않는다 — 「직전 답변이 반송 문구였는가」를
+    #   history 문자열로 세던 방식이 바로 §회귀 세트가 경고하는 패턴이다. 여기서는
+    #   명시적인 **수**(smalltalk_turns)와 단계 이름만 본다.
+    import importlib
+    _ts = importlib.import_module("api.talk_schema")
+    F, T, N = False, True, None      # pc_related 세 값
+    # ⓐ 사장님이 부르신 경계 그대로 — 잡담 5연속.
+    seq = [F, F, F, F, F]
+    expect = [(1, "open"), (2, "open"), (3, "open"), (4, "guide"), (5, "silent")]
+    turns, got = 0, []
+    for v in seq:
+        turns, stage = _ts.advance_smalltalk(turns, v)
+        got.append((turns, stage))
+    check("[54] 잡담 1~3회 허용 · 4회 안내 · 5회 침묵", got == expect, expect, got)
+    # ⓑ 침묵 상태에서도 PC 질문이면 즉시 복귀 + 카운터 0 (④⑤).
+    turns, stage = _ts.advance_smalltalk(5, T)
+    check("[54] 침묵 중 PC 질문 -> 카운터 0 + 단계 pc(즉시 복귀)",
+          (turns, stage) == (0, "pc"), (0, "pc"), (turns, stage))
+    # 리셋 뒤에는 다시 3회 여유가 있다 — 복귀가 «한 턴짜리»가 아님을 본다.
+    turns, got = 0, []
+    for v in (F, T, F, F, F):
+        turns, stage = _ts.advance_smalltalk(turns, v)
+        got.append((turns, stage))
+    check("[54] 리셋 뒤 다시 1회차부터 센다(3회 여유가 되살아난다)",
+          got == [(1, "open"), (0, "pc"), (1, "open"), (2, "open"), (3, "open")],
+          [(1, "open"), (0, "pc"), (1, "open"), (2, "open"), (3, "open")], got)
+    # ⓒ pc_related=null(모름)은 잡담이 아니다 — 카운터를 올리지 않는다.
+    #   이 검사가 실패하려면: 모델이 형식을 어긴 응답(판정 없음)을 잡담으로 세야 한다.
+    #   그러면 진짜 고객이 모델 실수 몇 번에 침묵 처분을 받는다.
+    check("[54] pc_related=null(모름)은 잡담으로 세지 않는다",
+          _ts.advance_smalltalk(2, N) == (2, "open"), (2, "open"),
+          _ts.advance_smalltalk(2, N))
+    check("[54] 0회차에서 모름이 와도 0 이다", _ts.advance_smalltalk(0, N) == (0, "pc"),
+          (0, "pc"), _ts.advance_smalltalk(0, N))
+    # ⓓ 카운터는 침묵 단계에서 멈춘다 — 화면이 오래 잡담해도 정수가 무한히 자라지 않는다.
+    turns = 5
+    for _ in range(10):
+        turns, stage = _ts.advance_smalltalk(turns, F)
+    check("[54] 잡담이 계속돼도 카운터는 SMALLTALK_SILENT_FROM 에서 멈춘다",
+          (turns, stage) == (_ts.SMALLTALK_SILENT_FROM, "silent"),
+          (_ts.SMALLTALK_SILENT_FROM, "silent"), (turns, stage))
+    # ⓔ 화면 값을 믿지 않는다 — 형식이 틀리거나 범위 밖이면 접는다.
+    #   화면이 0 으로 조작해 잡담을 무한히 하는 것은 `rate_limit_policies`(visitor.ai)가
+    #   막는다(새 방어를 만들지 않는다). 여기서 보는 것은 **깨지지 않는 것**뿐이다.
+    bad_cases = [(None, 0), ("3", 3), (-7, 0), (99, _ts.SMALLTALK_SILENT_FROM),
+                 (True, 0), ("abc", 0), (2.9, 0)]
+    bad_got = [(raw, _ts.clamp_turns(raw)) for raw, _ in bad_cases]
+    check("[54] 화면이 보낸 카운터를 clamp 한다(None·문자열·음수·과대·bool)",
+          bad_got == bad_cases, bad_cases, bad_got)
+    # ⓕ 경계를 두 벌로 두지 않는다 — stage_for 와 advance_smalltalk 이 같은 경계를 본다.
+    mism = [t for t in range(0, _ts.SMALLTALK_SILENT_FROM + 1)
+            if _ts.advance_smalltalk(t - 1, False)[1] != _ts.stage_for(t) and t > 0]
+    check("[54] stage_for 와 advance_smalltalk 의 경계가 같다(경계 단일 원천)",
+          mism == [], [], mism)
+
+    # ⓖ 잡담 turn 에서도 «원장이 답할 것»은 프롬프트가 금지한다 — A-03 은 그대로 산다.
+    #   사장님이 허락하신 것은 게임 추천·일상 대화이지 견적을 말해도 된다가 아니다.
+    #   이 검사가 실패하려면: [잡담] 문단에서 금지 경계가 빠져야 한다(그러면 모델이
+    #   "RTX 4060이면 충분해요" 같은 말을 해도 프롬프트상 막는 것이 없다).
+    talkpy = pathlib.Path(ROOT, "api", "talk.py").read_text(encoding="utf-8")
+    import api.talk as _talk
+    block = _talk.SMALLTALK_BLOCK
+    for token in ("부품 추천", "가격", "사양 판정", "재고", "등급"):
+        check(f"[54] 프롬프트 [잡담] 문단이 '{token}' 을 금지 경계로 명시한다",
+              token in block, "있음", "없음")
+    check("[54] 프롬프트 [잡담] 문단이 허용 범위(게임 추천·일상)를 명시한다",
+          "게임 추천" in block and "잡담" in block, "있음", block[:80])
+    check("[54] _build_prompt 가 [잡담] 문단을 실제로 싣는다(정의만 하고 안 쓰면 무의미)",
+          "SMALLTALK_BLOCK" in talkpy.split("SMALLTALK_BLOCK = ", 1)[1],
+          "_build_prompt 에서 참조", "참조 없음")
+    # ⓗ 침묵 단계에서도 LLM 호출은 유지된다 — ④(PC 질문이면 즉시 복귀)를 지키려면
+    #   이번 말이 PC 관련인지 판정해야 하고, 그건 LLM 만 한다. 키워드로 미리 걸러
+    #   호출을 줄이면 2026-09-16 「격자 안내」 재설계가 벗어난 방식으로 되돌아간다.
+    #   이 검사가 실패하려면: parse_talk 가 LLM 호출 «앞»에서 조기 반환하게 돼야 한다.
+    body_src = talkpy.split("def parse_talk(", 1)[1]
+    before_llm = body_src.split("llm.call(", 1)[0]
+    early = [ln.strip()[:70] for ln in before_llm.splitlines()
+             if ln.strip().startswith("return ")]
+    check("[54] 침묵이어도 LLM 을 부른다 — parse_talk 는 호출 앞에서 조기 return 하지 않는다",
+          early == [], [], early)
+    # ⓘ 카운터를 TalkState 에 넣지 않았다 — 격자 좌표 계약을 오염시키지 않는다.
+    check("[54] TalkState 에 잡담 카운터가 없다(좌표와 흐름은 다른 축)",
+          "smalltalk_turns" not in _ts.TalkState.model_fields,
+          "없음", sorted(_ts.TalkState.model_fields))
+    check("[54] ChatFlow 는 TalkState 와 별도 모델이다",
+          "smalltalk_turns" in _ts.ChatFlow.model_fields, "있음",
+          sorted(_ts.ChatFlow.model_fields))
+    # ⓙ 화면이 카운터를 되돌려 보내고, grid 로 새어 들어가지 않는다.
+    appjs2 = pathlib.Path(ROOT, "mockups", "mvp2", "app.js").read_text(encoding="utf-8")
+    check("[54] app.js 가 /api/talk/parse 에 chat_flow 를 되돌려 보낸다",
+          "chat_flow:state.chatFlow" in appjs2.replace(" ", ""), "있음", "없음")
+    grid_call = [ln for ln in appjs2.splitlines() if "/api/grid/recommend" in ln]
+    check("[54] app.js 가 grid/recommend 에는 chat_flow 를 싣지 않는다(좌표 계약 분리)",
+          all("chat_flow" not in ln and "chatFlow" not in ln for ln in grid_call),
+          "없음", grid_call[:2])
+
 
 if __name__ == "__main__":
     sys.exit(main())
