@@ -8,6 +8,29 @@ GT710 2GB가 나왔다 — 저소음 + 최저가를 정확히 만족한 결과�
 (후보 카운터와 견적 엔진이 같은 규칙을 써야 화면과 결과가 어긋나지 않는다).
 
 `spec_fields`와 같은 캐시 방식이다 — 요청마다 읽지 않고, 관리자가 고치면 `reload()`.
+
+■ ★ 표가 셋이다 — 어느 규칙을 어디에 두는가 (2026-09-18 확정)
+  정본: docs/design/usage-rules-rebuild-2026-09-18.md §4
+
+      표                  축                    성격          못 맞추면
+      usage_floors        용도                  고정 하한     **조합을 포기한다**
+      usage_tier_rules    용도 × 예산           겨냥          규칙을 풀고 짓는다
+      part_cond_rules     이미 고른 다른 부품   조건부 겨냥   규칙을 풀고 짓는다
+
+  판정 질문 셋을 순서대로 묻는다:
+    ① **다른 슬롯의 선택에 달렸는가?** -> `part_cond_rules`
+       (VRAM 8GB 를 고르면 RAM 32GB — 예산이 아니라 «무엇을 골랐는가»가 조건이다)
+    ② **예산이 오르면 값도 오르는가?** -> `usage_tier_rules`
+       (AI 는 150만 32GB · 400만 64GB — 같은 용도인데 값이 여럿이다)
+    ③ **예산과 무관하게 이 밑으로는 그 용도를 «못 하는가»?** -> `usage_floors`
+       (개발 RAM 16GB — 8GB 로는 IDE 가 스왑한다. 돈이 없어도 내릴 수 없다)
+
+  ⚠ 값을 고를 때의 기준도 다르다. 하한은 그 카테고리 프로그램들의 **가장 낮은**
+    커뮤니티 권장치(모두가 공통으로 필요한 선)이고, 겨냥은 **무거운 쪽**(전업·대형
+    프로젝트) 수치다. 예) 개발 — VS Code 커뮤니티 16GB 가 하한, 안드로이드
+    스튜디오·인텔리제이·도커 커뮤니티 32GB 가 겨냥.
+    32 를 하한으로 박으면 60만원 개발 PC 가 아예 안 나오고, 16 만 두면 예산이
+    있어도 32 로 안 올라간다 — **둘 다 필요해서 표가 둘이다.**
 """
 from fastapi import APIRouter
 from sqlalchemy import text
@@ -95,7 +118,9 @@ def summary(value: str) -> list:
 # 근거다**(슬라이스 58). 같은 조립이 `candidates._apply_one`(118-120행)과
 # `recommend.py`(652-654행)에도 인라인으로 있다. 정본은 여기이고 저 둘은 각자
 # 담당자가 이 함수를 부르도록 정리할 자리다 — 지금 고치면 담당 밖이라 남겨 둔다.
-_UNIT = {"required_power_watt": "W", "capacity_gb": "GB"}
+_UNIT = {"required_power_watt": "W", "capacity_gb": "GB", "vram_gb": "GB"}
+# vram_gb (2026-09-19 · 0104) — 3D 분할이 GPU 하한을 **전원(W) 이 아니라 VRAM** 으로
+#   바꾸면서 필요해졌다. 없으면 근거 한 줄이 "그래픽카드 8 이상"으로 단위 없이 나간다.
 
 
 def floor_text(rows: list) -> str:
