@@ -144,6 +144,9 @@ def _load_pool(conn):
         # gpu_power_draw_watt(0094) — 호환 규칙 'power'가 읽는 **카드 실소비전력**.
         # 여기 안 실으면 규칙이 NULL 을 보고 GPU 가 통째로 탈락한다(슬라이스 39·43·46 전례).
         " gpu_power_draw_watt,"
+        # cpu_gpu(0100) — CPU 내장그래픽 유무의 **1순위 원천**(백필 완료). 여기 안 실으면
+        # `cpu_has_igpu`가 상품명 폴백으로만 판정한다 — 그 폴백이 옛 결함의 진원지였다.
+        " cpu_gpu,"
         " spec_sources, data_origin, market_price"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
@@ -1060,13 +1063,26 @@ def _igpu_gpu_omit(chosen: dict, allow: bool):
 
     allow=False(호출부가 이 용도엔 GPU 성능 하한이 있다고 판단)면 항상 (None, False) —
     iGPU가 있어도 그 용도엔 별도 GPU가 필요하다는 뜻이라 생략하지 않는다.
+
+    ★ `cpu_has_igpu`는 **3상태**(True/False/None)다. 여기서 세 갈래를 다르게 다룬다:
+      True  — GPU 슬롯을 비운다(근거: 내장그래픽 사용).
+      False — 그대로 둔다. 근거도 적지 않는다(외장 GPU 가 당연한 구성).
+      None  — **모른다**. 「없다」로 굳히지 않고 **안전한 쪽**(그래픽카드를 넣는다)을
+              고르되, **그 사실을 근거에 적는다**. 화면이 안 나오는 견적보다
+              몇만 원 비싼 견적이 낫다 — 다만 고객이 그 이유를 알아야 한다
+              (§화면 정직성: 「모른다」를 「없다」인 척하지 않는다).
     """
     cpu = chosen.get("CPU")
     if not allow or cpu is None or "GPU" not in chosen:
         return None, False   # 재사용·미선택으로 CPU나 GPU 자리가 없으면 판정할 것이 없다
-    if not cpu_has_igpu(cpu.get("product_name"), cpu.get("maker")):
-        return None, False   # iGPU가 없으면 지금 동작 그대로 — 추론하지 않는다
-    return "CPU 내장그래픽 사용 (별도 그래픽카드 불필요)", True
+    # DB 값(`cpu_gpu`, 0100)을 1순위로 넘긴다 — 없으면 함수가 상품명 폴백을 쓴다.
+    verdict = cpu_has_igpu(cpu.get("product_name"), cpu.get("maker"), cpu.get("cpu_gpu"))
+    if verdict is True:
+        return "CPU 내장그래픽 사용 (별도 그래픽카드 불필요)", True
+    if verdict is None:
+        return ("CPU 내장그래픽 여부 미확인이라 그래픽카드를 포함했습니다"
+                " (화면 출력이 안 되는 구성을 피하기 위한 안전 선택)"), False
+    return None, False       # False — iGPU 가 없다. 지금 동작 그대로.
 
 
 def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_override=None,
@@ -1115,6 +1131,11 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     if meta is not None:
         meta["exhausted"] = False   # 기본값 — 슬롯이 비어 DFS를 아예 안 부르는 경우 등
     slots = active_slots if active_slots is not None else SLOTS
+    # 「이번에 채우기로 한 자리」의 원본 — 아래 iGPU 우선 패스가 `slots` 에서 GPU 를 뺄 수
+    # 있는데, `reused`(쓰시던 부품) 계산이 그걸 보면 **엔진이 일부러 뺀 자리**가 「고객이
+    # 재사용하기로 한 자리」로 둔갑한다(다른 사실이다 — §화면 정직성). 그래서 재사용
+    # 판정은 끝까지 이 원본만 본다.
+    planned_slots = list(slots)
     slot_pools = {}
     for s in slots:
         cands = [p for p in pool if p["part_type"] in SLOT_TYPES[s]]
@@ -1137,9 +1158,62 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     if alloc_floor:
         _alloc = UA.for_usage(usage_key)
         leaf_ok = lambda ch, tot: not UA.violations(_alloc, ch, tot)   # noqa: E731
-    chosen, exhausted = _dfs(slot_pools, limit, rules, slots, order=_order_of(tier, cap is not None),
-                             leaf_ok=leaf_ok,
-                             order_of=lambda s: _order_of(tier, cap is not None, s))
+    # ── iGPU 우선 패스 (2026-09-18) ────────────────────────────────────────────
+    # **왜 사후 생략만으로는 부족한가.** GPU 슬롯을 「고른 뒤에 빼는」 것만 하면 DFS 는
+    # 여전히 GPU 가격(최저 297,700원)을 «예산 안에» 넣고 탐색한다. 그러면 70만원 사무용
+    # 예산에서 CPU 에 쓸 수 있는 돈이 GPU 값만큼 깎이고, 내림차순 티어(추천·고성능)는
+    # 그 좁아진 여유에 맞는 F 계열 CPU(12100F·14700F — iGPU 없음)를 먼저 집어 버린다.
+    # 결과적으로 「iGPU CPU 를 고를 수 있었는데 고르지 않는」 자리가 생기고, 사후 생략은
+    # 영영 발동하지 않는다(실측: 컬럼 배선만 했을 때 총액이 한 푼도 안 변했다).
+    #
+    # 그래서 **탐색 자체를 두 번** 한다. 1차는 「CPU 는 내장그래픽을 가진 것만, GPU
+    # 슬롯은 아예 없음」으로 돌린다 — GPU 값이 예산에서 빠진 채로 CPU 를 고르므로
+    # 사장님이 실제로 파는 사무용 구성(3200G·12100·5500GT)이 그대로 나온다. 1차가
+    # 실패하면(iGPU CPU 가 예산·호환에 안 맞으면) 2차로 기존 탐색을 그대로 돌린다 —
+    # **기존 동작이 폴백**이라 이 패스가 없던 결과를 없애지 않는다.
+    #
+    # ⚠ 1차 패스는 `allow_igpu_omit`(호출부가 「이 용도엔 GPU 성능 하한이 없다」고
+    # 판정한 경우)일 때만 돈다. 게임·영상편집은 여기 들어오지 않는다.
+    # ⚠ 판정은 `cpu_has_igpu` 가 **True 라고 단언한 것만** 통과시킨다 — None(모름)은
+    # 넣지 않는다(화면이 안 나오는 구성을 만들 수 있다 — 안전한 쪽이 곧 «넣지 않는» 쪽).
+    def _slot_pools_for(sl, pl):
+        out = {}
+        for s in sl:
+            cands = [p for p in pl if p["part_type"] in SLOT_TYPES[s]]
+            if not cands:
+                return None
+            out[s] = _tier_sort(cands, tier, cap is not None, s)
+        return out
+
+    def _rules_without_gpu(rs):
+        rs = {s: r for s, r in rs.items() if s != "GPU"}
+        return {s: [r for r in rl if r["ref_slot"] != "GPU"] for s, rl in rs.items()}
+
+    attempts = []               # [(슬롯, 풀, 규칙, 이 패스가 GPU 를 아예 안 골랐나)]
+    if allow_igpu_omit and "GPU" in slots:
+        igpu_pool = [p for p in pool
+                     if p["part_type"] not in SLOT_TYPES["CPU"]
+                     or cpu_has_igpu(p.get("product_name"), p.get("maker"),
+                                     p.get("cpu_gpu")) is True]
+        if any(p["part_type"] in SLOT_TYPES["CPU"] for p in igpu_pool):
+            attempts.append(([s for s in slots if s != "GPU"], igpu_pool,
+                             _rules_without_gpu(rules), True))
+    attempts.append((slots, pool, rules, False))
+
+    chosen, exhausted = None, False
+    dfs_slots, dfs_rules, gpu_omitted_by_pass = slots, rules, False
+    for a_slots, a_pool, a_rules, a_dropped in attempts:
+        a_pools = _slot_pools_for(a_slots, a_pool)
+        if a_pools is None:
+            continue            # 이 패스는 슬롯 하나가 통째로 비었다 — 다음 패스로
+        chosen, exhausted = _dfs(a_pools, limit, a_rules, a_slots,
+                                 order=_order_of(tier, cap is not None), leaf_ok=leaf_ok,
+                                 order_of=lambda s: _order_of(tier, cap is not None, s))
+        if chosen is not None:
+            dfs_slots, dfs_rules, gpu_omitted_by_pass = a_slots, a_rules, a_dropped
+            break
+    slots = dfs_slots           # 아래 out_slots·reused 계산이 이 패스 기준이어야 한다
+    rules = dfs_rules
     if meta is not None:
         meta["exhausted"] = exhausted
     if chosen is None:
@@ -1183,6 +1257,14 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     # 없을 때만 True — `floors_checked`에 GPU 항목이 있으면 호출부가 False로
     # 넘겨 이 분기 자체를 스킵한다).
     igpu_note, drop_gpu = _igpu_gpu_omit(chosen, allow_igpu_omit)
+    # iGPU 우선 패스(위)가 이겼으면 GPU 는 **애초에 고르지도 않았다** — `chosen` 에 GPU
+    # 키가 없어 위 함수는 (None, False)를 낸다. 그래도 고객에게는 「엔진이 일부러 뺀
+    # 자리」로 똑같이 보여야 한다(빼는 시점만 다를 뿐 같은 사실이다). 그래서 여기서
+    # 근거를 채워 준다 — 안 하면 GPU 자리가 «아무 설명 없이» 사라진다.
+    if gpu_omitted_by_pass and "GPU" not in chosen:
+        igpu_note = igpu_note or "CPU 내장그래픽 사용 (별도 그래픽카드 불필요)"
+        omitted = omitted + [{"slot": "GPU", "label": SLOT_KO.get("GPU", "GPU"),
+                              "reason": "cpu_has_igpu", "note": igpu_note}]
     if drop_gpu:
         chosen = {s: p for s, p in chosen.items() if s != "GPU"}
         out_slots = [s for s in out_slots if s != "GPU"]
@@ -1300,7 +1382,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
                     "note": "쓰시던 부품을 사용합니다 - 이 견적에 포함되지 않았습니다"}
                    # `slots`(원래 채우기로 한 자리)를 기준으로 본다 — `out_slots`로 보면
                    # 기본 쿨러로 «빼기로 한» 자리가 「쓰시던 부품」으로 둔갑한다.
-                   for s in SLOTS if s not in slots],
+                   for s in SLOTS if s not in planned_slots],
         # 엔진이 «일부러» 뺀 자리 — 재사용도 아니고 후보가 없는 것도 아니다(2026-09-09).
         "omitted": omitted,
         # 용도별 예산 배분(0086) — 배분을 받은 티어(추천·고성능)만 값이 있고 가성비는 None.

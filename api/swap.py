@@ -44,6 +44,7 @@ from .timeutil import iso, now_iso
 from .db import engine
 from .product_name import display_name   # 대안 제시도 고객이 보는 자리다
 from .catalog_map import gpu_chipset_key   # 상품명 -> 칩셋 키. talk.py가 쓰는 것과 같은 단일 원천
+from .catalog_map import cpu_has_igpu      # CPU 내장그래픽 판정의 단일 원천(3상태) — 아래 §화면출력 참조
 from .recommend import (check_rule_fields, SLOTS, SLOT_TYPES, _load_pool, _slot_ok, build_compat,
                         load_compat_rules, _cmp, _rule_applies, rule_verdict, rule_ref_value,
                         _power_offset)
@@ -67,6 +68,9 @@ SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_powe
              " capacity_gb, vram_gb, cpu_cores,"
              # gpu_power_draw_watt(0094) — 파워 호환 규칙이 읽는 카드 실소비전력.
              " gpu_power_draw_watt,"
+             # cpu_gpu(0100) — CPU 내장그래픽 유무. `_display_lost` 가 읽는다(GPU 없는
+             # 구성에서 외장필수 CPU 로 바꾸면 화면이 안 나온다 — compat_rules 에 없는 축).
+             " cpu_gpu,"
              " form_factor, form_factor_list, tag_white, tag_silent")
 
 
@@ -173,13 +177,46 @@ def _partial_compat(chosen: dict, rules: dict) -> dict:
             "violations": sorted(set(violations))}
 
 
+def _display_lost(chosen: dict) -> bool:
+    """이 구성이 **화면을 못 띄우는가** — 그래픽카드가 없는데 CPU 내장그래픽도 없다.
+
+    ⚠ 이건 `compat_rules` 가 잡지 못하는 결함이다. 규칙 9개(socket·mem·power·
+    gpu_len·cooler_*·case_board·radiator) 중 「영상 출력이 되는가」를 묻는 규칙은
+    **하나도 없다** — GPU 슬롯이 비어 있으면 GPU 를 겨냥한 규칙(power·gpu_len)은
+    검사 대상 자체가 없어져 조용히 통과한다. 그래서 견적 엔진이 iGPU 를 근거로
+    GPU 를 뺀 사무용 구성에서 CPU 만 7500F(외장 필수)로 바꾸면, 호환 검사는 전부
+    초록불인데 **켜면 화면이 안 나오는 PC** 가 고객에게 나간다.
+
+    `cpu_has_igpu` 는 3상태다. 여기서 막는 것은 **False(iGPU 가 없다고 확인된 것)**
+    뿐이다 — None(모름)까지 막으면 판정 못 한 CPU 로는 아예 교체를 못 하게 되어
+    「모른다」를 「없다」로 굳히는 옛 결함을 대안 목록 쪽에 다시 심는 꼴이 된다.
+    """
+    if chosen.get("GPU") is not None:
+        return False                      # 외장 GPU 가 있으면 CPU 가 무엇이든 화면은 나온다
+    cpu = chosen.get("CPU")
+    if cpu is None:
+        return False                      # CPU 가 없는 구성은 이 판정의 대상이 아니다
+    return cpu_has_igpu(cpu.get("product_name"), cpu.get("maker"),
+                        cpu.get("cpu_gpu")) is False
+
+
 def _valid(chosen, rules) -> list:
     """위반 슬롯 목록. 빈 슬롯이 하나라도 있으면 `_partial_compat`(null-안전 경로)을
     쓴다 — 8슬롯이 전부 찬 기존 경로(대다수 · 7362 같은 정상 케이스)는 원래 코드를
-    한 글자도 바꾸지 않는다(회귀 위험 최소화)."""
+    한 글자도 바꾸지 않는다(회귀 위험 최소화).
+
+    2026-09-18: 여기에 **영상 출력 판정**(`_display_lost`)을 더한다. compat_rules 에
+    그 규칙이 없어서(위 함수 독스트링) 「GPU 없음 + iGPU 없는 CPU」조합이 호환 통과로
+    빠져나가고 있었다. 위반 슬롯으로 'CPU' 를 올린다 — 방금 바꾼 자리가 CPU 이므로
+    고객이 읽는 409 문구가 그 자리를 가리킨다.
+    """
     if any(chosen[s] is None for s in SLOTS):
-        return _partial_compat(chosen, rules)["violations"]
-    return [s for s in SLOTS if not _slot_ok(s, chosen[s], chosen, rules)]
+        base = _partial_compat(chosen, rules)["violations"]
+    else:
+        base = [s for s in SLOTS if not _slot_ok(s, chosen[s], chosen, rules)]
+    if _display_lost(chosen) and "CPU" not in base:
+        base = base + ["CPU"]
+    return sorted(set(base))
 
 
 def _chain_reason(alt_slot: str, chain: list, chosen: dict, alt: dict, rules: dict) -> str:

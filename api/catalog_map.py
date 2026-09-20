@@ -265,38 +265,54 @@ def cpu_bundled_cooler(product_name: str) -> bool:
     return bool(CPU_COOLER_BUNDLED.search(name))
 
 
-# CPU 내장그래픽(iGPU) 유무 — 상품명 패턴 판정(제조사별 명명 규칙, 2026-09-15 실측).
+# CPU 내장그래픽(iGPU) 유무 — **DB 컬럼 1순위, 상품명 규칙은 폴백**(2026-09-18 개정).
 #
-# `cpu_gpu`(0020) 컬럼이 죽은 필드라(1/678만 채워짐) DB 값을 못 믿는다. `cpu_bundled_cooler`
-# 와 같은 이유로 **상품명에서 판정**한다 — 다만 근거 성격이 다르다: 쿨러는 "상품명이
-# 스스로 밝힌 것만" 인정하는 표현 매칭이고, 여기는 **인텔·AMD가 실제로 지키는 모델
-# 명명 규칙**(구조적 패턴)이다. 표현이 아니라 규칙이므로 판정 방향이 비대칭이 아니다.
+# 2026-09-15 판(문자열 전용)에는 두 개의 결함이 있었다:
 #
-# 실측 검증(2026-09-15, docs/design/office-subdivide-plan-2026-09-15.md §1-3, 재고
-# CPU 683행 중 판매중+재고>0 276건 전수 대조): 오탐(규칙과 실제가 다른 사례) 0건 —
-# 제온 4건만 F-suffix 규칙 예외로 별도 처리했고, 그 밖은 전수 일치했다.
+#  ① 「AMD 는 G 가 붙어야 iGPU」는 **Zen3 까지의 규칙**이다. 라이젠 7000(Zen4)·
+#     9000(Zen5) 은 G 없이도 라데온 2CU 내장그래픽을 갖는다(다나와 원문 대조:
+#     7600·7700·9600X·9800X3D 전부 「내장그래픽」 있음, 7500F 만 「없음」).
+#     그 결과 판매중 라이젠 7000/9000 35 종이 「iGPU 없음」으로 오판돼 사무용
+#     견적이 최저 297,700 원짜리 외장 GPU 를 **강제**하고 있었다(실측 36건 불일치).
+#  ② 판정 불가를 `False` 로 돌려줬다 — 「모른다」가 「없다」로 둔갑한다. 이제
+#     **True/False/None 3상태**로 답하고, None 일 때의 처리는 호출부가 정한다.
+#
+# 이제 `product_specs.cpu_gpu`(2026-09-18 백필 완료 — TRUE 358 · FALSE 274 · NULL 51)
+# 가 **1순위 원천**이다. 호출부가 후보 행에서 읽은 값을 `cpu_gpu=` 로 넘기면 그걸
+# 그대로 믿고, 값이 없을 때만(NULL·미전달) 아래 명명 규칙으로 폴백한다.
 CPU_IGPU_INTEL_NO_IGPU = re.compile(r"(?<![0-9A-Za-z])\d{3,5}K?F(?![0-9A-Za-z])")
 CPU_IGPU_AMD_HAS_IGPU = re.compile(r"(?<![0-9A-Za-z])\d{3,4}G[ET]?(?![0-9A-Za-z])")
+# AMD 모델 번호 + 접미 — "7600"·"9800X3D"·"7500F"·"5500GT"·"200GE" 를 (숫자, 접미)로 가른다.
+CPU_IGPU_AMD_MODEL = re.compile(r"(?<![0-9A-Za-z])(\d{3,4})([A-Za-z0-9]{0,4})(?![0-9A-Za-z])")
+# 서버·HEDT 계열 — 세대 규칙과 무관하게 iGPU 가 없다(DB 실측: 스레드리퍼 46행·EPYC 4행
+# 전부 FALSE/NULL, TRUE 0건). 숫자 규칙보다 **먼저** 본다.
+CPU_IGPU_NO_IGPU_LINE = re.compile(r"스레드리퍼|threadripper|epyc|에픽", re.I)
 
 
-def cpu_has_igpu(product_name: str, maker: str) -> bool:
-    """CPU가 내장그래픽을 갖는가 — 제조사별 모델 명명 규칙으로 판정한다.
+def cpu_has_igpu(product_name: str, maker: str, cpu_gpu=None):
+    """CPU가 내장그래픽을 갖는가 — **True / False / None(모름)** 3상태.
 
-    ⚠ 제조사를 먼저 본다 — 인텔·AMD 규칙이 정반대다(인텔은 '없다'는 표시,
-    AMD는 '있다'는 표시). 제조사를 안 가르면 서로의 접미 문자를 오판한다.
+    ⚠ `None` 은 「없다」가 아니라 「판정 못 했다」다. 둘을 같은 값으로 돌려주면
+    모르는 CPU 가 조용히 「iGPU 없음」으로 굳어 외장 GPU 를 강제하거나(옛 결함),
+    반대로 화면이 안 나오는 견적을 만든다. **어느 쪽으로 기울지는 호출부가 정한다**
+    (견적 엔진은 안전한 쪽 — 모르면 그래픽카드를 넣고 그 사실을 근거에 적는다).
 
-      인텔: 모델 번호가 F(또는 KF)로 끝나면 iGPU 없음 — 그 밖(K 포함)은 있음.
-            "14700F"·"245KF" → 없음. "13600K"·"14700" → 있음(K는 배수잠금
-            해제일 뿐 iGPU 유무와 무관 — `_cpu_unlocked_suffix`와 같은 접미
-            판정이지만 **다른 질문**이라 별도 정규식이다).
-            ⚠ 제온(Xeon) 계열은 F 유무와 무관하게 대부분 iGPU가 없다 — 재고
-            표본 4건 전부 F가 없는데도 실제로는 서버용이라 iGPU 미탑재.
-            상품명에 '제온'·'Xeon'이 있으면 F 판정보다 먼저 False로 확정한다.
-      AMD:  모델 번호가 G·GE·GT로 끝나면 iGPU 있음(APU) — 그 밖은 없음.
-            "5600G"·"8700G"·"5500GT" → 있음. "7600"·"9700X" → 없음.
+    cpu_gpu  DB `product_specs.cpu_gpu` 값(True/False/None). **1순위 원천**이다 —
+             주어지면 상품명을 보지 않고 그대로 답한다. 후보 뷰에서 읽은 값을
+             그대로 넘기면 된다(`v_recommendation_candidates.cpu_gpu`).
 
-    값 모르면(maker가 인텔·AMD 둘 다 아니면) False로 둔다 — 지어내지 않는다.
+    상품명 폴백 규칙(DB 값이 NULL 이거나 안 넘어온 경우):
+      인텔: 모델 번호가 F(또는 KF)로 끝나면 없음 — 그 밖(K 포함)은 있음.
+            제온(Xeon)은 F 유무와 무관하게 없음(서버용).
+      AMD:  스레드리퍼·EPYC → 없음(HEDT/서버).
+            접미 G·GE·GT → 있음(APU). 접미 F → 없음(7500F·9600F).
+            그 밖이면 **세대로 가른다** — 모델 번호 7000 이상(Zen4·Zen5, 라이젠
+            7000/8000/9000)은 G 가 없어도 있음. 6000 미만(Zen3 이하)은 없음.
+            모델 번호를 못 찾으면 None(모름).
+      그 밖 제조사: None(모름) — 지어내지 않는다.
     """
+    if cpu_gpu is not None:
+        return bool(cpu_gpu)
     name = product_name or ""
     mk = (maker or "").strip()
     if mk in ("인텔", "Intel", "INTEL", "intel"):
@@ -304,8 +320,22 @@ def cpu_has_igpu(product_name: str, maker: str) -> bool:
             return False
         return not bool(CPU_IGPU_INTEL_NO_IGPU.search(name))
     if mk in ("AMD", "amd"):
-        return bool(CPU_IGPU_AMD_HAS_IGPU.search(name))
-    return False
+        if CPU_IGPU_NO_IGPU_LINE.search(name):
+            return False
+        if CPU_IGPU_AMD_HAS_IGPU.search(name):
+            return True            # G·GE·GT — 세대 무관 APU
+        m = CPU_IGPU_AMD_MODEL.search(name)
+        if not m:
+            return None
+        model, suffix = int(m.group(1)), (m.group(2) or "").upper()
+        if suffix.startswith("F"):
+            return False           # 7500F·9600F — F 만 iGPU 가 없다
+        if model >= 7000:
+            return True            # Zen4·Zen5 — G 없이도 라데온 2CU 내장
+        if model < 7000:
+            return False           # Zen3 이하 — G 가 없으면 iGPU 없음
+        return None
+    return None
 
 
 def map_part_type(l1: str, l2: str, l3: str, name: str, raw: str = ""):

@@ -377,6 +377,7 @@ MIN_BUDGET_MAX_PROBES = 8    # 안전판(실측 필요 회수의 4배 이상 —
 
 
 def _min_feasible_budget(rec_mod, wide_common, rules_active, active_slots, floor_hint,
+                         allow_igpu_omit=False,
                           uncapped_built=None):
     """이 조건(용도·선호·핀·재사용 — 예산만 뺀 `wide_common`)으로 "가성비(value)" 티어가
     성립하는 가장 낮은 예산(만원 단위로 올림)을 찾는다. **실제로 성공을 확인한 값만**
@@ -400,7 +401,8 @@ def _min_feasible_budget(rec_mod, wide_common, rules_active, active_slots, floor
     built = uncapped_built
     if built is None:
         built = rec_mod._build_set("value", wide_common, None, rules_active,
-                                    active_slots=active_slots, meta={})
+                                    active_slots=active_slots, meta={},
+                                    allow_igpu_omit=allow_igpu_omit)
     if built is None:
         return None   # 탐색 상한 도달이든 진짜 불가능이든 — 어느 쪽도 지어내지 않는다
 
@@ -419,7 +421,8 @@ def _min_feasible_budget(rec_mod, wide_common, rules_active, active_slots, floor
         mid_u = (lo_u + hi_u) // 2
         probes += 1
         ok = rec_mod._build_set("value", wide_common, mid_u * MIN_BUDGET_UNIT, rules_active,
-                                 active_slots=active_slots, meta={}) is not None
+                                 active_slots=active_slots, meta={},
+                                 allow_igpu_omit=allow_igpu_omit) is not None
         if ok:
             hi_u = mid_u
         else:
@@ -664,13 +667,23 @@ def count_candidates(body: CountBody):
                 wide_common, _, _ = _apply_one(wide_common, c.l, c.v)
         active_slots = [s for s in _rec.SLOTS if s not in reuse_slots]
         rules_active, _rules_unknown = _rec._rules_for_active(compat_rules, reuse_slots)
+        # ── iGPU 생략 허용 (2026-09-18) ──────────────────────────────────────
+        # 엔진(recommend.py `allow_igpu_omit`)과 **같은 판정**이어야 한다. 안 맞추면
+        # 카운터가 「730,000원부터 가능합니다」라고 말하는데 엔진은 같은 조건으로
+        # 401,400원짜리 견적을 실제로 내놓는다 — 화면 하나가 서로 다른 말을 한다
+        # (회귀 [사무·인강] 경계 예산 검사가 이걸 잡았다).
+        # 여기서 보는 축은 「이 용도에 GPU 성능 하한이 있는가」뿐이다 — 재사용·핀은
+        # 아래 reuse_slots 로 이미 갈렸고, 카운터에는 「부품」 핀 경로가 없다.
+        _floors = UF.slot_floors(usage_v) or {}
+        allow_igpu_omit = "GPU" not in _floors and "GPU" not in reuse_slots
 
         uncapped_built = None   # cap=None으로 이미 돌렸으면 아래에서 재사용(중복 DFS 방지)
         if need_compat_check:
             compat_checked = True
             real_meta: dict = {}
             built = _rec._build_set("value", wide_common, cap, rules_active,
-                                     active_slots=active_slots, meta=real_meta)
+                                     active_slots=active_slots, meta=real_meta,
+                                     allow_igpu_omit=allow_igpu_omit)
             compat_infeasible = built is None and not real_meta.get("exhausted")
             if cap is None:
                 uncapped_built = built   # 이번 호출이 이미 cap=None이었다 — 그대로 쓴다
@@ -686,10 +699,12 @@ def count_candidates(body: CountBody):
             hi_cap = int(cap * _rec.HIGHEND_CAP_X)
             hi_pool = alloc_filter(wide_common, hi_cap, usage_key)   # 용도별 상한(0086)
             hi_built = _rec._build_set("highend", hi_pool, cap, rules_active,
-                                        active_slots=active_slots, meta={})
+                                        active_slots=active_slots, meta={},
+                                        allow_igpu_omit=allow_igpu_omit)
             if hi_built is None:
                 hi_built = _rec._build_set("highend", wide_common, cap, rules_active,
-                                            active_slots=active_slots, meta={})
+                                            active_slots=active_slots, meta={},
+                                            allow_igpu_omit=allow_igpu_omit)
             if hi_built is not None:
                 highend_feasible = True
                 highend_total = hi_built["total"]
@@ -699,7 +714,8 @@ def count_candidates(body: CountBody):
         if over_budget or compat_infeasible:
             budget_min_total = _min_feasible_budget(
                 _rec, wide_common, rules_active, active_slots,
-                floor_hint=budget_floor_total, uncapped_built=uncapped_built)
+                floor_hint=budget_floor_total, uncapped_built=uncapped_built,
+                allow_igpu_omit=allow_igpu_omit)
 
     if empty:
         verdict = ("조건이 너무 좁아 "
