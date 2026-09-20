@@ -6652,10 +6652,13 @@ def main():
                test_supplier_scale,
                test_alloc_capped_uncapped,
                test_usage_tier_rules_invariants,
+               test_part_cond_rules_invariants,
                test_usage_alloc_invariants,
                test_grid_workstations,
                test_talk_grid_contract,
-               test_game_customer_copy):
+               test_game_customer_copy,
+               test_omitted_variant_screen,
+               test_ai_vram_floor):
         try:
             fn()
         except Exception as e:
@@ -6731,6 +6734,116 @@ def test_usage_tier_rules_invariants():
         check("[51] 규칙의 slot 이 엔진 슬롯 어휘(taxonomy.SLOTS) 안에 있다", not bad, "없음", bad)
     except Exception as e:                               # noqa: BLE001
         print(f"  [SKIP] taxonomy 로드 실패 — {e}")
+
+
+def test_part_cond_rules_invariants():
+    """[53] 조건부 부품 겨냥(part_cond_rules · 0101) — 표가 엔진과 어긋나지 않는가 (2026-09-20 신설)
+
+    이 표는 2026-09-18 에 만들어졌지만 **엔진이 한 번도 부르지 않았다**(연결 2026-09-20).
+    다시 조용히 끊기지 않도록 「표 ↔ 엔진」 접점을 전부 잰다 — [51] 과 같은 종류의 검사다.
+
+    ① when/then field 가 v_recommendation_candidates 에 있고 `_load_pool` 이 SELECT 한다 —
+       둘 중 하나만 빠져도 값이 None 이라 **조건이 영원히 성립하지 않는다**(PCR NULL 원칙
+       때문에 예외 없이 조용히 꺼진다. 슬라이스 46 전례와 같은 결말).
+    ② when/then slot 이 엔진 슬롯 어휘(taxonomy.SLOTS) 안에 있다 — 아니면 `_slot_of` 가
+       절대 못 맞춘다.
+    ③ usage_key 가 NULL 이거나 usage_floors.usage_key 안에 있다 — 엔진은 UF.match 가 고른
+       키를 그대로 PCR.apply 에 넘긴다(어휘를 두 벌 두지 않는다).
+    ④ **엔진이 실제로 부른다** — `api/recommend.py` 가 PCR 을 import 하고 `.apply(` 를
+       부른다. 이 검사가 이 표가 만들어지고 이틀간 죽어 있던 사실의 재발 방지다.
+    ⑤ 응답 계약 — `POST /api/recommend` 가 티어별 `part_cond_rules{applied,relaxed,items}`
+       를 낸다.
+    ⑥ **불성립을 만들지 않는다**(성격이 겨냥이지 하한이 아니다 — CLAUDE.md §전역 견적
+       규칙 「8GB+16GB 도 돌아간다」). 규칙이 걸린 응답에서 sets 가 통째로 비면 안 된다.
+    ⑦ 규칙이 «걸렸다»(applied)고 말한 티어의 구성은 실제로 그 규칙을 만족한다 —
+       근거에 적은 말과 부품이 어긋나면 §화면 정직성 위반이다.
+    """
+    print("\n[53] 조건부 부품 겨냥 — part_cond_rules 표·엔진 정합 (2026-09-20 신설)")
+    rows = db_all("SELECT usage_key, when_slot, when_field, then_slot, then_field,"
+                  " then_op, then_value, label FROM part_cond_rules WHERE active")
+    if not rows:
+        print("  [SKIP] part_cond_rules 없음/비어 있음(0101 미적용 또는 DB 미접속)")
+        return
+
+    view_cols = {r["column_name"] for r in db_all(
+        "SELECT column_name FROM information_schema.columns"
+        " WHERE table_name='v_recommendation_candidates'")}
+    fields = {r["when_field"] for r in rows} | {r["then_field"] for r in rows}
+    check("[53] 규칙이 쓰는 field 가 v_recommendation_candidates 에 있다(없으면 조용한 미적용)",
+          fields <= view_cols, "차집합 없음", sorted(fields - view_cols))
+
+    rec_src = io.open(os.path.join(ROOT, "api", "recommend.py"), encoding="utf-8").read()
+    ls = rec_src.index("def _load_pool(")
+    le = rec_src.index("FROM v_recommendation_candidates", ls)
+    sel = rec_src[ls:le]
+    missing = sorted(f for f in fields if f not in sel)
+    check("[53] 규칙이 쓰는 field 를 recommend._load_pool 이 SELECT 한다", not missing,
+          "누락 없음", missing)
+
+    try:
+        from api.taxonomy import SLOTS as _SLOTS
+        slots = {r["when_slot"] for r in rows} | {r["then_slot"] for r in rows}
+        bad = sorted(slots - set(_SLOTS))
+        check("[53] 규칙의 slot 이 엔진 슬롯 어휘(taxonomy.SLOTS) 안에 있다", not bad, "없음", bad)
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [SKIP] taxonomy 로드 실패 — {e}")
+
+    floor_keys = {r["usage_key"] for r in db_all("SELECT DISTINCT usage_key FROM usage_floors")}
+    keys = {r["usage_key"] for r in rows if r["usage_key"] is not None}
+    check("[53] 활성 part_cond_rules.usage_key ⊆ usage_floors.usage_key ∪ {NULL}",
+          keys <= floor_keys, "차집합 없음", sorted(keys - floor_keys))
+
+    # ④ 엔진이 실제로 부르는가 — 표만 있고 아무도 안 부르던 상태(2026-09-18~19)의 재발 방지.
+    check("[53] recommend.py 가 part_cond_rules 로더를 import 한다",
+          "part_cond_rules as PCR" in rec_src, "import 있음", "없음")
+    check("[53] recommend.py 가 PCR.apply() 를 호출한다",
+          "PCR.apply(" in rec_src, "호출 있음", "없음")
+
+    # ⑤⑥⑦ 실응답 — 규칙이 실제로 걸리는 조건으로 한 번 부른다(게임은 8GB 카드가 뽑히는
+    # 대표 구간이다. 규칙이 안 걸리면 ⑦ 은 공집합 검사라 여전히 참이다 — 지어내지 않는다).
+    _st, res = post("/api/recommend", {"mode": "guided", "constraints": [
+        {"l": "용도", "v": "게임"}, {"l": "예산", "v": "150만원"}]})
+    pcr = (res or {}).get("part_cond_rules")
+    check("[53] /api/recommend 응답에 티어별 part_cond_rules 계약이 있다",
+          isinstance(pcr, dict) and set(pcr) == {"value", "recommend", "highend"}
+          and all(set(v) == {"applied", "relaxed", "items"} for v in pcr.values()),
+          "{value,recommend,highend}×{applied,relaxed,items}", pcr)
+    if not isinstance(pcr, dict):
+        return
+    sets = res.get("sets") or {}
+    engaged = [t for t, v in pcr.items() if v["applied"] or v["relaxed"]]
+    check("[53] 조건 규칙이 걸려도 견적이 불성립이 되지 않는다(겨냥이지 하한이 아니다)",
+          not engaged or any(sets.get(t) for t in sets), "구성 있음",
+          f"걸린 티어 {engaged} / sets 전부 None")
+    # ⑦ applied 라고 말한 티어는 실제로 만족해야 한다. 슬롯 사양은 응답 spec 에서 읽는다.
+    bad = []
+    for t, v in pcr.items():
+        if not v["applied"] or not sets.get(t):
+            continue
+        spec = {i["part_type"]: (i.get("spec") or {}) for i in sets[t]["items"]}
+        for it in v["items"]:
+            got = spec.get(it["slot"], {}).get(it["field"])
+            ok = got is not None and (
+                got >= it["value"] if it["op"] == "gte" else
+                got <= it["value"] if it["op"] == "lte" else
+                got == it["value"] if it["op"] == "eq" else True)
+            if not ok:
+                bad.append((t, it["slot"], it["field"], it["op"], it["value"], got))
+    check("[53] applied=true 인 티어의 구성이 그 조건 규칙을 실제로 만족한다(근거 = 부품)",
+          not bad, "위반 없음", bad)
+    # 가성비는 겨냥을 받지 않는다(usage_tier_rules 와 같은 판단 — 「예산과 무관한 조건 안
+    # 최저가」가 정의라 예산 따라 값이 바뀌는 겨냥과 양립하지 않는다. 회귀 「가성비는 전
+    # 예산 공통」이 그 불변식이다). 그래서 이 티어는 항상 applied=relaxed=false 여야 한다.
+    check("[53] 가성비 티어에는 조건부 겨냥을 걸지 않는다(전 예산 공통 불변식과 충돌)",
+          not pcr["value"]["applied"] and not pcr["value"]["relaxed"],
+          "둘 다 false", pcr["value"])
+    # 근거 문구 — 램을 올렸으면 «왜» 올렸는지가 reasons 에 있어야 한다(우리 정체성).
+    miss = [t for t, v in pcr.items()
+            if (v["applied"] or v["relaxed"]) and sets.get(t)
+            and not any(lb in " ".join(sets[t]["reasons"])
+                        for lb in [i["label"] for i in v["items"]])]
+    check("[53] 조건 규칙이 걸린 티어의 reasons 에 그 규칙 라벨(근거)이 적혀 있다",
+          not miss, "전부 적혀 있음", miss)
 
 
 def test_usage_alloc_invariants():
@@ -7384,6 +7497,242 @@ def test_game_customer_copy():
     print(f"  [INFO] 사람 검수 대기: {unrev}/{len(copy_rows)}종 (reviewed_by IS NULL)")
     drift("게임 고객문구 행수", len(copy_rows))
     drift("게임 등급제안 행수", len(sug))
+
+
+def test_omitted_variant_screen():
+    """[57] «두지 않기로 한 구성»의 사유를 화면이 말한다 (0106 · 2026-09-20 신설).
+
+    ■ 고친 병
+      0106 으로 사무·주식 용도에서 「고성능」을 없앴다(실판매 사무용 200만원 이상 0벌).
+      서버는 그 사유를 `card_sets[].cards[].omitted_variants[{variant,key,reason}]`
+      로 내려보내는데, **화면은 그 필드를 읽지 않고** 「이 구성 정보가 아직 없습니다」
+      라고만 말했다. 사무용 고객은 그 문장을 「준비가 덜 됐다」로 읽는다 — 실제로는
+      우리가 근거를 갖고 일부러 안 만든 것이다. 정반대의 뜻이 전달됐다.
+
+    ■ 왜 회귀로 고정하는가
+      이 결함은 **콘솔이 조용한 채 화면만 틀린 말을 한다.** 에러도 404 도 나지 않고
+      탭은 잘 그려진다. 다음 사람이 `detailMarkup`/`variantTabsMarkup` 를 손대며
+      `omitted_variants` 분기를 지워도 아무것도 시끄럽지 않다.
+
+    ■ 어떻게 보는가 — 브라우저 없이
+      app.js 는 node 에서 `module.exports` 로 순수 렌더 함수를 내준다(기존 관례).
+      그래서 **실 서버 응답 카드를 그대로 cardMarkup 에 넣어** 결과 마크업을 본다.
+      DOM 도 브라우저도 필요 없다. node 가 없는 환경에서는 소스 계약(분기 존재)만
+      본다 — 조용히 건너뛰지 않고 그 사실을 출력한다.
+    """
+    print(chr(10) + "[57] 제외된 구성의 사유를 화면이 말한다 (0106 신설)")
+
+    import subprocess as _sp57
+    import shutil as _sh57
+    import tempfile as _tf57
+
+    appjs_path = pathlib.Path(ROOT, "mockups", "mvp2", "app.js")
+    appjs = appjs_path.read_text(encoding="utf-8")
+
+    # ── ① 소스 계약 — 화면이 서버의 제외 필드를 실제로 읽는다 ──────────────
+    #   이 검사가 실패하려면: 누군가 omitted_variants 분기를 지워야 한다.
+    check("[57] app.js 가 서버의 omitted_variants 를 읽는다",
+          "omitted_variants" in appjs, "있음", "없음")
+    #   사유를 화면이 «다시 쓰지» 않는다 — 서버 문자열 o.reason 만 쓴다.
+    check("[57] app.js 가 사유로 서버의 reason 필드를 쓴다",
+          "o.reason" in appjs.replace(" ", "") or "om.reason" in appjs.replace(" ", "")
+          or ".reason===" in appjs.replace(" ", "") or "o.reason:" in appjs,
+          "reason 참조 있음", "없음")
+    #   제외 사유 문구에 화면이 직접 쓴 판매 수치가 없어야 한다 — 그 숫자는 DB 것이다.
+    #   (이 검사가 실패하려면: 누가 "200만원"·"0벌" 같은 값을 app.js 리터럴로 박아야 한다.)
+    fabricated = [w for w in ("0벌", "1,296,600", "16벌", "262벌", "3.4%") if w in appjs]
+    check("[57] app.js 에 제외 근거 수치 리터럴이 없다(수치는 서버 문자열 안에만)",
+          not fabricated, "없음", fabricated)
+
+    # ── ② 실 응답 → 실제 렌더 결과 ────────────────────────────────────────
+    #   사무·주식은 제외가 있고(고성능), 영상편집은 없다. 서버에서 직접 받아 본다.
+    def _set_with_omission(state):
+        _st, d = post("/api/grid/recommend", {"state": state})
+        for s in ((d or {}).get("card_sets") or []):
+            for c in (s.get("cards") or []):
+                return c
+        return None
+
+    office = _set_with_omission({"usages": ["단순 사무용"], "budget_won": 1500000,
+                                 "budget_bound": "이하"})
+    video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
+                                "budget_bound": "이하"})
+    check("[57] 사무용 카드에 제외된 구성이 내려온다(고성능)",
+          bool(office) and "perf" in (office.get("omitted_variant_keys") or []),
+          "perf 제외", office and office.get("omitted_variant_keys"))
+    check("[57] 영상편집 카드에는 제외가 없다(제외 없는 용도)",
+          bool(video) and (video.get("omitted_variants") or []) == [],
+          [], video and video.get("omitted_variants"))
+
+    node = _sh57.which("node")
+    if not node or not office or not video:
+        check("[57] 렌더 결과 검사 — node 또는 서버 카드가 없어 건너뜀",
+              True, "건너뜀", "node=" + str(bool(node)), kind="DB")
+        return
+
+    # node 로 app.js 를 불러 카드를 실제로 그린다. 판정은 파이썬이 한다(JSON 으로 받는다).
+    driver = (
+        "const R=require(process.argv[2]);"
+        "const d=JSON.parse(require('fs').readFileSync(process.argv[3],'utf8'));"
+        "const out={};"
+        "for(const[k,card]of Object.entries(d)){out[k]={};"
+        " for(const v of ['value','reco','perf']){"
+        "  out[k][v]={card:R.cardMarkup(card,0,null,v),quote:R.quoteMarkup(card,v)};}}"
+        "out.guard={};"
+        "for(const[n,c]of Object.entries({empty:{},badlist:{omitted_variants:'nope'},"
+        " noreason:{omitted_variants:[{key:'perf',variant:'고성능'}]}})){"
+        "  try{out.guard[n]=R.cardMarkup(c,0,null,'perf').length;}"
+        "  catch(e){out.guard[n]='THROW:'+e.message;}}"
+        "process.stdout.write(JSON.stringify(out));")
+
+    with _tf57.TemporaryDirectory() as tmp:
+        cards_p = pathlib.Path(tmp, "cards.json")
+        drv_p = pathlib.Path(tmp, "drv.js")
+        cards_p.write_text(json.dumps({"office": office, "video": video},
+                                      ensure_ascii=False), encoding="utf-8")
+        drv_p.write_text(driver, encoding="utf-8")
+        p = _sp57.run([node, str(drv_p).replace("\\", "/"),
+                       str(appjs_path).replace("\\", "/"),
+                       str(cards_p).replace("\\", "/")],
+                      capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if p.returncode != 0:
+        check("[57] node 로 app.js 렌더 성공", False, "성공",
+              (p.stderr or "")[-200:])
+        return
+    R = json.loads(p.stdout)
+
+    STALE = "이 구성 정보가 아직 없습니다"
+    reason = office["omitted_variants"][0]["reason"]
+
+    # ⓐ **핵심** — 제외된 구성을 고르면 「아직 없습니다」라고 말하지 않는다.
+    #   이 검사가 실패하려면: detailMarkup 이 omitted 분기 없이 옛 문구로 되돌아가야 한다.
+    for scope in ("card", "quote"):
+        check(f"[57] 사무용 고성능({scope}) 이 «{STALE}» 라고 말하지 않는다",
+              STALE not in R["office"]["perf"][scope], "없음", "있음")
+    # ⓑ 서버가 준 사유 **원문 그대로** 실린다(요약·재작성 금지).
+    esc_reason = (reason.replace("&", "&amp;").replace("<", "&lt;")
+                  .replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;"))
+    for scope in ("card", "quote"):
+        check(f"[57] 사무용 고성능({scope}) 에 서버 사유 원문이 그대로 실린다",
+              esc_reason in R["office"]["perf"][scope], "원문 포함", "없음")
+    # ⓒ 제외된 탭은 **누를 수 있어야 한다** — disabled 면 고객이 사유를 열 수 없다.
+    perf_tab = re.search(r'<button[^>]*data-variant-key="perf"[^>]*>',
+                         R["office"]["reco"]["card"])
+    check("[57] 제외된 고성능 탭이 화면에 남아 있다(지우면 사유를 전할 자리가 없다)",
+          perf_tab is not None, "있음", "없음")
+    check("[57] 제외된 고성능 탭은 disabled 가 아니다(눌러야 사유를 본다)",
+          perf_tab is not None and "disabled" not in perf_tab.group(0),
+          "누를 수 있음", perf_tab and perf_tab.group(0)[:120])
+    check("[57] 제외된 탭이 제외임을 마크업으로 밝힌다(data-variant-omitted)",
+          perf_tab is not None and "data-variant-omitted" in perf_tab.group(0),
+          "있음", "없음")
+    # ⓓ 제외된 구성이 **다른 구성 값으로 대신 채워지지 않는다** — 고성능을 눌렀는데
+    #   추천 가격이 뜨면 화면이 거짓말을 한다.
+    check("[57] 제외된 고성능 카드에 가격 블록이 없다(다른 구성으로 대신 채우지 않는다)",
+          'class="tier-price"' not in R["office"]["perf"]["card"], "없음", "있음")
+    # ⓔ 제외 없는 용도는 그대로 동작한다 — 이 변경이 영상편집을 망가뜨리지 않았는가.
+    for v in ("value", "reco", "perf"):
+        check(f"[57] 영상편집 {v} 는 정상 구성이다(사유 문구 없음)",
+              "data-omitted-reason" not in R["video"][v]["card"], "없음", "있음")
+    check("[57] 영상편집 고성능에 가격이 나온다",
+          'class="tier-price"' in R["video"]["perf"]["card"], "있음", "없음")
+    # ⓕ 빈·망가진 응답에 화면이 죽지 않는다(사유가 비면 지어내지 않고 밝힌다).
+    bad = {k: v for k, v in R["guard"].items() if not isinstance(v, int)}
+    check("[57] 빈·망가진 카드에도 렌더가 예외를 내지 않는다", not bad, "정상", bad)
+
+
+def test_ai_vram_floor():
+    """[56] AI 용도 GPU 하한 — 와트가 아니라 VRAM 이어야 한다 (0107 · 2026-09-20 신설)
+
+    CLAUDE.md 명시: 스테이블 디퓨전의 VRAM 부족은 **느려지는 게 아니라 실행 실패(OOM)**.
+    증상이 「느림」이 아니라 「안 돌아감」이라 잘못 견적하면 고객이 쓸 수 없는 PC 를 받는다.
+    그래서 이 검사가 증명하려는 것은 넷이다 — 각 검사가 **무엇이 잘못돼야 실패하는지**를
+    함께 적는다(§회귀 「검사가 무엇을 증명하는지 본다」).
+
+    ① ai 의 GPU 하한 field 가 vram_gb 다.
+       실패 조건: 누가 0107 을 되돌리거나 required_power_watt 로 되돌려 놓는다.
+       ⚠ 값 자체(12)는 고정하지 않는다 — 근거(커뮤니티 표본)가 바뀌면 올라갈 수 있는
+         수이고, 수를 회귀에 박으면 §회귀 「고정 기대값 폐지」를 어긴다. 대신 **아래
+         ②가 그 값이 근거 범위 안인지**를 DB 원천과 대조한다.
+    ② 하한값이 `software_community_spec` 의 AI 커뮤니티 VRAM 범위 안이다.
+       ⚠ confidence='추정' 인 software 는 **모집단에서 뺀다** — CLAUDE.md 규약
+         「추정 12건은 견적 규칙에 직접 투입 금지」. 그 둘(컴피UI 12 · LLM 파인튜닝 24)을
+         넣으면 상한이 24 로 벌어져 이 검사가 과잉 하한도 통과시킨다.
+       실패 조건: 표본에 없는 수를 손으로 박아 넣는다(값 지어내기).
+    ③ 겨냥(usage_tier_rules)이 하한보다 낮지 않다.
+       실패 조건: 하한을 올리고 tier 행을 안 내려 근거 한 줄이 12 와 8 을 동시에 말한다
+       (§화면 정직성 「한 행이 두 원천으로 말하지 않는다」).
+    ④ 실견적 근거 문구에 **숫자가 있고**, 고른 GPU 가 실제로 하한을 만족한다.
+       실패 조건: 문구가 "고사양 GPU 등급"류로 돌아가거나, 하한을 말만 하고 안 건다.
+    """
+    print("\n[56] AI 용도 GPU 하한 — 와트가 아니라 VRAM (0107 · 2026-09-20 신설)")
+    row = db_all("SELECT field, value, detail_fmt FROM usage_floors"
+                 " WHERE usage_key='ai' AND slot='GPU' AND active")
+    if not row:
+        print("  [SKIP] usage_floors ai/GPU 행 없음(0107 미적용 또는 DB 미접속)")
+        return
+    r = row[0]
+
+    # ① 축이 VRAM 인가
+    check("[56] ai 의 GPU 하한 field 가 vram_gb (와트는 전력 등급이지 실행 가능 여부가 아니다)",
+          r["field"] == "vram_gb", "vram_gb", r["field"])
+    if r["field"] != "vram_gb":
+        return
+
+    # ② 값이 커뮤니티 표본 범위 안인가 — confidence='추정' 제외
+    samples = [x["vram_gb"] for x in db_all(
+        "SELECT cs.vram_gb FROM software_community_spec cs"
+        "  JOIN software s ON s.software_id = cs.software_id"
+        " WHERE s.category='AI' AND cs.vram_gb IS NOT NULL"
+        "   AND s.confidence <> '추정'")]
+    if samples:
+        lo, hi = min(samples), max(samples)
+        check(f"[56] 하한 {r['value']} 이 AI 커뮤니티 VRAM 표본 범위 [{lo}, {hi}] 안"
+              f" (추정 제외 · n={len(samples)})",
+              lo <= r["value"] <= hi, f"{lo}~{hi}", r["value"])
+        # 하한은 «최저 커뮤니티값»이 기준이다(docs/design/usage-rules-rebuild §4).
+        # 최고값을 하한으로 쓰면 그건 겨냥이지 하한이 아니다.
+        check("[56] 하한이 표본 최저값이다(최고값을 하한으로 쓰면 그건 겨냥이다)",
+              r["value"] == lo, lo, r["value"])
+    else:
+        print("  [INFO] AI 커뮤니티 VRAM 표본 0건(추정 제외) — 범위 대조 생략")
+
+    # ③ 겨냥이 하한보다 낮지 않다
+    low = [t for t in db_all(
+        "SELECT budget_min, value FROM usage_tier_rules"
+        " WHERE usage_key='ai' AND slot='GPU' AND field='vram_gb'"
+        "   AND op='gte' AND active")
+        if int(t["value"]) < r["value"]]
+    check("[56] 활성 ai GPU 겨냥(usage_tier_rules)이 하한보다 낮은 행이 없다",
+          not low, "없음",
+          [(t["budget_min"], t["value"]) for t in low])
+
+    # ④ 실견적 — 근거에 숫자가 있고, 고른 GPU 가 실제로 하한을 넘는가
+    C = [{"l": "용도", "v": "AI 작업"}, {"l": "예산", "v": "200만원"}]
+    _st, d = post("/api/recommend", {"mode": "chat", "constraints": C})
+    d = d or {}
+    items = ((d.get("usage_floors") or {}).get("items") or [])
+    gpu_f = next((f for f in items if f["slot"] == "GPU"), None)
+    check("[56] 응답의 ai GPU 하한도 vram_gb 다(표와 엔진이 같은 축)",
+          bool(gpu_f) and gpu_f["field"] == "vram_gb",
+          "vram_gb", gpu_f and gpu_f["field"])
+
+    for tier, s in (d.get("sets") or {}).items():
+        if not s:
+            continue
+        # 근거 문구에 숫자가 있어야 한다("고사양 GPU 등급"이 아니라 "VRAM 12GB 이상")
+        note = next((x for x in (s.get("reasons") or []) if "하한" in x), "")
+        check(f"[56] {tier} 근거에 하한 수치가 들어 있다",
+              str(r["value"]) in note, f"'{r['value']}' 포함", note[:90])
+        gpu = next((i for i in s["items"] if i["part_type"] == "GPU"), None)
+        if gpu is None:
+            continue                       # 재사용·iGPU 생략 — 이 티어엔 비교할 것이 없다
+        got = db_one("SELECT vram_gb FROM v_recommendation_candidates"
+                     " WHERE product_code=:pc", pc=gpu["product_code"])
+        check(f"[56] {tier} 가 고른 GPU 가 VRAM 하한을 실제로 만족",
+              got is not None and got >= r["value"], f">= {r['value']}", got)
+
+    drift("ai GPU 하한(vram_gb)", r["value"])
 
 
 if __name__ == "__main__":

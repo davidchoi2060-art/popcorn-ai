@@ -46,6 +46,7 @@ from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 
 from . import usage_floors as UF
 from . import usage_tier_rules as UTR   # 용도×예산 티어 겨냥(0085) — 하한 위의 목표, 조립 조건 아님
 from . import usage_alloc as UA         # 용도별 예산 배분(0086) — 상한은 후보 필터, 하한은 완성 조합 판정
+from . import part_cond_rules as PCR    # 이미 고른 부품이 조건인 겨냥(0101) — VRAM 8GB 카드면 RAM 32GB
 from .timeutil import iso, now_iso
 # BUDGET_ALLOC 상수는 이 파일에서 더 읽지 않는다(2026-09-12) — 배분율의 정본은 usage_alloc 표,
 # 상수는 그 모듈 안에서 DB 폴백으로만 쓰인다. 상한 필터는 candidates.alloc_filter 하나다.
@@ -1816,6 +1817,83 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             """근거 문구 이어붙이기 — 마침표로 문장을 끊는다(floor_note 이어붙이기와 같은 이유)."""
             return ". ".join(n for n in notes if n) or None
 
+        # ── 조건부 부품 겨냥(part_cond_rules · 0101 · 설계 §5) ─────────────────
+        # 「VRAM 8GB 그래픽카드를 골랐으면 RAM 32GB」처럼 **다른 슬롯의 선택**이 조건인
+        # 규칙이다. UF/UTR 과 달리 풀을 미리 거를 수가 없다 — 조건이 되는 GPU 를 «탐색이
+        # 끝나야» 알기 때문이다(CPU 기본 쿨러·iGPU 생략을 사후에 판정하는 것과 같은 자리).
+        # 그래서 순서를 뒤집는다:
+        #   1) 지금까지와 «똑같이» 한 번 짓는다(기존 동작 — 이 결과가 항상 폴백으로 남는다).
+        #   2) 그 구성의 GPU 로 PCR.apply → 걸리는 규칙이 있는데 그 구성이 못 맞추면,
+        #      해당 슬롯 후보를 규칙으로 좁힌 풀로 **같은 경로를 한 번 더** 돈다.
+        #   3) 좁힌 풀로 못 지으면 1) 의 결과를 그대로 낸다 — 겨냥이지 하한이 아니다
+        #      (8GB+16GB 도 «돌아간다». 프레임타임이 나쁠 뿐이다 — CLAUDE.md §전역 견적 규칙).
+        #      **그래서 이 규칙은 새로운 불성립을 만들 수 없다**(1 의 결과가 늘 살아 있다).
+        #   4) 어느 쪽이든 근거에 남긴다 — 올렸으면 왜 올렸는지, 못 올렸으면 못 올렸다고.
+        # 판정 술어는 UTR.passes 를 그대로 쓴다(PCR 튜플이 UTR 과 같은 4칸 모양이다) —
+        # 판정을 두 벌 두지 않는다(CANON §1).
+        _pool_rows = {(p["product_code"], p["sku"]): p for p in pool}
+        pcr_relaxed_note = "이 예산에서는 그 구성이 없어 적용하지 못했습니다"
+        pcr_state: dict = {}
+
+        def _pcr_rows(built) -> dict:
+            """완성 구성 -> {슬롯: 부품 원본행}. 규칙은 뷰 컬럼(vram_gb)을 읽으므로
+            응답용 `spec`(표시 사양) 이 아니라 **풀 원본 행**을 본다 — 표시 사양 목록이
+            바뀌어도 규칙이 조용히 꺼지지 않게."""
+            out = {}
+            for it in built["items"]:
+                r = _pool_rows.get((it["product_code"], it["sku"]))
+                if r is not None:
+                    out[_slot_of(it["part_type"])] = r
+            return out
+
+        def _pcr_extra(built) -> dict:
+            """이 구성에 실제로 걸리는 조건부 규칙 {슬롯: [(필드, 연산, 값, 라벨)]}.
+
+            재사용 슬롯은 뺀다 — 고르지 않는 자리에 겨냥을 걸 수도, 걸었다고 말할 수도
+            없다(floors_checked·tier_rules 와 같은 판단). 생략된 자리(iGPU·기본 쿨러)는
+            `items` 에 없으므로 조건이 애초에 성립하지 않는다(PCR 의 NULL 원칙과 같다).
+            """
+            return {s: rs for s, rs in PCR.apply(_pcr_rows(built), usage_key).items()
+                    if s not in reuse_slots}
+
+        def _pcr_pool_filter(parts, extra):
+            """조건 규칙을 만족하는 부품만 남긴 풀 — `_tier_filter` 와 같은 모양."""
+            return [p for p in parts
+                    if not (rs := extra.get(_slot_of(p["part_type"]))) or UTR.passes(p, rs)]
+
+        def _pcr_violates(built, extra) -> bool:
+            rows = _pcr_rows(built)
+            for slot, rs in extra.items():
+                row = rows.get(slot)
+                if row is None:      # 그 자리가 견적에 없다 — 판정할 대상이 없다
+                    continue
+                if not UTR.passes(row, rs):
+                    return True
+            return False
+
+        def _pcr_apply(tier, res, build_fn):
+            """(built, honored, utr_relaxed) -> 조건 규칙을 반영한 같은 모양의 튜플."""
+            built, honored, utr_rel = res
+            if built is None:
+                pcr_state[tier] = {"applied": False, "relaxed": False, "items": []}
+                return res
+            extra = _pcr_extra(built)
+            if extra and _pcr_violates(built, extra):
+                b2, h2, u2 = build_fn(lambda pl: _pcr_pool_filter(pl, extra))
+                if b2 is not None:
+                    built, honored, utr_rel = b2, h2, u2
+                    # 규칙으로 좁히면 «다른 GPU» 가 뽑힐 수도 있다(12GB 카드로 바뀌면 이
+                    # 조건은 더 이상 걸리지 않는다) — 최종 구성 기준으로 다시 잰다.
+                    extra = _pcr_extra(built)
+            relaxed = bool(extra) and _pcr_violates(built, extra)
+            pcr_state[tier] = {"applied": bool(extra) and not relaxed, "relaxed": relaxed,
+                               "items": PCR.items(extra)}
+            if extra:
+                # 문구는 DB 의 label 에서 온다(PCR.summary) — 엔진이 지어내지 않는다.
+                built["reasons"] = built["reasons"] + [
+                    _join(PCR.summary(extra), pcr_relaxed_note if relaxed else None)]
+            return built, honored, utr_rel
+
         rules = load_compat_rules(conn)   # 요청당 1회 로드 — 규칙 변경이 즉시 반영된다
         check_rule_fields(pool, rules)    # 규칙 필드 누락은 조용한 전면 불통과 → 경고로 드러낸다
         # 재사용 슬롯이 낀 규칙은 DFS에서 아예 뺀다(rules_active) — chosen에 그 슬롯이
@@ -1845,21 +1923,41 @@ def recommend(body: RecommendBody, request: Request, response: Response):
         meta_v, meta_r, meta_h = {}, {}, {}
 
         # ── 가성비형 ──────────────────────────────────────────────────────────
-        built_v = _build_set("value", common, cap, rules_active, floor_note,
-                             active_slots=active_slots, unknown_rules=rules_unknown,
-                             reuse_note=reuse_note, meta=meta_v, allow_igpu_omit=allow_igpu_omit)
-        honored_v = None
-        if part_v:
-            if gpu_matches and built_v is None:
-                # 핀 풀(common)로는 성립하지 않는다 — 「부품」을 뺀 풀로 다시 짓는다(핀 해제).
-                built_v = _build_set("value", common_full, cap, rules_active, floor_note,
-                                     active_slots=active_slots, unknown_rules=rules_unknown,
-                                     reuse_note=reuse_note, meta=meta_v, allow_igpu_omit=allow_igpu_omit)
-                honored_v = False
-            else:
-                honored_v = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
+        def _build_value(xform):
+            """가성비형 한 번 짓기 — (built, honored, utr_relaxed) 3칸으로 맞춘다
+            (`_pcr_apply` 가 세 티어를 같은 모양으로 다룬다). `xform` 은 풀 변환
+            (기본은 그대로) — 조건부 규칙 재시도가 넣을 수 있게 열어 두지만, **가성비에는
+            조건부 규칙을 걸지 않는다**(바로 아래 호출부 참조).
+
+            ⚠ **왜 가성비에는 part_cond_rules 를 걸지 않는가** — `usage_tier_rules` 를
+            가성비에서 빼는 것과 «똑같은» 이유다(위 tier_rules 주석). 실측으로도 확인했다:
+            걸었더니 회귀 「가성비는 전 예산 공통(가격 오름차순 첫 성립 조합)」이 깨졌다
+            (게임 가성비 100만원 826,000원 · 120만원 1,048,800원 — 예산마다 다른 구성).
+            조건부 규칙은 「예산이 되면 32GB 로 올린다」는 겨냥이라 **예산에 따라 결과가
+            달라지는 것이 정상**인데, 가성비의 정의는 「예산과 무관한 조건 안 최저가」다 —
+            두 성질이 양립하지 않는다. 겨냥은 추천·고성능이 받는다.
+            """
+            b = _build_set("value", xform(common), cap, rules_active, floor_note,
+                           active_slots=active_slots, unknown_rules=rules_unknown,
+                           reuse_note=reuse_note, meta=meta_v, allow_igpu_omit=allow_igpu_omit)
+            h = None
+            if part_v:
+                if gpu_matches and b is None:
+                    # 핀 풀(common)로는 성립하지 않는다 — 「부품」을 뺀 풀로 다시 짓는다(핀 해제).
+                    b = _build_set("value", xform(common_full), cap, rules_active, floor_note,
+                                   active_slots=active_slots, unknown_rules=rules_unknown,
+                                   reuse_note=reuse_note, meta=meta_v,
+                                   allow_igpu_omit=allow_igpu_omit)
+                    h = False
+                else:
+                    h = bool(gpu_matches)   # 재고에 아예 없으면 애초에 핀이 안 걸린 것
+            return b, h, False
+
+        built_v, honored_v, _ = _build_value(lambda pl: pl)
+        pcr_state["value"] = {"applied": False, "relaxed": False, "items": []}
         sets = {"value": built_v}
         _attach_pin(sets["value"], honored_v, cap)
+
 
         # 배분율은 "한 부품에 몰빵하지 마라"는 균형 장치일 뿐 조립 조건이 아니다.
         # 저예산에서는 그것이 슬롯을 전멸시켜 견적을 못 만든다 — 실측: 50만원 사무용에서
@@ -1928,18 +2026,28 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             True로 고정하면 지어낸 사실이 된다 — cap 유무로 판정한다.
             """
             hi_cap_display = hi_limit if hi_limit is not None else hi_cap
-            built, honored = None, None
-            if tier_rules:
-                built, honored = _alloc_cascade("highend", common_t, common_full_t, tier_note,
-                                                hi_note, hi_limit, meta_h)
-                if built is None:
-                    utr_relaxed_tiers.append("highend")
-            if built is None:
-                built, honored = _alloc_cascade("highend", common, common_full,
-                                                tier_relaxed if tier_rules else None,
-                                                hi_note, hi_limit, meta_h)
+
+            def _once(xform):
+                """고성능형 한 벌 — (built, honored, utr_relaxed). `xform` 은 풀 변환."""
+                b, h = None, None
+                rel = False
+                if tier_rules:
+                    b, h = _alloc_cascade("highend", xform(common_t), xform(common_full_t),
+                                          tier_note, hi_note, hi_limit, meta_h)
+                    if b is None:
+                        rel = True
+                if b is None:
+                    b, h = _alloc_cascade("highend", xform(common), xform(common_full),
+                                          tier_relaxed if tier_rules else None,
+                                          hi_note, hi_limit, meta_h)
+                return b, h, rel
+
+            built, honored, utr_rel = _pcr_apply("highend", _once(lambda pl: pl), _once)
+            if utr_rel:
+                utr_relaxed_tiers.append("highend")
             sets["highend"] = built
             _attach_pin(sets["highend"], honored, hi_cap_display)
+
 
         if sets["value"] is None:
             # 가성비 탐색이 예산 밖이면 추천형은 시도하지 않는다(그대로 둔다 — 정직 +
@@ -1960,17 +2068,24 @@ def recommend(body: RecommendBody, request: Request, response: Response):
             # ── 추천형 ────────────────────────────────────────────────────────
             # usage_tier_rules(0085): 겨냥 풀로 먼저, 안 되면 겨냥만 풀고 원래 풀로.
             # 각 풀 안에서 배분 캐스케이드(0086)가 돈다.
-            built_r, honored_r = None, None
-            if tier_rules:
-                built_r, honored_r = _alloc_cascade("recommend", common_t, common_full_t,
-                                                    tier_note, meta=meta_r)
-                if built_r is None:
-                    utr_relaxed_tiers.append("recommend")
-            if built_r is None:
-                built_r, honored_r = _alloc_cascade("recommend", common, common_full,
-                                                    tier_relaxed if tier_rules else None, meta=meta_r)
+            def _once_r(xform):
+                b, h, rel = None, None, False
+                if tier_rules:
+                    b, h = _alloc_cascade("recommend", xform(common_t), xform(common_full_t),
+                                          tier_note, meta=meta_r)
+                    if b is None:
+                        rel = True
+                if b is None:
+                    b, h = _alloc_cascade("recommend", xform(common), xform(common_full),
+                                          tier_relaxed if tier_rules else None, meta=meta_r)
+                return b, h, rel
+
+            built_r, honored_r, utr_rel_r = _pcr_apply("recommend", _once_r(lambda pl: pl), _once_r)
+            if utr_rel_r:
+                utr_relaxed_tiers.append("recommend")
             sets["recommend"] = built_r
             _attach_pin(sets["recommend"], honored_r, cap)
+
 
             # 예산을 숫자로 말하지 않아도(‘200만원 이상’·‘AI 추천 예산’) 상한은 있어야 한다.
             # 없으면 고성능이 3,025만원이 된다 — 램 하나에 931만원을 쓰던 그 구성이
@@ -2037,6 +2152,18 @@ def recommend(body: RecommendBody, request: Request, response: Response):
                                  "relaxed": bool(utr_relaxed_tiers),
                                  "relaxed_tiers": utr_relaxed_tiers},
             "highend_cap_x": HIGHEND_CAP_X,
+            # 조건부 부품 겨냥(part_cond_rules · 0101) — 「이미 고른 GPU 가 조건」이라
+            # 값이 **티어마다 다르다**(추천은 8GB 카드, 고성능은 16GB 카드를 고를 수 있다).
+            # usage_tier_rules 처럼 요청 단위 하나로 낼 수 없어 티어별로 낸다.
+            #   applied  그 티어에 규칙이 걸렸고 구성이 실제로 만족한다
+            #   relaxed  규칙이 걸렸지만 이 예산에 맞는 구성이 없어 풀었다(견적은 그대로 난다 —
+            #            겨냥이지 하한이 아니다). 그 티어 reasons 에도 같은 사실이 적혀 있다.
+            # ⚠ value(가성비)는 **항상 둘 다 false** 다 — 가성비는 겨냥을 받지 않는다
+            #   (usage_tier_rules 와 같은 판단 · `_build_value` docstring 에 근거).
+            "part_cond_rules": {t: pcr_state.get(
+                t, {"applied": False, "relaxed": False, "items": []})
+                for t in ("value", "recommend", "highend")},
+
             # 재사용 슬롯 — 티어별 sets[tier].reused와 같은 정보를 요청 단위로도 낸다.
             # 전 티어가 None(불성립)이어도 "무엇을 재사용으로 골랐는지"는 화면이 알아야
             # 한다(customer-audit-2026-08-24 §1-1) — sets 안에 묻으면 실패 시 사라진다.
