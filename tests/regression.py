@@ -6660,7 +6660,8 @@ def main():
                test_omitted_variant_screen,
                test_ai_vram_floor,
                test_design_split_invariants,
-               test_assembly_fee_screen):
+               test_assembly_fee_screen,
+               test_admin_grid_screen_draws_cells):
         try:
             fn()
         except Exception as e:
@@ -8071,6 +8072,225 @@ def test_assembly_fee_screen():
     # 빈·망가진 응답에 렌더가 죽지 않는다(안내를 붙이면서 새 예외를 만들지 않았는가).
     thrown = [x for x in R58["guard"] if x != "ok"]
     check("[58] 빈·망가진 카드에도 렌더가 예외를 내지 않는다", not thrown, "정상", thrown)
+
+
+# node 드라이버 — 템플릿의 <script> 를 뽑아 최소 DOM 위에서 돌린다.
+R_DRIVER_JS = 'const fs = require(\'fs\');\nconst vm = require(\'vm\');\nconst tpl = fs.readFileSync(process.argv[2], \'utf8\');\nconst data = JSON.parse(fs.readFileSync(process.argv[3], \'utf8\'));\nconst mutate = process.argv[4] || \'\';\n\nlet m = tpl.match(/<script>([\\s\\S]*?)<\\/script>/);\nif (!m) { console.error(\'SCRIPT_NOT_FOUND\'); process.exit(3); }\nlet src = m[1];\nif (mutate === \'tierkey\') {\n  // 음성 검사 — 0105 이전의 좌표(스펙 티어)로 되돌린다.\n  //   저장도 조회도 tier_key(전 칸 NULL)로 하면 비게임 칸이 용도마다 한 자리에\n  //   겹쳐 덮어써진다 — 이번에 실제로 일어난 일 그대로다.\n  const before = src;\n  src = src.replace(\n    "      : key(c.budget_band_key, c.usage, c.platform);",\n    "      : key(c.tier_key, c.usage, c.platform);");\n  src = src.replace(\n    "        var c = byCoord[key(b.band_key, u, state.platform)];",\n    "        var c = byCoord[key(null, u, state.platform)];");\n  if (src === before) { console.error(\'MUTATION_NOOP\'); process.exit(4); }\n}\n\nconst bins = {};\nfunction el(k) {\n  return {\n    _k: k,\n    set innerHTML(v) { bins[k] = String(v); },\n    get innerHTML() { return bins[k] || \'\'; },\n    set hidden(v) { bins[\'@hidden:\' + k] = v ? \'1\' : \'0\'; },\n    get hidden() { return bins[\'@hidden:\' + k] === \'1\'; },\n    style: {},\n    setAttribute() {}, getAttribute() { return null; },\n    addEventListener() {},\n    querySelector() { return null; },\n    querySelectorAll() { return []; },\n  };\n}\nconst cache = {};\nconst document = {\n  querySelector(sel) {\n    const mm = /\\[data-bind="([^"]+)"\\]/.exec(sel);\n    if (!mm) return null;\n    if (!cache[mm[1]]) cache[mm[1]] = el(mm[1]);\n    return cache[mm[1]];\n  },\n  querySelectorAll() { return []; },\n  addEventListener() {},\n};\nconst errors = [];\nconst fetch = function (url) {\n  if (url === \'/api/admin/grid\') {\n    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });\n  }\n  return Promise.reject(new Error(\'UNEXPECTED_FETCH \' + url));\n};\nconst ctx = vm.createContext({ document, fetch, console, Promise, Date, Number,\n  String, Math, Object, Array, JSON, setTimeout, isNaN, parseInt, parseFloat });\ntry { vm.runInContext(src, ctx); } catch (e) { errors.push(\'THROW:\' + e.message); }\n\nsetTimeout(function () {\n  process.stdout.write(JSON.stringify({ bins: bins, errors: errors }));\n}, 80);'
+
+
+# ── [59] 관리자 격자 화면이 «실제로 칸을 그린다» ────────────────────────────
+#
+# ■ 고친 병 (2026-09-20)
+#   0105 가 격자 축을 스펙 티어(`tier_key`)에서 **예산대**(`budget_band_key`)로
+#   바꿨는데 `templates/admin/grid.html.j2` 는 좌표를 계속 `tier_key` 로 찾고
+#   있었다. `tier_key` 는 이제 전 칸에서 NULL 이라 134칸이 좌표 하나에 겹쳐
+#   덮어써졌고, 화면은 **콘솔 에러 없이 표만 통째로 비었다**.
+#   API 는 내내 200 에 134칸을 정상으로 내려주고 있었으므로 응답만 보는 검사는
+#   전부 통과했다 — 그래서 아무도 못 잡았다.
+#
+# ■ 그래서 이 검사는 «API 가 칸을 준다»를 보지 않는다. 그건 화면을 보는 게 아니다.
+#   실제 템플릿의 JS 를 node 로 돌려 **그려진 마크업**을 받아, 서버가 준
+#   cell_id 하나하나가 정말 표에 나타나는지 대조한다.
+#   ⚠ 「칸 수가 0이 아니다」로 끝내면 안 된다 — 좌표가 겹치면 한 칸만 그려져도
+#     0이 아니다. **전수 대조**여야 이 병을 잡는다.
+#
+# ■ 음성 검사 — 좌표를 옛 `tier_key` 로 되돌린 사본을 같은 방법으로 렌더해서
+#   이 검사가 **실제로 FAIL 하는지** 확인한다. 통과하면 아무것도 증명하지 않는다.
+_GRID_TPL = os.path.join(ROOT, "templates", "admin", "grid.html.j2")
+
+
+def _grid_render_driver():
+    """템플릿의 JS 를 node 에서 돌리는 최소 DOM 대역.
+
+    jsdom 을 쓰지 않는다(의존성이 없다 — [57]·[58] 과 같은 관행). 이 화면이
+    건드리는 것은 `[data-bind]` 요소의 innerHTML·hidden·style 뿐이라 그만 흉내 낸다.
+    ★ 실패를 삼키지 않는다 — 화면이 오류 배너를 띄웠다면 그것도 받아 적는다.
+    """
+    return R_DRIVER_JS
+
+
+def test_admin_grid_screen_draws_cells():
+    """[59] 관리자 격자 화면이 서버가 준 칸을 실제로 그린다 (2026-09-20 신설)."""
+    import subprocess as _sp59
+    import shutil as _sh59
+    import tempfile as _tf59
+    print(chr(10) + "[59] 관리자 격자 화면이 칸을 실제로 그린다 (축 전환 회귀)")
+
+    tpl_path = pathlib.Path(_GRID_TPL)
+    check("[59] 격자 템플릿이 있다", tpl_path.exists(), "있음", _GRID_TPL)
+    if not tpl_path.exists():
+        return
+
+    tpl_src = tpl_path.read_text(encoding="utf-8")
+
+    # ⓐ 좌표에 죽은 축이 남아 있지 않다 — 소스 수준의 빠른 그물.
+    #    `tier_key` 는 0105 로 전 칸 NULL 이 됐다. 좌표 키에 쓰면 표가 빈다.
+    for bad in ("key(t.tier_key,", "key(c.tier_key,", "byCoord[key(t.tier_key"):
+        check("[59] 격자 좌표가 죽은 축을 쓰지 않는다(" + bad + ")",
+              bad not in tpl_src, "없음", "있음")
+    # ⓑ 실패를 삼키는 관용구가 없다 — 이번 병이 «조용한 빈 화면»이었다.
+    check("[59] 격자 화면에 `if (!res.ok) return;` 류가 없다",
+          not re.search(r"if\s*\(\s*!\s*\w+\.ok\s*\)\s*return\s*;", tpl_src),
+          "없음", "있음")
+
+    try:
+        grid = get("/api/admin/grid")
+    except Exception as e:
+        check("[59] GET /api/admin/grid 조회", False, "200", repr(e))
+        return
+
+    cells = grid.get("cells") or []
+    check("[59] 서버가 칸을 준다(화면 검사의 전제)", bool(cells), "1건 이상", len(cells))
+    if not cells:
+        return
+
+    node = _sh59.which("node")
+    if not node:
+        check("[59] 렌더 검사 — node 가 없어 건너뜀", True, "건너뜀", "", kind="DB")
+        return
+
+    def render(mutate=""):
+        with _tf59.TemporaryDirectory() as tmp:
+            data_p = pathlib.Path(tmp, "grid.json")
+            drv_p = pathlib.Path(tmp, "drv.js")
+            data_p.write_text(json.dumps(grid, ensure_ascii=False), encoding="utf-8")
+            drv_p.write_text(_grid_render_driver(), encoding="utf-8")
+            args = [node, str(drv_p).replace("\\", "/"),
+                    str(tpl_path).replace("\\", "/"),
+                    str(data_p).replace("\\", "/")]
+            if mutate:
+                args.append(mutate)
+            p = _sp59.run(args, capture_output=True, text=True,
+                          encoding="utf-8", timeout=90)
+        if p.returncode != 0:
+            return None, (p.stderr or "")[-300:]
+        return json.loads(p.stdout), None
+
+    R, err = render()
+    check("[59] node 로 격자 템플릿 렌더 성공", R is not None, "성공", err)
+    if R is None:
+        return
+
+    check("[59] 렌더 중 예외가 없다", not R["errors"], "없음", R["errors"])
+    # 화면의 오류 배너가 떴다면 그것도 실패다(조용한 성공으로 넘기지 않는다).
+    check("[59] 화면이 오류 배너를 띄우지 않았다",
+          not (R["bins"].get("err-title") or "").strip(), "없음",
+          R["bins"].get("err-title"))
+
+    body = (R["bins"].get("grid-body") or "") + (R["bins"].get("game-grid-body") or "")
+    check("[59] 격자 표가 «로딩 중» 자리표시자로 남아 있지 않다",
+          "격자 로딩 중" not in body and len(body) > 200, "그려짐", body[:80])
+
+    # ★ 핵심 — 서버가 준 cell_id 가 «하나하나» 마크업에 나타나는가.
+    #   기본 플랫폼(인텔) 칸이 대상이다(화면이 플랫폼 토글로 갈라 그린다).
+    drawn = set(int(x) for x in re.findall(r'data-cell-id="(\d+)"', body))
+    want = set(c["cell_id"] for c in cells if c["platform"] == "인텔")
+    missing = sorted(want - drawn)
+    check("[59] ★ 서버가 준 인텔 칸이 전부 표에 그려진다(전수 대조)",
+          not missing, str(len(want)) + "칸 전부",
+          str(len(missing)) + "칸 누락 " + str(missing[:8]))
+    extra = sorted(drawn - set(c["cell_id"] for c in cells))
+    check("[59] 표에 서버가 주지 않은 칸이 없다(지어내지 않는다)",
+          not extra, "없음", extra[:8])
+    # 좌표가 겹치면 뒤 칸이 앞 칸을 덮어써 «그려진 칸 수»가 준다 — 중복 없이 1칸 1자리.
+    ids_all = re.findall(r'data-cell-id="(\d+)"', body)
+    check("[59] 한 칸이 한 자리에만 그려진다(좌표 충돌 없음)",
+          len(ids_all) == len(set(ids_all)), "중복 0",
+          len(ids_all) - len(set(ids_all)))
+
+    # ⓒ 게임 칸이 등급×해상도로 갈려 그려진다 — 게임 칸은 usage 가 '게임' 고정이라
+    #   등급·해상도를 빠뜨리면 같은 예산대 칸끼리 겹쳐 사라진다.
+    gbody = R["bins"].get("game-grid-body") or ""
+    gwant = set(c["cell_id"] for c in cells
+                if c["usage"] == "게임" and c["platform"] == "인텔")
+    gdrawn = set(int(x) for x in re.findall(r'data-cell-id="(\d+)"', gbody))
+    check("[59] 게임 칸이 전부 그려진다(등급×해상도 좌표)",
+          gwant <= gdrawn, str(len(gwant)) + "칸", sorted(gwant - gdrawn)[:8])
+    for grade in sorted(set(c["game_grade"] for c in cells if c["usage"] == "게임")):
+        check("[59] 게임 표에 " + grade + "등급 행이 있다",
+              (grade + "등급") in gbody, "있음", "없음")
+    for res in ("1080p", "1440p", "4K"):
+        check("[59] 게임 표에 " + res + " 행이 있다", res in gbody, "있음", "없음")
+
+    # ⓓ ★ «안 만드는 칸»이 «비어 있는 칸»과 다르게 보인다(0106).
+    omissions = grid.get("variant_omissions") or []
+    check("[59] 서버가 «발행하지 않는 구성»을 내려준다(검사의 전제)",
+          bool(omissions), "1건 이상", len(omissions))
+    if omissions:
+        panel = R["bins"].get("omission-panel") or ""
+        check("[59] 제외 사유 패널이 화면에 그려진다",
+              len(panel) > 100, "그려짐", panel[:80])
+        check("[59] 제외 사유 패널이 숨겨져 있지 않다",
+              R["bins"].get("@hidden:omission-panel") == "0", "보임",
+              R["bins"].get("@hidden:omission-panel"))
+        # 사유는 **서버 원문 그대로** 실린다(요약·재작성 금지 — 고객 화면과 같은 규칙).
+        for o in omissions:
+            esc = (o["reason_public"].replace("&", "&amp;").replace("<", "&lt;")
+                   .replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;"))
+            check("[59] " + o["usage"] + " 제외 사유가 서버 원문 그대로 실린다",
+                  esc in panel, "원문 포함", "없음")
+        # 제외된 용도의 칸은 배지로 «발행 안 함»을 밝힌다 — 빈 칸과 구분된다.
+        omit_usages = set(o["usage"] for o in omissions)
+        omit_cells = [c for c in cells
+                      if c["usage"] in omit_usages and c["platform"] == "인텔"]
+        check("[59] 제외 용도의 칸이 실재한다(검사의 전제)",
+              bool(omit_cells), "1건 이상", len(omit_cells))
+        nbody = R["bins"].get("grid-body") or ""
+        for c in omit_cells:
+            seg = re.search(r'data-cell-id="' + str(c["cell_id"]) + r'"(.*?)</button>',
+                            nbody, re.S)
+            check("[59] 칸 " + str(c["cell_id"]) + "(" + c["usage"] + ")가 표에 있다",
+                  seg is not None, "있음", "없음")
+            if seg:
+                check("[59] 칸 " + str(c["cell_id"]) + "(" + c["usage"] +
+                      ")가 «발행 안 함»을 밝힌다",
+                      "발행 안 함" in seg.group(1), "밝힘", seg.group(1)[:120])
+        # 제외가 없는 용도의 칸에는 그 배지가 붙지 않는다(아무 데나 달지 않았는가).
+        plain = None
+        for c in cells:
+            if c["platform"] == "인텔" and not c["variants_omitted"]:
+                plain = c
+                break
+        if plain:
+            seg = re.search(r'data-cell-id="' + str(plain["cell_id"]) + r'"(.*?)</button>',
+                            body, re.S)
+            check("[59] 제외 없는 칸 " + str(plain["cell_id"]) + "에는 배지가 없다",
+                  seg is not None and "발행 안 함" not in seg.group(1),
+                  "없음", seg and seg.group(1)[:120])
+
+    # ⓔ 화면이 수치를 지어내지 않는다 — 건수는 서버 값 그대로(§화면 정직성).
+    check("[59] 채워진 칸 수가 서버 filled_count 그대로다",
+          (R["bins"].get("filled-count") or "").replace(",", "")
+          == str(grid["filled_count"]),
+          grid["filled_count"], R["bins"].get("filled-count"))
+    check("[59] 대상 칸 수가 서버 target_count 그대로다",
+          (R["bins"].get("target-count") or "").replace(",", "")
+          == str(grid["target_count"]),
+          grid["target_count"], R["bins"].get("target-count"))
+
+    # ⓕ ★ 음성 검사 — 좌표를 옛 축(tier_key)으로 되돌리면 이 검사가 실제로 FAIL 하는가.
+    #    되돌린 사본에서도 전수 대조가 통과한다면 위의 검사는 아무것도 증명하지 않는다.
+    M, merr = render("tierkey")
+    if M is None:
+        check("[59] 음성 검사 — 옛 축 사본 렌더", False, "성공", merr)
+    else:
+        mbody = ((M["bins"].get("grid-body") or "")
+                 + (M["bins"].get("game-grid-body") or ""))
+        mdrawn = set(int(x) for x in re.findall(r'data-cell-id="(\d+)"', mbody))
+        nwant = set(c["cell_id"] for c in cells
+                    if c["usage"] != "게임" and c["platform"] == "인텔")
+        gone = nwant - mdrawn
+        # ★ 위의 «전수 대조»가 이 사본에서는 반드시 깨져야 한다.
+        check("[59] ★ 음성 검사 — 좌표를 옛 tier_key 로 되돌리면 전수 대조가 깨진다"
+              "(이 검사가 병을 실제로 잡는다는 증거)",
+              bool(gone), "칸 누락 발생",
+              "누락 0건 — 검사가 병을 못 잡는다")
+        # 겹친 좌표는 «용도마다 한 칸»만 남긴다 — 병의 모양까지 같은지 본다.
+        usages_n = len(set(c["usage"] for c in cells
+                           if c["usage"] != "게임" and c["platform"] == "인텔"))
+        check("[59] 음성 검사 — 겹친 좌표에서는 용도마다 한 칸만 남는다",
+              len(nwant & mdrawn) <= usages_n,
+              "최대 " + str(usages_n) + "칸", len(nwant & mdrawn))
 
 
 if __name__ == "__main__":

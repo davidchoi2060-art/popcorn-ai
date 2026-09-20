@@ -9,19 +9,36 @@
     아니라 admin2.css 상태 별칭(--state-*·--primary 등)으로 매핑했다 — admin2
     화면은 tokens.css를 읽지 않는다(§디자인 계약 admin2 예외).
 
-  ■ 구조 — 원안대로 비게임(6티어×6용도) 표와 게임(6등급×3해상도) 표를 별도
-    구획으로 분리(이미 있던 골격 유지). 추가:
-    · 티어 행 머리에 스펙 하한 요약(`tiers[].floor`, 서버 실컬럼)
-    · 게임 등급 행 머리에 "배정 N종"(`game_grades[].game_count`, 실카운트)
+  ■ 구조 — 두 표를 **같은 예산대 열**로 나란히 둔다(2026-09-20 축 정정).
+    0105 가 축을 스펙 티어에서 **예산대**(`budget_band_key`)로 바꿨는데 이 화면은
+    좌표를 `tier_key` 로 계속 찾고 있었다. `tier_key` 는 이제 전 칸에서 NULL 이라
+    134칸이 한 좌표에 겹쳐 덮어써졌고, **콘솔 에러 없이 표만 통째로 비었다**
+    (API 는 200·134칸을 정상으로 내려주고 있었다). 좌표를 새 축으로 옮긴다:
+      비게임  budget_band_key × usage × platform            (용도 12 × 예산대 7)
+      게임    budget_band_key × (game_grade, game_resolution) × platform
+    게임 칸은 `usage='게임'` 고정이고 등급×해상도로 갈린다 — 용도 행을 쓸 수 없어
+    등급·해상도를 한 행 머리로 묶어 18행으로 둔다(열은 비게임과 같은 예산대 축).
+    한 표에 섞지 않은 이유: 예산대 어휘 자체가 다르다(`bands[].axis` 가 game /
+    nongame 으로 갈리고 구간 금액도 다르다). 섞으면 열 머리가 거짓이 된다.
+
+    · 예산대 열 머리에 구간(`bands[].budget_min_won`~`budget_max_won`)과
+      표본 수(`sample_n`)를 적는다 — 「이 열이 얼마짜리인가 · 근거는 무엇인가」
     · 칸에 3종(가성비/추천/고성능) 존재 여부 점 3개(`cells[].variants_present`)
-    · S등급처럼 GPU/CPU 하한이 갈리는 게임 칸은 목록에서도 "GPU/CPU 분리" 배지 +
-      스펙 줄(`game_gpu_tier_key`/`game_cpu_tier_key_override`)로 미리 알린다
+    · ★ «발행하지 않기로 한» 구성(`cells[].variants_omitted` · 0106)은 빈 칸과
+      **다른 모양**으로 그린다 — 점은 테두리 고리, 칸에는 「고성능 발행 안 함」
+      배지. 사유(`variant_omissions[].reason_public`)는 표 아래 패널과 칸 상세에
+      서버 원문 그대로 싣는다(고객 화면 mockups/mvp2/app.js 와 같은 원칙).
+    · 좌표에 칸이 아예 없는 자리는 「칸 없음」으로 그린다 — 격자가 성긴 축이라
+      (용도마다 해당 예산대가 2~3개뿐) 빈 칸(미생성)과 섞이면 생성 실패로 오해한다
+    · S등급처럼 GPU/CPU 하한이 갈리는 게임 칸은 「GPU/CPU 분리」 배지 + 스펙 줄
     · 미배정 게임(`unassigned_games`, GTA 등) 참고 문구 — 등급 격자 밖 정보
 
-  ■ 서랍 — 3종 탭(가성비/추천/고성능)은 이미 있던 구조 그대로. 추가:
+  ■ 서랍 — 3종 탭(가성비/추천/고성능). 발행하지 않는 구성의 탭도 **지우지 않고
+    누를 수 있게** 둔다(지우면 사유를 전할 자리가 없다). 그 탭을 고르면
+    「아직 생성되지 않았습니다」가 아니라 **발행하지 않는 사유**를 보인다.
+    예산대 근거(`band_range`·`band_sample_n`·`band_source`·`band_note`)도 함께 싣는다.
     · S등급 등 GPU/CPU 비대칭 칸은 두 값을 분리 표기(`.grd-split`, 원안 §isSplit)
-    · 게임 칸에 배정 게임 태그 목록 + 등급 판정 사유(`game_info.grade_note`,
-      `game_load_grades` 조인 — 등급×해상도 note와는 별개로 등급 자체의 근거)
+    · 게임 칸에 배정 게임 태그 목록 + 등급 판정 사유(`game_info.grade_note`)
 
   ■ 원안의 샘플값(TIERS·GRADES 배열 하드코딩 price·floor·games)은 레이아웃
     참고용일 뿐 실제 데이터로 옮기지 않았다 — 전부 `GET /api/admin/grid` 및
@@ -92,13 +109,18 @@
 .grd-legend .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .grd-legend .dot.intent{border-radius:2px;border:1px solid var(--outline);background:repeating-linear-gradient(45deg,var(--surface) 0 3px,var(--outline-variant) 3px 4px)}
 .grd-legend .dot.missing{border-radius:2px;border:1px solid var(--state-wait);background:var(--container)}
+.grd-legend .dot.na{border-radius:2px;border:1px dashed var(--outline-variant);background:transparent}
+.grd-legend .omitmark{display:inline-flex;align-items:center;justify-content:center;width:9px;height:9px;flex:none;
+  border-radius:50%;border:1px solid var(--secondary);color:var(--secondary);font:700 7px/1 var(--font-num)}
 
 /* ── 격자 ── */
 .grd-wrap{overflow:auto;padding:2px}
-.grd-grid{display:grid;gap:1px;background:var(--outline-variant);min-width:1180px}
+.grd-grid{display:grid;gap:1px;background:var(--outline-variant);min-width:940px}
 .grd-corner{background:var(--container-low);padding:8px 12px;font:500 11px/1.3 var(--font);color:var(--on-variant);display:flex;flex-direction:column;justify-content:flex-end;gap:2px}
 .grd-corner b{font:600 12px/1.3 var(--font);color:var(--on)}
 .grd-colhead{border:0;background:var(--container-low);padding:8px 10px;font:600 12px/1.3 var(--font);color:var(--on);text-align:left;cursor:pointer;border-bottom:2px solid transparent}
+.grd-colhead .rng{display:block;font:500 10.5px/1.35 var(--font-num);color:var(--on-variant);margin-top:2px}
+.grd-colhead .smp{display:block;font:400 10px/1.35 var(--font);color:var(--on-variant)}
 .grd-colhead.hl{background:var(--primary-container);border-bottom-color:var(--primary-bright)}
 .grd-rowhead{border:0;background:var(--container-low);padding:8px 10px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;cursor:pointer;border-right:2px solid transparent}
 .grd-rowhead .nm{font:600 13px/1.3 var(--font)}
@@ -108,6 +130,8 @@
 .grd-rowhead.hl{background:var(--primary-container);border-right-color:var(--primary-bright)}
 .grd-cell{border:0;min-height:80px;padding:9px 11px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:5px;background:var(--card);font-family:var(--font);cursor:pointer}
 .grd-cell:disabled{cursor:default}
+.grd-cell.na{cursor:default;background:var(--surface);border:1px dashed var(--outline-variant);align-items:center;justify-content:center;
+  font:400 10.5px/1.3 var(--font);color:var(--on-variant)}
 .grd-cell.hl{background:var(--primary-container)}
 .grd-cell.dim{opacity:.28}
 .grd-cell.sel{box-shadow:inset 0 0 0 2px var(--primary-bright)}
@@ -119,6 +143,21 @@
 .grd-variants{display:flex;gap:3px;align-items:center}
 .grd-variants i{width:5px;height:5px;border-radius:50%;background:var(--outline-variant);flex:none}
 .grd-variants i.on{background:var(--primary-bright)}
+/* «만들지 않기로 한» 구성 — 빈 칸(회색 점)과 다른 모양이어야 한다(0106).
+   색만으로 가르지 않는다(색약 배려) — 테두리만 있는 고리로 그린다. */
+.grd-variants i.omitted{background:transparent;box-shadow:inset 0 0 0 1px var(--secondary)}
+.grd-omit-badge{font:600 9px/1 var(--font);color:var(--secondary);border:1px solid var(--secondary);
+  border-radius:3px;padding:1px 4px;align-self:flex-start}
+/* 용도별 «발행하지 않는 구성» 안내 — 표 아래 사유 목록 */
+.grd-omit-panel{padding:12px 16px;display:flex;flex-direction:column;gap:9px}
+.grd-omit-panel h3{margin:0;font:600 13px/1.3 var(--font)}
+.grd-omit-panel .sub{font:400 11.5px/1.5 var(--font);color:var(--on-variant)}
+.grd-omit-row{border-top:1px solid var(--outline-variant);padding-top:8px;display:flex;flex-direction:column;gap:3px}
+.grd-omit-row .hd{font:600 12px/1.3 var(--font);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.grd-omit-row .rs{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.grd-omit-row .src{font:400 11px/1.5 var(--font);color:var(--on-variant);white-space:pre-wrap;
+  background:var(--container-low);border-radius:6px;padding:7px 9px}
+.grd-omit-row .who{font:400 11px/1.3 var(--font);color:var(--on-variant)}
 .grd-axis-note{font:400 12px/1.5 var(--font);color:var(--on-variant)}
 .grd-axis-note a{color:var(--on-variant)}
 
@@ -159,6 +198,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
 @media (max-width:768px){
   .grd-drawer{width:100vw}
   .grd-bar{flex-direction:column;align-items:stretch}
+  /* 세로 스택 — 격자는 가로 스크롤을 유지한다(칸을 뭉개면 좌표를 못 읽는다).
+     min-width 를 풀면 칸이 30px 로 찌그러져 «빈 표»처럼 보인다. */
+  .grd-tools{flex-direction:column;align-items:stretch;gap:9px}
+  .grd-legend{gap:8px}
+  .grd-omit-panel{padding:11px 13px}
+  .grd-split{grid-template-columns:1fr}
+  .grd-split > div:first-child{border-right:0;border-bottom:1px solid var(--outline-variant)}
 }
 </style>
 {% endblock %}
@@ -169,7 +215,7 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
 
 {% block content %}
 <div class="body">
-  <div class="kicker">사전 생성 견적 격자(스펙 축) · 비게임 스펙티어 6 × 용도 6 + 게임 등급 6 × 해상도 3 · 플랫폼 2 · 축(스펙 하한·용도 목록)은 이 화면에서 고치지 않습니다</div>
+  <div class="kicker">사전 생성 견적 격자(예산대 축) · 비게임 용도 × 예산대 + 게임 부하등급·해상도 × 예산대 · 플랫폼 2 · 축(예산대 경계·용도 목록)은 이 화면에서 고치지 않습니다</div>
 
   <div data-bind="content-area">
     <div class="card banner" data-bind="empty-banner" hidden style="border-style:dashed">
@@ -219,22 +265,26 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
         <span class="sw"><span class="dot" style="background:var(--state-fail)"></span>생성 실패</span>
         <span class="sw"><span class="dot missing"></span>빈 칸(미생성)</span>
         <span class="sw"><span class="dot intent"></span>빈 칸(의도)</span>
+        <span class="sw"><span class="dot na"></span>칸 없음(이 예산대에 두지 않음)</span>
+        <span class="sw"><span class="omitmark">×</span>발행하지 않는 구성(사유 있음)</span>
       </div>
     </div>
 
     <div class="card grd-wrap" data-keep="1">
-      <div class="grd-section-title" style="font:600 13px/1.3 var(--font);margin-bottom:6px">비게임 용도 — 스펙 티어 × 용도</div>
+      <div class="grd-section-title" style="font:600 13px/1.3 var(--font);margin-bottom:6px">비게임 용도 — 용도 × 예산대</div>
       <div data-bind="grid-body" aria-label="견적 격자(비게임)">격자 로딩 중…</div>
     </div>
 
     <div class="card grd-wrap" data-keep="1" style="margin-top:16px">
-      <div class="grd-section-title" style="font:600 13px/1.3 var(--font);margin-bottom:6px">게임 — 부하 등급 × 해상도</div>
+      <div class="grd-section-title" style="font:600 13px/1.3 var(--font);margin-bottom:6px">게임 — 부하 등급 · 해상도 × 예산대</div>
       <div data-bind="game-grid-body" aria-label="견적 격자(게임)">격자 로딩 중…</div>
     </div>
 
+    <div class="card grd-omit-panel" data-bind="omission-panel" hidden></div>
+
     <p class="grd-axis-note" data-bind="unassigned-note" hidden></p>
 
-    <div class="grd-axis-note">축(티어 경계·용도 목록)은 별도 화면에서 관리 · 이 화면은 칸의 내용물만 다루며 부품 손 교체는 없음(재생성만)</div>
+    <div class="grd-axis-note">축(예산대 경계·용도 목록)은 별도 화면에서 관리 · 이 화면은 칸의 내용물만 다루며 부품 손 교체는 없음(재생성만)</div>
   </div>
 
   <div class="card err-card" data-bind="load-error" hidden>
@@ -288,8 +338,8 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     intent:  { label: '빈 칸(의도)',       color: 'var(--outline)' }
   };
 
-  var state = { data: null, platform: '인텔', hlTier: null, hlUse: null, failOnly: false, selectedCellId: null, cellDetail: null, activeVariant: '추천' };
-  var byCoord = {};   // "tierKey|usage|platform" 또는 "G|grade|resolution|platform" -> cell
+  var state = { data: null, platform: '인텔', hlRow: null, hlCol: null, failOnly: false, selectedCellId: null, cellDetail: null, activeVariant: '추천' };
+  var byCoord = {};   // "N|band|usage|platform" 또는 "G|band|grade|resolution|platform" -> cell
 
   function budgetRange(bmin, bmax) {
     var lo = manwon(bmin), hi = manwon(bmax);
@@ -299,56 +349,112 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     return lo + ' ~ ' + hi;
   }
 
-  function key(tierKey, usage, platform) { return tierKey + '|' + usage + '|' + platform; }
-  function gameKey(grade, resolution, platform) { return 'G|' + grade + '|' + resolution + '|' + platform; }
+  // ── 좌표 ──────────────────────────────────────────────────────
+  // 0105 에서 축이 스펙 티어(tier_key)에서 **예산대**(budget_band_key)로 바뀌었다.
+  // tier_key 는 이제 모든 칸에서 NULL 이라 좌표 키에 쓰면 전 칸이 한 자리에 겹쳐
+  // 표가 통째로 빈다(이 화면이 실제로 그렇게 비어 있었다 — 2026-09-20 결함).
+  //   비게임  budget_band_key × usage × platform
+  //   게임    budget_band_key × (game_grade, game_resolution) × platform
+  //           게임 칸은 usage 가 '게임' 고정이라 용도로는 갈리지 않는다.
+  function key(bandKey, usage, platform) { return 'N|' + bandKey + '|' + usage + '|' + platform; }
+  function gameKey(bandKey, grade, resolution, platform) {
+    return 'G|' + bandKey + '|' + grade + '|' + resolution + '|' + platform;
+  }
+  function coordOf(c) {
+    return c.usage === '게임'
+      ? gameKey(c.budget_band_key, c.game_grade, c.game_resolution, c.platform)
+      : key(c.budget_band_key, c.usage, c.platform);
+  }
 
-  // 3종(가성비/추천/고성능) 현재본 존재 여부 점 3개 — 서버가 준 variants_present
+  function bandsOf(axis) {
+    return ((state.data && state.data.bands) || []).filter(function (b) { return b.axis === axis; });
+  }
+
+  // 예산대 열 머리 — 구간(band_range)과 근거(sample_n)를 서버 값 그대로 적는다.
+  // 운영자가 «이 열이 얼마짜리인가»를 표에서 바로 읽어야 한다(정의서 요구).
+  function bandHead(b, idx, clickable) {
+    var rng = b.budget_max_won == null
+      ? manwon(b.budget_min_won) + ' 이상'
+      : manwon(b.budget_min_won) + ' ~ ' + manwon(b.budget_max_won);
+    var inner = '<span>' + esc(b.label) + '</span>' +
+      '<span class="rng">' + esc(rng) + '</span>' +
+      '<span class="smp">표본 ' + num(b.sample_n) + '건</span>';
+    if (!clickable) return '<div class="grd-colhead" role="columnheader">' + inner + '</div>';
+    return '<button type="button" class="grd-colhead' + (state.hlCol === idx ? ' hl' : '') +
+      '" data-action="hl-col" data-idx="' + idx + '" role="columnheader"' +
+      ' title="' + esc(b.source || '') + '">' + inner + '</button>';
+  }
+
+  // 3종(가성비/추천/고성능) 현재본 — 서버가 준 variants_present / variants_omitted 를
   // 그대로 그린다(화면이 있음/없음을 판정하지 않는다, CLAUDE.md §화면 정직성).
+  // ★ «비어 있다»와 «만들지 않기로 했다»는 다른 사실이다(0106) — 모양을 달리한다.
   function variantDots(c) {
     var present = (c && c.variants_present) || [];
+    var omitted = (c && c.variants_omitted) || [];
     return '<span class="grd-variants">' + ['가성비', '추천', '고성능'].map(function (v) {
-      return '<i class="' + (present.indexOf(v) !== -1 ? 'on' : '') + '" title="' + esc(v) + (present.indexOf(v) !== -1 ? ' 있음' : ' 없음') + '"></i>';
+      var on = present.indexOf(v) !== -1;
+      var off = !on && omitted.indexOf(v) !== -1;
+      var cls = on ? 'on' : (off ? 'omitted' : '');
+      var tip = on ? ' 있음' : (off ? ' 발행하지 않음(사유 있음)' : ' 없음');
+      return '<i class="' + cls + '" title="' + esc(v) + esc(tip) + '"></i>';
     }).join('') + '</span>';
+  }
+
+  function omitBadge(c) {
+    var omitted = (c && c.variants_omitted) || [];
+    if (!omitted.length) return '';
+    return '<span class="grd-omit-badge" title="이 용도는 해당 구성을 발행하지 않습니다(사유는 표 아래·칸 상세에 있습니다)">' +
+      esc(omitted.join('·')) + ' 발행 안 함</span>';
+  }
+
+  // 칸 하나 — 두 표가 같은 모양을 쓰도록 한 곳에서만 만든다(§단일 원천).
+  function cellButton(c, aria, extraCls, extraHtml) {
+    var meta = STATE_META[c.state] || { label: c.state, color: 'var(--outline)' };
+    var dim = state.failOnly && c.state !== 'fail';
+    var sel = state.selectedCellId === c.cell_id;
+    var cls = 'grd-cell' + (extraCls ? ' ' + extraCls : '') + (dim ? ' dim' : '') + (sel ? ' sel' : '');
+    var bg = '';
+    if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
+    else if (c.state === 'missing') bg = 'background:var(--container);';
+    var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
+    return '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
+      '" ' + (c.state === 'intent' ? 'disabled' : '') +
+      ' aria-label="' + esc(aria + ' · ' + meta.label) + '">' +
+      '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
+      '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
+      (extraHtml || '') +
+      '<span class="total">' + total + '</span>' +
+      omitBadge(c) +
+      '<span class="ago">' + variantDots(c) + '</span></button>';
+  }
+
+  // 칸이 아예 없는 좌표 — «비어 있는 칸»이 아니라 «두지 않은 자리»다.
+  // 빈 칸(미생성)과 같은 모양으로 그리면 운영자가 생성 실패로 오해한다.
+  function naCell() {
+    return '<div class="grd-cell na" aria-label="칸 없음">칸 없음</div>';
   }
 
   function renderGrid() {
     var d = state.data;
     if (!d) return;
-    var usages = d.usages;   // 비게임 6종
-    var cols = 'grid-template-columns:150px repeat(' + usages.length + ',minmax(134px,1fr));';
+    var usages = d.usages;                 // 비게임 용도(서버 목록)
+    var bands = bandsOf('nongame');        // 예산대 열(서버 목록·sort_order 순)
+    var cols = 'grid-template-columns:150px repeat(' + bands.length + ',minmax(128px,1fr));';
     var html = '<div class="grd-grid" style="' + cols + '" role="grid">';
 
-    html += '<div class="grd-corner"><span>스펙 티어 ↓ / 용도 →</span><b>' + esc(state.platform) + '</b></div>';
+    html += '<div class="grd-corner"><span>용도 ↓ / 예산대 →</span><b>' + esc(state.platform) + '</b></div>';
+    bands.forEach(function (b, bi) { html += bandHead(b, bi, true); });
+
     usages.forEach(function (u, ui) {
-      html += '<button type="button" class="grd-colhead' + (state.hlUse === ui ? ' hl' : '') +
-        '" data-action="hl-use" data-idx="' + ui + '" role="columnheader">' + esc(u) + '</button>';
-    });
+      html += '<button type="button" class="grd-rowhead' + (state.hlRow === ui ? ' hl' : '') +
+        '" data-action="hl-row" data-idx="' + ui + '" role="rowheader">' +
+        '<span class="nm">' + esc(u) + '</span></button>';
 
-    d.tiers.forEach(function (t, ti) {
-      html += '<button type="button" class="grd-rowhead' + (state.hlTier === ti ? ' hl' : '') +
-        '" data-action="hl-tier" data-idx="' + ti + '" role="rowheader">' +
-        '<span class="nm">' + esc(t.name) + '</span><span class="key">' + esc(t.tier_key) + '</span>' +
-        (t.floor ? '<span class="floor">' + esc(t.floor) + '</span>' : '') + '</button>';
-
-      usages.forEach(function (u, ui) {
-        var c = byCoord[key(t.tier_key, u, state.platform)];
-        if (!c) { html += '<div class="grd-cell" style="cursor:default"></div>'; return; }
-        var meta = STATE_META[c.state] || { label: c.state, color: 'var(--outline)' };
-        var hl = state.hlTier === ti || state.hlUse === ui;
-        var dim = state.failOnly && c.state !== 'fail';
-        var sel = state.selectedCellId === c.cell_id;
-        var cls = 'grd-cell' + (hl ? ' hl' : '') + (dim ? ' dim' : '') + (sel ? ' sel' : '');
-        var bg = '';
-        if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
-        else if (c.state === 'missing') bg = 'background:var(--container);';
-        var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
-        html += '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
-          '" ' + (c.state === 'intent' ? 'disabled' : '') +
-          ' aria-label="' + esc(t.name + ' × ' + u + ' × ' + state.platform + ' · ' + meta.label) + '">' +
-          '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
-          '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
-          '<span class="total">' + total + '</span>' +
-          '<span class="ago">' + variantDots(c) + '</span></button>';
+      bands.forEach(function (b, bi) {
+        var c = byCoord[key(b.band_key, u, state.platform)];
+        if (!c) { html += naCell(); return; }
+        var hl = state.hlRow === ui || state.hlCol === bi;
+        html += cellButton(c, u + ' × ' + b.label + ' × ' + state.platform, hl ? 'hl' : '');
       });
     });
 
@@ -360,45 +466,60 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     var d = state.data;
     if (!d) return;
     var resolutions = ['1080p', '1440p', '4K'];
-    var cols = 'grid-template-columns:150px repeat(' + resolutions.length + ',minmax(134px,1fr));';
+    var bands = bandsOf('game');
+    var cols = 'grid-template-columns:168px repeat(' + bands.length + ',minmax(128px,1fr));';
     var html = '<div class="grd-grid" style="' + cols + '" role="grid">';
 
-    html += '<div class="grd-corner"><span>부하 등급 ↓ / 해상도 →</span><b>' + esc(state.platform) + '</b></div>';
-    resolutions.forEach(function (r, ri) {
-      html += '<div class="grd-colhead" role="columnheader">' + esc(r) + '</div>';
-    });
+    html += '<div class="grd-corner"><span>부하 등급 · 해상도 ↓ / 예산대 →</span><b>' + esc(state.platform) + '</b></div>';
+    bands.forEach(function (b, bi) { html += bandHead(b, bi, false); });
 
+    // 게임 칸은 usage='게임' 고정이고 등급×해상도로 갈린다 — 비게임의 «용도» 행 자리에
+    // 등급·해상도 두 값을 한 행 머리로 묶는다(행 18개). 같은 예산대 열을 쓰므로
+    // 두 표를 나란히 읽을 수 있다.
     d.game_grades.forEach(function (g) {
-      html += '<div class="grd-rowhead" role="rowheader"><span class="nm">' + esc(g.grade) + '등급 · ' + esc(g.label) + '</span>' +
-        '<span class="floor">배정 ' + num(g.game_count) + '종</span></div>';
       resolutions.forEach(function (r) {
-        var c = byCoord[gameKey(g.grade, r, state.platform)];
-        if (!c) { html += '<div class="grd-cell" style="cursor:default"></div>'; return; }
-        var meta = STATE_META[c.state] || { label: c.state, color: 'var(--outline)' };
-        var sel = state.selectedCellId === c.cell_id;
-        var cls = 'grd-cell' + (sel ? ' sel' : '');
-        var bg = '';
-        if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
-        else if (c.state === 'missing') bg = 'background:var(--container);';
-        var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
-        var isSplit = !!c.game_cpu_tier_key_override;
-        var specLine = c.game_gpu_tier_key
-          ? ('GPU ' + esc(c.game_gpu_tier_key) + (isSplit ? ' · CPU ' + esc(c.game_cpu_tier_key_override) : ''))
-          : '';
-        html += '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
-          '" ' + (c.state === 'intent' ? 'disabled' : '') +
-          ' aria-label="' + esc(g.label + ' × ' + r + ' × ' + state.platform + ' · ' + meta.label) + '">' +
-          '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
-          '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span>' +
-          (isSplit ? '<span class="split-badge" title="GPU/CPU 하한 비대칭">GPU/CPU 분리</span>' : '') + '</span>' +
-          (specLine ? '<span class="ago">' + specLine + '</span>' : '') +
-          '<span class="total">' + total + '</span>' +
-          '<span class="ago">' + variantDots(c) + '</span></button>';
+        html += '<div class="grd-rowhead" role="rowheader">' +
+          '<span class="nm">' + esc(g.grade) + '등급 · ' + esc(r) + '</span>' +
+          '<span class="key">' + esc(g.label) + '</span>' +
+          '<span class="floor">배정 ' + num(g.game_count) + '종</span></div>';
+        bands.forEach(function (b) {
+          var c = byCoord[gameKey(b.band_key, g.grade, r, state.platform)];
+          if (!c) { html += naCell(); return; }
+          var isSplit = !!c.game_cpu_tier_key_override;
+          var specLine = c.game_gpu_tier_key
+            ? ('GPU ' + esc(c.game_gpu_tier_key) + (isSplit ? ' · CPU ' + esc(c.game_cpu_tier_key_override) : ''))
+            : '';
+          var extra = (isSplit ? '<span class="split-badge" title="GPU/CPU 하한 비대칭">GPU/CPU 분리</span>' : '') +
+            (specLine ? '<span class="ago">' + specLine + '</span>' : '');
+          html += cellButton(c, g.label + ' × ' + r + ' × ' + b.label + ' × ' + state.platform, '', extra);
+        });
       });
     });
 
     html += '</div>';
     set('game-grid-body', html);
+  }
+
+  // 용도별 «발행하지 않는 구성» — 사유는 DB(grid_variant_omissions)에 있고
+  // 서버가 그대로 내려준다. 운영자가 «왜 여긴 2종이지»를 묻지 않게 한 자리에 모은다.
+  function renderOmissionPanel() {
+    var d = state.data;
+    var el = $('omission-panel');
+    if (!el) return;
+    var list = d.variant_omissions || [];
+    if (!list.length) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = '<h3>발행하지 않는 구성 · ' + num(list.length) + '건</h3>' +
+      '<div class="sub">아래 용도는 해당 구성을 <b>일부러 두지 않습니다</b>. 격자에서 빈 칸(미생성)과는 다른 사실이며, 재생성 대상이 아닙니다.</div>' +
+      list.map(function (o) {
+        return '<div class="grd-omit-row">' +
+          '<div class="hd"><span>' + esc(o.usage) + '</span>' +
+          '<span class="grd-omit-badge">' + esc(o.tier_variant) + ' 발행 안 함</span></div>' +
+          '<div class="rs">' + esc(o.reason_public) + '</div>' +
+          (o.reason_source ? '<div class="src">' + esc(o.reason_source) + '</div>' : '') +
+          '<div class="who">' + esc(o.decided_by || '') + '</div>' +
+          '</div>';
+      }).join('');
   }
 
   function renderUnassignedNote() {
@@ -444,16 +565,11 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
   function render(d) {
     state.data = d;
     byCoord = {};
-    d.cells.forEach(function (c) {
-      if (c.usage === '게임') {
-        byCoord[gameKey(c.game_grade, c.game_resolution, c.platform)] = c;
-      } else {
-        byCoord[key(c.tier_key, c.usage, c.platform)] = c;
-      }
-    });
+    d.cells.forEach(function (c) { byCoord[coordOf(c)] = c; });
     renderSummary();
     renderGrid();
     renderGameGrid();
+    renderOmissionPanel();
     renderUnassignedNote();
   }
 
@@ -476,12 +592,12 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (c) {
         state.cellDetail = c;
+        // 좌표 문구도 새 축(예산대)으로 적는다 — tier_key 는 이제 항상 NULL 이라
+        // 그대로 쓰면 서랍 머리가 «null · 개발»이 된다.
         var coordText = c.usage === '게임'
-          ? ('게임 · ' + esc(c.game_grade) + '등급 · ' + esc(c.game_resolution) + ' × ' + esc(c.platform))
-          : (esc(c.tier_key) + ' · ' + esc(c.usage) + ' × ' + esc(c.platform));
-        var byC = c.usage === '게임'
-          ? byCoord[gameKey(c.game_grade, c.game_resolution, c.platform)]
-          : byCoord[key(c.tier_key, c.usage, c.platform)];
+          ? ('게임 · ' + esc(c.game_grade) + '등급 · ' + esc(c.game_resolution) + ' · ' + esc(c.band_label) + ' × ' + esc(c.platform))
+          : (esc(c.usage) + ' · ' + esc(c.band_label) + ' × ' + esc(c.platform));
+        var byC = byCoord[coordOf(c)];
         var meta = STATE_META[c.intended_empty ? 'intent' : ((byC || {}).state || (c.quotes && c.quotes['추천'] ? 'ok' : 'missing'))] || {};
         set('d-coord', coordText);
         set('d-label', esc(meta.label || '—'));
@@ -499,6 +615,15 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     var q = c.quotes ? c.quotes[state.activeVariant] : null;
     var gi = c.game_info;
     var isSplit = !!(gi && gi.cpu_tier_key_override);
+    // 이 용도가 «발행하지 않기로 한» 구성(0106) — 서버가 사유와 함께 내려준다.
+    var omissions = c.variant_omissions || [];
+    var omitOf = function (v) {
+      for (var i = 0; i < omissions.length; i++) {
+        if (omissions[i].tier_variant === v) return omissions[i];
+      }
+      return null;
+    };
+    var omitted = omitOf(state.activeVariant);
 
     var body = '';
 
@@ -515,19 +640,48 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
         (gi.note ? '<br>' + esc(gi.note) : '') + '</div>';
     }
 
+    // 탭은 세 종을 늘 보여준다 — 발행하지 않는 구성도 눌러야 사유를 볼 수 있다
+    // (고객 화면 mockups/mvp2/app.js 와 같은 원칙). 지우면 사유를 전할 자리가 없다.
     body += '<div class="grd-tabs" data-keep="1" role="tablist" aria-label="구성 종류" style="margin:10px 0">' +
       ['가성비', '추천', '고성능'].map(function (v) {
-        return '<button type="button" class="grd-tab" data-action="variant" data-variant="' + v +
-          '" role="tab" aria-selected="' + (state.activeVariant === v ? 'true' : 'false') + '">' + v + '</button>';
+        var om = omitOf(v);
+        return '<button type="button" class="grd-tab" data-action="variant" data-variant="' + v + '"' +
+          (om ? ' data-variant-omitted="1" title="발행하지 않는 구성입니다"' : '') +
+          ' role="tab" aria-selected="' + (state.activeVariant === v ? 'true' : 'false') + '">' + v +
+          (om ? ' <span class="grd-omit-badge">발행 안 함</span>' : '') + '</button>';
       }).join('') + '</div>';
 
+    // 예산대 근거 — 「이 예산대가 얼마짜리인가 · 왜 그 구간인가」를 서랍에서 읽는다.
+    // 전부 서버 값이다(band_range·band_sample_n·band_source·band_note).
+    var bandRng = c.band_range
+      ? (c.band_range.max == null
+          ? manwon(c.band_range.min) + ' 이상'
+          : manwon(c.band_range.min) + ' ~ ' + manwon(c.band_range.max))
+      : '—';
     body += '<dl class="grd-dl">' +
-      '<dt>예산 구간</dt><dd>' + esc(budgetRange(c.budget_min, c.budget_max)) + '</dd>' +
+      '<dt>예산대</dt><dd>' + esc(c.band_label || '—') + ' · ' + esc(bandRng) + '</dd>' +
+      '<dt>예산대 표본</dt><dd>' + num(c.band_sample_n) + '건</dd>' +
+      '<dt>칸 예산 구간</dt><dd>' + esc(budgetRange(c.budget_min, c.budget_max)) + '</dd>' +
       '<dt>생성 시각</dt><dd>' + (q ? esc(new Date(q.generated_at).toLocaleString('ko-KR')) : '—') + '</dd>' +
       '<dt>배치 ID</dt><dd>' + (q ? esc(q.batch_id) : '—') + '</dd>' +
       '</dl>';
+    if (c.band_source) {
+      body += '<div class="grd-omit-row" style="border:0;padding:0"><div class="src">예산대 근거 · ' + esc(c.band_source) + '</div></div>';
+    }
+    if (c.band_note) {
+      body += '<div class="grd-omit-row" style="border:0;padding:0"><div class="src">칸 메모 · ' + esc(c.band_note) + '</div></div>';
+    }
 
-    if (c.intended_empty) {
+    if (omitted) {
+      // ★ 발행하지 않기로 한 구성 — «아직 생성되지 않았다»고 말하면 거짓이다.
+      //   사유는 DB(grid_variant_omissions.reason_public)에 있고 그대로 싣는다.
+      body += '<div class="grd-empty-note" data-omitted-reason="1">' +
+        '<b>발행하지 않는 구성입니다</b> — 배치 대상이 아니며 재생성으로 채워지지 않습니다.<br>' +
+        esc(omitted.reason_public) +
+        (omitted.reason_source ? '<div class="src" style="margin-top:8px">' + esc(omitted.reason_source) + '</div>' : '') +
+        (omitted.decided_by ? '<div class="who" style="margin-top:6px">' + esc(omitted.decided_by) + '</div>' : '') +
+        '</div>';
+    } else if (c.intended_empty) {
       body += '<div class="grd-empty-note">의도적으로 비운 칸 — 이 구성은 시드가 채우지 않았습니다. 재생성 대상이 아닙니다.</div>';
     } else if (!q) {
       body += '<div class="grd-empty-note">아직 생성되지 않은 구성(' + esc(state.activeVariant) + ') — 배치 대상이지만 현재본 견적이 없습니다.</div>';
@@ -598,13 +752,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     } else if (action === 'variant') {
       state.activeVariant = t.getAttribute('data-variant');
       renderDrawerBody();
-    } else if (action === 'hl-tier') {
+    } else if (action === 'hl-row') {
       var idx = Number(t.getAttribute('data-idx'));
-      state.hlTier = state.hlTier === idx ? null : idx;
+      state.hlRow = state.hlRow === idx ? null : idx;
       renderGrid();
-    } else if (action === 'hl-use') {
-      var uidx = Number(t.getAttribute('data-idx'));
-      state.hlUse = state.hlUse === uidx ? null : uidx;
+    } else if (action === 'hl-col') {
+      var cidx = Number(t.getAttribute('data-idx'));
+      state.hlCol = state.hlCol === cidx ? null : cidx;
       renderGrid();
     } else if (action === 'open-cell') {
       openDrawer(Number(t.getAttribute('data-cell-id')));

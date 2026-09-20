@@ -110,8 +110,11 @@ def _meta(conn) -> dict:
     game_map_rows = conn.execute(text("SELECT count(*) FROM game_cell_map")).scalar_one()
     workload_map_rows = conn.execute(text(
         "SELECT count(*) FROM workload_cell_map")).scalar_one()
+    # 「견적 있는 칸」 — 화면 라벨이 말하는 대로 **칸 수**다. 0092 로 칸 하나가
+    # 3종(가성비/추천/고성능) 현재본을 가지므로 행 수를 세면 칸 수의 3배 가까운
+    # 값(388)이 「칸 134개」 자리에 뜬다. DISTINCT 로 칸을 센다.
     cell_count = conn.execute(text(
-        "SELECT count(*) FROM grid_quotes WHERE is_current")).scalar_one()
+        "SELECT count(DISTINCT cell_id) FROM grid_quotes WHERE is_current")).scalar_one()
     ladder_rows = conn.execute(text("SELECT count(*) FROM gpu_ladder")).scalar_one()
     # 「기준 일시」 = 매핑 캐시가 마지막으로 재계산된 시각. 두 표가 같은 배치에서
     # 함께 쓰이므로 둘 중 늦은 쪽을 쓴다 — 한쪽만 보면 그 표가 비었을 때 null 이 된다.
@@ -195,6 +198,41 @@ def _filter_sql(usage, platform):
     return where, params
 
 
+def _cell_axis_sql(alias: str = "c") -> str:
+    """칸 좌표 컬럼 — 0092 가 `grid_cells.tier` 를 없앴고 0105 가 축을 **예산대**로
+    바꿨다. 이 모듈은 오래도록 `c.tier` 를 고른 채로 남아 있어 선택 조회가
+    **HTTP 500**(UndefinedColumn)으로 죽고 있었다(2026-09-20 발견).
+
+    좌표를 한 자리에서만 적는다 — 두 쿼리가 서로 다른 컬럼을 고르면 같은 칸이
+    두 표에서 다른 이름으로 나온다. 화면이 보여 줄 이름은 `band_label` 이다
+    (`admin_grid.py._cell_label()` 과 같은 어휘 — 두 화면이 같은 칸을 같은 말로
+    부른다).
+    """
+    return (f" {alias}.usage, {alias}.platform, {alias}.budget_band_key,"
+            f" {alias}.game_grade, {alias}.game_resolution, b.label AS band_label,")
+
+
+_CELL_AXIS_JOIN = " JOIN grid_budget_bands b ON b.band_key = c.budget_band_key"
+
+# 칸 하나가 3종(가성비/추천/고성능) 현재본을 갖는다(0092). 변종을 고르지 않고
+# grid_quotes 를 조인하면 칸 하나가 최대 3행으로 늘어나 「70칸 성립」이 210행으로
+# 부풀고, 정렬이 가격순이라 같은 칸이 표에 흩어져 나온다. `admin_grid.py` 와 같은
+# 대표본("추천") 하나만 얹는다 — 표가 세는 단위는 «칸»이다.
+REPRESENTATIVE_VARIANT = "추천"
+_QUOTE_JOIN = (" grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
+               " AND q.tier_variant = :rv")
+
+
+def _cell_axis_out(r: dict) -> dict:
+    """칸 좌표를 응답 모양으로. `tier` 키는 더 이상 내려보내지 않는다 —
+    없는 축을 빈 값으로 흉내 내면 화면이 그 자리를 «값 없음»으로 그린다."""
+    return {
+        "usage": r["usage"], "platform": r["platform"],
+        "budget_band_key": r["budget_band_key"], "band_label": r["band_label"],
+        "game_grade": r["game_grade"], "game_resolution": r["game_resolution"],
+    }
+
+
 def _selection_cells(conn, *, kind: str, item_id: int, usage, platform, level) -> dict:
     """고른 항목의 성립 칸 + 불성립·판정 불가 칸.
 
@@ -209,45 +247,48 @@ def _selection_cells(conn, *, kind: str, item_id: int, usage, platform, level) -
 
     where, params = _filter_sql(usage, platform)
     params["id"] = item_id
+    params["rv"] = REPRESENTATIVE_VARIANT
     level_sql = ""
     if level:
         level_sql = " AND m.match_level = :level"
         params["level"] = level
 
     cells = conn.execute(text(
-        "SELECT c.cell_id, c.tier, c.usage, c.platform, c.budget_min, c.budget_max,"
+        "SELECT c.cell_id," + _cell_axis_sql() +
+        " c.budget_min, c.budget_max,"
         " m.match_level, m.gpu_used, q.total, q.verdict, q.status"
         f" FROM {map_table} m"
-        " JOIN grid_cells c ON c.cell_id = m.cell_id"
-        " LEFT JOIN grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
+        " JOIN grid_cells c ON c.cell_id = m.cell_id" + _CELL_AXIS_JOIN +
+        " LEFT JOIN" + _QUOTE_JOIN +
         f" WHERE m.{key_col} = :id" + where + level_sql +
         " ORDER BY q.total ASC NULLS LAST, c.cell_id"), params).mappings().all()
 
     # 불성립·판정 불가 — 등급 필터는 걸지 않는다(성립하지 않은 칸에는 등급이 없다).
     un_where, un_params = _filter_sql(usage, platform)
     un_params["id"] = item_id
+    un_params["rv"] = REPRESENTATIVE_VARIANT
     unmatched = conn.execute(text(
-        "SELECT c.cell_id, c.tier, c.usage, c.platform, q.total,"
+        "SELECT c.cell_id," + _cell_axis_sql() + " q.total,"
         " (SELECT it->>'name'"
         "    FROM jsonb_array_elements(COALESCE(q.payload->'items','[]'::jsonb)) it"
         "   WHERE it->>'part_type' = 'GPU' LIMIT 1) AS gpu_name"
-        " FROM grid_cells c"
-        " JOIN grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
+        " FROM grid_cells c" + _CELL_AXIS_JOIN +
+        " JOIN" + _QUOTE_JOIN +
         f" WHERE NOT EXISTS (SELECT 1 FROM {map_table} m"
         f"   WHERE m.{key_col} = :id AND m.cell_id = c.cell_id)" + un_where +
         " ORDER BY q.total ASC NULLS LAST, c.cell_id"), un_params).mappings().all()
 
     return {
         "cells": [{
-            "cell_id": r["cell_id"], "tier": r["tier"], "usage": r["usage"],
-            "platform": r["platform"], "budget_min": r["budget_min"],
+            "cell_id": r["cell_id"], **_cell_axis_out(r),
+            "budget_min": r["budget_min"],
             "budget_max": r["budget_max"], "match_level": r["match_level"],
             "gpu_used": r["gpu_used"], "total": r["total"],
             "verdict": r["verdict"], "status": r["status"],
         } for r in cells],
         "unmatched": [{
-            "cell_id": r["cell_id"], "tier": r["tier"], "usage": r["usage"],
-            "platform": r["platform"], "total": r["total"],
+            "cell_id": r["cell_id"], **_cell_axis_out(r),
+            "total": r["total"],
             # 칸 견적에 실제로 담긴 GPU 상품명(원문). 칩셋으로 정규화하지 않는다 —
             # 정규화·판정은 배치 소관이고, 여기서 흉내 내면 원천이 둘이 된다.
             "gpu_name": r["gpu_name"],

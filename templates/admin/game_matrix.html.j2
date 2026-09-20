@@ -325,6 +325,16 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     return state.tab === 'games' ? state.base.games : state.base.workloads;
   }
   function idOf(it) { return state.tab === 'games' ? it.game_id : it.workload_id; }
+  // 칸 표시명 — 0092 가 `grid_cells.tier` 를, 0105 가 스펙 티어 축을 없앴다.
+  // 이제 칸을 가르는 것은 **용도와 예산대**이고, 게임 칸은 등급·해상도로 갈린다.
+  // 어휘는 상품 매트릭스 관리(`api/admin_grid.py._cell_label()`)와 같게 맞춘다 —
+  // 두 화면이 같은 칸을 다른 말로 부르면 운영자가 같은 칸인 줄 모른다.
+  function cellName(c) {
+    if (c.usage === '게임') {
+      return '게임(' + c.game_grade + '등급) · ' + c.game_resolution + ' · ' + c.band_label;
+    }
+    return c.usage + ' · ' + c.band_label;
+  }
   function nameOf(it) {
     if (state.tab === 'games') return it.name;
     return it.task + (it.model_size ? ' · ' + it.model_size : '');
@@ -498,7 +508,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
         return '<tr data-action="cell" data-cell-id="' + r.cell_id + '"' +
           (state.cellId === r.cell_id ? ' aria-selected="true"' : '') + '>' +
           '<td class="id">' + num(r.cell_id) + '</td>' +
-          '<td class="nm">' + esc(r.tier + ' · ' + r.usage) + '</td>' +
+          '<td class="nm">' + esc(cellName(r)) + '</td>' +
           '<td>' + esc(r.platform) + '</td>' +
           '<td>' + esc(r.gpu_used) + '</td>' +
           '<td class="num">' + won(r.total) + '</td>' +
@@ -514,7 +524,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var label = it.unjudgeable ? '판정 불가' : '불성립';
     set('fails', fails.map(function (f) {
       return '<tr><td class="id">' + num(f.cell_id) + '</td>' +
-        '<td class="nm">' + esc(f.tier + ' · ' + f.usage) + '</td>' +
+        '<td class="nm">' + esc(cellName(f)) + '</td>' +
         '<td>' + esc(f.platform) + '</td>' +
         '<td>' + esc(f.gpu_name == null ? 'GPU 항목 없음' : f.gpu_name) + '</td>' +
         '<td class="num">' + won(f.total) + '</td>' +
@@ -566,7 +576,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
 
     set('ev-body',
       '<div class="gm-ev-cell">칸 ' + num(cell.cell_id) + '</div>' +
-      '<div class="gm-ev-desc">' + esc(cell.tier + ' · ' + cell.usage + ' · ' + cell.platform + ' · ' + nameOf(it)) + '</div>' +
+      '<div class="gm-ev-desc">' + esc(cellName(cell) + ' · ' + cell.platform + ' · ' + nameOf(it)) + '</div>' +
       '<div class="gm-ev-lines">' + lines + '</div>' +
       '<div class="gm-ev-verdict" style="color:' + (OK_LEVELS[cell.match_level] ? 'var(--success-dark)' : 'var(--on)') + '">' +
       '판정 ' + esc(cell.match_level) + ' (배치 판정값)</div>' +
