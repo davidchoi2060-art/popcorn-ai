@@ -104,6 +104,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+
+  <script src="../shared/assembly-fee.js"></script>
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
@@ -304,6 +306,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <span style="font-size:26px;font-weight:900;color:#fff;"><span data-bind="showcase_total">—</span><span style="font-size:15px;color:#9a968d;">원</span>
 </span>
 </div>
+<!-- 조립공임 안내 — 예상 견적가 바로 아래. showcase 총액은 부품 합계이고 공임은 주문 단계에서
+     더해진다. 문구·금액은 ../shared/assembly-fee.js 한 곳에서 온다(마크업에 30,000 없음). -->
+<div data-assembly-fee-note="short" style="margin-top:8px;text-align:right;font-size:12.5px;font-weight:700;color:#8a8578;"></div>
 </div>
 <div style="background:#17171b;color:#fff;border-radius:22px;padding:30px 30px;display:flex;flex-direction:column;">
 <!-- 「예시 · 실측값 아님」 배지(2026-08-24, 감사 §2-6 후속). 이 패널(파이·용량바·FPS)은

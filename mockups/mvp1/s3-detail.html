@@ -67,6 +67,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+
+  <script src="../shared/assembly-fee.js"></script>
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
@@ -98,6 +100,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
       <div style="text-align:right;">
         <div style="font-size:13px;font-weight:700;color:#8a8578;">현재 구성 총액 · 3시간 전 재고가 기준</div>
         <div style="font-size:30px;font-weight:900;color:#17171b;" data-bind="s3_total">—<span style="font-size:16px;color:#8a8578;">원</span></div>
+        <!-- 조립공임 안내 — 총액 바로 아래. 이 총액은 부품 합계이며 공임은 주문 단계에서 더해진다.
+             문구·금액 원천은 ../shared/assembly-fee.js 한 곳뿐이다. -->
+        <div data-assembly-fee-note="quote" style="margin-top:6px;font-size:12.5px;line-height:1.5;font-weight:700;color:#8a8578;max-width:min(320px,100%);"></div>
       </div>
     </div>
 

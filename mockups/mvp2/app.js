@@ -48,6 +48,19 @@ const IMG_NOTE='이미지는 예시입니다. 부품·가격·재고는 실제 �
 const NOT_READY='부품 조정은 준비 중입니다.';
 // 0106 — 서버가 «제외»라고는 했는데 사유 문자열이 비어 온 경우에만 쓴다. 사유를 지어내지 않는다.
 const OMITTED_NO_REASON='이 용도는 이 구성을 두지 않습니다. 사유는 서버에서 받지 못했습니다.';
+// 조립공임 — 금액·문구는 ../shared/assembly-fee.js 한 곳에서 온다(§단일 원천).
+//   · 브라우저는 index.html 이 먼저 실은 window.PopcornAssemblyFee 를 쓴다.
+//   · node(회귀 검사)는 require 로 같은 파일을 읽는다 — 두 경로가 같은 숫자를 본다.
+//   · 총액(v.total)에 더하지 않는다 — 공임은 장바구니·주문 단계에서 더해진다(사장님 확정).
+const FEE=(function(){
+ if(root&&root.PopcornAssemblyFee)return root.PopcornAssemblyFee;
+ try{return require('../shared/assembly-fee.js');}catch(e){return null;}
+})();
+// 원천이 없으면 금액을 지어내지 않고 못 불렀다고 말한다(§실패를 삼키지 않는다).
+const FEE_UNKNOWN='조립공임 안내를 불러오지 못했습니다.';
+function feeNote(kind){return FEE?FEE.noteText(kind):FEE_UNKNOWN;}
+// 가격이 보이는 자리마다 붙이는 한 줄. 값이 없는 카드(미배치·제외)에는 붙이지 않는다.
+function feeNoteMarkup(kind,cls){return `<p class="${cls}" data-assembly-fee-note="${kind}">${esc(feeNote(kind))}</p>`;}
 
 // ── A-135: 카드 안 3종 탭 ────────────────────────────────────────────────────
 const VARIANT_DEFS=[{key:'value',label:'가성비'},{key:'reco',label:'추천'},{key:'perf',label:'고성능'}];
@@ -261,7 +274,7 @@ function cardMarkup(card,i,centerTier,activeVariant){
  const badges=[featured?'<span class="rec-tag">내 조건 중심</span>':'',over?`<span class="rec-tag over">예산 초과${overBy?' +'+overBy+'원':''}</span>`:''].join('');
  const tierName=tierDisplayName(card);
  const priceBlock=v&&Number.isFinite(v.total)
-  ?`<div class="tier-price-row"><div class="tier-price">${money(v.total)}<small>원</small></div>${card.platform?`<span class="tier-price-note">배치 관측가 · ${esc(card.platform)}</span>`:''}</div>`
+  ?`<div class="tier-price-row"><div class="tier-price">${money(v.total)}<small>원</small></div>${card.platform?`<span class="tier-price-note">배치 관측가 · ${esc(card.platform)}</span>`:''}</div>${feeNoteMarkup('short','tier-fee-note')}`
   :(om?'':'<p class="condition-note">이 구성은 아직 배치되지 않았습니다.</p>');
  const range=v?tierRangeText(v.tier_range||card.tier_range):'';
  // 제외된 구성일 때는 값이 없는 스펙표(— 4줄)를 그리지 않는다 — 사유 한 덩이만 남긴다.
@@ -359,7 +372,7 @@ function quoteMarkup(card,activeVariant){
  const over=!card.fromSaved&&variantOver(v,card);
  const verdict=over?'<span class="under over">예산 초과</span>':'';
  const tierName=tierDisplayName(card);
- return `<div class="quote-top"><span class="eyebrow">내 구성${tierKeyOf(card)?' · '+esc(tierKeyOf(card)):''}</span></div><div class="quote-title"><div><h2>${esc(tierName)}</h2><p>${esc([card.usage,card.platform].filter(Boolean).join(' · '))}</p></div><div class="quote-total">${v&&Number.isFinite(v.total)?money(v.total):'—'}<small>원</small>${verdict}</div></div>${variantTabsMarkup('quote',0,activeKey,vs,card)}${om?omittedReasonMarkup(om):''}${!hasThree?'<p class="condition-note">이 견적은 아직 단일 구성만 제공합니다.</p>':''}<div class="quote-media"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><div class="media-caption">대표 예시 이미지<small>실제 부품은 아래 목록 기준</small></div><button data-action="video" aria-label="대표 예시 이미지 크게 보기">▶</button></div><div class="quote-reason"><b>✦ 이렇게 골랐어요</b>${reasons.length?'<ul>'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<br>서버가 준 이유가 없습니다.'}</div><div class="parts-heading"><b>구성 부품 <span>${parts.length}종</span></b><span>서버 가격 · 원</span></div><table class="parts" aria-label="현재 견적 부품 목록"><tbody>${parts.map(p=>`<tr><td class="category">${esc(p.cat)}</td><td class="part-name">${partLine(p)}</td><td class="part-price">${money(p.price)}</td></tr>`).join('')}${omittedRows(omitted)}</tbody></table><p class="quote-disclaimer">재고는 조회 시점 기준입니다.${v&&v.generated_at?' 견적 생성 '+esc(String(v.generated_at).slice(0,10))+'.':''} ${NOT_READY}</p><div class="quote-actions"><button class="secondary" data-action="save">견적 저장</button><button class="primary" data-action="cart" disabled title="장바구니는 준비 중입니다">장바구니 담기(준비 중)</button></div>`;
+ return `<div class="quote-top"><span class="eyebrow">내 구성${tierKeyOf(card)?' · '+esc(tierKeyOf(card)):''}</span></div><div class="quote-title"><div><h2>${esc(tierName)}</h2><p>${esc([card.usage,card.platform].filter(Boolean).join(' · '))}</p></div><div class="quote-total">${v&&Number.isFinite(v.total)?money(v.total):'—'}<small>원</small>${verdict}</div></div>${v&&Number.isFinite(v.total)?feeNoteMarkup('quote','quote-fee-note'):''}${variantTabsMarkup('quote',0,activeKey,vs,card)}${om?omittedReasonMarkup(om):''}${!hasThree?'<p class="condition-note">이 견적은 아직 단일 구성만 제공합니다.</p>':''}<div class="quote-media"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><div class="media-caption">대표 예시 이미지<small>실제 부품은 아래 목록 기준</small></div><button data-action="video" aria-label="대표 예시 이미지 크게 보기">▶</button></div><div class="quote-reason"><b>✦ 이렇게 골랐어요</b>${reasons.length?'<ul>'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<br>서버가 준 이유가 없습니다.'}</div><div class="parts-heading"><b>구성 부품 <span>${parts.length}종</span></b><span>서버 가격 · 원</span></div><table class="parts" aria-label="현재 견적 부품 목록"><tbody>${parts.map(p=>`<tr><td class="category">${esc(p.cat)}</td><td class="part-name">${partLine(p)}</td><td class="part-price">${money(p.price)}</td></tr>`).join('')}${omittedRows(omitted)}</tbody></table><p class="quote-disclaimer">재고는 조회 시점 기준입니다.${v&&v.generated_at?' 견적 생성 '+esc(String(v.generated_at).slice(0,10))+'.':''} ${NOT_READY}</p><div class="quote-actions"><button class="secondary" data-action="save">견적 저장</button><button class="primary" data-action="cart" disabled title="장바구니는 준비 중입니다">장바구니 담기(준비 중)</button></div>`;
 }
 // 오류 문구 — 502 는 AI 연결 불가(폴백 UI 없음). 서버 detail 은 console 로만.
 function errorMessage(status,data){
@@ -370,7 +383,7 @@ function errorMessage(status,data){
  if(d&&typeof d==='object'&&d.message)return String(d.message);
  return (status>=500?'서버 오류':'요청 오류')+`(${status})`;
 }
-const render={money,esc,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON};
+const render={money,esc,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON};
 if(typeof module!=='undefined'&&module.exports){module.exports=render;return;}   // node(자기검증) — 여기서 끝
 if(!root.document||root.PopcornApp)return;
 
@@ -519,7 +532,7 @@ function requestChange(text){
 }
 function selectTab(tab){$('#workspace').classList.toggle('mobile-quote',tab==='quote');document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));}
 function save(){if(!state.selected)return;const om=omissionFor(state.selected,state.selectedVariant);if(om){toast('두지 않기로 한 구성이라 저장할 내용이 없어요.');return;}const v=variantsOf(state.selected)[state.selectedVariant]||variantsOf(state.selected).reco;if(!v)return;const flat={name:tierDisplayName(state.selected),total:v.total,parts:normalizeParts(v.items||v.parts),talk:state.talk?copy(state.talk):null,savedAt:new Date().toISOString()};state.saved.unshift(flat);state.saved=state.saved.slice(0,10);try{localStorage.setItem(SAVE_KEY,JSON.stringify(state.saved));toast('이 브라우저에 견적을 저장했어요.');}catch{toast('브라우저 저장이 제한되어 이번 화면에서만 보관해요.');}$('#savedCount').textContent=state.saved.length;}
-function showSaved(){$('#savedList').innerHTML=state.saved.length?state.saved.map((q,i)=>`<div class="saved-item"><div><b>${esc(q.name)}</b><small>${money(q.total)}원 · ${new Date(q.savedAt).toLocaleDateString('ko-KR')}</small></div><button class="primary" data-load="${i}">불러오기</button></div>`).join(''):'<div class="empty-saved">아직 저장한 견적이 없어요.<br>구성을 선택한 뒤 “견적 저장”을 눌러주세요.</div>';$('#savedDialog').showModal();}
+function showSaved(){$('#savedList').innerHTML=state.saved.length?state.saved.map((q,i)=>`<div class="saved-item"><div><b>${esc(q.name)}</b><small>${money(q.total)}원 · ${new Date(q.savedAt).toLocaleDateString('ko-KR')}</small><small class="saved-fee-note" data-assembly-fee-note="short">${esc(feeNote('short'))}</small></div><button class="primary" data-load="${i}">불러오기</button></div>`).join(''):'<div class="empty-saved">아직 저장한 견적이 없어요.<br>구성을 선택한 뒤 “견적 저장”을 눌러주세요.</div>';$('#savedDialog').showModal();}
 // 조건 다이얼로그 — 현재 값은 state.talk(서버 TalkState)에서 읽는다. 제출은 문장으로 파서에 보낸다(init 참고) —
 // 화면이 state 를 직접 고쳐 recommend 를 부르면 서버 검증(§5)을 건너뛰게 되므로 하지 않는다.
 async function showConditions(){const f=$('#conditionsForm');const won=ST.budgetWon(state.talk);f.elements.budget.value=won!=null?Math.round(won/10000):'';const cur=ST.usages(state.talk);

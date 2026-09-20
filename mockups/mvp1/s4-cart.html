@@ -31,6 +31,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+
+  <script src="../shared/assembly-fee.js"></script>
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
@@ -161,6 +163,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
               <div><div style="font-size:13px;font-weight:700;color:#9a968d;">총 결제금액</div><div id="s4-total-cap" style="font-size:11px;color:#7a766d;"></div></div>
               <div id="s4-total" style="font-size:26px;font-weight:900;color:#fff;">—<span style="font-size:14px;color:#9a968d;">원</span></div>
             </div>
+            <!-- 조립공임 안내 — 이 화면은 주문 단계라 공임이 총액에 «실제로 더해져 있다».
+                 문구·금액 원천은 ../shared/assembly-fee.js 한 곳이다. -->
+            <div data-assembly-fee-note="cart" style="margin-top:8px;font-size:12px;line-height:1.5;font-weight:700;color:#9a968d;"></div>
           </div>
         </div>
 
@@ -511,7 +516,9 @@ window.addEventListener('scroll',closeTip,{passive:true});
  /* 조립비는 견적 스냅샷에 실려 오지 않는다(api/handoff 는 몰 값을 쓴다).
     화면이 쓰는 이 상수는 자체 결제 경로(api/orders.ASSEMBLY_FEE)와 같은 값이다 -
     인계 경로의 표시 근거는 아직 서버가 주지 않는다(보고 대상). */
- var ASSEMBLY_FEE=30000;
+ /* 값은 ../shared/assembly-fee.js 한 곳에만 있다 — 이 파일이 들고 있던 30000 리터럴을 옮겼다.
+    공용 파일이 안 실리면 «모른다»로 두고 총액을 지어내지 않는다(null 규약). */
+ var ASSEMBLY_FEE=(window.PopcornAssemblyFee&&window.PopcornAssemblyFee.ASSEMBLY_FEE);
  fetch('/api/ops').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(ops){
   // 1) 견적 스냅샷 부품으로 구성 상세를 그린다(마크업에는 부품이 없다)
   var slot=document.getElementById('s4-parts');
@@ -552,9 +559,12 @@ window.addEventListener('scroll',closeTip,{passive:true});
   }
   var asm=document.getElementById('s4-assembly');
   var asmP=document.getElementById('s4-assembly-price');
+  /* 공임 원천(shared/assembly-fee.js)이 안 실렸으면 금액을 모른다 — 0 원으로
+     지어내지 않고 그 사실을 말한다(§실패를 삼키지 않는다). 총액도 — 로 둔다. */
+  var feeKnown=Number.isFinite(ASSEMBLY_FEE);
   if(hasParts){
    if(asm)asm.style.display='flex';
-   if(asmP)asmP.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
+   if(asmP)asmP.textContent=feeKnown?(ASSEMBLY_FEE.toLocaleString()+'원'):'—원';
   }
   // 2) 합계 — 부품 합계 행 · 총액(단일 원천 s4SetTotal). 부품이 없으면 합계 상자
   //    자체를 열지 않는다(마크업 기본값 display:none 유지) — "부품 합계 0종·0원"을
@@ -566,9 +576,11 @@ window.addEventListener('scroll',closeTip,{passive:true});
    var sumVal=document.getElementById('s4-sum-val');
    if(sumVal)sumVal.textContent=S.total.toLocaleString()+'원';
    var feeVal=document.getElementById('s4-fee-val');
-   if(feeVal)feeVal.textContent=ASSEMBLY_FEE.toLocaleString()+'원';
-   window.s4SetTotal(S.total+ASSEMBLY_FEE+periphSum);
-   var tcap=document.getElementById('s4-total-cap');if(tcap)tcap.textContent='VAT 포함';
+   if(feeVal)feeVal.textContent=feeKnown?(ASSEMBLY_FEE.toLocaleString()+'원'):'—원';
+   window.s4SetTotal(feeKnown?(S.total+ASSEMBLY_FEE+periphSum):null);
+   var tcap=document.getElementById('s4-total-cap');
+   if(tcap)tcap.textContent=feeKnown?'VAT 포함':'조립공임을 불러오지 못했습니다';
+   if(!feeKnown)window.s4Msg='조립공임을 불러오지 못해 총액을 확정할 수 없습니다.';
    var rst=document.getElementById('s4-restock');if(rst)rst.style.display='flex';
   }else{
    window.s4SetTotal(null);

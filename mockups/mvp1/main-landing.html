@@ -106,6 +106,8 @@
   }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+
+  <script src="../shared/assembly-fee.js"></script>
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
@@ -246,7 +248,7 @@
             <div style="text-align:left;"><div style="color:#fff; font-family:var(--font); font-weight:800; font-size:20px;">검증 완료</div><div style="color:rgba(255,255,255,.6); font-size:14px; margin-top:2px;">조건·호환·예산을 통과한 구성</div></div>
           </div>
           <div style="position:relative; display:flex; align-items:center; gap:24px;">
-            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:var(--font-num);">Verified Pick</div><div style="color:#fff; font-family:var(--font); font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">—</span><span style="font-size:18px; font-weight:700;">원</span></div></div>
+            <div style="text-align:right;"><div style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-family:var(--font-num);">Verified Pick</div><div style="color:#fff; font-family:var(--font); font-weight:900; font-size:30px; letter-spacing:-0.02em;"><span data-bind="showcase_total">—</span><span style="font-size:18px; font-weight:700;">원</span></div><!-- 조립공임 안내 — 금액 바로 아래. 문구·금액은 ../shared/assembly-fee.js 한 곳에서 온다. --><div data-assembly-fee-note="short" style="margin-top:6px; font-size:12.5px; font-weight:700; color:rgba(255,255,255,.62);"></div></div>
             <button style="background:#65A1D4; color:#fff; border:none; width:56px; height:56px; border-radius:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" data-cta="start"><span class="msym" style="font-size:26px;">arrow_forward</span></button>
           </div>
         </div>
@@ -294,7 +296,7 @@
           <div style="background:linear-gradient(160deg,#1A202C,#0F172A); border-radius:28px; padding:38px; position:relative; overflow:hidden; box-shadow:0 30px 60px -30px rgba(15,23,42,.7); display:flex; flex-direction:column;">
             <div style="position:absolute; top:0; right:0; background:#65A1D4; color:#fff; font-family:var(--font); font-weight:900; font-size:12px; letter-spacing:.12em; padding:9px 18px; border-radius:0 0 0 18px;">TOP PICK</div>
             <div style="color:rgba(255,255,255,.55); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;" data-bind="showcase_caption">검증 통과 견적</div>
-            <div style="color:#fff; font-family:var(--font); font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 26px;"><span data-bind="showcase_total">—</span><span style="font-size:22px;">원</span></div>
+            <div style="color:#fff; font-family:var(--font); font-weight:900; font-size:42px; letter-spacing:-0.02em; margin:8px 0 6px;"><span data-bind="showcase_total">—</span><span style="font-size:22px;">원</span></div><div data-assembly-fee-note="short" style="margin:0 0 26px; font-size:12.5px; font-weight:700; color:rgba(255,255,255,.62);"></div>
             <div style="display:flex; flex-direction:column; gap:2px;" data-repeat="showcase_items">
               <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">CPU · Ryzen 5 7600</span><span style="color:#fff; font-family:var(--font-num); font-size:14px;">—</span></div>
               <div style="display:flex; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.1);"><span style="color:rgba(255,255,255,.8); font-size:15px;">GPU · RTX 4060 Ti</span><span style="color:#fff; font-family:var(--font-num); font-size:14px;">—</span></div>

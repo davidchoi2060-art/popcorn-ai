@@ -135,7 +135,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 #s2-fit-badge{white-space:nowrap}
 }
 </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css">
+  <link rel="stylesheet" href="../shared/fonts/fonts.css">
+  <script src="../shared/assembly-fee.js"></script>
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
@@ -221,6 +222,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 <div style="font-size:13px;font-weight:700;color:#9a968d;margin-top:18px;">최종 견적가</div>
 <div style="font-size:56px;font-weight:900;line-height:1.02;letter-spacing:-.02em;"><span id="s2-price">—</span><span style="font-size:30px;">원</span>
 </div>
+<!-- 조립공임 안내 — 최종 견적가 «바로 아래». 총액(s2-price)은 부품 합계 그대로이고
+     공임은 주문 단계(S4)에서 더해진다. 문구·금액은 ../shared/assembly-fee.js 한 곳에서 온다
+     (마크업에 30,000 을 적지 않는다 — §단일 원천). -->
+<div data-assembly-fee-note="quote" style="margin-top:8px;font-size:13px;line-height:1.5;font-weight:700;color:#c9c5bd;"></div>
 <div style="display:flex;gap:26px;margin-top:22px;padding-bottom:24px;border-bottom:1px solid #2e2e29;">
 <div>
 <div style="font-size:30px;font-weight:900;color:#7fa8ff;"><span id="s2-fps">—</span><span style="font-size:16px;color:#c9c5bd;"> FPS</span>

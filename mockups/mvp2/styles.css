@@ -82,3 +82,10 @@
 .rec-tag.over{background:var(--container);color:var(--error)}
 .card-actions{display:flex;gap:8px;margin-top:14px}
 @media(max-width:768px){.tier-cell{padding:7px 2px}.tier-cell-key{font-size:11px}.tier-cell-label{font-size:9px}.tier-name{font-size:22px}.tier-price{font-size:22px}}
+
+/* 조립공임 안내 — 금액 바로 옆/아래에 붙는 한 줄. 숫자보다 작게 두되 읽히는 크기(12·12.5px)를
+   지킨다(회색 8px 금지). 문구·금액은 ../shared/assembly-fee.js 한 곳에서 온다. */
+.tier-fee-note{margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--muted);font-weight:500}
+.quote-fee-note{margin:-8px 0 16px;font-size:12.5px;line-height:1.6;color:var(--muted);text-align:right}
+.saved-fee-note{display:block;margin-top:2px;font-size:11.5px;color:var(--muted)}
+@media(max-width:768px){.quote-fee-note{text-align:left;margin:4px 0 14px}}

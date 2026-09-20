@@ -81,6 +81,7 @@
   <dialog id="conditionsDialog"><div class="dialog-header"><h2>내 조건 수정</h2><button class="close" data-close="conditionsDialog" aria-label="조건 수정 닫기">×</button></div><form id="conditionsForm"><label>예산 상한 (만원)<input type="number" name="budget" min="50" step="1" required></label><label>주요 용도<select name="purpose"><!-- 용도 목록은 서버가 준다 — app.js 가 채운다 --></select></label><label class="check-label"><input type="checkbox" name="monitor">모니터는 이미 있어요</label><p class="demo-note">조건을 바꾸면 새로운 추천 목록을 보여드립니다.</p><button class="primary" type="submit">이 조건으로 다시 추천</button></form></dialog>
   <div id="toast" class="toast" role="status"></div>
 </div>
+<script src="../shared/assembly-fee.js"></script>
 <script src="app.js"></script>
 <script>window.PopcornApp&&window.PopcornApp.init();</script>
 </body>

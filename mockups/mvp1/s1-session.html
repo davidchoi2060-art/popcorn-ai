@@ -24,6 +24,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 .spectxt{min-width:0;overflow-wrap:anywhere;}
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
+
+  <script src="../shared/assembly-fee.js"></script>
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
@@ -191,7 +193,9 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           <div id="s1-budget-marker" style="display:none;position:absolute;top:-4px;width:3px;height:18px;background:#17171b;border-radius:2px;transition:left .5s;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#a29d92;font-weight:700;"><span>0</span><span>150만</span><span>300만+</span></div>
-        <p id="s1-budget-note" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;line-height:1.55;">부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.</p>
+        <p id="s1-budget-note" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;line-height:1.55;">부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.</p>
+        <!-- 조립공임 안내 — 예산 문구 바로 아래. 문구·금액 원천은 ../shared/assembly-fee.js 한 곳이다. -->
+        <p data-assembly-fee-note="short" style="margin:4px 0 0;font-size:12.5px;color:#8a8578;font-weight:700;line-height:1.55;"></p>
         <p style="margin:6px 0 0;font-size:11px;color:#b5b0a4;">2026년 7월 시장가 · 자체 재고가 기준</p>
       </div>
 
@@ -960,7 +964,7 @@ function renderChecks(checks){return checks.map(function(c){var v=checkVisual(c.
 function bannerHtml(kind,title,sub){var C={ok:['var(--success-container, #e9f6ef)','var(--success, #2f9e6d)','var(--success-deep, #0f5132)','var(--success-muted, #3d7a5c)','verified'],warn:['#fbecec','#b31b25','#8a1f22','#a15055','error'],pending:['#fdf3e2','#c77b1f','#8a561a','#a1783f','rule']}[kind]||['#fbecec','#b31b25','#8a1f22','#a15055','error'];return '<div style="display:flex;align-items:center;gap:11px;padding:14px 16px;border-radius:12px;background:'+C[0]+';"><span style="font-family:\'Material Symbols Outlined\';font-size:26px;color:'+C[1]+';">'+C[4]+'</span><div><div style="font-size:15px;font-weight:900;color:'+C[2]+';">'+esc(title)+'</div><div style="font-size:12.5px;font-weight:600;color:'+C[3]+';">'+esc(sub||'')+'</div></div></div>';}
 // 발열·소음·소비전력은 실측 없이는 모르는 값이다(위 삭제 사유 참조) — S2 §2 검수
 // 섹션과 같은 문장을 쓴다. 전력 마진만 서버 실측(power_headroom_pct)이라 그대로 쓴다.
-function inspectBlock(s){var hp=s.compat&&s.compat.power_headroom_pct;var hpTxt=(hp==null)?'—':(hp+'%');var hpCol=(hp==null)?'#9a968d':(hp<15?'#ff9d7a':'var(--success-bright, #5fd6a0)');function card(l,v,c){return '<div style="background:#17171b;border-radius:13px;padding:13px 15px;"><div style="font-size:11px;color:#9a968d;font-weight:700;">'+l+'</div><div style="font-size:23px;font-weight:900;line-height:1.15;color:'+(c||'#fff')+';">'+v+'</div></div>';}var grid='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+card('전력 마진',hpTxt,hpCol)+card('부품 합계',s.total?s.total.toLocaleString()+'원':'—')+'</div>';var note='<p style="margin:10px 0 0;font-size:12.5px;line-height:1.6;color:#6b6b73;">발열·소음 실측치는 출고 시 이 PC의 실측 리포트로 제공됩니다. 새 제품 검사·포트/부팅 확인·3시간 안정성 테스트를 전부 통과해야 출고합니다.</p>';return grid+note;}
+function inspectBlock(s){var hp=s.compat&&s.compat.power_headroom_pct;var hpTxt=(hp==null)?'—':(hp+'%');var hpCol=(hp==null)?'#9a968d':(hp<15?'#ff9d7a':'var(--success-bright, #5fd6a0)');function card(l,v,c){return '<div style="background:#17171b;border-radius:13px;padding:13px 15px;"><div style="font-size:11px;color:#9a968d;font-weight:700;">'+l+'</div><div style="font-size:23px;font-weight:900;line-height:1.15;color:'+(c||'#fff')+';">'+v+'</div></div>';}var grid='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+card('전력 마진',hpTxt,hpCol)+card('부품 합계',s.total?s.total.toLocaleString()+'원':'—')+'</div>';var note='<p style="margin:10px 0 0;font-size:12.5px;line-height:1.6;color:#6b6b73;">발열·소음 실측치는 출고 시 이 PC의 실측 리포트로 제공됩니다. 새 제품 검사·포트/부팅 확인·3시간 안정성 테스트를 전부 통과해야 출고합니다.</p>';var feeNote='<p style="margin:8px 0 0;font-size:12px;line-height:1.55;font-weight:700;color:#8a8578;">'+((window.PopcornAssemblyFee&&window.PopcornAssemblyFee.noteText('quote'))||'')+'</p>';return grid+feeNote+note;}
 function currentPicks(){var picks={};SLOTS.forEach(function(s){var o=s.opts[pick[s.key]];picks[s.key]=(o&&!o.none)?o.product_code:null;});return picks;}
 function renderValidated(s){var bn=document.getElementById('s1-vbanner'),cp=document.getElementById('s1-compat'),ins=document.getElementById('s1-inspect');var checks=(s.compat&&s.compat.checks)||[];var nFail=0;checks.forEach(function(c){if(c.pass===false)nFail++;});var lead=(s.reasons&&s.reasons[0])||'';
  if(bn)bn.innerHTML=nFail?bannerHtml('warn',nFail+'건의 호환 문제가 있어요',lead)

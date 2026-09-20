@@ -6658,7 +6658,9 @@ def main():
                test_talk_grid_contract,
                test_game_customer_copy,
                test_omitted_variant_screen,
-               test_ai_vram_floor):
+               test_ai_vram_floor,
+               test_design_split_invariants,
+               test_assembly_fee_screen):
         try:
             fn()
         except Exception as e:
@@ -7469,14 +7471,34 @@ def test_game_customer_copy():
     if not sug:
         print("  [SKIP] game_grade_suggestions 비어 있음")
     else:
-        # ① 제안이 확정 배정을 침범하지 않는다. 이게 표를 나눈 이유 자체다 —
-        #    겹치면 승인 화면이 «사장님이 정한 등급»을 기계 제안으로 덮어쓸 수 있다.
+        # ① 제안이 확정 배정을 «침범»하지 않는다. 이게 표를 나눈 이유 자체다.
+        #
+        #    ⚠ 2026-09-20 개정 — 원래는 「겹침 0건」이었다. 그런데 그건 승인이
+        #    한 번도 일어나지 않은 상태에서만 성립하는 조건이었다. 제안 65종을
+        #    검토해 54종을 확정하자 즉시 깨졌는데, 깨진 것은 «규칙»이지 «데이터»가
+        #    아니다 — 제안 행은 「무엇을 근거로 승인했나」의 이력이라 남겨야 한다
+        #    (등급을 사람이 바꾼 5건이 특히 그렇다: 검은사막 L->A 등).
+        #
+        #    막으려던 것은 「겹침」이 아니라 «덮어쓰기»다. 그래서 겹침을 허용하되
+        #    원래 의도를 두 조건으로 나눠 지킨다:
+        #      (a) 확정 행의 grade 는 제안값과 달라도 된다 — 사람이 바꾼 것이다
+        #      (b) 견적·승인 경로가 제안 표를 읽지 않는다  <- 아래 ③이 지킨다
+        #    (b)가 성립하는 한 기계 제안이 사람 판단을 덮을 경로 자체가 없다.
+        #
+        #    확인법: grep -n "game_grade_suggestions" api/*.py  (0건이어야 한다)
         overlap = db_all(
-            "SELECT s.game_id FROM game_grade_suggestions s"
+            "SELECT s.game_id, s.suggested_grade, a.grade FROM game_grade_suggestions s"
             "  JOIN game_grade_assignments a USING (game_id)"
             " WHERE a.is_confirmed")
-        check("[55] 확정 배정(is_confirmed)이 있는 게임은 제안 표에 없다",
-              not overlap, "겹침 0건", [r["game_id"] for r in overlap][:10])
+        # 겹치는 것 자체는 정상(= 승인이 일어났다). 확정 행에 grade 가 반드시 있어야
+        # 한다 — 제안이 NULL 인 채로 확정됐다면 「사람이 판단했다」가 거짓이다.
+        confirmed_without_grade = [r["game_id"] for r in overlap if not r["grade"]]
+        check("[55] 승인된 게임의 확정 등급이 비어 있지 않다",
+              not confirmed_without_grade, "빈 등급 0건", confirmed_without_grade[:10])
+        changed = [r for r in overlap if r["suggested_grade"] != r["grade"]]
+        print(f"  [INFO] 승인 {len(overlap)}종 중 사람이 제안과 다르게 정한 것 {len(changed)}종"
+              + (" — " + ", ".join(f"#{r['game_id']} {r['suggested_grade']}->{r['grade']}"
+                                   for r in changed[:6]) if changed else ""))
         # ② 제안 등급 어휘 ⊆ game_load_grades (NULL 은 '기계가 판정 못 함'이라 허용)
         known = {r["grade"] for r in db_all("SELECT grade FROM game_load_grades")}
         unknown = sorted({r["suggested_grade"] for r in sug
@@ -7733,6 +7755,322 @@ def test_ai_vram_floor():
               got is not None and got >= r["value"], f">= {r['value']}", got)
 
     drift("ai GPU 하한(vram_gb)", r["value"])
+
+
+def test_design_split_invariants():
+    """[57] 디자인 2분할 — 디자인·조판 / 사진·후보정 (0108 · 2026-09-20 신설)
+
+    무엇을 증명하는가:
+    ① **두 갈래가 둘 다 존재한다.** 개명(design -> design_edit)만 하고 신설을
+       잊으면 사진 고객이 조용히 조판 견적을 받는다.
+    ② **편집·조판에 GPU 하한이 없다.** 이것이 이 분할의 요점이다 —
+       `api/recommend.py` 는 용도에 GPU 하한이 «있기만 하면» 종류 불문
+       `allow_igpu_omit` 을 끈다(1775-1780). 조판에 GPU 하한이 생기는 순간
+       명함 찍는 고객이 쓰지도 않을 GPU 를 강제로 받는다(실측: 448,500 -> 851,600).
+       실패 조건: 누가 «두 갈래 모두 디자인이니 하한을 맞추자»고 GPU 행을 넣는다.
+    ③ **사진·후보정의 GPU 하한이 실측 근거 범위 안이다.** `software`(라이트룸 공식
+       rec_vram_gb) 와 `software_community_spec`(사진·디자인 카테고리 커뮤니티
+       vram_gb, confidence='추정' 제외) 을 모집단으로 쓴다.
+       ⚠ 값(8)을 박지 않는다 — 근거가 바뀌면 움직일 수 있는 수다([56] 과 같은 판단).
+       실패 조건: 표본에 없는 수를 손으로 박는다(값 지어내기).
+    ④ **모호한 말은 싼 쪽으로 간다.** 「디자인」·「포토샵」 단독이 조판으로 떨어져야
+       한다(0102 에서 확립된 원칙). 실패 조건: 누가 photo 낱말에 모호어를 넣는다.
+    ⑤ **격자가 두 갈래를 안다.** `api/grid_public.py USAGE_TO_GRID` 에 두 라벨이
+       둘 다 있어야 한다 — 없으면 카드가 KeyError 가 아니라 «조용히» 0장이 된다
+       (0102 때 실제로 빠뜨릴 뻔한 자리). `grid_cells` 에도 두 용도의 칸이 있어야 한다.
+    """
+    print("\n[57] 디자인 2분할 — 조판/사진 갈래 정합 (0108 · 2026-09-20 신설)")
+    rows = db_all("SELECT usage_key, usage_label, slot, field, value, match_terms"
+                  " FROM usage_floors WHERE usage_key IN ('design_edit','design_photo')"
+                  "   AND active ORDER BY sort_order")
+    if not rows:
+        print("  [SKIP] design_edit/design_photo 행 없음(0108 미적용 또는 DB 미접속)")
+        return
+
+    edit = [r for r in rows if r["usage_key"] == "design_edit"]
+    photo = [r for r in rows if r["usage_key"] == "design_photo"]
+
+    # ① 둘 다 있다
+    check("[57] 두 갈래가 둘 다 usage_floors 에 있다", bool(edit) and bool(photo),
+          "design_edit·design_photo", sorted({r["usage_key"] for r in rows}))
+    if not (edit and photo):
+        return
+    check("[57] 옛 design 키가 남아 있지 않다(개명이지 복제가 아니다)",
+          not db_all("SELECT 1 FROM usage_floors WHERE usage_key='design'"),
+          "0행", "design 행이 남아 있다")
+
+    # ② 편집·조판에 GPU 하한이 없다 — allow_igpu_omit 을 살려 두는 자리
+    edit_gpu = [r for r in edit if r["slot"] == "GPU"]
+    check("[57] 디자인·조판에 GPU 하한이 없다"
+          " (있으면 allow_igpu_omit 이 꺼져 가벼운 고객이 GPU 를 강제로 받는다)",
+          not edit_gpu, "GPU 행 0건",
+          [(r["field"], r["value"]) for r in edit_gpu])
+
+    # ③ 사진·후보정 GPU 하한이 실측 표본 범위 안
+    pg = next((r for r in photo if r["slot"] == "GPU"), None)
+    check("[57] 사진·후보정에 GPU 하한이 있다(라이트룸 AI 가속은 VRAM 이 없으면 안 돈다)",
+          pg is not None and pg["field"] == "vram_gb", "vram_gb", pg and pg["field"])
+    if pg is not None:
+        samples = [x["v"] for x in db_all(
+            "SELECT s.rec_vram_gb AS v FROM software s"
+            " WHERE s.category='사진·디자인' AND s.rec_vram_gb IS NOT NULL"
+            "   AND s.confidence <> '추정'"
+            " UNION ALL"
+            " SELECT cs.vram_gb AS v FROM software_community_spec cs"
+            "  JOIN software s2 ON s2.software_id = cs.software_id"
+            " WHERE s2.category='사진·디자인' AND cs.vram_gb IS NOT NULL"
+            "   AND s2.confidence <> '추정'")]
+        if samples:
+            lo, hi = min(samples), max(samples)
+            check(f"[57] 사진 GPU 하한 {pg['value']} 이 사진·디자인 VRAM 표본"
+                  f" 범위 [{lo}, {hi}] 안 (추정 제외 · n={len(samples)})",
+                  lo <= pg["value"] <= hi, f"{lo}~{hi}", pg["value"])
+            drift("사진·후보정 GPU 하한(vram_gb)", pg["value"])
+        else:
+            print("  [INFO] 사진·디자인 VRAM 표본 0건(추정 제외) — 범위 대조 생략")
+
+    # ④ 모호한 말은 싼 쪽(조판)으로 — photo 낱말에 모호어가 없어야 한다
+    photo_terms = set(photo[0]["match_terms"] or [])
+    edit_terms = set(edit[0]["match_terms"] or [])
+    AMBIG = ["디자인", "포토샵", "포샵", "일러", "그래픽"]
+    leaked = [t for t in AMBIG if t in photo_terms]
+    check("[57] 사진·후보정 낱말에 모호어가 없다(모호한 말은 싼 쪽 — 0102 확립)",
+          not leaked, "없음", leaked)
+    check("[57] 「디자인」이 디자인·조판 낱말에 있다(모호어의 기본 귀착지)",
+          "디자인" in edit_terms, "있음", sorted(edit_terms)[:5])
+
+    # ⑤ 낱말이 다른 용도를 훔치지 않는다 — **전수 부분문자열 검사**(양방향)
+    #   `match()` 는 sort 순 첫 매치 하나만 쓰고 `t in value` 로 «부분일치» 한다.
+    #   그래서 design 쪽 낱말 t 가 다른 용도의 낱말 o 의 **부분문자열이고**
+    #   design 쪽이 sort 에서 앞서면, o 를 말한 고객이 design 으로 샌다.
+    #   이 검사가 실제로 둘을 잡았다(0108 작업 중):
+    #     「BI」 ⊂ 「BIM」(cad)         — "BIM 설계합니다" 가 design_edit 으로 샜다
+    #     「RAW」 ⊂ 「CorelDRAW」(edit) — "CorelDRAW 씁니다" 가 design_photo 로 샜다
+    #   둘 다 고쳤다(「BI 디자인」·「RAW 파일」처럼 좁혔다). 손으로는 못 찾는 종류다.
+    all_rows = db_all("SELECT usage_key, match_terms, sort_order, floor_id"
+                      " FROM usage_floors WHERE active ORDER BY sort_order, floor_id")
+    terms_by = {}
+    order_by = {}
+    for r in all_rows:
+        terms_by.setdefault(r["usage_key"], set()).update(r["match_terms"] or [])
+        order_by.setdefault(r["usage_key"], r["sort_order"])
+    dkeys = [k for k in terms_by if k.startswith("design")]
+    steals = []
+    for dk in dkeys:
+        for ok_ in terms_by:
+            if ok_ == dk or order_by[dk] >= order_by[ok_]:
+                continue        # design 이 뒤면 훔칠 수 없다
+            for dt in terms_by[dk]:
+                for ot in terms_by[ok_]:
+                    if dt in ot:
+                        steals.append(f"{dk}:'{dt}' ⊂ {ok_}:'{ot}'")
+    check("[57] design 낱말이 뒤 용도의 낱말을 부분일치로 훔치지 않는다(전수 검사)",
+          not steals, "없음", steals[:5])
+    # photo 가 edit 을 훔치는 것도 같은 문제다(photo 가 앞이다) — 위 루프가 함께 본다.
+
+    # ⑥ 격자가 두 갈래를 안다
+    _gp = io.open(os.path.join(ROOT, "api", "grid_public.py"),
+                  encoding="utf-8").read()
+    for lab in ("디자인·조판", "사진·후보정"):
+        check(f"[57] USAGE_TO_GRID 에 '{lab}' 이 있다(없으면 카드가 조용히 0장)",
+              f'"{lab}"' in _gp, "있음", "없음")
+    cell_usages = {r["usage"] for r in db_all(
+        "SELECT DISTINCT usage FROM grid_cells")}
+    for lab in ("디자인·조판", "사진·후보정"):
+        check(f"[57] grid_cells 에 '{lab}' 칸이 있다",
+              lab in cell_usages, "있음", sorted(cell_usages))
+
+
+def test_assembly_fee_screen():
+    """[58] 가격을 보여주는 화면은 조립공임 안내를 함께 보인다 (2026-09-20 신설)
+
+    ■ 고친 병
+      조립공임 30,000원은 사장님 확정값이고, 「최종 장바구니에서 마지막에 추가」한다.
+      그런데 견적 화면은 부품 합계만 크게 보여주고 그 사실을 한 글자도 말하지 않았다.
+      고객은 149만원을 보고 담았는데 결제창에서 152만원을 본다 — 화면이 말한 수와
+      실제로 내는 돈이 다르다(§화면 정직성 · 「모든 견적에는 이유가 있습니다」).
+
+    ■ 왜 회귀로 고정하는가
+      이 결함은 **콘솔이 조용하다.** 안내 한 줄을 지워도 에러도 404 도 나지 않고
+      가격은 멀쩡히 뜬다. 다음 사람이 레이아웃을 정리하며 그 <div> 를 지워도
+      아무것도 시끄럽지 않다 — 그래서 마크업/렌더 결과로 못 박는다.
+
+    ■ 이 검사가 증명하는 것 (각 항목이 «무엇이 잘못돼야 실패하는지»)
+      ① 금액 30,000 이 mockups 안에 **한 곳에만** 선언돼 있다.
+         실패 조건: 누가 화면 파일에 30000 을 다시 박는다(§단일 원천 — 두 벌이 갈린다).
+      ② 가격이 나오는 MVP1 화면 전부가 그 공용 원천을 싣고, 안내 자리를 갖는다.
+         실패 조건: 새 화면을 만들며 script 태그나 안내 <div> 를 빠뜨린다.
+      ③ MVP2 는 **렌더 결과**로 본다 — 가격 블록이 있으면 안내도 있다(node).
+         실패 조건: cardMarkup/quoteMarkup 에서 feeNoteMarkup 호출이 사라진다.
+      ④ 총액에 공임을 **더하지 않는다** — 화면은 말하기만 한다(사장님 2차 교정).
+         실패 조건: 누가 설계 초안(총액=부품합+공임)대로 되돌려 화면이 수를 바꾼다.
+      ⑤ 문구가 어휘 표준(평서·간결체)을 따른다.
+         실패 조건: 「공임 3만원 추가요!」류 구어체가 들어온다.
+    """
+    print(chr(10) + "[58] 가격 화면의 조립공임 안내 (2026-09-20 신설)")
+
+    import subprocess as _sp58
+    import shutil as _sh58
+    import tempfile as _tf58
+
+    MOCK = pathlib.Path(ROOT, "mockups")
+    src = pathlib.Path(MOCK, "shared", "assembly-fee.js")
+    check("[58] 화면 쪽 조립공임 원천 파일이 있다(mockups/shared/assembly-fee.js)",
+          src.exists(), "있음", "없음")
+    if not src.exists():
+        return
+    src_txt = src.read_text(encoding="utf-8")
+
+    # ── ① 금액은 한 곳에만 ────────────────────────────────────────────────
+    #   30000 · 30,000 을 «선언»한 파일을 센다. 세기 전에 셋을 걷어낸다:
+    #     ⓐ 주석(<!-- -->, /* */, //) — 「이 값은 저기 있다」고 설명하는 산문은 두 벌이
+    #        아니다. 실제로 이 저장소엔 그런 설명이 여러 곳에 있다(s4-cart 의 «조립비도
+    #        조립할 부품이 없으면…» · ui-progress 의 옛 결함 기록).
+    #     ⓑ 안내 문구 «조립공임 30,000원» — 원천이 만들어 낸 결과물이다.
+    #   ⚠ 주석 제거는 어림이다(문자열 안 "//" 도 잘린다 — 예: URL). 이 검사에서는
+    #     «덜 보는» 쪽으로만 틀리므로, 진짜 선언을 놓치는 일은 30000 이 URL 뒤 같은
+    #     줄에 있을 때뿐이다(그런 코드는 이 저장소에 없다).
+    def _strip_comments(s):
+        s = re.sub(r"<!--.*?-->", "", s, flags=re.S)
+        s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+        s = re.sub(r"(?m)//.*$", "", s)
+        return s
+
+    dupes = []
+    for f in list(MOCK.rglob("*.html")) + list(MOCK.rglob("*.js")):
+        if f == src:
+            continue
+        if "vendors" in f.parts or "assets" in f.parts:
+            continue
+        body = _strip_comments(f.read_text(encoding="utf-8", errors="replace"))
+        body = body.replace("조립공임 30,000원", "")
+        if re.search(r"\b30000\b", body) or "30,000" in body:
+            dupes.append(str(f.relative_to(MOCK)).replace("\\", "/"))
+    check("[58] mockups 안에 조립공임 금액이 두 벌 있지 않다(§단일 원천)",
+          not dupes, "원천 1곳", dupes)
+    #   그 한 곳이 실제로 사장님 확정값을 든다 — 값은 고정하되 원천에서만 읽는다.
+    m_fee = re.search(r"ASSEMBLY_FEE\s*=\s*(\d+)", src_txt)
+    check("[58] 원천이 조립공임 금액을 선언한다",
+          m_fee is not None, "선언 있음", "없음")
+    if m_fee is None:
+        return
+    fee = int(m_fee.group(1))
+    #   서버의 자체 결제 경로(api/orders.ASSEMBLY_FEE)와 어긋나면 화면이 거짓을 말한다.
+    #   ⚠ api/ 는 다른 담당 소관이라 여기서는 «대조»만 한다 — 값을 여기서 정하지 않는다.
+    orders_py = pathlib.Path(ROOT, "api", "orders.py").read_text(encoding="utf-8")
+    m_srv = re.search(r"ASSEMBLY_FEE\s*=\s*(\d+)", orders_py)
+    check("[58] 화면 공임이 서버 결제 경로(api/orders.ASSEMBLY_FEE)와 같은 값이다",
+          m_srv is not None and fee == int(m_srv.group(1)),
+          m_srv and int(m_srv.group(1)), fee)
+
+    # ── ⑤ 문구 — 평서·간결체, 구어·감탄 없음 ──────────────────────────────
+    notes = re.findall(r"return '([^']*조립공임[^']*)'", src_txt)
+    bad_tone = [n for n in notes if ("!" in n or "~" in n or n.rstrip().endswith("요"))]
+    check("[58] 안내 문구에 구어·감탄이 없다(§문서·화면 어휘 표준)",
+          not bad_tone, "없음", bad_tone)
+
+    # ── ② MVP1 — 가격이 나오는 화면 전수 ──────────────────────────────────
+    #   목록은 «가격을 화면에 내미는 고객단 화면»이다. 주문 이후 화면(my-*·S5)은
+    #   이미 «결제된 금액»을 보여주는 자리라 대상이 아니다(공임이 그 안에 들어 있다).
+    PRICE_SCREENS = ["s0-landing.html", "main-landing.html", "s1-session.html",
+                     "s2-result.html", "s3-detail.html", "s4-cart.html"]
+    for name in PRICE_SCREENS:
+        html = pathlib.Path(MOCK, "mvp1", name).read_text(encoding="utf-8")
+        check("[58] " + name + " 이 조립공임 원천을 싣는다",
+              "shared/assembly-fee.js" in html, "있음", "없음")
+        has_slot = ("data-assembly-fee-note" in html or "PopcornAssemblyFee" in html)
+        check("[58] " + name + " 에 조립공임 안내 자리가 있다",
+              has_slot, "있음", "없음")
+    #   S4(장바구니·주문)는 «실제로 더해진다»고 말해야 한다 — 「별도」라고 하면 거짓이다.
+    s4 = pathlib.Path(MOCK, "mvp1", "s4-cart.html").read_text(encoding="utf-8")
+    check("[58] S4 는 공임이 총액에 포함된다고 말한다(cart 문구)",
+          'data-assembly-fee-note="cart"' in s4, "cart", "다른 문구")
+
+    # ── ③④ MVP2 — 렌더 결과로 본다 ────────────────────────────────────────
+    appjs_path = pathlib.Path(MOCK, "mvp2", "app.js")
+    check("[58] mvp2/index.html 이 조립공임 원천을 싣는다",
+          "shared/assembly-fee.js" in pathlib.Path(
+              MOCK, "mvp2", "index.html").read_text(encoding="utf-8"),
+          "있음", "없음")
+
+    node = _sh58.which("node")
+    if not node:
+        check("[58] mvp2 렌더 결과 검사 — node 가 없어 건너뜀",
+              True, "건너뜀", "node=None", kind="DB")
+        return
+
+    _st, g = post("/api/grid/recommend",
+                  {"state": {"usages": ["단순 사무용"], "budget_won": 1500000,
+                             "budget_bound": "이하"}})
+    cards = []
+    for s in ((g or {}).get("card_sets") or []):
+        cards.extend(s.get("cards") or [])
+    if not cards:
+        check("[58] mvp2 렌더 결과 검사 — 서버 카드가 0장이라 건너뜀",
+              True, "건너뜀", "cards=0", kind="DB")
+        return
+
+    driver = (
+        "const R=require(process.argv[2]);"
+        "const cards=JSON.parse(require('fs').readFileSync(process.argv[3],'utf8'));"
+        "const out={fee:R.FEE&&R.FEE.ASSEMBLY_FEE,rows:[]};"
+        "cards.forEach((c,i)=>{for(const v of ['value','reco','perf']){"
+        " const m=R.cardMarkup(c,i,null,v),q=R.quoteMarkup(c,v);"
+        " const vs=R.cardQuotes(c)||{};const t=vs[v]&&vs[v].total;"
+        " out.rows.push({i,v,total:(typeof t==='number'?t:null),"
+        "  cardPrice:m.includes('class=\\\"tier-price\\\"'),"
+        "  cardNote:m.includes('tier-fee-note'),"
+        "  quoteNote:q.includes('quote-fee-note'),"
+        "  cardText:m});}});"
+        "out.guard=[];"
+        "for(const bad of [{},{quotes:null},{quotes:{reco:{total:null}}}]){"
+        " try{R.cardMarkup(bad,0,null,'reco');R.quoteMarkup(bad,'reco');out.guard.push('ok');}"
+        " catch(e){out.guard.push('THROW:'+e.message);}}"
+        "process.stdout.write(JSON.stringify(out));")
+
+    with _tf58.TemporaryDirectory() as tmp:
+        cp = pathlib.Path(tmp, "cards.json")
+        dp = pathlib.Path(tmp, "drv.js")
+        cp.write_text(json.dumps(cards, ensure_ascii=False), encoding="utf-8")
+        dp.write_text(driver, encoding="utf-8")
+        pr = _sp58.run([node, str(dp).replace("\\", "/"),
+                        str(appjs_path).replace("\\", "/"),
+                        str(cp).replace("\\", "/")],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if pr.returncode != 0:
+        check("[58] node 로 app.js 렌더 성공", False, "성공", (pr.stderr or "")[-200:])
+        return
+    R58 = json.loads(pr.stdout)
+
+    check("[58] app.js 가 공용 원천에서 공임을 읽는다(화면 리터럴이 아니다)",
+          R58.get("fee") == fee, fee, R58.get("fee"))
+
+    # ③ 가격 블록이 있으면 안내도 있다. 없으면 붙이지 않는다(더할 금액 자체가 없다).
+    mism = [(r["i"], r["v"]) for r in R58["rows"] if r["cardPrice"] != r["cardNote"]]
+    check("[58] 가격을 보여주는 카드는 «전부» 조립공임 안내를 함께 보인다",
+          not mism, "불일치 0건", mism)
+    qm = [(r["i"], r["v"]) for r in R58["rows"]
+          if (r["total"] is not None) != r["quoteNote"]]
+    check("[58] 총액을 보여주는 견적 패널도 «전부» 안내를 함께 보인다",
+          not qm, "불일치 0건", qm)
+
+    # ④ 총액을 바꾸지 않는다 — 서버 total 이 그대로 뜨고, total+공임 값은 없다.
+    shown, added = [], []
+    for r in R58["rows"]:
+        if r["total"] is None:
+            continue
+        if "{:,}".format(r["total"]) not in r["cardText"]:
+            shown.append((r["i"], r["v"], r["total"]))
+        if "{:,}".format(r["total"] + fee) in r["cardText"]:
+            added.append((r["i"], r["v"], r["total"] + fee))
+    check("[58] 카드가 서버 총액을 그대로 보여준다", not shown, "전부 일치", shown)
+    check("[58] 화면이 총액에 공임을 더하지 않는다"
+          " (사장님 교정 — 공임은 장바구니 마지막에 더해진다)",
+          not added, "더하지 않음", added)
+
+    # 빈·망가진 응답에 렌더가 죽지 않는다(안내를 붙이면서 새 예외를 만들지 않았는가).
+    thrown = [x for x in R58["guard"] if x != "ok"]
+    check("[58] 빈·망가진 카드에도 렌더가 예외를 내지 않는다", not thrown, "정상", thrown)
 
 
 if __name__ == "__main__":
