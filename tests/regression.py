@@ -28,6 +28,7 @@ import json
 import math
 import os
 import pathlib
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -6653,7 +6654,8 @@ def main():
                test_usage_tier_rules_invariants,
                test_usage_alloc_invariants,
                test_grid_workstations,
-               test_talk_grid_contract):
+               test_talk_grid_contract,
+               test_game_customer_copy):
         try:
             fn()
         except Exception as e:
@@ -7159,6 +7161,225 @@ def test_talk_grid_contract():
     check("[54] app.js 가 grid/recommend 에는 chat_flow 를 싣지 않는다(좌표 계약 분리)",
           all("chat_flow" not in ln and "chatFlow" not in ln for ln in grid_call),
           "없음", grid_call[:2])
+
+
+# ── [55] 고객 문구 수치 실재 (2026-09-19 신설) ────────────────────────────────
+# 이 정규식과 haystack 구성은 조사자의 1회성 검증기(D:/Hermes-Workspace/verify_copy.py)
+# 에서 그대로 가져왔다. **그쪽은 JSON 파일을 봤고, 이쪽은 DB 를 본다** — 검사 대상이
+# 「적재 전 원고」가 아니라 「지금 고객에게 나갈 정본」이어야 하기 때문이다.
+_COPY_GPU_RE = re.compile(
+    r'(?:RTX|GTX|RX|GT|Arc|Radeon|GeForce)\s*[A-Za-z0-9 ]{0,14}\d{3,4}\s?'
+    r'(?:Ti|XT|SUPER|S|GRE|XTX)?', re.I)
+_COPY_FPS_RE = re.compile(r'(\d{2,4})\s*fps', re.I)
+_COPY_HZ_RE = re.compile(r'(\d{2,4})\s*Hz', re.I)
+_COPY_GB_RE = re.compile(r'(\d{1,3})\s*GB', re.I)
+
+# 고객 문구의 말투 경계. 견적 «근거»로 나가는 글이라 단정·과장·구어체를 넣지 않는다.
+_COPY_BAD_WORDS = ('일반적으로', '보통은', '끝판왕', '가성비 갑', '갈아엎',
+                   '집어넣', '~하죠', '거예요', '!', '?')
+
+# 문구가 근거로 삼을 수 있는 사실의 출처. 여기 없는 숫자는 «우리가 지어낸 숫자»다.
+_COPY_GAME_TEXT_COLS = (
+    'min_cpu', 'min_gpu', 'rec_cpu', 'rec_gpu', 'rec_gpu_nvidia', 'rec_gpu_amd',
+    'rec_gpu_intel', 'bottleneck_evidence', 'community_note', 'note', 'description',
+    'refresh_selection_note', 'min_spec_note_raw', 'rec_spec_note_raw')
+_COPY_GAME_NUM_COLS = (
+    'competitive_fps_target', 'comfortable_fps_target', 'minimum_fps_target',
+    'typical_monitor_hz', 'esports_standard_hz', 'min_ram_gb', 'rec_ram_gb',
+    'min_vram_gb', 'rec_vram_gb', 'min_target_fps', 'rec_target_fps',
+    'min_storage_gb', 'rec_storage_gb')
+
+
+def _copy_norm(s):
+    return re.sub(r'[\s®™]', '', s).upper()
+
+
+def _copy_violations(copy_rows, haystacks):
+    """문구에 쓰인 GPU 모델명·fps·Hz·GB 중 그 게임의 DB 값에 없는 것을 모은다.
+
+    반환: [(game_id, name, 종류, 값)] — 빈 목록이어야 한다.
+    """
+    bad = []
+    for r in copy_rows:
+        gid = r['game_id']
+        hay = haystacks.get(gid, '')
+        hayn = _copy_norm(hay)
+        text_all = ' '.join(filter(None, (
+            r.get('spec_summary_ko'), r.get('why_this_pc'),
+            r.get('upgrade_hint'), r.get('caution'))))
+        for gpu in _COPY_GPU_RE.findall(text_all):
+            if _copy_norm(gpu) not in hayn:
+                bad.append((gid, r.get('name'), 'GPU', gpu))
+        for pat, kind in ((_COPY_FPS_RE, 'fps'), (_COPY_HZ_RE, 'Hz'),
+                          (_COPY_GB_RE, 'GB')):
+            for n in pat.findall(text_all):
+                if not re.search(r'(?<!\d)%s(?!\d)' % n, hay):
+                    bad.append((gid, r.get('name'), kind, n))
+        for bw in _COPY_BAD_WORDS:
+            if bw in text_all:
+                bad.append((gid, r.get('name'), 'WORD', bw))
+    return bad
+
+
+def test_game_customer_copy():
+    """[55] 고객용 게임 상세설명 — 문구 속 수치가 DB 에 실재하는가 (2026-09-19 신설)
+
+    왜 이 검사가 필요한가 — 이 네 문장은 **고객에게 나가는 견적 근거**다.
+      "RTX 4060 이면 1440p 에서 90fps 나옵니다" 같은 문장은 고객이 돈을 쓰는 이유가
+      된다. 조사자는 적재 전에 모든 GPU 모델명·fps·Hz·GB 를 그 게임의 DB 값과 대조해
+      위반 0건을 만들었다. **그건 1회성이었다.** 나중에 누가 말투를 다듬으면서
+      "144fps" 를 "165fps" 로 고치거나 "RTX 4060" 을 "RTX 4070" 으로 바꾸면,
+      아무 것도 깨지지 않고 **조용히 거짓말이 고객에게 나간다.** 코드가 아니라 글이
+      틀리는 사고라 기존 회귀 어디에도 걸리지 않는다.
+
+    검사하는 것 (game_customer_copy 전 행):
+      ① 문구에 등장하는 GPU 모델명이 그 game_id 의 GPU 관련 컬럼·실측 fps 행에 있다
+      ② 문구에 등장하는 fps·Hz·GB 숫자가 그 game_id 의 사양/목표/실측 값에 있다
+      ③ 단정·과장·구어체 낱말이 없다(견적 근거의 말투 경계)
+      ④ 미검수(reviewed_by IS NULL) 행은 실패가 아니라 **알림**이다 — 사람 검수는
+         화면이 생긴 뒤의 일이고, 그 사실을 조용히 넘기지만 않으면 된다
+
+    ⚠ 「없는 숫자를 못 쓴다」이지 「숫자가 옳다」가 아니다. DB 값 자체가 틀렸다면
+      이 검사는 통과한다. 그건 사양 조사의 몫이다(여기서 두 벌로 검증하지 않는다).
+
+    ⚠ 두 번째 한계 — **숫자의 «역할»까지 보지는 않는다**(2026-09-19 실측).
+      롤 문구의 "240fps"(competitive_fps_target)를 "165fps"로 바꿔 넣고 돌려 보니
+      **통과했다.** 165 가 같은 게임의 comfortable_fps_target 값이라 haystack 에
+      실재하기 때문이다. 즉 「이 게임과 무관한 숫자」는 잡지만 「이 게임의 다른
+      칸에서 가져온 숫자」는 못 잡는다. 같은 실험에서 333fps(어디에도 없는 값)와
+      RTX 5090(롤 GPU 컬럼에 없는 모델)은 둘 다 잡혔다.
+      역할까지 보려면 문장의 어느 구절이 어느 컬럼을 가리키는지 알아야 하는데,
+      그건 문구를 구조화해야 풀리는 문제다(지금 source_fields 는 행 단위라 부족).
+      여기에 억지 휴리스틱을 넣지 않는다 — 잡는 범위를 정확히 적어 두는 편이 낫다.
+
+    ★ 자기 시험 — 검사가 «진짜로 잡는가»를 매 실행 확인한다.
+      일부러 틀린 숫자·없는 GPU 를 넣은 가짜 행을 만들어 돌려보고, 잡히지 않으면
+      그것도 실패로 센다. DB 는 건드리지 않는다(메모리 안의 사본일 뿐).
+      이게 없으면 정규식을 잘못 고쳐 검출기가 죽어도 「위반 0건」이 계속 초록으로 뜬다 —
+      가장 위험한 실패 방식이다.
+    """
+    print("\n[55] 고객용 게임 상세설명 — 문구 수치 실재 (2026-09-19 신설)")
+    copy_rows = db_all(
+        "SELECT c.game_id, g.name, c.spec_summary_ko, c.why_this_pc,"
+        "       c.upgrade_hint, c.caution, c.confidence, c.reviewed_by"
+        "  FROM game_customer_copy c JOIN games g USING (game_id)"
+        " ORDER BY c.game_id")
+    if not copy_rows:
+        print("  [SKIP] game_customer_copy 없음/비어 있음(0103 미적용 또는 DB 미접속)")
+        return
+
+    # 근거 haystack — 조사자 검증기와 같은 컬럼 집합을 DB 에서 직접 읽는다.
+    games = db_all("SELECT game_id, " + ", ".join(
+        _COPY_GAME_TEXT_COLS + _COPY_GAME_NUM_COLS) + " FROM games")
+    mfps = db_all("SELECT game_id, gpu_model, cpu_model, note, preset, fps_avg,"
+                  "       fps_1pct_low FROM game_measured_fps")
+    by_game = {}
+    for m in mfps:
+        by_game.setdefault(m["game_id"], []).append(m)
+    haystacks = {}
+    for g in games:
+        parts = [str(g.get(k) or '') for k in _COPY_GAME_TEXT_COLS]
+        for m in by_game.get(g["game_id"], []):
+            parts += [str(m.get(k) or '') for k in
+                      ("gpu_model", "cpu_model", "note", "preset",
+                       "fps_avg", "fps_1pct_low")]
+        parts += [str(g[k]) for k in _COPY_GAME_NUM_COLS if g.get(k) is not None]
+        haystacks[g["game_id"]] = ' || '.join(parts)
+
+    bad = _copy_violations(copy_rows, haystacks)
+    fab = [b for b in bad if b[2] != 'WORD']
+    tone = [b for b in bad if b[2] == 'WORD']
+    check(f"[55] 문구 {len(copy_rows)}종의 GPU 모델명·fps·Hz·GB 가 전부 그 게임의 DB 값에 있다",
+          not fab, "위반 0건", fab[:10])
+    check("[55] 고객 문구에 단정·과장·구어체 낱말이 없다", not tone, "위반 0건", tone[:10])
+
+    # spec_summary_ko · why_this_pc 는 전 행에 있어야 한다.
+    # upgrade_hint · caution 은 없을 수 있다 — 조사자가 «할 말이 없어서» 비운 칸이 있다:
+    #   GTA(17)      게임사가 정식 요구사양을 아직 공개하지 않았다
+    #   스팀 인디(23) 특정 게임이 아니라 장르 통칭이라 사양 데이터가 없다
+    # 둘 다 caution 에 「견적 근거로 쓸 수 없다」고 명시돼 있다. 없는 조언을 지어내
+    # 채우는 것보다 비우는 편이 옳다 — 그래서 빈 칸 자체를 실패로 세지 않는다.
+    # 대신 «아무 말도 없는» 행은 막는다: 요약이 없으면 화면에 빈 카드가 뜬다.
+    missing = [(r["game_id"], r["name"], col) for r in copy_rows
+               for col in ("spec_summary_ko", "why_this_pc")
+               if not (r.get(col) or "").strip()]
+    check("[55] spec_summary_ko · why_this_pc 는 빈 행이 없다",
+          not missing, "빈 칸 없음", missing[:10])
+    # upgrade_hint 가 빈 행은 «쓸 수 없는 항목»이라고 스스로 밝혀야 한다.
+    # 이걸 안 걸면 나중에 조언 칸이 통째로 비어도 아무도 모른다.
+    silent = [(r["game_id"], r["name"]) for r in copy_rows
+              if not (r.get("upgrade_hint") or "").strip()
+              and "견적 근거로 쓸 수 없" not in (r.get("caution") or "")]
+    check("[55] upgrade_hint 가 빈 행은 caution 에 «견적 근거로 쓸 수 없다»를 명시한다",
+          not silent, "설명 없는 빈 칸 0건", silent[:10])
+
+    # confidence 어휘를 고정한다 — 화면이 '낮음' 배지를 달려면 값이 셋뿐이어야 한다.
+    confs = {r.get("confidence") for r in copy_rows}
+    check("[55] confidence 어휘는 {높음, 보통, 낮음} 안이다",
+          confs <= {"높음", "보통", "낮음"}, "{높음,보통,낮음}",
+          sorted(c for c in confs if c not in ("높음", "보통", "낮음")))
+
+    # ★ 자기 시험 — 일부러 틀린 값을 넣어 검출기가 살아 있는지 본다(DB 미변경).
+    victim = copy_rows[0]
+    poisoned = [{
+        "game_id": victim["game_id"], "name": victim["name"],
+        # 존재하지 않는 GPU + 존재하지 않는 프레임/주사율/VRAM 수치
+        "spec_summary_ko": "RTX 9090 Ti 를 권장합니다.",
+        "why_this_pc": "이 게임은 4K 에서 777fps 를 냅니다.",
+        "upgrade_hint": "997Hz 모니터에 맞춰 VRAM 97GB 를 확보합니다.",
+        "caution": None,
+    }]
+    caught = {b[2] for b in _copy_violations(poisoned, haystacks)}
+    check("[55] ★자기시험: 없는 GPU 모델명을 넣으면 잡는다",
+          "GPU" in caught, "GPU 위반 검출", sorted(caught))
+    check("[55] ★자기시험: 없는 fps·Hz·GB 수치를 넣으면 전부 잡는다",
+          {"fps", "Hz", "GB"} <= caught, "fps·Hz·GB 검출", sorted(caught))
+    # 반대 방향 — 진짜 DB 값은 위반으로 세지 않는다(오탐이면 검사가 무용지물이 된다).
+    g0 = next((g for g in games if g["game_id"] == victim["game_id"]), None)
+    truth = next((g0[k] for k in ("competitive_fps_target", "typical_monitor_hz",
+                                  "rec_ram_gb", "min_ram_gb")
+                  if g0 and g0.get(k)), None)
+    if truth is not None:
+        clean = [{"game_id": victim["game_id"], "name": victim["name"],
+                  "spec_summary_ko": f"기준은 {truth}fps 입니다.",
+                  "why_this_pc": None, "upgrade_hint": None, "caution": None}]
+        check("[55] ★자기시험: DB 에 실재하는 수치는 위반으로 세지 않는다(오탐 없음)",
+              not _copy_violations(clean, haystacks), "위반 0건",
+              _copy_violations(clean, haystacks))
+
+    # ── 등급 «제안» 표 — 확정과 섞이지 않는다 ─────────────────────────────────
+    sug = db_all("SELECT game_id, suggested_grade, confidence FROM game_grade_suggestions")
+    if not sug:
+        print("  [SKIP] game_grade_suggestions 비어 있음")
+    else:
+        # ① 제안이 확정 배정을 침범하지 않는다. 이게 표를 나눈 이유 자체다 —
+        #    겹치면 승인 화면이 «사장님이 정한 등급»을 기계 제안으로 덮어쓸 수 있다.
+        overlap = db_all(
+            "SELECT s.game_id FROM game_grade_suggestions s"
+            "  JOIN game_grade_assignments a USING (game_id)"
+            " WHERE a.is_confirmed")
+        check("[55] 확정 배정(is_confirmed)이 있는 게임은 제안 표에 없다",
+              not overlap, "겹침 0건", [r["game_id"] for r in overlap][:10])
+        # ② 제안 등급 어휘 ⊆ game_load_grades (NULL 은 '기계가 판정 못 함'이라 허용)
+        known = {r["grade"] for r in db_all("SELECT grade FROM game_load_grades")}
+        unknown = sorted({r["suggested_grade"] for r in sug
+                          if r["suggested_grade"] is not None} - known)
+        check("[55] 제안 등급 어휘 ⊆ game_load_grades.grade",
+              not unknown, "차집합 없음", unknown)
+        # ③ 제안 표는 견적 경로가 읽지 않는다 — 읽으면 추측이 확정인 척 견적에 실린다.
+        api_src = []
+        for p in glob.glob(os.path.join(ROOT, "api", "*.py")):
+            if "game_grade_suggestions" in pathlib.Path(p).read_text(encoding="utf-8"):
+                api_src.append(os.path.basename(p))
+        check("[55] api/ 의 어떤 모듈도 game_grade_suggestions 를 읽지 않는다"
+              "(승인 화면이 생기면 그때 이 목록에 관리자 모듈만 들어와야 한다)",
+              not api_src, "참조 없음", api_src)
+
+    # 미검수는 실패가 아니라 알림 — 다만 조용히 넘기지 않는다.
+    unrev = sum(1 for r in copy_rows if not r.get("reviewed_by"))
+    print(f"  [INFO] 사람 검수 대기: {unrev}/{len(copy_rows)}종 (reviewed_by IS NULL)")
+    drift("게임 고객문구 행수", len(copy_rows))
+    drift("게임 등급제안 행수", len(sug))
 
 
 if __name__ == "__main__":
