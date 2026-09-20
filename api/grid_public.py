@@ -98,8 +98,10 @@ log = logging.getLogger("grid_public")
 router = APIRouter(prefix="/api/grid", tags=["grid-public"])
 
 # ── 상수 ────────────────────────────────────────────────────────────────
-DEFAULT_TIER_KEY = "T1"          # 예산 없을 때 중심 tier_key — 위 ① 참고(가정값)
-TIERS_UP = 2                     # 중심 + 위 2개(0072 이래 정책 유지, 이번 변경 범위 밖)
+# 0105 — `DEFAULT_TIER_KEY`/`TIERS_UP` 은 사라졌다. 비게임 축에서 tier_key 가
+# 빠졌고, 예산대 목록 자체가 이미 그 용도에 맞게 좁아서(격자에 있는 칸만) 중심을
+# 가정값으로 찍을 필요가 없다 — 예산이 없으면 그 용도의 가장 싼 구간이 중심이다.
+BANDS_UP = 2                     # 중심 + 위 2개(0072 이래 «위쪽도 보여준다» 정책 유지)
 DEFAULT_PLATFORM = "인텔"        # 사장님 확정(2026-09-11), 스키마와 무관
 # 플랫폼 어휘는 talk_schema.PLATFORM_VALUES 하나만 쓴다(validate_state 가 거른다) — 여기
 # 따로 두지 않는다(단일 원천). 옛 PLATFORMS 상수는 미참조라 지웠다(2026-09-16 확인자 G-2).
@@ -108,50 +110,31 @@ GAME_USAGE = "게임"              # grid_cells.usage 의 게임 축 리터럴(0
 # 않는다(단일 원천). null 이면 그 값으로 카드를 내고 assumed 에 표시한다(§6 ③).
 ASSUMED_RESOLUTION = f"game.resolution={DEFAULT_RESOLUTION}"
 
-# ── 용도 매핑 — 파서 9종 → grid_cells.usage 6종(비게임) + '게임'(게임 3종 합류) ──
-# 비게임 6종은 2026-09-16 실측 SQL 로 확인한 값 그대로다:
-#   SELECT DISTINCT usage FROM grid_cells WHERE usage <> '게임'
-#   → {'AI 작업','디자인','영상편집','사무·인강','주식·트레이딩','3D 그래픽'}
-# 이 6종은 `usage_floors.usage_label`(ai/design/video/office/trading/video_3d)과
-# **1:1로 이미 같은 문자열**이다(0090·0092 가 같은 어휘를 썼다) — 그래서 옛 판처럼
-# 여러 파서 용도를 하나로 접는 매핑표가 필요 없다. 게임 계열 3종(게임·캐주얼 게임·
-# 고사양 게임)만 GAME_USAGE 로 합류시킨다 — 세부(등급·해상도)는 tier_key 가 아니라
-# game_grade+game_resolution 이 결정한다(아래 _game_card_set).
-# 이 매핑의 키는 usage_floors.usage_label 9종과 같다 — talk_schema.load_vocab 이 매
-# 요청 DB 에서 읽는 그 어휘다. state.usages 는 validate_state 가 이미 그 어휘로
-# 걸러 주므로 여기서는 값→격자 용도 변환만 한다.
+# ── 용도 매핑 — 파서 14종 → grid_cells.usage(비게임 11종) + '게임' ──────────
+# 2026-09-20 (0105) — **접는 매핑이 사라졌다.** 0105 격자가 `usage_floors.usage_label`
+# 을 그대로 `grid_cells.usage` 축으로 쓰므로 비게임은 전부 **항등 매핑**이다.
+#   옛 판(0092~0104)은 격자 용도가 6종뿐이라 «단순 사무용»·«복합 사무용»을 둘 다
+#   '사무·인강' 으로, «캐드·설계»·«3D 렌더링» 을 둘 다 '3D 그래픽' 으로 접었다 —
+#   하한(usage_floors)은 갈렸는데 격자는 안 갈려서 «두 용도가 같은 카드를 보되
+#   엔진 하한은 서로 다른» 상태였다(0102·0104 주석이 "후속 작업"이라고 남긴 것).
+#   0105 가 그 후속 작업이다: 격자가 14종 용도를 직접 안다.
+# ⚠ 옛 리터럴('사무·인강'·'3D 그래픽')은 **키로만** 남긴다 — consult_sessions·
+#   grid_quotes.payload 가 그 값을 들고 있어 지우면 그 입력이 통째로
+#   needs=['usages'] 로 떨어진다. 값은 새 격자 용도로 옮긴다.
 USAGE_TO_GRID = {
     "AI 작업": "AI 작업",
     "디자인": "디자인",
     "영상편집": "영상편집",
-    # 2026-09-18 (0102) — `office` 가 «단순 사무용»·«복합 사무용» 둘로 갈렸다.
-    #   `usage_floors.usage_label` 이 두 값으로 바뀌었으므로 여기 키도 둘이 된다.
-    #   ⚠ 값(격자 용도)은 **둘 다 '사무·인강'** 이다 — `grid_cells.usage` 축은
-    #     0092 가 만든 «가격 격자»의 축이고 12행 실측이 그 문자열 하나다. 격자를
-    #     쪼개려면 카드를 다시 생성해야 하는데(tools/grid_generate.py) 그건 이
-    #     작업 범위 밖이다. 하한(usage_floors)은 갈렸고 격자는 아직 안 갈렸다 —
-    #     즉 두 용도가 «같은 가격대 카드»를 보되 견적 엔진의 하한은 서로 다르다.
-    #     격자까지 가르는 것은 후속 작업이다(설계 문서 §미해결).
-    #   ⚠ '사무·인강' 키도 남긴다 — grid_cells.usage 리터럴이자 옛 세션·문서가
-    #     쓰던 값이라 지우면 그 입력이 통째로 needs=['usages'] 로 떨어진다.
-    "단순 사무용": "사무·인강",
-    "복합 사무용": "사무·인강",
-    "사무·인강": "사무·인강",
+    "단순 사무용": "단순 사무용",
+    "복합 사무용": "복합 사무용",
+    "사무·인강": "단순 사무용",        # 옛 리터럴 — 0105 이전 세션 호환
     "주식·트레이딩": "주식·트레이딩",
-    # 2026-09-19 (0104) — `video_3d`(3D 그래픽) 가 «캐드·설계»·«3D 렌더링» 둘로 갈렸다.
-    #   `usage_floors.usage_label` 이 두 값으로 바뀌었으므로 여기 키도 둘이 된다.
-    #   ⚠ 값(격자 용도)은 **둘 다 '3D 그래픽'** 이다 — 0102 의 사무 분할과 같은 상황이다.
-    #     `grid_cells.usage` 축은 0092 가 만든 «가격 격자»의 축이고 12행 실측이 그
-    #     문자열 하나다. 격자를 쪼개려면 카드를 다시 생성해야 하는데
-    #     (tools/grid_generate.py) 그건 이 작업 범위 밖이다. 하한(usage_floors)과
-    #     겨냥(usage_tier_rules)은 갈렸고 격자는 아직 안 갈렸다 — 즉 두 용도가
-    #     «같은 가격대 카드»를 보되 견적 엔진의 하한·상한은 서로 다르다.
-    #   ⚠ '3D 그래픽' 키도 남긴다 — grid_cells.usage 리터럴(12행)이자
-    #     consult_sessions 60건·grid_quotes.payload 72건이 들고 있는 값이라
-    #     지우면 그 입력이 통째로 needs=['usages'] 로 떨어진다.
-    "캐드·설계": "3D 그래픽",
-    "3D 렌더링": "3D 그래픽",
-    "3D 그래픽": "3D 그래픽",
+    "캐드·설계": "캐드·설계",
+    "3D 렌더링": "3D 렌더링",
+    "3D 그래픽": "3D 렌더링",          # 옛 리터럴 — 0105 이전 세션 호환
+    "개발": "개발",
+    "방송 송출": "방송 송출",
+    "음악 작업": "음악 작업",
     "게임": GAME_USAGE,
     "캐주얼 게임": GAME_USAGE,
     "고사양 게임": GAME_USAGE,
@@ -160,6 +143,23 @@ USAGE_TO_GRID = {
 # grid_quotes.tier_variant(한글) → 응답 키(카드 3종 구조, 지시 6번 예시 그대로)
 VARIANT_KEY_MAP = {"가성비": "value", "추천": "reco", "고성능": "perf"}
 REPRESENTATIVE_VARIANT = "추천"   # 하위호환 최상위 필드가 참조하는 대표 variant
+
+
+def _load_omissions(conn, usage: str) -> list[dict]:
+    """이 용도가 «발행하지 않는» 구성과 그 사유(0106).
+
+    화면이 「왜 여긴 세 개인데 여긴 두 개지」를 묻지 않게 하는 자리다. 카드가
+    조용히 사라지면 고객은 이유를 지어내 생각한다 — 우리 정체성은 「모든 견적에는
+    이유가 있습니다」이므로, 없는 것에도 사유를 붙여 내려준다.
+    사유 문구는 `grid_variant_omissions.reason_public` 원문이다 — 여기서 새로
+    만들지 않는다(§단일 원천). 그 컬럼은 NOT NULL 이라 사유 없는 제외가 없다.
+    """
+    rows = conn.execute(text(
+        "SELECT tier_variant, reason_public FROM grid_variant_omissions"
+        " WHERE usage = :u"), {"u": usage}).mappings().all()
+    return [{"variant": r["tier_variant"],
+             "key": VARIANT_KEY_MAP.get(r["tier_variant"]),
+             "reason": r["reason_public"]} for r in rows]
 
 
 # ── 부품 순서·라벨 — 화면(mockups/mvp2/app.js makeQuotes) 순서, 스키마와 무관 ──
@@ -213,77 +213,68 @@ def parse_budget(s: str | None) -> tuple[int | None, str | None]:
     return won, bound
 
 
-def _load_tiers(conn, usage_grid: str | None, platform: str) -> list[dict]:
-    """spec_tiers(T0~T5)를 정본 순서로 싣고, 있으면 그 usage×platform 의 관측
-    가격(grid_cells.budget_min/max)을 붙인다.
+def _load_bands(conn, axis: str, usage_grid: str | None, platform: str,
+                game_grade: str | None = None,
+                game_resolution: str | None = None) -> list[dict]:
+    """이 (용도[×등급×해상도] × 플랫폼)에 **실제로 칸이 있는** 예산대만 정본 순서로.
 
-    ⚠ 관측 가격은 usage 마다 다르다(같은 T2 라도 '사무·인강'은 310만원대,
-    'AI 작업'은 346만원대 — 2026-09-16 실측). 그래서 옛 판처럼 usage 를 무시하고
-    "티어 하나의 가격"을 구할 수 없다 — 반드시 usage_grid+platform 을 함께
-    받는다. usage_grid 가 없거나(용도 미정) 게임(GAME_USAGE, tier_key 축이 아님)
-    이면 관측 가격을 조회하지 않고 전부 None 으로 둔다(지어내지 않는다) —
-    이 경우 `tier_index_for`는 비교 재료가 없어 DEFAULT_TIER_KEY 로 떨어진다.
+    ⚠ 0105 대전환 — 옛 판(`_load_tiers`)은 `spec_tiers` T0~T5 **전부**를 싣고 그
+    티어의 관측 가격을 붙였다. 그 축이 «사무·인강 × T5 = 1,344만원» 같은 헛칸을
+    만들었다. 새 판은 그 반대로 간다: **격자에 존재하는 칸만** 예산대 목록이
+    된다. 어떤 용도에 어떤 예산대를 둘지는 0105 마이그레이션이 실판매 표본으로
+    정했고(각 칸의 `band_note` 에 근거가 적혀 있다), 이 함수는 그것을 읽기만 한다.
+
+    구간 경계(`budget_min_won`/`budget_max_won`)는 `grid_budget_bands`의 **정의**고,
+    `budget_min`/`budget_max`는 배치가 실제로 만든 **관측 범위**(가성비~고성능)다.
+    둘을 섞지 않는다 — 앞은 입력, 뒤는 출력이다.
     """
-    tier_rows = conn.execute(text(
-        "SELECT tier_key, popcorn_name FROM spec_tiers ORDER BY sort_order"
-    )).mappings().all()
-    tiers = [{"tier_key": r["tier_key"], "name": r["popcorn_name"],
-              "budget_min": None, "budget_max": None} for r in tier_rows]
-
-    if usage_grid and usage_grid != GAME_USAGE:
-        obs = conn.execute(text(
-            "SELECT tier_key, budget_min, budget_max FROM grid_cells"
-            " WHERE usage = :u AND platform = :p"),
-            {"u": usage_grid, "p": platform}).mappings().all()
-        obs_by_tier = {o["tier_key"]: o for o in obs}
-        for t in tiers:
-            o = obs_by_tier.get(t["tier_key"])
-            if o is not None:
-                t["budget_min"] = o["budget_min"]
-                t["budget_max"] = o["budget_max"]
-    return tiers
+    where = " AND c.usage = :u"
+    params: dict = {"axis": axis, "p": platform, "u": usage_grid}
+    if axis == "game":
+        where += " AND c.game_grade = :g AND c.game_resolution = :r"
+        params.update({"u": GAME_USAGE, "g": game_grade, "r": game_resolution})
+    rows = conn.execute(text(
+        "SELECT b.band_key, b.label, b.budget_min_won, b.budget_max_won, b.sample_n,"
+        " b.gpu_required, c.cell_id, c.budget_min, c.budget_max, c.band_note,"
+        " c.intended_empty"
+        " FROM grid_budget_bands b"
+        " JOIN grid_cells c ON c.budget_band_key = b.band_key AND c.platform = :p"
+        + where +
+        " WHERE b.axis = :axis ORDER BY b.sort_order"), params).mappings().all()
+    return [dict(r) for r in rows]
 
 
-def tier_index_for(tiers: list[dict], won: int | None, bound: str | None) -> int:
-    """예산 값으로 중심 티어 인덱스를 고른다.
+def band_index_for(bands: list[dict], won: int | None, bound: str | None) -> int:
+    """예산 값으로 중심 예산대 인덱스를 고른다.
 
-    ⚠ 스키마 대전제가 바뀌었다(0092) — budget_min/budget_max 는 더 이상 "이
-    티어가 커버하는 가격 구간"이 아니라 "배치가 실제로 만든 추천(recommend)
-    견적 총액" **단일 관측점**이다(min==max로 저장됨, tools/grid_generate.py
-    write_budget_observed — "셋을 각각 다른 값으로 만들 근거가 없어 지어내지
-    않는다"). 옛 알고리즘의 반열림 구간 [budget_min, budget_max) 비교는 폭이
-    0인 구간을 비교하는 것과 같아 예산이 그 값과 정확히 일치할 때만 맞는다 —
-    실사용에서는 사실상 항상 실패한다.
+    ⚠ 0105 로 비교 재료가 «점»에서 «구간»으로 돌아왔다. 옛 판(`tier_index_for`)은
+    budget_min==budget_max(단일 관측점)라 반열림 구간 비교가 사실상 항상 실패해서
+    "가장 가까운 관측점" 규칙으로 대체해야 했다. 이제 `grid_budget_bands`가 실판매
+    분포에서 뽑은 **진짜 구간**을 들고 있으므로 구간 비교로 돌아간다.
 
-    그래서 이 함수는 "관측된 가격 점들 중 예산 조건에 맞는 가장 가까운 티어"를
-    고르는 규칙으로 대체한다(새 가격을 지어내지 않고, 실측된 점만 비교 재료로
-    쓴다 — 위 헤더 ② 항목, 사장님 확정 아님·이번 작업 판단):
-      · bound 없음 또는 '이하'(둘 다 상한 취급, 옛 로직과 같은 전제) — 예산
-        이하인 관측 가격 중 **가장 비싼** 티어(예산을 최대한 채운다).
-        전부 예산을 넘으면 그나마 **가장 싼** 티어(가장 가까운 선택지).
-      · '이상'(하한) — 예산 이상인 관측 가격 중 **가장 싼** 티어.
-        전부 예산에 못 미치면 **가장 비싼** 티어.
-
-    관측값이 없는 티어(budget_min이 NULL — 배치 미실행이거나 이 usage×platform
-    조합이 아직 없음)는 비교에서 제외한다(지어내지 않는다). **예산이 없거나
-    비교할 관측값이 하나도 없으면** DEFAULT_TIER_KEY 로 폴백한다.
+      · bound 없음 또는 '이하'(상한 취급) — 예산이 들어가는 구간. 없으면 예산
+        이하인 구간 중 가장 비싼 것(예산을 최대한 채운다), 그것도 없으면 가장 싼 것.
+      · '이상'(하한) — 예산 이상을 커버하는 구간 중 가장 싼 것. 없으면 가장 비싼 것.
+    예산이 없거나 구간이 하나도 없으면 0(가장 싼 구간)이다 — 옛 DEFAULT_TIER_KEY
+    같은 가정값을 새로 만들지 않는다(구간 목록 자체가 이미 그 용도에 맞게 좁다).
     """
-    priced = [(i, t) for i, t in enumerate(tiers) if t["budget_min"] is not None]
-    if won is None or not priced:
-        for i, t in enumerate(tiers):
-            if t["tier_key"] == DEFAULT_TIER_KEY:
-                return i
+    if not bands:
+        return 0
+    if won is None:
         return 0
     if bound == "이상":
-        ge = [(i, t) for i, t in priced if t["budget_min"] >= won]
-        if ge:
-            return min(ge, key=lambda it: it[1]["budget_min"])[0]
-        return max(priced, key=lambda it: it[1]["budget_min"])[0]
-    # '이하' 또는 bound 없음
-    le = [(i, t) for i, t in priced if t["budget_min"] <= won]
+        ge = [i for i, b in enumerate(bands)
+              if b["budget_max_won"] is None or b["budget_max_won"] >= won]
+        return ge[0] if ge else len(bands) - 1
+    inside = [i for i, b in enumerate(bands)
+              if b["budget_min_won"] <= won
+              and (b["budget_max_won"] is None or won <= b["budget_max_won"])]
+    if inside:
+        return inside[0]
+    le = [i for i, b in enumerate(bands) if b["budget_min_won"] <= won]
     if le:
-        return max(le, key=lambda it: it[1]["budget_min"])[0]
-    return min(priced, key=lambda it: it[1]["budget_min"])[0]
+        return le[-1]
+    return 0
 
 
 # ── 제약 읽기 ───────────────────────────────────────────────────────────
@@ -419,13 +410,20 @@ def _variant_payload(row, budget_won: int | None, bound: str | None, stock_by_co
 
 
 def _build_card(cell_id: int, variants: dict, name: str, kind: str,
-                 tier_key: str | None, tier_name: str | None,
-                 usage: str, platform: str, tier_range: dict,
+                 band: dict, usage: str, platform: str,
                  game_grade: str | None, game_resolution: str | None, game_name: str | None,
-                 budget_won: int | None, bound: str | None, stock_by_code: dict) -> dict:
-    """칸 하나 → 카드 하나. `quotes.{value,reco,perf}` 에 3종을 전부 담고(지시
-    6번 핵심 변화), 하위호환을 위해 대표(추천) variant 값을 최상위에도 그대로
-    얹는다. 없는 variant 는 None — 지어내지 않는다(admin_grid.py 와 같은 관행)."""
+                 budget_won: int | None, bound: str | None, stock_by_code: dict,
+                 omissions: list[dict] | None = None) -> dict:
+    """칸 하나 → 카드 하나. `quotes.{value,reco,perf}` 에 3종을 전부 담고, 하위호환을
+    위해 대표(추천) variant 값을 최상위에도 그대로 얹는다. 없는 variant 는 None.
+
+    ⚠ `tier_range`(0105) — 옛 판은 `{min: budget_min, max: budget_max}` 였고 그 둘이
+    같은 값(추천 단일점)이었다. 이제 min=가성비·max=고성능 **실제 범위**다.
+    구간 «정의»(band_min/band_max)는 별도 필드로 따로 싣는다 — 정의와 관측을
+    한 필드에 겹쳐 담지 않는다.
+    `tier_key`/`tier` 는 0105 로 비게임 축에서 사라졌다 — 화면 하위호환을 위해
+    키는 남기되 항상 None 이다(없는 값을 지어내 채우지 않는다).
+    """
     quotes: dict = {}
     for kr_label, out_key in VARIANT_KEY_MAP.items():
         row = variants.get(kr_label)
@@ -433,14 +431,26 @@ def _build_card(cell_id: int, variants: dict, name: str, kind: str,
                             if row is not None else None)
 
     rep = quotes.get(VARIANT_KEY_MAP[REPRESENTATIVE_VARIANT])   # "reco"
+    om = list(omissions or [])
     return {
         "cell_id": cell_id, "kind": kind,               # kind: "nongame" | "game"
-        "tier_key": tier_key, "tier": tier_name,
-        "usage": usage, "platform": platform, "tier_range": tier_range,
+        "tier_key": None, "tier": None,                 # 0105 로 축에서 사라짐(하위호환 키)
+        "band_key": band["band_key"], "band": band["label"],
+        "band_range": {"min": band["budget_min_won"], "max": band["budget_max_won"]},
+        "band_sample_n": band["sample_n"], "band_note": band["band_note"],
+        "gpu_required": band["gpu_required"],
+        "usage": usage, "platform": platform,
+        # ── 0106: «없는 카드»의 사유. 화면은 탭을 비활성으로 두고 이 문구를 쓴다 ──
+        # `quotes[key] is None` 만으로는 «아직 안 만들어진 것»과 «만들지 않기로 한
+        # 것»을 구분할 수 없다. 그 둘은 고객에게 전혀 다른 말이라 필드를 가른다.
+        "omitted_variants": om,
+        "omitted_variant_keys": [o["key"] for o in om if o.get("key")],
+        # 관측 범위 — 가성비~고성능. 옛 이름을 유지해 화면이 안 깨지게 한다.
+        "tier_range": {"min": band["budget_min"], "max": band["budget_max"]},
         "game_grade": game_grade, "game_resolution": game_resolution, "game_name": game_name,
         "name": name,
         "quotes": quotes,
-        # ── 하위호환 — 화면이 아직 quotes.* 로 안 옮겼어도 깨지지 않게(지시 6번) ──
+        # ── 하위호환 — 화면이 아직 quotes.* 로 안 옮겼어도 깨지지 않게 ──
         "quote_id": rep["quote_id"] if rep else None,
         "total": rep["total"] if rep else None,
         "over_budget": rep["over_budget"] if rep else False,
@@ -452,153 +462,132 @@ def _build_card(cell_id: int, variants: dict, name: str, kind: str,
     }
 
 
-def _build_nongame_cards(conn, considered: list[dict], usage_grid: str, platform: str,
-                          budget_won: int | None, bound: str | None) -> tuple[list, list]:
-    """지시 5번 — WHERE 절을 tier_key 로 건다(비게임 축)."""
+def _build_cards(conn, considered: list[dict], usage_grid: str, platform: str,
+                 kind: str, budget_won: int | None, bound: str | None,
+                 game_grade: str | None = None, game_resolution: str | None = None,
+                 game_name: str | None = None) -> tuple[list, list]:
+    """고려한 예산대 칸들 → 카드 + 빈칸 사유. 게임·비게임 공통(0105).
+
+    0092 판은 축이 달라 `_build_nongame_cards`/`_build_game_cards` 둘로 갈려
+    있었다. 0105 에서는 둘 다 «칸 = 예산대» 라 조회가 같아져 하나로 합친다
+    (같은 판정을 두 벌 두지 않는다 · §단일 원천). 다른 것은 카드 이름과
+    game_* 필드뿐이다.
+    """
     cards: list = []
     empty_cells: list = []
-    tier_keys = [t["tier_key"] for t in considered]
+    if not considered:
+        return cards, empty_cells
+
+    cell_ids = [b["cell_id"] for b in considered]
+    # 이 용도가 발행하지 않는 구성 + 사유(0106) — 칸마다 같으므로 한 번만 읽는다.
+    omissions = _load_omissions(conn, usage_grid)
     rows = conn.execute(text(
-        "SELECT c.cell_id, c.tier_key, c.budget_min, c.budget_max, c.intended_empty,"
-        " q.tier_variant, q.quote_id, q.generated_at, q.total, q.status, q.payload"
-        " FROM grid_cells c"
-        " LEFT JOIN grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
-        " WHERE c.usage = :u AND c.platform = :p AND c.tier_key = ANY(:tks)"),
-        {"u": usage_grid, "p": platform, "tks": tier_keys}).mappings().all()
-
-    by_tier: dict = {}
+        "SELECT cell_id, tier_variant, quote_id, generated_at, total, status, payload"
+        " FROM grid_quotes WHERE cell_id = ANY(:ids) AND is_current"),
+        {"ids": cell_ids}).mappings().all()
+    by_cell: dict = {}
     for r in rows:
-        slot = by_tier.setdefault(r["tier_key"], {
-            "cell_id": r["cell_id"], "intended_empty": r["intended_empty"],
-            "budget_min": r["budget_min"], "budget_max": r["budget_max"], "variants": {},
-        })
-        if r["quote_id"] is not None:
-            slot["variants"][r["tier_variant"]] = r
-
+        by_cell.setdefault(r["cell_id"], {})[r["tier_variant"]] = r
     stock_by_code = _stock_by_code(conn, rows)
 
-    for tier in considered:
-        info = by_tier.get(tier["tier_key"])
-        tier_range = {"min": tier["budget_min"], "max": tier["budget_max"]}
-        if info is None:
-            # 108칸 전량 시드(0092)라 정상적으로는 일어나지 않는다 — 방어적 분기.
-            empty_cells.append({
-                "cell_id": None, "tier_key": tier["tier_key"], "tier": tier["name"],
-                "usage": usage_grid, "tier_range": tier_range,
-                "reason": "격자에 이 칸이 없습니다(데이터 정합 확인 필요)"})
+    for band in considered:
+        info = {"cell_id": band["cell_id"], "band_key": band["band_key"],
+                "band": band["label"], "usage": usage_grid,
+                "band_range": {"min": band["budget_min_won"], "max": band["budget_max_won"]},
+                "tier_range": {"min": band["budget_min"], "max": band["budget_max"]}}
+        if band["intended_empty"]:
+            empty_cells.append({**info, "reason": "의도적으로 비운 칸"})
             continue
-        if info["intended_empty"]:
-            empty_cells.append({
-                "cell_id": info["cell_id"], "tier_key": tier["tier_key"], "tier": tier["name"],
-                "usage": usage_grid, "tier_range": tier_range,
-                "reason": "의도적으로 비운 칸 — 이 티어×용도 조합은 격자가 만들지 않는다"})
+        variants = by_cell.get(band["cell_id"]) or {}
+        if not variants:
+            empty_cells.append({**info, "reason": "현재본 견적 없음"})
             continue
-        if not info["variants"]:
-            empty_cells.append({
-                "cell_id": info["cell_id"], "tier_key": tier["tier_key"], "tier": tier["name"],
-                "usage": usage_grid, "tier_range": tier_range,
-                "reason": "현재본 견적 없음"})
-            continue
-        name = f"{tier['name']} · {usage_grid}"     # 예: "팝콘3 · 디자인"(지시 7번)
+        if kind == "game":
+            name = f"{game_grade}등급 · {game_resolution} · {band['label']}"
+        else:
+            name = f"{usage_grid} · {band['label']}"
         cards.append(_build_card(
-            info["cell_id"], info["variants"], name, "nongame",
-            tier["tier_key"], tier["name"], usage_grid, platform, tier_range,
-            None, None, None, budget_won, bound, stock_by_code))
-    return cards, empty_cells
-
-
-def _build_game_cards(conn, grade: str, resolution: str, game_name: str | None,
-                       platform: str, budget_won: int | None, bound: str | None) -> tuple[list, list]:
-    """지시 5번 — WHERE 절을 game_grade+game_resolution 으로 건다(게임 축).
-    (grade, resolution, platform) 은 uq_grid_cells_game_coord 로 유일하므로
-    칸은 최대 1개다 — 비게임처럼 인접 등급을 함께 보여주는 정책은 지시서에
-    없어 만들지 않는다(카드 최대 1장)."""
-    cards: list = []
-    empty_cells: list = []
-    cell = conn.execute(text(
-        "SELECT cell_id, budget_min, budget_max, intended_empty FROM grid_cells"
-        " WHERE usage = :g_usage AND game_grade = :g AND game_resolution = :r AND platform = :p"),
-        {"g_usage": GAME_USAGE, "g": grade, "r": resolution, "p": platform}).mappings().first()
-    tier_range = {"min": cell["budget_min"], "max": cell["budget_max"]} if cell else {"min": None, "max": None}
-    if cell is None:
-        empty_cells.append({
-            "cell_id": None, "game_grade": grade, "game_resolution": resolution,
-            "game_name": game_name, "usage": GAME_USAGE, "tier_range": tier_range,
-            "reason": "격자에 이 등급·해상도 칸이 없습니다(데이터 정합 확인 필요)"})
-        return cards, empty_cells
-    if cell["intended_empty"]:
-        empty_cells.append({
-            "cell_id": cell["cell_id"], "game_grade": grade, "game_resolution": resolution,
-            "game_name": game_name, "usage": GAME_USAGE, "tier_range": tier_range,
-            "reason": "의도적으로 비운 칸"})
-        return cards, empty_cells
-
-    q_rows = conn.execute(text(
-        "SELECT tier_variant, quote_id, generated_at, total, status, payload"
-        " FROM grid_quotes WHERE cell_id = :id AND is_current"),
-        {"id": cell["cell_id"]}).mappings().all()
-    variants = {r["tier_variant"]: r for r in q_rows}
-    if not variants:
-        empty_cells.append({
-            "cell_id": cell["cell_id"], "game_grade": grade, "game_resolution": resolution,
-            "game_name": game_name, "usage": GAME_USAGE, "tier_range": tier_range,
-            "reason": "현재본 견적 없음"})
-        return cards, empty_cells
-
-    stock_by_code = _stock_by_code(conn, list(variants.values()))
-    name = f"{grade}등급 · {resolution}"        # 예: "E등급 · 1080p"(지시 7번)
-    cards.append(_build_card(
-        cell["cell_id"], variants, name, "game", None, None, GAME_USAGE, platform,
-        tier_range, grade, resolution, game_name, budget_won, bound, stock_by_code))
+            band["cell_id"], variants, name, kind, band, usage_grid, platform,
+            game_grade, game_resolution, game_name, budget_won, bound, stock_by_code,
+            omissions))
     return cards, empty_cells
 
 
 # ── 용도별 카드 묶음(card_set) ────────────────────────────────────────────
 def _nongame_card_set(conn, usage: str, state: TalkState, platform: str,
                       notes: list[str]) -> dict:
-    """비게임 용도 하나 → card_set. tier_key 힌트가 있으면 그 칸 중심, 없으면 예산으로
-    tier_index_for. 둘 다 있으면 예산 우선(헤더 ④·설계서 §11)."""
+    """비게임 용도 하나 → card_set. 예산으로 중심 예산대를 고르고 그 위 BANDS_UP 개까지.
+
+    ⚠ 0105 — `tier_key` 힌트는 더 이상 비게임 축이 아니다(축에서 사라졌다).
+    state.tier_key 가 와도 무시하고 notes 에 그 사실을 남긴다 — 조용히 삼키면
+    화면이 "반영됐다"고 착각한다.
+    """
     usage_grid = USAGE_TO_GRID[usage]
-    tiers = _load_tiers(conn, usage_grid, platform)
-    ci = tier_index_for(tiers, state.budget_won, state.budget_bound)
-    hint_i = next((i for i, t in enumerate(tiers) if t["tier_key"] == state.tier_key), None)
+    bands = _load_bands(conn, "nongame", usage_grid, platform)
+    if not bands:
+        notes.append(f"{usage}: no bands in grid for platform={platform}")
+        return {"usage": usage, "usage_grid": usage_grid, "kind": "nongame",
+                "cards": [], "empty_cells": [], "omitted_variants": [],
+                "center_band": None,
+                "center_band_key": None, "bands_considered": [],
+                "center_tier": None, "center_tier_key": None, "tiers_considered": []}
+    ci = band_index_for(bands, state.budget_won, state.budget_bound)
     if state.tier_key is not None:
-        if state.budget_won is None:
-            ci = hint_i if hint_i is not None else ci
-            if hint_i is None:
-                notes.append(f"{usage}: tier_key hint {state.tier_key} not in spec_tiers - ignored")
-        elif hint_i is not None and hint_i != ci:
-            notes.append(f"{usage}: tier_key hint {state.tier_key} != budget pick"
-                         f" {tiers[ci]['tier_key']} - budget wins")
-    elif state.budget_won is None:
-        notes.append(f"{usage}: no budget, no tier_key hint - center {DEFAULT_TIER_KEY}")
-    considered = tiers[ci: ci + 1 + TIERS_UP]
-    cards, empty_cells = _build_nongame_cards(
-        conn, considered, usage_grid, platform, state.budget_won, state.budget_bound)
+        notes.append(f"{usage}: tier_key hint {state.tier_key} ignored"
+                     " - 0105 removed tier_key from the non-game axis")
+    if state.budget_won is None:
+        notes.append(f"{usage}: no budget - center = cheapest band {bands[0]['band_key']}")
+    considered = bands[ci: ci + 1 + BANDS_UP]
+    cards, empty_cells = _build_cards(
+        conn, considered, usage_grid, platform, "nongame",
+        state.budget_won, state.budget_bound)
     if not cards:
-        notes.append(f"{usage}: no cards in considered tiers {[t['tier_key'] for t in considered]}")
+        notes.append(f"{usage}: no cards in considered bands"
+                     f" {[b['band_key'] for b in considered]}")
     return {
         "usage": usage, "usage_grid": usage_grid, "kind": "nongame",
         "cards": cards, "empty_cells": empty_cells,
-        "center_tier": tiers[ci]["name"], "center_tier_key": tiers[ci]["tier_key"],
-        "tiers_considered": [t["tier_key"] for t in considered],
+        # 용도 단위의 «없는 구성» 사유(0106) — 카드마다 같은 문장이라, 화면이 묶음
+        # 머리에 한 번만 쓰고 싶을 때 여기를 읽는다(카드 안에도 같은 값이 있다).
+        "omitted_variants": _load_omissions(conn, usage_grid),
+        "center_band": bands[ci]["label"], "center_band_key": bands[ci]["band_key"],
+        "bands_considered": [b["band_key"] for b in considered],
+        # 하위호환 키 — 0105 로 tier 축이 사라져 항상 None/[] 이다(지어내지 않는다)
+        "center_tier": None, "center_tier_key": None, "tiers_considered": [],
     }
 
 
 def _game_card_set(conn, usage: str, state: TalkState, platform: str,
                    notes: list[str]) -> dict:
-    """게임 계열 용도 → card_set 하나(칸 최대 1개). grade 는 이미 있다고 전제(호출부가
-    needs 로 거른다). 해상도 null 이면 DEFAULT_RESOLUTION — assumed 는 호출부가 단다."""
+    """게임 계열 용도 → card_set. 0105 로 **칸이 여럿이다**(등급×해상도 하나에
+    예산대가 1~3개) — 옛 판은 칸이 최대 1개라 카드도 1장뿐이었고, 그래서 롤 하는
+    고객이 219만원짜리 카드 한 장만 봤다. 이제 예산대마다 카드가 나온다."""
     g = state.game
     resolution = g.resolution or DEFAULT_RESOLUTION
     game_name = g.names[0] if g.names else None
-    cards, empty_cells = _build_game_cards(
-        conn, g.grade, resolution, game_name, platform, state.budget_won, state.budget_bound)
+    bands = _load_bands(conn, "game", GAME_USAGE, platform, g.grade, resolution)
+    if not bands:
+        notes.append(f"{usage}: no bands at grade={g.grade} resolution={resolution}"
+                     f" platform={platform}")
+        return {"usage": usage, "usage_grid": GAME_USAGE, "kind": "game",
+                "cards": [], "empty_cells": [], "omitted_variants": [],
+                "center_band": None,
+                "center_band_key": None, "bands_considered": [],
+                "center_tier": None, "center_tier_key": None, "tiers_considered": []}
+    ci = band_index_for(bands, state.budget_won, state.budget_bound)
+    considered = bands[ci: ci + 1 + BANDS_UP]
+    cards, empty_cells = _build_cards(
+        conn, considered, GAME_USAGE, platform, "game",
+        state.budget_won, state.budget_bound, g.grade, resolution, game_name)
     if not cards:
-        notes.append(f"{usage}: no cards at grade={g.grade} resolution={resolution} platform={platform}")
+        notes.append(f"{usage}: no cards at grade={g.grade} resolution={resolution}"
+                     f" platform={platform}")
     return {
         "usage": usage, "usage_grid": GAME_USAGE, "kind": "game",
         "cards": cards, "empty_cells": empty_cells,
+        "omitted_variants": _load_omissions(conn, GAME_USAGE),
+        "center_band": bands[ci]["label"], "center_band_key": bands[ci]["band_key"],
+        "bands_considered": [b["band_key"] for b in considered],
         "center_tier": None, "center_tier_key": None, "tiers_considered": [],
     }
 

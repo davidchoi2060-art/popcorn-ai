@@ -87,13 +87,17 @@ def _cell_state(c: dict, last_batch_id) -> str:
     return "ok"
 
 
-def _cell_label(tier_key, usage, game_grade, game_resolution,
-                 tier_names: dict, grade_labels: dict) -> str:
-    """칸 표시명 — 비게임은 '팝콘2 · 디자인', 게임은 '게임A등급 · 1440p' 식."""
+def _cell_label(usage, band_label, game_grade, game_resolution,
+                 grade_labels: dict) -> str:
+    """칸 표시명 — 비게임은 '디자인 · 실무 주력', 게임은 '게임(경쟁 이스포츠) · 1080p · FHD 고주사율'.
+
+    0105 — 비게임 축에서 tier_key 가 사라졌으므로 팝콘 브랜드명을 쓰지 않는다.
+    칸을 가르는 것은 용도와 **예산대**다.
+    """
     if usage == "게임":
         g = grade_labels.get(game_grade, game_grade)
-        return f"게임({g}) · {game_resolution}"
-    return f"{tier_names.get(tier_key, tier_key)} · {usage}"
+        return f"게임({g}) · {game_resolution} · {band_label}"
+    return f"{usage} · {band_label}"
 
 
 def _tier_floor_text(row: dict) -> str:
@@ -110,17 +114,20 @@ def grid():
     가르지 않고 전부 내려준다 — 화면이 플랫폼 토글을 클라이언트에서 필터링한다."""
     with engine.connect() as conn:
         cells = conn.execute(text(
-            "SELECT c.cell_id, c.tier_key, c.usage, c.game_grade, c.game_resolution,"
-            " c.platform, c.budget_min, c.budget_max, c.intended_empty,"
+            "SELECT c.cell_id, c.usage, c.budget_band_key, c.game_grade, c.game_resolution,"
+            " c.platform, c.budget_min, c.budget_max, c.band_note, c.intended_empty,"
+            " b.label AS band_label, b.budget_min_won, b.budget_max_won,"
+            " b.sample_n AS band_sample_n, b.gpu_required, b.sort_order AS band_sort,"
             " q.quote_id, q.batch_id, q.generated_at, q.total, q.verdict, q.status,"
             " t.gpu_tier_key AS game_gpu_tier_key,"
             " t.cpu_tier_key_override AS game_cpu_tier_key_override"
             " FROM grid_cells c"
+            " JOIN grid_budget_bands b ON b.band_key = c.budget_band_key"
             " LEFT JOIN grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
             "   AND q.tier_variant = :rv"
             " LEFT JOIN game_grade_resolution_tiers t"
             "   ON t.grade = c.game_grade AND t.resolution = c.game_resolution"
-            " ORDER BY c.cell_id"
+            " ORDER BY c.usage, b.sort_order, c.cell_id"
         ), {"rv": REPRESENTATIVE_VARIANT}).mappings().all()
 
         # 칸별 3종(가성비/추천/고성능) 존재 여부 — 목록 표의 점 3개가 쓴다.
@@ -141,6 +148,14 @@ def grid():
         tiers_out = [{"tier_key": t["tier_key"], "name": t["popcorn_name"],
                       "floor": _tier_floor_text(t)} for t in tier_rows]
 
+        # 예산대 축(0105) — 행 머리가 쓴다. 근거(source)·표본 수를 그대로 내려준다:
+        # 운영자가 "왜 이 구간인가"를 화면에서 바로 볼 수 있어야 한다.
+        band_rows = conn.execute(text(
+            "SELECT band_key, axis, label, budget_min_won, budget_max_won, budget_label,"
+            " gpu_required, sample_n, source FROM grid_budget_bands ORDER BY sort_order"
+        )).mappings().all()
+        bands_out = [dict(b) for b in band_rows]
+
         # 등급별 배정 게임 수 — 행 머리의 "배정 N종"(실카운트, game_grade_assignments).
         grade_counts = dict(conn.execute(text(
             "SELECT grade, count(*) FROM game_grade_assignments"
@@ -157,6 +172,19 @@ def grid():
             "SELECT DISTINCT usage FROM grid_cells WHERE usage <> '게임'"
             " ORDER BY usage"
         )).scalars().all()
+
+        # 용도별로 «발행하지 않는» 구성과 그 사유(0106). 운영자가 «왜 이 용도만
+        # 카드가 둘인가»를 화면에서 바로 볼 수 있어야 한다 — 고객 문구
+        # (reason_public)와 근거(reason_source)를 둘 다 내려준다.
+        omission_rows = conn.execute(text(
+            "SELECT usage, tier_variant, reason_public, reason_source, decided_by,"
+            " decided_at FROM grid_variant_omissions ORDER BY usage, tier_variant"
+        )).mappings().all()
+        omissions_out = [{**dict(o), "decided_at": _iso(o["decided_at"])}
+                         for o in omission_rows]
+        omitted_by_usage: dict[str, set] = {}
+        for o in omission_rows:
+            omitted_by_usage.setdefault(o["usage"], set()).add(o["tier_variant"])
 
         # 미배정 게임(grade IS NULL) — 등급 격자에 나타나지 않는 게임을 참고로 노출
         # (정의서 §⑦ · GTA 1건, 강제 아님 — 실제로 있으면 그대로 보여준다).
@@ -194,23 +222,31 @@ def grid():
 
     return {
         "tiers": tiers_out,
+        "bands": bands_out,
         "game_grades": grades_out,
         "usages": list(usages),
+        "variant_omissions": omissions_out,
         "unassigned_games": [{"name": g["name"], "note": g["note"]} for g in unassigned_games],
         "cells": [{
-            "cell_id": c["cell_id"], "tier_key": c["tier_key"],
+            "cell_id": c["cell_id"], "tier_key": None,       # 0105 로 축에서 사라짐(하위호환 키)
             "usage": c["usage"], "game_grade": c["game_grade"],
             "game_resolution": c["game_resolution"],
-            "label": _cell_label(c["tier_key"], c["usage"], c["game_grade"],
-                                   c["game_resolution"], tier_names, grade_labels),
+            "budget_band_key": c["budget_band_key"], "band_label": c["band_label"],
+            "band_range": {"min": c["budget_min_won"], "max": c["budget_max_won"]},
+            "band_sample_n": c["band_sample_n"], "band_note": c["band_note"],
+            "gpu_required": c["gpu_required"],
+            "label": _cell_label(c["usage"], c["band_label"], c["game_grade"],
+                                   c["game_resolution"], grade_labels),
             "platform": c["platform"], "budget_min": c["budget_min"],
             "budget_max": c["budget_max"], "intended_empty": c["intended_empty"],
             "state": _cell_state(c, last_batch_id),
-            # 게임 칸만 채워진다(비게임은 tier_key로 이미 스펙을 안다) — S등급처럼
-            # GPU/CPU가 갈리는 칸을 목록에서도 구분해 보여주려고 조인해 둔 값.
             "game_gpu_tier_key": c["game_gpu_tier_key"],
             "game_cpu_tier_key_override": c["game_cpu_tier_key_override"],
             "variants_present": sorted(variants_by_cell.get(c["cell_id"], set()),
+                                        key=VARIANTS.index),
+            # 이 칸이 «만들지 않기로 한» 구성(0106) — variants_present 에서 빠진
+            # 이유가 «배치 실패»인지 «발행 안 함»인지를 화면이 구분할 수 있게 한다.
+            "variants_omitted": sorted(omitted_by_usage.get(c["usage"], set()),
                                         key=VARIANTS.index),
             "quote": None if c["quote_id"] is None else {
                 "quote_id": c["quote_id"], "batch_id": c["batch_id"],
@@ -231,9 +267,12 @@ def grid_cell(cell_id: int):
     게임 칸은 등급에 속한 게임 목록과 스펙(등급×해상도 조인)도 함께 준다."""
     with engine.connect() as conn:
         cell = conn.execute(text(
-            "SELECT cell_id, tier_key, usage, game_grade, game_resolution,"
-            " platform, budget_min, budget_max, intended_empty"
-            " FROM grid_cells WHERE cell_id=:id"), {"id": cell_id}).mappings().first()
+            "SELECT c.cell_id, c.usage, c.budget_band_key, c.game_grade, c.game_resolution,"
+            " c.platform, c.budget_min, c.budget_max, c.band_note, c.intended_empty,"
+            " b.label AS band_label, b.budget_min_won, b.budget_max_won, b.budget_label,"
+            " b.gpu_required, b.sample_n AS band_sample_n, b.source AS band_source"
+            " FROM grid_cells c JOIN grid_budget_bands b ON b.band_key = c.budget_band_key"
+            " WHERE c.cell_id=:id"), {"id": cell_id}).mappings().first()
         if cell is None:
             raise HTTPException(404, "칸을 찾을 수 없습니다")
 
@@ -270,6 +309,13 @@ def grid_cell(cell_id: int):
         for v in VARIANTS:
             quotes_by_variant.setdefault(v, None)
 
+        # 이 용도가 «발행하지 않는» 구성과 사유(0106) — None 인 variant 가
+        # «실패»인지 «만들지 않기로 한 것»인지를 서랍이 말할 수 있게 한다.
+        omissions = [dict(o) for o in conn.execute(text(
+            "SELECT tier_variant, reason_public, reason_source, decided_by"
+            " FROM grid_variant_omissions WHERE usage=:u ORDER BY tier_variant"),
+            {"u": cell["usage"]}).mappings().all()]
+
         game_info = None
         if cell["usage"] == "게임":
             grade = cell["game_grade"]
@@ -296,11 +342,17 @@ def grid_cell(cell_id: int):
             }
 
     return {
-        "cell_id": cell["cell_id"], "tier_key": cell["tier_key"],
+        "cell_id": cell["cell_id"], "tier_key": None,     # 0105 로 축에서 사라짐(하위호환 키)
         "usage": cell["usage"], "game_grade": cell["game_grade"],
         "game_resolution": cell["game_resolution"],
+        "budget_band_key": cell["budget_band_key"], "band_label": cell["band_label"],
+        "band_range": {"min": cell["budget_min_won"], "max": cell["budget_max_won"]},
+        "band_budget_label": cell["budget_label"],
+        "band_sample_n": cell["band_sample_n"], "band_source": cell["band_source"],
+        "band_note": cell["band_note"], "gpu_required": cell["gpu_required"],
         "platform": cell["platform"], "budget_min": cell["budget_min"],
         "budget_max": cell["budget_max"], "intended_empty": cell["intended_empty"],
         "game_info": game_info,
+        "variant_omissions": omissions,
         "quotes": quotes_by_variant,
     }

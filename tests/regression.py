@@ -6783,7 +6783,11 @@ def test_usage_alloc_invariants():
                 return t["usage_key"]
         return None
     cards = db_all(
-        "SELECT c.usage, c.tier_key, q.payload FROM grid_quotes q JOIN grid_cells c USING (cell_id)"
+        # 0105 — 비게임 축에서 `tier_key` 가 사라졌다(격자가 예산대 축으로 재설계됨).
+        # 검사 자체는 그대로다 — 위반 목록에 찍을 «칸 식별자»만 tier_key 에서
+        # budget_band_key 로 바꾼다(판정 기준·허용 범위는 건드리지 않았다).
+        "SELECT c.usage, c.budget_band_key AS tier_key, q.payload"
+        " FROM grid_quotes q JOIN grid_cells c USING (cell_id)"
         " WHERE q.is_current AND q.payload IS NOT NULL")
     pre, skipped, bad_cards, seen = 0, 0, [], 0
     for c in cards:

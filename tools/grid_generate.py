@@ -1,63 +1,71 @@
 # -*- coding: utf-8 -*-
 """사전 생성 견적 격자 갱신 배치 — grid_cells 각 칸을 recommend 엔진으로 채운다.
 
-A-135 재설계 최종 단계(2026-09-16) — "가격 구간 먼저"에서 "용도·스펙이 먼저,
-가격은 결과"로 전환. 새 조합 엔진을 만들지 않는다 — 기존 `POST /api/recommend`
-(고객 실시간 경로와 같은 엔진)를 그대로 호출한다. 스펙 하한은 이제 엔진이 직접
-받는다(`api/recommend.py` RecommendBody.gpu_watt_min 등, 이번 물결 신설) — 배치는
-그 값을 spec_tiers/game_grade_resolution_tiers에서 읽어 넘기기만 한다. 저장 구조는
-`db/migrations/versions/0092_grid_spec_axis.py`(비게임 칸 = tier_key+usage 6종,
-게임 칸 = game_grade+game_resolution, grid_quotes.tier_variant 3종).
+0105 예산대 축 재설계(2026-09-20). 새 조합 엔진을 만들지 않는다 — 기존
+`POST /api/recommend`(고객 실시간 경로와 같은 엔진)를 그대로 호출한다.
+저장 구조는 `db/migrations/versions/0105_grid_budget_band_axis.py`.
 
 실행:
-  .venv/Scripts/python tools/grid_generate.py --dry   (호출·판정만 하고 DB에 쓰지 않는다)
+  .venv/Scripts/python tools/grid_generate.py --dry
   .venv/Scripts/python tools/grid_generate.py
 
-■ 스펙 하한은 엔진이 직접 건다 — 배치는 그 값을 「전달」만 한다(2026-09-16 재설계)
-  옛 판(0072~0082 가격축)은 엔진에 스펙 하한 개념이 없어 배치가 사후에 "총액이
-  칸의 budget_min 아래인가"만 봤다(`below_tier_min` 판정, 근사치). 지금은 엔진
-  (`api/recommend.py` `_spec_floor_filter`)이 **후보 풀 단계에서** gpu_watt_min·
-  cpu_cores_min·ram_min_gb·ssd_min_gb로 직접 거른다 — 예산과 무관한 독립 축이다.
-  배치는 각 칸의 tier_key(비게임) 또는 (game_grade, game_resolution)의 스펙(게임)을
-  spec_tiers/game_grade_resolution_tiers에서 읽어 그대로 넘기고, **예산은 넘기지
-  않는다**(가격은 결과이지 입력이 아니다 — 아래 "예산 없음" 참조). 그래도 이 배치는
-  엔진 응답의 items[].spec을 다시 읽어 실제로 하한을 만족하는지 사후 검증한다
-  (below_tier_min — 엔진이 필터링을 제대로 했다면 항상 통과해야 하는 안전장치).
+■ 무엇이 바뀌었나 — 실측으로 확인된 결함 둘을 고친다
+  (A) **등급이 엔진에 도달하지 않았다.** 옛 `cell_spec_floor()` 는 `game_grade` 를
+      tier 조회 키로만 쓰고 반환 dict 에서 버렸다. DB 에서 `E/1080p` 와 `L/1080p`
+      가 같은 행(T1·override NULL)이라 두 칸이 엔진에 보내는 body 가 바이트 단위로
+      같았다 — 18칸이 실제로는 5가지 하한이었다.
+      → 이제 칸의 **예산대**(grid_budget_bands)가 함께 엔진으로 간다. 같은 T1
+      하한이라도 예산대가 다르면 다른 가격이 나온다(아래 (B) 참조).
+  (B) **하한이 가격을 정하지 못했다.** `api/recommend.py _order_of()` 는 숫자 예산이
+      없으면 `"median"`(후보 풀 중앙값)을 준다 — 실측상 GPU 하한을 완전히 제거해도
+      추천 총액이 2,229,400 으로 T1(2,199,300)과 거의 같았다. 하한이 아니라 **풀
+      모양**이 가격을 만들고 있었다.
+      → 이제 `{"l":"예산","v":band.budget_label}` 로 **숫자 예산**을 보낸다.
+        `api/candidates.py _budget_cap()` 이 그 문자열에서 상한을 읽으면
+        `has_cap=True` 가 되어 `_order_of` 가 `desc`+예산 가지치기로 바뀐다.
+        실측: T1 하한 + "150만원" → 추천 1,499,900 (엔진은 원래 할 수 있었다).
+      ⚠ **라벨 형식이 정확해야 한다.** `_budget_cap` 의 정규식은
+        `(-)?\\s*(\\d{1,3}(?:,\\d{3})+|\\d+)\\s*만` 이고 "이상"이 들어 있으면 None 을
+        준다. 형식을 벗어나면 엔진이 **조용히 무시**하고 median 으로 되돌아간다.
+        그래서 이 배치는 라벨을 지어내지 않고 `grid_budget_bands.budget_label`
+        컬럼(0105 가 그 형식에 맞춰 넣은 값)을 그대로 실어 보낸다.
 
-■ 예산 없음("AI 추천 예산") — 엔진의 기존 동작을 그대로 쓴다
-  `api/recommend.py`는 "예산" 라벨을 필수로 요구하지만(400 회피), 숫자 예산이
-  없으면(`_budget_cap`이 None을 줌) 추천 티어는 "중간 순위 우선"(`_order_of`
-  머리 주석)으로, 고성능 티어는 그 자체로 가격 내림차순 + 상한 없음(단, 이제는
-  스펙 하한이 후보를 좁혀 두므로 예전처럼 "가장 비싼 부품 아무거나"로 폭주하지
-  않는다 — 스펙 하한이 이미 램·SSD를 합리적 범위로 제한한다)으로 동작한다.
-  옛 "가상 상한"(X_VIRTUAL_CAP_MULT, budget_min×1.5를 라벨로 위장해 보내던 편법)은
-  **폐기한다** — 예산 자체가 입력이 아니게 됐으니 위장할 하한도 없다.
+■ 3종을 전부 살린다 — budget_min/max 가 이제 «범위»다
+  옛 판은 `budget_min = budget_max = 추천 총액` 이었다(단일 관측점). 그래서 같은
+  칸의 가성비 구성(실측 921,100원)이 발행되지 않고 버려졌다.
+  이제 `budget_min = 가성비 총액` · `budget_max = 고성능 총액` 으로 **실제 3종의
+  범위**를 기록한다. 추천은 그 사이에 있고 grid_quotes 에 그대로 남는다.
+  ⚠ 셋 중 일부만 성공하면 **있는 것만으로** 범위를 만든다(지어내지 않는다).
+    전부 실패하면 둘 다 NULL.
 
-■ 카드 3종(가성비/추천/고성능) — 한 번의 호출로 전부 받는다
-  `/api/recommend` 응답의 `sets.value`·`sets.recommend`·`sets.highend`가 이미
-  한 호출에 동시에 들어 있다(기존 옛 판 `judge()`가 `sets.recommend`만 쓰고
-  나머지 둘을 버리고 있었다) — 이제 셋 다 grid_quotes에 tier_variant별로 INSERT.
+■ 스펙 하한을 어디서 읽나
+  게임 칸: `game_grade_resolution_tiers` 의 (grade, resolution) → gpu_tier_key
+    (+cpu_tier_key_override) → `spec_tiers`. 0092 와 같은 원천이다.
+    ⚠ 예산대가 `gpu_required=false`(내장그래픽 구간)면 **gpu_watt_min 만 None 으로
+      떨어뜨린다** — 그 구간에는 우리 풀의 외장 GPU(최저 297,700원)가 애초에
+      들어갈 수 없기 때문이다. 나머지 하한(CPU·RAM·SSD)은 그대로 건다.
+      gpu_watt_min 이 None 이고 용도에 GPU 하한이 없으면 엔진이 **이미 갖고 있는
+      iGPU 전용 탐색 패스**(api/recommend.py, 사무용에 쓰는 그것)를 탄다 —
+      여기서 새로 만들지 않는다.
+  비게임 칸: **스펙 하한을 넘기지 않는다**(4개 전부 None). 비게임 용도의 하한은
+    `usage_floors` 가 단일 원천으로 이미 갖고 있고, 엔진이 「용도」 라벨만 받으면
+    그 하한을 스스로 건다. 0092 가 거기에 spec_tiers T0~T5 를 겹쳐 건 것이
+    «사무·인강 × T5 = 1,344만원» 헛칸의 직접 원인이었다 — 축에서 뺐으니 하한도
+    겹쳐 걸지 않는다.
 
-■ budget_min/budget_max — 이제 입력이 아니라 관측값이다(0092 스키마 주석 그대로)
-  배치가 실제로 만든 **추천(recommend) variant**의 총액을 grid_cells.budget_min/
-  budget_max에 UPDATE한다(지시서 원문 그대로 — "배치가 실제 만든 추천 가격을
-  budget_min/max에 UPDATE"). 셋을 각각 다른 값으로 만들 근거(가성비~고성능 범위 등)는
-  지시서에 없어 지어내지 않는다 — min=max=추천 총액. 추천이 실패하면 NULL로 둔다
-  (다른 variant가 성공해도 지어내지 않는다 — 지시서가 특정한 것은 recommend뿐).
+■ 용도에 따라 **발행하지 않는 구성**이 있다 (0106)
+  `grid_variant_omissions(usage, tier_variant)` 에 행이 있으면 그 용도는 그 구성을
+  발행하지 않는다. 사무·주식의 「고성능」이 그것이다 — 200만원 위 실판매가 0벌이라
+  사장님이 «그 카드를 만들지 않는다»로 확정했다(2026-09-20).
+  · 그 표에 행이 없으면 지금까지처럼 3종 전부를 발행한다(기본값 = 현재 동작).
+  · 제외된 구성은 **엔진 실패가 아니다.** 실패로 세지 않고, grid_quotes 에도
+    쓰지 않는다. 사유는 그 표의 `reason_public` 이 들고 있고 화면이 그것을 읽는다.
+  · 엔진은 여전히 한 번만 호출한다(응답에 3종이 함께 온다) — 제외는 «저장하지
+    않는다»이지 «다르게 계산한다»가 아니다. 엔진 상수(HIGHEND_CAP_X)는 건드리지
+    않았다.
 
-■ 실패도 원장에 남긴다 (0072 이후 계승)
-  실패 칸도 grid_quotes에 행을 INSERT한다: status='생성 실패' · engine_note=사유
-  (200자 절단) · payload=NULL · total=NULL · verdict=NULL · is_current=true.
-  ⚠ 연결 오류(status None)로 3회 연속 실패해 중단(abort)하는 경우는 남은 칸을
-  기록하지 않는다 — 서버가 죽은 것은 칸의 사실이 아니다.
-
-■ 원장 — UPDATE가 아니라 INSERT
-  칸×variant를 다시 채울 때 이전 is_current 행을 false로 내리고 새 행을 INSERT한다
-  (견적 이력 보존). 부분 유니크 인덱스(cell_id, tier_variant WHERE is_current)가
-  "칸×variant당 현재본 하나"를 강제한다.
-
-■ 콘솔 출력은 ASCII만 — cp949 콘솔에서 한글이 깨지는 것 자체는 tools/_console.py가
-  막아 주지만, 이 스크립트는 지시에 따라 진행 로그를 ASCII로 고정한다.
+■ 실패도 원장에 남긴다 · 원장은 UPDATE 가 아니라 INSERT (0072 이후 계승)
+■ 콘솔 출력은 ASCII 만 (서버 stdout cp949)
 """
 import argparse
 import json
@@ -76,25 +84,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API_URL = "http://127.0.0.1:8000/api/recommend"
 PLATFORM_ASCII = {"인텔": "intel", "AMD": "amd"}
 
-# grid_quotes.status 값 — 0072 마이그레이션 status 컬럼 주석이 정본(이 파일이 판정).
-# 예산 상한 개념이 없어졌으므로(스펙 하한만 남음) 성공 판정은 이제 STATUS_OK 하나뿐
-# 이다 — verdict는 cap=None이면 엔진이 항상 "none"을 주므로 "over"가 나올 일이
-# 없다(recommend.py `_build_set`: `verdict = "none" if cap is None else ...`). 그래도
-# 상수 자체는 남긴다 — 0072 스키마 주석의 값 어휘(정상/예산 상한 초과/생성 실패)를
-# 이 파일이 계속 참조하고, 언젠가 엔진이 다시 예산을 받는 날 이 분기가 되살아난다.
 STATUS_OK = "정상"
 STATUS_OVER = "예산 상한 초과"
 STATUS_FAIL = "생성 실패"
 
 NOTE_MAX = 200                     # grid_quotes.engine_note String(200)
 
-# 엔진 티어 키 -> grid_quotes.tier_variant 값(0092 CHECK 제약: 가성비/추천/고성능)
 VARIANT_MAP = {"value": "가성비", "recommend": "추천", "highend": "고성능"}
-BUDGET_OBSERVE_VARIANT = "recommend"   # budget_min/max 관측값의 원천 variant(지시서 원문)
+# budget_min/budget_max 의 원천 variant — 이제 «범위»다(0105).
+BUDGET_MIN_VARIANT = "가성비"
+BUDGET_MAX_VARIANT = "고성능"
 
-# 스펙 하한 사후 검증(below_tier_min 패턴) — (slot=part_type, spec 필드, floor 딕셔너리 키, 단위)
-# recommend.py의 SPEC_FLOOR_SPECS와 같은 4슬롯이다 — 이 배치는 엔진이 이미 건 필터를
-# 다시 구현하지 않고, 엔진 응답(items[].spec)이 실제로 그 하한을 만족하는지만 잰다.
+GAME_USAGE = "게임"
+
 CHECK_SPECS = (
     ("GPU", "required_power_watt", "gpu_watt_min", "W"),
     ("CPU", "cpu_cores", "cpu_cores_min", "코어"),
@@ -104,7 +106,6 @@ CHECK_SPECS = (
 
 
 def _load_spec_tiers(conn) -> dict:
-    """spec_tiers 전행 -> {tier_key: {gpu_watt_min, cpu_cores_min, ram_min_gb, ssd_min_gb}}."""
     from sqlalchemy import text
     rows = conn.execute(text(
         "SELECT tier_key, gpu_watt_min, cpu_cores_min, ram_min_gb, ssd_min_gb"
@@ -113,7 +114,6 @@ def _load_spec_tiers(conn) -> dict:
 
 
 def _load_game_grade_tiers(conn) -> dict:
-    """game_grade_resolution_tiers 전행 -> {(grade, resolution): {gpu_tier_key, cpu_tier_key_override}}."""
     from sqlalchemy import text
     rows = conn.execute(text(
         "SELECT grade, resolution, gpu_tier_key, cpu_tier_key_override"
@@ -121,40 +121,67 @@ def _load_game_grade_tiers(conn) -> dict:
     return {(r["grade"], r["resolution"]): dict(r) for r in rows}
 
 
-def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict) -> dict:
-    """격자 칸 하나 -> ({usage_label, gpu_watt_min, cpu_cores_min, ram_min_gb, ssd_min_gb}, error|None).
+def _load_bands(conn) -> dict:
+    """grid_budget_bands 전행 -> {band_key: row}. 예산 라벨·GPU 성립 여부의 단일 원천."""
+    from sqlalchemy import text
+    rows = conn.execute(text(
+        "SELECT band_key, axis, label, budget_min_won, budget_max_won, budget_label,"
+        " gpu_required, engine_usage_label FROM grid_budget_bands")).mappings().all()
+    return {r["band_key"]: dict(r) for r in rows}
 
-    비게임 칸: spec_tiers[cell.tier_key]를 그대로 스펙 하한으로 쓴다. 용도(usage)는
-    grid_cells.usage 컬럼 값을 그대로 「용도」 제약으로 보낸다 — 0092 마이그레이션
-    자신의 주석대로 이 값은 이미 usage_floors.usage_label과 같은 어휘다(대화 파서와
-    같은 라벨, 새로 매핑하지 않는다).
 
-    게임 칸: game_grade_resolution_tiers에서 (grade, resolution)의 gpu_tier_key
-    (+cpu_tier_key_override)를 찾는다. GPU watt 하한·RAM·SSD 하한은 **기본(gpu) tier**
-    값을, CPU 코어 하한은 override가 있으면 **override tier** 값을 쓴다(S등급 GPU/CPU
-    비대칭 — 원본 game_grade_resolution_tiers.note "GPU T2급/CPU T4급 비대칭" 그대로).
-    override가 없으면 기본 tier 값을 그대로 쓴다(둘이 같은 tier가 된다). usage는
-    "게임"으로 고정 — 대화 파서(usage_floors game/game_casual/gaming_high)가 이미
-    쓰는 라벨과 같다(usage_floors.match()가 부분일치로 이 라벨을 그대로 받는다).
+def _load_omissions(conn) -> dict:
+    """grid_variant_omissions -> {usage: {tier_variant, ...}} (0106).
 
-    FK 무결성이 이미 DB가 지키므로(0091·0092 ForeignKey) tier_key/grade/resolution이
-    맵에 없는 경우는 데이터 정합이 깨진 것 — 지어내지 않고 error 문자열을 돌려준다.
+    그 용도에서 **발행하지 않는** 구성 목록. 행이 없는 용도는 빈 집합이 되고,
+    그러면 지금까지처럼 3종 전부를 발행한다 — 기본값이 현재 동작이라, 새 용도를
+    추가하면서 이 표를 잊어도 카드가 조용히 사라지지 않는다.
     """
-    if cell["usage"] != "게임":
-        tier = spec_tiers.get(cell["tier_key"])
-        if tier is None:
-            return None, f"tier_key={cell['tier_key']!r}가 spec_tiers에 없습니다"
-        return {
-            "usage_label": cell["usage"],
-            "gpu_watt_min": tier["gpu_watt_min"], "cpu_cores_min": tier["cpu_cores_min"],
-            "ram_min_gb": tier["ram_min_gb"], "ssd_min_gb": tier["ssd_min_gb"],
-        }, None
+    from sqlalchemy import text
+    out: dict = {}
+    for r in conn.execute(text(
+            "SELECT usage, tier_variant FROM grid_variant_omissions")).mappings().all():
+        out.setdefault(r["usage"], set()).add(r["tier_variant"])
+    return out
+
+
+def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict, bands: dict):
+    """격자 칸 하나 -> (엔진에 보낼 것 전부, error|None).
+
+    반환 dict:
+      usage_label   「용도」 제약으로 보낼 문자열
+      budget_label  「예산」 제약으로 보낼 문자열(grid_budget_bands 원문 — 지어내지 않는다)
+      band_key/band_label/band_max  로그·판정용
+      gpu_watt_min · cpu_cores_min · ram_min_gb · ssd_min_gb  스펙 하한(엔진 body 최상위)
+
+    ⚠ 옛 판과 달리 **예산대가 반드시 함께 간다.** 이게 «등급이 엔진에 도달하지
+      않는다»(결함 A)와 «하한이 가격을 정하지 못한다»(결함 B)를 동시에 푸는 자리다.
+    """
+    band = bands.get(cell["budget_band_key"])
+    if band is None:
+        return None, f"budget_band_key={cell['budget_band_key']!r}가 grid_budget_bands에 없습니다"
+
+    common = {
+        "budget_label": band["budget_label"],
+        "band_key": band["band_key"], "band_label": band["label"],
+        "band_max": band["budget_max_won"],
+    }
+
+    if cell["usage"] != GAME_USAGE:
+        # 비게임 — 스펙 하한은 usage_floors 가 단일 원천이다(위 헤더 참조).
+        # 용도 라벨만 보내면 엔진이 그 표를 읽어 스스로 건다.
+        common.update({
+            "usage_label": band["engine_usage_label"] or cell["usage"],
+            "gpu_watt_min": None, "cpu_cores_min": None,
+            "ram_min_gb": None, "ssd_min_gb": None,
+        })
+        return common, None
 
     key = (cell["game_grade"], cell["game_resolution"])
     gt = game_tiers.get(key)
     if gt is None:
-        return None, f"(grade={cell['game_grade']!r}, resolution={cell['game_resolution']!r})가" \
-                     " game_grade_resolution_tiers에 없습니다"
+        return None, (f"(grade={cell['game_grade']!r}, resolution={cell['game_resolution']!r})가"
+                      " game_grade_resolution_tiers에 없습니다")
     base = spec_tiers.get(gt["gpu_tier_key"])
     if base is None:
         return None, f"gpu_tier_key={gt['gpu_tier_key']!r}가 spec_tiers에 없습니다"
@@ -163,21 +190,19 @@ def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict) -> dict:
         cpu_tier = spec_tiers.get(gt["cpu_tier_key_override"])
         if cpu_tier is None:
             return None, f"cpu_tier_key_override={gt['cpu_tier_key_override']!r}가 spec_tiers에 없습니다"
-    return {
-        "usage_label": "게임",
-        "gpu_watt_min": base["gpu_watt_min"], "cpu_cores_min": cpu_tier["cpu_cores_min"],
+
+    # 내장그래픽 구간이면 GPU 하한만 떨군다 — 나머지 하한은 그대로 건다(위 헤더).
+    gpu_watt_min = base["gpu_watt_min"] if band["gpu_required"] else None
+    common.update({
+        "usage_label": band["engine_usage_label"] or GAME_USAGE,
+        "gpu_watt_min": gpu_watt_min, "cpu_cores_min": cpu_tier["cpu_cores_min"],
         "ram_min_gb": base["ram_min_gb"], "ssd_min_gb": base["ssd_min_gb"],
-    }, None
+    })
+    return common, None
 
 
 def _mark_batch_session(wconn, res: dict) -> None:
-    """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시.
-
-    2026-09-14 실사고: 배치 6회가 real 상담 485행을 남겨 «오늘 상담 수»류 지표를 왜곡했다.
-    X-Popcorn-Test 헤더는 .env 스위치가 켜져야 먹고(서버는 꺼져 있다) 그 스위치를
-    켜 두면 회귀가 거짓 통과한다(CLAUDE.md §회귀). 그래서 헤더 대신 응답의 session_id 로
-    바로 되짚어 표시한다 — 지우지 않는다(원장). 사장님 지시 "지워" 의 적용.
-    """
+    """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시."""
     sid = ((res.get("json") or {}).get("session_id")) if res.get("ok") else None
     if sid is None:
         return
@@ -187,16 +212,18 @@ def _mark_batch_session(wconn, res: dict) -> None:
     ), {"sid": sid})
 
 
-def _call_recommend(usage_label: str, floor: dict, platform: str) -> dict:
-    """엔진 호출 — 예산은 넘기지 않는다("AI 추천 예산", 숫자 상한 없음). 스펙 하한
-    4종은 body 최상위 필드로 직접 넘긴다(constraints가 아니다 — RecommendBody 신설
-    필드, api/recommend.py 참조). "예산" 라벨 자체는 여전히 필수(400 회피용 형식
-    요건)이지만 그 값이 후보를 거르지는 않는다(_budget_cap이 "이상"/무숫자를 None
-    으로 읽는 기존 동작 그대로 — 옛 "가상 상한" 편법 없이).
+def _call_recommend(floor: dict, platform: str) -> dict:
+    """엔진 호출 — 「용도」·「예산」·「플랫폼」 + 스펙 하한 4종.
+
+    ⚠ 예산 문자열은 `grid_budget_bands.budget_label` 원문이다. 그 값이
+    `api/candidates.py _budget_cap()` 이 읽는 형식이라야 `has_cap=True` 가 되고,
+    그래야 `_order_of` 가 median(풀 중앙값)에서 desc(예산을 채우는 방향)로 바뀐다.
+    여기서 문자열을 새로 만들지 않는다 — 만들면 형식이 갈라지고, 갈라지면 엔진이
+    조용히 무시한다.
     """
     constraints = [
-        {"l": "용도", "v": usage_label},
-        {"l": "예산", "v": "AI 추천 예산"},
+        {"l": "용도", "v": floor["usage_label"]},
+        {"l": "예산", "v": floor["budget_label"]},
         {"l": "플랫폼", "v": platform},
     ]
     body = {
@@ -208,7 +235,7 @@ def _call_recommend(usage_label: str, floor: dict, platform: str) -> dict:
         API_URL, data=json.dumps(body).encode("utf-8"),
         headers={"Content-Type": "application/json"}, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=180) as resp:
             return {"ok": True, "status": resp.status, "json": json.loads(resp.read())}
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
@@ -218,13 +245,7 @@ def _call_recommend(usage_label: str, floor: dict, platform: str) -> dict:
 
 
 def _spec_violations(build: dict, floor: dict) -> list:
-    """엔진이 실제로 스펙 하한을 지켰는지 사후 검증(below_tier_min 패턴, 안전장치).
-
-    엔진(`_spec_floor_filter`)이 후보 풀 단계에서 이미 걸렀으므로 정상적으로는
-    빈 목록이어야 한다 — 그런데도 남기는 이유는 "필터가 실제로 적용됐다"를
-    지어내지 않고 확인하기 위해서다. 위반이 있으면 그 사실(슬롯·기대값·실제값)을
-    그대로 문자열로 남긴다(지어내지 않는다 원칙).
-    """
+    """엔진이 실제로 스펙 하한을 지켰는지 사후 검증(below_tier_min 패턴, 안전장치)."""
     items_by_slot = {it.get("part_type"): it for it in (build.get("items") or [])}
     out = []
     for slot, field, floor_key, unit in CHECK_SPECS:
@@ -233,11 +254,6 @@ def _spec_violations(build: dict, floor: dict) -> list:
             continue   # 이 슬롯엔 하한이 없다 — 검증할 것이 없다
         item = items_by_slot.get(slot)
         if item is None:
-            # GPU가 iGPU 생략으로 빠졌을 수 있다 — 그런데 하한이 있으면(min_v is not
-            # None) 엔진이 allow_igpu_omit을 False로 처리해 생략하지 않아야 정상이다
-            # (recommend.py: `body.gpu_watt_min is None` 조건). 슬롯 자체가 없으면
-            # 하한을 만족하는지 확인할 수 없으므로 위반으로 남긴다(모르는 것을
-            # 통과로 지어내지 않는다).
             out.append(f"{slot} 슬롯 없음(하한 {min_v}{unit} 기대)")
             continue
         val = (item.get("spec") or {}).get(field)
@@ -246,12 +262,16 @@ def _spec_violations(build: dict, floor: dict) -> list:
     return out
 
 
-def judge_variant(cell_id: int, eng_key: str, data: dict, floor: dict) -> dict:
+def judge_variant(eng_key: str, data: dict, floor: dict) -> dict:
     """엔진 응답 하나에서 티어 하나(value/recommend/highend)의 grid_quotes 행 판정.
 
-    반환: {"status", "total", "verdict", "engine_note", "payload"(build|None), "kind"}
-    kind: "ok" | "fail" — 예산 상한 개념이 사라져 "over"는 이제 이론상 나오지
-    않는다(verdict는 cap=None이면 항상 "none").
+    ⚠ 예산이 다시 입력이 됐으므로(0105) `verdict == "over"` 가 **실제로 나올 수
+    있다** — 옛 판에서는 cap=None 이라 엔진이 항상 "none" 을 줬다.
+      · 가성비·추천이 over 면 그 칸은 그 예산대에서 성립하지 않는다는 사실이다
+        (STATUS_OVER 로 남긴다 — 지우지 않는다).
+      · **고성능(highend)은 예외다**: `api/recommend.py` 의 고성능 티어는 설계상
+        예산 상한을 HIGHEND_CAP_X 배로 늘려 잡는 «위쪽 선택지»라, over 가 뜨는 게
+        정상 동작이다. 이걸 실패로 세면 모든 칸이 PARTIAL 이 된다.
     """
     def fail(reason: str) -> dict:
         return {"status": STATUS_FAIL, "total": None, "verdict": None,
@@ -264,17 +284,19 @@ def judge_variant(cell_id: int, eng_key: str, data: dict, floor: dict) -> dict:
 
     total = build.get("total")
     if total is None:
-        return fail("total_missing recommend build has no total")
+        return fail(f"total_missing {eng_key} build has no total")
 
     violations = _spec_violations(build, floor)
     if violations:
         return fail("below_tier_min " + "; ".join(violations))
 
     verdict = (build.get("budget") or {}).get("verdict")
-    status = STATUS_OVER if verdict == "over" else STATUS_OK
+    over = (verdict == "over" and eng_key != "highend")
+    status = STATUS_OVER if over else STATUS_OK
     return {"status": status, "total": total, "verdict": verdict,
-            "engine_note": None, "payload": build, "kind": "ok" if status == STATUS_OK else "fail",
-            "reason": None}
+            "engine_note": None, "payload": build,
+            "kind": "ok" if not over else "over",
+            "reason": None if not over else f"budget_over total={total} band_max={floor['band_max']}"}
 
 
 def write_quote_row(wconn, cell_id: int, variant: str, batch_id: str, judged: dict) -> None:
@@ -295,15 +317,34 @@ def write_quote_row(wconn, cell_id: int, variant: str, batch_id: str, judged: di
          "payload": json.dumps(payload, ensure_ascii=False) if payload is not None else None})
 
 
-def write_budget_observed(wconn, cell_id: int, recommend_total) -> None:
-    """budget_min/budget_max — 입력이 아니라 관측값(0092 스키마 주석). 배치가 실제로
-    만든 **추천(recommend) variant** 가격을 그대로 UPDATE한다(지시서 원문). 추천이
-    실패했으면(recommend_total is None) NULL로 둔다 — 다른 variant가 성공했어도
-    지어내지 않는다(지시서가 특정한 원천은 recommend 하나뿐이다)."""
+def retire_omitted_current(wconn, cell_id: int, omit: set) -> None:
+    """발행하지 않기로 한 구성의 옛 현재본을 내린다 — 삭제가 아니라 is_current=false.
+
+    `grid_quotes` 는 원장이다(0072 이후). 행은 남기고 «현재본» 표시만 뗀다.
+    이 함수가 있어서 `grid_variant_omissions` 에 행을 추가하고 배치만 다시 돌려도
+    화면에서 그 카드가 사라진다 — 규칙을 바꿀 때마다 마이그레이션을 쓰지 않는다.
+    """
+    if not omit:
+        return
     from sqlalchemy import text
     wconn.execute(text(
-        "UPDATE grid_cells SET budget_min=:v, budget_max=:v WHERE cell_id=:cid"),
-        {"v": recommend_total, "cid": cell_id})
+        "UPDATE grid_quotes SET is_current=false"
+        " WHERE cell_id=:cid AND is_current AND tier_variant = ANY(:vs)"),
+        {"cid": cell_id, "vs": sorted(omit)})
+
+
+def write_budget_observed(wconn, cell_id: int, lo, hi) -> None:
+    """budget_min/budget_max — 관측값이되 이제 «범위»다(0105).
+
+    min=가성비 총액 · max=고성능 총액. 옛 판(min=max=추천 단일점)은 같은 칸의
+    가성비 구성(실측 921,100원)을 발행하지 않고 버렸다 — 그게 롤 하는 고객에게
+    219만원만 보여 주던 이유의 절반이다.
+    일부만 성공하면 있는 것만으로 범위를 만든다. 둘 다 없으면 NULL — 지어내지 않는다.
+    """
+    from sqlalchemy import text
+    wconn.execute(text(
+        "UPDATE grid_cells SET budget_min=:lo, budget_max=:hi WHERE cell_id=:cid"),
+        {"lo": lo, "hi": hi, "cid": cell_id})
 
 
 def _next_batch_id(conn) -> str:
@@ -319,6 +360,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry", "--dry-run", dest="dry", action="store_true",
                     help="engine calls + judgement only, no grid_quotes/grid_cells writes")
+    ap.add_argument("--only", default=None,
+                    help="comma-separated cell_id list (debug)")
     args = ap.parse_args()
 
     from dotenv import load_dotenv
@@ -326,41 +369,57 @@ def main():
     load_dotenv(os.path.join(ROOT, ".env"))
     engine = create_engine(os.environ["DATABASE_URL"])
 
+    only = None
+    if args.only:
+        only = {int(x) for x in args.only.split(",") if x.strip()}
+
     with engine.connect() as conn:
         cells = conn.execute(text(
-            "SELECT cell_id, tier_key, usage, game_grade, game_resolution, platform"
+            "SELECT cell_id, usage, budget_band_key, game_grade, game_resolution, platform"
             " FROM grid_cells WHERE NOT intended_empty ORDER BY cell_id")).mappings().all()
         spec_tiers = _load_spec_tiers(conn)
         game_tiers = _load_game_grade_tiers(conn)
+        bands = _load_bands(conn)
+        omissions = _load_omissions(conn)
         batch_id = _next_batch_id(conn)
 
-    print(f"[grid_generate] target_cells={len(cells)} batch_id={batch_id} dry={int(args.dry)}")
+    if only is not None:
+        cells = [c for c in cells if c["cell_id"] in only]
+
+    omitted_n = sum(len(v) for v in omissions.values())
+    print(f"[grid_generate] target_cells={len(cells)} bands={len(bands)}"
+          f" omission_rules={omitted_n} batch_id={batch_id} dry={int(args.dry)}", flush=True)
+    for u in sorted(omissions):
+        print(f"[grid_generate] omit usage={u!r} variants={sorted(omissions[u])}"
+              " (grid_variant_omissions -- not published, reason stored in DB)",
+              flush=True)
 
     t0 = time.time()
-    ok_n, fail_cell_n, fail_variant_n = 0, 0, 0
+    ok_n, over_n, fail_cell_n, fail_variant_n = 0, 0, 0, 0
     failures = []
     conn_fail_streak = 0
 
-    for cell in cells:
+    for idx, cell in enumerate(cells, 1):
         platform_ascii = PLATFORM_ASCII.get(cell["platform"], "unknown")
-        floor, err = cell_spec_floor(cell, spec_tiers, game_tiers)
+        # 이 칸이 발행하는 구성 — 0106. 제외된 구성은 호출도 판정도 저장도 하지 않는다.
+        omit = omissions.get(cell["usage"], set())
+        pub = {ek: v for ek, v in VARIANT_MAP.items() if v not in omit}
+        floor, err = cell_spec_floor(cell, spec_tiers, game_tiers, bands)
         if err:
-            # 데이터 정합 자체가 깨진 경우 — 엔진 호출 없이 3 variant 모두 실패로
-            # 남긴다(견적 불가 판정, 어느 슬롯이 왜 비었는지 사유를 남긴다 원칙).
             fail_cell_n += 1
             failures.append((cell["cell_id"], f"spec_floor_lookup_failed: {err}"))
-            print(f"[grid_generate] cell_id={cell['cell_id']} platform={platform_ascii}"
-                  f" -> FAIL spec_floor_lookup_failed: {err}")
+            print(f"[grid_generate] ({idx}/{len(cells)}) cell_id={cell['cell_id']}"
+                  f" platform={platform_ascii} -> FAIL spec_floor_lookup_failed: {err}", flush=True)
             if not args.dry:
                 with engine.begin() as wconn:
-                    for variant in VARIANT_MAP.values():
+                    for variant in pub.values():
                         write_quote_row(wconn, cell["cell_id"], variant, batch_id, {
                             "status": STATUS_FAIL, "total": None, "verdict": None,
                             "engine_note": err[:NOTE_MAX], "payload": None})
-                    write_budget_observed(wconn, cell["cell_id"], None)
+                    write_budget_observed(wconn, cell["cell_id"], None, None)
             continue
 
-        res = _call_recommend(floor["usage_label"], floor, cell["platform"])
+        res = _call_recommend(floor, cell["platform"])
 
         if not res["ok"]:
             fail_cell_n += 1
@@ -368,56 +427,78 @@ def main():
                       if res["status"] is None else
                       f"http_error status={res['status']} detail={res.get('detail', '')[:150]}")
             failures.append((cell["cell_id"], reason))
-            print(f"[grid_generate] cell_id={cell['cell_id']} platform={platform_ascii}"
-                  f" -> FAIL {reason}")
+            print(f"[grid_generate] ({idx}/{len(cells)}) cell_id={cell['cell_id']}"
+                  f" platform={platform_ascii} -> FAIL {reason}", flush=True)
             if not args.dry:
                 with engine.begin() as wconn:
-                    for variant in VARIANT_MAP.values():
+                    for variant in pub.values():
                         write_quote_row(wconn, cell["cell_id"], variant, batch_id, {
                             "status": STATUS_FAIL, "total": None, "verdict": None,
                             "engine_note": reason[:NOTE_MAX], "payload": None})
-                    write_budget_observed(wconn, cell["cell_id"], None)
+                    write_budget_observed(wconn, cell["cell_id"], None, None)
             conn_fail_streak = conn_fail_streak + 1 if res["status"] is None else 0
             if conn_fail_streak >= 3:
                 print("[grid_generate] FATAL: 3 consecutive connection errors -- "
                       "aborting, is the API server up at 127.0.0.1:8000? "
-                      "(remaining cells NOT recorded)")
+                      "(remaining cells NOT recorded)", flush=True)
                 break
             continue
 
         conn_fail_streak = 0
         data = res["json"] or {}
         judged_by_variant = {}
-        cell_ok = True
-        for eng_key, variant in VARIANT_MAP.items():
-            judged = judge_variant(cell["cell_id"], eng_key, data, floor)
+        cell_state = "OK"
+        for eng_key, variant in pub.items():
+            judged = judge_variant(eng_key, data, floor)
             judged_by_variant[variant] = judged
             if judged["kind"] == "ok":
                 ok_n += 1
+            elif judged["kind"] == "over":
+                over_n += 1
+                cell_state = "OVER"
+                failures.append((cell["cell_id"], f"{variant}: {judged['reason']}"))
             else:
                 fail_variant_n += 1
-                cell_ok = False
+                cell_state = "PARTIAL"
                 failures.append((cell["cell_id"], f"{variant}: {judged['reason']}"))
 
-        recommend_total = judged_by_variant[VARIANT_MAP["recommend"]]["total"]
+        # 관측 범위 — 0106 이후 «발행한 구성»만 본다. 고성능을 발행하지 않는 용도에서
+        # budget_max 는 남은 구성의 최대값(추천)이다. 발행하지 않은 카드의 가격을
+        # 범위 상한으로 말하지 않는다.
+        lo = (judged_by_variant.get(BUDGET_MIN_VARIANT) or {}).get("total")
+        hi = (judged_by_variant.get(BUDGET_MAX_VARIANT) or {}).get("total")
+        if lo is None or hi is None:
+            # 일부만 성공(또는 일부를 발행하지 않음) — 있는 것만으로 범위를 만든다
+            got = sorted(j["total"] for j in judged_by_variant.values() if j["total"] is not None)
+            lo = got[0] if got else None
+            hi = got[-1] if got else None
+
         summary = " ".join(
             f"{v}={j['total'] if j['total'] is not None else 'FAIL'}"
             for v, j in judged_by_variant.items())
-        print(f"[grid_generate] cell_id={cell['cell_id']} platform={platform_ascii}"
-              f" usage={floor['usage_label']} -> {'OK' if cell_ok else 'PARTIAL'} {summary}")
+        if omit:
+            summary += " omitted=" + ",".join(sorted(omit))
+        print(f"[grid_generate] ({idx}/{len(cells)}) cell_id={cell['cell_id']}"
+              f" platform={platform_ascii} usage={floor['usage_label']}"
+              f" band={floor['band_key']} -> {cell_state} {summary}", flush=True)
 
         if not args.dry:
             with engine.begin() as wconn:
                 for variant, judged in judged_by_variant.items():
                     write_quote_row(wconn, cell["cell_id"], variant, batch_id, judged)
-                write_budget_observed(wconn, cell["cell_id"], recommend_total)
+                # 제외된 구성의 옛 현재본을 내린다(삭제가 아니다 — 원장은 남는다).
+                # 이게 있어야 grid_variant_omissions 에 행을 새로 넣고 배치만 돌려도
+                # 화면에서 그 카드가 사라진다(마이그레이션을 또 쓰지 않아도 된다).
+                retire_omitted_current(wconn, cell["cell_id"], omit)
+                write_budget_observed(wconn, cell["cell_id"], lo, hi)
                 _mark_batch_session(wconn, res)
 
     elapsed = time.time() - t0
-    print(f"[grid_generate] done in {elapsed:.1f}s ok_variants={ok_n} "
-          f"fail_cells={fail_cell_n} fail_variants={fail_variant_n} batch_id={batch_id}")
+    print(f"[grid_generate] done in {elapsed:.1f}s ok_variants={ok_n} over_variants={over_n}"
+          f" fail_cells={fail_cell_n} fail_variants={fail_variant_n} batch_id={batch_id}",
+          flush=True)
     if failures:
-        print("[grid_generate] failures (also recorded in grid_quotes status='fail'"
+        print("[grid_generate] non-ok variants (also recorded in grid_quotes"
               " unless --dry):")
         for cid, reason in failures:
             print(f"  cell_id={cid} {reason}")
