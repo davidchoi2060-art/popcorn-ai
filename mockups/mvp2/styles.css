@@ -67,6 +67,13 @@
 .tier-price small{font-size:13px;font-weight:500;margin-left:2px;color:var(--muted)}
 .tier-price-note{font-size:11px;color:var(--muted);white-space:nowrap}
 .omitted-spec{color:var(--muted);font-style:italic}
+/* 0106 — «두지 않기로 한» 구성. 비활성(회색·클릭 불가)과 모양을 다르게 둔다:
+   비활성은 「아직 없다」로 읽히고, 이쪽은 「의도적으로 안 둔다」이며 누를 수 있어야 한다. */
+.tier-tab.omitted{color:var(--muted);opacity:1}
+.tier-tab.omitted .tier-tab-mark{margin-left:3px;font-size:10px;color:var(--blue-strong);vertical-align:super}
+.tier-tab.omitted.active{color:var(--ink);border-bottom-color:var(--line)}
+.omitted-reason{margin:13px 0 4px;padding:13px 14px;background:var(--soft);border-left:3px solid var(--blue-strong);border-radius:0 10px 10px 0;font-size:12px;line-height:1.85;color:var(--muted)}
+.omitted-reason b{display:block;margin-bottom:6px;font-size:13px;color:var(--ink)}
 .reason-list{margin:8px 0 0;padding-left:18px;font-size:12px;color:var(--muted);line-height:1.7}
 .tradeoff summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--ink);margin:0}
 .tradeoff summary::-webkit-details-marker{display:none}

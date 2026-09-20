@@ -46,6 +46,8 @@ const USAGE_AI='AI 작업';    // api/grid_workstations.USAGE_AI 와 같은 값
 const POSTER='assets/pc-front.png';   // 대표 예시 이미지(④ 소관) — 카드·견적 공통, 캡션으로 예시임을 밝힌다
 const IMG_NOTE='이미지는 예시입니다. 부품·가격·재고는 실제 값입니다.';
 const NOT_READY='부품 조정은 준비 중입니다.';
+// 0106 — 서버가 «제외»라고는 했는데 사유 문자열이 비어 온 경우에만 쓴다. 사유를 지어내지 않는다.
+const OMITTED_NO_REASON='이 용도는 이 구성을 두지 않습니다. 사유는 서버에서 받지 못했습니다.';
 
 // ── A-135: 카드 안 3종 탭 ────────────────────────────────────────────────────
 const VARIANT_DEFS=[{key:'value',label:'가성비'},{key:'reco',label:'추천'},{key:'perf',label:'고성능'}];
@@ -196,14 +198,46 @@ function variantsOf(card){
  if(q)return q;
  return {value:null,reco:card,perf:null};
 }
-function variantTabsMarkup(scope,index,active,available){
+// ── 0106: «만들지 않기로 한 구성»과 «아직 없는 구성»은 다른 말이다 ───────────
+// 서버가 card.omitted_variants[{variant,key,reason}] 로 «두지 않기로 한» 구성과 그 사유를
+// 함께 준다(api/grid_public._load_omissions → grid_variant_omissions.reason_public 원문).
+// 화면은 그 문자열을 **그대로** 쓴다 — 요약·재작성·수치 추가를 하지 않는다(§화면 정직성).
+// 사유가 없는 용도(영상편집 등)는 [] 로 오므로 아래 조회가 전부 null 을 낸다.
+function omissionsOf(card){
+ const list=card&&card.omitted_variants;
+ return (Array.isArray(list)?list:[]).filter(o=>o&&typeof o==='object'&&o.key);
+}
+function omissionFor(card,key){
+ if(!key)return null;
+ return omissionsOf(card).find(o=>o.key===key)||null;
+}
+// 사유 문자열이 비어 오면 «우리가 대신 지어내지» 않는다 — 제외 사실만 말하고 사유는 없다고 밝힌다.
+function omissionReason(o){
+ const r=o&&typeof o.reason==='string'?o.reason.trim():'';
+ return r||OMITTED_NO_REASON;
+}
+// ⚠ 제외된 구성의 탭을 **지우지도, 비활성으로 막지도 않는다.**
+//   · 탭을 없애면 고객은 「왜 여긴 두 개지」를 스스로 지어내 답한다 — 사유를 전할 자리가 사라진다.
+//   · disabled 로 두면 누를 수 없어 사유를 열 수 없다(브라우저가 클릭 이벤트를 안 준다).
+//   그래서 «누를 수 있는» 탭으로 두고, 누르면 서버가 준 사유를 본문에 편다.
+//   「아직 없는 것」(서버가 제외라고 말한 적 없는 것)만 여전히 disabled + 기존 문구다.
+function variantTabsMarkup(scope,index,active,available,card){
  return `<div class="tier-tabs" role="tablist">${VARIANT_DEFS.map(v=>{
+  const om=omissionFor(card,v.key);
+  if(om){
+   const reason=omissionReason(om);
+   return `<button type="button" class="tier-tab omitted${v.key===active?' active':''}" role="tab" aria-selected="${v.key===active}" data-variant-scope="${scope}" data-variant-index="${index}" data-variant-key="${v.key}" data-variant-omitted="1" title="${esc(reason)}">${esc(v.label)}<span class="tier-tab-mark" aria-hidden="true">✳</span><span class="sr-only"> — 이 용도는 이 구성을 두지 않습니다. 눌러서 사유 보기</span></button>`;
+  }
   const has=available[v.key]!=null;
   return `<button type="button" class="tier-tab${v.key===active?' active':''}" role="tab" aria-selected="${v.key===active}" data-variant-scope="${scope}" data-variant-index="${index}" data-variant-key="${v.key}" ${has?'':'disabled title="이 구성 정보가 아직 없습니다"'}>${esc(v.label)}</button>`;
  }).join('')}</div>`;
 }
-function detailMarkup(v){
- if(!v)return '<p class="condition-note">이 구성 정보가 아직 없습니다.</p>';
+// 제외 사유 본문 — 서버 문자열 하나만 싣는다.
+function omittedReasonMarkup(om){
+ return `<p class="omitted-reason" data-omitted-reason="1"><b>이 구성은 두지 않습니다</b>${esc(omissionReason(om))}</p>`;
+}
+function detailMarkup(v,om){
+ if(!v)return om?omittedReasonMarkup(om):'<p class="condition-note">이 구성 정보가 아직 없습니다.</p>';
  const reasons=Array.isArray(v.reasons)?v.reasons:[];
  const parts=normalizeParts(v.items||v.parts);
  const omitted=normalizeOmitted(v.omitted);
@@ -213,7 +247,10 @@ function cardMarkup(card,i,centerTier,activeVariant){
  const activeKey=activeVariant||DEFAULT_VARIANT;
  const vs=variantsOf(card);
  const hasThree=!!cardQuotes(card);
- const v=vs[activeKey]||vs.reco||vs.value||vs.perf||null;
+ // 제외된 구성을 고른 상태면 **다른 구성으로 대신 채우지 않는다** — 그러면 고객은
+ // 「고성능을 눌렀는데 추천이 나온다」고 읽는다. v 를 비워 두고 사유만 편다.
+ const om=omissionFor(card,activeKey);
+ const v=om?null:(vs[activeKey]||vs.reco||vs.value||vs.perf||null);
  // 서버는 center_tier(이름)·center_tier_key(키) 둘을 준다 — 어느 쪽으로 와도 같은 카드가 중심이다.
  const featured=!!centerTier&&(tierKeyOf(card)===centerTier||tierDisplayName(card)===centerTier);
  const over=variantOver(v,card);
@@ -225,9 +262,11 @@ function cardMarkup(card,i,centerTier,activeVariant){
  const tierName=tierDisplayName(card);
  const priceBlock=v&&Number.isFinite(v.total)
   ?`<div class="tier-price-row"><div class="tier-price">${money(v.total)}<small>원</small></div>${card.platform?`<span class="tier-price-note">배치 관측가 · ${esc(card.platform)}</span>`:''}</div>`
-  :'<p class="condition-note">이 구성은 아직 배치되지 않았습니다.</p>';
+  :(om?'':'<p class="condition-note">이 구성은 아직 배치되지 않았습니다.</p>');
  const range=v?tierRangeText(v.tier_range||card.tier_range):'';
- return `<article class="rec-card${featured?' featured':''}" data-card-index="${i}"><button class="rec-media" data-build-video="${i}" aria-label="${esc(tierName)} 대표 예시 이미지 보기"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><span class="rec-media-badge">대표 예시 이미지</span><span class="rec-media-play" aria-hidden="true">▶</span><span class="rec-media-caption">대표 예시 이미지 ↗</span></button><div class="rec-top"><span class="rec-num">구성 0${i+1}</span><span>${badges}</span></div><span class="tier-kicker">${esc(tierKeyOf(card)||'')}</span><h3 class="tier-name">${esc(tierName)}</h3>${variantTabsMarkup('card',i,activeKey,vs)}${!hasThree?'<p class="condition-note">이 카드는 아직 단일 구성만 제공합니다 — 3종 비교는 준비 중입니다.</p>':''}${priceBlock}${range?`<p class="condition-note">티어 예산대 ${range}</p>`:''}<dl class="rec-specs">${specRows(parts,omitted)}</dl><p class="rec-desc">${esc(reasons[0]||'')}</p>${detailMarkup(v)}<div class="card-actions"><button class="primary" data-select="${i}" data-select-variant="${activeKey}" ${v?'':'disabled'}>이 구성 자세히 보기 ↗</button></div></article>`;
+ // 제외된 구성일 때는 값이 없는 스펙표(— 4줄)를 그리지 않는다 — 사유 한 덩이만 남긴다.
+ const specBlock=om?'':`<dl class="rec-specs">${specRows(parts,omitted)}</dl><p class="rec-desc">${esc(reasons[0]||'')}</p>`;
+ return `<article class="rec-card${featured?' featured':''}${om?' has-omitted':''}" data-card-index="${i}"><button class="rec-media" data-build-video="${i}" aria-label="${esc(tierName)} 대표 예시 이미지 보기"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><span class="rec-media-badge">대표 예시 이미지</span><span class="rec-media-play" aria-hidden="true">▶</span><span class="rec-media-caption">대표 예시 이미지 ↗</span></button><div class="rec-top"><span class="rec-num">구성 0${i+1}</span><span>${badges}</span></div><span class="tier-kicker">${esc(tierKeyOf(card)||'')}</span><h3 class="tier-name">${esc(tierName)}</h3>${variantTabsMarkup('card',i,activeKey,vs,card)}${!hasThree?'<p class="condition-note">이 카드는 아직 단일 구성만 제공합니다 — 3종 비교는 준비 중입니다.</p>':''}${priceBlock}${range?`<p class="condition-note">티어 예산대 ${range}</p>`:''}${specBlock}${detailMarkup(v,om)}<div class="card-actions"><button class="primary" data-select="${i}" data-select-variant="${activeKey}" ${v?'':'disabled'}${om?' title="두지 않기로 한 구성이라 자세히 볼 내용이 없습니다"':''}>이 구성 자세히 보기 ↗</button></div></article>`;
 }
 // 원안 §매트릭스(팝콘1~5·X 6칸)는 고객단 응답이 tiers_considered(최대 3개)만 주므로 그만큼만 그린다 —
 // 없는 티어를 채워 6칸으로 지어내지 않는다(§화면 정직성). 전체 티어 목록이 필요하면 grid_public.py에
@@ -312,14 +351,15 @@ function quoteMarkup(card,activeVariant){
  const activeKey=activeVariant||DEFAULT_VARIANT;
  const vs=variantsOf(card);
  const hasThree=!!cardQuotes(card);
- const v=vs[activeKey]||vs.reco||vs.value||vs.perf||null;
+ const om=omissionFor(card,activeKey);
+ const v=om?null:(vs[activeKey]||vs.reco||vs.value||vs.perf||null);
  const parts=v?normalizeParts(v.items||v.parts):[];
  const omitted=v?normalizeOmitted(v.omitted):[];
  const reasons=v&&Array.isArray(v.reasons)?v.reasons:[];
  const over=!card.fromSaved&&variantOver(v,card);
  const verdict=over?'<span class="under over">예산 초과</span>':'';
  const tierName=tierDisplayName(card);
- return `<div class="quote-top"><span class="eyebrow">내 구성${tierKeyOf(card)?' · '+esc(tierKeyOf(card)):''}</span></div><div class="quote-title"><div><h2>${esc(tierName)}</h2><p>${esc([card.usage,card.platform].filter(Boolean).join(' · '))}</p></div><div class="quote-total">${v&&Number.isFinite(v.total)?money(v.total):'—'}<small>원</small>${verdict}</div></div>${variantTabsMarkup('quote',0,activeKey,vs)}${!hasThree?'<p class="condition-note">이 견적은 아직 단일 구성만 제공합니다.</p>':''}<div class="quote-media"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><div class="media-caption">대표 예시 이미지<small>실제 부품은 아래 목록 기준</small></div><button data-action="video" aria-label="대표 예시 이미지 크게 보기">▶</button></div><div class="quote-reason"><b>✦ 이렇게 골랐어요</b>${reasons.length?'<ul>'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<br>서버가 준 이유가 없습니다.'}</div><div class="parts-heading"><b>구성 부품 <span>${parts.length}종</span></b><span>서버 가격 · 원</span></div><table class="parts" aria-label="현재 견적 부품 목록"><tbody>${parts.map(p=>`<tr><td class="category">${esc(p.cat)}</td><td class="part-name">${partLine(p)}</td><td class="part-price">${money(p.price)}</td></tr>`).join('')}${omittedRows(omitted)}</tbody></table><p class="quote-disclaimer">재고는 조회 시점 기준입니다.${v&&v.generated_at?' 견적 생성 '+esc(String(v.generated_at).slice(0,10))+'.':''} ${NOT_READY}</p><div class="quote-actions"><button class="secondary" data-action="save">견적 저장</button><button class="primary" data-action="cart" disabled title="장바구니는 준비 중입니다">장바구니 담기(준비 중)</button></div>`;
+ return `<div class="quote-top"><span class="eyebrow">내 구성${tierKeyOf(card)?' · '+esc(tierKeyOf(card)):''}</span></div><div class="quote-title"><div><h2>${esc(tierName)}</h2><p>${esc([card.usage,card.platform].filter(Boolean).join(' · '))}</p></div><div class="quote-total">${v&&Number.isFinite(v.total)?money(v.total):'—'}<small>원</small>${verdict}</div></div>${variantTabsMarkup('quote',0,activeKey,vs,card)}${om?omittedReasonMarkup(om):''}${!hasThree?'<p class="condition-note">이 견적은 아직 단일 구성만 제공합니다.</p>':''}<div class="quote-media"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><div class="media-caption">대표 예시 이미지<small>실제 부품은 아래 목록 기준</small></div><button data-action="video" aria-label="대표 예시 이미지 크게 보기">▶</button></div><div class="quote-reason"><b>✦ 이렇게 골랐어요</b>${reasons.length?'<ul>'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<br>서버가 준 이유가 없습니다.'}</div><div class="parts-heading"><b>구성 부품 <span>${parts.length}종</span></b><span>서버 가격 · 원</span></div><table class="parts" aria-label="현재 견적 부품 목록"><tbody>${parts.map(p=>`<tr><td class="category">${esc(p.cat)}</td><td class="part-name">${partLine(p)}</td><td class="part-price">${money(p.price)}</td></tr>`).join('')}${omittedRows(omitted)}</tbody></table><p class="quote-disclaimer">재고는 조회 시점 기준입니다.${v&&v.generated_at?' 견적 생성 '+esc(String(v.generated_at).slice(0,10))+'.':''} ${NOT_READY}</p><div class="quote-actions"><button class="secondary" data-action="save">견적 저장</button><button class="primary" data-action="cart" disabled title="장바구니는 준비 중입니다">장바구니 담기(준비 중)</button></div>`;
 }
 // 오류 문구 — 502 는 AI 연결 불가(폴백 UI 없음). 서버 detail 은 console 로만.
 function errorMessage(status,data){
@@ -330,7 +370,7 @@ function errorMessage(status,data){
  if(d&&typeof d==='object'&&d.message)return String(d.message);
  return (status>=500?'서버 오류':'요청 오류')+`(${status})`;
 }
-const render={money,esc,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY};
+const render={money,esc,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON};
 if(typeof module!=='undefined'&&module.exports){module.exports=render;return;}   // node(자기검증) — 여기서 끝
 if(!root.document||root.PopcornApp)return;
 
@@ -478,7 +518,7 @@ function requestChange(text){
  addMessage('user',text);addMessage('assistant',NOT_READY+' 예산·용도를 바꾸려면 「＋ 새 대화」에서 다시 말씀해 주세요.');
 }
 function selectTab(tab){$('#workspace').classList.toggle('mobile-quote',tab==='quote');document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));}
-function save(){if(!state.selected)return;const v=variantsOf(state.selected)[state.selectedVariant]||variantsOf(state.selected).reco;if(!v)return;const flat={name:tierDisplayName(state.selected),total:v.total,parts:normalizeParts(v.items||v.parts),talk:state.talk?copy(state.talk):null,savedAt:new Date().toISOString()};state.saved.unshift(flat);state.saved=state.saved.slice(0,10);try{localStorage.setItem(SAVE_KEY,JSON.stringify(state.saved));toast('이 브라우저에 견적을 저장했어요.');}catch{toast('브라우저 저장이 제한되어 이번 화면에서만 보관해요.');}$('#savedCount').textContent=state.saved.length;}
+function save(){if(!state.selected)return;const om=omissionFor(state.selected,state.selectedVariant);if(om){toast('두지 않기로 한 구성이라 저장할 내용이 없어요.');return;}const v=variantsOf(state.selected)[state.selectedVariant]||variantsOf(state.selected).reco;if(!v)return;const flat={name:tierDisplayName(state.selected),total:v.total,parts:normalizeParts(v.items||v.parts),talk:state.talk?copy(state.talk):null,savedAt:new Date().toISOString()};state.saved.unshift(flat);state.saved=state.saved.slice(0,10);try{localStorage.setItem(SAVE_KEY,JSON.stringify(state.saved));toast('이 브라우저에 견적을 저장했어요.');}catch{toast('브라우저 저장이 제한되어 이번 화면에서만 보관해요.');}$('#savedCount').textContent=state.saved.length;}
 function showSaved(){$('#savedList').innerHTML=state.saved.length?state.saved.map((q,i)=>`<div class="saved-item"><div><b>${esc(q.name)}</b><small>${money(q.total)}원 · ${new Date(q.savedAt).toLocaleDateString('ko-KR')}</small></div><button class="primary" data-load="${i}">불러오기</button></div>`).join(''):'<div class="empty-saved">아직 저장한 견적이 없어요.<br>구성을 선택한 뒤 “견적 저장”을 눌러주세요.</div>';$('#savedDialog').showModal();}
 // 조건 다이얼로그 — 현재 값은 state.talk(서버 TalkState)에서 읽는다. 제출은 문장으로 파서에 보낸다(init 참고) —
 // 화면이 state 를 직접 고쳐 recommend 를 부르면 서버 검증(§5)을 건너뛰게 되므로 하지 않는다.
