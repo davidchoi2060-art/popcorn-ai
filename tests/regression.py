@@ -6695,6 +6695,7 @@ def main():
                test_admin_grid_screen_draws_cells,
                test_game_cell_map_freshness,
                test_talk_answer_screen,
+               test_game_copy_review_gate,
                test_market_bands_and_handling):
         try:
             fn()
@@ -8843,6 +8844,218 @@ def test_game_cell_map_freshness():
     drift("game_cell_map 행수", db_one("SELECT count(*) FROM game_cell_map"))
     drift("매핑된 게임 수", db_one("SELECT count(DISTINCT game_id) FROM game_cell_map"))
 
+
+
+def test_game_copy_review_gate():
+    """[62] 게임 견적 근거 검수 게이트 — 검수 안 된 문구는 고객에게 나가지 않는다
+    (ADM-TLK-020 · 2026-09-21 신설).
+
+    ■ 왜 이 검사가 필요한가 — 이것이 사장님 확정의 «핵심»이다
+      `game_customer_copy` 86행은 «게임 소개»가 아니라 **«이 게임에 왜 이런 PC 가
+      필요한가» 견적 근거**다. 사장님 확정은 「검수 화면을 짓고 86종을 보신 뒤
+      견적 화면에 쓴다」였고, 그 확정이 코드에서 성립하는 자리는 단 하나 —
+      `api/talk_answer.load_game_facts` 의 `if r["reviewed_by"]:` 한 줄이다.
+
+      그 한 줄이 지워지거나 조건이 뒤집히면 **86종 전부가 검수 없이 즉시 고객에게
+      나간다.** 그리고 아무것도 깨지지 않는다: 답변은 더 풍부해 보이고, 테스트는
+      초록이고, 콘솔은 조용하다. **가장 위험한 실패 방식**이라 회귀로 못박는다.
+
+    ■ 검사하는 것
+      ① 게이트가 코드에 실재한다(talk_answer 가 reviewed_by 를 실제로 본다)
+      ② ★음성 검사 — 게이트를 «끈» 사본을 만들면 실제로 FAIL 하는가
+         (이게 없으면 검출기가 죽어도 초록이 계속 뜬다 — [55] 와 같은 관행)
+      ③ DB 제약이 «반려에 검수자 이름» 을 막는다(0112) — 애플리케이션 밖 방어선
+      ④ 승인/반려/되돌리기가 원장(admin_operator_activity_logs)을 남긴다
+      ⑤ 목록이 전 행을 반환하지 않는다(size 상한 < 전체 행수)
+      ⑥ 필터 선택지·건수를 서버가 준다 · 화면이 수치를 박지 않는다
+
+    ⚠ 이 검사가 «문구의 내용»을 보지는 않는다 — 그건 [55] 의 몫이다(수치 실재).
+      여기는 「검수되지 않은 것이 새지 않는가」만 본다.
+    """
+    print(chr(10) + "[62] 게임 견적 근거 검수 게이트 (ADM-TLK-020 · 2026-09-21 신설)")
+
+    ta_path = pathlib.Path(ROOT, "api", "talk_answer.py")
+    ta_src = ta_path.read_text(encoding="utf-8")
+
+    # ── ① 게이트가 실재한다 ────────────────────────────────────────────────
+    check("[62] talk_answer 가 game_customer_copy 를 읽는다",
+          "game_customer_copy" in ta_src, "있음", "없음")
+    check("[62] talk_answer 가 reviewed_by 로 고객 노출을 가른다",
+          "reviewed_by" in ta_src, "있음", "없음")
+    # 조회에 copy 컬럼을 싣되, 그 값을 «reviewed_by 확인 뒤에» 넣는 분기가 있어야 한다.
+    gate_re = re.compile(r"if\s+r\[[\"']reviewed_by[\"']\]\s*:")
+    check("[62] 검수 통과 행만 copy 를 싣는 분기가 있다(`if r['reviewed_by']:`)",
+          bool(gate_re.search(ta_src)), "분기 있음",
+          "없다 — 검수 전 문구가 고객에게 샐 수 있다")
+
+    # ── ② ★음성 검사 — 게이트를 끄면 실제로 FAIL 하는가 ─────────────────────
+    #    파일을 고치지 않는다. 메모리 안의 사본에서 분기만 지우고 같은 검출기를 돌린다.
+    poisoned = gate_re.sub("if True:", ta_src)
+    check("[62] ★자기시험: 게이트를 끈 사본에서는 위 검사가 FAIL 한다",
+          not gate_re.search(poisoned), "검출기가 게이트 소멸을 잡는다",
+          "게이트를 지웠는데도 통과했다 — 검출기가 죽었다")
+    #    반대 방향 — 원본은 통과해야 한다(오탐이면 아무도 안 믿는 검사가 된다).
+    check("[62] ★자기시험: 원본은 위반으로 세지 않는다(오탐 없음)",
+          bool(gate_re.search(ta_src)), "통과", "오탐")
+
+    # ── ③ DB 제약 — 반려 행에 검수자 이름이 들어가지 못한다 ──────────────────
+    cons = db_all(
+        "SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint"
+        " WHERE conrelid = 'game_customer_copy'::regclass AND contype = 'c'")
+    names = {c["conname"] for c in cons}
+    check("[62] 0112 체크 제약이 있다(승인 ⇔ reviewed_by 가 찬다)",
+          "ck_game_customer_copy_reviewed_pair" in names,
+          "ck_game_customer_copy_reviewed_pair", sorted(names))
+    check("[62] 상태 어휘를 DB 가 제한한다",
+          "ck_game_customer_copy_review_state" in names,
+          "ck_game_customer_copy_review_state", sorted(names))
+    # 실제로 거부하는가 — 롤백되는 트랜잭션 안에서 써 본다(DB 미변경).
+    if _engine is not None:
+        rejected_row = db_all("SELECT game_id FROM game_customer_copy"
+                              " WHERE review_state <> '승인' LIMIT 1")
+        if rejected_row:
+            gid = rejected_row[0]["game_id"]
+            blocked = False
+            try:
+                with _engine.connect() as c:
+                    tx = c.begin()
+                    try:
+                        c.execute(text("UPDATE game_customer_copy SET reviewed_by='회귀시험'"
+                                       " WHERE game_id = :g"), {"g": gid})
+                    finally:
+                        tx.rollback()
+            except Exception:                                   # noqa: BLE001
+                blocked = True
+            check("[62] ★음성: 미승인 행에 reviewed_by 를 넣으면 DB 가 거부한다",
+                  blocked, "거부됨",
+                  "통과했다 — 검수 게이트를 우회해 문구가 고객에게 나갈 수 있다")
+
+    # ── ④ 원장 — 쓰기가 기록을 남긴다 ───────────────────────────────────────
+    mod = pathlib.Path(ROOT, "api", "admin_game_copy.py")
+    check("[62] 검수 API 모듈이 있다", mod.exists(), "있음", str(mod))
+    if not mod.exists():
+        return
+    api_src = mod.read_text(encoding="utf-8")
+    check("[62] 승인·반려·되돌리기가 기존 원장에 남긴다(새 이력표를 만들지 않는다)",
+          "admin_operator_activity_logs" in api_src and "game_copy" in api_src,
+          "있음", "없음")
+    for act in ("game_copy_approve", "game_copy_reject", "game_copy_unapprove"):
+        check(f"[62] `{act}` 를 기록하는 코드가 있다", act in api_src, "있음", "없음")
+    # 실제 원장에 남은 것도 본다 — 코드만 있고 안 불리면 의미가 없다.
+    led = db_all("SELECT action, count(*) AS n FROM admin_operator_activity_logs"
+                 " WHERE target_kind = 'game_copy' GROUP BY 1")
+    if led:
+        acts = {r["action"] for r in led}
+        check("[62] 원장에 승인 기록이 실제로 있다",
+              "game_copy_approve" in acts, "있음", sorted(acts))
+        print("  [INFO] game_copy 원장: "
+              + ", ".join(f"{r['action']} {r['n']}건" for r in led))
+    else:
+        print("  [INFO] game_copy 원장 기록 없음(아직 아무도 검수하지 않았다)")
+
+    # ── ⑤ 목록이 전 행을 반환하지 않는다 ────────────────────────────────────
+    total_rows = db_one("SELECT count(*) FROM game_customer_copy") or 0
+    try:
+        from api.admin_game_copy import MAX_PAGE_SIZE as _CAP
+    except Exception:                                            # noqa: BLE001
+        _CAP = None
+    check("[62] 한 페이지 상한이 전체 행수보다 작다(전 행 반환이 구조적으로 불가능)",
+          _CAP is not None and total_rows > 0 and _CAP < total_rows,
+          f"상한 < {total_rows}", _CAP)
+    # 서버에 실제로 물어본다 — 상한을 넘겨 요청해도 상한까지만 온다.
+    st, body = 0, None
+    try:
+        body = get(f"/api/admin/game-copy?size={total_rows + 100}")
+        st = 200
+    except Exception as e:                                       # noqa: BLE001
+        check("[62] GET /api/admin/game-copy 조회", False, "200", repr(e))
+    if st == 200 and body:
+        check("[62] size 를 크게 보내도 상한까지만 반환한다",
+              len(body["items"]) <= (_CAP or 50), f"<= {_CAP}", len(body["items"]))
+        check("[62] 전체 건수를 서버가 말한다(화면이 세지 않는다)",
+              body.get("grand_total") == total_rows, total_rows, body.get("grand_total"))
+        # ⑥ 선택지는 서버가 준다
+        f = body.get("filters") or {}
+        check("[62] 검수 상태 선택지를 서버가 준다",
+              len(f.get("states") or []) == 3, 3, f.get("states"))
+        check("[62] 확신도 선택지를 서버가 준다",
+              len(f.get("confidences") or []) == 3, 3, f.get("confidences"))
+        # 고객 노출 건수는 팝콘톡의 조건 그대로 세야 한다(두 벌로 세지 않는다).
+        live_db = db_one("SELECT count(*) FROM game_customer_copy"
+                         " WHERE reviewed_by IS NOT NULL") or 0
+        check("[62] 「고객 노출 중」건수가 팝콘톡 조건(reviewed_by IS NOT NULL)과 같다",
+              body.get("live_count") == live_db, live_db, body.get("live_count"))
+
+        # ★ 상세가 실제로 열린다 — 이 검사가 없어서 500 을 한 번 놓쳤다(2026-09-21).
+        #   `source` 는 games 의 «임의 컬럼»이라 값 타입이 제각각이고(문자열·정수·
+        #   불리언·날짜), 한 곳에서 타입을 잘못 가정하면 상세만 통째로 죽는다.
+        #   목록은 멀쩡하므로 목록만 보면 알 수 없다 — 그래서 한 건을 실제로 연다.
+        first = (body.get("items") or [{}])[0].get("game_id")
+        if first:
+            try:
+                det = get(f"/api/admin/game-copy/{first}")
+                check("[62] 상세가 열린다(원천 값 타입이 섞여도 500 이 나지 않는다)",
+                      bool(det.get("paragraphs")), "문단 있음", list(det)[:6])
+                check("[62] 상세가 그 게임의 games 원본 값을 함께 준다(대조 재료)",
+                      len(det.get("source") or []) > 0, ">0",
+                      len(det.get("source") or []))
+                # 값이 없는 칸은 **문자열을 지어내지 않고** null 이어야 한다.
+                made_up = [s["field"] for s in (det.get("source") or [])
+                           if s.get("value") in ("None", "null", "-")]
+                check("[62] 값이 없는 원천 칸에 문자열을 지어내지 않는다",
+                      not made_up, "0건", made_up[:5])
+            except Exception as e:                               # noqa: BLE001
+                check("[62] 상세가 열린다(원천 값 타입이 섞여도 500 이 나지 않는다)",
+                      False, "200", repr(e))
+
+    # ── ⑥ 화면 — 수치를 박지 않고, 셸을 상속하고, 실패를 삼키지 않는다 ───────
+    tpl = pathlib.Path(ROOT, "templates", "admin", "game_copy_review.html.j2")
+    check("[62] 검수 화면 템플릿이 있다", tpl.exists(), "있음", str(tpl))
+    if tpl.exists():
+        tsrc = tpl.read_text(encoding="utf-8")
+        check("[62] 공용 셸을 상속한다(배치·색을 새로 그리지 않는다)",
+              'extends "admin/_admin2_shell.html.j2"' in tsrc, "있음", "없음")
+        style = re.search(r"<style>(.*?)</style>", tsrc, re.S)
+        style_src = style.group(1) if style else ""
+        hexes = re.findall(r"#[0-9a-fA-F]{3,8}\b", style_src)
+        check("[62] 화면 스타일에 임의 HEX 가 없다(admin2 토큰만)",
+              not hexes, "0건", hexes[:5])
+        check("[62] 화면이 실패를 삼키지 않는다(`if (!res.ok) return;` 없음)",
+              not re.search(r"if\s*\(\s*!\s*\w+\.ok\s*\)\s*\{?\s*return\s*;", tsrc),
+              "없음", "있음")
+        check("[62] 건수를 마크업에 박지 않는다(서버 응답만)",
+              not re.search(r">\s*\d{2,}\s*건", tsrc), "0건",
+              re.findall(r">\s*\d{2,}\s*건", tsrc)[:3])
+        check("[62] 외부 CDN 을 읽지 않는다",
+              not re.search(r'(src|href)="https?://', tsrc), "0건",
+              re.findall(r'(?:src|href)="https?://[^"]+', tsrc)[:3])
+        check("[62] 768px 세로 스택 규칙이 있다",
+              "@media (max-width:768px)" in style_src, "있음", "없음")
+        # 일괄 동작이 장식이 아니다 — 체크박스를 두었으면 부르는 코드가 있어야 한다
+        # (CLAUDE.md §목록 화면 규약).
+        if 'data-action="gc-pick"' in tsrc:
+            check("[62] 일괄 선택이 장식이 아니다(일괄 동작을 부르는 코드가 있다)",
+                  "bulk-approve" in tsrc, "있음", "없음")
+            check("[62] 건너뛴 항목을 사유와 함께 화면이 말한다",
+                  "skipped" in tsrc and "reason" in tsrc, "있음", "없음")
+
+    # ── ⑦ 페이지·API 가 미로그인을 막는다 ───────────────────────────────────
+    check("[62] 검수 API 가 미로그인을 막는다",
+          anon_status("/api/admin/game-copy") in (401, 403), "401/403",
+          anon_status("/api/admin/game-copy"))
+    check("[62] 검수 화면이 미로그인을 막는다",
+          anon_status("/admin2/game-copy-review") in (401, 403), "401/403",
+          anon_status("/admin2/game-copy-review"))
+
+    # ── ⑧ 메뉴 정본에 등록돼 있다 ───────────────────────────────────────────
+    nav_src = pathlib.Path(ROOT, "api", "admin_nav.py").read_text(encoding="utf-8")
+    check("[62] LNB 정본에 이 화면이 등록돼 있다",
+          "/admin2/game-copy-review" in nav_src, "있음", "없음")
+
+    unrev = db_one("SELECT count(*) FROM game_customer_copy"
+                   " WHERE reviewed_by IS NULL") or 0
+    print(f"  [INFO] 검수 대기 {unrev}/{total_rows}종 · "
+          f"고객 노출 {total_rows - unrev}종")
 
 
 def test_market_bands_and_handling():

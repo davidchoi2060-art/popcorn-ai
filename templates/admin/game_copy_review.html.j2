@@ -1,0 +1,685 @@
+{#
+  게임 견적 근거 검수 (ADM-TLK-020) — 2026-09-21 신설
+
+  ■ 이 화면이 답하는 질문
+    「`game_customer_copy` 86종의 네 문단을 고객에게 내보내도 되는가」
+
+    이 문구는 «게임 소개»가 아니라 **«이 게임에 왜 이런 PC 가 필요한가» 견적 근거**다.
+    남의 권장사양을 옮긴 것이 아니라 우리가 판단한 것 — 정체성 「모든 견적에는 이유가
+    있습니다」에 정확히 들어맞는데 지금 한 줄도 안 나간다(reviewed_by 0/86).
+
+  ■★ 승인 한 번 = 고객 노출
+    `api/talk_answer.py` `load_game_facts` 가 이 표를 **이미 읽고 있고**
+    `reviewed_by IS NOT NULL` 행만 싣는다. 검수만 통과하면 코드 수정 없이 나간다.
+    그래서 이 화면의 본체는 승인 버튼이 아니라 **대조 도구**다 — 상세가 그 게임의
+    `games` 원본 값(rec_gpu · rec_target_fps · typical_monitor_hz · community_note …)을
+    문구와 나란히 놓는다. 대조할 수 없으면 검수가 아니라 도장찍기다.
+
+  ■ 화면이 «세지» 않는다
+    건수·선택지·상태값은 전부 서버 응답(`/api/admin/game-copy`)의 것을 그린다.
+    「86」도 마크업에 없다 — `grand_total` 을 받아 그린다(CLAUDE.md §화면 정직성).
+
+  ■ 셸 — admin2 공통 셸 상속. 색·서체는 `/shared/admin2/admin2.css` 의 의미 별칭
+    (`--card`·`--on-variant`·`--outline-variant`…)만 쓴다. 임의 HEX 0건.
+    좌측 메뉴 정본은 `api/admin_nav.py` — 이 파일이 다시 정의하지 않는다.
+
+  ■ 일괄 승인 — 열었다. 다만 좁게 열었다(상한 20 · 확신도 '낮음' 은 건너뜀).
+    판단 근거는 `api/admin_game_copy.py` `bulk_approve` docstring.
+    건너뛴 항목은 **막지 않고 사유와 함께 돌려받아 화면에 그대로 그린다**
+    (CLAUDE.md §목록 화면 규약).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}게임 견적 근거 검수{% endblock %}
+
+{% block head_extra %}
+<style>
+.gc-root{padding:20px 22px 32px;overflow-y:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:14px}
+.gc-loading{padding:48px 20px;text-align:center;color:var(--on-variant);font:400 13px/1.6 var(--font)}
+.gc-error{padding:16px 18px;color:var(--rv-ink);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line);
+      border-radius:9px;font:500 13px/1.7 var(--font)}
+.gc-error a,.gc-error button{color:inherit;text-decoration:underline;cursor:pointer;background:none;border:0;
+      font:inherit;padding:0}
+
+.gc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.gc-kpi{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;padding:13px 15px}
+.gc-kpi .k-label{font:500 11.5px/1.3 var(--font);color:var(--on-variant)}
+.gc-kpi .k-value{font:700 22px/1.3 var(--font-num);color:var(--on);margin-top:4px;font-variant-numeric:tabular-nums}
+.gc-kpi .k-sub{font:400 11px/1.5 var(--font);color:var(--on-variant);margin-top:4px}
+
+.gc-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);
+      border:1px solid var(--outline-variant);border-radius:10px;padding:10px 13px}
+.gc-bar label{font:500 11.5px/1.3 var(--font);color:var(--on-variant)}
+.gc-bar select,.gc-bar input[type=search]{font:500 12px/1.2 var(--font);padding:7px 9px;border-radius:6px;
+      border:1px solid var(--outline);background:var(--card);color:var(--on)}
+.gc-bar .grow{flex:1}
+
+.gc-btn{font:600 12px/1 var(--font);padding:8px 13px;border-radius:6px;border:1px solid var(--outline);
+      background:var(--card);color:var(--on);cursor:pointer}
+.gc-btn:hover{background:var(--container-low)}
+.gc-btn:disabled{opacity:.45;cursor:not-allowed}
+.gc-btn.primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.gc-btn.danger{border-color:var(--rv-red);color:var(--rv-red)}
+
+.gc-tablewrap{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;overflow:hidden;
+      display:flex;flex-direction:column}
+.gc-thead,.gc-row{display:grid;
+      grid-template-columns:34px minmax(150px,2.2fr) minmax(64px,80px) minmax(70px,92px)
+                             minmax(78px,100px) minmax(120px,1.4fr);
+      align-items:center;column-gap:10px}
+.gc-thead{padding:10px 14px;border-bottom:1px solid var(--outline-variant);background:var(--container-low);
+      font:600 11px/1.2 var(--font);color:var(--on-variant)}
+.gc-row{padding:11px 14px;border-bottom:1px solid var(--outline-variant);cursor:pointer;
+      font:400 12.5px/1.45 var(--font);color:var(--on)}
+.gc-row:hover{background:var(--container-low)}
+.gc-row.on{background:var(--container-low)}
+.gc-row .c-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.gc-row .c-num{font-family:var(--font-num);font-variant-numeric:tabular-nums;color:var(--on-variant)}
+.gc-row .c-muted{color:var(--on-variant);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gc-empty{padding:40px 18px;text-align:center;color:var(--on-variant);font:400 13px/1.7 var(--font)}
+.gc-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;
+      border-top:1px solid var(--outline-variant);font:400 11.5px/1.6 var(--font);color:var(--on-variant)}
+.gc-foot .grow{flex:1}
+
+.gc-badge{display:inline-block;font:600 10.5px/1 var(--font);padding:4px 7px;border-radius:5px;
+      border:1px solid var(--outline-variant);background:var(--container-low);color:var(--on-variant)}
+.gc-badge.ok{border-color:var(--rv-green);color:var(--rv-green)}
+.gc-badge.no{border-color:var(--rv-red);color:var(--rv-red)}
+.gc-badge.warn{border-color:var(--rv-amber);color:var(--rv-amber)}
+
+.gc-bulkbox{background:var(--container-low);border:1px solid var(--outline-variant);border-radius:9px;
+      padding:11px 13px;font:400 12px/1.7 var(--font);color:var(--on)}
+.gc-bulkbox .hd{font:600 12.5px/1.4 var(--font);margin-bottom:6px}
+.gc-bulkbox ul{margin:6px 0 0;padding-left:18px}
+.gc-bulkbox li{margin:2px 0}
+
+/* 상세 서랍 */
+.gc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:40}
+.gc-backdrop[hidden]{display:none}
+.gc-drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,96vw);background:var(--card);z-index:41;
+      display:flex;flex-direction:column;border-left:1px solid var(--outline-variant)}
+.gc-drawer[hidden]{display:none}
+.gc-dw-hd{flex:none;padding:15px 18px;border-bottom:1px solid var(--outline-variant);background:var(--container-low)}
+.gc-dw-hd .row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.gc-dw-hd .title{font:700 16px/1.3 var(--font-head);color:var(--on);flex:1;min-width:120px}
+.gc-dw-hd .close{background:none;border:0;font:600 15px/1 var(--font);color:var(--on-variant);cursor:pointer;padding:4px}
+.gc-dw-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:7px;font:400 11.5px/1.5 var(--font);color:var(--on-variant)}
+.gc-dw-body{flex:1;min-height:0;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+
+.gc-sec{border:1px solid var(--outline-variant);border-radius:9px;padding:12px 13px}
+.gc-sec > h4{margin:0 0 9px;font:600 12.5px/1.3 var(--font);color:var(--on)}
+.gc-sec > .hint{margin:-4px 0 9px;font:400 11px/1.6 var(--font);color:var(--on-variant)}
+
+.gc-para{margin-bottom:11px}
+.gc-para:last-child{margin-bottom:0}
+.gc-para .lb{font:600 11.5px/1.3 var(--font);color:var(--on-variant);margin-bottom:5px}
+.gc-para .tx{font:400 13px/1.75 var(--font);color:var(--on);white-space:pre-wrap;overflow-wrap:anywhere}
+.gc-para .tx.none{color:var(--on-variant);font-style:normal}
+.gc-para textarea{width:100%;font:400 13px/1.7 var(--font);color:var(--on);background:var(--card);
+      border:1px solid var(--outline);border-radius:6px;padding:8px 10px;resize:vertical;min-height:64px}
+.gc-para .orig{margin-top:6px;padding:7px 9px;background:var(--container-low);border-radius:6px;
+      font:400 11.5px/1.65 var(--font);color:var(--on-variant);white-space:pre-wrap;overflow-wrap:anywhere}
+
+.gc-src{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:6px 12px;align-items:baseline}
+.gc-src .f{font:600 11.5px/1.6 var(--font);color:var(--on-variant);overflow-wrap:anywhere}
+.gc-src .v{font:400 12px/1.7 var(--font-num);color:var(--on);overflow-wrap:anywhere}
+.gc-src .v.none{font-family:var(--font);color:var(--on-variant)}
+
+.gc-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gc-inline-err{font:500 11.5px/1.6 var(--font);color:var(--rv-red);margin-top:6px}
+.gc-ok{font:500 11.5px/1.6 var(--font);color:var(--rv-green);margin-top:6px}
+.gc-reject-input{flex:1;min-width:180px;font:400 12px/1.4 var(--font);padding:7px 9px;border-radius:6px;
+      border:1px solid var(--outline);background:var(--card);color:var(--on)}
+
+.gc-log{font:400 11.5px/1.7 var(--font);color:var(--on-variant)}
+.gc-log .r{padding:6px 0;border-bottom:1px solid var(--outline-variant)}
+.gc-log .r:last-child{border-bottom:0}
+.gc-log b{color:var(--on)}
+
+@media (max-width:768px){
+  .gc-root{padding:14px 12px 24px}
+  .gc-thead{display:none}
+  .gc-row{grid-template-columns:28px 1fr;row-gap:5px;padding:12px 12px}
+  .gc-row > span{grid-column:2}
+  .gc-row > .c-check{grid-column:1;grid-row:1 / span 5}
+  .gc-drawer{width:100vw}
+  .gc-src{grid-template-columns:1fr}
+  .gc-bar{flex-direction:column;align-items:stretch}
+  .gc-bar .grow{flex:none}
+}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="gc-headnote" id="gcHeadNote" style="font:500 11.5px/1 var(--font);color:var(--on-variant)">불러오는 중…</span>
+{% endblock %}
+
+{% block content %}
+<div class="gc-root" data-screen-id="ADM-TLK-020" data-domain="game-copy">
+  <div class="gc-loading" id="gcLoading">불러오는 중…</div>
+  <div class="gc-error" id="gcError" hidden></div>
+
+  <div id="gcMain" hidden>
+    <div class="gc-kpis" id="gcKpis"></div>
+
+    <div class="gc-bar" style="margin-top:14px">
+      <label for="gcState">검수 상태</label>
+      <select id="gcState" data-action="gc-filter"></select>
+      <label for="gcConf">확신도</label>
+      <select id="gcConf" data-action="gc-filter"></select>
+      <label for="gcKeyword">검색</label>
+      <input type="search" id="gcKeyword" placeholder="게임명 · 문구" style="min-width:160px">
+      <button type="button" class="gc-btn" data-action="gc-search">조회</button>
+      <span class="grow"></span>
+      <button type="button" class="gc-btn primary" id="gcBulkBtn" data-action="gc-bulk" disabled>선택 일괄 승인</button>
+    </div>
+
+    <div class="gc-bulkbox" id="gcBulkNote" hidden style="margin-top:12px"></div>
+
+    <div class="gc-tablewrap" style="margin-top:14px">
+      <div class="gc-thead" role="row">
+        <span role="columnheader"><input type="checkbox" id="gcAll" data-action="gc-all" aria-label="이 페이지 전체 선택"></span>
+        <span role="columnheader">게임명</span>
+        <span role="columnheader">확신도</span>
+        <span role="columnheader">검수 상태</span>
+        <span role="columnheader">인기 순위</span>
+        <span role="columnheader">검수자 · 사유</span>
+      </div>
+      <div id="gcTbody" role="table" aria-label="게임 견적 근거 검수 목록"></div>
+      <div class="gc-foot">
+        <span id="gcPageInfo">—</span>
+        <span class="grow"></span>
+        <button type="button" class="gc-btn" id="gcPrev" data-action="gc-prev">이전</button>
+        <button type="button" class="gc-btn" id="gcNext" data-action="gc-next">다음</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="gc-backdrop" id="gcBackdrop" data-keep="1" hidden></div>
+<aside class="gc-drawer" id="gcDrawer" data-keep="1" hidden aria-label="견적 근거 상세">
+  <div class="gc-dw-hd">
+    <div class="row1">
+      <span class="title" id="gcDwTitle">—</span>
+      <span class="gc-badge" id="gcDwState">—</span>
+      <span class="gc-badge" id="gcDwConf">—</span>
+      <button type="button" class="close" data-action="gc-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="gc-dw-meta" id="gcDwMeta"></div>
+  </div>
+  <div class="gc-dw-body" id="gcDwBody">
+    <div class="gc-loading" id="gcDwLoading">불러오는 중…</div>
+    <div class="gc-error" id="gcDwError" hidden></div>
+    <div id="gcDwContent" hidden></div>
+  </div>
+</aside>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+
+  var API = '/api/admin/game-copy';
+  var LOGIN_URL = '/admin2/login';
+
+  var S = { page: 1, size: 20, state: '', conf: '', kw: '',
+            list: null, sel: {}, openId: null, detail: null, editing: false };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  // 서버가 준 것만 그린다. 값이 없으면 지어내지 않고 「미기재」라고 밝힌다.
+  function orNone(v) {
+    return (v === null || v === undefined || v === '') ? null : String(v);
+  }
+
+  function fetchJson(url, opts) {
+    return fetch(url, opts).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    });
+  }
+
+  function msgOf(r, fallback) {
+    var d = r.body && (r.body.detail || r.body.error || r.body.message);
+    return fallback + ' — 오류 ' + r.status + (d ? ' · ' + d : '');
+  }
+
+  function setError(msg, relogin) {
+    $('gcLoading').hidden = true;
+    $('gcMain').hidden = true;
+    var box = $('gcError');
+    box.hidden = false;
+    box.innerHTML = esc(msg) + (relogin
+      ? ' <a href="' + LOGIN_URL + '">다시 로그인</a>'
+      : ' <button type="button" data-action="gc-retry">다시 시도</button>');
+  }
+
+  // ── 목록 ───────────────────────────────────────────────────────────
+  function load() {
+    $('gcLoading').hidden = false;
+    $('gcError').hidden = true;
+    var q = '?page=' + S.page + '&size=' + S.size
+          + '&state=' + encodeURIComponent(S.state)
+          + '&confidence=' + encodeURIComponent(S.conf)
+          + '&keyword=' + encodeURIComponent(S.kw);
+    fetchJson(API + q).then(function (r) {
+      if (!r.ok) {
+        if (r.status === 401) { setError('세션이 만료되었습니다 — 다시 로그인해야 합니다.', true); return; }
+        setError(msgOf(r, '목록을 불러오지 못했습니다'));
+        return;
+      }
+      S.list = r.body;
+      $('gcLoading').hidden = true;
+      $('gcMain').hidden = false;
+      renderAll();
+    }, function (e) {
+      setError('네트워크 오류 — ' + ((e && e.message) || '서버에 연결할 수 없습니다'));
+    });
+  }
+
+  function renderAll() {
+    renderHeadNote();
+    renderKpis();
+    renderFilters();
+    renderRows();
+    renderFoot();
+    syncBulkBtn();
+  }
+
+  function renderHeadNote() {
+    var L = S.list, n = $('gcHeadNote');
+    if (!n || !L) return;
+    // 「승인하면 고객에게 나간다」를 서버가 준 조건으로 말한다.
+    n.textContent = '고객 노출 중 ' + L.live_count + '건 / 전체 ' + L.grand_total + '건';
+  }
+
+  function kpi(label, value, sub) {
+    return '<div class="gc-kpi"><div class="k-label">' + esc(label) + '</div>'
+      + '<div class="k-value">' + esc(value) + '</div>'
+      + '<div class="k-sub">' + esc(sub) + '</div></div>';
+  }
+
+  function renderKpis() {
+    var L = S.list, f = L.filters, by = {};
+    f.states.forEach(function (s) { by[s.value] = s.n; });
+    $('gcKpis').innerHTML =
+        kpi('전체 문구', L.grand_total + '건', 'game_customer_copy 행 수')
+      + kpi('고객 노출 중', L.live_count + '건', '팝콘톡이 ' + L.customer_gate_label)
+      + f.states.map(function (s) {
+          return kpi('검수 ' + s.value, s.n + '건', '전체 기준');
+        }).join('');
+  }
+
+  function renderFilters() {
+    var L = S.list;
+    var st = $('gcState'), cf = $('gcConf');
+    // 선택지는 **서버가 준다** — 화면이 현재 페이지에서 뽑지 않는다.
+    st.innerHTML = '<option value="">전체</option>' + L.filters.states.map(function (s) {
+      return '<option value="' + esc(s.value) + '"' + (S.state === s.value ? ' selected' : '')
+        + '>' + esc(s.value) + ' (' + s.n + ')</option>';
+    }).join('');
+    cf.innerHTML = '<option value="">전체</option>' + L.filters.confidences.map(function (c) {
+      return '<option value="' + esc(c.value) + '"' + (S.conf === c.value ? ' selected' : '')
+        + '>' + esc(c.value) + ' (' + c.n + ')</option>';
+    }).join('');
+    $('gcKeyword').value = S.kw;
+  }
+
+  function stateBadge(v) {
+    var cls = v === '승인' ? 'ok' : (v === '반려' ? 'no' : '');
+    return '<span class="gc-badge ' + cls + '">' + esc(v) + '</span>';
+  }
+
+  function renderRows() {
+    var L = S.list, box = $('gcTbody');
+    if (!L.items.length) {
+      box.innerHTML = '<div class="gc-empty">조건에 맞는 문구가 없습니다.'
+        + '<br>조회가 실패한 것이 아니라 지금 그런 문구가 없습니다.</div>';
+      return;
+    }
+    box.innerHTML = L.items.map(function (it) {
+      var rank = it.pcbang_rank == null ? '순위 없음'
+        : (it.pcbang_rank + '위 (' + esc(it.rank_as_of) + ')');
+      var who = it.review_state === '승인'
+        ? esc(it.reviewed_by || '')
+        : (it.review_state === '반려' ? esc(it.reject_reason || '') : '');
+      return '<div class="gc-row' + (S.openId === it.game_id ? ' on' : '')
+        + '" data-action="gc-open" data-id="' + it.game_id + '" role="row">'
+        + '<span class="c-check"><input type="checkbox" data-action="gc-pick" data-id="' + it.game_id
+        + '"' + (S.sel[it.game_id] ? ' checked' : '') + ' aria-label="' + esc(it.name) + ' 선택"></span>'
+        + '<span class="c-name">' + esc(it.name)
+        + (it.edited ? ' <span class="gc-badge warn">수정됨</span>' : '') + '</span>'
+        + '<span>' + esc(it.confidence || '미기재') + '</span>'
+        + '<span>' + stateBadge(it.review_state) + '</span>'
+        + '<span class="c-num">' + esc(rank) + '</span>'
+        + '<span class="c-muted" title="' + who + '">' + (who || '—') + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  function renderFoot() {
+    var L = S.list;
+    var from = L.total === 0 ? 0 : (L.page - 1) * L.size + 1;
+    var to = Math.min(L.page * L.size, L.total);
+    $('gcPageInfo').textContent = '전체 ' + L.total + '건 중 ' + from + '–' + to + '건 표시'
+      + ' · ' + L.page + ' / ' + Math.max(L.pages, 1) + ' 쪽';
+    $('gcPrev').disabled = L.page <= 1;
+    $('gcNext').disabled = L.page >= L.pages;
+  }
+
+  function syncBulkBtn() {
+    var n = Object.keys(S.sel).filter(function (k) { return S.sel[k]; }).length;
+    var b = $('gcBulkBtn');
+    b.disabled = n === 0;
+    b.textContent = n === 0 ? '선택 일괄 승인' : ('선택 ' + n + '건 일괄 승인');
+  }
+
+  // ── 상세 ───────────────────────────────────────────────────────────
+  function openDetail(id) {
+    S.openId = id; S.editing = false; S.detail = null;
+    $('gcBackdrop').hidden = false;
+    $('gcDrawer').hidden = false;
+    $('gcDwLoading').hidden = false;
+    $('gcDwError').hidden = true;
+    $('gcDwContent').hidden = true;
+    $('gcDwTitle').textContent = '불러오는 중…';
+    $('gcDwMeta').innerHTML = '';
+    renderRows();
+    Promise.all([fetchJson(API + '/' + id), fetchJson(API + '/' + id + '/activity')])
+      .then(function (rs) {
+        var D = rs[0], A = rs[1];
+        $('gcDwLoading').hidden = true;
+        if (!D.ok) {
+          var box = $('gcDwError');
+          box.hidden = false;
+          box.textContent = D.status === 401
+            ? '세션이 만료되었습니다 — 다시 로그인해야 합니다.'
+            : msgOf(D, '상세를 불러오지 못했습니다');
+          return;
+        }
+        S.detail = D.body;
+        S.detail._activity = A.ok && A.body ? A.body.items : null;
+        S.detail._activityError = A.ok ? null : msgOf(A, '작업 기록을 불러오지 못했습니다');
+        renderDetail();
+      }, function (e) {
+        $('gcDwLoading').hidden = true;
+        var box = $('gcDwError');
+        box.hidden = false;
+        box.textContent = '네트워크 오류 — ' + ((e && e.message) || '서버에 연결할 수 없습니다');
+      });
+  }
+
+  function closeDetail() {
+    S.openId = null; S.detail = null; S.editing = false;
+    $('gcBackdrop').hidden = true;
+    $('gcDrawer').hidden = true;
+    renderRows();
+  }
+
+  function renderDetail() {
+    var D = S.detail;
+    $('gcDwTitle').textContent = D.name;
+    $('gcDwState').textContent = D.review_state;
+    $('gcDwState').className = 'gc-badge ' + (D.review_state === '승인' ? 'ok'
+      : (D.review_state === '반려' ? 'no' : ''));
+    $('gcDwConf').textContent = '확신도 ' + (D.confidence || '미기재');
+
+    var meta = [];
+    if (D.popularity && D.popularity.pcbang_rank != null) {
+      meta.push('PC방 ' + D.popularity.pcbang_rank + '위 (' + esc(D.popularity.as_of)
+        + ' · 출처 ' + esc(D.popularity.source) + ')');
+    }
+    if (D.reviewed_by) { meta.push('검수 ' + esc(D.reviewed_by) + ' · ' + esc(D.reviewed_at || '')); }
+    if (D.updated_at) { meta.push('갱신 ' + esc(D.updated_at)); }
+    $('gcDwMeta').innerHTML = meta.map(function (m) { return '<span>' + m + '</span>'; }).join('');
+
+    var html = '';
+
+    // ① 네 문단 — 편집 중이면 textarea, 아니면 전문
+    html += '<div class="gc-sec"><h4>고객에게 나갈 문구</h4>'
+      + '<div class="hint">승인하면 팝콘톡이 이 문장을 고객 답변의 근거로 싣습니다'
+      + ' (조건: ' + esc(D.customer_gate) + ').</div>';
+    html += D.paragraphs.map(function (p) {
+      var body;
+      if (S.editing) {
+        body = '<textarea data-field="' + esc(p.field) + '" aria-label="' + esc(p.label) + '">'
+          + esc(p.text || '') + '</textarea>';
+      } else {
+        body = orNone(p.text) === null
+          ? '<div class="tx none">작성된 내용이 없습니다</div>'
+          : '<div class="tx">' + esc(p.text) + '</div>';
+      }
+      var orig = p.original == null ? ''
+        : '<div class="orig"><b>생성기 원문</b><br>' + esc(p.original) + '</div>';
+      return '<div class="gc-para"><div class="lb">' + esc(p.label) + '</div>' + body + orig + '</div>';
+    }).join('');
+    html += '</div>';
+
+    // ② 근거 — games 원본 값
+    html += '<div class="gc-sec"><h4>근거 — 이 게임의 원본 값</h4>'
+      + '<div class="hint">'
+      + (D.source_is_fallback
+          ? '이 문구에는 근거 컬럼 기록(source_fields)이 없어, 기본 사양 묶음을 대신 보여줍니다.'
+          : '문구가 근거로 삼았다고 기록된 컬럼(source_fields)의 실제 값입니다.')
+      + ' 위 문장의 숫자·모델명이 아래 값에서 나왔는지 대조하십시오.</div>';
+    if (!D.source.length) {
+      html += '<div class="tx none" style="font:400 12px/1.7 var(--font);color:var(--on-variant)">'
+        + '표시할 원본 값이 없습니다.</div>';
+    } else {
+      html += '<div class="gc-src">' + D.source.map(function (s) {
+        var v = orNone(s.value);
+        return '<div class="f" title="' + esc(s.field) + '">' + esc(s.label) + '</div>'
+          + (v === null ? '<div class="v none">미기재</div>'
+                        : '<div class="v">' + esc(v) + '</div>');
+      }).join('') + '</div>';
+    }
+    if (D.source_fields_missing && D.source_fields_missing.length) {
+      html += '<div class="gc-inline-err">games 에 없는 컬럼이 근거로 적혀 있습니다: '
+        + esc(D.source_fields_missing.join(', ')) + '</div>';
+    }
+    html += '</div>';
+
+    // ③ 반려 사유(있으면)
+    if (D.reject_reason) {
+      html += '<div class="gc-sec"><h4>반려 사유</h4><div class="tx" style="font:400 12.5px/1.75 var(--font)">'
+        + esc(D.reject_reason) + '</div></div>';
+    }
+    if (D.reviewed_note) {
+      html += '<div class="gc-sec"><h4>검수 메모</h4><div class="tx" style="font:400 12.5px/1.75 var(--font)">'
+        + esc(D.reviewed_note) + '</div></div>';
+    }
+
+    // ④ 동작
+    html += '<div class="gc-sec"><h4>판정</h4><div class="gc-actions">';
+    if (S.editing) {
+      html += '<button type="button" class="gc-btn primary" data-action="gc-save-approve">수정 후 승인</button>'
+        + '<button type="button" class="gc-btn" data-action="gc-cancel-edit">수정 취소</button>';
+    } else if (D.review_state === '승인') {
+      html += '<button type="button" class="gc-btn danger" data-action="gc-unapprove">승인 되돌리기</button>';
+    } else {
+      html += '<button type="button" class="gc-btn primary" data-action="gc-approve">승인</button>'
+        + '<button type="button" class="gc-btn" data-action="gc-edit">문구 수정</button>';
+    }
+    html += '</div>';
+    if (D.review_state !== '반려' && !S.editing) {
+      html += '<div class="gc-actions" style="margin-top:9px">'
+        + '<label for="gcRejectReason" style="font:500 11.5px/1.3 var(--font);color:var(--on-variant)">반려 사유</label>'
+        + '<input type="text" class="gc-reject-input" id="gcRejectReason" placeholder="이대로는 못 내보내는 이유">'
+        + '<button type="button" class="gc-btn danger" data-action="gc-reject">반려</button></div>';
+    }
+    html += '<div class="gc-inline-err" id="gcDwErrMsg" hidden></div>'
+      + '<div class="gc-ok" id="gcDwOkMsg" hidden></div></div>';
+
+    // ⑤ 작업 기록
+    html += '<div class="gc-sec"><h4>작업 기록</h4>';
+    if (D._activityError) {
+      html += '<div class="gc-inline-err">' + esc(D._activityError) + '</div>';
+    } else if (!D._activity || !D._activity.length) {
+      html += '<div class="gc-log">아직 기록된 작업이 없습니다.</div>';
+    } else {
+      html += '<div class="gc-log">' + D._activity.map(function (a) {
+        var d = a.detail || {};
+        var extra = [];
+        if (d.reason) { extra.push('사유 ' + esc(d.reason)); }
+        if (d.edited) { extra.push('문구 수정 포함'); }
+        if (d.bulk) { extra.push('일괄'); }
+        return '<div class="r"><b>' + esc(a.action) + '</b> · '
+          + esc(a.operator_name || '기록 없음') + ' · ' + esc(a.created_at)
+          + (extra.length ? ' · ' + extra.join(' · ') : '') + '</div>';
+      }).join('') + '</div>';
+    }
+    html += '</div>';
+
+    $('gcDwContent').innerHTML = html;
+    $('gcDwContent').hidden = false;
+  }
+
+  function dwMsg(id, text) {
+    var e = $('gcDwErrMsg'), o = $('gcDwOkMsg');
+    if (e) { e.hidden = true; }
+    if (o) { o.hidden = true; }
+    var t = $(id);
+    if (t) { t.hidden = false; t.textContent = text; }
+  }
+
+  function collectEdits() {
+    var out = {};
+    var tas = $('gcDwContent').querySelectorAll('textarea[data-field]');
+    for (var i = 0; i < tas.length; i++) { out[tas[i].getAttribute('data-field')] = tas[i].value; }
+    return out;
+  }
+
+  function post(path, body) {
+    return fetchJson(API + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+  }
+
+  function afterWrite(r, okText) {
+    if (!r.ok) {
+      dwMsg('gcDwErrMsg', r.status === 401
+        ? '세션이 만료되었습니다 — 다시 로그인해야 합니다.'
+        : msgOf(r, '처리하지 못했습니다'));
+      return false;
+    }
+    dwMsg('gcDwOkMsg', okText);
+    return true;
+  }
+
+  function doApprove(edits) {
+    var body = {};
+    if (edits) { body.edits = edits; }
+    post('/' + S.openId + '/approve', body).then(function (r) {
+      if (!afterWrite(r, '승인했습니다 — 이제 팝콘톡 답변에 실립니다.')) { return; }
+      S.editing = false;
+      openDetail(S.openId);
+      load();
+    });
+  }
+
+  function doReject() {
+    var el = $('gcRejectReason');
+    var reason = el ? el.value.trim() : '';
+    if (!reason) { dwMsg('gcDwErrMsg', '반려 사유를 입력해야 합니다.'); return; }
+    post('/' + S.openId + '/reject', { reason: reason }).then(function (r) {
+      if (!afterWrite(r, '반려했습니다 — 고객에게 나가지 않습니다.')) { return; }
+      openDetail(S.openId);
+      load();
+    });
+  }
+
+  function doUnapprove() {
+    post('/' + S.openId + '/unapprove', {}).then(function (r) {
+      if (!afterWrite(r, '승인을 되돌렸습니다 — 고객 답변에서 빠집니다.')) { return; }
+      openDetail(S.openId);
+      load();
+    });
+  }
+
+  function doBulk() {
+    var ids = Object.keys(S.sel).filter(function (k) { return S.sel[k]; }).map(Number);
+    if (!ids.length) { return; }
+    var note = $('gcBulkNote');
+    post('/bulk-approve', { game_ids: ids }).then(function (r) {
+      note.hidden = false;
+      if (!r.ok) {
+        note.innerHTML = '<div class="hd">일괄 승인을 처리하지 못했습니다</div>'
+          + esc(r.status === 401 ? '세션이 만료되었습니다 — 다시 로그인해야 합니다.'
+                                 : msgOf(r, '요청이 거부되었습니다'));
+        return;
+      }
+      var B = r.body;
+      var h = '<div class="hd">일괄 승인 결과 — 승인 ' + B.approved_count
+        + '건 · 건너뜀 ' + B.skipped_count + '건 (한 번 상한 ' + B.bulk_max + '건)</div>';
+      if (B.skipped_count) {
+        h += '건너뛴 항목과 사유:<ul>' + B.skipped.map(function (s) {
+          return '<li>' + esc(s.name || ('게임 ' + s.game_id)) + ' — ' + esc(s.reason) + '</li>';
+        }).join('') + '</ul>';
+      }
+      note.innerHTML = h;
+      S.sel = {};
+      load();
+    });
+  }
+
+  // ── 이벤트 위임 ─────────────────────────────────────────────────────
+  document.addEventListener('click', function (ev) {
+    var pick = ev.target.closest('[data-action="gc-pick"]');
+    if (pick) {
+      ev.stopPropagation();
+      S.sel[pick.getAttribute('data-id')] = pick.checked;
+      syncBulkBtn();
+      return;
+    }
+    var t = ev.target.closest('[data-action]');
+    if (!t) { return; }
+    var a = t.getAttribute('data-action');
+    if (a === 'gc-retry') { load(); }
+    else if (a === 'gc-search') { S.page = 1; S.kw = $('gcKeyword').value.trim(); load(); }
+    else if (a === 'gc-prev') { if (S.page > 1) { S.page -= 1; load(); } }
+    else if (a === 'gc-next') { if (S.list && S.page < S.list.pages) { S.page += 1; load(); } }
+    else if (a === 'gc-all') {
+      var on = $('gcAll').checked;
+      (S.list ? S.list.items : []).forEach(function (it) { S.sel[it.game_id] = on; });
+      renderRows(); syncBulkBtn();
+    }
+    else if (a === 'gc-open') { openDetail(Number(t.getAttribute('data-id'))); }
+    else if (a === 'gc-close') { closeDetail(); }
+    else if (a === 'gc-edit') { S.editing = true; renderDetail(); }
+    else if (a === 'gc-cancel-edit') { S.editing = false; renderDetail(); }
+    else if (a === 'gc-approve') { doApprove(null); }
+    else if (a === 'gc-save-approve') { doApprove(collectEdits()); }
+    else if (a === 'gc-reject') { doReject(); }
+    else if (a === 'gc-unapprove') { doUnapprove(); }
+    else if (a === 'gc-bulk') { doBulk(); }
+  });
+
+  document.addEventListener('change', function (ev) {
+    if (ev.target.closest('[data-action="gc-filter"]')) {
+      S.page = 1;
+      S.state = $('gcState').value;
+      S.conf = $('gcConf').value;
+      load();
+    }
+  });
+
+  document.getElementById('gcBackdrop').addEventListener('click', closeDetail);
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && S.openId != null) { closeDetail(); }
+  });
+
+  load();
+})();
+</script>
+{% endraw %}
+{% endblock %}
