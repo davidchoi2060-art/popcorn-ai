@@ -268,7 +268,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
         <div class="gm-card gm-panel">
           <h6><span data-bind="skip-title">미매핑</span></h6>
           <div class="gm-skip" data-bind="skips"></div>
-          <div class="gm-note" style="padding:10px 0 0">스킵 사유는 배치의 SUMMARY_JSON에만 있고 테이블에 저장되지 않습니다 — 배치 로그로만 확인할 수 있습니다. 사유가 적재되면 이 자리에 표시합니다.</div>
+          <div class="gm-note" style="padding:10px 0 0">스킵 사유는 매핑 배치가 `games.mapping_skip_reason` 에 전 종을 다시 기록합니다(0080 · 0109) — 매핑되지 않은 항목에는 사유가 반드시 있습니다.</div>
         </div>
 
         <div class="gm-card gm-panel">
@@ -309,7 +309,13 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
   var show = function (k, on) { var e = $(k); if (e) e.hidden = !on; };
 
   // 「권장」 계열은 통과이므로 초록(A-45) — 라벨을 «항상» 함께 낸다(색약 배려).
-  var OK_LEVELS = { '권장충족': 1, '권장구성': 1 };
+  // 「경량충족」(0109)도 통과다 — 사장님 확정 경로로 «이 게임 칸에서 돌아간다»를
+  // 뜻한다. 근거 경로가 서열 대조가 아니라서 라벨을 따로 두지만, 판정 결과는
+  // 통과이므로 색까지 다르게 하면 운영자가 «덜 된 것»으로 읽는다.
+  var OK_LEVELS = { '권장충족': 1, '권장구성': 1, '경량충족': 1 };
+  // 판정 근거를 서열 점수로 설명할 수 없는 등급 — 근거 패널이 이걸 보고
+  // 「사다리 밖 + 확정 등급」 경로를 밝힌다(배치 머리 주석과 같은 말).
+  var LIGHT_LEVELS = { '경량충족': 1 };
 
   var state = {
     base: null,        // GET /api/admin/game-matrix (선택 없음) 응답
@@ -505,12 +511,19 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     } else {
       show('sel-unmapped', false); show('sel-filtered', false); show('cells-wrap', true);
       set('cells', rows.map(function (r) {
+        // 한 칸이 여러 변종에서 성립할 수 있다(0109). 표는 «칸» 단위라
+        // 가장 싼 성립 변종을 대표로 쓰고, 몇 벌이 성립했는지 함께 밝힌다 —
+        // 접되 버리지 않는다(서버가 variants[] 를 그대로 내려준다).
+        var vs = r.variants || [];
+        var vtxt = esc(r.tier_variant || '') +
+          (vs.length > 1 ? ' 외 ' + num(vs.length - 1) + '벌' : '');
         return '<tr data-action="cell" data-cell-id="' + r.cell_id + '"' +
           (state.cellId === r.cell_id ? ' aria-selected="true"' : '') + '>' +
           '<td class="id">' + num(r.cell_id) + '</td>' +
           '<td class="nm">' + esc(cellName(r)) + '</td>' +
           '<td>' + esc(r.platform) + '</td>' +
-          '<td>' + esc(r.gpu_used) + '</td>' +
+          '<td>' + esc(r.gpu_used) + '<span class="sub" style="display:block;font-size:11px;color:var(--muted,#666)">' +
+          vtxt + '</span></td>' +
           '<td class="num">' + won(r.total) + '</td>' +
           '<td>' + levelTag(r.match_level) + '</td></tr>';
       }).join(''));
@@ -549,6 +562,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
 
     var it = sel.item, isGame = sel.kind === 'game';
     var g = state.base.ladder[cell.gpu_used] || null;
+    var light = !!LIGHT_LEVELS[cell.match_level];
     var lines = '';
     if (isGame) {
       lines += line('GPU 칩셋', cell.gpu_used + (g ? ' · ladder_score ' + g.ladder_score : ' · 서열 미등재'));
@@ -557,6 +571,13 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
       lines += line('min_gpu 원문', it.min_gpu == null ? '원천에 값 없음' : it.min_gpu);
       lines += line('요구 RAM', '권장 ' + (it.rec_ram_gb == null ? '미상' : it.rec_ram_gb + 'GB') +
         ' / 최소 ' + (it.min_ram_gb == null ? '미상' : it.min_ram_gb + 'GB'));
+      // 경량충족은 서열 점수 대조로 나온 판정이 아니다 — 근거 경로를 밝힌다.
+      // 이 줄이 없으면 운영자가 위의 ladder_score 를 판정 근거로 오독한다.
+      if (light) {
+        lines += line('판정 경로',
+          '권장 사양 그래픽카드가 GPU 서열표에 없고, 확정 게임 등급이 경량 계열입니다' +
+          ' — 서열 점수 대조 대신 이 경로로 판정했습니다');
+      }
     } else {
       lines += line('GPU 칩셋', cell.gpu_used + (g ? ' · VRAM ' + g.vram_gb + 'GB' : ' · 서열 미등재'));
       lines += line('요구 VRAM', '권장 ' + (it.rec_vram_gb == null ? '미상' : it.rec_vram_gb + 'GB') +
@@ -576,7 +597,8 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
 
     set('ev-body',
       '<div class="gm-ev-cell">칸 ' + num(cell.cell_id) + '</div>' +
-      '<div class="gm-ev-desc">' + esc(cellName(cell) + ' · ' + cell.platform + ' · ' + nameOf(it)) + '</div>' +
+      '<div class="gm-ev-desc">' + esc(cellName(cell) + ' · ' + cell.platform + ' · ' + nameOf(it)) +
+      (cell.tier_variant ? esc(' · ' + cell.tier_variant + ' 구성') : '') + '</div>' +
       '<div class="gm-ev-lines">' + lines + '</div>' +
       '<div class="gm-ev-verdict" style="color:' + (OK_LEVELS[cell.match_level] ? 'var(--success-dark)' : 'var(--on)') + '">' +
       '판정 ' + esc(cell.match_level) + ' (배치 판정값)</div>' +

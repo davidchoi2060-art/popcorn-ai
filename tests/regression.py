@@ -6661,7 +6661,8 @@ def main():
                test_ai_vram_floor,
                test_design_split_invariants,
                test_assembly_fee_screen,
-               test_admin_grid_screen_draws_cells):
+               test_admin_grid_screen_draws_cells,
+               test_game_cell_map_freshness):
         try:
             fn()
         except Exception as e:
@@ -8291,6 +8292,259 @@ def test_admin_grid_screen_draws_cells():
         check("[59] 음성 검사 — 겹친 좌표에서는 용도마다 한 칸만 남는다",
               len(nwant & mdrawn) <= usages_n,
               "최대 " + str(usages_n) + "칸", len(nwant & mdrawn))
+
+
+def test_game_cell_map_freshness():
+    """[60] 게임-칸 매핑 캐시가 격자와 정합하는가 (0109 · 2026-09-21 신설)
+
+    ★ 이 검사가 왜 필요한가 — 이번 병은 **코드가 멀쩡히 돌고 콘솔도 조용한 채
+      화면만 비었다.** 기존 회귀는 `game_cell_map` 이 «존재하는지»만 봤지
+      «격자와 같은 시대의 값인지»는 보지 않았다. 증상은 사장님이
+      `/admin2/game-matrix` 에서 롤을 골랐을 때 칸이 하나도 안 나온 것이다.
+
+    각 검사가 **무엇이 잘못돼야 실패하는지**를 함께 적는다(§회귀).
+
+    ① 매핑 표의 cell_id FK 가 **현재** 격자 표를 가리킨다.
+       실패 조건: 격자 표를 개명·교체하고 FK 를 안 옮긴다. 실제로 0092 가
+       `grid_cells` -> `grid_cells_legacy_v1` 로 개명했을 때 FK 가 oid 를 따라
+       옛 표에 남아, 배치가 칸 113~134 를 넣으려다 ForeignKeyViolation 으로
+       죽는 상태로 반 년 가까이 있었다(2026-09-21 실측).
+    ② 격자 칸이 재생성되면 매핑도 같이 갱신됐는가 — 매핑이 **낡지 않았는가.**
+       현재 견적이 있는 칸 중 어느 매핑에도 안 나타나는 칸이 있으면,
+       그 칸은 배치가 돌기 전에 생긴 칸이다.
+       실패 조건: 격자를 재생성하고 배치를 안 돌린다(결함 ⓐ 그 자체).
+    ③ 빈 게임에 사유가 **빠짐없이** 있다.
+       실패 조건: 배치가 이번 실행에서 다룬 id 만 UPDATE 해 옛 사유가 남는다
+       (실측: 게임 23종 시절의 8행이 86종 시대에 그대로 남아 63종이 «사유 없이»
+       비어 있었다 — 화면이 「판정 불가」 배지조차 못 띄운다).
+    ④ 변종별 판정이 무시되지 않는다.
+       실패 조건: 누가 키를 다시 cell_id 단위로 되돌린다(변종 2/3 이 사라진다).
+    ⑤ PC방 상위권이 비지 않는다.
+       실패 조건: 가벼운 게임 판정 경로가 사라지거나, 등급 조건이 A/B/C/S 까지
+       넓어져 파싱 실패를 가벼움으로 오판한다.
+    ⑥ 화면이 등급 어휘를 알아본다(서버가 주는 match_level 전부).
+       실패 조건: 배치가 새 등급을 만들었는데 템플릿이 그걸 모른 채
+       «통과 아님» 색으로 그린다.
+    """
+    print(chr(10) + "[60] 게임-칸 매핑 캐시가 격자와 정합하는가 (0109 신설)")
+
+    if _engine is None:
+        print("  [SKIP] DB 미접속")
+        return
+
+    # ── ① FK 가 현재 격자 표를 가리킨다 ─────────────────────────────
+    fks = db_all(
+        "SELECT conrelid::regclass::text tbl, confrelid::regclass::text ref"
+        "  FROM pg_constraint"
+        " WHERE conrelid IN ('game_cell_map'::regclass,'workload_cell_map'::regclass)"
+        "   AND contype='f' AND 'cell_id' = ANY("
+        "       SELECT a.attname FROM pg_attribute a"
+        "        WHERE a.attrelid = conrelid AND a.attnum = ANY(conkey))")
+    check("[60]① 매핑 표의 cell_id FK 가 2개다(게임·AI 각 1)",
+          len(fks) == 2, 2, len(fks))
+    for f in fks:
+        check("[60]① " + f["tbl"] + " 의 cell_id FK 가 현재 격자 표(grid_cells)를 가리킨다"
+              " — 개명된 옛 표를 가리키면 새 칸을 못 넣는다",
+              f["ref"] == "grid_cells", "grid_cells", f["ref"])
+
+    # ── ② 매핑이 낡지 않았다 — 현재 견적이 있는 칸이 전부 매핑에 나타난다 ──
+    #    「현재 견적이 있고 GPU 항목도 있는 칸」이 모집단이다. GPU 없는 칸은
+    #    배치가 판정 대상에서 빼는 것이 설계다(0105 gpu_required=false).
+    stale = db_all(
+        "SELECT c.cell_id FROM grid_cells c"
+        " WHERE EXISTS (SELECT 1 FROM grid_quotes q"
+        "   WHERE q.cell_id=c.cell_id AND q.is_current"
+        "     AND EXISTS (SELECT 1 FROM jsonb_array_elements("
+        "       COALESCE(q.payload->'items','[]'::jsonb)) it"
+        "       WHERE it->>'part_type'='GPU'))"
+        "   AND NOT EXISTS (SELECT 1 FROM game_cell_map m WHERE m.cell_id=c.cell_id)"
+        "   AND NOT EXISTS (SELECT 1 FROM workload_cell_map w WHERE w.cell_id=c.cell_id)")
+    check("[60]② ★ 견적이 있는 칸이 전부 매핑에 나타난다"
+          " (격자를 재생성하고 배치를 안 돌리면 여기서 걸린다)",
+          not stale, "누락 0칸",
+          str(len(stale)) + "칸 " + str([r["cell_id"] for r in stale][:8]))
+
+    # 매핑이 «없는» 칸을 참조하지도 않는다(반대 방향 — 칸이 사라졌는데 캐시가 남음).
+    orphan = db_one(
+        "SELECT count(*) FROM game_cell_map m"
+        " WHERE NOT EXISTS (SELECT 1 FROM grid_quotes q"
+        "   WHERE q.cell_id=m.cell_id AND q.tier_variant=m.tier_variant AND q.is_current)")
+    check("[60]② 매핑이 사라진 견적을 가리키지 않는다(캐시가 원천보다 오래 살지 않는다)",
+          orphan == 0, 0, orphan)
+
+    # ── ③ 빈 게임에 사유가 빠짐없이 있다 ────────────────────────────
+    no_reason = db_all(
+        "SELECT g.game_id, g.name FROM games g"
+        " WHERE NOT EXISTS (SELECT 1 FROM game_cell_map m WHERE m.game_id=g.game_id)"
+        "   AND g.mapping_skip_reason IS NULL")
+    check("[60]③ ★ 매핑 0건인 게임에 사유가 빠짐없이 있다"
+          " (사유가 없으면 화면이 「판정 불가」 배지도 못 띄운다)",
+          not no_reason, "사유 누락 0종",
+          str(len(no_reason)) + "종 " + str([r["name"] for r in no_reason][:6]))
+    # 반대 — 매핑에 성공했는데 낡은 사유가 남아 있지 않다.
+    stale_reason = db_all(
+        "SELECT g.name FROM games g"
+        " WHERE g.mapping_skip_reason IS NOT NULL"
+        "   AND EXISTS (SELECT 1 FROM game_cell_map m WHERE m.game_id=g.game_id)")
+    check("[60]③ 매핑에 성공한 게임에 낡은 사유가 남아 있지 않다",
+          not stale_reason, "0종",
+          str(len(stale_reason)) + "종 " + str([r["name"] for r in stale_reason][:6]))
+    # 사유 키가 전부 사람이 읽는 문구를 갖는다 — 원문 키가 화면에 노출되지 않는다.
+    sys.path.insert(0, ROOT)
+    from api import game_matrix_reasons as _gmr
+    keys = [r["k"] for r in db_all(
+        "SELECT DISTINCT mapping_skip_reason k FROM games"
+        " WHERE mapping_skip_reason IS NOT NULL")]
+    check("[60]③ 저장된 사유 키가 전부 문구 사전에 있다(원문 키 노출 없음)",
+          all(k in _gmr.REASON_LABELS for k in keys), "전부 등재",
+          [k for k in keys if k not in _gmr.REASON_LABELS])
+
+    # ── ④ 변종별 판정이 무시되지 않는다 ─────────────────────────────
+    pk_cols = [r["c"] for r in db_all(
+        "SELECT a.attname c FROM pg_index i"
+        "  JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum = ANY(i.indkey)"
+        " WHERE i.indrelid='game_cell_map'::regclass AND i.indisprimary")]
+    check("[60]④ game_cell_map 의 PK 에 tier_variant 가 들어 있다"
+          " (칸 단위로 되돌리면 변종 2/3 이 조용히 버려진다)",
+          "tier_variant" in pk_cols, "포함", pk_cols)
+    # 변종을 실제로 «가르고» 있는가 — 같은 (게임,칸)에서 등급이 갈리는 쌍이 있어야
+    # 한다. 0이면 변종을 키에만 넣고 판정은 한 벌로 하고 있다는 뜻이다.
+    split = db_one(
+        "SELECT count(*) FROM ("
+        " SELECT game_id, cell_id FROM game_cell_map"
+        "  GROUP BY 1,2 HAVING count(DISTINCT match_level) > 1) t")
+    check("[60]④ ★ 같은 칸에서 변종마다 판정이 갈리는 쌍이 실재한다"
+          " (0이면 변종별 판정이 이름뿐이다)",
+          split > 0, "> 0", split)
+    # 화면 API 는 여전히 «칸» 단위로 센다 — 행 수를 칸 수라고 말하지 않는다.
+    try:
+        api = get("/api/admin/game-matrix?game_id=1")
+    except Exception as e:                               # noqa: BLE001
+        check("[60] GET /api/admin/game-matrix 조회", False, "200", repr(e))
+        return
+    sel = api.get("selection") or {}
+    cells = sel.get("cells") or []
+    ids = [c["cell_id"] for c in cells]
+    check("[60]④ 화면 API 가 칸을 중복해서 내려보내지 않는다(변종을 칸으로 접는다)",
+          len(ids) == len(set(ids)), "중복 0", len(ids) - len(set(ids)))
+    check("[60]④ 접힌 칸이 성립 변종 목록을 함께 준다(접되 버리지 않는다)",
+          all(c.get("variants") for c in cells), "전부 있음",
+          sum(1 for c in cells if not c.get("variants")))
+    # 대표값이 «가장 싼 성립 변종»이다 — 정의서 §④ 의 질문에 맞는 답인가.
+    bad_rep = [c["cell_id"] for c in cells
+               if c.get("variants") and c.get("total") is not None
+               and any(v["total"] is not None and v["total"] < c["total"]
+                       for v in c["variants"])]
+    check("[60]④ 칸 대표가 성립 변종 중 최저가다(더 싼 성립 구성을 숨기지 않는다)",
+          not bad_rep, "없음", bad_rep[:6])
+
+    # ── ⑤ PC방 상위권이 비지 않는다 ─────────────────────────────────
+    top = db_all(
+        "SELECT s.pcbang_rank r, g.name, g.mapping_skip_reason sk,"
+        "  count(DISTINCT m.cell_id) cells"
+        " FROM game_popularity_snapshots s"
+        " JOIN games g ON g.game_id=s.game_id"
+        " LEFT JOIN game_cell_map m ON m.game_id=g.game_id"
+        " WHERE s.pcbang_rank BETWEEN 1 AND 10"
+        " GROUP BY 1,2,3 ORDER BY 1")
+    empty = [t for t in top if t["cells"] == 0]
+    check("[60]⑤ ★ PC방 상위 10위 표본이 실재한다(검사의 전제)",
+          len(top) >= 8, ">= 8종", len(top))
+    # 전량이 보여야 한다고 박지 않는다 — 원천에 사양이 없는 게임(로블록스)은
+    # 사람이 채워야 하고, 그건 코드 결함이 아니다. 대신 «사유 없이 비는 것»은
+    # 금지한다. 그것이 사장님이 본 증상이다.
+    check("[60]⑤ ★ PC방 상위 10위 중 비어 있는 게임은 전부 사유가 있다"
+          " (이유 없이 빈 화면이 이번 병이다)",
+          all(t["sk"] for t in empty), "전부 사유 있음",
+          [t["name"] for t in empty if not t["sk"]])
+    visible = len(top) - len(empty)
+    check("[60]⑤ ★ PC방 상위 10위 중 과반이 칸을 갖는다"
+          " (가벼운 게임 판정 경로가 사라지면 1종으로 떨어진다)",
+          visible * 2 > len(top), "> " + str(len(top) // 2) + "종", visible)
+    drift("PC방 상위10 매핑된 게임 수", visible)
+
+    # 가벼운 게임 판정은 **게임 칸에만** 붙는다(사장님 문구 「모든 게임 칸」).
+    spill = db_all(
+        "SELECT DISTINCT c.usage FROM game_cell_map m"
+        "  JOIN grid_cells c ON c.cell_id=m.cell_id"
+        " WHERE m.match_level='경량충족' AND c.usage <> '게임'")
+    check("[60]⑤ 경량충족이 게임 칸 밖으로 새지 않는다(사장님 문구를 넓히지 않았다)",
+          not spill, "없음", [r["usage"] for r in spill])
+    # 근거 조건 — 경량충족을 받은 게임은 전부 사람확정 E·L 등급이다.
+    ungraded = db_all(
+        "SELECT DISTINCT g.name FROM game_cell_map m"
+        "  JOIN games g ON g.game_id=m.game_id"
+        " WHERE m.match_level='경량충족'"
+        "   AND NOT EXISTS (SELECT 1 FROM game_grade_assignments a"
+        "     WHERE a.game_id=g.game_id AND a.is_confirmed AND a.grade IN ('E','L'))")
+    check("[60]⑤ ★ 경량충족은 사람확정 E·L 등급 게임에만 붙는다"
+          " (A/B/C/S 로 넓히면 파싱 실패를 가벼움으로 오판한다 — 엘든링)",
+          not ungraded, "없음", [r["name"] for r in ungraded][:6])
+
+    # ── ⑥ 화면이 서버가 주는 등급 어휘를 전부 알아본다 ───────────────
+    tpl = pathlib.Path(ROOT, "templates", "admin", "game_matrix.html.j2")
+    check("[60]⑥ 매트릭스 템플릿이 있다", tpl.exists(), "있음", str(tpl))
+    if tpl.exists():
+        src = tpl.read_text(encoding="utf-8")
+        ok_m = re.search(r"var OK_LEVELS = \{([^}]*)\}", src)
+        known = set(re.findall(r"'([^']+)'\s*:", ok_m.group(1))) if ok_m else set()
+        # 서버가 실제로 주는 «통과» 등급 — 최소충족/구동가능은 통과가 아니다.
+        pass_levels = set(l for l in (api.get("game_levels") or [])
+                          if l not in ("최소충족",))
+        check("[60]⑥ ★ 화면의 통과 등급 목록이 서버가 주는 통과 등급을 전부 안다"
+              " (새 등급을 모르면 통과인데 «불성립» 색으로 그린다)",
+              pass_levels <= known, sorted(pass_levels),
+              sorted(pass_levels - known))
+        # 경량충족은 근거 경로가 서열 대조가 아니다 — 근거 패널이 그걸 밝히는가.
+        check("[60]⑥ 근거 패널이 경량충족의 판정 경로를 밝힌다"
+              " (서열 점수를 근거로 오독하게 두지 않는다)",
+              "LIGHT_LEVELS" in src and "판정 경로" in src, "밝힘", "없음")
+
+    # ── ⓧ ★ 음성 검사 — 고친 것을 예전으로 되돌리면 실제로 FAIL 하는가 ──
+    #    통과하는 검사만 늘리면 아무것도 증명하지 않는다. 여기서는 DB 를
+    #    건드리지 않고, **옛 로직을 그대로 재현한 사본**을 같은 원천 위에서
+    #    돌려 위 검사들이 깨지는지 본다.
+    quotes = db_all(
+        "SELECT q.cell_id, q.tier_variant, c.usage,"
+        " (SELECT it->>'name' FROM jsonb_array_elements("
+        "    COALESCE(q.payload->'items','[]'::jsonb)) it"
+        "  WHERE it->>'part_type'='GPU' LIMIT 1) gpu"
+        " FROM grid_quotes q JOIN grid_cells c ON c.cell_id=q.cell_id"
+        " WHERE q.is_current")
+    # ⓧ-1 변종을 칸으로 덮어쓰면(옛 `cell_index[cid] = ...`) 몇 벌이 사라지나.
+    old_index, new_index = {}, {}
+    for r in quotes:
+        if not r["gpu"]:
+            continue
+        old_index[r["cell_id"]] = r["gpu"]          # 덮어쓴다 — 옛 코드
+        new_index[(r["cell_id"], r["tier_variant"])] = r["gpu"]
+    check("[60]ⓧ ★ 음성 검사 — 칸 단위로 되돌리면 견적이 실제로 버려진다"
+          "(이 검사가 병을 잡는다는 증거)",
+          len(new_index) > len(old_index), "버려짐 발생",
+          "버려진 견적 0벌 — 검사가 병을 못 잡는다")
+    # 버려지는 것이 «무해한 중복»이 아니라 **다른 GPU** 라는 것까지 본다.
+    by_cell = {}
+    for (cid, _v), gpu in new_index.items():
+        by_cell.setdefault(cid, set()).add(gpu)
+    differing = sum(1 for v in by_cell.values() if len(v) > 1)
+    check("[60]ⓧ ★ 음성 검사 — 버려지는 변종이 «다른 GPU» 다(무해한 중복이 아니다)",
+          differing > 0, "> 0칸", differing)
+    drift("변종마다 GPU 가 다른 칸 수", differing)
+
+    # ⓧ-2 「가벼움」 조건에서 등급 검사를 빼면(= 서열표 밖이면 무조건 가벼움)
+    #      엘든링 같은 A/B/C/S 게임이 «가벼움»으로 잘못 붙는가.
+    loose = db_all(
+        "SELECT g.name, a.grade FROM games g"
+        "  JOIN game_grade_assignments a ON a.game_id=g.game_id AND a.is_confirmed"
+        " WHERE g.mapping_skip_reason = 'rec_gpu_not_in_ladder'"
+        "   AND a.grade NOT IN ('E','L')")
+    check("[60]ⓧ ★ 음성 검사 — 등급 조건을 빼면 오판할 게임이 실재한다"
+          "(조건이 «서열표 밖»만이었다면 이 게임들이 가벼움으로 붙었다)",
+          len(loose) > 0, "> 0종",
+          str(len(loose)) + "종 " + str([(r["name"], r["grade"]) for r in loose][:4]))
+
+    drift("game_cell_map 행수", db_one("SELECT count(*) FROM game_cell_map"))
+    drift("매핑된 게임 수", db_one("SELECT count(DISTINCT game_id) FROM game_cell_map"))
 
 
 if __name__ == "__main__":
