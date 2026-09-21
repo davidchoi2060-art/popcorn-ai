@@ -160,6 +160,22 @@ def list_usages():
       terms      `match_terms` 원본 — 부분일치 대상
       floor_note 서버가 실제로 거는 하한 한 줄(숫자 포함). 화면의 「이유」 자리는
                  이 값을 그대로 쓴다 — 화면이 이유를 지어내지 않는다.
+
+    ■ ⚠ 0110 — **라벨이 겹칠 수 있다.** 용도 재편으로 키 둘이 한 라벨을 쓴다:
+        office_simple·office_complex -> 「사무용」
+        design_edit·design_photo     -> 「디자인·조판」
+      키를 지우지 않은 것은 의도다 — `api/talk.py` 가 이 표를 팝콘톡 어휘의 정본으로
+      읽어서, 키를 지우면 「업무용」·「라이트룸」 같은 말을 못 알아듣는다(0110 머리 주석).
+      그런데 이 목록을 그대로 내보내면 **화면에 같은 칩이 두 번 뜬다**(실측으로
+      확인했다 — 「사무용 사무용」·「디자인·조판 디자인·조판」).
+      그래서 **라벨 단위로 접는다.** 어느 쪽을 남기는가가 중요하다:
+        고객이 그 칩을 누르면 값으로 **라벨 문자열**이 되돌아오고, 서버는 그것을
+        `match()` 에 넣는다. `match()` 는 sort_order 순 **먼저 맞는 키 하나**를 쓰므로,
+        남길 것은 «그 라벨을 실제로 잡는 키»다. 다른 것을 남기면 화면이 보여준
+        하한과 서버가 거는 하한이 어긋난다.
+      terms 는 합치지 않는다 — 합치면 화면의 `matchUsage` 가 서버 `match()` 와 다른
+      답을 내게 된다(자유 입력 「업무용」이 화면에선 사무용으로 잡히는데 서버에선
+      office_complex 로 가는 식). 두 규칙이 같아야 한다는 것이 이 API 의 전제다.
     """
     out: list = []
     idx: dict = {}
@@ -172,4 +188,14 @@ def list_usages():
         out[idx[k]]["_r"].append(r)
     for u in out:
         u["floor_note"] = floor_text(u.pop("_r"))
-    return {"ok": True, "usages": out}
+
+    # 라벨 접기 — 위 ⚠ 참조. 그 라벨을 `match()` 가 실제로 잡는 키만 남긴다.
+    picked: dict = {}
+    for u in out:
+        lab = u["label"]
+        hit = match(lab)
+        owner = hit[0]["usage_key"] if hit else None
+        if lab not in picked or u["key"] == owner:
+            picked[lab] = u
+    # 원래 순서(sort_order)를 지킨다 — 이 배열 순서가 곧 우선순위라고 위에 적었다.
+    return {"ok": True, "usages": [u for u in out if picked.get(u["label"]) is u]}

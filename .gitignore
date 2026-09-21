@@ -17,6 +17,16 @@ Thumbs.db
 # logs
 *.log
 
+# 외부 조회 원문 캐시 (위키백과 요약 — api/wiki_fetch.py). 파생 자료라 커밋하지 않는다.
+.cache/
+
+# .env 의 사본·백업도 전부 막는다 (2026-09-21).
+# DB 비밀번호 교체 때 `.env-1` 이 남아 커밋 직전까지 갔다 — `.env` 한 줄만으로는
+# `.env-1`·`.env.bak`·`.env.old` 가 안 걸린다.
+.env-*
+.env.*
+!.env.example
+
 # 민감 인프라 식별자 (프로젝트 ID·IP·서비스계정 — 커밋 금지)
 docs/infra/GCP_SETUP.md
 

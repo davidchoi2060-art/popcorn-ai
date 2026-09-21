@@ -160,6 +160,10 @@ from .db import engine
 # 스키마(TalkState·ParseResult) · 어휘 로더(load_vocab) · 검증(validate_state·missing_for) ·
 # 프롬프트 [격자] 문단(vocab_prompt_block)이 전부 저기 있다. 여기서 다시 적지 않는다.
 from . import talk_schema as TS
+# 답변 경로 [B] (2026-09-21 · talk_design_v2). **[A] 좌표 추출과 가른 자리**다 --
+# 자유 답변·DB 근거 수집·위키 조회·★필터가 전부 저기 있다. 이 파일의 [A] 프롬프트는
+# 한 글자도 바뀌지 않았다(제약 추출 정확도를 건드리지 않는다).
+from . import talk_answer as TA
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
@@ -865,10 +869,28 @@ def parse_talk(body: ParseBody, request: Request):
              len(text), len(vocab.usages), len(vocab.confirmed_games), len(vocab.tiers),
              len(history), "yes" if prev_ok else "no")
 
+    # ── [A] 좌표 추출 ∥ [B] 답변 — **병렬이다**(2026-09-21 · talk_design_v2 §4-1) ──
+    # 순차면 12초로 LLM_TIMEOUT_SEC(15)에 육박한다. 병렬이면 최악 7초.
+    # [B] 는 [A] 의 state 를 기다리지 않는다 -- 자체 어휘 매칭으로 판정한다(§6-1 단서).
+    # [B] 가 늦거나 죽어도 [A] 는 그대로 나간다(답변이 없는 것 < 상담이 끊기는 것).
+    prev_state_obj = None
+    if prev_ok:
+        try:
+            prev_state_obj = TS.TalkState.model_validate(body.state)
+        except Exception:                                    # noqa: BLE001
+            prev_state_obj = None
+
+    def _call_a():
+        return llm.call(prompt, task_key="task.s1_parse", customer_facing=True,
+                        max_output_tokens=LLM_MAX_OUTPUT_TOKENS,
+                        timeout_sec=LLM_TIMEOUT_SEC)
+
+    def _call_b():
+        return TA.answer_path(engine.connect, text, vocab,
+                              prev_state=prev_state_obj, history=history)
+
     try:
-        result = llm.call(prompt, task_key="task.s1_parse", customer_facing=True,
-                          max_output_tokens=LLM_MAX_OUTPUT_TOKENS,
-                          timeout_sec=LLM_TIMEOUT_SEC)
+        result, ans = TA.run_parallel(_call_a, _call_b)
     except llm.LLMBlockedError as e:
         raise HTTPException(502, f"AI 파싱이 한도에 걸렸습니다({e.kind}/{e.provider}) - {e}")
     except llm.LLMAllProvidersFailedError as e:
@@ -899,12 +921,34 @@ def parse_talk(body: ParseBody, request: Request):
     if not missing and state.game is not None and state.game.resolution is None:
         assumed.append(f"game.resolution={TS.DEFAULT_RESOLUTION}")
     pc = _pc_verdict(obj)
-    # 잡담 흐름 전이(2026-09-17) -- 순수함수 하나가 정한다(talk_schema.advance_smalltalk).
-    # 화면이 보낸 카운터는 그 함수가 clamp 한다. pc=None(모름)은 잡담으로 세지 않는다.
+    # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
+    #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
+    #   올랐고, 그 속도면 **5턴째에 침묵 처분**이다 -- 게임을 고른 뒤 PC 를 사겠다고
+    #   순서까지 말한 고객이 대화 도중에 차단된다.
+    #   **경계 3/4/5 는 그대로 두고 «세는 대상»만 바꾼다.** 판정은 [B] 가 이미 쓰는
+    #   어휘 매칭을 그대로 재사용한다 -- 새 판정기를 만들지 않는다.
+    game_related = TA.is_game_related(text, vocab)
     prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
-    turns, stage = TS.advance_smalltalk(prev_turns, pc)
+    turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
     reply = _reply_text(obj, pc, bool(state.usages), stage)
     evidence = _evidence_lines(obj)
+
+    # ── [B] 결과 조립 ────────────────────────────────────────────────────────
+    # ★ 수-3: `stage=silent` 여도 **answer 는 낸다**. 침묵은 「PC 견적 창구에서 무관한
+    #   잡담을 끊는다」는 규약이지 「게임 질문에 답하지 않는다」가 아니다. 다만 그때
+    #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
+    answer = ans.answer or ""
+    if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
+        answer = answer.replace(TA.NUDGE_NARROW, "").strip()
+    # [A] 와 [B] 의 게임명 교차 검증 -- 둘이 다르면 로그로 남긴다(삼키지 않는다).
+    # 값 자체는 [A] 의 state 가 정본이다(격자 좌표 계약을 [B] 가 덮어쓰지 않는다).
+    a_names = set(state.game.names) if state.game and state.game.names else set()
+    if ans.game_names and a_names and not (a_names & set(ans.game_names)):
+        log.info("[talk] path A/B game name mismatch: a=%d b=%d",
+                 len(a_names), len(ans.game_names))
+    if ans.error:
+        log.warning("[talk] answer path unavailable: %s", ans.error)
+
     log.info("[talk] parse done: provider=%s pc=%s usages=%d game=%s missing=%d dropped=%d"
              " reply_chars=%d stage=%s turns=%d tokens_in=%s elapsed=%.2fs",
              result.provider, "none" if pc is None else ("yes" if pc else "no"),
@@ -957,6 +1001,33 @@ def parse_talk(body: ParseBody, request: Request):
         # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
         "chat_flow": TS.ChatFlow(smalltalk_turns=turns).model_dump(),
         "stage": stage,
+        # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
+        # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,
+        # `answer` 는 [B] 가 내는 자유 답변 600자다 -- 서로 **독립된 상한**이라
+        # `_reply_text` 의 200자 컷을 `answer` 가 타지 않는다(분리안의 부수 이득).
+        # `answer` 가 빈 문자열이면 [B] 가 답할 근거를 못 찾았거나 경로가 막힌 것이다 --
+        # 화면은 그때 `reply` 만 띄운다.
+        "answer": answer,
+        # 「저희 자료」와 「찾아본 것」을 **같은 문단에 넣지 않는다**(A-18 정신).
+        # [{kind:"own"|"web", label, url?}] -- 화면이 말풍선을 나눈다.
+        "sources": ans.sources,
+        # wide | narrow | ready -- 순수함수 `talk_schema.narrowing_level` 이 정한다.
+        # 화면이 다시 계산하지 않게 서버가 붙인다(경계를 두 벌로 두지 않는다).
+        "narrowing": ans.narrowing,
+        # [B] 가 실제로 DB 에서 읽어 근거로 쓴 게임들. `state.game.names`([A] 가 고객
+        # 문장에서 뽑은 것)와 **다른 축**이다 -- 저쪽은 «고객이 말한 이름», 이쪽은
+        # «우리 표에서 찾아 근거로 쓴 이름»이다. 비어 있으면 DB 를 못 봤다는 뜻이다.
+        "answer_game_names": ans.game_names,
+        # 「조금 시간이 걸린다」 안내 -- **웹검색을 탈 때만** 있다. 항상 띄우면 안내가
+        # «늘 있는 것»이 되어 뜻을 잃는다(설계서 §4-2).
+        "answer_notice": ans.notice,
+        # ★ 필터가 무엇을 손댔는가 -- 조용히 지우지 않는다(`dropped[]` 규약과 같은 원칙).
+        # {kept, replaced[{before, after, kinds, source}], dropped[], gate_hit}
+        "answer_filter": ans.filter_report,
+        "answer_elapsed_sec": ans.elapsed_sec,
+        "answer_provider": ans.provider, "answer_model": ans.model,
+        "answer_cost_usd": ans.cost_usd,
+        "answer_error": ans.error,
         # 침묵 턴 표시. reply 가 빈 문자열인 것과 같은 사실이지만, 화면이 «빈 문자열»을
         # 「모델이 실수로 안 냈다」와 구분해 다룰 수 있게 명시 플래그로 준다.
         "silent": stage == TS.STAGE_SILENT,

@@ -4880,11 +4880,42 @@ def test_usage_floors():
         if sc.get("source") == "recent":
             check("실제 견적이면 생성 시각을 준다", bool(pk.get("at")), "at 있음", pk.get("at"))
     # 랜딩이 상담 세션을 남기지 않는가 — 방문마다 쌓이면 원장이 오염된다
+    #
+    # ⚠ 2026-09-21 — 이 검사를 **좁혔다**. 옛 판은 `consult_sessions` 의 **전체 행
+    #   수**를 호출 전후로 비교했다. 그 표는 회귀 자신·다른 에이전트·사람이 동시에
+    #   쓰는 원장이라, showcase 와 **아무 상관 없는** 행 하나만 끼어들어도 실패했다
+    #   (실측: 「기대 17025 / 실제 17026」이 하루에 두 번 떴고, 그 1건은 mode=chat ·
+    #    data_origin=test 로 견적 API 가 만든 것이었다).
+    #   즉 그 실패는 «showcase 가 세션을 만들었다»를 **증명하지 못했다**
+    #   (CLAUDE.md §회귀 세트 — 「그 실패가 무엇을 증명하는가」).
+    #
+    #   고친 방식: 전체 수 대신 **그 호출이 만들 수 있었던 행**만 본다.
+    #     · 호출 직전의 최대 session_id 를 표식으로 잡고
+    #     · 그 뒤에 생긴 행 중 **showcase 가 만들 법한 것**(mode 가 견적 경로 4종
+    #       —guided/chat/expert/talk— 이 아닌 행)이 있는지 센다.
+    #   showcase 는 견적을 만들지 않으므로 세션을 남긴다면 그 4종 밖이다. 동시에
+    #   돌아가는 견적 호출은 반드시 그 4종 안이라 이 검사를 흔들지 못한다.
+    #   실패 조건: showcase 가 세션을 남기기 시작한다(옛 결함의 재발) — 그때 그 행의
+    #   mode 가 무엇이든 «견적 4종 밖»이거나, 4종 중 하나를 가장했더라도 아래
+    #   두 번째 검사(증가 폭 상한)가 잡는다.
+    mark = db_one("SELECT coalesce(max(session_id), 0) FROM consult_sessions")
     n0 = db_one("SELECT count(*) FROM consult_sessions")
     get("/api/showcase")
-    check("showcase는 상담 세션을 만들지 않는다",
-          db_one("SELECT count(*) FROM consult_sessions") == n0, n0,
-          db_one("SELECT count(*) FROM consult_sessions"))
+    stray = db_all(
+        "SELECT session_id, mode, data_origin FROM consult_sessions"
+        " WHERE session_id > :m"
+        "   AND (mode IS NULL OR mode NOT IN ('guided','chat','expert','talk'))"
+        " ORDER BY session_id", m=mark)
+    check("showcase는 상담 세션을 만들지 않는다"
+          " (견적 경로 4종 밖의 세션이 새로 생기면 showcase 가 만든 것이다)",
+          not stray, "0건",
+          [(r["session_id"], r["mode"], r["data_origin"]) for r in stray[:5]])
+    # 두 번째 안전망 — 한 번의 GET 이 세션을 여러 개 만들 수는 없다. 동시 실행이
+    # 있어도 이 한 호출 사이에 수십 개가 생기지는 않으므로, 급증은 그 자체로 신호다.
+    grew = db_one("SELECT count(*) FROM consult_sessions") - n0
+    check("showcase 호출 한 번에 상담 세션이 급증하지 않는다"
+          " (동시 실행 여유 5건 — 전체 수 비교의 거짓 실패를 피하면서 폭주는 잡는다)",
+          grew <= 5, "<=5", grew)
     # 첫 화면 마크업이 서버 값을 받을 자리를 갖고 있는가
     for page, binds in (("main-landing.html", ("showcase_total", "showcase_items")),
                         ("s0-landing.html", ("live_stock_count", "showcase_total"))):
@@ -6662,7 +6693,8 @@ def main():
                test_design_split_invariants,
                test_assembly_fee_screen,
                test_admin_grid_screen_draws_cells,
-               test_game_cell_map_freshness):
+               test_game_cell_map_freshness,
+               test_market_bands_and_handling):
         try:
             fn()
         except Exception as e:
@@ -7283,6 +7315,241 @@ def test_talk_grid_contract():
           all("chat_flow" not in ln and "chatFlow" not in ln for ln in grid_call),
           "없음", grid_call[:2])
 
+    # ── [54-B] 팝콘톡 답변 경로 [B] (2026-09-21 · talk_design_v2) ──────────────
+    # 고친 병 — **사장님이 직접 보신 증상**: 고객이 세 번 물었는데 세 번 다 안 답했다.
+    #   고객: "요즘 인기 많은 게임을 소개해줘"  -> 봇: "혹시 새 컴퓨터를 맞추려고...?"
+    #   고객: "게임 내용이 궁금해 ... 그런후에 PC를 살려고" -> 봇: "게임 정하신 후에..."
+    #   고객: "슈팅게임"                        -> 봇: "게임을 충분히 알아보신 후에..."
+    # 원인 둘: ① 프롬프트가 `reply` 를 되묻기/확인 전용 200자로 못박아 **답을 담을 칸이
+    # 계약에 없었다** ② 「슈팅게임」이 pc=false 로 떨어져 잡담 카운터가 올랐다(5턴이면 침묵).
+    #
+    # ⚠ **LLM 을 부르지 않는다** — 아래는 전부 순수함수·정규식·DB 조회다.
+    import api.talk_answer as _ta
+    import api.talk_filter as _tf
+    import api.wiki_fetch as _wf
+
+    # ⓐ 게임 문장이 잡담으로 떨어지지 않는다 (설계서 §6-3 수-1 의 본체).
+    #   이 검사가 실패하려면: game_related 가 카운터에 반영되지 않아야 한다. 그러면
+    #   게임 이야기를 5턴 하는 고객이 다시 침묵 처분을 받는다.
+    check("[54-B] 게임 문장(game_related)은 잡담 카운터를 올리지 않는다",
+          _ts.advance_smalltalk(2, False, True) == (2, "open"), (2, "open"),
+          _ts.advance_smalltalk(2, False, True))
+    got_g = []
+    turns_g = 0
+    for _ in range(5):
+        turns_g, st_g = _ts.advance_smalltalk(turns_g, False, True)
+        got_g.append((turns_g, st_g))
+    check("[54-B] 게임 이야기를 5턴 이어가도 침묵 처분되지 않는다",
+          all(s == "pc" for _, s in got_g), "전부 pc", got_g)
+    # 경계 숫자 자체는 사장님 확정(2026-09-17) 그대로다 — 세는 대상만 바꿨다.
+    check("[54-B] game_related=False 면 예전 전이 그대로다(경계 3/4/5 불변)",
+          [_ts.advance_smalltalk(t, False, False) for t in range(0, 5)]
+          == [(1, "open"), (2, "open"), (3, "open"), (4, "guide"), (5, "silent")],
+          "불변", [_ts.advance_smalltalk(t, False, False) for t in range(0, 5)])
+    # 게임이면서 PC 질문인 문장은 리셋이 이긴다("발로란트 할 PC 맞춰주세요").
+    check("[54-B] pc=True 가 game_related 보다 우선한다(리셋)",
+          _ts.advance_smalltalk(3, True, True) == (0, "pc"), (0, "pc"),
+          _ts.advance_smalltalk(3, True, True))
+
+    # ⓑ narrowing 전이표 — 순수함수라 LLM 없이 전수로 본다(설계서 R1).
+    _st_empty = _ts.TalkState()
+    _st_game = _ts.TalkState(game=_ts.GameState(names=["발로란트"]))
+    _st_ready = _ts.TalkState(usages=["게임"], game=_ts.GameState(names=["발로란트"]))
+    _st_budget = _ts.TalkState(budget_won=1500000, game=_ts.GameState(names=["발로란트"]))
+    narrow_cases = [
+        ((None, False), "wide"), ((None, True), "narrow"),
+        ((_st_empty, False), "wide"), ((_st_empty, True), "narrow"),
+        ((_st_game, False), "narrow"), ((_st_game, True), "narrow"),
+        ((_st_ready, False), "ready"), ((_st_budget, False), "ready"),
+    ]
+    narrow_got = [_ts.narrowing_level(s, g) for (s, g), _ in narrow_cases]
+    check("[54-B] narrowing_level 전이표(wide/narrow/ready 경계)",
+          narrow_got == [e for _, e in narrow_cases],
+          [e for _, e in narrow_cases], narrow_got)
+    # ★ wide 에서 유도하지 않는다 — 이른 유도가 고객을 잡담 카운터에 올린 것이 이번 병이다.
+    check("[54-B] wide 에서는 유도 문구를 붙이지 않는다(이른 유도 금지)",
+          "NARROWING_NARROW" in pathlib.Path(ROOT, "api", "talk_answer.py").read_text(
+              encoding="utf-8").split("res.narrowing == ")[1][:40],
+          "narrow 에서만", "경계가 다름")
+
+    # ⓒ ★ 필터 재현율 — 가격·부품 문장이 필터를 통과하지 못한다(실제 문장 표본).
+    #   표본은 설계자가 3사 응답 667문장에서 뽑은 것이다(POSITIVE 14건).
+    #   이 검사가 실패하려면: 탐지기가 조용히 약해져야 한다. 그러면 「발로란트 60만원이면
+    #   충분」이 고객에게 그대로 나가고, 같은 화면의 견적(908,800원)과 어긋난다.
+    _FILTER_POS = [
+        "그래픽카드 GTX 960 정도면 충분합니다.",
+        "저사양 PC(60~80만원)에서도 잘 돌아갑니다.",
+        "필요 PC 사양: 중사양 (중상급 PC 필요)",
+        "너무 비싼 최고급 사양까지는 필요 없고",
+        "너무 고사양 PC까지는 필요하지 않음",
+        "중간 이상 사양이 필요함",
+        "램, 그래픽카드, CPU 밸런스 중요",
+        "이 게임은 요구사양이 매우 낮습니다.",
+        "지금 재고가 있어서 내일 배송됩니다.",
+        "CPU i5급, RAM 16GB, GPU RTX 4060급, SSD 1TB 정도면 됩니다.",
+        "발로란트 50~60만원, 롤 70~80만원이면 충분해요.",
+        "발로란트는 60만원 PC로 충분합니다.",
+        "RTX 4060급이면 충분합니다.",
+        "144Hz 모니터를 추천드립니다.",
+    ]
+    # NEGATIVE — 순수 게임 설명은 **손대지 않는다**. 1턴(게임 소개)에 3사 모두 0건이
+    # 걸린 것이 필터가 옳은 자리를 때린다는 증거였다.
+    _FILTER_NEG = [
+        "발로란트는 5대5 전술 슈팅 게임입니다.",
+        "2020년 6월 2일 윈도우용으로 출시되었습니다.",
+        "2026-09-17 기준 PC방 5위 6.65% 입니다.",
+        "100명의 플레이어가 한 섬에 떨어져 마지막 한 명이 남을 때까지 경쟁합니다.",
+        "라이엇 게임즈가 개발했습니다.",
+        "젊은 층에게 특히 인기가 많습니다.",
+        "팀워크와 전략이 중요한 게임이에요.",
+        "이 중에서 가장 마음에 드는 게임을 고르시면 좋습니다.",
+        "슈팅 게임 중에서는 오버워치2도 인기가 많아요.",
+        "캐릭터마다 고유한 스킬이 있습니다.",
+    ]
+
+    def _caught(s):
+        k = _tf.detect(s)
+        return bool(k) and _tf._claims_value(s, k)
+
+    miss = [s for s in _FILTER_POS if not _caught(s)]
+    check("[54-B] ★ 가격·부품 문장이 필터를 통과하지 못한다(3사 실측 표본 14건)",
+          miss == [], "미탐 0건", miss)
+    fp = [s for s in _FILTER_NEG if _caught(s)]
+    check("[54-B] ★ 순수 게임 설명은 필터가 손대지 않는다(오탐 표본 10건)",
+          fp == [], "오탐 0건", fp)
+
+    # ⓓ ★ 치환값 원천 검사 — 치환 문구 안의 수치가 `grid_quotes` 조회와 일치하는가.
+    #   **하드코딩 방지.** 다른 담당의 예산 재설계가 끝나도 이 검사가 안 깨져야 한다
+    #   (깨지면 누가 숫자를 코드에 박았다는 뜻이다).
+    _db_lo = db_one(
+        "SELECT MIN(q.total) FROM grid_quotes q"
+        " JOIN grid_cells c ON c.cell_id = q.cell_id"
+        " WHERE q.is_current AND q.verdict = 'within' AND c.game_grade = 'E'"
+        "   AND c.usage LIKE '%게임%'")
+    if _engine is not None:
+        with _engine.connect() as _c:
+            _floors = _tf.price_floors(_c)
+        _res = _tf.apply_filter("발로란트는 60만원 PC로 충분합니다.", _floors, "E")
+        if _db_lo is not None:
+            # 게임 칸에 현재 성립 견적이 있다 -> 그 값이 **그대로** 문구에 들어가야 한다.
+            check("[54-B] ★ 치환 문구의 금액이 grid_quotes 실조회와 일치한다(하드코딩 금지)",
+                  format(int(_db_lo), ",") in _res.text,
+                  "DB 최저가 %s" % format(int(_db_lo), ","), _res.text)
+        else:
+            # ★ 게임 칸에 현재 성립 견적이 **없다**(예: 격자 재생성 중). 이때 금액을
+            #   지어내면 안 된다 — 금액 없는 문구로 접는 것이 옳은 동작이다.
+            #   이 갈림이 있어야 다른 담당의 예산 재설계 중에도 검사가 거짓말을 안 한다.
+            check("[54-B] ★ 게임 칸 현재 견적이 없으면 금액을 지어내지 않는다",
+                  not _tf._RE_PRICE.search(_res.text), "금액 없음", _res.text)
+        check("[54-B] 치환 뒤에는 모델이 말한 거짓 금액이 남지 않는다(ⓑ-3 을 쓰지 않는다)",
+              "60만원" not in _res.text, "없음", _res.text)
+    # 필터 소스에 금액 리터럴을 박지 않았다 — 조회로만 쓴다.
+    _tf_src = pathlib.Path(ROOT, "api", "talk_filter.py").read_text(encoding="utf-8")
+    _hard = re.findall(r"\b(?:645000|908800|1918600|2691400|1836900)\b", _tf_src)
+    check("[54-B] ★ 필터 코드에 예산 수치를 박지 않았다(조회로만 쓴다)",
+          _hard == [], [], _hard)
+
+    # ⓔ ★ 음성 검사 — **필터를 끄면 실제로 FAIL 하는가.**
+    #   검사가 병을 잡는다는 증거다. 탐지기를 비활성화한 상태에서 같은 표본을 돌려
+    #   「거짓이 그대로 통과」하는 것을 확인한다. 이것이 0이면 위 ⓒ 검사는 이름뿐이다.
+    _leak = []
+    for s in _FILTER_POS:
+        # 필터 없이 그대로 내보냈다고 가정 -> 가격·부품 주장이 고객에게 나간다.
+        if _tf._RE_PRICE.search(s) or _tf._RE_PART.search(s):
+            _leak.append(s)
+    check("[54-B] ⓧ 음성 검사 — 필터가 없으면 가격·부품 주장이 실제로 새어 나간다",
+          len(_leak) > 0, "> 0건", len(_leak))
+    _off = _tf.apply_filter("발로란트는 60만원 PC로 충분합니다.",
+                            _tf.PriceFloors(), None)
+    check("[54-B] ⓧ 음성 검사 — 대조 원천이 비면 치환 대신 «금액 없는 문구»로 접는다",
+          "60만원" not in _off.text and _off.replaced, "거짓 제거", _off.text)
+
+    # ⓕ ★ 근거가 없으면 문장을 만들지 않는다 (설계서 §4-3 「배틀그라운드 19자」 사고).
+    #   위키 본문이 19자뿐인데 모델이 204토큰짜리 그럴듯한 설명을 냈다 — 내용은 맞지만
+    #   **근거에 없던 말**이다(사전지식으로 메웠다). 80자 문턱이 그것을 막는다.
+    check("[54-B] ★ 근거 80자 문턱이 서 있다", _wf.EXTRACT_MIN_CHARS == 80,
+          80, _wf.EXTRACT_MIN_CHARS)
+    check("[54-B] ★ 근거가 문턱 미만이면 ok=False 다(문장을 만들지 않는다)",
+          not _wf.WikiResult(ok=False, extract="x" * 19).ok, "ok=False", "ok=True")
+    # 근거가 둘 다 비면 「자료 없음」 고정 문구다 — 지어내지 않는다.
+    check("[54-B] 근거가 하나도 없으면 「자료 없음」으로 답한다",
+          not _ta.Evidence().has_any() and "자료" in _ta.NO_DATA,
+          "자료 없음 문구", _ta.NO_DATA)
+
+    # ⓖ ★ 웹검색 제목 유사도 관문 — 실측 오매칭 6건이 전부 거부되는가(설계서 R5).
+    #   관문이 없으면 「아이온2」에 «리튬 이온 전지» 설명이 고객에게 나간다.
+    _MISMATCH = [("아이온2", "리튬 이온 전지"), ("아크 서바이벌", "아이언 (래퍼)"),
+                 ("워독스", "문호 스트레이 독스"), ("패스 오브 엑자일2", "카카오게임즈"),
+                 ("MS 플라이트 시뮬레이터 2024", "IBM PC 호환기종"),
+                 ("리니지 클래식", "엔씨")]
+    _passed = [(q, t) for q, t in _MISMATCH if _wf.passes_gate(q, t)]
+    check("[54-B] ★ 유사도 관문이 실측 오매칭 6건을 전부 거부한다",
+          _passed == [], "전부 거부", _passed)
+    _true = [("발로란트", "발로란트"), ("오버워치", "오버워치 2")]
+    _rejected = [(q, t) for q, t in _true if not _wf.passes_gate(q, t)]
+    check("[54-B] 관문이 진짜 일치는 거부하지 않는다", _rejected == [], [], _rejected)
+    # ⓧ 음성 검사 — 관문을 끄면 저 6건이 실제로 통과한다(관문이 일하고 있다는 증거).
+    _would = [(q, t) for q, t in _MISMATCH if _wf.title_similarity(q, t) > 0.0]
+    check("[54-B] ⓧ 음성 검사 — 관문이 없으면 오매칭이 실제로 통과한다",
+          len(_would) > 0, "> 0건", len(_would))
+
+    # ⓗ answer 와 reply 의 상한이 **서로 독립**인가(설계서 R7).
+    #   `reply` 200자 컷이 `answer` 를 죽이면 답변 칸을 새로 낸 뜻이 사라진다.
+    import api.talk as _talk_mod
+    import api.llm as _llm
+    check("[54-B] answer 상한(600)과 reply 상한(200)이 서로 독립이다",
+          _ta.ANSWER_MAX_LEN == 600 and _talk_mod.REPLY_MAX_LEN == 200
+          and _ta.ANSWER_MAX_LEN != _talk_mod.REPLY_MAX_LEN,
+          "600 / 200", (_ta.ANSWER_MAX_LEN, _talk_mod.REPLY_MAX_LEN))
+    # `_reply_text` 의 200자 컷을 answer 가 타지 않는다 — 다른 필드이므로 구조적으로 그렇다.
+    _talk_src = pathlib.Path(ROOT, "api", "talk.py").read_text(encoding="utf-8")
+    check("[54-B] answer 가 _reply_text 를 타지 않는다(다른 필드다)",
+          "_reply_text(" not in _talk_src.split('"answer": answer')[0].rsplit(
+              "answer = ans.answer", 1)[-1],
+          "안 탄다", "탄다")
+
+    # ⓘ ★ 좌표 추출([A])의 프롬프트를 건드리지 않았다 — 제약 추출 정확도 유지.
+    #   이 검사가 실패하려면: 답변 경로를 만들면서 [A] 프롬프트를 손봐야 한다.
+    #   그러면 회귀 33건이 붙잡고 있던 좌표 추출이 조용히 달라진다.
+    check("[54-B] ★ [A] 좌표 추출은 여전히 task.s1_parse 다(모델 교체 없음)",
+          '"task.s1_parse"' in _talk_src, "있음", "없음")
+    check("[54-B] ★ 답변 호출은 별도 task_key 다(같은 호출에 섞지 않는다)",
+          _ta.ANSWER_TASK_KEY == "task.talk_answer"
+          and _ta.ANSWER_TASK_KEY in _llm.TASK_DEFAULTS,
+          "task.talk_answer 등록됨", _ta.ANSWER_TASK_KEY)
+    check("[54-B] 답변 프롬프트는 격자 어휘를 싣지 않는다(토큰 30배 방지)",
+          "vocab_prompt_block" not in pathlib.Path(
+              ROOT, "api", "talk_answer.py").read_text(encoding="utf-8"),
+          "안 싣는다", "싣는다")
+
+    # ⓙ ★ `game_customer_copy` 는 **검수 전에는 내보내지 않는다**(사장님 확정).
+    #   reviewed_by 0/86 인 지금, 고객에게 한 줄도 나가면 안 된다.
+    _ta_src = pathlib.Path(ROOT, "api", "talk_answer.py").read_text(encoding="utf-8")
+    check("[54-B] ★ copy 는 reviewed_by 가 있을 때만 근거로 싣는다(검수 전 비노출)",
+          'if r["reviewed_by"]:' in _ta_src, "reviewed_by 확인", "무조건 싣는다")
+    # `games.description` 은 «게임 소개»가 아니라 사양 부하 메모다 — 고객에게 안 읽는다.
+    check("[54-B] ★ games.description 을 고객 답변 근거로 싣지 않는다(사양 메모다)",
+          "description" not in _ta_src.split("def _fact_lines")[1].split("def ")[0],
+          "안 싣는다", "싣는다")
+
+    # ⓚ 인기도는 **날짜·모수를 병기**한다 — 그 둘이 없으면 줄 자체를 만들지 않는다.
+    _f_nodate = _ta.GameFacts(name="x", pcbang_rank=5)
+    _f_ok = _ta.GameFacts(name="x", pcbang_rank=5, pcbang_share=6.65,
+                          snapshot_date="2026-09-17")
+    check("[54-B] 인기도에 날짜가 없으면 그 줄을 만들지 않는다",
+          _f_nodate.popularity_line() is None, None, _f_nodate.popularity_line())
+    check("[54-B] 인기도 줄에 날짜와 모수가 함께 들어간다",
+          "2026-09-17" in (_f_ok.popularity_line() or "")
+          and "6.65" in (_f_ok.popularity_line() or ""),
+          "날짜+모수", _f_ok.popularity_line())
+    # `games.popularity_rank` 는 0/86 죽은 컬럼이라 **조회하지 않는다**.
+    #   ⚠ 문자열 모양이 아니라 «SELECT 문에 있는가»로 본다 — 주석·docstring 에서
+    #     그 컬럼을 «쓰지 않는 이유»로 언급하는 것은 정상이다.
+    _sel_sql = " ".join(re.findall(r'"[^"]*SELECT[^"]*"', _ta_src, re.I))
+    check("[54-B] 죽은 컬럼 games.popularity_rank 를 조회하지 않는다",
+          "popularity_rank" not in _sel_sql, "안 읽는다", "SELECT 에 있음")
+
+
 
 # ── [55] 고객 문구 수치 실재 (2026-09-19 신설) ────────────────────────────────
 # 이 정규식과 haystack 구성은 조사자의 1회성 검증기(D:/Hermes-Workspace/verify_copy.py)
@@ -7577,7 +7844,12 @@ def test_omitted_variant_screen():
                 return c
         return None
 
-    office = _set_with_omission({"usages": ["단순 사무용"], "budget_won": 1500000,
+    # 0110 — 「단순 사무용」은 usage_floors.usage_label 어휘에서 사라졌다(「사무용」으로
+    #   합침 · 사장님 확정 ④). 옛 이름을 그대로 보내면 state 경로가 어휘 밖이라
+    #   dropped 로 떨구고 card_sets 가 비는데, 그건 **정상 동작**이다(어휘의 정본은 DB).
+    #   여기서 보려는 것은 «제외된 구성이 사유와 함께 내려오는가»지 옛 이름의 생존이
+    #   아니므로 현행 이름을 쓴다. 옛 이름의 처리는 usage_label_map 이 맡는다([60]).
+    office = _set_with_omission({"usages": ["사무용"], "budget_won": 1500000,
                                  "budget_bound": "이하"})
     video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
                                 "budget_bound": "이하"})
@@ -7870,17 +8142,41 @@ def test_design_split_invariants():
           not steals, "없음", steals[:5])
     # photo 가 edit 을 훔치는 것도 같은 문제다(photo 가 앞이다) — 위 루프가 함께 본다.
 
-    # ⑥ 격자가 두 갈래를 안다
-    _gp = io.open(os.path.join(ROOT, "api", "grid_public.py"),
-                  encoding="utf-8").read()
-    for lab in ("디자인·조판", "사진·후보정"):
-        check(f"[57] USAGE_TO_GRID 에 '{lab}' 이 있다(없으면 카드가 조용히 0장)",
-              f'"{lab}"' in _gp, "있음", "없음")
-    cell_usages = {r["usage"] for r in db_all(
-        "SELECT DISTINCT usage FROM grid_cells")}
-    for lab in ("디자인·조판", "사진·후보정"):
-        check(f"[57] grid_cells 에 '{lab}' 칸이 있다",
-              lab in cell_usages, "있음", sorted(cell_usages))
+    # ⑥ 격자가 이 갈래들을 안다 — 0110 에서 **검사 방식을 바꿨다**
+    #   왜 바꿨나: 옛 검사는 `api/grid_public.py` 소스에 리터럴 두 개
+    #   ('디자인·조판'·'사진·후보정')가 적혀 있는지 봤다. 그런데
+    #     (a) 0110 이 사장님 확정으로 **사진·후보정을 디자인·조판에 합쳤다**
+    #         (시장 표본 2벌 · 그 2벌도 같은 상품의 용량 변형) — 격자에 그 칸이
+    #         더는 없으므로 옛 기대값이 사실과 어긋난다.
+    #     (b) 더 중요한 것: **손으로 적은 표를 검사하는 것 자체가 병이었다.**
+    #         0102·0108 이 그 표에 키를 넣는 것을 두 번 빠뜨렸고, 회귀는 «리터럴이
+    #         있는가»만 봐서 «격자에 칸이 있는가»와 어긋나도 잡지 못했다.
+    #         0110 이 그 매핑을 DB(grid_cells + usage_label_map)로 옮겼다.
+    #   그래서 이제 **DB 대조**를 한다 — usage_floors 의 모든 용도가 격자 용도로
+    #   실제로 이어지는가. 다음 용도 개편에서 기대값을 또 고칠 필요가 없고,
+    #   «카드가 조용히 0장» 을 잡는 힘은 오히려 세진다(전수 검사다).
+    #   ⚠ 「USAGE_TO_GRID 리터럴이 돌아오지 않았는가」는 [60] 이 따로 지킨다.
+    try:
+        sys.path.insert(0, ROOT)
+        from api.grid_public import usage_map as _umap
+        m = _umap()
+        cell_usages = {r["usage"] for r in db_all(
+            "SELECT DISTINCT usage FROM grid_cells")}
+        floor_labels = {r["usage_label"] for r in db_all(
+            "SELECT DISTINCT usage_label FROM usage_floors WHERE active")}
+        unmapped = sorted(lab for lab in floor_labels
+                          if m.get(lab) not in cell_usages)
+        check("[57] usage_floors 의 모든 용도가 격자 칸으로 이어진다"
+              " (안 이어지면 그 용도의 카드가 조용히 0장이 된다"
+              " — 0102·0108 이 두 번 빠뜨린 자리)",
+              not unmapped, "0건", unmapped)
+        # 디자인 갈래 둘은 usage_floors 에 **키로 남아 있고**(팝콘톡 어휘 보존),
+        # 격자에서는 한 용도로 모인다. 그 대응이 실제로 걸리는지 이름으로 확인한다.
+        for lab in ("디자인·조판", "사진·후보정"):
+            check(f"[57] '{lab}' 이 격자 용도로 이어진다 -> {m.get(lab)!r}",
+                  m.get(lab) in cell_usages, "격자 용도", m.get(lab))
+    except Exception as e:                                   # noqa: BLE001
+        check("[57] 격자 용도 매핑 대조", False, "정상", repr(e))
 
 
 def test_assembly_fee_screen():
@@ -8545,6 +8841,203 @@ def test_game_cell_map_freshness():
 
     drift("game_cell_map 행수", db_one("SELECT count(*) FROM game_cell_map"))
     drift("매핑된 게임 수", db_one("SELECT count(DISTINCT game_id) FROM game_cell_map"))
+
+
+
+def test_market_bands_and_handling():
+    """[60] 예산 구간·용도 체계·빈 칸 3값 정합 (0110 · 2026-09-21 신설)
+
+    ■ 오늘 얻은 교훈이 이 검사의 이유다
+      격자 결함 다섯이 **전부 코드가 멀쩡히 돌고 콘솔도 조용한 채 화면만 비었다.**
+      · tier_key 가 NULL 이 됐는데 좌표 키가 그대로라 표가 통째로 비었다(0105)
+      · FK 가 `grid_cells_legacy_v1` 을 가리켰는데 조회는 성공했다(0109)
+      · 용도를 분할하며 매핑표에 키를 빠뜨려 카드가 0장이 될 뻔했다(0102·0108)
+      전부 «실패하지 않는 결함»이다. 그래서 관계식으로 못 박는다.
+
+    ■ 각 항목이 «무엇이 잘못돼야 실패하는지»
+      ① **구간 정의가 한 벌이다.** 이름 하나에 값 하나 — 같은 band_key 가 두 번
+         나오거나, 같은 축에서 구간이 겹치거나 비면 실패. 구간이 «견적 관측값»으로
+         되돌아가는 것(0110 이 고친 병)이 이 모양으로 나타난다.
+         실패 조건: 누가 quote_low/high 를 다시 구간처럼 쓴다.
+      ② **각 용도의 칸이 설계대로다.** 「취급함」 칸이 그 용도의 주력 구간 밖에
+         생기면 연속이 끊겨 실패 — 사장님 확정 ⑤(주력 구간만 남긴다)가 깨진 것이다.
+         주력 구간 자체는 **DB 가 정본**이라 여기 숫자를 적지 않는다(값 지어내기 금지).
+         실패 조건: 주력 밖 칸을 「취급함」으로 켠다(=옛 134칸 상태로 되돌린다).
+      ③ **빈 칸 3값이 전부 설정돼 있다.** handling_state 미설정 0건.
+         0110 이전에는 boolean 이었고 134칸 전부 false 였다 — 즉 «아무도 안 썼다».
+         실패 조건: 전부 「취급함」으로 되돌린다(= 구분이 다시 사라진다).
+      ④ **견적 총액이 그 칸 구간 안에 든다.** 추천본이 구간 하한보다 낮거나
+         상한보다 높으면 실패(고성능은 HIGHEND_CAP_X 설계상 예외 — 제외한다).
+         이것이 0105 가 실측한 «median 되돌림»을 잡는 자리다: 예산 라벨 형식이
+         깨지면 엔진이 조용히 풀 중앙값을 주고, 그러면 구간 이름이 거짓이 된다.
+         실패 조건: budget_label 형식을 깨거나 구간 경계를 옮기고 배치를 안 돌린다.
+      ⑤ **격자 용도가 전부 usage_floors 에 걸린다.** 걸리지 않으면 배치가 보내는
+         「용도」를 엔진이 못 알아듣고 **하한 없이** 견적을 만든다 — 실패가 아니라
+         조용한 오답이다. 실패 조건: 용도 라벨을 바꾸고 match_terms 를 안 고친다.
+      ⑥ **격자 용도 매핑이 손으로 적혀 있지 않다.** USAGE_TO_GRID 리터럴이
+         돌아오면 실패 — 0102·0108 이 두 번 빠뜨린 자리다(0110 이 DB 로 옮겼다).
+      ⑦ **FK 가 현행 표를 가리킨다.** grid_quotes·game_cell_map·workload_cell_map 이
+         `_legacy_*` 를 가리키면 실패. 0109 에서 실제로 난 사고다.
+      ⑧ **예산 칩 값을 엔진이 읽는다.** `GET /api/budget-bands` 의
+         constraint_value 를 `_budget_cap` 이 실제로 같은 수로 파싱하는지 본다.
+         형식이 어긋나면 엔진은 예외 없이 median 으로 되돌아간다.
+    """
+    print("\n[60] 예산 구간·용도·빈 칸 3값 정합 (0110 · 2026-09-21 신설)")
+    bands = db_all("SELECT band_key, axis, label, budget_min_won, budget_max_won,"
+                   " budget_label, sort_order FROM grid_budget_bands"
+                   " ORDER BY axis, sort_order")
+    if not bands:
+        print("  [SKIP] grid_budget_bands 0행(0110 미적용 또는 DB 미접속)")
+        return
+
+    # ── ① 구간 정의가 한 벌인가 ────────────────────────────────────────
+    keys = [b["band_key"] for b in bands]
+    check("[60] band_key 가 중복되지 않는다(이름 하나에 값 하나)",
+          len(keys) == len(set(keys)), "중복 없음",
+          [k for k in set(keys) if keys.count(k) > 1])
+    for axis in ("game", "nongame"):
+        ax = [b for b in bands if b["axis"] == axis]
+        if not ax:
+            continue
+        gaps = [f"{a['band_key']}({a['budget_max_won']}) -> "
+                f"{b['band_key']}({b['budget_min_won']})"
+                for a, b in zip(ax, ax[1:])
+                if a["budget_max_won"] != b["budget_min_won"]]
+        check(f"[60] {axis} 축 구간이 빈틈·겹침 없이 이어진다", not gaps, "연속", gaps)
+        opens = [b["band_key"] for b in ax if b["budget_max_won"] is None]
+        check(f"[60] {axis} 축에서 상한이 열린 구간은 마지막 하나뿐이다"
+              " (중간이 열리면 그 위 구간과 겹친다)",
+              opens in ([], [ax[-1]["band_key"]]), [ax[-1]["band_key"]], opens)
+
+    # ── ② 각 용도의 「취급함」 칸이 연속된 주력 구간을 이룬다 ────────────
+    order = {b["band_key"]: i for i, b in enumerate(
+        [x for x in bands if x["axis"] == "nongame"])}
+    rows = db_all("SELECT usage, budget_band_key, handling_state"
+                  " FROM grid_cells WHERE usage <> '게임'")
+    by_usage = {}
+    for r in rows:
+        by_usage.setdefault(r["usage"], {})[r["budget_band_key"]] = r["handling_state"]
+    for usage, m in sorted(by_usage.items()):
+        idx = sorted(order[k] for k, st in m.items() if st == "취급함")
+        if not idx:
+            check(f"[60] '{usage}' 에 「취급함」 칸이 있다", False, ">=1", 0)
+            continue
+        check(f"[60] '{usage}' 의 「취급함」 구간이 연속이다"
+              " (주력 구간 밖에 칸이 켜지면 끊긴다)",
+              idx == list(range(idx[0], idx[-1] + 1)),
+              f"{idx[0]}~{idx[-1]} 연속", idx)
+        check(f"[60] '{usage}' 가 비게임 8구간을 전부 갖는다"
+              " (칸을 지우지 않고 상태로 구분한다 — 사장님 확정 ②)",
+              len(m) == 8, 8, len(m))
+
+    # ── ③ 빈 칸 3값이 전부 설정돼 있다 ─────────────────────────────────
+    STATES = {"취급함", "일부러 비움", "모름", "채울 예정"}
+    st_rows = db_all("SELECT handling_state, count(*) n FROM grid_cells"
+                     " GROUP BY 1 ORDER BY 2 DESC")
+    bad = [r["handling_state"] for r in st_rows if r["handling_state"] not in STATES]
+    check("[60] handling_state 가 전부 4값 안이다(미설정·오탈자 0건)",
+          not bad, "취급함/일부러 비움/모름/채울 예정", bad)
+    null_n = db_one("SELECT count(*) FROM grid_cells WHERE handling_state IS NULL")
+    check("[60] handling_state 미설정 0건", null_n == 0, 0, null_n)
+    non_active = sum(r["n"] for r in st_rows if r["handling_state"] != "취급함")
+    check("[60] 「취급함」이 아닌 칸이 실제로 존재한다"
+          " (0110 이전에는 134칸 전부 false 였고 그 값을 쓰는 코드가 없었다)",
+          non_active > 0, ">0", non_active)
+    drift("취급 안 하는 칸 수", non_active)
+
+    # ── ④ 견적 총액이 그 칸 구간 안에 드는가 ───────────────────────────
+    #   ⚠ 「구간 밖이면 0건」으로 잡지 않는다. 구간 밖 자체는 **있을 수 있는 사실**이다
+    #     (부품 풀이 그 구간 하한까지 못 올라가는 칸이 실측 10개 있다). 잡아야 하는
+    #     것은 «구간 밖인데 화면에는 정상이라고 적힌» 경우다 — 그게 조용한 거짓이다.
+    outs = db_all(
+        "SELECT c.cell_id, c.usage, b.band_key, b.budget_min_won, b.budget_max_won,"
+        " q.total, q.status FROM grid_cells c"
+        " JOIN grid_budget_bands b ON b.band_key = c.budget_band_key"
+        " JOIN grid_quotes q ON q.cell_id = c.cell_id AND q.is_current"
+        " WHERE c.handling_state = '취급함' AND q.tier_variant = '추천'"
+        "   AND q.total IS NOT NULL"
+        "   AND (q.total < b.budget_min_won"
+        "        OR (b.budget_max_won IS NOT NULL AND q.total > b.budget_max_won))")
+    lying = [o for o in outs if o["status"] == "정상"]
+    check("[60] 구간 밖 「추천」 견적이 «정상»으로 적혀 있지 않다"
+          " (구간 밖인데 정상이라고 말하면 구간 이름이 거짓이 된다 —"
+          " 0105 가 실측한 median 되돌림이 이 모양으로 나타난다)",
+          not lying, "0건",
+          [f"cell {o['cell_id']} {o['usage']}/{o['band_key']}"
+           f" total={o['total']} band=[{o['budget_min_won']},{o['budget_max_won']}]"
+           f" status={o['status']}" for o in lying[:5]])
+    check("[60] 구간 밖 「추천」이 전부 하한미달/상한초과로 표시돼 있다",
+          all(o["status"] in ("구간 하한 미달", "예산 상한 초과") for o in outs),
+          "하한미달 또는 상한초과",
+          sorted({o["status"] for o in outs}))
+    drift("구간 밖 추천 견적 수", len(outs))
+
+    # ── ⑤ 격자 용도가 전부 usage_floors 에 걸린다 ──────────────────────
+    try:
+        sys.path.insert(0, ROOT)
+        from api import usage_floors as _UF
+        _UF.reload()
+        cell_usages = [r["usage"] for r in db_all(
+            "SELECT DISTINCT usage FROM grid_cells ORDER BY usage")]
+        unmatched = [u for u in cell_usages if not _UF.match(u)]
+        check("[60] 격자 용도가 전부 usage_floors.match() 에 걸린다"
+              " (안 걸리면 배치가 하한 없이 견적을 만든다 — 조용한 오답)",
+              not unmatched, "0건", unmatched)
+    except Exception as e:                                   # noqa: BLE001
+        print(f"  [INFO] usage_floors 대조 생략 — {e!r}")
+
+    # ── ⑥ 격자 용도 매핑이 손으로 적혀 있지 않다 ───────────────────────
+    _gp = io.open(os.path.join(ROOT, "api", "grid_public.py"), encoding="utf-8").read()
+    check("[60] api/grid_public.py 가 용도 매핑을 손으로 들고 있지 않다"
+          " (USAGE_TO_GRID 리터럴 — 0102·0108 이 두 번 키를 빠뜨린 자리)",
+          "USAGE_TO_GRID = {" not in _gp, "없음", "USAGE_TO_GRID 리터럴이 돌아왔다")
+    check("[60] usage_label_map(원장 옛 이름 매핑표)이 있다",
+          bool(db_all("SELECT 1 FROM usage_label_map LIMIT 1")), "있음", "없음")
+
+    # ── ⑦ FK 가 현행 표를 가리킨다 (0109 에서 실제로 난 사고) ───────────
+    fks = db_all(
+        "SELECT rel.relname src, ref.relname tgt FROM pg_constraint con"
+        " JOIN pg_class rel ON rel.oid = con.conrelid"
+        " JOIN pg_class ref ON ref.oid = con.confrelid"
+        " WHERE con.contype='f' AND rel.relname IN"
+        "   ('grid_quotes','game_cell_map','workload_cell_map','grid_cells')")
+    strays = [f"{f['src']} -> {f['tgt']}" for f in fks if "_legacy" in f["tgt"]]
+    check("[60] 격자 FK 가 _legacy 표를 가리키지 않는다(0109 사고 재발 방지)",
+          not strays, "없음", strays)
+
+    # ── ⑧ 예산 칩 값을 엔진이 실제로 읽는가 ────────────────────────────
+    try:
+        d = get("/api/budget-bands")
+        chips = d.get("chips") or []
+        check("[60] /api/budget-bands 가 칩을 준다(화면 하드코딩 제거)",
+              len(chips) >= 2, ">=2", len(chips))
+        from api.candidates import _budget_cap
+        broken = [c["constraint_value"] for c in chips
+                  if c.get("max_won") is not None
+                  and _budget_cap(c["constraint_value"]) != c["max_won"]]
+        check("[60] 예산 칩 값을 견적 엔진(_budget_cap)이 같은 수로 읽는다"
+              " (형식이 어긋나면 엔진이 조용히 median 으로 되돌아간다)",
+              not broken, "0건", broken)
+        capped = [c for c in chips if c.get("max_won") is not None]
+        check("[60] 예산 칩이 4~8개다(한눈에 고를 수 있는 수 · 격자 15구간과 다르다)",
+              4 <= len(chips) <= 8, "4~8", len(chips))
+        check("[60] 상한이 닫힌 칩이 2개 이상이다(전부 「이상」이면 상한이 안 걸린다)",
+              len(capped) >= 2, ">=2", len(capped))
+    except Exception as e:                                   # noqa: BLE001
+        check("[60] /api/budget-bands 호출", False, "200", repr(e))
+
+    # ── S1 화면이 예산 칩을 서버에서 받는가 ────────────────────────────
+    try:
+        _s1 = io.open(os.path.join(ROOT, "mockups", "mvp1", "s1-session.html"),
+                      encoding="utf-8").read()
+        check("[60] S1 화면이 /api/budget-bands 를 부른다",
+              "/api/budget-bands" in _s1, "있음", "없음")
+        check("[60] S1 Q_BUDGET 에 예산 칩이 하드코딩돼 있지 않다",
+              "'70만원 이하'" not in _s1 and "'200만원 이상'" not in _s1,
+              "없음", "하드코딩된 칩 값이 남아 있다")
+    except Exception as e:                                   # noqa: BLE001
+        print(f"  [INFO] S1 화면 대조 생략 — {e!r}")
+
 
 
 if __name__ == "__main__":

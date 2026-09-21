@@ -30,13 +30,30 @@
         그래서 이 배치는 라벨을 지어내지 않고 `grid_budget_bands.budget_label`
         컬럼(0105 가 그 형식에 맞춰 넣은 값)을 그대로 실어 보낸다.
 
-■ 3종을 전부 살린다 — budget_min/max 가 이제 «범위»다
+■ 3종을 전부 살린다 — quote_low/quote_high 가 «관측 범위»다
   옛 판은 `budget_min = budget_max = 추천 총액` 이었다(단일 관측점). 그래서 같은
   칸의 가성비 구성(실측 921,100원)이 발행되지 않고 버려졌다.
-  이제 `budget_min = 가성비 총액` · `budget_max = 고성능 총액` 으로 **실제 3종의
+  이제 `quote_low = 가성비 총액` · `quote_high = 고성능 총액` 으로 **실제 3종의
   범위**를 기록한다. 추천은 그 사이에 있고 grid_quotes 에 그대로 남는다.
   ⚠ 셋 중 일부만 성공하면 **있는 것만으로** 범위를 만든다(지어내지 않는다).
     전부 실패하면 둘 다 NULL.
+
+■ 0110 — 구간이 «입력»이고 견적은 그 안에서 난다
+  컬럼 이름이 바뀌었다: `budget_min/budget_max` -> `quote_low/quote_high`.
+  뜻이 두 번 바뀌는 동안(입력 -> 관측점 -> 관측범위) 이름이 그대로라 «같은 NB_L2
+  의 하한이 33만~171만»처럼 읽혔다. 이제 이름이 «견적 관측값»이라고 말한다.
+  **예산 구간의 단일 원천은 `grid_budget_bands` 한 벌뿐**이고, 이 배치는 그 구간을
+  «입력»으로 받아(`budget_label` 을 엔진에 실어 보낸다) 그 안에서 견적을 낸다.
+
+■ 0110 — 어느 칸을 도는가: `handling_state = '취급함'` 만
+  옛 `intended_empty`(boolean)는 «시장에도 없다»와 «표본이 없어 모른다»를 구분하지
+  못했고, 134칸 전부 false 인 채 **쓰는 코드가 없었다**. 이제 4값이다 —
+  취급함 / 일부러 비움 / 모름 / 채울 예정. 배치는 **취급함만** 돈다.
+  나머지 셋은 견적이 «없는 것이 정상»이고, 화면이 사유를 그대로 말한다.
+
+■ 0110 — 견적이 그 칸 구간 안에 드는지 배치가 스스로 본다
+  구간을 먼저 고정한 이상 «가성비·추천이 구간 하한보다 낮다»는 것도 결함이다
+  (구간 이름이 거짓이 된다). 옛 판정은 상한만 봤다 — `_band_fit()` 이 아래를 본다.
 
 ■ 스펙 하한을 어디서 읽나
   게임 칸: `game_grade_resolution_tiers` 의 (grade, resolution) → gpu_tier_key
@@ -86,14 +103,20 @@ PLATFORM_ASCII = {"인텔": "intel", "AMD": "amd"}
 
 STATUS_OK = "정상"
 STATUS_OVER = "예산 상한 초과"
+# 0110 — 「구간 하한 미달」은 「상한 초과」와 **다른 사실**이다. 한 이름으로 적으면
+# 화면이 2,058,500원짜리 칸을 「예산 상한 초과」라고 말한다(거짓). 그래서 가른다.
+STATUS_UNDER = "구간 하한 미달"
 STATUS_FAIL = "생성 실패"
 
 NOTE_MAX = 200                     # grid_quotes.engine_note String(200)
 
 VARIANT_MAP = {"value": "가성비", "recommend": "추천", "highend": "고성능"}
-# budget_min/budget_max 의 원천 variant — 이제 «범위»다(0105).
+# quote_low/quote_high 의 원천 variant — 견적 총액의 «관측 범위»다(0105 · 0110 개명).
 BUDGET_MIN_VARIANT = "가성비"
 BUDGET_MAX_VARIANT = "고성능"
+
+# 0110 — 배치가 도는 칸. grid_cells.handling_state 4값 중 이것 하나뿐이다.
+STATE_ACTIVE = "취급함"
 
 GAME_USAGE = "게임"
 
@@ -130,6 +153,15 @@ def _load_bands(conn) -> dict:
     return {r["band_key"]: dict(r) for r in rows}
 
 
+# ⚠ 0110 — 격자 용도 라벨을 엔진에 **그대로** 보낸다(override 표를 두지 않았다).
+#   usage_floors.match() 가 현행 11개 라벨을 전부 잡는 것을 실측 확인했다:
+#   사무용 / 영상편집 / 디자인·조판 / 캐드·설계 / 주식·트레이딩 / 3D 렌더링 /
+#   학습용 AI / 음악 작업 / 사무형 AI / 개발 / 게임.
+#   용도 라벨을 바꾸면 이 대응이 **조용히** 깨진다 — 엔진이 못 알아들으면 실패가
+#   아니라 «하한 없이 만든 견적»이 나온다. tests/regression.py 의
+#   「격자 용도가 전부 usage_floors 에 걸린다」가 그 감시다.
+
+
 def _load_omissions(conn) -> dict:
     """grid_variant_omissions -> {usage: {tier_variant, ...}} (0106).
 
@@ -164,7 +196,7 @@ def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict, bands: dict)
     common = {
         "budget_label": band["budget_label"],
         "band_key": band["band_key"], "band_label": band["label"],
-        "band_max": band["budget_max_won"],
+        "band_min": band["budget_min_won"], "band_max": band["budget_max_won"],
     }
 
     if cell["usage"] != GAME_USAGE:
@@ -262,6 +294,29 @@ def _spec_violations(build: dict, floor: dict) -> list:
     return out
 
 
+def _band_fit(total: int, floor: dict, eng_key: str) -> str | None:
+    """견적 총액이 이 칸의 «구간 안»에 드는가 — 0110 에서 새로 본다.
+
+    구간을 먼저 고정하고 그 안에서 견적을 내기로 했으므로(사장님 확정 ①),
+    구간을 벗어난 총액은 **구간 이름을 거짓으로 만든다**. 옛 판정은 상한만 봤다.
+
+    ⚠ 위아래 둘 다 예외가 있다 — 지어낸 관용이 아니라 엔진 설계에서 오는 것이다.
+      · 고성능(highend)은 `api/recommend.py HIGHEND_CAP_X` 가 예산 상한을 1.5배로
+        늘려 잡는 «위쪽 선택지»라 상한 초과가 정상 동작이다(0105 가 실측).
+      · 가성비(value)는 «그 하한을 만족하는 가장 싼 구성»이라 구간 하한보다 낮을
+        수 있다. 그게 이 티어의 존재 이유다.
+      그래서 **아래로 새는지는 「추천」에서만** 본다 — 추천이 구간 하한보다 낮으면
+      그 칸은 자기 구간 이름을 못 지킨다.
+    반환: 위반 사유 문자열 또는 None(문제 없음).
+    """
+    lo, hi = floor.get("band_min"), floor.get("band_max")
+    if hi is not None and total > hi and eng_key != "highend":
+        return f"band_over total={total} band_max={hi}"
+    if lo is not None and total < lo and eng_key == "recommend":
+        return f"band_under total={total} band_min={lo}"
+    return None
+
+
 def judge_variant(eng_key: str, data: dict, floor: dict) -> dict:
     """엔진 응답 하나에서 티어 하나(value/recommend/highend)의 grid_quotes 행 판정.
 
@@ -272,6 +327,10 @@ def judge_variant(eng_key: str, data: dict, floor: dict) -> dict:
       · **고성능(highend)은 예외다**: `api/recommend.py` 의 고성능 티어는 설계상
         예산 상한을 HIGHEND_CAP_X 배로 늘려 잡는 «위쪽 선택지»라, over 가 뜨는 게
         정상 동작이다. 이걸 실패로 세면 모든 칸이 PARTIAL 이 된다.
+
+    0110 — 엔진 verdict 말고 **구간 경계 자체**로도 본다(`_band_fit`). 엔진의
+    verdict 는 «예산 라벨»(상한 하나)을 기준으로 나오는데, 격자 구간은 하한도
+    갖고 있어서 엔진이 모르는 위반이 있다.
     """
     def fail(reason: str) -> dict:
         return {"status": STATUS_FAIL, "total": None, "verdict": None,
@@ -291,12 +350,15 @@ def judge_variant(eng_key: str, data: dict, floor: dict) -> dict:
         return fail("below_tier_min " + "; ".join(violations))
 
     verdict = (build.get("budget") or {}).get("verdict")
-    over = (verdict == "over" and eng_key != "highend")
-    status = STATUS_OVER if over else STATUS_OK
+    band_miss = _band_fit(total, floor, eng_key)
+    over = (verdict == "over" and eng_key != "highend") or band_miss is not None
+    status, reason = STATUS_OK, None
+    if over:
+        reason = band_miss or (f"budget_over total={total} band_max={floor['band_max']}")
+        status = STATUS_UNDER if reason.startswith("band_under") else STATUS_OVER
     return {"status": status, "total": total, "verdict": verdict,
-            "engine_note": None, "payload": build,
-            "kind": "ok" if not over else "over",
-            "reason": None if not over else f"budget_over total={total} band_max={floor['band_max']}"}
+            "engine_note": reason[:NOTE_MAX] if reason else None, "payload": build,
+            "kind": "ok" if not over else "over", "reason": reason}
 
 
 def write_quote_row(wconn, cell_id: int, variant: str, batch_id: str, judged: dict) -> None:
@@ -334,16 +396,18 @@ def retire_omitted_current(wconn, cell_id: int, omit: set) -> None:
 
 
 def write_budget_observed(wconn, cell_id: int, lo, hi) -> None:
-    """budget_min/budget_max — 관측값이되 이제 «범위»다(0105).
+    """quote_low/quote_high — 배치가 실제로 만든 견적 총액의 **관측 범위**(0110 개명).
 
-    min=가성비 총액 · max=고성능 총액. 옛 판(min=max=추천 단일점)은 같은 칸의
+    low=가성비 총액 · high=고성능 총액. 옛 판(min=max=추천 단일점)은 같은 칸의
     가성비 구성(실측 921,100원)을 발행하지 않고 버렸다 — 그게 롤 하는 고객에게
     219만원만 보여 주던 이유의 절반이다.
     일부만 성공하면 있는 것만으로 범위를 만든다. 둘 다 없으면 NULL — 지어내지 않는다.
+    ⚠ 이 값은 **예산 구간이 아니다.** 구간의 단일 원천은 grid_budget_bands 다.
+      0110 이 컬럼을 개명한 이유가 그것이다(뜻이 두 번 바뀌는 동안 이름이 그대로였다).
     """
     from sqlalchemy import text
     wconn.execute(text(
-        "UPDATE grid_cells SET budget_min=:lo, budget_max=:hi WHERE cell_id=:cid"),
+        "UPDATE grid_cells SET quote_low=:lo, quote_high=:hi WHERE cell_id=:cid"),
         {"lo": lo, "hi": hi, "cid": cell_id})
 
 
@@ -374,9 +438,12 @@ def main():
         only = {int(x) for x in args.only.split(",") if x.strip()}
 
     with engine.connect() as conn:
+        # 0110 — 「취급함」 칸만 돈다. 「일부러 비움 / 모름 / 채울 예정」은 견적이
+        # 없는 것이 정상이고, 그 사유를 화면이 handling_note 로 그대로 말한다.
         cells = conn.execute(text(
             "SELECT cell_id, usage, budget_band_key, game_grade, game_resolution, platform"
-            " FROM grid_cells WHERE NOT intended_empty ORDER BY cell_id")).mappings().all()
+            " FROM grid_cells WHERE handling_state = :st ORDER BY cell_id"),
+            {"st": STATE_ACTIVE}).mappings().all()
         spec_tiers = _load_spec_tiers(conn)
         game_tiers = _load_game_grade_tiers(conn)
         bands = _load_bands(conn)

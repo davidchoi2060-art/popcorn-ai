@@ -657,6 +657,16 @@ TASK_DEFAULTS: dict[str, tuple[str, str]] = {
     "task.s2_explain": ("codex",  "gpt-5.6-sol"),                # 근거 설명 - 한국어 품질
     "task.ops_assist": ("gemini", "gemini-3.7-flash"),           # 운영 도우미 - "이 정도로 충분"
     "task.spec_fill":  ("claude", "claude-opus-5"),              # 웹 사양 채움 - 정확도
+    # 팝콘톡 자유 답변(2026-09-21 · talk_design_v2 §5-3). **좌표 추출(s1_parse)과 가른다** --
+    # 같은 호출에 「자유롭게 답하라」와 「추측하지 마라」를 함께 두면 두 압력이 싸우고,
+    # 지는 쪽이 좌표 추출이면 티가 안 난다(견적이 틀린 용도로 계속 나온다).
+    # 모델 선정 근거(같은 과제·같은 프롬프트 각 3회 실측):
+    #   haiku-4-5  3.14s / 189자 — 순위 수치를 **빠뜨렸다**
+    #   sonnet-5   4.87s / 286자 — 좋지만 +1.7초에 단가 2배
+    #   gpt-5.6-luna 3.27s / 187자 — **날짜(2026-09-17)와 순위를 스스로 인용했다** ★
+    #   gpt-5.6-terra 3.10s / 175자 — "높은 점유율" 로 수치를 뭉갰다
+    # luna 는 속도·품질·비용(입력 $0.2/출력 $1.2 = haiku 의 1/5·1/4) 셋 다 앞선다.
+    "task.talk_answer": ("codex", "gpt-5.6-luna"),
 }
 for _tk, (_pk, _md) in TASK_DEFAULTS.items():
     assert _pk in PROVIDERS, f"TASK_DEFAULTS[{_tk}]: unknown provider {_pk!r}"

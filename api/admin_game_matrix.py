@@ -282,7 +282,9 @@ def _selection_cells(conn, *, kind: str, item_id: int, usage, platform, level) -
     # 접기는 파이썬에서 한다 — SQL 안에서 접으면 variants[] 를 잃는다.
     rows = conn.execute(text(
         "SELECT c.cell_id," + _cell_axis_sql() +
-        " c.budget_min, c.budget_max,"
+        # 0110: grid_cells.budget_min/max -> quote_low/quote_high 개명(뜻은 그대로
+        # «배치가 만든 견적 총액의 관측 범위»). 응답 키는 화면 하위호환으로 유지한다.
+        " c.quote_low, c.quote_high,"
         " m.match_level, m.gpu_used, m.tier_variant,"
         " q.total, q.verdict, q.status"
         f" FROM {map_table} m"
@@ -301,7 +303,7 @@ def _selection_cells(conn, *, kind: str, item_id: int, usage, platform, level) -
         if cur is None:
             # 행이 이미 가격 오름차순이라 처음 만난 변종이 그 칸의 최저가다.
             cur = {"cell_id": r["cell_id"], **_cell_axis_out(r),
-                   "budget_min": r["budget_min"], "budget_max": r["budget_max"],
+                   "budget_min": r["quote_low"], "budget_max": r["quote_high"],
                    "match_level": r["match_level"], "gpu_used": r["gpu_used"],
                    "tier_variant": r["tier_variant"], "total": r["total"],
                    "verdict": r["verdict"], "status": r["status"],

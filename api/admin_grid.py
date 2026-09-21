@@ -67,12 +67,29 @@ router = APIRouter(prefix="/api/admin")
 VARIANTS = ["가성비", "추천", "고성능"]
 REPRESENTATIVE_VARIANT = "추천"   # 목록 표에 대표로 얹는 본 — 정의서 §⑥-3
 
+# ── 칸 취급 상태 (0110 · 사장님 확정 ⑥) ────────────────────────────────
+# 옛 `intended_empty`(boolean)는 「시장에도 없다」와 「표본이 없어 모른다」를
+# 구분하지 못했고, 134칸 전부 false 인 채 **쓰는 코드가 없었다**(읽기만).
+# 이제 4값이고 화면이 셋을 갈라 보여 준다 — 「칸 없음」이 왜 없는지를 말한다.
+STATE_ACTIVE = "취급함"
+# 화면 색·범례가 쓰는 버킷으로 옮긴다. `_cell_state` 가 유일한 판정 자리다.
+HANDLING_STATE_BUCKET = {
+    "일부러 비움": "intent_none",     # 시장 표본은 있으나 우리가 그 구간을 취급하지 않는다
+    "모름": "intent_unknown",         # 시장 표본이 0이라 판단 근거가 없다
+    "채울 예정": "intent_planned",    # 취급하기로 했으나 아직 견적이 없다
+}
+
 
 def _cell_state(c: dict, last_batch_id) -> str:
     """칸 색상·범례가 쓰는 6버킷 중 하나 — 화면이 각자 다시 판정하면 갈라지므로
     (§단일 원천) 여기 한 곳에서만 정의한다. 대표본(추천) 기준으로 판정한다."""
-    if c["intended_empty"]:
-        return "intent"
+    # 0110 — handling_state 4값. 「취급함」이 아닌 칸은 견적이 없는 것이 정상이고,
+    # 그 사유(일부러 비움 / 모름 / 채울 예정)를 화면이 그대로 말해야 한다.
+    # 옛 boolean(intended_empty)은 셋을 「intent」 한 버킷으로 뭉개 «칸 없음»으로
+    # 보이게 했다 — 사장님 지적의 직접 원인이다.
+    st = c["handling_state"]
+    if st != STATE_ACTIVE:
+        return HANDLING_STATE_BUCKET[st]
     if c["quote_id"] is None:
         return "missing"
     status = c["status"] or ""
@@ -82,6 +99,11 @@ def _cell_state(c: dict, last_batch_id) -> str:
         return "fail"
     if status == "예산 상한 초과":
         return "over"
+    # 0110 — 「하한 미달」은 「상한 초과」와 다른 사실이다. 그 칸의 견적이 자기 구간
+    # 이름보다 싸다는 뜻이고, 원인은 «그 하한으로는 그 값까지 못 올라간다»(부품 풀
+    # 상한에 걸린다)이지 예산을 넘긴 것이 아니다. 같은 색으로 칠하면 화면이 거짓말한다.
+    if status == "구간 하한 미달":
+        return "under"
     if status == "재고 소진 슬롯 있음":
         return "stock"
     return "ok"
@@ -115,7 +137,8 @@ def grid():
     with engine.connect() as conn:
         cells = conn.execute(text(
             "SELECT c.cell_id, c.usage, c.budget_band_key, c.game_grade, c.game_resolution,"
-            " c.platform, c.budget_min, c.budget_max, c.band_note, c.intended_empty,"
+            " c.platform, c.quote_low, c.quote_high, c.band_note,"
+            " c.handling_state, c.handling_note,"
             " b.label AS band_label, b.budget_min_won, b.budget_max_won,"
             " b.sample_n AS band_sample_n, b.gpu_required, b.sort_order AS band_sort,"
             " q.quote_id, q.batch_id, q.generated_at, q.total, q.verdict, q.status,"
@@ -195,11 +218,13 @@ def grid():
         )).mappings().all()
 
         target_total = conn.execute(text(
-            "SELECT count(*) FROM grid_cells WHERE NOT intended_empty")).scalar_one()
+            "SELECT count(*) FROM grid_cells WHERE handling_state = :st"),
+            {"st": STATE_ACTIVE}).scalar_one()
         filled_total = conn.execute(text(
             "SELECT count(*) FROM grid_cells c JOIN grid_quotes q"
             " ON q.cell_id = c.cell_id AND q.is_current AND q.tier_variant = :rv"
-            " WHERE NOT c.intended_empty"), {"rv": REPRESENTATIVE_VARIANT}).scalar_one()
+            " WHERE c.handling_state = :st"),
+            {"rv": REPRESENTATIVE_VARIANT, "st": STATE_ACTIVE}).scalar_one()
 
         last_batch_id = conn.execute(text(
             "SELECT max(batch_id) FROM grid_quotes")).scalar_one()
@@ -237,8 +262,10 @@ def grid():
             "gpu_required": c["gpu_required"],
             "label": _cell_label(c["usage"], c["band_label"], c["game_grade"],
                                    c["game_resolution"], grade_labels),
-            "platform": c["platform"], "budget_min": c["budget_min"],
-            "budget_max": c["budget_max"], "intended_empty": c["intended_empty"],
+            "platform": c["platform"], "quote_low": c["quote_low"],
+            "quote_high": c["quote_high"],
+            "handling_state": c["handling_state"],
+            "handling_note": c["handling_note"],
             "state": _cell_state(c, last_batch_id),
             "game_gpu_tier_key": c["game_gpu_tier_key"],
             "game_cpu_tier_key_override": c["game_cpu_tier_key_override"],
@@ -268,7 +295,8 @@ def grid_cell(cell_id: int):
     with engine.connect() as conn:
         cell = conn.execute(text(
             "SELECT c.cell_id, c.usage, c.budget_band_key, c.game_grade, c.game_resolution,"
-            " c.platform, c.budget_min, c.budget_max, c.band_note, c.intended_empty,"
+            " c.platform, c.quote_low, c.quote_high, c.band_note,"
+            " c.handling_state, c.handling_note,"
             " b.label AS band_label, b.budget_min_won, b.budget_max_won, b.budget_label,"
             " b.gpu_required, b.sample_n AS band_sample_n, b.source AS band_source"
             " FROM grid_cells c JOIN grid_budget_bands b ON b.band_key = c.budget_band_key"
@@ -350,8 +378,10 @@ def grid_cell(cell_id: int):
         "band_budget_label": cell["budget_label"],
         "band_sample_n": cell["band_sample_n"], "band_source": cell["band_source"],
         "band_note": cell["band_note"], "gpu_required": cell["gpu_required"],
-        "platform": cell["platform"], "budget_min": cell["budget_min"],
-        "budget_max": cell["budget_max"], "intended_empty": cell["intended_empty"],
+        "platform": cell["platform"], "quote_low": cell["quote_low"],
+        "quote_high": cell["quote_high"],
+        "handling_state": cell["handling_state"],
+        "handling_note": cell["handling_note"],
         "game_info": game_info,
         "variant_omissions": omissions,
         "quotes": quotes_by_variant,

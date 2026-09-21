@@ -261,10 +261,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
       <div class="grd-legend">
         <span class="sw"><span class="dot" style="background:var(--state-done)"></span>정상</span>
         <span class="sw"><span class="dot" style="background:var(--state-run)"></span>예산 상한 초과</span>
+        <span class="sw"><span class="dot" style="background:var(--state-run)"></span>구간 하한 미달</span>
         <span class="sw"><span class="dot" style="background:var(--state-run)"></span>재고 소진 슬롯 있음</span>
         <span class="sw"><span class="dot" style="background:var(--state-fail)"></span>생성 실패</span>
         <span class="sw"><span class="dot missing"></span>빈 칸(미생성)</span>
-        <span class="sw"><span class="dot intent"></span>빈 칸(의도)</span>
+        <span class="sw"><span class="dot intent"></span>취급 안 함</span>
+        <span class="sw"><span class="dot intent"></span>확인 안 됨</span>
+        <span class="sw"><span class="dot" style="background:var(--state-wait)"></span>채울 예정</span>
         <span class="sw"><span class="dot na"></span>칸 없음(이 예산대에 두지 않음)</span>
         <span class="sw"><span class="omitmark">×</span>발행하지 않는 구성(사유 있음)</span>
       </div>
@@ -332,11 +335,23 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
   var STATE_META = {
     ok:      { label: '정상',            color: 'var(--state-done)' },
     over:    { label: '예산 상한 초과',    color: 'var(--state-run)' },
+    /* 0110 — 구간 하한 미달. 견적이 그 칸 구간 이름보다 «싸다»는 뜻이다(부품 풀이
+       그 위로 못 올라간다). 「상한 초과」와 같은 이름으로 적으면 화면이 거짓말한다. */
+    under:   { label: '구간 하한 미달',    color: 'var(--state-run)' },
     stock:   { label: '재고 소진 슬롯 있음', color: 'var(--state-run)' },
     fail:    { label: '생성 실패',        color: 'var(--state-fail)' },
     missing: { label: '빈 칸(미생성)',     color: 'var(--state-wait)' },
+    /* 0110 — 옛 `intent` 한 버킷을 셋으로 갈랐다(사장님 확정 ⑥). 「칸 없음」이
+       왜 없는지가 서로 다른 사실이라 한 이름으로 뭉치면 화면이 거짓말한다.
+       색·배경은 기존 토큰 그대로다 — 배치·색을 새로 그리지 않았다. */
+    intent_none:    { label: '취급 안 함',   color: 'var(--outline)' },
+    intent_unknown: { label: '확인 안 됨',   color: 'var(--outline)' },
+    intent_planned: { label: '채울 예정',    color: 'var(--state-wait)' },
+    /* 하위호환 — 서버가 옛 값을 주던 시절의 키. 남겨 두면 화면이 죽지 않는다. */
     intent:  { label: '빈 칸(의도)',       color: 'var(--outline)' }
   };
+  /* 견적이 없는 것이 «정상»인 상태들 — 칸을 빗금으로 그리고 클릭을 막는다. */
+  var INTENT_STATES = { intent: 1, intent_none: 1, intent_unknown: 1, intent_planned: 1 };
 
   var state = { data: null, platform: '인텔', hlRow: null, hlCol: null, failOnly: false, selectedCellId: null, cellDetail: null, activeVariant: '추천' };
   var byCoord = {};   // "N|band|usage|platform" 또는 "G|band|grade|resolution|platform" -> cell
@@ -414,11 +429,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     var sel = state.selectedCellId === c.cell_id;
     var cls = 'grd-cell' + (extraCls ? ' ' + extraCls : '') + (dim ? ' dim' : '') + (sel ? ' sel' : '');
     var bg = '';
-    if (c.state === 'intent') bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
+    var isIntent = !!INTENT_STATES[c.state];
+    if (isIntent) bg = 'background:repeating-linear-gradient(45deg,var(--surface) 0 7px,var(--outline-variant) 7px 8px);';
     else if (c.state === 'missing') bg = 'background:var(--container);';
-    var total = c.state === 'intent' ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
+    var total = isIntent ? '—' : (c.state === 'missing' ? '생성 필요' : won(c.quote && c.quote.total));
     return '<button type="button" class="' + cls + '" style="' + bg + '" data-action="open-cell" data-cell-id="' + c.cell_id +
-      '" ' + (c.state === 'intent' ? 'disabled' : '') +
+      '" title="' + esc(isIntent ? (c.handling_note || meta.label) : meta.label) + '"' +
+      ' ' + (isIntent ? 'disabled' : '') +
       ' aria-label="' + esc(aria + ' · ' + meta.label) + '">' +
       '<span class="top"><span class="dot" style="background:' + meta.color + '"></span>' +
       '<span style="color:' + (c.state === 'ok' ? 'var(--success-dark)' : meta.color) + '">' + esc(meta.label) + '</span></span>' +
@@ -598,7 +615,13 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
           ? ('게임 · ' + esc(c.game_grade) + '등급 · ' + esc(c.game_resolution) + ' · ' + esc(c.band_label) + ' × ' + esc(c.platform))
           : (esc(c.usage) + ' · ' + esc(c.band_label) + ' × ' + esc(c.platform));
         var byC = byCoord[coordOf(c)];
-        var meta = STATE_META[c.intended_empty ? 'intent' : ((byC || {}).state || (c.quotes && c.quotes['추천'] ? 'ok' : 'missing'))] || {};
+        /* 0110 — 서버가 준 handling_state 를 목록과 같은 버킷 규칙으로 옮긴다.
+           목록(cells[].state)이 이미 서버 판정이라 그것이 있으면 그것을 쓴다. */
+        var hs = c.handling_state;
+        var drawerState = (hs && hs !== '취급함')
+          ? ({ '일부러 비움': 'intent_none', '모름': 'intent_unknown', '채울 예정': 'intent_planned' }[hs] || 'intent')
+          : ((byC || {}).state || (c.quotes && c.quotes['추천'] ? 'ok' : 'missing'));
+        var meta = STATE_META[drawerState] || {};
         set('d-coord', coordText);
         set('d-label', esc(meta.label || '—'));
         $('d-dot').style.background = meta.color || 'var(--outline)';
@@ -661,7 +684,10 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     body += '<dl class="grd-dl">' +
       '<dt>예산대</dt><dd>' + esc(c.band_label || '—') + ' · ' + esc(bandRng) + '</dd>' +
       '<dt>예산대 표본</dt><dd>' + num(c.band_sample_n) + '건</dd>' +
-      '<dt>칸 예산 구간</dt><dd>' + esc(budgetRange(c.budget_min, c.budget_max)) + '</dd>' +
+      /* 0110 — 이 줄이 「구간」이라고 쓰여 있었지만 실제로는 «배치가 만든 견적
+         총액»이었다. 구간은 바로 위 「예산대」 줄이 유일한 자리다. 이름을 고쳤다. */
+      '<dt>견적 관측 범위</dt><dd>' + esc(budgetRange(c.quote_low, c.quote_high)) + '</dd>' +
+      '<dt>취급 상태</dt><dd>' + esc(c.handling_state || '—') + '</dd>' +
       '<dt>생성 시각</dt><dd>' + (q ? esc(new Date(q.generated_at).toLocaleString('ko-KR')) : '—') + '</dd>' +
       '<dt>배치 ID</dt><dd>' + (q ? esc(q.batch_id) : '—') + '</dd>' +
       '</dl>';
@@ -681,8 +707,23 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
         (omitted.reason_source ? '<div class="src" style="margin-top:8px">' + esc(omitted.reason_source) + '</div>' : '') +
         (omitted.decided_by ? '<div class="who" style="margin-top:6px">' + esc(omitted.decided_by) + '</div>' : '') +
         '</div>';
-    } else if (c.intended_empty) {
-      body += '<div class="grd-empty-note">의도적으로 비운 칸 — 이 구성은 시드가 채우지 않았습니다. 재생성 대상이 아닙니다.</div>';
+    } else if (c.handling_state && c.handling_state !== '취급함') {
+      /* 0110 — 셋을 갈라 말한다. 사유(handling_note)는 서버 값 그대로 싣는다 —
+         화면이 이유를 지어내지 않는다. */
+      var HEAD = {
+        '일부러 비움': '취급하지 않는 칸입니다',
+        '모름': '확인되지 않은 칸입니다',
+        '채울 예정': '채울 예정인 칸입니다'
+      };
+      var TAIL = {
+        '일부러 비움': '시장 표본은 있으나 이 구간을 취급하지 않기로 했습니다. 재생성 대상이 아닙니다.',
+        '모름': '시장 표본이 없어 이 구간에 상품이 있는지 확인되지 않았습니다. 재생성 대상이 아닙니다.',
+        '채울 예정': '취급하기로 했으나 아직 견적이 없습니다.'
+      };
+      body += '<div class="grd-empty-note"><b>' + esc(HEAD[c.handling_state] || c.handling_state) + '</b> — ' +
+        esc(TAIL[c.handling_state] || '') +
+        (c.handling_note ? '<div class="src" style="margin-top:8px">' + esc(c.handling_note) + '</div>' : '') +
+        '</div>';
     } else if (!q) {
       body += '<div class="grd-empty-note">아직 생성되지 않은 구성(' + esc(state.activeVariant) + ') — 배치 대상이지만 현재본 견적이 없습니다.</div>';
     } else {

@@ -36,7 +36,7 @@
 
   새 판(0091·0092):
     · 비게임 칸 = tier_key(FK→spec_tiers T0~T5, 팝콘1~5·X) + usage(6종 문자열:
-      AI 작업/영상편집/디자인/사무·인강/주식·트레이딩/3D 그래픽 — 아래 USAGE_TO_GRID
+      AI 작업/영상편집/디자인/사무·인강/주식·트레이딩/3D 그래픽 — 아래 usage_map()
       주석의 실측 SQL 참고).
     · 게임 칸 = usage='게임' 고정 + game_grade(FK→game_load_grades E/A/B/C/S/L)
       + game_resolution(1080p/1440p/4K). tier_key 는 게임 칸에서 항상 NULL —
@@ -121,37 +121,66 @@ ASSUMED_RESOLUTION = f"game.resolution={DEFAULT_RESOLUTION}"
 # ⚠ 옛 리터럴('사무·인강'·'3D 그래픽')은 **키로만** 남긴다 — consult_sessions·
 #   grid_quotes.payload 가 그 값을 들고 있어 지우면 그 입력이 통째로
 #   needs=['usages'] 로 떨어진다. 값은 새 격자 용도로 옮긴다.
-USAGE_TO_GRID = {
-    "AI 작업": "AI 작업",
-    # ── 0108 design 2분할 — 두 키를 **반드시** 넣는다 ────────────────────────
-    #   0102(사무 분할) 때 이 표에 새 키를 넣는 것을 빠뜨려 격자 카드가 0장이
-    #   될 뻔했다. 여기 없는 용도는 카드가 «조용히» 사라진다(KeyError 가 아니라
-    #   needs=['usages']) — 그래서 분할 마이그레이션과 한 묶음으로 고친다.
-    "디자인·조판": "디자인·조판",
-    "사진·후보정": "사진·후보정",
-    "디자인": "디자인·조판",            # 옛 리터럴 — 0108 이전 세션·격자 입력 호환
-    #   ⚠ 옛 「디자인」을 **조판 쪽으로** 보낸다. 근거: 분할 전 디자인 6칸의 현재
-    #     견적 18장이 전부 내장그래픽(GPU omitted) 구성이었다 — 그 라벨이 지금까지
-    #     받아 온 것은 GPU 없는 견적이다. 0102 의 «모호한 말은 싼 쪽» 과도 같다.
-    "영상편집": "영상편집",
-    "단순 사무용": "단순 사무용",
-    "복합 사무용": "복합 사무용",
-    "사무·인강": "단순 사무용",        # 옛 리터럴 — 0105 이전 세션 호환
-    "주식·트레이딩": "주식·트레이딩",
-    "캐드·설계": "캐드·설계",
-    "3D 렌더링": "3D 렌더링",
-    "3D 그래픽": "3D 렌더링",          # 옛 리터럴 — 0105 이전 세션 호환
-    "개발": "개발",
-    "방송 송출": "방송 송출",
-    "음악 작업": "음악 작업",
-    "게임": GAME_USAGE,
-    "캐주얼 게임": GAME_USAGE,
-    "고사양 게임": GAME_USAGE,
-}
+# ⚠ 0110 — 이 표를 **손으로 적지 않는다.** DB 두 곳이 정본이다:
+#     정규 이름 = `grid_cells.usage` 의 DISTINCT (격자가 실제로 가진 용도)
+#     옛 이름   = `usage_label_map` (legacy_label -> canonical_label)
+#   손으로 적던 시절 0102(사무 분할) 때 새 키를 빠뜨려 격자 카드가 0장이 될 뻔했고,
+#   0108(디자인 분할) 주석이 그 사고를 "분할 마이그레이션과 한 묶음으로 고친다"고
+#   남겼다 — 즉 **표가 사람 손에 있는 한 다음 분할에서 또 빠진다.** 0110 이 용도를
+#   다시 재편하면서(합치기 3 + AI 분할) 그 구조를 끝낸다.
+#   여기 없는 용도는 카드가 «조용히» 사라진다(KeyError 가 아니라 needs=['usages']).
+#
+# `usage_label_map.canonical_label` 이 NULL 이면 «대응을 모른다»는 뜻이라 매핑에
+# 넣지 않는다 — 지어내 잇지 않는다(그 입력은 needs 로 떨어지고, 그게 정직한 결과다).
+_USAGE_MAP_CACHE: dict | None = None
+
+
+def _load_usage_map(conn) -> dict:
+    out: dict = {}
+    for (u,) in conn.execute(text("SELECT DISTINCT usage FROM grid_cells")):
+        out[u] = u                     # 격자가 가진 이름은 항등 매핑
+    for r in conn.execute(text(
+            "SELECT legacy_label, canonical_label FROM usage_label_map"
+            " WHERE canonical_label IS NOT NULL")).mappings():
+        # 격자에 실제로 있는 이름으로만 잇는다. 매핑표가 격자보다 앞서 갈 수 있다.
+        if r["canonical_label"] in out:
+            out.setdefault(r["legacy_label"], r["canonical_label"])
+    return out
+
+
+def usage_map() -> dict:
+    """파서·원장 용도 라벨 -> grid_cells.usage. DB 가 정본이고 프로세스 수명 캐시."""
+    global _USAGE_MAP_CACHE
+    if _USAGE_MAP_CACHE is None:
+        try:
+            with engine.connect() as conn:
+                _USAGE_MAP_CACHE = _load_usage_map(conn)
+        except Exception as e:      # DB 를 못 읽으면 매핑 없이 — 카드가 안 나올 뿐
+            print(f"[grid_public] usage_map load failed: {e}")
+            _USAGE_MAP_CACHE = {}
+    return _USAGE_MAP_CACHE
+
+
+def reload_usage_map() -> int:
+    global _USAGE_MAP_CACHE
+    _USAGE_MAP_CACHE = None
+    return len(usage_map())
+
 
 # grid_quotes.tier_variant(한글) → 응답 키(카드 3종 구조, 지시 6번 예시 그대로)
 VARIANT_KEY_MAP = {"가성비": "value", "추천": "reco", "고성능": "perf"}
 REPRESENTATIVE_VARIANT = "추천"   # 하위호환 최상위 필드가 참조하는 대표 variant
+
+# ── 칸 취급 상태 (0110 · 사장님 확정 ⑥) ────────────────────────────────
+# 옛 `intended_empty`(boolean)는 「시장에도 없다」와 「표본이 없어 모른다」를
+# 구분하지 못했고, 고객에게는 둘 다 「의도적으로 비운 칸」으로 나갔다.
+# 문구는 CLAUDE.md §어휘 — 고객에게 «비움»·«모름» 같은 내부 말을 쓰지 않는다.
+STATE_ACTIVE = "취급함"
+HANDLING_REASON = {
+    "일부러 비움": "취급하지 않는 가격대입니다",
+    "모름": "이 가격대는 아직 확인되지 않았습니다",
+    "채울 예정": "준비 중인 가격대입니다",
+}
 
 
 def _load_omissions(conn, usage: str) -> list[dict]:
@@ -244,8 +273,8 @@ def _load_bands(conn, axis: str, usage_grid: str | None, platform: str,
         params.update({"u": GAME_USAGE, "g": game_grade, "r": game_resolution})
     rows = conn.execute(text(
         "SELECT b.band_key, b.label, b.budget_min_won, b.budget_max_won, b.sample_n,"
-        " b.gpu_required, c.cell_id, c.budget_min, c.budget_max, c.band_note,"
-        " c.intended_empty"
+        " b.gpu_required, c.cell_id, c.quote_low, c.quote_high, c.band_note,"
+        " c.handling_state, c.handling_note"
         " FROM grid_budget_bands b"
         " JOIN grid_cells c ON c.budget_band_key = b.band_key AND c.platform = :p"
         + where +
@@ -314,11 +343,12 @@ def _usage_grid_of(constraints: list[Constraint]) -> tuple[str | None, str | Non
     v = _pick(constraints, "용도")
     if not v:
         return None, None
-    if v in USAGE_TO_GRID:
-        return USAGE_TO_GRID[v], v
-    for lab in sorted(USAGE_TO_GRID, key=len, reverse=True):
+    umap = usage_map()
+    if v in umap:
+        return umap[v], v
+    for lab in sorted(umap, key=len, reverse=True):
         if lab in v:
-            return USAGE_TO_GRID[lab], v
+            return umap[lab], v
     return None, v
 
 
@@ -334,15 +364,16 @@ def _state_from_constraints(cons: list[Constraint]) -> tuple[TalkState, list[str
     usage_grid, usage_raw = _usage_grid_of(cons)
     usages: list[str] = []
     if usage_grid is not None:
-        # USAGE_TO_GRID 의 키(파서 라벨) 중 usage_raw 가 가리키는 것을 usages 로. 게임
+        # usage_map() 의 키(파서 라벨) 중 usage_raw 가 가리키는 것을 usages 로. 게임
         # 계열은 격자 용도가 같아도 라벨을 보존한다(is_game_usage 가 라벨을 본다).
-        label = usage_raw if usage_raw in USAGE_TO_GRID else next(
-            (lab for lab in sorted(USAGE_TO_GRID, key=len, reverse=True) if lab in (usage_raw or "")),
+        umap = usage_map()
+        label = usage_raw if usage_raw in umap else next(
+            (lab for lab in sorted(umap, key=len, reverse=True) if lab in (usage_raw or "")),
             None)
         if label:
             usages.append(label)
     elif usage_raw:
-        notes.append(f"legacy constraints: usage '{usage_raw}' not in USAGE_TO_GRID")
+        notes.append(f"legacy constraints: usage '{usage_raw}' not in usage_map()")
     state = TalkState(usages=usages, budget_won=budget_won, budget_bound=bound,
                       platform=_platform_of(cons))
     return state, notes
@@ -455,7 +486,7 @@ def _build_card(cell_id: int, variants: dict, name: str, kind: str,
         "omitted_variants": om,
         "omitted_variant_keys": [o["key"] for o in om if o.get("key")],
         # 관측 범위 — 가성비~고성능. 옛 이름을 유지해 화면이 안 깨지게 한다.
-        "tier_range": {"min": band["budget_min"], "max": band["budget_max"]},
+        "tier_range": {"min": band["quote_low"], "max": band["quote_high"]},
         "game_grade": game_grade, "game_resolution": game_resolution, "game_name": game_name,
         "name": name,
         "quotes": quotes,
@@ -503,9 +534,14 @@ def _build_cards(conn, considered: list[dict], usage_grid: str, platform: str,
         info = {"cell_id": band["cell_id"], "band_key": band["band_key"],
                 "band": band["label"], "usage": usage_grid,
                 "band_range": {"min": band["budget_min_won"], "max": band["budget_max_won"]},
-                "tier_range": {"min": band["budget_min"], "max": band["budget_max"]}}
-        if band["intended_empty"]:
-            empty_cells.append({**info, "reason": "의도적으로 비운 칸"})
+                "tier_range": {"min": band["quote_low"], "max": band["quote_high"]},
+                "handling_state": band["handling_state"]}
+        # 0110 — 「취급함」이 아닌 칸의 사유를 셋으로 갈라 말한다(사장님 확정 ⑥).
+        # 옛 boolean 은 셋을 「의도적으로 비운 칸」 한 문구로 뭉갰다.
+        if band["handling_state"] != STATE_ACTIVE:
+            empty_cells.append({**info,
+                                "reason": HANDLING_REASON[band["handling_state"]],
+                                "reason_detail": band["handling_note"]})
             continue
         variants = by_cell.get(band["cell_id"]) or {}
         if not variants:
@@ -531,7 +567,7 @@ def _nongame_card_set(conn, usage: str, state: TalkState, platform: str,
     state.tier_key 가 와도 무시하고 notes 에 그 사실을 남긴다 — 조용히 삼키면
     화면이 "반영됐다"고 착각한다.
     """
-    usage_grid = USAGE_TO_GRID[usage]
+    usage_grid = usage_map()[usage]
     bands = _load_bands(conn, "nongame", usage_grid, platform)
     if not bands:
         notes.append(f"{usage}: no bands in grid for platform={platform}")
@@ -624,8 +660,11 @@ def recommend(body: RecommendBody):
       cards[].quotes = {value, reco, perf} — 칸 하나의 3종 구성. 각 안에 {quote_id,
       total, over_budget, status, parts, reasons, omitted, generated_at}. 카드
       최상위에도 대표(추천) variant 값을 그대로 얹는다(하위호환).
-      empty_cells  고려한 칸 중 카드가 안 나온 것의 사유 — intended_empty 면 그
-                   사실, 현재본 견적이 없으면 '현재본 없음'.
+      empty_cells  고려한 칸 중 카드가 안 나온 것의 사유. handling_state 가
+                   「취급함」이 아니면 그 상태별 문구(0110 — 취급하지 않는 구간 /
+                   시장 표본이 없어 확인되지 않은 구간 / 준비 중인 구간)와
+                   handling_note 원문을 reason_detail 에 싣고, 그 밖이면
+                   '현재본 견적 없음'.
     """
     notes: list[str] = []
     dropped: list[dict] = []
@@ -646,10 +685,10 @@ def recommend(body: RecommendBody):
         platform = state.platform or DEFAULT_PLATFORM
         game_usages = [u for u in state.usages if is_game_usage(u)]
         nongame_usages = [u for u in state.usages if not is_game_usage(u)
-                          and u in USAGE_TO_GRID]
+                          and u in usage_map()]
         for u in state.usages:
-            if not is_game_usage(u) and u not in USAGE_TO_GRID:
-                notes.append(f"usage '{u}' not in USAGE_TO_GRID - skipped")
+            if not is_game_usage(u) and u not in usage_map():
+                notes.append(f"usage '{u}' not in usage_map() - skipped")
 
         # ── needs — 카드를 막는 좌표. talk.py 의 missing 과 같은 함수(단일 원천) ──
         needs = missing_for(state, vocab)

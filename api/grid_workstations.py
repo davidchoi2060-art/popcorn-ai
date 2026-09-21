@@ -48,7 +48,7 @@ from .product_name import display_name
 
 router = APIRouter(prefix="/api/grid", tags=["grid-public"])
 
-USAGE_AI = "AI 작업"           # talk.py 용도 라벨 · grid_public.USAGE_TO_GRID 의 키와 같은 값
+USAGE_AI = "AI 작업"           # talk.py 용도 라벨 · grid_public.usage_map() 의 키와 같은 값
 THRESHOLD_TIER = "T5"          # 참고 정보용 — spec_tiers 최상위 스펙(팝콘X). 판정에는 안 쓴다
 OVER_BUDGET_N = 2              # 예산 초과분 중 「바로 위」 몇 개
 NO_BUDGET_N = 5                # 예산 없을 때 가격 오름차순 몇 개

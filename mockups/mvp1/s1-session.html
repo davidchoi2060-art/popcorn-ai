@@ -193,8 +193,10 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
           <div id="s1-budget-marker" style="display:none;position:absolute;top:-4px;width:3px;height:18px;background:#17171b;border-radius:2px;transition:left .5s;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#a29d92;font-weight:700;"><span>0</span><span>150만</span><span>300만+</span></div>
-        <p id="s1-budget-note" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;line-height:1.55;">부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.</p>
-        <!-- 조립공임 안내 — 예산 문구 바로 아래. 문구·금액 원천은 ../shared/assembly-fee.js 한 곳이다. -->
+        <p id="s1-budget-note" style="margin:10px 0 0;font-size:12.5px;color:#8a8578;line-height:1.55;">부품 전체 합계 기준. 용도·대상을 알려주시면 범위가 좁혀집니다.</p>
+
+        <!-- 조립공임 안내 — 예산 문구 바로 아래. 문구·금액 원천은 ../shared/assembly-fee.js 한 곳이다. -->
+
         <p data-assembly-fee-note="short" style="margin:4px 0 0;font-size:12.5px;color:#8a8578;font-weight:700;line-height:1.55;"></p>
         <p style="margin:6px 0 0;font-size:11px;color:#b5b0a4;">2026년 7월 시장가 · 자체 재고가 기준</p>
       </div>
@@ -408,7 +410,15 @@ var Q_REUSE={id:'reuse',q:'그대로 쓰실 부품을 골라 주세요.',cl:'재
    두면 화면엔 「게임 · 영상편집」 두 칩이 뜨는데 하한은 한 벌만 걸려 화면이 거짓말한다. */
 var Q_USE={id:'use',q:'주로 무엇에 쓰실 거예요?',cl:'용도',ci:'interests',f:0.5,opts:[]};
 var Q_ENV={id:'env',q:'인터넷 연결은 어떻게 쓰세요?',cl:'연결',ci:'wifi',f:0.82,noFilter:true,opts:[{t:'무선(WiFi)',v:'무선',why:['WiFi 미탑재 보드 제외']},{t:'유선(랜선)',v:'유선',why:[]},{t:'잘 모름',v:'무선 기본',why:['WiFi 기본 포함 보드 우선']}]};
-var Q_BUDGET={id:'budget',q:'예산은 어느 정도 생각하세요?',cl:'예산',ci:'savings',f:0.5,opts:[{t:'~70만',v:'70만원 이하',why:['70만 초과 부품 제외']},{t:'~100만',v:'100만원 이하',why:['100만 초과 부품 제외']},{t:'~150만',v:'150만원 이하',why:['150만 초과 부품 제외']},{t:'200만+',v:'200만원 이상',why:['상한 없이 최고 사양까지']},{t:'잘 모르겠어요(추천 받을래요)',v:'AI 추천 예산',why:['가성비 최적 구간으로 압축']}]};
+/* 예산 선택지도 «서버가 준다» — 어휘를 여기 박지 않는다(0110, 아래 BUDGET_CHIPS 블록).
+   병: 칩 다섯(70/100/150/200만+)이 **화면 안에 하드코딩**돼 있었고, 시장 정화 표본
+     782벌의 62.5%가 「200만원 이상」 한 칩에 뭉쳤다 — 사실상 그 위를 안 묻는 것이다.
+     게다가 그 경계는 `grid_budget_bands` 의 어느 구간과도 맞지 않았다(70만 하나만 우연히 일치).
+   고친 방식: `GET /api/budget-bands` 가 칩을 준다. 값(`constraint_value`)이
+     `api/candidates.py _budget_cap()` 이 읽는 형식인지 **서버가 매 응답마다 스스로 검사**한다
+     — 형식이 어긋나면 엔진이 조용히 median 으로 되돌아가기 때문이다.
+   ⚠ 못 받으면 «예산 선택지를 내지 않는다». 어휘를 여기 폴백으로 박으면 두 벌이 된다. */
+var Q_BUDGET={id:'budget',q:'예산은 어느 정도 생각하세요?',cl:'예산',ci:'savings',f:0.5,opts:[]};
 var Q_PRIORITY={id:'priority',q:'특별히 중요한 게 있을까요?',cl:'선호',ci:'star',multi:true,skip:true,f:0.62,opts:[{t:'조용함',v:'저소음',why:['고소음 쿨러·GPU 제외']},{t:'화이트·디자인',v:'화이트',why:['화이트 외 케이스 제외']},{t:'최대 성능',v:'성능 우선',why:['저성능 후보 제외']},{t:'확장성 여유',v:'확장성',why:['확장 슬롯 부족 보드 제외']},{t:'A/S 넉넉히',v:'A/S 중시',why:['보증 짧은 부품 후순위']},{t:'가성비',v:'가성비',why:['가격효율 낮은 후보 후순위']},{t:'특별히 없음',v:'없음',skipAll:true,why:[]}]};
 /* ── 용도 목록은 «화면이 갖지 않는다» — 서버 `usage_floors` 표가 단일 원천 (2026-08-17) ──
    병: 화면이 용도 어휘를 **세 벌** 들고 있었다(USE_PAT · guided Q_USE · 팝콘톡 TALKS · SCEN).
@@ -445,6 +455,19 @@ var USAGES_READY=fetch('/api/usages')
  .then(function(d){USAGES=(d&&d.usages)||[];})
  .catch(function(e){USAGES=[];USAGES_ERR=(e&&e.message)||String(e);})
  .then(function(){USAGES_DONE=true;Q_USE.opts=usageOpts();});
+/* ── 예산 칩도 «화면이 갖지 않는다» — `grid_budget_bands` 가 단일 원천 (0110) ──
+   서버가 주는 것: chip_text(화면 문구) · constraint_value(서버로 되돌아가는 값) ·
+   max_won(예산 막대 위치) · why(시장 표본 수). 화면은 그리기만 한다.
+   ⚠ 둘을 갈라 두는 것이 핵심이다 — 화면 문구(「~150만」)와 서버로 가는 값
+     (「150만원 이하」)은 형식 제약이 서로 다르다. 한 문자열로 합치면 둘 중 하나가 깨진다. */
+var BUDGET_CHIPS=[],BUDGET_ERR=null,BUDGET_DONE=false;
+function budgetOpts(){return BUDGET_CHIPS.map(function(c){
+ return {t:c.chip_text,v:c.constraint_value,why:c.why?[c.why]:[]};});}
+var BUDGET_READY=fetch('/api/budget-bands')
+ .then(function(r){if(!r.ok)throw new Error('서버 응답 '+r.status);return r.json();})
+ .then(function(d){BUDGET_CHIPS=(d&&d.chips)||[];})
+ .catch(function(e){BUDGET_CHIPS=[];BUDGET_ERR=(e&&e.message)||String(e);})
+ .then(function(){BUDGET_DONE=true;Q_BUDGET.opts=budgetOpts();});
 /* 순서 2026-08-21 사장님 지시: 용도 -> 예산 -> 나머지. 「누가 쓰실 PC인가요?」(Q_PURPOSE)는
    뺀다 — noFilter 라 원래도 consPairs·서버 전송에 안 들어갔으므로(위 Q_PURPOSE 주석)
    빼도 서버로 가는 조건엔 변화가 없다. 다만 Q_PURPOSE 의 '직원용' 답만이 Q_QTY(몇 대
@@ -598,6 +621,8 @@ function setProgress(){var dots=document.getElementById('s1-dots');if(dots){dots
 function guidedAsk(){
  /* 용도 단계는 «서버 목록이 도착한 뒤»에 그린다 — 없는 채로 그리면 선택지가 빈 채 지나간다. */
  if(qidx<QUEUE.length&&QUEUE[qidx].id==='use'&&!USAGES_DONE){USAGES_READY.then(guidedAsk);return;}
+ /* 예산 단계도 같다 — 서버 칩이 도착하기 전에 그리면 선택지가 빈 채 지나간다(0110). */
+ if(qidx<QUEUE.length&&QUEUE[qidx].id==='budget'&&!BUDGET_DONE){BUDGET_READY.then(guidedAsk);return;}
  setProgress();
  if(qidx>=QUEUE.length){setTimeout(function(){
    addAI('다 여쭤봤습니다. <b>추천 구성</b>을 준비했어요.<br>'+tagsBlock()+'<br>'+verdictSlot());

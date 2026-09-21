@@ -160,8 +160,9 @@ def clamp_turns(raw) -> int:
     return min(raw, SMALLTALK_SILENT_FROM)
 
 
-def advance_smalltalk(prev_turns, pc_related: bool | None) -> tuple[int, str]:
-    """(직전 카운터, 이번 문장의 pc 판정) -> (새 카운터, 단계).
+def advance_smalltalk(prev_turns, pc_related: bool | None,
+                      game_related: bool = False) -> tuple[int, str]:
+    """(직전 카운터, 이번 문장의 pc 판정, 게임 관련인가) -> (새 카운터, 단계).
 
     **순수함수다** — DB·LLM·시각을 보지 않는다. 회귀가 이 함수만으로 전이 전체를
     검사할 수 있게(= LLM 을 부르지 않고) 이 모양으로 뽑았다.
@@ -171,16 +172,70 @@ def advance_smalltalk(prev_turns, pc_related: bool | None) -> tuple[int, str]:
                                               않는다 — 모르는 것을 잡담으로 단정하면
                                               진짜 고객이 입을 닫는다(모듈 docstring
                                               「pc_related 는 bool 이 아니면 None」과 같은 원칙).
+      game_related is True -> (그대로, 단계)  **게임 이야기는 잡담이 아니다.**
       pc_related is False -> (직전+1, 단계)   1~3 받아줌 · 4 안내 · 5부터 침묵.
                                               SMALLTALK_SILENT_FROM 에서 멈춘다.
+
+    ■ game_related 를 더한 이유 (2026-09-21 · talk_design_v2 §6-3 수-1)
+      사장님이 직접 보신 사고: 고객이 「슈팅게임」이라고 답했는데 `pc=false` 로 떨어져
+      잡담 카운터가 올랐다. 그 속도면 **5턴째에 침묵 처분**이다 — 게임을 고른 뒤 PC 를
+      사겠다고 순서까지 말한 고객이 대화 도중에 차단된다.
+
+      **경계 숫자(3/4/5)는 사장님이 2026-09-17 에 확정하신 것 그대로 두고, «무엇을
+      세는가»만 바꾼다.** 게임 문장은 `pc_related is None`(모름)과 **같은 취급**이다 —
+      카운터를 올리지도 내리지도 않는다. 이미 있는 「모름은 잡담이 아니다」 규약의
+      **세 번째 값**이라 새 개념이 아니다.
+
+      ⚠ 리셋(0)이 아니라 **유지**인 이유: 게임 이야기는 PC 상담의 길목이지 PC 상담
+      자체가 아니다. 리셋으로 두면 게임 이야기만 무한히 이어가는 통로가 열린다.
+      `pc_related is True`(진짜 PC 질문)일 때만 여유가 되살아난다.
+
+      ⚠ 우선순위: `pc_related is True` 가 먼저다 — 게임이면서 PC 질문인 문장
+      (\"발로란트 할 PC 맞춰주세요\")은 리셋되어야 한다.
     """
     prev = clamp_turns(prev_turns)
     if pc_related is True:
         return 0, STAGE_PC
-    if pc_related is None:
+    if pc_related is None or game_related:
         return prev, stage_for(prev)
     nxt = min(prev + 1, SMALLTALK_SILENT_FROM)
     return nxt, stage_for(nxt)
+
+
+# ── 1-c. 「좁혀짐」 판정 (2026-09-21 · talk_design_v2 §1-2) ────────────────────
+# 지금 코드에 「좁혀짐」 개념이 없다 — 있는 것은 `missing` 하나뿐이다. 그런데 사장님이
+# 확정하신 흐름(\"자유롭게 답하되 구체적으로 좁혀지면 우리쪽으로 유도\")은 missing 으로
+# 표현되지 않는다: missing 은 «카드를 낼 수 있는가»이고 narrowing 은 «유도할 때인가»다.
+#
+# **순수함수로 둔다** — `advance_smalltalk` 의 전례 그대로. LLM·DB 없이 회귀에서 전수로
+# 돌릴 수 있고, 경계를 두 벌로 두지 않는다.
+NARROWING_WIDE = "wide"      # 게임명도 장르어도 없다 -> **답만 한다. 유도 금지**
+NARROWING_NARROW = "narrow"  # 장르어 1개 이상 또는 게임명 1개 -> 답하고 + 유도 한 줄 1회
+NARROWING_READY = "ready"    # 게임명 + (예산·용도·해상도·구매 의사) -> 견적 경로
+
+
+def narrowing_level(state: "TalkState | None", genre_hit: bool = False) -> str:
+    """(누적 state, 이번 문장에 장르어가 있었나) -> wide | narrow | ready.
+
+    **순수함수다.** `genre_hit` 은 호출부가 어휘 매칭으로 이미 낸 값을 받는다 —
+    여기서 장르 어휘를 다시 정의하지 않는다(어휘의 정본은 DB `games.genre`).
+
+    판정:
+      ready  : 게임명이 1개 이상 **그리고** (예산 ∨ 용도 ∨ 해상도) 가 함께 잡혔다.
+               «무엇을 할지»와 «어떤 조건으로»가 둘 다 있으면 견적을 낼 자리다.
+      narrow : 게임명 1개 이상 ∨ 장르어 1개 이상. 좁혀지는 중이다.
+      wide   : 그 밖 전부. 고객이 아직 둘러보는 중이다 — **유도하면 대화가 끊긴다**
+               (선행 조사 실측: 1·3턴 유도가 고객을 잡담 카운터에 올렸다).
+    """
+    if state is None:
+        return NARROWING_NARROW if genre_hit else NARROWING_WIDE
+    game = state.game
+    names = list(game.names) if game and game.names else []
+    if names:
+        has_cond = bool(state.budget_won) or bool(state.usages) or bool(
+            game.resolution if game else None)
+        return NARROWING_READY if has_cond else NARROWING_NARROW
+    return NARROWING_NARROW if genre_hit else NARROWING_WIDE
 
 
 # ── 2. 어휘 로더 (§3 「정본은 DB」) ──────────────────────────────────────────
@@ -191,6 +246,12 @@ class Vocab:
     confirmed_games: dict[str, str] = field(default_factory=dict)   # name -> grade (grade NOT NULL 만)
     all_game_names: list[str] = field(default_factory=list)    # games.name 전부(등급 미배정 포함)
     usages: list[tuple[str, list[str]]] = field(default_factory=list)   # [(usage_label, match_terms)]
+    # 장르 어휘 — `games.genre` DISTINCT. 「좁혀짐」 판정(narrowing_level)과 답변 경로의
+    # 게임 추천이 함께 쓴다. **코드에 박지 않는다** — 표가 늘면 다음 요청부터 따라온다.
+    genres: list[str] = field(default_factory=list)
+    # 장르 별칭 — `talk_genre_aliases`(0111). 고객이 쓰는 말("슈팅게임")과 우리 장르
+    # 값(FPS·협동슈팅·액션TPS)의 글자가 달라서 필요하다. alias(소문자) -> [genre].
+    genre_aliases: dict[str, list[str]] = field(default_factory=dict)
     # 등급 무게 — 확정 게임이 여럿일 때 「가장 무거운 등급」을 고르는 축. 설계서에 없는 규칙이라
     # 아래 _load_grade_weight 에 근거를 적었다. grade -> int (클수록 무겁다).
     grade_weight: dict[str, int] = field(default_factory=dict)
@@ -256,8 +317,17 @@ def load_vocab(conn) -> Vocab:
     all_names = [n for n in conn.execute(text(
         "SELECT name FROM games ORDER BY name")).scalars().all() if n]
     usages = [(u["label"], list(u["terms"])) for u in UF.list_usages()["usages"]]
+    genres = [g for g in conn.execute(text(
+        "SELECT DISTINCT genre FROM games WHERE genre IS NOT NULL ORDER BY genre"
+    )).scalars().all() if g]
+    aliases: dict[str, list[str]] = {}
+    for r in conn.execute(text(
+        "SELECT alias, genre FROM talk_genre_aliases ORDER BY alias, genre"
+    )).mappings().all():
+        aliases.setdefault(r["alias"], []).append(r["genre"])
     return Vocab(tiers=tiers, grades=grades, confirmed_games=confirmed,
-                 all_game_names=all_names, usages=usages,
+                 all_game_names=all_names, usages=usages, genres=genres,
+                 genre_aliases=aliases,
                  grade_weight=_load_grade_weight(conn, grades))
 
 
