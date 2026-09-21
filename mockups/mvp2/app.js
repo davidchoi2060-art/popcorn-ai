@@ -83,6 +83,19 @@ const TALK={
  missing:p=>Array.isArray(p&&p.missing)?p.missing:[],
  dropped:p=>Array.isArray(p&&p.dropped)?p.dropped:[],
  reply:p=>(p&&p.reply)||'',
+ // ── 답변 경로 [B] (2026-09-21 · talk_design_v2 §6-2) ─────────────────────
+ // ★ 이 연결이 끊기면 고객은 답을 받지 못한다(2026-09-21 사장님 실측 사고).
+ //   서버는 `answer` 를 내려보내는데 화면이 읽지 않아, 세 번 물은 고객이 세 번 다
+ //   되묻기만 받았다. 회귀 [59] 가 이 줄을 지킨다.
+ answer:p=>(p&&typeof p.answer==='string')?p.answer:'',
+ sources:p=>Array.isArray(p&&p.sources)?p.sources:[],
+ narrowing:p=>(p&&typeof p.narrowing==='string')?p.narrowing:null,
+ // 「조금 걸린다」 안내 — **웹검색 턴에만** 서버가 준다(늘 있는 것이 아니다).
+ answerNotice:p=>(p&&typeof p.answer_notice==='string'&&p.answer_notice)?p.answer_notice:'',
+ // 필터가 무엇을 손댔는가 — 화면에 싣지 않는다(서버 내부 사유). console.debug 로만.
+ answerFilter:p=>(p&&p.answer_filter&&typeof p.answer_filter==='object')?p.answer_filter:null,
+ answerError:p=>(p&&typeof p.answer_error==='string')?p.answer_error:null,
+ answerGameNames:p=>Array.isArray(p&&p.answer_game_names)?p.answer_game_names:[],
  pcRelated:p=>p?p.pc_related:null,
  // 잡담 흐름(2026-09-17) — 서버 talk_schema.ChatFlow 그대로. state 와 **형제**다(격자 좌표가 아니다).
  // 화면은 이 수를 «해석하지 않고» 다음 요청에 되돌려 보내기만 한다 — 경계(3/4/5)는 서버가 정한다.
@@ -374,6 +387,133 @@ function quoteMarkup(card,activeVariant){
  const tierName=tierDisplayName(card);
  return `<div class="quote-top"><span class="eyebrow">내 구성${tierKeyOf(card)?' · '+esc(tierKeyOf(card)):''}</span></div><div class="quote-title"><div><h2>${esc(tierName)}</h2><p>${esc([card.usage,card.platform].filter(Boolean).join(' · '))}</p></div><div class="quote-total">${v&&Number.isFinite(v.total)?money(v.total):'—'}<small>원</small>${verdict}</div></div>${v&&Number.isFinite(v.total)?feeNoteMarkup('quote','quote-fee-note'):''}${variantTabsMarkup('quote',0,activeKey,vs,card)}${om?omittedReasonMarkup(om):''}${!hasThree?'<p class="condition-note">이 견적은 아직 단일 구성만 제공합니다.</p>':''}<div class="quote-media"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><div class="media-caption">대표 예시 이미지<small>실제 부품은 아래 목록 기준</small></div><button data-action="video" aria-label="대표 예시 이미지 크게 보기">▶</button></div><div class="quote-reason"><b>✦ 이렇게 골랐어요</b>${reasons.length?'<ul>'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<br>서버가 준 이유가 없습니다.'}</div><div class="parts-heading"><b>구성 부품 <span>${parts.length}종</span></b><span>서버 가격 · 원</span></div><table class="parts" aria-label="현재 견적 부품 목록"><tbody>${parts.map(p=>`<tr><td class="category">${esc(p.cat)}</td><td class="part-name">${partLine(p)}</td><td class="part-price">${money(p.price)}</td></tr>`).join('')}${omittedRows(omitted)}</tbody></table><p class="quote-disclaimer">재고는 조회 시점 기준입니다.${v&&v.generated_at?' 견적 생성 '+esc(String(v.generated_at).slice(0,10))+'.':''} ${NOT_READY}</p><div class="quote-actions"><button class="secondary" data-action="save">견적 저장</button><button class="primary" data-action="cart" disabled title="장바구니는 준비 중입니다">장바구니 담기(준비 중)</button></div>`;
 }
+// ── 답변(answer) 렌더 — 2026-09-21 · talk_design_v2 §6-2 ────────────────────
+// 서버 /api/talk/parse 가 `answer`(질문에 대한 답)와 `reply`(되묻기)를 **둘 다** 준다.
+// 실측(2026-09-21, 로컬 :8000 · 사장님 3턴 + 잡담 1턴):
+//   answer  게임 질문일 때만 채워진다. 잡담('오늘 날씨 좋네요')이면 '' 이다.
+//           줄바꿈이 **하나도 없다** — 목록을 ' - **이름**: 내용' 처럼 한 줄에 이어 붙여 온다.
+//   reply   언제나 있다(잡담 포함). 침묵 단계(silent=true)에서만 '' 이다.
+// 그래서 화면은 **말풍선 하나** 안에 [answer 본문] → [근거] → [되묻기] 순으로 쌓는다.
+// 말풍선을 둘로 나누면 고객이 «두 사람이 말한다»고 느낀다(사장님 화면 = 상담 창구다).
+//
+// ⚠ innerHTML 을 쓰지 않는다. 여기 들어오는 문자열은 LLM 이 쓴 것이다 — 태그를 만들어
+//   붙이면 그대로 XSS 경로가 된다. 아래는 **텍스트 노드 + 우리가 만든 태그**만 쓴다.
+const ANSWER_LIST_MIN=2;              // ' - ' 조각이 이만큼 있어야 «목록»으로 본다(아래 근거)
+const WAIT_SHORT='조건을 읽는 중…';
+// 「고객에게는 조금 시간이 걸린다고 얘기하고」(사장님 확정). 응답이 실측 5~7초라
+// 기다리는 동안 화면이 죽은 것처럼 보이면 안 된다. **화면 문구**이지 서버 값이 아니다 —
+// 서버가 `answer_notice`(웹검색 턴만)를 주면 그건 말풍선 안에 따로 싣는다.
+const WAIT_LONG='답을 찾고 있어요. 자료를 확인하느라 조금 걸릴 수 있어요.';
+const WAIT_LONG_MS=2500;
+const SOURCES_HEADING='근거';
+
+// 「한 줄로 온 목록」을 줄로 편다. ' - ' 가 ANSWER_LIST_MIN 개 이상일 때만 편다 —
+// 한 번뿐이면 본문 속 줄표(«라이엇 게임즈 — 1위» 같은 것)일 수 있어 건드리지 않는다.
+// 서버가 나중에 진짜 줄바꿈으로 바꿔 보내도 이 함수는 그대로 통과시킨다.
+function answerNormalize(text){
+ let s=String(text==null?'':text).replace(/\r\n?/g,'\n').trim();
+ if(!s)return '';
+ const hits=(s.match(/(?:^|[\s\n])[-*]\s+\S/g)||[]).length;
+ if(hits>=ANSWER_LIST_MIN)s=s.replace(/[ \t]+[-*][ \t]+(?=\S)/g,'\n- ');
+ return s;
+}
+// '**굵게**' 만 본다. 나머지 별표·기호는 **그냥 글자**로 남는다(지원 범위를 넓히지 않는다).
+function answerSpans(text){
+ const t=String(text==null?'':text);
+ const out=[];let i=0,m;const re=/\*\*([\s\S]+?)\*\*/g;
+ while((m=re.exec(t))){
+  if(m.index>i)out.push({bold:false,text:t.slice(i,m.index)});
+  out.push({bold:true,text:m[1]});
+  i=re.lastIndex;
+ }
+ if(i<t.length)out.push({bold:false,text:t.slice(i)});
+ return out.filter(x=>x.text!=='');
+}
+// 블록으로 쪼갠다 — {type:'ul',items:[spans]} | {type:'p',spans}. DOM 을 만들지 않는다(node 검증 가능).
+function answerBlocks(text){
+ const s=answerNormalize(text);
+ if(!s)return [];
+ const out=[];
+ for(const raw of s.split('\n')){
+  const line=raw.trim();
+  if(!line)continue;
+  const m=/^[-*]\s+(.*)$/.exec(line);
+  if(!m){out.push({type:'p',spans:answerSpans(line)});continue;}
+  const last=out[out.length-1];
+  if(last&&last.type==='ul')last.items.push(answerSpans(m[1]));
+  else out.push({type:'ul',items:[answerSpans(m[1])]});
+ }
+ return out;
+}
+// 근거 목록 — 서버 sources[] 를 화면이 읽을 수 있는 모양으로만 접는다(지어내지 않는다).
+// url 은 http(s) 만 통과시킨다(javascript: 를 링크로 만들지 않는다).
+function sourceItems(sources){
+ return (Array.isArray(sources)?sources:[])
+  .filter(s=>s&&typeof s==='object'&&s.label)
+  .map(s=>({kind:s.kind==='web'?'web':'own',label:String(s.label),
+            url:(typeof s.url==='string'&&/^https?:\/\//i.test(s.url))?s.url:null}));
+}
+// ── DOM 생성 — document 를 인자로 받는다(node/jsdom 에서도 같은 코드가 돈다) ──
+function appendSpans(host,spans,doc){
+ for(const sp of (spans||[])){
+  if(!sp||!sp.text)continue;
+  if(sp.bold){const b=doc.createElement('strong');b.appendChild(doc.createTextNode(sp.text));host.appendChild(b);}
+  else host.appendChild(doc.createTextNode(sp.text));
+ }
+ return host;
+}
+function answerFragment(blocks,doc){
+ const frag=doc.createDocumentFragment();
+ for(const b of (blocks||[])){
+  if(!b)continue;
+  if(b.type==='ul'){
+   const ul=doc.createElement('ul');ul.className='answer-list';
+   for(const spans of (b.items||[])){const li=doc.createElement('li');appendSpans(li,spans,doc);ul.appendChild(li);}
+   if(ul.childNodes.length)frag.appendChild(ul);
+  }else{
+   const p=doc.createElement('p');p.className='answer-para';
+   appendSpans(p,b.spans,doc);
+   if(p.childNodes.length)frag.appendChild(p);
+  }
+ }
+ return frag;
+}
+function sourcesElement(items,doc){
+ const box=doc.createElement('p');box.className='answer-sources';
+ const h=doc.createElement('b');h.textContent=SOURCES_HEADING;box.appendChild(h);
+ (items||[]).forEach(s=>{
+  box.appendChild(doc.createTextNode(' '));
+  if(s.url){const a=doc.createElement('a');a.href=s.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=s.label;box.appendChild(a);}
+  else box.appendChild(doc.createTextNode(s.label));
+ });
+ return box;
+}
+// ★ 말풍선 본문 하나. answer 가 비면 reply 만, reply 가 비면 answer 만 — 둘 다 없으면 null.
+//   (cap=null 전례 — 어느 필드가 없어도 화면이 죽지 않는다.)
+function answerBody(p,doc){
+ const answer=TALK.answer(p),reply=TALK.reply(p);
+ if(!answer&&!reply)return null;
+ const body=doc.createElement('div');body.className='assistant-text';
+ if(answer){
+  const notice=TALK.answerNotice(p);
+  if(notice){const n=doc.createElement('p');n.className='answer-notice';n.textContent=notice;body.appendChild(n);}
+  const box=doc.createElement('div');box.className='answer-body';
+  box.appendChild(answerFragment(answerBlocks(answer),doc));
+  if(box.childNodes.length)body.appendChild(box);
+  // 본문이 이미 «출처는 gametrics입니다» 라고 말하는 턴이 있다(실측 T1). 그래도 근거 줄은
+  // 남긴다 — 저 문장은 LLM 이 쓴 것이고, 이 줄은 **서버가 준 sources[]** 다. 둘은 다른 축이고
+  // 「모든 견적에는 이유가 있습니다」는 우리가 보증하는 쪽을 보여주는 것이다. 다만 한 줄로
+  // 작게 두어 본문과 겹쳐 읽히지 않게 한다(말풍선을 나누지 않는다).
+  const src=sourceItems(TALK.sources(p));
+  if(src.length)body.appendChild(sourcesElement(src,doc));
+ }
+ if(reply){
+  const r=doc.createElement('p');
+  r.className=answer?'answer-followup':'answer-reply';
+  r.textContent=reply;body.appendChild(r);
+ }
+ return body;
+}
 // 오류 문구 — 502 는 AI 연결 불가(폴백 UI 없음). 서버 detail 은 console 로만.
 function errorMessage(status,data){
  const d=data&&data.detail;
@@ -383,7 +523,7 @@ function errorMessage(status,data){
  if(d&&typeof d==='object'&&d.message)return String(d.message);
  return (status>=500?'서버 오류':'요청 오류')+`(${status})`;
 }
-const render={money,esc,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON};
+const render={money,esc,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,answerNormalize,answerSpans,answerBlocks,answerFragment,answerBody,sourceItems,sourcesElement,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON,WAIT_SHORT,WAIT_LONG,WAIT_LONG_MS,SOURCES_HEADING};
 if(typeof module!=='undefined'&&module.exports){module.exports=render;return;}   // node(자기검증) — 여기서 끝
 if(!root.document||root.PopcornApp)return;
 
@@ -410,6 +550,19 @@ function pushHistory(role,text){state.history.push({role,text:String(text).slice
 function setBusy(on){state.busy=on;document.querySelectorAll('#startForm .send,#chatForm .send,[data-purpose],[data-chat],[data-prompt],[data-action="retry"]').forEach(b=>{if(b.dataset.done)return;b.disabled=on;});}
 
 function addMessage(role,content,html=false){const node=document.createElement('div');node.className='message '+role;node.innerHTML=role==='user'?`<div class="user-bubble">${esc(content)}</div>`:`<div class="assistant-label"><span class="ai-mark">✦</span>팝콘PC AI</div><div class="assistant-text">${html?content:esc(content)}</div>`;$('#messages').append(node);scrollChat();return node;}
+// ★ answer/reply 말풍선 — **innerHTML 을 쓰지 않는다**. 본문은 LLM 이 쓴 문자열이라
+//   태그 문자열로 조립하면 그대로 XSS 경로가 된다. 라벨(우리 고정 마크업)만 innerHTML 로
+//   두고, 서버 문자열은 전부 answerBody() 가 만든 텍스트 노드로 들어간다.
+//   answer·reply 가 둘 다 비면 말풍선 자체를 만들지 않는다(빈 풍선 금지 · null 가드).
+function drawAnswer(p){
+ const body=answerBody(p,document);
+ if(!body)return null;
+ const node=document.createElement('div');node.className='message assistant';
+ const label=document.createElement('div');label.className='assistant-label';
+ label.innerHTML='<span class="ai-mark">✦</span>팝콘PC AI';
+ node.appendChild(label);node.appendChild(body);
+ $('#messages').append(node);scrollChat();return node;
+}
 function showError(err,retry){state.retry=retry;addMessage('assistant',`<strong>요청에 실패했습니다.</strong>\n${esc(err&&err.message||err)}<div class="change-actions"><button class="secondary" data-action="retry">다시 시도</button></div>`,true);}
 function scrollChat(){requestAnimationFrame(()=>{$('#messages').scrollTop=$('#messages').scrollHeight;});}
 function showWorkspace(){ $('#welcome').hidden=true;$('#welcomeFoot').hidden=true;$('#workspace').hidden=false; }
@@ -422,11 +575,15 @@ async function submit(text){
  showWorkspace();selectTab('chat');
  addMessage('user',text);
  const history=state.history.slice(-HISTORY_MAX);   // 이번 문장 이전의 최근 6턴
- const thinking=addMessage('assistant','조건을 읽는 중…');
+ // ⑤ 「고객에게는 조금 시간이 걸린다고 얘기하고」 — 실측 응답이 5~7초다. 2.5초를 넘기면
+ //   같은 말풍선의 문구만 길게 바꾼다(말풍선을 새로 만들지 않는다 — 기록이 안내문으로 덮인다).
+ const thinking=addMessage('assistant',WAIT_SHORT);
+ const waitTimer=setTimeout(()=>{const t=thinking.querySelector('.assistant-text');if(t)t.textContent=WAIT_LONG;},WAIT_LONG_MS);
  setBusy(true);
  let p;
  try{p=await api('POST','/api/talk/parse',{text,state:state.talk,chat_flow:state.chatFlow,history});}   // 이전 턴 state·잡담 카운터를 되돌려 보낸다(누적)
- catch(e){thinking.remove();setBusy(false);showError(e,()=>submit(text));return;}
+ catch(e){clearTimeout(waitTimer);thinking.remove();setBusy(false);showError(e,()=>submit(text));return;}
+ clearTimeout(waitTimer);
  thinking.remove();
  pushHistory('user',text);
  const next=TALK.state(p);
@@ -435,6 +592,10 @@ async function submit(text){
  const flow=TALK.chatFlow(p);
  if(flow)state.chatFlow=flow;   // 화면은 이 수를 해석하지 않는다 — 다음 요청에 그대로 돌려보낼 뿐(경계는 서버가 센다)
  const reply=TALK.reply(p);
+ const answer=TALK.answer(p);
+ const afilter=TALK.answerFilter(p);
+ if(afilter)console.debug('talk/parse answer_filter(서버 내부 사유 — 화면에 싣지 않음)',afilter);
+ if(TALK.answerError(p))console.warn('talk/parse answer 경로 실패(서버 사유)',TALK.answerError(p));
  // ── 잡담 5회차~ : 말풍선을 만들지 않는다 ────────────────────────────────────
  // 사장님 지시는 「양해를 구하고 답변하지 않는다」이고, 그 양해는 4회차(stage='guide')에
  // 이미 한 번 나갔다. 여기서 짧은 안내를 다시 말풍선으로 내면 그것도 «답변»이고, 잡담이
@@ -443,12 +604,28 @@ async function submit(text){
  // 다만 화면이 죽은 것처럼 보이면 안 되므로, 기록에 남지 않는 toast 로 «받긴 했다»만
  // 알린다(말풍선 아님 · history 에 안 들어감 · 3.2초 뒤 사라짐). 입력창은 그대로 살아
  // 있다 — PC 질문 한 마디면 서버가 카운터를 0 으로 되돌려 즉시 복귀한다(④⑤).
+ //
+ // ★ 2026-09-21 — **`answer` 가 있으면 침묵하지 않는다.** 서버 talk.py(수-3)가 같은
+ //   판단을 이미 했다: 침묵은 「PC 견적 창구에서 무관한 잡담을 끊는다」는 규약이지
+ //   「게임 질문에 답하지 않는다」가 아니다. 화면에도 같은 병이 있었다 — 여기서 끊으면
+ //   서버가 애써 만든 답이 버려진다. 답이 있으면 그것만 그리고(되묻기 reply 는 이 단계에
+ //   애초에 비어 있다) 격자로는 가지 않는다.
  if(TALK.silent(p)){
   console.debug('talk/parse silent — 잡담 단계',TALK.stage(p),TALK.chatFlow(p));
-  toast('PC 견적 이야기를 해주시면 이어서 도와드릴게요.');
+  if(answer)drawAnswer(p);
+  else toast('PC 견적 이야기를 해주시면 이어서 도와드릴게요.');
   setBusy(false);return;
  }
- if(reply){addMessage('assistant',reply);pushHistory('assistant',reply);}
+ // ★ answer(질문에 대한 답) + reply(되묻기)를 **한 말풍선**에 쌓는다.
+ //   둘을 따로 addMessage 하면 고객이 «두 사람이 말한다»고 느낀다(사장님 화면 = 상담 창구).
+ //   answer 가 비어 있으면(잡담 턴 — 실측 '오늘 날씨 좋네요' -> answer:'') reply 만 그려
+ //   지금까지의 동작이 그대로 유지된다.
+ if(answer||reply){
+  drawAnswer(p);
+  // 이력에는 **한 줄로 접어** 넣는다. answer 가 600자까지 오는데 그대로 쌓으면 다음 턴
+  // 프롬프트가 답변문으로 덮인다(서버도 300자로 자른다 — pushHistory).
+  pushHistory('assistant',answer||reply);
+ }
  const dropped=TALK.dropped(p);
  if(dropped.length){addMessage('assistant','반영하지 못한 조건: '+dropped.map(d=>`${d.field||d.l||'?'}=${d.value??d.v??'?'}(${d.reason||'사유 없음'})`).join(' · '));}
  if(TALK.evidence(p).length)console.debug('talk/parse evidence',TALK.evidence(p));

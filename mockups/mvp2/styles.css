@@ -89,3 +89,27 @@
 .quote-fee-note{margin:-8px 0 16px;font-size:12.5px;line-height:1.6;color:var(--muted);text-align:right}
 .saved-fee-note{display:block;margin-top:2px;font-size:11.5px;color:var(--muted)}
 @media(max-width:768px){.quote-fee-note{text-align:left;margin:4px 0 14px}}
+
+/* ── 답변(answer) 말풍선 — 2026-09-21 · talk_design_v2 §6-2 ───────────────────
+   새 컴포넌트를 만들지 않았다: 기존 `.message.assistant > .assistant-text` 안에서만
+   푼다(말풍선 골격·라벨·여백은 그대로). 색은 전부 기존 토큰(--ink/--muted/--blue/--soft/
+   --line)이고 새 HEX 를 두지 않는다. 치수는 이 파일이 이미 쓰는 px 눈금에 맞췄다.
+   answer 는 «답»(길다·목록), reply 는 «되묻기»(짧다) — 한 말풍선 안에서 두 덩어리로
+   구분되게 한다. 말풍선을 나누면 고객이 두 사람이 말한다고 느낀다. */
+.assistant-text .answer-body{white-space:normal}   /* 목록/문단을 직접 만드므로 pre-line 을 끈다 */
+.answer-para{margin:0 0 9px;line-height:1.95}
+.answer-para:last-child{margin-bottom:0}
+.answer-body strong{color:var(--ink);font-weight:600}
+.answer-list{margin:0 0 10px;padding-left:18px;list-style:disc}
+.answer-list li{margin:0 0 6px;line-height:1.85;overflow-wrap:anywhere}
+.answer-list li:last-child{margin-bottom:0}
+/* 「조금 걸린다」 안내 — 서버 answer_notice 가 온 턴에만 그린다(늘 띄우지 않는다). */
+.answer-notice{margin:0 0 10px;font-size:12px;line-height:1.7;color:var(--muted)}
+/* 근거 — 「모든 견적에는 이유가 있습니다」. 본문보다 작게, 한 줄로. */
+.answer-sources{margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line);font-size:11.5px;line-height:1.7;color:var(--muted);white-space:normal}
+.answer-sources b{color:var(--ink);font-weight:600;margin-right:4px}
+.answer-sources a{color:var(--blue-strong)}
+/* 되묻기 — 답 다음에 오면 한 칸 띄워 «다음 이야기»로 읽히게 한다. 혼자 오면 본문 그대로. */
+.answer-followup{margin:13px 0 0;padding-top:11px;border-top:1px solid var(--line);color:var(--ink);line-height:1.9;white-space:pre-line}
+.answer-reply{margin:0;white-space:pre-line}
+@media(max-width:768px){.answer-list{padding-left:16px}.answer-para,.answer-list li{line-height:1.8}}

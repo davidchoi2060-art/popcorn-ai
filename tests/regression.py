@@ -6694,6 +6694,7 @@ def main():
                test_assembly_fee_screen,
                test_admin_grid_screen_draws_cells,
                test_game_cell_map_freshness,
+               test_talk_answer_screen,
                test_market_bands_and_handling):
         try:
             fn()
@@ -9038,6 +9039,234 @@ def test_market_bands_and_handling():
     except Exception as e:                                   # noqa: BLE001
         print(f"  [INFO] S1 화면 대조 생략 — {e!r}")
 
+
+
+def test_talk_answer_screen():
+    """[61] mvp2 화면이 서버의 `answer` 를 실제로 그리는가 (2026-09-21 신설)
+
+    ★ 고친 병(사장님 실측): 서버 `POST /api/talk/parse` 가 `answer`(질문에 대한 답)를
+      내려보내는데 **화면(mockups/mvp2/app.js)이 그 필드를 한 번도 읽지 않았다.**
+      그래서 「인기 게임을 소개해줘」라고 세 번 물은 고객이 세 번 다 되묻기만 받았다.
+      서버만 고치고 화면을 두면 고객에게는 **아무것도 바뀌지 않는다** — 이 검사가
+      그 연결을 지킨다. 연결을 끊으면(TALK.answer 제거 / drawAnswer 제거) FAIL 한다.
+
+    브라우저를 쓰지 않는다 — app.js 문자열 계약 + node 로 **순수 렌더 함수**를 돌려
+    본다([58] 과 같은 방식). DOM 은 가짜 document 를 주입해 만든다. 그 가짜 document 의
+    요소는 `innerHTML` 에 값을 넣으면 **예외를 던진다** — 즉 ③ 검사는 «innerHTML 을
+    안 쓴다»를 말로 확인하는 것이 아니라 실제로 강제한다(LLM 문자열이 들어오는
+    자리라 innerHTML 은 그대로 XSS 경로다).
+    """
+    import subprocess as _sp61
+    import shutil as _sh61
+    import tempfile as _tf61
+
+    print("\n[61] mvp2 화면이 서버 answer 를 그린다 (2026-09-21 신설)")
+    app_path = pathlib.Path(ROOT, "mockups", "mvp2", "app.js")
+    src = app_path.read_text(encoding="utf-8")
+
+    # ── ① 연결 — app.js 가 `answer` 를 읽는다 ─────────────────────────────
+    #   이 검사가 실패하려면: TALK 에서 answer 조회를 지우거나, 읽고도 안 그리면 된다.
+    check("[61] app.js 가 서버 응답의 answer 필드를 읽는다",
+          bool(re.search(r"answer\s*:\s*p\s*=>", src)) and "p.answer" in src,
+          "TALK.answer 있음", "answer 조회가 없다 — 고객이 답을 못 본다")
+    check("[61] app.js 가 answer 를 실제로 말풍선에 그린다(읽고 버리지 않는다)",
+          "drawAnswer(" in src and "answerBody(" in src,
+          "drawAnswer/answerBody 있음", "그리는 자리가 없다")
+    # ★ submit() 함수 **안**만 본다 — `answerBody` 안에도 같은 줄이 있어서
+    #   파일 전체로 찾으면 submit 쪽 연결이 끊겨도 통과해 버린다(음성 검사에서 잡혔다).
+    _sub = re.search(r"async function submit\(text\)\{(.*?)\n\}\n", src, re.S)
+    sub = _sub.group(1) if _sub else ""
+    check("[61] submit() 을 찾았다(아래 검사들의 전제)", bool(_sub), "찾음", "못 찾음")
+    check("[61] submit() 이 answer 를 집어 그린다(읽는 자리와 그리는 자리가 이어진다)",
+          bool(re.search(r"const\s+answer\s*=\s*TALK\.answer\(p\)", sub))
+          and "drawAnswer(p)" in sub,
+          "submit 안에서 TALK.answer(p) -> drawAnswer(p)", "연결 끊김")
+    # answer 든 reply 든 있으면 반드시 그린다 — 옛 화면은 reply 만 그렸다.
+    check("[61] submit() 이 answer|reply 중 하나라도 있으면 그린다",
+          bool(re.search(r"if\(answer\|\|reply\)\{\s*\n?\s*drawAnswer\(p\);", sub)),
+          "if(answer||reply){ drawAnswer(p)", "그리는 분기가 없다")
+    # `reply` 를 지우면 안 된다 — 둘은 역할이 다르다(answer=답 / reply=되묻기).
+    check("[61] 기존 reply 조회가 그대로 남아 있다(answer 가 reply 를 밀어내지 않는다)",
+          bool(re.search(r"reply\s*:\s*p\s*=>", src)) and "TALK.reply(p)" in src,
+          "TALK.reply 있음", "reply 가 사라졌다")
+    check("[61] sources(근거)도 읽는다 — 「모든 견적에는 이유가 있습니다」",
+          bool(re.search(r"sources\s*:\s*p\s*=>", src)), "있음", "없음")
+
+    # ── ② pc=false·silent 에서 입을 닫지 않는다 ───────────────────────────
+    #   옛 화면은 silent 턴에 toast 만 띄우고 return 했다 — 서버가 만든 answer 가 버려졌다.
+    sil = re.search(r"if\(TALK\.silent\(p\)\)\{(.{0,400}?)\n\s*\}", sub, re.S)
+    check("[61] silent(잡담) 턴에도 answer 가 있으면 그린다(화면이 답을 버리지 않는다)",
+          bool(sil) and bool(re.search(r"if\(answer\)\s*drawAnswer\(p\)", sil.group(1))),
+          "silent 분기 안에 if(answer)drawAnswer(p)",
+          (sil.group(1)[:90] if sil else "분기를 못 찾음"))
+
+    # ── ③ innerHTML 금지 — LLM 문자열이 들어오는 자리 ────────────────────
+    body_src = src[src.find("function answerBody"):src.find("function errorMessage")]
+    frag_src = src[src.find("function answerFragment"):src.find("function sourcesElement")]
+    check("[61] answer 렌더 함수가 innerHTML 을 쓰지 않는다(XSS 경로 차단)",
+          "innerHTML" not in body_src and "innerHTML" not in frag_src,
+          "없음", "innerHTML 이 있다")
+    dr = re.search(r"function drawAnswer\(p\)\{(.*?)\n\}", src, re.S)
+    check("[61] drawAnswer 가 서버 문자열을 innerHTML 로 넣지 않는다"
+          "(라벨 한 줄만 고정 마크업)",
+          bool(dr) and dr.group(1).count("innerHTML") <= 1
+          and "answer" not in dr.group(1).split("innerHTML")[-1][:60],
+          "고정 라벨만", (dr.group(1)[:90] if dr else "drawAnswer 없음"))
+
+    # ── ④ null 가드 ──────────────────────────────────────────────────────
+    check("[61] answerBody 에 «둘 다 비면 안 그린다» 가드가 있다(빈 말풍선 금지)",
+          bool(re.search(r"if\(!answer&&!reply\)return null", body_src)),
+          "있음", "없음")
+    check("[61] drawAnswer 가 null 을 받으면 말풍선을 만들지 않는다(cap=null 전례)",
+          bool(dr) and "if(!body)return null" in dr.group(1),
+          "있음", "없음")
+
+    # ── ⑤ 화면이 숫자를 지어내지 않는다 ──────────────────────────────────
+    #   answer 렌더 구간에 수치 리터럴(퍼센트·원·fps)이 있으면 화면이 말을 보태는 것이다.
+    lit = re.findall(r"\d+(?:\.\d+)?\s*(?:%|원|fps|GB|Hz)", body_src + frag_src)
+    check("[61] answer 렌더 구간에 수치 리터럴이 없다(수치는 서버 문자열 안에만)",
+          not lit, "0건", lit[:5])
+
+    # ── ⑥ node 로 실제 렌더 — 가짜 document 가 innerHTML 을 금지한다 ─────
+    node = _sh61.which("node")
+    if not node:
+        check("[61] mvp2 answer 렌더 결과 검사 — node 가 없어 건너뜀",
+              True, "건너뜀", "node=None", kind="DB")
+        return
+
+    driver = r"""
+const R=require(process.argv[2]);
+// 가짜 document — innerHTML 에 값을 넣으면 던진다(계약을 말이 아니라 코드로 강제).
+function mk(tag){
+ const el={tagName:tag.toUpperCase(),children:[],childNodes:[],attrs:{},className:'',_text:null,
+  appendChild(c){this.children.push(c);this.childNodes.push(c);return c;},
+  setAttribute(k,v){this.attrs[k]=v;},
+  get text(){return this._text!=null?this._text:this.children.map(c=>c.text).join('');}};
+ Object.defineProperty(el,'innerHTML',{set(){throw new Error('innerHTML used in '+tag);}});
+ Object.defineProperty(el,'textContent',{set(v){this._text=String(v);this.children=[];this.childNodes=[];},
+  get(){return this.text;}});
+ return el;
+}
+const doc={createElement:mk,createTextNode:t=>({tagName:'#text',_text:String(t),children:[],get text(){return this._text;}}),
+ createDocumentFragment:()=>mk('#fragment')};
+function walk(n,out){out.push(n);(n.children||[]).forEach(c=>walk(c,out));return out;}
+const cases=JSON.parse(require('fs').readFileSync(process.argv[3],'utf8'));
+const out={rows:[],guard:[],tags:[]};
+for(const p of cases){
+ let r={ok:true};
+ try{
+  const b=R.answerBody(p,doc);
+  if(!b){r={ok:true,nullBody:true};out.rows.push(r);continue;}
+  const all=walk(b,[]);
+  r.text=b.text;
+  r.li=all.filter(n=>n.tagName==='LI').length;
+  r.strong=all.filter(n=>n.tagName==='STRONG').length;
+  r.tags=[...new Set(all.map(n=>n.tagName))];
+  r.hrefs=all.filter(n=>n.tagName==='A').map(n=>n.href||n.attrs.href);
+ }catch(e){r={ok:false,err:e.message};}
+ out.rows.push(r);
+}
+// 망가진 응답에 예외가 없어야 한다.
+for(const bad of [null,undefined,{},{answer:null,reply:null},{answer:123,reply:[]},
+                  {answer:'x',sources:'nope'},{answer:'- ',reply:''},{answer:'**',reply:''}]){
+ try{R.answerBody(bad,doc);out.guard.push('ok');}catch(e){out.guard.push('THROW:'+e.message);}
+}
+process.stdout.write(JSON.stringify(out));
+"""
+    # 실측(2026-09-21 로컬 :8000)에서 온 모양 그대로. **서버를 부르지 않는다** —
+    # LLM 문장은 매번 달라지므로 여기서는 «계약 모양»만 본다(회귀가 LLM 에 흔들리지 않게).
+    cases = [
+        {"answer": "인기 게임입니다. - **리그 오브 레전드**: MOBA, 라이엇 게임즈"
+                   " - **발로란트**: FPS, 라이엇 게임즈 - **서든어택**: FPS, 넥슨"
+                   " 어떤 장르를 찾으시나요?",
+         "reply": "혹시 새 컴퓨터를 맞추려고 하시나요?",
+         "sources": [{"kind": "own", "label": "저희가 정리해 둔 자료예요."}]},
+        # 잡담 턴 — answer 가 빈 문자열이다. reply 만 그려야 하고 깨지면 안 된다.
+        {"answer": "", "reply": "네, 날씨가 좋네요.", "sources": []},
+        # 침묵 턴 — reply 가 비고 answer 만 있다.
+        {"answer": "- **배틀그라운드**: 배틀로얄", "reply": "", "silent": True,
+         "sources": [{"kind": "web", "label": "위키백과",
+                      "url": "https://ko.wikipedia.org/wiki/x"}]},
+        # XSS — LLM 이 태그를 써 보낸 경우. 태그가 «되면» 안 된다.
+        {"answer": "<img src=x onerror=alert(1)> - **<script>bad</script>**: 내용",
+         "reply": "<svg onload=alert(2)>",
+         "sources": [{"kind": "web", "label": "나쁜 링크", "url": "javascript:alert(3)"}]},
+    ]
+    with _tf61.TemporaryDirectory() as tmp:
+        cp = pathlib.Path(tmp, "cases.json")
+        dp = pathlib.Path(tmp, "drv61.js")
+        cp.write_text(json.dumps(cases, ensure_ascii=False), encoding="utf-8")
+        dp.write_text(driver, encoding="utf-8")
+        pr = _sp61.run([node, str(dp).replace("\\", "/"),
+                        str(app_path).replace("\\", "/"),
+                        str(cp).replace("\\", "/")],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if pr.returncode != 0:
+        check("[61] node 로 app.js answer 렌더 성공", False, "성공",
+              (pr.stderr or "")[-300:])
+        return
+    R61 = json.loads(pr.stdout)
+    rows = R61["rows"]
+
+    errs = [r.get("err") for r in rows if not r.get("ok")]
+    check("[61] 네 가지 응답 모양 모두 렌더에 예외가 없다", not errs, "0건", errs)
+    if errs:
+        return
+
+    # ① 마크다운 — 목록이 li 로, 굵게가 strong 으로 그려진다. 별표가 날것으로 남지 않는다.
+    r0 = rows[0]
+    check("[61] ' - ' 목록이 li 로 그려진다(하이픈이 날것으로 보이지 않는다)",
+          r0.get("li") == 3, 3, r0.get("li"))
+    check("[61] '**굵게**' 가 strong 으로 그려진다(별표가 날것으로 보이지 않는다)",
+          r0.get("strong") == 3, 3, r0.get("strong"))
+    check("[61] 화면에 보이는 글자에 '**' 가 남아 있지 않다",
+          "**" not in (r0.get("text") or ""), "없음",
+          (r0.get("text") or "")[:60])
+    check("[61] answer 와 reply 가 **한 말풍선**에 함께 있다(두 메시지처럼 보이지 않는다)",
+          "혹시 새 컴퓨터를 맞추려고 하시나요?" in (r0.get("text") or ""),
+          "reply 포함", (r0.get("text") or "")[-40:])
+    check("[61] 서버 sources 라벨이 화면에 보인다(근거를 밝힌다)",
+          "저희가 정리해 둔 자료예요." in (r0.get("text") or ""), "있음", "없음")
+
+    # ② answer 가 빈 턴 — reply 만. 목록·근거를 지어내지 않는다.
+    r1 = rows[1]
+    check("[61] answer 가 빈 턴에도 화면이 깨지지 않는다(reply 만 그린다)",
+          r1.get("text") == "네, 날씨가 좋네요.", "reply 만", r1.get("text"))
+    check("[61] answer 가 빈 턴에 목록을 만들지 않는다", r1.get("li") == 0, 0, r1.get("li"))
+
+    # ③ 태그 허용 목록 — 우리가 만드는 것 말고는 없다(주입 태그가 요소가 되지 않는다).
+    allowed = {"DIV", "P", "UL", "LI", "STRONG", "B", "A", "#text", "#FRAGMENT"}
+    stray = sorted({t for r in rows for t in (r.get("tags") or []) if t not in allowed})
+    check("[61] 만들어지는 태그가 허용 목록뿐이다(img/script/svg 가 생기지 않는다)",
+          not stray, "0건", stray)
+    r3 = rows[3]
+    check("[61] LLM 이 써 보낸 태그는 **글자로** 보인다(실행되지 않는다)",
+          "<img src=x onerror=alert(1)>" in (r3.get("text") or ""), "글자로 보임",
+          (r3.get("text") or "")[:60])
+    bad_href = [h for r in rows for h in (r.get("hrefs") or [])
+                if h and not str(h).lower().startswith("http")]
+    check("[61] javascript: 주소를 링크로 만들지 않는다", not bad_href, "0건", bad_href)
+
+    # ④ 망가진 응답 가드
+    thrown = [g for g in R61["guard"] if g != "ok"]
+    check("[61] 망가진 응답 8종에 예외가 없다(null 가드)", not thrown, "0건", thrown)
+
+    # ⑤ 「조금 걸린다」 안내 — 응답이 실측 5~7초다. 화면이 죽은 듯 보이면 안 된다.
+    check("[61] 기다리는 동안 안내 문구가 있다(setBusy 재활용 · 긴 대기 문구 교체)",
+          "WAIT_LONG" in sub and "WAIT_LONG_MS" in sub
+          and "clearTimeout(waitTimer)" in sub and "setTimeout(" in sub,
+          "submit 안에 대기 문구 타이머", "없다 — 5~7초 동안 화면이 죽은 듯 보인다")
+    check("[61] 서버 answer_notice 가 오면 그것도 그린다(화면이 지어내지 않는다)",
+          "answer_notice" in src and "answerNotice(" in src, "있음", "없음")
+
+    # ⑥ 스타일 — 새 색을 두지 않았다(디자인 계약). 긴 답이 넘치지 않는다.
+    css = pathlib.Path(ROOT, "mockups", "mvp2", "styles.css").read_text(encoding="utf-8")
+    seg = css[css.find(".assistant-text .answer-body"):]
+    check("[61] answer 스타일에 임의 HEX 가 없다(토큰만 쓴다)",
+          not re.search(r"#[0-9a-fA-F]{3,8}\b", seg), "0건",
+          re.findall(r"#[0-9a-fA-F]{3,8}\b", seg)[:3])
+    check("[61] 긴 답이 좁은 화면에서 넘치지 않는다(overflow-wrap)",
+          "overflow-wrap:anywhere" in seg, "있음", "없음")
 
 
 if __name__ == "__main__":
