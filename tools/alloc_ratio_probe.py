@@ -57,14 +57,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools._console import ensure_utf8_console                  # noqa: E402
 ensure_utf8_console()
 
-from dotenv import load_dotenv                                  # noqa: E402
-from sqlalchemy import create_engine, text                      # noqa: E402
-
-from api.dedupe import score                                    # noqa: E402
-from api.product_name import display_name                       # noqa: E402
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(ROOT, ".env"))
+
+# ⚠ dotenv·sqlalchemy·api 는 **여기서 import 하지 않는다**(2026-09-22).
+#   --from-mall 경로는 JSON 두 개만 읽는다 — DB 도 카탈로그도 안 본다. 그런데 이 줄들이
+#   맨 위에 있으면 그 경로조차 sqlalchemy 가 깔린 곳에서만 돈다. 실제로 이 저장소를
+#   클라우드 작업창에서 열면 fastapi·sqlalchemy 가 없어 «읽기 전용 분석 도구»가
+#   ModuleNotFoundError 로 죽었다. 이름 대조 경로에서만 지연 import 한다.
+
+
+def _db_deps():
+    """이름 대조 경로 전용 지연 import. 없으면 무엇이 없는지 말하고 끝낸다."""
+    from dotenv import load_dotenv
+    from sqlalchemy import create_engine
+    from api.dedupe import score
+    from api.product_name import display_name
+    load_dotenv(os.path.join(ROOT, ".env"))
+    return create_engine, score, display_name
 
 # 견적 8 자리와 같은 순서(taxonomy.SLOTS). HDD 는 견적 슬롯이 아니라 따로 본다.
 SLOTS = ["CPU", "MB", "RAM", "GPU", "CASE", "COOLER", "POWER", "SSD"]
@@ -128,11 +137,121 @@ def pct(values: list, q: float) -> float:
     return xs[i]
 
 
+# ====================================================== 몰 수집분 입력 경로 ==
+#
+# 2026-09-22 신설. 위 경로(이름 대조)는 **상품번호를 모를 때**의 방법이다 —
+# `tools/builtpc_parse.py` 가 `spec_source_text` 에서 이름만 뽑아 오기 때문에
+# `api/dedupe.score` 로 카탈로그와 맞춰야 했고, 그 문턱값(0.60)에는 근거가 없어
+# §문턱 민감도를 함께 찍어야 했다.
+#
+# 몰 상세 페이지에는 **부품마다 상품번호(pcode)가 그대로 있다.** 그래서 이 경로에는
+# 대조가 아예 없다 — 맞출 것이 없으니 틀릴 것도 없다. DB 도 필요 없다(가격까지
+# 몰에서 받는다). 두 경로는 «같은 것을 두 벌 구현»한 것이 아니라 **입력이 다른
+# 것**이고, 비율 산식과 표 출력은 아래에서 한 벌만 쓴다.
+
+SLOT_BY_CATE = {
+    "프로세서(CPU)": "CPU", "CPU쿨러": "COOLER", "메모리(RAM)": "RAM",
+    "메인보드": "MB", "그래픽(VGA)": "GPU", "초고속(SSD)": "SSD",
+    "케이스": "CASE", "파워": "POWER", "대용량(HDD)": "HDD",
+}
+
+# 몰 목록에 공개로 남아 있는 시험 상품(2026-09-22 발견, 판매가 5,800원).
+# 비율에 섞이면 분포가 통째로 흔들린다.
+MALL_EXCLUDE = {"123456"}
+
+
+def _mall_price(prices: dict, pcode):
+    """몰 가격. **0원과 «못 읽음»을 구분한다.**
+
+    내장그래픽·번들쿨러는 값이 실제로 0 이다(실측 4건 — UHD Graphics · Radeon
+    Graphics · Xe Graphics · 「프로세서에 포함」). 그것을 결측으로 처리하면 그 완제품이
+    통째로 빠지고, 0 으로 처리하면 「GPU 에 0원 쓴 구성」이라는 «사실»이 남는다.
+    """
+    r = prices.get(str(pcode))
+    if not r:
+        return None
+    v = r.get("price")
+    if v in (None, ""):
+        return 0 if "0원" in (r.get("err") or "") else None
+    return int(v)
+
+
+def run_mall(builds_path: str, prices_path: str):
+    with open(builds_path, encoding="utf-8") as f:
+        raw = json.load(f)
+    builds = raw.get("items") if isinstance(raw, dict) else raw
+    with open(prices_path, encoding="utf-8") as f:
+        raw = json.load(f)
+    prices = raw.get("prices") if isinstance(raw, dict) else raw
+
+    print(f"완제PC {len(builds)}건 · 부품가 {len(prices)}건을 읽었습니다.")
+
+    ratios = {s: [] for s in SLOTS + ["HDD"]}
+    sums, skipped = [], []
+    for b in builds:
+        code = str(b.get("product_code"))
+        sale = b.get("sale_price")
+        if code in MALL_EXCLUDE:
+            skipped.append((code, "시험 상품")); continue
+        if not sale:
+            skipped.append((code, "판매가 없음")); continue
+        slots, missing = {}, None
+        for part in b.get("parts") or []:
+            slot = SLOT_BY_CATE.get(part.get("cate"))
+            if not slot:
+                continue                      # 사은품·조립비·배송·랜사운드 등은 슬롯이 아니다
+            v = _mall_price(prices, part.get("pcode"))
+            if v is None:
+                missing = part.get("pcode"); break
+            slots[slot] = slots.get(slot, 0) + v
+        if missing:
+            skipped.append((code, f"부품가 없음 {missing}")); continue
+        core = sum(slots.values())
+        if core <= 0:
+            skipped.append((code, "부품가 합 0")); continue
+        sums.append(core / sale)
+        for slot, v in slots.items():
+            ratios[slot].append(v / core)
+
+    print(f"대상 {len(sums)}건 · 제외 {len(skipped)}건"
+          + (" (" + ", ".join(f"{c}:{w}" for c, w in skipped[:5]) + ")" if skipped else ""))
+
+    if sums:
+        print("\n[검산] 부품가 합 / 판매가")
+        print(f"  최저 {min(sums):.3f}  10% {pct(sums, 0.10):.3f}"
+              f"  중앙 {statistics.median(sums):.3f}  90% {pct(sums, 0.90):.3f}"
+              f"  최고 {max(sums):.3f}")
+        print("  1 보다 작아야 정상이다 — 차이가 조립비·배송·사은품·마진이다.")
+        print("  그래서 아래 비율의 분모는 판매가가 아니라 «부품가 합»이다:"
+              " 우리 엔진이 더하는 것이 그 합이기 때문이다.")
+
+    print_ratio_table(ratios, SLOTS + ["HDD"], "부품가 / 부품가 합")
+    return 0
+
+
+def print_ratio_table(ratios: dict, order: list, denom: str):
+    print(f"\n[슬롯별 비율] {denom}")
+    print("  슬롯      n   최저    10%    중앙    90%    최고")
+    for slot in order:
+        v = ratios.get(slot) or []
+        if not v:
+            print(f"  {slot:<7} {0:>4}   (해당 건이 없습니다)")
+            continue
+        print(f"  {slot:<7} {len(v):>4}  " + "  ".join(
+            f"{x * 100:5.1f}%" for x in
+            (min(v), pct(v, 0.10), statistics.median(v), pct(v, 0.90), max(v))))
+    print("\n  usage_alloc 의 pct_min 은 이 표의 «10%» 쯤, pct_max 는 «90%» 쯤이"
+          " 출발점입니다(0086 이 GPU·CPU·RAM 에 쓴 것과 같은 방식).")
+    print("  다만 정하는 것은 사장님이고, 이 도구는 재기만 합니다.")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="완제PC 실구성에서 슬롯별 예산 비율을 잰다(읽기 전용)")
-    ap.add_argument("--in", dest="src", required=True,
-                    help="tools/builtpc_parse.py --out 이 만든 JSON")
+    ap.add_argument("--in", dest="src",
+                    help="tools/builtpc_parse.py --out 이 만든 JSON(이름 대조 경로)")
+    ap.add_argument("--from-mall", nargs=2, metavar=("완제PC JSON", "부품가 JSON"),
+                    help="몰 수집분으로 잰다 — 상품번호가 있어 이름 대조도 DB 도 필요 없다")
     ap.add_argument("--min-score", type=float, default=DEFAULT_MIN_SCORE,
                     help=f"이름 대조 문턱값(기본 {DEFAULT_MIN_SCORE})")
     ap.add_argument("--min-slots", type=int, default=6,
@@ -142,12 +261,26 @@ def main():
     ap.add_argument("--out", help="산출 JSON 경로(선택)")
     args = ap.parse_args()
 
+    if args.from_mall:
+        return run_mall(*args.from_mall)
+    if not args.src:
+        ap.error("--in 또는 --from-mall 중 하나가 필요합니다.")
+
     with open(args.src, encoding="utf-8") as f:
         builts = json.load(f)
     print(f"완제PC 구성 {len(builts)}건을 읽었습니다: {args.src}")
 
     try:
+        create_engine, _score, _display_name = _db_deps()
+        globals()["score"] = _score
+        globals()["display_name"] = _display_name
         engine = create_engine(os.environ["DATABASE_URL"])
+    except ImportError as e:
+        print(f"이름 대조 경로에는 sqlalchemy·dotenv·api 모듈이 필요합니다: {e}",
+              file=sys.stderr)
+        print("몰 수집분으로 재려면 --from-mall 을 쓰세요(그 경로는 DB 가 필요 없습니다).",
+              file=sys.stderr)
+        return 2
         with engine.connect() as conn:
             catalog = load_catalog(conn)
     except KeyError:
@@ -214,19 +347,8 @@ def main():
         print(f"\n[검산] 슬롯 {args.min_slots}개 이상 대조된 완제PC 가 없습니다."
               " --min-score 를 낮춰 보세요.")
 
-    print(f"\n[슬롯별 예산 비율] 문턱 {args.min_score} 기준 · 부품가 / 완제품가")
-    print("  슬롯      n   최저    10%    중앙    90%    최고")
-    for slot in SLOTS:
-        v = ratios[slot]
-        if not v:
-            print(f"  {slot:<7} {0:>4}   (대조된 건이 없습니다)")
-            continue
-        print(f"  {slot:<7} {len(v):>4}  " + "  ".join(
-            f"{x * 100:5.1f}%" for x in
-            (min(v), pct(v, 0.10), statistics.median(v), pct(v, 0.90), max(v))))
-    print("\n  usage_alloc 의 pct_min 은 이 표의 «10%» 쯤, pct_max 는 «90%» 쯤이"
-          " 출발점입니다(0086 이 GPU·CPU·RAM 에 쓴 것과 같은 방식).")
-    print("  다만 정하는 것은 사장님이고, 이 도구는 재기만 합니다.")
+    print_ratio_table(ratios, SLOTS,
+                      f"문턱 {args.min_score} 기준 · 부품가 / 완제품가")
 
     print("\n[대조 예시] 원문 -> 카탈로그 (점수)")
     for slot in SLOTS:
