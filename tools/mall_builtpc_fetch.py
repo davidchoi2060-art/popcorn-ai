@@ -615,6 +615,10 @@ def main():
             continue
         fail_streak = 0
         got.append(code)
+        if a.save_dir and len(got) <= 5:                      # 확인용 표본만
+            os.makedirs(a.save_dir, exist_ok=True)
+            io.open(os.path.join(a.save_dir, "detail_%s.html" % code),
+                    "w", encoding="utf-8").write(html)
         if a.raw:
             raw_ranges(code, html, a.raw)
         elif a.dump:

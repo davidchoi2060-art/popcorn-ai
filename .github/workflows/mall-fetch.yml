@@ -94,8 +94,10 @@ jobs:
             args+=(--links "$LINKS" --pages "${PAGES:-1}")
             [ "$PROBE" = "true" ] && args+=(--probe)
             [ "$MODE" = "목록탐색" ] && args+=(--links-only)
-            [ "$PROBE" = "true" ] && args+=(--save-dir out)
           fi
+          # 원문 표본을 함께 돌려받는다 -- 실행 로그를 클라우드 작업창에서 못 읽으므로
+          # 파서가 놓친 자리를 확인하려면 원문이 손에 있어야 한다.
+          [ "$PROBE" = "true" ] && args+=(--save-dir out)
           if [ -n "$CODES" ]; then args+=(--codes "$CODES"); fi
           if [ "${LIMIT:-0}" != "0" ] && [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
           case "$MODE" in
