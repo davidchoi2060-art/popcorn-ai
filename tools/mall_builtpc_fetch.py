@@ -165,6 +165,30 @@ def dump(pd_no, html, width=200):
             break
 
 
+def raw_ranges(pd_no, html, spec):
+    """원문 줄을 그대로 보여준다 -- `--dump` 로 위치를 잡은 뒤 그 자리를 들여다본다.
+
+    구조 덤프는 태그를 걷어내 «어디에 있나»만 알려준다. 파서를 쓰려면 그 자리의
+    실제 마크업(감싸는 태그·class)이 필요하다. 사진이나 짐작으로 선택자를 만들지
+    않기 위한 두 번째 걸음이다."""
+    lines = html.splitlines()
+    print("=" * 70)
+    print("pd_no=%s  원문 %d줄" % (pd_no, len(lines)))
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r"^(\d+)\s*-\s*(\d+)$", part)
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+        else:
+            lo = hi = int(part)
+        lo, hi = max(1, lo), min(len(lines), hi)
+        print("\n-- L%d ~ L%d ------------------------------------------------" % (lo, hi))
+        for n in range(lo, hi + 1):
+            print("  %-6d %s" % (n, lines[n - 1].rstrip()[:300]))
+
+
 # ================================================================== 대상 ==
 
 def targets_from_json(path, limit=None):
@@ -207,6 +231,7 @@ def main():
     ap.add_argument("--from-db", action="store_true", help="판매중 완제PC 를 DB 에서 고른다")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--dump", action="store_true", help="파싱하지 않고 구조만 보고한다")
+    ap.add_argument("--raw", default="", help="원문 줄을 그대로 본다(예: 2000-2015,2310-2560)")
     ap.add_argument("--refetch", action="store_true", help="캐시를 무시하고 다시 받는다")
     ap.add_argument("--cache-only", action="store_true", help="네트워크를 쓰지 않는다")
     ap.add_argument("--out", default="", help="결과 JSON 경로(--dump 에는 쓰지 않는다)")
@@ -241,7 +266,9 @@ def main():
             continue
         fail_streak = 0
         got.append(code)
-        if a.dump:
+        if a.raw:
+            raw_ranges(code, html, a.raw)
+        elif a.dump:
             dump(code, html)
         else:
             print("  %s 받음%s (%d bytes)" % (code, " [캐시]" if cached else "", len(html)))

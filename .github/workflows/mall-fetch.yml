@@ -23,6 +23,10 @@ on:
         description: '구조만 보고(파싱 전 실측)'
         type: boolean
         default: true
+      raw:
+        description: '원문 줄 범위 (예: 2000-2015,2310-2560) — 주면 dump 대신 이것만'
+        required: false
+        default: ''
 
 concurrency:
   group: popcorn-mall-fetch
@@ -40,12 +44,17 @@ jobs:
         env:
           CODES: ${{ inputs.codes }}
           DUMP: ${{ inputs.dump }}
+          RAW: ${{ inputs.raw }}
           # 러너 작업공간 안에만 남긴다 — /srv 의 운영 캐시를 건드리지 않는다.
           MALL_BUILTPC_CACHE: ${{ github.workspace }}/.cache/mall_builtpc
         run: |
           set -o pipefail
           args=(--codes "$CODES")
-          [ "$DUMP" = "true" ] && args+=(--dump)
+          if [ -n "$RAW" ]; then
+            args+=(--raw "$RAW")
+          elif [ "$DUMP" = "true" ]; then
+            args+=(--dump)
+          fi
           log=$(mktemp)
           python3 tools/mall_builtpc_fetch.py "${args[@]}" 2>&1 | tee "$log"
           {
