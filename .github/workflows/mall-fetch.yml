@@ -1,0 +1,56 @@
+# 몰 완제PC 공개 페이지를 «읽기만» 한다 — 손으로 부르는 전용.
+#
+# 왜 러너에서 도는가: 클라우드 작업창은 에이전트 프록시가 허용한 도메인만
+# 통과시키는데 그 설정이 작업창을 새로 열어야 적용된다(2026-09-22 실측:
+# popcornpc.co.kr 에 CONNECT 403). 서버 VM 은 그 제약이 없다.
+#
+# 이 워크플로가 «하지 않는» 것 — 이게 안전의 전부다:
+#   · sudo 를 쓰지 않는다(popcorn-ci 를 부르지 않는다 → 서버 root 권한과 무관).
+#   · DB 에 닿지 않는다(도구의 --from-db 경로를 쓰지 않는다).
+#   · 몰에 GET 만 보낸다. 로그인·폼 제출·쿠키가 없다(공개 상세 페이지다).
+#
+# ⚠ pull_request 트리거는 절대 넣지 않는다(deploy.yml·regression.yml 의 같은 주석).
+name: 몰 완제PC 수집
+
+on:
+  workflow_dispatch:
+    inputs:
+      codes:
+        description: '상품번호 쉼표 구분 (예: 98149,98150)'
+        required: true
+        default: '98149'
+      dump:
+        description: '구조만 보고(파싱 전 실측)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: popcorn-mall-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: [self-hosted, popcorn-vm]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 수집
+        shell: bash
+        env:
+          CODES: ${{ inputs.codes }}
+          DUMP: ${{ inputs.dump }}
+          # 러너 작업공간 안에만 남긴다 — /srv 의 운영 캐시를 건드리지 않는다.
+          MALL_BUILTPC_CACHE: ${{ github.workspace }}/.cache/mall_builtpc
+        run: |
+          set -o pipefail
+          args=(--codes "$CODES")
+          [ "$DUMP" = "true" ] && args+=(--dump)
+          log=$(mktemp)
+          python3 tools/mall_builtpc_fetch.py "${args[@]}" 2>&1 | tee "$log"
+          {
+            echo '## 몰 완제PC 수집'
+            echo '```'
+            tail -n 120 "$log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
