@@ -7414,6 +7414,34 @@ DB(5432)·SSH가 없고 HTTPS 프록시만 열려 있다(실측). 그래서 회�
 `app.js` 세 함수에 `innerHTML`·숫자 리터럴이 없는지를 검사한다. 한계: `+`로 이어
 붙인 SQL은 이 스캐너가 못 잡는다(코드 docstring에 명시).
 
+**부기 ⑤ — mvp2 확정이 판정 기준·에이전트 정의까지 번진다(2026-09-22, 같은 날 후속).**
+`CLAUDE.md:100`(고객 화면 서술)은 부기②를 근거로 커밋 `44f82dc`("CLAUDE.md 의 고객
+화면 기준을 S1 에서 mvp2 로 정정한다")로 이미 반영됐다. 사장님이 같은 날 「mvp2 로」를
+다시 확정해 범위를 넓혔다 — **길잡이(pathfinder)의 판정 근거 ①「정본 화면」도 S1에서
+mvp2로 바뀐다.** 고친 자리 둘: `CLAUDE.md` §팀 운용의 길잡이 항목(판정 근거 ① 줄) ·
+`.claude/agents/pathfinder.md`(description · §다른 팀원과 무엇이 다른가의 고객단
+범위 표기 · §판정 근거 셋의 ①). 옛 값(S1)은 지우지 않고 「~였다」로 남겼다(100행
+정정과 같은 표기 관례). 같은 항목의 "고객단(랜딩→S0~S5→인계 · MY)만 본다"는 화면
+이름 나열이라 사실과 어긋날 수 있으나(지금 고객이 걷는 길이 mvp2 한 화면 + MY인지)
+**여기서 임의로 고치지 않는다** — 흐름 정의는 사장님 몫.
+
+`.claude/agents/pathfinder.md`의 미러 `E:\DEV\.claude\agents\`는 사장님 PC 소관이라
+기록자 작업 환경(클라우드 컨테이너)에서는 갱신할 수 없다 — 반영은 사장님/하네스 몫.
+
+⚠ **부수 발견**: `.claude/agents/pathfinder.md`의 옛 문장("미러 `E:\DEV\.claude…gents\`")
+에 눈에 보이지 않는 제어문자(BEL, `\x07`)가 "claude"와 "gents" 사이에 끼어 있었다 —
+경로가 `E:\DEV\.claude\agents\`를 의도한 것으로 보이는데 표시상 `E:\DEV\.claudegents\`
+처럼 보여 그동안 아무도 눈치채지 못했다. **`\a`(백슬래시+a, "agents"의 머리글자를
+쓰려던 표기)가 어느 단계에서 이스케이프로 해석돼 BEL로 바뀐 흔적으로 보인다**(하네스
+확인) — 이번 편집으로 함께 바로잡았다(같은 줄을 다시 쓰는 김에 고쳤을 뿐, 언제
+생겼는지는 별도 조사하지 않았다).
+
+**API 목록은 미확인 — 별도.** `pathfinder.md` 24행의 고객단 API 목록(`/api/candidates`·
+`/api/recommend`·`/api/swap/*`·`/api/handoff`·`/api/my/*`)은 이번 물결에서 손대지
+않았다 — mvp2가 실제로 `/api/recommend` 대신 `/api/grid/recommend`를 쓰는지(A-137이
+근거로 든 `grid_public.py`) 확인이 먼저다. 확인 전까지 이 목록은 구 mvp1 기준일 수
+있다.
+
 **커밋.** `b6ab16e`(main). 검증: 확인자가 단계마다 통과 판정.
 
 **확인법.** `grep -n "GATE_SQL" api/game_copy.py` · `grep -n "game_context"
