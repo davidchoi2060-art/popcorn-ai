@@ -87,9 +87,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from . import game_copy as GC
 from .db import engine
 from .talk_schema import (DEFAULT_RESOLUTION, TalkState, is_game_usage, load_vocab,
-                          missing_for, validate_state)
+                          match_game, missing_for, validate_state)
 from .taxonomy import SLOT_LABELS
 from .timeutil import iso as _iso
 
@@ -453,7 +454,8 @@ def _build_card(cell_id: int, variants: dict, name: str, kind: str,
                  band: dict, usage: str, platform: str,
                  game_grade: str | None, game_resolution: str | None, game_name: str | None,
                  budget_won: int | None, bound: str | None, stock_by_code: dict,
-                 omissions: list[dict] | None = None) -> dict:
+                 omissions: list[dict] | None = None,
+                 game_context: dict | None = None) -> dict:
     """칸 하나 → 카드 하나. `quotes.{value,reco,perf}` 에 3종을 전부 담고, 하위호환을
     위해 대표(추천) variant 값을 최상위에도 그대로 얹는다. 없는 variant 는 None.
 
@@ -497,6 +499,13 @@ def _build_card(cell_id: int, variants: dict, name: str, kind: str,
         "status": rep["status"] if rep else None,
         "parts": rep["parts"] if rep else [],
         "reasons": rep["reasons"] if rep else [],
+        # game_context 는 reasons 의 형제 필드다(사장님 확정) — reasons 는 엔진이
+        # «이 부품을 고른 이유»(매 요청 계산), game_context 는 사람이 검수한 «이
+        # 게임엔 이런 PC가 맞다»는 근거(검수 시점 확정)다. 원천·갱신 주기가 달라
+        # 섞으면 검수 책임이 엔진 뒤로 숨는다. 카드마다 같은 값을 싣는다 — 화면이
+        # omitted_variants 처럼 카드 단위로 렌더하기 때문에(칸 단위 필드를 카드에도
+        # 복제해 두는 기존 관례, 위 omissions 파라미터와 같은 이유).
+        "game_context": game_context,
         "omitted": rep["omitted"] if rep else [],
         "generated_at": rep["generated_at"] if rep else None,
     }
@@ -505,7 +514,8 @@ def _build_card(cell_id: int, variants: dict, name: str, kind: str,
 def _build_cards(conn, considered: list[dict], usage_grid: str, platform: str,
                  kind: str, budget_won: int | None, bound: str | None,
                  game_grade: str | None = None, game_resolution: str | None = None,
-                 game_name: str | None = None) -> tuple[list, list]:
+                 game_name: str | None = None,
+                 game_context: dict | None = None) -> tuple[list, list]:
     """고려한 예산대 칸들 → 카드 + 빈칸 사유. 게임·비게임 공통(0105).
 
     0092 판은 축이 달라 `_build_nongame_cards`/`_build_game_cards` 둘로 갈려
@@ -554,7 +564,7 @@ def _build_cards(conn, considered: list[dict], usage_grid: str, platform: str,
         cards.append(_build_card(
             band["cell_id"], variants, name, kind, band, usage_grid, platform,
             game_grade, game_resolution, game_name, budget_won, bound, stock_by_code,
-            omissions))
+            omissions, game_context))
     return cards, empty_cells
 
 
@@ -602,8 +612,46 @@ def _nongame_card_set(conn, usage: str, state: TalkState, platform: str,
     }
 
 
+def _game_context(conn, names: list[str], vocab) -> dict | None:
+    """게임 카드에 실을 «검수 통과 근거» — `reasons`(엔진이 부품을 고른 이유)와는
+    다른 원천이라 형제 필드로 싣는다(사장님 확정). `reasons`는 견적 엔진이 매 요청
+    계산하는 값이고, 이건 `game_customer_copy`에 사람이 검수해 둔 문구다 — 갱신
+    주기도 다르다(엔진은 요청마다, 검수는 운영자가 승인할 때). 섞으면 "엔진이
+    말했다"로 읽혀 검수 책임이 지워진다.
+
+    names(고객이 말한 원문, 정규화 전)를 순서대로 `match_game`으로 `games.name`에
+    대응시키고(중복 제거, 대응 안 되는 이름은 버림), 그 순서대로 첫 번째로 검수를
+    통과한 게임을 고른다. 하나도 없으면 None — 게이트는 `game_copy.load_reviewed_copy`
+    하나뿐이고 여기서 다시 적지 않는다.
+    """
+    canon: list[str] = []
+    for raw in names or []:
+        g = match_game(raw, vocab)
+        if g and g not in canon:
+            canon.append(g)
+    if not canon:
+        return None
+    copies = GC.load_reviewed_copy(conn, canon)
+    for name in canon:
+        c = copies.get(name)
+        if c is not None:
+            return {
+                "game_name": c.name,
+                "spec_summary": c.spec_summary,
+                "why_this_pc": c.why_this_pc,
+                "upgrade_hint": c.upgrade_hint,
+                "caution": c.caution,
+                "source": {"kind": "game_customer_copy",
+                           "fields": list(c.source_fields or []),
+                           "url": c.source_url},
+                "confidence": c.confidence,
+                "reviewed_at": _iso(c.reviewed_at),
+            }
+    return None
+
+
 def _game_card_set(conn, usage: str, state: TalkState, platform: str,
-                   notes: list[str]) -> dict:
+                   notes: list[str], vocab) -> dict:
     """게임 계열 용도 → card_set. 0105 로 **칸이 여럿이다**(등급×해상도 하나에
     예산대가 1~3개) — 옛 판은 칸이 최대 1개라 카드도 1장뿐이었고, 그래서 롤 하는
     고객이 219만원짜리 카드 한 장만 봤다. 이제 예산대마다 카드가 나온다."""
@@ -621,9 +669,13 @@ def _game_card_set(conn, usage: str, state: TalkState, platform: str,
                 "center_tier": None, "center_tier_key": None, "tiers_considered": []}
     ci = band_index_for(bands, state.budget_won, state.budget_bound)
     considered = bands[ci: ci + 1 + BANDS_UP]
+    ctx = _game_context(conn, g.names, vocab)
+    if ctx is None:
+        notes.append(f"{usage}: no reviewed game copy for {g.names}")
     cards, empty_cells = _build_cards(
         conn, considered, GAME_USAGE, platform, "game",
-        state.budget_won, state.budget_bound, g.grade, resolution, game_name)
+        state.budget_won, state.budget_bound, g.grade, resolution, game_name,
+        game_context=ctx)
     if not cards:
         notes.append(f"{usage}: no cards at grade={g.grade} resolution={resolution}"
                      f" platform={platform}")
@@ -660,6 +712,9 @@ def recommend(body: RecommendBody):
       cards[].quotes = {value, reco, perf} — 칸 하나의 3종 구성. 각 안에 {quote_id,
       total, over_budget, status, parts, reasons, omitted, generated_at}. 카드
       최상위에도 대표(추천) variant 값을 그대로 얹는다(하위호환).
+      cards[].game_context  검수 통과 게임 근거(`reasons`의 형제 필드, 사장님 확정) —
+                            없으면 null. 게임 카드에만 값이 실리고 비게임 카드는
+                            항상 null이다.
       empty_cells  고려한 칸 중 카드가 안 나온 것의 사유. handling_state 가
                    「취급함」이 아니면 그 상태별 문구(0110 — 취급하지 않는 구간 /
                    시장 표본이 없어 확인되지 않은 구간 / 준비 중인 구간)와
@@ -706,7 +761,7 @@ def recommend(body: RecommendBody):
             # usage 라벨은 가장 먼저 온 게임 계열 용도를 쓴다.
             if len(game_usages) > 1:
                 notes.append(f"game usages {game_usages} merged into one card set")
-            cs = _game_card_set(conn, game_usages[0], state, platform, notes)
+            cs = _game_card_set(conn, game_usages[0], state, platform, notes, vocab)
             card_sets.append(cs)
             game_resolution = state.game.resolution or DEFAULT_RESOLUTION
             game_name = state.game.names[0] if state.game.names else None

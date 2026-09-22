@@ -6,9 +6,8 @@
   「`game_customer_copy` 86행의 네 문단을 고객에게 내보내도 되는가」 — 그 하나뿐이다.
 
   이 86행은 «게임 소개문»이 아니라 **«이 게임에 왜 이런 PC 가 필요한가» 견적 근거**다
-  (남의 권장사양을 옮긴 것이 아니라 우리가 판단한 것). 팝콘톡
-  (`api/talk_answer.py` `load_game_facts`)이 **이미 이 표를 읽고 있고**, 조회 조건이
-  `reviewed_by IS NOT NULL` 이라 지금은 0/86 이라 한 줄도 안 나간다.
+  (남의 권장사양을 옮긴 것이 아니라 우리가 판단한 것). 고객 경로(팝콘톡·견적 카드)는
+  `api/game_copy.load_reviewed_copy` 하나를 거친다 — 그 함수가 검수 통과 행만 낸다.
   ★ **검수만 통과하면 코드 수정 없이 그대로 나간다.** 이 API 는 그 «통과»를 만든다.
 
 ■ 왜 검수자에게 games 원본 값을 나란히 보여주는가 (`/api/admin/game-copy/{id}` 의 `source`)
@@ -52,6 +51,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import bindparam, text
 
+from . import game_copy as GC
 from .auth import current_operator
 from .db import engine
 from .timeutil import iso
@@ -243,11 +243,11 @@ def list_copies(page: int = 1, size: int = 20, state: str = "",
             "SELECT confidence, count(*) FROM game_customer_copy GROUP BY 1")).all())
         grand_total = conn.execute(text(
             "SELECT count(*) FROM game_customer_copy")).scalar_one()
-        # 「지금 실제로 고객에게 나갈 수 있는 문구가 몇 건인가」 — 팝콘톡의
-        # 조회 조건(`reviewed_by IS NOT NULL`)을 **그대로** 세어 준다. 화면이
+        # 「지금 실제로 고객에게 나갈 수 있는 문구가 몇 건인가」 — 고객 경로가 쓰는
+        # 게이트(`api/game_copy.GATE_SQL`)를 **그대로** 세어 준다. 화면이
         # '승인' 건수로 대신 세면 언젠가 둘이 갈라진다(같은 것을 두 벌 두지 않는다).
         live = conn.execute(text(
-            "SELECT count(*) FROM game_customer_copy WHERE reviewed_by IS NOT NULL")
+            "SELECT count(*) FROM game_customer_copy WHERE " + GC.GATE_SQL)
         ).scalar_one()
 
     return {
@@ -349,7 +349,7 @@ def get_copy(game_id: int):
         } if pop else None),
         # 화면이 「승인하면 고객에게 나간다」를 사실로 말할 수 있게, 그 조건을
         # 서버가 밝힌다(화면이 문장을 지어내지 않는다).
-        "customer_gate": "reviewed_by IS NOT NULL",
+        "customer_gate": GC.GATE_SQL,
     }
 
 
@@ -398,8 +398,8 @@ def approve(game_id: int, body: ApproveBody):
     """승인 — `reviewed_by`/`reviewed_at` 을 채우고 `review_state='승인'` 으로 전이.
 
     ★ 이 한 번으로 그 게임의 문구가 **팝콘톡 답변에 실제로 나가기 시작한다**
-      (`api/talk_answer.load_game_facts` 가 `reviewed_by IS NOT NULL` 행만 싣는다 —
-       그 파일은 이번 작업에서 읽기만 했다. 코드 수정 없이 켜지는 것이 설계다).
+      (고객 경로는 `api/game_copy.load_reviewed_copy` 하나를 거치고, 그 함수가
+       검수 통과 행만 싣는다. 코드 수정 없이 켜지는 것이 설계다).
 
     문구를 고쳐서 승인하면 기계 원문을 `original_*` 에 보존한다(0112 §③).
     """

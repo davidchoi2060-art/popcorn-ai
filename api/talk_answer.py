@@ -29,9 +29,9 @@
   둘 다 없으면 **「자료 없음」이라 말한다. 지어내지 않는다.**
 
 ■ ★ `game_customer_copy` 는 **검수 전에는 내보내지 않는다**
-  86/86 완비지만 `reviewed_by` 가 **0/86** 이다. 사장님 확정: "전수 검수 후에 낸다".
-  그래서 `reviewed_by IS NOT NULL` 인 행만 읽는다 — 지금은 0건이라 아무것도 안 나간다.
-  검수가 끝나면 **코드 수정 없이** 저절로 나가기 시작한다.
+  사장님 확정: "전수 검수 후에 낸다". 게이트는 이 파일이 직접 들지 않는다 —
+  `api/game_copy.load_reviewed_copy` 하나가 «검수 통과 행만 고객 경로에 낸다»는
+  약속을 지킨다(두 곳에 같은 조건을 적으면 한쪽만 고쳐져 미검수 문구가 샌다).
 
 ■ ★ `games.description` 을 고객에게 읽어주지 않는다
   86/86 채워져 있지만 «게임 소개»가 아니라 **사양 부하 메모**다(평균 70자 ·
@@ -49,6 +49,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import bindparam, text
 
+from . import game_copy as GC
 from . import llm
 from . import talk_filter as TF
 from . import talk_schema as TS
@@ -93,7 +94,7 @@ class GameFacts:
     steam_ccu: int | None = None
     snapshot_date: str | None = None
     snapshot_source: str | None = None
-    # 검수를 통과한 copy 만. `reviewed_by IS NULL` 이면 비어 있다(사장님 확정).
+    # 검수를 통과한 copy 만 — 게이트는 `api/game_copy.py` 한 곳(사장님 확정).
     copy_spec: str | None = None
     copy_why: str | None = None
 
@@ -125,22 +126,22 @@ def load_game_facts(conn, names: list[str], vocab: "TS.Vocab") -> list[GameFacts
         return []
     rows = conn.execute(text(
         "SELECT g.game_id, g.name, g.genre, g.vendor, g.release_date,"
-        "       a.grade,"
-        "       c.spec_summary_ko, c.why_this_pc, c.reviewed_by"
+        "       a.grade"
         "  FROM games g"
         "  LEFT JOIN game_grade_assignments a ON a.game_id = g.game_id"
-        "  LEFT JOIN game_customer_copy c ON c.game_id = g.game_id"
         " WHERE g.name IN :names"
     ).bindparams(bindparam("names", expanding=True)), {"names": canon}).mappings().all()
+    # 검수 통과 문구는 게이트를 직접 들지 않고 `game_copy` 하나에 맡긴다.
+    copies = GC.load_reviewed_copy(conn, canon)
     out: list[GameFacts] = []
     for r in rows:
         f = GameFacts(name=r["name"], genre=r["genre"], vendor=r["vendor"],
                       release_date=str(r["release_date"]) if r["release_date"] else None,
                       grade=r["grade"])
-        # ★ 검수 전에는 내보내지 않는다(reviewed_by 0/86 — 사장님 확정).
-        if r["reviewed_by"]:
-            f.copy_spec = r["spec_summary_ko"]
-            f.copy_why = r["why_this_pc"]
+        c = copies.get(r["name"])
+        if c:
+            f.copy_spec = c.spec_summary
+            f.copy_why = c.why_this_pc
         pop = conn.execute(text(
             "SELECT snapshot_date, source, pcbang_rank, pcbang_share_pct, steam_ccu"
             "  FROM game_popularity_snapshots WHERE game_id = :gid"
@@ -291,7 +292,7 @@ def _fact_lines(f: GameFacts) -> list[str]:
     pop = f.popularity_line()
     if pop:
         lines.append("%s 인기도: %s (출처 %s)" % (f.name, pop, f.snapshot_source or "-"))
-    # 검수를 통과한 copy 만 실린다(reviewed_by). 지금은 0/86 이라 안 실린다.
+    # 검수를 통과한 copy 만 실린다(게이트는 `api/game_copy.py` 한 곳).
     if f.copy_spec:
         lines.append("%s 안내: %s" % (f.name, f.copy_spec))
     if f.copy_why:

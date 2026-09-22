@@ -146,6 +146,10 @@ const GRID={
  internalNotes:g=>{const out=[];if(Array.isArray(g&&g.notes))out.push(...g.notes);if(g&&typeof g.note==='string'&&g.note)out.push(g.note);return out;},
  budgetWon:g=>g&&Number.isFinite(g.budget_won)?g.budget_won:null,
  budgetBound:g=>(g&&g.budget_bound)||null,
+ // card.game_context — reasons(엔진, 매 요청 계산)의 «형제 필드»다(api/grid_public._game_context
+ // docstring 그대로). 사람이 검수해 둔 문구라 원천·갱신 주기가 다르고, 그래서 화면 구역도
+ // 「이렇게 골랐어요」와 분리한다(사장님 확정). 비게임 카드·검수본 없음이면 null — 그리지 않는다.
+ gameContext:card=>(card&&card.game_context&&typeof card.game_context==='object')?card.game_context:null,
 };
 
 // ── 렌더(순수) ─────────────────────────────────────────────────────────────
@@ -387,6 +391,63 @@ function quoteMarkup(card,activeVariant){
  const tierName=tierDisplayName(card);
  return `<div class="quote-top"><span class="eyebrow">내 구성${tierKeyOf(card)?' · '+esc(tierKeyOf(card)):''}</span></div><div class="quote-title"><div><h2>${esc(tierName)}</h2><p>${esc([card.usage,card.platform].filter(Boolean).join(' · '))}</p></div><div class="quote-total">${v&&Number.isFinite(v.total)?money(v.total):'—'}<small>원</small>${verdict}</div></div>${v&&Number.isFinite(v.total)?feeNoteMarkup('quote','quote-fee-note'):''}${variantTabsMarkup('quote',0,activeKey,vs,card)}${om?omittedReasonMarkup(om):''}${!hasThree?'<p class="condition-note">이 견적은 아직 단일 구성만 제공합니다.</p>':''}<div class="quote-media"><img src="${POSTER}" alt="대표 예시 이미지 — 실제 구성과 다릅니다"><div class="media-caption">대표 예시 이미지<small>실제 부품은 아래 목록 기준</small></div><button data-action="video" aria-label="대표 예시 이미지 크게 보기">▶</button></div><div class="quote-reason"><b>✦ 이렇게 골랐어요</b>${reasons.length?'<ul>'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<br>서버가 준 이유가 없습니다.'}</div><div class="parts-heading"><b>구성 부품 <span>${parts.length}종</span></b><span>서버 가격 · 원</span></div><table class="parts" aria-label="현재 견적 부품 목록"><tbody>${parts.map(p=>`<tr><td class="category">${esc(p.cat)}</td><td class="part-name">${partLine(p)}</td><td class="part-price">${money(p.price)}</td></tr>`).join('')}${omittedRows(omitted)}</tbody></table><p class="quote-disclaimer">재고는 조회 시점 기준입니다.${v&&v.generated_at?' 견적 생성 '+esc(String(v.generated_at).slice(0,10))+'.':''} ${NOT_READY}</p><div class="quote-actions"><button class="secondary" data-action="save">견적 저장</button><button class="primary" data-action="cart" disabled title="장바구니는 준비 중입니다">장바구니 담기(준비 중)</button></div>`;
 }
+// ── ③단계: 「이 게임에 대해」 구역 — game_context (2026-09-22) ───────────────
+// `quote-reason`(위 quoteMarkup, «이렇게 골랐어요»)과 **섞지 않는다**. reasons 는 엔진이
+// 매 요청 계산하는 값이고 game_context 는 사람이 검수해 둔 문구다(api/grid_public.py
+// `_game_context` docstring — "섞으면 «엔진이 말했다»로 읽혀 검수 책임이 지워진다").
+// null 이면 빈 상자도 "근거 없음" 문구도 없다(§화면 정직성 그대로 — 없는 것은 없는 대로 둔다).
+// innerHTML 을 쓰지 않는다 — 이 문구는 사람이 자유 텍스트로 쓴 것이라(LLM 은 아니지만 운영자
+// 입력도 같은 원칙) drawAnswer/answerFragment 의 관례를 그대로 따른다: doc 를 인자로 받아
+// node 에서도 검증 가능하게 한다.
+
+// 순수 함수 — 그릴 줄들의 배열만 만든다(DOM 없음). spec_summary → why_this_pc → upgrade_hint
+// → caution(「주의: 」 접두 — 함정 문구를 본문과 구분해 읽게) 순, 비어 있지 않은 것만.
+// 넷 다 비면 [](reviewed_at 도 붙이지 않는다 — 붙일 본문이 없는데 검수일만 남는 것은 이상하다).
+// confidence·source.fields(DB 컬럼명)는 고객에게 의미가 없어 그리지 않는다. 화면이 수치나
+// 문장을 보태지 않는다 — 서버가 준 문자열만 옮긴다.
+function gameContextBlocks(ctx){
+ if(!ctx||typeof ctx!=='object')return [];
+ const lines=[];
+ const push=s=>{if(typeof s==='string'&&s.trim())lines.push(s.trim());};
+ push(ctx.spec_summary);
+ push(ctx.why_this_pc);
+ push(ctx.upgrade_hint);
+ if(typeof ctx.caution==='string'&&ctx.caution.trim())lines.push('주의: '+ctx.caution.trim());
+ if(!lines.length)return [];
+ if(typeof ctx.reviewed_at==='string'&&ctx.reviewed_at)lines.push('검수 '+ctx.reviewed_at.slice(0,10));
+ return lines;
+}
+// source.url 이 http(s) 일 때만 링크 후보로 돌려준다 — sourceItems 와 같은 규칙(javascript: 를
+// 링크로 만들지 않는다). gameContextBlocks 와 분리한 순수 함수라 node 에서 따로도 검증된다.
+function gameContextLink(ctx){
+ const url=ctx&&ctx.source&&typeof ctx.source==='object'?ctx.source.url:null;
+ return (typeof url==='string'&&/^https?:\/\//i.test(url))?url:null;
+}
+// DOM 생성 — doc 를 인자로 받는다(node/jsdom 에서도 같은 코드가 돈다, answerFragment 관례).
+// createElement·createTextNode·appendChild·setAttribute 만 쓴다 — innerHTML 금지.
+function gameContextElement(ctx,doc){
+ const blocks=gameContextBlocks(ctx);
+ if(!blocks.length)return null;
+ const box=doc.createElement('div');box.className='quote-game';
+ const b=doc.createElement('b');
+ b.appendChild(doc.createTextNode('✦ 이 게임에 대해'));
+ box.appendChild(b);
+ if(ctx&&typeof ctx.game_name==='string'&&ctx.game_name.trim())
+  box.appendChild(doc.createTextNode(' · '+ctx.game_name.trim()));
+ for(const line of blocks){
+  const p=doc.createElement('p');
+  p.appendChild(doc.createTextNode(line));
+  box.appendChild(p);
+ }
+ const url=gameContextLink(ctx);
+ if(url){
+  const a=doc.createElement('a');
+  a.setAttribute('href',url);a.setAttribute('target','_blank');a.setAttribute('rel','noopener');
+  a.appendChild(doc.createTextNode('출처 보기'));
+  box.appendChild(a);
+ }
+ return box;
+}
 // ── 답변(answer) 렌더 — 2026-09-21 · talk_design_v2 §6-2 ────────────────────
 // 서버 /api/talk/parse 가 `answer`(질문에 대한 답)와 `reply`(되묻기)를 **둘 다** 준다.
 // 실측(2026-09-21, 로컬 :8000 · 사장님 3턴 + 잡담 1턴):
@@ -523,7 +584,7 @@ function errorMessage(status,data){
  if(d&&typeof d==='object'&&d.message)return String(d.message);
  return (status>=500?'서버 오류':'요청 오류')+`(${status})`;
 }
-const render={money,esc,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,answerNormalize,answerSpans,answerBlocks,answerFragment,answerBody,sourceItems,sourcesElement,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON,WAIT_SHORT,WAIT_LONG,WAIT_LONG_MS,SOURCES_HEADING};
+const render={money,esc,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,gameContextBlocks,gameContextLink,gameContextElement,answerNormalize,answerSpans,answerBlocks,answerFragment,answerBody,sourceItems,sourcesElement,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON,WAIT_SHORT,WAIT_LONG,WAIT_LONG_MS,SOURCES_HEADING};
 if(typeof module!=='undefined'&&module.exports){module.exports=render;return;}   // node(자기검증) — 여기서 끝
 if(!root.document||root.PopcornApp)return;
 
@@ -700,7 +761,24 @@ function setQuoteVariant(key){
 
 // ── 카드 선택 → 오른쪽 패널(서버 카드 그대로, 선택 당시 탭을 이어받는다) ───
 function selectQuote(index,variantKey){const q=state.quotes[index];if(!q)return;state.selected=copy(q);state.selectedIndex=index;state.selectedVariant=variantKey||state.cardVariant[index]||DEFAULT_VARIANT;$('#workspace').classList.add('has-quote');addMessage('user',(tierDisplayName(q)||'선택한 구성')+' 자세히 볼게요.');addMessage('assistant','오른쪽에 부품과 이유를 펼쳤어요. '+NOT_READY);renderQuote();selectTab('quote');}
-function renderQuote(){const q=state.selected;if(!q)return;$('#quotePane').innerHTML=quoteMarkup(q,state.selectedVariant);}
+function renderQuote(){
+ const q=state.selected;if(!q)return;
+ const pane=$('#quotePane');
+ pane.innerHTML=quoteMarkup(q,state.selectedVariant);
+ // game_context 는 innerHTML 뒤에 심는다 — 이 블록이 던져도 위 견적 패널은 이미
+ // 그려진 뒤다(순서가 곧 가드다. §화면이 죽으면 조용히 다른 것을 판다 전례 —
+ // cap=null 을 toLocaleString 에 넘겨 TypeError 가 나자 뒷단 전체가 멈춘 적이 있다).
+ try{
+  const el=gameContextElement(GRID.gameContext(q),document);
+  if(el){
+   const anchor=pane.querySelector('.quote-reason');
+   const before=pane.querySelector('.parts-heading');
+   if(anchor)anchor.after(el);
+   else if(before)before.before(el);
+   else pane.appendChild(el);
+  }
+ }catch(e){console.warn('renderQuote: game_context 렌더 실패',e);}
+}
 // 부품 교체 대화 API 는 아직 없다 — 구성이 선택된 뒤의 입력은 준비 중으로 답한다. 선택 전이면 파서로(조건 변경).
 function requestChange(text){
  text=(text||'').trim();if(!text)return;

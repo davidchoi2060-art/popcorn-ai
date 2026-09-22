@@ -22,6 +22,7 @@ DB 대조는 프로젝트 .venv의 SQLAlchemy를 쓴다(DATABASE_URL, 로컬 전
 해당 검사만 건너뛰고 그 사실을 알린다 — 조용히 통과시키지 않는다.
 목업=스펙 단계에서는 "브라우저 손검증 + 이 스크립트"가 검증 수단이다.
 """
+import ast
 import glob
 import io
 import json
@@ -6696,6 +6697,7 @@ def main():
                test_game_cell_map_freshness,
                test_talk_answer_screen,
                test_game_copy_review_gate,
+               test_game_context_gate,
                test_market_bands_and_handling):
         try:
             fn()
@@ -7525,10 +7527,15 @@ def test_talk_grid_contract():
           "안 싣는다", "싣는다")
 
     # ⓙ ★ `game_customer_copy` 는 **검수 전에는 내보내지 않는다**(사장님 확정).
-    #   reviewed_by 0/86 인 지금, 고객에게 한 줄도 나가면 안 된다.
+    #   게이트는 이제 talk_answer.py 가 직접 들지 않는다 — `api/game_copy.py`
+    #   하나가 진다([62]가 그 자리를 지킨다). 여기서는 「talk_answer 가 게이트를
+    #   두 번째로 다시 적지 않았다」와 「game_copy 를 실제로 부른다」만 본다.
     _ta_src = pathlib.Path(ROOT, "api", "talk_answer.py").read_text(encoding="utf-8")
-    check("[54-B] ★ copy 는 reviewed_by 가 있을 때만 근거로 싣는다(검수 전 비노출)",
-          'if r["reviewed_by"]:' in _ta_src, "reviewed_by 확인", "무조건 싣는다")
+    check("[54-B] ★ talk_answer 는 게이트를 직접 들지 않는다(단일 원천은 game_copy)",
+          "reviewed_by" not in _ta_src,
+          "reviewed_by 글자 없음", "reviewed_by 가 남아 있다 — 게이트가 두 벌이다")
+    check("[54-B] ★ talk_answer 가 game_copy.load_reviewed_copy 를 부른다",
+          "GC.load_reviewed_copy(" in _ta_src, "부른다", "안 부른다")
     # `games.description` 은 «게임 소개»가 아니라 사양 부하 메모다 — 고객에게 안 읽는다.
     check("[54-B] ★ games.description 을 고객 답변 근거로 싣지 않는다(사양 메모다)",
           "description" not in _ta_src.split("def _fact_lines")[1].split("def ")[0],
@@ -8853,16 +8860,19 @@ def test_game_copy_review_gate():
     ■ 왜 이 검사가 필요한가 — 이것이 사장님 확정의 «핵심»이다
       `game_customer_copy` 86행은 «게임 소개»가 아니라 **«이 게임에 왜 이런 PC 가
       필요한가» 견적 근거**다. 사장님 확정은 「검수 화면을 짓고 86종을 보신 뒤
-      견적 화면에 쓴다」였고, 그 확정이 코드에서 성립하는 자리는 단 하나 —
-      `api/talk_answer.load_game_facts` 의 `if r["reviewed_by"]:` 한 줄이다.
+      견적 화면에 쓴다」였고, 그 확정이 코드에서 성립하는 자리는 `api/game_copy.py`
+      하나다 — 게이트 정의 `GATE_SQL`과, 그 게이트로 검수 통과 행만 읽어 오는
+      `load_reviewed_copy`. 고객 경로(`talk_answer.py`)는 그 함수를 부를 뿐 게이트를
+      직접 들지 않는다 — 두 곳에 같은 조건을 적으면 한쪽만 고쳐져 미검수 문구가 샌다.
 
-      그 한 줄이 지워지거나 조건이 뒤집히면 **86종 전부가 검수 없이 즉시 고객에게
+      그 게이트가 지워지거나 조건이 뒤집히면 **86종 전부가 검수 없이 즉시 고객에게
       나간다.** 그리고 아무것도 깨지지 않는다: 답변은 더 풍부해 보이고, 테스트는
       초록이고, 콘솔은 조용하다. **가장 위험한 실패 방식**이라 회귀로 못박는다.
 
     ■ 검사하는 것
-      ① 게이트가 코드에 실재한다(talk_answer 가 reviewed_by 를 실제로 본다)
-      ② ★음성 검사 — 게이트를 «끈» 사본을 만들면 실제로 FAIL 하는가
+      ① 게이트가 `api/game_copy.py` 하나에만 실재한다(정의 + 실사용 + talk_answer
+         는 직접 들지 않음 + AST 로 그 상수 리터럴을 코드 상수로 가진 파일이 하나뿐)
+      ② ★음성 검사 — 게이트 정의를 «끈» 사본을 만들면 실제로 검출기가 못 잡는가
          (이게 없으면 검출기가 죽어도 초록이 계속 뜬다 — [55] 와 같은 관행)
       ③ DB 제약이 «반려에 검수자 이름» 을 막는다(0112) — 애플리케이션 밖 방어선
       ④ 승인/반려/되돌리기가 원장(admin_operator_activity_logs)을 남긴다
@@ -8876,27 +8886,74 @@ def test_game_copy_review_gate():
 
     ta_path = pathlib.Path(ROOT, "api", "talk_answer.py")
     ta_src = ta_path.read_text(encoding="utf-8")
+    gc_path = pathlib.Path(ROOT, "api", "game_copy.py")
+    gc_src = gc_path.read_text(encoding="utf-8")
+    agc_path = pathlib.Path(ROOT, "api", "admin_game_copy.py")
+    agc_src = agc_path.read_text(encoding="utf-8")
 
-    # ── ① 게이트가 실재한다 ────────────────────────────────────────────────
-    check("[62] talk_answer 가 game_customer_copy 를 읽는다",
-          "game_customer_copy" in ta_src, "있음", "없음")
-    check("[62] talk_answer 가 reviewed_by 로 고객 노출을 가른다",
-          "reviewed_by" in ta_src, "있음", "없음")
-    # 조회에 copy 컬럼을 싣되, 그 값을 «reviewed_by 확인 뒤에» 넣는 분기가 있어야 한다.
-    gate_re = re.compile(r"if\s+r\[[\"']reviewed_by[\"']\]\s*:")
-    check("[62] 검수 통과 행만 copy 를 싣는 분기가 있다(`if r['reviewed_by']:`)",
-          bool(gate_re.search(ta_src)), "분기 있음",
-          "없다 — 검수 전 문구가 고객에게 샐 수 있다")
+    # ── ① 게이트가 `api/game_copy.py` 하나에만 실재한다 ──────────────────────
+    gate_def_re = re.compile(r'^GATE_SQL\s*=\s*"reviewed_by IS NOT NULL"\s*$', re.M)
+    check("[62] game_copy.py 가 있다", gc_path.exists(), "있음", "없음")
+    check("[62] GATE_SQL 정의가 game_copy.py 에 있다",
+          bool(gate_def_re.search(gc_src)), "정의 있음", "정의가 없거나 다른 문구다")
+    check("[62] GATE_SQL 이 정의뿐 아니라 조회에도 쓰인다(그냥 상수 선언이 아니다)",
+          gc_src.count("GATE_SQL") >= 2, ">= 2회", str(gc_src.count("GATE_SQL")) + "회")
+    check("[62] talk_answer 는 게이트를 직접 들지 않는다(reviewed_by 글자가 없다)",
+          "reviewed_by" not in ta_src, "없음", "남아 있다 — 게이트가 두 벌이다")
+    check("[62] admin_game_copy 가 game_copy.GATE_SQL 을 쓴다(문자열을 다시 안 적는다)",
+          "GC.GATE_SQL" in agc_src, "GC.GATE_SQL 사용", "안 쓴다")
 
-    # ── ② ★음성 검사 — 게이트를 끄면 실제로 FAIL 하는가 ─────────────────────
-    #    파일을 고치지 않는다. 메모리 안의 사본에서 분기만 지우고 같은 검출기를 돌린다.
-    poisoned = gate_re.sub("if True:", ta_src)
-    check("[62] ★자기시험: 게이트를 끈 사본에서는 위 검사가 FAIL 한다",
-          not gate_re.search(poisoned), "검출기가 게이트 소멸을 잡는다",
-          "게이트를 지웠는데도 통과했다 — 검출기가 죽었다")
+    # AST 로 문자열 상수를 전수 수집해, 게이트 리터럴을 코드 상수로 가진 api/*.py 가
+    # game_copy.py 하나뿐인지 본다. docstring 은 설명 중 예시로 인용될 수 있으므로
+    # 전부 제외한다(모듈뿐 아니라 클래스·함수 docstring 도 — `ast.get_docstring` 이
+    # 잡는 노드는 넷이다). 주석은 애초에 AST 에 없다.
+    GATE_LITERAL = "reviewed_by IS NOT NULL"
+
+    def _docstring_const_ids(tree: ast.AST) -> set:
+        ids = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                body = getattr(node, "body", None)
+                if (body and isinstance(body[0], ast.Expr)
+                        and isinstance(body[0].value, ast.Constant)
+                        and isinstance(body[0].value.value, str)):
+                    ids.add(id(body[0].value))
+        return ids
+
+    def _files_with_gate_literal(root: pathlib.Path) -> list[str]:
+        hit = []
+        for py in sorted((root / "api").glob("*.py")):
+            src = py.read_text(encoding="utf-8")
+            try:
+                tree = ast.parse(src, filename=str(py))
+            except SyntaxError:
+                continue
+            skip_ids = _docstring_const_ids(tree)
+            found = False
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    if id(node) in skip_ids:
+                        continue          # docstring 노드는 건너뛴다
+                    if GATE_LITERAL in node.value:
+                        found = True
+                        break
+            if found:
+                hit.append(py.name)
+        return hit
+
+    gate_files = _files_with_gate_literal(pathlib.Path(ROOT))
+    check("[62] 게이트 리터럴을 코드 상수로 가진 api/*.py 가 game_copy.py 하나뿐이다",
+          gate_files == ["game_copy.py"], "['game_copy.py']", gate_files)
+
+    # ── ② ★음성 검사 — 게이트 정의를 끄면 검출기가 실제로 못 잡는가 ───────────
+    #    파일을 고치지 않는다. 메모리 안의 사본에서 정의만 지우고 같은 검출기를 돌린다.
+    poisoned = gate_def_re.sub('GATE_SQL = "TRUE"', gc_src)
+    check("[62] ★자기시험: 게이트 정의를 끈 사본에서는 검출기가 못 찾는다",
+          not gate_def_re.search(poisoned), "검출기가 게이트 소멸을 잡는다",
+          "게이트를 지웠는데도 검출기가 여전히 있다고 봤다 — 검출기가 죽었다")
     #    반대 방향 — 원본은 통과해야 한다(오탐이면 아무도 안 믿는 검사가 된다).
     check("[62] ★자기시험: 원본은 위반으로 세지 않는다(오탐 없음)",
-          bool(gate_re.search(ta_src)), "통과", "오탐")
+          bool(gate_def_re.search(gc_src)), "통과", "오탐")
 
     # ── ③ DB 제약 — 반려 행에 검수자 이름이 들어가지 못한다 ──────────────────
     cons = db_all(
@@ -9056,6 +9113,402 @@ def test_game_copy_review_gate():
                    " WHERE reviewed_by IS NULL") or 0
     print(f"  [INFO] 검수 대기 {unrev}/{total_rows}종 · "
           f"고객 노출 {total_rows - unrev}종")
+
+
+def test_game_context_gate():
+    """[63] game_context 가 검수 게이트를 S2 경로(grid_public.py·app.js)까지 지킨다
+    (ADM-TLK-020 후속 · S2 게임 카드 · 2026-09-22 신설).
+
+    ■ [62] 가 증명하지 «못한» 것 — 이 검사가 메우는 빈틈
+      [62] 의 검출기(`_files_with_gate_literal`)는 「게이트 리터럴
+      `"reviewed_by IS NOT NULL"` 을 코드 상수로 가진 파일이 game_copy.py 하나뿐인가」
+      만 본다. **그 문자열을 아예 이어 붙이지 않고 `game_customer_copy` 를 직접
+      SELECT/UPDATE 하는 두 번째 경로**는 그 리터럴이 없으므로 [62] 의 그물에
+      걸리지 않는다 — 검수를 통째로 건너뛰고 미검수 문구를 읽어도 [62]는 초록이다.
+      그리고 [62] 는 `talk_answer.py` 한 파일만 봤다 — S2 격자 경로
+      (`api/grid_public.py`, `_game_context`/`_build_card`)와 그 값을 실제로 그리는
+      화면(`mockups/mvp2/app.js`)은 [62]의 검사 대상이 아니었다.
+
+    ■ 검사하는 것 — 실패하려면 코드의 어디가 잘못돼야 하는가
+      ① `grid_public.py` 가 `game_copy.load_reviewed_copy` 를 실제로 부르고
+         (게이트를 다시 구현하지 않고), `_build_card` 의 반환 dict 안에서
+         `game_context` 가 `reasons` 와 **같은 dict 리터럴의 형제**여야 한다
+         (딴 return 문으로 갈라지면 사이에 `}` 가 낀다) — 그리고 `_game_context` 의
+         반환값에 `reviewed_by` 를 다시 얹지 않는다(검수자 이름을 고객에게 흘리지
+         않는다).
+      ② ★음성 자기시험 포함 — `game_customer_copy` 를 SQL 동사(FROM/JOIN/UPDATE/
+         INSERT INTO/DELETE FROM)로 건드리는 `api/*.py` 파일이 `game_copy.py`·
+         `admin_game_copy.py` 정확히 둘뿐이어야 한다(AST 문자열 상수 전수 스캔,
+         [62] 와 같이 docstring 은 제외). 세 번째 파일이 생기면(=[62] 가 못 보는
+         우회 경로) 실패 — 사본에 그런 파일을 «끼워» 검출기가 실제로 잡는지까지
+         본다(원본 파일은 건드리지 않는다).
+      ③ ★음성 자기시험 포함 — `app.js` 의 `GRID.gameContext` 접근자, `renderQuote`
+         가 견적 패널을 먼저 그린 «뒤»에 `game_context` 를 심는 순서(순서가 가드다
+         — cap=null 전례와 같은 이유: 이 블록이 죽어도 견적 패널은 이미 그려진
+         뒤여야 한다), `gameContextBlocks`/`gameContextLink`/`gameContextElement`
+         세 함수 본문에 `innerHTML` 계열이 없고(운영자가 자유 텍스트로 적은
+         문구라 XSS 경로다) 수치 리터럴도 없다(화면이 수치를 보태지 않는다),
+         `styles.css` 에 `.quote-game` 선택자가 있다(그리기만 하고 스타일이
+         없으면 상자가 안 보인다).
+      ④ node 로 `gameContextElement` 를 실제로 실행한다 — 가짜 document 가
+         `innerHTML` 대입에 예외를 던지는 채로: null·전부 공백 ctx 는 null,
+         정상 ctx 는 `<p>` 5개(요약·이유·업그레이드·주의·검수일)와 `.quote-game`
+         상자, http(s) 출처만 `<a href>` 로 남고 `javascript:` 는 링크가 안 되며,
+         LLM 이 아니라 사람이 적은 문구라도 `<script>` 같은 태그 문자열은 텍스트
+         그대로 남고 예외가 없다.
+      ⑤ DB·서버가 있을 때만 — 검수 통과 게임으로 `POST /api/grid/recommend` 를
+         실제로 불러 게임 카드의 `game_context` 키 집합이 정확히 8개(`reviewed_by`
+         없이)이고, 비게임 카드는 항상 `game_context is None` 이다.
+
+    ⚠ [62] 가 이미 지킨 DB 제약(0112)·원장·목록 상한·필터는 다시 보지 않는다
+      (§단일 원천 — 같은 것을 두 벌 두지 않는다).
+
+    ⚠ 이 검사가 증명하지 «못하는» 것 — ②의 SQL 스캐너는 문자열 상수 «하나» 안에
+      `FROM game_customer_copy` 가 통째로 있을 때만 잡는다. 런타임에 `+` 로 이어
+      붙인 SQL(`"...FROM" + " game_customer_copy"`)처럼 조각난 문자열은 AST 의
+      `ast.Constant` 하나로 안 잡혀 못 잡는다(checker 실측 2026-09-22). 지금
+      정본은 전부 인접 리터럴 병합 스타일(`"..." "..."`, 컴파일 시점에 한
+      `ast.Constant` 로 합쳐진다)이라 뚫린 자리는 없다 — 다만 다음에 누가 `+` 로
+      SQL 을 이어 붙이면 이 검사는 그것을 «세 번째 경로 없음»으로 오판할 수 있다.
+    """
+    print(chr(10) + "[63] game_context 검수 게이트 — S2 grid_public·app.js (2026-09-22 신설)")
+
+    # ── ① grid_public.py — 게이트를 다시 구현하지 않고 형제 필드로 담는다 ────
+    gp_path = pathlib.Path(ROOT, "api", "grid_public.py")
+    gp_src = gp_path.read_text(encoding="utf-8")
+
+    check("[63] grid_public.py 가 game_copy 모듈을 가져온다(게이트를 다시 안 든다)",
+          "from . import game_copy as GC" in gp_src, "있음", "없음")
+    check("[63] _game_context 가 GC.load_reviewed_copy 를 실제로 부른다",
+          "GC.load_reviewed_copy(" in gp_src, "있음", "없음")
+    check("[63] grid_public.py 에 게이트 조건(reviewed_by)이 다시 적혀 있지 않다"
+          "(있으면 게이트가 두 벌이다)",
+          "reviewed_by" not in gp_src, "없음", "남아 있다")
+
+    # _build_card 함수 «본문만» 떼어(다른 함수의 "reasons"/"game_context" 를
+    # 잘못 잡지 않게) reasons 와 game_context 가 같은 dict 리터럴 안의 형제인지 본다.
+    try:
+        i0 = gp_src.index("def _build_card(")
+        i1 = gp_src.index("\ndef ", i0 + 1)
+        build_card_src = gp_src[i0:i1]
+    except ValueError:
+        build_card_src = ""
+    check("[63] _build_card() 를 찾았다(아래 형제 필드 검사의 전제)",
+          bool(build_card_src), "찾음", "못 찾음")
+    sibling_ok = False
+    between = None
+    if build_card_src and '"reasons":' in build_card_src and '"game_context":' in build_card_src:
+        r_idx = build_card_src.index('"reasons":')
+        g_idx = build_card_src.index('"game_context":', r_idx)
+        if g_idx > r_idx:
+            between = build_card_src[r_idx:g_idx]
+            sibling_ok = "}" not in between
+    check("[63] _build_card 의 반환 dict 안에서 reasons 와 game_context 가"
+          " 형제다(둘 사이에 '}' 가 없다 — 다른 return 문으로 안 갈라졌다)",
+          sibling_ok, "형제(같은 dict 리터럴)", between)
+
+    # _game_context 함수 본문만 AST 로 떼어, 그 안의 문자열 상수 집합에
+    # 'reviewed_by' 가 없는지 본다(docstring 은 설명이라 제외).
+    try:
+        gp_tree = ast.parse(gp_src, filename=str(gp_path))
+    except SyntaxError as e:                                  # noqa: BLE001
+        gp_tree = None
+        check("[63] grid_public.py 가 문법적으로 파싱된다(AST 검사의 전제)",
+              False, "파싱 성공", repr(e))
+    if gp_tree is not None:
+        gctx_fn = next((n for n in ast.walk(gp_tree)
+                        if isinstance(n, ast.FunctionDef) and n.name == "_game_context"), None)
+        check("[63] _game_context() 를 찾았다(아래 reviewed_by 검사의 전제)",
+              gctx_fn is not None, "찾음", "못 찾음")
+        if gctx_fn is not None:
+            doc_id = None
+            if (gctx_fn.body and isinstance(gctx_fn.body[0], ast.Expr)
+                    and isinstance(gctx_fn.body[0].value, ast.Constant)
+                    and isinstance(gctx_fn.body[0].value.value, str)):
+                doc_id = id(gctx_fn.body[0].value)
+            leaked = [n.value for n in ast.walk(gctx_fn)
+                      if isinstance(n, ast.Constant) and isinstance(n.value, str)
+                      and id(n) != doc_id and "reviewed_by" in n.value]
+            check("[63] _game_context() 의 반환값에 reviewed_by 를 다시 얹지 않는다"
+                  "(검수자 이름을 고객 응답에 흘리지 않는다)",
+                  not leaked, "0건", leaked)
+
+    # ── ② 표를 읽는 경로가 game_copy.py·admin_game_copy.py 둘뿐이다 ─────────
+    #   [62] 가 못 보는 것: GATE_SQL 문자열을 안 쓰고 game_customer_copy 를
+    #   직접 SELECT/UPDATE 하는 세 번째 모듈. 문자열 «상수»(docstring 제외)를
+    #   AST 로 전수 스캔해 SQL 동사 + 표 이름을 정규식으로 찾는다.
+    GATE_TABLE_RE = re.compile(
+        r"\b(FROM|JOIN|UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+game_customer_copy\b", re.I)
+
+    def _docstring_const_ids63(tree):
+        ids = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                body = getattr(node, "body", None)
+                if (body and isinstance(body[0], ast.Expr)
+                        and isinstance(body[0].value, ast.Constant)
+                        and isinstance(body[0].value.value, str)):
+                    ids.add(id(body[0].value))
+        return ids
+
+    def _scan_table_writers63(src_map: dict) -> list:
+        hit = []
+        for name, src in src_map.items():
+            try:
+                tree = ast.parse(src, filename=name)
+            except SyntaxError:
+                continue
+            skip_ids = _docstring_const_ids63(tree)
+            found = False
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    if id(node) in skip_ids:
+                        continue
+                    if GATE_TABLE_RE.search(node.value):
+                        found = True
+                        break
+            if found:
+                hit.append(name)
+        return sorted(hit)
+
+    api_dir63 = pathlib.Path(ROOT, "api")
+    src_map63 = {p.name: p.read_text(encoding="utf-8")
+                for p in sorted(api_dir63.glob("*.py"))}
+    writers63 = _scan_table_writers63(src_map63)
+    check("[63] game_customer_copy 를 SQL 로 직접 건드리는 api/*.py 가"
+          " game_copy.py·admin_game_copy.py 정확히 둘뿐이다(세 번째 경로가 없다)",
+          writers63 == ["admin_game_copy.py", "game_copy.py"],
+          ["admin_game_copy.py", "game_copy.py"], writers63)
+
+    # ★음성 자기시험 — grid_public.py «사본»(파일은 안 고친다)에 직접 SELECT 한
+    # 줄을 끼우면 검출기가 셋째 파일로 잡는지.
+    if "grid_public.py" in src_map63:
+        poisoned_map63 = dict(src_map63)
+        poisoned_map63["grid_public.py"] = (
+            src_map63["grid_public.py"]
+            + "\n\n_LEAK_SQL = \"SELECT spec_summary_ko FROM game_customer_copy\"\n")
+        poisoned_writers63 = _scan_table_writers63(poisoned_map63)
+        check("[63] ★자기시험: 직접 SELECT 하는 셋째 파일을 사본에 끼우면 검출기가 잡는다"
+              "([62] 는 못 잡는 자리 — 이 검사가 그 빈틈을 메운다는 증거)",
+              len(poisoned_writers63) == 3 and "grid_public.py" in poisoned_writers63,
+              "3파일(grid_public.py 포함)", poisoned_writers63)
+        check("[63] ★자기시험: 원본에는 없는 위반이라 원본은 두 파일만 잡는다(오탐 없음)",
+              writers63 == ["admin_game_copy.py", "game_copy.py"], True, writers63)
+
+    # ── ③ 화면 — mvp2 가 그리되 지어내지 않는다 ─────────────────────────────
+    mvp2_dir = pathlib.Path(ROOT, "mockups", "mvp2")
+    app_path = mvp2_dir / "app.js"
+    app_src = app_path.read_text(encoding="utf-8")
+
+    check("[63] GRID 에 gameContext 접근자가 있다(카드에서 game_context 를 읽는다)",
+          bool(re.search(r"gameContext\s*:\s*card\s*=>", app_src)), "있음", "없음")
+
+    rq = re.search(r"function renderQuote\(\)\{(.*?)\n\}\n", app_src, re.S)
+    check("[63] renderQuote() 를 찾았다(못 찾으면 아래 순서 검사는 FAIL — 전제 실패를"
+          " 통과로 두지 않는다)", bool(rq), "찾음", "못 찾음")
+    if rq:
+        rq_body = rq.group(1)
+        i_inner = rq_body.find(".innerHTML=")
+        i_ctx = rq_body.find("gameContextElement(")
+        order_ok = i_inner != -1 and i_ctx != -1 and i_inner < i_ctx
+    else:
+        rq_body, i_inner, i_ctx, order_ok = "", -1, -1, False
+    check("[63] renderQuote 가 견적 패널을 .innerHTML= 로 먼저 그린 «뒤»에"
+          " game_context 를 심는다(순서가 가드다 — cap=null 로 뒷단이 통째로"
+          " 멈춘 전례와 같은 이유)",
+          order_ok, ".innerHTML= 이후에 gameContextElement(",
+          {"innerHTML_at": i_inner, "gameContextElement_at": i_ctx})
+
+    def _fn_body63(name: str):
+        m = re.search(r"function " + re.escape(name) + r"\([^)]*\)\{(.*?)\n\}\n", app_src, re.S)
+        return m.group(1) if m else None
+
+    DANGEROUS_RE63 = re.compile(r"innerHTML|insertAdjacentHTML|outerHTML")
+    LITERAL_RE63 = re.compile(r"\d+(?:\.\d+)?\s*(?:%|원|fps|GB|Hz)")
+    for fname63 in ("gameContextBlocks", "gameContextLink", "gameContextElement"):
+        body63 = _fn_body63(fname63)
+        check(f"[63] {fname63}() 를 찾았다(못 찾으면 아래 두 검사는 FAIL)",
+              body63 is not None, "찾음", "못 찾음")
+        if body63 is None:
+            check(f"[63] {fname63}() 본문에 innerHTML 계열이 없다", False, "없음", "함수 없음")
+            check(f"[63] {fname63}() 본문에 수치 리터럴이 없다", False, "0건", "함수 없음")
+            continue
+        check(f"[63] {fname63}() 본문에 innerHTML/insertAdjacentHTML/outerHTML 이 없다"
+              "(운영자가 자유 텍스트로 쓴 문구라 XSS 경로다)",
+              not DANGEROUS_RE63.search(body63), "없음", DANGEROUS_RE63.findall(body63))
+        check(f"[63] {fname63}() 본문에 수치 리터럴이 없다(화면이 수치를 보태지 않는다)",
+              not LITERAL_RE63.findall(body63), "0건", LITERAL_RE63.findall(body63))
+
+    # ★음성 자기시험 — gameContextElement 본문 «사본»에 innerHTML 대입을 끼우면
+    # 검출기가 잡는지(파일은 안 고친다).
+    ge_body63 = _fn_body63("gameContextElement")
+    if ge_body63 is not None:
+        poisoned_body63 = ge_body63 + "\nel.innerHTML='';\n"
+        check("[63] ★자기시험: gameContextElement 사본에 el.innerHTML='' 을 끼우면"
+              " 검출기가 잡는다", bool(DANGEROUS_RE63.search(poisoned_body63)),
+              "검출됨", "검출기가 못 잡는다 — 죽은 검사다")
+        check("[63] ★자기시험: 원본에는 그 줄이 없으니 원본은 위반으로 세지 않는다"
+              "(오탐 없음)", not DANGEROUS_RE63.search(ge_body63), "통과", "오탐")
+
+    css_path63 = mvp2_dir / "styles.css"
+    css_src63 = css_path63.read_text(encoding="utf-8")
+    check("[63] styles.css 에 .quote-game 선택자가 있다(그리기만 하고 스타일이"
+          " 없으면 상자가 안 보인다)",
+          bool(re.search(r"\.quote-game\b", css_src63)), "있음", "없음")
+
+    # ── ④ node 로 실제 렌더 — 가짜 document 가 innerHTML 대입을 금지한다 ───
+    import subprocess as _sp63
+    import shutil as _sh63
+    import tempfile as _tf63
+
+    node63 = _sh63.which("node")
+    if not node63:
+        check("[63] gameContextElement 렌더 결과 검사 — node 가 없어 건너뜀",
+              True, "건너뜀", "node=None", kind="DB")
+    else:
+        driver63 = r"""
+const R=require(process.argv[2]);
+function mk(tag){
+ const el={tagName:tag.toUpperCase(),children:[],childNodes:[],attrs:{},className:'',_text:null,
+  appendChild(c){this.children.push(c);this.childNodes.push(c);return c;},
+  setAttribute(k,v){this.attrs[k]=v;},
+  get text(){return this._text!=null?this._text:this.children.map(c=>c.text).join('');}};
+ Object.defineProperty(el,'innerHTML',{set(){throw new Error('innerHTML used in '+tag);}});
+ return el;
+}
+const doc={createElement:mk,
+ createTextNode:t=>({tagName:'#text',_text:String(t),children:[],get text(){return this._text;}})};
+function walk(n,out){out.push(n);(n.children||[]).forEach(c=>walk(c,out));return out;}
+const cases=JSON.parse(require('fs').readFileSync(process.argv[3],'utf8'));
+const out=[];
+for(const c of cases){
+ let r={ok:true};
+ try{
+  const el=R.gameContextElement(c.ctx,doc);
+  if(!el){r.isNull=true;out.push(r);continue;}
+  const all=walk(el,[]);
+  r.className=el.className;
+  r.ps=all.filter(n=>n.tagName==='P').map(n=>n.text);
+  r.as=all.filter(n=>n.tagName==='A').map(n=>n.attrs.href);
+  r.tags=[...new Set(all.map(n=>n.tagName))];
+ }catch(e){r={ok:false,err:e.message};}
+ out.push(r);
+}
+process.stdout.write(JSON.stringify(out));
+"""
+        cases63 = [
+            {"ctx": None},
+            {"ctx": {"spec_summary": "  ", "why_this_pc": "", "upgrade_hint": None,
+                     "caution": "   "}},
+            {"ctx": {
+                "game_name": "발로란트",
+                "spec_summary": "1080p 기준 요구 사양 요약",
+                "why_this_pc": "이 게임엔 이런 PC가 맞습니다",
+                "upgrade_hint": "그래픽카드를 올리면 더 쾌적합니다",
+                "caution": "저사양에서는 화질을 낮추세요",
+                "source": {"kind": "game_customer_copy", "fields": ["gpu"],
+                          "url": "https://ko.example.com/valorant"},
+                "confidence": "high", "reviewed_at": "2026-09-21T09:00:00"}},
+            {"ctx": {"spec_summary": "요약만 있는 경우",
+                     "source": {"url": "javascript:alert(1)"}}},
+            {"ctx": {"spec_summary": "<script>bad</script>"}},
+        ]
+        with _tf63.TemporaryDirectory() as tmp63:
+            cp63 = pathlib.Path(tmp63, "cases63.json")
+            dp63 = pathlib.Path(tmp63, "drv63.js")
+            cp63.write_text(json.dumps(cases63, ensure_ascii=False), encoding="utf-8")
+            dp63.write_text(driver63, encoding="utf-8")
+            pr63 = _sp63.run([node63, str(dp63), str(app_path), str(cp63)],
+                             capture_output=True, text=True, encoding="utf-8", timeout=60)
+        if pr63.returncode != 0:
+            check("[63] node 로 gameContextElement 렌더 성공", False, "성공",
+                  (pr63.stderr or "")[-300:])
+        else:
+            rows63 = json.loads(pr63.stdout)
+            check("[63] node: gameContextElement(null,doc) 는 null 을 돌려준다",
+                  rows63[0].get("isNull") is True, True, rows63[0])
+            check("[63] node: 넷 다 공백인 ctx 는 null(빈 상자를 만들지 않는다)",
+                  rows63[1].get("isNull") is True, True, rows63[1])
+            r2_63 = rows63[2]
+            check("[63] node: 정상 ctx 는 .quote-game 상자를 만든다",
+                  r2_63.get("className") == "quote-game", "quote-game",
+                  r2_63.get("className"))
+            check("[63] node: 정상 ctx 는 <p> 5개다(요약·이유·업그레이드·주의·검수일)",
+                  len(r2_63.get("ps") or []) == 5, 5, len(r2_63.get("ps") or []))
+            check("[63] node: 마지막 <p> 가 검수일 문구다",
+                  (r2_63.get("ps") or [""])[-1] == "검수 2026-09-21",
+                  "검수 2026-09-21", (r2_63.get("ps") or [""])[-1])
+            check("[63] node: http(s) 출처는 <a href> 로 남는다",
+                  r2_63.get("as") == ["https://ko.example.com/valorant"],
+                  ["https://ko.example.com/valorant"], r2_63.get("as"))
+            r3_63 = rows63[3]
+            check("[63] node: javascript: 출처는 링크로 만들지 않는다",
+                  (r3_63.get("as") or []) == [], [], r3_63.get("as"))
+            r4_63 = rows63[4]
+            check("[63] node: <script> 문구가 요소로 실행되지 않고 텍스트로 남으며"
+                  " 예외가 없다",
+                  r4_63.get("ok") is not False
+                  and "SCRIPT" not in (r4_63.get("tags") or [])
+                  and "<script>bad</script>" in "".join(r4_63.get("ps") or []),
+                  "텍스트로 보존·예외 없음", r4_63)
+
+    # ── ⑤ DB·서버가 있을 때만 — 실 응답의 game_context 키 집합 ─────────────
+    if _engine is None:
+        check("[63] game_context 실응답 검사 — DB 미접속으로 건너뜀",
+              True, "건너뜀", _db_why, kind="DB")
+        return
+
+    reviewed = db_all("SELECT g.name FROM game_customer_copy c"
+                      " JOIN games g USING (game_id)"
+                      " WHERE c.reviewed_by IS NOT NULL LIMIT 1")
+    if not reviewed:
+        check("[63] game_context 실응답 검사 — 검수 통과 게임이 없어 건너뜀",
+              True, "건너뜀", "game_customer_copy.reviewed_by 전부 NULL", kind="DB")
+    else:
+        gname63 = reviewed[0]["name"]
+        _st63, d63 = post("/api/grid/recommend",
+                          {"state": {"usages": ["게임"], "game": {"names": [gname63]}}})
+        d63 = d63 or {}
+        game_cs63 = next((cs for cs in (d63.get("card_sets") or [])
+                          if cs.get("kind") == "game"), None)
+        cards63 = (game_cs63 or {}).get("cards") or []
+        if not cards63:
+            check(f"[63] game_context 실응답 검사 — '{gname63}' 카드가 안 나와 건너뜀"
+                  "(등급 미확정 등 — DB 상태 문제이지 이 검사의 결함이 아니다)",
+                  True, "건너뜀", {"needs": d63.get("needs"), "dropped": d63.get("dropped")},
+                  kind="DB")
+        else:
+            expect_keys63 = {"game_name", "spec_summary", "why_this_pc", "upgrade_hint",
+                             "caution", "source", "confidence", "reviewed_at"}
+            bad63 = []
+            for c63 in cards63:
+                gc63 = c63.get("game_context")
+                if gc63 is None:
+                    bad63.append({"cell_id": c63.get("cell_id"), "reason": "game_context 없음"})
+                    continue
+                keys63 = set(gc63.keys())
+                if keys63 != expect_keys63:
+                    bad63.append({"cell_id": c63.get("cell_id"), "keys": sorted(keys63)})
+            check(f"[63] '{gname63}' 게임 카드 전부가 game_context 를 8개 키로 준다"
+                  "(reviewed_by 없이)",
+                  not bad63, "전부 일치·reviewed_by 없음", bad63)
+
+        # 비게임 카드는 game_context 가 항상 null 이다.
+        _st63b, d63b = post("/api/grid/recommend",
+                            {"state": {"usages": ["사무용"], "budget_won": 1500000,
+                                       "budget_bound": "이하"}})
+        d63b = d63b or {}
+        nongame_cards63 = [c for cs in (d63b.get("card_sets") or [])
+                          if cs.get("kind") != "game" for c in (cs.get("cards") or [])]
+        if not nongame_cards63:
+            check("[63] 비게임 카드 game_context 검사 — 카드가 안 나와 건너뜀",
+                  True, "건너뜀", d63b.get("needs"), kind="DB")
+        else:
+            leaked63 = [c.get("cell_id") for c in nongame_cards63
+                       if c.get("game_context") is not None]
+            check("[63] 비게임 카드는 game_context 가 항상 null 이다"
+                  "(게임 카드에만 값이 실린다)",
+                  not leaked63, [], leaked63)
 
 
 def test_market_bands_and_handling():
