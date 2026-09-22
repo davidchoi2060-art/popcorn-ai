@@ -80,7 +80,9 @@ def fetch_from_mall(limit=None):
     from tools.mall_builtpc_fetch import MAX_FAIL
     items, streak = [], 0
     for i, c in enumerate(codes, 1):
-        html, _ = fetch(c)
+        # refetch=True -- 가격을 «쓰는» 도구라 캐시를 믿지 않는다. 며칠 전 캐시로
+        # 시중가를 넣으면 그날 값이 아니라 그때 값을 정본에 박는 것이 된다.
+        html, _ = fetch(c, refetch=True)
         if not html:
             streak += 1
             print("  %s 받기 실패 (연속 %d)" % (c, streak))
@@ -99,17 +101,28 @@ def fetch_from_mall(limit=None):
 def plan(conn, items):
     """무엇을 바꿀지 정한다. (대상 목록, 건너뛴 사유별 목록)"""
     from sqlalchemy import text
-    codes = [str(r["product_code"]) for r in items]
+    # products.product_code 는 BIGINT 다 -- 문자열로 넘기면 `operator does not exist:
+    # bigint = text` 로 죽는다(2026-09-22 서버 드라이런에서 실제로 났다). 몰 상품번호는
+    # 전부 숫자지만, 숫자가 아닌 것이 섞여 들어와도 조용히 빠지지 않게 따로 센다.
+    targets, skipped = [], {"상품번호가 숫자가 아님": [], "우리 DB 에 없음": [],
+                            "완제PC 아님": [], "시중가 없음": [],
+                            "시중가가 판매가보다 낮음": [], "이미 같은 값": []}
+    codes = []
+    for r in items:
+        try:
+            codes.append(int(str(r["product_code"]).strip()))
+        except (TypeError, ValueError):
+            skipped["상품번호가 숫자가 아님"].append(repr(r.get("product_code")))
     rows = conn.execute(text(
         "SELECT product_code, part_type, status, sale_price, market_price"
         "  FROM products WHERE product_code = ANY(:codes)"),
         {"codes": codes}).mappings().all()
     db = {str(r["product_code"]): r for r in rows}
 
-    targets, skipped = [], {"우리 DB 에 없음": [], "완제PC 아님": [], "시중가 없음": [],
-                            "시중가가 판매가보다 낮음": [], "이미 같은 값": []}
     for it in items:
-        pc = str(it["product_code"])
+        pc = str(it["product_code"]).strip()
+        if not pc.isdigit():
+            continue          # 위에서 이미 셌다
         mp, sp = it.get("market_price"), it.get("sale_price")
         row = db.get(pc)
         if row is None:
@@ -122,7 +135,8 @@ def plan(conn, items):
             skipped["시중가가 판매가보다 낮음"].append("%s(%s<%s)" % (pc, mp, sp)); continue
         if row["market_price"] == mp:
             skipped["이미 같은 값"].append(pc); continue
-        targets.append({"pc": pc, "new": mp, "old": row["market_price"],
+        # pc 는 int 로 넘긴다 -- 아래 제안 INSERT 의 product_code 도 같은 BIGINT 다.
+        targets.append({"pc": int(pc), "new": mp, "old": row["market_price"],
                         "sale_db": row["sale_price"], "status": row["status"]})
     return targets, skipped
 
@@ -146,6 +160,11 @@ def apply_one(t, when, approve_first):
         return "자동 승인(%s)" % res["reason"], True
     if not approve_first:
         return "검수 대기로 남김(%s)" % res["reason"], False
+    # `--approve-first` 는 이름 그대로 «첫 값»에만 쓴다. 이미 값이 있는데 자동 승인이
+    # 거절됐다면 그것은 변동폭이 큰 것이고, 사장님이 승인한 것은 「비어 있는 시중가를
+    # 채우는 일」이지 「기존 값을 크게 바꾸는 일」이 아니다 -- 그건 사람이 본다.
+    if t["old"]:
+        return "검수 대기로 남김(기존 값이 있어 첫 값이 아님)", False
 
     # 첫 값 일괄 승인 — 값 쓰기는 기존 코드가 한다(위 머리말 참고).
     from fastapi import HTTPException
