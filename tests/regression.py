@@ -313,12 +313,48 @@ def post(path, body=None):
     try:
         with urllib.request.urlopen(req) as r:
             _capture(r)
-            return r.status, json.load(r)
+            st, d = r.status, json.load(r)
+            _mark_test_session(d)
+            return st, d
     except urllib.error.HTTPError as e:
         try:
             return e.code, json.loads(e.read().decode())
         except Exception:
             return e.code, None
+
+
+def _mark_test_session(d):
+    """방금 이 회귀가 만든 상담 행만 `data_origin='test'` 로 표시한다.
+
+    ■ 왜 헤더만으로는 부족한가 (2026-09-22)
+      `_headers()` 가 붙이는 `X-Popcorn-Test` 는 **`POPCORN_TEST_HEADER_ENABLED`
+      가 켜져 있을 때만** 신뢰된다(`api/recommend._resolve_data_origin`). 그리고
+      그 값은 **배포 서버 env 에 두지 않는 것이 규칙이다** — `deploy/README.md`
+      가 `grep -c POPCORN_TEST_HEADER_ENABLED /etc/popcorn-ai.env` 를 「0 이어야
+      한다」고 못 박는다(서버 안에서 loopback 으로 API 를 두드리는 내부 프로세스가
+      실고객 세션을 'test' 로 감추는 경로가 열리기 때문).
+      즉 **서버에서 회귀를 돌리면 헤더는 무시되고 상담 행이 'real' 로 태어난다.**
+      A-75 사고(consult_sessions 6,893건 중 6,732건이 회귀였던 것)와 같은 경로다.
+
+    ■ 그래서 스위치를 켜는 대신, 만든 쪽이 자기 행만 직접 표시한다
+      `tools/grid_generate.py` 의 `_mark_batch_session` 이 같은 이유로 같은 방식을
+      쓴다. `AND data_origin='real'` 을 건 것은 남의 행이나 이미 표시된 행을
+      건드리지 않기 위해서다. 개발 PC 처럼 스위치가 켜진 곳에서는 행이 이미
+      'test' 로 태어나므로 이 UPDATE 는 **한 행도 건드리지 않는다.**
+
+    ■ 왜 `post()` 에만 거는가
+      상담 행을 만드는 요청은 전부 이 헬퍼를 지난다. `post_raw()` 는 카탈로그
+      업로드(multipart)용이고 `get()`·`anon_admin_status()` 는 읽기다.
+      DB 에 닿지 못하면 `db_exec` 가 None 을 돌려주고 조용히 넘어간다 — 그때는
+      애초에 원장 대조 검사들도 건너뛰는 상태다.
+    """
+    if not isinstance(d, dict):
+        return
+    sid = d.get("session_id")
+    if not isinstance(sid, int) or isinstance(sid, bool):
+        return
+    db_exec("UPDATE consult_sessions SET data_origin='test'"
+            " WHERE session_id=:sid AND data_origin='real'", sid=sid)
 
 
 def _capture(resp):
