@@ -18,7 +18,8 @@ from .timeutil import iso
 from .pricing import sale_from_purchase, formula_text
 from .candidates import BUDGET_ALLOC, SILENT_SCOPE, WHITE_SCOPE
 from .db import engine
-from .recommend import SLOTS, TIER_LABELS, HIGHEND_CAP_X
+from .recommend import SLOTS, TIER_LABELS, HIGHEND_CAP_X, SLOT_PRICE_POLICY
+from .taxonomy import SLOT_LABELS
 
 router = APIRouter(prefix="/api/admin")
 
@@ -31,15 +32,27 @@ from .taxonomy import PART_LABELS as PART_KO   # 단일 원천(슬라이스 A)
 
 # 총액 처리 — spec-policy-weights.md 1a 표의 「총액 처리」 열과 같은 문구(UX-31).
 # highend만 상수를 문장에 꽂는다 — recommend.HIGHEND_CAP_X를 복제하지 않고 그 모듈에서 읽는다.
+#
+# ⚠ 「내림차순」이라는 말은 2026-09-13(RAM·SSD·HDD) 이후로 «전 슬롯»이 아니다. 그런데 이
+# 표는 그 뒤로도 「캡 내 가격 내림차순」이라고만 말해 왔다 — 운영자가 이 화면만 보면
+# 엔진이 램을 최저가로 고르는 것을 알 수 없었다. 2026-09-22 에 메인보드·케이스·쿨러·
+# 파워까지 최저가로 옮기면서 내림차순이 CPU·GPU 둘만 남았으므로, 예외 자리를
+# **`SLOT_PRICE_POLICY` 에서 읽어** 문장에 붙인다(목록을 여기 다시 적지 않는다 —
+# §단일 원천. 정책이 바뀌면 이 문장이 저절로 따라간다).
+_CHEAPEST_KO = "·".join(SLOT_LABELS.get(s, s) for s in SLOTS
+                        if SLOT_PRICE_POLICY.get(s) == "cheapest")
+_ORDER_EXCEPT = f" (단 {_CHEAPEST_KO}는 조건 충족 중 최저가)" if _CHEAPEST_KO else ""
+
 TIER_RULES = [
     {"key": "value", "label": TIER_LABELS["value"], "order": "슬롯별 가격 오름차순",
      "cap": "예산 상한 적용", "note": "최소 구성이 예산 밖이면 전 티어 불성립",
      "total_handling": "슬롯별 최저가 합산"},
     {"key": "recommend", "label": TIER_LABELS["recommend"],
-     "order": "캡 내 가격 내림차순 + 총액 가지치기(DFS)",
+     "order": "캡 내 가격 내림차순 + 총액 가지치기(DFS)" + _ORDER_EXCEPT,
      "cap": "예산 상한 적용", "note": "캡 내 최고가 합산이 예산을 넘지 않도록 총액으로 다시 자른다",
      "total_handling": "DFS로 조합 탐색해 예산 안 최댓값"},
-    {"key": "highend", "label": TIER_LABELS["highend"], "order": "전체 풀 가격 내림차순",
+    {"key": "highend", "label": TIER_LABELS["highend"],
+     "order": "전체 풀 가격 내림차순" + _ORDER_EXCEPT,
      "cap": "예산 상한 미적용", "note": "예산 초과 시 'over'로 정직 표기 — 숨기지 않는다",
      "total_handling": f"추천형 총액의 {HIGHEND_CAP_X:g}배로 폭주 제한"},
 ]

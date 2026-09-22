@@ -435,6 +435,20 @@ def test_engine():
             check(f"[{lab}·{tier}] slot_policy 가 RAM·SSD 를 최저가로 밝힌다",
                   all(pol.get(k, {}).get("order") == "asc" for k in ("RAM", "SSD")),
                   "RAM·SSD asc", pol)
+            # 2026-09-22 — 메인보드·케이스·파워도 최저가다(사장님 확정, recommend.
+            # SLOT_PRICE_POLICY). **이 검사가 실패하려면** 그 자리가 정책에서 빠지거나
+            # `_dfs` 가 슬롯별 `order_of` 를 다시 안 쓰게 돼야 한다 — 즉 「내림차순이
+            # CPU·GPU 둘만 남았다」가 요청 경로 끝까지 살아 있는지를 증명한다.
+            # **증명하지 못하는 것**: 고른 부품이 정말 조건 충족 중 최저가인가. 케이스·
+            # 파워·보드는 RAM·SSD 의 (capacity_gb, mem_type) 같은 «같은 급» 묶음 키가
+            # 없어(호환 규칙이 CPU·케이스·보드를 서로 참조한다) 여기서 그 관계식을 세울
+            # 수 없다 — 그 확인은 격자 재생성 전후 비교가 한다. 지어낸 검사를 넣느니
+            # 못 하는 것을 적어 둔다(§검사가 무엇을 증명하는지 본다).
+            # ⚠ 쿨러는 뺐다 — 기본(번들) 쿨러 생략(`_bundled_cooler`)이 그 자리를 아예
+            # 없앨 수 있어, 없는 것을 「밝히지 않았다」고 실패시키면 거짓 실패가 된다.
+            check(f"[{lab}·{tier}] slot_policy 가 메인보드·케이스·파워도 최저가로 밝힌다",
+                  all(pol.get(k, {}).get("order") == "asc" for k in ("MB", "CASE", "POWER")),
+                  "MB·CASE·POWER asc", pol)
             items = {i["part_type"]: i for i in st["items"]}
             alloc = st.get("alloc") or {}
             floor_on = bool(alloc.get("floor_applied"))

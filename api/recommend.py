@@ -93,8 +93,65 @@ ALLOC_FLOOR_RELAXED = "시장 배분 하한으로는 조합이 없어 상한만 
 # 판정은 `_order_of(tier, has_cap, slot)` 한 곳이다(§단일 원천) — `_tier_sort` 와 `_dfs` 의
 # 예산 이진 컷(`_price_cut`)이 같은 슬롯별 방향을 본다. 값은 "cheapest" 하나뿐이고 그 외
 # 슬롯은 티어 기본 정렬이다.
-SLOT_PRICE_POLICY = {"RAM": "cheapest", "SSD": "cheapest", "HDD": "cheapest"}
-SLOT_POLICY_NOTE = "메모리·저장장치는 용량 기준 충족 중 최저가(용량이 곧 성능 — 예산을 채우지 않습니다)"
+#
+# ── 2026-09-22 사장님 확정 — 메인보드·케이스·쿨러·파워도 최저가로 옮긴다 ──────────
+# 위 2026-09-13 주석 마지막 줄이 「예산 소진(내림차순)은 GPU·CPU·MB·쿨러·파워·케이스만」
+# 이라 적고 있는데, **그 여섯 중 넷이 문제였다.** 사장님 원문(2026-09-22):
+#   "CPU는 성능이 낮고, GPU는 높고, 케이스는 고가고, 공랭쿨러면 되는데 수랭쿨러가
+#    들어가고 등등 전혀 쌩뚱맞은 조합이 나오고 있음"
+# 원인은 두 개가 겹친 것이다.
+#   ① `_dfs.go()` 는 슬롯 순서대로 **자기 상한 안의 가장 비싼 것**을 집고 남은 자리에는
+#      최저가 합(min_rest)만 남겨 둔다 — 즉 상한이 곧 목표가 된다.
+#   ② 그 상한이 메인보드·케이스·쿨러·파워에는 `usage_alloc` 행이 없어 코드 상수
+#      (candidates.BUDGET_ALLOC — 보드 15%·파워 10%·케이스 8%·쿨러 8%)만 걸리고
+#      **하한은 0**이다. 300만원 칸이면 케이스 24만·쿨러 24만·파워 30만·보드 45만까지
+#      자동으로 차오른다. 「고가 케이스」·「필요 없는 수랭」의 정확한 기계적 원인이다.
+# 이 넷은 **조건만 맞으면 되는 자리**다 — 보드는 소켓·폼팩터, 케이스는 GPU 길이·쿨러
+# 높이·라디에이터, 파워는 소요 전력, 쿨러는 CPU 발열량(compat_rules `cooler_tdp` =
+# COOLER.cooler_tdp >= CPU.tdp_watt). 조건은 호환 규칙이 이미 지키고 있으므로, 그 위에서
+# 더 비싼 것을 집을 이유가 견적서에 적을 만한 근거가 못 된다. 그래서 예산을 소진하는
+# 자리는 **CPU·그래픽카드 둘만** 남긴다.
+# ⚠ 쿨러가 최저가(asc)가 되면 `_cooler_prefer_aio`(2026-09-14 수냉 앞당기기)가 스스로
+#   비활성이 된다 — 그 함수는 `slot_order=="asc"` 면 아무것도 하지 않는다. 사장님이 그
+#   결정을 직접 뒤집으신 것이라 함수는 지우지 않고 남긴다(그 함수 주석 참조).
+# ⚠ 「최저가」가 「싸구려」가 되지 않게 막는 힘은 배분 하한(pct_min)이다 — RAM 과 같은
+#   구조다(위 문단). 그런데 이 넷은 `usage_alloc` 에 행이 **없어 하한이 0**이다. 완제품
+#   표본에서 이 넷의 비율을 뽑아 채우는 것이 남은 일이고(2026-09-22 사장님 승인, 자료는
+#   사장님 PC), 그때까지는 호환 규칙과 `_cooler_official_only` 의 2만원 하한이 유일한
+#   바닥이다. **여기에 임의의 숫자를 넣지 않는다.**
+SLOT_PRICE_POLICY = {
+    # 「용량이 곧 성능」 (2026-09-13)
+    "RAM": "cheapest", "SSD": "cheapest", "HDD": "cheapest",
+    # 「조건만 맞으면 된다」 (2026-09-22)
+    "MB": "cheapest", "CASE": "cheapest", "COOLER": "cheapest", "POWER": "cheapest",
+}
+# 두 무리는 «왜 최저가인가»가 다르다. 근거가 다르면 고객에게 하는 말도 갈라야 한다 —
+# 케이스를 「용량이 곧 성능」이라고 설명하면 그것은 거짓이다(§화면 정직성).
+SLOT_POLICY_REASON = {
+    "RAM": "용량", "SSD": "용량", "HDD": "용량",
+    "MB": "조건", "CASE": "조건", "COOLER": "조건", "POWER": "조건",
+}
+SLOT_POLICY_NOTE_BY_REASON = {
+    "용량": "용량 기준 충족 중 최저가(용량이 곧 성능 — 예산을 채우지 않습니다)",
+    "조건": "호환·발열 조건 충족 중 최저가(예산은 CPU·그래픽카드에 씁니다)",
+}
+
+
+def slot_policy_note(policy_slots) -> str | None:
+    """이번 견적에서 «실제로» 최저가로 고른 자리만 이름을 부른다.
+
+    옛 `SLOT_POLICY_NOTE` 는 고정 문자열("메모리·저장장치는 …")이라 자리가 늘어나면
+    거짓이 된다 — 그리고 재사용(「쓰던 부품 그대로」)으로 빠진 자리까지 말했다.
+    호출부가 넘기는 `policy_slots` 는 이 견적에서 정렬 방향이 티어 기본과 실제로 달랐던
+    자리 목록이므로, 그것만 적으면 문구가 스스로 낡지 않는다(§화면 정직성).
+    """
+    parts = []
+    for reason, note in SLOT_POLICY_NOTE_BY_REASON.items():
+        names = [SLOT_KO.get(s, s) for s in policy_slots
+                 if SLOT_POLICY_REASON.get(s) == reason]
+        if names:
+            parts.append(f"{'·'.join(names)}는 {note}")
+    return " / ".join(parts) if parts else None
 
 
 class Constraint(BaseModel):
@@ -434,8 +491,9 @@ def _order_of(tier, has_cap, slot=None) -> str:
     있다(§단일 원천) — 그래서 판단을 이 함수 하나로 모은다. `_build_set`가
     `_tier_sort`를 부를 때 쓴 것과 **같은 (tier, has_cap, slot)**을 `_dfs`에도 그대로 넘긴다.
 
-    `slot`(2026-09-13 추가 · SLOT_PRICE_POLICY) — 슬롯별 가격 정책. "cheapest" 슬롯(RAM·
-    SSD·HDD)은 추천·고성능에서도 오름차순이다. None 이면 티어 기본(옛 동작 그대로 —
+    `slot`(2026-09-13 추가 · SLOT_PRICE_POLICY) — 슬롯별 가격 정책. "cheapest" 슬롯
+    (RAM·SSD·HDD, 2026-09-22 부터 MB·CASE·COOLER·POWER 도)은 추천·고성능에서도
+    오름차순이다. 내림차순이 남은 자리는 **CPU·GPU 둘뿐**이다. None 이면 티어 기본(옛 동작 그대로 —
     `_build_set` 의 reasons 문구처럼 «티어 전체»의 방향을 묻는 자리). `_dfs` 는 슬롯마다
     이 함수를 다시 불러 그 슬롯의 방향으로 이진 컷을 한다 — 오름차순으로 정렬된 슬롯에
     내림차순 컷을 하면 예산 안 후보를 조용히 버린다.
@@ -965,12 +1023,23 @@ def _cooler_official_only(cands, cpu):
 def _cooler_prefer_aio(cands, cpu, slot_order):
     """U7-K/U9/i9/R9-X 급 — 수냉을 정렬 순서에서 앞당긴다(강제 아님, 2026-09-14).
 
+    ⚠⚠ **2026-09-22 부터 이 함수는 아무 일도 하지 않는다.** 사장님이 그날 이 결정을
+    직접 뒤집으셨다 — 원문 "공랭쿨러면 되는데, 수랭쿨러가 들어가고". COOLER 가
+    `SLOT_PRICE_POLICY` 에 들어가 `slot_order` 가 항상 "asc" 라, 아래 첫 분기에서
+    그대로 돌아간다. 수냉은 이제 **공랭이 CPU 발열량(compat_rules `cooler_tdp`)을
+    못 맞추거나 더 비쌀 때만** 들어간다.
+    지우지 않는 이유: 2026-09-14 결정과 그 근거(시장 실측 70~100%)는 «있었던 일»이라
+    남긴다(§옛 값은 지우지 않는다). 쿨러를 다시 내림차순으로 되돌리면 이 함수가 그날
+    동작 그대로 살아난다 — 그래서 되살리는 방법이 「한 줄 되돌리기」로 남아 있다.
+
     **가능하면** 정렬 순서로만 앞당긴다 — 강제가 아니라서 수냉이 후보에 없으면
     공랭으로 자연스럽게 넘어간다(그룹이 비면 그냥 사라질 뿐 별도 분기가 필요 없다).
 
     ⚠ 이미 이 물결이 적용한 `SLOT_PRICE_POLICY`(A-129~131)를 깨지 않는다 — 쿨러는
     SLOT_PRICE_POLICY 에 없어 티어 기본 정렬을 그대로 쓰고, `slot_order=="asc"`
-    (가성비형 = 최저가 우선)에서는 이 재배치를 적용하지 않는다. 안정 분할(stable
+    (가성비형 = 최저가 우선)에서는 이 재배치를 적용하지 않는다(**이 문단은 2026-09-14
+    당시의 서술이다. 2026-09-22 에 쿨러가 SLOT_PRICE_POLICY 로 들어가 이제 전 티어가
+    "asc" 다 — 위 ⚠⚠ 참조**). 안정 분할(stable
     partition)이라 각 그룹(수냉/공랭) 내부의 기존 가격 순서는 그대로 유지된다 —
     「그 안에서 최저가」는 여전히 성립한다(지시서 「주의」 그대로).
 
@@ -1308,7 +1377,7 @@ def _build_set(tier, pool, cap, rules, floor_note=None, relax_note=None, limit_o
     # 고객이 「왜 총액이 예산보다 적은가」를 이 한 줄로 안다.
     policy_slots = [s for s in slots
                     if _order_of(tier, cap is not None, s) != _order_of(tier, cap is not None)]
-    policy_note = SLOT_POLICY_NOTE if policy_slots else None
+    policy_note = slot_policy_note(policy_slots)
     reasons = reasons + [n for n in
                          (policy_note, floor_note, relax_note, reuse_note, cooler_note, cpu_cooler_note,
                           igpu_note)
