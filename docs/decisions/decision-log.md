@@ -7594,3 +7594,61 @@ CPU가격 중앙 **3.30배**, CPU가 더 비싼 구성은 **2대(1%)**뿐이었�
 **확인법.** `python3 tools/alloc_ratio_probe.py --from-mall <완제PC JSON> <부품가 JSON>`
 (DB 없이 돈다) · `grep -n "MALL_EXCLUDE" tools/alloc_ratio_probe.py`(시험 상품 제외) ·
 `grep -c "usage_alloc" db/migrations/versions/*.py`(MB·CASE·COOLER·POWER 행이 없어야 한다).
+
+## 몰 시중가를 우리 원장으로 끌어온다 (2026-09-22)
+
+### A-140 완제PC 시중가를 몰 상세 상단에서 받아 `products.market_price` 에 반영한다 — 자동 승인 문턱(A-108 5%)은 몰 값에 걸지 않는다 (✅ 2026-09-22 사장님 확정 「승인」 · 「다 끝난뒤 실제 반영하고 내가 볼꼐」)
+
+**발단.** 스레드 「완제PC 몰 페이지 수집」에서 완제PC 212건의 상단 정보를 받아 두고,
+다음 단계로 셋(① 시중가 반영 ② 주간 자동 재수집 ③ 중단)을 올렸다. 사장님 답 **「승인」**
+= ①. 이어서 드라이런 결과를 보고하자 **「다 끝난뒤 실제 반영하고 내가 볼꼐」**.
+
+**하다가 드러난 사실 — 「채우기」가 아니라 「갱신」이었다.** 제안할 때는 *"우리는 지금
+판매가만 안다"* 고 적었는데 **틀렸다.** 완제PC 에는 `market_price` 가 이미 들어 있었다 —
+2026-08-15 몰 카탈로그 적재가 넣은 값이고(§데이터 ②), 그 뒤 몰 가격이 움직여 **212건 중
+202건이 어긋나 있었다.** 그래서 이 작업의 실체는 「빈 칸 채우기」가 아니라 **「같은 원천의
+값을 최신으로 되맞추기」**다.
+
+**확정 — 5% 문턱은 몰 값에 걸지 않는다.** `market_auto_approve_decision()`(A-108)은
+|변동률| 5% 미만만 자동 승인한다. 그 규칙은 **다나와 제안**을 대상으로 만들어졌다 —
+A-18 「외부 수집은 제안까지만 · 남의 페이지 값이 견적 근거가 되면 정체성이 무너진다」의 짝.
+여기 값은 **우리 몰**의 시중가이고, **같은 값이 카탈로그 적재로는 검수 없이 들어온다**
+(`api/catalog_ingest.py` UPSERT 의 `market_price` — 잠기지 않았으면 그대로 덮는다).
+같은 원천의 같은 값이 **들어오는 길에 따라** 한쪽만 사람 확인을 요구하는 것은 앞뒤가
+맞지 않는다. 그래서 `--approve-mall` 을 줄 때 문턱 밖도 반영하고, **근거 문장을 원장
+detail 에 남긴다.**
+⚠ **판정 함수는 건드리지 않았다** — 다나와 경로의 규칙은 그대로다. 이 도구가 판정을
+느슨하게 만드는 것이 아니라, 사람이 내린 결정을 집행하고 그 사실을 기록하는 것이다.
+
+**값 쓰기를 새로 구현하지 않았다.** `product_reviews` 제안 → `auto_approve_market_price()`
+→ `_approve_product_field()` — 사람이 화면에서 [확인]을 누를 때와 같은 코드가 값·
+`locked_fields` 잠금·`product_price_history`·검수행 전이를 한다. 되돌리기도 기존
+`POST /api/admin/reviews/undo/{log_id}` 그대로다.
+
+**실측 결과(2026-09-22).** 몰 212건 → 바꿀 것 202건(자동 승인 문턱 안 135 · 밖 67) ·
+건너뜀 10건(몰 시험 상품 `123456` 1건 + 이미 같은 값 9건). **반영 202/202**
+(자동 승인 135 · 승인 67). 실패 0.
+
+**⚠ 이 값이 지금 당장 고객 화면을 바꾸지는 않는다.** `market_price` 를 읽는 자리는
+`api/recommend.py`(A-100 · 조립 견적의 **부품** 슬롯 비교)와 백업 화면
+`mockups/mvp1/s2-result.html` 뿐이다. 이번에 채운 것은 **완제PC 상품**이라 그 비교에
+들어가지 않는다. 쓰일 자리는 완제PC 진열(A-132 계열)이다 — 데이터가 먼저 맞아 있는 것이고,
+화면은 별건이다.
+
+**⚠ 잠금의 대가.** 승인은 `locked_fields ? 'market_price'` 를 남긴다(A-104). 그 뒤로
+**카탈로그 적재는 이 값을 못 고친다** — 다음 갱신은 이 도구로 해야 한다. A-104 가 그렇게
+정한 규칙을 그대로 따른 것이고, 자동 재수집(위 선택지 ②)이 필요해지는 이유이기도 하다.
+
+**⚠ `CLAUDE.md` §데이터의 「잠금이 지키는 것은 매입가·판매가 «둘»뿐」은 낡았다.**
+A-104(2026-08-23)로 `market_price` 도 잠금을 본다(`catalog_ingest.py` 의 `market_price`
+CASE WHEN). 그 줄이 `market_price` 를 「무조건 EXCLUDED」 목록에 올려 두고 있다 — 기록자
+정정 대상.
+
+**만든 것.** `tools/mall_market_price_apply.py`(드라이런 기본) · popcorn-ci 부명령
+`mall-price`/`mall-price-dry` · `.github/workflows/mall-price.yml`(결과 로그는 데이터 가지
+`data/mall-price`). 부수로 `tools/_console.ensure_utf8_console()` 이 **두 번 불리면
+프로세스가 죽던 것**을 고쳤다(래퍼 중복 → GC 가 buffer 를 닫음 → 출력 한 줄 없이 종료코드 1).
+
+**확인법.** `.venv/bin/python tools/mall_market_price_apply.py --fetch`(드라이런 — 다 맞았으면
+「이미 같은 값」이 대부분이어야 한다) · `grep -n "approve_mall" tools/mall_market_price_apply.py`
+(판정 함수를 부르되 고치지 않았는지) · 관리자 화면 작업 기록에서 `review_auto_approve` 202건.
