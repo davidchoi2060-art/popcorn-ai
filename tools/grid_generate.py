@@ -236,14 +236,17 @@ def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict, bands: dict)
 def _mark_batch_session(wconn, res: dict) -> None:
     """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시.
 
-    ■ 왜 `X-Popcorn-Test` 헤더를 쓰지 않는가 (2026-09-22 확인)
-      그 헤더는 **운영 서버에서 항상 무시된다.** 이중 게이트 중 하나가
-      `.env` 의 `POPCORN_TEST_HEADER_ENABLED` 인데 배포 서버 `.env` 에는 그 값을
-      **일부러 넣지 않는다**(`api/recommend.py` 의 헤더 주석 · `deploy/README.md`).
-      그래서 헤더를 실어 보내도 `data_origin` 은 'real' 로 남는다. 이 배치는
-      DATABASE_URL 을 이미 쥐고 있으므로 **자기가 만든 행만** 직접 표시한다.
-      `AND data_origin='real'` 을 건 것은 남의 행이나 이미 표시된 행을 건드리지
-      않기 위해서다.
+    ■ 왜 `X-Popcorn-Test` 헤더«만»으로는 안 되는가 (2026-09-22 확인)
+      헤더는 `_call_recommend()` 가 실제로 보낸다(그 함수 주석 참조). 다만 그것만
+      믿을 수 없다 — 이중 게이트 중 하나가 `.env` 의 `POPCORN_TEST_HEADER_ENABLED`
+      인데 **서버 env 에는 그 이름이 나타나면 안 된다**(`deploy/README.md` — 확인법이
+      `grep -c` -> 0). 서버 안에서 loopback 으로 API 를 두드리는 내부 프로세스가
+      실고객 세션을 'test' 로 감추는 경로가 열리기 때문이다. 그래서 **서버에서는
+      헤더가 조용히 무시되고**, 실제로 표식을 남기는 것은 이 함수다. 사장님 PC 에서는
+      반대로 헤더가 듣는다 — 그때는 행이 처음부터 'test' 로 태어나고 이 UPDATE 가
+      아무것도 바꾸지 않는다(`AND data_origin='real'` 조건이 그것을 보장한다).
+      그 조건은 남의 행이나 이미 표시된 행을 건드리지 않기 위한 것이기도 하다.
+      이 배치는 DATABASE_URL 을 이미 쥐고 있으므로 **자기가 만든 행만** 표시한다.
 
     ■ 실패 호출에는 세션이 없다
       `res["ok"]` 가 거짓이면 엔진이 행을 만들기 전에 끊긴 것이라 표시할 대상이 없다.
