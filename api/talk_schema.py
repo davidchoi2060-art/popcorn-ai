@@ -252,6 +252,9 @@ class Vocab:
     # 장르 별칭 — `talk_genre_aliases`(0111). 고객이 쓰는 말("슈팅게임")과 우리 장르
     # 값(FPS·협동슈팅·액션TPS)의 글자가 달라서 필요하다. alias(소문자) -> [genre].
     genre_aliases: dict[str, list[str]] = field(default_factory=dict)
+    # 게임명 별칭 — `talk_game_aliases`(0113). match_game 이 길이 검사 전에 본다.
+    # 키는 `_norm_name(alias)`, 값은 `games.name`("롤" -> "리그 오브 레전드").
+    game_aliases: dict[str, str] = field(default_factory=dict)
     # 등급 무게 — 확정 게임이 여럿일 때 「가장 무거운 등급」을 고르는 축. 설계서에 없는 규칙이라
     # 아래 _load_grade_weight 에 근거를 적었다. grade -> int (클수록 무겁다).
     grade_weight: dict[str, int] = field(default_factory=dict)
@@ -325,9 +328,15 @@ def load_vocab(conn) -> Vocab:
         "SELECT alias, genre FROM talk_genre_aliases ORDER BY alias, genre"
     )).mappings().all():
         aliases.setdefault(r["alias"], []).append(r["genre"])
+    game_aliases: dict[str, str] = {}
+    for r in conn.execute(text(
+        "SELECT a.alias, g.name FROM talk_game_aliases a JOIN games g USING (game_id)"
+        " ORDER BY a.alias"
+    )).mappings().all():
+        game_aliases[_norm_name(r["alias"])] = r["name"]
     return Vocab(tiers=tiers, grades=grades, confirmed_games=confirmed,
                  all_game_names=all_names, usages=usages, genres=genres,
-                 genre_aliases=aliases,
+                 genre_aliases=aliases, game_aliases=game_aliases,
                  grade_weight=_load_grade_weight(conn, grades))
 
 
@@ -345,9 +354,14 @@ def _norm_name(s: str) -> str:
 def match_game(raw_name: str, vocab: Vocab) -> str | None:
     """고객이 말한 게임명 원문 -> games.name (없으면 None).
 
-    정확 일치 우선, 그다음 정규화 후 포함 관계(양방향, 짧은 쪽이 2자 이상). 예:
-    "오버워치" -> "오버워치2", "gta5" -> "GTA", "사이버펑크 2077" -> "사이버펑크2077".
+    정확 일치 -> 별칭 표(`talk_game_aliases`) -> 정규화 후 포함 관계(양방향,
+    짧은 쪽이 2자 이상). 예: "오버워치" -> "오버워치2", "gta5" -> "GTA",
+    "사이버펑크 2077" -> "사이버펑크2077", "롤" -> "리그 오브 레전드"(별칭 표).
     후보가 여럿이면 긴 이름을 고른다(더 특정한 쪽).
+
+    별칭 단계가 길이 검사보다 앞에 있는 이유: "롤"은 정규화해도 1자라 길이
+    검사에서 죽고, "배그·옵치·던파·로아·마크"는 길이는 통과해도 대상 이름과
+    연속 부분문자열 관계가 아니라 포함 관계 비교에서 죽는다(2026-09-22 실측).
     """
     if not raw_name or not isinstance(raw_name, str):
         return None
@@ -355,6 +369,9 @@ def match_game(raw_name: str, vocab: Vocab) -> str | None:
     if raw in vocab.all_game_names:
         return raw
     q = _norm_name(raw)
+    hit = vocab.game_aliases.get(q)
+    if hit:
+        return hit
     if len(q) < 2:
         return None
     hits = []
@@ -564,19 +581,30 @@ def vocab_prompt_block(vocab: Vocab) -> str:
         ex = g.get("example_titles") or ""
         lines.append(f"- {g['grade']} {g['label']}" + (f" (예: {ex})" if ex else ""))
     lines.append("")
+    # name -> [alias, ...] 역매핑. game_aliases 는 정규화 키를 쓰지만, 한글 줄임말은
+    # 정규화해도 원문과 같으므로 그대로 표시해도 된다(예: "롤" -> "롤").
+    aliases_by_name: dict[str, list[str]] = {}
+    for alias_key, name in vocab.game_aliases.items():
+        aliases_by_name.setdefault(name, []).append(alias_key)
+
+    def _alias_suffix(name: str) -> str:
+        al = aliases_by_name.get(name)
+        return f" ({' / '.join(sorted(al))})" if al else ""
+
     by_grade: dict[str, list[str]] = {}
     for name, grade in vocab.confirmed_games.items():
         by_grade.setdefault(grade, []).append(name)
     order = {g["grade"]: g["sort_order"] for g in vocab.grades}
     pairs = []
     for grade in sorted(by_grade, key=lambda g: order.get(g, 999)):
-        pairs.extend(f"{n}={grade}" for n in sorted(by_grade[grade]))
+        pairs.extend(f"{n}={grade}{_alias_suffix(n)}" for n in sorted(by_grade[grade]))
     lines.append(f"[우리가 등급을 확정한 게임]  ({len(pairs)}종)")
     lines.append(", ".join(pairs))
     unconfirmed = sorted(n for n in vocab.all_game_names if n not in vocab.confirmed_games)
     if unconfirmed:
-        lines.append(f"목록에 있으나 등급 미확정: {', '.join(unconfirmed)}"
-                     " — 이 게임은 등급을 추정하지 말고 grade=null 로 둔다.")
+        lines.append("목록에 있으나 등급 미확정: "
+                     + ", ".join(f"{n}{_alias_suffix(n)}" for n in unconfirmed)
+                     + " — 이 게임은 등급을 추정하지 말고 grade=null 로 둔다.")
     lines.append('위 목록의 게임이면 그 등급을 쓰고 grade_src="catalog". 목록에 없는 게임은'
                  ' 위 등급 설명으로 추정하고 grade_src="ai_estimate" 로 표시한다.')
     lines.append("")

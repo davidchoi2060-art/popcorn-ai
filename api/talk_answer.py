@@ -246,7 +246,9 @@ def is_game_related(sentence: str, vocab: "TS.Vocab") -> bool:
     if match_genres(sentence, vocab):
         return True
     s = sentence.strip()
-    return any(TS.match_game(tok, vocab) for tok in re.split(r"[\s,·]+", s) if len(tok) >= 2)
+    # 길이 판정은 match_game 이 별칭 조회 뒤에 한다 — 여기서 먼저 자르면 「롤」(1자)이
+    # 별칭에 닿지 못한다(2026-09-22 확인자 실측)
+    return any(TS.match_game(tok, vocab) for tok in re.split(r"[\s,·]+", s) if tok)
 
 
 def extract_game_names(sentence: str, vocab: "TS.Vocab") -> list[str]:
@@ -258,7 +260,9 @@ def extract_game_names(sentence: str, vocab: "TS.Vocab") -> list[str]:
     if out:
         return out
     for tok in re.split(r"[\s,·?!.]+", sentence.strip()):
-        if len(tok) < 2:
+        # 길이 판정은 match_game 이 별칭 조회 뒤에 한다 — 여기서 먼저 자르면 「롤」(1자)이
+        # 별칭에 닿지 못한다(2026-09-22 확인자 실측)
+        if not tok:
             continue
         m = TS.match_game(tok, vocab)
         if m and m not in out:

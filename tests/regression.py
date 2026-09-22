@@ -6698,6 +6698,7 @@ def main():
                test_talk_answer_screen,
                test_game_copy_review_gate,
                test_game_context_gate,
+               test_game_aliases,
                test_market_bands_and_handling):
         try:
             fn()
@@ -9509,6 +9510,392 @@ process.stdout.write(JSON.stringify(out));
             check("[63] 비게임 카드는 game_context 가 항상 null 이다"
                   "(게임 카드에만 값이 실린다)",
                   not leaked63, [], leaked63)
+
+
+def test_game_aliases():
+    """[64] 게임 이름 별칭 표(talk_game_aliases · 0113) — 「롤」·「배그」 같은 줄임말이
+
+    match_game 을 실제로 통과하는가 (ADM-TLK-020 후속 · 2026-09-22 신설).
+
+    ■ 배경 — match_game(354행 부근)의 실패 지점 둘(0113 마이그레이션 실측)
+      ① "롤"은 정규화해도 1자라 길이 검사(2자 미만 컷)에서 죽는다.
+      ② "배그·옵치·던파·로아·마크"는 길이는 통과해도 대상 games.name 과
+         연속 부분문자열 관계가 아니라서 포함 관계 비교에서 죽는다.
+      표 하나(`talk_game_aliases`)로 정본을 두고, match_game 이 길이 검사보다
+      «먼저» 그 표를 본다 — 코드 상수로 박지 않는다(운영자가 표에 한 줄 넣으면
+      다음 요청부터 반영).
+
+    ■ 각 항목이 «무엇이 잘못돼야 실패하는가»
+      ① 마이그레이션 정적 검사 — revision/down_revision 이 어긋나거나, 테이블·FK
+         선언이 빠지거나, _SEED 에서 여섯 쌍 중 하나라도 빠지면(혹은 대상 미확인인
+         피파/스타/와우가 섞여 들어가면) 실패.
+      ② talk_schema.py 정적 검사 — Vocab 에 game_aliases 필드가 없거나, load_vocab
+         이 talk_game_aliases 를 안 읽거나, match_game 안에서 별칭 조회
+         (`vocab.game_aliases`)가 길이 검사(`len(q) < 2`)보다 뒤에 있거나
+         (「롤」이 다시 죽는다), game_aliases[ / .get( 자리 앞에 `_norm_name(` 이
+         없으면(다른 정규화로 키를 만들면 조회가 항상 빗나간다) 실패.
+      ③ 단위 — 실제 import 해서 Vocab(all_game_names=0073 시드 23종,
+         game_aliases=_SEED 파싱 결과)로 match_game 을 실행: **expect_seed(하드코딩
+         6쌍) 각각**을 개별 대조해 하나라도 못 맞히면 실패 — `hit6 == len(seed_pairs)`
+         처럼 «파싱된 개수»를 기준으로 삼지 않는다(그러면 _SEED 에서 한 쌍이 빠졌을
+         때 세는 값과 기준이 함께 줄어 5==5 로 «자기참조 통과»한다, 확인자 실측
+         2026-09-22). 같은 Vocab 에서 별칭 dict 를 비웠는데도 무언가 맞으면(=별칭
+         표가 아니라 우연한 포함 관계로 맞은 것) 실패. 기존 동작(발로·서든·메이플·
+         디아·FC·오버워치·자기 자신·zzz)이 하나라도 달라지면 실패 — 별칭 표를 얹다가
+         기존 포함 관계 로직을 건드렸다는 뜻이다.
+      ④ vocab_prompt_block — 별칭이 있는 Vocab 출력과 없는 Vocab 출력을 줄
+         단위로 비교해, 별칭이 「[우리가 등급을 확정한 게임]」 줄이 아닌 다른
+         줄에 스며들거나(=프롬프트의 다른 문단을 건드렸다) 아예 안 나타나면 실패.
+      ⑤ 음성 자기검사(메모리, 파일 안 건드림) — match_game 소스에서 별칭 조회
+         줄을 지운 문자열, 그리고 별칭 조회를 길이 검사 «뒤»로 옮긴 문자열
+         둘 다로 ②의 위치 검사 함수를 돌려 FAIL 하는지 — 이 둘이 FAIL 하지
+         «않으면» 애초에 ②의 위치 검사가 아무것도 증명하지 않는 것이다
+         (§회귀 세트 "검사를 새로 짤 때 스스로에게 물을 것"과 같은 이유).
+      ⑥ DB(있을 때만, 읽기 전용) — talk_game_aliases 6건 이상 · 모든 행의
+         game_id 가 games 에 실재(FK 라 당연하지만 「표가 비지 않았다」의 짝) ·
+         load_vocab(conn) 으로 실제 match_game("롤") == "리그 오브 레전드".
+      ⑦ talk_answer.py 사전 필터 부재(확인자 실측 2026-09-22 신설) — is_game_related·
+         extract_game_names 가 match_game 을 부르기 «전에» `len(tok) < 2` 류로
+         토큰을 잘라내면, match_game 안의 별칭 조회(②)가 아무리 옳아도 「롤」이
+         그 앞에서 이미 걸러져 도달하지 못한다. 길이 규칙은 match_game 한 곳뿐이어야
+         한다(단일 원천) — 두 함수 본문에 길이 비교가 다시 생기면 실패.
+         음성 자기검사로 검출기 자체가 살아 있는지 함께 본다.
+
+    ⚠ ③ 의 「여섯 별칭 6/6」은 expect_seed(하드코딩)로 개별 대조한다 —
+      `hit6 == len(seed_pairs)` 처럼 파싱된 개수를 기준으로 삼으면 _SEED 에서
+      한 쌍이 빠졌을 때 세는 값과 기준이 함께 줄어 «자기참조 통과»한다
+      (확인자 실측 2026-09-22 — 음성 검사에서 롤을 지웠는데도 5==5 로 통과했다).
+
+    ⚠ 「vocab.game_aliases」로 특정해 찾는다(바레 문자열 "game_aliases" 로 찾으면
+      docstring 의 "talk_game_aliases"(표 이름) 부분문자열에도 걸려 위치·존재
+      판정이 둘 다 틀린다 — 이 파일을 만들며 실제로 한 번 걸렸다).
+
+    ⚠ 23종 목록은 db/migrations/versions/0073_game_ai_db.py 의 GAMES 를
+      **AST 로 파싱**해서 쓴다(손으로 베끼지 않는다 — 시드가 바뀌면 검사도 따라간다).
+    """
+    print(chr(10) + "[64] 게임 이름 별칭 표 — talk_game_aliases · match_game (2026-09-22 신설)")
+    import types
+    import importlib
+
+    # ── ① 마이그레이션 파일 정적 검사 ────────────────────────────────────────
+    mig_path = pathlib.Path(ROOT, "db", "migrations", "versions", "0113_talk_game_aliases.py")
+    mig_ok = mig_path.exists()
+    check("[64] 마이그레이션 파일 존재(0113_talk_game_aliases.py)", mig_ok, "존재", "없음")
+    mig_src = mig_path.read_text(encoding="utf-8") if mig_ok else ""
+
+    check('[64] revision = "0113"',
+          bool(re.search(r'^revision\s*=\s*"0113"', mig_src, re.M)), "있음", "없음")
+    check('[64] down_revision = "0112"',
+          bool(re.search(r'^down_revision\s*=\s*"0112"', mig_src, re.M)), "있음", "없음")
+    check("[64] talk_game_aliases 테이블 생성",
+          bool(re.search(r'op\.create_table\(\s*"talk_game_aliases"', mig_src)), "있음", "없음")
+    check("[64] games FK(ForeignKey 또는 REFERENCES games)",
+          bool(re.search(r'ForeignKey\(\s*"games\.game_id"', mig_src))
+          or bool(re.search(r'REFERENCES\s+games\b', mig_src, re.I)),
+          "있음", "없음")
+
+    seed_pairs = ()
+    if mig_ok:
+        try:
+            mig_tree = ast.parse(mig_src, filename=str(mig_path))
+            seed_node = None
+            for node in ast.walk(mig_tree):
+                target = None
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                    target = node.target.id
+                elif (isinstance(node, ast.Assign) and len(node.targets) == 1
+                        and isinstance(node.targets[0], ast.Name)):
+                    target = node.targets[0].id
+                if target == "_SEED":
+                    seed_node = node.value
+            if seed_node is not None:
+                seed_pairs = ast.literal_eval(seed_node)
+        except Exception:                                    # noqa: BLE001
+            seed_pairs = ()
+    check("[64] _SEED 파싱 성공(아래 검사들의 전제)", bool(seed_pairs), "6쌍 이상", seed_pairs)
+
+    expect_seed = {
+        ("롤", "리그 오브 레전드"), ("배그", "배틀그라운드"), ("옵치", "오버워치2"),
+        ("던파", "던전앤파이터"), ("로아", "로스트아크"), ("마크", "마인크래프트"),
+    }
+    seed_set = set(seed_pairs)
+    check("[64] _SEED 여섯 별칭 전부", expect_seed <= seed_set, expect_seed, seed_set)
+    seed_aliases = {a for a, _n in seed_pairs}
+    excluded_aliases = {"피파", "스타", "와우"}
+    check("[64] 피파/스타/와우는 _SEED 에 없음(대상 미확인이라 넣지 않기로 함)",
+          not (excluded_aliases & seed_aliases), "교집합 없음", excluded_aliases & seed_aliases)
+
+    # ── ② talk_schema.py 정적 검사 ───────────────────────────────────────────
+    ts_path = pathlib.Path(ROOT, "api", "talk_schema.py")
+    ts_ok = ts_path.exists()
+    check("[64] api/talk_schema.py 존재", ts_ok, "존재", "없음")
+    ts_src = ts_path.read_text(encoding="utf-8") if ts_ok else ""
+
+    check("[64] Vocab.game_aliases: dict[str, str] 필드 존재",
+          bool(re.search(r"game_aliases\s*:\s*dict\[str,\s*str\]", ts_src)), "있음", "없음")
+    check("[64] load_vocab 이 FROM talk_game_aliases 를 읽는다",
+          "FROM talk_game_aliases" in ts_src, "있음", "없음")
+
+    match_game_src = ""
+    if "def match_game(" in ts_src:
+        i0 = ts_src.index("def match_game(")
+        i1 = ts_src.index("\ndef ", i0 + 1) if "\ndef " in ts_src[i0 + 1:] else len(ts_src)
+        match_game_src = ts_src[i0:i1]
+    check("[64] match_game() 을 찾았다(아래 위치 검사의 전제)", bool(match_game_src), "찾음", "못 찾음")
+
+    def _alias_before_lengthcheck_ok(src):
+        # "vocab.game_aliases"(실제 속성 접근)로 찾는다 — 바레 "game_aliases" 는
+        # docstring 의 "talk_game_aliases"(표 이름) 부분문자열에도 걸려 오탐한다.
+        ia = src.find("vocab.game_aliases")
+        il = src.find("len(q) < 2")
+        return ia != -1 and il != -1 and ia < il
+
+    check("[64] match_game: 별칭 조회(vocab.game_aliases)가 길이 검사(len(q) < 2)보다 앞"
+          "(그래야 1자인 「롤」이 길이 검사에서 먼저 죽지 않는다)",
+          _alias_before_lengthcheck_ok(match_game_src),
+          "별칭 조회 인덱스 < 길이검사 인덱스", match_game_src)
+
+    def _alias_key_sites_use_norm(src):
+        lines = src.splitlines()
+        bad = []
+        for i, line in enumerate(lines):
+            if re.search(r"game_aliases\[|game_aliases\.get\(", line):
+                window = "\n".join(lines[max(0, i - 2):i + 1])
+                if "_norm_name(" not in window:
+                    bad.append((i + 1, line.strip()))
+        return bad
+
+    bad_sites = _alias_key_sites_use_norm(ts_src)
+    check("[64] game_aliases[ / .get( 자리마다 앞줄 2줄 안에 _norm_name( 이 있다"
+          "(별칭 키를 _norm_name 밖에서 만들지 않는다)",
+          not bad_sites, "0건", bad_sites)
+
+    # ── import — DATABASE_URL 없이도 정의만 읽을 수 있게 api.db 스텁 폴백 ─────
+    ts_mod = None
+    try:
+        ts_mod = importlib.import_module("api.talk_schema")
+    except RuntimeError:
+        for m in ("api.db", "api.usage_floors", "api.talk_schema"):
+            sys.modules.pop(m, None)
+        stub = types.ModuleType("api.db")
+        stub.engine = None
+        sys.modules["api.db"] = stub
+        try:
+            ts_mod = importlib.import_module("api.talk_schema")
+        except Exception as e:                               # noqa: BLE001
+            check("[64] api.talk_schema import(DB 스텁 폴백 후)", False, "성공", repr(e))
+    except Exception as e:                                    # noqa: BLE001
+        check("[64] api.talk_schema import", False, "성공", repr(e))
+    check("[64] api.talk_schema import 성공(아래 단위 검사 전부의 전제)",
+          ts_mod is not None, "성공", "실패")
+
+    # ⚠ 함수 전체(⑦ 포함)에서 쓰이므로 if-블록 밖(항상 정의됨)에 둔다 — 안에 두면
+    # ts_mod 가 None 일 때 아래 ⑦ 이 NameError 로 터진다(그 자체가 "실패해야 할
+    # 때 실패하지 않는" 또 다른 자기참조형 결함이 된다).
+    game_names_0073 = []
+
+    if ts_mod is not None:
+        # ── ③ 단위 — 0073 시드 23종을 AST 로 파싱(손으로 베끼지 않는다) ──────
+        mig0073_path = pathlib.Path(ROOT, "db", "migrations", "versions", "0073_game_ai_db.py")
+        if mig0073_path.exists():
+            try:
+                mig0073_src = mig0073_path.read_text(encoding="utf-8")
+                mig0073_tree = ast.parse(mig0073_src, filename=str(mig0073_path))
+                games_node = None
+                for node in ast.walk(mig0073_tree):
+                    if isinstance(node, ast.Assign):
+                        for t in node.targets:
+                            if isinstance(t, ast.Name) and t.id == "GAMES":
+                                games_node = node.value
+                if games_node is not None:
+                    game_names_0073 = [n for n, _g in ast.literal_eval(games_node)]
+            except Exception:                                # noqa: BLE001
+                game_names_0073 = []
+        check("[64] 0073 시드 GAMES 파싱 성공(23종 목록 — 아래 단위 검사의 전제)",
+              len(game_names_0073) > 0, "1개 이상", len(game_names_0073))
+
+        try:
+            vocab_alias = ts_mod.Vocab(
+                all_game_names=game_names_0073,
+                game_aliases={ts_mod._norm_name(a): n for a, n in seed_pairs})
+            vocab_noalias = ts_mod.Vocab(all_game_names=game_names_0073, game_aliases={})
+
+            # ⚠ expect_seed(하드코딩 6쌍)로 «각각» 대조한다 — seed_pairs(=_SEED 파싱
+            # 결과)를 기준으로 쓰면 자기참조가 된다: _SEED 에서 한 쌍이 빠지면 vocab_alias
+            # 도 seed_pairs 도 함께 줄어, "hit6 == len(seed_pairs)" 는 5==5 로 «그대로
+            # 통과»해 버린다(확인자 실측 2026-09-22 — 음성 검사에서 롤을 지웠더니 안 잡혔다).
+            miss6 = [(a, n, ts_mod.match_game(a, vocab_alias)) for a, n in sorted(expect_seed)
+                     if ts_mod.match_game(a, vocab_alias) != n]
+            check("[64] 여섯 별칭 -> 대상 게임 6/6(expect_seed 하드코딩 6쌍을 개별 대조"
+                  " — _SEED 파싱 결과 크기에 기대지 않는다)",
+                  not miss6, "6/6 일치(빠진 쌍 없음)", miss6)
+
+            none6 = sum(1 for a, _n in seed_pairs if ts_mod.match_game(a, vocab_noalias) is None)
+            check("[64] 같은 Vocab 에서 별칭 dict 를 비우면 여섯 다 None"
+                  "(별칭 «표»가 이유임을 증명 — 우연한 포함 관계가 아니다)",
+                  none6 == len(seed_pairs) and len(seed_pairs) > 0, len(seed_pairs), none6)
+
+            existing = [
+                ("발로", "발로란트"), ("서든", "서든어택"), ("메이플", "메이플스토리"),
+                ("디아", "디아블로4"), ("FC", "FC온라인"), ("오버워치", "오버워치2"),
+                ("리그 오브 레전드", "리그 오브 레전드"),
+            ]
+            for raw, expect in existing:
+                got = ts_mod.match_game(raw, vocab_alias)
+                check(f"[64] 기존 동작 불변: {raw!r} -> {expect!r}", got == expect, expect, got)
+            got_zzz = ts_mod.match_game("zzz", vocab_alias)
+            check("[64] 어휘 밖 이름 'zzz' -> None", got_zzz is None, None, got_zzz)
+
+            # ── ④ vocab_prompt_block — 줄 단위 diff ──────────────────────────
+            common_kwargs = dict(
+                grades=[{"grade": "E", "label": "낮음", "sort_order": 1, "example_titles": ""}],
+                confirmed_games={"리그 오브 레전드": "E"},
+                all_game_names=["리그 오브 레전드"],
+                usages=[],
+                tiers=[],
+            )
+            v_alias = ts_mod.Vocab(game_aliases={"롤": "리그 오브 레전드"}, **common_kwargs)
+            v_noalias = ts_mod.Vocab(game_aliases={}, **common_kwargs)
+            lines_a = ts_mod.vocab_prompt_block(v_alias).split("\n")
+            lines_n = ts_mod.vocab_prompt_block(v_noalias).split("\n")
+            check("[64] vocab_prompt_block: 별칭 유무 두 출력의 줄 수가 같다(구조 불변)",
+                  len(lines_a) == len(lines_n), len(lines_n), len(lines_a))
+            diff_idx = [i for i in range(min(len(lines_a), len(lines_n)))
+                        if lines_a[i] != lines_n[i]]
+            check("[64] vocab_prompt_block: 「(롤)」 병기는 [우리가 등급을 확정한 게임] 줄에만"
+                  " 있고, 그 밖의 다른 줄은 전부 동일하다",
+                  bool(diff_idx) and all(
+                      "(롤)" in lines_a[i] and "(롤)" not in lines_n[i] for i in diff_idx),
+                  "차이는 별칭 붙은 줄뿐", diff_idx)
+        except Exception as e:                                # noqa: BLE001
+            check("[64] Vocab/match_game/vocab_prompt_block 단위 검사 실행", False, "정상 실행", repr(e))
+
+        # ── ⑤ 음성 자기검사(메모리, 파일 안 건드림) ──────────────────────────
+        if match_game_src:
+            lines_mg = match_game_src.splitlines(keepends=True)
+            alias_line_idx = next(
+                (i for i, l in enumerate(lines_mg) if "vocab.game_aliases" in l), None)
+            len_line_idx = next(
+                (i for i, l in enumerate(lines_mg) if "len(q) < 2" in l), None)
+            check("[64]⑤ 전제 — match_game 소스에서 별칭 줄·길이검사 줄을 찾았다",
+                  alias_line_idx is not None and len_line_idx is not None,
+                  "둘 다 찾음", (alias_line_idx, len_line_idx))
+            if alias_line_idx is not None and len_line_idx is not None:
+                variant_removed = "".join(
+                    lines_mg[:alias_line_idx] + lines_mg[alias_line_idx + 1:])
+                check("[64]⑤ 별칭 조회 줄을 지운 문자열 -> 위치 검사가 FAIL 한다",
+                      _alias_before_lengthcheck_ok(variant_removed) is False,
+                      False, _alias_before_lengthcheck_ok(variant_removed))
+
+                rest = lines_mg[:alias_line_idx] + lines_mg[alias_line_idx + 1:]
+                new_len_idx = next(
+                    (i for i, l in enumerate(rest) if "len(q) < 2" in l), None)
+                if new_len_idx is not None:
+                    insert_at = min(new_len_idx + 2, len(rest))
+                    variant_moved = "".join(
+                        rest[:insert_at] + [lines_mg[alias_line_idx]] + rest[insert_at:])
+                    check("[64]⑤ 별칭 조회를 길이 검사 «뒤»로 옮긴 문자열 -> 위치 검사가 FAIL 한다",
+                          _alias_before_lengthcheck_ok(variant_moved) is False,
+                          False, _alias_before_lengthcheck_ok(variant_moved))
+
+    # ── ⑥ DB(있을 때만, 읽기 전용) ───────────────────────────────────────────
+    if _engine is None:
+        check("[64] DB 원천 대조 — talk_game_aliases 실측", True, "건너뜀", _db_why, kind="DB")
+    else:
+        n = db_one("SELECT count(*) FROM talk_game_aliases")
+        check("[64] talk_game_aliases >= 6건", (n or 0) >= 6, ">=6", n, kind="DB")
+        orphan = db_one(
+            "SELECT count(*) FROM talk_game_aliases a"
+            " LEFT JOIN games g ON g.game_id = a.game_id WHERE g.game_id IS NULL")
+        check("[64] 모든 별칭의 game_id 가 games 에 실재한다(FK 라 당연하지만"
+              " 「표가 비지 않았다」의 짝)",
+              (orphan or 0) == 0, 0, orphan, kind="DB")
+        if ts_mod is not None:
+            try:
+                with _engine.connect() as c64:
+                    v_db = ts_mod.load_vocab(c64)
+                got_roll = ts_mod.match_game("롤", v_db)
+                check("[64] load_vocab(conn).game_aliases 로 실제 match_game('롤')"
+                      " == '리그 오브 레전드'",
+                      got_roll == "리그 오브 레전드", "리그 오브 레전드", got_roll, kind="DB")
+            except Exception as e:                            # noqa: BLE001
+                check("[64] load_vocab(conn) 실행", False, "정상 실행", repr(e), kind="DB")
+
+    # ── ⑦ talk_answer.py 사전 필터 — match_game 앞에서 길이로 자르지 않는다 ────
+    #   확인자 실측(2026-09-22): is_game_related·extract_game_names 가 match_game 을
+    #   부르기 «전에» `len(tok) < 2` 로 토큰을 걸러 「롤」(1자)이 별칭에 닿지 못했다.
+    #   길이 규칙은 match_game 한 곳(정확히는 별칭 조회 다음)뿐이어야 한다 — 단일 원천.
+    LEN_FILTER_RE = re.compile(r"len\(\s*\w+\s*\)\s*[<>]=?\s*\d+")
+
+    def _func_body_src(src, name):
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            return None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == name:
+                return ast.get_source_segment(src, node) or ""
+        return None
+
+    ta_path = pathlib.Path(ROOT, "api", "talk_answer.py")
+    ta_ok = ta_path.exists()
+    check("[64]⑦ api/talk_answer.py 존재", ta_ok, "존재", "없음")
+    ta_src = ta_path.read_text(encoding="utf-8") if ta_ok else ""
+
+    igr_src = _func_body_src(ta_src, "is_game_related") if ta_ok else None
+    egn_src = _func_body_src(ta_src, "extract_game_names") if ta_ok else None
+    check("[64]⑦ is_game_related() 를 찾았다(아래 검사의 전제)",
+          igr_src is not None, "찾음", "못 찾음")
+    check("[64]⑦ extract_game_names() 를 찾았다(아래 검사의 전제)",
+          egn_src is not None, "찾음", "못 찾음")
+
+    for _fn_name, _body in (("is_game_related", igr_src), ("extract_game_names", egn_src)):
+        if _body is None:
+            continue
+        m = LEN_FILTER_RE.search(_body)
+        check(f"[64]⑦ {_fn_name}() 본문에 길이 사전 필터(len(tok) 비교류)가 없다"
+              "(길이 규칙은 match_game 한 곳뿐 — 여기서 먼저 자르면 「롤」이 별칭에 못 닿는다)",
+              m is None, "없음", m.group(0) if m else None)
+
+    # ★음성 자기검사(메모리) — 지웠던 필터를 문자열로 되살리면 위 검출기가 잡는가.
+    if egn_src is not None:
+        variant_bad = egn_src + "\n        if len(tok) < 2:\n            continue\n"
+        check("[64]⑦ 음성 자기검사 — len(tok) < 2 사전 필터를 되살린 문자열은 검출된다"
+              "(검출 안 되면 위 정적 검사가 아무것도 증명하지 않는 것이다)",
+              LEN_FILTER_RE.search(variant_bad) is not None, "검출됨", "검출 안 됨")
+
+    # ★단위 — 실제 import 해서 「롤」이 두 함수 모두에서 살아 있는지 확인.
+    #   api.db 스텁은 ②③ 에서 만든 것과 같은 자리(sys.modules)를 그대로 재사용한다 —
+    #   추가 의존(llm·wiki_fetch·game_copy·sqlalchemy)이 막히면 import 예외로 드러난다.
+    ta_mod = None
+    if ts_mod is not None:
+        try:
+            ta_mod = importlib.import_module("api.talk_answer")
+        except Exception as e:                                # noqa: BLE001
+            check("[64]⑦ api.talk_answer import(api.db 스텁 재사용)", False, "성공", repr(e))
+    check("[64]⑦ api.talk_answer import 성공(아래 단위 검사의 전제)",
+          ta_mod is not None, "성공", "실패")
+
+    if ta_mod is not None and game_names_0073:
+        try:
+            vocab7 = ta_mod.TS.Vocab(
+                all_game_names=game_names_0073,
+                game_aliases={ta_mod.TS._norm_name(a): n for a, n in seed_pairs},
+                genres=[], genre_aliases={})
+            got_igr = ta_mod.is_game_related("롤 하는데 그래픽카드 추천해줘", vocab7)
+            check("[64]⑦ is_game_related('롤 하는데 그래픽카드 추천해줘') is True"
+                  "(사전 필터가 없어야 「롤」이 별칭까지 닿는다)",
+                  got_igr is True, True, got_igr)
+            got_egn = ta_mod.extract_game_names("롤 해요", vocab7)
+            check("[64]⑦ extract_game_names('롤 해요') 에 「리그 오브 레전드」 포함",
+                  "리그 오브 레전드" in (got_egn or []), "리그 오브 레전드 포함", got_egn)
+            got_office = ta_mod.is_game_related("사무용으로 쓸 거예요", vocab7)
+            check("[64]⑦ is_game_related('사무용으로 쓸 거예요') is False(불변 — 게임"
+                  " 낱말·게임명·장르 어느 것도 안 걸린다)",
+                  got_office is False, False, got_office)
+        except Exception as e:                                # noqa: BLE001
+            check("[64]⑦ is_game_related/extract_game_names 단위 검사 실행",
+                  False, "정상 실행", repr(e))
 
 
 def test_market_bands_and_handling():
