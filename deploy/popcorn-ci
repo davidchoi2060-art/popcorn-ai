@@ -88,10 +88,13 @@ cmd_regression() {
 
 # 견적 격자(grid_cells·grid_quotes) 재생성. 파생 표라 되돌림은 재실행이다.
 # DATABASE_URL 과 127.0.0.1:8000 을 둘 다 쓰므로 ghrunner 로는 못 돌고 여기를 거친다.
-# ⚠ tools/grid_generate.py 는 /api/recommend 를 부르면서 X-Popcorn-Test 표식을
-#    붙이지 않는다(2026-09-22 확인 — 보내는 헤더가 Content-Type 하나뿐이다).
-#    그대로 돌리면 만들어지는 상담 행이 표식 없이 진짜 원장에 섞인다. --dry 도
-#    엔진 호출은 그대로 하므로 같다. 그 파일이 표식을 붙이게 된 뒤에 쓴다.
+# 이 배치가 만드는 상담 행은 tools/grid_generate.py 가 스스로 표시한다
+# (`_mark_batch_session` — 응답의 session_id 로 자기 행만 data_origin='test').
+# X-Popcorn-Test 헤더 방식이 아니다: 그 헤더는 `POPCORN_TEST_HEADER_ENABLED` 가
+# 켜져 있을 때만 신뢰되는데 그 값은 서버 env 에 **두지 않는 것이 규칙이다**
+# (deploy/README.md — "0 이어야 한다"). 그래서 헤더를 실어도 'real' 로 남는다.
+# 드라이런 경로에도 표시가 붙은 것은 685c7e5 부터다 — 그 앞 코드로 grid-dry 를
+# 돌리면 표식 없는 상담이 쌓인다. 재설치는 685c7e5 이후 코드로 한다.
 cmd_grid() {
   step "견적 격자 재생성"
   as_app "cd '$APP_DIR' && .venv/bin/python tools/grid_generate.py"
