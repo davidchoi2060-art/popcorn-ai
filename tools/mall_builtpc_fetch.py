@@ -480,10 +480,15 @@ def collect_plist(max_pages=50, save_dir=""):
         if m and total is None:
             total = int(m.group(1))
         found = _PDNO_RE.findall(html)
-        fresh = [c for c in found if c not in seen]
-        for c in fresh:
+        # 한 쪽 안에서도 같은 번호가 여러 번 나온다(카드·썸네일·비교 링크가 각각
+        # 같은 상세 주소를 건다 -- 실측 212건이 636번 등장). 담으면서 걸러야 한다.
+        fresh = []
+        for c in found:
+            if c in seen:
+                continue
             seen.add(c)
             codes.append(c)
+            fresh.append(c)
         print("  %s 쪽%-3d  상품번호 %d개(새로 %d개)%s"
               % (how, page, len(found), len(fresh),
                  "  몰이 말한 전체 %s건" % total if total is not None and page == 1 else ""))
