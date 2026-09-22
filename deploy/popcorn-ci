@@ -40,8 +40,19 @@ step() { echo; echo "=== $* ==="; }
 cmd_deploy() {
   step "1. 코드 받기 ($BRANCH)"
   # --ff-only: 서버 트리에 손댄 흔적이 있으면 조용히 합치지 말고 실패시킨다.
+  # FETCH_HEAD 로 합친다 — `origin/$BRANCH` 는 원격 추적 참조라 fetch 가 그것을
+  # 갱신하지 못한 경우(원격 refspec 설정이 다르면 생긴다) 낡은 지점으로 합치고도
+  # "Already up to date." 를 찍는다. 그러면 배포는 초록불인데 서버 코드는 어제 것이다.
   runuser -u "$APP_USER" -- git -C "$APP_DIR" fetch origin "$BRANCH"
-  runuser -u "$APP_USER" -- git -C "$APP_DIR" merge --ff-only "origin/$BRANCH"
+  want=$(runuser -u "$APP_USER" -- git -C "$APP_DIR" rev-parse FETCH_HEAD)
+  runuser -u "$APP_USER" -- git -C "$APP_DIR" merge --ff-only FETCH_HEAD
+  got=$(runuser -u "$APP_USER" -- git -C "$APP_DIR" rev-parse HEAD)
+  # 합쳤는데도 받아온 지점과 다르면 멈춘다 — 여기서 넘어가면 그 뒤 단계가 전부
+  # 「낡은 코드를 성공적으로 배포」한다.
+  if [ "$got" != "$want" ]; then
+    echo "  받아온 지점 $want 과 서버 HEAD $got 이 다르다 — 배포를 멈춘다." >&2
+    exit 1
+  fi
   runuser -u "$APP_USER" -- git -C "$APP_DIR" log -1 --pretty='  HEAD %h %s'
 
   step "2. 의존성"
