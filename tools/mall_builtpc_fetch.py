@@ -360,13 +360,14 @@ def fetch_url(url):
 
 
 def links(urls, pages=1, probe=False):
-    """목록 페이지에서 완제PC 상품번호를 모은다. (codes, seen_urls)
+    """목록 페이지에서 완제PC 상품번호를 모은다. (codes, seen_urls, hrefs)
 
     `{page}` 가 들어 있는 주소는 1..pages 로 펼친다. 같은 번호는 한 번만 담고,
     **발견 순서를 지킨다**(몰이 매긴 정렬을 우리가 뒤섞지 않는다).
     probe 면 그 페이지의 다른 링크도 함께 보고한다 — 목록 주소를 «찾는» 걸음이다.
     """
     codes, seen, visited = [], set(), []
+    all_hrefs, href_seen = [], set()
     for base in urls:
         expanded = ([base.replace("{page}", str(i)) for i in range(1, pages + 1)]
                     if "{page}" in base else [base])
@@ -384,16 +385,17 @@ def links(urls, pages=1, probe=False):
                     fresh += 1
             print("  %s  ->  상품번호 %d개(새로 %d개)" % (url, len(found), fresh))
             if probe:
-                hrefs, shown = [], set()
+                hrefs = []
                 for h in _HREF_RE.findall(html):
-                    if h in shown or h.startswith(("#", "javascript:", "mailto:")):
+                    if h in href_seen or h.startswith(("#", "javascript:", "mailto:")):
                         continue
-                    shown.add(h)
+                    href_seen.add(h)
                     hrefs.append(h)
-                print("  -- 링크 후보(앞 %d개) --" % min(60, len(hrefs)))
+                    all_hrefs.append(h)
+                print("  -- 링크 후보 %d개(앞 60개만 보임) --" % len(hrefs))
                 for h in hrefs[:60]:
                     print("     %s" % h[:160])
-    return codes, visited
+    return codes, visited, all_hrefs
 
 # ================================================================== 대상 ==
 
@@ -456,13 +458,13 @@ def main():
     if a.links:
         urls = [u.strip() for u in a.links.split(",") if u.strip()]
         print("목록 탐색 %d주소 · 쪽 %d · 간격 %.1f초" % (len(urls), a.pages, DELAY))
-        codes, visited = links(urls, pages=a.pages, probe=a.probe)
+        codes, visited, hrefs = links(urls, pages=a.pages, probe=a.probe)
         print("\n상품번호 %d개: %s" % (len(codes), ",".join(codes[:200])))
         if len(codes) > 200:
             print("(앞 200개만 보였습니다)")
         if a.out:
             io.open(a.out, "w", encoding="utf-8").write(
-                json.dumps({"codes": codes, "sources": visited},
+                json.dumps({"codes": codes, "sources": visited, "hrefs": hrefs},
                            ensure_ascii=False, indent=1))
             print("기록: %s" % a.out)
         if a.links_only:
