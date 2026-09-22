@@ -1,0 +1,78 @@
+# 몰 시중가 -> products.market_price — 손으로 부르는 전용.
+#
+# 왜 sudo 를 거치는가: 이 도구는 몰(popcornpc.co.kr)과 DATABASE_URL 을 둘 다 쓴다.
+# 러너 계정(ghrunner)은 /etc/popcorn-ai.env 를 못 읽으므로(의도된 것) root 작업을
+# 가둬 둔 /usr/local/bin/popcorn-ci 를 거친다 — 워크플로에는 sudo 로 부르는 한 줄만
+# 있고, 실제로 무엇을 하는지는 서버의 그 고정 파일이 정한다(grid.yml 과 같은 구조).
+#
+# 기본은 «드라이런»이다. 쓰려면 반영 체크를 켜야 한다.
+# 값 쓰기·잠금·이력·되돌리기는 기존 검수 승인 코드가 한다(A-103·A-104·A-108).
+#
+# 결과 로그를 데이터 가지(data/mall-price)에 올린다 — 클라우드 작업창에서
+# Actions 로그 호스트에 닿지 못해(2026-09-22 실측 CONNECT 403) 결과를 읽을 길이
+# 그것뿐이다. main 이 아니라서 배포는 돌지 않는다.
+#
+# ⚠ pull_request 트리거는 절대 넣지 않는다(deploy.yml·regression.yml 의 같은 주석).
+name: 몰 시중가 반영
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: '반영 — 체크하지 않으면 드라이런(아무것도 쓰지 않는다)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: popcorn-deploy
+  cancel-in-progress: false
+
+jobs:
+  mall-price:
+    runs-on: [self-hosted, popcorn-vm]
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: 시중가 반영
+        id: run
+        shell: bash
+        env:
+          APPLY: ${{ inputs.apply }}
+        run: |
+          set -o pipefail
+          if [ "$APPLY" = "true" ]; then sub=mall-price; else sub=mall-price-dry; fi
+          echo "부명령: $sub"
+          mkdir -p out
+          if sudo -n /usr/local/bin/popcorn-ci "$sub" 2>&1 | tee "out/mall-price-$sub.log"; then
+            ok=0
+          else
+            ok=1
+          fi
+          {
+            echo "## 몰 시중가 반영 ($sub)"
+            echo '```'
+            tail -n 60 "out/mall-price-$sub.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$ok"
+
+      - name: 결과를 데이터 가지에 올린다
+        if: always()
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          ls out/* >/dev/null 2>&1 || { echo '올릴 결과가 없습니다 -- 건너뜁니다.'; exit 0; }
+          tmp=$(mktemp -d)
+          cp out/* "$tmp"/
+          cd "$tmp"
+          git init -q
+          git config user.name 'popcorn-runner'
+          git config user.email 'runner@popcornai.local'
+          git add -A
+          git commit -qm "몰 시중가 반영 결과 (run $RUN_ID)"
+          git push -q --force "https://x-access-token:$TOKEN@github.com/$REPO" HEAD:refs/heads/data/mall-price
+          echo "데이터 가지 갱신: data/mall-price"

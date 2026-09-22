@@ -6,8 +6,8 @@
 #   그래서 배포·재시작 같은 root 작업을 워크플로에 적어두면, 리포에 푸시할 수 있는
 #   사람은 누구나 서버에서 root 명령을 돌릴 수 있게 된다.
 #   대신 root 작업은 전부 이 파일 하나에 가두고, 러너 계정(ghrunner)에게는
-#   sudoers 로 `popcorn-ci deploy|regression|verify` 세 줄만 허용한다.
-#   → 워크플로를 고쳐도 서버에서 할 수 있는 일은 이 세 가지를 벗어나지 못한다.
+#   sudoers 로 아래 `case` 에 있는 부명령만 한 줄씩 허용한다.
+#   → 워크플로를 고쳐도 서버에서 할 수 있는 일은 그 목록을 벗어나지 못한다.
 #
 # 설치(서버에서 한 번):
 #   sudo install -m 755 -o root -g root /srv/popcorn-ai/deploy/popcorn-ci /usr/local/bin/popcorn-ci
@@ -106,6 +106,22 @@ cmd_grid_dry() {
   as_app "cd '$APP_DIR' && .venv/bin/python tools/grid_generate.py --dry"
 }
 
+# 몰 시중가 -> products.market_price (2026-09-22 사장님 「승인」).
+# 몰(popcornpc.co.kr)과 DATABASE_URL 을 둘 다 써야 해서 ghrunner 로는 못 돌고 여기를 거친다.
+# 값 쓰기는 새로 구현하지 않는다 — 검수 제안 -> 승인 -> 잠금까지 기존 코드가 한다
+# (A-103·A-104·A-108 · tools/mall_market_price_apply.py 머리말 참고).
+# `--approve-first` 는 A-108 「첫 값은 사람이 확인한다」를 사람이 «일괄로» 내린 결정으로
+# 대신한다는 뜻이다. 판정 함수는 그대로다 — 그 근거는 원장 detail 에 남는다.
+cmd_mall_price_dry() {
+  step "몰 시중가 반영 - 드라이런(쓰기 없음)"
+  as_app "cd '$APP_DIR' && .venv/bin/python tools/mall_market_price_apply.py --fetch"
+}
+
+cmd_mall_price() {
+  step "몰 시중가 반영"
+  as_app "cd '$APP_DIR' && .venv/bin/python tools/mall_market_price_apply.py --fetch --apply --approve-first"
+}
+
 cmd_verify() {
   step "배포 후 검증 (deploy/verify.sh)"
   bash "$APP_DIR/deploy/verify.sh"
@@ -117,8 +133,10 @@ case "${1-}" in
   verify)     cmd_verify ;;
   grid)       cmd_grid ;;
   grid-dry)   cmd_grid_dry ;;
+  mall-price)     cmd_mall_price ;;
+  mall-price-dry) cmd_mall_price_dry ;;
   *)
-    echo "사용법: popcorn-ci deploy|regression|verify|grid|grid-dry" >&2
+    echo "사용법: popcorn-ci deploy|regression|verify|grid|grid-dry|mall-price|mall-price-dry" >&2
     exit 2
     ;;
 esac

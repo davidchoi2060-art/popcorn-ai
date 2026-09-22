@@ -57,6 +57,12 @@
 import io
 import sys
 
+# 이미 우리가 감싼 스트림인지 표시한다(아래 «두 번 감싸면 죽는다» 참고).
+_MARK = "_popcorn_utf8"
+# 우리가 만든 래퍼를 붙잡아 둔다 — 참조가 끊기면 GC 가 그 래퍼를 닫으면서
+# «밑에 깔린 buffer 까지» 닫아 버린다.
+_KEEP = []
+
 
 def ensure_utf8_console() -> None:
     """stdout·stderr를 UTF-8 TextIOWrapper로 재포장한다(인코딩 실패는 대체문자로 넘긴다).
@@ -66,9 +72,30 @@ def ensure_utf8_console() -> None:
     더했다** — 잡히지 않은 예외의 한글 메시지가 traceback 출력에서 같은 방식으로 죽는
     것을 막는다(예: 캐치되지 않고 새어나간 `RuntimeError(f"... {e.code} — ...")`).
     stderr는 예외 직전에 죽는 상황에서도 보이도록 줄단위로 즉시 내보낸다.
+
+    ■ 두 번 감싸면 죽는다 — 그래서 한 번만 감싼다 (2026-09-22 실사고)
+      `tools/` 도구가 **다른 `tools/` 도구를 import** 하면 이 함수가 한 프로세스에서
+      두 번 불린다(부르는 쪽에서 한 번, import 되는 쪽에서 또 한 번). 예전 판은 그때
+      **같은 `buffer` 를 감싼 래퍼를 하나 더** 만들었고, 먼저 만든 래퍼는 아무도 참조
+      하지 않아 GC 가 거둬 가면서 그 `buffer` 를 닫았다. 결과는
+
+          ValueError('I/O operation on closed file.') / lost sys.stderr
+
+      이고, **출력이 한 글자도 안 나온 채 종료코드 1** 이다. 실제로
+      `tools/mall_market_price_apply.py` 가 `tools/danawa_fetch` 를 import 하다가
+      여기서 죽었다(2026-09-22). 두 파일 다 멀쩡한데 «합치면» 죽는 종류라, 각각을
+      돌려 보는 검증으로는 안 잡힌다.
+
+      그래서 ① 우리가 감싼 스트림에 표시를 남겨 두 번째 호출은 아무것도 하지 않고
+      ② 만든 래퍼를 `_KEEP` 에 붙잡아 둔다(①만으로도 이번 사고는 막히지만, 호출부가
+      `sys.stdout` 을 또 갈아끼우는 경우까지 생각하면 ②가 있어야 안전하다).
     """
-    if hasattr(sys.stdout, "buffer"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "buffer"):
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace",
-                                       line_buffering=True)
+    for name, line_buffering in (("stdout", False), ("stderr", True)):
+        st = getattr(sys, name, None)
+        if st is None or getattr(st, _MARK, False) or not hasattr(st, "buffer"):
+            continue
+        w = io.TextIOWrapper(st.buffer, encoding="utf-8", errors="replace",
+                             line_buffering=line_buffering)
+        setattr(w, _MARK, True)
+        _KEEP.append(w)
+        setattr(sys, name, w)

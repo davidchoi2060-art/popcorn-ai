@@ -33,7 +33,7 @@ sudo popcorn-ci verify          # 먼저 손으로 한 번 돌려 본다
 > ⚠ 이 파일이 리포에서 바뀌면 위 `install` 을 **다시 실행해야** 반영된다.
 > 자동으로 따라가지 않는 것이 이 구조의 핵심이다.
 
-## 3. sudo 권한을 세 줄만 준다
+## 3. sudo 권한을 부명령별로 한 줄씩 준다
 
 ```bash
 sudo tee /etc/sudoers.d/popcorn-ci >/dev/null <<'EOF'
@@ -42,6 +42,8 @@ ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci regression
 ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci verify
 ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci grid
 ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci grid-dry
+ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci mall-price
+ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci mall-price-dry
 EOF
 sudo chmod 440 /etc/sudoers.d/popcorn-ci
 sudo visudo -c                  # "parsed OK" 가 나와야 한다
