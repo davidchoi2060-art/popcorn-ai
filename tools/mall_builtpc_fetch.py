@@ -212,6 +212,12 @@ def raw_ranges(pd_no, html, spec):
 _NAME_RE = re.compile(r'<span class="name">\s*(.*?)\s*</span>', re.S)
 _TAGS_RE = re.compile(r"<span style='font-size:15px;'>\s*(#[^<]*)</span>")
 _PRICE_RE = re.compile(r'<li>(시중가|판매가)<span>([\d,]+)</span>원</li>')
+# 상단 사양표와 「PC 추가부품」의 경계 -- 원문의 <th colspan="3">PC 추가부품</th>
+_ADDON_MARK = "PC 추가부품"
+# 「미선택」 자리. 배송 행("[택배 배송 + 발포제](...)을 선택하셔요.")은 실제로 «선택된»
+# 값이라 걸리면 안 되므로 대괄호 하나로 시작해 그 문장으로 «끝나는» 것만 본다.
+_UNSET_RE = re.compile(r"^\[[^\]]*\](를|을) 선택하세요\.?$")
+
 _ROW_RE = re.compile(
     r"<td class='cate'>(?P<cate>[^<]+)</td>.*?"
     r"name='pcode\d+' value='(?P<pcode>\d+)'.*?"
@@ -237,11 +243,20 @@ def parse(pd_no, html):
 
     prices = {k: int(v.replace(",", "")) for k, v in _PRICE_RE.findall(html)}
 
-    parts = []
-    for r in _ROW_RE.finditer(html):
-        parts.append({"cate": _clean(r.group("cate")),
-                      "pcode": r.group("pcode"),
-                      "name": _clean(r.group("name"))})
+    # 상단 사양표에서 «끊는다» -- 사장님 지시("상단 부분만 조회해서 가져와야 함").
+    # 경계는 지어낸 것이 아니라 원문에 있다(2026-09-22 실측, pd_no=102112 L2637):
+    #   <th colspan="3">PC 추가부품</th>
+    # 그 아래는 CD/DVD·키보드·마우스·웹캠 같은 «추가부품» 목록이라 이 완제PC 의
+    # 구성이 아니다. 끊지 않으면 한 상품에 부품이 28~32개로 잡힌다(실측).
+    top = html.split(_ADDON_MARK, 1)[0]
+
+    parts, unset = [], []
+    for r in _ROW_RE.finditer(top):
+        cate, name = _clean(r.group("cate")), _clean(r.group("name"))
+        if _UNSET_RE.match(name):
+            unset.append(cate)       # 고객이 고르는 자리 -- 부품이 아니다
+            continue
+        parts.append({"cate": cate, "pcode": r.group("pcode"), "name": name})
 
     return {
         "product_code": str(pd_no),
@@ -251,6 +266,7 @@ def parse(pd_no, html):
         "sale_price": prices.get("판매가"),
         "custom_price": None,        # 원문에 없다 -- JS 계산값
         "parts": parts,
+        "unset_slots": unset,        # 미선택 자리(윈도우·모니터·HDD 등)
     }
 
 
@@ -305,6 +321,7 @@ def selftest():
     eq("판매가", got["sale_price"], 1591800)
     eq("맞춤가", got["custom_price"], None)
     eq("부품 수", len(got["parts"]), 2)
+    eq("미선택 자리", got["unset_slots"], [])
     eq("부품1 분류", got["parts"][0]["cate"], "프로세서(CPU)")
     eq("부품1 코드", got["parts"][0]["pcode"], "110964")
     eq("부품2 분류", got["parts"][1]["cate"], "케이스")
@@ -312,7 +329,7 @@ def selftest():
 
     for f in fails:
         print("  X %s" % f)
-    print("자체 검사: %d개 중 %d개 실패" % (11, len(fails)))
+    print("자체 검사: %d개 중 %d개 실패" % (12, len(fails)))
     return 1 if fails else 0
 
 
