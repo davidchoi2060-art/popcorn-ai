@@ -57,6 +57,9 @@ concurrency:
 jobs:
   fetch:
     runs-on: [self-hosted, popcorn-vm]
+    # 결과 가지(data/mall-fetch)에 쓰기 위한 것뿐이다. main 에는 쓰지 않는다.
+    permissions:
+      contents: write
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -110,3 +113,27 @@ jobs:
           path: out/
           if-no-files-found: ignore
           retention-days: 7
+
+      # 산출물 zip 은 blob 호스트에서 받아야 하는데 클라우드 작업창은 그 호스트에
+      # 못 닿는다(2026-09-22 실측: CONNECT 403). github.com 자체는 닿으므로
+      # 결과를 «데이터 가지»에 한 커밋으로 올려 둔다 — main 이 아니라서 배포가 돌지
+      # 않고(배포는 push: branches [main]), 매번 덮어써 이력이 쌓이지 않는다.
+      - name: 결과를 데이터 가지에 올린다
+        if: always()
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          ls out/*.json >/dev/null 2>&1 || { echo '올릴 JSON 이 없습니다 -- 건너뜁니다.'; exit 0; }
+          tmp=$(mktemp -d)
+          cp out/*.json "$tmp"/
+          cd "$tmp"
+          git init -q
+          git config user.name 'popcorn-runner'
+          git config user.email 'runner@popcornai.local'
+          git add -A
+          git commit -qm "몰 완제PC 수집 결과 (run $RUN_ID)"
+          git push -q --force "https://x-access-token:$TOKEN@github.com/$REPO" HEAD:refs/heads/data/mall-fetch
+          echo "데이터 가지 갱신: data/mall-fetch"
