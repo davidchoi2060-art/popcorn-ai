@@ -402,6 +402,96 @@ def links(urls, pages=1, probe=False, save_dir=""):
                     print("     %s" % h[:160])
     return codes, visited, all_hrefs
 
+
+# ============================================================ 목록 endpoint ==
+#
+# ■ 목록은 «페이지 안에» 없다 (2026-09-22 실측, list_01.html)
+#   `/shop/system_list.html` 원문에는 상품 카드가 5개뿐이다(최근 본 상품 등).
+#   진짜 목록은 화면이 열린 뒤 jQuery 가 불러 채운다:
+#
+#       $.ajax({ url: "/skin/shop/basic/system_list_include_plist.php",
+#                method: "POST",
+#                data: { subm, price_op_arr, cpu, ..., page, list_sort_type, view_type } })
+#
+#   그래서 목록 주소를 아무리 GET 해도 상품번호가 안 나온다. 이 자리를 직접 부른다.
+#
+# ■ GET 을 먼저 해 본다 -- 규약을 먼저 지키고, 안 되면 그 사실을 적는다
+#   이 파일의 규약은 「GET 만 한다」였다(담기·저장·로그인 폼을 누르지 않겠다는 뜻).
+#   PHP 가 $_REQUEST 를 읽으면 GET 으로도 같은 목록이 나오므로 **GET 을 먼저** 보낸다.
+#   그것이 비면 같은 자리에 POST 로 한 번 더 묻는다 -- **조회 전용 목록이라** 담기·
+#   저장·주문과 성격이 다르다(상태를 바꾸지 않는다). 어느 쪽으로 받았는지 보고에 남긴다.
+
+PLIST = BASE + "/skin/shop/basic/system_list_include_plist.php"
+_TOTAL_RE = re.compile(r"id=[\"']total_num[\"'][^>]*value=[\"'](\d+)[\"']")
+
+
+def _plist_once(page, post=False):
+    """목록 한 쪽. (html, 방식) -- 못 받으면 (None, 방식)."""
+    fields = {"page": str(page), "list_sort_type": "", "view_type": ""}
+    body = "&".join("%s=%s" % (k, v) for k, v in fields.items())
+    if post:
+        req = urllib.request.Request(
+            PLIST, data=body.encode("utf-8"),
+            headers={"User-Agent": UA, "Accept-Language": "ko-KR,ko;q=0.9",
+                     "Content-Type": "application/x-www-form-urlencoded",
+                     "X-Requested-With": "XMLHttpRequest",
+                     "Referer": BASE + "/shop/system_list.html"})
+    else:
+        req = urllib.request.Request(
+            PLIST + "?" + body,
+            headers={"User-Agent": UA, "Accept-Language": "ko-KR,ko;q=0.9",
+                     "Referer": BASE + "/shop/system_list.html"})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            raw = r.read()
+    except Exception as e:                                    # noqa: BLE001
+        print("  %s 쪽%d 실패(%s)" % ("POST" if post else "GET", page, type(e).__name__))
+        return None, ("POST" if post else "GET")
+    finally:
+        time.sleep(DELAY)
+    return raw.decode("cp949", "replace"), ("POST" if post else "GET")
+
+
+def collect_plist(max_pages=50, save_dir=""):
+    """목록 endpoint 를 1쪽부터 훑어 상품번호를 모은다. (codes, how, total)
+
+    첫 쪽에서 «어느 방식으로 목록이 오는지»를 정하고(GET 먼저, 비면 POST),
+    그다음부터는 그 방식만 쓴다. 새 번호가 하나도 안 나오는 쪽을 만나면 멈춘다 --
+    몰이 마지막 쪽을 되풀이해 돌려주는 경우가 있어 쪽 수만 믿지 않는다.
+    """
+    codes, seen, how, total = [], set(), None, None
+    for page in range(1, max_pages + 1):
+        if how is None:
+            html, _ = _plist_once(page, post=False)
+            how = "GET"
+            if html is None or not _PDNO_RE.search(html):
+                print("  GET 으로는 목록이 비었습니다 -- 같은 자리에 POST 로 다시 묻습니다.")
+                html, _ = _plist_once(page, post=True)
+                how = "POST"
+        else:
+            html, _ = _plist_once(page, post=(how == "POST"))
+        if html is None:
+            break
+        if save_dir and page <= 2:
+            os.makedirs(save_dir, exist_ok=True)
+            io.open(os.path.join(save_dir, "plist_%02d.html" % page),
+                    "w", encoding="utf-8").write(html)
+        m = _TOTAL_RE.search(html)
+        if m and total is None:
+            total = int(m.group(1))
+        found = _PDNO_RE.findall(html)
+        fresh = [c for c in found if c not in seen]
+        for c in fresh:
+            seen.add(c)
+            codes.append(c)
+        print("  %s 쪽%-3d  상품번호 %d개(새로 %d개)%s"
+              % (how, page, len(found), len(fresh),
+                 "  몰이 말한 전체 %s건" % total if total is not None and page == 1 else ""))
+        if not fresh:
+            break
+    return codes, how, total
+
+
 # ================================================================== 대상 ==
 
 def targets_from_json(path, limit=None):
@@ -446,6 +536,9 @@ def main():
                     help="목록 페이지에서 상품번호를 읽는다(쉼표 구분 · {page} 지원)")
     ap.add_argument("--pages", type=int, default=1, help="--links 의 {page} 를 1..N 으로 펼친다")
     ap.add_argument("--probe", action="store_true", help="--links 에서 다른 링크도 함께 보고한다")
+    ap.add_argument("--plist", action="store_true",
+                    help="몰 목록 endpoint 를 훑어 완제PC 상품번호를 모은다")
+    ap.add_argument("--max-pages", type=int, default=50, help="--plist 가 볼 최대 쪽 수")
     ap.add_argument("--save-dir", default="", help="--links 로 받은 목록 원문을 이 폴더에 남긴다")
     ap.add_argument("--links-only", action="store_true",
                     help="상품번호만 모으고 상세 페이지는 받지 않는다")
@@ -461,7 +554,19 @@ def main():
     if a.selftest:
         raise SystemExit(selftest())
 
-    if a.links:
+    if a.plist:
+        print("목록 endpoint 훑기 · 최대 %d쪽 · 간격 %.1f초" % (a.max_pages, DELAY))
+        codes, how, total = collect_plist(a.max_pages, save_dir=a.save_dir)
+        print("\n상품번호 %d개 (몰이 말한 전체 %s건 · %s 로 받음)"
+              % (len(codes), total if total is not None else "?", how or "?"))
+        if a.out:
+            io.open(a.out, "w", encoding="utf-8").write(
+                json.dumps({"codes": codes, "method": how, "total_reported": total},
+                           ensure_ascii=False, indent=1))
+            print("기록: %s" % a.out)
+        if a.links_only:
+            return
+    elif a.links:
         urls = [u.strip() for u in a.links.split(",") if u.strip()]
         print("목록 탐색 %d주소 · 쪽 %d · 간격 %.1f초" % (len(urls), a.pages, DELAY))
         codes, visited, hrefs = links(urls, pages=a.pages, probe=a.probe,
