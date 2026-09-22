@@ -25,6 +25,7 @@ on:
           - 수집          # 준 상품번호를 파싱해 JSON 으로 떨군다
           - 목록훑기      # 몰 목록 endpoint 를 훑어 상품번호 전량을 모은다
           - 목록탐색      # 준 주소에서 상품번호·링크 후보를 모은다
+          - 부품가격      # data/mall-fetch 가지의 part_codes.txt 로 부품 가격을 받는다
           - 구조덤프      # 파싱하지 않고 마크업 구조만 보고한다
           - 원문          # 지정한 줄 범위를 그대로 본다
       codes:
@@ -86,6 +87,12 @@ jobs:
           set -o pipefail
           mkdir -p out
           args=()
+          if [ "$MODE" = "부품가격" ]; then
+            # 대상 목록은 저장소 본류가 아니라 결과 가지에 둔다(데이터를 main 에 넣지 않는다).
+            git fetch -q origin 'refs/heads/data/mall-fetch:refs/remotes/origin/data/mall-fetch' -f
+            git show origin/data/mall-fetch:part_codes.txt > out/part_codes.txt
+            args+=(--parts-file out/part_codes.txt)
+          fi
           if [ "$MODE" = "목록훑기" ] || [ "$MODE" = "전량수집" ]; then
             args+=(--plist --max-pages "${PAGES:-50}")
             [ "$MODE" = "목록훑기" ] && args+=(--save-dir out --links-only)
@@ -104,6 +111,7 @@ jobs:
             구조덤프) args+=(--dump) ;;
             원문)     args+=(--raw "$RAW") ;;
             목록훑기) args+=(--out out/mall_codes.json) ;;
+            부품가격) args+=(--out out/part_prices.json) ;;
             *)        args+=(--out out/mall_builtpc.json) ;;
           esac
           log=$(mktemp)

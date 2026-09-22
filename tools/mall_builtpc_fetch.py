@@ -514,6 +514,40 @@ def collect_plist(max_pages=50, save_dir=""):
     return codes, how, total
 
 
+
+# ============================================================== 부품 가격 ==
+#
+# ■ 왜 여기에 붙였나 (2026-09-22)
+#   완제PC 상단에서 얻은 `parts[].pcode` 는 몰의 «부품» 상품번호다. 그 부품이 얼마인지
+#   알면 「완제품 판매가 대비 슬롯별 부품가 비율」을 DB 없이 잴 수 있다(격자 스레드 요청).
+#
+# ■ 새로 짜지 않는다 -- `api/mall.py` 가 이미 그 페이지를 읽는다
+#   `_one()` 은 `/shop/product_detail.html?pd_no=` 의 hidden 필드(`price`·`dealer_price`)와
+#   품절 표시를 **실측으로 확인된 방식**으로 읽는다(「몰에 없는 상품」과 「0원」을 구분하는
+#   pd_no 되돌림 검사까지 들어 있다). 같은 것을 두 벌 두지 않는다(CLAUDE.md §단일 원천).
+#   다만 그 쪽은 견적 직전이라 동시 4개로 받는다 -- 여기는 배치라 **한 건씩 1.5초**로 돈다.
+
+def part_prices(codes):
+    """부품 상품번호 -> 몰 가격. {pcode: {price, dealer_price, soldout, ok, err}}"""
+    from api.mall import _one                                # 표준 라이브러리만 쓴다
+    out, fail_streak = {}, 0
+    for i, code in enumerate(codes, 1):
+        r = _one(code)
+        out[str(code)] = {"price": r["price"], "dealer_price": r["dealer_price"],
+                          "soldout": r["soldout"], "ok": r["ok"], "err": r["err"]}
+        if r["ok"]:
+            fail_streak = 0
+        else:
+            fail_streak += 1
+            if fail_streak >= MAX_FAIL:
+                print("연속 실패 %d회 -- 멈춥니다(마지막 사유 %s)." % (MAX_FAIL, r["err"]))
+                break
+        if i % 25 == 0 or i == len(codes):
+            ok = sum(1 for v in out.values() if v["ok"])
+            print("  %d/%d  성공 %d" % (i, len(codes), ok))
+        time.sleep(DELAY)
+    return out
+
 # ================================================================== 대상 ==
 
 def targets_from_json(path, limit=None):
@@ -558,6 +592,8 @@ def main():
                     help="목록 페이지에서 상품번호를 읽는다(쉼표 구분 · {page} 지원)")
     ap.add_argument("--pages", type=int, default=1, help="--links 의 {page} 를 1..N 으로 펼친다")
     ap.add_argument("--probe", action="store_true", help="--links 에서 다른 링크도 함께 보고한다")
+    ap.add_argument("--parts-file", default="",
+                    help="부품 상품번호 파일(쉼표·줄바꿈 구분) -> 몰 가격을 받는다")
     ap.add_argument("--plist", action="store_true",
                     help="몰 목록 endpoint 를 훑어 완제PC 상품번호를 모은다")
     ap.add_argument("--max-pages", type=int, default=50, help="--plist 가 볼 최대 쪽 수")
@@ -575,6 +611,27 @@ def main():
 
     if a.selftest:
         raise SystemExit(selftest())
+
+    if a.parts_file:
+        text = io.open(a.parts_file, encoding="utf-8").read()
+        pcodes = [c.strip() for c in re.split(r"[,\s]+", text) if c.strip().isdigit()]
+        pcodes = list(dict.fromkeys(pcodes))                  # 중복 제거 · 순서 유지
+        print("부품 %d건 · 간격 %.1f초" % (len(pcodes), DELAY))
+        prices = part_prices(pcodes)
+        ok = sum(1 for v in prices.values() if v["ok"])
+        sold = sum(1 for v in prices.values() if v["soldout"])
+        print("\n받음 %d건 · 가격 확인 %d건 · 품절 표시 %d건" % (len(prices), ok, sold))
+        errs = {}
+        for v in prices.values():
+            if not v["ok"]:
+                errs[v["err"]] = errs.get(v["err"], 0) + 1
+        if errs:
+            print("못 읽은 사유: %s" % ", ".join("%s %d건" % kv for kv in errs.items()))
+        if a.out:
+            io.open(a.out, "w", encoding="utf-8").write(
+                json.dumps({"prices": prices}, ensure_ascii=False, indent=1))
+            print("기록: %s" % a.out)
+        return
 
     if a.plist:
         print("목록 endpoint 훑기 · 최대 %d쪽 · 간격 %.1f초" % (a.max_pages, DELAY))
