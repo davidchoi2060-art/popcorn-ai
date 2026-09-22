@@ -640,13 +640,20 @@ def main():
             print(f"  cell_id={cid} {reason}")
 
     # 사후 대조 -- 「표시했다」가 아니라 「표시된 채 남아 있다」를 확인한다.
-    with engine.connect() as conn:
-        made_n, unmarked_n = audit_batch_sessions(conn, batch_sids)
+    # 감시 장치가 감시 대상을 깨뜨리면 안 된다: 22분치 결과를 다 쓴 뒤에 도는
+    # 검사라, 여기서 예외가 나도 배치 보고를 트레이스백으로 덮지 않는다.
+    try:
+        with engine.connect() as conn:
+            made_n, unmarked_n = audit_batch_sessions(conn, batch_sids)
+    except Exception as exc:                      # noqa: BLE001 -- 안전망이 본류를 막지 않는다
+        print(f"[grid_generate] ledger audit FAILED to run: {exc!r}"
+              f" (sessions={len(batch_sids)} -- 표시 여부를 확인하지 못했다)", flush=True)
+        made_n = unmarked_n = None
     if unmarked_n:
         print(f"[grid_generate] LEDGER WARN: sessions={made_n} unmarked={unmarked_n}"
               " -- 이 배치가 만든 상담 행이 원장에 'real' 로 남아 있다."
               " tools/grid_generate.py _mark_batch_session 을 확인한다.", flush=True)
-    else:
+    elif unmarked_n == 0:
         print(f"[grid_generate] ledger ok: sessions={made_n} all marked data_origin='test'"
               " (실고객 행은 세지 않는다 -- 이 배치가 만든 session_id 만 대조)", flush=True)
 
