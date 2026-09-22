@@ -189,6 +189,133 @@ def raw_ranges(pd_no, html, spec):
             print("  %-6d %s" % (n, lines[n - 1].rstrip()[:300]))
 
 
+# ================================================================== 파싱 ==
+#
+# ■ 아래 정규식은 전부 **실측 마크업**에서 나왔다 (2026-09-22, pd_no=98149)
+#   화면 사진이나 짐작으로 만든 것이 하나도 없다. 실제 원문(3,985줄)에서 확인한 자리:
+#
+#     L2005-2007  <span class="name">골드 NO.04.98149 ...</span>
+#                 <br/><span style='font-size:15px;'>#게임용 #디자인용 ...</span>
+#     L2069-2071  <ul class="price market">
+#                   <li>시중가<span>1,830,000</span>원</li>
+#                   <li>판매가<span>1,591,800</span>원</li>
+#     L2317-2340  <tr><td class='cate'>프로세서(CPU)</td> ...
+#                   <input type='hidden' id='pcode' name='pcode2' value='110964'>
+#                   <a ... class='selected'> <strong>[인텔]</strong> i5 12세대 12400F ...</a>
+#
+# ■ 맞춤가는 «원문에 없다» -- 지어내지 않는다
+#   L3030 이 `<span class="price" id='total_dealer_price'></span>` 로 **비어** 있다.
+#   그 값은 브라우저에서 JS 가 부품별 값을 ajax 로 받아 더해 만든다. 우리는 JS 를
+#   돌리지 않으므로 이 도구는 맞춤가를 **None 으로 둔다.** 판매가에 어떤 비율을
+#   곱해 넣고 싶은 유혹이 있지만(화면상 약 0.98), 그건 관측이 아니라 추측이다.
+
+_NAME_RE = re.compile(r'<span class="name">\s*(.*?)\s*</span>', re.S)
+_TAGS_RE = re.compile(r"<span style='font-size:15px;'>\s*(#[^<]*)</span>")
+_PRICE_RE = re.compile(r'<li>(시중가|판매가)<span>([\d,]+)</span>원</li>')
+_ROW_RE = re.compile(
+    r"<td class='cate'>(?P<cate>[^<]+)</td>.*?"
+    r"name='pcode\d+' value='(?P<pcode>\d+)'.*?"
+    r"class='selected'[^>]*>(?P<name>.*?)</a>", re.S)
+
+
+def _clean(t):
+    return _WS_RE.sub(" ", _TAG_RE.sub("", t)).strip()
+
+
+def parse(pd_no, html):
+    """공개 상세 페이지에서 «우리 DB 에 없는 것»을 읽는다.
+
+    돌려주는 것: product_code · title · usage_tags · market_price(시중가) ·
+    sale_price(판매가) · custom_price(항상 None, 위 주석 참조) · parts(교차 확인용).
+    못 읽은 항목은 None/빈 목록이고, **그 사실을 그대로 남긴다.**
+    """
+    m = _NAME_RE.search(html)
+    title = _clean(m.group(1)) if m else None
+
+    m = _TAGS_RE.search(html)
+    tags = [t for t in re.split(r"\s+", m.group(1).strip()) if t.startswith("#")] if m else []
+
+    prices = {k: int(v.replace(",", "")) for k, v in _PRICE_RE.findall(html)}
+
+    parts = []
+    for r in _ROW_RE.finditer(html):
+        parts.append({"cate": _clean(r.group("cate")),
+                      "pcode": r.group("pcode"),
+                      "name": _clean(r.group("name"))})
+
+    return {
+        "product_code": str(pd_no),
+        "title": title,
+        "usage_tags": tags,
+        "market_price": prices.get("시중가"),
+        "sale_price": prices.get("판매가"),
+        "custom_price": None,        # 원문에 없다 -- JS 계산값
+        "parts": parts,
+    }
+
+
+# 실측 원문에서 그대로 떼어낸 조각이다(합성 마크업이 아니다) -- 원천 표기가 바뀌면
+# 이 자체 검사가 먼저 깨져서 알려 준다.
+_FIXTURE = """
+<div class="info">
+\t<span class="name">
+\t\t골드 NO.04.98149 [인기상품1위]인텔  [12400F/16GB/500GB/RTX5060]\t</span>
+\t<br/><span style='font-size:15px;'>#게임용 #디자인용 #사무용 #녹스 #주식용 #인터넷강의 #화상회의</span>
+<div class="price_wrap clear">
+<ul class="price market">
+<li>시중가<span>1,830,000</span>원</li>
+<li>판매가<span>1,591,800</span>원</li>
+</ul>
+</div>
+\t<tr >
+\t\t<td class='cate'>프로세서(CPU)</td>
+\t\t<td class='mg'><img src='/data/pimg/110/110964_300.jpg' height='46'/></td>
+\t\t<td class='select'>
+\t\t\t<input type='hidden' id='dealer_price' name='dealer_price2' value='0'>
+\t\t\t<input type='hidden' id='pcode' name='pcode2' value='110964'>
+\t\t\t<div class='select_box'>
+\t\t\t\t<a href='#' class='selected' data='/x.jpg' id_no='2' pcg='10011'> <strong>[인텔]</strong> i5 12세대 12400F [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재] </a>
+\t\t\t</div>
+\t\t</td>
+\t</tr>
+\t<tr >
+\t\t<td class='cate'>케이스</td>
+\t\t<td class='select'>
+\t\t\t<input type='hidden' id='pcode' name='pcode11' value='121242'>
+\t\t\t<a href='#' class='selected' data='/y.jpg' id_no='11' pcg='10219'> <strong>[ABKO]</strong> U30 마린 블랙 </a>
+\t\t</td>
+\t</tr>
+</div>
+"""
+
+
+def selftest():
+    got = parse("98149", _FIXTURE)
+    fails = []
+
+    def eq(what, a, b):
+        if a != b:
+            fails.append("%s: %r != %r" % (what, a, b))
+
+    eq("title", got["title"],
+       "골드 NO.04.98149 [인기상품1위]인텔 [12400F/16GB/500GB/RTX5060]")
+    eq("태그 수", len(got["usage_tags"]), 7)
+    eq("첫 태그", got["usage_tags"][0], "#게임용")
+    eq("시중가", got["market_price"], 1830000)
+    eq("판매가", got["sale_price"], 1591800)
+    eq("맞춤가", got["custom_price"], None)
+    eq("부품 수", len(got["parts"]), 2)
+    eq("부품1 분류", got["parts"][0]["cate"], "프로세서(CPU)")
+    eq("부품1 코드", got["parts"][0]["pcode"], "110964")
+    eq("부품2 분류", got["parts"][1]["cate"], "케이스")
+    eq("부품2 코드", got["parts"][1]["pcode"], "121242")
+
+    for f in fails:
+        print("  X %s" % f)
+    print("자체 검사: %d개 중 %d개 실패" % (11, len(fails)))
+    return 1 if fails else 0
+
+
 # ================================================================== 대상 ==
 
 def targets_from_json(path, limit=None):
@@ -232,10 +359,14 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--dump", action="store_true", help="파싱하지 않고 구조만 보고한다")
     ap.add_argument("--raw", default="", help="원문 줄을 그대로 본다(예: 2000-2015,2310-2560)")
+    ap.add_argument("--selftest", action="store_true", help="실측 조각으로 파서만 검사한다(네트워크 없음)")
     ap.add_argument("--refetch", action="store_true", help="캐시를 무시하고 다시 받는다")
     ap.add_argument("--cache-only", action="store_true", help="네트워크를 쓰지 않는다")
     ap.add_argument("--out", default="", help="결과 JSON 경로(--dump 에는 쓰지 않는다)")
     a = ap.parse_args()
+
+    if a.selftest:
+        raise SystemExit(selftest())
 
     if a.codes:
         codes = [c.strip() for c in a.codes.split(",") if c.strip()]
@@ -249,7 +380,7 @@ def main():
         codes = codes[:a.limit]
 
     print("대상 %d건 · 간격 %.1f초 · 캐시 %s" % (len(codes), DELAY, CACHE))
-    got, failed, fail_streak = [], [], 0
+    got, failed, rows, fail_streak = [], [], [], 0
     for code in codes:
         try:
             html, cached = fetch(code, refetch=a.refetch, cache_only=a.cache_only)
@@ -271,16 +402,22 @@ def main():
         elif a.dump:
             dump(code, html)
         else:
-            print("  %s 받음%s (%d bytes)" % (code, " [캐시]" if cached else "", len(html)))
+            row = parse(code, html)
+            rows.append(row)
+            print("  %s%s  %s" % (code, " [캐시]" if cached else "", row["title"]))
+            print("      시중가 %s · 판매가 %s · 맞춤가 %s"
+                  % (row["market_price"], row["sale_price"],
+                     row["custom_price"] if row["custom_price"] is not None else "(원문에 없음)"))
+            print("      용도 %s" % (" ".join(row["usage_tags"]) or "(없음)"))
+            print("      부품 %d개: %s" % (len(row["parts"]),
+                                           ", ".join(p["cate"] for p in row["parts"])))
 
     print("\n받음 %d건 · 실패 %d건" % (len(got), len(failed)))
     if failed:
         print("실패 목록: %s" % ",".join(failed[:50]))
-    if a.out and not a.dump:
-        # ⚠ 파싱은 아직 없다 -- 실측(--dump) 뒤에 이 파일에 덧붙인다.
-        #    지금 단계에서 out 은 "무엇을 받았나"만 남긴다. 값을 지어내지 않는다.
+    if a.out and not (a.dump or a.raw):
         io.open(a.out, "w", encoding="utf-8").write(
-            json.dumps({"fetched": got, "failed": failed, "cache": CACHE},
+            json.dumps({"items": rows, "failed": failed, "cache": CACHE},
                        ensure_ascii=False, indent=1))
         print("기록: %s" % a.out)
 
