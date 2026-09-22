@@ -22,7 +22,8 @@ on:
         default: 수집
         options:
           - 수집          # 상세 페이지를 파싱해 JSON 으로 떨군다
-          - 목록탐색      # 목록 페이지에서 상품번호만 모은다
+          - 목록훑기      # 몰 목록 endpoint 를 훑어 상품번호 전량을 모은다
+          - 목록탐색      # 준 주소에서 상품번호·링크 후보를 모은다
           - 구조덤프      # 파싱하지 않고 마크업 구조만 보고한다
           - 원문          # 지정한 줄 범위를 그대로 본다
       codes:
@@ -34,7 +35,7 @@ on:
         required: false
         default: ''
       pages:
-        description: '목록 쪽 수'
+        description: '목록 쪽 수 (목록훑기에서는 최대 쪽 수)'
         required: false
         default: '1'
       limit:
@@ -84,6 +85,9 @@ jobs:
           set -o pipefail
           mkdir -p out
           args=()
+          if [ "$MODE" = "목록훑기" ]; then
+            args+=(--plist --max-pages "${PAGES:-50}" --save-dir out --links-only)
+          fi
           if [ -n "$LINKS" ]; then
             args+=(--links "$LINKS" --pages "${PAGES:-1}")
             [ "$PROBE" = "true" ] && args+=(--probe)
