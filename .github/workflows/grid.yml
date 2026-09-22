@@ -1,0 +1,50 @@
+# 견적 격자(grid_cells·grid_quotes) 재생성 — 손으로 부르는 전용.
+#
+# 왜 자동이 아닌가: 엔진을 134칸 × 3종 부르는 배치라 몇 분이 걸리고, 파생 표를
+# 통째로 갈아 끼운다. 커밋마다 돌릴 일이 아니다.
+#
+# 왜 sudo 를 거치는가: tools/grid_generate.py 는 DATABASE_URL 과 127.0.0.1:8000 을
+# 둘 다 쓴다. 러너 계정(ghrunner)은 /etc/popcorn-ai.env 를 못 읽으므로(의도된 것)
+# root 작업을 가둬 둔 /usr/local/bin/popcorn-ci 를 거친다 — 워크플로에는 sudo 로
+# 부르는 한 줄만 있고, 실제로 무엇을 하는지는 서버의 그 고정 파일이 정한다.
+#
+# ⚠ pull_request 트리거는 절대 넣지 않는다(deploy.yml·regression.yml 의 같은 주석).
+name: 견적 격자 재생성
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: '드라이런 — 격자 표에 쓰지 않는다'
+        type: boolean
+        default: false
+
+concurrency:
+  group: popcorn-deploy
+  cancel-in-progress: false
+
+jobs:
+  grid:
+    runs-on: [self-hosted, popcorn-vm]
+    timeout-minutes: 60
+    steps:
+      - name: 격자 재생성
+        shell: bash
+        env:
+          DRY: ${{ inputs.dry }}
+        run: |
+          set -o pipefail
+          if [ "$DRY" = "true" ]; then sub=grid-dry; else sub=grid; fi
+          log=$(mktemp)
+          if sudo -n /usr/local/bin/popcorn-ci "$sub" 2>&1 | tee "$log"; then
+            ok=0
+          else
+            ok=1
+          fi
+          {
+            echo "## 견적 격자 재생성 ($sub)"
+            echo '```'
+            tail -n 40 "$log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$ok"
