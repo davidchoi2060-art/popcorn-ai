@@ -233,7 +233,7 @@ def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict, bands: dict)
     return common, None
 
 
-def _mark_batch_session(wconn, res: dict) -> None:
+def _mark_batch_session(wconn, res: dict) -> int | None:
     """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시.
 
     ■ 왜 `X-Popcorn-Test` 헤더«만»으로는 안 되는가 (2026-09-22 확인)
@@ -250,14 +250,45 @@ def _mark_batch_session(wconn, res: dict) -> None:
 
     ■ 실패 호출에는 세션이 없다
       `res["ok"]` 가 거짓이면 엔진이 행을 만들기 전에 끊긴 것이라 표시할 대상이 없다.
+
+    ■ 표시한 session_id 를 돌려준다
+      배치가 끝난 뒤 «정말 다 표시됐는지»를 되물을 수 있어야 한다(main 의 사후 대조).
+      UPDATE 가 성공을 반환한다고 해서 원장이 그 상태로 남아 있다는 뜻은 아니다 --
+      다른 경로가 같은 행을 되돌릴 수도 있고, 여기서 예외가 나 커밋이 말려도
+      루프는 다음 칸으로 간다. 그래서 «했다»가 아니라 «남아 있다»를 확인한다.
     """
     sid = ((res.get("json") or {}).get("session_id")) if res.get("ok") else None
     if sid is None:
-        return
+        return None
     from sqlalchemy import text
     wconn.execute(text(
         "UPDATE consult_sessions SET data_origin='test' WHERE session_id=:sid AND data_origin='real'"
     ), {"sid": sid})
+    return sid
+
+
+def audit_batch_sessions(conn, sids: list) -> tuple:
+    """이 배치가 만든 상담 행이 전부 'test' 로 남아 있는지 되센다.
+
+    ■ 왜 「오늘 real 이 늘었나」로 세지 않는가
+      이 DB 는 배포 서버와 공유다(CLAUDE.md). 배치가 도는 22분 사이에 실고객이
+      들어오면 오늘의 real 은 «정상적으로» 는다 -- 그걸 오염으로 읽으면 다음부터
+      아무도 경고를 안 믿는다. 그래서 **우리가 만든 session_id 만** 되센다.
+      거짓 경보가 없으므로 0 이 아니면 그건 진짜 고칠 것이다.
+
+    ■ 못 세는 구멍
+      호출이 실패(`res["ok"]` false)하면 session_id 를 못 받는다. 엔진이 행을 만든
+      뒤에 끊긴 경우가 있으면 그 행은 이 목록에 없고 여기서도 안 잡힌다.
+      지금은 fail_cells=0 이라 해당 없지만, 실패가 생기면 이 한계를 같이 읽어야 한다.
+    """
+    if not sids:
+        return 0, 0
+    from sqlalchemy import text
+    row = conn.execute(text(
+        "SELECT count(*) AS n FROM consult_sessions"
+        " WHERE session_id = ANY(:sids) AND data_origin <> 'test'"),
+        {"sids": sids}).mappings().one()
+    return len(sids), int(row["n"])
 
 
 def _call_recommend(floor: dict, platform: str) -> dict:
@@ -485,6 +516,7 @@ def main():
               " (grid_variant_omissions -- not published, reason stored in DB)",
               flush=True)
 
+    batch_sids: list = []   # consult_sessions.session_id 는 BIGSERIAL 이라 정수다
     t0 = time.time()
     ok_n, over_n, fail_cell_n, fail_variant_n = 0, 0, 0, 0
     failures = []
@@ -582,7 +614,9 @@ def main():
                 # 화면에서 그 카드가 사라진다(마이그레이션을 또 쓰지 않아도 된다).
                 retire_omitted_current(wconn, cell["cell_id"], omit)
                 write_budget_observed(wconn, cell["cell_id"], lo, hi)
-                _mark_batch_session(wconn, res)
+                sid = _mark_batch_session(wconn, res)
+            if sid:
+                batch_sids.append(sid)
         else:
             # ⚠ --dry 는 «격자 표에 쓰지 않는다»는 뜻이지 «아무것도 안 만든다»가 아니다.
             #   엔진 호출은 그대로 하므로 consult_sessions 행은 실제로 생긴다(2026-09-22
@@ -591,7 +625,9 @@ def main():
             #   그래서 드라이런에서도 «자기가 만든 행»만 표시한다. 이건 격자를 바꾸는
             #   쓰기가 아니라 자기 흔적을 치우는 쓰기다.
             with engine.begin() as wconn:
-                _mark_batch_session(wconn, res)
+                sid = _mark_batch_session(wconn, res)
+            if sid:
+                batch_sids.append(sid)
 
     elapsed = time.time() - t0
     print(f"[grid_generate] done in {elapsed:.1f}s ok_variants={ok_n} over_variants={over_n}"
@@ -602,6 +638,18 @@ def main():
               " unless --dry):")
         for cid, reason in failures:
             print(f"  cell_id={cid} {reason}")
+
+    # 사후 대조 -- 「표시했다」가 아니라 「표시된 채 남아 있다」를 확인한다.
+    with engine.connect() as conn:
+        made_n, unmarked_n = audit_batch_sessions(conn, batch_sids)
+    if unmarked_n:
+        print(f"[grid_generate] LEDGER WARN: sessions={made_n} unmarked={unmarked_n}"
+              " -- 이 배치가 만든 상담 행이 원장에 'real' 로 남아 있다."
+              " tools/grid_generate.py _mark_batch_session 을 확인한다.", flush=True)
+    else:
+        print(f"[grid_generate] ledger ok: sessions={made_n} all marked data_origin='test'"
+              " (실고객 행은 세지 않는다 -- 이 배치가 만든 session_id 만 대조)", flush=True)
+
     if args.dry:
         print("[grid_generate] --dry mode -- no rows written to grid_quotes/grid_cells")
 
