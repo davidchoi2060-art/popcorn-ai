@@ -1,0 +1,39 @@
+# 회귀 세트만 따로 돌린다 — 배포는 하지 않는다.
+#
+# 자동으로 돌리지 않는 이유: 이 세트는 검사 과정에서 운영 Cloud SQL 에
+# 검사용 행을 넣었다 지운다(tests/regression.py 의 suppliers·stock_movements 등).
+# 사장님 PC 에서 돌릴 때와 같은 DB 라 새로운 위험은 아니지만, 커밋마다
+# 자동으로 건드릴 일은 아니라서 손으로 부르는 방식으로 둔다.
+#
+# ⚠ pull_request 트리거는 절대 넣지 않는다(deploy.yml 의 같은 주석 참조).
+name: 회귀 세트
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: popcorn-deploy
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    runs-on: [self-hosted, popcorn-vm]
+    timeout-minutes: 60
+    steps:
+      - name: 회귀 세트
+        shell: bash
+        run: |
+          set -o pipefail
+          log=$(mktemp)
+          if sudo -n /usr/local/bin/popcorn-ci regression 2>&1 | tee "$log"; then
+            ok=0
+          else
+            ok=1
+          fi
+          {
+            echo '## 회귀 세트'
+            echo '```'
+            tail -n 30 "$log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$ok"

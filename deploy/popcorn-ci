@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# 서버(GCP VM)에서 배포·검증을 실행하는 **고정 스크립트**.
+#
+# 왜 리포가 아니라 /usr/local/bin 에 두는가:
+#   GitHub Actions self-hosted 러너는 리포의 워크플로 파일을 그대로 실행한다.
+#   그래서 배포·재시작 같은 root 작업을 워크플로에 적어두면, 리포에 푸시할 수 있는
+#   사람은 누구나 서버에서 root 명령을 돌릴 수 있게 된다.
+#   대신 root 작업은 전부 이 파일 하나에 가두고, 러너 계정(ghrunner)에게는
+#   sudoers 로 `popcorn-ci deploy|regression|verify` 세 줄만 허용한다.
+#   → 워크플로를 고쳐도 서버에서 할 수 있는 일은 이 세 가지를 벗어나지 못한다.
+#
+# 설치(서버에서 한 번):
+#   sudo install -m 755 -o root -g root /srv/popcorn-ai/deploy/popcorn-ci /usr/local/bin/popcorn-ci
+#   ⚠ 이 파일이 리포에서 바뀌면 위 명령을 다시 실행해야 반영된다(자동 반영 아님 — 의도된 것).
+#
+# 자세한 설치 절차는 deploy/RUNNER.md.
+
+set -Eeuo pipefail
+
+APP_DIR=/srv/popcorn-ai
+APP_USER=popcorn
+ENV_FILE=/etc/popcorn-ai.env
+SERVICE=popcorn-api
+API=http://127.0.0.1:8000
+BRANCH=main
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "popcorn-ci: root 로 실행해야 한다 (sudo popcorn-ci ...)" >&2
+  exit 1
+fi
+
+# popcorn 계정으로, /etc/popcorn-ai.env 를 읽은 상태에서 명령을 돌린다.
+# env 파일은 640 root:popcorn 이라 popcorn 이 그룹 권한으로 읽는다(deploy/README.md §2).
+as_app() {
+  runuser -u "$APP_USER" -- bash -c "set -a; . '$ENV_FILE'; set +a; $1"
+}
+
+step() { echo; echo "=== $* ==="; }
+
+cmd_deploy() {
+  step "1. 코드 받기 ($BRANCH)"
+  # --ff-only: 서버 트리에 손댄 흔적이 있으면 조용히 합치지 말고 실패시킨다.
+  runuser -u "$APP_USER" -- git -C "$APP_DIR" fetch origin "$BRANCH"
+  runuser -u "$APP_USER" -- git -C "$APP_DIR" merge --ff-only "origin/$BRANCH"
+  runuser -u "$APP_USER" -- git -C "$APP_DIR" log -1 --pretty='  HEAD %h %s'
+
+  step "2. 의존성"
+  runuser -u "$APP_USER" -- "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
+
+  step "3. 마이그레이션"
+  as_app "cd '$APP_DIR/db' && ../.venv/bin/python -m alembic upgrade head"
+  as_app "cd '$APP_DIR/db' && ../.venv/bin/python -m alembic current"
+
+  step "4. 재시작"
+  systemctl restart "$SERVICE"
+  systemctl is-active "$SERVICE"
+
+  step "5. 헬스 체크"
+  # 재시작 직후에는 아직 안 뜬다 — 최대 30초까지 기다린다.
+  for i in $(seq 1 15); do
+    if curl -fsS --max-time 5 "$API/api/health" 2>/dev/null; then
+      echo; echo "  배포 완료."
+      return 0
+    fi
+    sleep 2
+  done
+  echo "  헬스 체크 실패 — 최근 로그:" >&2
+  journalctl -u "$SERVICE" -n 40 --no-pager >&2
+  return 1
+}
+
+cmd_regression() {
+  step "회귀 세트 (서버 코드 · 운영 DB 대조)"
+  # 실행 중인 서버(127.0.0.1:8000)를 검사하므로 배포 뒤에 돌려야 의미가 있다.
+  as_app "cd '$APP_DIR' && REGRESSION_BASE='$API' .venv/bin/python tests/regression.py"
+}
+
+cmd_verify() {
+  step "배포 후 검증 (deploy/verify.sh)"
+  bash "$APP_DIR/deploy/verify.sh"
+}
+
+case "${1-}" in
+  deploy)     cmd_deploy ;;
+  regression) cmd_regression ;;
+  verify)     cmd_verify ;;
+  *)
+    echo "사용법: popcorn-ci deploy|regression|verify" >&2
+    exit 2
+    ;;
+esac

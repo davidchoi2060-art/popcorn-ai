@@ -1,0 +1,60 @@
+# main 에 푸시되면 서버(GCP VM)가 스스로 받아서 배포한다.
+#
+# 서버에 설치한 self-hosted 러너가 이 작업을 가져간다. 러너 계정(ghrunner)은
+# 권한이 거의 없고, root 작업은 서버에 고정해 둔 /usr/local/bin/popcorn-ci
+# 한 파일만 할 수 있다(deploy/popcorn-ci · deploy/RUNNER.md 참조).
+#
+# ⚠ pull_request 트리거는 **절대 넣지 않는다**. 이 리포는 공개라, 넣는 순간
+#    남이 포크에서 올린 코드가 우리 서버에서 돌 수 있다.
+name: 배포
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+    inputs:
+      regression:
+        description: '배포 뒤 회귀 세트까지 돌린다(운영 DB에 검사용 행을 넣었다 지운다)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: popcorn-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, popcorn-vm]
+    timeout-minutes: 20
+    steps:
+      # 리포를 체크아웃하지 않는다 — 서버에서 할 일은 전부 popcorn-ci 안에 있고,
+      # 워크플로가 서버에 코드를 내려놓을 이유가 없다.
+      - name: 배포
+        shell: bash
+        run: sudo -n /usr/local/bin/popcorn-ci deploy
+
+      - name: 검증
+        shell: bash
+        run: sudo -n /usr/local/bin/popcorn-ci verify
+
+      - name: 회귀 세트
+        if: inputs.regression
+        shell: bash
+        run: |
+          set -o pipefail
+          log=$(mktemp)
+          if sudo -n /usr/local/bin/popcorn-ci regression 2>&1 | tee "$log"; then
+            ok=0
+          else
+            ok=1
+          fi
+          {
+            echo '## 회귀 세트'
+            echo '```'
+            tail -n 30 "$log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$ok"
