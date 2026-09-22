@@ -86,6 +86,22 @@ cmd_regression() {
   as_app "cd '$APP_DIR' && REGRESSION_BASE='$API' .venv/bin/python tests/regression.py"
 }
 
+# 견적 격자(grid_cells·grid_quotes) 재생성. 파생 표라 되돌림은 재실행이다.
+# DATABASE_URL 과 127.0.0.1:8000 을 둘 다 쓰므로 ghrunner 로는 못 돌고 여기를 거친다.
+# ⚠ tools/grid_generate.py 는 /api/recommend 를 부르면서 X-Popcorn-Test 표식을
+#    붙이지 않는다(2026-09-22 확인 — 보내는 헤더가 Content-Type 하나뿐이다).
+#    그대로 돌리면 만들어지는 상담 행이 표식 없이 진짜 원장에 섞인다. --dry 도
+#    엔진 호출은 그대로 하므로 같다. 그 파일이 표식을 붙이게 된 뒤에 쓴다.
+cmd_grid() {
+  step "견적 격자 재생성"
+  as_app "cd '$APP_DIR' && .venv/bin/python tools/grid_generate.py"
+}
+
+cmd_grid_dry() {
+  step "견적 격자 재생성 — 드라이런(쓰기 없음)"
+  as_app "cd '$APP_DIR' && .venv/bin/python tools/grid_generate.py --dry"
+}
+
 cmd_verify() {
   step "배포 후 검증 (deploy/verify.sh)"
   bash "$APP_DIR/deploy/verify.sh"
@@ -95,8 +111,10 @@ case "${1-}" in
   deploy)     cmd_deploy ;;
   regression) cmd_regression ;;
   verify)     cmd_verify ;;
+  grid)       cmd_grid ;;
+  grid-dry)   cmd_grid_dry ;;
   *)
-    echo "사용법: popcorn-ci deploy|regression|verify" >&2
+    echo "사용법: popcorn-ci deploy|regression|verify|grid|grid-dry" >&2
     exit 2
     ;;
 esac

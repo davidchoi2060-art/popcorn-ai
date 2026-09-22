@@ -40,6 +40,8 @@ sudo tee /etc/sudoers.d/popcorn-ci >/dev/null <<'EOF'
 ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci deploy
 ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci regression
 ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci verify
+ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci grid
+ghrunner ALL=(root) NOPASSWD: /usr/local/bin/popcorn-ci grid-dry
 EOF
 sudo chmod 440 /etc/sudoers.d/popcorn-ci
 sudo visudo -c                  # "parsed OK" 가 나와야 한다
