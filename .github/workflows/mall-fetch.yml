@@ -8,6 +8,7 @@
 #   · sudo 를 쓰지 않는다(popcorn-ci 를 부르지 않는다 → 서버 root 권한과 무관).
 #   · DB 에 닿지 않는다(도구의 --from-db 경로를 쓰지 않는다).
 #   · 몰에 GET 만 보낸다. 로그인·폼 제출·쿠키가 없다(공개 상세 페이지다).
+#   · 결과를 저장소에 커밋하지 않는다 — 산출 JSON 은 실행 산출물로만 남긴다.
 #
 # ⚠ pull_request 트리거는 절대 넣지 않는다(deploy.yml·regression.yml 의 같은 주석).
 name: 몰 완제PC 수집
@@ -15,18 +16,39 @@ name: 몰 완제PC 수집
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: '무엇을 하나'
+        type: choice
+        default: 수집
+        options:
+          - 수집          # 상세 페이지를 파싱해 JSON 으로 떨군다
+          - 목록탐색      # 목록 페이지에서 상품번호만 모은다
+          - 구조덤프      # 파싱하지 않고 마크업 구조만 보고한다
+          - 원문          # 지정한 줄 범위를 그대로 본다
       codes:
-        description: '상품번호 쉼표 구분 (예: 98149,98150)'
-        required: true
-        default: '98149'
-      dump:
-        description: '구조만 보고(파싱 전 실측)'
-        type: boolean
-        default: true
-      raw:
-        description: '원문 줄 범위 (예: 2000-2015,2310-2560) — 주면 dump 대신 이것만'
+        description: '상품번호 쉼표 구분 (예: 98149,98150) — 수집·구조덤프·원문'
         required: false
         default: ''
+      links:
+        description: '목록 주소 쉼표 구분 ({page} 쓰면 쪽 수만큼 펼친다)'
+        required: false
+        default: ''
+      pages:
+        description: '목록 쪽 수'
+        required: false
+        default: '1'
+      limit:
+        description: '대상 상한 (0 이면 제한 없음)'
+        required: false
+        default: '0'
+      raw:
+        description: '원문 줄 범위 (예: 2000-2015,2310-2560) — 「원문」 모드'
+        required: false
+        default: ''
+      probe:
+        description: '목록탐색에서 다른 링크도 함께 보고'
+        type: boolean
+        default: false
 
 concurrency:
   group: popcorn-mall-fetch
@@ -35,31 +57,56 @@ concurrency:
 jobs:
   fetch:
     runs-on: [self-hosted, popcorn-vm]
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+
+      - name: 파서 자체 검사
+        shell: bash
+        run: python3 tools/mall_builtpc_fetch.py --selftest
 
       - name: 수집
         shell: bash
         env:
+          MODE: ${{ inputs.mode }}
           CODES: ${{ inputs.codes }}
-          DUMP: ${{ inputs.dump }}
+          LINKS: ${{ inputs.links }}
+          PAGES: ${{ inputs.pages }}
+          LIMIT: ${{ inputs.limit }}
           RAW: ${{ inputs.raw }}
+          PROBE: ${{ inputs.probe }}
           # 러너 작업공간 안에만 남긴다 — /srv 의 운영 캐시를 건드리지 않는다.
           MALL_BUILTPC_CACHE: ${{ github.workspace }}/.cache/mall_builtpc
         run: |
           set -o pipefail
-          args=(--codes "$CODES")
-          if [ -n "$RAW" ]; then
-            args+=(--raw "$RAW")
-          elif [ "$DUMP" = "true" ]; then
-            args+=(--dump)
+          mkdir -p out
+          args=()
+          if [ -n "$LINKS" ]; then
+            args+=(--links "$LINKS" --pages "${PAGES:-1}")
+            [ "$PROBE" = "true" ] && args+=(--probe)
+            [ "$MODE" = "목록탐색" ] && args+=(--links-only)
           fi
+          if [ -n "$CODES" ]; then args+=(--codes "$CODES"); fi
+          if [ "${LIMIT:-0}" != "0" ] && [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
+          case "$MODE" in
+            구조덤프) args+=(--dump) ;;
+            원문)     args+=(--raw "$RAW") ;;
+            *)        args+=(--out out/mall_builtpc.json) ;;
+          esac
           log=$(mktemp)
           python3 tools/mall_builtpc_fetch.py "${args[@]}" 2>&1 | tee "$log"
           {
-            echo '## 몰 완제PC 수집'
+            echo "## 몰 완제PC 수집 ($MODE)"
             echo '```'
             tail -n 120 "$log"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 산출물
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mall-builtpc
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -316,6 +316,85 @@ def selftest():
     return 1 if fails else 0
 
 
+# ================================================================ 목록 탐색 ==
+#
+# ■ 왜 필요한가 (2026-09-22)
+#   상세 페이지를 돌려면 «어떤 상품번호를 돌 것인가»가 먼저다. `--from-db` 가 정답이지만
+#   그 경로는 DATABASE_URL 이 있는 자리에서만 돈다 — 서버 러너 계정(ghrunner)은
+#   `/etc/popcorn-ai.env` 를 못 읽고(의도된 것), 클라우드 작업창은 5432 에 못 닿는다.
+#   그래서 «몰의 공개 목록 페이지에서 상품번호를 읽는» 길을 하나 더 둔다. 여전히 GET 뿐이다.
+#
+# ■ 남의 주소를 받지 않는다
+#   `--links` 로 준 주소가 popcornpc.co.kr 이 아니면 거부한다. 이 도구가 다른 사이트를
+#   긁는 데 쓰이지 않게 하는 자물쇠다.
+
+_HOST_OK = ("popcornpc.co.kr",)
+_PDNO_RE = re.compile(r"system_detail\.html\?[^\"'<>]*?pd_no=(\d+)")
+_HREF_RE = re.compile(r"""href\s*=\s*["']([^"'<>]+)["']""", re.I)
+
+
+def _same_site(url):
+    m = re.match(r"https?://([^/]+)", url)
+    host = (m.group(1) if m else "").split(":")[0].lower()
+    return any(host == h or host.endswith("." + h) for h in _HOST_OK)
+
+
+def fetch_url(url):
+    """임의의 «우리 몰» 공개 페이지 원문. 캐시하지 않는다(목록은 매일 바뀐다)."""
+    if not _same_site(url):
+        raise SystemExit("우리 몰 주소가 아닙니다: %s" % url)
+    req = urllib.request.Request(
+        url, headers={"User-Agent": UA, "Accept-Language": "ko-KR,ko;q=0.9"})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            raw = r.read()
+    except urllib.error.HTTPError as e:
+        print("  HTTP %s  %s" % (e.code, url))
+        return None
+    except Exception as e:                                    # noqa: BLE001
+        print("  실패(%s)  %s" % (type(e).__name__, url))
+        return None
+    finally:
+        time.sleep(DELAY)
+    return raw.decode("cp949", "replace")
+
+
+def links(urls, pages=1, probe=False):
+    """목록 페이지에서 완제PC 상품번호를 모은다. (codes, seen_urls)
+
+    `{page}` 가 들어 있는 주소는 1..pages 로 펼친다. 같은 번호는 한 번만 담고,
+    **발견 순서를 지킨다**(몰이 매긴 정렬을 우리가 뒤섞지 않는다).
+    probe 면 그 페이지의 다른 링크도 함께 보고한다 — 목록 주소를 «찾는» 걸음이다.
+    """
+    codes, seen, visited = [], set(), []
+    for base in urls:
+        expanded = ([base.replace("{page}", str(i)) for i in range(1, pages + 1)]
+                    if "{page}" in base else [base])
+        for url in expanded:
+            html = fetch_url(url)
+            if html is None:
+                continue
+            visited.append(url)
+            found = _PDNO_RE.findall(html)
+            fresh = 0
+            for c in found:
+                if c not in seen:
+                    seen.add(c)
+                    codes.append(c)
+                    fresh += 1
+            print("  %s  ->  상품번호 %d개(새로 %d개)" % (url, len(found), fresh))
+            if probe:
+                hrefs, shown = [], set()
+                for h in _HREF_RE.findall(html):
+                    if h in shown or h.startswith(("#", "javascript:", "mailto:")):
+                        continue
+                    shown.add(h)
+                    hrefs.append(h)
+                print("  -- 링크 후보(앞 %d개) --" % min(60, len(hrefs)))
+                for h in hrefs[:60]:
+                    print("     %s" % h[:160])
+    return codes, visited
+
 # ================================================================== 대상 ==
 
 def targets_from_json(path, limit=None):
@@ -356,6 +435,12 @@ def main():
     ap.add_argument("--codes", default="", help="상품번호 쉼표 구분(예: 98149,98150)")
     ap.add_argument("--from-json", default="", help="builtpc_parse.py 산출 JSON 에서 대상을 읽는다")
     ap.add_argument("--from-db", action="store_true", help="판매중 완제PC 를 DB 에서 고른다")
+    ap.add_argument("--links", default="",
+                    help="목록 페이지에서 상품번호를 읽는다(쉼표 구분 · {page} 지원)")
+    ap.add_argument("--pages", type=int, default=1, help="--links 의 {page} 를 1..N 으로 펼친다")
+    ap.add_argument("--probe", action="store_true", help="--links 에서 다른 링크도 함께 보고한다")
+    ap.add_argument("--links-only", action="store_true",
+                    help="상품번호만 모으고 상세 페이지는 받지 않는다")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--dump", action="store_true", help="파싱하지 않고 구조만 보고한다")
     ap.add_argument("--raw", default="", help="원문 줄을 그대로 본다(예: 2000-2015,2310-2560)")
@@ -368,7 +453,21 @@ def main():
     if a.selftest:
         raise SystemExit(selftest())
 
-    if a.codes:
+    if a.links:
+        urls = [u.strip() for u in a.links.split(",") if u.strip()]
+        print("목록 탐색 %d주소 · 쪽 %d · 간격 %.1f초" % (len(urls), a.pages, DELAY))
+        codes, visited = links(urls, pages=a.pages, probe=a.probe)
+        print("\n상품번호 %d개: %s" % (len(codes), ",".join(codes[:200])))
+        if len(codes) > 200:
+            print("(앞 200개만 보였습니다)")
+        if a.out:
+            io.open(a.out, "w", encoding="utf-8").write(
+                json.dumps({"codes": codes, "sources": visited},
+                           ensure_ascii=False, indent=1))
+            print("기록: %s" % a.out)
+        if a.links_only:
+            return
+    elif a.codes:
         codes = [c.strip() for c in a.codes.split(",") if c.strip()]
     elif a.from_json:
         codes = targets_from_json(a.from_json, a.limit)
