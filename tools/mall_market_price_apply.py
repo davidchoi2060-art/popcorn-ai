@@ -77,12 +77,19 @@ def fetch_from_mall(limit=None):
     print("목록 %d건(몰이 말한 전체 %s · %s)" % (len(codes), total, how))
     if limit:
         codes = codes[:limit]
-    items = []
+    from tools.mall_builtpc_fetch import MAX_FAIL
+    items, streak = [], 0
     for i, c in enumerate(codes, 1):
         html, _ = fetch(c)
         if not html:
-            print("  %s 받기 실패" % c)
+            streak += 1
+            print("  %s 받기 실패 (연속 %d)" % (c, streak))
+            # 연속 실패는 차단 신호로 본다 -- 계속 두드리지 않는다(A-18).
+            if streak >= MAX_FAIL:
+                print("  연속 %d회 실패 -- 수집을 멈춘다." % streak)
+                break
             continue
+        streak = 0
         items.append(parse(c, html))
         if i % 50 == 0:
             print("  %d/%d" % (i, len(codes)))
