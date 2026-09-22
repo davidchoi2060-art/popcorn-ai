@@ -234,7 +234,20 @@ def cell_spec_floor(cell: dict, spec_tiers: dict, game_tiers: dict, bands: dict)
 
 
 def _mark_batch_session(wconn, res: dict) -> None:
-    """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시."""
+    """배치 호출은 고객 상담이 아니다 — 방금 만들어진 consult_sessions 행을 'test' 로 표시.
+
+    ■ 왜 `X-Popcorn-Test` 헤더를 쓰지 않는가 (2026-09-22 확인)
+      그 헤더는 **운영 서버에서 항상 무시된다.** 이중 게이트 중 하나가
+      `.env` 의 `POPCORN_TEST_HEADER_ENABLED` 인데 배포 서버 `.env` 에는 그 값을
+      **일부러 넣지 않는다**(`api/recommend.py` 의 헤더 주석 · `deploy/README.md`).
+      그래서 헤더를 실어 보내도 `data_origin` 은 'real' 로 남는다. 이 배치는
+      DATABASE_URL 을 이미 쥐고 있으므로 **자기가 만든 행만** 직접 표시한다.
+      `AND data_origin='real'` 을 건 것은 남의 행이나 이미 표시된 행을 건드리지
+      않기 위해서다.
+
+    ■ 실패 호출에는 세션이 없다
+      `res["ok"]` 가 거짓이면 엔진이 행을 만들기 전에 끊긴 것이라 표시할 대상이 없다.
+    """
     sid = ((res.get("json") or {}).get("session_id")) if res.get("ok") else None
     if sid is None:
         return
@@ -558,6 +571,15 @@ def main():
                 # 화면에서 그 카드가 사라진다(마이그레이션을 또 쓰지 않아도 된다).
                 retire_omitted_current(wconn, cell["cell_id"], omit)
                 write_budget_observed(wconn, cell["cell_id"], lo, hi)
+                _mark_batch_session(wconn, res)
+        else:
+            # ⚠ --dry 는 «격자 표에 쓰지 않는다»는 뜻이지 «아무것도 안 만든다»가 아니다.
+            #   엔진 호출은 그대로 하므로 consult_sessions 행은 실제로 생긴다(2026-09-22
+            #   지적받아 확인). 표시를 여기서 빼면 드라이런이 돌 때마다 표식 없는 상담이
+            #   원장에 쌓인다 — 「검증이 흔적을 남긴다」(슬라이스 78)가 정확히 이 모양이었다.
+            #   그래서 드라이런에서도 «자기가 만든 행»만 표시한다. 이건 격자를 바꾸는
+            #   쓰기가 아니라 자기 흔적을 치우는 쓰기다.
+            with engine.begin() as wconn:
                 _mark_batch_session(wconn, res)
 
     elapsed = time.time() - t0
