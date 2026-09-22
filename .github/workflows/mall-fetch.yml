@@ -88,6 +88,7 @@ jobs:
             args+=(--links "$LINKS" --pages "${PAGES:-1}")
             [ "$PROBE" = "true" ] && args+=(--probe)
             [ "$MODE" = "목록탐색" ] && args+=(--links-only)
+            [ "$PROBE" = "true" ] && args+=(--save-dir out)
           fi
           if [ -n "$CODES" ]; then args+=(--codes "$CODES"); fi
           if [ "${LIMIT:-0}" != "0" ] && [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
@@ -126,9 +127,9 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          ls out/*.json >/dev/null 2>&1 || { echo '올릴 JSON 이 없습니다 -- 건너뜁니다.'; exit 0; }
+          ls out/* >/dev/null 2>&1 || { echo '올릴 결과가 없습니다 -- 건너뜁니다.'; exit 0; }
           tmp=$(mktemp -d)
-          cp out/*.json "$tmp"/
+          cp out/* "$tmp"/
           cd "$tmp"
           git init -q
           git config user.name 'popcorn-runner'

@@ -359,7 +359,7 @@ def fetch_url(url):
     return raw.decode("cp949", "replace")
 
 
-def links(urls, pages=1, probe=False):
+def links(urls, pages=1, probe=False, save_dir=""):
     """목록 페이지에서 완제PC 상품번호를 모은다. (codes, seen_urls, hrefs)
 
     `{page}` 가 들어 있는 주소는 1..pages 로 펼친다. 같은 번호는 한 번만 담고,
@@ -376,6 +376,11 @@ def links(urls, pages=1, probe=False):
             if html is None:
                 continue
             visited.append(url)
+            if save_dir:
+                os.makedirs(save_dir, exist_ok=True)
+                fn = os.path.join(save_dir, "list_%02d.html" % len(visited))
+                io.open(fn, "w", encoding="utf-8").write(html)
+                print("  원문 저장: %s (%d바이트)" % (fn, len(html)))
             found = _PDNO_RE.findall(html)
             fresh = 0
             for c in found:
@@ -441,6 +446,7 @@ def main():
                     help="목록 페이지에서 상품번호를 읽는다(쉼표 구분 · {page} 지원)")
     ap.add_argument("--pages", type=int, default=1, help="--links 의 {page} 를 1..N 으로 펼친다")
     ap.add_argument("--probe", action="store_true", help="--links 에서 다른 링크도 함께 보고한다")
+    ap.add_argument("--save-dir", default="", help="--links 로 받은 목록 원문을 이 폴더에 남긴다")
     ap.add_argument("--links-only", action="store_true",
                     help="상품번호만 모으고 상세 페이지는 받지 않는다")
     ap.add_argument("--limit", type=int, default=None)
@@ -458,7 +464,8 @@ def main():
     if a.links:
         urls = [u.strip() for u in a.links.split(",") if u.strip()]
         print("목록 탐색 %d주소 · 쪽 %d · 간격 %.1f초" % (len(urls), a.pages, DELAY))
-        codes, visited, hrefs = links(urls, pages=a.pages, probe=a.probe)
+        codes, visited, hrefs = links(urls, pages=a.pages, probe=a.probe,
+                                      save_dir=a.save_dir)
         print("\n상품번호 %d개: %s" % (len(codes), ",".join(codes[:200])))
         if len(codes) > 200:
             print("(앞 200개만 보였습니다)")
