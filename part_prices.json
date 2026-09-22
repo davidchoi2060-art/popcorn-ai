@@ -1,0 +1,2209 @@
+{
+ "prices": {
+  "110964": {
+   "price": 159500,
+   "dealer_price": 155510,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123395": {
+   "price": 19500,
+   "dealer_price": 19010,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "109547": {
+   "price": 225800,
+   "dealer_price": 220160,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113685": {
+   "price": 77000,
+   "dealer_price": 75080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124852": {
+   "price": 667200,
+   "dealer_price": 650520,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128462": {
+   "price": 212400,
+   "dealer_price": 207090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121242": {
+   "price": 39500,
+   "dealer_price": 38910,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129250": {
+   "price": 42600,
+   "dealer_price": 41540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113800": {
+   "price": 174100,
+   "dealer_price": 169750,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113850": {
+   "price": 330500,
+   "dealer_price": 322240,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127891": {
+   "price": 137600,
+   "dealer_price": 134160,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "121697": {
+   "price": 58500,
+   "dealer_price": 57040,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "111066": {
+   "price": 169500,
+   "dealer_price": 165260,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121789": {
+   "price": 19000,
+   "dealer_price": 18530,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112504": {
+   "price": 61400,
+   "dealer_price": 59870,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128419": {
+   "price": 382900,
+   "dealer_price": 373330,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121652": {
+   "price": 47000,
+   "dealer_price": 45830,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "111146": {
+   "price": 39000,
+   "dealer_price": 38030,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119270": {
+   "price": 186900,
+   "dealer_price": 182230,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128778": {
+   "price": 22600,
+   "dealer_price": 22040,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116508": {
+   "price": 68300,
+   "dealer_price": 66590,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122516": {
+   "price": 302800,
+   "dealer_price": 295230,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120943": {
+   "price": 60600,
+   "dealer_price": 59090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113254": {
+   "price": 441500,
+   "dealer_price": 430460,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120906": {
+   "price": 78500,
+   "dealer_price": 76540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127555": {
+   "price": 661000,
+   "dealer_price": 644480,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129288": {
+   "price": 1995600,
+   "dealer_price": 1945710,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126686": {
+   "price": 79700,
+   "dealer_price": 77710,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "110967": {
+   "price": 362200,
+   "dealer_price": 353150,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113689": {
+   "price": 148800,
+   "dealer_price": 145080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "107524": {
+   "price": 46500,
+   "dealer_price": 45800,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124631": {
+   "price": 864300,
+   "dealer_price": 842690,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121632": {
+   "price": 45100,
+   "dealer_price": 43970,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128870": {
+   "price": 81600,
+   "dealer_price": 79560,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124186": {
+   "price": 46700,
+   "dealer_price": 45530,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116034": {
+   "price": 470300,
+   "dealer_price": 458540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128954": {
+   "price": 125000,
+   "dealer_price": 121880,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124467": {
+   "price": 63100,
+   "dealer_price": 61520,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123110": {
+   "price": 44100,
+   "dealer_price": 43000,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113162": {
+   "price": 379800,
+   "dealer_price": 370310,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126924": {
+   "price": 89300,
+   "dealer_price": 87070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120979": {
+   "price": 42600,
+   "dealer_price": 41960,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112864": {
+   "price": 338000,
+   "dealer_price": 329550,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119845": {
+   "price": 171400,
+   "dealer_price": 167120,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "115248": {
+   "price": 390100,
+   "dealer_price": 380350,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "111087": {
+   "price": 45800,
+   "dealer_price": 45110,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "108887": {
+   "price": 112900,
+   "dealer_price": 110080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124985": {
+   "price": 42600,
+   "dealer_price": 41540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116038": {
+   "price": 291300,
+   "dealer_price": 284020,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128953": {
+   "price": 122700,
+   "dealer_price": 119630,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124465": {
+   "price": 131400,
+   "dealer_price": 128120,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116537": {
+   "price": 236100,
+   "dealer_price": 230200,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124407": {
+   "price": 1272900,
+   "dealer_price": 1241080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119931": {
+   "price": 142700,
+   "dealer_price": 140560,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "122178": {
+   "price": 138600,
+   "dealer_price": 135140,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "110965": {
+   "price": 197500,
+   "dealer_price": 192560,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "109138": {
+   "price": 225900,
+   "dealer_price": 220250,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "51188": {
+   "price": null,
+   "dealer_price": null,
+   "soldout": false,
+   "ok": false,
+   "err": "몰 가격 0원"
+  },
+  "119266": {
+   "price": 150500,
+   "dealer_price": 146740,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121359": {
+   "price": 192900,
+   "dealer_price": 188080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "101309": {
+   "price": null,
+   "dealer_price": null,
+   "soldout": false,
+   "ok": false,
+   "err": "몰 가격 0원"
+  },
+  "110674": {
+   "price": null,
+   "dealer_price": null,
+   "soldout": false,
+   "ok": false,
+   "err": "몰 가격 0원"
+  },
+  "113919": {
+   "price": 39500,
+   "dealer_price": 38510,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112789": {
+   "price": 148900,
+   "dealer_price": 145180,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "110899": {
+   "price": 97600,
+   "dealer_price": 95160,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121492": {
+   "price": 33000,
+   "dealer_price": 32180,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123633": {
+   "price": 20700,
+   "dealer_price": 20180,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112861": {
+   "price": 184800,
+   "dealer_price": 180180,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119779": {
+   "price": 42000,
+   "dealer_price": 40950,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "114155": {
+   "price": 98900,
+   "dealer_price": 96430,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122409": {
+   "price": 651400,
+   "dealer_price": 635120,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123854": {
+   "price": 261700,
+   "dealer_price": 255160,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112780": {
+   "price": 317700,
+   "dealer_price": 309760,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "114514": {
+   "price": 61600,
+   "dealer_price": 60060,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112458": {
+   "price": 338800,
+   "dealer_price": 330330,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121803": {
+   "price": 615500,
+   "dealer_price": 600110,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128654": {
+   "price": 1498700,
+   "dealer_price": 1461230,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "108696": {
+   "price": 128300,
+   "dealer_price": 125090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121806": {
+   "price": 401900,
+   "dealer_price": 391850,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "110991": {
+   "price": 491900,
+   "dealer_price": 479600,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "110966": {
+   "price": 352500,
+   "dealer_price": 343690,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "118431": {
+   "price": 93400,
+   "dealer_price": 91070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123558": {
+   "price": 2662800,
+   "dealer_price": 2596230,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "109753": {
+   "price": 564600,
+   "dealer_price": 550490,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "114363": {
+   "price": 1786200,
+   "dealer_price": 1741550,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "119268": {
+   "price": 121500,
+   "dealer_price": 118460,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126853": {
+   "price": 708300,
+   "dealer_price": 690590,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113918": {
+   "price": 44100,
+   "dealer_price": 43000,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119276": {
+   "price": 432900,
+   "dealer_price": 422080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113945": {
+   "price": 434300,
+   "dealer_price": 423440,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122117": {
+   "price": 236200,
+   "dealer_price": 230300,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127405": {
+   "price": 667400,
+   "dealer_price": 650720,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121944": {
+   "price": 451600,
+   "dealer_price": 440310,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "123372": {
+   "price": 9161700,
+   "dealer_price": 8932660,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122350": {
+   "price": 183700,
+   "dealer_price": 179110,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116326": {
+   "price": 497900,
+   "dealer_price": 485450,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116029": {
+   "price": 584000,
+   "dealer_price": 569400,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123014": {
+   "price": 266500,
+   "dealer_price": 259840,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128082": {
+   "price": 2682300,
+   "dealer_price": 2615240,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127201": {
+   "price": 363000,
+   "dealer_price": 362640,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127203": {
+   "price": 152400,
+   "dealer_price": 152250,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127344": {
+   "price": 25136800,
+   "dealer_price": 24508380,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "119230": {
+   "price": 575000,
+   "dealer_price": 560630,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120901": {
+   "price": 142700,
+   "dealer_price": 139130,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120905": {
+   "price": 137500,
+   "dealer_price": 134060,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128779": {
+   "price": 34400,
+   "dealer_price": 33540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112983": {
+   "price": 347300,
+   "dealer_price": 338620,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123291": {
+   "price": 2340500,
+   "dealer_price": 2281990,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123121": {
+   "price": 221700,
+   "dealer_price": 216160,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "118524": {
+   "price": 1020400,
+   "dealer_price": 994890,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120857": {
+   "price": 240700,
+   "dealer_price": 234680,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "118432": {
+   "price": 97000,
+   "dealer_price": 94580,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112984": {
+   "price": 518700,
+   "dealer_price": 505730,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128080": {
+   "price": 5008500,
+   "dealer_price": 4883290,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112624": {
+   "price": 165600,
+   "dealer_price": 161960,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "112635": {
+   "price": 85500,
+   "dealer_price": 84220,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "119606": {
+   "price": 437900,
+   "dealer_price": 426950,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113146": {
+   "price": 330000,
+   "dealer_price": 321750,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123867": {
+   "price": 87800,
+   "dealer_price": 85610,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129422": {
+   "price": 474300,
+   "dealer_price": 462440,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122306": {
+   "price": 339300,
+   "dealer_price": 330820,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121748": {
+   "price": 146800,
+   "dealer_price": 143130,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121808": {
+   "price": 827200,
+   "dealer_price": 806520,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124231": {
+   "price": 306900,
+   "dealer_price": 299230,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128085": {
+   "price": 13500000,
+   "dealer_price": 13162500,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "111403": {
+   "price": 28500,
+   "dealer_price": 27790,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119856": {
+   "price": 94400,
+   "dealer_price": 92040,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124170": {
+   "price": 276100,
+   "dealer_price": 269200,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "114635": {
+   "price": 323500,
+   "dealer_price": 315410,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "120865": {
+   "price": 87800,
+   "dealer_price": 85610,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116027": {
+   "price": 642200,
+   "dealer_price": 626150,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127182": {
+   "price": 2779900,
+   "dealer_price": 2710400,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "120008": {
+   "price": 385100,
+   "dealer_price": 375470,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112556": {
+   "price": 387000,
+   "dealer_price": 377330,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124455": {
+   "price": 18400,
+   "dealer_price": 17940,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "108035": {
+   "price": 17500,
+   "dealer_price": 17060,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113481": {
+   "price": 893100,
+   "dealer_price": 870770,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113499": {
+   "price": 160100,
+   "dealer_price": 156100,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "102780": {
+   "price": 329000,
+   "dealer_price": 320780,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113484": {
+   "price": 274100,
+   "dealer_price": 267250,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129255": {
+   "price": 460900,
+   "dealer_price": 449380,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113511": {
+   "price": 1385800,
+   "dealer_price": 1351160,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "115829": {
+   "price": 3952200,
+   "dealer_price": 3853400,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113508": {
+   "price": 975200,
+   "dealer_price": 950820,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119864": {
+   "price": 14012200,
+   "dealer_price": 13661900,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127157": {
+   "price": 248600,
+   "dealer_price": 242390,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "129573": {
+   "price": 32438500,
+   "dealer_price": 31627540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120285": {
+   "price": 2061300,
+   "dealer_price": 2009770,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "119214": {
+   "price": 1488500,
+   "dealer_price": 1451290,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "98086": {
+   "price": 659100,
+   "dealer_price": 642620,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "118490": {
+   "price": 10000,
+   "dealer_price": 9750,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129552": {
+   "price": 36900,
+   "dealer_price": 35980,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "105195": {
+   "price": 29600,
+   "dealer_price": 28860,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129551": {
+   "price": 39600,
+   "dealer_price": 38610,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121488": {
+   "price": 39900,
+   "dealer_price": 39300,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113829": {
+   "price": 48800,
+   "dealer_price": 48070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123027": {
+   "price": 179900,
+   "dealer_price": 175400,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128827": {
+   "price": 100600,
+   "dealer_price": 98090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128646": {
+   "price": 26300,
+   "dealer_price": 25640,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "117375": {
+   "price": 58700,
+   "dealer_price": 57230,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "125143": {
+   "price": 23600,
+   "dealer_price": 23010,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "114641": {
+   "price": 3079600,
+   "dealer_price": 3002610,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113485": {
+   "price": 264800,
+   "dealer_price": 260830,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "121111": {
+   "price": 48247200,
+   "dealer_price": 47041020,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "107106": {
+   "price": 481400,
+   "dealer_price": 469370,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "111065": {
+   "price": 297500,
+   "dealer_price": 290060,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122049": {
+   "price": 149900,
+   "dealer_price": 146150,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "119305": {
+   "price": 134500,
+   "dealer_price": 131140,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120977": {
+   "price": 92900,
+   "dealer_price": 90580,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "109667": {
+   "price": 201200,
+   "dealer_price": 198180,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "126871": {
+   "price": 235200,
+   "dealer_price": 229320,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122305": {
+   "price": 324900,
+   "dealer_price": 316780,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122250": {
+   "price": 317100,
+   "dealer_price": 309170,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "114723": {
+   "price": 47400,
+   "dealer_price": 46220,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122324": {
+   "price": null,
+   "dealer_price": null,
+   "soldout": false,
+   "ok": false,
+   "err": "몰 가격 0원"
+  },
+  "121281": {
+   "price": 47200,
+   "dealer_price": 46490,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122785": {
+   "price": 390600,
+   "dealer_price": 380840,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113884": {
+   "price": 1586000,
+   "dealer_price": 1546350,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113888": {
+   "price": 513300,
+   "dealer_price": 500470,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "121921": {
+   "price": 928900,
+   "dealer_price": 914970,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "123940": {
+   "price": 74400,
+   "dealer_price": 72540,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "112665": {
+   "price": 252500,
+   "dealer_price": 246190,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123455": {
+   "price": 100,
+   "dealer_price": 100,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "114725": {
+   "price": 241200,
+   "dealer_price": 235170,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122038": {
+   "price": 861300,
+   "dealer_price": 839770,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113568": {
+   "price": 253300,
+   "dealer_price": 246970,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121758": {
+   "price": 146800,
+   "dealer_price": 143130,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122560": {
+   "price": 109800,
+   "dealer_price": 107060,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127699": {
+   "price": 156000,
+   "dealer_price": 152100,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123450": {
+   "price": 128300,
+   "dealer_price": 125090,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "123887": {
+   "price": 1910400,
+   "dealer_price": 1862640,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123604": {
+   "price": 128300,
+   "dealer_price": 125090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "115751": {
+   "price": 137600,
+   "dealer_price": 134160,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127444": {
+   "price": 165300,
+   "dealer_price": 165130,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122798": {
+   "price": 403600,
+   "dealer_price": 393510,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124903": {
+   "price": 202300,
+   "dealer_price": 197240,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "126870": {
+   "price": 253200,
+   "dealer_price": 246870,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124765": {
+   "price": 40100,
+   "dealer_price": 39100,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121355": {
+   "price": 46900,
+   "dealer_price": 45730,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119256": {
+   "price": 316800,
+   "dealer_price": 308880,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124967": {
+   "price": 891000,
+   "dealer_price": 891000,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "122186": {
+   "price": 65700,
+   "dealer_price": 64710,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "115726": {
+   "price": 125800,
+   "dealer_price": 122660,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122194": {
+   "price": 62000,
+   "dealer_price": 61070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123603": {
+   "price": 78000,
+   "dealer_price": 76050,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126067": {
+   "price": 1247200,
+   "dealer_price": 1216020,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113969": {
+   "price": 385100,
+   "dealer_price": 375470,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128091": {
+   "price": 61400,
+   "dealer_price": 59870,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127442": {
+   "price": 90300,
+   "dealer_price": 88040,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128501": {
+   "price": 36600,
+   "dealer_price": 35690,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "115830": {
+   "price": 325300,
+   "dealer_price": 317170,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127355": {
+   "price": 148800,
+   "dealer_price": 148650,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126860": {
+   "price": 811000,
+   "dealer_price": 790730,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "122122": {
+   "price": 59500,
+   "dealer_price": 58010,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123904": {
+   "price": 934100,
+   "dealer_price": 910750,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124010": {
+   "price": 84200,
+   "dealer_price": 82100,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119448": {
+   "price": 61300,
+   "dealer_price": 59770,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119754": {
+   "price": 282100,
+   "dealer_price": 275050,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127644": {
+   "price": 22500,
+   "dealer_price": 21940,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113743": {
+   "price": 56500,
+   "dealer_price": 55090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113566": {
+   "price": 477300,
+   "dealer_price": 465370,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122002": {
+   "price": 40500,
+   "dealer_price": 39490,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "120873": {
+   "price": 65200,
+   "dealer_price": 63570,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127946": {
+   "price": 18800,
+   "dealer_price": 18330,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127679": {
+   "price": 65500,
+   "dealer_price": 63860,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127752": {
+   "price": 34800,
+   "dealer_price": 33930,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127658": {
+   "price": 240200,
+   "dealer_price": 234200,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124576": {
+   "price": 1189800,
+   "dealer_price": 1160060,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "127295": {
+   "price": 48200,
+   "dealer_price": 47000,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121011": {
+   "price": 76500,
+   "dealer_price": 74590,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127659": {
+   "price": 236000,
+   "dealer_price": 230100,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123708": {
+   "price": 1488500,
+   "dealer_price": 1451290,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123208": {
+   "price": 131400,
+   "dealer_price": 128120,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122119": {
+   "price": 209300,
+   "dealer_price": 204070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124011": {
+   "price": 1288300,
+   "dealer_price": 1256090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121279": {
+   "price": 92400,
+   "dealer_price": 90090,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "128119": {
+   "price": 19500,
+   "dealer_price": 19010,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123917": {
+   "price": 148900,
+   "dealer_price": 145180,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126198": {
+   "price": 380800,
+   "dealer_price": 371280,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119863": {
+   "price": 6046300,
+   "dealer_price": 5895140,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127838": {
+   "price": 334700,
+   "dealer_price": 326330,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "129571": {
+   "price": 8109600,
+   "dealer_price": 7906860,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127334": {
+   "price": 337000,
+   "dealer_price": 328580,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127047": {
+   "price": 682700,
+   "dealer_price": 665630,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128733": {
+   "price": 330400,
+   "dealer_price": 322140,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124567": {
+   "price": 1092200,
+   "dealer_price": 1064900,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "113970": {
+   "price": 610500,
+   "dealer_price": 595240,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119988": {
+   "price": 54500,
+   "dealer_price": 53680,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128699": {
+   "price": 325500,
+   "dealer_price": 317360,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127522": {
+   "price": 39900,
+   "dealer_price": 39860,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127917": {
+   "price": 325200,
+   "dealer_price": 317070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113700": {
+   "price": 117900,
+   "dealer_price": 114950,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128424": {
+   "price": 800700,
+   "dealer_price": 780680,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121365": {
+   "price": 384900,
+   "dealer_price": 375280,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128611": {
+   "price": 49600,
+   "dealer_price": 48360,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "120917": {
+   "price": 64700,
+   "dealer_price": 63080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129424": {
+   "price": 316900,
+   "dealer_price": 316580,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124898": {
+   "price": 219000,
+   "dealer_price": 213530,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127338": {
+   "price": 708300,
+   "dealer_price": 690590,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128587": {
+   "price": 43700,
+   "dealer_price": 42610,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124223": {
+   "price": 219800,
+   "dealer_price": 214310,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123939": {
+   "price": 83700,
+   "dealer_price": 81610,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127768": {
+   "price": 34800,
+   "dealer_price": 33930,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128269": {
+   "price": 219700,
+   "dealer_price": 214210,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123699": {
+   "price": 1080900,
+   "dealer_price": 1053880,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "128650": {
+   "price": 56700,
+   "dealer_price": 55280,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121481": {
+   "price": 128300,
+   "dealer_price": 125090,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123697": {
+   "price": 1099000,
+   "dealer_price": 1099000,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "128026": {
+   "price": 355800,
+   "dealer_price": 346910,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128728": {
+   "price": 330400,
+   "dealer_price": 322140,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123057": {
+   "price": 219700,
+   "dealer_price": 214210,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123572": {
+   "price": 1903200,
+   "dealer_price": 1855620,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "111410": {
+   "price": 706300,
+   "dealer_price": 688640,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "119447": {
+   "price": 65200,
+   "dealer_price": 63570,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129333": {
+   "price": 700100,
+   "dealer_price": 682600,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "110212": {
+   "price": 147800,
+   "dealer_price": 144110,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128135": {
+   "price": 46600,
+   "dealer_price": 45440,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124004": {
+   "price": 99100,
+   "dealer_price": 96620,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123197": {
+   "price": 116500,
+   "dealer_price": 113590,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "128274": {
+   "price": 171400,
+   "dealer_price": 167120,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123795": {
+   "price": 1278000,
+   "dealer_price": 1246050,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "113744": {
+   "price": 667200,
+   "dealer_price": 650520,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124474": {
+   "price": 82500,
+   "dealer_price": 80440,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127562": {
+   "price": 61600,
+   "dealer_price": 60060,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128804": {
+   "price": 641600,
+   "dealer_price": 625560,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "123914": {
+   "price": 269000,
+   "dealer_price": 262280,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129332": {
+   "price": 863300,
+   "dealer_price": 841720,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "108494": {
+   "price": 159500,
+   "dealer_price": 155510,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128825": {
+   "price": 142800,
+   "dealer_price": 139230,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124633": {
+   "price": 712500,
+   "dealer_price": 694690,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128449": {
+   "price": 235100,
+   "dealer_price": 229220,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129775": {
+   "price": 731900,
+   "dealer_price": 713600,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127724": {
+   "price": 264800,
+   "dealer_price": 258180,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "129380": {
+   "price": 112900,
+   "dealer_price": 110080,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127908": {
+   "price": 105800,
+   "dealer_price": 103160,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128645": {
+   "price": 81600,
+   "dealer_price": 81520,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124962": {
+   "price": 731800,
+   "dealer_price": 713510,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123589": {
+   "price": 2100300,
+   "dealer_price": 2047790,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "108693": {
+   "price": 99000,
+   "dealer_price": 96530,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "116556": {
+   "price": 190000,
+   "dealer_price": 185250,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "124497": {
+   "price": 93400,
+   "dealer_price": 91070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "123937": {
+   "price": 670500,
+   "dealer_price": 653740,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "123967": {
+   "price": 2336400,
+   "dealer_price": 2277990,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "121807": {
+   "price": 270900,
+   "dealer_price": 264130,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "107547": {
+   "price": 100,
+   "dealer_price": 100,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122226": {
+   "price": 172500,
+   "dealer_price": 168190,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "126045": {
+   "price": 813000,
+   "dealer_price": 792680,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "122413": {
+   "price": 184200,
+   "dealer_price": 179600,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "115837": {
+   "price": 177500,
+   "dealer_price": 173060,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "126923": {
+   "price": 102600,
+   "dealer_price": 100040,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "126223": {
+   "price": 308000,
+   "dealer_price": 300300,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "121699": {
+   "price": 33300,
+   "dealer_price": 32800,
+   "soldout": true,
+   "ok": true,
+   "err": null
+  },
+  "123636": {
+   "price": 93400,
+   "dealer_price": 91070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "127969": {
+   "price": 325200,
+   "dealer_price": 317070,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  },
+  "128942": {
+   "price": 162200,
+   "dealer_price": 158150,
+   "soldout": false,
+   "ok": true,
+   "err": null
+  }
+ }
+}
