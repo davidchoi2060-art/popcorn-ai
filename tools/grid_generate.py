@@ -276,9 +276,17 @@ def _call_recommend(floor: dict, platform: str) -> dict:
         "gpu_watt_min": floor["gpu_watt_min"], "cpu_cores_min": floor["cpu_cores_min"],
         "ram_min_gb": floor["ram_min_gb"], "ssd_min_gb": floor["ssd_min_gb"],
     }
+    # 표식을 «두 겹»으로 건다 -- 어느 한쪽만으로는 구멍이 남는다(2026-09-22).
+    #   ① 이 헤더: 서버 `.env` 에 POPCORN_TEST_HEADER_ENABLED 가 켜져 있으면 행이
+    #      **처음부터** data_origin='test' 로 태어난다. 꺼져 있으면 조용히 무시된다
+    #      (자기 신고라 아무나 못 쓰게 이중 게이트 -- api/recommend.py TEST_HEADER 주석).
+    #      이름과 값은 tests/regression.py `_headers()` 와 같은 것을 쓴다.
+    #   ② `_mark_batch_session()`: 그 스위치가 꺼져 있어도 배치가 자기 행을 직접 표시한다.
+    # ①만 믿으면 스위치가 없는 서버에서 표식이 통째로 사라지고, ②만 믿으면 INSERT 와
+    # UPDATE 사이에 'real' 인 찰나가 남는다. 둘 다 건다.
     req = urllib.request.Request(
         API_URL, data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST")
+        headers={"Content-Type": "application/json", "X-Popcorn-Test": "1"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=180) as resp:
             return {"ok": True, "status": resp.status, "json": json.loads(resp.read())}
