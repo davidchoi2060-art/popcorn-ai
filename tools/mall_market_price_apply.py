@@ -17,15 +17,20 @@
   **잠금이 중요하다**: `locked_fields ? 'market_price'` 가 붙어야 다음 카탈로그 적재가
   이 값을 되돌리지 않는다(`api/catalog_ingest.py` UPSERT · A-104).
 
-■ A-108 「첫 값은 사람이 확인한다」와 이 도구의 관계
-  자동 승인 판정(`market_auto_approve_decision`)은 현재 값이 0/NULL 이면 «사람 확인»을
-  낸다. 완제PC 는 대부분 0 이라 212건이 전부 검수 대기로 남고, 그 큐에는 시세용 일괄
-  승인 버튼이 없다(`bulk_confirm` 은 low_confidence 전용) — 사장님이 212번을 눌러야 한다.
-  그래서 **`--approve-first` 를 줄 때만** 첫 값도 승인한다. 근거는 사장님의 2026-09-22
-  「승인」(스레드 「완제PC 몰 페이지 수집」 — 「시중가를 우리 DB에 넣기」에 대한 답)이고,
-  그 사실을 원장 detail 에 남긴다.
-  ⚠ **판정 함수는 건드리지 않는다** — 다나와 경로의 규칙은 그대로다. 이 도구가 스스로
-  판정을 느슨하게 하는 것이 아니라, 사람이 내린 일괄 결정을 기계적으로 집행하는 것이다.
+■ A-108 자동 승인 문턱(5%)과 이 도구의 관계
+  `market_auto_approve_decision()` 은 |변동률| 5% 미만만 자동 승인하고, 현재 값이
+  0/NULL 이면 「첫 값은 사람이 확인한다」로 사람에게 넘긴다. 그 규칙은 **다나와 제안**
+  (남의 사이트 값)을 대상으로 정해진 것이다 -- A-18 「외부 수집은 제안까지만」의 짝.
+  여기서 넣는 값은 **우리 몰의 시중가**이고, 같은 값이 카탈로그 적재로도 들어온다
+  (`api/catalog_ingest.py` UPSERT 의 `market_price` -- 잠기지 않았으면 검수 없이 덮는다).
+  즉 이 경로에 문턱을 그대로 걸면, 같은 원천의 같은 값이 들어오는 길에 따라 한쪽만
+  사람 확인을 요구하게 된다. 그래서 `--approve-mall` 을 줄 때는 문턱에 걸린 건도
+  반영하고, **그 근거를 원장 detail 에 남긴다.**
+  ⚠ **판정 함수는 건드리지 않는다** -- 다나와 경로의 규칙은 그대로다. 드라이런은
+  「문턱 안 / 문턱 밖」을 나눠 보고하므로, 플래그 없이 돌리면 무엇이 대기로 남는지
+  미리 보인다.
+  ⚠ **승인은 `locked_fields ? 'market_price'` 를 남긴다**(A-104) -- 그 뒤로 카탈로그
+  적재는 이 값을 못 고친다. 다음 갱신은 이 도구로 한다.
 
 ■ 안 하는 것
   · 드라이런이 기본이다(`--apply` 를 줘야 쓴다).
@@ -37,8 +42,8 @@
 
 ■ 실행
     python tools/mall_market_price_apply.py --fetch                 # 드라이런
-    python tools/mall_market_price_apply.py --fetch --apply --approve-first
-    python tools/mall_market_price_apply.py --from-json out.json --apply --approve-first
+    python tools/mall_market_price_apply.py --fetch --apply --approve-mall
+    python tools/mall_market_price_apply.py --from-json out.json --apply --approve-mall
 """
 import argparse
 import io
@@ -61,7 +66,9 @@ ensure_utf8_console()
 # 사장님 일괄 승인 근거 — 원장 detail 에 그대로 남긴다(왜 첫 값을 사람 클릭 없이
 # 넣었는지가 나중에 답이 돼야 한다).
 OWNER_APPROVAL = ("사장님 2026-09-22 일괄 승인 - 스레드 '완제PC 몰 페이지 수집'"
-                  " ('시중가를 우리 DB에 넣기' 에 대한 답 '승인')")
+                  " ('시중가를 우리 DB에 넣기' 에 대한 답 '승인', 이어서 '다 끝난뒤"
+                  " 실제 반영하고 내가 볼꼐'). 원천은 우리 몰의 상세 상단 시중가로,"
+                  " 카탈로그 적재가 검수 없이 넣는 값과 같은 것이다.")
 DETAIL_TMPL = "[몰 시중가: {v:,}원 (popcornpc.co.kr 상세 상단, {when} 관측)]"
 
 
@@ -101,6 +108,7 @@ def fetch_from_mall(limit=None):
 def plan(conn, items):
     """무엇을 바꿀지 정한다. (대상 목록, 건너뛴 사유별 목록)"""
     from sqlalchemy import text
+    from api.admin_reviews import market_auto_approve_decision
     # products.product_code 는 BIGINT 다 -- 문자열로 넘기면 `operator does not exist:
     # bigint = text` 로 죽는다(2026-09-22 서버 드라이런에서 실제로 났다). 몰 상품번호는
     # 전부 숫자지만, 숫자가 아닌 것이 섞여 들어와도 조용히 빠지지 않게 따로 센다.
@@ -136,12 +144,18 @@ def plan(conn, items):
         if row["market_price"] == mp:
             skipped["이미 같은 값"].append(pc); continue
         # pc 는 int 로 넘긴다 -- 아래 제안 INSERT 의 product_code 도 같은 BIGINT 다.
+        # 판정은 여기서 다시 적지 않고 «그 함수»를 그대로 부른다(A-108 단일 원천) --
+        # 드라이런이 건수만 말하고 "그래서 몇 건이 실제로 반영되나"를 빠뜨리면
+        # 반영해 보고 나서야 알게 된다.
+        auto, pct, _why = market_auto_approve_decision(
+            row["market_price"], mp, row["part_type"])
         targets.append({"pc": int(pc), "new": mp, "old": row["market_price"],
-                        "sale_db": row["sale_price"], "status": row["status"]})
+                        "sale_db": row["sale_price"], "status": row["status"],
+                        "auto": auto, "pct": pct})
     return targets, skipped
 
 
-def apply_one(t, when, approve_first):
+def apply_one(t, when, approve_mall):
     """제안 한 건 기록 + 승인. (결과문자열, 반영여부)"""
     from api.db import engine
     from api.admin_reviews import (auto_approve_market_price, _lock_waiting_review,
@@ -158,15 +172,10 @@ def apply_one(t, when, approve_first):
     res = auto_approve_market_price(rid)
     if res["auto_approved"]:
         return "자동 승인(%s)" % res["reason"], True
-    if not approve_first:
+    if not approve_mall:
         return "검수 대기로 남김(%s)" % res["reason"], False
-    # `--approve-first` 는 이름 그대로 «첫 값»에만 쓴다. 이미 값이 있는데 자동 승인이
-    # 거절됐다면 그것은 변동폭이 큰 것이고, 사장님이 승인한 것은 「비어 있는 시중가를
-    # 채우는 일」이지 「기존 값을 크게 바꾸는 일」이 아니다 -- 그건 사람이 본다.
-    if t["old"]:
-        return "검수 대기로 남김(기존 값이 있어 첫 값이 아님)", False
 
-    # 첫 값 일괄 승인 — 값 쓰기는 기존 코드가 한다(위 머리말 참고).
+    # 값 쓰기는 기존 코드가 한다(위 머리말 참고).
     from fastapi import HTTPException
     with engine.begin() as conn:
         try:
@@ -189,8 +198,11 @@ def main():
     ap.add_argument("--from-json", default="", help="수집 JSON 에서 읽는다")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--apply", action="store_true", help="실제로 쓴다(기본은 드라이런)")
-    ap.add_argument("--approve-first", action="store_true",
-                    help="현재 값이 0/NULL 인 «첫 값»도 승인한다(사장님 일괄 승인 근거 필요)")
+    ap.add_argument("--approve-mall", "--approve-first", dest="approve_mall",
+                    action="store_true",
+                    help="자동 승인 문턱에 걸린 건도 반영한다 -- 시중가의 원천이 우리 몰이라는"
+                         " 근거. --approve-first 는 옛 이름이고, 서버에 깔린 popcorn-ci 가"
+                         " 아직 그 이름으로 부르고 있어 남겨 둔다.")
     a = ap.parse_args()
 
     if a.from_json:
@@ -208,7 +220,9 @@ def main():
     with engine.connect() as conn:
         targets, skipped = plan(conn, items)
 
-    print("\n바꿀 것 %d건" % len(targets))
+    n_auto = sum(1 for t in targets if t["auto"])
+    print("\n바꿀 것 %d건 (자동 승인 문턱 안 %d건 · 문턱 밖 %d건)"
+          % (len(targets), n_auto, len(targets) - n_auto))
     for t in targets[:10]:
         print("  %s  시중가 %s -> %s  (우리 판매가 %s)"
               % (t["pc"], t["old"], format(t["new"], ","), t["sale_db"]))
@@ -220,13 +234,15 @@ def main():
 
     if not a.apply:
         print("\n드라이런입니다 — 아무것도 쓰지 않았습니다. 반영하려면 --apply.")
+        print("문턱 밖 %d건은 --approve-mall 없이는 검수 대기로 남습니다."
+              % (len(targets) - n_auto))
         return
 
     when = date.today().isoformat()
     done = 0
     reasons = {}
     for i, t in enumerate(targets, 1):
-        msg, ok = apply_one(t, when, a.approve_first)
+        msg, ok = apply_one(t, when, a.approve_mall)
         done += 1 if ok else 0
         reasons[msg.split("(")[0]] = reasons.get(msg.split("(")[0], 0) + 1
         if i % 25 == 0 or i == len(targets):

@@ -110,8 +110,10 @@ cmd_grid_dry() {
 # 몰(popcornpc.co.kr)과 DATABASE_URL 을 둘 다 써야 해서 ghrunner 로는 못 돌고 여기를 거친다.
 # 값 쓰기는 새로 구현하지 않는다 — 검수 제안 -> 승인 -> 잠금까지 기존 코드가 한다
 # (A-103·A-104·A-108 · tools/mall_market_price_apply.py 머리말 참고).
-# `--approve-first` 는 A-108 「첫 값은 사람이 확인한다」를 사람이 «일괄로» 내린 결정으로
-# 대신한다는 뜻이다. 판정 함수는 그대로다 — 그 근거는 원장 detail 에 남는다.
+# `--approve-mall` 은 A-108 자동 승인 문턱(5%)에 걸린 건도 반영한다는 뜻이다. 그 문턱은
+# 다나와 제안(남의 사이트 값)을 대상으로 정해진 것이고, 여기 값은 우리 몰의 시중가라
+# 카탈로그 적재가 검수 없이 넣는 값과 같다. 판정 함수는 그대로다 — 근거는 원장에 남는다.
+# ⚠ 서버에 깔린 옛 판은 `--approve-first` 로 부른다. 도구가 그 이름도 받아 준다.
 cmd_mall_price_dry() {
   step "몰 시중가 반영 - 드라이런(쓰기 없음)"
   as_app "cd '$APP_DIR' && .venv/bin/python tools/mall_market_price_apply.py --fetch"
@@ -119,7 +121,7 @@ cmd_mall_price_dry() {
 
 cmd_mall_price() {
   step "몰 시중가 반영"
-  as_app "cd '$APP_DIR' && .venv/bin/python tools/mall_market_price_apply.py --fetch --apply --approve-first"
+  as_app "cd '$APP_DIR' && .venv/bin/python tools/mall_market_price_apply.py --fetch --apply --approve-mall"
 }
 
 cmd_verify() {
