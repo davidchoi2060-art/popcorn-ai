@@ -36,9 +36,12 @@ jobs:
         shell: bash
         run: sudo -n /usr/local/bin/popcorn-ci deploy
 
-      - name: 검증
-        shell: bash
-        run: sudo -n /usr/local/bin/popcorn-ci verify
+      # verify 는 배포 단계에 넣지 않는다. deploy/verify.sh 는 `set -uo pipefail`
+      # 이라 안에서 무엇이 깨져도 마지막 echo 때문에 항상 0으로 끝난다 — 통과하는
+      # 검사로 두면 「초록불인데 실은 안 본 것」이 된다. 게다가 지금 그 스크립트의
+      # §2(HTTPS 전환 전 기준) · §3~4(비밀번호 없는 dev 로그인)는 현행과 어긋난다.
+      # 배포의 실제 관문은 popcorn-ci deploy 안의 헬스 체크다(실패하면 0이 아니다).
+      # verify 는 필요할 때 서버에서 손으로 부른다: sudo popcorn-ci verify
 
       - name: 회귀 세트
         if: inputs.regression
