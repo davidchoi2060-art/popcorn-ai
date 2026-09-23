@@ -291,6 +291,97 @@ def audit_batch_sessions(conn, sids: list) -> tuple:
     return len(sids), int(row["n"])
 
 
+PROBE_FILE = os.path.join(ROOT, "tools", "grid_probe.txt")
+
+
+def _load_probe_list() -> list:
+    """`tools/grid_probe.txt` -> [(usage, band_key, platform), ...] (없으면 빈 목록).
+
+    ■ 무엇을 재는 도구인가
+      격자 칸은 «용도 x 구간»이고, 구간이 정하는 것은 **예산 상한 하나**다
+      (`cell_spec_floor` -- 비게임 칸은 스펙 하한을 보내지 않고 usage_floors 가
+      단일 원천이다). 그래서 **구간을 바꾸면 견적 총액도 따라 바뀐다.**
+      「이 칸이 188만을 만들었으니 188만이 드는 구간으로 옮기면 되겠다」가
+      **틀리는 이유가 이것이다** -- 옮기는 순간 상한이 달라져 총액이 다시 움직인다.
+
+      그래서 옮기기 «전»에, 아직 칸이 없는 (용도, 구간) 조합에서 엔진이 얼마를
+      만드는지 재 본다. 이 파일이 그 목록이고, 이 함수가 그것을 읽는다.
+
+    ■ 형식 -- 한 줄에 하나, `용도|구간키|플랫폼`. `#` 뒤는 주석.
+        디자인·조판|W0|인텔
+
+    ■ 이 목록은 임시다. 다 재고 나면 파일을 지운다 -- 남겨 두면 다음 사람이
+      「이게 정본 목록인가」를 묻게 된다.
+    """
+    if not os.path.exists(PROBE_FILE):
+        return []
+    out = []
+    with open(PROBE_FILE, encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.split("#", 1)[0].strip()
+            if not line:
+                continue
+            parts = [x.strip() for x in line.split("|")]
+            if len(parts) != 3:
+                print(f"[probe] SKIP malformed line: {raw.rstrip()!r}", flush=True)
+                continue
+            out.append(tuple(parts))
+    return out
+
+
+def band_of(total: int, bands: dict, axis: str) -> str | None:
+    """이 총액이 «실제로» 드는 구간. 없으면 None(지어내지 않는다)."""
+    # `_load_bands` 는 sort_order 를 싣지 않는다 -- 하한으로 정렬하면 같은 순서가 된다
+    # (구간은 겹치지 않고 하한이 단조다). 없는 컬럼을 참조하지 않는다.
+    for key, b in sorted(bands.items(), key=lambda kv: kv[1]["budget_min_won"]):
+        if b["axis"] != axis:
+            continue
+        lo, hi = b["budget_min_won"], b["budget_max_won"]
+        if total >= lo and (hi is None or total <= hi):
+            return key
+    return None
+
+
+def run_probe(engine, probes: list, spec_tiers: dict, game_tiers: dict,
+              bands: dict, batch_sids: list) -> None:
+    """후보 (용도, 구간) 조합에서 «추천» 총액이 어디에 떨어지는지 재서 표로 낸다.
+
+    **아무것도 쓰지 않는다** -- grid_cells 도 grid_quotes 도 건드리지 않는다.
+    유일한 쓰기는 자기가 만든 상담 행에 'test' 표식을 남기는 것뿐이다
+    (`_mark_batch_session` -- 안 하면 원장에 표식 없는 상담이 쌓인다, A-75).
+    """
+    print(f"[probe] {len(probes)} combos -- grid_cells/grid_quotes 에 쓰지 않는다",
+          flush=True)
+    for usage, band_key, platform in probes:
+        cell = {"usage": usage, "budget_band_key": band_key,
+                "game_grade": None, "game_resolution": None, "platform": platform}
+        floor, err = cell_spec_floor(cell, spec_tiers, game_tiers, bands)
+        if err:
+            print(f"[probe] usage={usage} band={band_key} SKIP {err}", flush=True)
+            continue
+        res = _call_recommend(floor, platform)
+        with engine.begin() as wconn:
+            sid = _mark_batch_session(wconn, res)
+        if sid:
+            batch_sids.append(sid)
+        pa = PLATFORM_ASCII.get(platform, "unknown")
+        if not res["ok"]:
+            print(f"[probe] usage={usage} band={band_key} {pa} CALL FAILED"
+                  f" status={res['status']}", flush=True)
+            continue
+        judged = judge_variant("recommend", res["json"] or {}, floor)
+        total = judged.get("total")
+        if total is None:
+            print(f"[probe] usage={usage} band={band_key} {pa} no recommend tier"
+                  f" ({judged.get('reason')})", flush=True)
+            continue
+        lands = band_of(total, bands, "nongame") or "-"
+        fit = _band_fit(total, floor, "recommend") or "in band"
+        print(f"[probe] usage={usage} band={band_key} {pa}"
+              f" cap={floor['band_min']}~{floor['band_max']}"
+              f" recommend={total} lands_in={lands} -> {fit}", flush=True)
+
+
 def _call_recommend(floor: dict, platform: str) -> dict:
     """엔진 호출 — 「용도」·「예산」·「플랫폼」 + 스펙 하한 4종.
 
@@ -518,6 +609,18 @@ def main():
 
     batch_sids: list = []   # consult_sessions.session_id 는 BIGSERIAL 이라 정수다
     t0 = time.time()
+
+    # ── 후보 구간 재기 (tools/grid_probe.txt 가 있을 때만) ──────────────────
+    # **`--dry` 에서만 돈다.** 실배치에서 같이 돌리면 22분짜리 작업 앞에 재기가
+    # 붙어 배포가 늦어지고, 무엇보다 «재기 목록이 배치를 대신했나»를 로그에서
+    # 구분하기 어려워진다. 실배치에서 파일을 발견하면 무시했다고 **말한다** --
+    # 조용히 건너뛰면 다음 사람이 재기 결과를 기다리다 만다.
+    probes = _load_probe_list()
+    if probes and not args.dry:
+        print(f"[grid_generate] NOTE: tools/grid_probe.txt ({len(probes)} combos)"
+              " ignored -- 재기는 --dry 에서만 돈다", flush=True)
+    elif probes:
+        run_probe(engine, probes, spec_tiers, game_tiers, bands, batch_sids)
     ok_n, over_n, fail_cell_n, fail_variant_n = 0, 0, 0, 0
     failures = []
     conn_fail_streak = 0
