@@ -307,8 +307,14 @@ def _load_probe_list() -> list:
       그래서 옮기기 «전»에, 아직 칸이 없는 (용도, 구간) 조합에서 엔진이 얼마를
       만드는지 재 본다. 이 파일이 그 목록이고, 이 함수가 그것을 읽는다.
 
-    ■ 형식 -- 한 줄에 하나, `용도|구간키|플랫폼`. `#` 뒤는 주석.
+    ■ 형식 -- 한 줄에 하나, `용도|구간키|플랫폼` 또는 `용도|구간키|플랫폼|GPU하한W`.
         디자인·조판|W0|인텔
+        디자인·조판|W3|인텔|300      <- 그래픽카드 하한 300W 를 «가정»하고 잰다
+
+      4번째 칸은 엔진 body 의 `gpu_watt_min` 으로 그대로 들어간다. 이 값이 있으면
+      `api/recommend.py` 의 `allow_igpu_omit` 이 꺼져 **GPU 를 생략하지 못한다**
+      (1845-1850). 즉 usage_floors 에 GPU 하한을 «넣었다면 얼마가 되는가»를
+      DB 를 고치지 않고 미리 재는 자리다. `-` 또는 비우면 하한 없음.
 
     ■ 이 목록은 임시다. 다 재고 나면 파일을 지운다 -- 남겨 두면 다음 사람이
       「이게 정본 목록인가」를 묻게 된다.
@@ -322,10 +328,16 @@ def _load_probe_list() -> list:
             if not line:
                 continue
             parts = [x.strip() for x in line.split("|")]
-            if len(parts) != 3:
+            if len(parts) not in (3, 4):
                 print(f"[probe] SKIP malformed line: {raw.rstrip()!r}", flush=True)
                 continue
-            out.append(tuple(parts))
+            gpu_w = None
+            if len(parts) == 4 and parts[3] not in ("", "-"):
+                if not parts[3].isdigit():
+                    print(f"[probe] SKIP bad gpu_watt_min: {raw.rstrip()!r}", flush=True)
+                    continue
+                gpu_w = int(parts[3])
+            out.append((parts[0], parts[1], parts[2], gpu_w))
     return out
 
 
@@ -352,34 +364,80 @@ def run_probe(engine, probes: list, spec_tiers: dict, game_tiers: dict,
     """
     print(f"[probe] {len(probes)} combos -- grid_cells/grid_quotes 에 쓰지 않는다",
           flush=True)
-    for usage, band_key, platform in probes:
+    gpu_census(engine)
+    for usage, band_key, platform, gpu_w in probes:
         cell = {"usage": usage, "budget_band_key": band_key,
                 "game_grade": None, "game_resolution": None, "platform": platform}
         floor, err = cell_spec_floor(cell, spec_tiers, game_tiers, bands)
         if err:
             print(f"[probe] usage={usage} band={band_key} SKIP {err}", flush=True)
             continue
+        # 가정한 GPU 하한을 «여기서만» 얹는다 -- usage_floors 는 건드리지 않는다.
+        if gpu_w is not None:
+            floor = dict(floor)
+            floor["gpu_watt_min"] = gpu_w
+        gtag = f"gpu>={gpu_w}W" if gpu_w is not None else "gpu-none"
+        head = f"[probe] {usage} {band_key} {PLATFORM_ASCII.get(platform, '?')} {gtag}"
         res = _call_recommend(floor, platform)
         with engine.begin() as wconn:
             sid = _mark_batch_session(wconn, res)
         if sid:
             batch_sids.append(sid)
-        pa = PLATFORM_ASCII.get(platform, "unknown")
         if not res["ok"]:
-            print(f"[probe] usage={usage} band={band_key} {pa} CALL FAILED"
-                  f" status={res['status']}", flush=True)
+            print(f"{head} CALL FAILED status={res['status']}", flush=True)
             continue
-        judged = judge_variant("recommend", res["json"] or {}, floor)
-        total = judged.get("total")
-        if total is None:
-            print(f"[probe] usage={usage} band={band_key} {pa} no recommend tier"
-                  f" ({judged.get('reason')})", flush=True)
-            continue
-        lands = band_of(total, bands, "nongame") or "-"
-        fit = _band_fit(total, floor, "recommend") or "in band"
-        print(f"[probe] usage={usage} band={band_key} {pa}"
-              f" cap={floor['band_min']}~{floor['band_max']}"
-              f" recommend={total} lands_in={lands} -> {fit}", flush=True)
+        data = res["json"] or {}
+        cols = []
+        for eng_key in ("value", "recommend", "highend"):
+            judged = judge_variant(eng_key, data, floor)
+            total = judged.get("total")
+            if total is None:
+                cols.append(f"{eng_key}=NULL({judged.get('reason')})")
+                continue
+            extra = ""
+            if eng_key == "recommend":
+                lands = band_of(total, bands, "nongame") or "-"
+                extra = f"(lands={lands} {_band_fit(total, floor, eng_key) or 'in band'})"
+            cols.append(f"{eng_key}={total}{extra} {_gpu_of(judged.get('payload'))}")
+        print(f"{head} cap={floor['band_min']}~{floor['band_max']} | "
+              + " | ".join(cols), flush=True)
+
+
+def _gpu_of(build) -> str:
+    """그 구성이 «실제로» 고른 그래픽카드 -- 없으면 GPU:none(생략됐다는 사실)."""
+    if not build:
+        return "GPU:?"
+    for it in (build.get("items") or []):
+        if it.get("part_type") == "GPU":
+            spec = it.get("spec") or {}
+            return (f"GPU:{it.get('product_name', '')[:28]}"
+                    f"/{it.get('sale_price')}원/{spec.get('required_power_watt')}W")
+    return "GPU:none"
+
+
+def gpu_census(engine) -> None:
+    """후보 풀의 그래픽카드를 required_power_watt 등급별로 «세어» 둔다.
+
+    기획이 「300W 급이면 얼마」라고 말하려면 그 수가 어디서 왔는지가 있어야 한다.
+    CLAUDE.md 에 적힌 등급별 가격대는 슬라이스 58(2026-08) 값이라 지금 값이 아니다.
+    읽기 전용 -- 세기만 한다.
+    """
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT required_power_watt AS w, count(*) AS n,"
+                " min(sale_price) AS lo, max(sale_price) AS hi,"
+                " percentile_disc(0.5) WITHIN GROUP (ORDER BY sale_price) AS mid"
+                " FROM v_recommendation_candidates"
+                " WHERE part_type='GPU' AND stock_qty > 0 AND sale_price IS NOT NULL"
+                " GROUP BY 1 ORDER BY 1 NULLS FIRST")).mappings().all()
+        print("[probe][gpu] required_power_watt | 건수 | 최저 | 중앙 | 최고", flush=True)
+        for r in rows:
+            print(f"[probe][gpu] {r['w']} | {r['n']} | {r['lo']} | {r['mid']} | {r['hi']}",
+                  flush=True)
+    except Exception as e:
+        print(f"[probe][gpu] census FAILED: {e}", flush=True)
 
 
 def _call_recommend(floor: dict, platform: str) -> dict:
