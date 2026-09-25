@@ -346,7 +346,26 @@ function setHeadingMarkup(g,s,showHeading){
  // 제목 줄은 기존 .parts-heading(굵은 제목 + 작은 보조) 를 그대로 쓴다 — 새 배치를 그리지 않는다.
  return `<div class="parts-heading set-heading" data-set-usage="${esc(GRID.setUsage(s))}"><b>${showHeading?esc(setHeadingText(s,g)):'추천 구성'}</b><span>${badges}</span></div>${estLine}`;
 }
+// 2026-09-25 재설계 4단계 — kind==='sold' 는 조합 카드가 아니라 «지금 파는 몰 조립PC» 최대 2개다
+// (api/sold_reco). 가격·수준·근거·링크는 전부 서버 값이고, 화면은 워크스테이션 카드와 같은 틀로 그린다.
+function soldSpecText(sp){
+ if(!sp||typeof sp!=='object')return '사양 정보 없음';
+ const out=[];if(sp.cpu)out.push('CPU '+sp.cpu);if(sp.gpu)out.push('그래픽 '+sp.gpu);if(sp.ram_gb!=null)out.push('메모리 '+sp.ram_gb+'GB');if(sp.ssd_gb!=null)out.push('SSD '+(sp.ssd_gb>=1000?(sp.ssd_gb/1000)+'TB':sp.ssd_gb+'GB'));
+ return out.join(' · ')||'사양 정보 없음';
+}
+function soldCardMarkup(it,i){
+ const reasons=Array.isArray(it.reasons)?it.reasons:[];
+ return `<article class="rec-card${i===0?' featured':''}" data-sold-code="${esc(it.product_code)}"><div class="rec-top"><span class="rec-num">${esc(it.tag||'')}</span><span>${it.over_budget===true?'<span class="rec-tag over">예산 초과</span>':''}<span class="rec-tag">${esc(it.level||'')}</span></span></div><h3>${esc(it.name||'이름 없음')}</h3><div class="rec-price">${money(it.price)}<small>원</small></div><p class="rec-desc">${esc(soldSpecText(it.spec))}</p>${reasons.length?'<ul class="tradeoff">'+reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':''}${it.mall_url?`<a class="primary" href="${esc(it.mall_url)}" target="_blank" rel="noopener">팝콘PC 몰에서 보기 ↗</a>`:'<span class="condition-note">몰 링크 없음</span>'}</article>`;
+}
+function soldSetMarkup(g,s,showHeading){
+ const items=Array.isArray(s.items)?s.items:[];
+ const head=`<div class="parts-heading set-heading" data-set-usage="${esc(GRID.setUsage(s))}"><b>${showHeading?esc(setHeadingText(s,g)):'추천 상품'}</b><span>${s.min_level?esc(s.min_level+' 이상 · '+(s.min_level_work||'')):''}</span></div>`;
+ const empty=s.empty_reason?`<p class="condition-note"><b>${esc(s.empty_reason)}</b> ${esc(s.empty_note||'')}</p>`:'';
+ const ctx=s.game_context?`<div data-sold-game-context="${esc(GRID.setUsage(s))}"></div>`:'';
+ return `${head}${empty}${items.length?`<div class="recommendations">${items.map(soldCardMarkup).join('')}</div>`:''}${ctx}<p class="condition-note">실제 판매 중인 조립PC 입니다. 가격은 조회 시점 몰 판매가이며 조립비·보증이 포함돼 있습니다.</p>`;
+}
 function cardSetMarkup(g,s,offset,showHeading){
+ if(GRID.setKind(s)==='sold')return soldSetMarkup(g,s,showHeading);
  const cards=GRID.setCards(s);
  const center=GRID.setCenterTier(s);
  const cardHtml=cards.map((q,i)=>cardMarkup(q,offset+i,center,DEFAULT_VARIANT)).join('');
@@ -584,7 +603,7 @@ function errorMessage(status,data){
  if(d&&typeof d==='object'&&d.message)return String(d.message);
  return (status>=500?'서버 오류':'요청 오류')+`(${status})`;
 }
-const render={money,esc,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,gameContextBlocks,gameContextLink,gameContextElement,answerNormalize,answerSpans,answerBlocks,answerFragment,answerBody,sourceItems,sourcesElement,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON,WAIT_SHORT,WAIT_LONG,WAIT_LONG_MS,SOURCES_HEADING};
+const render={money,esc,soldSetMarkup,soldCardMarkup,soldSpecText,feeNote,feeNoteMarkup,FEE,conditionsMarkup,conditionChips,cardMarkup,recommendationMarkup,cardSetMarkup,setHeadingMarkup,setHeadingText,flattenSets,workstationsMarkup,quoteMarkup,matrixMarkup,specSummary,tierRangeText,errorMessage,usageOf,cardQuotes,tierKeyOf,tierDisplayName,normalizeParts,normalizeOmitted,omissionsOf,omissionFor,omissionReason,omittedReasonMarkup,gameContextBlocks,gameContextLink,gameContextElement,answerNormalize,answerSpans,answerBlocks,answerFragment,answerBody,sourceItems,sourcesElement,TALK,ST,GRID,ASSUMED_RES_1080,VARIANT_DEFS,IMG_NOTE,NOT_READY,OMITTED_NO_REASON,WAIT_SHORT,WAIT_LONG,WAIT_LONG_MS,SOURCES_HEADING};
 if(typeof module!=='undefined'&&module.exports){module.exports=render;return;}   // node(자기검증) — 여기서 끝
 if(!root.document||root.PopcornApp)return;
 
@@ -720,7 +739,10 @@ async function recommend(opts){
  $('#messages').append(node);setQuick();
  requestAnimationFrame(()=>{const m=$('#messages');m.scrollTop=node.offsetTop-m.offsetTop-16;});
  loadUsages(node);
- for(const s of GRID.sets(g)){if(GRID.setUsageGrid(s)===USAGE_AI)await workstations(node,g,s);}
+ for(const s of GRID.sets(g)){
+  if(GRID.setKind(s)==='sold'&&s.game_context){try{const slot=node.querySelector(`[data-sold-game-context="${CSS.escape(GRID.setUsage(s))}"]`);const el=slot&&gameContextElement(s.game_context,document);if(el)slot.replaceWith(el);}catch(e){console.warn('sold: game_context 렌더 실패',e);}}
+  if(GRID.setKind(s)!=='sold'&&GRID.setUsageGrid(s)===USAGE_AI)await workstations(node,g,s);
+ }
 }
 async function loadUsages(node){
  if(!state.usages){try{const u=await api('GET','/api/usages');state.usages=Array.isArray(u.usages)?u.usages:[];}catch(e){state.usages=null;const box=node.querySelector('.purpose-options');if(box)box.innerHTML=`<span class="condition-note">용도 목록을 불러오지 못했습니다 — ${esc(e.message)}</span>`;return;}}

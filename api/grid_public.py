@@ -83,12 +83,18 @@ import json
 import logging
 import re
 
+import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import game_copy as GC
 from .db import engine
+from . import sold_reco as SOLD
+
+# 고객 추천 원천 스위치(2026-09-25 재설계 4단계). 기본 「sold」= 판매 중인 몰 조립PC.
+# 「grid」로 두면 옛 조합 격자(grid_quotes)로 돌아간다 — 격자 코드·표는 지우지 않았다.
+RECO_SOURCE = os.environ.get("POPCORN_RECO_SOURCE", "sold").strip().lower()
 from .talk_schema import (DEFAULT_RESOLUTION, TalkState, is_game_usage, load_vocab,
                           match_game, missing_for, validate_state)
 from .taxonomy import SLOT_LABELS
@@ -754,9 +760,30 @@ def recommend(body: RecommendBody):
         assumed: list[str] = []
         ai_estimated: list[dict] = []
         game_resolution = game_name = None
+        if RECO_SOURCE == "sold":
+            # 2026-09-25 재설계 4단계 — 조합 격자 대신 판매 중인 몰 조립PC 최대 2개(api/sold_reco).
+            # 게임은 등급이 있어야 수준을 정한다(needs 에 game.grade 가 남는 것은 그대로).
+            others = [u for u in state.usages if not is_game_usage(u)]
+            card_sets.extend(SOLD.card_sets(
+                state, game_usages if game_grade is not None else [], others, notes))
+            if game_usages and game_grade is not None:
+                game_resolution = state.game.resolution or DEFAULT_RESOLUTION
+                game_name = state.game.names[0] if state.game.names else None
+                if state.game.resolution is None:
+                    assumed.append(ASSUMED_RESOLUTION)
+                if state.game.grade_src == "ai_estimate":
+                    ai_estimated.append({"game_names": list(state.game.names), "grade": game_grade})
+                ctx = _game_context(conn, state.game.names, vocab)
+                for cs in card_sets:
+                    if cs["usage_grid"] == "게임":
+                        cs["game_context"] = ctx
+            nongame_usages = []
+            game_usages_grid = []
+        else:
+            game_usages_grid = game_usages
         for u in nongame_usages:
             card_sets.append(_nongame_card_set(conn, u, state, platform, notes))
-        if game_usages and game_grade is not None:
+        if game_usages_grid and game_grade is not None:
             # 게임 계열 용도가 여럿(게임+고사양 게임)이어도 격자 칸은 같다 — 한 벌만.
             # usage 라벨은 가장 먼저 온 게임 계열 용도를 쓴다.
             if len(game_usages) > 1:
