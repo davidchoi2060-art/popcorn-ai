@@ -286,6 +286,15 @@ def balance_notes(sp, price):
     return n
 
 
+def title_mismatch(title, sp):
+    """상품명에 적힌 그래픽카드와 실제 기본 구성이 다르면 적는다(몰 데이터 점검용)."""
+    g = (sp.get("gpu") or {}).get("name", "").replace(" ", "")
+    named = re.findall(r"(RTX ?\d{4}(?: ?Ti)?|RX ?\d{4}(?: ?XT)?)", title or "")
+    if named and g and not any(x.replace(" ", "") in g for x in named):
+        return [f"상품명은 {named[-1]} 인데 기본 구성은 {sp['gpu']['name']}"]
+    return []
+
+
 def load_catalog(xlsx):
     import openpyxl
     wb = openpyxl.load_workbook(xlsx, read_only=True)
@@ -329,13 +338,14 @@ def main(xlsx, out_dir):
             route=it.get("발견 경로"), sale=it.get("사이트 판매 표시"),
             cpu_raw=it.get("CPU"), gpu_raw=it.get("GPU"), ram_raw=it.get("RAM"), ssd_raw=it.get("SSD"),
             spec=sp, eval=ev, excluded=excl, includes=extras,
-            balance=balance_notes(sp, price) if sp["cpu"] else [],
+            balance=(balance_notes(sp, price) if sp["cpu"] else []) + title_mismatch(name, sp),
             url=it.get("원문 URL"),
         ))
     mark_dominated(results)
     with open(os.path.join(out_dir, "product_fit.json"), "w", encoding="utf-8") as f:
         json.dump(dict(requirements=REQUIREMENTS, results=results), f, ensure_ascii=False, indent=1, default=str)
     write_xlsx(results, os.path.join(out_dir, "판매상품_용도적합성_평가.xlsx"))
+    export_seed(results, os.path.join(out_dir, "product_fit_seed.json"))
     return results
 
 
@@ -359,6 +369,32 @@ def mark_dominated(results):
                     best = o
         if best:
             r["dominated_by"] = dict(code=best["code"], price=best["price"])
+
+
+def export_seed(results, path, source="popcornpc-catalog.xlsx (몰 수집 2026-09-25) + tools/product_fit.py",
+                evaluated_at="2026-09-25"):
+    """DB 적재용 스냅샷(0115 가 읽는 모양) — db/migrations/data/product_fit_YYYYMMDD.json"""
+    levels = []
+    for u, steps in REQUIREMENTS.items():
+        for i, (lvl, desc, cond) in enumerate(steps):
+            cs = " · ".join(f"{COND_KO[k][0]} {COND_KO[k][1](v)}" + ("" if k in ("dgpu", "nv") else " 이상")
+                            for k, v in cond.items())
+            levels.append(dict(usage=u, level=lvl, rank=i + 1, work=desc, conditions=cs))
+    prods = []
+    for r in results:
+        sp = r["spec"]
+        cpu, gpu = sp["cpu"] or {}, sp["gpu"] or {}
+        prods.append(dict(
+            code=int(r["code"]), name=r["name"], price=r["price"], url=r["url"],
+            excluded=" · ".join(r["excluded"]) or None, includes=" · ".join(r["includes"]) or None,
+            spec=dict(cpu=cpu.get("name"), gpu=gpu.get("name"), ram_gb=sp["ram"], ssd_gb=sp["ssd"],
+                      cpu_mt=cpu.get("mt"), cpu_st=cpu.get("st"), gpu_idx=gpu.get("idx"), vram_gb=gpu.get("vram")),
+            balance=" · ".join(r["balance"]) or None,
+            dominated_by=int(r["dominated_by"]["code"]) if r.get("dominated_by") else None,
+            fit=[dict(usage=u, level=v[0], blocked=v[1]) for u, v in (r["eval"] or {}).items()]))
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dict(source=source, evaluated_at=evaluated_at, levels=levels, products=prods),
+                  f, ensure_ascii=False, indent=0)
 
 
 BANDS = [(0, 900000, "~90만"), (900000, 1300000, "90~130만"), (1300000, 1800000, "130~180만"),

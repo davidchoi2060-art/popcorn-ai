@@ -1,0 +1,156 @@
+{#
+  판매 상품 용도 매트릭스 (ADM-GRD-020) — 2026-09-25 재설계 3단계
+
+  ■ 이 화면이 답하는 질문
+    「이 용도·수준의 고객에게, 이 가격대에서 지금 팔고 있는 조립PC 중 무엇을 권할 수 있나」
+    칸마다 상품을 만들지 않는다. 몰 조립PC 를 평가(0115)한 결과를 칸에 표시한다.
+    한 상품이 여러 칸에 들어가고, 빈칸은 이유(예산 부족 / 더 싼 상품으로 충족 /
+    보유 상품 없음)를 말한다.
+
+  ■ 화면이 «세지» 않는다 — 칸의 수·대표 상품·빈칸 이유는 전부 서버
+    (`GET /api/admin/product-fit`)가 판정한다. 화면은 그린다.
+
+  ■ 배치 — 사장님 승인 검토 엑셀 「용도x가격 미리보기」 시트와 같은 표. 색은 admin2
+    상태 별칭만 쓰고 라벨을 함께 적는다(색만으로 말하지 않는다).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}판매 상품 용도 매트릭스{% endblock %}
+
+{% block head_extra %}
+<style>
+*{box-sizing:border-box}
+.body{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto}
+.kicker{font:400 12px/1.6 var(--font);color:var(--on-variant)}
+.card{background:var(--card);border:1px solid var(--outline-variant);border-radius:10px;flex:none}
+.pf-bar{padding:12px 18px;display:flex;gap:26px;flex-wrap:wrap}
+.pf-stat{display:flex;flex-direction:column;gap:2px}
+.pf-stat .lbl{font:500 11px/1.3 var(--font);color:var(--on-variant)}
+.pf-stat .v{font:600 20px/1.2 var(--font-num)}
+.pf-wrap{overflow:auto;max-height:72vh}
+table.pf{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;font:400 12px/1.4 var(--font)}
+table.pf th,table.pf td{border-bottom:1px solid var(--outline-variant);border-right:1px solid var(--outline-variant);padding:7px 8px;vertical-align:top}
+table.pf thead th{position:sticky;top:0;background:var(--container);font-weight:600;text-align:left;z-index:1}
+table.pf th.row{background:var(--surface);text-align:left;min-width:170px;font-weight:600}
+table.pf th.row .work{display:block;font-weight:400;color:var(--on-variant);margin-top:2px}
+table.pf td.hit{cursor:pointer}
+table.pf td.hit:hover,table.pf td.sel{background:var(--primary-container)}
+table.pf td .n{font:600 12px/1.3 var(--font);color:var(--state-done)}
+table.pf td .rep{display:block;margin-top:2px}
+table.pf td .price{font-family:var(--font-num)}
+table.pf td.empty{color:var(--on-variant)}
+table.pf td.empty .why{font-weight:600}
+table.pf td.empty.short .why{color:var(--state-fail)}
+table.pf tr.first th,table.pf tr.first td{border-top:2px solid var(--outline)}
+.pf-detail{padding:14px 16px;font:400 12px/1.5 var(--font)}
+.pf-detail .note{margin-bottom:8px}
+.pf-detail h3{margin:0 0 8px;font:600 14px/1.3 var(--font)}
+table.pf-items{border-collapse:collapse;width:100%;font:400 12px/1.45 var(--font)}
+table.pf-items th,table.pf-items td{border-bottom:1px solid var(--outline-variant);padding:6px 8px;text-align:left;vertical-align:top}
+table.pf-items td.price{text-align:right;font-family:var(--font-num);white-space:nowrap}
+.note{color:var(--on-variant)}
+.warn{color:var(--state-fail)}
+</style>
+{% endblock %}
+
+{% block header_extra %}
+<span class="a2-badge">조회 전용</span>
+{% endblock %}
+
+{% block content %}
+<div class="body">
+  <div class="kicker">판매 중인 몰 조립PC 를 용도·수준 x 가격대 칸에 표시합니다 · 칸을 채우려고 구성을 만들지 않습니다 · 가격은 현재 판매가 기준</div>
+  <div class="card pf-bar">
+    <div class="pf-stat"><span class="lbl">추천 대상 상품</span><span class="v" data-bind="live">—</span></div>
+    <div class="pf-stat"><span class="lbl">상품이 있는 칸</span><span class="v" data-bind="filled">—</span></div>
+    <div class="pf-stat"><span class="lbl">예산 부족 칸</span><span class="v" data-bind="short">—</span></div>
+    <div class="pf-stat"><span class="lbl">보유 상품 없음 칸</span><span class="v" data-bind="none">—</span></div>
+  </div>
+  <div class="card pf-wrap"><table class="pf" data-bind="grid"><tbody><tr><td>불러오는 중</td></tr></tbody></table></div>
+  <div class="card pf-detail" data-bind="detail" hidden></div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+{% raw %}
+<script>
+(function () {
+  'use strict';
+  var $ = function (k) { return document.querySelector('[data-bind="' + k + '"]'); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+  var num = function (n) { return n == null ? '—' : Number(n).toLocaleString('ko-KR'); };
+  var D = null, byCode = {};
+
+  function draw() {
+    var bands = D.bands, cells = {}, filled = 0, short = 0, none = 0;
+    D.cells.forEach(function (c) {
+      cells[c.usage + '|' + c.level + '|' + c.band] = c;
+      if (c.count) filled++; else if (c.reason === '예산 부족') short++; else if (c.reason === '보유 상품 없음') none++;
+    });
+    $('live').textContent = num(D.live_count);
+    $('filled').textContent = num(filled) + ' / ' + num(D.cells.length);
+    $('short').textContent = num(short);
+    $('none').textContent = num(none);
+    var h = '<thead><tr><th>용도 · 수준</th>' + bands.map(function (b) { return '<th>' + esc(b.label) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    var prev = null;
+    D.levels.forEach(function (lv) {
+      var first = lv.usage !== prev; prev = lv.usage;
+      h += '<tr class="' + (first ? 'first' : '') + '"><th class="row" title="' + esc(lv.conditions) + '">' +
+        esc(lv.usage) + ' ' + esc(lv.level) + '<span class="work">' + esc(lv.work) + '</span></th>';
+      bands.forEach(function (b) {
+        var c = cells[lv.usage + '|' + lv.level + '|' + b.key];
+        if (!c) { h += '<td></td>'; return; }
+        if (c.count) {
+          var p = byCode[c.rep] || {};
+          h += '<td class="hit" data-cell="' + esc(lv.usage + '|' + lv.level + '|' + b.key) + '"><span class="n">' + num(c.count) + '개</span>' +
+            '<span class="rep">대표 ' + esc(p.code) + ' · <span class="price">' + num(p.price) + '</span></span></td>';
+        } else {
+          h += '<td class="empty' + (c.reason === '예산 부족' ? ' short' : '') + '"><span class="why">' + esc(c.reason) + '</span><br>' + esc(c.reason_note) + '</td>';
+        }
+      });
+      h += '</tr>';
+    });
+    $('grid').innerHTML = h + '</tbody>';
+  }
+
+  function detail(key) {
+    var parts = key.split('|'), c = D.cells.filter(function (x) { return x.usage === parts[0] && x.level === parts[1] && x.band === parts[2]; })[0];
+    var lv = D.levels.filter(function (x) { return x.usage === parts[0] && x.level === parts[1]; })[0];
+    var band = D.bands.filter(function (b) { return b.key === parts[2]; })[0];
+    var el = $('detail'); el.hidden = false;
+    var h = '<h3>' + esc(parts[0] + ' ' + parts[1]) + ' · ' + esc(band.label) + ' · ' + num(c.count) + '개</h3>' +
+      '<div class="note">' + esc(lv.work) + ' — 조건: ' + esc(lv.conditions) + '</div>' +
+      '<table class="pf-items"><thead><tr><th>상품</th><th>구성</th><th>가격</th><th>점검</th></tr></thead><tbody>';
+    c.codes.forEach(function (code) {
+      var p = byCode[code], s = p.spec || {}, notes = [];
+      if (p.includes) notes.push('가격에 ' + p.includes + ' 포함');
+      if (p.dominated_by) notes.push('더 싼 ' + p.dominated_by + ' 이 모든 용도에서 같거나 높음');
+      if (p.balance) notes.push(p.balance);
+      h += '<tr><td>' + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.code) + '</a>' : esc(p.code)) + '<br>' + esc(p.name) + '</td>' +
+        '<td>' + esc([s.cpu, s.gpu, s.ram_gb ? s.ram_gb + 'GB' : null, s.ssd_gb ? s.ssd_gb + 'GB SSD' : null].filter(Boolean).join(' · ')) + '</td>' +
+        '<td class="price">' + num(p.price) + '<br><span class="note">' + esc(p.price_src) + '</span></td>' +
+        '<td class="' + (p.dominated_by ? 'warn' : 'note') + '">' + esc(notes.join(' / ')) + '</td></tr>';
+    });
+    el.innerHTML = h + '</tbody></table>';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  $('grid').addEventListener('click', function (e) {
+    var td = e.target.closest('td.hit'); if (!td) return;
+    document.querySelectorAll('table.pf td.sel').forEach(function (x) { x.classList.remove('sel'); });
+    td.classList.add('sel');
+    detail(td.getAttribute('data-cell'));
+  });
+
+  fetch('/api/admin/product-fit', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('오류 ' + r.status); return r.json(); })
+    .then(function (d) { D = d; d.products.forEach(function (p) { byCode[p.code] = p; }); draw(); })
+    .catch(function (e) { $('grid').innerHTML = '<tbody><tr><td class="warn">불러오기 실패 — ' + esc(e.message) + '</td></tr></tbody>'; });
+})();
+</script>
+{% endraw %}
+{% endblock %}
