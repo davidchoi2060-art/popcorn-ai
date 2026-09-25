@@ -332,10 +332,33 @@ def main(xlsx, out_dir):
             balance=balance_notes(sp, price) if sp["cpu"] else [],
             url=it.get("원문 URL"),
         ))
+    mark_dominated(results)
     with open(os.path.join(out_dir, "product_fit.json"), "w", encoding="utf-8") as f:
         json.dump(dict(requirements=REQUIREMENTS, results=results), f, ensure_ascii=False, indent=1, default=str)
     write_xlsx(results, os.path.join(out_dir, "판매상품_용도적합성_평가.xlsx"))
     return results
+
+
+def _rank(usage, lvl):
+    order = [l for l, _, _ in REQUIREMENTS[usage]]
+    return order.index(lvl) + 1 if lvl else 0
+
+
+def mark_dominated(results):
+    """「더 저렴한 모델 대신 이것을 사야 하는 이유」가 있는지 본다.
+    더 싸면서 모든 용도에서 같거나 높은 단계에 닿는 판매 상품이 있으면 그 상품을 적는다.
+    (모니터·윈도우 포함가는 본체값 비교가 아니라서 비교 대상에서 뺀다)"""
+    live = [r for r in results if not r["excluded"] and r["eval"] and r["price"] and not r["includes"]]
+    for r in live:
+        best = None
+        for o in live:
+            if o is r or o["price"] >= r["price"]:
+                continue
+            if all(_rank(u, o["eval"][u][0]) >= _rank(u, r["eval"][u][0]) for u in REQUIREMENTS):
+                if best is None or o["price"] < best["price"]:
+                    best = o
+        if best:
+            r["dominated_by"] = dict(code=best["code"], price=best["price"])
 
 
 BANDS = [(0, 900000, "~90만"), (900000, 1300000, "90~130만"), (1300000, 1800000, "130~180만"),
@@ -372,7 +395,7 @@ def write_xlsx(results, path):
     ws2 = wb.create_sheet("상품별 평가")
     usages = list(REQUIREMENTS)
     hdr = ["상품번호", "상품명", "판매가", "가격대", "평가 제외", "가격 포함 품목", "CPU", "그래픽", "램GB", "SSD GB",
-           "CPU 멀티", "CPU 싱글", "그래픽 지수", "VRAM"] + usages + ["추천 가능 작업 요약", "다음 단계에서 막힌 이유", "구성 균형 메모", "링크"]
+           "CPU 멀티", "CPU 싱글", "그래픽 지수", "VRAM"] + usages + ["추천 가능 작업 요약", "다음 단계에서 막힌 이유", "구성 균형 메모", "판매 이유 점검", "링크"]
     ws2.append(hdr)
     for r in results:
         sp, ev = r["spec"], r["eval"]
@@ -392,7 +415,9 @@ def write_xlsx(results, path):
         ws2.append([r["code"], r["name"], r["price"], band_of(r["price"]), " · ".join(r["excluded"]),
                     " · ".join(r["includes"]), cpu.get("name") or r["cpu_raw"], gpu.get("name") or r["gpu_raw"],
                     sp["ram"], sp["ssd"], cpu.get("mt"), cpu.get("st"), gpu.get("idx"), gpu.get("vram")]
-                   + lv + ["\n".join(summ), "\n".join(blk), " · ".join(r["balance"]), r["url"]])
+                   + lv + ["\n".join(summ), "\n".join(blk), " · ".join(r["balance"]),
+                      (f"더 싼 {r['dominated_by']['code']}({r['dominated_by']['price']:,})이 모든 용도에서 같거나 높음"
+                       if r.get("dominated_by") else ""), r["url"]])
 
     ws3 = wb.create_sheet("용도x가격 미리보기")
     ws3.append(["용도·단계"] + [b[2] for b in BANDS])
@@ -404,7 +429,16 @@ def write_xlsx(results, path):
             for lo, hi, lab in BANDS:
                 hits = [r for r in live if r["eval"][u][0] and order.index(r["eval"][u][0]) >= order.index(lvl)
                         and r["price"] is not None and lo <= r["price"] < hi]
-                row.append(f"{len(hits)}개 · 최저 {min(h['price'] for h in hits):,}" if hits else "")
+                if hits:
+                    best = min(hits, key=lambda h: h["price"])
+                    row.append(f"{len(hits)}개 · 대표 {best['code']} {best['price']:,}")
+                else:
+                    # 빈칸의 이유를 가른다 — 더 비싼 구간에는 있나(예산 부족) · 아예 없나(보유 상품 없음)
+                    above = [r["price"] for r in live if r["eval"][u][0]
+                             and order.index(r["eval"][u][0]) >= order.index(lvl) and r["price"] >= hi]
+                    row.append(f"예산 부족 (최저 {min(above):,})" if above else
+                               ("보유 상품 없음" if not any(r["price"] < lo for r in live if r["eval"][u][0]
+                                and order.index(r["eval"][u][0]) >= order.index(lvl)) else ""))
             ws3.append(row)
 
     for w in wb.worksheets:
@@ -416,11 +450,11 @@ def write_xlsx(results, path):
     for t, ws_ in widths.items():
         for i, wd in enumerate(ws_):
             wb[t].column_dimensions[openpyxl.utils.get_column_letter(i + 1)].width = wd
-    for i, wd in enumerate([9, 48, 11, 11, 18, 12, 22, 22, 7, 8, 9, 9, 9, 7] + [11] * len(usages) + [60, 50, 30, 20]):
+    for i, wd in enumerate([9, 48, 11, 11, 18, 12, 22, 22, 7, 8, 9, 9, 9, 7] + [11] * len(usages) + [60, 50, 30, 36, 20]):
         ws2.column_dimensions[openpyxl.utils.get_column_letter(i + 1)].width = wd
     for row in ws2.iter_rows(min_row=2):
         for c in row:
-            c.alignment = Alignment(vertical="top", wrap_text=c.column in (2, len(hdr) - 3, len(hdr) - 2))
+            c.alignment = Alignment(vertical="top", wrap_text=c.column in (2, len(hdr) - 4, len(hdr) - 3))
         row[2].number_format = "#,##0"
     wb.save(path)
 
