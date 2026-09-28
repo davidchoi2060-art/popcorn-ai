@@ -47,6 +47,9 @@ def present(row, admin=False):
     result = dict(row["content"])
     result["name"] = remove_discount_label(result.get("name", ""))
     result["slot_label"] = SLOT_LABELS.get(result.get("slot"), result.get("slot", ""))
+    if result.get("image_asset"):
+        result["merchant_image_url"] = result.get("image_url")
+        result["image_url"] = f"/api/product-images/{row['source_product_code']}/detail"
     result.update(product_code=row["source_product_code"], price=row["sale_price"],
                   price_basis="현재 부품 판매가", status=row["status"],
                   source_current=is_current(row), product_linked=row["product_code"] is not None)
@@ -54,6 +57,7 @@ def present(row, admin=False):
         result["updated_at"] = row["updated_at"]
     else:
         result["name"] = display_name(result.get("name", ""))
+        result.pop("image_asset", None)
         result.pop("review_issues", None)
     return result
 

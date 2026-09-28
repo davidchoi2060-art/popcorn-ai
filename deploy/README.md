@@ -950,3 +950,11 @@ sudo grep -c UI_CHECK_DEV_LOGIN /etc/popcorn-ai.env    # 0 이어야 한다
 ```bash
 sudo grep -c POPCORN_TEST_HEADER_ENABLED /etc/popcorn-ai.env    # 0 이어야 한다
 ```
+
+## 제품 이미지 저장소 (2026-09-28)
+
+`popcorn-ai-product-media-045e861b`는 서울 리전 비공개 상품 이미지 버킷이다. 원본·가공 이미지는 여기에, 메타데이터는 `product_explanations.content.image_asset`에 둔다. 이 작업 시점의 서버는 미배포이며 다음 배포에 `api/product_images.py`와 requirements 변경이 포함돼야 한다. Compute VM 기본 자격 증명(ADC)과 해당 버킷의 storage.objectViewer를 사용한다. 장기 서비스 계정 키를 생성하거나 앱 환경에 보관하지 않는다.
+
+공개는 `/api/product-images/<code>/detail` 또는 `/thumbnail`만 허용한다. 원본 object URL이나 버킷 전체 공개 권한을 고객에게 주지 않는다. 본문을 제공할 때 SHA256 ETag와 1시간 캐시를 사용한다. 저장소 접근 실패는 503, 없는 상품 이미지는 404로 구분한다.
+
+원본·표시용·썸네일 object key는 변경하지 않고 보존한다. 추후 재가공 규칙이 바뀌면 새 버전 경로를 생성한다. `gcloud storage cp --recursive --no-clobber`로 올린 후 `gcloud storage objects list 'gs://popcorn-ai-product-media-045e861b/**' --format='json(name,size,md5_hash,generation)'` 결과로 apply 도구의 업로드 검증을 수행한다. 실제 배포 후 ADC 읽기까지 별도 확인한다.

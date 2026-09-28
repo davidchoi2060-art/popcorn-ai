@@ -8,7 +8,7 @@
 {% endblock %}
 {% block content %}
 <div class="body">
-<h1>부품 설명 관리</h1><p>판매처에 등록된 제품별 자료를 기준으로 합니다. 실제 사양 불일치와 누락 항목만 확인사항으로 표시합니다.</p>
+<h1>부품 설명 관리</h1><p>부품별 사양과 설명을 확인합니다. 사양 불일치와 누락 항목은 확인사항으로 표시합니다.</p>
 <form id="pe-search" class="pe-toolbar"><label>상품명·코드 <input id="pe-q" maxlength="100"></label><label>부품 종류 <select id="pe-slot"><option value="">전체</option>{% for value,label in part_slots %}<option value="{{value}}">{{label}}</option>{% endfor %}</select></label><button>검색</button></form>
 <p id="pe-count" class="pe-count" role="status"></p><div id="pe-list"></div><div class="pe-toolbar"><button id="pe-prev" type="button">이전</button><button id="pe-next" type="button">다음</button></div>
 </div>

@@ -10,6 +10,14 @@ status는 draft/approved/retired. approved_by는 admin_operators FK, approved_at
 
 관리자 정의서: [부품 설명 상세](design/req/req-part-explanations.md).
 
+### 2026-09-28 이미지 자산 메타데이터
+
+`content.image_asset`은 `bucket`, 원본·상세·썸네일 object key, SHA256, 원본/재단 크기,
+crop_box, 가공 방식, 수집 시각을 보관한다. 실제 파일은 Cloud Storage에 저장하고 DB에는
+바이너리를 넣지 않는다. 원본 URL(`image_url`)은 유지하며 조회 응답에서 관리 자산 경로를
+우선 사용한다. 사진 가공은 원본 픽셀을 유지한 균일 외곽 여백 재단으로 한정한다.
+파일 누락·사양 설명 승인·출고 검증 상태는 서로 독립적이다. 스키마 추가는 필요 없다.
+
 **파일 경로:** `docs/06_db-erd.md`
 **문서 버전:** Ver 4.0
 **DBMS:** PostgreSQL (DB명 `popcorn_pc`) — 구성 위치: 구글 클라우드(기구성, 사용자 확인 2026-07-21). **실제 DB 생성·마이그레이션은 본 개정본 검토 후 별도 승인으로 착수한다.**
