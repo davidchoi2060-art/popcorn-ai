@@ -116,6 +116,13 @@ _TAIL = re.compile(r"\s*\[?\s*회원가입.*$")
 _MIN_LEN = 4
 
 
+def remove_discount_label(name):
+    """Remove the retired membership discount label from authored display names."""
+    if not name:
+        return name
+    return name.replace("[회원가입 계좌이체 맞춤할인 -2.5%]", "").strip()
+
+
 def display_name(raw):
     """HTML 마크업을 벗기고 판매조건 꼬리를 걷어낸 견적 표시용 이름. 못 걷으면 원천을 그대로 돌려준다."""
     if not raw:

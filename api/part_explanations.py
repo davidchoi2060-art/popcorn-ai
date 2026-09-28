@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from .db import engine
 from .taxonomy import SLOT_LABELS
-from .product_name import display_name
+from .product_name import display_name, remove_discount_label
 
 router = APIRouter()
 
@@ -45,6 +45,7 @@ SELECT = """
 
 def present(row, admin=False):
     result = dict(row["content"])
+    result["name"] = remove_discount_label(result.get("name", ""))
     result["slot_label"] = SLOT_LABELS.get(result.get("slot"), result.get("slot", ""))
     result.update(product_code=row["source_product_code"], price=row["sale_price"],
                   price_basis="현재 부품 판매가", status=row["status"],

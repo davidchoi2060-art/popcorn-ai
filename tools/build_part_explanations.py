@@ -4,8 +4,11 @@ import hashlib
 import html
 import json
 import re
+import sys
 from pathlib import Path
 from urllib.parse import urljoin
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from api.product_name import remove_discount_label
 
 ROLES = {
  'CPU':('프로그램의 명령과 연산을 처리하는 중심 부품입니다.','사용할 프로그램과 동시 작업량, 메인보드의 CPU 지원 목록과 BIOS를 함께 확인하세요.'),
@@ -44,11 +47,11 @@ def build(directory):
     items={i['code']:i for c in data['catalog'] for i in c['items'] if not i['pseudo']}
     output=[]
     for code,item in sorted(items.items()):
-        row=raw[code]; name=clean(row['상품명']); spec=row.get('스펙') or ''; slot=item['slot']
+        row=raw[code]; name=remove_discount_label(clean(row['상품명'])); spec=row.get('스펙') or ''; slot=item['slot']
         facts=extract(slot,spec);role,caution=ROLES[slot]
         source_url=f'https://www.popcornpc.co.kr/shop/product_detail.html?pd_no={code}'
         sources=[dict(id='merchant',kind='merchant',title='팝콘PC 관리자 상품 사양',url=source_url,observed_at=admin['observed_at'])]
-        issues=['제조사 모델별 사양 및 이미지 대조 전'];image_url=None
+        issues=[];image_url=None
         if not facts:
             facts=[dict(label='등록 상품명',value=name,source_id='merchant',verification='사양 보완 필요')]
             issues.append('구조화 가능한 사양 원문 부족')
@@ -82,7 +85,7 @@ def build(directory):
         snapshot=dict(name=row['상품명'],spec=spec)
         fp=hashlib.sha256(json.dumps([row['상품명'] or '',spec],ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
         content=dict(name=name,slot=slot,summary=summary,role=role,facts=facts,highlights=highlights,
-            cautions=[caution],image_url=image_url,image_caption='판매처 등록 이미지 · 실물 모델 대조 전' if image_url else '제품 이미지 미확인',
+            cautions=[caution],image_url=image_url,image_caption='판매처 등록 이미지' if image_url else '제품 이미지 미확인',
             image_source_url=source_url,sources=sources,review_issues=issues,
             questions=[dict(question='이 부품은 어떤 역할을 하나요?',answer=role),dict(question='선택할 때 무엇을 확인하나요?',answer=caution)],
             usage_note='전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공')
