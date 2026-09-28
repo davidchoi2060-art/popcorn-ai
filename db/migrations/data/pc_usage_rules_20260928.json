@@ -1,0 +1,1188 @@
+{
+  "rule_version": "20260928-v1",
+  "scenarios": [
+    {
+      "id": "O01",
+      "group": "사무·학습",
+      "title": "문서 작성·웹 검색",
+      "customer_request": "문서와 인터넷 위주로 저렴하게 쓰고 싶어요.",
+      "apps": [
+        "office"
+      ],
+      "basic": {
+        "ram_gb": 8,
+        "storage_gb": 256
+      },
+      "better": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "benefit": "동시에 여는 프로그램과 보관할 파일에 여유를 더하는 선택",
+      "questions": [
+        "동시에 사용하는 프로그램은?",
+        "보관할 자료 용량은?"
+      ],
+      "validation": "대표 문서·웹페이지를 함께 열어 응답과 메모리 사용량 기록",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정"
+    },
+    {
+      "id": "O02",
+      "group": "사무·학습",
+      "title": "Excel·여러 프로그램 동시 사용",
+      "customer_request": "엑셀, 브라우저, 메신저를 한꺼번에 켜요.",
+      "apps": [
+        "office"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "큰 파일과 여러 앱을 함께 사용할 작업 공간 확대",
+      "questions": [
+        "파일 크기·수식·매크로·Power Query 사용 여부는?",
+        "동시 앱 수는?"
+      ],
+      "validation": "대표 통합문서 열기·재계산 시간을 같은 조건에서 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정"
+    },
+    {
+      "id": "O03",
+      "group": "사무·학습",
+      "title": "Zoom 수업·화면 공유",
+      "customer_request": "수업을 들으면서 문서와 화면 공유를 사용해요.",
+      "apps": [
+        "zoom",
+        "office"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "자료·녹화 파일 보관과 동시 작업 용량 확대",
+      "questions": [
+        "카메라·마이크 보유 여부는?",
+        "녹화 여부와 회선 속도는?"
+      ],
+      "validation": "30분 화면 공유·통화 중 끊김·CPU/RAM 사용 기록",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정"
+    },
+    {
+      "id": "O04",
+      "group": "사무·학습",
+      "title": "듀얼 모니터 사무",
+      "customer_request": "모니터 두 대에서 문서와 인터넷을 같이 봐요.",
+      "apps": [
+        "office"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "다중 앱과 파일 저장 용량 확대; 모니터 지원은 별도 확인",
+      "questions": [
+        "두 모니터 모델·해상도·주사율·단자는?",
+        "케이블·허브를 쓰나요?"
+      ],
+      "validation": "실제 두 화면 동시 연결·절전 복귀·해상도/주사율 확인",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "monitors": 2
+    },
+    {
+      "id": "T01",
+      "group": "주식·다중 화면",
+      "title": "HTS·단일 모니터",
+      "customer_request": "영웅문4와 차트를 모니터 1대에서 보려고 해요.",
+      "apps": [
+        "hts"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "차트·브라우저 동시 사용과 저장 여유 중심의 비교",
+      "questions": [
+        "증권사·HTS 버전과 차트 창 수는?",
+        "모든 모니터 모델·해상도·단자는?",
+        "조건검색·엑셀 연동을 하나요?"
+      ],
+      "validation": "고객 창 배치 재현, 시세 갱신·창 전환·다중 출력 확인. 실거래 주문 없이 검증",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "monitors": 1
+    },
+    {
+      "id": "T02",
+      "group": "주식·다중 화면",
+      "title": "HTS·듀얼 모니터",
+      "customer_request": "영웅문4와 차트를 모니터 2대에서 보려고 해요.",
+      "apps": [
+        "hts"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "차트·브라우저 동시 사용과 저장 여유 중심의 비교",
+      "questions": [
+        "증권사·HTS 버전과 차트 창 수는?",
+        "모든 모니터 모델·해상도·단자는?",
+        "조건검색·엑셀 연동을 하나요?"
+      ],
+      "validation": "고객 창 배치 재현, 시세 갱신·창 전환·다중 출력 확인. 실거래 주문 없이 검증",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "monitors": 2
+    },
+    {
+      "id": "T03",
+      "group": "주식·다중 화면",
+      "title": "HTS·모니터 네 대",
+      "customer_request": "영웅문4와 차트를 모니터 4대에서 보려고 해요.",
+      "apps": [
+        "hts"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "차트·브라우저 동시 사용과 저장 여유 중심의 비교",
+      "questions": [
+        "증권사·HTS 버전과 차트 창 수는?",
+        "모든 모니터 모델·해상도·단자는?",
+        "조건검색·엑셀 연동을 하나요?"
+      ],
+      "validation": "고객 창 배치 재현, 시세 갱신·창 전환·다중 출력 확인. 실거래 주문 없이 검증",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "monitors": 4
+    },
+    {
+      "id": "G01",
+      "group": "게임·방송",
+      "title": "LoL · FHD 60 목표",
+      "customer_request": "LoL · FHD 60 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "lol"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 60
+    },
+    {
+      "id": "G02",
+      "group": "게임·방송",
+      "title": "LoL · FHD 144 목표",
+      "customer_request": "LoL · FHD 144 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "lol"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 144
+    },
+    {
+      "id": "G03",
+      "group": "게임·방송",
+      "title": "VALORANT · FHD 144 목표",
+      "customer_request": "VALORANT · FHD 144 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "valorant"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 144
+    },
+    {
+      "id": "G04",
+      "group": "게임·방송",
+      "title": "VALORANT · FHD 240 목표",
+      "customer_request": "VALORANT · FHD 240 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "valorant"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 240
+    },
+    {
+      "id": "G05",
+      "group": "게임·방송",
+      "title": "PUBG · FHD 60 목표",
+      "customer_request": "PUBG · FHD 60 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "pubg"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 60
+    },
+    {
+      "id": "G06",
+      "group": "게임·방송",
+      "title": "PUBG · QHD 144 목표",
+      "customer_request": "PUBG · QHD 144 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "pubg"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "2560×1440",
+      "target_fps": 144
+    },
+    {
+      "id": "G07",
+      "group": "게임·방송",
+      "title": "Overwatch · FHD 144 목표",
+      "customer_request": "Overwatch · FHD 144 목표로 게임을 하고 싶어요.",
+      "apps": [
+        "overwatch"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 144
+    },
+    {
+      "id": "G08",
+      "group": "게임·방송",
+      "title": "PUBG + OBS 녹화",
+      "customer_request": "PUBG + OBS 녹화로 게임을 하고 싶어요.",
+      "apps": [
+        "pubg",
+        "obs"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "게임 외 앱을 함께 쓰고 더 많은 파일을 보관할 용량 차이; FPS 개선으로 해석하지 않음",
+      "questions": [
+        "그래픽 옵션과 레이트레이싱·업스케일링 설정은?",
+        "목표는 평균 FPS인가요, 최저 프레임인가요?",
+        "동시에 녹화·방송하나요?"
+      ],
+      "validation": "게임 버전·맵·옵션 고정, 3회 반복 평균/1% low FPS·프레임 시간·온도 기록. 녹화 시 누락 프레임 추가",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "resolution": "1920×1080",
+      "target_fps": 60
+    },
+    {
+      "id": "C01",
+      "group": "디자인·영상·설계",
+      "title": "Photoshop · 웹 이미지",
+      "customer_request": "Photoshop · 웹 이미지 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "photoshop"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "이미지 여러 장·레이어 작업의 메모리와 저장 여유",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 크기·레이어·도면/장면 규모는?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "C02",
+      "group": "디자인·영상·설계",
+      "title": "Photoshop · 큰 원본·다중 레이어",
+      "customer_request": "Photoshop · 큰 원본·다중 레이어 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "photoshop"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "better": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "benefit": "큰 원본과 여러 문서의 작업 공간 확대",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 크기·레이어·도면/장면 규모는?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "C03",
+      "group": "디자인·영상·설계",
+      "title": "Premiere · HD 편집",
+      "customer_request": "Premiere · HD 편집 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "premiere"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "동시 앱과 원본 영상 저장 용량 확대",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 해상도·코덱·비트심도·트랙 수·프록시 사용은?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "C04",
+      "group": "디자인·영상·설계",
+      "title": "Premiere · 4K 편집",
+      "customer_request": "Premiere · 4K 편집 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "premiere"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "better": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "benefit": "4K 원본·캐시와 동시 작업을 위한 용량 확대",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 해상도·코덱·비트심도·트랙 수·프록시 사용은?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "4K",
+      "cycles": false
+    },
+    {
+      "id": "C05",
+      "group": "디자인·영상·설계",
+      "title": "After Effects · HD 합성",
+      "customer_request": "After Effects · HD 합성 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "aftereffects"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "합성·미리보기와 동시 프로그램의 메모리 여유",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 해상도·코덱·비트심도·트랙 수·프록시 사용은?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "C06",
+      "group": "디자인·영상·설계",
+      "title": "After Effects · 4K 합성",
+      "customer_request": "After Effects · 4K 합성 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "aftereffects"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "better": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "benefit": "더 큰 합성과 캐시를 위한 용량 확대",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 해상도·코덱·비트심도·트랙 수·프록시 사용은?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "4K",
+      "cycles": false
+    },
+    {
+      "id": "C07",
+      "group": "디자인·영상·설계",
+      "title": "Blender · 모델링 학습",
+      "customer_request": "Blender · 모델링 학습 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "blender"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "장면·텍스처가 늘어날 때의 용량 확대",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 크기·레이어·도면/장면 규모는?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "C08",
+      "group": "디자인·영상·설계",
+      "title": "Blender · Cycles GPU 렌더링",
+      "customer_request": "Blender · Cycles GPU 렌더링 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "blender"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "better": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "benefit": "장면 데이터와 프로젝트 저장 용량 확대; 렌더 시간은 별도",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 크기·레이어·도면/장면 규모는?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": true
+    },
+    {
+      "id": "C09",
+      "group": "디자인·영상·설계",
+      "title": "AutoCAD 2027 · 2D 도면",
+      "customer_request": "AutoCAD 2027 · 2D 도면 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "autocad"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "동시 도면과 참조 파일 작업 공간 확대",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 크기·레이어·도면/장면 규모는?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "C10",
+      "group": "디자인·영상·설계",
+      "title": "AutoCAD 2027 · 3D·복잡한 도면",
+      "customer_request": "AutoCAD 2027 · 3D·복잡한 도면 작업에 쓸 PC를 찾고 있어요.",
+      "apps": [
+        "autocad"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "better": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "benefit": "큰 도면·참조 데이터의 메모리와 저장 여유",
+      "questions": [
+        "정확한 프로그램 버전과 플러그인은?",
+        "원본 크기·레이어·도면/장면 규모는?",
+        "작업용 저장장치를 이미 갖고 있나요?"
+      ],
+      "validation": "대표 프로젝트 열기·편집·내보내기 3회, RAM/VRAM 최고 사용량과 처리 시간을 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "media_level": "HD",
+      "cycles": false
+    },
+    {
+      "id": "D01",
+      "group": "개발",
+      "title": "VS Code · 웹 개발",
+      "customer_request": "웹 개발과 브라우저 테스트를 해요.",
+      "apps": [
+        "vscode"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "편집기·브라우저·빌드 도구의 동시 사용 용량 확대",
+      "questions": [
+        "언어·빌드 도구와 프로젝트 규모는?",
+        "Docker·로컬 DB도 쓰나요?"
+      ],
+      "validation": "실제 저장소 설치·빌드·테스트 시간과 메모리 사용량 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정"
+    },
+    {
+      "id": "D02",
+      "group": "개발",
+      "title": "Docker · 로컬 개발 환경",
+      "customer_request": "DB와 서버 컨테이너 여러 개를 같이 돌려요.",
+      "apps": [
+        "docker",
+        "vscode"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "컨테이너·개발 도구의 메모리와 이미지 저장 공간 확대",
+      "questions": [
+        "컨테이너 개수·메모리 제한은?",
+        "WSL2/Hyper-V와 OS 에디션은?"
+      ],
+      "validation": "지정 Compose 실행·테스트·재빌드, 메모리·디스크 사용량 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정"
+    },
+    {
+      "id": "D03",
+      "group": "개발",
+      "title": "Android Studio + 에뮬레이터",
+      "customer_request": "안드로이드 앱을 만들고 에뮬레이터로 확인해요.",
+      "apps": [
+        "android"
+      ],
+      "basic": {
+        "ram_gb": 16,
+        "storage_gb": 500
+      },
+      "better": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "benefit": "공식 RAM·GPU 메모리 권장량과 SDK 저장 여유를 비교",
+      "questions": [
+        "동시 AVD 수와 API 버전은?",
+        "앱 프로젝트 규모·가상화 설정은?"
+      ],
+      "validation": "AVD 구동·Gradle 빌드·설치 반복, 가상화·GPU 드라이버 확인",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정"
+    },
+    {
+      "id": "A01",
+      "group": "로컬 AI",
+      "title": "로컬 AI · 모델 1개 추론",
+      "customer_request": "작은 언어 모델을 내 PC에서 사용하고 싶어요.",
+      "apps": [
+        "ollama_gpu",
+        "ollama_context"
+      ],
+      "basic": {
+        "ram_gb": 32,
+        "storage_gb": 1000
+      },
+      "better": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "benefit": "모델·컨텍스트를 정한 뒤 비교; 용량만으로 GPU 적재 가능 여부를 단정하지 않음",
+      "questions": [
+        "모델명·정확한 태그·양자화는?",
+        "컨텍스트와 동시 요청 수는?",
+        "CPU 오프로딩 허용 여부는?"
+      ],
+      "validation": "모델 태그 고정, 실제 로드·CPU/GPU 분할·최대 메모리·tokens/s 측정",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "needs_model": true
+    },
+    {
+      "id": "A02",
+      "group": "로컬 AI",
+      "title": "로컬 AI · 긴 문서·큰 모델",
+      "customer_request": "긴 문서와 더 큰 모델을 로컬에서 처리하고 싶어요.",
+      "apps": [
+        "ollama_gpu",
+        "ollama_context"
+      ],
+      "basic": {
+        "ram_gb": 64,
+        "storage_gb": 2000
+      },
+      "better": {
+        "ram_gb": 96,
+        "storage_gb": 2000
+      },
+      "benefit": "시스템 RAM 증가가 필요한지 실측한 뒤 비교; VRAM 증가와는 다름",
+      "questions": [
+        "모델·양자화·문서 토큰 수는?",
+        "완전 GPU 적재가 필수인가요?",
+        "목표 응답 속도는?"
+      ],
+      "validation": "최대 컨텍스트에서 메모리 오류·오프로딩·응답 시간 확인",
+      "policy_basis": "팝콘AI 비교용 가정 · 공식 최소/권장 사양과 별도 · 고객 답변으로 수정",
+      "needs_model": true
+    }
+  ],
+  "requirements": {
+    "office": {
+      "min": {
+        "ram_gb": 4,
+        "cores": 2,
+        "base_ghz": 1.6
+      },
+      "rec": {},
+      "unknown": [
+        "Windows 11 설치·라이선스",
+        "설치 후 여유공간 4GB",
+        "화면·DirectX 및 연결 장치"
+      ]
+    },
+    "zoom": {
+      "min": {
+        "ram_gb": 4,
+        "cores": 2,
+        "base_ghz": 2
+      },
+      "rec": {
+        "ram_gb": 16,
+        "cores": 4,
+        "base_ghz": 2.5
+      },
+      "unknown": [
+        "지원 OS·앱 버전",
+        "카메라·마이크",
+        "회선 업로드·다운로드"
+      ]
+    },
+    "hts": {
+      "min": {},
+      "rec": {},
+      "unknown": [
+        "영웅문4 최신 공식 하드웨어 요구 사양",
+        "OS·보안 모듈 호환",
+        "실제 창 구성에서 반응 시간"
+      ]
+    },
+    "lol": {
+      "min": {
+        "ram_gb": 2,
+        "vram_gb": 1
+      },
+      "rec": {
+        "ram_gb": 4,
+        "vram_gb": 2
+      },
+      "unknown": [
+        "CPU·GPU 기준 모델 대비 성능 근거",
+        "DX11·지원 Windows·TPM 설정",
+        "설치 후 여유공간 16GB"
+      ]
+    },
+    "valorant": {
+      "min": {
+        "ram_gb": 4
+      },
+      "rec": {
+        "ram_gb": 4
+      },
+      "unknown": [
+        "CPU·GPU 공식 144FPS 기준 모델과의 비교 근거",
+        "SSE4.2/AVX·DX11·드라이버",
+        "Windows 11 TPM 2.0·Secure Boot 설정"
+      ]
+    },
+    "pubg": {
+      "min": {
+        "ram_gb": 8,
+        "vram_gb": 2
+      },
+      "rec": {
+        "ram_gb": 16
+      },
+      "unknown": [
+        "CPU·GPU 기준 모델 대비 성능 근거",
+        "지원 OS·DX11·회선",
+        "설치 후 여유공간 50GB"
+      ]
+    },
+    "overwatch": {
+      "min": {
+        "ram_gb": 6
+      },
+      "rec": {
+        "ram_gb": 8
+      },
+      "unknown": [
+        "CPU·GPU 권장 모델 대비 성능 근거",
+        "지원 OS·DX11·드라이버",
+        "설치 후 여유공간 50GB"
+      ]
+    },
+    "obs": {
+      "min": {},
+      "rec": {},
+      "unknown": [
+        "설치 버전의 OS·GPU 지원",
+        "인코더·코덱·방송 플랫폼",
+        "송출 회선과 녹화 디스크 쓰기 성능"
+      ]
+    },
+    "photoshop": {
+      "min": {
+        "ram_gb": 8,
+        "vram_gb": 1.5
+      },
+      "rec": {
+        "ram_gb": 16,
+        "vram_gb": 2
+      },
+      "unknown": [
+        "지원 OS·AVX2·SSE4.2·DX12",
+        "설치 후 여유공간·별도 스크래치 드라이브",
+        "모니터 해상도·색 관리"
+      ]
+    },
+    "premiere": {
+      "min": {
+        "ram_gb": 8,
+        "vram_gb": 4
+      },
+      "rec": {
+        "vram_gb": 8
+      },
+      "unknown": [
+        "Windows 11 24H2·AVX2·GPU 세대·드라이버",
+        "Intel 권장 CPU의 Quick Sync 조건 / AMD 세대",
+        "설치 후 여유공간·화면·오디오"
+      ]
+    },
+    "aftereffects": {
+      "min": {
+        "ram_gb": 16,
+        "vram_gb": 4
+      },
+      "rec": {
+        "vram_gb": 8
+      },
+      "unknown": [
+        "Windows 11 24H2·AVX2·GPU API·드라이버",
+        "Intel 권장 CPU의 Quick Sync 조건 / AMD 세대",
+        "설치 후 여유공간·화면·오디오"
+      ]
+    },
+    "blender": {
+      "min": {
+        "ram_gb": 8,
+        "vram_gb": 2,
+        "cores": 4
+      },
+      "rec": {
+        "ram_gb": 32,
+        "vram_gb": 8,
+        "cores": 8
+      },
+      "unknown": [
+        "SSE4.2·OpenGL/Vulkan·드라이버",
+        "지원 OS·화면 해상도"
+      ]
+    },
+    "autocad": {
+      "min": {
+        "ram_gb": 16,
+        "vram_gb": 2,
+        "threads": 8,
+        "base_ghz": 2.5
+      },
+      "rec": {
+        "ram_gb": 32,
+        "vram_gb": 8,
+        "base_ghz": 3,
+        "boost_ghz": 4
+      },
+      "unknown": [
+        "GPU 대역폭·DX11/12 조건",
+        "Windows 11·.NET·인증 하드웨어 여부",
+        "설치 여유공간·화면·툴셋별 추가 조건",
+        "공식 본문 직접 확인 보완"
+      ]
+    },
+    "vscode": {
+      "min": {},
+      "rec": {
+        "ram_gb": 1,
+        "base_ghz": 1.6
+      },
+      "unknown": [
+        "지원 OS·런타임·확장 요구 사항"
+      ]
+    },
+    "docker": {
+      "min": {
+        "ram_gb": 8
+      },
+      "rec": {},
+      "unknown": [
+        "Windows·WSL2/Hyper-V 버전",
+        "SLAT·BIOS 가상화 활성화",
+        "컨테이너별 CPU·메모리 할당"
+      ]
+    },
+    "android": {
+      "min": {
+        "ram_gb": 16,
+        "vram_gb": 4
+      },
+      "rec": {
+        "ram_gb": 32,
+        "vram_gb": 8
+      },
+      "unknown": [
+        "CPU 세대·가상화 BIOS 활성화",
+        "지원 GPU 세대·드라이버",
+        "Windows·화면·설치 후 여유공간"
+      ]
+    },
+    "ollama_gpu": {
+      "min": {},
+      "rec": {},
+      "unknown": [
+        "정확한 모델·양자화·컨텍스트",
+        "OS·GPU 백엔드·드라이버",
+        "실제 모델 로드와 메모리·토큰 속도"
+      ]
+    }
+  },
+  "sources": {
+    "office": {
+      "id": "office",
+      "title": "Microsoft 365 업무용 요구 사양",
+      "url": "https://support.microsoft.com/en-us/office/system-requirements/system-requirements-for-microsoft-365-for-business-education-and-government-use",
+      "summary": "Windows 기준 CPU 2코어·1.6GHz 이상, RAM 4GB, 설치 여유 4GB. 대용량 Excel 처리 시간은 별도 평가.",
+      "version": "Microsoft 365 Apps · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "zoom": {
+      "id": "zoom",
+      "title": "Zoom 데스크톱 요구 사양",
+      "url": "https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060748",
+      "summary": "최소 2코어·2GHz·RAM 4GB, 권장 4코어·2.5GHz·RAM 16GB. 카메라·마이크·회선 조건도 필요.",
+      "version": "Zoom Workplace · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "hts": {
+      "id": "hts",
+      "title": "영웅문4 공식 도움말",
+      "url": "https://download.kiwoom.com/hero4_help_new/qa06.htm",
+      "summary": "독립 창과 중복 창 기능 확인. 최신 하드웨어 최소·권장 수치는 이번 조사에서 확보하지 못함. 창 개수에 따른 부하는 실측 대상.",
+      "version": "영웅문4 · 기능 자료만 확인",
+      "checked_at": "2026-09-28",
+      "status": "requirements_missing"
+    },
+    "lol": {
+      "id": "lol",
+      "title": "리그 오브 레전드 요구 사양",
+      "url": "https://support.riotgames.com/ko-kr/league-of-legends/performance/minimum-and-recommended-system-requirements-league-of-legends",
+      "summary": "RAM 최소 2GB·권장 4GB, VRAM 1GB·2GB, 설치 여유 16GB. 권장 FHD 표기는 144FPS 보증이 아님. DX11과 OS·TPM 조건 확인.",
+      "version": "2026-09-22 문서",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "valorant": {
+      "id": "valorant",
+      "title": "VALORANT 요구 사양",
+      "url": "https://support.riotgames.com/en-us/valorant/support-tools/minimum-recommended-pc-specs",
+      "summary": "RAM 4GB. 공식 144FPS 단계 예시는 i5-9400F/Ryzen 5 2600X와 GTX 1050 Ti/R7 370/Arc A310. 240FPS 기준은 해당 문서에 없음. Windows 11은 TPM 2.0·Secure Boot 필요.",
+      "version": "2026-05-21 문서",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "pubg": {
+      "id": "pubg",
+      "title": "PUBG 제작사 Steam 요구 사양",
+      "url": "https://store.steampowered.com/app/578080/?cc=us&l=english",
+      "summary": "최소 RAM 8GB·GTX 960 2GB/R7 370 2GB·여유 40GB. 권장 RAM 16GB·GTX 1060 3GB/RX 580 4GB·여유 50GB. 해상도별 FPS 보증 자료가 아님.",
+      "version": "Steam 제작사 게시 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "overwatch": {
+      "id": "overwatch",
+      "title": "Overwatch 제작사 Steam 요구 사양",
+      "url": "https://store.steampowered.com/app/2357570/Overwatch/",
+      "summary": "RAM 최소 6GB·권장 8GB, 설치 여유 50GB. 권장 GPU 예시는 GTX 1060/1650, R9 380/RX 6400, Arc A770. 144FPS는 별도 검증.",
+      "version": "Steam 제작사 게시 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "obs": {
+      "id": "obs",
+      "title": "OBS 요구 사양",
+      "url": "https://obsproject.com/kb/system-requirements",
+      "summary": "Windows 10/11, DirectX 10.1 GPU를 기본 조건으로 제시. 인코더·해상도·FPS·장면 복잡도에 따라 부하가 달라지며 실행 조건만으로 녹화·송출 성능을 보장하지 않음.",
+      "version": "문서 표기 2021-08-25 · 오래된 기본 조건임",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "photoshop": {
+      "id": "photoshop",
+      "title": "Photoshop 기술 요구 사양",
+      "url": "https://helpx.adobe.com/photoshop/desktop/get-started/technical-requirements-installation/adobe-photoshop-on-desktop-technical-requirements.html",
+      "summary": "27.x Windows: RAM 최소 8GB·권장 16GB, DX12 GPU, VRAM 최소 1.5GB·권장 표 2GB(4K 화면은 4GB). 설치 여유 최소 10GB·권장 100GB와 별도 스크래치 드라이브. AVX2·SSE4.2 및 OS 조건 확인.",
+      "version": "27.x · 2026-09-09 문서",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "premiere": {
+      "id": "premiere",
+      "title": "Premiere 기술 요구 사양",
+      "url": "https://helpx.adobe.com/premiere/desktop/get-started/technical-requirements/adobe-premiere-pro-technical-requirements.html",
+      "summary": "26.x Windows: RAM 최소 8GB, HD 권장 16GB·4K 권장 32GB. GPU 메모리 최소 4GB·권장 8GB. 권장 CPU는 Quick Sync 있는 Intel 11세대 이상 또는 Ryzen 3000 이상. Windows 11 24H2, AVX2, 추가 미디어 드라이브 필요.",
+      "version": "26.0~26.5.1 · 2026-09-16 문서",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "aftereffects": {
+      "id": "aftereffects",
+      "title": "After Effects 요구 사양",
+      "url": "https://helpx.adobe.com/africa/after-effects/desktop/get-started/technical-requirements/system-requirements.html",
+      "summary": "26.x Windows: RAM 최소·HD 권장 16GB, 4K 권장 32GB. GPU 메모리 최소 4GB·권장 8GB. Intel 권장 CPU에 Quick Sync 조건. Windows 11 24H2, AVX2, 미디어 드라이브 및 GPU별 API 조건 확인.",
+      "version": "26.0/26.2/26.2.1 · 2026-06-17 문서",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "blender": {
+      "id": "blender",
+      "title": "Blender 요구 사양",
+      "url": "https://www.blender.org/download/requirements/",
+      "summary": "Windows: 최소 4코어·RAM 8GB·VRAM 2GB, 권장 8코어·RAM 32GB·VRAM 8GB. SSE4.2와 OpenGL/Vulkan 조건 확인. Cycles GPU 렌더링은 별도 백엔드 요건 적용.",
+      "version": "현행 다운로드 요구 사양 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "autocad": {
+      "id": "autocad",
+      "title": "AutoCAD 2027 요구 사양",
+      "url": "https://www.autodesk.com/de/support/technical/article/caas/sfdcarticles/sfdcarticles/DEU/System-requirements-for-AutoCAD-2027-including-Specialized-Toolsets.html",
+      "summary": "RAM 기본 16GB·권장 32GB, GPU 기본 2GB·29GB/s·DX11, 권장 8GB·106GB/s·DX12. CPU 기본 8논리코어·2.5GHz 이상, 권장 기본3GHz·터보4GHz 이상. Windows 11. 공식 검색 색인에서 확인, 페이지 본문 직접 열기는 실패.",
+      "version": "AutoCAD 2027 · 2026-04-03 문서",
+      "checked_at": "2026-09-28",
+      "status": "official_search_excerpt"
+    },
+    "vscode": {
+      "id": "vscode",
+      "title": "VS Code 요구 사양",
+      "url": "https://code.visualstudio.com/docs/supporting/requirements",
+      "summary": "편집기 자체 권장 CPU 1.6GHz·RAM 1GB. 언어 서버·브라우저·빌드·확장은 별도 부하이며 전체 개발 환경 요구량과 같지 않음.",
+      "version": "현행 문서 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "docker": {
+      "id": "docker",
+      "title": "Docker Desktop Windows 설치 조건",
+      "url": "https://docs.docker.com/desktop/setup/install/windows-install/",
+      "summary": "RAM 8GB, 지원 Windows·WSL2 또는 Hyper-V, SLAT·BIOS 가상화 필요. 컨테이너별 메모리는 추가 산정.",
+      "version": "현행 문서 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "android": {
+      "id": "android",
+      "title": "Android Studio 설치 조건",
+      "url": "https://developer.android.com/studio/install",
+      "summary": "Windows: Studio 단독 RAM 8GB, Emulator 포함 16GB·권장 32GB. Emulator GPU 메모리 최소 4GB·권장 8GB와 GPU 세대 조건. 가상화 활성화, 여유공간·드라이버·CPU 조건 확인.",
+      "version": "Windows Studio + Emulator · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "ollama_gpu": {
+      "id": "ollama_gpu",
+      "title": "Ollama 하드웨어 지원",
+      "url": "https://docs.ollama.com/gpu",
+      "summary": "GPU 지원 목록과 드라이버 조건은 OS·백엔드별로 다름. RTX 5060/5060 Ti/5070/5070 Ti/5080/5090과 RTX PRO Blackwell 목록 확인. 모델이 메모리에 들어가는지와 응답 속도는 별도.",
+      "version": "현행 문서 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    },
+    "ollama_context": {
+      "id": "ollama_context",
+      "title": "Ollama 컨텍스트 길이",
+      "url": "https://docs.ollama.com/context-length",
+      "summary": "컨텍스트가 길어지면 메모리 사용량이 증가. 모델 파일 크기만으로 VRAM 요구량을 정하지 않고 실제 로드·오프로딩 상태를 확인해야 함.",
+      "version": "현행 문서 · 조회일 기준",
+      "checked_at": "2026-09-28",
+      "status": "read"
+    }
+  }
+}

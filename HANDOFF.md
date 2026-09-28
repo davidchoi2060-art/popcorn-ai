@@ -169,3 +169,16 @@
 **같은 작업 최종 보완:** 127920의 판매처 상세 페이지를 직접 재조회해 `img#viewimg`의 대표 이미지를 추가 확보했다. 최종 **201종 / 603개 파일 / DB 연결 201종 / 재단 196종 / 경계 유지 5종 / 미확보 0종**이다. 위 200종 수치는 최초 처리 시점 기록이다. 추가 1종은 `image-127920-before.json`으로 별도 백업했으며 최종 검사 결과는 `image-final-verification.json`이다.
 
 **표시 정리(사용자 요청):** 사양표의 `판매처 원문` 등 근거 배지, 이미지 출처 캡션, 출처 안내와 근거 펼침을 화면에서 제거했다. 출처·검증 기록은 DB와 설명 문서에 유지한다. 실제 확인사항은 유지한다.
+
+
+## 2026-09-28 최신 인계 — 구성 DB와 실제 LLM 상담
+
+이 절이 위 과거 상태보다 우선한다. 현재 작업 위치는 `D:/DEV/popcorn-ai`, main 직접 커밋·푸시이다. 이전의 PC 접근 불가·683파일 미확인·0115 추정은 과거 기록이다. 공유 DB에 직접 접속하여 0117 구성 설명과 0118 사용 시나리오 마이그레이션을 적용했다. 0117 코드 배포 커밋은 `ab9e43f`, Actions run `36424324870` 성공이다.
+
+- 구성 원천은 `pc_configurations`/`pc_configuration_parts`/`pc_configuration_offers`, 상세 조회 `/api/admin/pc-configurations/{id}`. 설명 버전·원문 변경을 조회 시 대조한다. 127201/127203은 조립 전용 설명 코드이며 가짜 단품 상품을 만들지 않았다.
+- 이번 추가 경로: `/admin2/configuration-consultation`, `POST /api/admin/configuration-consultation`. 기존 LLM 모듈과 `task.s1_parse`를 사용하며 관리자 인증 안에서 검토한다. 기존 mvp2의 옛 parse/추천 경로는 변경하지 않았다.
+- LLM은 고객 조건·질문만 정리한다. 상품/가격/부품은 DB에서 가져온다. 해상도/FPS/모니터 수의 인용 검증, 가격 예산 분리, 필수 미달·오래된 설명 제외, 중단·재시도·새 상담 뒤 응답 역전 방어가 있다. 모든 비교 응답은 customer_publishable=false이다.
+- 미해결: 복합 동시 작업의 실제 자원 요구, AI 모델 적재, 미등록 용도/선호 조건에 대한 근거 확장 및 고객 공개 흐름. 110899 출고 SSD P/N과 113685 출고 보드 리비전 확인은 계속 필요하다. 단순 RAM/VRAM 용량으로 FPS·작업 성능을 확정하지 않는다.
+- 검증: `.venv/Scripts/python -m unittest tests.test_configuration_consultation tests.test_pc_configuration_copy tests.test_part_explanations -q`, `node --check mockups/shared/configuration-consultation.js`.
+- 로컬 실제 API 검토: `http://127.0.0.1:8772/`, 실행 도구와 실제 응답·화면 증거는 `C:/Users/leon2/OneDrive/Documents/ChatGPT/팝콘AI/outputs/llm-consultation-20260928/`. 이 루프백 전용 하네스는 배포용 인증을 대체하지 않는다. 기존 정적 미리보기는 8766이다.
+- 실제 공급자 테스트 중 기존 LLM 가격표 유효기간 경고가 발생했다. 공급자 가격표/비용 정책은 이번 작업에서 변경하지 않았다.

@@ -1739,3 +1739,9 @@ req-product-new.md §④ "✕ 표 신설 필요" 31항목 중 이 개정이 담�
 - `pc_configuration_history`: (configuration_id, revision) PK, snapshot JSONB, archived_at. 구성·설명·가격을 교체하기 전 이전 행과 부품/판매 항목을 보존한다.
 
 부품 설명과 출처 해시가 바뀌면 읽기 API는 affected parts를 반환하고 needs_review=true로 판정한다. products 원문의 변경도 기존 is_current 검사로 탐지한다. 조립 전용 부품은 구성 설명 연결과 독립 판매 가능 여부를 분리한다. 재고/가격/벤치마크 검증을 설명 승인으로 대체하지 않는다. 고객 공개 endpoint는 이번 범위에 포함하지 않는다.
+
+## 23. LLM 상담용 사용 조건 기준 (2026-09-28, 0118)
+
+`pc_usage_rule_sets`(rule_version PK, content JSONB, updated_at)는 출처·공식 부분 사양·비교 정책을 버전으로 보관한다. `pc_usage_scenarios`(scenario_id PK, rule_version FK, content JSONB)는 고객 작업 시나리오를 담는다. 기존 격자 좌표와 연결하지 않는다.
+
+새 상담 API는 기존 LLM 호출/비용 제한 모듈을 재사용한다. 모델은 조건과 후속 질문만 생성하고 상품/가격/FPS/재고를 반환하지 않는다. 후보는 서버가 최신 저장 구성 및 부품 설명 해시와 등록된 사양 기준을 대조해 조회한다. 가격은 관측값, 카드는 검토 후보로 표시한다. 고객 공개 승인을 자동 부여하지 않는다.
