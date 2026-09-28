@@ -12,6 +12,7 @@
 추천이 "조립 가능"이라고 말하는 근거가 무너진다.
 """
 import re
+from .ram_bundle import ram_bundle
 
 # ─────────────────────────── part_type 매핑 ───────────────────────────
 # 실측 category_l1 > l2 조합 122종 중 취급 대상만 매핑한다.
@@ -600,6 +601,9 @@ def extract_specs(part_type: str, kv: dict, feats: list, name: str, l2: str,
         put("pcie_gen", _pcie(feats), "feature")
 
     elif part_type == "RAM":
+        bundle = ram_bundle(name)
+        if bundle:
+            put("capacity_gb", bundle['total_gb'], "name_bundle_explicit")
         put("mem_type", next((v.upper() for v in feats if MEM_TYPE.match(v)), None), "feature")
         put("capacity_gb", _cap(kv.get("메모리 용량") or kv.get("용량")), "eav")
         put("capacity_gb", _cap_feat(feats), "feature")
@@ -966,6 +970,11 @@ def extract_from_text(part_type: str, raw: str, name: str = "") -> tuple:
     # kv가 비어도 태그·케이스 규격은 뽑을 수 있으므로 조기 return 하지 않는다(슬라이스 48)
     mapping = B_MAP.get(part_type) or {}
     s, src = {}, {}
+    if part_type == "RAM":
+        bundle = ram_bundle(name)
+        if bundle:
+            s['capacity_gb'] = bundle['total_gb']
+            src['capacity_gb'] = 'name_bundle_explicit'
     if part_type == "CASE":
         lst = case_form_list(raw)
         if lst:

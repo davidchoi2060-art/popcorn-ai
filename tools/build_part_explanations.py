@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api.product_name import remove_discount_label
+from api.ram_bundle import ram_bundle, bundle_facts
 
 ROLES = {
  'CPU':('프로그램의 명령과 연산을 처리하는 중심 부품입니다.','사용할 프로그램과 동시 작업량, 메인보드의 CPU 지원 목록과 BIOS를 함께 확인하세요.'),
@@ -63,9 +64,10 @@ def build(directory):
                 if match:image_url=urljoin(source_url,html.unescape(match[1]))
         if not image_url:issues.append('해당 상품 대표 이미지 미확인')
         if code in ('127201','127203'):issues.append('조립 전용 부품: 상품 DB 연결 대기')
-        if code=='127555':
-            facts=[f for f in facts if f['label'] not in ('상품 용량','패키지 구성')]
-            issues.append('상품명과 기존 사양의 메모리 용량 불일치: 총 용량·모듈 수 검수 필요')
+        if slot=='RAM' and ram_bundle(name):
+            facts=[f for f in facts if f['label'] not in ('상품 용량','패키지 구성','모듈당 용량')
+                   and not (f['label']=='타이밍' and re.search(r'GB',f['value'],re.I))]
+            facts=bundle_facts(name)+facts
         if code=='110899':
             sources.append(dict(id='samsung',kind='manufacturer',title='Samsung PM9A1 용량별 사양표',url='https://download.semiconductor.samsung.com/resources/brochure/Product%20Overviews%20PM9A1%20SSD%20Storage%20for%20the%20Next-Generation%20PC.pdf',observed_at='2026-09-28'))
             for f in facts:
