@@ -1728,3 +1728,14 @@ req-product-new.md §④ "✕ 표 신설 필요" 31항목 중 이 개정이 담�
 | 팝콘 X | 450만 ~ (NULL) | **800만 ~ 1,500만** (상한 신설 — 1,500만 위는 격자 아닌 전문 상담) |
 
 **개정 사유(사장님 확정 2026-09-11)**: 0072 경계는 2026 시장과 어긋났다 — DDR5 3~4배 폭등, 다나와 2026 상반기 판매 TOP10 절반이 RTX 5060 Ti 150만원대(150만 미만 상위 구성 없음), GPU 가격 계단 5060 Ti 150 / 5070 200 / 5070 Ti 300 / 5080 260+ / 5090 600+만, 그리고 우리 격자 실측에서 팝콘 3 이 최저가 합으로도 60만을 넘어 전 칸 구조적으로 비어 있었다. 같은 개정에서 `intended_empty` 를 새 경계로 재판정했다: U1(사무·인터넷)은 팝콘 3 만 채움(홈오피스 상한 112만이 새 팝콘 3 안) · U3·U7(고사양게임·AI)은 팝콘 3 만 비움(150만 미만 불가, AI 하한 GPU 650W 급 최저 108만) · U8 전부 비움 유지 · 나머지 전 티어 채움 — **비움 30칸 / 채움 82칸**(0072: 28/84). 기존 `grid_quotes` 현재본(70행)은 옛 경계로 만든 것이라 **지우지 않고 `is_current=false` 로 내리고** `engine_note` 앞에 `[0082 경계 개정으로 현재본 해제]` 를 붙인다 — 적용 직후 진열대는 0 이므로 DBA 는 `tools/grid_generate.py` 를 바로 돌린다. downgrade 는 경계·`intended_empty` 만 0072 값으로 되돌리고 `is_current` 는 복원하지 않는다(그 사이 배치가 새 현재본을 만들었을 수 있어 부분 유니크 충돌·두 경계 혼재 위험 — 0072 경계로 배치 재실행이 정식 경로).
+
+## 22. 조립PC 구성 설명 저장 (2026-09-28, 0117)
+
+기존 격자·주문·상품 원장은 유지한다. 검토를 마친 로컬 구성 설명을 다음 관계로 저장한다.
+
+- `pc_configurations`: configuration_id PK, BOM fingerprint, content(JSONB: 제목/소개/특징/질문/확인사항), revision, content_hash, observed_date, status(draft/review_required/approved/retired), updated_at. 고객 공개 여부는 별도이며 최초 적재는 draft.
+- `pc_configuration_parts`: (configuration_id, ordinal) PK, slot, source_code, explanation_code FK→product_explanations.source_product_code, quantity, pseudo, selection_note, explanation_hash. 실부품은 설명 FK 필수. 내장 기능은 pseudo로 구분하고 별도 부품/가격으로 만들지 않는다. 조립 전용 부품도 이 FK로 연결하므로 판매 불가한 단품을 products에 허위 등록하지 않는다.
+- `pc_configuration_offers`: offer_id PK, configuration_id FK, price_snapshot, payload(JSONB: 조립비/포함범위/가격 근거). 가격은 관측값으로 저장하며 최신 견적 또는 재고 확정값으로 쓰지 않는다.
+- `pc_configuration_history`: (configuration_id, revision) PK, snapshot JSONB, archived_at. 구성·설명·가격을 교체하기 전 이전 행과 부품/판매 항목을 보존한다.
+
+부품 설명과 출처 해시가 바뀌면 읽기 API는 affected parts를 반환하고 needs_review=true로 판정한다. products 원문의 변경도 기존 is_current 검사로 탐지한다. 조립 전용 부품은 구성 설명 연결과 독립 판매 가능 여부를 분리한다. 재고/가격/벤치마크 검증을 설명 승인으로 대체하지 않는다. 고객 공개 endpoint는 이번 범위에 포함하지 않는다.

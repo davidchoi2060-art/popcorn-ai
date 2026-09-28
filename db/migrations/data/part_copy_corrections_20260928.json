@@ -1,0 +1,859 @@
+[
+  {
+    "code": 110899,
+    "before_hash": "087c411716e11563d6956ec2055a30d9c7043f64bd06d4b12b54c9911c7ee5af",
+    "content": {
+      "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+      "role": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+      "slot": "SSD",
+      "facts": [
+        {
+          "label": "용량",
+          "value": "256(GB)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "연결 형태",
+          "value": "M.2(NVMe)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "M.2 크기",
+          "value": "2280",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "플래시 종류",
+          "value": "TLC",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "최대 읽기 (제조사 256GB 기준)",
+          "value": "6,400 MB/s",
+          "source_id": "samsung",
+          "verification": "제조사 256GB 표 대조"
+        },
+        {
+          "label": "최대 쓰기 (제조사 256GB 기준)",
+          "value": "2,700 MB/s",
+          "source_id": "samsung",
+          "verification": "제조사 256GB 표 대조"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=110899",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        },
+        {
+          "id": "samsung",
+          "url": "https://download.semiconductor.samsung.com/resources/brochure/Product%20Overviews%20PM9A1%20SSD%20Storage%20for%20the%20Next-Generation%20PC.pdf",
+          "kind": "manufacturer",
+          "title": "Samsung PM9A1 용량별 사양표",
+          "observed_at": "2026-09-28"
+        }
+      ],
+      "summary": "용량 256(GB) · 연결 형태 M.2(NVMe) · M.2 크기 2280",
+      "cautions": [
+        "저장 용량, M.2 또는 SATA 연결 방식과 메인보드 지원을 확인하세요. 표기 최고 속도가 실제 작업에서 항상 유지되는 것은 아닙니다.",
+        "읽기 6,400MB/s·쓰기 2,700MB/s는 제조사 PM9A1 256GB 표의 참고값입니다. 출고품 P/N 대조 전 실제 장착품의 보장 속도로 사용하지 않습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/110/110899_600.jpg",
+      "questions": [
+        {
+          "answer": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "저장 용량, M.2 또는 SATA 연결 방식과 메인보드 지원을 확인하세요. 표기 최고 속도가 실제 작업에서 항상 유지되는 것은 아닙니다.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "용량: 256(GB)",
+        "연결 형태: M.2(NVMe)",
+        "M.2 크기: 2280"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "cf0a274cac29eba93fcee30dc9ced86c4a1571712081ed30de274d11afce0407",
+        "crop_box": [
+          18,
+          210,
+          583,
+          391
+        ],
+        "crop_mode": "uniform_margin",
+        "detail_key": "products/110899/cf0a274cac29eba9/detail.png",
+        "detail_size": [
+          565,
+          181
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/110899/cf0a274cac29eba9/original.jpg",
+        "detail_sha256": "7525ffa6906ddf6f9bd0e97f43fd9b63af44be9319ac4ba656ba8bd88dc6fbe1",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/110899/cf0a274cac29eba9/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [
+        "출고 SSD의 P/N 확인 필요: 제조사 256GB 기준 속도와 출고품 일치 여부 미확인"
+      ],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=110899",
+      "resolved_issues": [
+        {
+          "previous": [
+            "판매처 속도는 다른 용량 값과 혼재. 제조사 256GB 표로 설명 초안 정정, 실물 P/N 확인 필요"
+          ],
+          "resolution": "충돌 수치는 조건부 안내로 정정; 출고품 확인 분리",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  },
+  {
+    "code": 113685,
+    "before_hash": "56785387b0d5f13790a282842cd5a8003612059344470b7457c55cff5867e1e6",
+    "content": {
+      "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+      "role": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+      "slot": "MB",
+      "facts": [
+        {
+          "label": "CPU 소켓",
+          "value": "LGA1700",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "메모리 규격",
+          "value": "DDR4",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "보드 크기",
+          "value": "m-ATX",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "메모리 슬롯",
+          "value": "2(EA)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "최대 메모리",
+          "value": "최대 64(GB)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "M.2 슬롯",
+          "value": "1(EA)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "유선 네트워크",
+          "value": "기가비트",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113685",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        },
+        {
+          "id": "gigabyte",
+          "url": "https://www.gigabyte.com/pk/Motherboard/H610M-H-V2-DDR4-rev-10/sp",
+          "kind": "manufacturer",
+          "title": "H610M H V2 DDR4 rev.1.0 사양",
+          "observed_at": "2026-09-28"
+        }
+      ],
+      "summary": "CPU 소켓 LGA1700 · 메모리 규격 DDR4 · 보드 크기 m-ATX",
+      "cautions": [
+        "CPU 소켓만 같다고 모두 지원하지 않습니다. 정확한 보드 리비전과 BIOS, 메모리 규격, 저장장치 슬롯을 확인하세요.",
+        "정확한 영상 출력 단자는 출고 보드 리비전 확인 후 안내합니다. 판매처에 표기된 DVI를 지원 확정으로 사용하지 않습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/113/113685_600.jpg",
+      "questions": [
+        {
+          "answer": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "CPU 소켓만 같다고 모두 지원하지 않습니다. 정확한 보드 리비전과 BIOS, 메모리 규격, 저장장치 슬롯을 확인하세요.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "CPU 소켓: LGA1700",
+        "메모리 규격: DDR4",
+        "보드 크기: m-ATX"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "91071fe5731566ff39227bfa713c2066d8c1a2767d70f25c89d970000963929a",
+        "crop_box": [
+          1,
+          91,
+          600,
+          482
+        ],
+        "crop_mode": "uniform_margin",
+        "detail_key": "products/113685/91071fe5731566ff/detail.png",
+        "detail_size": [
+          599,
+          391
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/113685/91071fe5731566ff/original.jpg",
+        "detail_sha256": "248ae4986ec39ea90b8f1cfd9abbf230df76f04df9a74ac0401b7a9cc03c3c22",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/113685/91071fe5731566ff/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [
+        "출고 보드 리비전 확인 필요: 판매처 DVI 표기와 제조사 rev.1.0 HDMI·D-Sub 표기가 다름"
+      ],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113685",
+      "resolved_issues": [
+        {
+          "previous": [
+            "판매처 원문의 DVI 표기와 제조사 rev.1.0 출력 목록 차이. 출고 리비전 확인 필요"
+          ],
+          "resolution": "충돌 수치는 조건부 안내로 정정; 출고품 확인 분리",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  },
+  {
+    "code": 120906,
+    "before_hash": "58a8a4940b809338414e16b798bd0e034286166ffe390a2a7e3f3245afeb12ab",
+    "content": {
+      "name": "3RSYS Socoool RC1900 ARGB 솔더링 (BLACK)",
+      "role": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+      "slot": "COOLER",
+      "facts": [
+        {
+          "label": "냉각 방식",
+          "value": "듀얼타워 공랭",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "높이",
+          "value": "157mm",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "크기",
+          "value": "132 × 140 × 157mm",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "팬 구성",
+          "value": "130mm + 120mm, 2개",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "지원 소켓",
+          "value": "LGA1851 / LGA1700 / LGA1200 / LGA115x / AM5 / AM4",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "조명",
+          "value": "ARGB",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=120906",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        },
+        {
+          "id": "3rsys",
+          "url": "https://3rsys.com/shop/item.php?it_id=1701066030&ca_id=10201010&page=1",
+          "kind": "manufacturer",
+          "title": "3RSYS 공식 제품 사양",
+          "observed_at": "2026-09-28"
+        }
+      ],
+      "summary": "듀얼타워 공랭 · 높이 157mm · 팬 2개",
+      "cautions": [
+        "CPU 소켓용 장착 부속과 케이스 여유를 확인하세요. 표기 TDP만으로 모든 CPU의 온도나 소음을 보장하지 않습니다.",
+        "출고 제품의 장착 부속과 케이스 높이 여유를 확인합니다. 제조사 안내에 따르면 2025년 외관 변경이 있어 사진과 출고 외형이 다를 수 있습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/120/120906_600.jpg",
+      "questions": [
+        {
+          "answer": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "CPU 소켓용 장착 부속과 케이스 여유를 확인하세요. 표기 TDP만으로 모든 CPU의 온도나 소음을 보장하지 않습니다.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "냉각 방식: 듀얼타워 공랭",
+        "높이: 157mm",
+        "크기: 132 × 140 × 157mm"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "e830c802b08cd28e891e3b938da7ae2d912627761a19ccb099eed95a6a26de7a",
+        "crop_box": [
+          0,
+          0,
+          600,
+          600
+        ],
+        "crop_mode": "no_outer_margin",
+        "detail_key": "products/120906/e830c802b08cd28e/detail.png",
+        "detail_size": [
+          600,
+          600
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/120906/e830c802b08cd28e/original.jpg",
+        "detail_sha256": "55d5b73a4f6c99a9bf1a2ab32e02c3e8b23e8c3562e67463c8a8dc2087768af8",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/120906/e830c802b08cd28e/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=120906",
+      "resolved_issues": [
+        {
+          "previous": [
+            "구조화 가능한 사양 원문 부족"
+          ],
+          "resolution": "제조사 사양 보완",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  },
+  {
+    "code": 120917,
+    "before_hash": "caac1b071df49950f2875a3caffb5212c39ee2f40d223df5e10ccb9cf566f125",
+    "content": {
+      "name": "앱코 SETTLER 하이브리드 STH-800B ETA BRONZE 블랙 PCIE5.1",
+      "role": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+      "slot": "POWER",
+      "facts": [
+        {
+          "label": "정격 출력",
+          "value": "800W",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        },
+        {
+          "label": "크기",
+          "value": "150 × 140 × 85mm",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        },
+        {
+          "label": "케이블 방식",
+          "value": "일체형",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        },
+        {
+          "label": "GPU 전원",
+          "value": "12V-2x6 600W 1개 / PCI-E 6+2핀 2개",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        },
+        {
+          "label": "CPU 전원",
+          "value": "8핀 1개 / 4+4핀 1개",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        },
+        {
+          "label": "SATA 커넥터",
+          "value": "7개",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        },
+        {
+          "label": "보증 표기",
+          "value": "7년 (제조사 조건 확인)",
+          "source_id": "abko",
+          "verification": "제조사 상세 이미지 확인"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=120917",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        },
+        {
+          "id": "abko",
+          "url": "https://www.abko.co.kr/brand/detail.php?it_id=1770685602",
+          "kind": "manufacturer",
+          "title": "ABKO STH-800B PCIE5.1 공식 상세 사양 이미지",
+          "observed_at": "2026-09-28",
+          "spec_image": "https://abko1311.mycafe24.com/DB/ABKO/Powersupply/SETTLER/STH-800B_bk_db.jpg"
+        }
+      ],
+      "summary": "정격 800W · 케이블 일체형 · 12V-2x6",
+      "cautions": [
+        "정격 출력, GPU 권장 전력과 전원 커넥터를 함께 확인하세요. 효율 인증만으로 소음이나 전체 품질을 보장할 수는 없습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/120/120917_600.jpg",
+      "questions": [
+        {
+          "answer": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "정격 출력, GPU 권장 전력과 전원 커넥터를 함께 확인하세요. 효율 인증만으로 소음이나 전체 품질을 보장할 수는 없습니다.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "정격 출력: 800W",
+        "크기: 150 × 140 × 85mm",
+        "케이블 방식: 일체형"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "ab96aac87801b29b1e736f656738a4d9bde28067bdcda3fb50f226967c736d27",
+        "crop_box": [
+          16,
+          63,
+          585,
+          514
+        ],
+        "crop_mode": "uniform_margin",
+        "detail_key": "products/120917/ab96aac87801b29b/detail.png",
+        "detail_size": [
+          569,
+          451
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/120917/ab96aac87801b29b/original.jpg",
+        "detail_sha256": "c6a91e68ca87a6404db709e852252c707035249b08c93332893d173607808c04",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/120917/ab96aac87801b29b/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=120917",
+      "resolved_issues": [
+        {
+          "previous": [
+            "구조화 가능한 사양 원문 부족"
+          ],
+          "resolution": "제조사 사양 보완",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  },
+  {
+    "code": 121011,
+    "before_hash": "0034e017e1d87610d198f59914619a5b915f1c861c001920232c52fd0d2d898b",
+    "content": {
+      "name": "3RSYS Socoool RC1900N 솔더링 (BLACK)",
+      "role": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+      "slot": "COOLER",
+      "facts": [
+        {
+          "label": "냉각 방식",
+          "value": "듀얼타워 공랭",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "높이",
+          "value": "157mm",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "크기",
+          "value": "132 × 140 × 157mm",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "팬 구성",
+          "value": "130mm + 120mm, 2개",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "지원 소켓",
+          "value": "LGA1851 / LGA1700 / LGA1200 / LGA115x / AM5 / AM4",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        },
+        {
+          "label": "조명",
+          "value": "없음 (non-LED)",
+          "source_id": "3rsys",
+          "verification": "제조사 제품 사양 확인"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=121011",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        },
+        {
+          "id": "3rsys",
+          "url": "https://3rsys.com/shop/item.php?it_id=1702860370&ca_id=10201010&page=1",
+          "kind": "manufacturer",
+          "title": "3RSYS 공식 제품 사양",
+          "observed_at": "2026-09-28"
+        }
+      ],
+      "summary": "듀얼타워 공랭 · 높이 157mm · 팬 2개",
+      "cautions": [
+        "CPU 소켓용 장착 부속과 케이스 여유를 확인하세요. 표기 TDP만으로 모든 CPU의 온도나 소음을 보장하지 않습니다.",
+        "출고 제품의 장착 부속과 케이스 높이 여유를 확인합니다. 제조사 안내에 따르면 2025년 외관 변경이 있어 사진과 출고 외형이 다를 수 있습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/121/121011_600.jpg",
+      "questions": [
+        {
+          "answer": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "CPU 소켓용 장착 부속과 케이스 여유를 확인하세요. 표기 TDP만으로 모든 CPU의 온도나 소음을 보장하지 않습니다.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "냉각 방식: 듀얼타워 공랭",
+        "높이: 157mm",
+        "크기: 132 × 140 × 157mm"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "4dc4864086debf417c8430ad4209ec256244178cdac05f34da223993e9aaa888",
+        "crop_box": [
+          0,
+          9,
+          600,
+          592
+        ],
+        "crop_mode": "uniform_margin",
+        "detail_key": "products/121011/4dc4864086debf41/detail.png",
+        "detail_size": [
+          600,
+          583
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/121011/4dc4864086debf41/original.jpg",
+        "detail_sha256": "5f31a66b067322eda5a00447f492b68ffbcb3d677ceacf2583d2b278f8b56b97",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/121011/4dc4864086debf41/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=121011",
+      "resolved_issues": [
+        {
+          "previous": [
+            "구조화 가능한 사양 원문 부족"
+          ],
+          "resolution": "제조사 사양 보완",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  },
+  {
+    "code": 127201,
+    "before_hash": "25d017bba9905b815ed9fb051de2189618e06e62fd5e92e4609ef49d6105ae3b",
+    "content": {
+      "name": "[병행] 인텔 코어 울트라7 시리즈2 265 [벌크] - 단품판매불가",
+      "role": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+      "slot": "CPU",
+      "facts": [
+        {
+          "label": "모델",
+          "value": "울트라7 시리즈2 265",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "코어 구성",
+          "value": "P8+E12",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "스레드",
+          "value": "20",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "소켓",
+          "value": "LGA1851",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "기본 클럭",
+          "value": "2.4(GHz)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "최대 클럭",
+          "value": "5.3(GHz)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127201",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        }
+      ],
+      "summary": "모델 울트라7 시리즈2 265 · 코어 구성 P8+E12 · 스레드 20",
+      "cautions": [
+        "사용할 프로그램과 동시 작업량, 메인보드의 CPU 지원 목록과 BIOS를 함께 확인하세요.",
+        "이 부품은 조립PC 구성용이며 단품 판매 상품이 아닙니다. 개별 판매가를 임의로 책정하지 않습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/127/127201_600.jpg",
+      "questions": [
+        {
+          "answer": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "사용할 프로그램과 동시 작업량, 메인보드의 CPU 지원 목록과 BIOS를 함께 확인하세요.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "모델: 울트라7 시리즈2 265",
+        "코어 구성: P8+E12",
+        "스레드: 20"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "785d658d9a870bee4d70fc74713b308f114d9022fc7cb906aa048e0f4f59d681",
+        "crop_box": [
+          125,
+          93,
+          474,
+          508
+        ],
+        "crop_mode": "uniform_margin",
+        "detail_key": "products/127201/785d658d9a870bee/detail.png",
+        "detail_size": [
+          349,
+          415
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/127201/785d658d9a870bee/original.jpg",
+        "detail_sha256": "de8c7241052f7f2edd1608fb3e56543355298aa05a7e9a9baf791241b2fa1493",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/127201/785d658d9a870bee/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127201",
+      "availability_scope": "assembly_only",
+      "resolved_issues": [
+        {
+          "previous": [
+            "조립 전용 부품: 상품 DB 연결 대기"
+          ],
+          "resolution": "조립 전용 구성 연결로 분리",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  },
+  {
+    "code": 127203,
+    "before_hash": "903ca6f33698e1e48fa4ab70a45b4e8df96f457b32eef235717ee80789c695a7",
+    "content": {
+      "name": "GIGABYTE B860M AORUS ELITE - 단품판매불가",
+      "role": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+      "slot": "MB",
+      "facts": [
+        {
+          "label": "CPU 소켓",
+          "value": "LGA1851",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "메모리 규격",
+          "value": "DDR5",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "보드 크기",
+          "value": "m-ATX",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "메모리 슬롯",
+          "value": "4(EA)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "최대 메모리",
+          "value": "최대 256(GB)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "M.2 슬롯",
+          "value": "3(EA)",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        },
+        {
+          "label": "유선 네트워크",
+          "value": "2.5기가비트",
+          "source_id": "merchant",
+          "verification": "판매처 원문"
+        }
+      ],
+      "sources": [
+        {
+          "id": "merchant",
+          "url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127203",
+          "kind": "merchant",
+          "title": "팝콘PC 관리자 상품 사양",
+          "observed_at": "2026-09-28T15:27:53+09:00"
+        }
+      ],
+      "summary": "CPU 소켓 LGA1851 · 메모리 규격 DDR5 · 보드 크기 m-ATX",
+      "cautions": [
+        "CPU 소켓만 같다고 모두 지원하지 않습니다. 정확한 보드 리비전과 BIOS, 메모리 규격, 저장장치 슬롯을 확인하세요.",
+        "이 부품은 조립PC 구성용이며 단품 판매 상품이 아닙니다. 개별 판매가를 임의로 책정하지 않습니다."
+      ],
+      "image_url": "https://www.popcornpc.co.kr/data/pimg/127/127203_600.jpg",
+      "questions": [
+        {
+          "answer": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+          "question": "이 부품은 어떤 역할을 하나요?"
+        },
+        {
+          "answer": "CPU 소켓만 같다고 모두 지원하지 않습니다. 정확한 보드 리비전과 BIOS, 메모리 규격, 저장장치 슬롯을 확인하세요.",
+          "question": "선택할 때 무엇을 확인하나요?"
+        }
+      ],
+      "highlights": [
+        "CPU 소켓: LGA1851",
+        "메모리 규격: DDR5",
+        "보드 크기: m-ATX"
+      ],
+      "usage_note": "전체 PC의 용도 적합성과 선택 이유는 고객 조건 및 전체 구성 평가 후 제공",
+      "image_asset": {
+        "bucket": "popcorn-ai-product-media-045e861b",
+        "sha256": "d95348d3b47383454f25e016d05cf23096376c24125a29643010e8375457ef0a",
+        "crop_box": [
+          0,
+          89,
+          600,
+          474
+        ],
+        "crop_mode": "uniform_margin",
+        "detail_key": "products/127203/d95348d3b4738345/detail.png",
+        "detail_size": [
+          600,
+          385
+        ],
+        "prepared_at": "2026-09-28T08:27:09.229404+00:00",
+        "original_key": "products/127203/d95348d3b4738345/original.jpg",
+        "detail_sha256": "27078ce133231c2413c7df18d1aee91d795a25117610fb49b252b362d784137c",
+        "original_size": [
+          600,
+          600
+        ],
+        "thumbnail_key": "products/127203/d95348d3b4738345/thumb.webp"
+      },
+      "image_caption": "판매처 등록 이미지",
+      "review_issues": [],
+      "image_source_url": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127203",
+      "availability_scope": "assembly_only",
+      "resolved_issues": [
+        {
+          "previous": [
+            "조립 전용 부품: 상품 DB 연결 대기"
+          ],
+          "resolution": "조립 전용 구성 연결로 분리",
+          "date": "2026-09-28"
+        }
+      ]
+    }
+  }
+]
