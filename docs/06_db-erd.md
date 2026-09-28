@@ -1,5 +1,15 @@
 # 06. DB 설계 (ERD & 스키마)
 
+## 2026-09-28 추가: product_explanations (0116)
+
+부품 설명은 호환 엔진의 product_specs와 분리한다. 원상품코드(source_product_code BIGINT PK)로 관리하며 product_code BIGINT NULL FK → products에 연결한다. 조립 전용 미등록 부품도 초안 보관이 가능하다.
+
+content JSONB에는 정확한 모델명·역할·사양(facts)·특징·확인사항·질문·이미지 출처·필드별 근거를 담는다. source_snapshot JSONB는 설명에 사용한 상품명과 사양 원문만 보관한다. source_fingerprint VARCHAR(64)는 두 원문의 SHA256이며, 현재 products 원문과 다르면 공개하지 않는다. 가격·재고·호환 판정은 복제하지 않는다.
+
+status는 draft/approved/retired. approved_by는 admin_operators FK, approved_at·updated_at은 TIMESTAMPTZ. approved에는 승인자와 승인시각이 필요하다. 최초 시드는 전부 draft. 외부 사실 보강은 설명의 근거에만 기록하고 product_specs를 변경하지 않는다. 상세공개는 승인 상태·현재 원문 일치·상품 판매중을 모두 요구한다. 고객 선택 이유는 부품 설명에 고정하지 않는다.
+
+관리자 정의서: [부품 설명 상세](design/req/req-part-explanations.md).
+
 **파일 경로:** `docs/06_db-erd.md`
 **문서 버전:** Ver 4.0
 **DBMS:** PostgreSQL (DB명 `popcorn_pc`) — 구성 위치: 구글 클라우드(기구성, 사용자 확인 2026-07-21). **실제 DB 생성·마이그레이션은 본 개정본 검토 후 별도 승인으로 착수한다.**

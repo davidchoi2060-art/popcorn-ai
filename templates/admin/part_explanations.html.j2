@@ -1,0 +1,23 @@
+{% extends "admin/_admin2_shell.html.j2" %}
+{% block title %}부품 설명 관리{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/shared/part-explanations.css">
+<style>
+.body{padding:var(--sp-lg,1.5rem);overflow:auto}.pe-toolbar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.pe-toolbar input,.pe-toolbar select,.pe-toolbar button{font:inherit;padding:.6rem;border:1px solid var(--outline-variant);border-radius:.4rem;background:var(--card);color:var(--on)}.pe-count{margin:1rem 0;color:var(--on-variant)}.pe-error{color:var(--state-fail)}
+</style>
+{% endblock %}
+{% block content %}
+<div class="body">
+<h1>부품 설명 관리</h1><p>판매처 사양 기반 초안. 제조사 대조·충돌 검수 후 고객 공개.</p>
+<form id="pe-search" class="pe-toolbar"><label>상품명·코드 <input id="pe-q" maxlength="100"></label><label>부품 종류 <select id="pe-slot"><option value="">전체</option>{% for value,label in part_slots %}<option value="{{value}}">{{label}}</option>{% endfor %}</select></label><button>검색</button></form>
+<p id="pe-count" class="pe-count" role="status"></p><div id="pe-list"></div><div class="pe-toolbar"><button id="pe-prev" type="button">이전</button><button id="pe-next" type="button">다음</button></div>
+</div>
+{% endblock %}
+{% block foot_extra %}
+<script src="/shared/part-explanations.js"></script>
+<script>
+(()=>{let offset=0,total=0,request=0;const limit=20,$=id=>document.getElementById(id);
+async function load(){const seq=++request;$('pe-count').textContent='불러오는 중';$('pe-prev').disabled=$('pe-next').disabled=true;try{const params=new URLSearchParams({q:$('pe-q').value,slot:$('pe-slot').value,offset,limit});const r=await fetch('/api/admin/part-explanations?'+params,{credentials:'same-origin'});if(!r.ok)throw Error('서버 응답 '+r.status);const d=await r.json();if(seq!==request)return;total=d.total;$('pe-list').innerHTML=d.items.map(p=>PopcornPartExplanations.markup(p,{review:true})).join('')||'<p>일치하는 부품 없음</p>';PopcornPartExplanations.attach($('pe-list'),d.items);$('pe-count').textContent='전체 '+total+'개 중 '+(total?offset+1:0)+'–'+Math.min(offset+limit,total)+'개';$('pe-prev').disabled=offset===0;$('pe-next').disabled=offset+limit>=total;}catch(e){if(seq!==request)return;$('pe-list').replaceChildren();$('pe-count').textContent='불러오기 실패: '+e.message;}}
+$('pe-search').onsubmit=e=>{e.preventDefault();offset=0;load();};$('pe-prev').onclick=()=>{offset=Math.max(0,offset-limit);load();};$('pe-next').onclick=()=>{offset+=limit;load();};load();})();
+</script>
+{% endblock %}
