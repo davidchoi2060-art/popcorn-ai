@@ -2,6 +2,21 @@
 
 final result: passed
 
+## 2026-09-29 · 상품 설명 편집 시안 1
+
+Source: `C:/Users/leon2/.codex/generated_images/01a0d6a3-e8fa-7cc1-8897-e6b9fa7e34f0/exec-5c17e547-7ca4-4904-80f5-6110b0ce9d97.png`.
+Captures under `C:/Users/leon2/OneDrive/Documents/ChatGPT/팝콘AI/outputs/admin-pc-catalog-mockups-20260929/`: `editor-desktop-final.png` and `editor-mobile.png`.
+
+- Matched P100866, active 상품 설명, two benefits in the unsaved fixture state, 1600×1024 desktop vs source 1568×1003 equivalent ratio. Real catalog has three benefits: deleting the third for visual comparison was only a local in-memory draft, never a DB edit. Registered content is not trimmed to reproduce the illustrative count.
+- P2 fixed: initial textarea/counter spacing pushed section navigation below the viewport. Input counters moved inside inputs; benefit textareas use two resizable lines and tighter spacing. Source and latest implementation displayed together again; fields, product rail, section dividers, footer and imagery now match the intended hierarchy.
+- P2 fixed: footer updated before tab visibility changed. Observe actual hidden attribute so mouse and keyboard tab changes consistently display the correct actions.
+- P2 fixed: native confirm blocked the embedded browser during cancel QA. Replaced with accessible in-page dialog containing 계속 편집 / 변경 취소. Verified that close/cancel protects unsaved inputs and returns to the saved state.
+- Desktop and 390×844 mobile inspected. Mobile input scrolls internally and fixed save actions remain accessible. Existing typography, warm surfaces, emerald focus/action, actual supplier case photo and Feather icons retained. Exact legacy copy and longer allowed field limits are deliberate P3 differences.
+- Browser: edit, feature add/delete, FAQ add/delete, unsaved preview, save success, saved revision history, cancel/keep editing, close protection and mobile controls verified. No console errors. Write UI used isolated process-memory fixture; real DB write/archive was separately exercised within a rolled-back transaction and rollback confirmed.
+- 49 focused unit tests pass (including allowlist, empty/oversized fields, stale revision, no-op, protected fields, archive and actor, retired records, role and cross-site rejection). All 104 existing descriptions validate. Full application history/no-op save routes work through authentication context. No permanent test edits to catalog or new migration.
+
+final result: passed
+
 ## Follow-up · panel bottom alignment (2026-09-29)
 
 User reported the right panel ended above the list. On the live 1920×855 viewport the list bottom was 836.67px and inspector bottom 669.98px (166.69px gap). Removed the inspector-only viewport height cap and nested summary scrolling; desktop grid panels now stretch to the same row height, with their content expanding and their footer controls at the bottom. The page scrolls normally when content is taller than the viewport. Local browser inspection at 1280×720 confirmed identical panel bottoms, and the detail button remains reachable by normal page scrolling. This supersedes the independent inspector scrolling described in the original QA history below. Mobile stacked layout rules are unchanged.

@@ -1734,6 +1734,7 @@ req-product-new.md §④ "✕ 표 신설 필요" 31항목 중 이 개정이 담�
 기존 격자·주문·상품 원장은 유지한다. 검토를 마친 로컬 구성 설명을 다음 관계로 저장한다.
 
 - `pc_configurations`: configuration_id PK, BOM fingerprint, content(JSONB: 제목/소개/특징/질문/확인사항), revision, content_hash, observed_date, status(draft/review_required/approved/retired), updated_at. 고객 공개 여부는 별도이며 최초 적재는 draft.
+  - 2026-09-29 설명 편집 API는 기존 history.snapshot에 변경 전 구성과 `edit(kind,operator_id,name,fields)` 메타데이터를 함께 기록한다. revision 일치와 행 잠금 후 설명 허용 필드만 갱신한다. 부품/가격/기준일/공개·검수 상태는 설명 저장의 대상이 아니다. 기존 JSONB를 사용하므로 물리 스키마 변경 없음.
 - `pc_configuration_parts`: (configuration_id, ordinal) PK, slot, source_code, explanation_code FK→product_explanations.source_product_code, quantity, pseudo, selection_note, explanation_hash. 실부품은 설명 FK 필수. 내장 기능은 pseudo로 구분하고 별도 부품/가격으로 만들지 않는다. 조립 전용 부품도 이 FK로 연결하므로 판매 불가한 단품을 products에 허위 등록하지 않는다.
 - `pc_configuration_offers`: offer_id PK, configuration_id FK, price_snapshot, payload(JSONB: 조립비/포함범위/가격 근거). 가격은 관측값으로 저장하며 최신 견적 또는 재고 확정값으로 쓰지 않는다.
 - `pc_configuration_history`: (configuration_id, revision) PK, snapshot JSONB, archived_at. 구성·설명·가격을 교체하기 전 이전 행과 부품/판매 항목을 보존한다.

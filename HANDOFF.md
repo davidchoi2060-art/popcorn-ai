@@ -2,6 +2,8 @@
 
 ## 최신 인계 · 2026-09-29
 
+- 상품 설명 편집은 승인 시안 1(`exec-5c17e547-7ca4-4904-80f5-6110b0ce9d97.png`)로 구현. `pc-description-editor.js/css`와 `api/pc_configuration_edit.py`가 편집·미저장 미리보기·저장·변경 이력을 제공한다. 기존 history 테이블을 사용하며 새 DB 마이그레이션은 없다. revision 충돌은 409, 부품·가격·공개·검수 상태는 수정하지 않는다. 실제 저장은 operator/owner만 가능하다. 테스트는 49개, 실 DB 변경 테스트는 전량 롤백했고 실제 상품 내용은 유지했다.
+
 - 전체 구성 보기의 승인된 2번 시안을 구현했다. 왼쪽 상품 요약과 오른쪽 부품 구성 / 상품 설명 / 검토 기록 3개 탭, 고객 설명 미리보기를 제공한다. LNB 그룹 아이콘은 기존 vendored Feather의 단색 선 아이콘으로 통일했다. 기존 상세 API만 사용하며 DB 변경은 없다. 관련 코드: `mockups/shared/pc-configuration-detail.{js,css}`. 상세 UI 검증은 `design-qa.md`의 마지막 절을 참고한다.
 
 - 우측 상세 패널의 상품 설명·정보 검토·호환성·고객 공개 영역에 기존 내용을 읽기 전용으로 출력한다. 호환성은 api/data/pc_catalog_review_snapshot.json의 과거 검토 기록이며 승인 기능은 아니다. 고객 공개는 설명 미리보기만 제공하며 실제 공개 전환 연결은 사용자 요청대로 후속 처리한다.

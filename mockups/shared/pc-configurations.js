@@ -56,6 +56,7 @@ $('filters').onsubmit=e=>{e.preventDefault();offset=0;load();};['source','review
 $('rows').onclick=e=>{const row=e.target.closest('tr[data-id]');if(row)select(row.dataset.id);};$('rows').onchange=e=>{const row=e.target.closest('tr[data-id]');if(row)select(row.dataset.id);};
 $('pages').onclick=e=>{const b=e.target.closest('button[data-page]');if(b&&!b.disabled){offset=(Number(b.dataset.page)-1)*Number($('limit').value);load();}};
 $('previous-product').onclick=()=>select(items[items.indexOf(selected)-1]?.configuration_id);$('next-product').onclick=()=>select(items[items.indexOf(selected)+1]?.configuration_id);
+$('dialog-body').addEventListener('pc-description-saved',()=>load());
 $('detail').onclick=detail;$('dialog-close').onclick=()=>{$('dialog').close();};$('dialog').addEventListener('close',()=>{++detailRequest;});
 $('export').onclick=async()=>{const b=$('export');b.disabled=true;$('message').textContent='';try{const r=await fetch('/api/admin/pc-configurations/export.xlsx?'+params(),{credentials:'same-origin'});if(!r.ok)throw Error('엑셀을 내려받지 못했습니다. 다시 시도해 주세요.');const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='조립PC_제품군.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
 load();
