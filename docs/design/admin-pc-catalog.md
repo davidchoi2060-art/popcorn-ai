@@ -18,3 +18,12 @@
 
 `python -m unittest tests.test_pc_catalog_admin tests.test_pc_configuration_copy tests.test_part_explanations tests.test_configuration_consultation -q` 및 JS 구문 검사. 필터 조합·페이지 총수·비공개 경계·XLSX 라우트 우선순위·엑셀 수식 주입 방지 검증을 포함한다.
 로컬 브라우저에서 실 DB 목록, 신규 15건, 정보 확인 필터의 빈 결과, 다음 페이지, P97909 검색, 엑셀 다운로드, 전체 부품과 CPU 사양 펼치기를 확인했다. 자세한 시각 검토는 루트 `design-qa.md`.
+
+## 오른쪽 상세 내용 출력 · 2026-09-29
+
+사용자 요청: 연결은 나중에 하고 기존에 작성한 내용을 화면에 먼저 출력한다.
+상품 설명(소개·특장점·부품별 역할/선택 이유), 정보 검토(실제 부품별 review_issues·구성별 확인 사항), 호환성(기존 문서 검토 기록), 고객 공개(비공개 상태·고객 설명/FAQ/알뜰·추천 기준 미리보기)를 펼침 영역으로 표시한다. 첫 상품 설명은 기본으로 펼친다.
+
+호환성 표시 자료는 `api/data/pc_catalog_review_snapshot.json`의 읽기 전용 스냅샷이다. 로컬 `outputs/final-catalog-20260928/current-catalog-after-import.json`의 기존 기록, `new-builds-refreshed.json`의 신규 검토, `new-builds-extra-check.json`의 공식 출처에서 표시용 항목만 추출했다. 공급처 연락처/매입가/원문 개인정보는 포함하지 않는다. 107원천 기록이 현재104제품군 전부에 대응하며 부품 코드·수량 일치도 읽을 때 다시 비교한다. 기존 상품 기록은 갱신 전 자료임을 명시하며, 수치만으로 결론낼 수 없는 발열/전력 검사는 참고 기록으로 표시한다. 이 자료는 승인이나 추천 자격 판정에 사용하지 않는다.
+
+새 테이블·DB 쓰기·검수 처리·공개 전환 기능은 추가하지 않는다. 비공개 상태는 유지한다. 빠르게 상품을 바꿔도 이전 상세 응답이 새 상품에 출력되지 않도록 요청 순번을 검사한다.

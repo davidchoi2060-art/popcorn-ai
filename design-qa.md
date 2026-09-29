@@ -50,3 +50,11 @@ User reported the right panel ended above the list. On the live 1920×855 viewpo
 - [x] No DB write or schema migration; existing admin auth retained.
 - [x] Visual comparison and responsive corrections.
 - [x] Core interactions and error/empty states verified.
+
+
+## 2026-09-29 · 제품군 상세 내용 출력
+- 104개 모두 기존 검토 기록 존재, 부품 코드·수량104/104 일치(읽기 전용 DB 대조).
+- 로컬 브라우저 N02: 상품 설명, 호환성15항목(문서상 충족8/조건·추가 확인7), 고객용 설명·알뜰/추천 기준 펼침 확인. JS 오류 없음.
+- P100866: SSD P/N·메인보드 리비전의 실제 review_issues 2개와 구성별 확인 사항 출력 확인.
+- 단위 테스트40개 통과. BOM 교체/수량 변경 시 과거 기록 표시, 승인 근거로 사용하지 않음, 누락 자료에 판정을 생성하지 않음 검증.
+- 기존 데스크톱 좌우 패널 하단 정렬 규칙 유지. 접기/펼치기는 본문 길이에 맞춰 페이지가 늘어나는 방식.

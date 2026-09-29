@@ -8,6 +8,7 @@ from sqlalchemy import text
 from .db import engine
 from .part_explanations import is_current
 from .taxonomy import SLOT_LABELS
+from .pc_catalog_review_snapshot import review_snapshot
 
 router=APIRouter()
 
@@ -49,6 +50,7 @@ def read_configuration(conn, identity):
         if part_needs_review(p,row): affected.append(p['source_code'])
     offers=[dict(o) for o in conn.execute(text('SELECT * FROM pc_configuration_offers WHERE configuration_id=:id ORDER BY price_snapshot,offer_id'),{'id':identity}).mappings()]
     return dict(r,parts=parts,offers=offers,needs_review=bool(affected),affected_parts=affected,
+                compatibility_display=review_snapshot(identity,parts),
                 customer_publishable=False,price_is_snapshot=True)
 
 def catalog_rows(conn):
