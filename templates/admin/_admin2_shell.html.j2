@@ -65,7 +65,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팝콘PC 관리자 · {% block title %}{% endblock %}</title>
 <link rel="stylesheet" href="/shared/fonts/fonts.css">
-<link rel="stylesheet" href="/shared/admin2/admin2.css">
+<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20260929-icons">
 {% block head_extra %}{% endblock %}
 </head>
 <body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" {% block body_attrs_extra %}{% endblock %}>
@@ -78,7 +78,7 @@
       <div class="a2-lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
         <button type="button" class="a2-lnb-g" data-action="lnb-group" title="{{ g.title }}"
                 aria-expanded="{{ 'true' if g.active else 'false' }}">
-          <span class="a2-gi" aria-hidden="true">{{ g.title[0] }}</span>
+          <span class="a2-gi" aria-hidden="true"><img src="/shared/icons/admin/{{ g.icon }}.svg" alt=""></span>
           <span class="a2-t">{{ g.title }}</span>
           <span class="a2-c">{{ g.done }}/{{ g.total }}</span>
           <span class="a2-x" aria-hidden="true">▼</span>

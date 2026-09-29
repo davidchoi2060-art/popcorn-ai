@@ -3,6 +3,7 @@
 {% block head_extra %}
 <link rel="stylesheet" href="/shared/part-explanations.css">
 <link rel="stylesheet" href="/shared/pc-configurations.css">
+<link rel="stylesheet" href="/shared/pc-configuration-detail.css">
 {% endblock %}
 {% block content %}
 <main class="catalog">
@@ -26,6 +27,6 @@
     <aside class="catalog-inspector" aria-label="선택한 제품군 요약"><div class="catalog-section-title"><h2>제품군 상세 정보</h2><div class="catalog-arrows"><button id="catalog-previous-product" type="button" aria-label="이전 상품" disabled><img src="/shared/icons/su/ms-chevron_right.svg" alt=""></button><button id="catalog-next-product" type="button" aria-label="다음 상품" disabled><img src="/shared/icons/su/ms-chevron_right.svg" alt=""></button></div></div><div id="catalog-summary"><p class="catalog-empty">목록에서 상품을 선택해 주세요.</p></div><button class="catalog-primary catalog-detail-button" id="catalog-detail" type="button" disabled><img src="/shared/icons/su/ft-file-text.svg" alt="">전체 구성·부품 보기</button></aside>
   </div>
 </main>
-<dialog id="catalog-dialog" aria-labelledby="catalog-dialog-title"><div class="catalog-dialog-header"><div><span id="catalog-dialog-id"></span><h2 id="catalog-dialog-title">전체 구성·부품</h2></div><button id="catalog-dialog-close" type="button" aria-label="상세 닫기"><img src="/shared/icons/su/ms-close.svg" alt=""></button></div><div id="catalog-dialog-body"></div></dialog>
+<dialog id="catalog-dialog" aria-labelledby="catalog-dialog-title"><div class="catalog-dialog-header"><div><span id="catalog-dialog-id"></span><h2 id="catalog-dialog-title">전체 구성·부품</h2></div><button id="catalog-dialog-close" type="button" aria-label="상세 닫기"><img src="/shared/icons/admin/x.svg" alt=""></button></div><div id="catalog-dialog-body"></div></dialog>
 {% endblock %}
-{% block foot_extra %}<script src="/shared/part-explanations.js"></script><script src="/shared/pc-configurations.js"></script>{% endblock %}
+{% block foot_extra %}<script src="/shared/part-explanations.js"></script><script src="/shared/pc-configuration-detail.js"></script><script src="/shared/pc-configurations.js"></script>{% endblock %}

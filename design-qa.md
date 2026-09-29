@@ -58,3 +58,20 @@ User reported the right panel ended above the list. On the live 1920×855 viewpo
 - P100866: SSD P/N·메인보드 리비전의 실제 review_issues 2개와 구성별 확인 사항 출력 확인.
 - 단위 테스트40개 통과. BOM 교체/수량 변경 시 과거 기록 표시, 승인 근거로 사용하지 않음, 누락 자료에 판정을 생성하지 않음 검증.
 - 기존 데스크톱 좌우 패널 하단 정렬 규칙 유지. 접기/펼치기는 본문 길이에 맞춰 페이지가 늘어나는 방식.
+
+## 2026-09-29 · 전체 구성 보기 2번 시안 및 세 탭
+
+Source directory: `C:/Users/leon2/.codex/generated_images/01a0d6a3-e8fa-7cc1-8897-e6b9fa7e34f0/`.
+Parts: `exec-849c495d-2d60-4f37-8f8a-84451309ac2c.png`; copy: `exec-b4f2f1cf-effb-4f9e-9e80-60f1f1d539f0.png`; review: `exec-cfaaa1e8-8db8-4d1b-86c8-7b1b6ed6dba4.png`.
+
+Implementation captures: `C:/Users/leon2/OneDrive/Documents/ChatGPT/팝콘AI/outputs/admin-pc-catalog-mockups-20260929/detail-parts-implemented.png`, `detail-copy-implemented.png`, `detail-review-implemented.png` (1600×1024), `detail-mobile.png` (390×844). Compared source and implementation together. Reference 1568×1003 has the same approximate aspect ratio; existing admin 1.15 text zoom retained.
+
+- P2 resolved: tall part rows hid lower parts. Compacted row spacing and first four specification facts, with additional details expandable. Eight parts fit at desktop height with CPU expanded.
+- P2 resolved: previously packaged colored icons and duplicate chevrons differed from the selected visual. Replaced with actual vendored Feather outline icons for navigation and detail controls.
+- P2 resolved: modal focus scrolled the background LNB and mobile viewport shifted horizontally. Clip the shell while the dialog is open and lock root overflow. Final mobile dialog left=0, width=390, body width=390, shell scroll=0.
+- Fidelity: fixed left product rail, three green-underlined tabs, white/ivory surfaces, thin separators, editorial product copy, actual issue rows and expandable review table. Existing admin typography/palette retained. Product images preserve aspect ratio. Real supplier images, full model names and longer registered copy intentionally replace illustrative content; content scrolls internally without truncating facts.
+- Browser checks: tabs and keyboard arrows, part expansion/collapse, all 13 review items, customer preview open/close, parent close, LNB collapse/expand and loaded icons. No JS console errors. Existing saved product total remains distinct from current part prices. No fabricated approval, performance or publication state.
+- Validation: 40 focused backend unit tests passed; both JS syntax checks passed. Renderer fixture confirms three tabs/eight parts, saved and individual prices, and escaping of malicious product titles/model names. No DB writes or migration.
+- No unresolved P0/P1/P2 findings. P3 illustration differences are deliberate substitutions of real data and real product photography.
+
+final result: passed

@@ -310,3 +310,6 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
   .a2-hd{column-gap:7px}
   .a2-hd .a2-hub{display:none}
 }
+
+/* Shared LNB: use the existing icon catalog and preserve collapsed navigation. */
+.a2-lnb-g .a2-gi{display:flex;align-items:center;justify-content:center}.a2-lnb-g .a2-gi img{width:14px;height:14px;object-fit:contain;filter:brightness(0) invert(1);opacity:.72}
