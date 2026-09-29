@@ -103,3 +103,5 @@ final result: passed
 - Mobile: dialog left=0,width=390, document scrollWidth=390; table scrolls internally; candidate list stacks and actions remain accessible.
 - Backend: 60 focused tests pass. Real-DB transaction tests cover update/new, history preservation, package capacity, unchanged assembly fee, recommendation exclusion and complete rollback. No QA mutations persisted. Four edited JS files pass syntax checks.
 - Boundary: candidate sales display is not physical stock/dispatch confirmation; saving is not compatibility/publication approval. No unresolved P0/P1/P2 in this editor scope.
+
+- Deployed verification 2026-09-30: main a7c40df, GitHub run36586903883 success. Authenticated server UI candidate comparison/preview verified; 1,054,900+28,700=1,083,600; canceled without persisting. Final screenshots parts-picker-live.png / parts-confirm-live.png show resolved icons; no console errors.
