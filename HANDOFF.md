@@ -182,3 +182,14 @@
 - 검증: `.venv/Scripts/python -m unittest tests.test_configuration_consultation tests.test_pc_configuration_copy tests.test_part_explanations -q`, `node --check mockups/shared/configuration-consultation.js`.
 - 로컬 실제 API 검토: `http://127.0.0.1:8772/`, 실행 도구와 실제 응답·화면 증거는 `C:/Users/leon2/OneDrive/Documents/ChatGPT/팝콘AI/outputs/llm-consultation-20260928/`. 이 루프백 전용 하네스는 배포용 인증을 대체하지 않는다. 기존 정적 미리보기는 8766이다.
 - 실제 공급자 테스트 중 기존 LLM 가격표 유효기간 경고가 발생했다. 공급자 가격표/비용 정책은 이번 작업에서 변경하지 않았다.
+
+
+## 2026-09-29 최신 인계 — 부품 변경 견적 DB 설계
+
+사용자 제공 화면(부품 변경 전후 + 오른쪽 GPU 비교 패널)을 기준으로 ERD §24와 `docs/design/pc-component-change-contract.md`를 작성하고 0119 신규 테이블/제약을 추가했다. 기존 원본 구성과 고객 견적을 분리하며, draft revision·누적 교체/추가/제거·검증·확정 버전·감사 기록을 보관한다. 적용은 동일 BOM/revision의 유효한 pass 검사 및 확인 가격을 요구하고 현재 버전 이동까지 원자적으로 처리한다. 소유권 및 최신 가격/사양 재조회·JSON 구조 검증은 후속 API 책임이다.
+
+추가 사용자 결정: 고객이 최종 확정한 견적은 제품군 관리로 축적한다. `pc_quote_confirmations` INSERT는 `pc_catalog_submissions` pending을 같은 트랜잭션에서 자동 생성한다. 동일 BOM은 기존 제품군에 연결하고 신규 BOM만 새 관리 구성으로 추가할 계약이다. 최종 확정 버튼/API와 실제 pending 처리기·제품군 생성은 아직 구현하지 않았다. 단순 부품 변경 적용만으로 등록하지 않는다.
+
+검증 도구 `tools/check_pc_quote_schema.py`는 신규 DDL/테스트 행을 단일 트랜잭션에서 검사 후 rollback한다. 실제 고객/상품/재고는 변경하지 않는다. 기존 quote_snapshots/스왑/고객 UI는 그대로이며 새 기능이 화면에서 동작한다고 안내하지 않는다. populated downgrade는 거부한다.
+
+이미지 제작은 사용자 요청으로 별도 대화 「조립PC 104개 제품군 완성 예시 이미지 제작」(thread `01a0eb9f-022f-71a1-9b64-5be368859dab`)에서 진행한다. 케이스/공랭·수랭/LED 중심의 생성 예시이며 결과는 이 작업 폴더의 outputs/assembled-pc-images-20260929/에 저장하도록 요청했다. 이 DB 작업과 파일/DB 쓰기 충돌이 없도록 분리했다.

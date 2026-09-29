@@ -1745,3 +1745,42 @@ req-product-new.md §④ "✕ 표 신설 필요" 31항목 중 이 개정이 담�
 `pc_usage_rule_sets`(rule_version PK, content JSONB, updated_at)는 출처·공식 부분 사양·비교 정책을 버전으로 보관한다. `pc_usage_scenarios`(scenario_id PK, rule_version FK, content JSONB)는 고객 작업 시나리오를 담는다. 기존 격자 좌표와 연결하지 않는다.
 
 새 상담 API는 기존 LLM 호출/비용 제한 모듈을 재사용한다. 모델은 조건과 후속 질문만 생성하고 상품/가격/FPS/재고를 반환하지 않는다. 후보는 서버가 최신 저장 구성 및 부품 설명 해시와 등록된 사양 기준을 대조해 조회한다. 가격은 관측값, 카드는 검토 후보로 표시한다. 고객 공개 승인을 자동 부여하지 않는다.
+
+
+## 24. 고정 구성 기반 고객 견적·변경안 (2026-09-29, 0119)
+
+원본 구성은 수정하지 않는다. 기존 `consult_sessions` 소유권, `products`/`product_specs`/`product_explanations`, `compat_rules`, `pricing`을 재사용한다. 기존 `quote_snapshots`에는 적용 전 변경안을 쓰지 않는다. 주문 경로가 최신 snapshot을 집기 때문에 미리보기가 주문으로 오인될 수 있다. 새 견적의 확정 버전을 기존 주문/저장 흐름으로 인계하는 것은 후속 API에서 명시적으로 수행한다.
+
+| 테이블 | 키와 관계 | 역할 |
+|---|---|---|
+| pc_customer_quotes | quote_id UUID PK; session_id FK→consult_sessions; configuration_id FK→pc_configurations; current_version | 상담 소유권에 연결된 고객 견적. 최초 원본 구성/판매 항목/가격 스냅샷과 구성 revision 보존 |
+| pc_quote_versions | (quote_id,version) PK; quote_id FK | 확정한 BOM·사용 조건·금액·가격 근거·조립비 포함 여부의 불변 버전 |
+| pc_change_sets | change_set_id UUID PK; (quote_id,base_version) FK→pc_quote_versions; current_revision | 한 번에 적용할 변경 묶음. draft/applied/cancelled. 기준 견적 버전과 최종 적용 버전 연결 |
+| pc_change_revisions | (change_set_id,revision) PK; change_set_id FK | 변경안 누적 결과 전체 BOM, fingerprint, 가격 산정 상태·차액·총액·예산·가격 근거. 변경 때마다 새 행 |
+| pc_change_items | (change_set_id,revision,line_key) PK/FK→pc_change_revisions | replace/add/remove 단위의 이전·이후 부품 배열(모델 코드/수량/장착 위치/사양·설명·가격 스냅샷). before/after 배열은 작업 종류에 맞는 비어 있지 않은 조합 |
+| pc_change_validations | validation_id UUID PK; (change_set_id,revision) FK | 전체 변경 구성 기준 호환성·판매 상태·가격·요청 일치의 pass/fail/unknown, 평가한 BOM fingerprint, 규칙 버전·입력 해시·판정 상세·확인일·유효기한 |
+| pc_performance_evidence | evidence_id UUID PK | 실제 제품/전체 테스트 구성·게임/프로그램 버전·설정·해상도·테스트 방법·지표/단위·출처·측정일·검토자/검토일. measured/published/estimate 구분 |
+| pc_quote_events | event_id UUID PK; quote_id FK; change_set_id 선택 FK | 작성자 종류/식별자, 동작, revision 참조 등의 감사 기록. API에서 비밀값·접근키 기록 금지 |
+
+### DB 불변식
+
+- quote/version과 change/revision의 포인터는 복합 FK로 같은 부모에 속하는 행만 가리킨다. 생성 트랜잭션은 부모→최초 버전→포인터 순서이다. 최초 작성 중 이외에는 current 포인터가 있어야 한다(API 계약).
+- 한 고객 견적에 활성 draft 한 개, 같은 기준 버전을 적용한 변경안 한 개. terminal 상태 변경안은 다시 수정하지 않는다. 새 요청은 현재 확정 버전에서 새 변경안을 만든다.
+- 불변 버전·변경 항목·검증·근거·이력은 UPDATE/DELETE를 거부한다. draft 수정·개별 취소도 새 revision의 전체 변경 집합을 저장한다. 단품 추가와 전체 교체를 구분하여 RAM 키트/수량과 SSD 장착 위치를 보존한다.
+- 적용은 선택 validation이 동일 change/revision/BOM이고 모든 판정 pass·유효기간 내, 가격 confirmed·합계 일치, 기준 견적 버전이 여전히 현재일 때만 허용한다. 새 확정 버전은 base_version+1이며 변경안의 BOM/가격과 일치해야 한다. 적용 트랜잭션에서 고객 견적 행 잠금, 실제 최신 상품/가격/규칙 입력 해시 재대조가 추가로 필요하다(후속 API).
+- 차액과 총액은 NULL=산정 전, 0=차액 없음이다. `confirmed` 가격에는 근거와 기준 금액이 필요하며 total=base_total+delta이다. 완제품 옵션 차액이 없으면 단품 가격 차이를 확정 옵션 가격으로 쓰지 않는다. 총액에 포함된 조립비를 재가산하지 않는다.
+- 성능 근거가 없으면 NULL/근거 부족으로 처리한다. 8GB→12GB를 FPS 향상률로 환산하지 않는다. estimate는 실측으로 노출하지 않는다. 저장 용량을 게임 개수로 바꾸면 게임당 용량과 예약 공간 가정을 함께 표시한다.
+- populated downgrade는 거부한다. 초기 마이그레이션은 신규 빈 테이블만 추가하고 실제 상품·재고·기존 견적·구성 데이터는 바꾸지 않는다.
+
+API·상태 전이·가격 산정/호환 검사 재사용 상세: `docs/design/pc-component-change-contract.md`. 이번 DB 구조 반영이 실제 고객 변경 API나 UI 연결 완료를 뜻하지 않는다.
+
+
+### 24-A. 고객 최종 확정 견적의 제품군 등록 (2026-09-29 추가 승인)
+
+- `pc_quote_confirmations`: confirmation_id UUID PK, (quote_id,version) UNIQUE/FK→pc_quote_versions, confirmed_by, confirmed_at. 현재 활성 견적 버전만 최종 확정할 수 있고 확정 이력은 불변이다.
+- `pc_catalog_submissions`: confirmation_id PK/FK→pc_quote_confirmations, bom_fingerprint, status(pending/linked/review_required), configuration_id FK→pc_configurations, note, timestamps. 최종 확정 INSERT와 같은 트랜잭션에서 자동 등록 대기를 만든다. 부품 변경 적용만으로는 등록하지 않는다.
+- 등록 처리기는 BOM 모델·수량·장착/키트 구성의 정규화 fingerprint로 기존 제품군을 찾는다. 같은 BOM이면 기존 제품군에 연결하고, 없으면 `pc_configurations`의 신규 draft와 parts/offer/설명 생성 대상으로 등록한다. 동시에 같은 BOM을 등록해도 기존 fingerprint UNIQUE와 재조회로 중복을 방지한다. 여러 확정 견적의 이력은 각각 연결한다.
+- 고객 예산·개인정보·대화는 공용 상품 설명으로 복사하지 않는다. 생성 이미지는 별도 예시 자산으로 관리한다. 고객 확정은 판매/재고/성능 보증이 아니며 판매 가격 갱신·재검토·공개 상태는 제품군 관리에서 따로 다룬다.
+- 최초 고객 확정의 당시 가격은 출처 이력이다. 기존 제품군의 최신 가격을 과거 고객 견적 금액으로 덮어쓰지 않는다. 신규 상품의 판매가는 현재 조달/옵션 정책으로 확인한다.
+
+이번 마이그레이션은 최종 확정과 등록 대기를 DB에서 연결한다. 고객 확정 API 및 pending을 처리하여 실제 제품군을 생성/연결하는 등록 처리기는 후속 구현 대상이다.
