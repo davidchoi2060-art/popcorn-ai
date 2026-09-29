@@ -2,6 +2,10 @@
 
 final result: passed
 
+## Follow-up · panel bottom alignment (2026-09-29)
+
+User reported the right panel ended above the list. On the live 1920×855 viewport the list bottom was 836.67px and inspector bottom 669.98px (166.69px gap). Removed the inspector-only viewport height cap and nested summary scrolling; desktop grid panels now stretch to the same row height, with their content expanding and their footer controls at the bottom. The page scrolls normally when content is taller than the viewport. Local browser inspection at 1280×720 confirmed identical panel bottoms, and the detail button remains reachable by normal page scrolling. This supersedes the independent inspector scrolling described in the original QA history below. Mobile stacked layout rules are unchanged.
+
 ## Evidence
 
 - Source visual truth: `C:/Users/leon2/OneDrive/Documents/ChatGPT/팝콘AI/outputs/admin-pc-catalog-mockups-20260929/03-split-v2.png`
