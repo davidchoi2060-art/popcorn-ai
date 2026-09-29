@@ -87,6 +87,8 @@ def load_catalog(c):
     for r in c.execute(text('SELECT * FROM pc_configuration_offers')).mappings():offers.setdefault(r['configuration_id'],[]).append(dict(r['payload']))
     result=[]
     for r in configs:
+        if r['content'].get('_admin_bom_edit',{}).get('review_required'):
+            continue
         rows=parts.get(r['configuration_id'],[]);stale=[];hydrated=[]
         for p in rows:
             e=explanations.get(p['explanation_code']);content=e['content'] if e else {}

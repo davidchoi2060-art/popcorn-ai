@@ -43,3 +43,16 @@ LNB의 메뉴 구조·경로·권한은 유지하고 그룹 아이콘을 단색 
 `PUT /api/admin/pc-configurations/{identity}/description`은 기존 admin 인증과 별도 operator/owner 검사를 사용한다. revision 낙관적 잠금과 기존 importer의 advisory lock을 함께 사용한다. 허용한 설명 필드만 기존 content에 병합하며 facts/evidence/부품/가격/기준일/상태는 유지한다. 추천 기준은 설명 문구만 수정하며 기존 키는 바꿀 수 없다. 이전 content 및 parts/offers를 같은 트랜잭션으로 history에 보존한 뒤 revision을 증가시킨다. 변경이 없는 저장은 이력을 추가하지 않는다. `GET .../description-history`는 이전 설명 스냅샷을 페이지 단위로 조회한다. 고객 공개나 추천 자격 승인을 대신하지 않는다.
 
 실제 DB 저장·이력·revision·보호 필드를 트랜잭션 롤백으로 검증했다. 브라우저의 변경 저장 QA는 127.0.0.1:8774의 메모리 fixture에서 수행했고 DB를 수정하지 않는다. 앱 전체 경로/인증/no-op 저장도 확인했다. 테스트용 fixture 서버는 리포에 포함하지 않는다.
+
+
+## 관리자 부품 구성 편집 · 1+2+3 결합안
+
+사용자 승인: 구성표 중심 편집, 오른쪽 교체 후보 비교, 저장 전 변경 내용 확인을 한 흐름으로 연결한다. 기존 상세 탭·LNB·사진·색상 토큰을 유지한다. 후보는 설명이 등록된 판매중·가격 있는 부품이며, 설명 원문이 달라졌거나 검토 이슈가 있으면 선택할 수 없다. 이는 자동 호환성 통과 목록을 뜻하지 않는다. RAM/SSD는 패키지 수량을 변경할 수 있다. 나머지 부품 수량은 유지한다.
+
+GET `.../{id}/part-candidates`, POST `.../{id}/parts-preview`, PUT `.../{id}/parts`를 추가했다. 기존 `pc_configurations`, `pc_configuration_parts`, `pc_configuration_offers`, `pc_configuration_history`를 사용하며 새 스키마는 없다. 기존 수정은 이전 BOM·설명·가격·작업자를 history에 보관한다. 새 저장은 원본을 유지하고 A 접두 ID로 추가한다. 동일 BOM 중복은 차단한다.
+
+가격은 기존 완제품 기준가에 교체 부품의 현재 단품 판매가 차액을 더한 **관리용 예상가**다. 완제품 옵션 판매가로 확정하지 않는다. 기존 서비스 포함 조건을 보존하고 조립비를 다시 더하지 않는다. 원본 offer는 history 및 새 offer의 original_offer에 남기며 새 offer는 quote_only로 구분한다.
+
+저장 시 revision, 판매 상태, 원문, 가격, preview_token을 다시 대조한다. DB 잠금은 기존 importer와 공유한다. 변경된 구성은 review_required이며 `_admin_bom_edit.review_required`가 남아 있는 동안 관리자 추천 테스트에서도 제외한다. 상품 설명 저장만으로 이 플래그를 해제하지 않는다. 과거 호환성 기록은 이전 BOM 기록임을 표시한다. 기존 문구를 검토용으로 보존하되 용량 등 변경된 사실은 근거로 다시 계산하고 불명확하면 비운다. 자동 호환성 판정·검토 승인·공개 전환은 이번 구현 범위에 포함하지 않는다.
+
+브라우저 저장 시험은 localhost8775에서 실제 save_parts를 실행한 뒤 DB 트랜잭션을 항상 롤백하고 화면 결과만 메모리에 보관했다. 서버용 소스에 이 시험 경로는 포함하지 않는다.

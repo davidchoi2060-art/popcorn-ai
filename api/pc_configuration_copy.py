@@ -49,7 +49,7 @@ def read_configuration(conn, identity):
         p['needs_review']=part_needs_review(p,row)
         if part_needs_review(p,row): affected.append(p['source_code'])
     offers=[dict(o) for o in conn.execute(text('SELECT * FROM pc_configuration_offers WHERE configuration_id=:id ORDER BY price_snapshot,offer_id'),{'id':identity}).mappings()]
-    return dict(r,parts=parts,offers=offers,needs_review=bool(affected),affected_parts=affected,
+    return dict(r,parts=parts,offers=offers,needs_review=bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
                 compatibility_display=review_snapshot(identity,parts),
                 customer_publishable=False,price_is_snapshot=True)
 
@@ -74,7 +74,7 @@ def catalog_rows(conn):
         case=next((p for p in bom if p['slot']=='CASE' and not p['pseudo']),None)
         offer_list=offers.get(r['configuration_id'],[])
         offer=offer_list[0] if offer_list else None
-        description_ready=bool(content.get('title') and content.get('intro') and bom) and all(
+        description_ready=not content.get('_admin_bom_edit',{}).get('review_required') and bool(content.get('title') and content.get('intro') and bom) and all(
             p['pseudo'] or bool(explanations.get(p['explanation_code'],{}).get('content',{}).get('role')) for p in bom)
         result.append(dict(configuration_id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],
             revision=r['revision'],status=r['status'],observed_date=r['observed_date'],

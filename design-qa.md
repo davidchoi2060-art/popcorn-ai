@@ -90,3 +90,16 @@ Implementation captures: `C:/Users/leon2/OneDrive/Documents/ChatGPT/팝콘AI/out
 - No unresolved P0/P1/P2 findings. P3 illustration differences are deliberate substitutions of real data and real product photography.
 
 final result: passed
+
+
+## 2026-09-29 · 관리자 부품 편집 결합안
+
+- Source: generated_images/01a0d6a3-e8fa-7cc1-8897-e6b9fa7e34f0/exec-50563adf-74b2-44ec-b48c-05c22ee2751b.png (1672×941). Implementation: outputs/admin-pc-catalog-mockups-20260929/parts-picker-qa.png and parts-confirm-qa.png (1920×1080), parts-mobile-qa.png (390×844), under the task workspace. Source and implementation viewed together; both desktop aspect ratios are 16:9. Existing 1.15 admin zoom retained.
+- Preserved: charcoal LNB, ivory surfaces, emerald selected state, left product rail, composition table, right comparison drawer, fixed bottom actions, before/after confirmation. Real photos/model names/specification facts replace reference illustration and fabricated specs. Candidates are paginated above a two-column comparison; filters for unimplemented compatibility approval are not fabricated.
+- P2 resolved: admin zoom pushed drawer footer below viewport; divide viewport height by shell zoom. Desktop and mobile bottom actions now visible.
+- P2 resolved: nonexistent warning icon replaced with existing vendored help-circle SVG. No new icon system.
+- P2 resolved: quantity validation restores the previous valid number instead of silently proceeding with a bad visible value; keyboard tab navigation and customer preview cannot bypass dirty-parts protection.
+- Browser: memory change preserved when choosing SSD; 1,054,900 + 28,700 + 29,700 = 1,113,300 shown before saving; save closes dialog; reopening the rollback fixture shows RAM16/SSD512 and review-required copy. Search no-results, invalid quantity with actual keyboard, discard/keep, original/new save options verified. No console JS errors.
+- Mobile: dialog left=0,width=390, document scrollWidth=390; table scrolls internally; candidate list stacks and actions remain accessible.
+- Backend: 60 focused tests pass. Real-DB transaction tests cover update/new, history preservation, package capacity, unchanged assembly fee, recommendation exclusion and complete rollback. No QA mutations persisted. Four edited JS files pass syntax checks.
+- Boundary: candidate sales display is not physical stock/dispatch confirmation; saving is not compatibility/publication approval. No unresolved P0/P1/P2 in this editor scope.
