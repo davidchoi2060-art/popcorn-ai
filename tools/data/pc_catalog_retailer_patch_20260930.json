@@ -1,0 +1,23 @@
+[
+  {
+    "code": 114514,
+    "source": {
+      "id": "compuzone-dn240-1077304",
+      "kind": "merchant",
+      "title": "컴퓨존 darkFlash NEBULA DN-240 ARGB 블랙 상품 사양",
+      "url": "https://www.compuzone.co.kr/product/product_detail.htm?ProductNo=1077304"
+    },
+    "reviewed_evidence": {
+      "product_name": "DARKFLASH NEBULA DN-240 ARGB (블랙)",
+      "source_fingerprint": "4564bac868e2d120bed46bbcfc00402f3abdf02b6fef92abf98fe6e26c67332b",
+      "locator": "상품 요약 사양의 TDP : 290W · 실제 브라우저 페이지 확인; docs/design/pc-catalog-retailer-review-20260930.md",
+      "observed_at": "2026-09-30",
+      "exact_model": true,
+      "conflict": false,
+      "version_sensitive": false
+    },
+    "specs": {"cooler_tdp": 290},
+    "facts": [["판매처 표기 냉각 TDP", "290 W"]],
+    "note": "컴퓨존의 해당 모델 게시 사양 기준입니다. 제조사 확인이나 실측 냉각 성능을 뜻하지 않으며 CPU의 최대 부하·설정·케이스 통풍에 따른 온도와 소음을 보장하지 않습니다."
+  }
+]
