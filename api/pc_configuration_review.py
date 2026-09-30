@@ -88,6 +88,8 @@ def assess(config, parts, offers, rows, specs, rules):
                     try:
                         state = 'pass' if rule_verdict(rule,v,r) else 'fail'
                         detail = (rule.get('detail_fmt') or '{v} / {r}').replace('{v}',str(v)).replace('{r}',str(rule_ref_value(rule,r)))
+                        if state == 'fail' and rule['op'] == 'contains':
+                            detail = f"등록 지원 목록 {v} / 대상 {r} · 목록에 없음"
                         if rule['rule_key']=='power':
                             detail = f"파워 정격 {v}W / GPU {r}W + 규칙 여유 {rule.get('ref_offset') or 0}W"
                     except (TypeError, ValueError):

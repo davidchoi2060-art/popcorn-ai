@@ -66,6 +66,14 @@ class ReviewTests(unittest.TestCase):
         self.rules[0]['op']='surprise'
         self.assertEqual(self.assess()['checks'][0]['state'],'unknown')
 
+    def test_unsupported_socket_detail_does_not_claim_support(self):
+        self.rules[0].update(op='contains',detail_fmt='{r} 지원')
+        self.specs[2]['socket']=['LGA1700']
+        result=self.assess()['checks'][0]
+        self.assertEqual(result['state'],'fail')
+        self.assertIn('목록에 없음',result['detail'])
+        self.assertNotEqual(result['detail'],'AM5 지원')
+
     def test_rules_apply_to_all_pairs_in_repeated_slots(self):
         self.parts.append(dict(self.parts[1],ordinal=3))
         self.assertEqual(len(self.assess()['checks']),2)
