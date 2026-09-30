@@ -49,7 +49,9 @@ def read_configuration(conn, identity):
         p['needs_review']=part_needs_review(p,row)
         if part_needs_review(p,row): affected.append(p['source_code'])
     offers=[dict(o) for o in conn.execute(text('SELECT * FROM pc_configuration_offers WHERE configuration_id=:id ORDER BY price_snapshot,offer_id'),{'id':identity}).mappings()]
-    return dict(r,parts=parts,offers=offers,needs_review=bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
+    from .pc_configuration_review import load_review
+    workflow=load_review(conn,identity)[3] if r['content'].get('_review') else None
+    return dict(r,review_workflow=workflow,parts=parts,offers=offers,needs_review=(bool(workflow) and not workflow['eligible']) or bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
                 compatibility_display=review_snapshot(identity,parts),
                 customer_publishable=False,price_is_snapshot=True)
 
@@ -70,6 +72,8 @@ def catalog_rows(conn):
     result=[]
     for r in rows:
         content=r['content']; bom=by_pc.get(r['configuration_id'],[])
+        from .pc_configuration_review import load_review
+        workflow=load_review(conn,r['configuration_id'])[3] if content.get('_review') else None
         affected=[p['source_code'] for p in bom if part_needs_review(p,explanations.get(p['explanation_code']))]
         case=next((p for p in bom if p['slot']=='CASE' and not p['pseudo']),None)
         offer_list=offers.get(r['configuration_id'],[])
@@ -83,7 +87,8 @@ def catalog_rows(conn):
             price_note=offer['payload'].get('price_note','') if offer else '',offer_count=len(offer_list),
             image_url=f"/api/product-images/{case['explanation_code']}/detail" if case else None,
             image_caption='케이스 이미지',part_count=len(bom),description_ready=description_ready,
-            needs_review=bool(affected) or not description_ready,affected_parts=affected,
+            review_state=workflow['state'] if workflow else None,
+            needs_review=bool(affected) or not description_ready or (bool(workflow) and not workflow['eligible']),affected_parts=affected,
             customer_publishable=False,price_is_snapshot=True))
     return result
 

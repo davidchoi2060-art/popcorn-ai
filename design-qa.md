@@ -105,3 +105,11 @@ final result: passed
 - Boundary: candidate sales display is not physical stock/dispatch confirmation; saving is not compatibility/publication approval. No unresolved P0/P1/P2 in this editor scope.
 
 - Deployed verification 2026-09-30: main a7c40df, GitHub run36586903883 success. Authenticated server UI candidate comparison/preview verified; 1,054,900+28,700=1,083,600; canceled without persisting. Final screenshots parts-picker-live.png / parts-confirm-live.png show resolved icons; no console errors.
+
+## 2026-09-30 · 현재 구성 검토와 추천 승인
+
+- Existing approved detail layout retained: left product rail, ivory/charcoal/emerald tokens, three tabs. Current review editor extends the existing review tab; historical snapshot is collapsible rather than represented as current evidence.
+- Backend: 74 focused tests. Real DB transaction verifies draft exclusion, approval inclusion, copy edit invalidation, reapproval, revoke and five history snapshots; all writes rolled back and original digest confirmed unchanged.
+- Browser: current DB checks, required evidence validation, dirty close/keep, rollback-only approval, reopened approved result, blockers and disabled approval verified. P97909 has eight known rule results; P100866 shows two part explanation blockers. No JS errors during local verification.
+- Mobile 390x844: no document horizontal overflow; rule table scrolls internally, review footer follows existing parts editor sticky action pattern. Original admin zoom retained.
+- Bounds: rule pass is not physical assembly or dispatch certification. Missing specifications require human evidence, never fabricated pass/FPS. Approval only changes administrative recommendation eligibility; no real product was approved during QA.

@@ -86,8 +86,9 @@ def load_catalog(c):
     for r in c.execute(text('SELECT * FROM pc_configuration_parts ORDER BY configuration_id,ordinal')).mappings():parts.setdefault(r['configuration_id'],[]).append(dict(r))
     for r in c.execute(text('SELECT * FROM pc_configuration_offers')).mappings():offers.setdefault(r['configuration_id'],[]).append(dict(r['payload']))
     result=[]
+    from .pc_configuration_review import review_allows
     for r in configs:
-        if r['content'].get('_admin_bom_edit',{}).get('review_required'):
+        if not review_allows(c,r):
             continue
         rows=parts.get(r['configuration_id'],[]);stale=[];hydrated=[]
         for p in rows:

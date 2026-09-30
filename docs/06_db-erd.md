@@ -1785,3 +1785,9 @@ API·상태 전이·가격 산정/호환 검사 재사용 상세: `docs/design/p
 - 최초 고객 확정의 당시 가격은 출처 이력이다. 기존 제품군의 최신 가격을 과거 고객 견적 금액으로 덮어쓰지 않는다. 신규 상품의 판매가는 현재 조달/옵션 정책으로 확인한다.
 
 이번 마이그레이션은 최종 확정과 등록 대기를 DB에서 연결한다. 고객 확정 API 및 pending을 처리하여 실제 제품군을 생성/연결하는 등록 처리기는 후속 구현 대상이다.
+
+### 24-B. 관리자 제품군 추천 검토 (2026-09-30, DDL 없음)
+
+기존 `pc_configurations.content._review`에 state(pending/approved/revoked), basis, findings(항목별 confirmed/evidence), note, actor, at, checks, scope=admin_recommendation_review를 저장한다. 구성 status는 승인 시 approved, 대기/제외 시 review_required이며 revision을 증가시킨다. `_admin_bom_edit.review_required`는 승인 시 해제하되 전체 입력 해시 변경은 추천 시 다시 대조한다. 파생 상태 stale은 DB status와 구분한다.
+
+basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설명·상품·사양·활성 호환 규칙에 결합한다. 검토 메타 변경만으로 자기 승인이 무효화되지는 않는다. history는 이전 구성과 BOM/offers, edit.kind=review 및 action/작업자를 보존한다. 새 테이블이나 마이그레이션은 없다. 이 승인은 관리자 추천 후보 자격이며 고객 공개·물리 재고·실조립/출고 승인을 뜻하지 않는다.
