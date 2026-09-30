@@ -5,6 +5,21 @@ const badge=(text,tone='')=>`<span class="catalog-badge ${tone}">${esc(text)}</s
 const queueLabels={ready:'추천 가능 후보',conditional:'조건부 추천 후보',hold:'추천 전 보완',excluded:'우선 제외'};
 const cap=v=>v==null?'확인 필요':esc(v)+'GB';
 let offset=0,total=0,items=[],selected=null,request=0,detailRequest=0,summaryRequest=0;
+let appliedParams=new URLSearchParams();
+const storageKey='popcorn.admin.pcCatalog.v1',filterIds=['q','source','review','visibility','queue'];
+function readStored(area,key,fallback){try{return JSON.parse(window[area].getItem(key))??fallback;}catch{return fallback;}}
+function writeStored(area,key,value){try{window[area].setItem(key,JSON.stringify(value));return true;}catch{return false;}}
+function setLimit(value,persist=false){const limit=['10','20','30'].includes(String(value))?String(value):'10';$('limit').value=limit;$('limit-bottom').value=limit;if(persist&&!writeStored('localStorage',storageKey+'.limit',limit))$('limit').parentElement.querySelector('small').textContent='이 브라우저에서 설정 저장이 제한됩니다.';}
+function saveFilters(){writeStored('sessionStorage',storageKey+'.filters',Object.fromEntries(filterIds.map(id=>[id,$(id).value])));}
+let recent=readStored('localStorage',storageKey+'.recent',[]);
+recent=Array.isArray(recent)?recent.filter(x=>typeof x==='string'&&x.trim()&&x.length<=100).slice(0,5):[];
+function showRecent(){const host=$('recent');host.hidden=!recent.length;host.innerHTML=recent.length?'<span>최근 검색</span>'+recent.map((q,i)=>`<button type="button" data-recent="${i}">${esc(q)}</button>`).join('')+'<button type="button" data-clear-recent>기록 지우기</button>':'';}
+function rememberSearch(){const q=$('q').value.trim();if(!q)return;recent=[q,...recent.filter(x=>x!==q)].slice(0,5);writeStored('localStorage',storageKey+'.recent',recent);showRecent();}
+function resetFilters(){filterIds.forEach(id=>$(id).value='');offset=0;load();}
+setLimit(readStored('localStorage',storageKey+'.limit','10'));
+const storedFilters=readStored('sessionStorage',storageKey+'.filters',{});
+if(storedFilters&&typeof storedFilters==='object')filterIds.forEach(id=>{const value=storedFilters[id];if(typeof value!=='string')return;if(id==='q')$(id).value=value.slice(0,100);else if([...$(id).options].some(o=>o.value===value))$(id).value=value;});
+showRecent();
 const checkLabels={case_variant:'케이스 세부 모델',cooler_display_headers:'쿨러 표시 장치 연결',gpu_nominal_length:'그래픽카드 장착 길이',gpu_power_connection:'GPU 전원 연결',gpu_power_connector_count:'GPU 전원 커넥터 수',gpu_recommended_psu:'GPU 권장 파워',gpu_regional_identity:'GPU 세부 모델',radiator_mount:'라디에이터 장착',replacement_ram_platform:'교체 메모리 규격',cpu_board_support:'CPU·메인보드 지원',installed_bios:'설치 BIOS',memory_capacity:'메모리 용량',cooler_socket:'쿨러 소켓',air_cooler_nominal_height:'쿨러 장착 높이',psu_model_identity:'파워 모델',psu_bay_cabling:'파워·배선 공간',display_output:'화면 출력',whole_system_thermal_stability:'실조립·온도·안정성',latest_admin_selling:'부품 판매 표시',supplier_selling_display:'공급처 판매 표시',ram_capacity_qty:'메모리 수량·용량',cpu_model_identity:'CPU 모델',memory_profile_stability:'메모리 설정·안정성',actual_dispatch:'실재고·출고'};
 const checkStates={pass:['문서상 충족','green'],unknown:['추가 확인','amber'],conditional:['조건 확인','amber'],conflict:['불일치 기록','amber'],not_applicable:['해당 없음',''],reference:['참고 기록','']};
 function list(values){return `<ul>${values.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;}
@@ -44,9 +59,9 @@ function pages(){const limit=Number($('limit').value),page=Math.floor(offset/lim
  $('pages').innerHTML=html+`<button type="button" data-page="${page+1}" ${page>=last?'disabled':''}>다음</button>`;
  $('range').textContent=`전체 ${total}개 중 ${total?offset+1:0}–${Math.min(offset+limit,total)} 표시`;
 }
-async function load(){const seq=++request;++detailRequest;++summaryRequest;if($('dialog').open)$('dialog').close();$('message').textContent='';$('count').textContent='불러오는 중';$('detail').disabled=true;$('export').disabled=true;$('rows').setAttribute('aria-busy','true');
+async function load(){saveFilters();const seq=++request;++detailRequest;++summaryRequest;if($('dialog').open)$('dialog').close();$('message').textContent='';$('count').textContent='불러오는 중';$('detail').disabled=true;$('export').disabled=true;$('rows').setAttribute('aria-busy','true');
  const args=params();args.set('offset',offset);args.set('limit',$('limit').value);
- try{const r=await fetch('/api/admin/pc-configurations?'+args,{credentials:'same-origin'});if(!r.ok)throw Error(r.status===401||r.status===403?'관리자 로그인이 필요합니다.':'목록을 불러오지 못했습니다.');const d=await r.json();if(seq!==request)return;
+ try{const r=await fetch('/api/admin/pc-configurations?'+args,{credentials:'same-origin'});if(!r.ok)throw Error(r.status===401||r.status===403?'관리자 로그인이 필요합니다.':'목록을 불러오지 못했습니다.');const d=await r.json();if(seq!==request)return;appliedParams=new URLSearchParams(args);appliedParams.delete('offset');appliedParams.delete('limit');
  total=d.total;items=d.items;$('queues').innerHTML=[['','전체',d.summary_total],...Object.entries(queueLabels).map(([k,v])=>[k,v,d.summary[k]||0])].map(([k,v,n])=>`<button type="button" data-queue="${k}" aria-pressed="${$('queue').value===k}"><span>${v}</span><strong>${n}</strong></button>`).join('');$('checked').textContent='현재 검색 조건 기준 · 상태 확인 '+new Date(d.checked_at).toLocaleString('ko-KR')+' · 가격은 별도 기준일 확인';if(offset>=total&&offset>0){offset=0;return load();}
  $('count').textContent=`전체 ${total}개`+(total!==d.catalog_total?` / 등록 ${d.catalog_total}개`:'');
  $('rows').innerHTML=items.map(p=>`<tr data-id="${esc(p.configuration_id)}"><td><input type="radio" name="configuration" aria-label="${esc(p.configuration_id)} 선택"></td><td>${photo(p)}</td><td><button class="catalog-title" type="button"><small>${esc(p.configuration_id)}</small>${esc(p.title)}</button></td><td>${esc(p.facts.cpu||'CPU 확인 필요')}<small>${esc(p.facts.gpu||'GPU 확인 필요')}<br>RAM ${cap(p.facts.ram_gb)} / SSD ${cap(p.facts.storage_gb)}</small></td><td><strong>${money(p.price)}</strong></td><td>${badge(p.source==='신규'?'신규 구성':'기존 판매 상품',p.source==='신규'?'green':'blue')}<br>${p.review_state?badge(({approved:'추천 검토 승인',stale:'근거 변경 · 재검토',pending:'검토 대기',revoked:'추천 제외'})[p.review_state]||'검토 대기')+'<br>':''}${badge(queueLabels[p.management_state]||'추천 검토',p.recommendation_state==='ready'?'green':'amber')}<br>${badge(p.description_ready?'설명 등록':'설명 보완',p.description_ready?'':'amber')}<br>${badge(p.needs_review?'정보 확인 필요':'정보 변경 없음',p.needs_review?'amber':'green')} ${badge('비공개')}</td></tr>`).join('')||'<tr><td colspan="6"><p class="catalog-empty">조건에 맞는 제품군이 없습니다.</p></td></tr>';
@@ -58,7 +73,11 @@ async function detail(tab='parts'){if(!selected)return;const id=selected.configu
 $('refresh').onclick=()=>load();
 $('queues').onclick=e=>{const b=e.target.closest('[data-queue]');if(b){$('queue').value=b.dataset.queue;offset=0;load();}};
 $('summary').addEventListener('click',e=>{const b=e.target.closest('[data-open-tab]');if(b)detail(b.dataset.openTab);});
-$('filters').onsubmit=e=>{e.preventDefault();offset=0;load();};['source','review','visibility','queue','limit'].forEach(id=>$(id).onchange=()=>{offset=0;load();});$('reset').onclick=()=>{$('filters').reset();offset=0;load();};
+const runSearch=e=>{e.preventDefault();rememberSearch();offset=0;load();};
+$('filters').onsubmit=runSearch;$('filters').querySelector('button[type="submit"]').onclick=runSearch;['source','review','visibility','queue'].forEach(id=>$(id).onchange=()=>{offset=0;load();});$('reset').onclick=resetFilters;
+['limit','limit-bottom'].forEach(id=>$(id).onchange=()=>{setLimit($(id).value,true);offset=0;load();});
+$('clear-search').onclick=()=>{$('q').value='';offset=0;load();$('q').focus();};
+$('recent').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-clear-recent')){recent=[];writeStored('localStorage',storageKey+'.recent',recent);showRecent();$('q').focus();}else if(b.dataset.recent!==undefined){$('q').value=recent[Number(b.dataset.recent)]||'';rememberSearch();offset=0;load();}};
 $('rows').onclick=e=>{const row=e.target.closest('tr[data-id]');if(row)select(row.dataset.id);};$('rows').onchange=e=>{const row=e.target.closest('tr[data-id]');if(row)select(row.dataset.id);};
 $('pages').onclick=e=>{const b=e.target.closest('button[data-page]');if(b&&!b.disabled){offset=(Number(b.dataset.page)-1)*Number($('limit').value);load();}};
 $('previous-product').onclick=()=>select(items[items.indexOf(selected)-1]?.configuration_id);$('next-product').onclick=()=>select(items[items.indexOf(selected)+1]?.configuration_id);
@@ -66,6 +85,6 @@ $('dialog-body').addEventListener('pc-description-saved',()=>load());
 $('dialog-body').addEventListener('pc-review-saved',async()=>{await load();$('message').textContent='검토 내용을 저장했습니다. 추천 반영 상태는 최신 구성과 근거를 기준으로 판단합니다.';});
 $('dialog-body').addEventListener('pc-parts-saved',async e=>{$('filters').reset();$('q').value=e.detail.configuration_id;offset=0;await load();$('message').textContent='부품 구성을 저장했습니다. 상품 설명·호환성 검토 후 고객 공개를 진행해 주세요.';});
 $('detail').onclick=()=>detail();$('dialog-close').onclick=()=>{$('dialog').close();};$('dialog').addEventListener('close',()=>{++detailRequest;});
-$('export').onclick=async()=>{const b=$('export');b.disabled=true;$('message').textContent='';try{const r=await fetch('/api/admin/pc-configurations/export.xlsx?'+params(),{credentials:'same-origin'});if(!r.ok)throw Error('엑셀을 내려받지 못했습니다. 다시 시도해 주세요.');const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='조립PC_제품군.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
+$('export').onclick=async()=>{const b=$('export');b.disabled=true;$('message').textContent='';try{const r=await fetch('/api/admin/pc-configurations/export.xlsx?'+appliedParams,{credentials:'same-origin'});if(!r.ok)throw Error('엑셀을 내려받지 못했습니다. 다시 시도해 주세요.');const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='조립PC_제품군.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
 load();
 })();

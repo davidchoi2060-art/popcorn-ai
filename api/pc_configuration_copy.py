@@ -1,6 +1,8 @@
 """Admin-only BOM copy reads; no public recommendation or price authority."""
 import hashlib
 import json
+import re
+import unicodedata
 from datetime import datetime, timezone
 from io import BytesIO
 from fastapi import APIRouter, HTTPException, Query
@@ -109,6 +111,9 @@ def catalog_rows(conn):
         result.append(dict(configuration_id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],
             revision=r['revision'],status=r['status'],observed_date=r['observed_date'],
             title=content.get('title',''),intro=content.get('intro',''),facts=content.get('facts',{}),
+            search_parts=[{'name':explanations.get(p['explanation_code'],{}).get('product_name')
+                          or explanations.get(p['explanation_code'],{}).get('content',{}).get('name',''),
+                          'code':p['source_code']} for p in bom if not p['pseudo']],
             source=content.get('source',''),price=offer['price_snapshot'] if offer else None,
             price_note=offer['payload'].get('price_note','') if offer else '',offer_count=len(offer_list),
             image_url=f"/api/product-images/{case['explanation_code']}/detail" if case else None,
@@ -121,11 +126,31 @@ def catalog_rows(conn):
     return result
 
 
+def search_text(value):
+    """Ignore model punctuation/spacing, while retaining letters and digits."""
+    return re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',str(value)).casefold())
+
+
+def matches_search(row, query):
+    tokens=[search_text(t) for t in query.split() if search_text(t)]
+    if not tokens: return True
+    facts=row['facts']
+    fields=[row['configuration_id'],row['title'],*[str(v) for v in facts.values() if v is not None]]
+    for part in row.get('search_parts',[]): fields.extend([part['name'],part['code']])
+    # Label installed totals as well as allowing searches by individual part names.
+    for key,labels in [('ram_gb',('RAM','메모리')),('storage_gb',('SSD','저장장치'))]:
+        value=facts.get(key)
+        if isinstance(value,(int,float)):
+            fields.extend(f'{label} {value:g}GB' for label in labels)
+            if key=='storage_gb' and value>=1000:
+                fields.append(f'SSD {value/1000:g}TB')
+    normalized=[search_text(f) for f in fields if f]
+    return all(any(token in f for f in normalized) for token in tokens)
+
+
 def filter_rows(rows,q='',source='',review='',visibility='',queue=''):
-    needle=q.strip().casefold()
     return [r for r in rows if
-        (not needle or needle in ' '.join([r['configuration_id'],r['title'],
-          *[str(v) for v in r['facts'].values()]]).casefold())
+        matches_search(r,q)
         and (not source or r['source']==source)
         and (not review or r['needs_review']==(review=='needs_review'))
         and (not queue or r.get('management_state')==queue)

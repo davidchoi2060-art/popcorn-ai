@@ -28,6 +28,30 @@ class AdminCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.filter_rows(self.rows,visibility='public'),[])
         self.assertEqual(catalog.filter_rows(self.rows,visibility='private'),self.rows)
 
+    def test_search_combines_terms_across_parts_in_any_order(self):
+        self.rows[0]['search_parts']=[dict(name='GIGABYTE H610M K DDR4',code='12345')]
+        self.assertEqual(catalog.filter_rows(self.rows,q='H610M i312100 8GB'),self.rows[:1])
+        self.assertEqual(catalog.filter_rows(self.rows,q='8GB 12345 CORE'),self.rows[:1])
+        self.assertEqual(catalog.filter_rows(self.rows,q='H610M RTX'),[])
+        self.assertEqual(catalog.filter_rows(self.rows,q='ｉ３－１２１００'),self.rows[:1])
+
+    def test_search_capacity_and_empty_query(self):
+        self.rows[0]['facts']['storage_gb']=1000
+        self.assertEqual(catalog.filter_rows(self.rows,q='RAM8GB SSD1TB'),self.rows[:1])
+        self.assertEqual(catalog.filter_rows(self.rows,q='   '),self.rows)
+        self.assertEqual(catalog.filter_rows(self.rows,q='없는상품'),[])
+
+    def test_large_pages_and_export_use_same_multi_term_query(self):
+        self.rows[0]['search_parts']=[dict(name='화이트 케이스',code='56789')]
+        with patch.object(catalog,'catalog_rows',return_value=self.rows):
+            result=self.client.get('/api/admin/pc-configurations',params={'q':'케이스 i312100','limit':30}).json()
+            r=self.client.get('/api/admin/pc-configurations/export.xlsx',params={'q':'케이스 i312100'})
+        self.assertEqual(result['total'],1)
+        self.assertEqual(result['items'],self.rows[:1])
+        ws=load_workbook(BytesIO(r.content)).active
+        self.assertEqual(ws.max_row,2)
+        self.assertEqual(ws['A2'].value,result['items'][0]['configuration_id'])
+
     def test_server_pagination_keeps_filtered_count(self):
         with patch.object(catalog,'catalog_rows',return_value=self.rows):
             r=self.client.get('/api/admin/pc-configurations',params={'offset':1,'limit':1})
