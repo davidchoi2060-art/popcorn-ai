@@ -10,16 +10,20 @@
 {% block content %}
 <main class="catalog">
   <div class="catalog-heading"><div><h1>조립PC 제품군 목록</h1><p>구성과 부품 정보를 확인하고 제품군을 관리합니다.</p></div>
-    <div class="catalog-actions"><span class="catalog-coming">신규 구성 등록 · 준비 중</span><button id="catalog-export" type="button"><img src="/shared/icons/su/ft-file-text.svg" alt="">엑셀 내려받기</button></div>
+    <div class="catalog-actions"><button id="catalog-refresh" type="button">최신 상태 조회</button><button id="catalog-export" type="button"><img src="/shared/icons/su/ft-file-text.svg" alt="">엑셀 내려받기</button></div>
   </div>
+  <div id="catalog-queues" class="catalog-queues" role="group" aria-label="추천 분류별 목록"></div>
+  <p class="catalog-workflow-note">후보 분류와 추천 승인은 별도입니다. 부품 구성 → 상품 설명 → 검토 기록 순서로 확인합니다. 새 제품군은 기존 구성의 ‘부품 구성 변경’에서 저장할 수 있습니다.</p>
   <form id="catalog-filters" class="catalog-filters" role="search">
     <label class="catalog-search"><span class="catalog-sr">상품명·구성 ID·CPU·GPU 검색</span><img src="/shared/icons/su/ft-search.svg" alt=""><input id="catalog-q" maxlength="100" placeholder="상품명 · 구성 ID · CPU · GPU 검색"><button type="submit">검색</button></label>
     <label><span class="catalog-sr">등록 출처</span><select id="catalog-source"><option value="">등록 출처 : 전체</option><option value="신규">신규 구성</option><option value="기존">기존 판매 상품</option></select></label>
     <label><span class="catalog-sr">정보 검토</span><select id="catalog-review"><option value="">정보 검토 : 전체</option><option value="needs_review">확인 필요</option><option value="ready">정보 변경 없음</option></select></label>
     <label><span class="catalog-sr">공개 상태</span><select id="catalog-visibility"><option value="">공개 상태 : 전체</option><option value="private">비공개</option><option value="public">공개</option></select></label>
+    <label><span class="catalog-sr">추천 분류</span><select id="catalog-queue"><option value="">추천 분류 : 전체</option><option value="ready">추천 가능 후보</option><option value="conditional">조건부 추천 후보</option><option value="hold">추천 전 보완</option><option value="excluded">우선 제외</option></select></label>
     <button id="catalog-reset" type="button">초기화</button>
   </form>
   <p id="catalog-message" role="status" class="catalog-message"></p>
+  <p id="catalog-checked" class="catalog-note"></p>
   <div class="catalog-layout">
     <section class="catalog-list" aria-label="조립PC 제품군 목록">
       <div class="catalog-section-title"><h2 id="catalog-count">불러오는 중</h2><span>상품을 선택하면 구성 정보를 확인할 수 있습니다.</span></div>

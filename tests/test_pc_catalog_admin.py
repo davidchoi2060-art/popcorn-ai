@@ -15,6 +15,8 @@ class AdminCatalogTests(unittest.TestCase):
                    dict(configuration_id='P01',title='게임 PC',source='기존',facts={'gpu':'RTX 3050'},
                        needs_review=True,customer_publishable=False,price=1000000,observed_date='2026-09-28',
                        price_note='',description_ready=True)]
+        self.rows[0].update(management_state='conditional',assembly_check_count=1,review_reasons=[])
+        self.rows[1].update(management_state='hold',assembly_check_count=0,review_reasons=['CPU 소켓 미확인'])
         app=FastAPI();app.include_router(catalog.router);self.client=TestClient(app)
 
     def test_filter_combinations_and_case_insensitive_specs(self):
@@ -34,6 +36,34 @@ class AdminCatalogTests(unittest.TestCase):
 
     def test_invalid_filter_is_not_silently_treated_as_ready(self):
         self.assertEqual(self.client.get('/api/admin/pc-configurations?review=approved').status_code,422)
+        self.assertEqual(self.client.get('/api/admin/pc-configurations?queue=approved').status_code,422)
+
+    def test_queue_filter_and_summary_share_search_scope(self):
+        with patch.object(catalog,'catalog_rows',return_value=self.rows):
+            result=self.client.get('/api/admin/pc-configurations?queue=hold').json()
+            narrow=self.client.get('/api/admin/pc-configurations?queue=hold&source=신규').json()
+        self.assertEqual(result['items'],self.rows[1:])
+        self.assertEqual(result['summary'],dict(ready=0,conditional=1,hold=1,excluded=0))
+        self.assertEqual(narrow['items'],[])
+        self.assertEqual(narrow['summary_total'],1)
+        self.assertEqual(narrow['summary']['conditional'],1)
+
+    def test_exclusion_is_distinct_from_unknown(self):
+        state=dict(state='pending',checks=[dict(state='unknown')],blockers=[],recommendation_state='hold')
+        self.assertEqual(catalog.queue_status(dict(status='draft'),state),'hold')
+        state['checks'][0]['state']='fail'
+        self.assertEqual(catalog.queue_status(dict(status='draft'),state),'excluded')
+        state['checks']=[];state['state']='revoked'
+        self.assertEqual(catalog.queue_status(dict(status='approved'),state),'excluded')
+
+    def test_export_preserves_queue_filter_and_reasons(self):
+        with patch.object(catalog,'catalog_rows',return_value=self.rows):
+            r=self.client.get('/api/admin/pc-configurations/export.xlsx?queue=hold')
+        ws=load_workbook(BytesIO(r.content)).active
+        self.assertEqual(ws.max_row,2)
+        self.assertEqual(ws['A2'].value,'P01')
+        self.assertEqual(ws['N2'].value,'추천 전 보완')
+        self.assertEqual(ws['P2'].value,'CPU 소켓 미확인')
 
     def test_export_route_precedes_identity_and_obeys_filter(self):
         with patch.object(catalog,'catalog_rows',return_value=self.rows):
