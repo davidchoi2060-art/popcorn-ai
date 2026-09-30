@@ -60,6 +60,12 @@ def apply(c, snapshot, plan):
             assert label not in labels, 'Do not overwrite existing facts'
             content['facts'].append(dict(label=label, value=value, source_id=source['id'], verification=verification))
         content.setdefault('cautions', []).append(item['note'])
+        for route in item.get('issue_routes', []):
+            assert route['issue'] in content.get('review_issues', []), 'Issue changed'
+            assert route['source_fingerprint'] == row['source_fingerprint'] and is_current(validation_row), 'Issue source changed'
+            assert route['stage'] == 'assembly' and route.get('reason') and route.get('source_url','').startswith('https://')
+            assert not any(r['issue']==route['issue'] for r in content.get('review_issue_routes', [])), 'Issue already routed'
+            content.setdefault('review_issue_routes', []).append(route)
         if item.get('assembly_specs'):
             assert row['product_code'] is None and content.get('availability_scope') == 'assembly_only'
             assert not content.get('review_specs'), 'Existing review facts must be reviewed separately'
@@ -85,7 +91,7 @@ def apply(c, snapshot, plan):
             locks = sorted(set(prod['locked_fields'] or []) | {'specs.'+f for f in item['specs']})
             c.execute(text('UPDATE products SET locked_fields=CAST(:v AS jsonb) WHERE product_code=:code'),dict(code=code,v=json.dumps(locks)))
         backups['explanations'].append(row)
-        content.setdefault('resolved_issues',[]).append(dict(date='2026-09-30', resolution=verification+' · 누락 사양 보완', source_id=source['id']))
+        content.setdefault('resolved_issues',[]).append(dict(date='2026-09-30', resolution=item.get('resolution',verification+' · 누락 사양 보완'), source_id=source['id']))
         c.execute(text('UPDATE product_explanations SET content=CAST(:v AS jsonb),updated_at=now() WHERE source_product_code=:code'),dict(code=code,v=json.dumps(content,ensure_ascii=False)))
         touched[code] = explanation_digest(dict(row,content=content))
 

@@ -50,6 +50,17 @@ class ReviewTests(unittest.TestCase):
     def test_manual_requirements_always_present(self):
         self.assertEqual(set(self.assess()['required']),set(review.MANUAL))
 
+    def test_critical_unknown_cannot_be_approved_by_note_only(self):
+        self.specs[2]['socket']=None
+        self.approve_fixture()
+        state=self.assess()
+        self.assertFalse(state['eligible'])
+        body=review.ReviewEdit(revision=1,basis=state['basis'],action='approve',
+            findings={k:dict(confirmed=True,evidence='검토 메모만 입력한 테스트 내용') for k in state['required']})
+        with patch.object(review,'load_review',return_value=(self.config,self.parts,self.offers,state)), self.assertRaises(HTTPException) as ctx:
+            review.save_review(None,'T1',body,{'operator_id':1})
+        self.assertEqual(ctx.exception.status_code,422)
+
     def test_missing_rules_or_parts_block_approval(self):
         self.rules=[]
         self.assertIn('활성 호환 규칙 없음',self.assess()['blockers'])

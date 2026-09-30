@@ -1,0 +1,50 @@
+[
+  {
+    "code": 113685,
+    "source": {
+      "id": "assembly-route-113685-20260930",
+      "kind": "manufacturer",
+      "title": "기존 모델 사양 대조 및 공급품 확인 범위",
+      "url": "https://www.gigabyte.com/pk/Motherboard/H610M-H-V2-DDR4-rev-10/sp"
+    },
+    "facts": [],
+    "resolution": "사양값 변경 없음 · 공급품 식별을 조립 확인으로 이관",
+    "note": "실제 공급품 식별은 조립 단계에서 확인합니다. 고객이 해당 단자/속도를 필수 조건으로 요청하면 추천 전 확인합니다.",
+    "issue_routes": [
+      {
+        "issue": "출고 보드 리비전 확인 필요: 판매처 DVI 표기와 제조사 rev.1.0 HDMI·D-Sub 표기가 다름",
+        "stage": "assembly",
+        "source_fingerprint": "c220757a1b87da35082f73337806445f7612a1ef8c9c228dbc9ab6fb4d2d5be6",
+        "reason": "모델 수준의 근거는 확보했으며 실제 출고품의 식별만 남음",
+        "source_url": "https://www.gigabyte.com/pk/Motherboard/H610M-H-V2-DDR4-rev-10/sp",
+        "customer_conditions": [
+          "display_outputs"
+        ]
+      }
+    ]
+  },
+  {
+    "code": 110899,
+    "source": {
+      "id": "assembly-route-110899-20260930",
+      "kind": "manufacturer",
+      "title": "기존 모델 사양 대조 및 공급품 확인 범위",
+      "url": "https://download.semiconductor.samsung.com/resources/brochure/Product%20Overviews%20PM9A1%20SSD%20Storage%20for%20the%20Next-Generation%20PC.pdf"
+    },
+    "facts": [],
+    "resolution": "사양값 변경 없음 · 공급품 식별을 조립 확인으로 이관",
+    "note": "실제 공급품 식별은 조립 단계에서 확인합니다. 고객이 해당 단자/속도를 필수 조건으로 요청하면 추천 전 확인합니다.",
+    "issue_routes": [
+      {
+        "issue": "출고 SSD의 P/N 확인 필요: 제조사 256GB 기준 속도와 출고품 일치 여부 미확인",
+        "stage": "assembly",
+        "source_fingerprint": "9247c021aad5ac522b7e1bd9fd8d6e80ccc8ce3091ab8eb34fc52b0dc4c09e90",
+        "reason": "모델 수준의 근거는 확보했으며 실제 출고품의 식별만 남음",
+        "source_url": "https://download.semiconductor.samsung.com/resources/brochure/Product%20Overviews%20PM9A1%20SSD%20Storage%20for%20the%20Next-Generation%20PC.pdf",
+        "customer_conditions": [
+          "storage_speed"
+        ]
+      }
+    ]
+  }
+]

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.audit_pc_catalog import analyze
 from tools.enrich_pc_catalog_sources import validate_source
 from api.pc_review_specs import specs_for_review
+from api.pc_review_policy import issue_stages
 
 
 def triage(data, plan):
@@ -46,11 +47,23 @@ def triage(data, plan):
 
     for part in audit['common_parts']:
         for issue in part['issues']:
-            add('공통 부품 확인', f"part:{part['code']}:{issue}", issue,
+            routed = any(i['issue']==issue and i['stage']=='assembly' for i in issue_stages(rows.get(part['code'],{})))
+            add('조립 단계 공통 확인' if routed else '공통 부품 확인', f"part:{part['code']}:{issue}", issue,
                 part['configurations'], part['code'])
     for cfg in audit['configurations']:
         if cfg['group'] == '추천 가능 후보':
             continue
+        for check in cfg['review'].get('assembly_checks', []):
+            if check['key'].startswith('part:'):
+                continue
+            # Ordinals are local to a BOM; do not merge different components.
+            rule_key, *ordinals = check['key'].split(':')
+            identities = [str(p['explanation_code']) for p in by_config[cfg['id']]
+                          if str(p['ordinal']) in ordinals and not p['pseudo']]
+            task_key = 'assembly:' + rule_key + ':' + ':'.join(sorted(identities))
+            if not identities:
+                task_key += ':' + cfg['id']
+            add('조립 단계 공통 확인',task_key,check['label']+' · '+check['detail'],[cfg['id']])
         for check in cfg['unknown'] + cfg['failed']:
             rule = rules[check['key'].split(':')[0]]
             slots = defaultdict(list)

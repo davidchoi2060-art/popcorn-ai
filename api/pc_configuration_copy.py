@@ -18,13 +18,15 @@ def digest(value):
 def explanation_digest(row):
     return digest({k:row[k] for k in ('content','source_snapshot','source_fingerprint')})
 
-def part_needs_review(part, row):
+def part_needs_review(part, row, stage='all'):
     if part['pseudo']:
         return False
     if not row or part['explanation_hash']!=explanation_digest(row):
         return True
     if row['content'].get('review_issues'):
-        return True
+        from .pc_review_policy import issue_stages
+        if stage != 'recommendation' or any(i['stage']=='recommendation' for i in issue_stages(row)):
+            return True
     # Assembly-only identity is linked to the BOM, not to a fictitious retail product.
     if row.get('product_code') is None:
         return row['content'].get('availability_scope')!='assembly_only'
@@ -50,9 +52,11 @@ def read_configuration(conn, identity):
         if part_needs_review(p,row): affected.append(p['source_code'])
     offers=[dict(o) for o in conn.execute(text('SELECT * FROM pc_configuration_offers WHERE configuration_id=:id ORDER BY price_snapshot,offer_id'),{'id':identity}).mappings()]
     from .pc_configuration_review import load_review
-    workflow=load_review(conn,identity)[3] if r['content'].get('_review') else None
+    current_review=load_review(conn,identity)[3]
+    workflow=current_review if r['content'].get('_review') else None
     return dict(r,review_workflow=workflow,parts=parts,offers=offers,needs_review=(bool(workflow) and not workflow['eligible']) or bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
                 compatibility_display=review_snapshot(identity,parts),
+                recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
                 customer_publishable=False,price_is_snapshot=True)
 
 def catalog_rows(conn):
@@ -60,7 +64,7 @@ def catalog_rows(conn):
     rows=conn.execute(text('SELECT * FROM pc_configurations ORDER BY configuration_id')).mappings().all()
     parts=conn.execute(text('SELECT * FROM pc_configuration_parts ORDER BY configuration_id,ordinal')).mappings().all()
     explanations={r['source_product_code']:r for r in conn.execute(text('''
-      SELECT e.*,p.product_name,p.spec_source_text,p.status AS sale_status
+      SELECT e.*,p.product_name,p.spec_source_text,p.status AS sale_status,p.sale_price
       FROM product_explanations e LEFT JOIN products p ON p.product_code=e.product_code
       WHERE EXISTS (SELECT 1 FROM pc_configuration_parts b WHERE b.explanation_code=e.source_product_code)
     ''')).mappings()}
@@ -69,6 +73,11 @@ def catalog_rows(conn):
         offers.setdefault(o['configuration_id'],[]).append(dict(o))
     by_pc={}
     for p in parts: by_pc.setdefault(p['configuration_id'],[]).append(p)
+    from .pc_review_specs import specs_for_review
+    from .pc_configuration_review import assess
+    by_product={s['product_code']:dict(s) for s in conn.execute(text('SELECT * FROM product_specs WHERE product_code IN (SELECT product_code FROM product_explanations WHERE product_code IS NOT NULL)')).mappings()}
+    specs=specs_for_review(explanations,by_product)
+    rules=[dict(x) for x in conn.execute(text('SELECT * FROM compat_rules WHERE active ORDER BY rule_id')).mappings()]
     result=[]
     for r in rows:
         content=r['content']; bom=by_pc.get(r['configuration_id'],[])
@@ -77,6 +86,7 @@ def catalog_rows(conn):
         affected=[p['source_code'] for p in bom if part_needs_review(p,explanations.get(p['explanation_code']))]
         case=next((p for p in bom if p['slot']=='CASE' and not p['pseudo']),None)
         offer_list=offers.get(r['configuration_id'],[])
+        current_review=assess(r,bom,offer_list,explanations,specs,rules)
         offer=offer_list[0] if offer_list else None
         description_ready=not content.get('_admin_bom_edit',{}).get('review_required') and bool(content.get('title') and content.get('intro') and bom) and all(
             p['pseudo'] or bool(explanations.get(p['explanation_code'],{}).get('content',{}).get('role')) for p in bom)
@@ -88,6 +98,7 @@ def catalog_rows(conn):
             image_url=f"/api/product-images/{case['explanation_code']}/detail" if case else None,
             image_caption='케이스 이미지',part_count=len(bom),description_ready=description_ready,
             review_state=workflow['state'] if workflow else None,
+            recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
             needs_review=bool(affected) or not description_ready or (bool(workflow) and not workflow['eligible']),affected_parts=affected,
             customer_publishable=False,price_is_snapshot=True))
     return result

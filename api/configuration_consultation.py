@@ -81,22 +81,38 @@ def required_questions(p,registry):
 
 def load_catalog(c):
     configs=c.execute(text("SELECT * FROM pc_configurations WHERE status<>'retired' ORDER BY configuration_id")).mappings().all()
-    explanations={r['source_product_code']:dict(r) for r in c.execute(text('''SELECT e.*,p.product_name,p.spec_source_text,p.status AS sale_status FROM product_explanations e LEFT JOIN products p ON p.product_code=e.product_code''')).mappings()}
+    explanations={r['source_product_code']:dict(r) for r in c.execute(text('''SELECT e.*,p.product_name,p.spec_source_text,p.status AS sale_status,p.sale_price FROM product_explanations e LEFT JOIN products p ON p.product_code=e.product_code''')).mappings()}
     parts={};offers={}
     for r in c.execute(text('SELECT * FROM pc_configuration_parts ORDER BY configuration_id,ordinal')).mappings():parts.setdefault(r['configuration_id'],[]).append(dict(r))
     for r in c.execute(text('SELECT * FROM pc_configuration_offers')).mappings():offers.setdefault(r['configuration_id'],[]).append(dict(r['payload']))
     result=[]
-    from .pc_configuration_review import review_allows
+    from .pc_configuration_review import review_allows, assess
+    from .pc_review_specs import specs_for_review
+    by_product={s['product_code']:dict(s) for s in c.execute(text('SELECT * FROM product_specs WHERE product_code IN (SELECT product_code FROM product_explanations WHERE product_code IS NOT NULL)')).mappings()}
+    specs=specs_for_review(explanations,by_product)
+    rules=[dict(x) for x in c.execute(text('SELECT * FROM compat_rules WHERE active ORDER BY rule_id')).mappings()]
     for r in configs:
         if not review_allows(c,r):
             continue
         rows=parts.get(r['configuration_id'],[]);stale=[];hydrated=[]
+        review=assess(r,rows,offers.get(r['configuration_id'],[]),explanations,specs,rules)
+        if review['recommendation_state']=='hold':
+            continue
         for p in rows:
             e=explanations.get(p['explanation_code']);content=e['content'] if e else {}
-            if part_needs_review(p,e) or (e and e['product_code'] is not None and e['sale_status']!='판매중'):stale.append(p['source_code'])
+            if part_needs_review(p,e,stage='recommendation') or (e and e['product_code'] is not None and e['sale_status']!='판매중'):stale.append(p['source_code'])
             hydrated.append(dict(p,facts=content.get('facts',[])))
-        result.append(dict(id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],facts=r['content']['facts'],parts=hydrated,offers=offers.get(r['configuration_id'],[]),title=r['content']['title'],stale_parts=stale,observed_date=str(r['observed_date']),revision=r['revision']))
+        result.append(dict(id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],facts=r['content']['facts'],parts=hydrated,offers=offers.get(r['configuration_id'],[]),title=r['content']['title'],stale_parts=stale,observed_date=str(r['observed_date']),revision=r['revision'],recommendation_state=review['recommendation_state'],assembly_checks=review['assembly_checks'],customer_conditions=review['customer_conditions']))
     return result
+
+def condition_requires_review(pc, profile):
+    flags = pc.get('customer_conditions', [])
+    if 'display_outputs' in flags and any((u.monitor_count or 0)>1 or re.search(r'DVI|HDMI|DisplayPort|디스플레이포트',u.description,re.I) for u in profile.uses):
+        return True
+    if 'storage_speed' in flags and any(re.search(r'MB/s|GB/s|IOPS|읽기.?속도|쓰기.?속도',u.description,re.I) for u in profile.uses):
+        return True
+    return False
+
 
 def match(p,registry,catalog):
     base=dict(state='needs_conditions',candidates=[],customer_publishable=False,questions=required_questions(p,registry))
@@ -104,7 +120,7 @@ def match(p,registry,catalog):
     scenarios=[registry[u.scenario_id] for u in p.uses]
     if p.unresolved or p.concurrent=='together' or any(s.get('needs_model') for s in scenarios):
         return dict(base,state='evidence_pending',questions=[],reason='동시 작업·추가 요구 또는 AI 모델별 기준을 더 확인해야 합니다. 이 조건을 생략한 상품을 추천하지 않습니다.',unresolved=p.unresolved)
-    valid=[c for c in catalog if not c['stale_parts'] and c['offers']]
+    valid=[c for c in catalog if not c['stale_parts'] and c['offers'] and not condition_requires_review(c,p)]
     pools={level:None for level in ['basic','better']};evaluations={}
     for s in scenarios:
         es=[evaluate(pc,s,s['_rules']['requirements']) for pc in valid];evaluations[s['id']]=dict(zip([pc['id'] for pc in valid],es))
@@ -125,7 +141,7 @@ def match(p,registry,catalog):
     for label,x in [('알뜰 구성',basic),('추천 구성',better)]:
         if not x:continue
         pc=by[x['pc_id']];checks=[evaluations[s['id']][pc['id']] for s in scenarios]
-        cards.append(dict(label=label,configuration_id=pc['id'],offer_id=x['offer_id'],title=pc['title'],price_snapshot=x['price'],price_note=x['price_note'],facts=pc['facts'],observed_date=pc['observed_date'],pending=list(dict.fromkeys(v for e in checks for v in e['missing_checks'])),reasons=[f"{s['title']}: 용량 비교 조건 대조" for s in scenarios],bom_fingerprint=pc['bom_fingerprint'],revision=pc['revision']))
+        cards.append(dict(label=label,configuration_id=pc['id'],offer_id=x['offer_id'],title=pc['title'],price_snapshot=x['price'],price_note=x['price_note'],facts=pc['facts'],observed_date=pc['observed_date'],pending=list(dict.fromkeys([v for e in checks for v in e['missing_checks']]+[x['label']+' · 조립 시 확인' for x in pc.get('assembly_checks',[])])),reasons=[f"{s['title']}: 용량 비교 조건 대조" for s in scenarios],bom_fingerprint=pc['bom_fingerprint'],revision=pc['revision']))
     return dict(base,state='comparison',questions=[],candidates=cards,reason='사양 일부를 대조한 검토 후보입니다. 목표 성능과 출고 확정은 별도 확인이 필요합니다.',additional_cost=None if not alternative else alternative['price']-basic['price'])
 
 def parse_output(value):

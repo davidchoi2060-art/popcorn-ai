@@ -13,10 +13,10 @@ from .db import engine
 from .pc_configuration_copy import digest, part_needs_review
 from .pc_review_specs import specs_for_review
 from .recommend import rule_verdict, rule_ref_value, _rule_applies
+from .pc_review_policy import POLICY_VERSION, issue_stages, route_checks
 
 router = APIRouter()
 MANUAL = {
-    'assembly': '장착·연결·수량 확인',
     'copy': '변경 구성과 상품 설명 일치',
     'price': '가격 기준·조립 서비스 포함 조건 확인',
 }
@@ -40,16 +40,23 @@ class ReviewEdit(BaseModel):
 def basis_hash(config, parts, offers, rows, specs, rules):
     content = {k:v for k,v in config['content'].items() if k not in ('_review', '_admin_bom_edit')}
     # Workflow flags and approval timestamps are not source evidence.
-    return digest(dict(content=content, parts=parts, offers=offers, rows=rows, specs=specs, rules=rules))
+    return digest(dict(policy=POLICY_VERSION,content=content, parts=parts, offers=offers, rows=rows, specs=specs, rules=rules))
 
 
 def assess(config, parts, offers, rows, specs, rules):
     blockers = []
+    assembly_checks = []
+    customer_conditions = []
     real = [p for p in parts if not p['pseudo']]
     for p in real:
         e = rows.get(p['explanation_code'])
-        if part_needs_review(p,e):
+        if part_needs_review(p,e,stage='recommendation'):
             blockers.append(f"{p['slot']} · {p['source_code']}: 부품 설명·원문 확인 필요")
+        if e:
+            for issue in issue_stages(e):
+                if issue['stage'] == 'assembly':
+                    assembly_checks.append(dict(key=f"part:{p['ordinal']}:{len(assembly_checks)}",label=f"{p['slot']} · {p['source_code']}",detail=issue['issue'],state='unknown',stage='assembly'))
+                    customer_conditions.extend(issue['customer_conditions'])
         if e and e.get('product_code') is not None and e.get('sale_status') != '판매중':
             blockers.append(f"{p['slot']} · {p['source_code']}: 판매중 부품 아님")
     if not real or not offers:
@@ -95,14 +102,19 @@ def assess(config, parts, offers, rows, specs, rules):
                             detail = f"파워 정격 {v}W / GPU {r}W + 규칙 여유 {rule.get('ref_offset') or 0}W"
                     except (TypeError, ValueError):
                         detail += ' · 사양 형식 확인 필요'
-                checks.append(dict(key=key,label=rule['label'],state=state,detail=detail))
+                checks.append(dict(key=key,label=rule['label'],state=state,detail=detail,
+                                   missing_fields=[field for field,value in ((rule['field'],v),(rule['ref_field'],r)) if value is None]))
                 if state == 'fail':
                     blockers.append(rule['label']+' · 현재 DB 사양 불일치')
-    required = {x['key']:x['label']+' · 수동 근거 확인' for x in checks if x['state']=='unknown'} | MANUAL
+    route_checks(checks,parts,specs)
+    assembly_checks += [dict(x) for x in checks if x['stage']=='assembly']
+    required = {x['key']:x['label']+' · 추천 전 근거 확인' for x in checks if x['state']=='unknown' and x['stage']=='recommendation'} | MANUAL
+    critical_unknown = any(x['state']=='unknown' and x['stage']=='recommendation' for x in checks)
+    recommendation = 'hold' if blockers or critical_unknown else 'conditional' if assembly_checks else 'ready'
     basis = basis_hash(config,parts,offers,rows,specs,rules)
     saved = content.get('_review',{})
     current = saved.get('basis') == basis
-    approved = config['status'] == 'approved' and saved.get('state') == 'approved' and current and not blockers
+    approved = config['status'] == 'approved' and saved.get('state') == 'approved' and current and recommendation != 'hold'
     findings = saved.get('findings',{}) if current else {}
     return dict(configuration_id=config['configuration_id'],revision=config['revision'],basis=basis,
                 checks=checks,blockers=list(dict.fromkeys(blockers)),required=required,
@@ -110,6 +122,10 @@ def assess(config, parts, offers, rows, specs, rules):
                 state='approved' if approved else ('stale' if saved and not current else ('pending' if saved.get('state')=='approved' else saved.get('state','pending'))),
                 approved_by=saved.get('actor'),approved_at=saved.get('at'),
                 eligible=approved,customer_publishable=False,
+                policy_version=POLICY_VERSION,recommendation_state=recommendation,
+                assembly_state='not_started',assembly_checks=assembly_checks,
+                assembly_checklist=['실제 부품·수량·장착·전원 연결','부팅·메모리·저장장치 인식','사용 조건별 부하·온도·안정성'],
+                customer_conditions=sorted(set(customer_conditions)),
                 prior_review=saved if saved and not current else None)
 
 
@@ -157,6 +173,8 @@ def save_review(c, identity, body, actor):
     if body.action == 'approve':
         if state['blockers']:
             raise HTTPException(422,'승인 전 보완 필요: '+' / '.join(state['blockers']))
+        if state['recommendation_state'] == 'hold':
+            raise HTTPException(422,'추천 필수 규격은 근거 사양을 보완한 뒤 승인할 수 있습니다. 검토 메모만으로 통과 처리하지 않습니다.')
         if any(not body.findings.get(k) or not body.findings[k].confirmed or len(body.findings[k].evidence.strip())<10 for k in state['required']):
             raise HTTPException(422,'모든 확인 항목에 근거(10자 이상)와 확인 표시가 필요합니다.')
     if body.action == 'revoke' and not body.note.strip():

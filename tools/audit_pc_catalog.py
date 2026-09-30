@@ -55,7 +55,7 @@ def analyze(data):
         key=cfg['configuration_id']
         state=assess(cfg,parts[key],offers[key],rows,specs,data['rules'])
         fail=[x for x in state['checks'] if x['state']=='fail']
-        unknown=[x for x in state['checks'] if x['state']=='unknown']
+        unknown=[x for x in state['checks'] if x['state']=='unknown' and x.get('stage','recommendation')=='recommendation']
         structural=[];price_notes=[]
         for slot in ('CPU','RAM','SSD','MB','POWER','CASE'):
             if not any(p['slot']==slot and not p['pseudo'] for p in parts[key]): structural.append(slot+' 실제 구성 누락')
@@ -81,7 +81,7 @@ def analyze(data):
                     if total!=o['price_snapshot']: price_notes.append(f"부품+기존 조립비 {total} / 저장가 {o['price_snapshot']}")
                 else: price_notes.append('현재 단품 합계 산출 근거 부족')
         excluded=bool(fail) or cfg['status']=='retired' or any('판매중 부품 아님' in x for x in state['blockers']) or (bool(sale_states) and all(x not in ('판매중','DB 연결 없음') for x in sale_states))
-        group='제외 대상' if excluded else '보완 필요' if state['blockers'] or unknown or structural or price_notes or 'DB 연결 없음' in sale_states else '추천 가능 후보'
+        group='제외 대상' if excluded else '보완 필요' if state['blockers'] or unknown or structural or price_notes or 'DB 연결 없음' in sale_states else '조건부 추천 후보' if state.get('assembly_checks') else '추천 가능 후보'
         results.append(dict(id=key,title=cfg['content'].get('title'),source=cfg['content'].get('source'),
             facts=cfg['content'].get('facts'),group=group,review=state,offers=offers[key],
             failed=fail,unknown=unknown,part_count=len(parts[key]),structural=structural,price_notes=price_notes,sale_states=sale_states))
