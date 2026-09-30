@@ -113,3 +113,5 @@ final result: passed
 - Browser: current DB checks, required evidence validation, dirty close/keep, rollback-only approval, reopened approved result, blockers and disabled approval verified. P97909 has eight known rule results; P100866 shows two part explanation blockers. No JS errors during local verification.
 - Mobile 390x844: no document horizontal overflow; rule table scrolls internally, review footer follows existing parts editor sticky action pattern. Original admin zoom retained.
 - Bounds: rule pass is not physical assembly or dispatch certification. Missing specifications require human evidence, never fabricated pass/FPS. Approval only changes administrative recommendation eligibility; no real product was approved during QA.
+
+- Deployment: 9b8f1cc / run36662946904 succeeded. Authenticated P97909 server view displays eight current rules and evidence fields with fixed footer, no JS errors. Screenshot: task workspace outputs/admin-review-20260930/review-live.png. Mobile footer verified at y732–844 within 390x844 viewport, then viewport reset; screenshot review-mobile.png. Temporary localhost8776 fixture is stopped after verification.
