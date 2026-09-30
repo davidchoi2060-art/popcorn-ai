@@ -12,6 +12,7 @@ from api.pc_configuration_review import assess
 from api.pc_configuration_copy import explanation_digest
 from api.part_explanations import is_current
 from api.pc_configuration_parts_edit import capacity
+from api.pc_review_specs import specs_for_review
 
 
 def collect():
@@ -42,7 +43,7 @@ def collect():
 def analyze(data):
     rows={r['source_product_code']:r for r in data['rows']}
     by_product={r['product_code']:r for r in data['specs']}
-    specs={code:by_product.get(r['product_code'],{}) for code,r in rows.items()}
+    specs=specs_for_review(rows,by_product)
     parts,offers,used=defaultdict(list),defaultdict(list),defaultdict(set)
     for p in data['parts']:
         parts[p['configuration_id']].append(p)

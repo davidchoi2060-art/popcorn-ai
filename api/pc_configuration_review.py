@@ -11,6 +11,7 @@ from sqlalchemy import text
 from .auth import current_operator
 from .db import engine
 from .pc_configuration_copy import digest, part_needs_review
+from .pc_review_specs import specs_for_review
 from .recommend import rule_verdict, rule_ref_value, _rule_applies
 
 router = APIRouter()
@@ -133,7 +134,7 @@ def load_review(c, identity, lock=False):
             p.status AS sale_status,p.sale_price FROM product_explanations e LEFT JOIN products p USING(product_code)
             WHERE e.source_product_code=ANY(:codes) ORDER BY e.source_product_code'''),dict(codes=codes)).mappings()}
     by_product = {r['product_code']:dict(r) for r in c.execute(text('SELECT * FROM product_specs WHERE product_code=ANY(:codes) ORDER BY product_code'+(' FOR SHARE' if lock else '')),dict(codes=product_codes)).mappings()}
-    specs = {code:by_product.get(r['product_code'],{}) for code,r in rows.items()}
+    specs = specs_for_review(rows, by_product)
     rules = [dict(r) for r in c.execute(text('SELECT * FROM compat_rules WHERE active ORDER BY rule_id'+(' FOR SHARE' if lock else ''))).mappings()]
     return dict(config), parts, offers, assess(config,parts,offers,rows,specs,rules)
 

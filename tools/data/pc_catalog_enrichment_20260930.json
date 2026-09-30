@@ -1,0 +1,153 @@
+[
+  {
+    "code": 128080,
+    "source": {
+      "id": "nvidia-4000",
+      "kind": "manufacturer",
+      "title": "NVIDIA RTX PRO 4000 Blackwell 사양",
+      "url": "https://www.nvidia.com/en-sg/products/workstations/professional-desktop-gpus/rtx-pro-4000/"
+    },
+    "specs": {
+      "gpu_power_draw_watt": 140
+    },
+    "facts": [
+      [
+        "최대 소비전력",
+        "140 W"
+      ]
+    ],
+    "note": "그래픽카드 최대 소비전력입니다. 시스템 전체 권장 파워 용량과 구분합니다."
+  },
+  {
+    "code": 128085,
+    "source": {
+      "id": "nvidia-5000",
+      "kind": "manufacturer",
+      "title": "NVIDIA RTX PRO 5000 Blackwell 48GB 사양",
+      "url": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-5000/"
+    },
+    "specs": {
+      "gpu_power_draw_watt": 300
+    },
+    "facts": [
+      [
+        "최대 소비전력",
+        "300 W"
+      ]
+    ],
+    "note": "그래픽카드 최대 소비전력입니다. 시스템 전체 권장 파워 용량과 구분합니다."
+  },
+  {
+    "code": 128119,
+    "source": {
+      "id": "coolermaster-tdp",
+      "kind": "manufacturer",
+      "title": "Cooler Master CPU Socket Compatibility and RGB Lighting List",
+      "url": "https://files.coolermaster.com/landing/tdp/block1/html/index.html"
+    },
+    "specs": {
+      "cooler_tdp": 200
+    },
+    "facts": [
+      [
+        "제조사 표기 TDP",
+        "200 W"
+      ]
+    ],
+    "note": "제조사 TDP 표기이며 실제 온도·소음이나 모든 CPU의 터보 부하 냉각 성능을 보장하는 수치는 아닙니다."
+  },
+  {
+    "code": 120906,
+    "source": {
+      "id": "3rsys-rc1900",
+      "kind": "manufacturer",
+      "title": "3RSYS RC1900 ARGB 솔더링 BLACK 제품 사양",
+      "url": "https://www.3rsys.com/shop/item.php?it_id=1701066030"
+    },
+    "evidence_image": "https://3rsys.com/data/editor/2503/85fee71a059881f22ec82deee676c6c7_1742543237_7483.jpg",
+    "specs": {
+      "cooler_tdp": 280
+    },
+    "facts": [
+      [
+        "제조사 표기 TDP",
+        "280 W"
+      ]
+    ],
+    "note": "제조사 TDP 표기이며 실제 온도·소음이나 모든 CPU의 터보 부하 냉각 성능을 보장하는 수치는 아닙니다."
+  },
+  {
+    "code": 121011,
+    "source": {
+      "id": "3rsys-rc1900n",
+      "kind": "manufacturer",
+      "title": "3RSYS RC1900N 솔더링 BLACK 제품 사양",
+      "url": "https://www.3rsys.com/shop/item.php?it_id=1702860370"
+    },
+    "evidence_image": "https://3rsys.com/data/editor/2502/7a73fa1e11d41d4dacc49ba8fb5b5787_1739773376_7812.jpg",
+    "specs": {
+      "cooler_tdp": 280
+    },
+    "facts": [
+      [
+        "제조사 표기 TDP",
+        "280 W"
+      ]
+    ],
+    "note": "제조사 TDP 표기이며 실제 온도·소음이나 모든 CPU의 터보 부하 냉각 성능을 보장하는 수치는 아닙니다."
+  },
+  {
+    "code": 127201,
+    "source": {
+      "id": "intel-265",
+      "kind": "manufacturer",
+      "title": "Intel Core Ultra 7 265 공식 사양",
+      "url": "https://www.intel.com/content/www/us/en/products/sku/241068/intel-core-ultra-7-processor-265-30m-cache-up-to-5-30-ghz/specifications.html"
+    },
+    "assembly_specs": {
+      "socket": "LGA1851",
+      "tdp_watt": 65,
+      "cpu_gpu": true
+    },
+    "facts": [
+      [
+        "프로세서 기본 전력",
+        "65 W"
+      ],
+      [
+        "최대 터보 전력",
+        "182 W"
+      ]
+    ],
+    "note": "65W는 기본 전력이며 최대 터보 전력은 182W입니다. 장시간 부하는 CPU 전력 제한·냉각·보드 설정을 함께 확인합니다."
+  },
+  {
+    "code": 127203,
+    "source": {
+      "id": "gigabyte-b860m",
+      "kind": "manufacturer",
+      "title": "GIGABYTE B860M AORUS ELITE 공식 사양",
+      "url": "https://www.gigabyte.com/Motherboard/B860M-AORUS-ELITE/sp"
+    },
+    "assembly_specs": {
+      "socket": "LGA1851",
+      "mem_type": "DDR5",
+      "form_factor": "m-ATX"
+    },
+    "facts": [
+      [
+        "제조사 대조 CPU 소켓",
+        "LGA1851"
+      ],
+      [
+        "제조사 대조 메모리",
+        "DDR5"
+      ],
+      [
+        "제조사 대조 보드 크기",
+        "Micro ATX · 24.4 × 24.4 cm"
+      ]
+    ],
+    "note": "동일 모델명 기준의 규격 자료입니다. CPU 지원 BIOS 및 실제 출고 보드 리비전은 조립 시 확인합니다."
+  }
+]
