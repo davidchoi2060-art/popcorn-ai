@@ -10,10 +10,10 @@
 {% block content %}
 <main class="catalog">
   <div class="catalog-heading"><div><h1>조립PC 제품군 목록</h1><p>구성과 부품 정보를 확인하고 제품군을 관리합니다.</p></div>
-    <div class="catalog-actions"><button id="catalog-refresh" type="button">최신 상태 조회</button><button id="catalog-export" type="button"><img src="/shared/icons/su/ft-file-text.svg" alt="">엑셀 내려받기</button></div>
+    <div class="catalog-actions"><a href="/admin2/pc-builder">+ 신규 조립PC 생성</a><button id="catalog-refresh" type="button">최신 상태 조회</button><button id="catalog-export" type="button"><img src="/shared/icons/su/ft-file-text.svg" alt="">엑셀 내려받기</button></div>
   </div>
   <div id="catalog-queues" class="catalog-queues" role="group" aria-label="추천 분류별 목록"></div>
-  <p class="catalog-workflow-note">후보 분류와 추천 승인은 별도입니다. 부품 구성 → 상품 설명 → 검토 기록 순서로 확인합니다. 새 제품군은 기존 구성의 ‘부품 구성 변경’에서 저장할 수 있습니다.</p>
+  <p class="catalog-workflow-note">후보 분류와 추천 승인은 별도입니다. 신규 조립PC 생성에서 빈 구성에 부품을 추가하고 검토 대기로 등록할 수 있습니다. 기존 제품의 부품 구성 변경은 별도 흐름입니다.</p>
   <form id="catalog-filters" class="catalog-filters" role="search">
     <div class="catalog-search-line"><label class="catalog-search"><span class="catalog-sr">상품명·구성 ID·부품명·부품 코드 검색</span><img src="/shared/icons/su/ft-search.svg" alt=""><input id="catalog-q" type="search" maxlength="100" autocomplete="off" aria-describedby="catalog-search-help" placeholder="상품명, 구성 ID 또는 부품명으로 검색 · 예: RTX4060 32GB"></label><button id="catalog-clear-search" type="button">검색어 지우기</button><button class="catalog-primary" type="submit">검색</button></div>
     <p id="catalog-search-help" class="catalog-search-help">띄어쓰기로 조건을 함께 입력하세요. 입력 순서와 영문 대소문자에 관계없이 모든 검색어가 포함된 구성을 찾습니다.</p>

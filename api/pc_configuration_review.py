@@ -84,6 +84,10 @@ def assess(config, parts, offers, rows, specs, rules):
     slots = {}
     for p in real:
         slots.setdefault(p['slot'], []).append(p)
+    if any(sum(p['quantity'] for p in slots.get(slot,[]))>1 for slot in ('RAM','SSD')):
+        assembly_checks.append(dict(key='assembly:slot_count',label='RAM·SSD 장착 수량',
+            detail='RAM 판매 패키지의 모듈 수와 메인보드 RAM·M.2 슬롯/공유 대역폭을 실제 조립 전에 확인합니다.',
+            state='unknown',stage='assembly'))
     if not rules:
         blockers.append('활성 호환 규칙 없음')
     # Evaluate all registered active rules against the fixed BOM, not DFS traversal order.

@@ -552,6 +552,7 @@ def workspace_nav():
     return [dict(label=label, href=href, icon=icon) for label, href, icon in [
         ('처리할 일', '/admin2/pc-workspace', 'eye'),
         ('조립PC 제품군', '/admin2/pc-configurations', 'box'),
+        ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu'),
         ('부품', '/admin2/part-explanations', 'cpu'),
         ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart'),
         ('변경 이력', '/admin2/activity-logs', 'rotate-ccw'),
