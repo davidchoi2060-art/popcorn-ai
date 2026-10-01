@@ -124,5 +124,6 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
     if latest['revision'] != d['revision'] or digest(source_context(latest)) != digest(context):
         raise HTTPException(409, 'AI 제안 생성 중 상품 또는 근거가 바뀌었습니다. 최신 내용에서 다시 요청해 주세요.')
     return dict(parsed, revision=d['revision'], mode=body.mode,
+                source_basis=d['current_review']['basis'],
                 provider=result.provider, model=result.model, log_id=result.log_id,
                 sources=['현재 부품 구성', '등록된 부품 설명', '현재 검토 근거'])
