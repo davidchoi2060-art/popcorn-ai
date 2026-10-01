@@ -23,3 +23,6 @@ google-genai~=2.18
 # deprecated-package trap like google-generativeai).
 anthropic~=0.122
 openai~=3.1
+
+# Normalize generated product images and enforce dimensions.
+Pillow>=11,<13

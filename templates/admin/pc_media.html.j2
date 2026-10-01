@@ -1,0 +1,5 @@
+{% extends 'admin/_admin2_shell.html.j2' %}
+{% block title %}대표 이미지 관리{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/pc-builder.css"><link rel="stylesheet" href="/shared/pc-media.css">{% endblock %}
+{% block content %}<main class="pc-builder"><header class="builder-top"><div><small>조립PC 제품군 / 대표 이미지</small><h1>대표 이미지 생성·관리</h1><p>완성 구성과 최신 호환성 검사 기준 · 운영자 선택 후 대표 이미지 적용</p></div><a id="media-back" href="/admin2/pc-configurations">제품군 목록</a></header><p id="media-message" role="status"></p><div id="media-root">구성·검사 자료 조회 중</div></main>{% endblock %}
+{% block foot_extra %}<script src="/shared/pc-media.js"></script>{% endblock %}

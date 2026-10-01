@@ -73,9 +73,12 @@ def read_configuration(conn, identity):
     offers=[dict(o) for o in conn.execute(text('SELECT * FROM pc_configuration_offers WHERE configuration_id=:id ORDER BY price_snapshot,offer_id'),{'id':identity}).mappings()]
     from .pc_configuration_review import load_review
     current_review=load_review(conn,identity)[3]
+    from .pc_media import snapshot
+    media=conn.execute(text("SELECT job_id,visual_basis FROM pc_media_jobs WHERE configuration_id=:id AND selected AND status='ready'"),dict(id=identity)).mappings().first()
+    media_current=bool(media and snapshot(conn,identity)['visual_basis']==media['visual_basis'])
     workflow=current_review if r['content'].get('_review') else None
     market_alerts=changes_for(r,parts,offers,explanations,*load_market(conn))
-    return dict(r,review_workflow=workflow,parts=parts,offers=offers,needs_review=bool(market_alerts) or (bool(workflow) and not workflow['eligible']) or bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
+    return dict(r,representative_image_url=f"/api/admin/pc-media/{identity}/images/{media['job_id']}" if media_current else None,representative_image_stale=bool(media and not media_current),review_workflow=workflow,parts=parts,offers=offers,needs_review=bool(market_alerts) or (bool(workflow) and not workflow['eligible']) or bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
                 cooling_plan=current_review['cooling_plan'],market_alerts=market_alerts,current_review=current_review,management_state=queue_status(r,current_review),
                 compatibility_display=review_snapshot(identity,parts),
                 recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
@@ -101,6 +104,8 @@ def catalog_rows(conn):
     specs=specs_for_review(explanations,by_product)
     rules=[dict(x) for x in conn.execute(text('SELECT * FROM compat_rules WHERE active ORDER BY rule_id')).mappings()]
     market=load_market(conn)
+    from .pc_media import visual_snapshot
+    media={r["configuration_id"]:dict(r) for r in conn.execute(text("SELECT configuration_id,job_id,visual_basis FROM pc_media_jobs WHERE selected AND status='ready'")).mappings()}
     result=[]
     for r in rows:
         content=r['content']; bom=by_pc.get(r['configuration_id'],[])
@@ -108,6 +113,8 @@ def catalog_rows(conn):
         case=next((p for p in bom if p['slot']=='CASE' and not p['pseudo']),None)
         offer_list=offers.get(r['configuration_id'],[])
         current_review=assess(r,bom,offer_list,explanations,specs,rules)
+        image=media.get(r['configuration_id'])
+        image_current=bool(image and image['visual_basis']==digest(visual_snapshot([p for p in bom if not p['pseudo']],explanations,current_review['cooling_plan'])))
         market_alerts=changes_for(r,bom,offer_list,explanations,*market)
         workflow=current_review if content.get('_review') else None
         offer=offer_list[0] if offer_list else None
@@ -121,8 +128,8 @@ def catalog_rows(conn):
                           'code':p['source_code']} for p in bom if not p['pseudo']],
             source=content.get('source',''),price=offer['price_snapshot'] if offer else None,
             price_note=offer['payload'].get('price_note','') if offer else '',offer_count=len(offer_list),
-            image_url=f"/api/product-images/{case['explanation_code']}/detail" if case else None,
-            image_caption='케이스 이미지',part_count=len(bom),description_ready=description_ready,
+            image_url=f"/api/admin/pc-media/{r['configuration_id']}/images/{image['job_id']}" if image_current else f"/api/product-images/{case['explanation_code']}/detail" if case else None,
+            image_caption='AI 조립 예시 이미지' if image_current else '케이스 이미지',representative_image_stale=bool(image and not image_current),part_count=len(bom),description_ready=description_ready,
             review_state=workflow['state'] if workflow else ('pending' if content.get('_admin_bom_edit',{}).get('review_required') else None),
             cooling_plan=current_review['cooling_plan'],market_alerts=market_alerts,
             management_state=queue_status(r,current_review),review_reasons=review_reasons(current_review),
