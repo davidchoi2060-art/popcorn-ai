@@ -313,3 +313,6 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
 
 /* Shared LNB: use the existing icon catalog and preserve collapsed navigation. */
 .a2-lnb-g .a2-gi{display:flex;align-items:center;justify-content:center}.a2-lnb-g .a2-gi img{width:14px;height:14px;object-fit:contain;filter:brightness(0) invert(1);opacity:.72}
+
+/* Shared compact workspace navigation. */
+.pcw-nav a{display:flex;gap:14px;align-items:center;padding:18px 22px;color:#dedbd3;text-decoration:none;border-left:3px solid transparent;font-size:14px}.pcw-nav a[aria-current=page]{background:#ffffff0b;border-left-color:#008569;color:#fff;font-weight:600}.pcw-nav img{width:20px;height:20px;filter:invert(85%)}.pcw-nav a:last-child{margin-top:35px;border-top:1px solid #ffffff18}.pcw-nav a:focus-visible{outline:2px solid #72c5ad;outline-offset:-3px}
