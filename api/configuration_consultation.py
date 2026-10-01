@@ -107,6 +107,8 @@ def load_catalog(c):
 
 def condition_requires_review(pc, profile):
     flags = pc.get('customer_conditions', [])
+    if 'cooling_usage' in flags and any(re.search(r'저소음|무소음|조용|오버클럭|PBO|24시간|장시간.*(?:렌더|부하)',u.description,re.I) for u in profile.uses):
+        return True
     if 'display_outputs' in flags and any((u.monitor_count or 0)>1 or re.search(r'DVI|HDMI|DisplayPort|디스플레이포트',u.description,re.I) for u in profile.uses):
         return True
     if 'storage_speed' in flags and any(re.search(r'MB/s|GB/s|IOPS|읽기.?속도|쓰기.?속도',u.description,re.I) for u in profile.uses):

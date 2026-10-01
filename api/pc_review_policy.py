@@ -1,5 +1,6 @@
 """Workflow routing only; compatibility values/operators remain in compat_rules."""
 from .part_explanations import is_current
+from .pc_cooling_plan import cooling_plan
 
 POLICY_VERSION = 'recommendation-assembly-v2'
 
@@ -20,7 +21,7 @@ def issue_stages(row):
     return result
 
 
-def route_checks(checks, parts, specs, config=None):
+def route_checks(checks, parts, specs, config=None, rows=None):
     """Retain unknown/fail truth; route only narrow noncritical unknowns to assembly."""
     slots = {}
     for part in parts:
@@ -32,12 +33,20 @@ def route_checks(checks, parts, specs, config=None):
                   and specs.get(slots['CPU'][0]['explanation_code'], {}).get('cpu_gpu') is True
                   and (any(p['slot'] == 'GPU' and p['pseudo'] for p in parts) or explicit_integrated))
     by_ordinal = {p['ordinal']: p for p in parts if not p['pseudo']}
+    cooling = cooling_plan(parts, rows or {})
     for check in checks:
         check['stage'] = 'recommendation'
         if check['state'] != 'unknown':
             continue
         rule = check['key'].split(':')[0]
-        if integrated and rule == 'gpu_len':
+        if cooling['installed'] == 'bundled' and cooling['verified_bundle'] and rule in ('cooler_socket', 'cooler_tdp', 'cooler_height', 'radiator'):
+            if rule == 'cooler_socket':
+                check.update(state='pass', detail='5500GT 멀티팩 원문에 Wraith Stealth 포함 · AMD MPK 기본 냉각 솔루션 일치')
+            elif rule == 'radiator':
+                check.update(state='not_applicable', stage='none', detail='Wraith Stealth 공랭 기본 쿨러 · 수랭 라디에이터 없음')
+            else:
+                check.update(stage='assembly', detail='CPU 포함 Wraith Stealth 사용 · 실제 장착 공간과 기본 전력 설정의 부하·온도·소음을 조립 시 확인 (수치 추정 없음)')
+        elif integrated and rule == 'gpu_len':
             check.update(state='not_applicable', stage='none', detail='외장 GPU 없음 · CPU 내장그래픽 사양 및 구성 확인')
         elif integrated and rule == 'power' and slots.get('POWER') and all(
                 isinstance(specs.get(p['explanation_code'], {}).get('rated_watt'), (int, float))

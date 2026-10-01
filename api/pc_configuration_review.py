@@ -14,6 +14,7 @@ from .pc_configuration_copy import digest, part_needs_review
 from .pc_review_specs import specs_for_review
 from .recommend import rule_verdict, rule_ref_value, _rule_applies
 from .pc_review_policy import POLICY_VERSION, issue_stages, route_checks
+from .pc_cooling_plan import cooling_plan
 
 router = APIRouter()
 MANUAL = {
@@ -43,7 +44,9 @@ def basis_hash(config, parts, offers, rows, specs, rules):
     # List reads contain all families and SQL RowMappings; detail reads contain
     # one family and plain dicts. Canonicalize both to this BOM's exact evidence.
     codes={p['explanation_code'] for p in parts if not p['pseudo']}
-    return digest(dict(policy=POLICY_VERSION,content=content,
+    cooling = cooling_plan(parts, rows)
+    policy = POLICY_VERSION + ':bundled-5500gt-v1' if cooling['verified_bundle'] and cooling['installed']=='bundled' else POLICY_VERSION
+    return digest(dict(policy=policy,content=content,
         parts=sorted((dict(p) for p in parts),key=lambda p:p['ordinal']),
         offers=sorted((dict(o) for o in offers),key=lambda o:o['offer_id']),
         rows={k:dict(v) for k,v in rows.items() if k in codes},
@@ -114,7 +117,10 @@ def assess(config, parts, offers, rows, specs, rules):
                                    missing_fields=[field for field,value in ((rule['field'],v),(rule['ref_field'],r)) if value is None]))
                 if state == 'fail':
                     blockers.append(rule['label']+' · 현재 DB 사양 불일치')
-    route_checks(checks,parts,specs,config)
+    route_checks(checks,parts,specs,config,rows)
+    cooling = cooling_plan(parts,rows)
+    if cooling['installed']=='bundled':
+        customer_conditions.append('cooling_usage')
     assembly_checks += [dict(x) for x in checks if x['stage']=='assembly']
     required = {x['key']:x['label']+' · 추천 전 근거 확인' for x in checks if x['state']=='unknown' and x['stage']=='recommendation'} | MANUAL
     critical_unknown = any(x['state']=='unknown' and x['stage']=='recommendation' for x in checks)
@@ -130,7 +136,7 @@ def assess(config, parts, offers, rows, specs, rules):
                 state='approved' if approved else ('stale' if saved and not current else ('pending' if saved.get('state')=='approved' else saved.get('state','pending'))),
                 approved_by=saved.get('actor'),approved_at=saved.get('at'),
                 eligible=approved,customer_publishable=False,
-                policy_version=POLICY_VERSION,recommendation_state=recommendation,
+                policy_version=POLICY_VERSION,recommendation_state=recommendation,cooling_plan=cooling_plan(parts,rows),
                 assembly_state='not_started',assembly_checks=assembly_checks,
                 assembly_checklist=['실제 부품·수량·장착·전원 연결','부팅·메모리·저장장치 인식','사용 조건별 부하·온도·안정성'],
                 customer_conditions=sorted(set(customer_conditions)),

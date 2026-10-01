@@ -76,7 +76,7 @@ def read_configuration(conn, identity):
     workflow=current_review if r['content'].get('_review') else None
     market_alerts=changes_for(r,parts,offers,explanations,*load_market(conn))
     return dict(r,review_workflow=workflow,parts=parts,offers=offers,needs_review=bool(market_alerts) or (bool(workflow) and not workflow['eligible']) or bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
-                market_alerts=market_alerts,current_review=current_review,management_state=queue_status(r,current_review),
+                cooling_plan=current_review['cooling_plan'],market_alerts=market_alerts,current_review=current_review,management_state=queue_status(r,current_review),
                 compatibility_display=review_snapshot(identity,parts),
                 recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
                 customer_publishable=False,price_is_snapshot=True)
@@ -124,7 +124,7 @@ def catalog_rows(conn):
             image_url=f"/api/product-images/{case['explanation_code']}/detail" if case else None,
             image_caption='케이스 이미지',part_count=len(bom),description_ready=description_ready,
             review_state=workflow['state'] if workflow else None,
-            market_alerts=market_alerts,
+            cooling_plan=current_review['cooling_plan'],market_alerts=market_alerts,
             management_state=queue_status(r,current_review),review_reasons=review_reasons(current_review),
             recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
             needs_review=bool(market_alerts) or bool(affected) or not description_ready or (bool(workflow) and not workflow['eligible']),affected_parts=affected,
