@@ -59,3 +59,5 @@
 ## 2026-10-02 대표 이미지 운영 기능
 승인한 대표이미지 기능을 /admin2/pc-media?id=제품ID에 연결했다. 기존 제품군 작업공간/상세에서 진입. 전체 BOM과 현재 호환규칙·부품 원문/판매 상태, 케이스 사진·장착 쿨러 확인 후 운영자 버튼으로 1장 생성한다. 기존 GEMINI_API_KEY 및 google-genai 사용, PC_IMAGE_MODEL 기본 gemini-3.1-flash-image(공식 https://ai.google.dev/gemini-api/docs/generate-content/image-generation 확인). 기존 private product media bucket을 재사용하고 서버 ADC의 create/get 권한 사전 확인. 자동 유료호출/모델폴백 없음. 작업은 새 pc_media_jobs(0120)에 기록하며 BOM·가격·설명·revision·추천 승인은 변경하지 않는다. 요청UUID 재요청/진행중 중복 차단, 작업 중단 가능 표기, 실패 재생성 자동 실행 없음. 클라우드 저장 실패는 서버 임시 원본으로 저장만 재시도한다(서버 임시파일 유실 시 새 생성 필요). 대표선택은 현재 시각구성 해시 일치 필수. 구성·사진·냉각 정보가 바뀌면 이전 이미지가 목록/상세 대표에서 빠지고 관리화면에서 변경 안내, 가격만 변경되면 시각기준 유지. AI 조립 예시 표시. 이미지 작업/선택은 기존 추천승인 무효화 없음. 영상은 후속.
 검사132개, 기존 Node2개, 실제 DB 등록/중복/선택/목록·상세/수량변경 무효화 전량롤백 통과. provider/cloud는 시험에서 대체했고 유료 생성0회. 운영 배포·UI 확인은 진행 중.
+
+운영 확인: 배포36909271195/36909671645 성공. 인증된 N07 화면 8부품·기준 케이스·공랭 및 검사 표시 확인. GCP describe/IAM 직접 확인 결과 VM은 Storage read_only, 버킷 계정 objectViewer. 업로드 활성화를 위한 objectCreator 추가 및 VM Storage read_write 범위 변경(중지·재시작 필요)은 사용자 확인 요청 중. 승인 없이 권한 확대·재시작하지 않았음. 생성 버튼은 저장권한 확인 전 비활성. 유료실생성/실업로드 미검증.
