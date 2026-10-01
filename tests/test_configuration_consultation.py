@@ -1,4 +1,5 @@
 import copy,json,unittest
+from unittest.mock import patch
 from pathlib import Path
 from pydantic import ValidationError
 from api.configuration_consultation import Conditions,Use,Body,ground_conditions,parse_output,required_questions,match
@@ -74,3 +75,30 @@ class ConsultationTests(unittest.TestCase):
         self.assertFalse(required_questions(p,self.registry))
 
 if __name__=='__main__':unittest.main()
+
+
+class CatalogOfferShapeTests(unittest.TestCase):
+    def test_review_receives_database_offer_and_match_receives_payload(self):
+        from api.configuration_consultation import load_catalog
+        config=dict(configuration_id='test',status='approved',content=dict(facts={},title='테스트'),bom_fingerprint='bom',observed_date='2026-10-01',revision=1)
+        offer=dict(configuration_id='test',offer_id='db-offer',price_snapshot=123,payload=dict(id='payload-offer',price=123,price_note='기준'))
+        class Result:
+            def __init__(self,rows): self.rows=rows
+            def mappings(self): return self
+            def all(self): return self.rows
+            def __iter__(self): return iter(self.rows)
+        class Connection:
+            def execute(self,sql):
+                query=str(sql)
+                if query.startswith('SELECT * FROM pc_configurations'): return Result([config])
+                if query.startswith('SELECT * FROM pc_configuration_offers'): return Result([offer])
+                return Result([])
+        def assess(cfg,parts,offers,*rest):
+            # This is the real basis_hash contract: complete DB offer row is required.
+            from api.pc_configuration_review import basis_hash
+            basis_hash(cfg,parts,offers,{}, {}, [])
+            self.assertEqual(offers,[offer])
+            return dict(recommendation_state='ready',assembly_checks=[],customer_conditions=[])
+        with patch('api.pc_configuration_review.review_allows',return_value=True),patch('api.pc_configuration_review.assess',side_effect=assess):
+            catalog=load_catalog(Connection())
+        self.assertEqual(catalog[0]['offers'],[offer['payload']])

@@ -84,7 +84,7 @@ def load_catalog(c):
     explanations={r['source_product_code']:dict(r) for r in c.execute(text('''SELECT e.*,p.product_name,p.spec_source_text,p.status AS sale_status,p.sale_price FROM product_explanations e LEFT JOIN products p ON p.product_code=e.product_code''')).mappings()}
     parts={};offers={}
     for r in c.execute(text('SELECT * FROM pc_configuration_parts ORDER BY configuration_id,ordinal')).mappings():parts.setdefault(r['configuration_id'],[]).append(dict(r))
-    for r in c.execute(text('SELECT * FROM pc_configuration_offers')).mappings():offers.setdefault(r['configuration_id'],[]).append(dict(r['payload']))
+    for r in c.execute(text('SELECT * FROM pc_configuration_offers')).mappings():offers.setdefault(r['configuration_id'],[]).append(dict(r))
     result=[]
     from .pc_configuration_review import review_allows, assess
     from .pc_review_specs import specs_for_review
@@ -102,7 +102,7 @@ def load_catalog(c):
             e=explanations.get(p['explanation_code']);content=e['content'] if e else {}
             if part_needs_review(p,e,stage='recommendation') or (e and e['product_code'] is not None and e['sale_status']!='판매중'):stale.append(p['source_code'])
             hydrated.append(dict(p,facts=content.get('facts',[])))
-        result.append(dict(id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],facts=r['content']['facts'],parts=hydrated,offers=offers.get(r['configuration_id'],[]),title=r['content']['title'],stale_parts=stale,observed_date=str(r['observed_date']),revision=r['revision'],recommendation_state=review['recommendation_state'],assembly_checks=review['assembly_checks'],customer_conditions=review['customer_conditions']))
+        result.append(dict(id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],facts=r['content']['facts'],parts=hydrated,offers=[dict(o['payload']) for o in offers.get(r['configuration_id'],[])],title=r['content']['title'],stale_parts=stale,observed_date=str(r['observed_date']),revision=r['revision'],recommendation_state=review['recommendation_state'],assembly_checks=review['assembly_checks'],customer_conditions=review['customer_conditions']))
     return result
 
 def condition_requires_review(pc, profile):
