@@ -1,0 +1,182 @@
+{
+  "12100": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "14100": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "5600G": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": null
+  },
+  "8600G": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": null
+  },
+  "7500F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": null
+  },
+  "9600X": {
+    "manufacturer_guidance": "고성능 공랭 권장(최적 성능)",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-5-9600x.html"
+  },
+  "9700X": {
+    "manufacturer_guidance": "고성능 공랭 권장(최적 성능)",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-7-9700x.html"
+  },
+  "9800X3D": {
+    "manufacturer_guidance": "수랭 권장(최적 성능)",
+    "planning_proposal": "제조사 수랭 권장 · 고성능 공랭 후보는 해당 모델의 검수 근거 확인",
+    "source_url": "https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-7-9800x3d.html"
+  },
+  "9950X": {
+    "manufacturer_guidance": "수랭 권장(최적 성능)",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x.html"
+  },
+  "14100F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "14400F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "12400": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "14900KF": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "14600KF": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "12400F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "5500GT": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": null
+  },
+  "5600": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": null
+  },
+  "14900K": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "225F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "12700F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "13400F": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "12700": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "5700X": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "기본 또는 타워 공랭 우선 검토 · 수랭은 선택사항",
+    "source_url": null
+  },
+  "245KF": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "245K": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "265KF": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "270K Plus": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "7800X3D": {
+    "manufacturer_guidance": "수랭 권장(최적 성능)",
+    "planning_proposal": "제조사 수랭 권장 · 고성능 공랭 후보는 해당 모델의 검수 근거 확인",
+    "source_url": "https://www.amd.com/en/products/processors/desktops/ryzen/7000-series/amd-ryzen-7-7800x3d.html"
+  },
+  "265": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "14600K": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "265K": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "7500X3D": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": null
+  },
+  "250K Plus": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "12700K": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "고성능 공랭 우선 검토 · 지속 부하/외관 요구 시 수랭 비교",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "14700KF": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  },
+  "12900KF": {
+    "manufacturer_guidance": "CPU별 냉각 방식 권장 미확인 · 일반 가이드 적용",
+    "planning_proposal": "수랭 우선 검토 · 고성능 공랭은 전력 제한/부하 검수 근거 필요",
+    "source_url": "https://www.intel.com/content/www/us/en/support/articles/000038285/processors/intel-core-processors.html"
+  }
+}

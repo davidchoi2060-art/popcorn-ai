@@ -136,7 +136,7 @@ def assess(config, parts, offers, rows, specs, rules):
                 state='approved' if approved else ('stale' if saved and not current else ('pending' if saved.get('state')=='approved' else saved.get('state','pending'))),
                 approved_by=saved.get('actor'),approved_at=saved.get('at'),
                 eligible=approved,customer_publishable=False,
-                policy_version=POLICY_VERSION,recommendation_state=recommendation,cooling_plan=cooling_plan(parts,rows),
+                policy_version=POLICY_VERSION,recommendation_state=recommendation,cooling_plan=cooling_plan(parts,rows,specs),
                 assembly_state='not_started',assembly_checks=assembly_checks,
                 assembly_checklist=['실제 부품·수량·장착·전원 연결','부팅·메모리·저장장치 인식','사용 조건별 부하·온도·안정성'],
                 customer_conditions=sorted(set(customer_conditions)),

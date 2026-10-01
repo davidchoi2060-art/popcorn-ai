@@ -154,9 +154,10 @@ def matches_search(row, query):
     return all(any(token in f for f in normalized) for token in tokens)
 
 
-def filter_rows(rows,q='',source='',review='',visibility='',queue='',changes=''):
+def filter_rows(rows,q='',source='',review='',visibility='',queue='',changes='',cooling=''):
     return [r for r in rows if
         matches_search(r,q)
+        and (not cooling or r.get('cooling_plan',{}).get('method')==cooling)
         and (not source or r['source']==source)
         and (not review or r['needs_review']==(review=='needs_review'))
         and (not queue or r.get('management_state')==queue)
@@ -169,9 +170,10 @@ def list_configurations(offset:int=Query(0,ge=0),limit:int=Query(20,ge=1,le=104)
         q:str=Query('',max_length=100),source:str=Query('',pattern='^(|신규|기존)$'),
         review:str=Query('',pattern='^(|needs_review|ready)$'),visibility:str=Query('',pattern='^(|public|private)$'),
         queue:str=Query('',pattern='^(|ready|conditional|hold|excluded)$'),
-        changes:str=Query('',pattern='^(|changed)$')):
+        changes:str=Query('',pattern='^(|changed)$'),
+        cooling:str=Query('',pattern='^(|air|liquid|bundled_air|unknown)$')):
     with engine.connect() as c: all_rows=catalog_rows(c)
-    base=filter_rows(all_rows,q,source,review,visibility,changes=changes)
+    base=filter_rows(all_rows,q,source,review,visibility,changes=changes,cooling=cooling)
     rows=filter_rows(base,queue=queue)
     return dict(total=len(rows),catalog_total=len(all_rows),offset=offset,limit=limit,
                 items=rows[offset:offset+limit],customer_publishable=False,
@@ -184,7 +186,7 @@ def export_workbook(rows):
     from openpyxl.styles import Font, PatternFill
     wb=Workbook(); ws=wb.active; ws.title='조립PC 제품군'
     ws.append(['구성 ID','상품명','등록 출처','CPU','GPU','메모리(GB)','저장장치(GB)',
-               '기준 가격(원)','가격 기준일','가격 안내','상품 설명','정보 검토','고객 공개','추천 분류','조립 확인 건수','추천 전 보완 사유','가격·판매 확인 알림'])
+               '기준 가격(원)','가격 기준일','가격 안내','상품 설명','정보 검토','고객 공개','추천 분류','조립 확인 건수','추천 전 보완 사유','가격·판매 확인 알림','냉각 방식','CPU별 냉각 방향'])
     for r in rows:
         f=r['facts']
         values=[r['configuration_id'],r['title'],r['source'],f.get('cpu'),f.get('gpu'),
@@ -192,7 +194,7 @@ def export_workbook(rows):
                 '설명 등록' if r['description_ready'] else '설명 보완 필요',
                 '확인 필요' if r['needs_review'] else '정보 변경 없음','비공개',
                 QUEUE_LABELS.get(r.get('management_state'),'미확인'),r.get('assembly_check_count',0),' / '.join(r.get('review_reasons',[])),
-                ' / '.join(x['label'] for x in r.get('market_alerts',[]))]
+                ' / '.join(x['label'] for x in r.get('market_alerts',[])),r.get('cooling_plan',{}).get('method_label'),r.get('cooling_plan',{}).get('planning_proposal')]
         ws.append(values)
         # Catalog text is untrusted. Never let a name turn into an Excel formula.
         for cell in ws[ws.max_row]:
@@ -208,8 +210,9 @@ def export_workbook(rows):
 def export_configurations(q:str=Query('',max_length=100),source:str=Query('',pattern='^(|신규|기존)$'),
         review:str=Query('',pattern='^(|needs_review|ready)$'),visibility:str=Query('',pattern='^(|public|private)$'),
         queue:str=Query('',pattern='^(|ready|conditional|hold|excluded)$'),
-        changes:str=Query('',pattern='^(|changed)$')):
-    with engine.connect() as c: rows=filter_rows(catalog_rows(c),q,source,review,visibility,queue,changes)
+        changes:str=Query('',pattern='^(|changed)$'),
+        cooling:str=Query('',pattern='^(|air|liquid|bundled_air|unknown)$')):
+    with engine.connect() as c: rows=filter_rows(catalog_rows(c),q,source,review,visibility,queue,changes,cooling)
     return Response(export_workbook(rows),media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition':'attachment; filename="pc-configurations.xlsx"','Cache-Control':'no-store'})
 
