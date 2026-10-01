@@ -45,7 +45,8 @@ def route_checks(checks, parts, specs, config=None, rows=None):
             elif rule == 'radiator':
                 check.update(state='not_applicable', stage='none', detail='Wraith Stealth 공랭 기본 쿨러 · 수랭 라디에이터 없음')
             else:
-                check.update(stage='assembly', detail='CPU 포함 Wraith Stealth 사용 · 실제 장착 공간과 기본 전력 설정의 부하·온도·소음을 조립 시 확인 (수치 추정 없음)')
+                check.update(stage='assembly', label='CPU 냉각 성능 확인' if rule=='cooler_tdp' else '기본 쿨러 장착 공간 확인',
+                             detail='CPU 포함 Wraith Stealth 사용 · 실제 장착 공간과 기본 전력 설정의 부하·온도·소음을 조립 시 확인 (수치 추정 없음)')
         elif integrated and rule == 'gpu_len':
             check.update(state='not_applicable', stage='none', detail='외장 GPU 없음 · CPU 내장그래픽 사양 및 구성 확인')
         elif integrated and rule == 'power' and slots.get('POWER') and all(
