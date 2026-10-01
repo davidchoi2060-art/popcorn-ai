@@ -1,6 +1,7 @@
 (function(root){
 'use strict';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function marketMarkup(alerts=[]){return `<section class="catalog-market"><h4>가격·판매 상태 대조</h4>${alerts.length?`<ul>${alerts.map(a=>`<li><strong>${esc(a.label)}</strong>${a.kind==='price'?`<br>저장 기준가 ${money(a.saved_price)} → 현재 DB 기준 ${money(a.current_price)}`:a.kind==='price_history'?`<br>${money(a.old_price)} → ${money(a.new_price)} · ${esc(a.changed_at.slice(0,10))}`:''}</li>`).join('')}</ul>`:'<p>현재 DB와 대조한 가격·판매 확인 알림이 없습니다.</p>'}<p>상품 DB 반영 기준입니다. 외부 실재고를 조회한 결과는 아닙니다. 완제품 옵션 가격은 별도로 확인하며 저장 가격은 자동으로 바꾸지 않습니다.</p></section>`;}
 function cleanName(value){return String(value??'').replace(/\[\s*회원가입\s*계좌이체\s*맞춤할인[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim();}
 const money=v=>Number.isFinite(v)?v.toLocaleString('ko-KR')+'원':'가격 확인 필요';
 const icon=name=>`<img class="pcd-icon" src="/shared/icons/admin/${name}.svg" alt="">`;
@@ -22,5 +23,5 @@ if(root.PcPartsEditor)root.PcPartsEditor.mount(host,d);
 if(root.PcReviewEditor)root.PcReviewEditor.mount(host,d);
 host.querySelectorAll('img:not(.pcd-icon)').forEach(img=>img.addEventListener('error',()=>{const label=document.createElement('span');label.className='pcd-muted';label.textContent='이미지 확인 필요';img.replaceWith(label);},{once:true}));
 }
-root.PcCatalogDetail={markup,mount,cleanName};if(typeof module!=='undefined')module.exports={markup,cleanName};
+root.PcCatalogDetail={markup,mount,cleanName,marketMarkup};if(typeof module!=='undefined')module.exports={markup,cleanName};
 })(typeof window!=='undefined'?window:globalThis);

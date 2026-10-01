@@ -1,7 +1,7 @@
 """Workflow routing only; compatibility values/operators remain in compat_rules."""
 from .part_explanations import is_current
 
-POLICY_VERSION = 'recommendation-assembly-v1'
+POLICY_VERSION = 'recommendation-assembly-v2'
 
 
 def issue_stages(row):
@@ -20,15 +20,17 @@ def issue_stages(row):
     return result
 
 
-def route_checks(checks, parts, specs):
+def route_checks(checks, parts, specs, config=None):
     """Retain unknown/fail truth; route only narrow noncritical unknowns to assembly."""
     slots = {}
     for part in parts:
         if not part['pseudo']:
             slots.setdefault(part['slot'], []).append(part)
+    facts=(config or {}).get('content',{}).get('facts',{})
+    explicit_integrated=(facts.get('discrete') is False and facts.get('gpu')=='내장 그래픽')
     integrated = (not slots.get('GPU') and len(slots.get('CPU', [])) == 1
                   and specs.get(slots['CPU'][0]['explanation_code'], {}).get('cpu_gpu') is True
-                  and any(p['slot'] == 'GPU' and p['pseudo'] for p in parts))
+                  and (any(p['slot'] == 'GPU' and p['pseudo'] for p in parts) or explicit_integrated))
     by_ordinal = {p['ordinal']: p for p in parts if not p['pseudo']}
     for check in checks:
         check['stage'] = 'recommendation'

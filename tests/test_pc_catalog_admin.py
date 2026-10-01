@@ -58,6 +58,19 @@ class AdminCatalogTests(unittest.TestCase):
         self.assertEqual(r.status_code,200)
         self.assertEqual(r.json()['total'],2);self.assertEqual(r.json()['items'],self.rows[1:])
 
+    def test_change_filter_is_shared_by_list_export_and_summary(self):
+        self.rows[1]['market_alerts']=[dict(kind='sale',label='부품 품절')]
+        with patch.object(catalog,'catalog_rows',return_value=self.rows):
+            r=self.client.get('/api/admin/pc-configurations?changes=changed').json()
+            x=self.client.get('/api/admin/pc-configurations/export.xlsx?changes=changed')
+        self.assertEqual(r['items'],self.rows[1:])
+        self.assertEqual(r['changed_count'],1)
+        self.assertEqual(r['issue_groups'][0]['configurations'],['P01'])
+        ws=load_workbook(BytesIO(x.content)).active
+        self.assertEqual(ws.max_row,2)
+        self.assertEqual(ws['Q2'].value,'부품 품절')
+        self.assertEqual(self.client.get('/api/admin/pc-configurations?changes=invalid').status_code,422)
+
     def test_invalid_filter_is_not_silently_treated_as_ready(self):
         self.assertEqual(self.client.get('/api/admin/pc-configurations?review=approved').status_code,422)
         self.assertEqual(self.client.get('/api/admin/pc-configurations?queue=approved').status_code,422)

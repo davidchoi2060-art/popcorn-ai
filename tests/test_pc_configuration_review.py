@@ -34,6 +34,15 @@ class ReviewTests(unittest.TestCase):
         self.config['content']['_review']=dict(state='approved',basis=self.assess()['basis'],findings={})
         self.config['status']='approved'
 
+    def test_list_bulk_sources_and_order_do_not_invalidate_detail_approval(self):
+        self.approve_fixture()
+        self.parts.reverse()
+        self.rows[999]=dict(product_name='unrelated product',sale_price=999)
+        self.specs[999]=dict(socket='unrelated socket')
+        self.assertTrue(self.assess()['eligible'])
+        self.rows[1]['sale_price']+=1
+        self.assertFalse(self.assess()['eligible'])
+
     def test_fixed_bom_uses_rule_and_cannot_override_known_conflict(self):
         self.assertEqual(self.assess()['checks'][0]['state'],'pass')
         self.specs[2]['socket']='LGA1700'

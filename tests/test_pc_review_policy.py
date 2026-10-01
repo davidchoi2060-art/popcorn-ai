@@ -35,6 +35,20 @@ class PolicyTests(unittest.TestCase):
         checks[1]['state']='pass';checks[0]['missing_fields'].append('tdp_watt')
         self.assertEqual(route_checks(copy.deepcopy(checks),parts,specs)[0]['stage'],'recommendation')
 
+    def test_new_bom_can_explicitly_declare_integrated_without_placeholder(self):
+        parts=[dict(slot='CPU',pseudo=False,ordinal=0,explanation_code=1),dict(slot='POWER',pseudo=False,ordinal=1,explanation_code=2)]
+        checks=[dict(key='gpu_len',state='unknown'),dict(key='power',state='unknown')]
+        specs={1:dict(cpu_gpu=True),2:dict(rated_watt=500)}
+        config=dict(content=dict(facts=dict(discrete=False,gpu='내장 그래픽')))
+        out=route_checks(copy.deepcopy(checks),parts,specs,config)
+        self.assertEqual(out[0]['state'],'not_applicable')
+        self.assertEqual(out[1]['stage'],'assembly')
+        specs[1]['cpu_gpu']=False
+        self.assertEqual(route_checks(copy.deepcopy(checks),parts,specs,config)[0]['state'],'unknown')
+        specs[1]['cpu_gpu']=True
+        parts.append(dict(slot='GPU',pseudo=False,ordinal=2,explanation_code=3))
+        self.assertEqual(route_checks(copy.deepcopy(checks),parts,specs,config)[0]['state'],'unknown')
+
     def test_exact_issue_and_current_source_required(self):
         fp=fingerprint('SSD','256GB');row=dict(product_code=1,product_name='SSD',spec_source_text='256GB',source_fingerprint=fp,content=dict(review_issues=['P/N 확인'],review_issue_routes=[dict(issue='P/N 확인',stage='assembly',reason='공급 식별',source_url='https://example.com',source_fingerprint=fp,customer_conditions=['storage_speed'])]))
         self.assertEqual(issue_stages(row)[0]['stage'],'assembly')

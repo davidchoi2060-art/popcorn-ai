@@ -40,7 +40,15 @@ class ReviewEdit(BaseModel):
 def basis_hash(config, parts, offers, rows, specs, rules):
     content = {k:v for k,v in config['content'].items() if k not in ('_review', '_admin_bom_edit')}
     # Workflow flags and approval timestamps are not source evidence.
-    return digest(dict(policy=POLICY_VERSION,content=content, parts=parts, offers=offers, rows=rows, specs=specs, rules=rules))
+    # List reads contain all families and SQL RowMappings; detail reads contain
+    # one family and plain dicts. Canonicalize both to this BOM's exact evidence.
+    codes={p['explanation_code'] for p in parts if not p['pseudo']}
+    return digest(dict(policy=POLICY_VERSION,content=content,
+        parts=sorted((dict(p) for p in parts),key=lambda p:p['ordinal']),
+        offers=sorted((dict(o) for o in offers),key=lambda o:o['offer_id']),
+        rows={k:dict(v) for k,v in rows.items() if k in codes},
+        specs={k:dict(v) for k,v in specs.items() if k in codes},
+        rules=sorted((dict(r) for r in rules),key=lambda r:(r.get('rule_id',0),r['rule_key']))))
 
 
 def assess(config, parts, offers, rows, specs, rules):
@@ -106,7 +114,7 @@ def assess(config, parts, offers, rows, specs, rules):
                                    missing_fields=[field for field,value in ((rule['field'],v),(rule['ref_field'],r)) if value is None]))
                 if state == 'fail':
                     blockers.append(rule['label']+' · 현재 DB 사양 불일치')
-    route_checks(checks,parts,specs)
+    route_checks(checks,parts,specs,config)
     assembly_checks += [dict(x) for x in checks if x['stage']=='assembly']
     required = {x['key']:x['label']+' · 추천 전 근거 확인' for x in checks if x['state']=='unknown' and x['stage']=='recommendation'} | MANUAL
     critical_unknown = any(x['state']=='unknown' and x['stage']=='recommendation' for x in checks)
