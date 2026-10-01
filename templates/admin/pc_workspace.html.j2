@@ -1,0 +1,28 @@
+{% extends "admin/_admin2_shell.html.j2" %}
+{% block title %}처리할 일 · AI 도움{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/shared/pc-workspace.css">
+<link rel="stylesheet" href="/shared/part-explanations.css">
+<link rel="stylesheet" href="/shared/pc-configuration-detail.css">
+<link rel="stylesheet" href="/shared/pc-description-editor.css">
+<link rel="stylesheet" href="/shared/pc-parts-editor.css">
+<link rel="stylesheet" href="/shared/pc-review-editor.css">
+{% endblock %}
+{% block content %}
+<main class="pcw">
+ <aside class="pcw-queue" aria-label="처리할 제품 목록">
+  <h1>처리할 일</h1><label class="pcw-search">상품·사유 검색<input id="pcw-search" type="search" maxlength="100" placeholder="상품명, 부품명, 확인할 내용"></label>
+  <div id="pcw-filters" class="pcw-filters" aria-label="작업 분류"></div>
+  <p id="pcw-count" role="status"></p><div id="pcw-tasks"></div>
+  <a class="pcw-list-link" href="/admin2/pc-configurations">전체 조립PC 제품군 보기 →</a>
+ </aside>
+ <section class="pcw-work" aria-label="제품 작업 영역">
+  <p id="pcw-message" role="status" aria-live="polite"></p>
+  <div id="pcw-product"><p class="pcw-empty">작업을 불러오는 중입니다.</p></div>
+ </section>
+</main>
+<dialog id="pcw-detail"><header><h2>제품군 상세 · 검토</h2><button type="button" id="pcw-close">닫기</button></header><div id="pcw-detail-body"></div></dialog>
+{% endblock %}
+{% block foot_extra %}
+<script src="/shared/part-explanations.js"></script><script src="/shared/pc-description-editor.js"></script><script src="/shared/pc-parts-editor.js"></script><script src="/shared/pc-quote-assembly.js"></script><script src="/shared/pc-review-editor.js"></script><script src="/shared/pc-configuration-detail.js"></script><script src="/shared/pc-workspace.js"></script>
+{% endblock %}

@@ -346,6 +346,7 @@ NAV = [
         ("상품 분류 관리", "/admin2/categories-v2", None),   # 2026-09-09 신규(v2)로 교체 — 구 /admin2/categories(ADM-CAT-010)는 P-09 동결
         ("상품 관리", "/admin2/products", None),
         ("부품 설명 관리", "/admin2/part-explanations", "사양 근거와 고객 설명 초안 검토"),
+        ("처리할 일 · AI 도움", "/admin2/pc-workspace", "제품 검토 작업과 AI 설명 제안"),
         ("조립PC 제품군", "/admin2/pc-configurations", "확정 구성 목록과 전체 부품 조회"),
         ("추천 테스트", "/admin2/configuration-consultation", "LLM 조건 확인과 구성 목록 비교·상담 검토"),
         ("상품 등록", "/admin2/product-new", None),   # 2026-09-11 신설(ADM-PRD-011) — v6 대응, 제작자 자기검증 완료·확인자 재검증 전
@@ -544,6 +545,18 @@ def nav_for_screens(current_path: str = "") -> list:
             "active": any(r["active"] for r in rows),
         })
     return out
+
+
+def workspace_nav():
+    """Focused work navigation; legacy screens remain available in the full admin."""
+    return [dict(label=label, href=href, icon=icon) for label, href, icon in [
+        ('처리할 일', '/admin2/pc-workspace', 'eye'),
+        ('조립PC 제품군', '/admin2/pc-configurations', 'box'),
+        ('부품', '/admin2/part-explanations', 'cpu'),
+        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart'),
+        ('변경 이력', '/admin2/activity-logs', 'rotate-ccw'),
+        ('전체 운영 메뉴', '/admin2/dash', 'sliders'),
+    ]]
 
 
 def nav_for(current_path: str = "") -> list:

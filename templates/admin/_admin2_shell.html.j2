@@ -74,6 +74,15 @@
   <nav class="a2-lnb" id="lnb" data-keep="1" aria-label="주메뉴">
     <div class="a2-lnb-brand" id="lnbBrand">팝콘 AI</div>
     <div class="a2-lnb-scroll">
+      {% if workspace_nav %}
+      <div class="pcw-nav">
+        {% for item in workspace_nav %}
+        <a href="{{ item.href }}" title="{{ item.label }}" {% if request.url.path == item.href %}aria-current="page"{% endif %}>
+          <img src="/shared/icons/admin/{{ item.icon }}.svg" alt=""><span class="a2-t">{{ item.label }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
       {% for g in nav %}
       <div class="a2-lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
         <button type="button" class="a2-lnb-g" data-action="lnb-group" title="{{ g.title }}"
@@ -95,6 +104,7 @@
         </div>
       </div>
       {% endfor %}
+      {% endif %}
     </div>
     <button type="button" class="a2-lnb-toggle" id="lnbToggle" data-action="toggle-lnb">
       <span class="ic" id="lnbToggleIcon">«</span><span class="lb">메뉴창 접기</span>

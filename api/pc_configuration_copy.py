@@ -111,7 +111,7 @@ def catalog_rows(conn):
         market_alerts=changes_for(r,bom,offer_list,explanations,*market)
         workflow=current_review if content.get('_review') else None
         offer=offer_list[0] if offer_list else None
-        description_ready=not content.get('_admin_bom_edit',{}).get('review_required') and bool(content.get('title') and content.get('intro') and bom) and all(
+        description_ready=bool(content.get('title') and content.get('intro') and bom) and all(
             p['pseudo'] or bool(explanations.get(p['explanation_code'],{}).get('content',{}).get('role')) for p in bom)
         result.append(dict(configuration_id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],
             revision=r['revision'],status=r['status'],observed_date=r['observed_date'],
@@ -123,11 +123,11 @@ def catalog_rows(conn):
             price_note=offer['payload'].get('price_note','') if offer else '',offer_count=len(offer_list),
             image_url=f"/api/product-images/{case['explanation_code']}/detail" if case else None,
             image_caption='케이스 이미지',part_count=len(bom),description_ready=description_ready,
-            review_state=workflow['state'] if workflow else None,
+            review_state=workflow['state'] if workflow else ('pending' if content.get('_admin_bom_edit',{}).get('review_required') else None),
             cooling_plan=current_review['cooling_plan'],market_alerts=market_alerts,
             management_state=queue_status(r,current_review),review_reasons=review_reasons(current_review),
             recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
-            needs_review=bool(market_alerts) or bool(affected) or not description_ready or (bool(workflow) and not workflow['eligible']),affected_parts=affected,
+            needs_review=bool(market_alerts) or bool(affected) or not description_ready or bool(content.get('_admin_bom_edit',{}).get('review_required')) or (bool(workflow) and not workflow['eligible']),affected_parts=affected,
             customer_publishable=False,price_is_snapshot=True))
     return result
 
