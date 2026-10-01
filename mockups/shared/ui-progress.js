@@ -327,8 +327,11 @@
     // body 값과 무관하게 **항상** 읽기 전용이라(용도별 최소 사양·분류 변경·병합처럼
     // "저장/미리보기 겸용"인 URL이 아니다) preview 규약보다 quiet 규약이 맞고, 초기
     // 조회처럼 애초에 preview 개념이 없는 호출까지 함께 잡힌다.
+    // AI proposals only create drafts/lookup notes, never save a product.
+    // The workspace already shows progress and errors beside the proposal.
     var quiet = /\/auth\/(login|logout|me)\b/.test(url) ||
-      /\/api\/candidates\/count\b/.test(url);
+      /\/api\/candidates\/count\b/.test(url) ||
+      /^\/api\/admin\/pc-configurations\/[^/]+\/ai-proposals$/.test(path(url));
     // 미리보기(본문 preview:true)는 저장과 같은 URL을 쓸 수 있어 URL 패턴(verb())만으로는
     // 못 가른다 — 배너를 띄우지 않고, 화면이 자기 자리에서 진행을 보여준다(㉯ 확정,
     // 2026-08-15). 미리보기가 아닌 요청의 동작은 이 한 줄 추가 전과 동일하다.
