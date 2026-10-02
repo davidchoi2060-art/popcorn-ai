@@ -1,0 +1,35 @@
+/* Scoped to product/specification/compatibility management overlays only.
+   Layout follows the existing admin palette; list layouts and APIs are unchanged. */
+:is(.pp-drawer,.sd-modal-card,.ss-modal,.cr-drawer){box-sizing:border-box;background:var(--card);color:var(--on);overflow:hidden;border-color:var(--outline-variant)}
+:is(.pp-drawer,.sd-modal-card,.ss-modal,.cr-drawer) *{box-sizing:border-box}
+:is(.pp-veil,.sd-overlay,.ss-modal-overlay,.cr-overlay){background:rgba(25,25,21,.38)}
+:is(.pp-drawer,.cr-drawer){width:min(640px,100%);max-width:100%;min-height:0}
+:is(.pp-dr-head,.sd-modal-hd,.ss-modal-hd,.cr-drawer-head){background:var(--card);padding:18px 22px 14px;flex:0 0 auto;border-bottom:1px solid var(--outline-variant)}
+:is(.pp-dr-title,.sd-modal-title,.ss-modal-title,.cr-drawer-key){font-size:17px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+:is(.pp-dr-title-row,.sd-modal-hd,.ss-modal-hdrow,.cr-drawer-head-row){gap:10px}
+.pp-dr-title-row{flex-wrap:wrap}.pp-dr-title{flex:1 1 240px}.pp-dr-mall-link{order:1}
+:is(.pp-dr-close,.sd-modal-close,.ss-modal-close,.cr-x){width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1px solid var(--outline-variant);border-radius:6px;background:var(--card);color:var(--on)}
+:is(.pp-drawer,.sd-modal-card,.ss-modal,.cr-drawer) button:focus-visible{outline:3px solid var(--rv-green);outline-offset:2px}
+:is(.pp-dr-body,.sd-modal-body,.ss-modal-body,.cr-drawer-body){flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;padding:18px 22px;scrollbar-gutter:stable}
+:is(.pp-dr-body,.sd-modal-body,.ss-modal-body,.cr-drawer-body)>*{flex-shrink:0}
+:is(.pp-dr-foot,.sd-modal-foot,.ss-modal-foot,.cr-drawer-foot){flex:0 0 auto;flex-wrap:wrap;gap:10px;padding:14px 22px;background:var(--container-low);border-top:1px solid var(--outline-variant)}
+.cr-drawer-foot-note{min-width:160px}
+.sd-modal-card{overflow:hidden}.sd-modal-body{display:flex}
+:is(.sd-modal,.ss-modal-overlay){padding:20px}
+:is(.sd-modal-card,.ss-modal){width:720px;max-width:100%;min-height:0;max-height:100%;border:1px solid var(--outline-variant);border-radius:10px}
+.ss-modal-hdrow{flex-wrap:wrap}.ss-modal-sub{white-space:normal;overflow-wrap:anywhere;flex:1 1 100%}.ss-modal-close{margin-left:auto}.ss-modal-title{flex:1}
+:is(.pp-field,.sd-form-grid,.cr-field-grid){grid-template-columns:96px minmax(0,1fr)}
+.pp-field{grid-template-columns:96px minmax(0,1fr) auto}
+:is(.pp-dr-body,.sd-modal-body,.ss-modal-body,.cr-drawer-body) :is(input,select,textarea){max-width:100%;min-width:0}
+:is(.pp-dr-body,.sd-modal-body,.ss-modal-body,.cr-drawer-body) :is(.val,.sd-fieldhint,.cr-fieldlist-val){overflow-wrap:anywhere}
+@media(max-width:768px){
+  :is(.pp-drawer,.cr-drawer){width:100%}
+  :is(.sd-modal,.ss-modal-overlay){padding:10px}
+  :is(.sd-modal-card,.ss-modal){height:auto;max-height:100%;border-radius:8px}
+  :is(.pp-dr-head,.sd-modal-hd,.ss-modal-hd,.cr-drawer-head){padding:12px 14px}
+  :is(.pp-dr-body,.sd-modal-body,.ss-modal-body,.cr-drawer-body){padding:14px}
+  :is(.pp-dr-foot,.sd-modal-foot,.ss-modal-foot,.cr-drawer-foot){padding:12px 14px}
+  .sd-modal-hd{flex-wrap:wrap}.sd-modal-title{flex:1 1 160px}.sd-modal-ownertag{order:1}
+  .sd-form-grid,.cr-field-grid{grid-template-columns:minmax(0,1fr)}
+  .sd-form-label{padding-top:0}.sd-typeunit-row{flex-wrap:wrap}
+}
