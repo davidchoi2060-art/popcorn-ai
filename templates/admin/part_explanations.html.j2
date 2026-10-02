@@ -1,23 +1,12 @@
 {% extends "admin/_admin2_shell.html.j2" %}
-{% block title %}부품 설명 관리{% endblock %}
-{% block head_extra %}
-<link rel="stylesheet" href="/shared/part-explanations.css">
-<style>
-.body{padding:var(--sp-lg,1.5rem);overflow:auto}.pe-toolbar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.pe-toolbar input,.pe-toolbar select,.pe-toolbar button{font:inherit;padding:.6rem;border:1px solid var(--outline-variant);border-radius:.4rem;background:var(--card);color:var(--on)}.pe-count{margin:1rem 0;color:var(--on-variant)}.pe-error{color:var(--state-fail)}
-</style>
-{% endblock %}
+{% block title %}부품 관리{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/parts-management.css?v=20261002-1">{% endblock %}
 {% block content %}
-<div class="body">
-<h1>부품 설명 관리</h1><p>부품별 사양과 설명을 확인합니다. 사양 불일치와 누락 항목은 확인사항으로 표시합니다.</p>
-<form id="pe-search" class="pe-toolbar"><label>상품명·코드 <input id="pe-q" maxlength="100"></label><label>부품 종류 <select id="pe-slot"><option value="">전체</option>{% for value,label in part_slots %}<option value="{{value}}">{{label}}</option>{% endfor %}</select></label><button>검색</button></form>
-<p id="pe-count" class="pe-count" role="status"></p><div id="pe-list"></div><div class="pe-toolbar"><button id="pe-prev" type="button">이전</button><button id="pe-next" type="button">다음</button></div>
-</div>
+<main class="pm">
+<header class="pm-heading"><div><h1>부품 관리</h1><p>사양과 고객 설명, 보완할 정보를 한곳에서 확인합니다.</p></div><div class="pm-actions"><button class="primary" id="pm-ai-top">AI 보완 제안</button><a href="/admin2/catalog-import">자료 가져오기</a></div></header>
+<section class="pm-filters" aria-label="부품 검색 조건"><input id="pm-q" maxlength="100" aria-label="부품 검색" placeholder="제품명 · 상품 코드 · 주요 사양 검색"><select id="pm-sale" aria-label="판매 상태"><option value="">판매 상태 전체</option><option>판매중</option><option>품절</option><option>단종</option></select><select id="pm-review" aria-label="보완 상태"><option value="">보완 상태 전체</option><option value="needs">보완 필요</option><option value="pending">검토 대기</option><option value="approved">승인 기록</option><option value="retired">보관</option></select><select id="pm-limit" aria-label="표시 수"><option value="10">10개</option><option value="20" selected>20개</option><option value="30">30개</option></select><label class="pm-owned"><input type="checkbox" id="pm-owned">DB 보유 부품만</label><nav class="pm-slots" aria-label="부품 종류"><button data-slot="">전체</button>{% for value,label in part_slots %}<button data-slot="{{value}}">{{label}}</button>{% endfor %}</nav></section>
+<p class="pm-message" id="pm-message" role="status" aria-live="polite"></p>
+<div class="pm-grid"><section class="pm-list-card"><header><h2>부품 목록</h2><span id="pm-count">불러오는 중</span></header><div class="pm-list-scroll"><table class="pm-table"><thead><tr><th><input type="checkbox" id="pm-select-page" aria-label="현재 페이지 전체 선택"></th><th>부품 · 제품명</th><th>주요 사양</th><th>판매가</th><th>설명 검토</th></tr></thead><tbody id="pm-rows"></tbody></table></div><footer class="pm-pagination"><button id="pm-batch">선택 항목 보완 제안</button><div><button id="pm-prev">이전</button><span id="pm-page"></span><button id="pm-next">다음</button></div><small>표시 수와 검색 조건 유지</small></footer></section><aside class="pm-detail-card" aria-label="부품 상세"><header><h2>부품 상세</h2><button id="pm-back" class="pm-back">목록으로</button></header><div id="pm-detail" class="pm-detail-body"><p class="pm-empty">목록에서 부품 선택</p></div></aside></div>
+</main>
 {% endblock %}
-{% block foot_extra %}
-<script src="/shared/part-explanations.js"></script>
-<script>
-(()=>{let offset=0,total=0,request=0;const limit=20,$=id=>document.getElementById(id);
-async function load(){const seq=++request;$('pe-count').textContent='불러오는 중';$('pe-prev').disabled=$('pe-next').disabled=true;try{const params=new URLSearchParams({q:$('pe-q').value,slot:$('pe-slot').value,offset,limit});const r=await fetch('/api/admin/part-explanations?'+params,{credentials:'same-origin'});if(!r.ok)throw Error('서버 응답 '+r.status);const d=await r.json();if(seq!==request)return;total=d.total;$('pe-list').innerHTML=d.items.map(p=>PopcornPartExplanations.markup(p,{review:true})).join('')||'<p>일치하는 부품 없음</p>';PopcornPartExplanations.attach($('pe-list'),d.items);$('pe-count').textContent='전체 '+total+'개 중 '+(total?offset+1:0)+'–'+Math.min(offset+limit,total)+'개';$('pe-prev').disabled=offset===0;$('pe-next').disabled=offset+limit>=total;}catch(e){if(seq!==request)return;$('pe-list').replaceChildren();$('pe-count').textContent='불러오기 실패: '+e.message;}}
-$('pe-search').onsubmit=e=>{e.preventDefault();offset=0;load();};$('pe-prev').onclick=()=>{offset=Math.max(0,offset-limit);load();};$('pe-next').onclick=()=>{offset+=limit;load();};load();})();
-</script>
-{% endblock %}
+{% block foot_extra %}<script src="/shared/parts-management.js?v=20261002-1"></script>{% endblock %}

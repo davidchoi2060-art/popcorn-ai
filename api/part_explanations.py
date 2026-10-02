@@ -59,6 +59,7 @@ def present(row, admin=False):
         result["name"] = display_name(result.get("name", ""))
         result.pop("image_asset", None)
         result.pop("review_issues", None)
+        result.pop("_admin_part_history", None)
     return result
 
 
