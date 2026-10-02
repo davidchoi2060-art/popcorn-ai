@@ -40,6 +40,18 @@ with engine.connect() as c:
             assert read_configuration(c,'N07')['representative_image_url']
             assert next(r for r in catalog_rows(c) if r['configuration_id']=='N07')['image_caption']=='AI 조립 예시 이미지'
             assert c.execute(text("SELECT md5(string_agg(row_to_json(x)::text,'' ORDER BY configuration_id)) FROM pc_configurations x")).scalar()==before
+            second=m.start('N07',m.Generate(request_id=uuid4(),basis=s['basis']),request,BackgroundTasks())
+            second_id=str(second['job_id'])
+            with patch.object(m,'upload',side_effect=RuntimeError('storage offline')):m.work(second_id)
+            staged=c.execute(text('SELECT status,staged_png FROM pc_media_jobs WHERE job_id=:j'),dict(j=second_id)).mappings().one()
+            assert staged['status']=='failed' and bytes(staged['staged_png'])==raw
+            generated_count=generate.call_count
+            m.retry_storage('N07',second['job_id'],request,BackgroundTasks())
+            m.work(second_id,True)
+            assert generate.call_count==generated_count
+            ready=c.execute(text('SELECT status,staged_png FROM pc_media_jobs WHERE job_id=:j'),dict(j=second_id)).mappings().one()
+            assert ready['status']=='ready' and ready['staged_png'] is None
+            print('PASS durable bytes: upload failure keeps DB original; storage retry never invokes generator')
             c.execute(text("UPDATE pc_configuration_parts SET quantity=2 WHERE configuration_id='N07' AND slot='SSD'"))
             assert not m.state('N07')['jobs'][0]['current']
             assert not read_configuration(c,'N07')['representative_image_url']

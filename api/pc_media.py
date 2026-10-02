@@ -73,7 +73,7 @@ def snapshot(c,identity,lock=False):
 
 
 def jobs(c,identity):
-    return [dict(r) for r in c.execute(text('SELECT job_id,status,phase,error,visual_basis,model,selected,created_at,updated_at FROM pc_media_jobs WHERE configuration_id=:id ORDER BY created_at DESC LIMIT 20'),dict(id=identity)).mappings()]
+    return [dict(r) for r in c.execute(text('SELECT job_id,status,phase,error,visual_basis,model,selected,created_at,updated_at,staged_png IS NOT NULL AS staged_available FROM pc_media_jobs WHERE configuration_id=:id ORDER BY created_at DESC LIMIT 20'),dict(id=identity)).mappings()]
 
 @router.get('/api/admin/pc-media/{identity}')
 def state(identity:str):
@@ -177,13 +177,14 @@ def work(job_id,storage_only=False):
     try:
         with engine.connect() as c:job=dict(c.execute(text('SELECT * FROM pc_media_jobs WHERE job_id=:j'),dict(j=job_id)).mappings().one())
         if job['status']!='running':return
-        if storage_only:raw=path.read_bytes()
+        if storage_only:raw=bytes(job['staged_png']) if job.get('staged_png') is not None else path.read_bytes()
         else:
             raw=generate_image(job['snapshot'],job['model'])
-            SPOOL.mkdir(parents=True,exist_ok=True);path.write_bytes(raw);phase='storage'
+            with engine.begin() as c:c.execute(text("UPDATE pc_media_jobs SET staged_png=:raw,phase='storage',updated_at=now() WHERE job_id=:j"),dict(raw=raw,j=job_id))
+            phase='storage'
         with engine.begin() as c:c.execute(text("UPDATE pc_media_jobs SET phase='storage',updated_at=now() WHERE job_id=:j"),dict(j=job_id))
         asset=upload(job,raw)
-        with engine.begin() as c:c.execute(text("UPDATE pc_media_jobs SET status='ready',phase='complete',error=NULL,asset=CAST(:a AS jsonb),updated_at=now() WHERE job_id=:j"),dict(j=job_id,a=json.dumps(asset)))
+        with engine.begin() as c:c.execute(text("UPDATE pc_media_jobs SET status='ready',phase='complete',error=NULL,staged_png=NULL,asset=CAST(:a AS jsonb),updated_at=now() WHERE job_id=:j"),dict(j=job_id,a=json.dumps(asset)))
         path.unlink(missing_ok=True)
     except Exception as exc:
         import logging
@@ -196,7 +197,7 @@ def retry_storage(identity:str,job_id:UUID,request:Request,background:Background
     with engine.begin() as c:
         row=c.execute(text('SELECT * FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id FOR UPDATE'),dict(j=job_id,id=identity)).mappings().first()
         if not row or row['status']!='failed' or row['phase']!='storage':raise HTTPException(409,'저장 재시도 대상 없음')
-        if not (SPOOL/(str(job_id)+'.png')).exists():raise HTTPException(409,'생성 원본 없음 · 다시 생성 필요')
+        if row.get('staged_png') is None and not (SPOOL/(str(job_id)+'.png')).exists():raise HTTPException(409,'생성 원본 없음 · 다시 생성 필요')
         c.execute(text("UPDATE pc_media_jobs SET status='running',error=NULL,updated_at=now() WHERE job_id=:j"),dict(j=job_id))
     background.add_task(work,str(job_id),True)
     return dict(job_id=job_id)
@@ -218,9 +219,11 @@ def image(identity:str,job_id:UUID):
     with engine.connect() as c:asset=c.execute(text("SELECT asset FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id AND status='ready'"),dict(j=job_id,id=identity)).scalar()
     if not asset:
         with engine.connect() as c:
-            staged=c.execute(text("SELECT 1 FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id AND status='failed' AND phase='storage'"),dict(j=job_id,id=identity)).scalar()
+            staged=c.execute(text("SELECT staged_png FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id AND status='failed' AND phase='storage'"),dict(j=job_id,id=identity)).scalar()
         path=SPOOL/(str(job_id)+'.png')
-        if staged and path.exists() and path.stat().st_size<=20*1024*1024:
+        if staged is not None:
+            return Response(bytes(staged),media_type='image/png',headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
+        if path.exists() and path.stat().st_size<=20*1024*1024:
             return Response(path.read_bytes(),media_type='image/png',headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
         raise HTTPException(404,'이미지 없음')
     key=f'pc-configurations/{job_id}/representative.png'
