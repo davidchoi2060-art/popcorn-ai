@@ -7741,3 +7741,10 @@ CASE WHEN). 그 줄이 `market_price` 를 「무조건 EXCLUDED」 목록에 올
 # 최신 인계 · 2026-10-02 대표 이미지 실생성·클라우드·선택 검증 완료
 
 사용자가 콘솔에서 VM Storage 읽기·쓰기 범위를 적용하고 시작했다. gcloud VM RUNNING/devstorage.read_write 및 health HTTP200 확인. 추가 유료1장 재생성 명시 승인 후 N07 생성 job 4fd70b96-2e26-4621-8f6a-0ab6ad641c24 완료, private GCS popcorn-ai-product-media-045e861b/pc-configurations/4fd70b96-2e26-4621-8f6a-0ab6ad641c24/representative.png 저장, 대표 선택 완료. 실제 DB ready/complete/selected=true/staged_png NULL 확인. GCS 원본 다운로드 SHA256 30a10a64e3f0ac4e968c7bcab0acf4b10290959af14d6e8eebe846e5b40a318a가 DB와 일치. 운영 목록/요약/전체 구성 보기에서 AI 조립 예시 표시 및 이미지 naturalWidth1024 확인. 이번 유료호출1회, 누적 실제 생성2회(첫 회 저장 실패 기록은 보존). 과거 실패 원본은 복구되지 않았으며 새 작업으로 대체했다. BOM·가격·추천 승인 변경 없음. 이미지 운영 기능 실검증 완료, 영상 생성 API 연결은 별도 후속. 로컬 증빙 outputs/admin-new-pc-design-20261001/16-media-selected-live.png,17-detail-selected-image.png,N07-representative.png(채팅 작업폴더).
+
+
+# 최신 인계 · 2026-10-02 제품 소개 영상 운영 검증 완료
+
+사용자 승인으로 /admin2/pc-video?id=제품ID 운영 연결. 현재 BOM·호환 규칙·대표 이미지 확인 후 운영자 버튼으로 10초 1920×1080/30fps MP4 생성. v7 큰 글자·흰색 5px 외곽선·빠른 확대/전환, CC0 음악2개/무음 선택. 실제 3D 회전이 아닌 대표 사진 편집이며 추가 AI API 호출 없음. 사용자 제작 엔딩은 미수령으로 본편만 생성한다. 동일 원본·설정 완료 영상 재사용. private GCS 저장/해시 재조회 확인, 인증 재생·Range·다운로드, 저장 실패 시 .cache 보존 원본으로 저장만 재시도. 0122 pc_video_jobs 도입; BOM·가격·추천 승인 변경 없음.
+코드3a0e5a4, 배포36963079172 success. PC141검사·Node2개 및 실제DB 등록/중복/재사용/기준변경/대표미선택/저장재시도 전량롤백 통과. 운영 N07 job5baa43dc-7a76-4ad5-926e-4bf38c3e85b6 ready/complete, 생성~37초. 실제10초 전체재생·1920×1080·MP4다운로드 확인. GCS/DB/다운로드 SHA256 0909e7e05444369667273c83697074f028cf95398c03bb833f9a1cf2c2875c9e 일치. 동일조건 재요청 후 새작업 없이 재사용 확인. 전체 제품 일괄 생성하지 않음; 다른 제품도 조건 충족 후 개별 생성 가능. 다음: 사용자 제작 엔딩 파일을 받은 후 합성 흐름 검토, 관리자 나머지 업무 흐름 점검. 로컬 증빙 채팅폴더 outputs/admin-video-live-20261002/live-video-ready.png, N07-live.mp4, live-job.json.
+
