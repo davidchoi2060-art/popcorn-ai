@@ -33,3 +33,10 @@
   .sd-form-grid,.cr-field-grid{grid-template-columns:minmax(0,1fr)}
   .sd-form-label{padding-top:0}.sd-typeunit-row{flex-wrap:wrap}
 }
+
+/* Keep the close button beside the title; secondary guidance wraps below it. */
+.ss-modal-sub{order:1}
+/* Short displays otherwise compress the product list to a zero-height row area. */
+@media(max-height:760px){
+ .pp-searchbox{max-height:calc(230px / var(--a2-zoom,1));overflow:auto;overscroll-behavior:contain}
+}
