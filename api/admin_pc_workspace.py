@@ -1,5 +1,7 @@
 """Product work queue and source-bound AI proposals; proposals never write catalog data."""
 import json
+import logging
+from uuid import uuid4
 from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, TypeAdapter
@@ -10,6 +12,25 @@ from .pc_configuration_copy import catalog_rows, read_configuration, digest
 from .pc_configuration_edit import Description, EDITABLE
 
 router = APIRouter()
+log = logging.getLogger(__name__)
+
+
+class ProposalFormatError(ValueError):
+    """Bounded diagnostics only; never retain model text or invalid input values."""
+    def __init__(self, code, paths=(), position=None, rules=()):
+        self.code = code
+        self.paths = list(paths)[:5]
+        self.position = position
+        self.rules = list(dict.fromkeys(rules))[:5]
+        super().__init__(code)
+
+
+def validation_paths(error, prefix=()):
+    allowed = {'changes', 'notes', 'field', 'value', 'reason', 'question', 'answer',
+               'title', 'intro', 'benefits', 'scene', 'checks', 'faq'}
+    return list(dict.fromkeys('.'.join(str(p) if isinstance(p, int) or p in allowed else '?'
+                                     for p in (*prefix, *item['loc'])) or '$'
+                              for item in error.errors(include_input=False, include_context=False)))[:5]
 
 COPY_QUALITY_GUIDE = (
     '고객 설명 품질 기준: 상품명은 사용 장면 중심으로 짧게, 소개는 쉬운 2~3문장으로 작성한다. '
@@ -68,17 +89,33 @@ def source_context(d):
 
 
 def parse_proposal(raw, content):
+    if not isinstance(raw, str):
+        raise ProposalFormatError('response_type')
     value = raw.strip()
     if value.startswith('```'):
         value = value.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
-    proposal = Proposal.model_validate(json.loads(value))
+    if not value:
+        raise ProposalFormatError('empty_response')
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise ProposalFormatError('invalid_json', position={'line': error.lineno, 'column': error.colno}) from None
+    try:
+        proposal = Proposal.model_validate(decoded)
+    except ValidationError as error:
+        raise ProposalFormatError('proposal_schema', validation_paths(error),
+                                  rules=[item['type'] for item in error.errors(include_input=False, include_context=False)]) from None
     fields = [c.field for c in proposal.changes]
     if len(fields) != len(set(fields)):
-        raise ValueError('duplicate proposal fields')
+        raise ProposalFormatError('duplicate_fields')
     # Validate each proposed field; a new product may have incomplete untouched fields.
     # Full Description validation remains mandatory at save time.
-    for change in proposal.changes:
-        change.value=TypeAdapter(Description.model_fields[change.field].rebuild_annotation()).validate_python(change.value)
+    for index, change in enumerate(proposal.changes):
+        try:
+            change.value=TypeAdapter(Description.model_fields[change.field].rebuild_annotation()).validate_python(change.value)
+        except ValidationError as error:
+            raise ProposalFormatError('field_schema', validation_paths(error, ('changes', index, change.field)),
+                                      rules=[item['type'] for item in error.errors(include_input=False, include_context=False)]) from None
     return proposal.model_dump(mode='json')
 
 
@@ -122,17 +159,33 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
         raise HTTPException(422, '상품 근거가 너무 큽니다. 자료 범위를 정리한 뒤 다시 요청해 주세요.')
     try:
         result = llm.call(prompt, system=system, task_key='task.ops_assist', customer_facing=False, max_output_tokens=2500, timeout_sec=45, fallback_order=[])
-        parsed = parse_proposal(result.text, d['content'])
-        if body.mode == 'review' and parsed['changes']:
-            raise ValueError('review mode cannot change copy')
     except llm.LLMNotConfiguredError:
         raise HTTPException(503, 'AI API 연결 설정을 확인해 주세요. 입력한 내용은 유지됩니다.')
     except llm.LLMBlockedError:
         raise HTTPException(429, 'AI 사용 한도에 도달했습니다. 잠시 후 다시 요청해 주세요.')
     except llm.LLMError:
         raise HTTPException(502, 'AI 응답을 받지 못했습니다. 잠시 후 다시 요청해 주세요.')
-    except (ValueError, ValidationError, TypeError):
-        raise HTTPException(502, 'AI 제안 형식이 올바르지 않습니다. 상품은 변경되지 않았습니다. 다시 생성해 주세요.')
+    try:
+        parsed = parse_proposal(result.text, d['content'])
+        if body.mode == 'review' and parsed['changes']:
+            raise ProposalFormatError('review_changes')
+    except ProposalFormatError as error:
+        diagnostic_id = uuid4().hex
+        cost_log_id = result.log_id if type(result.log_id) is int else None
+        diagnostic = dict(event='pc_ai_proposal_format_error', diagnostic_id=diagnostic_id,
+                          configuration_id=d['configuration_id'], revision=d['revision'], mode=body.mode,
+                          cost_log_id=cost_log_id, code=error.code, paths=error.paths,
+                          rules=error.rules, position=error.position)
+        # No response, prompt, ValidationError text/input, or exception traceback in logs.
+        log.warning('%s', json.dumps(diagnostic, ensure_ascii=False))
+        kind = {'response_type':'응답 타입', 'empty_response':'빈 응답', 'invalid_json':'JSON 문법',
+                'proposal_schema':'제안 구조', 'duplicate_fields':'중복 항목',
+                'field_schema':'항목 값', 'review_changes':'검토 모드 변경 항목'}[error.code]
+        location = ' · 항목 ' + ', '.join(error.paths) if error.paths else ''
+        position = f" · {error.position['line']}행 {error.position['column']}열" if error.position else ''
+        cost_reference = f' · 비용 기록 {cost_log_id}' if cost_log_id is not None else ' · 비용 기록 연결 미확인'
+        raise HTTPException(502, f'AI 제안 형식 오류: {kind}{location}{position}. 상품은 변경되지 않았습니다. '
+                                f'진단 ID {diagnostic_id}{cost_reference}. 자동 재시도하지 않았습니다.') from None
     with engine.connect() as conn:
         latest = read_configuration(conn, identity)
     if latest['revision'] != d['revision'] or latest['current_review']['basis'] != d['current_review']['basis'] or digest(source_context(latest)) != digest(context):
