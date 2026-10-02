@@ -7769,3 +7769,11 @@ CASE WHEN). 그 줄이 `market_price` 를 「무조건 EXCLUDED」 목록에 올
 - Jinja 네 템플릿 로드, CSS 블록 균형, git diff --check 통과. 배포 36968078717(4574280), 36968379401(b16c6b4), 36968537787(17b9f6c) 성공.
 - 상품 저장/스키마 생성/호환 규칙 변경은 실행하지 않음. 호환 규칙 저장 버튼은 기존 서버 API 대기 상태 유지. 분류/매입/권한 등 나머지 팝업 전체 검증 완료라는 의미는 아님.
 - 증거: 사용자 작업실 outputs/admin-dialog-review-20261002/spec-definition-small.png, spec-standard-desktop.png, product-drawer.png, compat-drawer.png. 이후 팝업 추가도 같은 원칙 적용; 다른 메뉴는 실제 화면 확인 후 범위를 좁혀 적용.
+
+
+## 2026-10-02 대표 이미지 관리 승인 디자인 적용 / 영상 디자인 확인 대기
+- 사용자 정정: 화면마다 대화에 디자인 시안을 먼저 제시하고 확인·수정한 뒤 개발·검증·서버 반영. 공통 원칙 기록/공통/원칙/common-ui-design-review-before-implementation-20261002.md 저장 성공. 이번 대표 이미지 시안은 "좋아 위 화면 진행"으로 승인됨.
+- 대표 이미지 화면: pc_media 템플릿 + pc-media.js 개편, pc-assets.css 신설. 기존 관리자 셸 유지. 실제 상품 요약, 선택 대표/미선택 케이스 기준 사진, 생성 준비·현재 DB 규격/이미지 API/클라우드 체크, 부품 접기, 실제 조립 확인 안내, 별도 갤러리 및 전체/현재 구성 필터. 오류·현재성·선택/원본 보존 재시도·생성 비용 차단 로직 유지. 작업 수는 실패 포함하므로 장수가 아닌 건수 표기.
+- 배포08c03a0 / run36969612730 성공. Jinja/CSS 구조, Node 구문, diff check 통과. 운영 N05는 실제 호환 규격 오류로 생성 비활성 확인. N07은 기존 대표 표시/사용 중/실패 작업과 원본 조회 불가 안내/필터 전환 확인. 600x650 본문 width=scrollWidth509, 갤러리451로 가로 넘침 없음. 생성·대표 선택·DB 변경은 실행하지 않음.
+- 생성 시안: 작업실 outputs/admin-media-design-20261002/representative-image-design.png 및 video-management-design.png. 영상 시안은 보여줬으며 별도 확인 질문 대기. 영상 운영 템플릿/JS는 아직 변경하지 않음. 시안이 임의 추가한 엔딩 업로드 영역은 실제 구현 범위가 아니므로 연결 대기 안내만 계획함.
+- 증거: N05-image-management-live.png, N07-image-management-live.png. 다음: 영상 시안 확인 후 동일 구조로 구현, 운영 화면 검증. 신규 디자인은 먼저 시안 확인, 실제 검증 뒤 서버 반영 순서를 지킬 것.
