@@ -46,3 +46,13 @@ class MediaTests(unittest.TestCase):
             self.assertEqual(m.upload(dict(job_id='job'),b'image')['sha256'],m.hashlib.sha256(b'image').hexdigest())
             with self.assertRaises(ValueError):m.upload(dict(job_id='job'),b'changed')
         self.assertEqual(session.post.call_args.kwargs['params']['ifGenerationMatch'],'0')
+
+    def test_vm_readonly_scope_blocks_generation_readiness_before_iam(self):
+        session=MagicMock();session.__enter__.return_value=session
+        session.credentials=MagicMock(spec=m.ComputeCredentials)
+        response=MagicMock();response.text='https://www.googleapis.com/auth/devstorage.read_only'
+        m._cloud_ready.cache_clear()
+        with patch.object(m,'cloud_session',return_value=session),patch.object(m.requests,'get',return_value=response):
+            self.assertFalse(m._cloud_ready(99))
+        session.get.assert_not_called()
+        m._cloud_ready.cache_clear()

@@ -13,6 +13,8 @@ from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 import google.auth
+import requests
+from google.auth.compute_engine import Credentials as ComputeCredentials
 from google.auth.transport.requests import AuthorizedSession
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -145,6 +147,10 @@ def cloud_session():
 def _cloud_ready(period):
     try:
         with cloud_session() as session:
+            if isinstance(session.credentials,ComputeCredentials):
+                r=requests.get('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/scopes',headers={'Metadata-Flavor':'Google'},timeout=3)
+                r.raise_for_status()
+                if not {'https://www.googleapis.com/auth/devstorage.read_write','https://www.googleapis.com/auth/devstorage.full_control','https://www.googleapis.com/auth/cloud-platform'}.intersection(r.text.splitlines()):return False
             r=session.get(f'https://storage.googleapis.com/storage/v1/b/{MEDIA_BUCKET}/iam/testPermissions',params=[('permissions','storage.objects.create'),('permissions','storage.objects.get')],timeout=(5,10))
             r.raise_for_status()
             return {'storage.objects.create','storage.objects.get'}.issubset(set(r.json().get('permissions',[])))
@@ -179,7 +185,9 @@ def work(job_id,storage_only=False):
         asset=upload(job,raw)
         with engine.begin() as c:c.execute(text("UPDATE pc_media_jobs SET status='ready',phase='complete',error=NULL,asset=CAST(:a AS jsonb),updated_at=now() WHERE job_id=:j"),dict(j=job_id,a=json.dumps(asset)))
         path.unlink(missing_ok=True)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning('PC media failure phase=%s type=%s http=%s',phase,type(exc).__name__,getattr(getattr(exc,'response',None),'status_code',None))
         with engine.begin() as c:c.execute(text("UPDATE pc_media_jobs SET status='failed',phase=:p,error=:e,updated_at=now() WHERE job_id=:j"),dict(j=job_id,p=phase,e='클라우드 저장 실패 · 저장 재시도 가능' if phase=='storage' else '이미지 생성 실패 · 자동 재호출 없음'))
 
 @router.post('/api/admin/pc-media/{identity}/retry-storage/{job_id}',status_code=202)
@@ -208,7 +216,13 @@ def select(identity:str,body:Choose,request:Request):
 @router.get('/api/admin/pc-media/{identity}/images/{job_id}')
 def image(identity:str,job_id:UUID):
     with engine.connect() as c:asset=c.execute(text("SELECT asset FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id AND status='ready'"),dict(j=job_id,id=identity)).scalar()
-    if not asset:raise HTTPException(404,'이미지 없음')
+    if not asset:
+        with engine.connect() as c:
+            staged=c.execute(text("SELECT 1 FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id AND status='failed' AND phase='storage'"),dict(j=job_id,id=identity)).scalar()
+        path=SPOOL/(str(job_id)+'.png')
+        if staged and path.exists() and path.stat().st_size<=20*1024*1024:
+            return Response(path.read_bytes(),media_type='image/png',headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
+        raise HTTPException(404,'이미지 없음')
     key=f'pc-configurations/{job_id}/representative.png'
     if asset.get('bucket')!=MEDIA_BUCKET or asset.get('key')!=key:raise HTTPException(404,'등록 이미지 경로 불일치')
     try:
