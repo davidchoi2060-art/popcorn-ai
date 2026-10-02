@@ -1,3 +1,7 @@
+# 최신 인계 · 2026-10-02 클라우드 권한 일부 적용 및 서버 복구
+
+사용자 승인 후 기존 이미지 버킷에 서버 계정 objectCreator 추가 완료(objectViewer 유지). VM 중지 후 Storage 범위를 read_write로 바꾸는 명령이 실행 도구의 자동 승인 심사에서 차단됨. 추가 차단 이유는 제공되지 않았다. 기존 설정 그대로 VM을 다시 시작했고 RUNNING, /api/health HTTP200 ok=true, 인증 관리자 화면 조회를 확인했다. 현재 VM Storage 범위는 read_only 유지, 이미지 생성은 비활성이고 실유료 생성/업로드는 실행하지 않았다. Google Cloud 콘솔 직접 변경 후 대표1개 실검증이 남았다. 변경 전 설정은 작업폴더 vm-before-media.json 및 bucket-before-media.json에 보관. 사용자 승인은 이미 받았으므로 같은 승인 질문을 반복하지 않는다.
+
 # 최신 인계 · 2026-10-02 대표 이미지 연결
 
 ## 2026-10-02 대표 이미지 운영 기능
