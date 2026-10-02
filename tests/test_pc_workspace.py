@@ -79,6 +79,11 @@ class WorkspaceTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as error:workspace.propose('N01',SuggestionRequest(revision=1),Request({'type':'http','headers':[]}))
             self.assertEqual(error.exception.status_code,409)
             self.assertEqual(call.call_args.kwargs['fallback_order'],[])
+            system = call.call_args.kwargs['system']
+            self.assertIn(workspace.COPY_QUALITY_GUIDE, system)
+            self.assertIn('[["특장점 제목","설명"]', system)
+            self.assertIn('운영체제 포함 여부', system)
+            self.assertIn('자료 간 모델명·용량이 다르면', system)
 
     def test_request_extra_keys_cannot_set_model_or_apply(self):
         with self.assertRaises(ValidationError):

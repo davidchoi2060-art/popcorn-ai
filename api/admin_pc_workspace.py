@@ -11,6 +11,16 @@ from .pc_configuration_edit import Description, EDITABLE
 
 router = APIRouter()
 
+COPY_QUALITY_GUIDE = (
+    '고객 설명 품질 기준: 상품명은 사용 장면 중심으로 짧게, 소개는 쉬운 2~3문장으로 작성한다. '
+    '특장점은 확인된 사양과 그 사양의 구체적인 쓰임을 연결한다. 저장 용량만으로 넉넉함을, NVMe라는 이름만으로 빠름을 단정하지 않는다. '
+    '운영체제 포함 여부, 출력 단자, 보증, 주변기기 포함 여부는 입력에 명시된 사실이 있을 때만 단정한다. '
+    '기존 description에도 근거 없는 문구가 있을 수 있으므로 부품 facts 등 확인 근거와 대조한다. '
+    '자료 간 모델명·용량이 다르면 임의로 확정하지 않고 notes에 충돌 항목을 남긴다. '
+    '고객 확인 안내에는 선택에 필요한 조건만 쓰고 내부 검토·자료 보완 요청은 notes로 분리한다. '
+    '권장 사양 충족을 실측 성능으로 표현하지 않는다. 게임 FPS는 해상도·옵션·구성에 대응하는 측정 근거가 있을 때만 쓴다. '
+)
+
 
 class SuggestionRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -101,9 +111,12 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
               '제품 구성이나 사양·가격·재고·승인을 변경하지 않는다. 근거 없는 FPS, 속도, 호환성 보장, 실측 주장을 만들지 않는다. '
               '현재 정보만 사용하고 불확실한 내용은 notes에 확인할 질문으로 남긴다. required_copy_fields는 아직 빈 필드이며 설명 작성 모드에서 이 항목을 우선 작성한다. '
               'JSON 객체만 출력한다: {"changes":[{"field":"intro","value":"새 설명","reason":"선택 이유"}],"notes":["확인 사항"]}. '
-              '변경 가능 필드는 title/intro/benefits/scene/checks/faq만이다. benefits는 [제목,설명] 배열, '
+              '변경 가능 필드는 title/intro/benefits/scene/checks/faq만이다. title/intro/scene 값은 비어 있지 않은 문자열이다. '
+              'benefits 값은 [["특장점 제목","설명"],["다음 제목","설명"]]처럼 두 문자열 쌍의 배열이며 최소1개, 최대12개다. '
               'checks는 문자열 배열, faq는 question/answer 객체 배열이다. 최대6개 변경. '
-              '검토 보조 모드에서는 changes를 비우고 notes로만 의견을 제시하며 승인 여부를 판정하지 않는다.')
+              'notes는 문자열 배열이며 최대15개다. 전체 답변을 짧게 유지하고 JSON 밖에 설명을 붙이지 않는다. '
+              '검토 보조 모드에서는 changes를 비우고 notes로만 의견을 제시하며 승인 여부를 판정하지 않는다. '
+              + COPY_QUALITY_GUIDE)
     prompt = json.dumps(dict(mode=body.mode, instruction=body.instruction, product=context), ensure_ascii=False, default=str)
     if len(prompt) > 60000:
         raise HTTPException(422, '상품 근거가 너무 큽니다. 자료 범위를 정리한 뒤 다시 요청해 주세요.')
