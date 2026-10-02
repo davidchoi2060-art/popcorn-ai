@@ -7737,3 +7737,7 @@ CASE WHEN). 그 줄이 `market_price` 를 「무조건 EXCLUDED」 목록에 올
 검사132개, 기존 Node2개, 실제 DB 등록/중복/선택/목록·상세/수량변경 무효화 전량롤백 통과. provider/cloud는 시험에서 대체했고 유료 생성0회. 운영 배포·UI 확인은 진행 중.
 
 운영 확인: 배포36909271195/36909671645 성공. 인증된 N07 화면 8부품·기준 케이스·공랭 및 검사 표시 확인. GCP describe/IAM 직접 확인 결과 VM은 Storage read_only, 버킷 계정 objectViewer. 업로드 활성화를 위한 objectCreator 추가 및 VM Storage read_write 범위 변경(중지·재시작 필요)은 사용자 확인 요청 중. 승인 없이 권한 확대·재시작하지 않았음. 생성 버튼은 저장권한 확인 전 비활성. 유료실생성/실업로드 미검증.
+
+# 최신 인계 · 2026-10-02 대표 이미지 실생성·클라우드·선택 검증 완료
+
+사용자가 콘솔에서 VM Storage 읽기·쓰기 범위를 적용하고 시작했다. gcloud VM RUNNING/devstorage.read_write 및 health HTTP200 확인. 추가 유료1장 재생성 명시 승인 후 N07 생성 job 4fd70b96-2e26-4621-8f6a-0ab6ad641c24 완료, private GCS popcorn-ai-product-media-045e861b/pc-configurations/4fd70b96-2e26-4621-8f6a-0ab6ad641c24/representative.png 저장, 대표 선택 완료. 실제 DB ready/complete/selected=true/staged_png NULL 확인. GCS 원본 다운로드 SHA256 30a10a64e3f0ac4e968c7bcab0acf4b10290959af14d6e8eebe846e5b40a318a가 DB와 일치. 운영 목록/요약/전체 구성 보기에서 AI 조립 예시 표시 및 이미지 naturalWidth1024 확인. 이번 유료호출1회, 누적 실제 생성2회(첫 회 저장 실패 기록은 보존). 과거 실패 원본은 복구되지 않았으며 새 작업으로 대체했다. BOM·가격·추천 승인 변경 없음. 이미지 운영 기능 실검증 완료, 영상 생성 API 연결은 별도 후속. 로컬 증빙 outputs/admin-new-pc-design-20261001/16-media-selected-live.png,17-detail-selected-image.png,N07-representative.png(채팅 작업폴더).
