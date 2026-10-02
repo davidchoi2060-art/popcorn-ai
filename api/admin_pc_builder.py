@@ -58,7 +58,7 @@ def permission(request):
 def candidates(slot: Literal['CPU','GPU','RAM','SSD','MB','COOLER','POWER','CASE'],
                q: str = Query('', max_length=100), source: Literal['sale','owned']='sale',
                offset: int=Query(0,ge=0), limit: int=Query(20,ge=1,le=50)):
-    where = """ WHERE e.content->>'slot'=:slot AND p.status='판매중' AND p.sale_price>0
+    where = """ WHERE e.content->>'slot'=:slot AND e.status!='retired' AND p.status='판매중' AND p.sale_price>0
       AND (:q='' OR p.product_name ILIKE :search OR e.source_product_code::text=:q)
       AND (:source!='owned' OR p.stock_qty>0)"""
     args = dict(slot=slot,q=q.strip(),search='%'+q.strip()+'%',source=source,offset=offset,limit=limit)
@@ -68,6 +68,46 @@ def candidates(slot: Literal['CPU','GPU','RAM','SSD','MB','COOLER','POWER','CASE
         items=[dict(part_view(r),stock_qty=r['stock_qty'],source=source) for r in rows]
     return dict(items=items,total=total,offset=offset,limit=limit,
         stock_note='보유 부품은 DB 재고 기준이며 실사·예약·출고 가능 확인은 별도입니다.')
+
+
+
+class Draft(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    title: str = Field(default='', max_length=180)
+    parts: list[Selection] = Field(max_length=20)
+    integrated_gpu: bool = False
+    bundled_cooler: bool = False
+    request_id: str = Field(pattern=r'^[A-Za-z0-9-]{16,64}$')
+
+
+def resolve_draft(body, rows):
+    """Refresh browser selections from current DB; never trust cached facts/prices."""
+    items=[]; rejected=[]; seen=set(); slots=set()
+    for selected in body.parts:
+        row=rows.get(selected.code)
+        reason=None
+        if selected.code in seen: reason='중복 부품'
+        elif not row: reason='상품 자료 연결 없음'
+        elif row['sale_status']!='판매중' or not row['sale_price'] or row['sale_price']<=0: reason='판매 상태 또는 가격 확인 필요'
+        elif row.get('status')=='retired': reason='보관된 부품 자료'
+        elif not is_current(row): reason='부품 원문과 설명 갱신 필요'
+        elif slot_of(row['part_type']) not in SLOTS or slot_of(row['part_type'])!=row['content'].get('slot'): reason='부품 종류 확인 필요'
+        elif selected.source=='owned' and (row.get('stock_qty') or 0)<selected.quantity: reason='DB 보유 수량 부족'
+        elif row['content']['slot'] not in ('RAM','SSD') and (selected.quantity!=1 or row['content']['slot'] in slots): reason='단일 장착 부품 중복 또는 수량 오류'
+        seen.add(selected.code)
+        if reason:
+            rejected.append(dict(code=selected.code,name=(row['content'].get('name') if row else str(selected.code)),reason=reason));continue
+        slots.add(row['content']['slot'])
+        items.append(dict(part_view(row),quantity=selected.quantity,source=selected.source,stock_qty=row['stock_qty']))
+    return dict(items=items,rejected=rejected,note='현재 판매가·상품 자료·DB 보유 수량으로 초안 복원 · 호환 검사와 저장은 별도')
+
+
+@router.post('/api/admin/pc-builder/draft/resolve')
+def restore_draft(body:Draft,request:Request):
+    permission(request)
+    with engine.connect() as c:
+        rows={r['source_product_code']:dict(r) for r in c.execute(text(SELECT+' WHERE e.source_product_code=ANY(:codes)'),dict(codes=[p.code for p in body.parts])).mappings()}
+    return resolve_draft(body,rows)
 
 
 def calculate(body, rows, specs, rules):
@@ -80,7 +120,7 @@ def calculate(body, rows, specs, rules):
     parts=[]; lines=[]; count={}
     for ordinal,s in enumerate(body.parts):
         r=rows.get(s.code)
-        if not r or r['sale_status']!='판매중' or not r['sale_price'] or r['sale_price']<=0:
+        if not r or r.get('status')=='retired' or r['sale_status']!='판매중' or not r['sale_price'] or r['sale_price']<=0:
             raise HTTPException(409,'판매중인 부품과 유효한 현재 판매가를 다시 확인해 주세요.')
         slot=slot_of(r['part_type'])
         if slot not in SLOTS or r['content'].get('slot')!=slot:

@@ -46,7 +46,7 @@ class BuilderTests(unittest.TestCase):
             with self.assertRaises(ValidationError):builder.Selection(code=1,quantity=qty)
 
     def test_sale_stale_and_slot_disagreement(self):
-        for mutation in [('sale_status','품절'),('source_fingerprint','changed'),('part_type','MONITOR')]:
+        for mutation in [('sale_status','품절'),('source_fingerprint','changed'),('part_type','MONITOR'),('status','retired')]:
             self.setUp();self.rows[1][mutation[0]]=mutation[1]
             with self.assertRaises(HTTPException):self.calculate()
 
@@ -101,3 +101,39 @@ class BuilderTests(unittest.TestCase):
         with patch.object(builder,'prepare',return_value=(r,dup)):
             self.assertTrue(builder.save_build(None,self.body,{'operator_id':1})['reused'])
 
+
+
+class DraftRestoreTests(unittest.TestCase):
+    setUp = BuilderTests.setUp
+    def draft(self):
+        return builder.Draft(title='작성 중인 상품',parts=[p.model_dump() for p in self.body.parts],request_id=self.body.request_id)
+
+    def test_restore_reads_current_price_and_preserves_quantities(self):
+        self.rows[1]['sale_price']=12345
+        self.body.parts[2].quantity=2
+        result=builder.resolve_draft(self.draft(),self.rows)
+        self.assertEqual(result['items'][0]['unit_price'],12345)
+        self.assertEqual(result['items'][2]['quantity'],2)
+        self.assertEqual(result['rejected'],[])
+        self.assertNotIn('preview_token',result)
+
+    def test_unavailable_stale_archived_and_low_stock_are_reported(self):
+        for key,value in [('sale_status','품절'),('source_fingerprint','stale'),('status','retired'),('sale_price',0)]:
+            self.setUp();self.rows[1][key]=value
+            result=builder.resolve_draft(self.draft(),self.rows)
+            self.assertEqual(len(result['items']),7);self.assertEqual(result['rejected'][0]['code'],1)
+        self.setUp();self.body.parts[2].source='owned';self.rows[3]['stock_qty']=0
+        self.assertIn('수량 부족',builder.resolve_draft(self.draft(),self.rows)['rejected'][0]['reason'])
+
+    def test_restore_does_not_mutate_rows_or_trust_client_prices(self):
+        before=copy.deepcopy(self.rows);builder.resolve_draft(self.draft(),self.rows)
+        self.assertEqual(before,self.rows)
+        body=self.draft().model_dump();body['parts'][0]['unit_price']=1
+        with self.assertRaises(ValidationError):builder.Draft.model_validate(body)
+
+    def test_restore_permission_and_unknown_codes(self):
+        app=FastAPI();app.include_router(builder.router);client=TestClient(app)
+        with patch.object(builder,'current_operator',return_value={'role':'viewer'}):
+            self.assertEqual(client.post('/api/admin/pc-builder/draft/resolve',json=self.draft().model_dump()).status_code,403)
+        result=builder.resolve_draft(self.draft(),{})
+        self.assertEqual(len(result['rejected']),8);self.assertFalse(result['items'])

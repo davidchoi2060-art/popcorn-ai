@@ -9,7 +9,22 @@ const money=x=>Number(x||0).toLocaleString('ko-KR')+'원';
 function note(text,error=false){message.textContent=text;message.className=error?'builder-error':'builder-success';}
 async function api(url,body){const r=await fetch(url,{credentials:'same-origin',headers:body?{'Content-Type':'application/json'}:{},method:body?'POST':'GET',body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:'입력 내용 또는 로그인 상태를 확인해 주세요.');return d;}
 function input(){return {title,parts:parts.map(p=>({code:p.code,quantity:p.quantity,source:p.source})),integrated_gpu:integrated,bundled_cooler:bundled,request_id:requestId,preview_token:preview?.preview_token||null};}
-function invalidate(){preview=null;saved=null;}
+const draftKey='popcorn.pc-builder.draft.v1';
+function remember(){
+ if(parts.some(p=>!Number.isInteger(p.quantity)||p.quantity<1||p.quantity>16))return;
+ try{if(!parts.length&&!title.trim()){sessionStorage.removeItem(draftKey);return;}
+ sessionStorage.setItem(draftKey,JSON.stringify({title,parts:parts.map(p=>({code:p.code,quantity:p.quantity,source:p.source})),integrated_gpu:integrated,bundled_cooler:bundled,request_id:requestId}));}catch{note('브라우저 초안 보관을 사용할 수 없습니다. 화면을 닫기 전에 검토 대기로 저장해 주세요.',true);}
+}
+function forget(){try{sessionStorage.removeItem(draftKey);}catch{}}
+function invalidate(){preview=null;saved=null;remember();}
+async function start(){
+ let draft;try{draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');}catch{note('초안 읽기 실패 · 부품을 다시 선택해 주세요.',true);}
+ if(draft){busy=true;draw();try{const resolved=await api('/api/admin/pc-builder/draft/resolve',draft);
+ title=draft.title;parts=resolved.items;integrated=draft.integrated_gpu;bundled=draft.bundled_cooler;requestId=draft.request_id;
+ remember();note(resolved.note+(resolved.rejected.length?' · 복원 제외: '+resolved.rejected.map(p=>p.name+' ('+p.reason+')').join(', '):''),resolved.rejected.length>0);
+ }catch(e){note('초안 복원 실패 · 보관된 초안은 유지합니다. '+e.message,true);}finally{busy=false;draw();}}
+ await load();
+}
 const order=['CPU','GPU','MB','RAM','SSD','COOLER','POWER','CASE'];
 function missingSlots(){return order.filter(k=>!parts.some(p=>p.slot===k)&&!(k==='GPU'&&integrated)&&!(k==='COOLER'&&bundled));}
 function capacityText(p){
@@ -60,7 +75,7 @@ screen.addEventListener('change',e=>{const t=e.target;if(t.id==='builder-source'
 async function act(e){const t=e.target.closest('button');if(!t||busy)return;if(t.dataset.step){step=Number(t.dataset.step);if(step===2&&!preview){note('부품 구성에서 구성·가격 확인을 먼저 진행해 주세요.',true);step=1;}draw();return;}if(t.dataset.source){source=t.dataset.source;offset=0;load();return;}if(t.dataset.adjust!==undefined){const p=parts[Number(t.dataset.adjust)];p.quantity=Math.min(16,Math.max(1,(Number(p.quantity)||1)+Number(t.dataset.delta)));invalidate();draw();return;}if(t.id==='builder-clear'){if(confirm('현재 구성 초안을 초기화하시겠습니까? 저장된 제품군은 변경되지 않습니다.')){parts=[];title='';integrated=false;bundled=false;requestId=crypto.randomUUID();invalidate();note('구성 초안 초기화 완료');draw();}return;}if(t.dataset.slot){slot=t.dataset.slot;offset=0;load();return;}if(t.dataset.add){if(loading)return;const p=items.find(p=>p.code===Number(t.dataset.add));if(p){if(!['RAM','SSD'].includes(p.slot)&&parts.some(x=>x.slot===p.slot)){note('같은 종류의 부품을 제거한 뒤 추가해 주세요.',true);return;}parts.push({...p,quantity:1,source});invalidate();draw();}return;}if(t.dataset.remove!==undefined){parts.splice(Number(t.dataset.remove),1);invalidate();draw();return;}
  if(t.id==='builder-prev'||t.id==='builder-next'){offset+=t.id==='builder-next'?20:-20;load();return;}
  if(t.id==='builder-reset'){parts=[];title='';integrated=false;bundled=false;requestId=crypto.randomUUID();invalidate();step=1;note('새 구성을 시작합니다.');draw();return;}
- if(t.id==='builder-preview'||t.id==='builder-save'){busy=true;draw();try{const result=await api('/api/admin/pc-builder/'+(t.id==='builder-save'?'save':'preview'),input());if(t.id==='builder-save'){saved=result;note('검토 대기 저장 완료');}else{preview=result;step=2;note('현재 부품·가격·호환 규칙 기준으로 확인했습니다.');}}catch(e){if(t.id==='builder-save')preview=null;note(e.message,true);if(!preview)step=1;}finally{busy=false;draw();}}
+ if(t.id==='builder-preview'||t.id==='builder-save'){busy=true;draw();try{const result=await api('/api/admin/pc-builder/'+(t.id==='builder-save'?'save':'preview'),input());if(t.id==='builder-save'){saved=result;forget();note('검토 대기 저장 완료');}else{preview=result;step=2;note('현재 부품·가격·호환 규칙 기준으로 확인했습니다.');}}catch(e){if(t.id==='builder-save')preview=null;note(e.message,true);if(!preview)step=1;}finally{busy=false;draw();}}
 }
-screen.addEventListener('click',act);document.querySelector('.builder-steps').addEventListener('click',act);draw();load();
+screen.addEventListener('click',act);document.querySelector('.builder-steps').addEventListener('click',act);draw();start();
 })();
