@@ -26,3 +26,5 @@ openai~=3.1
 
 # Normalize generated product images and enforce dimensions.
 Pillow>=11,<13
+# Bundled cross-platform renderer; no AI video API calls.
+imageio-ffmpeg==0.6.0

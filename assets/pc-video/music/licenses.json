@@ -1,0 +1,23 @@
+{
+  "checked_date": "2026-10-01",
+  "tracks": [
+    {
+      "id": "hyper-ultra",
+      "title": "Hyper Ultra-Racing",
+      "author": "cynicmusic",
+      "license": "CC0",
+      "source": "https://opengameart.org/content/hyper-ultra-racing",
+      "url": "https://opengameart.org/sites/default/files/AugustUltraAmbience.wav",
+      "local_file": "hyper-ultra.wav"
+    },
+    {
+      "id": "hyperflight",
+      "title": "Hyperflight Racing",
+      "author": "cynicmusic",
+      "license": "CC0",
+      "source": "https://opengameart.org/content/hyperflight-racing",
+      "url": "https://opengameart.org/sites/default/files/2012_november_fakeAwake04%20back%20to%20A%20minor.wav",
+      "local_file": "hyperflight.wav"
+    }
+  ]
+}

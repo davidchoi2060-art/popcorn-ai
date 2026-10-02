@@ -90,3 +90,4 @@ _private/
 
 # 자동 실행 로그 (scripts/autostart.ps1)
 logs/autostart-*.log
+.pc-video-spool/
