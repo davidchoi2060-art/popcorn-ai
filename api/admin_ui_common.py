@@ -17,7 +17,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from .admin_nav import counts as nav_counts, nav_for
+from .admin_nav import counts as nav_counts, nav_for, new_admin_nav
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -39,10 +39,21 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     """
     # 좌측 메뉴는 **서버가 그린다**(admin_nav 가 단일 원천). 셸이 한 벌이라
     # 모든 화면이 자동으로 같은 메뉴를 받는다 — 화면마다 복제되던 병이 구조적으로 사라진다.
+    choice = request.query_params.get('admin')
+    if choice not in ('new', 'legacy'):
+        choice = None
+    mode = ctx.pop('admin_mode', None) or choice or request.cookies.get('admin_ui_mode', 'legacy')
+    mode = 'new' if mode == 'new' else 'legacy'
+    ctx['new_admin'] = mode == 'new'
+    # Override page-local focused navigation: the shell owns OLD/NEW consistently.
+    ctx['workspace_nav'] = new_admin_nav(request.url.path) if mode == 'new' else None
     ctx.setdefault("nav", nav_for(request.url.path))
     ctx.setdefault("nav_counts", nav_counts())
     ctx.update(screen_id=screen_id, domain=domain, crumb_group=crumb_group, crumb_now=crumb_now)
     resp = templates.TemplateResponse(request, template, ctx)
+    if choice or mode != request.cookies.get('admin_ui_mode', 'legacy'):
+        resp.set_cookie('admin_ui_mode', mode, httponly=True, samesite='lax',
+                        secure=request.url.scheme == 'https', path='/admin2')
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     return resp

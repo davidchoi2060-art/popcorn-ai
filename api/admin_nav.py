@@ -560,6 +560,20 @@ def workspace_nav():
     ]]
 
 
+def new_admin_nav(current_path=''):
+    """One shared work menu for NEW; existing page/API implementations are reused."""
+    groups = [
+        ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
+        ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
+        ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
+        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import')),
+        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/product-fit')),
+        ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/handoff-log', '/admin2/swap-click-logs')),
+    ]
+    return [dict(label=label, href=href, icon=icon, active=current_path.rstrip('/') in paths)
+            for label, href, icon, paths in groups]
+
+
 def nav_for(current_path: str = "") -> list:
     """템플릿(좌측 메뉴)이 쓰기 좋은 형태로 편다 — `nav_for_screens()` + 매뉴얼 그룹.
 

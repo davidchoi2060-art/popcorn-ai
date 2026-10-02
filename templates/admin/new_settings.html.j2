@@ -1,0 +1,4 @@
+{% extends 'admin/_admin2_shell.html.j2' %}
+{% block title %}설정 · 자료 관리{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/admin-new.css?v=20261002">{% endblock %}
+{% block content %}<main class="an-home"><header class="an-heading"><div><h1>설정 · 자료 관리</h1><p>기존 기능 연결 · 업무별 통합과 화면 개편은 순차 적용</p></div></header><div class="an-tools">{% for group in tool_groups %}<section class="an-list"><h2>{{ group.title }}</h2>{% for item in group['items'] %}<a class="an-tool" href="{{ item.href }}">{{ item.label }} →</a>{% endfor %}</section>{% endfor %}</div></main>{% endblock %}

@@ -65,22 +65,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팝콘PC 관리자 · {% block title %}{% endblock %}</title>
 <link rel="stylesheet" href="/shared/fonts/fonts.css">
-<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20260929-icons">
+<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20261002-new">
 {% block head_extra %}{% endblock %}
 </head>
-<body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" {% block body_attrs_extra %}{% endblock %}>
+<body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" data-admin-mode="{{ 'new' if new_admin else 'legacy' }}" {% block body_attrs_extra %}{% endblock %}>
 <div class="a2-shell" id="shell">
 
   <nav class="a2-lnb" id="lnb" data-keep="1" aria-label="주메뉴">
     <div class="a2-lnb-brand" id="lnbBrand">팝콘 AI</div>
     <div class="a2-lnb-scroll">
+      {% if not new_admin %}
+      <a class="a2-new-entry" href="/admin2/new?admin=new" title="관리자-NEW"><img src="/shared/icons/admin/box.svg" alt=""><span class="a2-t">관리자-NEW →</span></a>
+      {% endif %}
       {% if workspace_nav %}
+      <div class="a2-new-label">신 관리자</div>
       <div class="pcw-nav">
         {% for item in workspace_nav %}
-        <a href="{{ item.href }}" title="{{ item.label }}" {% if request.url.path == item.href %}aria-current="page"{% endif %}>
+        <a href="{{ item.href }}" title="{{ item.label }}" {% if item.active %}aria-current="page"{% endif %}>
           <img src="/shared/icons/admin/{{ item.icon }}.svg" alt=""><span class="a2-t">{{ item.label }}</span>
         </a>
         {% endfor %}
+      </div>
+      <div class="a2-new-secondary">
+        <a href="/admin2/new-settings" title="설정 · 자료 관리" {% if request.url.path == '/admin2/new-settings' %}aria-current="page"{% endif %}><img src="/shared/icons/admin/sliders.svg" alt=""><span class="a2-t">설정 · 자료 관리</span></a>
+        <a href="/admin2/?admin=legacy" title="구 관리자"><img src="/shared/icons/admin/rotate-ccw.svg" alt=""><span class="a2-t">구 관리자</span></a>
       </div>
       {% else %}
       {% for g in nav %}
