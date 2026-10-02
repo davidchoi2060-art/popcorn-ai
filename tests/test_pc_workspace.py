@@ -1,6 +1,10 @@
 import copy
 import json
 import unittest
+from unittest.mock import patch,MagicMock
+from starlette.requests import Request
+from fastapi import HTTPException
+from api import admin_pc_workspace as workspace
 from pydantic import ValidationError
 from api.admin_pc_workspace import task_for, parse_proposal, source_context, SuggestionRequest
 
@@ -53,6 +57,28 @@ class WorkspaceTests(unittest.TestCase):
         for forbidden in ('private','supplier_cost','current_unit_price','offers'):
             self.assertNotIn(forbidden,serialized)
         self.assertEqual(source_context(d)['parts'][0]['quantity'],2)
+
+    def test_new_empty_copy_accepts_individual_valid_proposals(self):
+        empty=dict(title='신규 PC',intro='구성 안내',benefits=[],scene='',checks=[],faq=[])
+        proposal=parse_proposal(json.dumps(dict(changes=[dict(field='scene',value='일상 작업',reason='빈 항목 작성'),dict(field='benefits',value=[['저장장치','등록된 SSD 구성입니다.']],reason='빈 특장점')],notes=[])),empty)
+        self.assertEqual(len(proposal['changes']),2)
+        self.assertEqual(empty['scene'],'')
+        with self.assertRaises(ValidationError):
+            parse_proposal(json.dumps(dict(changes=[dict(field='scene',value='',reason='빈 값')],notes=[])),empty)
+
+    def test_private_component_audit_is_not_sent_to_ai(self):
+        d=dict(configuration_id='A1',revision=1,content=self.content,parts=[dict(slot_label='CPU',quantity=1,source_code='1',pseudo=False,explanation={'name':'CPU','role':'연산','_admin_part_history':[{'operator_id':'private'}],'updated_at':'private','supplier_price':'private'})],current_review=dict(checks=[],blockers=[]))
+        value=json.dumps(source_context(d))
+        self.assertNotIn('private',value);self.assertNotIn('_admin_part_history',value)
+
+    def test_proposal_rejects_price_basis_change_after_generation(self):
+        d=dict(configuration_id='N01',revision=1,status='draft',content=self.content,parts=[],current_review={'checks':[],'blockers':[],'basis':'a'*64})
+        later=copy.deepcopy(d);later['current_review']['basis']='b'*64
+        response=MagicMock(text=json.dumps({'changes':[],'notes':['등록자료 확인']}),provider='stub',model='stub',log_id=None)
+        with patch.object(workspace,'current_operator',return_value={'role':'owner'}),patch.object(workspace,'engine'),patch.object(workspace,'read_configuration',side_effect=[d,later]),patch.object(workspace.llm,'call',return_value=response) as call:
+            with self.assertRaises(HTTPException) as error:workspace.propose('N01',SuggestionRequest(revision=1),Request({'type':'http','headers':[]}))
+            self.assertEqual(error.exception.status_code,409)
+            self.assertEqual(call.call_args.kwargs['fallback_order'],[])
 
     def test_request_extra_keys_cannot_set_model_or_apply(self):
         with self.assertRaises(ValidationError):

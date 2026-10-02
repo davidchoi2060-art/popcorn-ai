@@ -38,6 +38,19 @@ class DescriptionEditTests(unittest.TestCase):
         self.assertEqual(error.exception.status_code,409)
         self.assertFalse(any('INSERT' in str(c.args[0]) or 'UPDATE pc_' in str(c.args[0]) for c in conn.execute.call_args_list))
 
+    def test_source_changes_block_description_save(self):
+        body=self.body(title='수정');body.source_basis='a'*64
+        with patch('api.pc_configuration_review.load_review',return_value=(None,None,None,{'basis':'b'*64})):
+            with self.assertRaises(HTTPException) as error:edit.save_copy(self.connection(),'P1',body,self.actor)
+        self.assertEqual(error.exception.status_code,409)
+
+    def test_new_product_requires_complete_copy(self):
+        c=dict(self.content,_admin_creation={'request_id':'new'})
+        self.assertTrue(edit.description_complete(c))
+        for key,value in [('scene',''),('benefits',[]),('intro',' ')]:
+            self.assertFalse(edit.description_complete(dict(c,**{key:value})))
+        self.assertTrue(edit.description_complete({'title':'기존','intro':'기존'}))
+
     def test_no_change_does_not_create_revision(self):
         conn=self.connection();result=edit.save_copy(conn,'P1',self.body(),self.actor)
         self.assertFalse(result['changed']);self.assertEqual(result['revision'],2)

@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import text
 from .db import engine
+from .pc_configuration_edit import description_complete
 from .part_explanations import is_current
 from .taxonomy import SLOT_LABELS
 from .pc_catalog_review_snapshot import review_snapshot
@@ -118,7 +119,7 @@ def catalog_rows(conn):
         market_alerts=changes_for(r,bom,offer_list,explanations,*market)
         workflow=current_review if content.get('_review') else None
         offer=offer_list[0] if offer_list else None
-        description_ready=bool(content.get('title') and content.get('intro') and bom) and all(
+        description_ready=bool(description_complete(content) and bom) and all(
             p['pseudo'] or bool(explanations.get(p['explanation_code'],{}).get('content',{}).get('role')) for p in bom)
         result.append(dict(configuration_id=r['configuration_id'],bom_fingerprint=r['bom_fingerprint'],
             revision=r['revision'],status=r['status'],observed_date=r['observed_date'],

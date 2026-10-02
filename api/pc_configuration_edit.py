@@ -2,11 +2,10 @@
 import json
 from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 from sqlalchemy import text
 from .auth import current_operator
 from .db import engine
-from .pc_configuration_copy import digest
 
 router = APIRouter()
 Short = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -35,9 +34,24 @@ class CopyEdit(BaseModel):
     model_config = ConfigDict(extra='forbid')
     revision: int = Field(gt=0)
     content: Description
+    source_basis: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
+
+
+
+def description_complete(content):
+    if not content.get('title') or not content.get('intro'):
+        return False
+    if not content.get('_admin_creation'):
+        return True # Keep the established legacy catalog review contract.
+    try:
+        Description.model_validate({k:content.get(k,{} if k=='recommendation_policy' else [] if k in ('benefits','checks','faq') else '') for k in EDITABLE})
+        return True
+    except ValidationError:
+        return False
 
 
 def save_copy(conn, identity, body, actor):
+    from .pc_configuration_copy import digest
     # Coordinate with the existing importer; row lock + revision prevent lost updates.
     conn.execute(text("SELECT pg_advisory_xact_lock(hashtext('pc_configuration_copy'))"))
     prior = conn.execute(text('SELECT * FROM pc_configurations WHERE configuration_id=:id FOR UPDATE'), {'id': identity}).mappings().first()
@@ -47,6 +61,10 @@ def save_copy(conn, identity, body, actor):
         raise HTTPException(409, '다른 변경이 먼저 저장되었습니다. 입력한 내용은 유지됩니다. 최신 내용을 확인한 후 다시 편집해 주세요.')
     if prior['status'] == 'retired':
         raise HTTPException(409, '보관된 제품군의 설명은 수정할 수 없습니다.')
+    if body.source_basis is not None:
+        from .pc_configuration_review import load_review
+        if load_review(conn,identity)[3]['basis'] != body.source_basis:
+            raise HTTPException(409,'상품 구성·가격·부품 근거가 변경되었습니다. 최신 자료에서 설명을 다시 확인해 주세요.')
     edit = body.content.model_dump(mode='json')
     if set(edit['recommendation_policy']) != set(prior['content'].get('recommendation_policy', {})):
         raise HTTPException(422, '추천 기준의 항목 이름은 변경할 수 없습니다.')
