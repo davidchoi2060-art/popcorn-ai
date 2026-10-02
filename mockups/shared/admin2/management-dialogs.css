@@ -40,3 +40,11 @@
 @media(max-height:760px){
  .pp-searchbox{max-height:calc(230px / var(--a2-zoom,1));overflow:auto;overscroll-behavior:contain}
 }
+
+/* Mobile shell content grows with the list. Overlays must anchor to the viewport,
+   not to that scroll-height. Account for the shell zoom just as PC dialogs do. */
+:is(.pp-veil,.sd-overlay,.sd-modal,.ss-modal-overlay,.cr-overlay){position:fixed;inset:0 auto auto 0;width:calc(100vw / var(--a2-zoom,1));height:calc(100dvh / var(--a2-zoom,1));box-sizing:border-box}
+:is(.pp-drawer,.cr-drawer){position:fixed;inset:0 0 auto auto;height:calc(100dvh / var(--a2-zoom,1));max-width:calc(100vw / var(--a2-zoom,1))}
+@media(max-width:768px){
+ :is(.pp-drawer,.cr-drawer){width:calc(100vw / var(--a2-zoom,1))}
+}
