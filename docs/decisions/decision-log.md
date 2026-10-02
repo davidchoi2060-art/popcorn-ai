@@ -7790,3 +7790,5 @@ CASE WHEN). 그 줄이 `market_price` 를 「무조건 EXCLUDED」 목록에 올
 처리할 일은 기존 /api/admin/pc-workspace/tasks 실제 응답 사용, 가격 확인/설명 보완/검토 대기 실제 분류 그대로 표시. 검색·분류·표시 수 10/20/30은 브라우저 localStorage 보존. 작업 선택은 기존 제품 작업 공간으로 연결. 설정 화면은 기존 도구 연결이며 전체 개편 완료라고 표시하지 않는다.
 
 검증: tests.test_admin_new_navigation 5건, Jinja 3템플릿, Node 구문, diff check 통과. 루프백 읽기 전용 미리보기에서 실제 DB 작업 응답104건, N07검색1건·10개 표시 유지, 구→신→제품군 왕복 LNB 확인. 600x650 main clientWidth=scrollWidth509. 미리보기의 권한 헤더/미디어는 운영 인증 검증이 아니며 운영 배포 뒤 별도 확인 필요. 스키마·상품·승인·유료 생성 변경 없음. 구 화면 삭제/DB 정리는 다음 범위.
+### 신 관리자 서버 반영 확인
+배포 438a9c3 / 36973472786 success, 조회 중 잘못된 0건 표시 보완 5789c74 / 36973633464 success. 운영 로그인 세션에서 구 홈의 관리자-NEW 버튼 → 신 홈, 제품군 → N07 대표 이미지 → 신규 구성 이동 시 신 LNB 유지 확인. 실제 작업 목록104건, N07검색과 표시 수 저장 확인; 좁은600px 본문 clientWidth=scrollWidth509. 증거 작업실 outputs/admin-media-design-20261002/admin-new-live.png 및 admin-new-live-small.png. 이번 상품 저장·승인·유료 생성·스키마 변경 없음. 남은 별도 미커밋 영상 화면 파일3개는 이 배포에 포함하지 않았다. 다음: 제품군/상세 및 부품 업무 통합을 승인 시안 기준으로 순차 개편.
