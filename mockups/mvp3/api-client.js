@@ -1,0 +1,8 @@
+/* Closed contract fixture. No fetch, credentials, or operational writes. */
+(function(root){'use strict';
+  const contract={configuration:{method:'GET',path:'/api/customer/pc-configurations/{configuration_id}'},preview:{method:'POST',path:'/api/customer/quote-change-preview'},publication:'closed'};
+  function conditions(input){const out={};for(const key of ['os','keyboard','mouse','monitor','warranty']){const v=input?.[key]||{},stale=v.needs_reconfirmation===true;const valid=key==='warranty'?v.state==='verified':['included','excluded'].includes(v.state);const known=valid&&!stale;out[key]={state:known?v.state:'unknown',detail:known&&typeof v.detail==='string'?v.detail:'',months:known&&key==='warranty'&&Number.isInteger(v.months)&&v.months>0?v.months:null,needs_reconfirmation:stale,customer_statement:known&&typeof v.customer_statement==='string'?v.customer_statement:'구매 전 확인이 필요합니다.'};if(!known)out[key].customer_statement='구매 전 확인이 필요합니다.';}return out;}
+  function publicFixture(input){if(!input||input.publication!=='allowed'||input.customer_publishable!==true||input.review?.state!=='approved'||input.review?.current_basis!==true||input.review?.eligible!==true||input.retired)return {status:404,error:'not_public'};return {status:200,data:{id:input.id,revision:input.revision,conditions:conditions(input.conditions)}};}
+  async function request(){throw new Error('고객 공개 연결은 아직 열리지 않았어요. 로컬 데모로 확인해주세요.');}
+  const client={contract,conditions,publicFixture,request};if(typeof module!=='undefined')module.exports=client;else root.MVP3Api=client;
+})(typeof window==='undefined'?globalThis:window);
