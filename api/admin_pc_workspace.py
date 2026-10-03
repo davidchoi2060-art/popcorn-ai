@@ -10,6 +10,7 @@ from .auth import current_operator
 from .db import engine
 from .pc_configuration_copy import catalog_rows, read_configuration, digest
 from .pc_configuration_edit import Description, EDITABLE
+from .pc_copy_claims import sales_context, filter_changes
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ def source_context(d):
     return dict(configuration_id=d['configuration_id'], revision=d['revision'],
         description={k:d['content'].get(k) for k in EDITABLE},
         facts=d['content'].get('facts', {}),
+        sales_conditions=sales_context(),
         required_copy_fields=[k for k in ('title','intro','benefits','scene') if not d['content'].get(k)],
         parts=[dict(slot=p['slot_label'], quantity=p['quantity'], code=p['source_code'],
                     explanation={k:p.get('explanation',{}).get(k) for k in ('name','slot','facts','role','highlights','cautions','questions','sources','review_issues') if k in p.get('explanation',{})}) for p in d['parts'] if not p['pseudo']],
@@ -153,6 +155,9 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
               'checks는 문자열 배열, faq는 question/answer 객체 배열이다. 최대6개 변경. '
               'notes는 문자열 배열이며 최대15개다. 전체 답변을 짧게 유지하고 JSON 밖에 설명을 붙이지 않는다. '
               '검토 보조 모드에서는 changes를 비우고 notes로만 의견을 제시하며 승인 여부를 판정하지 않는다. '
+              'sales_conditions의 unknown은 포함도 미포함도 확정되지 않았다는 뜻이다. BOM에 없거나 기존 설명에 적혀 있어도 판매조건 근거가 아니다. '
+              'unknown 판매조건은 포함 여부 확인 안내만 작성한다. 프로그램·버전·작업 조건을 특정한 근거 없이 요구 사양 충족을 주장하지 않는다. '
+              '출고 재고·최종 판매가·포함 조건 미확정처럼 고객 구매 판단에 필요한 안내는 내부 정보라는 이유로 삭제하지 않는다. '
               + COPY_QUALITY_GUIDE)
     prompt = json.dumps(dict(mode=body.mode, instruction=body.instruction, product=context), ensure_ascii=False, default=str)
     if len(prompt) > 60000:
@@ -190,6 +195,7 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
         latest = read_configuration(conn, identity)
     if latest['revision'] != d['revision'] or latest['current_review']['basis'] != d['current_review']['basis'] or digest(source_context(latest)) != digest(context):
         raise HTTPException(409, 'AI 제안 생성 중 상품 또는 근거가 바뀌었습니다. 최신 내용에서 다시 요청해 주세요.')
+    parsed = filter_changes(parsed)
     return dict(parsed, revision=d['revision'], mode=body.mode,
                 source_basis=d['current_review']['basis'],
                 provider=result.provider, model=result.model, log_id=result.log_id,

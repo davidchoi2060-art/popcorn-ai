@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 from sqlalchemy import text
 from .auth import current_operator
 from .db import engine
+from .pc_copy_claims import claim_issues, LABELS
 
 router = APIRouter()
 Short = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -69,6 +70,13 @@ def save_copy(conn, identity, body, actor):
     if set(edit['recommendation_policy']) != set(prior['content'].get('recommendation_policy', {})):
         raise HTTPException(422, '추천 기준의 항목 이름은 변경할 수 없습니다.')
     content = dict(prior['content'], **edit)
+    for field in EDITABLE:
+        # Preserve legacy text on unrelated edits; inspect every newly changed field.
+        if edit[field] != prior['content'].get(field):
+            issues = claim_issues(edit[field], field)
+            if issues:
+                labels = '·'.join(LABELS[key] for key in issues)
+                raise HTTPException(422, f'설명 근거 확인 필요: {field} ({labels}). 포함 여부 확인 안내 또는 확인된 부품 사양으로 수정해 주세요.')
     if content == prior['content']:
         return dict(revision=prior['revision'], updated_at=prior['updated_at'], content=content, changed=False)
     snapshot = dict(prior)
