@@ -95,6 +95,17 @@ def ai_conditions(config):
     return {k:{f:v[f] for f in ('state','detail','months','customer_statement')} for k,v in effective_conditions(config).items()}
 
 
+def customer_conditions(config, parts=None, offers=None):
+    """Customer-safe terms contract; does not approve publication or recommendation."""
+    terms = effective_conditions(config, parts, offers)
+    return {key:dict(state=item['state'],
+                    detail=item['detail'] if item['state'] != 'unknown' else '',
+                    months=item['months'] if item['state'] == 'verified' else None,
+                    needs_reconfirmation=item['stale'],
+                    customer_statement=item['customer_statement'])
+            for key,item in terms.items()}
+
+
 def save_condition(conn, identity, body, actor):
     from .pc_configuration_review import load_review
     from .pc_configuration_edit import write_content

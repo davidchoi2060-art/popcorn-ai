@@ -71,6 +71,37 @@ class SalesTests(unittest.TestCase):
         self.assertEqual(claim_issues(terms['warranty']['customer_statement'],conditions=terms),[])
         self.assertIn('warranty',claim_issues('보증·AS 기간은 36개월입니다.',conditions=terms))
 
+    def test_customer_contract_excludes_private_evidence_and_prior_assertions(self):
+        self.record()
+        result=sales.customer_conditions(self.cfg,self.parts,self.offers)
+        self.assertEqual(result['os']['state'],'included')
+        self.assertEqual(result['os']['detail'],'Windows 11 Home')
+        self.assertEqual(set(result['os']),{'state','detail','months','needs_reconfirmation','customer_statement'})
+        self.offers[0]['price_snapshot']+=1
+        result=sales.customer_conditions(self.cfg,self.parts,self.offers)
+        self.assertEqual(result['os']['state'],'unknown')
+        self.assertTrue(result['os']['needs_reconfirmation'])
+        self.assertEqual(result['os']['detail'],'')
+        self.assertIsNone(result['os']['months'])
+        self.assertNotIn('Windows',str(result))
+        for private in ('evidence','source','operator_id','confirmed_at','scope_basis','previous'):
+            self.assertNotIn(private,str(result))
+
+    def test_unconfirmed_operator_notes_are_not_customer_detail(self):
+        self.record(condition=dict(state='unknown',detail='private draft',evidence='private evidence',source='private source',months=None))
+        result=sales.customer_conditions(self.cfg,self.parts,self.offers)
+        self.assertEqual(result['os']['state'],'unknown')
+        self.assertEqual(result['os']['detail'],'')
+        self.assertNotIn('private',str(result))
+
+    def test_customer_warranty_keeps_scope_and_period_without_approval(self):
+        self.record('warranty',dict(self.condition,state='verified',detail='판매자 조립 보증',months=12))
+        result=sales.customer_conditions(self.cfg,self.parts,self.offers)
+        self.assertEqual(result['warranty']['months'],12)
+        self.assertEqual(result['warranty']['detail'],'판매자 조립 보증')
+        self.assertNotIn('publishable',result)
+        self.assertNotIn('eligible',result)
+
     def test_stale_save_conflict_before_content_history_write(self):
         conn=MagicMock()
         with patch('api.pc_configuration_review.load_review',return_value=(self.cfg,self.parts,self.offers,{'basis':'c'*64})),patch('api.pc_configuration_edit.write_content') as write:
