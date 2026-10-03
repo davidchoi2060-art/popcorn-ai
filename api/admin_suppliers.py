@@ -22,12 +22,15 @@ suppliers를 참조하는 테이블이 6개다. 매입 이력이 걸린 공급�
 같은 이름이 둘이면 매입가를 어느 쪽에 넣었는지 알 수 없다. 대소문자·앞뒤 공백을
 무시하고 막는다(0025의 유니크 인덱스). 화면에도 같은 판정을 먼저 보여준다.
 """
-from fastapi import APIRouter, HTTPException
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from .admin_orders import _log
+from .auth import current_operator
 from .db import engine
 from .timeutil import iso
 
@@ -43,6 +46,58 @@ class SupplierBody(BaseModel):
     platform: str | None = None
     brands: str | None = None
     status: str | None = None
+
+
+class SupplierSnapshot(BaseModel):
+    """The four base values returned by profile; contact data is never editable here."""
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    platform: str | None
+    brands: str | None
+    status: str
+
+
+class SupplierEdits(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = None
+    platform: str | None = None
+    brands: str | None = None
+    status: str | None = None
+
+
+class SupplierEditorBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected: SupplierSnapshot
+    supplier: SupplierEdits
+
+
+def _workspace_access(write=False):
+    """Keep the existing auth boundary, including standalone router consumers."""
+    op = current_operator()
+    if op is None:
+        raise HTTPException(401, "로그인이 필요합니다")
+    if op.get("role") not in (("operator", "owner") if write else
+                              ("viewer", "operator", "owner")):
+        raise HTTPException(403, "공급처 관리 권한이 부족합니다")
+    return op
+
+
+def _workspace_values(values):
+    name = (values["name"] or "").strip()
+    if not name:
+        raise HTTPException(400, "공급처 이름을 입력하세요")
+    if len(name) > 100:
+        raise HTTPException(400, "이름은 100자 이하로 입력하세요")
+    status = (values["status"] or "").strip()
+    if status not in STATES:
+        raise HTTPException(400, "상태는 " + " · ".join(STATES) + " 중 하나입니다")
+    platform = (values["platform"] or "").strip() or None
+    brands = (values["brands"] or "").strip() or None
+    if platform and len(platform) > 50:
+        raise HTTPException(400, "플랫폼은 50자 이하로 입력하세요")
+    if brands and len(brands) > 200:
+        raise HTTPException(400, "취급 브랜드는 200자 이하로 입력하세요")
+    return dict(name=name, platform=platform, brands=brands, status=status)
 
 
 # 공급처 목록·단건이 함께 쓰는 SELECT 몸통 — ADM-SRC-030(공급처 화면) 신설로 추가.
@@ -280,3 +335,143 @@ def deactivate_impact(supplier_id: int):
                     " 앞으로 매입가를 갱신할 곳이 없어집니다." if only else "")
                  + " 삭제가 아니라 중지이므로 언제든 다시 활성으로 되돌릴 수 있습니다."),
     }
+
+
+@router.get("/suppliers/directory")
+def supplier_directory(q: str = Query("", max_length=100),
+                       status: Literal["all", "활성", "중지"] = "all",
+                       page: int = Query(1, ge=1, le=1000000),
+                       page_size: int = Query(20)):
+    """Paged NEW workspace source; the legacy collection contract stays intact."""
+    op = _workspace_access()
+    if page_size not in (20, 50, 100):
+        raise HTTPException(422, "표시 수는 20 · 50 · 100 중 하나입니다")
+    conditions, params = [], {}
+    if status != "all":
+        conditions.append("s.status = :status")
+        params["status"] = status
+    term = q.strip()
+    if term:
+        # Escape literal LIKE metacharacters. All user values remain bound parameters.
+        pattern = "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        params["term"] = pattern
+        sid = int(term) if term.isdecimal() else -1
+        params["sid"] = sid if sid <= 9223372036854775807 else -1
+        conditions.append("(s.supplier_id = :sid OR lower(s.name) LIKE lower(:term) ESCAPE '\\'"
+                          " OR lower(COALESCE(s.platform,'')) LIKE lower(:term) ESCAPE '\\'"
+                          " OR lower(COALESCE(s.brands,'')) LIKE lower(:term) ESCAPE '\\')")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    with engine.connect() as conn:
+        summary = dict(conn.execute(text(
+            "SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE s.status='활성') AS active,"
+            " COUNT(*) FILTER (WHERE s.status='중지') AS inactive,"
+            " COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM supplier_presets pr"
+            " WHERE pr.supplier_id=s.supplier_id)) AS no_preset_count FROM suppliers s"
+        )).mappings().one())
+        total = conn.execute(text("SELECT COUNT(*) FROM suppliers s" + where), params).scalar()
+        rows = conn.execute(text(_SELECT_BODY + where +
+            " ORDER BY (s.status='중지'), s.name, s.supplier_id LIMIT :limit OFFSET :offset"),
+            {**params, "limit": page_size, "offset": (page - 1) * page_size}).mappings().all()
+    return {"items": [_shape(r) for r in rows], "total": total, "page": page,
+            "page_size": page_size, "summary": summary, "empty": summary["active"] == 0,
+            "note": ("활성 공급처가 없습니다. 등록하거나 중지된 공급처를 확인하세요."
+                     if not summary["active"] else "공급처 기본 정보와 연결 기록을 확인하세요."),
+            "can_write": op["role"] in ("operator", "owner"),
+            "states": list(STATES), "page_sizes": [20, 50, 100]}
+
+
+@router.get("/suppliers/{supplier_id}/profile")
+def supplier_profile(supplier_id: int):
+    op = _workspace_access()
+    with engine.connect() as conn:
+        row = _one(conn, supplier_id)
+        if row is None:
+            raise HTTPException(404, "공급처를 찾을 수 없습니다")
+        contact = conn.execute(text(
+            "SELECT contact_name, contact_phone, order_phone, contact_fetched_at"
+            " FROM suppliers WHERE supplier_id=:i"), {"i": supplier_id}).mappings().one()
+    return {"item": _shape(row),
+            "contact": {"name": contact["contact_name"], "phone": contact["contact_phone"],
+                        "order_phone": contact["order_phone"],
+                        "fetched_at": iso(contact["contact_fetched_at"]),
+                        "source": "mall_observation" if contact["contact_fetched_at"] else "unverified"},
+            "edit_snapshot": {key: row[key] for key in ("name", "platform", "brands", "status")},
+            "can_write": op["role"] in ("operator", "owner")}
+
+
+@router.get("/suppliers/{supplier_id}/products")
+def supplier_products(supplier_id: int, page: int = Query(1, ge=1, le=1000000),
+                      page_size: int = Query(20)):
+    _workspace_access()
+    if page_size not in (20, 50, 100):
+        raise HTTPException(422, "표시 수는 20 · 50 · 100 중 하나입니다")
+    with engine.connect() as conn:
+        if conn.execute(text("SELECT 1 FROM suppliers WHERE supplier_id=:i"),
+                        {"i": supplier_id}).first() is None:
+            raise HTTPException(404, "공급처를 찾을 수 없습니다")
+        total = conn.execute(text("SELECT COUNT(*) FROM product_supplier_prices"
+                                  " WHERE supplier_id=:i"), {"i": supplier_id}).scalar()
+        rows = conn.execute(text(
+            "SELECT sp.product_code, p.sku,"
+            " COALESCE(p.product_name,p.sku,CAST(sp.product_code AS TEXT)) AS display_name,"
+            " sp.supply_state FROM product_supplier_prices sp"
+            " LEFT JOIN products p ON p.product_code=sp.product_code WHERE sp.supplier_id=:i"
+            " ORDER BY sp.product_code LIMIT :limit OFFSET :offset"),
+            {"i": supplier_id, "limit": page_size, "offset": (page - 1) * page_size}).mappings().all()
+    return {"supplier_id": supplier_id, "items": [dict(r) for r in rows],
+            "total": total, "page": page, "page_size": page_size}
+
+
+@router.patch("/suppliers/{supplier_id}/editor")
+def edit_supplier_workspace(supplier_id: int, body: SupplierEditorBody):
+    """Partial edits with atomic compare-and-swap; never change legacy PATCH semantics.
+
+    Comparing inside UPDATE protects even the gap after a SELECT. PostgreSQL checks
+    this predicate again when a concurrent update releases the row lock. No migration,
+    contacts, product links, price or sourcing writes are needed.
+    """
+    _workspace_access(write=True)
+    expected = body.expected.model_dump()
+    try:
+        with engine.begin() as conn:
+            before = _one(conn, supplier_id)
+            if before is None:
+                raise HTTPException(404, "공급처를 찾을 수 없습니다")
+            stale = {"error": "stale_supplier", "message": "다른 변경이 있습니다. 최신 정보를 확인하세요"}
+            if any(before[k] != expected[k] for k in expected):
+                raise HTTPException(409, stale)
+            merged = {**expected, **body.supplier.model_dump(exclude_unset=True)}
+            values = _workspace_values(merged)
+            # Preserve omitted values exactly, including historical whitespace.
+            for key in values:
+                if key not in body.supplier.model_fields_set:
+                    values[key] = expected[key]
+            changed = {key: {"before": before[key], "after": values[key]}
+                       for key in values if before[key] != values[key]}
+            if not changed:
+                return {**_shape(before), "note": "바뀐 값이 없습니다", "changed": {}}
+            dup = conn.execute(text(
+                "SELECT supplier_id,name,status,platform,brands FROM suppliers"
+                " WHERE lower(btrim(name))=lower(btrim(:n)) AND supplier_id<>:i"),
+                {"n": values["name"], "i": supplier_id}).mappings().first()
+            if dup:
+                raise HTTPException(409, {"error": "duplicate_name",
+                    "message": f"같은 이름의 공급처가 이미 있습니다 — {dup['name']}({dup['status']})",
+                    **dict(dup)})
+            updated = conn.execute(text(
+                "UPDATE suppliers SET name=:n,platform=:p,brands=:b,status=:s"
+                " WHERE supplier_id=:i AND name IS NOT DISTINCT FROM :en"
+                " AND platform IS NOT DISTINCT FROM :ep AND brands IS NOT DISTINCT FROM :eb"
+                " AND status IS NOT DISTINCT FROM :es RETURNING supplier_id"),
+                {"i": supplier_id, "n": values["name"], "p": values["platform"],
+                 "b": values["brands"], "s": values["status"], "en": expected["name"],
+                 "ep": expected["platform"], "eb": expected["brands"], "es": expected["status"]}).scalar()
+            if updated is None:
+                raise HTTPException(409, stale)
+            _log(conn, "supplier_update", before["name"], {"changed": changed}, kind="supplier")
+            row = _one(conn, supplier_id)
+    except IntegrityError:
+        raise HTTPException(409, "이미 있는 공급처입니다") from None
+    note = (f"{row['name']} 중지했습니다. 기존 매입가·단가표·기록은 그대로 남습니다."
+            if changed.get("status", {}).get("after") == "중지" else f"{row['name']} 저장했습니다")
+    return {**_shape(row), "note": note, "changed": changed}
