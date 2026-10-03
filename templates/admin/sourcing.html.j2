@@ -58,6 +58,7 @@
 {% block title %}매입 견적(용산){% endblock %}
 
 {% block head_extra %}
+{% if new_admin %}<link rel="stylesheet" href="/shared/admin2/sourcing-new.css?v=20261003-e1">{% else %}
 <style>
 .src-root{padding:20px 22px 26px;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;gap:14px}
 .src-loading{padding:48px 20px;text-align:center;color:var(--on-variant);font:400 13px/1.6 var(--font)}
@@ -223,13 +224,17 @@
   .src-search input{min-width:0;flex:1}
 }
 </style>
+{% endif %}
 {% endblock %}
 
 {% block header_extra %}
+{% if not new_admin %}
 <span class="src-headnote" id="srcHeadNote">불러오는 중…</span>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if new_admin %}{% include "admin/_sourcing_new.html.j2" %}{% else %}
 <div class="src-root" data-screen-id="ADM-SRC-010" data-domain="sourcing">
   <div class="src-loading" id="srcLoading">불러오는 중…</div>
   <div class="src-error" id="srcError" hidden></div>
@@ -293,9 +298,11 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block foot_extra %}
+{% if new_admin %}<script src="/shared/admin2/sourcing-new.js?v=20261003-e1"></script>{% else %}
 {% raw %}
 <script>
 (function () {
@@ -856,4 +863,5 @@
 })();
 </script>
 {% endraw %}
+{% endif %}
 {% endblock %}

@@ -63,7 +63,7 @@ def list_members():
 
 def _select_sql(*, extended: bool = True) -> str:
     """The legacy activity population, with extra read-only member facts."""
-    extra = 'm.status, m.last_login_at, m.user_id,' if extended else ''
+    extra = 'm.status, m.last_login_at, m.user_id, m.data_origin,' if extended else ''
     return f"""
         SELECT m.member_id, m.nickname, m.email, m.joined_via, m.created_at,
                {extra}
@@ -98,7 +98,8 @@ def _item(r, *, extended: bool = True) -> dict:
     }
     if extended:
         item.update(via_code=r['joined_via'], status=r['status'],
-                    last_login_at=iso(r['last_login_at']), visitor_linked=r['user_id'] is not None)
+                    last_login_at=iso(r['last_login_at']), visitor_linked=r['user_id'] is not None,
+                    data_origin=r['data_origin'])
     return item
 
 

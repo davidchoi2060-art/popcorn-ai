@@ -46,6 +46,7 @@
 {% block title %}재고 입고{% endblock %}
 
 {% block head_extra %}
+{% if new_admin %}<link rel="stylesheet" href="/shared/admin2/stock-inbound-new.css?v=20261003-e1">{% else %}
 <style>
 .si-wrap,.si-wrap *{box-sizing:border-box}
 .si-wrap{flex:1;min-height:0;display:flex;background:var(--rv-canvas)}
@@ -236,13 +237,17 @@
   .si-hist{flex:none;max-height:360px}
 }
 </style>
+{% endif %}
 {% endblock %}
 
 {% block header_extra %}
+{% if not new_admin %}
 <span class="si-hdcount" id="siHdCount" data-bind="header-count">입고 대기 <b>—</b>건</span>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if new_admin %}{% include "admin/_stock_inbound_new.html.j2" %}{% else %}
 <div class="si-wrap">
 
   <section class="si-list" data-keep="1" aria-label="입고 대기 목록">
@@ -347,9 +352,11 @@
   </section>
 
 </div>
+{% endif %}
 {% endblock %}
 
 {% block foot_extra %}
+{% if new_admin %}<script src="/shared/admin2/stock-inbound-new.js?v=20261003-e1"></script>{% else %}
 {% raw %}
 <script>
 (function () {
@@ -1090,4 +1097,5 @@
 })();
 </script>
 {% endraw %}
+{% endif %}
 {% endblock %}

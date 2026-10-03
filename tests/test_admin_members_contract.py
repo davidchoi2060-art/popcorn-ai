@@ -25,6 +25,10 @@ class MemberPageContract(unittest.TestCase):
         self.assertEqual(allowed.status_code,200)
         self.assertIn('data-admin-mode="new"',allowed.text)
         self.assertIn('/shared/admin2/members.js',allowed.text)
+        self.assertIn('id="filterToggle"',allowed.text)
+        self.assertIn('aria-controls="filterFields"',allowed.text)
+        self.assertIn('id="rows" class="mm-member-list"',allowed.text)
+        self.assertIn('저장 분류만으로 실제 고객 여부를 판단할 수 없습니다.',allowed.text)
         self.assertIn('no-store',allowed.headers['cache-control'])
         for unwanted in ['검토 시안','example.invalid','id="role"','id="scenario"','가상 회원']:
             self.assertNotIn(unwanted,allowed.text)

@@ -70,7 +70,8 @@ class Fixture:
         self.db.create_function('GREATEST', -1, lambda *args: max((v for v in args if v is not None), default=None))
         self.db.executescript('''
           CREATE TABLE members(member_id INTEGER PRIMARY KEY,nickname TEXT,email TEXT,joined_via TEXT,created_at TEXT,
-            mall_member_id TEXT,mall_map_requested_at TEXT,status TEXT,last_login_at TEXT,user_id INTEGER);
+            mall_member_id TEXT,mall_map_requested_at TEXT,status TEXT,last_login_at TEXT,user_id INTEGER,
+            data_origin TEXT DEFAULT 'real');
           CREATE TABLE orders(member_id INTEGER,created_at TEXT,status TEXT);
           CREATE TABLE consult_sessions(member_id INTEGER,created_at TEXT,data_origin TEXT,user_id INTEGER);
           CREATE TABLE member_reviews(member_id INTEGER,created_at TEXT,status TEXT);
@@ -81,7 +82,7 @@ class Fixture:
             action TEXT,target_kind TEXT,target_id TEXT,detail TEXT);
         ''')
         for i in range(1, 13):
-            self.db.execute('INSERT INTO members VALUES(?,?,?,?,?,?,?,?,?,?)',
+            self.db.execute('INSERT INTO members(member_id,nickname,email,joined_via,created_at,mall_member_id,mall_map_requested_at,status,last_login_at,user_id) VALUES(?,?,?,?,?,?,?,?,?,?)',
                             (i, f'회원{i}', f'member-{i}@example.invalid', ['email','google','kakao','naver'][i%4],
                              '2026-09-01 01:00:00', None, None, 'active', None, 100+i))
         self.db.commit()
@@ -130,6 +131,22 @@ class MemberTests(unittest.TestCase):
         self.assertEqual(members.search_members(q='不存在')['total'],0)
         self.assertEqual(members.search_members(q='9'*100)['total'],0)
         self.assertTrue(all('OR TRUE--' not in sql for sql,_ in self.fixture.calls))
+
+    def test_origin_is_raw_read_only_extended_fact_not_legacy_classification(self):
+        origins = ['real', 'demo', None, '<origin & legacy>']
+        legacy_before = members.list_members()
+        for member_id, origin in enumerate(origins, 1):
+            self.fixture.edit('UPDATE members SET data_origin=? WHERE member_id=?', (origin, member_id))
+        self.assertEqual(members.list_members(), legacy_before)
+        page = members.search_members(sort='id_asc')
+        self.assertEqual(page['total'], 12)
+        for member_id, origin in enumerate(origins, 1):
+            self.assertEqual(page['items'][member_id-1]['data_origin'], origin)
+            detail = members.member_detail(member_id)
+            self.assertEqual(detail['member']['data_origin'], origin)
+            self.assertEqual(detail['member']['status'], 'active')
+            self.assertEqual(detail['member']['map_state'], 'none')
+        self.assertNotIn('data_origin', page['available_filters'])
     def test_pages_stable_ties_and_out_of_range(self):
         a=members.search_members(page_size=10);b=members.search_members(page=2,page_size=10)
         self.assertEqual([m['id'] for m in a['items']],[12,11,10,9,8,7,6,5,4,3])
