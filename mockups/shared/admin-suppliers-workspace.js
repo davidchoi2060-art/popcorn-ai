@@ -78,7 +78,7 @@
     el('sw-count').textContent = '검색 결과 ' + j.total + '곳';
     el('sw-rows').innerHTML = j.items.map(it => '<button type="button" class="sw-row" data-action="select" data-id="' + esc(it.id) +
       '" aria-pressed="' + (it.id === S.selected) + '"><span class="sw-row-top"><strong>' + esc(it.name) + '</strong>' + badge(it.status) +
-      '</span><span class="sw-muted">ID ' + esc(it.id) + ' · ' + esc(it.platform || '플랫폼 미등록') +
+      '</span><span class="sw-muted"><span class="sw-brief">ID ' + esc(it.id) + '</span> · ' + esc(it.platform || '플랫폼 미등록') +
       '</span><span class="sw-row-bottom"><span>' + esc(it.brands || '브랜드 미등록') + '</span><span>연결 ' + esc(it.linked_products) + '개</span></span></button>').join('') ||
       '<div class="sw-empty">' + (sum.total === 0 ? '등록된 공급처가 없습니다.' : '조건에 맞는 공급처가 없습니다. 검색어나 상태를 바꿔보세요.') + '</div>';
     const start = (j.page - 1) * j.page_size;
@@ -144,9 +144,9 @@
       (it.status === '활성' ? '중지 영향 확인' : '활성으로 되돌리기') + '</button></div>' : '<p class="sw-muted">조회 전용 권한입니다.</p>';
     const contact = c.name || c.phone || c.order_phone ? '<dl><dt>담당자</dt><dd>' + esc(c.name || '미등록') + '</dd><dt>대표 전화</dt><dd>' +
       esc(c.phone || '미등록') + '</dd><dt>발주 전화</dt><dd>' + esc(c.order_phone || '미등록') + '</dd></dl>' : '<p class="sw-muted">등록된 연락 정보가 없습니다.</p>';
-    el('sw-detail').innerHTML = outside + '<div class="sw-detail-title"><div><span class="sw-muted">공급처 상세 · ID ' + esc(it.id) + '</span><h2>' + esc(it.name) + '</h2></div>' + badge(it.status) +
+    el('sw-detail').innerHTML = outside + '<div class="sw-detail-title"><div><span class="sw-muted sw-brief">공급처 상세 · ID ' + esc(it.id) + '</span><h2>' + esc(it.name) + '</h2></div>' + badge(it.status) +
       '</div><h3>기본 정보</h3><dl><dt>플랫폼</dt><dd>' + esc(it.platform || '미등록') + '</dd><dt>취급 브랜드</dt><dd>' + esc(it.brands || '미등록') + '</dd></dl>' + actions +
-      '<hr><h3>연락 정보 <span class="sw-muted">조회</span></h3>' + contact + '<p class="sw-muted">' +
+      '<hr><h3>연락 정보 <span class="sw-muted sw-brief">조회</span></h3>' + contact + '<p class="sw-muted">' +
       (c.source === 'mall_observation' ? '쇼핑몰 수집 기록 · ' : '출처 미확인 · ') + esc(stamp(c.fetched_at)) +
       '<br>저장된 정보입니다. 현재 연락 가능 여부를 확인한 것은 아닙니다.</p><hr><h3>상품·단가표 연결</h3><dl><dt>매입가 연결 상품</dt><dd>' + esc(it.linked_products) +
       '개</dd><dt>단가표 파일</dt><dd>' + esc(it.price_files) + '건</dd><dt>파서 프리셋</dt><dd>' + (it.preset_count ? '등록됨' : '없음') + '</dd></dl>' +
@@ -171,7 +171,7 @@
     if (S.productsError) { node.innerHTML = '<p class="sw-error" role="alert">' + esc(S.productsError) + '</p><button type="button" data-action="retry-products">다시 조회</button>'; return; }
     const j = S.products;
     if (!j) { node.textContent = '연결 상품 조회 중…'; return; }
-    node.innerHTML = j.items.map(p => '<div class="sw-product"><span>' + esc(p.display_name) + '<br><span class="sw-muted">상품 ' + esc(p.product_code) + ' · ' + esc(p.sku || 'SKU 미등록') +
+    node.innerHTML = j.items.map(p => '<div class="sw-product"><span>' + esc(p.display_name) + '<br><span class="sw-muted"><span class="sw-brief">상품 ' + esc(p.product_code) + '</span> · ' + esc(p.sku || 'SKU 미등록') +
       '</span></span><span class="sw-muted">' + esc(p.supply_state || '상태 미등록') + '</span></div>').join('') || '<p class="sw-muted">연결된 상품이 없습니다.</p>';
     if (j.total) node.innerHTML += '<nav class="sw-pagination" aria-label="연결 상품 페이지"><button type="button" data-action="products-prev" ' + (j.page <= 1 ? 'disabled' : '') +
       '>이전</button><span>총 ' + j.total + '개 · ' + j.page + ' / ' + Math.ceil(j.total / j.page_size) + '</span><button type="button" data-action="products-next" ' +
@@ -187,8 +187,8 @@
       '</h2><p class="sw-muted">' + (editing ? '연락 정보·상품 연결은 함께 변경하지 않습니다.' : '이름은 필수입니다. 새 공급처는 활성 상태로 등록합니다.') + '</p>' +
       '<form id="sw-form" class="sw-form"><label>공급처 이름 *<input id="sw-name" required maxlength="100" value="' + esc(S.draft.name) +
       '" autocomplete="off" placeholder="공급처 이름"><small>최대 100자 · 대소문자와 앞뒤 공백은 중복 판정에서 무시합니다.</small></label><label>플랫폼<input id="sw-platform" maxlength="50" value="' +
-      esc(S.draft.platform) + '" placeholder="선택 입력"><small>최대 50자</small></label><label>취급 브랜드<input id="sw-brands" maxlength="200" value="' + esc(S.draft.brands) +
-      '" placeholder="선택 입력"><small>최대 200자</small></label><div class="sw-error" id="sw-form-error" role="alert">' + esc(S.error || '') + '</div>' + duplicate + latest +
+      esc(S.draft.platform) + '" placeholder="선택 입력"><small class="sw-brief">최대 50자</small></label><label>취급 브랜드<input id="sw-brands" maxlength="200" value="' + esc(S.draft.brands) +
+      '" placeholder="선택 입력"><small class="sw-brief">최대 200자</small></label><div class="sw-error" id="sw-form-error" role="alert">' + esc(S.error || '') + '</div>' + duplicate + latest +
       (S.error && editing && !S.latest ? '<button type="button" data-action="compare">최신 정보와 비교</button>' : '') +
       '<div class="sw-actions"><button type="submit" class="sw-primary" ' + (!S.canWrite ? 'disabled' : '') + '>' + (editing ? '변경 저장' : '등록') +
       '</button><button type="button" data-action="cancel">취소</button></div></form>';

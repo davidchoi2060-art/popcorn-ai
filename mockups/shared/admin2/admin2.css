@@ -28,6 +28,11 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 :root{
+  /* 관리자 일반 10pt / 아주 짧은 비핵심 보조 9pt. 기본 16px 기준 rem.
+     기존 셸 zoom은 별도로 유지하며 고객 디자인 토큰과 분리한다. */
+  --pc-text-standard: .8333333333rem;
+  --pc-text-brief: .75rem;
+  --pc-text-action: 1rem;
   /* ── 원시 팔레트 — reviews.html.j2 원안 그대로(oklch 베이지) ── */
   --rv-page:#e8e4dc; --rv-canvas:#f7f4ee; --rv-card:#fffdf9; --rv-panel:#f4f0e7; --rv-panel2:#f2eee5;
   --rv-ink:#26231e; --rv-ink-soft:#403c35; --rv-muted:#6f6a61; --rv-faint:#8a8377;
