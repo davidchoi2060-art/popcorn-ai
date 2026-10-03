@@ -11,9 +11,11 @@
   <header class="topbar"><a class="brand" href="index.html" aria-label="팝콘AI 처음 화면"><strong>팝콘AI</strong></a><span class="tagline">게임하는 당신의<br>최적의 PC를, 더 쉽게</span><span class="demo-label">MVP3 · 로컬 데모</span><nav aria-label="상담 메뉴"><button type="button" data-action="new">새 상담</button><button type="button" data-action="saved">내 견적</button></nav></header>
   <div class="workspace">
     <aside class="chat" aria-label="PC 상담">
-      <div class="chat-intro"><h1>어떤 PC를 찾으세요?</h1><p>게임, 예산, 원하는 조건을 편하게 말해주세요.</p></div>
+      <button id="chat-toggle" class="chat-toggle" type="button" aria-expanded="true" aria-controls="chat-body"><span id="chat-summary">상담 시작하기</span><span id="chat-toggle-label">상담 접기 ▴</span></button>
+      <div id="chat-body" class="chat-body"><div class="chat-intro"><h1>어떤 PC를 찾으세요?</h1><p>게임, 예산, 원하는 조건을 편하게 말해주세요.</p></div>
       <div id="messages" class="messages" role="log" aria-label="상담 내용" aria-live="polite"></div>
       <div class="composer"><div id="suggestions" class="suggestions"></div><form id="chat-form"><label class="sr-only" for="request">원하는 조건</label><textarea id="request" rows="2" maxlength="500" placeholder="예: 배그랑 롤 하고, 예산은 150만원이에요"></textarea><button class="send" type="submit" aria-label="요청 보내기"><img src="../shared/icons/su/ft-send.svg" alt=""></button></form><small>가상 상담 예시 · AI나 운영 API를 호출하지 않아요.</small></div>
+      </div>
     </aside>
     <main class="content" id="main"><div id="view" class="view"></div><div id="actions" class="actionbar"></div></main>
   </div>
