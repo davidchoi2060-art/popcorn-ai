@@ -125,6 +125,18 @@ class ReviewTests(unittest.TestCase):
         self.config['status']='retired'
         self.assertFalse(self.assess()['eligible'])
 
+    def test_sales_conditions_change_invalidates_approval_and_conflicting_copy_blocks(self):
+        from api.pc_sales_conditions import scope_basis
+        self.approve_fixture()
+        self.config['content']['_sales_conditions']={'os':dict(state='excluded',detail='',evidence='판매 구성 확인',
+            source='검토 문서',checked_date='2026-10-03',months=None,operator_id=7,confirmed_at='now',
+            scope_basis=scope_basis(self.config,self.parts,self.offers))}
+        self.assertFalse(self.assess()['eligible'])
+        self.config['content']['checks']=['운영체제는 포함됩니다.']
+        self.assertTrue(any('판매조건과 상품 설명' in b for b in self.assess()['blockers']))
+        self.config['content']['checks']=['운영체제는 미포함입니다.']
+        self.assertFalse(any('판매조건과 상품 설명' in b for b in self.assess()['blockers']))
+
     def test_legacy_catalog_preserved_until_review_started(self):
         c=dict(configuration_id='T',content={})
         self.assertTrue(review.review_allows(None,c))

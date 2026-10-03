@@ -76,6 +76,13 @@ def assess(config, parts, offers, rows, specs, rules):
     if config['status'] == 'retired':
         blockers.append('보관된 제품군')
     content = config['content']
+    if content.get('_sales_conditions'):
+        from .pc_sales_conditions import effective_conditions
+        from .pc_copy_claims import claim_issues
+        terms = effective_conditions(config, parts, offers)
+        for key in ('title','intro','benefits','scene','checks','faq'):
+            if claim_issues(content.get(key, []), key, terms):
+                blockers.append(f'판매조건과 상품 설명 근거 확인 필요: {key}')
     if not description_complete(content):
         blockers.append('상품명·소개·특장점·사용 상황 보완 필요' if content.get('_admin_creation') else '상품명·소개 누락')
     for key in ('cpu','ram_gb','storage_gb'):

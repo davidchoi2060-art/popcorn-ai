@@ -22,8 +22,11 @@ SOFTWARE = re.compile(r'(?:프로그램|소프트웨어|앱).{0,60}(?:조건|사
 WARRANTY = re.compile(r'(?:보증|무상\s*(?:AS|A/S|수리)).{0,30}(?:\d+\s*(?:년|개월)|제공합니다|보장합니다)', re.I)
 
 
-def sales_context():
+def sales_context(config=None):
     # Deliberately no extraction from description/facts/BOM. No verified source exists yet.
+    if config is not None:
+        from .pc_sales_conditions import ai_conditions
+        return ai_conditions(config)
     return {key: {'state': 'unknown'} for key in (*SALES_SUBJECTS, 'warranty')}
 
 
@@ -42,13 +45,18 @@ def statements(value):
                 yield from statements(item)
 
 
-def claim_issues(value, field=None):
+def claim_issues(value, field=None, conditions=None):
     issues = set()
     if field == 'benefits':
         # A feature title and its description express one claim together.
         value = [' '.join(pair) for pair in value]
+    normalize = lambda s: re.sub(r'\s+', '', s).rstrip('.!?。')
+    allowed = {normalize(c['customer_statement']) for c in (conditions or {}).values()
+               if c.get('state') != 'unknown' and c.get('customer_statement')}
     for text in statements(value):
         for clause in re.split(r'[.!?。\n;]', text):
+            if normalize(clause) in allowed:
+                continue
             for key, subject in SALES_SUBJECTS.items():
                 for match in re.finditer(subject, clause, re.I):
                     tail = clause[match.end():]
@@ -62,13 +70,13 @@ def claim_issues(value, field=None):
     return sorted(issues)
 
 
-def filter_changes(proposal):
+def filter_changes(proposal, conditions=None):
     safe, notes = [], list(proposal['notes'])
     for change in proposal['changes']:
-        issues = claim_issues(change['value'], change['field'])
+        issues = claim_issues(change['value'], change['field'], conditions)
         if issues:
             labels = '·'.join(LABELS[key] for key in issues)
-            notes.insert(0, f"근거 확인 필요: {change['field']} 제안 제외 ({labels}). 판매조건은 등록된 확정 근거가 없으며 프로그램 요구 조건은 별도 대조가 필요합니다.")
+            notes.insert(0, f"근거 확인 필요: {change['field']} 제안 제외 ({labels}). 현재 확인된 판매조건의 안내와 대조하거나 프로그램 요구 조건을 별도로 확인해 주세요.")
         else:
             safe.append(change)
     return dict(proposal, changes=safe, notes=list(dict.fromkeys(notes))[:15])

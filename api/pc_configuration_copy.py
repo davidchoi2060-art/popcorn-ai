@@ -79,11 +79,12 @@ def read_configuration(conn, identity):
     media_current=bool(media and snapshot(conn,identity)['visual_basis']==media['visual_basis'])
     workflow=current_review if r['content'].get('_review') else None
     market_alerts=changes_for(r,parts,offers,explanations,*load_market(conn))
+    from .pc_sales_conditions import effective_conditions
     return dict(r,representative_image_url=f"/api/admin/pc-media/{identity}/images/{media['job_id']}" if media_current else None,representative_image_stale=bool(media and not media_current),review_workflow=workflow,parts=parts,offers=offers,needs_review=bool(market_alerts) or (bool(workflow) and not workflow['eligible']) or bool(affected) or bool(r['content'].get('_admin_bom_edit',{}).get('review_required')),affected_parts=affected,
                 cooling_plan=current_review['cooling_plan'],market_alerts=market_alerts,current_review=current_review,management_state=queue_status(r,current_review),
                 compatibility_display=review_snapshot(identity,parts),
                 recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
-                customer_publishable=False,price_is_snapshot=True)
+                sales_conditions=effective_conditions(r,parts,offers),customer_publishable=False,price_is_snapshot=True)
 
 def catalog_rows(conn):
     """Bulk read once; evaluate the same source-review rule used by detail reads."""

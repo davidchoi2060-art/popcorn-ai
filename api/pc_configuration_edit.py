@@ -73,17 +73,28 @@ def save_copy(conn, identity, body, actor):
     for field in EDITABLE:
         # Preserve legacy text on unrelated edits; inspect every newly changed field.
         if edit[field] != prior['content'].get(field):
-            issues = claim_issues(edit[field], field)
+            from .pc_configuration_copy import read_configuration
+            from .pc_sales_conditions import effective_conditions
+            # Load only if a claim needs evidence. Existing no-claim edits keep their read contract.
+            initial = claim_issues(edit[field], field)
+            issues = (claim_issues(edit[field], field, effective_conditions(read_configuration(conn, identity)))
+                      if initial and prior['content'].get('_sales_conditions') else initial)
             if issues:
                 labels = '·'.join(LABELS[key] for key in issues)
                 raise HTTPException(422, f'설명 근거 확인 필요: {field} ({labels}). 포함 여부 확인 안내 또는 확인된 부품 사양으로 수정해 주세요.')
     if content == prior['content']:
         return dict(revision=prior['revision'], updated_at=prior['updated_at'], content=content, changed=False)
+    return write_content(conn, prior, content, actor, 'description',
+                         [k for k in EDITABLE if prior['content'].get(k) != edit[k]])
+
+
+def write_content(conn, prior, content, actor, kind, fields):
+    from .pc_configuration_copy import digest
+    identity = prior['configuration_id']
     snapshot = dict(prior)
     for key, table in [('parts', 'pc_configuration_parts'), ('offers', 'pc_configuration_offers')]:
         snapshot[key] = [dict(r) for r in conn.execute(text(f'SELECT * FROM {table} WHERE configuration_id=:id ORDER BY '+('ordinal' if key=='parts' else 'offer_id')), {'id': identity}).mappings()]
-    snapshot['edit'] = dict(kind='description', operator_id=actor['operator_id'], name=actor.get('name', ''),
-                            fields=[k for k in EDITABLE if prior['content'].get(k) != edit[k]])
+    snapshot['edit'] = dict(kind=kind, operator_id=actor['operator_id'], name=actor.get('name', ''), fields=fields)
     conn.execute(text('INSERT INTO pc_configuration_history(configuration_id,revision,snapshot) VALUES(:id,:revision,CAST(:snapshot AS jsonb))'),
                  dict(id=identity, revision=prior['revision'], snapshot=json.dumps(snapshot, ensure_ascii=False, default=str)))
     parts = [{k: v for k, v in p.items() if k != 'configuration_id'} for p in snapshot['parts']]
@@ -119,5 +130,5 @@ def description_history(identity: str, offset: int=Query(0, ge=0), limit: int=Qu
             WHERE configuration_id=:id ORDER BY revision DESC LIMIT :limit OFFSET :offset'''),
             dict(id=identity, offset=offset, limit=limit)).mappings()
         items = [dict(revision=r['revision'], archived_at=r['archived_at'], edit=r['snapshot'].get('edit'),
-                      content={k:r['snapshot'].get('content',{}).get(k) for k in EDITABLE}) for r in rows]
+                      content={k:r['snapshot'].get('content',{}).get(k) for k in (*EDITABLE, '_sales_conditions')}) for r in rows]
     return dict(total=total, offset=offset, items=items)
