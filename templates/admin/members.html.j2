@@ -1,0 +1,25 @@
+{% extends 'admin/_admin2_shell.html.j2' %}
+{% block title %}회원 관리{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/admin2/members.css?v=20261003-1">{% endblock %}
+{% block content %}
+<section class="mm-workspace" id="membersWorkspace">
+  <div class="mm-title"><div><p class="mm-eyebrow">자체 회원 원장</p><h1>회원 관리</h1><p class="mm-muted">회원 정보·활동 기록·쇼핑몰 연결 요청 관리</p></div><button id="reload" class="mm-btn" type="button">새로고침</button></div>
+  <div class="mm-mode"><span class="mm-dot"></span><strong id="memberMode">운영 모드 확인 중</strong><span id="modeNote"></span><span class="mm-muted">연결 상태는 DB 원장 기준 · 실몰 검증 정보 없음</span></div>
+  <form class="mm-filters" id="filterForm">
+    <label class="mm-search">회원 검색<input id="q" placeholder="회원번호, 이름 또는 이메일" maxlength="100" autocomplete="off"></label>
+    <label>가입 경로<select id="via"><option value="">전체 경로</option></select></label>
+    <label>쇼핑몰 연결<select id="map"><option value="">전체 상태</option><option value="none">미연결</option><option value="requested">요청 기록</option><option value="mapped">연결 완료</option></select></label>
+    <label>회원 상태<select id="status"><option value="">전체 상태</option></select></label>
+    <button class="mm-btn mm-primary" id="searchBtn" type="submit">검색</button><button class="mm-btn" type="button" id="reset">초기화</button>
+  </form>
+  <div class="mm-callout mm-page-message" id="pageMessage" role="status" aria-live="polite" hidden></div>
+  <div class="mm-grid">
+    <section class="mm-card mm-list-panel" aria-label="회원 목록"><div class="mm-list-head"><strong id="resultCount">불러오는 중</strong><div><label class="mm-inline">정렬 <select id="sort"><option value="joined_desc">가입 최신순</option><option value="id_asc">회원번호순</option><option value="activity_desc">기록 생성 최신순</option></select></label><label class="mm-inline">표시 <select id="pageSize"><option>10</option><option selected>20</option><option>50</option></select></label></div></div><div class="mm-table-wrap"><table class="mm-table"><thead><tr><th>회원</th><th>가입 경로</th><th>쇼핑몰 연결</th><th>주문 기록</th><th>최근 기록 생성</th></tr></thead><tbody id="rows"></tbody></table><div class="mm-empty" id="listMessage" role="status">회원 목록 조회 중</div></div><div class="mm-pager"><span id="pageRange">건수 확인 중</span><div><button class="mm-btn" id="prev" type="button" aria-label="이전 페이지" disabled>이전</button><span id="pageLabel">—</span><button class="mm-btn" id="next" type="button" aria-label="다음 페이지" disabled>다음</button></div></div><p class="mm-list-foot">주문·후기는 자체 원장 기록 수 · 최근 기록 생성은 마지막 접속 시각과 별도</p></section>
+    <aside class="mm-card mm-detail" id="detail" aria-label="선택한 회원 상세" aria-live="polite"><div class="mm-empty">회원 선택 후 상세 확인</div></aside>
+  </div>
+  <div class="mm-notice"><b>지표 확인 기준</b><span>회원 귀속 상담만 집계 · 익명 상담 전체와 별도</span><span>가격 알림은 설정 수 · 발송 수와 별도</span><span>가입 경로는 저장값 · OAuth 인증 증거와 별도</span><span id="displayTimezone"></span></div>
+</section>
+<dialog class="mm-dialog" id="confirm"><form method="dialog"><div class="mm-dialog-head"><span class="mm-eyebrow">연결 요청 기록</span><button class="mm-btn mm-cancel" value="cancel" aria-label="닫기">닫기</button></div><h2 id="confirmTitle"></h2><p id="confirmMode"></p><p>DB 요청 시각 및 관리자 작업 원장 저장</p><div class="mm-callout">이메일 발송 및 외부 쇼핑몰 계정 변경 없음<br>고객 동의 API 존재 · 현행 고객 화면의 안내 진입 경로 미확인</div><p class="mm-muted">연결 완료는 고객 동의 API의 별도 처리 대상 · 실몰 검증 정보 없음</p><div class="mm-dialog-foot"><button class="mm-btn mm-cancel" value="cancel">취소</button><button class="mm-btn mm-primary" id="saveRequest" type="button">요청 기록</button></div></form></dialog>
+<div class="mm-toast" id="toast" role="status" hidden></div>
+{% endblock %}
+{% block foot_extra %}<script src="/shared/fmt-time.js"></script><script src="/shared/admin2/members.js?v=20261003-1"></script>{% endblock %}

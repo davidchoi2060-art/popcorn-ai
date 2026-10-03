@@ -42,5 +42,11 @@ class NewNavigationTests(unittest.TestCase):
             active=[i['label'] for i in new_admin_nav(path) if i['active']]
             self.assertEqual(['조립PC 제품군'],active)
 
+    def test_member_page_uses_new_menu_and_preserves_profile(self):
+        html=self.page(request('/admin2/members',cookie='admin_ui_mode=new')).body.decode()
+        self.assertIn('class="a2-new-secondary"',html)
+        self.assertIn('/admin2/members',html)
+        self.assertEqual(['회원 관리'],[i['label'] for i in new_admin_nav('/admin2/members') if i['active']])
+
 
 if __name__=='__main__':unittest.main()
