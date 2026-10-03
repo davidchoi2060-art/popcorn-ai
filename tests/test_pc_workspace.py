@@ -128,6 +128,36 @@ class WorkspaceTests(unittest.TestCase):
                     self.assertNotIn('private-secret',caught.exception.detail)
                     self.assertEqual(d,original)
 
+    def test_provider_output_limit_rejects_even_parseable_partial_response(self):
+        d=dict(configuration_id='N01',revision=1,status='draft',content=self.content,parts=[],current_review={'checks':[],'blockers':[],'basis':'a'*64})
+        for raw in ('', '{"changes":', '{"changes":[],"notes":[]}'):
+            response=MagicMock(text=raw,finish_reason='MAX_TOKENS',tokens_out=2496,log_id=123)
+            with patch.object(workspace,'current_operator',return_value={'role':'owner'}),patch.object(workspace,'engine'),patch.object(workspace,'read_configuration',return_value=d) as read,patch.object(workspace.llm,'call',return_value=response) as call,patch.object(workspace.log,'warning') as warn:
+                with self.assertRaises(HTTPException) as caught:
+                    workspace.propose('N01',SuggestionRequest(revision=1),Request({'type':'http','headers':[]}))
+            self.assertIn('출력 한도 도달',caught.exception.detail)
+            metadata=json.loads(warn.call_args.args[1])
+            self.assertEqual(metadata['code'],'output_limit')
+            self.assertEqual(metadata['finish_reason'],'MAX_TOKENS')
+            self.assertEqual(metadata['tokens_out'],2496)
+            self.assertEqual(metadata['max_output_tokens'],2500)
+            call.assert_called_once();read.assert_called_once()
+            self.assertEqual(call.call_args.kwargs['max_output_tokens'],2500)
+            self.assertEqual(call.call_args.kwargs['fallback_order'],[])
+
+    def test_json_error_does_not_infer_truncation_from_tokens(self):
+        d=dict(configuration_id='N01',revision=1,status='draft',content=self.content,parts=[],current_review={'checks':[],'blockers':[],'basis':'a'*64})
+        for reason,expected in [('STOP','STOP'),(None,None),('private-secret',None)]:
+            response=MagicMock(text='{"changes":',finish_reason=reason,tokens_out=2496,log_id=123)
+            with patch.object(workspace,'current_operator',return_value={'role':'owner'}),patch.object(workspace,'engine'),patch.object(workspace,'read_configuration',return_value=d),patch.object(workspace.llm,'call',return_value=response),patch.object(workspace.log,'warning') as warn:
+                with self.assertRaises(HTTPException) as caught:
+                    workspace.propose('N01',SuggestionRequest(revision=1),Request({'type':'http','headers':[]}))
+            self.assertIn('JSON 문법',caught.exception.detail)
+            metadata=json.loads(warn.call_args.args[1])
+            self.assertEqual(metadata['code'],'invalid_json')
+            self.assertEqual(metadata['finish_reason'],expected)
+            self.assertNotIn('private-secret',warn.call_args.args[1])
+
 
 if __name__ == '__main__':
     unittest.main()

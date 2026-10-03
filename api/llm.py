@@ -271,6 +271,18 @@ class LLMProviderError(LLMError):
 # ============================================================================
 # 결과
 # ============================================================================
+@dataclass(frozen=True)
+class ProviderResponse:
+    text: str
+    tokens_in: int | None
+    tokens_out: int | None
+    finish_reason: str | None = None
+
+    def __iter__(self):
+        # Preserve the three-value adapter contract for existing callers.
+        return iter((self.text, self.tokens_in, self.tokens_out))
+
+
 @dataclass
 class LLMResult:
     provider: str
@@ -282,6 +294,7 @@ class LLMResult:
     elapsed_sec: float
     log_id: int | None     # api_cost_logs.log_id -- 기록 실패 시 None (cost_logged 참고)
     cost_logged: bool      # False면 이미 비용은 발생했으나 api_cost_logs에 못 남겼다는 뜻
+    finish_reason: str | None = None  # Gemini metadata; unavailable for legacy adapters.
 
 
 # ============================================================================
@@ -438,11 +451,11 @@ class ProviderSpec:
     env_key: str             # .env 키 이름
     default_model: str       # call()에서 model= 생략 시 쓰는 값. pricing에 반드시 있어야 한다
     pricing: dict[str, ModelPricing]   # 이 세션에서 실제로 쓴 모델만 채운다(카탈로그 전체 아님)
-    caller: Callable[[str, str, str | None, int, int], tuple[str, int | None, int | None]]
+    caller: Callable[[str, str, str | None, int, int], tuple[str, int | None, int | None] | ProviderResponse]
 
 
 def _call_gemini(model: str, prompt: str, system: str | None,
-                  max_output_tokens: int, timeout_sec: int) -> tuple[str, int | None, int | None]:
+                  max_output_tokens: int, timeout_sec: int) -> ProviderResponse:
     """Gemini Developer API 호출 1회. 반환: (텍스트, 입력 토큰, 출력 토큰[thinking 포함]).
 
     SDK: google-genai (google-generativeai는 폐기 -- 모듈 docstring 근거 참고).
@@ -475,7 +488,15 @@ def _call_gemini(model: str, prompt: str, system: str | None,
     if usage is not None:
         tokens_out = (usage.candidates_token_count or 0) + (usage.thoughts_token_count or 0)
 
+    candidates = resp.candidates or []
+    reason = getattr(candidates[0], 'finish_reason', None) if candidates else None
+    reason = getattr(reason, 'value', reason)
+    finish_reason = reason if reason in ('STOP', 'MAX_TOKENS') else ('OTHER' if reason else None)
     text_out = resp.text
+    if finish_reason == 'MAX_TOKENS':
+        # A completed billable request, even with no text. Record its usage before
+        # the caller rejects incomplete output; do not treat it as retryable.
+        return ProviderResponse(text_out or '', tokens_in, tokens_out, finish_reason)
     if text_out is None:
         # 응답은 왔는데 텍스트가 없다(예: 안전 필터 차단) -- 빈 문자열을 성공으로
         # 포장하지 않는다. finish_reason을 근거로 남긴다.
@@ -485,7 +506,7 @@ def _call_gemini(model: str, prompt: str, system: str | None,
             "Gemini returned no text"
             + (f" (finish_reason={', '.join(reasons)})" if reasons else ""),
             transient=True)  # 안전 필터 등 -- 다른 벤더는 통과시킬 수도 있어 폴백 가치가 있다
-    return text_out, tokens_in, tokens_out
+    return ProviderResponse(text_out, tokens_in, tokens_out, finish_reason)
 
 
 def _call_claude(model: str, prompt: str, system: str | None,
@@ -856,8 +877,10 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
         _check_caps(conn, spec.key, task_key, customer_facing, has_alt_provider)
 
     t0 = time.monotonic()
-    text_out, tokens_in, tokens_out = spec.caller(
+    response = spec.caller(
         used_model, prompt, system, max_output_tokens, timeout_sec)
+    text_out, tokens_in, tokens_out = response
+    finish_reason = response.finish_reason if isinstance(response, ProviderResponse) else None
     elapsed = time.monotonic() - t0
 
     cost_usd = _cost_usd(spec, used_model, tokens_in, tokens_out)
@@ -883,7 +906,8 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
     return LLMResult(
         provider=spec.key, model=used_model, text=text_out,
         tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=cost_usd,
-        elapsed_sec=round(elapsed, 3), log_id=log_id, cost_logged=cost_logged)
+        elapsed_sec=round(elapsed, 3), log_id=log_id, cost_logged=cost_logged,
+        finish_reason=finish_reason)
 
 
 # ============================================================================

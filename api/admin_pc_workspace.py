@@ -172,6 +172,8 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
     except llm.LLMError:
         raise HTTPException(502, 'AI 응답을 받지 못했습니다. 잠시 후 다시 요청해 주세요.')
     try:
+        if getattr(result, 'finish_reason', None) == 'MAX_TOKENS':
+            raise ProposalFormatError('output_limit')
         parsed = parse_proposal(result.text, d['content'])
         if body.mode == 'review' and parsed['changes']:
             raise ProposalFormatError('review_changes')
@@ -182,11 +184,16 @@ def propose(identity: str, body: SuggestionRequest, request: Request):
                           configuration_id=d['configuration_id'], revision=d['revision'], mode=body.mode,
                           cost_log_id=cost_log_id, code=error.code, paths=error.paths,
                           rules=error.rules, position=error.position)
+        finish_reason = getattr(result, 'finish_reason', None)
+        diagnostic['finish_reason'] = finish_reason if isinstance(finish_reason, str) and finish_reason in ('STOP', 'MAX_TOKENS', 'OTHER') else None
+        diagnostic['max_output_tokens'] = 2500
+        diagnostic['tokens_out'] = result.tokens_out if type(getattr(result, 'tokens_out', None)) is int else None
         # No response, prompt, ValidationError text/input, or exception traceback in logs.
         log.warning('%s', json.dumps(diagnostic, ensure_ascii=False))
         kind = {'response_type':'응답 타입', 'empty_response':'빈 응답', 'invalid_json':'JSON 문법',
                 'proposal_schema':'제안 구조', 'duplicate_fields':'중복 항목',
-                'field_schema':'항목 값', 'review_changes':'검토 모드 변경 항목'}[error.code]
+                'field_schema':'항목 값', 'review_changes':'검토 모드 변경 항목',
+                'output_limit':'출력 한도 도달로 응답 미완성'}[error.code]
         location = ' · 항목 ' + ', '.join(error.paths) if error.paths else ''
         position = f" · {error.position['line']}행 {error.position['column']}열" if error.position else ''
         cost_reference = f' · 비용 기록 {cost_log_id}' if cost_log_id is not None else ' · 비용 기록 연결 미확인'
