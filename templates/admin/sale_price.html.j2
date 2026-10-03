@@ -25,6 +25,7 @@
 {% block title %}판매가 관리{% endblock %}
 
 {% block head_extra %}
+{% if new_admin %}<link rel="stylesheet" href="/shared/admin2/sale-price-new.css?v=20261003-1">{% else %}
 <style>
 *{box-sizing:border-box}
 .sp-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;background:var(--rv-canvas)}
@@ -166,17 +167,21 @@
   .sp-vals{grid-template-columns:1fr}
 }
 </style>
+{% endif %}
 {% endblock %}
 
 {% block header_extra %}
+{% if not new_admin %}
 <div class="sp-toggle" role="group" aria-label="가격 구분" data-keep="1">
   <button type="button" class="sp-toggle-btn on" data-action="axis" data-axis="sale">판매가</button>
   <button type="button" class="sp-toggle-btn" data-action="axis" data-axis="purchase" disabled
           title="향후 사용예정 — 몰에는 매입가 개념이 없어 비교 대상이 없습니다">매입가</button>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if new_admin %}{% include "admin/_sale_price_new.html.j2" %}{% else %}
 <div class="sp-wrap">
   <div class="sp-loading" id="spLoading">불러오는 중…</div>
   <div class="sp-err" id="spErr" hidden></div>
@@ -280,9 +285,11 @@
     </div>
   </aside>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block foot_extra %}
+{% if new_admin %}<script src="/shared/admin2/sale-price-new.js?v=20261003-1"></script>{% else %}
 <script>
 (function () {
   'use strict';
@@ -644,4 +651,5 @@
   load();
 })();
 </script>
+{% endif %}
 {% endblock %}

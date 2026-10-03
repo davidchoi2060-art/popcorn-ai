@@ -1791,3 +1791,13 @@ API·상태 전이·가격 산정/호환 검사 재사용 상세: `docs/design/p
 기존 `pc_configurations.content._review`에 state(pending/approved/revoked), basis, findings(항목별 confirmed/evidence), note, actor, at, checks, scope=admin_recommendation_review를 저장한다. 구성 status는 승인 시 approved, 대기/제외 시 review_required이며 revision을 증가시킨다. `_admin_bom_edit.review_required`는 승인 시 해제하되 전체 입력 해시 변경은 추천 시 다시 대조한다. 파생 상태 stale은 DB status와 구분한다.
 
 basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설명·상품·사양·활성 호환 규칙에 결합한다. 검토 메타 변경만으로 자기 승인이 무효화되지는 않는다. history는 이전 구성과 BOM/offers, edit.kind=review 및 action/작업자를 보존한다. 새 테이블이나 마이그레이션은 없다. 이 승인은 관리자 추천 후보 자격이며 고객 공개·물리 재고·실조립/출고 승인을 뜻하지 않는다.
+
+### 25. MVP3 서버 보관 추천상품 (2026-10-03, 0123)
+
+사용자의 실제 LLM·DB 연결 지시에 따라 이미 고객에게 공개되는 `/api/talk/parse`와 `/api/grid/recommend`를 재사용한다. 관리자 전용 제품군의 공개 상태를 변경하지 않는다.
+
+`mvp3_saved_recommendations`: quote_id UUID PK; user_id FK→users; owner_key_hash SHA-256; request_id UUID; request_basis SHA-256; product_snapshot JSONB object; talk_state JSONB object; saved_at TIMESTAMPTZ. UNIQUE(user_id,owner_key_hash,request_id), 소유자/저장시각 인덱스. 기존 방문자 쿠키는 집계용 연결이며 단독 소유 인증으로 사용하지 않는다. GET/POST는 X-Access-Key의 브라우저 전용 추측불가 보관키도 요구하고 SHA-256만 저장한다. URL/로그에 키를 넣지 않으며 키를 잃으면 해당 보관 기록에 접근할 수 없다. POST는 기존 pc_vid 방문자 연결과 보관키를 재검사하고 서버가 현재 상담 조건으로 추천 원천을 다시 조회해 선택 상품과 화면 가격을 대조한다. 화면이 보낸 상품 설명·가격·재고를 저장 원천으로 사용하지 않는다. 동일 요청은 동일 저장본을 반환하고 다른 내용 재사용은409로 거부한다.
+
+이 저장본은 추천상품/당시 참고가격 보관이며 주문·인계·부품변경 적용·구매 가격확정이 아니다. 기존 quote_snapshots/pc_customer_quotes의 계약에 완제품 보관을 끼워 넣지 않는다. 견적 본문은 DB에서 조회하며 소유자 쿠키가 다른 저장본은 반환하지 않는다. 가격은 참고 스냅샷이며 price_confirmed=false, 포함조건/성능근거가 없으면 만들지 않는다. 대화 원문·회원 개인정보·관리자 근거·비밀키는 이 신규 표에 넣지 않는다. 새 빈 테이블 추가만 하며 기존 자료는 변경하지 않는다. 자료가 들어 있으면 downgrade를 거부한다.
+
+공개 사양 spec의 현재 원천은 product_fit_products의 JSONB다. 서버 보관은 cpu/gpu 문자열과 ram_gb/ssd_gb/vram_gb 용량 값만 허용하며 CPU/GPU 평가 점수나 임의 내부 필드는 제외한다. 부품별 구매가격·옵션 차액·게임 FPS를 이 값에서 생성하지 않는다.
