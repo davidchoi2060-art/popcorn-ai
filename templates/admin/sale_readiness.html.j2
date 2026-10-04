@@ -1,0 +1,35 @@
+{% extends 'admin/_admin2_shell.html.j2' %}
+{% block title %}판매 준비 현황{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/admin-sale-readiness.css?v=20261004-1">{% endblock %}
+{% block content %}
+<section class="sr-page" id="saleReadiness" data-view="list" aria-labelledby="srTitle">
+  <div class="sr-heading"><h1 id="srTitle">판매 준비 현황</h1><p>막힌 이유를 확인하고 필요한 작업으로 이동합니다.</p></div>
+  <div class="sr-summary" aria-label="검색 결과 전체의 상태별 건수">
+    <div class="sr-metric sr-needs-work"><img data-icon="alert-circle" src="/shared/icons/admin/help-circle.svg" alt=""><div><span>보완 필요</span><strong id="srNeedsWork">—</strong></div></div>
+    <div class="sr-metric sr-needs-check"><img data-icon="clock" src="/shared/icons/admin/help-circle.svg" alt=""><div><span>확인 필요</span><strong id="srNeedsCheck">—</strong></div></div>
+    <div class="sr-metric sr-basis-met"><img data-icon="check" src="/shared/icons/admin/help-circle.svg" alt=""><div><span id="srBasisLabel">등록 근거 충족</span><strong id="srBasisMet">—</strong></div></div>
+  </div>
+  <div class="sr-workspace">
+    <div class="sr-toolbar">
+      <div class="sr-tabs" role="tablist" aria-label="조회 대상">
+        <button type="button" role="tab" id="srConfigurations" aria-selected="true" aria-controls="srListPanel" tabindex="0" data-scope="configurations">구성 PC</button>
+        <button type="button" role="tab" id="srParts" aria-selected="false" aria-controls="srListPanel" tabindex="-1" data-scope="parts">부품</button>
+      </div>
+      <form id="srSearchForm" class="sr-search" role="search"><label class="sr-visually-hidden" for="srSearch">제품명·상품코드 검색</label><img data-icon="search" src="/shared/icons/admin/help-circle.svg" alt=""><input id="srSearch" name="q" type="search" placeholder="제품명·상품코드 검색" maxlength="100" autocomplete="off"><button type="submit" class="sr-button">검색</button></form>
+      <button type="button" class="sr-button sr-refresh" id="srRefresh"><img src="/shared/icons/admin/rotate-ccw.svg" alt="">새로고침</button>
+    </div>
+    <div class="sr-context"><span id="srResult" role="status">불러오는 중</span><span id="srExcluded">조회 제외 —</span></div>
+    <div class="sr-columns">
+      <section class="sr-list-panel" id="srListPanel" role="tabpanel" aria-labelledby="srConfigurations">
+        <div class="sr-list-head" aria-hidden="true"><span>제품</span><span>현재 상태</span><span>먼저 할 일</span></div>
+        <ul class="sr-list" id="srRows" aria-label="제품 목록"></ul>
+        <div class="sr-message" id="srListMessage" role="status">목록을 불러오는 중입니다.</div>
+        <div class="sr-pager"><span id="srRange">—</span><div><button type="button" class="sr-button" id="srPrev" disabled>이전</button><button type="button" class="sr-button" id="srNext" disabled>다음</button></div></div>
+      </section>
+      <aside class="sr-detail" id="srDetail" aria-label="선택한 제품의 최신 근거" aria-live="polite"><div class="sr-message">제품을 선택하면 최신 근거를 확인합니다.</div></aside>
+    </div>
+    <p class="sr-note" id="srNote">확인된 근거 기준이며 주문·결제 가능 여부와는 별도입니다.</p>
+  </div>
+</section>
+{% endblock %}
+{% block foot_extra %}<script src="/admin/vendors/feather-icons/feather.min.js"></script><script src="/shared/admin-sale-readiness.js?v=20261004-1"></script>{% endblock %}
